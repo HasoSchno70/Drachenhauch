@@ -389,8 +389,25 @@ impl Lexer {
             s.push(self.advance());
             while self.peek(0).is_ascii_digit() { s.push(self.advance()); }
         }
+        // Exponent: `1e9`, `2.5E-3` -- immer eine Kommazahl, wie VAL("1e3").
+        // Nur wenn danach eine Ziffer kommt (ggf. nach dem Vorzeichen); sonst
+        // bleibt `e` ein eigener Name, wie bisher.
+        if matches!(self.peek(0), 'e' | 'E') {
+            let vz = matches!(self.peek(1), '+' | '-');
+            let ziffer = if vz { self.peek(2) } else { self.peek(1) };
+            if ziffer.is_ascii_digit() {
+                is_float = true;
+                s.push(self.advance());
+                if vz { s.push(self.advance()); }
+                while self.peek(0).is_ascii_digit() { s.push(self.advance()); }
+            }
+        }
         let val = if is_float {
-            Val::Float(s.parse::<f64>().unwrap_or(0.0))
+            match s.parse::<f64>() {
+                Ok(f) if f.is_finite() => Val::Float(f),
+                _ => return Err(self.err(
+                    "Kommazahl-Literal zu gross (FLOAT reicht bis etwa 1.8e308)", line, col)),
+            }
         } else {
             // Zu grosse Ganzzahl-Literale NICHT still zu 0 machen, sondern als
             // Fehler melden (INTEGER ist 64-bit).

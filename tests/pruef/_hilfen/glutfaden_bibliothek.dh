@@ -1,0 +1,51 @@
+' Die Muster-Bibliothek als Text -- dieselben Zeilen, die ref_bibliothek.py
+' aus PySticky aufzeichnet (Einsortieren, Daten der Eintraege, Vorschaubilder
+' Punkt fuer Punkt, Name im Cache, library.json lesen).
+FUNCTION gbHex$(f AS INTEGER) AS STRING
+    RETURN RIGHT$("000000" + HEX$(f BAND &HFFFFFF), 6)
+END FUNCTION
+
+FUNCTION bibliothekText$(ordner AS STRING, dateien AS ARRAY OF STRING, json AS STRING) AS STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM n AS STRING
+    FOR EACH n IN ["Rosen im Garten/rose.pxs", "x/Katze.pxs", "Muster/Seerose.pxs", "Advent/stern.pat", _
+                   "a/Osterhase.xsd", "a/Bordüre_breit.pxs", "a/ABC-Schrift.oxs", "Leer/nichts.pxs", _
+                   "Weihnachten/Schneemann im Wald.pxs", "a/Meise.pxs", "ÄÖÜ/GÄNSEBLÜMCHEN.pxs", "a/b.c/Hund.pxs"]
+        ARRAY_PUSH(aus, "kategorie " + n + " -> " + JOIN$(kern.autoKategorien(n), " | "))
+    NEXT
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        DIM p AS STRING : p = PATHJOIN(ordner, d)
+        DIM m AS kern.Muster : m = kern.pxsLaden(p)
+        DIM e AS kern.Bibliothekseintrag : e = kern.eintragAusMuster(p, m)
+        ARRAY_PUSH(aus, "eintrag " + d + ": " + e.name + " | " + STR$(e.breite) + " " + STR$(e.hoehe) + " | farben " + STR$(e.farben) + " | stiche " + STR$(e.stiche) + " | stoff " + STR$(e.stoff))
+        DIM bild AS IMAGE : bild = kern.vorschauBild(m)
+        DIM bb AS INTEGER : bb = IMAGE_WIDTH(bild)
+        DIM bh AS INTEGER : bh = IMAGE_HEIGHT(bild)
+        ARRAY_PUSH(aus, "vorschau " + d + ": " + STR$(bb) + "x" + STR$(bh))
+        DIM zeilen AS ARRAY OF STRING : zeilen = []
+        DIM x AS INTEGER, y AS INTEGER
+        FOR y = 0 TO bh - 1
+            DIM z AS ARRAY OF STRING : z = []
+            FOR x = 0 TO bb - 1
+                ARRAY_PUSH(z, gbHex$(GETPIXEL(bild, x, y)))
+            NEXT
+            ARRAY_PUSH(zeilen, JOIN$(z, " "))
+        NEXT
+        ARRAY_PUSH(aus, "  " + JOIN$(zeilen, " / "))
+        IMAGE_FREE(bild)
+    NEXT
+    FOR EACH n IN ["C:" + CHR$(92) + "a" + CHR$(92) + "b.pxs", "/x/ü.pxs", ""]
+        ARRAY_PUSH(aus, "vorschauname '" + REPLACE$(n, CHR$(92), CHR$(92) + CHR$(92)) + "' -> " + kern.vorschauName$(n))
+    NEXT
+    DIM b AS kern.Bibliothek : b = kern.bibliothekLaden(json)
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM ee AS kern.Bibliothekseintrag
+    FOR EACH ee IN b.eintraege
+        ARRAY_PUSH(namen, ee.name)
+    NEXT
+    ARRAY_PUSH(aus, "gelesen: " + JOIN$(namen, " | ") + " | kategorien " + JOIN$(b.kategorien, " "))
+    DIM ohne AS kern.Bibliothek : ohne = kern.bibliothekLaden("gibt_es_nicht.json")
+    ARRAY_PUSH(aus, "ohne kategorien: " + JOIN$(ohne.kategorien, " ") + " | version " + ohne.version)
+    RETURN JOIN$(aus, CHR$(10))
+END FUNCTION

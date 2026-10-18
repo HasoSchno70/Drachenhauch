@@ -97,6 +97,69 @@ static PROGRAMM_ARGS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::ne
 /// so kann ein zweiter Einstiegspunkt sie gefahrlos ebenfalls setzen wollen.
 pub fn set_programm_args(args: Vec<String>) { let _ = PROGRAMM_ARGS.set(args); }
 
+/// Geht die Standardausgabe in ein Terminal (nicht in eine Datei, eine Pipe,
+/// die IDE)?
+pub fn ausgabe_ist_terminal() -> bool {
+    use std::io::IsTerminal;
+    std::io::stdout().is_terminal()
+}
+
+/// Spalten des Terminals der Standardausgabe; 0, wenn sie in keines geht oder
+/// die Breite sich nicht erfragen laesst.
+pub fn terminal_breite() -> i64 {
+    if !ausgabe_ist_terminal() { return 0; }
+    if let Some(b) = terminal_breite_system() { return b; }
+    std::env::var("COLUMNS").ok().and_then(|s| s.trim().parse::<i64>().ok()).filter(|&b| b > 0).unwrap_or(0)
+}
+
+#[cfg(windows)]
+fn terminal_breite_system() -> Option<i64> {
+    use windows::Win32::System::Console::{GetConsoleScreenBufferInfo, GetStdHandle, CONSOLE_SCREEN_BUFFER_INFO, STD_OUTPUT_HANDLE};
+    unsafe {
+        let h = GetStdHandle(STD_OUTPUT_HANDLE).ok()?;
+        let mut info = CONSOLE_SCREEN_BUFFER_INFO::default();
+        GetConsoleScreenBufferInfo(h, &mut info).ok()?;
+        let b = (info.srWindow.Right - info.srWindow.Left + 1) as i64;
+        if b > 0 { Some(b) } else { None }
+    }
+}
+
+#[cfg(all(unix, not(target_os = "emscripten")))]
+fn terminal_breite_system() -> Option<i64> {
+    #[repr(C)]
+    struct Winsize { zeilen: u16, spalten: u16, x: u16, y: u16 }
+    extern "C" { fn ioctl(fd: i32, anfrage: std::os::raw::c_ulong, ...) -> i32; }
+    #[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd"))]
+    const TIOCGWINSZ: std::os::raw::c_ulong = 0x4008_7468;
+    #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "freebsd")))]
+    const TIOCGWINSZ: std::os::raw::c_ulong = 0x5413;
+    let mut w = Winsize { zeilen: 0, spalten: 0, x: 0, y: 0 };
+    let r = unsafe { ioctl(1, TIOCGWINSZ, &mut w as *mut Winsize) };
+    if r == 0 && w.spalten > 0 { Some(w.spalten as i64) } else { None }
+}
+
+#[cfg(not(any(windows, all(unix, not(target_os = "emscripten")))))]
+fn terminal_breite_system() -> Option<i64> { None }
+
+/// Der Ort, von dem aus das Programm aufgerufen wurde: `DHRT_START_DIR`
+/// (setzen `dhrt run` und die exportierte Exe vor dem Ordnerwechsel), sonst
+/// das Arbeitsverzeichnis.
+pub fn startort() -> Result<String, String> {
+    if let Some(s) = std::env::var_os("DHRT_START_DIR") {
+        if !s.is_empty() { return Ok(s.to_string_lossy().into_owned()); }
+    }
+    std::env::current_dir().map(|p| p.to_string_lossy().into_owned()).map_err(|e| e.to_string())
+}
+
+/// Ein Argument als Pfad vom Aufrufort aus: absolut (auch mit Wurzel ohne
+/// Laufwerk) bleibt, leer und `-` (Standardeingabe) bleiben, sonst steht der
+/// Startort davor.
+pub fn arg_pfad(arg: &str, start: &str) -> String {
+    let p = std::path::Path::new(arg);
+    if arg.is_empty() || arg == "-" || p.is_absolute() || p.has_root() { return arg.to_string(); }
+    std::path::Path::new(start).join(p).to_string_lossy().into_owned()
+}
+
 /// Die .dh-Datei, die gerade laeuft.
 ///
 /// `TASK_START` startet einen Kindprozess `dhrt call <datei> <funktion>` --
@@ -124,11 +187,9 @@ fn next_rand() -> u64 {
     })
 }
 
-/// Lokale Datum/Uhrzeit als (Jahr, Monat, Tag, Stunde, Minute, Sekunde).
-/// Pendant zu Pythons `time.strftime` (LOKALzeit) fuer TIME$/DATE$. Auf Windows
-/// liefert `GetLocalTime` die Felder direkt (inkl. Zeitzone); sonst Fallback auf
-/// UTC, berechnet aus dem Unix-Timestamp (civil-from-days). Clock-basiert,
-/// also naturgemaess nicht deterministisch testbar.
+/// Lokale Datum/Uhrzeit als (Jahr, Monat, Tag, Stunde, Minute, Sekunde) fuer
+/// TIME$/DATE$/ZEIT_JETZT. Auf Windows liefert `GetLocalTime` die Felder direkt
+/// (inkl. Zeitzone), sonst `localtime_r` (unten).
 #[cfg(windows)]
 pub(crate) fn local_datetime() -> (i64, i64, i64, i64, i64, i64) {
     #[repr(C)]
@@ -147,25 +208,85 @@ pub(crate) fn local_datetime() -> (i64, i64, i64, i64, i64, i64) {
     }
 }
 
+/// Versatz der Ortszeit zu UTC in Sekunden fuer einen UTC-Zeitpunkt (Sekunden
+/// seit 1970) -- samt der Sommerzeit an GENAU diesem Tag, damit ein Zeitstempel
+/// aus dem Winter auch im Sommer richtig umgerechnet wird. Fuer `ZEIT_PARSE`
+/// mit Zeitzone (zeit.rs). Windows rechnet ueber die Zonenregeln des Systems.
+#[cfg(windows)]
+pub(crate) fn lokaler_versatz(utc: i64) -> i64 {
+    #[repr(C)]
+    struct SystemTimeW {
+        w_year: u16, w_month: u16, w_day_of_week: u16, w_day: u16,
+        w_hour: u16, w_minute: u16, w_second: u16, w_milliseconds: u16,
+    }
+    extern "system" {
+        fn SystemTimeToTzSpecificLocalTime(tz: *const std::ffi::c_void,
+            u: *const SystemTimeW, l: *mut SystemTimeW) -> i32;
+    }
+    let (j, mo, d, h, mi, s) = crate::zeit::in_teile(utc);
+    if !(1601..=30827).contains(&j) { return 0; }
+    let u = SystemTimeW { w_year: j as u16, w_month: mo as u16, w_day_of_week: 0,
+        w_day: d as u16, w_hour: h as u16, w_minute: mi as u16, w_second: s as u16,
+        w_milliseconds: 0 };
+    unsafe {
+        let mut l: SystemTimeW = std::mem::zeroed();
+        if SystemTimeToTzSpecificLocalTime(std::ptr::null(), &u, &mut l) == 0 { return 0; }
+        crate::zeit::aus_teilen(l.w_year as i64, l.w_month as i64, l.w_day as i64,
+            l.w_hour as i64, l.w_minute as i64, l.w_second as i64) - utc
+    }
+}
+
+/// Ausserhalb von Windows: die Ortszeit aus der C-Bibliothek (`localtime_r`),
+/// unter Linux und macOS samt Zonenregeln aus `TZ` bzw. `/etc/localtime`, im
+/// Browser (emscripten) aus JavaScripts `Date`. Bis 2026.31 war die "Ortszeit"
+/// dort schlicht UTC: `DATE$`/`TIME$`/`ZEIT_JETZT` gingen in Berlin im Sommer
+/// zwei Stunden nach, und `ZEIT_PARSE("...Z")` rechnete nicht um.
+///
+/// `struct tm` ist unter glibc, macOS und musl gleich aufgebaut: neun `int`,
+/// dann `tm_gmtoff` (Sekunden oestlich von UTC, samt Sommerzeit) und
+/// `tm_zone`. Der Versatz kommt aus `tm_gmtoff` -- dieselbe Quelle wie die
+/// Felder, also passen Uhr und Umrechnung zusammen.
+#[cfg(not(windows))]
+mod ortszeit_c {
+    use std::os::raw::{c_char, c_int, c_long};
+    #[repr(C)]
+    struct Tm {
+        sec: c_int, min: c_int, hour: c_int, mday: c_int, mon: c_int, year: c_int,
+        wday: c_int, yday: c_int, isdst: c_int, gmtoff: c_long, zone: *const c_char,
+    }
+    extern "C" {
+        fn localtime_r(t: *const i64, ergebnis: *mut Tm) -> *mut Tm;
+        fn tzset();
+    }
+    static TZ: std::sync::Once = std::sync::Once::new();
+
+    /// (Jahr, Monat, Tag, Stunde, Minute, Sekunde, Versatz) fuer einen
+    /// UTC-Zeitpunkt; `None`, wenn die C-Bibliothek ihn nicht darstellen kann.
+    pub(crate) fn lokal(utc: i64) -> Option<(i64, i64, i64, i64, i64, i64, i64)> {
+        // POSIX verlangt von localtime_r nicht, TZ zu lesen -- tzset tut es.
+        TZ.call_once(|| unsafe { tzset() });
+        unsafe {
+            let mut tm: Tm = std::mem::zeroed();
+            if localtime_r(&utc, &mut tm).is_null() { return None; }
+            Some((tm.year as i64 + 1900, tm.mon as i64 + 1, tm.mday as i64,
+                  tm.hour as i64, tm.min as i64, tm.sec as i64, tm.gmtoff as i64))
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub(crate) fn lokaler_versatz(utc: i64) -> i64 {
+    ortszeit_c::lokal(utc).map(|t| t.6).unwrap_or(0)
+}
+
 #[cfg(not(windows))]
 pub(crate) fn local_datetime() -> (i64, i64, i64, i64, i64, i64) {
     use std::time::{SystemTime, UNIX_EPOCH};
     let secs = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
-    let days = secs.div_euclid(86_400);
-    let rem = secs.rem_euclid(86_400);
-    let (h, mi, s) = (rem / 3600, (rem % 3600) / 60, rem % 60);
-    // Howard Hinnant's civil_from_days (UTC).
-    let z = days + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let y = yoe + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let mo = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = if mo <= 2 { y + 1 } else { y };
-    (y, mo, d, h, mi, s)
+    if let Some((j, mo, d, h, mi, s, _)) = ortszeit_c::lokal(secs) {
+        return (j, mo, d, h, mi, s);
+    }
+    crate::zeit::in_teile(secs)
 }
 
 fn need_str<'a>(v: &'a Value, fn_: &str) -> Result<&'a str, String> {
@@ -247,6 +368,7 @@ fn zeichen_stelle_genau(s: &str, n: usize) -> Option<usize> {
 fn need_int(v: &Value, fn_: &str) -> Result<i64, String> {
     match v {
         Value::Int(i) => Ok(*i),
+        Value::Float(f) => glatt_int(*f).ok_or_else(|| format!("{} erwartet INTEGER, erhalten FLOAT {}{}", fn_, crate::value::fmt_float(*f), KEIN_GANZ_HINWEIS)),
         // Ein Text, wo eine Zahl steht, ist fast immer einer von drei Faellen
         // (Dateiname, Taste, Hex-Farbe) -- der Satz dazu steht in umstieg.rs.
         Value::Str(s) => Err(format!("{} erwartet INTEGER, erhalten STRING{}",
@@ -255,6 +377,15 @@ fn need_int(v: &Value, fn_: &str) -> Result<i64, String> {
     }
 }
 
+/// Eine Kommazahl ohne Nachkommastellen als INTEGER -- dieselbe Regel wie
+/// eine Zuweisung an eine INTEGER-Variable. `/` liefert immer FLOAT (seit
+/// 2026-09-24); `GUI_WINDOW("...", BREITE / 2 - 170, ...)` brach deshalb mit
+/// "erwartet INTEGER" ab, obwohl `x = BREITE / 2` ging (Web-Runde 2026-10-13).
+pub(crate) fn glatt_int(f: f64) -> Option<i64> {
+    if f.is_finite() && f.fract() == 0.0 && f.abs() < 9.0e15 { Some(f as i64) } else { None }
+}
+pub(crate) const KEIN_GANZ_HINWEIS: &str = " -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \\ teilt ganzzahlig";
+
 /// Wie `need_int`, nimmt aber auch eine Kommazahl und rundet sie.
 ///
 /// Fuer Groessen, Dauern und Stueckzahlen, die im Programm typischerweise
@@ -262,6 +393,22 @@ fn need_int(v: &Value, fn_: &str) -> Result<i64, String> {
 /// verlangen zwingt den Aufrufer zu einem `INT(...)` um jeden Ausdruck --
 /// und wer es vergisst, bekommt einen Typfehler fuer etwas, das rechnerisch
 /// voellig in Ordnung ist.
+/// Die Bildzeit in Millisekunden fuer PARTICLE_/SPRITE_/ANIM_FSM_UPDATE.
+/// `DELTA()` liefert SEKUNDEN -- `PARTICLE_UPDATE(p, DELTA())` wurde zu 0 ms
+/// gerundet, und die Partikel alterten nie, ohne Meldung (Dogfooding
+/// 2026-10-10). Eine Kommazahl zwischen 0 und 1 ist darum ein Fehler mit dem
+/// richtigen Aufruf; sonst gerundet wie bisher, auch 16.7.
+fn dt_ms(v: &Value, fn_: &str) -> Result<i64, String> {
+    if let Value::Float(f) = v {
+        if *f > 0.0 && *f < 1.0 {
+            return Err(format!("{}: {} ms ist weniger als eine Millisekunde -- dt_ms zaehlt Millisekunden, DELTA() liefert Sekunden: INT(DELTA() * 1000)", fn_, f));
+        }
+    }
+    let dt = need_int_gerundet(v, fn_)?;
+    if dt < 0 { return Err(format!("{}: dt_ms muss >= 0 sein", fn_)); }
+    Ok(dt)
+}
+
 fn need_int_gerundet(v: &Value, fn_: &str) -> Result<i64, String> {
     match v {
         Value::Int(i) => Ok(*i),
@@ -725,6 +872,39 @@ pub(crate) fn tausender_punkte(ganz: &str) -> String {
     out
 }
 
+/// Eine Zahl deutsch: Tausenderpunkte, Dezimalkomma. Ohne `stellen` bleibt
+/// eine Ganzzahl ganz und eine Kommazahl behaelt ihre Stellen; mit `stellen`
+/// wird am Dezimaltext gerundet (wie CENT, ab 5 auf).
+pub(crate) fn zahl_text(v: &Value, stellen: Option<usize>) -> Result<String, String> {
+    let (neg, ganz, bruch) = match v {
+        Value::Int(i) => {
+            let ganz = (*i as i128).abs().to_string();
+            match stellen {
+                None | Some(0) => (*i < 0, ganz, String::new()),
+                Some(n) => (*i < 0, ganz, "0".repeat(n)),
+            }
+        }
+        Value::Float(f) => match stellen {
+            Some(n) => dez_runden(*f, n)?,
+            None => {
+                if !f.is_finite() { return Err("kein endlicher Wert (NAN oder unendlich)".to_string()); }
+                let s = format!("{}", f.abs());
+                let (g, b) = s.split_once('.').map(|(g, b)| (g.to_string(), b.to_string()))
+                    .unwrap_or((s.clone(), String::new()));
+                (*f < 0.0, g, b)
+            }
+        },
+        v => return Err(format!("erwartet eine Zahl, erhalten {}", v.type_name())),
+    };
+    let ganz = { let t = ganz.trim_start_matches('0'); if t.is_empty() { "0".to_string() } else { t.to_string() } };
+    let null = ganz == "0" && bruch.bytes().all(|c| c == b'0');
+    let mut out = String::new();
+    if neg && !null { out.push('-'); }
+    out.push_str(&tausender_punkte(&ganz));
+    if !bruch.is_empty() { out.push(','); out.push_str(&bruch); }
+    Ok(out)
+}
+
 /// Cent in deutscher Schreibweise: 1234567 -> "1.234.567" + ",89".
 fn euro_text(cent: i64, symbol: &str) -> String {
     let neg = cent < 0;
@@ -758,6 +938,12 @@ fn round_half_even(x: f64) -> i64 {
 
 /// Minimaler printf fuer FORMAT$ / f-String-Specs: %[-][0][width][.prec](d|i|f|s|x|X).
 fn format_one(mask: &str, v: &Value) -> R {
+    // Eine Maske ohne Platzhalter gab bis 2026.28 sich selbst zurueck, und der
+    // Wert verschwand still -- etwa bei der VB-Maske "#,##0.00" (gefunden in
+    // der Konsolen-Runde). Die Doku versprach schon eine Meldung.
+    if !mask.replace("%%", "").contains('%') {
+        return err(format!("FORMAT$: die Maske {:?} hat keinen Platzhalter -- der Wert kaeme                             nicht vor. FORMAT$ arbeitet im printf-Stil (\"%.2f\", \"%05d\");                             Tausenderpunkte und Dezimalkomma schreibt ZAHL$(wert, stellen)", mask));
+    }
     let bytes: Vec<char> = mask.chars().collect();
     let mut out = String::new();
     let mut i = 0;
@@ -1407,6 +1593,25 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             };
             Ok(Value::Int(cent_aus_teilen(neg, &ganz, &bruch, "CENT")?))
         }
+        // ZAHL$ (2026-10-11, Konsolen-Runde): Tausenderpunkte und
+        // Dezimalkomma fuer jede Zahl, nicht nur fuer Geld -- vorher gab es das
+        // nur ueber EURO$ mit ganzen Cent, und NUMFMT$ schreibt "1.2K".
+        "zahl$" => {
+            if a.is_empty() || a.len() > 2 {
+                return err(format!("ZAHL$: erwartet 1..2 Argument(e), erhalten {}", a.len()));
+            }
+            let stellen = match a.get(1) {
+                None => None,
+                Some(v) => {
+                    let n = need_int(v, "ZAHL$")?;
+                    if !(0..=15).contains(&n) {
+                        return err(format!("ZAHL$: Nachkommastellen {} -- erlaubt sind 0 bis 15", n));
+                    }
+                    Some(n as usize)
+                }
+            };
+            Ok(Value::str_rc(zahl_text(&a[0], stellen).map_err(|e| format!("ZAHL$: {}", e))?))
+        }
         "euro$" => {
             if a.is_empty() || a.len() > 2 {
                 return err(format!("EURO$: erwartet 1..2 Argument(e), erhalten {}", a.len()));
@@ -1621,7 +1826,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "typeof" => {
             arity!(1);
             Ok(match &a[0] {
-                Value::Instance(rc) => Value::str_rc(&rc.borrow().class_name.to_uppercase()),
+                // Eine Klasse aus einem Namensraum heisst intern `alias@klasse`;
+                // nach aussen `ALIAS.KLASSE`, wie man sie schreibt.
+                Value::Instance(rc) => Value::str_rc(crate::namensraum::lesbar_text(&rc.borrow().class_name).to_uppercase()),
                 v => Value::str_rc(v.type_name()),
             })
         }
@@ -2112,6 +2319,25 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 None => Ok(Value::Int(-1)),
             }
         }
+        "instrrev" => {
+            // Die LETZTE Fundstelle, 0-basiert in Zeichen wie INSTR; mit
+            // `start` die letzte, die dort oder davor beginnt (VB InStrRev,
+            // Pythons str.rfind). Gemeldet beim Dogfooding (2026-10-09):
+            // ohne den Befehl brauchte ein Umbruch an der letzten Wortgrenze
+            // eine eigene Schleife.
+            if a.len() < 2 || a.len() > 3 { return err(format!("INSTRREV: erwartet 2..3 Argumente, erhalten {}", a.len())); }
+            let hay = need_str(&a[0], "INSTRREV")?;
+            let needle = need_str(&a[1], "INSTRREV")?;
+            let bis = if a.len() == 3 {
+                let s = need_int(&a[2], "INSTRREV")?;
+                if s < 0 { return Ok(Value::Int(-1)); }
+                zeichen_stelle(hay, s as usize)
+            } else { hay.len() };
+            match hay.rmatch_indices(needle).find(|(o, _)| *o <= bis) {
+                Some((o, _)) => Ok(Value::Int(zeichen_zahl(&hay[..o]) as i64)),
+                None => Ok(Value::Int(-1)),
+            }
+        }
         "replace$" | "replace" => {
             arity!(3);
             let s = need_str(&a[0], "REPLACE$")?;
@@ -2135,14 +2361,16 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(2);
             if let Value::Array(arr) = &a[0] {
                 let arr = arr.borrow();
-                // Ein LEERES Array kann keinen falschen Wert enthalten.
-                if arr.element_type != "string" && arr.cells.len() > 0 {
-                    return err("JOIN$: ARRAY OF STRING noetig".to_string());
+                // Texte, Zahlen und Wahrheitswerte -- je wie STR$ geschrieben.
+                // Vorher nur ARRAY OF STRING: wer Zahlen verbinden wollte,
+                // musste sie erst einzeln umwandeln (Glutfaden, 2026-10-15).
+                if arr.cells.iter().any(|v| !matches!(v, Value::Str(_) | Value::Int(_) | Value::Float(_) | Value::Bool(_))) {
+                    return err("JOIN$: Feld aus Texten, Zahlen oder Wahrheitswerten noetig".to_string());
                 }
                 let delim = need_str(&a[1], "JOIN$")?;
                 let parts: Vec<String> = arr.cells.iter().map(|v| match v { Value::Str(s) => s.to_string(), o => o.fmt() }).collect();
                 Ok(Value::str_rc(&parts.join(delim)))
-            } else { err("JOIN$ erwartet ARRAY OF STRING".to_string()) }
+            } else { err("JOIN$ erwartet ein Feld".to_string()) }
         }
         // --- String-Erweiterungen (WP3) ---
         "ltrim$" | "ltrim" => { arity!(1); Ok(Value::str_rc(need_str(&a[0], "LTRIM$")?.trim_start())) }
@@ -2669,6 +2897,21 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Nil)
         }
         #[cfg(feature = "physik")]
+        "phys3d_sleep" => {
+            if a.len() != 2 && a.len() != 3 {
+                return Err("PHYS3D_SLEEP: erwartet 2 oder 3 Argumente (welt, koerper [, schlafen])".into());
+            }
+            let an = if a.len() == 3 { need_flag(&a[2], "PHYS3D_SLEEP")? } else { true };
+            phys3d_h(&a[0], "PHYS3D_SLEEP")?.borrow_mut().sleep(need_int(&a[1], "PHYS3D_SLEEP")?, an);
+            Ok(Value::Nil)
+        }
+        #[cfg(feature = "physik")]
+        "phys3d_sleeping" => {
+            arity!(2);
+            Ok(Value::Bool(phys3d_h(&a[0], "PHYS3D_SLEEPING")?.borrow()
+                .is_sleeping(need_int(&a[1], "PHYS3D_SLEEPING")?)))
+        }
+        #[cfg(feature = "physik")]
         "phys3d_count" => {
             arity!(1);
             Ok(Value::Int(phys3d_h(&a[0], "PHYS3D_COUNT")?.borrow().count()))
@@ -2763,6 +3006,21 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Nil)
         }
         #[cfg(feature = "physik")]
+        "phys2d_sleep" => {
+            if a.len() != 2 && a.len() != 3 {
+                return Err("PHYS2D_SLEEP: erwartet 2 oder 3 Argumente (welt, koerper [, schlafen])".into());
+            }
+            let an = if a.len() == 3 { need_flag(&a[2], "PHYS2D_SLEEP")? } else { true };
+            phys2d_h(&a[0], "PHYS2D_SLEEP")?.borrow_mut().sleep(need_int(&a[1], "PHYS2D_SLEEP")?, an);
+            Ok(Value::Nil)
+        }
+        #[cfg(feature = "physik")]
+        "phys2d_sleeping" => {
+            arity!(2);
+            Ok(Value::Bool(phys2d_h(&a[0], "PHYS2D_SLEEPING")?.borrow()
+                .is_sleeping(need_int(&a[1], "PHYS2D_SLEEPING")?)))
+        }
+        #[cfg(feature = "physik")]
         "phys2d_is_dynamic" => {
             arity!(2);
             Ok(Value::Bool(phys2d_h(&a[0], "PHYS2D_IS_DYNAMIC")?.borrow()
@@ -2839,8 +3097,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "sprite_get_frame" => { arity!(1); Ok(Value::Int(spr(&a[0], "SPRITE_GET_FRAME")?.borrow().current_frame as i64)) }
         "sprite_update" => {
-            arity!(2); let dt = need_int(&a[1], "SPRITE_UPDATE")?;
-            if dt < 0 { return err("SPRITE_UPDATE: dt_ms muss >= 0 sein"); }
+            arity!(2); let dt = dt_ms(&a[1], "SPRITE_UPDATE")?;
             spr(&a[0], "SPRITE_UPDATE")?.borrow_mut().update(dt); Ok(Value::Nil)
         }
         "sprite_collides" | "sprite_collide" => {
@@ -2880,8 +3137,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "anim_fsm_update" => {
             arity!(3);
-            let dt = need_int(&a[2], "ANIM_FSM_UPDATE")?;
-            if dt < 0 { return err("ANIM_FSM_UPDATE: dt_ms muss >= 0 sein"); }
+            let dt = dt_ms(&a[2], "ANIM_FSM_UPDATE")?;
             let f = fsm_h(&a[0], "ANIM_FSM_UPDATE")?;
             let sp = spr(&a[1], "ANIM_FSM_UPDATE")?;
             let changed = f.borrow_mut().update(&mut sp.borrow_mut(), dt)?;
@@ -3106,6 +3362,11 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 FileH::Write(w) => {
                     let payload = if name == "writeline" { format!("{}\n", text) } else { text };
                     let bytes = crate::kodierung::kodieren(&payload, kod, "WRITE")?;
+                    // utf8bom: das BOM gehoert vor die leere Datei, nicht vor jede Zeile.
+                    let bom = crate::kodierung::bom_vorn(kod);
+                    if !bom.is_empty() && w.metadata().map(|m| m.len() == 0).unwrap_or(false) {
+                        w.write_all(bom).map_err(|e| format!("WRITE: {}", e))?;
+                    }
                     w.write_all(&bytes).map_err(|e| format!("WRITE: {}", e))?;
                     Ok(Value::Nil)
                 }
@@ -3226,6 +3487,17 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let kod = if a.len() > 1 { Some(need_str(&a[1], "READLINES")?) } else { None };
             let text = text_lesen(pfad, kod, "READLINES")?;
             Ok(new_str_array(text.lines().map(|l| l.to_string()).collect()))
+        }
+        // FILE_ENCODING$(pfad$) -- welche Kodierung "auto" fuer diese Datei
+        // waehlt (2026-10-14, Texteditor-Runde). Ohne die Antwort liest ein
+        // Editor eine cp1252-Datei richtig und schreibt sie als UTF-8 zurueck:
+        // "auto" gilt nur beim Lesen, und wer sichert, muss den Namen kennen.
+        "file_encoding$" => {
+            arity!(1);
+            let pfad = need_str(&a[0], "FILE_ENCODING$")?;
+            let bytes = std::fs::read(resolve_asset_path(pfad))
+                .map_err(|e| format!("FILE_ENCODING$: {}: {}", pfad, e))?;
+            Ok(Value::str_rc(crate::kodierung::erkennen(&bytes)))
         }
         "filesize" => {
             arity!(1);
@@ -3351,14 +3623,33 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(3);
             let pfad = need_str(&a[0], "ZIP_WRITE")?;
             let namen = str_array(&a[1], "ZIP_WRITE")?;
-            let inhalte = str_array(&a[2], "ZIP_WRITE")?;
+            // Texte ODER Puffer: bis 2026-10-16 ging jede Zelle durch
+            // `str_of`, und ein BUFFER (ein PNG, ein PDF) landete still als
+            // Text "<BUFFER 123 Bytes>" im Archiv.
+            let inhalte: Vec<Vec<u8>> = match &a[2] {
+                Value::Array(arr) => {
+                    let arr = arr.borrow();
+                    let mut v = Vec::with_capacity(arr.cells.len());
+                    for i in 0..arr.cells.len() {
+                        match arr.cells.get(i) {
+                            Value::Str(t) => v.push(t.as_bytes().to_vec()),
+                            Value::Buffer(b) => v.push(b.borrow().clone()),
+                            andere => return err(format!(
+                                "ZIP_WRITE: Inhalt {} ist {} -- erwartet wird ein Text oder ein BUFFER",
+                                i, andere.type_name())),
+                        }
+                    }
+                    v
+                }
+                _ => return err("ZIP_WRITE: erwartet ein ARRAY OF STRING oder ARRAY OF BUFFER".to_string()),
+            };
             if namen.len() != inhalte.len() {
                 return err(format!(
                     "ZIP_WRITE: {} Namen, aber {} Inhalte -- die Arrays muessen \
                      gleich lang sein", namen.len(), inhalte.len()));
             }
             let paare: Vec<(String, Vec<u8>)> = namen.into_iter()
-                .zip(inhalte.into_iter().map(|s| s.into_bytes()))
+                .zip(inhalte)
                 .collect();
             Ok(Value::Int(crate::zipdatei::packe_daten(
                 std::path::Path::new(pfad), &paare)?))
@@ -3841,6 +4132,28 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if i < 0 || i as usize >= args.len() { return Ok(Value::str_rc("")); }
             Ok(Value::str_rc(&args[i as usize]))
         }
+        // STARTDIR$ / ARGPATH$ (2026-10-11, Konsolen-Runde): `dhrt run` und
+        // die exportierte Exe wechseln in den Ordner des Programms (damit
+        // Bilder und Klaenge gefunden werden) -- ein relativer Pfad, den der
+        // Nutzer aus SEINEM Ordner angibt, zeigte dann ins Leere. Auch
+        // examples/172_filter.dh als Exe fand `daten/obst.txt` nicht.
+        "startdir$" | "startdir" => {
+            arity!(0);
+            Ok(Value::str_rc(startort().map_err(|e| format!("STARTDIR$: {}", e))?))
+        }
+        "argpath$" | "argpath" => {
+            arity!(1);
+            let i = need_int(&a[0], "ARGPATH$")?;
+            let args = programm_args();
+            if i < 0 || i as usize >= args.len() { return Ok(Value::str_rc("")); }
+            Ok(Value::str_rc(arg_pfad(&args[i as usize], &startort().map_err(|e| format!("ARGPATH$: {}", e))?)))
+        }
+        // TERMINAL / TERMINAL_WIDTH (2026-10-11, Konsolen-Runde): Farben und
+        // eine Fortschrittszeile gehoeren ins Terminal, nicht in eine Datei,
+        // in die jemand mit `> ergebnis.txt` umleitet -- vorher liess sich
+        // das nicht unterscheiden.
+        "terminal" => { arity!(0); Ok(Value::Bool(ausgabe_ist_terminal())) }
+        "terminal_width" => { arity!(0); Ok(Value::Int(terminal_breite())) }
         "getenv$" | "getenv" => {
             if a.is_empty() || a.len() > 2 { return err(format!("GETENV$: erwartet 1..2 Argumente, erhalten {}", a.len())); }
             let name_ = need_str(&a[0], "GETENV$")?;
@@ -4184,6 +4497,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 _ => Ok(Value::Bool(false)),
             }
         }
+        // JSON_KEY$(name$) -- ein Schluessel als Pfad-Segment: ein Punkt darin
+        // trennt dann nicht mehr ("a.b" -> "a\.b"), ein Rueckstrich wird "\\".
+        // Fuer Schluessel, die man nicht selbst gewaehlt hat (aus JSON_KEYS,
+        // Nutzertext).
+        "json_key$" => {
+            arity!(1);
+            Ok(Value::str_rc(json_schluessel_segment(need_str(&a[0], "JSON_KEY$")?)))
+        }
         "json_keys" => {
             // Zugabe beim Schreib-Ausbau: JSON_LEN lieferte fuer ein Objekt
             // schon immer die Anzahl seiner Schluessel -- an die Schluessel
@@ -4343,6 +4664,13 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let s = need_int(&a[1], "CHART_DATA")?;
             if s < 0 { return err("CHART_DATA: Reihe darf nicht negativ sein"); }
             c.borrow_mut().set_data(s as usize, &werte)?;
+            Ok(Value::Nil)
+        }
+        "chart_x" => {
+            arity!(2);
+            let xs = num_array(&a[1], "CHART_X")?;
+            let c = chart_h(&a[0], "CHART_X")?;
+            c.borrow_mut().set_x(&xs)?;
             Ok(Value::Nil)
         }
         "chart_set_point" => {
@@ -4542,7 +4870,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
             Ok(Value::Nil)
         }
-        "particle_update" => { arity!(2); let dt = need_int_gerundet(&a[1], "PARTICLE_UPDATE")?; if dt < 0 { return err("PARTICLE_UPDATE: dt_ms muss >= 0 sein"); } psys(&a[0], "PARTICLE_UPDATE")?.borrow_mut().update(dt as i32); Ok(Value::Nil) }
+        "particle_update" => { arity!(2); let dt = dt_ms(&a[1], "PARTICLE_UPDATE")?; psys(&a[0], "PARTICLE_UPDATE")?.borrow_mut().update(dt as i32); Ok(Value::Nil) }
 
         // ===== Modul: ecs =====
         "ecs_new_world" => { arity!(0); Ok(Value::Ecs(Rc::new(RefCell::new(crate::ecs::World::new())))) }
@@ -5446,16 +5774,43 @@ fn json_resolve<'a>(root: &'a serde_json::Value, path: &str, fn_: &str) -> Resul
     json_try_resolve(root, path).ok_or_else(|| format!("{}: Pfad '{}' nicht aufloesbar", fn_, path))
 }
 
+/// Die Segmente eines Pfads: getrennt an `.`, aber `\.` ist ein Punkt IM
+/// Schluessel und `\\` ein Rueckstrich (JSON_KEY$ schreibt einen Schluessel
+/// so). Ohne das war ein Schluessel mit Punkt weder les- noch schreibbar --
+/// der Garn-Vorrat in Glutfaden hat welche ("unknown::unknown::Farbe 1.5").
+/// Ein Rueckstrich vor etwas anderem bleibt stehen, wie er ist.
+pub(crate) fn json_segmente(path: &str) -> Vec<String> {
+    let mut teile = vec![String::new()];
+    let mut it = path.chars();
+    while let Some(c) = it.next() {
+        match c {
+            '\\' => match it.next() {
+                Some(n @ ('.' | '\\')) => teile.last_mut().unwrap().push(n),
+                Some(n) => { let s = teile.last_mut().unwrap(); s.push('\\'); s.push(n); }
+                None => teile.last_mut().unwrap().push('\\'),
+            },
+            '.' => teile.push(String::new()),
+            _ => teile.last_mut().unwrap().push(c),
+        }
+    }
+    teile
+}
+
+/// Ein Schluessel als Pfad-Segment: Punkt und Rueckstrich geschuetzt (JSON_KEY$).
+pub(crate) fn json_schluessel_segment(name: &str) -> String {
+    name.replace('\\', "\\\\").replace('.', "\\.")
+}
+
 fn json_try_resolve<'a>(root: &'a serde_json::Value, path: &str) -> Option<&'a serde_json::Value> {
     if path.is_empty() { return Some(root); }
     let mut cur = root;
-    for part in path.split('.') {
+    for part in json_segmente(path) {
         match cur {
             serde_json::Value::Array(arr) => {
                 let idx: usize = part.parse().ok()?;
                 cur = arr.get(idx)?;
             }
-            serde_json::Value::Object(obj) => { cur = obj.get(part)?; }
+            serde_json::Value::Object(obj) => { cur = obj.get(&part)?; }
             _ => return None,
         }
     }
@@ -5626,7 +5981,14 @@ fn text_schreiben(pfad: &str, text: &str, kodierung: Option<&str>, fn_: &str,
         Some(n) => crate::kodierung::aus_name(n, fn_)?,
         None => crate::kodierung::Kodierung::Utf8,
     };
-    let bytes = crate::kodierung::kodieren(text, k, fn_)?;
+    let mut bytes = crate::kodierung::kodieren(text, k, fn_)?;
+    // utf8bom: nur vor eine leere Datei -- beim Anhaengen an eine volle
+    // stuende es sonst mitten im Text.
+    let bom = crate::kodierung::bom_vorn(k);
+    let leer = !anhaengen || std::fs::metadata(pfad).map(|m| m.len() == 0).unwrap_or(true);
+    if !bom.is_empty() && leer {
+        bytes.splice(0..0, bom.iter().copied());
+    }
     if anhaengen {
         use std::io::Write;
         let mut f = std::fs::OpenOptions::new().append(true).create(true).open(pfad)
@@ -5662,7 +6024,7 @@ fn json_wert(v: serde_json::Value) -> Value {
 fn json_eltern<'a>(root: &'a mut serde_json::Value, path: &str, fn_: &str)
     -> Result<(&'a mut serde_json::Value, String, bool), String>
 {
-    let teile: Vec<&str> = path.split('.').collect();
+    let teile: Vec<String> = json_segmente(path);
     let (letztes, zwischen) = teile.split_last().unwrap();   // split immer >= 1
     let mut cur = root;
     let mut bisher = String::new();
@@ -5675,14 +6037,14 @@ fn json_eltern<'a>(root: &'a mut serde_json::Value, path: &str, fn_: &str)
         if cur.is_null() { *cur = serde_json::json!({}); }
         match cur {
             serde_json::Value::Object(obj) => {
-                if !obj.contains_key(*seg) {
+                if !obj.contains_key(seg.as_str()) {
                     if seg.parse::<usize>().is_ok() {
                         return Err(json_zahl_hinweis(fn_, &bisher, seg));
                     }
                     obj.insert(seg.to_string(), serde_json::json!({}));
                     neu_angelegt = true;
                 }
-                cur = obj.get_mut(*seg).unwrap();
+                cur = obj.get_mut(seg.as_str()).unwrap();
             }
             serde_json::Value::Array(arr) => {
                 let laenge = arr.len();
@@ -6460,8 +6822,43 @@ pub fn is_graphics_builtin(name: &str) -> bool {
         "screen" | "cls" | "flip" | "text" | "text_bold" | "text_size" | "circle"
         | "box" | "line" | "plot" | "rect" | "drawimage" | "loadimage" | "loadsound"
         | "playsound" | "keypressed" | "keydown" | "mousex" | "mousey" | "mousebutton"
-        | "quitrequested" | "sleep" | "imagewidth" | "imageheight" | "color" | "fill"
+        | "quitrequested" | "sleep" | "imagewidth" | "imageheight" | "image_width" | "image_height"
+        | "color" | "fill"
     )
+}
+
+#[cfg(test)]
+mod zahl_text_tests {
+    use super::zahl_text;
+    use crate::value::Value;
+    #[test]
+    fn deutsch_mit_tausenderpunkten() {
+        assert_eq!(zahl_text(&Value::Int(400000), None).unwrap(), "400.000");
+        assert_eq!(zahl_text(&Value::Int(-1234), Some(2)).unwrap(), "-1.234,00");
+        assert_eq!(zahl_text(&Value::Float(1234567.891), Some(2)).unwrap(), "1.234.567,89");
+        assert_eq!(zahl_text(&Value::Float(3.75), None).unwrap(), "3,75");
+        assert_eq!(zahl_text(&Value::Float(2.5), Some(0)).unwrap(), "3");
+        assert_eq!(zahl_text(&Value::Float(-0.001), Some(2)).unwrap(), "0,00");
+        assert_eq!(zahl_text(&Value::Float(999.995), Some(2)).unwrap(), "1.000,00");
+        assert_eq!(zahl_text(&Value::Int(7), None).unwrap(), "7");
+        assert!(zahl_text(&Value::Float(f64::NAN), None).is_err());
+    }
+}
+
+#[cfg(test)]
+mod arg_pfad_tests {
+    use super::arg_pfad;
+    #[test]
+    fn relativ_wird_vom_startort_aus_gelesen() {
+        let s = if cfg!(windows) { r"C:\a" } else { "/a" };
+        let erwartet = std::path::Path::new(s).join("b/c.txt").to_string_lossy().into_owned();
+        assert_eq!(arg_pfad("b/c.txt", s), erwartet);
+        assert_eq!(arg_pfad("", s), "");
+        assert_eq!(arg_pfad("-", s), "-");
+        let abs = if cfg!(windows) { r"D:\x.txt" } else { "/x.txt" };
+        assert_eq!(arg_pfad(abs, s), abs);
+        assert_eq!(arg_pfad("/wurzel", s), "/wurzel");
+    }
 }
 
 #[cfg(test)]
@@ -6618,4 +7015,23 @@ pub fn echter_pfad(p: &str) -> String {
         }
     };
     s.strip_prefix(r"\\?\").map(|x| x.to_string()).unwrap_or(s)
+}
+
+#[cfg(test)]
+mod json_segment_tests {
+    use super::{json_schluessel_segment, json_segmente};
+
+    #[test]
+    fn punkt_im_schluessel_und_rueckweg() {
+        assert_eq!(json_segmente("a.b"), vec!["a", "b"]);
+        assert_eq!(json_segmente(r"a\.b.c"), vec!["a.b", "c"]);
+        assert_eq!(json_segmente(r"a\\.b"), vec![r"a\", "b"]);
+        assert_eq!(json_segmente(r"a\xb"), vec![r"a\xb"]);
+        assert_eq!(json_segmente(""), vec![""]);
+        for name in ["Farbe 1.5", r"C:\pfad\x.y", "ohne", "..", r"\"] {
+            let seg = json_schluessel_segment(name);
+            assert_eq!(json_segmente(&seg), vec![name.to_string()], "{}", name);
+            assert_eq!(json_segmente(&format!("stock.{}", seg)), vec!["stock".to_string(), name.to_string()]);
+        }
+    }
 }

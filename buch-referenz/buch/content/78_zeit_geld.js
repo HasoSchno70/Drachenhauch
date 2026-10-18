@@ -13,6 +13,16 @@ module.exports = (H) => [
       'IMPORT "zeit"',
       "PRINT ZEIT_TEXT$(ZEIT_JETZT())",
     ]),
+  H.cmd("ZEIT_UNIX · ZEIT_AUS_UNIX · ZEIT_NACH_UNIX", "ZEIT_UNIX()   ZEIT_AUS_UNIX(sekunden)   ZEIT_NACH_UNIX(zeit)",
+    "Ein Zeitpunkt zählt in Ortszeit. Andere Programme, Web-APIs und viele Dateien schreiben dagegen Unix-Zeit: Sekunden seit 1970 in UTC. ZEIT_UNIX liefert sie für jetzt (mit Bruchteil), ZEIT_AUS_UNIX macht daraus einen Zeitpunkt, ZEIT_NACH_UNIX rechnet zurück – jeweils mit der Sommerzeit des betreffenden Tages.",
+    [
+      'IMPORT "zeit"',
+      "DIM u AS INTEGER",
+      "u = 1784980800",
+      "PRINT ZEIT_TEXT$(ZEIT_AUS_UNIX(u))",
+      "PRINT ZEIT_NACH_UNIX(ZEIT_AUS_UNIX(u)) = u",
+      "PRINT ZEIT_UNIX()",
+    ]),
   H.cmd("ZEIT_PARSE · ZEIT_LESBAR", "ZEIT_PARSE(text$)   ZEIT_LESBAR(text$)",
     "ZEIT_PARSE macht aus Text einen Zeitpunkt. Es versteht die Schreibweisen, die einem in Datenbanken und Web-Schnittstellen begegnen. Unlesbares bricht mit Klartext ab, statt still eine -1 zu liefern – ein kaputtes Datum fiele sonst erst viel später als unsinniges Ergebnis auf. Wo Eingaben unsicher sind, fragt ZEIT_LESBAR vorher, ohne abzubrechen.",
     [
@@ -75,7 +85,7 @@ module.exports = (H) => [
       "PRINT ZEIT_WOCHENTAG(a)        ' 5 = Freitag",
     ]),
   H.cmd("ZEIT_FORMAT$", "ZEIT_FORMAT$(zeit, muster$)",
-    "Zeigt einen Zeitpunkt nach einem Muster an. Die Platzhalter sind deutsch: JJJJ für das Jahr, MM für den Monat, TT für den Tag, hh:mm:ss für die Uhrzeit, WT für den kurzen und WTAG für den ausgeschriebenen Wochentag. Ein leeres Muster liefert die Normalform.",
+    "Zeigt einen Zeitpunkt nach einem Muster an. Die Platzhalter sind deutsch: JJJJ für das Jahr, MM für den Monat, TT für den Tag, hh:mm:ss für die Uhrzeit, WT für den kurzen und WTAG für den ausgeschriebenen Wochentag. Ein leeres Muster liefert die Normalform. Die Schreibweise von C und Python geht auch (%Y-%m-%d %H:%M:%S, %a, %A); ein %-Platzhalter, den es nicht gibt, ist ein Fehler.",
     [
       'IMPORT "zeit"',
       "DIM a AS INTEGER",
@@ -83,6 +93,7 @@ module.exports = (H) => [
       'PRINT ZEIT_FORMAT$(a, "TT.MM.JJJJ")              \' 28.08.2026',
       'PRINT ZEIT_FORMAT$(a, "WT TT.MM. hh:mm")         \' Fr 28.08. 20:30',
       'PRINT ZEIT_FORMAT$(a, "WTAG, TT.MM.JJJJ hh:mm")  \' Freitag, ...',
+      'PRINT ZEIT_FORMAT$(a, "%Y-%m-%d %H:%M")          \' 2026-08-28 20:30',
     ]),
 
   H.h2("Ein Countdown im Fenster"),

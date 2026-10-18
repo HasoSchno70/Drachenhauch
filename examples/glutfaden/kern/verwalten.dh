@@ -1,0 +1,964 @@
+' Muster anlegen und verwalten (PySticky core/pattern_diff.py,
+' core/snapshots.py, core/session_timer.py, core/smart_resize.py und
+' Pattern.resize).
+IMPORT "json"
+IMPORT "zeit"
+
+' --- Muster vergleichen ------------------------------------------------------------
+
+CONST DIFF_GLEICH = 0
+CONST DIFF_NEU = 1               ' im neuen ein Stich, im alten keiner
+CONST DIFF_WEG = 2               ' im alten ein Stich, im neuen keiner
+CONST DIFF_ANDERS = 3            ' in beiden, aber andere Farbe oder Stichart
+
+CLASS Vergleich
+    DIM maske AS ARRAY OF INTEGER    ' DIFF_* je Zelle, breite x hoehe
+    DIM breite AS INTEGER
+    DIM hoehe AS INTEGER
+    DIM neu AS INTEGER
+    DIM weg AS INTEGER
+    DIM anders AS INTEGER
+    DIM gleich AS INTEGER
+    DIM groesseAnders AS BOOLEAN
+    DIM rueckNeu AS INTEGER
+    DIM rueckWeg AS INTEGER
+
+    FUNCTION aenderungen() AS INTEGER
+        RETURN neu + weg + anders + rueckNeu + rueckWeg
+    END FUNCTION
+END CLASS
+
+' Der Rueckstich als Schluessel: Lage und die FARBE seines Musters (nicht die
+' Nummer -- die verschiebt sich zwischen zwei Fassungen)
+FUNCTION rueckSchluessel$(m AS Muster, r AS Rueckstich) AS STRING
+    DIM f AS INTEGER : f = -1
+    IF r.farbe >= 0 AND r.farbe < m.farbanzahl() THEN f = m.farben[r.farbe].garn.farbe BAND &HFFFFFF
+    RETURN STR$(r.x1) + "," + STR$(r.y1) + "," + STR$(r.x2) + "," + STR$(r.y2) + "," + STR$(f)
+END FUNCTION
+
+' Zwei Muster Zelle fuer Zelle ueber das Sichtbare vergleichen (verglichen
+' wird die Farbe selbst, nicht ihre Nummer); bei verschiedener Groesse
+' zaehlt die groessere Flaeche. Rueckstiche als Multimenge.
+FUNCTION musterVergleichen(alt AS Muster, neu AS Muster) AS Vergleich
+    DIM v AS Vergleich : v = NEW Vergleich()
+    DIM b AS INTEGER : b = MAX(alt.breite, neu.breite)
+    DIM h AS INTEGER : h = MAX(alt.hoehe, neu.hoehe)
+    v.breite = b : v.hoehe = h
+    v.groesseAnders = alt.breite <> neu.breite OR alt.hoehe <> neu.hoehe
+    DIM af AS ARRAY OF INTEGER, at AS ARRAY OF INTEGER, ae AS ARRAY OF INTEGER
+    DIM nf AS ARRAY OF INTEGER, nt AS ARRAY OF INTEGER, ne AS ARRAY OF INTEGER
+    alt.ebenen.zusammensetzen(af, at, ae)
+    neu.ebenen.zusammensetzen(nf, nt, ne)
+    DIM ak AS ARRAY OF INTEGER : ak = []
+    DIM nk AS ARRAY OF INTEGER : nk = []
+    DIM f AS Farbeintrag
+    FOR EACH f IN alt.farben
+        ARRAY_PUSH(ak, f.garn.farbe BAND &HFFFFFF)
+    NEXT
+    FOR EACH f IN neu.farben
+        ARRAY_PUSH(nk, f.garn.farbe BAND &HFFFFFF)
+    NEXT
+    DIM maske[b * h] AS INTEGER
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO h - 1
+        FOR x = 0 TO b - 1
+            DIM ac AS INTEGER : ac = -1
+            DIM aty AS INTEGER : aty = 0
+            DIM nc AS INTEGER : nc = -1
+            DIM nty AS INTEGER : nty = 0
+            IF x < alt.breite AND y < alt.hoehe THEN
+                ac = af[y * alt.breite + x]
+                aty = at[y * alt.breite + x]
+            END IF
+            IF x < neu.breite AND y < neu.hoehe THEN
+                nc = nf[y * neu.breite + x]
+                nty = nt[y * neu.breite + x]
+            END IF
+            IF ac < 0 AND nc < 0 THEN CONTINUE
+            IF ac < 0 THEN
+                maske[y * b + x] = DIFF_NEU
+                v.neu = v.neu + 1
+            ELSEIF nc < 0 THEN
+                maske[y * b + x] = DIFF_WEG
+                v.weg = v.weg + 1
+            ELSE
+                ' ausserhalb der Liste: wie PySticky auf die Grenzen geklemmt
+                DIM ka AS INTEGER : ka = IIF(LEN(ak) > 0, ak[CLAMP(ac, 0, LEN(ak) - 1)], -1)
+                DIM kn AS INTEGER : kn = IIF(LEN(nk) > 0, nk[CLAMP(nc, 0, LEN(nk) - 1)], -1)
+                IF ka <> kn OR aty <> nty THEN
+                    maske[y * b + x] = DIFF_ANDERS
+                    v.anders = v.anders + 1
+                ELSE
+                    v.gleich = v.gleich + 1
+                END IF
+            END IF
+        NEXT
+    NEXT
+    v.maske = maske
+    DIM zahl AS MAP OF INTEGER : zahl = {}
+    DIM r AS Rueckstich
+    FOR EACH r IN alt.rueckstiche
+        DIM k AS STRING : k = rueckSchluessel$(alt, r)
+        MAPPUT(zahl, k, IIF(MAPHAS(zahl, k), MAPGET(zahl, k), 0) + 1)
+    NEXT
+    FOR EACH r IN neu.rueckstiche
+        DIM k2 AS STRING : k2 = rueckSchluessel$(neu, r)
+        IF MAPHAS(zahl, k2) THEN
+            IF MAPGET(zahl, k2) > 0 THEN
+                MAPPUT(zahl, k2, MAPGET(zahl, k2) - 1)
+            ELSE
+                v.rueckNeu = v.rueckNeu + 1
+            END IF
+        ELSE
+            v.rueckNeu = v.rueckNeu + 1
+        END IF
+    NEXT
+    DIM s AS STRING
+    FOR EACH s IN MAPKEYS(zahl)
+        v.rueckWeg = v.rueckWeg + MAPGET(zahl, s)
+    NEXT
+    RETURN v
+END FUNCTION
+
+' --- Stickzeit -----------------------------------------------------------------------
+' In den Metadaten des Musters, wie PySticky: total_stitch_seconds (ganze
+' Sekunden) und last_session_start (Zeitpunkt in Sekunden seit 1970, nur
+' waehrend einer laufenden Sitzung).
+
+CONST STICKZEIT_GESAMT = "total_stitch_seconds"
+CONST STICKZEIT_START = "last_session_start"
+CONST STICKZEIT_HOECHSTENS = 43200          ' 12 h -- laenger gilt als vergessen
+
+FUNCTION stickzeitGesamt(m AS Muster) AS INTEGER
+    IF NOT JSON_HAS(m.metadaten, STICKZEIT_GESAMT) THEN RETURN 0
+    DIM z AS INTEGER
+    IF jsonGanz(m.metadaten, STICKZEIT_GESAMT, z) THEN RETURN z
+    RETURN 0
+END FUNCTION
+
+FUNCTION stickzeitLaeuft(m AS Muster) AS BOOLEAN
+    RETURN JSON_HAS(m.metadaten, STICKZEIT_START)
+END FUNCTION
+
+' Eine Sitzung beginnen (ein liegengebliebener Start wird ueberschrieben)
+SUB stickzeitStart(m AS Muster, jetzt AS FLOAT)
+    JSON_SET_FLOAT(m.metadaten, STICKZEIT_START, jetzt)
+END SUB
+
+' Die Sitzung beenden und ihre Dauer dazuzaehlen; liefert die Dauer (0 ohne
+' Sitzung, und 0 bei mehr als 12 h -- dann war das Programm wohl einfach
+' offen geblieben)
+FUNCTION stickzeitStopp(m AS Muster, jetzt AS FLOAT) AS INTEGER
+    IF NOT JSON_HAS(m.metadaten, STICKZEIT_START) THEN RETURN 0
+    DIM art AS STRING : art = JSON_TYPE(m.metadaten, STICKZEIT_START)
+    DIM start AS FLOAT
+    DIM ok AS BOOLEAN : ok = TRUE
+    IF art = "number" THEN
+        start = JSON_GET_FLOAT(m.metadaten, STICKZEIT_START)
+    ELSEIF art = "string" AND REGEX_TEST(TRIM$(JSON_GET_STRING(m.metadaten, STICKZEIT_START)), "^[+-]?([0-9]+\.?[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?$") THEN
+        start = VAL(TRIM$(JSON_GET_STRING(m.metadaten, STICKZEIT_START)))
+    ELSE
+        ok = FALSE
+    END IF
+    DIM weg AS BOOLEAN : weg = JSON_REMOVE(m.metadaten, STICKZEIT_START)
+    IF NOT ok THEN RETURN 0
+    DIM d AS FLOAT : d = jetzt - start
+    DIM dauer AS INTEGER : dauer = 0
+    IF d > 0 THEN dauer = FLOOR(d)
+    IF dauer > STICKZEIT_HOECHSTENS THEN RETURN 0
+    JSON_SET_INT(m.metadaten, STICKZEIT_GESAMT, stickzeitGesamt(m) + dauer)
+    RETURN dauer
+END FUNCTION
+
+' "5 Sek", "47 Min", "3h", "12h 33min"
+FUNCTION dauerKurz$(sekunden AS INTEGER) AS STRING
+    DIM s AS INTEGER : s = MAX(0, sekunden)
+    IF s < 60 THEN RETURN trf$("{0} Sek", [STR$(s)])
+    IF s < 3600 THEN RETURN trf$("{0} Min", [STR$(s \ 60)])
+    DIM h AS INTEGER : h = s \ 3600
+    DIM mi AS INTEGER : mi = (s MOD 3600) \ 60
+    IF mi = 0 THEN RETURN STR$(h) + "h"
+    RETURN STR$(h) + "h " + STR$(mi) + "min"
+END FUNCTION
+
+' --- Schnappschuesse -------------------------------------------------------------------
+' <Einstellungsordner>/snapshots/<Schluessel>/v_JJJJ-MM-TT_hh-mm-ss.pxs, wie
+' PySticky (dort unter seinem eigenen Programmordner).
+
+CONST SCHNAPPSCHUESSE_HOECHSTENS = 20
+CONST SCHNAPPSCHUSS_ABSTAND = 1800           ' Sekunden
+
+' Ein Name als Ordnername: alles ausser Buchstaben (a-z), Ziffern, _ und -
+' wird zu _, Unterstriche aussen fallen weg
+FUNCTION sicherName$(name AS STRING) AS STRING
+    IF name = "" THEN RETURN "_unnamed"
+    DIM t AS STRING : t = REGEX_REPLACE(name, "[^a-zA-Z0-9_-]+", "_")
+    WHILE LEFT$(t, 1) = "_" : t = MID$(t, 1) : WEND
+    WHILE RIGHT$(t, 1) = "_" : t = LEFT$(t, LEN(t) - 1) : WEND
+    IF t = "" THEN RETURN "_unnamed"
+    RETURN t
+END FUNCTION
+
+FUNCTION schnappschussOrdner$(schluessel AS STRING) AS STRING
+    RETURN PATHJOIN(PATHJOIN(DIRNAME(einstellungsDatei$("x")), "snapshots"), sicherName$(schluessel))
+END FUNCTION
+
+' Der Schluessel: der Dateiname ohne Endung, ohne Datei der Musterame mit
+' einer Kennung (zwei nie gesicherte "Neues Muster" teilen sich sonst einen
+' Ordner -- PySticky nimmt dafuer die Objektnummer, hier die farbId-artige
+' Kennung, die der Aufrufer einmal je Muster vergibt)
+FUNCTION schnappschussSchluessel$(m AS Muster, pfad AS STRING, kennung AS STRING) AS STRING
+    IF pfad <> "" THEN
+        DIM n AS STRING : n = BASENAME(pfad)
+        DIM p AS INTEGER : p = INSTRREV(n, ".")
+        IF p > 0 THEN n = LEFT$(n, p)
+        RETURN n
+    END IF
+    RETURN IIF(m.name <> "", m.name, "_unnamed") + "__" + kennung
+END FUNCTION
+
+' Zeitpunkt aus dem Dateinamen (-1, wenn er nicht so heisst)
+FUNCTION schnappschussZeit(datei AS STRING) AS INTEGER
+    DIM n AS STRING : n = BASENAME(datei)
+    IF NOT REGEX_TEST(n, "^v_[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}\.pxs$") THEN RETURN -1
+    DIM t AS STRING : t = MID$(n, 2, 19)
+    t = LEFT$(t, 10) + " " + REPLACE$(MID$(t, 11), "-", ":")
+    IF NOT ZEIT_LESBAR(t) THEN RETURN -1
+    RETURN ZEIT_PARSE(t)
+END FUNCTION
+
+FUNCTION schnappschussName$(zeit AS INTEGER) AS STRING
+    DIM t AS STRING : t = ZEIT_TEXT$(zeit)
+    RETURN "v_" + LEFT$(t, 10) + "_" + REPLACE$(MID$(t, 11), ":", "-") + ".pxs"
+END FUNCTION
+
+' Alle Schnappschuesse eines Musters, der neueste zuerst
+FUNCTION schnappschuesse(schluessel AS STRING) AS ARRAY OF STRING
+    DIM o AS STRING : o = schnappschussOrdner$(schluessel)
+    DIM aus AS ARRAY OF STRING : aus = []
+    IF NOT DIREXISTS(o) THEN RETURN aus
+    DIM zeiten AS ARRAY OF INTEGER : zeiten = []
+    DIM d AS STRING
+    FOR EACH d IN DIRLIST(o, "v_*.pxs")
+        DIM z AS INTEGER : z = schnappschussZeit(d)
+        IF z < 0 THEN CONTINUE
+        ' absteigend einordnen, bei gleicher Zeit hinter die schon da sind
+        DIM i AS INTEGER : i = 0
+        WHILE i < LEN(zeiten)
+            IF zeiten[i] < z THEN EXIT WHILE
+            i = i + 1
+        WEND
+        ARRAY_INSERT(zeiten, i, z)
+        ARRAY_INSERT(aus, i, PATHJOIN(o, d))
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Einen Schnappschuss sichern (eine Sekunde weiter, wenn der Name schon
+' vergeben ist) und alles ueber die Hoechstzahl hinaus loeschen
+FUNCTION schnappschussAnlegen(m AS Muster, schluessel AS STRING, jetzt AS INTEGER, hoechstens AS INTEGER) AS STRING
+    DIM o AS STRING : o = schnappschussOrdner$(schluessel)
+    IF NOT DIREXISTS(o) THEN MKDIR(o)
+    DIM z AS INTEGER : z = jetzt
+    WHILE FILEEXISTS(PATHJOIN(o, schnappschussName$(z)))
+        z = z + 1
+    WEND
+    DIM ziel AS STRING : ziel = PATHJOIN(o, schnappschussName$(z))
+    pxsSpeichern(m, ziel)
+    DIM alle AS ARRAY OF STRING : alle = schnappschuesse(schluessel)
+    DIM i AS INTEGER
+    FOR i = hoechstens TO LEN(alle) - 1
+        TRY
+            DELETEFILE(alle[i])
+        CATCH e
+        END TRY
+    NEXT
+    RETURN ziel
+END FUNCTION
+
+' Ist der letzte Schnappschuss aelter als der Abstand (oder gibt es keinen)?
+FUNCTION schnappschussFaellig(schluessel AS STRING, jetzt AS INTEGER, abstand AS INTEGER) AS BOOLEAN
+    DIM alle AS ARRAY OF STRING : alle = schnappschuesse(schluessel)
+    IF LEN(alle) = 0 THEN RETURN TRUE
+    RETURN jetzt - schnappschussZeit(alle[0]) >= abstand
+END FUNCTION
+
+' --- Groesse aendern --------------------------------------------------------------------
+
+' Eine Ebene in neuer Groesse mit denselben Eigenschaften (id bleibt)
+FUNCTION ebeneInGroesse(e AS Ebene, b AS INTEGER, h AS INTEGER) AS Ebene
+    DIM n AS Ebene : n = neueEbene(e.name, b, h)
+    n.id = e.id
+    n.sichtbar = e.sichtbar
+    n.gesperrt = e.gesperrt
+    n.deckkraft = e.deckkraft
+    n.notiz = e.notiz
+    RETURN n
+END FUNCTION
+
+' Die neue Groesse als ein Schritt: Ebenen und Rueckstiche kommen fertig
+SUB groesseUebernehmen(m AS Muster, v AS Verlauf, b AS INTEGER, h AS INTEGER, ebenen AS ARRAY OF Ebene, rueck AS ARRAY OF Rueckstich, text AS STRING)
+    v.beginnen(text)
+    DIM t AS Aenderung : t = v.teil(TEIL_GROESSE)
+    t.breiteVorher = m.breite : t.hoeheVorher = m.hoehe
+    t.breiteNachher = b : t.hoeheNachher = h
+    t.ebenenVorher = ARRAY_COPY(m.ebenen.ebenen)
+    t.aktivVorher = m.ebenen.aktiv
+    t.ebenenNachher = ebenen
+    t.aktivNachher = m.ebenen.aktiv
+    t.rueckVorher = ARRAY_COPY(m.rueckstiche)
+    t.rueckNachher = rueck
+    v.beenden()
+    teilAnwenden(m, t, TRUE)
+END SUB
+
+' Zuschneiden oder auffuellen (PySticky Pattern.resize): oben links bleibt
+' stehen, rechts und unten kommen leere Zellen dazu oder fallen weg. Ein
+' Rueckstich mit einem Ende ausserhalb faellt ganz weg. FALSE, wenn sich
+' nichts aendert.
+FUNCTION groesseAendern(m AS Muster, v AS Verlauf, b AS INTEGER, h AS INTEGER) AS BOOLEAN
+    IF b < 1 OR h < 1 THEN THROW trf$("Ungültige Größe: {0}x{1} (min. 1x1)", [STR$(b), STR$(h)])
+    IF b = m.breite AND h = m.hoehe THEN RETURN FALSE
+    DIM neu AS ARRAY OF Ebene : neu = []
+    DIM e AS Ebene
+    DIM x AS INTEGER, y AS INTEGER
+    FOR EACH e IN m.ebenen.ebenen
+        DIM n AS Ebene : n = ebeneInGroesse(e, b, h)
+        DIM r AS ARRAY OF INTEGER : r = n.raster
+        DIM d AS ARRAY OF INTEGER : d = n.erledigt
+        DIM a AS ARRAY OF INTEGER : a = n.art
+        DIM er AS ARRAY OF INTEGER : er = e.raster
+        DIM ed AS ARRAY OF INTEGER : ed = e.erledigt
+        DIM ea AS ARRAY OF INTEGER : ea = e.art
+        DIM ab AS INTEGER : ab = m.breite
+        FOR y = 0 TO MIN(h, m.hoehe) - 1
+            FOR x = 0 TO MIN(b, ab) - 1
+                r[y * b + x] = er[y * ab + x]
+                d[y * b + x] = ed[y * ab + x]
+                a[y * b + x] = ea[y * ab + x]
+            NEXT
+        NEXT
+        ARRAY_PUSH(neu, n)
+    NEXT
+    DIM rueck AS ARRAY OF Rueckstich : rueck = []
+    DIM rs AS Rueckstich
+    FOR EACH rs IN m.rueckstiche
+        IF MIN(rs.x1, rs.x2) < 0 OR MAX(rs.x1, rs.x2) > 2 * b OR MIN(rs.y1, rs.y2) < 0 OR MAX(rs.y1, rs.y2) > 2 * h THEN CONTINUE
+        ARRAY_PUSH(rueck, rs)
+    NEXT
+    groesseUebernehmen(m, v, b, h, neu, rueck, tr$("Größe ändern"))
+    RETURN TRUE
+END FUNCTION
+
+' Wie ein Pixelbild skalieren (PySticky smart_resize): jede neue Zelle nimmt
+' die naechstliegende alte (abgerundet, keine Mischung, keine neuen Farben),
+' Rueckstiche werden mitgestreckt (Pythons round).
+FUNCTION groesseSkalieren(m AS Muster, v AS Verlauf, b AS INTEGER, h AS INTEGER) AS BOOLEAN
+    IF b < 1 OR h < 1 THEN THROW trf$("Ungültige Größe: {0}x{1}", [STR$(b), STR$(h)])
+    IF b = m.breite AND h = m.hoehe THEN RETURN FALSE
+    DIM sx AS FLOAT : sx = m.breite / b
+    DIM sy AS FLOAT : sy = m.hoehe / h
+    DIM qx[b] AS INTEGER
+    DIM qy[h] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO b - 1 : qx[i] = CLAMP(INT(i * sx), 0, m.breite - 1) : NEXT
+    FOR i = 0 TO h - 1 : qy[i] = CLAMP(INT(i * sy), 0, m.hoehe - 1) : NEXT
+    DIM neu AS ARRAY OF Ebene : neu = []
+    DIM e AS Ebene
+    DIM x AS INTEGER, y AS INTEGER
+    DIM ab AS INTEGER : ab = m.breite
+    FOR EACH e IN m.ebenen.ebenen
+        DIM n AS Ebene : n = ebeneInGroesse(e, b, h)
+        DIM r AS ARRAY OF INTEGER : r = n.raster
+        DIM d AS ARRAY OF INTEGER : d = n.erledigt
+        DIM a AS ARRAY OF INTEGER : a = n.art
+        DIM er AS ARRAY OF INTEGER : er = e.raster
+        DIM ed AS ARRAY OF INTEGER : ed = e.erledigt
+        DIM ea AS ARRAY OF INTEGER : ea = e.art
+        FOR y = 0 TO h - 1
+            DIM zq AS INTEGER : zq = qy[y] * ab
+            FOR x = 0 TO b - 1
+                r[y * b + x] = er[zq + qx[x]]
+                d[y * b + x] = ed[zq + qx[x]]
+                a[y * b + x] = ea[zq + qx[x]]
+            NEXT
+        NEXT
+        ARRAY_PUSH(neu, n)
+    NEXT
+    DIM rx AS FLOAT : rx = b / m.breite
+    DIM ry AS FLOAT : ry = h / m.hoehe
+    DIM rueck AS ARRAY OF Rueckstich : rueck = []
+    DIM rs AS Rueckstich
+    FOR EACH rs IN m.rueckstiche
+        ARRAY_PUSH(rueck, neuerRueckstich(pyRunden(rs.x1 * rx), pyRunden(rs.y1 * ry), pyRunden(rs.x2 * rx), pyRunden(rs.y2 * ry), rs.farbe))
+    NEXT
+    groesseUebernehmen(m, v, b, h, neu, rueck, tr$("Größe ändern"))
+    RETURN TRUE
+END FUNCTION
+
+' --- Drehen, Spiegeln, Zuschneiden (PySticky Pattern.rotate_*, flip_*, crop,
+' auto_crop) -----------------------------------------------------------------
+' Jede Wandlung ist EIN Schritt ueber den Groessen-Teil (Ebenen und
+' Rueckstiche vorher/nachher) -- PySticky leert dafuer den Verlauf.
+
+CONST UMLEGEN_RECHTS = 0              ' 90 Grad im Uhrzeigersinn
+CONST UMLEGEN_LINKS = 1               ' 90 Grad gegen den Uhrzeigersinn
+CONST UMLEGEN_180 = 2
+CONST UMLEGEN_WAAGERECHT = 3          ' links <-> rechts
+CONST UMLEGEN_SENKRECHT = 4           ' oben <-> unten
+
+FUNCTION umlegenText$(art AS INTEGER) AS STRING
+    SELECT CASE art
+        CASE UMLEGEN_RECHTS : RETURN tr$("90° rechts gedreht")
+        CASE UMLEGEN_LINKS : RETURN tr$("90° links gedreht")
+        CASE UMLEGEN_180 : RETURN tr$("180° gedreht")
+        CASE UMLEGEN_WAAGERECHT : RETURN tr$("Horizontal gespiegelt")
+        CASE UMLEGEN_SENKRECHT : RETURN tr$("Vertikal gespiegelt")
+    END SELECT
+    RETURN ""
+END FUNCTION
+
+' Was aus einem Stichtyp wird. 180 Grad sind zweimal rechts -- PySticky
+' laesst die Typen dort stehen, und ein Viertelstich oben links bliebe oben
+' links, obwohl sein Kaestchen jetzt unten rechts liegt.
+FUNCTION umlegenTyp(art AS INTEGER, t AS INTEGER) AS INTEGER
+    SELECT CASE art
+        CASE UMLEGEN_RECHTS : RETURN stichGedreht(t)
+        CASE UMLEGEN_LINKS : RETURN stichGedrehtLinks(t)
+        CASE UMLEGEN_180 : RETURN stichGedreht(stichGedreht(t))
+        CASE UMLEGEN_WAAGERECHT : RETURN stichGespiegeltH(t)
+        CASE UMLEGEN_SENKRECHT : RETURN stichGespiegeltV(t)
+    END SELECT
+    RETURN t
+END FUNCTION
+
+' Das ganze Muster drehen oder spiegeln: alle Ebenen samt Stichtyp und
+' erledigt, die Rueckstiche (Halbstich-Koordinaten) mit derselben Abbildung.
+' Liefert FALSE bei einer unbekannten Art.
+FUNCTION musterUmlegen(m AS Muster, v AS Verlauf, art AS INTEGER) AS BOOLEAN
+    IF art < UMLEGEN_RECHTS OR art > UMLEGEN_SENKRECHT THEN RETURN FALSE
+    DIM ab AS INTEGER : ab = m.breite
+    DIM ah AS INTEGER : ah = m.hoehe
+    DIM b AS INTEGER : b = IIF(art = UMLEGEN_RECHTS OR art = UMLEGEN_LINKS, ah, ab)
+    DIM h AS INTEGER : h = IIF(art = UMLEGEN_RECHTS OR art = UMLEGEN_LINKS, ab, ah)
+    ' Je Stichtyp das Ergebnis einmal, nicht je Zelle
+    DIM typ[STICHTYP_MAX + 1] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO STICHTYP_MAX : typ[i] = umlegenTyp(art, i) : NEXT
+    DIM neu AS ARRAY OF Ebene : neu = []
+    DIM e AS Ebene
+    DIM x AS INTEGER, y AS INTEGER, z AS INTEGER, q AS INTEGER
+    FOR EACH e IN m.ebenen.ebenen
+        DIM n AS Ebene : n = ebeneInGroesse(e, b, h)
+        DIM r AS ARRAY OF INTEGER : r = n.raster
+        DIM d AS ARRAY OF INTEGER : d = n.erledigt
+        DIM a AS ARRAY OF INTEGER : a = n.art
+        DIM er AS ARRAY OF INTEGER : er = e.raster
+        DIM ed AS ARRAY OF INTEGER : ed = e.erledigt
+        DIM ea AS ARRAY OF INTEGER : ea = e.art
+        FOR y = 0 TO ah - 1
+            FOR x = 0 TO ab - 1
+                q = y * ab + x
+                IF art = UMLEGEN_RECHTS THEN
+                    z = x * b + (ah - 1 - y)
+                ELSEIF art = UMLEGEN_LINKS THEN
+                    z = (ab - 1 - x) * b + y
+                ELSEIF art = UMLEGEN_180 THEN
+                    z = (ah - 1 - y) * b + (ab - 1 - x)
+                ELSEIF art = UMLEGEN_WAAGERECHT THEN
+                    z = y * b + (ab - 1 - x)
+                ELSE
+                    z = (ah - 1 - y) * b + x
+                END IF
+                r[z] = er[q]
+                d[z] = ed[q]
+                IF ea[q] >= 0 AND ea[q] <= STICHTYP_MAX THEN a[z] = typ[ea[q]] ELSE a[z] = ea[q]
+            NEXT
+        NEXT
+        ARRAY_PUSH(neu, n)
+    NEXT
+    DIM rueck AS ARRAY OF Rueckstich : rueck = []
+    DIM rs AS Rueckstich
+    FOR EACH rs IN m.rueckstiche
+        DIM k AS Rueckstich : k = neuerRueckstich(rs.x1, rs.y1, rs.x2, rs.y2, rs.farbe)
+        IF art = UMLEGEN_RECHTS THEN
+            k.x1 = 2 * ah - rs.y1 : k.y1 = rs.x1 : k.x2 = 2 * ah - rs.y2 : k.y2 = rs.x2
+        ELSEIF art = UMLEGEN_LINKS THEN
+            k.x1 = rs.y1 : k.y1 = 2 * ab - rs.x1 : k.x2 = rs.y2 : k.y2 = 2 * ab - rs.x2
+        ELSEIF art = UMLEGEN_180 THEN
+            k.x1 = 2 * ab - rs.x1 : k.y1 = 2 * ah - rs.y1 : k.x2 = 2 * ab - rs.x2 : k.y2 = 2 * ah - rs.y2
+        ELSEIF art = UMLEGEN_WAAGERECHT THEN
+            k.x1 = 2 * ab - rs.x1 : k.x2 = 2 * ab - rs.x2
+        ELSE
+            k.y1 = 2 * ah - rs.y1 : k.y2 = 2 * ah - rs.y2
+        END IF
+        ARRAY_PUSH(rueck, k)
+    NEXT
+    groesseUebernehmen(m, v, b, h, neu, rueck, umlegenText$(art))
+    RETURN TRUE
+END FUNCTION
+
+' Auf einen Bereich zuschneiden (PySticky Pattern.crop): Rueckstiche werden
+' mitverschoben, einer mit einem Ende ausserhalb faellt weg. FALSE bei einem
+' Bereich ausserhalb oder ohne Aenderung.
+FUNCTION musterZuschneiden(m AS Muster, v AS Verlauf, x0 AS INTEGER, y0 AS INTEGER, b AS INTEGER, h AS INTEGER, text AS STRING) AS BOOLEAN
+    IF b < 1 OR h < 1 OR x0 < 0 OR y0 < 0 OR x0 + b > m.breite OR y0 + h > m.hoehe THEN RETURN FALSE
+    IF x0 = 0 AND y0 = 0 AND b = m.breite AND h = m.hoehe THEN RETURN FALSE
+    DIM neu AS ARRAY OF Ebene : neu = []
+    DIM e AS Ebene
+    DIM x AS INTEGER, y AS INTEGER
+    DIM ab AS INTEGER : ab = m.breite
+    FOR EACH e IN m.ebenen.ebenen
+        DIM n AS Ebene : n = ebeneInGroesse(e, b, h)
+        DIM r AS ARRAY OF INTEGER : r = n.raster
+        DIM d AS ARRAY OF INTEGER : d = n.erledigt
+        DIM a AS ARRAY OF INTEGER : a = n.art
+        DIM er AS ARRAY OF INTEGER : er = e.raster
+        DIM ed AS ARRAY OF INTEGER : ed = e.erledigt
+        DIM ea AS ARRAY OF INTEGER : ea = e.art
+        FOR y = 0 TO h - 1
+            FOR x = 0 TO b - 1
+                r[y * b + x] = er[(y + y0) * ab + x + x0]
+                d[y * b + x] = ed[(y + y0) * ab + x + x0]
+                a[y * b + x] = ea[(y + y0) * ab + x + x0]
+            NEXT
+        NEXT
+        ARRAY_PUSH(neu, n)
+    NEXT
+    DIM rueck AS ARRAY OF Rueckstich : rueck = []
+    DIM rs AS Rueckstich
+    FOR EACH rs IN m.rueckstiche
+        DIM k AS Rueckstich : k = neuerRueckstich(rs.x1 - 2 * x0, rs.y1 - 2 * y0, rs.x2 - 2 * x0, rs.y2 - 2 * y0, rs.farbe)
+        IF MIN(k.x1, k.x2) < 0 OR MAX(k.x1, k.x2) > 2 * b OR MIN(k.y1, k.y2) < 0 OR MAX(k.y1, k.y2) > 2 * h THEN CONTINUE
+        ARRAY_PUSH(rueck, k)
+    NEXT
+    groesseUebernehmen(m, v, b, h, neu, rueck, text)
+    RETURN TRUE
+END FUNCTION
+
+' Der Bereich mit Stichen [x0, y0, x1, y1] ueber ALLE Ebenen, leer = [].
+' PySticky nimmt nur die sichtbaren -- ein Stich auf einer ausgeblendeten
+' Ebene ausserhalb waere beim Zuschneiden still verloren.
+FUNCTION stichBereich(m AS Muster) AS ARRAY OF INTEGER
+    DIM x0 AS INTEGER : x0 = m.breite
+    DIM y0 AS INTEGER : y0 = m.hoehe
+    DIM x1 AS INTEGER : x1 = -1
+    DIM y1 AS INTEGER : y1 = -1
+    DIM e AS Ebene
+    DIM x AS INTEGER, y AS INTEGER
+    DIM b AS INTEGER : b = m.breite
+    FOR EACH e IN m.ebenen.ebenen
+        DIM r AS ARRAY OF INTEGER : r = e.raster
+        FOR y = 0 TO m.hoehe - 1
+            FOR x = 0 TO b - 1
+                IF r[y * b + x] <> KEIN_STICH THEN
+                    IF x < x0 THEN x0 = x
+                    IF x > x1 THEN x1 = x
+                    IF y < y0 THEN y0 = y
+                    IF y > y1 THEN y1 = y
+                END IF
+            NEXT
+        NEXT
+    NEXT
+    IF x1 < 0 THEN RETURN []
+    RETURN [x0, y0, x1, y1]
+END FUNCTION
+
+' Leere Raender abschneiden (Auto-Zuschneiden). Liefert die entfernten
+' Raender [links, oben, rechts, unten] oder [] ohne Aenderung -- auch bei
+' einem leeren Muster (PySticky schnitt das auf 1 x 1).
+FUNCTION autoZuschneiden(m AS Muster, v AS Verlauf) AS ARRAY OF INTEGER
+    DIM g AS ARRAY OF INTEGER : g = stichBereich(m)
+    IF LEN(g) = 0 THEN RETURN []
+    DIM b AS INTEGER : b = g[2] - g[0] + 1
+    DIM h AS INTEGER : h = g[3] - g[1] + 1
+    DIM aw AS INTEGER : aw = m.breite
+    DIM ahh AS INTEGER : ahh = m.hoehe
+    IF NOT musterZuschneiden(m, v, g[0], g[1], b, h, tr$("Auto-Zuschneiden")) THEN RETURN []
+    RETURN [g[0], g[1], aw - g[2] - 1, ahh - g[3] - 1]
+END FUNCTION
+
+
+' --- Neues Muster ---------------------------------------------------------------------------
+
+CLASS Vorlage
+    DIM name AS STRING
+    DIM breite AS INTEGER
+    DIM hoehe AS INTEGER
+    DIM stoff AS INTEGER             ' 0 = keiner (eingebaute Vorlagen)
+    DIM beschreibung AS STRING
+    DIM kategorie AS STRING
+    DIM zeichen AS STRING
+END CLASS
+
+FUNCTION vorlageNeu(kat AS STRING, name AS STRING, b AS INTEGER, h AS INTEGER, zeichen AS STRING, besch AS STRING) AS Vorlage
+    DIM v AS Vorlage : v = NEW Vorlage()
+    v.kategorie = kat : v.name = name : v.breite = b : v.hoehe = h
+    v.zeichen = zeichen : v.beschreibung = besch
+    RETURN v
+END FUNCTION
+
+FUNCTION vorlagenKategorien() AS ARRAY OF STRING
+    RETURN ["Lesezeichen", "Deckchen", "Bordüren", "Bilder", "Kissen", "Accessoires", "Weihnachten"]
+END FUNCTION
+
+' Die eingebauten Vorlagen (PySticky TEMPLATES)
+FUNCTION vorlagen() AS ARRAY OF Vorlage
+    DIM l AS ARRAY OF Vorlage : l = []
+    ARRAY_PUSH(l, vorlageNeu("Lesezeichen", "Lesezeichen Klein", 25, 80, "📑", "Schmales Lesezeichen"))
+    ARRAY_PUSH(l, vorlageNeu("Lesezeichen", "Lesezeichen Standard", 30, 100, "📖", "Klassisches Format"))
+    ARRAY_PUSH(l, vorlageNeu("Lesezeichen", "Lesezeichen Breit", 40, 120, "📚", "Breites Lesezeichen mit Platz für Motive"))
+    ARRAY_PUSH(l, vorlageNeu("Deckchen", "Untersetzer Rund", 40, 40, "⭕", "Quadratisch für runde Untersetzer"))
+    ARRAY_PUSH(l, vorlageNeu("Deckchen", "Untersetzer Groß", 60, 60, "🔲", "Größerer Untersetzer"))
+    ARRAY_PUSH(l, vorlageNeu("Deckchen", "Deckchen Klein", 80, 80, "🏠", "Kleines Zierdeckchen"))
+    ARRAY_PUSH(l, vorlageNeu("Deckchen", "Deckchen Mittel", 120, 120, "🎀", "Mittleres Deckchen für Tische"))
+    ARRAY_PUSH(l, vorlageNeu("Deckchen", "Tischläufer Kurz", 40, 150, "➡️", "Kurzer Tischläufer"))
+    ARRAY_PUSH(l, vorlageNeu("Deckchen", "Tischläufer Lang", 40, 250, "↔️", "Langer Tischläufer"))
+    ARRAY_PUSH(l, vorlageNeu("Bordüren", "Bordüre Schmal", 20, 200, "📏", "Schmale Zierbordüre"))
+    ARRAY_PUSH(l, vorlageNeu("Bordüren", "Bordüre Mittel", 35, 200, "🎗️", "Mittlere Bordüre"))
+    ARRAY_PUSH(l, vorlageNeu("Bordüren", "Bordüre Breit", 50, 200, "🎞️", "Breite Bordüre für Handtücher"))
+    ARRAY_PUSH(l, vorlageNeu("Bordüren", "Borte Endlos", 30, 400, "♾️", "Lange Borte zum Wiederholen"))
+    ARRAY_PUSH(l, vorlageNeu("Bilder", "Mini-Bild", 40, 40, "🖼️", "Kleines Motiv, Ornament"))
+    ARRAY_PUSH(l, vorlageNeu("Bilder", "Kleines Bild", 60, 80, "🎨", "Postkartengröße"))
+    ARRAY_PUSH(l, vorlageNeu("Bilder", "Mittleres Bild", 100, 120, "🖼️", "A5-Format"))
+    ARRAY_PUSH(l, vorlageNeu("Bilder", "Großes Bild", 150, 200, "🎭", "A4-Format"))
+    ARRAY_PUSH(l, vorlageNeu("Bilder", "Wandbild", 200, 250, "🏛️", "Großes Wandbild"))
+    ARRAY_PUSH(l, vorlageNeu("Kissen", "Nadelkissen", 30, 30, "📍", "Kleines Nadelkissen"))
+    ARRAY_PUSH(l, vorlageNeu("Kissen", "Duftkissen", 50, 50, "🌸", "Lavendelkissen"))
+    ARRAY_PUSH(l, vorlageNeu("Kissen", "Sofakissen Klein", 100, 100, "🛋️", "30×30 cm Kissen"))
+    ARRAY_PUSH(l, vorlageNeu("Kissen", "Sofakissen Groß", 140, 140, "🛏️", "40×40 cm Kissen"))
+    ARRAY_PUSH(l, vorlageNeu("Accessoires", "Schlüsselanhänger", 20, 30, "🔑", "Mini-Anhänger"))
+    ARRAY_PUSH(l, vorlageNeu("Accessoires", "Taschenspiegel", 35, 35, "🪞", "Rund, für Spiegel"))
+    ARRAY_PUSH(l, vorlageNeu("Accessoires", "Brillenetui", 35, 70, "👓", "Für Brillenetui-Einsatz"))
+    ARRAY_PUSH(l, vorlageNeu("Accessoires", "Handytasche", 40, 80, "📱", "Smartphone-Hülle"))
+    ARRAY_PUSH(l, vorlageNeu("Accessoires", "Geldbörse", 50, 40, "👛", "Für Geldbörsen-Einsatz"))
+    ARRAY_PUSH(l, vorlageNeu("Weihnachten", "Baumschmuck Klein", 25, 25, "🎄", "Kleiner Anhänger"))
+    ARRAY_PUSH(l, vorlageNeu("Weihnachten", "Baumschmuck Groß", 40, 50, "⭐", "Größerer Schmuck"))
+    ARRAY_PUSH(l, vorlageNeu("Weihnachten", "Nikolausstiefel", 60, 80, "🥾", "Stiefelform"))
+    ARRAY_PUSH(l, vorlageNeu("Weihnachten", "Adventskalender", 120, 150, "📅", "24 Felder"))
+    RETURN l
+END FUNCTION
+
+' Die Groessen fuer Diamond Painting (2,5 mm Drill)
+FUNCTION dpVorlagenNamen() AS ARRAY OF STRING
+    RETURN ["— Keine Auswahl (eigene Werte) —", "DP A4 quadratisch (60×60 = 15×15 cm)", "DP A4 hoch (60×80 = 15×20 cm)", "DP A4 quer (80×60 = 20×15 cm)", "DP A3 (100×100 = 25×25 cm)", "DP A3 quer (140×100 = 35×25 cm)", "DP A2 (150×150 = 38×38 cm)", "DP A2 quer (200×150 = 50×38 cm)", "DP A1 (200×200 = 50×50 cm)", "DP A1 quer (280×200 = 70×50 cm)", "DP A0 (300×300 = 75×75 cm)", "DP Gross (400×400 = 100×100 cm)"]
+END FUNCTION
+
+' je Eintrag Breite und Hoehe (der erste: keine)
+FUNCTION dpVorlagenMasse() AS ARRAY OF INTEGER
+    RETURN [0, 0, 60, 60, 60, 80, 80, 60, 100, 100, 140, 100, 150, 150, 200, 150, 200, 200, 280, 200, 300, 300, 400, 400]
+END FUNCTION
+
+' Eigene Vorlagen (PyStickys user_templates.json: eine Liste von Objekten mit
+' name, width, height, fabric_count, description, category). Ein Eintrag mit
+' fehlendem Pflichtfeld oder unbekanntem Schluessel wird uebergangen, wie
+' bei PySticky (UserTemplate(**eintrag)).
+FUNCTION eigeneVorlagen(pfad AS STRING) AS ARRAY OF Vorlage
+    DIM l AS ARRAY OF Vorlage : l = []
+    IF NOT FILEEXISTS(pfad) THEN RETURN l
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_LOAD(pfad)
+    CATCH e
+        RETURN l
+    END TRY
+    IF JSON_TYPE(j, "") <> "array" THEN RETURN l
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "") - 1
+        DIM w AS STRING : w = STR$(i)
+        IF JSON_TYPE(j, w) <> "object" THEN CONTINUE
+        DIM ok AS BOOLEAN : ok = TRUE
+        DIM k AS STRING
+        FOR EACH k IN JSON_KEYS(j, w)
+            IF INSTR("|name|width|height|fabric_count|description|category|", "|" + k + "|") < 0 THEN ok = FALSE
+        NEXT
+        IF NOT ok OR NOT JSON_HAS(j, w + ".name") OR NOT JSON_HAS(j, w + ".width") OR NOT JSON_HAS(j, w + ".height") THEN CONTINUE
+        ' Breite und Hoehe wie Pythons int() -- PySticky nimmt sie ungeprueft
+        ' und stolpert erst beim Benutzen ueber eine Kommazahl oder einen Text
+        DIM vb AS INTEGER, vh AS INTEGER
+        IF NOT jsonGanz(j, w + ".width", vb) OR NOT jsonGanz(j, w + ".height", vh) THEN CONTINUE
+        DIM v AS Vorlage : v = NEW Vorlage()
+        IF JSON_TYPE(j, w + ".name") = "string" THEN
+            v.name = JSON_GET_STRING(j, w + ".name")
+        ELSE
+            v.name = JSON_STRINGIFY(JSON_GET_JSON(j, w + ".name"))
+        END IF
+        v.breite = vb
+        v.hoehe = vh
+        v.stoff = 14
+        DIM vs AS INTEGER
+        IF JSON_HAS(j, w + ".fabric_count") THEN
+            IF jsonGanz(j, w + ".fabric_count", vs) THEN v.stoff = vs
+        END IF
+        IF JSON_HAS(j, w + ".description") THEN
+            IF JSON_TYPE(j, w + ".description") = "string" THEN v.beschreibung = JSON_GET_STRING(j, w + ".description")
+        END IF
+        v.kategorie = "Eigene"
+        IF JSON_HAS(j, w + ".category") THEN
+            IF JSON_TYPE(j, w + ".category") = "string" THEN v.kategorie = JSON_GET_STRING(j, w + ".category")
+        END IF
+        v.zeichen = "⭐"
+        ARRAY_PUSH(l, v)
+    NEXT
+    RETURN l
+END FUNCTION
+
+FUNCTION eigeneVorlagenJson$(l AS ARRAY OF Vorlage) AS STRING
+    DIM j AS JSON_HANDLE : j = JSON_NEW_ARRAY()
+    DIM v AS Vorlage
+    FOR EACH v IN l
+        DIM e AS JSON_HANDLE : e = JSON_NEW_OBJECT()
+        JSON_SET_STRING(e, "name", v.name)
+        JSON_SET_INT(e, "width", v.breite)
+        JSON_SET_INT(e, "height", v.hoehe)
+        JSON_SET_INT(e, "fabric_count", v.stoff)
+        JSON_SET_STRING(e, "description", v.beschreibung)
+        JSON_SET_STRING(e, "category", v.kategorie)
+        JSON_APPEND_JSON(j, "", e)
+    NEXT
+    RETURN JSON_PRETTY(j)
+END FUNCTION
+
+' Ein neues Muster wie PyStickys "Neu": eine Ebene "Hintergrund", Stoff (im
+' Diamond-Modus 10 = 2,5-mm-Drill), mit dem Namen der Vorlage und genau einer
+' Farbe -- im Kreuzstich das erste Garn der Palette `palette` (fehlt sie:
+' Anchor), im Diamond-Modus das erste der alphabetisch ersten
+' Diamond-Palette.
+FUNCTION musterAnlegen(b AS INTEGER, h AS INTEGER, stoff AS INTEGER, diamant AS BOOLEAN, vorlage AS STRING, paletten AS ARRAY OF Palette, palette AS STRING, symbole AS ARRAY OF STRING) AS Muster
+    DIM m AS Muster : m = neuesMuster(tr$("Neues Muster"), b, h)
+    m.stoff = IIF(diamant, 10, stoff)
+    IF diamant THEN m.modus = "diamond"
+    IF vorlage <> "" THEN m.name = vorlage
+    DIM q AS Palette
+    IF diamant THEN
+        DIM namen AS ARRAY OF STRING : namen = []
+        DIM p AS Palette
+        FOR EACH p IN paletten
+            IF p.istDiamant THEN ARRAY_PUSH(namen, p.name)
+        NEXT
+        SORT(namen)
+        IF LEN(namen) > 0 THEN q = paletteNamens(paletten, namen[0])
+    ELSE
+        q = paletteNamens(paletten, palette)
+        IF IS_NIL(q) THEN q = paletteNamens(paletten, "Anchor")
+    END IF
+    IF NOT IS_NIL(q) THEN
+        IF LEN(q.garne) > 0 THEN
+            DIM v AS Verlauf : v = neuerVerlauf()
+            DIM nr AS INTEGER : nr = farbeHinzufuegen(m, v, q.garne[0], symbole, FALSE, FALSE)
+        END IF
+    END IF
+    RETURN m
+END FUNCTION
+
+' Fertige Groesse in cm (Stiche je Zoll / 2,54)
+FUNCTION fertigCm(stiche AS INTEGER, stoff AS FLOAT) AS FLOAT
+    RETURN stiche / (stoff / 2.54)
+END FUNCTION
+
+' --- Eigenschaften ----------------------------------------------------------------------------
+' author, copyright, notes, started_date (JJJJ-MM-TT) in den Metadaten; leer
+' nimmt den Schluessel heraus.
+
+FUNCTION eigenschaftenSchluessel() AS ARRAY OF STRING
+    RETURN ["author", "copyright", "notes", "started_date"]
+END FUNCTION
+
+FUNCTION eigenschaft$(m AS Muster, k AS STRING) AS STRING
+    IF NOT JSON_HAS(m.metadaten, k) THEN RETURN ""
+    IF JSON_TYPE(m.metadaten, k) = "string" THEN RETURN JSON_GET_STRING(m.metadaten, k)
+    IF JSON_TYPE(m.metadaten, k) = "null" THEN RETURN ""
+    RETURN JSON_STRINGIFY(JSON_GET_JSON(m.metadaten, k))
+END FUNCTION
+
+' Die Notizen; ohne eigene die des PDF-Exports
+FUNCTION notizen$(m AS Muster) AS STRING
+    DIM n AS STRING : n = eigenschaft$(m, "notes")
+    IF n = "" THEN n = eigenschaft$(m, "pdf_notes")
+    RETURN n
+END FUNCTION
+
+' Liefert, ob sich etwas geaendert hat
+FUNCTION eigenschaftSetzen(m AS Muster, k AS STRING, wert AS STRING) AS BOOLEAN
+    DIM w AS STRING : w = TRIM$(wert)
+    IF w = "" THEN
+        IF NOT JSON_HAS(m.metadaten, k) THEN RETURN FALSE
+        DIM weg AS BOOLEAN : weg = JSON_REMOVE(m.metadaten, k)
+        RETURN TRUE
+    END IF
+    IF JSON_HAS(m.metadaten, k) THEN
+        IF JSON_TYPE(m.metadaten, k) = "string" THEN
+            IF JSON_GET_STRING(m.metadaten, k) = w THEN RETURN FALSE
+        END IF
+    END IF
+    JSON_SET_STRING(m.metadaten, k, w)
+    RETURN TRUE
+END FUNCTION
+
+' Wie PyStickys fabric_label_for
+FUNCTION stoffBezeichnung$(m AS Muster) AS STRING
+    DIM s AS STRING : s = IIF(m.stoff = INT(m.stoff), STR$(INT(m.stoff)), STR$(m.stoff))
+    IF m.modus <> "diamond" THEN RETURN trf$("Aida {0}", [s])
+    IF m.stoff = 10 THEN RETURN "2.5 mm Square"
+    IF m.stoff = 9 THEN RETURN "2.8 mm Round"
+    IF m.stoff = 8 THEN RETURN "3.0 mm Round"
+    RETURN s + " (Drill-Pitch)"
+END FUNCTION
+
+' --- Abgelegte Dateien (PySticky dragEnterEvent/dropEvent) ------------------------
+
+CONST ABLAGE_KEINE = 0
+CONST ABLAGE_MUSTER = 1               ' .pxs und die fremden Formate
+CONST ABLAGE_BILD = 2                 ' geht in den Bild-Import
+
+' Bildformate: was die Laufzeit selbst liest (LOADIMAGE), und was dazu
+' kommen kann, wenn GTKs Bildlader es hat (PySticky: WebP, TIFF, AVIF; dazu
+' HEIC/HEIF und JPEG XL). Ob ein Lader da ist, haengt an der Installation --
+' die GTK aus Inkscape kann TIFF und AVIF, aber kein WebP.
+FUNCTION bildEndungenEigen() AS ARRAY OF STRING
+    RETURN ["png", "jpg", "jpeg", "bmp", "gif", "tga", "qoi"]
+END FUNCTION
+
+FUNCTION bildEndungenZusatz() AS ARRAY OF STRING
+    RETURN ["webp", "tif", "tiff", "avif", "heic", "heif", "jxl"]
+END FUNCTION
+
+' Die eigenen und die zusaetzlichen, die der Bildlader kennt (system: seine
+' Endungen, klein geschrieben)
+FUNCTION bildEndungen(system AS ARRAY OF STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = bildEndungenEigen()
+    DIM e AS STRING
+    FOR EACH e IN bildEndungenZusatz()
+        IF ARRAY_INDEXOF(system, e) >= 0 THEN ARRAY_PUSH(aus, e)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+FUNCTION endung$(pfad AS STRING) AS STRING
+    DIM e AS STRING : e = LOWER$(pfad)
+    DIM p AS INTEGER : p = INSTRREV(e, ".")
+    IF p < 0 THEN RETURN ""
+    RETURN MID$(e, p + 1)
+END FUNCTION
+
+' Liest die Laufzeit das Bild nicht selbst, geht es ueber GTKs Bildlader
+FUNCTION bildUeberGtk(pfad AS STRING) AS BOOLEAN
+    RETURN ARRAY_INDEXOF(bildEndungenEigen(), endung$(pfad)) < 0
+END FUNCTION
+
+' Was mit einer Datei geschieht, nach ihrer Endung -- Bilder die, die die
+' Laufzeit liest (ablageArt) bzw. dazu die aus bildEndungen (ablageArtMit).
+FUNCTION ablageArt(pfad AS STRING) AS INTEGER
+    RETURN ablageArtMit(pfad, bildEndungenEigen())
+END FUNCTION
+
+FUNCTION ablageArtMit(pfad AS STRING, bilder AS ARRAY OF STRING) AS INTEGER
+    DIM e AS STRING : e = endung$(pfad)
+    IF e = "" THEN RETURN ABLAGE_KEINE
+    IF e = "pxs" OR e = "oxs" OR e = "xsd" OR e = "pat" THEN RETURN ABLAGE_MUSTER
+    IF ARRAY_INDEXOF(bilder, e) >= 0 THEN RETURN ABLAGE_BILD
+    RETURN ABLAGE_KEINE
+END FUNCTION
+
+' Die Zeilen einer text/uri-list (RFC 2483): getrennt durch CR LF, Zeilen mit
+' "#" sind Kommentare, leere fallen weg.
+FUNCTION uriListe(text AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(text, CHR$(13), ""), CHR$(10))
+        z = TRIM$(z)
+        IF z = "" OR LEFT$(z, 1) = "#" THEN CONTINUE
+        ARRAY_PUSH(aus, z)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' --- Fremde Muster (PySticky PatternImportDialog) ---------------------------------
+
+CLASS FremdImport
+    DIM muster AS Muster
+    DIM warnungen AS ARRAY OF STRING
+    DIM format AS STRING                ' wie PySticky: "PCStitch (PAT)" ...
+END CLASS
+
+' Der Formatname zur Endung (PySticky _PatternImportWorker), "" = keins davon
+FUNCTION fremdFormat$(pfad AS STRING) AS STRING
+    DIM e AS STRING : e = LOWER$(pfad)
+    DIM p AS INTEGER : p = INSTRREV(e, ".")
+    IF p < 0 THEN RETURN ""
+    SELECT CASE MID$(e, p)
+        CASE ".xsd" : RETURN tr$("Pattern Maker (XSD)")
+        CASE ".pat" : RETURN tr$("PCStitch (PAT)")
+        CASE ".oxs" : RETURN tr$("Open Cross Stitch (OXS)")
+    END SELECT
+    RETURN ""
+END FUNCTION
+
+' Eine XSD-, PAT- oder OXS-Datei lesen; ein Fehler ist ein THROW mit der
+' Meldung des Lesers. Die Warnungen bleiben, wie der Leser sie schreibt.
+FUNCTION fremdLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY OF STRING) AS FremdImport
+    DIM f AS FremdImport : f = NEW FremdImport()
+    f.format = fremdFormat$(pfad)
+    DIM e AS STRING : e = LOWER$(pfad)
+    IF f.format = "" THEN
+        DIM p AS INTEGER : p = INSTRREV(e, ".")
+        THROW trf$("Unbekanntes Format: {0}", [IIF(p < 0, tr$("(ohne Endung)"), MID$(e, p))])
+    END IF
+    IF RIGHT$(e, 4) = ".oxs" THEN
+        DIM o AS OxsImport : o = oxsLaden(pfad, paletten, symbole)
+        f.muster = o.muster : f.warnungen = o.warnungen
+    ELSEIF RIGHT$(e, 4) = ".pat" THEN
+        DIM pa AS PatImport : pa = patLaden(pfad, paletten, symbole)
+        f.muster = pa.muster : f.warnungen = pa.warnungen
+    ELSE
+        DIM x AS XsdImport : x = xsdLaden(pfad, paletten, symbole)
+        f.muster = x.muster : f.warnungen = x.warnungen
+    END IF
+    RETURN f
+END FUNCTION
+
+' Die Angaben des Dialogs (PySticky _update_info): Name, Groesse in Stichen
+' und Zentimetern, Farben, Stiche ueber alle Ebenen, Format.
+FUNCTION fremdInfo(f AS FremdImport) AS ARRAY OF STRING
+    DIM m AS Muster : m = f.muster
+    RETURN [m.name, trf$("{0} × {1} Stiche ({2} × {3} cm)", [STR$(m.breite), STR$(m.hoehe), zahlAnzeige$(m.breiteCm(), 1), zahlAnzeige$(m.hoeheCm(), 1)]), _
+        STR$(m.farbanzahl()), STR$(statistikVon(m).sticheGesamt), f.format]
+END FUNCTION
+
+' --- Neu in Glutfaden (daten/neuigkeiten.txt) ----------------------------------------
+' Abschnitte mit "## Titel", darunter Absaetze (Leerzeilen trennen sie), "#" am
+' Zeilenanfang ist Kommentar. Liefert (Titel, Texte); ein Text haelt seine
+' Absaetze mit einer Leerzeile dazwischen. Ohne Datei: zwei leere Listen.
+FUNCTION neuigkeitenLesen(pfad AS STRING) AS TUPLE
+    DIM titel AS ARRAY OF STRING : titel = []
+    DIM texte AS ARRAY OF STRING : texte = []
+    IF NOT FILEEXISTS(pfad) THEN RETURN (titel, texte)
+    DIM nl AS STRING : nl = CHR$(10)
+    DIM absatz AS STRING, text AS STRING, z AS STRING
+    FOR EACH z IN READLINES(pfad)
+        z = RTRIM$(z)
+        IF LEFT$(z, 3) = "## " THEN
+            IF LEN(titel) > 0 THEN ARRAY_PUSH(texte, neuAbsatz$(text, absatz))
+            ARRAY_PUSH(titel, TRIM$(MID$(z, 3)))
+            text = ""
+            absatz = ""
+        ELSEIF LEFT$(z, 1) = "#" THEN
+            CONTINUE
+        ELSEIF LEN(titel) = 0 THEN
+            CONTINUE
+        ELSEIF TRIM$(z) = "" THEN
+            text = neuAbsatz$(text, absatz)
+            absatz = ""
+        ELSE
+            absatz = IIF(absatz = "", TRIM$(z), absatz + " " + TRIM$(z))
+        END IF
+    NEXT
+    IF LEN(titel) > 0 THEN ARRAY_PUSH(texte, neuAbsatz$(text, absatz))
+    RETURN (titel, texte)
+END FUNCTION
+
+FUNCTION neuAbsatz$(text AS STRING, absatz AS STRING) AS STRING
+    IF absatz = "" THEN RETURN text
+    IF text = "" THEN RETURN absatz
+    RETURN text + CHR$(10) + CHR$(10) + absatz
+END FUNCTION

@@ -1,0 +1,398 @@
+' Farben verwalten (PySticky ui/dialogs/color_management_dialog.py):
+' sortieren, umordnen, loeschen, zusammenfuehren, Faeden je Farbe.
+'
+' Der Dialog arbeitet auf einem PLAN (welche alte Farbe an welcher Stelle
+' steht, welche weg ist oder in welche sie aufgeht, wie viele Faeden), und
+' farbplanAnwenden macht daraus EINEN Schritt im Verlauf. Mit Absicht anders
+' als das Original, das direkt im Muster arbeitete:
+'   - Sortieren nummeriert die Stiche mit um. PySticky stellte nur die
+'     Farbliste um -- jeder Stich zeigte danach auf eine andere Farbe, das
+'     Muster war umgefaerbt.
+'   - "Abbrechen" verwirft wirklich (dort blieb alles im Muster stehen), und
+'     Rueckgaengig nimmt den ganzen Umbau zurueck (dort wurde der Verlauf
+'     geleert).
+'   - "Ungenutzte entfernen" laesst Farben stehen, die nur Rueckstiche haben
+'     -- wie der Knopf der Seitenleiste; PySticky loeschte sie samt Linien.
+' Die Regeln fuer die Stiche sind die des Originals: Loeschen nimmt Stich,
+' Typ und "erledigt" weg und die Rueckstiche der Farbe; Zusammenfuehren legt
+' die Stiche auf die Zielfarbe, und nur wenn Quelle oder Ziel Perle oder
+' Drill ist, wird der Typ neu gesetzt (merge_colors_stitches); die
+' Rueckstiche gehen mit. Alle Ebenen, auch unsichtbare und gesperrte.
+
+CONST FP_BLEIBT = -2
+CONST FP_WEG = -1
+
+FUNCTION farbSortierungen() AS ARRAY OF STRING
+    RETURN ["Original", "Nach Name (A-Z)", "Nach Name (Z-A)", "Nach Hersteller", _
+        "Nach Helligkeit (hell → dunkel)", "Nach Helligkeit (dunkel → hell)", _
+        "Nach Verwendung (meiste zuerst)", "Nach Verwendung (wenigste zuerst)"]
+END FUNCTION
+
+' Helligkeit wie ThreadColor.luminance (BT.601)
+FUNCTION garnHelligkeit(f AS INTEGER) AS FLOAT
+    RETURN (0.299 * ((f SHR 16) BAND 255) + 0.587 * ((f SHR 8) BAND 255) + 0.114 * (f BAND 255)) / 255.0
+END FUNCTION
+
+' a vor b? (strikt kleiner nach dem Schluessel der Sortierung)
+FUNCTION fvKleiner(m AS Muster, a AS INTEGER, b AS INTEGER, art AS INTEGER) AS BOOLEAN
+    DIM fa AS Farbeintrag : fa = m.farben[a]
+    DIM fb AS Farbeintrag : fb = m.farben[b]
+    SELECT CASE art
+        CASE 1, 2
+            RETURN LOWER$(fa.garn.name) < LOWER$(fb.garn.name)
+        CASE 3
+            DIM ha AS STRING : ha = IIF(fa.garn.hersteller = "", "ZZZ", fa.garn.hersteller)
+            DIM hb AS STRING : hb = IIF(fb.garn.hersteller = "", "ZZZ", fb.garn.hersteller)
+            IF ha <> hb THEN RETURN ha < hb
+            RETURN LOWER$(fa.garn.name) < LOWER$(fb.garn.name)
+        CASE 4, 5
+            RETURN garnHelligkeit(fa.garn.farbe) < garnHelligkeit(fb.garn.farbe)
+        CASE 6, 7
+            RETURN fa.stichzahl < fb.stichzahl
+    END SELECT
+    RETURN a < b
+END FUNCTION
+
+' Eine Folge alter Farbnummern sortiert -- stabil wie Pythons list.sort, auch
+' absteigend (reverse=True laesst Gleiche in ihrer Reihenfolge). "Original"
+' ist die Reihenfolge der Nummern selbst. Die Stichzahlen muessen stimmen.
+FUNCTION farbFolgeSortiert(m AS Muster, folge AS ARRAY OF INTEGER, art AS INTEGER) AS ARRAY OF INTEGER
+    DIM aus AS ARRAY OF INTEGER : aus = ARRAY_COPY(folge)
+    DIM absteigend AS BOOLEAN : absteigend = art = 2 OR art = 4 OR art = 6
+    DIM i AS INTEGER, j AS INTEGER, x AS INTEGER
+    FOR i = 1 TO LEN(aus) - 1
+        x = aus[i]
+        j = i - 1
+        IF art = 0 THEN
+            WHILE j >= 0
+                IF aus[j] <= x THEN EXIT WHILE
+                aus[j + 1] = aus[j]
+                j = j - 1
+            WEND
+        ELSEIF absteigend THEN
+            WHILE j >= 0
+                IF NOT fvKleiner(m, aus[j], x, art) THEN EXIT WHILE
+                aus[j + 1] = aus[j]
+                j = j - 1
+            WEND
+        ELSE
+            WHILE j >= 0
+                IF NOT fvKleiner(m, x, aus[j], art) THEN EXIT WHILE
+                aus[j + 1] = aus[j]
+                j = j - 1
+            WEND
+        END IF
+        aus[j + 1] = x
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Ein Eintrag mit anderer Faden-Zahl: eine Kopie (dieselbe farbId), sonst
+' aenderte der Verlauf auch den Vorher-Stand mit.
+FUNCTION farbeintragKopie(f AS Farbeintrag) AS Farbeintrag
+    DIM k AS Farbeintrag : k = NEW Farbeintrag()
+    k.garn = f.garn
+    k.symbol = f.symbol
+    k.stichzahl = f.stichzahl
+    k.auslassen = f.auslassen
+    k.straenge = f.straenge
+    k.istPerle = f.istPerle
+    k.istDiamant = f.istDiamant
+    k.farbId = f.farbId
+    RETURN k
+END FUNCTION
+
+' Der Plan als ein Schritt. folge = die bleibenden alten Nummern in der neuen
+' Reihenfolge; ziel[i] = FP_BLEIBT, FP_WEG oder die alte Nummer der Farbe, in
+' die i aufgeht (sie muss bleiben); straenge[i] = Faeden der alten Farbe i.
+' FALSE, wenn sich nichts aendert.
+FUNCTION farbplanAnwenden(m AS Muster, v AS Verlauf, folge AS ARRAY OF INTEGER, ziel AS ARRAY OF INTEGER, straenge AS ARRAY OF INTEGER, titel AS STRING) AS BOOLEAN
+    DIM n AS INTEGER : n = m.farbanzahl()
+    DIM i AS INTEGER, k AS INTEGER
+    ' Was wird aus jeder alten Farbe: neue Stelle oder weg
+    DIM hin[n] AS INTEGER
+    FOR i = 0 TO n - 1 : hin[i] = KEIN_STICH : NEXT
+    FOR k = 0 TO LEN(folge) - 1
+        hin[folge[k]] = k
+    NEXT
+    DIM aendert AS BOOLEAN : aendert = LEN(folge) <> n
+    FOR k = 0 TO LEN(folge) - 1
+        IF folge[k] <> k OR straenge[folge[k]] <> m.farben[folge[k]].straenge THEN aendert = TRUE
+    NEXT
+    IF NOT aendert THEN RETURN FALSE
+    v.beginnen(titel)
+    ' 1. Die Stiche weggenommener Farben: geloescht oder auf das Ziel (alte
+    '    Nummern -- umnummeriert wird erst danach)
+    DIM e AS Ebene
+    FOR EACH e IN m.ebenen.ebenen
+        DIM r AS ARRAY OF INTEGER : r = e.raster
+        DIM a AS ARRAY OF INTEGER : a = e.art
+        DIM p AS ARRAY OF INTEGER : p = []
+        DIM fa AS ARRAY OF INTEGER : fa = []
+        DIM ta AS ARRAY OF INTEGER : ta = []
+        DIM b AS INTEGER : b = e.breite
+        FOR i = 0 TO LEN(r) - 1
+            DIM c AS INTEGER : c = r[i]
+            IF c < 0 OR c >= n THEN CONTINUE
+            IF ziel[c] = FP_BLEIBT THEN CONTINUE
+            ARRAY_PUSH(p, i MOD b) : ARRAY_PUSH(p, i \ b)
+            IF ziel[c] = FP_WEG THEN
+                ARRAY_PUSH(fa, -1) : ARRAY_PUSH(ta, 0)
+            ELSE
+                DIM q AS Farbeintrag : q = m.farben[c]
+                DIM zf AS Farbeintrag : zf = m.farben[ziel[c]]
+                DIM typ AS INTEGER : typ = a[i]
+                IF q.istPerle OR q.istDiamant OR zf.istPerle OR zf.istDiamant THEN
+                    typ = IIF(zf.istPerle, PERLE, IIF(zf.istDiamant, DIAMANT, VOLL))
+                END IF
+                ARRAY_PUSH(fa, ziel[c]) : ARRAY_PUSH(ta, typ)
+            END IF
+        NEXT
+        IF LEN(p) > 0 THEN
+            ' auch gesperrte Ebenen: die Farbe verschwindet aus dem ganzen Muster
+            DIM gesperrt AS BOOLEAN : gesperrt = e.gesperrt
+            e.gesperrt = FALSE
+            DIM z AS INTEGER : z = zellenAufEbene(m, v, e, p, fa, ta, titel)
+            e.gesperrt = gesperrt
+        END IF
+    NEXT
+    ' 2. Liste, Faeden und Rueckstiche, dann alles umnummeriert
+    DIM t AS Aenderung : t = v.teil(TEIL_FARBEN)
+    t.farbenVorher = ARRAY_COPY(m.farben)
+    t.rueckVorher = ARRAY_COPY(m.rueckstiche)
+    DIM neu AS ARRAY OF Farbeintrag : neu = []
+    DIM zurueck AS ARRAY OF INTEGER : zurueck = []
+    FOR k = 0 TO LEN(folge) - 1
+        DIM f AS Farbeintrag : f = m.farben[folge[k]]
+        IF straenge[folge[k]] <> f.straenge THEN
+            f = farbeintragKopie(f)
+            f.straenge = straenge[folge[k]]
+        END IF
+        ARRAY_PUSH(neu, f)
+        ARRAY_PUSH(zurueck, folge[k])
+    NEXT
+    t.farbenNachher = neu
+    DIM rn AS ARRAY OF Rueckstich : rn = []
+    DIM rs AS Rueckstich
+    FOR EACH rs IN m.rueckstiche
+        DIM rf AS INTEGER : rf = rs.farbe
+        IF rf >= 0 AND rf < n THEN
+            IF ziel[rf] = FP_WEG THEN CONTINUE
+            IF ziel[rf] >= 0 THEN rf = ziel[rf]
+            rf = hin[rf]
+        END IF
+        ARRAY_PUSH(rn, neuerRueckstich(rs.x1, rs.y1, rs.x2, rs.y2, rf))
+    NEXT
+    t.rueckNachher = rn
+    t.hin = hin
+    t.zurueck = zurueck
+    v.beenden()
+    teilAnwenden(m, t, TRUE)
+    RETURN TRUE
+END FUNCTION
+
+' --- Der Plan, wie der Dialog ihn bearbeitet ------------------------------------------
+' folge: die alten Nummern, wie sie in der Liste stehen (nur bleibende);
+' ziel und straenge je ALTER Nummer.
+CLASS Farbplan
+    DIM folge AS ARRAY OF INTEGER
+    DIM ziel AS ARRAY OF INTEGER
+    DIM straenge AS ARRAY OF INTEGER
+END CLASS
+
+FUNCTION neuerFarbplan(m AS Muster) AS Farbplan
+    DIM p AS Farbplan : p = NEW Farbplan()
+    p.folge = []
+    p.ziel = []
+    p.straenge = []
+    DIM i AS INTEGER
+    FOR i = 0 TO m.farbanzahl() - 1
+        ARRAY_PUSH(p.folge, i)
+        ARRAY_PUSH(p.ziel, FP_BLEIBT)
+        ARRAY_PUSH(p.straenge, m.farben[i].straenge)
+    NEXT
+    RETURN p
+END FUNCTION
+
+' Wie viele Stiche haette die Farbe an Stelle pos nach dem Plan (eigene plus
+' die zusammengefuehrten)? Die Stichzahlen des Musters muessen stimmen.
+FUNCTION planStiche(m AS Muster, p AS Farbplan, pos AS INTEGER) AS INTEGER
+    DIM alt AS INTEGER : alt = p.folge[pos]
+    DIM s AS INTEGER : s = m.farben[alt].stichzahl
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(p.ziel) - 1
+        IF p.ziel[i] = alt THEN s = s + m.farben[i].stichzahl
+    NEXT
+    RETURN s
+END FUNCTION
+
+' Stelle von pos nach ziel schieben (hoch, runter, an den Anfang, ans Ende)
+SUB planVerschieben(p AS Farbplan, pos AS INTEGER, nach AS INTEGER)
+    IF pos < 0 OR pos >= LEN(p.folge) THEN RETURN
+    nach = CLAMP(nach, 0, LEN(p.folge) - 1)
+    IF nach = pos THEN RETURN
+    DIM alt AS INTEGER : alt = p.folge[pos]
+    ARRAY_REMOVE_AT(p.folge, pos)
+    DIM n AS INTEGER : n = ARRAY_INSERT(p.folge, nach, alt)
+END SUB
+
+' Stellen (Positionen in der Liste) loeschen; was in sie aufging, auch
+SUB planLoeschen(p AS Farbplan, stellen AS ARRAY OF INTEGER)
+    DIM alte AS ARRAY OF INTEGER : alte = []
+    DIM s AS INTEGER
+    FOR EACH s IN stellen
+        IF s >= 0 AND s < LEN(p.folge) THEN ARRAY_PUSH(alte, p.folge[s])
+    NEXT
+    DIM a AS INTEGER, i AS INTEGER
+    FOR EACH a IN alte
+        p.ziel[a] = FP_WEG
+        FOR i = 0 TO LEN(p.ziel) - 1
+            IF p.ziel[i] = a THEN p.ziel[i] = FP_WEG
+        NEXT
+        ARRAY_REMOVE_AT(p.folge, ARRAY_INDEXOF(p.folge, a))
+    NEXT
+END SUB
+
+' Die Stellen quellen gehen in die Stelle zielStelle auf (die erste gewaehlte
+' bleibt -- wie im Original)
+SUB planZusammen(p AS Farbplan, zielStelle AS INTEGER, quellen AS ARRAY OF INTEGER)
+    IF zielStelle < 0 OR zielStelle >= LEN(p.folge) THEN RETURN
+    DIM z AS INTEGER : z = p.folge[zielStelle]
+    DIM alte AS ARRAY OF INTEGER : alte = []
+    DIM s AS INTEGER
+    FOR EACH s IN quellen
+        IF s >= 0 AND s < LEN(p.folge) AND s <> zielStelle THEN ARRAY_PUSH(alte, p.folge[s])
+    NEXT
+    DIM a AS INTEGER, i AS INTEGER
+    FOR EACH a IN alte
+        p.ziel[a] = z
+        FOR i = 0 TO LEN(p.ziel) - 1
+            IF p.ziel[i] = a THEN p.ziel[i] = z
+        NEXT
+        ARRAY_REMOVE_AT(p.folge, ARRAY_INDEXOF(p.folge, a))
+    NEXT
+END SUB
+
+' Ungenutzte (keine Stiche, auch nicht aus Zusammengefuehrtem, keine
+' Rueckstiche) aus dem Plan; liefert, wie viele
+FUNCTION planUngenutzte(m AS Muster, p AS Farbplan) AS INTEGER
+    DIM n AS INTEGER : n = m.farbanzahl()
+    DIM rueck[n] AS INTEGER
+    DIM r AS Rueckstich
+    FOR EACH r IN m.rueckstiche
+        IF r.farbe >= 0 AND r.farbe < n THEN rueck[r.farbe] = 1
+    NEXT
+    DIM weg AS ARRAY OF INTEGER : weg = []
+    DIM k AS INTEGER, i AS INTEGER
+    FOR k = 0 TO LEN(p.folge) - 1
+        IF planStiche(m, p, k) > 0 THEN CONTINUE
+        DIM alt AS INTEGER : alt = p.folge[k]
+        DIM linien AS BOOLEAN : linien = rueck[alt] = 1
+        FOR i = 0 TO n - 1
+            IF p.ziel[i] = alt AND rueck[i] = 1 THEN linien = TRUE
+        NEXT
+        IF NOT linien THEN ARRAY_PUSH(weg, k)
+    NEXT
+    planLoeschen(p, weg)
+    RETURN LEN(weg)
+END FUNCTION
+
+SUB planSortieren(m AS Muster, p AS Farbplan, art AS INTEGER)
+    p.folge = farbFolgeSortiert(m, p.folge, art)
+END SUB
+
+' Liefert TRUE, wenn sich etwas geaendert hat
+FUNCTION planAnwenden(m AS Muster, v AS Verlauf, p AS Farbplan) AS BOOLEAN
+    RETURN farbplanAnwenden(m, v, p.folge, p.ziel, p.straenge, tr$("Farben verwalten"))
+END FUNCTION
+
+' --- Palette als Datei (PySticky _on_export_palette / _on_import_palette) -----------
+' Das JSON-Format "pysticky_palette" 1.0: Name, Farbe (r, g, b), Hersteller,
+' Katalognummer und Symbol je Farbe. Geschrieben wie Pythons json.dump mit
+' indent=2 (JSON_PRETTY), damit PySticky dieselbe Datei liest und schreibt.
+
+FUNCTION paletteDateiText$(m AS Muster) AS STRING
+    DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+    JSON_SET_STRING(j, "format", "pysticky_palette")
+    JSON_SET_STRING(j, "version", "1.0")
+    JSON_SET_STRING(j, "name", m.name)
+    JSON_SET_JSON(j, "colors", JSON_NEW_ARRAY())
+    DIM f AS Farbeintrag
+    FOR EACH f IN m.farben
+        DIM o AS JSON_HANDLE : o = JSON_NEW_OBJECT()
+        JSON_SET_STRING(o, "name", f.garn.name)
+        DIM c AS JSON_HANDLE : c = JSON_NEW_OBJECT()
+        JSON_SET_INT(c, "r", (f.garn.farbe SHR 16) BAND 255)
+        JSON_SET_INT(c, "g", (f.garn.farbe SHR 8) BAND 255)
+        JSON_SET_INT(c, "b", f.garn.farbe BAND 255)
+        JSON_SET_JSON(o, "color", c)
+        JSON_SET_STRING(o, "manufacturer", f.garn.hersteller)
+        JSON_SET_STRING(o, "catalog_number", f.garn.nummer)
+        JSON_SET_STRING(o, "symbol", f.symbol)
+        JSON_APPEND_JSON(j, "colors", o)
+    NEXT
+    RETURN JSON_PRETTY(j)
+END FUNCTION
+
+FUNCTION paletteGanz(j AS JSON_HANDLE, pfad AS STRING, vorgabe AS INTEGER) AS INTEGER
+    IF NOT JSON_HAS(j, pfad) THEN RETURN vorgabe
+    IF JSON_TYPE(j, pfad) <> "number" THEN RETURN vorgabe
+    RETURN CLAMP(INT(JSON_GET_FLOAT(j, pfad)), 0, 255)
+END FUNCTION
+
+FUNCTION paletteText$(j AS JSON_HANDLE, pfad AS STRING, vorgabe AS STRING) AS STRING
+    IF NOT JSON_HAS(j, pfad) THEN RETURN vorgabe
+    IF JSON_TYPE(j, pfad) <> "string" THEN RETURN vorgabe
+    RETURN JSON_GET_STRING(j, pfad)
+END FUNCTION
+
+' Eine Palettendatei ins Muster nehmen -- ein Schritt. Farben, die es schon
+' gibt (gleicher Hersteller und Nummer, ohne Nummer gleiche Farbe), werden
+' nicht doppelt angelegt. Das Symbol der Datei kommt nur, wenn keine andere
+' Farbe es traegt (PySticky setzte es auch dann -- zwei Farben mit einem
+' Symbol). Liefert die Zahl der gelesenen Farben wie das Original; THROW mit
+' der Meldung des Originals, wenn die Datei keine Palette ist.
+FUNCTION paletteImportieren(m AS Muster, v AS Verlauf, text AS STRING, symbole AS ARRAY OF STRING) AS INTEGER
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_PARSE(text)
+    CATCH fehler
+        THROW trf$("Datei konnte nicht gelesen werden: {0}", [fehler])
+    END TRY
+    IF JSON_TYPE(j, "") <> "object" THEN THROW tr$("Die Datei ist keine gültige PySticky-Palettendatei.")
+    IF paletteText$(j, "format", "") <> "pysticky_palette" THEN THROW tr$("Die Datei ist keine gültige PySticky-Palettendatei.")
+    DIM n AS INTEGER
+    IF JSON_HAS(j, "colors") THEN
+        IF JSON_TYPE(j, "colors") = "array" THEN n = JSON_LEN(j, "colors")
+    END IF
+    IF n = 0 THEN THROW tr$("Die Palettendatei enthält keine Farben.")
+    v.beginnen(tr$("Palette importieren"))
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM w AS STRING : w = "colors." + STR$(i)
+        DIM farbe AS INTEGER : farbe = (paletteGanz(j, w + ".color.r", 128) SHL 16) BOR (paletteGanz(j, w + ".color.g", 128) SHL 8) BOR paletteGanz(j, w + ".color.b", 128)
+        DIM g AS Garn : g = neuesGarn(paletteText$(j, w + ".name", tr$("Unbekannt")), farbe, paletteText$(j, w + ".manufacturer", ""), paletteText$(j, w + ".catalog_number", ""))
+        DIM nr AS INTEGER : nr = farbeHinzufuegen(m, v, g, symbole, FALSE, FALSE)
+        DIM s AS STRING : s = TRIM$(paletteText$(j, w + ".symbol", ""))
+        IF s <> "" AND nr >= 0 THEN
+            DIM egal AS STRING : egal = symbolSetzen(m, v, nr, s)
+        END IF
+    NEXT
+    v.beenden()
+    RETURN n
+END FUNCTION
+
+' --- Drucken (PySticky _on_print) ----------------------------------------------------
+' Eine Seite: 5 % der Seitenbreite Rand ringsum, das Muster so gross wie es
+' passt und mittig, quer bei einem breiten Muster. Liefert (Zelle, x0, y0).
+FUNCTION druckLage(b AS INTEGER, h AS INTEGER, seiteB AS FLOAT, seiteH AS FLOAT) AS TUPLE
+    DIM rand AS FLOAT : rand = seiteB * 0.05
+    DIM nb AS FLOAT : nb = seiteB - 2 * rand
+    DIM nh AS FLOAT : nh = seiteH - 2 * rand
+    DIM z AS FLOAT : z = MIN(nb / b, nh / h)
+    RETURN (z, rand + (nb - z * b) / 2, rand + (nh - z * h) / 2)
+END FUNCTION
+
+FUNCTION druckQuer(b AS INTEGER, h AS INTEGER) AS BOOLEAN
+    RETURN b > h
+END FUNCTION

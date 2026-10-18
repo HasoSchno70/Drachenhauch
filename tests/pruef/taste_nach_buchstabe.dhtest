@@ -1,0 +1,80 @@
+' KEYHIT("z") -- die Taste, auf der der Buchstabe STEHT (2026-10-10).
+'
+' Ein Tastencode meint die LAGE der Taste (raylib/GLFW benennen Tasten nach
+' der US-Tastatur): KEY_Z ist auf einer deutschen Tastatur die Taste mit dem
+' Y, auf einer franzoesischen die mit dem W. Fuer WASD ist das richtig, fuer
+' Strg+Z nicht -- gefunden beim Dogfooding der 3D-Werkstatt, wo Strg+Z mit
+' KEYHIT(KEY_Z) auf der deutschen Tastatur nichts zuruecknahm. Die gui-Kuerzel
+' gingen schon nach der Belegung (graphics.rs `belegung`), ein Programm hatte
+' keinen Weg dorthin. Jetzt nimmt KEYHIT & Co. auch einen Buchstaben als Text.
+'
+' Die echten Faelle schicken die Taste so, wie ein Druck auf die Beschriftung
+' bei der Belegung DIESES Rechners ankommt (fenstersender.ps1 "buchstabe:z":
+' Scancode aus MapVirtualKey). Auf einer deutschen Tastatur kaeme bei einer
+' Zuordnung nach der Lage "y" vor "z" heraus.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== ein buchstabe meint die beschriftete taste
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "taste.dh", "buchstabe:z|buchstabe:y|buchstabe:a", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei taste.dh
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+SETFPS(60)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM folge AS STRING
+DIM gehalten AS INTEGER
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 4000
+    IF KEYHIT("z") THEN folge = folge + "z"
+    IF KEYHIT("Y") THEN folge = folge + "y"
+    IF KEYHIT("a") THEN folge = folge + "a"
+    IF KEYPRESSED("z") THEN gehalten = gehalten + 1
+    IF KEYRELEASED("z") THEN folge = folge + "Z"
+    CLS(0) : FLIP()
+WEND
+PRINT folge
+PRINT gehalten > 0
+--- system windows
+--- erwartet
+gesendet
+zZya
+TRUE
+
+=== ein text, der kein buchstabe ist, ist ein fehler
+SCREEN(200, 100, "T", 1)
+PRINT KEYHIT("+")
+--- fehler
+KEYHIT: ein Text meint den Buchstaben oder die Ziffer auf der Taste -- "+" ist keins
+
+=== ein langer text ist ein fehler
+SCREEN(200, 100, "T", 1)
+PRINT KEYPRESSED("leer")
+--- fehler
+KEYPRESSED: ein Text meint den Buchstaben oder die Ziffer auf der Taste -- "leer" ist keins
+
+=== check warnt nicht vor einem buchstaben
+DIM p AS INTEGER
+p = PROCESS_START("dhrt", "--check", "p.dh")
+DIM aus AS STRING
+DIM leer AS INTEGER
+WHILE leer < 5
+    DIM z AS STRING : z = PROCESS_READ$(p)
+    IF z = "" THEN
+        IF NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(30)
+    ELSE
+        aus = aus + TRIM$(z)
+    END IF
+WEND
+PRINT aus
+--- datei p.dh
+IF KEYPRESSED(KEY_LCTRL) AND KEYHIT("z") THEN PRINT "zurueck"
+IF KEYREPEAT("x") OR KEYRELEASED("1") THEN PRINT "x"
+--- erwartet
+[]

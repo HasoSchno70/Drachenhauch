@@ -53,3 +53,59 @@ PRINT PHYS3D_COUNT(w)
 2
 1
 
+
+=== schlafend angelegt bleibt der stapel ruhig bis zum anstoss
+' PHYS3D_SLEEP (2026-10-10): ein frisch aufgebauter Stapel ruht ohnehin --
+' schlafend angelegt kostet er den Loeser nichts. Ein Stoss weckt ihn.
+IMPORT "physics3d"
+DIM w AS PHYS_WORLD
+w = PHYS3D_NEW()
+PHYS3D_ADD_BOX(w, 0.0, -0.5, 0.0, 10.0, 0.5, 10.0, 0, 0.0)
+DIM a AS INTEGER
+DIM b AS INTEGER
+a = PHYS3D_ADD_BOX(w, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1, 0.0)
+b = PHYS3D_ADD_BOX(w, 0.0, 1.5, 0.0, 0.5, 0.5, 0.5, 1, 0.0)
+PHYS3D_SLEEP(w, a)
+PHYS3D_SLEEP(w, b)
+PRINT "schlafen "; PHYS3D_SLEEPING(w, a); " "; PHYS3D_SLEEPING(w, b)
+DIM i AS INTEGER
+FOR i = 1 TO 30 : PHYS3D_STEP(w, 1.0 / 60) : NEXT
+PRINT "noch "; PHYS3D_SLEEPING(w, b); " lage "; PHYS3D_BODY_Y(w, b)
+PHYS3D_APPLY_IMPULSE(w, b, 2.0, 0.0, 0.0)
+PRINT "wach "; NOT PHYS3D_SLEEPING(w, b)
+FOR i = 1 TO 30 : PHYS3D_STEP(w, 1.0 / 60) : NEXT
+PRINT "geschoben "; PHYS3D_BODY_X(w, b) > 0.3
+PRINT "boden schlaeft nie "; PHYS3D_SLEEPING(w, 0)
+--- erwartet
+schlafen TRUE TRUE
+noch TRUE lage 1.5
+wach TRUE
+geschoben TRUE
+boden schlaeft nie FALSE
+
+=== ein schlafender koerper in der luft faellt erst geweckt
+IMPORT "physics3d"
+DIM w AS PHYS_WORLD
+w = PHYS3D_NEW()
+DIM k AS INTEGER
+k = PHYS3D_ADD_SPHERE(w, 0.0, 5.0, 0.0, 0.5, 1, 0.0)
+PHYS3D_SLEEP(w, k)
+DIM i AS INTEGER
+FOR i = 1 TO 30 : PHYS3D_STEP(w, 1.0 / 60) : NEXT
+PRINT "haengt "; PHYS3D_BODY_Y(w, k)
+PHYS3D_SLEEP(w, k, FALSE)
+FOR i = 1 TO 30 : PHYS3D_STEP(w, 1.0 / 60) : NEXT
+PRINT "faellt "; PHYS3D_BODY_Y(w, k) < 4.0
+PRINT PHYS3D_SLEEPING(w, 99)
+--- erwartet
+haengt 5.0
+faellt TRUE
+FALSE
+
+=== sleep mit falscher argumentzahl
+IMPORT "physics3d"
+DIM w AS PHYS_WORLD
+w = PHYS3D_NEW()
+PHYS3D_SLEEP(w)
+--- fehler
+PHYS3D_SLEEP: erwartet 2 oder 3 Argumente

@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2107,
+ "count": 2153,
  "builtins": [
   {
    "name": "ABS",
@@ -120,6 +120,12 @@
    "name": "ARGC",
    "kind": "core",
    "signature": "ARGC() AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "ARGPATH$",
+   "kind": "core",
+   "signature": "ARGPATH$(nummer) AS STRING",
    "module": "dhrt"
   },
   {
@@ -540,6 +546,36 @@
    "name": "AUDIO_IS_PLAYING",
    "kind": "core",
    "signature": "AUDIO_IS_PLAYING(ch)",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_IS_WAITING",
+   "kind": "core",
+   "signature": "AUDIO_IS_WAITING(sound) AS BOOLEAN",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_RECORD_START",
+   "kind": "core",
+   "signature": "AUDIO_RECORD_START([max_sekunden])",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_RECORD_STOP",
+   "kind": "core",
+   "signature": "AUDIO_RECORD_STOP() AS SOUND",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_RECORDING",
+   "kind": "core",
+   "signature": "AUDIO_RECORDING() AS BOOLEAN",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_PEAK",
+   "kind": "core",
+   "signature": "AUDIO_PEAK() AS FLOAT",
    "module": "audio"
   },
   {
@@ -1479,6 +1515,12 @@
    "module": "chart"
   },
   {
+   "name": "CHART_X",
+   "kind": "core",
+   "signature": "CHART_X(diagramm, xwerte)",
+   "module": "chart"
+  },
+  {
    "name": "CHART_NEW",
    "kind": "core",
    "signature": "CHART_NEW(art: STRING, x: INTEGER, y: INTEGER, breite: INTEGER, hoehe: INTEGER) AS CHART",
@@ -2016,6 +2058,12 @@
    "name": "CUBE_WIRES",
    "kind": "graphics",
    "signature": "CUBE_WIRES(x, y, z, breite, hoehe, tiefe, farbe)",
+   "module": "g3d"
+  },
+  {
+   "name": "CUBE_MATRIX_WIRES",
+   "kind": "graphics",
+   "signature": "CUBE_MATRIX_WIRES(mat [, farbe])",
    "module": "g3d"
   },
   {
@@ -2601,6 +2649,12 @@
    "module": "core"
   },
   {
+   "name": "ZAHL$",
+   "kind": "core",
+   "signature": "ZAHL$(zahl [, stellen]) AS STRING",
+   "module": "core"
+  },
+  {
    "name": "EXEPATH$",
    "kind": "core",
    "signature": "EXEPATH$() AS STRING",
@@ -2635,6 +2689,12 @@
    "kind": "core",
    "signature": "FILEEXISTS(p: STRING)",
    "module": "core"
+  },
+  {
+   "name": "FILE_ENCODING$",
+   "kind": "core",
+   "signature": "FILE_ENCODING$(pfad) AS STRING",
+   "module": "dhrt"
   },
   {
    "name": "FILESIZE",
@@ -3225,6 +3285,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_CHANGED",
+   "kind": "core",
+   "signature": "GUI_CHANGED(wdg) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
    "name": "GUI_CHECKED",
    "kind": "core",
    "signature": "GUI_CHECKED(wdg)",
@@ -3627,6 +3693,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_FORM_CONFLICT$",
+   "kind": "core",
+   "signature": "GUI_FORM_CONFLICT$(win[, formular$])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_FORM_VERSION",
+   "kind": "core",
+   "signature": "GUI_FORM_VERSION(win, spalte$[, formular$])",
+   "module": "gui"
+  },
+  {
    "name": "GUI_FORM_LOAD",
    "kind": "core",
    "signature": "GUI_FORM_LOAD(win, db, tabelle$, id[, formular$])",
@@ -3635,7 +3713,7 @@
   {
    "name": "GUI_FORM_SAVE",
    "kind": "core",
-   "signature": "GUI_FORM_SAVE(win, db, tabelle$, id[, formular$])",
+   "signature": "GUI_FORM_SAVE(win, db, tabelle$, id[, formular$[, ueberschreiben]])",
    "module": "gui"
   },
   {
@@ -5793,6 +5871,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_WINDOW_CONTENT_W",
+   "kind": "core",
+   "signature": "GUI_WINDOW_CONTENT_W(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_CONTENT_H",
+   "kind": "core",
+   "signature": "GUI_WINDOW_CONTENT_H(win)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_WINDOW_GET_W",
    "kind": "core",
    "signature": "GUI_WINDOW_GET_W(win)",
@@ -6243,6 +6333,18 @@
    "module": "core"
   },
   {
+   "name": "IMAGE_HEIGHT",
+   "kind": "graphics",
+   "signature": "IMAGE_HEIGHT(img)",
+   "module": "core"
+  },
+  {
+   "name": "IMAGE_WIDTH",
+   "kind": "graphics",
+   "signature": "IMAGE_WIDTH(img)",
+   "module": "core"
+  },
+  {
    "name": "IMAGE_ALPHA_CROP",
    "kind": "graphics",
    "signature": "IMAGE_ALPHA_CROP(bild: IMAGE, schwelle: Zahl) -> IMAGE",
@@ -6473,7 +6575,13 @@
   {
    "name": "IMAGE_SCALE",
    "kind": "core",
-   "signature": "IMAGE_SCALE(img, w, h)",
+   "signature": "IMAGE_SCALE(img, w, h [, filter$])",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_ENHANCE",
+   "kind": "core",
+   "signature": "IMAGE_ENHANCE(img, art$, faktor)",
    "module": "imgfx"
   },
   {
@@ -6594,6 +6702,12 @@
    "name": "INSTR",
    "kind": "core",
    "signature": "INSTR(s, sub[, start])",
+   "module": "core"
+  },
+  {
+   "name": "INSTRREV",
+   "kind": "core",
+   "signature": "INSTRREV(s, sub[, start])",
    "module": "core"
   },
   {
@@ -6801,6 +6915,12 @@
    "module": "json"
   },
   {
+   "name": "JSON_KEY$",
+   "kind": "core",
+   "signature": "JSON_KEY$(name: STRING) AS STRING",
+   "module": "json"
+  },
+  {
    "name": "JSON_LEN",
    "kind": "core",
    "signature": "JSON_LEN(h: ?, path: STRING)",
@@ -6893,25 +7013,25 @@
   {
    "name": "KEYHIT",
    "kind": "graphics",
-   "signature": "KEYHIT(code: Zahl) -> BOOLEAN",
+   "signature": "KEYHIT(taste: Code oder Buchstabe) -> BOOLEAN",
    "module": "core"
   },
   {
    "name": "KEYPRESSED",
    "kind": "graphics",
-   "signature": "KEYPRESSED(code: Zahl)",
+   "signature": "KEYPRESSED(taste: Code oder Buchstabe)",
    "module": "core"
   },
   {
    "name": "KEYRELEASED",
    "kind": "graphics",
-   "signature": "KEYRELEASED(code: Zahl) -> BOOLEAN",
+   "signature": "KEYRELEASED(taste: Code oder Buchstabe) -> BOOLEAN",
    "module": "core"
   },
   {
    "name": "KEYREPEAT",
    "kind": "graphics",
-   "signature": "KEYREPEAT(code: Zahl) -> BOOLEAN",
+   "signature": "KEYREPEAT(taste: Code oder Buchstabe) -> BOOLEAN",
    "module": "core"
   },
   {
@@ -7653,6 +7773,12 @@
    "module": "m3d"
   },
   {
+   "name": "MODEL_MATRIX_WIRES",
+   "kind": "graphics",
+   "signature": "MODEL_MATRIX_WIRES(handle, mat [, farbe])",
+   "module": "m3d"
+  },
+  {
    "name": "MODEL_PBR",
    "kind": "graphics",
    "signature": "MODEL_PBR(modell, metalness, roughness)",
@@ -7877,19 +8003,25 @@
   {
    "name": "MQTT_PUBLISH",
    "kind": "core",
-   "signature": "MQTT_PUBLISH(h, topic$, payload$[, retain: BOOLEAN])",
+   "signature": "MQTT_PUBLISH(h, topic$, payload$[, retain: BOOLEAN]) AS BOOLEAN",
    "module": "mqtt"
   },
   {
    "name": "MQTT_SUBSCRIBE",
    "kind": "core",
-   "signature": "MQTT_SUBSCRIBE(h, topic$)",
+   "signature": "MQTT_SUBSCRIBE(h, topic$) AS BOOLEAN",
    "module": "mqtt"
   },
   {
    "name": "MQTT_UPDATE",
    "kind": "core",
    "signature": "MQTT_UPDATE(h)",
+   "module": "mqtt"
+  },
+  {
+   "name": "MQTT_WILL",
+   "kind": "core",
+   "signature": "MQTT_WILL(topic$, inhalt$[, retain])",
    "module": "mqtt"
   },
   {
@@ -7989,6 +8121,18 @@
    "module": "net"
   },
   {
+   "name": "NET_UDP_LAST_HOST$",
+   "kind": "core",
+   "signature": "NET_UDP_LAST_HOST$(sock) AS STRING",
+   "module": "net"
+  },
+  {
+   "name": "NET_UDP_LAST_PORT",
+   "kind": "core",
+   "signature": "NET_UDP_LAST_PORT(sock) AS INTEGER",
+   "module": "net"
+  },
+  {
    "name": "NET_UDP_OPEN",
    "kind": "core",
    "signature": "NET_UDP_OPEN()",
@@ -8007,9 +8151,15 @@
    "module": "net"
   },
   {
+   "name": "NET_UDP_RECV_BYTES",
+   "kind": "core",
+   "signature": "NET_UDP_RECV_BYTES(sock, max_bytes) AS BUFFER",
+   "module": "net"
+  },
+  {
    "name": "NET_UDP_SEND",
    "kind": "core",
-   "signature": "NET_UDP_SEND(sock, host, port, text)",
+   "signature": "NET_UDP_SEND(sock, host, port, text_oder_puffer)",
    "module": "net"
   },
   {
@@ -8205,6 +8355,18 @@
    "module": "dhrt"
   },
   {
+   "name": "PDF_CIRCLE",
+   "kind": "core",
+   "signature": "PDF_CIRCLE(p: PDF, x, y, r)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_CIRCLE_FILL",
+   "kind": "core",
+   "signature": "PDF_CIRCLE_FILL(p: PDF, x, y, r)",
+   "module": "pdf"
+  },
+  {
    "name": "PDF_CLOSE",
    "kind": "core",
    "signature": "PDF_CLOSE(p: PDF)",
@@ -8217,6 +8379,12 @@
    "module": "pdf"
   },
   {
+   "name": "PDF_DASH",
+   "kind": "core",
+   "signature": "PDF_DASH(p: PDF, strich_mm [, luecke_mm])",
+   "module": "pdf"
+  },
+  {
    "name": "PDF_FONT",
    "kind": "core",
    "signature": "PDF_FONT(p: PDF, schrift$, groesse_pt)",
@@ -8226,6 +8394,18 @@
    "name": "PDF_FONT_LOAD",
    "kind": "core",
    "signature": "PDF_FONT_LOAD(p: PDF, pfad$, name$)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_GET_OPACITY",
+   "kind": "core",
+   "signature": "PDF_GET_OPACITY(p: PDF) AS FLOAT",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_IMAGE",
+   "kind": "core",
+   "signature": "PDF_IMAGE(pdf, bild, x, y, breite [, hoehe])",
    "module": "pdf"
   },
   {
@@ -8244,6 +8424,12 @@
    "name": "PDF_NEW",
    "kind": "core",
    "signature": "PDF_NEW([groesse$ [, ausrichtung$]]) AS PDF",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_OPACITY",
+   "kind": "core",
+   "signature": "PDF_OPACITY(p: PDF, deckkraft)",
    "module": "pdf"
   },
   {
@@ -8268,6 +8454,18 @@
    "name": "PDF_PAGE_WIDTH",
    "kind": "core",
    "signature": "PDF_PAGE_WIDTH(p: PDF) AS FLOAT",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_POLYGON",
+   "kind": "core",
+   "signature": "PDF_POLYGON(p: PDF, xs, ys)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_POLYGON_FILL",
+   "kind": "core",
+   "signature": "PDF_POLYGON_FILL(p: PDF, xs, ys)",
    "module": "pdf"
   },
   {
@@ -8303,7 +8501,7 @@
   {
    "name": "PDF_TEXT",
    "kind": "core",
-   "signature": "PDF_TEXT(p: PDF, x_mm, y_mm, text$)",
+   "signature": "PDF_TEXT(p: PDF, x_mm, y_mm, text$ [, winkel])",
    "module": "pdf"
   },
   {
@@ -8376,6 +8574,18 @@
    "name": "PHYS2D_IS_DYNAMIC",
    "kind": "core",
    "signature": "PHYS2D_IS_DYNAMIC(w, idx) AS BOOLEAN",
+   "module": "physics2d"
+  },
+  {
+   "name": "PHYS2D_SLEEP",
+   "kind": "core",
+   "signature": "PHYS2D_SLEEP(w, idx [, schlafen])",
+   "module": "physics2d"
+  },
+  {
+   "name": "PHYS2D_SLEEPING",
+   "kind": "core",
+   "signature": "PHYS2D_SLEEPING(w, idx) AS BOOLEAN",
    "module": "physics2d"
   },
   {
@@ -8490,6 +8700,18 @@
    "name": "PHYS3D_COUNT",
    "kind": "core",
    "signature": "PHYS3D_COUNT(w) AS INTEGER",
+   "module": "physics3d"
+  },
+  {
+   "name": "PHYS3D_SLEEP",
+   "kind": "core",
+   "signature": "PHYS3D_SLEEP(w, idx [, schlafen])",
+   "module": "physics3d"
+  },
+  {
+   "name": "PHYS3D_SLEEPING",
+   "kind": "core",
+   "signature": "PHYS3D_SLEEPING(w, idx) AS BOOLEAN",
    "module": "physics3d"
   },
   {
@@ -8973,6 +9195,24 @@
    "module": "core"
   },
   {
+   "name": "STARTDIR$",
+   "kind": "core",
+   "signature": "STARTDIR$() AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "TERMINAL",
+   "kind": "core",
+   "signature": "TERMINAL() AS BOOLEAN",
+   "module": "dhrt"
+  },
+  {
+   "name": "TERMINAL_WIDTH",
+   "kind": "core",
+   "signature": "TERMINAL_WIDTH() AS INTEGER",
+   "module": "dhrt"
+  },
+  {
    "name": "TEXT_GET_STYLE$",
    "kind": "graphics",
    "signature": "TEXT_GET_STYLE$()",
@@ -9204,6 +9444,12 @@
    "name": "RENDERTARGET_END",
    "kind": "graphics",
    "signature": "RENDERTARGET_END()",
+   "module": "core"
+  },
+  {
+   "name": "RENDERTARGET_IMAGE",
+   "kind": "graphics",
+   "signature": "RENDERTARGET_IMAGE(rt) AS IMAGE",
    "module": "core"
   },
   {
@@ -9761,7 +10007,7 @@
   {
    "name": "SETFONT",
    "kind": "graphics",
-   "signature": "SETFONT(handle: INTEGER)",
+   "signature": "SETFONT(handle: INTEGER [, groesse: INTEGER])",
    "module": "core"
   },
   {
@@ -12126,6 +12372,24 @@
    "name": "ZEIT_JETZT",
    "kind": "core",
    "signature": "ZEIT_JETZT() AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_UNIX",
+   "kind": "core",
+   "signature": "ZEIT_UNIX() AS FLOAT",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_AUS_UNIX",
+   "kind": "core",
+   "signature": "ZEIT_AUS_UNIX(unix_sekunden) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_NACH_UNIX",
+   "kind": "core",
+   "signature": "ZEIT_NACH_UNIX(zeit) AS INTEGER",
    "module": "zeit"
   },
   {

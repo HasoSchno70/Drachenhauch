@@ -83,6 +83,25 @@ DIM spieler AS STRING = "Anna"
 Das geht je Zeile für eine Variable; in einer CLASS setzt `SUB Init()` die
 Startwerte der Felder.
 
+**Ein `DIM` in einer Schleife fängt jede Runde frisch an** -- mit 0, `""`,
+`FALSE`, einem leeren Feld oder einer leeren MAP, wie in FreeBASIC und QBasic.
+Wer einen Wert über die Runden behalten will, schreibt das `DIM` vor die
+Schleife:
+
+```basic
+DIM summe AS INTEGER          ' vor der Schleife: zaehlt mit
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    DIM zeile AS STRING       ' in der Schleife: jede Runde leer
+    zeile = zeile + "*"
+    summe = summe + i
+    PRINT zeile; " "; summe   ' * 1, * 3, * 6
+NEXT
+```
+
+Bis 2026.27 behielt ein `DIM` in der Schleife den Wert der vorigen Runde (wie
+in VB.NET) -- außer bei einem Feld mit Größe im Hauptprogramm.
+
 > **Reservierte Wörter nicht als Variablennamen.** Manche kurze Namen sind
 > Schlüsselwörter und können nicht als Bezeichner dienen — neben den
 > offensichtlichen (`to`, `step`, `mod`, `end`, `next`, `new`, `class`, `in`)
@@ -130,9 +149,11 @@ bin = &B11010110          ' Binaer
 
 DIM f AS FLOAT
 f = 3.14
+f = 1.5e3                 ' Exponent: 1500.0 (auch 2.5E-3, 1e9)
 ```
 
 Hex und Binary sind nur INTEGER-Konstanten — keine Floats. Alle drei Schreibweisen ergeben denselben INTEGER-Wert.
+Eine Zahl mit Exponent (`1e9`, `2.5E-3`) ist immer eine Kommazahl, auch ohne Punkt -- wie bei `VAL("1e3")`.
 
 ## Datentypen
 
@@ -833,7 +854,7 @@ PRINT q, r       ' "3 2"
 
 **Einschränkungen:**
 - `BYREF` darf **nicht** mit einem Default-Wert kombiniert werden (was würde es heißen, eine Default-Variable per Referenz zu übergeben?).
-- `BYREF` wird von `dhrt` unterstützt: der Compiler setzt an der Aufruf­stelle eine lvalue-Erfassung plus Post-Call-Write-Back (Copy-In/Copy-Out), die VM gibt die finalen Parameter­werte zurück. (Aktuell nur bei direkten `SUB`/`FUNCTION`-Aufrufen — nicht über `FUNCREF` oder Methoden­aufrufe, deren Klasse erst zur Laufzeit feststeht.)
+- `BYREF` wird von `dhrt` unterstützt: der Compiler setzt an der Aufruf­stelle eine lvalue-Erfassung plus Post-Call-Write-Back (Copy-In/Copy-Out), die VM gibt die finalen Parameter­werte zurück. Das gilt für `SUB`/`FUNCTION` und für **Methoden**, deren Klasse beim Übersetzen feststeht (`DIM s AS Stapel` ... `s.fuellen(a, n)`, auch der Aufruf auf `Self`). Steht die Klasse erst zur Laufzeit fest (die Variable von `FOR EACH` über ein `TUPLE`, ein Wert ohne Typ), ist der Aufruf einer Methode mit `BYREF` ein Fehler mit dem Hinweis, das Objekt in einer Variablen mit Typ zu halten — still als `BYVAL` zu laufen hieße, die Änderung zu verlieren. Eine Überschreibung muss dieselben Parameter `BYREF` nehmen wie die Methode, die sie überschreibt. Über `FUNCREF` gibt es kein `BYREF`.
 
 **Rekursion** funktioniert:
 
@@ -1045,6 +1066,12 @@ NEXT
 > Änderungen im Unterprogramm wirken auf das Original (genau das nutzen die
 > `ARRAY_PUSH`/`SORT`/… und eigene In-Place-Routinen). Wer eine **eigene Kopie**
 > braucht, ruft `ARRAY_COPY(arr)`.
+>
+> Dasselbe gilt für die **Rückgabe**: ein Feld, ein Objekt und ein Struct
+> kommen als Verweis zurück. Ein Index oder Feld geht darum direkt auf dem
+> Ergebnis eines Aufrufs (`teile(s)[2]`, `held().hp`), lesend wie
+> schreibend -- `held().hp = 0` ändert das Objekt, das `held` geliefert hat.
+> Nur `+=`, `-=`, `++` ... gehen dort nicht: der Aufruf liefe zweimal.
 >
 > **Index-Zugriff ist streng, Slicing klemmt.** Ein direkter Index außerhalb der
 > Grenzen wirft einen Laufzeitfehler (`Index 5 ausserhalb [0..2]`). Ein **Slice**
@@ -1474,6 +1501,9 @@ END FUNCTION
 ```
 
 Reiche den Wert als Parameter herein oder deklariere ihn in der Datei selbst.
+Die Felder einer Klasse sind davon nicht betroffen: in einer Methode meint ein
+nacktes `e` das Feld (auch ein geerbtes), selbst wenn das Hauptprogramm oder
+die Datei ebenfalls ein `e` hat.
 Ohne `AS` bleibt der alte, flache Zugriff erlaubt — bestehende Programme
 ändern sich nicht.
 
@@ -1522,6 +1552,26 @@ f = mathe.Farbe.ROT
 
 Als Typ ist ein ENUM ein `INTEGER`, wie ein flaches ENUM auch. Damit können
 beide Dateien ein `Farbe` haben, ohne sich in die Quere zu kommen.
+
+**Ein Namensraum aus mehreren Dateien:** Dateien, die mit demselben Namen
+eingebunden werden, bilden EINEN Namensraum und sehen einander. So lässt sich
+eine Bibliothek in Teile zerlegen und über eine Sammeldatei einbinden:
+
+```basic
+' kern/kern.dh -- die Sammeldatei
+IMPORT "muster.dh" AS kern
+IMPORT "ebene.dh" AS kern
+IMPORT "pxs.dh" AS kern
+
+' main.dh
+IMPORT "kern/kern.dh" AS kern
+DIM m AS kern.Muster
+m = kern.pxsLaden("herz.pxs")
+```
+
+Was eine Datei des Namensraums **ohne** `AS` einbindet, gehört nicht dazu —
+es bleibt draußen, wie jeder flache Import. `kern.Name` meldet dann, in welcher
+Datei der Name steht und dass dort `IMPORT "datei.dh" AS kern` fehlt.
 
 **Nicht zu verwechseln** mit `AS` an einem eingebauten Modul: `IMPORT "json" AS
 j` ersetzt dort das Präfix (`J_PARSE` statt `JSON_PARSE`). Für `.dh`-Dateien

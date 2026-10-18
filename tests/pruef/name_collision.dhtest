@@ -213,8 +213,10 @@ PRINT KEY_SPACE
 16711680
 32
 
-=== wiederholtes dim setzt den wert nicht zurueck
-' Ein `DIM` in einer Schleife laeuft bei jedem Durchlauf -- es darf den
+=== wiederholtes dim faengt jede runde frisch an
+' Ein `DIM` in einer Schleife laeuft bei jedem Durchlauf und setzt seit
+' 2026.28 den Startwert (bis 2026.27 behielt es den alten Wert, hier 3).
+' Mehr dazu in dim_in_schleife.dhtest.
 DIM n AS INTEGER
 FOR n = 1 TO 3
     DIM z AS INTEGER
@@ -222,7 +224,7 @@ FOR n = 1 TO 3
 NEXT
 PRINT z
 --- erwartet
-3
+1
 
 === kollision wird auch ueber blockgrenzen erkannt
 ' Nebenertrag derselben Ursache: die Kollisions-Erkennung sah bis dahin

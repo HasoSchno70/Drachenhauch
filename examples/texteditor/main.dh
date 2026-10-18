@@ -1,0 +1,407 @@
+' Texteditor -- mehrere Dateien in Reitern, Suchen und Ersetzen, Kodierung
+' und Zeilenenden bleiben, wie sie waren.
+'
+'     dhrt run main.dh                     (leeres Dokument)
+'     dhrt run main.dh -- a.txt b.csv      (Dateien oeffnen)
+'
+' Oberflaeche in DejaVu Sans, der Text in DejaVu Sans Mono -- beide in der
+' Laufzeit eingebaut. Dateien lassen sich auch ins Fenster ziehen.
+IMPORT "gui"
+IMPORT "json"
+
+CONST BREITE = 1100
+CONST HOEHE = 720
+CONST STATUS_H = 28
+CONST MAXDOK = 32
+
+SCREEN(BREITE, HOEHE, "Texteditor")
+WINDOW_RESIZABLE(TRUE)
+WINDOW_MIN_SIZE(640, 400)
+SETFPS(60)
+DIM schrift AS INTEGER : schrift = LOADFONT("sans", 32)
+DIM schriftMono AS INTEGER : schriftMono = LOADFONT("mono", 32)
+SETFONT(schrift, 16)             ' scharf geladen, in 16 gezeichnet
+GUI_THEME_PRESET("modern_light")
+
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("Texteditor", 0, 0, BREITE, HOEHE)
+GUI_WINDOW_CHROME(win, FALSE)
+
+' --- Menues -------------------------------------------------------------------------
+DIM mDatei AS INTEGER : mDatei = GUI_MENU(win, "Datei")
+DIM miNeu AS INTEGER : miNeu = GUI_MENU_ITEM(mDatei, "Neu", "Strg+N")
+DIM miOeffnen AS INTEGER : miOeffnen = GUI_MENU_ITEM(mDatei, "Öffnen ...", "Strg+O")
+DIM miSpeichern AS INTEGER : miSpeichern = GUI_MENU_ITEM(mDatei, "Speichern", "Strg+S")
+DIM miSpeichernUnter AS INTEGER : miSpeichernUnter = GUI_MENU_ITEM(mDatei, "Speichern unter ...", "Strg+Umschalt+S")
+DIM miSchliessen AS INTEGER : miSchliessen = GUI_MENU_ITEM(mDatei, "Schließen", "Strg+W")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miBeenden AS INTEGER : miBeenden = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
+
+DIM mBearb AS INTEGER : mBearb = GUI_MENU(win, "Bearbeiten")
+DIM miSuchen AS INTEGER : miSuchen = GUI_MENU_ITEM(mBearb, "Suchen ...", "Strg+F")
+DIM miWeiter AS INTEGER : miWeiter = GUI_MENU_ITEM(mBearb, "Weitersuchen", "F3")
+DIM miErsetzen AS INTEGER : miErsetzen = GUI_MENU_ITEM(mBearb, "Ersetzen ...", "Strg+H")
+DIM miZeile AS INTEGER : miZeile = GUI_MENU_ITEM(mBearb, "Gehe zu Zeile ...", "Strg+G")
+
+DIM mAnsicht AS INTEGER : mAnsicht = GUI_MENU(win, "Ansicht")
+DIM miNummern AS INTEGER : miNummern = GUI_MENU_ITEM(mAnsicht, "Zeilennummern")
+GUI_MENU_CHECK(miNummern, TRUE)
+DIM miUmbruch AS INTEGER : miUmbruch = GUI_MENU_ITEM(mAnsicht, "Zeilenumbruch", "Alt+Z")
+GUI_MENU_SEPARATOR(mAnsicht)
+DIM miGroesser AS INTEGER : miGroesser = GUI_MENU_ITEM(mAnsicht, "Größer", "Strg+Plus")
+DIM miKleiner AS INTEGER : miKleiner = GUI_MENU_ITEM(mAnsicht, "Kleiner", "Strg+Minus")
+
+' --- Statusleiste ---------------------------------------------------------------
+' Menue und Reiterleiste nehmen oben KOPF Punkte; die Widgets zaehlen darunter
+CONST KOPF = 56
+DIM status AS GUI_WIDGET : status = GUI_STATUSBAR(win, 0, HOEHE - KOPF - STATUS_H, BREITE, STATUS_H, "Bereit")
+GUI_SET_ANCHOR(status, "lrb")
+DIM sfPos AS INTEGER : sfPos = GUI_STATUSBAR_ADD(status, "Z 1, Sp 1", 150)
+DIM sfKod AS INTEGER : sfKod = GUI_STATUSBAR_ADD(status, "UTF-8", 150)
+DIM sfEnde AS INTEGER : sfEnde = GUI_STATUSBAR_ADD(status, "LF", 70)
+GUI_STATUSBAR_CLICKABLE(status, sfKod, TRUE)
+GUI_STATUSBAR_TIP(status, sfKod, "Kodierung beim Speichern -- Klick wechselt")
+GUI_STATUSBAR_CLICKABLE(status, sfEnde, TRUE)
+GUI_STATUSBAR_TIP(status, sfEnde, "Zeilenenden beim Speichern -- Klick wechselt")
+
+' --- Dokumente (je Reiter eines) -------------------------------------------------
+DIM dokTa[MAXDOK] AS GUI_WIDGET
+DIM dokPfad[MAXDOK] AS STRING
+DIM dokKod[MAXDOK] AS STRING       ' "utf8", "utf8bom" oder "cp1252"
+DIM dokCrlf[MAXDOK] AS BOOLEAN
+DIM dokGeaendert[MAXDOK] AS BOOLEAN
+DIM anzahl AS INTEGER
+DIM schriftGroesse AS INTEGER : schriftGroesse = 17
+DIM neuNummer AS INTEGER
+DIM suchText AS STRING
+
+FUNCTION kodName$(kod AS STRING) AS STRING
+    IF kod = "cp1252" THEN RETURN "Windows-1252"
+    IF kod = "utf8bom" THEN RETURN "UTF-8 mit BOM"
+    RETURN "UTF-8"
+END FUNCTION
+
+FUNCTION dokName$(i AS INTEGER) AS STRING
+    IF dokPfad[i] = "" THEN RETURN "Unbenannt"
+    RETURN BASENAME(dokPfad[i])
+END FUNCTION
+
+SUB reiterNeu()
+    ' GUI_TABS legt die Leiste neu an und setzt den aktiven Reiter auf 0
+    DIM aktiv AS INTEGER : aktiv = GUI_ACTIVE_TAB(win)
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM i AS INTEGER
+    FOR i = 0 TO anzahl - 1
+        ARRAY_PUSH(namen, IIF(dokGeaendert[i], "● ", "") + dokName$(i))
+        GUI_SET_TAB(dokTa[i], i)
+    NEXT
+    GUI_TABS(win, namen)
+    GUI_SET_ACTIVE_TAB(win, MIN(MAX(aktiv, 0), anzahl - 1))
+END SUB
+
+SUB feldEinrichten(ta AS GUI_WIDGET)
+    GUI_SET_FONT(ta, schriftMono)
+    GUI_SET_FONT_SIZE(ta, schriftGroesse)
+    GUI_TEXTAREA_SET(ta, "zeilennummern", IIF(GUI_MENU_CHECKED(miNummern), 1, 0))
+    GUI_TEXTAREA_SET(ta, "aktive_zeile", 1)
+    GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+    GUI_TEXTAREA_SET(ta, "umbruch", IIF(GUI_MENU_CHECKED(miUmbruch), 1, 0))
+    GUI_SET_ANCHOR(ta, "lrtb")
+END SUB
+
+FUNCTION dokNeu(text AS STRING, pfad AS STRING, kod AS STRING, crlf AS BOOLEAN) AS INTEGER
+    IF anzahl >= MAXDOK THEN
+        GUI_STATUSBAR_SET(status, 0, "Höchstens " + STR$(MAXDOK) + " Dateien gleichzeitig")
+        RETURN -1
+    END IF
+    DIM i AS INTEGER : i = anzahl
+    dokTa[i] = GUI_TEXTAREA(win, 0, 0, BREITE, HOEHE - KOPF - STATUS_H)
+    feldEinrichten(dokTa[i])
+    GUI_SET_TEXT(dokTa[i], text)
+    GUI_TEXTAREA_GOTO(dokTa[i], 1)             ' Marke an den Anfang, nicht ans Ende
+    dokPfad[i] = pfad : dokKod[i] = kod : dokCrlf[i] = crlf : dokGeaendert[i] = FALSE
+    anzahl = anzahl + 1
+    reiterNeu()
+    GUI_SET_ACTIVE_TAB(win, i)
+    GUI_FOCUS(dokTa[i])
+    RETURN i
+END FUNCTION
+
+' --- Dateien ------------------------------------------------------------------------
+FUNCTION oeffnen(pfad AS STRING) AS INTEGER
+    ' Schon offen? Dann dorthin.
+    DIM i AS INTEGER
+    FOR i = 0 TO anzahl - 1
+        IF dokPfad[i] <> "" AND SAMEFILE(dokPfad[i], pfad) THEN
+            GUI_SET_ACTIVE_TAB(win, i)
+            RETURN i
+        END IF
+    NEXT
+    DIM text AS STRING
+    DIM kod AS STRING
+    TRY
+        ' Welche Kodierung "auto" waehlt, steht vorher fest -- gesichert
+        ' wird spaeter in genau dieser.
+        kod = FILE_ENCODING$(pfad)
+        IF kod = "binaer" THEN THROW "keine Textdatei (Nullbytes)"
+        DIM f AS FILE : f = OPENFILE(pfad, "r", kod)
+        text = READALL$(f)
+        CLOSEFILE(f)
+    CATCH e
+        GUI_STATUSBAR_SET(status, 0, "Nicht geöffnet: " + e)
+        RETURN -1
+    END TRY
+    DIM crlf AS BOOLEAN : crlf = INSTR(text, CHR$(13) + CHR$(10)) >= 0
+    IF crlf THEN text = REPLACE$(text, CHR$(13) + CHR$(10), CHR$(10))
+    i = dokNeu(text, pfad, kod, crlf)
+    IF i >= 0 THEN GUI_STATUSBAR_SET(status, 0, "Geöffnet: " + BASENAME(pfad))
+    RETURN i
+END FUNCTION
+
+FUNCTION speichern(i AS INTEGER, frage AS BOOLEAN) AS BOOLEAN
+    DIM pfad AS STRING : pfad = dokPfad[i]
+    IF pfad = "" OR frage THEN
+        pfad = FILE_SAVE_DIALOG("Speichern unter", IIF(dokPfad[i] = "", "unbenannt.txt", dokName$(i)), "")
+        IF pfad = "" THEN RETURN FALSE
+    END IF
+    DIM text AS STRING : text = GUI_TEXT(dokTa[i])
+    IF dokCrlf[i] THEN text = REPLACE$(text, CHR$(10), CHR$(13) + CHR$(10))
+    TRY
+        WRITEALL(pfad, text, dokKod[i])
+    CATCH e
+        GUI_STATUSBAR_SET(status, 0, "Nicht gespeichert: " + e)
+        RETURN FALSE
+    END TRY
+    dokPfad[i] = pfad : dokGeaendert[i] = FALSE
+    reiterNeu()
+    GUI_STATUSBAR_SET(status, 0, "Gespeichert: " + BASENAME(pfad))
+    RETURN TRUE
+END FUNCTION
+
+SUB schliessen(i AS INTEGER)
+    GUI_DESTROY(dokTa[i])
+    DIM k AS INTEGER
+    FOR k = i TO anzahl - 2
+        dokTa[k] = dokTa[k + 1] : dokPfad[k] = dokPfad[k + 1] : dokKod[k] = dokKod[k + 1]
+        dokCrlf[k] = dokCrlf[k + 1] : dokGeaendert[k] = dokGeaendert[k + 1]
+    NEXT
+    anzahl = anzahl - 1
+    IF anzahl = 0 THEN
+        neuNummer = neuNummer + 1
+        DIM leer AS INTEGER : leer = dokNeu("", "", "utf8", FALSE)
+    ELSE
+        reiterNeu()
+    END IF
+END SUB
+
+' --- Rueckfragen (nicht blockierend: ein Dialog, die Antwort ein Bild lang) ----
+DIM frageDlg AS GUI_WINDOW
+DIM frageArt AS STRING : frageArt = ""      ' schliessen | beenden | suchen | ersetzen1 | ersetzen2 | zeile
+DIM frageDok AS INTEGER
+DIM ersetzenSuch AS STRING
+DIM beenden AS BOOLEAN
+
+SUB fragen(art AS STRING, d AS GUI_WINDOW)
+    frageArt = art : frageDlg = d
+END SUB
+
+SUB schliessenAnfragen(i AS INTEGER)
+    IF dokGeaendert[i] THEN
+        frageDok = i
+        fragen("schliessen", GUI_DIALOG("Schließen", dokName$(i) + " ist nicht gespeichert.", "Speichern|Verwerfen|Abbrechen"))
+    ELSE
+        schliessen(i)
+    END IF
+END SUB
+
+FUNCTION ungespeichert() AS INTEGER
+    DIM i AS INTEGER, n AS INTEGER
+    FOR i = 0 TO anzahl - 1
+        IF dokGeaendert[i] THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+
+SUB beendenAnfragen()
+    DIM n AS INTEGER : n = ungespeichert()
+    IF n = 0 THEN
+        beenden = TRUE
+    ELSE
+        fragen("beenden", GUI_DIALOG("Beenden", STR$(n) + " Datei(en) sind nicht gespeichert.", "Alle speichern|Verwerfen|Abbrechen"))
+    END IF
+END SUB
+
+' --- Suchen ---------------------------------------------------------------------------
+FUNCTION suchen(i AS INTEGER, text AS STRING, abZeile AS INTEGER, abSpalte AS INTEGER) AS BOOLEAN
+    IF text = "" THEN RETURN FALSE
+    DIM z AS INTEGER, s AS INTEGER
+    (z, s) = GUI_TEXTAREA_FIND(dokTa[i], text, abZeile, abSpalte)
+    IF z < 0 THEN (z, s) = GUI_TEXTAREA_FIND(dokTa[i], text, 1, 1)
+    IF z < 0 THEN
+        GUI_STATUSBAR_SET(status, 0, "Nicht gefunden: " + text)
+        RETURN FALSE
+    END IF
+    GUI_TEXTAREA_SELECT(dokTa[i], z, s, z, s + LEN(text))
+    GUI_FOCUS(dokTa[i])
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION ersetzenAlle(i AS INTEGER, alt AS STRING, neu AS STRING) AS INTEGER
+    IF alt = "" THEN RETURN 0
+    DIM text AS STRING : text = GUI_TEXT(dokTa[i])
+    DIM n AS INTEGER : n = (LEN(text) - LEN(REPLACE$(text, alt, ""))) \ LEN(alt)
+    IF n > 0 THEN
+        ' Alles markieren und einfuegen: EIN Rueckgaengig-Schritt
+        GUI_TEXTAREA_SELECT(dokTa[i], 1, 1, 1000000, 1000000)
+        GUI_TEXTAREA_INSERT(dokTa[i], REPLACE$(text, alt, neu))
+    END IF
+    RETURN n
+END FUNCTION
+
+' --- Start ------------------------------------------------------------------------------
+DIM a AS INTEGER, geoeffnet AS INTEGER
+FOR a = 0 TO ARGC() - 1
+    IF oeffnen(ARGPATH$(a)) >= 0 THEN geoeffnet = geoeffnet + 1
+NEXT
+IF geoeffnet = 0 AND anzahl = 0 THEN
+    DIM erst AS INTEGER : erst = dokNeu("", "", "utf8", FALSE)
+END IF
+
+' --- Hauptschleife ---------------------------------------------------------------------
+DIM ok AS BOOLEAN
+WHILE NOT beenden
+    IF QUITREQUESTED() AND NOT WINDOW_CLOSE_REQUESTED() THEN BREAK
+    IF WINDOW_CLOSE_REQUESTED() AND frageArt = "" THEN beendenAnfragen()
+    ' Groesse folgt dem Fenster
+    IF WINDOW_RESIZED() THEN GUI_WINDOW_SET_BOUNDS(win, 0, 0, SCREENWIDTH(), SCREENHEIGHT())
+    GUI_UPDATE()
+
+    DIM d AS INTEGER : d = GUI_ACTIVE_TAB(win)
+    DIM ta AS GUI_WIDGET : ta = dokTa[d]
+
+    ' Abgelegte Dateien
+    DIM k AS INTEGER
+    FOR k = 0 TO FILES_DROPPED() - 1
+        DIM x AS INTEGER : x = oeffnen(FILE_DROPPED(k))
+    NEXT
+
+    ' Geaendert? Die Bedienung zaehlt, nicht das Laden
+    FOR k = 0 TO anzahl - 1
+        IF NOT dokGeaendert[k] AND GUI_CHANGED(dokTa[k]) THEN
+            dokGeaendert[k] = TRUE
+            reiterNeu()
+        END IF
+    NEXT
+
+    ' Reiter mit dem Kreuz geschlossen
+    DIM zu AS INTEGER : zu = GUI_TAB_CLOSED(win)
+    IF zu >= 0 AND frageArt = "" THEN schliessenAnfragen(zu)
+
+    IF frageArt = "" THEN
+        IF GUI_CLICKED(miNeu) THEN neuNummer = neuNummer + 1 : x = dokNeu("", "", "utf8", FALSE)
+        IF GUI_CLICKED(miOeffnen) THEN
+            DIM p AS STRING : p = FILE_OPEN_DIALOG("Öffnen", "")
+            IF p <> "" THEN x = oeffnen(p)
+        END IF
+        IF GUI_CLICKED(miSpeichern) THEN ok = speichern(d, FALSE)
+        IF GUI_CLICKED(miSpeichernUnter) THEN ok = speichern(d, TRUE)
+        IF GUI_CLICKED(miSchliessen) THEN schliessenAnfragen(d)
+        IF GUI_CLICKED(miBeenden) THEN beendenAnfragen()
+        IF GUI_CLICKED(miSuchen) THEN fragen("suchen", GUI_PROMPT("Suchen", "Was suchen?", IIF(GUI_TEXTAREA_SELECTION$(ta) <> "", GUI_TEXTAREA_SELECTION$(ta), suchText)))
+        IF GUI_CLICKED(miWeiter) THEN
+            DIM z AS INTEGER, s AS INTEGER, z2 AS INTEGER, s2 AS INTEGER
+            (z, s, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
+            ok = suchen(d, suchText, z2, s2)
+        END IF
+        IF GUI_CLICKED(miErsetzen) THEN fragen("ersetzen1", GUI_PROMPT("Ersetzen", "Was ersetzen?", suchText))
+        IF GUI_CLICKED(miZeile) THEN fragen("zeile", GUI_PROMPT("Gehe zu Zeile", "Zeile:", ""))
+    END IF
+    IF GUI_CLICKED(miNummern) OR GUI_CLICKED(miUmbruch) THEN
+        FOR k = 0 TO anzahl - 1 : feldEinrichten(dokTa[k]) : NEXT
+    END IF
+    IF GUI_CLICKED(miGroesser) OR GUI_CLICKED(miKleiner) THEN
+        schriftGroesse = CLAMP(schriftGroesse + IIF(GUI_CLICKED(miGroesser), 2, -2), 10, 40)
+        FOR k = 0 TO anzahl - 1 : GUI_SET_FONT_SIZE(dokTa[k], schriftGroesse) : NEXT
+    END IF
+
+    ' Antworten der Rueckfragen
+    IF frageArt <> "" THEN
+        DIM antw AS INTEGER : antw = GUI_ANSWER(frageDlg)
+        IF antw > 0 THEN
+            DIM art AS STRING : art = frageArt : frageArt = ""
+            SELECT CASE art
+                CASE "schliessen"
+                    IF antw = 1 THEN
+                        IF speichern(frageDok, FALSE) THEN schliessen(frageDok)
+                    ELSEIF antw = 2 THEN
+                        schliessen(frageDok)
+                    END IF
+                CASE "beenden"
+                    IF antw = 1 THEN
+                        DIM alleGut AS BOOLEAN : alleGut = TRUE
+                        FOR k = 0 TO anzahl - 1
+                            IF dokGeaendert[k] THEN
+                                IF NOT speichern(k, FALSE) THEN alleGut = FALSE
+                            END IF
+                        NEXT
+                        beenden = alleGut
+                    ELSEIF antw = 2 THEN
+                        beenden = TRUE
+                    END IF
+                CASE "suchen"
+                    IF antw = 1 THEN
+                        suchText = GUI_DIALOG_TEXT(frageDlg)
+                        DIM cz AS INTEGER, cs AS INTEGER
+                        (cz, cs) = GUI_TEXTAREA_CURSOR(ta)
+                        ok = suchen(d, suchText, cz, cs)
+                    END IF
+                CASE "ersetzen1"
+                    IF antw = 1 AND GUI_DIALOG_TEXT(frageDlg) <> "" THEN
+                        ersetzenSuch = GUI_DIALOG_TEXT(frageDlg) : suchText = ersetzenSuch
+                        fragen("ersetzen2", GUI_PROMPT("Ersetzen", "„" + ersetzenSuch + "“ ersetzen durch:", ""))
+                    END IF
+                CASE "ersetzen2"
+                    IF antw = 1 THEN
+                        DIM n AS INTEGER : n = ersetzenAlle(d, ersetzenSuch, GUI_DIALOG_TEXT(frageDlg))
+                        GUI_STATUSBAR_SET(status, 0, STR$(n) + " ersetzt")
+                    END IF
+                CASE "zeile"
+                    IF antw = 1 AND VAL(GUI_DIALOG_TEXT(frageDlg)) > 0 THEN
+                        GUI_TEXTAREA_GOTO(ta, VAL(GUI_DIALOG_TEXT(frageDlg)))
+                        GUI_FOCUS(ta)
+                    END IF
+            END SELECT
+        END IF
+    END IF
+
+    ' Klick auf Kodierung bzw. Zeilenende stellt um, was beim Speichern gilt
+    DIM sk AS INTEGER : sk = GUI_STATUSBAR_CLICKED(status)
+    IF anzahl > 0 AND (sk = sfKod OR sk = sfEnde) THEN
+        d = GUI_ACTIVE_TAB(win)
+        IF sk = sfKod THEN
+            SELECT CASE dokKod[d]
+                CASE "utf8" : dokKod[d] = "utf8bom"
+                CASE "utf8bom" : dokKod[d] = "cp1252"
+                CASE ELSE : dokKod[d] = "utf8"
+            END SELECT
+        ELSE
+            dokCrlf[d] = NOT dokCrlf[d]
+        END IF
+        dokGeaendert[d] = TRUE
+        reiterNeu()
+    END IF
+
+    ' Statusleiste
+    IF anzahl > 0 THEN
+        d = GUI_ACTIVE_TAB(win)
+        DIM pz AS INTEGER, ps AS INTEGER
+        (pz, ps) = GUI_TEXTAREA_CURSOR(dokTa[d])
+        GUI_STATUSBAR_SET(status, sfPos, "Z " + STR$(pz) + ", Sp " + STR$(ps))
+        GUI_STATUSBAR_SET(status, sfKod, kodName$(dokKod[d]))
+        GUI_STATUSBAR_SET(status, sfEnde, IIF(dokCrlf[d], "CRLF", "LF"))
+        SETWINDOWTITLE(IIF(dokGeaendert[d], "● ", "") + dokName$(d) + " – Texteditor")
+    END IF
+
+    CLS(RGB(245, 246, 248))
+    GUI_DRAW()
+    FLIP()
+WEND

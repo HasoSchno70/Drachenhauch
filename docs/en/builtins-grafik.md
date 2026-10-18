@@ -370,17 +370,21 @@ a second canvas with its own memory, where a rectangle is enough.
 | `TEXT_BOLD(an)` / `TEXT_ITALIC(an)` | switch only bold or italic on or off; the rest of the style stays |
 | `FONT_STYLE(font, stil$)` → FONT | the real bold/italic face of a loaded font (looks for the file next to it, e.g. `segoeuib.ttf` for `segoeui.ttf`); if there is none, `font` itself comes back |
 | `FONT_HAS_STYLE(font, stil$)` | TRUE if this face exists as a file -- otherwise the runtime imitates it |
-| `LOADFONT(pfad$, groesse[, zeichen$])` → FONT | load TTF/OTF/TTC → FONT handle (INTEGER); `zeichen$` = script blocks (`"kyrillisch, griechisch"`, `"japanisch"`, `"emoji"` …) or the characters themselves that should be baked |
+| `LOADFONT(pfad$, groesse[, zeichen$])` → FONT | load TTF/OTF/TTC → FONT handle (INTEGER); `zeichen$` = script blocks (`"kyrillisch, griechisch"`, `"japanisch"`, `"emoji"` …) or the characters themselves that should be baked. Instead of a path a **built-in font** works too: `"sans"`, `"serif"`, `"mono"` (DejaVu, each with `-fett`, `-kursiv`, `-fett-kursiv`) |
 | `LOADFONT_SDF(pfad$, groesse[, zeichen$])` → FONT | a font that stays sharp at **any** size: baked as a distance field, drawn with a shader that keeps the edge soft by one pixel. An ordinary font blurs as soon as it is drawn larger than it was baked (titles, camera zoom). Without `zeichen$` ASCII and Latin-1 including €; baking costs more per character than with `LOADFONT` (about 130 ms for this selection) |
 | `FONT_HAS_GLYPH(font, zeichen$)` → BOOLEAN | does the font itself have a glyph for it? If not, `TEXT` draws it with the fallback font; `-1` = built-in font |
 | `FONT_GLYPH_WIDTH(font, zeichen$, groesse)` → FLOAT | how far `TEXT` advances after this character at `groesse` points — measured like `TEXT_WIDTH`, without switching the active font |
 | `FONT_TO_IMAGE(font[, erstes[, letztes]])` → IMAGE | the characters `erstes`..`letztes` (default 32..126, at most 256) as an image in the format of `LOADFONT_IMAGE`: each character white in a transparent field, magenta (`&HFF00FF`) outside and in between. That turns a vector font into a pixel font that you can touch up and load again with `LOADFONT_IMAGE(bild, &HFF00FF, erstes)` |
-| `SETFONT(font)` | set the active font; `SETFONT(-1)` = default font |
+| `SETFONT(font[, groesse])` | set the active font; `SETFONT(-1)` = default font. Without `groesse` the size the font was loaded at applies afterwards; with `groesse` everything is drawn at that size from now on (like `SETFONT` + `TEXT_SIZE`) -- load sharp, draw small: `SETFONT(LOADFONT("sans", 32), 16)` |
 | `TEXT_SPACING(px)` | letter spacing for TTF (native) |
 | `TEXT_LINE_SPACING(px)` | line spacing for multi-line text |
 
 `LOADFONT` loads a TrueType/OpenType font of your own; `TEXT_SIZE` then
-scales it freely. `TEXT_WIDTH` measures in the **active** font — which lets
+scales it freely. **A normal font without a path:** `LOADFONT("sans", 32)`
+takes DejaVu Sans from the runtime — the same as in the PDF, on every system,
+with all four faces for `TEXT_STYLE`/`FONT_STYLE`. Before, this needed a path
+like `C:/Windows/Fonts/segoeui.ttf`, which does not exist on macOS and Linux.
+A file with exactly that name wins. `TEXT_WIDTH` measures in the **active** font — which lets
 you centre or right-align text. The native runtime renders real glyphs
 (raylib `LoadFontEx`/`DrawTextEx`).
 
@@ -432,14 +436,17 @@ things take care of this:
   languages of Central Europe), Greek, Cyrillic, general punctuation
   (`… – „ “`) and `€`. If the font file does not contain a character, raylib
   draws a `?` there; a pixel font for a retro game often has no umlauts.
-- **Without a font of your own, a fallback font steps in.** The built-in
-  raylib font knows ASCII and Latin-1 (characters 32 to 255, so `äöüÄÖÜß` as
-  well). If a character beyond that occurs (such as `€` or kanji), the
-  runtime draws this text with a system font (Windows: Segoe UI, macOS:
-  SF/Helvetica, Linux: DejaVu/Liberation). German text with umlauts stays in
-  the built-in font -- until 2026-10-01 every text with a character beyond
-  ASCII switched to the fallback, and in a user interface “Löschen” stood in
-  a different font from “Buchen” next to it.
+- **Without a font of your own, a fallback font steps in for missing
+  characters.** The built-in raylib font knows ASCII and Latin-1 (characters
+  32 to 255, so `äöüÄÖÜß` as well). It draws typographic punctuation as its
+  plain counterparts: `„“”` as `"`, `‚‘’` as `'`, `– —` as `-`, `…` as `...`
+  (display only -- the text stays as it is). Whatever is still missing (such
+  as `€` or kanji) comes **character by character** from a system font
+  (Windows: Segoe UI, macOS: SF/Helvetica, Linux: DejaVu/Liberation); the
+  rest of the line stays in the built-in font. Until 2026.27 such a character
+  switched the whole line to the other font, until 2026-10-01 even every
+  umlaut did. Rotated text (`TEXTROT`) still switches as a whole if a
+  character is missing after the replacement.
 - **Glyphs on demand.** If a character is in no loaded font (kanji, hangul,
   emoji, Arabic, Hebrew, Thai), the runtime notes it while drawing or
   measuring and bakes it at the next `FLIP` from the matching system font —
@@ -500,7 +507,7 @@ of 16 would have silently shortened a confirmed sentence).
 | Function | Purpose |
 |---|---|
 | `LOADIMAGE(path$)` → IMAGE | load a file (PNG, JPG, BMP, …) |
-| `IMAGEWIDTH(img)`, `IMAGEHEIGHT(img)` → INTEGER | pixel size |
+| `IMAGEWIDTH(img)`, `IMAGEHEIGHT(img)` → INTEGER | pixel size; equivalently `IMAGE_WIDTH`/`IMAGE_HEIGHT` in the naming scheme of the other `IMAGE_*` commands |
 | `GETPIXEL(img, x, y)` → INTEGER | read the pixel colour (`&HRRGGBB`) at `(x, y)`; `-1` for an index outside. Counterpart to `PLOT` (write) — for per-pixel collision, masking, colour sampling |
 | `GETALPHA(img, x, y)` → INTEGER | opacity at `(x, y)`, `0..255`; `-1` for an index outside. Needed because `GETPIXEL` returns a **colour**, and there opacity 0 means *opaque* — a transparent pixel would come back as a black one |
 | `DRAWIMAGE(img, x, y)` | draw the image at (x, y) |
@@ -785,7 +792,7 @@ loaded one.
 | `GENTEX_COLOR(breite, hoehe, farbe)` | single-coloured area |
 | `GENTEX_GRADIENT(breite, hoehe, farbe1, farbe2 [, vertikal])` | linear gradient |
 | `GENTEX_GRADIENT_BOX(breite, hoehe, dichte, farbe1, farbe2)` | rectangular gradient from the inside out — vignettes |
-| `GENTEX_RADIAL(breite, hoehe, innen, aussen [, dichte])` | round gradient from the centre outwards — soft lights and glows, drawn additively |
+| `GENTEX_RADIAL(breite, hoehe, innen, aussen [, dichte])` | round gradient from the centre outwards — soft lights and glows, drawn additively. `dichte` (0..1, default 0) is the share of the radius in full inner colour: 0 = soft from the centre, 1 = a disc; more is an error |
 | `GENTEX_CHECKED(breite, hoehe, feld_x, feld_y, farbe1, farbe2)` | checkerboard |
 | `GENTEX_PERLIN(breite, hoehe, skala)` | Perlin noise — clouds, terrain, marble |
 | `GENTEX_CELLULAR(breite, hoehe, kachel)` | cellular noise (Voronoi) — stone floors, cracks, scales |
@@ -803,6 +810,7 @@ A render target is an off-screen surface you draw on just like on the window
 | `RENDERTARGET_END()` | back to the window |
 | `RENDERTARGET_DRAW(ziel, x, y [, skala [, tint [, gespiegelt]]])` | stamp the target onto the window like an image |
 | `RENDERTARGET_CLEAR(ziel [, farbe])` | clear by hand — needed when `behalten` is on |
+| `RENDERTARGET_IMAGE(ziel)` → IMAGE | the content as an image — whatever was drawn since `RENDERTARGET_BEGIN` is played back **right away** for this, not only at `FLIP`. This gets a chart into a PDF (`PDF_IMAGE`) or a file (`IMAGE_SAVE`) |
 
 Without `behalten`, the target is cleared to transparent at the start of
 every frame. A trail, by contrast, comes about like this: `behalten = TRUE`,
@@ -837,6 +845,7 @@ sampler would stay black.
 | `KEYPRESSED(code)` → BOOLEAN | TRUE **as long as** the key with SDL code `code` is held — every frame again. For moving/steering. |
 | `KEYHIT(code)` → BOOLEAN | TRUE only in **the one frame** in which the key goes down. For shooting, jumping, toggling. |
 | | *Letters:* `KEY_A`…`KEY_Z` are the clear spelling. `ASC("s")` and `ASC("S")` both mean the same key — until 2026-08-31 the **upper-case** spelling silently hit nothing at all, which looked like a forgotten call. |
+| | *Position or label:* a key code means the **position** of the key on the US keyboard — `KEY_Z` is the key labelled Y on a German keyboard, the one labelled W on a French one. That is right for WASD. For shortcuts like Ctrl+Z write the **letter as text**: `KEYHIT("z")` means the key the Z is printed on (also for `KEYPRESSED`, `KEYRELEASED`, `KEYREPEAT`; letters, digits and the space). |
 | `KEYRELEASED(code)` → BOOLEAN | TRUE in the frame in which the key is released — for “charge up and fire on release”, say |
 | `KEYREPEAT(code)` → BOOLEAN | like `KEYHIT`, but while held it also fires with the system key repeat. For text cursors and quantity input. |
 | `MOUSEX()`, `MOUSEY()` → INTEGER | current mouse position (in logical pixels) |

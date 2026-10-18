@@ -1,0 +1,387 @@
+' Die Muster-Bibliothek (PySticky ui/dialogs/pattern_library_data.py und die
+' Rechnungen aus pattern_library_dialog.py und thumbnail_widget.py): eine
+' Liste von Mustern mit Groesse, Farben, Kategorien, Schlagwoertern, Notizen
+' und Favoriten, gespeichert als library.json im selben Aufbau wie bei
+' PySticky, die Vorschaubilder als PNG in .thumbnails daneben.
+'
+' Anders als PySticky: die Bibliothek liegt im Einstellungsordner (dort im
+' Repository-Ordner "Muster"); die Vorgabe-Kategorie heisst "Bordüren" wie
+' die, die das Einsortieren vergibt (dort "Bordueren" -- ein so einsortiertes
+' Muster stand unter keiner Kategorie); Sortieren stellt nur die Anzeige um
+' (dort die gespeicherte Reihenfolge); Vorschaubilder gibt es fuer alle vier
+' Formate (dort nur fuer .pxs).
+IMPORT "json"
+
+CLASS Bibliothekseintrag
+    DIM pfad AS STRING
+    DIM name AS STRING
+    DIM breite AS INTEGER
+    DIM hoehe AS INTEGER
+    DIM farben AS INTEGER
+    DIM stiche AS INTEGER
+    DIM stoff AS INTEGER
+    DIM kategorien AS ARRAY OF STRING
+    DIM tags AS ARRAY OF STRING
+    DIM vorschau AS STRING          ' "" = keins (null in der Datei)
+    DIM hinzugefuegt AS STRING
+    DIM geoeffnet AS STRING
+    DIM favorit AS BOOLEAN
+    DIM notizen AS STRING
+END CLASS
+
+CLASS Bibliothek
+    DIM version AS STRING
+    DIM eintraege AS ARRAY OF Bibliothekseintrag
+    DIM kategorien AS ARRAY OF STRING
+    DIM pfad AS STRING              ' library.json
+END CLASS
+
+FUNCTION bibliothekKategorien() AS ARRAY OF STRING
+    RETURN ["Alle", "Favoriten", "Blumen", "Tiere", "Landschaften", "Alphabete", "Bordüren", "Weihnachten", "Ostern", "Sonstiges"]
+END FUNCTION
+
+' Jetzt als ISO-Zeit wie Pythons datetime.now().isoformat() (ohne Mikrosekunden)
+FUNCTION isoJetzt$() AS STRING
+    RETURN ZEIT_FORMAT$(ZEIT_JETZT(), "JJJJ-MM-TT") + "T" + ZEIT_FORMAT$(ZEIT_JETZT(), "hh:mm:ss")
+END FUNCTION
+
+FUNCTION neuerBibliothekseintrag(pfad AS STRING) AS Bibliothekseintrag
+    DIM e AS Bibliothekseintrag : e = NEW Bibliothekseintrag()
+    e.pfad = pfad
+    e.stoff = 14
+    e.kategorien = []
+    e.tags = []
+    e.hinzugefuegt = isoJetzt$()
+    RETURN e
+END FUNCTION
+
+FUNCTION leereBibliothek(pfad AS STRING) AS Bibliothek
+    DIM b AS Bibliothek : b = NEW Bibliothek()
+    b.version = "1.0"
+    b.eintraege = []
+    b.kategorien = bibliothekKategorien()
+    b.pfad = pfad
+    RETURN b
+END FUNCTION
+
+' Der Ordner der Bibliothek: der eingestellte (library_path), sonst im
+' Einstellungsordner
+FUNCTION bibliothekOrdner$(eigener AS STRING = "") AS STRING
+    RETURN eigenerOrdner$(eigener, PATHJOIN(DIRNAME(einstellungsDatei$("x")), "Bibliothek"))
+END FUNCTION
+
+FUNCTION jsonText$(j AS JSON_HANDLE, w AS STRING) AS STRING
+    IF JSON_TYPE(j, w) = "string" THEN RETURN JSON_GET_STRING(j, w)
+    IF JSON_TYPE(j, w) = "null" THEN RETURN ""
+    RETURN JSON_STRINGIFY(JSON_GET_JSON(j, w))
+END FUNCTION
+
+FUNCTION jsonTexte(j AS JSON_HANDLE, w AS STRING) AS ARRAY OF STRING
+    DIM l AS ARRAY OF STRING : l = []
+    IF JSON_TYPE(j, w) <> "array" THEN RETURN l
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, w) - 1
+        ARRAY_PUSH(l, jsonText$(j, w + "." + STR$(i)))
+    NEXT
+    RETURN l
+END FUNCTION
+
+' library.json lesen. Ein Eintrag mit unbekanntem Schluessel oder ohne
+' Pflichtfeld wird uebergangen (bei PySticky LibraryEntry(**e)); eine kaputte
+' Datei ergibt eine leere Bibliothek.
+FUNCTION bibliothekLaden(pfad AS STRING) AS Bibliothek
+    DIM b AS Bibliothek : b = leereBibliothek(pfad)
+    IF NOT FILEEXISTS(pfad) THEN RETURN b
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_LOAD(pfad)
+    CATCH fehler
+        RETURN b
+    END TRY
+    IF JSON_TYPE(j, "") <> "object" THEN RETURN b
+    IF JSON_HAS(j, "version") THEN b.version = jsonText$(j, "version")
+    IF JSON_TYPE(j, "categories") = "array" THEN b.kategorien = jsonTexte(j, "categories")
+    IF JSON_TYPE(j, "entries") <> "array" THEN RETURN b
+    DIM pflicht AS ARRAY OF STRING : pflicht = ["filepath", "name", "width", "height", "color_count", "stitch_count"]
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "entries") - 1
+        DIM w AS STRING : w = "entries." + STR$(i)
+        IF JSON_TYPE(j, w) <> "object" THEN CONTINUE
+        DIM ok AS BOOLEAN : ok = TRUE
+        DIM k AS STRING
+        FOR EACH k IN JSON_KEYS(j, w)
+            IF INSTR("|filepath|name|width|height|color_count|stitch_count|fabric_count|categories|tags|thumbnail_path|added_date|last_opened|favorite|notes|", "|" + k + "|") < 0 THEN ok = FALSE
+        NEXT
+        FOR EACH k IN pflicht
+            IF NOT JSON_HAS(j, w + "." + k) THEN ok = FALSE
+        NEXT
+        IF NOT ok THEN CONTINUE
+        DIM e AS Bibliothekseintrag : e = neuerBibliothekseintrag(jsonText$(j, w + ".filepath"))
+        e.name = jsonText$(j, w + ".name")
+        DIM z AS INTEGER
+        IF jsonGanz(j, w + ".width", z) THEN e.breite = z
+        IF jsonGanz(j, w + ".height", z) THEN e.hoehe = z
+        IF jsonGanz(j, w + ".color_count", z) THEN e.farben = z
+        IF jsonGanz(j, w + ".stitch_count", z) THEN e.stiche = z
+        IF JSON_HAS(j, w + ".fabric_count") THEN
+            IF jsonGanz(j, w + ".fabric_count", z) THEN e.stoff = z
+        END IF
+        e.kategorien = jsonTexte(j, w + ".categories")
+        e.tags = jsonTexte(j, w + ".tags")
+        IF JSON_HAS(j, w + ".thumbnail_path") THEN e.vorschau = jsonText$(j, w + ".thumbnail_path")
+        IF JSON_HAS(j, w + ".added_date") THEN
+            DIM d AS STRING : d = jsonText$(j, w + ".added_date")
+            IF d <> "" THEN e.hinzugefuegt = d
+        END IF
+        IF JSON_HAS(j, w + ".last_opened") THEN e.geoeffnet = jsonText$(j, w + ".last_opened")
+        IF JSON_TYPE(j, w + ".favorite") = "boolean" THEN e.favorit = JSON_GET_BOOL(j, w + ".favorite")
+        IF JSON_HAS(j, w + ".notes") THEN e.notizen = jsonText$(j, w + ".notes")
+        ARRAY_PUSH(b.eintraege, e)
+    NEXT
+    RETURN b
+END FUNCTION
+
+FUNCTION textListe(l AS ARRAY OF STRING) AS JSON_HANDLE
+    DIM j AS JSON_HANDLE : j = JSON_NEW_ARRAY()
+    DIM t AS STRING
+    FOR EACH t IN l
+        JSON_APPEND_STRING(j, "", t)
+    NEXT
+    RETURN j
+END FUNCTION
+
+FUNCTION bibliothekJson$(b AS Bibliothek) AS STRING
+    DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+    JSON_SET_STRING(j, "version", b.version)
+    JSON_SET_JSON(j, "entries", JSON_NEW_ARRAY())
+    DIM e AS Bibliothekseintrag
+    FOR EACH e IN b.eintraege
+        DIM o AS JSON_HANDLE : o = JSON_NEW_OBJECT()
+        JSON_SET_STRING(o, "filepath", e.pfad)
+        JSON_SET_STRING(o, "name", e.name)
+        JSON_SET_INT(o, "width", e.breite)
+        JSON_SET_INT(o, "height", e.hoehe)
+        JSON_SET_INT(o, "color_count", e.farben)
+        JSON_SET_INT(o, "stitch_count", e.stiche)
+        JSON_SET_INT(o, "fabric_count", e.stoff)
+        JSON_SET_JSON(o, "categories", textListe(e.kategorien))
+        JSON_SET_JSON(o, "tags", textListe(e.tags))
+        IF e.vorschau = "" THEN JSON_SET_NULL(o, "thumbnail_path") ELSE JSON_SET_STRING(o, "thumbnail_path", e.vorschau)
+        JSON_SET_STRING(o, "added_date", e.hinzugefuegt)
+        JSON_SET_STRING(o, "last_opened", e.geoeffnet)
+        JSON_SET_BOOL(o, "favorite", e.favorit)
+        JSON_SET_STRING(o, "notes", e.notizen)
+        JSON_APPEND_JSON(j, "entries", o)
+    NEXT
+    JSON_SET_JSON(j, "categories", textListe(b.kategorien))
+    RETURN JSON_PRETTY(j)
+END FUNCTION
+
+SUB bibliothekSichern(b AS Bibliothek)
+    textSchreiben(b.pfad, bibliothekJson$(b))
+END SUB
+
+' --- Einsortieren nach Namen -------------------------------------------------------------
+
+' Kategorien aus Datei- und Ordnername (Teilwoerter, alle passenden; sonst
+' "Sonstiges"). Wie im Original findet "ei" auch "Meise" und "Weihnachten".
+FUNCTION autoKategorien(pfad AS STRING) AS ARRAY OF STRING
+    DIM n AS STRING : n = BASENAME(pfad)
+    DIM p AS INTEGER : p = INSTRREV(n, ".")
+    IF p > 0 THEN n = LEFT$(n, p)
+    DIM such AS STRING : such = LOWER$(n + " " + BASENAME(DIRNAME(pfad)))
+    DIM kats AS ARRAY OF STRING : kats = ["Blumen", "Tiere", "Landschaften", "Weihnachten", "Ostern", "Bordüren", "Alphabete"]
+    DIM woerter AS ARRAY OF STRING : woerter = ["blum,flower,rose,tulpe,lilie,gänseblümchen", "tier,animal,katze,hund,vogel,bird,cat,dog,pferd", _
+        "landschaft,landscape,natur,wald,berg,meer,see", "weihnacht,christmas,xmas,advent,nikolaus,schneemann", _
+        "oster,easter,hase,bunny,ei", "bordür,border,rand,leiste,streifen", "alphabet,buchstab,letter,abc,schrift,font"]
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(kats) - 1
+        DIM w AS STRING
+        FOR EACH w IN SPLIT$(woerter[i], ",")
+            IF INSTR(such, w) >= 0 THEN
+                ARRAY_PUSH(aus, kats[i])
+                EXIT FOR
+            END IF
+        NEXT
+    NEXT
+    IF LEN(aus) = 0 THEN aus = ["Sonstiges"]
+    RETURN aus
+END FUNCTION
+
+' --- Ein Muster aufnehmen ----------------------------------------------------------------
+
+' Die Daten eines Eintrags aus dem Muster: Farben = Eintraege der Farbliste,
+' Stiche = ueber ALLE Ebenen gezaehlt (wie PySticky total_stitches)
+FUNCTION eintragAusMuster(pfad AS STRING, m AS Muster) AS Bibliothekseintrag
+    DIM e AS Bibliothekseintrag : e = neuerBibliothekseintrag(pfad)
+    DIM n AS STRING : n = m.name
+    IF n = "" THEN
+        n = BASENAME(pfad)
+        DIM p AS INTEGER : p = INSTRREV(n, ".")
+        IF p > 0 THEN n = LEFT$(n, p)
+    END IF
+    e.name = n
+    e.breite = m.breite
+    e.hoehe = m.hoehe
+    e.farben = m.farbanzahl()
+    DIM s AS INTEGER
+    DIM eb AS Ebene
+    FOR EACH eb IN m.ebenen.ebenen
+        s = s + eb.stichzahl()
+    NEXT
+    e.stiche = s
+    e.stoff = INT(m.stoff)
+    e.kategorien = autoKategorien(pfad)
+    RETURN e
+END FUNCTION
+
+' Ein Muster in einem der vier Formate lesen (wirft bei Fehlern)
+FUNCTION musterLesen(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY OF STRING) AS Muster
+    SELECT CASE LOWER$(RIGHT$(pfad, 4))
+        CASE ".oxs" : RETURN oxsLaden(pfad, paletten, symbole).muster
+        CASE ".pat" : RETURN patLaden(pfad, paletten, symbole).muster
+        CASE ".xsd" : RETURN xsdLaden(pfad, paletten, symbole).muster
+    END SELECT
+    RETURN pxsLaden(pfad)
+END FUNCTION
+
+FUNCTION eintragIndex(b AS Bibliothek, pfad AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(b.eintraege) - 1
+        IF b.eintraege[i].pfad = pfad THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION bibliothekFormat(pfad AS STRING) AS BOOLEAN
+    DIM e AS STRING : e = LOWER$(RIGHT$(pfad, 4))
+    RETURN e = ".pxs" OR e = ".xsd" OR e = ".pat" OR e = ".oxs"
+END FUNCTION
+
+' Alle Musterdateien unter einem Ordner (mit Unterordnern), .pxs zuerst
+FUNCTION musterDateien(ordner AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM endung AS STRING
+    FOR EACH endung IN [".pxs", ".xsd", ".pat", ".oxs"]
+        DIM d AS STRING
+        FOR EACH d IN DIRLIST_REC(ordner)
+            IF LOWER$(RIGHT$(d, 4)) = endung THEN ARRAY_PUSH(aus, PATHJOIN(ordner, d))
+        NEXT
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' --- Kategorien, Suche, Sortieren ------------------------------------------------------
+
+FUNCTION eintragInKategorie(e AS Bibliothekseintrag, kategorie AS STRING) AS BOOLEAN
+    IF kategorie = "Alle" THEN RETURN TRUE
+    IF kategorie = "Favoriten" THEN RETURN e.favorit
+    DIM k AS STRING
+    FOR EACH k IN e.kategorien
+        IF k = kategorie THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION kategorieZahl(b AS Bibliothek, kategorie AS STRING) AS INTEGER
+    DIM n AS INTEGER
+    DIM e AS Bibliothekseintrag
+    FOR EACH e IN b.eintraege
+        IF eintragInKategorie(e, kategorie) THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+
+' Die Plaetze der Eintraege, die zu Kategorie und Suche passen; die Suche
+' geht als Teiltext ueber Name, Schlagwoerter und Kategorien (klein)
+FUNCTION bibliothekFiltern(b AS Bibliothek, kategorie AS STRING, suche AS STRING) AS ARRAY OF INTEGER
+    DIM aus AS ARRAY OF INTEGER : aus = []
+    DIM s AS STRING : s = LOWER$(suche)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(b.eintraege) - 1
+        DIM e AS Bibliothekseintrag : e = b.eintraege[i]
+        IF NOT eintragInKategorie(e, kategorie) THEN CONTINUE
+        IF s <> "" THEN
+            IF INSTR(LOWER$(e.name + " " + JOIN$(e.tags, " ") + " " + JOIN$(e.kategorien, " ")), s) < 0 THEN CONTINUE
+        END IF
+        ARRAY_PUSH(aus, i)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+FUNCTION bibliothekSortierungen() AS ARRAY OF STRING
+    RETURN ["Name", "Datum", "Größe", "Farben"]
+END FUNCTION
+
+' Kommt a vor b? Name aufsteigend (klein), sonst absteigend
+FUNCTION eintragVor(a AS Bibliothekseintrag, b AS Bibliothekseintrag, art AS STRING) AS BOOLEAN
+    SELECT CASE art
+        CASE "Datum" : RETURN a.hinzugefuegt > b.hinzugefuegt
+        CASE "Größe" : RETURN a.breite * a.hoehe > b.breite * b.hoehe
+        CASE "Farben" : RETURN a.farben > b.farben
+    END SELECT
+    RETURN LOWER$(a.name) < LOWER$(b.name)
+END FUNCTION
+
+' Stabil sortieren (Gleichstand behaelt die Reihenfolge)
+FUNCTION bibliothekSortieren(b AS Bibliothek, plaetze AS ARRAY OF INTEGER, art AS STRING) AS ARRAY OF INTEGER
+    DIM aus AS ARRAY OF INTEGER : aus = []
+    DIM p AS INTEGER
+    FOR EACH p IN plaetze
+        DIM i AS INTEGER : i = LEN(aus)
+        WHILE i > 0
+            IF NOT eintragVor(b.eintraege[p], b.eintraege[aus[i - 1]], art) THEN EXIT WHILE
+            i = i - 1
+        WEND
+        ARRAY_INSERT(aus, i, p)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Schlagwoerter aus "rot, klein ,," -> ["rot", "klein"]
+FUNCTION tagsLesen(text AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM t AS STRING
+    FOR EACH t IN SPLIT$(text, ",")
+        IF TRIM$(t) <> "" THEN ARRAY_PUSH(aus, TRIM$(t))
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Die Zeile unter der Liste: "<b>Name</b> | 100×80 Stiche (15.9×12.7 cm) | ..."
+FUNCTION eintragDetail$(e AS Bibliothekseintrag) AS STRING
+    DIM st AS INTEGER : st = IIF(e.stoff > 0, e.stoff, 14)
+    RETURN trf$("<b>{0}</b> | {1}×{2} Stiche ({3}×{4} cm) | {5} Farben | {6} Stiche", [e.name, STR$(e.breite), STR$(e.hoehe), FORMAT$(e.breite / st * 2.54, "%.1f"), FORMAT$(e.hoehe / st * 2.54, "%.1f"), STR$(e.farben), zahlAnzeige$(e.stiche, -1)])
+END FUNCTION
+
+' --- Vorschaubilder ------------------------------------------------------------------------
+
+FUNCTION vorschauName$(pfad AS STRING) AS STRING
+    RETURN LEFT$(MD5$(pfad), 16) + ".png"
+END FUNCTION
+
+' Das Vorschaubild wie PySticky: hoechstens 100 Punkte, hoechstens doppelt
+' so gross, je Stich ein Rechteck der Farbe des zusammengesetzten Bildes
+' (Stichart egal); kleiner als 1 ueberschreibt, krumm groesser laesst Luecken
+FUNCTION vorschauBild(m AS Muster) AS IMAGE
+    DIM massstab AS FLOAT : massstab = MIN(100 / m.breite, MIN(100 / m.hoehe, 2.0))
+    DIM b AS INTEGER : b = MAX(1, INT(m.breite * massstab))
+    DIM h AS INTEGER : h = MAX(1, INT(m.hoehe * massstab))
+    DIM bild AS IMAGE : bild = IMAGE_NEW(b, h, &HFFFFFF)
+    DIM f AS ARRAY OF INTEGER, t AS ARRAY OF INTEGER, er AS ARRAY OF INTEGER
+    m.ebenen.zusammensetzen(f, t, er)
+    DIM seite AS INTEGER : seite = MAX(1, INT(massstab))
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO m.hoehe - 1
+        FOR x = 0 TO m.breite - 1
+            DIM c AS INTEGER : c = f[y * m.breite + x]
+            IF c < 0 OR c >= m.farbanzahl() THEN CONTINUE
+            DIM px AS INTEGER : px = INT(x * massstab)
+            DIM py AS INTEGER : py = INT(y * massstab)
+            ' beide Ecken eingeschlossen
+            IMAGE_FILL_RECT(bild, px, py, px + seite - 1, py + seite - 1, m.farben[c].garn.farbe BAND &HFFFFFF)
+        NEXT
+    NEXT
+    RETURN bild
+END FUNCTION

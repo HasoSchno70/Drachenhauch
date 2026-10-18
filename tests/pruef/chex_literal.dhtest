@@ -38,3 +38,34 @@ PRINT 0.5
 0
 0.5
 
+
+=== exponent im literal
+' Bis 2026.27 ein Parse-Fehler, obwohl VAL("1e3") es las und der
+' Hervorheber es als Zahl faerbte.
+PRINT 1e3
+PRINT 2.5E-3
+PRINT 1.5e+2 * 2
+PRINT TYPEOF(1e3)
+DIM best AS FLOAT
+best = 1.0E9
+PRINT best > 999999999.0
+--- erwartet
+1000.0
+0.0025
+300.0
+FLOAT
+TRUE
+
+=== e ohne ziffer bleibt ein name
+DIM e AS INTEGER
+e = 4
+PRINT 3 * e
+PRINT 2 + e
+--- erwartet
+12
+6
+
+=== zu grosser exponent ist ein fehler
+PRINT 1e400
+--- fehler
+Kommazahl-Literal zu gross

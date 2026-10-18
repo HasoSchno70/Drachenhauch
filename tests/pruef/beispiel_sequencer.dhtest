@@ -1,0 +1,124 @@
+' Der Sequencer aus der Musik-Runde (examples/sequencer/main.dh, 2026-10-11).
+'
+' Geprueft am Ergebnis: die WAV, die er schreibt (`--- ton`), und die Datei,
+' die er sichert (json-Modul). Die Faelle rufen seine Unterprogramme direkt --
+' der Quelltext steht hinter `DIM beenden AS BOOLEAN`, also vor der
+' Hauptschleife, wenn alle Globalen angelegt sind -- und enden mit EXIT(0).
+' Bei 112 BPM und 12 Uhr-Ticks je Schritt ist ein Schritt 133,9 ms lang.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+--- langsam
+
+=== die wav trifft die schritte
+DIM prA AS INTEGER, prB AS INTEGER
+FOR prA = 0 TO SPUREN - 1
+    FOR prB = 0 TO SCHRITTE - 1 : an[prA, prB] = FALSE : NEXT
+NEXT
+an[0, 0] = TRUE
+an[0, 8] = TRUE
+wavSchreiben("x.wav", 1)
+PRINT "geschrieben"
+EXIT(0)
+--- programm ../../examples/sequencer/main.dh nach DIM beenden AS BOOLEAN
+--- erwartet
+geschrieben
+--- ton _programm/x.wav
+pegel 0 30 > 0.2
+pegel 500 1060 < 0.01
+pegel 1080 1110 > 0.2
+
+=== swing schiebt jeden zweiten schritt
+' Swing 50 % verschiebt Schritt 1 um einen halben Schritt: 18 statt 12 Ticks,
+' also 201 statt 134 ms.
+DIM prA AS INTEGER, prB AS INTEGER
+FOR prA = 0 TO SPUREN - 1
+    FOR prB = 0 TO SCHRITTE - 1 : an[prA, prB] = FALSE : NEXT
+NEXT
+an[0, 1] = TRUE
+swing = 50
+wavSchreiben("x.wav", 1)
+PRINT "geschrieben"
+EXIT(0)
+--- programm ../../examples/sequencer/main.dh nach DIM beenden AS BOOLEAN
+--- erwartet
+geschrieben
+--- ton _programm/x.wav
+pegel 0 195 < 0.01
+pegel 210 240 > 0.2
+
+=== eine stumme spur fehlt in der wav
+DIM prA AS INTEGER, prB AS INTEGER
+FOR prA = 0 TO SPUREN - 1
+    FOR prB = 0 TO SCHRITTE - 1 : an[prA, prB] = FALSE : NEXT
+NEXT
+an[0, 0] = TRUE
+an[4, 4] = TRUE
+stumm[0] = TRUE
+wavSchreiben("x.wav", 1)
+PRINT "geschrieben"
+EXIT(0)
+--- programm ../../examples/sequencer/main.dh nach DIM beenden AS BOOLEAN
+--- erwartet
+geschrieben
+--- ton _programm/x.wav
+pegel 0 520 < 0.01
+pegel 545 600 > 0.2
+
+=== sichern und laden ergeben dasselbe muster
+' Die Tonhoehe steht als Buchstabe im Schrittstreifen ("a" = Grundton), eine
+' Pause als Punkt.
+DIM prA AS INTEGER, prB AS INTEGER
+FOR prA = 0 TO SPUREN - 1
+    FOR prB = 0 TO SCHRITTE - 1 : an[prA, prB] = FALSE : NEXT
+NEXT
+an[4, 0] = TRUE : ton[4, 0] = 3
+an[4, 6] = TRUE : ton[4, 6] = 12
+an[5, 15] = TRUE : ton[5, 15] = 24
+tempo = 130 : swing = 20 : stumm[2] = TRUE
+sichern("m.json")
+DIM prJ AS JSON_HANDLE : prJ = JSON_LOAD("m.json")
+PRINT JSON_GET_STRING(prJ, "spuren.4.schritte")
+PRINT JSON_GET_STRING(prJ, "spuren.5.schritte")
+FOR prA = 0 TO SPUREN - 1
+    stumm[prA] = FALSE
+    FOR prB = 0 TO SCHRITTE - 1 : an[prA, prB] = FALSE : ton[prA, prB] = 0 : NEXT
+NEXT
+tempo = 112 : swing = 0
+laden("m.json")
+PRINT tempo; " "; swing; " "; stumm[2]; " "; stumm[3]
+PRINT an[4, 0]; " "; ton[4, 0]; " "; an[4, 6]; " "; ton[4, 6]; " "; an[5, 15]; " "; ton[5, 15]; " "; an[4, 1]
+PRINT GUI_VALUE(slTempo); " "; GUI_CHECKED(stummKasten[2])
+EXIT(0)
+--- programm ../../examples/sequencer/main.dh nach DIM beenden AS BOOLEAN
+--- erwartet
+d.....m.........
+...............y
+130 20 TRUE FALSE
+TRUE 3 TRUE 12 TRUE 24 FALSE
+130.0 TRUE
+
+=== der mitschnitt klingt mit hall und uebersteuert nicht
+' Strg+Umschalt+E im Programm: zwei Durchgaenge live mit allen Effekten.
+' Sechs Spuren uebereinander gingen auf vollem SFX-Bus bis 1,13 -- der
+' Mixer klippte. Die Spitze schwankt von Lauf zu Lauf (das Echo laeuft in
+' Millisekunden, die Noten auf Uhr-Ticks): auf 40 Prozent 0,88 bis 1,01 in
+' acht Laeufen -- der Fall fiel ab und zu mit "uebersteuert TRUE". Auf 32
+' Prozent 0,72 bis 0,85; geprueft wird "laut genug und nicht ueber 1,0".
+DIM prBild AS INTEGER
+DIM prUeber AS BOOLEAN
+--- programm ../../examples/sequencer/main.dh nach DIM beenden AS BOOLEAN
+--- einschub nach pegelZeigen()
+prBild = prBild + 1
+IF prBild = 5 THEN mitschnittStarten()
+IF INSTR(GUI_STATUSBAR_TEXT$(sb, sbPegel), "Übersteuert") >= 0 THEN prUeber = TRUE
+IF prBild > 5 AND mitschnittBis < 0 THEN
+    PRINT "uebersteuert "; prUeber
+    PRINT GUI_STATUSBAR_TEXT$(sb, 0)
+    EXIT(0)
+END IF
+--- erwartet
+uebersteuert FALSE
+Geschrieben: muster_live.wav (mit Effekten)
+--- ton _programm/muster_live.wav
+spitze 0.75 +-0.25
+dauer 5.36 +-0.15

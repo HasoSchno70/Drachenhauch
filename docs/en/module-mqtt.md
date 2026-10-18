@@ -16,8 +16,8 @@ directly against the OASIS MQTT 3.1.1 specification).
 ## Deliberately not covered
 
 Only **QoS 0** (publish/subscribe without an ack handshake — QoS 1/2 would need
-packet ID tracking + a retry state machine), no `UNSUBSCRIBE`, no will
-message, no TLS (`mqtts://`). For typical hobbyist use (publishing sensor
+packet ID tracking + a retry state machine), no `UNSUBSCRIBE`, no TLS
+(`mqtts://`). The last will (`MQTT_WILL`) is there since 2026-10-12. For typical hobbyist use (publishing sensor
 values, subscribing to control topics against a local broker such as
 Mosquitto) QoS 0 is entirely sufficient — most ESP32 tutorials use QoS 0
 anyway.
@@ -29,8 +29,9 @@ anyway.
 | `MQTT_CONNECT(host$, port, client_id$[, keepalive_s[, user$[, pass$]]])` | MQTT_HANDLE | establish the connection to the broker (`keepalive_s` default 60) |
 | `MQTT_DISCONNECT(handle)` | — | close the connection |
 | `MQTT_IS_CONNECTED(handle)` | BOOLEAN | is the connection still up? |
-| `MQTT_PUBLISH(handle, topic$, payload$[, retain])` | — | send a message to a topic; with `retain` the broker keeps it for later subscribers |
-| `MQTT_SUBSCRIBE(handle, topic$)` | — | subscribe to a topic -- incoming messages are then fetched by `MQTT_UPDATE` |
+| `MQTT_PUBLISH(handle, topic$, payload$[, retain])` | BOOLEAN | send a message to a topic; with `retain` the broker keeps it for later subscribers. FALSE if the connection is gone |
+| `MQTT_SUBSCRIBE(handle, topic$)` | BOOLEAN | subscribe to a topic -- incoming messages are then fetched by `MQTT_UPDATE`. FALSE if the connection is gone |
+| `MQTT_WILL(topic$, inhalt$[, retain])` | — | the **last will** for the next `MQTT_CONNECT`: if the connection breaks without a disconnect, the broker publishes this message |
 | `MQTT_UPDATE(handle)` | — | **call once per frame**: reads in received messages and keeps the connection alive with PINGREQ |
 | `MQTT_NEXT_MESSAGE(handle)` | BOOLEAN | advance by one message; FALSE when the queue is empty |
 | `MQTT_MESSAGE_TOPIC(handle)` | STRING | topic of the current message |
@@ -107,6 +108,58 @@ END TRY
 ```
 
 `MQTT_DISCONNECT` is idempotent — disconnecting twice does not throw.
+
+**If the connection breaks** (broker restarted, Wi-Fi gone), that is a
+**state, not an error**: `MQTT_UPDATE` does not throw, `MQTT_IS_CONNECTED`
+becomes FALSE, `MQTT_PUBLISH` and `MQTT_SUBSCRIBE` return FALSE. Up to
+2026.30 `MQTT_UPDATE` threw (error 10054 under Windows), and a program
+without `TRY` ended as soon as the broker restarted. If the broker vanishes
+without any goodbye (power gone -- then no abort comes over the network
+either), the client notices it by the missing answer to its PINGREQ: after
+half the keepalive time (at least 2 s) the connection counts as lost.
+Reconnecting is up to the program:
+
+```basic
+IMPORT "mqtt"
+DIM h AS MQTT_HANDLE
+DIM verbunden AS BOOLEAN
+DIM naechsterVersuch AS INTEGER
+SUB verbinden()
+    TRY
+        h = MQTT_CONNECT("127.0.0.1", 1883, "dashboard")
+        MQTT_SUBSCRIBE(h, "werkstatt/#")
+        verbunden = TRUE
+    CATCH e
+        naechsterVersuch = MILLIS() + 3000
+    END TRY
+END SUB
+' je Bild:
+IF verbunden THEN
+    MQTT_UPDATE(h)
+    IF NOT MQTT_IS_CONNECTED(h) THEN verbunden = FALSE : naechsterVersuch = MILLIS() + 3000
+ELSEIF MILLIS() >= naechsterVersuch THEN
+    verbinden()
+END IF
+```
+
+## The last will
+
+A board reports `online` with `retain` at startup -- and when its power runs
+out, that `online` stays at the broker: every dashboard that starts later
+takes the dead device for alive. The remedy is the **last will**: a message
+the client deposits when connecting and that the BROKER publishes as soon as
+the connection breaks without a disconnect (crash, power, network). A clean
+`MQTT_DISCONNECT` does not trigger it.
+
+```basic
+IMPORT "mqtt"
+MQTT_WILL("werkstatt/status", "offline", TRUE)   ' gilt fuer das naechste CONNECT
+DIM h AS MQTT_HANDLE : h = MQTT_CONNECT("127.0.0.1", 1883, "werkstatt-sensor")
+MQTT_PUBLISH(h, "werkstatt/status", "online", TRUE)
+```
+
+The will applies to exactly one `MQTT_CONNECT` -- whoever reconnects sets it
+again (the ESP32 libraries do the same: `setWill` before `connect`).
 
 ## Complete example
 

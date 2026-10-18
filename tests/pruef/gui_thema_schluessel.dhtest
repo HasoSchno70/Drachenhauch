@@ -1,0 +1,23 @@
+' Unbekannte Schluessel bei Thema und Metriken nennen die gueltigen (2026-10-10).
+' Bis 2026.27 sagten GUI_THEME_SET/GET und GUI_METRIC_SET/GET nur
+' "unbekannter Schluessel" -- gefunden beim Feed-Leser ('window_bg' statt
+' 'win_bg'). Die uebrigen *_SET nannten die gueltigen laengst.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== thema nennt die gueltigen schluessel
+IMPORT "gui"
+PRINT GUI_THEME_GET("window_bg")
+--- fehler
+GUI_THEME_GET: unbekannter Schluessel 'window_bg' (bekannt: accent, close_hover, muted_fg, text_fg, title_bg, title_bg_focus, title_fg, widget_bg, widget_border, win_bg, win_border)
+
+=== thema setzen ebenso
+IMPORT "gui"
+GUI_THEME_SET("hintergrund", RGB(1, 2, 3))
+--- fehler
+GUI_THEME_SET: unbekannter Schluessel 'hintergrund' (bekannt: accent,
+
+=== metriken ebenso
+IMPORT "gui"
+PRINT GUI_METRIC_GET("radius")
+--- fehler
+GUI_METRIC_GET: unbekannter Schluessel 'radius' (bekannt:

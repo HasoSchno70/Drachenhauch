@@ -143,8 +143,10 @@ stimmt der Satz aus der alten Roadmap.
 
 `HTTPD_START(0)` lässt das Betriebssystem einen freien Port wählen —
 praktisch, wenn mehrere Programme gleichzeitig laufen. Den gewählten Port
-meldet man am besten mit `EPRINT`: `PRINT` wird gepuffert und erscheint erst
-am Programmende, `EPRINT` sofort.
+meldet man am besten mit `EPRINT`: das erscheint sofort, auch wenn die Ausgabe
+in eine Datei geht. `PRINT` kommt im Terminal ebenfalls sofort, in eine Datei
+umgeleitet aber gesammelt -- und ein wartender Server schreibt danach nichts
+mehr, das den Rest hinausschieben wuerde.
 
 ```basic
 s = HTTPD_START(0)

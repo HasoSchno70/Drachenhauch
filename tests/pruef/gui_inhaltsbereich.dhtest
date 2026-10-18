@@ -1,0 +1,54 @@
+' GUI_WINDOW_CONTENT_W/H (2026-10-09, Dogfooding): Breite und Hoehe des
+' Inhaltsbereichs unter Titel-, Menue- und Reiterleiste. Vorher musste ein
+' Programm mit Menue die Hoehe der Leiste raten -- die Statusleiste eines
+' Notizzettels sass zu hoch. Geprueft wird nicht eine feste Zahl (die haengt
+' am Thema), sondern dass ein Widget bei y = CONTENT_H - 10 genau am
+' unteren Rand liegt. Format: docs/werkzeuge.md, dhrt test.
+
+=== ohne leisten ist der inhalt das ganze fenster
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+GUI_WINDOW_CHROME(w, FALSE)
+PRINT GUI_WINDOW_CONTENT_W(w); " "; GUI_WINDOW_CONTENT_H(w)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+360 260
+
+=== mit titel und menue liegt ein widget unten genau am rand
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM m AS INTEGER
+m = GUI_MENU(w, "Datei")
+GUI_MENU_ITEM(m, "Ende")
+DIM h AS INTEGER
+h = GUI_WINDOW_CONTENT_H(w)
+DIM unten AS GUI_WIDGET
+unten = GUI_BUTTON(w, "x", 0, h - 10, 50, 10)
+GUI_UPDATE()
+PRINT "kleiner "; h < 260 AND h > 200
+' 5 Punkte ueber dem unteren Fensterrand liegt der Knopf, 5 darunter nicht mehr
+PRINT "unten "; GUI_HIT_TEST(GUI_WINDOW_GET_X(w) + 5, GUI_WINDOW_GET_Y(w) + 260 - 5) = unten
+PRINT "breite "; GUI_WINDOW_CONTENT_W(w)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+kleiner TRUE
+unten TRUE
+breite 360
+
+=== ein falsches handle sagt es
+IMPORT "gui"
+TRY
+    PRINT GUI_WINDOW_CONTENT_H(99)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+GUI_WINDOW_CONTENT_*: ungueltiges GUI_WINDOW-Handle

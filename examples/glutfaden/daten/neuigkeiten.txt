@@ -1,0 +1,34 @@
+# Was in Glutfaden neu ist (Kopf-Knopf -> „Neu in Glutfaden“, PySticky
+# „Neu in dieser Version“). Je Abschnitt eine Zeile mit „## “ und dem Titel,
+# darunter der Text; Leerzeilen trennen Absätze. Zeilen mit # sind Kommentar.
+# Die neueste Stufe steht oben.
+
+## 🌍 Stufe 25: Englisch in jedem Dialog
+Jetzt sprechen auch alle Dialoge Englisch, dazu die Ausgaben: PDF- und HTML-Anleitung, Statistik als CSV, Stickplan und Paket. Meldungen beim Lesen fremder Muster und der Verlauf (Rückgängig: …) folgen der Sprache ebenso.
+
+## 🌐 Stufe 24: Deutsch und Englisch
+Glutfaden spricht Englisch: Einstellungen → Allgemein → Sprache (automatisch richtet sich nach der Systemsprache). Gewechselt wird beim nächsten Start. Tastenkürzel heißen dann Ctrl und Shift, Zahlen haben einen Dezimalpunkt.
+
+## 🧲 Stufe 23: Raster, Stift und Finger
+Mit dem Magneten in der Werkzeugleiste rasten Linie, Rechteck, Ellipse und Vieleck auf jedes fünfte Kästchen ein (der Abstand steht in den Einstellungen).
+
+Mit einem Zeichenstift (Wacom, Surface Pen …) wächst der Pinsel des Stift-Werkzeugs mit dem Druck; die Maus setzt weiter einen Stich je Kästchen. Auf Touchscreen und Touchpad zoomen zwei Finger, sobald es in den Einstellungen eingeschaltet ist.
+
+## 🧵 Stufe 22: Kleinigkeiten aus PySticky
+Die Kante einer Auswahl läuft, solange ein Auswahlwerkzeug gewählt ist, und leere Kästchen zeigen den feinen Punkt eines Aida-Stoffs.
+
+Ein Garn lässt sich aus dem Katalog auf die Farbleiste ziehen. Ebenen werden in der Liste gezogen: oben oder unten losgelassen wandern sie, in der Mitte einer anderen Zeile werden sie mit ihr zusammengeführt.
+
+Neu in den Einstellungen: eigene Ordner für Bibliothek und Vorlagen, „Gewählte Farbe hervorheben“ und ob die Stickzeit gemessen wird.
+
+## 📥 Stufe 21: Muster importieren
+XSD-, PAT- und OXS-Dateien zeigen vor dem Übernehmen Vorschau, Größe, Farben und die Warnungen des Lesers. Bilder gehen auch in Formaten, die GTK lesen kann (TIFF, AVIF, HEIC …). Dazu ein Zoom-Regler in der Statusleiste und ein helles Erscheinungsbild.
+
+## 🗂 Stufe 20: Ebenen und Ansicht
+Ebenen lassen sich leeren und mit einer Notiz versehen. Mittelkreuz, Spiegelachsen, Pfeiltasten, Rollbalken, Dateien aufs Fenster ziehen und die Übersicht der Tastenkürzel (F1).
+
+## 🎨 Stufe 19: Werkzeuge
+Optionsleisten je Werkzeug, eine Pipette für den ganzen Bildschirm, Paletten-Dateien und Drucken.
+
+## ✂ Stufe 18: Muster umbauen
+Drehen, spiegeln und zuschneiden; Ebenen vereinen und einzeln ansehen.

@@ -1,0 +1,974 @@
+[
+ {
+  "VenusNumber": "2000",
+  "Color": {
+   "R": 255,
+   "G": 255,
+   "B": 255
+  },
+  "Name": "White"
+ },
+ {
+  "VenusNumber": "2001",
+  "Color": {
+   "R": 252,
+   "G": 250,
+   "B": 245
+  },
+  "Name": "Off White"
+ },
+ {
+  "VenusNumber": "2002",
+  "Color": {
+   "R": 255,
+   "G": 253,
+   "B": 230
+  },
+  "Name": "Ecru"
+ },
+ {
+  "VenusNumber": "2003",
+  "Color": {
+   "R": 245,
+   "G": 235,
+   "B": 215
+  },
+  "Name": "Cream"
+ },
+ {
+  "VenusNumber": "2004",
+  "Color": {
+   "R": 250,
+   "G": 240,
+   "B": 220
+  },
+  "Name": "Ivory"
+ },
+ {
+  "VenusNumber": "2010",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Black"
+ },
+ {
+  "VenusNumber": "2011",
+  "Color": {
+   "R": 45,
+   "G": 45,
+   "B": 45
+  },
+  "Name": "Charcoal"
+ },
+ {
+  "VenusNumber": "2012",
+  "Color": {
+   "R": 80,
+   "G": 80,
+   "B": 80
+  },
+  "Name": "Dark Gray"
+ },
+ {
+  "VenusNumber": "2013",
+  "Color": {
+   "R": 120,
+   "G": 120,
+   "B": 120
+  },
+  "Name": "Medium Gray"
+ },
+ {
+  "VenusNumber": "2014",
+  "Color": {
+   "R": 170,
+   "G": 170,
+   "B": 170
+  },
+  "Name": "Light Gray"
+ },
+ {
+  "VenusNumber": "2015",
+  "Color": {
+   "R": 210,
+   "G": 210,
+   "B": 210
+  },
+  "Name": "Pearl Gray"
+ },
+ {
+  "VenusNumber": "2100",
+  "Color": {
+   "R": 139,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Dark Red"
+ },
+ {
+  "VenusNumber": "2101",
+  "Color": {
+   "R": 178,
+   "G": 34,
+   "B": 34
+  },
+  "Name": "Firebrick"
+ },
+ {
+  "VenusNumber": "2102",
+  "Color": {
+   "R": 205,
+   "G": 92,
+   "B": 92
+  },
+  "Name": "Indian Red"
+ },
+ {
+  "VenusNumber": "2103",
+  "Color": {
+   "R": 220,
+   "G": 20,
+   "B": 60
+  },
+  "Name": "Crimson"
+ },
+ {
+  "VenusNumber": "2104",
+  "Color": {
+   "R": 255,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Red"
+ },
+ {
+  "VenusNumber": "2105",
+  "Color": {
+   "R": 255,
+   "G": 99,
+   "B": 71
+  },
+  "Name": "Tomato"
+ },
+ {
+  "VenusNumber": "2106",
+  "Color": {
+   "R": 255,
+   "G": 127,
+   "B": 80
+  },
+  "Name": "Coral"
+ },
+ {
+  "VenusNumber": "2107",
+  "Color": {
+   "R": 250,
+   "G": 128,
+   "B": 114
+  },
+  "Name": "Salmon"
+ },
+ {
+  "VenusNumber": "2108",
+  "Color": {
+   "R": 255,
+   "G": 160,
+   "B": 122
+  },
+  "Name": "Light Salmon"
+ },
+ {
+  "VenusNumber": "2110",
+  "Color": {
+   "R": 128,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Maroon"
+ },
+ {
+  "VenusNumber": "2111",
+  "Color": {
+   "R": 165,
+   "G": 42,
+   "B": 42
+  },
+  "Name": "Brown Red"
+ },
+ {
+  "VenusNumber": "2200",
+  "Color": {
+   "R": 255,
+   "G": 182,
+   "B": 193
+  },
+  "Name": "Light Pink"
+ },
+ {
+  "VenusNumber": "2201",
+  "Color": {
+   "R": 255,
+   "G": 192,
+   "B": 203
+  },
+  "Name": "Pink"
+ },
+ {
+  "VenusNumber": "2202",
+  "Color": {
+   "R": 255,
+   "G": 105,
+   "B": 180
+  },
+  "Name": "Hot Pink"
+ },
+ {
+  "VenusNumber": "2203",
+  "Color": {
+   "R": 255,
+   "G": 20,
+   "B": 147
+  },
+  "Name": "Deep Pink"
+ },
+ {
+  "VenusNumber": "2204",
+  "Color": {
+   "R": 219,
+   "G": 112,
+   "B": 147
+  },
+  "Name": "Pale Violet Red"
+ },
+ {
+  "VenusNumber": "2205",
+  "Color": {
+   "R": 199,
+   "G": 21,
+   "B": 133
+  },
+  "Name": "Medium Violet Red"
+ },
+ {
+  "VenusNumber": "2206",
+  "Color": {
+   "R": 255,
+   "G": 240,
+   "B": 245
+  },
+  "Name": "Lavender Blush"
+ },
+ {
+  "VenusNumber": "2207",
+  "Color": {
+   "R": 255,
+   "G": 228,
+   "B": 225
+  },
+  "Name": "Misty Rose"
+ },
+ {
+  "VenusNumber": "2300",
+  "Color": {
+   "R": 255,
+   "G": 165,
+   "B": 0
+  },
+  "Name": "Orange"
+ },
+ {
+  "VenusNumber": "2301",
+  "Color": {
+   "R": 255,
+   "G": 140,
+   "B": 0
+  },
+  "Name": "Dark Orange"
+ },
+ {
+  "VenusNumber": "2302",
+  "Color": {
+   "R": 255,
+   "G": 69,
+   "B": 0
+  },
+  "Name": "Orange Red"
+ },
+ {
+  "VenusNumber": "2303",
+  "Color": {
+   "R": 255,
+   "G": 200,
+   "B": 100
+  },
+  "Name": "Light Orange"
+ },
+ {
+  "VenusNumber": "2304",
+  "Color": {
+   "R": 255,
+   "G": 218,
+   "B": 185
+  },
+  "Name": "Peach Puff"
+ },
+ {
+  "VenusNumber": "2305",
+  "Color": {
+   "R": 255,
+   "G": 228,
+   "B": 196
+  },
+  "Name": "Bisque"
+ },
+ {
+  "VenusNumber": "2306",
+  "Color": {
+   "R": 250,
+   "G": 235,
+   "B": 215
+  },
+  "Name": "Antique White"
+ },
+ {
+  "VenusNumber": "2307",
+  "Color": {
+   "R": 210,
+   "G": 105,
+   "B": 30
+  },
+  "Name": "Chocolate"
+ },
+ {
+  "VenusNumber": "2400",
+  "Color": {
+   "R": 255,
+   "G": 255,
+   "B": 0
+  },
+  "Name": "Yellow"
+ },
+ {
+  "VenusNumber": "2401",
+  "Color": {
+   "R": 255,
+   "G": 215,
+   "B": 0
+  },
+  "Name": "Gold"
+ },
+ {
+  "VenusNumber": "2402",
+  "Color": {
+   "R": 255,
+   "G": 223,
+   "B": 0
+  },
+  "Name": "Golden Yellow"
+ },
+ {
+  "VenusNumber": "2403",
+  "Color": {
+   "R": 238,
+   "G": 232,
+   "B": 170
+  },
+  "Name": "Pale Goldenrod"
+ },
+ {
+  "VenusNumber": "2404",
+  "Color": {
+   "R": 240,
+   "G": 230,
+   "B": 140
+  },
+  "Name": "Khaki"
+ },
+ {
+  "VenusNumber": "2405",
+  "Color": {
+   "R": 255,
+   "G": 250,
+   "B": 205
+  },
+  "Name": "Lemon Chiffon"
+ },
+ {
+  "VenusNumber": "2406",
+  "Color": {
+   "R": 250,
+   "G": 250,
+   "B": 210
+  },
+  "Name": "Light Goldenrod"
+ },
+ {
+  "VenusNumber": "2407",
+  "Color": {
+   "R": 218,
+   "G": 165,
+   "B": 32
+  },
+  "Name": "Goldenrod"
+ },
+ {
+  "VenusNumber": "2408",
+  "Color": {
+   "R": 184,
+   "G": 134,
+   "B": 11
+  },
+  "Name": "Dark Goldenrod"
+ },
+ {
+  "VenusNumber": "2500",
+  "Color": {
+   "R": 0,
+   "G": 128,
+   "B": 0
+  },
+  "Name": "Green"
+ },
+ {
+  "VenusNumber": "2501",
+  "Color": {
+   "R": 0,
+   "G": 100,
+   "B": 0
+  },
+  "Name": "Dark Green"
+ },
+ {
+  "VenusNumber": "2502",
+  "Color": {
+   "R": 34,
+   "G": 139,
+   "B": 34
+  },
+  "Name": "Forest Green"
+ },
+ {
+  "VenusNumber": "2503",
+  "Color": {
+   "R": 0,
+   "G": 255,
+   "B": 0
+  },
+  "Name": "Lime"
+ },
+ {
+  "VenusNumber": "2504",
+  "Color": {
+   "R": 50,
+   "G": 205,
+   "B": 50
+  },
+  "Name": "Lime Green"
+ },
+ {
+  "VenusNumber": "2505",
+  "Color": {
+   "R": 144,
+   "G": 238,
+   "B": 144
+  },
+  "Name": "Light Green"
+ },
+ {
+  "VenusNumber": "2506",
+  "Color": {
+   "R": 152,
+   "G": 251,
+   "B": 152
+  },
+  "Name": "Pale Green"
+ },
+ {
+  "VenusNumber": "2507",
+  "Color": {
+   "R": 0,
+   "G": 255,
+   "B": 127
+  },
+  "Name": "Spring Green"
+ },
+ {
+  "VenusNumber": "2508",
+  "Color": {
+   "R": 46,
+   "G": 139,
+   "B": 87
+  },
+  "Name": "Sea Green"
+ },
+ {
+  "VenusNumber": "2509",
+  "Color": {
+   "R": 60,
+   "G": 179,
+   "B": 113
+  },
+  "Name": "Medium Sea Green"
+ },
+ {
+  "VenusNumber": "2510",
+  "Color": {
+   "R": 143,
+   "G": 188,
+   "B": 143
+  },
+  "Name": "Dark Sea Green"
+ },
+ {
+  "VenusNumber": "2511",
+  "Color": {
+   "R": 85,
+   "G": 107,
+   "B": 47
+  },
+  "Name": "Dark Olive Green"
+ },
+ {
+  "VenusNumber": "2512",
+  "Color": {
+   "R": 107,
+   "G": 142,
+   "B": 35
+  },
+  "Name": "Olive Drab"
+ },
+ {
+  "VenusNumber": "2513",
+  "Color": {
+   "R": 128,
+   "G": 128,
+   "B": 0
+  },
+  "Name": "Olive"
+ },
+ {
+  "VenusNumber": "2514",
+  "Color": {
+   "R": 154,
+   "G": 205,
+   "B": 50
+  },
+  "Name": "Yellow Green"
+ },
+ {
+  "VenusNumber": "2600",
+  "Color": {
+   "R": 0,
+   "G": 128,
+   "B": 128
+  },
+  "Name": "Teal"
+ },
+ {
+  "VenusNumber": "2601",
+  "Color": {
+   "R": 0,
+   "G": 139,
+   "B": 139
+  },
+  "Name": "Dark Cyan"
+ },
+ {
+  "VenusNumber": "2602",
+  "Color": {
+   "R": 0,
+   "G": 255,
+   "B": 255
+  },
+  "Name": "Cyan"
+ },
+ {
+  "VenusNumber": "2603",
+  "Color": {
+   "R": 0,
+   "G": 206,
+   "B": 209
+  },
+  "Name": "Dark Turquoise"
+ },
+ {
+  "VenusNumber": "2604",
+  "Color": {
+   "R": 64,
+   "G": 224,
+   "B": 208
+  },
+  "Name": "Turquoise"
+ },
+ {
+  "VenusNumber": "2605",
+  "Color": {
+   "R": 72,
+   "G": 209,
+   "B": 204
+  },
+  "Name": "Medium Turquoise"
+ },
+ {
+  "VenusNumber": "2606",
+  "Color": {
+   "R": 175,
+   "G": 238,
+   "B": 238
+  },
+  "Name": "Pale Turquoise"
+ },
+ {
+  "VenusNumber": "2607",
+  "Color": {
+   "R": 127,
+   "G": 255,
+   "B": 212
+  },
+  "Name": "Aquamarine"
+ },
+ {
+  "VenusNumber": "2608",
+  "Color": {
+   "R": 102,
+   "G": 205,
+   "B": 170
+  },
+  "Name": "Medium Aquamarine"
+ },
+ {
+  "VenusNumber": "2700",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 128
+  },
+  "Name": "Navy"
+ },
+ {
+  "VenusNumber": "2701",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 139
+  },
+  "Name": "Dark Blue"
+ },
+ {
+  "VenusNumber": "2702",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 205
+  },
+  "Name": "Medium Blue"
+ },
+ {
+  "VenusNumber": "2703",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 255
+  },
+  "Name": "Blue"
+ },
+ {
+  "VenusNumber": "2704",
+  "Color": {
+   "R": 65,
+   "G": 105,
+   "B": 225
+  },
+  "Name": "Royal Blue"
+ },
+ {
+  "VenusNumber": "2705",
+  "Color": {
+   "R": 100,
+   "G": 149,
+   "B": 237
+  },
+  "Name": "Cornflower Blue"
+ },
+ {
+  "VenusNumber": "2706",
+  "Color": {
+   "R": 70,
+   "G": 130,
+   "B": 180
+  },
+  "Name": "Steel Blue"
+ },
+ {
+  "VenusNumber": "2707",
+  "Color": {
+   "R": 30,
+   "G": 144,
+   "B": 255
+  },
+  "Name": "Dodger Blue"
+ },
+ {
+  "VenusNumber": "2708",
+  "Color": {
+   "R": 0,
+   "G": 191,
+   "B": 255
+  },
+  "Name": "Deep Sky Blue"
+ },
+ {
+  "VenusNumber": "2709",
+  "Color": {
+   "R": 135,
+   "G": 206,
+   "B": 235
+  },
+  "Name": "Sky Blue"
+ },
+ {
+  "VenusNumber": "2710",
+  "Color": {
+   "R": 135,
+   "G": 206,
+   "B": 250
+  },
+  "Name": "Light Sky Blue"
+ },
+ {
+  "VenusNumber": "2711",
+  "Color": {
+   "R": 173,
+   "G": 216,
+   "B": 230
+  },
+  "Name": "Light Blue"
+ },
+ {
+  "VenusNumber": "2712",
+  "Color": {
+   "R": 176,
+   "G": 224,
+   "B": 230
+  },
+  "Name": "Powder Blue"
+ },
+ {
+  "VenusNumber": "2800",
+  "Color": {
+   "R": 128,
+   "G": 0,
+   "B": 128
+  },
+  "Name": "Purple"
+ },
+ {
+  "VenusNumber": "2801",
+  "Color": {
+   "R": 75,
+   "G": 0,
+   "B": 130
+  },
+  "Name": "Indigo"
+ },
+ {
+  "VenusNumber": "2802",
+  "Color": {
+   "R": 138,
+   "G": 43,
+   "B": 226
+  },
+  "Name": "Blue Violet"
+ },
+ {
+  "VenusNumber": "2803",
+  "Color": {
+   "R": 148,
+   "G": 0,
+   "B": 211
+  },
+  "Name": "Dark Violet"
+ },
+ {
+  "VenusNumber": "2804",
+  "Color": {
+   "R": 153,
+   "G": 50,
+   "B": 204
+  },
+  "Name": "Dark Orchid"
+ },
+ {
+  "VenusNumber": "2805",
+  "Color": {
+   "R": 186,
+   "G": 85,
+   "B": 211
+  },
+  "Name": "Medium Orchid"
+ },
+ {
+  "VenusNumber": "2806",
+  "Color": {
+   "R": 218,
+   "G": 112,
+   "B": 214
+  },
+  "Name": "Orchid"
+ },
+ {
+  "VenusNumber": "2807",
+  "Color": {
+   "R": 238,
+   "G": 130,
+   "B": 238
+  },
+  "Name": "Violet"
+ },
+ {
+  "VenusNumber": "2808",
+  "Color": {
+   "R": 221,
+   "G": 160,
+   "B": 221
+  },
+  "Name": "Plum"
+ },
+ {
+  "VenusNumber": "2809",
+  "Color": {
+   "R": 216,
+   "G": 191,
+   "B": 216
+  },
+  "Name": "Thistle"
+ },
+ {
+  "VenusNumber": "2810",
+  "Color": {
+   "R": 230,
+   "G": 230,
+   "B": 250
+  },
+  "Name": "Lavender"
+ },
+ {
+  "VenusNumber": "2811",
+  "Color": {
+   "R": 147,
+   "G": 112,
+   "B": 219
+  },
+  "Name": "Medium Purple"
+ },
+ {
+  "VenusNumber": "2900",
+  "Color": {
+   "R": 139,
+   "G": 69,
+   "B": 19
+  },
+  "Name": "Saddle Brown"
+ },
+ {
+  "VenusNumber": "2901",
+  "Color": {
+   "R": 101,
+   "G": 67,
+   "B": 33
+  },
+  "Name": "Dark Brown"
+ },
+ {
+  "VenusNumber": "2902",
+  "Color": {
+   "R": 150,
+   "G": 105,
+   "B": 60
+  },
+  "Name": "Medium Brown"
+ },
+ {
+  "VenusNumber": "2903",
+  "Color": {
+   "R": 193,
+   "G": 154,
+   "B": 107
+  },
+  "Name": "Khaki Brown"
+ },
+ {
+  "VenusNumber": "2904",
+  "Color": {
+   "R": 210,
+   "G": 180,
+   "B": 140
+  },
+  "Name": "Tan"
+ },
+ {
+  "VenusNumber": "2905",
+  "Color": {
+   "R": 245,
+   "G": 222,
+   "B": 179
+  },
+  "Name": "Wheat"
+ },
+ {
+  "VenusNumber": "2906",
+  "Color": {
+   "R": 222,
+   "G": 184,
+   "B": 135
+  },
+  "Name": "Burlywood"
+ },
+ {
+  "VenusNumber": "2907",
+  "Color": {
+   "R": 205,
+   "G": 133,
+   "B": 63
+  },
+  "Name": "Peru"
+ },
+ {
+  "VenusNumber": "2908",
+  "Color": {
+   "R": 160,
+   "G": 82,
+   "B": 45
+  },
+  "Name": "Sienna"
+ },
+ {
+  "VenusNumber": "2909",
+  "Color": {
+   "R": 165,
+   "G": 42,
+   "B": 42
+  },
+  "Name": "Brown"
+ },
+ {
+  "VenusNumber": "2910",
+  "Color": {
+   "R": 244,
+   "G": 164,
+   "B": 96
+  },
+  "Name": "Sandy Brown"
+ },
+ {
+  "VenusNumber": "2911",
+  "Color": {
+   "R": 188,
+   "G": 143,
+   "B": 143
+  },
+  "Name": "Rosy Brown"
+ }
+]

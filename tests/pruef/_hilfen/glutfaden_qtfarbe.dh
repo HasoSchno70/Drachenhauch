@@ -1,0 +1,36 @@
+' Qts darker/lighter als Text -- dieselben Zeilen, die ref_qtfarbe.py aus
+' PySide aufzeichnet (16 Bit je Kanal, dazu die Kette und 8 Bit).
+IMPORT "../../../examples/glutfaden/kern/kern.dh" AS kern
+FUNCTION gqW$(q AS INTEGER) AS STRING
+    RETURN RIGHT$("0000" + HEX$(kern.qtR16(q)), 4) + RIGHT$("0000" + HEX$(kern.qtG16(q)), 4) + RIGHT$("0000" + HEX$(kern.qtB16(q)), 4)
+END FUNCTION
+
+FUNCTION qtfarbeText$(farben AS ARRAY OF INTEGER) AS STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM f AS INTEGER
+    FOR EACH f IN farben
+        DIM q AS INTEGER : q = kern.qtWert(f)
+        DIM t AS ARRAY OF STRING : t = []
+        DIM k AS INTEGER
+        FOR EACH k IN [105, 110, 115, 130, 140, 150]
+            ARRAY_PUSH(t, "d" + STR$(k) + " " + gqW$(kern.qtDunkler(q, k)))
+        NEXT
+        FOR EACH k IN [110, 120, 145, 150]
+            ARRAY_PUSH(t, "l" + STR$(k) + " " + gqW$(kern.qtHeller(q, k)))
+        NEXT
+        ARRAY_PUSH(t, "k " + gqW$(kern.qtHeller(kern.qtDunkler(q, 140), 120)))
+        ARRAY_PUSH(t, "8 " + RIGHT$("000000" + HEX$(kern.farbeDunkler(f, 140)), 6) + " " + RIGHT$("000000" + HEX$(kern.farbeHeller(f, 150)), 6))
+        ARRAY_PUSH(aus, RIGHT$("000000" + HEX$(f), 6) + ": " + JOIN$(t, " "))
+    NEXT
+    RETURN JOIN$(aus, CHR$(10))
+END FUNCTION
+
+' Die Farben aus der Aufzeichnung (vor dem Doppelpunkt)
+FUNCTION qtfarbeQuellen(ref AS STRING) AS ARRAY OF INTEGER
+    DIM q AS ARRAY OF INTEGER : q = []
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(ref, CHR$(10))
+        IF LEN(z) > 7 THEN ARRAY_PUSH(q, kern.farbeAusHex("#" + LEFT$(z, 6)))
+    NEXT
+    RETURN q
+END FUNCTION

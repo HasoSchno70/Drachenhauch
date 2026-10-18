@@ -62,6 +62,8 @@ der **Körper-Index** (INTEGER) für alle folgenden Aufrufe.
 | `PHYS3D_SET_VEL(w, idx, vx, vy, vz)` | — | Linear-Geschwindigkeit setzen |
 | `PHYS3D_APPLY_IMPULSE(w, idx, ix, iy, iz)` | — | einmaligen Impuls geben (Sprung, Schuss, Explosion) |
 | `PHYS3D_REMOVE(w, idx)` | — | Körper aus der Welt entfernen |
+| `PHYS3D_SLEEP(w, idx [, schlafen])` | — | Körper schlafen legen (ohne drittes Argument oder TRUE) bzw. wecken (FALSE). Ein schlafender Körper kostet den Löser nichts, bis ihn ein Stoß, ein gesetztes Tempo oder ein wacher Körper berührt. Für frisch aufgebaute Stapel: 1323 aufeinanderliegende Würfel kosten wach 20 ms je Schritt, schlafend 0,3 ms. **Achtung:** ein schlafender Körper in der Luft bleibt dort hängen, bis ihn etwas weckt |
+| `PHYS3D_SLEEPING(w, idx)` | BOOLEAN | schläft der Körper? (statische und ungültige: FALSE) |
 
 ## Rendern (Quaternion → Transform)
 

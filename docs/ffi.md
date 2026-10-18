@@ -128,7 +128,16 @@ Ein Name mit Endung oder Pfad gilt wörtlich (`"libsqlite3.so.0"`,
   Variable.
 * **Abhängigkeiten unter Windows:** Bei einem Pfad (`LIB "C:/Programme/X/x.dll"`)
   sucht Windows die Bibliotheken, die diese DLL selbst braucht, zuerst in
-  ihrem Ordner -- der muss nicht im PATH stehen.
+  ihrem Ordner -- der muss nicht im PATH stehen. Außerdem hängt Drachenhauch
+  den Ordner hinten an den PATH dieses Programms: Lädt die Bibliothek
+  später selbst Module nach (GdkPixbuf seine Bildlader, GStreamer und Qt
+  ihre Plugins), finden auch die ihre Abhängigkeiten. Ohne das brach GTK aus
+  Inkscape beim ersten Symbol ab, weil das SVG-Modul librsvg nicht fand.
+* **Gleiche Funktion, anderer Name je System:** Manche Bibliotheken
+  exportieren unter Windows nur eine Fassung mit Anhang (`gdk_pixbuf_save`
+  heißt dort `gdk_pixbuf_save_utf8` -- in C ist das ein Makro). Meist gibt es
+  eine Schwester, die überall gleich heißt (`gdk_pixbuf_savev`); sonst zwei
+  `DECLARE`-Zeilen mit `ALIAS`.
 * Liegt eine Datei unter dem Namen da, lässt sich aber nicht laden, sagt
   die Meldung das samt dem Grund des Systems: meist fehlt ihr selbst eine
   Bibliothek, oder sie ist für 32 Bit gebaut.
@@ -369,8 +378,10 @@ r = CreatePolygonRgn(dreieck, LEN(dreieck), 1)
   st.werte`). Ein Feld der Kopie zu schreiben (`p.x = 1`) ist darum eine
   Meldung; ins Feld schreibt man mit Index. `FOR EACH` geht nur über eine
   Dimension, wie bei jedem Feld.
-* Ein Index direkt auf dem Ergebnis eines Aufrufs (`reihe(5)[0].x`) ist
-  eine Meldung -- erst einer Variable zuweisen.
+* **Direkt auf dem Ergebnis eines Aufrufs** geht beides: `reihe(5)[0].x`,
+  `ort(7).y`, `LEN(reihe(4))`, `FOR EACH p IN reihe(3)`. Der Aufruf läuft
+  dabei genau einmal. Ein Struct kommt wie ein Feld als Verweis zurück --
+  `f()[1].x = 3` schreibt in den Puffer, den `f` geliefert hat.
 
 **In einer Klasse** ist ein Struct ein gewöhnliches Feld; jedes Objekt
 bekommt bei `NEW` seinen eigenen Puffer:
@@ -734,11 +745,24 @@ qsort(b, 3, 4, FUNCTION(a, b) SGN(zahlBei(b) - zahlBei(a)))   ' 42 13 -7
   übergibt einen Nullzeiger. Passt die Zahl ihrer Parameter nicht, ist das
   ein Fehler, bevor die Bibliothek überhaupt gerufen wird.
 * **Ein Fehler im Rückruf** kommt beim Aufruf der Bibliothek an, sobald sie
-  zurückkehrt -- als gewöhnlicher Laufzeitfehler, abfangbar mit `CATCH`.
-  Durch die Bibliothek hindurch abbrechen kann er nicht; ab dem Fehler
-  liefert jeder weitere Rückruf dieses Aufrufs 0, und die Bibliothek
-  arbeitet mit diesen Antworten zu Ende. Dasselbe gilt für einen Wert vom
-  falschen Typ (eine BOOLEAN-Funktion, wo `LONG` verlangt ist).
+  zurückkehrt -- als gewöhnlicher Laufzeitfehler, abfangbar mit `CATCH`,
+  mit der Zeile im Rückruf, an der es scheiterte (`ERROR_LINE()`). Durch die
+  Bibliothek hindurch abbrechen kann er nicht: der gescheiterte Rückruf
+  liefert 0, und die Bibliothek arbeitet weiter. Weitere Rückrufe laufen
+  wie gewohnt (bis 2026.31 lieferten sie stumm 0 -- in einer GTK-Oberfläche
+  reagierte danach kein Knopf mehr, nicht einmal der zum Schließen).
+  Gemeldet wird der erste Fehler, und zwar von dem Aufruf, während dessen
+  der Rückruf lief -- nicht von einem Aufruf, den ein späterer Rückruf
+  selbst macht (bis 2026.31 holte ihn der nächste ab, der zurückkehrte: in
+  einer GTK-Oberfläche scheiterte danach jedes Zeichnen mit derselben,
+  immer längeren Meldung). Dasselbe gilt für einen Wert vom falschen
+  Typ (eine BOOLEAN-Funktion, wo `LONG` verlangt ist).
+* **Kehrt die Bibliothek nicht zurück** -- `gtk_main`, `g_main_loop_run`,
+  eine Nachrichtenschleife --, steht der Fehler nach einer Sekunde in der
+  Fehlerausgabe, mit Zeile und dem Namen der Funktion, die noch läuft; jeder
+  weitere sofort. Vorher sah man nichts, und das Programm wirkte, als hinge
+  es. Wer einen Fehler in einem Rückruf selbst behandeln will, umgibt dessen
+  Inhalt mit `TRY ... CATCH`.
 * **Ein Rückruf darf selbst Bibliotheken rufen**, auch dieselbe.
 * **Nur auf dem Faden des Programms.** Ruft eine Bibliothek aus einem eigenen
   Faden zurück (`CreateThread`, `pthread_create`, manche Treiber), wird der

@@ -25,8 +25,8 @@ PDF_SAVE(p, "rechnung.pdf")
 
 | Funktion | Zweck |
 |---|---|
-| `PDF_NEW([größe$[, ausrichtung$]])` → PDF | `a3`…`a6`, `letter`, `legal`; `hoch`/`quer` |
-| `PDF_PAGE(p)` | neue Seite beginnen |
+| `PDF_NEW([größe$[, ausrichtung$]])` → PDF | `a0`…`a6`, `letter`, `legal`; `hoch`/`quer` |
+| `PDF_PAGE(p)` | neue Seite beginnen -- die erste legt `PDF_NEW` schon an; solange sie leer ist, legt `PDF_PAGE` keine zweite an |
 | `PDF_PAGE_COUNT(p)` → INTEGER | wie viele bisher |
 | `PDF_PAGE_WIDTH(p)` / `PDF_PAGE_HEIGHT(p)` → FLOAT | Seitenmaß in mm |
 | `PDF_TITLE(p, titel$)` | Titel in den Dokument-Angaben |
@@ -34,17 +34,26 @@ PDF_SAVE(p, "rechnung.pdf")
 | `PDF_FONT_LOAD(p, pfad$, name$)` | eine eigene TrueType-/OpenType-Schrift laden, danach unter `name$` für `PDF_FONT` da |
 | `PDF_COLOR(p, farbe)` | `RGB(…)` — gilt für Text, Striche und Flächen |
 | `PDF_LINE_WIDTH(p, mm)` | Strichstärke |
-| `PDF_TEXT(p, x, y, text$)` | Text setzen |
+| `PDF_DASH(p, strich_mm[, luecke_mm])` | gestrichelt für alle folgenden Linien und Umrisse; ohne Lücke so lang wie der Strich, `PDF_DASH(p, 0)` wieder durchgezogen |
+| `PDF_TEXT(p, x, y, text$[, winkel])` | Text setzen; `winkel` in Grad gegen den Uhrzeigersinn, gedreht um (x, y) |
 | `PDF_TEXT_WIDTH(p, text$)` → FLOAT | Breite in mm, in der aktuellen Schrift und Größe |
 | `PDF_LINE(p, x1, y1, x2, y2)` | Linie zeichnen |
 | `PDF_RECT(p, x, y, b, h)` / `PDF_RECT_FILL(…)` | Umriss / Fläche |
+| `PDF_CIRCLE(p, x, y, r)` / `PDF_CIRCLE_FILL(…)` | Kreis um (x, y), Umriss / Fläche |
+| `PDF_POLYGON(p, xs, ys)` / `PDF_POLYGON_FILL(…)` | geschlossenes Vieleck aus zwei gleich langen Feldern, mindestens drei Punkte |
+| `PDF_OPACITY(p, deckkraft)` / `PDF_GET_OPACITY(p)` → FLOAT | Deckkraft 0..1 für alles Folgende (Wasserzeichen) |
+| `PDF_IMAGE(p, bild, x, y, b[, h])` | ein Bild (`IMAGE`) in das Rechteck setzen, Maße in mm; ohne `h` nach dem Seitenverhältnis |
 | `PDF_SAVE(p, pfad$)` | schreiben |
 | `PDF_PRINT(p[, drucker$[, kopien[, zieldatei$]]])` | **drucken** — Windows über GDI, macOS/Linux über CUPS; siehe [Drucken](#drucken-und-vorschau) |
 | `PDF_PREVIEW(p, seite[, breite_px])` → IMAGE | die Seite als Bild, für eine Vorschau im Fenster |
 | `PDF_CLOSE(p)` | Speicher freigeben |
 
-Schrift, Größe, Farbe und Strichstärke sind Einstellungen des **Dokuments**,
-nicht der Seite — sie gelten nach `PDF_PAGE` weiter.
+Schrift, Größe, Farbe, Strichstärke und Deckkraft sind Einstellungen des
+**Dokuments**, nicht der Seite — sie gelten nach `PDF_PAGE` weiter. Die
+Deckkraft steht im PDF als echte Durchsicht; beim Drucken unter Windows (GDI)
+und in `PDF_PREVIEW` wird die Farbe stattdessen gegen das weiße Papier
+gemischt — dasselbe Bild, solange darunter nichts liegt. Ein Passwortschutz
+fehlt: krilla verschlüsselt nicht.
 
 ## Schriften
 
@@ -76,6 +85,29 @@ PDF_FONT_LOAD(p, "fonts/NotoSansJP-Regular.ttf", "japanisch")
 PDF_FONT(p, "japanisch", 12)
 PDF_TEXT(p, 20, 40, "請求書")
 ```
+
+## Bilder und Diagramme
+
+`PDF_IMAGE` setzt ein `IMAGE` — aus `LOADIMAGE`, `IMAGE_NEW` oder einem
+Render-Ziel. Ein Diagramm kommt so in den Bericht: in ein Render-Ziel zeichnen,
+mit `RENDERTARGET_IMAGE` als Bild holen, einsetzen. Mit 10 Punkten je
+Millimeter wird es gedruckt scharf:
+
+```basic
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(1700, 850)
+RENDERTARGET_BEGIN(rt)
+CHART_BOUNDS(c, 0, 0, 1700, 850)   ' kurz an die Stelle (0, 0) ...
+CHART_DRAW(c)
+RENDERTARGET_END()
+CHART_BOUNDS(c, x, y, b, h)        ' ... und zurueck an seinen Platz
+DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+PDF_IMAGE(p, bild, 20, 90, 170)    ' 170 mm breit
+```
+
+Ein durchsichtiger Punkt bleibt im PDF durchsichtig; beim Drucken über GDI
+wird er auf weißes Papier gerechnet. Bis 2026.30 kannte das Modul keine
+Bilder — ein Bericht musste seine Kurven Strich für Strich mit `PDF_LINE`
+nachzeichnen, ohne Achsen und Beschriftung.
 
 ## Text und Breite
 

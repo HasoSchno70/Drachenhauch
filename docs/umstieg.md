@@ -95,7 +95,7 @@ Diese Formen aus anderen BASICs versteht Drachenhauch so, wie man sie kennt:
 | `ARRAY_REMOVE` | `ARRAY_REMOVE_AT(a, i)` |
 | `MAKEDIR` | `MKDIR(pfad$)` — bei jedem unbekannten Befehl schlägt die Meldung den echten Namen vor |
 | `MouseDown(1)` für links | `MOUSEBUTTON(0)` — 0 links, 1 rechts, 2 Mitte |
-| `KEYHIT("a")` | `KEYHIT(ASC("a"))` oder `KEYHIT(KEY_A)` — eine Taste ist eine Zahl |
+| `KEYHIT("a")` | geht: ein Buchstabe als Text meint die Taste, auf der er steht; `KEYHIT(KEY_A)` meint die Lage (für WASD) |
 | `RGB("FF0000")` | `COLOR_FROM_HEX("#FF0000")`, im Quelltext `&HFF0000` |
 | `PLAYSOUND("sprung.wav")` | erst laden: `s = LOADSOUND("sprung.wav")`, dann `PLAYSOUND(s)` (ebenso `DRAWIMAGE`, `SPRITE_NEW` mit `LOADIMAGE`) |
 

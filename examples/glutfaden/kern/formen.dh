@@ -1,0 +1,440 @@
+' Formen fuer die Werkzeuge (PySticky ui/tools/*_tool.py): welche Zellen eine
+' Linie, ein Rechteck, eine Ellipse oder eine Fuellung trifft. Ohne
+' Oberflaeche und ohne Muster-Zustand -- nur Rechnen.
+'
+' Ergebnis ist immer ein flaches Feld [x0, y0, x1, y1, ...]. Die Zellen
+' koennen ausserhalb des Musters liegen (eine Form, die ueber den Rand
+' gezogen wird); wegschneiden ist Sache dessen, der sie setzt.
+
+' Abrunden wie Pythons // (zur kleineren Zahl, auch bei negativen Werten).
+FUNCTION halbAb(a AS INTEGER) AS INTEGER
+    IF a >= 0 THEN RETURN a \ 2
+    RETURN -((-a + 1) \ 2)
+END FUNCTION
+
+' Bresenham, immer vom kleineren Punkt aus gerechnet: sonst saehe dieselbe
+' Linie je nach Zugrichtung anders aus (bei 2:1 entscheidet der Fehlerterm
+' in beiden Richtungen verschieden).
+FUNCTION linie(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER) AS ARRAY OF INTEGER
+    IF x1 > x2 OR (x1 = x2 AND y1 > y2) THEN
+        SWAP x1, x2
+        SWAP y1, y2
+    END IF
+    DIM p AS ARRAY OF INTEGER : p = []
+    DIM dx AS INTEGER : dx = ABS(x2 - x1)
+    DIM dy AS INTEGER : dy = ABS(y2 - y1)
+    DIM sx AS INTEGER : sx = IIF(x1 < x2, 1, -1)
+    DIM sy AS INTEGER : sy = IIF(y1 < y2, 1, -1)
+    DIM fehler AS INTEGER : fehler = dx - dy
+    DIM x AS INTEGER : x = x1
+    DIM y AS INTEGER : y = y1
+    DO
+        ARRAY_PUSH(p, x)
+        ARRAY_PUSH(p, y)
+        IF x = x2 AND y = y2 THEN EXIT DO
+        DIM e2 AS INTEGER : e2 = 2 * fehler
+        IF e2 > -dy THEN
+            fehler = fehler - dy
+            x = x + sx
+        END IF
+        IF e2 < dx THEN
+            fehler = fehler + dx
+            y = y + sy
+        END IF
+    LOOP
+    RETURN p
+END FUNCTION
+
+' Mit Umschalt: nur waagerecht, senkrecht oder 45 Grad. Liefert den
+' Endpunkt als (x, y).
+FUNCTION winkelGerade(sx AS INTEGER, sy AS INTEGER, x AS INTEGER, y AS INTEGER) AS TUPLE
+    DIM dx AS INTEGER : dx = x - sx
+    DIM dy AS INTEGER : dy = y - sy
+    DIM adx AS INTEGER : adx = ABS(dx)
+    DIM ady AS INTEGER : ady = ABS(dy)
+    IF adx > 2 * ady THEN RETURN (x, sy)
+    IF ady > 2 * adx THEN RETURN (sx, y)
+    DIM l AS INTEGER : l = MAX(adx, ady)
+    RETURN (sx + l * IIF(dx >= 0, 1, -1), sy + l * IIF(dy >= 0, 1, -1))
+END FUNCTION
+
+' Mit Umschalt: Quadrat bzw. Kreis -- die laengere Seite gilt fuer beide.
+FUNCTION quadratEcke(sx AS INTEGER, sy AS INTEGER, x AS INTEGER, y AS INTEGER) AS TUPLE
+    DIM dx AS INTEGER : dx = x - sx
+    DIM dy AS INTEGER : dy = y - sy
+    DIM l AS INTEGER : l = MAX(ABS(dx), ABS(dy))
+    RETURN (sx + l * IIF(dx >= 0, 1, -1), sy + l * IIF(dy >= 0, 1, -1))
+END FUNCTION
+
+FUNCTION rechteck(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, gefuellt AS BOOLEAN) AS ARRAY OF INTEGER
+    DIM p AS ARRAY OF INTEGER : p = []
+    DIM ax AS INTEGER : ax = MIN(x1, x2)
+    DIM bx AS INTEGER : bx = MAX(x1, x2)
+    DIM ay AS INTEGER : ay = MIN(y1, y2)
+    DIM by AS INTEGER : by = MAX(y1, y2)
+    DIM x AS INTEGER, y AS INTEGER
+    IF gefuellt THEN
+        FOR y = ay TO by
+            FOR x = ax TO bx
+                ARRAY_PUSH(p, x) : ARRAY_PUSH(p, y)
+            NEXT
+        NEXT
+        RETURN p
+    END IF
+    ' Rand ohne doppelte Ecken (eine Zeile oder Spalte ist ihr eigener Rand)
+    FOR x = ax TO bx
+        ARRAY_PUSH(p, x) : ARRAY_PUSH(p, ay)
+        IF by <> ay THEN
+            ARRAY_PUSH(p, x) : ARRAY_PUSH(p, by)
+        END IF
+    NEXT
+    FOR y = ay + 1 TO by - 1
+        ARRAY_PUSH(p, ax) : ARRAY_PUSH(p, y)
+        IF bx <> ax THEN
+            ARRAY_PUSH(p, bx) : ARRAY_PUSH(p, y)
+        END IF
+    NEXT
+    RETURN p
+END FUNCTION
+
+' Mittelpunkt-Ellipse im Rechteck der beiden Punkte. Gefuellt merkt sich je
+' Zeilenabstand vom Mittelpunkt die groesste halbe Breite: das ist genau die
+' Vereinigung der Spannen, die das Original Zeile fuer Zeile in eine Menge
+' legt -- ohne vier Millionen Eintraege bei einer grossen Ellipse.
+FUNCTION ellipse(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, gefuellt AS BOOLEAN) AS ARRAY OF INTEGER
+    DIM cx AS INTEGER : cx = halbAb(x1 + x2)
+    DIM cy AS INTEGER : cy = halbAb(y1 + y2)
+    DIM rx AS INTEGER : rx = ABS(x2 - x1) \ 2
+    DIM ry AS INTEGER : ry = ABS(y2 - y1) \ 2
+    IF rx = 0 AND ry = 0 THEN
+        IF x1 = x2 AND y1 = y2 THEN RETURN [cx, cy]
+        RETURN rechteck(x1, y1, x2, y2, TRUE)
+    END IF
+    IF rx = 0 THEN RETURN rechteck(cx, MIN(y1, y2), cx, MAX(y1, y2), TRUE)
+    IF ry = 0 THEN RETURN rechteck(MIN(x1, x2), cy, MAX(x1, x2), cy, TRUE)
+
+    DIM breiteJe[ry + 1] AS INTEGER          ' gefuellt: halbe Breite je Abstand
+    DIM i AS INTEGER
+    FOR i = 0 TO ry : breiteJe[i] = -1 : NEXT
+    DIM rand AS MAP OF BOOLEAN : rand = {}
+    DIM p AS ARRAY OF INTEGER : p = []
+
+    DIM x AS INTEGER : x = 0
+    DIM y AS INTEGER : y = ry
+    DIM rx2 AS INTEGER : rx2 = rx * rx
+    DIM ry2 AS INTEGER : ry2 = ry * ry
+    DIM p1 AS FLOAT : p1 = ry2 - rx2 * ry + 0.25 * rx2
+    WHILE ry2 * x < rx2 * y
+        ellipsePunkt(cx, cy, x, y, gefuellt, breiteJe, rand, p)
+        x = x + 1
+        IF p1 < 0 THEN
+            p1 = p1 + 2 * ry2 * x + ry2
+        ELSE
+            y = y - 1
+            p1 = p1 + 2 * ry2 * x - 2 * rx2 * y + ry2
+        END IF
+    WEND
+    DIM p2 AS FLOAT : p2 = ry2 * (x + 0.5) ^ 2 + rx2 * (y - 1) ^ 2 - rx2 * ry2
+    WHILE y >= 0
+        ellipsePunkt(cx, cy, x, y, gefuellt, breiteJe, rand, p)
+        y = y - 1
+        IF p2 > 0 THEN
+            p2 = p2 + rx2 - 2 * rx2 * y
+        ELSE
+            x = x + 1
+            p2 = p2 + 2 * ry2 * x - 2 * rx2 * y + rx2
+        END IF
+    WEND
+    IF NOT gefuellt THEN RETURN p
+    DIM d AS INTEGER, xi AS INTEGER
+    FOR d = 0 TO ry
+        IF breiteJe[d] < 0 THEN CONTINUE
+        FOR xi = cx - breiteJe[d] TO cx + breiteJe[d]
+            ARRAY_PUSH(p, xi) : ARRAY_PUSH(p, cy + d)
+            IF d > 0 THEN
+                ARRAY_PUSH(p, xi) : ARRAY_PUSH(p, cy - d)
+            END IF
+        NEXT
+    NEXT
+    RETURN p
+END FUNCTION
+
+SUB ellipsePunkt(cx AS INTEGER, cy AS INTEGER, x AS INTEGER, y AS INTEGER, gefuellt AS BOOLEAN, _
+                 breiteJe AS ARRAY OF INTEGER, rand AS MAP OF BOOLEAN, p AS ARRAY OF INTEGER)
+    IF gefuellt THEN
+        IF x > breiteJe[y] THEN breiteJe[y] = x
+        RETURN
+    END IF
+    randPunkt(cx + x, cy + y, rand, p)
+    randPunkt(cx - x, cy + y, rand, p)
+    randPunkt(cx + x, cy - y, rand, p)
+    randPunkt(cx - x, cy - y, rand, p)
+END SUB
+
+SUB randPunkt(x AS INTEGER, y AS INTEGER, rand AS MAP OF BOOLEAN, p AS ARRAY OF INTEGER)
+    DIM k AS STRING : k = STR$(x) + "," + STR$(y)
+    IF MAPHAS(rand, k) THEN RETURN
+    MAPPUT(rand, k, TRUE)
+    ARRAY_PUSH(p, x) : ARRAY_PUSH(p, y)
+END SUB
+
+' Fuellen auf einer Ebene: alle Zellen, die mit (x, y) dieselbe Farbe teilen
+' und ueber Nachbarn links/rechts/oben/unten zusammenhaengen (kein Stich
+' zaehlt als Farbe -1). Hat die Startzelle schon die neue Farbe, leer.
+'
+' Die Warteschlange ist ein Feld fester Groesse und die Nachbarn stehen in
+' der Schleife selbst: so bleibt sie bei festen Zahlentypen und laeuft als
+' Maschinencode (eine Million Zellen in einigen Millisekunden statt Sekunden).
+FUNCTION fuellung(e AS Ebene, x AS INTEGER, y AS INTEGER, neu AS INTEGER) AS ARRAY OF INTEGER
+    DIM leer AS ARRAY OF INTEGER : leer = []
+    IF NOT e.drin(x, y) THEN RETURN leer
+    DIM b AS INTEGER : b = e.breite
+    DIM h AS INTEGER : h = e.hoehe
+    DIM r AS ARRAY OF INTEGER : r = e.raster
+    DIM ziel AS INTEGER : ziel = r[y * b + x]
+    IF ziel = neu THEN RETURN leer
+    DIM n AS INTEGER : n = b * h
+    DIM gesehen[n] AS INTEGER
+    DIM warte[n] AS INTEGER
+    DIM ende AS INTEGER : ende = 1
+    warte[0] = y * b + x
+    gesehen[y * b + x] = 1
+    DIM kopf AS INTEGER
+    DIM i AS INTEGER, cx AS INTEGER, j AS INTEGER
+    WHILE kopf < ende
+        i = warte[kopf]
+        kopf = kopf + 1
+        cx = i MOD b
+        IF cx > 0 THEN
+            j = i - 1
+            IF gesehen[j] = 0 AND r[j] = ziel THEN gesehen[j] = 1 : warte[ende] = j : ende = ende + 1
+        END IF
+        IF cx < b - 1 THEN
+            j = i + 1
+            IF gesehen[j] = 0 AND r[j] = ziel THEN gesehen[j] = 1 : warte[ende] = j : ende = ende + 1
+        END IF
+        IF i >= b THEN
+            j = i - b
+            IF gesehen[j] = 0 AND r[j] = ziel THEN gesehen[j] = 1 : warte[ende] = j : ende = ende + 1
+        END IF
+        IF i < n - b THEN
+            j = i + b
+            IF gesehen[j] = 0 AND r[j] = ziel THEN gesehen[j] = 1 : warte[ende] = j : ende = ende + 1
+        END IF
+    WEND
+    ' Die Warteschlange enthaelt jede gefundene Zelle genau einmal
+    DIM p[2 * ende] AS INTEGER
+    FOR i = 0 TO ende - 1
+        p[2 * i] = warte[i] MOD b
+        p[2 * i + 1] = warte[i] \ b
+    NEXT
+    RETURN p
+END FUNCTION
+
+' Fuellen wie fuellung, aber mit den Einstellungen (fill_tool.py): als gleich
+' gilt jede Farbe k mit passt[k + 1] = 1 (fuellPassend: die Zielfarbe und mit
+' Toleranz aehnliche), und diagonal haengen auch die vier Ecknachbarn an.
+' Hat die Startzelle schon die neue Farbe, leer -- auch mit Toleranz.
+FUNCTION fuellungWie(e AS Ebene, x AS INTEGER, y AS INTEGER, neu AS INTEGER, passt AS ARRAY OF INTEGER, diagonal AS BOOLEAN) AS ARRAY OF INTEGER
+    DIM leer AS ARRAY OF INTEGER : leer = []
+    IF NOT e.drin(x, y) THEN RETURN leer
+    DIM b AS INTEGER : b = e.breite
+    DIM h AS INTEGER : h = e.hoehe
+    DIM r AS ARRAY OF INTEGER : r = e.raster
+    IF r[y * b + x] = neu THEN RETURN leer
+    DIM np AS INTEGER : np = LEN(passt)
+    DIM n AS INTEGER : n = b * h
+    DIM gesehen[n] AS INTEGER
+    DIM warte[n] AS INTEGER
+    DIM ende AS INTEGER : ende = 1
+    warte[0] = y * b + x
+    gesehen[y * b + x] = 1
+    DIM kopf AS INTEGER
+    DIM i AS INTEGER, cx AS INTEGER, cy AS INTEGER, j AS INTEGER, dx AS INTEGER, dy AS INTEGER, nx AS INTEGER, ny AS INTEGER, f AS INTEGER
+    WHILE kopf < ende
+        i = warte[kopf]
+        kopf = kopf + 1
+        cx = i MOD b
+        cy = i \ b
+        FOR dy = -1 TO 1
+            FOR dx = -1 TO 1
+                IF dx = 0 AND dy = 0 THEN CONTINUE
+                IF NOT diagonal AND dx <> 0 AND dy <> 0 THEN CONTINUE
+                nx = cx + dx
+                ny = cy + dy
+                IF nx < 0 OR nx >= b OR ny < 0 OR ny >= h THEN CONTINUE
+                j = ny * b + nx
+                IF gesehen[j] <> 0 THEN CONTINUE
+                f = r[j] + 1
+                IF f < 0 OR f >= np THEN CONTINUE
+                IF passt[f] = 0 THEN CONTINUE
+                gesehen[j] = 1
+                warte[ende] = j
+                ende = ende + 1
+            NEXT
+        NEXT
+    WEND
+    DIM p[2 * ende] AS INTEGER
+    FOR i = 0 TO ende - 1
+        p[2 * i] = warte[i] MOD b
+        p[2 * i + 1] = warte[i] \ b
+    NEXT
+    RETURN p
+END FUNCTION
+
+' --- Vieleck (PySticky ui/tools/polygon_tool.py) ------------------------------------
+' Umriss: eine Linie je Kante, auch die schliessende. Gefuellt: der Umriss und
+' je Zeile die Spannen zwischen den Kantenschnitten (gerade/ungerade, Kante
+' halboffen min <= y < max, waagerechte Kanten zaehlen nicht), abgeschnitten
+' auf das Vieleck UND das Muster -- wie das Original. Die Eckpunkte sind Zellen;
+' der Umriss bleibt unbeschnitten (wegschneiden ist Sache dessen, der setzt).
+FUNCTION vieleck(punkte AS ARRAY OF INTEGER, gefuellt AS BOOLEAN, b AS INTEGER, h AS INTEGER) AS ARRAY OF INTEGER
+    DIM p AS ARRAY OF INTEGER : p = []
+    DIM n AS INTEGER : n = LEN(punkte) \ 2
+    IF n = 0 THEN RETURN p
+    DIM lx AS INTEGER : lx = punkte[0]
+    DIM rx AS INTEGER : rx = punkte[0]
+    DIM oy AS INTEGER : oy = punkte[1]
+    DIM uy AS INTEGER : uy = punkte[1]
+    DIM k AS INTEGER
+    FOR k = 1 TO n - 1
+        lx = MIN(lx, punkte[2 * k]) : rx = MAX(rx, punkte[2 * k])
+        oy = MIN(oy, punkte[2 * k + 1]) : uy = MAX(uy, punkte[2 * k + 1])
+    NEXT
+    ' Doppelte ueber eine Maske des umschliessenden Rechtecks
+    DIM mb AS INTEGER : mb = rx - lx + 1
+    DIM gesehen[mb * (uy - oy + 1)] AS INTEGER
+    DIM q AS INTEGER
+    FOR k = 0 TO n - 1
+        DIM j AS INTEGER : j = (k + 1) MOD n
+        DIM l AS ARRAY OF INTEGER : l = linie(punkte[2 * k], punkte[2 * k + 1], punkte[2 * j], punkte[2 * j + 1])
+        FOR q = 0 TO LEN(l) - 2 STEP 2
+            DIM gi AS INTEGER : gi = (l[q + 1] - oy) * mb + l[q] - lx
+            IF gesehen[gi] = 0 THEN
+                gesehen[gi] = 1
+                ARRAY_PUSH(p, l[q]) : ARRAY_PUSH(p, l[q + 1])
+            END IF
+        NEXT
+    NEXT
+    IF NOT gefuellt OR n < 3 THEN RETURN p
+    DIM y AS INTEGER, x AS INTEGER
+    FOR y = MAX(0, oy) TO MIN(h - 1, uy)
+        DIM xs AS ARRAY OF FLOAT : xs = []
+        FOR k = 0 TO n - 1
+            j = (k + 1) MOD n
+            DIM y1 AS INTEGER : y1 = punkte[2 * k + 1]
+            DIM y2 AS INTEGER : y2 = punkte[2 * j + 1]
+            IF y1 = y2 THEN CONTINUE
+            IF y >= MIN(y1, y2) AND y < MAX(y1, y2) THEN
+                DIM x1 AS INTEGER : x1 = punkte[2 * k]
+                DIM x2 AS INTEGER : x2 = punkte[2 * j]
+                ARRAY_PUSH(xs, x1 + (y - y1) * (x2 - x1) / (y2 - y1))
+            END IF
+        NEXT
+        SORT(xs)
+        FOR k = 0 TO LEN(xs) - 2 STEP 2
+            DIM xa AS INTEGER : xa = MAX(MAX(0, lx), abschneiden(xs[k]))
+            DIM xb AS INTEGER : xb = MIN(MIN(b - 1, rx), abschneiden(xs[k + 1]))
+            FOR x = xa TO xb
+                gi = (y - oy) * mb + x - lx
+                IF gesehen[gi] = 0 THEN
+                    gesehen[gi] = 1
+                    ARRAY_PUSH(p, x) : ARRAY_PUSH(p, y)
+                END IF
+            NEXT
+        NEXT
+    NEXT
+    RETURN p
+END FUNCTION
+
+' Richtung null abschneiden, wie Pythons int().
+FUNCTION abschneiden(v AS FLOAT) AS INTEGER
+    IF v >= 0 THEN RETURN FLOOR(v)
+    RETURN -FLOOR(-v)
+END FUNCTION
+
+' --- Symmetrie (PySticky ui/canvas/mixins/mirror_mixin.py) --------------------------
+CONST SPIEGEL_AUS = 0
+CONST SPIEGEL_WAAGERECHT = 1      ' links/rechts gespiegelt
+CONST SPIEGEL_SENKRECHT = 2       ' oben/unten
+CONST SPIEGEL_VIERFACH = 3
+CONST SPIEGEL_ACHTFACH = 4        ' nur bei quadratischen Mustern, sonst vierfach
+
+' Der Spiegel, der wirklich gilt: Achtfach nur bei quadratischen Mustern.
+FUNCTION spiegelWirksam(modus AS INTEGER, b AS INTEGER, h AS INTEGER) AS INTEGER
+    IF modus = SPIEGEL_ACHTFACH AND b <> h THEN RETURN SPIEGEL_VIERFACH
+    RETURN CLAMP(modus, SPIEGEL_AUS, SPIEGEL_ACHTFACH)
+END FUNCTION
+
+' Kurzname fuer die Mitte der Leinwand (PySticky mode_labels)
+FUNCTION spiegelKurz$(modus AS INTEGER) AS STRING
+    SELECT CASE modus
+        CASE SPIEGEL_WAAGERECHT : RETURN "2x↔"
+        CASE SPIEGEL_SENKRECHT : RETURN "2x↕"
+        CASE SPIEGEL_VIERFACH : RETURN "4x"
+        CASE SPIEGEL_ACHTFACH : RETURN "8x"
+    END SELECT
+    RETURN ""
+END FUNCTION
+
+' Die Zelle und ihre Spiegelbilder, ohne Doppelte, nur innerhalb des Musters.
+' Die Formeln des Originals (mit Mitte b/2 und halben Zellen) ergeben genau
+' b-1-x und h-1-y, beim Achtfachen zusaetzlich die vertauschten Achsen.
+FUNCTION spiegelZellen(x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER, modus AS INTEGER) AS ARRAY OF INTEGER
+    DIM p AS ARRAY OF INTEGER : p = [x, y]
+    IF modus = SPIEGEL_AUS THEN RETURN p
+    DIM sx AS INTEGER : sx = b - 1 - x
+    DIM sy AS INTEGER : sy = h - 1 - y
+    IF modus = SPIEGEL_WAAGERECHT OR modus >= SPIEGEL_VIERFACH THEN spiegelDazu(p, sx, y, b, h)
+    IF modus = SPIEGEL_SENKRECHT OR modus >= SPIEGEL_VIERFACH THEN spiegelDazu(p, x, sy, b, h)
+    IF modus >= SPIEGEL_VIERFACH THEN spiegelDazu(p, sx, sy, b, h)
+    IF modus = SPIEGEL_ACHTFACH AND b = h THEN
+        spiegelDazu(p, y, x, b, h)
+        spiegelDazu(p, b - 1 - y, h - 1 - x, b, h)
+        spiegelDazu(p, b - 1 - y, x, b, h)
+        spiegelDazu(p, y, h - 1 - x, b, h)
+    END IF
+    RETURN p
+END FUNCTION
+
+SUB spiegelDazu(p AS ARRAY OF INTEGER, x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER)
+    IF x < 0 OR y < 0 OR x >= b OR y >= h THEN RETURN
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(p) - 2 STEP 2
+        IF p[k] = x AND p[k + 1] = y THEN RETURN
+    NEXT
+    ARRAY_PUSH(p, x) : ARRAY_PUSH(p, y)
+END SUB
+
+' Viele Zellen samt Spiegelbildern (Formen, Striche).
+FUNCTION gespiegelt(punkte AS ARRAY OF INTEGER, b AS INTEGER, h AS INTEGER, modus AS INTEGER) AS ARRAY OF INTEGER
+    IF modus = SPIEGEL_AUS THEN RETURN punkte
+    DIM p AS ARRAY OF INTEGER : p = []
+    DIM k AS INTEGER, q AS INTEGER
+    FOR k = 0 TO LEN(punkte) - 2 STEP 2
+        DIM s AS ARRAY OF INTEGER : s = spiegelZellen(punkte[k], punkte[k + 1], b, h, modus)
+        FOR q = 0 TO LEN(s) - 1
+            ARRAY_PUSH(p, s[q])
+        NEXT
+    NEXT
+    RETURN p
+END FUNCTION
+
+' Rueckstiche in Halbstich-Einheiten (0..2b, 0..2h): waagerecht, senkrecht,
+' beides; achtfach zaehlt hier als vierfach (wie im Original). Nur Linien,
+' deren Enden im Muster liegen. Liefert [x1, y1, x2, y2, ...] samt der eigenen.
+FUNCTION spiegelRueckstich(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, b AS INTEGER, h AS INTEGER, modus AS INTEGER) AS ARRAY OF INTEGER
+    DIM p AS ARRAY OF INTEGER : p = [x1, y1, x2, y2]
+    DIM mx AS INTEGER : mx = 2 * b
+    DIM my AS INTEGER : my = 2 * h
+    IF modus = SPIEGEL_WAAGERECHT OR modus >= SPIEGEL_VIERFACH THEN
+        ARRAY_PUSH(p, mx - x1) : ARRAY_PUSH(p, y1) : ARRAY_PUSH(p, mx - x2) : ARRAY_PUSH(p, y2)
+    END IF
+    IF modus = SPIEGEL_SENKRECHT OR modus >= SPIEGEL_VIERFACH THEN
+        ARRAY_PUSH(p, x1) : ARRAY_PUSH(p, my - y1) : ARRAY_PUSH(p, x2) : ARRAY_PUSH(p, my - y2)
+    END IF
+    IF modus >= SPIEGEL_VIERFACH THEN
+        ARRAY_PUSH(p, mx - x1) : ARRAY_PUSH(p, my - y1) : ARRAY_PUSH(p, mx - x2) : ARRAY_PUSH(p, my - y2)
+    END IF
+    RETURN p
+END FUNCTION

@@ -1,0 +1,176 @@
+' Alles zum Weitergeben in einer ZIP-Datei -- PySticky io/bundle_export.py.
+'
+'     <name>.pxs       das Muster
+'     <name>.html      die Anleitung als Webseite
+'     <name>.png       das Bild (Zelle 12, mit Raster, ohne Symbole)
+'     <name>.pdf       die Anleitung als PDF
+'     garnliste.csv    Bedarf je Farbe (Semikolon, mit BOM fuer Excel)
+'     original/<bild>  das Bild, aus dem das Muster entstand (wenn es noch da ist)
+'     LIESMICH.txt     was im Paket liegt
+'
+' Ein Teil, der nicht entsteht (die Platte voll, das Originalbild fort), fehlt
+' im Paket und steht in `fehlt` -- das Paket entsteht trotzdem. Geschrieben
+' wird erst in eine Nebendatei und dann umbenannt: ein abgebrochener Lauf
+' laesst ein vorhandenes Paket stehen.
+
+CLASS PaketErgebnis
+    DIM pfad AS STRING
+    DIM dateien AS ARRAY OF STRING
+    DIM fehlt AS ARRAY OF STRING
+
+    SUB Init()
+        dateien = []
+        fehlt = []
+    END SUB
+END CLASS
+
+' Dateiname wie _safe_basename: jede Folge anderer Zeichen als a-z, A-Z,
+' 0-9, _ und - wird zu einem _, vorne und hinten faellt _ weg.
+FUNCTION paketName$(m AS Muster) AS STRING
+    DIM n AS STRING : n = IIF(m.name = "", "muster", m.name)
+    DIM e AS STRING : e = REGEX_REPLACE(n, "[^a-zA-Z0-9_-]+", "_")
+    WHILE LEFT$(e, 1) = "_"
+        e = MID$(e, 1, 9999)
+    WEND
+    WHILE RIGHT$(e, 1) = "_"
+        e = LEFT$(e, LEN(e) - 1)
+    WEND
+    RETURN IIF(e = "", "muster", e)
+END FUNCTION
+
+' Ein CSV-Feld wie Pythons csv-Modul (minimal): in Anfuehrungszeichen nur,
+' wenn Trenner, Anfuehrungszeichen oder ein Umbruch darin stehen.
+FUNCTION csvFeld$(t AS STRING) AS STRING
+    IF INSTR(t, ";") >= 0 OR INSTR(t, CHR$(34)) >= 0 OR INSTR(t, CHR$(10)) >= 0 OR INSTR(t, CHR$(13)) >= 0 THEN
+        RETURN CHR$(34) + REPLACE$(t, CHR$(34), CHR$(34) + CHR$(34)) + CHR$(34)
+    END IF
+    RETURN t
+END FUNCTION
+
+' Die Garnliste: eine Zeile je Farbe, die gestickt wird (_write_thread_csv).
+' Im Diamond-Modus ohne Straenge.
+FUNCTION garnlisteCsv$(m AS Muster) AS STRING
+    DIM dp AS BOOLEAN : dp = m.modus = "diamond"
+    DIM sps AS INTEGER : sps = stichJeStrang(INT(m.stoff))
+    DIM z AS ARRAY OF STRING : z = []
+    IF dp THEN
+        ARRAY_PUSH(z, tr$("Symbol;Hersteller;Nr.;Name;Hex;Drills"))
+    ELSE
+        ARRAY_PUSH(z, tr$("Symbol;Hersteller;Nr.;Name;Hex;Stiche;Strange (~)"))
+    END IF
+    DIM f AS Farbeintrag
+    FOR EACH f IN m.farben
+        IF f.auslassen THEN CONTINUE
+        DIM t AS STRING : t = csvFeld$(f.symbol) + ";" + csvFeld$(f.garn.hersteller) + ";" + csvFeld$(f.garn.nummer) + ";" + csvFeld$(f.garn.name) + ";" + farbeAlsHex$(f.garn.farbe) + ";" + STR$(f.stichzahl)
+        IF NOT dp THEN t = t + ";" + STR$(IIF(f.stichzahl > 0, (f.stichzahl + sps - 1) \ sps, 0))
+        ARRAY_PUSH(z, t)
+    NEXT
+    ' mit BOM, Zeilenende CRLF wie das csv-Modul
+    RETURN CHR$(&HFEFF) + JOIN$(z, CHR$(13) + CHR$(10)) + CHR$(13) + CHR$(10)
+END FUNCTION
+
+FUNCTION leseMich$(m AS Muster, inhalt AS ARRAY OF STRING) AS STRING
+    DIM z AS ARRAY OF STRING : z = []
+    ARRAY_PUSH(z, trf$("Glutfaden-Paket: {0}", [m.name]))
+    ARRAY_PUSH(z, "=" * 60)
+    ARRAY_PUSH(z, trf$("Größe: {0} × {1} {2}", [STR$(m.breite), STR$(m.hoehe), begriff$(m, "einheit")]))
+    IF m.modus = "diamond" THEN
+        ARRAY_PUSH(z, begriff$(m, "stoff") + ": " + stoffName$(m))
+    ELSE
+        ARRAY_PUSH(z, trf$("Stoffzaehlung: {0} ct", [STR$(INT(m.stoff))]))
+    END IF
+    ARRAY_PUSH(z, trf$("Farben: {0}", [STR$(LEN(m.farben))]))
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, tr$("Enthaltene Dateien:"))
+    DIM n AS STRING
+    FOR EACH n IN inhalt
+        ARRAY_PUSH(z, "  - " + n)
+    NEXT
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, tr$("Das .pxs öffnen Glutfaden und PySticky."))
+    RETURN JOIN$(z, CHR$(10))
+END FUNCTION
+
+' Das Paket schreiben. `papier` ist das Format des PDFs ("" = ohne PDF).
+FUNCTION paketExportieren(m AS Muster, zipPfad AS STRING, papier AS STRING, mystery AS BOOLEAN, paletten AS ARRAY OF Palette, autor AS STRING = "", copyright AS STRING = "") AS PaketErgebnis
+    DIM erg AS PaketErgebnis : erg = NEW PaketErgebnis()
+    erg.pfad = zipPfad
+    DIM basis AS STRING : basis = paketName$(m)
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM inhalte AS ARRAY OF BUFFER : inhalte = []
+    DIM arbeit AS STRING : arbeit = PATHJOIN(TEMPDIR$(), "glutfaden_paket_" + LEFT$(UUID4$(), 8))
+    MKDIR(arbeit)
+    TRY
+        ' 1. das Muster
+        DIM px AS STRING : px = PATHJOIN(arbeit, basis + ".pxs")
+        pxsSpeichern(m, px)
+        ARRAY_PUSH(namen, basis + ".pxs") : ARRAY_PUSH(inhalte, READALL_BYTES(px))
+        ' 2. HTML
+        TRY
+            DIM ho AS HtmlOptionen : ho = NEW HtmlOptionen()
+            ho.mystery = mystery
+            ho.paletten = paletten
+            ho.autor = autor
+            ho.copyright = copyright
+            ARRAY_PUSH(inhalte, BUFFER_FROM_STRING(htmlText$(m, ho, basis)))
+            ARRAY_PUSH(namen, basis + ".html")
+        CATCH f1
+            ARRAY_PUSH(erg.fehlt, trf$("html ({0})", [f1]))
+        END TRY
+        ' 3. PNG
+        TRY
+            DIM pn AS STRING : pn = PATHJOIN(arbeit, basis + ".png")
+            bildExportieren(m, pn, 12, TRUE, FALSE)
+            ARRAY_PUSH(inhalte, READALL_BYTES(pn))
+            ARRAY_PUSH(namen, basis + ".png")
+        CATCH f2
+            ARRAY_PUSH(erg.fehlt, trf$("png ({0})", [f2]))
+        END TRY
+        ' 4. PDF
+        IF papier <> "" THEN
+            TRY
+                DIM po AS PdfOptionen : po = NEW PdfOptionen()
+                po.papier = papier
+                po.mystery = mystery
+                po.paletten = paletten
+                po.autor = autor
+                po.copyright = copyright
+                DIM pd AS STRING : pd = PATHJOIN(arbeit, basis + ".pdf")
+                DIM ab AS ARRAY OF STRING : ab = pdfExportieren(m, pd, po)
+                ARRAY_PUSH(inhalte, READALL_BYTES(pd))
+                ARRAY_PUSH(namen, basis + ".pdf")
+            CATCH f3
+                ARRAY_PUSH(erg.fehlt, trf$("pdf ({0})", [f3]))
+            END TRY
+        END IF
+        ' 5. Garnliste
+        ARRAY_PUSH(namen, "garnliste.csv") : ARRAY_PUSH(inhalte, BUFFER_FROM_STRING(garnlisteCsv$(m)))
+        ' 6. das Originalbild
+        IF m.quellBild <> "" THEN
+            IF FILEEXISTS(m.quellBild) THEN
+                TRY
+                    ARRAY_PUSH(inhalte, READALL_BYTES(m.quellBild))
+                    ARRAY_PUSH(namen, "original/" + BASENAME(m.quellBild))
+                CATCH f4
+                    ARRAY_PUSH(erg.fehlt, trf$("original ({0})", [f4]))
+                END TRY
+            ELSE
+                ARRAY_PUSH(erg.fehlt, trf$("original ({0} nicht gefunden)", [BASENAME(m.quellBild)]))
+            END IF
+        END IF
+        ' 7. LIESMICH
+        ARRAY_PUSH(inhalte, BUFFER_FROM_STRING(leseMich$(m, namen)))
+        ARRAY_PUSH(namen, "LIESMICH.txt")
+        DIM neben AS STRING : neben = zipPfad + ".tmp"
+        ZIP_WRITE(neben, namen, inhalte)
+        IF FILEEXISTS(zipPfad) THEN DELETEFILE(zipPfad)
+        RENAME(neben, zipPfad)
+    CATCH f
+        IF FILEEXISTS(zipPfad + ".tmp") THEN DELETEFILE(zipPfad + ".tmp")
+        RMDIR(arbeit, TRUE)
+        THROW trf$("Paket nicht geschrieben: {0}", [f])
+    END TRY
+    RMDIR(arbeit, TRUE)
+    erg.dateien = namen
+    RETURN erg
+END FUNCTION

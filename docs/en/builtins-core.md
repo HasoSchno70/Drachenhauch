@@ -38,6 +38,12 @@ PRINT "x = ";           ' no newline
 PRINT x                 ' continues on the same line
 ```
 
+**When the output appears:** in a terminal, every line at once. When the
+output goes to a file or another program, `PRINT` collects the lines and
+writes them out after 50 ms at the latest -- and always before `SLEEP`,
+`INPUT`, `EPRINT` and at `FLIP`. A "please wait ..." is therefore there before
+the pause begins.
+
 ## Conversion
 
 | Function | Purpose |
@@ -51,6 +57,7 @@ PRINT x                 ' continues on the same line
 | `RGB(r, g, b)` → INTEGER | 3 numbers (0..255) to a 24-bit colour. `RGB(255, 128, 0)` = `&HFF8000`. Decimal numbers are **rounded** (so `x * 255 / 640` works) -- there is no clamping, 255.6 is still too large. |
 | `HEX$(n)` → STRING | INT to upper-case hex (without prefix). `HEX$(255)` = `"FF"`. |
 | `NUMFMT$(zahl [, nachkommastellen])` → STRING | write large numbers briefly (`1.2K`, `3.4M`) — for scores and idle games |
+| `ZAHL$(zahl [, stellen])` → STRING | a number in German notation with dots between thousands and a decimal comma (`400.000`, `1.234.567,89`); with `stellen` rounded commercially |
 | `ENUM_NAME(enum, wert)` → STRING | return the name for an ENUM value — for display and debugging |
 
 ```basic
@@ -291,15 +298,16 @@ Functions with a `$` suffix also exist without it (`UPPER$` ≡ `UPPER`).
 | `LEFT$(s, n)`, `RIGHT$(s, n)` | first/last n characters |
 | `MID$(s, start[, n])` | substring from position start (0-based), n characters or to the end |
 | `INSTR(s, sub[, start])` → INTEGER | position of sub in s (0-based), or -1 |
+| `INSTRREV(s, sub[, start])` → INTEGER | last position of sub in s (with `start`: the last one beginning there or before), or -1 |
 | `REPLACE$(s, alt, neu)` | replace all occurrences |
 | `TRIM$(s)` | remove whitespace at the front/back |
 | `SPLIT$(s, delim)` → ARRAY OF STRING | split |
-| `JOIN$(arr, delim)` → STRING | join (array OF STRING) |
+| `JOIN$(arr, delim)` → STRING | join; numbers and booleans in the array are written as with `STR$` |
 | `PADL$(s, breite[, fill])`, `PADR$(...)` | pad on the left/right |
 | `REPEAT$(s, n)` | concatenate s n times |
 | `SPACE$(n)` | n spaces |
 | `HEX$(n)` | INT as a hex string |
-| `FORMAT$(value, mask)` | printf style. `FORMAT$(42, "%05d")` → `"00042"`. Six specifiers: `%d`/`%i`, `%f`, `%x`, `%X`, `%s` — plus `%%` for a literal percent sign. Width, zeros and precision as usual (`%05d`, `%-6d`, `%.2f`). Anything else reports "unknown specifier" |
+| `FORMAT$(value, mask)` | printf style. `FORMAT$(42, "%05d")` → `"00042"`. Six specifiers: `%d`/`%i`, `%f`, `%x`, `%X`, `%s` — plus `%%` for a literal percent sign. Width, zeros and precision as usual (`%05d`, `%-6d`, `%.2f`). Anything else reports "unknown specifier", and a mask without any placeholder (such as the VB mask `"#,##0.00"`) is an error too -- dots between thousands come from `ZAHL$` |
 
 > **Unlike QBasic/VB:** `MID$` and `INSTR` count from **0**, and `INSTR`
 > returns **-1** for "not found", not 0. Patterns carried over from QBasic
@@ -333,6 +341,7 @@ PRINT MID$("Drachenhauch", 4, 5)   ' "henha"  (0-based: from the 5th character)
 PRINT INSTR("hello world", "world")   ' 6
 PRINT INSTR("hello", "he")           ' 0  -- a match right at the start
 PRINT INSTR("hello", "xy")           ' -1 -- not found
+PRINT INSTRREV("a/b/c", "/")          ' 3
 PRINT MID$("pre:rest", LEN("pre:"))  ' "rest" -- without + 1
 PRINT REPLACE$("a-b-c", "-", "_")     ' "a_b_c"
 
@@ -507,7 +516,7 @@ as one.
 | `ZIP_READ(archiv$, name$)` → BUFFER | one entry as bytes |
 | `ZIP_EXTRACT(archiv$, ordner$)` → INTEGER | extract everything, returns the number of files |
 | `ZIP_CREATE(archiv$, dateien)` → INTEGER | archive from a list of file paths |
-| `ZIP_WRITE(archiv$, namen, inhalte)` → INTEGER | archive from names and texts, without a detour through files |
+| `ZIP_WRITE(archiv$, namen, inhalte)` → INTEGER | archive from names and contents (texts or buffers), without a detour through files |
 
 ```basic
 DIM namen AS ARRAY OF STRING
@@ -579,16 +588,20 @@ You write the function **without parentheses**: `TASK_START(BerechneKarte, 42)`.
 **A task runs as a separate process** — not as a thread. Three
 things follow from that which you need to know:
 
-**1. A task does not see your globals.** Not even a `CONST` at the top
-level. The main program does not run in the task process at all:
+**1. A task does not see your globals.** The main program does not run in
+the task process at all -- a variable it sets does not exist there:
 
 ```basic
-CONST FAKTOR AS INTEGER = 10
+DIM faktor AS INTEGER
+faktor = 10
 
 FUNCTION Nutzt() AS INTEGER
-    RETURN FAKTOR        ' error when started as a task
+    RETURN faktor        ' error when started as a task
 END FUNCTION
 ```
+
+A `CONST` with a fixed value (`CONST FAKTOR AS INTEGER = 10`) it does see,
+though: it is substituted already when compiling.
 
 Pass the function what it needs as parameters. The message explains this
 when it happens. The same limit applies to a module imported with `AS` —
@@ -598,7 +611,9 @@ on whatever happens to be at the top of the program.
 **2. Arguments and result are a number, text or BOOLEAN.** You may
 pass as many as you like — `TASK_START(Zeichne, 3, "rot", TRUE)` —, but an
 object or an array handle cannot cross a process boundary. Whoever needs more
-passes JSON through. A text with spaces stays **one** argument.
+passes JSON through. A text with spaces stays **one** argument, and a text
+may be any length -- the arguments go via standard input, not the command
+line (until 2026.27 Windows stopped at about 32,000 characters).
 The result always comes back as a STRING; for a number, therefore,
 `VAL(TASK_RESULT$(a))`.
 
@@ -861,6 +876,8 @@ f = OPENFILE("gross.csv", "r", "cp1252")
 | Name | also written as |
 |---|---|
 | `utf8` (default) | `utf-8` |
+| `utf8bom` | `utf-8-bom`, `utf-8-sig` |
+| `auto` (reading only) | -- |
 | `cp1252` | `windows-1252`, `ansi` |
 | `latin1` | `iso-8859-1` |
 
@@ -885,6 +902,45 @@ encoding has usually copied it from somewhere.
    (`cp1252` has the euro sign — that is exactly why both exist.)
 5. **A BOM at the start of the file is always dropped**, in every text reader. Otherwise
    the first column would forever be called `﻿Name`.
+
+**`auto` is for tools that read other people's files** and do not know in
+advance what they get: valid UTF-8 (with or without a BOM) is read as UTF-8,
+anything else as cp1252 -- ASCII is the same in both, so a line with umlauts
+decides unambiguously. A null byte means a binary file and is an error with
+its own message (*sieht nach einer Binärdatei aus*), so that a search tool can
+skip it. Line by line (`OPENFILE`, `STDIN`) the decision is made per line.
+When writing, `auto` is an error -- there you have to say what should come
+out.
+
+```basic
+DIM z AS ARRAY OF STRING
+TRY
+    z = READLINES(pfad, "auto")
+CATCH e
+    EPRINT("übersprungen: " + e)
+END TRY
+```
+
+**Whoever reads a file AND writes it back** (an editor, a tool that changes
+one line) has to know what `auto` chose -- otherwise a cp1252 file silently
+becomes UTF-8 on saving. `FILE_ENCODING$(pfad$)` tells you: `"utf8"`,
+`"utf8bom"` (valid UTF-8 with a BOM in front), `"cp1252"` or `"binaer"` (a
+null byte, so UTF-16 as well). Every name except `"binaer"` is accepted again
+when writing:
+
+```basic
+DIM kod AS STRING : kod = FILE_ENCODING$(pfad)
+DIM text AS STRING
+DIM f AS FILE : f = OPENFILE(pfad, "r", kod)
+text = READALL$(f) : CLOSEFILE(f)
+' ... edit ...
+WRITEALL(pfad, text, kod)          ' same encoding, same BOM
+```
+
+`utf8bom` reads like `utf8` (the BOM is dropped as always) and puts
+`EF BB BF` in front of the file when writing -- only in front of an **empty**
+one: `WRITE`/`WRITELINE` and `APPENDFILE` to a non-empty file do not write a
+second one.
 
 **Not included: UTF-16.** Excel writes that for "Unicode Text (*.txt)". It
 needs BOM detection, two byte orders and surrogate pairs — a decision of its own,
@@ -911,6 +967,7 @@ Path-based, without a FILE handle *(native runtime only)*:
 | `WRITEALL(pfad$, text$[, kodierung$])` | write text completely (overwrites/creates) |
 | `READLINES(pfad$[, kodierung$])` → ARRAY OF STRING | read a file as an array of lines |
 | `FILESIZE(pfad$)` → INTEGER | size in bytes |
+| `FILE_ENCODING$(pfad$)` → STRING | what `"auto"` would choose: `utf8`, `utf8bom`, `cp1252` or `binaer` (see encodings) |
 | `DELETEFILE(pfad$)`, `RENAME(alt$, neu$)` | delete / rename·move |
 | `DIREXISTS(pfad$)` → BOOLEAN | directory present? |
 | `DIRLIST(pfad$[, muster$])` → ARRAY OF STRING | entry names (sorted), optionally filtered |
@@ -1102,6 +1159,8 @@ worked.
 |---|---|
 | `ARGC()` → INTEGER | number of arguments for this program |
 | `ARG$(n)` → STRING | argument no. `n` (0-based); out of range → `""` |
+| `ARGPATH$(n)` → STRING | argument no. `n` as a **path from where the program was called** (see below) |
+| `STARTDIR$()` → STRING | the folder the program was called from |
 | `GETENV$(name$ [, vorgabe$])` → STRING | read an environment variable |
 | `SETENV(name$, wert$)` | set an environment variable (this program + its children) |
 | `CWD$()` → STRING | current working directory |
@@ -1112,6 +1171,8 @@ worked.
 | `SHELL(programm$, ...)` → INTEGER | start a program, wait, return value |
 | `SHELL_OUT$(programm$, ...)` → STRING | like `SHELL`, but collects the output |
 | `STDIN([kodierung$])` → FILE | standard input as a file handle |
+| `TERMINAL()` → BOOLEAN | does the output go to a terminal (not into a file, a pipe, the IDE)? |
+| `TERMINAL_WIDTH()` → INTEGER | columns of the terminal, 0 if the output does not go to one |
 
 ```basic
 ' A tool that expects a file
@@ -1120,7 +1181,7 @@ IF ARGC() < 1 THEN
     EPRINT("Verwendung: zaehle <datei>")
     EXIT(2)
 END IF
-pfad = ARG$(0)
+pfad = ARGPATH$(0)
 IF NOT FILEEXISTS(pfad) THEN
     EPRINT("Nicht gefunden: " + pfad)
     EXIT(1)
@@ -1142,6 +1203,23 @@ arguments. This is on purpose: otherwise `dhrt` could never add a switch of its 
 without breaking existing programs. The **exported `.exe`**
 is the program itself — there is nothing to separate there, all arguments
 belong to it, without `--`.
+
+**Paths in arguments: `ARGPATH$` instead of `ARG$`.** `dhrt run` and the
+exported `.exe` change into the program's folder at startup -- so that
+`LOADIMAGE("assets/held.png")` finds its image no matter where it was started
+from. A relative path the user gives from *their* folder then points nowhere:
+`werkzeug.exe daten/obst.txt` looks for `daten/obst.txt` next to the `.exe`.
+`ARGPATH$(n)` therefore puts the calling folder in front (`STARTDIR$()`); an
+absolute path, an empty argument and `-` (standard input) stay as they are. For
+options, patterns and numbers keep using `ARG$`.
+
+| Called from `C:\arbeit` | `ARG$(0)` | `ARGPATH$(0)` |
+|---|---|---|
+| `werkzeug.exe daten\obst.txt` | `daten\obst.txt` | `C:\arbeit\daten\obst.txt` |
+| `werkzeug.exe D:\x.txt` | `D:\x.txt` | `D:\x.txt` |
+
+Until 2026.28 the exported `.exe` did not know the calling folder at all; under
+`dhrt run` it was already in the environment variable `DHRT_START_DIR`.
 
 **`EXIT` is not an error.** It ends the program immediately and is **not** caught by
 `TRY`/`CATCH` — an `EXIT` in the middle of a `TRY` block really
@@ -1581,7 +1659,7 @@ For more complex sprite collision see the [sprite module](module-sprite.md) with
 | `AUDIO_SET_VOLUME(ch, v)` | `AUDIO_VOLUME(ch, v)` |
 | `AUDIO_MUSIC_SET_VOLUME(v)` | `AUDIO_MUSIC_VOLUME(v)` |
 
-Container method `arr.join(trenner)` ≡ `JOIN$(arr, trenner)` (array OF STRING).
+Container method `arr.join(trenner)` ≡ `JOIN$(arr, trenner)`.
 
 **Conventions / stumbling blocks** (deliberately NOT renamed — for clarification only):
 

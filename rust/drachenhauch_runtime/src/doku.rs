@@ -349,7 +349,7 @@ pub fn grammatik(wurzel: &Path) -> Result<Value, String> {
          "patterns": [{"name": "constant.character.escape.drachenhauch", "match": "\"\""}]},
         {"name": "constant.numeric.hex.drachenhauch", "match": "\\b0[xX][0-9a-fA-F]+\\b|&[Hh][0-9a-fA-F]+"},
         {"name": "constant.numeric.binary.drachenhauch", "match": "\\b0[bB][01]+\\b|&[Bb][01]+"},
-        {"name": "constant.numeric.drachenhauch", "match": "\\b[0-9]+(\\.[0-9]+)?\\b"},
+        {"name": "constant.numeric.drachenhauch", "match": "\\b[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?\\b"},
         {"name": "constant.language.boolean.drachenhauch", "match": wort(&bools)},
         {"name": "storage.type.drachenhauch", "match": wort(&typen)},
         {"name": "keyword.declaration.drachenhauch", "match": wort(&decl)},

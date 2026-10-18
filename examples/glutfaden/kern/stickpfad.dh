@@ -1,0 +1,383 @@
+' Die Reihenfolge der Stiche je Farbe -- PySticky core/stitch_path_optimizer.py.
+'
+' Je Farbe (in der Reihenfolge, in der sie im Muster zuerst vorkommt, Zeile
+' fuer Zeile gelesen) ein Pfad durch alle ihre sichtbaren Stiche:
+'
+'   zeilenweise  Zeile fuer Zeile, abwechselnd links->rechts und zurueck
+'   naechster    immer zum naechsten noch offenen Stich, Start oben links
+'   daenisch     Zeile fuer Zeile, jede von links nach rechts
+'   spaltenweise Spalte fuer Spalte, abwechselnd oben->unten und zurueck
+'   diagonal     Diagonale fuer Diagonale (x + y), jede von links
+'
+' Die Rueckseiten-Distanz ist die Summe der Abstaende von Stich zu Stich
+' (in Stichen), ein Schritt ueber 4 Stiche ist ein Sprung (dort schneidet
+' man den Faden besser ab). Der Garnverbrauch ist eine Schaetzung:
+' 2,5 cm je Stich und 0,5 cm je Stich Rueckseite, bei 14er Stoff.
+'
+' Beim naechsten Nachbarn gewinnt bei gleichem Abstand der obere, dann der
+' linke Stich -- PySticky waehlt dort nach der Reihenfolge seiner Mengen,
+' die an Pythons Hashes haengt; das ist nicht nachzubilden und auch nicht
+' gewollt (dieselbe Eingabe soll denselben Pfad geben).
+
+CONST SP_ZEILEN = 0
+CONST SP_NACHBAR = 1
+CONST SP_DAENISCH = 2
+CONST SP_SPALTEN = 3
+CONST SP_DIAGONAL = 4
+CONST SP_SPRUNG = 4                   ' ab hier (echt groesser) ist ein Schritt ein Sprung
+CONST SP_GARN_JE_STICH = 2.5          ' cm bei 14er Stoff
+
+' Kennung wie PySticky (OptimizationStrategy.value)
+FUNCTION spKennung$(s AS INTEGER) AS STRING
+    SELECT CASE s
+        CASE SP_ZEILEN : RETURN "row_by_row"
+        CASE SP_NACHBAR : RETURN "nearest"
+        CASE SP_DAENISCH : RETURN "danish"
+        CASE SP_SPALTEN : RETURN "column"
+        CASE SP_DIAGONAL : RETURN "diagonal"
+    END SELECT
+    RETURN "?"
+END FUNCTION
+
+FUNCTION spName$(s AS INTEGER) AS STRING
+    SELECT CASE s
+        CASE SP_ZEILEN : RETURN tr$("Zeilenweise (Schlangenlinie)")
+        CASE SP_NACHBAR : RETURN tr$("Nächster Nachbar")
+        CASE SP_DAENISCH : RETURN tr$("Dänische Methode")
+        CASE SP_SPALTEN : RETURN tr$("Spaltenweise")
+        CASE SP_DIAGONAL : RETURN tr$("Diagonal")
+    END SELECT
+    RETURN "?"
+END FUNCTION
+
+CLASS Farbpfad
+    DIM farbe AS INTEGER
+    DIM xs AS ARRAY OF INTEGER
+    DIM ys AS ARRAY OF INTEGER
+    DIM distanz AS FLOAT
+    DIM spruenge AS INTEGER
+
+    FUNCTION stiche() AS INTEGER
+        RETURN LEN(xs)
+    END FUNCTION
+
+    ' Abstand des Stichs i zum vorigen (0 beim ersten)
+    FUNCTION abstand(i AS INTEGER) AS FLOAT
+        IF i <= 0 THEN RETURN 0.0
+        DIM dx AS INTEGER : dx = xs[i] - xs[i - 1]
+        DIM dy AS INTEGER : dy = ys[i] - ys[i - 1]
+        RETURN SQR(dx * dx + dy * dy)
+    END FUNCTION
+
+    FUNCTION istSprung(i AS INTEGER) AS BOOLEAN
+        RETURN abstand(i) > SP_SPRUNG
+    END FUNCTION
+
+    ' Garn in cm bei einem Stoff von `stoff` Stichen je Zoll
+    FUNCTION garnCm(stoff AS FLOAT) AS FLOAT
+        DIM f AS FLOAT : f = 14 / stoff
+        RETURN LEN(xs) * SP_GARN_JE_STICH * f + distanz * 0.5 * f
+    END FUNCTION
+END CLASS
+
+CLASS Stickpfad
+    DIM strategie AS INTEGER
+    DIM stoff AS FLOAT
+    DIM pfade AS ARRAY OF Farbpfad
+    DIM stiche AS INTEGER
+    DIM distanz AS FLOAT
+    DIM spruenge AS INTEGER
+    DIM garnCm AS FLOAT
+
+    SUB Init()
+        pfade = []
+    END SUB
+END CLASS
+
+' Die Stiche einer Farbe in Lesereihenfolge (Zeile fuer Zeile) bzw. Spalte
+' fuer Spalte; die Farben in der Reihenfolge ihres ersten Vorkommens.
+SUB spSammeln(k AS Komposit, spaltenweise AS BOOLEAN, BYREF px AS ARRAY OF INTEGER, BYREF py AS ARRAY OF INTEGER, BYREF pf AS ARRAY OF INTEGER)
+    px = [] : py = [] : pf = []
+    DIM i AS INTEGER, j AS INTEGER
+    DIM aussen AS INTEGER : aussen = IIF(spaltenweise, k.breite, k.hoehe)
+    DIM innen AS INTEGER : innen = IIF(spaltenweise, k.hoehe, k.breite)
+    FOR i = 0 TO aussen - 1
+        FOR j = 0 TO innen - 1
+            DIM x AS INTEGER : x = IIF(spaltenweise, i, j)
+            DIM y AS INTEGER : y = IIF(spaltenweise, j, i)
+            DIM c AS INTEGER : c = k.farbe[y * k.breite + x]
+            IF c < 0 THEN CONTINUE
+            ARRAY_PUSH(px, x) : ARRAY_PUSH(py, y) : ARRAY_PUSH(pf, c)
+        NEXT
+    NEXT
+END SUB
+
+FUNCTION stickpfadBerechnen(m AS Muster, strategie AS INTEGER, stoff AS FLOAT) AS Stickpfad
+    DIM erg AS Stickpfad : erg = NEW Stickpfad()
+    erg.strategie = strategie
+    erg.stoff = stoff
+    DIM k AS Komposit : k = kompositVon(m)
+    ' die Farben in der Reihenfolge ihres ersten Vorkommens (Zeile fuer Zeile)
+    DIM zx AS ARRAY OF INTEGER, zy AS ARRAY OF INTEGER, zf AS ARRAY OF INTEGER
+    spSammeln(k, FALSE, zx, zy, zf)
+    DIM platz AS MAP OF INTEGER : platz = {}
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zf) - 1
+        IF NOT MAPHAS(platz, STR$(zf[i])) THEN
+            MAPPUT(platz, STR$(zf[i]), LEN(erg.pfade))
+            DIM fp AS Farbpfad : fp = NEW Farbpfad()
+            fp.farbe = zf[i]
+            fp.xs = [] : fp.ys = []
+            ARRAY_PUSH(erg.pfade, fp)
+        END IF
+    NEXT
+    ' die Stiche in der Grundreihenfolge der Strategie
+    DIM gx AS ARRAY OF INTEGER, gy AS ARRAY OF INTEGER, gf AS ARRAY OF INTEGER
+    IF strategie = SP_SPALTEN THEN
+        spSammeln(k, TRUE, gx, gy, gf)
+    ELSEIF strategie = SP_DIAGONAL THEN
+        gx = [] : gy = [] : gf = []
+        DIM d AS INTEGER, x AS INTEGER
+        FOR d = 0 TO k.breite + k.hoehe - 2
+            FOR x = MAX(0, d - k.hoehe + 1) TO MIN(d, k.breite - 1)
+                DIM c AS INTEGER : c = k.farbe[(d - x) * k.breite + x]
+                IF c < 0 THEN CONTINUE
+                ARRAY_PUSH(gx, x) : ARRAY_PUSH(gy, d - x) : ARRAY_PUSH(gf, c)
+            NEXT
+        NEXT
+    ELSE
+        gx = zx : gy = zy : gf = zf
+    END IF
+    FOR i = 0 TO LEN(gf) - 1
+        DIM p AS Farbpfad : p = erg.pfade[MAPGET(platz, STR$(gf[i]))]
+        ARRAY_PUSH(p.xs, gx[i])
+        ARRAY_PUSH(p.ys, gy[i])
+    NEXT
+    ' je Farbe ordnen und zaehlen
+    DIM fp2 AS Farbpfad
+    FOR EACH fp2 IN erg.pfade
+        IF strategie = SP_ZEILEN THEN
+            spSchlange(fp2.xs, fp2.ys)
+        ELSEIF strategie = SP_SPALTEN THEN
+            spSchlange(fp2.ys, fp2.xs)
+        ELSEIF strategie = SP_NACHBAR THEN
+            spNachbar(fp2)
+        END IF
+        DIM s AS INTEGER
+        FOR s = 1 TO fp2.stiche() - 1
+            DIM a AS FLOAT : a = fp2.abstand(s)
+            fp2.distanz = fp2.distanz + a
+            IF a > SP_SPRUNG THEN fp2.spruenge = fp2.spruenge + 1
+        NEXT
+        erg.stiche = erg.stiche + fp2.stiche()
+        erg.distanz = erg.distanz + fp2.distanz
+        erg.spruenge = erg.spruenge + fp2.spruenge
+    NEXT
+    DIM f AS FLOAT : f = 14 / stoff
+    erg.garnCm = erg.stiche * SP_GARN_JE_STICH * f + erg.distanz * 0.5 * f
+    RETURN erg
+END FUNCTION
+
+' Schlangenlinie: die Stiche liegen nach `gruppe` geordnet (und darin
+' aufsteigend nach `lauf`); jede zweite Gruppe wird umgedreht. Fuer Zeilen
+' ist die Gruppe y und der Lauf x, fuer Spalten umgekehrt.
+SUB spSchlange(lauf AS ARRAY OF INTEGER, gruppe AS ARRAY OF INTEGER)
+    DIM n AS INTEGER : n = LEN(lauf)
+    DIM vorwaerts AS BOOLEAN : vorwaerts = TRUE
+    DIM a AS INTEGER : a = 0
+    WHILE a < n
+        DIM e AS INTEGER : e = a
+        WHILE e + 1 < n AND gruppe[e + 1] = gruppe[a]
+            e = e + 1
+        WEND
+        IF NOT vorwaerts THEN
+            DIM i AS INTEGER, j AS INTEGER
+            i = a : j = e
+            WHILE i < j
+                DIM t AS INTEGER : t = lauf[i] : lauf[i] = lauf[j] : lauf[j] = t
+                i = i + 1 : j = j - 1
+            WEND
+        END IF
+        vorwaerts = NOT vorwaerts
+        a = e + 1
+    WEND
+END SUB
+
+' Naechster Nachbar ueber ein Raster von Faechern (wie PySticky
+' _optimize_nearest_neighbor_fast): gesucht wird in Ringen um das Fach des
+' letzten Stichs, bis kein naeherer mehr kommen kann.
+SUB spNachbar(fp AS Farbpfad)
+    DIM n AS INTEGER : n = fp.stiche()
+    IF n <= 1 THEN RETURN
+    DIM xs AS ARRAY OF INTEGER : xs = fp.xs
+    DIM ys AS ARRAY OF INTEGER : ys = fp.ys
+    DIM x0 AS INTEGER : x0 = xs[0]
+    DIM x1 AS INTEGER : x1 = xs[0]
+    DIM y0 AS INTEGER : y0 = ys[0]
+    DIM y1 AS INTEGER : y1 = ys[0]
+    DIM i AS INTEGER
+    FOR i = 1 TO n - 1
+        x0 = MIN(x0, xs[i]) : x1 = MAX(x1, xs[i])
+        y0 = MIN(y0, ys[i]) : y1 = MAX(y1, ys[i])
+    NEXT
+    DIM breite AS INTEGER : breite = x1 - x0 + 1
+    DIM hoehe AS INTEGER : hoehe = y1 - y0 + 1
+    DIM fach AS INTEGER : fach = MAX(1, INT(SQR(breite * hoehe / (n / 15))))
+    DIM fb AS INTEGER : fb = (breite - 1) \ fach + 1
+    DIM fh AS INTEGER : fh = (hoehe - 1) \ fach + 1
+    DIM kopf[fb * fh] AS INTEGER
+    DIM weiter[n] AS INTEGER
+    DIM offen[fb * fh] AS INTEGER
+    DIM weg[n] AS BOOLEAN
+    FOR i = 0 TO fb * fh - 1 : kopf[i] = -1 : NEXT
+    ' rueckwaerts eintragen, damit jedes Fach in Lesereihenfolge liegt
+    FOR i = n - 1 TO 0 STEP -1
+        DIM fi AS INTEGER : fi = ((ys[i] - y0) \ fach) * fb + (xs[i] - x0) \ fach
+        weiter[i] = kopf[fi]
+        kopf[fi] = i
+        offen[fi] = offen[fi] + 1
+    NEXT
+    ' Start: kleinstes x + y, bei Gleichstand der erste (also der obere)
+    DIM akt AS INTEGER : akt = 0
+    FOR i = 1 TO n - 1
+        IF xs[i] + ys[i] < xs[akt] + ys[akt] THEN akt = i
+    NEXT
+    DIM nx[n] AS INTEGER
+    DIM ny[n] AS INTEGER
+    nx[0] = xs[akt] : ny[0] = ys[akt]
+    weg[akt] = TRUE
+    offen[((ys[akt] - y0) \ fach) * fb + (xs[akt] - x0) \ fach] = offen[((ys[akt] - y0) \ fach) * fb + (xs[akt] - x0) \ fach] - 1
+    DIM schritt AS INTEGER
+    FOR schritt = 1 TO n - 1
+        DIM cx AS INTEGER : cx = (xs[akt] - x0) \ fach
+        DIM cy AS INTEGER : cy = (ys[akt] - y0) \ fach
+        DIM best AS INTEGER : best = -1
+        DIM bestD AS INTEGER : bestD = 0
+        DIM r AS INTEGER
+        FOR r = 0 TO MAX(fb, fh)
+            IF best >= 0 THEN
+                DIM ring AS INTEGER : ring = MAX(0, (r - 1) * fach)
+                IF ring * ring > bestD THEN BREAK
+            END IF
+            DIM ry AS INTEGER, rx AS INTEGER
+            FOR ry = cy - r TO cy + r
+                IF ry < 0 OR ry >= fh THEN CONTINUE
+                ' auf dem Rand des Rings: oben/unten alle, sonst nur links und rechts
+                DIM sx AS INTEGER : sx = IIF(ABS(ry - cy) = r, 1, MAX(1, 2 * r))
+                FOR rx = cx - r TO cx + r STEP sx
+                    IF rx < 0 OR rx >= fb THEN CONTINUE
+                    DIM fn AS INTEGER : fn = ry * fb + rx
+                    IF offen[fn] = 0 THEN CONTINUE
+                    DIM q AS INTEGER : q = kopf[fn]
+                    WHILE q >= 0
+                        IF NOT weg[q] THEN
+                            DIM dx AS INTEGER : dx = xs[q] - xs[akt]
+                            DIM dy AS INTEGER : dy = ys[q] - ys[akt]
+                            DIM dd AS INTEGER : dd = dx * dx + dy * dy
+                            IF best < 0 OR dd < bestD OR (dd = bestD AND (ys[q] < ys[best] OR (ys[q] = ys[best] AND xs[q] < xs[best]))) THEN
+                                best = q
+                                bestD = dd
+                            END IF
+                        END IF
+                        q = weiter[q]
+                    WEND
+                NEXT
+            NEXT
+        NEXT
+        weg[best] = TRUE
+        DIM bf AS INTEGER : bf = ((ys[best] - y0) \ fach) * fb + (xs[best] - x0) \ fach
+        offen[bf] = offen[bf] - 1
+        nx[schritt] = xs[best] : ny[schritt] = ys[best]
+        akt = best
+    NEXT
+    fp.xs = nx
+    fp.ys = ny
+END SUB
+
+' Die Pfade auf einem Ausschnitt (PySticky _get_page_color_paths): nur die
+' Stiche darin, in ihrer Reihenfolge, mit Lagen relativ zur Ecke x0/y0; die
+' Abstaende gelten auf der Seite neu (ein Stich ausserhalb faellt weg, der
+' Schritt darueber ist dann ein Sprung). Farben ohne Stich darin fallen weg.
+FUNCTION spAusschnitt(sp AS Stickpfad, x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER) AS ARRAY OF Farbpfad
+    DIM erg AS ARRAY OF Farbpfad : erg = []
+    DIM p AS Farbpfad
+    FOR EACH p IN sp.pfade
+        DIM q AS Farbpfad : q = NEW Farbpfad()
+        q.farbe = p.farbe
+        q.xs = [] : q.ys = []
+        DIM i AS INTEGER
+        FOR i = 0 TO p.stiche() - 1
+            IF p.xs[i] < x0 OR p.xs[i] > x1 OR p.ys[i] < y0 OR p.ys[i] > y1 THEN CONTINUE
+            ARRAY_PUSH(q.xs, p.xs[i] - x0)
+            ARRAY_PUSH(q.ys, p.ys[i] - y0)
+        NEXT
+        IF q.stiche() = 0 THEN CONTINUE
+        FOR i = 1 TO q.stiche() - 1
+            DIM a AS FLOAT : a = q.abstand(i)
+            q.distanz = q.distanz + a
+            IF a > SP_SPRUNG THEN q.spruenge = q.spruenge + 1
+        NEXT
+        ARRAY_PUSH(erg, q)
+    NEXT
+    RETURN erg
+END FUNCTION
+
+' Der Stickplan als Text (PySticky StitchPathDialog._export_text).
+FUNCTION stickplanText$(m AS Muster, sp AS Stickpfad) AS STRING
+    DIM z AS ARRAY OF STRING : z = []
+    ARRAY_PUSH(z, "=" * 60)
+    ARRAY_PUSH(z, tr$("STICKPLAN - Optimierte Stichreihenfolge"))
+    ARRAY_PUSH(z, "=" * 60)
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, trf$("Strategie: {0}", [spKennung$(sp.strategie)]))
+    ARRAY_PUSH(z, trf$("Gesamtstiche: {0}", [STR$(sp.stiche)]))
+    ARRAY_PUSH(z, trf$("Geschätzter Garnverbrauch: {0} cm", [FORMAT$(sp.garnCm, "%.0f")]))
+    ARRAY_PUSH(z, trf$("Anzahl Sprünge: {0}", [STR$(sp.spruenge)]))
+    ARRAY_PUSH(z, "")
+    DIM p AS Farbpfad
+    FOR EACH p IN sp.pfade
+        ARRAY_PUSH(z, "-" * 60)
+        ARRAY_PUSH(z, trf$("FARBE: {0}", [m.farben[p.farbe].garn.name]))
+        ARRAY_PUSH(z, trf$("Stiche: {0}, Sprünge: {1}", [STR$(p.stiche()), STR$(p.spruenge)]))
+        ARRAY_PUSH(z, "-" * 60)
+        ARRAY_PUSH(z, "")
+        ARRAY_PUSH(z, tr$("Nr.   Position    Distanz   Hinweis"))
+        ARRAY_PUSH(z, "-" * 40)
+        DIM i AS INTEGER
+        FOR i = 0 TO p.stiche() - 1
+            ARRAY_PUSH(z, FORMAT$(i + 1, "%4d") + "  (" + FORMAT$(p.xs[i], "%3d") + "," + FORMAT$(p.ys[i], "%3d") + ")   " + FORMAT$(p.abstand(i), "%6.1f") + "   " + IIF(p.istSprung(i), tr$(" ← SPRUNG"), ""))
+        NEXT
+        ARRAY_PUSH(z, "")
+    NEXT
+    ARRAY_PUSH(z, "=" * 60)
+    ARRAY_PUSH(z, tr$("Ende des Stickplans"))
+    RETURN JOIN$(z, CHR$(10)) + CHR$(10)
+END FUNCTION
+
+' Wie gut eine Strategie gegen die beste ist (PySticky _update_comparison_table).
+FUNCTION spBewertung$(distanz AS FLOAT, beste AS FLOAT) AS STRING
+    DIM v AS FLOAT : v = IIF(beste > 0, distanz / beste, 1.0)
+    IF v < 1.05 THEN RETURN tr$("★★★ Beste")
+    IF v < 1.15 THEN RETURN tr$("★★ Gut")
+    IF v < 1.30 THEN RETURN tr$("★ OK")
+    RETURN "—"
+END FUNCTION
+
+' Alle fuenf Strategien, nach der Rueckseiten-Distanz geordnet (bei gleicher
+' Distanz in der Reihenfolge der Strategien -- wie Pythons sorted).
+FUNCTION spVergleich(m AS Muster, stoff AS FLOAT) AS ARRAY OF Stickpfad
+    DIM erg AS ARRAY OF Stickpfad : erg = []
+    DIM s AS INTEGER
+    FOR s = SP_ZEILEN TO SP_DIAGONAL
+        DIM r AS Stickpfad : r = stickpfadBerechnen(m, s, stoff)
+        DIM i AS INTEGER : i = LEN(erg)
+        ARRAY_PUSH(erg, r)
+        WHILE i > 0
+            IF erg[i - 1].distanz <= r.distanz THEN EXIT WHILE
+            erg[i] = erg[i - 1]
+            i = i - 1
+        WEND
+        erg[i] = r
+    NEXT
+    RETURN erg
+END FUNCTION

@@ -37,6 +37,7 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 |---|---|
 | `CUBE(x, y, z, breite, hoehe, tiefe, farbe)` | gefüllter Quader |
 | `CUBE_WIRES(x, y, z, breite, hoehe, tiefe, farbe)` | derselbe als Drahtgitter |
+| `CUBE_MATRIX_WIRES(mat [, farbe])` | die 12 Kanten eines Würfels (Kante 1, Mitte im Ursprung) durch eine Welt-Matrix aus `m3d` -- der Umriss eines gedrehten Klotzes, etwa aus `physics3d`; Größe über die Skalierung der Matrix |
 | `SPHERE(x, y, z, radius, farbe)` | Kugel um einen Mittelpunkt |
 | `SPHERE_WIRES(x, y, z, radius, farbe)` | Kugel als Drahtgitter |
 | `CYLINDER(x, y, z, r_oben, r_unten, hoehe, farbe)` | Zylinder — mit `r_oben = 0` wird ein Kegel daraus |
@@ -74,6 +75,7 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 | `MODEL(modell, x, y, z, skala, farbe)` | — | zeichnen |
 | `MODEL_EX(modell, x, y, z, achse_x, achse_y, achse_z, winkel_grad, skala, farbe)` | — | zeichnen und um eine Achse drehen |
 | `MODEL_WIRES(modell, x, y, z, skala, farbe)` | — | als Drahtgitter zeichnen |
+| `MODEL_MATRIX_WIRES(handle, mat [, farbe])` | — | Drahtgitter mit einer Welt-Matrix aus `m3d`, das Gegenstück zu `MODEL_MATRIX` -- für gedrehte Körper (Physik, Bones); `MODEL_WIRES` kennt nur Lage und Größe. Gezeichnet wird jedes Dreieck, ein Würfel also mit Diagonalen -- für seine 12 Kanten `CUBE_MATRIX_WIRES`. Liegt das Gitter genau auf den Flächen, wirkt es gestrichelt -- dann die Matrix um ein halbes Prozent größer skalieren |
 | `MODEL_BBOX(modell)` | TUPLE | Hüllquader `(min_x, min_y, min_z, max_x, max_y, max_z)` in den eigenen Koordinaten des Modells (ohne Lage und Skala beim Zeichnen) — für Kollisionen und um ein Modell auf den Boden zu stellen |
 | `MODEL_SAVE(modell, pfad$)` | — | alle Teile des Modells als Wavefront-OBJ schreiben (`.obj`) — ein Labyrinth aus `MESH_CUBICMAP` oder ein Gelände in Blender weiterbearbeiten, mit `LOADMODEL` zurückholen. Ohne Material, Textur und Animation; die Texturkoordinaten werden so geschrieben, dass sie nach `LOADMODEL` wieder richtig herum stehen |
 | `MODEL_TEXTURE(modell, bild)` | — | ein Bild als Oberfläche auflegen |
@@ -102,7 +104,7 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 | `LIGHT_SET_COLOR(licht, farbe)` | — | Lichtfarbe ändern |
 | `LIGHT_SET_ENABLED(licht [, an])` | — | einzelnes Licht an- oder ausschalten |
 | `LIGHT_FOG(farbe, dichte)` | — | Nebel mit der Entfernung; lässt Weites verblassen |
-| `MODEL_LIT(modell)` | — | dieses Modell wird beleuchtet (sonst zeichnet es flach) |
+| `MODEL_LIT(modell)` | — | dieses Modell wird beleuchtet (sonst zeichnet es flach). Die Deckkraft der Farbe gilt auch beleuchtet: `MODEL(m, x, y, z, 1.0, RGBA(80, 160, 255, 100))` ist halbdurchsichtig -- durchsichtige Modelle zuletzt zeichnen, sonst verdecken sie, was danach kommt (bis 2026.27 blieb ein beleuchtetes Modell deckend) |
 | `MODEL_PBR(modell, metalness, roughness)` | — | Materialverhalten: `metalness` 0 = Kunststoff, 1 = Metall; `roughness` 0 = spiegelnd, 1 = matt |
 | `MODEL_EMISSIVE(modell, farbe, staerke)` | — | das Modell leuchtet selbst — auch durch den Nebel hindurch |
 
@@ -123,7 +125,10 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 Zwei Sorten: `PICK_*` nimmt **automatisch den Mausstrahl** — das ist der übliche
 Fall. `RAY_HIT_*` bekommt den Strahl von dir und eignet sich für Schüsse, Sicht
 und alles, was nicht an der Maus hängt. Beide liefern die Entfernung bis zum
-Treffer oder `-1`.
+Treffer oder `-1`, immer in Welt-Einheiten -- die Richtung eines `RAY_HIT_*`
+muss nicht die Länge 1 haben (bis 2026.27 maßen Quader und Modell in
+Vielfachen der Richtungslänge). Der Treffpunkt ist der Ursprung plus die
+Einheitsrichtung mal Entfernung.
 
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
@@ -287,7 +292,8 @@ SHADOW_TARGET(0, 0, 0)
 ```
 
 Den Schatten wirft das **erste** gerichtete Licht; Modelle brauchen `MODEL_LIT`, um
-zu werfen und zu empfangen. Ein kleinerer `SHADOW_AREA`-Wert macht den Schatten
+zu werfen und zu empfangen -- gezeichnet mit `MODEL`, `MODEL_EX` oder
+`MODEL_MATRIX` (bis 2026.27 warf `MODEL_MATRIX` keinen). Ein kleinerer `SHADOW_AREA`-Wert macht den Schatten
 schärfer, deckt aber weniger ab — deshalb führt man ihn mit `SHADOW_TARGET` der
 Spielfigur nach. Demo: [93_shadows](../examples/93_shadows.dh).
 

@@ -1,0 +1,124 @@
+' Ziehen markiert nur in dem Textfeld, in dem der Druck BEGANN (2026-10-09,
+' Dogfooding). Ein Klick in eine Liste oeffnet eine Notiz, das Programm setzt
+' den Fokus in den Text -- solange die Taste noch unten war, hielt der
+' Textbereich das fuer seinen eigenen Zug und markierte bis zur Maus, also
+' alles; das erste Tippen haette die ganze Notiz ersetzt. Dasselbe beim
+' einzeiligen Textfeld. Die Gegenprobe: ein Zug, der im Feld beginnt,
+' markiert weiter. Der Nullpunkt der Fensterinhalte liegt bei (11, 33).
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== textbereich bekommt den fokus waehrend die taste unten ist
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 150, 120, SPLIT$("eins|zwei", "|"))
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 190, 20, 160, 120)
+GUI_SET_TEXT(ta, "eins zwei drei")
+DIM f AS INTEGER
+DIM alt AS INTEGER
+alt = -1
+FOR f = 1 TO 16
+    GUI_UPDATE()
+    IF GUI_LISTBOX_SELECTED(lb) <> alt THEN
+        alt = GUI_LISTBOX_SELECTED(lb)
+        GUI_FOCUS(ta)
+    END IF
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "fokus "; GUI_FOCUSED() = ta; " markiert ["; GUI_TEXTAREA_SELECTION$(ta); "]"
+--- datei ev.txt
+# Test-Aufnahme
+c 5
+e 3 7 61 86 0 0 // Event: test
+e 4 6 0 0 0 0 // Event: test
+e 6 7 260 90 0 0 // Event: test
+e 8 7 330 120 0 0 // Event: test
+e 10 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=17
+--- erwartet
+fokus TRUE markiert []
+
+=== textfeld bekommt den fokus waehrend die taste unten ist
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 150, 120, SPLIT$("eins|zwei", "|"))
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 190, 20, 160, 28)
+GUI_SET_TEXT(tf, "hallo welt")
+DIM f AS INTEGER
+DIM alt AS INTEGER
+alt = -1
+FOR f = 1 TO 16
+    GUI_UPDATE()
+    IF GUI_LISTBOX_SELECTED(lb) <> alt THEN
+        alt = GUI_LISTBOX_SELECTED(lb)
+        GUI_FOCUS(tf)
+    END IF
+    GUI_DRAW()
+    FLIP()
+NEXT
+' Eine Markierung zeigt die Ruecktaste: mit ihr loescht sie alles, ohne nur
+' das letzte Zeichen (die Marke steht nach GUI_SET_TEXT am Ende).
+PRINT "fokus "; GUI_FOCUSED() = tf; " text ["; GUI_TEXT(tf); "]"
+--- datei ev.txt
+# Test-Aufnahme
+c 7
+e 3 7 61 86 0 0 // Event: test
+e 4 6 0 0 0 0 // Event: test
+e 6 7 230 66 0 0 // Event: test
+e 8 7 203 66 0 0 // Event: test
+e 10 5 0 0 0 0 // Event: test
+e 12 2 259 0 0 0 // Event: test
+e 13 1 259 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=17
+--- erwartet
+fokus TRUE text [hallo wel]
+
+=== ein zug, der im textbereich beginnt, markiert weiter
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 190, 20, 160, 120)
+GUI_SET_TEXT(ta, "eins zwei drei")
+DIM f AS INTEGER
+FOR f = 1 TO 16
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "markiert "; LEN(GUI_TEXTAREA_SELECTION$(ta)) > 3
+--- datei ev.txt
+# Test-Aufnahme
+c 5
+e 3 7 205 62 0 0 // Event: test
+e 4 6 0 0 0 0 // Event: test
+e 6 7 280 62 0 0 // Event: test
+e 8 7 340 62 0 0 // Event: test
+e 10 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=17
+--- erwartet
+markiert TRUE

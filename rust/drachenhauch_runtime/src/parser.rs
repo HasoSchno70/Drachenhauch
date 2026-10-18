@@ -474,8 +474,27 @@ impl Parser {
 
     fn is_assignment_lookahead(&self) -> bool {
         let mut i = 1;
+        // Zuletzt ein Aufruf (`f(1)`)? Dann ist es kein Ziel einer Zuweisung.
+        let mut aufruf_zuletzt = false;
         loop {
             let t = self.tt(i);
+            // `f(n)[0].x = ...`, `obj.teil(2).hp = ...`: das Ergebnis eines
+            // Aufrufs ist ein Verweis (Feld, Struct, Objekt) -- hineinschreiben
+            // aendert das Original.
+            if t == Tt::Lparen {
+                let mut depth = 1;
+                i += 1;
+                while depth > 0 {
+                    let tt = self.tt(i);
+                    if tt == Tt::Eof || tt == Tt::Newline { return false; }
+                    if tt == Tt::Lparen { depth += 1; }
+                    else if tt == Tt::Rparen { depth -= 1; }
+                    i += 1;
+                }
+                aufruf_zuletzt = true;
+                continue;
+            }
+            if t == Tt::Dot || t == Tt::Lbracket { aufruf_zuletzt = false; }
             // Review-Fund: verlangte bisher striktes Tt::Ident nach dem Punkt
             // -- ein Membername, der zufaellig wie ein Keyword lexed (z.B.
             // `.image`, `.sound`, `.data`), liess die Lookahead-Erkennung
@@ -501,7 +520,7 @@ impl Parser {
             }
             break;
         }
-        is_assign_op(self.tt(i)) || self.ist_schritt_op(i)
+        !aufruf_zuletzt && (is_assign_op(self.tt(i)) || self.ist_schritt_op(i))
     }
 
     /// Steht an Position `i` ein `++` bzw. `--`, das eine Anweisung
@@ -942,7 +961,18 @@ impl Parser {
                 }
                 self.expect(Tt::Rbracket, "Erwartet ']'")?;
                 target = Node::IndexAccess { target: Box::new(target), indices };
+            } else if self.matches(Tt::Lparen) {
+                let args = self.call_args()?;
+                self.expect(Tt::Rparen, "")?;
+                target = Node::Call { callee: Box::new(target), args };
             } else { break; }
+        }
+        // `f()[0] += 1` laese und schriebe ueber zwei Aufrufe -- liefe der
+        // Aufruf zweimal, haette er zwei Wirkungen; einmal geht nur mit einer
+        // Variable dazwischen.
+        let mehrfach = self.ist_schritt_op(0) || compound_op(self.tt(0)).is_some();
+        if mehrfach && ziel_ist_aufruf(&target) {
+            return self.err("+=, -=, ++ ... auf dem Ergebnis eines Aufrufs liefe den Aufruf zweimal -- erst einer Variable zuweisen und dort aendern: r = f(...) : r[0] += 1");
         }
         // `i++` / `i--` -- eine Anweisung, kein Ausdruck. Der Unterschied
         // zwischen Prae- und Postfix ist die haeufigste Fehlerquelle an
@@ -1169,6 +1199,22 @@ impl Parser {
         if self.ist_exit() { return self.exit_kern(); }
         if self.ist_swap() { return self.swap_kern(); }
         if self.ist_let() || self.ist_call() { self.pos += 1; return self.inline_statement_kern(); }
+        // Anweisungen, die es im Einzeiler nicht gibt (2026-10-14,
+        // Texteditor-Runde): vorher hiess es nur "Unerwartetes Token DIM".
+        match self.tt(0) {
+            Tt::Dim | Tt::Const => {
+                let w = if self.tt(0) == Tt::Dim { "DIM" } else { "CONST" };
+                return self.err(&format!("{} geht nicht hinter THEN/ELSE -- die Variable vor dem IF \
+                                          anlegen und im IF nur zuweisen (oder das IF mehrzeilig \
+                                          schreiben, mit END IF)", w));
+            }
+            Tt::For | Tt::While | Tt::Repeat | Tt::Select | Tt::Try | Tt::With => {
+                let w = self.tt(0).name();
+                return self.err(&format!("{} geht nicht im einzeiligen IF -- IF ... THEN, dann {} auf \
+                                          eigener Zeile, am Ende END IF", w, w));
+            }
+            _ => {}
+        }
         match self.tt(0) {
             Tt::Print => {
                 self.pos += 1;
@@ -2460,5 +2506,16 @@ pub fn dump_ast_json(source: &str) -> Result<String, String> {
     match p.parse() {
         Ok(ast) => Ok(serde_json::to_string(&ast.to_json()).unwrap()),
         Err(e) => Err(format!("Parse {}:{}: {}", e.line, e.col, e.msg)),
+    }
+}
+
+/// `f()[0].x`, `teile(s)[2]`: die Kette aus Index und Feld beginnt bei einem
+/// Aufruf. Als Ziel einer Zuweisung schriebe sie in eine Kopie.
+fn ziel_ist_aufruf(n: &Node) -> bool {
+    match n {
+        Node::IndexAccess { target, .. } | Node::MemberAccess { target, .. } => {
+            matches!(**target, Node::Call { .. }) || ziel_ist_aufruf(target)
+        }
+        _ => false,
     }
 }

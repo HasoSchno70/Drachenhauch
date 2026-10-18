@@ -1,0 +1,928 @@
+' Bildimport: aus einem Foto ein Muster (PySticky core/image_import.py und
+' core/confetti_reduction.py).
+'
+' Der Ablauf wie im Original: weiss unterlegen, Ausschnitt, Helligkeit /
+' Kontrast / Saettigung, auf Mustergroesse bringen (Lanczos) -- das macht
+' bildVorbereiten mit den Bild-Befehlen der Laufzeit, die dafuer wie Pillow
+' rechnen. Alles danach arbeitet auf schlichten Zahlenfeldern und braucht kein
+' Fenster: Farben waehlen (die haeufigsten oder Median-Cut), jedem Punkt das
+' naechste Garn geben (CIEDE2000), wahlweise mit Fehlerstreuung (Floyd-
+' Steinberg) oder geordnetem Raster (Bayer 4x4), Confetti entfernen,
+' Konturen als Rueckstiche (Sobel).
+'
+' Drei bewusste Abweichungen: die Farben stehen nach Haeufigkeit (PySticky
+' nimmt die Reihenfolge, in der Python eine Menge durchlaeuft), die Konturen
+' folgen dem Ausschnitt (PySticky liest dafuer das ganze Bild noch einmal --
+' bei einem Ausschnitt liegen sie neben dem Muster), und der Import laeuft in
+' Schritten (`Bildimport.schritt`), damit die Oberflaeche einen Balken zeigen
+' kann.
+
+CONST DITHER_KEINS = 0
+CONST DITHER_FLOYD = 1
+CONST DITHER_GEORDNET = 2
+CONST WAHL_HAEUFIGSTE = 0
+CONST WAHL_MEDIAN = 1
+CONST GROESSTER_IMPORT = 500        ' wie MAX_IMPORT_DIMENSION
+CONST MEISTE_FARBEN = 100
+
+CLASS Importeinstellung
+    DIM breite AS INTEGER
+    DIM hoehe AS INTEGER
+    DIM maxFarben AS INTEGER
+    DIM palette AS Palette
+    DIM dithering AS INTEGER
+    DIM farbwahl AS INTEGER
+    DIM seitenverhaeltnis AS BOOLEAN
+    DIM konturen AS BOOLEAN
+    DIM helligkeit AS FLOAT
+    DIM kontrast AS FLOAT
+    DIM saettigung AS FLOAT
+    DIM confetti AS INTEGER            ' kleinste Inselgroesse, <= 1 = aus
+    DIM ausschnitt AS ARRAY OF FLOAT   ' x1, y1, x2, y2 zwischen 0 und 1
+
+    SUB Init()
+        breite = 50 : hoehe = 50 : maxFarben = 20
+        seitenverhaeltnis = TRUE
+        helligkeit = 1.0 : kontrast = 1.0 : saettigung = 1.0
+        confetti = 1
+        ausschnitt = [0.0, 0.0, 1.0, 1.0]
+    END SUB
+
+    FUNCTION ditherName$() AS STRING
+        IF dithering = DITHER_FLOYD THEN RETURN "floyd_steinberg"
+        IF dithering = DITHER_GEORDNET THEN RETURN "ordered"
+        RETURN "none"
+    END FUNCTION
+END CLASS
+
+' Ein Bild als drei Zahlenfelder (0..255), Zeile fuer Zeile.
+CLASS Pixelbild
+    DIM breite AS INTEGER
+    DIM hoehe AS INTEGER
+    DIM r AS ARRAY OF INTEGER
+    DIM g AS ARRAY OF INTEGER
+    DIM b AS ARRAY OF INTEGER
+END CLASS
+
+FUNCTION neuesPixelbild(breite AS INTEGER, hoehe AS INTEGER) AS Pixelbild
+    DIM p AS Pixelbild : p = NEW Pixelbild()
+    p.breite = breite : p.hoehe = hoehe
+    DIM n AS INTEGER : n = breite * hoehe
+    DIM r[n] AS INTEGER
+    DIM g[n] AS INTEGER
+    DIM b[n] AS INTEGER
+    p.r = r : p.g = g : p.b = b
+    RETURN p
+END FUNCTION
+
+' Die Punkte eines IMAGE als Pixelbild.
+FUNCTION pixelAusBild(bild AS IMAGE) AS Pixelbild
+    DIM p AS Pixelbild : p = neuesPixelbild(IMAGE_WIDTH(bild), IMAGE_HEIGHT(bild))
+    DIM pr AS ARRAY OF INTEGER : pr = p.r
+    DIM pg AS ARRAY OF INTEGER : pg = p.g
+    DIM pb AS ARRAY OF INTEGER : pb = p.b
+    DIM x AS INTEGER, y AS INTEGER, i AS INTEGER, c AS INTEGER
+    FOR y = 0 TO p.hoehe - 1
+        FOR x = 0 TO p.breite - 1
+            c = GETPIXEL(bild, x, y)
+            pr[i] = (c SHR 16) BAND 255
+            pg[i] = (c SHR 8) BAND 255
+            pb[i] = c BAND 255
+            i = i + 1
+        NEXT
+    NEXT
+    RETURN p
+END FUNCTION
+
+' Die Mustergroesse, wie das Original sie aus Bild und Wunsch rechnet.
+FUNCTION zielGroesse(bb AS INTEGER, bh AS INTEGER, e AS Importeinstellung) AS TUPLE
+    DIM tb AS INTEGER : tb = e.breite
+    DIM th AS INTEGER : th = e.hoehe
+    IF e.seitenverhaeltnis THEN
+        DIM orig AS FLOAT : orig = bb / bh
+        DIM ziel AS FLOAT : ziel = tb / th
+        IF orig > ziel THEN
+            th = MAX(1, INT(tb / orig))
+        ELSE
+            tb = MAX(1, INT(th * orig))
+        END IF
+    END IF
+    RETURN (MAX(1, tb), MAX(1, th))
+END FUNCTION
+
+' Ausschnitt in Punkten (wie das Original: erst auf 0..1 klemmen, dann
+' mindestens ein Punkt -- sonst holte PIL schwarze Ränder ins Bild).
+FUNCTION ausschnittPunkte(bb AS INTEGER, bh AS INTEGER, a AS ARRAY OF FLOAT) AS TUPLE
+    DIM x1 AS FLOAT : x1 = CLAMP(a[0], 0.0, 1.0)
+    DIM y1 AS FLOAT : y1 = CLAMP(a[1], 0.0, 1.0)
+    DIM x2 AS FLOAT : x2 = CLAMP(a[2], 0.0, 1.0)
+    DIM y2 AS FLOAT : y2 = CLAMP(a[3], 0.0, 1.0)
+    IF x1 <= 0 AND y1 <= 0 AND x2 >= 1 AND y2 >= 1 THEN RETURN (0, 0, bb, bh)
+    DIM l AS INTEGER : l = INT(x1 * bb)
+    DIM o AS INTEGER : o = INT(y1 * bh)
+    DIM r AS INTEGER : r = INT(x2 * bb)
+    DIM u AS INTEGER : u = INT(y2 * bh)
+    l = MAX(0, MIN(l, bb - 1))
+    o = MAX(0, MIN(o, bh - 1))
+    r = MAX(l + 1, MIN(r, bb))
+    u = MAX(o + 1, MIN(u, bh))
+    RETURN (l, o, r - l, u - o)
+END FUNCTION
+
+' Das Bild fuer den Import vorbereiten. `grau` bekommt das Graubild in
+' derselben Groesse, wenn Konturen gewuenscht sind (sonst bleibt es NIL).
+FUNCTION bildVorbereiten(bild AS IMAGE, e AS Importeinstellung, BYREF grau AS Pixelbild) AS Pixelbild
+    DIM bb AS INTEGER : bb = IMAGE_WIDTH(bild)
+    DIM bh AS INTEGER : bh = IMAGE_HEIGHT(bild)
+    ' weiss unterlegen (durchsichtig = Stoff)
+    DIM w AS IMAGE : w = IMAGE_NEW(bb, bh, &HFFFFFF)
+    IMAGE_DRAW_IMAGE(w, bild, 0, 0)
+    DIM ax AS INTEGER, ay AS INTEGER, ab AS INTEGER, ah AS INTEGER
+    (ax, ay, ab, ah) = ausschnittPunkte(bb, bh, e.ausschnitt)
+    DIM q AS IMAGE : q = w
+    IF ax <> 0 OR ay <> 0 OR ab <> bb OR ah <> bh THEN
+        q = IMAGE_CROP(w, ax, ay, ab, ah)
+        IMAGE_FREE(w)
+    END IF
+    DIM roh AS IMAGE : roh = q
+    IF e.helligkeit <> 1.0 THEN q = bildErsetzen(q, IMAGE_ENHANCE(q, "helligkeit", e.helligkeit), roh)
+    IF e.kontrast <> 1.0 THEN q = bildErsetzen(q, IMAGE_ENHANCE(q, "kontrast", e.kontrast), roh)
+    IF e.saettigung <> 1.0 THEN q = bildErsetzen(q, IMAGE_ENHANCE(q, "saettigung", e.saettigung), roh)
+    DIM tb AS INTEGER, th AS INTEGER
+    (tb, th) = zielGroesse(ab, ah, e)
+    DIM k AS IMAGE : k = IMAGE_SCALE(q, tb, th, "lanczos")
+    DIM p AS Pixelbild : p = pixelAusBild(k)
+    IMAGE_FREE(k)
+    IF e.konturen THEN
+        ' Graustufen wie convert("L"), dann ebenfalls Lanczos
+        DIM gr AS IMAGE : gr = IMAGE_ENHANCE(roh, "saettigung", 0.0)
+        DIM gk AS IMAGE : gk = IMAGE_SCALE(gr, tb, th, "lanczos")
+        grau = pixelAusBild(gk)
+        IMAGE_FREE(gr) : IMAGE_FREE(gk)
+    END IF
+    IF q <> roh THEN IMAGE_FREE(q)
+    IMAGE_FREE(roh)
+    RETURN p
+END FUNCTION
+
+' Zwischenbilder freigeben -- das ungeaenderte (`roh`) braucht noch das Graubild.
+FUNCTION bildErsetzen(alt AS IMAGE, neu AS IMAGE, roh AS IMAGE) AS IMAGE
+    IF alt <> roh THEN IMAGE_FREE(alt)
+    RETURN neu
+END FUNCTION
+
+' --- Lab ---------------------------------------------------------------------
+
+FUNCTION linearAus(v AS FLOAT) AS FLOAT
+    v = v / 255.0
+    IF v > 0.04045 THEN RETURN ((v + 0.055) / 1.055) ^ 2.4
+    RETURN v / 12.92
+END FUNCTION
+
+' Lab einer Farbe aus Kommazahlen -- in drei Felder an Stelle i.
+SUB labEintragen(r AS FLOAT, g AS FLOAT, b AS FLOAT, ll AS ARRAY OF FLOAT, la AS ARRAY OF FLOAT, lb AS ARRAY OF FLOAT, i AS INTEGER)
+    DIM rl AS FLOAT : rl = linearAus(r)
+    DIM gl AS FLOAT : gl = linearAus(g)
+    DIM bl AS FLOAT : bl = linearAus(b)
+    DIM fx AS FLOAT : fx = labF((0.4124564 * rl + 0.3575761 * gl + 0.1804375 * bl) / 0.95047)
+    DIM fy AS FLOAT : fy = labF((0.2126729 * rl + 0.7151522 * gl + 0.0721750 * bl) / 1.0)
+    DIM fz AS FLOAT : fz = labF((0.0193339 * rl + 0.1191920 * gl + 0.9503041 * bl) / 1.08883)
+    ll[i] = 116 * fy - 16
+    la[i] = 500 * (fx - fy)
+    lb[i] = 200 * (fy - fz)
+END SUB
+
+' Die Lab-Werte aller Garne einer Liste.
+CLASS Garnfarben
+    DIM garne AS ARRAY OF Garn
+    DIM l AS ARRAY OF FLOAT
+    DIM a AS ARRAY OF FLOAT
+    DIM b AS ARRAY OF FLOAT
+    DIM rgb AS ARRAY OF INTEGER
+END CLASS
+
+FUNCTION garnfarbenVon(liste AS ARRAY OF Garn) AS Garnfarben
+    DIM gf AS Garnfarben : gf = NEW Garnfarben()
+    gf.garne = liste
+    DIM n AS INTEGER : n = LEN(liste)
+    DIM l[n] AS FLOAT
+    DIM a[n] AS FLOAT
+    DIM b[n] AS FLOAT
+    DIM c[n] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM f AS INTEGER : f = liste[i].farbe
+        c[i] = f
+        labEintragen(rotAnteil(f), gruenAnteil(f), blauAnteil(f), l, a, b, i)
+    NEXT
+    gf.l = l : gf.a = a : gf.b = b : gf.rgb = c
+    RETURN gf
+END FUNCTION
+
+' Index des naechsten Garns (der erste bei Gleichstand, wie argmin).
+FUNCTION naechstesGarn(l AS FLOAT, a AS FLOAT, b AS FLOAT, gl AS ARRAY OF FLOAT, ga AS ARRAY OF FLOAT, gb AS ARRAY OF FLOAT) AS INTEGER
+    DIM best AS INTEGER : best = 0
+    DIM bd AS FLOAT : bd = deltaE2000(l, a, b, gl[0], ga[0], gb[0])
+    DIM j AS INTEGER
+    FOR j = 1 TO LEN(gl) - 1
+        DIM d AS FLOAT : d = deltaE2000(l, a, b, gl[j], ga[j], gb[j])
+        IF d < bd THEN
+            bd = d
+            best = j
+        END IF
+    NEXT
+    RETURN best
+END FUNCTION
+
+' --- Farben waehlen ---------------------------------------------------------------
+
+' Fuer jeden Punkt der Zeilen von..bis-1 das naechste Garn (Index in gf) nach `ziel`.
+' Gleiche Farben werden nur einmal gerechnet.
+SUB naechsteZeilen(p AS Pixelbild, gf AS Garnfarben, ziel AS ARRAY OF INTEGER, von AS INTEGER, bis AS INTEGER, merk AS MAP OF INTEGER)
+    DIM pr AS ARRAY OF INTEGER : pr = p.r
+    DIM pg AS ARRAY OF INTEGER : pg = p.g
+    DIM pb AS ARRAY OF INTEGER : pb = p.b
+    DIM gl AS ARRAY OF FLOAT : gl = gf.l
+    DIM ga AS ARRAY OF FLOAT : ga = gf.a
+    DIM gb AS ARRAY OF FLOAT : gb = gf.b
+    DIM ll[1] AS FLOAT
+    DIM la[1] AS FLOAT
+    DIM lb[1] AS FLOAT
+    DIM i AS INTEGER
+    FOR i = von * p.breite TO bis * p.breite - 1
+        DIM s AS STRING : s = STR$((pr[i] SHL 16) BOR (pg[i] SHL 8) BOR pb[i])
+        IF MAPHAS(merk, s) THEN
+            ziel[i] = MAPGET(merk, s)
+        ELSE
+            labEintragen(pr[i], pg[i], pb[i], ll, la, lb, 0)
+            DIM k AS INTEGER : k = naechstesGarn(ll[0], la[0], lb[0], gl, ga, gb)
+            MAPPUT(merk, s, k)
+            ziel[i] = k
+        END IF
+    NEXT
+END SUB
+
+' Die haeufigsten `anzahl` Garne einer Zuordnung -- nach Haeufigkeit, bei
+' Gleichstand das mit der kleineren Nummer zuerst (so sortiert das Original).
+FUNCTION haeufigste(zuordnung AS ARRAY OF INTEGER, garnzahl AS INTEGER, anzahl AS INTEGER) AS ARRAY OF INTEGER
+    DIM z[garnzahl] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zuordnung) - 1
+        z[zuordnung[i]] = z[zuordnung[i]] + 1
+    NEXT
+    DIM benutzt AS ARRAY OF INTEGER : benutzt = []
+    FOR i = 0 TO garnzahl - 1
+        IF z[i] > 0 THEN ARRAY_PUSH(benutzt, i)
+    NEXT
+    ' stabil nach Haeufigkeit absteigend (Einfuegen; die Liste ist kurz)
+    DIM j AS INTEGER, k AS INTEGER, v AS INTEGER
+    FOR j = 1 TO LEN(benutzt) - 1
+        v = benutzt[j]
+        k = j - 1
+        WHILE k >= 0
+            IF z[benutzt[k]] >= z[v] THEN BREAK
+            benutzt[k + 1] = benutzt[k]
+            k = k - 1
+        WEND
+        benutzt[k + 1] = v
+    NEXT
+    DIM erg AS ARRAY OF INTEGER : erg = []
+    FOR i = 0 TO MIN(anzahl, LEN(benutzt)) - 1
+        ARRAY_PUSH(erg, benutzt[i])
+    NEXT
+    RETURN erg
+END FUNCTION
+
+' Garne einer Teilliste (nach Nummern in der grossen Liste).
+FUNCTION teilGarne(gf AS Garnfarben, nummern AS ARRAY OF INTEGER) AS ARRAY OF Garn
+    DIM erg AS ARRAY OF Garn : erg = []
+    DIM n AS INTEGER
+    FOR EACH n IN nummern
+        ARRAY_PUSH(erg, gf.garne[n])
+    NEXT
+    RETURN erg
+END FUNCTION
+
+' Eine Kiste beim Median-Cut: Punktnummern und ihre Spannen.
+CLASS Farbkiste
+    DIM punkte AS ARRAY OF INTEGER
+    DIM spanne AS ARRAY OF INTEGER
+END CLASS
+
+FUNCTION neueKiste(p AS Pixelbild, punkte AS ARRAY OF INTEGER) AS Farbkiste
+    DIM k AS Farbkiste : k = NEW Farbkiste()
+    k.punkte = punkte
+    k.spanne = [kanalSpanne(punkte, p.r), kanalSpanne(punkte, p.g), kanalSpanne(punkte, p.b)]
+    RETURN k
+END FUNCTION
+
+FUNCTION kanalSpanne(punkte AS ARRAY OF INTEGER, kanal AS ARRAY OF INTEGER) AS INTEGER
+    IF LEN(punkte) = 0 THEN RETURN 0
+    DIM lo AS INTEGER : lo = 255
+    DIM hi AS INTEGER : hi = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(punkte) - 1
+        DIM v AS INTEGER : v = kanal[punkte[i]]
+        IF v < lo THEN lo = v
+        IF v > hi THEN hi = v
+    NEXT
+    RETURN hi - lo
+END FUNCTION
+
+FUNCTION kanalVon(p AS Pixelbild, k AS INTEGER) AS ARRAY OF INTEGER
+    IF k = 0 THEN RETURN p.r
+    IF k = 1 THEN RETURN p.g
+    RETURN p.b
+END FUNCTION
+
+' Der Median wie np.median (bei gerader Zahl das Mittel der beiden mittleren).
+FUNCTION median(punkte AS ARRAY OF INTEGER, kanal AS ARRAY OF INTEGER) AS FLOAT
+    DIM n AS INTEGER : n = LEN(punkte)
+    DIM v[n] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        v[i] = kanal[punkte[i]]
+    NEXT
+    SORT(v)
+    IF n MOD 2 = 1 THEN RETURN v[n \ 2]
+    RETURN (v[n \ 2 - 1] + v[n \ 2]) / 2.0
+END FUNCTION
+
+' Median-Cut: die Kiste mit der groessten Spanne am Median teilen, bis
+' `anzahl` Kisten da sind; je Kiste das naechste noch nicht genommene Garn.
+FUNCTION medianCut(p AS Pixelbild, gf AS Garnfarben, anzahl AS INTEGER) AS ARRAY OF INTEGER
+    DIM alle[p.breite * p.hoehe] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(alle) - 1
+        alle[i] = i
+    NEXT
+    DIM kisten AS ARRAY OF Farbkiste : kisten = [neueKiste(p, alle)]
+    WHILE LEN(kisten) < anzahl
+        DIM bi AS INTEGER : bi = -1
+        DIM bs AS INTEGER : bs = -1
+        DIM bk AS INTEGER : bk = 0
+        FOR i = 0 TO LEN(kisten) - 1
+            IF LEN(kisten[i].punkte) < 2 THEN CONTINUE
+            DIM c AS INTEGER
+            FOR c = 0 TO 2
+                IF kisten[i].spanne[c] > bs THEN
+                    bs = kisten[i].spanne[c]
+                    bi = i
+                    bk = c
+                END IF
+            NEXT
+        NEXT
+        IF bi < 0 OR bs <= 0 THEN BREAK
+        DIM kiste AS Farbkiste : kiste = kisten[bi]
+        ARRAY_REMOVE_AT(kisten, bi)
+        DIM kanal AS ARRAY OF INTEGER : kanal = kanalVon(p, bk)
+        DIM grenze AS FLOAT : grenze = median(kiste.punkte, kanal)
+        DIM links AS ARRAY OF INTEGER, rechts AS ARRAY OF INTEGER
+        (links, rechts) = teilen(kiste.punkte, kanal, grenze)
+        IF LEN(links) = 0 OR LEN(rechts) = 0 THEN
+            DIM lo AS INTEGER : lo = 255
+            DIM hi AS INTEGER : hi = 0
+            DIM q AS INTEGER
+            FOR EACH q IN kiste.punkte
+                lo = MIN(lo, kanal[q]) : hi = MAX(hi, kanal[q])
+            NEXT
+            (links, rechts) = teilen(kiste.punkte, kanal, (lo + hi) / 2.0)
+        END IF
+        IF LEN(links) = 0 OR LEN(rechts) = 0 THEN BREAK
+        ARRAY_PUSH(kisten, neueKiste(p, links))
+        ARRAY_PUSH(kisten, neueKiste(p, rechts))
+    WEND
+    ' je Kiste das naechste freie Garn zur Durchschnittsfarbe
+    DIM genommen[LEN(gf.garne)] AS BOOLEAN
+    DIM erg AS ARRAY OF INTEGER : erg = []
+    DIM ll[1] AS FLOAT
+    DIM la[1] AS FLOAT
+    DIM lb[1] AS FLOAT
+    DIM k AS Farbkiste
+    FOR EACH k IN kisten
+        DIM sr AS FLOAT, sg AS FLOAT, sb AS FLOAT
+        sr = 0 : sg = 0 : sb = 0
+        DIM q2 AS INTEGER
+        FOR EACH q2 IN k.punkte
+            sr = sr + p.r[q2] : sg = sg + p.g[q2] : sb = sb + p.b[q2]
+        NEXT
+        DIM n AS INTEGER : n = LEN(k.punkte)
+        labEintragen(sr / n, sg / n, sb / n, ll, la, lb, 0)
+        DIM wahl AS INTEGER : wahl = naechstesFreies(ll[0], la[0], lb[0], gf, genommen)
+        IF wahl < 0 THEN
+            wahl = naechstesGarn(ll[0], la[0], lb[0], gf.l, gf.a, gf.b)
+        ELSE
+            genommen[wahl] = TRUE
+        END IF
+        ARRAY_PUSH(erg, wahl)
+    NEXT
+    RETURN erg
+END FUNCTION
+
+FUNCTION teilen(punkte AS ARRAY OF INTEGER, kanal AS ARRAY OF INTEGER, grenze AS FLOAT) AS TUPLE
+    DIM l AS ARRAY OF INTEGER : l = []
+    DIM r AS ARRAY OF INTEGER : r = []
+    DIM q AS INTEGER
+    FOR EACH q IN punkte
+        IF kanal[q] < grenze THEN ARRAY_PUSH(l, q) ELSE ARRAY_PUSH(r, q)
+    NEXT
+    RETURN (l, r)
+END FUNCTION
+
+FUNCTION naechstesFreies(l AS FLOAT, a AS FLOAT, b AS FLOAT, gf AS Garnfarben, genommen AS ARRAY OF BOOLEAN) AS INTEGER
+    DIM best AS INTEGER : best = -1
+    DIM bd AS FLOAT
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(gf.l) - 1
+        IF genommen[j] THEN CONTINUE
+        DIM d AS FLOAT : d = deltaE2000(l, a, b, gf.l[j], gf.a[j], gf.b[j])
+        IF best < 0 OR d < bd THEN
+            bd = d
+            best = j
+        END IF
+    NEXT
+    RETURN best
+END FUNCTION
+
+' --- Fehlerstreuung -------------------------------------------------------------------
+
+' Floyd-Steinberg fuer die Zeilen von..bis-1: `arbeit` sind die Kommazahl-
+' Kanaele (r, g, b je Punkt hintereinander), `ziel` bekommt den Index in `tf`.
+SUB floydZeilen(breite AS INTEGER, hoehe AS INTEGER, arbeit AS ARRAY OF FLOAT, tf AS Garnfarben, ziel AS ARRAY OF INTEGER, von AS INTEGER, bis AS INTEGER)
+    DIM gl AS ARRAY OF FLOAT : gl = tf.l
+    DIM ga AS ARRAY OF FLOAT : ga = tf.a
+    DIM gb AS ARRAY OF FLOAT : gb = tf.b
+    DIM cr AS ARRAY OF INTEGER : cr = tf.rgb
+    DIM ll[1] AS FLOAT
+    DIM la[1] AS FLOAT
+    DIM lb[1] AS FLOAT
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = von TO bis - 1
+        FOR x = 0 TO breite - 1
+            DIM i AS INTEGER : i = (y * breite + x) * 3
+            DIM r AS FLOAT : r = arbeit[i]
+            DIM g AS FLOAT : g = arbeit[i + 1]
+            DIM b AS FLOAT : b = arbeit[i + 2]
+            labEintragen(r, g, b, ll, la, lb, 0)
+            DIM k AS INTEGER : k = naechstesGarn(ll[0], la[0], lb[0], gl, ga, gb)
+            ziel[y * breite + x] = k
+            DIM er AS FLOAT : er = r - ((cr[k] SHR 16) BAND 255)
+            DIM eg AS FLOAT : eg = g - ((cr[k] SHR 8) BAND 255)
+            DIM eb AS FLOAT : eb = b - (cr[k] BAND 255)
+            IF x + 1 < breite THEN streuen(arbeit, i + 3, er, eg, eb, 7)
+            IF y + 1 < hoehe THEN
+                DIM u AS INTEGER : u = i + breite * 3
+                IF x > 0 THEN streuen(arbeit, u - 3, er, eg, eb, 3)
+                streuen(arbeit, u, er, eg, eb, 5)
+                IF x + 1 < breite THEN streuen(arbeit, u + 3, er, eg, eb, 1)
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+' working[...] = clip(working + error * gewicht / 16, 0, 255) -- in dieser Reihenfolge.
+SUB streuen(arbeit AS ARRAY OF FLOAT, i AS INTEGER, er AS FLOAT, eg AS FLOAT, eb AS FLOAT, gewicht AS INTEGER)
+    arbeit[i] = CLAMP(arbeit[i] + er * gewicht / 16, 0.0, 255.0)
+    arbeit[i + 1] = CLAMP(arbeit[i + 1] + eg * gewicht / 16, 0.0, 255.0)
+    arbeit[i + 2] = CLAMP(arbeit[i + 2] + eb * gewicht / 16, 0.0, 255.0)
+END SUB
+
+' Geordnetes Raster (Bayer 4x4, Spanne 32): zu jedem Kanal derselbe Versatz,
+' dann das naechste Garn. Arbeitet auf einer Kopie der Pixel.
+FUNCTION bayerBild(p AS Pixelbild) AS Pixelbild
+    DIM bayer AS ARRAY OF INTEGER : bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
+    DIM q AS Pixelbild : q = neuesPixelbild(p.breite, p.hoehe)
+    DIM qr AS ARRAY OF INTEGER : qr = q.r
+    DIM qg AS ARRAY OF INTEGER : qg = q.g
+    DIM qb AS ARRAY OF INTEGER : qb = q.b
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO p.hoehe - 1
+        FOR x = 0 TO p.breite - 1
+            ' (M / 16 - 0.5) * 32 = 2 M - 16, also ganzzahlig
+            DIM v AS INTEGER : v = 2 * bayer[(y MOD 4) * 4 + x MOD 4] - 16
+            DIM i AS INTEGER : i = y * p.breite + x
+            qr[i] = CLAMP(p.r[i] + v, 0, 255)
+            qg[i] = CLAMP(p.g[i] + v, 0, 255)
+            qb[i] = CLAMP(p.b[i] + v, 0, 255)
+        NEXT
+    NEXT
+    RETURN q
+END FUNCTION
+
+' --- Confetti (core/confetti_reduction.py) -------------------------------------------
+
+' Zusammenhaengende Gebiete gleicher Farbe (4er-Nachbarschaft). `marke` bekommt
+' je Punkt die Gebietsnummer (-1 = kein Stich), die Rueckgabe die Groessen.
+FUNCTION gebiete(raster AS ARRAY OF INTEGER, breite AS INTEGER, hoehe AS INTEGER, marke AS ARRAY OF INTEGER) AS ARRAY OF INTEGER
+    DIM n AS INTEGER : n = breite * hoehe
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        marke[i] = -1
+    NEXT
+    DIM groessen AS ARRAY OF INTEGER : groessen = []
+    DIM stapel[n * 4 + 4] AS INTEGER
+    DIM start AS INTEGER
+    FOR start = 0 TO n - 1
+        IF marke[start] <> -1 THEN CONTINUE
+        DIM farbe AS INTEGER : farbe = raster[start]
+        IF farbe = -1 THEN CONTINUE
+        DIM id AS INTEGER : id = LEN(groessen)
+        DIM oben AS INTEGER : oben = 1
+        stapel[0] = start
+        DIM g AS INTEGER : g = 0
+        WHILE oben > 0
+            oben = oben - 1
+            DIM q AS INTEGER : q = stapel[oben]
+            IF marke[q] <> -1 THEN CONTINUE
+            IF raster[q] <> farbe THEN CONTINUE
+            marke[q] = id
+            g = g + 1
+            DIM y AS INTEGER : y = q \ breite
+            DIM x AS INTEGER : x = q MOD breite
+            IF y > 0 THEN stapel[oben] = q - breite : oben = oben + 1
+            IF y < hoehe - 1 THEN stapel[oben] = q + breite : oben = oben + 1
+            IF x > 0 THEN stapel[oben] = q - 1 : oben = oben + 1
+            IF x < breite - 1 THEN stapel[oben] = q + 1 : oben = oben + 1
+        WEND
+        ARRAY_PUSH(groessen, g)
+    NEXT
+    RETURN groessen
+END FUNCTION
+
+' Eine Runde: jedes zu kleine Gebiet bekommt die haeufigste andere Farbe
+' unter seinen 8 Nachbarn (bei Gleichstand die kleinere Nummer). Gelesen
+' wird aus dem schon geaenderten Raster, in der Reihenfolge des ersten
+' Punktes -- sonst tauschen zwei Einzelpunkte ewig ihre Farbe.
+FUNCTION confettiRunde(raster AS ARRAY OF INTEGER, breite AS INTEGER, hoehe AS INTEGER, mindest AS INTEGER, farbzahl AS INTEGER) AS BOOLEAN
+    DIM n AS INTEGER : n = breite * hoehe
+    DIM marke[n] AS INTEGER
+    DIM groessen AS ARRAY OF INTEGER : groessen = gebiete(raster, breite, hoehe, marke)
+    DIM gz AS INTEGER : gz = LEN(groessen)
+    IF gz = 0 THEN RETURN FALSE
+    ' die Punkte je kleinem Gebiet, in Rasterreihenfolge, als verkettete Liste
+    DIM erster[gz] AS INTEGER
+    DIM letzter[gz] AS INTEGER
+    DIM naechster[n] AS INTEGER
+    DIM reihe AS ARRAY OF INTEGER : reihe = []
+    DIM i AS INTEGER
+    FOR i = 0 TO gz - 1
+        erster[i] = -1
+    NEXT
+    FOR i = 0 TO n - 1
+        DIM m AS INTEGER : m = marke[i]
+        naechster[i] = -1
+        IF m < 0 THEN CONTINUE
+        IF groessen[m] >= mindest THEN CONTINUE
+        IF erster[m] < 0 THEN
+            erster[m] = i
+            ARRAY_PUSH(reihe, m)
+        ELSE
+            naechster[letzter[m]] = i
+        END IF
+        letzter[m] = i
+    NEXT
+    IF LEN(reihe) = 0 THEN RETURN FALSE
+    DIM zahl[farbzahl] AS INTEGER
+    DIM geaendert AS BOOLEAN
+    DIM gid AS INTEGER
+    FOR EACH gid IN reihe
+        DIM eigen AS INTEGER : eigen = raster[erster[gid]]
+        DIM f AS INTEGER
+        FOR f = 0 TO farbzahl - 1
+            zahl[f] = 0
+        NEXT
+        DIM q AS INTEGER : q = erster[gid]
+        WHILE q >= 0
+            DIM py AS INTEGER : py = q \ breite
+            DIM px AS INTEGER : px = q MOD breite
+            DIM dy AS INTEGER, dx AS INTEGER
+            FOR dy = -1 TO 1
+                FOR dx = -1 TO 1
+                    IF dy = 0 AND dx = 0 THEN CONTINUE
+                    DIM ny AS INTEGER : ny = py + dy
+                    DIM nx AS INTEGER : nx = px + dx
+                    IF ny >= 0 AND ny < hoehe AND nx >= 0 AND nx < breite THEN
+                        DIM nc AS INTEGER : nc = raster[ny * breite + nx]
+                        IF nc <> -1 AND nc <> eigen THEN zahl[nc] = zahl[nc] + 1
+                    END IF
+                NEXT
+            NEXT
+            q = naechster[q]
+        WEND
+        DIM beste AS INTEGER : beste = -1
+        DIM bz AS INTEGER : bz = 0
+        FOR f = 0 TO farbzahl - 1
+            IF zahl[f] > bz THEN
+                bz = zahl[f]
+                beste = f
+            END IF
+        NEXT
+        IF beste < 0 THEN CONTINUE
+        q = erster[gid]
+        WHILE q >= 0
+            raster[q] = beste
+            q = naechster[q]
+        WEND
+        geaendert = TRUE
+    NEXT
+    RETURN geaendert
+END FUNCTION
+
+' Confetti entfernen: hoechstens fuenf Runden, wie im Original.
+SUB confettiEntfernen(raster AS ARRAY OF INTEGER, breite AS INTEGER, hoehe AS INTEGER, mindest AS INTEGER, farbzahl AS INTEGER)
+    IF mindest <= 1 OR breite * hoehe = 0 THEN RETURN
+    DIM r AS INTEGER
+    FOR r = 1 TO 5
+        IF NOT confettiRunde(raster, breite, hoehe, mindest, farbzahl) THEN BREAK
+    NEXT
+END SUB
+
+' --- Konturen (Sobel) ----------------------------------------------------------------------
+
+' Kanten im Graubild als Rueckstich-Strecken (Halbstich-Einheiten: Punkt x,y
+' -> 2x, 2y) -- je Kantenpunkt zu jedem Kantennachbarn rechts, unten,
+' rechts-unten und rechts-oben. Schwelle relativ zur staerksten Kante.
+FUNCTION konturStrecken(grau AS Pixelbild, schwelle AS FLOAT) AS ARRAY OF INTEGER
+    DIM w AS INTEGER : w = grau.breite
+    DIM h AS INTEGER : h = grau.hoehe
+    DIM n AS INTEGER : n = w * h
+    DIM v[n] AS FLOAT
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        v[i] = grau.r[i] / 255.0
+    NEXT
+    DIM gx[n] AS FLOAT
+    DIM gy[n] AS FLOAT
+    DIM kx AS ARRAY OF INTEGER : kx = [-1, 0, 1, -2, 0, 2, -1, 0, 1]
+    DIM ky AS ARRAY OF INTEGER : ky = [-1, -2, -1, 0, 0, 0, 1, 2, 1]
+    DIM dy AS INTEGER, dx AS INTEGER, x AS INTEGER, y AS INTEGER
+    ' wie np.pad(edge) und neun verschobene Summanden, in derselben Reihenfolge
+    FOR dy = 0 TO 2
+        FOR dx = 0 TO 2
+            DIM fx AS FLOAT : fx = kx[dy * 3 + dx]
+            DIM fy AS FLOAT : fy = ky[dy * 3 + dx]
+            FOR y = 0 TO h - 1
+                DIM sy AS INTEGER : sy = CLAMP(y + dy - 1, 0, h - 1)
+                FOR x = 0 TO w - 1
+                    DIM sx AS INTEGER : sx = CLAMP(x + dx - 1, 0, w - 1)
+                    DIM wert AS FLOAT : wert = v[sy * w + sx]
+                    gx[y * w + x] = gx[y * w + x] + fx * wert
+                    gy[y * w + x] = gy[y * w + x] + fy * wert
+                NEXT
+            NEXT
+        NEXT
+    NEXT
+    DIM st[n] AS FLOAT
+    DIM mx AS FLOAT : mx = 0
+    FOR i = 0 TO n - 1
+        st[i] = SQR(gx[i] ^ 2 + gy[i] ^ 2)
+        IF st[i] > mx THEN mx = st[i]
+    NEXT
+    DIM kante[n] AS BOOLEAN
+    IF mx > 0.000001 THEN
+        FOR i = 0 TO n - 1
+            kante[i] = st[i] / mx > schwelle
+        NEXT
+    END IF
+    DIM erg AS ARRAY OF INTEGER : erg = []
+    DIM rx AS ARRAY OF INTEGER : rx = [1, 0, 1, 1]
+    DIM ry AS ARRAY OF INTEGER : ry = [0, 1, 1, -1]
+    DIM r AS INTEGER
+    FOR y = 0 TO h - 1
+        FOR x = 0 TO w - 1
+            IF NOT kante[y * w + x] THEN CONTINUE
+            FOR r = 0 TO 3
+                DIM nx AS INTEGER : nx = x + rx[r]
+                DIM ny AS INTEGER : ny = y + ry[r]
+                IF nx >= 0 AND nx < w AND ny >= 0 AND ny < h THEN
+                    IF kante[ny * w + nx] THEN
+                        ARRAY_PUSH(erg, x * 2) : ARRAY_PUSH(erg, y * 2)
+                        ARRAY_PUSH(erg, nx * 2) : ARRAY_PUSH(erg, ny * 2)
+                    END IF
+                END IF
+            NEXT
+        NEXT
+    NEXT
+    RETURN erg
+END FUNCTION
+
+' Die dunkelste Farbe (vereinfachte Leuchtdichte, die erste bei Gleichstand).
+FUNCTION dunkelsteFarbe(m AS Muster) AS INTEGER
+    DIM best AS INTEGER : best = 0
+    DIM bl AS FLOAT : bl = 1E99
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(m.farben) - 1
+        DIM c AS INTEGER : c = m.farben[i].garn.farbe
+        DIM l AS FLOAT : l = 0.299 * rotAnteil(c) + 0.587 * gruenAnteil(c) + 0.114 * blauAnteil(c)
+        IF l < bl THEN
+            bl = l
+            best = i
+        END IF
+    NEXT
+    RETURN best
+END FUNCTION
+
+' --- Der Ablauf in Schritten ------------------------------------------------------------------
+
+CONST PH_WAHL = 0          ' Farben waehlen (haeufigste: naechstes Garn je Punkt aus allen)
+CONST PH_ZUORDNEN = 1      ' jedem Punkt eins der gewaehlten Garne
+CONST PH_CONFETTI = 2
+CONST PH_FERTIG = 3
+
+CLASS Bildimport
+    DIM e AS Importeinstellung
+    DIM bild AS Pixelbild
+    DIM grau AS Pixelbild
+    DIM name AS STRING
+    DIM symbole AS ARRAY OF STRING
+    DIM alle AS Garnfarben
+    DIM gewaehlt AS Garnfarben
+    DIM nummern AS ARRAY OF INTEGER    ' gewaehlte Garne als Nummern in `alle`
+    DIM jeAlle AS ARRAY OF INTEGER       ' je Punkt: naechstes Garn aus `alle`
+    DIM raster AS ARRAY OF INTEGER     ' je Punkt: Index in `gewaehlt`
+    DIM arbeit AS ARRAY OF FLOAT       ' Floyd-Steinberg
+    DIM bayer AS Pixelbild
+    DIM merk AS MAP OF INTEGER
+    DIM phase AS INTEGER
+    DIM zeile AS INTEGER
+    DIM ergebnis AS Muster
+
+    ' Wie weit (0..1), grob nach Zeilen gewichtet.
+    FUNCTION fortschritt() AS FLOAT
+        IF phase >= PH_FERTIG THEN RETURN 1.0
+        DIM teil AS FLOAT : teil = zeile / MAX(1, bild.hoehe)
+        IF phase = PH_WAHL THEN RETURN 0.45 * teil
+        IF phase = PH_ZUORDNEN THEN RETURN 0.45 + 0.45 * teil
+        RETURN 0.95
+    END FUNCTION
+
+    FUNCTION fertig() AS BOOLEAN
+        RETURN phase >= PH_FERTIG
+    END FUNCTION
+
+    ' Hoechstens `zeilen` Zeilen weiterrechnen. TRUE, solange etwas fehlt.
+    FUNCTION schritt(zeilen AS INTEGER) AS BOOLEAN
+        IF phase = PH_WAHL THEN
+            IF e.farbwahl = WAHL_MEDIAN THEN
+                nummern = medianCut(bild, alle, e.maxFarben)
+                gewaehltSetzen()
+                RETURN TRUE
+            END IF
+            DIM bis AS INTEGER : bis = MIN(bild.hoehe, zeile + zeilen)
+            naechsteZeilen(bild, alle, jeAlle, zeile, bis, merk)
+            zeile = bis
+            IF zeile >= bild.hoehe THEN
+                nummern = haeufigste(jeAlle, LEN(alle.garne), e.maxFarben)
+                gewaehltSetzen()
+            END IF
+            RETURN TRUE
+        END IF
+        IF phase = PH_ZUORDNEN THEN
+            DIM bis2 AS INTEGER : bis2 = MIN(bild.hoehe, zeile + zeilen)
+            IF e.dithering = DITHER_FLOYD THEN
+                floydZeilen(bild.breite, bild.hoehe, arbeit, gewaehlt, raster, zeile, bis2)
+            ELSEIF e.dithering = DITHER_GEORDNET THEN
+                naechsteZeilen(bayer, gewaehlt, raster, zeile, bis2, merk)
+            ELSEIF e.farbwahl = WAHL_MEDIAN THEN
+                naechsteZeilen(bild, gewaehlt, raster, zeile, bis2, merk)
+            ELSE
+                umlegen(zeile, bis2)
+            END IF
+            zeile = bis2
+            IF zeile >= bild.hoehe THEN
+                phase = PH_CONFETTI
+                zeile = 0
+            END IF
+            RETURN TRUE
+        END IF
+        IF phase = PH_CONFETTI THEN
+            confettiEntfernen(raster, bild.breite, bild.hoehe, e.confetti, LEN(gewaehlt.garne))
+            musterBauen()
+            phase = PH_FERTIG
+            RETURN FALSE
+        END IF
+        RETURN FALSE
+    END FUNCTION
+
+    ' Nach der Wahl: Lab der gewaehlten Garne, Arbeitsfelder fuer die Zuordnung.
+    SUB gewaehltSetzen()
+        gewaehlt = garnfarbenVon(teilGarne(alle, nummern))
+        merk = {}
+        DIM n AS INTEGER : n = bild.breite * bild.hoehe
+        DIM r[n] AS INTEGER
+        raster = r
+        IF e.dithering = DITHER_FLOYD THEN
+            DIM a[n * 3] AS FLOAT
+            DIM i AS INTEGER
+            FOR i = 0 TO n - 1
+                a[i * 3] = bild.r[i] : a[i * 3 + 1] = bild.g[i] : a[i * 3 + 2] = bild.b[i]
+            NEXT
+            arbeit = a
+        ELSEIF e.dithering = DITHER_GEORDNET THEN
+            bayer = bayerBild(bild)
+        END IF
+        phase = PH_ZUORDNEN
+        zeile = 0
+    END SUB
+
+    ' Ohne Streuung: die gewaehlten bleiben, die anderen gehen zum naechsten
+    ' gewaehlten (je Garn einmal gerechnet).
+    SUB umlegen(von AS INTEGER, bis AS INTEGER)
+        DIM i AS INTEGER, k AS INTEGER
+        FOR i = von * bild.breite TO bis * bild.breite - 1
+            DIM g AS INTEGER : g = jeAlle[i]
+            DIM s AS STRING : s = "g" + STR$(g)
+            IF MAPHAS(merk, s) THEN
+                raster[i] = MAPGET(merk, s)
+            ELSE
+                DIM wahl AS INTEGER : wahl = -1
+                FOR k = 0 TO LEN(nummern) - 1
+                    IF nummern[k] = g THEN wahl = k : BREAK
+                NEXT
+                IF wahl < 0 THEN wahl = naechstesGarn(alle.l[g], alle.a[g], alle.b[g], gewaehlt.l, gewaehlt.a, gewaehlt.b)
+                MAPPUT(merk, s, wahl)
+                raster[i] = wahl
+            END IF
+        NEXT
+    END SUB
+
+    SUB musterBauen()
+        DIM m AS Muster : m = NEW Muster(name, bild.breite, bild.hoehe)
+        DIM mitPerlen AS BOOLEAN : mitPerlen = e.palette.istPerlen
+        DIM mitDiamant AS BOOLEAN : mitDiamant = e.palette.istDiamant
+        IF mitDiamant THEN
+            m.modus = "diamond"
+            m.stoff = 10
+        END IF
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(gewaehlt.garne) - 1
+            DIM sym AS STRING
+            IF i < LEN(symbole) THEN sym = symbole[i] ELSE sym = "#" + STR$(i - LEN(symbole) + 1)
+            DIM f AS Farbeintrag : f = neuerFarbeintrag(gewaehlt.garne[i], sym)
+            f.istPerle = mitPerlen
+            f.istDiamant = mitDiamant
+            ARRAY_PUSH(m.farben, f)
+        NEXT
+        DIM typ AS INTEGER : typ = VOLL
+        IF mitPerlen THEN
+            typ = PERLE
+        ELSEIF mitDiamant THEN
+            typ = DIAMANT
+        END IF
+        DIM eb AS Ebene : eb = m.ebenen.aktiveEbene()
+        DIM ras AS ARRAY OF INTEGER : ras = eb.raster
+        DIM art AS ARRAY OF INTEGER : art = eb.art
+        FOR i = 0 TO LEN(raster) - 1
+            IF raster[i] >= 0 THEN
+                ras[i] = raster[i]
+                art[i] = typ
+            END IF
+        NEXT
+        m.stichzahlenNeu()
+        IF e.konturen AND NOT IS_NIL(grau) AND LEN(m.farben) > 0 THEN
+            DIM str AS ARRAY OF INTEGER : str = konturStrecken(grau, 0.3)
+            DIM df AS INTEGER : df = dunkelsteFarbe(m)
+            FOR i = 0 TO LEN(str) - 1 STEP 4
+                ARRAY_PUSH(m.rueckstiche, neuerRueckstich(str[i], str[i + 1], str[i + 2], str[i + 3], df))
+            NEXT
+        END IF
+        m.quellPalette = e.palette.name
+        m.quellAusschnitt = [e.ausschnitt[0], e.ausschnitt[1], e.ausschnitt[2], e.ausschnitt[3]]
+        JSON_SET_BOOL(m.metadaten, "dithering", e.dithering <> DITHER_KEINS)
+        JSON_SET_STRING(m.metadaten, "dithering_mode", e.ditherName$())
+        JSON_SET_STRING(m.metadaten, "quantization_method", IIF(e.farbwahl = WAHL_MEDIAN, "median_cut", "nearest"))
+        JSON_SET_INT(m.metadaten, "max_colors", e.maxFarben)
+        JSON_SET_BOOL(m.metadaten, "auto_backstitches", e.konturen)
+        JSON_SET_INT(m.metadaten, "confetti_min_run_size", e.confetti)
+        JSON_SET_BOOL(m.metadaten, "keep_aspect_ratio", e.seitenverhaeltnis)
+        JSON_SET_FLOAT(m.metadaten, "brightness", e.helligkeit)
+        JSON_SET_FLOAT(m.metadaten, "contrast", e.kontrast)
+        JSON_SET_FLOAT(m.metadaten, "saturation", e.saettigung)
+        ergebnis = m
+    END SUB
+END CLASS
+
+' Einen Import vorbereiten (Pixel stehen schon fest). Gerechnet wird mit schritt().
+FUNCTION importBeginnen(bild AS Pixelbild, grau AS Pixelbild, e AS Importeinstellung, name AS STRING, symbole AS ARRAY OF STRING) AS Bildimport
+    IF IS_NIL(e.palette) OR LEN(e.palette.garne) = 0 THEN THROW tr$("Bildimport: keine Palette mit Garnen gewaehlt")
+    DIM im AS Bildimport : im = NEW Bildimport()
+    im.e = e
+    im.bild = bild
+    im.grau = grau
+    im.name = name
+    im.symbole = symbole
+    im.alle = garnfarbenVon(e.palette.garne)
+    DIM n AS INTEGER : n = bild.breite * bild.hoehe
+    DIM v[n] AS INTEGER
+    im.jeAlle = v
+    im.merk = {}
+    im.phase = PH_WAHL
+    RETURN im
+END FUNCTION
+
+' Alles in einem Zug.
+FUNCTION musterAusPixeln(bild AS Pixelbild, grau AS Pixelbild, e AS Importeinstellung, name AS STRING, symbole AS ARRAY OF STRING) AS Muster
+    DIM im AS Bildimport : im = importBeginnen(bild, grau, e, name, symbole)
+    WHILE im.schritt(1000000) : WEND
+    RETURN im.ergebnis
+END FUNCTION

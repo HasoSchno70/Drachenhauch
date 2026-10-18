@@ -137,3 +137,37 @@ PRINT PARTICLE_COUNT(p)
 --- erwartet
 5
 
+=== sekunden statt millisekunden sind ein fehler mit dem richtigen aufruf
+' PARTICLE_UPDATE(p, DELTA()) rundete 0,016 auf 0 ms -- die Partikel
+' alterten nie, ohne Meldung (Dogfooding 2026-10-10). Eine Kommazahl zwischen
+' 0 und 1 ist sicher in Sekunden gemeint. Dasselbe fuer SPRITE_UPDATE und
+' ANIM_FSM_UPDATE; ganze Zahlen und Kommazahlen ab 1 gehen wie bisher.
+IMPORT "particles"
+IMPORT "sprite"
+DIM p AS PARTICLE_SYSTEM
+p = PARTICLE_SYSTEM_NEW(0, 0)
+PARTICLE_SET_LIFETIME(p, 100, 100)
+PARTICLE_EMIT(p, 5)
+PARTICLE_UPDATE(p, 0)
+PARTICLE_UPDATE(p, 0.0)
+PRINT PARTICLE_COUNT(p)
+TRY
+    PARTICLE_UPDATE(p, 0.016)
+CATCH e
+    PRINT e
+END TRY
+PARTICLE_UPDATE(p, 150.0)
+PRINT PARTICLE_COUNT(p)
+DIM bild AS INTEGER
+bild = 0
+DIM s AS SPRITE
+TRY
+    SPRITE_UPDATE(s, 0.5)
+CATCH e2
+    PRINT e2
+END TRY
+--- erwartet
+5
+PARTICLE_UPDATE: 0.016 ms ist weniger als eine Millisekunde -- dt_ms zaehlt Millisekunden, DELTA() liefert Sekunden: INT(DELTA() * 1000)
+0
+SPRITE_UPDATE: 0.5 ms ist weniger als eine Millisekunde -- dt_ms zaehlt Millisekunden, DELTA() liefert Sekunden: INT(DELTA() * 1000)

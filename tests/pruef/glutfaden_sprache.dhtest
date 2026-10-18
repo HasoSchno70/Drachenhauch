@@ -1,0 +1,310 @@
+' Glutfaden Stufe 24: die Oberflaeche auf Deutsch und Englisch (Teil 1 --
+' Hauptfenster, Werkzeugleiste, Seitenleiste, Statuszeile, Kuerzel).
+' Jeder Anzeigetext geht durch tr$("deutsch") bzw. trf$("... {0} ...", [w]);
+' auf Englisch kommt er aus daten/sprache/en.txt (Deutsch TAB Englisch).
+'
+' Der erste Fall liest den Quelltext selbst: jedes Literal in tr$/trf$ und
+' jeder Name der Kuerzel-Tafel muss in der Tafel stehen, mit denselben
+' Platzhaltern, und kein Eintrag der Tafel darf verwaist sein. Ein fehlender
+' Eintrag ist sonst unsichtbar -- der Text bleibt einfach deutsch.
+' Die Probe laeuft mit DH_GLUT_SPRACHE=en (eine Probe bleibt sonst deutsch)
+' und sammelt, was in den gebauten Fenstern steht.
+
+
+=== jeder angezeigte text steht in der tafel
+IMPORT "helfer.dh"
+' Die Tafel: Deutsch TAB Englisch -- doppelte Schluessel und leere Seiten sind Fehler
+DIM tafel AS MAP OF STRING : tafel = {}
+DIM doppelt AS ARRAY OF STRING : doppelt = []
+DIM leer AS ARRAY OF STRING : leer = []
+DIM z AS STRING
+FOR EACH z IN READLINES(GLUTORDNER + "/daten/sprache/en.txt")
+    z = REPLACE$(z, CHR$(13), "")
+    DIM tab AS INTEGER : tab = INSTR(z, CHR$(9))
+    IF tab >= 0 THEN
+        DIM de AS STRING : de = LEFT$(z, tab)
+        IF MAPHAS(tafel, de) THEN ARRAY_PUSH(doppelt, de)
+        IF TRIM$(de) = "" OR TRIM$(MID$(z, tab + 1)) = "" THEN ARRAY_PUSH(leer, z)
+        MAPPUT(tafel, de, MID$(z, tab + 1))
+    END IF
+NEXT
+
+' Ein Kommentar endet die Zeile, ausser in einer Zeichenkette
+FUNCTION ohneKommentar$(l AS STRING) AS STRING
+    DIM q AS BOOLEAN : q = FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(l) - 1
+        DIM c AS STRING : c = MID$(l, i, 1)
+        IF c = CHR$(34) THEN
+            q = NOT q
+        ELSEIF c = "'" AND NOT q THEN
+            RETURN LEFT$(l, i)
+        END IF
+    NEXT
+    RETURN l
+END FUNCTION
+
+' Die Platzhalter eines Textes, sortiert
+FUNCTION platz$(t AS STRING) AS STRING
+    DIM p AS ARRAY OF STRING : p = REGEX_FIND_ALL(t, "\{[^}]*\}")
+    SORT(p)
+    RETURN JOIN$(p, " ")
+END FUNCTION
+
+' Jedes Literal in tr$ und trf$ -- die Probe (vorfuehrung.dh) fragt mit
+' Absicht nach einem Text, den es nicht gibt, und zeigt nichts an
+DIM q AS STRING : q = CHR$(34)
+DIM musterTr AS STRING : musterTr = "(?:^|[^A-Za-z0-9_])tr\$\(" + q + "([^" + q + "]*)" + q
+DIM musterTrf AS STRING : musterTrf = "(?:^|[^A-Za-z0-9_])trf\$\(" + q + "([^" + q + "]*)" + q
+DIM gesehen AS MAP OF STRING : gesehen = {}
+DIM fehlt AS ARRAY OF STRING : fehlt = []
+DIM falsch AS ARRAY OF STRING : falsch = []
+DIM dateien AS INTEGER : dateien = 0
+DIM f AS STRING
+FOR EACH f IN DIRLIST_REC(GLUTORDNER, "*.dh")
+    IF BASENAME(f) = "vorfuehrung.dh" THEN CONTINUE
+    dateien = dateien + 1
+    DIM nr AS INTEGER : nr = 0
+    DIM l AS STRING
+    FOR EACH l IN READLINES(PATHJOIN(GLUTORDNER, f))
+        nr = nr + 1
+        IF INSTR(l, "tr$(") < 0 AND INSTR(l, "trf$(") < 0 THEN CONTINUE
+        l = ohneKommentar$(l)
+        DIM t AS STRING
+        FOR EACH t IN REGEX_FIND_ALL(l, musterTr)
+            MAPPUT(gesehen, t, "tr")
+            IF NOT MAPHAS(tafel, t) THEN ARRAY_PUSH(fehlt, BASENAME(f) + ":" + STR$(nr) + " " + t)
+            ' tr$ setzt nichts ein -- ein {0} stuende woertlich da
+            IF REGEX_TEST(t, "\{[0-9]+\}") THEN ARRAY_PUSH(falsch, "tr$ mit {n}: " + BASENAME(f) + ":" + STR$(nr) + " " + t)
+        NEXT
+        FOR EACH t IN REGEX_FIND_ALL(l, musterTrf)
+            MAPPUT(gesehen, t, "trf")
+            IF NOT MAPHAS(tafel, t) THEN ARRAY_PUSH(fehlt, BASENAME(f) + ":" + STR$(nr) + " " + t)
+            IF NOT REGEX_TEST(t, "\{[0-9]+\}") THEN ARRAY_PUSH(falsch, "trf$ ohne {n}: " + BASENAME(f) + ":" + STR$(nr) + " " + t)
+        NEXT
+    NEXT
+NEXT
+' Die Namen der Kuerzel-Tafel (F1, Einstellungen) gehen durch tr$(a.name)
+DIM a AS kern.Kuerzelaktion
+DIM namen AS INTEGER : namen = 0
+FOR EACH a IN kern.kuerzelAktionen()
+    namen = namen + 1
+    MAPPUT(gesehen, a.name, "ka")
+    IF NOT MAPHAS(tafel, a.name) THEN ARRAY_PUSH(fehlt, "kuerzel " + a.kennung + " " + a.name)
+NEXT
+' Listen aus dem Kern sind dort Schluessel und bleiben deutsch -- die
+' Ansicht uebersetzt sie beim Anzeigen (tr$(t), trListe), also muss jeder
+' Eintrag in der Tafel stehen
+DIM listenZahl AS INTEGER : listenZahl = 0
+SUB listeDazu(l AS ARRAY OF STRING)
+    DIM t AS STRING
+    FOR EACH t IN l
+        listenZahl = listenZahl + 1
+        MAPPUT(gesehen, t, "liste")
+        IF NOT MAPHAS(tafel, t) THEN ARRAY_PUSH(fehlt, "liste " + t)
+    NEXT
+END SUB
+listeDazu(kern.erfahrungsstufen())
+listeDazu(kern.bibliothekKategorien())
+listeDazu(kern.bibliothekSortierungen())
+listeDazu(kern.harmonieArten())
+listeDazu(kern.vorlagenKategorien())
+listeDazu(kern.farbSortierungen())
+listeDazu(kern.startAktionen())
+listeDazu(kern.pipettenArten())
+listeDazu(kern.farbAnzeigen())
+listeDazu(kern.dpVorlagenNamen())
+listeDazu(kern.rasterVoreinstellungen())
+listeDazu(["Eigene"])
+DIM vl AS kern.Vorlage
+FOR EACH vl IN kern.vorlagen()
+    listeDazu([vl.kategorie, vl.name, vl.beschreibung])
+NEXT
+DIM anders AS ARRAY OF STRING : anders = []
+DIM verwaist AS ARRAY OF STRING : verwaist = []
+DIM k AS STRING
+FOR EACH k IN MAPKEYS(tafel)
+    IF platz$(k) <> platz$(tafel[k]) THEN ARRAY_PUSH(anders, k + " -> " + tafel[k])
+    IF NOT MAPHAS(gesehen, k) THEN ARRAY_PUSH(verwaist, k)
+NEXT
+PRINT "tafel ueber 1500: "; LEN(MAPKEYS(tafel)) > 1500; " | doppelt "; LEN(doppelt); " | leer "; LEN(leer)
+PRINT "dateien ueber 20: "; dateien > 20; " | texte ueber 1500: "; LEN(MAPKEYS(gesehen)) > 1500; " | kuerzel-namen "; namen; " | aus kern-listen ueber 100: "; listenZahl > 100
+PRINT "fehlen in der tafel: "; LEN(fehlt)
+FOR EACH k IN fehlt
+    PRINT "  "; k
+NEXT
+PRINT "andere platzhalter: "; LEN(anders)
+FOR EACH k IN anders
+    PRINT "  "; k
+NEXT
+PRINT "falsch eingepackt: "; LEN(falsch)
+FOR EACH k IN falsch
+    PRINT "  "; k
+NEXT
+PRINT "verwaist: "; LEN(verwaist)
+FOR EACH k IN verwaist
+    PRINT "  "; k
+NEXT
+FOR EACH k IN doppelt
+    PRINT "  doppelt: "; k
+NEXT
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- erwartet
+tafel ueber 1500: TRUE | doppelt 0 | leer 0
+dateien ueber 20: TRUE | texte ueber 1500: TRUE | kuerzel-namen 77 | aus kern-listen ueber 100: TRUE
+fehlen in der tafel: 0
+andere platzhalter: 0
+falsch eingepackt: 0
+verwaist: 0
+
+=== kern: sprache, uebersetzen, kuerzel, zahlen, einstellung
+IMPORT "helfer.dh"
+' "auto" folgt der Systemsprache, Unbekanntes gilt als auto
+PRINT "aufloesen: "; kern.spracheAufloesen$("auto", "de_DE"); " "; kern.spracheAufloesen$("auto", "de-AT"); " "; kern.spracheAufloesen$("auto", "en-US"); " "; kern.spracheAufloesen$("auto", ""); " "; kern.spracheAufloesen$(" DE ", "en"); " "; kern.spracheAufloesen$("en", "de"); " "; kern.spracheAufloesen$("fr", "de")
+' Fehlt die Tafel, bleibt es deutsch
+PRINT "ohne datei: "; kern.spracheLaden("en", "gibtsnicht.txt"); " "; kern.spracheJetzt$(); " "; kern.englisch()
+' Deutsch: alles unveraendert
+PRINT "de: "; kern.spracheLaden("de", "gibtsnicht.txt"); " | "; kern.tr$("Sichern"); " | "; kern.trf$("Die Ebene „{0}“ ist gesperrt.", ["Rand"]); " | "; kern.kuerzelAnzeige$("Strg+Umschalt+S, Entf"); " | "; kern.zahlAnzeige$(1234.5, 1); " | "; kern.zahlAnzeige$(0.25, -1)
+' Eine eigene Tafel: Kommentar, CR am Zeilenende, ein Tabulator im Englischen
+WRITEALL("t.txt", "# Kommentar" + CHR$(10) + "Sichern" + CHR$(9) + "Save" + CHR$(13) + CHR$(10) + "{0} von {1}" + CHR$(9) + "{0} of {1}" + CHR$(10) + "zwei" + CHR$(9) + "a" + CHR$(9) + "b" + CHR$(10) + "ohne tabulator" + CHR$(10))
+PRINT "geladen: "; kern.spracheLaden("en", "t.txt"); " "; kern.spracheJetzt$(); " "; kern.englisch()
+PRINT "en: "; kern.tr$("Sichern"); " | fehlt bleibt: "; kern.tr$("Öffnen"); " | "; REPLACE$(kern.tr$("zwei"), CHR$(9), "<tab>"); " | kommentar: "; kern.tr$("# Kommentar"); " | "; kern.tr$("ohne tabulator")
+' Die Werte werden nach dem Uebersetzen eingesetzt und nicht noch einmal gelesen
+PRINT "trf: "; kern.trf$("{0} von {1}", ["3", "7"]); " | "; kern.trf$("{0} von {1}", ["{1}", "x"]); " | unbekannt: "; kern.trf$("{0} und {1}", ["a", "b"]); " | zu wenig: "; kern.trf$("{0} von {1}", ["3"])
+PRINT "kuerzel: "; kern.kuerzelAnzeige$("Strg+Umschalt+Entf, Alt+Bild auf, Leertaste"); " | "; kern.kuerzelAnzeige$("Strg+Y, Strg+Umschalt+Z"); " | "; kern.kuerzelAnzeige$("Einfg, Pos1, Ende, Bild ab, Rücktaste, Enter, Tab, Esc, Strg+Komma, Strg+Punkt, Alt+Links, Plus"); " | "; kern.kuerzelAnzeige$("F1"); " | leer '"; kern.kuerzelAnzeige$(""); "'"
+PRINT "zahlen: "; kern.zahlAnzeige$(1234567.891, 2); " | "; kern.zahlAnzeige$(2.5, 1); " | "; kern.zahlAnzeige$(400000, -1); " | "; kern.zahlAnzeige$(-1234.5, 1); " | "; kern.zahlAnzeige$(7, 0)
+' Die echte Tafel: Kuerzel-Liste und Farbenblindheit auf Englisch
+PRINT "echte tafel: "; kern.spracheLaden("en", GLUTORDNER + "/daten/sprache/en.txt")
+DIM es AS kern.Einstellungen : es = NEW kern.Einstellungen()
+DIM zl AS STRING
+FOR EACH zl IN kern.kuerzelListe(es)
+    IF INSTR(zl, "Undo") = 0 OR INSTR(zl, "Redo") = 0 OR INSTR(zl, "Save as") = 0 OR INSTR(zl, "Delete") = 0 THEN PRINT "  "; REPLACE$(zl, CHR$(9), " -> ")
+NEXT
+PRINT "farbenblind: "; JOIN$(kern.farbenblindNamen(), " / ")
+kern.spracheLaden("de", "")
+PRINT "zurueck: "; REPLACE$(kern.kuerzelListe(es)[0], CHR$(9), " -> "); " | "; kern.farbenblindNamen()[1]
+' Die Einstellung ui_language: Vorgabe auto, gemerkt, Unbekanntes wird auto
+PRINT "vorgabe '"; es.sprache; "'"
+es.sprache = "en"
+WRITEALL("es.json", kern.einstellungenJson$(es))
+FOR EACH zl IN READLINES("es.json")
+    IF INSTR(zl, "ui_language") >= 0 THEN PRINT TRIM$(zl)
+NEXT
+PRINT "gelesen '"; kern.einstellungenLaden("es.json").sprache; "'"
+WRITEALL("krumm.json", "{" + CHR$(34) + "ui_language" + CHR$(34) + ": " + CHR$(34) + "fr" + CHR$(34) + "}")
+PRINT "krumm '"; kern.einstellungenLaden("krumm.json").sprache; "'"
+WRITEALL("de.json", "{" + CHR$(34) + "ui_language" + CHR$(34) + ": " + CHR$(34) + "de" + CHR$(34) + "}")
+PRINT "deutsch '"; kern.einstellungenLaden("de.json").sprache; "'"
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- erwartet
+aufloesen: de de en en de en de
+ohne datei: FALSE de FALSE
+de: TRUE | Sichern | Die Ebene „Rand“ ist gesperrt. | Strg+Umschalt+S, Entf | 1.234,5 | 0,25
+geladen: TRUE en TRUE
+en: Save | fehlt bleibt: Öffnen | a<tab>b | kommentar: # Kommentar | ohne tabulator
+trf: 3 of 7 | {1} of x | unbekannt: a und b | zu wenig: 3 of {1}
+kuerzel: Ctrl+Shift+Del, Alt+PgUp, Space | Ctrl+Y, Ctrl+Shift+Z | Ins, Home, End, PgDown, Backspace, Enter, Tab, Esc, Ctrl+Comma, Ctrl+Period, Alt+Left, Plus | F1 | leer ''
+zahlen: 1,234,567.89 | 2.5 | 400,000 | -1,234.5 | 7
+echte tafel: TRUE
+  Save as -> Ctrl+Shift+S
+  Undo -> Ctrl+Z
+  Redo -> Ctrl+Y, Ctrl+Shift+Z
+farbenblind: No simulation / Protanopia (red blindness) / Deuteranopia (green blindness) / Tritanopia (blue blindness)
+zurueck: Neues Muster -> Strg+N | Protanopie (Rot-Blindheit)
+vorgabe 'auto'
+"ui_language": "en",
+gelesen 'en'
+krumm 'auto'
+deutsch 'de'
+
+=== probe: oberflaeche auf englisch
+IMPORT "helfer.dh"
+' --probe-sprache mit DH_GLUT_SPRACHE=en: die Kern-Funktionen in der
+' laufenden Oberflaeche, alle Texte des Hauptfensters und der
+' Kuerzel-Uebersicht (F1) -- deutsch aussehende werden aufgelistet --, dann
+' die Sprache in den Einstellungen umstellen (wirkt erst beim naechsten Start).
+MKDIR("app")
+SETENV("APPDATA", CWD$() + "/app")
+SETENV("HOME", CWD$() + "/app")
+SETENV("DH_GLUT_SPRACHE", "en")
+dlStarten(["run", BEISPIEL, "--", "--probe-sprache", "--foto", "d", "alle.pxs"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT REPLACE$(dlAus, CHR$(13), "");
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    PRINT "hauptfenster "; FILEEXISTS("d_hauptfenster.png")
+    PRINT "datei unveraendert: "; READLINES("alle.pxs")[0] = READLINES("vorher.pxs")[0]
+END IF
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- datei alle.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- datei vorher.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- erwartet
+rueckgabe 0
+sprache: en | englisch TRUE | einstellung 'auto'
+tr: Open pattern | unbekannt bleibt: Gibt es nicht | trf: The layer “Ebene 1” is locked.
+kuerzel: Ctrl+Shift+S | Ctrl+Z | Ctrl+Shift+Del, Alt+PgUp, Space
+zahlen: 1,234,567.89 | 2.5 | 400,000
+tooltip mit kuerzel: Save (Ctrl+S) -- Save as: Ctrl+Shift+S
+hauptfenster: 631 texte, deutsch aussehend 0
+f1: 143 texte, deutsch aussehend 0
+  f1-zeile: Save as -> Ctrl+Shift+S
+  f1-zeile: Undo -> Ctrl+Z
+einstellungen: sprache 0 'Automatic (system language)'
+uebernommen: 'de' | gemerkt 'de' | The language changes at the next start. | oberflaeche bleibt en
+dialoge:
+  neu: 29 texte, deutsch aussehend 0
+  eigenschaften: 19 texte, deutsch aussehend 0
+  groesse: 8 texte, deutsch aussehend 0
+  versionen: 9 texte, deutsch aussehend 0
+  vorlage sichern: 9 texte, deutsch aussehend 0
+  vorlagen: 4 texte, deutsch aussehend 0
+  neuigkeiten: 18 texte, deutsch aussehend 0
+  einstellungen: 284 texte, deutsch aussehend 0
+  raster: 18 texte, deutsch aussehend 0
+  statistik: 118 texte, deutsch aussehend 0
+  heatmap: 8 texte, deutsch aussehend 0
+  aehnliche: 9 texte, deutsch aussehend 0
+  ersetzen: 9 texte, deutsch aussehend 0
+  seltene: 5 texte, deutsch aussehend 0
+  symbol: 98 texte, deutsch aussehend 0
+  blend: 14 texte, deutsch aussehend 0
+  export: 37 texte, deutsch aussehend 0
+  farbverwaltung: 56 texte, deutsch aussehend 0
+  kacheln: 7 texte, deutsch aussehend 0
+  palette: 41 texte, deutsch aussehend 0
+  tauschen: 10 texte, deutsch aussehend 0
+  rahmen: 34 texte, deutsch aussehend 0
+  harmonie: 16 texte, deutsch aussehend 0
+  bibliothek: 27 texte, deutsch aussehend 0
+  stickpfad: 66 texte, deutsch aussehend 0
+  vorschau: 28 texte, deutsch aussehend 0
+  vorrat: 39 texte, deutsch aussehend 0
+  fremdimport: 15 texte, deutsch aussehend 0
+pdf: stile CenterText Normal SmallCenter Title1 Title2 | erster titel '✂ CROSS-STITCH PATTERN' | datei TRUE
+html: <html lang='en'> | deutsch aussehende zeilen 0
+oxs: <?xml version='1.0' encoding='utf-8'?> | in beiden sprachen gleich TRUE | wieder en
+csv: ﻿Symbol,Name,Manufacturer,Catalog number,Stitches,Percent,Skeins,Cost,Do not stitch
+hauptfenster TRUE
+datei unveraendert: TRUE

@@ -80,6 +80,7 @@ module.exports = (H) => [
       'IF KEYRELEASED(KEY_SPACE) THEN sprung_kappen()',
       'IF KEYREPEAT(KEY_BACKSPACE) THEN text = LEFT$(text, LEN(text) - 1)',
     ]),
+  H.tip("Lage oder Beschriftung", "Ein Tastencode wie KEY_Z meint die LAGE der Taste nach der US-Tastatur – auf einer deutschen Tastatur ist das die Taste mit dem Y. Für WASD ist das richtig, die Finger liegen überall gleich. Für Kürzel wie Strg+Z schreibst du den Buchstaben als Text: KEYHIT(\"z\") meint die Taste, auf der das Z steht. Das geht mit KEYPRESSED, KEYHIT, KEYRELEASED und KEYREPEAT, für Buchstaben, Ziffern und das Leerzeichen."),
   H.cmd("MOUSE_HIT · MOUSE_RELEASED", 'MOUSE_HIT(n)   MOUSE_RELEASED(n)',
     "Dasselbe für die Maustasten (0 = links, 1 = rechts, 2 = mitte). Ein Klick ist damit ein Ereignis und kein Zustand mehr – ohne das zählt ein gehaltener Knopf in jedem Frame erneut.",
     [

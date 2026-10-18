@@ -230,3 +230,179 @@ PRINT MAPHAS(m, "name") ; " " ; MAPHAS(m, "titel")
 --- erwartet
 TRUE TRUE
 TRUE FALSE
+
+=== mit versionsspalte erkennt save fremdes speichern
+' GUI_FORM_VERSION (2026-10-12, Vereinsverwaltung): GUI_FORM_SAVE speichert
+' nur, wenn die Zeile noch den Stand vom Laden traegt, und liefert sonst 0
+' mit GUI_FORM_CONFLICT$ "geaendert" bzw. "geloescht". Vorher ueberschrieb es
+' die Aenderung eines Kollegen wortlos, und ein UPDATE auf eine geloeschte
+' Zeile meldete Erfolg. Derselbe Ablauf laeuft in db_server.dhtest gegen
+' PostgreSQL und MySQL mit derselben Erwartung.
+IMPORT "hilfe.dh"
+SCREEN(400, 200, "V", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM c AS DB_CONN : c = DB_OPEN("v.db")
+DIM fremd AS DB_CONN : fremd = DB_OPEN("v.db")
+DB_EXEC(c, "CREATE TABLE mitglied (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, menge INTEGER, stand INTEGER NOT NULL DEFAULT 1)")
+versionAblauf(c, fremd, "mitglied")
+gleichAblauf(c, "mitglied")
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/formversion.dh"
+--- erwartet
+angelegt TRUE stand 1
+gespeichert TRUE stand 2
+unveraendert TRUE stand 3
+fremd 1
+konflikt 0 geaendert noch geaendert TRUE
+in der datenbank Anja/4/4
+ueberschrieben TRUE '' Anna/9/5
+danach TRUE Anna/10/6
+geladen TRUE Berta ''
+nach laden TRUE Berta/11/8
+geloescht 0 geloescht
+ueberschreiben hilft nicht 0 geloescht
+ohne version 0 geloescht
+ohne aenderung 1
+
+=== versionsspalte: falsche angaben werden gemeldet
+IMPORT "gui"
+IMPORT "db"
+SCREEN(400, 200, "V", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("V", 0, 0, 400, 200)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 10, 10, 200, 28, "")
+GUI_BIND(name, "name")
+DIM c AS DB_CONN : c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT, stand INTEGER)")
+DB_EXEC(c, "INSERT INTO t (id, name, stand) VALUES (1, 'a', NULL)")
+TRY
+    GUI_FORM_VERSION(w, "stand; DROP TABLE t")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_FORM_VERSION(w, "name")
+CATCH e
+    PRINT e
+END TRY
+GUI_FORM_VERSION(w, "stand")
+' Nicht geladen: es weiss nicht, welchen Stand es bearbeitet.
+TRY
+    PRINT GUI_FORM_SAVE(w, c, "t", 1)
+CATCH e
+    PRINT e
+END TRY
+' Geladen, aber die Spalte ist leer.
+TRY
+    PRINT GUI_FORM_LOAD(w, c, "t", 1)
+CATCH e
+    PRINT e
+END TRY
+PRINT "konflikt ohne save '"; GUI_FORM_CONFLICT$(w); "'"
+--- erwartet
+GUI_FORM_VERSION: 'stand; DROP TABLE t' ist kein Spaltenname (Buchstaben, Ziffern, _)
+GUI_FORM_VERSION: 'name' ist an ein Widget gebunden -- die Versionsspalte fuehrt die Laufzeit selbst
+GUI_FORM_SAVE: dieses Formular hat die Versionsspalte 'stand', wurde aber nicht mit GUI_FORM_LOAD geladen -- es weiss nicht, welchen Stand es bearbeitet (oder ueberschreiben = TRUE)
+GUI_FORM_LOAD: die Versionsspalte 'stand' ist leer oder keine ganze Zahl
+konflikt ohne save ''
+
+=== ein geldfeld bindet cent als ganze zahl
+' GUI_TEXTINPUT_SET(tf, "zahlen", 3) (2026-10-12): getippt und gezeigt wie
+' eine Kommazahl mit zwei Stellen, gebunden als INTEGER in Cent -- so, wie
+' man Geld speichert. Vorher musste ein Programm den Betrag an der Bindung
+' vorbei umrechnen (Vereinsverwaltung, Rechnungen-Pilot). Dabei die Regel
+' fuer fuehrende Nullen: "0,99" ist eine Zahl, "01234" bleibt Text.
+IMPORT "gui"
+IMPORT "db"
+SCREEN(400, 200, "G", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("G", 0, 0, 400, 200)
+DIM betrag AS GUI_WIDGET : betrag = GUI_TEXTINPUT(w, 10, 10, 150, 28, "")
+GUI_TEXTINPUT_SET(betrag, "zahlen", 3)
+DIM preis AS GUI_WIDGET : preis = GUI_TEXTINPUT(w, 10, 50, 150, 28, "")
+GUI_TEXTINPUT_SET(preis, "zahlen", 2)
+DIM nr AS GUI_WIDGET : nr = GUI_TEXTINPUT(w, 10, 90, 150, 28, "")
+GUI_TEXTINPUT_SET(nr, "zahlen", 1)
+GUI_BIND(betrag, "betrag") : GUI_BIND(preis, "preis") : GUI_BIND(nr, "nr")
+DIM c AS DB_CONN : c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, betrag INTEGER, preis REAL, nr TEXT)")
+GUI_SET_TEXT(betrag, "48,5") : GUI_SET_TEXT(preis, "0,99") : GUI_SET_TEXT(nr, "01234")
+DIM id AS INTEGER : id = GUI_FORM_SAVE(w, c, "t", -1)
+DIM r AS DB_RESULT : r = DB_QUERY(c, "SELECT betrag, typeof(betrag), preis, typeof(preis), nr, typeof(nr) FROM t")
+IF DB_NEXT(r) THEN PRINT DB_GET_STRING(r, 0); " "; DB_GET_STRING(r, 1); " | "; DB_GET_STRING(r, 2); " "; DB_GET_STRING(r, 3); " | "; DB_GET_STRING(r, 4); " "; DB_GET_STRING(r, 5)
+' zurueck: Cent werden wieder Euro mit zwei Stellen
+DB_EXEC(c, "UPDATE t SET betrag = ? WHERE id = ?", -1999, id)
+GUI_FORM_CLEAR(w)
+PRINT GUI_FORM_LOAD(w, c, "t", id); " "; GUI_TEXT(betrag); " | "; GUI_TEXT(preis); " | "; GUI_TEXT(nr); " | geaendert "; GUI_FORM_CHANGED(w)
+' aus einer MAP: eine Zahl ist Cent, ein Text steht da, wie er kommt
+GUI_FORM_SET(w, {"betrag": 5})
+PRINT GUI_TEXT(betrag)
+GUI_FORM_SET(w, {"betrag": "12,30"})
+PRINT GUI_TEXT(betrag)
+TRY
+    GUI_TEXTINPUT_SET(betrag, "zahlen", 4)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+4850 integer | 0.99 real | 01234 text
+TRUE -19,99 | 0,99 | 01234 | geaendert FALSE
+0,05
+12,30
+GUI_TEXTINPUT_SET: zahlen ist 0 (frei), 1 (ganze Zahl), 2 (Kommazahl) oder 3 (Geldbetrag in Cent)
+
+=== eine klappliste mit werten bindet den wert statt der nummer
+' GUI_LISTBOX_SET_DATA gilt seit 2026-10-12 auch fuer Klapplisten: gezeigt
+' wird "19 %", gebunden 19. Ohne Werte bleibt es bei der Nummer des Eintrags.
+' Gefunden am Rechnungen-Piloten, der den Steuersatz von Hand umrechnete.
+IMPORT "gui"
+IMPORT "db"
+SCREEN(400, 200, "K", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("K", 0, 0, 400, 200)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 120, 28, ["19 %", "7 %", "0 %"])
+GUI_LISTBOX_SET_DATA(dd, 0, "19") : GUI_LISTBOX_SET_DATA(dd, 1, "7") : GUI_LISTBOX_SET_DATA(dd, 2, "0")
+DIM art AS GUI_WIDGET : art = GUI_DROPDOWN(w, 10, 50, 120, 28, ["privat", "firma"])
+DIM land AS GUI_WIDGET : land = GUI_DROPDOWN(w, 10, 90, 120, 28, ["Deutschland", "Österreich"])
+GUI_LISTBOX_SET_DATA(land, 0, "DE") : GUI_LISTBOX_SET_DATA(land, 1, "AT")
+GUI_BIND(dd, "mwst") : GUI_BIND(art, "art") : GUI_BIND(land, "land")
+PRINT GUI_LISTBOX_DATA$(dd, 1); " "; GUI_LISTBOX_FIND_DATA(land, "AT")
+DIM c AS DB_CONN : c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, mwst INTEGER, art INTEGER, land TEXT)")
+GUI_DROPDOWN_SET_SELECTED(dd, 1) : GUI_DROPDOWN_SET_SELECTED(art, 1)
+' ohne Auswahl: NULL
+GUI_DROPDOWN_SET_SELECTED(land, -1)
+DIM id AS INTEGER : id = GUI_FORM_SAVE(w, c, "t", -1)
+DIM r AS DB_RESULT : r = DB_QUERY(c, "SELECT mwst, typeof(mwst), art, land IS NULL FROM t")
+IF DB_NEXT(r) THEN PRINT DB_GET_INT(r, 0); " "; DB_GET_STRING(r, 1); " "; DB_GET_INT(r, 2); " "; DB_GET_INT(r, 3)
+DB_EXEC(c, "UPDATE t SET mwst = 0, land = 'AT' WHERE id = ?", id)
+PRINT GUI_FORM_LOAD(w, c, "t", id); " "; GUI_DROPDOWN_TEXT(dd); " "; GUI_DROPDOWN_TEXT(land)
+DIM m AS MAP OF STRING : m = GUI_FORM_GET(w)
+PRINT MAPGET(m, "mwst"); " "; MAPGET(m, "art"); " "; MAPGET(m, "land")
+' aus einer MAP: Text oder Zahl, verglichen mit dem Wert
+GUI_FORM_SET(w, {"mwst": 7, "land": "DE"})
+PRINT GUI_DROPDOWN_TEXT(dd); " "; GUI_DROPDOWN_TEXT(land)
+GUI_FORM_SET(w, {"mwst": "19.0"})
+PRINT GUI_DROPDOWN_TEXT(dd)
+' unbekannter Wert: keine Auswahl
+GUI_FORM_SET(w, {"mwst": 16})
+PRINT GUI_DROPDOWN_SELECTED(dd)
+' die Werte ueberleben die .dhform
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(GUI_TO_JSON(w))
+PRINT GUI_LISTBOX_DATA$(GUI_WINDOW_WIDGET(w2, 0), 2)
+TRY
+    DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 10, 150, 60, 28)
+    GUI_LISTBOX_SET_DATA(b, 0, "1")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+7 1
+7 integer 1 1
+TRUE 0 % Österreich
+0 1 AT
+7 % Deutschland
+19 %
+-1
+0
+GUI_LISTBOX_SET_DATA: das Widget ist keine Liste und keine Klappliste

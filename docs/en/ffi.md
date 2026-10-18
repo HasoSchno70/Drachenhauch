@@ -128,7 +128,16 @@ A name with an extension or a path is taken literally (`"libsqlite3.so.0"`,
   variable.
 * **Dependencies on Windows:** with a path (`LIB "C:/Programme/X/x.dll"`)
   Windows looks for the libraries that this DLL itself needs in its folder
-  first -- that folder does not have to be in the PATH.
+  first -- that folder does not have to be in the PATH. In addition
+  Drachenhauch appends the folder to the PATH of this program: if the library
+  later loads modules itself (GdkPixbuf its image loaders, GStreamer and Qt
+  their plugins), those find their dependencies too. Without this, GTK from
+  Inkscape aborted at the first icon because the SVG module did not find
+  librsvg.
+* **Same function, different name per system:** some libraries export only a
+  suffixed version on Windows (`gdk_pixbuf_save` is `gdk_pixbuf_save_utf8`
+  there -- in C it is a macro). Usually there is a sibling with the same name
+  everywhere (`gdk_pixbuf_savev`); otherwise two `DECLARE` lines with `ALIAS`.
 * If a file exists under the name but cannot be loaded, the message
   says so together with the system's reason: usually the file itself is missing a
   library, or it was built for 32 bits.
@@ -369,8 +378,10 @@ r = CreatePolygonRgn(dreieck, LEN(dreieck), 1)
   `FOR EACH w IN st.werte`). Writing a field of the copy (`p.x = 1`) is
   therefore a message; you write into the array with an index. `FOR EACH`
   works over one dimension only, as for every array.
-* An index directly on the result of a call (`reihe(5)[0].x`) is a
-  message -- assign it to a variable first.
+* **Directly on the result of a call** both work: `reihe(5)[0].x`,
+  `ort(7).y`, `LEN(reihe(4))`, `FOR EACH p IN reihe(3)`. The call runs
+  exactly once. Like an array, a struct comes back as a reference --
+  `f()[1].x = 3` writes into the buffer `f` returned.
 
 **In a class** a struct is an ordinary field; every object gets its own
 buffer at `NEW`:
@@ -733,11 +744,22 @@ qsort(b, 3, 4, FUNCTION(a, b) SGN(zahlBei(b) - zahlBei(a)))   ' 42 13 -7
   passes a null pointer. If the number of its parameters does not match, that is
   an error before the library is even called.
 * **An error in the callback** arrives at the library call as soon as the library
-  returns -- as an ordinary runtime error, catchable with `CATCH`.
-  It cannot abort through the library; from the error onwards
-  every further callback of this call returns 0, and the library
-  finishes its work with these answers. The same applies to a value of the
-  wrong type (a BOOLEAN function where `LONG` is required).
+  returns -- as an ordinary runtime error, catchable with `CATCH`, with the
+  line in the callback where it failed (`ERROR_LINE()`). It cannot abort
+  through the library: the failed callback returns 0 and the library carries
+  on. Further callbacks run as usual (up to 2026.31 they silently returned 0
+  -- in a GTK interface no button reacted afterwards, not even the one for
+  closing). The first error is reported, by the call during which the
+  callback ran -- not by a call that a later callback makes itself (up to
+  2026.31 the next call to return picked it up: in a GTK interface every
+  redraw then failed with the same, ever longer message). The same applies
+  to a value of the wrong type (a BOOLEAN function where `LONG` is required).
+* **If the library does not return** -- `gtk_main`, `g_main_loop_run`, a
+  message loop --, the error appears on standard error after one second,
+  with the line and the name of the function that is still running; every
+  further one at once. Before, nothing was shown and the program seemed to
+  hang. Whoever wants to handle an error in a callback themselves wraps its
+  body in `TRY ... CATCH`.
 * **A callback may itself call libraries**, even the same one.
 * **Only on the program's thread.** If a library calls back from its own
   thread (`CreateThread`, `pthread_create`, some drivers), the

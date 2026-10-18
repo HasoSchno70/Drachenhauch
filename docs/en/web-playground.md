@@ -1,5 +1,28 @@
 # Web playground (dhrt → WebAssembly)
 
+> **As of 2026-10-13 (web round, example `examples/webspiel`):**
+> - **A normal font in the browser too.** `LOADFONT("sans", 32)` takes the
+>   built-in DejaVu font as on the desktop; the web build switches on the
+>   feature `schriften` for it (`dhrt.wasm` 13.7 → 18.8 MB, much less when the
+>   server compresses it). Without the feature the message says so, instead of
+>   "file 'sans' not found".
+> - **What a program writes survives a reload.** The working directory is
+>   `/spiel`, an IndexedDB folder (IDBFS, `web_speicher.rs`, `-lidbfs.js`):
+>   filled at start, written back at most once a second from FLIP and at the
+>   end. A program writes `bestenliste.json` as on the desktop. It still reaches
+>   `assets/` relatively -- `/spiel/assets` is a link, and IDBFS stores it as a
+>   link, not the files behind it. The folder belongs to the **page**: all
+>   programs of one address share it. Checked: a counter in a file stood at 2
+>   after "Run" (= reload).
+> - **A short tap arrives.** Press and release between two frames (a tap on a
+>   phone, a quick click) now counts in the browser too (`flanken.rs` was
+>   excluded there); before, only a slow click started the game.
+> - **No more flood of warnings.** The keyboard layout was read via
+>   `GetKeyName` in every FLIP -- raylib does not know it in the browser and
+>   warned 26 times per frame, which slowed the playground down. There the
+>   position applies now; window handle and hidden window are no longer
+>   requested in the browser.
+
 
 > **As of 2026-08-03: the web build runs.** Console AND graphics programs are
 > compiled and executed in the browser (verified: circles, shapes and text on
@@ -42,6 +65,10 @@
 
 All measured, not guessed:
 
+- **No on-screen keyboard on a phone.** The canvas is not an input field; a
+  phone shows no keyboard for a gui text field inside it. Typing needs a real
+  keyboard (key events arrive, checked with `KeyboardEvent`s); tapping and
+  dragging work everywhere.
 - **The canvas turns black after the program ends.** WebGL discards the
   drawing buffer after presenting it (`preserveDrawingBuffer` is not set). For
   the same reason, `SAVESCREENSHOT` returns an empty image in the browser.

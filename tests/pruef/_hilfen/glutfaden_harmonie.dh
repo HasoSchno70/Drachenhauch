@@ -1,0 +1,42 @@
+' Farb-Harmonien als Text -- dieselben Zeilen, die ref_harmonie.py aus
+' PySticky aufzeichnet (rgb_to_hsl, hsl_to_rgb, find_closest_thread je
+' Harmonie-Art fuer drei Paletten).
+FUNCTION ghHex$(f AS INTEGER) AS STRING
+    RETURN RIGHT$("000000" + HEX$(f BAND &HFFFFFF), 6)
+END FUNCTION
+
+FUNCTION harmonieText$(quellen AS ARRAY OF INTEGER, paletten AS ARRAY OF kern.Palette) AS STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM q AS INTEGER
+    FOR EACH q IN quellen
+        DIM h AS FLOAT, s AS FLOAT, l AS FLOAT
+        (h, s, l) = kern.farbeHsl(q)
+        ARRAY_PUSH(aus, "hsl " + ghHex$(q) + " " + FORMAT$(h, "%.9f") + " " + FORMAT$(s, "%.9f") + " " + FORMAT$(l, "%.9f"))
+    NEXT
+    DIM name AS STRING
+    FOR EACH name IN ["DMC", "Anchor", "Mill Hill Beads"]
+        DIM p AS kern.Palette : p = kern.paletteNamens(paletten, name)
+        FOR EACH q IN quellen
+            DIM art AS STRING
+            FOR EACH art IN kern.harmonieArten()
+                DIM teile AS ARRAY OF STRING : teile = []
+                DIM v AS kern.Harmonievorschlag
+                FOR EACH v IN kern.harmonieVorschlaege(q, art, p)
+                    ARRAY_PUSH(teile, v.name + " " + ghHex$(v.ziel) + " " + p.garne[v.garn].nummer + " " + FORMAT$(v.abstand, "%.6f"))
+                NEXT
+                ARRAY_PUSH(aus, name + " " + ghHex$(q) + " " + art + ": " + JOIN$(teile, " | "))
+            NEXT
+        NEXT
+    NEXT
+    RETURN JOIN$(aus, CHR$(10))
+END FUNCTION
+
+' Die Ausgangsfarben aus den hsl-Zeilen der Aufzeichnung
+FUNCTION harmonieQuellen(ref AS STRING) AS ARRAY OF INTEGER
+    DIM q AS ARRAY OF INTEGER : q = []
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(ref, CHR$(10))
+        IF LEFT$(z, 4) = "hsl " THEN ARRAY_PUSH(q, kern.farbeAusHex("#" + MID$(z, 4, 6)))
+    NEXT
+    RETURN q
+END FUNCTION

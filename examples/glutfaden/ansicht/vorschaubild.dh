@@ -1,0 +1,489 @@
+' Die Muster-Vorschau zeichnen (PySticky ui/rendering/preview_render_engine.py
+' und ui/diamond_drill_render.py) -- mit Cairo, fuer den Dialog UND die
+' Bild-Ausgabe; ohne Fenster nutzbar, darum eine eigene Datei.
+'
+' Drei Arten: Stoff (Aida-Loecher, Kreuzstiche aus drei Faeden mit Schatten
+' und Glanz, Knoten, Perlen, Drills), Pixel (Farbflaechen, ab 8 Punkten je
+' Zelle mit Rand) und Symbol (Raster, schwarze Symbole). Dazu Rueckstiche
+' und erledigte Stiche. Die Farbtoene kommen aus Qts darker/lighter
+' (kern/qtfarbe.dh), damit sie dieselben sind wie bei PySticky.
+'
+' Wie im Original: nach einem Drill in einem gewoehnlichen Muster bleibt die
+' Kantenglaettung aus, bis ein Teilstich, Knoten oder eine Perle sie wieder
+' anschaltet (die Kreuze dazwischen sind treppig); im Symbol-Raster ist jede
+' zehnte Linie ab dem Rand des gezeichneten Ausschnitts kraeftig.
+
+CONST VB_STOFF = 0
+CONST VB_PIXEL = 1
+CONST VB_SYMBOL = 2
+
+' Linienart der Rueckstiche (wie Qt: durchgezogen, gestrichelt, gepunktet,
+' Strich-Punkt) und Kappe (rund, eckig, flach)
+CONST VB_LINIE_VOLL = 0
+CONST VB_LINIE_STRICH = 1
+CONST VB_LINIE_PUNKT = 2
+CONST VB_LINIE_STRICHPUNKT = 3
+CONST VB_KAPPE_RUND = 0
+CONST VB_KAPPE_ECKIG = 1
+CONST VB_KAPPE_FLACH = 2
+
+CLASS Vorschaustil
+    DIM art AS INTEGER
+    DIM stoff AS INTEGER             ' Farbe des Stoffs
+    DIM rueckstiche AS BOOLEAN
+    DIM erledigt AS BOOLEAN
+    DIM linie AS INTEGER
+    DIM kappe AS INTEGER
+    DIM breiteVersatz AS INTEGER
+END CLASS
+
+FUNCTION neuerVorschaustil(art AS INTEGER) AS Vorschaustil
+    DIM s AS Vorschaustil : s = NEW Vorschaustil()
+    s.art = art
+    s.stoff = &HFFFFFF
+    s.rueckstiche = TRUE
+    RETURN s
+END FUNCTION
+
+' Die Stofffarben der Vorschau
+FUNCTION vbStoffNamen() AS ARRAY OF STRING
+    RETURN [tr$("Weiß"), tr$("Ecru"), tr$("Beige"), tr$("Hellblau"), tr$("Hellgrün"), tr$("Hellrosa"), tr$("Schwarz"), tr$("Dunkelblau")]
+END FUNCTION
+
+FUNCTION vbStoffFarben() AS ARRAY OF INTEGER
+    RETURN [&HFFFFFF, &HF5F0E1, &HEBE1CD, &HDCEBFA, &HE1F5E1, &HFFEBF0, &H141414, &H1E2D50]
+END FUNCTION
+
+DIM vbAa AS BOOLEAN                    ' Kantenglaettung an (wie Qts Hint)
+
+SUB vbGlatt(cr AS INTEGER, an AS BOOLEAN)
+    vbAa = an
+    cairo_set_antialias(cr, IIF(an, 0, 1))      ' DEFAULT bzw. NONE
+END SUB
+
+SUB vbFarbe(cr AS INTEGER, f AS INTEGER, deck AS FLOAT)
+    cairo_set_source_rgba(cr, ((f SHR 16) BAND 255) / 255.0, ((f SHR 8) BAND 255) / 255.0, (f BAND 255) / 255.0, deck)
+END SUB
+
+' Ein ganzzahliges Rechteck fuellen, genau auf die Punkte (Qts fillRect)
+SUB vbRechteck(cr AS INTEGER, x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER, f AS INTEGER, deck AS FLOAT)
+    DIM vorher AS BOOLEAN : vorher = vbAa
+    cairo_set_antialias(cr, 1)
+    vbFarbe(cr, f, deck)
+    cairo_rectangle(cr, x, y, b, h)
+    cairo_fill(cr)
+    cairo_set_antialias(cr, IIF(vorher, 0, 1))
+END SUB
+
+' Eine Linie wie Qts drawLine mit Stift (Breite, Kappe); ein Strich je Linie
+SUB vbLinie(cr AS INTEGER, x1 AS FLOAT, y1 AS FLOAT, x2 AS FLOAT, y2 AS FLOAT, f AS INTEGER, deck AS FLOAT, breite AS FLOAT, kappe AS INTEGER)
+    vbFarbe(cr, f, deck)
+    cairo_set_line_width(cr, breite)
+    cairo_set_line_cap(cr, IIF(kappe = VB_KAPPE_RUND, 1, IIF(kappe = VB_KAPPE_ECKIG, 2, 0)))
+    cairo_set_line_join(cr, 2)
+    cairo_move_to(cr, x1, y1)
+    cairo_line_to(cr, x2, y2)
+    cairo_stroke(cr)
+END SUB
+
+' Qts drawEllipse(x, y, b, h): die Ellipse im Rechteck, gefuellt
+SUB vbEllipse(cr AS INTEGER, x AS FLOAT, y AS FLOAT, b AS FLOAT, h AS FLOAT, f AS INTEGER, deck AS FLOAT)
+    vbFarbe(cr, f, deck)
+    cairo_save(cr)
+    cairo_translate(cr, x + b / 2, y + h / 2)
+    cairo_scale(cr, b / 2, h / 2)
+    cairo_arc(cr, 0, 0, 1, 0, 2 * PI)
+    cairo_restore(cr)
+    cairo_fill(cr)
+END SUB
+
+' --- Stoff ---------------------------------------------------------------------------------
+
+SUB vbKreuzFein(cr AS INTEGER, x AS INTEGER, y AS INTEGER, z AS INTEGER, c AS INTEGER)
+    DIM rand AS INTEGER : rand = z \ 6
+    DIM faden AS INTEGER : faden = MAX(1, z \ 5)
+    DIM versatz AS INTEGER : versatz = MAX(1, faden \ 3)
+    DIM halb AS INTEGER : halb = MAX(1, faden \ 2)
+    DIM q AS INTEGER : q = kern.qtWert(c)
+    DIM schatten AS INTEGER : schatten = kern.qtFarbe(kern.qtDunkler(q, 140))
+    DIM glanz AS INTEGER : glanz = kern.qtFarbe(kern.qtHeller(q, 120))
+    DIM schattenGlanz AS INTEGER : schattenGlanz = kern.qtFarbe(kern.qtHeller(kern.qtDunkler(q, 140), 120))
+    DIM i AS INTEGER
+    FOR i = -1 TO 1
+        DIM o AS INTEGER : o = i * versatz
+        DIM sf AS INTEGER : sf = IIF(i = -1, glanz, IIF(i = 1, schattenGlanz, c))
+        vbLinie(cr, x + rand + o + 1, y + rand + 1, x + z - rand + o + 1, y + z - rand + 1, schatten, 1, halb, VB_KAPPE_RUND)
+        vbLinie(cr, x + rand + o, y + rand, x + z - rand + o, y + z - rand, sf, 1, halb, VB_KAPPE_RUND)
+    NEXT
+    FOR i = -1 TO 1
+        o = i * versatz
+        sf = IIF(i = -1, glanz, IIF(i = 1, schattenGlanz, c))
+        vbLinie(cr, x + z - rand - o + 1, y + rand + 1, x + rand - o + 1, y + z - rand + 1, schatten, 1, halb, VB_KAPPE_RUND)
+        vbLinie(cr, x + z - rand - o, y + rand, x + rand - o, y + z - rand, sf, 1, halb, VB_KAPPE_RUND)
+    NEXT
+END SUB
+
+SUB vbKreuzEinfach(cr AS INTEGER, x AS INTEGER, y AS INTEGER, z AS INTEGER, c AS INTEGER)
+    DIM faden AS INTEGER : faden = MAX(1, z \ 4)
+    DIM rand AS INTEGER : rand = MAX(1, z \ 6)
+    DIM schatten AS INTEGER : schatten = kern.farbeDunkler(c, 130)
+    vbLinie(cr, x + rand + 1, y + rand + 1, x + z - rand + 1, y + z - rand + 1, schatten, 1, faden, VB_KAPPE_RUND)
+    vbLinie(cr, x + z - rand + 1, y + rand + 1, x + rand + 1, y + z - rand + 1, schatten, 1, faden, VB_KAPPE_RUND)
+    vbLinie(cr, x + rand, y + rand, x + z - rand, y + z - rand, c, 1, faden, VB_KAPPE_RUND)
+    vbLinie(cr, x + z - rand, y + rand, x + rand, y + z - rand, c, 1, faden, VB_KAPPE_RUND)
+END SUB
+
+SUB vbKreuz(cr AS INTEGER, x AS INTEGER, y AS INTEGER, z AS INTEGER, c AS INTEGER)
+    IF z >= 6 THEN vbKreuzFein(cr, x, y, z, c) ELSE vbKreuzEinfach(cr, x, y, z, c)
+END SUB
+
+SUB vbKnotenStoff(cr AS INTEGER, x AS INTEGER, y AS INTEGER, z AS INTEGER, c AS INTEGER)
+    DIM r AS INTEGER : r = MAX(1, INT(z * 0.18))
+    DIM cx AS INTEGER : cx = x + z \ 2
+    DIM cy AS INTEGER : cy = y + z \ 2
+    vbGlatt(cr, TRUE)
+    IF z >= 8 THEN vbEllipse(cr, cx - r + 1, cy - r + 1, 2 * r, 2 * r, kern.farbeDunkler(c, 150), 1)
+    vbEllipse(cr, cx - r, cy - r, 2 * r, 2 * r, c, 1)
+END SUB
+
+SUB vbPerleStoff(cr AS INTEGER, x AS INTEGER, y AS INTEGER, z AS INTEGER, c AS INTEGER)
+    DIM r AS INTEGER : r = MAX(2, INT(z * 0.38))
+    DIM cx AS INTEGER : cx = x + z \ 2
+    DIM cy AS INTEGER : cy = y + z \ 2
+    vbGlatt(cr, TRUE)
+    IF z >= 8 THEN vbEllipse(cr, cx - r + 1, cy - r + 2, 2 * r, 2 * r, kern.farbeDunkler(c, 150), 1)
+    vbEllipse(cr, cx - r, cy - r, 2 * r, 2 * r, c, 1)
+    IF z >= 6 THEN
+        DIM hr AS INTEGER : hr = MAX(1, r \ 3)
+        vbEllipse(cr, cx - r \ 2, cy - r \ 2, 2 * hr, 2 * hr, kern.farbeHeller(c, 150), 217 / 255)
+    END IF
+END SUB
+
+' Teilstiche als Faeden (nicht als Dreiecke)
+SUB vbTeilStoff(cr AS INTEGER, x AS INTEGER, y AS INTEGER, z AS INTEGER, c AS INTEGER, t AS INTEGER)
+    ' die Glaettung geht an, bevor der Rueckfall aufs Kreuz entschieden wird
+    vbGlatt(cr, TRUE)
+    IF t < 1 OR t > 7 THEN
+        vbKreuz(cr, x, y, z, c)
+        RETURN
+    END IF
+    DIM rand AS INTEGER : rand = MAX(1, z \ 6)
+    DIM faden AS INTEGER : faden = IIF(z >= 6, MAX(2, z \ 4), MAX(1, z \ 4))
+    DIM schatten AS INTEGER : schatten = kern.farbeDunkler(c, 140)
+    DIM ol_x AS INTEGER : ol_x = x + rand
+    DIM ol_y AS INTEGER : ol_y = y + rand
+    DIM or_x AS INTEGER : or_x = x + z - rand
+    DIM ul_y AS INTEGER : ul_y = y + z - rand
+    DIM mx AS INTEGER : mx = x + z \ 2
+    DIM my AS INTEGER : my = y + z \ 2
+    DIM p AS ARRAY OF INTEGER
+    SELECT CASE t
+        CASE 1 : p = [ol_x, ul_y, or_x, ol_y]
+        CASE 2 : p = [ol_x, ol_y, or_x, ul_y]
+        CASE 3 : p = [mx, my, ol_x, ol_y]
+        CASE 4 : p = [mx, my, or_x, ol_y]
+        CASE 5 : p = [mx, my, ol_x, ul_y]
+        CASE 6 : p = [mx, my, or_x, ul_y]
+        CASE 7 : p = [ol_x, ul_y, or_x, ol_y, mx, my, or_x, ol_y]
+    END SELECT
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(p) - 1 STEP 4
+        IF z >= 8 THEN vbLinie(cr, p[k] + 1, p[k + 1] + 1, p[k + 2] + 1, p[k + 3] + 1, schatten, 1, faden, VB_KAPPE_RUND)
+        vbLinie(cr, p[k], p[k + 1], p[k + 2], p[k + 3], c, 1, faden, VB_KAPPE_RUND)
+    NEXT
+END SUB
+
+' Ein Drill: vier Dreiecke (oben Glanz, unten Schatten), ab 14 Punkten mit Rand
+SUB vbDrill(cr AS INTEGER, x AS INTEGER, y AS INTEGER, z AS INTEGER, c AS INTEGER)
+    DIM einzug AS INTEGER : einzug = IIF(z < 12, 0, INT(z * 0.08))
+    DIM x0 AS INTEGER : x0 = x + einzug
+    DIM y0 AS INTEGER : y0 = y + einzug
+    DIM x1 AS INTEGER : x1 = x + z - einzug
+    DIM y1 AS INTEGER : y1 = y + z - einzug
+    DIM cx AS FLOAT : cx = (x0 + x1) / 2.0
+    DIM cy AS FLOAT : cy = (y0 + y1) / 2.0
+    vbGlatt(cr, TRUE)
+    DIM ecken AS ARRAY OF INTEGER : ecken = [x0, y0, x1, y0, x1, y0, x1, y1, x1, y1, x0, y1, x0, y1, x0, y0]
+    DIM toene AS ARRAY OF INTEGER : toene = [kern.farbeHeller(c, 145), kern.farbeHeller(c, 110), kern.farbeDunkler(c, 130), kern.farbeDunkler(c, 105)]
+    DIM k AS INTEGER
+    FOR k = 0 TO 3
+        vbFarbe(cr, toene[k], 1)
+        cairo_move_to(cr, ecken[4 * k], ecken[4 * k + 1])
+        cairo_line_to(cr, ecken[4 * k + 2], ecken[4 * k + 3])
+        cairo_line_to(cr, cx, cy)
+        cairo_close_path(cr)
+        cairo_fill(cr)
+    NEXT
+    IF z >= 14 THEN
+        cairo_set_source_rgba(cr, 0, 0, 0, 120 / 255)
+        cairo_set_line_width(cr, 1)
+        cairo_set_line_cap(cr, 2)
+        cairo_set_line_join(cr, 2)
+        cairo_rectangle(cr, x0, y0, x1 - x0, y1 - y0)
+        cairo_stroke(cr)
+    END IF
+    vbGlatt(cr, FALSE)
+END SUB
+
+' --- Pixel ---------------------------------------------------------------------------------
+
+SUB vbTeilPixel(cr AS INTEGER, x AS INTEGER, y AS INTEGER, z AS INTEGER, c AS INTEGER, t AS INTEGER)
+    IF t < 1 OR t > 7 THEN
+        vbRechteck(cr, x, y, z, z, c, 1)
+        RETURN
+    END IF
+    DIM h AS FLOAT : h = z / 2.0
+    DIM r AS FLOAT : r = x + z
+    DIM u AS FLOAT : u = y + z
+    DIM p AS ARRAY OF FLOAT
+    SELECT CASE t
+        CASE 1 : p = [x, y, r, y, x, u]
+        CASE 2 : p = [x, y, r, y, r, u]
+        CASE 3 : p = [x, y, x + h, y, x, y + h]
+        CASE 4 : p = [x + h, y, r, y, r, y + h]
+        CASE 5 : p = [x, y + h, x, u, x + h, u]
+        CASE 6 : p = [r, y + h, x + h, u, r, u]
+        CASE 7 : p = [x, y, r, y, r, u, x + h, u, x, y + h]
+    END SELECT
+    vbGlatt(cr, TRUE)
+    vbFarbe(cr, c, 1)
+    cairo_move_to(cr, p[0], p[1])
+    DIM k AS INTEGER
+    FOR k = 2 TO LEN(p) - 1 STEP 2
+        cairo_line_to(cr, p[k], p[k + 1])
+    NEXT
+    cairo_close_path(cr)
+    cairo_fill(cr)
+    vbGlatt(cr, FALSE)
+END SUB
+
+' --- Symbol --------------------------------------------------------------------------------
+
+' Text mittig im Rechteck (Qts AlignCenter), auf das Rechteck beschnitten
+SUB vbSymbolText(cr AS INTEGER, text AS STRING, punkt AS INTEGER, x AS FLOAT, y AS FLOAT, b AS FLOAT, h AS FLOAT)
+    DIM px AS INTEGER : px = INT(punkt * 96 / 72 + 0.5)
+    DIM l AS INTEGER : l = pango_cairo_create_layout(cr)
+    DIM fd AS INTEGER : fd = pango_font_description_from_string("Segoe UI Symbol")
+    pango_font_description_set_absolute_size(fd, px * PANGO_SCALE)
+    pango_layout_set_font_description(l, fd)
+    pango_font_description_free(fd)
+    pango_layout_set_text(l, text, -1)
+    DIM tb AS INTEGER, th AS INTEGER
+    pango_layout_get_pixel_size(l, tb, th)
+    cairo_save(cr)
+    cairo_rectangle(cr, x, y, b, h)
+    cairo_clip(cr)
+    cairo_set_source_rgba(cr, 0, 0, 0, 1)
+    cairo_move_to(cr, x + (b - tb) / 2, y + (h - th) / 2)
+    pango_cairo_show_layout(cr, l)
+    cairo_restore(cr)
+    g_object_unref(l)
+END SUB
+
+SUB vbSymbol(cr AS INTEGER, x AS INTEGER, y AS INTEGER, z AS INTEGER, symbol AS STRING, t AS INTEGER)
+    DIM voll AS INTEGER : voll = MAX(6, INT(z * 0.65))
+    DIM teil AS INTEGER : teil = MAX(5, INT(z * 0.40))
+    DIM hw AS FLOAT : hw = z / 2
+    DIM diag AS INTEGER : diag = MAX(1, z \ 14)
+    SELECT CASE t
+        CASE 0 : vbSymbolText(cr, symbol, voll, x, y, z, z)
+        CASE 1
+            vbLinie(cr, x, y + z, x + z, y, 0, 1, diag, VB_KAPPE_ECKIG)
+            vbSymbolText(cr, symbol, teil, x + hw * 0.55, y + 1, hw * 0.5, hw * 0.7)
+        CASE 2
+            vbLinie(cr, x, y, x + z, y + z, 0, 1, diag, VB_KAPPE_ECKIG)
+            vbSymbolText(cr, symbol, teil, x + 1, y + 1, hw * 0.5, hw * 0.7)
+        CASE 3 : vbSymbolText(cr, symbol, teil, x + 1, y + 1, hw, hw)
+        CASE 4 : vbSymbolText(cr, symbol, teil, x + hw, y + 1, hw - 1, hw)
+        CASE 5 : vbSymbolText(cr, symbol, teil, x + 1, y + hw, hw, hw - 1)
+        CASE 6 : vbSymbolText(cr, symbol, teil, x + hw, y + hw, hw - 1, hw - 1)
+        CASE 7
+            vbLinie(cr, x, y + z, x + z, y, 0, 1, diag, VB_KAPPE_ECKIG)
+            vbSymbolText(cr, symbol, voll, x, y, z, z)
+        CASE 9, 10
+            DIM r AS INTEGER : r = IIF(t = 9, MAX(2, z \ 5), MAX(3, z \ 4))
+            vbEllipse(cr, x + z \ 2 - r, y + z \ 2 - r, 2 * r, 2 * r, 0, 1)
+        CASE ELSE : vbSymbolText(cr, symbol, voll, x, y, z, z)
+    END SELECT
+END SUB
+
+SUB vbSymbolRaster(cr AS INTEGER, spalten AS INTEGER, zeilen AS INTEGER, z AS INTEGER)
+    DIM b AS INTEGER : b = spalten * z
+    DIM h AS INTEGER : h = zeilen * z
+    DIM i AS INTEGER
+    FOR i = 0 TO spalten
+        vbLinie(cr, i * z, 0, i * z, h, IIF(i MOD 10 = 0, &H3C3C3C, &HC8C8C8), 1, IIF(i MOD 10 = 0, 2, 1), VB_KAPPE_ECKIG)
+    NEXT
+    FOR i = 0 TO zeilen
+        vbLinie(cr, 0, i * z, b, i * z, IIF(i MOD 10 = 0, &H3C3C3C, &HC8C8C8), 1, IIF(i MOD 10 = 0, 2, 1), VB_KAPPE_ECKIG)
+    NEXT
+END SUB
+
+' --- Ganzes Bild ---------------------------------------------------------------------------
+
+' Zellen x0..x1-1, y0..y1-1; Zelle (x0, y0) liegt bei (0, 0)
+SUB vbZeichnen(cr AS INTEGER, m AS kern.Muster, s AS Vorschaustil, z AS INTEGER, x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER)
+    DIM spalten AS INTEGER : spalten = x1 - x0
+    DIM zeilen AS INTEGER : zeilen = y1 - y0
+    IF spalten <= 0 OR zeilen <= 0 THEN RETURN
+    DIM dp AS BOOLEAN : dp = m.modus = "diamond"
+    DIM grund AS INTEGER : grund = IIF(s.art = VB_SYMBOL, &HFFFFFF, s.stoff)
+    vbGlatt(cr, FALSE)
+    vbRechteck(cr, 0, 0, spalten * z, zeilen * z, grund, 1)
+    DIM f AS ARRAY OF INTEGER, t AS ARRAY OF INTEGER, er AS ARRAY OF INTEGER
+    m.ebenen.zusammensetzen(f, t, er)
+    DIM nf AS INTEGER : nf = m.farbanzahl()
+    DIM x AS INTEGER, y AS INTEGER
+    SELECT CASE s.art
+        CASE VB_STOFF
+            vbGlatt(cr, TRUE)
+            IF z >= 4 THEN
+                DIM loch AS INTEGER : loch = kern.farbeDunkler(s.stoff, 110)
+                DIM lg AS INTEGER : lg = MAX(1, z \ 4)
+                FOR y = 0 TO zeilen
+                    FOR x = 0 TO spalten
+                        vbEllipse(cr, x * z - lg \ 2, y * z - lg \ 2, lg, lg, loch, 1)
+                    NEXT
+                NEXT
+            END IF
+        CASE VB_SYMBOL
+            vbGlatt(cr, TRUE)
+            vbSymbolRaster(cr, spalten, zeilen, z)
+    END SELECT
+    FOR y = y0 TO y1 - 1
+        FOR x = x0 TO x1 - 1
+            DIM i AS INTEGER : i = y * m.breite + x
+            DIM c AS INTEGER : c = f[i]
+            IF c < 0 OR c >= nf THEN CONTINUE
+            DIM farbe AS INTEGER : farbe = m.farben[c].garn.farbe BAND &HFFFFFF
+            DIM st AS INTEGER : st = t[i]
+            DIM px AS INTEGER : px = (x - x0) * z
+            DIM py AS INTEGER : py = (y - y0) * z
+            SELECT CASE s.art
+                CASE VB_STOFF
+                    IF st = kern.DIAMANT OR (dp AND st = kern.VOLL) THEN
+                        vbDrill(cr, px, py, z, farbe)
+                    ELSEIF st = kern.VOLL THEN
+                        vbKreuz(cr, px, py, z, farbe)
+                    ELSEIF st = kern.KNOTEN THEN
+                        vbKnotenStoff(cr, px, py, z, farbe)
+                    ELSEIF st = kern.PERLE THEN
+                        vbPerleStoff(cr, px, py, z, farbe)
+                    ELSE
+                        vbTeilStoff(cr, px, py, z, farbe, st)
+                    END IF
+                CASE VB_PIXEL
+                    IF st = kern.DIAMANT OR (dp AND st = kern.VOLL) THEN
+                        vbDrill(cr, px, py, z, farbe)
+                    ELSEIF st = kern.VOLL THEN
+                        vbRechteck(cr, px, py, z, z, farbe, 1)
+                    ELSEIF st = kern.KNOTEN THEN
+                        vbRechteck(cr, px, py, z, z, s.stoff, 1)
+                        DIM r AS INTEGER : r = MAX(1, INT(z * 0.18))
+                        vbGlatt(cr, TRUE)
+                        vbEllipse(cr, px + z \ 2 - r, py + z \ 2 - r, 2 * r, 2 * r, farbe, 1)
+                        vbGlatt(cr, FALSE)
+                    ELSE
+                        vbTeilPixel(cr, px, py, z, farbe, st)
+                    END IF
+                CASE ELSE
+                    vbSymbol(cr, px, py, z, m.farben[c].symbol, st)
+            END SELECT
+        NEXT
+    NEXT
+    IF s.art = VB_PIXEL AND z >= 8 THEN
+        DIM rand AS INTEGER : rand = kern.farbeDunkler(s.stoff, 115)
+        FOR x = 0 TO spalten
+            vbRechteck(cr, x * z, 0, 1, zeilen * z + 1, rand, 1)
+        NEXT
+        FOR y = 0 TO zeilen
+            vbRechteck(cr, 0, y * z, spalten * z + 1, 1, rand, 1)
+        NEXT
+    END IF
+    IF s.rueckstiche THEN vbRueckstiche(cr, m, s, z, x0, y0, x1, y1)
+    IF s.erledigt THEN vbErledigt(cr, m, z, x0, y0, x1, y1)
+END SUB
+
+SUB vbRueckstiche(cr AS INTEGER, m AS kern.Muster, s AS Vorschaustil, z AS INTEGER, x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER)
+    vbGlatt(cr, TRUE)
+    DIM halb AS FLOAT : halb = z / 2.0
+    DIM breite AS INTEGER : breite = MAX(1, z \ 5 + s.breiteVersatz)
+    DIM r AS kern.Rueckstich
+    FOR EACH r IN m.rueckstiche
+        IF MAX(r.x1, r.x2) < x0 * 2 OR MIN(r.x1, r.x2) > x1 * 2 OR MAX(r.y1, r.y2) < y0 * 2 OR MIN(r.y1, r.y2) > y1 * 2 THEN CONTINUE
+        DIM farbe AS INTEGER : farbe = 0
+        IF r.farbe >= 0 AND r.farbe < m.farbanzahl() THEN farbe = m.farben[r.farbe].garn.farbe BAND &HFFFFFF
+        ' Pythons int(): Richtung null, auch fuer Negatives
+        DIM ax AS INTEGER : ax = vbGanz((r.x1 - x0 * 2) * halb)
+        DIM ay AS INTEGER : ay = vbGanz((r.y1 - y0 * 2) * halb)
+        DIM bx AS INTEGER : bx = vbGanz((r.x2 - x0 * 2) * halb)
+        DIM by AS INTEGER : by = vbGanz((r.y2 - y0 * 2) * halb)
+        vbStrich(cr, ax + 1, ay + 1, bx + 1, by + 1, 0, 80 / 255, breite + 2, s.linie, s.kappe)
+        vbStrich(cr, ax, ay, bx, by, farbe, 1, breite, IIF(s.art = VB_SYMBOL, VB_LINIE_STRICH, s.linie), s.kappe)
+    NEXT
+END SUB
+
+' Pythons int(): Richtung null
+FUNCTION vbGanz(v AS FLOAT) AS INTEGER
+    IF v < 0 THEN RETURN -INT(-v)
+    RETURN INT(v)
+END FUNCTION
+
+' Eine Linie mit Linienart (Qts Strichmuster in Einheiten der Breite)
+SUB vbStrich(cr AS INTEGER, ax AS FLOAT, ay AS FLOAT, bx AS FLOAT, by AS FLOAT, f AS INTEGER, deck AS FLOAT, breite AS FLOAT, linie AS INTEGER, kappe AS INTEGER)
+    DIM muster AS ARRAY OF FLOAT
+    SELECT CASE linie
+        CASE VB_LINIE_STRICH : muster = [4.0, 2.0]
+        CASE VB_LINIE_PUNKT : muster = [1.0, 2.0]
+        CASE VB_LINIE_STRICHPUNKT : muster = [4.0, 2.0, 1.0, 2.0]
+        CASE ELSE : muster = []
+    END SELECT
+    IF LEN(muster) > 0 THEN
+        DIM b AS BUFFER : b = BUFFER_NEW(8 * LEN(muster))
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(muster) - 1
+            BUFFER_SET_F64(b, 8 * k, muster[k] * breite)
+        NEXT
+        cairo_set_dash(cr, BUFFER_ZEIGER(b), LEN(muster), 0.0)
+    END IF
+    vbLinie(cr, ax, ay, bx, by, f, deck, breite, kappe)
+    IF LEN(muster) > 0 THEN cairo_set_dash(cr, 0, 0, 0.0)
+END SUB
+
+' Erledigtes: je sichtbarer Ebene ein gruener Schleier, ab 12 Punkten ein Haken
+SUB vbErledigt(cr AS INTEGER, m AS kern.Muster, z AS INTEGER, x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER)
+    DIM e AS kern.Ebene
+    FOR EACH e IN m.ebenen.ebenen
+        IF NOT e.sichtbar THEN CONTINUE
+        DIM x AS INTEGER, y AS INTEGER
+        FOR y = y0 TO y1 - 1
+            FOR x = x0 TO x1 - 1
+                DIM i AS INTEGER : i = y * e.breite + x
+                IF e.erledigt[i] = 0 OR e.raster[i] < 0 THEN CONTINUE
+                DIM px AS INTEGER : px = (x - x0) * z
+                DIM py AS INTEGER : py = (y - y0) * z
+                vbRechteck(cr, px, py, z, z, &H00C850, 50 / 255)
+                IF z >= 12 THEN
+                    DIM cx AS INTEGER : cx = px + z \ 2
+                    DIM cy AS INTEGER : cy = py + z \ 2
+                    DIM h AS INTEGER : h = z \ 4
+                    vbLinie(cr, cx - h, cy, cx - h \ 2, cy + h, &H00B43C, 180 / 255, MAX(1, z \ 8), VB_KAPPE_RUND)
+                    vbLinie(cr, cx - h \ 2, cy + h, cx + h, cy - h, &H00B43C, 180 / 255, MAX(1, z \ 8), VB_KAPPE_RUND)
+                END IF
+            NEXT
+        NEXT
+    NEXT
+END SUB
+
+' Das ganze Muster als PNG; TRUE, wenn geschrieben
+FUNCTION vbPng(m AS kern.Muster, s AS Vorschaustil, z AS INTEGER, pfad AS STRING) AS BOOLEAN
+    DIM b AS INTEGER : b = IIF(m.breite > 0, m.breite * z, 100)
+    DIM h AS INTEGER : h = IIF(m.hoehe > 0, m.hoehe * z, 100)
+    DIM flaeche AS INTEGER : flaeche = cairo_image_surface_create(CAIRO_ARGB32, b, h)
+    DIM cr AS INTEGER : cr = cairo_create(flaeche)
+    vbZeichnen(cr, m, s, z, 0, 0, m.breite, m.hoehe)
+    DIM st AS INTEGER : st = cairo_surface_write_to_png(flaeche, pfad)
+    cairo_destroy(cr)
+    cairo_surface_destroy(flaeche)
+    RETURN st = 0
+END FUNCTION

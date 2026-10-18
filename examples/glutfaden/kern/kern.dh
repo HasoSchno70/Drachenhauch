@@ -1,0 +1,41 @@
+' Der Kern von Glutfaden -- ohne Oberflaeche. Eingebunden als
+'     IMPORT "kern/kern.dh" AS kern
+' Die Teile tragen denselben Namensraum "kern" (mehrere Dateien mit einem
+' Alias bilden EINEN Raum) und sehen einander dadurch ohne Vorsatz.
+IMPORT "json"
+IMPORT "zeit"
+IMPORT "imgfx"
+IMPORT "regex"
+IMPORT "pdf"
+IMPORT "stich.dh" AS kern
+IMPORT "garn.dh" AS kern
+IMPORT "ebene.dh" AS kern
+IMPORT "muster.dh" AS kern
+IMPORT "formen.dh" AS kern
+IMPORT "eingabe.dh" AS kern
+IMPORT "sprache.dh" AS kern
+IMPORT "verlauf.dh" AS kern
+IMPORT "bearbeiten.dh" AS kern
+IMPORT "auswahl.dh" AS kern
+IMPORT "bildimport.dh" AS kern
+IMPORT "export.dh" AS kern
+IMPORT "oxs.dh" AS kern
+IMPORT "pat.dh" AS kern
+IMPORT "xsdhersteller.dh" AS kern
+IMPORT "xsd.dh" AS kern
+IMPORT "diamant.dh" AS kern
+IMPORT "stickpfad.dh" AS kern
+IMPORT "analyse.dh" AS kern
+IMPORT "planung.dh" AS kern
+IMPORT "verwalten.dh" AS kern
+IMPORT "harmonie.dh" AS kern
+IMPORT "bibliothek.dh" AS kern
+IMPORT "qtfarbe.dh" AS kern
+IMPORT "einstellungen.dh" AS kern
+IMPORT "farbverwaltung.dh" AS kern
+IMPORT "flaeche.dh" AS kern
+IMPORT "bildexport.dh" AS kern
+IMPORT "pdfexport.dh" AS kern
+IMPORT "htmlexport.dh" AS kern
+IMPORT "paket.dh" AS kern
+IMPORT "pxs.dh" AS kern

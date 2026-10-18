@@ -1,0 +1,121 @@
+' Der Platzhalter bleibt, bis getippt wird -- auch mit Fokus (2026-10-09,
+' Dogfooding). Vorher verschwand er mit dem Fokus, und ein Feld, das beim
+' Start den Fokus hat, zeigte ihn nie. Gemessen im Bild: im Feld steht etwas
+' anderes als der Grund. Format: docs/werkzeuge.md, dhrt test.
+
+=== textfeld mit fokus zeigt den platzhalter
+IMPORT "gui"
+SCREEN(400, 200, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 20, 20, 300, 30, "Titel der Notiz")
+GUI_FOCUS(tf)
+DIM f AS INTEGER
+FOR f = 1 TO 3
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "fokus "; GUI_FOCUSED() = tf
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT={fall}/bild.png
+--- nachher
+DIM b AS INTEGER
+b = LOADIMAGE("bild.png")
+DIM grund AS INTEGER
+grund = GETPIXEL(b, 300, 35)
+DIM n AS INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 26 TO 44
+    FOR x = 40 TO 200
+        DIM c AS INTEGER
+        c = GETPIXEL(b, x, y)
+        IF ABS((c SHR 16 BAND 255) - (grund SHR 16 BAND 255)) + ABS((c SHR 8 BAND 255) - (grund SHR 8 BAND 255)) + ABS((c BAND 255) - (grund BAND 255)) > 60 THEN n += 1
+    NEXT
+NEXT
+PRINT "platzhalter zu sehen "; n > 30
+--- erwartet
+platzhalter zu sehen TRUE
+
+=== textbereich mit fokus zeigt den platzhalter
+IMPORT "gui"
+SCREEN(400, 200, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 20, 20, 300, 120, "Text der Notiz")
+GUI_FOCUS(ta)
+DIM f AS INTEGER
+FOR f = 1 TO 3
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT={fall}/bild.png
+--- nachher
+DIM b AS INTEGER
+b = LOADIMAGE("bild.png")
+DIM grund AS INTEGER
+grund = GETPIXEL(b, 300, 120)
+DIM n AS INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 24 TO 42
+    FOR x = 30 TO 200
+        DIM c AS INTEGER
+        c = GETPIXEL(b, x, y)
+        IF ABS((c SHR 16 BAND 255) - (grund SHR 16 BAND 255)) + ABS((c SHR 8 BAND 255) - (grund SHR 8 BAND 255)) + ABS((c BAND 255) - (grund BAND 255)) > 60 THEN n += 1
+    NEXT
+NEXT
+PRINT "platzhalter zu sehen "; n > 30
+--- erwartet
+platzhalter zu sehen TRUE
+
+=== getippter text verdraengt den platzhalter
+IMPORT "gui"
+SCREEN(400, 200, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 20, 20, 300, 30, "Titel der Notiz")
+GUI_SET_TEXT(tf, "x")
+GUI_FOCUS(tf)
+DIM f AS INTEGER
+FOR f = 1 TO 3
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT={fall}/bild.png
+--- nachher
+DIM b AS INTEGER
+b = LOADIMAGE("bild.png")
+DIM grund AS INTEGER
+grund = GETPIXEL(b, 300, 35)
+DIM n AS INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+' hinter dem "x" steht nichts mehr
+FOR y = 26 TO 44
+    FOR x = 60 TO 200
+        DIM c AS INTEGER
+        c = GETPIXEL(b, x, y)
+        IF ABS((c SHR 16 BAND 255) - (grund SHR 16 BAND 255)) + ABS((c SHR 8 BAND 255) - (grund SHR 8 BAND 255)) + ABS((c BAND 255) - (grund BAND 255)) > 60 THEN n += 1
+    NEXT
+NEXT
+PRINT "nur der text "; n = 0
+--- erwartet
+nur der text TRUE

@@ -15,7 +15,7 @@ eingebettet (`main.rs` liest `/program.dh` zuerst, dann `/program.dhc`).
 Ablauf (mit vollstaendiger Toolchain):
   1. `<datei.dh>` -> `web/program.dh` (Quelle, kopiert) + `web/program.dhc`
      (Fallback, via Python-Compiler -- nur Build-Zeit, nicht im Browser noetig)
-  2. `cargo build --target wasm32-unknown-emscripten --features graphics --release`
+  2. `cargo build --target wasm32-unknown-emscripten --features "graphics schriften" --release`
      mit emscripten-Linker-Flags (ASYNCIFY fuer den blockierenden VM-Loop,
      GLFW3 fuer raylib, `--embed-file program.dh@/program.dh` + `.dhc`).
   3. `dhrt.js` + `dhrt.wasm` nach `web/` kopieren.
@@ -166,6 +166,9 @@ def emcc_flags(out_dir: str | Path) -> list:
         # dieses Flag uebersetzt und linkt alles, und der Browser bricht erst
         # beim Start ab: "alcOpenDevice: function import requires a callable".
         "-lopenal",
+        # IndexedDB als Dateisystem (web_speicher.rs): was ein Programm im
+        # Browser schreibt, ueberlebt das Neuladen der Seite.
+        "-lidbfs.js",
         # requestFullscreen gehoert dazu: raylibs ToggleFullscreen ruft es auf
         # dem Web-Pfad auf, und ohne den Export bricht das Programm ab
         # (SET_FULLSCREEN(TRUE) ist in Spielen/Demos die Regel).
@@ -213,7 +216,7 @@ def _print_manual(info: dict, out_dir: str | Path = WEB) -> None:
     print("\nQuelle wurde bereits eingebettet. Manueller Build-Befehl:")
     print(f'  set EMCC_CFLAGS={" ".join(emcc_flags(out_dir))}')
     print(f"  cargo build --manifest-path {CRATE / 'Cargo.toml'} \\")
-    print(f"    --target {TARGET} --features graphics --release")
+    print(f"    --target {TARGET} --features \"graphics schriften\" --release")
     print("  -> target/wasm32-unknown-emscripten/release/dhrt.{js,wasm} nach web/ kopieren")
 
 
@@ -312,7 +315,7 @@ def build(dh_path: str | Path, out_dir: str | Path = WEB) -> int:
     env["EMCC_CFLAGS"] = " ".join(emcc_flags(out_dir))
     erzwinge_relink(env["EMCC_CFLAGS"])
     cmd = ["cargo", "build", "--manifest-path", str(CRATE / "Cargo.toml"),
-           "--target", TARGET, "--features", "graphics", "--release"]
+           "--target", TARGET, "--features", "graphics schriften", "--release"]
     print("Build:", " ".join(cmd))
     rc = subprocess.run(cmd, cwd=str(Path(out_dir)), env=env).returncode
     if rc != 0:

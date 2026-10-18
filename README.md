@@ -75,7 +75,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 ## Herunterladen
 
-**[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 53 MB, aktuell Fassung 2026.26.
+**[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 56 MB, aktuell Fassung 2026.32.
 
 Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 225 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
 
@@ -98,8 +98,8 @@ rust\drachenhauch_runtime\target\release\dhrt test tests\pruef         # alle Pr
 
 | Ausgabe | Zum Drucken (A4) | Fürs Lesegerät |
 |---|---|---|
-| **Deutsch** — 537 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
-| **English** — 530 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
+| **Deutsch** — 548 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
+| **English** — 539 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
 
 Beide Sprachen entstehen aus **denselben** Kapitelquellen (`content/NN_*.js`): die Renderer bekommen ein `H`, das jede Zeichenkette vorher durch den Katalog `i18n/en.json` schickt. Ein zweiter Satz englischer Kapiteldateien wäre binnen eines Monats vom deutschen abgedriftet — so kann er es nicht. Fehlt ein Eintrag, bleibt der deutsche Satz stehen und das Buch baut trotzdem; `node fehlend.js en` zählt, wo noch welche fehlen.
 
@@ -276,6 +276,9 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `98_coroutines.dh` | **Coroutines/YIELD**: Generatoren, `FOR EACH`-Drain, send/return-Dialog, `CORO_RESULT`, Methoden-Coroutine |
 | `154_chart.dh` | **Diagramme**: alle sechs Arten, Themen, Maus-Interaktion |
 | `156_gui_alle_widgets.dh` | **alle 22 GUI-Widgets** in einer Vollbild-Anwendung, jedes mit echter Aufgabe |
+| `glutfaden/main.dh` | **Glutfaden** — der Kreuzstich-Editor PySticky in Drachenhauch, mit GTK 3 über fremde Bibliotheken: Teil- und Rückstiche, Ebenen, Bildimport, PDF/HTML/OXS-Export, PCStitch und Pattern Maker, Drucken, helles und dunkles Thema |
+| `texteditor/main.dh` | **Texteditor** — Reiter, Suchen und Ersetzen, Kodierung und Zeilenenden bleiben beim Speichern |
+| `fotos/main.dh` | **Fotobetrachter mit GTK 3** — Übersicht, Einzelansicht, Drehen nach den Kameradaten, Diaschau |
 | `200_gui_akkordeon_assistent.dh` | **Akkordeon, Assistent, Baumtabelle** — eine kleine Projektablage: Einstellungen in aufklappbaren Abschnitten, Ordner und Dateien als Baum mit Spalten, neue Einträge über einen Assistenten mit Pflichtfeldern |
 | `196_rechnung_fenster.dh` | **Ein zweites OS-Fenster** — Kind der Rechnungsverwaltung: eigener `dhrt`, verbunden über `WINDOW_OPEN`/`PARENT_SEND` |
 | `196_rechnungen.dh` | **Rechnungen** — der sechste Pilot: eine Geschäftsanwendung (Kunden, Artikel, Rechnungen mit Positionen, SQLite, PDF, CSV, Rückfrage bei ungesicherten Änderungen) |

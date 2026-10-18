@@ -142,6 +142,12 @@ module.exports = (H) => [
       '\' ... in der 3D-Szene (nach CAMERA3D): ...',
       'MODEL_MATRIX(box, m, RGB(224, 128, 64))',
     ]),
+  H.cmd("MODEL_MATRIX_WIRES", 'MODEL_MATRIX_WIRES(modell, matrix [, farbe])',
+    "Das Drahtgitter zu MODEL_MATRIX mit derselben Matrix – für Umrisse gedrehter Körper, etwa ein angewählter Klotz in einer Physik-Szene. MODEL_WIRES kennt nur Lage und Größe. Liegt das Gitter genau auf den Flächen, wirkt es gestrichelt; dann die Matrix ein halbes Prozent größer machen.",
+    [
+      'MODEL_MATRIX(box, m, RGB(224, 128, 64))',
+      'MODEL_MATRIX_WIRES(box, MAT4_MUL(m, MAT4_SCALE(1.005, 1.005, 1.005)), RGB(32, 40, 48))',
+    ]),
   H.cmd("MODEL_INSTANCED", "MODEL_INSTANCED(modell, mats [, tint [, anzahl]])",
     "Zeichnet EIN Mesh mit hunderten Matrizen aus einem ARRAY OF MAT4 – in einem einzigen Zeichenaufruf. Für Wälder, Asteroidenfelder oder Armeen ist das um Größenordnungen schneller als ein MODEL_MATRIX pro Objekt. tint ist entweder eine Farbe für alle oder ein ARRAY OF INTEGER mit einer Farbe je Matrix; anzahl begrenzt, wie viele Einträge gezeichnet werden.",
     [

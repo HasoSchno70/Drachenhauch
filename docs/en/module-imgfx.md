@@ -10,7 +10,7 @@ IMPORT "imgfx"
 
 | Function | Returns |
 |---|---|
-| `IMAGE_SCALE(img, w, h)` | IMAGE (new, in `w × h`) — **bilinearly smoothed** |
+| `IMAGE_SCALE(img, w, h [, filter$])` | IMAGE (new, in `w × h`) — **bilinearly smoothed**; with `filter$` (`lanczos`, `bicubic`, `box`, `hamming`, `linear`) computed like Pillow's `Image.resize`, number for number |
 | `IMAGE_SCALE_NN(img, w, h)` | IMAGE (new, in `w × h`) — **without interpolation** (nearest neighbour), for pixel art |
 | `IMAGE_ROTATE(img, grad)` | IMAGE (new, bounding box grows if needed) — **resamples**, see below |
 | `IMAGE_ROTATE_CW(img)` | IMAGE (new, rotated 90° clockwise) — **exact**, `w × h` → `h × w` |
@@ -28,6 +28,7 @@ IMPORT "imgfx"
 | `IMAGE_BLUR(img, radius)` | IMAGE (new, Gaussian blur, `radius` in px) |
 | `IMAGE_BRIGHTNESS(img, n)` | IMAGE (new): brightness, `n` = `-255..255` |
 | `IMAGE_CONTRAST(img, n)` | IMAGE (new): contrast, `n` = `-100..100` |
+| `IMAGE_ENHANCE(img, art$, faktor)` | IMAGE (new): `brightness`, `contrast` or `saturation` like Pillow's `ImageEnhance` — `1.0` leaves the image, `0.0` gives black, grey (the mean) or greyscale, above `1.0` amplifies; opacity is kept |
 | `IMAGE_GRAYSCALE(img)` | IMAGE (new, in greyscale) |
 | `IMAGE_INVERT(img)` | IMAGE (new, colours inverted) |
 | `IMAGE_REPLACE_COLOR(img, from, to)` | IMAGE (new): replaces **exactly** the colour `from` with `to` |

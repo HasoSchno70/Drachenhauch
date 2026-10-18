@@ -286,6 +286,8 @@ Laufzeitfehler in spiel.dh:42: Index 10 ausserhalb [0..2] in Dimension 0
 **Compile errors** (before execution) carry the line where they arise as
 well — parser errors as much as compiler errors (e.g. a SUB declared twice).
 `dhrt --check datei.dh` reports them as JSON without starting the program.
+The line is the one in its own file; if the finding is in a file pulled in
+with IMPORT, `file` gives its path.
 
 ### Messages in English (`DHRT_LANG=en`)
 
@@ -1064,16 +1066,22 @@ has been removed.
 ```
 dhrt --export examples/89_heightmap.dh [ausgabe-ordner]
 ```
-Default output: `<quelle>_dist/`. In the **IDE** (`dhrt run ide/ide.dh`):
+Default output: `<quelle>_dist/`. If the target ends in `.exe` (and is not an
+existing folder), it is the exe's **file name**: `dhrt --export
+werkzeug.dh aus/meins.exe` writes `aus/meins.exe` with the assets next to it
+(until 2026.28 a folder `meins.exe` was created). At startup the exe records
+where it was called from, like `dhrt run` -- a tool reads relative paths from
+its arguments with `ARGPATH$` (see [builtins-core.md](builtins-core.md)). In the **IDE** (`dhrt run ide/ide.dh`):
 **Ctrl+F6** bundles the active file into `<name>_dist/` next to the source,
 lean (see below); the export's output scrolls along at the bottom left (see
 [ide.md](ide.md)).
 
 **Lean export** (`--schlank`): the full runtime carries everything (graphics,
 sound, PDF with embedded fonts, database, network, video, hardware) and is
-about 33 MB in size. Next to it, two smaller ones live in `laufzeiten/`:
-`dhrt-konsole` (data, network, mail, machine code; 16 MB) and `dhrt-spiel`
-(graphics, sound, dialogs, physics, machine code; 21 MB). With `--schlank` the
+about 37 MB in size. Next to it, two smaller ones live in `laufzeiten/`:
+`dhrt-konsole` (data, network, mail, machine code; 19 MB) and `dhrt-spiel`
+(graphics, sound, dialogs, physics, the built-in fonts for
+`LOADFONT("sans")`, machine code; 27 MB). With `--schlank` the
 export takes the smallest one that lacks none of the commands the program
 calls -- even in a subroutine that never runs. **The runtimes themselves are
 asked** (`dhrt-konsole --fehlende name …`: every name is called with

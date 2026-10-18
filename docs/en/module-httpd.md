@@ -142,8 +142,9 @@ That way round, the sentence from the old roadmap is right.
 
 `HTTPD_START(0)` lets the operating system choose a free port — handy when
 several programs run at the same time. The chosen port is best reported with
-`EPRINT`: `PRINT` is buffered and only appears at the end of the program,
-`EPRINT` immediately.
+`EPRINT`: it appears at once, even when the output goes to a file. `PRINT`
+appears at once in a terminal too, but redirected to a file it is collected --
+and a waiting server writes nothing more that would push the rest out.
 
 ```basic
 s = HTTPD_START(0)

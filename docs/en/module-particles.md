@@ -151,7 +151,7 @@ PARTICLE_EMIT(regen, 2)
 
 ## Update with dt
 
-`PARTICLE_UPDATE(sys, dt_ms)` must be called every frame — the particles age and move. `dt_ms` is the frame time (difference to the previous `MILLIS()`).
+`PARTICLE_UPDATE(sys, dt_ms)` must be called every frame — the particles age and move. `dt_ms` is the frame time (difference to the previous `MILLIS()`). **Milliseconds, not seconds:** `DELTA()` returns seconds -- use `PARTICLE_UPDATE(sys, INT(DELTA() * 1000))`. A number between 0 and 1 is an error that says exactly that (otherwise the particles would never age). The same holds for `SPRITE_UPDATE` and `ANIM_FSM_UPDATE`.
 
 ```basic
 DIM now_ms AS INTEGER

@@ -188,6 +188,7 @@ enum Cmd {
 enum Cmd3D {
     Cube(f32, f32, f32, f32, f32, f32, Color),       // x,y,z, w,h,d
     CubeWires(f32, f32, f32, f32, f32, f32, Color),
+    CubeMatrixWires(Rc<[f32; 16]>, Color),
     Sphere(f32, f32, f32, f32, Color),               // cx,cy,cz, r
     SphereWires(f32, f32, f32, f32, Color),
     Cylinder(f32, f32, f32, f32, f32, f32, Color),   // x,y,z, r_top,r_bot, h
@@ -204,6 +205,7 @@ enum Cmd3D {
     // idx, mat, tint. Gerendert via rl-Matrix-Stack (rlMultMatrixf) -> kein
     // mutabler Model-Borrow noetig; DrawMesh honoriert rlGetMatrixTransform().
     ModelMatrix(usize, Rc<[f32; 16]>, Color),
+    ModelMatrixWires(usize, Rc<[f32; 16]>, Color),
     // Modul m3d: GPU-Instancing -- dasselbe Modell mit N Welt-Matrizen in EINEM
     // Draw-Call (raylib DrawMeshInstanced). idx, Matrizen (column-major), tint.
     ModelInstanced(usize, Rc<Vec<[f32; 16]>>, Color),
@@ -636,11 +638,15 @@ void main()
     vec3 color = ambientTerm + Lo;
     color = color/(color + vec3(1.0));        // Reinhard-Tonemapping
     color = pow(color, vec3(1.0/2.2));         // Gamma
-    finalColor = vec4(color, 1.0);
-    // Exponentieller Tiefen-Fog (fogDensity 0 => kein Effekt).
+    // Deckkraft aus der Farbe (RGBA) und der Textur -- bis 2026.27 stand hier
+    // 1.0, und ein beleuchtetes Modell blieb trotz RGBA(..., 100) deckend.
+    float alpha = colDiffuse.a*texture(texture0, fragTexCoord).a;
+    finalColor = vec4(color, alpha);
+    // Exponentieller Tiefen-Fog (fogDensity 0 => kein Effekt). Nur die Farbe:
+    // sonst wuerde ein Modell mit der Entfernung durchsichtig.
     float fd = length(viewPos - fragPosition)*fogDensity;
     float fog = clamp(1.0/exp(fd*fd), 0.0, 1.0);
-    finalColor = mix(fogColor, finalColor, fog);
+    finalColor.rgb = mix(fogColor.rgb, finalColor.rgb, fog);
     // Eigenleuchten (durchschlaegt den Fog -> Neon/Glow, mit Bloom-POSTFX).
     finalColor.rgb += emissive.rgb * emissive.a;
 }
@@ -699,7 +705,8 @@ uniform int lightCount;
 void main()
 {
     vec3 albedo = colDiffuse.rgb*texture(texture0, fragTexCoord).rgb*fragColor.rgb;
-    if (lightCount == 0) { finalColor = vec4(albedo, 1.0); return; }
+    float alpha = colDiffuse.a*texture(texture0, fragTexCoord).a*fragColor.a;
+    if (lightCount == 0) { finalColor = vec4(albedo, alpha); return; }
     vec3 N = normalize(fragNormal);
     vec3 V = normalize(viewPos - fragPosition);
     vec3 lit = ambient.rgb*albedo;
@@ -719,7 +726,7 @@ void main()
         float spec = pow(max(dot(N, H), 0.0), 32.0)*0.3;
         lit += (albedo*NdotL + vec3(spec))*lights[i].color.rgb*atten;
     }
-    finalColor = vec4(lit, 1.0);
+    finalColor = vec4(lit, alpha);
 }
 "#;
 
@@ -1593,6 +1600,10 @@ fn schrift_laden(rl: &mut RaylibHandle, thread: &RaylibThread, pfad: &str, groes
 /// Die Bytes einer Schriftdatei, Sammlungen (.ttc) auf ihre erste Schrift
 /// verkleinert, dazu die Endung, unter der raylib sie lesen soll.
 fn schrift_daten(pfad: &str) -> Result<(Vec<u8>, &'static str), String> {
+    if let Some(name) = pfad.strip_prefix(EINGEBAUT_VORSATZ) {
+        return eingebaute_schrift(name).map(|d| (d.to_vec(), ".ttf"))
+            .ok_or_else(|| format!("'{}' ist keine eingebaute Schrift", name));
+    }
     let daten = std::fs::read(pfad).map_err(|e| format!("'{}': {}", pfad, e))?;
     Ok(match ttc_erste_schrift(&daten) {
         Some(erste) => (erste, ".ttf"),
@@ -1601,6 +1612,45 @@ fn schrift_daten(pfad: &str) -> Result<(Vec<u8>, &'static str), String> {
             (daten, art)
         }
     })
+}
+
+/// Das Fenster-Handle des Systems -- im Browser gibt es keins (raylib warnt
+/// dort bei jedem Aufruf; FLIP fragte es in jedem Bild).
+fn fenster_handle(rl: &mut RaylibHandle) -> *mut std::ffi::c_void {
+    #[cfg(target_os = "emscripten")]
+    { let _ = rl; std::ptr::null_mut() }
+    #[cfg(not(target_os = "emscripten"))]
+    unsafe { rl.get_window_handle() }
+}
+
+/// Eine eingebaute Schrift steht in `font_herkunft` als "eingebaut:sans" --
+/// so laufen sie und eine Datei durch dieselben Wege (Laden, Schnitte).
+const EINGEBAUT_VORSATZ: &str = "eingebaut:";
+
+#[cfg(feature = "schriften")]
+fn eingebaute_schrift(name: &str) -> Option<&'static [u8]> { crate::schriften::eingebaute_schrift(name) }
+#[cfg(not(feature = "schriften"))]
+fn eingebaute_schrift(_name: &str) -> Option<&'static [u8]> { None }
+
+/// LOADFONT("sans", 32): ein Name der eingebauten DejaVu-Schriften (sans,
+/// serif, mono, je mit -fett/-kursiv/-fett-kursiv). Eine Datei gleichen
+/// Namens gewinnt. Bis 2026.30 bekam ein Programm eine normale Schrift nur
+/// ueber einen festen Pfad wie C:/Windows/Fonts/segoeui.ttf -- unter macOS
+/// und Linux gab es den nicht.
+fn eingebauter_pfad(pfad: &str, befehl: &str) -> Result<Option<String>, String> {
+    if std::path::Path::new(pfad).exists() { return Ok(None); }
+    if eingebaute_schrift(pfad).is_some() {
+        return Ok(Some(format!("{}{}", EINGEBAUT_VORSATZ, pfad.trim().to_lowercase())));
+    }
+    // Ein Name, der eine eingebaute Schrift meint, in einem Bau ohne sie: das
+    // sagen, statt "Datei 'sans' nicht gefunden" zu melden.
+    let k = pfad.trim().to_lowercase();
+    let familie = k.split('-').next().unwrap_or("");
+    if !k.contains('.') && !k.contains('/') && !k.contains('\\')
+        && ["sans", "serif", "mono", "helvetica", "times", "courier"].contains(&familie) {
+        return Err(format!("{}: '{}' ist eine eingebaute Schrift, aber dieser Bau hat keine (Feature \"schriften\") -- eine .ttf-Datei angeben", befehl, pfad));
+    }
+    Ok(None)
 }
 
 /// Fuehrt `f` aus, waehrend raylib nur Fehler meldet.
@@ -1756,21 +1806,27 @@ impl Graphics {
         // IMMER versteckt anlegen: der Barrierefreiheits-Adapter (a11y.rs)
         // verlangt ein Fenster, das noch nie sichtbar war. Gezeigt wird es
         // gleich darunter -- ausser der Aufrufer wollte es ohnehin versteckt.
+        // Im Browser gibt es kein verstecktes Fenster (raylib warnt nur).
+        #[cfg(not(target_os = "emscripten"))]
         builder.hidden();
         let (mut rl, thread) = Graphics::fenster_bauen(builder)?;
         // Klicks zwischen zwei Bildern mitzaehlen (flanken.rs).
         crate::flanken::einhaengen();
         let _ = crate::flanken::abholen();
         let _ = crate::flanken::tasten_abholen();
-        let a11y = crate::a11y::A11y::neu(unsafe { rl.get_window_handle() });
+        let hwnd = fenster_handle(&mut rl);
+        let a11y = crate::a11y::A11y::neu(hwnd);
         // Eingabemethoden (ime.rs): zweiter Subclass fuer die Umwandlung im Feld.
-        crate::ime::einhaengen(unsafe { rl.get_window_handle() });
-        crate::systemzeiger::einhaengen(unsafe { rl.get_window_handle() });
-        crate::stillfenster::einrichten(unsafe { rl.get_window_handle() });
-        crate::tray::einhaengen(unsafe { rl.get_window_handle() });
+        crate::ime::einhaengen(hwnd);
+        crate::systemzeiger::einhaengen(hwnd);
+        crate::stillfenster::einrichten(hwnd);
+        crate::tray::einhaengen(hwnd);
+        #[cfg(not(target_os = "emscripten"))]
         if !hidden {
             rl.clear_window_state(WindowState::default().set_window_hidden(true));
         }
+        #[cfg(target_os = "emscripten")]
+        let _ = hidden;
         // `dhrt bild` setzt DHRT_ABSEITS: das Fenster wird aus dem Blick
         // geschoben, statt fuer eine Sekunde aufzublitzen. Das BILD stimmt
         // trotzdem -- gesichert wird der Zeichenpuffer, nicht der Bildschirm
@@ -1969,24 +2025,24 @@ impl Graphics {
         Ok(g)
     }
 
-    /// Welcher Font zeichnet diesen Text? Normalerweise der aktive. Steht
-    /// keiner (eingebaute Bitmapschrift) und enthaelt der Text ein Zeichen,
-    /// das sie nicht hat (jenseits von Latin-1), springt der Ausweich-Font
-    /// ein -- als Handle
-    /// `FONT_AUSWEICH`, das nicht in `fonts` steht.
-    /// Braucht dieser Text in der eingebauten Schrift den Ausweich-Font? Nur,
-    /// wenn ein Zeichen darin fehlt: raylibs Bitmapschrift hat 32..255 samt
-    /// Umlauten und ss (rtext.c, LoadFontDefault). Bis 2026-10-01 ging jeder
-    /// Text mit einem Zeichen ueber ASCII GANZ an den Ausweich-Font -- in
-    /// einer Oberflaeche stand "Loeschen" dann in einer anderen Schrift als
-    /// "Buchen" daneben.
-    fn braucht_ausweich(&self, s: &str) -> bool {
-        !self.ausweich.is_empty() && s.chars().any(|c| !self.font_hat(-1, c as u32))
+    /// Welcher Font zeichnet diesen Text? Der aktive, sonst die eingebaute
+    /// Bitmapschrift (-1). Fehlt ihr ein Zeichen, zerlegen Zeichnen und Messen
+    /// den Text in Laeufe (`zeichne_text`, `std_breite`): nur das Zeichen kommt
+    /// aus der Ausweichschrift. Bis 2026-10-01 ging jeder Text mit einem Zeichen
+    /// ueber ASCII GANZ an die Ausweichschrift, bis 2026.27 noch jeder mit
+    /// einem Zeichen jenseits von Latin-1 (`„`, `–`, `€`).
+    fn font_fuer(&self, _s: &str) -> i64 {
+        if self.active_font >= 0 { self.active_font } else { -1 }
     }
 
-    fn font_fuer(&self, s: &str) -> i64 {
+    /// Fuer GEDREHTEN Text (TEXTROT): `DrawTextPro` dreht einen Text als
+    /// Ganzes, Laeufe aus zwei Schriften liessen sich nicht sauber
+    /// zusammensetzen -- hier wechselt darum weiter der ganze Text, aber erst,
+    /// wenn nach dem Ersetzen der Satzzeichen noch ein Zeichen fehlt.
+    fn font_fuer_gedreht(&self, s: &str) -> i64 {
         if self.active_font >= 0 { return self.active_font; }
-        if self.braucht_ausweich(&s) { return FONT_AUSWEICH; }
+        let s = pixel_ersatz(s);
+        if !self.ausweich.is_empty() && s.chars().any(|c| !std_hat(c as u32)) { return FONT_AUSWEICH; }
         -1
     }
 
@@ -2010,6 +2066,7 @@ impl Graphics {
     /// noch eine Ausweich-Schrift eine Glyphe hat -- FLIP laedt nach.
     fn glyphen_pruefen(&self, h: i64, s: &str) {
         if s.is_ascii() { return; }
+        let s = if h < 0 && h != FONT_AUSWEICH { pixel_ersatz(s) } else { std::borrow::Cow::Borrowed(s) };
         let mut fehlend = self.glyphen_fehlend.borrow_mut();
         for ch in s.chars() {
             let c = ch as u32;
@@ -2028,10 +2085,7 @@ impl Graphics {
         if s.is_ascii() || basis.is_none() {
             return match basis {
                 Some(f) => f.measure_text(s, size, self.text_spacing).x,
-                None => {
-                    let c = std::ffi::CString::new(s).unwrap_or_default();
-                    unsafe { raylib::ffi::MeasureText(c.as_ptr(), size as i32) as f32 }
-                }
+                None => std_breite(s, size, &self.ausweich),
             };
         }
         let mut breite = 0.0f32;
@@ -2185,6 +2239,44 @@ impl Graphics {
         Ok(())
     }
     pub fn rendertarget_end(&mut self) { self.active_rt = None; }
+
+    /// RENDERTARGET_IMAGE(rt): der Inhalt eines Render-Targets als IMAGE --
+    /// was seit RENDERTARGET_BEGIN aufgezeichnet ist, wird dafuer SOFORT
+    /// abgespielt, nicht erst beim FLIP.
+    ///
+    /// Bis 2026.30 gab es keinen Weg von Gezeichnetem zu einem Bild: ein
+    /// Diagramm liess sich zeigen, aber nicht in einen PDF-Bericht oder eine
+    /// PNG-Datei bringen, ohne den Bildschirm abzufotografieren
+    /// (Messdaten-Runde, 2026-10-13).
+    pub fn rendertarget_image(&mut self, idx: i64) -> Result<i64, String> {
+        let i = self.check_rt(idx, "RENDERTARGET_IMAGE")?;
+        if self.active_rt == Some(i) {
+            return Err("RENDERTARGET_IMAGE: das Ziel ist noch offen -- erst RENDERTARGET_END".into());
+        }
+        if !self.render_targets[i].cmds.is_empty() {
+            self.ausweich_nachladen();
+            let Graphics { rl, thread, textures, fonts, ausweich, font_glyphs, render_targets, cam3d, .. } = self;
+            let cmds = std::mem::take(&mut render_targets[i].cmds);
+            let synth = [Layer { z: 0, cmds }];
+            let clear = if render_targets[i].behalten { None } else { Some(Color::new(0, 0, 0, 0)) };
+            let empty_set = std::collections::HashSet::new();
+            let empty_map = std::collections::HashMap::new();
+            let empty_emis = std::collections::HashMap::new();
+            let ausweich: &[Ausweich] = ausweich.as_slice();
+            let font_glyphs: &[std::collections::HashSet<u32>] = font_glyphs.as_slice();
+            let mut tx = rl.begin_texture_mode(thread, &mut render_targets[i].rt);
+            // Dieselben Argumente wie beim FLIP: Massstab 1, keine 3D-Szene.
+            render_scene(&mut tx, 1, clear, &synth, &[0], textures, fonts, ausweich, font_glyphs,
+                &[], *cam3d, &[], None,
+                (-1, -1, -1, -1), &empty_set, &empty_map, &empty_emis,
+                (false, 0, 0, 0), &[], None, None, None, None);
+        }
+        let mut img = self.render_targets[i].rt.texture().load_image()
+            .map_err(|e| format!("RENDERTARGET_IMAGE: {}", e))?;
+        // Eine RenderTexture steht in OpenGL auf dem Kopf.
+        img.flip_vertical();
+        self.push_tex_from_image(img)
+    }
 
     /// GUI_WINDOW_ZOOM: ab jetzt in die Zoom-Flaeche zeichnen. FALSE, wenn
     /// es keine gibt (dann zeichnet der Aufrufer unvergroessert).
@@ -2630,6 +2722,19 @@ impl Graphics {
         self.emit3d(Cmd3D::ModelMatrix(i, mat, col(col_)));
         Ok(())
     }
+    /// MODEL_MATRIX_WIRES: das Drahtgitter zu MODEL_MATRIX -- MODEL_WIRES
+    /// kennt nur Lage und Groesse, ein gedrehter Koerper hatte keinen Umriss.
+    /// CUBE_MATRIX_WIRES: die 12 Kanten eines Einheitswuerfels (Mitte im
+    /// Ursprung, Kante 1) durch eine Welt-Matrix -- der Umriss eines gedrehten
+    /// Klotzes. MODEL_MATRIX_WIRES zeichnet jedes Dreieck, also mit Diagonalen.
+    pub fn draw_cube_matrix_wires(&mut self, mat: Rc<[f32; 16]>, col_: i64) {
+        self.emit3d(Cmd3D::CubeMatrixWires(mat, col(col_)));
+    }
+    pub fn draw_model_matrix_wires(&mut self, idx: i64, mat: Rc<[f32; 16]>, col_: i64) -> Result<(), String> {
+        let i = self.check_model(idx, "MODEL_MATRIX_WIRES")?;
+        self.emit3d(Cmd3D::ModelMatrixWires(i, mat, col(col_)));
+        Ok(())
+    }
     /// Laedt den Instancing-Shader (einmal). Das `instanceTransform`-Attribut wird
     /// auf SHADER_LOC_MATRIX_MODEL gelegt (raylib bindet dort die Per-Instance-VBO);
     /// view/ambient/lightCount-Locations werden gecacht.
@@ -2773,7 +2878,11 @@ impl Graphics {
     #[allow(clippy::too_many_arguments)]
     pub fn ray_hit_box(&self, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32,
                        cx: f32, cy: f32, cz: f32, sx: f32, sy: f32, sz: f32) -> f64 {
-        let ray = Ray::new(Vector3::new(ox, oy, oz), Vector3::new(dx, dy, dz));
+        // Normalisiert wie bei Dreieck/Viereck/Kugel: sonst kam die Entfernung
+        // in Vielfachen der Richtungslaenge (bis 2026.27: Richtung 2 -> halbe
+        // Entfernung), und der naechste Treffer ueber verschiedene RAY_HIT_*
+        // liess sich nicht vergleichen.
+        let Some(ray) = Self::unit_ray(ox, oy, oz, dx, dy, dz) else { return -1.0; };
         let bb = BoundingBox::new(
             Vector3::new(cx - sx / 2.0, cy - sy / 2.0, cz - sz / 2.0),
             Vector3::new(cx + sx / 2.0, cy + sy / 2.0, cz + sz / 2.0));
@@ -2888,7 +2997,7 @@ impl Graphics {
     pub fn ray_hit_model(&self, idx: i64, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32,
                          px: f32, py: f32, pz: f32, scale: f32) -> f64 {
         if idx < 0 || idx as usize >= self.models.len() { return -1.0; }
-        let ray = Ray::new(Vector3::new(ox, oy, oz), Vector3::new(dx, dy, dz));
+        let Some(ray) = Self::unit_ray(ox, oy, oz, dx, dy, dz) else { return -1.0; };
         // Gleiche Transform-Reihenfolge wie DrawModel: erst skalieren, dann verschieben.
         let transform = Matrix::scale(scale, scale, scale) * Matrix::translate(px, py, pz);
         let mut best = -1.0f64;
@@ -3936,8 +4045,17 @@ impl Graphics {
             if !pfad.is_empty() {
                 let versuche: Vec<u8> = if s == FETT | KURSIV { vec![FETT | KURSIV, FETT, KURSIV] } else { vec![s] };
                 'suche: for v in versuche {
-                    for kand in crate::schnitt::schnitt_kandidaten(&pfad, v) {
-                        if !std::path::Path::new(&kand).exists() { continue; }
+                    let kandidaten = match pfad.strip_prefix(EINGEBAUT_VORSATZ) {
+                        // Eingebaut: die Familie hat alle vier Schnitte
+                        Some(name) => {
+                            let familie = name.split('-').next().unwrap_or(name);
+                            let endung = match v { FETT => "-fett", KURSIV => "-kursiv", _ => "-fett-kursiv" };
+                            vec![format!("{}{}{}", EINGEBAUT_VORSATZ, familie, endung)]
+                        }
+                        None => crate::schnitt::schnitt_kandidaten(&pfad, v),
+                    };
+                    for kand in kandidaten {
+                        if !kand.starts_with(EINGEBAUT_VORSATZ) && !std::path::Path::new(&kand).exists() { continue; }
                         let rl = &mut self.rl;
                         let thread = &self.thread;
                         if let Ok(f) = schrift_laden(rl, thread, &kand, groesse, &zeichen) {
@@ -3986,7 +4104,6 @@ impl Graphics {
     /// Breite nicht.
     pub fn text_width_stil(&self, s: &str, size: i32, font: i64, stil: u8) -> i32 {
         let size = size.max(1);
-        let font = if font < 0 && self.braucht_ausweich(&s) { FONT_AUSWEICH } else { font };
         let (h, emu) = self.schnitt_da(font, stil);
         let mut b = self.breite_mit(h, s, size as f32);
         if emu & crate::schnitt::FETT != 0 && !s.is_empty() { b += crate::schnitt::fett_versatz(size as f32); }
@@ -3999,7 +4116,7 @@ impl Graphics {
     /// durch die Camera (w2s) wie TEXT.
     pub fn text_rot(&mut self, x: i32, y: i32, s: String, angle_deg: f32, scale: f32, c: i64) {
         let (x, y) = self.w2s(x, y);
-        let font = self.font_fuer(&s);
+        let font = self.font_fuer_gedreht(&s);
         self.emit(Cmd::TextRot(x, y, s, self.text_size, col(c), font,
                                self.text_spacing, angle_deg, scale.max(0.0001)));
     }
@@ -4013,6 +4130,7 @@ impl Graphics {
     pub fn text_rot_styled(&mut self, x: i32, y: i32, s: String, angle_deg: f32,
                            c: i64, font: i64, size: i32) {
         let (x, y) = self.w2s(x, y);
+        let font = if font < 0 { self.font_fuer_gedreht(&s) } else { font };
         self.emit(Cmd::TextRot(x, y, s, size.max(1), col(c), font,
                                self.text_spacing, angle_deg, 1.0));
     }
@@ -4023,9 +4141,6 @@ impl Graphics {
         let (x, y) = self.w2s(x, y);
         // Auch hier ausweichen: ein Widget ohne eigene Schrift (font = -1)
         // zeigt sonst "K?ln" in der Tabelle.
-        let font = if font < 0 && self.braucht_ausweich(&s) {
-            FONT_AUSWEICH
-        } else { font };
         self.glyphen_pruefen(font, &s);
         self.emit(Cmd::Text(x, y, s, size.max(1), col(c), font, self.text_spacing));
     }
@@ -4035,7 +4150,6 @@ impl Graphics {
     pub fn text_styled_stil(&mut self, x: i32, y: i32, s: String, c: i64, font: i64, size: i32, stil: u8) {
         if stil == 0 { return self.text_styled(x, y, s, c, font, size); }
         let (x, y) = self.w2s(x, y);
-        let font = if font < 0 && self.braucht_ausweich(&s) { FONT_AUSWEICH } else { font };
         let sp = self.text_spacing;
         self.text_emit(x, y, s, size.max(1), c, font, sp, stil);
     }
@@ -4047,7 +4161,6 @@ impl Graphics {
     pub fn text_nachgebildet(&mut self, x: i32, y: i32, s: String, c: i64, font: i64, size: i32, stil: u8) {
         if stil == 0 { return self.text_styled(x, y, s, c, font, size); }
         let (x, y) = self.w2s(x, y);
-        let font = if font < 0 && self.braucht_ausweich(&s) { FONT_AUSWEICH } else { font };
         self.glyphen_pruefen(font, &s);
         let sp = self.text_spacing;
         self.emit(Cmd::TextStil(x, y, s, size.max(1), col(c), font, sp, stil));
@@ -4058,12 +4171,13 @@ impl Graphics {
     /// Mit erweitertem Zeichensatz: raylib backt sonst nur die 95 ASCII-
     /// Glyphen, und jedes deutsche Wort mit Umlaut kaeme als "K?ln" heraus.
     pub fn load_font(&mut self, path: &str, size: i32) -> Result<i64, String> {
-        let resolved = crate::builtins::resolve_asset_path(path);
+        let eingebaut = eingebauter_pfad(path, "LOADFONT")?;
+        let resolved = match &eingebaut { Some(e) => e.clone(), None => crate::builtins::resolve_asset_path(path) };
         let path = resolved.as_str();
         let chars = zeichensatz();
         let rl = &mut self.rl;
         let thread = &self.thread;
-        crate::builtins::datei_da(path, "LOADFONT")?;
+        if eingebaut.is_none() { crate::builtins::datei_da(path, "LOADFONT")?; }
         let f = schrift_laden(rl, thread, path, size, &chars)
             .map_err(|e| format!("LOADFONT: Font nicht ladbar: {}", e))?;
         Self::keine_ersatzschrift(&f, path)?;
@@ -4083,11 +4197,12 @@ impl Graphics {
     /// es braucht; ein Programm fuer Japan die Kana und alle Kanji.
     pub fn load_font_mit(&mut self, path: &str, size: i32, zeichen: &str) -> Result<i64, String> {
         let chars = zeichen_aus_namen(zeichen)?;
-        let resolved = crate::builtins::resolve_asset_path(path);
+        let eingebaut = eingebauter_pfad(path, "LOADFONT")?;
+        let resolved = match &eingebaut { Some(e) => e.clone(), None => crate::builtins::resolve_asset_path(path) };
         let path = resolved.as_str();
         let rl = &mut self.rl;
         let thread = &self.thread;
-        crate::builtins::datei_da(path, "LOADFONT")?;
+        if eingebaut.is_none() { crate::builtins::datei_da(path, "LOADFONT")?; }
         let f = schrift_laden(rl, thread, path, size, &chars)
             .map_err(|e| format!("LOADFONT: Font nicht ladbar: {}", e))?;
         Self::keine_ersatzschrift(&f, path)?;
@@ -4211,10 +4326,6 @@ impl Graphics {
 
     pub fn text_width_in(&self, s: &str, size: i32, font: i64) -> i32 {
         let size = size.max(1);
-        // Gegenstueck zu text_styled, das bei Umlauten ebenfalls ausweicht.
-        let font = if font < 0 && self.braucht_ausweich(&s) {
-            FONT_AUSWEICH
-        } else { font };
         self.breite_mit(font, s, size as f32) as i32
     }
 
@@ -4284,9 +4395,10 @@ impl Graphics {
             None => (32u32..127).chain(0xA0..=0xFF).filter_map(char::from_u32)
                 .chain("€–—„“”‘’…•".chars()).collect(),
         };
-        let resolved = crate::builtins::resolve_asset_path(path);
+        let eingebaut = eingebauter_pfad(path, "LOADFONT_SDF")?;
+        let resolved = match &eingebaut { Some(e) => e.clone(), None => crate::builtins::resolve_asset_path(path) };
         let path = resolved.as_str();
-        crate::builtins::datei_da(path, "LOADFONT_SDF")?;
+        if eingebaut.is_none() { crate::builtins::datei_da(path, "LOADFONT_SDF")?; }
         let (daten, _) = schrift_daten(path).map_err(|e| format!("LOADFONT_SDF: Font nicht ladbar: {}", e))?;
         let size = size.clamp(8, 256);
         let cps: Vec<i32> = chars.chars().map(|c| c as i32).collect();
@@ -4502,6 +4614,16 @@ impl Graphics {
         Ok(())
     }
 
+    /// Die Punkte eines Bildes als RGBA (Zeile fuer Zeile) -- fuer PDF_IMAGE.
+    pub fn image_rgba(&self, idx: i64, fn_: &str) -> Result<(Vec<u8>, u32, u32), String> {
+        let mut img = self.src_image(idx, fn_)?;
+        img.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+        let (w, h) = (img.width.max(0) as usize, img.height.max(0) as usize);
+        if w == 0 || h == 0 { return Err(format!("{}: das Bild ist leer", fn_)); }
+        let px = unsafe { std::slice::from_raw_parts(img.data as *const u8, w * h * 4) }.to_vec();
+        Ok((px, w as u32, h as u32))
+    }
+
     fn src_image(&self, idx: i64, fn_: &str) -> Result<Image, String> {
         if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, fn_)); }
         Ok(self.textures[idx as usize].img.clone())
@@ -4512,6 +4634,31 @@ impl Graphics {
         if w <= 0 || h <= 0 { return Err("IMAGE_SCALE: w und h muessen > 0 sein".into()); }
         let mut img = self.src_image(idx, "IMAGE_SCALE")?;
         img.resize(w, h);
+        self.push_tex_from_image(img)
+    }
+    /// IMAGE_SCALE mit Filter (`lanczos`, `bikubisch`, `box`, `hamming`,
+    /// `linear`): gerechnet wie Pillows `Image.resize` (resample.rs), nicht
+    /// mit raylibs stb_image_resize -- ein Muster aus einem Foto haengt an
+    /// diesen Zahlen. Ohne Filter bleibt es bei raylibs Glaetten.
+    pub fn image_scale_filter(&mut self, idx: i64, w: i32, h: i32, filter: crate::resample::Filter) -> Result<i64, String> {
+        if w <= 0 || h <= 0 { return Err("IMAGE_SCALE: w und h muessen > 0 sein".into()); }
+        let (px, b, hh) = self.image_rgba(idx, "IMAGE_SCALE")?;
+        let neu = crate::resample::skalieren(&px, b as usize, hh as usize, w as usize, h as usize, filter);
+        self.bild_aus_rgba(&neu, w, h, "IMAGE_SCALE")
+    }
+    /// IMAGE_ENHANCE: Helligkeit, Kontrast, Saettigung wie Pillows
+    /// `ImageEnhance` (1.0 = unveraendert, 0.0 = schwarz / grau / Graustufen).
+    pub fn image_enhance(&mut self, idx: i64, art: crate::resample::Anpassung, faktor: f64) -> Result<i64, String> {
+        let (px, b, hh) = self.image_rgba(idx, "IMAGE_ENHANCE")?;
+        let neu = crate::resample::anpassen(&px, art, faktor);
+        self.bild_aus_rgba(&neu, b as i32, hh as i32, "IMAGE_ENHANCE")
+    }
+    /// Ein neues IMAGE aus RGBA-Bytes (Zeile fuer Zeile).
+    fn bild_aus_rgba(&mut self, px: &[u8], w: i32, h: i32, fn_: &str) -> Result<i64, String> {
+        let img = Image::gen_image_color(w, h, Color::new(0, 0, 0, 0));
+        let n = (w.max(0) as usize) * (h.max(0) as usize) * 4;
+        if px.len() != n { return Err(format!("{}: {} Bytes statt {}", fn_, px.len(), n)); }
+        unsafe { std::slice::from_raw_parts_mut(img.data as *mut u8, n) }.copy_from_slice(px);
         self.push_tex_from_image(img)
     }
     /// IMAGE_SCALE_NN: Skalieren OHNE Interpolation (Nearest-Neighbour).
@@ -4916,23 +5063,116 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         let f = breite_px as f64 / breite_mm.max(1.0);
         let hoehe_px = ((hoehe_mm * f).round() as i32).max(1);
         let mut img = Image::gen_image_color(breite_px, hoehe_px, Color::WHITE);
-        let farbe = |c: (f64, f64, f64)| Color::new((c.0 * 255.0) as u8, (c.1 * 255.0) as u8, (c.2 * 255.0) as u8, 255);
+        // Durchsicht kennt die Vorschau nicht -- die Farbe wird gegen das
+        // weisse Papier gemischt (dasselbe Bild, solange darunter nichts liegt).
+        let farbe = |c: (f64, f64, f64), d: f64| {
+            let c = crate::pdf::gegen_weiss(c, d);
+            Color::new((c.0 * 255.0).round() as u8, (c.1 * 255.0).round() as u8, (c.2 * 255.0).round() as u8, 255)
+        };
         let px = |mm: f64| (mm * f).round() as i32;
+        let (bw, bh) = (img.width, img.height);
         for op in ops {
             match op {
-                Op::Text { x, y, text, groesse_pt, farbe: c, .. } => {
-                    let groesse = ((groesse_pt * 25.4 / 72.0) * f).round() as i32;
-                    img.draw_text(text, px(*x), px(*y), groesse.max(4), farbe(*c));
-                }
-                Op::Linie { x1, y1, x2, y2, farbe: c, .. } => {
-                    img.draw_line(px(*x1), px(*y1), px(*x2), px(*y2), farbe(*c));
-                }
-                Op::Rechteck { x, y, b, h, fuellen, farbe: c, .. } => {
-                    if *fuellen {
-                        img.draw_rectangle(px(*x), px(*y), px(*b).max(1), px(*h).max(1), farbe(*c));
-                    } else {
-                        img.draw_rectangle_lines(Rectangle::new(px(*x) as f32, px(*y) as f32, px(*b) as f32, px(*h) as f32), 1, farbe(*c));
+                Op::Text { x, y, text, groesse_pt, farbe: c, winkel, deck, .. } => {
+                    let groesse = (((groesse_pt * 25.4 / 72.0) * f).round() as i32).max(4);
+                    if *winkel == 0.0 {
+                        img.draw_text(text, px(*x), px(*y), groesse, farbe(*c, *deck));
+                        continue;
                     }
+                    // gedreht: den Text als Bild setzen und Punkt fuer Punkt
+                    // um (x, y) gedreht hineinmischen (gegen den Uhrzeigersinn;
+                    // y zeigt nach unten)
+                    let mut t = Image::image_text(text, groesse, farbe(*c, *deck));
+                    t.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+                    let (tw, th) = (t.width, t.height);
+                    let quelle = unsafe { std::slice::from_raw_parts(t.data as *const u8, (tw * th * 4).max(0) as usize) };
+                    let ziel = unsafe { std::slice::from_raw_parts_mut(img.data as *mut u8, (bw * bh * 4).max(0) as usize) };
+                    let (sn, cs) = (winkel.to_radians().sin(), winkel.to_radians().cos());
+                    let (ax, ay) = (*x * f, *y * f);
+                    let ecken = [(0.0, 0.0), (tw as f64, 0.0), (0.0, th as f64), (tw as f64, th as f64)];
+                    let lage: Vec<(f64, f64)> = ecken.iter().map(|(u, v)| (ax + u * cs + v * sn, ay - u * sn + v * cs)).collect();
+                    let x0 = lage.iter().map(|q| q.0).fold(f64::INFINITY, f64::min).floor().max(0.0) as i32;
+                    let x1 = lage.iter().map(|q| q.0).fold(f64::NEG_INFINITY, f64::max).ceil().min(bw as f64 - 1.0) as i32;
+                    let y0 = lage.iter().map(|q| q.1).fold(f64::INFINITY, f64::min).floor().max(0.0) as i32;
+                    let y1 = lage.iter().map(|q| q.1).fold(f64::NEG_INFINITY, f64::max).ceil().min(bh as f64 - 1.0) as i32;
+                    for yy in y0..=y1 {
+                        for xx in x0..=x1 {
+                            let (dx, dy) = (xx as f64 + 0.5 - ax, yy as f64 + 0.5 - ay);
+                            let u = (dx * cs - dy * sn).floor() as i32;
+                            let v = (dx * sn + dy * cs).floor() as i32;
+                            if u < 0 || v < 0 || u >= tw || v >= th { continue; }
+                            let q = ((v * tw + u) * 4) as usize;
+                            let al = quelle[q + 3] as u32;
+                            if al == 0 { continue; }
+                            let z = ((yy * bw + xx) * 4) as usize;
+                            for k in 0..3 {
+                                ziel[z + k] = ((quelle[q + k] as u32 * al + ziel[z + k] as u32 * (255 - al)) / 255) as u8;
+                            }
+                        }
+                    }
+                }
+                Op::Linie { x1, y1, x2, y2, farbe: c, deck, strichel, .. } if strichel.0 > 0.0 => {
+                    vorschau_strichzug(&mut img, &[(*x1 * f, *y1 * f), (*x2 * f, *y2 * f)], (strichel.0 * f, strichel.1 * f), farbe(*c, *deck));
+                }
+                Op::Linie { x1, y1, x2, y2, farbe: c, deck, .. } => {
+                    img.draw_line(px(*x1), px(*y1), px(*x2), px(*y2), farbe(*c, *deck));
+                }
+                // gestrichelte Umrisse: als Zug, die Strichfolge laeuft ueber
+                // die Ecken weiter
+                Op::Rechteck { x, y, b, h, fuellen: false, farbe: c, deck, strichel, .. } if strichel.0 > 0.0 => {
+                    let z = [(*x, *y), (*x + *b, *y), (*x + *b, *y + *h), (*x, *y + *h), (*x, *y)];
+                    let z: Vec<(f64, f64)> = z.iter().map(|q| (q.0 * f, q.1 * f)).collect();
+                    vorschau_strichzug(&mut img, &z, (strichel.0 * f, strichel.1 * f), farbe(*c, *deck));
+                }
+                Op::Kreis { x, y, r, fuellen: false, farbe: c, deck, strichel, .. } if strichel.0 > 0.0 => {
+                    let z: Vec<(f64, f64)> = (0..=72).map(|k| {
+                        let w = k as f64 / 72.0 * std::f64::consts::TAU;
+                        ((*x + *r * w.cos()) * f, (*y + *r * w.sin()) * f)
+                    }).collect();
+                    vorschau_strichzug(&mut img, &z, (strichel.0 * f, strichel.1 * f), farbe(*c, *deck));
+                }
+                Op::Vieleck { punkte, fuellen: false, farbe: c, deck, strichel, .. } if strichel.0 > 0.0 => {
+                    let mut z: Vec<(f64, f64)> = punkte.iter().map(|q| (q.0 * f, q.1 * f)).collect();
+                    z.push(z[0]);
+                    vorschau_strichzug(&mut img, &z, (strichel.0 * f, strichel.1 * f), farbe(*c, *deck));
+                }
+                Op::Rechteck { x, y, b, h, fuellen, farbe: c, deck, .. } => {
+                    if *fuellen {
+                        img.draw_rectangle(px(*x), px(*y), px(*b).max(1), px(*h).max(1), farbe(*c, *deck));
+                    } else {
+                        img.draw_rectangle_lines(Rectangle::new(px(*x) as f32, px(*y) as f32, px(*b) as f32, px(*h) as f32), 1, farbe(*c, *deck));
+                    }
+                }
+                Op::Kreis { x, y, r, fuellen, farbe: c, deck, .. } => {
+                    let k = farbe(*c, *deck);
+                    let ziel = unsafe { std::slice::from_raw_parts_mut(img.data as *mut u8, (bw * bh * 4).max(0) as usize) };
+                    if let Some(mut l) = crate::leinwand::Leinwand::neu(ziel, bw, bh) {
+                        // die Leinwand zaehlt an Punktmitten, das Blatt an Kanten
+                        let (cx, cy, rr) = ((*x * f - 0.5) as f32, (*y * f - 0.5) as f32, (*r * f) as f32);
+                        if *fuellen { l.ellipse(cx, cy, rr, rr, [k.r, k.g, k.b, 255]); }
+                        else { l.ring(cx, cy, rr, 1.0, [k.r, k.g, k.b, 255]); }
+                    }
+                }
+                Op::Vieleck { punkte, fuellen, farbe: c, deck, .. } => {
+                    let k = farbe(*c, *deck);
+                    let ziel = unsafe { std::slice::from_raw_parts_mut(img.data as *mut u8, (bw * bh * 4).max(0) as usize) };
+                    if let Some(mut l) = crate::leinwand::Leinwand::neu(ziel, bw, bh) {
+                        let mut pkt: Vec<(f32, f32)> = punkte.iter().map(|q| ((q.0 * f - 0.5) as f32, (q.1 * f - 0.5) as f32)).collect();
+                        if *fuellen { l.vieleck(&pkt, [k.r, k.g, k.b, 255]); }
+                        else { pkt.push(pkt[0]); l.linie(&pkt, 1.0, [k.r, k.g, k.b, 255]); }
+                    }
+                }
+                Op::Bild { x, y, b, h, rgba, pw, ph, deck } => {
+                    let mut quelle = Image::gen_image_color(*pw as i32, *ph as i32, Color::BLANK);
+                    quelle.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+                    let n = rgba.len();
+                    let ziel = unsafe { std::slice::from_raw_parts_mut(quelle.data as *mut u8, n) };
+                    ziel.copy_from_slice(rgba);
+                    let a = (deck.clamp(0.0, 1.0) * 255.0).round() as u8;
+                    img.draw(&quelle,
+                        Rectangle::new(0.0, 0.0, *pw as f32, *ph as f32),
+                        Rectangle::new(px(*x) as f32, px(*y) as f32, px(*b) as f32, px(*h) as f32),
+                        Color::new(255, 255, 255, a));
                 }
             }
         }
@@ -5348,14 +5588,30 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         match map_key(code) { Some(k) => self.t_neu(k), None => false }
     }
 
+    /// Die Taste, auf der ein Zeichen STEHT -- `KEYHIT("z")`. Ein Tastencode
+    /// meint die Lage (KEY_Z ist auf einer deutschen Tastatur die Taste mit
+    /// dem Y), ein Buchstabe als Text die Beschriftung, wie bei den
+    /// gui-Kuerzeln: Strg+Z soll dort sein, wo Z draufsteht.
+    pub fn taste_fuer_zeichen(&self, c: char) -> Option<i64> {
+        let c = c.to_ascii_lowercase();
+        if c.is_ascii_lowercase() { return Some(self.belegung[(c as u8 - b'a') as usize]); }
+        if c.is_ascii_digit() || c == ' ' { return Some(c as i64); }
+        None
+    }
+
     /// Die Belegung neu lesen: je Buchstabentaste (nach Lage) der Buchstabe,
     /// den sie schreibt. Waehrend eine Aufnahme laeuft, gilt die Lage -- eine
     /// Aufnahme speichert Tasten nach Lage, und die Pruefsammlungen spielen
     /// Strg+Z als die Taste an der US-Lage des Z ein.
     fn belegung_auffrischen(&mut self) {
         if self.auto_playing { self.belegung = std::array::from_fn(|i| 97 + i as i64); return; }
+        // Im Browser kennt raylib GetKeyName nicht und warnt bei JEDEM Aufruf
+        // -- 26 Zeilen je Bild in der Ausgabe, die den Playground ausbremsten
+        // (Web-Runde 2026-10-13). Dort gilt die Lage.
+        #[cfg(target_os = "emscripten")]
+        { self.belegung = std::array::from_fn(|i| 97 + i as i64); return; }
         let namen: [Option<String>; 26] = std::array::from_fn(|i| {
-            map_key(97 + i as i64).and_then(|k| self.rl.get_key_name(k))
+            map_key(97 + i as i64).and_then(|k| self.tastenname_roh(k))
         });
         self.belegung = belegung_aus(&namen);
     }
@@ -5664,10 +5920,57 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// Namen pro Bild ab, und die Antwort aendert sich nicht. Auf Plattformen
     /// ohne `GetKeyName` (Web) warnt raylib bei JEDEM Aufruf -- ungemerkt
     /// flutete das die Ausgabe und verdeckte alles andere.
+    /// Was eine Taste nach der Belegung schreibt (klein), oder None.
+    ///
+    /// **Unter Windows nicht ueber GLFW:** `glfwGetKeyName` liest die Namen
+    /// mit `ToUnicode`, und das veraendert den Tottasten-Zustand -- und der
+    /// gilt nicht je Prozess. Starteten mehrere Programme zugleich, kam der
+    /// Akzent der deutschen ´-Taste (in GLFWs Reihenfolge vor A) bei einem
+    /// ANDEREN an: aus A wurde "Á", aus Q "^" (gemessen: 8 Fenster zugleich,
+    /// 6 von 48 falsch; nacheinander 24 von 24 richtig). Das traf KEY_NAME$
+    /// und die Belegung fuer KEYHIT("z") und die Menue-Kuerzel.
+    /// `MapVirtualKeyW` liest die Belegung ohne Zustand; eine Tottaste
+    /// erkennt es am hoechsten Bit und liefert ihr eigenes Zeichen.
+    #[cfg(windows)]
+    fn tastenname_roh(&self, k: raylib::consts::KeyboardKey) -> Option<String> {
+        // ueber das windows-Crate, nicht #[link(name = "user32")]: das stellte
+        // user32.lib vor raylib, und dessen CloseWindow/ShowCursor heissen
+        // wie user32-Exporte (LNK2005, siehe a11y)
+        use windows::Win32::UI::Input::KeyboardAndMouse::{MapVirtualKeyW, MAPVK_VK_TO_CHAR, MAPVK_VSC_TO_VK_EX};
+        unsafe extern "C" {
+            fn glfwGetKeyScancode(taste: i32) -> i32;
+        }
+        // Ziffernblock wie GLFW: feste Tasten statt des Scancodes -- der
+        // meint ohne NumLock Pos1/Bild/Entf, und KEY_KP5 hiesse dann nichts.
+        const ZIFFERNBLOCK: [u32; 15] = [0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69,
+                                         0x6E, 0x6F, 0x6A, 0x6D, 0x6B]; // 0..9 . / * - +
+        let kc = k as i32;
+        let vk = if (320..=334).contains(&kc) {
+            ZIFFERNBLOCK[(kc - 320) as usize]
+        } else {
+            let scan = unsafe { glfwGetKeyScancode(kc) };
+            if scan <= 0 { return None; }
+            // GLFW zaehlt erweiterte Tasten als 0x100 + Scancode, Windows als 0xE0xx
+            let scan = if scan & 0x100 != 0 { 0xE000 | (scan as u32 & 0xFF) } else { scan as u32 };
+            unsafe { MapVirtualKeyW(scan, MAPVK_VSC_TO_VK_EX) }
+        };
+        if vk == 0 { return None; }
+        let z = unsafe { MapVirtualKeyW(vk, MAPVK_VK_TO_CHAR) } & 0xFFFF;
+        let c = char::from_u32(z)?;
+        if c == '\0' || c.is_control() { return None; }
+        Some(c.to_lowercase().collect())
+    }
+    #[cfg(not(windows))]
+    fn tastenname_roh(&self, k: raylib::consts::KeyboardKey) -> Option<String> {
+        // X11 (XkbKeycodeToKeysym) und macOS (UCKeyTranslate mit eigenem
+        // Tottasten-Zustand) lesen ohne geteilten Zustand.
+        self.rl.get_key_name(k)
+    }
+
     pub fn key_name(&mut self, code: i64) -> String {
         if let Some(n) = self.key_names.get(&code) { return n.clone(); }
         let Some(k) = map_key(code) else { return String::new(); };
-        let name = match self.rl.get_key_name(k) {
+        let name = match self.tastenname_roh(k) {
             Some(n) if !n.trim().is_empty() => n.to_uppercase(),
             _ => key_label(k).to_string(),
         };
@@ -6691,6 +6994,18 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                                 raylib::ffi::Vector3 { x: *sc, y: *sc, z: *sc }, white);
                         }
                     }
+                    // MODEL_MATRIX wirft denselben Schatten wie MODEL -- bis
+                    // 2026.27 fehlte es hier, und alles, was sich dreht
+                    // (Physik, Bones), stand ohne Schatten auf dem Boden.
+                    Cmd3D::ModelMatrix(i, mat, _) => {
+                        if let Some(m) = self.models.get(*i) {
+                            raylib::ffi::rlPushMatrix();
+                            raylib::ffi::rlMultMatrixf(mat.as_ptr());
+                            raylib::ffi::DrawModel(*m.as_ref(),
+                                raylib::ffi::Vector3 { x: 0.0, y: 0.0, z: 0.0 }, 1.0, white);
+                            raylib::ffi::rlPopMatrix();
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -6792,7 +7107,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
 
     pub fn flip(&mut self) {
         self.zeiger_anwenden();
-        crate::stillfenster::zurueckgeben(unsafe { self.rl.get_window_handle() });
+        crate::stillfenster::zurueckgeben(fenster_handle(&mut self.rl));
         self.flips += 1;
         // Glyphen auf Zuruf: was dieses Bild ohne Glyphe aufzeichnete, wird
         // VOR dem Rendern gebacken -- das erste Bild ist dann schon richtig.
@@ -6905,7 +7220,10 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         // DH-Render-Loop den Main-Thread und der Tab haengt. ASYNCIFY wickelt den
         // Stack ab; beim naechsten Frame geht es hier weiter.
         #[cfg(target_os = "emscripten")]
-        unsafe { emscripten_sleep(0); }
+        {
+            unsafe { emscripten_sleep(0); }
+            crate::web_speicher::takt();
+        }
 
         // Aufgezeichnete Eingabe einspeisen. Muss HIER stehen: das Draw-Handle
         // ist gerade gedroppt worden (= EndDrawing), raylib hat die echte
@@ -7023,6 +7341,96 @@ fn m3d_arr_to_ffi(a: &[f32; 16]) -> raylib::ffi::Matrix {
 /// Voraussetzung fuer Rueckkopplungs-/Nachzieheffekte).
 /// Font-Handle eines Zeichen-Befehls aufloesen. `None` = eingebaute Schrift.
 /// FONT_AUSWEICH steht fuer den Umlaut-Ausweichfont, der nicht in `fonts` liegt.
+/// Typografische Zeichen, die die eingebaute Pixelschrift nicht hat, als ihre
+/// einfachen Gegenstuecke -- NUR fuer die Anzeige, der Text bleibt, wie er ist.
+/// Bis 2026.27 setzte ein einziges `„` oder `–` die ganze Zeile in die
+/// Ausweichschrift (gefunden beim Feed-Leser: jede dritte Tabellenzeile sprang
+/// in eine andere Schrift). Entscheidung des Nutzers: ersetzen, und was dann
+/// noch fehlt, Zeichen fuer Zeichen aus der Ausweichschrift.
+fn ersatz_fuer(c: char) -> Option<&'static str> {
+    Some(match c {
+        '\u{201C}' | '\u{201D}' | '\u{201E}' | '\u{201F}' | '\u{2033}' => "\"",
+        '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}' | '\u{2032}' => "'",
+        '\u{2010}' | '\u{2011}' | '\u{2012}' | '\u{2013}' | '\u{2014}' | '\u{2015}' | '\u{2212}' => "-",
+        '\u{2026}' => "...",
+        '\u{2022}' => "\u{B7}",
+        '\u{2009}' | '\u{200A}' | '\u{202F}' => " ",
+        _ => return None,
+    })
+}
+
+fn pixel_ersatz(s: &str) -> std::borrow::Cow<'_, str> {
+    if s.is_ascii() || !s.chars().any(|c| ersatz_fuer(c).is_some()) {
+        return std::borrow::Cow::Borrowed(s);
+    }
+    let mut o = String::with_capacity(s.len());
+    for c in s.chars() {
+        match ersatz_fuer(c) { Some(e) => o.push_str(e), None => o.push(c) }
+    }
+    std::borrow::Cow::Owned(o)
+}
+
+/// Hat raylibs eingebaute Bitmapschrift das Zeichen? (32..126, 160..255)
+fn std_hat(c: u32) -> bool { c < 0x7F || (0xA0..=0xFF).contains(&c) }
+
+/// Die eingebaute Schrift als Font-Objekt, mit Groesse und Abstand wie raylibs
+/// `DrawText`/`MeasureText` (mindestens 10, Abstand Groesse/10 ganzzahlig) --
+/// so laesst sie sich in Laeufe zerlegen wie eine geladene Schrift.
+fn std_schrift(size: f32) -> (raylib::core::text::WeakFont, f32, f32) {
+    let s = (size as i32).max(10);
+    (unsafe { raylib::core::text::WeakFont::from_raw(raylib::ffi::GetFontDefault()) },
+     s as f32, (s / 10) as f32)
+}
+
+/// Wo die Grossbuchstaben der eingebauten Pixelschrift stehen, als Anteil der
+/// Schriftgroesse: von 0,1 bis 0,8 (gemessen an "H" bei 30 Punkten: Zeilen
+/// 13 bis 33 ab y = 10).
+const STD_KAPPE_OBEN: f32 = 0.1;
+const STD_KAPPE_UNTEN: f32 = 0.8;
+
+/// Groesse und senkrechter Versatz fuer einen Lauf der Ausweich-Schrift NEBEN
+/// der eingebauten Pixelschrift. Dieselbe Punktgroesse sieht dort ganz anders
+/// aus: die Pixelschrift fuellt sieben Zehntel ihrer Groesse mit
+/// Grossbuchstaben, eine TrueType-Schrift gut die Haelfte -- ein "€" in einem
+/// Betrag kam nur halb so hoch wie die Ziffern daneben (Vereinsverwaltung,
+/// 2026-10-12). Darum wird die Ausweich-Schrift an ihrem "H" auf dieselbe
+/// Grossbuchstabenhoehe gebracht und auf dieselbe Grundlinie gesetzt.
+/// EINE Rechnung fuer Zeichnen und Messen.
+fn an_pixelschrift(f: &raylib::ffi::Font, size: f32) -> (f32, f32) {
+    if f.baseSize <= 0 || f.glyphs.is_null() || f.recs.is_null() { return (size, 0.0); }
+    let i = unsafe { raylib::ffi::GetGlyphIndex(*f, 'H' as i32) }.max(0) as usize;
+    let (g, rec) = unsafe { (*f.glyphs.add(i), *f.recs.add(i)) };
+    if g.value != 'H' as i32 || rec.height <= 0.0 { return (size, 0.0); }
+    let b = f.baseSize as f32;
+    let kappe = rec.height / b;
+    let unten = (g.offsetY as f32 + rec.height) / b;
+    let sz = size * (STD_KAPPE_UNTEN - STD_KAPPE_OBEN) / kappe;
+    (sz, size * STD_KAPPE_UNTEN - sz * unten)
+}
+
+/// Breite eines Textes in der eingebauten Schrift samt Ausweich-Laeufen --
+/// EINE Rechnung fuer `breite_mit` und `miss_text`.
+fn std_breite(txt: &str, size: f32, ausweich: &[Ausweich]) -> f32 {
+    let txt = pixel_ersatz(txt);
+    if ausweich.is_empty() || txt.chars().all(|c| std_hat(c as u32)) {
+        let c = std::ffi::CString::new(txt.as_ref()).unwrap_or_default();
+        return unsafe { raylib::ffi::MeasureText(c.as_ptr(), size as i32) as f32 };
+    }
+    let (std, sz, sp) = std_schrift(size);
+    let mut b = 0.0f32;
+    let mut erster = true;
+    for (fi, lauf) in text_laeufe(-1, &txt, std_hat, ausweich) {
+        if !erster { b += sp; }
+        erster = false;
+        b += if fi == 0 { std.measure_text(&lauf, sz, sp).x } else {
+            let f = &ausweich[fi - 1].font;
+            let (fsz, _) = an_pixelschrift(f, sz);
+            f.measure_text(&lauf, fsz, sp).x
+        };
+    }
+    b
+}
+
 fn font_zu_handle<'a>(h: i64, fonts: &'a [Font], ausweich: &'a [Ausweich]) -> Option<&'a Font> {
     if h == FONT_AUSWEICH { return ausweich.first().map(|a| &a.font); }
     if h < 0 { return None; }
@@ -7061,7 +7469,30 @@ fn zeichne_text<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32, siz
     let basis = font_zu_handle(h, fonts, ausweich);
     let basis = match basis {
         Some(f) => f,
-        None => { d.draw_text(txt, x as i32, y as i32, size as i32, col); return; }
+        None => {
+            let txt = pixel_ersatz(txt);
+            if ausweich.is_empty() || txt.chars().all(|c| std_hat(c as u32)) {
+                d.draw_text(&txt, x as i32, y as i32, size as i32, col);
+                return;
+            }
+            let (std, sz, sp) = std_schrift(size);
+            let mut cx = x;
+            let mut erster = true;
+            for (fi, lauf) in text_laeufe(-1, &txt, std_hat, ausweich) {
+                if !erster { cx += sp; }
+                erster = false;
+                if fi == 0 {
+                    d.draw_text_ex(&std, &lauf, Vector2::new(cx, y), sz, sp, col);
+                    cx += std.measure_text(&lauf, sz, sp).x;
+                } else {
+                    let f = &ausweich[fi - 1].font;
+                    let (fsz, dy) = an_pixelschrift(f, sz);
+                    sdf::mit(-1, || d.draw_text_ex(f, &lauf, Vector2::new(cx, y + dy), fsz, sp, col));
+                    cx += f.measure_text(&lauf, fsz, sp).x;
+                }
+            }
+            return;
+        }
     };
     if txt.is_ascii() || ausweich.is_empty() {
         sdf::mit(h, || d.draw_text_ex(basis, txt, Vector2::new(x, y), size, spacing, col));
@@ -7197,10 +7628,7 @@ fn miss_text(h: i64, txt: &str, size: f32, spacing: f32, fonts: &[Font],
              font_glyphs: &[std::collections::HashSet<u32>], ausweich: &[Ausweich]) -> f32 {
     let basis = match font_zu_handle(h, fonts, ausweich) {
         Some(f) => f,
-        None => {
-            let c = std::ffi::CString::new(txt).unwrap_or_default();
-            return unsafe { raylib::ffi::MeasureText(c.as_ptr(), size as i32) as f32 };
-        }
+        None => return std_breite(txt, size, ausweich),
     };
     if txt.is_ascii() || ausweich.is_empty() { return basis.measure_text(txt, size, spacing).x; }
     let basis_hat = |c: u32| -> bool {
@@ -7367,6 +7795,14 @@ fn render_scene<D: RaylibDraw>(
                     match c {
                         Cmd3D::Cube(x, y, z, w, h, dd, col) =>
                             d3.draw_cube(Vector3::new(*x, *y, *z), *w, *h, *dd, *col),
+                        Cmd3D::CubeMatrixWires(mat, col) => {
+                            unsafe {
+                                raylib::ffi::rlPushMatrix();
+                                raylib::ffi::rlMultMatrixf(mat.as_ptr());
+                            }
+                            d3.draw_cube_wires(Vector3::new(0.0, 0.0, 0.0), 1.0, 1.0, 1.0, *col);
+                            unsafe { raylib::ffi::rlPopMatrix(); }
+                        }
                         Cmd3D::CubeWires(x, y, z, w, h, dd, col) =>
                             d3.draw_cube_wires(Vector3::new(*x, *y, *z), *w, *h, *dd, *col),
                         Cmd3D::Sphere(x, y, z, r, col) =>
@@ -7414,6 +7850,17 @@ fn render_scene<D: RaylibDraw>(
                                     raylib::ffi::rlMultMatrixf(mat.as_ptr());
                                 }
                                 d3.draw_model(m, Vector3::new(0.0, 0.0, 0.0), 1.0, *col);
+                                unsafe { raylib::ffi::rlPopMatrix(); }
+                            }
+                        }
+                        Cmd3D::ModelMatrixWires(i, mat, col) => {
+                            if let Some(m) = models.get(*i) {
+                                set_material(&mut light_shader, *i);
+                                unsafe {
+                                    raylib::ffi::rlPushMatrix();
+                                    raylib::ffi::rlMultMatrixf(mat.as_ptr());
+                                }
+                                d3.draw_model_wires(m, Vector3::new(0.0, 0.0, 0.0), 1.0, *col);
                                 unsafe { raylib::ffi::rlPopMatrix(); }
                             }
                         }
@@ -7643,7 +8090,7 @@ fn render_scene<D: RaylibDraw>(
                                 // DrawText). Via ffi, weil der generische Draw-Kontext kein
                                 // get_font_default hat.
                                 let fspacing = fsize / 10.0;
-                                let c_txt = std::ffi::CString::new(txt.as_str()).unwrap_or_default();
+                                let c_txt = std::ffi::CString::new(pixel_ersatz(txt).as_ref()).unwrap_or_default();
                                 unsafe {
                                     let df = raylib::ffi::GetFontDefault();
                                     let m = raylib::ffi::MeasureTextEx(df, c_txt.as_ptr(), fsize, fspacing);
@@ -8593,3 +9040,30 @@ pub fn zeiger_form(name: &str) -> Option<&'static str> {
         _ => return None,
     })
 }
+
+/// Ein gestrichelter Zug fuer die PDF-Vorschau: Punkte, Strich und Luecke in
+/// Bildpunkten; die Folge laeuft ueber die Ecken weiter wie im PDF.
+#[cfg(feature = "pdf")]
+fn vorschau_strichzug(img: &mut Image, punkte: &[(f64, f64)], strichel: (f64, f64), farbe: Color) {
+    let (an, aus) = (strichel.0.max(1.0), strichel.1.max(1.0));
+    let mut stand = 0.0_f64;              // Lage in der Folge an + aus
+    for w in punkte.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        let laenge = ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt();
+        if laenge <= 0.0 { continue; }
+        let mut s = 0.0;
+        while s < laenge {
+            let in_folge = stand % (an + aus);
+            let (strich, rest) = if in_folge < an { (true, an - in_folge) } else { (false, an + aus - in_folge) };
+            let e = (s + rest).min(laenge);
+            if strich {
+                let p = |t: f64| (a.0 + (b.0 - a.0) * t / laenge, a.1 + (b.1 - a.1) * t / laenge);
+                let (p1, p2) = (p(s), p(e));
+                img.draw_line(p1.0.round() as i32, p1.1.round() as i32, p2.0.round() as i32, p2.1.round() as i32, farbe);
+            }
+            stand += e - s;
+            s = e;
+        }
+    }
+}
+

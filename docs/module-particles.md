@@ -151,7 +151,7 @@ PARTICLE_EMIT(regen, 2)
 
 ## Update mit dt
 
-`PARTICLE_UPDATE(sys, dt_ms)` muss jeden Frame aufgerufen werden — die Partikel altern und bewegen sich. `dt_ms` ist die Frame-Zeit (Differenz zur vorigen `MILLIS()`).
+`PARTICLE_UPDATE(sys, dt_ms)` muss jeden Frame aufgerufen werden — die Partikel altern und bewegen sich. `dt_ms` ist die Frame-Zeit (Differenz zur vorigen `MILLIS()`). **Millisekunden, nicht Sekunden:** `DELTA()` liefert Sekunden -- dafür `PARTICLE_UPDATE(sys, INT(DELTA() * 1000))`. Eine Zahl zwischen 0 und 1 ist ein Fehler, der genau das sagt (sonst alterten die Partikel nie). Dasselbe gilt für `SPRITE_UPDATE` und `ANIM_FSM_UPDATE`.
 
 ```basic
 DIM now_ms AS INTEGER

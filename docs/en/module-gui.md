@@ -45,7 +45,10 @@ IMPORT "gui"
 | `GUI_BIND(wdg, schluessel$[, formular$])` | — | **data binding**: the widget carries a key (column name) — see [Data binding](#data-binding) |
 | `GUI_FORM_GET(win[, formular$])` / `GUI_FORM_SET(win, map[, formular$])` | MAP OF STRING / — | read all bound values / set them from a MAP |
 | `GUI_FORM_CLEAR` / `GUI_FORM_CLEAN` / `GUI_FORM_CHANGED(win[, formular$])` | — / — / BOOL | clear / mark as saved / changed since the last set? |
-| `GUI_FORM_LOAD(win, db, tabelle$, id[, formular$])` / `GUI_FORM_SAVE(…)` | BOOL / INTEGER | load the row `WHERE id = ?` into the widgets / INSERT (id < 0) or UPDATE, returns the id |
+| `GUI_FORM_LOAD(win, db, tabelle$, id[, formular$])` | BOOL | load the row `WHERE id = ?` into the widgets |
+| `GUI_FORM_SAVE(win, db, tabelle$, id[, formular$[, ueberschreiben]])` | INTEGER | INSERT (id < 0) or UPDATE, returns the id -- **0 if nothing was saved** (row deleted or changed in the meantime) |
+| `GUI_FORM_VERSION(win, spalte$[, formular$])` | — | version column: SAVE only saves while the row still carries the state it was loaded with (empty = off) — see [Data binding](#data-binding) |
+| `GUI_FORM_CONFLICT$(win[, formular$])` | STRING | why the last SAVE saved nothing: `geaendert` (changed), `geloescht` (deleted) or empty |
 | `GUI_TEXTAREA_SET(ta, "umbruch", 1)` | — | text area wraps at word boundaries (notes, letters) |
 | `GUI_SET_MIN_SIZE(wdg, min_w, min_h)` | — | minimum size: a weighted child in a container and an anchored widget do not shrink below it |
 | `GUI_LAYOUT_MIN_W(layout)` / `GUI_LAYOUT_MIN_H(layout)` | INTEGER | what a container needs at least — the value for `WINDOW_MIN_SIZE` |
@@ -93,7 +96,7 @@ IMPORT "gui"
 | `GUI_TOOLBAR_ITEM_W(tb, eintrag)` | INTEGER | width of an entry |
 | `GUI_TOOLBAR_OVERFLOW(tb)` | INTEGER | how many buttons are currently in the » menu (0 = everything fits) |
 | `GUI_STATUSBAR(win, x, y, w, h[, text$])` | GUI_WIDGET | status bar; `text$` is the first field |
-| `GUI_STATUSBAR_ADD(sb, text$, breite[, ausrichtung$])` | INTEGER | append a field: `breite` (width) in points, 0 = shares the rest; `links`/`mitte`/`rechts` (left/centre/right) |
+| `GUI_STATUSBAR_ADD(sb, text$, breite[, ausrichtung$])` | INTEGER | append a field: `breite` (width) in points, 0 = shares the rest; `links`/`mitte`/`rechts` (left/centre/right). A text that does not fit ends in `...` |
 | `GUI_STATUSBAR_SET(sb, feld, text$)` | — | text of a field (`GUI_SET_TEXT` means field 0) |
 | `GUI_STATUSBAR_TEXT$(sb, feld)` | STRING | text of a field |
 | `GUI_STATUSBAR_TIP(sb, feld, tip$)` | — | tooltip of a field |
@@ -121,8 +124,8 @@ IMPORT "gui"
 | `GUI_SPINNER(win, x, y, w, min, max[, default[, step]])` | GUI_WIDGET | number field with +/- (click/mouse wheel/arrow keys; value via `GUI_VALUE`) |
 | `GUI_SPLITTER(win, x, y, length, orient$, min, max)` | GUI_WIDGET | movable divider (`"v"`/`"h"`); position via `GUI_VALUE` |
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | container (decoration) |
-| `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | single-line input field (cursor + selection, Ctrl+Z/Y) |
-| `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort` (password), `nur_lesen` (read-only), `maxlaenge` (max length), `zahlen` (numbers: 0 free, 1 integer, 2 decimal) |
+| `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | single-line input field (cursor + selection, Ctrl+Z/Y); the placeholder stays, dimmed, until something is typed -- also with focus |
+| `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort` (password), `nur_lesen` (read-only), `maxlaenge` (max length), `zahlen` (numbers: 0 free, 1 integer, 2 decimal, 3 amount of money in cents) |
 | `GUI_ENTERED(tf)` | BOOLEAN | was Enter pressed in the text input in this frame? |
 | `GUI_ON_ENTER(tf, handler)` | — | callback for it |
 | `GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | **multi-line** text field (ENTER = new line, scrolls vertically and horizontally, arrows, selection via mouse drag/Shift+arrow, Ctrl+A/C/X/V). Can be coloured as a **code field** — see [Code field](#the-textarea-as-a-code-field) |
@@ -234,7 +237,8 @@ IMPORT "gui"
 | `GUI_DRAW([obenauf])` | — | draw all windows (back→front); `obenauf`=FALSE leaves out the context menu and tooltip |
 | `GUI_DRAW_TOP()` | — | only what lies above all windows: open context menu and tooltip |
 | `GUI_DRAW_WINDOW(win)` | — | draw ONE window again, above everything added since `GUI_DRAW` |
-| `GUI_CLICKED(widget)` | BOOLEAN | clicked in this frame? Applies to button, menu entry, **checkbox, toggle and radio** |
+| `GUI_CLICKED(widget)` | BOOLEAN | clicked in this frame? Applies to button, menu entry, **checkbox, toggle and radio** and to a click on a list entry -- also the one already selected |
+| `GUI_CHANGED(widget)` | BOOLEAN | did the **user** change the widget in the last `GUI_UPDATE` (selection, value, text, tick)? What the program sets itself does not count. The first call starts watching and returns FALSE |
 | `GUI_CHECKED(widget)` | BOOLEAN | checkbox state |
 | `GUI_VALUE(widget)` | FLOAT | slider value |
 | `GUI_TEXT(widget)` | STRING | text (label/button/TextInput) |
@@ -292,7 +296,7 @@ Clicks are evaluated as with buttons via `GUI_CLICKED(item)`. The menu bar pushe
   sits to the left of or above the mouse instead of running off the screen, a
   submenu opens to the left of its parent menu, a bar menu moves to the left.
 
-**Keyboard shortcuts** appear on the right of the entry and are checked every frame — even with the menu closed, and **in all visible windows of the program**: first in the window with focus, then in the others from top to bottom. A program with a toolbar on the left and an inspector on the right has one menu, and `Strg+S` saves even when the last click went into the inspector (until 2026-09-07 a shortcut only applied in the window with focus — three editors had to take the focus back after every button). If the focus window has the same shortcut itself, it wins. A modal window only allows its own shortcuts; a window in design mode (`GUI_WINDOW_DESIGN`) does not count, its menus are just a view. They are written the way you read them: `Strg+S`, `Strg+Umschalt+O`, `Alt+Enter`, `F5`, `Entf`; English names (`Ctrl`, `Shift`, `Delete`, `PageDown`) work too. **`Plus` and `Minus`** (also `Strg++` and `Strg+-`) are not a single key: raylib names keys by their position in the US layout, and the "+" of a German keyboard sits where the US keyboard has "]", its "-" on "/" -- such a shortcut therefore hits the key of both layouts and the numeric keypad (`Strg+Plus`, `Strg+Minus`, `Strg+0` for zoom). **Letters follow the layout**: `Strg+Z` is the key labelled Z — on a German keyboard it sits where the US keyboard has the Y (until 2026-10-01 Ctrl+Y therefore undid and Ctrl+Z redid, in every text field). This applies to menu shortcuts and the keys of the text fields (Ctrl+A/C/V/X/Z/Y/B/I/U); `KEYHIT`/`KEYPRESSED` in programs stay with the position, a game wants WASD where the fingers are. While a recording is playing, the position applies here too. The modifiers must match **exactly**: a plain S is not Ctrl+S. **Without Ctrl or Alt a key belongs to the text field with focus** — a `Entf` shortcut deletes a character there instead of triggering the menu item; without text focus it triggers. **F1 to F12 are exempt**: they never produce text and trigger even from inside the text field (F5 starts in an IDE from the code field). A disabled entry has no shortcut. An unknown key name is an error when creating, not a shortcut that silently never fires. **A shortcut that has fired takes the key away from the text area** — otherwise `Strg+Umschalt+Hoch` would do two things: trigger the entry and push the selection up one line, and a command that reads the selection afterwards would see a different one than the one marked.
+**Keyboard shortcuts** appear on the right of the entry and are checked every frame — even with the menu closed, and **in all visible windows of the program**: first in the window with focus, then in the others from top to bottom. A program with a toolbar on the left and an inspector on the right has one menu, and `Strg+S` saves even when the last click went into the inspector (until 2026-09-07 a shortcut only applied in the window with focus — three editors had to take the focus back after every button). If the focus window has the same shortcut itself, it wins. A modal window only allows its own shortcuts; a window in design mode (`GUI_WINDOW_DESIGN`) does not count, its menus are just a view. They are written the way you read them: `Strg+S`, `Strg+Umschalt+O`, `Alt+Enter`, `F5`, `Entf`; English names (`Ctrl`, `Shift`, `Delete`, `PageDown`) work too. **`Plus` and `Minus`** (also `Strg++` and `Strg+-`) are not a single key: raylib names keys by their position in the US layout, and the "+" of a German keyboard sits where the US keyboard has "]", its "-" on "/" -- such a shortcut therefore hits the key of both layouts and the numeric keypad (`Strg+Plus`, `Strg+Minus`, `Strg+0` for zoom). **Letters follow the layout**: `Strg+Z` is the key labelled Z — on a German keyboard it sits where the US keyboard has the Y (until 2026-10-01 Ctrl+Y therefore undid and Ctrl+Z redid, in every text field). This applies to menu shortcuts and the keys of the text fields (Ctrl+A/C/V/X/Z/Y/B/I/U); `KEYHIT`/`KEYPRESSED` with a key code stay with the position, a game wants WASD where the fingers are; with a letter as text (`KEYHIT("z")`) the layout applies there too. While a recording is playing, the position applies here too. The modifiers must match **exactly**: a plain S is not Ctrl+S. **Without Ctrl or Alt a key belongs to the text field with focus** — a `Entf` shortcut deletes a character there instead of triggering the menu item; without text focus it triggers. **Likewise a key belongs to the control with focus that uses it itself**: the space bar to a button, check box, radio, toggle, list or table; the arrow keys, Home, End and Page Up/Down to a slider, knob, spinner, list, tree or tab control; letters and digits to a list, tree, table or dropdown (typing jumps). A program with `Leertaste` as the shortcut for play/stop therefore does not start while you toggle a check box with the space bar -- until 2026-10-11 it did both. **F1 to F12 are exempt**: they never produce text and trigger even from inside the text field (F5 starts in an IDE from the code field). A disabled entry has no shortcut. An unknown key name is an error when creating, not a shortcut that silently never fires. **A shortcut that has fired takes the key away from the text area** — otherwise `Strg+Umschalt+Hoch` would do two things: trigger the entry and push the selection up one line, and a command that reads the selection afterwards would see a different one than the one marked.
 
 ### Ctrl+wheel belongs to the program
 
@@ -346,11 +350,11 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_LISTBOX_ICON(lb, i, bild)` / `GUI_LISTBOX_COLOR(lb, i, farbe)` | — | icon and text colour per entry (-1 = none / theme) |
 | `GUI_LISTBOX_CHECKED(lb, i)` / `GUI_LISTBOX_SET_CHECKED(lb, i, an)` | BOOLEAN / — | check mark per entry (with `kaestchen`) |
 | `GUI_LISTBOX_IS_SELECTED(lb, i)` / `GUI_LISTBOX_SELECT(lb, i, an)` / `GUI_LISTBOX_SEL_COUNT(lb)` / `GUI_LISTBOX_SEL_ROW(lb, k)` / `GUI_LISTBOX_CLEAR_SELECTION(lb)` | — | multi-selection as in the table |
-| `GUI_LISTBOX_SET_DATA(lb, i, wert$)` | — | invisible value per entry (an ID, a path) |
+| `GUI_LISTBOX_SET_DATA(lb, i, wert$)` | — | invisible value per entry (an ID, a path, a tax rate) -- also for dropdowns; a bound dropdown with values binds the value instead of the number |
 | `GUI_LISTBOX_DATA$(lb, i)` | STRING | read the invisible value of an entry |
 | `GUI_LISTBOX_FIND_DATA(lb, wert$)` | INTEGER | first entry with this value, -1 = none |
 | `GUI_LISTBOX_DETAIL(lb, i, text$)` | — | extra text on the right of the entry, dimmed (shortcut, size, line number) |
-| `GUI_LISTBOX_TIP(lb, i, text$)` | — | tooltip per entry |
+| `GUI_LISTBOX_TIP(lb, i, text$)` | — | tooltip per entry. Without one, an entry that does not fit the row (it ends with "...") shows its whole text when hovered |
 | `GUI_LISTBOX_ENABLE(lb, i, an)` | — | disable an entry: visible, but neither clickable nor reachable with the arrow keys |
 | `GUI_LISTBOX_ENABLED(lb, i)` | BOOLEAN | whether an entry is selectable |
 | `GUI_LISTBOX_HEADER(lb, i, an)` | — | make an entry a group header: structures the list, is not selectable |
@@ -385,6 +389,7 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_APPLY_STYLE(widget, name$)` | — | apply a named style to a widget -- saves repeating it widget by widget |
 | `GUI_GET_Y(wdg)` / `GUI_GET_W(wdg)` / `GUI_GET_H(wdg)` | INTEGER | position and size of the widget in the window (counterpart to `GUI_SET_BOUNDS`) |
 | `GUI_WINDOW_GET_Y(win)` / `GUI_WINDOW_GET_W(win)` / `GUI_WINDOW_GET_H(win)` | INTEGER | position and size of the window on the screen |
+| `GUI_WINDOW_CONTENT_W(win)` / `GUI_WINDOW_CONTENT_H(win)` | INTEGER | width and height of the content area below the title, menu and tab bar -- widget coordinates count from there; a status bar sits at the bottom without guessing the height of the menu bar |
 | `GUI_TABLE_SET(tbl, schluessel$, wert)` | — | set a table setting (`zebra`, `gitter`, `zeilenhoehe`, `filterzeile`, `feste_spalten`, ...) |
 | `GUI_TABLE_GET(tbl, schluessel$)` | FLOAT | read one of these settings back |
 | `GUI_TABLE_CLICKED_COL(tbl)` | INTEGER | which column was clicked? -- for cells of the kind `knopf` (button) |
@@ -681,7 +686,8 @@ user.
 GUI_TEXTINPUT_SET(tf, "passwort", 1)     ' dots instead of characters; GUI_TEXT returns the real text
 GUI_TEXTINPUT_SET(tf, "nur_lesen", 1)    ' display, select, copy -- but not change
 GUI_TEXTINPUT_SET(tf, "maxlaenge", 8)    ' cuts off, also when pasting (0 = unlimited)
-GUI_TEXTINPUT_SET(tf, "zahlen", 2)       ' 1 = integer (with sign), 2 = decimal (point or comma)
+GUI_TEXTINPUT_SET(tf, "zahlen", 2)       ' 1 = integer (with sign), 2 = decimal (point or comma),
+                                         ' 3 = money: "48,00" in the field, 4800 (cents) in the binding
 GUI_SET_ALIGN(tf, "rechts")              ' numbers sit on the right -- as long as the text fits
 ```
 
@@ -2783,17 +2789,49 @@ IF GUI_FORM_CHANGED(win, "kunde") THEN nachfragen()
   id = ?` and returns FALSE if the row does not exist; `GUI_FORM_SAVE`
   writes `INSERT` (for `id < 0`, returns the new id) or `UPDATE`. The
   column is called `id` — SQLite's convention. Values are stored **typed**:
-  a numeric field as a number (unless it starts with a zero like a postcode
-  — that stays text), a checkbox as 0/1, a dropdown as its index, a slider
-  as a floating-point number, everything else as text. Whatever the program
-  converts (amounts in cents, a dropdown into a tax rate) it does not bind
-  and writes itself.
+  a numeric field as a number (unless it starts with a zero before a digit
+  like the postcode `01234` — that stays text; `0,99` is a number), a
+  checkbox as 0/1, a dropdown as its index, a slider as a floating-point
+  number, everything else as text. A **money field** (`zahlen` 3) is typed
+  and shown like a decimal with two places and bound as an INTEGER in
+  cents — `48,50` in the field is `4850` in the column, and loading turns
+  `4850` back into `48,50`. A number that `GUI_FORM_SET` receives is cents
+  there too; a text stands as it comes. A **dropdown with values**
+  (`GUI_LISTBOX_SET_DATA` per entry) binds the value of the selected entry
+  instead of its number — shown `19 %`, stored `19` (as a number if it is
+  one; without a selection NULL), and loading selects the entry with that
+  value. Whatever else the program converts it does not bind and writes
+  itself.
+- **Nothing saved:** `GUI_FORM_SAVE` returns **0** when the `UPDATE` hit no
+  row, and `GUI_FORM_CONFLICT$` says `geloescht` (the row no longer exists)
+  — up to 2026.30 it returned the id as if it had saved, and the input was
+  silently gone.
+- **Editing at the same time:** `GUI_FORM_VERSION(win, "stand", formular$)`
+  names an integer column that every save counts up. `GUI_FORM_LOAD`
+  remembers its state, `GUI_FORM_SAVE` only writes
+  `… WHERE id = ? AND stand = <when loaded>` — if someone else has saved in
+  the meantime, it hits nothing, returns 0 and `GUI_FORM_CONFLICT$` says
+  `geaendert`. The input is still in the form then; the program asks
+  "reload or overwrite?" and overwrites deliberately with the sixth argument
+  `TRUE`. A new record gets `stand = 1`. Without a preceding `GUI_FORM_LOAD`
+  the form does not know which state it is editing — that is an error.
+
+```basic
+GUI_FORM_VERSION(win, "stand", "m")
+DIM id AS INTEGER : id = GUI_FORM_SAVE(win, db, "mitglied", aktId, "m")
+IF id = 0 THEN
+    IF GUI_FORM_CONFLICT$(win, "m") = "geaendert" THEN nachfragen() ELSE status("gelöscht")
+END IF
+```
 - **Changed?** On binding, after `GUI_FORM_SET/LOAD/SAVE/CLEAR` and after
   `GUI_FORM_CLEAN` the state counts as clean; `GUI_FORM_CHANGED` compares
   against it. That makes the prompt "Save | Discard | Cancel" a single
   line.
 - In the `.dhform`: `bind` and `form`; the form designer has the fields
   "Binding" and "Form" for them.
+
+The club manager (`examples/verein/`) shows all of it together against a
+server that several people use at the same time.
 
 Deliberately not included: binding table rows to lists, resolving foreign
 keys, joins. That is the border between a form and an ORM, and beyond it a
@@ -3504,7 +3542,10 @@ font stays pixelated — unlike `LOADFONT` (TTF), which smooths.
 > `LOADFONT(pfad, 18)` builds the character set *for 18 px*; `SETFONT`
 > thereby sets not only the typeface but also the active text size to 18.
 > So don't be surprised if after `SETFONT` everything is larger or smaller
-> than before. The same font sharp in two sizes? Load it twice — otherwise a
+> than before. Should the interface be smaller than the load size, say so
+> right away: `SETFONT(font, 16)` loads nothing anew, it just draws at 16
+> from now on — a font loaded at 32 stays sharp that way.
+> The same font sharp in two sizes? Load it twice — otherwise a
 > TTF becomes soft when scaled up a lot. `GUI_SET_FONT_SIZE` only changes how
 > large it is drawn, not what the character set was built for.
 

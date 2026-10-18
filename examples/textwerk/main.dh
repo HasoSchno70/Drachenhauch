@@ -1,0 +1,484 @@
+' textwerk -- drei kleine Werkzeuge fuer die Kommandozeile.
+'
+'   suche [Schalter] MUSTER [PFAD ...]    Zeilen finden (wie grep)
+'   csv DATEI [Schalter]                  eine CSV-Datei als Tabelle, mit Summen
+'   zaehle [DATEI ...]                    Zeilen, Woerter, Zeichen (wie wc)
+'
+' Ohne Pfad lesen `suche` und `zaehle` die Standardeingabe:
+'   dir | dhrt run main.dh -- suche -i txt
+'
+' Dateinamen gelten vom Ordner des Aufrufs aus (ARGPATH$) -- dhrt und die
+' exportierte .exe wechseln beim Start in den Ordner des Programms.
+' Gelesen wird mit der Kodierung "auto": UTF-8 oder cp1252 (Excel), eine
+' Binaerdatei wird uebersprungen. Farben gibt es nur im Terminal (TERMINAL()),
+' nicht in einer umgeleiteten Ausgabe und nicht mit gesetztem NO_COLOR.
+'
+' Rueckgabe wie bei grep: 0 = gefunden / alles gut, 1 = nichts gefunden,
+' 2 = Fehler (falsch aufgerufen, Datei fehlt, Muster kaputt).
+'
+' Als eigenstaendiges Werkzeug:  dhrt --export main.dh textwerk.exe
+IMPORT "regex"
+
+CONST OK = 0
+CONST NICHTS = 1
+CONST FEHLER = 2
+
+DIM befehl AS STRING
+DIM rest AS ARRAY OF STRING         ' die Argumente hinter dem Befehl, wie geschrieben
+DIM restOrt AS ARRAY OF STRING      ' dieselben als Pfad vom Aufrufort aus (ARGPATH$)
+DIM fehlerZahl AS INTEGER
+DIM farbig AS BOOLEAN
+farbig = TERMINAL() AND GETENV$("NO_COLOR") = ""
+
+FUNCTION farbe$(text AS STRING, code AS STRING) AS STRING
+    IF NOT farbig THEN RETURN text
+    RETURN CHR$(27) + "[" + code + "m" + text + CHR$(27) + "[0m"
+END FUNCTION
+
+' Liest eine Datei; eine Binaerdatei wird uebergangen (TRUE = gelesen).
+FUNCTION istBinaer(meldung AS STRING) AS BOOLEAN
+    RETURN INSTR(meldung, "Binaerdatei") >= 0
+END FUNCTION
+
+SUB melde(text AS STRING)
+    EPRINT("textwerk: " + text)
+    fehlerZahl = fehlerZahl + 1
+END SUB
+
+SUB hilfe()
+    PRINT "textwerk -- drei kleine Werkzeuge fuer die Kommandozeile"
+    PRINT ""
+    PRINT "  suche [-i] [-w] [-v] [-n] [-c] [-l] [-r] [--glob MUSTER] [--kodierung K] MUSTER [PFAD ...]"
+    PRINT "      Kodierung: auto (Vorgabe), utf8, cp1252, latin1"
+    PRINT "      -i  Gross/klein egal       -w  nur ganze Woerter    -v  Zeilen OHNE Treffer"
+    PRINT "      -n  Zeilennummern          -c  nur zaehlen          -l  nur Dateinamen"
+    PRINT "      -r  Ordner durchsuchen     --glob *.dh  nur passende Dateien"
+    PRINT "  csv DATEI [--trenner ;] [--summe SPALTE] [--gruppe SPALTE] [--sortiere SPALTE] [--absteigend]"
+    PRINT "  zaehle [DATEI ...]"
+    PRINT ""
+    PRINT "Ohne PFAD lesen suche und zaehle die Standardeingabe."
+END SUB
+
+' --- Zeilen lesen: Datei oder Standardeingabe ----------------------------------
+FUNCTION zeilenVon(pfad AS STRING, kodierung AS STRING) AS ARRAY OF STRING
+    IF pfad = "-" THEN
+        DIM z AS ARRAY OF STRING
+        DIM f AS FILE
+        f = STDIN(kodierung)
+        WHILE NOT ENDOFFILE(f)
+            ARRAY_PUSH(z, READLINE(f))
+        WEND
+        RETURN z
+    END IF
+    RETURN READLINES(pfad, kodierung)
+END FUNCTION
+
+' --- suche --------------------------------------------------------------------
+FUNCTION suche() AS INTEGER
+    DIM gross AS BOOLEAN, wort AS BOOLEAN, umkehren AS BOOLEAN
+    DIM nummern AS BOOLEAN, zaehlen AS BOOLEAN, nurNamen AS BOOLEAN, rekursiv AS BOOLEAN
+    DIM glob AS STRING : glob = "*"
+    DIM kodierung AS STRING : kodierung = "auto"
+    DIM muster AS STRING
+    DIM pfade AS ARRAY OF STRING        ' wie geschrieben (fuer die Ausgabe)
+    DIM orte AS ARRAY OF STRING         ' zum Oeffnen
+    DIM i AS INTEGER
+    WHILE i < LEN(rest)
+        DIM a AS STRING
+        a = rest[i]
+        IF muster = "" AND LEFT$(a, 1) = "-" AND LEN(a) > 1 THEN
+            SELECT CASE a
+                CASE "-i" : gross = TRUE
+                CASE "-w" : wort = TRUE
+                CASE "-v" : umkehren = TRUE
+                CASE "-n" : nummern = TRUE
+                CASE "-c" : zaehlen = TRUE
+                CASE "-l" : nurNamen = TRUE
+                CASE "-r" : rekursiv = TRUE
+                CASE "--glob", "--kodierung"
+                    IF i + 1 >= LEN(rest) THEN
+                        melde(a + " braucht einen Wert")
+                        RETURN FEHLER
+                    END IF
+                    i = i + 1
+                    IF a = "--glob" THEN glob = rest[i] ELSE kodierung = rest[i]
+                CASE ELSE
+                    melde("unbekannter Schalter " + a)
+                    RETURN FEHLER
+            END SELECT
+        ELSEIF muster = "" THEN
+            muster = a
+        ELSE
+            ARRAY_PUSH(pfade, a)
+            ARRAY_PUSH(orte, restOrt[i])
+        END IF
+        i = i + 1
+    WEND
+    IF muster = "" THEN
+        melde("suche: kein Muster")
+        RETURN FEHLER
+    END IF
+
+    DIM ausdruck AS STRING
+    ausdruck = muster
+    IF wort THEN ausdruck = "\b(?:" + ausdruck + ")\b"
+    IF gross THEN ausdruck = "(?i)" + ausdruck
+    TRY
+        REGEX_TEST("", ausdruck)
+    CATCH e
+        melde("Muster kaputt: " + e)
+        RETURN FEHLER
+    END TRY
+
+    ' Ordner aufloesen (DIRLIST_REC liefert nur Dateien, relativ zum Ordner)
+    DIM dateien AS ARRAY OF STRING      ' zum Oeffnen
+    DIM namen AS ARRAY OF STRING        ' fuer die Ausgabe
+    IF LEN(pfade) = 0 THEN
+        ARRAY_PUSH(dateien, "-")
+        ARRAY_PUSH(namen, "(Eingabe)")
+    END IF
+    FOR i = 0 TO LEN(pfade) - 1
+        IF orte[i] <> "-" AND DIREXISTS(orte[i]) THEN
+            IF rekursiv THEN
+                DIM d AS STRING
+                FOR EACH d IN DIRLIST_REC(orte[i], glob)
+                    ARRAY_PUSH(dateien, PATHJOIN(orte[i], d))
+                    ARRAY_PUSH(namen, PATHJOIN(pfade[i], d))
+                NEXT
+            ELSE
+                melde(pfade[i] + " ist ein Ordner (mit -r durchsuchen)")
+            END IF
+        ELSE
+            ARRAY_PUSH(dateien, orte[i])
+            ARRAY_PUSH(namen, IIF(orte[i] = "-", "(Eingabe)", pfade[i]))
+        END IF
+    NEXT
+    DIM mitNamen AS BOOLEAN
+    mitNamen = LEN(dateien) > 1 OR rekursiv
+
+    DIM gefunden AS INTEGER
+    DIM nr AS INTEGER
+    FOR nr = 0 TO LEN(dateien) - 1
+        DIM zeilen AS ARRAY OF STRING
+        TRY
+            zeilen = zeilenVon(dateien[nr], kodierung)
+        CATCH e
+            ' Eine Binaerdatei in einem durchsuchten Ordner ist kein Fehler
+            IF istBinaer(e) AND rekursiv THEN CONTINUE
+            melde(e)
+            CONTINUE
+        END TRY
+        DIM name AS STRING
+        name = namen[nr]
+        DIM anzahl AS INTEGER
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(zeilen) - 1
+            IF REGEX_TEST(zeilen[k], ausdruck) <> umkehren THEN
+                anzahl = anzahl + 1
+                IF nurNamen THEN EXIT FOR
+                IF NOT zaehlen THEN
+                    DIM vorn AS STRING
+                    IF mitNamen THEN vorn = farbe$(name, "35") + ":"
+                    IF nummern THEN vorn = vorn + farbe$(STR$(k + 1), "32") + ":"
+                    PRINT vorn; markiere$(zeilen[k], ausdruck, umkehren)
+                END IF
+            END IF
+        NEXT
+        IF nurNamen AND anzahl > 0 THEN PRINT farbe$(name, "35")
+        IF zaehlen THEN
+            IF mitNamen THEN PRINT name; ":"; anzahl ELSE PRINT anzahl
+        END IF
+        gefunden = gefunden + anzahl
+    NEXT
+    IF fehlerZahl > 0 THEN RETURN FEHLER
+    RETURN IIF(gefunden > 0, OK, NICHTS)
+END FUNCTION
+
+' Den ersten Treffer in der Zeile hervorheben (nur im Terminal)
+FUNCTION markiere$(zeile AS STRING, ausdruck AS STRING, umkehren AS BOOLEAN) AS STRING
+    IF NOT farbig OR umkehren THEN RETURN zeile
+    DIM wo AS TUPLE
+    wo = REGEX_FIND_POS(zeile, ausdruck)
+    DIM st AS INTEGER, ln AS INTEGER
+    (st, ln) = wo
+    IF st < 0 OR ln = 0 THEN RETURN zeile
+    RETURN LEFT$(zeile, st) + farbe$(MID$(zeile, st, ln), "1;31") + MID$(zeile, st + ln, LEN(zeile))
+END FUNCTION
+
+' --- csv ----------------------------------------------------------------------
+FUNCTION spalteVon(kopf AS ARRAY OF STRING, name AS STRING) AS INTEGER
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(kopf) - 1
+        IF LOWER$(TRIM$(kopf[j])) = LOWER$(TRIM$(name)) THEN RETURN j
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION zahl(s AS STRING) AS FLOAT
+    ' 1.234,56 (deutsch) und 1234.56 (englisch)
+    DIM t AS STRING
+    t = TRIM$(s)
+    IF INSTR(t, ",") >= 0 THEN
+        t = REPLACE$(t, ".", "")
+        t = REPLACE$(t, ",", ".")
+    END IF
+    RETURN VAL(t)
+END FUNCTION
+
+FUNCTION csvBefehl() AS INTEGER
+    DIM datei AS STRING
+    DIM trenner AS STRING : trenner = ""
+    DIM summe AS STRING, gruppe AS STRING, sortiere AS STRING
+    DIM absteigend AS BOOLEAN
+    DIM i AS INTEGER
+    WHILE i < LEN(rest)
+        DIM a AS STRING
+        a = rest[i]
+        IF a = "--absteigend" THEN
+            absteigend = TRUE
+        ELSEIF a = "--trenner" OR a = "--summe" OR a = "--gruppe" OR a = "--sortiere" THEN
+            IF i + 1 >= LEN(rest) THEN
+                melde(a + " braucht einen Wert")
+                RETURN FEHLER
+            END IF
+            i = i + 1
+            SELECT CASE a
+                CASE "--trenner" : trenner = rest[i]
+                CASE "--summe" : summe = rest[i]
+                CASE "--gruppe" : gruppe = rest[i]
+                CASE "--sortiere" : sortiere = rest[i]
+            END SELECT
+        ELSEIF LEFT$(a, 1) = "-" THEN
+            melde("unbekannter Schalter " + a)
+            RETURN FEHLER
+        ELSE
+            datei = restOrt[i]
+        END IF
+        i = i + 1
+    WEND
+    IF datei = "" THEN
+        melde("csv: keine Datei")
+        RETURN FEHLER
+    END IF
+    IF trenner = "" THEN
+        ' raten: steht in der ersten Zeile ein Semikolon, ist es Excel auf Deutsch
+        DIM erste AS ARRAY OF STRING
+        TRY
+            erste = READLINES(datei, "auto")
+        CATCH e
+            melde(e)
+            RETURN FEHLER
+        END TRY
+        trenner = IIF(LEN(erste) > 0 AND INSTR(erste[0], ";") >= 0, ";", ",")
+    END IF
+    DIM t AS ARRAY OF STRING
+    TRY
+        t = CSV_LOAD(datei, trenner, "auto")
+    CATCH e
+        melde(e)
+        RETURN FEHLER
+    END TRY
+    DIM zeilen AS INTEGER, spalten AS INTEGER
+    zeilen = DIMSIZE(t, 0)
+    spalten = DIMSIZE(t, 1)
+    IF zeilen = 0 THEN
+        melde(datei + " ist leer")
+        RETURN FEHLER
+    END IF
+    DIM kopf AS ARRAY OF STRING
+    DIM j AS INTEGER
+    FOR j = 0 TO spalten - 1
+        ARRAY_PUSH(kopf, t[0, j])
+    NEXT
+
+    IF gruppe <> "" THEN
+        ' Summe (oder Anzahl) je Wert der Gruppenspalte
+        DIM g AS INTEGER, s AS INTEGER
+        g = spalteVon(kopf, gruppe)
+        s = IIF(summe = "", -1, spalteVon(kopf, summe))
+        IF g < 0 OR (summe <> "" AND s < 0) THEN
+            melde("Spalte nicht gefunden: " + IIF(g < 0, gruppe, summe) + " (da sind: " + JOIN$(kopf, ", ") + ")")
+            RETURN FEHLER
+        END IF
+        DIM werte AS MAP OF FLOAT
+        DIM reihen AS ARRAY OF STRING
+        DIM r AS INTEGER
+        FOR r = 1 TO zeilen - 1
+            DIM schl AS STRING
+            schl = t[r, g]
+            IF NOT MAPHAS(werte, schl) THEN
+                MAPPUT(werte, schl, 0.0)
+                ARRAY_PUSH(reihen, schl)
+            END IF
+            MAPPUT(werte, schl, MAPGET(werte, schl) + IIF(s < 0, 1.0, zahl(t[r, s])))
+        NEXT
+        SORT(reihen)
+        DIM breit AS INTEGER : breit = LEN(kopf[g])
+        DIM w AS STRING
+        FOR EACH w IN reihen
+            breit = MAX(breit, LEN(w))
+        NEXT
+        PRINT PADR$(kopf[g], breit); "  "; IIF(s < 0, "Anzahl", kopf[s])
+        PRINT REPEAT$("-", breit); "  "; REPEAT$("-", 12)
+        DIM gesamt AS FLOAT
+        FOR EACH w IN reihen
+            PRINT PADR$(w, breit); "  "; PADL$(ZAHL$(MAPGET(werte, w), IIF(s < 0, 0, 2)), 12)
+            gesamt = gesamt + MAPGET(werte, w)
+        NEXT
+        PRINT REPEAT$("-", breit); "  "; REPEAT$("-", 12)
+        PRINT PADR$("Summe", breit); "  "; PADL$(ZAHL$(gesamt, IIF(s < 0, 0, 2)), 12)
+        RETURN OK
+    END IF
+
+    ' Reihenfolge der Datenzeilen
+    DIM folge AS ARRAY OF INTEGER
+    DIM r2 AS INTEGER
+    FOR r2 = 1 TO zeilen - 1
+        ARRAY_PUSH(folge, r2)
+    NEXT
+    IF sortiere <> "" THEN
+        DIM sc AS INTEGER
+        sc = spalteVon(kopf, sortiere)
+        IF sc < 0 THEN
+            melde("Spalte nicht gefunden: " + sortiere + " (da sind: " + JOIN$(kopf, ", ") + ")")
+            RETURN FEHLER
+        END IF
+        ' einfach einfuegen -- stabil, und Zahlen als Zahlen
+        DIM a1 AS INTEGER, b1 AS INTEGER
+        FOR a1 = 1 TO LEN(folge) - 1
+            DIM x AS INTEGER : x = folge[a1]
+            b1 = a1 - 1
+            WHILE b1 >= 0
+                IF NOT vorher(t[folge[b1], sc], t[x, sc], absteigend) THEN EXIT WHILE
+                folge[b1 + 1] = folge[b1]
+                b1 = b1 - 1
+            WEND
+            folge[b1 + 1] = x
+        NEXT
+    END IF
+
+    ' Breiten
+    DIM breiten AS ARRAY OF INTEGER
+    FOR j = 0 TO spalten - 1
+        ARRAY_PUSH(breiten, LEN(kopf[j]))
+        FOR r2 = 1 TO zeilen - 1
+            breiten[j] = MIN(40, MAX(breiten[j], LEN(t[r2, j])))
+        NEXT
+    NEXT
+    DIM zeile AS STRING
+    FOR j = 0 TO spalten - 1
+        zeile = zeile + PADR$(LEFT$(kopf[j], breiten[j]), breiten[j]) + "  "
+    NEXT
+    PRINT RTRIM$(zeile)
+    zeile = ""
+    FOR j = 0 TO spalten - 1
+        zeile = zeile + REPEAT$("-", breiten[j]) + "  "
+    NEXT
+    PRINT RTRIM$(zeile)
+    DIM summen AS ARRAY OF FLOAT
+    FOR j = 0 TO spalten - 1
+        ARRAY_PUSH(summen, 0.0)
+    NEXT
+    DIM nr AS INTEGER
+    FOR EACH nr IN folge
+        zeile = ""
+        FOR j = 0 TO spalten - 1
+            DIM zelle AS STRING
+            zelle = LEFT$(t[nr, j], breiten[j])
+            IF istZahl(t[nr, j]) THEN
+                zeile = zeile + PADL$(zelle, breiten[j]) + "  "
+                summen[j] = summen[j] + zahl(t[nr, j])
+            ELSE
+                zeile = zeile + PADR$(zelle, breiten[j]) + "  "
+            END IF
+        NEXT
+        PRINT RTRIM$(zeile)
+    NEXT
+    IF summe <> "" THEN
+        DIM sc2 AS INTEGER
+        sc2 = spalteVon(kopf, summe)
+        IF sc2 < 0 THEN
+            melde("Spalte nicht gefunden: " + summe + " (da sind: " + JOIN$(kopf, ", ") + ")")
+            RETURN FEHLER
+        END IF
+        PRINT "Summe "; kopf[sc2]; ": "; ZAHL$(summen[sc2], 2)
+    END IF
+    EPRINT(STR$(zeilen - 1) + " Zeilen, " + STR$(spalten) + " Spalten")
+    RETURN OK
+END FUNCTION
+
+FUNCTION istZahl(s AS STRING) AS BOOLEAN
+    RETURN REGEX_TEST(TRIM$(s), "^-?[0-9][0-9.]*(,[0-9]+)?$|^-?[0-9]+\.[0-9]+$")
+END FUNCTION
+
+FUNCTION vorher(a AS STRING, b AS STRING, absteigend AS BOOLEAN) AS BOOLEAN
+    ' TRUE, wenn a HINTER b gehoert (dann rueckt a auf)
+    DIM groesser AS BOOLEAN
+    IF istZahl(a) AND istZahl(b) THEN
+        groesser = zahl(a) > zahl(b)
+        IF absteigend THEN groesser = zahl(a) < zahl(b)
+    ELSE
+        groesser = LOWER$(a) > LOWER$(b)
+        IF absteigend THEN groesser = LOWER$(a) < LOWER$(b)
+    END IF
+    RETURN groesser
+END FUNCTION
+
+' --- zaehle -------------------------------------------------------------------
+FUNCTION zaehle() AS INTEGER
+    DIM dateien AS ARRAY OF STRING
+    DIM namen AS ARRAY OF STRING
+    dateien = restOrt
+    namen = rest
+    IF LEN(dateien) = 0 THEN
+        ARRAY_PUSH(dateien, "-")
+        ARRAY_PUSH(namen, "")
+    END IF
+    DIM gz AS INTEGER, gw AS INTEGER, gc AS INTEGER
+    DIM nr AS INTEGER
+    FOR nr = 0 TO LEN(dateien) - 1
+        DIM zeilen AS ARRAY OF STRING
+        TRY
+            zeilen = zeilenVon(dateien[nr], "auto")
+        CATCH e
+            melde(e)
+            CONTINUE
+        END TRY
+        DIM w AS INTEGER, c AS INTEGER
+        DIM z AS STRING
+        FOR EACH z IN zeilen
+            c = c + LEN(z) + 1
+            DIM teil AS STRING
+            FOR EACH teil IN SPLIT$(z, " ")
+                IF TRIM$(teil) <> "" THEN w = w + 1
+            NEXT
+        NEXT
+        PRINT PADL$(STR$(LEN(zeilen)), 8); PADL$(STR$(w), 8); PADL$(STR$(c), 10); " "; IIF(namen[nr] = "-", "", namen[nr])
+        gz = gz + LEN(zeilen) : gw = gw + w : gc = gc + c
+    NEXT
+    IF LEN(dateien) > 1 THEN PRINT PADL$(STR$(gz), 8); PADL$(STR$(gw), 8); PADL$(STR$(gc), 10); " zusammen"
+    RETURN IIF(fehlerZahl > 0, FEHLER, OK)
+END FUNCTION
+
+' --- Hauptprogramm ------------------------------------------------------------
+IF ARGC() = 0 THEN
+    hilfe()
+    EXIT(FEHLER)
+END IF
+befehl = ARG$(0)
+DIM n AS INTEGER
+FOR n = 1 TO ARGC() - 1
+    ARRAY_PUSH(rest, ARG$(n))
+    ARRAY_PUSH(restOrt, ARGPATH$(n))
+NEXT
+SELECT CASE befehl
+    CASE "suche" : EXIT(suche())
+    CASE "csv" : EXIT(csvBefehl())
+    CASE "zaehle" : EXIT(zaehle())
+    CASE "-h", "--hilfe", "hilfe"
+        hilfe()
+        EXIT(OK)
+    CASE ELSE
+        melde("unbekannter Befehl " + befehl + " (suche, csv, zaehle)")
+        EXIT(FEHLER)
+END SELECT

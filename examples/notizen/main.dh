@@ -1,0 +1,341 @@
+' notizen -- ein Notizzettel: Notizen mit Titel und formatiertem Text,
+' gespeichert in SQLite, durchsuchbar, als PDF zu sichern.
+'
+' Links die Liste mit Suchfeld, rechts Titel und Text. Fett, kursiv und
+' unterstrichen gehen mit Strg+B/I/U und werden als Markdown gespeichert.
+' Das Symbol im Infobereich holt das Fenster zurueck, wenn es versteckt ist.
+IMPORT "gui"
+IMPORT "db"
+IMPORT "pdf"
+IMPORT "imgfx"
+
+CONST BREITE = 900
+CONST HOEHE = 600
+CONST LINKS_B = 260
+
+DIM ablage AS DB_CONN
+ablage = DB_OPEN("notizen.db")
+DB_EXEC(ablage, "CREATE TABLE IF NOT EXISTS notiz (id INTEGER PRIMARY KEY, titel TEXT, text TEXT, geaendert TEXT)")
+
+SCREEN(BREITE, HOEHE, "Notizen", 1)
+SETFPS(60)
+WINDOW_RESIZABLE(TRUE)
+WINDOW_MIN_SIZE(600, 360)
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Notizen", 0, 0, BREITE, HOEHE)
+GUI_WINDOW_CHROME(win, FALSE)
+
+DIM mDatei AS INTEGER
+mDatei = GUI_MENU(win, "Datei")
+DIM miNeu AS INTEGER
+miNeu = GUI_MENU_ITEM(mDatei, "Neue Notiz", "Strg+N")
+DIM miSichern AS INTEGER
+miSichern = GUI_MENU_ITEM(mDatei, "Sichern", "Strg+S")
+DIM miLoeschen AS INTEGER
+miLoeschen = GUI_MENU_ITEM(mDatei, "Löschen", "Strg+Entf")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miPdf AS INTEGER
+miPdf = GUI_MENU_ITEM(mDatei, "Als PDF sichern ...", "Strg+P")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miVerstecken AS INTEGER
+miVerstecken = GUI_MENU_ITEM(mDatei, "Ins Infobereich", "Strg+H")
+DIM miEnde AS INTEGER
+miEnde = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
+
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste
+DIM innenH AS INTEGER
+innenH = GUI_WINDOW_CONTENT_H(win)
+DIM tfSuche AS GUI_WIDGET
+tfSuche = GUI_TEXTINPUT(win, 12, 12, LINKS_B, 28, "suchen ...")
+DIM lst AS GUI_WIDGET
+lst = GUI_LISTBOX(win, 12, 48, LINKS_B, innenH - 48 - 38, [])
+GUI_LISTBOX_PLACEHOLDER(lst, "Noch keine Notiz -- Strg+N legt eine an.")
+DIM tfTitel AS GUI_WIDGET
+tfTitel = GUI_TEXTINPUT(win, LINKS_B + 24, 12, BREITE - LINKS_B - 36, 28, "Titel")
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(win, LINKS_B + 24, 48, BREITE - LINKS_B - 36, innenH - 48 - 38, "Text der Notiz")
+GUI_TEXTAREA_SET(ta, "formatiert", 1)
+GUI_TEXTAREA_SET(ta, "umbruch", 1)
+DIM sb AS GUI_WIDGET
+sb = GUI_STATUSBAR(win, 0, innenH - 26, BREITE, 26, "Bereit.")
+GUI_STATUSBAR_ADD(sb, "", 110, "rechts")
+GUI_STATUSBAR_ADD(sb, "", 100, "mitte")
+GUI_SET_ANCHOR(tfSuche, "lt")
+GUI_SET_ANCHOR(lst, "ltb")
+GUI_SET_ANCHOR(tfTitel, "ltr")
+GUI_SET_ANCHOR(ta, "ltrb")
+GUI_SET_ANCHOR(sb, "lrb")
+
+' --- Das Symbol: ein Zettel mit Zeilen -------------------------------------
+FUNCTION zettel() AS INTEGER
+    DIM b AS INTEGER
+    b = IMAGE_NEW(32, 32)
+    IMAGE_FILL_ROUNDRECT(b, 5, 2, 22, 28, 3, RGB(250, 230, 120))
+    DIM i AS INTEGER
+    FOR i = 0 TO 3
+        IMAGE_FILL_RECT(b, 9, 8 + i * 5, 14, 2, RGB(150, 120, 40))
+    NEXT
+    RETURN b
+END FUNCTION
+DIM symbol AS INTEGER
+symbol = zettel()
+WINDOW_ICON(symbol)
+TRAY_SHOW(symbol, "Notizen")
+TRAY_MENU("Fenster zeigen|Neue Notiz|-|Beenden")
+
+' --- Zustand ---------------------------------------------------------------
+DIM aktuell AS INTEGER        ' id der offenen Notiz, 0 = neue
+DIM gesichertTitel AS STRING  ' Stand beim letzten Laden/Sichern
+DIM gesichertText AS STRING
+DIM sichtbar AS BOOLEAN
+sichtbar = TRUE
+DIM beenden AS BOOLEAN
+DIM letzteWahl AS INTEGER
+letzteWahl = -1
+DIM letzteSuche AS STRING
+DIM rueckfrage AS GUI_WINDOW  ' offene Rueckfrage, sonst unbenutzt
+DIM fragtWegen AS STRING      ' was nach der Rueckfrage passieren soll
+DIM fragtId AS INTEGER
+
+FUNCTION jetzt$() AS STRING
+    RETURN DATE$() + " " + LEFT$(TIME$(), 5)
+END FUNCTION
+
+FUNCTION ungesichert() AS BOOLEAN
+    RETURN GUI_TEXT(tfTitel) <> gesichertTitel OR GUI_TEXTAREA_MARKDOWN$(ta) <> gesichertText
+END FUNCTION
+
+FUNCTION titelVon$(titel AS STRING, text AS STRING) AS STRING
+    IF TRIM$(titel) <> "" THEN RETURN TRIM$(titel)
+    ' ohne Titel die erste Zeile des Textes
+    DIM erste AS STRING
+    erste = TRIM$(SPLIT$(text + CHR$(10), CHR$(10))[0])
+    IF erste = "" THEN RETURN "(ohne Titel)"
+    RETURN LEFT$(erste, 40)
+END FUNCTION
+
+SUB status(t AS STRING)
+    GUI_STATUSBAR_SET(sb, 0, t)
+END SUB
+
+SUB listeLaden()
+    GUI_LISTBOX_CLEAR(lst)
+    DIM r AS DB_RESULT
+    r = DB_QUERY(ablage, "SELECT id, titel, text, geaendert FROM notiz ORDER BY geaendert DESC, id DESC")
+    WHILE DB_NEXT(r)
+        DIM i AS INTEGER
+        i = GUI_LISTBOX_ADD(lst, titelVon$(DB_GET_STRING(r, 1), DB_GET_STRING(r, 2)))
+        GUI_LISTBOX_SET_DATA(lst, i, STR$(DB_GET_INT(r, 0)))
+        GUI_LISTBOX_DETAIL(lst, i, LEFT$(DB_GET_STRING(r, 3), 10))
+    WEND
+    DB_CLOSE_RESULT(r)
+    GUI_LISTBOX_FILTER(lst, GUI_TEXT(tfSuche))
+    auswahlZeigen()
+    DIM anz AS INTEGER
+    anz = GUI_LISTBOX_COUNT(lst)
+    GUI_STATUSBAR_SET(sb, 1, STR$(anz) + IIF(anz = 1, " Notiz", " Notizen"))
+END SUB
+
+' Die offene Notiz in der Liste waehlen (oder nichts, wenn sie neu ist).
+SUB auswahlZeigen()
+    DIM z AS INTEGER
+    z = GUI_LISTBOX_FIND_DATA(lst, STR$(aktuell))
+    IF aktuell > 0 AND z >= 0 THEN
+        GUI_LISTBOX_SELECT(lst, z, TRUE)
+    ELSE
+        GUI_LISTBOX_CLEAR_SELECTION(lst)
+    END IF
+    letzteWahl = GUI_LISTBOX_SELECTED(lst)
+END SUB
+
+SUB oeffnen(id AS INTEGER)
+    aktuell = id
+    gesichertTitel = ""
+    gesichertText = ""
+    IF id > 0 THEN
+        DIM r AS DB_RESULT
+        r = DB_QUERY(ablage, "SELECT titel, text FROM notiz WHERE id = ?", id)
+        IF DB_NEXT(r) THEN
+            gesichertTitel = DB_GET_STRING(r, 0)
+            gesichertText = DB_GET_STRING(r, 1)
+        END IF
+        DB_CLOSE_RESULT(r)
+    END IF
+    ' die Liste zeigt, was offen ist; eine neue Notiz steht noch nicht darin
+    auswahlZeigen()
+    GUI_SET_TEXT(tfTitel, gesichertTitel)
+    GUI_TEXTAREA_SET_MARKDOWN(ta, gesichertText)
+    ' was der Textbereich aus dem Markdown macht, gilt als gesichert
+    gesichertText = GUI_TEXTAREA_MARKDOWN$(ta)
+    IF id = 0 THEN GUI_FOCUS(tfTitel) ELSE GUI_FOCUS(ta)
+END SUB
+
+SUB sichern()
+    DIM titel AS STRING
+    titel = GUI_TEXT(tfTitel)
+    DIM text AS STRING
+    text = GUI_TEXTAREA_MARKDOWN$(ta)
+    IF TRIM$(titel) = "" AND TRIM$(text) = "" THEN
+        status("Leere Notiz -- nichts gesichert.")
+        RETURN
+    END IF
+    IF aktuell > 0 THEN
+        DB_EXEC(ablage, "UPDATE notiz SET titel = ?, text = ?, geaendert = ? WHERE id = ?", titel, text, jetzt$(), aktuell)
+    ELSE
+        DB_EXEC(ablage, "INSERT INTO notiz (titel, text, geaendert) VALUES (?, ?, ?)", titel, text, jetzt$())
+        aktuell = DB_LAST_ROWID(ablage)
+    END IF
+    gesichertTitel = titel
+    gesichertText = text
+    listeLaden()
+    status("Gesichert: " + titelVon$(titel, GUI_TEXT(ta)))
+END SUB
+
+SUB loeschen()
+    IF aktuell = 0 THEN RETURN
+    DB_EXEC(ablage, "DELETE FROM notiz WHERE id = ?", aktuell)
+    oeffnen(0)
+    listeLaden()
+    status("Gelöscht.")
+END SUB
+
+' Fragt nach, wenn die offene Notiz ungesichert ist; sonst gleich weiter.
+SUB weiterNach(was AS STRING, id AS INTEGER)
+    IF ungesichert() THEN
+        fragtWegen = was
+        fragtId = id
+        rueckfrage = GUI_DIALOG("Ungesichert", "Die Notiz hat ungesicherte Änderungen.", "Sichern|Verwerfen|Abbrechen")
+        RETURN
+    END IF
+    ausfuehren(was, id)
+END SUB
+
+SUB ausfuehren(was AS STRING, id AS INTEGER)
+    SELECT CASE was
+        CASE "oeffnen"
+            oeffnen(id)
+        CASE "neu"
+            oeffnen(0)
+        CASE "ende"
+            beenden = TRUE
+    END SELECT
+END SUB
+
+SUB pdfSichern()
+    DIM ziel AS STRING
+    ziel = FILE_SAVE_DIALOG("Als PDF sichern", titelVon$(GUI_TEXT(tfTitel), GUI_TEXT(ta)) + ".pdf", "pdf")
+    IF ziel = "" THEN RETURN
+    pdfSchreiben(ziel)
+    status("PDF geschrieben: " + ziel)
+END SUB
+
+SUB pdfSchreiben(ziel AS STRING)
+    DIM p AS PDF
+    p = PDF_NEW("A4")           ' legt die erste Seite schon an
+    PDF_FONT(p, "sans-fett", 16)
+    PDF_TEXT(p, 20, 20, titelVon$(GUI_TEXT(tfTitel), GUI_TEXT(ta)))
+    PDF_FONT(p, "sans", 11)
+    DIM y AS FLOAT
+    y = 32
+    DIM zeilen AS ARRAY OF STRING
+    zeilen = SPLIT$(GUI_TEXT(ta), CHR$(10))
+    DIM z AS STRING
+    FOR EACH z IN zeilen
+        ' an Wortgrenzen umbrechen, 170 mm breit
+        DIM rest AS STRING
+        rest = z
+        DO
+            DIM teil AS STRING
+            teil = rest
+            WHILE PDF_TEXT_WIDTH(p, teil) > 170 AND INSTR(teil, " ") > 0
+                teil = LEFT$(teil, INSTRREV(teil, " "))
+                teil = RTRIM$(teil)
+            WEND
+            PDF_TEXT(p, 20, y, teil)
+            y = y + 6
+            IF y > 280 THEN
+                PDF_PAGE(p)
+                y = 20
+            END IF
+            rest = LTRIM$(MID$(rest, LEN(teil)))
+        LOOP UNTIL rest = ""
+    NEXT
+    PDF_SAVE(p, ziel)
+END SUB
+
+SUB fensterZeigen(an AS BOOLEAN)
+    IF an THEN WINDOW_SHOW() ELSE WINDOW_HIDE()
+    sichtbar = an
+END SUB
+
+listeLaden()
+oeffnen(0)
+status("Bereit.")
+
+WHILE NOT beenden
+    GUI_UPDATE()
+    IF WINDOW_CLOSE_REQUESTED() THEN
+        weiterNach("ende", 0)
+    ELSEIF QUITREQUESTED() THEN
+        BREAK
+    END IF
+    IF WINDOW_RESIZED() THEN GUI_WINDOW_SET_BOUNDS(win, 0, 0, SCREENWIDTH(), SCREENHEIGHT())
+
+    ' Antwort auf die Rueckfrage: 1 Sichern, 2 Verwerfen, 3 Abbrechen
+    IF fragtWegen <> "" THEN
+        DIM a AS INTEGER
+        a = GUI_ANSWER(rueckfrage)
+        IF a > 0 THEN
+            IF a = 1 THEN sichern()
+            IF a <= 2 THEN ausfuehren(fragtWegen, fragtId)
+            ' bei Abbrechen zurueck auf die offene Notiz
+            IF a = 3 THEN auswahlZeigen()
+            fragtWegen = ""
+            letzteWahl = GUI_LISTBOX_SELECTED(lst)
+        END IF
+    END IF
+
+    IF GUI_CLICKED(miNeu) THEN weiterNach("neu", 0)
+    IF GUI_CLICKED(miSichern) THEN sichern()
+    IF GUI_CLICKED(miLoeschen) THEN loeschen()
+    IF GUI_CLICKED(miPdf) THEN pdfSichern()
+    IF GUI_CLICKED(miVerstecken) THEN fensterZeigen(FALSE)
+    IF GUI_CLICKED(miEnde) THEN weiterNach("ende", 0)
+
+    ' Suche: die Liste filtert selbst, der Filter folgt dem Feld
+    IF GUI_TEXT(tfSuche) <> letzteSuche THEN
+        letzteSuche = GUI_TEXT(tfSuche)
+        GUI_LISTBOX_FILTER(lst, letzteSuche)
+    END IF
+
+    ' eine Notiz angeklickt (oder mit den Pfeilen gewaehlt)
+    DIM w AS INTEGER
+    w = GUI_LISTBOX_SELECTED(lst)
+    IF (w <> letzteWahl OR GUI_CLICKED(lst)) AND w >= 0 AND fragtWegen = "" THEN
+        letzteWahl = w
+        DIM id AS INTEGER
+        id = VAL(GUI_LISTBOX_DATA$(lst, w))
+        IF id <> aktuell THEN weiterNach("oeffnen", id)
+    END IF
+
+    IF TRAY_CLICKED() THEN fensterZeigen(NOT sichtbar)
+    SELECT CASE TRAY_MENU_CLICKED$()
+        CASE "Fenster zeigen"
+            fensterZeigen(TRUE)
+        CASE "Neue Notiz"
+            fensterZeigen(TRUE)
+            weiterNach("neu", 0)
+        CASE "Beenden"
+            fensterZeigen(TRUE)
+            weiterNach("ende", 0)
+    END SELECT
+
+    GUI_STATUSBAR_SET(sb, 2, IIF(ungesichert(), "geändert", ""))
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+
+TRAY_HIDE()
+DB_CLOSE(ablage)

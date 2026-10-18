@@ -1,0 +1,169 @@
+' Farb-Harmonien (PySticky ui/dialogs/color_harmony_dialog.py): zu einer
+' Ausgangsfarbe Garne, die nach Farbtheorie dazu passen. Gedreht wird nur der
+' Farbton im HSL-Raum (Pythons colorsys), Saettigung und Helligkeit bleiben;
+' jedes Ziel bekommt das naechste Garn einer Palette nach CIEDE2000 (bei
+' Gleichstand das erste). Ein Vorschlag je Versatz -- keine Liste der besten.
+
+CLASS Harmonievorschlag
+    DIM name AS STRING               ' "Komplementär", "Analog −30°" ...
+    DIM ziel AS INTEGER              ' &HRRGGBB, die gedrehte Farbe
+    DIM garn AS INTEGER              ' Platz in der Palette, -1 = keins
+    DIM abstand AS FLOAT
+END CLASS
+
+FUNCTION harmonieArten() AS ARRAY OF STRING
+    RETURN ["Komplementär", "Analog", "Triade", "Split-Komplementär", "Tetrade"]
+END FUNCTION
+
+FUNCTION harmonieBeschreibung$(art AS STRING) AS STRING
+    SELECT CASE art
+        CASE "Komplementär" : RETURN tr$("Eine Farbe — direkt gegenüber im Farbkreis. Maximaler Kontrast.")
+        CASE "Analog" : RETURN tr$("Zwei Nachbarfarben (±30°). Sanfter, harmonischer Übergang.")
+        CASE "Triade" : RETURN tr$("Zwei Farben gleichmäßig verteilt (±120°). Lebhaft, ausgewogen.")
+        CASE "Split-Komplementär" : RETURN tr$("Zwei Farben neben dem Komplementär (±150°). Spannung ohne Kollision.")
+        CASE "Tetrade" : RETURN tr$("Drei Farben im Rechteck (90°/180°/270°). Reichhaltiges Schema.")
+    END SELECT
+    RETURN ""
+END FUNCTION
+
+' Namen und Versaetze in Grad, in der Reihenfolge der Karten; unbekannt = leer.
+' Das Minus ist U+2212 wie im Original.
+SUB harmonieVersaetze(art AS STRING, BYREF namen AS ARRAY OF STRING, BYREF grad AS ARRAY OF INTEGER)
+    namen = []
+    grad = []
+    SELECT CASE art
+        CASE "Komplementär"
+            namen = [tr$("Komplementär")] : grad = [180]
+        CASE "Analog"
+            namen = [tr$("Analog −30°"), tr$("Analog +30°")] : grad = [-30, 30]
+        CASE "Triade"
+            namen = [tr$("Triade +120°"), tr$("Triade −120°")] : grad = [120, -120]
+        CASE "Split-Komplementär"
+            namen = [tr$("Split +150°"), tr$("Split −150°")] : grad = [150, -150]
+        CASE "Tetrade"
+            namen = [tr$("Tetrade +90°"), tr$("Tetrade +180°"), tr$("Tetrade +270°")] : grad = [90, 180, 270]
+    END SELECT
+END SUB
+
+' Pythons x % 1.0: immer >= 0
+FUNCTION pyRest1(x AS FLOAT) AS FLOAT
+    RETURN x - FLOOR(x)
+END FUNCTION
+
+' colorsys.rgb_to_hls, als (H 0..360, S 0..1, L 0..1)
+FUNCTION farbeHsl(f AS INTEGER) AS TUPLE
+    DIM r AS FLOAT : r = rotAnteil(f) / 255.0
+    DIM g AS FLOAT : g = gruenAnteil(f) / 255.0
+    DIM b AS FLOAT : b = blauAnteil(f) / 255.0
+    DIM maxc AS FLOAT : maxc = MAX(r, MAX(g, b))
+    DIM minc AS FLOAT : minc = MIN(r, MIN(g, b))
+    DIM summe AS FLOAT : summe = maxc + minc
+    DIM spanne AS FLOAT : spanne = maxc - minc
+    DIM l AS FLOAT : l = summe / 2.0
+    IF minc = maxc THEN RETURN (0.0, 0.0, l)
+    DIM s AS FLOAT
+    IF l <= 0.5 THEN s = spanne / summe ELSE s = spanne / (2.0 - maxc - minc)
+    DIM rc AS FLOAT : rc = (maxc - r) / spanne
+    DIM gc AS FLOAT : gc = (maxc - g) / spanne
+    DIM bc AS FLOAT : bc = (maxc - b) / spanne
+    DIM h AS FLOAT
+    IF r = maxc THEN
+        h = bc - gc
+    ELSEIF g = maxc THEN
+        h = 2.0 + rc - bc
+    ELSE
+        h = 4.0 + gc - rc
+    END IF
+    h = pyRest1(h / 6.0)
+    RETURN (h * 360, s, l)
+END FUNCTION
+
+FUNCTION hlsTeil(m1 AS FLOAT, m2 AS FLOAT, ton AS FLOAT) AS FLOAT
+    DIM h AS FLOAT : h = pyRest1(ton)
+    IF h < 1 / 6 THEN RETURN m1 + (m2 - m1) * h * 6.0
+    IF h < 0.5 THEN RETURN m2
+    IF h < 2 / 3 THEN RETURN m1 + (m2 - m1) * (2 / 3 - h) * 6.0
+    RETURN m1
+END FUNCTION
+
+' colorsys.hls_to_rgb; die Kanaele wie Pythons int() abgeschnitten
+FUNCTION hslFarbe(h AS FLOAT, s AS FLOAT, l AS FLOAT) AS INTEGER
+    DIM hn AS FLOAT : hn = (h - 360 * FLOOR(h / 360)) / 360.0
+    DIM r AS FLOAT, g AS FLOAT, b AS FLOAT
+    IF s = 0.0 THEN
+        r = l : g = l : b = l
+    ELSE
+        DIM m2 AS FLOAT
+        IF l <= 0.5 THEN m2 = l * (1.0 + s) ELSE m2 = l + s - l * s
+        DIM m1 AS FLOAT : m1 = 2.0 * l - m2
+        r = hlsTeil(m1, m2, hn + 1 / 3)
+        g = hlsTeil(m1, m2, hn)
+        b = hlsTeil(m1, m2, hn - 1 / 3)
+    END IF
+    RETURN RGB(INT(r * 255), INT(g * 255), INT(b * 255)) BAND &HFFFFFF
+END FUNCTION
+
+' Das naechste Garn einer Palette (-1 bei leerer), Abstand ueber BYREF
+FUNCTION naechstesGarnIn(ziel AS INTEGER, p AS Palette, BYREF abstand AS FLOAT) AS INTEGER
+    DIM best AS INTEGER : best = -1
+    abstand = 1E300
+    IF p IS NIL THEN RETURN -1
+    DIM l AS FLOAT, a AS FLOAT, b AS FLOAT
+    (l, a, b) = farbeLab(ziel)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(p.garne) - 1
+        DIM l2 AS FLOAT, a2 AS FLOAT, b2 AS FLOAT
+        (l2, a2, b2) = farbeLab(p.garne[i].farbe)
+        DIM d AS FLOAT : d = deltaE2000(l, a, b, l2, a2, b2)
+        IF d < abstand THEN
+            abstand = d
+            best = i
+        END IF
+    NEXT
+    RETURN best
+END FUNCTION
+
+FUNCTION harmonieVorschlaege(quelle AS INTEGER, art AS STRING, p AS Palette) AS ARRAY OF Harmonievorschlag
+    DIM aus AS ARRAY OF Harmonievorschlag : aus = []
+    DIM namen AS ARRAY OF STRING
+    DIM grad AS ARRAY OF INTEGER
+    harmonieVersaetze(art, namen, grad)
+    DIM h AS FLOAT, s AS FLOAT, l AS FLOAT
+    (h, s, l) = farbeHsl(quelle)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(grad) - 1
+        DIM v AS Harmonievorschlag : v = NEW Harmonievorschlag()
+        v.name = namen[i]
+        DIM nh AS FLOAT : nh = h + grad[i]
+        nh = nh - 360 * FLOOR(nh / 360)
+        v.ziel = hslFarbe(nh, s, l)
+        DIM d AS FLOAT
+        v.garn = naechstesGarnIn(v.ziel, p, d)
+        v.abstand = d
+        ARRAY_PUSH(aus, v)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Die Bewertung eines Abstands: (Punkte, Text, Stufe 1..4)
+FUNCTION harmonieBewertung(d AS FLOAT) AS TUPLE
+    IF d < 5 THEN RETURN ("●●●●", tr$("Perfekt"), 4)
+    IF d < 10 THEN RETURN ("●●●○", tr$("Sehr nah"), 3)
+    IF d < 20 THEN RETURN ("●●○○", tr$("Akzeptabel"), 2)
+    RETURN ("●○○○", tr$("Weit weg"), 1)
+END FUNCTION
+
+' Welche Palette der Dialog zuerst zeigt: die des Herstellers (genau so
+' geschrieben), sonst DMC, sonst die erste
+FUNCTION harmoniePalette(paletten AS ARRAY OF Palette, hersteller AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    IF hersteller <> "" THEN
+        FOR i = 0 TO LEN(paletten) - 1
+            IF paletten[i].name = hersteller THEN RETURN i
+        NEXT
+    END IF
+    FOR i = 0 TO LEN(paletten) - 1
+        IF paletten[i].name = "DMC" THEN RETURN i
+    NEXT
+    RETURN IIF(LEN(paletten) > 0, 0, -1)
+END FUNCTION

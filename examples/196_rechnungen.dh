@@ -14,9 +14,10 @@
 '      ihre Datenbank-id (Sortieren/Filtern stellt Datenzeilen nicht um)
 '    * Kunden-Formular ueber Datenbindung: GUI_BIND je Feld, GUI_FORM_LOAD /
 '      GUI_FORM_SAVE / GUI_FORM_CHANGED erledigen Laden, Speichern und die
-'      Frage "geaendert?" -- keine Spaltenliste mehr im Programm. Der
-'      Artikel rechnet Preis (Cent) und MwSt um und bleibt darum von Hand,
-'      nutzt die Bindung aber fuer die Aenderungserkennung
+'      Frage "geaendert?" -- keine Spaltenliste mehr im Programm. Beim
+'      Artikel auch fuer Geld und Steuersatz: der Preis ist ein Geldfeld
+'      (Cent in der Datenbank), die MwSt-Klappliste traegt je Eintrag den
+'      Satz als Wert
 '    * Notiz je Kunde in einem Textbereich mit Zeilenumbruch
 '    * Drucken (Strg+D): ein Druckdialog aus Bordmitteln -- Klappliste der
 '      Drucker (PRINTERS), Kopien, Vorschau (PDF_PREVIEW) -- und PDF_PRINT
@@ -347,10 +348,12 @@ DIM lATitel AS GUI_WIDGET : lATitel = GUI_LABEL(win, "Artikel", 0, 0)
 reiter(lATitel, 1) : GUI_LAYOUT_ADD(fA, lATitel)
 DIM tfABez AS GUI_WIDGET : tfABez = feld(fA, 1, "Bezeichnung *", "")
 DIM tfAPreis AS GUI_WIDGET : tfAPreis = feld(fA, 1, "Preis (netto)", "z. B. 19,99")
-GUI_TEXTINPUT_SET(tfAPreis, "zahlen", 2)
+GUI_TEXTINPUT_SET(tfAPreis, "zahlen", 3)    ' Geldfeld: "19,99" im Feld, 1999 in der Datenbank
 DIM lAMwst AS GUI_WIDGET : lAMwst = GUI_LABEL(win, "MwSt", 0, 0)
 reiter(lAMwst, 1) : GUI_LAYOUT_ADD(fA, lAMwst)
 DIM ddAMwst AS GUI_WIDGET : ddAMwst = GUI_DROPDOWN(win, 0, 0, 0, 0, ["19 %", "7 %", "0 %"])
+' Gebunden wird der Satz, nicht die Nummer des Eintrags.
+GUI_LISTBOX_SET_DATA(ddAMwst, 0, "19") : GUI_LISTBOX_SET_DATA(ddAMwst, 1, "7") : GUI_LISTBOX_SET_DATA(ddAMwst, 2, "0")
 reiter(ddAMwst, 1) : GUI_LAYOUT_ADD(fA, ddAMwst)
 DIM lAFehler AS GUI_WIDGET : lAFehler = GUI_LABEL(win, "", 0, 0)
 GUI_SET_COLOR(lAFehler, "fg", ROT) : GUI_SET_WRAP(lAFehler, formW)
@@ -371,20 +374,9 @@ GUI_LAYOUT_ADD(fA, kA)
 
 DIM artikelIdAkt AS INTEGER : artikelIdAkt = -1
 DIM aZeileAlt AS INTEGER : aZeileAlt = -1
-' Der Artikel rechnet Preis (Cent) und MwSt (Index -> Satz) um und schreibt
-' darum selbst -- die Bindung dient hier nur der Frage "geaendert?".
-GUI_BIND(tfABez, "bezeichnung", "artikel") : GUI_BIND(tfAPreis, "preis", "artikel") : GUI_BIND(ddAMwst, "mwst", "artikel")
-
-FUNCTION mwstVonIndex(i AS INTEGER) AS INTEGER
-    IF i = 1 THEN RETURN 7
-    IF i = 2 THEN RETURN 0
-    RETURN 19
-END FUNCTION
-FUNCTION indexVonMwst(m AS INTEGER) AS INTEGER
-    IF m = 7 THEN RETURN 1
-    IF m = 0 THEN RETURN 2
-    RETURN 0
-END FUNCTION
+' Die Schluessel sind die Spaltennamen -- GUI_FORM_LOAD/SAVE erledigen Laden
+' und Speichern, auch fuer Preis (Cent) und Steuersatz.
+GUI_BIND(tfABez, "bezeichnung", "artikel") : GUI_BIND(tfAPreis, "preis_cent", "artikel") : GUI_BIND(ddAMwst, "mwst", "artikel")
 
 SUB artikelLaden()
     GUI_TABLE_CLEAR(tArtikel)
@@ -403,18 +395,15 @@ SUB artikelZeigen(id AS INTEGER)
     artikelIdAkt = id
     GUI_SET_TEXT(lAFehler, "")
     IF id < 0 THEN
-        GUI_SET_TEXT(tfABez, "") : GUI_SET_TEXT(tfAPreis, "")
-        GUI_DROPDOWN_SET_SELECTED(ddAMwst, indexVonMwst(VAL(einst$("mwst", "19"))))
+        GUI_FORM_CLEAR(win, "artikel")
+        GUI_FORM_SET(win, {"mwst": einst$("mwst", "19")}, "artikel")
         GUI_SET_TEXT(lATitel, "Neuer Artikel")
     ELSE
-        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT bezeichnung, preis_cent, mwst FROM artikel WHERE id = ?", id)
-        IF DB_NEXT(r) THEN
-            GUI_SET_TEXT(tfABez, DB_GET_STRING(r, 0))
-            DIM c AS INTEGER : c = DB_GET_INT(r, 1)
-            GUI_SET_TEXT(tfAPreis, STR$(c \ 100) + "," + FORMAT$(c MOD 100, "%02d"))
-            GUI_DROPDOWN_SET_SELECTED(ddAMwst, indexVonMwst(DB_GET_INT(r, 2)))
+        IF NOT GUI_FORM_LOAD(win, db, "artikel", id, "artikel") THEN
+            status("Den Artikel gibt es nicht mehr.")
+            artikelIdAkt = -1
+            GUI_FORM_CLEAR(win, "artikel")
         END IF
-        DB_CLOSE_RESULT(r)
         GUI_SET_TEXT(lATitel, "Artikel #" + STR$(id))
     END IF
     GUI_FORM_CLEAN(win, "artikel")
@@ -424,18 +413,14 @@ FUNCTION artikelSpeichern() AS BOOLEAN
     IF GUI_VALIDATE(win) > 0 THEN RETURN FALSE
     DIM bez AS STRING : bez = TRIM$(GUI_TEXT(tfABez))
     DIM cent AS INTEGER : cent = centVon(GUI_TEXT(tfAPreis))
-    IF cent < 0 THEN
-        ' Was die Regel nicht kennt (Tausenderpunkte), meldet das Programm
-        ' ueber denselben Weg.
-        GUI_SET_ERROR(tfAPreis, "Der Preis ist keine Zahl (z. B. 19,99).") : GUI_FOCUS(tfAPreis) : RETURN FALSE
+    DIM id AS INTEGER : id = GUI_FORM_SAVE(win, db, "artikel", artikelIdAkt, "artikel")
+    IF id = 0 THEN
+        ' Ein anderes Fenster hat den Artikel inzwischen geloescht.
+        status("Den Artikel gibt es nicht mehr -- Speichern legt ihn neu an.")
+        artikelIdAkt = -1
+        RETURN FALSE
     END IF
-    DIM mwst AS INTEGER : mwst = mwstVonIndex(GUI_DROPDOWN_SELECTED(ddAMwst))
-    IF artikelIdAkt < 0 THEN
-        DB_EXEC(db, "INSERT INTO artikel (bezeichnung, preis_cent, mwst) VALUES (?, ?, ?)", bez, cent, mwst)
-        artikelIdAkt = DB_LAST_ROWID(db)
-    ELSE
-        DB_EXEC(db, "UPDATE artikel SET bezeichnung = ?, preis_cent = ?, mwst = ? WHERE id = ?", bez, cent, mwst, artikelIdAkt)
-    END IF
+    artikelIdAkt = id
     artikelLaden()
     aZeileAlt = zeileVonId(artikelId, artikelAnz, artikelIdAkt)
     GUI_TABLE_SET_SELECTED(tArtikel, aZeileAlt)

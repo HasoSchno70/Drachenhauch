@@ -25,15 +25,27 @@
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Kodierung {
     Utf8,
+    /// UTF-8 mit Byte-Order-Mark vorn (2026-10-14, Texteditor-Runde). Lesen
+    /// wie utf8 (ein BOM faellt ohnehin weg), SCHREIBEN setzt EF BB BF an
+    /// den Anfang der Datei -- sonst verliert ein Editor das BOM einer Datei,
+    /// die er nur oeffnet und sichert, und ein Programm, das darauf achtet
+    /// (Excel liest UTF-8 nur damit richtig), sieht danach Zeichensalat.
+    Utf8Bom,
     /// Windows-1252 -- was Excel und Notepad unter „ANSI" schreiben.
     Cp1252,
     /// ISO-8859-1: jedes Byte ist sein eigener Codepunkt. Kann nie scheitern.
     Latin1,
+    /// Nur beim Lesen (2026-10-11, Konsolen-Runde): gueltiges UTF-8 bleibt
+    /// UTF-8, sonst Windows-1252; ein Nullbyte heisst Binaerdatei und ist ein
+    /// Fehler. Ein Werkzeug, das fremde Dateien durchsucht, weiss vorher
+    /// nicht, was es bekommt -- ASCII ist in beiden gleich, eine Zeile mit
+    /// Umlauten entscheidet sich also eindeutig.
+    Auto,
 }
 
 /// Alle Namen, die eine Kodierung annimmt -- fuer die Fehlermeldung an einer
 /// Stelle, statt in jedem Builtin neu aufgezaehlt.
-pub const NAMEN: &str = "utf8, cp1252 (= ansi, windows-1252), latin1 (= iso-8859-1)";
+pub const NAMEN: &str = "utf8, utf8bom, cp1252 (= ansi, windows-1252), latin1 (= iso-8859-1), auto (nur lesen)";
 
 /// Namen aus dem DH-Programm auf die Kodierung abbilden.
 ///
@@ -47,8 +59,10 @@ pub fn aus_name(name: &str, fn_: &str) -> Result<Kodierung, String> {
         .collect();
     match k.as_str() {
         "utf8" | "utf" => Ok(Kodierung::Utf8),
+        "utf8bom" | "utf8sig" => Ok(Kodierung::Utf8Bom),
         "cp1252" | "windows1252" | "win1252" | "ansi" | "1252" => Ok(Kodierung::Cp1252),
         "latin1" | "iso88591" | "latin" | "88591" => Ok(Kodierung::Latin1),
+        "auto" => Ok(Kodierung::Auto),
         _ => Err(format!("{}: Kodierung '{}' kenne ich nicht -- moeglich sind: {}",
                          fn_, name, NAMEN)),
     }
@@ -75,16 +89,31 @@ pub fn dekodieren(bytes: &[u8], k: Kodierung, fn_: &str, pfad: &str)
     -> Result<String, String>
 {
     match k {
-        Kodierung::Utf8 => match std::str::from_utf8(bytes) {
+        Kodierung::Utf8 | Kodierung::Utf8Bom => match std::str::from_utf8(bytes) {
             Ok(s) => Ok(s.to_string()),
             Err(e) => Err(utf8_meldung(fn_, pfad, bytes, e.valid_up_to())),
         },
         Kodierung::Latin1 => Ok(bytes.iter().map(|&b| b as char).collect()),
-        Kodierung::Cp1252 => Ok(bytes.iter().map(|&b| {
-            if (0x80..0xA0).contains(&b) { CP1252_HOCH[(b - 0x80) as usize] }
-            else { b as char }
-        }).collect()),
+        Kodierung::Cp1252 => Ok(cp1252_lesen(bytes)),
+        Kodierung::Auto => {
+            if let Some(stelle) = bytes.iter().position(|&b| b == 0) {
+                let wo = if pfad.is_empty() { String::new() } else { format!("{}: ", pfad) };
+                return Err(format!("{}: {}sieht nach einer Binaerdatei aus (Nullbyte an Stelle {}) \
+                                    -- \"auto\" liest nur Text", fn_, wo, stelle));
+            }
+            match std::str::from_utf8(bytes) {
+                Ok(s) => Ok(s.to_string()),
+                Err(_) => Ok(cp1252_lesen(bytes)),
+            }
+        }
     }
+}
+
+fn cp1252_lesen(bytes: &[u8]) -> String {
+    bytes.iter().map(|&b| {
+        if (0x80..0xA0).contains(&b) { CP1252_HOCH[(b - 0x80) as usize] }
+        else { b as char }
+    }).collect()
 }
 
 /// Die Meldung, um die es bei diesem ganzen Modul geht.
@@ -113,7 +142,11 @@ fn utf8_meldung(fn_: &str, pfad: &str, bytes: &[u8], bis: usize) -> String {
 /// nicht erst geschrieben wird.
 pub fn kodieren(text: &str, k: Kodierung, fn_: &str) -> Result<Vec<u8>, String> {
     match k {
-        Kodierung::Utf8 => Ok(text.as_bytes().to_vec()),
+        Kodierung::Auto => Err(format!("{}: \"auto\" gilt nur beim Lesen -- zum Schreiben \
+                                        eine Kodierung angeben (utf8, cp1252, latin1)", fn_)),
+        // Ohne das BOM: es gehoert an den Anfang der DATEI, nicht vor jede
+        // geschriebene Zeile -- wer es setzt, fragt `bom_vorn`.
+        Kodierung::Utf8 | Kodierung::Utf8Bom => Ok(text.as_bytes().to_vec()),
         Kodierung::Latin1 => {
             let mut raus = Vec::with_capacity(text.len());
             for c in text.chars() {
@@ -153,6 +186,24 @@ fn unmappbar(fn_: &str, c: char, k: &str) -> String {
             fn_, c, c as u32, k)
 }
 
+/// Das BOM, das vor eine leere Datei gehoert -- leer bei allem ausser utf8bom.
+pub fn bom_vorn(k: Kodierung) -> &'static [u8] {
+    if k == Kodierung::Utf8Bom { &[0xEF, 0xBB, 0xBF] } else { &[] }
+}
+
+/// Welche Kodierung `auto` fuer diese Bytes waehlt -- als Name, den das
+/// Schreiben wieder annimmt (`FILE_ENCODING$`). "binaer" bei einem Nullbyte
+/// (darunter UTF-16, das hier nicht gelesen wird); ein UTF-8-BOM vor
+/// gueltigem UTF-8 heisst "utf8bom", damit Oeffnen und Sichern es behalten.
+pub fn erkennen(bytes: &[u8]) -> &'static str {
+    if bytes.contains(&0) { return "binaer"; }
+    match std::str::from_utf8(bytes) {
+        Ok(_) if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) => "utf8bom",
+        Ok(_) => "utf8",
+        Err(_) => "cp1252",
+    }
+}
+
 /// Ein fuehrendes BOM abschneiden.
 ///
 /// Excel schreibt es, und ohne dieses Abschneiden heisst die erste Spalte
@@ -162,6 +213,30 @@ pub fn ohne_bom(s: String) -> String {
     match s.strip_prefix('\u{feff}') {
         Some(rest) => rest.to_string(),
         None => s,
+    }
+}
+
+#[cfg(test)]
+mod auto_tests {
+    use super::*;
+    #[test]
+    fn auto_nimmt_utf8_sonst_cp1252_und_lehnt_binaer_ab() {
+        assert_eq!(aus_name("AUTO", "T").unwrap(), Kodierung::Auto);
+        assert_eq!(aus_name("UTF-8-BOM", "T").unwrap(), Kodierung::Utf8Bom);
+        assert_eq!(aus_name("utf-8-sig", "T").unwrap(), Kodierung::Utf8Bom);
+        assert_eq!(erkennen(b""), "utf8");
+        assert_eq!(erkennen("Müller".as_bytes()), "utf8");
+        assert_eq!(erkennen(&[0xEF, 0xBB, 0xBF, b'a']), "utf8bom");
+        assert_eq!(erkennen(&[b'M', 0xFC]), "cp1252");
+        assert_eq!(erkennen(&[0xFF, 0xFE, b'a', 0]), "binaer");
+        assert_eq!(kodieren("ä", Kodierung::Utf8Bom, "T").unwrap(), "ä".as_bytes());
+        assert_eq!(bom_vorn(Kodierung::Utf8Bom), &[0xEF, 0xBB, 0xBF]);
+        assert!(bom_vorn(Kodierung::Utf8).is_empty());
+        assert_eq!(dekodieren("Müller".as_bytes(), Kodierung::Auto, "T", "").unwrap(), "Müller");
+        assert_eq!(dekodieren(&[b'M', 0xFC, b'l', 0x80], Kodierung::Auto, "T", "").unwrap(), "Mül€");
+        let e = dekodieren(&[b'a', 0, b'b'], Kodierung::Auto, "READLINES", "x.bin").unwrap_err();
+        assert!(e.contains("Binaerdatei") && e.contains("x.bin") && e.contains("Stelle 1"), "{}", e);
+        assert!(kodieren("x", Kodierung::Auto, "WRITEALL").unwrap_err().contains("nur beim Lesen"));
     }
 }
 

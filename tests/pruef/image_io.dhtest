@@ -745,3 +745,11 @@ DHRT_FRAMES=2
 --- erwartet
 48 48
 hoechstens 256 TRUE
+
+=== image_width und image_height sind dieselben wie imagewidth
+' Der zweite Name passt ins Schema der uebrigen IMAGE_*-Befehle (2026-10-10).
+DIM b AS IMAGE
+b = IMAGE_NEW(30, 20)
+PRINT IMAGE_WIDTH(b); " "; IMAGE_HEIGHT(b); " "; IMAGEWIDTH(b); " "; IMAGEHEIGHT(b)
+--- erwartet
+30 20 30 20

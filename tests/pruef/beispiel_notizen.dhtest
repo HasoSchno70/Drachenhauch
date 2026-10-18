@@ -1,0 +1,121 @@
+' Das Beispiel examples/notizen/main.dh (2026-10-09, beim Dogfooding
+' entstanden): Notizen in SQLite, Liste mit Suche, formatierter Text als
+' Markdown, PDF. Der Einschub steht hinter dem Aufbau, ruft die
+' Unterprogramme des Programms und liest danach Liste und Datenbank, die das
+' Programm im eigenen Ordner anlegt.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== sichern, liste, suche und loeschen
+GUI_SET_TEXT(tfTitel, "Einkauf")
+GUI_TEXTAREA_SET_MARKDOWN(ta, "Milch und **Brot**")
+sichern()
+oeffnen(0)
+GUI_SET_TEXT(tfTitel, "")
+GUI_SET_TEXT(ta, "Anruf bei Oma" + CHR$(10) + "zweite Zeile")
+sichern()
+PRINT "liste "; GUI_LISTBOX_COUNT(lst); " | "; GUI_LISTBOX_ITEM(lst, 0); " | "; GUI_LISTBOX_ITEM(lst, 1)
+PRINT "gewaehlt "; GUI_LISTBOX_ITEM(lst, GUI_LISTBOX_SELECTED(lst))
+PRINT "status "; GUI_STATUSBAR_TEXT$(sb, 0); " | "; GUI_STATUSBAR_TEXT$(sb, 1)
+' die Suche filtert die Liste
+GUI_LISTBOX_FILTER(lst, "eink")
+PRINT "gefiltert "; GUI_LISTBOX_VIEW_COUNT(lst)
+GUI_LISTBOX_FILTER(lst, "")
+DIM prR AS DB_RESULT
+prR = DB_QUERY(ablage, "SELECT titel, text FROM notiz ORDER BY id")
+WHILE DB_NEXT(prR)
+    PRINT "db ["; DB_GET_STRING(prR, 0); "] ["; REPLACE$(DB_GET_STRING(prR, 1), CHR$(10), "/"); "]"
+WEND
+DB_CLOSE_RESULT(prR)
+loeschen()
+PRINT "nach dem loeschen "; GUI_LISTBOX_COUNT(lst); " "; GUI_LISTBOX_ITEM(lst, 0)
+EXIT(0)
+--- programm ../../examples/notizen/main.dh nach status("Bereit.")
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+liste 2 | Anruf bei Oma | Einkauf
+gewaehlt Anruf bei Oma
+status Gesichert: Anruf bei Oma | 2 Notizen
+gefiltert 1
+db [Einkauf] [Milch und **Brot**]
+db [] [Anruf bei Oma/zweite Zeile]
+nach dem loeschen 1 Einkauf
+
+=== geaendert erkennt titel und format
+PRINT "neu "; ungesichert()
+GUI_SET_TEXT(tfTitel, "T")
+PRINT "titel "; ungesichert()
+sichern()
+PRINT "gesichert "; ungesichert()
+GUI_SET_TEXT(ta, "Text")
+sichern()
+GUI_TEXTAREA_SELECT(ta, 1, 1, 1, 5)
+GUI_TEXTAREA_STYLE(ta, "fett", TRUE)
+PRINT "nur fett "; ungesichert(); " "; GUI_TEXTAREA_MARKDOWN$(ta)
+oeffnen(aktuell)
+PRINT "neu geoeffnet "; ungesichert()
+EXIT(0)
+--- programm ../../examples/notizen/main.dh nach status("Bereit.")
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+neu FALSE
+titel TRUE
+gesichert FALSE
+nur fett TRUE **Text**
+neu geoeffnet FALSE
+
+=== ohne titel gilt die erste zeile
+PRINT titelVon$("  Titel ", "x")
+PRINT titelVon$("", "  erste Zeile" + CHR$(10) + "zweite")
+PRINT titelVon$("", "")
+PRINT titelVon$("", REPEAT$("a", 60))
+EXIT(0)
+--- programm ../../examples/notizen/main.dh nach status("Bereit.")
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+Titel
+erste Zeile
+(ohne Titel)
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+=== das pdf bricht lange zeilen an wortgrenzen um
+GUI_SET_TEXT(tfTitel, "Grüße")
+DIM prLang AS STRING
+prLang = ""
+DIM prI AS INTEGER
+FOR prI = 1 TO 40
+    prLang = prLang + "Wort" + STR$(prI) + " "
+NEXT
+GUI_SET_TEXT(ta, "kurz" + CHR$(10) + RTRIM$(prLang))
+pdfSchreiben("notiz.pdf")
+EXIT(0)
+--- programm ../../examples/notizen/main.dh nach status("Bereit.")
+--- umgebung
+DHRT_FRAMES=60
+--- datei leser.dh
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+--- nachher
+IMPORT "leser.dh"
+DIM s AS ARRAY OF STRING
+s = pdfSeiten("_programm/notiz.pdf")
+PRINT "seiten "; LEN(s)
+PRINT "titel "; INSTR(s[0], "Grüße") >= 0
+PRINT "erstes und letztes wort "; INSTR(s[0], "Wort1 ") >= 0; " "; INSTR(s[0], "Wort40") >= 0
+' umgebrochen: die Woerter stehen auf mehreren Hoehen
+DIM y1 AS STRING
+DIM y40 AS STRING
+DIM k AS INTEGER
+FOR k = 0 TO LEN(pdfStellen) - 1
+    DIM t AS ARRAY OF STRING
+    t = SPLIT$(pdfStellen[k], "|")
+    IF INSTR(t[3], "Wort1 ") >= 0 THEN y1 = t[2]
+    IF INSTR(t[3], "Wort40") >= 0 THEN y40 = t[2]
+NEXT
+PRINT "mehrere zeilen "; y1 <> "" AND y40 <> "" AND y1 <> y40
+--- erwartet
+seiten 1
+titel TRUE
+erstes und letztes wort TRUE TRUE
+mehrere zeilen TRUE

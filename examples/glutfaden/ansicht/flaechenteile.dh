@@ -1,0 +1,693 @@
+' Teile um die Zeichenflaeche (Stufe 15): Lineale oben und links
+' (PyStickys RulerWidget/RulerCorner), die Minikarte oben in der
+' Seitenleiste (MinimapWidget), die Kachel-Vorschau (TilePreviewPanel) und
+' die Leiste des Werkzeugs Farbverlauf (GradientOptionsPanel). Die Rechnung
+' steht in kern/flaeche.dh.
+
+CONST FL_LINEAL = 25                  ' RulerWidget.RULER_SIZE
+CONST FL_AKZENT = &HFF8A3D
+CONST FL_MARKE = &H5CC977             ' die Spalte/Zeile unter dem Zeiger (THEME.success)
+
+DIM flRaster AS INTEGER               ' GtkGrid: Ecke, Lineale, Zeichenflaeche
+DIM flOben AS INTEGER
+DIM flLinks AS INTEGER
+DIM flEcke AS INTEGER
+DIM flUeber AS INTEGER                ' Lineal-Position unter der Maus (-1 = keine)
+DIM flUeberLinks AS BOOLEAN           ' ... auf dem linken Lineal
+DIM flStand AS STRING                 ' zuletzt gezeichnet: Lage, Zelle, Maus, Groesse
+DIM flSchrift AS INTEGER
+DIM flRollW AS INTEGER                ' GtkAdjustment waagerecht / senkrecht
+DIM flRollS AS INTEGER
+DIM flRollSperre AS BOOLEAN
+
+' --- Lineale ----------------------------------------------------------------------------
+
+FUNCTION flLinealNeu(links AS BOOLEAN) AS INTEGER
+    DIM l AS INTEGER : l = gtk_drawing_area_new()
+    IF links THEN
+        gtk_widget_set_size_request(l, FL_LINEAL, -1)
+        gtk_widget_set_vexpand(l, TRUE)
+    ELSE
+        gtk_widget_set_size_request(l, -1, FL_LINEAL)
+        gtk_widget_set_hexpand(l, TRUE)
+    END IF
+    gtk_widget_add_events(l, GDK_MASKE_BEWEGUNG BOR GDK_MASKE_DRUCK BOR GDK_MASKE_VERLASSEN)
+    signalZeichnen(l, "draw", flLinealZeichnen, IIF(links, 1, 0), 0, 0)
+    signalEreignis(l, "motion-notify-event", flLinealBewegung, IIF(links, 1, 0), 0, 0)
+    signalEreignis(l, "button-press-event", flLinealDruck, IIF(links, 1, 0), 0, 0)
+    signalEreignis(l, "leave-notify-event", flLinealVerlassen, IIF(links, 1, 0), 0, 0)
+    tipp(l, IIF(links, tr$("Klicken holt diese Zeile in die Mitte"), tr$("Klicken holt diese Spalte in die Mitte")))
+    RETURN l
+END FUNCTION
+
+' Zeichenflaeche samt Linealen; liefert das Raster zum Einpacken.
+FUNCTION flaecheMitLinealen(flaeche AS INTEGER) AS INTEGER
+    flRaster = gtk_grid_new()
+    flEcke = gtk_drawing_area_new()
+    gtk_widget_set_size_request(flEcke, FL_LINEAL, FL_LINEAL)
+    gtk_widget_add_events(flEcke, GDK_MASKE_DRUCK)
+    signalZeichnen(flEcke, "draw", flEckeZeichnen, 0, 0, 0)
+    signalEreignis(flEcke, "button-press-event", flEckeDruck, 0, 0, 0)
+    tipp(flEcke, tr$("Klicken zentriert das Muster"))
+    flOben = flLinealNeu(FALSE)
+    flLinks = flLinealNeu(TRUE)
+    gtk_grid_attach(flRaster, flEcke, 0, 0, 1, 1)
+    gtk_grid_attach(flRaster, flOben, 1, 0, 1, 1)
+    gtk_grid_attach(flRaster, flLinks, 0, 1, 1, 1)
+    gtk_grid_attach(flRaster, flaeche, 1, 1, 1, 1)
+    ' Rollbalken (PySticky CanvasContainer): rechts und unten
+    flRollW = gtk_adjustment_new(0, 0, 1, 20, 100, 1)
+    flRollS = gtk_adjustment_new(0, 0, 1, 20, 100, 1)
+    signal(flRollW, "value-changed", flGerollt, 0, 0, 0)
+    signal(flRollS, "value-changed", flGerollt, 1, 0, 0)
+    DIM rw AS INTEGER : rw = gtk_scrollbar_new(GTK_WAAGERECHT, flRollW)
+    DIM rs AS INTEGER : rs = gtk_scrollbar_new(GTK_SENKRECHT, flRollS)
+    gtk_widget_set_can_focus(rw, FALSE)
+    gtk_widget_set_can_focus(rs, FALSE)
+    gtk_grid_attach(flRaster, rs, 2, 1, 1, 1)
+    gtk_grid_attach(flRaster, rw, 1, 2, 1, 1)
+    flUeber = -1
+    flSchrift = pango_font_description_from_string("DejaVu Sans 8")
+    RETURN flRaster
+END FUNCTION
+
+' Nach dem Zeichnen der Flaeche: Lineale und Minikarte nachziehen, wenn sich
+' Lage, Zoom, Maus oder Groesse geaendert haben -- eine Stelle statt jeder,
+' die lwX/lwY/lwZelle setzt.
+SUB flaecheNachziehen()
+    IF NOT lwHat THEN RETURN
+    DIM s AS STRING : s = STR$(lwX) + "|" + STR$(lwY) + "|" + STR$(lwZelle) + "|" + STR$(lwMausX) + "|" + STR$(lwMausY) + "|" + _
+        STR$(gtk_widget_get_allocated_width(lwFlaeche)) + "|" + STR$(gtk_widget_get_allocated_height(lwFlaeche)) + "|" + STR$(einst.rasterHaupt)
+    IF s = flStand THEN RETURN
+    flStand = s
+    flRollNachziehen()
+    IF flOben <> 0 THEN gtk_widget_queue_draw(flOben)
+    IF flLinks <> 0 THEN gtk_widget_queue_draw(flLinks)
+    IF mkFeld <> 0 THEN gtk_widget_queue_draw(mkFeld)
+END SUB
+
+' Die Rollbalken auf Lage und Zoom der Flaeche setzen (ohne zurueckzuschreiben)
+SUB flRollNachziehen()
+    IF flRollW = 0 OR NOT lwHat THEN RETURN
+    DIM bw AS FLOAT : bw = gtk_widget_get_allocated_width(lwFlaeche)
+    DIM bh AS FLOAT : bh = gtk_widget_get_allocated_height(lwFlaeche)
+    DIM u AS FLOAT, o AS FLOAT, s AS FLOAT, v AS FLOAT
+    flRollSperre = TRUE
+    (u, o, s, v) = kern.rollBereich(lwMuster.breite * lwZelle, bw, lwX)
+    gtk_adjustment_configure(flRollW, v, u, o + s, 20, s * 0.9, s)
+    (u, o, s, v) = kern.rollBereich(lwMuster.hoehe * lwZelle, bh, lwY)
+    gtk_adjustment_configure(flRollS, v, u, o + s, 20, s * 0.9, s)
+    flRollSperre = FALSE
+END SUB
+
+SUB flGerollt(a AS INTEGER, senkrecht AS INTEGER)
+    IF flRollSperre OR NOT lwHat THEN RETURN
+    IF senkrecht = 1 THEN lwY = -gtk_adjustment_get_value(a) ELSE lwX = -gtk_adjustment_get_value(a)
+    gtk_widget_queue_draw(lwFlaeche)
+END SUB
+
+SUB flLinealeZeigen(an AS BOOLEAN)
+    IF flRaster = 0 THEN RETURN
+    gtk_widget_set_visible(flOben, an)
+    gtk_widget_set_visible(flLinks, an)
+    gtk_widget_set_visible(flEcke, an)
+END SUB
+
+' Abstand der beschrifteten Striche: das Haupt-Raster, bei kleinem Zoom ein
+' Vielfaches davon -- sonst laufen die Zahlen ineinander.
+FUNCTION flSchritt() AS INTEGER
+    DIM s AS INTEGER : s = MAX(1, einst.rasterHaupt)
+    DIM f AS INTEGER
+    FOR EACH f IN [1, 2, 5, 10, 20, 50, 100]
+        IF s * f * lwZelle >= 28 THEN RETURN s * f
+    NEXT
+    RETURN s * 100
+END FUNCTION
+
+FUNCTION flLinealZeichnen(w AS INTEGER, cr AS INTEGER, links AS INTEGER) AS BOOLEAN
+    DIM bw AS FLOAT : bw = gtk_widget_get_allocated_width(w)
+    DIM bh AS FLOAT : bh = gtk_widget_get_allocated_height(w)
+    cairoFarbe(cr, uiFarbe(&H202228))
+    cairo_paint(cr)
+    IF NOT lwHat THEN RETURN TRUE
+    DIM z AS FLOAT : z = lwZelle
+    DIM ursprung AS FLOAT : ursprung = IIF(links = 1, lwY, lwX)
+    DIM laenge AS FLOAT : laenge = IIF(links = 1, bh, bw)
+    DIM quer AS FLOAT : quer = IIF(links = 1, bw, bh)
+    DIM anzahl AS INTEGER : anzahl = IIF(links = 1, lwMuster.hoehe, lwMuster.breite)
+    DIM maus AS INTEGER : maus = IIF(links = 1, lwMausY, lwMausX)
+    DIM ueber AS INTEGER : ueber = IIF(flUeberLinks = (links = 1), flUeber, -1)
+    ' Spalte/Zeile unter dem Zeiger auf der Flaeche (gruen) samt Dreieck
+    IF maus >= 0 AND maus < anzahl THEN
+        DIM p AS FLOAT : p = ursprung + maus * z
+        cairo_set_source_rgba(cr, 0.36, 0.79, 0.47, 0.40)
+        flRechteck(cr, links = 1, p, 0, z, quer)
+        cairo_fill(cr)
+        cairoFarbe(cr, FL_MARKE)
+        DIM m AS FLOAT : m = p + z / 2
+        IF links = 1 THEN
+            cairo_move_to(cr, quer, m - 4) : cairo_line_to(cr, quer, m + 4) : cairo_line_to(cr, quer - 6, m)
+        ELSE
+            cairo_move_to(cr, m - 4, quer) : cairo_line_to(cr, m + 4, quer) : cairo_line_to(cr, m, quer - 6)
+        END IF
+        cairo_close_path(cr)
+        cairo_fill(cr)
+    END IF
+    ' Spalte/Zeile unter der Maus auf dem Lineal
+    IF ueber >= 0 AND ueber < anzahl AND ueber <> maus THEN
+        cairo_set_source_rgba(cr, 1.0, 0.54, 0.24, 0.24)
+        flRechteck(cr, links = 1, ursprung + ueber * z, 0, z, quer)
+        cairo_fill(cr)
+    END IF
+    DIM von AS INTEGER : von = MAX(0, FLOOR(-ursprung / z) - 1)
+    DIM bis AS INTEGER : bis = MIN(anzahl, FLOOR((laenge - ursprung) / z) + 1)
+    DIM schritt AS INTEGER : schritt = flSchritt()
+    DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
+    pango_layout_set_font_description(layout, flSchrift)
+    DIM i AS INTEGER
+    cairo_set_line_width(cr, 1.0)
+    FOR i = von TO bis
+        DIM q AS FLOAT : q = FLOOR(ursprung + i * z) + 0.5
+        IF q < 0 OR q > laenge THEN CONTINUE
+        DIM gross AS BOOLEAN : gross = i MOD MAX(1, einst.rasterHaupt) = 0
+        DIM hervor AS BOOLEAN : hervor = i = ueber OR i = maus
+        IF NOT gross AND z < 4 AND NOT hervor THEN CONTINUE
+        IF i = maus THEN
+            cairoFarbe(cr, FL_MARKE)
+        ELSEIF i = ueber THEN
+            cairoFarbe(cr, FL_AKZENT)
+        ELSEIF gross THEN
+            cairoFarbe(cr, FL_AKZENT)
+        ELSE
+            cairoFarbe(cr, uiFarbe(&H6A6E78))
+        END IF
+        DIM strich AS FLOAT : strich = IIF(gross, 12, 6)
+        IF links = 1 THEN
+            cairo_move_to(cr, quer - strich, q) : cairo_line_to(cr, quer, q)
+        ELSE
+            cairo_move_to(cr, q, quer - strich) : cairo_line_to(cr, q, quer)
+        END IF
+        cairo_stroke(cr)
+        IF gross AND i MOD schritt = 0 THEN
+            IF NOT hervor THEN cairoFarbe(cr, uiFarbe(&H9AA0AD))
+            pango_layout_set_text(layout, STR$(i), -1)
+            DIM tw AS INTEGER, th AS INTEGER
+            pango_layout_get_pixel_size(layout, tw, th)
+            IF links = 1 THEN
+                cairo_move_to(cr, 2, q - th)
+            ELSE
+                cairo_move_to(cr, q - tw / 2, quer - 13 - th)
+            END IF
+            pango_cairo_show_layout(cr, layout)
+        END IF
+    NEXT
+    g_object_unref(layout)
+    ' Kante zur Flaeche
+    cairoFarbe(cr, uiFarbe(&H3A3C44))
+    IF links = 1 THEN
+        cairo_move_to(cr, quer - 0.5, 0) : cairo_line_to(cr, quer - 0.5, laenge)
+    ELSE
+        cairo_move_to(cr, 0, quer - 0.5) : cairo_line_to(cr, laenge, quer - 0.5)
+    END IF
+    cairo_stroke(cr)
+    RETURN TRUE
+END FUNCTION
+
+' Rechteck laengs (Position p, Dicke d) quer ueber das Lineal
+SUB flRechteck(cr AS INTEGER, links AS BOOLEAN, p AS FLOAT, q AS FLOAT, d AS FLOAT, quer AS FLOAT)
+    IF links THEN
+        cairo_rectangle(cr, q, p, quer, d)
+    ELSE
+        cairo_rectangle(cr, p, q, d, quer)
+    END IF
+END SUB
+
+FUNCTION flLinealStelle(links AS INTEGER, ereignis AS INTEGER) AS INTEGER
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
+    IF NOT lwHat THEN RETURN -1
+    DIM p AS INTEGER
+    IF links = 1 THEN
+        p = FLOOR((py - lwY) / lwZelle)
+        IF p < 0 OR p >= lwMuster.hoehe THEN RETURN -1
+    ELSE
+        p = FLOOR((px - lwX) / lwZelle)
+        IF p < 0 OR p >= lwMuster.breite THEN RETURN -1
+    END IF
+    RETURN p
+END FUNCTION
+
+FUNCTION flLinealBewegung(w AS INTEGER, ereignis AS INTEGER, links AS INTEGER) AS BOOLEAN
+    DIM p AS INTEGER : p = flLinealStelle(links, ereignis)
+    IF p <> flUeber OR flUeberLinks <> (links = 1) THEN
+        flUeber = p
+        flUeberLinks = links = 1
+        gtk_widget_queue_draw(w)
+    END IF
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION flLinealVerlassen(w AS INTEGER, ereignis AS INTEGER, links AS INTEGER) AS BOOLEAN
+    flUeber = -1
+    gtk_widget_queue_draw(w)
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION flLinealDruck(w AS INTEGER, ereignis AS INTEGER, links AS INTEGER) AS BOOLEAN
+    DIM p AS INTEGER : p = flLinealStelle(links, ereignis)
+    IF p >= 0 THEN linealSpringen(links = 1, p)
+    RETURN TRUE
+END FUNCTION
+
+' Spalte (oder Zeile) p in die Mitte holen -- wie _on_h_ruler_clicked
+SUB linealSpringen(links AS BOOLEAN, p AS INTEGER)
+    IF NOT lwHat THEN RETURN
+    IF links THEN
+        lwY = gtk_widget_get_allocated_height(lwFlaeche) \ 2 - (p * lwZelle + lwZelle / 2)
+    ELSE
+        lwX = gtk_widget_get_allocated_width(lwFlaeche) \ 2 - (p * lwZelle + lwZelle / 2)
+    END IF
+    gtk_widget_queue_draw(lwFlaeche)
+END SUB
+
+FUNCTION flEckeZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    cairoFarbe(cr, uiFarbe(&H202228))
+    cairo_paint(cr)
+    ' Fadenkreuz
+    cairoFarbe(cr, uiFarbe(&H9AA0AD))
+    cairo_set_line_width(cr, 1.0)
+    cairo_arc(cr, 12.5, 12.5, 5, 0, TAU) : cairo_stroke(cr)
+    cairo_move_to(cr, 12.5, 4) : cairo_line_to(cr, 12.5, 21) : cairo_stroke(cr)
+    cairo_move_to(cr, 4, 12.5) : cairo_line_to(cr, 21, 12.5) : cairo_stroke(cr)
+    cairoFarbe(cr, uiFarbe(&H3A3C44))
+    cairo_move_to(cr, FL_LINEAL - 0.5, 0) : cairo_line_to(cr, FL_LINEAL - 0.5, FL_LINEAL)
+    cairo_move_to(cr, 0, FL_LINEAL - 0.5) : cairo_line_to(cr, FL_LINEAL, FL_LINEAL - 0.5)
+    cairo_stroke(cr)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION flEckeDruck(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    musterZentrieren()
+    RETURN TRUE
+END FUNCTION
+
+' Das Muster in die Mitte, ohne den Zoom zu aendern (_center_pattern)
+SUB musterZentrieren()
+    IF NOT lwHat THEN RETURN
+    lwX = (gtk_widget_get_allocated_width(lwFlaeche) - lwMuster.breite * lwZelle) / 2
+    lwY = (gtk_widget_get_allocated_height(lwFlaeche) - lwMuster.hoehe * lwZelle) / 2
+    gtk_widget_queue_draw(lwFlaeche)
+END SUB
+
+' --- Minikarte --------------------------------------------------------------------------
+
+DIM mkBox AS INTEGER                  ' Ueberschrift, Feld, Masse
+DIM mkFeld AS INTEGER
+DIM mkInfo AS INTEGER
+DIM mkBild AS INTEGER                 ' cairo_surface_t, 0 = keins
+DIM mkPuffer AS BUFFER
+DIM mkNeu AS BOOLEAN                  ' Bild neu rechnen
+DIM mkGroesse AS STRING               ' fuer welche Feldgroesse
+DIM mkB AS INTEGER                    ' Bildmasse und Lage im Feld
+DIM mkH AS INTEGER
+DIM mkX AS INTEGER
+DIM mkY AS INTEGER
+DIM mkZiehen AS BOOLEAN
+
+FUNCTION minikarteNeu() AS INTEGER
+    mkBox = gtk_box_new(GTK_SENKRECHT, 2)
+    gtk_box_pack_start(mkBox, slUeberschrift(tr$("Übersicht")), FALSE, FALSE, 0)
+    mkFeld = gtk_drawing_area_new()
+    gtk_widget_set_size_request(mkFeld, -1, 150)
+    gtkKlasse(mkFeld, "innen")
+    gtk_widget_add_events(mkFeld, GDK_MASKE_BEWEGUNG BOR GDK_MASKE_DRUCK BOR GDK_MASKE_LOSLASSEN)
+    signalZeichnen(mkFeld, "draw", mkZeichnen, 0, 0, 0)
+    signalEreignis(mkFeld, "button-press-event", mkDruck, 0, 0, 0)
+    signalEreignis(mkFeld, "motion-notify-event", mkBewegung, 0, 0, 0)
+    signalEreignis(mkFeld, "button-release-event", mkLoslassen, 0, 0, 0)
+    tipp(mkFeld, tr$("Klicken oder ziehen: diese Stelle in die Mitte holen"))
+    gtk_box_pack_start(mkBox, mkFeld, FALSE, FALSE, 0)
+    mkInfo = gtk_label_new("")
+    gtkKlasse(mkInfo, "nebensache")
+    gtk_box_pack_start(mkBox, mkInfo, FALSE, FALSE, 0)
+    mkNeu = TRUE
+    RETURN mkBox
+END FUNCTION
+
+' Das Bild der Minikarte neu rechnen (nach jeder Aenderung am Muster).
+SUB minikarteAuffrischen()
+    mkNeu = TRUE
+    IF mkFeld <> 0 THEN gtk_widget_queue_draw(mkFeld)
+    ' den Text nur, wenn er sich aendert -- gtk_label_set_text vermisst auch
+    ' bei gleichem Text neu (siehe verlaufLeisteNachziehen)
+    IF mkInfo <> 0 AND lwHat THEN
+        DIM t AS STRING : t = trf$("{0} × {1} Stiche", [STR$(lwMuster.breite), STR$(lwMuster.hoehe)])
+        IF t <> gtk_label_get_text(mkInfo) THEN gtk_label_set_text(mkInfo, t)
+    END IF
+END SUB
+
+SUB minikarteZeigen(an AS BOOLEAN)
+    IF mkBox <> 0 THEN gtk_widget_set_visible(mkBox, an)
+END SUB
+
+SUB mkBauen(bw AS INTEGER, bh AS INTEGER)
+    (mkB, mkH, mkX, mkY) = kern.minikarteMass(lwMuster.breite, lwMuster.hoehe, bw, bh)
+    ' das Feld ist hier so gross, wie es ist -- kleiner als 120 x 100 wird es nur
+    ' in der Breite, wenn die Seitenleiste schmal ist
+    mkX = (bw - mkB) \ 2
+    mkY = (bh - mkH) \ 2
+    DIM p AS ARRAY OF INTEGER : p = kern.minikartePunkte(lwFarbe, lwMuster.breite, lwMuster.hoehe, lwRgbEcht[0:lwMuster.farbanzahl()], mkB, mkH)
+    IF mkBild <> 0 THEN cairo_surface_destroy(mkBild) : mkBild = 0
+    DIM zeile AS INTEGER : zeile = cairo_format_stride_for_width(CAIRO_ARGB32, mkB)
+    mkPuffer = BUFFER_NEW(zeile * mkH)
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO mkH - 1
+        FOR x = 0 TO mkB - 1
+            BUFFER_SET_U32(mkPuffer, y * zeile + x * 4, &HFF000000 BOR p[y * mkB + x])
+        NEXT
+    NEXT
+    mkBild = cairo_image_surface_create_for_data(BUFFER_ZEIGER(mkPuffer), CAIRO_ARGB32, mkB, mkH, zeile)
+    mkNeu = FALSE
+END SUB
+
+' Der sichtbare Ausschnitt als Anteil am Muster (_update_minimap_viewport)
+FUNCTION mkAusschnitt() AS TUPLE
+    DIM pw AS FLOAT : pw = lwMuster.breite * lwZelle
+    DIM ph AS FLOAT : ph = lwMuster.hoehe * lwZelle
+    RETURN kern.minikarteAusschnitt(-lwX / pw, -lwY / ph, gtk_widget_get_allocated_width(lwFlaeche) / pw, _
+        gtk_widget_get_allocated_height(lwFlaeche) / ph, mkX, mkY, mkB, mkH)
+END FUNCTION
+
+FUNCTION mkZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM bw AS INTEGER : bw = gtk_widget_get_allocated_width(w)
+    DIM bh AS INTEGER : bh = gtk_widget_get_allocated_height(w)
+    cairoFarbe(cr, uiFarbe(&H16171B))
+    cairo_rectangle(cr, 0, 0, bw, bh)
+    cairo_fill(cr)
+    IF NOT lwHat THEN RETURN TRUE
+    DIM g AS STRING : g = STR$(bw) + "x" + STR$(bh)
+    IF mkNeu OR g <> mkGroesse THEN
+        mkGroesse = g
+        mkBauen(bw, bh)
+    END IF
+    cairo_set_source_surface(cr, mkBild, mkX, mkY)
+    cairo_paint(cr)
+    cairoFarbe(cr, uiFarbe(&H3A3C44))
+    cairo_set_line_width(cr, 1.0)
+    cairo_rectangle(cr, mkX - 0.5, mkY - 0.5, mkB + 1, mkH + 1)
+    cairo_stroke(cr)
+    ' Alles ausser dem Ausschnitt abgedunkelt, der Ausschnitt mit Rahmen
+    DIM vx AS INTEGER, vy AS INTEGER, vw AS INTEGER, vh AS INTEGER
+    (vx, vy, vw, vh) = mkAusschnitt()
+    ' vier Streifen wie im Original (oben, unten, links, rechts)
+    cairo_set_source_rgba(cr, 0, 0, 0, 100 / 255.0)
+    DIM r AS INTEGER : r = mkX + mkB - 1
+    DIM u AS INTEGER : u = mkY + mkH - 1
+    DIM vr AS INTEGER : vr = vx + vw - 1
+    DIM vu AS INTEGER : vu = vy + vh - 1
+    IF vy > mkY THEN cairo_rectangle(cr, mkX, mkY, mkB, vy - mkY)
+    IF vu < u THEN cairo_rectangle(cr, mkX, vu, mkB, u - vu)
+    DIM oben AS INTEGER : oben = MAX(vy, mkY)
+    DIM hoch AS INTEGER : hoch = MIN(vu, u) - oben
+    IF vx > mkX THEN cairo_rectangle(cr, mkX, oben, vx - mkX, hoch)
+    IF vr < r THEN cairo_rectangle(cr, vr, oben, r - vr, hoch)
+    cairo_fill(cr)
+    cairoFarbe(cr, FL_AKZENT)
+    cairo_set_line_width(cr, 2.0)
+    cairo_rectangle(cr, vx + 1, vy + 1, MAX(0, vw - 2), MAX(0, vh - 2))
+    cairo_stroke(cr)
+    RETURN TRUE
+END FUNCTION
+
+' Eine Stelle der Minikarte in die Mitte der Flaeche (_on_minimap_navigate)
+SUB mkSpringen(px AS FLOAT, py AS FLOAT)
+    IF NOT lwHat OR mkB <= 0 OR mkH <= 0 THEN RETURN
+    DIM rx AS FLOAT : rx = CLAMP((px - mkX) / mkB, 0.0, 1.0)
+    DIM ry AS FLOAT : ry = CLAMP((py - mkY) / mkH, 0.0, 1.0)
+    minikarteSpringen(rx, ry)
+END SUB
+
+SUB minikarteSpringen(rx AS FLOAT, ry AS FLOAT)
+    lwX = INT(gtk_widget_get_allocated_width(lwFlaeche) / 2 - rx * lwMuster.breite * lwZelle)
+    lwY = INT(gtk_widget_get_allocated_height(lwFlaeche) / 2 - ry * lwMuster.hoehe * lwZelle)
+    gtk_widget_queue_draw(lwFlaeche)
+END SUB
+
+FUNCTION mkDruck(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
+    IF lwTaste(ereignis) <> 1 THEN RETURN FALSE
+    mkZiehen = TRUE
+    mkSpringen(px, py)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION mkBewegung(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    IF NOT mkZiehen THEN RETURN FALSE
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
+    mkSpringen(px, py)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION mkLoslassen(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    mkZiehen = FALSE
+    RETURN TRUE
+END FUNCTION
+
+' --- Kachel-Vorschau --------------------------------------------------------------------
+
+DIM kvDialog AS INTEGER
+DIM kvFeld AS INTEGER
+DIM kvX AS INTEGER                    ' GtkSpinButton
+DIM kvY AS INTEGER
+DIM kvGrenzen AS INTEGER              ' GtkCheckButton
+DIM kvBild AS INTEGER                 ' das Muster 1:1 (cairo_surface_t)
+DIM kvPuffer AS BUFFER
+DIM kvZelle AS INTEGER                ' zuletzt gezeichnete Zellgroesse
+
+FUNCTION kvBauen() AS INTEGER
+    kvDialog = gtk_dialog_new_with_buttons(trf$("Kachel-Vorschau — {0}", [lwMuster.name]), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Schließen"), GTK_ANTWORT_OK, 0)
+    gtk_window_set_default_size(kvDialog, 760, 620)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(kvDialog)
+    gtk_container_set_border_width(innen, 10)
+    DIM l AS INTEGER : l = gtk_label_new(tr$("Das Muster mehrfach nebeneinander -- für Wiederholungsmuster und Bordüren: passen die Ränder aneinander?"))
+    gtk_label_set_xalign(l, 0.0)
+    gtk_label_set_line_wrap(l, TRUE)
+    gtk_box_pack_start(innen, l, FALSE, FALSE, 4)
+    DIM zeile AS INTEGER : zeile = gtk_box_new(GTK_WAAGERECHT, 8)
+    gtk_box_pack_start(zeile, gtk_label_new(tr$("Kacheln:")), FALSE, FALSE, 0)
+    gtk_box_pack_start(zeile, gtk_label_new(tr$("waagerecht")), FALSE, FALSE, 0)
+    kvX = gtk_spin_button_new_with_range(1, 5, 1)
+    gtk_spin_button_set_value(kvX, 3)
+    gtk_box_pack_start(zeile, kvX, FALSE, FALSE, 0)
+    gtk_box_pack_start(zeile, gtk_label_new(tr$("senkrecht")), FALSE, FALSE, 0)
+    kvY = gtk_spin_button_new_with_range(1, 5, 1)
+    gtk_spin_button_set_value(kvY, 3)
+    gtk_box_pack_start(zeile, kvY, FALSE, FALSE, 0)
+    kvGrenzen = gtk_check_button_new_with_label(tr$("Kachelgrenzen anzeigen"))
+    gtk_toggle_button_set_active(kvGrenzen, TRUE)
+    gtk_box_pack_start(zeile, kvGrenzen, FALSE, FALSE, 12)
+    gtk_box_pack_start(innen, zeile, FALSE, FALSE, 4)
+    kvFeld = gtk_drawing_area_new()
+    gtk_widget_set_size_request(kvFeld, 250, 200)
+    gtk_widget_set_vexpand(kvFeld, TRUE)
+    gtk_widget_set_hexpand(kvFeld, TRUE)
+    signalZeichnen(kvFeld, "draw", kvZeichnen, 0, 0, 0)
+    gtk_box_pack_start(innen, kvFeld, TRUE, TRUE, 4)
+    signal(kvX, "value-changed", kvGeaendert, 0, 0, 0)
+    signal(kvY, "value-changed", kvGeaendert, 0, 0, 0)
+    signal(kvGrenzen, "toggled", kvGeaendert, 0, 0, 0)
+    ' Das Muster einmal 1:1, mit Cremeweiss, wo kein Stich ist -- gezeichnet
+    ' wird es je Kachel vergroessert
+    IF kvBild <> 0 THEN cairo_surface_destroy(kvBild) : kvBild = 0
+    DIM b AS INTEGER : b = lwMuster.breite
+    DIM h AS INTEGER : h = lwMuster.hoehe
+    DIM p AS ARRAY OF INTEGER : p = kern.minikartePunkte(lwFarbe, b, h, lwRgbEcht[0:lwMuster.farbanzahl()], b, h)
+    DIM zl AS INTEGER : zl = cairo_format_stride_for_width(CAIRO_ARGB32, b)
+    kvPuffer = BUFFER_NEW(zl * h)
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO h - 1
+        FOR x = 0 TO b - 1
+            BUFFER_SET_U32(kvPuffer, y * zl + x * 4, &HFF000000 BOR p[y * b + x])
+        NEXT
+    NEXT
+    kvBild = cairo_image_surface_create_for_data(BUFFER_ZEIGER(kvPuffer), CAIRO_ARGB32, b, h, zl)
+    gtk_widget_show_all(kvDialog)
+    RETURN kvDialog
+END FUNCTION
+
+SUB kvGeaendert(w AS INTEGER, daten AS INTEGER)
+    IF kvFeld <> 0 THEN gtk_widget_queue_draw(kvFeld)
+END SUB
+
+FUNCTION kvZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM bw AS INTEGER : bw = gtk_widget_get_allocated_width(w)
+    DIM bh AS INTEGER : bh = gtk_widget_get_allocated_height(w)
+    cairoFarbe(cr, uiFarbe(&H16171B))
+    cairo_paint(cr)
+    DIM pw AS INTEGER : pw = lwMuster.breite
+    DIM ph AS INTEGER : ph = lwMuster.hoehe
+    DIM tx AS INTEGER : tx = gtk_spin_button_get_value_as_int(kvX)
+    DIM ty AS INTEGER : ty = gtk_spin_button_get_value_as_int(kvY)
+    DIM cs AS INTEGER : cs = kern.kachelZelle(pw, ph, bw, bh, tx, ty)
+    kvZelle = cs
+    DIM sx AS INTEGER : sx = (bw - pw * tx * cs) \ 2
+    DIM sy AS INTEGER : sy = (bh - ph * ty * cs) \ 2
+    DIM a AS INTEGER, b AS INTEGER, i AS INTEGER
+    FOR b = 0 TO ty - 1
+        FOR a = 0 TO tx - 1
+            DIM kx AS INTEGER : kx = sx + a * pw * cs
+            DIM ky AS INTEGER : ky = sy + b * ph * cs
+            cairo_save(cr)
+            cairo_translate(cr, kx, ky)
+            cairo_scale(cr, cs, cs)
+            cairo_set_source_surface(cr, kvBild, 0, 0)
+            cairo_pattern_set_filter(cairo_get_source(cr), CAIRO_FILTER_NAECHST)
+            cairo_rectangle(cr, 0, 0, pw, ph)
+            cairo_fill(cr)
+            cairo_restore(cr)
+            IF cs >= 4 THEN
+                ' Rasterlinien (200, 200, 200, 80)
+                cairo_set_source_rgba(cr, 200 / 255.0, 200 / 255.0, 200 / 255.0, 80 / 255.0)
+                cairo_set_line_width(cr, 1.0)
+                FOR i = 0 TO pw
+                    cairo_move_to(cr, kx + i * cs + 0.5, ky) : cairo_line_to(cr, kx + i * cs + 0.5, ky + ph * cs)
+                NEXT
+                FOR i = 0 TO ph
+                    cairo_move_to(cr, kx, ky + i * cs + 0.5) : cairo_line_to(cr, kx + pw * cs, ky + i * cs + 0.5)
+                NEXT
+                cairo_stroke(cr)
+            END IF
+            IF gtk_toggle_button_get_active(kvGrenzen) THEN
+                cairo_set_source_rgba(cr, 1.0, 0.54, 0.24, &H99 / 255.0)
+                cairo_set_line_width(cr, 1.0)
+                sdStrichel(cr, 4, 3)
+                cairo_rectangle(cr, kx + 0.5, ky + 0.5, pw * cs, ph * cs)
+                cairo_stroke(cr)
+                sdStrichel(cr, 0, 0)
+            END IF
+        NEXT
+    NEXT
+    ' Die mittlere Kachel (bei weniger als 3 x 3 die erste) hervorgehoben
+    DIM mx AS INTEGER : mx = IIF(tx >= 3 AND ty >= 3, tx \ 2, 0)
+    DIM my AS INTEGER : my = IIF(tx >= 3 AND ty >= 3, ty \ 2, 0)
+    cairoFarbe(cr, FL_AKZENT)
+    cairo_set_line_width(cr, 2.0)
+    cairo_rectangle(cr, sx + mx * pw * cs - 1, sy + my * ph * cs - 1, pw * cs + 2, ph * cs + 2)
+    cairo_stroke(cr)
+    cairoFarbe(cr, uiFarbe(&H9AA0AD))
+    DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
+    pango_layout_set_font_description(layout, flSchrift)
+    pango_layout_set_text(layout, trf$("{0}×{1} Stiche | {2}×{3} Kacheln", [STR$(pw), STR$(ph), STR$(tx), STR$(ty)]), -1)
+    DIM tw AS INTEGER, th AS INTEGER
+    pango_layout_get_pixel_size(layout, tw, th)
+    cairo_move_to(cr, 10, bh - 6 - th)
+    pango_cairo_show_layout(cr, layout)
+    g_object_unref(layout)
+    RETURN TRUE
+END FUNCTION
+
+SUB kachelDialog()
+    IF NOT lwHat THEN RETURN
+    DIM d AS INTEGER : d = kvBauen()
+    DIM a AS INTEGER : a = gtk_dialog_run(kvDialog)
+    gtk_widget_destroy(kvDialog)
+    kvDialog = 0
+    kvFeld = 0
+END SUB
+
+' --- Werkzeug Farbverlauf: Start- und Endfarbe ---------------------------------------
+
+DIM fvlBox AS INTEGER                  ' in der Werkzeugleiste, nur beim Farbverlauf zu sehen
+DIM fvlStartWahl AS INTEGER
+DIM fvlEndeWahl AS INTEGER
+DIM fvlStart AS INTEGER                ' Farbnummern
+DIM fvlEnde AS INTEGER
+DIM fvlSperre AS BOOLEAN
+DIM fvlListe AS STRING                 ' womit die Listen gefuellt sind
+
+FUNCTION verlaufLeisteNeu() AS INTEGER
+    fvlBox = gtk_box_new(GTK_WAAGERECHT, 4)
+    gtk_widget_set_no_show_all(fvlBox, TRUE)
+    DIM l AS INTEGER : l = gtk_label_new(tr$("Verlauf von"))
+    gtk_box_pack_start(fvlBox, l, FALSE, FALSE, 4)
+    fvlStartWahl = gtk_combo_box_text_new()
+    gtk_widget_set_can_focus(fvlStartWahl, FALSE)
+    gtk_widget_set_tooltip_text(fvlStartWahl, tr$("Startfarbe -- der erste Punkt der gezogenen Linie"))
+    gtk_box_pack_start(fvlBox, fvlStartWahl, FALSE, FALSE, 0)
+    DIM n AS INTEGER : n = gtk_label_new(tr$("nach"))
+    gtk_box_pack_start(fvlBox, n, FALSE, FALSE, 0)
+    fvlEndeWahl = gtk_combo_box_text_new()
+    gtk_widget_set_can_focus(fvlEndeWahl, FALSE)
+    gtk_widget_set_tooltip_text(fvlEndeWahl, tr$("Endfarbe -- dazwischen nimmt jeder Punkt die nächste Farbe der Palette"))
+    gtk_box_pack_start(fvlBox, fvlEndeWahl, FALSE, FALSE, 0)
+    DIM k AS INTEGER : k = gtk_button_new_with_label("⇄")
+    gtk_widget_set_can_focus(k, FALSE)
+    gtk_widget_set_tooltip_text(k, tr$("Start- und Endfarbe tauschen"))
+    signal(k, "clicked", fvlTauschen, 0, 0, 0)
+    gtk_box_pack_start(fvlBox, k, FALSE, FALSE, 0)
+    signal(fvlStartWahl, "changed", fvlGewaehlt, 0, 0, 0)
+    signal(fvlEndeWahl, "changed", fvlGewaehlt, 1, 0, 0)
+    gtk_widget_show(l)
+    gtk_widget_show(fvlStartWahl)
+    gtk_widget_show(n)
+    gtk_widget_show(fvlEndeWahl)
+    gtk_widget_show(k)
+    fvlEnde = 1
+    RETURN fvlBox
+END FUNCTION
+
+' Die beiden Listen nach den Farben des Musters (nach dem Laden und jedem Umbau)
+SUB verlaufLeisteNachziehen()
+    IF fvlStartWahl = 0 OR NOT lwHat THEN RETURN
+    DIM n AS INTEGER : n = lwMuster.farbanzahl()
+    IF fvlStart >= n THEN fvlStart = MAX(0, n - 1)
+    IF fvlEnde >= n THEN fvlEnde = MAX(0, n - 1)
+    ' Neu gefuellt wird nur, wenn sich die Farben geaendert haben: jedes
+    ' Fuellen laesst die Werkzeugleiste neu vermessen, und die Seitenleiste
+    ' frischt oft auf -- ein Foto im selben Takt traf sonst ein Fenster
+    ' mitten im Vermessen (Gtk-CRITICAL "alloc_needed")
+    DIM stand AS STRING
+    DIM f AS kern.Farbeintrag
+    FOR EACH f IN lwMuster.farben
+        stand = stand + f.symbol + " " + f.garn.name + CHR$(10)
+    NEXT
+    fvlSperre = TRUE
+    IF stand <> fvlListe THEN
+        fvlListe = stand
+        gtk_combo_box_text_remove_all(fvlStartWahl)
+        gtk_combo_box_text_remove_all(fvlEndeWahl)
+        FOR EACH f IN lwMuster.farben
+            gtk_combo_box_text_append_text(fvlStartWahl, f.symbol + " " + f.garn.name)
+            gtk_combo_box_text_append_text(fvlEndeWahl, f.symbol + " " + f.garn.name)
+        NEXT
+    END IF
+    IF n > 0 THEN
+        IF gtk_combo_box_get_active(fvlStartWahl) <> fvlStart THEN gtk_combo_box_set_active(fvlStartWahl, fvlStart)
+        IF gtk_combo_box_get_active(fvlEndeWahl) <> fvlEnde THEN gtk_combo_box_set_active(fvlEndeWahl, fvlEnde)
+    END IF
+    fvlSperre = FALSE
+END SUB
+
+SUB fvlGewaehlt(w AS INTEGER, ende AS INTEGER)
+    IF fvlSperre THEN RETURN
+    DIM i AS INTEGER : i = gtk_combo_box_get_active(w)
+    IF i < 0 THEN RETURN
+    IF ende = 1 THEN fvlEnde = i ELSE fvlStart = i
+END SUB
+
+SUB fvlTauschen(w AS INTEGER, daten AS INTEGER)
+    verlaufFarben(fvlEnde, fvlStart)
+END SUB
+
+SUB verlaufFarben(start AS INTEGER, ende AS INTEGER)
+    fvlStart = start
+    fvlEnde = ende
+    verlaufLeisteNachziehen()
+END SUB
+
+SUB verlaufLeisteZeigen(an AS BOOLEAN)
+    IF fvlBox <> 0 THEN gtk_widget_set_visible(fvlBox, an)
+END SUB

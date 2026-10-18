@@ -965,8 +965,62 @@ thread_local! {
     /// Die VM, die die Funktionen der Rueckrufe ausfuehrt -- gesetzt vor
     /// jedem Aufruf einer Bibliothek (wie `Kontext::vm` im Maschinencode).
     static VM: std::cell::Cell<*mut crate::vm::Vm<'static>> = const { std::cell::Cell::new(std::ptr::null_mut()) };
-    /// Der Fehler eines Rueckrufs, bis der Aufruf der Bibliothek ihn meldet.
-    static RR_FEHLER: RefCell<Option<String>> = const { RefCell::new(None) };
+    /// Der Fehler eines Rueckrufs, bis der Aufruf der Bibliothek ihn meldet --
+    /// mit der Tiefe dieses Aufrufs (wie viele Bibliotheksfunktionen liefen).
+    static RR_FEHLER: RefCell<Option<(String, u32, usize)>> = const { RefCell::new(None) };
+    /// Die Bibliotheksfunktionen, die gerade laufen (innen zuletzt) -- fuer
+    /// die Meldung des Waechters.
+    static LAUFEND: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Zaehlt die abgeholten Rueckruf-Fehler. Der Waechter vergleicht damit, ob
+/// SEIN Fehler inzwischen abgeholt wurde.
+#[cfg(feature = "ffi")]
+static WACHE_NR: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// Hat der Waechter den offenen Fehler schon gemeldet? Dann ist die Bibliothek
+/// eine Hauptschleife, und jeder weitere Fehler steht sofort da.
+#[cfg(feature = "ffi")]
+static WACHE_GEMELDET: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Ein Rueckruf ist gescheitert (2026-10-14, Fotobetrachter-Runde). Der
+/// erste Fehler wird gemerkt und kommt beim Aufruf der Bibliothek an, sobald
+/// sie zurueckkehrt. Kehrt sie nicht zurueck (`gtk_main`, `g_main_loop_run`,
+/// eine Nachrichtenschleife), sah man vorher NICHTS: das Programm hing, und
+/// weil jeder weitere Rueckruf 0 lieferte, liess es sich nicht einmal
+/// schliessen. Jetzt meldet ein Waechter den Fehler, wenn ihn nach einer
+/// Sekunde niemand abgeholt hat, und danach jeden weiteren sofort.
+#[cfg(feature = "ffi")]
+fn rueckruf_gescheitert(meldung: String, zeile: u32) {
+    use std::sync::atomic::Ordering;
+    let (laufend, tiefe) = LAUFEND.with(|l| { let l = l.borrow(); (l.last().cloned().unwrap_or_default(), l.len()) });
+    let text = if zeile > 0 {
+        match crate::preprocess::lauf_stelle(zeile) {
+            Some(wo) => format!("{} ({})", meldung, wo),
+            None => format!("{} (Zeile {})", meldung, zeile),
+        }
+    } else { meldung.clone() };
+    let neu = RR_FEHLER.with(|f| {
+        let mut f = f.borrow_mut();
+        if f.is_none() { *f = Some((meldung, zeile, tiefe)); true } else { false }
+    });
+    if !neu {
+        if WACHE_GEMELDET.load(Ordering::SeqCst) {
+            eprintln!("{}", crate::meldung::t(&format!("{}: {}", laufend, text)));
+        }
+        return;
+    }
+    if laufend.is_empty() { return; }
+    let nr = WACHE_NR.load(Ordering::SeqCst);
+    let _ = std::thread::Builder::new().name("dhrt-rueckrufwache".into()).spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+        if WACHE_NR.load(Ordering::SeqCst) == nr {
+            WACHE_GEMELDET.store(true, Ordering::SeqCst);
+            eprintln!("{}", crate::meldung::t(&format!(
+                "{}: {} -- {} ist eine Sekunde spaeter noch nicht zurueckgekehrt, darum steht der Fehler schon jetzt hier; \
+                 Rueckrufe, die scheitern duerfen, mit TRY ... CATCH umgeben",
+                laufend, text, laufend)));
+        }
+    });
 }
 
 /// Der Faden des Programms. Ein Rueckruf aus einem anderen wird nicht
@@ -1131,7 +1185,7 @@ extern "C" fn eingang(nummer: u64, plaetze: *const u64, rueck: *mut u64) {
     let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe { eingang_innen(nummer, plaetze, rueck) }));
     if r.is_err() {
         unsafe { *rueck = 0; }
-        RR_FEHLER.with(|f| { f.borrow_mut().get_or_insert_with(|| "interner Fehler im Rueckruf".into()); });
+        rueckruf_gescheitert("interner Fehler im Rueckruf".into(), 0);
     }
 }
 
@@ -1144,11 +1198,14 @@ unsafe fn eingang_innen(nummer: u64, plaetze: *const u64, rueck: *mut u64) {
         }
         return;
     }
-    if RR_FEHLER.with(|f| f.borrow().is_some()) { return; }
+    // Auch nach einem Fehler laufen weitere Rueckrufe (wie bei Pythons
+    // ctypes): in einer Hauptschleife haengt sonst jeder Knopf, auch der zum
+    // Schliessen. Gemerkt bleibt der ERSTE Fehler.
     let Some(rr) = ZUSTAND.with(|z| z.borrow().rueckrufe.get(nummer as usize).cloned()) else { return; };
-    let setze = |m: String| RR_FEHLER.with(|f| *f.borrow_mut() = Some(m));
     let vm = VM.with(|v| v.get());
+    let setze = |m: String| rueckruf_gescheitert(m, 0);
     if vm.is_null() { setze(format!("Rueckruf {}: keine laufende VM", rr.name)); return; }
+    (*vm).fehlerzeile_vergessen();
     let werte: Vec<Value> = rr.params.iter().enumerate().map(|(i, t)| {
         let p = *plaetze.add(i);
         match t {
@@ -1179,14 +1236,33 @@ unsafe fn eingang_innen(nummer: u64, plaetze: *const u64, rueck: *mut u64) {
                                    rr.name, s.name.to_uppercase(), v.type_name())),
             },
         },
-        Err(e) => setze(format!("Fehler im Rueckruf {}: {}", rr.name, e)),
+        // Die Zeile im Rueckruf, an der es scheiterte (nur fuer den Waechter).
+        Err(e) => rueckruf_gescheitert(format!("Fehler im Rueckruf {}: {}", rr.name, e), (*vm).error_line()),
     }
 }
 
-/// Nach dem Aufruf einer Bibliothek: hat ein Rueckruf einen Fehler gemerkt?
+/// Nach dem Aufruf einer Bibliothek (der `tiefe`-te, der lief): hat ein
+/// Rueckruf, den DIESER Aufruf ausgeloest hat, einen Fehler gemerkt?
+///
+/// Nur dieser meldet ihn (2026-10-17, Glutfaden Stufe 10). Vorher holte ihn
+/// der naechste Aufruf ab, der zurueckkehrte -- in einer Hauptschleife also
+/// ein Aufruf IN einem spaeteren Rueckruf (`cairo_set_source_rgba` beim
+/// naechsten Zeichnen). Der warf ihn dort, der spaetere Rueckruf scheiterte
+/// damit selbst, und so fort: jeder Rueckruf nach dem ersten Fehler war
+/// kaputt, und die Meldung wuchs mit jedem um eine Schale.
 #[cfg(feature = "ffi")]
-fn rueckruf_fehler() -> Option<String> {
-    if let Some(e) = RR_FEHLER.with(|f| f.borrow_mut().take()) { return Some(e); }
+fn rueckruf_fehler(tiefe: usize) -> Option<String> {
+    let gemerkt = RR_FEHLER.with(|f| {
+        let mut f = f.borrow_mut();
+        if matches!(&*f, Some((_, _, t)) if *t >= tiefe) { f.take() } else { None }
+    });
+    if let Some((e, zeile, _)) = gemerkt {
+        WACHE_NR.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        WACHE_GEMELDET.store(false, std::sync::atomic::Ordering::SeqCst);
+        let vm = VM.with(|v| v.get());
+        if !vm.is_null() { unsafe { (*vm).fehlerzeile_setzen(zeile) }; }
+        return Some(e);
+    }
     FREMDER_FADEN.lock().ok().and_then(|mut f| f.take())
 }
 
@@ -1239,8 +1315,10 @@ unsafe fn laden(pfad: &std::path::Path) -> Result<libloading::Library, libloadin
     #[cfg(windows)]
     if pfad.is_absolute() {
         let mit_rueckstrich = pfad.to_string_lossy().replace('/', "\\");
-        return libloading::os::windows::Library::load_with_flags(
-            &mit_rueckstrich, libloading::os::windows::LOAD_WITH_ALTERED_SEARCH_PATH).map(Into::into);
+        let l = libloading::os::windows::Library::load_with_flags(
+            &mit_rueckstrich, libloading::os::windows::LOAD_WITH_ALTERED_SEARCH_PATH)?;
+        ordner_in_suchpfad(pfad);
+        return Ok(l.into());
     }
     // Unter Linux und macOS GLOBAL: eine eingebettete Sprache (Python) laedt
     // spaeter eigene Erweiterungen, die die Zeichen der Bibliothek erwarten,
@@ -1252,6 +1330,28 @@ unsafe fn laden(pfad: &std::path::Path) -> Result<libloading::Library, libloadin
     }
     #[cfg(not(unix))]
     libloading::Library::new(pfad)
+}
+
+/// Den Ordner einer ueber den vollen Pfad geladenen Bibliothek hinten an den
+/// PATH dieses Prozesses haengen (2026-10-14, Fotobetrachter-Runde).
+/// `LOAD_WITH_ALTERED_SEARCH_PATH` gilt nur fuer DIESES Laden: laedt die
+/// Bibliothek spaeter selbst ein Modul nach (GdkPixbuf seine Bildlader,
+/// GStreamer und Qt ihre Plugins), sucht Windows dessen Abhaengigkeiten wieder
+/// nur neben dem Programm, im System und im PATH -- das SVG-Modul des GTK aus
+/// Inkscape fand librsvg nicht, und GTK brach beim ersten Symbol ab.
+#[cfg(all(feature = "ffi", windows))]
+fn ordner_in_suchpfad(datei: &std::path::Path) {
+    let Some(ordner) = datei.parent() else { return };
+    let gleich = |p: &std::path::Path| {
+        let a = p.to_string_lossy().replace('/', "\\");
+        let b = ordner.to_string_lossy().replace('/', "\\");
+        a.trim_end_matches('\\').eq_ignore_ascii_case(b.trim_end_matches('\\'))
+    };
+    let alt = std::env::var_os("PATH").unwrap_or_default();
+    let mut teile: Vec<std::path::PathBuf> = std::env::split_paths(&alt).collect();
+    if teile.iter().any(|p| gleich(p)) { return; }
+    teile.push(std::path::PathBuf::from(ordner.to_string_lossy().replace('/', "\\")));
+    if let Ok(neu) = std::env::join_paths(teile) { std::env::set_var("PATH", neu); }
 }
 
 #[cfg(feature = "ffi")]
@@ -1709,18 +1809,23 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
     let worte = auf.rueck_struct.as_ref().map(|s| (s.groesse as usize).div_ceil(8)).unwrap_or(0).max(4);
     let (mut rp_fest, mut rp_vec) = ([0u64; 4], Vec::new());
     let rueck_platz: &mut [u64] = if worte <= 4 { &mut rp_fest[..] } else { rp_vec = vec![0u64; worte]; &mut rp_vec[..] };
-    if variadisch {
+    let tiefe = LAUFEND.with(|l| { let mut l = l.borrow_mut(); l.push(sig.name.clone()); l.len() });
+    let gerufen = if variadisch {
         let mut r = 0u64;
-        variadisch_rufen(auf, fest, &plaetze[..n], &weitere, &mut r)?;
+        let g = variadisch_rufen(auf, fest, &plaetze[..n], &weitere, &mut r);
         rueck_platz[0] = r;
+        g
     } else {
         unsafe { (auf.einstieg)(auf.ziel, plaetze.as_ptr(), rueck_platz.as_mut_ptr()) };
-    }
+        Ok(())
+    };
+    LAUFEND.with(|l| { l.borrow_mut().pop(); });
+    gerufen?;
     drop(texte);
     drop(breite);
     drop(kopien);
     let _ = &ablage;
-    if let Some(e) = rueckruf_fehler() { return Err(format!("{}: {}", sig.name, e)); }
+    if let Some(e) = rueckruf_fehler(tiefe) { return Err(format!("{}: {}", sig.name, e)); }
     let rueck = rueck_platz[0];
     let ergebnis = match sig.rueck {
         'x' => {

@@ -700,6 +700,15 @@ fn live_ausgabe() -> bool {
     *LIVE.get_or_init(|| std::env::var("DHRT_LIVE").map(|v| v == "1").unwrap_or(false))
 }
 
+/// stdout ist ein Terminal: dann geht jede PRINT-Zeile sofort hinaus
+/// (zeilenweise wie in C und Python). In eine Datei oder Leitung wird
+/// gebuendelt -- dort zaehlt der Durchsatz.
+fn ausgabe_terminal() -> bool {
+    use std::io::IsTerminal;
+    static T: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *T.get_or_init(|| std::io::stdout().is_terminal())
+}
+
 /// Ein JSON-Event als Zeile auf stdout schreiben + flushen.
 fn dbg_emit(ev: &serde_json::Value) {
     use std::io::Write;
@@ -788,6 +797,11 @@ pub struct Vm<'p> {
     global_slots: Vec<Option<Rc<RefCell<Slot>>>>,
     data_ptr: usize,
     out: String,
+    /// Wann `out` zuletzt hinausging. PRINT sammelt (schnell bei vielen
+    /// Zeilen), geht aber nach spaetestens 50 ms hinaus -- vorher erst am
+    /// Programmende, auch im Terminal: "Bitte warten ..." vor einer langen
+    /// Rechnung oder einem SLEEP erschien erst danach (Dogfooding 2026-10-09).
+    out_zeit: std::time::Instant,
     input_state: InputModule,
     ui_state: UiState,
     // Modul `scene`: globaler Stack (name, daten). Daten = key->typisierter Wert.
@@ -925,6 +939,9 @@ pub struct Vm<'p> {
     // Modul mqtt: baut auf std::net auf wie net, eigener Handle-Typ.
     #[cfg(feature = "net")]
     mqtt_clients: Vec<Option<crate::mqtt::Client>>,
+    /// MQTT_WILL: der letzte Wille fuer das NAECHSTE MQTT_CONNECT.
+    #[cfg(feature = "net")]
+    mqtt_wille: Option<crate::mqtt::Wille>,
     /// Modul `httpd` -- laufende Webserver (Tombstone-Vec wie ueberall:
     /// eine vergebene Nummer bleibt gueltig, auch wenn ein frueherer
     /// Server schon gestoppt wurde).
@@ -1047,6 +1064,7 @@ impl<'p> Vm<'p> {
             global_slots,
             data_ptr: 0,
             out: String::new(),
+            out_zeit: std::time::Instant::now(),
             input_state: InputModule::default(),
             ui_state: UiState::new(),
             scene_stack: Vec::new(),
@@ -1112,6 +1130,8 @@ impl<'p> Vm<'p> {
             udp_socks: Vec::new(),
             #[cfg(feature = "net")]
             mqtt_clients: Vec::new(),
+            #[cfg(feature = "net")]
+            mqtt_wille: None,
             httpd_server: Vec::new(),
             #[cfg(feature = "pdf")]
             pdf_dok: Vec::new(),
@@ -1301,6 +1321,22 @@ impl<'p> Vm<'p> {
         if self.stop.is_some() || self.dbg.is_some() {
             return String::new();
         }
+        // Gibt es das STDIN()-Handle schon, liest INPUT aus SEINEM Puffer --
+        // es liest voraus (1 MiB, siehe `stdin_handle`), und was dort liegt,
+        // saehe ein zweiter Leser nicht.
+        if let Some(Value::File(f)) = &self.stdin_datei {
+            let mut f = f.borrow_mut();
+            let (kod, anfang, pfad) = (f.kod, f.am_anfang, f.path.clone());
+            f.am_anfang = false;
+            if let Some(r) = f.leser() {
+                let mut roh: Vec<u8> = Vec::new();
+                let _ = r.read_until(b'\n', &mut roh);
+                while roh.last() == Some(&b'\n') || roh.last() == Some(&b'\r') { roh.pop(); }
+                let z = crate::kodierung::dekodieren(&roh, kod, "INPUT", &pfad)
+                    .unwrap_or_else(|_| String::from_utf8_lossy(&roh).into_owned());
+                return if anfang { crate::kodierung::ohne_bom(z) } else { z };
+            }
+        }
         read_input_line()
     }
 
@@ -1371,10 +1407,16 @@ impl<'p> Vm<'p> {
         // Gehoert stdin jemand anderem (Stop-Kanal/Debugger), einen leeren
         // Strom geben: die uebliche Schleife laeuft dann null mal, statt dem
         // Protokoll eine Zeile wegzunehmen.
+        // Ein eigener Puffer von 1 MiB: Rusts Standardeingabe liest in 8-KB-
+        // Stuecken, und an einer Pipe kostet jeder Lesevorgang -- 400 000
+        // Zeilen aus `cat datei |` (Git-Bash) brauchten 2,8 s statt 0,1 s mit
+        // `< datei`, aus `type datei |` (cmd) 0,7 s (gemessen 2026-10-11,
+        // Konsolen-Runde). INPUT liest danach aus DIESEM Puffer
+        // (`read_input_line`), damit beide gemischt werden koennen.
         let strom: Box<dyn std::io::BufRead> = if self.stop.is_some() || self.dbg.is_some() {
             Box::new(std::io::empty())
         } else {
-            Box::new(std::io::stdin().lock())
+            Box::new(std::io::BufReader::with_capacity(1 << 20, std::io::stdin().lock()))
         };
         let h = Value::File(Rc::new(RefCell::new(crate::value::DhFile {
             path: "<Standardeingabe>".to_string(),
@@ -1423,6 +1465,20 @@ impl<'p> Vm<'p> {
     }
 
     fn try_typtest(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        // `__frisch(typ$)`: ein NEUER Startwert fuer ein DIM in einem
+        // Schleifenrumpf (compiler.rs `dim_frisch`) -- leeres Feld, leere MAP,
+        // neue Struct-Instanz, neutrales Element, NIL fuer Klassen. Ein DIM in
+        // einer Schleife faengt seit 2026.28 jede Runde frisch an.
+        if name == "__frisch" {
+            let ty = match a.first() { Some(Value::Str(t)) => t.to_string(), _ => String::new() };
+            return Ok(Some(if let Some(vt) = ty.strip_prefix("map:") {
+                Value::Map(Rc::new(RefCell::new(DhMap::new(vt.to_string()))))
+            } else if ty.starts_with("array:") {
+                leeres_feld(&ty)
+            } else {
+                self.element_default(&ty)
+            }));
+        }
         if name != "__is_typ" { return Ok(None); }
         let gesucht = match a.get(1) {
             Some(Value::Str(s)) => s.to_string(),
@@ -1844,7 +1900,7 @@ impl<'p> Vm<'p> {
         // ueber PROCESS_START setzt DHRT_LIVE): an einer Leitung
         // waere stdout sonst blockgepuffert, und die Ausgabe kaeme
         // erst am Ende auf einmal.
-        if newline && live_ausgabe() { self.flush_out(); }
+        if newline && (live_ausgabe() || ausgabe_terminal() || self.out_zeit.elapsed() >= std::time::Duration::from_millis(50)) { self.flush_out(); }
     }
 
     /// Eine Funktion des Programms rufen, fuer den Maschinencode (M4 Schritt
@@ -3614,6 +3670,7 @@ impl<'p> Vm<'p> {
                                 let cn = rc.borrow().class_name.clone();
                                 let m = self.resolve_method(&cn, method)
                                     .ok_or_else(|| format!("Methode '{}' existiert nicht in {}", method, cn))?;
+                                byref_ohne_typ(m, method, &cn, argc)?;
                                 instr.merk.set((Rc::as_ptr(&rc.borrow().layout), m as *const Func as usize));
                                 m
                             };
@@ -3645,6 +3702,7 @@ impl<'p> Vm<'p> {
                             let cn = rc.borrow().class_name.clone();
                             let m = self.resolve_method(&cn, method)
                                 .ok_or_else(|| format!("Methode '{}' existiert nicht in {}", method, cn))?;
+                            byref_ohne_typ(m, method, &cn, argc)?;
                             if m.is_coroutine {
                                 stack.push(make_coro(m, margs, Some(obj.clone())));
                             } else {
@@ -4123,6 +4181,53 @@ impl<'p> Vm<'p> {
                 // (der Elternklasse der Aufrufstelle) statt bei der Klasse
                 // des Objekts. Sonst fande sie die ueberschreibende Methode
                 // wieder und riefe sich selbst, bis der Stapel voll ist.
+                op::CALL_METHOD_BYREF => {
+                    let l = arg.list();
+                    let method = l[0].str();
+                    let argc = l[1].as_usize();
+                    let stellen: Vec<usize> = match &l[2] {
+                        Arg::List(s) => s.iter().map(|a| a.as_usize()).collect(),
+                        Arg::Ints(s) => s.iter().map(|&a| a as usize).collect(),
+                        _ => Vec::new(),
+                    };
+                    let split = stack.len() - argc;
+                    let margs = stack.split_off(split);
+                    let obj = vm_pop(stack)?;
+                    let rc = match &obj {
+                        Value::Instance(rc) => rc.clone(),
+                        Value::Nil => return Err(format!(
+                            "Methodenaufruf '.{}' bei NIL-Referenz{}", method, NIL_NEW)),
+                        _ => return Err(format!("Methodenaufruf '.{}' bei nicht-Objekt ({})", method, obj.type_name())),
+                    };
+                    let cn = rc.borrow().class_name.clone();
+                    let m = self.resolve_method(&cn, method)
+                        .ok_or_else(|| format!("Methode '{}' existiert nicht in {}", method, cn))?;
+                    // Eine Unterklasse, die die Methode mit anderen BYREF-Stellen
+                    // ueberschreibt, passt nicht zu dem, was der Compiler erfasst hat.
+                    let hier: Vec<usize> = (0..argc).filter(|&i| m.param_byref.get(i).copied().unwrap_or(false)).collect();
+                    if hier != stellen {
+                        return Err(format!(
+                            "{}.{}: die Methode der Klasse {} hat ihre BYREF-Parameter an anderen Stellen \
+                             als die, nach der der Aufruf uebersetzt ist -- eine Ueberschreibung muss \
+                             dieselben Parameter BYREF nehmen", crate::namensraum::lesbar_text(&cn).to_uppercase(), method,
+                            crate::namensraum::lesbar_text(&cn).to_uppercase()));
+                    }
+                    if m.is_coroutine {
+                        return Err(format!("{}: eine Coroutine kann keine BYREF-Parameter zurueckschreiben", method));
+                    }
+                    let (ret, werte) = self.exec_byref(m, margs, Some(obj))?;
+                    // exec_byref liefert ALLE BYREF-Parameter; zurueck geht nur,
+                    // was der Aufruf uebergeben hat.
+                    let mut k = 0;
+                    for (i, &br) in m.param_byref.iter().enumerate() {
+                        if br {
+                            if i < argc { stack.push(werte[k].clone()); }
+                            k += 1;
+                        }
+                    }
+                    if !m.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
+                }
+
                 op::CALL_SUPER => {
                     let l = arg.list();
                     let start_class = l[0].str();
@@ -4396,6 +4501,22 @@ impl<'p> Vm<'p> {
         self.cur_line
     }
 
+    /// FFI-Rueckrufe (2026-10-14): ein Fehler im Rueckruf wird nie per CATCH
+    /// "verbraucht", `err_line_set` bliebe also stehen, und jeder spaetere
+    /// Fehler trug die Zeile des ersten. Jeder Rueckruf beginnt darum frisch.
+    #[cfg(feature = "ffi")]
+    pub(crate) fn fehlerzeile_vergessen(&mut self) { self.err_line_set = false; }
+
+    /// Die Zeile des ersten Rueckruf-Fehlers wieder einsetzen, wenn der Aufruf
+    /// der Bibliothek ihn meldet -- sonst stuende dort die des letzten.
+    #[cfg(feature = "ffi")]
+    pub(crate) fn fehlerzeile_setzen(&mut self, zeile: u32) {
+        if zeile == 0 { return; }
+        self.cur_line = zeile;
+        self.error_line = zeile;
+        self.err_line_set = true;
+    }
+
     /// Zugriff auf den frame_count (fuer main.rs-Schleifenlogik), 0 ohne Grafik.
     #[allow(dead_code)]
     pub fn frame_count(&self) -> u64 {
@@ -4610,9 +4731,22 @@ impl<'p> Vm<'p> {
                 let i = bi_int(a, 0, "NET_UDP_SEND")?;
                 let h = bi_str(a, 1, "NET_UDP_SEND")?.to_string();
                 let p = bi_int(a, 2, "NET_UDP_SEND")?;
-                let t = bi_str(a, 3, "NET_UDP_SEND")?.to_string();
-                Value::Int(net::udp_send(self.net_udp(i)?, &h, p, &t)?)
+                // Text oder ein BUFFER -- ein Spielstand mit Kommazahlen ist kein UTF-8.
+                match a.get(3) {
+                    Some(Value::Buffer(b)) => { let bytes = b.borrow().clone(); Value::Int(net::udp_send_bytes(self.net_udp(i)?, &h, p, &bytes)?) }
+                    _ => { let t = bi_str(a, 3, "NET_UDP_SEND")?.to_string(); Value::Int(net::udp_send(self.net_udp(i)?, &h, p, &t)?) }
+                }
             }
+            "net_udp_recv_bytes" => {
+                let i = bi_int(a, 0, "NET_UDP_RECV_BYTES")?;
+                let n = bi_int(a, 1, "NET_UDP_RECV_BYTES")?;
+                let bytes = net::udp_recv_bytes(self.net_udp_mut(i)?, n, "NET_UDP_RECV_BYTES")?;
+                Value::Buffer(std::rc::Rc::new(std::cell::RefCell::new(bytes)))
+            }
+            // Absender getrennt: "::1:5000" laesst sich nur zerlegen, wenn man
+            // weiss, dass am LETZTEN Doppelpunkt geschnitten werden muss.
+            "net_udp_last_host$" | "net_udp_last_host" => Value::str_rc(&self.net_udp(bi_int(a, 0, "NET_UDP_LAST_HOST$")?)?.last_from.0),
+            "net_udp_last_port" => Value::Int(self.net_udp(bi_int(a, 0, "NET_UDP_LAST_PORT")?)?.last_from.1),
             "net_udp_recv" => { let i = bi_int(a, 0, "NET_UDP_RECV")?; let n = bi_int(a, 1, "NET_UDP_RECV")?; Value::str_rc(net::udp_recv(self.net_udp_mut(i)?, n)?) }
             "net_udp_last_from" => {
                 let s = self.net_udp(bi_int(a, 0, "NET_UDP_LAST_FROM")?)?;
@@ -5014,11 +5148,11 @@ impl<'p> Vm<'p> {
                     Some(_) => return Err("PDF_NEW: 2. Argument ist \"hoch\" oder \"quer\"".to_string()),
                 };
                 let (b, h) = pdf::seitenmass(&art, quer).ok_or_else(|| format!(
-                    "PDF_NEW: Seitengroesse '{}' kenne ich nicht -- a3, a4, a5, a6, letter, legal", art))?;
+                    "PDF_NEW: Seitengroesse '{}' kenne ich nicht -- a0 bis a6, letter, legal", art))?;
                 self.pdf_dok.push(Some(pdf::Dokument::neu(b, h)));
                 Value::Int((self.pdf_dok.len() - 1) as i64)
             }
-            "pdf_page" => { let i = bi_int(a, 0, "PDF_PAGE")?; self.pdf_d(i)?.neue_seite(); Value::Nil }
+            "pdf_page" => { let i = bi_int(a, 0, "PDF_PAGE")?; self.pdf_d(i)?.seite_beginnen(); Value::Nil }
             "pdf_page_count" => { let i = bi_int(a, 0, "PDF_PAGE_COUNT")?; Value::Int(self.pdf_d(i)?.seiten.len() as i64) }
             "pdf_page_width" => { let i = bi_int(a, 0, "PDF_PAGE_WIDTH")?; Value::Float(self.pdf_d(i)?.breite_mm) }
             "pdf_page_height" => { let i = bi_int(a, 0, "PDF_PAGE_HEIGHT")?; Value::Float(self.pdf_d(i)?.hoehe_mm) }
@@ -5065,11 +5199,62 @@ impl<'p> Vm<'p> {
                 self.pdf_d(i)?.setze_strich(mm.max(0.0));
                 Value::Nil
             }
+            // PDF_TEXT(p, x, y, text$ [, winkel]) -- der Winkel in Grad gegen
+            // den Uhrzeigersinn, gedreht um (x, y). Fuer Wasserzeichen und
+            // senkrechte Achsenbeschriftungen (Glutfaden, 2026-10-16).
             "pdf_text" => {
+                if a.len() != 4 && a.len() != 5 {
+                    return Err(format!("PDF_TEXT: erwartet 4 oder 5 Argumente (pdf, x, y, text$ [, winkel]), nicht {}", a.len()));
+                }
                 let i = bi_int(a, 0, "PDF_TEXT")?;
                 let (x, y) = (bi_num(a, 1, "PDF_TEXT")?, bi_num(a, 2, "PDF_TEXT")?);
                 let t = bi_str(a, 3, "PDF_TEXT")?.to_string();
-                self.pdf_d(i)?.text(x, y, &t).map_err(|e| format!("PDF_TEXT: {}", e))?;
+                let w = if a.len() > 4 { bi_num(a, 4, "PDF_TEXT")? } else { 0.0 };
+                self.pdf_d(i)?.text(x, y, &t, w).map_err(|e| format!("PDF_TEXT: {}", e))?;
+                Value::Nil
+            }
+            // PDF_OPACITY(p, deckkraft) -- 0..1 fuer alles, was danach kommt;
+            // PDF_GET_OPACITY liest sie zurueck.
+            "pdf_opacity" => {
+                let i = bi_int(a, 0, "PDF_OPACITY")?;
+                let d = bi_num(a, 1, "PDF_OPACITY")?;
+                self.pdf_d(i)?.setze_deckkraft(d).map_err(|e| format!("PDF_OPACITY: {}", e))?;
+                Value::Nil
+            }
+            "pdf_get_opacity" => { let i = bi_int(a, 0, "PDF_GET_OPACITY")?; Value::Float(self.pdf_d(i)?.deckkraft()) }
+            // PDF_DASH(p, strich_mm [, luecke_mm]) -- gestrichelt fuer alle
+            // folgenden Linien und Umrisse; ohne Luecke so lang wie der
+            // Strich, PDF_DASH(p, 0) zieht wieder durch (Glutfaden Stufe 7:
+            // die Spruenge im Stickpfad).
+            "pdf_dash" => {
+                if a.len() != 2 && a.len() != 3 {
+                    return Err(format!("PDF_DASH: erwartet 2 oder 3 Argumente (pdf, strich_mm [, luecke_mm]), nicht {}", a.len()));
+                }
+                let i = bi_int(a, 0, "PDF_DASH")?;
+                let an = bi_num(a, 1, "PDF_DASH")?;
+                let aus = if a.len() > 2 { bi_num(a, 2, "PDF_DASH")? } else { an };
+                self.pdf_d(i)?.setze_strichel(an, aus).map_err(|e| format!("PDF_DASH: {}", e))?;
+                Value::Nil
+            }
+            "pdf_circle" | "pdf_circle_fill" => {
+                let fn_ = if name == "pdf_circle" { "PDF_CIRCLE" } else { "PDF_CIRCLE_FILL" };
+                let i = bi_int(a, 0, fn_)?;
+                let (x, y, r) = (bi_num(a, 1, fn_)?, bi_num(a, 2, fn_)?, bi_num(a, 3, fn_)?);
+                self.pdf_d(i)?.kreis(x, y, r, name == "pdf_circle_fill").map_err(|e| format!("{}: {}", fn_, e))?;
+                Value::Nil
+            }
+            // PDF_POLYGON(p, xs, ys) -- ein geschlossener Zug; die Felder
+            // muessen gleich lang sein.
+            "pdf_polygon" | "pdf_polygon_fill" => {
+                let fn_ = if name == "pdf_polygon" { "PDF_POLYGON" } else { "PDF_POLYGON_FILL" };
+                let i = bi_int(a, 0, fn_)?;
+                let xs = gfloats(a, 1, fn_)?;
+                let ys = gfloats(a, 2, fn_)?;
+                if xs.len() != ys.len() {
+                    return Err(format!("{}: xs und ys muessen gleich lang sein ({} gegen {})", fn_, xs.len(), ys.len()));
+                }
+                let pkt: Vec<(f64, f64)> = xs.into_iter().zip(ys).collect();
+                self.pdf_d(i)?.vieleck(pkt, name == "pdf_polygon_fill").map_err(|e| format!("{}: {}", fn_, e))?;
                 Value::Nil
             }
             "pdf_text_width" => {
@@ -5091,6 +5276,29 @@ impl<'p> Vm<'p> {
                 let (b, h) = (bi_num(a, 3, fn_)?, bi_num(a, 4, fn_)?);
                 self.pdf_d(i)?.rechteck(x, y, b, h, name == "pdf_rect_fill");
                 Value::Nil
+            }
+            // PDF_IMAGE(pdf, bild, x, y, b [, h]) -- ein IMAGE (LOADIMAGE,
+            // RENDERTARGET_IMAGE, IMAGE_NEW ...) in die Seite setzen. Bis 2026.30
+            // kannte das pdf-Modul nur Text, Linien und Rechtecke; ein Bericht
+            // musste seine Diagramme Strich fuer Strich nachmalen
+            // (Messdaten-Runde, 2026-10-13).
+            "pdf_image" => {
+                if a.len() != 5 && a.len() != 6 {
+                    return Err(format!("PDF_IMAGE: erwartet 5 oder 6 Argumente (pdf, bild, x, y, b [, h]), nicht {}", a.len()));
+                }
+                let i = bi_int(a, 0, "PDF_IMAGE")?;
+                let bild = bi_int(a, 1, "PDF_IMAGE")?;
+                let (x, y, b) = (bi_num(a, 2, "PDF_IMAGE")?, bi_num(a, 3, "PDF_IMAGE")?, bi_num(a, 4, "PDF_IMAGE")?);
+                let h = if a.len() > 5 { bi_num(a, 5, "PDF_IMAGE")? } else { 0.0 };
+                #[cfg(feature = "graphics")]
+                {
+                    let g = self.gfx.as_ref().ok_or("PDF_IMAGE: kein Bild geladen -- ein Bild kommt aus LOADIMAGE, IMAGE_NEW oder RENDERTARGET_IMAGE")?;
+                    let (px, pw, ph) = g.image_rgba(bild, "PDF_IMAGE")?;
+                    self.pdf_d(i)?.bild(x, y, b, h, px, pw, ph).map_err(|e| format!("PDF_IMAGE: {}", e))?;
+                    Value::Nil
+                }
+                #[cfg(not(feature = "graphics"))]
+                { let _ = (i, bild, x, y, b, h); return Err("PDF_IMAGE: dieser Bau hat keine Grafik".into()); }
             }
             "pdf_save" => {
                 let i = bi_int(a, 0, "PDF_SAVE")?;
@@ -5314,9 +5522,24 @@ impl<'p> Vm<'p> {
                 let keepalive = if a.len() >= 4 { bi_int(a, 3, "MQTT_CONNECT")? } else { 60 };
                 let username = match a.get(4) { Some(Value::Str(s)) => Some(s.to_string()), _ => None };
                 let password = match a.get(5) { Some(Value::Str(s)) => Some(s.to_string()), _ => None };
-                let c = mqtt::connect(&host, port, &client_id, keepalive, username.as_deref(), password.as_deref())?;
+                // Der Wille gilt fuer genau diese Verbindung -- auch wenn sie
+                // scheitert, wer neu verbindet, setzt ihn neu.
+                let wille = self.mqtt_wille.take();
+                let c = mqtt::connect(&host, port, &client_id, keepalive, username.as_deref(), password.as_deref(), wille.as_ref())?;
                 self.mqtt_clients.push(Some(c));
                 Value::Int((self.mqtt_clients.len() - 1) as i64)
+            }
+            // MQTT_WILL(topic$, inhalt$[, retain]) -- vor MQTT_CONNECT
+            "mqtt_will" => {
+                let topic = bi_str(a, 0, "MQTT_WILL")?.to_string();
+                if topic.is_empty() || topic.contains('#') || topic.contains('+') {
+                    return Err("MQTT_WILL: das Topic darf nicht leer sein und keine Platzhalter (# +) enthalten".into());
+                }
+                let inhalt = bi_str(a, 1, "MQTT_WILL")?.as_bytes().to_vec();
+                let retain = match a.get(2) { Some(Value::Bool(b)) => *b, Some(Value::Int(n)) => *n != 0, None => false,
+                    _ => return Err("MQTT_WILL: retain ist TRUE oder FALSE".into()) };
+                self.mqtt_wille = Some(mqtt::Wille { topic, inhalt, retain });
+                Value::Nil
             }
             "mqtt_disconnect" => {
                 let i = bi_int(a, 0, "MQTT_DISCONNECT")? as usize;
@@ -5330,9 +5553,9 @@ impl<'p> Vm<'p> {
             "mqtt_publish" => {
                 let i = bi_int(a, 0, "MQTT_PUBLISH")?; let topic = bi_str(a, 1, "MQTT_PUBLISH")?.to_string(); let payload = bi_str(a, 2, "MQTT_PUBLISH")?.to_string();
                 let retain = if a.len() >= 4 { bi_bool(a, 3, "MQTT_PUBLISH")? } else { false };
-                mqtt::publish(self.mqtt_client(i)?, &topic, &payload, retain)?; Value::Nil
+                Value::Bool(mqtt::publish(self.mqtt_client(i)?, &topic, &payload, retain))
             }
-            "mqtt_subscribe" => { let i = bi_int(a, 0, "MQTT_SUBSCRIBE")?; let topic = bi_str(a, 1, "MQTT_SUBSCRIBE")?.to_string(); mqtt::subscribe(self.mqtt_client(i)?, &topic)?; Value::Nil }
+            "mqtt_subscribe" => { let i = bi_int(a, 0, "MQTT_SUBSCRIBE")?; let topic = bi_str(a, 1, "MQTT_SUBSCRIBE")?.to_string(); Value::Bool(mqtt::subscribe(self.mqtt_client(i)?, &topic)) }
             "mqtt_update" => { let i = bi_int(a, 0, "MQTT_UPDATE")?; mqtt::update(self.mqtt_client(i)?)?; Value::Nil }
             "mqtt_next_message" => { let i = bi_int(a, 0, "MQTT_NEXT_MESSAGE")?; Value::Bool(mqtt::next_message(self.mqtt_client(i)?)) }
             "mqtt_message_topic" => { let i = bi_int(a, 0, "MQTT_MESSAGE_TOPIC")?; Value::str_rc(mqtt::message_topic(self.mqtt_client(i)?)) }
@@ -6128,6 +6351,26 @@ impl<'p> Vm<'p> {
                 let (j, mo, d, h, mi, s) = crate::builtins::local_datetime();
                 Value::Int(zeit::aus_teilen(j, mo, d, h, mi, s))
             }
+            // Unix-Zeit (UTC, mit Bruchteil) -- die Zahl, die andere Programme,
+            // Web-APIs und Dateiformate meinen (Pythons time.time())
+            "zeit_unix" => {
+                if !a.is_empty() { return Err("ZEIT_UNIX: erwartet keine Argumente".into()); }
+                let d = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+                Value::Float(d.as_secs_f64())
+            }
+            "zeit_aus_unix" => {
+                let u = match a.first() {
+                    Some(Value::Int(n)) if a.len() == 1 => *n,
+                    Some(Value::Float(f)) if a.len() == 1 && f.is_finite() => f.floor() as i64,
+                    _ => return Err("ZEIT_AUS_UNIX: erwartet Unix-Sekunden (eine Zahl)".into()),
+                };
+                Value::Int(zeit::aus_unix_mit(u, crate::builtins::lokaler_versatz))
+            }
+            "zeit_nach_unix" => {
+                if a.len() != 1 { return Err("ZEIT_NACH_UNIX: erwartet einen Zeitpunkt".into()); }
+                let t = z_int(a, 0, "ZEIT_NACH_UNIX")?;
+                Value::Int(zeit::nach_unix_mit(t, crate::builtins::lokaler_versatz))
+            }
             "zeit_parse" => {
                 let text = z_str(a, 0, "ZEIT_PARSE")?;
                 match zeit::parse(text) {
@@ -6137,8 +6380,9 @@ impl<'p> Vm<'p> {
                     // viel spaeter als unsinnige Rechnung auf.
                     None => return Err(format!(
                         "ZEIT_PARSE: '{}' ist kein Zeitpunkt -- erwartet \
-                         'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden \
-                         oder nur Datum)", text)),
+                         'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden, \
+                         nur Datum oder mit Zeitzone) oder \
+                         'Sat, 28 Aug 2026 20:30:00 +0200'", text)),
                 }
             }
             // ZEIT_TEXT$ gibt Text, ZEIT_LESBAR fragt nach. Getrennte Namen,
@@ -6150,7 +6394,7 @@ impl<'p> Vm<'p> {
             "zeit_format$" | "zeit_format" => {
                 let t = z_int(a, 0, "ZEIT_FORMAT$")?;
                 let muster = if a.len() > 1 { z_str(a, 1, "ZEIT_FORMAT$")? } else { "" };
-                Value::str_rc(zeit::format(t, muster))
+                Value::str_rc(zeit::format_pruefen(t, muster)?)
             }
             "zeit_teil" => {
                 let t = z_int(a, 0, "ZEIT_TEIL")?;
@@ -6200,6 +6444,8 @@ impl<'p> Vm<'p> {
         // Warteschleife auf 100% eines Kerns.
         if name == "sleep" {
             let ms = bi_int(a, 0, "SLEEP")?.max(0) as u64;
+            // Was vor der Pause ausgegeben wurde, steht waehrend der Pause da.
+            self.flush_out();
             std::thread::sleep(std::time::Duration::from_millis(ms));
             return Ok(Some(Value::Nil));
         }
@@ -6877,6 +7123,7 @@ impl<'p> Vm<'p> {
         let _ = h.write_all(self.out.as_bytes());
         let _ = h.flush();
         self.out.clear();
+        self.out_zeit = std::time::Instant::now();
     }
 
     /// Modul `timer` (timer.rs): AFTER/EVERY/CANCEL/UPDATE + COOLDOWN.
@@ -6991,6 +7238,10 @@ impl<'p> Vm<'p> {
         if !name.starts_with("gui_") { return Ok(None); }
         fn gi(a: &[Value], i: usize, f: &str) -> R<i64> {
             match a.get(i) { Some(Value::Int(n)) => Ok(*n),
+                Some(Value::Float(x)) => crate::builtins::glatt_int(*x).ok_or_else(|| format!("{}: erwartet INTEGER (Arg {}), erhalten {}{}",
+                    f, i + 1, crate::value::fmt_float(*x), crate::builtins::KEIN_GANZ_HINWEIS)),
+                Some(Value::Str(t)) => Err(format!("{}: erwartet INTEGER (Arg {}){}", f, i + 1,
+                    crate::umstieg::text_statt_zahl(f, t))),
                 _ => Err(format!("{}: erwartet INTEGER (Arg {})", f, i + 1)) }
         }
         fn gs(a: &[Value], i: usize, f: &str) -> R<String> {
@@ -7392,10 +7643,29 @@ impl<'p> Vm<'p> {
                 let form = if a.len() > 1 { gs(a,1,"GUI_FORM_CHANGED")? } else { String::new() };
                 Value::Bool(self.gui.form_changed(gi(a,0,"GUI_FORM_CHANGED")?, &form)?)
             }
+            // GUI_FORM_VERSION(win, spalte$[, formular$]) -- Versionsspalte fuer
+            // GUI_FORM_LOAD/SAVE (optimistische Sperre), leer = aus.
+            "gui_changed" => Value::Bool(self.gui.changed(gi(a,0,"GUI_CHANGED")?)?),
+            "gui_form_version" => {
+                let form = if a.len() > 2 { gs(a,2,"GUI_FORM_VERSION")? } else { String::new() };
+                self.gui.form_version_setzen(gi(a,0,"GUI_FORM_VERSION")?, &form, &gs(a,1,"GUI_FORM_VERSION")?)?;
+                Value::Nil
+            }
+            "gui_form_conflict$" | "gui_form_conflict" => {
+                let form = if a.len() > 1 { gs(a,1,"GUI_FORM_CONFLICT$")? } else { String::new() };
+                Value::str_rc(self.gui.form_konflikt(gi(a,0,"GUI_FORM_CONFLICT$")?, &form)?)
+            }
             // GUI_FORM_LOAD(win, db, tabelle$, id[, formular$]) -> BOOLEAN
-            // GUI_FORM_SAVE(win, db, tabelle$, id[, formular$]) -> id
+            // GUI_FORM_SAVE(win, db, tabelle$, id[, formular$[, ueberschreiben]]) -> id
             // Die Spalte heisst `id` -- die Konvention von SQLite (rowid-Alias)
             // und von jedem ORM; wer anders heisst, schreibt sein SQL selbst.
+            //
+            // SAVE liefert 0, wenn nichts gespeichert wurde: die Zeile gibt es
+            // nicht mehr ("geloescht") oder -- mit GUI_FORM_VERSION -- ein
+            // anderer hat sie seit dem Laden gespeichert ("geaendert");
+            // GUI_FORM_CONFLICT$ sagt welches. Bis 2026.30 lieferte ein UPDATE
+            // auf eine geloeschte Zeile die Kennung zurueck, als waere alles
+            // gespeichert -- die Eingabe war still weg (Vereinsverwaltung).
             "gui_form_load" | "gui_form_save" => {
                 #[cfg(feature = "db")]
                 {
@@ -7412,12 +7682,28 @@ impl<'p> Vm<'p> {
                     if keys.is_empty() {
                         return Err(format!("{}: im Formular '{}' ist kein Widget gebunden (GUI_BIND)", fn_, form));
                     }
+                    let (vspalte, vstand) = self.gui.form_version(win, &form);
+                    let mit_version = !vspalte.is_empty();
                     if name == "gui_form_load" {
-                        let sql = format!("SELECT {} FROM {} WHERE id = ?", keys.join(", "), tabelle);
+                        let spalten = if mit_version { format!("{}, {}", keys.join(", "), vspalte) } else { keys.join(", ") };
+                        let sql = format!("SELECT {} FROM {} WHERE id = ?", spalten, tabelle);
                         let res = self.db_conn(conn_idx)?.query(&sql, &[crate::db::Param::Int(id)], fn_)?;
                         match res.rows.first() {
                             None => Value::Bool(false),
                             Some(row) => {
+                                if mit_version {
+                                    let stand = match row.last() {
+                                        Some(crate::db::DbVal::Int(n)) => Some(*n),
+                                        Some(crate::db::DbVal::Real(f)) => Some(*f as i64),
+                                        Some(crate::db::DbVal::Text(t)) | Some(crate::db::DbVal::Zahl(t)) => t.trim().parse::<i64>().ok(),
+                                        _ => None,
+                                    };
+                                    if stand.is_none() {
+                                        return Err(format!("{}: die Versionsspalte '{}' ist leer oder keine ganze Zahl", fn_, vspalte));
+                                    }
+                                    self.gui.form_stand_setzen(win, &form, stand);
+                                }
+                                self.gui.form_konflikt_setzen(win, &form, "");
                                 let werte: Vec<(String, Value)> = keys.iter().cloned().zip(row.iter().map(|z| match z {
                                     crate::db::DbVal::Null => Value::str_rc(""),
                                     crate::db::DbVal::Int(n) => Value::Int(*n),
@@ -7430,20 +7716,61 @@ impl<'p> Vm<'p> {
                             }
                         }
                     } else {
+                        let ueberschreiben = a.len() > 5 && gbool(a,5,fn_)?;
+                        if a.len() > 6 { return Err(format!("{}: zu viele Argumente", fn_)); }
                         let werte = self.gui.form_get_typisiert(win, &form)?;
                         let mut params: Vec<crate::db::Param> = Vec::new();
                         for (_, wv) in &werte { params.push(crate::db::dh_to_sql(wv, fn_)?); }
                         let neue_id = if id < 0 {
-                            let sql = format!("INSERT INTO {} ({}) VALUES ({})", tabelle, keys.join(", "),
-                                              keys.iter().map(|_| "?").collect::<Vec<_>>().join(", "));
-                            self.db_conn(conn_idx)?.einfuegen(&sql, &params, fn_)?
+                            let (spalten, platz) = if mit_version {
+                                (format!("{}, {}", keys.join(", "), vspalte),
+                                 format!("{}, 1", keys.iter().map(|_| "?").collect::<Vec<_>>().join(", ")))
+                            } else {
+                                (keys.join(", "), keys.iter().map(|_| "?").collect::<Vec<_>>().join(", "))
+                            };
+                            let sql = format!("INSERT INTO {} ({}) VALUES ({})", tabelle, spalten, platz);
+                            let nid = self.db_conn(conn_idx)?.einfuegen(&sql, &params, fn_)?;
+                            if mit_version { self.gui.form_stand_setzen(win, &form, Some(1)); }
+                            nid
                         } else {
-                            let sql = format!("UPDATE {} SET {} WHERE id = ?", tabelle,
-                                              keys.iter().map(|k| format!("{} = ?", k)).collect::<Vec<_>>().join(", "));
+                            let mut setz = keys.iter().map(|k| format!("{} = ?", k)).collect::<Vec<_>>().join(", ");
+                            if mit_version { setz = format!("{}, {} = {} + 1", setz, vspalte, vspalte); }
                             params.push(crate::db::Param::Int(id));
-                            self.db_conn(conn_idx)?.exec(&sql, &params, fn_)?;
+                            let pruefen = mit_version && !ueberschreiben;
+                            let sql = if pruefen {
+                                let stand = vstand.ok_or_else(|| format!(
+                                    "{}: dieses Formular hat die Versionsspalte '{}', wurde aber nicht mit GUI_FORM_LOAD geladen -- \
+                                     es weiss nicht, welchen Stand es bearbeitet (oder ueberschreiben = TRUE)", fn_, vspalte))?;
+                                params.push(crate::db::Param::Int(stand));
+                                format!("UPDATE {} SET {} WHERE id = ? AND {} = ?", tabelle, setz, vspalte)
+                            } else {
+                                format!("UPDATE {} SET {} WHERE id = ?", tabelle, setz)
+                            };
+                            let n = self.db_conn(conn_idx)?.exec(&sql, &params, fn_)?;
+                            if n == 0 {
+                                // Getroffen hat es nichts: gibt es die Zeile noch?
+                                let sql = format!("SELECT {} FROM {} WHERE id = ?",
+                                                  if mit_version { vspalte.as_str() } else { "id" }, tabelle);
+                                let da = !self.db_conn(conn_idx)?.query(&sql, &[crate::db::Param::Int(id)], fn_)?.rows.is_empty();
+                                self.gui.form_konflikt_setzen(win, &form, if da && pruefen { "geaendert" } else { "geloescht" });
+                                return Ok(Some(Value::Int(0)));
+                            }
+                            if mit_version {
+                                let neu = match vstand { Some(s) if !ueberschreiben => Some(s + 1), _ => {
+                                    let sql = format!("SELECT {} FROM {} WHERE id = ?", vspalte, tabelle);
+                                    let res = self.db_conn(conn_idx)?.query(&sql, &[crate::db::Param::Int(id)], fn_)?;
+                                    match res.rows.first().and_then(|z| z.first()) {
+                                        Some(crate::db::DbVal::Int(n)) => Some(*n),
+                                        Some(crate::db::DbVal::Real(f)) => Some(*f as i64),
+                                        Some(crate::db::DbVal::Text(t)) | Some(crate::db::DbVal::Zahl(t)) => t.trim().parse::<i64>().ok(),
+                                        _ => None,
+                                    }
+                                }};
+                                self.gui.form_stand_setzen(win, &form, neu);
+                            }
                             id
                         };
+                        self.gui.form_konflikt_setzen(win, &form, "");
                         self.gui.form_clean(win, &form)?;
                         Value::Int(neue_id)
                     }
@@ -7778,6 +8105,8 @@ impl<'p> Vm<'p> {
             "gui_window_get_y" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_Y")?)?.1 as i64),
             "gui_window_get_w" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_W")?)?.2 as i64),
             "gui_window_get_h" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_H")?)?.3 as i64),
+            "gui_window_content_w" => Value::Int(self.gui.window_inhalt(gi(a,0,"GUI_WINDOW_CONTENT_W")?)?.0 as i64),
+            "gui_window_content_h" => Value::Int(self.gui.window_inhalt(gi(a,0,"GUI_WINDOW_CONTENT_H")?)?.1 as i64),
             "gui_window_destroy" => { self.gui.window_destroy(gi(a,0,"GUI_WINDOW_DESTROY")?)?; Value::Nil }
             "gui_window_widget_count" => Value::Int(self.gui.window_widget_count(gi(a,0,"GUI_WINDOW_WIDGET_COUNT")?)?),
             "gui_window_widget" => Value::Int(self.gui.window_widget(gi(a,0,"GUI_WINDOW_WIDGET")?, gi(a,1,"GUI_WINDOW_WIDGET")?)?),
@@ -8399,7 +8728,10 @@ impl<'p> Vm<'p> {
         const HDR: i32 = 22; const ROW: i32 = 20; const SCR: i32 = 12; const PAD: i32 = 6;
         // --- Arg-Extraktion (lokal) ---
         fn gi(a: &[Value], i: usize, f: &str) -> R<i64> {
-            match a.get(i) { Some(Value::Int(n)) => Ok(*n), _ => Err(format!("{}: erwartet INTEGER (Arg {})", f, i + 1)) }
+            match a.get(i) { Some(Value::Int(n)) => Ok(*n),
+                Some(Value::Float(x)) => crate::builtins::glatt_int(*x).ok_or_else(|| format!("{}: erwartet INTEGER (Arg {}), erhalten {}{}",
+                    f, i + 1, crate::value::fmt_float(*x), crate::builtins::KEIN_GANZ_HINWEIS)),
+                _ => Err(format!("{}: erwartet INTEGER (Arg {})", f, i + 1)) }
         }
         fn gid(a: &[Value], f: &str) -> R<String> {
             match a.first() { Some(Value::Str(s)) => Ok(s.to_string()), _ => Err(format!("{}: id muss STRING sein", f)) }
@@ -8674,6 +9006,20 @@ impl<'p> Vm<'p> {
                 Some(v) => Err(format!("{}: erwartet Zahl, erhalten {} (Argument {})", fn_, v.type_name(), i + 1)),
                 None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
             }
+        }
+        // Tastenargument von KEYHIT & Co.: eine Zahl ist die LAGE der Taste,
+        // ein einzelner Buchstabe (oder eine Ziffer) die Taste, auf der er steht.
+        fn taste(g: &crate::graphics::Graphics, a: &[Value], fn_: &str) -> R<i64> {
+            if let Some(Value::Str(s)) = a.first() {
+                let mut z = s.chars();
+                if let (Some(c), None) = (z.next(), z.next()) {
+                    if let Some(k) = g.taste_fuer_zeichen(c) { return Ok(k); }
+                }
+                return Err(format!(
+                    "{}: ein Text meint den Buchstaben oder die Ziffer auf der Taste -- \"{}\" ist keins (Sondertasten als Konstante: KEY_ENTER, KEY_LEFT, ...)",
+                    fn_, s));
+            }
+            gi(a, 0, fn_)
         }
         fn gs<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
             match a.get(i) {
@@ -8995,10 +9341,18 @@ impl<'p> Vm<'p> {
                 gi(a,4,"GENTEX_CHECKED")?, gi(a,5,"GENTEX_CHECKED")?)?),
             "gentex_color" => Value::Int(g!().gen_tex_color(
                 gi(a,0,"GENTEX_COLOR")? as i32, gi(a,1,"GENTEX_COLOR")? as i32, gi(a,2,"GENTEX_COLOR")?)?),
-            "gentex_radial" => Value::Int(g!().gen_tex_radial(
-                gi(a,0,"GENTEX_RADIAL")? as i32, gi(a,1,"GENTEX_RADIAL")? as i32,
-                gi(a,2,"GENTEX_RADIAL")?, gi(a,3,"GENTEX_RADIAL")?,
-                if a.len() >= 5 { need_f(a,4,"GENTEX_RADIAL")? } else { 0.0 })?),
+            "gentex_radial" => {
+                // dichte = Anteil des Radius in voller Innenfarbe. Ueber 1 gab
+                // raylib still eine harte Scheibe statt eines Lichts
+                // (Web-Runde 2026-10-13: 1.6 sah nach "dichter" aus).
+                let dichte = if a.len() >= 5 { need_f(a,4,"GENTEX_RADIAL")? } else { 0.0 };
+                if !(0.0..=1.0).contains(&dichte) {
+                    return Err(format!("GENTEX_RADIAL: dichte {} liegt nicht in 0..1 -- sie ist der Anteil des Radius in voller Innenfarbe (0 = weicher Verlauf ab der Mitte, 1 = Scheibe)", dichte));
+                }
+                Value::Int(g!().gen_tex_radial(
+                    gi(a,0,"GENTEX_RADIAL")? as i32, gi(a,1,"GENTEX_RADIAL")? as i32,
+                    gi(a,2,"GENTEX_RADIAL")?, gi(a,3,"GENTEX_RADIAL")?, dichte)?)
+            }
             "gentex_cellular" => Value::Int(g!().gen_tex_cellular(
                 gi(a,0,"GENTEX_CELLULAR")? as i32, gi(a,1,"GENTEX_CELLULAR")? as i32,
                 gi(a,2,"GENTEX_CELLULAR")?)?),
@@ -9063,6 +9417,7 @@ impl<'p> Vm<'p> {
             }
             "rendertarget_begin" => { g!().rendertarget_begin(gi(a,0,"RENDERTARGET_BEGIN")?)?; Value::Nil }
             "rendertarget_end" => { g!().rendertarget_end(); Value::Nil }
+            "rendertarget_image" => Value::Int(g!().rendertarget_image(gi(a,0,"RENDERTARGET_IMAGE")?)?),
             "rendertarget_draw" => {
                 let scale = if a.len() >= 4 { need_f(a,3,"RENDERTARGET_DRAW")? } else { 1.0 };
                 let tint = if a.len() >= 5 { Some(gi(a,4,"RENDERTARGET_DRAW")?) } else { None };
@@ -9233,7 +9588,22 @@ impl<'p> Vm<'p> {
                     Value::Int(g!().load_font(gs(a,0,"LOADFONT")?, gi(a,1,"LOADFONT")? as i32)?)
                 }
             }
-            "setfont" => { g!().set_font(gi(a,0,"SETFONT")?)?; Value::Nil }
+            "setfont" => {
+                // Zweites Argument (2026-10-14, Texteditor-Runde): die Groesse,
+                // in der ab jetzt gezeichnet wird. Ohne sie gilt weiter die
+                // Lade-Groesse -- wer scharf bei 32 laedt und bei 16 zeichnen
+                // will, schrieb vorher SETFONT + TEXT_SIZE und vergass das zweite.
+                if a.is_empty() || a.len() > 2 {
+                    return Err(format!("SETFONT: erwartet (handle[, groesse]), erhalten {} Argument(e)", a.len()));
+                }
+                g!().set_font(gi(a,0,"SETFONT")?)?;
+                if a.len() == 2 {
+                    let gr = gi(a,1,"SETFONT")?;
+                    if gr < 1 { return Err(format!("SETFONT: groesse muss mindestens 1 sein, erhalten {}", gr)); }
+                    g!().set_text_size(gr as i32);
+                }
+                Value::Nil
+            }
             "loadfont_sdf" => {
                 if a.len() < 2 || a.len() > 3 { return Err("LOADFONT_SDF: erwartet (pfad$, groesse[, zeichen$])".into()); }
                 let z = if a.len() == 3 { Some(gs(a,2,"LOADFONT_SDF")?) } else { None };
@@ -9288,15 +9658,20 @@ impl<'p> Vm<'p> {
                 let tint = if a.len() >= 6 { Some(gi(a, 5, "DRAWIMAGEROT")?) } else { None };
                 g!().draw_image_rot(idx, x, y, ang, scale, tint)?; Value::Nil
             }
-            "imagewidth" => Value::Int(g!().image_width(gi(a,0,"IMAGEWIDTH")?)?),
-            "imageheight" => Value::Int(g!().image_height(gi(a,0,"IMAGEHEIGHT")?)?),
+            // IMAGE_WIDTH/IMAGE_HEIGHT: derselbe Befehl im Namensschema der
+            // uebrigen IMAGE_*-Befehle (IMAGE_NEW, IMAGE_SAVE ...).
+            "imagewidth" | "image_width" => Value::Int(g!().image_width(gi(a,0,"IMAGE_WIDTH")?)?),
+            "imageheight" | "image_height" => Value::Int(g!().image_height(gi(a,0,"IMAGE_HEIGHT")?)?),
             "flip" => {
                 g!().flip();
+                // Gesammelte PRINT-Zeilen eines Spiels gehen spaetestens nach
+                // 50 ms hinaus, nicht erst beim Beenden.
+                if !self.out.is_empty() && self.out_zeit.elapsed() >= std::time::Duration::from_millis(50) { self.flush_out(); }
                 // Musik-Stream nachfuettern (sonst stockt die Wiedergabe).
                 if let Some(au) = self.audio.as_mut() { au.update(); }
                 Value::Nil
             }
-            "keypressed" => Value::Bool(g!().key_down(gi(a,0,"KEYPRESSED")?)),
+            "keypressed" => { let k = taste(g!(), a, "KEYPRESSED")?; Value::Bool(g!().key_down(k)) }
             "inkey$" | "inkey" => Value::Str(g!().inkey().into()),
             "waitkey" => Value::Int(g!().waitkey()),
             // SCROLL verschiebt persistente Framebuffer-Pixel -- die native
@@ -9325,9 +9700,9 @@ impl<'p> Vm<'p> {
             // sie umzudeuten wuerde bestehende Programme still kaputtmachen).
             "mouse_hit" => Value::Bool(g!().mouse_hit(gi(a,0,"MOUSE_HIT")?)),
             "mouse_released" => Value::Bool(g!().mouse_released(gi(a,0,"MOUSE_RELEASED")?)),
-            "keyhit" => Value::Bool(g!().key_hit(gi(a,0,"KEYHIT")?)),
-            "keyreleased" => Value::Bool(g!().key_released_edge(gi(a,0,"KEYRELEASED")?)),
-            "keyrepeat" => Value::Bool(g!().key_repeat(gi(a,0,"KEYREPEAT")?)),
+            "keyhit" => { let k = taste(g!(), a, "KEYHIT")?; Value::Bool(g!().key_hit(k)) }
+            "keyreleased" => { let k = taste(g!(), a, "KEYRELEASED")?; Value::Bool(g!().key_released_edge(k)) }
+            "keyrepeat" => { let k = taste(g!(), a, "KEYREPEAT")?; Value::Bool(g!().key_repeat(k)) }
             "mouse_delta_x" => Value::Float(g!().mouse_delta_x()),
             "mouse_delta_y" => Value::Float(g!().mouse_delta_y()),
             "mouse_set_pos" => { let (x, y) = (gi(a,0,"MOUSE_SET_POS")?, gi(a,1,"MOUSE_SET_POS")?);
@@ -9760,6 +10135,26 @@ impl<'p> Vm<'p> {
                 };
                 let tint = if a.len() >= 3 { gi(a, 2, "MODEL_MATRIX")? } else { 0xFF_FFFF };
                 g!().draw_model_matrix(gi(a, 0, "MODEL_MATRIX")?, mat, tint)?;
+                Value::Nil
+            }
+            "cube_matrix_wires" => {
+                // CUBE_MATRIX_WIRES(mat [, farbe]) -- Kanten eines Einheitswuerfels.
+                let mat = match a.first() {
+                    Some(Value::Mat4(m)) => m.clone(),
+                    _ => return Err("CUBE_MATRIX_WIRES: Arg 1 muss MAT4 sein".into()),
+                };
+                let farbe = if a.len() >= 2 { gi(a, 1, "CUBE_MATRIX_WIRES")? } else { 0xFF_FFFF };
+                g!().draw_cube_matrix_wires(mat, farbe);
+                Value::Nil
+            }
+            "model_matrix_wires" => {
+                // MODEL_MATRIX_WIRES(handle, mat [, farbe]) -- Umriss zu MODEL_MATRIX.
+                let mat = match a.get(1) {
+                    Some(Value::Mat4(m)) => m.clone(),
+                    _ => return Err("MODEL_MATRIX_WIRES: Arg 2 muss MAT4 sein".into()),
+                };
+                let farbe = if a.len() >= 3 { gi(a, 2, "MODEL_MATRIX_WIRES")? } else { 0xFF_FFFF };
+                g!().draw_model_matrix_wires(gi(a, 0, "MODEL_MATRIX_WIRES")?, mat, farbe)?;
                 Value::Nil
             }
             "model_instanced" => {
@@ -10364,6 +10759,15 @@ impl<'p> Vm<'p> {
                 self.audio_mut()?.ch_stop(i, fade, &easing)?; Value::Nil
             }
             "audio_is_playing" => { let i = gi(a, 0, "AUDIO_IS_PLAYING")?; Value::Bool(self.audio_mut()?.ch_is_playing(i)?) }
+            "audio_is_waiting" => { let i = gi(a, 0, "AUDIO_IS_WAITING")?; Value::Bool(self.audio_mut()?.ch_is_waiting(i)?) }
+            "audio_record_start" => {
+                if a.len() > 1 { return Err(format!("AUDIO_RECORD_START: erwartet 0..1 Argumente, erhalten {}", a.len())); }
+                let m = if a.is_empty() { 600.0 } else { need_f(a, 0, "AUDIO_RECORD_START")? };
+                self.audio_mut()?.record_start(m)?; Value::Nil
+            }
+            "audio_record_stop" => { Value::Int(self.audio_mut()?.record_stop()?) }
+            "audio_recording" => { Value::Bool(self.audio_mut()?.recording()) }
+            "audio_peak" => { Value::Float(round_audio(self.audio_mut()?.peak())) }
             "audio_volume" | "audio_set_volume" => { let i = gi(a, 0, "AUDIO_VOLUME")?; let v = need_f(a, 1, "AUDIO_VOLUME")?; self.audio_mut()?.ch_set_volume(i, v)?; Value::Nil }
             "audio_get_volume" => { let i = gi(a, 0, "AUDIO_GET_VOLUME")?; Value::Float(round_audio(self.audio_mut()?.ch_get_volume(i)?)) }
             "audio_pan" => { let i = gi(a, 0, "AUDIO_PAN")?; let l = need_f(a, 1, "AUDIO_PAN")?; let r = need_f(a, 2, "AUDIO_PAN")?; self.audio_mut()?.ch_pan(i, l, r)?; Value::Nil }
@@ -10971,7 +11375,27 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             // --- Modul: imgfx (immutable, liefern neues IMAGE-Handle) ---
-            "image_scale" => Value::Int(g!().image_scale(gi(a,0,"IMAGE_SCALE")?, gi(a,1,"IMAGE_SCALE")? as i32, gi(a,2,"IMAGE_SCALE")? as i32)?),
+            "image_scale" => {
+                let (b, h) = (gi(a,1,"IMAGE_SCALE")? as i32, gi(a,2,"IMAGE_SCALE")? as i32);
+                if a.len() > 4 { return Err("IMAGE_SCALE: erwartet (bild, breite, hoehe [, filter$])".into()); }
+                if a.len() == 4 {
+                    let name = gs(a, 3, "IMAGE_SCALE")?;
+                    let f = crate::resample::Filter::aus_namen(&name).ok_or_else(|| format!(
+                        "IMAGE_SCALE: unbekannter Filter '{}' -- moeglich sind lanczos, bikubisch, box, hamming, linear", name))?;
+                    Value::Int(g!().image_scale_filter(gi(a,0,"IMAGE_SCALE")?, b, h, f)?)
+                } else {
+                    Value::Int(g!().image_scale(gi(a,0,"IMAGE_SCALE")?, b, h)?)
+                }
+            }
+            "image_enhance" => {
+                if a.len() != 3 { return Err("IMAGE_ENHANCE: erwartet (bild, art$, faktor)".into()); }
+                let name = gs(a, 1, "IMAGE_ENHANCE")?;
+                let art = crate::resample::Anpassung::aus_namen(&name).ok_or_else(|| format!(
+                    "IMAGE_ENHANCE: unbekannte Art '{}' -- moeglich sind helligkeit, kontrast, saettigung", name))?;
+                let f = need_f(a, 2, "IMAGE_ENHANCE")?;
+                if !f.is_finite() || f < 0.0 { return Err("IMAGE_ENHANCE: der Faktor muss eine Zahl ab 0 sein".into()); }
+                Value::Int(g!().image_enhance(gi(a,0,"IMAGE_ENHANCE")?, art, f)?)
+            }
             "image_scale_nn" => Value::Int(g!().image_scale_nn(gi(a,0,"IMAGE_SCALE_NN")?, gi(a,1,"IMAGE_SCALE_NN")? as i32, gi(a,2,"IMAGE_SCALE_NN")? as i32)?),
             "image_rotate" => Value::Int(g!().image_rotate(gi(a,0,"IMAGE_ROTATE")?, need_f(a,1,"IMAGE_ROTATE")? as f32)?),
             "image_rotate_cw" => Value::Int(g!().image_rotate_cw(gi(a,0,"IMAGE_ROTATE_CW")?)?),
@@ -12635,4 +13059,19 @@ fn feld_platz(instr: &crate::model::Instr, obj: &Instance, name: &str) -> Option
 
 thread_local! {
     static LEERE_LAGE: Rc<crate::value::Layout> = Rc::new(crate::value::Layout::default());
+}
+
+/// CALL_METHOD auf eine Methode mit BYREF-Parametern: der Compiler kannte die
+/// Klasse nicht (`DIM x` ohne Typ, Feldelement ohne Typ), konnte die Argumente
+/// also nicht erfassen. Still als BYVAL zu laufen hiesse, die Aenderungen zu
+/// verlieren -- darum ein Fehler mit dem Weg hinaus.
+fn byref_ohne_typ(m: &Func, method: &str, cn: &str, argc: usize) -> Result<(), String> {
+    if m.param_byref.iter().take(argc).any(|&b| b) {
+        let k = crate::namensraum::lesbar_text(cn).to_uppercase();
+        return Err(format!(
+            "{}.{} hat BYREF-Parameter, aber beim Uebersetzen war die Klasse des Objekts \
+             nicht bekannt -- die Werte kaemen nicht zurueck. Das Objekt in einer \
+             Variablen mit Typ halten (DIM x AS {}) und darueber aufrufen.", k, method, k));
+    }
+    Ok(())
 }

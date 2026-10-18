@@ -1,0 +1,237 @@
+' Planen und Vorrat als Text -- dieselben Zeilen, die ref_planung.py aus
+' PySticky aufzeichnet (Einkaufsliste, Vorrat, Palette umwandeln, Farben
+' tauschen, Rahmenaufteilung). Die Fehlertexte der Rahmenaufteilung stehen
+' dort englisch-deutsch gemischt und sind nicht dabei.
+FUNCTION gpWahr$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "True", "False")
+END FUNCTION
+
+' Eine Kommazahl, wie Python sie in einem f-String ohne Format schreibt
+FUNCTION gpPy$(x AS FLOAT) AS STRING
+    IF x = INT(x) THEN RETURN STR$(INT(x)) + ".0"
+    RETURN STR$(x)
+END FUNCTION
+
+' Python repr() eines schlichten Texts
+FUNCTION gpRepr$(t AS STRING) AS STRING
+    RETURN "'" + t + "'"
+END FUNCTION
+
+SUB gpEinkauf(aus AS ARRAY OF STRING, liste AS ARRAY OF kern.Einkaufszeile, mitStichen AS BOOLEAN)
+    DIM z AS kern.Einkaufszeile
+    FOR EACH z IN liste
+        DIM s AS STRING : s = IIF(mitStichen, STR$(z.stiche) + " ", "")
+        ARRAY_PUSH(aus, "  " + z.schluessel + " | " + z.garn.name + " | " + s + STR$(z.benoetigt) + " " + STR$(z.vorhanden) + " " + STR$(z.kaufen) + " " + gpWahr$(z.diamant))
+    NEXT
+    ARRAY_PUSH(aus, "  summe " + STR$(kern.einkaufSumme(liste)))
+END SUB
+
+SUB gpLagen(aus AS ARRAY OF STRING, m AS kern.Muster)
+    DIM nr AS INTEGER
+    FOR nr = 0 TO m.ebenen.anzahl() - 1
+        DIM e AS kern.Ebene : e = m.ebenen.ebenen[nr]
+        DIM z AS ARRAY OF STRING : z = []
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(e.raster) - 1
+            IF e.raster[i] < 0 THEN
+                ARRAY_PUSH(z, ".")
+            ELSE
+                ARRAY_PUSH(z, STR$(e.raster[i]) + "/" + STR$(e.art[i]) + IIF(e.erledigt[i] <> 0, "+", ""))
+            END IF
+        NEXT
+        ARRAY_PUSH(aus, "  ebene " + STR$(nr) + ": " + JOIN$(z, " "))
+    NEXT
+END SUB
+
+' Das grosse Muster der Strangrechnung, wie ref_planung.py es baut
+FUNCTION gpGross() AS kern.Muster
+    DIM g AS kern.Muster : g = kern.neuesMuster("Gross", 90, 60)
+    g.stoff = 14
+    ARRAY_PUSH(g.farben, kern.neuerFarbeintrag(kern.neuesGarn("Black", RGB(0, 0, 0), "DMC", "310"), "a"))
+    ARRAY_PUSH(g.farben, kern.neuerFarbeintrag(kern.neuesGarn("Blue", RGB(30, 60, 200), "DMC", "820"), "b"))
+    ARRAY_PUSH(g.farben, kern.neuerFarbeintrag(kern.neuesGarn("Green", RGB(30, 160, 60), "Anchor", "245"), "c"))
+    ARRAY_PUSH(g.farben, kern.neuerFarbeintrag(kern.neuesGarn("Gelb", RGB(250, 230, 40), "", ""), "d"))
+    DIM grenzen AS ARRAY OF INTEGER : grenzen = [0, 2000, 3800, 5000, 5400]
+    DIM e AS kern.Ebene : e = g.ebenen.aktiveEbene()
+    DIM i AS INTEGER, k AS INTEGER
+    DIM ok AS BOOLEAN
+    FOR i = 0 TO 5399
+        FOR k = 0 TO 3
+            IF i >= grenzen[k] AND i < grenzen[k + 1] THEN ok = e.setzeStich(i MOD 90, i \ 90, k)
+        NEXT
+    NEXT
+    RETURN g
+END FUNCTION
+
+FUNCTION planungText$(pfad AS STRING, pfadDp AS STRING, vorratPfad AS STRING, ordner AS STRING, palettenOrdner AS STRING) AS STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM m AS kern.Muster : m = kern.pxsLaden(pfad)
+    DIM d AS kern.Muster : d = kern.pxsLaden(pfadDp)
+    m.stichzahlenNeu()
+    d.stichzahlenNeu()
+    ' --- Schluessel
+    DIM sh AS ARRAY OF STRING : sh = ["DMC", "", "", "", " Anchor ", ""]
+    DIM sn AS ARRAY OF STRING : sn = ["310", "", "", "77", "", " "]
+    DIM sm AS ARRAY OF STRING : sm = ["x", "Eigen 1.5", "", "y", "z", "  "]
+    DIM i AS INTEGER
+    FOR i = 0 TO 5
+        DIM k AS STRING : k = kern.vorratSchluessel$(sh[i], sn[i], sm[i])
+        DIM a AS STRING, b AS STRING, c AS STRING
+        (a, b, c) = kern.vorratTeile(k)
+        ARRAY_PUSH(aus, "schluessel " + gpRepr$(sh[i]) + " " + gpRepr$(sn[i]) + " " + gpRepr$(sm[i]) + " -> " + k + " | " + a + "|" + b + "|" + c)
+    NEXT
+    DIM tk AS STRING
+    FOR EACH tk IN ["DMC::310", "unknown::unknown::a::b", "nur", "a::"]
+        DIM a2 AS STRING, b2 AS STRING, c2 AS STRING
+        (a2, b2, c2) = kern.vorratTeile(tk)
+        ARRAY_PUSH(aus, "teile " + tk + " -> " + a2 + "|" + b2 + "|" + c2)
+    NEXT
+    ' --- Vorrat lesen und schreiben
+    DIM inv AS kern.Vorrat : inv = kern.vorratLaden(vorratPfad)
+    FOR EACH tk IN inv.schluessel()
+        ARRAY_PUSH(aus, "vorrat " + tk + " " + STR$(inv.holeSchluessel(tk)))
+    NEXT
+    DIM neu AS kern.Vorrat : neu = kern.vorratLaden(vorratPfad)
+    neu.pfad = PATHJOIN(ordner, "vorrat_neu.json")
+    neu.setzeSchluessel(kern.vorratSchluessel$("DMC", "321", ""), 0)
+    neu.setzeSchluessel(kern.vorratSchluessel$("", "", "Eigenfarbe 1.5"), 4)
+    neu.sichern()
+    DIM leer AS kern.Vorrat : leer = kern.vorratLaden(PATHJOIN(ordner, "gibtsnicht.json"))
+    leer.pfad = PATHJOIN(ordner, "vorrat_leer.json")
+    leer.sichern()
+    ' --- Einkaufsliste
+    DIM zu AS FLOAT
+    FOR EACH zu IN [20.0, 0.0, 35.0]
+        ARRAY_PUSH(aus, "einkauf " + gpPy$(zu) + ":")
+        gpEinkauf(aus, kern.einkaufsliste(m, inv, zu), TRUE)
+    NEXT
+    ARRAY_PUSH(aus, "einkauf dp:")
+    gpEinkauf(aus, kern.einkaufsliste(d, inv, 20.0), TRUE)
+    ARRAY_PUSH(aus, "einkauf leer:")
+    gpEinkauf(aus, kern.einkaufsliste(m, leer, 20.0), TRUE)
+    DIM st AS FLOAT
+    FOR EACH st IN [14.0, 18.0, 14.5]
+        DIM mm AS kern.Muster : mm = kern.pxsLaden(pfad)
+        mm.stoff = st
+        ARRAY_PUSH(aus, "einkauf stoff " + IIF(st = INT(st), STR$(INT(st)), STR$(st)) + ":")
+        gpEinkauf(aus, kern.einkaufsliste(mm, inv, 20.0), TRUE)
+    NEXT
+    DIM g AS kern.Muster : g = gpGross()
+    FOR EACH st IN [14.0, 11.0, 16.0, 18.0, 28.0, 32.0, 14.5]
+        FOR EACH zu IN [0.0, 20.0, 35.0, 7.5]
+            g.stoff = st
+            ARRAY_PUSH(aus, "gross " + IIF(st = INT(st), STR$(INT(st)), STR$(st)) + " " + gpPy$(zu) + ":")
+            gpEinkauf(aus, kern.einkaufsliste(g, inv, zu), TRUE)
+        NEXT
+    NEXT
+    g.stoff = 14
+    ARRAY_PUSH(aus, "gross mehrere:")
+    gpEinkauf(aus, kern.einkaufslisteMehrere([g, m, d], inv, 20.0), FALSE)
+    ARRAY_PUSH(aus, "einkauf mehrere:")
+    gpEinkauf(aus, kern.einkaufslisteMehrere([m, d], inv, 20.0), FALSE)
+    ARRAY_PUSH(aus, "einkauf mehrere dp zuerst:")
+    gpEinkauf(aus, kern.einkaufslisteMehrere([d, m], inv, 20.0), FALSE)
+    ' --- Projektliste
+    DIM pl AS kern.Projektliste : pl = NEW kern.Projektliste()
+    pl.pfad = PATHJOIN(ordner, "projekte.json")
+    pl.pfade = ["C:" + CHR$(92) + "Muster" + CHR$(92) + "a.pxs", "C:" + CHR$(92) + "Muster" + CHR$(92) + "Äpfel b.pxs"]
+    pl.sichern()
+    ' --- Palette umwandeln
+    DIM paletten AS ARRAY OF kern.Palette : paletten = kern.palettenLaden(palettenOrdner)
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM pal AS kern.Palette
+    FOR EACH pal IN paletten
+        ARRAY_PUSH(namen, pal.name)
+    NEXT
+    SORT(namen)
+    ARRAY_PUSH(aus, "paletten: " + JOIN$(namen, " | "))
+    DIM pn AS STRING
+    FOR EACH pn IN ["Anchor", "Madeira", "Mill Hill Beads", "DMC Diamant", "Venus"]
+        FOR EACH pal IN paletten
+            IF pal.name = pn THEN BREAK
+        NEXT
+        DIM ab AS ARRAY OF FLOAT
+        DIM ziele AS ARRAY OF INTEGER : ziele = kern.umwandlungRechnen(m, pal, ab)
+        DIM gut AS INTEGER, ak AS INTEGER, sch AS INTEGER, ueber25 AS INTEGER
+        gut = 0 : ak = 0 : sch = 0 : ueber25 = 0
+        ARRAY_PUSH(aus, "umwandeln " + pn + " (" + STR$(LEN(pal.garne)) + " Farben):")
+        FOR i = 0 TO LEN(ziele) - 1
+            DIM zg AS kern.Garn : zg = pal.garne[ziele[i]]
+            ARRAY_PUSH(aus, "  " + zg.hersteller + "|" + zg.nummer + "|" + zg.name + "|" + FORMAT$(ab[i], "%.1f"))
+            SELECT CASE kern.zuordnungGuete(ab[i])
+                CASE 0 : gut = gut + 1
+                CASE 1 : ak = ak + 1
+                CASE ELSE : sch = sch + 1
+            END SELECT
+            IF ab[i] > 25 THEN ueber25 = ueber25 + 1
+        NEXT
+        ARRAY_PUSH(aus, "  guete " + STR$(gut) + " " + STR$(ak) + " " + STR$(sch) + " | schlecht >25: " + STR$(ueber25))
+        ARRAY_PUSH(aus, "  kollisionen " + JOIN$(kern.umwandlungKollisionen(m, pal, ziele), " / "))
+    NEXT
+    FOR EACH pal IN paletten
+        IF pal.name = "Anchor" THEN BREAK
+    NEXT
+    DIM fi AS INTEGER
+    FOR EACH fi IN [0, 4]
+        DIM fab AS ARRAY OF FLOAT
+        DIM reihe AS ARRAY OF INTEGER : reihe = kern.paletteNachNaehe(pal, m.farben[fi].garn.farbe, fab)
+        DIM z AS ARRAY OF STRING : z = []
+        FOR i = 0 TO 11
+            ARRAY_PUSH(z, pal.garne[reihe[i]].nummer + ":" + FORMAT$(fab[i], "%.1f"))
+        NEXT
+        ARRAY_PUSH(aus, "auswahl " + m.farben[fi].garn.name + " " + JOIN$(z, " "))
+        DIM tr AS ARRAY OF STRING : tr = []
+        DIM r AS INTEGER
+        FOR EACH r IN reihe
+            DIM gg AS kern.Garn : gg = pal.garne[r]
+            IF INSTR(LOWER$(gg.name), "blue") >= 0 OR INSTR(LOWER$(gg.nummer), "blue") >= 0 OR INSTR(LOWER$(gg.hersteller), "blue") >= 0 THEN ARRAY_PUSH(tr, gg.nummer)
+        NEXT
+        ARRAY_PUSH(aus, "  suche 'blue' " + LEFT$(JOIN$(tr, " "), 300))
+    NEXT
+    ' --- Farben tauschen
+    DIM paare AS ARRAY OF INTEGER : paare = [0, 1, 1, 3, 2, 4, 3, 5, 5, 6]
+    FOR i = 0 TO 4
+        DIM fa AS INTEGER : fa = paare[2 * i]
+        DIM fb AS INTEGER : fb = paare[2 * i + 1]
+        DIM mt AS kern.Muster : mt = kern.pxsLaden(pfad)
+        mt.stichzahlenNeu()
+        DIM ia AS INTEGER : ia = mt.farben[fa].stichzahl
+        DIM ib AS INTEGER : ib = mt.farben[fb].stichzahl
+        DIM sicht AS ARRAY OF INTEGER : sicht = kern.sichtbareZaehlen(mt)
+        DIM ver AS kern.Verlauf : ver = kern.neuerVerlauf()
+        DIM n AS INTEGER : n = kern.farbenTauschen(mt, ver, fa, fb)
+        IF n <> sicht[fa] + sicht[fb] THEN ARRAY_PUSH(aus, "  !! getauscht " + STR$(n))
+        DIM zz AS ARRAY OF STRING : zz = []
+        DIM f AS kern.Farbeintrag
+        FOR EACH f IN mt.farben
+            ARRAY_PUSH(zz, STR$(f.stichzahl))
+        NEXT
+        ARRAY_PUSH(aus, "tauschen " + STR$(fa) + " " + STR$(fb) + ": info " + STR$(ia) + " " + STR$(ib) + " | getauscht " + STR$(sicht[fa]) + " " + STR$(sicht[fb]) + " | zahlen " + JOIN$(zz, " "))
+        gpLagen(aus, mt)
+    NEXT
+    ' --- Rahmen
+    FOR EACH st IN [14.0, 16.0, 18.0, 11.0, 14.5, 28.0]
+        DIM vz AS ARRAY OF STRING : vz = []
+        DIM w AS INTEGER
+        FOR EACH w IN kern.rahmenVorlagenStiche()
+            ARRAY_PUSH(vz, STR$(kern.rahmenFuerStoff(w, st)))
+        NEXT
+        ARRAY_PUSH(aus, "vorlagen " + IIF(st = INT(st), STR$(INT(st)), STR$(st)) + ": " + JOIN$(vz, " "))
+    NEXT
+    DIM ra AS ARRAY OF INTEGER : ra = [300, 200, 82, 82, 3, 10, 10, 82, 82, 3, 82, 83, 82, 82, 0, 100, 50, 40, 60, 5, 5, 300, 10, 20, 9, 1000, 1000, 10, 10, 9]
+    FOR i = 0 TO 5
+        DIM rr AS INTEGER, rs AS INTEGER
+        (rr, rs) = kern.rahmenRaster(ra[5 * i], ra[5 * i + 1], ra[5 * i + 2], ra[5 * i + 3], ra[5 * i + 4])
+        ARRAY_PUSH(aus, "raster " + STR$(ra[5 * i]) + " " + STR$(ra[5 * i + 1]) + " " + STR$(ra[5 * i + 2]) + " " + STR$(ra[5 * i + 3]) + " " + STR$(ra[5 * i + 4]) + ": (" + STR$(rr) + ", " + STR$(rs) + ")")
+    NEXT
+    DIM pp AS ARRAY OF INTEGER : pp = [10, 10, 3, 12, 7, 2, 26, 20, 0, 30, 30, 3, 11, 11, 10, 25, 19, 1]
+    FOR i = 0 TO 5
+        DIM plan AS kern.Rahmenplan : plan = kern.rahmenPlanen(m, pp[3 * i], pp[3 * i + 1], pp[3 * i + 2])
+        ARRAY_PUSH(aus, "plan " + STR$(pp[3 * i]) + " " + STR$(pp[3 * i + 1]) + " " + STR$(pp[3 * i + 2]) + ": " + STR$(plan.reihen) + " " + STR$(plan.spalten) + " " + gpWahr$(plan.einRahmen()))
+        DIM se AS kern.Rahmensektor
+        FOR EACH se IN plan.sektoren
+            ARRAY_PUSH(aus, "  " + STR$(se.nr + 1) + " R" + STR$(se.reihe + 1) + " S" + STR$(se.spalte + 1) + " " + STR$(se.x0) + " … " + STR$(se.x1 - 1) + " " + STR$(se.y0) + " … " + STR$(se.y1 - 1) + " " + STR$(se.stiche))
+        NEXT
+    NEXT
+    RETURN JOIN$(aus, CHR$(10))
+END FUNCTION

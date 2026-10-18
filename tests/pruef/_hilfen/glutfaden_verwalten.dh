@@ -1,0 +1,157 @@
+' Muster verwalten als Text -- dieselben Zeilen, die ref_verwalten.py aus
+' PySticky aufzeichnet (Groesse aendern, Vergleich, Stickzeit, sichere
+' Schluessel, neues Muster, eigene Vorlagen).
+FUNCTION gvWahr$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "True", "False")
+END FUNCTION
+
+SUB gvLagen(aus AS ARRAY OF STRING, m AS kern.Muster)
+    m.stichzahlenNeu()
+    DIM zz AS ARRAY OF STRING : zz = []
+    DIM f AS kern.Farbeintrag
+    FOR EACH f IN m.farben
+        ARRAY_PUSH(zz, STR$(f.stichzahl))
+    NEXT
+    ARRAY_PUSH(aus, "  groesse " + STR$(m.breite) + "x" + STR$(m.hoehe) + " ebenen " + STR$(m.ebenen.anzahl()) + " zahlen " + JOIN$(zz, " "))
+    DIM nr AS INTEGER
+    FOR nr = 0 TO m.ebenen.anzahl() - 1
+        DIM e AS kern.Ebene : e = m.ebenen.ebenen[nr]
+        DIM z AS ARRAY OF STRING : z = []
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(e.raster) - 1
+            IF e.raster[i] < 0 THEN
+                ARRAY_PUSH(z, ".")
+            ELSE
+                ARRAY_PUSH(z, STR$(e.raster[i]) + "/" + STR$(e.art[i]) + IIF(e.erledigt[i] <> 0, "+", ""))
+            END IF
+        NEXT
+        ARRAY_PUSH(aus, "  ebene " + STR$(nr) + " " + e.name + " " + gvWahr$(e.sichtbar) + ": " + JOIN$(z, " "))
+    NEXT
+    DIM r AS ARRAY OF STRING : r = []
+    DIM rs AS kern.Rueckstich
+    FOR EACH rs IN m.rueckstiche
+        ARRAY_PUSH(r, STR$(rs.x1) + "," + STR$(rs.y1) + "," + STR$(rs.x2) + "," + STR$(rs.y2) + "," + STR$(rs.farbe))
+    NEXT
+    ARRAY_PUSH(aus, "  rueck: " + JOIN$(r, " "))
+END SUB
+
+SUB gvZelle(e AS kern.Ebene, x AS INTEGER, y AS INTEGER, farbe AS INTEGER, typ AS INTEGER)
+    e.raster[y * e.breite + x] = farbe
+    e.art[y * e.breite + x] = typ
+END SUB
+
+FUNCTION verwaltenText$(pfad AS STRING, vorlagenPfad AS STRING, paletten AS ARRAY OF kern.Palette, symbole AS ARRAY OF STRING) AS STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+    DIM masse AS ARRAY OF INTEGER : masse = [40, 30, 20, 12, 30, 24, 31, 7, 5, 50]
+    DIM i AS INTEGER
+    DIM ok AS BOOLEAN
+    FOR i = 0 TO 4
+        DIM w AS INTEGER : w = masse[2 * i]
+        DIM h AS INTEGER : h = masse[2 * i + 1]
+        DIM m AS kern.Muster : m = kern.pxsLaden(pfad)
+        ok = kern.groesseAendern(m, v, w, h)
+        ARRAY_PUSH(aus, "resize " + STR$(w) + " " + STR$(h) + ":")
+        gvLagen(aus, m)
+        m = kern.pxsLaden(pfad)
+        ok = kern.groesseSkalieren(m, v, w, h)
+        ARRAY_PUSH(aus, "smart " + STR$(w) + " " + STR$(h) + ":")
+        gvLagen(aus, m)
+    NEXT
+    ' Vergleich: die Probe gegen veraenderte Fassungen
+    DIM alt AS kern.Muster : alt = kern.pxsLaden(pfad)
+    DIM namen AS ARRAY OF STRING : namen = ["farbe", "art", "weg", "sichtbar", "groesse", "verschoben", "rueck"]
+    DIM k AS INTEGER
+    FOR k = 0 TO 6
+        DIM neu AS kern.Muster : neu = kern.pxsLaden(pfad)
+        DIM e0 AS kern.Ebene : e0 = neu.ebenen.ebenen[0]
+        SELECT CASE k
+            CASE 0 : gvZelle(e0, 0, 0, 2, 0)
+            CASE 1 : gvZelle(e0, 1, 0, 1, 2)
+            CASE 2 : gvZelle(e0, 2, 0, -1, 0)
+            CASE 3 : neu.ebenen.ebenen[2].sichtbar = TRUE
+            CASE 4
+                ok = kern.groesseAendern(neu, v, 34, 20)
+                gvZelle(neu.ebenen.ebenen[0], 33, 19, 1, 0)
+            CASE 5
+                ARRAY_INSERT(neu.farben, 0, kern.neuerFarbeintrag(neu.farben[1].garn, "x"))
+                DIM eb AS kern.Ebene
+                FOR EACH eb IN neu.ebenen.ebenen
+                    DIM j AS INTEGER
+                    FOR j = 0 TO LEN(eb.raster) - 1
+                        IF eb.raster[j] >= 0 THEN eb.raster[j] = eb.raster[j] + 1
+                    NEXT
+                NEXT
+                DIM rs AS kern.Rueckstich
+                FOR EACH rs IN neu.rueckstiche
+                    rs.farbe = rs.farbe + 1
+                NEXT
+            CASE 6
+                ARRAY_REMOVE_AT(neu.rueckstiche, 3)
+                ARRAY_PUSH(neu.rueckstiche, kern.neuerRueckstich(0, 0, 4, 4, 2))
+                ARRAY_PUSH(neu.rueckstiche, kern.neuerRueckstich(0, 0, 2, 2, 3))
+        END SELECT
+        DIM d AS kern.Vergleich : d = kern.musterVergleichen(alt, neu)
+        ARRAY_PUSH(aus, "diff " + namen[k] + ": " + STR$(d.neu) + " " + STR$(d.weg) + " " + STR$(d.anders) + " " + STR$(d.gleich) + " " + STR$(d.breite) + "x" + STR$(d.hoehe) + " " + gvWahr$(d.groesseAnders) + " " + STR$(d.rueckNeu) + " " + STR$(d.rueckWeg) + " " + STR$(d.aenderungen()))
+        DIM mz AS STRING : mz = ""
+        DIM c AS INTEGER
+        FOR EACH c IN d.maske
+            mz = mz + STR$(c)
+        NEXT
+        ARRAY_PUSH(aus, "  " + mz)
+    NEXT
+    ' Stickzeit
+    DIM z AS kern.Muster : z = kern.neuesMuster("z", 5, 5)
+    ARRAY_PUSH(aus, "zeit leer " + STR$(kern.stickzeitGesamt(z)) + " " + gvWahr$(kern.stickzeitLaeuft(z)) + " " + STR$(kern.stickzeitStopp(z, 100.0)))
+    kern.stickzeitStart(z, 1000.5)
+    kern.stickzeitStart(z, 2000.25)
+    DIM laeuft AS BOOLEAN : laeuft = kern.stickzeitLaeuft(z)
+    DIM s1 AS INTEGER : s1 = kern.stickzeitStopp(z, 2090.0)
+    ARRAY_PUSH(aus, "zeit " + gvWahr$(laeuft) + " " + STR$(s1) + " " + STR$(kern.stickzeitGesamt(z)) + " " + gvWahr$(kern.stickzeitLaeuft(z)))
+    kern.stickzeitStart(z, 0.0)
+    s1 = kern.stickzeitStopp(z, 12 * 3600 + 1.0)
+    ARRAY_PUSH(aus, "zeit lang " + STR$(s1) + " " + STR$(kern.stickzeitGesamt(z)))
+    kern.stickzeitStart(z, 0.0)
+    s1 = kern.stickzeitStopp(z, 12 * 3600 + 0.9)
+    ARRAY_PUSH(aus, "zeit genau 12h " + STR$(s1) + " " + STR$(kern.stickzeitGesamt(z)))
+    kern.stickzeitStart(z, 500.0)
+    s1 = kern.stickzeitStopp(z, 400.0)
+    ARRAY_PUSH(aus, "zeit rueckwaerts " + STR$(s1) + " " + STR$(kern.stickzeitGesamt(z)))
+    JSON_SET_STRING(z.metadaten, kern.STICKZEIT_START, "kaputt")
+    s1 = kern.stickzeitStopp(z, 9.0)
+    ARRAY_PUSH(aus, "zeit kaputt " + STR$(s1) + " " + gvWahr$(kern.stickzeitLaeuft(z)))
+    JSON_SET_STRING(z.metadaten, kern.STICKZEIT_START, " 1.5e2 ")
+    s1 = kern.stickzeitStopp(z, 200.0)
+    ARRAY_PUSH(aus, "zeit text " + STR$(s1) + " " + STR$(kern.stickzeitGesamt(z)))
+    JSON_SET_STRING(z.metadaten, kern.STICKZEIT_GESAMT, "x")
+    ARRAY_PUSH(aus, "zeit gesamt kaputt " + STR$(kern.stickzeitGesamt(z)))
+    DIM dz AS ARRAY OF STRING : dz = []
+    DIM sek AS INTEGER
+    FOR EACH sek IN [-5, 0, 59, 60, 3599, 3600, 3660, 7199, 45296, 86400]
+        ARRAY_PUSH(dz, kern.dauerKurz$(sek))
+    NEXT
+    ARRAY_PUSH(aus, "dauer " + JOIN$(dz, " | "))
+    ' sichere Schluessel
+    DIM n AS STRING
+    FOR EACH n IN ["Mein Muster", "", "___", "a/b" + CHR$(92) + "c:d", "Äpfel & Birnen", "x-y_z", "  ", "Neues Muster__1a2b"]
+        ARRAY_PUSH(aus, "schluessel '" + REPLACE$(n, CHR$(92), CHR$(92) + CHR$(92)) + "' -> " + kern.sicherName$(n))
+    NEXT
+    ' neues Muster
+    DIM nm AS ARRAY OF INTEGER : nm = [50, 50, 14, 0, 60, 80, 16, 1, 25, 80, 18, 0]
+    DIM vn AS ARRAY OF STRING : vn = ["", "DP A4 hoch", "Lesezeichen Klein"]
+    FOR i = 0 TO 2
+        DIM b AS INTEGER : b = nm[4 * i]
+        DIM hh AS INTEGER : hh = nm[4 * i + 1]
+        DIM st AS INTEGER : st = nm[4 * i + 2]
+        DIM dp AS BOOLEAN : dp = nm[4 * i + 3] = 1
+        DIM mn AS kern.Muster : mn = kern.musterAnlegen(b, hh, st, dp, vn[i], paletten, "Anchor", symbole)
+        DIM fe AS kern.Farbeintrag : fe = mn.farben[0]
+        ARRAY_PUSH(aus, "neu " + STR$(b) + " " + STR$(hh) + " " + STR$(st) + " " + gvWahr$(dp) + ": " + mn.name + " | " + STR$(mn.breite) + "x" + STR$(mn.hoehe) + " " + STR$(INT(mn.stoff)) + " " + mn.modus + " | ebenen " + STR$(mn.ebenen.anzahl()) + " " + mn.ebenen.ebenen[0].name + " | farbe " + fe.garn.hersteller + " " + fe.garn.nummer + " " + fe.garn.name + " " + gvWahr$(fe.istPerle) + " " + gvWahr$(fe.istDiamant))
+    NEXT
+    ' eigene Vorlagen
+    DIM vl AS kern.Vorlage
+    FOR EACH vl IN kern.eigeneVorlagen(vorlagenPfad)
+        ARRAY_PUSH(aus, "vorlage " + vl.name + " " + STR$(vl.breite) + " " + STR$(vl.hoehe) + " " + STR$(vl.stoff) + " '" + vl.beschreibung + "' " + vl.kategorie)
+    NEXT
+    RETURN JOIN$(aus, CHR$(10))
+END FUNCTION

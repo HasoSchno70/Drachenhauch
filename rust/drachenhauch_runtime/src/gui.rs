@@ -366,6 +366,34 @@ fn nimmt_text_w(w: &Widget) -> bool {
     w.kind.nimmt_text() || (w.kind == Kind::Dropdown && w.frei)
 }
 
+/// Braucht das Widget mit Fokus diese Taste (ohne Strg/Alt) selbst? Dann
+/// gehoert sie ihm und nicht einem Menue-Kuerzel. Bis 2026.28 galt das nur
+/// fuer Textfelder -- ein Kaestchen mit Fokus kippte bei der Leertaste UND
+/// das Kuerzel "Leertaste" feuerte (gefunden beim Sequencer, Musik-Runde).
+/// Leertaste und Enter loesen jedes bedienbare Widget aus, Pfeile und
+/// Pos1/Ende/Bild bewegen darin, und wo Tippen springt (Listen, Baeume,
+/// Tabellen, Klapplisten), gehoeren ihm auch Buchstaben und Ziffern.
+fn widget_nimmt_taste(w: &Widget, code: i64) -> bool {
+    if nimmt_text_w(w) { return true; }
+    const AUSLOESEN: [i64; 3] = [32, 13, 1073741912];          // Leertaste, Enter
+    const BEWEGEN: [i64; 8] = [1073741903, 1073741904, 1073741905, 1073741906,
+                               1073741898, 1073741901, 1073741899, 1073741902];
+    let k = w.kind;
+    if AUSLOESEN.contains(&code) {
+        return matches!(k, Kind::Button | Kind::Card | Kind::Checkbox | Kind::Radio | Kind::Toggle
+            | Kind::Dropdown | Kind::ListBox | Kind::Tree | Kind::Table | Kind::Accordion
+            | Kind::TabControl | Kind::DatePicker | Kind::ColorPicker | Kind::TimePicker);
+    }
+    if BEWEGEN.contains(&code) {
+        return matches!(k, Kind::Slider | Kind::Knob | Kind::Spinner | Kind::Radio | Kind::Dropdown
+            | Kind::ListBox | Kind::Tree | Kind::Table | Kind::Accordion | Kind::TabControl
+            | Kind::DatePicker | Kind::TimePicker | Kind::ColorPicker | Kind::RichText | Kind::Splitter);
+    }
+    // Wo Tippen springt, gehoeren auch Buchstaben und Ziffern dem Widget
+    matches!(k, Kind::ListBox | Kind::Tree | Kind::Table | Kind::Dropdown)
+        && ((97..=122).contains(&code) || (48..=57).contains(&code))
+}
+
 /// Bearbeitbare Klappliste: `sel` folgt dem Text -- der Eintrag, der genau so
 /// heisst (Gross/klein egal), sonst -1.
 fn dd_frei_abgleichen(w: &mut Widget) {
@@ -734,7 +762,7 @@ fn zahl_erlaubt(text: &str, zahlen: u8) -> bool {
     for (i, ch) in text.chars().enumerate() {
         if ch.is_ascii_digit() { continue; }
         if ch == '-' && i == 0 { continue; }
-        if zahlen == 2 && (ch == '.' || ch == ',') { trenner += 1; if trenner > 1 { return false; } continue; }
+        if zahlen >= 2 && (ch == '.' || ch == ',') { trenner += 1; if trenner > 1 { return false; } continue; }
         return false;
     }
     true
@@ -1603,6 +1631,24 @@ fn zahl_lesen(text: &str) -> Option<f64> {
     let t = text.trim().replace(',', ".");
     if t.is_empty() { return None; }
     t.parse::<f64>().ok().filter(|x| x.is_finite())
+}
+
+/// Ein Betrag in Cent, wie ein Geldfeld ihn zeigt: 4800 -> "48,00",
+/// -5 -> "-0,05".
+fn cent_text(c: i64) -> String {
+    let v = if c < 0 { "-" } else { "" };
+    format!("{}{},{:02}", v, c.unsigned_abs() / 100, c.unsigned_abs() % 100)
+}
+
+/// Die Regel fuer Zahlenfelder mit fuehrender Null: "080331" ist eine
+/// Postleitzahl oder Nummer und bleibt Text (als INTEGER verloere sie die
+/// Null) -- "0,99" und "0" sind dagegen Zahlen. Bis 2026.30 galt die Regel
+/// fuer alles, was mit 0 anfing und laenger war: ein Preis "0,99" ging als
+/// Text in die Datenbank.
+fn nummer_mit_null(text: &str) -> bool {
+    let t = text.trim();
+    let mut z = t.chars();
+    z.next() == Some('0') && z.next().map_or(false, |c| c.is_ascii_digit())
 }
 
 fn zahl_kurz(x: f64) -> String {
@@ -2534,6 +2580,13 @@ pub struct Widget {
     hovered: bool,
     on_click: Option<Rueckruf>,
     on_change: Option<Rueckruf>,
+    /// GUI_CHANGED: einmal gefragt, wird das Widget beobachtet -- GUI_UPDATE
+    /// merkt sich zu Beginn seinen Wert und vergleicht am Ende. So zaehlt nur,
+    /// was die BEDIENUNG geaendert hat; ein Wert, den das Programm zwischen
+    /// zwei Bildern setzt, ist keine Aenderung.
+    beobachtet: bool,
+    stand_vorher: String,
+    geaendert: bool,
     /// Maus betritt / verlaesst das Widget, Fokus kommt / geht.
     on_hover: Option<Rueckruf>,
     on_leave: Option<Rueckruf>,
@@ -2557,6 +2610,10 @@ pub struct Widget {
     /// Zeile unter der Maus fuer die Blende, je Bild neu (eine schlichte
     /// Liste hat keinen ListState, der sie tragen koennte).
     zeile_jetzt: i32,
+    /// Der GANZE Text der Listenzeile unter der Maus, wenn er in der Zeile
+    /// gekuerzt dasteht ("..."); sonst leer. Gesetzt in GUI_UPDATE, gezeigt
+    /// als Tooltip, wenn der Eintrag keinen eigenen hat.
+    ganzer_text: String,
     /// Weiches Rollen mit dem Rad: das Ziel, und der Stand, den das Rollen
     /// zuletzt selbst geschrieben hat -- steht dort etwas anderes, hat jemand
     /// anderes gerollt (Pfeiltaste, SCROLL_TO), und das Rad gibt nach.
@@ -2873,6 +2930,15 @@ pub struct Widget {
     undo_zeit: f64,
 }
 
+/// Datenbank-Buchfuehrung eines Formulars (siehe `Window::form_db`).
+#[derive(Default, Clone)]
+struct FormDb {
+    form: String,
+    spalte: String,
+    stand: Option<i64>,
+    konflikt: String,
+}
+
 pub struct Window {
     title: String,
     x: i32, y: i32, w: i32, h: i32,
@@ -2888,6 +2954,10 @@ pub struct Window {
     /// Stand der gebundenen Werte beim letzten Setzen/Leeren/Bereinigen:
     /// (Formular, Schluessel, Text). Daraus antwortet GUI_FORM_CHANGED.
     form_stand: Vec<(String, String, String)>,
+    /// Je Formular, das mit der Datenbank spricht: Versionsspalte
+    /// (GUI_FORM_VERSION), der beim Laden gelesene Stand und was das letzte
+    /// GUI_FORM_SAVE verhindert hat (GUI_FORM_CONFLICT$).
+    form_db: Vec<FormDb>,
     /// Entwurfsmodus (GUI_WINDOW_DESIGN): das Fenster wird gezeichnet, aber
     /// seine Widgets bekommen KEINE Eingabe -- kein Hover, kein Klick, kein
     /// Fokus, keine Rueckrufe. Ein Form-Designer legt so echte Widgets auf
@@ -3043,6 +3113,14 @@ fn ist_funktionstaste(code: i64) -> bool {
 /// nur auf dem Ziffernblock oder nur auf einer Belegung.
 const K_PLUS: i64 = -43;
 const K_MINUS: i64 = -45;
+
+/// Unbekannter Schluessel bei Thema/Metrik: die gueltigen nennen, sortiert --
+/// wie bei den uebrigen *_SET (bis 2026.27 sagten diese vier nur "unbekannt").
+fn unbekannt<'a>(befehl: &str, key: &str, bekannt: impl Iterator<Item = &'a String>) -> String {
+    let mut namen: Vec<&str> = bekannt.map(|s| s.as_str()).collect();
+    namen.sort_unstable();
+    format!("{}: unbekannter Schluessel '{}' (bekannt: {})", befehl, key, namen.join(", "))
+}
 
 fn kuerzel_taste(g: &Graphics, code: i64) -> bool {
     match code {
@@ -3254,6 +3332,13 @@ pub struct Gui {
     /// Bild einen Wunsch an Graphics, gesetzt wird beim FLIP.
     cursors: bool,
     was_mouse_down: bool,
+    /// Das Text-Widget, in dem der laufende Druck BEGANN. Nur dort markiert
+    /// Ziehen. Bekommt ein Feld den Fokus erst, waehrend die Taste schon
+    /// unten ist (Klick in eine Liste, das Programm setzt den Fokus in den
+    /// Text), hielt es das Halten fuer seinen eigenen Zug und markierte bis
+    /// zur Maus -- gefunden beim Dogfooding 2026-10-09: die ganze Notiz war
+    /// markiert, und das erste Tippen haette sie ersetzt.
+    zug_feld: Option<(usize, usize)>,
     frame_count: i64,
     theme: HashMap<String, i64>,
     metrics: HashMap<String, i32>,
@@ -3345,7 +3430,7 @@ impl Gui {
             open_menu: None, context_open: None, kontext_neu: None, sub_chain: Vec::new(), tasten_mod: (false, false),
             kuerzel_gefeuert: false, was_right_down: false, was_mitte_down: false,
             scroll_drag: None,
-            was_mouse_down: false, frame_count: 0,
+            was_mouse_down: false, zug_feld: None, frame_count: 0,
             theme: default_theme(), metrics: default_metrics(),
             styles: HashMap::new(),
             pending: Vec::new(),
@@ -3450,7 +3535,7 @@ impl Gui {
         self.windows.push(Window {
             title, x, y, w, h, widgets: Vec::new(),
             movable: true, closable: false, visible: true, entwurf: false, zoom: 1.0,
-            resizable: false, pruefung_live: false, form_stand: Vec::new(), chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
+            resizable: false, pruefung_live: false, form_stand: Vec::new(), form_db: Vec::new(), chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
             close_clicked: false, alive: true, dlg: false, answer: 0,
             menus: Vec::new(),
@@ -4344,7 +4429,7 @@ impl Gui {
             kind, x, y, w, h, text: String::new(), color: -1,   // -1 = dem Thema folgen
             value: 0.0, min: 0.0, max: 1.0, checked: false,
             placeholder: String::new(), clicked: false, hovered: false,
-            on_click: None, on_change: None, ov: HashMap::new(), tbl: None, tree: None, list: None,
+            on_click: None, on_change: None, beobachtet: false, stand_vorher: String::new(), geaendert: false, ov: HashMap::new(), tbl: None, tree: None, list: None,
             layout: None, auto_w: false, auto_h: false,
             panel: None, panel_von: -1, tabctl: None, tc_von: -1, tc_seite: -1, akk: None, wz: None,
             leiste: None, status: None, pfad: None, sinnbild: String::new(),
@@ -4354,7 +4439,7 @@ impl Gui {
             min_w: 0, min_h: 0, nat_w: w, nat_h: h, regeln: Vec::new(), fehler: String::new(), fehler_label: -1,
             on_hover: None, on_leave: None, on_focus: None, on_blur: None,
             was_hovered: false, was_focused: false,
-            ueber_t: 0.0, druck_t: 0.0, fokus_t: 0.0, zeile_b: Blende::default(), zeile_jetzt: -1, rad_ziel: None, rad_letzt: 0.0,
+            ueber_t: 0.0, druck_t: 0.0, fokus_t: 0.0, zeile_b: Blende::default(), zeile_jetzt: -1, ganzer_text: String::new(), rad_ziel: None, rad_letzt: 0.0,
             alive: true, visible: true, rund: false, variante: 0,
             group: String::new(), items: Vec::new(), sel: -1,
             enabled: true, font: -1, font_size: 0, stil: 0,
@@ -5549,20 +5634,35 @@ impl Gui {
         if w.kind != Kind::ListBox { return Err(format!("{}: das Widget ist keine Liste (GUI_LISTBOX)", fn_)); }
         Ok(w)
     }
-    /// Unsichtbarer Wert je Eintrag -- die ID einer Datenbankzeile, ein Pfad.
-    /// Der TEXT ist fuer Menschen und aendert sich; der Wert bleibt.
+    /// Liste ODER Klappliste -- die Werte je Eintrag gelten fuer beide.
+    fn werte_ref(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
+        let w = self.wdg(h, fn_)?;
+        if !matches!(w.kind, Kind::ListBox | Kind::Dropdown) {
+            return Err(format!("{}: das Widget ist keine Liste und keine Klappliste", fn_));
+        }
+        Ok(w)
+    }
+    /// Unsichtbarer Wert je Eintrag -- die ID einer Datenbankzeile, ein Pfad,
+    /// ein Steuersatz. Der TEXT ist fuer Menschen und aendert sich; der Wert
+    /// bleibt. Auch fuer Klapplisten: eine gebundene Klappliste mit Werten
+    /// bindet den WERT des gewaehlten Eintrags statt seiner Nummer.
     pub fn list_set_data(&mut self, h: i64, i: i64, wert: String) -> Result<(), String> {
-        let p = Self::list_idx(self.list_ref(h, "GUI_LISTBOX_SET_DATA")?, i, "GUI_LISTBOX_SET_DATA")?;
-        self.list_mut(h, "GUI_LISTBOX_SET_DATA")?.daten[p] = wert; Ok(())
+        let p = Self::list_idx(self.werte_ref(h, "GUI_LISTBOX_SET_DATA")?, i, "GUI_LISTBOX_SET_DATA")?;
+        let w = self.wdg_mut(h, "GUI_LISTBOX_SET_DATA")?;
+        let n = w.items.len();
+        let l = w.list.get_or_insert_with(|| Box::new(ListState { anker: -1, ..Default::default() }));
+        l.sync(n);
+        l.daten[p] = wert;
+        Ok(())
     }
     pub fn list_data(&self, h: i64, i: i64) -> Result<String, String> {
-        let w = self.list_ref(h, "GUI_LISTBOX_DATA")?;
+        let w = self.werte_ref(h, "GUI_LISTBOX_DATA")?;
         let p = Self::list_idx(w, i, "GUI_LISTBOX_DATA")?;
         Ok(w.list.as_ref().and_then(|l| l.daten.get(p).cloned()).unwrap_or_default())
     }
     /// Der erste Eintrag mit diesem Wert, -1 = keiner.
     pub fn list_find_data(&self, h: i64, wert: &str) -> Result<i64, String> {
-        let w = self.list_ref(h, "GUI_LISTBOX_FIND_DATA")?;
+        let w = self.werte_ref(h, "GUI_LISTBOX_FIND_DATA")?;
         Ok(w.list.as_ref().and_then(|l| l.daten.iter().position(|d| d == wert)).map(|p| p as i64).unwrap_or(-1))
     }
     /// GUI_LISTBOX_SPANS: Abschnitte eines Eintrags einfaerben (Zeichen
@@ -9764,9 +9864,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// (ein "Entf" darf dort loeschen, nicht den Menuepunkt ausloesen).
     fn kuerzel_pruefen(&mut self, g: &Graphics) {
         let mods = (g.key_ctrl() as u8) | ((g.key_shift() as u8) << 1) | ((g.key_alt() as u8) << 2);
-        let text_fokus = self.focus_widget
-            .and_then(|(w, i)| self.windows.get(w).and_then(|win| win.widgets.get(i)))
-            .map(nimmt_text_w).unwrap_or(false);
+        let fokus_w = self.focus_widget
+            .and_then(|(w, i)| self.windows.get(w).and_then(|win| win.widgets.get(i)));
         let kandidaten: Vec<usize> = self.focus_window.into_iter()
             .chain(self.z_order.iter().rev().copied())
             .filter(|&wi| wi < self.windows.len())
@@ -9782,10 +9881,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             for (mi, m) in win.menus.iter().enumerate() {
                 for (ii, it) in m.items.iter().enumerate() {
                     if it.k_code == 0 || !it.enabled || it.separator || it.k_mods != mods { continue; }
-                    // Ohne Strg/Alt gehoert die Taste dem Textfeld mit Fokus (Entf
-                    // loescht dort ein Zeichen) -- AUSSER F1..F12: die erzeugen nie
-                    // Text, und F5 in einer IDE muss aus dem Code-Feld heraus starten.
-                    if text_fokus && (mods & 5) == 0 && !ist_funktionstaste(it.k_code) { continue; }
+                    // Ohne Strg/Alt gehoert die Taste dem Widget mit Fokus, wenn es
+                    // sie braucht (Entf loescht im Textfeld ein Zeichen, die
+                    // Leertaste kippt ein Kaestchen) -- AUSSER F1..F12: die
+                    // erzeugen nie Text, und F5 in einer IDE muss aus dem
+                    // Code-Feld heraus starten.
+                    if (mods & 5) == 0 && !ist_funktionstaste(it.k_code)
+                        && fokus_w.is_some_and(|w| widget_nimmt_taste(w, it.k_code)) { continue; }
                     if kuerzel_taste(g, it.k_code) { treffer = Some((wi, mi, ii)); break 'suche; }
                 }
             }
@@ -10221,6 +10323,17 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             .ok_or("GUI_WINDOW_GET_*: ungueltiges GUI_WINDOW-Handle")?;
         Ok((self.unsk(w.x), self.unsk(w.y), self.unsk(w.w), self.unsk(w.h)))
     }
+    /// Breite und Hoehe des INHALTSbereichs -- unter Titel-, Menue- und
+    /// Reiterleiste, dort, wo Widget-Koordinaten zaehlen. Ohne das musste ein
+    /// Programm mit Menue die Hoehe der Leiste raten, und die haengt an Thema
+    /// und Massstab (gefunden beim Dogfooding 2026-10-09: die Statusleiste
+    /// eines Notizzettels sass zu hoch).
+    pub fn window_inhalt(&self, h: i64) -> Result<(i32, i32), String> {
+        let wi = h as usize;
+        let w = self.windows.get(wi)
+            .ok_or("GUI_WINDOW_CONTENT_*: ungueltiges GUI_WINDOW-Handle")?;
+        Ok((self.unsk(w.w), self.unsk((w.h - self.content_top(wi)).max(0))))
+    }
     /// Loest JEDE Interaktions-Referenz auf Fenster `wi` (oder ein Widget
     /// darin), egal ob das Fenster gerade zerstoert, unsichtbar gemacht oder
     /// per Close-Button geschlossen wird.
@@ -10343,8 +10456,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 w.maxlaenge = wert as i32;
             }
             "zahlen" | "numeric" => {
-                if !(0.0..=2.0).contains(&wert) {
-                    return Err("GUI_TEXTINPUT_SET: zahlen ist 0 (frei), 1 (ganze Zahl) oder 2 (Kommazahl)".into());
+                if !(0.0..=3.0).contains(&wert) || wert.fract() != 0.0 {
+                    return Err("GUI_TEXTINPUT_SET: zahlen ist 0 (frei), 1 (ganze Zahl), 2 (Kommazahl) oder 3 (Geldbetrag in Cent)".into());
                 }
                 w.zahlen = wert as u8;
             }
@@ -10429,6 +10542,34 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let w = &mut self.windows[wi].widgets[i];
             w.h = h; w.bh = h;
         }
+    }
+
+    /// Der Hinweis einer leeren Liste, eines Baums oder einer Tabelle:
+    /// umgebrochen auf die Breite, jede Zeile mittig. Vorher stand er in einer
+    /// Zeile und lief rechts aus dem Feld (gesehen beim Dogfooding 2026-10-09:
+    /// "Noch keine Notiz -- Strg" in einer 260 Punkte breiten Liste).
+    fn leer_hinweis(&self, g: &mut Graphics, wdg: &Widget, x: i32, y: i32, breite: i32, text: &str, farbe: i64) {
+        let rand = self.sk(6);
+        let innen = (breite - 2 * rand).max(1);
+        let zh = self.wsize(g, wdg) + self.sk(4);
+        for (k, z) in self.umbrechen(g, wdg, text, innen).into_iter().enumerate() {
+            let tw = self.wtext_width(g, wdg, &z);
+            self.wtext(g, wdg, x + ((breite - tw) / 2).max(rand), y + k as i32 * zh, z, farbe);
+        }
+    }
+
+    /// Text auf `breite` Pixel kuerzen: passt er, unveraendert, sonst so viele
+    /// Zeichen, wie mit "..." dahinter passen.
+    fn text_kuerzen(&self, g: &Graphics, wdg: &Widget, text: &str, breite: i32) -> String {
+        if self.wtext_width(g, wdg, text) <= breite { return text.to_string(); }
+        let zeichen: Vec<char> = text.chars().collect();
+        let mut n = zeichen.len();
+        while n > 0 {
+            n -= 1;
+            let probe: String = zeichen[..n].iter().collect::<String>() + "...";
+            if self.wtext_width(g, wdg, &probe) <= breite { return probe; }
+        }
+        String::new()
     }
 
     /// Text an Wortgrenzen auf `breite` Pixel umbrechen. Ein Wort, das allein
@@ -11229,7 +11370,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         w.nur_lesen = wj["nur_lesen"].as_bool().unwrap_or(false);
         w.frei = w.kind == Kind::Dropdown && wj["bearbeitbar"].as_bool().unwrap_or(false);
         w.maxlaenge = wj["maxlaenge"].as_i64().unwrap_or(0).max(0) as i32;
-        w.zahlen = wj["zahlen"].as_i64().unwrap_or(0).clamp(0, 2) as u8;
+        w.zahlen = wj["zahlen"].as_i64().unwrap_or(0).clamp(0, 3) as u8;
         w.tooltip = wj["tooltip"].as_str().unwrap_or("").to_string();
         w.tab_index = wj["tab_index"].as_i64().unwrap_or(0).max(0) as i32;
         w.on_enter = wj["on_enter"].as_str().map(Rueckruf::benannt);
@@ -11689,19 +11830,19 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     // --- Theme / Metriken ---
     pub fn theme_accent(&mut self, c: i64) { self.theme.insert("accent".into(), c); }
     pub fn theme_set(&mut self, key: String, c: i64) -> Result<(), String> {
-        if !self.theme.contains_key(&key) { return Err(format!("GUI_THEME_SET: unbekannter Schluessel '{}'", key)); }
+        if !self.theme.contains_key(&key) { return Err(unbekannt("GUI_THEME_SET", &key, self.theme.keys())); }
         self.theme.insert(key, c); Ok(())
     }
     pub fn theme_get(&self, key: &str) -> Result<i64, String> {
-        self.theme.get(key).copied().ok_or_else(|| format!("GUI_THEME_GET: unbekannter Schluessel '{}'", key))
+        self.theme.get(key).copied().ok_or_else(|| unbekannt("GUI_THEME_GET", key, self.theme.keys()))
     }
     pub fn metric_set(&mut self, key: String, v: i32) -> Result<(), String> {
-        if !self.metrics.contains_key(&key) { return Err(format!("GUI_METRIC_SET: unbekannter Schluessel '{}'", key)); }
+        if !self.metrics.contains_key(&key) { return Err(unbekannt("GUI_METRIC_SET", &key, self.metrics.keys())); }
         if v < 0 { return Err("GUI_METRIC_SET: Wert muss >= 0 sein".into()); }
         self.metrics.insert(key, v); Ok(())
     }
     pub fn metric_get(&self, key: &str) -> Result<i32, String> {
-        self.metrics.get(key).copied().ok_or_else(|| format!("GUI_METRIC_GET: unbekannter Schluessel '{}'", key))
+        self.metrics.get(key).copied().ok_or_else(|| unbekannt("GUI_METRIC_GET", key, self.metrics.keys()))
     }
     pub fn theme_preset(&mut self, name: &str) -> Result<(), String> {
         let key = name.to_lowercase();
@@ -12390,7 +12531,46 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     }
 
     // --- Update (ein Frame) ---
+    /// Was GUI_CHANGED vergleicht: der Wert wie fuer die Bindung, dazu
+    /// Auswahl, Zahl und Haken (eine Liste, eine Tabelle haben keinen Text).
+    fn abdruck(&self, w: &Widget) -> String {
+        let tab = w.tbl.as_ref().map(|t| t.selected).unwrap_or(-1);
+        format!("{}|{}|{}|{}|{}", self.wert_text(w), w.sel, w.value, w.checked, tab)
+    }
+
+    /// GUI_CHANGED(wdg): hat die Bedienung das Widget im letzten GUI_UPDATE
+    /// geaendert? Der erste Aufruf meldet FALSE und beginnt zu beobachten.
+    pub fn changed(&mut self, h: i64) -> Result<bool, String> {
+        let w = self.wdg_mut(h, "GUI_CHANGED")?;
+        if !w.beobachtet { w.beobachtet = true; return Ok(false); }
+        Ok(w.geaendert)
+    }
+
     pub fn update(&mut self, g: &mut Graphics) {
+        // GUI_CHANGED: den Stand vor der Bedienung merken
+        for wi in 0..self.windows.len() {
+            for i in 0..self.windows[wi].widgets.len() {
+                if self.windows[wi].widgets[i].beobachtet {
+                    let a = self.abdruck(&self.windows[wi].widgets[i]);
+                    let w = &mut self.windows[wi].widgets[i];
+                    w.stand_vorher = a;
+                    w.geaendert = false;
+                }
+            }
+        }
+        self.update_innen(g);
+        for wi in 0..self.windows.len() {
+            for i in 0..self.windows[wi].widgets.len() {
+                if self.windows[wi].widgets[i].beobachtet {
+                    let a = self.abdruck(&self.windows[wi].widgets[i]);
+                    let w = &mut self.windows[wi].widgets[i];
+                    w.geaendert = a != w.stand_vorher;
+                }
+            }
+        }
+    }
+
+    fn update_innen(&mut self, g: &mut Graphics) {
         let mx = g.mouse_x() as i32;
         let my = g.mouse_y() as i32;
         let is_down = g.mouse_button(0);
@@ -12569,6 +12749,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         let k = if self.list_bar_at(top, i, mx, my) { -1 } else { self.liste_zeile(top, i, my) };
                         if let Some(l) = self.windows[top].widgets[i].list.as_mut() { l.hover = k; }
                         self.windows[top].widgets[i].zeile_jetzt = k;
+                        let ganz = if k >= 0 {
+                            let platz = self.liste_textplatz(g, top, i, k as usize);
+                            let wdg = &self.windows[top].widgets[i];
+                            let it = wdg.items.get(k as usize).cloned().unwrap_or_default();
+                            if self.mit_auslassung(g, wdg, &it, platz).is_some() { it } else { String::new() }
+                        } else { String::new() };
+                        self.windows[top].widgets[i].ganzer_text = ganz;
                         if right_just { self.liste_rechtsklick(top, i, k); }
                     }
                     if kind == Kind::RichText { self.richtext_wheel(top, i, r.3, g); }
@@ -12709,7 +12896,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     .and_then(|s| s.felder.get(s.hover.max(0) as usize).filter(|_| s.hover >= 0))
                     .map(|f| !f.tip.is_empty()).unwrap_or(false);
                 let pfad_tip = w.pfad.as_ref().map(|p| p.hover == -2).unwrap_or(false);
-                if w.hovered && (!w.tooltip.is_empty() || !w.fehler.is_empty() || leisten_tip || listen_tip || status_tip || pfad_tip) { found = Some((top, i)); }
+                let ganz_tip = w.hovered && !w.ganzer_text.is_empty();
+                if w.hovered && (!w.tooltip.is_empty() || !w.fehler.is_empty() || leisten_tip || listen_tip || status_tip || pfad_tip || ganz_tip) { found = Some((top, i)); }
             }
             found
         });
@@ -12720,6 +12908,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let w = &self.windows[wi].widgets[i];
             w.leiste.as_ref().map(|l| l.hover).or_else(|| w.list.as_ref().map(|l| l.hover))
                 .or_else(|| w.status.as_ref().map(|s| s.hover)).or_else(|| w.pfad.as_ref().map(|p| p.hover))
+                // Eine schlichte Liste hat keinen ListState -- ihre Zeile
+                // unter der Maus zaehlt trotzdem als eigener Teil.
+                .or_else(|| (w.kind == Kind::ListBox).then_some(w.zeile_jetzt))
         }).unwrap_or(-1);
         if teil != self.hover_teil {
             self.hover_teil = teil;
@@ -13034,6 +13225,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }   // !menue_hat_tasten
         self.dialog_auswerten();
         self.was_mouse_down = is_down;
+        if !is_down { self.zug_feld = None; }
         self.was_right_down = right_down;
         self.frame_count += 1;
     }
@@ -13388,6 +13580,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             if !self.was_mouse_down {
                 let r = self.abs_rect(wi, &self.windows[wi].widgets[i]);
                 if Self::in_rect(mx, my, r) {
+                    self.zug_feld = Some((wi, i));
                     caret = idx; anchor = idx;
                     let jetzt = g.get_time();
                     let w = &mut self.windows[wi].widgets[i];
@@ -13402,8 +13595,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         w.wort_zug = true;
                     }
                 }
-            } else if !self.windows[wi].widgets[i].wort_zug {
-                caret = idx;   // Drag -> Selektion bis hierher
+            } else if !self.windows[wi].widgets[i].wort_zug && self.zug_feld == Some((wi, i)) {
+                caret = idx;   // Drag -> Selektion bis hierher (nur ein Zug, der hier begann)
             }
         }
 
@@ -14369,7 +14562,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
             if !Self::in_rect(mx, my, (ax, ay, fw, fh)) || self.topmost_at(mx, my) != Some(wi) {
                 self.windows[wi].widgets[i].farbfeld_zug = true;
+            } else {
+                self.zug_feld = Some((wi, i));
             }
+        } else if g.mouse_button(0) && self.zug_feld != Some((wi, i)) {
+            // Die Taste war schon unten, als das Feld den Fokus bekam.
+            self.windows[wi].widgets[i].farbfeld_zug = true;
         }
         if g.mouse_button(0) && !self.windows[wi].widgets[i].farbfeld_zug {
             let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
@@ -16430,6 +16628,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         geaendert = true;
                     }
                 } else {
+                    // Ein Klick auf einen Eintrag meldet GUI_CLICKED (und
+                    // on_click) ein Bild lang -- auch auf den schon gewaehlten.
+                    // Vorher war GUI_CLICKED auf einer Liste STUMM, immer FALSE
+                    // ohne Fehler (gefunden beim Dogfooding 2026-10-09: ein
+                    // Notizzettel konnte die gewaehlte Notiz nicht neu oeffnen,
+                    // die Auswahl aenderte sich ja nicht).
+                    w.clicked = true;
+                    if let Some(f) = w.on_click.clone() { self.pending.push(f); }
                     let multi = w.list.as_ref().map(|l| l.multi).unwrap_or(false);
                     if multi {
                         let l = w.list.as_mut().unwrap();
@@ -16518,10 +16724,17 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             .map(|(i, w)| (w.bind.clone(), i)).collect()
     }
     /// Wert eines Widgets als Text -- die Form fuer Vergleich und MAP.
+    /// Die Werte einer Klappliste, wenn sie welche hat (GUI_LISTBOX_SET_DATA).
+    fn klapp_werte(w: &Widget) -> Option<&Vec<String>> {
+        w.list.as_ref().map(|l| &l.daten).filter(|d| d.iter().any(|x| !x.is_empty()))
+    }
     fn wert_text(&self, w: &Widget) -> String {
         match w.kind {
             Kind::Checkbox | Kind::Toggle => if w.checked { "1".into() } else { "0".into() },
-            Kind::Dropdown => w.sel.to_string(),
+            Kind::Dropdown => match Self::klapp_werte(w) {
+                Some(d) => if w.sel >= 0 { d.get(w.sel as usize).cloned().unwrap_or_default() } else { String::new() },
+                None => w.sel.to_string(),
+            },
             Kind::Slider | Kind::Spinner | Kind::Knob => Self::fmt_num(w.value),
             Kind::DatePicker => crate::kalender::format(w.datum[0], w.datum[1], w.datum[2]),
             Kind::ColorPicker => format!("#{:06X}", crate::farbraum::hsv_zu_rgb(w.hsv[0], w.hsv[1], w.hsv[2])),
@@ -16534,13 +16747,26 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     fn wert_typisiert(&self, w: &Widget) -> Value {
         match w.kind {
             Kind::Checkbox | Kind::Toggle => Value::Bool(w.checked),
-            Kind::Dropdown => Value::Int(w.sel as i64),
+            // Mit Werten je Eintrag: der Wert (als Zahl, wenn er eine ist),
+            // ohne Auswahl NIL; sonst die Nummer des Eintrags.
+            Kind::Dropdown => match Self::klapp_werte(w) {
+                Some(d) => {
+                    let t = if w.sel >= 0 { d.get(w.sel as usize).cloned().unwrap_or_default() } else { String::new() };
+                    if w.sel < 0 { Value::Nil }
+                    else if let Ok(n) = t.trim().parse::<i64>() { Value::Int(n) }
+                    else if let Some(f) = zahl_lesen(&t).filter(|_| t.trim().contains('.')) { Value::Float(f) }
+                    else { Value::str_rc(&t) }
+                }
+                None => Value::Int(w.sel as i64),
+            },
             Kind::Slider | Kind::Knob => Value::Float(w.value),
             Kind::Spinner => if w.step.fract() == 0.0 && w.value.fract() == 0.0 { Value::Int(w.value as i64) } else { Value::Float(w.value) },
             // Ein Zahlenfeld liefert eine Zahl -- AUSSER es beginnt mit einer
             // Null und hat mehr als eine Stelle: das ist eine Postleitzahl
             // oder eine Nummer, und die verloere als INTEGER ihre Null.
-            Kind::TextInput if w.zahlen > 0 && !(w.text.trim().len() > 1 && w.text.trim().starts_with('0')) => match zahl_lesen(&w.text) {
+            // Ein Geldfeld (zahlen 3) liefert ganze Cent.
+            Kind::TextInput if w.zahlen > 0 && !nummer_mit_null(&w.text) => match zahl_lesen(&w.text) {
+                Some(x) if w.zahlen == 3 => Value::Int((x * 100.0).round() as i64),
                 Some(x) if w.zahlen == 1 && x.fract() == 0.0 => Value::Int(x as i64),
                 Some(x) => Value::Float(x),
                 None => Value::str_rc(&w.text),
@@ -16566,6 +16792,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     _ => zahl.map(|x| x != 0.0).unwrap_or_else(|| matches!(text.to_ascii_lowercase().as_str(), "true" | "ja" | "wahr" | "x")),
                 };
                 if w.kind == Kind::Toggle { w.value = if w.checked { 1.0 } else { 0.0 }; }
+            }
+            Kind::Dropdown if Self::klapp_werte(w).is_some() => {
+                // Gesucht wird der WERT: als Text, und bei Zahlen auch dem Betrag
+                // nach (aus der Datenbank kommt 19 oder 19.0 oder "19").
+                let d = Self::klapp_werte(w).cloned().unwrap_or_default();
+                w.sel = d.iter().position(|x| {
+                    *x == text || (zahl.is_some() && zahl_lesen(x) == zahl)
+                }).map(|p| p as i32).unwrap_or(-1);
             }
             Kind::Dropdown => {
                 let n = items.len() as i32;
@@ -16595,8 +16829,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             _ => {
                 // Textfelder: eine Zahl aus der Datenbank kommt als Text an,
                 // ein Zahlenfeld mit Komma-Stellen zeigt sie deutsch.
+                // Ein Geldfeld bekommt eine ZAHL als Cent; ein Text steht so
+                // da, wie er kommt (er ist schon die Anzeige).
                 let t = match v {
                     Value::Float(f) if w.zahlen == 2 => format!("{:.2}", f).replace('.', ","),
+                    Value::Int(n) if w.zahlen == 3 => cent_text(*n),
+                    Value::Float(f) if w.zahlen == 3 => cent_text(f.round() as i64),
                     _ => text,
                 };
                 w.text = t;
@@ -16675,6 +16913,48 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             if jetzt != alt { return Ok(true); }
         }
         Ok(false)
+    }
+    fn form_db_mut(&mut self, wi: usize, form: &str) -> &mut FormDb {
+        let v = &mut self.windows[wi].form_db;
+        let pos = match v.iter().position(|f| f.form == form) {
+            Some(p) => p,
+            None => { v.push(FormDb { form: form.to_string(), ..Default::default() }); v.len() - 1 }
+        };
+        &mut v[pos]
+    }
+    /// GUI_FORM_VERSION(win, spalte$[, formular$]): diese Spalte zaehlt jedes
+    /// Speichern hoch, und GUI_FORM_SAVE speichert nur, wenn sie noch den
+    /// Stand vom Laden traegt. Leer schaltet ab.
+    pub fn form_version_setzen(&mut self, win: i64, form: &str, spalte: &str) -> Result<(), String> {
+        let wi = win as usize;
+        self.windows.get(wi).ok_or("GUI_FORM_VERSION: erwartet GUI_WINDOW")?;
+        if !spalte.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            return Err(format!("GUI_FORM_VERSION: '{}' ist kein Spaltenname (Buchstaben, Ziffern, _)", spalte));
+        }
+        if !spalte.is_empty() && self.form_widgets(wi, form).iter().any(|(k, _)| k.eq_ignore_ascii_case(spalte)) {
+            return Err(format!("GUI_FORM_VERSION: '{}' ist an ein Widget gebunden -- die Versionsspalte fuehrt die Laufzeit selbst", spalte));
+        }
+        let f = self.form_db_mut(wi, form);
+        f.spalte = spalte.to_string();
+        f.stand = None;
+        Ok(())
+    }
+    /// (Versionsspalte, beim Laden gelesener Stand) -- Spalte leer = keine.
+    pub fn form_version(&self, win: i64, form: &str) -> (String, Option<i64>) {
+        self.windows.get(win as usize)
+            .and_then(|w| w.form_db.iter().find(|f| f.form == form))
+            .map(|f| (f.spalte.clone(), f.stand)).unwrap_or_default()
+    }
+    pub fn form_stand_setzen(&mut self, win: i64, form: &str, stand: Option<i64>) {
+        if (win as usize) < self.windows.len() { self.form_db_mut(win as usize, form).stand = stand; }
+    }
+    pub fn form_konflikt_setzen(&mut self, win: i64, form: &str, k: &str) {
+        if (win as usize) < self.windows.len() { self.form_db_mut(win as usize, form).konflikt = k.to_string(); }
+    }
+    /// GUI_FORM_CONFLICT$: "" (gespeichert), "geaendert" oder "geloescht".
+    pub fn form_konflikt(&self, win: i64, form: &str) -> Result<String, String> {
+        let w = self.windows.get(win as usize).ok_or("GUI_FORM_CONFLICT$: erwartet GUI_WINDOW")?;
+        Ok(w.form_db.iter().find(|f| f.form == form).map(|f| f.konflikt.clone()).unwrap_or_default())
     }
     /// Die Schluessel eines Formulars (fuer SELECT/INSERT/UPDATE in der VM).
     pub fn form_keys(&self, win: i64, form: &str) -> Result<Vec<String>, String> {
@@ -17341,6 +17621,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 }
             }
         }
+        // Ein gekuerzter Eintrag ("...") zeigt seinen ganzen Text.
+        if w.kind == Kind::ListBox && !w.ganzer_text.is_empty() { return Some(w.ganzer_text.clone()); }
         if let Some(l) = w.leiste.as_ref() {
             if l.hover >= 0 {
                 if let Some(e) = l.eintraege.get(l.hover as usize).filter(|e| !e.tip.is_empty()) {
@@ -19041,7 +19323,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Inhalt auf das Feld-Innere clippen (langer Text laeuft nicht raus).
         g.push_clip(ax + 2, ay + 1, (w - 4 - rechts).max(0), (h - 2).max(0));
         if anzeige.is_empty() {
-            if !wdg.placeholder.is_empty() && !focused {
+            // Der Platzhalter bleibt, bis getippt wird -- auch mit Fokus. Vorher
+            // verschwand er mit dem Fokus, und ein Feld, das beim Start den
+            // Fokus hat, zeigte ihn nie (Dogfooding 2026-10-09).
+            if !wdg.placeholder.is_empty() {
                 self.wtext(g, wdg, tx, ty, wdg.placeholder.clone(), self.leise(self.wcol(wdg, "bg", "win_bg")));
             }
         } else {
@@ -19380,9 +19665,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         g.draw_image_rect_alpha(wdg.hg_bild, ax + (w - dw) / 2, ay + (h - dh) / 2, dw, dh, wdg.hg_deckkraft);
                     }
                 }
-                if wdg.text.is_empty() && !focused && !wdg.placeholder.is_empty() {
-                    self.wtext(g, wdg, ax + pad, ay + pad, wdg.placeholder.clone(), self.leise(self.wcol(wdg, "bg", "win_bg")));
-                } else {
+                // Der Platzhalter bleibt, bis getippt wird (wie im Textfeld);
+                // mit Fokus laeuft das Zeichnen danach weiter -- fuer die
+                // Schreibmarke und die Nummernspalte.
+                let platzhalter = wdg.text.is_empty() && wdg.vorschau.is_empty() && !wdg.placeholder.is_empty();
+                if platzhalter {
+                    let gut = self.ta_gutter(g, wdg, 1);
+                    self.wtext(g, wdg, ax + pad + gut, ay + pad, wdg.placeholder.clone(), self.leise(self.wcol(wdg, "bg", "win_bg")));
+                }
+                if !(platzhalter && !focused) {
                     let (chars, caret_anz) = self.anzeige_mit_vorschau(wdg);
                     let starts = Self::line_starts(&chars);
                     let view_lines = ((h - 2 * pad) / lh).max(1);
@@ -19837,8 +20128,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     // Leer ist eine Aussage: "keine Treffer" statt einer Flaeche,
                     // die aussieht, als sei die Liste kaputt.
                     if let Some(t) = l.map(|l| l.leer_text.clone()).filter(|t| !t.is_empty()) {
-                        let tw = self.wtext_width(g, wdg, &t);
-                        self.wtext(g, wdg, ax + ((w - tw) / 2).max(pad), ay + self.sk(10), t, muted);
+                        self.leer_hinweis(g, wdg, ax, ay + self.sk(10), w, &t, muted);
                     }
                 }
                 for (r, &k) in ansicht.iter().enumerate() {
@@ -19934,7 +20224,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                                 self.wtext(g, wdg, x, ty, teil, c);
                             }
                         }
-                        _ => self.wtext(g, wdg, tx, ty, Self::sichtbar_vorn(it, rechts - tx), farbe),
+                        _ => {
+                            let t = self.mit_auslassung(g, wdg, it, rechts - tx)
+                                .unwrap_or_else(|| Self::sichtbar_vorn(it, rechts - tx));
+                            self.wtext(g, wdg, tx, ty, t, farbe)
+                        }
                     }
                     g.pop_clip();
                 }
@@ -20019,12 +20313,16 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         if ueber { g.box_fill(x0 + 1, ay + 1, x1 - 2, ay + h - 1, shade(bg, 14)); }
                         if n > 0 { g.line(x0, ay + self.sk(5), x0, ay + h - self.sk(5), self.th("win_border")); }
                         if f.text.is_empty() { continue; }
-                        let tw = self.wtext_width(g, wdg, &f.text);
                         let innen = (x1 - x0 - 2 * pad).max(0);
+                        // Passt der Text nicht, endet er mit "..." statt mitten
+                        // im Wort abgeschnitten (Dogfooding 2026-10-09: aus
+                        // "geaendert" wurde "geaender", ohne dass man es merkt).
+                        let text = self.text_kuerzen(g, wdg, &f.text, innen);
+                        let tw = self.wtext_width(g, wdg, &text);
                         let tx = match f.ausr { 1 => x0 + pad + ((innen - tw) / 2).max(0), 2 => x0 + pad + (innen - tw).max(0), _ => x0 + pad };
                         let fc = if ueber { acc } else if k == 0 { haupt } else { neben };
                         g.push_clip(x0 + pad / 2, ay, (x1 - x0 - pad).max(0), h);
-                        self.wtext(g, wdg, tx, ay + (h - sz).max(0) / 2, f.text.clone(), fc);
+                        self.wtext(g, wdg, tx, ay + (h - sz).max(0) / 2, text, fc);
                         g.pop_clip();
                     }
                 }
@@ -20299,6 +20597,47 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// schmaler als ein Punkt. Eine Liste zeichnete einen Eintrag sonst ganz
     /// und liess ihn nur vom Clip beschneiden -- eine Ausgabezeile mit 300000
     /// Zeichen kostete so jedes Bild bis zu 72 ms (Stresstest 2026-10-02).
+    /// Wie viel Breite der TEXT eines Listeneintrags hat -- dieselbe Rechnung
+    /// wie beim Zeichnen (Kaestchen, Sinnbild, Zusatztext rechts, Rollbalken).
+    /// Gebraucht fuer den Tooltip mit dem ganzen Text.
+    fn liste_textplatz(&self, g: &Graphics, wi: usize, idx: usize, k: usize) -> i32 {
+        let wdg = &self.windows[wi].widgets[idx];
+        let pad = self.m("pad");
+        let ih = self.list_zeile_h(wdg);
+        let box_w = self.list_box_w(wdg);
+        let l = wdg.list.as_deref();
+        let hat_icon = l.map(|l| l.icons.iter().any(|&i| i >= 0)).unwrap_or(false);
+        let icon_w = if hat_icon { ih } else { 0 };
+        let (_, _, w, _) = self.abs_rect(wi, wdg);
+        let wz = if self.list_bar_geom(wi, idx).is_some() { w - self.sk(8) - 2 } else { w };
+        let tx = if box_w > 0 { box_w } else { pad } + icon_w + if icon_w > 0 { 2 } else { 0 };
+        let rechts = match l.and_then(|l| l.details.get(k)).filter(|d| !d.is_empty()) {
+            Some(d) => wz - pad - self.wtext_width(g, wdg, d) - self.sk(10),
+            None => wz - 2,
+        };
+        rechts - tx
+    }
+
+    /// Text auf eine Breite kuerzen: passt er nicht, endet er mit "..." --
+    /// statt mitten im Buchstaben abgeschnitten zu werden.
+    fn mit_auslassung(&self, g: &Graphics, wdg: &Widget, text: &str, breite: i32) -> Option<String> {
+        // Nie mehr Zeichen messen, als in die Zeile passen KOENNEN (keins ist
+        // schmaler als ein Punkt) -- ein Eintrag mit einer Million Zeichen
+        // kostete sonst je Bild zwanzig Messungen ueber den ganzen Text.
+        let cap = breite.max(0) as usize + 8;
+        let kopf: String = text.chars().take(cap + 1).collect();
+        let zu_lang = kopf.chars().count() > cap;
+        if !zu_lang && self.wtext_width(g, wdg, &kopf) <= breite { return None; }
+        let z: Vec<char> = kopf.chars().take(cap).collect();
+        let (mut lo, mut hi) = (0usize, z.len());
+        while lo < hi {
+            let m = (lo + hi + 1) / 2;
+            let t: String = z[..m].iter().collect::<String>().trim_end().to_string() + "...";
+            if self.wtext_width(g, wdg, &t) <= breite { lo = m; } else { hi = m - 1; }
+        }
+        Some(z[..lo].iter().collect::<String>().trim_end().to_string() + "...")
+    }
+
     fn sichtbar_vorn(s: &str, px: i32) -> String {
         let cap = px.max(0) as usize + 8;
         if s.len() <= cap { return s.to_string(); }
@@ -20749,9 +21088,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let wz = if bar.is_some() { w - self.sk(8) - 2 } else { w };
         g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
         if zeilen.is_empty() && !t.leer_text.is_empty() {
-            let tw = self.wtext_width(g, wdg, &t.leer_text);
             let muted = self.leise(self.wcol(wdg, "bg", "widget_bg"));
-            self.wtext(g, wdg, ax + ((w - tw) / 2).max(self.sk(6)), ay + self.sk(10), t.leer_text.clone(), muted);
+            self.leer_hinweis(g, wdg, ax, ay + self.sk(10), w, &t.leer_text, muted);
         }
         let rh = self.sk(TREE_ROW_H);
         let mut summe = 0.0f64;
@@ -21151,12 +21489,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         g.push_clip(kx, fy, kw, self.sk(TBL_FILTER_H));
                         let fokus = t.filter_focus == c as i32;
                         self.fbox_tief(g, cx + 2, fy + 2, cx + cw - 3, fy + self.sk(TBL_FILTER_H) - 3,
-                                       self.th("field_bg"),
-                                       if fokus { accent } else { self.th("field_border") });
+                                       self.th("win_bg"),
+                                       if fokus { accent } else { self.th("widget_border") });
                         let leer = t.filters.get(c).map(|s| s.is_empty()).unwrap_or(true);
                         let s = if leer { "Filter ...".to_string() }
                                 else { t.filters[c].clone() };
-                        let farbe = if leer { shade(title_fg, -60) } else { fg };
+                        // Gedaempft wie der Platzhalter eines Textfelds, gegen DESSEN Grund
+                        // gemessen (vorher aus der Kopfschrift abgeleitet: auf hellen
+                        // Themen fast schwarz, auf dem schwarzen Feld unsichtbar).
+                        let farbe = if leer { self.leise(self.th("win_bg")) } else { fg };
                         g.push_clip(cx + 4, fy + 2, (cw - 8).max(1), self.sk(TBL_FILTER_H) - 4);
                         self.wtext(g, wdg, cx + 6, fy + (self.sk(TBL_FILTER_H) - schrift).max(0) / 2,
                                    s, farbe);
@@ -21294,9 +21635,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Leer ist eine Aussage: "Keine Treffer" statt einer Flaeche, die
         // aussieht, als sei die Tabelle kaputt (wie bei der Liste).
         if t.view.is_empty() && !t.leer_text.is_empty() {
-            let tw = self.wtext_width(g, wdg, &t.leer_text);
             let muted = self.leise(bg);
-            self.wtext(g, wdg, body_x + ((body_w - tw) / 2).max(self.sk(6)), body_y + self.sk(10), t.leer_text.clone(), muted);
+            self.leer_hinweis(g, wdg, body_x, body_y + self.sk(10), body_w, &t.leer_text, muted);
         }
         g.pop_clip();
 
@@ -21340,7 +21680,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if t.edit_row == r as i32 && t.edit_col == c as i32 && t.col_typ_of(c) == 3 {
             // Auswahlspalte: der gewaehlte Eintrag und ein Pfeil -- die Liste
             // selbst liegt in der oberen Schicht (draw_wahl_popup).
-            self.fbox_tief(g, cx + 1, cy + 2, cx + cw - 2, cy + ch - 3, self.th("field_bg"), accent);
+            self.fbox_tief(g, cx + 1, cy + 2, cx + cw - 2, cy + ch - 3, self.th("win_bg"), accent);
             self.wtext(g, wdg, cx + 5, cy + (ch - schrift).max(0) / 2, t.edit_text.clone(), fg_thema);
             let (px, py) = (cx + cw - 12, cy + ch / 2);
             g.line(px - 4, py - 2, px, py + 2, accent);
@@ -21349,7 +21689,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         if t.edit_row == r as i32 && t.edit_col == c as i32 {
             self.fbox_tief(g, cx + 1, cy + 2, cx + cw - 2, cy + ch - 3,
-                           self.th("field_bg"), accent);
+                           self.th("win_bg"), accent);
             let alle: Vec<char> = t.edit_text.chars().collect();
             let tx = cx + 5 - t.edit_scroll;
             let ty = cy + (ch - schrift).max(0) / 2;
@@ -21404,7 +21744,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let b = (ch - 8).clamp(10, 18);
                 let bx = match al { 1 => cx + (cw - b) / 2, 2 => cx + cw - b - self.sk(TBL_PADDING), _ => cx + self.sk(TBL_PADDING) };
                 let by = cy + (ch - b) / 2;
-                g.box_fill(bx, by, bx + b - 1, by + b - 1, self.th("field_bg"));
+                g.box_fill(bx, by, bx + b - 1, by + b - 1, self.th("win_bg"));
                 g.rect(bx, by, bx + b - 1, by + b - 1, border);
                 if cell.value >= 0.5 {
                     // Haken als zwei Striche -- ein gefuelltes Kaestchen
@@ -21421,7 +21761,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let bx = cx + rand;
                 let by = cy + (ch - bh) / 2;
                 let v = cell.value.clamp(0.0, 1.0);
-                g.box_fill(bx, by, bx + bw - 1, by + bh - 1, self.th("field_bg"));
+                g.box_fill(bx, by, bx + bw - 1, by + bh - 1, self.th("win_bg"));
                 if v > 0.0 {
                     let fw = ((bw - 2) as f64 * v) as i32;
                     if fw > 0 {
@@ -21449,6 +21789,36 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                            cell.text.clone(), fgc);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod geldfeld_tests {
+    use super::{cent_text, nummer_mit_null, zahl_erlaubt};
+
+    #[test]
+    fn cent_als_anzeige() {
+        assert_eq!(cent_text(4800), "48,00");
+        assert_eq!(cent_text(5), "0,05");
+        assert_eq!(cent_text(-1999), "-19,99");
+        assert_eq!(cent_text(0), "0,00");
+    }
+
+    #[test]
+    fn fuehrende_null_nur_vor_ziffern() {
+        assert!(nummer_mit_null("080331"));
+        assert!(nummer_mit_null(" 01 "));
+        assert!(!nummer_mit_null("0,99"));
+        assert!(!nummer_mit_null("0.5"));
+        assert!(!nummer_mit_null("0"));
+        assert!(!nummer_mit_null("80331"));
+    }
+
+    #[test]
+    fn geldfeld_nimmt_komma_wie_kommazahl() {
+        assert!(zahl_erlaubt("12,50", 3));
+        assert!(!zahl_erlaubt("12,5,0", 3));
+        assert!(!zahl_erlaubt("12,50", 1));
     }
 }
 

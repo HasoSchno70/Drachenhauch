@@ -133,6 +133,12 @@ arm = MAT4_MUL(body, MAT4_MUL(MAT4_TRANSLATE(1.2, 0.6, 0), MAT4_SCALE(1.2,0.3,0.
 MODEL_MATRIX(box, arm, &H50C0FF)
 ```
 
+Lighting and shadows work as with `MODEL`: a model with `MODEL_LIT` casts its
+shadow under `SHADOW_ENABLE` and receives others (until 2026.27 it cast none --
+rotated physics bodies stood on the ground without a shadow).
+
+The outline for it comes from `MODEL_MATRIX_WIRES(handle, mat [, farbe])` with the same matrix.
+
 Many instances = many `MODEL_MATRIX` calls (one draw per call). For very
 many identical meshes `MODEL_INSTANCED` is the fast variant (see below).
 

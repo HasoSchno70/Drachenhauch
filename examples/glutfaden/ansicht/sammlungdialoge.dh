@@ -1,0 +1,1004 @@
+' Farb-Harmonien und Muster-Bibliothek -- die Dialoge zu kern/harmonie.dh und
+' kern/bibliothek.dh (PySticky ui/dialogs/color_harmony_dialog.py,
+' pattern_library_dialog.py, thumbnail_widget.py).
+'
+' Farb-Harmonien: Strg+Umschalt+H oder [Harmonien…] unter der Farbliste.
+' Ausgangsfarbe ist die gewaehlte Farbe; jede Karte zeigt die gedrehte
+' Wunschfarbe und das naechste Garn der Palette, angeklickte kommen mit
+' "Hinzufügen" ins Muster -- anders als PySticky je Farbe ein Schritt im
+' Verlauf, und die Meldung zaehlt nur, was wirklich neu ist.
+'
+' Bibliothek: Strg+L oder "Muster" -> "Bibliothek …". Kategorien links,
+' Suche und Sortierung oben, Karten mit Vorschaubild, unten Daten,
+' Schlagwoerter und Notizen; Rechtsklick auf eine Karte fuer Favorit,
+' Kategorien, Schlagwoerter, Ordner und Entfernen. Anders als PySticky gibt
+' es Vorschaubilder auch fuer .oxs, .pat und .xsd, Sortieren stellt nur die
+' Anzeige um, und Notizen werden beim Wechsel der Karte und beim Schliessen
+' gesichert (dort nach einer halben Sekunde Ruhe).
+
+' Farben: die Dialoge sind hell (GTK), also PyStickys helles Thema
+' (bg_medium, bg_lighter ...) mit Glutfadens Orange als Akzent
+CONST SG_AKZENT = &HE8701E
+CONST SG_GRUND = &HECEDF3
+CONST SG_HELL = &HDDE0EB
+CONST SG_RAND = &H9AA1BD
+CONST SG_RAND_DUNKEL = &HB8BCCF
+CONST SG_TEXT = &H1A1A2E
+CONST SG_TEXT2 = &H3A3A60
+CONST SG_LEISE = &H6A6A8A
+CONST SG_AUS = &HA0A0B0
+
+SUB sgRund(cr AS INTEGER, x AS FLOAT, y AS FLOAT, b AS FLOAT, h AS FLOAT, r AS FLOAT)
+    cairo_new_sub_path(cr)
+    cairo_arc(cr, x + b - r, y + r, r, -PI / 2, 0)
+    cairo_arc(cr, x + b - r, y + h - r, r, 0, PI / 2)
+    cairo_arc(cr, x + r, y + h - r, r, PI / 2, PI)
+    cairo_arc(cr, x + r, y + r, r, PI, 3 * PI / 2)
+    cairo_close_path(cr)
+END SUB
+
+' Text links oben in einem Rechteck, senkrecht mittig wie Qt AlignVCenter
+SUB sgTextLinks(cr AS INTEGER, text AS STRING, px AS FLOAT, fett AS BOOLEAN, x AS FLOAT, y AS FLOAT, h AS FLOAT)
+    DIM l AS INTEGER : l = sdLayout(cr, text, px, fett)
+    DIM tb AS INTEGER, th AS INTEGER
+    pango_layout_get_pixel_size(l, tb, th)
+    cairo_move_to(cr, x, y + (h - th) / 2)
+    pango_cairo_show_layout(cr, l)
+    g_object_unref(l)
+END SUB
+
+SUB sgTextRechts(cr AS INTEGER, text AS STRING, px AS FLOAT, fett AS BOOLEAN, rechts AS FLOAT, y AS FLOAT)
+    DIM l AS INTEGER : l = sdLayout(cr, text, px, fett)
+    DIM tb AS INTEGER, th AS INTEGER
+    pango_layout_get_pixel_size(l, tb, th)
+    cairo_move_to(cr, rechts - tb, y)
+    pango_cairo_show_layout(cr, l)
+    g_object_unref(l)
+END SUB
+
+' --- Farb-Harmonien -------------------------------------------------------------------
+
+DIM hdDialog AS INTEGER
+DIM hdQuelle AS INTEGER               ' Platz der Ausgangsfarbe im Muster
+DIM hdArt AS INTEGER
+DIM hdBeschreibung AS INTEGER
+DIM hdPalWahl AS INTEGER
+DIM hdInfo AS INTEGER
+DIM hdKartenBox AS INTEGER
+DIM hdKarten AS ARRAY OF INTEGER
+DIM hdVorschlaege AS ARRAY OF kern.Harmonievorschlag
+DIM hdGewaehlt AS ARRAY OF BOOLEAN
+DIM hdUeber AS INTEGER                ' Karte unter der Maus, -1 = keine
+DIM hdHinzu AS INTEGER
+DIM hdPal AS kern.Palette
+
+FUNCTION hdGarn(i AS INTEGER) AS kern.Garn
+    IF hdPal IS NIL OR i < 0 OR i >= LEN(hdVorschlaege) THEN RETURN NIL
+    IF hdVorschlaege[i].garn < 0 THEN RETURN NIL
+    RETURN hdPal.garne[hdVorschlaege[i].garn]
+END FUNCTION
+
+' Die gewaehlten Garne, jedes einmal (zwei Karten koennen dasselbe treffen)
+FUNCTION hdAuswahl() AS ARRAY OF INTEGER
+    DIM aus AS ARRAY OF INTEGER : aus = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(hdVorschlaege) - 1
+        IF NOT hdGewaehlt[i] OR hdVorschlaege[i].garn < 0 THEN CONTINUE
+        IF ARRAY_INDEXOF(aus, hdVorschlaege[i].garn) < 0 THEN ARRAY_PUSH(aus, hdVorschlaege[i].garn)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+SUB hdKnopfNachziehen()
+    DIM n AS INTEGER : n = LEN(hdAuswahl())
+    gtk_button_set_label(hdHinzu, trf$("Hinzufügen ({0})", [STR$(n)]))
+    gtk_widget_set_sensitive(hdHinzu, n > 0)
+END SUB
+
+FUNCTION hdQuelleZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM g AS kern.Garn : g = lwMuster.farben[hdQuelle].garn
+    sdFarbe(cr, g.farbe, 1)
+    sgRund(cr, 2, 2, 116, 51, 8)
+    cairo_fill_preserve(cr)
+    sdFarbe(cr, SG_RAND, 1)
+    cairo_set_line_width(cr, 2)
+    cairo_stroke(cr)
+    sdFarbe(cr, SG_TEXT, 1)
+    sdTextMitte(cr, IIF(g.nummer <> "", g.nummer, "?"), 12, TRUE, 0, 56, 120, 22)
+    RETURN FALSE
+END FUNCTION
+
+' Eine Vorschlagskarte (180x170): Kopf, Wunsch- und Garnfeld, Garn, Name,
+' Bewertung; gewaehlt mit Haken, ueberfahren mit "+ wählen"
+FUNCTION hdKarteZeichnen(w AS INTEGER, cr AS INTEGER, i AS INTEGER) AS BOOLEAN
+    IF i >= LEN(hdVorschlaege) THEN RETURN FALSE
+    DIM v AS kern.Harmonievorschlag : v = hdVorschlaege[i]
+    DIM g AS kern.Garn : g = hdGarn(i)
+    DIM gew AS BOOLEAN : gew = hdGewaehlt[i]
+    DIM ueber AS BOOLEAN : ueber = hdUeber = i
+    IF gew THEN
+        sdFarbe(cr, SG_AKZENT, 40 / 255)
+    ELSEIF ueber THEN
+        sdFarbe(cr, SG_HELL, 1)
+    ELSE
+        sdFarbe(cr, SG_GRUND, 1)
+    END IF
+    sgRund(cr, 2, 2, 176, 166, 10)
+    cairo_fill_preserve(cr)
+    sdFarbe(cr, IIF(gew OR ueber, SG_AKZENT, SG_RAND), 1)
+    cairo_set_line_width(cr, IIF(gew, 3, IIF(ueber, 2, 1)))
+    cairo_stroke(cr)
+    sdFarbe(cr, IIF(gew, SG_AKZENT, SG_TEXT2), 1)
+    sgTextLinks(cr, v.name, 12, TRUE, 14, 10, 24)
+    ' Wunsch- und Garnfeld
+    DIM garnFarbe AS INTEGER : garnFarbe = IIF(g IS NIL, v.ziel, g.farbe)
+    DIM felder AS ARRAY OF INTEGER : felder = [v.ziel, garnFarbe]
+    DIM xs AS ARRAY OF INTEGER : xs = [14, 68]
+    DIM bs AS ARRAY OF INTEGER : bs = [50, 102]
+    DIM texte AS ARRAY OF STRING : texte = [tr$("Wunsch"), tr$("Garn")]
+    DIM k AS INTEGER
+    FOR k = 0 TO 1
+        sdFarbe(cr, felder[k], 1)
+        sgRund(cr, xs[k], 36, bs[k], 56, 5)
+        cairo_fill_preserve(cr)
+        sdFarbe(cr, SG_RAND_DUNKEL, 1)
+        cairo_set_line_width(cr, 1)
+        cairo_stroke(cr)
+        IF kern.helligkeit(felder[k]) > 0.5 THEN cairo_set_source_rgba(cr, 0, 0, 0, 140 / 255) ELSE cairo_set_source_rgba(cr, 1, 1, 1, 200 / 255)
+        sgTextLinks(cr, texte[k], 9, TRUE, xs[k] + 4, 38, 12)
+    NEXT
+    IF g IS NIL THEN
+        sdFarbe(cr, SG_AUS, 1)
+        sgTextLinks(cr, tr$("Kein passendes Garn"), 10, FALSE, 14, 98, 16)
+    ELSE
+        DIM herst AS STRING : herst = IIF(g.hersteller <> "", LEFT$(g.hersteller, 8), "—")
+        sdFarbe(cr, SG_TEXT, 1)
+        sgTextLinks(cr, herst + " " + IIF(g.nummer <> "", g.nummer, "?"), 13, TRUE, 14, 98, 18)
+        DIM nm AS STRING : nm = g.name
+        IF LEN(nm) > 24 THEN nm = LEFT$(nm, 23) + "…"
+        sdFarbe(cr, SG_TEXT2, 1)
+        sgTextLinks(cr, nm, 10, FALSE, 14, 116, 16)
+        DIM punkte AS STRING, text AS STRING, stufe AS INTEGER
+        (punkte, text, stufe) = kern.harmonieBewertung(v.abstand)
+        sdFarbe(cr, IIF(stufe >= 3, SG_AKZENT, SG_LEISE), 1)
+        sgTextLinks(cr, punkte, 12, TRUE, 14, 134, 16)
+        sdFarbe(cr, SG_LEISE, 1)
+        sgTextLinks(cr, text, 10, FALSE, 66, 135, 16)
+    END IF
+    IF gew THEN
+        ' Haken in einem Kreis rechts oben
+        sdFarbe(cr, SG_AKZENT, 1)
+        cairo_arc(cr, 149 + 11, 8 + 11, 11, 0, 2 * PI)
+        cairo_fill(cr)
+        cairo_set_source_rgba(cr, 1, 1, 1, 1)
+        cairo_set_line_width(cr, 2.5)
+        cairo_set_line_cap(cr, 1)
+        cairo_set_line_join(cr, 1)
+        cairo_move_to(cr, 149 + 6, 8 + 11)
+        cairo_line_to(cr, 149 + 10, 8 + 16)
+        cairo_line_to(cr, 149 + 17, 8 + 7)
+        cairo_stroke(cr)
+    ELSEIF ueber AND NOT (g IS NIL) THEN
+        sdFarbe(cr, SG_AKZENT, 1)
+        sgTextRechts(cr, tr$("+ wählen"), 10, TRUE, 169, 8)
+    END IF
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION hdKarteDruck(w AS INTEGER, ereignis AS INTEGER, i AS INTEGER) AS BOOLEAN
+    DIM knopf AS INTEGER
+    IF NOT gdk_event_get_button(ereignis, knopf) THEN RETURN FALSE
+    IF knopf <> 1 THEN RETURN FALSE
+    hdKarteKippen(i)
+    RETURN TRUE
+END FUNCTION
+
+SUB hdKarteKippen(i AS INTEGER)
+    IF i < 0 OR i >= LEN(hdVorschlaege) THEN RETURN
+    IF hdVorschlaege[i].garn < 0 THEN RETURN
+    hdGewaehlt[i] = NOT hdGewaehlt[i]
+    gtk_widget_queue_draw(hdKarten[i])
+    hdKnopfNachziehen()
+END SUB
+
+FUNCTION hdKarteBetreten(w AS INTEGER, ereignis AS INTEGER, i AS INTEGER) AS BOOLEAN
+    hdUeber = i
+    gtk_widget_queue_draw(w)
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION hdKarteVerlassen(w AS INTEGER, ereignis AS INTEGER, i AS INTEGER) AS BOOLEAN
+    IF hdUeber = i THEN hdUeber = -1
+    gtk_widget_queue_draw(w)
+    RETURN FALSE
+END FUNCTION
+
+' Karten neu rechnen (Art oder Palette gewechselt -- die Auswahl geht verloren)
+SUB hdNeu()
+    DIM k AS INTEGER
+    FOR EACH k IN hdKarten
+        gtk_widget_destroy(k)
+    NEXT
+    hdKarten = []
+    hdGewaehlt = []
+    hdUeber = -1
+    DIM art AS STRING : art = kern.harmonieArten()[MAX(0, gtk_combo_box_get_active(hdArt))]
+    gtk_label_set_text(hdBeschreibung, kern.harmonieBeschreibung$(art))
+    DIM p AS INTEGER : p = gtk_combo_box_get_active(hdPalWahl)
+    hdPal = NIL
+    IF p >= 0 AND p < LEN(slPaletten) THEN hdPal = slPaletten[p]
+    gtk_label_set_text(hdInfo, IIF(hdPal IS NIL, "", trf$("{0} Farben verfügbar", [STR$(IIF(hdPal IS NIL, 0, LEN(hdPal.garne)))])))
+    hdVorschlaege = []
+    IF NOT (hdPal IS NIL) THEN hdVorschlaege = kern.harmonieVorschlaege(lwMuster.farben[hdQuelle].garn.farbe, art, hdPal)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(hdVorschlaege) - 1
+        ARRAY_PUSH(hdGewaehlt, FALSE)
+        DIM f AS INTEGER : f = gtk_drawing_area_new()
+        gtk_widget_set_size_request(f, 180, 170)
+        gtk_widget_add_events(f, GDK_MASKE_DRUCK BOR GDK_MASKE_VERLASSEN BOR 4096)
+        DIM s AS INTEGER : s = signalZeichnen(f, "draw", hdKarteZeichnen, i, 0, 0)
+        signalEreignis(f, "button-press-event", hdKarteDruck, i, 0, 0)
+        signalEreignis(f, "enter-notify-event", hdKarteBetreten, i, 0, 0)
+        signalEreignis(f, "leave-notify-event", hdKarteVerlassen, i, 0, 0)
+        gtk_box_pack_start(hdKartenBox, f, FALSE, FALSE, 0)
+        ARRAY_PUSH(hdKarten, f)
+    NEXT
+    gtk_widget_show_all(hdKartenBox)
+    hdKnopfNachziehen()
+END SUB
+
+SUB hdGeaendert(w AS INTEGER, daten AS INTEGER)
+    hdNeu()
+END SUB
+
+SUB hdAlle(w AS INTEGER, an AS INTEGER)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(hdVorschlaege) - 1
+        hdGewaehlt[i] = an = 1 AND hdVorschlaege[i].garn >= 0
+        gtk_widget_queue_draw(hdKarten[i])
+    NEXT
+    hdKnopfNachziehen()
+END SUB
+
+FUNCTION hdBauen() AS INTEGER
+    IF NOT lwHat THEN RETURN 0
+    IF lwMuster.farbanzahl() = 0 THEN
+        pdWarnung(fenster, tr$("Keine Farbe"), tr$("Bitte füge zuerst eine Farbe zum Muster hinzu."))
+        RETURN 0
+    END IF
+    hdQuelle = IIF(wzFarbe >= 0 AND wzFarbe < lwMuster.farbanzahl(), wzFarbe, 0)
+    DIM g AS kern.Garn : g = lwMuster.farben[hdQuelle].garn
+    hdDialog = gtk_dialog_new_with_buttons(tr$("Farb-Harmonien"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, 0)
+    hdHinzu = gtk_dialog_add_button(hdDialog, tr$("Hinzufügen (0)"), GTK_ANTWORT_OK)
+    gtkKlasse(hdHinzu, "suggested-action")
+    gtk_window_set_default_size(hdDialog, 820, 620)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(hdDialog)
+    gtk_container_set_border_width(innen, 14)
+    gtk_box_set_spacing(innen, 10)
+    DIM intro AS INTEGER : intro = gtk_label_new("")
+    gtk_label_set_markup(intro, tr$("Diese Funktion schlägt Garne vor, die mit der gewählten Ausgangsfarbe nach <b>Farbtheorie</b> harmonieren. Wähle den Harmonie-Typ und klicke auf die Karten, die du in deine Palette übernehmen willst."))
+    gtk_label_set_line_wrap(intro, TRUE)
+    gtk_label_set_xalign(intro, 0.0)
+    gtkKlasse(intro, "karte")
+    gtk_box_pack_start(innen, intro, FALSE, FALSE, 0)
+    DIM kopf AS INTEGER : kopf = gtk_box_new(GTK_WAAGERECHT, 16)
+    ' Ausgangsfarbe
+    DIM qb AS INTEGER : qb = gtk_box_new(GTK_SENKRECHT, 6)
+    gtkKlasse(qb, "karte")
+    gtk_box_pack_start(qb, adUeberschrift(tr$("AUSGANGSFARBE")), FALSE, FALSE, 0)
+    DIM qf AS INTEGER : qf = gtk_drawing_area_new()
+    gtk_widget_set_size_request(qf, 120, 80)
+    gtk_widget_set_halign(qf, 3)
+    DIM s AS INTEGER : s = signalZeichnen(qf, "draw", hdQuelleZeichnen, 0, 0, 0)
+    gtk_box_pack_start(qb, qf, FALSE, FALSE, 0)
+    DIM qn AS INTEGER : qn = gtk_label_new("")
+    gtk_label_set_markup(qn, "<b>" + sdMaske$(g.name) + "</b>")
+    gtk_label_set_line_wrap(qn, TRUE)
+    gtk_label_set_max_width_chars(qn, 16)
+    gtk_box_pack_start(qb, qn, FALSE, FALSE, 0)
+    gtk_box_pack_start(kopf, qb, FALSE, FALSE, 0)
+    ' Einstellungen
+    DIM eb AS INTEGER : eb = gtk_box_new(GTK_SENKRECHT, 8)
+    gtkKlasse(eb, "karte")
+    gtk_box_pack_start(eb, adUeberschrift(tr$("EINSTELLUNGEN")), FALSE, FALSE, 0)
+    hdArt = gtk_combo_box_text_new()
+    DIM t AS STRING
+    FOR EACH t IN kern.harmonieArten()
+        gtk_combo_box_text_append_text(hdArt, tr$(t))
+    NEXT
+    gtk_combo_box_set_active(hdArt, 0)
+    gtk_box_pack_start(eb, dlZeile(tr$("Harmonie-Typ:"), hdArt), FALSE, FALSE, 0)
+    hdBeschreibung = gtk_label_new("")
+    gtk_label_set_xalign(hdBeschreibung, 0.0)
+    gtk_label_set_line_wrap(hdBeschreibung, TRUE)
+    gtkKlasse(hdBeschreibung, "nebensache")
+    gtk_box_pack_start(eb, hdBeschreibung, FALSE, FALSE, 0)
+    hdPalWahl = gtk_combo_box_text_new()
+    DIM p AS kern.Palette
+    FOR EACH p IN slPaletten
+        gtk_combo_box_text_append_text(hdPalWahl, p.name)
+    NEXT
+    gtk_combo_box_set_active(hdPalWahl, kern.harmoniePalette(slPaletten, g.hersteller))
+    gtk_box_pack_start(eb, dlZeile(tr$("Garn-Palette:"), hdPalWahl), FALSE, FALSE, 0)
+    hdInfo = gtk_label_new("")
+    gtk_label_set_xalign(hdInfo, 0.0)
+    gtkKlasse(hdInfo, "nebensache")
+    gtk_box_pack_start(eb, hdInfo, FALSE, FALSE, 0)
+    gtk_box_pack_start(kopf, eb, TRUE, TRUE, 0)
+    gtk_box_pack_start(innen, kopf, FALSE, FALSE, 0)
+    ' Vorschlaege
+    DIM vb AS INTEGER : vb = gtk_box_new(GTK_SENKRECHT, 8)
+    gtkKlasse(vb, "karte")
+    gtk_box_pack_start(vb, adUeberschrift(tr$("VORSCHLÄGE — KARTE ANKLICKEN ZUM AUSWÄHLEN")), FALSE, FALSE, 0)
+    hdKartenBox = gtk_box_new(GTK_WAAGERECHT, 12)
+    gtk_box_pack_start(vb, hdKartenBox, TRUE, TRUE, 0)
+    gtk_box_pack_start(innen, vb, TRUE, TRUE, 0)
+    DIM kz AS INTEGER : kz = gtk_box_new(GTK_WAAGERECHT, 8)
+    DIM ka AS INTEGER : ka = gtk_button_new_with_label(tr$("Alle auswählen"))
+    DIM kk AS INTEGER : kk = gtk_button_new_with_label(tr$("Keine auswählen"))
+    gtk_box_pack_start(kz, ka, FALSE, FALSE, 0)
+    gtk_box_pack_start(kz, kk, FALSE, FALSE, 0)
+    gtk_box_pack_start(innen, kz, FALSE, FALSE, 0)
+    signal(ka, "clicked", hdAlle, 1, 0, 0)
+    signal(kk, "clicked", hdAlle, 0, 0, 0)
+    signal(hdArt, "changed", hdGeaendert, 0, 0, 0)
+    signal(hdPalWahl, "changed", hdGeaendert, 0, 0, 0)
+    hdKarten = []
+    hdNeu()
+    gtk_widget_show_all(hdDialog)
+    RETURN hdDialog
+END FUNCTION
+
+' Die gewaehlten Garne ins Muster; liefert, wie viele neu sind
+FUNCTION hdHinzufuegen() AS INTEGER
+    DIM neu AS INTEGER
+    DIM i AS INTEGER
+    FOR EACH i IN hdAuswahl()
+        DIM vorher AS INTEGER : vorher = lwMuster.farbanzahl()
+        DIM nr AS INTEGER : nr = kern.farbeHinzufuegen(lwMuster, wzVerlauf, hdPal.garne[i], slSymbole, hdPal.istPerlen, hdPal.istDiamant, NOT einst.symboleAuto)
+        IF lwMuster.farbanzahl() > vorher THEN neu = neu + 1
+    NEXT
+    IF neu > 0 THEN allesNeu()
+    statusMeldung(IIF(neu > 0, trf$("{0} harmonische Farbe(n) hinzugefügt", [STR$(neu)]), tr$("Die gewählten Garne sind schon im Muster")))
+    RETURN neu
+END FUNCTION
+
+SUB harmonieDialog()
+    IF hdBauen() = 0 THEN RETURN
+    IF gtk_dialog_run(hdDialog) = GTK_ANTWORT_OK THEN
+        DIM n AS INTEGER : n = hdHinzufuegen()
+    END IF
+    gtk_widget_destroy(hdDialog)
+    hdDialog = 0
+END SUB
+
+' --- Bibliothek ------------------------------------------------------------------------
+
+DIM bbDialog AS INTEGER
+DIM bbBib AS kern.Bibliothek
+DIM bbKatListe AS INTEGER
+DIM bbSuche AS INTEGER
+DIM bbSort AS INTEGER
+DIM bbInfo AS INTEGER
+DIM bbRaster AS INTEGER
+DIM bbKarten AS ARRAY OF INTEGER        ' Karten der angezeigten Eintraege
+DIM bbBilder AS ARRAY OF INTEGER        ' je Karte die Box fuer das Bild
+DIM bbPlaetze AS ARRAY OF INTEGER       ' angezeigte Eintraege (Platz in bbBib.eintraege)
+DIM bbGewaehlt AS INTEGER               ' Platz des gewaehlten Eintrags, -1 = keiner
+DIM bbDetail AS INTEGER
+DIM bbOeffnen AS INTEGER
+DIM bbTags AS INTEGER
+DIM bbNotizen AS INTEGER
+DIM bbSperre AS BOOLEAN
+DIM bbWarte AS ARRAY OF INTEGER         ' Eintraege, deren Vorschau noch fehlt
+DIM bbTakt AS INTEGER
+DIM bbMenueEintrag AS INTEGER           ' Eintrag des Kontextmenues
+
+FUNCTION bbKategorie$() AS STRING
+    DIM z AS INTEGER : z = gtk_list_box_get_selected_row(bbKatListe)
+    DIM i AS INTEGER : i = IIF(z = 0, 0, gtk_list_box_row_get_index(z))
+    IF i < 0 OR i >= LEN(bbBib.kategorien) THEN RETURN "Alle"
+    RETURN bbBib.kategorien[i]
+END FUNCTION
+
+FUNCTION bbThumbOrdner$() AS STRING
+    RETURN PATHJOIN(DIRNAME(bbBib.pfad), ".thumbnails")
+END FUNCTION
+
+SUB bbSichern()
+    TRY
+        kern.bibliothekSichern(bbBib)
+    CATCH fehler
+        pdWarnung(bbDialog, tr$("Fehler"), trf$("Änderung an der Bibliothek konnte nicht gespeichert werden:{0}{1}", [CHR$(10), fehler]))
+    END TRY
+END SUB
+
+SUB bbKategorienFuellen()
+    DIM alt AS STRING : alt = ""
+    IF gtk_list_box_get_selected_row(bbKatListe) <> 0 THEN alt = bbKategorie$()
+    bbSperre = TRUE
+    adLeeren(bbKatListe)
+    DIM k AS STRING
+    DIM wahl AS INTEGER : wahl = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bbBib.kategorien) - 1
+        k = bbBib.kategorien[i]
+        gtk_list_box_insert(bbKatListe, sdZelle(sdMaske$(tr$(k) + " (" + STR$(kern.kategorieZahl(bbBib, k)) + ")"), 0, FALSE), -1)
+        IF k = alt THEN wahl = i
+    NEXT
+    gtk_widget_show_all(bbKatListe)
+    gtk_list_box_select_row(bbKatListe, gtk_list_box_get_row_at_index(bbKatListe, wahl))
+    bbSperre = FALSE
+END SUB
+
+' Ist das Vorschaubild im Cache noch gut? (da und nicht aelter als das Muster)
+FUNCTION bbVorschauGut(e AS kern.Bibliothekseintrag) AS BOOLEAN
+    IF e.vorschau = "" OR NOT FILEEXISTS(e.vorschau) THEN RETURN FALSE
+    IF NOT FILEEXISTS(e.pfad) THEN RETURN TRUE
+    RETURN FILETIME(e.pfad) <= FILETIME(e.vorschau)
+END FUNCTION
+
+' Das Bild einer Karte setzen: aus dem Cache oder "B×H" als Platzhalter
+SUB bbBildSetzen(k AS INTEGER)
+    ' der Halter hat genau ein Kind (ein GtkBin) -- das alte weg, das neue hinein
+    DIM box AS INTEGER : box = bbBilder[k]
+    DIM alt AS INTEGER : alt = gtk_bin_get_child(box)
+    IF alt <> 0 THEN gtk_widget_destroy(alt)
+    DIM e AS kern.Bibliothekseintrag : e = bbBib.eintraege[bbPlaetze[k]]
+    DIM w AS INTEGER
+    IF bbVorschauGut(e) THEN
+        DIM f AS INTEGER
+        DIM pb AS INTEGER : pb = gdk_pixbuf_new_from_file_at_scale(e.vorschau, 110, 90, TRUE, f)
+        IF pb = 0 THEN
+            g_error_free(f)
+        ELSE
+            w = gtk_image_new_from_pixbuf(pb)
+            g_object_unref(pb)
+        END IF
+    END IF
+    IF w = 0 THEN
+        w = gtk_label_new(STR$(e.breite) + "×" + STR$(e.hoehe))
+        IF ARRAY_INDEXOF(bbWarte, bbPlaetze[k]) < 0 AND FILEEXISTS(e.pfad) THEN ARRAY_PUSH(bbWarte, bbPlaetze[k])
+    END IF
+    gtk_container_add(box, w)
+    gtk_widget_show_all(box)
+END SUB
+
+' Ein Vorschaubild rechnen und in den Cache legen; FALSE, wenn es nicht geht
+FUNCTION bbVorschauRechnen(i AS INTEGER) AS BOOLEAN
+    DIM e AS kern.Bibliothekseintrag : e = bbBib.eintraege[i]
+    TRY
+        DIM m AS kern.Muster : m = kern.musterLesen(e.pfad, slPaletten, slSymbole)
+        DIM bild AS IMAGE : bild = kern.vorschauBild(m)
+        IF NOT DIREXISTS(bbThumbOrdner$()) THEN MKDIR(bbThumbOrdner$())
+        DIM ziel AS STRING : ziel = PATHJOIN(bbThumbOrdner$(), kern.vorschauName$(e.pfad))
+        IMAGE_SAVE(bild, ziel, FALSE)
+        IMAGE_FREE(bild)
+        e.vorschau = ziel
+        RETURN TRUE
+    CATCH fehler
+        RETURN FALSE
+    END TRY
+END FUNCTION
+
+' Je Takt ein fehlendes Vorschaubild -- die Bibliothek ist sofort da, die
+' Bilder folgen
+FUNCTION bbVorschauTakt(daten AS INTEGER) AS BOOLEAN
+    IF bbDialog = 0 THEN
+        bbTakt = 0
+        RETURN FALSE
+    END IF
+    IF LEN(bbWarte) = 0 THEN RETURN TRUE
+    DIM i AS INTEGER : i = bbWarte[0]
+    ARRAY_REMOVE_AT(bbWarte, 0)
+    IF bbVorschauRechnen(i) THEN
+        bbSichern()
+        DIM k AS INTEGER : k = ARRAY_INDEXOF(bbPlaetze, i)
+        IF k >= 0 THEN bbBildSetzen(k)
+    END IF
+    RETURN TRUE
+END FUNCTION
+
+' Alle fehlenden Vorschaubilder auf einmal (fuer die Vorfuehrung)
+SUB bbVorschauAlle()
+    WHILE LEN(bbWarte) > 0
+        DIM ok AS BOOLEAN : ok = bbVorschauTakt(0)
+    WEND
+END SUB
+
+FUNCTION bbKarteDruck(w AS INTEGER, ereignis AS INTEGER, k AS INTEGER) AS BOOLEAN
+    DIM knopf AS INTEGER
+    IF NOT gdk_event_get_button(ereignis, knopf) THEN RETURN FALSE
+    bbWaehlen(bbPlaetze[k])
+    IF knopf = 3 THEN
+        bbMenue(bbPlaetze[k], ereignis)
+    ELSEIF knopf = 1 AND gdk_event_get_event_type(ereignis) = GDK_DOPPELKLICK THEN
+        bbOeffnenGeklickt(0, 0)
+    END IF
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION bbKarte(k AS INTEGER) AS INTEGER
+    DIM e AS kern.Bibliothekseintrag : e = bbBib.eintraege[bbPlaetze[k]]
+    DIM eb AS INTEGER : eb = gtk_event_box_new()
+    DIM v AS INTEGER : v = gtk_box_new(GTK_SENKRECHT, 4)
+    gtkKlasse(v, "bkarte")
+    gtk_widget_set_size_request(v, 140, 160)
+    DIM bild AS INTEGER : bild = gtk_event_box_new()
+    gtkKlasse(bild, "bbild")
+    gtk_widget_set_size_request(bild, 120, 100)
+    gtk_box_pack_start(v, bild, FALSE, FALSE, 0)
+    DIM n AS INTEGER : n = gtk_label_new("")
+    gtk_label_set_markup(n, IIF(e.favorit, "<span foreground='#fbbf24'>★</span> ", "") + sdMaske$(e.name))
+    gtk_label_set_line_wrap(n, TRUE)
+    gtk_label_set_max_width_chars(n, 14)
+    gtk_label_set_justify(n, 2)
+    gtk_box_pack_start(v, n, FALSE, FALSE, 0)
+    gtk_container_add(eb, v)
+    signalEreignis(eb, "button-press-event", bbKarteDruck, k, 0, 0)
+    ARRAY_PUSH(bbBilder, bild)
+    RETURN eb
+END FUNCTION
+
+SUB bbAuswahlZeigen()
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(bbKarten) - 1
+        DIM v AS INTEGER : v = gtk_bin_get_child(bbKarten[k])
+        IF bbPlaetze[k] = bbGewaehlt THEN
+            gtk_style_context_add_class(gtk_widget_get_style_context(v), "gewaehlt")
+        ELSE
+            gtk_style_context_remove_class(gtk_widget_get_style_context(v), "gewaehlt")
+        END IF
+    NEXT
+END SUB
+
+SUB bbFuellen()
+    DIM k AS INTEGER
+    FOR EACH k IN bbKarten
+        gtk_widget_destroy(k)
+    NEXT
+    bbKarten = []
+    bbBilder = []
+    DIM suche AS STRING : suche = gtk_entry_get_text(bbSuche)
+    bbPlaetze = kern.bibliothekFiltern(bbBib, bbKategorie$(), suche)
+    bbPlaetze = kern.bibliothekSortieren(bbBib, bbPlaetze, kern.bibliothekSortierungen()[MAX(0, gtk_combo_box_get_active(bbSort))])
+    FOR k = 0 TO LEN(bbPlaetze) - 1
+        DIM c AS INTEGER : c = bbKarte(k)
+        gtk_grid_attach(bbRaster, c, k MOD 5, k \ 5, 1, 1)
+        ARRAY_PUSH(bbKarten, c)
+        bbBildSetzen(k)
+    NEXT
+    gtk_widget_show_all(bbRaster)
+    IF suche <> "" THEN
+        gtk_label_set_text(bbInfo, trf$("{0} von {1} Muster", [STR$(LEN(bbPlaetze)), STR$(LEN(bbBib.eintraege))]))
+    ELSE
+        gtk_label_set_text(bbInfo, trf$("{0} Muster", [STR$(LEN(bbPlaetze))]))
+    END IF
+    bbAuswahlZeigen()
+END SUB
+
+FUNCTION bbNotizenText$() AS STRING
+    DIM puffer AS INTEGER : puffer = gtk_text_view_get_buffer(bbNotizen)
+    DIM a AS BUFFER : a = BUFFER_NEW(256)
+    DIM e AS BUFFER : e = BUFFER_NEW(256)
+    gtk_text_buffer_get_bounds(puffer, BUFFER_ZEIGER(a), BUFFER_ZEIGER(e))
+    DIM z AS INTEGER : z = gtk_text_buffer_get_text(puffer, BUFFER_ZEIGER(a), BUFFER_ZEIGER(e), FALSE)
+    DIM t AS STRING : t = TEXT_AUS_ZEIGER$(z)
+    g_free(z)
+    RETURN t
+END FUNCTION
+
+' Notizen und Schlagwoerter des gewaehlten Eintrags uebernehmen
+SUB bbFelderUebernehmen()
+    IF bbGewaehlt < 0 OR bbGewaehlt >= LEN(bbBib.eintraege) THEN RETURN
+    DIM e AS kern.Bibliothekseintrag : e = bbBib.eintraege[bbGewaehlt]
+    DIM n AS STRING : n = TRIM$(bbNotizenText$())
+    DIM t AS ARRAY OF STRING : t = kern.tagsLesen(gtk_entry_get_text(bbTags))
+    IF n = e.notizen AND JOIN$(t, ",") = JOIN$(e.tags, ",") THEN RETURN
+    e.notizen = n
+    e.tags = t
+    bbSichern()
+END SUB
+
+SUB bbWaehlen(i AS INTEGER)
+    bbFelderUebernehmen()
+    bbGewaehlt = i
+    bbAuswahlZeigen()
+    DIM da AS BOOLEAN : da = i >= 0 AND i < LEN(bbBib.eintraege)
+    gtk_widget_set_sensitive(bbOeffnen, da)
+    gtk_widget_set_sensitive(bbTags, da)
+    gtk_widget_set_sensitive(bbNotizen, da)
+    bbSperre = TRUE
+    IF da THEN
+        DIM e AS kern.Bibliothekseintrag : e = bbBib.eintraege[i]
+        DIM d AS STRING : d = kern.eintragDetail$(e)
+        gtk_label_set_markup(bbDetail, "<b>" + sdMaske$(e.name) + MID$(d, INSTR(d, "</b>")))
+        gtk_entry_set_text(bbTags, JOIN$(e.tags, ", "))
+        gtk_text_buffer_set_text(gtk_text_view_get_buffer(bbNotizen), e.notizen, -1)
+    ELSE
+        gtk_label_set_text(bbDetail, tr$("Wähle ein Muster aus"))
+        gtk_entry_set_text(bbTags, "")
+        gtk_text_buffer_set_text(gtk_text_view_get_buffer(bbNotizen), "", -1)
+    END IF
+    bbSperre = FALSE
+END SUB
+
+SUB bbKategorieGewaehlt(liste AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
+    IF bbSperre THEN RETURN
+    bbFuellen()
+END SUB
+
+SUB bbSucheGeaendert(w AS INTEGER, daten AS INTEGER)
+    bbFuellen()
+END SUB
+
+SUB bbTagsFertig(w AS INTEGER, daten AS INTEGER)
+    IF bbSperre OR bbDialog = 0 THEN RETURN
+    bbFelderUebernehmen()
+    bbKategorienFuellen()
+END SUB
+
+FUNCTION bbTagsVerlassen(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    bbTagsFertig(w, 0)
+    RETURN FALSE
+END FUNCTION
+
+' Eine Datei aufnehmen; FALSE, wenn sie schon da ist oder nicht lesbar
+FUNCTION bbAufnehmen(pfad AS STRING) AS BOOLEAN
+    IF NOT kern.bibliothekFormat(pfad) THEN RETURN FALSE
+    DIM voll AS STRING : voll = REALPATH$(pfad)
+    IF kern.eintragIndex(bbBib, voll) >= 0 THEN RETURN FALSE
+    TRY
+        DIM m AS kern.Muster : m = kern.musterLesen(voll, slPaletten, slSymbole)
+        ARRAY_PUSH(bbBib.eintraege, kern.eintragAusMuster(voll, m))
+        RETURN TRUE
+    CATCH fehler
+        RETURN FALSE
+    END TRY
+END FUNCTION
+
+FUNCTION bbAufnehmenAlle(pfade AS ARRAY OF STRING) AS INTEGER
+    DIM n AS INTEGER
+    DIM p AS STRING
+    FOR EACH p IN pfade
+        IF bbAufnehmen(p) THEN n = n + 1
+    NEXT
+    bbSichern()
+    bbKategorienFuellen()
+    bbFuellen()
+    RETURN n
+END FUNCTION
+
+SUB bbHinzufuegenGeklickt(w AS INTEGER, daten AS INTEGER)
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new(tr$("Muster hinzufügen"), bbDialog, GTK_DATEI_OEFFNEN, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Hinzufügen"), GTK_ANTWORT_ANNEHMEN, 0)
+    gtk_file_chooser_set_select_multiple(d, TRUE)
+    DIM filter AS INTEGER : filter = gtk_file_filter_new()
+    gtk_file_filter_set_name(filter, tr$("Alle Muster (*.pxs, *.xsd, *.pat, *.oxs)"))
+    DIM m AS STRING
+    FOR EACH m IN ["*.pxs", "*.xsd", "*.pat", "*.oxs"]
+        gtk_file_filter_add_pattern(filter, m)
+    NEXT
+    gtk_file_chooser_add_filter(d, filter)
+    DIM pfade AS ARRAY OF STRING : pfade = []
+    IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
+        DIM l AS INTEGER : l = gtk_file_chooser_get_filenames(d)
+        DIM i AS INTEGER
+        FOR i = 0 TO g_slist_length(l) - 1
+            DIM z AS INTEGER : z = g_slist_nth_data(l, i)
+            ARRAY_PUSH(pfade, TEXT_AUS_ZEIGER$(z))
+            g_free(z)
+        NEXT
+        g_slist_free(l)
+    END IF
+    gtk_widget_destroy(d)
+    IF LEN(pfade) = 0 THEN RETURN
+    DIM n AS INTEGER : n = bbAufnehmenAlle(pfade)
+    gtk_label_set_text(bbInfo, trf$("{0}  ·  {1} neu", [gtk_label_get_text(bbInfo), STR$(n)]))
+END SUB
+
+SUB bbScannenGeklickt(w AS INTEGER, daten AS INTEGER)
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new(tr$("Verzeichnis scannen"), bbDialog, GTK_DATEI_ORDNER, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Scannen"), GTK_ANTWORT_ANNEHMEN, 0)
+    DIM ordner AS STRING
+    IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
+        DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
+        ordner = TEXT_AUS_ZEIGER$(z)
+        g_free(z)
+    END IF
+    gtk_widget_destroy(d)
+    IF ordner = "" THEN RETURN
+    DIM n AS INTEGER : n = bbAufnehmenAlle(kern.musterDateien(ordner))
+    pdWarnung(bbDialog, tr$("Scan abgeschlossen"), trf$("{0} neue Muster zur Bibliothek hinzugefügt.", [STR$(n)]))
+END SUB
+
+SUB bbKategorieNeu(w AS INTEGER, daten AS INTEGER)
+    DIM n AS STRING : n = TRIM$(textFragen(tr$("Neue Kategorie"), tr$("Name der Kategorie:"), ""))
+    IF n = "" OR ARRAY_INDEXOF(bbBib.kategorien, n) >= 0 THEN RETURN
+    ARRAY_PUSH(bbBib.kategorien, n)
+    bbSichern()
+    bbKategorienFuellen()
+END SUB
+
+' Eine Kategorie loeschen -- die ersten beiden (Alle, Favoriten) nicht
+FUNCTION bbKategorieLoeschen(nr AS INTEGER, fragen AS BOOLEAN) AS BOOLEAN
+    IF nr < 2 OR nr >= LEN(bbBib.kategorien) THEN
+        IF fragen THEN pdWarnung(bbDialog, tr$("Nicht möglich"), tr$("Diese Kategorie kann nicht gelöscht werden."))
+        RETURN FALSE
+    END IF
+    DIM k AS STRING : k = bbBib.kategorien[nr]
+    IF fragen THEN
+        IF NOT pdFrage(bbDialog, tr$("Kategorie löschen"), trf$("Kategorie '{0}' wirklich löschen?{1}{2}Die Muster werden nicht gelöscht, nur die Kategorie-Zuordnung.", [k, CHR$(10), CHR$(10)])) THEN RETURN FALSE
+    END IF
+    ARRAY_REMOVE_AT(bbBib.kategorien, nr)
+    DIM e AS kern.Bibliothekseintrag
+    FOR EACH e IN bbBib.eintraege
+        DIM j AS INTEGER : j = ARRAY_INDEXOF(e.kategorien, k)
+        IF j >= 0 THEN ARRAY_REMOVE_AT(e.kategorien, j)
+    NEXT
+    bbSichern()
+    bbKategorienFuellen()
+    bbFuellen()
+    RETURN TRUE
+END FUNCTION
+
+SUB bbKategorieWeg(w AS INTEGER, daten AS INTEGER)
+    DIM z AS INTEGER : z = gtk_list_box_get_selected_row(bbKatListe)
+    DIM ok AS BOOLEAN : ok = bbKategorieLoeschen(IIF(z = 0, -1, gtk_list_box_row_get_index(z)), TRUE)
+END SUB
+
+' --- Kontextmenue einer Karte
+
+SUB bbFavorit(i AS INTEGER)
+    bbBib.eintraege[i].favorit = NOT bbBib.eintraege[i].favorit
+    bbSichern()
+    bbKategorienFuellen()
+    bbFuellen()
+END SUB
+
+SUB bbKategorieKippen(i AS INTEGER, kategorie AS STRING)
+    DIM e AS kern.Bibliothekseintrag : e = bbBib.eintraege[i]
+    DIM j AS INTEGER : j = ARRAY_INDEXOF(e.kategorien, kategorie)
+    IF j >= 0 THEN ARRAY_REMOVE_AT(e.kategorien, j) ELSE ARRAY_PUSH(e.kategorien, kategorie)
+    bbSichern()
+    bbKategorienFuellen()
+    bbFuellen()
+END SUB
+
+SUB bbEntfernen(i AS INTEGER)
+    ARRAY_REMOVE_AT(bbBib.eintraege, i)
+    bbGewaehlt = -1
+    bbSichern()
+    bbKategorienFuellen()
+    bbFuellen()
+    bbWaehlen(-1)
+END SUB
+
+SUB bbMenueGewaehlt(w AS INTEGER, was AS INTEGER)
+    DIM i AS INTEGER : i = bbMenueEintrag
+    IF i < 0 OR i >= LEN(bbBib.eintraege) THEN RETURN
+    DIM e AS kern.Bibliothekseintrag : e = bbBib.eintraege[i]
+    SELECT CASE was
+        CASE 0 : bbOeffnenGeklickt(0, 0)
+        CASE 1 : bbFavorit(i)
+        CASE 2
+            DIM t AS STRING : t = textFragen(tr$("Tags bearbeiten"), trf$("Tags für '{0}' (kommagetrennt):", [e.name]), JOIN$(e.tags, ", "))
+            IF t <> "" OR LEN(e.tags) > 0 THEN
+                e.tags = kern.tagsLesen(t)
+                bbSichern()
+                IF i = bbGewaehlt THEN
+                    bbSperre = TRUE
+                    gtk_entry_set_text(bbTags, JOIN$(e.tags, ", "))
+                    bbSperre = FALSE
+                END IF
+            END IF
+        CASE 3
+            IF FILEEXISTS(e.pfad) THEN OPENDOC(DIRNAME(e.pfad))
+        CASE 4
+            IF pdFrage(bbDialog, tr$("Eintrag entfernen"), trf$("'{0}' aus der Bibliothek entfernen?{1}{2}Die Datei selbst wird nicht gelöscht.", [e.name, CHR$(10), CHR$(10)])) THEN bbEntfernen(i)
+        CASE ELSE
+            ' 100 + n: Kategorie n (ab der dritten) kippen
+            IF was >= 100 AND was - 100 < LEN(bbBib.kategorien) THEN bbKategorieKippen(i, bbBib.kategorien[was - 100])
+    END SELECT
+END SUB
+
+SUB bbMenue(i AS INTEGER, ereignis AS INTEGER)
+    bbMenueEintrag = i
+    DIM e AS kern.Bibliothekseintrag : e = bbBib.eintraege[i]
+    DIM m AS INTEGER : m = gtk_menu_new()
+    DIM texte AS ARRAY OF STRING : texte = [tr$("Öffnen"), IIF(e.favorit, tr$("★ Aus Favoriten entfernen"), tr$("☆ Zu Favoriten hinzufügen"))]
+    DIM eintrag AS INTEGER
+    eintrag = gtk_menu_item_new_with_label(tr$("Öffnen"))
+    signal(eintrag, "activate", bbMenueGewaehlt, 0, 0, 0)
+    gtk_menu_shell_append(m, eintrag)
+    gtk_menu_shell_append(m, gtk_separator_menu_item_new())
+    eintrag = gtk_menu_item_new_with_label(texte[1])
+    signal(eintrag, "activate", bbMenueGewaehlt, 1, 0, 0)
+    gtk_menu_shell_append(m, eintrag)
+    DIM unter AS INTEGER : unter = gtk_menu_new()
+    DIM k AS INTEGER
+    FOR k = 2 TO LEN(bbBib.kategorien) - 1
+        DIM c AS INTEGER : c = gtk_check_menu_item_new_with_label(tr$(bbBib.kategorien[k]))
+        gtk_check_menu_item_set_active(c, ARRAY_INDEXOF(e.kategorien, bbBib.kategorien[k]) >= 0)
+        signal(c, "activate", bbMenueGewaehlt, 100 + k, 0, 0)
+        gtk_menu_shell_append(unter, c)
+    NEXT
+    eintrag = gtk_menu_item_new_with_label(tr$("Kategorie zuweisen"))
+    gtk_menu_item_set_submenu(eintrag, unter)
+    gtk_menu_shell_append(m, eintrag)
+    eintrag = gtk_menu_item_new_with_label(tr$("🏷️ Tags bearbeiten …"))
+    signal(eintrag, "activate", bbMenueGewaehlt, 2, 0, 0)
+    gtk_menu_shell_append(m, eintrag)
+    gtk_menu_shell_append(m, gtk_separator_menu_item_new())
+    eintrag = gtk_menu_item_new_with_label(tr$("Im Ordner anzeigen"))
+    gtk_widget_set_sensitive(eintrag, FILEEXISTS(e.pfad))
+    signal(eintrag, "activate", bbMenueGewaehlt, 3, 0, 0)
+    gtk_menu_shell_append(m, eintrag)
+    gtk_menu_shell_append(m, gtk_separator_menu_item_new())
+    eintrag = gtk_menu_item_new_with_label(tr$("Aus Bibliothek entfernen"))
+    signal(eintrag, "activate", bbMenueGewaehlt, 4, 0, 0)
+    gtk_menu_shell_append(m, eintrag)
+    gtk_widget_show_all(m)
+    gtk_menu_popup_at_pointer(m, ereignis)
+END SUB
+
+' Das gewaehlte Muster oeffnen (nach der Frage nach Ungesichertem)
+SUB bbOeffnenGeklickt(w AS INTEGER, daten AS INTEGER)
+    IF bbGewaehlt < 0 OR bbGewaehlt >= LEN(bbBib.eintraege) THEN RETURN
+    bbFelderUebernehmen()
+    DIM e AS kern.Bibliothekseintrag : e = bbBib.eintraege[bbGewaehlt]
+    IF NOT ungesichertFragen("Öffnen") THEN RETURN
+    IF NOT FILEEXISTS(e.pfad) THEN
+        pdWarnung(bbDialog, tr$("Fehler"), trf$("Datei konnte nicht geöffnet werden:{0}{1}", [CHR$(10), e.pfad]))
+        RETURN
+    END IF
+    e.geoeffnet = kern.isoJetzt$()
+    bbSichern()
+    IF musterOeffnen(e.pfad) THEN
+        statusMeldung(trf$("Aus Bibliothek geöffnet: {0}", [e.name]))
+        gtk_dialog_response(bbDialog, GTK_ANTWORT_OK)
+    END IF
+END SUB
+
+FUNCTION bbBauen() AS INTEGER
+    DIM ordner AS STRING : ordner = kern.bibliothekOrdner$(einst.bibliothekPfad)
+    bbBib = kern.bibliothekLaden(PATHJOIN(ordner, "library.json"))
+    bbGewaehlt = -1
+    bbWarte = []
+    bbKarten = []
+    bbBilder = []
+    bbPlaetze = []
+    bbDialog = gtk_dialog_new_with_buttons(tr$("Muster-Bibliothek"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Schließen"), GTK_ANTWORT_ABBRECHEN, 0)
+    gtk_window_set_default_size(bbDialog, 1000, 700)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(bbDialog)
+    gtk_container_set_border_width(innen, 12)
+    gtk_box_set_spacing(innen, 10)
+    ' oben: hinzufuegen, scannen
+    DIM oben AS INTEGER : oben = gtk_box_new(GTK_WAAGERECHT, 8)
+    DIM kh AS INTEGER : kh = gtk_button_new_with_label(tr$("➕ Hinzufügen …"))
+    gtkKlasse(kh, "suggested-action")
+    DIM ks AS INTEGER : ks = gtk_button_new_with_label(tr$("📁 Verzeichnis scannen …"))
+    gtk_box_pack_end(oben, ks, FALSE, FALSE, 0)
+    gtk_box_pack_end(oben, kh, FALSE, FALSE, 0)
+    gtk_box_pack_start(innen, oben, FALSE, FALSE, 0)
+    DIM mitte AS INTEGER : mitte = gtk_paned_new(GTK_WAAGERECHT)
+    ' links: Kategorien
+    DIM links AS INTEGER : links = gtk_box_new(GTK_SENKRECHT, 6)
+    gtkKlasse(links, "karte")
+    gtk_widget_set_size_request(links, 190, -1)
+    gtk_box_pack_start(links, adUeberschrift(tr$("KATEGORIEN")), FALSE, FALSE, 0)
+    DIM kr AS INTEGER : kr = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_policy(kr, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+    bbKatListe = gtk_list_box_new()
+    gtk_list_box_set_selection_mode(bbKatListe, GTK_AUSWAHL_EINE)
+    gtkKlasse(bbKatListe, "liste")
+    gtk_container_add(kr, bbKatListe)
+    gtk_box_pack_start(links, kr, TRUE, TRUE, 0)
+    DIM kz AS INTEGER : kz = gtk_box_new(GTK_WAAGERECHT, 4)
+    DIM kplus AS INTEGER : kplus = gtk_button_new_with_label("+")
+    gtk_widget_set_tooltip_text(kplus, tr$("Kategorie hinzufügen"))
+    DIM kminus AS INTEGER : kminus = gtk_button_new_with_label("−")
+    gtk_widget_set_tooltip_text(kminus, tr$("Kategorie löschen"))
+    gtk_box_pack_start(kz, kplus, FALSE, FALSE, 0)
+    gtk_box_pack_start(kz, kminus, FALSE, FALSE, 0)
+    gtk_box_pack_start(links, kz, FALSE, FALSE, 0)
+    gtk_paned_pack1(mitte, links, FALSE, FALSE)
+    ' rechts: Suche, Sortierung, Karten
+    DIM rechts AS INTEGER : rechts = gtk_box_new(GTK_SENKRECHT, 6)
+    gtkKlasse(rechts, "karte")
+    DIM sz AS INTEGER : sz = gtk_box_new(GTK_WAAGERECHT, 8)
+    bbSuche = gtk_search_entry_new()
+    gtk_entry_set_placeholder_text(bbSuche, tr$("Suchen …"))
+    gtk_box_pack_start(sz, bbSuche, TRUE, TRUE, 0)
+    bbSort = gtk_combo_box_text_new()
+    DIM t AS STRING
+    FOR EACH t IN kern.bibliothekSortierungen()
+        gtk_combo_box_text_append_text(bbSort, tr$(t))
+    NEXT
+    gtk_combo_box_set_active(bbSort, 0)
+    gtk_box_pack_start(sz, bbSort, FALSE, FALSE, 0)
+    gtk_box_pack_start(rechts, sz, FALSE, FALSE, 0)
+    bbInfo = gtk_label_new(tr$("0 Muster"))
+    gtk_label_set_xalign(bbInfo, 0.0)
+    gtkKlasse(bbInfo, "nebensache")
+    gtk_box_pack_start(rechts, bbInfo, FALSE, FALSE, 0)
+    DIM rolle AS INTEGER : rolle = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_policy(rolle, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+    bbRaster = gtk_grid_new()
+    gtk_grid_set_row_spacing(bbRaster, 12)
+    gtk_grid_set_column_spacing(bbRaster, 12)
+    gtk_container_add(rolle, bbRaster)
+    gtk_box_pack_start(rechts, rolle, TRUE, TRUE, 0)
+    gtk_paned_pack2(mitte, rechts, TRUE, FALSE)
+    gtk_box_pack_start(innen, mitte, TRUE, TRUE, 0)
+    ' unten: Daten, Oeffnen, Schlagwoerter, Notizen
+    DIM unten AS INTEGER : unten = gtk_box_new(GTK_SENKRECHT, 6)
+    gtkKlasse(unten, "karte")
+    DIM uz AS INTEGER : uz = gtk_box_new(GTK_WAAGERECHT, 8)
+    bbDetail = gtk_label_new(tr$("Wähle ein Muster aus"))
+    gtk_label_set_xalign(bbDetail, 0.0)
+    gtk_label_set_ellipsize(bbDetail, 3)
+    gtk_box_pack_start(uz, bbDetail, TRUE, TRUE, 0)
+    bbOeffnen = gtk_button_new_with_label(tr$("Öffnen"))
+    gtkKlasse(bbOeffnen, "suggested-action")
+    gtk_widget_set_sensitive(bbOeffnen, FALSE)
+    gtk_box_pack_start(uz, bbOeffnen, FALSE, FALSE, 0)
+    gtk_box_pack_start(unten, uz, FALSE, FALSE, 0)
+    DIM uf AS INTEGER : uf = gtk_box_new(GTK_WAAGERECHT, 10)
+    gtk_box_set_homogeneous(uf, TRUE)
+    DIM tb AS INTEGER : tb = gtk_box_new(GTK_SENKRECHT, 4)
+    DIM tl AS INTEGER : tl = gtk_label_new(tr$("Tags:"))
+    gtk_label_set_xalign(tl, 0.0)
+    gtkKlasse(tl, "nebensache")
+    gtk_box_pack_start(tb, tl, FALSE, FALSE, 0)
+    bbTags = gtk_entry_new()
+    gtk_entry_set_placeholder_text(bbTags, tr$("Tags (kommagetrennt) …"))
+    gtk_widget_set_sensitive(bbTags, FALSE)
+    gtk_box_pack_start(tb, bbTags, FALSE, FALSE, 0)
+    gtk_box_pack_start(uf, tb, TRUE, TRUE, 0)
+    DIM nb AS INTEGER : nb = gtk_box_new(GTK_SENKRECHT, 4)
+    DIM nl AS INTEGER : nl = gtk_label_new(tr$("Notizen:"))
+    gtk_label_set_xalign(nl, 0.0)
+    gtkKlasse(nl, "nebensache")
+    gtk_box_pack_start(nb, nl, FALSE, FALSE, 0)
+    bbNotizen = gtk_text_view_new()
+    gtk_text_view_set_wrap_mode(bbNotizen, GTK_UMBRUCH_WORT)
+    gtk_widget_set_size_request(bbNotizen, -1, 50)
+    gtk_widget_set_sensitive(bbNotizen, FALSE)
+    gtk_box_pack_start(nb, bbNotizen, TRUE, TRUE, 0)
+    gtk_box_pack_start(uf, nb, TRUE, TRUE, 0)
+    gtk_box_pack_start(unten, uf, FALSE, FALSE, 0)
+    gtk_box_pack_start(innen, unten, FALSE, FALSE, 0)
+    signal(kh, "clicked", bbHinzufuegenGeklickt, 0, 0, 0)
+    signal(ks, "clicked", bbScannenGeklickt, 0, 0, 0)
+    signal(kplus, "clicked", bbKategorieNeu, 0, 0, 0)
+    signal(kminus, "clicked", bbKategorieWeg, 0, 0, 0)
+    signal(bbOeffnen, "clicked", bbOeffnenGeklickt, 0, 0, 0)
+    signal(bbSuche, "search-changed", bbSucheGeaendert, 0, 0, 0)
+    signal(bbSort, "changed", bbSucheGeaendert, 0, 0, 0)
+    signal(bbTags, "activate", bbTagsFertig, 0, 0, 0)
+    signalEreignis(bbTags, "focus-out-event", bbTagsVerlassen, 0, 0, 0)
+    DIM sk AS INTEGER : sk = signalZeile(bbKatListe, "row-selected", bbKategorieGewaehlt, 0, 0, 0)
+    bbKategorienFuellen()
+    bbFuellen()
+    gtk_widget_show_all(bbDialog)
+    IF bbTakt = 0 THEN bbTakt = g_timeout_add(30, bbVorschauTakt, 0)
+    RETURN bbDialog
+END FUNCTION
+
+' Beim Abbauen verliert das Schlagwort-Feld den Fokus -- sein Rueckruf darf
+' dann nichts mehr an der Liste tun, die gerade verschwindet
+SUB bbSchliessen()
+    bbFelderUebernehmen()
+    DIM d AS INTEGER : d = bbDialog
+    bbDialog = 0
+    gtk_widget_destroy(d)
+END SUB
+
+SUB bibliothekDialog()
+    DIM d AS INTEGER : d = bbBauen()
+    DIM a AS INTEGER : a = gtk_dialog_run(bbDialog)
+    bbSchliessen()
+END SUB

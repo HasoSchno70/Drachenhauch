@@ -101,7 +101,11 @@ pub fn zaehlen(taste: i32, aktion: i32) {
 /// Anlegen des Fensters (der GL-Kontext ist dann aktuell).
 pub fn einhaengen() {
     // Ohne raylib (Rust-Tests ohne Grafik) gibt es kein GLFW zum Linken.
-    #[cfg(all(feature = "graphics", not(target_os = "emscripten")))]
+    // Im Browser auch: emscriptens GLFW kennt beide Rueckrufe (raylib haengt
+    // sich dort selbst so ein). Bis 2026.30 war der Browser ausgenommen -- und
+    // ein kurzes Antippen auf dem Handy, Druecken und Loslassen zwischen zwei
+    // Bildern, kam nie an (Web-Runde 2026-10-13).
+    #[cfg(feature = "graphics")]
     unsafe {
         unsafe extern "C" {
             fn glfwGetCurrentContext() -> *mut std::ffi::c_void;

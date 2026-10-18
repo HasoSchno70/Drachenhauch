@@ -41,7 +41,8 @@ Plays a SOUND and returns a channel handle. With it you can pause the sound, sto
 | `AUDIO_PAUSE(ch)` | pause the channel |
 | `AUDIO_RESUME(ch)` | continue |
 | `AUDIO_STOP(ch[, fade_out_ms])` | stop the channel, optionally fade out |
-| `AUDIO_IS_PLAYING(ch)` → BOOLEAN | Is the channel playing right now? |
+| `AUDIO_IS_PLAYING(ch)` → BOOLEAN | Is the sound audible right now? One scheduled with `AUDIO_PLAY_AT` only from its tick on |
+| `AUDIO_IS_WAITING(ch)` → BOOLEAN | scheduled with `AUDIO_PLAY_AT`, but the clock has not reached the tick yet |
 | `AUDIO_VOLUME(ch, vol)` | set the volume 0..1 |
 | `AUDIO_GET_VOLUME(ch)` → FLOAT | current volume |
 | `AUDIO_PAN(ch, left_vol, right_vol)` | stereo pan (both 0..1) |
@@ -480,6 +481,35 @@ PRINT AUDIO_BUS_GET_VOLUME("music")   ' 0.4
 
 The `AUDIO_FFT` tap hangs on the master, so it still captures the whole mix.
 
+## Recording and level
+
+`AUDIO_SOUND_MIX` builds a sound **dry**: reverb, echo, filter and everything
+else on the buses only acts live. If you want what comes out of the speaker
+as a file, record the mixer:
+
+| Function | Effect |
+|---|---|
+| `AUDIO_RECORD_START([max_sekunden])` | record the finished mix, behind all effects and after the master volume; at most `max_sekunden` (default 600, at most 3600). A running recording starts over |
+| `AUDIO_RECORD_STOP()` → SOUND | stop and return it as a sound (stereo, the device's sample rate); without a running recording an error |
+| `AUDIO_RECORDING()` → BOOLEAN | is a recording running? |
+| `AUDIO_PEAK()` → FLOAT | highest swing at the master since the last call, after the master volume; above 1.0 means clipping |
+
+```basic
+AUDIO_RECORD_START()
+' ... let it play until the piece is done ...
+AUDIO_SAVE_WAV(AUDIO_RECORD_STOP(), "aufnahme.wav")
+```
+
+The recording takes as long as the music; it keeps running on the audio
+thread while the program draws.
+
+`AUDIO_PEAK` queried once per frame is a level meter. Several sounds on top of
+each other add up -- six tracks at 0.8 each go slightly above 1.0, and then
+the mixer clips, in the speaker and in the recording. The remedy is a quieter
+bus (`AUDIO_BUS_VOLUME("sfx", 0.4)`), not a quieter master afterwards. A
+master volume driven by `AUDIO_MODULATE("master", "volume", ...)` is unknown
+to recording and level -- they use the value from `AUDIO_BUS_VOLUME`.
+
 ## Real-time effects (filter / reverb / delay)
 
 Every bus (`sfx`, `music`, `master`) has a **real-time effects chain** on the
@@ -561,6 +591,32 @@ AUDIO_PLAY_AT(schlag, takt, 8)               ' sounds on the 8th tick
 
 `AUDIO_PLAY_AT` schedules the start; from then on the audio thread takes care
 of it. There is **no** `UPDATE` you would have to call every frame.
+
+**The same sound may be scheduled several times.** A sequencer schedules the
+hi-hat two or three steps ahead -- every `AUDIO_PLAY_AT` adds another
+instance and leaves the waiting ones alone (up to 2026.28 it stopped the
+previous one, and of two scheduled hits one arrived). `AUDIO_STOP`,
+`AUDIO_PAUSE`, `AUDIO_RESUME`, `AUDIO_VOLUME`, `AUDIO_PITCH` and the pan
+commands act on all instances; `AUDIO_PLAY` plays the sound exactly once
+again.
+
+**A tick that has already passed sounds at once.** If the program stalled for
+a while, a loop that stubbornly schedules every step catches up on all missed
+ones at once -- a bang of stacked notes. The sequencer in the example skips
+them:
+
+```basic
+DIM jetzt AS INTEGER : jetzt = AUDIO_CLOCK_TICKS(uhr) \ FEINE
+IF geplant <= jetzt THEN geplant = jetzt + 1     ' skip what was missed
+WHILE geplant < jetzt + VORAUS
+    AUDIO_PLAY_AT(hihat, uhr, geplant * FEINE)
+    geplant = geplant + 1
+WEND
+```
+
+For a scheduled sound `AUDIO_IS_PLAYING` is only true from its tick on,
+before that `AUDIO_IS_WAITING` is. If you remove the clock it never starts --
+then both are FALSE.
 
 ## Spatial hearing: listener and emitter
 
@@ -743,13 +799,15 @@ END IF
 
 [examples/190_tracker.dh](../../examples/190_tracker.dh) — **the tracker in Drachenhauch**: notes from `AUDIO_NOTE`, playback via `AUDIO_CLOCK`/`AUDIO_PLAY_AT` (scheduled two rows ahead, stopped by removing the clock), WAV export via `AUDIO_SOUND_NEW/MIX/NORMALIZE`.
 
+[examples/sequencer/main.dh](../../examples/sequencer/main.dh) — **step sequencer**: six tracks, sixteen steps, scheduled three steps ahead on an audio clock (swing via finer ticks), reverb/echo/wah on the SFX bus, WAV dry via `AUDIO_SOUND_MIX` or with effects via `AUDIO_RECORD_START`, level from `AUDIO_PEAK`.
+
 [examples/116_sampler.dh](../../examples/116_sampler.dh) — **Amiga-style sampler**: a single pluck sample (`SAMPLE_LOAD`) is played across the whole keyboard via `SAMPLE_PLAY` (resampling = pitch like Paula). Auto melody + bass from the same sample, clickable keys, `L` switches on the Paula lo-fi mode.
 
 ## In the native runtime (dhrt)
 
 The `audio` module runs natively via **Kira** (cpal) — its own audio thread, decoupled from the game loop (replaced raylib audio on 2026-06-13; included with the `graphics` feature, raylib remains for window/input). Audio output is **not** part of the deterministic bit-identical guarantee — like `RND`/`tween`. Notes:
 
-- `SOUND` and `AUDIO_CHANNEL` are integer handles; a “channel” is the most recently started instance of a loaded/built sound.
+- `SOUND` and `AUDIO_CHANNEL` are integer handles; a “channel” is the most recently started instance of a loaded/built sound -- with `AUDIO_PLAY_AT` together with all those still scheduled.
 - Fade in/out, `AUDIO_STOP` with a fade and `AUDIO_PAN_SLIDE` are **native Kira tweens** (run on the audio thread); `loops` via `loop_region` (endless) or restart counting (finite). `AUDIO_FFT` taps the mixer's main track through an effect.
 - Volume is kept internally in decibels (Kira); the built-ins still take linear 0..1.
 - Tone generation (`AUDIO_TONE`/`AUDIO_NOISE`/`AUDIO_SFX`) and the sampler build the waveform as a float buffer directly as Kira `StaticSoundData`.

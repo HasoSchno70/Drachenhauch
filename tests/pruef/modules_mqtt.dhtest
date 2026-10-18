@@ -72,3 +72,128 @@ topic:  sensors/temp
 payload:  21.5
 got message:  TRUE
 connected after disconnect:  FALSE
+
+=== bricht der broker ab, ist das ein zustand und kein fehler
+' Bis 2026.30 warf MQTT_UPDATE (unter Windows 10054), sobald der Broker
+' abbrach -- ein Dashboard ohne TRY endete, wenn der Raspberry Pi neu startete
+' (Werkstatt-Dashboard, 2026-10-12). Jetzt wird MQTT_IS_CONNECTED FALSE, und
+' MQTT_PUBLISH/MQTT_SUBSCRIBE melden FALSE statt zu werfen.
+IMPORT "mqtt"
+DIM brokerProzess AS INTEGER
+FUNCTION brokerStarten(modus AS STRING) AS INTEGER
+    IF FILEEXISTS("port.txt") THEN DELETEFILE("port.txt")
+    brokerProzess = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/port.txt", modus)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS("port.txt") THEN
+            DIM z AS ARRAY OF STRING : z = READLINES("port.txt")
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN VAL(z[0])
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN 0
+END FUNCTION
+DIM h AS MQTT_HANDLE : h = MQTT_CONNECT("127.0.0.1", brokerStarten(""), "dh-weg", 30)
+PRINT "vorher "; MQTT_IS_CONNECTED(h); " "; MQTT_SUBSCRIBE(h, "a/#"); " "; MQTT_PUBLISH(h, "a/b", "x")
+PROCESS_KILL(brokerProzess)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE MQTT_IS_CONNECTED(h) AND MILLIS() - t0 < 5000
+    MQTT_UPDATE(h)
+    IF MQTT_IS_CONNECTED(h) THEN MQTT_PUBLISH(h, "a/b", "x")
+    SLEEP(20)
+WEND
+PRINT "nachher "; MQTT_IS_CONNECTED(h); " schnell "; MILLIS() - t0 < 5000
+PRINT "publish "; MQTT_PUBLISH(h, "a/b", "y"); " subscribe "; MQTT_SUBSCRIBE(h, "c")
+MQTT_UPDATE(h)
+PRINT "update ohne fehler"
+--- argumente
+{sammlung}/_hilfen/mqttbroker.dh
+--- erwartet
+vorher TRUE TRUE TRUE
+nachher FALSE schnell TRUE
+publish FALSE subscribe FALSE
+update ohne fehler
+
+=== ein broker ohne ping-antwort gilt nach der halben keepalive-zeit als weg
+' Verschwindet der Broker ohne Abmeldung (Strom weg), kommt kein RST -- der
+' Client merkte es bis 2026.30 nie. Jetzt wartet er auf die Antwort zu seinem
+' PINGREQ hoechstens die halbe Keepalive-Zeit (mindestens 2 s).
+IMPORT "mqtt"
+DIM brokerProzess AS INTEGER
+FUNCTION brokerStarten(modus AS STRING) AS INTEGER
+    IF FILEEXISTS("port.txt") THEN DELETEFILE("port.txt")
+    brokerProzess = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/port.txt", modus)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS("port.txt") THEN
+            DIM z AS ARRAY OF STRING : z = READLINES("port.txt")
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN VAL(z[0])
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN 0
+END FUNCTION
+DIM h AS MQTT_HANDLE : h = MQTT_CONNECT("127.0.0.1", brokerStarten("stumm"), "dh-stumm", 2)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE MQTT_IS_CONNECTED(h) AND MILLIS() - t0 < 8000
+    MQTT_UPDATE(h)
+    SLEEP(20)
+WEND
+DIM dauer AS INTEGER : dauer = MILLIS() - t0
+PRINT "weg "; NOT MQTT_IS_CONNECTED(h); " nach mehr als 2 s "; dauer > 2000; " vor 6 s "; dauer < 6000
+IF PROCESS_RUNNING(brokerProzess) THEN PROCESS_KILL(brokerProzess)
+--- argumente
+{sammlung}/_hilfen/mqttbroker.dh
+--- erwartet
+weg TRUE nach mehr als 2 s TRUE vor 6 s TRUE
+
+=== der letzte wille steht im connect-paket
+' MQTT_WILL(topic$, inhalt$[, retain]) gilt fuer das naechste MQTT_CONNECT:
+' Will-Flag 0x04 und Retain 0x20 im Flag-Byte, Topic und Inhalt hinter der
+' Kennung. Gelesen am Draht -- der Test-Broker schreibt das CONNECT als Hex.
+' Ohne den Willen blieb ein "online" mit retain fuer immer stehen.
+IMPORT "mqtt"
+DIM brokerProzess AS INTEGER
+FUNCTION brokerStarten(modus AS STRING) AS INTEGER
+    IF FILEEXISTS("port.txt") THEN DELETEFILE("port.txt")
+    brokerProzess = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/port.txt", modus)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS("port.txt") THEN
+            DIM z AS ARRAY OF STRING : z = READLINES("port.txt")
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN VAL(z[0])
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN 0
+END FUNCTION
+MQTT_WILL("w/status", "offline", TRUE)
+DIM h AS MQTT_HANDLE : h = MQTT_CONNECT("127.0.0.1", brokerStarten(""), "id", 30)
+MQTT_DISCONNECT(h)
+DIM hex AS STRING : hex = READLINES("port.txt.connect")[0]
+' Flag-Byte: Kopf (2), "MQTT" mit Laenge (6), Level (1)
+PRINT "flags "; MID$(hex, 18, 2)
+PRINT "wille "; INSTR(UPPER$(hex), "0008772F7374617475730007") > 0
+' Der Wille gilt nur EINMAL: das naechste CONNECT ist ohne
+h = MQTT_CONNECT("127.0.0.1", brokerStarten(""), "id", 30)
+MQTT_DISCONNECT(h)
+hex = READLINES("port.txt.connect")[0]
+PRINT "danach "; MID$(hex, 18, 2)
+TRY
+    MQTT_WILL("w/#", "x")
+CATCH e
+    PRINT e
+END TRY
+--- argumente
+{sammlung}/_hilfen/mqttbroker.dh
+--- erwartet
+flags 26
+wille TRUE
+danach 02
+MQTT_WILL: das Topic darf nicht leer sein und keine Platzhalter (# +) enthalten

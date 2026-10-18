@@ -56,7 +56,7 @@ module.exports = (H) => [
   H.warn("Beim Entpacken wird geprüft, wohin geschrieben wird. Ein Archiv darf Einträge wie ../../autoexec.bat oder C:/Windows/x.dll enthalten; wer den Namen aus dem Archiv einfach an den Zielordner hängt, schreibt damit außerhalb davon – der Angreifer wählt die Datei, du entpackst sie. Solche Einträge werden übersprungen. Deshalb liefert ZIP_EXTRACT die Zahl der entstandenen Dateien zurück: Ein Unterschied zur Länge von ZIP_LIST fällt so auf.",
     "Ein Archiv ist fremder Text"),
   H.cmd("ZIP_CREATE · ZIP_WRITE", "ZIP_CREATE(archiv$, dateien)   ZIP_WRITE(archiv$, namen, inhalte)",
-    "Zwei Wege, ein Archiv zu bauen: ZIP_CREATE aus einer Liste vorhandener Dateipfade, ZIP_WRITE aus Namen und Texten ohne Umweg über die Platte. Beide liefern die Zahl der geschriebenen Einträge.",
+    "Zwei Wege, ein Archiv zu bauen: ZIP_CREATE aus einer Liste vorhandener Dateipfade, ZIP_WRITE aus Namen und Inhalten ohne Umweg über die Platte – Texte (ARRAY OF STRING) oder Bytes (ARRAY OF BUFFER, etwa ein PNG). Beide liefern die Zahl der geschriebenen Einträge.",
     [
       "DIM namen AS ARRAY OF STRING",
       "DIM inhalte AS ARRAY OF STRING",

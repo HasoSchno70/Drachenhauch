@@ -45,6 +45,27 @@ lauf 0
 4
 9
 
+=== ein ziel mit .exe ist der dateiname
+' Bis 2026.28 entstand ein ORDNER `werkzeug.exe` mit `prog.exe` darin
+' (Konsolen-Runde). Auch unter macOS/Linux heisst die Datei dann so.
+IMPORT "helfer.dh"
+dlStarten(["--export", CWD$() + "/prog.dh", CWD$() + "/aus/werkzeug.exe"])
+PRINT "export "; dlCode
+PRINT "datei "; FILEEXISTS(CWD$() + "/aus/werkzeug.exe"); " ordner "; DIREXISTS(CWD$() + "/aus/werkzeug.exe")
+programmLauf(CWD$() + "/aus/werkzeug.exe")
+PRINT "lauf "; lpCode
+PRINT lpAus;
+--- datei prog.dh
+PRINT "hallo"
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/exportlauf.dh"
+--- erwartet
+export 0
+datei TRUE ordner FALSE
+lauf 0
+hallo
+
 === ohne zielordner landet das bundle in name_dist
 IMPORT "helfer.dh"
 dlStarten(["--export", "spiel.dh"])

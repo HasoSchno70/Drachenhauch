@@ -369,17 +369,21 @@ zweite Zeichenfläche samt Speicher, wo ein Rechteck genügt.
 | `TEXT_BOLD(an)` / `TEXT_ITALIC(an)` | nur Fett bzw. Kursiv an- oder ausschalten, der Rest des Stils bleibt |
 | `FONT_STYLE(font, stil$)` → FONT | der echte fette/kursive Schnitt einer geladenen Schrift (sucht die Datei daneben, z. B. `segoeuib.ttf` zu `segoeui.ttf`); gibt es keinen, kommt `font` selbst zurück |
 | `FONT_HAS_STYLE(font, stil$)` | TRUE, wenn es diesen Schnitt als Datei gibt -- sonst bildet die Laufzeit ihn nach |
-| `LOADFONT(pfad$, groesse[, zeichen$])` → FONT | TTF/OTF/TTC laden → FONT-Handle (INTEGER); `zeichen$` = Schriftblöcke (`"kyrillisch, griechisch"`, `"japanisch"`, `"emoji"` …) oder die Zeichen selbst, die gebacken werden sollen |
+| `LOADFONT(pfad$, groesse[, zeichen$])` → FONT | TTF/OTF/TTC laden → FONT-Handle (INTEGER); `zeichen$` = Schriftblöcke (`"kyrillisch, griechisch"`, `"japanisch"`, `"emoji"` …) oder die Zeichen selbst, die gebacken werden sollen. Statt eines Pfads geht auch eine **eingebaute Schrift**: `"sans"`, `"serif"`, `"mono"` (DejaVu, je mit `-fett`, `-kursiv`, `-fett-kursiv`) |
 | `LOADFONT_SDF(pfad$, groesse[, zeichen$])` → FONT | eine Schrift, die bei **jeder** Größe scharf bleibt: gebacken als Abstandsfeld, gezeichnet mit einem Shader, der die Kante einen Punkt weich hält. Eine gewöhnliche Schrift verschwimmt, sobald sie größer gezeichnet wird, als sie gebacken wurde (Titel, Kamera-Zoom). Ohne `zeichen$` ASCII und Latin-1 samt €; das Backen kostet je Zeichen mehr als bei `LOADFONT` (rund 130 ms für diese Auswahl) |
 | `FONT_HAS_GLYPH(font, zeichen$)` → BOOLEAN | hat die Schrift selbst ein Zeichen dafür? Wenn nicht, zeichnet `TEXT` es mit der Ausweich-Schrift; `-1` = eingebaute Schrift |
 | `FONT_GLYPH_WIDTH(font, zeichen$, groesse)` → FLOAT | wie weit `TEXT` nach diesem Zeichen weiterrückt, bei `groesse` Punkten — gemessen wie `TEXT_WIDTH`, ohne die aktive Schrift umzustellen |
 | `FONT_TO_IMAGE(font[, erstes[, letztes]])` → IMAGE | die Zeichen `erstes`..`letztes` (Vorgabe 32..126, höchstens 256) als Bild im Format von `LOADFONT_IMAGE`: jedes Zeichen weiß in einem durchsichtigen Feld, Magenta (`&HFF00FF`) außen und dazwischen. So wird aus einer Vektorschrift eine Pixelschrift, die man nachbearbeiten und mit `LOADFONT_IMAGE(bild, &HFF00FF, erstes)` wieder laden kann |
-| `SETFONT(font)` | aktive Schrift setzen; `SETFONT(-1)` = Default-Font |
+| `SETFONT(font[, groesse])` | aktive Schrift setzen; `SETFONT(-1)` = Default-Font. Ohne `groesse` gilt danach die Größe, mit der die Schrift geladen wurde; mit `groesse` wird ab jetzt so groß gezeichnet (wie `SETFONT` + `TEXT_SIZE`) -- scharf laden, klein zeichnen: `SETFONT(LOADFONT("sans", 32), 16)` |
 | `TEXT_SPACING(px)` | Buchstabenabstand für TTF (nativ) |
 | `TEXT_LINE_SPACING(px)` | Zeilenabstand für mehrzeiligen Text |
 
 `LOADFONT` lädt eine eigene TrueType-/OpenType-Schrift; `TEXT_SIZE` skaliert sie
-anschließend frei. `TEXT_WIDTH` misst in der **aktiven** Schrift — damit lässt
+anschließend frei. **Eine normale Schrift ohne Pfad:** `LOADFONT("sans", 32)`
+nimmt DejaVu Sans aus der Laufzeit — dieselbe wie im PDF, auf jedem System,
+mit allen vier Schnitten für `TEXT_STYLE`/`FONT_STYLE`. Vorher brauchte das
+einen Pfad wie `C:/Windows/Fonts/segoeui.ttf`, den es unter macOS und Linux
+nicht gibt. Eine Datei, die genauso heißt, gewinnt. `TEXT_WIDTH` misst in der **aktiven** Schrift — damit lässt
 sich zentrieren/rechtsbündig setzen. Echte Glyphen rendert die native Runtime
 (raylib `LoadFontEx`/`DrawTextEx`).
 
@@ -433,14 +437,17 @@ Dinge:
   Interpunktion (`… – „ “`) und `€`. Enthält die Schriftdatei ein Zeichen
   nicht, zeichnet raylib dort ein `?`; eine Pixel-Schrift für ein Retro-Spiel
   hat oft keine Umlaute.
-- **Ohne eigene Schrift springt eine Ausweich-Schrift ein.** Die eingebaute
-  raylib-Schrift kennt ASCII und Latin-1 (Zeichen 32 bis 255, also auch
-  `äöüÄÖÜß`). Kommt ein Zeichen darüber hinaus vor (etwa `€` oder Kanji),
-  zeichnet die Runtime diesen Text mit einer Systemschrift (Windows: Segoe
-  UI, macOS: SF/Helvetica, Linux: DejaVu/Liberation). Deutscher Text mit
-  Umlauten bleibt in der eingebauten Schrift -- bis 2026-10-01 wich jeder
-  Text mit einem Zeichen über ASCII aus, und in einer Oberfläche stand
-  „Löschen“ in einer anderen Schrift als „Buchen“ daneben.
+- **Ohne eigene Schrift springt für fehlende Zeichen eine Ausweich-Schrift
+  ein.** Die eingebaute raylib-Schrift kennt ASCII und Latin-1 (Zeichen 32
+  bis 255, also auch `äöüÄÖÜß`). Typografische Satzzeichen zeichnet sie als
+  ihre einfachen Gegenstücke: `„“”` als `"`, `‚‘’` als `'`, `– —` als `-`,
+  `…` als `...` (nur die Anzeige -- der Text bleibt, wie er ist). Was dann
+  noch fehlt (etwa `€` oder Kanji), kommt **Zeichen für Zeichen** aus einer
+  Systemschrift (Windows: Segoe UI, macOS: SF/Helvetica, Linux:
+  DejaVu/Liberation); der Rest der Zeile bleibt in der eingebauten Schrift.
+  Bis 2026.27 wechselte bei einem solchen Zeichen die ganze Zeile die Schrift,
+  bis 2026-10-01 sogar bei jedem Umlaut. Gedrehter Text (`TEXTROT`) wechselt
+  weiterhin als Ganzes, wenn nach dem Ersetzen ein Zeichen fehlt.
 - **Glyphen auf Zuruf.** Steht ein Zeichen in keiner geladenen Schrift
   (Kanji, Hangul, Emoji, Arabisch, Hebräisch, Thai), merkt sich die Runtime
   es beim Zeichnen oder Messen und backt es beim nächsten `FLIP` aus der
@@ -501,7 +508,7 @@ wie getippt über die Tipp-Warteschlange, die 256 Zeichen je Bild fasst
 | Funktion | Zweck |
 |---|---|
 | `LOADIMAGE(path$)` → IMAGE | Datei laden (PNG, JPG, BMP, …) |
-| `IMAGEWIDTH(img)`, `IMAGEHEIGHT(img)` → INTEGER | Pixelgröße |
+| `IMAGEWIDTH(img)`, `IMAGEHEIGHT(img)` → INTEGER | Pixelgröße; gleichwertig `IMAGE_WIDTH`/`IMAGE_HEIGHT` im Namensschema der übrigen `IMAGE_*`-Befehle |
 | `GETPIXEL(img, x, y)` → INTEGER | Pixelfarbe (`&HRRGGBB`) an `(x, y)` lesen; `-1` bei Index außerhalb. Gegenstück zu `PLOT` (schreiben) — für Kollision per Pixel, Maskierung, Farb-Sampling |
 | `GETALPHA(img, x, y)` → INTEGER | Deckkraft an `(x, y)`, `0..255`; `-1` bei Index außerhalb. Nötig, weil `GETPIXEL` eine **Farbe** liefert und dort Deckkraft 0 *deckend* bedeutet — ein durchsichtiger Punkt käme als schwarzer zurück |
 | `DRAWIMAGE(img, x, y)` | Bild bei (x, y) zeichnen |
@@ -787,7 +794,7 @@ lässt.
 | `GENTEX_COLOR(breite, hoehe, farbe)` | einfarbige Fläche |
 | `GENTEX_GRADIENT(breite, hoehe, farbe1, farbe2 [, vertikal])` | linearer Verlauf |
 | `GENTEX_GRADIENT_BOX(breite, hoehe, dichte, farbe1, farbe2)` | rechteckiger Verlauf von innen nach außen — Vignetten |
-| `GENTEX_RADIAL(breite, hoehe, innen, aussen [, dichte])` | runder Verlauf von der Mitte nach außen — weiche Lichter und Glows, additiv gezeichnet |
+| `GENTEX_RADIAL(breite, hoehe, innen, aussen [, dichte])` | runder Verlauf von der Mitte nach außen — weiche Lichter und Glows, additiv gezeichnet. `dichte` (0..1, Vorgabe 0) ist der Anteil des Radius in voller Innenfarbe: 0 = weich ab der Mitte, 1 = Scheibe; mehr ist ein Fehler |
 | `GENTEX_CHECKED(breite, hoehe, feld_x, feld_y, farbe1, farbe2)` | Schachbrett |
 | `GENTEX_PERLIN(breite, hoehe, skala)` | Perlin-Rauschen — Wolken, Gelände, Marmor |
 | `GENTEX_CELLULAR(breite, hoehe, kachel)` | Zellrauschen (Voronoi) — Steinboden, Risse, Schuppen |
@@ -805,6 +812,7 @@ wie auf das Fenster — für Spiegel, Minikarten, Bild-im-Bild oder Nachzieheffe
 | `RENDERTARGET_END()` | zurück auf das Fenster |
 | `RENDERTARGET_DRAW(ziel, x, y [, skala [, tint [, gespiegelt]]])` | das Ziel wie ein Bild aufs Fenster stempeln |
 | `RENDERTARGET_CLEAR(ziel [, farbe])` | von Hand leeren — nötig, wenn `behalten` an ist |
+| `RENDERTARGET_IMAGE(ziel)` → IMAGE | der Inhalt als Bild — was seit `RENDERTARGET_BEGIN` gezeichnet wurde, wird dafür **sofort** abgespielt, nicht erst beim `FLIP`. So kommt ein Diagramm in ein PDF (`PDF_IMAGE`) oder eine Datei (`IMAGE_SAVE`) |
 
 Ohne `behalten` wird das Ziel zu Beginn jedes Bildes durchsichtig geleert. Ein
 Schweif entsteht dagegen so: `behalten = TRUE`, und pro Bild ein
@@ -839,6 +847,7 @@ Sampler bliebe schwarz.
 | `KEYPRESSED(code)` → BOOLEAN | TRUE **solange** die Taste mit SDL-Code `code` gehalten wird — jedes Frame erneut. Für Bewegen/Lenken. |
 | `KEYHIT(code)` → BOOLEAN | TRUE nur in **dem einen Frame**, in dem die Taste heruntergeht. Für Schießen, Springen, Umschalten. |
 | | *Buchstaben:* `KEY_A`…`KEY_Z` sind die klare Schreibweise. `ASC("s")` und `ASC("S")` meinen beide dieselbe Taste — bis 2026-08-31 traf die **große** Schreibweise still gar nichts, was wie ein vergessener Aufruf aussah. |
+| | *Lage oder Beschriftung:* ein Tastencode meint die **Lage** der Taste nach der US-Tastatur — `KEY_Z` ist auf einer deutschen Tastatur die Taste mit dem Y, auf einer französischen die mit dem W. Für WASD ist das richtig. Für Kürzel wie Strg+Z schreibt man den **Buchstaben als Text**: `KEYHIT("z")` meint die Taste, auf der das Z steht (auch für `KEYPRESSED`, `KEYRELEASED`, `KEYREPEAT`; Buchstaben, Ziffern und das Leerzeichen). |
 | `KEYRELEASED(code)` → BOOLEAN | TRUE in dem Frame, in dem die Taste losgelassen wird — etwa „aufladen und beim Loslassen feuern“ |
 | `KEYREPEAT(code)` → BOOLEAN | wie `KEYHIT`, feuert beim Halten aber zusätzlich mit der System-Tastenwiederholung. Für Textcursor und Mengen-Eingabe. |
 | `MOUSEX()`, `MOUSEY()` → INTEGER | aktuelle Mausposition (in logischen Pixeln) |

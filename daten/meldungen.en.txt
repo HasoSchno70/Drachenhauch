@@ -41,6 +41,8 @@ Ungleich schreibt man in Drachenhauch <> -- IF a <> b THEN	Not-equal is written 
 Verglichen wird mit EINEM =: IF a = b THEN (== gibt es nicht)	Comparison uses ONE =: IF a = b THEN (there is no ==)
 Kommentare beginnen in Drachenhauch mit ' (Hochkomma) oder REM, nicht mit //	Comments in Drachenhauch start with ' (apostrophe) or REM, not with //
 Ganzzahl-Literal zu gross (INTEGER ist 64-bit)	Integer literal too large (INTEGER is 64-bit)
+Kommazahl-Literal zu gross (FLOAT reicht bis etwa 1.8e308)	Float literal too large (FLOAT goes up to about 1.8e308)
+{}: ein Text meint den Buchstaben oder die Ziffer auf der Taste -- "{}" ist keins (Sondertasten als Konstante: KEY_ENTER, KEY_LEFT, ...)	{}: a text means the letter or digit printed on the key -- "{}" is neither (special keys as a constant: KEY_ENTER, KEY_LEFT, ...)
 Hex-Literal &H ohne Ziffern	Hex literal &H without digits
 Binaer-Literal &B ohne Ziffern	Binary literal &B without digits
 Einzelnes '}' im f-String (verwende '}}}}')	Single '}' in an f-string (use '}}}}')
@@ -83,6 +85,7 @@ EXIT {} steht in keiner {}-Schleife	EXIT {} is not inside a {} loop
 SWAP a, b: erwartet ',' zwischen den beiden Variablen	SWAP a, b: expected ',' between the two variables
 IMPORT braucht Anfuehrungszeichen: IMPORT "{}" (eigene Datei mit Endung: IMPORT "{}.dh")	IMPORT needs quotes: IMPORT "{}" (your own file with its extension: IMPORT "{}.dh")
 '=' als Anweisung -- meintest du eine Zuweisung?	'=' as a statement -- did you mean an assignment?
++=, -=, ++ ... auf dem Ergebnis eines Aufrufs liefe den Aufruf zweimal -- erst einer Variable zuweisen und dort aendern: r = f(...) : r[0] += 1	+=, -=, ++ ... on the result of a call would run the call twice -- assign it to a variable first and change it there: r = f(...) : r[0] += 1
 Tupel-Destructuring erwartet mindestens 2 Ziele	Tuple destructuring needs at least 2 targets
 Erwartet '=' nach Tupel-Zielen	Expected '=' after the tuple targets
 Erwartet Variablenname als Tupel-Ziel	Expected a variable name as tuple target
@@ -126,6 +129,8 @@ Nach Prompt-String erwartet ',' (oder ';') und Variable	After the prompt string 
 Erwartet Variable nach INPUT	Expected a variable after INPUT
 Erwartet THEN nach Bedingung	Expected THEN after the condition
 ELSEIF geht nur im mehrzeiligen IF -- IF ... THEN, dann jeder Zweig auf eigenen Zeilen, am Ende END IF	ELSEIF only works in a multi-line IF -- IF ... THEN, then each branch on its own lines, END IF at the end
+{} geht nicht hinter THEN/ELSE -- die Variable vor dem IF anlegen und im IF nur zuweisen (oder das IF mehrzeilig schreiben, mit END IF)	{} does not work after THEN/ELSE -- declare the variable before the IF and only assign it inside (or write the IF over several lines, with END IF)
+{} geht nicht im einzeiligen IF -- IF ... THEN, dann {} auf eigener Zeile, am Ende END IF	{} does not work in a single-line IF -- IF ... THEN, then {} on its own line, END IF at the end
 END IF erwartet, Programmende erreicht	Expected END IF, reached the end of the program
 ELSE IF: in Drachenhauch in EINEM Wort -- ELSEIF bedingung THEN	ELSE IF: in Drachenhauch it is ONE word -- ELSEIF condition THEN
 Erwartet END IF	Expected END IF
@@ -218,8 +223,9 @@ Der Ausdruck endet mitten drin -- geht er in der naechsten Zeile weiter, die Zei
 IMPORT: Datei nicht gefunden: {} (gesucht: {})	IMPORT: file not found: {} (searched: {})
 IMPORT: Lesefehler bei {}: {}	IMPORT: error reading {}: {}
 Hardware-Modul '{}' ist in diesem dhrt-Build nicht enthalten -- Funktionsaufrufe schlagen zur Laufzeit fehl. Neu bauen mit: python rust\build_runtime.py --hardware	Hardware module '{}' is not included in this dhrt build -- calls will fail at run time. Rebuild with: python rust\build_runtime.py --hardware
-{} kennt keine Klasse {}.	{} has no class {}.
-{} kennt keinen Namen {}.	{} has no name {}.
+{} kennt keine Klasse {}.{}	{} has no class {}.{}
+{} kennt keinen Namen {}.{}	{} has no name {}.{}
+{} steht in {}, und diese Datei gehoert nicht zum Namensraum {} -- was eine Datei des Namensraums ohne AS einbindet, bleibt draussen. Dort IMPORT "{}" AS {} schreiben.	{} is in {}, and that file does not belong to the namespace {} -- what a file of the namespace imports without AS stays outside. Write IMPORT "{}" AS {} there.
 {} kommt aus dem Hauptprogramm. Eine mit AS importierte Datei [[]]sieht dessen Globals nicht -- reiche den Wert als Parameter [[]]herein oder deklariere ihn in der Datei selbst.	{} comes from the main program. A file imported with AS does not see its globals -- pass the value in as a parameter or declare it in the file itself.
 {}.{} ist eine Klasse. Zum Erzeugen `NEW {}.{}(...)`, als Typ `DIM x AS {}.{}`.	{}.{} is a class. To create one `NEW {}.{}(...)`, as a type `DIM x AS {}.{}`.
 {}.{} ist PRIVATE und nur innerhalb der eigenen Datei verwendbar.	{}.{} is PRIVATE and can only be used inside its own file.
@@ -315,6 +321,7 @@ Default-Parameter muessen Literale sein (VM-Pfad)	Default parameters must be lit
 DATA: '-' nur auf Zahlen	DATA: '-' only on numbers
 DATA: ungueltiges Literal	DATA: invalid literal
 IS: unbekannter Typ '{}' (keine Klasse, kein Werttyp)	IS: unknown type '{}' (not a class, not a value type)
+IS: '{}' ist eine Variable, kein Typ -- IS prueft den Typ (x IS Klasse); ob zwei Variablen dasselbe Objekt meinen, sagt =	IS: '{}' is a variable, not a type -- IS checks the type (x IS Class); whether two variables refer to the same object is answered by =
 IS: unbekannter Typ '{}' -- fehlt ein IMPORT? (z.B. {})	IS: unknown type '{}' -- is an IMPORT missing? (e.g. {})
 Unbekannter Typ '{}' (keine Klasse, kein Werttyp, kein importiertes Modul)	Unknown type '{}' (not a class, not a value type, not an imported module)
 Unbekannter Typ '{}' -- fehlt IMPORT "{}"?	Unknown type '{}' -- is IMPORT "{}" missing?
@@ -371,8 +378,8 @@ die eigene Instanz heisst in Drachenhauch Self (Self.x = 3)	the own instance is 
 ein Dateiname ist noch kein [[Bild]]: erst `x = {}("{}")`, dann `{}(x, ...)`	a file name is not an image yet: first `x = {}("{}")`, then `{}(x, ...)`
 ein Dateiname ist noch kein [[Klang]]: erst `x = {}("{}")`, dann `{}(x, ...)`	a file name is not a sound yet: first `x = {}("{}")`, then `{}(x, ...)`
 ein Dateiname ist noch kein [[Schrift]]: erst `x = {}("{}")`, dann `{}(x, ...)`	a file name is not a font yet: first `x = {}("{}")`, then `{}(x, ...)`
-eine Taste ist eine ZAHL: {}(ASC("{}")) oder die Konstante KEY_{}	a key is a NUMBER: {}(ASC("{}")) or the constant KEY_{}
 eine Farbe aus Hex-Text kommt aus COLOR_FROM_HEX("{}"); im Quelltext geht auch &H{}	a color from hex text comes from COLOR_FROM_HEX("{}"); in the source &H{} works too
+ein ganzes Thema setzt GUI_THEME_PRESET("{}"); GUI_THEME nimmt nur die Akzentfarbe	a whole theme is set by GUI_THEME_PRESET("{}"); GUI_THEME only takes the accent colour
 
 # ---------------------------------------------------------------- Laufzeit: Typen und Werte
 {}: Erwartet {}, erhalten {}	{}: expected {}, got {}
@@ -737,6 +744,7 @@ Ungueltige Regex '{}': {}	Invalid regex '{}': {}
 {}: fps muss >= 0 sein	{}: fps must be >= 0
 {}: idx muss >= 0 sein	{}: idx must be >= 0
 {}: dt_ms muss >= 0 sein	{}: dt_ms must be >= 0
+{}: {} ms ist weniger als eine Millisekunde -- dt_ms zaehlt Millisekunden, DELTA() liefert Sekunden: INT(DELTA() * 1000)	{}: {} ms is less than a millisecond -- dt_ms counts milliseconds, DELTA() returns seconds: INT(DELTA() * 1000)
 {}: dauer_ms muss >= 0 sein	{}: dauer_ms must be >= 0
 {}: count muss >= 0 sein	{}: count must be >= 0
 {}: Radius muss >= 0 sein	{}: the radius must be >= 0
@@ -922,14 +930,18 @@ GUI_FORM_LOAD/SAVE: dieser Bau hat kein db-Modul	GUI_FORM_LOAD/SAVE: this build 
 404 -- nicht gefunden	404 -- not found
 {}: im Formular '{}' ist kein Widget gebunden (GUI_BIND)	{}: no widget is bound in the form '{}' (GUI_BIND)
 {}: '{}' ist kein Tabellenname (Buchstaben, Ziffern, _)	{}: '{}' is not a table name (letters, digits, _)
+GUI_FORM_VERSION: '{}' ist kein Spaltenname (Buchstaben, Ziffern, _)	GUI_FORM_VERSION: '{}' is not a column name (letters, digits, _)
+GUI_FORM_VERSION: '{}' ist an ein Widget gebunden -- die Versionsspalte fuehrt die Laufzeit selbst	GUI_FORM_VERSION: '{}' is bound to a widget -- the runtime keeps the version column itself
+{}: dieses Formular hat die Versionsspalte '{}', wurde aber nicht mit GUI_FORM_LOAD geladen -- es weiss nicht, welchen Stand es bearbeitet (oder ueberschreiben = TRUE)	{}: this form has the version column '{}' but was not loaded with GUI_FORM_LOAD -- it does not know which state it is editing (or ueberschreiben = TRUE)
+{}: die Versionsspalte '{}' ist leer oder keine ganze Zahl	{}: the version column '{}' is empty or not a whole number
 {}: '{}' ist kein Feld -- moeglich sind {}	{}: '{}' is not a field -- possible are {}
 {}: '{}' braucht von und bis	{}: '{}' needs from and to
 {}: '{}' ist kein Stil -- moeglich sind "ok" (Vorgabe) und "janein"	{}: '{}' is not a style -- possible are "ok" (default) and "janein"
 {}: '{}' ist kein Stil -- moeglich sind "ok" (Vorgabe), "janein" oder eigene Knoepfe mit | getrennt ("Speichern|Verwerfen|Abbrechen")	{}: '{}' is not a style -- possible are "ok" (default), "janein" or your own buttons separated by | ("Save|Discard|Cancel")
-{}: '{}' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden oder nur Datum)	{}: '{}' is not a point in time -- expected 'YYYY-MM-DD hh:mm:ss' (also with T, without seconds or just the date)
+{}: '{}' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden, nur Datum oder mit Zeitzone) oder 'Sat, 28 Aug 2026 20:30:00 +0200'	{}: '{}' is not a point in time -- expected 'YYYY-MM-DD hh:mm:ss' (also with T, without seconds, just the date or with a time zone) or 'Sat, 28 Aug 2026 20:30:00 +0200'
 {}: '{}' kenne ich nicht -- "hoch" oder "quer"	{}: '{}' is unknown -- "hoch" (portrait) or "quer" (landscape)
 {}: 2. Argument ist "hoch" oder "quer"	{}: the 2nd argument is "hoch" (portrait) or "quer" (landscape)
-{}: Seitengroesse '{}' kenne ich nicht -- a3, a4, a5, a6, letter, legal	{}: unknown page size '{}' -- a3, a4, a5, a6, letter, legal
+{}: Seitengroesse '{}' kenne ich nicht -- a0 bis a6, letter, legal	{}: unknown page size '{}' -- a0 to a6, letter, legal
 {}: Seite {} gibt es nicht (1..{})	{}: page {} does not exist (1..{})
 {}: 0 bis 4 Nachkommastellen (mehr haelt ein Betrag nicht)	{}: 0 to 4 decimal places (an amount holds no more)
 {}: Betrag zu gross	{}: amount too large
@@ -1064,8 +1076,6 @@ HTTPD_SEND: es liegt keine Anfrage an (erst HTTPD_ACCEPT)	HTTPD_SEND: there is n
 {}: Antwort ist kein gueltiges JSON: {}	{}: the response is not valid JSON: {}
 MQTT_CONNECT: Port {} ausserhalb 0..65535	MQTT_CONNECT: port {} outside 0..65535
 MQTT_CONNECT: Adresse {} nicht aufloesbar	MQTT_CONNECT: address {} cannot be resolved
-MQTT_PUBLISH: nicht verbunden	MQTT_PUBLISH: not connected
-MQTT_SUBSCRIBE: nicht verbunden	MQTT_SUBSCRIBE: not connected
 unbekannte Sicherheit {} -- erlaubt sind "starttls", "tls", "keine"	unknown security {} -- allowed are "starttls", "tls", "keine"
 {} enthaelt einen Zeilenumbruch -- das waere eine zusaetzliche Kopfzeile und ist deshalb nicht erlaubt	{} contains a line break -- that would be an extra header line and is therefore not allowed
 {} {} sieht nicht wie eine Adresse aus (erwartet wird name@beispiel.de)	{} {} does not look like an address (expected is name@example.com)
@@ -1285,6 +1295,8 @@ LOADFONT: Font nicht ladbar: {}	LOADFONT: font cannot be loaded: {}
 LOADFONT: Font '{}' nicht ladbar (keine TrueType-/OpenType-Schrift, die raylib lesen kann)	LOADFONT: font '{}' cannot be loaded (not a TrueType/OpenType font raylib can read)
 DHRT_FONT nicht ladbar: {}	DHRT_FONT cannot be loaded: {}
 SETFONT: ungueltiges FONT-Handle {}	SETFONT: invalid FONT handle {}
+SETFONT: erwartet (handle[, groesse]), erhalten {} Argument(e)	SETFONT: expects (handle[, groesse]), got {} argument(s)
+SETFONT: groesse muss mindestens 1 sein, erhalten {}	SETFONT: groesse must be at least 1, got {}
 LOADFONT_SDF: Font nicht ladbar: {}	LOADFONT_SDF: font cannot be loaded: {}
 LOADFONT_SDF: Font '{}' nicht ladbar (keine TrueType-/OpenType-Schrift, die raylib lesen kann)	LOADFONT_SDF: font '{}' cannot be loaded (not a TrueType/OpenType font raylib can read)
 LOADFONT_SDF: der Schrift-Shader liess sich nicht uebersetzen	LOADFONT_SDF: the font shader could not be compiled
@@ -1412,6 +1424,7 @@ GUI_BREADCRUMB_FIRST_VISIBLE: Widget ist keine Pfadleiste (GUI_BREADCRUMB)	GUI_B
 GUI_CANVAS_*: Widget ist kein canvas	GUI_CANVAS_*: widget is not a canvas
 {}: Widget ist kein dropdown/listbox	{}: widget is not a dropdown/listbox
 {}: das Widget ist keine Liste (GUI_LISTBOX)	{}: the widget is not a list (GUI_LISTBOX)
+{}: das Widget ist keine Liste und keine Klappliste	{}: the widget is neither a list nor a dropdown
 {}: Eintrag {} gibt es nicht (die Liste hat {})	{}: there is no entry {} (the list has {})
 GUI_DOUBLE_CLICKED: nur fuer Listen, Tabellen und Baeume (GUI_LISTBOX, GUI_TABLE, GUI_TREE)	GUI_DOUBLE_CLICKED: only for lists, tables and trees (GUI_LISTBOX, GUI_TABLE, GUI_TREE)
 {}: starts, laengen und farben muessen gleich lang sein ({}, {}, {})	{}: starts, lengths and colors must have the same length ({}, {}, {})
@@ -1490,6 +1503,7 @@ GUI_SET_COLOR: role muss bg/fg/border/accent/hover/pressed sein	GUI_SET_COLOR: r
 GUI_STYLE_SET: prop muss bg/fg/border/accent/hover/pressed/font/font_size sein	GUI_STYLE_SET: prop must be bg/fg/border/accent/hover/pressed/font/font_size
 GUI_APPLY_STYLE: unbekannter Style '{}'	GUI_APPLY_STYLE: unknown style '{}'
 GUI_WINDOW_GET_*: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_GET_*: invalid GUI_WINDOW handle
+GUI_WINDOW_CONTENT_*: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_CONTENT_*: invalid GUI_WINDOW handle
 GUI_WINDOW_WIDGET_COUNT: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_WIDGET_COUNT: invalid GUI_WINDOW handle
 GUI_WINDOW_WIDGET: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_WIDGET: invalid GUI_WINDOW handle
 GUI_SET_ALIGN: '{}' unbekannt -- links, mitte oder rechts	GUI_SET_ALIGN: '{}' unknown -- links, mitte or rechts
@@ -1498,7 +1512,7 @@ GUI_SET_WRAP: breite muss >= 0 sein (0 = aus)	GUI_SET_WRAP: width must be >= 0 (
 GUI_SET_WRAP: nur eine Beschriftung (GUI_LABEL) kann umbrechen	GUI_SET_WRAP: only a label (GUI_LABEL) can wrap
 GUI_TEXTINPUT_SET: das Widget ist kein GUI_TEXTINPUT	GUI_TEXTINPUT_SET: the widget is not a GUI_TEXTINPUT
 GUI_TEXTINPUT_SET: maxlaenge muss >= 0 sein (0 = frei)	GUI_TEXTINPUT_SET: maxlaenge must be >= 0 (0 = unlimited)
-GUI_TEXTINPUT_SET: zahlen ist 0 (frei), 1 (ganze Zahl) oder 2 (Kommazahl)	GUI_TEXTINPUT_SET: zahlen is 0 (any), 1 (whole number) or 2 (decimal number)
+GUI_TEXTINPUT_SET: zahlen ist 0 (frei), 1 (ganze Zahl), 2 (Kommazahl) oder 3 (Geldbetrag in Cent)	GUI_TEXTINPUT_SET: zahlen is 0 (any), 1 (whole number), 2 (decimal number) or 3 (amount of money in cents)
 GUI_ON_ENTER: nur ein Textfeld (GUI_TEXTINPUT) meldet Enter	GUI_ON_ENTER: only a text field (GUI_TEXTINPUT) reports Enter
 {}: ungueltiges Fenster-Handle {}	{}: invalid window handle {}
 {}: ungueltiges Widget-Handle {}	{}: invalid widget handle {}
@@ -1672,7 +1686,6 @@ FOR EACH geht nur ueber ein Feld mit einer Dimension -- {} hat {}: FOR i = 0 TO 
 FOR EACH {}: {} ist schon als {} angelegt -- fuer die Elemente von {} eine Variable vom Typ {} nehmen	FOR EACH {}: {} is already declared as {} -- for the elements of {} take a variable of type {}
 FOR EACH {}: {} ist schon ohne Typ angelegt -- fuer die Elemente von {} eine eigene Variable nehmen	FOR EACH {}: {} is already declared without a type -- for the elements of {} take a variable of its own
 {} ist in FOR EACH eine Kopie des Elements -- {} = ... ginge ins Leere; ins Feld schreiben mit Index (FOR i = 0 TO LEN(feld) - 1 : feld[i].x = ...)	{} is a copy of the element in FOR EACH -- {} = ... would go nowhere; write into the array with an index (FOR i = 0 TO LEN(feld) - 1 : feld[i].x = ...)
-{}(...) liefert {} -- erst einer Variable zuweisen: DIM r AS {} : r = {}(...) : r{}	{}(...) returns {} -- assign it to a variable first: DIM r AS {} : r = {}(...) : r{}
 ein Feld von Structs	an array of structs
 einen Struct	a struct
 DIM {}: die Groesse {} ist negativ	DIM {}: the size {} is negative
@@ -1730,3 +1743,35 @@ die Abfrage hat {} Platzhalter, uebergeben sind {} Werte	the query has {} placeh
 den Typ {} liest Drachenhauch (noch) nicht -- in der Abfrage mit ::text umwandeln	Drachenhauch cannot read the type {} (yet) -- convert it with ::text in the query
 ein Nullzeichen im Text -- PostgreSQL nimmt es nicht	a null character in the text -- PostgreSQL does not accept it
 Spalte {} ({}): {}	column {} ({}): {}
+MQTT_WILL: das Topic darf nicht leer sein und keine Platzhalter (# +) enthalten	MQTT_WILL: the topic must not be empty or contain wildcards (# +)
+MQTT_WILL: retain ist TRUE oder FALSE	MQTT_WILL: retain is TRUE or FALSE
+ZEIT_FORMAT$: '%{}' kennt das Muster nicht -- %Y %y %m %d %H %M %S %a %A %% oder JJJJ MM TT hh mm ss WT WTAG	ZEIT_FORMAT$: '%{}' is not a known pattern -- %Y %y %m %d %H %M %S %a %A %% or JJJJ MM TT hh mm ss WT WTAG
+CHART_X: {} x-Werte fuer {} Punkte -- erst CHART_DATA, dann CHART_X mit gleich vielen	CHART_X: {} x values for {} points -- first CHART_DATA, then CHART_X with as many
+CHART_X: der x-Wert von Punkt {} ist kleiner als der davor -- die Werte muessen aufsteigen	CHART_X: the x value of point {} is smaller than the one before -- the values must ascend
+RENDERTARGET_IMAGE: das Ziel ist noch offen -- erst RENDERTARGET_END	RENDERTARGET_IMAGE: the target is still open -- RENDERTARGET_END first
+PDF_IMAGE: erwartet 5 oder 6 Argumente (pdf, bild, x, y, b [, h]), nicht {}	PDF_IMAGE: expects 5 or 6 arguments (pdf, image, x, y, w [, h]), not {}
+PDF_IMAGE: kein Bild geladen -- ein Bild kommt aus LOADIMAGE, IMAGE_NEW oder RENDERTARGET_IMAGE	PDF_IMAGE: no image loaded -- an image comes from LOADIMAGE, IMAGE_NEW or RENDERTARGET_IMAGE
+PDF_IMAGE: dieser Bau hat keine Grafik	PDF_IMAGE: this build has no graphics
+PDF_DASH: erwartet 2 oder 3 Argumente (pdf, strich_mm [, luecke_mm]), nicht {}	PDF_DASH: expects 2 or 3 arguments (pdf, dash_mm [, gap_mm]), not {}
+Strich und Luecke muessen beide groesser als 0 sein (oder beide 0 fuer durchgezogen), nicht {} und {}	dash and gap must both be greater than 0 (or both 0 for solid), not {} and {}
+die Breite muss groesser als 0 sein, nicht {}	the width must be greater than 0, not {}
+das Bild ist leer	the image is empty
+{}: das Bild ist leer	{}: the image is empty
+'{}' ist keine eingebaute Schrift	'{}' is not a built-in font
+GENTEX_RADIAL: dichte {} liegt nicht in 0..1 -- sie ist der Anteil des Radius in voller Innenfarbe (0 = weicher Verlauf ab der Mitte, 1 = Scheibe)	GENTEX_RADIAL: dichte {} is not in 0..1 -- it is the share of the radius in full inner colour (0 = soft gradient from the centre, 1 = disc)
+{} erwartet INTEGER, erhalten FLOAT {} -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig	{} expects INTEGER, got FLOAT {} -- not a whole number; INT(x) cuts off, ROUND(x) rounds, \ divides as integers
+{}: erwartet INTEGER (Arg {}), erhalten {} -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig	{}: expects INTEGER (arg {}), got {} -- not a whole number; INT(x) cuts off, ROUND(x) rounds, \ divides as integers
+{}: '{}' ist eine eingebaute Schrift, aber dieser Bau hat keine (Feature "schriften") -- eine .ttf-Datei angeben	{}: '{}' is a built-in font, but this build has none (feature "schriften") -- give a .ttf file
+{} -- {} ist eine Sekunde spaeter noch nicht zurueckgekehrt, darum steht der Fehler schon jetzt hier; Rueckrufe, die scheitern duerfen, mit TRY ... CATCH umgeben	{} -- {} has not returned one second later, so the error is shown here already; wrap callbacks that may fail in TRY ... CATCH
+{} (Zeile {})	{} (line {})
+{}.{} hat BYREF-Parameter, aber beim Uebersetzen war die Klasse des Objekts nicht bekannt -- die Werte kaemen nicht zurueck. Das Objekt in einer Variablen mit Typ halten (DIM x AS {}) und darueber aufrufen.	{}.{} has BYREF parameters, but the class of the object was not known at compile time -- the values would not come back. Hold the object in a typed variable (DIM x AS {}) and call through it.
+{}.{}: die Methode der Klasse {} hat ihre BYREF-Parameter an anderen Stellen als die, nach der der Aufruf uebersetzt ist -- eine Ueberschreibung muss dieselben Parameter BYREF nehmen	{}.{}: the method of class {} has its BYREF parameters in other places than the one the call was compiled for -- an override must take the same parameters BYREF
+{}: eine Coroutine kann keine BYREF-Parameter zurueckschreiben	{}: a coroutine cannot write back BYREF parameters
+JOIN$: Feld aus Texten, Zahlen oder Wahrheitswerten noetig	JOIN$: needs an array of strings, numbers or booleans
+JOIN$ erwartet ein Feld	JOIN$ expects an array
+IMAGE_SCALE: erwartet (bild, breite, hoehe [, filter$])	IMAGE_SCALE: expects (image, width, height [, filter$])
+IMAGE_SCALE: unbekannter Filter '{}' -- moeglich sind lanczos, bikubisch, box, hamming, linear	IMAGE_SCALE: unknown filter '{}' -- possible are lanczos, bicubic, box, hamming, linear
+IMAGE_ENHANCE: erwartet (bild, art$, faktor)	IMAGE_ENHANCE: expects (image, kind$, factor)
+IMAGE_ENHANCE: unbekannte Art '{}' -- moeglich sind helligkeit, kontrast, saettigung	IMAGE_ENHANCE: unknown kind '{}' -- possible are brightness, contrast, saturation
+IMAGE_ENHANCE: der Faktor muss eine Zahl ab 0 sein	IMAGE_ENHANCE: the factor must be a number from 0 up
+{} liefert nie "{}" -- der Vergleich trifft nie. Moeglich sind: {}.	{} never returns "{}" -- the comparison never matches. Possible are: {}.

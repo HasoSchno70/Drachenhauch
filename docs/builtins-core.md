@@ -38,6 +38,11 @@ PRINT "x = ";           ' kein Newline
 PRINT x                 ' schließt an
 ```
 
+**Wann die Ausgabe erscheint:** im Terminal jede Zeile sofort. Geht die Ausgabe
+in eine Datei oder an ein anderes Programm, sammelt `PRINT` die Zeilen und gibt
+sie spätestens nach 50 ms hinaus -- vor `SLEEP`, `INPUT`, `EPRINT` und bei
+`FLIP` immer. Ein „Bitte warten …“ steht also da, bevor die Pause beginnt.
+
 ## Konvertierung
 
 | Funktion | Zweck |
@@ -51,6 +56,7 @@ PRINT x                 ' schließt an
 | `RGB(r, g, b)` → INTEGER | 3 Zahlen (0..255) zu 24-Bit-Farbe. `RGB(255, 128, 0)` = `&HFF8000`. Kommazahlen werden **gerundet** (`x * 255 / 640` geht also) -- geklemmt wird nicht, 255.6 ist weiterhin zu gross. |
 | `HEX$(n)` → STRING | INT zu Hex-Großbuchstaben (ohne Präfix). `HEX$(255)` = `"FF"`. |
 | `NUMFMT$(zahl [, nachkommastellen])` → STRING | grosse Zahlen kurz schreiben (`1.2K`, `3.4M`) — für Punktestände und Idle-Spiele |
+| `ZAHL$(zahl [, stellen])` → STRING | Zahl deutsch mit Tausenderpunkten und Dezimalkomma (`400.000`, `1.234.567,89`); mit `stellen` kaufmännisch gerundet |
 | `ENUM_NAME(enum, wert)` → STRING | zu einem ENUM-Wert seinen Namen zurückgeben — für Anzeige und Fehlersuche |
 
 ```basic
@@ -291,15 +297,16 @@ Funktionen mit `$`-Suffix gibt es auch ohne (`UPPER$` ≡ `UPPER`).
 | `LEFT$(s, n)`, `RIGHT$(s, n)` | erste/letzte n Zeichen |
 | `MID$(s, start[, n])` | Teilstring ab Position start (0-basiert), n Zeichen oder bis Ende |
 | `INSTR(s, sub[, start])` → INTEGER | Position von sub in s (0-basiert), oder -1 |
+| `INSTRREV(s, sub[, start])` → INTEGER | letzte Position von sub in s (mit `start`: die letzte, die dort oder davor beginnt), oder -1 |
 | `REPLACE$(s, alt, neu)` | alle Vorkommen ersetzen |
 | `TRIM$(s)` | Whitespace vorne/hinten weg |
 | `SPLIT$(s, delim)` → ARRAY OF STRING | Zerlegen |
-| `JOIN$(arr, delim)` → STRING | Vereinen (Array OF STRING) |
+| `JOIN$(arr, delim)` → STRING | Vereinen; Zahlen und Wahrheitswerte im Feld werden wie mit `STR$` geschrieben |
 | `PADL$(s, breite[, fill])`, `PADR$(...)` | Auffüllen links/rechts |
 | `REPEAT$(s, n)` | s n-mal aneinanderhängen |
 | `SPACE$(n)` | n Leerzeichen |
 | `HEX$(n)` | INT als Hex-String |
-| `FORMAT$(value, mask)` | printf-Stil. `FORMAT$(42, "%05d")` → `"00042"`. Sechs Spezifizierer: `%d`/`%i`, `%f`, `%x`, `%X`, `%s` — dazu `%%` für ein wörtliches Prozentzeichen. Breite, Nullen und Genauigkeit wie gewohnt (`%05d`, `%-6d`, `%.2f`). Alles andere meldet „unbekannter Spezifizierer“ |
+| `FORMAT$(value, mask)` | printf-Stil. `FORMAT$(42, "%05d")` → `"00042"`. Sechs Spezifizierer: `%d`/`%i`, `%f`, `%x`, `%X`, `%s` — dazu `%%` für ein wörtliches Prozentzeichen. Breite, Nullen und Genauigkeit wie gewohnt (`%05d`, `%-6d`, `%.2f`). Alles andere meldet „unbekannter Spezifizierer“, eine Maske ganz ohne Platzhalter (etwa die VB-Maske `"#,##0.00"`) ebenfalls einen Fehler -- Tausenderpunkte schreibt `ZAHL$` |
 
 > **Anders als QBasic/VB:** `MID$` und `INSTR` zählen ab **0**, und `INSTR`
 > liefert bei „nicht gefunden“ **-1**, nicht 0. Aus QBasic übernommene Muster
@@ -333,6 +340,7 @@ PRINT MID$("Drachenhauch", 4, 5)   ' "henha"  (0-basiert: ab dem 5. Zeichen)
 PRINT INSTR("hello world", "world")   ' 6
 PRINT INSTR("hello", "he")           ' 0  -- ein Treffer ganz vorn
 PRINT INSTR("hello", "xy")           ' -1 -- nicht gefunden
+PRINT INSTRREV("a/b/c", "/")          ' 3
 PRINT MID$("pre:rest", LEN("pre:"))  ' "rest" -- ohne + 1
 PRINT REPLACE$("a-b-c", "-", "_")     ' "a_b_c"
 
@@ -507,7 +515,7 @@ eine weiterzugeben.
 | `ZIP_READ(archiv$, name$)` → BUFFER | einen Eintrag als Bytes |
 | `ZIP_EXTRACT(archiv$, ordner$)` → INTEGER | alles entpacken, liefert die Zahl der Dateien |
 | `ZIP_CREATE(archiv$, dateien)` → INTEGER | Archiv aus einer Liste von Dateipfaden |
-| `ZIP_WRITE(archiv$, namen, inhalte)` → INTEGER | Archiv aus Namen und Texten, ohne Umweg über Dateien |
+| `ZIP_WRITE(archiv$, namen, inhalte)` → INTEGER | Archiv aus Namen und Inhalten (Texte oder Puffer), ohne Umweg über Dateien |
 
 ```basic
 DIM namen AS ARRAY OF STRING
@@ -579,16 +587,21 @@ Die Funktion schreibst du **ohne Klammern** hin: `TASK_START(BerechneKarte, 42)`
 **Ein Auftrag läuft als eigener Prozess** — nicht als Thread. Daraus folgen
 drei Dinge, die man kennen muss:
 
-**1. Ein Auftrag sieht deine Globals nicht.** Auch keine `CONST` auf oberster
-Ebene. Das Hauptprogramm läuft im Auftragsprozess nämlich gar nicht:
+**1. Ein Auftrag sieht deine Globals nicht.** Das Hauptprogramm läuft im
+Auftragsprozess nämlich gar nicht -- eine Variable, die es setzt, gibt es dort
+nicht:
 
 ```basic
-CONST FAKTOR AS INTEGER = 10
+DIM faktor AS INTEGER
+faktor = 10
 
 FUNCTION Nutzt() AS INTEGER
-    RETURN FAKTOR        ' Fehler, wenn als Auftrag gestartet
+    RETURN faktor        ' Fehler, wenn als Auftrag gestartet
 END FUNCTION
 ```
+
+Eine `CONST` mit festem Wert (`CONST FAKTOR AS INTEGER = 10`) sieht er dagegen:
+sie wird schon beim Übersetzen eingesetzt.
 
 Gib der Funktion als Parameter mit, was sie braucht. Die Meldung erklärt das,
 wenn es passiert. Dieselbe Grenze gilt für ein mit `AS` importiertes Modul —
@@ -598,7 +611,10 @@ davon ab, was zufällig oben im Programm steht.
 **2. Argumente und Ergebnis sind Zahl, Text oder BOOLEAN.** Du darfst
 beliebig viele übergeben — `TASK_START(Zeichne, 3, "rot", TRUE)` —, aber ein
 Objekt oder ein Array-Handle geht nicht über eine Prozessgrenze. Wer mehr
-braucht, reicht JSON durch. Ein Text mit Leerzeichen bleibt **ein** Argument.
+braucht, reicht JSON durch. Ein Text mit Leerzeichen bleibt **ein** Argument,
+und ein Text darf beliebig lang sein -- die Argumente gehen über die
+Standardeingabe, nicht über die Befehlszeile (bis 2026.27 war unter Windows bei
+rund 32 000 Zeichen Schluss).
 Das Ergebnis kommt immer als STRING zurück; für eine Zahl also
 `VAL(TASK_RESULT$(a))`.
 
@@ -862,6 +878,8 @@ f = OPENFILE("gross.csv", "r", "cp1252")
 | Name | auch geschrieben als |
 |---|---|
 | `utf8` (Vorgabe) | `utf-8` |
+| `utf8bom` | `utf-8-bom`, `utf-8-sig` |
+| `auto` (nur lesen) | -- |
 | `cp1252` | `windows-1252`, `ansi` |
 | `latin1` | `iso-8859-1` |
 
@@ -886,6 +904,44 @@ Kodierung angibt, hat sie meist irgendwo abgeschrieben.
    (`cp1252` hat das Euro-Zeichen — genau dafür gibt es beide.)
 5. **Ein BOM am Dateianfang fällt immer weg**, in jedem Textleser. Sonst hieße
    die erste Spalte für immer `﻿Name`.
+
+**`auto` ist für Werkzeuge, die fremde Dateien lesen** und vorher nicht wissen,
+was sie bekommen: gültiges UTF-8 (auch mit BOM) wird als UTF-8 gelesen, alles
+andere als cp1252 -- ASCII ist in beiden gleich, eine Zeile mit Umlauten
+entscheidet sich also eindeutig. Ein Nullbyte heißt Binärdatei und ist ein
+Fehler mit eigener Meldung (*sieht nach einer Binärdatei aus*), damit ein
+Such-Werkzeug sie überspringen kann. Zeilenweise (`OPENFILE`, `STDIN`) wird je
+Zeile entschieden. Beim Schreiben ist `auto` ein Fehler -- dort muss man
+sagen, was entstehen soll.
+
+```basic
+DIM z AS ARRAY OF STRING
+TRY
+    z = READLINES(pfad, "auto")
+CATCH e
+    EPRINT("übersprungen: " + e)
+END TRY
+```
+
+**Wer eine Datei liest UND wieder schreibt** (ein Editor, ein Werkzeug, das
+eine Zeile ändert), muss wissen, was `auto` gewählt hat -- sonst wird aus einer
+cp1252-Datei beim Sichern stillschweigend UTF-8. Das sagt
+`FILE_ENCODING$(pfad$)`: `"utf8"`, `"utf8bom"` (gültiges UTF-8 mit BOM vorn),
+`"cp1252"` oder `"binaer"` (Nullbyte, also auch UTF-16). Jeder Name außer
+`"binaer"` geht beim Schreiben wieder hinein:
+
+```basic
+DIM kod AS STRING : kod = FILE_ENCODING$(pfad)
+DIM text AS STRING
+DIM f AS FILE : f = OPENFILE(pfad, "r", kod)
+text = READALL$(f) : CLOSEFILE(f)
+' ... bearbeiten ...
+WRITEALL(pfad, text, kod)          ' gleiche Kodierung, gleiches BOM
+```
+
+`utf8bom` liest wie `utf8` (das BOM fällt wie immer weg) und setzt beim
+Schreiben `EF BB BF` vor die Datei -- nur vor eine **leere**: `WRITE`/
+`WRITELINE` und `APPENDFILE` an eine volle Datei schreiben kein zweites.
 
 **Nicht dabei: UTF-16.** Das schreibt Excel bei „Unicode Text (*.txt)". Es
 braucht BOM-Erkennung, zwei Byte-Reihenfolgen und Ersatzpaare — eine eigene
@@ -912,6 +968,7 @@ Pfadbasiert, ohne FILE-Handle *(nur native Runtime)*:
 | `WRITEALL(pfad$, text$[, kodierung$])` | Text komplett schreiben (überschreibt/erzeugt) |
 | `READLINES(pfad$[, kodierung$])` → ARRAY OF STRING | Datei als Zeilen-Array lesen |
 | `FILESIZE(pfad$)` → INTEGER | Größe in Bytes |
+| `FILE_ENCODING$(pfad$)` → STRING | was `"auto"` wählen würde: `utf8`, `utf8bom`, `cp1252` oder `binaer` (siehe Kodierungen) |
 | `DELETEFILE(pfad$)`, `RENAME(alt$, neu$)` | löschen / umbenennen·verschieben |
 | `DIREXISTS(pfad$)` → BOOLEAN | Verzeichnis vorhanden? |
 | `DIRLIST(pfad$[, muster$])` → ARRAY OF STRING | Eintragsnamen (sortiert), optional gefiltert |
@@ -1104,6 +1161,8 @@ geklappt hat.
 |---|---|
 | `ARGC()` → INTEGER | Anzahl der Argumente für dieses Programm |
 | `ARG$(n)` → STRING | Argument Nr. `n` (0-basiert); außerhalb → `""` |
+| `ARGPATH$(n)` → STRING | Argument Nr. `n` als **Pfad vom Aufrufort aus** (siehe unten) |
+| `STARTDIR$()` → STRING | der Ordner, aus dem das Programm aufgerufen wurde |
 | `GETENV$(name$ [, vorgabe$])` → STRING | Umgebungsvariable lesen |
 | `SETENV(name$, wert$)` | Umgebungsvariable setzen (dieses Programm + seine Kinder) |
 | `CWD$()` → STRING | aktuelles Arbeitsverzeichnis |
@@ -1114,6 +1173,8 @@ geklappt hat.
 | `SHELL(programm$, ...)` → INTEGER | Programm starten, warten, Rückgabewert |
 | `SHELL_OUT$(programm$, ...)` → STRING | wie `SHELL`, sammelt aber die Ausgabe ein |
 | `STDIN([kodierung$])` → FILE | die Standardeingabe als Datei-Handle |
+| `TERMINAL()` → BOOLEAN | geht die Ausgabe in ein Terminal (nicht in eine Datei, eine Pipe, die IDE)? |
+| `TERMINAL_WIDTH()` → INTEGER | Spalten des Terminals, 0 wenn die Ausgabe in keines geht |
 
 ```basic
 ' Ein Werkzeug, das eine Datei erwartet
@@ -1122,7 +1183,7 @@ IF ARGC() < 1 THEN
     EPRINT("Verwendung: zaehle <datei>")
     EXIT(2)
 END IF
-pfad = ARG$(0)
+pfad = ARGPATH$(0)
 IF NOT FILEEXISTS(pfad) THEN
     EPRINT("Nicht gefunden: " + pfad)
     EXIT(1)
@@ -1144,6 +1205,23 @@ Argumente. Das ist Absicht: sonst könnte `dhrt` sich keinen eigenen Schalter
 mehr zulegen, ohne bestehende Programme zu brechen. Die **exportierte `.exe`**
 ist selbst das Programm — dort gibt es nichts zu trennen, alle Argumente
 gehören ihr, ohne `--`.
+
+**Pfade in Argumenten: `ARGPATH$` statt `ARG$`.** `dhrt run` und die
+exportierte `.exe` wechseln beim Start in den Ordner des Programms -- so findet
+`LOADIMAGE("assets/held.png")` sein Bild, egal von wo aus gestartet wurde. Ein
+relativer Pfad, den der Nutzer aus *seinem* Ordner angibt, zeigt dann aber
+ins Leere: `werkzeug.exe daten/obst.txt` sucht `daten/obst.txt` neben der
+`.exe`. `ARGPATH$(n)` setzt darum den Aufrufort davor (`STARTDIR$()`); ein
+absoluter Pfad, ein leeres Argument und `-` (Standardeingabe) bleiben, wie sie
+sind. Für Optionen, Muster und Zahlen bleibt es bei `ARG$`.
+
+| Aufruf aus `C:\arbeit` | `ARG$(0)` | `ARGPATH$(0)` |
+|---|---|---|
+| `werkzeug.exe daten\obst.txt` | `daten\obst.txt` | `C:\arbeit\daten\obst.txt` |
+| `werkzeug.exe D:\x.txt` | `D:\x.txt` | `D:\x.txt` |
+
+Bis 2026.28 kannte die exportierte `.exe` den Aufrufort gar nicht; unter
+`dhrt run` stand er schon in der Umgebungsvariablen `DHRT_START_DIR`.
 
 **`EXIT` ist kein Fehler.** Es beendet das Programm sofort und wird von
 `TRY`/`CATCH` **nicht** gefangen — ein `EXIT` mitten in einem `TRY`-Block läuft
@@ -1583,7 +1661,7 @@ Für komplexere Sprite-Kollision siehe [Sprite-Modul](module-sprite.md) mit `SPR
 | `AUDIO_SET_VOLUME(ch, v)` | `AUDIO_VOLUME(ch, v)` |
 | `AUDIO_MUSIC_SET_VOLUME(v)` | `AUDIO_MUSIC_VOLUME(v)` |
 
-Container-Methode `arr.join(trenner)` ≡ `JOIN$(arr, trenner)` (Array OF STRING).
+Container-Methode `arr.join(trenner)` ≡ `JOIN$(arr, trenner)`.
 
 **Konventionen / Stolpersteine** (bewusst NICHT umbenannt — nur zur Klarstellung):
 

@@ -26,26 +26,35 @@ PDF_SAVE(p, "rechnung.pdf")
 
 | Function | Purpose |
 |---|---|
-| `PDF_NEW([größe$[, ausrichtung$]])` → PDF | `a3`…`a6`, `letter`, `legal`; `hoch`/`quer` (portrait/landscape) |
-| `PDF_PAGE(p)` | start a new page |
+| `PDF_NEW([größe$[, ausrichtung$]])` → PDF | `a0`…`a6`, `letter`, `legal`; `hoch`/`quer` (portrait/landscape) |
+| `PDF_PAGE(p)` | start a new page -- `PDF_NEW` already creates the first one; while it is empty, `PDF_PAGE` does not add a second |
 | `PDF_PAGE_COUNT(p)` → INTEGER | how many so far |
 | `PDF_PAGE_WIDTH(p)` / `PDF_PAGE_HEIGHT(p)` → FLOAT | page size in mm |
 | `PDF_TITLE(p, titel$)` | title in the document information |
 | `PDF_FONT(p, schrift$, größe_pt)` | font and size |
 | `PDF_FONT_LOAD(p, pfad$, name$)` | load your own TrueType/OpenType font, afterwards available to `PDF_FONT` as `name$` |
 | `PDF_COLOR(p, farbe)` | `RGB(…)` — applies to text, strokes and fills |
+| `PDF_DASH(p, strich_mm[, luecke_mm])` | dashed for all following lines and outlines; without a gap as long as the dash, `PDF_DASH(p, 0)` solid again |
 | `PDF_LINE_WIDTH(p, mm)` | stroke width |
-| `PDF_TEXT(p, x, y, text$)` | set text |
+| `PDF_TEXT(p, x, y, text$[, winkel])` | set text; `winkel` (angle) in degrees counter-clockwise, rotated about (x, y) |
 | `PDF_TEXT_WIDTH(p, text$)` → FLOAT | width in mm, in the current font and size |
 | `PDF_LINE(p, x1, y1, x2, y2)` | draw a line |
 | `PDF_RECT(p, x, y, b, h)` / `PDF_RECT_FILL(…)` | outline / fill |
+| `PDF_CIRCLE(p, x, y, r)` / `PDF_CIRCLE_FILL(…)` | circle around (x, y), outline / fill |
+| `PDF_POLYGON(p, xs, ys)` / `PDF_POLYGON_FILL(…)` | closed polygon from two arrays of equal length, at least three points |
+| `PDF_OPACITY(p, deckkraft)` / `PDF_GET_OPACITY(p)` → FLOAT | opacity 0..1 for everything that follows (watermarks) |
+| `PDF_IMAGE(p, bild, x, y, b[, h])` | place an image (`IMAGE`) in the rectangle, sizes in mm; without `h` by the aspect ratio |
 | `PDF_SAVE(p, pfad$)` | write |
 | `PDF_PRINT(p[, drucker$[, kopien[, zieldatei$]]])` | **print** — Windows via GDI, macOS/Linux via CUPS; see [Printing](#printing-and-preview) |
 | `PDF_PREVIEW(p, seite[, breite_px])` → IMAGE | the page as an image, for a preview in a window |
 | `PDF_CLOSE(p)` | free the memory |
 
-Font, size, colour and stroke width are settings of the **document**,
-not of the page — they stay in effect after `PDF_PAGE`.
+Font, size, colour, stroke width and opacity are settings of the
+**document**, not of the page — they stay in effect after `PDF_PAGE`. The
+opacity is written into the PDF as real transparency; when printing on
+Windows (GDI) and in `PDF_PREVIEW` the colour is mixed against the white
+paper instead — the same picture, as long as nothing lies underneath. There is
+no password protection: krilla does not encrypt.
 
 ## Fonts
 
@@ -77,6 +86,29 @@ PDF_FONT_LOAD(p, "fonts/NotoSansJP-Regular.ttf", "japanisch")
 PDF_FONT(p, "japanisch", 12)
 PDF_TEXT(p, 20, 40, "請求書")
 ```
+
+## Images and charts
+
+`PDF_IMAGE` places an `IMAGE` — from `LOADIMAGE`, `IMAGE_NEW` or a render
+target. This is how a chart gets into a report: draw it into a render target,
+fetch it as an image with `RENDERTARGET_IMAGE`, place it. At 10 pixels per
+millimetre it prints sharp:
+
+```basic
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(1700, 850)
+RENDERTARGET_BEGIN(rt)
+CHART_BOUNDS(c, 0, 0, 1700, 850)   ' briefly at (0, 0) ...
+CHART_DRAW(c)
+RENDERTARGET_END()
+CHART_BOUNDS(c, x, y, b, h)        ' ... and back to its place
+DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+PDF_IMAGE(p, bild, 20, 90, 170)    ' 170 mm wide
+```
+
+A transparent pixel stays transparent in the PDF; when printing through GDI it
+is blended onto white paper. Up to 2026.30 the module knew no images — a
+report had to redraw its curves stroke by stroke with `PDF_LINE`, without axes
+or labels.
 
 ## Text and width
 

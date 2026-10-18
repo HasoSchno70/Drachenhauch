@@ -1,0 +1,85 @@
+' Helfer fuer beispiel_verein.dhtest: der Ablauf, den jemand mit der
+' Vereinsverwaltung (examples/verein/main.dh) durchspielt -- anlegen, laden,
+' gleichzeitig mit einem Kollegen speichern, ueberschreiben, ein geloeschtes
+' Mitglied, eine Zahlung, die Beitragsliste. Er wird in die App
+' eingeschoben (hinter `DIM beenden AS BOOLEAN`) und ruft ihre
+' Unterprogramme (die Beitragsliste liest _hilfen/pdftext.dh, das der Fall
+' mit importiert). Die Kennungen haengen an der Datenbank und werden darum
+' nicht ausgegeben. Namen mit `va`, damit nichts in der App verdeckt wird.
+
+SUB vaZeig(t AS STRING)
+    PRINT t; " | "; GUI_STATUSBAR_TEXT$(sb, 0)
+END SUB
+
+FUNCTION vaZeile$(id AS INTEGER) AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT name, ort, email, beitrag, aktiv, stand FROM mitglied WHERE id = ?", id)
+    IF DB_NEXT(r) THEN RETURN DB_GET_STRING(r, 0) + "/" + DB_GET_STRING(r, 1) + "/" + DB_GET_STRING(r, 2) + "/" + STR$(DB_GET_INT(r, 3)) + "/" + STR$(DB_GET_BOOL(r, 4)) + "/" + STR$(DB_GET_INT(r, 5))
+    RETURN "(keine)"
+END FUNCTION
+
+SUB vaAblauf()
+    DB_EXEC(db, "DELETE FROM zahlung") : DB_EXEC(db, "DELETE FROM mitglied")
+    listeLaden() : neu()
+    ' Anlegen: Pflichtfeld, Postleitzahl und Geldfeld
+    GUI_SET_TEXT(tfName, "")
+    PRINT "ohne namen "; speichern(); " "; GUI_ERROR(tfName)
+    GUI_SET_TEXT(tfName, "Müller") : GUI_SET_TEXT(tfVorname, "Anna") : GUI_SET_TEXT(tfPlz, "531")
+    GUI_SET_TEXT(tfOrt, "Bonn") : GUI_SET_TEXT(tfMail, "anna@example.org") : GUI_SET_TEXT(tfBeitrag, "60")
+    GUI_SET_DATE(dpEintritt, "2024-03-01")
+    PRINT "plz kurz "; speichern(); " "; GUI_ERROR(tfPlz)
+    GUI_SET_TEXT(tfPlz, "53111")
+    PRINT "angelegt "; speichern() : vaZeig("")
+    DIM a AS INTEGER : a = aktId
+    PRINT "zeile "; vaZeile$(a)
+    neu()
+    GUI_SET_TEXT(tfName, "Öztürk") : GUI_SET_TEXT(tfVorname, "Cem") : GUI_SET_TEXT(tfBeitrag, "24,50")
+    GUI_SET_CHECKED(cbAktiv, FALSE)
+    PRINT "angelegt "; speichern() : vaZeig("")
+    DIM b AS INTEGER : b = aktId
+    PRINT "zeile "; vaZeile$(b); " | tabelle "; GUI_TABLE_ROW_COUNT(tab); " "; GUI_TABLE_GET_CELL(tab, 0, 0); " "; GUI_TABLE_GET_CELL(tab, 0, 3)
+
+    ' Laden und gleichzeitig mit einem Kollegen bearbeiten
+    laden(a) : vaZeig("geladen")
+    PRINT "felder "; GUI_TEXT(tfName); "|"; GUI_TEXT(tfOrt); "|"; GUI_DATE(dpEintritt); "|"; GUI_CHECKED(cbAktiv); "|"; GUI_TEXT(tfBeitrag); " geaendert "; GUI_FORM_CHANGED(win, "m")
+    DIM kollege AS DB_CONN : kollege = DB_OPEN(ziel)
+    DB_EXEC(kollege, "UPDATE mitglied SET email = ?, stand = stand + 1 WHERE id = ?", "neu@example.org", a)
+    GUI_SET_TEXT(tfOrt, "Köln")
+    PRINT "speichern "; speichern(); " dialog "; konfliktOffen
+    PRINT "zeile "; vaZeile$(a)
+    ' "Überschreiben" im Dialog: unsere Eingaben gewinnen, auch die alte E-Mail
+    konfliktOffen = FALSE
+    PRINT "ueberschreiben "; speichern(TRUE) : vaZeig("")
+    PRINT "zeile "; vaZeile$(a)
+    ' "Neu laden": der Kollege speichert noch einmal, wir verwerfen
+    DB_EXEC(kollege, "UPDATE mitglied SET ort = ?, stand = stand + 1 WHERE id = ?", "Aachen", a)
+    GUI_SET_TEXT(tfOrt, "Bremen")
+    PRINT "speichern "; speichern(); " dialog "; konfliktOffen
+    konfliktOffen = FALSE
+    laden(a)
+    PRINT "neu geladen "; GUI_TEXT(tfOrt); " geaendert "; GUI_FORM_CHANGED(win, "m")
+
+    ' Der Kollege loescht ein Mitglied, das wir offen haben
+    laden(b)
+    GUI_SET_TEXT(tfOrt, "Essen")
+    DB_EXEC(kollege, "DELETE FROM mitglied WHERE id = ?", b)
+    PRINT "speichern geloeschtes "; speichern(); " neu "; aktId < 0 : vaZeig("")
+    PRINT "tabelle "; GUI_TABLE_ROW_COUNT(tab)
+    PRINT "nochmal "; speichern(); " tabelle "; GUI_TABLE_ROW_COUNT(tab) : vaZeig("")
+    DB_CLOSE(kollege)
+
+    ' Zahlung und offener Betrag
+    laden(a)
+    GUI_SET_TEXT(tfZBetrag, "25,5") : zahlungBuchen() : vaZeig("")
+    PRINT REPLACE$(GUI_TEXT(lbOffen), STR$(jahr), "JJJJ"); " | zahlungen "; GUI_TABLE_ROW_COUNT(tabZ); " "; GUI_TABLE_GET_CELL(tabZ, 0, 1)
+    beitragsliste("liste.pdf")
+    PRINT "pdf "; FILEEXISTS("liste.pdf")
+    ' Nur aktive Mitglieder, je Zeile Soll / Ist / offen, dann die Summe.
+    DIM vaS AS ARRAY OF STRING : vaS = pdfSeiten("liste.pdf")
+    PRINT "seiten "; LEN(vaS)
+    DIM vaZ AS ARRAY OF STRING : vaZ = SPLIT$(vaS[0], CHR$(10))
+    DIM vaI AS INTEGER
+    FOR vaI = 1 TO LEN(vaZ) - 1
+        IF vaZ[vaI] <> "" THEN PRINT vaZ[vaI]
+    NEXT
+    PRINT "titel "; LEFT$(vaZ[0], 13)
+END SUB

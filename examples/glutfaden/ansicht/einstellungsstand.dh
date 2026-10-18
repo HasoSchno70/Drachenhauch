@@ -1,0 +1,135 @@
+' Die Einstellungen des laufenden Programms (kern/einstellungen.dh) -- geladen,
+' bevor irgendetwas aufgebaut wird, damit Zeichenflaeche, Werkzeuge und Dialoge
+' sie von Anfang an lesen. Eine eigene Datei, weil sie VOR allen anderen
+' Teilen der Ansicht eingebunden wird.
+
+DIM einst AS kern.Einstellungen
+einst = kern.einstellungenLaden(kern.einstellungsDatei$("einstellungen.json"))
+DIM einstTafel AS MAP OF STRING
+einstTafel = kern.kuerzelTafel(einst)
+
+' --- Sprache der Oberflaeche -----------------------------------------------------------
+' Gilt ab dem Start: die Fenster sind danach gebaut (wie PySticky). Eine Probe
+' (--probe, --probe-...) bleibt deutsch, auch wenn das System englisch ist --
+' ihre Erwartungen stehen deutsch da; DH_GLUT_SPRACHE ueberstimmt beides.
+' Ohne GTK gibt es keine Systemsprache: das Programm muss bis zur Pruefung in
+' main.dh kommen, die sagt, was fehlt (vorher brach es hier ab).
+FUNCTION systemSprache$() AS STRING
+    TRY
+        DIM l AS INTEGER : l = gtk_get_default_language()
+        IF l = 0 THEN RETURN ""
+        RETURN TEXT_AUS_ZEIGER$(pango_language_to_string(l))
+    CATCH e
+        RETURN ""
+    END TRY
+END FUNCTION
+
+FUNCTION spracheBeimStart$() AS STRING
+    IF GETENV$("DH_GLUT_SPRACHE", "") <> "" THEN RETURN kern.spracheAufloesen$(GETENV$("DH_GLUT_SPRACHE", ""), "de")
+    DIM a AS INTEGER
+    FOR a = 0 TO ARGC() - 1
+        IF LEFT$(ARG$(a), 7) = "--probe" THEN RETURN "de"
+    NEXT
+    RETURN kern.spracheAufloesen$(einst.sprache, systemSprache$())
+END FUNCTION
+
+DIM spracheGeladen AS BOOLEAN
+spracheGeladen = kern.spracheLaden(spracheBeimStart$(), PATHJOIN(CWD$(), "daten/sprache/en.txt"))
+
+' Die Kurzformen fuer die Ansicht
+FUNCTION tr$(t AS STRING) AS STRING
+    RETURN kern.tr$(t)
+END FUNCTION
+
+FUNCTION trf$(t AS STRING, werte AS ARRAY OF STRING) AS STRING
+    RETURN kern.trf$(t, werte)
+END FUNCTION
+
+' Eine Liste aus dem Kern zum Anzeigen: die Eintraege sind dort Schluessel
+' und bleiben deutsch, angezeigt wird jeder uebersetzt
+FUNCTION trListe(l AS ARRAY OF STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM t AS STRING
+    FOR EACH t IN l
+        ARRAY_PUSH(aus, kern.tr$(t))
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Eine Zahl so, wie sie angezeigt wird (1.234,5 / 1,234.5)
+FUNCTION zahlText$(x AS FLOAT, stellen AS INTEGER) AS STRING
+    RETURN kern.zahlAnzeige$(x, stellen)
+END FUNCTION
+
+' Das Kuerzel einer Aktion so, wie es angezeigt wird
+FUNCTION kz$(kennung AS STRING) AS STRING
+    RETURN kern.kuerzelAnzeige$(kern.kuerzelVon$(einst, kennung))
+END FUNCTION
+
+' Sichern, ohne dass ein Fehler beim Schreiben das Programm anhaelt
+SUB einstellungenMerken()
+    TRY
+        kern.einstellungenSichern(einst)
+    CATCH fehler
+        PRINT "Einstellungen nicht gesichert: "; fehler
+    END TRY
+END SUB
+
+' Der Ordner, in dem Datei-Dialoge anfangen ("" = was GTK will)
+FUNCTION einstOrdner$() AS STRING
+    IF einst.ordner <> "" AND DIREXISTS(einst.ordner) THEN RETURN einst.ordner
+    RETURN ""
+END FUNCTION
+
+' --- Kuerzel in Tooltips und Meldungen ------------------------------------------------
+' Ein Text nennt ein Kuerzel als {kennung}; eingesetzt wird, was gerade gilt.
+' Tooltips merken sich ihren Text und werden nach jeder Aenderung der
+' Einstellungen neu gesetzt -- sonst naennten sie die alte Taste.
+DIM tippW AS ARRAY OF INTEGER
+tippW = []
+DIM tippT AS ARRAY OF STRING
+tippT = []
+
+FUNCTION mitKuerzeln$(text AS STRING) AS STRING
+    IF INSTR(text, "{") < 0 THEN RETURN text
+    DIM a AS kern.Kuerzelaktion
+    FOR EACH a IN kern.kuerzelAktionen()
+        IF INSTR(text, "{" + a.kennung + "}") >= 0 THEN text = REPLACE$(text, "{" + a.kennung + "}", kz$(a.kennung))
+    NEXT
+    RETURN text
+END FUNCTION
+
+FUNCTION kuerzelHinweis$(kennung AS STRING) AS STRING
+    DIM k AS STRING : k = kz$(kennung)
+    IF k = "" THEN RETURN ""
+    RETURN " (" + k + ")"
+END FUNCTION
+
+' Ein Widget, das zerstoert wird (die Seitenleiste baut ihre Knoepfe neu),
+' faellt aus der Liste -- sonst bekaeme ein toter Zeiger einen Tooltip.
+SUB tippWeg(w AS INTEGER, daten AS INTEGER)
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(tippW, w)
+    IF i >= 0 THEN
+        ARRAY_REMOVE_AT(tippW, i)
+        ARRAY_REMOVE_AT(tippT, i)
+    END IF
+END SUB
+
+SUB tipp(w AS INTEGER, text AS STRING)
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(tippW, w)
+    IF i < 0 THEN
+        ARRAY_PUSH(tippW, w)
+        ARRAY_PUSH(tippT, text)
+        signal(w, "destroy", tippWeg, 0, 0, 0)
+    ELSE
+        tippT[i] = text
+    END IF
+    gtk_widget_set_tooltip_text(w, mitKuerzeln$(text))
+END SUB
+
+SUB tippsAuffrischen()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(tippW) - 1
+        gtk_widget_set_tooltip_text(tippW[i], mitKuerzeln$(tippT[i]))
+    NEXT
+END SUB

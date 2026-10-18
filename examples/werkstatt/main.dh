@@ -1,0 +1,260 @@
+' werkstatt -- Dashboard fuer die Sensoren in der Werkstatt (MQTT).
+'
+'     dhrt run main.dh                    (Broker 127.0.0.1:1883)
+'     dhrt run main.dh -- 192.168.1.5     (Broker auf dem Raspberry Pi)
+'     dhrt run main.dh -- 192.168.1.5:1884
+'
+' Das Board (oder sensor.dh, das es spielt) schickt Temperatur, Luftfeuchte,
+' Licht, Strom und die Tuer. Das Dashboard zeigt sie als Instrumente und
+' Verlauf, schaltet den Luefter, schlaegt bei Hitze Alarm (Meldung des
+' Systems, auf Wunsch schaltet es den Luefter selbst) und zeichnet auf
+' Wunsch alles als CSV auf.
+IMPORT "mqtt"
+IMPORT "chart"
+IMPORT "gui"
+
+CONST BREITE = 1180
+CONST HOEHE = 720
+CONST PANEL_X = 820
+DIM broker AS STRING : broker = "127.0.0.1"
+DIM port AS INTEGER : port = 1883
+IF ARGC() > 0 THEN broker = ARG$(0)
+IF INSTR(broker, ":") >= 0 THEN
+    port = VAL(MID$(broker, INSTR(broker, ":") + 1))
+    broker = LEFT$(broker, INSTR(broker, ":"))
+END IF
+
+SCREEN(BREITE, HOEHE, "Werkstatt")
+SETFPS(60)
+GUI_THEME_PRESET("glas_dunkel")
+
+' --- Instrumente ---------------------------------------------------------------
+FUNCTION tacho(titel AS STRING, x AS INTEGER, y AS INTEGER, lo AS FLOAT, hi AS FLOAT, einheit AS STRING) AS CHART
+    DIM c AS CHART : c = CHART_NEW("tacho", x, y, 250, 230)
+    CHART_THEME(c, "dunkel")
+    CHART_SET(c, "titel", titel)
+    CHART_SET(c, "einheit", einheit)
+    ' Bis zum ersten Messwert ohne Zahl -- sonst stuende "10,0 °C" da.
+    CHART_SET(c, "wertanzeige", "aus")
+    CHART_SET_NUM(c, "min", lo) : CHART_SET_NUM(c, "max", hi)
+    CHART_SET_NUM(c, "nachkomma", 1)
+    CHART_SET_NUM(c, "animation", 0.4)
+    CHART_SET_FLAG(c, "komma", TRUE)
+    CHART_VALUE(c, lo)
+    RETURN c
+END FUNCTION
+
+DIM cTemp AS CHART : cTemp = tacho("Temperatur", 16, 16, 10, 45, " °C")
+CHART_ZONE(cTemp, 10, 18, RGB(80, 140, 230), "kalt")
+CHART_ZONE(cTemp, 18, 28, RGB(70, 190, 110))
+CHART_ZONE(cTemp, 28, 45, RGB(230, 80, 60), "heiss")
+DIM cFeuchte AS CHART : cFeuchte = tacho("Luftfeuchte", 280, 16, 0, 100, " %")
+CHART_ZONE(cFeuchte, 0, 30, RGB(230, 170, 60), "trocken")
+CHART_ZONE(cFeuchte, 30, 65, RGB(70, 190, 110))
+CHART_ZONE(cFeuchte, 65, 100, RGB(80, 140, 230), "feucht")
+
+DIM cStrom AS CHART : cStrom = CHART_NEW("leiste", 546, 40, 250, 70)
+CHART_THEME(cStrom, "dunkel")
+CHART_SET(cStrom, "titel", "Strom")
+CHART_SET(cStrom, "einheit", " A")
+CHART_SET(cStrom, "wertanzeige", "aus")
+CHART_SET_NUM(cStrom, "min", 0) : CHART_SET_NUM(cStrom, "max", 3)
+CHART_SET_NUM(cStrom, "nachkomma", 2)
+CHART_SET_FLAG(cStrom, "komma", TRUE)
+CHART_VALUE(cStrom, 0)
+
+DIM cLicht AS CHART : cLicht = CHART_NEW("led", 546, 140, 250, 70)
+CHART_THEME(cLicht, "dunkel")
+CHART_SET(cLicht, "titel", "Licht")
+CHART_SET(cLicht, "einheit", " lx")
+CHART_SET_NUM(cLicht, "min", 0) : CHART_SET_NUM(cLicht, "max", 1000)
+CHART_SET_NUM(cLicht, "nachkomma", 0)
+CHART_SET(cLicht, "wertanzeige", "aus")
+CHART_VALUE(cLicht, 0)
+
+DIM cVerlauf AS CHART : cVerlauf = CHART_NEW("linie", 16, 270, 780, 430)
+CHART_THEME(cVerlauf, "dunkel")
+CHART_SET(cVerlauf, "titel", "Verlauf (letzte 2 Minuten)")
+CHART_SET(cVerlauf, "legende", "oben")
+CHART_SET_NUM(cVerlauf, "fenster", 240)
+CHART_SET_NUM(cVerlauf, "nachkomma", 1)
+CHART_SET_FLAG(cVerlauf, "glatt", TRUE)
+CHART_SET_FLAG(cVerlauf, "komma", TRUE)
+DIM rTemp AS INTEGER : rTemp = CHART_SERIES(cVerlauf, "Temperatur °C", RGB(240, 110, 70))
+DIM rFeuchte AS INTEGER : rFeuchte = CHART_SERIES(cVerlauf, "Feuchte %", RGB(90, 160, 240))
+
+' --- Bedienfeld ------------------------------------------------------------------
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("Werkstatt", PANEL_X, 0, BREITE - PANEL_X, HOEHE)
+GUI_WINDOW_CHROME(win, FALSE)
+DIM lbSensor AS GUI_WIDGET : lbSensor = GUI_LABEL(win, "Sensor: noch nichts gehört", 16, 16)
+DIM lbTuer AS GUI_WIDGET : lbTuer = GUI_LABEL(win, "Tür: ?", 16, 44)
+DIM tgLuefter AS GUI_WIDGET : tgLuefter = GUI_TOGGLE(win, "Lüfter", 16, 80)
+DIM cbAuto AS GUI_WIDGET : cbAuto = GUI_CHECKBOX(win, "bei Alarm selbst einschalten", 16, 116)
+DIM lbGrenze AS GUI_WIDGET : lbGrenze = GUI_LABEL(win, "Alarm ab 30,0 °C", 16, 156)
+DIM slGrenze AS GUI_WIDGET : slGrenze = GUI_SLIDER(win, 16, 180, 320, 20, 40, 30)
+DIM tgAufnahme AS GUI_WIDGET : tgAufnahme = GUI_TOGGLE(win, "Aufzeichnen (CSV)", 16, 220)
+DIM lbAufnahme AS GUI_WIDGET : lbAufnahme = GUI_LABEL(win, "", 16, 252)
+DIM lbAlarm AS GUI_WIDGET : lbAlarm = GUI_LABEL(win, "", 16, 290)
+DIM lbEreignisse AS GUI_WIDGET : lbEreignisse = GUI_LABEL(win, "Ereignisse", 16, 330)
+DIM lsEreignisse AS GUI_WIDGET : lsEreignisse = GUI_LISTBOX(win, 16, 356, 330, 340, [])
+
+SUB ereignis(t AS STRING)
+    GUI_LISTBOX_ADD(lsEreignisse, LEFT$(TIME$(), 8) + "  " + t, 0)
+    IF GUI_LISTBOX_COUNT(lsEreignisse) > 200 THEN GUI_LISTBOX_REMOVE(lsEreignisse, 200)
+END SUB
+
+' --- Verbindung ------------------------------------------------------------------
+DIM h AS MQTT_HANDLE
+DIM verbunden AS BOOLEAN
+DIM naechsterVersuch AS INTEGER
+
+SUB verbinden()
+    TRY
+        h = MQTT_CONNECT(broker, port, "werkstatt-dashboard")
+        MQTT_SUBSCRIBE(h, "werkstatt/#")
+        verbunden = TRUE
+        ereignis("verbunden mit " + broker)
+    CATCH e
+        verbunden = FALSE
+        naechsterVersuch = MILLIS() + 3000
+        GUI_SET_TEXT(lbSensor, "Kein Broker auf " + broker + " -- neuer Versuch in 3 s")
+    END TRY
+END SUB
+verbinden()
+
+' --- Zustand ---------------------------------------------------------------------
+DIM temp AS FLOAT, feuchte AS FLOAT, strom AS FLOAT, licht AS FLOAT
+DIM zuletzt AS INTEGER : zuletzt = -1    ' MILLIS() der letzten Messung
+DIM sensorDa AS BOOLEAN
+DIM sensorStatus AS STRING              ' "online"/"offline" vom Broker (letzter Wille)
+DIM alarm AS BOOLEAN
+DIM luefterGemeldet AS STRING
+DIM csv AS FILE
+DIM csvOffen AS BOOLEAN
+DIM csvZeilen AS INTEGER
+DIM neuerWert AS BOOLEAN
+
+SUB nachricht(thema AS STRING, inhalt AS STRING)
+    SELECT CASE thema
+        CASE "werkstatt/temperatur"
+            temp = VAL(inhalt) : CHART_VALUE(cTemp, temp) : neuerWert = TRUE : zuletzt = MILLIS()
+            CHART_SET(cTemp, "wertanzeige", "pille")
+        CASE "werkstatt/feuchte"
+            feuchte = VAL(inhalt) : CHART_VALUE(cFeuchte, feuchte)
+            CHART_SET(cFeuchte, "wertanzeige", "pille")
+        CASE "werkstatt/strom"
+            strom = VAL(inhalt) : CHART_VALUE(cStrom, strom)
+            CHART_SET(cStrom, "wertanzeige", "innen")
+        CASE "werkstatt/licht"
+            licht = VAL(inhalt) : CHART_VALUE(cLicht, licht)
+            CHART_SET(cLicht, "wertanzeige", "blase")
+        CASE "werkstatt/tuer"
+            GUI_SET_TEXT(lbTuer, "Tür: " + inhalt)
+            ereignis("Tür " + inhalt)
+        CASE "werkstatt/luefter"
+            ' Der Sensor bestaetigt den Schaltzustand; der Schalter folgt ihm.
+            GUI_SET_CHECKED(tgLuefter, inhalt = "an")
+            IF inhalt <> luefterGemeldet THEN ereignis("Lüfter " + inhalt)
+            luefterGemeldet = inhalt
+        CASE "werkstatt/status"
+            ' "offline" schickt der BROKER, wenn das Board ohne Abmeldung
+            ' verschwindet -- der letzte Wille in sensor.dh.
+            sensorStatus = inhalt
+            ereignis("Sensor " + inhalt)
+    END SELECT
+END SUB
+
+SUB aufnahme(an AS BOOLEAN)
+    IF an AND NOT csvOffen THEN
+        DIM name AS STRING : name = "werkstatt_" + REPLACE$(REPLACE$(DATE$() + "_" + LEFT$(TIME$(), 8), ":", "-"), " ", "_") + ".csv"
+        csv = OPENFILE(name, "w")
+        WRITELINE(csv, "zeit;temperatur;feuchte;licht;strom")
+        csvOffen = TRUE : csvZeilen = 0
+        GUI_SET_TEXT(lbAufnahme, "-> " + name)
+        GUI_SET_WRAP(lbAufnahme, 330)
+        ereignis("Aufzeichnung läuft")
+    ELSEIF NOT an AND csvOffen THEN
+        CLOSEFILE(csv)
+        csvOffen = FALSE
+        GUI_SET_TEXT(lbAufnahme, STR$(csvZeilen) + " Zeilen geschrieben")
+    END IF
+END SUB
+
+' --- Hauptschleife -----------------------------------------------------------------
+DIM beenden AS BOOLEAN
+WHILE NOT beenden
+    IF QUITREQUESTED() OR WINDOW_CLOSE_REQUESTED() THEN beenden = TRUE
+    IF verbunden THEN
+        MQTT_UPDATE(h)
+        IF NOT MQTT_IS_CONNECTED(h) THEN
+            verbunden = FALSE
+            naechsterVersuch = MILLIS() + 3000
+            ereignis("Verbindung zum Broker verloren")
+        END IF
+        WHILE verbunden AND MQTT_NEXT_MESSAGE(h)
+            nachricht(MQTT_MESSAGE_TOPIC(h), MQTT_MESSAGE_PAYLOAD(h))
+        WEND
+    ELSEIF MILLIS() >= naechsterVersuch THEN
+        verbinden()
+    END IF
+
+    GUI_UPDATE()
+    IF GUI_CLICKED(tgLuefter) AND verbunden THEN
+        MQTT_PUBLISH(h, "werkstatt/luefter/set", IIF(GUI_CHECKED(tgLuefter), "an", "aus"))
+    END IF
+    IF GUI_CLICKED(tgAufnahme) THEN aufnahme(GUI_CHECKED(tgAufnahme))
+    DIM grenze AS FLOAT : grenze = GUI_VALUE(slGrenze)
+    GUI_SET_TEXT(lbGrenze, "Alarm ab " + ZAHL$(grenze, 1) + " °C")
+
+    ' Sensor still? Nach 3 Sekunden ohne Messung gilt er als weg.
+    DIM da AS BOOLEAN : da = zuletzt >= 0 AND MILLIS() - zuletzt < 3000
+    IF da <> sensorDa THEN
+        sensorDa = da
+        ereignis(IIF(da, "Sensor sendet", "Sensor schweigt"))
+    END IF
+    IF sensorStatus = "offline" AND NOT da THEN
+        GUI_SET_TEXT(lbSensor, "Sensor: offline (Broker)")
+    ELSEIF zuletzt < 0 THEN
+        IF verbunden THEN GUI_SET_TEXT(lbSensor, "Sensor: noch nichts gehört")
+    ELSE
+        GUI_SET_TEXT(lbSensor, IIF(da, "Sensor: sendet", "Sensor: schweigt seit " + STR$((MILLIS() - zuletzt) \ 1000) + " s"))
+    END IF
+
+    IF neuerWert THEN
+        neuerWert = FALSE
+        CHART_PUSH(cVerlauf, rTemp, temp)
+        CHART_PUSH(cVerlauf, rFeuchte, feuchte)
+        IF csvOffen THEN
+            WRITELINE(csv, DATE$() + " " + LEFT$(TIME$(), 8) + ";" + FORMAT$(temp, "%.1f") + ";" + FORMAT$(feuchte, "%.1f") + ";" + STR$(INT(licht)) + ";" + FORMAT$(strom, "%.2f"))
+            csvZeilen = csvZeilen + 1
+        END IF
+        ' Alarm nur beim Ueberschreiten, nicht in jedem Bild
+        IF temp > grenze AND NOT alarm THEN
+            alarm = TRUE
+            GUI_SET_TEXT(lbAlarm, "ALARM: " + ZAHL$(temp, 1) + " °C")
+            NOTIFY("Werkstatt", "Temperatur " + ZAHL$(temp, 1) + " °C über " + ZAHL$(grenze, 1) + " °C")
+            ereignis("Alarm: " + ZAHL$(temp, 1) + " °C")
+            IF GUI_CHECKED(cbAuto) AND NOT GUI_CHECKED(tgLuefter) AND verbunden THEN
+                MQTT_PUBLISH(h, "werkstatt/luefter/set", "an")
+            END IF
+        ELSEIF temp < grenze - 0.5 AND alarm THEN
+            alarm = FALSE
+            GUI_SET_TEXT(lbAlarm, "")
+            ereignis("wieder unter " + ZAHL$(grenze, 1) + " °C")
+        END IF
+        ' Die Automatik schaltet auch wieder ab -- zwei Grad unter der Grenze,
+        ' damit der Luefter nicht im Takt der Messungen an und aus geht.
+        IF GUI_CHECKED(cbAuto) AND GUI_CHECKED(tgLuefter) AND temp < grenze - 2.0 AND verbunden THEN
+            MQTT_PUBLISH(h, "werkstatt/luefter/set", "aus")
+        END IF
+    END IF
+
+    CHART_UPDATE(cTemp, DELTA()) : CHART_UPDATE(cFeuchte, DELTA())
+    CHART_UPDATE(cStrom, DELTA()) : CHART_UPDATE(cLicht, DELTA())
+    CLS(RGB(24, 28, 34))
+    CHART_DRAW(cTemp) : CHART_DRAW(cFeuchte) : CHART_DRAW(cStrom) : CHART_DRAW(cLicht) : CHART_DRAW(cVerlauf)
+    GUI_DRAW()
+    FLIP()
+WEND
+aufnahme(FALSE)
+IF verbunden THEN MQTT_DISCONNECT(h)

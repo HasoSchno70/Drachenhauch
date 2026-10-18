@@ -1,6 +1,6 @@
 # Modul `net`
 
-TCP- und UDP-Netzwerk, nativ in `dhrt` ueber Rusts `std::net` (keine zusaetzliche Crate). Cross-Platform, **non-blocking** als Default — passt zu Game-Loops, in denen jeder Frame in <16 ms zurueckkehren muss. Encoding ist immer UTF-8.
+TCP- und UDP-Netzwerk, nativ in `dhrt` ueber Rusts `std::net` (keine zusaetzliche Crate). Cross-Platform, **non-blocking** als Default — passt zu Game-Loops, in denen jeder Frame in <16 ms zurueckkehren muss. Text geht als UTF-8 hinaus; rohe Bytes gehen als `BUFFER` (TCP und UDP).
 
 ```basic
 IMPORT "net"
@@ -21,7 +21,7 @@ IMPORT "net"
 | `NET_RECV_BYTES(sock, max_bytes)` | BUFFER | rohe Bytes ohne UTF-8-Dekodierung, leer wenn nichts da -- fuer Binaerprotokolle |
 | `NET_PEER_ADDR(sock)` | STRING | Remote-IP |
 | `NET_PEER_PORT(sock)` | INTEGER | Remote-Port |
-| `NET_IS_CONNECTED(sock)` | BOOLEAN | FALSE sobald die Gegenseite geschlossen hat oder ein Recv/Send fehlgeschlagen ist |
+| `NET_IS_CONNECTED(sock)` | BOOLEAN | FALSE sobald die Gegenseite geschlossen hat, hart abgebrochen ist oder ein Recv/Send fehlgeschlagen ist |
 | `NET_SET_TIMEOUT(sock, ms)` | — | `0` = non-blocking (Vorgabe), `> 0` = Timeout in ms, `< 0` = vollblockierend |
 | `NET_CLOSE(sock)` | — | Socket schliessen |
 | `NET_CLOSE_LISTENER(lst)` | — | Listener schliessen |
@@ -33,9 +33,12 @@ IMPORT "net"
 | `NET_UDP_BIND(port [, bind_addr$])` | NET_UDP | UDP-Socket auf Port binden. `bind_addr$` optional, Default alle IPv4-Interfaces; `"::"` bindet stattdessen IPv6 |
 | `NET_UDP_OPEN()` | NET_UDP | UDP-Socket ohne Bind (nur Senden) |
 | `NET_UDP_PORT(sock)` | INTEGER | gebundener Port (0 wenn OPEN) |
-| `NET_UDP_SEND(sock, host, port, text)` | INTEGER | gesendete Bytes |
+| `NET_UDP_SEND(sock, host, port, text)` | INTEGER | gesendete Bytes; statt Text geht auch ein `BUFFER` (rohe Bytes) |
 | `NET_UDP_RECV(sock, max_bytes)` | STRING | leer wenn nichts da |
+| `NET_UDP_RECV_BYTES(sock, max_bytes)` | BUFFER | ein Datagramm als rohe Bytes, leer wenn nichts da -- fuer Spielstaende und Binaerprotokolle |
 | `NET_UDP_LAST_FROM(sock)` | STRING `"host:port"` | Absender des letzten RECV (leer vor dem ersten RECV) |
+| `NET_UDP_LAST_HOST$(sock)` | STRING | nur die Adresse des Absenders (`"::1"` statt `"::1:5000"`) |
+| `NET_UDP_LAST_PORT(sock)` | INTEGER | nur sein Port |
 | `NET_UDP_SET_TIMEOUT(sock, ms)` | — | wie oben: `0` = non-blocking, `> 0` = Timeout, `< 0` = vollblockierend |
 | `NET_UDP_CLOSE(sock)` | — | Socket schliessen |
 
@@ -184,6 +187,29 @@ PRINT "Verbindung getrennt"
 Verbindung sauber geschlossen hat (TCP-FIN) oder ein `NET_RECV`/`NET_SEND`
 mit einem echten Fehler (nicht nur "gerade nichts da") fehlgeschlagen ist.
 
+**Bricht die Gegenseite hart ab** (Programm beendet, ohne zu lesen, Absturz,
+Kabel gezogen), ist das kein Laufzeitfehler: `NET_RECV` liefert `""`,
+`NET_RECV_BYTES` einen leeren Puffer, `NET_SEND` 0, und `NET_IS_CONNECTED`
+wird `FALSE`. Bis 2026-10-11 warfen `NET_RECV` und `NET_SEND` hier „Eine
+vorhandene Verbindung wurde vom Remotehost geschlossen" -- ein Spielwirt
+starb, sobald sein Gast das Fenster schloss.
+
+Bei **UDP** gibt es keine Verbindung: ein Datagramm an einen Port, an dem
+niemand mehr lauscht, verschwindet einfach. Windows meldet so etwas zwar
+beim naechsten Lesen; `NET_UDP_RECV` liest dann weiter, statt abzubrechen.
+Ob der andere noch da ist, sagt bei UDP nur, ob noch Pakete kommen -- wer
+das wissen muss, zaehlt die Zeit seit dem letzten Paket.
+
+**`NET_CLOSE` schliesst nachlaufend:** es beendet sofort die eigene
+Richtung (die Gegenseite liest danach das Ende), liest aber im Hintergrund
+noch hoechstens zwei Sekunden lang, was die Gegenseite schickt, bis sie
+selbst schliesst. Kommt an einem ganz geschlossenen Socket noch etwas an,
+bricht das Betriebssystem hart ab -- und die Gegenseite verwirft, was man
+ihr gerade noch geschickt hat (gemessen: eine Absage "BESETZT" vor dem
+Schliessen kam in 5 von 5 Versuchen nicht an, wenn das "HALLO" des anderen
+erst danach eintraf). `NET_CLOSE` haelt dabei nichts an. Dasselbe gilt am
+Programmende.
+
 ## UTF-8 ueber TCP
 
 `NET_RECV` dekodiert den empfangenen Byte-Strom als UTF-8. Da TCP ein reiner
@@ -210,6 +236,31 @@ NET_SEND(sock, b)
 DIM roh AS BUFFER : roh = NET_RECV_BYTES(sock, 4096)
 PRINT BUFFER_TO_HEX$(roh)
 ```
+
+Bei **UDP** genauso: `NET_UDP_SEND` nimmt einen `BUFFER`, und
+`NET_UDP_RECV_BYTES` liefert ein Datagramm als `BUFFER`. Ein Spielstand mit
+Kommazahlen ist kein UTF-8 -- ueber `NET_UDP_RECV` kaemen Bytes ueber 127
+als Ersatzzeichen an.
+
+```basic
+IMPORT "net"
+DIM sock AS NET_UDP : sock = NET_UDP_BIND(0, "127.0.0.1")
+DIM paket AS BUFFER : paket = BUFFER_NEW(9)
+BUFFER_SET(paket, 0, 2)                  ' Art des Pakets
+BUFFER_SET_F32(paket, 1, 412.5)          ' x
+BUFFER_SET_F32(paket, 5, 288.0)          ' y
+NET_UDP_SEND(sock, "127.0.0.1", NET_UDP_PORT(sock), paket)
+SLEEP(20)
+DIM rein AS BUFFER : rein = NET_UDP_RECV_BYTES(sock, 512)
+IF BUFFER_LEN(rein) > 0 THEN
+    PRINT BUFFER_GET_F32(rein, 1); " von "; NET_UDP_LAST_HOST$(sock); ":"; NET_UDP_LAST_PORT(sock)
+END IF
+```
+
+Eine Adresse wie `127.0.0.1` oder `::1` geht ohne Namensaufloesung hinaus;
+nur ein Name (`"spielserver.local"`) wird je Paket aufgeloest (hoechstens
+2 s). Wer oft an einen Namen sendet, loest ihn einmal auf -- etwa ueber das
+erste Paket der Gegenseite und `NET_UDP_LAST_HOST$`.
 
 ## IPv6
 
@@ -271,7 +322,9 @@ kein TIME_WAIT-bedingtes "Address already in use" ohne `SO_REUSEADDR`
 
 ## Beispiel
 
-[examples/72_net_chat.dh](../examples/72_net_chat.dh) zeigt einen kleinen Chat (TCP-Server + Client). UDP-Beispiele sind in den Tests (`tests/pruef/modules_net.dhtest`) zu finden.
+[examples/72_net_chat.dh](../examples/72_net_chat.dh) zeigt einen kleinen Chat (TCP-Server + Client).
+
+[examples/duell/main.dh](../examples/duell/main.dh) ist ein Echtzeit-Spiel fuer zwei: Verbinden und Rundenende ueber TCP, der Spielstand 30-mal je Sekunde als Binaerpaket ueber UDP, der Gast rechnet sein eigenes Schiff voraus und gleicht es mit jedem Stand des Wirts ab. [examples/duell/relay.dh](../examples/duell/relay.dh) spielt ein schlechtes Netz nach (Verzoegerung, Schwankung, Verlust) -- so laesst sich das alles auf EINEM Rechner ausprobieren: zwei Fenster, Wirt und Gast ueber `127.0.0.1`.
 
 ## In der nativen Runtime (dhrt)
 

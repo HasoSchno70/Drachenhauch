@@ -1,0 +1,911 @@
+' Muster als druckbare HTML-Datei -- PySticky io/html_export.py samt
+' Sektionen und Musterseiten.
+'
+' Eine Datei ohne Beilagen: Navigationsleiste, Deckblatt mit SVG-Vorschau und
+' Kenndaten, Vorschau, Legende mit Bedarf und Entsprechungen, Uebersicht mit
+' Seitenkacheln, dann je Seite eine Tabelle mit Symbolen und Zehnerlinien,
+' darueber ein SVG mit Teilstichen, Knoten, Perlen und Rueckstichen. Diamond
+' 1:1 beim Drucken (CSS in mm), Mystery-Modus, Ueberlappung. Der Text ist
+' derselbe wie bei PySticky, Zeile fuer Zeile -- nur endet jede Zeile mit LF
+' (PySticky schreibt unter Windows CRLF).
+'
+' Bewusst anders als PySticky: der Fuss sagt "Erstellt mit Glutfaden".
+
+CLASS HtmlOptionen
+    DIM ueberlappung AS INTEGER
+    DIM kreuz AS ARRAY OF STRING
+    DIM paletten AS ARRAY OF Palette
+    DIM mystery AS BOOLEAN
+    DIM titel AS STRING              ' leer = Dateiname ohne Endung
+    DIM datum AS STRING              ' TT.MM.JJJJ, leer = heute
+    DIM autor AS STRING              ' Vorgaben, wenn das Muster keine hat
+    DIM copyright AS STRING
+
+    SUB Init()
+        kreuz = []
+        paletten = []
+    END SUB
+END CLASS
+
+' Body-Text maskieren wie _html_encode: &times; und &amp; erst zurueck, dann
+' & < > (Anfuehrungszeichen bleiben).
+FUNCTION htmlKodiere$(t AS STRING) AS STRING
+    IF t = "" THEN RETURN t
+    t = REPLACE$(t, "&times;", "×")
+    t = REPLACE$(t, "&amp;", "&")
+    t = REPLACE$(t, "&", "&amp;")
+    t = REPLACE$(t, "<", "&lt;")
+    t = REPLACE$(t, ">", "&gt;")
+    RETURN t
+END FUNCTION
+
+FUNCTION cssRgb$(f AS INTEGER) AS STRING
+    RETURN "rgb(" + STR$(rotAnteil(f)) + "," + STR$(gruenAnteil(f)) + "," + STR$(blauAnteil(f)) + ")"
+END FUNCTION
+
+FUNCTION hf2$(v AS FLOAT) AS STRING
+    RETURN FORMAT$(v, "%.2f")
+END FUNCTION
+
+FUNCTION hf1$(v AS FLOAT) AS STRING
+    RETURN FORMAT$(v, "%.1f")
+END FUNCTION
+
+' Tausenderpunkt wie format_number in deutscher Sprache.
+FUNCTION htmlZahl$(n AS INTEGER) AS STRING
+    DIM t AS STRING : t = STR$(ABS(n))
+    DIM r AS STRING
+    WHILE LEN(t) > 3
+        r = "." + RIGHT$(t, 3) + r
+        t = LEFT$(t, LEN(t) - 3)
+    WEND
+    RETURN IIF(n < 0, "-", "") + t + r
+END FUNCTION
+
+' Ein Drill als SVG: vier Facetten, ab 14 Punkten ein Rand (svg_drill_shape).
+FUNCTION svgDrill$(x AS FLOAT, y AS FLOAT, w AS FLOAT, h AS FLOAT, farbe AS INTEGER) AS STRING
+    DIM seite AS FLOAT : seite = MIN(w, h)
+    DIM ein AS FLOAT : ein = diamantRand(seite)
+    DIM x0 AS FLOAT : x0 = x + ein
+    DIM y0 AS FLOAT : y0 = y + ein
+    DIM x1 AS FLOAT : x1 = x + w - ein
+    DIM y1 AS FLOAT : y1 = y + h - ein
+    DIM cx AS FLOAT : cx = (x0 + x1) / 2
+    DIM cy AS FLOAT : cy = (y0 + y1) / 2
+    DIM r AS STRING
+    r = "<polygon points='" + hf2$(x0) + "," + hf2$(y0) + " " + hf2$(x1) + "," + hf2$(y0) + " " + hf2$(cx) + "," + hf2$(cy) + "' fill='" + cssRgb$(schattiert(farbe, 145)) + "'/>"
+    r = r + "<polygon points='" + hf2$(x1) + "," + hf2$(y0) + " " + hf2$(x1) + "," + hf2$(y1) + " " + hf2$(cx) + "," + hf2$(cy) + "' fill='" + cssRgb$(schattiert(farbe, 110)) + "'/>"
+    r = r + "<polygon points='" + hf2$(x1) + "," + hf2$(y1) + " " + hf2$(x0) + "," + hf2$(y1) + " " + hf2$(cx) + "," + hf2$(cy) + "' fill='" + cssRgb$(schattiert(farbe, 70)) + "'/>"
+    r = r + "<polygon points='" + hf2$(x0) + "," + hf2$(y1) + " " + hf2$(x0) + "," + hf2$(y0) + " " + hf2$(cx) + "," + hf2$(cy) + "' fill='" + cssRgb$(schattiert(farbe, 95)) + "'/>"
+    IF seite >= 14 THEN r = r + "<rect x='" + hf2$(x0) + "' y='" + hf2$(y0) + "' width='" + hf2$(x1 - x0) + "' height='" + hf2$(y1 - y0) + "' fill='none' stroke='rgba(0,0,0,0.4)' stroke-width='0.5'/>"
+    RETURN r
+END FUNCTION
+
+' Ein Stich als SVG (svg_shape_for_stitch, 0,5 Punkte Ueberstand).
+FUNCTION svgStich$(t AS INTEGER, x AS FLOAT, y AS FLOAT, w AS FLOAT, h AS FLOAT, farbe AS INTEGER, alsDrill AS BOOLEAN) AS STRING
+    DIM grund AS STRING : grund = "<rect x='" + hf2$(x) + "' y='" + hf2$(y) + "' width='" + hf2$(w + 0.5) + "' height='" + hf2$(h + 0.5) + "' fill='"
+    IF t = DIAMANT OR (alsDrill AND t = VOLL) THEN RETURN grund + "#ebe8dc'/>" + svgDrill$(x, y, w, h, farbe)
+    DIM cx AS FLOAT : cx = x + w / 2
+    DIM cy AS FLOAT : cy = y + h / 2
+    IF t = KNOTEN THEN
+        DIM rk AS FLOAT : rk = MAX(0.5, MIN(w, h) * KNOTEN_RADIUS)
+        RETURN grund + "#fafafa'/><circle cx='" + hf2$(cx) + "' cy='" + hf2$(cy) + "' r='" + hf2$(rk) + "' fill='" + cssRgb$(farbe) + "'/>"
+    END IF
+    IF t = PERLE THEN
+        DIM rp AS FLOAT : rp = MAX(1.0, MIN(w, h) * PERLE_RADIUS)
+        DIM gl AS STRING : gl = "rgb(" + STR$(rotAnteil(farbe) + (255 - rotAnteil(farbe)) \ 2) + "," + STR$(gruenAnteil(farbe) + (255 - gruenAnteil(farbe)) \ 2) + "," + STR$(blauAnteil(farbe) + (255 - blauAnteil(farbe)) \ 2) + ")"
+        RETURN grund + "#fafafa'/><circle cx='" + hf2$(cx) + "' cy='" + hf2$(cy) + "' r='" + hf2$(rp) + "' fill='" + cssRgb$(farbe) + "'/><circle cx='" + hf2$(cx - rp / 2.5) + "' cy='" + hf2$(cy - rp / 2.5) + "' r='" + hf2$(rp / 3.0) + "' fill='" + gl + "' opacity='0.85'/>"
+    END IF
+    IF NOT istTeilstich(t) THEN RETURN grund + cssRgb$(farbe) + "'/>"
+    DIM p AS ARRAY OF FLOAT : p = teilstichPunkte(t)
+    DIM k AS INTEGER, pk AS STRING
+    FOR k = 0 TO LEN(p) - 1 STEP 2
+        pk = pk + IIF(k > 0, " ", "") + hf2$(x + p[k] * w) + "," + hf2$(y + p[k + 1] * h)
+    NEXT
+    RETURN "<polygon points='" + pk + "' fill='" + cssRgb$(farbe) + "'/>"
+END FUNCTION
+
+' Kopf mit CSS, Zeile fuer Zeile wie _generate_header.
+FUNCTION htmlKopf(titel AS STRING, dpCss AS STRING) AS ARRAY OF STRING
+    DIM z AS ARRAY OF STRING : z = []
+    ARRAY_PUSH(z, "<!DOCTYPE html>")
+    ARRAY_PUSH(z, "<html lang='" + IIF(englisch(), "en", "de") + "'>")
+    ARRAY_PUSH(z, "<head>")
+    ARRAY_PUSH(z, "<meta charset='UTF-8'>")
+    ARRAY_PUSH(z, "<title>Stickmuster: " + htmlKodiere$(titel) + "</title>")
+    ARRAY_PUSH(z, "<style>")
+    ARRAY_PUSH(z, "* { box-sizing: border-box; }")
+    ARRAY_PUSH(z, "body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; padding-top: 60px; }")
+    ARRAY_PUSH(z, ".container { max-width: 210mm; margin: auto; background: white; padding: 15mm; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }")
+    ARRAY_PUSH(z, "h1 { text-align: center; color: #333; margin-bottom: 10px; font-size: 24px; }")
+    ARRAY_PUSH(z, "h2 { text-align: center; color: #555; margin: 15px 0 10px 0; font-size: 16px; }")
+    ARRAY_PUSH(z, "h3 { text-align: center; color: #666; margin: 10px 0; font-size: 14px; }")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "/* Deckblatt */")
+    ARRAY_PUSH(z, ".cover-page { text-align: center; padding: 0; min-height: 100vh; display: flex; flex-direction: column; }")
+    ARRAY_PUSH(z, ".cover-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 20px; }")
+    ARRAY_PUSH(z, ".cover-icon { font-size: 64px; margin-bottom: 15px; }")
+    ARRAY_PUSH(z, ".cover-title { font-size: 36px; font-weight: 300; margin: 0 0 10px 0; letter-spacing: 2px; }")
+    ARRAY_PUSH(z, ".cover-subtitle { font-size: 24px; font-weight: 600; margin: 0; opacity: 0.95; }")
+    ARRAY_PUSH(z, ".cover-date { font-size: 14px; margin-top: 15px; opacity: 0.8; }")
+    ARRAY_PUSH(z, ".cover-body { flex: 1; padding: 30px 20px; display: flex; flex-direction: column; align-items: center; }")
+    ARRAY_PUSH(z, ".cover-preview { margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }")
+    ARRAY_PUSH(z, ".cover-preview-inner { border: 3px solid #667eea; border-radius: 8px; overflow: hidden; }")
+    ARRAY_PUSH(z, ".cover-preview-label { font-size: 12px; color: #666; margin-top: 10px; font-style: italic; }")
+    ARRAY_PUSH(z, ".cover-info { margin: 20px auto; max-width: 500px; text-align: left; width: 100%; }")
+    ARRAY_PUSH(z, ".cover-info table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }")
+    ARRAY_PUSH(z, ".cover-info td { padding: 12px 16px; border-bottom: 1px solid #f0f0f0; }")
+    ARRAY_PUSH(z, ".cover-info tr:last-child td { border-bottom: none; }")
+    ARRAY_PUSH(z, ".cover-info td:first-child { font-weight: 600; color: #667eea; width: 45%; background: #fafbff; }")
+    ARRAY_PUSH(z, ".cover-footer { padding: 20px; background: #f8f9fa; border-top: 1px solid #eee; }")
+    ARRAY_PUSH(z, ".cover-footer-text { font-size: 11px; color: #999; }")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "/* Statistik-Karten */")
+    ARRAY_PUSH(z, ".stats-box { display: flex; justify-content: center; gap: 15px; margin: 25px 0; flex-wrap: wrap; }")
+    ARRAY_PUSH(z, ".stat-item { text-align: center; padding: 20px 25px; background: white; border-radius: 12px; box-shadow: 0 3px 15px rgba(102,126,234,0.15); border: 1px solid #e8ecf4; min-width: 100px; }")
+    ARRAY_PUSH(z, ".stat-value { font-size: 26px; font-weight: 700; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }")
+    ARRAY_PUSH(z, ".stat-label { font-size: 11px; color: #888; margin-top: 6px; text-transform: uppercase; letter-spacing: 1px; }")
+    ARRAY_PUSH(z, ".stat-icon { font-size: 24px; margin-bottom: 8px; }")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "/* Seitenumbruch */")
+    ARRAY_PUSH(z, ".page-break { page-break-before: always; }")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "/* Tabellen */")
+    ARRAY_PUSH(z, ".legend-table { border-collapse: collapse; margin: 15px auto; width: 100%; }")
+    ARRAY_PUSH(z, ".legend-table th { background: #3498db; color: white; padding: 10px 8px; text-align: left; font-size: 12px; }")
+    ARRAY_PUSH(z, ".legend-table td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 11px; }")
+    ARRAY_PUSH(z, ".legend-table tr:nth-child(even) { background: #f9f9f9; }")
+    ARRAY_PUSH(z, ".legend-table tr:hover { background: #f0f7ff; }")
+    ARRAY_PUSH(z, ".color-box { width: 24px; height: 24px; display: inline-block; border: 1px solid #333; vertical-align: middle; border-radius: 3px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "/* Vorschau */")
+    ARRAY_PUSH(z, ".preview-container { position: relative; display: inline-block; margin: 15px auto; border: 2px solid #333; }")
+    ARRAY_PUSH(z, ".preview-table { border-collapse: collapse; border: 0; }")
+    ARRAY_PUSH(z, ".preview-table td { border: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }")
+    ARRAY_PUSH(z, ".preview-svg-overlay { position: absolute; top: 0; left: 0; pointer-events: none; }")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "/* Übersicht */")
+    ARRAY_PUSH(z, ".overview-section { text-align: center; }")
+    ARRAY_PUSH(z, ".overview-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px 12px 0 0; }")
+    ARRAY_PUSH(z, ".overview-header h1 { color: white; margin: 0 0 5px 0; font-size: 22px; }")
+    ARRAY_PUSH(z, ".overview-header p { margin: 0; opacity: 0.9; font-size: 13px; }")
+    ARRAY_PUSH(z, ".overview-container { display: flex; gap: 30px; justify-content: center; align-items: flex-start; flex-wrap: wrap; padding: 25px; background: #f8f9fa; border-radius: 0 0 12px 12px; border: 1px solid #e0e0e0; border-top: none; }")
+    ARRAY_PUSH(z, ".overview-preview-box { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 3px 15px rgba(0,0,0,0.1); }")
+    ARRAY_PUSH(z, ".overview-preview-title { font-size: 12px; color: #666; margin-bottom: 10px; font-weight: 600; }")
+    ARRAY_PUSH(z, ".overview-preview-inner { border: 2px solid #667eea; border-radius: 6px; overflow: hidden; }")
+    ARRAY_PUSH(z, ".overview-grid-box { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 3px 15px rgba(0,0,0,0.1); flex: 1; max-width: 400px; }")
+    ARRAY_PUSH(z, ".overview-grid-title { font-size: 12px; color: #666; margin-bottom: 15px; font-weight: 600; }")
+    ARRAY_PUSH(z, ".overview-table { border: none; width: 100%; border-collapse: collapse; }")
+    ARRAY_PUSH(z, ".overview-table td { border: none; padding: 0; vertical-align: top; }")
+    ARRAY_PUSH(z, ".overview-cell { display: block; margin: 4px; padding: 12px 8px; background: linear-gradient(145deg, #ffffff, #f0f0f0); border: 2px solid #e0e0e0; border-radius: 8px; text-decoration: none; color: #333; transition: all 0.2s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }")
+    ARRAY_PUSH(z, ".overview-cell:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102,126,234,0.3); border-color: #667eea; }")
+    ARRAY_PUSH(z, ".overview-cell-nr { font-size: 18px; font-weight: 700; color: #667eea; display: block; }")
+    ARRAY_PUSH(z, ".overview-cell-range { font-size: 9px; color: #888; display: block; margin-top: 3px; }")
+    ARRAY_PUSH(z, ".overview-info { margin-top: 20px; padding: 15px; background: white; border-radius: 8px; border-left: 4px solid #667eea; text-align: left; }")
+    ARRAY_PUSH(z, ".overview-info p { margin: 5px 0; font-size: 12px; color: #555; }")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "/* Muster-Raster */")
+    ARRAY_PUSH(z, ".pattern-container { position: relative; display: inline-block; }")
+    ARRAY_PUSH(z, ".grid-table { border-collapse: collapse; margin: 15px auto; border: 2px solid #333; table-layout: fixed; }")
+    ARRAY_PUSH(z, ".grid-table td { border: 1px solid #ccc; width: 16px; height: 16px; text-align: center; font-size: 10px; font-weight: bold; vertical-align: middle; padding: 1px; overflow: hidden; white-space: nowrap; }")
+    ARRAY_PUSH(z, ".grid-header { background-color: #ecf0f1; font-weight: bold; font-size: 9px; color: #333; }")
+    ARRAY_PUSH(z, "td.thick-right { border-right: 2px solid #333; }")
+    ARRAY_PUSH(z, "td.thick-bottom { border-bottom: 2px solid #333; }")
+    ARRAY_PUSH(z, "/* Working-Chart-Overlap: gestrichelter Rand + leicht abgedunkelt zur Trennung */")
+    ARRAY_PUSH(z, "td.overlap-col { background-color: #f3e9c6 !important; border-left: 1px dashed #b58900; }")
+    ARRAY_PUSH(z, "td.overlap-row { background-color: #f3e9c6 !important; border-top: 1px dashed #b58900; }")
+    ARRAY_PUSH(z, "td.overlap-cell { background-color: rgba(243, 233, 198, 0.45); }")
+    ARRAY_PUSH(z, ".grid-svg-overlay { position: absolute; top: 0; left: 0; pointer-events: none; }")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "/* Backstitch-Legende */")
+    ARRAY_PUSH(z, ".backstitch-info { margin-top: 10px; padding: 8px 12px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; font-size: 11px; color: #856404; }")
+    ARRAY_PUSH(z, ".backstitch-info strong { color: #664d03; }")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "/* Navigation */")
+    ARRAY_PUSH(z, ".nav-bar { position: fixed; top: 0; left: 0; right: 0; background: #2c3e50; padding: 10px 20px; z-index: 1000; display: flex; justify-content: space-between; align-items: center; }")
+    ARRAY_PUSH(z, ".nav-bar a { color: white; text-decoration: none; padding: 5px 15px; border-radius: 4px; margin: 0 5px; }")
+    ARRAY_PUSH(z, ".nav-bar a:hover { background: #34495e; }")
+    ARRAY_PUSH(z, ".nav-bar .btn-print { background: #27ae60; }")
+    ARRAY_PUSH(z, ".nav-bar .btn-print:hover { background: #2ecc71; }")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "/* Seiten-Header */")
+    ARRAY_PUSH(z, ".page-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 15px; }")
+    ARRAY_PUSH(z, ".page-header .title { font-size: 14px; font-weight: bold; color: #333; }")
+    ARRAY_PUSH(z, ".page-header .info { font-size: 11px; color: #666; }")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "/* Mini-Legende */")
+    ARRAY_PUSH(z, ".mini-legend { margin-top: 15px; padding: 10px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; font-size: 10px; }")
+    ARRAY_PUSH(z, ".mini-legend-item { display: inline-block; margin: 3px 8px; white-space: nowrap; }")
+    ARRAY_PUSH(z, ".mini-legend .color-box { width: 14px; height: 14px; margin-right: 4px; }")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "/* Footer */")
+    ARRAY_PUSH(z, ".page-footer { text-align: center; font-size: 10px; color: #999; margin-top: 20px; padding-top: 10px; border-top: 1px solid #eee; }")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "/* Druck */")
+    ARRAY_PUSH(z, "@media print {")
+    ARRAY_PUSH(z, "  .nav-bar { display: none !important; }")
+    ARRAY_PUSH(z, "  body { padding-top: 0; background: white; }")
+    ARRAY_PUSH(z, "  .container { box-shadow: none; padding: 5mm; max-width: none; }")
+    ARRAY_PUSH(z, "  .grid-table td { width: 14px; height: 14px; font-size: 9px; }")
+    ARRAY_PUSH(z, "  .cover-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }")
+    ARRAY_PUSH(z, "  .overview-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }")
+    ARRAY_PUSH(z, "  .stat-value { color: #667eea; -webkit-text-fill-color: #667eea; }")
+    ARRAY_PUSH(z, "  @page { size: A4; margin: 10mm; }")
+    ARRAY_PUSH(z, "}")
+    ARRAY_PUSH(z, dpCss)
+    ARRAY_PUSH(z, "</style>")
+    ARRAY_PUSH(z, "</head>")
+    ARRAY_PUSH(z, "<body>")
+    RETURN z
+END FUNCTION
+
+CLASS HtmlLauf
+    DIM m AS Muster
+    DIM k AS Komposit
+    DIM b AS Bedarf
+    DIM o AS HtmlOptionen
+    DIM dp AS BOOLEAN
+    DIM jeX AS INTEGER
+    DIM jeY AS INTEGER
+    DIM seitenX AS INTEGER
+    DIM seitenY AS INTEGER
+    DIM pitch AS FLOAT               ' Diamond: Drill-Kante in mm, sonst 0
+    DIM titel AS STRING
+    DIM datum AS STRING
+    DIM autor AS STRING
+    DIM copyright AS STRING
+END CLASS
+
+' Garnfarbe an einer Stelle, -1 = kein Stich.
+FUNCTION htmlFarbeBei(r AS HtmlLauf, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM f AS INTEGER : f = r.k.farbeBei(x, y)
+    IF f < 0 OR f >= LEN(r.m.farben) THEN RETURN -1
+    RETURN r.m.farben[f].garn.farbe
+END FUNCTION
+
+FUNCTION htmlSymbolBei$(r AS HtmlLauf, x AS INTEGER, y AS INTEGER) AS STRING
+    DIM f AS INTEGER : f = r.k.farbeBei(x, y)
+    IF f < 0 OR f >= LEN(r.m.farben) THEN RETURN ""
+    RETURN r.m.farben[f].symbol
+END FUNCTION
+
+' Alle Stiche als SVG-Formen in einer Flaeche mit Zellen w x h.
+FUNCTION htmlStiche$(r AS HtmlLauf, w AS FLOAT, h AS FLOAT) AS STRING
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO r.m.hoehe - 1
+        FOR x = 0 TO r.m.breite - 1
+            DIM c AS INTEGER : c = htmlFarbeBei(r, x, y)
+            IF c < 0 THEN CONTINUE
+            ARRAY_PUSH(teile, svgStich$(r.k.artBei(x, y), x * w, y * h, w, h, c, r.dp))
+        NEXT
+    NEXT
+    RETURN JOIN$(teile, "")
+END FUNCTION
+
+FUNCTION htmlMystery$(w AS FLOAT, h AS FLOAT) AS STRING
+    DIM fs AS FLOAT : fs = MIN(w, h) * 0.5
+    RETURN "<rect x='0' y='0' width='" + hf1$(w) + "' height='" + hf1$(h) + "' fill='#f5f5f5'/><text x='" + hf1$(w / 2) + "' y='" + hf1$(h / 2 + fs * 0.35) + "' font-size='" + FORMAT$(fs, "%.0f") + "' text-anchor='middle' fill='#cccccc'>?</text>"
+END FUNCTION
+
+' Rueckstiche als SVG-Linien (mit Schatten); Bereich in Stichen, `bis`
+' ausschliesslich (_generate_backstitches_svg).
+FUNCTION htmlRueckstiche$(r AS HtmlLauf, z AS FLOAT, ox AS FLOAT, oy AS FLOAT, sx AS INTEGER, sy AS INTEGER, bx AS INTEGER, by AS INTEGER) AS STRING
+    IF LEN(r.m.rueckstiche) = 0 THEN RETURN ""
+    DIM halb AS FLOAT : halb = z / 2
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM rs AS Rueckstich
+    FOR EACH rs IN r.m.rueckstiche
+        DIM ax AS INTEGER : ax = MIN(rs.x1 \ 2, r.m.breite - 1)
+        DIM ay AS INTEGER : ay = MIN(rs.y1 \ 2, r.m.hoehe - 1)
+        DIM cx AS INTEGER : cx = MIN(rs.x2 \ 2, r.m.breite - 1)
+        DIM cy AS INTEGER : cy = MIN(rs.y2 \ 2, r.m.hoehe - 1)
+        DIM drin AS BOOLEAN : drin = (sx <= ax AND ax < bx AND sy <= ay AND ay < by) OR (sx <= cx AND cx < bx AND sy <= cy AND cy < by)
+        IF NOT drin THEN CONTINUE
+        DIM farbe AS STRING : farbe = "rgb(0,0,0)"
+        IF rs.farbe >= 0 AND rs.farbe < LEN(r.m.farben) THEN farbe = cssRgb$(r.m.farben[rs.farbe].garn.farbe)
+        DIM x1 AS STRING : x1 = hf2$((rs.x1 - sx * 2) * halb + ox)
+        DIM y1 AS STRING : y1 = hf2$((rs.y1 - sy * 2) * halb + oy)
+        DIM x2 AS STRING : x2 = hf2$((rs.x2 - sx * 2) * halb + ox)
+        DIM y2 AS STRING : y2 = hf2$((rs.y2 - sy * 2) * halb + oy)
+        DIM sw AS FLOAT : sw = MAX(1.5, z / 8)
+        ARRAY_PUSH(teile, "<line x1='" + x1 + "' y1='" + y1 + "' x2='" + x2 + "' y2='" + y2 + "' stroke='rgba(0,0,0,0.3)' stroke-width='" + hf1$(sw + 1) + "' stroke-linecap='round'/>")
+        ARRAY_PUSH(teile, "<line x1='" + x1 + "' y1='" + y1 + "' x2='" + x2 + "' y2='" + y2 + "' stroke='" + farbe + "' stroke-width='" + hf1$(sw) + "' stroke-linecap='round'/>")
+    NEXT
+    RETURN JOIN$(teile, CHR$(10))
+END FUNCTION
+
+FUNCTION htmlDpCss$(r AS HtmlLauf) AS STRING
+    IF r.pitch <= 0 THEN RETURN ""
+    DIM z AS ARRAY OF STRING : z = ["@media print {", "  .grid-table td {", "    width: " + STR$(r.pitch) + "mm !important;", "    height: " + STR$(r.pitch) + "mm !important;", "    padding: 0 !important;", "    font-size: 0 !important;", "  }", "  .grid-svg-overlay { width: 100% !important; height: 100% !important; }", "}"]
+    RETURN JOIN$(z, CHR$(10))
+END FUNCTION
+
+FUNCTION htmlNavigation$(r AS HtmlLauf) AS STRING
+    DIM n AS INTEGER : n = r.seitenX * r.seitenY
+    DIM z AS ARRAY OF STRING : z = ["<div class='nav-bar'>", "<div>", tr$("<a href='#deckblatt'>Deckblatt</a>"), tr$("<a href='#vorschau'>Vorschau</a>"), tr$("<a href='#legende'>Legende</a>"), tr$("<a href='#uebersicht'>&Uuml;bersicht</a>")]
+    DIM i AS INTEGER
+    IF n <= 10 THEN
+        FOR i = 1 TO n
+            ARRAY_PUSH(z, "<a href='#seite" + STR$(i) + "'>S." + STR$(i) + "</a>")
+        NEXT
+    ELSE
+        ARRAY_PUSH(z, tr$("<a href='#seite1'>Muster &rarr;</a>"))
+    END IF
+    ARRAY_PUSH(z, "</div>")
+    ARRAY_PUSH(z, tr$("<div><a href='javascript:window.print()' class='btn-print'>&#128424; Als PDF drucken</a></div>"))
+    ARRAY_PUSH(z, "</div>")
+    RETURN JOIN$(z, CHR$(10))
+END FUNCTION
+
+FUNCTION htmlGroesse$(r AS HtmlLauf) AS STRING
+    ' wie PySticky: Stiche je Zoll -> cm, auch im Diamond-Modus
+    RETURN hf1$(r.m.breite / (r.m.stoff / 2.54)) + " &times; " + hf1$(r.m.hoehe / (r.m.stoff / 2.54))
+END FUNCTION
+
+FUNCTION htmlMeta$(m AS Muster, schluessel AS STRING) AS STRING
+    IF NOT JSON_HAS(m.metadaten, schluessel) THEN RETURN ""
+    IF JSON_TYPE(m.metadaten, schluessel) <> "string" THEN RETURN ""
+    RETURN JSON_GET_STRING(m.metadaten, schluessel)
+END FUNCTION
+
+FUNCTION htmlBegonnen$(r AS HtmlLauf) AS STRING
+    DIM b AS STRING : b = TRIM$(htmlMeta$(r.m, "started_date"))
+    IF b = "" THEN RETURN ""
+    IF LEN(b) = 10 AND MID$(b, 4, 1) = "-" AND MID$(b, 7, 1) = "-" THEN b = RIGHT$(b, 2) + "." + MID$(b, 5, 2) + "." + LEFT$(b, 4)
+    RETURN trf$("<tr><td>&#128197; Begonnen am</td><td>{0}</td></tr>", [htmlKodiere$(b)])
+END FUNCTION
+
+FUNCTION htmlNotizen$(r AS HtmlLauf) AS STRING
+    DIM n AS STRING : n = TRIM$(htmlMeta$(r.m, "notes"))
+    IF n = "" THEN RETURN ""
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM zl AS STRING
+    FOR EACH zl IN SPLIT$(n, CHR$(10))
+        ARRAY_PUSH(teile, htmlKodiere$(zl))
+    NEXT
+    RETURN trf$("<div class='cover-info' style='margin-top: 16px;'><table><tr><td style='vertical-align: top;'>&#128221; Notizen</td><td>{0}</td></tr></table></div>", [JOIN$(teile, "<br>")])
+END FUNCTION
+
+FUNCTION htmlDeckblatt$(r AS HtmlLauf) AS STRING
+    DIM m AS Muster : m = r.m
+    DIM mw AS FLOAT : mw = 200.0
+    DIM mh AS FLOAT : mh = mw * m.hoehe / m.breite
+    IF mh > 150 THEN
+        mh = 150.0 : mw = mh * m.breite / m.hoehe
+    END IF
+    DIM svg AS STRING
+    IF r.o.mystery THEN svg = htmlMystery$(mw, mh) ELSE svg = htmlStiche$(r, mw / m.breite, mh / m.hoehe)
+    DIM rueck AS STRING, rueckZahl AS INTEGER, rueckZeile AS STRING
+    IF NOT r.dp AND NOT r.o.mystery THEN
+        rueck = htmlRueckstiche$(r, mw / m.breite, 0, 0, 0, 0, m.breite, m.hoehe)
+        rueckZahl = LEN(m.rueckstiche)
+        IF rueckZahl > 0 THEN rueckZeile = trf$("<tr><td>&#8600; R&uuml;ckstiche</td><td>{0} Linien</td></tr>", [STR$(rueckZahl)])
+    END IF
+    DIM autorHtml AS STRING
+    IF r.autor <> "" THEN autorHtml = trf$("<p class='cover-date'>von {0}</p>", [htmlKodiere$(r.autor)])
+    DIM einheit AS STRING : einheit = begriff$(m, "einheit")
+    DIM vorrat AS STRING : vorrat = begriff$(m, "bedarfseinheit")
+    DIM ikon AS STRING : ikon = IIF(r.dp, "&#128142;", "&#129525;")
+    DIM auslass AS STRING
+    IF r.b.ausgelassen > 0 THEN auslass = trf$("<tr><td>&#10010; {0}</td><td>{1}</td></tr><tr><td>&#128683; Stofffarbe</td><td>{2} Farbe(n), wird nicht gestickt</td></tr>", [IIF(r.dp, tr$("Zu kleben:"), tr$("Zu sticken:")), htmlZahl$(r.b.zuSticken), STR$(r.b.ausgelassen)])
+    DIM kachel AS STRING
+    IF rueckZahl > 0 THEN kachel = trf$("<div class='stat-item'><div class='stat-icon'>&#8600;</div><div class='stat-value'>{0}</div><div class='stat-label'>R&uuml;ckstiche</div></div>", [STR$(rueckZahl)])
+    DIM seiten AS INTEGER : seiten = r.seitenX * r.seitenY
+    DIM z AS ARRAY OF STRING : z = [""]
+    ARRAY_PUSH(z, "<div id='deckblatt' class='cover-page'>")
+    ARRAY_PUSH(z, "<div class='cover-header'>")
+    ARRAY_PUSH(z, "<div class='cover-icon'>" + IIF(r.dp, "&#128142;", "&#9986;") + "</div>")
+    ARRAY_PUSH(z, "<h1 class='cover-title'>" + IIF(r.dp, tr$("DIAMOND-PAINTING-VORLAGE"), tr$("KREUZSTICH-MUSTER")) + "</h1>")
+    ARRAY_PUSH(z, "<p class='cover-subtitle'>" + htmlKodiere$(r.titel) + "</p>")
+    ARRAY_PUSH(z, autorHtml)
+    ARRAY_PUSH(z, trf$("<p class='cover-date'>Erstellt am {0}</p>", [r.datum]))
+    ARRAY_PUSH(z, "</div>")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "<div class='cover-body'>")
+    ARRAY_PUSH(z, "<div class='cover-preview'>")
+    ARRAY_PUSH(z, "<div class='cover-preview-inner'>")
+    ARRAY_PUSH(z, "<svg width='" + STR$(INT(mw)) + "' height='" + STR$(INT(mh)) + "' style='display:block;'>")
+    ARRAY_PUSH(z, svg)
+    ARRAY_PUSH(z, rueck)
+    ARRAY_PUSH(z, "</svg>")
+    ARRAY_PUSH(z, "</div>")
+    ARRAY_PUSH(z, "<div class='cover-preview-label'>" + begriff$(m, "vorschau") + IIF(rueckZahl > 0, tr$(" (inkl. R&uuml;ckstiche)"), "") + "</div>")
+    ARRAY_PUSH(z, "</div>")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "<div class='stats-box'>")
+    ARRAY_PUSH(z, "<div class='stat-item'><div class='stat-icon'>&#128208;</div><div class='stat-value'>" + STR$(m.breite) + "&times;" + STR$(m.hoehe) + "</div><div class='stat-label'>" + einheit + "</div></div>")
+    ARRAY_PUSH(z, trf$("<div class='stat-item'><div class='stat-icon'>&#127912;</div><div class='stat-value'>{0}</div><div class='stat-label'>Farben</div></div>", [STR$(LEN(m.farben))]))
+    ARRAY_PUSH(z, "<div class='stat-item'><div class='stat-icon'>" + ikon + "</div><div class='stat-value'>" + STR$(r.b.straenge) + "</div><div class='stat-label'>" + vorrat + "</div></div>")
+    ARRAY_PUSH(z, trf$("<div class='stat-item'><div class='stat-icon'>&#128196;</div><div class='stat-value'>{0}</div><div class='stat-label'>Seiten</div></div>", [STR$(seiten)]))
+    ARRAY_PUSH(z, kachel)
+    ARRAY_PUSH(z, "</div>")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "<div class='cover-info'>")
+    ARRAY_PUSH(z, "<table>")
+    ARRAY_PUSH(z, trf$("<tr><td>&#128207; Mustergr&ouml;&szlig;e</td><td>{0} × {1} {2}</td></tr>", [STR$(m.breite), STR$(m.hoehe), einheit]))
+    ARRAY_PUSH(z, "<tr><td>&#129526; " + begriff$(m, "stoff") + "</td><td>" + htmlKodiere$(stoffName$(m)) + "</td></tr>")
+    ARRAY_PUSH(z, trf$("<tr><td>&#128207; Fertige Gr&ouml;&szlig;e</td><td>{0} cm</td></tr>", [htmlGroesse$(r)]))
+    ARRAY_PUSH(z, trf$("<tr><td>&#127912; Anzahl Farben</td><td>{0} verschiedene Farben</td></tr>", [STR$(LEN(m.farben))]))
+    ARRAY_PUSH(z, trf$("<tr><td>&#10010; Gesamt</td><td>{0}{1}</td></tr>", [STR$(r.b.stiche), IIF(r.dp, tr$(" Drills"), tr$(" Kreuze"))]))
+    ARRAY_PUSH(z, auslass)
+    ARRAY_PUSH(z, rueckZeile)
+    ARRAY_PUSH(z, "<tr><td>" + ikon + " " + begriff$(m, "bedarf") + "</td><td>ca. " + STR$(r.b.straenge) + " " + vorrat + "</td></tr>")
+    ARRAY_PUSH(z, trf$("<tr><td>&#128196; Musterseiten</td><td>{0} Seiten</td></tr>", [STR$(seiten)]))
+    ARRAY_PUSH(z, htmlBegonnen$(r))
+    ARRAY_PUSH(z, "</table>")
+    ARRAY_PUSH(z, "</div>")
+    ARRAY_PUSH(z, htmlNotizen$(r))
+    ARRAY_PUSH(z, "</div>")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "<div class='cover-footer'>")
+    ARRAY_PUSH(z, trf$("<p class='cover-footer-text'>Erstellt mit Glutfaden &middot; {0}{1}</p>", [r.datum, IIF(r.copyright <> "", " &middot; " + htmlKodiere$(r.copyright), "")]))
+    ARRAY_PUSH(z, "</div>")
+    ARRAY_PUSH(z, "</div>")
+    RETURN JOIN$(z, CHR$(10))
+END FUNCTION
+
+FUNCTION htmlVorschau$(r AS HtmlLauf) AS STRING
+    DIM m AS Muster : m = r.m
+    DIM z AS FLOAT : z = MIN(650 / m.breite, 900 / m.hoehe)
+    z = MAX(1, MIN(8, z))
+    DIM tw AS FLOAT : tw = m.breite * z
+    DIM th AS FLOAT : th = m.hoehe * z
+    DIM svg AS STRING : svg = "<rect x='0' y='0' width='" + hf1$(tw) + "' height='" + hf1$(th) + "' fill='" + IIF(r.dp, "#ebe8dc", "#fafafa") + "'/>"
+    IF r.o.mystery THEN svg = svg + htmlMystery$(tw, th) ELSE svg = svg + htmlStiche$(r, z, z)
+    DIM rueck AS STRING
+    IF NOT r.o.mystery AND NOT r.dp THEN rueck = htmlRueckstiche$(r, z, 0, 0, 0, 0, m.breite, m.hoehe)
+    DIM info AS STRING
+    IF NOT r.o.mystery AND NOT r.dp AND LEN(m.rueckstiche) > 0 THEN info = trf$("<div class='backstitch-info'><strong>&#8600; R&uuml;ckstiche:</strong> {0} Linien werden &uuml;ber dem Muster gezeigt.</div>", [STR$(LEN(m.rueckstiche))])
+    DIM t AS ARRAY OF STRING : t = [""]
+    ARRAY_PUSH(t, "<div class='page-break'></div>")
+    ARRAY_PUSH(t, "<div id='vorschau'>")
+    ARRAY_PUSH(t, tr$("<h1>Vorschau des fertigen Musters</h1>"))
+    ARRAY_PUSH(t, trf$("<h3>Fertige Gr&ouml;&szlig;e auf {0}: {1} cm</h3>", [htmlKodiere$(stoffName$(m)), htmlGroesse$(r)]))
+    ARRAY_PUSH(t, "<div class='preview-container'>")
+    ARRAY_PUSH(t, "<svg class='preview-svg' width='" + hf1$(tw) + "' height='" + hf1$(th) + "'")
+    ARRAY_PUSH(t, "     shape-rendering='crispEdges'>")
+    ARRAY_PUSH(t, svg)
+    ARRAY_PUSH(t, rueck)
+    ARRAY_PUSH(t, "</svg>")
+    ARRAY_PUSH(t, "</div>")
+    ARRAY_PUSH(t, info)
+    ARRAY_PUSH(t, "</div>")
+    RETURN JOIN$(t, CHR$(10))
+END FUNCTION
+
+FUNCTION htmlLegende$(r AS HtmlLauf) AS STRING
+    DIM m AS Muster : m = r.m
+    ' Paletten der Entsprechungen
+    DIM kpal AS ARRAY OF Palette : kpal = []
+    DIM kgf AS ARRAY OF Garnfarben : kgf = []
+    DIM kn AS STRING
+    FOR EACH kn IN r.o.kreuz
+        DIM p AS Palette
+        DIM gefunden AS Palette
+        FOR EACH p IN r.o.paletten
+            IF LOWER$(p.name) = LOWER$(kn) THEN gefunden = p
+        NEXT
+        IF IS_NIL(gefunden) THEN THROW trf$("HTML-Export: Palette '{0}' gibt es nicht", [kn])
+        ARRAY_PUSH(kpal, gefunden)
+        ARRAY_PUSH(kgf, garnfarbenVon(gefunden.garne))
+    NEXT
+    DIM zeilen AS ARRAY OF STRING : zeilen = []
+    DIM nr AS INTEGER, faeden AS INTEGER, i AS INTEGER
+    DIM fb AS Farbbedarf
+    FOR EACH fb IN r.b.farben
+        IF fb.perle THEN CONTINUE
+        nr = nr + 1
+        faeden = faeden + 1
+        DIM e AS Farbeintrag : e = m.farben[fb.nr]
+        DIM g AS Garn : g = e.garn
+        DIM pz AS STRING : pz = "-"
+        DIM sz AS STRING : sz = "-"
+        DIM anhang AS STRING : anhang = " [⊘]"
+        DIM zeilenStil AS STRING : zeilenStil = " style='opacity:0.55;'"
+        IF NOT fb.auslassen THEN
+            pz = FORMAT$(IIF(r.b.zuSticken > 0, fb.zahl * 100.0 / r.b.zuSticken, 0.0), "%.1f") + "%"
+            sz = STR$(fb.straenge)
+            anhang = "" : zeilenStil = ""
+        END IF
+        DIM kz AS STRING
+        FOR i = 0 TO LEN(kpal) - 1
+            DIM eq AS Garn : eq = entsprechung(g, kpal[i], kgf[i])
+            kz = kz + IIF(IS_NIL(eq), "<td>—</td>", "<td>" + htmlKodiere$(IIF(eq.nummer <> "", eq.nummer, eq.name)) + "</td>")
+        NEXT
+        DIM lab AS STRING
+        IF g.istBlend() THEN
+            FOR i = 0 TO LEN(g.teile) - 1
+                lab = lab + IIF(i > 0, " + ", "") + TRIM$(g.teile[i].hersteller + " " + g.teile[i].nummer)
+            NEXT
+            IF LEN(g.anteile) > 0 THEN
+                DIM an AS STRING
+                FOR i = 0 TO LEN(g.anteile) - 1
+                    an = an + IIF(i > 0, "+", "") + STR$(g.anteile[i])
+                NEXT
+                lab = lab + " (" + an + ")"
+            END IF
+        ELSEIF r.dp THEN
+            lab = g.nummer
+        ELSE
+            lab = TRIM$(g.hersteller + " " + g.nummer)
+        END IF
+        DIM t AS ARRAY OF STRING : t = ["<tr" + zeilenStil + ">"]
+        ARRAY_PUSH(t, "<td>" + STR$(nr) + "</td>")
+        ARRAY_PUSH(t, "<td style='text-align:center;font-size:14px;'><b>" + htmlKodiere$(e.symbol) + "</b></td>")
+        ARRAY_PUSH(t, "<td><div class='color-box' style='background:" + cssRgb$(g.farbe) + "'></div></td>")
+        ARRAY_PUSH(t, "<td><b>" + htmlKodiere$(lab) + "</b></td>")
+        ARRAY_PUSH(t, "<td>" + htmlKodiere$(g.name) + anhang + "</td>")
+        ARRAY_PUSH(t, kz + "<td style='text-align:right;'>" + STR$(fb.zahl) + "</td>")
+        ARRAY_PUSH(t, "<td style='text-align:right;'>" + pz + "</td>")
+        ARRAY_PUSH(t, "<td style='text-align:center;font-weight:bold;'>" + sz + "</td>")
+        ARRAY_PUSH(t, "</tr>")
+        ARRAY_PUSH(zeilen, JOIN$(t, CHR$(10)))
+    NEXT
+    ' Perlen
+    DIM perlen AS STRING
+    DIM pz2 AS ARRAY OF STRING : pz2 = []
+    DIM gesamtP AS INTEGER
+    FOR EACH fb IN r.b.farben
+        IF NOT fb.perle THEN CONTINUE
+        DIM ep AS Farbeintrag : ep = m.farben[fb.nr]
+        gesamtP = gesamtP + fb.zahl
+        ARRAY_PUSH(pz2, JOIN$(["<tr>", "<td><div class='color-box' style='background:" + cssRgb$(ep.garn.farbe) + ";width:18px;height:18px;border-radius:50%;'></div></td>", "<td>" + htmlKodiere$(ep.symbol) + "</td>", "<td>" + htmlKodiere$(ep.garn.hersteller) + " " + htmlKodiere$(ep.garn.nummer) + "</td>", "<td>" + htmlKodiere$(ep.garn.name) + "</td>", "<td style='text-align:right;'>" + STR$(fb.zahl) + "</td>", "</tr>"], CHR$(10)))
+    NEXT
+    IF LEN(pz2) > 0 THEN
+        perlen = JOIN$(["", tr$("<h2 style='margin-top:30px;'>&#9679; Perlen (Beads)</h2>"), tr$("<p style='text-align:center;color:#666;font-size:12px;'>Perlen werden über dem Stoff angenaeht und kommen meist am Ende der Stickarbeit dran.</p>"), "<table class='legend-table' style='max-width:600px;'>", "<tr><th>Farbe</th><th>Symbol</th><th>Perlen-Nr.</th><th>Farbname</th><th>Anzahl</th></tr>", JOIN$(pz2, ""), "<tr style='background:#e8f4fc;font-weight:bold;'>", tr$("<td colspan='4' style='text-align:right;'>Gesamt:</td>"), "<td style='text-align:right;'>" + STR$(gesamtP) + "</td>", "</tr>", "</table>"], CHR$(10))
+    END IF
+    ' Rueckstiche
+    DIM rueck AS STRING
+    IF LEN(m.rueckstiche) > 0 AND NOT r.dp THEN
+        DIM je[MAX(1, LEN(m.farben))] AS INTEGER
+        DIM rs AS Rueckstich
+        FOR EACH rs IN m.rueckstiche
+            IF rs.farbe >= 0 AND rs.farbe < LEN(m.farben) THEN je[rs.farbe] = je[rs.farbe] + 1
+        NEXT
+        DIM rz AS ARRAY OF STRING : rz = []
+        FOR i = 0 TO LEN(m.farben) - 1
+            IF je[i] = 0 THEN CONTINUE
+            DIM eg AS Garn : eg = m.farben[i].garn
+            ARRAY_PUSH(rz, JOIN$(["<tr>", "<td><div class='color-box' style='background:" + cssRgb$(eg.farbe) + ";width:18px;height:18px;'></div></td>", "<td>" + htmlKodiere$(m.farben[i].symbol) + "</td>", "<td>" + htmlKodiere$(eg.hersteller) + " " + htmlKodiere$(eg.nummer) + "</td>", "<td>" + htmlKodiere$(eg.name) + "</td>", "<td style='text-align:right;'>" + STR$(je[i]) + "</td>", "</tr>"], CHR$(10)))
+        NEXT
+        rueck = JOIN$(["", tr$("<h2 style='margin-top:30px;'>&#8600; R&uuml;ckstiche</h2>"), tr$("<p style='text-align:center;color:#666;font-size:12px;'>R&uuml;ckstiche werden nach den Kreuzstichen gearbeitet und bilden Konturen und Details.</p>"), "<table class='legend-table' style='max-width:600px;'>", "<tr><th>Farbe</th><th>Symbol</th><th>Garnnummer</th><th>Farbname</th><th>Anzahl</th></tr>", JOIN$(rz, ""), "<tr style='background:#e8f4fc;font-weight:bold;'>", tr$("<td colspan='4' style='text-align:right;'>Gesamt:</td>"), "<td style='text-align:right;'>" + STR$(LEN(m.rueckstiche)) + "</td>", "</tr>", "</table>"], CHR$(10))
+    END IF
+    DIM kk AS STRING
+    FOR EACH kn IN r.o.kreuz
+        kk = kk + "<th>" + htmlKodiere$(kn) + "</th>"
+    NEXT
+    DIM einheit AS STRING : einheit = begriff$(m, "einheit")
+    DIM vorrat AS STRING : vorrat = begriff$(m, "bedarfseinheit")
+    DIM sl AS STRING : sl = tr$("Gesamt:")
+    DIM ss AS INTEGER : ss = r.b.stiche
+    IF r.b.ausgelassen > 0 THEN
+        sl = IIF(r.dp, tr$("Zu kleben:"), tr$("Zu sticken:"))
+        ss = r.b.zuSticken
+    END IF
+    DIM summe AS STRING : summe = JOIN$(["<tr style='background:#e8f4fc;font-weight:bold;'>", "<td colspan='" + STR$(5 + LEN(r.o.kreuz)) + "' style='text-align:right;'>" + sl + "</td>", "<td style='text-align:right;'>" + STR$(ss) + "</td>", "<td style='text-align:right;'>100%</td>", "<td style='text-align:center;'>" + STR$(r.b.straenge) + "</td>", "</tr>"], CHR$(10))
+    DIM fuss AS STRING
+    IF r.b.ausgelassen > 0 THEN fuss = tr$("<p style='color:#ff9800;font-size:12px;'>&#8856; = Stofffarbe, wird nicht gestickt</p>")
+    DIM z AS ARRAY OF STRING : z = [""]
+    ARRAY_PUSH(z, "<div class='page-break'></div>")
+    ARRAY_PUSH(z, "<div id='legende'>")
+    ARRAY_PUSH(z, "<h1>" + IIF(r.dp, tr$("Drill-Legende und Material"), tr$("Legende und Materialbedarf")) + "</h1>")
+    ARRAY_PUSH(z, trf$("<h3>{0} Farben &middot; {1} {2} &middot; ca. {3} {4} ben&ouml;tigt</h3>", [STR$(faeden), STR$(ss), einheit, STR$(r.b.straenge), vorrat]))
+    ARRAY_PUSH(z, "<table class='legend-table'>")
+    ARRAY_PUSH(z, "<tr><th>Nr.</th><th>Symbol</th><th>Farbe</th><th>" + begriff$(m, "nummer") + "</th><th>Farbname</th>" + kk + "<th>" + einheit + "</th><th>%</th><th>" + vorrat + "</th></tr>")
+    ARRAY_PUSH(z, JOIN$(zeilen, ""))
+    ARRAY_PUSH(z, summe)
+    ARRAY_PUSH(z, "</table>")
+    ARRAY_PUSH(z, fuss)
+    ARRAY_PUSH(z, rueck)
+    ARRAY_PUSH(z, perlen)
+    ARRAY_PUSH(z, "</div>")
+    RETURN JOIN$(z, CHR$(10))
+END FUNCTION
+
+FUNCTION htmlUebersicht$(r AS HtmlLauf) AS STRING
+    DIM m AS Muster : m = r.m
+    DIM ow AS FLOAT : ow = 250.0
+    DIM oh AS FLOAT : oh = ow * m.hoehe / m.breite
+    IF oh > 180 THEN
+        oh = 180.0 : ow = oh * m.breite / m.hoehe
+    END IF
+    DIM zw AS FLOAT : zw = ow / m.breite
+    DIM zh AS FLOAT : zh = oh / m.hoehe
+    DIM svg AS STRING
+    IF r.o.mystery THEN svg = htmlMystery$(ow, oh) ELSE svg = htmlStiche$(r, zw, zh)
+    DIM rueck AS STRING
+    IF NOT r.dp AND NOT r.o.mystery THEN rueck = htmlRueckstiche$(r, zw, 0, 0, 0, 0, m.breite, m.hoehe)
+    DIM linien AS STRING, i AS INTEGER
+    FOR i = 1 TO r.seitenX - 1
+        DIM lx AS STRING : lx = hf1$(i * r.jeX * zw)
+        linien = linien + "<line x1='" + lx + "' y1='0' x2='" + lx + "' y2='" + hf1$(oh) + "' stroke='rgba(255,255,255,0.9)' stroke-width='2'/>"
+    NEXT
+    FOR i = 1 TO r.seitenY - 1
+        DIM ly AS STRING : ly = hf1$(i * r.jeY * zh)
+        linien = linien + "<line x1='0' y1='" + ly + "' x2='" + hf1$(ow) + "' y2='" + ly + "' stroke='rgba(255,255,255,0.9)' stroke-width='2'/>"
+    NEXT
+    DIM nummern AS STRING, kacheln AS STRING
+    DIM sx AS INTEGER, sy AS INTEGER, n AS INTEGER : n = 1
+    DIM pw AS FLOAT : pw = r.jeX * zw
+    DIM ph AS FLOAT : ph = r.jeY * zh
+    FOR sy = 0 TO r.seitenY - 1
+        kacheln = kacheln + "<tr>"
+        FOR sx = 0 TO r.seitenX - 1
+            nummern = nummern + "<text x='" + hf1$(sx * pw + pw / 2) + "' y='" + hf1$(sy * ph + ph / 2 + 5) + "' text-anchor='middle' font-size='14' font-weight='bold' fill='white' stroke='#333' stroke-width='0.8'>" + STR$(n) + "</text>"
+            kacheln = kacheln + JOIN$(["<td>", "<a href='#seite" + STR$(n) + "' class='overview-cell'>", "<span class='overview-cell-nr'>" + STR$(n) + "</span>", "<span class='overview-cell-range'>X: " + STR$(sx * r.jeX + 1) + "-" + STR$(MIN((sx + 1) * r.jeX, m.breite)) + "</span>", "<span class='overview-cell-range'>Y: " + STR$(sy * r.jeY + 1) + "-" + STR$(MIN((sy + 1) * r.jeY, m.hoehe)) + "</span>", "</a></td>"], CHR$(10))
+            n = n + 1
+        NEXT
+        kacheln = kacheln + "</tr>"
+    NEXT
+    DIM einheit AS STRING : einheit = begriff$(m, "einheit")
+    DIM hinweis AS STRING
+    IF LEN(m.rueckstiche) > 0 AND NOT r.o.mystery AND NOT r.dp THEN hinweis = trf$("<p><strong>&#8600; R&uuml;ckstiche:</strong> {0} R&uuml;ckstiche werden auf den Musterseiten als Linien angezeigt.</p>", [STR$(LEN(m.rueckstiche))])
+    DIM z AS ARRAY OF STRING : z = [""]
+    ARRAY_PUSH(z, "<div class='page-break'></div>")
+    ARRAY_PUSH(z, "<div id='uebersicht' class='overview-section'>")
+    ARRAY_PUSH(z, "<div class='overview-header'>")
+    ARRAY_PUSH(z, tr$("<h1>&#128506; Seiten&uuml;bersicht</h1>"))
+    ARRAY_PUSH(z, trf$("<p>{0} Musterseiten &middot; {1} Spalten &times; {2} Zeilen &middot; je {3}&times;{4} {5}</p>", [STR$(r.seitenX * r.seitenY), STR$(r.seitenX), STR$(r.seitenY), STR$(r.jeX), STR$(r.jeY), einheit]))
+    ARRAY_PUSH(z, "</div>")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "<div class='overview-container'>")
+    ARRAY_PUSH(z, "<div class='overview-preview-box'>")
+    ARRAY_PUSH(z, tr$("<div class='overview-preview-title'>&#128444; Muster&uuml;bersicht</div>"))
+    ARRAY_PUSH(z, "<div class='overview-preview-inner'>")
+    ARRAY_PUSH(z, "<svg width='" + STR$(INT(ow)) + "' height='" + STR$(INT(oh)) + "' style='display:block;'>")
+    ARRAY_PUSH(z, svg)
+    ARRAY_PUSH(z, rueck)
+    ARRAY_PUSH(z, linien)
+    ARRAY_PUSH(z, nummern)
+    ARRAY_PUSH(z, "</svg>")
+    ARRAY_PUSH(z, "</div>")
+    ARRAY_PUSH(z, "</div>")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "<div class='overview-grid-box'>")
+    ARRAY_PUSH(z, tr$("<div class='overview-grid-title'>&#128196; Seiten ausw&auml;hlen</div>"))
+    ARRAY_PUSH(z, "<table class='overview-table'>")
+    ARRAY_PUSH(z, kacheln)
+    ARRAY_PUSH(z, "</table>")
+    ARRAY_PUSH(z, "</div>")
+    ARRAY_PUSH(z, "</div>")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "<div class='overview-info'>")
+    ARRAY_PUSH(z, tr$("<p><strong>&#128161; Tipp:</strong> Klicken Sie auf eine Seitennummer um direkt zur entsprechenden Musterseite zu springen.</p>"))
+    ARRAY_PUSH(z, trf$("<p><strong>&#128209; Seitenformat:</strong> Jede Seite zeigt einen Bereich von {0}&times;{1} {2} mit 10er-Rasterlinien.</p>", [STR$(r.jeX), STR$(r.jeY), einheit]))
+    ARRAY_PUSH(z, hinweis)
+    ARRAY_PUSH(z, "</div>")
+    ARRAY_PUSH(z, "</div>")
+    RETURN JOIN$(z, CHR$(10))
+END FUNCTION
+
+' Index der Seiten mit Pfeilen zu den Nachbarn (_build_page_navigator).
+FUNCTION htmlNavigator$(r AS HtmlLauf, cx AS INTEGER, cy AS INTEGER) AS STRING
+    IF r.seitenX * r.seitenY <= 1 THEN RETURN ""
+    DIM zeilen AS STRING
+    DIM px AS INTEGER, py AS INTEGER
+    FOR py = 0 TO r.seitenY - 1
+        DIM zellen AS STRING
+        zellen = ""
+        FOR px = 0 TO r.seitenX - 1
+            DIM zellStil AS STRING : zellStil = IIF(px = cx AND py = cy, "background:#3498db;color:white;font-weight:bold;", "background:#fff;color:#666;")
+            zellen = zellen + "<td style='" + zellStil + "border:1px solid #ccc;width:18px;height:14px;font-size:9px;text-align:center;'>" + STR$(py * r.seitenX + px + 1) + "</td>"
+        NEXT
+        zeilen = zeilen + "<tr>" + zellen + "</tr>"
+    NEXT
+    DIM pille AS STRING : pille = "<span style='display:inline-block;color:#666;font-size:10px;background:#f5f5f5;padding:3px 8px;border-radius:4px;white-space:nowrap;'>"
+    DIM oben AS STRING, unten AS STRING, links AS STRING, rechts AS STRING
+    IF cy > 0 THEN oben = trf$("{0}&uarr; Seite {1}</span>", [pille, STR$((cy - 1) * r.seitenX + cx + 1)])
+    IF cy < r.seitenY - 1 THEN unten = trf$("{0}&darr; Seite {1}</span>", [pille, STR$((cy + 1) * r.seitenX + cx + 1)])
+    IF cx > 0 THEN links = trf$("{0}&larr; Seite {1}</span>", [pille, STR$(cy * r.seitenX + cx)])
+    IF cx < r.seitenX - 1 THEN rechts = trf$("{0}Seite {1} &rarr;</span>", [pille, STR$(cy * r.seitenX + cx + 2)])
+    RETURN trf$("<div class='page-navigator' style='float:right;margin-left:12px;'><div style='font-size:9px;color:#666;margin-bottom:2px;text-align:center;'>Seiten-Index</div><table style='border-collapse:separate;border-spacing:4px;'><tr><td></td><td style='text-align:center;'>{0}</td><td></td></tr><tr><td style='text-align:right;'>{1}</td><td><table style='border-collapse:collapse;margin:0 auto;'>{2}</table></td><td style='text-align:left;'>{3}</td></tr><tr><td></td><td style='text-align:center;'>{4}</td><td></td></tr></table></div>", [oben, links, zeilen, rechts, unten])
+END FUNCTION
+
+' Teilstiche, Knoten und Perlen einer Seite als halbdurchsichtige Formen ueber
+' der Tabelle (_generate_partial_stitches_svg).
+FUNCTION htmlTeilstiche$(r AS HtmlLauf, z AS FLOAT, o AS FLOAT, x0 AS INTEGER, y0 AS INTEGER, bx AS INTEGER, by AS INTEGER) AS STRING
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = y0 TO MIN(by, r.m.hoehe) - 1
+        FOR x = x0 TO MIN(bx, r.m.breite) - 1
+            DIM t AS INTEGER : t = r.k.artBei(x, y)
+            IF t = VOLL THEN CONTINUE
+            DIM c AS INTEGER : c = htmlFarbeBei(r, x, y)
+            IF c < 0 THEN CONTINUE
+            DIM l AS FLOAT : l = (x - x0) * z + o
+            DIM ob AS FLOAT : ob = (y - y0) * z + o
+            IF t = KNOTEN OR t = PERLE THEN
+                DIM rr AS FLOAT : rr = IIF(t = KNOTEN, MAX(1.5, z * KNOTEN_RADIUS), MAX(2.0, z * PERLE_RADIUS))
+                ARRAY_PUSH(teile, "<circle cx='" + hf1$(l + z / 2) + "' cy='" + hf1$(ob + z / 2) + "' r='" + hf1$(rr) + "' fill='" + cssRgb$(c) + "' fill-opacity='0.55'/>")
+            ELSEIF istTeilstich(t) THEN
+                DIM p AS ARRAY OF FLOAT : p = teilstichPunkte(t)
+                DIM k AS INTEGER, pk AS STRING
+                pk = ""
+                FOR k = 0 TO LEN(p) - 1 STEP 2
+                    pk = pk + IIF(k > 0, " ", "") + hf1$(l + p[k] * z) + "," + hf1$(ob + p[k + 1] * z)
+                NEXT
+                ARRAY_PUSH(teile, "<polygon points='" + pk + "' fill='" + cssRgb$(c) + "' fill-opacity='0.55' stroke='rgba(0,0,0,0.3)' stroke-width='0.5'/>")
+            END IF
+        NEXT
+    NEXT
+    RETURN JOIN$(teile, CHR$(10))
+END FUNCTION
+
+FUNCTION htmlSeiten$(r AS HtmlLauf) AS STRING
+    DIM m AS Muster : m = r.m
+    DIM gesamt AS INTEGER : gesamt = r.seitenX * r.seitenY
+    DIM z AS INTEGER : z = 16
+    IF r.pitch > 0 THEN z = MAX(8, ROUND(r.pitch * 3.78))
+    DIM ueb AS INTEGER : ueb = r.o.ueberlappung
+    DIM seiten AS ARRAY OF STRING : seiten = []
+    DIM nr AS INTEGER : nr = 1
+    DIM px AS INTEGER, py AS INTEGER
+    FOR py = 0 TO r.seitenY - 1
+        FOR px = 0 TO r.seitenX - 1
+            DIM x0 AS INTEGER : x0 = px * r.jeX
+            DIM y0 AS INTEGER : y0 = py * r.jeY
+            DIM kx AS INTEGER : kx = x0 + r.jeX - 1
+            DIM ky AS INTEGER : ky = y0 + r.jeY - 1
+            DIM x1 AS INTEGER : x1 = MIN(kx + ueb, m.breite - 1)
+            DIM y1 AS INTEGER : y1 = MIN(ky + ueb, m.hoehe - 1)
+            DIM uebX AS INTEGER : uebX = IIF(ueb > 0 AND kx < m.breite - 1, kx + 1, -1)
+            DIM uebY AS INTEGER : uebY = IIF(ueb > 0 AND ky < m.hoehe - 1, ky + 1, -1)
+            DIM bw AS INTEGER : bw = x1 - x0 + 1
+            DIM bh AS INTEGER : bh = y1 - y0 + 1
+            DIM zf AS ARRAY OF INTEGER : zf = seitenFarben(r.k, LEN(m.farben), x0, y0, x1, y1)
+            DIM verbergen AS BOOLEAN : verbergen = r.dp OR r.o.mystery
+            DIM rueckZahl AS INTEGER
+            rueckZahl = 0
+            IF NOT verbergen THEN rueckZahl = LEN(seitenRueckstiche(m, x0, y0, x1, y1))
+            ' Tabelle
+            DIM tz AS ARRAY OF STRING : tz = []
+            DIM kopf AS STRING : kopf = "<td class='grid-header'></td>"
+            DIM x AS INTEGER, y AS INTEGER
+            FOR x = 0 TO bw - 1
+                DIM mx AS INTEGER : mx = x0 + x
+                DIM kl AS STRING : kl = "grid-header"
+                IF (mx + 1) MOD 10 = 0 THEN kl = kl + " thick-right"
+                IF uebX >= 0 AND mx >= uebX THEN kl = kl + " overlap-col"
+                IF mx = x0 OR (x + 1) MOD 5 = 0 OR (mx + 1) MOD 10 = 0 THEN
+                    kopf = kopf + "<td class='" + kl + "'>" + STR$(mx + 1) + "</td>"
+                ELSE
+                    kopf = kopf + "<td class='" + kl + "'></td>"
+                END IF
+            NEXT
+            ARRAY_PUSH(tz, "<tr>" + kopf + "</tr>")
+            FOR y = 0 TO bh - 1
+                DIM my AS INTEGER : my = y0 + y
+                DIM zk AS STRING : zk = "grid-header"
+                IF (my + 1) MOD 10 = 0 THEN zk = zk + " thick-bottom"
+                IF uebY >= 0 AND my >= uebY THEN zk = zk + " overlap-row"
+                DIM zeile AS STRING
+                IF my = y0 OR (y + 1) MOD 5 = 0 OR (my + 1) MOD 10 = 0 THEN
+                    zeile = "<td class='" + zk + "'>" + STR$(my + 1) + "</td>"
+                ELSE
+                    zeile = "<td class='" + zk + "'></td>"
+                END IF
+                FOR x = 0 TO bw - 1
+                    DIM mx2 AS INTEGER : mx2 = x0 + x
+                    DIM kls AS ARRAY OF STRING : kls = []
+                    IF (mx2 + 1) MOD 10 = 0 THEN ARRAY_PUSH(kls, "thick-right")
+                    IF (my + 1) MOD 10 = 0 THEN ARRAY_PUSH(kls, "thick-bottom")
+                    IF (uebX >= 0 AND mx2 >= uebX) OR (uebY >= 0 AND my >= uebY) THEN ARRAY_PUSH(kls, "overlap-cell")
+                    DIM ks AS STRING : ks = ""
+                    IF LEN(kls) > 0 THEN ks = " class='" + JOIN$(kls, " ") + "'"
+                    DIM sym AS STRING : sym = htmlKodiere$(htmlSymbolBei$(r, mx2, my))
+                    IF r.dp AND NOT r.o.mystery THEN
+                        DIM c AS INTEGER : c = htmlFarbeBei(r, mx2, my)
+                        IF c >= 0 THEN
+                            zeile = zeile + "<td" + ks + " style='background:" + cssRgb$(c) + ";'>" + sym + "</td>"
+                        ELSE
+                            zeile = zeile + "<td" + ks + "></td>"
+                        END IF
+                    ELSE
+                        zeile = zeile + "<td" + ks + ">" + sym + "</td>"
+                    END IF
+                NEXT
+                ARRAY_PUSH(tz, "<tr>" + zeile + "</tr>")
+            NEXT
+            DIM sw AS INTEGER : sw = (bw + 1) * z + 2
+            DIM sh AS INTEGER : sh = (bh + 1) * z + 2
+            DIM rueck AS STRING
+            rueck = ""
+            IF NOT verbergen THEN rueck = htmlRueckstiche$(r, z, z + 2, z + 2, x0, y0, x1 + 1, y1 + 1)
+            DIM teil AS STRING : teil = htmlTeilstiche$(r, z, z + 2, x0, y0, x1 + 1, y1 + 1)
+            ' kleine Legende
+            DIM leg AS STRING, i AS INTEGER, da AS INTEGER, summe AS INTEGER
+            leg = "" : da = 0 : summe = 0
+            FOR i = 0 TO LEN(m.farben) - 1
+                IF zf[i] = 0 THEN CONTINUE
+                da = da + 1
+                summe = summe + zf[i]
+                DIM g AS Garn : g = m.farben[i].garn
+                IF r.dp THEN
+                    leg = leg + "<span class='mini-legend-item'><span class='color-box' style='background:" + cssRgb$(g.farbe) + ";width:14px;height:14px;border:1px solid #999;display:inline-block;vertical-align:middle;'></span><b>" + htmlKodiere$(g.nummer) + "</b> <small>(" + STR$(zf[i]) + "×)</small></span>"
+                ELSE
+                    leg = leg + "<span class='mini-legend-item'><span class='color-box' style='background:" + cssRgb$(g.farbe) + "'></span>" + htmlKodiere$(m.farben[i].symbol) + "=" + htmlKodiere$(g.nummer) + " <small>(" + STR$(zf[i]) + "×, " + STR$(zf[i] * 3) + "F)</small></span>"
+                END IF
+            NEXT
+            DIM rinfo AS STRING
+            IF rueckZahl > 0 THEN rinfo = trf$(" &middot; {0} R&uuml;ckstiche", [STR$(rueckZahl)])
+            DIM rnote AS STRING
+            IF rueckZahl > 0 THEN rnote = trf$("<br><b>R&uuml;ckstiche:</b> {0} Linien (als farbige Linien im Muster dargestellt)", [STR$(rueckZahl)])
+            DIM s AS ARRAY OF STRING : s = [""]
+            ARRAY_PUSH(s, "<div class='page-break'></div>")
+            ARRAY_PUSH(s, "<div id='seite" + STR$(nr) + "'>")
+            ARRAY_PUSH(s, "<div class='page-header'>")
+            ARRAY_PUSH(s, trf$("<div class='title'>Seite {0} von {1}</div>", [STR$(nr), STR$(gesamt)]))
+            ARRAY_PUSH(s, trf$("<div class='info'>Spalten {0}-{1} &middot; Zeilen {2}-{3} &middot; {4} Stiche{5}</div>", [STR$(x0 + 1), STR$(x1 + 1), STR$(y0 + 1), STR$(y1 + 1), STR$(summe), rinfo]))
+            ARRAY_PUSH(s, htmlNavigator$(r, px, py))
+            ARRAY_PUSH(s, "</div>")
+            ARRAY_PUSH(s, "")
+            ARRAY_PUSH(s, "<div class='pattern-container'>")
+            ARRAY_PUSH(s, "<table class='grid-table'>")
+            ARRAY_PUSH(s, JOIN$(tz, ""))
+            ARRAY_PUSH(s, "</table>")
+            ARRAY_PUSH(s, "<svg class='grid-svg-overlay' width='" + STR$(sw) + "' height='" + STR$(sh) + "'>")
+            ARRAY_PUSH(s, teil)
+            ARRAY_PUSH(s, rueck)
+            ARRAY_PUSH(s, "</svg>")
+            ARRAY_PUSH(s, "</div>")
+            ARRAY_PUSH(s, "")
+            ARRAY_PUSH(s, "<div class='mini-legend'>")
+            ARRAY_PUSH(s, trf$("<b>Farben dieser Seite ({0}):</b> {1}", [STR$(da), leg]))
+            ARRAY_PUSH(s, rnote)
+            ARRAY_PUSH(s, "</div>")
+            ARRAY_PUSH(s, "")
+            ARRAY_PUSH(s, trf$("<div class='page-footer'>{0} &middot; Seite {1}/{2} &middot; {3}{4}</div>", [htmlKodiere$(r.titel), STR$(nr), STR$(gesamt), r.datum, IIF(r.copyright <> "", " &middot; " + htmlKodiere$(r.copyright), "")]))
+            ARRAY_PUSH(s, "</div>")
+            ARRAY_PUSH(seiten, JOIN$(s, CHR$(10)))
+            nr = nr + 1
+        NEXT
+    NEXT
+    RETURN JOIN$(seiten, "")
+END FUNCTION
+
+' Den ganzen Text bauen (ohne zu schreiben).
+FUNCTION htmlText$(m AS Muster, o AS HtmlOptionen, titel AS STRING) AS STRING
+    DIM r AS HtmlLauf : r = NEW HtmlLauf()
+    r.m = m : r.o = o
+    r.dp = m.modus = "diamond"
+    r.k = kompositVon(m)
+    r.b = bedarfVon(m, r.k)
+    r.jeX = 40 : r.jeY = 40
+    IF r.dp THEN
+        ' A4 mit 15 mm Rand, 12 mm links und 50 mm oben/unten Reserve
+        r.pitch = drillMm(INT(m.stoff))
+        r.jeX = MAX(1, INT((180.0 - 12.0) / r.pitch))
+        r.jeY = MAX(1, INT((267.0 - 50.0) / r.pitch))
+    END IF
+    r.seitenX = MAX(1, (m.breite + r.jeX - 1) \ r.jeX)
+    r.seitenY = MAX(1, (m.hoehe + r.jeY - 1) \ r.jeY)
+    r.titel = IIF(o.titel <> "", o.titel, titel)
+    r.datum = o.datum
+    IF r.datum = "" THEN r.datum = RIGHT$(DATE$(), 2) + "." + MID$(DATE$(), 5, 2) + "." + LEFT$(DATE$(), 4)
+    r.autor = htmlMeta$(m, "author")
+    IF r.autor = "" THEN r.autor = TRIM$(o.autor)
+    r.copyright = htmlMeta$(m, "copyright")
+    IF r.copyright = "" THEN r.copyright = TRIM$(o.copyright)
+    DIM kopf AS ARRAY OF STRING : kopf = htmlKopf(r.titel, htmlDpCss$(r))
+    DIM teile AS ARRAY OF STRING : teile = []
+    ARRAY_PUSH(teile, JOIN$(kopf, CHR$(10)))
+    ARRAY_PUSH(teile, htmlNavigation$(r))
+    ARRAY_PUSH(teile, "<div class='container'>")
+    ARRAY_PUSH(teile, htmlDeckblatt$(r))
+    ARRAY_PUSH(teile, htmlVorschau$(r))
+    ARRAY_PUSH(teile, htmlLegende$(r))
+    ARRAY_PUSH(teile, htmlUebersicht$(r))
+    ARRAY_PUSH(teile, htmlSeiten$(r))
+    ARRAY_PUSH(teile, "</div></body></html>")
+    RETURN JOIN$(teile, CHR$(10))
+END FUNCTION
+
+' Als Datei (die Endung .html kommt dazu, wenn sie fehlt); ohne Titel in den
+' Optionen steht der Dateiname auf dem Deckblatt.
+SUB htmlExportieren(m AS Muster, pfad AS STRING, o AS HtmlOptionen)
+    IF RIGHT$(LOWER$(pfad), 5) <> ".html" THEN pfad = pfad + ".html"
+    DIM titel AS STRING : titel = BASENAME(pfad)
+    titel = LEFT$(titel, LEN(titel) - 5)
+    WRITEALL(pfad, htmlText$(m, o, titel))
+END SUB

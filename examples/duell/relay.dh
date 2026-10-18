@@ -1,0 +1,84 @@
+' relay.dh -- ein schlechtes Netz zum Ausprobieren, auf einem Rechner.
+'
+'     dhrt run relay.dh -- 47111 127.0.0.1 47110 80 30 10
+'
+' lauscht auf UDP 47111 und reicht jedes Paket an 127.0.0.1:47110 weiter
+' (die Antworten zurueck an den, der zuletzt geschickt hat) -- mit 80 ms
+' Verzoegerung, bis zu 30 ms Schwankung und 10 % Verlust. Weil jedes Paket
+' seine eigene Schwankung bekommt, ueberholen sich Pakete auch.
+'
+' Mit dem Duell: Wirt auf 47110 starten, das Relay wie oben, und der Gast
+' schickt seine Pakete ueber das Relay:
+'
+'     dhrt run main.dh -- gast 127.0.0.1 47110 --udp-port 47111
+'
+' Ein siebtes Argument setzt den Zufall fest (fuer Pruefungen), ein achtes
+' beendet das Relay nach so vielen Sekunden.
+IMPORT "net"
+
+DIM lausch AS INTEGER : lausch = VAL(ARG$(0))
+DIM zielHost AS STRING : zielHost = ARG$(1)
+DIM zielPort AS INTEGER : zielPort = VAL(ARG$(2))
+DIM lag AS INTEGER : lag = VAL(ARG$(3))
+DIM jitter AS INTEGER : jitter = VAL(ARG$(4))
+DIM verlust AS FLOAT : verlust = VAL(ARG$(5)) / 100.0
+IF ARGC() > 6 THEN RANDOMIZE(VAL(ARG$(6)))
+DIM dauer AS INTEGER : dauer = 0
+IF ARGC() > 7 THEN dauer = VAL(ARG$(7)) * 1000
+IF ARGC() < 6 THEN
+    EPRINT("relay: relay.dh -- lauschport zielhost zielport lag_ms jitter_ms verlust_prozent [saat] [sekunden]")
+    EXIT(2)
+END IF
+
+CONST PLAETZE = 4096
+DIM u AS NET_UDP : u = NET_UDP_BIND(lausch)
+DIM faellig[PLAETZE] AS INTEGER      ' MILLIS, ab wann es hinaus darf; 0 = frei
+DIM inhalt[PLAETZE] AS BUFFER
+DIM nachHost[PLAETZE] AS STRING
+DIM nachPort[PLAETZE] AS INTEGER
+DIM gastHost AS STRING, gastPort AS INTEGER
+DIM rein AS INTEGER, raus AS INTEGER, weg AS INTEGER, voll AS INTEGER
+
+SUB merken(b AS BUFFER, host AS STRING, p AS INTEGER)
+    IF RND() < verlust THEN
+        weg = weg + 1
+        RETURN
+    END IF
+    DIM i AS INTEGER
+    FOR i = 0 TO PLAETZE - 1
+        IF faellig[i] = 0 THEN
+            faellig[i] = MILLIS() + lag + INT(RND() * (jitter + 1))
+            inhalt[i] = b : nachHost[i] = host : nachPort[i] = p
+            RETURN
+        END IF
+    NEXT
+    voll = voll + 1
+END SUB
+
+DIM t0 AS INTEGER : t0 = MILLIS()
+PRINT "relay "; lausch; " -> "; zielHost; ":"; zielPort; "  lag "; lag; " jitter "; jitter; " verlust "; INT(verlust * 100); " %"
+WHILE dauer = 0 OR MILLIS() - t0 < dauer
+    DIM b AS BUFFER : b = NET_UDP_RECV_BYTES(u, 65536)
+    WHILE BUFFER_LEN(b) > 0
+        rein = rein + 1
+        DIM vonPort AS INTEGER : vonPort = NET_UDP_LAST_PORT(u)
+        IF vonPort = zielPort THEN
+            IF gastHost <> "" THEN merken(b, gastHost, gastPort)
+        ELSE
+            gastHost = NET_UDP_LAST_HOST$(u) : gastPort = vonPort
+            merken(b, zielHost, zielPort)
+        END IF
+        b = NET_UDP_RECV_BYTES(u, 65536)
+    WEND
+    DIM jetzt AS INTEGER : jetzt = MILLIS()
+    DIM i AS INTEGER
+    FOR i = 0 TO PLAETZE - 1
+        IF faellig[i] > 0 AND faellig[i] <= jetzt THEN
+            NET_UDP_SEND(u, nachHost[i], nachPort[i], inhalt[i])
+            faellig[i] = 0
+            raus = raus + 1
+        END IF
+    NEXT
+    SLEEP(1)
+WEND
+PRINT "relay rein "; rein; " raus "; raus; " verloren "; weg; " voll "; voll

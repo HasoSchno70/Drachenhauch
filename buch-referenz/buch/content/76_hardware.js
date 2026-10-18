@@ -144,8 +144,8 @@ module.exports = (H) => [
       'm = MQTT_CONNECT("192.168.1.50", 1883, "drachenhauch-spiel")',
       'IF NOT MQTT_IS_CONNECTED(m) THEN PRINT "Broker nicht erreichbar"',
     ]),
-  H.cmd("MQTT_PUBLISH · MQTT_SUBSCRIBE", 'MQTT_PUBLISH(h, topic$, inhalt$[, behalten])   MQTT_SUBSCRIBE(h, topic$)',
-    "PUBLISH schickt eine Nachricht an ein Thema; mit behalten = TRUE merkt der Broker sie sich für später hinzukommende Empfänger. SUBSCRIBE abonniert ein Thema – Platzhalter sind erlaubt (+ für eine Ebene, # für alle darunter).",
+  H.cmd("MQTT_PUBLISH · MQTT_SUBSCRIBE", 'MQTT_PUBLISH(h, topic$, inhalt$[, behalten]) AS BOOLEAN   MQTT_SUBSCRIBE(h, topic$) AS BOOLEAN',
+    "PUBLISH schickt eine Nachricht an ein Thema; mit behalten = TRUE merkt der Broker sie sich für später hinzukommende Empfänger. SUBSCRIBE abonniert ein Thema – Platzhalter sind erlaubt (+ für eine Ebene, # für alle darunter). Beide liefern FALSE, wenn die Verbindung weg ist – das ist ein Zustand, kein Fehler: MQTT_IS_CONNECTED sagt dann FALSE, und das Programm verbindet neu.",
     [
       'MQTT_PUBLISH(m, "spiel/punkte", STR$(punkte))',
       'MQTT_SUBSCRIBE(m, "wohnzimmer/+/temperatur")',
@@ -158,7 +158,14 @@ module.exports = (H) => [
       '    PRINT MQTT_MESSAGE_TOPIC(m) + " = " + MQTT_MESSAGE_PAYLOAD(m)',
       'WEND',
     ]),
-  H.note("Umgesetzt ist MQTT 3.1.1 mit QoS 0 – die Stufe, die praktisch alle ESP32-Beispiele verwenden: Nachrichten werden einmal geschickt, ohne Empfangsbestätigung. Nicht dabei sind QoS 1/2, Testamente (Last Will) und verschlüsselte Verbindungen (TLS)."),
+  H.cmd("MQTT_WILL", 'MQTT_WILL(topic$, inhalt$[, behalten])',
+    "Der letzte Wille für das nächste MQTT_CONNECT: reißt die Verbindung ab, ohne dass sich das Programm abgemeldet hat (Strom weg, Absturz, Netz), veröffentlicht der Broker selbst diese Nachricht. So bleibt ein „online“, das mit behalten = TRUE beim Broker liegt, nicht für immer stehen. Ein sauberes MQTT_DISCONNECT löst ihn nicht aus; wer neu verbindet, setzt ihn neu.",
+    [
+      'MQTT_WILL("werkstatt/status", "offline", TRUE)',
+      'm = MQTT_CONNECT("192.168.1.50", 1883, "werkstatt-sensor")',
+      'MQTT_PUBLISH(m, "werkstatt/status", "online", TRUE)',
+    ]),
+  H.note("Umgesetzt ist MQTT 3.1.1 mit QoS 0 – die Stufe, die praktisch alle ESP32-Beispiele verwenden: Nachrichten werden einmal geschickt, ohne Empfangsbestätigung. Nicht dabei sind QoS 1/2 und verschlüsselte Verbindungen (TLS)."),
 
   H.cmd("SERIAL_IS_OPEN · SERIAL_FLUSH · SERIAL_TIMEOUT", 'SERIAL_IS_OPEN(h)   SERIAL_FLUSH(h)   SERIAL_TIMEOUT(h, sekunden)',
     "SERIAL_IS_OPEN prüft die Verbindung (ein abgezogenes USB-Kabel merkt man sonst erst beim Lesen). SERIAL_FLUSH schiebt gepufferte Daten sofort hinaus, SERIAL_TIMEOUT legt fest, wie lange ein Lesevorgang höchstens wartet.",

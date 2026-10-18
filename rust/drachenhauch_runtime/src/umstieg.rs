@@ -49,6 +49,17 @@ pub fn befehl(name: &str) -> Option<&'static str> {
             "ein Teil einer Zeit kommt aus ZEIT_TEIL(zeit, \"jahr\") -- oder ZEIT_FORMAT$(zeit, muster$)",
         "gui_window_new" | "gui_new_window" => "heisst GUI_WINDOW(titel$, x, y, breite, hoehe)",
         "stop" | "system" | "quit" => "das Programm beenden: END (allein auf der Zeile) oder EXIT(0)",
+        // Konsolen-Werkzeuge (2026-10-11): auf ISDIR schlug --check CHDIR,
+        // ISSTR, MKDIR vor -- ein Wort gegen zwei Wortteile faengt kein Abstand.
+        "isdir" | "is_dir" | "isfolder" | "direxist" | "dir_exists" | "folderexists" =>
+            "heisst in Drachenhauch DIREXISTS(pfad)",
+        "isfile" | "is_file" | "fileexist" | "file_exists" =>
+            "heisst in Drachenhauch FILEEXISTS(pfad)",
+        "command$" | "command" | "argv" =>
+            "die Argumente: ARGC() und ARG$(n) (ab 0) -- einen Pfad vom Ort des Aufrufs aus liefert ARGPATH$(n)",
+        "curdir$" | "curdir" | "getcwd" | "pwd" =>
+            "heisst in Drachenhauch CWD$() -- der Ordner, aus dem das Programm aufgerufen wurde, ist STARTDIR$()",
+        "isatty" => "heisst in Drachenhauch TERMINAL() (geht die Ausgabe in ein Terminal?)",
         _ => return None,
     })
 }
@@ -129,24 +140,22 @@ pub fn datei_statt_handle(befehl: &str, text: &str) -> String {
 
 /// Ein TEXT, wo eine Zahl hingehoert: der Anhang, der sagt WARUM.
 ///
-/// Drei Faelle, alle gemessen an dem, was man aus anderen BASICs mitbringt:
-/// eine Taste als Buchstabe (`KEYHIT("a")` -- dort vergleicht man INKEY$),
+/// Zwei Faelle, beide gemessen an dem, was man aus anderen BASICs mitbringt:
 /// eine Farbe als Hex-Text (`RGB("FF0000")`) und ein Dateiname, wo ein
-/// geladenes Bild/ein geladener Klang hingehoert.
+/// geladenes Bild/ein geladener Klang hingehoert. (`KEYHIT("a")` war bis
+/// 2026.27 der dritte -- seither meint ein Buchstabe die beschriftete Taste.)
 pub fn text_statt_zahl(befehl: &str, text: &str) -> String {
     let b = befehl.to_lowercase();
-    if matches!(b.as_str(), "keyhit" | "keypressed" | "keyreleased" | "keyrepeat")
-        && text.chars().count() == 1 {
-        let c = text.chars().next().unwrap_or('a');
-        return format!(
-            " -- eine Taste ist eine ZAHL: {}(ASC(\"{}\")) oder die Konstante KEY_{}",
-            b.to_uppercase(), c, c.to_uppercase());
-    }
     if (b == "rgb" || b == "rgba")
         && text.trim_start_matches('#').chars().all(|c| c.is_ascii_hexdigit())
         && !text.is_empty() {
         return format!(
             " -- eine Farbe aus Hex-Text kommt aus COLOR_FROM_HEX(\"{}\"); im Quelltext geht auch &H{}", text, text.trim_start_matches('#').to_uppercase());
+    }
+    // GUI_THEME nimmt nur die Akzentfarbe; ein Themenname gehoert zu
+    // GUI_THEME_PRESET (gefunden bei der Vereinsverwaltung, 2026-10-12).
+    if b == "gui_theme" {
+        return format!(" -- ein ganzes Thema setzt GUI_THEME_PRESET(\"{}\"); GUI_THEME nimmt nur die Akzentfarbe", text);
     }
     datei_statt_handle(befehl, text)
 }
@@ -192,15 +201,12 @@ mod tests {
 
     #[test]
     fn text_wo_eine_zahl_hingehoert() {
-        assert!(text_statt_zahl("keyhit", "a").contains("ASC(\"a\")"));
-        assert!(text_statt_zahl("keyhit", "a").contains("KEY_A"));
-        // Mehr als ein Zeichen ist keine Taste -- dann kein Tasten-Satz.
-        assert!(text_statt_zahl("keyhit", "leertaste").is_empty());
         assert!(text_statt_zahl("rgb", "FF0000").contains("COLOR_FROM_HEX"));
         assert!(text_statt_zahl("rgb", "#f80").contains("&HF80"));
         assert!(text_statt_zahl("rgb", "rot").is_empty());
         // Der Datei-Fall laeuft weiter durch.
         assert!(text_statt_zahl("playsound", "a.wav").contains("LOADSOUND"));
+        assert!(text_statt_zahl("GUI_THEME", "glas_hell").contains("GUI_THEME_PRESET(\"glas_hell\")"));
     }
 
     #[test]

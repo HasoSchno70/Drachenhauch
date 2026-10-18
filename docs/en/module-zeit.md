@@ -25,11 +25,20 @@ wristwatch, and `DATE$() + " " + TIME$()` returns the same text. When calculatin
 across a daylight-saving change, the module counts real seconds, not
 clock-face hours.
 
+On Windows the local time comes from the system setting, on macOS and Linux
+from the C library (environment variable `TZ`, otherwise `/etc/localtime`),
+in the browser from the browser's time zone. Up to 2026.31 it was simply UTC
+outside Windows: `TIME$()` ran two hours behind in Berlin in summer, and
+`ZEIT_PARSE("…Z")` did not convert.
+
 ## Text and point in time
 
 | Function | Effect |
 |---|---|
 | `ZEIT_JETZT()` → INTEGER | now, as a point in time |
+| `ZEIT_UNIX()` → FLOAT | now as **Unix time**: seconds since 1970 in UTC, with fraction (like Python's `time.time()`) |
+| `ZEIT_AUS_UNIX(sekunden)` → INTEGER | Unix seconds to a point in local time (with that day's daylight saving time) |
+| `ZEIT_NACH_UNIX(zeit)` → INTEGER | point in local time to Unix seconds |
 | `ZEIT_PARSE(text$)` → INTEGER | text to point in time; aborts on anything unreadable |
 | `ZEIT_LESBAR(text$)` → BOOLEAN | could the text be read? (asks, does not abort) |
 | `ZEIT_TEXT$(zeit)` → STRING | point in time as `JJJJ-MM-TT hh:mm:ss` (YYYY-MM-DD hh:mm:ss) |
@@ -43,10 +52,21 @@ IMPORT "zeit"
 
 PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28 20:30:00"))   ' normal form
 PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28T20:30:00"))   ' ISO with T
-PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28T20:30:00Z"))  ' with time-zone suffix
 PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28 20:30"))      ' without seconds
 PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28"))            ' date only = 00:00:00
+PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28T18:30:00Z"))  ' with a time zone
+PRINT ZEIT_TEXT$(ZEIT_PARSE("Fri, 28 Aug 2026 20:30:00 +0200"))  ' RSS, HTTP, e-mail
 ```
+
+**With a time zone the text is a fixed point in time** and is converted into
+the local time of this machine -- on a machine in Central Europe the last two
+lines give `2026-08-28 20:30:00` in August. Understood are `Z`, `+02:00`,
+`+0200`, `-05:00`, `UTC`/`GMT`/`UT`, the US zones `EST`/`EDT`, `CST`/`CDT`,
+`MST`/`MDT`, `PST`/`PDT` and `CET`/`CEST`/`MEZ`/`MESZ`; an unknown zone name is
+unreadable rather than silently wrong. Daylight saving time applies for the
+day of the timestamp, not for today. **Without a time zone** the text counts as
+local time. Until 2026.27 a zone suffix was cut off -- `18:30Z` counted as
+18:30 local time --, and the RFC 822 date of RSS feeds was not readable at all.
 
 Anything unreadable aborts with a plain message instead of silently returning `-1` — otherwise a
 broken date only shows up much later as a nonsensical result. Where input
@@ -145,6 +165,13 @@ PRINT ZEIT_WOCHENTAG(a)                         ' 5
 
 Without a pattern (`""`) you get the normal form, exactly as with `ZEIT_TEXT$`.
 
+**The notation of C, Python and PHP works too:** `%Y` `%m` `%d` `%H` `%M`
+`%S`, plus `%y` (two-digit year), `%a`/`%A` (weekday short/long) and `%%`.
+`ZEIT_FORMAT$(a, "%Y-%m-%d %H:%M:%S")` is the same as the normal form. A
+`%` placeholder that does not exist (`%j`) is an **error** -- up to 2026.30
+it came back literally, and a CSV file got the text `%Y-%m-%d` instead of a
+date in every line.
+
 `ZEIT_WOCHENTAG` counts from Monday, because otherwise a match day at the weekend
 would run across two numbers: Monday 1 … Sunday 7.
 
@@ -179,13 +206,21 @@ WEND
 - **Points in time are local time.** A point in time created on a machine in Berlin
   gives the same *number* on a machine in Tokyo only if both
   read the same text — and the same number shows a different time there.
-  If you compare across time zones, store the text, not the number.
+  If you compare across time zones, store the text with its time zone
+  (`2026-08-28T18:30:00Z`), not the number.
 - **`MILLIS()` is something else and cannot be converted.** It is the
   stopwatch for frame times and timers. If you compare `MILLIS() / 1000` with
   `ZEIT_JETZT()`, you are off by the time-zone offset —
   measured on 16.08.2026 in Central Europe: `MILLIS()/1000 = 1786883970`,
   `ZEIT_JETZT() = 1786891170`, i.e. **two hours of difference**. For date
   and time always use `ZEIT_JETZT()`.
+- **Unix time is UTC, a point in time is local time.** Other programs, web APIs
+  and many file formats write Unix seconds. Read them with `ZEIT_AUS_UNIX`
+  and write them with `ZEIT_NACH_UNIX` (or `ZEIT_UNIX()` for "now") --
+  writing the number from `ZEIT_JETZT()` there would be off by the time-zone
+  offset. In the hour that does not exist when daylight saving time starts,
+  or the doubled one in autumn, `ZEIT_NACH_UNIX` returns one of the two
+  possible answers.
 - **A day is not always 86400 seconds.** On the changeover days it is
   23 or 25 hours. `ZEIT_PLUS(t, 86400)` adds exactly 86400 seconds — on those
   two days of the year that is not the same time on the following day. If the

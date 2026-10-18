@@ -181,6 +181,9 @@ pub struct Style {
     pub f_schatten_daten: bool,
     /// Grosse Zahlen kurz schreiben (1.2M statt 1200000) -- wie NUMFMT$.
     pub f_kurz: bool,
+    /// Dezimalkomma statt Punkt ("25,7 °C") -- passend zu ZAHL$ und den
+    /// Feldern der gui; in der Pixelschrift ist der Punkt ein einzelnes Pixel.
+    pub f_komma: bool,
     /// Element unter der Maus hervorheben (aufhellen, herausruecken, wachsen).
     pub f_hover: bool,
     /// Sprechblase mit Name und Wert am Element unter der Maus.
@@ -207,6 +210,9 @@ pub struct Style {
     pub fassung: i32,
     /// Strichlaenge gestrichelter Linien in Pixeln; 0 = durchgezogen.
     pub strich: f64,
+    /// Liniendiagramm mit CHART_X: liegen zwei Nachbarn in x weiter als das
+    /// auseinander, wird die Linie dort unterbrochen (0 = nie).
+    pub luecke_ab: f64,
 
     /// Reihenfolge der Standardfarben fuer Reihen/Segmente ohne eigene Farbe.
     pub palette: Vec<i64>,
@@ -277,6 +283,7 @@ impl Default for Style {
             f_verlauf_daten: false,
             f_schatten_daten: false,
             f_kurz: false,
+            f_komma: false,
             f_hover: true,
             f_tooltip: false,
             f_treppe: false,
@@ -290,6 +297,7 @@ impl Default for Style {
             blatt_dicke: 0.2,
             fassung: 0,
             strich: 0.0,
+            luecke_ab: 0.0,
             palette: Vec::new(),
         };
         apply_theme(&mut s, "dunkel");
@@ -413,6 +421,10 @@ pub struct ChartObj {
     /// Farbe je Kategorie beim Kuchen; -1 = aus der Palette.
     pub label_colors: Vec<i64>,
     pub series: Vec<Series>,
+    /// CHART_X: x-Wert je Punkt (Liniendiagramm), leer = gleiche Abstaende.
+    /// Gilt fuer die Punktzahl, fuer die er gesetzt wurde -- CHART_DATA oder
+    /// CHART_PUSH mit einer anderen Zahl heben ihn auf.
+    pub xwerte: Vec<f64>,
     pub zones: Vec<Zone>,
     pub style: Style,
 
@@ -440,6 +452,7 @@ impl ChartObj {
             labels: Vec::new(),
             label_colors: Vec::new(),
             series: Vec::new(),
+            xwerte: Vec::new(),
             zones: Vec::new(),
             style: Style::default(),
             hover: -1,
@@ -514,12 +527,72 @@ impl ChartObj {
         Ok(())
     }
 
+    /// CHART_X: x-Werte der Punkte (z. B. Zeitstempel). Leer = wieder gleiche
+    /// Abstaende. Sie muessen zur Punktzahl passen und duerfen nicht fallen.
+    ///
+    /// Bis 2026.30 kannte das Liniendiagramm nur "Punkt Nummer i": eine
+    /// Messreihe mit einer Luecke von zweieinhalb Stunden zeigte 13:00 direkt
+    /// neben 16:00, die Luecke war nicht zu sehen (Messdaten-Runde, 2026-10-13).
+    pub fn set_x(&mut self, xs: &[f64]) -> Result<(), String> {
+        if xs.is_empty() { self.xwerte.clear(); return Ok(()); }
+        let n = self.labels.len();
+        if xs.len() != n {
+            return Err(format!("CHART_X: {} x-Werte fuer {} Punkte -- erst CHART_DATA, dann CHART_X mit gleich vielen", xs.len(), n));
+        }
+        if let Some(i) = (1..xs.len()).find(|&i| !(xs[i] >= xs[i - 1])) {
+            return Err(format!("CHART_X: der x-Wert von Punkt {} ist kleiner als der davor -- die Werte muessen aufsteigen", i));
+        }
+        self.xwerte = xs.to_vec();
+        Ok(())
+    }
+
+    /// x-Lage aller Punkte eines Liniendiagramms -- EINE Quelle fuer Zeichnen,
+    /// Treffertest, Fadenkreuz und Beschriftung.
+    fn linien_xs(&self, x0: i32, breite: i32, n: usize) -> Vec<i32> {
+        if self.xwerte.len() == n && n >= 2 {
+            let (lo, hi) = (self.xwerte[0], self.xwerte[n - 1]);
+            if hi > lo {
+                let w = breite as f64;
+                return self.xwerte.iter().map(|x| x0 + ((x - lo) / (hi - lo) * w).round() as i32).collect();
+            }
+        }
+        let dx = breite as f64 / (n.max(2) - 1) as f64;
+        (0..n).map(|i| x0 + (dx * i as f64) as i32).collect()
+    }
+
+    /// Zusammenhaengende Stuecke [von, bis) -- eine Luecke in x ueber
+    /// `luecke_ab` trennt sie.
+    fn linien_laeufe(&self, n: usize) -> Vec<(usize, usize)> {
+        let ab = self.style.luecke_ab;
+        if ab <= 0.0 || self.xwerte.len() != n {
+            return vec![(0, n)];
+        }
+        let mut raus = Vec::new();
+        let mut von = 0;
+        for i in 1..n {
+            if self.xwerte[i] - self.xwerte[i - 1] > ab {
+                raus.push((von, i));
+                von = i;
+            }
+        }
+        raus.push((von, n));
+        raus
+    }
+
     /// Werte einer Reihe komplett ersetzen. Kuerzere/laengere Listen passen die
     /// Kategorienzahl an, damit Achse und Daten nicht auseinanderlaufen.
+    ///
+    /// Bis 2026.30 wuchs die Zahl nur: nach einer Woche (60000 Punkte) und
+    /// dann einem Tag (8640) hingen 51000 Nullen hinter dem Tag, samt den
+    /// Beschriftungen der Woche (Messdaten-Runde, 2026-10-13).
     pub fn set_data(&mut self, serie: usize, values: &[f64]) -> Result<(), String> {
         if serie >= self.series.len() {
             return Err(format!("CHART_DATA: Reihe {} gibt es nicht", serie));
         }
+        if self.xwerte.len() != values.len() { self.xwerte.clear(); }
+        self.labels.truncate(values.len());
+        self.label_colors.truncate(values.len());
+        if self.hover >= values.len() as i32 { self.hover = -1; }
         while self.labels.len() < values.len() {
             self.labels.push(String::new());
             self.label_colors.push(-1);
@@ -542,6 +615,7 @@ impl ChartObj {
         }
         self.series[serie].values.push(value);
         self.series[serie].shown.push(value);
+        self.xwerte.clear();
         let n = self.series[serie].values.len();
         while self.labels.len() < n {
             self.labels.push(String::new());
@@ -574,6 +648,7 @@ impl ChartObj {
     }
 
     pub fn clear(&mut self) {
+        self.xwerte.clear();
         self.labels.clear();
         self.label_colors.clear();
         for s in &mut self.series {
@@ -737,6 +812,7 @@ impl ChartObj {
         } else {
             format!("{:.*}", n as usize, v)
         };
+        let s = if self.style.f_komma { s.replace('.', ",") } else { s };
         format!("{}{}", s, self.style.einheit)
     }
 }
@@ -1021,10 +1097,12 @@ impl ChartObj {
                 if mx < plot.x0 || mx > plot.x1 {
                     return (-1, -1);
                 }
-                let dx = plot.w() as f64 / (n - 1) as f64;
                 // Naechstliegender Stuetzpunkt in x -- eine Linie trifft man
                 // nicht auf den Pixel genau, also faengt die ganze Spalte.
-                let i = (((mx - plot.x0) as f64 / dx).round() as usize).min(n - 1);
+                let xs = self.linien_xs(plot.x0, plot.w(), n);
+                let k = xs.partition_point(|&x| x < mx);
+                let i = if k == 0 { 0 } else if k >= n { n - 1 }
+                    else if (xs[k] - mx) < (mx - xs[k - 1]) { k } else { k - 1 };
                 // Von den Reihen die, deren Punkt senkrecht am naechsten liegt.
                 let mut beste = (-1i32, i32::MAX);
                 for (si, s) in self.series.iter().enumerate() {
@@ -1429,7 +1507,8 @@ impl ChartObj {
 
             if st.werte != "aus" {
                 let text = if st.f_prozent {
-                    format!("{:.*}%", st.nachkomma.clamp(0, 9) as usize, v / summe * 100.0)
+                    let p = format!("{:.*}%", st.nachkomma.clamp(0, 9) as usize, v / summe * 100.0);
+                    if st.f_komma { p.replace('.', ",") } else { p }
                 } else {
                     self.fmt_value(v)
                 };
@@ -1580,13 +1659,18 @@ impl ChartObj {
         }
         self.draw_grid(g, &plot, lo, hi, false);
 
-        let dx = plot.w() as f64 / (n - 1) as f64;
+        let alle_xs = self.linien_xs(plot.x0, plot.w(), n);
+        let laeufe = self.linien_laeufe(n);
         for (si, s) in self.series.iter().enumerate() {
             let farbe = self.data_color(si);
-            let xs: Vec<i32> = (0..n).map(|i| plot.x0 + (dx * i as f64) as i32).collect();
-            let ys: Vec<i32> = (0..n)
+            let alle_ys: Vec<i32> = (0..n)
                 .map(|i| self.val_pos(&plot, *self.anzeige(s).get(i).unwrap_or(&0.0), lo, hi, false))
                 .collect();
+          for &(von, bis) in &laeufe {
+            let xs = &alle_xs[von..bis];
+            let ys = &alle_ys[von..bis];
+            let n = bis - von;
+            if n == 0 { continue; }
 
             if st.f_flaeche {
                 let basis = self.val_pos(&plot, 0.0f64.clamp(lo, hi), lo, hi, false);
@@ -1599,11 +1683,12 @@ impl ChartObj {
                     let unten = with_alpha(st.c_flaeche, st.flaeche_deckkraft * 0.06);
                     const STREIFEN: i32 = 2;
                     let mut x = xs[0];
+                    let mut i = 0usize;
                     while x < xs[n - 1] {
                         // Punkt links von x suchen und linear interpolieren.
-                        let t = (x - plot.x0) as f64 / dx;
-                        let i = (t.floor() as usize).min(n - 2);
-                        let f = (t - i as f64).clamp(0.0, 1.0);
+                        while i + 2 < n && xs[i + 1] <= x { i += 1; }
+                        let breite = (xs[i + 1] - xs[i]).max(1) as f64;
+                        let f = ((x - xs[i]) as f64 / breite).clamp(0.0, 1.0);
                         let y = ys[i] as f64 + (ys[i + 1] - ys[i]) as f64 * f;
                         let (y1, y2) = ((y as i32).min(basis), (y as i32).max(basis));
                         if y2 > y1 {
@@ -1624,13 +1709,19 @@ impl ChartObj {
                     let _ = g.polygon(&flach, oben, true);
                 }
             }
-            if st.f_glatt && !st.f_treppe {
+            if n == 1 {
+                // Ein einzelner Punkt zwischen zwei Luecken: ohne ihn sahe
+                // man nicht, dass dort gemessen wurde.
+                self.punkt(g, xs[0], ys[0], (st.linien_dicke as i32).max(2), farbe);
+            } else if st.f_glatt && !st.f_treppe {
                 // Eine geglaettete Treppe waere ein Widerspruch -- die Treppe
                 // gewinnt, weil sie die genauere Aussage macht.
-                g.spline(&xs, &ys, st.linien_dicke, farbe);
+                g.spline(xs, ys, st.linien_dicke, farbe);
             } else {
-                self.zug(g, &xs, &ys, st.linien_dicke, farbe);
+                self.zug(g, xs, ys, st.linien_dicke, farbe);
             }
+          }
+            let (xs, ys) = (&alle_xs, &alle_ys);
             for i in 0..n {
                 let glanz = if self.hover_serie == si as i32 { self.glanz_von(i) } else { 0.0 };
                 if st.f_punkte {
@@ -1649,7 +1740,7 @@ impl ChartObj {
         // damit es obenauf liegt, aber vor der Beschriftung.
         if st.f_fadenkreuz && self.hover >= 0 && (self.hover as usize) < n {
             let i = self.hover as usize;
-            let x = plot.x0 + (dx * i as f64) as i32;
+            let x = alle_xs[i];
             g.line(x, plot.y0, x, plot.y1, st.c_achse);
             if let Some(s) = self.series.get(self.hover_serie.max(0) as usize) {
                 let y = self.val_pos(&plot, *self.anzeige(s).get(i).unwrap_or(&0.0), lo, hi, false);
@@ -1658,23 +1749,49 @@ impl ChartObj {
         }
 
         // Kategoriebeschriftung: nur so viele, wie ohne Ueberlappung passen.
-        let schritt = self.label_step(g, n, plot.w());
-        for i in (0..n).step_by(schritt) {
+        for (i, x) in self.linien_beschriftung(g, n, &plot, &alle_xs) {
             if let Some(l) = self.labels.get(i) {
-                if !l.is_empty() {
-                    let tw = g.text_width_at(l, st.text_groesse);
-                    g.text_styled(
-                        plot.x0 + (dx * i as f64) as i32 - tw / 2,
-                        plot.y1 + 5,
-                        l.clone(),
-                        st.c_text,
-                        st.schrift,
-                        st.text_groesse,
-                    );
-                }
+                g.text_styled(x, plot.y1 + 5, l.clone(), st.c_text, st.schrift, st.text_groesse);
             }
         }
         self.draw_axis_titles(g, a, &plot);
+    }
+
+    /// Welche Beschriftungen der x-Achse eines Liniendiagramms gezeichnet
+    /// werden, mit ihrer linken Kante.
+    ///
+    /// Sind ALLE Punkte beschriftet, gilt wie bisher jeder k-te (gleichmaessig).
+    /// Sind nur EINZELNE beschriftet -- bei einer Messreihe die Tagesanfaenge
+    /// unter 60000 Punkten --, fielen die meisten genau auf die Luecken
+    /// zwischen den k-ten und verschwanden. Dann gilt jede gesetzte
+    /// Beschriftung, die nicht in die vorige hineinragt (Messdaten-Runde,
+    /// 2026-10-13).
+    fn linien_beschriftung(&self, g: &Graphics, n: usize, plot: &Area, xs: &[i32]) -> Vec<(usize, i32)> {
+        let st = &self.style;
+        let gesetzt = self.labels.iter().take(n).filter(|l| !l.is_empty()).count();
+        let mut raus = Vec::new();
+        if gesetzt == 0 { return raus; }
+        if gesetzt < n.min(self.labels.len()) {
+            let mut frei_ab = i32::MIN;
+            for (i, l) in self.labels.iter().enumerate().take(n) {
+                if l.is_empty() { continue; }
+                let tw = g.text_width_at(l, st.text_groesse);
+                let x = (xs[i] - tw / 2).max(plot.x0).min(plot.x1 - tw);
+                if x >= frei_ab {
+                    raus.push((i, x));
+                    frei_ab = x + tw + st.text_groesse / 2;
+                }
+            }
+            return raus;
+        }
+        let schritt = self.label_step(g, n, plot.w());
+        for i in (0..n).step_by(schritt) {
+            if let Some(l) = self.labels.get(i) {
+                let tw = g.text_width_at(l, st.text_groesse);
+                raus.push((i, xs[i] - tw / 2));
+            }
+        }
+        raus
     }
 
     /// Anzahl Zellen, Luecke in Pixeln und Ausrichtung der LED-Anzeige.
@@ -2443,7 +2560,7 @@ pub const KEYS_NUM: &[&str] = &[
     "striche", "unterstriche", "linien_dicke", "punkt_radius", "animation", "fenster", "schatten",
     "schatten_weich", "deckkraft", "flaeche_deckkraft",
     "hover_tempo", "hover_weite", "hover_glanz", "glanz",
-    "blatt_teile", "blatt_luecke", "blatt_dicke", "fassung", "strich",
+    "blatt_teile", "blatt_luecke", "blatt_dicke", "fassung", "strich", "luecke_ab",
 ];
 pub const KEYS_COLOR: &[&str] = &[
     "hintergrund", "rahmen", "gitter", "text", "titel", "achse", "zeiger", "flaeche", "verlauf",
@@ -2451,7 +2568,7 @@ pub const KEYS_COLOR: &[&str] = &[
 ];
 pub const KEYS_FLAG: &[&str] = &[
     "rahmen", "gitter_x", "gitter_y", "prozent", "flaeche", "punkte", "glatt", "null_linie",
-    "stapel", "verlauf", "verlauf_daten", "schatten_daten", "kurz",
+    "stapel", "verlauf", "verlauf_daten", "schatten_daten", "kurz", "komma",
     "hover", "tooltip", "treppe", "fadenkreuz",
 ];
 
@@ -2588,6 +2705,7 @@ impl ChartObj {
             "blatt_dicke" => s.blatt_dicke = v.clamp(0.05, 0.6),
             "fassung" => s.fassung = v.clamp(0.0, 60.0) as i32,
             "strich" => s.strich = v.clamp(0.0, 100.0),
+            "luecke_ab" => s.luecke_ab = v.max(0.0),
             _ => return Err(unbekannt("CHART_SET_NUM", key, KEYS_NUM)),
         }
         Ok(())
@@ -2633,6 +2751,7 @@ impl ChartObj {
             "verlauf_daten" => s.f_verlauf_daten = v,
             "schatten_daten" => s.f_schatten_daten = v,
             "kurz" => s.f_kurz = v,
+            "komma" => s.f_komma = v,
             "hover" => s.f_hover = v,
             "tooltip" => s.f_tooltip = v,
             "treppe" => s.f_treppe = v,
@@ -2877,6 +2996,10 @@ mod tests {
         c.set_flag("kurz", true).unwrap();
         c.set_num("nachkomma", 2.0).unwrap();
         assert_eq!(c.fmt_value(1_500_000.0), "1.50M km/h");
+        c.set_flag("komma", true).unwrap();
+        assert_eq!(c.fmt_value(1_500_000.0), "1,50M km/h");
+        c.set_flag("kurz", false).unwrap();
+        assert_eq!(c.fmt_value(42.25), "42,25 km/h");
     }
 
     #[test]
@@ -3197,5 +3320,32 @@ mod tests {
         let leer = stats(&[]);
         assert_eq!(leer["anzahl"], 0.0);
         assert_eq!(leer["mittel"], 0.0, "leere Reihe darf nicht NaN liefern");
+    }
+
+    #[test]
+    fn kuerzere_daten_kuerzen_die_punkte() {
+        let mut c = ChartObj::new(Kind::Line, 0, 0, 200, 100);
+        c.add_series("a", -1);
+        c.set_data(0, &[1.0; 100]).unwrap();
+        c.set_data(0, &[2.0; 10]).unwrap();
+        assert_eq!(c.labels.len(), 10, "eine Woche, dann ein Tag: der Tag hat 10 Punkte");
+        assert_eq!(c.series[0].values.len(), 10);
+    }
+
+    #[test]
+    fn x_werte_legen_die_punkte_und_trennen_luecken() {
+        let mut c = ChartObj::new(Kind::Line, 0, 0, 200, 100);
+        c.add_series("a", -1);
+        c.set_data(0, &[1.0, 2.0, 3.0, 4.0, 5.0]).unwrap();
+        assert_eq!(c.linien_xs(0, 100, 5), vec![0, 25, 50, 75, 100], "ohne x gleiche Abstaende");
+        c.set_x(&[0.0, 10.0, 20.0, 90.0, 100.0]).unwrap();
+        assert_eq!(c.linien_xs(0, 100, 5), vec![0, 10, 20, 90, 100]);
+        assert_eq!(c.linien_laeufe(5), vec![(0, 5)], "ohne luecke_ab keine Trennung");
+        c.set_num("luecke_ab", 30.0).unwrap();
+        assert_eq!(c.linien_laeufe(5), vec![(0, 3), (3, 5)]);
+        assert!(c.set_x(&[0.0, 1.0]).is_err(), "falsche Anzahl");
+        assert!(c.set_x(&[0.0, 2.0, 1.0, 3.0, 4.0]).is_err(), "fallend");
+        c.set_data(0, &[1.0, 2.0, 3.0]).unwrap();
+        assert!(c.xwerte.is_empty(), "andere Punktzahl hebt CHART_X auf");
     }
 }

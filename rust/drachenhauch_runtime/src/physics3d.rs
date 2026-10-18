@@ -146,6 +146,26 @@ impl Phys3dWorld {
         }
     }
 
+    /// Schlafen legen (TRUE) oder wecken (FALSE). Ein schlafender Koerper
+    /// kostet den Loeser nichts, bis ihn ein Stoss, ein neues Tempo oder ein
+    /// wacher Koerper beruehrt -- ein frisch aufgebauter Stapel faengt so
+    /// nicht mit voller Last an, nur um festzustellen, dass er ruht.
+    pub fn sleep(&mut self, idx: i64, schlafen: bool) {
+        if let Some(h) = self.handle(idx) {
+            if let Some(rb) = self.bodies.get_mut(h) {
+                if schlafen { rb.sleep(); } else { rb.wake_up(true); }
+            }
+        }
+    }
+
+    /// Schlaeft der Koerper? (Ungueltiger Index und statische: FALSE.)
+    pub fn is_sleeping(&self, idx: i64) -> bool {
+        self.handle(idx)
+            .and_then(|h| self.bodies.get(h))
+            .map(|rb| rb.is_dynamic() && rb.is_sleeping())
+            .unwrap_or(false)
+    }
+
     pub fn remove(&mut self, idx: i64) {
         let i = idx as usize;
         if idx < 0 || i >= self.handles.len() { return; }

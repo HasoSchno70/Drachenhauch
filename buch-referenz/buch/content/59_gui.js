@@ -66,6 +66,14 @@ module.exports = (H) => [
       'DIM lautstaerke AS FLOAT',
       'lautstaerke = GUI_VALUE(vol)',
     ]),
+  H.cmd("GUI_CHANGED", 'GUI_CHANGED(widget)',
+    "TRUE in dem Bild, in dem die Bedienung das Widget geändert hat – eine andere Auswahl in der Klappliste, ein gezogener Regler, ein getippter Text, ein Haken. Was das Programm selbst setzt, zählt nicht; so kann eine Auswertung ihre Klapplisten füllen, ohne sich selbst auszulösen. Der erste Aufruf beginnt zu beobachten und liefert FALSE.",
+    [
+      'GUI_UPDATE()',
+      'IF GUI_CHANGED(auswahl) OR GUI_CHANGED(regler) THEN',
+      '    auswerten()',
+      'END IF',
+    ]),
 
   H.h2("Baumansicht (Tree)"),
   H.p("Eine Baumansicht zeigt hierarchische Daten mit aufklappbaren Knoten – ideal für einen Level-Browser, eine Datei-/Ordnerstruktur oder einen Szenegraph-Inspektor."),
@@ -732,11 +740,18 @@ module.exports = (H) => [
     [
       'IF GUI_FORM_CHANGED(win, "kunde") THEN frage = GUI_DIALOG("Aenderungen", "Speichern?", "Speichern|Verwerfen|Abbrechen")',
     ]),
-  H.cmd("GUI_FORM_LOAD · GUI_FORM_SAVE", 'GUI_FORM_LOAD(win, db, tabelle$, id [, formular$]) AS BOOLEAN   GUI_FORM_SAVE(win, db, tabelle$, id [, formular$]) AS INTEGER',
-    "Das Formular gegen eine SQLite-Tabelle: LOAD liest SELECT schluessel… FROM tabelle WHERE id = ? in die gebundenen Widgets (FALSE, wenn es die Zeile nicht gibt); SAVE schreibt INSERT (bei id < 0, liefert die neue id) oder UPDATE. Gespeichert wird typisiert: Zahlenfeld als Zahl (außer mit führender Null, wie eine Postleitzahl), Kästchen als 0/1, Klappliste als Index, Regler als Kommazahl, sonst Text. Die Spalte heißt id.",
+  H.cmd("GUI_FORM_LOAD · GUI_FORM_SAVE", 'GUI_FORM_LOAD(win, db, tabelle$, id [, formular$]) AS BOOLEAN   GUI_FORM_SAVE(win, db, tabelle$, id [, formular$ [, ueberschreiben]]) AS INTEGER',
+    "Das Formular gegen eine Tabelle in SQLite, PostgreSQL oder MySQL: LOAD liest SELECT schluessel… FROM tabelle WHERE id = ? in die gebundenen Widgets (FALSE, wenn es die Zeile nicht gibt); SAVE schreibt INSERT (bei id < 0, liefert die neue id) oder UPDATE. Hat das UPDATE keine Zeile getroffen, liefert SAVE 0 – GUI_FORM_CONFLICT$ sagt, warum. Gespeichert wird typisiert: Zahlenfeld als Zahl (außer mit führender Null vor einer Ziffer, wie die Postleitzahl 01234), Geldfeld in Cent, Kästchen als 0/1, Klappliste als Index, Regler als Kommazahl, sonst Text. Die Spalte heißt id.",
     [
       'IF GUI_VALIDATE(win) = 0 THEN kundeId = GUI_FORM_SAVE(win, db, "kunden", kundeId, "kunde")',
       'IF NOT GUI_FORM_LOAD(win, db, "kunden", id, "kunde") THEN PRINT "gibt es nicht mehr"',
+    ]),
+  H.cmd("GUI_FORM_VERSION · GUI_FORM_CONFLICT$", 'GUI_FORM_VERSION(win, spalte$ [, formular$])   GUI_FORM_CONFLICT$(win [, formular$]) AS STRING',
+    "Mehrere Leute an einer Datenbank: die genannte ganzzahlige Spalte zählt jedes Speichern hoch. GUI_FORM_LOAD merkt sich ihren Stand, GUI_FORM_SAVE speichert nur, solange die Zeile ihn noch trägt – hat ein anderer inzwischen gespeichert, liefert es 0, und GUI_FORM_CONFLICT$ sagt \"geaendert\" (bei einer gelöschten Zeile \"geloescht\", nach einem erfolgreichen Speichern \"\"). Die Eingaben stehen dann noch im Formular; das sechste Argument TRUE von GUI_FORM_SAVE überschreibt bewusst. Ein neuer Datensatz bekommt den Stand 1. Ein leerer Spaltenname schaltet die Prüfung ab.",
+    [
+      'GUI_FORM_VERSION(win, "stand", "m")',
+      'IF GUI_FORM_SAVE(win, db, "mitglied", id, "m") = 0 THEN PRINT GUI_FORM_CONFLICT$(win, "m")',
+      'id = GUI_FORM_SAVE(win, db, "mitglied", id, "m", TRUE)    \' trotzdem speichern',
     ]),
   H.cmd("GUI_SET_MIN_SIZE · GUI_LAYOUT_MIN_W · GUI_LAYOUT_MIN_H", 'GUI_SET_MIN_SIZE(widget, min_w, min_h)   GUI_LAYOUT_MIN_W(layout)   GUI_LAYOUT_MIN_H(layout)',
     "Mindestmaß eines Widgets: ein gewichtetes Kind in einem Layout-Behälter fällt nie darunter (dann läuft die Zeile lieber über, als dass ein Knopf zu einem Strich wird), ein verankertes Widget schrumpft beim Verkleinern des Fensters nicht darunter. GUI_LAYOUT_MIN_W/H liefern, was ein Behälter samt Inhalt mindestens braucht – der richtige Wert für WINDOW_MIN_SIZE.",
@@ -845,6 +860,13 @@ module.exports = (H) => [
     [
       'GUI_WINDOW_SET_BOUNDS(win, 100, 80, 320, 240)',
       'SAVE_SET_INT(slot, "win_x", GUI_WINDOW_GET_X(win))',
+    ]),
+  H.cmd("GUI_WINDOW_CONTENT_W · GUI_WINDOW_CONTENT_H", 'GUI_WINDOW_CONTENT_W(win)   GUI_WINDOW_CONTENT_H(win)',
+    "Breite und Höhe des Inhaltsbereichs unter Titel-, Menü- und Reiterleiste. Dort zählen die Widget-Koordinaten -- so sitzt eine Statusleiste genau unten, ohne die Höhe der Menüleiste zu raten.",
+    [
+      'DIM h AS INTEGER',
+      'h = GUI_WINDOW_CONTENT_H(win)',
+      'sb = GUI_STATUSBAR(win, 0, h - 26, GUI_WINDOW_CONTENT_W(win), 26, "Bereit.")',
     ]),
   H.cmd("GUI_WINDOW_MOVABLE · GUI_WINDOW_CLOSABLE · GUI_WINDOW_RESIZABLE", 'GUI_WINDOW_MOVABLE(win, an)   GUI_WINDOW_CLOSABLE(win, an)   GUI_WINDOW_RESIZABLE(win, an)',
     "Schalten Verschieben an der Titelleiste, den Schließen-Knopf und den Größengriff unten rechts ab oder an. Ein festgenageltes Fenster (movable = FALSE) eignet sich für eine Statusanzeige, die immer an derselben Stelle bleibt.",

@@ -1,0 +1,483 @@
+' Pattern-Maker-Muster (.xsd) lesen.
+'
+' PyStickys XSD-Leser (io/formats/xsd_import.py) erwartet die Kennung "PM" und
+' liest keine echte Datei. Den Aufbau kennt Embroiderly (crates/
+' embroiderly-parsers/src/pmaker/xsd.rs, dort an Pattern Maker entschluesselt);
+' dieser Leser folgt dessen Beschreibung und ist an der Beispieldatei von
+' Embroiderly geprueft ("The Whisper of the Board", 250 x 331, acht Blends).
+'
+' Grob (little-endian, "Text n" = n Bytes + Null, UTF-8 oder cp1251):
+'   u16 0x0510, 4 Bytes, 4 x u16 Fassung, 727 Bytes, u16 Breite, u16 Hoehe,
+'   u32 Zahl der Teilstich-Zellen, u16 Zahl der "Joints", 2 x u16 Stoff,
+'   6 Bytes; Palette (u16 Zahl, je Farbe 2 Bytes, u8 Hersteller, Text 10
+'   Nummer, Text 40 Name, 3 Bytes RGB, 1 Byte, Blend: u16 Zahl, 4 x (u8
+'   Hersteller, Text 10 Nummer), 4 x u8 Straenge, u32 Perle, 4 + 2 Bytes),
+'   danach Plaetze, Notizen, Straenge, Formate, Symbole, Einstellungen, Stoff,
+'   Titel/Autor/Firma/Copyright/Beschreibung, ... 16924 Bytes ...
+'   Stiche: 4 x i32 Schluessel, dann Bloecke (u32 Laenge, Laenge x i32),
+'   verschluesselt mit XOR und wanderndem Schluessel, darin Laeufe; je Zelle
+'   ein i32 (Byte 3: 15 leer, 0 ganz mit Farbe in Byte 2, sonst Verweis auf
+'   einen 10-Byte-Satz mit halben, Viertel- und Petite-Stichen);
+'   Sondermodelle; Joints (Knoten, Rueck-, Spann-, Sonderstiche, Kurven,
+'   Perlen).
+'
+' Mehrere Teilstiche in einer Zelle landen auf mehreren Ebenen. Petite-Stiche
+' werden Viertelstiche, Spannstiche Rueckstiche; Sonderstiche und Kurven
+' kennt Glutfaden nicht (gezaehlt und gemeldet).
+
+CLASS XsdImport
+    DIM muster AS Muster
+    DIM warnungen AS ARRAY OF STRING
+    DIM fassung AS STRING
+END CLASS
+
+CLASS XsdLeser
+    DIM daten AS BUFFER
+    DIM p AS INTEGER
+
+    SUB Init(b AS BUFFER)
+        daten = b
+    END SUB
+
+    SUB brauche(n AS INTEGER)
+        IF n < 0 OR p + n > BUFFER_LEN(daten) THEN THROW trf$("XSD: Datei endet vorzeitig (bei Byte {0})", [STR$(p)])
+    END SUB
+
+    FUNCTION u8() AS INTEGER
+        brauche(1)
+        p = p + 1
+        RETURN BUFFER_GET(daten, p - 1)
+    END FUNCTION
+
+    FUNCTION u16() AS INTEGER
+        brauche(2)
+        p = p + 2
+        RETURN BUFFER_GET_U16(daten, p - 2)
+    END FUNCTION
+
+    FUNCTION u32() AS INTEGER
+        brauche(4)
+        p = p + 4
+        RETURN BUFFER_GET_U32(daten, p - 4)
+    END FUNCTION
+
+    SUB ueber(n AS INTEGER)
+        brauche(n)
+        p = p + n
+    END SUB
+
+    ' Text fester Laenge: n Bytes und ein Platz fuer die Null
+    FUNCTION text$(n AS INTEGER) AS STRING
+        brauche(n + 1)
+        DIM ende AS INTEGER : ende = 0
+        WHILE ende < n + 1 AND BUFFER_GET(daten, p + ende) <> 0
+            ende = ende + 1
+        WEND
+        DIM t AS STRING : t = xsdText$(daten, p, IIF(ende > n, 0, ende))
+        p = p + n + 1
+        RETURN t
+    END FUNCTION
+
+    FUNCTION farbe() AS INTEGER
+        brauche(3)
+        DIM f AS INTEGER : f = RGB(BUFFER_GET(daten, p), BUFFER_GET(daten, p + 1), BUFFER_GET(daten, p + 2))
+        p = p + 3
+        RETURN f
+    END FUNCTION
+END CLASS
+
+' Bytes als UTF-8, sonst cp1251 (russische Garnnamen).
+FUNCTION xsdText$(b AS BUFFER, ab AS INTEGER, n AS INTEGER) AS STRING
+    IF n <= 0 THEN RETURN ""
+    DIM s AS BUFFER : s = BUFFER_SLICE(b, ab, ab + n)
+    TRY
+        RETURN BUFFER_TO_STRING$(s)
+    CATCH e
+        ' weiter mit cp1251
+    END TRY
+    DIM obere AS ARRAY OF INTEGER
+    obere = [&H402, &H403, &H201A, &H453, &H201E, &H2026, &H2020, &H2021, &H20AC, &H2030, &H409, &H2039, &H40A, &H40C, &H40B, &H40F, _
+             &H452, &H2018, &H2019, &H201C, &H201D, &H2022, &H2013, &H2014, &H98, &H2122, &H459, &H203A, &H45A, &H45C, &H45B, &H45F, _
+             &HA0, &H40E, &H45E, &H408, &HA4, &H490, &HA6, &HA7, &H401, &HA9, &H404, &HAB, &HAC, &HAD, &HAE, &H407, _
+             &HB0, &HB1, &H406, &H456, &H491, &HB5, &HB6, &HB7, &H451, &H2116, &H454, &HBB, &H458, &H405, &H455, &H457]
+    DIM t AS STRING : t = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM c AS INTEGER : c = BUFFER_GET(s, i)
+        IF c >= &HC0 THEN
+            c = &H410 + c - &HC0
+        ELSEIF c >= &H80 THEN
+            c = obere[c - &H80]
+        END IF
+        t = t + CHR$(c)
+    NEXT
+    RETURN t
+END FUNCTION
+
+' 32 Bit nach links drehen
+FUNCTION xsdDrehen(k AS INTEGER, s AS INTEGER) AS INTEGER
+    IF s = 0 THEN RETURN k
+    RETURN ((k SHL s) BOR (k SHR (32 - s))) BAND &HFFFFFFFF
+END FUNCTION
+
+' Die Joints ueberspringen oder lesen. Ist `m` NIL, wird nur uebersprungen.
+SUB xsdJoints(r AS XsdLeser, zahl AS INTEGER, m AS Muster, nf AS INTEGER, zaehler AS MAP OF INTEGER)
+    DIM i AS INTEGER
+    FOR i = 1 TO zahl
+        DIM art AS INTEGER : art = r.u16()
+        SELECT CASE art
+            CASE 1, 6
+                ' Knoten: 2, x, y, 4, Farbe, 1 -- Perle: 2, x, y, Farbe, 1, Drehung
+                r.ueber(2)
+                DIM kx AS INTEGER : kx = r.u16()
+                DIM ky AS INTEGER : ky = r.u16()
+                IF art = 1 THEN r.ueber(4)
+                DIM kf AS INTEGER : kf = r.u8()
+                r.ueber(1)
+                IF art = 6 THEN r.ueber(2)
+                IF IS_NIL(m) THEN CONTINUE
+                IF kf >= nf THEN
+                    xsdZaehlen(zaehler, "Farbe")
+                    CONTINUE
+                END IF
+                ' die Stelle ist in halben Zellen; der Knoten gehoert zur Zelle darunter rechts
+                ' (liegt dort schon ein Stich, kommt er auf die naechste freie Ebene)
+                DIM zx AS INTEGER : zx = MIN(kx \ 2, m.breite - 1)
+                DIM zy AS INTEGER : zy = MIN(ky \ 2, m.hoehe - 1)
+                DIM en AS INTEGER : en = 0
+                WHILE en < m.ebenen.anzahl() AND m.ebenen.ebenen[en].stich(zx, zy) >= 0
+                    en = en + 1
+                WEND
+                IF en = m.ebenen.anzahl() THEN ARRAY_PUSH(m.ebenen.ebenen, neueEbene(tr$("Knoten und Perlen"), m.breite, m.hoehe))
+                oxsSetzen(m, m.ebenen.ebenen[en], zx, zy, kf, IIF(art = 1, KNOTEN, PERLE))
+            CASE 2, 5
+                r.ueber(2)
+                DIM x1 AS INTEGER : x1 = r.u16()
+                DIM y1 AS INTEGER : y1 = r.u16()
+                DIM x2 AS INTEGER : x2 = r.u16()
+                DIM y2 AS INTEGER : y2 = r.u16()
+                DIM lf AS INTEGER : lf = r.u8()
+                r.ueber(1)
+                IF IS_NIL(m) THEN CONTINUE
+                IF lf >= nf THEN
+                    xsdZaehlen(zaehler, "Farbe")
+                    CONTINUE
+                END IF
+                IF x1 > 2 * m.breite OR x2 > 2 * m.breite OR y1 > 2 * m.hoehe OR y2 > 2 * m.hoehe THEN
+                    xsdZaehlen(zaehler, "ausserhalb")
+                    CONTINUE
+                END IF
+                IF art = 5 THEN xsdZaehlen(zaehler, "Spannstich")
+                ARRAY_PUSH(m.rueckstiche, neuerRueckstich(x1, y1, x2, y2, lf))
+            CASE 3
+                r.ueber(3)
+                DIM pz AS INTEGER : pz = r.u16()
+                r.ueber(4 * pz)
+                IF NOT IS_NIL(m) THEN xsdZaehlen(zaehler, "Kurve")
+            CASE 4
+                r.ueber(23)
+                IF NOT IS_NIL(m) THEN xsdZaehlen(zaehler, "Sonderstich")
+            CASE ELSE
+                THROW trf$("XSD: unbekannte Joint-Art {0} bei Byte {1}", [STR$(art), STR$(r.p - 2)])
+        END SELECT
+    NEXT
+END SUB
+
+SUB xsdZaehlen(z AS MAP OF INTEGER, schluessel AS STRING)
+    MAPPUT(z, schluessel, IIF(MAPHAS(z, schluessel), MAPGET(z, schluessel), 0) + 1)
+END SUB
+
+' Garn aus Hersteller und Nummer: aus den Paletten, sonst aus der Datei.
+FUNCTION xsdGarn(hst AS STRING, nummer AS STRING, name AS STRING, farbe AS INTEGER, paletten AS ARRAY OF Palette, bekannt AS MAP OF INTEGER) AS Garn
+    DIM schl AS STRING : schl = LOWER$(hst) + "|" + LOWER$(nummer)
+    IF hst <> "" AND nummer <> "" AND MAPHAS(bekannt, schl) THEN
+        DIM wo AS INTEGER : wo = MAPGET(bekannt, schl)
+        RETURN paletten[wo \ 100000].garne[wo MOD 100000]
+    END IF
+    RETURN neuesGarn(IIF(name <> "", name, TRIM$(hst + " " + nummer)), farbe, hst, nummer)
+END FUNCTION
+
+FUNCTION xsdLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY OF STRING) AS XsdImport
+    DIM erg AS XsdImport : erg = NEW XsdImport()
+    erg.warnungen = []
+    DIM roh AS BUFFER
+    TRY
+        roh = READALL_BYTES(pfad)
+    CATCH e
+        THROW trf$("XSD: Datei nicht lesbar – {0}", [e])
+    END TRY
+    DIM r AS XsdLeser : r = NEW XsdLeser(roh)
+    IF BUFFER_LEN(roh) < 2 THEN THROW tr$("XSD: keine Pattern-Maker-Datei")
+    IF r.u16() <> &H510 THEN THROW tr$("XSD: keine Pattern-Maker-Datei (die Kennung 0x0510 fehlt)")
+    r.ueber(4)
+    DIM v0 AS INTEGER : v0 = r.u16()
+    DIM v1 AS INTEGER : v1 = r.u16()
+    DIM v2 AS INTEGER : v2 = r.u16()
+    DIM v3 AS INTEGER : v3 = r.u16()
+    erg.fassung = STR$(v1) + "." + STR$(v0) + "." + STR$(v3) + "." + STR$(v2)
+    r.ueber(727)
+    DIM b AS INTEGER : b = r.u16()
+    DIM h AS INTEGER : h = r.u16()
+    DIM kleinZahl AS INTEGER : kleinZahl = r.u32()
+    DIM jointZahl AS INTEGER : jointZahl = r.u16()
+    DIM stoffX AS INTEGER : stoffX = r.u16()
+    DIM stoffY AS INTEGER : stoffY = r.u16()
+    r.ueber(6)
+    IF b < 1 OR h < 1 THEN THROW trf$("XSD: ungültige Größe {0}x{1}", [STR$(b), STR$(h)])
+    IF b > GROESSTES_MUSTER OR h > GROESSTES_MUSTER THEN THROW trf$("XSD: Muster zu groß: {0}x{1} (höchstens {2})", [STR$(b), STR$(h), STR$(GROESSTES_MUSTER)])
+
+    ' Palette
+    DIM tafel AS MAP OF STRING : tafel = xsdHerstellerTafel()
+    DIM nf AS INTEGER : nf = r.u16()
+    IF nf > 240 THEN THROW trf$("XSD: unglaubwürdige Farbzahl {0}", [STR$(nf)])
+    DIM fHst[nf + 1] AS STRING
+    DIM fNr[nf + 1] AS STRING
+    DIM fName[nf + 1] AS STRING
+    DIM fFarbe[nf + 1] AS INTEGER
+    DIM fPerle[nf + 1] AS BOOLEAN
+    DIM blendHst AS ARRAY OF STRING : blendHst = []    ' je Farbe "hst|nr;hst|nr", leer = kein Blend
+    DIM blendStr AS ARRAY OF STRING : blendStr = []
+    DIM i AS INTEGER, k AS INTEGER
+    FOR i = 0 TO nf - 1
+        r.ueber(2)
+        DIM hid AS INTEGER : hid = r.u8()
+        fHst[i] = IIF(MAPHAS(tafel, STR$(hid)), MAPGET(tafel, STR$(hid)), "")
+        fNr[i] = TRIM$(r.text$(10))
+        fName[i] = TRIM$(r.text$(40))
+        fFarbe[i] = r.farbe()
+        r.ueber(1)
+        DIM bz AS INTEGER : bz = r.u16()
+        IF bz > 4 THEN THROW trf$("XSD: unglaubwürdiger Blend mit {0} Garnen (Farbe {1})", [STR$(bz), STR$(i + 1)])
+        DIM teile AS ARRAY OF STRING : teile = []
+        FOR k = 0 TO bz - 1
+            DIM th AS INTEGER : th = r.u8()
+            ARRAY_PUSH(teile, IIF(MAPHAS(tafel, STR$(th)), MAPGET(tafel, STR$(th)), "") + "|" + TRIM$(r.text$(10)))
+        NEXT
+        r.ueber((4 - bz) * 12)
+        DIM straenge AS ARRAY OF STRING : straenge = []
+        FOR k = 0 TO 3
+            DIM sz AS INTEGER : sz = r.u8()
+            IF k < bz THEN ARRAY_PUSH(straenge, STR$(MAX(sz, 1)))
+        NEXT
+        ARRAY_PUSH(blendHst, JOIN$(teile, ";"))
+        ARRAY_PUSH(blendStr, JOIN$(straenge, ";"))
+        fPerle[i] = r.u32() = 1
+        r.ueber(6)
+    NEXT
+    r.ueber(nf * 2)
+    FOR i = 1 TO nf * 9
+        r.ueber(r.u16())
+    NEXT
+    r.ueber(nf * 16)
+    ' Formate: Symbol, Rueckstich, 4 unbekannte, Sonder-, Spannstich, Knoten, Perle (je 240 x 10), Schrift (240 x 53)
+    r.ueber(240 * 10 * 2 + 240 * 4 + 240 * 10 * 4 + 240 * 53)
+    DIM symCode[nf + 1] AS INTEGER
+    FOR i = 0 TO nf - 1
+        symCode[i] = r.u16()
+        r.ueber(10)
+    NEXT
+    ' Muster- und Druckeinstellungen, Raster
+    r.text$(32) : r.ueber(20) : r.text$(32) : r.ueber(34)
+    r.text$(119) : r.text$(119) : r.ueber(20)
+    r.ueber(56)
+    r.text$(40) : r.ueber(3 + 65)
+    DIM titel AS STRING : titel = TRIM$(r.text$(40))
+    DIM autor AS STRING : autor = TRIM$(r.text$(40))
+    DIM firma AS STRING : firma = TRIM$(r.text$(40))
+    DIM recht AS STRING : recht = TRIM$(r.text$(200))
+    DIM notiz AS STRING : notiz = TRIM$(r.text$(2048))
+    r.ueber(6) : r.text$(40) : r.ueber(206)
+    ' Stich- und Symboleinstellungen, Bibliothek, Maschinen-Export
+    r.ueber(52 + 32 + 16412 + 512)
+
+    IF titel = "" THEN
+        titel = BASENAME(pfad)
+        IF INSTRREV(titel, ".") > 0 THEN titel = LEFT$(titel, INSTRREV(titel, "."))
+    END IF
+    DIM m AS Muster : m = NEW Muster(titel, b, h)
+    m.stoff = IIF(stoffX > 0, stoffX, STANDARD_STOFF)
+    IF stoffY <> stoffX THEN ARRAY_PUSH(erg.warnungen, trf$("Der Stoff zählt waagerecht {0} und senkrecht {1} Stiche je Zoll – übernommen ist {2}", [STR$(stoffX), STR$(stoffY), STR$(stoffX)]))
+    IF autor <> "" THEN JSON_SET_STRING(m.metadaten, "author", autor)
+    IF recht <> "" THEN JSON_SET_STRING(m.metadaten, "copyright", recht)
+    IF notiz <> "" THEN JSON_SET_STRING(m.metadaten, "notes", notiz)
+    IF firma <> "" THEN JSON_SET_STRING(m.metadaten, "company", firma)
+    JSON_SET_STRING(m.metadaten, "imported_from", "xsd")
+    JSON_SET_STRING(m.metadaten, "xsd_version", erg.fassung)
+    erg.muster = m
+
+    ' Farben: Garne ueber die Paletten, Blends aus ihren Teilen
+    DIM bekannt AS MAP OF INTEGER : bekannt = garnVerzeichnis(paletten)
+    DIM ohneSymbol AS ARRAY OF STRING : ohneSymbol = []
+    DIM doppelt AS ARRAY OF STRING : doppelt = []
+    FOR i = 0 TO nf - 1
+        DIM garn AS Garn
+        DIM istP AS BOOLEAN : istP = fPerle[i]
+        IF blendHst[i] = "" THEN
+            garn = xsdGarn(fHst[i], fNr[i], fName[i], fFarbe[i], paletten, bekannt)
+            IF MAPHAS(bekannt, LOWER$(fHst[i]) + "|" + LOWER$(fNr[i])) THEN
+                DIM wo AS INTEGER : wo = MAPGET(bekannt, LOWER$(fHst[i]) + "|" + LOWER$(fNr[i]))
+                istP = istP OR paletten[wo \ 100000].istPerlen
+            END IF
+        ELSE
+            DIM tg AS ARRAY OF Garn : tg = []
+            DIM an AS ARRAY OF INTEGER : an = []
+            DIM stueck AS STRING
+            FOR EACH stueck IN SPLIT$(blendHst[i], ";")
+                DIM th2 AS STRING : th2 = LEFT$(stueck, INSTR(stueck, "|"))
+                DIM tn AS STRING : tn = MID$(stueck, INSTR(stueck, "|") + 1, 99)
+                ' das Teilgarn steht meist selbst in der Palette der Datei
+                DIM tf AS INTEGER : tf = -1
+                DIM tname AS STRING : tname = ""
+                FOR k = 0 TO nf - 1
+                    IF blendHst[k] = "" AND fHst[k] = th2 AND fNr[k] = tn THEN
+                        tf = fFarbe[k]
+                        tname = fName[k]
+                        BREAK
+                    END IF
+                NEXT
+                ARRAY_PUSH(tg, xsdGarn(th2, tn, tname, IIF(tf >= 0, tf, fFarbe[i]), paletten, bekannt))
+            NEXT
+            FOR EACH stueck IN SPLIT$(blendStr[i], ";")
+                ARRAY_PUSH(an, VAL(stueck))
+            NEXT
+            garn = garnBlend(tg, an)
+            garn.farbe = fFarbe[i]                     ' wie Pattern Maker sie zeigt
+        END IF
+        DIM sym AS STRING : sym = ""
+        IF symCode[i] <> &HFFFF THEN sym = patSymbol$(symCode[i])
+        IF sym = "" THEN
+            ARRAY_PUSH(ohneSymbol, TRIM$(garn.hersteller + " " + garn.nummer))
+        ELSE
+            DIM f AS Farbeintrag
+            FOR EACH f IN m.farben
+                IF f.symbol = sym THEN sym = ""
+            NEXT
+            IF sym = "" THEN ARRAY_PUSH(doppelt, TRIM$(garn.hersteller + " " + garn.nummer))
+        END IF
+        IF sym = "" THEN sym = oxsSymbol$(m, symbole)
+        DIM fe AS Farbeintrag : fe = neuerFarbeintrag(garn, sym)
+        fe.istPerle = istP
+        ARRAY_PUSH(m.farben, fe)
+    NEXT
+    IF LEN(ohneSymbol) > 0 THEN ARRAY_PUSH(erg.warnungen, trf$("Neues Symbol für {0} (das Zeichen aus Pattern Makers Symbolschrift ist nicht darstellbar)", [JOIN$(ohneSymbol, ", ")]))
+    IF LEN(doppelt) > 0 THEN ARRAY_PUSH(erg.warnungen, trf$("Neues Symbol für {0} (das Zeichen ist schon vergeben)", [JOIN$(doppelt, ", ")]))
+
+    ' Stiche
+    DIM zellen AS INTEGER : zellen = b * h
+    DIM zelle[zellen] AS INTEGER
+    DIM z0 AS INTEGER : z0 = r.u32()
+    DIM z1 AS INTEGER : z1 = r.u32()
+    DIM z2 AS INTEGER : z2 = r.u32()
+    DIM z3 AS INTEGER : z3 = r.u32()
+    DIM schluessel AS INTEGER : schluessel = ((z0 BAND 255) SHL 24) BOR (((z1 SHR 8) BAND 255) SHL 16) BOR (((z2 SHR 16) BAND 255) SHL 8) BOR (z3 BAND 255)
+    DIM schritte[16] AS INTEGER
+    DIM roh4 AS ARRAY OF INTEGER : roh4 = [z0, z1, z2, z3]
+    FOR i = 0 TO 15
+        schritte[i] = (roh4[i \ 4] SHR (i MOD 4)) MOD 32
+    NEXT
+    DIM laufend AS INTEGER : laufend = z0
+    DIM si AS INTEGER : si = 0
+    DIM pos AS INTEGER : pos = 0
+    WHILE pos < zellen
+        DIM laenge AS INTEGER : laenge = r.u32()
+        IF laenge = 0 THEN CONTINUE
+        IF laenge > zellen * 2 THEN THROW trf$("XSD: unglaubwürdiger Stichblock bei Byte {0}", [STR$(r.p - 4)])
+        DIM blk[laenge] AS INTEGER
+        FOR k = 0 TO laenge - 1
+            blk[k] = r.u32() BXOR schluessel BXOR laufend
+            schluessel = xsdDrehen(schluessel, schritte[si])
+            laufend = (laufend + z1) BAND &HFFFFFFFF
+            si = (si + 1) MOD 16
+        NEXT
+        k = 0
+        WHILE k < laenge
+            DIM anzahl AS INTEGER : anzahl = 1
+            IF (blk[k] BAND &H40000000) <> 0 THEN
+                anzahl = (blk[k] BAND &H3FFFFFFF) SHR 16
+                k = k + 1
+                IF k >= laenge THEN THROW trf$("XSD: kaputter Stichblock bei Byte {0}", [STR$(r.p)])
+            END IF
+            IF pos + anzahl > zellen THEN THROW trf$("XSD: zu viele Stiche (mehr als {0} Zellen)", [STR$(zellen)])
+            DIM w AS INTEGER
+            FOR w = 1 TO anzahl
+                zelle[pos] = blk[k]
+                pos = pos + 1
+            NEXT
+            k = k + 1
+        WEND
+    WEND
+    DIM klein AS BUFFER : klein = BUFFER_SLICE(roh, r.p, r.p + 10 * kleinZahl)
+    r.ueber(10 * kleinZahl)
+    DIM ebenen AS ARRAY OF Ebene : ebenen = [m.ebenen.aktiveEbene()]
+    DIM falscheFarbe AS INTEGER : falscheFarbe = 0
+    DIM petite AS INTEGER : petite = 0
+    ' Teilstiche: Bit im Byte 0 bzw. 1 -> (Farb-Byte, Stichtyp)
+    DIM bitByte AS ARRAY OF INTEGER : bitByte = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1]
+    DIM bitWert AS ARRAY OF INTEGER : bitWert = [1, 2, 4, 8, 16, 32, 1, 2, 4, 8]
+    DIM bitFarbe AS ARRAY OF INTEGER : bitFarbe = [2, 3, 4, 5, 6, 7, 4, 5, 6, 7]
+    DIM bitTyp AS ARRAY OF INTEGER : bitTyp = [HALB_OL_UR, HALB_OR_UL, VIERTEL_OL, VIERTEL_UL, VIERTEL_OR, VIERTEL_UR, VIERTEL_OL, VIERTEL_UL, VIERTEL_OR, VIERTEL_UR]
+    FOR pos = 0 TO zellen - 1
+        DIM wert AS INTEGER : wert = zelle[pos]
+        DIM art AS INTEGER : art = (wert SHR 24) BAND 255
+        IF art = 15 THEN CONTINUE
+        DIM x AS INTEGER : x = pos MOD b
+        DIM y AS INTEGER : y = pos \ b
+        IF art = 0 THEN
+            DIM fv AS INTEGER : fv = (wert SHR 16) BAND 255
+            IF fv >= nf THEN
+                falscheFarbe = falscheFarbe + 1
+            ELSE
+                oxsSetzen(m, ebenen[0], x, y, fv, VOLL)
+            END IF
+            CONTINUE
+        END IF
+        DIM satz AS INTEGER : satz = (wert SHR 16) BAND &H7FFF
+        IF satz >= kleinZahl THEN THROW trf$("XSD: Teilstich-Satz {0} fehlt (es gibt {1})", [STR$(satz), STR$(kleinZahl)])
+        DIM ebeneNr AS INTEGER : ebeneNr = 0
+        DIM t AS INTEGER
+        FOR t = 0 TO 9
+            IF (BUFFER_GET(klein, satz * 10 + bitByte[t]) BAND bitWert[t]) = 0 THEN CONTINUE
+            DIM tf2 AS INTEGER : tf2 = BUFFER_GET(klein, satz * 10 + bitFarbe[t])
+            IF t >= 6 THEN petite = petite + 1
+            IF tf2 >= nf THEN
+                falscheFarbe = falscheFarbe + 1
+                CONTINUE
+            END IF
+            WHILE LEN(ebenen) <= ebeneNr
+                DIM neu AS Ebene : neu = neueEbene(trf$("Teilstiche {0}", [STR$(LEN(ebenen) + 1)]), b, h)
+                ARRAY_PUSH(m.ebenen.ebenen, neu)
+                ARRAY_PUSH(ebenen, neu)
+            WEND
+            oxsSetzen(m, ebenen[ebeneNr], x, y, tf2, bitTyp[t])
+            ebeneNr = ebeneNr + 1
+        NEXT
+    NEXT
+    IF falscheFarbe > 0 THEN ARRAY_PUSH(erg.warnungen, trf$("{0} Stich(e) mit unbekannter Farbe übersprungen", [STR$(falscheFarbe)]))
+    IF petite > 0 THEN ARRAY_PUSH(erg.warnungen, trf$("{0} Petite-Stich(e) als Viertelstiche übernommen", [STR$(petite)]))
+    IF LEN(ebenen) > 1 THEN ARRAY_PUSH(erg.warnungen, tr$("Zellen mit mehreren Teilstichen: die weiteren liegen auf eigenen Ebenen"))
+
+    ' Sondermodelle (nur ueberspringen), dann die Joints
+    DIM leer AS MAP OF INTEGER : leer = {}
+    DIM nichts AS Muster
+    r.ueber(2)
+    DIM modelle AS INTEGER : modelle = r.u16()
+    FOR i = 1 TO modelle
+        IF r.u16() <> 4 THEN CONTINUE
+        r.ueber(2 + 4 + 256 + 256 + 2)
+        FOR k = 0 TO 2
+            r.ueber(10)
+            IF r.u16() <> &H510 THEN BREAK
+            DIM mj AS INTEGER : mj = r.u16()
+            IF mj > 0 THEN xsdJoints(r, mj, nichts, nf, leer)
+        NEXT
+    NEXT
+    DIM zaehler AS MAP OF INTEGER : zaehler = {}
+    xsdJoints(r, jointZahl, m, nf, zaehler)
+    IF MAPHAS(zaehler, "Spannstich") THEN ARRAY_PUSH(erg.warnungen, trf$("{0} Spannstich(e) als Rückstiche übernommen", [STR$(MAPGET(zaehler, "Spannstich"))]))
+    IF MAPHAS(zaehler, "Sonderstich") THEN ARRAY_PUSH(erg.warnungen, trf$("{0} Sonderstich(e) nicht übernommen (kennt Glutfaden nicht)", [STR$(MAPGET(zaehler, "Sonderstich"))]))
+    IF MAPHAS(zaehler, "Kurve") THEN ARRAY_PUSH(erg.warnungen, trf$("{0} gebogene(r) Stich(e) nicht übernommen (kennt Glutfaden nicht)", [STR$(MAPGET(zaehler, "Kurve"))]))
+    IF MAPHAS(zaehler, "Farbe") THEN ARRAY_PUSH(erg.warnungen, trf$("{0} Rückstich(e), Knoten oder Perle(n) mit unbekannter Farbe übersprungen", [STR$(MAPGET(zaehler, "Farbe"))]))
+    IF MAPHAS(zaehler, "ausserhalb") THEN ARRAY_PUSH(erg.warnungen, tr$("Rückstich-Koordinaten außerhalb der Mustergrenzen — betroffene Rückstiche werden verworfen"))
+    m.stichzahlenNeu()
+    RETURN erg
+END FUNCTION

@@ -45,7 +45,10 @@ IMPORT "gui"
 | `GUI_BIND(wdg, schluessel$[, formular$])` | — | **Datenbindung**: das Widget trägt einen Schlüssel (Spaltennamen) — siehe [Datenbindung](#datenbindung) |
 | `GUI_FORM_GET(win[, formular$])` / `GUI_FORM_SET(win, map[, formular$])` | MAP OF STRING / — | alle gebundenen Werte lesen / aus einer MAP setzen |
 | `GUI_FORM_CLEAR` / `GUI_FORM_CLEAN` / `GUI_FORM_CHANGED(win[, formular$])` | — / — / BOOL | leeren / als gespeichert markieren / seit dem letzten Setzen geändert? |
-| `GUI_FORM_LOAD(win, db, tabelle$, id[, formular$])` / `GUI_FORM_SAVE(…)` | BOOL / INTEGER | Zeile `WHERE id = ?` in die Widgets laden / INSERT (id < 0) oder UPDATE, liefert die id |
+| `GUI_FORM_LOAD(win, db, tabelle$, id[, formular$])` | BOOL | Zeile `WHERE id = ?` in die Widgets laden |
+| `GUI_FORM_SAVE(win, db, tabelle$, id[, formular$[, ueberschreiben]])` | INTEGER | INSERT (id < 0) oder UPDATE, liefert die id -- **0, wenn nichts gespeichert wurde** (Zeile gelöscht oder inzwischen geändert) |
+| `GUI_FORM_VERSION(win, spalte$[, formular$])` | — | Versionsspalte: SAVE speichert nur, wenn die Zeile noch den Stand vom Laden trägt (leer = aus) — siehe [Datenbindung](#datenbindung) |
+| `GUI_FORM_CONFLICT$(win[, formular$])` | STRING | warum das letzte SAVE nichts gespeichert hat: `geaendert`, `geloescht` oder leer |
 | `GUI_TEXTAREA_SET(ta, "umbruch", 1)` | — | Textbereich bricht an Wortgrenzen um (Notizen, Briefe) |
 | `GUI_SET_MIN_SIZE(wdg, min_w, min_h)` | — | Mindestmaß: ein gewichtetes Kind im Behälter und ein verankertes Widget schrumpfen nicht darunter |
 | `GUI_LAYOUT_MIN_W(layout)` / `GUI_LAYOUT_MIN_H(layout)` | INTEGER | was ein Behälter mindestens braucht — der Wert für `WINDOW_MIN_SIZE` |
@@ -93,7 +96,7 @@ IMPORT "gui"
 | `GUI_TOOLBAR_ITEM_W(tb, eintrag)` | INTEGER | Breite eines Eintrags |
 | `GUI_TOOLBAR_OVERFLOW(tb)` | INTEGER | wie viele Knöpfe gerade im »-Menü stehen (0 = alles passt) |
 | `GUI_STATUSBAR(win, x, y, w, h[, text$])` | GUI_WIDGET | Statusleiste; `text$` ist das erste Feld |
-| `GUI_STATUSBAR_ADD(sb, text$, breite[, ausrichtung$])` | INTEGER | Feld anhängen: `breite` in Punkten, 0 = teilt sich den Rest; `links`/`mitte`/`rechts` |
+| `GUI_STATUSBAR_ADD(sb, text$, breite[, ausrichtung$])` | INTEGER | Feld anhängen: `breite` in Punkten, 0 = teilt sich den Rest; `links`/`mitte`/`rechts`. Passt ein Text nicht, endet er mit `...` |
 | `GUI_STATUSBAR_SET(sb, feld, text$)` | — | Text eines Feldes (`GUI_SET_TEXT` meint Feld 0) |
 | `GUI_STATUSBAR_TEXT$(sb, feld)` | STRING | Text eines Feldes |
 | `GUI_STATUSBAR_TIP(sb, feld, tip$)` | — | Tooltip eines Feldes |
@@ -121,8 +124,8 @@ IMPORT "gui"
 | `GUI_SPINNER(win, x, y, w, min, max[, default[, step]])` | GUI_WIDGET | Zahlenfeld mit +/- (Klick/Mausrad/Pfeiltasten; Wert via `GUI_VALUE`) |
 | `GUI_SPLITTER(win, x, y, length, orient$, min, max)` | GUI_WIDGET | verschiebbare Trennlinie (`"v"`/`"h"`); Position via `GUI_VALUE` |
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | Container (Deko) |
-| `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | einzeiliges Eingabefeld (Caret + Selektion, Strg+Z/Y) |
-| `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort`, `nur_lesen`, `maxlaenge`, `zahlen` (0 frei, 1 ganze Zahl, 2 Kommazahl) |
+| `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | einzeiliges Eingabefeld (Caret + Selektion, Strg+Z/Y); der Platzhalter steht gedaempft da, bis getippt wird -- auch mit Fokus |
+| `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort`, `nur_lesen`, `maxlaenge`, `zahlen` (0 frei, 1 ganze Zahl, 2 Kommazahl, 3 Geldbetrag in Cent) |
 | `GUI_ENTERED(tf)` | BOOLEAN | wurde in diesem Bild Enter im Textfeld gedrückt? |
 | `GUI_ON_ENTER(tf, handler)` | — | Rückruf dafür |
 | `GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | **mehrzeiliges** Textfeld (ENTER = neue Zeile, scrollt senkrecht und waagerecht, Pfeile, Selektion via Maus-Drag/Shift+Pfeil, Strg+A/C/X/V). Als **Code-Feld** einfärbbar — siehe [Code-Feld](#das-textarea-als-code-feld) |
@@ -234,7 +237,8 @@ IMPORT "gui"
 | `GUI_DRAW([obenauf])` | — | alle Fenster zeichnen (hinten→vorne); `obenauf`=FALSE lässt Kontextmenü und Tooltip weg |
 | `GUI_DRAW_TOP()` | — | nur was über allen Fenstern liegt: offenes Kontextmenü und Tooltip |
 | `GUI_DRAW_WINDOW(win)` | — | EIN Fenster noch einmal zeichnen, über allem, was seit `GUI_DRAW` dazugekommen ist |
-| `GUI_CLICKED(widget)` | BOOLEAN | in diesem Frame angeklickt? Gilt für Button, Menü-Eintrag, **Checkbox, Toggle und Radio** |
+| `GUI_CLICKED(widget)` | BOOLEAN | in diesem Frame angeklickt? Gilt für Button, Menü-Eintrag, **Checkbox, Toggle und Radio** und für einen Klick auf einen Listeneintrag -- auch auf den schon gewählten |
+| `GUI_CHANGED(widget)` | BOOLEAN | hat die **Bedienung** das Widget im letzten `GUI_UPDATE` geändert (Auswahl, Wert, Text, Haken)? Was das Programm selbst setzt, zählt nicht. Der erste Aufruf beginnt zu beobachten und liefert FALSE |
 | `GUI_CHECKED(widget)` | BOOLEAN | Checkbox-Zustand |
 | `GUI_VALUE(widget)` | FLOAT | Slider-Wert |
 | `GUI_TEXT(widget)` | STRING | Text (Label/Button/TextInput) |
@@ -292,7 +296,7 @@ Klick-Auswertung wie bei Buttons über `GUI_CLICKED(item)`. Die Menüleiste schi
   links bzw. über der Maus statt aus dem Bild zu laufen, ein Untermenü klappt
   links vom Elternmenü auf, ein Leistenmenü rückt nach links.
 
-**Tastenkürzel** stehen rechts im Eintrag und werden jedes Bild geprüft — auch bei geschlossenem Menü, und **in allen sichtbaren Fenstern des Programms**: zuerst im Fenster mit Fokus, dann in den übrigen von oben nach unten. Ein Programm mit Werkzeugleiste links und Inspektor rechts hat ein Menü, und `Strg+S` sichert auch dann, wenn der letzte Klick in den Inspektor ging (bis 2026-09-07 galt ein Kürzel nur im Fenster mit Fokus — drei Editoren mussten sich nach jedem Knopf den Fokus zurückholen). Hat das Fokus-Fenster dasselbe Kürzel selbst, gewinnt es. Ein modales Fenster lässt nur seine eigenen Kürzel zu; ein Fenster im Entwurfsmodus (`GUI_WINDOW_DESIGN`) zählt nicht, seine Menüs sind Ansicht. Geschrieben werden sie, wie man sie liest: `Strg+S`, `Strg+Umschalt+O`, `Alt+Enter`, `F5`, `Entf`; englische Namen (`Ctrl`, `Shift`, `Delete`, `PageDown`) gehen auch. **`Plus` und `Minus`** (auch `Strg++` und `Strg+-`) sind keine einzelne Taste: raylib benennt Tasten nach ihrer Lage im US-Layout, und das „+“ einer deutschen Tastatur liegt dort, wo die US-Tastatur „]“ hat, ihr „-“ auf „/“ -- ein solches Kürzel trifft darum die Taste beider Belegungen und den Ziffernblock (`Strg+Plus`, `Strg+Minus`, `Strg+0` für den Zoom). **Buchstaben gelten nach der Belegung**: `Strg+Z` ist die Taste, auf der das Z steht — auf einer deutschen Tastatur liegt sie dort, wo die US-Tastatur das Y hat (bis 2026-10-01 nahm darum Strg+Y zurück und Strg+Z wiederholte, in jedem Textfeld). Das gilt für Menü-Kürzel und die Tasten der Textfelder (Strg+A/C/V/X/Z/Y/B/I/U); `KEYHIT`/`KEYPRESSED` in Programmen bleiben bei der Lage, ein Spiel will WASD dort, wo die Finger liegen. Während eine Aufnahme läuft, gilt auch hier die Lage. Die Modifier müssen **genau** passen: ein bloßes S ist kein Strg+S. **Ohne Strg oder Alt gehört eine Taste dem Textfeld mit Fokus** — ein `Entf`-Kürzel löscht dort ein Zeichen, statt den Menüpunkt auszulösen; ohne Textfokus löst es aus. **Ausgenommen sind F1 bis F12**: sie erzeugen nie Text und lösen auch aus dem Textfeld heraus aus (F5 startet in einer IDE aus dem Code-Feld). Ein gesperrter Eintrag hat kein Kürzel. Ein unbekannter Tastenname ist ein Fehler beim Anlegen, nicht ein Kürzel, das still nie feuert. **Ein Kürzel, das gefeuert hat, nimmt dem Textbereich die Taste weg** — sonst täte `Strg+Umschalt+Hoch` zwei Dinge: den Eintrag auslösen und die Auswahl eine Zeile hochschieben, und ein Befehl, der danach die Auswahl liest, sähe eine andere als die markierte.
+**Tastenkürzel** stehen rechts im Eintrag und werden jedes Bild geprüft — auch bei geschlossenem Menü, und **in allen sichtbaren Fenstern des Programms**: zuerst im Fenster mit Fokus, dann in den übrigen von oben nach unten. Ein Programm mit Werkzeugleiste links und Inspektor rechts hat ein Menü, und `Strg+S` sichert auch dann, wenn der letzte Klick in den Inspektor ging (bis 2026-09-07 galt ein Kürzel nur im Fenster mit Fokus — drei Editoren mussten sich nach jedem Knopf den Fokus zurückholen). Hat das Fokus-Fenster dasselbe Kürzel selbst, gewinnt es. Ein modales Fenster lässt nur seine eigenen Kürzel zu; ein Fenster im Entwurfsmodus (`GUI_WINDOW_DESIGN`) zählt nicht, seine Menüs sind Ansicht. Geschrieben werden sie, wie man sie liest: `Strg+S`, `Strg+Umschalt+O`, `Alt+Enter`, `F5`, `Entf`; englische Namen (`Ctrl`, `Shift`, `Delete`, `PageDown`) gehen auch. **`Plus` und `Minus`** (auch `Strg++` und `Strg+-`) sind keine einzelne Taste: raylib benennt Tasten nach ihrer Lage im US-Layout, und das „+“ einer deutschen Tastatur liegt dort, wo die US-Tastatur „]“ hat, ihr „-“ auf „/“ -- ein solches Kürzel trifft darum die Taste beider Belegungen und den Ziffernblock (`Strg+Plus`, `Strg+Minus`, `Strg+0` für den Zoom). **Buchstaben gelten nach der Belegung**: `Strg+Z` ist die Taste, auf der das Z steht — auf einer deutschen Tastatur liegt sie dort, wo die US-Tastatur das Y hat (bis 2026-10-01 nahm darum Strg+Y zurück und Strg+Z wiederholte, in jedem Textfeld). Das gilt für Menü-Kürzel und die Tasten der Textfelder (Strg+A/C/V/X/Z/Y/B/I/U); `KEYHIT`/`KEYPRESSED` mit einem Tastencode bleiben bei der Lage, ein Spiel will WASD dort, wo die Finger liegen; mit einem Buchstaben als Text (`KEYHIT("z")`) gilt auch dort die Belegung. Während eine Aufnahme läuft, gilt auch hier die Lage. Die Modifier müssen **genau** passen: ein bloßes S ist kein Strg+S. **Ohne Strg oder Alt gehört eine Taste dem Textfeld mit Fokus** — ein `Entf`-Kürzel löscht dort ein Zeichen, statt den Menüpunkt auszulösen; ohne Textfokus löst es aus. **Genauso gehört eine Taste dem Bedienelement mit Fokus, das sie selbst benutzt**: die Leertaste einem Knopf, Kästchen, Radio, Kippschalter, einer Liste oder Tabelle; die Pfeiltasten, Pos1, Ende und Bild auf/ab einem Regler, Drehknopf, Drehfeld, einer Liste, einem Baum oder Reiterwerk; Buchstaben und Ziffern einer Liste, einem Baum, einer Tabelle oder Klappliste (Tippen springt). Ein Programm mit `Leertaste` als Kürzel für Spielen/Stopp startet also nicht, während man ein Kästchen per Leertaste umschaltet -- bis 2026-10-11 tat es beides. **Ausgenommen sind F1 bis F12**: sie erzeugen nie Text und lösen auch aus dem Textfeld heraus aus (F5 startet in einer IDE aus dem Code-Feld). Ein gesperrter Eintrag hat kein Kürzel. Ein unbekannter Tastenname ist ein Fehler beim Anlegen, nicht ein Kürzel, das still nie feuert. **Ein Kürzel, das gefeuert hat, nimmt dem Textbereich die Taste weg** — sonst täte `Strg+Umschalt+Hoch` zwei Dinge: den Eintrag auslösen und die Auswahl eine Zeile hochschieben, und ein Befehl, der danach die Auswahl liest, sähe eine andere als die markierte.
 
 ### Strg+Rad gehört dem Programm
 
@@ -346,11 +350,11 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_LISTBOX_ICON(lb, i, bild)` / `GUI_LISTBOX_COLOR(lb, i, farbe)` | — | Sinnbild und Textfarbe je Eintrag (-1 = keins / Thema) |
 | `GUI_LISTBOX_CHECKED(lb, i)` / `GUI_LISTBOX_SET_CHECKED(lb, i, an)` | BOOLEAN / — | Haken je Eintrag (mit `kaestchen`) |
 | `GUI_LISTBOX_IS_SELECTED(lb, i)` / `GUI_LISTBOX_SELECT(lb, i, an)` / `GUI_LISTBOX_SEL_COUNT(lb)` / `GUI_LISTBOX_SEL_ROW(lb, k)` / `GUI_LISTBOX_CLEAR_SELECTION(lb)` | — | Mehrfachauswahl wie bei der Tabelle |
-| `GUI_LISTBOX_SET_DATA(lb, i, wert$)` | — | unsichtbarer Wert je Eintrag (eine ID, ein Pfad) |
+| `GUI_LISTBOX_SET_DATA(lb, i, wert$)` | — | unsichtbarer Wert je Eintrag (eine ID, ein Pfad, ein Steuersatz) -- auch für Klapplisten; eine gebundene Klappliste mit Werten bindet den Wert statt der Nummer |
 | `GUI_LISTBOX_DATA$(lb, i)` | STRING | den unsichtbaren Wert eines Eintrags lesen |
 | `GUI_LISTBOX_FIND_DATA(lb, wert$)` | INTEGER | erster Eintrag mit diesem Wert, -1 = keiner |
 | `GUI_LISTBOX_DETAIL(lb, i, text$)` | — | Zusatztext rechts im Eintrag, gedämpft (Kürzel, Größe, Zeilennummer) |
-| `GUI_LISTBOX_TIP(lb, i, text$)` | — | Tooltip je Eintrag |
+| `GUI_LISTBOX_TIP(lb, i, text$)` | — | Tooltip je Eintrag. Ohne ihn zeigt ein Eintrag, der nicht in die Zeile passt (er endet mit „...“), beim Überfahren seinen ganzen Text |
 | `GUI_LISTBOX_ENABLE(lb, i, an)` | — | Eintrag sperren: sichtbar, aber weder anklickbar noch mit Pfeilen erreichbar |
 | `GUI_LISTBOX_ENABLED(lb, i)` | BOOLEAN | ob ein Eintrag wählbar ist |
 | `GUI_LISTBOX_HEADER(lb, i, an)` | — | Eintrag zum Gruppenkopf machen: gliedert, ist nicht wählbar |
@@ -385,6 +389,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_APPLY_STYLE(widget, name$)` | — | einen benannten Stil auf ein Widget uebertragen -- spart, ihn Widget fuer Widget zu wiederholen |
 | `GUI_GET_Y(wdg)` / `GUI_GET_W(wdg)` / `GUI_GET_H(wdg)` | INTEGER | Lage und Groesse des Widgets im Fenster (Gegenstueck zu `GUI_SET_BOUNDS`) |
 | `GUI_WINDOW_GET_Y(win)` / `GUI_WINDOW_GET_W(win)` / `GUI_WINDOW_GET_H(win)` | INTEGER | Lage und Groesse des Fensters auf dem Bildschirm |
+| `GUI_WINDOW_CONTENT_W(win)` / `GUI_WINDOW_CONTENT_H(win)` | INTEGER | Breite und Hoehe des Inhaltsbereichs unter Titel-, Menue- und Reiterleiste -- dort zaehlen die Widget-Koordinaten; so sitzt eine Statusleiste unten, ohne die Hoehe der Menueleiste zu raten |
 | `GUI_TABLE_SET(tbl, schluessel$, wert)` | — | Einstellung der Tabelle setzen (`zebra`, `gitter`, `zeilenhoehe`, `filterzeile`, `feste_spalten`, ...) |
 | `GUI_TABLE_GET(tbl, schluessel$)` | FLOAT | eine dieser Einstellungen zurueckreisen |
 | `GUI_TABLE_CLICKED_COL(tbl)` | INTEGER | welche Spalte wurde angeklickt? -- fuer Zellen der Art `knopf` |
@@ -682,7 +687,8 @@ setzt, ist kein Schritt des Nutzers.
 GUI_TEXTINPUT_SET(tf, "passwort", 1)     ' Punkte statt Zeichen; GUI_TEXT liefert den echten Text
 GUI_TEXTINPUT_SET(tf, "nur_lesen", 1)    ' anzeigen, markieren, kopieren -- aber nicht ändern
 GUI_TEXTINPUT_SET(tf, "maxlaenge", 8)    ' schneidet ab, auch beim Einfügen (0 = frei)
-GUI_TEXTINPUT_SET(tf, "zahlen", 2)       ' 1 = ganze Zahl (mit Vorzeichen), 2 = Kommazahl (Punkt oder Komma)
+GUI_TEXTINPUT_SET(tf, "zahlen", 2)       ' 1 = ganze Zahl (mit Vorzeichen), 2 = Kommazahl (Punkt oder Komma),
+                                         ' 3 = Geldbetrag: "48,00" im Feld, 4800 (Cent) in der Bindung
 GUI_SET_ALIGN(tf, "rechts")              ' Zahlen stehen rechts -- solange der Text hineinpasst
 ```
 
@@ -2796,17 +2802,50 @@ IF GUI_FORM_CHANGED(win, "kunde") THEN nachfragen()
   id = ?` und liefert FALSE, wenn es die Zeile nicht gibt; `GUI_FORM_SAVE`
   schreibt `INSERT` (bei `id < 0`, liefert die neue id) oder `UPDATE`. Die
   Spalte heißt `id` — die Konvention von SQLite. Gespeichert wird
-  **typisiert**: ein Zahlenfeld als Zahl (außer es beginnt mit einer Null wie
-  eine Postleitzahl — das bleibt Text), ein Kästchen als 0/1, eine Klappliste
-  als Index, ein Regler als Kommazahl, alles andere als Text. Was das
-  Programm umrechnet (Beträge in Cent, eine Klappliste in einen Steuersatz),
-  bindet es nicht und schreibt es selbst.
+  **typisiert**: ein Zahlenfeld als Zahl (außer es beginnt mit einer Null vor
+  einer Ziffer wie die Postleitzahl `01234` — das bleibt Text; `0,99` ist
+  eine Zahl), ein Kästchen als 0/1, eine Klappliste als Index, ein Regler als
+  Kommazahl, alles andere als Text. Ein **Geldfeld** (`zahlen` 3) wird
+  getippt und gezeigt wie eine Kommazahl mit zwei Stellen und gebunden als
+  INTEGER in Cent — `48,50` im Feld ist `4850` in der Spalte, und beim Laden
+  wird aus `4850` wieder `48,50`. Eine Zahl, die `GUI_FORM_SET` bekommt, sind
+  dort ebenfalls Cent; ein Text steht da, wie er kommt. Eine **Klappliste mit
+  Werten** (`GUI_LISTBOX_SET_DATA` je Eintrag) bindet den Wert des gewählten
+  Eintrags statt seiner Nummer — gezeigt `19 %`, gespeichert `19` (als Zahl,
+  wenn er eine ist; ohne Auswahl NULL), beim Laden wird der Eintrag mit
+  diesem Wert gewählt. Was das Programm sonst umrechnet, bindet es nicht und
+  schreibt es selbst.
+- **Nichts gespeichert:** `GUI_FORM_SAVE` liefert **0**, wenn das `UPDATE`
+  keine Zeile getroffen hat, und `GUI_FORM_CONFLICT$` sagt `geloescht` (die
+  Zeile gibt es nicht mehr) — bis 2026.30 lieferte es die id, als wäre
+  gespeichert worden, und die Eingabe war still weg.
+- **Gleichzeitig bearbeiten:** `GUI_FORM_VERSION(win, "stand", formular$)`
+  nennt eine ganzzahlige Spalte, die jedes Speichern hochzählt. `GUI_FORM_LOAD`
+  merkt sich ihren Stand, `GUI_FORM_SAVE` schreibt nur
+  `… WHERE id = ? AND stand = <beim Laden>` — hat ein anderer inzwischen
+  gespeichert, trifft es nichts, liefert 0 und `GUI_FORM_CONFLICT$` sagt
+  `geaendert`. Die Eingaben stehen dann noch im Formular; das Programm fragt
+  „neu laden oder überschreiben?“ und überschreibt bewusst mit dem sechsten
+  Argument `TRUE`. Ein neuer Datensatz bekommt `stand = 1`. Ohne vorheriges
+  `GUI_FORM_LOAD` weiß das Formular nicht, welchen Stand es bearbeitet — das
+  ist ein Fehler.
+
+```basic
+GUI_FORM_VERSION(win, "stand", "m")
+DIM id AS INTEGER : id = GUI_FORM_SAVE(win, db, "mitglied", aktId, "m")
+IF id = 0 THEN
+    IF GUI_FORM_CONFLICT$(win, "m") = "geaendert" THEN nachfragen() ELSE status("gelöscht")
+END IF
+```
 - **Geändert?** Beim Binden, nach `GUI_FORM_SET/LOAD/SAVE/CLEAR` und nach
   `GUI_FORM_CLEAN` gilt der Stand als sauber; `GUI_FORM_CHANGED` vergleicht
   dagegen. Damit ist die Rückfrage „Speichern | Verwerfen | Abbrechen" eine
   Zeile.
 - In der `.dhform`: `bind` und `form`; der Form-Designer hat dafür die Felder
   „Bindung" und „Formular".
+
+Die Vereinsverwaltung (`examples/verein/`) zeigt alles zusammen an einem
+Server, an dem mehrere Leute gleichzeitig arbeiten.
 
 Bewusst nicht: Tabellenzeilen an Listen binden, Fremdschlüssel auflösen,
 Verbunde. Das ist die Grenze zwischen Formular und ORM, und hinter ihr ist
@@ -3513,6 +3552,9 @@ pixelig bleibt — anders als `LOADFONT` (TTF), das glättet.
 > 18)` baut den Zeichensatz *für 18 px*; `SETFONT` setzt damit nicht nur die
 > Schriftart, sondern auch die aktive Textgröße auf 18. Wundere dich also
 > nicht, wenn nach `SETFONT` alles größer oder kleiner ist als vorher.
+> Soll die Oberfläche kleiner sein als die Lade-Größe, sag es gleich mit:
+> `SETFONT(schrift, 16)` lädt nichts neu, es zeichnet nur ab jetzt in 16 —
+> eine bei 32 geladene Schrift bleibt dabei scharf.
 > Dieselbe Schrift in zwei Größen scharf? Zweimal laden — stark hochskaliert
 > wird eine TTF sonst weich. `GUI_SET_FONT_SIZE` ändert nur, wie groß
 > gezeichnet wird, nicht, wofür der Zeichensatz gebaut wurde.

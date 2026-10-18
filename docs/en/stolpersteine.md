@@ -93,6 +93,11 @@ and the documentation. Consistent right now, so not a must.
 > Assigning to an INTEGER variable still works as long as the result is whole
 > (`i = 8 / 2` is 4); an array index from `/` aborts, and `dhrt --check` warns
 > about it. In the existing code, the full test run did not find a single place that depended on it.
+> **Since 2026-10-13 the same rule holds for commands:** where a command wants a
+> whole number, a whole floating-point number passes --
+> `GUI_WINDOW("…", BREITE / 2 - 170, …)` used to abort with "expects INTEGER",
+> although `x = BREITE / 2` worked. `2.5` stays an error, with the way out
+> (`INT`, `ROUND`, `\`).
 > The rest of this section describes the state before.
 > Author decision (2026-06-14): **`/` stays as it is** (whole → INTEGER, otherwise FLOAT;
 > no `4.0` break, book unchanged). Instead, the error message when assigning
@@ -478,9 +483,10 @@ reflections/mirror effects become possible.
 >   (`PLAYSOUND("sprung.wav")`, `DRAWIMAGE("held.png", ...)`,
 >   `SPRITE_NEW("held.png", 16, 16)`) only said "erwartet Zahl, erhalten
 >   STRING" (expected a number, got STRING). Now the message names the loader, chosen by the EXTENSION
->   (`umstieg::text_statt_zahl`). The same path covers `KEYHIT("a")` (a key
->   is a number: `ASC("a")` or `KEY_A`) and `RGB("FF0000")`
->   (`COLOR_FROM_HEX`) -- both used to end silently in a type message.
+>   (`umstieg::text_statt_zahl`). The same path covers `RGB("FF0000")`
+>   (`COLOR_FROM_HEX`) -- it used to end silently in a type message.
+>   (`KEYHIT("a")` was an error with a hint here too until 2026.27; since
+>   then a letter as text means the key it is printed on.)
 > - **The loaders now report their missing file straight away.** `LOADIMAGE` named
 >   the file and the search location, `LOADSOUND` returned `"...: os error 2"` and
 >   `PLAYMUSIC` even `IoError(Os { code: 2, ... })` -- and that under the

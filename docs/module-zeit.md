@@ -25,11 +25,20 @@ Armbanduhr, und `DATE$() + " " + TIME$()` liefert denselben Text. Beim Rechnen
 über eine Zeitumstellung hinweg zählt das Modul echte Sekunden, nicht
 Zifferblatt-Stunden.
 
+Die Ortszeit kommt unter Windows aus der Systemeinstellung, unter macOS und
+Linux aus der C-Bibliothek (Umgebungsvariable `TZ`, sonst `/etc/localtime`),
+im Browser aus der Zeitzone des Browsers. Bis 2026.31 galt außerhalb von
+Windows schlicht UTC: `TIME$()` ging in Berlin im Sommer zwei Stunden nach,
+und `ZEIT_PARSE("…Z")` rechnete nicht um.
+
 ## Text und Zeitpunkt
 
 | Funktion | Wirkung |
 |---|---|
 | `ZEIT_JETZT()` → INTEGER | jetzt, als Zeitpunkt |
+| `ZEIT_UNIX()` → FLOAT | jetzt als **Unix-Zeit**: Sekunden seit 1970 in UTC, mit Bruchteil (wie Pythons `time.time()`) |
+| `ZEIT_AUS_UNIX(sekunden)` → INTEGER | Unix-Sekunden zu Zeitpunkt in Ortszeit (samt Sommerzeit jenes Tages) |
+| `ZEIT_NACH_UNIX(zeit)` → INTEGER | Zeitpunkt in Ortszeit zu Unix-Sekunden |
 | `ZEIT_PARSE(text$)` → INTEGER | Text zu Zeitpunkt; bricht bei Unlesbarem ab |
 | `ZEIT_LESBAR(text$)` → BOOLEAN | ließe sich der Text lesen? (fragt, bricht nicht ab) |
 | `ZEIT_TEXT$(zeit)` → STRING | Zeitpunkt als `JJJJ-MM-TT hh:mm:ss` |
@@ -43,10 +52,22 @@ IMPORT "zeit"
 
 PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28 20:30:00"))   ' Normalform
 PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28T20:30:00"))   ' ISO mit T
-PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28T20:30:00Z"))  ' mit Zeitzonen-Anhang
 PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28 20:30"))      ' ohne Sekunden
 PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28"))            ' nur Datum = 00:00:00
+PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28T18:30:00Z"))  ' mit Zeitzone
+PRINT ZEIT_TEXT$(ZEIT_PARSE("Fri, 28 Aug 2026 20:30:00 +0200"))  ' RSS, HTTP, E-Mail
 ```
+
+**Mit Zeitzone ist der Text ein fester Zeitpunkt** und wird in die Ortszeit
+dieses Rechners umgerechnet -- an einem Rechner in Mitteleuropa ergeben die
+letzten beiden Zeilen im August `2026-08-28 20:30:00`. Verstanden werden `Z`,
+`+02:00`, `+0200`, `-05:00`, `UTC`/`GMT`/`UT`, die US-Zonen `EST`/`EDT`,
+`CST`/`CDT`, `MST`/`MDT`, `PST`/`PDT` und `CET`/`CEST`/`MEZ`/`MESZ`; ein
+unbekannter Zonenname ist nicht lesbar statt still falsch. Die Sommerzeit gilt
+für den Tag des Zeitstempels, nicht für heute. **Ohne Zeitzone** gilt der Text
+als Ortszeit. Bis 2026.27 wurde ein Zonen-Anhang abgeschnitten -- `18:30Z`
+galt als 18:30 Ortszeit --, und das RFC-822-Datum der RSS-Feeds war gar nicht
+lesbar.
 
 Unlesbares bricht mit Klartext ab statt still `-1` zu liefern — ein kaputtes
 Datum fällt sonst erst viel später als unsinniges Ergebnis auf. Wo Eingaben
@@ -145,6 +166,13 @@ PRINT ZEIT_WOCHENTAG(a)                         ' 5
 
 Ohne Muster (`""`) kommt die Normalform heraus, genau wie bei `ZEIT_TEXT$`.
 
+**Die Schreibweise von C, Python und PHP geht auch:** `%Y` `%m` `%d` `%H` `%M`
+`%S`, dazu `%y` (Jahr zweistellig), `%a`/`%A` (Wochentag kurz/lang) und `%%`.
+`ZEIT_FORMAT$(a, "%Y-%m-%d %H:%M:%S")` ist dasselbe wie die Normalform. Ein
+`%`-Platzhalter, den es nicht gibt (`%j`), ist ein **Fehler** -- bis 2026.30
+kam er wörtlich wieder heraus, und eine CSV-Datei bekam in jeder Zeile den
+Text `%Y-%m-%d` statt eines Datums.
+
 `ZEIT_WOCHENTAG` zählt ab Montag, weil ein Spieltag am Wochenende sonst über
 zwei Zahlen läuft: Montag 1 … Sonntag 7.
 
@@ -179,13 +207,21 @@ WEND
 - **Zeitpunkte sind Ortszeit.** Ein Zeitpunkt, der auf einem Rechner in Berlin
   entsteht, ergibt auf einem Rechner in Tokio dieselbe *Zahl* nur, wenn beide
   denselben Text lesen — und dieselbe Zahl zeigt dort eine andere Uhrzeit.
-  Wer über Zeitzonen hinweg vergleicht, speichert den Text, nicht die Zahl.
+  Wer über Zeitzonen hinweg vergleicht, speichert den Text mit Zeitzone
+  (`2026-08-28T18:30:00Z`), nicht die Zahl.
 - **`MILLIS()` ist etwas anderes und lässt sich nicht umrechnen.** Es ist die
   Stoppuhr für Frame-Zeiten und Timer. Wer `MILLIS() / 1000` mit
   `ZEIT_JETZT()` vergleicht, liegt um den Zeitzonen-Versatz daneben —
   gemessen am 16.08.2026 in Mitteleuropa: `MILLIS()/1000 = 1786883970`,
   `ZEIT_JETZT() = 1786891170`, also **zwei Stunden Unterschied**. Für Datum
   und Uhrzeit immer `ZEIT_JETZT()`.
+- **Unix-Zeit ist UTC, ein Zeitpunkt ist Ortszeit.** Andere Programme, Web-APIs
+  und viele Dateiformate schreiben Unix-Sekunden. Die liest man mit
+  `ZEIT_AUS_UNIX` ein und schreibt sie mit `ZEIT_NACH_UNIX` (oder für
+  „jetzt“ mit `ZEIT_UNIX()`) -- die Zahl von `ZEIT_JETZT()` dort
+  hineinzuschreiben, läge um den Zeitzonen-Versatz daneben. In der Stunde,
+  die es bei der Umstellung auf Sommerzeit nicht gibt, oder der doppelten im
+  Herbst liefert `ZEIT_NACH_UNIX` eine der beiden möglichen Antworten.
 - **Ein Tag ist nicht immer 86400 Sekunden.** An den Umstellungstagen sind es
   23 oder 25 Stunden. `ZEIT_PLUS(t, 86400)` addiert exakt 86400 Sekunden — das
   ist an diesen zwei Tagen im Jahr nicht dieselbe Uhrzeit am Folgetag. Wenn es

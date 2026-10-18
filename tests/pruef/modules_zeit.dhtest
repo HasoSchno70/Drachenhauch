@@ -30,35 +30,65 @@ PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28"))
 --- erwartet
 2026-08-28 00:00:00
 
-=== parse versteht die ueblichen schreibweisen[2026-08-28T20:30:00Z-2026-08-28 20:30:00]
+=== parse rechnet eine zeitzone um
+' Bis 2026.27 wurde der Anhang abgeschnitten (14:30Z = 14:30 Ortszeit). Seither
+' ist ein Zeitstempel mit Zone ein fester Zeitpunkt, umgerechnet in Ortszeit --
+' die haengt am Rechner, darum wird hier nur verglichen, was ueberall gilt.
 IMPORT "zeit"
-PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28T20:30:00Z"))
+PRINT ZEIT_DIFF(ZEIT_PARSE("2026-08-28T20:30:00Z"), ZEIT_PARSE("2026-08-28T20:30:00+02:00"))
+PRINT ZEIT_DIFF(ZEIT_PARSE("2026-08-28T15:30:00-05:00"), ZEIT_PARSE("2026-08-28T20:30:00Z"))
+PRINT ZEIT_DIFF(ZEIT_PARSE("2026-08-28T20:30:00+0530"), ZEIT_PARSE("2026-08-28T15:00:00Z"))
+PRINT ZEIT_DIFF(ZEIT_PARSE("2026-08-28 20:30:00 UTC"), ZEIT_PARSE("2026-08-28T20:30:00Z"))
+' ohne Zone bleibt der Text Ortszeit
+PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28T20:30:00"))
 --- erwartet
+7200
+0
+0
+0
 2026-08-28 20:30:00
+
+=== parse liest das rss- und e-mail-datum
+' RFC 822 -- Pflichtformat von RSS 2.0, dazu HTTP-Kopf Date und E-Mail. Bis
+' 2026.27 nicht lesbar (gefunden beim Feed-Leser).
+IMPORT "zeit"
+PRINT ZEIT_DIFF(ZEIT_PARSE("Fri, 28 Aug 2026 20:30:00 +0200"), ZEIT_PARSE("2026-08-28T18:30:00Z"))
+PRINT ZEIT_DIFF(ZEIT_PARSE("28 Aug 2026 18:30 GMT"), ZEIT_PARSE("2026-08-28T18:30:00Z"))
+PRINT ZEIT_DIFF(ZEIT_PARSE("Fri, 28 Aug 2026 14:30:00 EDT"), ZEIT_PARSE("2026-08-28T18:30:00Z"))
+PRINT ZEIT_DIFF(ZEIT_PARSE("Fri, 28 Aug 26 20:30:00 MESZ"), ZEIT_PARSE("2026-08-28T18:30:00Z"))
+PRINT ZEIT_TEXT$(ZEIT_PARSE("Fri, 28 August 2026 20:30"))
+PRINT ZEIT_LESBAR("Fri, 28 Aug 2026 20:30:00 XYZ"); " "; ZEIT_LESBAR("31 Feb 2026 10:00"); " "; ZEIT_LESBAR("28 Foo 2026 10:00")
+--- erwartet
+0
+0
+0
+0
+2026-08-28 20:30:00
+FALSE FALSE FALSE
 
 === parse meldet unlesbares im klartext
 IMPORT "zeit"
 PRINT ZEIT_PARSE("naechsten Dienstag")
 --- fehler
-ZEIT_PARSE: 'naechsten Dienstag' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden oder nur Datum)
+ZEIT_PARSE: 'naechsten Dienstag' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden, nur Datum oder mit Zeitzone) oder 'Sat, 28 Aug 2026 20:30:00 +0200'
 
 === parse lehnt unmoegliche daten ab (1)
 IMPORT "zeit"
 PRINT ZEIT_PARSE("2026-02-30")
 --- fehler
-ZEIT_PARSE: '2026-02-30' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden oder nur Datum)
+ZEIT_PARSE: '2026-02-30' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden, nur Datum oder mit Zeitzone) oder 'Sat, 28 Aug 2026 20:30:00 +0200'
 
 === parse lehnt unmoegliche daten ab (2)
 IMPORT "zeit"
 PRINT ZEIT_PARSE("2026-13-01")
 --- fehler
-ZEIT_PARSE: '2026-13-01' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden oder nur Datum)
+ZEIT_PARSE: '2026-13-01' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden, nur Datum oder mit Zeitzone) oder 'Sat, 28 Aug 2026 20:30:00 +0200'
 
 === parse lehnt unmoegliche daten ab (3)
 IMPORT "zeit"
 PRINT ZEIT_PARSE("2026-08-28 25:00:00")
 --- fehler
-ZEIT_PARSE: '2026-08-28 25:00:00' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden oder nur Datum)
+ZEIT_PARSE: '2026-08-28 25:00:00' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden, nur Datum oder mit Zeitzone) oder 'Sat, 28 Aug 2026 20:30:00 +0200'
 
 === lesbar fragt nach statt abzubrechen
 IMPORT "zeit"
@@ -276,3 +306,35 @@ DIM b AS STRING : b = ZEIT_TEXT$(ZEIT_JETZT())
 PRINT LEFT$(a, 16) = LEFT$(b, 16)
 --- erwartet
 TRUE
+
+=== unix-zeit passt zur ortszeit
+' ZEIT_UNIX ist die Zahl, die andere Programme meinen (UTC, mit Bruchteil);
+' ueber ZEIT_AUS_UNIX ist sie dieselbe Uhrzeit wie ZEIT_JETZT.
+IMPORT "zeit"
+DIM u AS FLOAT : u = ZEIT_UNIX()
+PRINT TYPEOF(u); " "; u > 1.7E9
+PRINT ABS(ZEIT_DIFF(ZEIT_AUS_UNIX(u), ZEIT_JETZT())) <= 2
+PRINT ABS(ZEIT_NACH_UNIX(ZEIT_JETZT()) - u) <= 2
+DIM t AS INTEGER : t = ZEIT_PARSE("2026-07-01 14:00:00")
+PRINT ZEIT_AUS_UNIX(ZEIT_NACH_UNIX(t)) = t
+--- erwartet
+FLOAT TRUE
+TRUE
+TRUE
+TRUE
+
+=== unix-zeit: falsche argumente
+IMPORT "zeit"
+TRY
+    PRINT ZEIT_UNIX(1)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT ZEIT_AUS_UNIX("x")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+ZEIT_UNIX: erwartet keine Argumente
+ZEIT_AUS_UNIX: erwartet Unix-Sekunden (eine Zahl)

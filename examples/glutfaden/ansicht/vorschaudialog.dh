@@ -1,0 +1,458 @@
+' Die Muster-Vorschau (F5) -- PySticky ui/dialogs/pattern_preview_dialog.py.
+' Zeigt das Muster, wie es gestickt (bzw. als Diamond Painting geklebt)
+' aussieht: Darstellung, Stoff und Stofffarbe, Rueckstiche, Fortschritt,
+' Zoom mit Rad und Regler, Verschieben mit der Maus, Einpassen, 1:1, und
+' "Als Bild speichern". Gezeichnet wird ueber ansicht/vorschaubild.dh.
+
+CONST VD_ZOOM_MIN = 20
+CONST VD_ZOOM_MAX = 300
+
+DIM vdlDialog AS INTEGER
+DIM vdlMuster AS kern.Muster
+DIM vdlDp AS BOOLEAN
+DIM vdlFlaeche AS INTEGER
+DIM vdlArt AS INTEGER
+DIM vdlArtText AS INTEGER
+DIM vdlStoff AS INTEGER
+DIM vdlStoffFarbe AS INTEGER
+DIM vdlRueck AS INTEGER
+DIM vdlFertig AS INTEGER
+DIM vdlRegler AS INTEGER
+DIM vdlZoomText AS INTEGER
+DIM vdlInfo AS ARRAY OF INTEGER       ' Groesse, Stiche, Farben, Fortschritt
+DIM vdlZoom AS INTEGER
+DIM vdlPanX AS FLOAT
+DIM vdlPanY AS FLOAT
+DIM vdlZiehen AS BOOLEAN
+DIM vdlZiehX AS FLOAT
+DIM vdlZiehY AS FLOAT
+DIM vdlSperre AS BOOLEAN
+DIM vdlEingepasst AS BOOLEAN
+
+FUNCTION vdlZelle() AS INTEGER
+    RETURN MAX(2, INT(10 * vdlZoom / 100))
+END FUNCTION
+
+FUNCTION vdlStil() AS Vorschaustil
+    DIM i AS INTEGER : i = MAX(0, gtk_combo_box_get_active(vdlArt))
+    DIM s AS Vorschaustil : s = neuerVorschaustil(i)
+    DIM f AS INTEGER : f = gtk_combo_box_get_active(vdlStoffFarbe)
+    s.stoff = vbStoffFarben()[IIF(f < 0, 0, f)]
+    s.rueckstiche = gtk_toggle_button_get_active(vdlRueck)
+    s.erledigt = gtk_toggle_button_get_active(vdlFertig)
+    ' wie auf der Zeichenflaeche (PySticky nimmt die Werte der Leinwand)
+    s.linie = einst.rueckLinie
+    s.kappe = einst.rueckKappe
+    IF vdlDp THEN
+        s.erledigt = FALSE
+        s.rueckstiche = TRUE
+    END IF
+    RETURN s
+END FUNCTION
+
+FUNCTION vdlArtBeschreibung$(i AS INTEGER) AS STRING
+    IF vdlDp THEN
+        IF i = 0 THEN RETURN tr$("Drill-Vorschau: facettierte Quadrate mit Glanzlicht und Schatten — so sieht die fertige DP-Vorlage geklebt aus.")
+        RETURN tr$("Pixel-Vorschau: flache Farbflächen — schnell zur Kontroll-Ansicht ohne Drill-Detail.")
+    END IF
+    SELECT CASE i
+        CASE 0 : RETURN tr$("Realistische Vorschau mit Aida-Stoff-Textur und Kreuzstich-Symbolen — so sieht es im Stickrahmen aus.")
+        CASE 1 : RETURN tr$("Pixel-Vorschau mit flachen Farben — schnell und klar wie im Editor.")
+    END SELECT
+    RETURN tr$("Schwarz-weißer Symbol-Plan — ideal zum Drucken und unterwegs benutzen.")
+END FUNCTION
+
+FUNCTION vdlStoffZahlen() AS ARRAY OF INTEGER
+    RETURN [11, 14, 16, 18, 28, 32]
+END FUNCTION
+
+FUNCTION vdlStoffNamen() AS ARRAY OF STRING
+    RETURN [tr$("Aida 11"), tr$("Aida 14"), tr$("Aida 16"), tr$("Aida 18"), tr$("Evenweave 28"), tr$("Leinen 32")]
+END FUNCTION
+
+SUB vdlInfoNachziehen()
+    DIM st AS kern.Statistik : st = kern.statistikVon(vdlMuster)
+    DIM zahl AS INTEGER : zahl = vdlStoffZahlen()[MAX(0, gtk_combo_box_get_active(vdlStoff))]
+    DIM jeCm AS FLOAT : jeCm = zahl / 2.54
+    gtk_label_set_text(vdlInfo[0], FORMAT$(vdlMuster.breite / jeCm, "%.1f") + " × " + FORMAT$(vdlMuster.hoehe / jeCm, "%.1f") + " cm")
+    gtk_label_set_text(vdlInfo[1], zahlText$(st.sticheGesamt, -1) + IIF(vdlDp, tr$(" Drills"), tr$(" Stiche")))
+    gtk_label_set_text(vdlInfo[2], trf$("{0} Farben", [STR$(st.benutzt)]))
+    gtk_label_set_text(vdlInfo[3], FORMAT$(kern.fortschrittVon(vdlMuster).prozent, "%.1f") + "%")
+END SUB
+
+' --- Zeichenflaeche
+
+FUNCTION vdlZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM b AS INTEGER : b = gtk_widget_get_allocated_width(w)
+    DIM h AS INTEGER : h = gtk_widget_get_allocated_height(w)
+    IF NOT vdlEingepasst AND b > 1 THEN
+        vdlEingepasst = TRUE
+        vdlEinpassen()
+    END IF
+    vbFarbe(cr, &H1B1C20, 1)
+    cairo_paint(cr)
+    IF vdlMuster.breite <= 0 OR vdlMuster.hoehe <= 0 THEN
+        vbFarbe(cr, &H8D93A1, 1)
+        sdTextMitte(cr, tr$("Kein Muster geladen"), 13, FALSE, 0, 0, b, h)
+        RETURN FALSE
+    END IF
+    DIM z AS INTEGER : z = vdlZelle()
+    ' sichtbarer Ausschnitt in Zellen, zwei Zellen Rand (wie PySticky)
+    DIM vx AS INTEGER : vx = MAX(0, INT(-vdlPanX))
+    DIM vy AS INTEGER : vy = MAX(0, INT(-vdlPanY))
+    DIM vb AS INTEGER : vb = MIN(vdlMuster.breite * z - vx, b)
+    DIM vh AS INTEGER : vh = MIN(vdlMuster.hoehe * z - vy, h)
+    IF vb > 0 AND vh > 0 THEN
+        DIM x0 AS INTEGER : x0 = MAX(0, vx \ z - 2)
+        DIM y0 AS INTEGER : y0 = MAX(0, vy \ z - 2)
+        DIM x1 AS INTEGER : x1 = MIN(vdlMuster.breite, (vx + vb) \ z + 3)
+        DIM y1 AS INTEGER : y1 = MIN(vdlMuster.hoehe, (vy + vh) \ z + 3)
+        cairo_save(cr)
+        cairo_translate(cr, INT(vdlPanX + x0 * z), INT(vdlPanY + y0 * z))
+        cairo_rectangle(cr, 0, 0, (x1 - x0) * z, (y1 - y0) * z)
+        cairo_clip(cr)
+        vbZeichnen(cr, vdlMuster, vdlStil(), z, x0, y0, x1, y1)
+        cairo_restore(cr)
+    END IF
+    ' Rahmen
+    cairo_set_antialias(cr, 1)
+    vbFarbe(cr, &H4A4A6A, 1)
+    cairo_set_line_width(cr, 1)
+    cairo_rectangle(cr, INT(vdlPanX) - 0.5, INT(vdlPanY) - 0.5, vdlMuster.breite * z + 1, vdlMuster.hoehe * z + 1)
+    cairo_stroke(cr)
+    cairo_set_antialias(cr, 0)
+    RETURN FALSE
+END FUNCTION
+
+SUB vdlZoomSetzen(z AS INTEGER)
+    vdlZoom = CLAMP(z, VD_ZOOM_MIN, VD_ZOOM_MAX)
+    gtk_label_set_text(vdlZoomText, STR$(vdlZoom) + "%")
+    vdlSperre = TRUE
+    gtk_range_set_value(vdlRegler, vdlZoom)
+    vdlSperre = FALSE
+    gtk_widget_queue_draw(vdlFlaeche)
+END SUB
+
+' Ganz sichtbar, mittig
+SUB vdlEinpassen()
+    DIM b AS INTEGER : b = gtk_widget_get_allocated_width(vdlFlaeche)
+    DIM h AS INTEGER : h = gtk_widget_get_allocated_height(vdlFlaeche)
+    IF vdlMuster.breite <= 0 OR vdlMuster.hoehe <= 0 OR b <= 40 OR h <= 40 THEN RETURN
+    vdlZoomSetzen(INT(MIN((b - 40) / vdlMuster.breite / 10 * 100, (h - 40) / vdlMuster.hoehe / 10 * 100)))
+    vdlMitte()
+END SUB
+
+SUB vdlMitte()
+    DIM z AS INTEGER : z = vdlZelle()
+    vdlPanX = (gtk_widget_get_allocated_width(vdlFlaeche) - vdlMuster.breite * z) / 2
+    vdlPanY = (gtk_widget_get_allocated_height(vdlFlaeche) - vdlMuster.hoehe * z) / 2
+    gtk_widget_queue_draw(vdlFlaeche)
+END SUB
+
+' Rad: in Schritten von 15 % (mindestens 5, mit Strg 2), der Punkt unter
+' der Maus bleibt stehen
+SUB vdlRadZoom(rein AS BOOLEAN, fein AS BOOLEAN, mx AS FLOAT, my AS FLOAT)
+    DIM min AS INTEGER : min = IIF(fein, 2, 5)
+    DIM alt AS INTEGER : alt = vdlZelle()
+    DIM z AS INTEGER : z = vdlZoom
+    IF rein THEN
+        z = MIN(VD_ZOOM_MAX, z + MAX(min, INT(z * 0.15)))
+    ELSE
+        z = MAX(VD_ZOOM_MIN, z - MAX(min, INT(z * 0.15 / 1.15)))
+    END IF
+    DIM gx AS FLOAT : gx = (mx - vdlPanX) / alt
+    DIM gy AS FLOAT : gy = (my - vdlPanY) / alt
+    vdlZoomSetzen(z)
+    vdlPanX = mx - gx * vdlZelle()
+    vdlPanY = my - gy * vdlZelle()
+END SUB
+
+FUNCTION vdlRad(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM mx AS FLOAT, my AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, mx, my)
+    DIM richtung AS INTEGER
+    ok = gdk_event_get_scroll_direction(ereignis, richtung)
+    DIM zustand AS INTEGER
+    ok = gdk_event_get_state(ereignis, zustand)
+    DIM fein AS BOOLEAN : fein = (zustand BAND GDK_STRG) <> 0
+    IF richtung = GDK_RAD_HOCH THEN
+        vdlRadZoom(TRUE, fein, mx, my)
+    ELSEIF richtung = GDK_RAD_RUNTER THEN
+        vdlRadZoom(FALSE, fein, mx, my)
+    ELSE
+        DIM dx AS FLOAT, dy AS FLOAT
+        ok = gdk_event_get_scroll_deltas(ereignis, dx, dy)
+        IF dy < 0 THEN vdlRadZoom(TRUE, fein, mx, my)
+        IF dy > 0 THEN vdlRadZoom(FALSE, fein, mx, my)
+    END IF
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION vdlDruck(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM k AS INTEGER
+    IF NOT gdk_event_get_button(ereignis, k) THEN RETURN FALSE
+    IF k <> 1 AND k <> 2 THEN RETURN FALSE
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, vdlZiehX, vdlZiehY)
+    vdlZiehen = TRUE
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION vdlLos(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    vdlZiehen = FALSE
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION vdlBewegung(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    IF NOT vdlZiehen THEN RETURN FALSE
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
+    vdlPanX = vdlPanX + px - vdlZiehX
+    vdlPanY = vdlPanY + py - vdlZiehY
+    vdlZiehX = px
+    vdlZiehY = py
+    gtk_widget_queue_draw(vdlFlaeche)
+    RETURN TRUE
+END FUNCTION
+
+' --- Bedienelemente
+
+SUB vdlGeaendert(w AS INTEGER, daten AS INTEGER)
+    IF vdlSperre THEN RETURN
+    DIM i AS INTEGER : i = MAX(0, gtk_combo_box_get_active(vdlArt))
+    gtk_label_set_text(vdlArtText, vdlArtBeschreibung$(i))
+    ' im Symbol-Plan zaehlt die Stofffarbe nicht
+    DIM symbol AS BOOLEAN : symbol = NOT vdlDp AND i = 2
+    gtk_widget_set_sensitive(vdlStoff, NOT symbol)
+    gtk_widget_set_sensitive(vdlStoffFarbe, NOT symbol)
+    IF daten = 1 THEN vdlInfoNachziehen()
+    gtk_widget_queue_draw(vdlFlaeche)
+END SUB
+
+SUB vdlRegler_(w AS INTEGER, daten AS INTEGER)
+    IF vdlSperre THEN RETURN
+    vdlZoomSetzen(INT(gtk_range_get_value(vdlRegler)))
+END SUB
+
+SUB vdlKnopf(w AS INTEGER, was AS INTEGER)
+    SELECT CASE was
+        CASE 0 : vdlEinpassen()
+        CASE 1
+            vdlZoomSetzen(100)
+            vdlMitte()
+        CASE 2 : vdlBildSichern(0)
+    END SELECT
+END SUB
+
+FUNCTION vdlGruppe(text AS STRING) AS INTEGER
+    DIM l AS INTEGER : l = gtk_label_new(text)
+    gtkKlasse(l, "nebensache")
+    RETURN l
+END FUNCTION
+
+FUNCTION vdlBauen(m AS kern.Muster) AS INTEGER
+    vdlMuster = m
+    vdlDp = m.modus = "diamond"
+    vdlEingepasst = FALSE
+    vdlZoom = 100
+    vdlDialog = gtk_dialog_new_with_buttons(IIF(vdlDp, tr$("Vorlagen-Vorschau"), tr$("Muster-Vorschau")) + " — " + m.name, fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Schließen"), GTK_ANTWORT_OK, 0)
+    gtk_window_set_default_size(vdlDialog, 1100, 800)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(vdlDialog)
+    gtk_container_set_border_width(innen, 12)
+    gtk_box_set_spacing(innen, 10)
+    DIM intro AS INTEGER : intro = gtk_label_new("")
+    IF vdlDp THEN
+        gtk_label_set_markup(intro, tr$("So sieht deine Vorlage fertig geklebt aus. Die Drills haben die typische Glanz-Optik mit hellerer Oberseite und dunklerem Schatten. Mit dem Mausrad zoomst du, mit Ziehen verschiebst du die Ansicht."))
+    ELSE
+        gtk_label_set_markup(intro, tr$("So sieht dein Muster gestickt aus. Wechsle die <b>Darstellung</b> für verschiedene Ansichten, probiere unterschiedliche <b>Stoffe</b> und <b>Stoff-Farben</b>. Mit dem Mausrad zoomst du, mit Ziehen verschiebst du die Ansicht."))
+    END IF
+    gtk_label_set_line_wrap(intro, TRUE)
+    gtk_label_set_xalign(intro, 0.0)
+    gtkKlasse(intro, "karte")
+    gtk_box_pack_start(innen, intro, FALSE, FALSE, 0)
+    ' Werkzeugzeile
+    DIM leiste AS INTEGER : leiste = gtk_box_new(GTK_WAAGERECHT, 10)
+    gtk_box_pack_start(leiste, vdlGruppe(IIF(vdlDp, tr$("DRILL-DARSTELLUNG"), tr$("DARSTELLUNG"))), FALSE, FALSE, 0)
+    vdlArt = gtk_combo_box_text_new()
+    DIM t AS STRING
+    DIM arten AS ARRAY OF STRING : arten = IIF(vdlDp, [tr$("Drill-Vorschau"), tr$("Pixel-Vorschau")], [tr$("Stoff-Vorschau"), tr$("Pixel-Vorschau"), tr$("Symbol-Plan")])
+    FOR EACH t IN arten
+        gtk_combo_box_text_append_text(vdlArt, t)
+    NEXT
+    gtk_combo_box_set_active(vdlArt, 0)
+    gtk_box_pack_start(leiste, vdlArt, FALSE, FALSE, 0)
+    DIM st1 AS INTEGER : st1 = gtk_separator_new(GTK_SENKRECHT)
+    gtk_box_pack_start(leiste, st1, FALSE, FALSE, 0)
+    DIM gs AS INTEGER : gs = vdlGruppe(tr$("STOFF"))
+    gtk_box_pack_start(leiste, gs, FALSE, FALSE, 0)
+    vdlStoff = gtk_combo_box_text_new()
+    FOR EACH t IN vdlStoffNamen()
+        gtk_combo_box_text_append_text(vdlStoff, t)
+    NEXT
+    gtk_combo_box_set_active(vdlStoff, 1)
+    gtk_widget_set_tooltip_text(vdlStoff, tr$("Stoffart — höhere Zahl = feiner gewebt = kleineres fertiges Muster"))
+    gtk_box_pack_start(leiste, vdlStoff, FALSE, FALSE, 0)
+    vdlStoffFarbe = gtk_combo_box_text_new()
+    FOR EACH t IN vbStoffNamen()
+        gtk_combo_box_text_append_text(vdlStoffFarbe, t)
+    NEXT
+    gtk_combo_box_set_active(vdlStoffFarbe, 0)
+    gtk_widget_set_tooltip_text(vdlStoffFarbe, tr$("Farbe des Stoff-Hintergrunds"))
+    gtk_box_pack_start(leiste, vdlStoffFarbe, FALSE, FALSE, 0)
+    DIM st2 AS INTEGER : st2 = gtk_separator_new(GTK_SENKRECHT)
+    gtk_box_pack_start(leiste, st2, FALSE, FALSE, 0)
+    vdlRueck = gtk_check_button_new_with_label(tr$("Rückstiche"))
+    gtk_toggle_button_set_active(vdlRueck, TRUE)
+    gtk_widget_set_tooltip_text(vdlRueck, tr$("Rückstich-Linien in der Vorschau zeigen"))
+    gtk_box_pack_start(leiste, vdlRueck, FALSE, FALSE, 0)
+    vdlFertig = gtk_check_button_new_with_label(tr$("Fortschritt"))
+    gtk_widget_set_tooltip_text(vdlFertig, tr$("Bereits erledigte Stiche markieren"))
+    gtk_box_pack_start(leiste, vdlFertig, FALSE, FALSE, 0)
+    DIM kp AS INTEGER : kp = gtk_button_new_with_label("1:1")
+    gtk_widget_set_tooltip_text(kp, tr$("Auf 100% Zoom setzen"))
+    gtk_box_pack_end(leiste, kp, FALSE, FALSE, 0)
+    DIM ke AS INTEGER : ke = gtk_button_new_with_label(tr$("Einpassen"))
+    gtk_widget_set_tooltip_text(ke, tr$("Zoom so anpassen, dass das ganze Muster sichtbar ist"))
+    gtk_box_pack_end(leiste, ke, FALSE, FALSE, 0)
+    vdlZoomText = gtk_label_new("100%")
+    gtk_widget_set_size_request(vdlZoomText, 50, -1)
+    gtkKlasse(vdlZoomText, "wert")
+    gtk_box_pack_end(leiste, vdlZoomText, FALSE, FALSE, 0)
+    vdlRegler = gtk_scale_new_with_range(GTK_WAAGERECHT, VD_ZOOM_MIN, VD_ZOOM_MAX, 1)
+    gtk_scale_set_draw_value(vdlRegler, FALSE)
+    gtk_range_set_value(vdlRegler, 100)
+    gtk_widget_set_size_request(vdlRegler, 140, -1)
+    gtk_widget_set_tooltip_text(vdlRegler, tr$("Zoom — auch per Mausrad im Vorschau-Bereich möglich"))
+    gtk_box_pack_end(leiste, vdlRegler, FALSE, FALSE, 0)
+    gtk_box_pack_end(leiste, vdlGruppe("ZOOM"), FALSE, FALSE, 0)
+    gtk_box_pack_start(innen, leiste, FALSE, FALSE, 0)
+    vdlArtText = gtk_label_new(vdlArtBeschreibung$(0))
+    gtk_label_set_xalign(vdlArtText, 0.0)
+    gtkKlasse(vdlArtText, "nebensache")
+    gtk_box_pack_start(innen, vdlArtText, FALSE, FALSE, 0)
+    ' Zeichenflaeche
+    vdlFlaeche = gtk_drawing_area_new()
+    gtk_widget_set_size_request(vdlFlaeche, 300, 200)
+    gtk_widget_add_events(vdlFlaeche, GDK_MASKE_BEWEGUNG BOR GDK_MASKE_DRUCK BOR GDK_MASKE_LOSLASSEN BOR GDK_MASKE_RAD BOR GDK_MASKE_RAD_FEIN)
+    DIM sz AS INTEGER : sz = signalZeichnen(vdlFlaeche, "draw", vdlZeichnen, 0, 0, 0)
+    signalEreignis(vdlFlaeche, "scroll-event", vdlRad, 0, 0, 0)
+    signalEreignis(vdlFlaeche, "button-press-event", vdlDruck, 0, 0, 0)
+    signalEreignis(vdlFlaeche, "button-release-event", vdlLos, 0, 0, 0)
+    signalEreignis(vdlFlaeche, "motion-notify-event", vdlBewegung, 0, 0, 0)
+    gtk_box_pack_start(innen, vdlFlaeche, TRUE, TRUE, 0)
+    ' Infozeile
+    DIM info AS INTEGER : info = gtk_box_new(GTK_WAAGERECHT, 20)
+    vdlInfo = []
+    DIM i AS INTEGER
+    FOR i = 0 TO 3
+        IF i > 0 THEN
+            DIM trenner AS INTEGER : trenner = gtk_label_new("|")
+            gtkKlasse(trenner, "nebensache")
+            gtk_box_pack_start(info, trenner, FALSE, FALSE, 0)
+            IF i = 3 AND vdlDp THEN gtk_widget_set_no_show_all(trenner, TRUE)
+        END IF
+        DIM l AS INTEGER : l = gtk_label_new("--")
+        gtkKlasse(l, "nebensache")
+        gtk_box_pack_start(info, l, FALSE, FALSE, 0)
+        ARRAY_PUSH(vdlInfo, l)
+    NEXT
+    IF vdlDp THEN gtk_widget_set_no_show_all(vdlInfo[3], TRUE)
+    gtk_box_pack_start(innen, info, FALSE, FALSE, 0)
+    DIM fuss AS INTEGER : fuss = gtk_box_new(GTK_WAAGERECHT, 8)
+    DIM kb AS INTEGER : kb = gtk_button_new_with_label(tr$("📷 Als Bild speichern …"))
+    gtk_box_pack_start(fuss, kb, FALSE, FALSE, 0)
+    gtk_box_pack_start(innen, fuss, FALSE, FALSE, 0)
+    IF vdlDp THEN
+        DIM w AS INTEGER
+        FOR EACH w IN [gs, vdlStoff, vdlStoffFarbe, st2, vdlRueck, vdlFertig]
+            gtk_widget_set_no_show_all(w, TRUE)
+        NEXT
+    END IF
+    signal(vdlArt, "changed", vdlGeaendert, 0, 0, 0)
+    signal(vdlStoff, "changed", vdlGeaendert, 1, 0, 0)
+    signal(vdlStoffFarbe, "changed", vdlGeaendert, 0, 0, 0)
+    signal(vdlRueck, "toggled", vdlGeaendert, 0, 0, 0)
+    signal(vdlFertig, "toggled", vdlGeaendert, 0, 0, 0)
+    signal(vdlRegler, "value-changed", vdlRegler_, 0, 0, 0)
+    signal(ke, "clicked", vdlKnopf, 0, 0, 0)
+    signal(kp, "clicked", vdlKnopf, 1, 0, 0)
+    signal(kb, "clicked", vdlKnopf, 2, 0, 0)
+    vdlInfoNachziehen()
+    gtk_widget_show_all(vdlDialog)
+    RETURN vdlDialog
+END FUNCTION
+
+' --- Als Bild speichern
+
+FUNCTION vdlAufloesung() AS INTEGER
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons(tr$("Auflösung"), vdlDialog, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, "OK", GTK_ANTWORT_OK, 0)
+    gtk_dialog_set_default_response(d, GTK_ANTWORT_OK)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
+    gtk_container_set_border_width(innen, 12)
+    DIM sp AS INTEGER : sp = adSpin(4, 50, 1, 12, 0)
+    gtk_entry_set_activates_default(sp, TRUE)
+    gtk_box_pack_start(innen, dlZeile(tr$("Pixel pro Stich:"), sp), FALSE, FALSE, 0)
+    gtk_widget_show_all(d)
+    DIM z AS INTEGER : z = 0
+    IF gtk_dialog_run(d) = GTK_ANTWORT_OK THEN z = gtk_spin_button_get_value_as_int(sp)
+    gtk_widget_destroy(d)
+    RETURN z
+END FUNCTION
+
+FUNCTION vdlZielWaehlen() AS STRING
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new(tr$("Als Bild speichern"), vdlDialog, GTK_DATEI_SICHERN, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Speichern"), GTK_ANTWORT_ANNEHMEN, 0)
+    gtk_file_chooser_set_do_overwrite_confirmation(d, TRUE)
+    gtk_file_chooser_set_current_name(d, vdlMuster.name + "_vorschau.png")
+    IF musterPfad <> "" THEN
+        DIM ok AS BOOLEAN : ok = gtk_file_chooser_set_current_folder(d, DIRNAME(musterPfad))
+    END IF
+    DIM filter AS INTEGER : filter = gtk_file_filter_new()
+    gtk_file_filter_set_name(filter, tr$("PNG (*.png)"))
+    gtk_file_filter_add_pattern(filter, "*.png")
+    gtk_file_chooser_add_filter(d, filter)
+    DIM pfad AS STRING
+    IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
+        DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
+        pfad = TEXT_AUS_ZEIGER$(z)
+        g_free(z)
+    END IF
+    gtk_widget_destroy(d)
+    IF pfad <> "" AND LOWER$(RIGHT$(pfad, 4)) <> ".png" THEN pfad = pfad + ".png"
+    RETURN pfad
+END FUNCTION
+
+' Das Bild schreiben; "" = gut, sonst warum nicht (ohne Rueckfragen, fuer
+' die Vorfuehrung und die Pruefung)
+FUNCTION vdlBildSchreiben$(z AS INTEGER, pfad AS STRING) AS STRING
+    IF NOT vbPng(vdlMuster, vdlStil(), z, pfad) THEN RETURN tr$("Bild konnte nicht gespeichert werden.")
+    RETURN ""
+END FUNCTION
+
+' Nachfragen (Aufloesung, Groesse, Ziel), dann schreiben; z = 0 fragt
+SUB vdlBildSichern(z AS INTEGER)
+    IF z = 0 THEN z = vdlAufloesung()
+    IF z = 0 THEN RETURN
+    DIM b AS INTEGER : b = vdlMuster.breite * z
+    DIM h AS INTEGER : h = vdlMuster.hoehe * z
+    IF b * h > 64000000 THEN
+        IF NOT pdFrage(vdlDialog, tr$("Großes Bild"), trf$("Das Bild wird {0} × {1} Pixel groß.{2}Fortfahren?", [STR$(b), STR$(h), CHR$(10)])) THEN RETURN
+    END IF
+    DIM pfad AS STRING : pfad = vdlZielWaehlen()
+    IF pfad = "" THEN RETURN
+    DIM f AS STRING : f = vdlBildSchreiben$(z, pfad)
+    IF f <> "" THEN
+        pdWarnung(vdlDialog, tr$("Fehler"), f)
+    ELSE
+        pdWarnung(vdlDialog, tr$("Export erfolgreich"), trf$("Bild gespeichert:{0}{1}{2}{3}Größe: {4} × {5} Pixel", [CHR$(10), pfad, CHR$(10), CHR$(10), STR$(b), STR$(h)]))
+    END IF
+END SUB
+
+SUB vorschauDialog()
+    IF NOT lwHat THEN RETURN
+    DIM d AS INTEGER : d = vdlBauen(lwMuster)
+    DIM a AS INTEGER : a = gtk_dialog_run(vdlDialog)
+    gtk_widget_destroy(vdlDialog)
+    vdlDialog = 0
+END SUB

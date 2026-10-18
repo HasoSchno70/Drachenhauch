@@ -1,0 +1,113 @@
+' Text in Stiche (PySticky ui/tools/text_tool.py): Pango zeichnet den Text in
+' ein Graustufenbild mit EINEM Punkt je Kaestchen, jeder Punkt ab halber
+' Deckung wird ein Stich -- das Original zeichnet in ein Schwarzweiss-Bild,
+' was auf dasselbe hinauslaeuft. Die Groesse ist in Punkt wie dort (bei 96 dpi
+' sind 12 Punkt 16 Kaestchen hoch).
+
+DIM txText AS STRING
+DIM txSchrift AS STRING
+DIM txGroesse AS INTEGER
+DIM txFett AS BOOLEAN
+DIM txKursiv AS BOOLEAN
+
+' Der Text als Ausschnitt: dabei/Farbe/Art je Kaestchen; leer, wenn nichts
+' uebrig bleibt. Zeilenumbrueche im Text gehen mit.
+FUNCTION textAusschnitt(text AS STRING, schrift AS STRING, groesse AS INTEGER, fett AS BOOLEAN, kursiv AS BOOLEAN, farbe AS INTEGER, art AS INTEGER) AS kern.Ausschnitt
+    groesse = CLAMP(groesse, 6, 72)
+    DIM beschreibung AS STRING : beschreibung = schrift + IIF(fett, " Bold", "") + IIF(kursiv, " Italic", "") + " " + STR$(groesse)
+    ' messen an einer kleinen Flaeche
+    DIM probe AS INTEGER : probe = cairo_image_surface_create(CAIRO_A8, 1, 1)
+    DIM pcr AS INTEGER : pcr = cairo_create(probe)
+    DIM layout AS INTEGER : layout = pango_cairo_create_layout(pcr)
+    DIM fd AS INTEGER : fd = pango_font_description_from_string(beschreibung)
+    pango_layout_set_font_description(layout, fd)
+    pango_layout_set_text(layout, text, -1)
+    DIM tinte AS PangoRechteck
+    DIM logisch AS PangoRechteck
+    pango_layout_get_pixel_extents(layout, tinte, logisch)
+    DIM b AS INTEGER : b = logisch.breite + 4
+    DIM h AS INTEGER : h = logisch.hoehe + 4
+    g_object_unref(layout)
+    cairo_destroy(pcr)
+    cairo_surface_destroy(probe)
+    IF logisch.breite <= 0 OR logisch.hoehe <= 0 THEN
+        pango_font_description_free(fd)
+        RETURN kern.neuerAusschnitt(0, 0)
+    END IF
+    ' zeichnen (geglaettet), jeder Punkt ab halber Deckung wird ein Stich
+    DIM flaeche AS INTEGER : flaeche = cairo_image_surface_create(CAIRO_A8, b, h)
+    DIM cr AS INTEGER : cr = cairo_create(flaeche)
+    layout = pango_cairo_create_layout(cr)
+    pango_layout_set_font_description(layout, fd)
+    pango_layout_set_text(layout, text, -1)
+    cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 1.0)
+    cairo_move_to(cr, 2 - logisch.x, 2 - logisch.y)
+    pango_cairo_show_layout(cr, layout)
+    cairo_surface_flush(flaeche)
+    DIM zeile AS INTEGER : zeile = cairo_image_surface_get_stride(flaeche)
+    DIM daten AS BUFFER : daten = BUFFER_AUS_ZEIGER(cairo_image_surface_get_data(flaeche), zeile * h)
+    g_object_unref(layout)
+    cairo_destroy(cr)
+    cairo_surface_destroy(flaeche)
+    pango_font_description_free(fd)
+    ' auf die Kaestchen mit Stich zuschneiden
+    DIM x AS INTEGER, y AS INTEGER
+    DIM lx AS INTEGER : lx = b
+    DIM rx AS INTEGER : rx = -1
+    DIM oy AS INTEGER : oy = h
+    DIM uy AS INTEGER : uy = -1
+    FOR y = 0 TO h - 1
+        FOR x = 0 TO b - 1
+            IF BUFFER_GET(daten, y * zeile + x) >= 128 THEN
+                IF x < lx THEN lx = x
+                IF x > rx THEN rx = x
+                IF y < oy THEN oy = y
+                IF y > uy THEN uy = y
+            END IF
+        NEXT
+    NEXT
+    IF rx < 0 THEN RETURN kern.neuerAusschnitt(0, 0)
+    DIM s AS kern.Ausschnitt : s = kern.neuerAusschnitt(rx - lx + 1, uy - oy + 1)
+    FOR y = oy TO uy
+        FOR x = lx TO rx
+            IF BUFFER_GET(daten, y * zeile + x) >= 128 THEN
+                DIM i AS INTEGER : i = (y - oy) * s.breite + (x - lx)
+                s.dabei[i] = 1
+                s.farbe[i] = farbe
+                s.art[i] = art
+            END IF
+        NEXT
+    NEXT
+    RETURN s
+END FUNCTION
+
+' Klick mit dem Text-Werkzeug: der Text aus der Leiste haengt an der Maus
+' (ansicht/optionsleisten.dh); ohne Text geht der Fokus ins Textfeld.
+SUB textBeginnen(x AS INTEGER, y AS INTEGER)
+    IF TRIM$(txText) = "" THEN
+        IF tlFeld <> 0 THEN gtk_widget_grab_focus(tlFeld)
+        statusMeldung(tr$("Erst einen Text eingeben -- oben in der Leiste."))
+        RETURN
+    END IF
+    IF NOT wzFarbeDa() THEN RETURN
+    textAnhaengen()
+END SUB
+
+' Die Schriften der Auswahl
+FUNCTION textSchriften() AS ARRAY OF STRING
+    RETURN ["Sans", "Serif", "Monospace", "Arial", "Georgia", "Courier New"]
+END FUNCTION
+
+SUB textAnhaengen()
+    DIM s AS kern.Ausschnitt : s = textAusschnitt(txText, txSchrift, txGroesse, txFett, txKursiv, wzFarbe, wzStichart)
+    IF s.breite = 0 THEN
+        statusMeldung(tr$("Der Text ergibt keine Stiche -- groesser schreiben?"))
+        RETURN
+    END IF
+    mrEinfuegen = TRUE
+    mrEinfuegenText = tr$("Text")
+    mrEinfuegenAus = s
+    statusMeldung(trf$("{0} Stiche, {1} x {2} -- klicken setzt, ESC bricht ab.", [STR$(s.stiche()), STR$(s.breite), STR$(s.hoehe)]))
+    gtk_widget_queue_draw(lwFlaeche)
+END SUB
+

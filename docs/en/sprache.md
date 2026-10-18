@@ -83,6 +83,24 @@ DIM spieler AS STRING = "Anna"
 This works for one variable per line; in a CLASS, `SUB Init()` sets the
 start values of the fields.
 
+**A `DIM` inside a loop starts fresh every round** -- with 0, `""`, `FALSE`,
+an empty array or an empty MAP, as in FreeBASIC and QBasic. If you want to
+keep a value across rounds, put the `DIM` before the loop:
+
+```basic
+DIM summe AS INTEGER          ' before the loop: keeps counting
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    DIM zeile AS STRING       ' inside the loop: empty every round
+    zeile = zeile + "*"
+    summe = summe + i
+    PRINT zeile; " "; summe   ' * 1, * 3, * 6
+NEXT
+```
+
+Until 2026.27 a `DIM` inside a loop kept the value of the previous round (as
+in VB.NET) -- except for a sized array in the main program.
+
 > **No reserved words as variable names.** Some short names are
 > keywords and cannot serve as identifiers — besides the
 > obvious ones (`to`, `step`, `mod`, `end`, `next`, `new`, `class`, `in`)
@@ -130,9 +148,11 @@ bin = &B11010110          ' binary
 
 DIM f AS FLOAT
 f = 3.14
+f = 1.5e3                 ' exponent: 1500.0 (also 2.5E-3, 1e9)
 ```
 
 Hex and binary are INTEGER constants only — no floats. All three notations yield the same INTEGER value.
+A number with an exponent (`1e9`, `2.5E-3`) is always a float, even without a point -- as with `VAL("1e3")`.
 
 ## Data types
 
@@ -833,7 +853,7 @@ PRINT q, r       ' "3 2"
 
 **Restrictions:**
 - `BYREF` may **not** be combined with a default value (what would it mean to pass a default variable by reference?).
-- `BYREF` is supported by `dhrt`: at the call site the compiler inserts an lvalue capture plus a post-call write-back (copy-in/copy-out), and the VM returns the final parameter values. (Currently only for direct `SUB`/`FUNCTION` calls — not via `FUNCREF` or method calls whose class is only known at run time.)
+- `BYREF` is supported by `dhrt`: at the call site the compiler inserts an lvalue capture plus a post-call write-back (copy-in/copy-out), and the VM returns the final parameter values. This holds for `SUB`/`FUNCTION` and for **methods** whose class is known at compile time (`DIM s AS Stapel` ... `s.fuellen(a, n)`, also calls on `Self`). If the class is only known at run time (the variable of `FOR EACH` over a `TUPLE`, a value without a type), calling a method with `BYREF` is an error that suggests holding the object in a typed variable — running it silently as `BYVAL` would lose the change. An override must take the same parameters `BYREF` as the method it overrides. There is no `BYREF` through a `FUNCREF`.
 
 **Recursion** works:
 
@@ -1044,6 +1064,12 @@ NEXT
 > changes in the subroutine affect the original (exactly what
 > `ARRAY_PUSH`/`SORT`/… and your own in-place routines rely on). If you need **a copy of your own**,
 > call `ARRAY_COPY(arr)`.
+>
+> The same holds for **return values**: an array, an object and a struct
+> come back as a reference. An index or field therefore works directly on
+> the result of a call (`teile(s)[2]`, `held().hp`), for reading and
+> writing -- `held().hp = 0` changes the object `held` returned. Only
+> `+=`, `-=`, `++` ... don't work there: the call would run twice.
 >
 > **Index access is strict, slicing clamps.** A direct index outside the
 > bounds throws a run-time error (`Index 5 ausserhalb [0..2]`). A **slice**,
@@ -1473,6 +1499,9 @@ END FUNCTION
 ```
 
 Pass the value in as a parameter or declare it in the file itself.
+The fields of a class are not affected: in a method a bare `e` means the
+field (an inherited one too), even if the main program or the file itself
+also has an `e`.
 Without `AS`, the old flat access remains allowed — existing programs
 do not change.
 
@@ -1521,6 +1550,26 @@ f = mathe.Farbe.ROT
 
 As a type, an ENUM is an `INTEGER`, just like a flat ENUM. This lets
 both files have a `Farbe` without getting in each other's way.
+
+**A namespace made of several files:** files imported under the same name
+form ONE namespace and see each other. That way a library can be split into
+parts and included through a collecting file:
+
+```basic
+' kern/kern.dh -- the collecting file
+IMPORT "muster.dh" AS kern
+IMPORT "ebene.dh" AS kern
+IMPORT "pxs.dh" AS kern
+
+' main.dh
+IMPORT "kern/kern.dh" AS kern
+DIM m AS kern.Muster
+m = kern.pxsLaden("herz.pxs")
+```
+
+What a file of the namespace imports **without** `AS` does not belong to it —
+it stays outside, like any flat import. `kern.Name` then reports in which file
+the name is and that `IMPORT "datei.dh" AS kern` is missing there.
 
 **Not to be confused** with `AS` on a built-in module: `IMPORT "json" AS
 j` replaces the prefix there (`J_PARSE` instead of `JSON_PARSE`). For `.dh` files

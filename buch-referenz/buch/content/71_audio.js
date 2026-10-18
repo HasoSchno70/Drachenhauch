@@ -217,7 +217,7 @@ module.exports = (H) => [
       'PRINT AUDIO_CLOCK_TICKS(clk) >= 0',
     ], { out: ["TRUE"] }),
   H.cmd("AUDIO_PLAY_AT", 'AUDIO_PLAY_AT(sound, clock, ticks [, volume [, loops]]) -> AUDIO_CHANNEL',
-    "Plant den Start eines Sounds exakt auf den angegebenen Tick der Uhr – vom Audio-Thread selbst ausgelöst, nicht durch dein Frame-Timing. So klingt ein Hi-Hat-Sample exakt im Takt, statt je nach Framerate leicht zu schwanken.",
+    "Plant den Start eines Sounds exakt auf den angegebenen Tick der Uhr – vom Audio-Thread selbst ausgelöst, nicht durch dein Frame-Timing. So klingt ein Hi-Hat-Sample exakt im Takt, statt je nach Framerate leicht zu schwanken. Derselbe Sound darf mehrmals geplant sein – jedes AUDIO_PLAY_AT legt eine weitere Instanz an, und AUDIO_STOP beendet alle. Ein Tick, der schon vorbei ist, klingt sofort.",
     [
       'IMPORT "audio"',
       'DIM s AS SOUND',
@@ -226,6 +226,35 @@ module.exports = (H) => [
       'ch = AUDIO_PLAY_AT(s, clk, 8)   \' startet exakt auf Tick 8',
       'PRINT ch >= 0',
     ], { out: ["TRUE"] }),
+
+  H.cmd("AUDIO_IS_WAITING", 'AUDIO_IS_WAITING(ch) AS BOOLEAN',
+    "AUDIO_IS_WAITING sagt, ob ein mit AUDIO_PLAY_AT geplanter Sound noch auf seinen Tick wartet; AUDIO_IS_PLAYING wird erst ab dem Tick wahr.",
+    [
+      'IMPORT "audio"',
+      'DIM s AS SOUND',
+      's = AUDIO_TONE(440.0, 200, "sine", 0.4)',
+      'DIM uhr AS AUDIO_CLOCK',
+      'uhr = AUDIO_CLOCK_NEW(100)',
+      'AUDIO_PLAY_AT(s, uhr, 50)',
+      'PRINT AUDIO_IS_WAITING(s); " "; AUDIO_IS_PLAYING(s)',
+    ], { out: ["TRUE FALSE"] }),
+
+  H.h2("Mitschnitt und Pegel"),
+  H.cmd("AUDIO_RECORD_START · AUDIO_RECORD_STOP · AUDIO_RECORDING", 'AUDIO_RECORD_START([max_sekunden])   AUDIO_RECORD_STOP() AS SOUND   AUDIO_RECORDING() AS BOOLEAN',
+    "Schneidet den fertigen Mix mit – hinter allen Effekten der Busse, so wie er aus dem Lautsprecher kommt. AUDIO_SOUND_MIX baut dagegen trocken: Hall und Echo wirken nur live. AUDIO_RECORD_STOP liefert den Mitschnitt als SOUND, den man mit AUDIO_SAVE_WAV schreibt.",
+    [
+      'IMPORT "audio"',
+      'AUDIO_RECORD_START()',
+      'PRINT AUDIO_RECORDING()',
+      '\' ... spielen lassen ...',
+      'AUDIO_SAVE_WAV(AUDIO_RECORD_STOP(), "aufnahme.wav")',
+    ], { out: ["TRUE"] }),
+  H.cmd("AUDIO_PEAK", 'AUDIO_PEAK() AS FLOAT',
+    "Liefert den höchsten Ausschlag am Master seit dem letzten Aufruf. Einmal je Bild abgefragt ist das eine Pegelanzeige; über 1.0 klippt der Mixer – dann einen Bus leiser stellen.",
+    [
+      'IMPORT "audio"',
+      'IF AUDIO_PEAK() > 1.0 THEN PRINT "Übersteuert!"',
+    ]),
 
   H.h2("Räumliches Audio: Listener & Emitter"),
   H.p("Für 2D-/3D-Spiele mit Ortsgefühl: Ein Listener ist das „Ohr“ der Szene (meist an Kamera oder Spielfigur gebunden), ein Emitter eine Klangquelle irgendwo in der Welt. Kira übernimmt selbst die Berechnung von Panning und Lautstärke-Abnahme mit der Entfernung – du musst nichts selbst rechnen."),

@@ -1,0 +1,992 @@
+[
+ {
+  "FincaNumber": "0001",
+  "Color": {
+   "R": 255,
+   "G": 255,
+   "B": 255
+  },
+  "Name": "White"
+ },
+ {
+  "FincaNumber": "0008",
+  "Color": {
+   "R": 252,
+   "G": 250,
+   "B": 245
+  },
+  "Name": "Off White"
+ },
+ {
+  "FincaNumber": "0120",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Black"
+ },
+ {
+  "FincaNumber": "0200",
+  "Color": {
+   "R": 50,
+   "G": 50,
+   "B": 50
+  },
+  "Name": "Charcoal"
+ },
+ {
+  "FincaNumber": "0201",
+  "Color": {
+   "R": 90,
+   "G": 90,
+   "B": 90
+  },
+  "Name": "Dark Gray"
+ },
+ {
+  "FincaNumber": "0202",
+  "Color": {
+   "R": 130,
+   "G": 130,
+   "B": 130
+  },
+  "Name": "Medium Gray"
+ },
+ {
+  "FincaNumber": "0203",
+  "Color": {
+   "R": 180,
+   "G": 180,
+   "B": 180
+  },
+  "Name": "Light Gray"
+ },
+ {
+  "FincaNumber": "0204",
+  "Color": {
+   "R": 220,
+   "G": 220,
+   "B": 220
+  },
+  "Name": "Pearl Gray"
+ },
+ {
+  "FincaNumber": "1000",
+  "Color": {
+   "R": 178,
+   "G": 34,
+   "B": 34
+  },
+  "Name": "Dark Burgundy"
+ },
+ {
+  "FincaNumber": "1010",
+  "Color": {
+   "R": 139,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Dark Red"
+ },
+ {
+  "FincaNumber": "1020",
+  "Color": {
+   "R": 205,
+   "G": 51,
+   "B": 51
+  },
+  "Name": "Brick Red"
+ },
+ {
+  "FincaNumber": "1030",
+  "Color": {
+   "R": 220,
+   "G": 20,
+   "B": 60
+  },
+  "Name": "Crimson"
+ },
+ {
+  "FincaNumber": "1040",
+  "Color": {
+   "R": 255,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Red"
+ },
+ {
+  "FincaNumber": "1050",
+  "Color": {
+   "R": 255,
+   "G": 99,
+   "B": 71
+  },
+  "Name": "Tomato"
+ },
+ {
+  "FincaNumber": "1060",
+  "Color": {
+   "R": 255,
+   "G": 127,
+   "B": 80
+  },
+  "Name": "Coral"
+ },
+ {
+  "FincaNumber": "1070",
+  "Color": {
+   "R": 250,
+   "G": 128,
+   "B": 114
+  },
+  "Name": "Salmon"
+ },
+ {
+  "FincaNumber": "1080",
+  "Color": {
+   "R": 255,
+   "G": 160,
+   "B": 122
+  },
+  "Name": "Light Salmon"
+ },
+ {
+  "FincaNumber": "1090",
+  "Color": {
+   "R": 128,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Maroon"
+ },
+ {
+  "FincaNumber": "1100",
+  "Color": {
+   "R": 165,
+   "G": 42,
+   "B": 42
+  },
+  "Name": "Brown Red"
+ },
+ {
+  "FincaNumber": "1200",
+  "Color": {
+   "R": 255,
+   "G": 182,
+   "B": 193
+  },
+  "Name": "Light Pink"
+ },
+ {
+  "FincaNumber": "1210",
+  "Color": {
+   "R": 255,
+   "G": 192,
+   "B": 203
+  },
+  "Name": "Pink"
+ },
+ {
+  "FincaNumber": "1220",
+  "Color": {
+   "R": 255,
+   "G": 105,
+   "B": 180
+  },
+  "Name": "Hot Pink"
+ },
+ {
+  "FincaNumber": "1230",
+  "Color": {
+   "R": 255,
+   "G": 20,
+   "B": 147
+  },
+  "Name": "Deep Pink"
+ },
+ {
+  "FincaNumber": "1240",
+  "Color": {
+   "R": 219,
+   "G": 112,
+   "B": 147
+  },
+  "Name": "Pale Violet Red"
+ },
+ {
+  "FincaNumber": "1250",
+  "Color": {
+   "R": 199,
+   "G": 21,
+   "B": 133
+  },
+  "Name": "Medium Violet Red"
+ },
+ {
+  "FincaNumber": "1260",
+  "Color": {
+   "R": 255,
+   "G": 240,
+   "B": 245
+  },
+  "Name": "Lavender Blush"
+ },
+ {
+  "FincaNumber": "1270",
+  "Color": {
+   "R": 255,
+   "G": 228,
+   "B": 225
+  },
+  "Name": "Misty Rose"
+ },
+ {
+  "FincaNumber": "2000",
+  "Color": {
+   "R": 255,
+   "G": 165,
+   "B": 0
+  },
+  "Name": "Orange"
+ },
+ {
+  "FincaNumber": "2010",
+  "Color": {
+   "R": 255,
+   "G": 140,
+   "B": 0
+  },
+  "Name": "Dark Orange"
+ },
+ {
+  "FincaNumber": "2020",
+  "Color": {
+   "R": 255,
+   "G": 69,
+   "B": 0
+  },
+  "Name": "Orange Red"
+ },
+ {
+  "FincaNumber": "2030",
+  "Color": {
+   "R": 255,
+   "G": 200,
+   "B": 100
+  },
+  "Name": "Light Orange"
+ },
+ {
+  "FincaNumber": "2040",
+  "Color": {
+   "R": 255,
+   "G": 218,
+   "B": 185
+  },
+  "Name": "Peach Puff"
+ },
+ {
+  "FincaNumber": "2050",
+  "Color": {
+   "R": 255,
+   "G": 228,
+   "B": 196
+  },
+  "Name": "Bisque"
+ },
+ {
+  "FincaNumber": "2060",
+  "Color": {
+   "R": 250,
+   "G": 235,
+   "B": 215
+  },
+  "Name": "Antique White"
+ },
+ {
+  "FincaNumber": "2070",
+  "Color": {
+   "R": 210,
+   "G": 105,
+   "B": 30
+  },
+  "Name": "Chocolate"
+ },
+ {
+  "FincaNumber": "2080",
+  "Color": {
+   "R": 205,
+   "G": 133,
+   "B": 63
+  },
+  "Name": "Peru"
+ },
+ {
+  "FincaNumber": "3000",
+  "Color": {
+   "R": 255,
+   "G": 255,
+   "B": 0
+  },
+  "Name": "Yellow"
+ },
+ {
+  "FincaNumber": "3010",
+  "Color": {
+   "R": 255,
+   "G": 215,
+   "B": 0
+  },
+  "Name": "Gold"
+ },
+ {
+  "FincaNumber": "3020",
+  "Color": {
+   "R": 255,
+   "G": 223,
+   "B": 0
+  },
+  "Name": "Golden Yellow"
+ },
+ {
+  "FincaNumber": "3030",
+  "Color": {
+   "R": 238,
+   "G": 232,
+   "B": 170
+  },
+  "Name": "Pale Goldenrod"
+ },
+ {
+  "FincaNumber": "3040",
+  "Color": {
+   "R": 240,
+   "G": 230,
+   "B": 140
+  },
+  "Name": "Khaki"
+ },
+ {
+  "FincaNumber": "3050",
+  "Color": {
+   "R": 255,
+   "G": 250,
+   "B": 205
+  },
+  "Name": "Lemon Chiffon"
+ },
+ {
+  "FincaNumber": "3060",
+  "Color": {
+   "R": 250,
+   "G": 250,
+   "B": 210
+  },
+  "Name": "Light Goldenrod"
+ },
+ {
+  "FincaNumber": "3070",
+  "Color": {
+   "R": 218,
+   "G": 165,
+   "B": 32
+  },
+  "Name": "Goldenrod"
+ },
+ {
+  "FincaNumber": "3080",
+  "Color": {
+   "R": 184,
+   "G": 134,
+   "B": 11
+  },
+  "Name": "Dark Goldenrod"
+ },
+ {
+  "FincaNumber": "4000",
+  "Color": {
+   "R": 0,
+   "G": 128,
+   "B": 0
+  },
+  "Name": "Green"
+ },
+ {
+  "FincaNumber": "4010",
+  "Color": {
+   "R": 0,
+   "G": 100,
+   "B": 0
+  },
+  "Name": "Dark Green"
+ },
+ {
+  "FincaNumber": "4020",
+  "Color": {
+   "R": 34,
+   "G": 139,
+   "B": 34
+  },
+  "Name": "Forest Green"
+ },
+ {
+  "FincaNumber": "4030",
+  "Color": {
+   "R": 0,
+   "G": 200,
+   "B": 0
+  },
+  "Name": "Lime"
+ },
+ {
+  "FincaNumber": "4040",
+  "Color": {
+   "R": 50,
+   "G": 205,
+   "B": 50
+  },
+  "Name": "Lime Green"
+ },
+ {
+  "FincaNumber": "4050",
+  "Color": {
+   "R": 144,
+   "G": 238,
+   "B": 144
+  },
+  "Name": "Light Green"
+ },
+ {
+  "FincaNumber": "4060",
+  "Color": {
+   "R": 152,
+   "G": 251,
+   "B": 152
+  },
+  "Name": "Pale Green"
+ },
+ {
+  "FincaNumber": "4070",
+  "Color": {
+   "R": 0,
+   "G": 255,
+   "B": 127
+  },
+  "Name": "Spring Green"
+ },
+ {
+  "FincaNumber": "4080",
+  "Color": {
+   "R": 46,
+   "G": 139,
+   "B": 87
+  },
+  "Name": "Sea Green"
+ },
+ {
+  "FincaNumber": "4090",
+  "Color": {
+   "R": 60,
+   "G": 179,
+   "B": 113
+  },
+  "Name": "Medium Sea Green"
+ },
+ {
+  "FincaNumber": "4100",
+  "Color": {
+   "R": 143,
+   "G": 188,
+   "B": 143
+  },
+  "Name": "Dark Sea Green"
+ },
+ {
+  "FincaNumber": "4110",
+  "Color": {
+   "R": 85,
+   "G": 107,
+   "B": 47
+  },
+  "Name": "Dark Olive Green"
+ },
+ {
+  "FincaNumber": "4120",
+  "Color": {
+   "R": 107,
+   "G": 142,
+   "B": 35
+  },
+  "Name": "Olive Drab"
+ },
+ {
+  "FincaNumber": "4130",
+  "Color": {
+   "R": 128,
+   "G": 128,
+   "B": 0
+  },
+  "Name": "Olive"
+ },
+ {
+  "FincaNumber": "4140",
+  "Color": {
+   "R": 154,
+   "G": 205,
+   "B": 50
+  },
+  "Name": "Yellow Green"
+ },
+ {
+  "FincaNumber": "5000",
+  "Color": {
+   "R": 0,
+   "G": 128,
+   "B": 128
+  },
+  "Name": "Teal"
+ },
+ {
+  "FincaNumber": "5010",
+  "Color": {
+   "R": 0,
+   "G": 139,
+   "B": 139
+  },
+  "Name": "Dark Cyan"
+ },
+ {
+  "FincaNumber": "5020",
+  "Color": {
+   "R": 0,
+   "G": 255,
+   "B": 255
+  },
+  "Name": "Cyan"
+ },
+ {
+  "FincaNumber": "5030",
+  "Color": {
+   "R": 0,
+   "G": 206,
+   "B": 209
+  },
+  "Name": "Dark Turquoise"
+ },
+ {
+  "FincaNumber": "5040",
+  "Color": {
+   "R": 64,
+   "G": 224,
+   "B": 208
+  },
+  "Name": "Turquoise"
+ },
+ {
+  "FincaNumber": "5050",
+  "Color": {
+   "R": 72,
+   "G": 209,
+   "B": 204
+  },
+  "Name": "Medium Turquoise"
+ },
+ {
+  "FincaNumber": "5060",
+  "Color": {
+   "R": 175,
+   "G": 238,
+   "B": 238
+  },
+  "Name": "Pale Turquoise"
+ },
+ {
+  "FincaNumber": "5070",
+  "Color": {
+   "R": 127,
+   "G": 255,
+   "B": 212
+  },
+  "Name": "Aquamarine"
+ },
+ {
+  "FincaNumber": "5080",
+  "Color": {
+   "R": 102,
+   "G": 205,
+   "B": 170
+  },
+  "Name": "Medium Aquamarine"
+ },
+ {
+  "FincaNumber": "6000",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 128
+  },
+  "Name": "Navy"
+ },
+ {
+  "FincaNumber": "6010",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 139
+  },
+  "Name": "Dark Blue"
+ },
+ {
+  "FincaNumber": "6020",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 205
+  },
+  "Name": "Medium Blue"
+ },
+ {
+  "FincaNumber": "6030",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 255
+  },
+  "Name": "Blue"
+ },
+ {
+  "FincaNumber": "6040",
+  "Color": {
+   "R": 65,
+   "G": 105,
+   "B": 225
+  },
+  "Name": "Royal Blue"
+ },
+ {
+  "FincaNumber": "6050",
+  "Color": {
+   "R": 100,
+   "G": 149,
+   "B": 237
+  },
+  "Name": "Cornflower Blue"
+ },
+ {
+  "FincaNumber": "6060",
+  "Color": {
+   "R": 70,
+   "G": 130,
+   "B": 180
+  },
+  "Name": "Steel Blue"
+ },
+ {
+  "FincaNumber": "6070",
+  "Color": {
+   "R": 30,
+   "G": 144,
+   "B": 255
+  },
+  "Name": "Dodger Blue"
+ },
+ {
+  "FincaNumber": "6080",
+  "Color": {
+   "R": 0,
+   "G": 191,
+   "B": 255
+  },
+  "Name": "Deep Sky Blue"
+ },
+ {
+  "FincaNumber": "6090",
+  "Color": {
+   "R": 135,
+   "G": 206,
+   "B": 235
+  },
+  "Name": "Sky Blue"
+ },
+ {
+  "FincaNumber": "6100",
+  "Color": {
+   "R": 135,
+   "G": 206,
+   "B": 250
+  },
+  "Name": "Light Sky Blue"
+ },
+ {
+  "FincaNumber": "6110",
+  "Color": {
+   "R": 173,
+   "G": 216,
+   "B": 230
+  },
+  "Name": "Light Blue"
+ },
+ {
+  "FincaNumber": "6120",
+  "Color": {
+   "R": 176,
+   "G": 224,
+   "B": 230
+  },
+  "Name": "Powder Blue"
+ },
+ {
+  "FincaNumber": "7000",
+  "Color": {
+   "R": 128,
+   "G": 0,
+   "B": 128
+  },
+  "Name": "Purple"
+ },
+ {
+  "FincaNumber": "7010",
+  "Color": {
+   "R": 75,
+   "G": 0,
+   "B": 130
+  },
+  "Name": "Indigo"
+ },
+ {
+  "FincaNumber": "7020",
+  "Color": {
+   "R": 138,
+   "G": 43,
+   "B": 226
+  },
+  "Name": "Blue Violet"
+ },
+ {
+  "FincaNumber": "7030",
+  "Color": {
+   "R": 148,
+   "G": 0,
+   "B": 211
+  },
+  "Name": "Dark Violet"
+ },
+ {
+  "FincaNumber": "7040",
+  "Color": {
+   "R": 153,
+   "G": 50,
+   "B": 204
+  },
+  "Name": "Dark Orchid"
+ },
+ {
+  "FincaNumber": "7050",
+  "Color": {
+   "R": 186,
+   "G": 85,
+   "B": 211
+  },
+  "Name": "Medium Orchid"
+ },
+ {
+  "FincaNumber": "7060",
+  "Color": {
+   "R": 218,
+   "G": 112,
+   "B": 214
+  },
+  "Name": "Orchid"
+ },
+ {
+  "FincaNumber": "7070",
+  "Color": {
+   "R": 238,
+   "G": 130,
+   "B": 238
+  },
+  "Name": "Violet"
+ },
+ {
+  "FincaNumber": "7080",
+  "Color": {
+   "R": 221,
+   "G": 160,
+   "B": 221
+  },
+  "Name": "Plum"
+ },
+ {
+  "FincaNumber": "7090",
+  "Color": {
+   "R": 216,
+   "G": 191,
+   "B": 216
+  },
+  "Name": "Thistle"
+ },
+ {
+  "FincaNumber": "7100",
+  "Color": {
+   "R": 230,
+   "G": 230,
+   "B": 250
+  },
+  "Name": "Lavender"
+ },
+ {
+  "FincaNumber": "7110",
+  "Color": {
+   "R": 147,
+   "G": 112,
+   "B": 219
+  },
+  "Name": "Medium Purple"
+ },
+ {
+  "FincaNumber": "8000",
+  "Color": {
+   "R": 139,
+   "G": 69,
+   "B": 19
+  },
+  "Name": "Saddle Brown"
+ },
+ {
+  "FincaNumber": "8010",
+  "Color": {
+   "R": 101,
+   "G": 67,
+   "B": 33
+  },
+  "Name": "Dark Brown"
+ },
+ {
+  "FincaNumber": "8020",
+  "Color": {
+   "R": 150,
+   "G": 105,
+   "B": 60
+  },
+  "Name": "Medium Brown"
+ },
+ {
+  "FincaNumber": "8030",
+  "Color": {
+   "R": 193,
+   "G": 154,
+   "B": 107
+  },
+  "Name": "Khaki Brown"
+ },
+ {
+  "FincaNumber": "8040",
+  "Color": {
+   "R": 210,
+   "G": 180,
+   "B": 140
+  },
+  "Name": "Tan"
+ },
+ {
+  "FincaNumber": "8050",
+  "Color": {
+   "R": 245,
+   "G": 222,
+   "B": 179
+  },
+  "Name": "Wheat"
+ },
+ {
+  "FincaNumber": "8060",
+  "Color": {
+   "R": 222,
+   "G": 184,
+   "B": 135
+  },
+  "Name": "Burlywood"
+ },
+ {
+  "FincaNumber": "8070",
+  "Color": {
+   "R": 205,
+   "G": 133,
+   "B": 63
+  },
+  "Name": "Peru"
+ },
+ {
+  "FincaNumber": "8080",
+  "Color": {
+   "R": 160,
+   "G": 82,
+   "B": 45
+  },
+  "Name": "Sienna"
+ },
+ {
+  "FincaNumber": "8090",
+  "Color": {
+   "R": 165,
+   "G": 42,
+   "B": 42
+  },
+  "Name": "Brown"
+ },
+ {
+  "FincaNumber": "8100",
+  "Color": {
+   "R": 244,
+   "G": 164,
+   "B": 96
+  },
+  "Name": "Sandy Brown"
+ },
+ {
+  "FincaNumber": "8110",
+  "Color": {
+   "R": 188,
+   "G": 143,
+   "B": 143
+  },
+  "Name": "Rosy Brown"
+ },
+ {
+  "FincaNumber": "9000",
+  "Color": {
+   "R": 212,
+   "G": 175,
+   "B": 55
+  },
+  "Name": "Metallic Gold"
+ },
+ {
+  "FincaNumber": "9001",
+  "Color": {
+   "R": 192,
+   "G": 192,
+   "B": 192
+  },
+  "Name": "Metallic Silver"
+ },
+ {
+  "FincaNumber": "9002",
+  "Color": {
+   "R": 184,
+   "G": 115,
+   "B": 51
+  },
+  "Name": "Metallic Copper"
+ },
+ {
+  "FincaNumber": "9003",
+  "Color": {
+   "R": 205,
+   "G": 127,
+   "B": 50
+  },
+  "Name": "Metallic Bronze"
+ }
+]

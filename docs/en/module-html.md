@@ -211,7 +211,7 @@ After `HTTP_RESULT`, `HTTP_STATUS()` and `HTTP_HEADER()` are ready exactly as af
 - **Several requests really run at the same time.** Two requests of 300 ms each are done after ~300 ms, not after 600.
 - **Numbers stay stable** (tombstones as with `timer`): a collected or cancelled number is not handed out again. So a program cannot accidentally refer an old number to someone else's request.
 - **Cancelling does not stop the request in mid-network** — it runs to the end, and its result is discarded. The program does not wait for anything.
-- **GET only.** That is enough for fetching data, and every further form doubles the states a program has to keep track of. For POST/download in a loop: a rare call at a place where a short standstill does not matter.
+- **Any method.** `HTTP_GET_START` is the short form for GET; `HTTP_REQUEST_START` takes any method together with body and headers (see the table). There is no `HTTP_DOWNLOAD` in the background -- for that use `HTTP_GET_START` and, after `HTTP_RESULT`, save the raw body from `HTTP_BYTES()` with `WRITEALL_BYTES`.
 
 ## URL helpers
 
@@ -226,7 +226,7 @@ url = "https://api.example.com/search?q=" + q
 
 ## HTML parser
 
-`HTML_TEXT` strips all tags and decodes HTML entities (`&amp;` → `&`, `&lt;` → `<`, …). Block-level tags (`<p>`, `<div>`, `<li>`, …) produce a newline. `<script>` and `<style>` are skipped entirely.
+`HTML_TEXT` strips all tags and decodes HTML entities (`&amp;` → `&`, `&lt;` → `<`, …). Block-level tags (`<p>`, `<div>`, `<li>`, …) produce a newline. `<script>` and `<style>` are skipped entirely. As in a browser, a tag only starts when `<` is followed by a letter, `/` with a letter, `!` or `?` -- `a < b` stays text.
 
 ```basic
 DIM html AS STRING

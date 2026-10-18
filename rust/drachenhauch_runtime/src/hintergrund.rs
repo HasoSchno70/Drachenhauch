@@ -139,11 +139,27 @@ pub struct TaskErgebnis {
 /// Laeuft ohne VM, also auf einem Auftrags-Thread wie `shell_arbeit`.
 pub fn task_arbeit(exe: std::path::PathBuf, datei: String, funktion: String,
                    args: Vec<String>) -> Result<TaskErgebnis, String> {
+    // Die Argumente gehen ueber die STANDARDEINGABE, nicht ueber die
+    // Befehlszeile: die ist unter Windows auf ~32 000 Zeichen begrenzt, und ein
+    // Feed oder ein JSON-Dokument als Argument scheiterte mit "Der Dateiname
+    // oder die Erweiterung ist zu lang" (bis 2026.27, gefunden beim
+    // Feed-Leser). Geschrieben wird in einem eigenen Faden -- gibt der Auftrag
+    // schon aus, bevor alles gelesen ist, haengt sonst keiner fest.
+    use std::io::Write;
+    use std::process::Stdio;
     let mut cmd = std::process::Command::new(&exe);
-    cmd.arg("call").arg(&datei).arg(&funktion);
-    for a in &args { cmd.arg(a); }
-    let out = cmd.output().map_err(|e| format!(
+    cmd.arg("call").arg(&datei).arg(&funktion).arg("--args-stdin")
+        .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut kind = cmd.spawn().map_err(|e| format!(
         "TASK_START: '{}' laesst sich nicht starten: {}", exe.display(), e))?;
+    let daten = serde_json::to_string(&args).unwrap_or_else(|_| "[]".into());
+    let mut eingabe = kind.stdin.take();
+    let schreiber = std::thread::spawn(move || {
+        if let Some(mut e) = eingabe.take() { let _ = e.write_all(daten.as_bytes()); }
+    });
+    let out = kind.wait_with_output().map_err(|e| format!(
+        "TASK_START: Auftrag nicht abzuwarten: {}", e))?;
+    let _ = schreiber.join();
 
     let roh = String::from_utf8_lossy(&out.stdout);
     // `dhrt call` antwortet mit genau einer JSON-Zeile -- auch im Fehlerfall.

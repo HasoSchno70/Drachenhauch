@@ -322,3 +322,23 @@ END TRY
 --- fehler
 ungefangen
 
+=== catch im hauptprogramm mit einem dim desselben namens weiter unten
+' Ein DIM gibt dem Namen einen globalen Platz. Bis 2026-10-17 schrieb der
+' CATCH in diesen Platz, bevor das DIM ihn einhaengte, und das Programm brach
+' mit "globale Variable noch nicht gesetzt" ab -- in der Zeile des THROW.
+TRY
+    THROW "kaputt"
+CATCH e
+    PRINT "gefangen: " + e
+END TRY
+DIM e AS STRING : e = "danach"
+PRINT e
+TRY
+    THROW "nochmal"
+CATCH e
+    PRINT "wieder: " + e
+END TRY
+--- erwartet
+gefangen: kaputt
+danach
+wieder: nochmal

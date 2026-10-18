@@ -1,0 +1,331 @@
+' Was alle Exporte gemeinsam rechnen (PySticky io/export_common.py,
+' io/export_cache.py und die Statistik aus io/pdf_export.py): je Zelle der
+' oberste sichtbare Stich, der Bedarf je Farbe, die Aufteilung auf Seiten,
+' Farben und Rueckstiche je Seite, Entsprechungen bei anderen Herstellern.
+
+' Stiche je Strang nach Stoff (core/constants.py STITCHES_PER_SKEIN)
+FUNCTION stichJeStrang(stoff AS INTEGER) AS INTEGER
+    SELECT CASE stoff
+        CASE 11 : RETURN 780
+        CASE 14 : RETURN 500
+        CASE 16 : RETURN 380
+        CASE 18 : RETURN 300
+        CASE 28 : RETURN 190
+        CASE 32 : RETURN 145
+    END SELECT
+    RETURN 500
+END FUNCTION
+
+' Drill-Kante in mm (10 = 2,5 mm eckig, 9 = 2,8 mm rund, 8 = 3,0 mm rund)
+FUNCTION drillMm(stoff AS INTEGER) AS FLOAT
+    SELECT CASE stoff
+        CASE 9 : RETURN 2.8
+        CASE 8 : RETURN 3.0
+    END SELECT
+    RETURN 2.5
+END FUNCTION
+
+FUNCTION stoffName$(m AS Muster) AS STRING
+    IF m.modus = "diamond" THEN
+        SELECT CASE INT(m.stoff)
+            CASE 10 : RETURN "2.5 mm Square"
+            CASE 9 : RETURN "2.8 mm Round"
+            CASE 8 : RETURN "3.0 mm Round"
+        END SELECT
+        RETURN STR$(INT(m.stoff)) + " (Drill-Pitch)"
+    END IF
+    RETURN trf$("Aida {0}", [STR$(INT(m.stoff))])
+END FUNCTION
+
+' Die Begriffe je Modus (export_common _MODE_TERMS).
+FUNCTION begriff$(m AS Muster, schluessel AS STRING) AS STRING
+    DIM dp AS BOOLEAN : dp = m.modus = "diamond"
+    SELECT CASE schluessel
+        CASE "einheit" : RETURN IIF(dp, tr$("Drills"), tr$("Stiche"))
+        CASE "einheit1" : RETURN IIF(dp, tr$("Drill"), tr$("Stich"))
+        CASE "zeit" : RETURN IIF(dp, tr$("Klebezeit"), tr$("Stickzeit"))
+        CASE "bedarf" : RETURN IIF(dp, tr$("Drill-Bedarf"), tr$("Garnbedarf"))
+        CASE "bedarfseinheit" : RETURN IIF(dp, tr$("Drills"), tr$("Stränge"))
+        CASE "bedarfkurz" : RETURN IIF(dp, tr$("Dr."), tr$("Str."))
+        CASE "stoff" : RETURN IIF(dp, tr$("Drill-Raster"), tr$("Stoffempfehlung"))
+        CASE "legende" : RETURN IIF(dp, tr$("Drill-Legende"), tr$("Garn-Legende"))
+        CASE "nummer" : RETURN IIF(dp, tr$("Drill-Code"), tr$("Garnnummer"))
+        CASE "vorschau" : RETURN IIF(dp, tr$("Vorschau der fertigen Vorlage"), tr$("Vorschau des fertigen Musters"))
+        CASE "titelzusatz" : RETURN IIF(dp, tr$("Diamond-Painting-Vorlage"), tr$("Kreuzstich-Muster"))
+        CASE "untertitel" : RETURN IIF(dp, tr$("Diamond-Painting-Anleitung"), tr$("Kreuzstich-Anleitung"))
+    END SELECT
+    THROW trf$("begriff$: unbekannter Schluessel {0}", [schluessel])
+END FUNCTION
+
+' --- Komposit: je Zelle der oberste sichtbare Stich ------------------------------------
+
+CLASS Komposit
+    DIM breite AS INTEGER
+    DIM hoehe AS INTEGER
+    DIM farbe AS ARRAY OF INTEGER        ' -1 = leer
+    DIM art AS ARRAY OF INTEGER
+
+    FUNCTION farbeBei(x AS INTEGER, y AS INTEGER) AS INTEGER
+        IF x < 0 OR y < 0 OR x >= breite OR y >= hoehe THEN RETURN -1
+        RETURN farbe[y * breite + x]
+    END FUNCTION
+
+    FUNCTION artBei(x AS INTEGER, y AS INTEGER) AS INTEGER
+        IF farbeBei(x, y) < 0 THEN RETURN 0
+        RETURN art[y * breite + x]
+    END FUNCTION
+END CLASS
+
+FUNCTION kompositVon(m AS Muster) AS Komposit
+    DIM k AS Komposit : k = NEW Komposit()
+    k.breite = m.breite : k.hoehe = m.hoehe
+    DIM n AS INTEGER : n = m.breite * m.hoehe
+    DIM f[n] AS INTEGER
+    DIM a[n] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        f[i] = -1
+    NEXT
+    ' von oben nach unten, die erste sichtbare Ebene mit Stich gewinnt
+    DIM e AS INTEGER
+    FOR e = m.ebenen.anzahl() - 1 TO 0 STEP -1
+        DIM eb AS Ebene : eb = m.ebenen.ebenen[e]
+        IF NOT eb.sichtbar THEN CONTINUE
+        kompositEbene(f, a, eb.raster, eb.art, n)
+    NEXT
+    k.farbe = f : k.art = a
+    RETURN k
+END FUNCTION
+
+SUB kompositEbene(f AS ARRAY OF INTEGER, a AS ARRAY OF INTEGER, r AS ARRAY OF INTEGER, ra AS ARRAY OF INTEGER, n AS INTEGER)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        IF f[i] = -1 AND r[i] <> -1 THEN
+            f[i] = r[i]
+            a[i] = ra[i]
+        END IF
+    NEXT
+END SUB
+
+' --- Bedarf je Farbe -------------------------------------------------------------------
+
+CLASS Farbbedarf
+    DIM nr AS INTEGER            ' Farbnummer im Muster
+    DIM zahl AS INTEGER          ' sichtbare Stiche
+    DIM straenge AS INTEGER      ' Straenge, im Diamond-Modus Drills mit 10 % Reserve
+    DIM auslassen AS BOOLEAN
+    DIM perle AS BOOLEAN
+END CLASS
+
+CLASS Bedarf
+    DIM farben AS ARRAY OF Farbbedarf
+    DIM stiche AS INTEGER        ' alle sichtbaren ausser Perlen
+    DIM straenge AS INTEGER
+    DIM zuSticken AS INTEGER     ' ohne ausgelassene Farben
+    DIM ausgelassen AS INTEGER   ' ausgelassene Farben, die vorkommen
+END CLASS
+
+FUNCTION bedarfVon(m AS Muster, k AS Komposit) AS Bedarf
+    DIM zahl[MAX(1, LEN(m.farben))] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(k.farbe) - 1
+        IF k.farbe[i] >= 0 AND k.farbe[i] < LEN(m.farben) THEN zahl[k.farbe[i]] = zahl[k.farbe[i]] + 1
+    NEXT
+    DIM b AS Bedarf : b = NEW Bedarf()
+    b.farben = []
+    DIM sps AS INTEGER : sps = stichJeStrang(INT(m.stoff))
+    DIM dp AS BOOLEAN : dp = m.modus = "diamond"
+    FOR i = 0 TO LEN(m.farben) - 1
+        DIM fb AS Farbbedarf : fb = NEW Farbbedarf()
+        fb.nr = i
+        fb.zahl = zahl[i]
+        fb.auslassen = m.farben[i].auslassen
+        fb.perle = m.farben[i].istPerle
+        ARRAY_PUSH(b.farben, fb)
+        IF fb.perle THEN CONTINUE
+        IF fb.auslassen THEN
+            IF fb.zahl > 0 THEN b.ausgelassen = b.ausgelassen + 1
+        ELSEIF dp THEN
+            IF fb.zahl > 0 THEN fb.straenge = INT(fb.zahl * 1.10)
+            b.zuSticken = b.zuSticken + fb.zahl
+        ELSE
+            IF fb.zahl > 0 THEN
+                fb.straenge = (fb.zahl + sps - 1) \ sps
+                IF fb.zahl > 1000 THEN fb.straenge = fb.straenge + 1
+            END IF
+            b.zuSticken = b.zuSticken + fb.zahl
+        END IF
+        b.stiche = b.stiche + fb.zahl
+        b.straenge = b.straenge + fb.straenge
+    NEXT
+    RETURN b
+END FUNCTION
+
+' Fertige Groesse in cm (Stiche je Zoll -> je cm).
+FUNCTION breiteCm(m AS Muster) AS FLOAT
+    IF m.modus = "diamond" THEN RETURN m.breite * drillMm(INT(m.stoff)) / 10
+    RETURN m.breite / (m.stoff / 2.54)
+END FUNCTION
+
+FUNCTION hoeheCm(m AS Muster) AS FLOAT
+    IF m.modus = "diamond" THEN RETURN m.hoehe * drillMm(INT(m.stoff)) / 10
+    RETURN m.hoehe / (m.stoff / 2.54)
+END FUNCTION
+
+' --- Seiten ------------------------------------------------------------------------------
+
+' Ein Papierformat: Masse in mm, Rand, Stiche je Seite (im Kreuzstich-Modus).
+CLASS Papier
+    DIM name AS STRING
+    DIM breite AS FLOAT
+    DIM hoehe AS FLOAT
+    DIM rand AS FLOAT
+    DIM stiche AS INTEGER
+END CLASS
+
+FUNCTION papierFuer(name AS STRING) AS Papier
+    DIM p AS Papier : p = NEW Papier()
+    p.name = name
+    SELECT CASE UPPER$(name)
+        CASE "A3" : p.breite = 297 : p.hoehe = 420 : p.rand = 15 : p.stiche = 60
+        CASE "A2" : p.breite = 420 : p.hoehe = 594 : p.rand = 20 : p.stiche = 90
+        CASE "A1" : p.breite = 594 : p.hoehe = 841 : p.rand = 20 : p.stiche = 130
+        CASE "A0" : p.breite = 841 : p.hoehe = 1189 : p.rand = 25 : p.stiche = 190
+        CASE "LETTER" : p.breite = 215.9 : p.hoehe = 279.4 : p.rand = 15 : p.stiche = 40 : p.name = "Letter"
+        CASE ELSE : p.breite = 210 : p.hoehe = 297 : p.rand = 15 : p.stiche = 40 : p.name = "A4"
+    END SELECT
+    RETURN p
+END FUNCTION
+
+FUNCTION papierNamen() AS ARRAY OF STRING
+    RETURN ["A4", "A3", "A2", "A1", "A0", "Letter"]
+END FUNCTION
+
+' Wie ein Muster auf Seiten verteilt wird.
+CLASS Seitenplan
+    DIM papier AS Papier
+    DIM jeX AS INTEGER           ' Stiche je Seite waagerecht
+    DIM jeY AS INTEGER
+    DIM seitenX AS INTEGER
+    DIM seitenY AS INTEGER
+    DIM ueberlappung AS INTEGER
+    DIM zelleMm AS FLOAT         ' nur Diamond: Drill-Kante (Massstab 1:1)
+
+    FUNCTION anzahl() AS INTEGER
+        RETURN seitenX * seitenY
+    END FUNCTION
+END CLASS
+
+' Wie PDFExporter: im Diamond-Modus passt die Seite so viele Drills, wie bei
+' 1:1 auf die Flaeche gehen (12 mm links und 50 mm oben/unten Reserve), sonst
+' die Vorgabe des Formats oder `zellenJeSeite`.
+FUNCTION seitenplanFuer(m AS Muster, papierName AS STRING, zellenJeSeite AS INTEGER, ueberlappung AS INTEGER) AS Seitenplan
+    DIM s AS Seitenplan : s = NEW Seitenplan()
+    s.papier = papierFuer(papierName)
+    s.ueberlappung = MAX(0, ueberlappung)
+    IF m.modus = "diamond" THEN
+        DIM pitch AS FLOAT : pitch = drillMm(INT(m.stoff))
+        s.zelleMm = pitch
+        ' in Punkten wie reportlab (mm = 72 / 25.4), sonst rundet die Teilung anders
+        DIM pt AS FLOAT : pt = 72 / 25.4
+        DIM verfB AS FLOAT : verfB = s.papier.breite * pt - 2 * s.papier.rand * pt
+        DIM verfH AS FLOAT : verfH = s.papier.hoehe * pt - 2 * s.papier.rand * pt
+        s.jeX = MAX(1, INT((verfB - 12 * pt) / (pitch * pt)))
+        s.jeY = MAX(1, INT((verfH - 50 * pt) / (pitch * pt)))
+    ELSE
+        s.jeX = IIF(zellenJeSeite > 0, zellenJeSeite, s.papier.stiche)
+        s.jeY = s.jeX
+    END IF
+    s.seitenX = MAX(1, (m.breite + s.jeX - 1) \ s.jeX)
+    s.seitenY = MAX(1, (m.hoehe + s.jeY - 1) \ s.jeY)
+    RETURN s
+END FUNCTION
+
+' Der Ausschnitt einer Seite (ab 0): (x0, y0, x1, y1), einschliesslich, mit
+' Ueberlappung nach rechts und unten.
+FUNCTION seitenBereich(m AS Muster, s AS Seitenplan, seite AS INTEGER) AS TUPLE
+    DIM px AS INTEGER : px = seite MOD s.seitenX
+    DIM py AS INTEGER : py = seite \ s.seitenX
+    DIM x0 AS INTEGER : x0 = px * s.jeX
+    DIM y0 AS INTEGER : y0 = py * s.jeY
+    RETURN (x0, y0, MIN(x0 + s.jeX - 1 + s.ueberlappung, m.breite - 1), MIN(y0 + s.jeY - 1 + s.ueberlappung, m.hoehe - 1))
+END FUNCTION
+
+' Die Nachbarseiten (fuer "← S. 2" usw.), ab 1; 0 = keine.
+FUNCTION nachbarn(s AS Seitenplan, seite AS INTEGER) AS ARRAY OF INTEGER
+    DIM px AS INTEGER : px = seite MOD s.seitenX
+    DIM py AS INTEGER : py = seite \ s.seitenX
+    RETURN [IIF(px > 0, seite, 0), IIF(px < s.seitenX - 1, seite + 2, 0), IIF(py > 0, seite + 1 - s.seitenX, 0), IIF(py < s.seitenY - 1, seite + 1 + s.seitenX, 0)]
+END FUNCTION
+
+' Stiche je Farbe in einem Ausschnitt (einschliesslich).
+FUNCTION seitenFarben(k AS Komposit, farbzahl AS INTEGER, x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER) AS ARRAY OF INTEGER
+    DIM z[MAX(1, farbzahl)] AS INTEGER
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = MAX(0, y0) TO MIN(k.hoehe - 1, y1)
+        FOR x = MAX(0, x0) TO MIN(k.breite - 1, x1)
+            DIM f AS INTEGER : f = k.farbe[y * k.breite + x]
+            IF f >= 0 AND f < farbzahl THEN z[f] = z[f] + 1
+        NEXT
+    NEXT
+    RETURN z
+END FUNCTION
+
+' Rueckstiche mit wenigstens einem Ende im Ausschnitt (Zellen, einschliesslich).
+FUNCTION seitenRueckstiche(m AS Muster, x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER) AS ARRAY OF Rueckstich
+    DIM erg AS ARRAY OF Rueckstich : erg = []
+    DIM r AS Rueckstich
+    FOR EACH r IN m.rueckstiche
+        DIM ax AS INTEGER : ax = MIN(r.x1 \ 2, m.breite - 1)
+        DIM ay AS INTEGER : ay = MIN(r.y1 \ 2, m.hoehe - 1)
+        DIM bx AS INTEGER : bx = MIN(r.x2 \ 2, m.breite - 1)
+        DIM by AS INTEGER : by = MIN(r.y2 \ 2, m.hoehe - 1)
+        IF (ax >= x0 AND ax <= x1 AND ay >= y0 AND ay <= y1) OR (bx >= x0 AND bx <= x1 AND by >= y0 AND by <= y1) THEN ARRAY_PUSH(erg, r)
+    NEXT
+    RETURN erg
+END FUNCTION
+
+' Das kleinste Papier, auf das ein Diamond-Muster 1:1 in hoechstens
+' `hoechstens` Seiten passt (recommend_paper_format_for_dp).
+FUNCTION papierEmpfehlung$(m AS Muster, hoechstens AS INTEGER) AS STRING
+    IF m.modus <> "diamond" THEN RETURN "A4"
+    DIM pitch AS FLOAT : pitch = drillMm(INT(m.stoff))
+    DIM namen AS ARRAY OF STRING : namen = ["A4", "A3", "A2", "A1", "A0"]
+    DIM nb AS ARRAY OF FLOAT : nb = [180.0, 267.0, 380.0, 544.0, 781.0]
+    DIM nh AS ARRAY OF FLOAT : nh = [247.0, 354.0, 504.0, 691.0, 989.0]
+    DIM i AS INTEGER
+    FOR i = 0 TO 4
+        DIM sx AS INTEGER : sx = CEIL(m.breite * pitch / nb[i])
+        DIM sy AS INTEGER : sy = CEIL(m.hoehe * pitch / nh[i])
+        IF sx * sy <= hoechstens THEN RETURN namen[i]
+    NEXT
+    RETURN "A0"
+END FUNCTION
+
+' Das naechste Garn einer anderen Palette (thread_cross_ref.find_equivalent):
+' stammt es schon von dort, bleibt es; sonst CIEDE2000.
+FUNCTION entsprechung(g AS Garn, pal AS Palette, gf AS Garnfarben) AS Garn
+    IF LOWER$(g.hersteller) = LOWER$(pal.name) AND g.hersteller <> "" THEN RETURN g
+    IF LEN(pal.garne) = 0 THEN RETURN NIL
+    DIM ll[1] AS FLOAT
+    DIM la[1] AS FLOAT
+    DIM lb[1] AS FLOAT
+    labEintragen(rotAnteil(g.farbe), gruenAnteil(g.farbe), blauAnteil(g.farbe), ll, la, lb, 0)
+    RETURN pal.garne[naechstesGarn(ll[0], la[0], lb[0], gf.l, gf.a, gf.b)]
+END FUNCTION
+
+' Text fuer Dateinamen und Kennungen: nur Buchstaben, Ziffern, _ und -.
+FUNCTION sichererName$(t AS STRING) AS STRING
+    DIM e AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        DIM c AS STRING : c = MID$(t, i, 1)
+        IF (c >= "a" AND c <= "z") OR (c >= "A" AND c <= "Z") OR (c >= "0" AND c <= "9") OR c = "_" OR c = "-" THEN
+            e = e + c
+        ELSEIF c = " " OR c = "." THEN
+            e = e + "_"
+        END IF
+    NEXT
+    IF e = "" THEN e = "muster"
+    RETURN e
+END FUNCTION

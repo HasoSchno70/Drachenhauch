@@ -436,8 +436,10 @@ TRUE TRUE
 
 === ein fehler im rueckruf kommt beim aufruf an
 ' Der Fehler darf nicht durch die Rahmen der C-Bibliothek laufen: er wird
-' gemerkt, jeder weitere Rueckruf liefert 0, und qsort meldet ihn, sobald es
-' zurueckkehrt -- abfangbar mit CATCH. Danach geht alles weiter.
+' gemerkt, der Rueckruf liefert 0, und qsort meldet ihn, sobald es
+' zurueckkehrt -- abfangbar mit CATCH. Danach geht alles weiter. Weitere
+' Rueckrufe laufen trotzdem (seit 2026-10-14, wie bei Pythons ctypes; vorher
+' lieferten sie stumm 0 -- in einer Hauptschleife hing dann jeder Knopf).
 DECLARE SUB qsort LIB "c" (feld AS BUFFER, n AS ZEIGER, groesse AS ZEIGER, _
                            vergleich AS FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG)
 DIM runden AS INTEGER
@@ -458,7 +460,7 @@ TRY
 CATCH e
     PRINT e
 END TRY
-PRINT "runden "; runden
+PRINT "weitere rueckrufe liefen: "; runden > 1
 TRY
     qsort(b, 10, 4, falsch)
 CATCH e
@@ -478,11 +480,86 @@ qsort(b, 10, 4, FUNCTION(a, b) 0)
 PRINT "weiter"
 --- erwartet
 qsort: Fehler im Rueckruf kaputt: Integer-Division durch 0
-runden 1
+weitere rueckrufe liefen: TRUE
 qsort: der Rueckruf falsch soll LONG liefern: erwartet eine ganze Zahl (LONG), erhalten BOOLEAN
 qsort: Argument 4 (vergleich AS FUNCTION): die Funktion einer nimmt 1 Wert(e), der Rueckruf uebergibt 2
 qsort: Argument 4 (vergleich AS FUNCTION): erwartet eine Funktion (FUNCREF, z.B. den Namen einer FUNCTION ohne Klammern), erhalten INTEGER
 weiter
+
+=== ein fehler in einer langen bibliotheksfunktion steht nach einer sekunde da
+DECLARE SUB qsort LIB "c" (feld AS BUFFER, n AS ZEIGER, groesse AS ZEIGER, vergleich AS FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG)
+DIM runden AS INTEGER
+DIM start AS INTEGER
+FUNCTION langsam(a AS INTEGER, b AS INTEGER) AS INTEGER
+    runden = runden + 1
+    IF runden = 1 THEN RETURN 1 \ 0
+    IF MILLIS() - start < 1500 THEN
+        SLEEP(100)
+        RETURN 0
+    END IF
+    IF runden < 1000 THEN
+        runden = 1000
+        THROW "zweiter fehler"
+    END IF
+    RETURN 0
+END FUNCTION
+' Kehrt eine Bibliothek nicht bald zurueck (gtk_main, eine Nachrichten-
+' schleife), sah man den Fehler vorher nie -- jetzt meldet ihn ein Waechter
+' nach einer Sekunde, und jeden weiteren sofort. Abgefangen wird weiter der
+' erste, sobald qsort zurueckkehrt (Fotobetrachter-Runde, 2026-10-14).
+start = MILLIS()
+TRY
+    qsort(BUFFER_NEW(400), 100, 4, langsam)
+CATCH e
+    PRINT e
+    PRINT "zeile "; ERROR_LINE()
+END TRY
+PRINT "spaeter als eine sekunde: "; MILLIS() - start > 1000
+--- erwartet
+qsort: Fehler im Rueckruf langsam: Integer-Division durch 0
+zeile 6
+spaeter als eine sekunde: TRUE
+--- stderr
+qsort: Fehler im Rueckruf langsam: Integer-Division durch 0 (fall.dh:6) -- qsort ist eine Sekunde spaeter noch nicht zurueckgekehrt
+qsort: Fehler im Rueckruf langsam: zweiter fehler (fall.dh:13)
+
+=== der fehler eines rueckrufs gehoert dem aufruf, der ihn ausgeloest hat
+' Der erste Vergleich scheitert, jeder weitere ruft selbst die C-Bibliothek
+' (abs). Bis 2026-10-17 holte der naechste Aufruf, der zurueckkehrte, den
+' Fehler ab -- das abs IM naechsten Vergleich. Der warf ihn dort, der
+' Vergleich scheiterte damit selbst, und so jeder weitere: die Meldung trug
+' eine Schale "abs: Fehler im Rueckruf ..." je Vergleich, und keiner rechnete
+' mehr. In einer GTK-Hauptschleife war nach einem Fehler jedes Zeichnen kaputt.
+DECLARE SUB qsort LIB "c" (feld AS BUFFER, n AS ZEIGER, groesse AS ZEIGER, _
+                           vergleich AS FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG)
+DECLARE FUNCTION abs LIB "c" (x AS LONG) AS LONG
+DIM runden AS INTEGER
+DIM spaeter AS INTEGER
+FUNCTION erstKaputt(a AS INTEGER, b AS INTEGER) AS INTEGER
+    runden = runden + 1
+    IF runden = 1 THEN RETURN 1 \ 0
+    DIM x AS INTEGER : x = abs(BUFFER_GET_I32(BUFFER_AUS_ZEIGER(a, 4), 0))
+    DIM y AS INTEGER : y = abs(BUFFER_GET_I32(BUFFER_AUS_ZEIGER(b, 4), 0))
+    spaeter = spaeter + 1
+    RETURN SGN(x - y)
+END FUNCTION
+DIM b AS BUFFER
+b = BUFFER_NEW(40)
+DIM i AS INTEGER
+FOR i = 0 TO 9
+    BUFFER_SET_I32(b, 4 * i, 9 - i)
+NEXT
+TRY
+    qsort(b, 10, 4, erstKaputt)
+CATCH e
+    PRINT e
+END TRY
+PRINT "spaetere vergleiche liefen: "; spaeter = runden - 1; " "; spaeter > 3
+PRINT "abs danach: "; abs(-4)
+--- erwartet
+qsort: Fehler im Rueckruf erstkaputt: Integer-Division durch 0
+spaetere vergleiche liefen: TRUE TRUE
+abs danach: 4
 
 === ein rueckruf aus einem anderen faden wird nicht ausgefuehrt
 ' CreateThread ruft die Funktion auf einem neuen Faden -- die VM laeuft nur
@@ -677,6 +754,40 @@ END TRY
 --- erwartet
 3
 []
+
+=== eine ueber den vollen pfad geladene bibliothek kommt in den suchpfad
+' Laedt eine Bibliothek spaeter selbst Module nach (GdkPixbuf seine Bildlader,
+' GStreamer und Qt ihre Plugins), sucht Windows deren Abhaengigkeiten nur
+' neben dem Programm, im System und im PATH -- das SVG-Modul des GTK aus
+' Inkscape fand librsvg nicht, und GTK brach beim ersten Symbol ab
+' (Fotobetrachter-Runde, 2026-10-14). Der Ordner kommt hinten an den PATH,
+' einmal.
+CONST GTK_VOLL = "C:/Program Files/Inkscape/bin/libgtk-3-0.dll"
+DECLARE FUNCTION gtk_get_major_version LIB GTK_VOLL () AS ULONG
+FUNCTION zaehle(text AS STRING, teil AS STRING) AS INTEGER
+    DIM n AS INTEGER, p AS INTEGER : p = INSTR(text, teil)
+    WHILE p >= 0
+        n = n + 1
+        p = INSTR(text, teil, p + 1)
+    WEND
+    RETURN n
+END FUNCTION
+IF NOT FILEEXISTS(GTK_VOLL) THEN
+    PRINT "UEBERSPRINGEN: kein GTK von Inkscape"
+ELSE
+    PRINT "vorher "; zaehle(LOWER$(GETENV$("PATH")), "inkscape\bin")
+    PRINT gtk_get_major_version()
+    PRINT "nachher "; zaehle(LOWER$(GETENV$("PATH")), "inkscape\bin")
+    PRINT gtk_get_major_version()
+    PRINT "noch einmal "; zaehle(LOWER$(GETENV$("PATH")), "inkscape\bin")
+END IF
+--- system windows
+--- erwartet
+vorher 0
+3
+nachher 1
+3
+noch einmal 1
 
 === das gtk-beispiel laeuft
 ' examples/207_gtk.dh mit --probe: es traegt einen Namen ein, drueckt zweimal

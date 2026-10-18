@@ -1,0 +1,796 @@
+' Fotos -- ein Fotobetrachter mit GTK 3 als Oberflaeche
+'
+'     dhrt run main.dh                 (Bilder-Ordner des Benutzers)
+'     dhrt run main.dh -- C:/Fotos     (dieser Ordner)
+'
+' Die Oberflaeche ist GTK 3, angesprochen ueber DECLARE ... LIB (docs/ffi.md),
+' gestaltet mit einem eigenen Stylesheet (GtkCssProvider): dunkle Flaeche,
+' Karten mit runden Ecken, Akzentfarbe fuer die Auswahl. Die Bilder laedt
+' GdkPixbuf -- JPEG, PNG, GIF, BMP, TIFF, WebP und was das GTK sonst mitbringt
+' --, verkleinert schon beim Laden und nach der Drehung aus den Kameradaten.
+'
+' Bedienung: Doppelklick oder Enter oeffnet ein Bild, Pfeile blaettern,
+' Esc zurueck zur Uebersicht, R/L drehen, 1 = Originalgroesse, Leertaste =
+' Diaschau, F11 = Vollbild.
+'
+' GTK muss da sein: unter Linux fast immer (Paket libgtk-3-0), unter macOS ueber
+' Homebrew (brew install gtk+3), unter Windows aus MSYS2 im PATH -- oder aus
+' Inkscape, das es mitbringt. Mit --probe fuehrt sich das Programm selbst vor
+' und endet (fuer Pruefungen).
+
+IMPORT "zeit"
+
+' --- Bibliotheken (je System ein Name, durch | getrennt; der erste, der laedt, gilt)
+CONST GTK = "libgtk-3-0.dll|C:/Program Files/Inkscape/bin/libgtk-3-0.dll|libgtk-3.so.0|libgtk-3.0.dylib|/opt/homebrew/lib/libgtk-3.0.dylib"
+CONST GDK = "libgdk-3-0.dll|C:/Program Files/Inkscape/bin/libgdk-3-0.dll|libgdk-3.so.0|libgdk-3.0.dylib|/opt/homebrew/lib/libgdk-3.0.dylib"
+CONST PIX = "libgdk_pixbuf-2.0-0.dll|C:/Program Files/Inkscape/bin/libgdk_pixbuf-2.0-0.dll|libgdk_pixbuf-2.0.so.0|libgdk_pixbuf-2.0.0.dylib|/opt/homebrew/lib/libgdk_pixbuf-2.0.0.dylib"
+CONST GOBJECT = "libgobject-2.0-0.dll|C:/Program Files/Inkscape/bin/libgobject-2.0-0.dll|libgobject-2.0.so.0|libgobject-2.0.0.dylib|/opt/homebrew/lib/libgobject-2.0.0.dylib"
+CONST GLIB = "libglib-2.0-0.dll|C:/Program Files/Inkscape/bin/libglib-2.0-0.dll|libglib-2.0.so.0|libglib-2.0.0.dylib|/opt/homebrew/lib/libglib-2.0.0.dylib"
+
+' --- GTK: Fenster, Kopfleiste, Behaelter
+DECLARE FUNCTION gtk_init_check LIB GTK (argc AS ZEIGER, argv AS ZEIGER) AS BOOLEAN
+DECLARE FUNCTION gtk_window_new LIB GTK (art AS LONG) AS ZEIGER
+DECLARE SUB gtk_window_set_titlebar LIB GTK (fenster AS ZEIGER, leiste AS ZEIGER)
+DECLARE SUB gtk_window_set_default_size LIB GTK (fenster AS ZEIGER, b AS LONG, h AS LONG)
+DECLARE SUB gtk_window_fullscreen LIB GTK (fenster AS ZEIGER)
+DECLARE SUB gtk_window_unfullscreen LIB GTK (fenster AS ZEIGER)
+DECLARE FUNCTION gtk_header_bar_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_header_bar_set_title LIB GTK (leiste AS ZEIGER, titel AS TEXT)
+DECLARE SUB gtk_header_bar_set_subtitle LIB GTK (leiste AS ZEIGER, titel AS TEXT)
+DECLARE SUB gtk_header_bar_set_show_close_button LIB GTK (leiste AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_header_bar_pack_start LIB GTK (leiste AS ZEIGER, kind AS ZEIGER)
+DECLARE SUB gtk_header_bar_pack_end LIB GTK (leiste AS ZEIGER, kind AS ZEIGER)
+DECLARE FUNCTION gtk_button_new_from_icon_name LIB GTK (name AS TEXT, groesse AS LONG) AS ZEIGER
+DECLARE FUNCTION gtk_toggle_button_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_button_set_image LIB GTK (knopf AS ZEIGER, bild AS ZEIGER)
+DECLARE FUNCTION gtk_toggle_button_get_active LIB GTK (knopf AS ZEIGER) AS BOOLEAN
+DECLARE SUB gtk_toggle_button_set_active LIB GTK (knopf AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_button_clicked LIB GTK (knopf AS ZEIGER)
+DECLARE FUNCTION gtk_box_new LIB GTK (richtung AS LONG, abstand AS LONG) AS ZEIGER
+DECLARE SUB gtk_box_pack_start LIB GTK (box AS ZEIGER, kind AS ZEIGER, dehnen AS BOOLEAN, fuellen AS BOOLEAN, rand AS ULONG)
+DECLARE FUNCTION gtk_stack_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_stack_add_named LIB GTK (stapel AS ZEIGER, kind AS ZEIGER, name AS TEXT)
+DECLARE SUB gtk_stack_set_visible_child_name LIB GTK (stapel AS ZEIGER, name AS TEXT)
+DECLARE FUNCTION gtk_stack_get_visible_child_name LIB GTK (stapel AS ZEIGER) AS TEXT
+DECLARE SUB gtk_stack_set_transition_type LIB GTK (stapel AS ZEIGER, art AS LONG)
+DECLARE SUB gtk_stack_set_transition_duration LIB GTK (stapel AS ZEIGER, ms AS ULONG)
+DECLARE FUNCTION gtk_scrolled_window_new LIB GTK (h AS ZEIGER, v AS ZEIGER) AS ZEIGER
+DECLARE SUB gtk_scrolled_window_set_policy LIB GTK (sw AS ZEIGER, h AS LONG, v AS LONG)
+DECLARE FUNCTION gtk_overlay_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_overlay_add_overlay LIB GTK (overlay AS ZEIGER, kind AS ZEIGER)
+DECLARE SUB gtk_container_add LIB GTK (behaelter AS ZEIGER, kind AS ZEIGER)
+' --- Uebersicht (FlowBox) und Inhalte
+DECLARE FUNCTION gtk_flow_box_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_flow_box_set_selection_mode LIB GTK (box AS ZEIGER, art AS LONG)
+DECLARE SUB gtk_flow_box_set_homogeneous LIB GTK (box AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_flow_box_set_max_children_per_line LIB GTK (box AS ZEIGER, n AS ULONG)
+DECLARE SUB gtk_flow_box_set_column_spacing LIB GTK (box AS ZEIGER, px AS ULONG)
+DECLARE SUB gtk_flow_box_set_row_spacing LIB GTK (box AS ZEIGER, px AS ULONG)
+DECLARE SUB gtk_flow_box_insert LIB GTK (box AS ZEIGER, kind AS ZEIGER, stelle AS LONG)
+DECLARE FUNCTION gtk_flow_box_get_child_at_index LIB GTK (box AS ZEIGER, i AS LONG) AS ZEIGER
+DECLARE SUB gtk_flow_box_select_child LIB GTK (box AS ZEIGER, kind AS ZEIGER)
+DECLARE FUNCTION gtk_flow_box_child_get_index LIB GTK (kind AS ZEIGER) AS LONG
+DECLARE FUNCTION gtk_image_new LIB GTK () AS ZEIGER
+DECLARE FUNCTION gtk_image_new_from_icon_name LIB GTK (name AS TEXT, groesse AS LONG) AS ZEIGER
+DECLARE SUB gtk_image_set_from_pixbuf LIB GTK (bild AS ZEIGER, pixbuf AS ZEIGER)
+DECLARE FUNCTION gtk_label_new LIB GTK (text AS TEXT) AS ZEIGER
+DECLARE SUB gtk_label_set_text LIB GTK (label AS ZEIGER, text AS TEXT)
+DECLARE FUNCTION gtk_label_get_text LIB GTK (label AS ZEIGER) AS TEXT
+DECLARE SUB gtk_label_set_ellipsize LIB GTK (label AS ZEIGER, art AS LONG)
+DECLARE SUB gtk_label_set_max_width_chars LIB GTK (label AS ZEIGER, n AS LONG)
+' --- Widgets allgemein
+DECLARE SUB gtk_widget_set_halign LIB GTK (w AS ZEIGER, art AS LONG)
+DECLARE SUB gtk_widget_set_valign LIB GTK (w AS ZEIGER, art AS LONG)
+DECLARE SUB gtk_widget_set_size_request LIB GTK (w AS ZEIGER, b AS LONG, h AS LONG)
+DECLARE SUB gtk_widget_set_tooltip_text LIB GTK (w AS ZEIGER, text AS TEXT)
+DECLARE SUB gtk_widget_set_sensitive LIB GTK (w AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_widget_set_visible LIB GTK (w AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_widget_set_can_focus LIB GTK (w AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_widget_grab_focus LIB GTK (w AS ZEIGER)
+DECLARE FUNCTION gtk_widget_get_allocated_width LIB GTK (w AS ZEIGER) AS LONG
+DECLARE FUNCTION gtk_widget_get_allocated_height LIB GTK (w AS ZEIGER) AS LONG
+DECLARE SUB gtk_widget_show_all LIB GTK (w AS ZEIGER)
+DECLARE SUB gtk_widget_destroy LIB GTK (w AS ZEIGER)
+DECLARE FUNCTION gtk_widget_get_style_context LIB GTK (w AS ZEIGER) AS ZEIGER
+DECLARE SUB gtk_style_context_add_class LIB GTK (kontext AS ZEIGER, klasse AS TEXT)
+DECLARE FUNCTION gtk_css_provider_new LIB GTK () AS ZEIGER
+DECLARE FUNCTION gtk_css_provider_load_from_data LIB GTK (p AS ZEIGER, css AS TEXT, laenge AS INTEGER, BYREF fehler AS ZEIGER) AS BOOLEAN
+DECLARE SUB gtk_style_context_add_provider_for_screen LIB GTK (schirm AS ZEIGER, p AS ZEIGER, vorrang AS ULONG)
+DECLARE SUB gtk_main LIB GTK ()
+DECLARE SUB gtk_main_quit LIB GTK ()
+' --- Ordner waehlen: der Dialog nimmt seine Knoepfe als Paare (Text, Antwort), am Ende NIL
+DECLARE FUNCTION gtk_file_chooser_dialog_new LIB GTK (titel AS TEXT, eltern AS ZEIGER, art AS LONG, knopf AS TEXT, ...) AS ZEIGER
+DECLARE FUNCTION gtk_dialog_run LIB GTK (dialog AS ZEIGER) AS LONG
+DECLARE FUNCTION gtk_file_chooser_get_filename LIB GTK (wahl AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_file_chooser_set_current_folder LIB GTK (wahl AS ZEIGER, ordner AS TEXT) AS BOOLEAN
+' --- GDK: Bildschirm und Tasten
+DECLARE FUNCTION gdk_screen_get_default LIB GDK () AS ZEIGER
+DECLARE FUNCTION gdk_event_get_keyval LIB GDK (ereignis AS ZEIGER, BYREF taste AS ULONG) AS BOOLEAN
+' --- GdkPixbuf: Bilder laden, drehen, skalieren
+DECLARE FUNCTION gdk_pixbuf_new_from_file_at_scale LIB PIX (pfad AS TEXT, b AS LONG, h AS LONG, seiten AS BOOLEAN, BYREF fehler AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gdk_pixbuf_get_file_info LIB PIX (pfad AS TEXT, BYREF b AS LONG, BYREF h AS LONG) AS ZEIGER
+DECLARE FUNCTION gdk_pixbuf_get_width LIB PIX (p AS ZEIGER) AS LONG
+DECLARE FUNCTION gdk_pixbuf_get_height LIB PIX (p AS ZEIGER) AS LONG
+DECLARE FUNCTION gdk_pixbuf_apply_embedded_orientation LIB PIX (p AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gdk_pixbuf_rotate_simple LIB PIX (p AS ZEIGER, winkel AS LONG) AS ZEIGER
+DECLARE FUNCTION gdk_pixbuf_scale_simple LIB PIX (p AS ZEIGER, b AS LONG, h AS LONG, art AS LONG) AS ZEIGER
+' --- GObject/GLib: Signale, Zeitgeber, Speicher
+' g_signal_connect ist in C ein Makro um g_signal_connect_data. Ein Rueckruf
+' hat je Signal eine andere Form -- darum je Form ein eigener Name.
+DECLARE FUNCTION signal LIB GOBJECT ALIAS "g_signal_connect_data" _
+    (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, daten AS ZEIGER), _
+     daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
+DECLARE FUNCTION signal2 LIB GOBJECT ALIAS "g_signal_connect_data" _
+    (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, arg AS ZEIGER, daten AS ZEIGER), _
+     daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
+DECLARE FUNCTION signal_taste LIB GOBJECT ALIAS "g_signal_connect_data" _
+    (objekt AS ZEIGER, name AS TEXT, rueckruf AS FUNCTION(objekt AS ZEIGER, ereignis AS ZEIGER, daten AS ZEIGER) AS BOOLEAN, _
+     daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
+DECLARE SUB g_object_unref LIB GOBJECT (objekt AS ZEIGER)
+DECLARE FUNCTION g_timeout_add LIB GLIB (ms AS ULONG, rueckruf AS FUNCTION(daten AS ZEIGER) AS BOOLEAN, daten AS ZEIGER) AS ULONG
+DECLARE FUNCTION g_idle_add LIB GLIB (rueckruf AS FUNCTION(daten AS ZEIGER) AS BOOLEAN, daten AS ZEIGER) AS ULONG
+DECLARE FUNCTION g_source_remove LIB GLIB (id AS ULONG) AS BOOLEAN
+DECLARE SUB g_free LIB GLIB (z AS ZEIGER)
+DECLARE SUB g_error_free LIB GLIB (fehler AS ZEIGER)
+
+' Ein GError: Bereich, Nummer, Meldung
+STRUCT GError LAYOUT C
+    bereich AS ULONG
+    nummer AS LONG
+    meldung AS ZEIGER
+END STRUCT
+
+' Konstanten aus den GTK-Kopfdateien
+CONST BOX_SENKRECHT = 1
+CONST BOX_WAAGERECHT = 0
+CONST ICON_KNOPF = 4
+CONST ICON_GROSS = 6
+CONST AUSWAHL_EINE = 1
+CONST POLITIK_AUTO = 1
+CONST POLITIK_NIE = 2
+CONST AUSRICHTEN_START = 1
+CONST AUSRICHTEN_ENDE = 2
+CONST AUSRICHTEN_MITTE = 3
+CONST UEBERGANG_BLENDE = 1
+CONST ELLIPSE_MITTE = 2
+CONST ORDNER_WAEHLEN = 2
+CONST ANTWORT_ANNEHMEN = -3
+CONST ANTWORT_ABBRECHEN = -6
+CONST DREH_LINKS = 90           ' GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE
+CONST DREH_RECHTS = 270         ' GDK_PIXBUF_ROTATE_CLOCKWISE
+CONST INTERP_GUT = 2            ' GDK_INTERP_BILINEAR
+CONST VORRANG_ANWENDUNG = 600   ' GTK_STYLE_PROVIDER_PRIORITY_APPLICATION
+
+CONST MINI_B = 180
+CONST MINI_H = 135
+
+' --- Das Stylesheet ------------------------------------------------------------
+FUNCTION stil$() AS STRING
+    DIM z AS ARRAY OF STRING : z = []
+    ARRAY_PUSH(z, "window, .flaeche { background-color: #16171b; color: #e6e7ec; }")
+    ARRAY_PUSH(z, "headerbar { background-image: linear-gradient(to bottom, #2b2d34, #212328); border-bottom: 1px solid #0b0c0f; color: #e6e7ec; box-shadow: none; padding: 0 8px; }")
+    ARRAY_PUSH(z, "headerbar .title { font-weight: 700; color: #f2f3f7; }")
+    ARRAY_PUSH(z, "headerbar .subtitle { color: #8d93a1; }")
+    ARRAY_PUSH(z, "headerbar button { background-image: none; background-color: transparent; border: none; border-radius: 8px; color: #d6d9e1; box-shadow: none; text-shadow: none; -gtk-icon-shadow: none; padding: 6px 8px; }")
+    ARRAY_PUSH(z, "headerbar button:hover { background-color: rgba(255,255,255,0.08); }")
+    ARRAY_PUSH(z, "headerbar button:checked { background-color: #3b6ee6; color: #ffffff; }")
+    ARRAY_PUSH(z, "headerbar button:disabled { color: #4b4f5a; }")
+    ARRAY_PUSH(z, "flowbox { padding: 18px; }")
+    ARRAY_PUSH(z, "flowboxchild { padding: 0; border-radius: 12px; background-color: transparent; }")
+    ARRAY_PUSH(z, "flowboxchild:focus { outline: none; }")
+    ARRAY_PUSH(z, ".karte { background-color: #22242b; border-radius: 12px; padding: 8px 8px 6px 8px; border: 1px solid #2c2f37; transition: all 160ms ease; }")
+    ARRAY_PUSH(z, "flowboxchild:hover .karte { background-color: #2a2d36; border-color: #454a57; }")
+    ARRAY_PUSH(z, "flowboxchild:selected .karte { background-color: #232f4d; border-color: #4f8cff; box-shadow: 0 0 0 2px #4f8cff; }")
+    ARRAY_PUSH(z, ".karte label { color: #b9bdc8; font-size: 9pt; }")
+    ARRAY_PUSH(z, "flowboxchild:selected .karte label { color: #ffffff; }")
+    ARRAY_PUSH(z, ".infoleiste { background-color: rgba(9,10,13,0.80); border-radius: 14px; padding: 9px 16px; margin: 18px; border: 1px solid rgba(255,255,255,0.06); }")
+    ARRAY_PUSH(z, ".infoleiste .name { color: #f2f3f7; font-weight: 700; }")
+    ARRAY_PUSH(z, ".infoleiste .neben { color: #9aa0ad; }")
+    ARRAY_PUSH(z, ".infoleiste .zaehler { color: #7fa8ff; font-weight: 700; }")
+    ARRAY_PUSH(z, ".rund { border-radius: 999px; min-width: 46px; min-height: 46px; background-image: none; background-color: rgba(9,10,13,0.55); color: #ffffff; border: none; margin: 18px; box-shadow: none; -gtk-icon-shadow: none; }")
+    ARRAY_PUSH(z, ".rund:hover { background-color: rgba(79,140,255,0.90); }")
+    ARRAY_PUSH(z, "scrolledwindow, viewport { background-color: transparent; border: none; }")
+    ARRAY_PUSH(z, ".leer { color: #6d7282; font-size: 15pt; }")
+    RETURN JOIN$(z, CHR$(10))
+END FUNCTION
+
+SUB klasse(w AS INTEGER, name AS STRING)
+    gtk_style_context_add_class(gtk_widget_get_style_context(w), name)
+END SUB
+
+FUNCTION gfehler$(f AS INTEGER) AS STRING
+    IF f = 0 THEN RETURN ""
+    DIM g AS GError : g = BUFFER_AUS_ZEIGER(f, SIZEOF(GError))
+    DIM t AS STRING : t = TEXT_AUS_ZEIGER$(g.meldung)
+    g_error_free(f)
+    RETURN t
+END FUNCTION
+
+' --- Zustand ------------------------------------------------------------------
+DIM fenster AS INTEGER, kopf AS INTEGER, stapel AS INTEGER
+DIM rasterRolle AS INTEGER, raster AS INTEGER
+DIM ansichtRolle AS INTEGER, bild AS INTEGER
+DIM infoName AS INTEGER, infoNeben AS INTEGER, infoZaehler AS INTEGER
+DIM leerText AS INTEGER
+DIM kOrdner AS INTEGER, kUebersicht AS INTEGER, kLinks AS INTEGER, kRechts AS INTEGER
+DIM kOriginal AS INTEGER, kDia AS INTEGER, kVoll AS INTEGER
+DIM kZurueck AS INTEGER, kWeiter AS INTEGER
+
+DIM ordner AS STRING
+DIM fotos AS ARRAY OF STRING : fotos = []
+DIM miniBild AS ARRAY OF INTEGER : miniBild = []
+DIM drehung AS MAP OF INTEGER : drehung = {}
+DIM naechsteMini AS INTEGER
+DIM ladeId AS INTEGER
+DIM akt AS INTEGER : akt = -1
+DIM original AS BOOLEAN
+DIM vollbild AS BOOLEAN
+DIM diaId AS INTEGER
+DIM ansichtB AS INTEGER, ansichtH AS INTEGER
+DIM neuLadenId AS INTEGER
+DIM letzteMeldung AS STRING
+
+CONST ENDUNGEN = ";jpg;jpeg;png;gif;bmp;webp;tif;tiff;heic;heif;avif;jxl;ico;tga;"
+
+FUNCTION istBild(name AS STRING) AS BOOLEAN
+    DIM p AS INTEGER : p = INSTRREV(name, ".")
+    IF p < 0 THEN RETURN FALSE
+    RETURN INSTR(ENDUNGEN, ";" + LOWER$(MID$(name, p + 1)) + ";") >= 0
+END FUNCTION
+
+FUNCTION vergleich(a AS STRING, b AS STRING) AS INTEGER
+    IF LOWER$(a) < LOWER$(b) THEN RETURN -1
+    IF LOWER$(a) > LOWER$(b) THEN RETURN 1
+    RETURN 0
+END FUNCTION
+
+' Drehung aus den Kameradaten, dann die des Nutzers; das Ergebnis ist neu,
+' das alte wird freigegeben.
+FUNCTION gedreht(p AS INTEGER, pfad AS STRING) AS INTEGER
+    DIM q AS INTEGER : q = gdk_pixbuf_apply_embedded_orientation(p)
+    g_object_unref(p)
+    DIM grad AS INTEGER
+    IF MAPHAS(drehung, pfad) THEN grad = MAPGET(drehung, pfad)
+    IF grad = 0 THEN RETURN q
+    DIM r AS INTEGER : r = gdk_pixbuf_rotate_simple(q, IIF(grad = 90, DREH_RECHTS, IIF(grad = 270, DREH_LINKS, 180)))
+    g_object_unref(q)
+    RETURN r
+END FUNCTION
+
+' Auf b x h einpassen (nie vergroessern).
+FUNCTION eingepasst(p AS INTEGER, b AS INTEGER, h AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = gdk_pixbuf_get_width(p)
+    DIM v AS INTEGER : v = gdk_pixbuf_get_height(p)
+    IF w <= b AND v <= h THEN RETURN p
+    DIM f AS FLOAT : f = MIN(b / w, h / v)
+    DIM q AS INTEGER : q = gdk_pixbuf_scale_simple(p, MAX(1, INT(w * f)), MAX(1, INT(v * f)), INTERP_GUT)
+    g_object_unref(p)
+    RETURN q
+END FUNCTION
+
+' Ein Bild in der Groesse laden, die es zum Einpassen in b x h braucht. Weil die
+' Kameradrehung erst nach dem Laden feststeht, wird in einem Quadrat der
+' groesseren Seite geladen und danach eingepasst.
+FUNCTION laden(pfad AS STRING, b AS INTEGER, h AS INTEGER) AS INTEGER
+    DIM f AS INTEGER
+    ' Ohne Kasten (b < 0) in voller Groesse. Sonst im Quadrat der groesseren
+    ' Seite -- aber nie groesser als das Original: at_scale zieht auch kleine
+    ' Bilder auf die Kastengroesse hoch.
+    DIM seite AS INTEGER : seite = MAX(b, h)
+    DIM w0 AS INTEGER, h0 AS INTEGER
+    IF b > 0 AND gdk_pixbuf_get_file_info(pfad, w0, h0) <> 0 THEN
+        IF MAX(w0, h0) <= seite THEN seite = -1
+    END IF
+    IF b < 0 THEN seite = -1
+    DIM p AS INTEGER : p = gdk_pixbuf_new_from_file_at_scale(pfad, seite, seite, TRUE, f)
+    IF p = 0 THEN
+        letzteMeldung = gfehler$(f)
+        RETURN 0
+    END IF
+    p = gedreht(p, pfad)
+    IF b > 0 THEN p = eingepasst(p, b, h)
+    RETURN p
+END FUNCTION
+
+' --- Uebersicht ------------------------------------------------------------------
+SUB miniSetzen(i AS INTEGER)
+    DIM p AS INTEGER : p = laden(fotos[i], MINI_B, MINI_H)
+    IF p = 0 THEN
+        gtk_widget_set_tooltip_text(miniBild[i], "Nicht lesbar: " + letzteMeldung)
+        RETURN
+    END IF
+    gtk_image_set_from_pixbuf(miniBild[i], p)
+    g_object_unref(p)
+END SUB
+
+' Je Leerlauf ein Vorschaubild -- das Fenster bleibt dabei bedienbar.
+FUNCTION miniLaden(daten AS INTEGER) AS BOOLEAN
+    IF naechsteMini >= LEN(fotos) THEN
+        ladeId = 0
+        RETURN FALSE
+    END IF
+    miniSetzen(naechsteMini)
+    naechsteMini = naechsteMini + 1
+    RETURN TRUE
+END FUNCTION
+
+SUB rasterNeu()
+    IF raster <> 0 THEN gtk_widget_destroy(raster)
+    raster = gtk_flow_box_new()
+    gtk_flow_box_set_selection_mode(raster, AUSWAHL_EINE)
+    gtk_flow_box_set_homogeneous(raster, TRUE)
+    gtk_flow_box_set_max_children_per_line(raster, 30)
+    gtk_flow_box_set_column_spacing(raster, 14)
+    gtk_flow_box_set_row_spacing(raster, 14)
+    gtk_widget_set_valign(raster, AUSRICHTEN_START)
+    gtk_container_add(rasterRolle, raster)
+    signal2(raster, "child-activated", karteGewaehlt, 0, 0, 0)
+END SUB
+
+SUB ordnerLaden(pfad AS STRING)
+    IF ladeId <> 0 THEN g_source_remove(ladeId) : ladeId = 0
+    diaStopp()
+    ordner = pfad
+    fotos = []
+    miniBild = []
+    drehung = {}
+    akt = -1
+    DIM n AS ARRAY OF STRING
+    TRY
+        n = DIRLIST(pfad)
+    CATCH e
+        n = []
+    END TRY
+    DIM name AS STRING
+    FOR EACH name IN n
+        IF istBild(name) THEN ARRAY_PUSH(fotos, PATHJOIN(pfad, name))
+    NEXT
+    SORT(fotos, vergleich)
+    rasterNeu()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(fotos) - 1
+        DIM karte AS INTEGER : karte = gtk_box_new(BOX_SENKRECHT, 6)
+        klasse(karte, "karte")
+        DIM mini AS INTEGER : mini = gtk_image_new_from_icon_name("image-x-generic-symbolic", ICON_GROSS)
+        gtk_widget_set_size_request(mini, MINI_B, MINI_H)
+        DIM beschr AS INTEGER : beschr = gtk_label_new(BASENAME(fotos[i]))
+        gtk_label_set_ellipsize(beschr, ELLIPSE_MITTE)
+        gtk_label_set_max_width_chars(beschr, 18)
+        gtk_box_pack_start(karte, mini, FALSE, FALSE, 0)
+        gtk_box_pack_start(karte, beschr, FALSE, FALSE, 0)
+        gtk_widget_set_tooltip_text(karte, BASENAME(fotos[i]))
+        gtk_flow_box_insert(raster, karte, -1)
+        ARRAY_PUSH(miniBild, mini)
+    NEXT
+    gtk_widget_show_all(raster)
+    naechsteMini = 0
+    IF LEN(fotos) > 0 THEN ladeId = g_idle_add(miniLaden, 0)
+    gtk_header_bar_set_subtitle(kopf, BASENAME(ordner) + "  ·  " + STR$(LEN(fotos)) + IIF(LEN(fotos) = 1, " Bild", " Bilder"))
+    gtk_widget_set_tooltip_text(kopf, ordner)
+    uebersicht()
+END SUB
+
+SUB uebersicht()
+    IF LEN(fotos) = 0 THEN
+        gtk_label_set_text(leerText, "Keine Bilder in diesem Ordner" + CHR$(10) + ordner)
+        gtk_stack_set_visible_child_name(stapel, "leer")
+    ELSE
+        gtk_stack_set_visible_child_name(stapel, "raster")
+        IF akt >= 0 THEN
+            DIM kind AS INTEGER : kind = gtk_flow_box_get_child_at_index(raster, akt)
+            gtk_flow_box_select_child(raster, kind)
+            gtk_widget_grab_focus(kind)
+        END IF
+    END IF
+    knoepfeNachziehen()
+END SUB
+
+SUB karteGewaehlt(box AS INTEGER, kind AS INTEGER, daten AS INTEGER)
+    zeigen(gtk_flow_box_child_get_index(kind))
+END SUB
+
+' --- Einzelansicht ------------------------------------------------------------------
+FUNCTION groesse$(bytes AS INTEGER) AS STRING
+    IF bytes >= 1048576 THEN RETURN ZAHL$(bytes / 1048576, 1) + " MB"
+    IF bytes >= 1024 THEN RETURN ZAHL$(bytes / 1024, 0) + " KB"
+    RETURN STR$(bytes) + " Bytes"
+END FUNCTION
+
+SUB bildLaden()
+    IF akt < 0 OR akt >= LEN(fotos) THEN RETURN
+    DIM b AS INTEGER : b = gtk_widget_get_allocated_width(ansichtRolle)
+    DIM h AS INTEGER : h = gtk_widget_get_allocated_height(ansichtRolle)
+    IF b < 50 OR h < 50 THEN b = 1100 : h = 700
+    ansichtB = b : ansichtH = h
+    DIM pfad AS STRING : pfad = fotos[akt]
+    DIM p AS INTEGER : p = laden(pfad, IIF(original, -1, b), IIF(original, -1, h))
+    IF p = 0 THEN
+        gtk_image_set_from_pixbuf(bild, 0)
+        gtk_label_set_text(infoName, BASENAME(pfad))
+        gtk_label_set_text(infoNeben, "nicht lesbar: " + letzteMeldung)
+    ELSE
+        gtk_image_set_from_pixbuf(bild, p)
+        g_object_unref(p)
+        DIM w AS INTEGER, v AS INTEGER
+        DIM fmt AS INTEGER : fmt = gdk_pixbuf_get_file_info(pfad, w, v)
+        gtk_label_set_text(infoName, BASENAME(pfad))
+        gtk_label_set_text(infoNeben, STR$(w) + " × " + STR$(v) + "   ·   " + groesse$(FILESIZE(pfad)) + "   ·   " + ZEIT_FORMAT$(FILETIME(pfad), "%d.%m.%Y %H:%M"))
+    END IF
+    gtk_label_set_text(infoZaehler, STR$(akt + 1) + " / " + STR$(LEN(fotos)))
+END SUB
+
+SUB zeigen(i AS INTEGER)
+    IF LEN(fotos) = 0 THEN RETURN
+    akt = (i + LEN(fotos)) MOD LEN(fotos)
+    gtk_stack_set_visible_child_name(stapel, "ansicht")
+    bildLaden()
+    knoepfeNachziehen()
+END SUB
+
+FUNCTION inAnsicht() AS BOOLEAN
+    RETURN gtk_stack_get_visible_child_name(stapel) = "ansicht"
+END FUNCTION
+
+SUB drehen(grad AS INTEGER)
+    IF akt < 0 THEN RETURN
+    DIM pfad AS STRING : pfad = fotos[akt]
+    DIM alt AS INTEGER
+    IF MAPHAS(drehung, pfad) THEN alt = MAPGET(drehung, pfad)
+    MAPPUT(drehung, pfad, (alt + grad + 360) MOD 360)
+    bildLaden()
+    miniSetzen(akt)
+END SUB
+
+' Die Ansicht hat eine neue Groesse: kurz warten, dann einmal neu laden (beim
+' Ziehen am Fensterrand kommen sonst Dutzende Ereignisse).
+SUB groesseGeaendert(w AS INTEGER, zuteilung AS INTEGER, daten AS INTEGER)
+    IF original OR NOT inAnsicht() THEN RETURN
+    DIM b AS INTEGER : b = gtk_widget_get_allocated_width(ansichtRolle)
+    DIM h AS INTEGER : h = gtk_widget_get_allocated_height(ansichtRolle)
+    IF ABS(b - ansichtB) < 8 AND ABS(h - ansichtH) < 8 THEN RETURN
+    IF neuLadenId = 0 THEN neuLadenId = g_timeout_add(150, spaeterLaden, 0)
+END SUB
+
+FUNCTION spaeterLaden(daten AS INTEGER) AS BOOLEAN
+    neuLadenId = 0
+    IF inAnsicht() THEN bildLaden()
+    RETURN FALSE
+END FUNCTION
+
+' --- Diaschau -------------------------------------------------------------------------
+FUNCTION diaSchritt(daten AS INTEGER) AS BOOLEAN
+    zeigen(akt + 1)
+    RETURN TRUE
+END FUNCTION
+
+SUB diaStopp()
+    IF diaId <> 0 THEN g_source_remove(diaId) : diaId = 0
+    IF kDia <> 0 THEN
+        IF gtk_toggle_button_get_active(kDia) THEN gtk_toggle_button_set_active(kDia, FALSE)
+    END IF
+END SUB
+
+SUB diaUmgeschaltet(knopf AS INTEGER, daten AS INTEGER)
+    IF gtk_toggle_button_get_active(kDia) THEN
+        IF LEN(fotos) = 0 THEN
+            gtk_toggle_button_set_active(kDia, FALSE)
+            RETURN
+        END IF
+        IF NOT inAnsicht() THEN zeigen(IIF(akt < 0, 0, akt))
+        IF diaId = 0 THEN diaId = g_timeout_add(3000, diaSchritt, 0)
+    ELSE
+        IF diaId <> 0 THEN g_source_remove(diaId) : diaId = 0
+    END IF
+END SUB
+
+' --- Knoepfe und Tasten -----------------------------------------------------------
+SUB knoepfeNachziehen()
+    DIM a AS BOOLEAN : a = inAnsicht()
+    gtk_widget_set_sensitive(kUebersicht, a)
+    gtk_widget_set_sensitive(kLinks, a)
+    gtk_widget_set_sensitive(kRechts, a)
+    gtk_widget_set_sensitive(kOriginal, a)
+    gtk_widget_set_sensitive(kDia, LEN(fotos) > 0)
+END SUB
+
+SUB ordnerWaehlen(knopf AS INTEGER, daten AS INTEGER)
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("Ordner mit Bildern", fenster, ORDNER_WAEHLEN, _
+        "Abbrechen", ANTWORT_ABBRECHEN, "Öffnen", ANTWORT_ANNEHMEN, NIL)
+    IF ordner <> "" THEN gtk_file_chooser_set_current_folder(d, ordner)
+    IF gtk_dialog_run(d) = ANTWORT_ANNEHMEN THEN
+        DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
+        DIM pfad AS STRING : pfad = TEXT_AUS_ZEIGER$(z)
+        g_free(z)
+        gtk_widget_destroy(d)
+        ordnerLaden(pfad)
+    ELSE
+        gtk_widget_destroy(d)
+    END IF
+END SUB
+
+SUB zurUebersicht(knopf AS INTEGER, daten AS INTEGER)
+    diaStopp()
+    uebersicht()
+END SUB
+SUB linksDrehen(knopf AS INTEGER, daten AS INTEGER) : drehen(270) : END SUB
+SUB rechtsDrehen(knopf AS INTEGER, daten AS INTEGER) : drehen(90) : END SUB
+SUB zurueck(knopf AS INTEGER, daten AS INTEGER) : zeigen(akt - 1) : END SUB
+SUB weiter(knopf AS INTEGER, daten AS INTEGER) : zeigen(akt + 1) : END SUB
+SUB originalUmgeschaltet(knopf AS INTEGER, daten AS INTEGER)
+    original = gtk_toggle_button_get_active(kOriginal)
+    bildLaden()
+END SUB
+SUB vollbildUmschalten(knopf AS INTEGER, daten AS INTEGER)
+    vollbild = NOT vollbild
+    IF vollbild THEN gtk_window_fullscreen(fenster) ELSE gtk_window_unfullscreen(fenster)
+END SUB
+
+FUNCTION taste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM t AS INTEGER
+    IF NOT gdk_event_get_keyval(ereignis, t) THEN RETURN FALSE
+    RETURN tasteVerarbeiten(t)
+END FUNCTION
+
+' Eine Taste (GDK-Tastenwert); TRUE = verbraucht. In der Uebersicht gehoeren
+' Pfeile und Enter der FlowBox.
+FUNCTION tasteVerarbeiten(t AS INTEGER) AS BOOLEAN
+    IF t = &HFFC8 THEN vollbildUmschalten(0, 0) : RETURN TRUE            ' F11
+    IF t = &H20 THEN
+        gtk_toggle_button_set_active(kDia, NOT gtk_toggle_button_get_active(kDia))
+        RETURN TRUE
+    END IF
+    IF NOT inAnsicht() THEN RETURN FALSE
+    SELECT CASE t
+        CASE &HFF51, &HFF55 : zeigen(akt - 1)                              ' links, Bild hoch
+        CASE &HFF53, &HFF56 : zeigen(akt + 1)                              ' rechts, Bild runter
+        CASE &HFF50 : zeigen(0)                                            ' Pos1
+        CASE &HFF57 : zeigen(LEN(fotos) - 1)                               ' Ende
+        CASE &HFF1B                                                        ' Esc
+            IF vollbild THEN
+                vollbildUmschalten(0, 0)
+            ELSE
+                zurUebersicht(0, 0)
+            END IF
+        CASE &H72, &H52 : drehen(90)                                       ' r
+        CASE &H6C, &H4C : drehen(270)                                      ' l
+        CASE &H31 : gtk_toggle_button_set_active(kOriginal, NOT original)  ' 1
+        CASE ELSE : RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+SUB fensterZu(objekt AS INTEGER, daten AS INTEGER)
+    gtk_main_quit()
+END SUB
+
+' --- Aufbau -------------------------------------------------------------------------
+FUNCTION knopf(symbol AS STRING, tipp AS STRING) AS INTEGER
+    DIM k AS INTEGER : k = gtk_button_new_from_icon_name(symbol, ICON_KNOPF)
+    gtk_widget_set_tooltip_text(k, tipp)
+    gtk_widget_set_can_focus(k, FALSE)
+    RETURN k
+END FUNCTION
+
+FUNCTION schalter(symbol AS STRING, tipp AS STRING) AS INTEGER
+    DIM k AS INTEGER : k = gtk_toggle_button_new()
+    gtk_button_set_image(k, gtk_image_new_from_icon_name(symbol, ICON_KNOPF))
+    gtk_widget_set_tooltip_text(k, tipp)
+    gtk_widget_set_can_focus(k, FALSE)
+    RETURN k
+END FUNCTION
+
+FUNCTION beschriftung(text AS STRING, art AS STRING) AS INTEGER
+    DIM l AS INTEGER : l = gtk_label_new(text)
+    klasse(l, art)
+    gtk_label_set_ellipsize(l, ELLIPSE_MITTE)
+    RETURN l
+END FUNCTION
+
+DIM bereit AS BOOLEAN
+TRY
+    bereit = gtk_init_check(0, 0)
+CATCH e
+    PRINT "GTK nicht gefunden -- unter Linux das Paket libgtk-3-0, unter macOS brew install gtk+3, unter Windows GTK aus MSYS2 in den PATH oder Inkscape installieren."
+    END
+END TRY
+IF NOT bereit THEN
+    PRINT "GTK ist da, findet aber keinen Bildschirm."
+    END
+END IF
+
+' Stylesheet fuer den ganzen Bildschirm
+DIM css AS INTEGER : css = gtk_css_provider_new()
+DIM cssFehler AS INTEGER
+IF NOT gtk_css_provider_load_from_data(css, stil$(), -1, cssFehler) THEN PRINT "Stylesheet: "; gfehler$(cssFehler)
+gtk_style_context_add_provider_for_screen(gdk_screen_get_default(), css, VORRANG_ANWENDUNG)
+
+fenster = gtk_window_new(0)
+gtk_window_set_default_size(fenster, 1180, 780)
+klasse(fenster, "flaeche")
+kopf = gtk_header_bar_new()
+gtk_header_bar_set_title(kopf, "Fotos")
+gtk_header_bar_set_show_close_button(kopf, TRUE)
+gtk_window_set_titlebar(fenster, kopf)
+
+kOrdner = knopf("folder-open-symbolic", "Ordner öffnen")
+kUebersicht = knopf("view-grid-symbolic", "Zur Übersicht (Esc)")
+gtk_header_bar_pack_start(kopf, kOrdner)
+gtk_header_bar_pack_start(kopf, kUebersicht)
+kVoll = knopf("view-fullscreen-symbolic", "Vollbild (F11)")
+kDia = schalter("media-playback-start-symbolic", "Diaschau (Leertaste)")
+kOriginal = schalter("zoom-original-symbolic", "Originalgröße (1)")
+kRechts = knopf("object-rotate-right-symbolic", "Nach rechts drehen (R)")
+kLinks = knopf("object-rotate-left-symbolic", "Nach links drehen (L)")
+gtk_header_bar_pack_end(kopf, kVoll)
+gtk_header_bar_pack_end(kopf, kDia)
+gtk_header_bar_pack_end(kopf, kOriginal)
+gtk_header_bar_pack_end(kopf, kRechts)
+gtk_header_bar_pack_end(kopf, kLinks)
+
+stapel = gtk_stack_new()
+gtk_stack_set_transition_type(stapel, UEBERGANG_BLENDE)
+gtk_stack_set_transition_duration(stapel, 180)
+
+' Uebersicht
+rasterRolle = gtk_scrolled_window_new(0, 0)
+gtk_scrolled_window_set_policy(rasterRolle, POLITIK_NIE, POLITIK_AUTO)
+gtk_stack_add_named(stapel, rasterRolle, "raster")
+
+' Einzelansicht: Bild, darueber runde Pfeile und die Infoleiste
+DIM ueberlage AS INTEGER : ueberlage = gtk_overlay_new()
+ansichtRolle = gtk_scrolled_window_new(0, 0)
+gtk_scrolled_window_set_policy(ansichtRolle, POLITIK_AUTO, POLITIK_AUTO)
+bild = gtk_image_new()
+gtk_container_add(ansichtRolle, bild)
+gtk_container_add(ueberlage, ansichtRolle)
+kZurueck = knopf("go-previous-symbolic", "Vorheriges (←)")
+kWeiter = knopf("go-next-symbolic", "Nächstes (→)")
+klasse(kZurueck, "rund") : klasse(kWeiter, "rund")
+gtk_widget_set_halign(kZurueck, AUSRICHTEN_START) : gtk_widget_set_valign(kZurueck, AUSRICHTEN_MITTE)
+gtk_widget_set_halign(kWeiter, AUSRICHTEN_ENDE) : gtk_widget_set_valign(kWeiter, AUSRICHTEN_MITTE)
+gtk_overlay_add_overlay(ueberlage, kZurueck)
+gtk_overlay_add_overlay(ueberlage, kWeiter)
+DIM info AS INTEGER : info = gtk_box_new(BOX_WAAGERECHT, 16)
+klasse(info, "infoleiste")
+gtk_widget_set_halign(info, AUSRICHTEN_MITTE) : gtk_widget_set_valign(info, AUSRICHTEN_ENDE)
+infoName = beschriftung("", "name")
+infoNeben = beschriftung("", "neben")
+infoZaehler = beschriftung("", "zaehler")
+gtk_box_pack_start(info, infoName, FALSE, FALSE, 0)
+gtk_box_pack_start(info, infoNeben, FALSE, FALSE, 0)
+gtk_box_pack_start(info, infoZaehler, FALSE, FALSE, 0)
+gtk_overlay_add_overlay(ueberlage, info)
+gtk_stack_add_named(stapel, ueberlage, "ansicht")
+
+' Leerer Ordner
+leerText = gtk_label_new("")
+klasse(leerText, "leer")
+gtk_stack_add_named(stapel, leerText, "leer")
+gtk_container_add(fenster, stapel)
+
+signal(kOrdner, "clicked", ordnerWaehlen, 0, 0, 0)
+signal(kUebersicht, "clicked", zurUebersicht, 0, 0, 0)
+signal(kLinks, "clicked", linksDrehen, 0, 0, 0)
+signal(kRechts, "clicked", rechtsDrehen, 0, 0, 0)
+signal(kZurueck, "clicked", zurueck, 0, 0, 0)
+signal(kWeiter, "clicked", weiter, 0, 0, 0)
+signal(kOriginal, "toggled", originalUmgeschaltet, 0, 0, 0)
+signal(kDia, "toggled", diaUmgeschaltet, 0, 0, 0)
+signal(kVoll, "clicked", vollbildUmschalten, 0, 0, 0)
+signal2(ansichtRolle, "size-allocate", groesseGeaendert, 0, 0, 0)
+signal_taste(fenster, "key-press-event", taste, 0, 0, 0)
+signal(fenster, "destroy", fensterZu, 0, 0, 0)
+
+gtk_widget_show_all(fenster)
+
+' Welcher Ordner? Das Argument, sonst der Bilder-Ordner des Benutzers.
+' --probe fuehrt das Programm selbst vor; --foto ziel sichert dabei zwei
+' Bildschirmfotos des Fensters (ziel_uebersicht.png, ziel_ansicht.png).
+DIM probe AS BOOLEAN
+DIM fotoZiel AS STRING
+DIM start AS STRING
+DIM a AS INTEGER
+FOR a = 0 TO ARGC() - 1
+    IF ARG$(a) = "--probe" THEN
+        probe = TRUE
+    ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
+        fotoZiel = ARGPATH$(a + 1)
+        a = a + 1
+    ELSE
+        start = ARGPATH$(a)
+    END IF
+NEXT
+IF start = "" THEN
+    DIM heim AS STRING : heim = GETENV$("USERPROFILE")
+    IF heim = "" THEN heim = GETENV$("HOME")
+    start = PATHJOIN(heim, "Pictures")
+    IF NOT DIREXISTS(start) THEN start = PATHJOIN(heim, "Bilder")
+    IF NOT DIREXISTS(start) THEN start = CWD$()
+END IF
+ordnerLaden(start)
+
+' --- Vorfuehrung fuer Pruefungen -----------------------------------------------------
+CONST CAIRO = "libcairo-2.dll|C:/Program Files/Inkscape/bin/libcairo-2.dll|libcairo.so.2|libcairo.2.dylib|/opt/homebrew/lib/libcairo.2.dylib"
+DECLARE FUNCTION gtk_image_get_pixbuf LIB GTK (bild AS ZEIGER) AS ZEIGER
+DECLARE SUB gtk_widget_draw LIB GTK (w AS ZEIGER, cr AS ZEIGER)
+DECLARE FUNCTION cairo_image_surface_create LIB CAIRO (format AS LONG, b AS LONG, h AS LONG) AS ZEIGER
+DECLARE FUNCTION cairo_create LIB CAIRO (flaeche AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION cairo_surface_write_to_png LIB CAIRO (flaeche AS ZEIGER, pfad AS TEXT) AS LONG
+DECLARE SUB cairo_destroy LIB CAIRO (cr AS ZEIGER)
+DECLARE SUB cairo_surface_destroy LIB CAIRO (flaeche AS ZEIGER)
+
+' Das Fenster zeichnet sich selbst in eine Cairo-Flaeche -- unabhaengig davon,
+' ob und wo es auf dem Bildschirm zu sehen ist.
+SUB fensterFoto(name AS STRING)
+    IF fotoZiel = "" THEN RETURN
+    DIM flaeche AS INTEGER : flaeche = cairo_image_surface_create(0, gtk_widget_get_allocated_width(fenster), gtk_widget_get_allocated_height(fenster))
+    DIM cr AS INTEGER : cr = cairo_create(flaeche)
+    gtk_widget_draw(fenster, cr)
+    DIM status AS INTEGER : status = cairo_surface_write_to_png(flaeche, fotoZiel + "_" + name + ".png")
+    IF status <> 0 THEN PRINT "Foto: Cairo-Status "; status
+    cairo_destroy(cr)
+    cairo_surface_destroy(flaeche)
+END SUB
+
+FUNCTION angezeigt$() AS STRING
+    DIM p AS INTEGER : p = gtk_image_get_pixbuf(bild)
+    IF p = 0 THEN RETURN "-"
+    RETURN STR$(gdk_pixbuf_get_width(p)) + "x" + STR$(gdk_pixbuf_get_height(p))
+END FUNCTION
+
+SUB zustand(wo AS STRING)
+    DIM was AS STRING : was = angezeigt$()
+    IF was = "-" THEN was = LEFT$(gtk_label_get_text(infoNeben), 12)
+    PRINT wo; ": "; gtk_stack_get_visible_child_name(stapel); " "; gtk_label_get_text(infoZaehler); " "; gtk_label_get_text(infoName); " "; was
+END SUB
+
+DIM schritt AS INTEGER
+DIM diaVon AS INTEGER
+FUNCTION vorfuehren(daten AS INTEGER) AS BOOLEAN
+    IF ladeId <> 0 THEN RETURN TRUE                       ' erst alle Vorschaubilder
+    schritt = schritt + 1
+    DIM t AS BOOLEAN
+    SELECT CASE schritt
+        CASE 1
+            PRINT "bilder "; LEN(fotos); ", vorschaubilder "; naechsteMini
+            fensterFoto("uebersicht")
+            karteGewaehlt(raster, gtk_flow_box_get_child_at_index(raster, 1), 0)
+            zustand("geoeffnet")
+        CASE 2
+            ' warten, bis die Ueberblendung durch ist
+        CASE 3
+            fensterFoto("ansicht")
+            gtk_button_clicked(kWeiter)
+            zustand("knopf weiter")
+            t = tasteVerarbeiten(&HFF51)
+            t = tasteVerarbeiten(&HFF51)
+            zustand("zweimal pfeil links")
+            t = tasteVerarbeiten(&HFF51)
+            zustand("noch einmal: von vorn nach hinten")
+            t = tasteVerarbeiten(&HFF53)
+            zustand("pfeil rechts: von hinten nach vorn")
+        CASE 4
+            t = tasteVerarbeiten(&H72)
+            zustand("r gedreht")
+            t = tasteVerarbeiten(&H6C)
+            zustand("l zurueck")
+            t = tasteVerarbeiten(&H31)
+            zustand("1 originalgroesse")
+            t = tasteVerarbeiten(&H31)
+        CASE 5
+            t = tasteVerarbeiten(&H20)
+            diaVon = akt
+            PRINT "diaschau an: "; diaId <> 0
+        CASE ELSE
+            IF schritt < 40 AND akt = diaVon THEN RETURN TRUE        ' bis die Diaschau weiterschaltet
+            PRINT "diaschau schaltet weiter: "; akt = (diaVon + 1) MOD LEN(fotos)
+            t = tasteVerarbeiten(&HFF1B)
+            PRINT "esc: "; gtk_stack_get_visible_child_name(stapel); ", diaschau an: "; diaId <> 0
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+IF probe THEN g_timeout_add(250, vorfuehren, 0)
+
+gtk_main()

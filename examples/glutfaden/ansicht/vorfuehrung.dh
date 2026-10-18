@@ -1,0 +1,3138 @@
+' Die Selbstvorfuehrung fuer Pruefungen (--probe, --probe-bearbeiten): ein
+' Zeitgeber geht Schritt fuer Schritt durch, schreibt, was er sieht, und sichert
+' mit --foto Bilder des Fensters. Die Werkzeuge bekommen dieselben Zellen und
+' Knoepfe gemeldet wie von der Maus (wzDruck/wzZiehen/wzLos).
+
+DIM schritt AS INTEGER
+SUB foto(name AS STRING)
+    IF fotoZiel = "" THEN RETURN
+    IF NOT gtkFoto(fenster, fotoZiel + "_" + name + ".png") THEN PRINT "Foto nicht gesichert: "; name
+END SUB
+
+' Stufe 1: ansehen, zoomen, eine Ebene aus- und einblenden
+FUNCTION vorfuehren(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    SELECT CASE schritt
+        CASE 1
+            ' Das erste Zeichnen hat eingepasst
+            PRINT "geladen: "; geladen; ", eingepasst: "; lwEingepasst
+            PRINT lwMuster.breite; " x "; lwMuster.hoehe; ", "; ZAHL$(lwMuster.breiteCm(), 1); " cm"
+        CASE 2
+            foto("eingepasst")
+            leinwandZoom(30.0, lwX + 5.5 * lwZelle, lwY + 5.5 * lwZelle)
+            PRINT "zoom: "; leinwandZoomProzent(); " %"
+        CASE 3
+            foto("nah")
+            ' Die Ebene "Herz" ausblenden -- die Stiche verschwinden aus dem Bild
+            IF LEN(slEbenenKnoepfe) < 2 THEN RETURN TRUE
+            DIM vorher AS INTEGER : vorher = lwFarbe[12 * lwMuster.breite + 17]
+            gtk_toggle_button_set_active(slEbenenKnoepfe[1], FALSE)
+            PRINT "zelle 17,12: "; vorher; " -> "; lwFarbe[12 * lwMuster.breite + 17]
+        CASE 4
+            IF LEN(slEbenenKnoepfe) < 2 THEN RETURN TRUE
+            foto("ohne_herz")
+            gtk_toggle_button_set_active(slEbenenKnoepfe[1], TRUE)
+            PRINT "wieder da: "; lwFarbe[12 * lwMuster.breite + 17]
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' Ein Zug mit der Maus: druecken, ueber die Zellen ziehen, loslassen.
+SUB zug(taste AS INTEGER, punkte AS ARRAY OF INTEGER, umschalt AS BOOLEAN)
+    DIM n AS INTEGER : n = LEN(punkte)
+    DIM z AS INTEGER : z = wzDruck(punkte[0], punkte[1], taste, umschalt)
+    DIM k AS INTEGER
+    FOR k = 2 TO n - 2 STEP 2
+        wzZiehen(punkte[k], punkte[k + 1], umschalt)
+    NEXT
+    wzLos(punkte[n - 2], punkte[n - 1], umschalt)
+END SUB
+
+' Stufe 2: bearbeiten
+DIM vfBlau AS INTEGER
+DIM vfDatei AS STRING
+FUNCTION vorfuehrenBearbeiten(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM i AS INTEGER, p AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            PRINT "geladen: "; geladen; " farben "; lwMuster.farbanzahl(); " geaendert "; istGeaendert()
+            ' DMC 996 (Electric Blue) aus dem Katalog ins Muster
+            FOR p = 0 TO LEN(slPaletten) - 1
+                IF slPaletten[p].hersteller = "DMC" THEN
+                    FOR i = 0 TO LEN(slPaletten[p].garne) - 1
+                        IF slPaletten[p].garne[i].nummer = "996" THEN garnHinzufuegen(p, i)
+                    NEXT
+                END IF
+            NEXT
+            vfBlau = wzFarbe
+            PRINT "farbe "; vfBlau; " "; lwMuster.farben[vfBlau].garn.name; " symbol "; lwMuster.farben[vfBlau].symbol; " farben "; lwMuster.farbanzahl()
+            ' dasselbe Garn noch einmal: keine neue Farbe
+            FOR p = 0 TO LEN(slPaletten) - 1
+                IF slPaletten[p].hersteller = "DMC" THEN
+                    FOR i = 0 TO LEN(slPaletten[p].garne) - 1
+                        IF slPaletten[p].garne[i].nummer = "996" THEN garnHinzufuegen(p, i)
+                    NEXT
+                END IF
+            NEXT
+            PRINT "noch einmal: farben "; lwMuster.farbanzahl(); " katalogzeilen "; LEN(slKatZeilen) > 100
+        CASE 2
+            ' neue Ebene, gefuelltes Rechteck in Blau
+            ebenenBefehl(0)
+            werkzeugWaehlen(WZ_RECHTECK, TRUE)
+            zug(1, [2, 2, 6, 5, 9, 7], FALSE)
+            PRINT "ebenen "; lwMuster.ebenen.anzahl(); " aktiv "; lwMuster.ebenen.aktiveEbene().name; " blau "; lwMuster.farben[vfBlau].stichzahl
+            PRINT "schritte "; LEN(wzVerlauf.rueck); " oben "; wzVerlauf.textZurueck$(); " geaendert "; istGeaendert()
+            PRINT "titel "; gtk_label_get_text_titel()
+            leinwandEinpassen()
+        CASE 3
+            foto("rechteck")
+            werkzeugZurueck()
+            PRINT "zurueck: blau "; lwMuster.farben[vfBlau].stichzahl; " ebenen "; lwMuster.ebenen.anzahl()
+        CASE 4
+            foto("zurueck")
+            werkzeugVor()
+            ' Stift mit Umschalt-Linie und Ellipse: Umschalt haelt die Linie gerade
+            werkzeugWaehlen(WZ_LINIE, FALSE)
+            zug(1, [0, 10, 15, 12], TRUE)
+            PRINT "linie gerade: "; lwMuster.stich(15, 10) = vfBlau; " "; lwMuster.stich(15, 12)
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            stichartWaehlen(kern.HALB_OL_UR)
+            zug(1, [20, 20, 24, 24], FALSE)
+            PRINT "stift: "; lwMuster.stich(22, 22) = vfBlau; " art "; lwMuster.ebenen.aktiveEbene().stichArt(22, 22)
+            stichartWaehlen(kern.VOLL)
+            ' rechte Maustaste radiert -- auch mit dem Stift
+            zug(3, [22, 22], FALSE)
+            PRINT "radiert: "; lwMuster.stich(22, 22) = vfBlau
+            ' Pipette nimmt die Farbe darunter
+            werkzeugWaehlen(WZ_PIPETTE, FALSE)
+            zug(1, [17, 12], FALSE)
+            PRINT "pipette: "; wzFarbe; " "; lwMuster.stich(17, 12)
+            ' Fuellen auf der leeren Ebene in einem Schritt
+            farbeWaehlen(vfBlau)
+            werkzeugWaehlen(WZ_FUELLEN, FALSE)
+            DIM vorher AS INTEGER : vorher = LEN(wzVerlauf.rueck)
+            zug(1, [30, 30], FALSE)
+            PRINT "gefuellt: "; lwMuster.ebenen.aktiveEbene().stichzahl(); " schritte +"; LEN(wzVerlauf.rueck) - vorher
+            werkzeugZurueck()
+            PRINT "fuellen zurueck: "; lwMuster.ebenen.aktiveEbene().stichzahl()
+        CASE 5
+            foto("wieder")
+            ' Ebene sperren: Stift setzt nichts
+            lwMuster.ebenen.aktiveEbene().gesperrt = TRUE
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            DIM n AS INTEGER : n = lwMuster.ebenen.aktiveEbene().stichzahl()
+            zug(1, [35, 35, 38, 38], FALSE)
+            PRINT "gesperrt: "; lwMuster.ebenen.aktiveEbene().stichzahl() = n
+            lwMuster.ebenen.aktiveEbene().gesperrt = FALSE
+            ' Ebene loeschen und zurueckholen
+            ebenenBefehl(1)
+            PRINT "geloescht: ebenen "; lwMuster.ebenen.anzahl(); " blau "; lwMuster.farben[vfBlau].stichzahl
+            werkzeugZurueck()
+            PRINT "zurueckgeholt: ebenen "; lwMuster.ebenen.anzahl(); " blau "; lwMuster.farben[vfBlau].stichzahl
+            ' Deckkraft halb: das Blau mischt sich mit dem Stoff
+            gtk_range_set_value(slDeckkraft, 50.0)
+            PRINT "deckkraft "; lwMuster.ebenen.aktiveEbene().deckkraft; " geaendert "; istGeaendert()
+        CASE 6
+            foto("halb")
+            gtk_range_set_value(slDeckkraft, 100.0)
+            ' sichern und wieder laden
+            vfDatei = fotoZiel + "_gesichert.pxs"
+            IF fotoZiel = "" THEN vfDatei = PATHJOIN(TEMPDIR$(), "glutfaden_probe.pxs")
+            PRINT "gesichert: "; musterSichern(vfDatei); " geaendert "; istGeaendert(); " titel "; gtk_label_get_text_titel()
+            DIM m AS kern.Muster : m = kern.pxsLaden(vfDatei)
+            PRINT "geladen: ebenen "; m.ebenen.anzahl(); " farben "; m.farbanzahl(); " stiche "; m.sticheGesamt(); " = "; lwMuster.sticheGesamt()
+            PRINT "zelle 5,4: "; m.stich(5, 4) = vfBlau; " "; m.farben[vfBlau].garn.hersteller; " "; m.farben[vfBlau].garn.nummer
+            ' zurueck nach dem Sichern: wieder ungesichert, und vor: wieder gesichert
+            werkzeugZurueck()
+            PRINT "nach zurueck "; istGeaendert()
+            werkzeugVor()
+            PRINT "nach vor "; istGeaendert()
+            ' unbenutzte Farben entfernen (die Demo hat keine), umbenennen
+            PRINT "ebene umbenannt: "; kern.ebeneUmbenennen(lwMuster, wzVerlauf, lwMuster.ebenen.aktiv, "Blau")
+            allesNeu()
+            PRINT "oben "; wzVerlauf.textZurueck$(); " liste "; gtk_label_get_text(slEbenenTexte[lwMuster.ebenen.anzahl() - 1 - lwMuster.ebenen.aktiv])
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION gtk_label_get_text_titel() AS STRING
+    RETURN musterTitel + IIF(istGeaendert(), " •", "")
+END FUNCTION
+
+' Stufe 3: Auswahl, Vieleck, Symmetrie, Rueckstich, Fortschritt, Text
+FUNCTION blauHolen() AS INTEGER
+    DIM p AS INTEGER, i AS INTEGER
+    FOR p = 0 TO LEN(slPaletten) - 1
+        IF slPaletten[p].hersteller = "DMC" THEN
+            FOR i = 0 TO LEN(slPaletten[p].garne) - 1
+                IF slPaletten[p].garne[i].nummer = "996" THEN garnHinzufuegen(p, i)
+            NEXT
+        END IF
+    NEXT
+    RETURN wzFarbe
+END FUNCTION
+
+FUNCTION vorfuehrenStufe3(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM n AS INTEGER, vorher AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            vfBlau = blauHolen()
+            PRINT "geladen: "; geladen; " blau "; vfBlau; " stiche "; lwMuster.sticheGesamt()
+            ' Auswahl ueber das Herz (Zeilen 12..20) auf der Ebene "Herz" -- die
+            ' Auswahl nimmt wie im Original nur die AKTIVE Ebene --, kopieren,
+            ' links oben einfuegen
+            lwMuster.ebenen.aktiv = 1
+            slEbeneMarkieren()
+            PRINT "aktive ebene "; lwMuster.ebenen.aktiveEbene().name
+            werkzeugWaehlen(WZ_AUSWAHL, FALSE)
+            zug(1, [14, 12, 20, 16, 25, 20], FALSE)
+            PRINT "auswahl "; mrAuswahl.anzahl; " "; mrAuswahl.x0; ","; mrAuswahl.y0; "-"; mrAuswahl.x1; ","; mrAuswahl.y1
+            auswahlKopieren()
+            vorher = lwMuster.sticheGesamt()
+            einfuegenBeginnen()
+            DIM z AS INTEGER : z = wzDruck(3, 3, 1, FALSE)
+            PRINT "eingefuegt: +"; lwMuster.sticheGesamt() - vorher; " oben "; wzVerlauf.textZurueck$(); " auswahl jetzt "; mrAuswahl.x0; ","; mrAuswahl.y0
+        CASE 2
+            foto("eingefuegt")
+            ' die eingefuegte Auswahl um 5 nach rechts ziehen: ein Schritt
+            DIM s0 AS INTEGER : s0 = LEN(wzVerlauf.rueck)
+            zug(1, [5, 5, 8, 5, 10, 5], FALSE)
+            PRINT "verschoben: auswahl "; mrAuswahl.x0; ","; mrAuswahl.y0; " schritte +"; LEN(wzVerlauf.rueck) - s0; " zelle 4,5 "; lwMuster.stich(4, 5)
+            ' drehen (r) und zurueck
+            vorher = lwMuster.sticheGesamt()
+            DIM ok AS BOOLEAN : ok = werkzeugTaste(&H72, FALSE, FALSE)
+            PRINT "gedreht: "; wzVerlauf.textZurueck$(); " breite "; mrAuswahl.x1 - mrAuswahl.x0 + 1; " hoehe "; mrAuswahl.y1 - mrAuswahl.y0 + 1; " stiche gleich "; lwMuster.sticheGesamt() = vorher
+            werkzeugZurueck()
+            ' Entf und ESC
+            ok = werkzeugTaste(&HFFFF, FALSE, FALSE)
+            PRINT "geloescht: "; wzVerlauf.textZurueck$(); " stiche "; lwMuster.sticheGesamt() - vorher
+            werkzeugZurueck()
+            ok = werkzeugTaste(&HFF1B, FALSE, FALSE)
+            PRINT "esc: auswahl weg "; NOT mehrHatAuswahl()
+        CASE 3
+            ' gefuelltes Vieleck in Blau: drei Ecken, rechte Taste schliesst
+            farbeWaehlen(vfBlau)
+            werkzeugWaehlen(WZ_VIELECK, TRUE)
+            n = wzDruck(28, 26, 1, FALSE)
+            n = wzDruck(36, 28, 1, FALSE)
+            n = wzDruck(30, 35, 1, FALSE)
+            n = wzDruck(30, 35, 3, FALSE)
+            PRINT "vieleck: blau "; lwMuster.farben[vfBlau].stichzahl; " oben "; wzVerlauf.textZurueck$(); " ecken "; LEN(mrEcken)
+            ' Symmetrie vierfach: ein Punkt mit dem Stift ergibt vier
+            spiegelWaehlen(kern.SPIEGEL_VIERFACH)
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            vorher = lwMuster.farben[vfBlau].stichzahl
+            zug(1, [2, 37], FALSE)
+            PRINT "vierfach: +"; lwMuster.farben[vfBlau].stichzahl - vorher; " "; lwMuster.stich(37, 37) = vfBlau; " "; lwMuster.stich(2, 2) = vfBlau; " "; lwMuster.stich(37, 2) = vfBlau
+            spiegelWaehlen(kern.SPIEGEL_AUS)
+        CASE 4
+            foto("vieleck")
+            ' Rueckstich: zwei Klicks auf Rasterpunkte (Halbstich-Einheiten)
+            werkzeugWaehlen(WZ_RUECKSTICH, FALSE)
+            lwHalbX = 4 : lwHalbY = 60
+            n = wzDruck(2, 30, 1, FALSE)
+            lwHalbX = 30 : lwHalbY = 60
+            n = wzDruck(15, 30, 1, FALSE)
+            lwHalbX = 30 : lwHalbY = 70
+            n = wzDruck(15, 35, 1, FALSE)
+            n = wzDruck(15, 35, 3, FALSE)
+            PRINT "rueckstiche "; LEN(lwMuster.rueckstiche); " oben "; wzVerlauf.textZurueck$()
+            ' rechts auf eine Linie: entfernt
+            lwHalbGenauX = 17.2 : lwHalbGenauY = 60.4
+            n = wzDruck(8, 30, 3, FALSE)
+            PRINT "entfernt: "; LEN(lwMuster.rueckstiche); " oben "; wzVerlauf.textZurueck$()
+            werkzeugZurueck()
+            PRINT "zurueck: "; LEN(lwMuster.rueckstiche)
+        CASE 5
+            foto("rueckstich")
+            ' Fortschritt: die Zeile des Rahmens ziehen, dann Pfeile und Enter
+            werkzeugWaehlen(WZ_FORTSCHRITT, FALSE)
+            zug(1, [5, 5, 30, 5], FALSE)
+            PRINT "erledigt "; lwFertig[5 * lwMuster.breite + 10]; " "; lwFertig[5 * lwMuster.breite + 30]; " oben "; wzVerlauf.textZurueck$()
+            farbeWaehlen(lwMuster.stich(10, 5))
+            DIM ok2 AS BOOLEAN : ok2 = werkzeugTaste(&HFF53, FALSE, FALSE)
+            PRINT "naechster offen "; mrCursor MOD lwMuster.breite; ","; mrCursor \ lwMuster.breite
+            ok2 = werkzeugTaste(&HFF0D, FALSE, FALSE)
+            DIM c AS INTEGER : c = kern.naechsterOffen(lwMuster, wzFarbe, -1, TRUE)
+            PRINT "nach enter "; mrCursor MOD lwMuster.breite; ","; mrCursor \ lwMuster.breite; " erster offen "; c MOD lwMuster.breite; ","; c \ lwMuster.breite
+            ' rechts nimmt zurueck
+            zug(3, [10, 5], FALSE)
+            PRINT "zurueckgenommen 10,5: "; lwFertig[5 * lwMuster.breite + 10]
+        CASE 6
+            foto("fortschritt")
+            ' Text, ohne Dialog: groesse 12 -> etwa 16 hoch
+            farbeWaehlen(vfBlau)
+            werkzeugWaehlen(WZ_TEXT, FALSE)
+            txText = "Hi" : txSchrift = "Sans" : txGroesse = 12 : txFett = TRUE : txKursiv = FALSE
+            textAnhaengen()
+            PRINT "text: an der maus "; mrEinfuegen; " groesse "; mrEinfuegenAus.breite; "x"; mrEinfuegenAus.hoehe; " stiche > 20 "; mrEinfuegenAus.stiche() > 20
+            vorher = lwMuster.farben[vfBlau].stichzahl
+            n = wzDruck(6, 18, 1, FALSE)
+            PRINT "text gesetzt: +"; lwMuster.farben[vfBlau].stichzahl - vorher = mrEinfuegenAus.stiche(); " oben "; wzVerlauf.textZurueck$(); " haengt "; mrEinfuegen
+            ' seltene Farben zusammenlegen (die Demo hat Anchor 309 mit 17)
+            n = seltenZusammenlegen(20)
+            allesNeu()
+            PRINT "selten: "; n; " oben "; wzVerlauf.textZurueck$()
+        CASE 7
+            foto("text")
+            ' sichern und laden: Rueckstiche und erledigt kommen mit
+            vfDatei = fotoZiel + "_stufe3.pxs"
+            IF fotoZiel = "" THEN vfDatei = PATHJOIN(TEMPDIR$(), "glutfaden_stufe3.pxs")
+            DIM ok3 AS BOOLEAN : ok3 = musterSichern(vfDatei)
+            DIM m AS kern.Muster : m = kern.pxsLaden(vfDatei)
+            DIM e AS kern.Ebene : e = kern.ebeneMitStich(m, 30, 5)
+            PRINT "geladen: rueckstiche "; LEN(m.rueckstiche); " erledigt 30,5 "; e.istErledigt(30, 5); " stiche "; m.sticheGesamt() = lwMuster.sticheGesamt()
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' Stufe 4: Bildimport -- Dialog bauen und einstellen, Vorschau, uebernehmen,
+' erneut aus dem Quellbild (mit den Einstellungen von damals), eine
+' Voreinstellung, sichern und laden.
+DIM vfMuster AS kern.Muster
+FUNCTION vorfuehrenStufe4(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM logoBild AS STRING : logoBild = PATHJOIN(CWD$(), "daten/bilder/glutfaden_256.png")
+    DIM ok AS BOOLEAN
+    SELECT CASE schritt
+        CASE 1
+            PRINT "dialog: "; imDialogBauen(logoBild, NIL); " bild "; imBildB; "x"; imBildH
+            gtk_spin_button_set_value(imBreite, 60)
+            gtk_spin_button_set_value(imHoehe, 60)
+            gtk_spin_button_set_value(imFarben, 12)
+            gtk_combo_box_set_active(imDither, 1)
+            gtk_spin_button_set_value(imConfetti, 2)
+            imAusschnitt = [0.1, 0.1, 0.9, 0.9]
+            imAusschnittGeaendert()
+            PRINT "info: "; gtk_label_get_text(imInfo)
+        CASE 2
+            imVorschauGeklickt(0, 0)
+            PRINT "vorschau: "; imErgebnis.breite; "x"; imErgebnis.hoehe; " farben "; imErgebnis.farbanzahl(); " stiche "; imErgebnis.sticheGesamt()
+        CASE 3
+            IF fotoZiel <> "" THEN ok = gtkFoto(imDialog, fotoZiel + "_importdialog.png")
+            DIM m AS kern.Muster : m = imRechnen()
+            musterUebernehmen(m)
+            imDialogWeg()
+            PRINT "importiert: "; lwMuster.breite; "x"; lwMuster.hoehe; " farben "; lwMuster.farbanzahl(); " titel "; musterTitel; " ungesichert "; istGeaendert(); " datei leer "; musterPfad = ""
+            PRINT "quelle: "; BASENAME(lwMuster.quellBild); " palette "; lwMuster.quellPalette; " dithering "; JSON_GET_STRING(lwMuster.metadaten, "dithering_mode")
+        CASE 4
+            foto("importiert")
+            ' erneut aus dem Quellbild: dieselben Einstellungen, dasselbe Muster
+            DIM e AS kern.Importeinstellung : e = imEinstellungAusMuster(lwMuster)
+            PRINT "wieder: "; e.breite; "x"; e.hoehe; " farben "; e.maxFarben; " dither "; e.dithering; " confetti "; e.confetti; " ausschnitt "; e.ausschnitt[0]; " palette "; e.palette.name
+            ok = imDialogBauen(lwMuster.quellBild, e)
+            DIM m2 AS kern.Muster : m2 = imRechnen()
+            imDialogWeg()
+            DIM gleich AS BOOLEAN : gleich = m2.breite = lwMuster.breite AND m2.hoehe = lwMuster.hoehe
+            DIM i AS INTEGER
+            IF gleich THEN
+                FOR i = 0 TO m2.breite * m2.hoehe - 1
+                    DIM a1 AS INTEGER : a1 = m2.ebenen.aktiveEbene().raster[i]
+                    DIM a2 AS INTEGER : a2 = lwMuster.ebenen.aktiveEbene().raster[i]
+                    IF m2.farben[a1].garn.nummer <> lwMuster.farben[a2].garn.nummer THEN gleich = FALSE
+                NEXT
+            END IF
+            PRINT "dasselbe muster: "; gleich
+        CASE 5
+            ' Voreinstellung "DP A4" setzt Groesse, Farben und die Diamant-Palette
+            ok = imDialogBauen(logoBild, NIL)
+            gtk_combo_box_set_active(imVorein, 5)
+            DIM ein AS kern.Importeinstellung : ein = imEinstellung()
+            PRINT "vorlage: "; ein.breite; "x"; ein.hoehe; " farben "; ein.maxFarben; " dither "; ein.dithering; " median "; ein.farbwahl = kern.WAHL_MEDIAN; " palette "; ein.palette.name
+            imDialogWeg()
+        CASE 6
+            vfDatei = fotoZiel + "_stufe4.pxs"
+            IF fotoZiel = "" THEN vfDatei = PATHJOIN(TEMPDIR$(), "glutfaden_stufe4.pxs")
+            ok = musterSichern(vfDatei)
+            DIM g AS kern.Muster : g = kern.pxsLaden(vfDatei)
+            PRINT "geladen: quelle "; BASENAME(g.quellBild); " palette "; g.quellPalette; " max "; JSON_GET_INT(g.metadaten, "max_colors"); " ausschnitt "; g.quellAusschnitt[2]; " stiche "; g.sticheGesamt() = lwMuster.sticheGesamt(); " gesichert "; NOT istGeaendert()
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' Stufe 5: Export -- der Dialog mit allen Zeilen, dann PDF, HTML, Bild, OXS
+' (und wieder eingelesen) und das Paket, je in eine Datei neben die Fotos.
+DIM vfVorher AS STRING
+
+' Der Platz eines Garns in der Garnliste einer Palette des Blend-Dialogs.
+FUNCTION vfGarnNr(palWahl AS INTEGER, nummer AS STRING) AS INTEGER
+    DIM g AS ARRAY OF kern.Garn : g = slPaletten[blPal[gtk_combo_box_get_active(palWahl)]].garne
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(g) - 1
+        IF g[i].nummer = nummer THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION vfZiel$(name AS STRING) AS STRING
+    IF fotoZiel <> "" THEN RETURN fotoZiel + "_" + name
+    RETURN PATHJOIN(TEMPDIR$(), "glutfaden_stufe5_" + name)
+END FUNCTION
+
+FUNCTION vorfuehrenStufe5(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM d AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            d = exDialogBauen()
+            DIM f AS INTEGER, zeilen AS STRING
+            FOR f = EX_PDF TO EX_PAKET
+                gtk_combo_box_set_active(exFormat, f)
+                zeilen = zeilen + " " + STR$(exZeilenAktiv())
+            NEXT
+            PRINT "dialog: zeilen je format"; zeilen; " papiere "; LEN(kern.papierNamen()); " entsprechungen "; LEN(exKreuz)
+            gtk_combo_box_set_active(exFormat, EX_PDF)
+            gtk_spin_button_set_value(exUeb, 2)
+            gtk_entry_set_text(exWasser, "ENTWURF")
+            gtk_toggle_button_set_active(exKreuz[0], TRUE)
+            gtk_text_buffer_set_text(gtk_text_view_get_buffer(exNotizen), "Mit dem Rand beginnen." + CHR$(10) + "Rot zuletzt.", -1)
+            IF fotoZiel <> "" THEN ok = gtkFoto(d, fotoZiel + "_exportdialog.png")
+            exWahlMerken()
+            DIM nz AS STRING : nz = exNotizenText$()
+            gtk_widget_destroy(d)
+            exExportieren(EX_PDF, vfZiel$("muster.pdf"), nz)
+            PRINT "pdf: "; meldung; " | "; exWahlKreuz[0]; " ueb "; exWahlUeb
+        CASE 2
+            exExportieren(EX_HTML, vfZiel$("muster.html"), "")
+            PRINT "html: "; meldung; " | beginnt "; LEFT$(READALL$(vfZiel$("muster.html")), 15)
+        CASE 3
+            exWahlZelle = 8 : exWahlSymbole = TRUE
+            exExportieren(EX_BILD, vfZiel$("muster.png"), "")
+            DIM b AS IMAGE : b = LOADIMAGE(vfZiel$("muster.png"))
+            PRINT "bild: "; meldung; " | "; IMAGE_WIDTH(b); "x"; IMAGE_HEIGHT(b)
+        CASE 4
+            DIM vorher AS INTEGER : vorher = lwMuster.sticheGesamt()
+            DIM alt AS STRING : alt = musterPfad
+            exExportieren(EX_OXS, vfZiel$("muster.oxs"), "")
+            PRINT "oxs: "; meldung
+            ok = musterOeffnen(vfZiel$("muster.oxs"))
+            PRINT "wieder eingelesen: "; ok; " stiche gleich "; lwMuster.sticheGesamt() = vorher; " datei leer "; musterPfad = ""; " | "; LEFT$(meldung, 29)
+            foto("aus_oxs")
+            ok = musterOeffnen(alt)
+        CASE 5
+            exWahlPapier = 0
+            exExportieren(EX_PAKET, vfZiel$("muster.zip"), "")
+            PRINT "paket: "; meldung
+            PRINT "  "; JOIN$(ZIP_LIST(vfZiel$("muster.zip")), ", ")
+        CASE 6
+            ' Diamond: der Papierwaehler empfiehlt das Format fuer 1:1
+            lwMuster.modus = "diamond" : lwMuster.stoff = 10
+            exWahlPapier = -1
+            d = exDialogBauen()
+            DIM wahl AS INTEGER : wahl = gtk_combo_box_get_active(exPapier)
+            PRINT "diamond: vorgewaehlt "; kern.papierNamen()[wahl]; " = empfehlung "; kern.papierEmpfehlung$(lwMuster, 1)
+            gtk_widget_destroy(d)
+            lwMuster.modus = "stitch" : lwMuster.stoff = 14
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' Stufe 6: eine PCStitch-Datei ist geoeffnet (das Startargument), daneben
+' liegt dieselbe als .xsd; dann Diamond Painting hin und zurueck (Strg+D).
+FUNCTION vorfuehrenStufe6(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    SELECT CASE schritt
+        CASE 1
+            PRINT "pat: "; LEFT$(meldung, 32); " | ebenen "; lwMuster.ebenen.anzahl(); " stiche "; lwMuster.sticheGesamt(); " rueckstiche "; LEN(lwMuster.rueckstiche); " datei leer "; musterPfad = ""
+            foto("aus_pat")
+        CASE 2
+            ok = musterOeffnen(LEFT$(start, LEN(start) - 4) + ".xsd")
+            PRINT "xsd: "; ok; " "; LEFT$(meldung, 36); " | farben "; lwMuster.farbanzahl(); " blend "; lwMuster.farben[2].garn.istBlend()
+            foto("aus_xsd")
+        CASE 3
+            ' Tweed-Blend: DMC 310 + DMC 321 (1:2), zweimal derselbe, dann 1:1
+            DIM bd AS INTEGER : bd = blDialogBauen()
+            gtk_combo_box_set_active(blGarnA, vfGarnNr(blPalA, "310"))
+            gtk_combo_box_set_active(blGarnB, vfGarnNr(blPalB, "321"))
+            gtk_spin_button_set_value(blStrB, 2)
+            PRINT "blend: "; REPLACE$(gtk_label_get_text(blText), CHR$(10), " | ")
+            IF fotoZiel <> "" THEN ok = gtkFoto(bd, fotoZiel + "_blend.png")
+            DIM n0 AS INTEGER : n0 = lwMuster.farbanzahl()
+            blUebernehmen()
+            DIM n1 AS INTEGER : n1 = lwMuster.farbanzahl()
+            blUebernehmen()
+            DIM n2 AS INTEGER : n2 = lwMuster.farbanzahl()
+            gtk_spin_button_set_value(blStrB, 1)
+            blUebernehmen()
+            PRINT "farben "; n0; " -> "; n1; " -> "; n2; " -> "; lwMuster.farbanzahl(); " | aktuell "; lwMuster.farben[wzFarbe].garn.name; " | rueckgaengig: "; wzVerlauf.textZurueck$()
+            gtk_widget_destroy(bd)
+        CASE 4
+            DIM vorher AS STRING : vorher = lwMuster.farben[0].garn.hersteller + " " + lwMuster.farben[0].garn.nummer
+            modusUmschalten()
+            PRINT "diamond: "; lwMuster.modus; " stoff "; lwMuster.stoff; " | "; TEXT_AUS_ZEIGER$(gtk_button_get_label(kModus)); " | "; lwMuster.farben[0].garn.hersteller; " | verlauf leer "; NOT wzVerlauf.kannZurueck(); " ungesichert "; istGeaendert()
+            foto("diamond")
+            vfVorher = vorher
+            blendDialog()
+            PRINT "blend im diamond-modus: "; meldung
+        CASE 5
+            modusUmschalten()
+            PRINT "zurueck: "; lwMuster.modus; " stoff "; lwMuster.stoff; " | "; TEXT_AUS_ZEIGER$(gtk_button_get_label(kModus)); " | dasselbe garn "; lwMuster.farben[0].garn.hersteller + " " + lwMuster.farben[0].garn.nummer = vfVorher
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' Stufe 7: der Stickpfad -- Dialog, Strategie wechseln, Tooltip, Zoom mit
+' Nummern, alle vergleichen, die drei Exporte; dazu der Schalter im
+' Export-Dialog.
+FUNCTION vfDialogFoto(name AS STRING) AS BOOLEAN
+    IF fotoZiel = "" THEN RETURN TRUE
+    DIM ok AS BOOLEAN : ok = gtkFoto(sdDialog, fotoZiel + "_" + name + ".png")
+    IF NOT ok THEN PRINT "Foto nicht gesichert: "; name
+    RETURN ok
+END FUNCTION
+
+FUNCTION vfSumme$() AS STRING
+    DIM t AS STRING
+    DIM w AS INTEGER
+    FOR EACH w IN sdSumme
+        t = t + " | " + gtk_label_get_text(w)
+    NEXT
+    RETURN MID$(t, 3, 999)
+END FUNCTION
+
+FUNCTION vorfuehrenStufe7(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    SELECT CASE schritt
+        CASE 1
+            DIM d AS INTEGER : d = sdDialogBauen()
+            PRINT "dialog: "; kern.spName$(gtk_combo_box_get_active(sdStrategie)); " stoff "; gtk_spin_button_get_value_as_int(sdStoff); " | "; vfSumme$()
+            PRINT "farben "; LEN(sdZeilen); " gewaehlt "; sdAktiv; " "; sdGarnName$(sdErg.pfade[sdAktiv]); " | vergleich sichtbar "; gtk_widget_get_visible(sdVergleich)
+        CASE 2
+            ok = vfDialogFoto("stickpfad")
+            gtk_combo_box_set_active(sdStrategie, kern.SP_NACHBAR)
+            PRINT "naechster nachbar: "; vfSumme$()
+            gtk_list_box_select_row(sdListe, sdZeilen[1])
+            DIM p AS kern.Farbpfad : p = sdErg.pfade[sdAktiv]
+            DIM z AS FLOAT : z = SD_ZELLE * sdZoom
+            DIM i AS INTEGER : i = sdStichBei(sdOx + (p.xs[2] + 0.5) * z, sdOy + (p.ys[2] + 0.5) * z)
+            PRINT "farbe 2 "; sdGarnName$(p); " | maus auf stich 3: "; sdTipp$(i); " | daneben "; sdStichBei(sdOx - 5, sdOy - 5)
+            ' einen Sprung suchen
+            FOR i = 1 TO p.stiche() - 1
+                IF p.istSprung(i) THEN
+                    PRINT "sprung: "; sdTipp$(i)
+                    EXIT FOR
+                END IF
+            NEXT
+        CASE 3
+            gtk_toggle_button_set_active(sdNummern, TRUE)
+            DIM vorher AS FLOAT : vorher = sdZoom
+            sdZoomKnopf(0, 1) : sdZoomKnopf(0, 1) : sdZoomKnopf(0, 1)
+            PRINT "zoom x1.25^3: "; ABS(sdZoom / vorher - 1.953125) < 0.0001; " | "; gtk_label_get_text(sdZoomText) <> ""
+            ok = vfDialogFoto("stickpfad_nummern")
+            sdZoomKnopf(0, 0)
+            PRINT "eingepasst: "; ABS(sdZoom - vorher) < 0.0001
+        CASE 4
+            gtk_spin_button_set_value(sdStoff, 18)
+            ' vorher eine andere Strategie -- der Vergleich soll die beste waehlen
+            gtk_combo_box_set_active(sdStrategie, kern.SP_DIAGONAL)
+            PRINT "vor dem vergleich: "; kern.spName$(gtk_combo_box_get_active(sdStrategie)); " | "; vfSumme$()
+            sdAlleVergleichen(0, 0)
+            PRINT "verglichen: "; kern.spName$(gtk_combo_box_get_active(sdStrategie)); " | "; vfSumme$(); " | vergleich sichtbar "; gtk_widget_get_visible(sdVergleich)
+            DIM r AS kern.Stickpfad
+            FOR EACH r IN sdVergleiche
+                PRINT "  "; sdKurzname$(r.strategie); " "; FORMAT$(r.distanz, "%.1f"); " "; r.spruenge; " "; FORMAT$(r.garnCm, "%.0f"); " "; kern.spBewertung$(r.distanz, sdVergleiche[0].distanz)
+            NEXT
+        CASE 5
+            ' erst jetzt: die eben gezeigte Tabelle hat im selben Schritt noch keine Groesse
+            ok = vfDialogFoto("stickpfad_vergleich")
+            DIM ziel AS STRING : ziel = IIF(fotoZiel <> "", fotoZiel, PATHJOIN(TEMPDIR$(), "glutfaden_stufe7"))
+            PRINT "text: ["; sdTextSichern$(ziel + "_plan.txt"); "] "; LEFT$(READLINES(ziel + "_plan.txt")[4], 99)
+            PRINT "bild: "; sdBildSichern(ziel + "_pfad.png")
+            DIM b AS IMAGE : b = LOADIMAGE(ziel + "_pfad.png")
+            PRINT "  "; IMAGE_WIDTH(b); " x "; IMAGE_HEIGHT(b); " = "; lwMuster.breite * 15 + 60; " x "; lwMuster.hoehe * 15 + 120
+            DIM ordner AS STRING : ordner = ziel + "_alle"
+            IF NOT DIREXISTS(ordner) THEN MKDIR(ordner)
+            DIM fehler AS ARRAY OF STRING
+            PRINT "alle: "; sdAlleBilder(ordner, fehler); " fehler "; LEN(fehler)
+            DIM namen AS ARRAY OF STRING : namen = DIRLIST(ordner)
+            SORT(namen)
+            PRINT "  "; JOIN$(namen, ", ")
+            ' Grund nach der Helligkeit des Garns (dunkel -> hell, hell -> dunkel),
+            ' ein Stich in seiner Farbe, die Legende unten
+            DIM k AS INTEGER
+            FOR k = 0 TO 1
+                DIM pb AS IMAGE : pb = LOADIMAGE(PATHJOIN(ordner, namen[k]))
+                DIM q AS kern.Farbpfad : q = sdErg.pfade[k]
+                PRINT "  "; namen[k]; ": grund "; kern.farbeAlsHex$(GETPIXEL(pb, 3, 3)); " stich 3 "; kern.farbeAlsHex$(GETPIXEL(pb, 30 + q.xs[2] * 15 + 13, 30 + q.ys[2] * 15 + 2)); " garn "; kern.farbeAlsHex$(lwMuster.farben[q.farbe].garn.farbe)
+            NEXT
+            gtk_widget_destroy(sdDialog)
+            sdDialog = 0
+        CASE 6
+            DIM ed AS INTEGER : ed = exDialogBauen()
+            PRINT "export: stickpfad vorgewaehlt "; gtk_toggle_button_get_active(exStickpfad)
+            gtk_toggle_button_set_active(exStickpfad, FALSE)
+            exWahlMerken()
+            gtk_widget_destroy(ed)
+            PRINT "abgewaehlt gemerkt: "; NOT exWahlStickpfad
+            exWahlStickpfad = TRUE
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' Stufe 8: auswerten -- Statistik (alle Reiter, CSV), Heatmap, aehnliche
+' Farben zusammenfuehren und zuruecknehmen, Farbenblindheit der Ansicht.
+FUNCTION vfFoto(w AS INTEGER, name AS STRING) AS BOOLEAN
+    IF fotoZiel = "" THEN RETURN TRUE
+    DIM ok AS BOOLEAN : ok = gtkFoto(w, fotoZiel + "_" + name + ".png")
+    IF NOT ok THEN PRINT "Foto nicht gesichert: "; name
+    RETURN ok
+END FUNCTION
+
+FUNCTION vfKarten$(namen AS ARRAY OF STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM n AS STRING
+    FOR EACH n IN namen
+        ARRAY_PUSH(t, n + "=" + adWort$(n))
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION
+
+FUNCTION vorfuehrenStufe8(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM ziel AS STRING : ziel = IIF(fotoZiel <> "", fotoZiel, PATHJOIN(TEMPDIR$(), "glutfaden_stufe8"))
+    SELECT CASE schritt
+        CASE 1
+            DIM d AS INTEGER : d = adStatistikBauen()
+            PRINT "statistik: "; vfKarten$(["groesse", "stiche", "farben", "rueckstiche", "abdeckung", "ebenen", "schwierigkeit"])
+            PRINT "  tipp: "; REPLACE$(TEXT_AUS_ZEIGER$(gtk_widget_get_tooltip_text(MAPGET(adKarten, "schwierigkeit"))), CHR$(10), " / ")
+            DIM i AS INTEGER
+            FOR i = 0 TO 4
+                PRINT "  top: "; gtk_label_get_text(adTop[3 * i + 1]); " "; TEXT_AUS_ZEIGER$(gtk_progress_bar_get_text(adTop[3 * i + 2]))
+            NEXT
+        CASE 2
+            ok = vfFoto(adDialog, "statistik")
+            gtk_combo_box_set_active(adStoff, 3)
+            gtk_spin_button_set_value(adZuschlag, 0)
+            gtk_spin_button_set_value(adPreis, 0.95)
+            PRINT "garn 18/0/0.95: "; gtk_label_get_text(adGarnSumme); " | "; gtk_label_get_text(adGarnKosten); " | "; adGarnLetzte.zeilen[1].garn.name; " "; FORMAT$(adGarnLetzte.zeilen[1].genau, "%.2f"); " Stränge"
+            gtk_notebook_set_current_page(adReiter, 2)
+        CASE 3
+            ok = vfFoto(adDialog, "statistik_garn")
+            gtk_combo_box_set_active(adErfahrung, 3)
+            gtk_spin_button_set_value(adStunden, 12)
+            PRINT "zeit Profi 12 h: "; vfKarten$(["gesamtzeit", "tage", "jestunde", "jefarbe"])
+            PRINT "fortschritt: "; TEXT_AUS_ZEIGER$(gtk_progress_bar_get_text(adBalken)); " | "; gtk_label_get_text(adBalkenText); " | "; vfKarten$(["erledigt", "verbleibend", "farbenfertig"])
+            PRINT "csv: ["; adCsvSichern$(ziel + "_statistik.csv"); "] wie kern bei 18/0/0.95: "; BUFFER_TO_STRING$(READALL_BYTES(ziel + "_statistik.csv")) = kern.statistikCsv$(lwMuster, 18, 0, 0.95)
+            gtk_notebook_set_current_page(adReiter, 4)
+        CASE 4
+            ok = vfFoto(adDialog, "statistik_fortschritt")
+            gtk_widget_destroy(adDialog)
+            adDialog = 0
+            DIM hd AS INTEGER : hd = hmBauen()
+            PRINT "heatmap: "; gtk_label_get_text(hmText)
+            gtk_combo_box_set_active(hmAchse, 1)
+            gtk_range_set_value(hmBloecke, 3)
+            PRINT "heatmap: "; gtk_label_get_text(hmText); " | "; gtk_label_get_text(hmBlockText)
+        CASE 5
+            ok = vfFoto(hmDialog, "heatmap")
+            gtk_widget_destroy(hmDialog)
+            hmDialog = 0
+            DIM ad AS INTEGER : ad = aeBauen()
+            PRINT "aehnlich 10: "; gtk_label_get_text(aeZahl); " | knopf "; gtk_widget_get_sensitive(aeKnopf)
+            gtk_range_set_value(aeSchwelle, 3)
+            PRINT "aehnlich 3: "; gtk_label_get_text(aeZahl)
+            gtk_range_set_value(aeSchwelle, 25)
+            PRINT "aehnlich 25: "; gtk_label_get_text(aeZahl)
+            aeAlle(0, 1)
+            PRINT "alle gewaehlt, widerspruch: "; LEFT$(aeZusammenfuehren$(), 40)
+            aeAlle(0, 0)
+            PRINT "keins gewaehlt: "; aeZusammenfuehren$()
+            gtk_range_set_value(aeSchwelle, 10)
+            aeAlle(0, 1)
+        CASE 6
+            ok = vfFoto(aeDialog, "aehnlich")
+            DIM vorher AS INTEGER : vorher = lwMuster.farbanzahl()
+            PRINT "zusammenfuehren: ["; aeZusammenfuehren$(); "] "; vorher; " -> "; lwMuster.farbanzahl(); " | "; meldung
+            gtk_widget_destroy(aeDialog)
+            aeDialog = 0
+            werkzeugZurueck()
+            PRINT "rueckgaengig: "; lwMuster.farbanzahl(); " farben, "; LEN(lwMuster.rueckstiche); " rueckstiche"
+        CASE 7
+            gtk_toggle_button_set_active(fbKnoepfe[2], TRUE)
+            PRINT "farbenblind: "; fbArt; " | "; LEFT$(meldung, 40); " | anzeige wie kern "; lwRgb[2] = kern.farbenblind(lwMuster.farben[2].garn.farbe, kern.FARBENBLIND_DEUTERANOPIE); " | muster unveraendert "; NOT istGeaendert()
+        CASE 8
+            foto("farbenblind")
+            gtk_toggle_button_set_active(fbKnoepfe[0], TRUE)
+            PRINT "zurueck: "; fbArt; " | anzeige "; lwRgb[2] = lwMuster.farben[2].garn.farbe
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+
+' Stufe 9: planen und Vorrat -- Garn-Vorrat (drei Reiter, sichern),
+' Einkaufsliste in der Statistik, Palette konvertieren und zuruecknehmen,
+' Farben tauschen und zuruecknehmen, Rahmenaufteilung. Der Vorrat liegt im
+' Einstellungsordner (APPDATA bzw. HOME) -- eine Pruefung setzt ihn um.
+FUNCTION vfZeilen$(liste AS ARRAY OF kern.Einkaufszeile) AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM z AS kern.Einkaufszeile
+    FOR EACH z IN liste
+        ARRAY_PUSH(t, z.schluessel + " " + STR$(z.benoetigt) + "/" + STR$(z.vorhanden) + "/" + STR$(z.kaufen))
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION
+
+FUNCTION vfSichtbar(zeilen AS ARRAY OF INTEGER) AS INTEGER
+    DIM n AS INTEGER
+    DIM z AS INTEGER
+    FOR EACH z IN zeilen
+        IF gtk_widget_get_visible(z) THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+
+DIM vfTausch AS INTEGER
+
+FUNCTION vorfuehrenStufe9(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM i AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            DIM d AS INTEGER : d = vdBauen()
+            PRINT "vorrat datei: "; BASENAME(pdVorratDatei$()); " | "; BASENAME(DIRNAME(pdVorratDatei$()))
+            PRINT "im muster: "; LEN(vdMSchl); " zeilen"
+            FOR i = 0 TO LEN(vdMSchl) - 1
+                PRINT "  "; vdMSchl[i]; " bedarf "; vdMBedarf[i]; " bestand "; gtk_spin_button_get_value_as_int(vdMSpin[i]); " kaufen "; gtk_label_get_text(vdMKauf[i])
+            NEXT
+            PRINT "alle: "; JOIN$(vdASchl, " | ")
+            gtk_spin_button_set_value(vdMSpin[0], 5)
+            PRINT "gesetzt "; vdMSchl[0]; " = 5: vorrat "; vdVorrat.holeSchluessel(vdMSchl[0]); " | kaufen "; gtk_label_get_text(vdMKauf[0]); " | geaendert "; vdGeaendert
+            DIM j AS INTEGER
+            FOR j = 0 TO LEN(vdASchl) - 1
+                IF vdASchl[j] = vdMSchl[0] THEN PRINT "  im zweiten reiter: "; gtk_spin_button_get_value_as_int(vdASpin[j])
+            NEXT
+            gtk_spin_button_set_value(vdMSpin[1], 0)
+            PRINT "auf 0: "; vdMSchl[1]; " im vorrat "; MAPHAS(vdVorrat.daten, vdMSchl[1])
+        CASE 2
+            ok = vfFoto(vdDialog, "vorrat")
+            gtk_notebook_set_current_page(vdReiter, 1)
+            gtk_entry_set_text(vdASuche, "dmc")
+            vdFiltern(0, 0)
+            PRINT "suche dmc: "; vfSichtbar(vdAZeile); " von "; LEN(vdAZeile)
+            gtk_entry_set_text(vdASuche, "")
+            vdFiltern(0, 0)
+            gtk_spin_button_set_value(vdASpin[0], 7)
+            PRINT "zweiter reiter "; vdASchl[0]; " = 7: vorrat "; vdVorrat.holeSchluessel(vdASchl[0])
+            PRINT "leere entfernt: "; vdVorrat.leereEntfernen(); " | "; JOIN$(vdVorrat.schluessel(), " | ")
+            vdAlleFuellen()
+        CASE 3
+            ok = vfFoto(vdDialog, "vorrat_alle")
+            vdProjektAufnehmen(musterPfad)
+            vdProjektAufnehmen(musterPfad)
+            PRINT "projekte: "; LEN(vdProjekte.pfade); " | "; BASENAME(vdProjekte.pfade[0]); " | warnung "; gtk_widget_get_visible(vdPWarnung)
+            PRINT "mehrere: "; gtk_label_get_text(vdPSumme)
+            PRINT "  wie kern: "; vfZeilen$(kern.einkaufslisteMehrere(vdPMuster, vdVorrat, 20)) = vfZeilen$(kern.einkaufsliste(lwMuster, vdVorrat, 20))
+            vdProjektAufnehmen(PATHJOIN(DIRNAME(musterPfad), "gibt_es_nicht.pxs"))
+            PRINT "fehlt: "; gtk_widget_get_visible(vdPWarnung); " | "; LEFT$(gtk_label_get_text(vdPWarnung), 40)
+            vdProjekte.entfernen(PATHJOIN(DIRNAME(musterPfad), "gibt_es_nicht.pxs"))
+            vdProjekteFuellen()
+            gtk_notebook_set_current_page(vdReiter, 2)
+        CASE 4
+            ok = vfFoto(vdDialog, "vorrat_projekte")
+            PRINT "sichern: "; vdAntwort(GTK_ANTWORT_OK)
+            gtk_widget_destroy(vdDialog)
+            vdDialog = 0
+            vdPTabelle = 0
+            DIM gelesen AS kern.Vorrat : gelesen = kern.vorratLaden(pdVorratDatei$())
+            PRINT "gelesen: "; JOIN$(gelesen.schluessel(), " | ")
+            PRINT "projekte gelesen: "; LEN(kern.projektlisteLaden(pdProjekteDatei$()).pfade)
+            ' bei 32 ct liegt Rot zwischen 0 und 50 % Zuschlag ueber einer Stranggrenze
+            lwMuster.stoff = 32
+            d = adStatistikBauen()
+            gtk_notebook_set_current_page(adReiter, 5)
+            PRINT "einkauf 32 ct 20 %: "; gtk_label_get_text(adEinkaufSumme); " | wie kern "; vfZeilen$(adEinkaufLetzte) = vfZeilen$(kern.einkaufsliste(lwMuster, gelesen, 20))
+            gtk_spin_button_set_value(adZuschlag, 0)
+            PRINT "einkauf 0 %: "; gtk_label_get_text(adEinkaufSumme); " | "; vfZeilen$(adEinkaufLetzte)
+            gtk_spin_button_set_value(adZuschlag, 50)
+            PRINT "einkauf 50 %: "; gtk_label_get_text(adEinkaufSumme); " | "; vfZeilen$(adEinkaufLetzte)
+            PRINT "  wie kern: "; vfZeilen$(adEinkaufLetzte) = vfZeilen$(kern.einkaufsliste(lwMuster, gelesen, 50))
+        CASE 5
+            ok = vfFoto(adDialog, "statistik_einkauf")
+            gtk_widget_destroy(adDialog)
+            adDialog = 0
+            lwMuster.stoff = 16
+            DIM pd AS INTEGER : pd = pkBauen()
+            PRINT "palette: "; pkNamen[gtk_combo_box_get_active(pkWahl)]; " "; gtk_label_get_text(pkInfo)
+            FOR i = 0 TO LEN(pkNamen) - 1
+                IF pkNamen[i] = "Anchor" THEN gtk_combo_box_set_active(pkWahl, i)
+            NEXT
+            PRINT "anchor: "; gtk_label_get_text(pkInfo); " | "; gtk_label_get_text(pkSumme)
+            PRINT "  ziel 1: "; pkPalette.garne[pkZiele[1]].nummer; " "; FORMAT$(pkAbstaende[1], "%.1f"); " | kollisionen "; JOIN$(kern.umwandlungKollisionen(lwMuster, pkPalette, pkZiele), " / ")
+        CASE 6
+            ok = vfFoto(pkDialog, "palette")
+            DIM alt AS STRING : alt = lwMuster.farben[1].garn.hersteller + " " + lwMuster.farben[1].garn.nummer
+            DIM sym AS STRING : sym = lwMuster.farben[1].symbol
+            pkKonvertieren()
+            PRINT "konvertiert: "; alt; " -> "; lwMuster.farben[1].garn.hersteller; " "; lwMuster.farben[1].garn.nummer; " | symbol bleibt "; lwMuster.farben[1].symbol = sym; " | "; meldung
+            gtk_widget_destroy(pkDialog)
+            pkDialog = 0
+            werkzeugZurueck()
+            PRINT "rueckgaengig: "; lwMuster.farben[1].garn.hersteller; " "; lwMuster.farben[1].garn.nummer
+            vfTausch = ftBauen()
+            gtk_combo_box_set_active(ftA, 1)
+            gtk_combo_box_set_active(ftB, 3)
+            PRINT "tauschen: "; gtk_label_get_text(ftInfo)
+        CASE 7
+            ok = vfFoto(vfTausch, "tauschen")
+            gtk_widget_destroy(vfTausch)
+            DIM vor1 AS INTEGER : vor1 = lwMuster.farben[1].stichzahl
+            DIM vor3 AS INTEGER : vor3 = lwMuster.farben[3].stichzahl
+            tauschenAusfuehren(1, 3)
+            PRINT "getauscht: "; meldung; " | zahlen "; vor1; " "; vor3; " -> "; lwMuster.farben[1].stichzahl; " "; lwMuster.farben[3].stichzahl
+            werkzeugZurueck()
+            PRINT "rueckgaengig: "; lwMuster.farben[1].stichzahl; " "; lwMuster.farben[3].stichzahl
+            DIM rd AS INTEGER : rd = rdBauen()
+            PRINT "rahmen: "; gtk_label_get_text(rdSumme)
+            gtk_spin_button_set_value(rdBreite, 12)
+            gtk_spin_button_set_value(rdHoehe, 10)
+            gtk_spin_button_set_value(rdUeber, 2)
+            PRINT "rahmen 12x10/2: "; gtk_label_get_text(rdSumme); " | sektoren "; LEN(rdPlan.sektoren)
+            DIM letzt AS INTEGER : letzt = LEN(rdPlan.sektoren) - 1
+            PRINT "  erster "; rdPlan.sektoren[0].x0; ".."; rdPlan.sektoren[0].x1 - 1; " letzter "; rdPlan.sektoren[letzt].x0; ".."; rdPlan.sektoren[letzt].x1 - 1
+        CASE 8
+            ok = vfFoto(rdDialog, "rahmen")
+            gtk_spin_button_set_value(rdUeber, 20)
+            PRINT "ueberlappung geklemmt: "; gtk_spin_button_get_value_as_int(rdUeber)
+            rdVorlage(0, 0)
+            PRINT "vorlage 4 zoll: "; gtk_spin_button_get_value_as_int(rdBreite); " | "; gtk_label_get_text(rdSumme)
+            gtk_spin_button_set_value(rdHoehe, 5)
+            PRINT "hoehe unter 10: "; gtk_spin_button_get_value_as_int(rdHoehe)
+            gtk_widget_destroy(rdDialog)
+            rdDialog = 0
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' --- Stufe 10: Muster anlegen und verwalten -----------------------------------------
+DIM vfVgl AS INTEGER
+
+FUNCTION vfListeZahl(liste AS INTEGER) AS INTEGER
+    DIM n AS INTEGER
+    WHILE gtk_list_box_get_row_at_index(liste, n) <> 0
+        n = n + 1
+    WEND
+    RETURN n
+END FUNCTION
+
+FUNCTION vorfuehrenStufe10(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM f AS STRING
+    DIM i AS INTEGER
+    DIM d AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            d = ehBauen()
+            PRINT "eigenschaften: stoff "; kern.stoffBezeichnung$(lwMuster); " | autor '"; gtk_entry_get_text(ehAutor); "' | begonnen "; gtk_toggle_button_get_active(ehBegonnen)
+            gtk_entry_set_text(ehAutor, "Anna Schmidt")
+            gtk_entry_set_text(ehCopyright, "© 2026 Anna Schmidt")
+            gtk_text_buffer_set_text(gtk_text_view_get_buffer(ehNotizen), "Zeile eins" + CHR$(10) + "Zeile zwei", -1)
+            gtk_toggle_button_set_active(ehBegonnen, TRUE)
+            gtk_entry_set_text(ehDatum, "31.02.2026")
+            DIM geaendert AS BOOLEAN
+            PRINT "31.02.: "; ehUebernehmen$(geaendert); " | autor im muster '"; kern.eigenschaft$(lwMuster, "author"); "'"
+            gtk_entry_set_text(ehDatum, "3.2.2026")
+            PRINT "3.2.: '"; ehUebernehmen$(geaendert); "' geaendert "; geaendert
+            PRINT "  im muster: "; kern.eigenschaft$(lwMuster, "author"); " | "; kern.eigenschaft$(lwMuster, "copyright"); " | "; kern.eigenschaft$(lwMuster, "started_date"); " | notizen "; LEN(SPLIT$(kern.notizen$(lwMuster), CHR$(10))); " zeilen"
+            PRINT "  nochmal: '"; ehUebernehmen$(geaendert); "' geaendert "; geaendert
+        CASE 2
+            ok = vfFoto(ehDialog, "eigenschaften")
+            gtk_widget_destroy(ehDialog)
+            ehDialog = 0
+            d = ehBauen()
+            PRINT "wieder geoeffnet: "; gtk_entry_get_text(ehDatum); " "; gtk_toggle_button_get_active(ehBegonnen)
+            gtk_widget_destroy(ehDialog)
+            ehDialog = 0
+            DIM b0 AS INTEGER : b0 = lwMuster.breite
+            DIM h0 AS INTEGER : h0 = lwMuster.hoehe
+            d = grBauen()
+            PRINT "groesse: "; gtk_spin_button_get_value_as_int(grBreite); " x "; gtk_spin_button_get_value_as_int(grHoehe)
+            gtk_widget_destroy(grDialog)
+            grDialog = 0
+            PRINT "gleich: "; grAusfuehren(b0, h0, FALSE)
+            ok = grAusfuehren(b0 + 10, h0 + 6, FALSE)
+            PRINT "groesser: "; lwMuster.breite; " x "; lwMuster.hoehe; " | "; meldung
+            werkzeugZurueck()
+            PRINT "rueckgaengig: "; lwMuster.breite; " x "; lwMuster.hoehe
+            werkzeugVor()
+            PRINT "wiederholt: "; lwMuster.breite; " x "; lwMuster.hoehe
+            werkzeugZurueck()
+            d = grBauen()
+            gtk_spin_button_set_value(grBreite, 20)
+            gtk_toggle_button_set_active(grSmart, TRUE)
+        CASE 3
+            ok = vfFoto(grDialog, "groesse")
+            PRINT "dialog: "; gtk_spin_button_get_value_as_int(grBreite); " x "; gtk_spin_button_get_value_as_int(grHoehe); " smart "; gtk_toggle_button_get_active(grSmart)
+            gtk_widget_destroy(grDialog)
+            grDialog = 0
+            DIM st0 AS INTEGER : st0 = lwMuster.sticheGesamt()
+            ok = grAusfuehren(20, 15, TRUE)
+            PRINT "smart: "; lwMuster.breite; " x "; lwMuster.hoehe; " stiche "; st0; " -> "; lwMuster.sticheGesamt(); " | "; meldung
+            werkzeugZurueck()
+            PRINT "rueckgaengig: "; lwMuster.breite; " x "; lwMuster.hoehe; " stiche "; lwMuster.sticheGesamt()
+            ' Schnappschuesse
+            PRINT "schluessel: "; vwSchluessel$(); " | ordner "; BASENAME(DIRNAME(kern.schnappschussOrdner$(vwSchluessel$())))
+            PRINT "vorher: "; LEN(kern.schnappschuesse(vwSchluessel$()))
+            vwSchnappschussWennFaellig()
+            vwSchnappschussWennFaellig()
+            PRINT "zweimal faellig: "; LEN(kern.schnappschuesse(vwSchluessel$()))
+            f = kern.schnappschussAnlegen(lwMuster, vwSchluessel$(), ZEIT_JETZT() - 3600, kern.SCHNAPPSCHUESSE_HOECHSTENS)
+            PRINT "aelter angelegt: "; LEN(kern.schnappschuesse(vwSchluessel$())); " | neuester zuerst "; kern.schnappschussZeit(kern.schnappschuesse(vwSchluessel$())[0]) > kern.schnappschussZeit(f)
+            d = vsBauen()
+            PRINT "versionen: "; vfListeZahl(vsListe); " eintraege | knoepfe "; gtk_widget_get_sensitive(vsKnoepfe[0])
+            gtk_list_box_select_row(vsListe, gtk_list_box_get_row_at_index(vsListe, 0))
+            ' das Datum ist das von heute -- die Uhrzeit wechselt, darum nur der Tag
+            DIM detail AS ARRAY OF STRING : detail = SPLIT$(gtk_label_get_text(vsDetail), CHR$(10))
+            PRINT "gewaehlt: "; gtk_widget_get_sensitive(vsKnoepfe[0]); " | heute "; LEFT$(detail[0], 17) = "Datum: " + ZEIT_FORMAT$(ZEIT_JETZT(), "TT.MM.JJJJ"); " | "; detail[1]
+        CASE 4
+            ok = vfFoto(vsDialog, "versionen")
+            ' eine Zelle aendern, eine wegnehmen, dann vergleichen
+            DIM e0 AS kern.Ebene : e0 = lwMuster.ebenen.ebenen[0]
+            DIM k AS INTEGER
+            DIM erst AS INTEGER : erst = -1
+            FOR k = 0 TO LEN(e0.raster) - 1
+                IF e0.raster[k] >= 0 AND erst < 0 THEN erst = k
+            NEXT
+            e0.raster[erst] = -1
+            e0.raster[LEN(e0.raster) - 1] = 1
+            lwMuster.stichzahlenNeu()
+            PRINT "vergleich offen: "; vsAntwort(VS_VERGLEICH, FALSE)
+            vfVgl = vgFenster
+            PRINT "vergleich: neu "; vgErgebnis.neu; " weg "; vgErgebnis.weg; " anders "; vgErgebnis.anders; " | "; vgErgebnis.breite; " x "; vgErgebnis.hoehe
+        CASE 5
+            ok = vfFoto(vfVgl, "vergleich")
+            gtk_widget_destroy(vfVgl)
+            vgFenster = 0
+            DIM vorher AS INTEGER : vorher = LEN(vsDateien)
+            gtk_list_box_select_row(vsListe, gtk_list_box_get_row_at_index(vsListe, vorher - 1))
+            PRINT "loeschen bleibt offen: "; vsAntwort(VS_LOESCHEN, FALSE); " | "; vorher; " -> "; LEN(vsDateien); " | eintraege "; vfListeZahl(vsListe)
+            gtk_list_box_select_row(vsListe, gtk_list_box_get_row_at_index(vsListe, 0))
+            DIM pfadVorher AS STRING : pfadVorher = musterPfad
+            PRINT "wiederherstellen schliesst: "; NOT vsAntwort(VS_WIEDER, FALSE)
+            PRINT "  pfad leer "; musterPfad = ""; " | ungesichert "; istGeaendert(); " | kennung bleibt "; vwSchluessel$() <> ""; " | "; LEFT$(meldung, 15)
+            gtk_widget_destroy(vsDialog)
+            vsDialog = 0
+            ' Stickzeit
+            werkzeugWaehlen(WZ_FORTSCHRITT, FALSE)
+            PRINT "stickzeit laeuft: "; kern.stickzeitLaeuft(lwMuster)
+            kern.stickzeitStart(lwMuster, ZEIT_UNIX() - 125)
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            PRINT "stickzeit: "; meldung; " | laeuft "; kern.stickzeitLaeuft(lwMuster)
+            werkzeugWaehlen(WZ_FORTSCHRITT, FALSE)
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            PRINT "sofort wieder weg: "; meldung
+            ' eigene Vorlagen
+            PRINT "vorlage leer: "; vlSichern$("  ", "Eigene", "")
+            PRINT "vorlage: '"; vlSichern$("Probe", "", "Ein Test"); "' | doppelt: "; vlSichern$("Probe", "Eigene", "")
+            PRINT "vorlage 2: '"; vlSichern$("Zweite", "Kissen", ""); "' | datei "; BASENAME(vwVorlagenDatei$())
+            vlDaten = kern.eigeneVorlagen(vwVorlagenDatei$())
+            PRINT "umbenennen auf vergeben: "; vlAendern$(0, "Zweite", FALSE)
+            PRINT "umbenennen: '"; vlAendern$(0, "Erste", FALSE); "'"
+            PRINT "loeschen: '"; vlAendern$(1, "", TRUE); "'"
+            DIM vv AS kern.Vorlage
+            FOR EACH vv IN kern.eigeneVorlagen(vwVorlagenDatei$())
+                PRINT "  "; vv.name; " "; vv.breite; "x"; vv.hoehe; " "; vv.stoff; " "; vv.kategorie; " '"; vv.beschreibung; "'"
+            NEXT
+            ' Neues Muster
+            d = nmBauen()
+            PRINT "neu: karten "; LEN(nmListe); " | breite "; gtk_spin_button_get_value_as_int(nmBreite); " | "; REPLACE$(gtk_label_get_text(nmInfo), CHR$(10), " / ")
+            gtk_toggle_button_set_active(nmKategorien[1], TRUE)
+            PRINT "eigene: "; LEN(nmListe); " | gewaehlt "; nmName$(); " "; gtk_spin_button_get_value_as_int(nmBreite); "x"; gtk_spin_button_get_value_as_int(nmHoehe); " | felder frei "; gtk_widget_get_sensitive(nmBreite)
+            gtk_toggle_button_set_active(nmKategorien[2], TRUE)
+        CASE 6
+            ok = vfFoto(nmDialog, "neu")
+            PRINT "kategorie "; kern.vorlagenKategorien()[0]; ": "; LEN(nmListe); " karten | "; nmName$(); " "; gtk_spin_button_get_value_as_int(nmBreite); "x"; gtk_spin_button_get_value_as_int(nmHoehe)
+            gtk_toggle_button_set_active(nmKarten[1], TRUE)
+            PRINT "zweite karte: "; nmName$(); " "; gtk_spin_button_get_value_as_int(nmBreite); "x"; gtk_spin_button_get_value_as_int(nmHoehe)
+            gtk_toggle_button_set_active(nmKategorien[0], TRUE)
+            gtk_combo_box_set_active(nmDpWahl, 2)
+            PRINT "dp: "; kern.dpVorlagenNamen()[2]; " "; gtk_spin_button_get_value_as_int(nmBreite); "x"; gtk_spin_button_get_value_as_int(nmHoehe); " dp "; nmDp
+            nmAnlegen()
+            PRINT "angelegt: "; lwMuster.breite; "x"; lwMuster.hoehe; " "; lwMuster.modus; " stoff "; INT(lwMuster.stoff); " farben "; lwMuster.farbanzahl(); " | "; meldung; " | pfad leer "; musterPfad = ""; " | geaendert "; istGeaendert()
+            gtk_combo_box_set_active(nmDpWahl, 0)
+            gtk_spin_button_set_value(nmBreite, 40)
+            gtk_spin_button_set_value(nmHoehe, 30)
+            gtk_combo_box_set_active(nmStoff, 0)
+            PRINT "eigene werte: "; REPLACE$(gtk_label_get_text(nmInfo), CHR$(10), " / ")
+            nmAnlegen()
+            PRINT "angelegt: "; lwMuster.breite; "x"; lwMuster.hoehe; " "; lwMuster.modus; " stoff "; INT(lwMuster.stoff); " | "; meldung
+            gtk_widget_destroy(nmDialog)
+            nmDialog = 0
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' --- Stufe 11: Farb-Harmonien und Bibliothek -------------------------------------------
+' Die Bibliothek nimmt die Muster im Ordner "sammlung" neben dem Arbeitsordner auf.
+DIM vfHinzu AS INTEGER
+DIM vfGewaehlt AS INTEGER
+
+FUNCTION vfHarmonien$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(hdVorschlaege) - 1
+        DIM v AS kern.Harmonievorschlag : v = hdVorschlaege[i]
+        DIM p AS STRING, b AS STRING, st AS INTEGER
+        (p, b, st) = kern.harmonieBewertung(v.abstand)
+        DIM g AS kern.Garn : g = hdGarn(i)
+        ARRAY_PUSH(t, v.name + " " + IIF(g IS NIL, "-", g.hersteller + " " + g.nummer) + " " + b)
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION
+
+FUNCTION vfBibliothek$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM p AS INTEGER
+    FOR EACH p IN bbPlaetze
+        ARRAY_PUSH(t, bbBib.eintraege[p].name)
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION
+
+FUNCTION vfKategorien$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bbBib.kategorien) - 1
+        DIM n AS INTEGER : n = kern.kategorieZahl(bbBib, bbBib.kategorien[i])
+        IF n > 0 OR i < 2 THEN ARRAY_PUSH(t, bbBib.kategorien[i] + " " + STR$(n))
+    NEXT
+    RETURN JOIN$(t, ", ")
+END FUNCTION
+
+FUNCTION vorfuehrenStufe11(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM i AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            wzFarbe = 2
+            DIM d AS INTEGER : d = hdBauen()
+            DIM q AS kern.Garn : q = lwMuster.farben[hdQuelle].garn
+            PRINT "harmonie: quelle "; q.hersteller; " "; q.nummer; " | palette "; slPaletten[gtk_combo_box_get_active(hdPalWahl)].name; " | "; gtk_label_get_text(hdInfo)
+            PRINT "  "; gtk_label_get_text(hdBeschreibung); " | "; vfHarmonien$()
+            gtk_combo_box_set_active(hdArt, 4)
+            PRINT "tetrade: "; vfHarmonien$()
+            hdKarteKippen(0)
+            hdKarteKippen(2)
+            PRINT "zwei gewaehlt: "; TEXT_AUS_ZEIGER$(gtk_button_get_label(hdHinzu)); " "; gtk_widget_get_sensitive(hdHinzu)
+        CASE 2
+            ok = vfFoto(hdDialog, "harmonie")
+            hdAlle(0, 0)
+            PRINT "keine: "; TEXT_AUS_ZEIGER$(gtk_button_get_label(hdHinzu)); " "; gtk_widget_get_sensitive(hdHinzu)
+            hdAlle(0, 1)
+            PRINT "alle: "; TEXT_AUS_ZEIGER$(gtk_button_get_label(hdHinzu))
+            DIM vorher AS INTEGER : vorher = lwMuster.farbanzahl()
+            vfHinzu = hdHinzufuegen()
+            PRINT "hinzugefuegt: "; vfHinzu; " | farben "; vorher; " -> "; lwMuster.farbanzahl(); " | "; meldung
+            PRINT "  nochmal: "; hdHinzufuegen(); " | "; meldung
+            gtk_widget_destroy(hdDialog)
+            hdDialog = 0
+            FOR i = 1 TO vfHinzu
+                werkzeugZurueck()
+            NEXT
+            PRINT "rueckgaengig: farben "; lwMuster.farbanzahl(); " | ungesichert "; istGeaendert()
+            ' Bibliothek
+            d = bbBauen()
+            PRINT "bibliothek leer: "; gtk_label_get_text(bbInfo); " | "; vfKategorien$()
+            PRINT "aufgenommen: "; bbAufnehmenAlle(kern.musterDateien(PATHJOIN(STARTDIR$(), "sammlung"))); " | nochmal: "; bbAufnehmenAlle(kern.musterDateien(PATHJOIN(STARTDIR$(), "sammlung")))
+            PRINT "  "; vfBibliothek$(); " | "; gtk_label_get_text(bbInfo)
+            PRINT "  "; vfKategorien$()
+            bbVorschauAlle()
+            PRINT "vorschaubilder: "; LEN(DIRLIST(bbThumbOrdner$(), "*.png"))
+        CASE 3
+            ok = vfFoto(bbDialog, "bibliothek")
+            gtk_combo_box_set_active(bbSort, 2)
+            PRINT "nach groesse: "; vfBibliothek$()
+            bbWaehlen(bbPlaetze[0])
+            PRINT "gewaehlt: "; gtk_label_get_text(bbDetail); " | oeffnen "; gtk_widget_get_sensitive(bbOeffnen)
+            gtk_entry_set_text(bbTags, " rot, gross ,, ")
+            gtk_text_buffer_set_text(gtk_text_view_get_buffer(bbNotizen), "Für den Flur  ", -1)
+            vfGewaehlt = bbGewaehlt
+            bbWaehlen(bbPlaetze[1])
+            PRINT "uebernommen: "; JOIN$(bbBib.eintraege[vfGewaehlt].tags, "|"); " | '"; bbBib.eintraege[vfGewaehlt].notizen; "'"
+            gtk_entry_set_text(bbSuche, "ROT")
+            bbFuellen()
+            PRINT "suche rot: "; vfBibliothek$(); " | "; gtk_label_get_text(bbInfo)
+            gtk_entry_set_text(bbSuche, "")
+            bbFavorit(vfGewaehlt)
+            bbKategorieKippen(vfGewaehlt, "Tiere")
+            PRINT "favorit und tiere: "; vfKategorien$()
+            gtk_list_box_select_row(bbKatListe, gtk_list_box_get_row_at_index(bbKatListe, 1))
+            PRINT "favoriten: "; vfBibliothek$()
+            PRINT "alle loeschen: "; bbKategorieLoeschen(0, FALSE); " | tiere loeschen: "; bbKategorieLoeschen(ARRAY_INDEXOF(bbBib.kategorien, "Tiere"), FALSE); " | "; vfKategorien$()
+            gtk_list_box_select_row(bbKatListe, gtk_list_box_get_row_at_index(bbKatListe, 0))
+            bbWaehlen(vfGewaehlt)
+        CASE 4
+            ok = vfFoto(bbDialog, "bibliothek_auswahl")
+            PRINT "vor dem oeffnen: "; musterTitel
+            bbOeffnenGeklickt(0, 0)
+            PRINT "geoeffnet: "; musterTitel; " | "; meldung; " | zuletzt "; bbBib.eintraege[vfGewaehlt].geoeffnet <> ""
+            bbSchliessen()
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' --- Stufe 12: Muster-Vorschau ---------------------------------------------------------
+' Das Muster aus dem Aufruf; "drills.pxs" neben dem Arbeitsordner fuer das
+' Diamond Painting.
+FUNCTION vfVorschauInfo$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM l AS INTEGER
+    FOR EACH l IN vdlInfo
+        IF gtk_widget_get_visible(l) THEN ARRAY_PUSH(t, gtk_label_get_text(l))
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION
+
+FUNCTION vorfuehrenStufe12(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM i AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            DIM d AS INTEGER : d = vdlBauen(lwMuster)
+            PRINT "vorschau: "; TEXT_AUS_ZEIGER$(gtk_window_get_title(vdlDialog)); " | "; vfVorschauInfo$()
+            PRINT "  "; gtk_label_get_text(vdlArtText)
+        CASE 2
+            PRINT "eingepasst: zoom "; vdlZoom; " zelle "; vdlZelle(); " | regler "; INT(gtk_range_get_value(vdlRegler)); " | "; gtk_label_get_text(vdlZoomText)
+            ok = vfFoto(vdlDialog, "vorschau_stoff")
+            gtk_combo_box_set_active(vdlArt, 1)
+            gtk_combo_box_set_active(vdlStoff, 0)
+            PRINT "pixel, aida 11: "; vfVorschauInfo$(); " | "; LEFT$(gtk_label_get_text(vdlArtText), 14)
+            gtk_combo_box_set_active(vdlStoffFarbe, 6)
+        CASE 3
+            ok = vfFoto(vdlDialog, "vorschau_pixel")
+            gtk_combo_box_set_active(vdlArt, 2)
+            gtk_toggle_button_set_active(vdlFertig, TRUE)
+            PRINT "symbol: stoff waehlbar "; gtk_widget_get_sensitive(vdlStoff); " "; gtk_widget_get_sensitive(vdlStoffFarbe); " | stil "; vdlStil().art; " erledigt "; vdlStil().erledigt
+            vdlKnopf(0, 1)
+            PRINT "1:1: zoom "; vdlZoom; " | "; gtk_label_get_text(vdlZoomText)
+            vdlRadZoom(TRUE, FALSE, 100, 100)
+            PRINT "rad rein: "; vdlZoom; " | rein fein: ";
+            vdlRadZoom(TRUE, TRUE, 100, 100)
+            PRINT vdlZoom; " | raus: ";
+            vdlRadZoom(FALSE, FALSE, 100, 100)
+            PRINT vdlZoom
+            ' gezoomt wird um den Punkt unter der Maus
+            DIM gx AS FLOAT : gx = (100 - vdlPanX) / vdlZelle()
+            DIM gy AS FLOAT : gy = (60 - vdlPanY) / vdlZelle()
+            vdlRadZoom(TRUE, FALSE, 100, 60)
+            PRINT "punkt unter der maus bleibt: "; ABS((100 - vdlPanX) / vdlZelle() - gx) < 0.001 AND ABS((60 - vdlPanY) / vdlZelle() - gy) < 0.001; " | zelle "; vdlZelle()
+            FOR i = 1 TO 40
+                vdlRadZoom(TRUE, FALSE, 0, 0)
+            NEXT
+            PRINT "ganz rein: "; vdlZoom; " zelle "; vdlZelle()
+            FOR i = 1 TO 60
+                vdlRadZoom(FALSE, FALSE, 0, 0)
+            NEXT
+            PRINT "ganz raus: "; vdlZoom; " zelle "; vdlZelle()
+            gtk_range_set_value(vdlRegler, 150)
+            PRINT "regler 150: "; vdlZoom; " | "; gtk_label_get_text(vdlZoomText)
+            vdlEinpassen()
+        CASE 4
+            ok = vfFoto(vdlDialog, "vorschau_symbol")
+            DIM ziel AS STRING : ziel = PATHJOIN(STARTDIR$(), "vorschau_export.png")
+            PRINT "bild: '"; vdlBildSchreiben$(12, ziel); "' | da "; FILEEXISTS(ziel)
+            gtk_widget_destroy(vdlDialog)
+            vdlDialog = 0
+            DIM dp AS kern.Muster : dp = kern.pxsLaden(PATHJOIN(STARTDIR$(), "drills.pxs"))
+            d = vdlBauen(dp)
+            PRINT "drills: arten "; gtk_tree_model_iter_n_children(gtk_combo_box_get_model(vdlArt), 0); " | stoff sichtbar "; gtk_widget_get_visible(vdlStoff); " rueck "; gtk_widget_get_visible(vdlRueck); " | "; vfVorschauInfo$()
+            PRINT "  "; gtk_label_get_text(vdlArtText)
+        CASE 5
+            ok = vfFoto(vdlDialog, "vorschau_drills")
+            gtk_widget_destroy(vdlDialog)
+            vdlDialog = 0
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' --- Stufe 13: Einstellungen -----------------------------------------------------------
+' Der Einstellungsordner kommt aus APPDATA/HOME (die Pruefung setzt ihn um);
+' sie liest danach die einstellungen.json.
+FUNCTION vfKu(kennung AS STRING) AS INTEGER
+    DIM a AS ARRAY OF kern.Kuerzelaktion : a = kern.kuerzelAktionen()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(a) - 1
+        IF a[i].kennung = kennung THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION vfHex$(f AS INTEGER) AS STRING
+    RETURN RIGHT$("000000" + HEX$(f), 6)
+END FUNCTION
+
+FUNCTION vorfuehrenStufe13(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM d AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            d = edBauen()
+            PRINT "vorgaben: raster "; gtk_spin_button_get_value_as_int(edHaupt); "/"; gtk_spin_button_get_value_as_int(edNeben); " zelle "; gtk_spin_button_get_value_as_int(edZelle); " zoom "; gtk_spin_button_get_value(edZoom); " pipette "; gtk_combo_box_get_active(edPipette); " anzeige "; gtk_combo_box_get_active(edAnzeige); " palette "; edPalNamen[gtk_combo_box_get_active(edPalette)]
+            PRINT "farben: "; vfHex$(edFarbe(edFarbeNormal)); " "; vfHex$(edFarbe(edFarbeNeben)); " "; vfHex$(edFarbe(edFarbeHaupt)); " | stoff "; vfHex$(edFarbe(edStoff))
+            PRINT "kuerzel: sichern "; gtk_label_get_text(edKuText[vfKu("sichern")]); " | vor "; gtk_label_get_text(edKuText[vfKu("vor")]); " | zoom_rein "; gtk_label_get_text(edKuText[vfKu("zoom_rein")]); " | "; LEN(edKuText); " Befehle"
+            ok = vfFoto(edDialog, "einstellungen")
+        CASE 2, 3, 4, 5, 6
+            ' jeder Reiter einmal im Bild (gezeichnet wird erst im naechsten Takt)
+            IF schritt > 2 THEN ok = vfFoto(edDialog, "einstellungen_" + STR$(schritt - 2))
+            gtk_notebook_set_current_page(edReiter, schritt - 1)
+        CASE 7
+            ok = vfFoto(edDialog, "einstellungen_kuerzel")
+            gtk_spin_button_set_value(edNeben, 9)
+            gtk_spin_button_set_value(edHaupt, 8)
+            PRINT "neben nach haupt 8: "; gtk_spin_button_get_value_as_int(edNeben)
+            gtk_spin_button_set_value(edNeben, 4)
+            edFarbeSetzen(edFarbeHaupt, &HC00000)
+            gtk_spin_button_set_value(edZelle, 30)
+            gtk_spin_button_set_value(edZoom, 1.5)
+            gtk_combo_box_set_active(edPipette, 1)
+            gtk_spin_button_set_value(edToleranz, 100)
+            gtk_toggle_button_set_active(edDiagonal, TRUE)
+            gtk_toggle_button_set_active(edKatalog, FALSE)
+            gtk_spin_button_set_value(edSymGroesse, 14)
+            gtk_combo_box_set_active(edAnzeige, 2)
+            gtk_spin_button_set_value(edMeldung, 7)
+            gtk_entry_set_text(edAutor, " Anna Müller ")
+            PRINT "kuerzel setzen: '"; edKuSetzen$(vfKu("sichern"), "f2"); "' | '"; edKuSetzen$(vfKu("export"), "F2"); "' | '"; edKuSetzen$(vfKu("export"), "Hyper+X"); "' | '"; edKuSetzen$(vfKu("vorschau"), "Strg+S"); "'"
+            PRINT "angezeigt: "; gtk_label_get_text(edKuText[vfKu("sichern")]); " | "; gtk_label_get_text(edKuText[vfKu("vorschau")])
+            edUebernehmen()
+            PRINT "uebernommen: raster "; einst.rasterHaupt; "/"; einst.rasterNeben; " haupt "; vfHex$(einst.hauptFarbe); " zelle "; einst.zelleStandard; " zoom "; einst.zoomTempo; " pipette "; einst.pipetteDanach; " toleranz "; einst.fuellToleranz; " diagonal "; einst.fuellenDiagonal; " katalog "; einst.katalog; " symbol "; einst.symbolGroesse; " anzeige "; einst.farbAnzeige; " meldung "; einst.meldungSekunden; " autor '"; einst.autor; "'"
+            PRINT "tafel: F2 "; MAPGETOR(einstTafel, "F2", "-"); " | Strg+S "; MAPGETOR(einstTafel, "Strg+S", "-"); " | sichern "; kern.kuerzelVon$(einst, "sichern")
+            PRINT "tooltip: "; TEXT_AUS_ZEIGER$(gtk_widget_get_tooltip_text(kSichern))
+            PRINT "datei: "; FILEEXISTS(einst.pfad)
+            gtk_widget_destroy(edDialog)
+            edDialog = 0
+        CASE 8
+            ok = vfFoto(fenster, "nur_symbol")
+            befehlAusfuehren("zoom_100")
+            PRINT "100 %: zelle "; lwZelle; " | "; leinwandZoomProzent(); " %"
+            befehlAusfuehren("zoom_rein")
+            PRINT "zoom rein: "; leinwandZoomProzent(); " %"
+            ' Fuellen auf der untersten Ebene: gleiche Farben liegen dort auf
+            ' Schraegen -- diagonal haengen sie zusammen, gerade nicht
+            lwMuster.ebenen.aktiv = 0
+            DIM e AS kern.Ebene : e = lwMuster.ebenen.aktiveEbene()
+            DIM fx AS INTEGER : fx = 4
+            DIM fy AS INTEGER : fy = 1
+            wzFarbe = lwMuster.farbanzahl() - 1
+            IF e.raster[fy * e.breite + fx] = wzFarbe THEN wzFarbe = 0
+            PRINT "fuellen: gerade "; LEN(kern.fuellung(e, fx, fy, wzFarbe)) \ 2; " | diagonal mit toleranz "; LEN(wzFuellung(e, fx, fy)) \ 2; " | ziel "; e.raster[fy * e.breite + fx]
+            werkzeugWaehlen(WZ_PIPETTE, FALSE)
+            DIM zug AS INTEGER : zug = wzDruck(fx, fy, 1, FALSE)
+            wzLos(fx, fy, FALSE)
+            PRINT "pipette: werkzeug "; wzAktiv; " | farbe "; wzFarbe; " = "; lwMuster.stich(fx, fy); " | "; meldung
+        CASE 9
+            d = roBauen()
+            roVoreinstellung(0, 2)
+            PRINT "raster-optionen blau: "; gtk_spin_button_get_value_as_int(roHaupt); "/"; gtk_spin_button_get_value_as_int(roNeben); " "; vfHex$(edFarbe(roNormal)); " "; vfHex$(edFarbe(roNebenFarbe)); " "; vfHex$(edFarbe(roHauptFarbe))
+            ok = vfFoto(roDialog, "raster_optionen")
+            roUebernehmen()
+            PRINT "uebernommen: "; einst.rasterHaupt; "/"; einst.rasterNeben; " "; vfHex$(einst.rasterFarbe); " "; vfHex$(einst.nebenFarbe); " "; vfHex$(einst.hauptFarbe)
+            gtk_widget_destroy(roDialog)
+            roDialog = 0
+            ok = vfFoto(fenster, "raster_blau")
+        CASE 10
+            d = edBauen()
+            DIM v AS kern.Einstellungen : v = NEW kern.Einstellungen()
+            edFuellen(v)
+            edUebernehmen()
+            PRINT "zurueckgesetzt: raster "; einst.rasterHaupt; "/"; einst.rasterNeben; " zoom "; einst.zoomTempo; " anzeige "; einst.farbAnzeige; " sichern "; kern.kuerzelVon$(einst, "sichern"); " | eigene kuerzel "; LEN(MAPKEYS(einst.kuerzel)); " | autor '"; einst.autor; "'"
+            gtk_widget_destroy(edDialog)
+            edDialog = 0
+        CASE 11
+            PRINT "zuletzt: "; LEN(zlPfade); " "; BASENAME(zlPfade[0])
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            wzFarbe = 0
+            DIM zug2 AS INTEGER : zug2 = wzDruck(0, 0, 1, FALSE)
+            wzLos(0, 0, FALSE)
+            PRINT "automatisch: "; autosichernJetzt(); " | "; RIGHT$(asZiel$(), 16); " da "; FILEEXISTS(asZiel$())
+            DIM ord AS STRING : ord = asOrdner$()
+            COPYFILE(musterPfad, PATHJOIN(ord, "tot.pxs"))
+            COPYFILE(musterPfad, PATHJOIN(ord, "lebend.pxs"))
+            WRITEALL(PATHJOIN(ord, "lebend.lebt"), "x")
+            DIM v2 AS STRING
+            DIM liste AS ARRAY OF STRING : liste = []
+            FOR EACH v2 IN asVerwaist()
+                ARRAY_PUSH(liste, BASENAME(v2))
+            NEXT
+            PRINT "verwaist: "; JOIN$(liste, " ")
+            DIM gesichert AS BOOLEAN : gesichert = musterSichern(musterPfad)
+            PRINT "gesichert: "; gesichert; " | autosave weg "; NOT FILEEXISTS(musterPfad + ".autosave"); " | bak "; FILEEXISTS(musterPfad + ".bak")
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' --probe-start: was der Start aus den Einstellungen gemacht hat (ohne Datei
+' im Aufruf -- dann gilt die Startaktion), danach zu.
+FUNCTION vorfuehrenStart(daten AS INTEGER) AS BOOLEAN
+    DIM b AS INTEGER, h AS INTEGER
+    gtk_window_get_size(fenster, b, h)
+    IF lwHat THEN
+        PRINT "start: "; musterTitel; " | "; lwMuster.breite; "x"; lwMuster.hoehe; " | datei "; BASENAME(musterPfad); " | werkzeug "; wzAktiv; " | fenster "; b; "x"; h; " | zuletzt "; LEN(zlPfade)
+    ELSE
+        PRINT "start: willkommensseite "; willkommenSichtbar(); " | zuletzt "; LEN(wkPfade); " | werkzeug "; wzAktiv; " | fenster "; b; "x"; h; " | werkzeugzeile gesperrt "; NOT gtk_widget_get_sensitive(werkzeugzeile)
+        DIM ok AS BOOLEAN : ok = vfFoto(fenster, "willkommen")
+        ' ohne Muster: ein Befehl, der eins braucht, meldet sich nur
+        befehlAusfuehren("export")
+        PRINT "  ohne muster: "; meldung; " | status "; gtk_label_get_text(status)
+        ' die Demo-Kachel: das Beispiel als neues Muster ohne Datei
+        willkommenAktion(3)
+        PRINT "  demo: "; lwHat; " "; musterTitel; " | datei '"; musterPfad; "' | willkommensseite "; willkommenSichtbar(); " | werkzeugzeile frei "; gtk_widget_get_sensitive(werkzeugzeile); " | ungesichert "; istGeaendert()
+    END IF
+    PRINT "kuerzel: "; TEXT_AUS_ZEIGER$(gtk_widget_get_tooltip_text(kSichern)); " | export "; kern.kuerzelVon$(einst, "export"); " | F2 "; MAPGETOR(einstTafel, "F2", "-")
+    ' wie das Kreuz: Fenster messen, dann zu (gemerkt wird beim Ende)
+    werkzeugWaehlen(WZ_LINIE, FALSE)
+    fensterMessen()
+    schliessenErlaubt = TRUE
+    gtk_widget_destroy(fenster)
+    RETURN FALSE
+END FUNCTION
+
+' --- Stufe 14: Farben verwalten ---------------------------------------------------------
+' Das Muster im Aufruf (die Pruefung nimmt eins mit Perle, Drill, einer
+' ungenutzten Farbe und drei Ebenen, davon eine unsichtbar und eine gesperrt).
+' Das Bild: je Ebene und Zelle die GARNFARBE, Typ und erledigt -- ein Umbau,
+' der nur die Reihenfolge aendert, darf daran nichts aendern.
+FUNCTION vfBild$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM e AS kern.Ebene
+    FOR EACH e IN lwMuster.ebenen.ebenen
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(e.raster) - 1
+            IF e.raster[i] >= 0 THEN ARRAY_PUSH(t, HEX$(lwMuster.farben[e.raster[i]].garn.farbe) + ":" + STR$(e.art[i]) + ":" + STR$(e.erledigt[i]))
+            IF e.raster[i] < 0 THEN ARRAY_PUSH(t, "-")
+        NEXT
+    NEXT
+    DIM r AS kern.Rueckstich
+    FOR EACH r IN lwMuster.rueckstiche
+        ' eine Farbnummer ausserhalb der Liste (alte Dateien) als sie selbst
+        DIM rf AS STRING : rf = "#" + STR$(r.farbe)
+        IF r.farbe >= 0 AND r.farbe < lwMuster.farbanzahl() THEN rf = HEX$(lwMuster.farben[r.farbe].garn.farbe)
+        ARRAY_PUSH(t, "r" + STR$(r.x1) + "," + STR$(r.y1) + "," + STR$(r.x2) + "," + STR$(r.y2) + ":" + rf)
+    NEXT
+    RETURN JOIN$(t, " ")
+END FUNCTION
+
+' Das ganze Muster: Liste (Name/Symbol/Faeden) und Bild
+FUNCTION vfAlles$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM f AS kern.Farbeintrag
+    FOR EACH f IN lwMuster.farben
+        ARRAY_PUSH(t, f.garn.name + "/" + f.symbol + "/" + STR$(f.straenge))
+    NEXT
+    RETURN JOIN$(t, "|") + " # " + vfBild$()
+END FUNCTION
+
+FUNCTION vfFvNamen$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM k AS INTEGER
+    FOR EACH k IN fvPlan.folge
+        ARRAY_PUSH(t, lwMuster.farben[k].garn.name + "/" + STR$(fvPlan.straenge[k]))
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION
+
+FUNCTION vfFvKnoepfe$() AS STRING
+    DIM t AS STRING
+    DIM k AS INTEGER
+    FOR EACH k IN fvKnoepfe
+        t = t + IIF(gtk_widget_get_sensitive(k), "1", "0")
+    NEXT
+    RETURN t
+END FUNCTION
+
+SUB vfFvWaehle(stellen AS ARRAY OF INTEGER)
+    gtk_list_box_unselect_all(fvListe)
+    DIM s AS INTEGER
+    FOR EACH s IN stellen
+        gtk_list_box_select_row(fvListe, fvZeilen[s])
+    NEXT
+END SUB
+
+DIM fvAllesVorher AS STRING
+DIM fvBildVorher AS STRING
+
+FUNCTION vorfuehrenStufe14(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM d AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            fvAllesVorher = vfAlles$()
+            fvBildVorher = vfBild$()
+            wzFarbe = 3
+            d = fvBauen()
+            fvFragenAus = TRUE
+            PRINT "kopf: "; gtk_label_get_text(fvKopf)
+            PRINT "liste: "; vfFvNamen$()
+            PRINT "knoepfe ohne wahl: "; vfFvKnoepfe$()
+            vfFvWaehle([3])
+            PRINT "eine gewaehlt: "; vfFvKnoepfe$(); " | "; REPLACE$(gtk_label_get_text(fvInfo), CHR$(10), " / ")
+            vfFvWaehle([1, 4])
+            PRINT "zwei gewaehlt: "; vfFvKnoepfe$(); " | "; REPLACE$(gtk_label_get_text(fvInfo), CHR$(10), " / ")
+            ok = vfFoto(fvDialog, "farben")
+        CASE 2
+            ' nur sortieren: das Bild bleibt, die Reihenfolge nicht
+            gtk_combo_box_set_active(fvSortierung, 4)
+            PRINT "hell -> dunkel: "; vfFvNamen$()
+            PRINT "auswahl folgt: "; LEN(fvGewaehlt()); " | "; REPLACE$(gtk_label_get_text(fvInfo), CHR$(10), " / ")
+            ok = fvUebernehmen()
+            gtk_widget_destroy(fvDialog)
+            fvDialog = 0
+            PRINT "sortiert uebernommen: "; ok; " | bild gleich "; vfBild$() = fvBildVorher; " | aktuelle farbe "; lwMuster.farben[wzFarbe].garn.name; " | "; meldung
+            werkzeugZurueck()
+            PRINT "zurueck: alles wie vorher "; vfAlles$() = fvAllesVorher; " | aktuelle farbe "; lwMuster.farben[wzFarbe].garn.name
+        CASE 3
+            d = fvBauen()
+            fvFragenAus = TRUE
+            vfFvWaehle([0, 2])
+            gtk_spin_button_set_value(fvFaeden, 5)
+            PRINT "faeden 5 fuer zwei: "; vfFvNamen$()
+            gtk_spin_button_set_value(fvAlleFaeden, 4)
+            fvAlleFaedenGeklickt(0, 0)
+            PRINT "alle 4: "; vfFvNamen$()
+            vfFvWaehle([4, 1])
+            fvAktion(0, 5)
+            PRINT "zusammen, die obere bleibt: "; vfFvNamen$(); " | "; gtk_label_get_text(fvKopf)
+            vfFvWaehle([1])
+            fvAktion(0, 3)
+            PRINT "ans ende: "; vfFvNamen$()
+            vfFvWaehle([1])
+            fvAktion(0, 4)
+            PRINT "geloescht: "; vfFvNamen$()
+            fvAktion(0, 6)
+            PRINT "ungenutzte weg: "; vfFvNamen$(); " | "; gtk_label_get_text(fvKopf)
+            gtk_entry_set_text(fvSuche, "dmc")
+            fvFiltern(0, 0)
+            DIM sichtbar AS INTEGER, z AS INTEGER
+            FOR EACH z IN fvZeilen
+                IF gtk_widget_get_visible(z) THEN sichtbar = sichtbar + 1
+            NEXT
+            PRINT "suche dmc: "; sichtbar; " von "; LEN(fvZeilen)
+            gtk_entry_set_text(fvSuche, "")
+            fvFiltern(0, 0)
+            ok = vfFoto(fvDialog, "farben_geplant")
+        CASE 4
+            DIM vor AS INTEGER : vor = lwMuster.farbanzahl()
+            ok = fvUebernehmen()
+            gtk_widget_destroy(fvDialog)
+            fvDialog = 0
+            DIM nachher AS STRING : nachher = vfAlles$()
+            PRINT "uebernommen: "; ok; " | "; vor; " -> "; lwMuster.farbanzahl(); " Farben | aktuelle "; IIF(wzFarbe >= 0, lwMuster.farben[wzFarbe].garn.name, "-"); " | rueckstiche "; LEN(lwMuster.rueckstiche)
+            PRINT "farben: "; vfFarbListe$()
+            werkzeugZurueck()
+            PRINT "zurueck: alles wie vorher "; vfAlles$() = fvAllesVorher
+            werkzeugVor()
+            PRINT "vor: wieder wie danach "; vfAlles$() = nachher; " | aktuelle farbe "; lwMuster.farben[wzFarbe].garn.name
+            werkzeugZurueck()
+        CASE 5
+            ' Abbrechen: der Plan geht verloren, das Muster bleibt
+            d = fvBauen()
+            fvFragenAus = TRUE
+            vfFvWaehle([0, 1, 2])
+            fvAktion(0, 4)
+            fvAktion(0, 6)
+            PRINT "abbrechen nach loeschen: plan "; LEN(fvPlan.folge); " | muster "; lwMuster.farbanzahl()
+            gtk_widget_destroy(fvDialog)
+            fvDialog = 0
+            PRINT "abgebrochen: alles wie vorher "; vfAlles$() = fvAllesVorher
+            ' Zuruecksetzen im Dialog
+            d = fvBauen()
+            vfFvWaehle([0, 1])
+            fvAktion(0, 5)
+            gtk_combo_box_set_active(fvSortierung, 1)
+            fvAktion(0, 7)
+            PRINT "zurueckgesetzt: "; vfFvNamen$(); " | sortierung "; gtk_combo_box_get_active(fvSortierung); " | aendert "; kern.planAnwenden(lwMuster, wzVerlauf, fvPlan)
+            gtk_widget_destroy(fvDialog)
+            fvDialog = 0
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION vfFarbListe$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM f AS kern.Farbeintrag
+    FOR EACH f IN lwMuster.farben
+        ARRAY_PUSH(t, f.garn.name + "/" + STR$(f.straenge) + "/" + STR$(f.stichzahl))
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION
+
+' --- Stufe 15: Zeichenflaeche (Lineale, Uebersicht, Kacheln, Farbverlauf) ---------------
+' Die Zellen der aktiven Ebene entlang einer Punktliste: "x,y=farbe:typ"
+FUNCTION v15Zellen$(p AS ARRAY OF INTEGER) AS STRING
+    DIM e AS kern.Ebene : e = lwMuster.ebenen.aktiveEbene()
+    DIM t AS ARRAY OF STRING : t = []
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(p) - 2 STEP 2
+        DIM i AS INTEGER : i = p[k + 1] * e.breite + p[k]
+        ARRAY_PUSH(t, STR$(p[k]) + "," + STR$(p[k + 1]) + "=" + STR$(e.raster[i]) + ":" + STR$(e.art[i]))
+    NEXT
+    RETURN JOIN$(t, " ")
+END FUNCTION
+
+FUNCTION v15Sichtbar$() AS STRING
+    RETURN "lineale " + STR$(gtk_widget_get_visible(flOben)) + "/" + STR$(gtk_widget_get_visible(flLinks)) + " uebersicht " + STR$(gtk_widget_get_visible(mkBox)) + " verlaufsleiste " + STR$(gtk_widget_get_visible(fvlBox))
+END FUNCTION
+
+DIM v15Vorher AS STRING
+
+FUNCTION vorfuehrenStufe15(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM d AS INTEGER
+    DIM vx AS INTEGER, vy AS INTEGER, vw AS INTEGER, vh AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            PRINT "start: "; v15Sichtbar$(); " | werkzeuge "; WZ_ANZAHL; " | "; kern.werkzeugNamen()[WZ_FARBVERLAUF]; " "; kern.kuerzelVon$(einst, "wz_farbverlauf")
+            PRINT "uebersicht: "; gtk_label_get_text(mkInfo)
+            leinwandZoom(30, 0, 0)
+            lwX = 40 : lwY = 30
+            lwMausX = 4 : lwMausY = 2
+            gtk_widget_queue_draw(lwFlaeche)
+        CASE 2
+            ok = vfFoto(fenster, "flaeche")
+            (vx, vy, vw, vh) = mkAusschnitt()
+            PRINT "minikarte: bild "; mkB; "x"; mkH; " bei "; mkX; ","; mkY; " | ausschnitt "; vx; ","; vy; " "; vw; "x"; vh
+            ' Lineal: Spalte 10 in die Mitte, Zeile 3 in die Mitte
+            linealSpringen(FALSE, 10)
+            linealSpringen(TRUE, 3)
+            DIM mx AS FLOAT : mx = lwX + 10.5 * lwZelle
+            DIM my AS FLOAT : my = lwY + 3.5 * lwZelle
+            PRINT "lineal: spalte 10 in der mitte "; ABS(mx - gtk_widget_get_allocated_width(lwFlaeche) / 2) <= 1; " | zeile 3 "; ABS(my - gtk_widget_get_allocated_height(lwFlaeche) / 2) <= 1
+            ' Minikarte: die rechte untere Ecke in die Mitte
+            minikarteSpringen(1.0, 1.0)
+            PRINT "minikarte: ecke in der mitte "; ABS(lwX + lwMuster.breite * lwZelle - gtk_widget_get_allocated_width(lwFlaeche) / 2) <= 1
+            musterZentrieren()
+            PRINT "zentriert: "; ABS(lwX * 2 + lwMuster.breite * lwZelle - gtk_widget_get_allocated_width(lwFlaeche)) <= 1; " zelle "; lwZelle
+        CASE 3
+            ' Farbverlauf: Werkzeug, Leiste, Zug von links oben nach rechts unten
+            ' gemalt wird auf einer sichtbaren Ebene
+            lwMuster.ebenen.aktiv = 0
+            seitenleisteMuster(lwMuster)
+            befehlAusfuehren("wz_farbverlauf")
+            PRINT "werkzeug: "; wzAktiv = WZ_FARBVERLAUF; " | "; v15Sichtbar$()
+            v15Vorher = vfAlles$()
+            fvlStart = 0 : fvlEnde = lwMuster.farbanzahl() - 1
+            verlaufLeisteNachziehen()
+            PRINT "leiste: "; gtk_combo_box_get_active(fvlStartWahl); " -> "; gtk_combo_box_get_active(fvlEndeWahl); " von "; lwMuster.farben[gtk_combo_box_get_active(fvlStartWahl)].garn.name
+            DIM z AS INTEGER : z = wzDruck(0, 0, 1, FALSE)
+            wzZiehen(8, 5, FALSE)
+            PRINT "vorschau: "; LEN(wzVorschau) \ 2; " punkte, farben "; JOIN$(wzVorschauFarben, ",")
+            ' ueber den Rand gezogen: das Ende bleibt im Muster
+            wzZiehen(400, 300, FALSE)
+            PRINT "ueber den rand: ende "; wzVorschau[LEN(wzVorschau) - 2]; ","; wzVorschau[LEN(wzVorschau) - 1]
+            wzZiehen(lwMuster.breite - 1, lwMuster.hoehe - 1, FALSE)
+            ok = vfFoto(fenster, "verlauf_vorschau")
+        CASE 4
+            DIM p AS ARRAY OF INTEGER : p = wzVorschau
+            DIM f AS ARRAY OF INTEGER : f = wzVorschauFarben
+            wzLos(lwMuster.breite - 1, lwMuster.hoehe - 1, FALSE)
+            PRINT "gesetzt: "; v15Zellen$(p)
+            PRINT "wie geplant: "; v15Zellen$(p) = v15Plan$(p, f, 0); " | schritt '"; wzVerlauf.textZurueck$(); "' | vorschau weg "; LEN(wzVorschau) = 0
+            werkzeugZurueck()
+            PRINT "zurueck: alles wie vorher "; vfAlles$() = v15Vorher
+            ' mit Spiegel und Halbstich: das Spiegelbild in der Farbe seines Punkts
+            spiegelWaehlen(1)
+            stichartWaehlen(kern.HALB_OL_UR)
+            fvlStart = 1 : fvlEnde = 2
+            zug(1, [1, 1, 5, 1], FALSE)
+            DIM b AS INTEGER : b = lwMuster.breite
+            PRINT "gespiegelt: "; v15Zellen$([1, 1, 5, 1]); " | "; v15Zellen$([b - 2, 1, b - 6, 1])
+            werkzeugZurueck()
+            spiegelWaehlen(0)
+            stichartWaehlen(kern.VOLL)
+            ' Start ausserhalb: kein Zug
+            PRINT "start draussen: "; wzDruck(-1, 2, 1, FALSE)
+            PRINT "nach allem: wie vorher "; vfAlles$() = v15Vorher
+        CASE 5
+            ' gesperrte Ebene: nichts, eine Meldung
+            lwMuster.ebenen.aktiveEbene().gesperrt = TRUE
+            zug(1, [0, 0, 3, 0], FALSE)
+            PRINT "gesperrt: "; meldung; " | unveraendert "; vfAlles$() = v15Vorher
+            lwMuster.ebenen.aktiveEbene().gesperrt = FALSE
+            ' Farben verwalten verschiebt die Nummern -- die Verlaufsfarben wandern mit
+            fvlStart = 2 : fvlEnde = 4
+            DIM namenVorher AS STRING : namenVorher = lwMuster.farben[2].garn.name + " -> " + lwMuster.farben[4].garn.name
+            d = fvBauen()
+            fvFragenAus = TRUE
+            gtk_combo_box_set_active(fvSortierung, 2)
+            ok = fvUebernehmen()
+            gtk_widget_destroy(fvDialog)
+            fvDialog = 0
+            PRINT "farben verwaltet: "; namenVorher; " | danach "; fvlStart; ","; fvlEnde; " "; lwMuster.farben[fvlStart].garn.name; " -> "; lwMuster.farben[fvlEnde].garn.name; " | leiste "; lwMuster.farben[gtk_combo_box_get_active(fvlStartWahl)].garn.name
+            werkzeugZurueck()
+            PRINT "zurueck: "; lwMuster.farben[fvlStart].garn.name; " -> "; lwMuster.farben[fvlEnde].garn.name; " | alles wie vorher "; vfAlles$() = v15Vorher
+        CASE 6
+            ' Kachel-Vorschau
+            d = kvBauen()
+            ok = vfFoto(kvDialog, "kacheln")
+        CASE 7
+            PRINT "kacheln 3x3: zelle "; kvZelle
+            gtk_spin_button_set_value(kvX, 5)
+            gtk_spin_button_set_value(kvY, 4)
+            gtk_toggle_button_set_active(kvGrenzen, FALSE)
+        CASE 8
+            ok = vfFoto(kvDialog, "kacheln_5x4")
+            PRINT "kacheln 5x4: zelle "; kvZelle; " | erwartet "; kern.kachelZelle(lwMuster.breite, lwMuster.hoehe, gtk_widget_get_allocated_width(kvFeld), gtk_widget_get_allocated_height(kvFeld), 5, 4)
+            gtk_widget_destroy(kvDialog)
+            kvDialog = 0
+            kvFeld = 0
+            ' Lineale und Uebersicht aus -- gemerkt
+            befehlAusfuehren("lineale")
+            befehlAusfuehren("uebersicht")
+            PRINT "aus: "; v15Sichtbar$(); " | gemerkt "; kern.einstellungenLaden(einst.pfad).lineale; " "; kern.einstellungenLaden(einst.pfad).uebersicht
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+        CASE 9
+            ok = vfFoto(fenster, "ohne_lineale")
+            befehlAusfuehren("lineale")
+            befehlAusfuehren("uebersicht")
+            PRINT "wieder an: "; v15Sichtbar$()
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' Was der Verlauf p/f auf der aktiven Ebene ergeben muss (Typ wie die Stichart)
+FUNCTION v15Plan$(p AS ARRAY OF INTEGER, f AS ARRAY OF INTEGER, typ AS INTEGER) AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(f) - 1
+        ARRAY_PUSH(t, STR$(p[2 * i]) + "," + STR$(p[2 * i + 1]) + "=" + STR$(f[i]) + ":" + STR$(typ))
+    NEXT
+    RETURN JOIN$(t, " ")
+END FUNCTION
+
+' --- Stufe 16: Farbleiste, Hervorheben, Nicht sticken, Willkommensseite ----------------
+FUNCTION v16Farben$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM f AS kern.Farbeintrag
+    FOR EACH f IN lwMuster.farben
+        ARRAY_PUSH(t, f.symbol + IIF(f.auslassen, "⊘", ""))
+    NEXT
+    RETURN JOIN$(t, " ")
+END FUNCTION
+
+DIM v16Vorher AS STRING
+
+FUNCTION vorfuehrenStufe16(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM i AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            v16Vorher = vfAlles$()
+            PRINT "farbleiste: sichtbar "; gtk_widget_get_visible(fbBox); " | felder "; fbBreite(); "x"; fbHoehe(); " | zahl "; gtk_label_get_text(fbZahl); " | aktuell "; gtk_label_get_text(fbAktuell)
+            ' Treffer: Mitte jedes Felds, der Abstand dazwischen, hinter dem letzten
+            DIM t AS ARRAY OF STRING : t = []
+            FOR i = 0 TO lwMuster.farbanzahl() - 1
+                ARRAY_PUSH(t, STR$(fbTreffer(fbFeldX(i) + fbBreite() / 2, 20)))
+            NEXT
+            PRINT "treffer: "; JOIN$(t, ","); " | abstand "; fbTreffer(fbFeldX(1) - 2, 20); " | dahinter "; fbTreffer(fbFeldX(lwMuster.farbanzahl()) + 5, 20); " | unten "; fbTreffer(5, fbHoehe() + 1)
+            farbeWaehlen(2)
+            PRINT "gewaehlt 2: "; gtk_label_get_text(fbAktuell)
+        CASE 2
+            ok = vfFoto(fenster, "farbleiste")
+            ' Tauschen per Ziehen: derselbe Weg wie Farben tauschen
+            DIM vorher0 AS INTEGER : vorher0 = lwMuster.farben[0].stichzahl
+            DIM vorher1 AS INTEGER : vorher1 = lwMuster.farben[1].stichzahl
+            farbleisteTauschen(0, 1)
+            PRINT "getauscht: stiche "; vorher0; "/"; vorher1; " -> "; lwMuster.farben[0].stichzahl; "/"; lwMuster.farben[1].stichzahl; " | schritt '"; wzVerlauf.textZurueck$(); "'"
+            werkzeugZurueck()
+            PRINT "zurueck: wie vorher "; vfAlles$() = v16Vorher
+            farbleisteTauschen(1, 1)
+            PRINT "mit sich selbst: wie vorher "; vfAlles$() = v16Vorher
+            ' Hervorheben (Strg+H): die anderen gedimmt, ohne Symbol
+            befehlAusfuehren("hervorheben")
+            PRINT "hervorgehoben: "; lwHervor; " | farbe 2 "; HEX$(lwRgb[2]); " = "; HEX$(lwRgbEcht[2]); " | farbe 0 "; HEX$(lwRgb[0]); " statt "; HEX$(lwRgbEcht[0]); " erwartet "; HEX$(kern.gedimmt(lwRgbEcht[0], einst.stoff, 255)); " | "; meldung
+        CASE 3
+            ok = vfFoto(fenster, "hervorgehoben")
+            befehlAusfuehren("hervorheben")
+            PRINT "aufgehoben: "; lwHervor; " | farbe 0 "; HEX$(lwRgb[0]) = HEX$(lwRgbEcht[0])
+            ' ueber das Menue: eine andere Farbe hervorheben, dann wieder aus
+            farbleisteAktion(4, 2)
+            PRINT "menue hervorheben 4: "; lwHervor
+            farbleisteAktion(4, 2)
+            PRINT "menue aufheben: "; lwHervor
+            ' Nicht sticken: ein Schritt, Garnliste ohne die Farbe
+            DIM g0 AS kern.Garnrechnung : g0 = kern.garnRechnen(lwMuster, 14, 0.0, 0.0)
+            farbleisteAktion(3, 3)
+            DIM g1 AS kern.Garnrechnung : g1 = kern.garnRechnen(lwMuster, 14, 0.0, 0.0)
+            PRINT "nicht sticken: "; v16Farben$(); " | garnzeilen "; LEN(g0.zeilen); " -> "; LEN(g1.zeilen); " | ausgelassen "; g1.ausgelasseneFarben; " | schritt '"; wzVerlauf.textZurueck$(); "' | "; meldung
+        CASE 4
+            ok = vfFoto(fenster, "nicht_sticken")
+            werkzeugZurueck()
+            PRINT "zurueck: "; v16Farben$(); " | wie vorher "; vfAlles$() = v16Vorher
+            werkzeugVor()
+            PRINT "vor: "; v16Farben$()
+            farbleisteAktion(3, 3)
+            PRINT "wieder sticken: "; v16Farben$(); " | wie vorher "; vfAlles$() = v16Vorher
+            ' Groesse 30 und aus/an
+            einst.farbleisteGroesse = 30
+            farbleisteNachziehen()
+            PRINT "groesse 30: felder "; fbBreite(); "x"; fbHoehe(); " | treffer 1 bei "; fbTreffer(fbFeldX(1) + 15, 10)
+            befehlAusfuehren("farbleiste")
+            PRINT "aus: "; gtk_widget_get_visible(fbBox); " | gemerkt "; kern.einstellungenLaden(einst.pfad).farbleiste; " "; kern.einstellungenLaden(einst.pfad).farbleisteGroesse
+            befehlAusfuehren("farbleiste")
+            PRINT "an: "; gtk_widget_get_visible(fbBox)
+        CASE 5
+            ok = vfFoto(fenster, "farbleiste_30")
+            einst.farbleisteGroesse = 48
+            farbleisteNachziehen()
+            ' Willkommensseite mit Muster: Zurueck-Knopf, nichts gesperrt
+            befehlAusfuehren("willkommen")
+            PRINT "startseite: "; willkommenSichtbar(); " | zurueck-knopf "; gtk_widget_get_visible(wkZurueck); " | werkzeugzeile frei "; gtk_widget_get_sensitive(werkzeugzeile); " | zuletzt "; LEN(wkPfade)
+        CASE 6
+            ok = vfFoto(fenster, "startseite")
+            willkommenAktion(4)
+            PRINT "zurueck zum muster: "; willkommenSichtbar(); " | wie vorher "; vfAlles$() = v16Vorher
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+
+' --- Stufe 17: Info- und Fortschritts-Leiste, Symbol-Editor ----------------------
+
+DIM v17Vorher AS STRING
+DIM v17Dialog AS INTEGER
+
+' Stand samt Fortschritt und Stoff (vfAlles$ kennt beides nicht)
+FUNCTION v17Stand$() AS STRING
+    DIM p AS kern.Fortschritt : p = kern.fortschrittVon(lwMuster)
+    DIM t AS ARRAY OF STRING : t = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(p.farbeErledigt) - 1
+        ARRAY_PUSH(t, STR$(p.farbeErledigt[i]))
+    NEXT
+    RETURN vfAlles$() + " # " + JOIN$(t, ",") + " # stoff " + STR$(lwMuster.stoff)
+END FUNCTION
+
+FUNCTION v17Karten$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM l AS INTEGER
+    FOR EACH l IN ilKarten
+        ARRAY_PUSH(t, gtk_label_get_text(l))
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION
+
+FUNCTION v17Zeilen$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(fsNr) - 1
+        ARRAY_PUSH(t, STR$(fsNr[k]) + ":" + gtk_label_get_text(fsProzent[k]) + " " + gtk_label_get_text(fsZahlJe[k]))
+    NEXT
+    RETURN JOIN$(t, "; ")
+END FUNCTION
+
+FUNCTION vorfuehrenStufe17(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM i AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            v17Vorher = v17Stand$()
+            PRINT "reiter: "; gtk_stack_get_visible_child_name(slStapel)
+            seitenleisteReiter("info")
+            PRINT "info: "; gtk_stack_get_visible_child_name(slStapel)
+            PRINT "karten: "; v17Karten$()
+            PRINT "wie der kern: "; v17Karten$() = JOIN$(kern.infoKarten(lwMuster, lwMuster.modus), " | ")
+            PRINT "stoffe: "; LEN(ilStoffe); " | gewaehlt "; gtk_combo_box_get_active(ilStoff); " = "; ilStoffe[gtk_combo_box_get_active(ilStoff)]
+            DIM t AS ARRAY OF STRING : t = []
+            FOR i = 0 TO LEN(ilFarbTexte) - 1
+                ARRAY_PUSH(t, gtk_label_get_text(ilFarbTexte[i]))
+            NEXT
+            PRINT "farben: "; JOIN$(t, " ; ")
+            PRINT "quellbild: "; gtk_widget_get_visible(ilQuelle); " | "; gtk_label_get_text(ilQuelleText)
+            farbeWaehlen(3)
+            PRINT "markiert 3: "; gtk_list_box_row_get_index(gtk_list_box_get_selected_row(ilFarbListe))
+        CASE 2
+            ok = vfFoto(fenster, "info")
+            ' Stoff ueber die Klappliste: ein Schritt, Masse und Garn folgen
+            DIM idx AS INTEGER : idx = ARRAY_INDEXOF(ilStoffe, 18.0)
+            gtk_combo_box_set_active(ilStoff, idx)
+            PRINT "stoff 18: "; lwMuster.stoff; " | "; gtk_label_get_text(ilKarten[3]); " | "; gtk_label_get_text(ilKarten[6]); " | schritt '"; wzVerlauf.textZurueck$(); "' | geaendert "; istGeaendert()
+            werkzeugZurueck()
+            PRINT "zurueck: "; lwMuster.stoff; " | klappliste "; ilStoffe[gtk_combo_box_get_active(ilStoff)]; " | "; gtk_label_get_text(ilKarten[3])
+            ' eine Zaehlung ausserhalb der Liste kommt dazu
+            lwMuster.stoff = 25
+            infoleisteNachziehen()
+            PRINT "stoff 25: "; LEN(ilStoffe); " eintraege, gewaehlt "; ilStoffe[gtk_combo_box_get_active(ilStoff)]
+            lwMuster.stoff = 40
+            infoleisteNachziehen()
+            PRINT "stoff 40: "; LEN(ilStoffe); " eintraege, letzter "; ilStoffe[LEN(ilStoffe) - 1]; ", gewaehlt "; ilStoffe[gtk_combo_box_get_active(ilStoff)]
+            lwMuster.stoff = 14
+            infoleisteNachziehen()
+            ' Zeile der Liste anklicken waehlt die Farbe
+            gtk_list_box_select_row(ilFarbListe, gtk_list_box_get_row_at_index(ilFarbListe, 1))
+            PRINT "liste waehlt: "; wzFarbe; " | farbleiste "; gtk_label_get_text(fbAktuell)
+            seitenleisteReiter("fortschritt")
+            PRINT "fortschritt: "; gtk_label_get_text(fsZahl); " | balken "; TEXT_AUS_ZEIGER$(gtk_progress_bar_get_text(fsBalken)); " | zeilen "; v17Zeilen$()
+            PRINT "knopf: "; fsModusText
+        CASE 3
+            ok = vfFoto(fenster, "fortschritt")
+            ' Sticken-Modus = Fortschritts-Werkzeug, beenden kehrt zurueck
+            werkzeugWaehlen(WZ_LINIE, FALSE)
+            befehlAusfuehren("stickmodus")
+            PRINT "sticken: "; wzAktiv = WZ_FORTSCHRITT; " | "; fsModusText
+            stickenModusUmschalten()
+            PRINT "beendet: "; wzAktiv = WZ_LINIE; " | "; fsModusText
+            ' Alle erledigt fuer die erste Zeile
+            DIM nr AS INTEGER : nr = fsNr[0]
+            farbeAlsErledigtNr(nr)
+            PRINT "alle erledigt "; nr; ": "; gtk_label_get_text(fsZahl); " | "; v17Zeilen$(); " | schritt '"; wzVerlauf.textZurueck$(); "'"
+            fortschrittZuruecksetzen(FALSE)
+            PRINT "zurueckgesetzt: "; gtk_label_get_text(fsZahl); " | balken "; TEXT_AUS_ZEIGER$(gtk_progress_bar_get_text(fsBalken)); " | schritt '"; wzVerlauf.textZurueck$(); "' | "; meldung
+            fortschrittZuruecksetzen(FALSE)
+            PRINT "nochmal: "; meldung
+            werkzeugZurueck()
+            werkzeugZurueck()
+            PRINT "zweimal zurueck: wie vorher "; v17Stand$() = v17Vorher; " | "; gtk_label_get_text(fsZahl)
+            seitenleisteReiter("muster")
+            ' Symbol-Editor fuer Farbe 2
+            v17Dialog = seDialogBauen(2)
+            PRINT "editor: symbole "; LEN(seKinder); " | gewaehlt "; seWahl; " markiert "; gtk_flow_box_child_is_selected(seKinder[ARRAY_INDEXOF(seSymbole, seWahl)])
+        CASE 4
+            ok = vfFoto(v17Dialog, "symboleditor")
+            PRINT "suche circle: "; seFiltern("circle"); " | keine treffer sichtbar "; gtk_widget_get_visible(seLeer)
+            PRINT "suche u+2665: "; seFiltern("u+2665"); " | gibt es nicht: "; seFiltern("kein zeichen"); " "; gtk_widget_get_visible(seLeer)
+            PRINT "suche leer: "; seFiltern("")
+            ' Ein Symbol einer anderen Farbe: abgewiesen
+            DIM alt AS STRING : alt = lwMuster.farben[2].symbol
+            seWaehlen(lwMuster.farben[0].symbol)
+            DIM f0 AS STRING : f0 = seUebernehmen()
+            PRINT "doppelt: "; f0 <> ""; " | symbol 2 bleibt "; lwMuster.farben[2].symbol = alt; " | schritte "; LEN(wzVerlauf.rueck); " | "; REPLACE$(f0, CHR$(10), " / ")
+            ' Leerraum als eigenes Zeichen zaehlt nicht
+            gtk_entry_set_text(seEigen, " ")
+            PRINT "leerraum: "; seWahl = lwMuster.farben[0].symbol
+            gtk_entry_set_text(seEigen, "Ω")
+            PRINT "eigenes: "; seWahl; " | markiert keins "; gtk_flow_box_child_is_selected(seKinder[0]) = FALSE
+            PRINT "uebernommen: '"; seUebernehmen(); "' | symbol 2 "; alt; " -> "; lwMuster.farben[2].symbol; " | schritt '"; wzVerlauf.textZurueck$(); "'"
+            gtk_widget_destroy(v17Dialog)
+            werkzeugZurueck()
+            PRINT "zurueck: "; lwMuster.farben[2].symbol = alt; " | wie vorher "; v17Stand$() = v17Vorher
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+
+' --- Stufe 18: Muster drehen, spiegeln, zuschneiden; Ebenen vereinen und ansehen ---
+
+DIM v18Vorher AS STRING
+DIM v18Alle AS INTEGER                ' belegte Zellen mit allen sichtbaren Ebenen
+
+FUNCTION v18Stand$() AS STRING
+    RETURN STR$(lwMuster.breite) + "x" + STR$(lwMuster.hoehe) + " " + STR$(lwMuster.ebenen.anzahl()) + " ebenen # " + vfAlles$()
+END FUNCTION
+
+' Zellen mit Stich im zusammengesetzten Bild der Leinwand
+FUNCTION v18Belegt() AS INTEGER
+    DIM n AS INTEGER, c AS INTEGER
+    FOR EACH c IN lwFarbe
+        IF c <> kern.KEIN_STICH THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+
+FUNCTION v18Stiche(e AS kern.Ebene) AS INTEGER
+    DIM n AS INTEGER, c AS INTEGER
+    FOR EACH c IN e.raster
+        IF c <> kern.KEIN_STICH THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+
+FUNCTION vorfuehrenStufe18(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM i AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            v18Vorher = v18Stand$()
+            PRINT "geladen: "; lwMuster.breite; "x"; lwMuster.hoehe; " | ebenen "; lwMuster.ebenen.anzahl(); " | kuerzel zuschneiden "; kern.kuerzelVon$(einst, "zuschneiden")
+            befehlAusfuehren("drehen_rechts")
+            PRINT "rechts: "; lwMuster.breite; "x"; lwMuster.hoehe; " | schritt '"; wzVerlauf.textZurueck$(); "' | geaendert "; istGeaendert(); " | "; meldung
+        CASE 2
+            ok = vfFoto(fenster, "gedreht")
+            werkzeugZurueck()
+            PRINT "zurueck: wie vorher "; v18Stand$() = v18Vorher
+            ' ueber den Muster-Knopf: dieselben Befehle
+            musterGeklickt(0, 14)
+            PRINT "knopf spiegeln: "; lwMuster.breite; "x"; lwMuster.hoehe; " '"; wzVerlauf.textZurueck$(); "' | "; meldung
+            musterGeklickt(0, 14)
+            PRINT "zweimal gespiegelt: wie vorher "; v18Stand$() = v18Vorher; " | schritte "; LEN(wzVerlauf.rueck)
+            befehlAusfuehren("drehen_links")
+            befehlAusfuehren("drehen_links")
+            befehlAusfuehren("drehen_180")
+            PRINT "links links 180: wie vorher "; v18Stand$() = v18Vorher
+            befehlAusfuehren("spiegeln_v")
+            befehlAusfuehren("spiegeln_v")
+            PRINT "senkrecht zweimal: wie vorher "; v18Stand$() = v18Vorher
+            ' Auto-Zuschneiden: erst nichts, dann nach dem Vergroessern zurueck
+            befehlAusfuehren("zuschneiden")
+            PRINT "zuschneiden ohne rand: "; meldung
+            ok = kern.groesseAendern(lwMuster, wzVerlauf, 20, 12)
+            allesNeu()
+            befehlAusfuehren("zuschneiden")
+            PRINT "zuschneiden: "; meldung; " | '"; wzVerlauf.textZurueck$(); "' | wie vorher "; v18Stand$() = v18Vorher
+        CASE 3
+            ' Ebenen vereinen: die ausgeblendete faellt weg, Rueckgaengig holt sie
+            DIM vorher AS INTEGER : vorher = kern.statistikVon(lwMuster).sticheGesamt
+            PRINT "ausgeblendete stiche: "; kern.ausgeblendeteStiche(lwMuster)
+            ebenenVereinenBefehl(FALSE)
+            PRINT "vereint: "; lwMuster.ebenen.anzahl(); " "; lwMuster.ebenen.ebenen[0].name; " | stiche "; vorher; " -> "; kern.statistikVon(lwMuster).sticheGesamt; " | ebenenzeilen "; LEN(slEbenenTexte); " | '"; wzVerlauf.textZurueck$(); "' | "; meldung
+            ebenenVereinenBefehl(FALSE)
+            PRINT "noch einmal: "; meldung
+            ok = vfFoto(fenster, "vereint")
+            werkzeugZurueck()
+            PRINT "zurueck: wie vorher "; v18Stand$() = v18Vorher; " | ebenenzeilen "; LEN(slEbenenTexte)
+            ' Nur aktive Ebene -- hier die ausgeblendete oberste
+            lwMuster.ebenen.aktiv = 2
+            slEbeneMarkieren()
+            v18Alle = v18Belegt()
+            befehlAusfuehren("nur_aktive")
+            PRINT "nur aktive: "; lwNurAktiv; " | kaestchen "; gtk_toggle_button_get_active(slNurAktiv); " | belegt "; v18Alle; " -> "; v18Belegt(); " = ebene 2 "; v18Stiche(lwMuster.ebenen.ebenen[2]); " | "; meldung
+        CASE 4
+            ok = vfFoto(fenster, "nur_aktive")
+            ' Wechsel der aktiven Ebene zieht die Anzeige mit
+            gtk_list_box_select_row(slEbenenListe, gtk_list_box_get_row_at_index(slEbenenListe, 2))
+            PRINT "aktiv "; lwMuster.ebenen.aktiv; ": belegt "; v18Belegt(); " = ebene 0 "; v18Stiche(lwMuster.ebenen.ebenen[0])
+            gtk_toggle_button_set_active(slNurAktiv, FALSE)
+            PRINT "aus per kaestchen: "; lwNurAktiv; " | belegt "; v18Belegt(); " = "; v18Alle
+            ' Andere abdunkeln: aktiv ist die unterste, die mittlere halb
+            lwMuster.ebenen.aktiv = 1
+            slEbeneMarkieren()
+            befehlAusfuehren("abdunkeln")
+            PRINT "abdunkeln: "; lwAbdunkeln; " | kaestchen "; gtk_toggle_button_get_active(slAbdunkeln); " | gemischt "; lwMischen(); " | deckkraft unten "; lwDeckkraft(lwMuster.ebenen.ebenen[0]); " aktiv "; lwDeckkraft(lwMuster.ebenen.ebenen[1])
+            ' eine Zelle nur auf der untersten: halb ueber dem Stoff
+            DIM e0 AS kern.Ebene : e0 = lwMuster.ebenen.ebenen[0]
+            FOR i = 0 TO LEN(e0.raster) - 1
+                IF e0.raster[i] <> kern.KEIN_STICH AND lwMuster.ebenen.ebenen[1].raster[i] = kern.KEIN_STICH THEN EXIT FOR
+            NEXT
+            DIM px AS INTEGER : px = i MOD lwMuster.breite
+            DIM py AS INTEGER : py = i \ lwMuster.breite
+            DIM f AS INTEGER : f = lwRgb[e0.raster[i]]
+            DIM s AS INTEGER : s = einst.stoff
+            DIM erw AS INTEGER : erw = &HFF000000 BOR (ROUND((((s SHR 16) BAND 255) + ((f SHR 16) BAND 255)) / 2.0) SHL 16) BOR (ROUND((((s SHR 8) BAND 255) + ((f SHR 8) BAND 255)) / 2.0) SHL 8) BOR ROUND(((s BAND 255) + (f BAND 255)) / 2.0)
+            PRINT "zelle "; px; ","; py; ": halb "; lwMischfarbe(px, py) = erw
+        CASE 5
+            ok = vfFoto(fenster, "abgedunkelt")
+            befehlAusfuehren("abdunkeln")
+            PRINT "abdunkeln aus: "; lwAbdunkeln; " | gemischt "; lwMischen(); " | datei unberuehrt "; v18Stand$() = v18Vorher
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+
+' --- Stufe 19: Optionsleisten, Bildschirm-Pipette, Paletten, Drucken -------------
+
+DIM v19Vorher AS STRING
+DIM v19Pixel AS INTEGER
+
+' Dateien der Probe ins Startverzeichnis -- dhrt run arbeitet im Ordner des
+' Programms, dort haette sie sonst Glutfaden zugemuellt
+FUNCTION v19Ort$(name AS STRING) AS STRING
+    RETURN PATHJOIN(STARTDIR$(), name)
+END FUNCTION
+
+' Die Pipette schliesst sich selbst: nimmt den Punkt (10, 10) des Fotos
+FUNCTION v19PipetteZu(daten AS INTEGER) AS BOOLEAN
+    DIM ok AS BOOLEAN : ok = vfFoto(bpFenster, "pipette")
+    v19Pixel = bpPunkt(bpBild, 10, 10)
+    bpFarbe = v19Pixel
+    bpEnde()
+    RETURN FALSE
+END FUNCTION
+
+' Die Druckseite als Bild (wie die Seite eines A4-Blatts in 96 dpi)
+FUNCTION v19DruckBild(pfad AS STRING, b AS INTEGER, h AS INTEGER) AS BOOLEAN
+    DIM f AS INTEGER : f = cairo_image_surface_create(CAIRO_ARGB32, b, h)
+    DIM cr AS INTEGER : cr = cairo_create(f)
+    cairo_set_source_rgb(cr, 1.0, 1.0, 1.0)
+    cairo_paint(cr)
+    druckZeichnen(cr, b, h)
+    cairo_destroy(cr)
+    DIM st AS INTEGER : st = cairo_surface_write_to_png(f, pfad)
+    cairo_surface_destroy(f)
+    RETURN st = 0
+END FUNCTION
+
+FUNCTION vorfuehrenStufe19(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM i AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            v19Vorher = vfAlles$()
+            PRINT "kuerzel drucken "; kern.kuerzelVon$(einst, "drucken")
+            befehlAusfuehren("wz_rueckstich")
+            PRINT "rueckstich: leiste "; gtk_widget_get_visible(rlBox); " text "; gtk_widget_get_visible(tlBox); " | dicke "; gtk_spin_button_get_value_as_int(rlDicke); " linie "; gtk_combo_box_get_active(rlLinie); " enden "; gtk_combo_box_get_active(rlEnden); " einrasten "; gtk_toggle_button_get_active(rlEinrasten)
+            ' ueber die Leiste: Linie gestrichelt, Enden flach, Dicke 4
+            gtk_combo_box_set_active(rlLinie, 1)
+            gtk_combo_box_set_active(rlEnden, 2)
+            gtk_spin_button_set_value(rlDicke, 4)
+            gtk_toggle_button_set_active(rlEinrasten, FALSE)
+            DIM e AS kern.Einstellungen : e = kern.einstellungenLaden(einst.pfad)
+            PRINT "gesetzt: "; einst.rueckBreite; " "; einst.rueckLinie; " "; einst.rueckKappe; " "; einst.rueckEinrasten; " | gemerkt "; e.rueckBreite; " "; e.rueckLinie; " "; e.rueckKappe; " "; e.rueckEinrasten
+        CASE 2
+            ok = vfFoto(fenster, "rueckstich")
+            ' Zurueck auf die Vorgabe, die Leiste folgt
+            rueckOptionenSetzen(2, 0, 0, TRUE)
+            PRINT "zurueck: linie "; gtk_combo_box_get_active(rlLinie); " dicke "; gtk_spin_button_get_value_as_int(rlDicke); " einrasten "; gtk_toggle_button_get_active(rlEinrasten)
+            ' Text: ohne Text kein Anhaengen, mit Text haengt er an der Maus
+            befehlAusfuehren("wz_text")
+            PRINT "text: leiste "; gtk_widget_get_visible(tlBox); " rueck "; gtk_widget_get_visible(rlBox); " | schrift "; gtk_combo_box_get_active(tlSchrift); " groesse "; gtk_spin_button_get_value_as_int(tlGroesse)
+            farbeWaehlen(2)
+            txText = "" : textLeisteNachziehen()
+            DIM z AS INTEGER : z = wzDruck(3, 3, 1, FALSE)
+            PRINT "ohne text: haengt "; mrEinfuegen; " | "; meldung
+            gtk_entry_set_text(tlFeld, "Hi")
+            PRINT "eingetippt: "; txText; " haengt "; mrEinfuegen
+            z = wzDruck(3, 3, 1, FALSE)
+            DIM b1 AS INTEGER : b1 = mrEinfuegenAus.breite
+            PRINT "klick: haengt "; mrEinfuegen; " breite > 0 "; b1 > 0
+            gtk_entry_set_text(tlFeld, "Hiiii")
+            PRINT "laenger: haengt "; mrEinfuegen; " breiter "; mrEinfuegenAus.breite > b1
+            gtk_toggle_button_set_active(tlFett, TRUE)
+            PRINT "fett: "; txFett; " haengt "; mrEinfuegen
+        CASE 3
+            ok = vfFoto(fenster, "text")
+            gtk_entry_set_text(tlFeld, "")
+            PRINT "geleert: haengt "; mrEinfuegen
+            gtk_entry_set_text(tlFeld, "Hi")
+            textAusLeiste()
+            PRINT "enter: haengt "; mrEinfuegen
+            mehrAbbrechen()
+            befehlAusfuehren("wz_stift")
+            PRINT "stift: leisten "; gtk_widget_get_visible(rlBox); " "; gtk_widget_get_visible(tlBox); " | muster unberuehrt "; vfAlles$() = v19Vorher
+            ' Bildschirm-Pipette: das Foto, ein Punkt, das Fenster (schliesst sich selbst)
+            DIM x0 AS INTEGER, y0 AS INTEGER
+            DIM foto AS INTEGER : foto = bpFoto(x0, y0)
+            PRINT "foto: "; foto <> 0; " | ausserhalb "; bpPunkt(foto, -1, 0); " "; bpPunkt(foto, 0, 100000); " | innen "; bpPunkt(foto, 10, 10) >= 0
+            g_object_unref(foto)
+            DIM t AS INTEGER : t = g_timeout_add(400, v19PipetteZu, 0)
+            DIM gepickt AS INTEGER : gepickt = bpWaehlen()
+            PRINT "pipette: "; gepickt = v19Pixel; " | fenster weg "; bpFenster = 0
+            ' Uebernehmen: das naechste DMC-Garn, so wie der Kern es findet
+            DIM abst AS FLOAT
+            DIM erw AS INTEGER : erw = kern.naechstesGarnIn(&H3A6E2A, slPaletten[slPalette], abst)
+            DIM n0 AS INTEGER : n0 = lwMuster.farbanzahl()
+            bildschirmFarbeUebernehmen(&H3A6E2A)
+            PRINT "uebernommen: "; lwMuster.farben[wzFarbe].garn.nummer = slPaletten[slPalette].garne[erw].nummer; " | farben "; n0; " -> "; lwMuster.farbanzahl(); " | '"; wzVerlauf.textZurueck$(); "' | "; meldung
+            werkzeugZurueck()
+            DIM pal AS INTEGER : pal = slPalette
+            slPalette = -1
+            bildschirmFarbeUebernehmen(&H123456)
+            PRINT "ohne palette: "; lwMuster.farben[wzFarbe].garn.name; " "; HEX$(lwMuster.farben[wzFarbe].garn.farbe); " | "; meldung
+            werkzeugZurueck()
+            slPalette = pal
+            PRINT "zurueck: wie vorher "; vfAlles$() = v19Vorher
+        CASE 4
+            ' Palette als Datei: schreiben, dieselbe wieder lesen (nichts Neues),
+            ' eine mit einer neuen Farbe, eine kaputte
+            PRINT "export: '"; paletteExportNach(v19Ort$("palette.json")); "' | gleich dem kern "; JOIN$(READLINES(v19Ort$("palette.json")), CHR$(10)) = kern.paletteDateiText$(lwMuster)
+            DIM sv AS INTEGER : sv = LEN(wzVerlauf.rueck)
+            PRINT "gleiche palette: "; paletteImportVon(v19Ort$("palette.json"), FALSE); " farben, im muster "; lwMuster.farbanzahl(); " | schritte "; LEN(wzVerlauf.rueck) - sv; " | "; meldung
+            WRITEALL(v19Ort$("neu.json"), "{" + CHR$(34) + "format" + CHR$(34) + ": " + CHR$(34) + "pysticky_palette" + CHR$(34) + ", " + CHR$(34) + "name" + CHR$(34) + ": " + CHR$(34) + "Probe" + CHR$(34) + ", " + CHR$(34) + "colors" + CHR$(34) + ": [{" + CHR$(34) + "name" + CHR$(34) + ": " + CHR$(34) + "Moos" + CHR$(34) + ", " + CHR$(34) + "color" + CHR$(34) + ": {" + CHR$(34) + "r" + CHR$(34) + ": 58, " + CHR$(34) + "g" + CHR$(34) + ": 110, " + CHR$(34) + "b" + CHR$(34) + ": 42}, " + CHR$(34) + "symbol" + CHR$(34) + ": " + CHR$(34) + "M" + CHR$(34) + "}]}")
+            PRINT "neue farbe: "; paletteImportVon(v19Ort$("neu.json"), FALSE); " | im muster "; lwMuster.farbanzahl(); " "; lwMuster.farben[lwMuster.farbanzahl() - 1].garn.name; " symbol "; lwMuster.farben[lwMuster.farbanzahl() - 1].symbol; " | '"; wzVerlauf.textZurueck$(); "' | "; meldung
+            werkzeugZurueck()
+            WRITEALL(v19Ort$("kaputt.json"), "{" + CHR$(34) + "format" + CHR$(34) + ": " + CHR$(34) + "andere" + CHR$(34) + "}")
+            PRINT "kaputt: "; paletteImportVon(v19Ort$("kaputt.json"), FALSE); " | "; meldung
+            PRINT "zurueck: wie vorher "; vfAlles$() = v19Vorher
+            ' Drucken: dieselbe Seite als PDF ohne Dialog, und als Bild
+            PRINT "drucken als pdf: '"; druckenNach(v19Ort$("druck.pdf")); "' | da "; FILEEXISTS(v19Ort$("druck.pdf")); " | quer "; kern.druckQuer(lwMuster.breite, lwMuster.hoehe)
+            PRINT "druckbild: "; v19DruckBild(v19Ort$("d_druck.png"), 794, 1123)
+            DIM zz AS FLOAT, ox AS FLOAT, oy AS FLOAT
+            (zz, ox, oy) = kern.druckLage(lwMuster.breite, lwMuster.hoehe, 794, 1123)
+            PRINT "lage: zelle "; FORMAT$(zz, "%.2f"); " links "; FORMAT$(ox, "%.2f"); " oben "; FORMAT$(oy, "%.2f")
+            ' Die Lage, die der Druckauftrag selbst traegt (nicht die Rechnung des Kerns)
+            DIM dop AS INTEGER : dop = drOperation()
+            PRINT "auftrag: quer "; gtk_page_setup_get_orientation(gtk_print_operation_get_default_page_setup(dop)) = GTK_SEITE_QUER
+            g_object_unref(dop)
+            ' Die Pipette liest Rot, Gruen, Blau in dieser Reihenfolge
+            DIM pb AS INTEGER : pb = gdk_pixbuf_new(0, FALSE, 8, 4, 4)
+            gdk_pixbuf_fill(pb, &H3A6E2AFF)
+            PRINT "punkt: "; HEX$(bpPunkt(pb, 1, 2))
+            g_object_unref(pb)
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+
+' --- Stufe 20: Ebene leeren, Notiz, Ansichtsschalter, Pfeile, Rollbalken, Ablegen, F1 ---
+
+DIM v20Vorher AS STRING
+DIM v20F1Offen AS BOOLEAN
+DIM v20Grund AS INTEGER               ' Leinwand-Bild zum Vergleichen (cairo_surface_t)
+
+' Die Leinwand, so wie sie gezeichnet wird, in ein Bild
+FUNCTION v20Bild() AS INTEGER
+    DIM f AS INTEGER : f = cairo_image_surface_create(CAIRO_ARGB32, gtk_widget_get_allocated_width(lwFlaeche), gtk_widget_get_allocated_height(lwFlaeche))
+    DIM cr AS INTEGER : cr = cairo_create(f)
+    DIM ok AS BOOLEAN : ok = lwZeichnen(lwFlaeche, cr, 0)
+    cairo_destroy(cr)
+    cairo_surface_flush(f)
+    RETURN f
+END FUNCTION
+
+FUNCTION v20Daten(f AS INTEGER) AS BUFFER
+    RETURN BUFFER_AUS_ZEIGER(cairo_image_surface_get_data(f), cairo_image_surface_get_stride(f) * cairo_image_surface_get_height(f))
+END FUNCTION
+
+FUNCTION v20Punkt(f AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM d AS BUFFER : d = BUFFER_AUS_ZEIGER(cairo_image_surface_get_data(f) + y * cairo_image_surface_get_stride(f) + x * 4, 4)
+    RETURN BUFFER_GET_U32(d, 0) BAND &HFFFFFF
+END FUNCTION
+
+' Wie viele Punkte zwei gleich grosse Bilder unterscheiden
+FUNCTION v20Anders(a AS INTEGER, b AS INTEGER) AS INTEGER
+    DIM pa AS BUFFER : pa = v20Daten(a)
+    DIM pb AS BUFFER : pb = v20Daten(b)
+    DIM n AS INTEGER : n = BUFFER_LEN(pa) \ 4
+    DIM i AS INTEGER, c AS INTEGER
+    FOR i = 0 TO n - 1
+        IF BUFFER_GET_U32(pa, i * 4) <> BUFFER_GET_U32(pb, i * 4) THEN c = c + 1
+    NEXT
+    RETURN c
+END FUNCTION
+
+' Wie viele von k Punkten auf der Strecke (x1,y1)-(x2,y2) sich in a und b unterscheiden
+FUNCTION v20AndersAuf(a AS INTEGER, b AS INTEGER, x1 AS FLOAT, y1 AS FLOAT, x2 AS FLOAT, y2 AS FLOAT, k AS INTEGER) AS INTEGER
+    DIM i AS INTEGER, c AS INTEGER
+    FOR i = 1 TO k
+        DIM x AS INTEGER : x = INT(x1 + (x2 - x1) * i / (k + 1))
+        DIM y AS INTEGER : y = INT(y1 + (y2 - y1) * i / (k + 1))
+        IF v20Punkt(a, x, y) <> v20Punkt(b, x, y) THEN c = c + 1
+    NEXT
+    RETURN c
+END FUNCTION
+
+FUNCTION v20Roetlich(farbe AS INTEGER) AS BOOLEAN
+    RETURN ((farbe SHR 16) BAND 255) > 220 AND ((farbe SHR 8) BAND 255) < 150 AND (farbe BAND 255) < 150
+END FUNCTION
+
+FUNCTION v20Blaeulich(farbe AS INTEGER) AS BOOLEAN
+    RETURN ((farbe SHR 16) BAND 255) < 150 AND ((farbe SHR 8) BAND 255) > 140 AND (farbe BAND 255) > 190
+END FUNCTION
+
+' Die Leinwand gegen den Grund: wie viele Punkte anders
+FUNCTION v20GegenGrund() AS INTEGER
+    DIM f AS INTEGER : f = v20Bild()
+    DIM n AS INTEGER : n = v20Anders(v20Grund, f)
+    cairo_surface_destroy(f)
+    RETURN n
+END FUNCTION
+
+FUNCTION v20Tipp$(w AS INTEGER) AS STRING
+    DIM z AS INTEGER : z = gtk_widget_get_tooltip_text(w)
+    IF z = 0 THEN RETURN ""
+    DIM t AS STRING : t = TEXT_AUS_ZEIGER$(z)
+    g_free(z)
+    RETURN t
+END FUNCTION
+
+' Die Zeile einer Ebene in der Seitenleiste (oben im Stapel = oben)
+FUNCTION v20EbenenText(nr AS INTEGER) AS INTEGER
+    RETURN slEbenenTexte[lwMuster.ebenen.anzahl() - 1 - nr]
+END FUNCTION
+
+FUNCTION v20F1Zu(daten AS INTEGER) AS BOOLEAN
+    v20F1Offen = kuDialog <> 0
+    IF kuDialog <> 0 THEN
+        DIM ok AS BOOLEAN : ok = vfFoto(kuDialog, "f1")
+        gtk_dialog_response(kuDialog, GTK_ANTWORT_ABBRECHEN)
+    END IF
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION v20Uri$(name AS STRING) AS STRING
+    DIM p AS STRING : p = REPLACE$(REPLACE$(v19Ort$(name), CHR$(92), "/"), " ", "%20")
+    IF LEFT$(p, 1) = "/" THEN RETURN "file://" + p
+    RETURN "file:///" + p
+END FUNCTION
+
+FUNCTION vorfuehrenStufe20(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM e AS kern.Ebene
+    DIM n AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            v20Vorher = vfAlles$()
+            PRINT "kuerzel: f1 "; kern.kuerzelVon$(einst, "tastenkuerzel"); " | leeren '"; kern.kuerzelVon$(einst, "ebene_leeren"); "' | tafel "; LEN(kern.kuerzelAktionen())
+            ' Ebene leeren: die mittlere ("Oben")
+            lwMuster.ebenen.aktiv = 1
+            slEbeneMarkieren()
+            e = lwMuster.ebenen.ebenen[1]
+            n = e.stichzahl()
+            ebeneLeerenBefehl(FALSE)
+            PRINT "geleert: "; n; " -> "; e.stichzahl(); " | zeile '"; gtk_label_get_text(v20EbenenText(1)); "' | rueckstiche "; LEN(lwMuster.rueckstiche); " | '"; wzVerlauf.textZurueck$(); "' | "; meldung
+            ebeneLeerenBefehl(FALSE)
+            PRINT "noch einmal: "; meldung
+            werkzeugZurueck()
+            PRINT "zurueck: wie vorher "; vfAlles$() = v20Vorher
+            lwMuster.ebenen.ebenen[1].gesperrt = TRUE
+            ebeneLeerenBefehl(FALSE)
+            PRINT "gesperrt: "; meldung; " | stiche "; lwMuster.ebenen.ebenen[1].stichzahl()
+            lwMuster.ebenen.ebenen[1].gesperrt = FALSE
+            ' Notiz: ins Feld, beim Verlassen ein Schritt
+            DIM s0 AS INTEGER : s0 = LEN(wzVerlauf.rueck)
+            gtk_text_buffer_set_text(gtk_text_view_get_buffer(slNotiz), "Schatten links", -1)
+            PRINT "notiz: geschrieben "; slNotizUebernehmen(); " | ebene '"; lwMuster.ebenen.ebenen[1].notiz; "' | tipp '"; v20Tipp$(v20EbenenText(1)); "' | schritte +"; LEN(wzVerlauf.rueck) - s0; " '"; wzVerlauf.textZurueck$(); "' | geaendert "; istGeaendert()
+            PRINT "noch einmal: "; slNotizUebernehmen(); " | schritte +"; LEN(wzVerlauf.rueck) - s0
+        CASE 2
+            ok = vfFoto(fenster, "notiz")
+            werkzeugZurueck()
+            PRINT "zurueck: notiz '"; lwMuster.ebenen.ebenen[1].notiz; "' feld '"; textSichtText$(slNotiz); "' tipp '"; v20Tipp$(v20EbenenText(1)); "'"
+            werkzeugVor()
+            DIM s1 AS INTEGER : s1 = LEN(wzVerlauf.rueck)
+            allesNeu()
+            PRINT "vor: notiz '"; lwMuster.ebenen.ebenen[1].notiz; "' feld '"; textSichtText$(slNotiz); "' | neu gebaut, schritte +"; LEN(wzVerlauf.rueck) - s1
+            ' Getippt, dann eine andere Ebene gewaehlt: die Notiz gehoert der alten
+            gtk_text_buffer_set_text(gtk_text_view_get_buffer(slNotiz), "Vordergrund", -1)
+            gtk_list_box_select_row(slEbenenListe, gtk_list_box_get_row_at_index(slEbenenListe, lwMuster.ebenen.anzahl() - 1))
+            PRINT "ebene gewechselt: aktiv "; lwMuster.ebenen.aktiv; " | oben '"; lwMuster.ebenen.ebenen[1].notiz; "' | feld jetzt '"; textSichtText$(slNotiz); "'"
+            ' Getippt, dann ein Befehl: erst die Notiz, dann der Befehl
+            gtk_text_buffer_set_text(gtk_text_view_get_buffer(slNotiz), "Grund", -1)
+            befehlAusfuehren("zoom_rein")
+            PRINT "vor dem befehl: unten '"; lwMuster.ebenen.ebenen[0].notiz; "'"
+            ' Getippt, dann baut ein Knopf (Rueckgaengig in der Kopfleiste ruft
+            ' werkzeugZurueck direkt) die Leiste neu: die Notiz kommt vorher an
+            gtk_text_buffer_set_text(gtk_text_view_get_buffer(slNotiz), "Rand", -1)
+            allesNeu()
+            PRINT "vor dem neuaufbau: unten '"; lwMuster.ebenen.ebenen[0].notiz; "' | feld '"; textSichtText$(slNotiz); "'"
+            werkzeugZurueck()
+            werkzeugZurueck()
+            werkzeugZurueck()
+            werkzeugZurueck()
+            PRINT "viermal zurueck: wie vorher "; vfAlles$() = v20Vorher; " | notizen '"; lwMuster.ebenen.ebenen[0].notiz; "' '"; lwMuster.ebenen.ebenen[1].notiz; "'"
+            leinwandEinpassen()
+            ' F1: die Uebersicht geht auf und wieder zu
+            DIM t AS INTEGER : t = g_timeout_add(400, v20F1Zu, 0)
+            befehlAusfuehren("tastenkuerzel")
+            PRINT "f1: war offen "; v20F1Offen; " | zeilen "; LEN(kern.kuerzelListe(einst))
+        CASE 3
+            ' Ansichtsschalter: gegen das Bild davor
+            lwMausX = -1
+            v20Grund = v20Bild()
+            PRINT "schalter: rueck "; lwRueckZeigen; " fortschritt "; lwFortschrittZeigen; " mitte "; lwMittelkreuz; " | knoepfe "; gtk_toggle_button_get_active(wzAnsichtKnoepfe[0]); " "; gtk_toggle_button_get_active(wzAnsichtKnoepfe[1]); " "; gtk_toggle_button_get_active(wzAnsichtKnoepfe[2])
+            befehlAusfuehren("rueckstiche_zeigen")
+            PRINT "ohne rueckstiche: "; lwRueckZeigen; " knopf "; gtk_toggle_button_get_active(wzAnsichtKnoepfe[0]); " | anders "; v20GegenGrund() > 0; " | "; meldung
+            befehlAusfuehren("wz_rueckstich")
+            PRINT "rueckstich-werkzeug: zeigt wieder "; lwRueckZeigen; " knopf "; gtk_toggle_button_get_active(wzAnsichtKnoepfe[0]); " | wie vorher "; v20GegenGrund() = 0
+            befehlAusfuehren("wz_stift")
+            gtk_toggle_button_set_active(wzAnsichtKnoepfe[1], FALSE)
+            PRINT "ohne fortschritt (knopf): "; lwFortschrittZeigen; " | anders "; v20GegenGrund() > 0
+            befehlAusfuehren("wz_fortschritt")
+            PRINT "fortschritt-werkzeug: zeigt wieder "; lwFortschrittZeigen; " | wie vorher "; v20GegenGrund() = 0
+            befehlAusfuehren("wz_stift")
+            ' Zentrierhilfe: der Ring um die Mitte ist rot
+            DIM mx AS FLOAT : mx = lwX + lwMuster.breite * lwZelle / 2
+            DIM my AS FLOAT : my = lwY + lwMuster.hoehe * lwZelle / 2
+            befehlAusfuehren("mittelkreuz")
+            DIM f AS INTEGER : f = v20Bild()
+            PRINT "zentrierhilfe: "; lwMittelkreuz; " | ring rot "; v20Roetlich(v20Punkt(f, INT(mx + 6), INT(my))); " | vorher rot "; v20Roetlich(v20Punkt(v20Grund, INT(mx + 6), INT(my))); " | anders "; v20Anders(v20Grund, f) > 0
+            cairo_surface_destroy(f)
+            befehlAusfuehren("mittelkreuz")
+            PRINT "zentrierhilfe aus: wie vorher "; v20GegenGrund() = 0
+        CASE 4
+            ' Spiegelachsen: senkrecht blau bei Links/Rechts
+            DIM ax AS FLOAT : ax = lwX + lwMuster.breite * lwZelle / 2
+            DIM k AS INTEGER, blau AS INTEGER
+            gtk_combo_box_set_active(wzSpiegelWahl, kern.SPIEGEL_WAAGERECHT)
+            DIM fw AS INTEGER : fw = v20Bild()
+            FOR k = 1 TO 40
+                IF v20Blaeulich(v20Punkt(fw, INT(ax), INT(lwY + lwMuster.hoehe * lwZelle * k / 41))) THEN blau = blau + 1
+            NEXT
+            PRINT "spiegel ↔: achse blau "; blau; " von 40 | waagerechte achse "; v20AndersAuf(v20Grund, fw, lwX + 3, lwY + lwMuster.hoehe * lwZelle / 2, lwX + lwMuster.breite * lwZelle - 3, lwY + lwMuster.hoehe * lwZelle / 2, 40) > 30
+            cairo_surface_destroy(fw)
+            ' Achtfach auf einem 14 x 8: gilt als vierfach, und so sieht es aus
+            gtk_combo_box_set_active(wzSpiegelWahl, kern.SPIEGEL_VIERFACH)
+            DIM f4 AS INTEGER : f4 = v20Bild()
+            gtk_combo_box_set_active(wzSpiegelWahl, kern.SPIEGEL_ACHTFACH)
+            DIM f8 AS INTEGER : f8 = v20Bild()
+            PRINT "achtfach auf "; lwMuster.breite; "x"; lwMuster.hoehe; ": wie vierfach "; v20Anders(f4, f8) = 0; " | wirksam "; kern.spiegelKurz$(kern.spiegelWirksam(wzSpiegel, lwMuster.breite, lwMuster.hoehe))
+            ok = vfFoto(fenster, "achsen")
+            cairo_surface_destroy(f4)
+            cairo_surface_destroy(f8)
+            ' auf einem quadratischen kommen die Diagonalen dazu
+            ok = kern.groesseAendern(lwMuster, wzVerlauf, 8, 8)
+            allesNeu()
+            leinwandEinpassen()
+            gtk_combo_box_set_active(wzSpiegelWahl, kern.SPIEGEL_VIERFACH)
+            f4 = v20Bild()
+            gtk_combo_box_set_active(wzSpiegelWahl, kern.SPIEGEL_ACHTFACH)
+            f8 = v20Bild()
+            PRINT "achtfach auf 8x8: diagonale anders "; v20AndersAuf(f4, f8, lwX + lwZelle * 0.6, lwY + lwZelle * 0.6, lwX + lwZelle * 7.4, lwY + lwZelle * 7.4, 40) > 10; " | wirksam "; kern.spiegelKurz$(kern.spiegelWirksam(wzSpiegel, lwMuster.breite, lwMuster.hoehe))
+            cairo_surface_destroy(f4)
+            cairo_surface_destroy(f8)
+            gtk_combo_box_set_active(wzSpiegelWahl, kern.SPIEGEL_AUS)
+            werkzeugZurueck()
+            allesNeu()
+            leinwandEinpassen()
+            PRINT "ohne spiegel: wie vorher "; vfAlles$() = v20Vorher; " | bild wie vorher "; v20GegenGrund() = 0
+        CASE 5
+            ' Pfeile: 20 Punkte, nur mit dem Fokus auf der Flaeche
+            gtk_widget_grab_focus(lwFlaeche)
+            DIM x0 AS FLOAT : x0 = lwX
+            DIM y0 AS FLOAT : y0 = lwY
+            ok = leinwandPfeil(&HFF51)
+            PRINT "pfeil links: "; lwX - x0; " "; ok;
+            ok = leinwandPfeil(&HFF53)
+            ok = leinwandPfeil(&HFF54)
+            PRINT " | rechts runter: "; lwX - x0; " "; lwY - y0;
+            ok = leinwandPfeil(&HFF52)
+            PRINT " | hoch: "; lwY - y0; " | anderes zeichen "; leinwandPfeil(&H61)
+            gtk_widget_grab_focus(slNotiz)
+            PRINT "im notizfeld: "; leinwandPfeil(&HFF51); " | lage "; lwX - x0
+            gtk_widget_grab_focus(lwFlaeche)
+            ' Rollbalken: folgen der Lage, ziehen sie mit
+            flRollNachziehen()
+            PRINT "rollbalken: wert "; gtk_adjustment_get_value(flRollW) = -lwX; " "; gtk_adjustment_get_value(flRollS) = -lwY; " | seite "; gtk_adjustment_get_page_size(flRollW) = gtk_widget_get_allocated_width(lwFlaeche)
+            gtk_adjustment_set_value(flRollW, gtk_adjustment_get_value(flRollW) + 30)
+            gtk_adjustment_set_value(flRollS, gtk_adjustment_get_value(flRollS) + 10)
+            PRINT "gezogen: "; lwX - x0; " "; lwY - y0
+            lwX = 5000
+            flRollNachziehen()
+            PRINT "weit weg: wert "; gtk_adjustment_get_value(flRollW); " | unten "; gtk_adjustment_get_lower(flRollW); " | lage bleibt "; lwX
+            leinwandEinpassen()
+            ' Ablegen
+            ok = ablageMerken("# Kommentar" + CHR$(13) + CHR$(10) + v20Uri$("notiz.txt") + CHR$(13) + CHR$(10) + v20Uri$("mit leer.pxs") + CHR$(13) + CHR$(10))
+            PRINT "ablage: "; ok; " | "; BASENAME(abPfad); " art "; abArt
+            ok = ablageMerken(v20Uri$("bild.PNG"))
+            PRINT "bild: "; ok; " art "; abArt
+            ok = ablageMerken(v20Uri$("notiz.txt"))
+            PRINT "nichts: "; ok; " | "; LEFT$(meldung, 70)
+            ok = ablageMerken("https://example.com/muster.pxs")
+            PRINT "keine datei: "; ok
+            ok = musterSichern(v19Ort$("zwischen.pxs"))
+            ok = ablageMerken(v20Uri$("mit leer.pxs"))
+            ablageAusfuehren()
+            PRINT "abgelegt geoeffnet: "; lwMuster.breite; "x"; lwMuster.hoehe; " | "; BASENAME(musterPfad); " | offen "; abPfad = ""
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+
+' --- Stufe 21: Erscheinungsbild, Zoom-Regler, Muster importieren, Bildformate --------
+
+DIM v21Gelesen AS STRING
+
+FUNCTION v21Werte$() AS STRING
+    DIM a AS ARRAY OF STRING : a = []
+    DIM w AS INTEGER
+    FOR EACH w IN fiWerte
+        ARRAY_PUSH(a, gtk_label_get_text(w))
+    NEXT
+    RETURN JOIN$(a, " | ")
+END FUNCTION
+
+FUNCTION v21Meldungen$() AS STRING
+    IF NOT gtk_widget_get_visible(fiRolle) THEN RETURN "(keine)"
+    RETURN REPLACE$(textSichtText$(fiMeldungen), CHR$(10), " / ")
+END FUNCTION
+
+FUNCTION v21Importieren(daten AS INTEGER) AS BOOLEAN
+    DIM ok AS BOOLEAN
+    DIM knopf AS INTEGER : knopf = gtk_dialog_get_widget_for_response(fiDialog, GTK_ANTWORT_OK)
+    PRINT "dialog: "; gtk_label_get_text(fiDatei); " | "; v21Werte$(); " | importieren "; gtk_widget_get_sensitive(knopf)
+    PRINT "  meldungen: "; LEFT$(v21Meldungen$(), 140)
+    ok = vfFoto(fiDialog, "import")
+    fiLaden(v19Ort$("kaputt.pat"))
+    PRINT "kaputt: "; v21Werte$(); " | importieren "; gtk_widget_get_sensitive(knopf); " | "; LEFT$(v21Meldungen$(), 90)
+    fiLaden(v19Ort$("probe.pat"))
+    gtk_dialog_response(fiDialog, GTK_ANTWORT_OK)
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION vorfuehrenStufe21(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    SELECT CASE schritt
+        CASE 1
+            ' Erscheinungsbild
+            PRINT "thema: "; einst.thema; " | leiste "; HEX$(uiFarbe(&H202228)); " | einstellung gemerkt '"; kern.einstellungenLaden(einst.pfad).thema; "'"
+            einst.thema = "light"
+            einstellungenAnwenden()
+            einstellungenMerken()
+            PRINT "hell: leiste "; HEX$(uiFarbe(&H202228)); " | rand "; HEX$(uiFarbe(&H3A3C44)); " | unbekannt bleibt "; HEX$(uiFarbe(&H123456)); " | gemerkt '"; kern.einstellungenLaden(einst.pfad).thema; "'"
+        CASE 2
+            ok = vfFoto(fenster, "hell")
+            einst.thema = "dark"
+            einstellungenAnwenden()
+            einstellungenMerken()
+            PRINT "dunkel: leiste "; HEX$(uiFarbe(&H202228)); " | gemerkt '"; kern.einstellungenLaden(einst.pfad).thema; "'"
+        CASE 3
+            ok = vfFoto(fenster, "dunkel")
+            ' Zoom-Regler: Bereich aus den Zellgroessen, folgt der Flaeche, zieht sie mit
+            DIM a AS INTEGER : a = gtk_range_get_adjustment(zoomRegler)
+            PRINT "zoomregler: "; gtk_adjustment_get_lower(a); " .. "; gtk_adjustment_get_upper(a); " | steht "; gtk_range_get_value(zoomRegler) = leinwandZoomProzent(); " | knopf '"; TEXT_AUS_ZEIGER$(gtk_button_get_label(zoomProzent)); "' = "; leinwandZoomProzent()
+            gtk_range_set_value(zoomRegler, 200)
+            PRINT "auf 200: flaeche "; leinwandZoomProzent(); " | knopf '"; TEXT_AUS_ZEIGER$(gtk_button_get_label(zoomProzent)); "'"
+            befehlAusfuehren("zoom_rein")
+            PRINT "zoom rein: regler folgt "; ROUND(gtk_range_get_value(zoomRegler)) = leinwandZoomProzent()
+            gtk_button_clicked(zoomProzent)
+            PRINT "klick auf die prozent: "; leinwandZoomProzent()
+            leinwandEinpassen()
+        CASE 4
+            ' Muster importieren: Datei, Angaben, Warnungen; kaputt; dann uebernehmen
+            DIM t AS INTEGER : t = g_timeout_add(400, v21Importieren, 0)
+            fremdImportDialog(v19Ort$("probe.pat"))
+            PRINT "importiert: "; lwMuster.name; " "; lwMuster.breite; "x"; lwMuster.hoehe; " | datei '"; musterPfad; "' | "; LEFT$(meldung, 60)
+            ' Bildformate: was GTKs Lader liest, kommt dazu
+            DIM e AS ARRAY OF STRING : e = bildEndungen()
+            PRINT "bildformate: eigene "; LEN(kern.bildEndungenEigen()); " | tiff (Standardlader) "; ARRAY_INDEXOF(e, "tiff") >= 0; " | svg nie "; ARRAY_INDEXOF(e, "svg") < 0
+            ' Ein TIFF, das GTK selbst schreibt, geht ueber den Umweg Punkt fuer Punkt durch
+            DIM fe AS INTEGER
+            DIM pb AS INTEGER : pb = gdk_pixbuf_new_from_file(PATHJOIN(CWD$(), LOGO), fe)
+            ok = gdk_pixbuf_savev(pb, v19Ort$("logo.tiff"), "tiff", 0, 0, fe)
+            g_object_unref(pb)
+            DIM png AS IMAGE : png = LOADIMAGE(PATHJOIN(CWD$(), LOGO))
+            PRINT "tiff geschrieben: "; ok; " | gelesen "; imDialogBauen(v19Ort$("logo.tiff"), NIL);
+            ' verglichen wird, was zu sehen ist: die Deckkraft ueberall, die Farbe
+            ' an den deckenden Punkten. Halbdurchsichtige weichen ab (bei Deckkraft 2
+            ' traegt die Farbe kaum noch Stellen) -- fuer den Import ohne Belang.
+            DIM gleich AS BOOLEAN : gleich = imBildB = IMAGE_WIDTH(png) AND imBildH = IMAGE_HEIGHT(png)
+            DIM deckend AS BOOLEAN : deckend = TRUE
+            DIM x AS INTEGER, y AS INTEGER
+            FOR y = 0 TO imBildH - 1 STEP 3
+                FOR x = 0 TO imBildB - 1 STEP 3
+                    IF GETALPHA(imBild, x, y) <> GETALPHA(png, x, y) THEN gleich = FALSE
+                    IF GETALPHA(png, x, y) = 255 AND GETPIXEL(imBild, x, y) <> GETPIXEL(png, x, y) THEN deckend = FALSE
+                NEXT
+            NEXT
+            PRINT " | "; imBildB; "x"; imBildH; " deckkraft gleich "; gleich; " | deckende punkte gleich "; deckend
+            imDialogWeg()
+            WRITEALL(v19Ort$("falsch.tiff"), "kein Bild")
+            PRINT "kein bild: "; imDialogBauen(v19Ort$("falsch.tiff"), NIL); " | "; LEFT$(meldung, 20)
+            imDialogWeg()
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+
+' --- Stufe 22: Auswahlkante, Aida, Ziehen, Pfade, Hervorheben, Stickzeit, Neu ------
+
+DIM v22Stand AS INTEGER
+DIM v22Bild AS INTEGER
+
+' Eine leere Zelle (von hinten gesucht: durch (0,0) laeuft in alle.pxs ein
+' Rueckstich) und eine mit vollem Stich
+FUNCTION v22Zelle(leer AS BOOLEAN) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = LEN(lwFarbe) - 1 TO 0 STEP -1
+        IF leer AND lwFarbe[i] < 0 THEN RETURN i
+        IF NOT leer AND lwFarbe[i] >= 0 AND lwTyp[i] = 0 THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION v22Mitte(f AS INTEGER, i AS INTEGER) AS INTEGER
+    DIM x AS INTEGER : x = i MOD lwMuster.breite
+    DIM y AS INTEGER : y = i \ lwMuster.breite
+    RETURN v20Punkt(f, FLOOR(lwX + x * lwZelle + lwZelle / 2), FLOOR(lwY + y * lwZelle + lwZelle / 2))
+END FUNCTION
+
+' Wie viele Punkte der oberen Kante der Auswahl Glut sind und wie viele dunkel
+FUNCTION v22Kante$(f AS INTEGER) AS STRING
+    DIM y AS INTEGER : y = FLOOR(lwY + mrAuswahl.y0 * lwZelle)
+    DIM x0 AS INTEGER : x0 = FLOOR(lwX + mrAuswahl.x0 * lwZelle) + 2
+    DIM x1 AS INTEGER : x1 = FLOOR(lwX + (mrAuswahl.x1 + 1) * lwZelle) - 2
+    DIM glut AS INTEGER, dunkel AS INTEGER, x AS INTEGER
+    FOR x = x0 TO x1
+        DIM p AS INTEGER : p = v20Punkt(f, x, y)
+        DIM r AS INTEGER : r = (p SHR 16) BAND 255
+        DIM b AS INTEGER : b = p BAND 255
+        IF r > 200 AND b < 120 THEN glut = glut + 1
+        IF r < 60 AND b < 80 THEN dunkel = dunkel + 1
+    NEXT
+    RETURN "glut " + IIF(glut > 0, "ja", "nein") + " dunkel " + IIF(dunkel > 0, "ja", "nein") + " | beide etwa gleich " + IIF(ABS(glut - dunkel) <= (x1 - x0) \ 4, "ja", "nein")
+END FUNCTION
+
+FUNCTION v22Ebenen$() AS STRING
+    DIM a AS ARRAY OF STRING : a = []
+    DIM e AS kern.Ebene
+    FOR EACH e IN lwMuster.ebenen.ebenen
+        ARRAY_PUSH(a, e.name + "(" + STR$(e.stichzahl()) + ")")
+    NEXT
+    RETURN JOIN$(a, " ") + " | aktiv " + STR$(lwMuster.ebenen.aktiv)
+END FUNCTION
+
+FUNCTION vorfuehrenStufe22(daten AS INTEGER) AS BOOLEAN
+    ' Erst, wenn das Vorgemerkte (nach dem Ablegen) gelaufen ist: dauert ein
+    ' Schritt laenger als der Takt, sind beide zugleich faellig, und GLib
+    ' nimmt mal den einen, mal den anderen zuerst
+    IF zhArt <> 0 THEN RETURN TRUE
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    SELECT CASE schritt
+        CASE 1
+            PRINT "vorgaben: ameisen "; einst.ameisen; " | textur "; einst.stoffTextur; " | stickzeit "; einst.stickzeit; " | hervorheben "; einst.hervorheben; " | bibliothek '"; einst.bibliothekPfad; "' | vorlagen '"; einst.vorlagenPfad; "'"
+            ' Aida: der Punkt in der Mitte einer leeren Zelle, nicht in einer gefuellten
+            lwZelle = 24
+            lwX = 10
+            lwY = 10
+            DIM leer AS INTEGER : leer = v22Zelle(TRUE)
+            DIM voll AS INTEGER : voll = v22Zelle(FALSE)
+            DIM f AS INTEGER : f = v20Bild()
+            DIM mitte AS INTEGER : mitte = v22Mitte(f, leer)
+            DIM vollAn AS INTEGER : vollAn = v22Mitte(f, voll)
+            PRINT "textur an: leere zelle "; leer MOD lwMuster.breite; ","; leer \ lwMuster.breite; " mitte "; IIF(mitte = einst.stoff, "stoff", "punkt"); " | dunkler "; kern.helligkeit(mitte) < kern.helligkeit(einst.stoff)
+            cairo_surface_destroy(f)
+            einst.stoffTextur = FALSE
+            f = v20Bild()
+            PRINT "textur aus: leere mitte "; IIF(v22Mitte(f, leer) = einst.stoff, "stoff", "punkt"); " | volle zelle "; voll MOD lwMuster.breite; ","; voll \ lwMuster.breite; " gleich wie mit textur "; v22Mitte(f, voll) = vollAn
+            cairo_surface_destroy(f)
+            einst.stoffTextur = TRUE
+            lwZelle = 7
+            f = v20Bild()
+            PRINT "unter 8 punkten: "; IIF(v22Mitte(f, leer) = einst.stoff, "stoff", "punkt")
+            cairo_surface_destroy(f)
+            leinwandEinpassen()
+        CASE 2
+            ' Die laufende Auswahlkante
+            lwZelle = 24
+            lwX = 10
+            lwY = 10
+            werkzeugWaehlen(WZ_AUSWAHL, FALSE)
+            mrAuswahl = kern.auswahlRechteck(lwMuster.breite, lwMuster.hoehe, 2, 2, 9, 5)
+            v22Bild = v20Bild()
+            v22Stand = mrAmeisenStand
+            ' Zwei Farben ohne Luecke: entlang der oberen Kante weicht jeder Punkt
+            ' vom Bild ohne Auswahl ab (einfarbig zeigten die Luecken den Grund)
+            DIM aw AS kern.Auswahl : aw = mrAuswahl
+            mrAuswahl = NIL
+            DIM ohne AS INTEGER : ohne = v20Bild()
+            mrAuswahl = aw
+            DIM ky AS FLOAT : ky = lwY + 2 * lwZelle
+            DIM gedeckt AS INTEGER : gedeckt = v20AndersAuf(ohne, v22Bild, lwX + 2 * lwZelle + 2, ky, lwX + 10 * lwZelle - 2, ky, 60)
+            cairo_surface_destroy(ohne)
+            PRINT "auswahl: takt laeuft "; mrAmeisenNr <> 0; " | kante "; v22Kante$(v22Bild); " | ohne luecke "; gedeckt >= 57
+        CASE 3
+            DIM g AS INTEGER : g = v20Bild()
+            PRINT "nach 300 ms: weitergerueckt "; mrAmeisenStand <> v22Stand; " | kante bewegt "; v20AndersAuf(v22Bild, g, lwX + 2 * lwZelle + 2, lwY + 2 * lwZelle, lwX + 10 * lwZelle - 2, lwY + 2 * lwZelle, 60) > 0
+            cairo_surface_destroy(g)
+            cairo_surface_destroy(v22Bild)
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+        CASE 4
+            PRINT "anderes werkzeug: takt aus "; mrAmeisenNr = 0; " | auswahl weg "; IS_NIL(mrAuswahl)
+            einst.ameisen = FALSE
+            werkzeugWaehlen(WZ_AUSWAHL, FALSE)
+            mrAuswahl = kern.auswahlRechteck(lwMuster.breite, lwMuster.hoehe, 2, 2, 9, 5)
+            v22Bild = v20Bild()
+            PRINT "ohne einstellung: takt "; mrAmeisenNr <> 0; " | kante "; v22Kante$(v22Bild)
+        CASE 5
+            DIM g2 AS INTEGER : g2 = v20Bild()
+            PRINT "ohne einstellung nach 300 ms: steht "; v20AndersAuf(v22Bild, g2, lwX + 2 * lwZelle + 2, lwY + 2 * lwZelle, lwX + 10 * lwZelle - 2, lwY + 2 * lwZelle, 60) = 0
+            cairo_surface_destroy(g2)
+            cairo_surface_destroy(v22Bild)
+            einst.ameisen = TRUE
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            leinwandEinpassen()
+            ' Ziehen: Quellen und Ziele sind eingerichtet
+            DIM r0 AS INTEGER : r0 = gtk_list_box_get_row_at_index(slKatListe, 0)
+            DIM e0 AS INTEGER : e0 = gtk_list_box_get_row_at_index(slEbenenListe, 0)
+            PRINT "ziehen: katalogzeile "; gtk_drag_source_get_target_list(gtk_bin_get_child(r0)) <> 0; " | ebenenzeile "; gtk_drag_source_get_target_list(gtk_bin_get_child(e0)) <> 0; " | farbleiste nimmt "; gtk_drag_dest_get_target_list(fbBox) <> 0; " | ebenenliste nimmt "; gtk_drag_dest_get_target_list(slEbenenListe) <> 0
+            ' Ein Garn auf die Farbleiste (der Weg nach dem Ablegen)
+            DIM vorher AS INTEGER : vorher = lwMuster.farbanzahl()
+            DIM pal AS kern.Palette : pal = slPaletten[slPalette]
+            DIM gn AS INTEGER : gn = LEN(pal.garne) - 1
+            zhVormerken(3, slPalette, gn)
+        CASE 6
+            DIM fa AS kern.Farbeintrag : fa = lwMuster.farben[lwMuster.farbanzahl() - 1]
+            PRINT "garn abgelegt: farben "; lwMuster.farbanzahl(); " | neu '"; fa.garn.name; "' | aktuell "; wzFarbe = lwMuster.farbanzahl() - 1
+            garnAbgelegt(slPalette, 99999)
+            garnAbgelegt(-1, 0)
+            PRINT "falsche nummern: farben "; lwMuster.farbanzahl()
+            ' Ebenen ziehen: die Stelle in der echten Liste, dann zusammenfuehren
+            DIM z1 AS INTEGER : z1 = gtk_list_box_get_row_at_index(slEbenenListe, 1)
+            DIM lage AS PangoRechteck
+            gtk_widget_get_allocation(z1, lage)
+            DIM zi AS INTEGER, an AS FLOAT
+            (zi, an) = zhEbeneStelle(slEbenenListe, lage.y + lage.hoehe \ 2)
+            PRINT "stelle: zeile "; zi; " | mitte "; ABS(an - 0.5) < 0.1; " | darunter "; zhEbeneStelle(slEbenenListe, lage.y + 5 * lage.hoehe)[0]
+            PRINT "vorher: "; v22Ebenen$()
+            PRINT "hinweis: "; ebenenZugText$(2, 2, 1)
+            ebenenZiehen(0, 1, 0.5)
+            PRINT "zusammen: "; v22Ebenen$(); " | "; LEFT$(meldung, 60)
+            befehlAusfuehren("zurueck")
+            PRINT "zurueck: "; v22Ebenen$()
+            ebenenZiehen(0, 2, 0.9)
+            PRINT "verschoben: "; v22Ebenen$()
+            befehlAusfuehren("zurueck")
+            lwMuster.ebenen.ebenen[1].gesperrt = TRUE
+            ebenenZiehen(0, 1, 0.5)
+            PRINT "gesperrt: "; v22Ebenen$(); " | "; LEFT$(meldung, 50)
+            lwMuster.ebenen.ebenen[1].gesperrt = FALSE
+            ' Ueber den vorgemerkten Weg (wie nach dem Ablegen)
+            zhVormerken(2, 2, 0)
+        CASE 7
+            PRINT "vorgemerkt zusammen: "; v22Ebenen$()
+            befehlAusfuehren("zurueck")
+            ' Gewaehlte Farbe hervorheben
+            farbeHervorheben(-1)
+            farbeWaehlen(1)
+            PRINT "hervorheben aus: "; lwHervor
+            einst.hervorheben = TRUE
+            farbeWaehlen(2)
+            PRINT "hervorheben an: "; lwHervor;
+            farbeWaehlen(3)
+            PRINT " -> "; lwHervor
+            einst.hervorheben = FALSE
+            farbeHervorheben(-1)
+            ' Stickzeit
+            einst.stickzeit = FALSE
+            werkzeugWaehlen(WZ_FORTSCHRITT, FALSE)
+            PRINT "stickzeit aus: laeuft "; kern.stickzeitLaeuft(lwMuster);
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            einst.stickzeit = TRUE
+            werkzeugWaehlen(WZ_FORTSCHRITT, FALSE)
+            PRINT " | an: laeuft "; kern.stickzeitLaeuft(lwMuster)
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            ' Ordner fuer Bibliothek und Vorlagen
+            einst.bibliothekPfad = v19Ort$("eigene bib")
+            einst.vorlagenPfad = v19Ort$("vorl")
+            PRINT "bibliothek: "; BASENAME(kern.bibliothekOrdner$(einst.bibliothekPfad)); " angelegt "; DIREXISTS(v19Ort$("eigene bib")); " | vorlagen: "; BASENAME(DIRNAME(vwVorlagenDatei$())); "/"; BASENAME(vwVorlagenDatei$())
+            WRITEALL(v19Ort$("datei"), "x")
+            einst.bibliothekPfad = v19Ort$("datei")
+            einst.vorlagenPfad = "   "
+            PRINT "geht nicht: bibliothek "; BASENAME(kern.bibliothekOrdner$(einst.bibliothekPfad)); " | vorlagen "; BASENAME(vwVorlagenDatei$()); " im einstellungsordner "; DIRNAME(vwVorlagenDatei$()) = DIRNAME(kern.einstellungsDatei$("x"))
+            einst.bibliothekPfad = ""
+            einst.vorlagenPfad = ""
+        CASE 8
+            ' Neu in Glutfaden
+            DIM d AS INTEGER : d = neuigkeitenBauen()
+            DIM titel AS ARRAY OF STRING, texte AS ARRAY OF STRING
+            (titel, texte) = kern.neuigkeitenLesen(PATHJOIN(CWD$(), NEUIGKEITEN))
+            ' Die Datei waechst mit jeder Stufe -- geprueft wird der Abschnitt dieser
+            DIM s22 AS INTEGER : s22 = -1
+            DIM ti AS INTEGER
+            FOR ti = 0 TO LEN(titel) - 1
+                IF INSTR(titel[ti], "Stufe 22:") >= 0 THEN s22 = ti
+            NEXT
+            PRINT "neu: mindestens 5 abschnitte "; LEN(titel) >= 5; " | stufe 22 '"; titel[s22]; "' | absaetze "; LEN(SPLIT$(texte[s22], CHR$(10) + CHR$(10)))
+            ok = vfFoto(d, "neu")
+            gtk_widget_destroy(d)
+            ' Die Einstellungen im Dialog
+            DIM ed AS INTEGER : ed = edBauen()
+            PRINT "dialog: textur "; gtk_toggle_button_get_active(edTextur); " | ameisen "; gtk_toggle_button_get_active(edAmeisen); " | stickzeit "; gtk_toggle_button_get_active(edStickzeit); " | hervorheben "; gtk_toggle_button_get_active(edHervorheben)
+            gtk_toggle_button_set_active(edTextur, FALSE)
+            gtk_toggle_button_set_active(edHervorheben, TRUE)
+            gtk_entry_set_text(edBibOrdner, "  " + v19Ort$("bib2") + " ")
+            edUebernehmen()
+            gtk_widget_destroy(ed)
+            DIM gem AS kern.Einstellungen : gem = kern.einstellungenLaden(einst.pfad)
+            PRINT "uebernommen: textur "; einst.stoffTextur; " | hervorheben "; einst.hervorheben; " | bibliothek "; BASENAME(einst.bibliothekPfad); " | gemerkt "; gem.stoffTextur; " "; gem.hervorheben; " "; BASENAME(gem.bibliothekPfad)
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+
+' --- Stufe 23: magnetisches Raster, Pinsel nach Stiftdruck, Pinch-Zoom ------------
+
+' Wie viele Zellen der aktiven Ebene einen Stich haben
+FUNCTION v23Stiche() AS INTEGER
+    RETURN lwMuster.ebenen.aktiveEbene().stichzahl()
+END FUNCTION
+
+' Ein Zug mit dem aktuellen Werkzeug von (x1, y1) nach (x2, y2), linke Taste
+SUB v23Zug(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    DIM z AS INTEGER : z = wzDruck(x1, y1, 1, FALSE)
+    wzZiehen(x2, y2, FALSE)
+    wzLos(x2, y2, FALSE)
+END SUB
+
+FUNCTION vorfuehrenStufe23(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    SELECT CASE schritt
+        CASE 1
+            PRINT "vorgaben: einrasten "; einst.einrasten; " alle "; einst.rasterSchritt; " | druck "; einst.stiftDruck; " pinsel "; einst.pinselGroesse; " | gesten "; einst.gesten
+            PRINT "knopf: "; gtk_toggle_button_get_active(wzRasterKnopf); " | tipp '"; LEFT$(TEXT_AUS_ZEIGER$(gtk_widget_get_tooltip_text(wzRasterKnopf)), 22); "' | kuerzel-befehl "; kern.kuerzelVon$(einst, "einrasten") = ""
+            befehlAusfuehren("einrasten")
+            PRINT "umgeschaltet: "; einst.einrasten; " | knopf "; gtk_toggle_button_get_active(wzRasterKnopf); " | "; meldung
+            ' Eine leere Ebene, damit nur der Zug zaehlt
+            ebenenBefehl(0)
+            farbeWaehlen(0)
+            werkzeugWaehlen(WZ_LINIE, FALSE)
+            v23Zug(3, 4, 12, 7)
+            PRINT "linie eingerastet: stiche "; v23Stiche(); " | (5,5) "; lwMuster.stich(5, 5) = 0; " (10,5) "; lwMuster.stich(10, 5) = 0; " | (3,4) leer "; lwMuster.ebenen.aktiveEbene().raster[4 * lwMuster.breite + 3] < 0
+            befehlAusfuehren("zurueck")
+            werkzeugWaehlen(WZ_RECHTECK, FALSE)
+            v23Zug(1, 1, 8, 6)
+            PRINT "rechteck: stiche "; v23Stiche(); " | ecke (0,0) "; lwMuster.ebenen.aktiveEbene().raster[0] = 0; " | (10,5) "; lwMuster.ebenen.aktiveEbene().raster[5 * lwMuster.breite + 10] = 0
+            befehlAusfuehren("zurueck")
+            ' am Rand geklemmt: 13 / 5 = 2,6 -> 15, im Muster 13; 7 / 5 = 1,4 -> 5
+            werkzeugWaehlen(WZ_LINIE, FALSE)
+            v23Zug(13, 7, 13, 7)
+            PRINT "am rand: stiche "; v23Stiche(); " | (13,5) "; lwMuster.ebenen.aktiveEbene().raster[5 * lwMuster.breite + 13] = 0
+            befehlAusfuehren("zurueck")
+            ' Vieleck: die Linie zur Maus zeigt auf die eingerastete Ecke
+            werkzeugWaehlen(WZ_VIELECK, FALSE)
+            mehrBewegung(3, 4)
+            PRINT "vieleck: maus "; mrMausX; ","; mrMausY;
+            DIM z AS INTEGER : z = wzDruck(7, 7, 1, FALSE)
+            PRINT " | ecke "; mrEcken[0]; ","; mrEcken[1]
+            mehrAbbrechen()
+            ' Andere Werkzeuge rasten nicht ein
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            v23Zug(3, 4, 3, 4)
+            PRINT "stift rastet nicht: (3,4) "; lwMuster.ebenen.aktiveEbene().raster[4 * lwMuster.breite + 3] = 0
+            befehlAusfuehren("zurueck")
+            ' Aus: wieder genau dort
+            befehlAusfuehren("einrasten")
+            werkzeugWaehlen(WZ_LINIE, FALSE)
+            v23Zug(3, 4, 3, 4)
+            PRINT "aus: (3,4) "; lwMuster.ebenen.aktiveEbene().raster[4 * lwMuster.breite + 3] = 0; " | "; meldung
+            befehlAusfuehren("zurueck")
+        CASE 2
+            ' Stiftdruck: was lwDruckLesen bei einem Stift hinterlaesst
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            lwStiftAuf = TRUE
+            lwStiftDruck = 0.5
+            v23Zug(7, 4, 7, 4)
+            PRINT "stift halber druck: stiche "; v23Stiche();
+            befehlAusfuehren("zurueck")
+            lwStiftDruck = 1.0
+            v23Zug(7, 4, 7, 4)
+            PRINT " | voller druck: "; v23Stiche();
+            befehlAusfuehren("zurueck")
+            lwStiftDruck = 0.1
+            v23Zug(7, 4, 7, 4)
+            PRINT " | leichter druck: "; v23Stiche()
+            befehlAusfuehren("zurueck")
+            lwStiftDruck = 0.5
+            v23Zug(2, 4, 6, 4)
+            PRINT "strich mit druck: stiche "; v23Stiche()
+            befehlAusfuehren("zurueck")
+            werkzeugWaehlen(WZ_RADIERER, FALSE)
+            PRINT "radierer ohne pinsel: "; wzPinsel();
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            einst.stiftDruck = FALSE
+            PRINT " | druck aus: "; wzPinsel();
+            einst.stiftDruck = TRUE
+            einst.pinselGroesse = 1
+            PRINT " | pinsel 1: "; wzPinsel()
+            einst.pinselGroesse = 5
+            ' Eine Maus hat keine Druck-Achse
+            DIM ev AS INTEGER : ev = gdk_event_new(GDK_KNOPF_DRUCK)
+            gdk_event_set_device(ev, gdk_seat_get_pointer(gdk_display_get_default_seat(gdk_display_get_default())))
+            PRINT "maus-ereignis: stift "; lwDruckLesen(ev); " druck "; lwStiftDruck
+            gdk_event_free(ev)
+            lwStiftAuf = FALSE
+            v23Zug(7, 4, 7, 4)
+            PRINT "maus: stiche "; v23Stiche()
+            befehlAusfuehren("zurueck")
+        CASE 3
+            ' Pinch-Zoom: aus per Vorgabe
+            PRINT "pinch: phase "; gtk_event_controller_get_propagation_phase(lwPinch);
+            einst.gesten = TRUE
+            pinchAnwenden()
+            PRINT " -> "; gtk_event_controller_get_propagation_phase(lwPinch)
+            befehlAusfuehren("zoom_100")
+            lwPinchBeginn(lwPinch, 0, 0)
+            DIM f AS FLOAT
+            DIM folge AS STRING : folge = ""
+            FOR EACH f IN [1.1, 1.2, 1.3, 1.4, 1.2, 1.15, 0.9]
+                DIM p0 AS INTEGER : p0 = leinwandZoomProzent()
+                pinchGeaendert(f)
+                folge = folge + IIF(leinwandZoomProzent() > p0, "+", IIF(leinwandZoomProzent() < p0, "-", "0"))
+            NEXT
+            PRINT "pinch-folge: "; folge; " | zuletzt "; lwPinchLetzte
+            leinwandEinpassen()
+        CASE 4
+            ' Einstellungen im Dialog
+            DIM ed AS INTEGER : ed = edBauen()
+            PRINT "dialog: einrasten "; gtk_toggle_button_get_active(edMagnet); " alle "; gtk_spin_button_get_value_as_int(edRasterSchritt); " grau "; NOT gtk_widget_get_sensitive(edRasterSchritt); " | druck "; gtk_toggle_button_get_active(edDruck); " pinsel "; gtk_spin_button_get_value_as_int(edPinsel); " | gesten "; gtk_toggle_button_get_active(edGesten); " | rueckstich unberuehrt "; gtk_toggle_button_get_active(edEinrasten) = einst.rueckEinrasten
+            gtk_toggle_button_set_active(edMagnet, TRUE)
+            gtk_spin_button_set_value(edRasterSchritt, 10)
+            gtk_spin_button_set_value(edPinsel, 8)
+            gtk_toggle_button_set_active(edGesten, FALSE)
+            PRINT "  schritt frei: "; gtk_widget_get_sensitive(edRasterSchritt)
+            edUebernehmen()
+            gtk_widget_destroy(ed)
+            DIM gem AS kern.Einstellungen : gem = kern.einstellungenLaden(einst.pfad)
+            PRINT "uebernommen: "; einst.einrasten; " "; einst.rasterSchritt; " "; einst.pinselGroesse; " "; einst.gesten; " | knopf "; gtk_toggle_button_get_active(wzRasterKnopf); " | phase "; gtk_event_controller_get_propagation_phase(lwPinch); " | gemerkt "; gem.einrasten; " "; gem.rasterSchritt; " "; gem.pinselGroesse; " "; gem.gesten
+            ok = vfFoto(fenster, "leiste")
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+
+' --- Sprache: was in den gebauten Fenstern steht ---------------------------------------
+' Laeuft alle Widgets ab (auch Popover von Menueknoepfen) und sammelt, was
+' angezeigt wird: Beschriftungen, Knoepfe, Tooltips, Platzhalter, Kopfleiste,
+' die gewaehlte Zeile einer Klappliste.
+
+DIM vsTexte AS ARRAY OF STRING
+DIM vsF1 AS ARRAY OF STRING
+
+SUB vsDazu(t AS STRING)
+    t = TRIM$(t)
+    IF t <> "" AND ARRAY_INDEXOF(vsTexte, t) < 0 THEN ARRAY_PUSH(vsTexte, t)
+END SUB
+
+FUNCTION vsZeiger$(z AS INTEGER) AS STRING
+    IF z = 0 THEN RETURN ""
+    RETURN TEXT_AUS_ZEIGER$(z)
+END FUNCTION
+
+SUB vsSammeln(w AS INTEGER)
+    IF w = 0 THEN RETURN
+    DIM typ AS STRING : typ = vsZeiger$(g_type_name_from_instance(w))
+    DIM z AS INTEGER : z = gtk_widget_get_tooltip_text(w)
+    IF z <> 0 THEN
+        vsDazu(TEXT_AUS_ZEIGER$(z))
+        g_free(z)
+    END IF
+    SELECT CASE typ
+        CASE "GtkLabel", "GtkAccelLabel" : vsDazu(gtk_label_get_text(w))
+        CASE "GtkButton", "GtkToggleButton", "GtkCheckButton", "GtkRadioButton", "GtkMenuButton", "GtkModelButton" : vsDazu(vsZeiger$(gtk_button_get_label(w)))
+        CASE "GtkHeaderBar"
+            vsDazu(vsZeiger$(gtk_header_bar_get_title(w)))
+            vsDazu(vsZeiger$(gtk_header_bar_get_subtitle(w)))
+        CASE "GtkEntry", "GtkSearchEntry" : vsDazu(vsZeiger$(gtk_entry_get_placeholder_text(w)))
+        CASE "GtkComboBoxText"
+            DIM a AS INTEGER : a = gtk_combo_box_text_get_active_text(w)
+            IF a <> 0 THEN
+                vsDazu(TEXT_AUS_ZEIGER$(a))
+                g_free(a)
+            END IF
+    END SELECT
+    IF typ = "GtkMenuButton" THEN vsSammeln(gtk_menu_button_get_popover(w))
+    IF typ = "GtkNotebook" THEN
+        DIM sn AS INTEGER
+        FOR sn = 0 TO gtk_notebook_get_n_pages(w) - 1
+            vsSammeln(gtk_notebook_get_tab_label(w, gtk_notebook_get_nth_page(w, sn)))
+        NEXT
+    END IF
+    IF NOT g_type_check_instance_is_a(w, gtk_container_get_type()) THEN RETURN
+    DIM liste AS INTEGER : liste = gtk_container_get_children(w)
+    DIM knoten AS INTEGER : knoten = liste
+    WHILE knoten <> 0
+        DIM b AS BUFFER : b = BUFFER_AUS_ZEIGER(knoten, 16)
+        vsSammeln(BUFFER_GET_I64(b, 0))
+        knoten = BUFFER_GET_I64(b, 8)
+    WEND
+    IF liste <> 0 THEN g_list_free(liste)
+END SUB
+
+' Die deutschen Saetze der Tafel, die eine eigene englische Fassung haben --
+' steht einer davon woertlich im Fenster, ist er nicht uebersetzt worden.
+' Nur laengere (Leerzeichen oder ab 8 Zeichen): "Alt" stuende sonst in "Alt+PgUp".
+DIM vsSaetze AS ARRAY OF STRING
+
+FUNCTION vsUebersehen(t AS STRING) AS BOOLEAN
+    IF LEN(vsSaetze) = 0 THEN
+        DIM tf AS MAP OF STRING : tf = kern.spracheTafel(PATHJOIN(CWD$(), "daten/sprache/en.txt"))
+        DIM k AS STRING
+        FOR EACH k IN MAPKEYS(tf)
+            DIM kk AS STRING : kk = TRIM$(REGEX_REPLACE(k, "\{[0-9]+\}", ""))
+            IF tf[k] <> k AND INSTR(k, "{") < 0 AND (INSTR(kk, " ") > 0 OR LEN(kk) >= 8) THEN ARRAY_PUSH(vsSaetze, k)
+        NEXT
+    END IF
+    DIM sz AS STRING
+    FOR EACH sz IN vsSaetze
+        IF INSTR(t, sz) >= 0 THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Sieht der Text deutsch aus? Umlaute, ß, haeufige deutsche Woerter oder ein
+' Satz der Tafel, der nicht uebersetzt wurde
+FUNCTION vsDeutsch(t AS STRING) AS BOOLEAN
+    ' der Name des Musters ist kein Text der Oberflaeche
+    IF musterTitel <> "" THEN t = REPLACE$(t, musterTitel, "")
+    IF lwHat AND lwMuster.name <> "" THEN t = REPLACE$(t, lwMuster.name, "")
+    IF lwHat THEN t = REPLACE$(t, vsTitelSchluessel$(), "")
+    ' Namen von Ebenen und Garnen sind Daten aus der Datei
+    IF lwHat THEN
+        DIM en AS INTEGER
+        FOR en = 0 TO lwMuster.ebenen.anzahl() - 1
+            IF lwMuster.ebenen.ebenen[en].name <> "" THEN t = REPLACE$(t, lwMuster.ebenen.ebenen[en].name, "")
+        NEXT
+    END IF
+    ' Dateinamen und Pfade sind Daten, keine Oberflaeche (ein Schraegstrich
+    ' allein nicht: "stitches/inch")
+    IF REGEX_TEST(t, "\.pxs|^[A-Za-z]:|^/|[\\]") THEN RETURN FALSE
+    IF REGEX_TEST(t, "[äöüÄÖÜß]") THEN RETURN TRUE
+    IF vsUebersehen(t) THEN RETURN TRUE
+    ' Tausenderpunkt (2.500) oder Dezimalkomma (2,5 cm) -- die deutsche Zahl
+    IF REGEX_TEST(t, "(^|[^0-9.,])[0-9]{1,3}([.][0-9]{3})+([^0-9]|$)") THEN RETURN TRUE
+    RETURN REGEX_TEST(" " + t + " ", "(?i)[^a-z](und|der|die|das|mit|nicht|ist|zum|zur|für|oder|aus|auf|alle|eine?|Muster|Farbe|Farben|Ebene|Ebenen|Stiche?|Sichern|Einstellungen|Garn|Zeile|Spalte|Klicken|Rückgängig|Werkzeug)[^a-z]")
+END FUNCTION
+
+FUNCTION vsF1Zu(daten AS INTEGER) AS BOOLEAN
+    vsTexte = []
+    vsSammeln(kuDialog)
+    vsF1 = vsTexte
+    gtk_dialog_response(kuDialog, GTK_ANTWORT_ABBRECHEN)
+    RETURN FALSE
+END FUNCTION
+
+SUB vsDeutscheZeigen(titel AS STRING, liste AS ARRAY OF STRING)
+    DIM d AS ARRAY OF STRING : d = []
+    DIM t AS STRING
+    FOR EACH t IN liste
+        IF vsDeutsch(t) THEN ARRAY_PUSH(d, REPLACE$(t, CHR$(10), " / "))
+    NEXT
+    SORT(d)
+    PRINT titel; ": "; LEN(liste); " texte, deutsch aussehend "; LEN(d)
+    FOR EACH t IN d
+        PRINT "  "; LEFT$(t, 110)
+    NEXT
+END SUB
+
+' Ein Dialog mit eigener Schleife (gtk_dialog_run): sobald er den Griff hat,
+' seine Texte sammeln und ihn schliessen wie mit dem Fensterkreuz
+DIM vsGefeuert AS BOOLEAN
+DIM vsDialogTexte AS ARRAY OF STRING
+DIM vsDialogName AS STRING
+
+FUNCTION vsDialogZu(daten AS INTEGER) AS BOOLEAN
+    DIM w AS INTEGER : w = gtk_grab_get_current()
+    IF w = 0 THEN RETURN TRUE
+    DIM d AS INTEGER : d = gtk_widget_get_toplevel(w)
+    vsTexte = []
+    vsSammeln(d)
+    ' Neues Projekt: dazu die Karten der Vorlagen (Kategorie Lesezeichen)
+    IF vsDialogName = "neu" THEN
+        gtk_toggle_button_set_active(nmKategorien[2], TRUE)
+        vsSammeln(d)
+    END IF
+    vsDialogTexte = vsTexte
+    vsGefeuert = TRUE
+    DIM ok AS BOOLEAN : ok = vfFoto(d, "dlg_" + REPLACE$(vsDialogName, " ", "_"))
+    gtk_dialog_response(d, -4)
+    RETURN FALSE
+END FUNCTION
+
+SUB vsDialogPruefen(name AS STRING, nr AS INTEGER)
+    vsGefeuert = FALSE
+    vsDialogTexte = []
+    vsDialogName = name
+    DIM id AS INTEGER : id = g_timeout_add(300, vsDialogZu, 0)
+    SELECT CASE nr
+        CASE 0 : neuDialog()
+        CASE 1 : eigenschaftenDialog()
+        CASE 2 : groesseDialog()
+        CASE 3 : versionenDialog()
+        CASE 4 : vorlageSichernDialog()
+        CASE 5 : vorlagenDialog()
+        CASE 6 : neuigkeitenDialog()
+        CASE 7 : einstellungenDialog()
+        CASE 8 : rasterDialog()
+        CASE 9 : statistikDialog()
+        CASE 10 : heatmapDialog()
+        CASE 11 : aehnlicheDialog()
+        CASE 12 : farbeErsetzenDialog()
+        CASE 13 : selteneDialog()
+        CASE 14 : symbolDialog()
+        CASE 15 : blendDialog()
+        CASE 16 : exportDialog()
+        CASE 17 : farbverwaltungDialog()
+        CASE 18 : kachelDialog()
+        CASE 19 : paletteDialog()
+        CASE 20 : tauschenDialog()
+        CASE 21 : rahmenDialog()
+        CASE 22 : harmonieDialog()
+        CASE 23 : bibliothekDialog()
+        CASE 24 : stickpfadDialog()
+        CASE 25 : vorschauDialog()
+        CASE 26
+            DIM vr AS BOOLEAN : vr = vorratDialog()
+        CASE 27 : fremdImportDialog("")
+    END SELECT
+    IF NOT vsGefeuert THEN
+        DIM weg AS BOOLEAN : weg = g_source_remove(id)
+        PRINT "  "; name; ": kein Dialog"
+        RETURN
+    END IF
+    vsDeutscheZeigen("  " + name, vsDialogTexte)
+END SUB
+
+FUNCTION vorfuehrenSprache(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    SELECT CASE schritt
+        CASE 1
+            PRINT "sprache: "; kern.spracheJetzt$(); " | englisch "; kern.englisch(); " | einstellung '"; einst.sprache; "'"
+            PRINT "tr: "; tr$("Muster öffnen"); " | unbekannt bleibt: "; tr$("Gibt es nicht"); " | trf: "; trf$("Die Ebene „{0}“ ist gesperrt.", ["Ebene 1"])
+            PRINT "kuerzel: "; kz$("sichern_unter"); " | "; kz$("zurueck"); " | "; kern.kuerzelAnzeige$("Strg+Umschalt+Entf, Alt+Bild auf, Leertaste")
+            PRINT "zahlen: "; zahlText$(1234567.891, 2); " | "; zahlText$(2.5, 1); " | "; zahlText$(400000, -1)
+            PRINT "tooltip mit kuerzel: "; LEFT$(TEXT_AUS_ZEIGER$(gtk_widget_get_tooltip_text(kSichern)), 60)
+            ok = vfFoto(fenster, "hauptfenster")
+            vsTexte = []
+            vsSammeln(fenster)
+            vsDeutscheZeigen("hauptfenster", vsTexte)
+        CASE 2
+            ' Die Uebersicht der Kuerzel (F1)
+            DIM t AS INTEGER : t = g_timeout_add(400, vsF1Zu, 0)
+            befehlAusfuehren("tastenkuerzel")
+            vsDeutscheZeigen("f1", vsF1)
+            DIM zeile AS STRING
+            FOR EACH zeile IN kern.kuerzelListe(einst)
+                IF LEFT$(zeile, 4) = "Undo" OR LEFT$(zeile, 7) = "Save as" THEN PRINT "  f1-zeile: "; REPLACE$(zeile, CHR$(9), " -> ")
+            NEXT
+        CASE 3
+            ' Die Sprache in den Einstellungen
+            DIM ed AS INTEGER : ed = edBauen()
+            PRINT "einstellungen: sprache "; gtk_combo_box_get_active(edSprache); " '"; vsZeiger$(gtk_combo_box_text_get_active_text(edSprache)); "'"
+            gtk_combo_box_set_active(edSprache, 1)
+            edUebernehmen()
+            gtk_widget_destroy(ed)
+            PRINT "uebernommen: '"; einst.sprache; "' | gemerkt '"; kern.einstellungenLaden(einst.pfad).sprache; "' | "; meldung; " | oberflaeche bleibt "; kern.spracheJetzt$()
+        CASE 4
+            ' Jeder Dialog einmal: Texte sammeln, deutsch aussehende zeigen
+            PRINT "dialoge:"
+            DIM dn AS ARRAY OF STRING : dn = ["neu", "eigenschaften", "groesse", "versionen", "vorlage sichern", "vorlagen", "neuigkeiten", _
+                "einstellungen", "raster", "statistik", "heatmap", "aehnliche", "ersetzen", "seltene", "symbol", "blend", "export", _
+                "farbverwaltung", "kacheln", "palette", "tauschen", "rahmen", "harmonie", "bibliothek", "stickpfad", "vorschau", "vorrat", "fremdimport"]
+            DIM di AS INTEGER
+            FOR di = 0 TO LEN(dn) - 1
+                vsDialogPruefen(dn[di], di)
+            NEXT
+        CASE 5
+            ' Ausgaben auf Englisch: Schluessel (Stilnamen, OXS-Elemente)
+            ' duerfen nicht mituebersetzt sein -- auf Deutsch fiele das nie auf
+            DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(lwMuster, "sprache.pdf", NEW kern.PdfOptionen())
+            DIM stile AS ARRAY OF STRING : stile = []
+            DIM zl AS STRING
+            DIM titelZeile AS STRING : titelZeile = ""
+            FOR EACH zl IN ab
+                IF LEFT$(zl, 2) = "P " THEN
+                    DIM st AS STRING : st = MID$(zl, 2, INSTR(zl, " | ") - 2)
+                    IF ARRAY_INDEXOF(stile, st) < 0 THEN ARRAY_PUSH(stile, st)
+                    IF titelZeile = "" AND st = "Title1" THEN titelZeile = MID$(zl, INSTR(zl, " | ") + 3)
+                END IF
+            NEXT
+            SORT(stile)
+            PRINT "pdf: stile "; JOIN$(stile, " "); " | erster titel '"; titelZeile; "' | datei "; FILEEXISTS("sprache.pdf")
+            kern.htmlExportieren(lwMuster, "sprache.html", NEW kern.HtmlOptionen())
+            DIM hz AS ARRAY OF STRING : hz = READLINES("sprache.html")
+            DIM hd AS ARRAY OF STRING : hd = []
+            DIM sprachZeile AS STRING : sprachZeile = ""
+            FOR EACH zl IN hz
+                IF INSTR(zl, "<html") >= 0 THEN sprachZeile = TRIM$(zl)
+                IF LEFT$(TRIM$(zl), 2) <> "/*" AND REGEX_TEST(zl, "[äöüÄÖÜß]|&[aouAOU]uml;|&szlig;") THEN ARRAY_PUSH(hd, LEFT$(TRIM$(zl), 90))
+            NEXT
+            PRINT "html: "; sprachZeile; " | deutsch aussehende zeilen "; LEN(hd)
+            FOR EACH zl IN hd
+                PRINT "  "; zl
+            NEXT
+            ' Eine OXS-Datei ist ein Austauschformat: in beiden Sprachen dieselbe
+            kern.oxsSpeichern(lwMuster, "sprache_en.oxs")
+            ok = kern.spracheLaden("de", "")
+            kern.oxsSpeichern(lwMuster, "sprache_de.oxs")
+            ok = kern.spracheLaden("en", PATHJOIN(CWD$(), "daten/sprache/en.txt"))
+            DIM ox AS STRING : ox = JOIN$(READLINES("sprache_en.oxs"), CHR$(10))
+            PRINT "oxs: "; LEFT$(ox, 38); " | in beiden sprachen gleich "; ox = JOIN$(READLINES("sprache_de.oxs"), CHR$(10)); " | wieder "; kern.spracheJetzt$()
+            DIM csv AS STRING : csv = kern.statistikCsv$(lwMuster, 14, 10.0, 0.0)
+            PRINT "csv: "; LEFT$(csv, INSTR(csv, CHR$(10)))
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION

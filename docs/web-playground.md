@@ -1,5 +1,29 @@
 # Web-Playground (dhrt → WebAssembly)
 
+> **Stand 2026-10-13 (Web-Runde, Beispiel `examples/webspiel`):**
+> - **Eine normale Schrift auch im Browser.** `LOADFONT("sans", 32)` nimmt die
+>   eingebaute DejaVu-Schrift wie auf dem Desktop; der Web-Bau schaltet dafür
+>   das Feature `schriften` ein (`dhrt.wasm` 13,7 → 18,8 MB, vom Server
+>   gepackt deutlich weniger). Ohne das Feature sagt die Meldung das, statt
+>   „Datei 'sans' nicht gefunden“.
+> - **Was ein Programm schreibt, überlebt das Neuladen.** Das
+>   Arbeitsverzeichnis ist `/spiel`, ein IndexedDB-Ordner (IDBFS,
+>   `web_speicher.rs`, `-lidbfs.js`): beim Start gefüllt, höchstens einmal je
+>   Sekunde aus FLIP und am Ende zurückgeschrieben. Ein Programm schreibt
+>   `bestenliste.json` wie auf dem Desktop. `assets/` erreicht es weiter
+>   relativ -- `/spiel/assets` ist ein Verweis, und IDBFS speichert ihn als
+>   Verweis, nicht die Dateien dahinter. Der Ordner gehört der **Seite**: alle
+>   Programme einer Adresse teilen ihn. Nachgesehen: ein Zähler in einer Datei
+>   stand nach „Ausführen“ (= Neuladen) auf 2.
+> - **Ein kurzes Antippen kommt an.** Drücken und Loslassen zwischen zwei
+>   Bildern (ein Tipp auf dem Handy, ein schneller Klick) zählt jetzt auch im
+>   Browser (`flanken.rs` war dort ausgenommen); vorher startete im Spiel nur
+>   ein langsamer Klick.
+> - **Keine Warnungsflut mehr.** Die Tastaturbelegung wurde in jedem FLIP über
+>   `GetKeyName` gelesen -- im Browser kennt raylib das nicht und warnte 26-mal
+>   je Bild, was den Playground ausbremste. Dort gilt jetzt die Lage; Fenster-
+>   Handle und verstecktes Fenster werden im Browser nicht mehr angefragt.
+
 
 > **Stand 2026-08-03: der Web-Build laeuft.** Konsolen- UND Grafik-Programme
 > werden im Browser kompiliert und ausgefuehrt (verifiziert: Kreise, Formen und
@@ -42,6 +66,10 @@
 
 Alle nachgemessen, nicht vermutet:
 
+- **Keine Bildschirmtastatur auf dem Handy.** Die Leinwand ist kein
+  Eingabefeld; ein Telefon blendet für ein gui-Textfeld darin keine Tastatur
+  ein. Getippt wird mit einer echten Tastatur (Tastenereignisse kommen an,
+  nachgesehen mit `KeyboardEvent`s); Antippen und Ziehen gehen überall.
 - **Leinwand wird nach Programmende schwarz.** WebGL verwirft den Zeichenpuffer
   nach dem Anzeigen (`preserveDrawingBuffer` ist nicht gesetzt). Aus demselben
   Grund liefert `SAVESCREENSHOT` im Browser ein leeres Bild. Betrifft nur das

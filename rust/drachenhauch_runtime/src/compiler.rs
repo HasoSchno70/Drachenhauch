@@ -117,6 +117,7 @@ mod oc {
     /// den Typ hat, den `typ_von` ihm zuschreibt (Arg = Konstante mit der
     /// Angabe). Der Wert bleibt liegen.
     pub const TYP_PRUEFEN: i64 = 123;
+    pub const CALL_METHOD_BYREF: i64 = 124;
     pub const HALT: i64 = 99;
 }
 
@@ -359,6 +360,11 @@ struct StructOrt {
     /// Bei einem Feld von Structs mit mehreren Dimensionen die hinteren
     /// Groessen (`DIM g[n, 4] AS Punkt` -> [4]); die erste sagt der Puffer.
     innen: Vec<u32>,
+    /// Ist die Basis ein Aufruf (`reihe(5)[0].x`), der Platz, in dem sein
+    /// Ergebnis liegt, sobald es einmal geladen ist -- der Aufruf laeuft
+    /// genau einmal, auch wenn der Puffer zweimal gebraucht wird (Stelle
+    /// und Laenge).
+    merk: std::cell::Cell<Option<usize>>,
 }
 
 /// `anzahl` eines Feldes von Structs, dessen Laenge erst der Puffer sagt
@@ -1911,6 +1917,32 @@ impl Compiler {
         }
     }
 
+    /// Ein DIM in einem Schleifenrumpf faengt jede Runde FRISCH an (seit
+    /// 2026.28, Entscheidung des Nutzers -- wie FreeBASIC/QBasic). Vorher
+    /// legten die DECLARE-Befehle nur beim ersten Mal an: `DIM s AS STRING`
+    /// behielt den Wert der vorigen Runde, `DIM f[2]` im Hauptprogramm nicht
+    /// -- gefunden beim Feed-Leser, eine Zeichenkette wuchs von Bild zu Bild.
+    /// Die Anlage bleibt, wie sie ist; dahinter steht eine gewoehnliche
+    /// Zuweisung des Startwerts (Zahlen, Texte und Wahrheitswerte als
+    /// Konstante, die kann auch der Maschinencode; alles andere ueber
+    /// `__frisch`).
+    fn dim_frisch(&mut self, name: &str, type_name: &str) -> CR {
+        if self.ctx.break_patches.is_empty() { return Ok(()); }
+        match type_default(type_name) {
+            CVal::Nil => {
+                let t = self.ctx.add_const(json!(type_name));
+                self.ctx.emit(oc::LOAD_CONST, json!(t));
+                self.ctx.emit(oc::CALL_BUILTIN, json!(["__frisch", 1]));
+            }
+            d => {
+                let c = self.ctx.add_const(enc(&d));
+                self.ctx.emit(oc::LOAD_CONST, json!(c));
+            }
+        }
+        self.store_var(name);
+        Ok(())
+    }
+
     fn stmt_dim(&mut self, name: &str, type_name: &str, array_dims: &Option<Vec<Node>>) -> CR {
         // Der Name ist ab hier bekannt -- EINMAL fuer alle DIM-Formen. Sie
         // laufen unten in fuenf verschiedene Zweige (Feld mit Groesse,
@@ -1977,9 +2009,11 @@ impl Compiler {
                 let name_idx = self.ctx.add_const(json!(name));
                 self.ctx.emit(oc::DECLARE_ARRAY_NAME, json!([name_idx, type_name, dims.len()]));
                 self.bind_global(name, name_idx);
-            } else if self.ctx.local_slots.contains_key(name) {
-                // Idempotent (Schleifenkoerper): Dim-Werte wieder vom Stack poppen.
-                for _ in 0..dims.len() { self.ctx.emit(oc::POP, Value::Null); }
+            } else if let Some(&slot) = self.ctx.local_slots.get(name) {
+                // Erneutes DIM (Schleifenrumpf): NEU anlegen wie im
+                // Hauptprogramm -- bis 2026.27 wurden die Groessen verworfen und
+                // das alte Feld behalten.
+                self.ctx.emit(oc::DECLARE_ARRAY_LOCAL, json!([slot, type_name, dims.len()]));
             } else {
                 // Funktions-lokales Array (eigener Slot statt globaler Name).
                 let slot = self.ctx.local_types.len();
@@ -2003,7 +2037,7 @@ impl Compiler {
                 // sizeless array: bleibt NIL bis zur Zuweisung.
                 self.ctx.declare_local(name, type_name);
             }
-            return Ok(());
+            return self.dim_frisch(name, type_name);
         }
         // STRUCT-Instanz -> Auto-Init.
         if self.struct_names.contains(type_name) {
@@ -2018,7 +2052,7 @@ impl Compiler {
                 self.ctx.local_defaults.push(CVal::Nil);
                 self.ctx.emit(oc::DECLARE_STRUCT_LOCAL, json!([slot, type_name]));
             }
-            return Ok(());
+            return self.dim_frisch(name, type_name);
         }
         // STRUCT ... LAYOUT C: ein BUFFER in seiner Groesse, voller Nullen.
         if let Some(groesse) = self.lagen.get(type_name).map(|l| l.groesse) {
@@ -2040,7 +2074,7 @@ impl Compiler {
         // aufrufende Schleife). Globaler Slot/Name nur im Hauptprogramm.
         if !self.ctx.is_main {
             self.ctx.declare_local(name, type_name);
-            return Ok(());
+            return self.dim_frisch(name, type_name);
         }
         let name_idx = self.ctx.add_const(json!(name));
         let type_idx = self.ctx.add_const(json!(type_name));
@@ -2051,7 +2085,7 @@ impl Compiler {
         } else {
             self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
         }
-        Ok(())
+        self.dim_frisch(name, type_name)
     }
 
     /// Welche angekuendigten Methoden sind bei `class_name` noch offen? (WP G)
@@ -2858,6 +2892,12 @@ impl Compiler {
             Node::IsTyp { wert, typ } => {
                 let t = typ.to_lowercase();
                 if !self.is_typname_bekannt(&t) {
+                    // Eine Variable rechts: gemeint ist meist "dasselbe Objekt",
+                    // und das fragt `=` (Glutfaden, 2026-10-15 -- vorher hiess es
+                    // nur "unbekannter Typ 'e'").
+                    if self.ctx.local_slots.contains_key(t.as_str()) || self.global_slots.contains_key(t.as_str()) || self.is_field(&t) {
+                        return Err(format!("IS: '{}' ist eine Variable, kein Typ -- IS prueft den Typ (x IS Klasse); ob zwei Variablen dasselbe Objekt meinen, sagt =", typ));
+                    }
                     return Err(unbekannter_is_typ_msg(typ));
                 }
                 self.expr(wert)?;
@@ -2910,8 +2950,32 @@ impl Compiler {
         Ok(())
     }
 
+    /// Befehle mit festem Wertevorrat: ein Vergleich mit einem Text ausserhalb
+    /// davon ist immer FALSE (bzw. `<>` immer TRUE) -- fast immer ein
+    /// Tippfehler, und er faellt nicht auf, weil das Programm einfach den
+    /// anderen Zweig nimmt. Glutfaden (2026-10-16) las so jeden
+    /// Wahrheitswert einer Datei als Vorgabe: `JSON_TYPE(..) <> "bool"`.
+    fn feste_werte(n: &Node) -> Option<(&'static str, &'static [&'static str])> {
+        let Node::Call { callee, .. } = n else { return None };
+        let Node::Identifier(name) = &**callee else { return None };
+        match name.as_str() {
+            "json_type" => Some(("JSON_TYPE", &["object", "array", "string", "number", "boolean", "null", "missing"])),
+            _ => None,
+        }
+    }
+
+    fn feste_werte_pruefen(&mut self, befehl: &Node, wert: &Node) {
+        let (Some((name, werte)), Node::StringLit(s)) = (Self::feste_werte(befehl), wert) else { return };
+        if werte.contains(&s.as_str()) { return; }
+        self.warnings.push((self.ctx.cur_line, format!(
+            "{} liefert nie \"{}\" -- der Vergleich trifft nie. Moeglich sind: {}.",
+            name, s, werte.join(", "))));
+    }
+
     fn expr_binary(&mut self, op: &str, left: &Node, right: &Node) -> CR {
         if op == "=" || op == "<>" {
+            self.feste_werte_pruefen(left, right);
+            self.feste_werte_pruefen(right, left);
             // `"5" = 5` und `TRUE = 1` sind in Drachenhauch immer FALSE (bzw.
             // `<>` immer TRUE): verschiedene Arten sind nie gleich, und
             // umgewandelt wird nicht. Das ist fast nie gemeint.
@@ -3047,16 +3111,16 @@ impl Compiler {
                 return Ok(());
             }
             self.warn_unbekanntes_mitglied(target, name, true);
+            let mut byref: Vec<bool> = Vec::new();
             if let Some(klasse) = self.statischer_typ(target) {
                 if let Some(sig) = self.find_method_sig(&klasse, name) {
+                    byref = sig.param_byref.clone();
                     let ws = self.arg_warnungen(&format!("{}.{}", Self::typ_klartext(&klasse), name), sig, args);
                     self.warnings.extend(ws);
                 }
             }
             self.expr(target)?;
-            for a in args { self.expr(a)?; }
-            self.ctx.emit(oc::CALL_METHOD, json!([name, args.len()]));
-            return Ok(());
+            return self.methode_rufen(name, args, &byref);
         }
         let name = match callee {
             Node::Identifier(n) => n.clone(),
@@ -3098,14 +3162,14 @@ impl Compiler {
                 if has_named {
                     return Err(format!("{}: Named-Args bei Methoden-Call nicht unterstuetzt", name));
                 }
+                let mut byref: Vec<bool> = Vec::new();
                 if let Some(sig) = self.find_method_sig(&cn, &name) {
+                    byref = sig.param_byref.clone();
                     let ws = self.arg_warnungen(&format!("{}.{}", Self::typ_klartext(&cn), name), sig, args);
                     self.warnings.extend(ws);
                 }
                 self.ctx.emit(oc::LOAD_SELF, Value::Null);
-                for a in args { self.expr(a)?; }
-                self.ctx.emit(oc::CALL_METHOD, json!([name, args.len()]));
-                return Ok(());
+                return self.methode_rufen(&name, args, &byref);
             }
         }
         if let Some(d) = self.ffi_decls.get(&name.to_lowercase()).cloned() {
@@ -3268,6 +3332,32 @@ impl Compiler {
     }
 
     // ---------------------------------------------------- BYREF (Copy-In/Copy-Out)
+    /// Argumente und Aufruf einer Methode; das Objekt liegt schon auf dem
+    /// Stapel. Hat die (statisch bekannte) Methode BYREF-Parameter, werden die
+    /// Argumente dort wie bei CALL_USER erfasst und nach dem Aufruf
+    /// zurueckgeschrieben -- bis 2026-10-14 nahm eine Methode BYREF still als
+    /// BYVAL (Glutfaden: `ebenen.zusammensetzen(farbe, typ, fertig)` blieb leer).
+    fn methode_rufen(&mut self, name: &str, args: &[Node], byref: &[bool]) -> CR {
+        let stellen: Vec<usize> = (0..args.len())
+            .filter(|&i| byref.get(i).copied().unwrap_or(false)).collect();
+        if stellen.is_empty() {
+            for a in args { self.expr(a)?; }
+            self.ctx.emit(oc::CALL_METHOD, json!([name, args.len()]));
+            return Ok(());
+        }
+        let mut caps: Vec<ByrefCap> = Vec::new();
+        for (i, a) in args.iter().enumerate() {
+            if stellen.contains(&i) {
+                caps.push(self.emit_byref_capture_and_load(a).map_err(|e| format!("{}: {}", name, e))?);
+            } else {
+                self.expr(a)?;
+            }
+        }
+        self.ctx.emit(oc::CALL_METHOD_BYREF, json!([name, args.len(), stellen]));
+        self.emit_byref_writeback(&caps);
+        Ok(())
+    }
+
     /// Frischer anonymer Local-Slot (kein DECLARE_LOCAL noetig -- vorab aus
     /// local_defaults alloziert). Name garantiert eindeutig via Slot-Index.
     fn fresh_byref_temp(&mut self) -> usize {
@@ -3360,6 +3450,13 @@ impl Compiler {
                    cases: &[(Vec<CaseMatch>, Option<Node>, Vec<Node>)],
                    else_block: &[Node]) -> CR {
         self.expr(subject)?;                  // Stack: [subj]
+        for (matches, _, _) in cases {
+            for m in matches {
+                if m.kind == "value" {
+                    if let Some(CaseVal::Expr(w)) = m.values.first() { self.feste_werte_pruefen(subject, w); }
+                }
+            }
+        }
         let mut end_jumps: Vec<usize> = vec![];
         for (matches, guard, block) in cases {
             let mut block_jumps: Vec<usize> = vec![];
@@ -3715,6 +3812,7 @@ impl Compiler {
     /// anderer.
     fn stmt_try(&mut self, body: &[Node], catch_var: &str, catch_block: &[Node],
                 has_catch: bool, finally_block: &[Node]) -> CR {
+        let try_zeile = self.ctx.cur_line;
         let hat_finally = !finally_block.is_empty();
         let fin_jmp = if hat_finally { Some(self.ctx.emit(oc::TRY_BEGIN, Value::Null)) } else { None };
         // Ohne CATCH gibt es keinen zweiten Handler. Ausnahme: das alte
@@ -3738,12 +3836,38 @@ impl Compiler {
             let ct = self.ctx.here();
             self.ctx.patch(cj, ct);
             if !catch_var.is_empty() {
+                // Die CATCH-Variable ist ein Text. Ein DIM desselben Namens
+                // weiter unten meint dieselbe Variable -- mit anderem Typ ist
+                // das dieselbe Warnung wie bei zwei DIM (2026-10-17, Glutfaden
+                // Stufe 11: `DIM e AS Eintrag` nach `CATCH e` meldete nur
+                // "'e' ist als STRING angesagt", ohne zu sagen, wo).
+                let klein = catch_var.to_lowercase();
+                if !self.ctx.dim_types.contains_key(&klein) {
+                    // Die Zeile des CATCH steht nicht im Baum: die Zeile ueber
+                    // der ersten Anweisung des Zweigs, sonst die des TRY.
+                    let zeile = match catch_block.first() {
+                        Some(Node::Stmt { line, .. }) if *line > 1 => *line - 1,
+                        _ => try_zeile,
+                    };
+                    self.ctx.dim_types.insert(klein, ("string".to_string(), zeile));
+                }
                 if self.ctx.is_main {
                     if !self.ctx.local_slots.contains_key(catch_var) {
                         let name_idx = self.ctx.add_const(json!(catch_var));
                         let type_idx = self.ctx.add_const(json!("string"));
                         let default_idx = self.ctx.add_const(json!(""));
-                        self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+                        // Hat der Name einen globalen Platz (ein DIM desselben
+                        // Namens irgendwo im Hauptprogramm), muss der Platz
+                        // HIER angelegt werden wie bei FOR -- sonst schrieb der
+                        // CATCH in einen Platz, den erst das spaetere DIM
+                        // einhaengt, und brach mit "globale Variable noch nicht
+                        // gesetzt" ab (in der Zeile des Fehlers, nicht des CATCH).
+                        if let Some(&slot) = self.global_slots.get(catch_var) {
+                            self.ctx.emit(oc::DECLARE_GLOBAL_SLOT,
+                                          json!([slot as i64, name_idx, type_idx, default_idx]));
+                        } else {
+                            self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+                        }
                     }
                     self.merke_deklariert(catch_var);
                 } else if !self.ctx.local_slots.contains_key(catch_var) {
@@ -4095,23 +4219,23 @@ impl Compiler {
         let l = self.lagen.get(&unter)?;
         Some(Ok(StructOrt { basis: n.clone(), wo: format!("{}.{}", Self::wo_text(target), name), fest: 0, dyn_: vec![],
                             art: '#', unter, anzahl, zeichen: 0, groesse: l.groesse, bits: 0, bit: 0,
-                            objekt: true, ganz: true, innen: innen.unwrap_or_default() }))
+                            objekt: true, ganz: true, innen: innen.unwrap_or_default(), merk: Default::default() }))
     }
 
     /// Feld oder Index direkt auf dem Ergebnis einer FUNCTION, die einen
-    /// Struct liefert (`reihe(5)[0].x`): fuer die Laenge muesste der Aufruf
-    /// zweimal laufen. Das sagt eine Meldung, statt dass zur Laufzeit ein
-    /// Puffer als Feld gelesen wird.
+    /// Struct oder ein Feld von Structs liefert (`reihe(5)[0].x`,
+    /// `punkt().x`). Der Ort hat den Aufruf als Basis; `struct_basis_laden`
+    /// wertet ihn einmal aus und merkt sich das Ergebnis.
     fn struct_aus_aufruf(&self, target: &Node) -> Option<Result<StructOrt, String>> {
         let Node::Call { callee, .. } = target else { return None };
         let Node::Identifier(f) = &**callee else { return None };
         let rt = self.typ_norm(&self.fn_sigs.get(f.as_str())?.return_type);
-        let basis = rt.strip_suffix("[]").unwrap_or(&rt);
-        let l = self.lagen.get(basis)?;
-        Some(Err(format!("{}(...) liefert {} -- erst einer Variable zuweisen: DIM r AS {} : r = {}(...) : r{}",
-                         f, if rt.ends_with("[]") { "ein Feld von Structs" } else { "einen Struct" },
-                         if rt.ends_with("[]") { format!("ARRAY OF {}", l.name) } else { l.name.clone() },
-                         f, if rt.ends_with("[]") { "[0].feld" } else { ".feld" })))
+        let (unter, innen) = struct_feldtyp(&rt);
+        let anzahl = if innen.is_some() { STRUCT_DYN } else { 0 };
+        let l = self.lagen.get(&unter)?;
+        Some(Ok(StructOrt { basis: target.clone(), wo: format!("{}(...)", f), fest: 0, dyn_: vec![], art: '#',
+                            unter, anzahl, zeichen: 0, groesse: l.groesse, bits: 0, bit: 0,
+                            objekt: false, ganz: false, innen: innen.unwrap_or_default(), merk: Default::default() }))
     }
 
     /// Ein Ausdruck, wie er in einer Meldung steht (`k.p`, `Self.p`).
@@ -4131,6 +4255,19 @@ impl Compiler {
                 self.expr(target)?;
                 let idx = self.ctx.add_const(json!(name));
                 self.ctx.emit(oc::LOAD_MEMBER, json!(idx));
+                Ok(())
+            }
+            Node::Call { .. } => {
+                if let Some(slot) = o.merk.get() {
+                    self.ctx.emit(oc::LOAD_LOCAL, json!(slot));
+                    return Ok(());
+                }
+                let slot = self.ctx.alloc_anon_slot("any");
+                let b = o.basis.clone();
+                self.expr(&b)?;
+                self.ctx.emit(oc::DUP, Value::Null);
+                self.ctx.emit(oc::STORE_LOCAL, json!(slot));
+                o.merk.set(Some(slot));
                 Ok(())
             }
             b => { let b = b.clone(); self.expr(&b) }
@@ -4174,13 +4311,13 @@ impl Compiler {
                 let l = self.lagen.get(&unter)?;
                 Some(Ok(StructOrt { basis: n.clone(), wo: name.clone(), fest: 0, dyn_: vec![], art: '#',
                                     unter, anzahl, zeichen: 0, groesse: l.groesse, bits: 0, bit: 0,
-                                    objekt: false, ganz: false, innen: innen.unwrap_or_default() }))
+                                    objekt: false, ganz: false, innen: innen.unwrap_or_default(), merk: Default::default() }))
             }
             Node::MemberAccess { target, name } => {
                 let mut o = match self.struct_ort(target) {
                     Some(Ok(o)) => o,
                     Some(Err(e)) => return Some(Err(e)),
-                    None => return self.struct_aus_aufruf(target).or_else(|| self.struct_objektfeld(n, target, name)),
+                    None => return self.struct_objektfeld(n, target, name),
                 };
                 o.ganz = false;
                 if o.anzahl == STRUCT_DYN {
@@ -4211,7 +4348,7 @@ impl Compiler {
                 let mut o = match self.struct_ort(target) {
                     Some(Ok(o)) => o,
                     Some(Err(e)) => return Some(Err(e)),
-                    None => return self.struct_aus_aufruf(target),
+                    None => return None,
                 };
                 o.ganz = false;
                 if o.anzahl == 0 {
@@ -4241,6 +4378,7 @@ impl Compiler {
                 o.anzahl = 0;
                 Some(Ok(o))
             }
+            Node::Call { .. } => self.struct_aus_aufruf(n),
             _ => None,
         }
     }

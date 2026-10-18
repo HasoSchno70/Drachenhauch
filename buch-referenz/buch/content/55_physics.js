@@ -94,6 +94,12 @@ module.exports = (H) => [
       'IF getroffen THEN PHYS2D_SET_DYNAMIC(welt, stein, TRUE)',
       'PRINT PHYS2D_IS_DYNAMIC(welt, stein)',
     ]),
+  H.cmd("PHYS2D_SLEEP · PHYS2D_SLEEPING", 'PHYS2D_SLEEP(w, id [, schlafen])   PHYS2D_SLEEPING(w, id)',
+    "Legt einen Körper schlafen (ohne drittes Argument oder TRUE) oder weckt ihn (FALSE). Ein schlafender Körper kostet nichts, bis ihn ein Stoß, ein gesetztes Tempo oder ein wacher Körper berührt – dann wacht er von selbst auf. Aber Vorsicht: in der Luft schlafend bleibt er dort hängen, bis etwas ihn weckt.",
+    [
+      'PHYS2D_SLEEP(welt, stein)',
+      'PRINT PHYS2D_SLEEPING(welt, stein)',
+    ]),
   H.tip("Erst stellen, dann fallen lassen", "Ein Stapel aus dynamischen Körpern beginnt sofort zu wackeln und sich zurechtzuruckeln, sobald die Welt läuft – bis zum ersten Wurf steht er schief. Baue ihn deshalb statisch auf und schalte die Teile erst beim Treffer auf dynamisch: Dann steht er, bis er soll."),
 
   H.h2("physics3d — echte 3D-Physik"),
@@ -128,6 +134,13 @@ module.exports = (H) => [
     [
       'PHYS3D_SET_POS(w, spieler, 0.0, 5.0, 0.0)',
       'PRINT PHYS3D_COUNT(w)',
+    ]),
+  H.cmd("PHYS3D_SLEEP · PHYS3D_SLEEPING", 'PHYS3D_SLEEP(w, id [, schlafen])   PHYS3D_SLEEPING(w, id)',
+    "Legt einen Körper schlafen oder weckt ihn (FALSE), wie in 2D. Lohnt sich bei frisch aufgebauten Stapeln: die liegen ohnehin still, und wach rechnet der Löser trotzdem mit jedem Kontakt – 1323 Würfel kosten wach 20 ms je Schritt, schlafend 0,3 ms. Ein Stoß weckt den Körper und seine Nachbarn.",
+    [
+      "' jeder Klotz des Turms schlaeft, bis ihn etwas trifft",
+      'k = PHYS3D_ADD_BOX(w, x, y, z, 0.5, 0.5, 0.5, TRUE, 0.1)',
+      'PHYS3D_SLEEP(w, k)',
     ]),
 
   H.cmd("COLLIDES", 'COLLIDES(x1, y1, w1, h1, x2, y2, w2, h2)',
