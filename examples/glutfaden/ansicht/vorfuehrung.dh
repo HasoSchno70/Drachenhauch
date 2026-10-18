@@ -2917,16 +2917,46 @@ SUB vsSammeln(w AS INTEGER)
     IF liste <> 0 THEN g_list_free(liste)
 END SUB
 
-' Sieht der Text deutsch aus? Umlaute, ß und haeufige deutsche Woerter
+' Die deutschen Saetze der Tafel, die eine eigene englische Fassung haben --
+' steht einer davon woertlich im Fenster, ist er nicht uebersetzt worden.
+' Nur laengere (Leerzeichen oder ab 8 Zeichen): "Alt" stuende sonst in "Alt+PgUp".
+DIM vsSaetze AS ARRAY OF STRING
+
+FUNCTION vsUebersehen(t AS STRING) AS BOOLEAN
+    IF LEN(vsSaetze) = 0 THEN
+        DIM tf AS MAP OF STRING : tf = kern.spracheTafel(PATHJOIN(CWD$(), "daten/sprache/en.txt"))
+        DIM k AS STRING
+        FOR EACH k IN MAPKEYS(tf)
+            DIM kk AS STRING : kk = TRIM$(REGEX_REPLACE(k, "\{[0-9]+\}", ""))
+            IF tf[k] <> k AND INSTR(k, "{") < 0 AND (INSTR(kk, " ") > 0 OR LEN(kk) >= 8) THEN ARRAY_PUSH(vsSaetze, k)
+        NEXT
+    END IF
+    DIM sz AS STRING
+    FOR EACH sz IN vsSaetze
+        IF INSTR(t, sz) >= 0 THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Sieht der Text deutsch aus? Umlaute, ß, haeufige deutsche Woerter oder ein
+' Satz der Tafel, der nicht uebersetzt wurde
 FUNCTION vsDeutsch(t AS STRING) AS BOOLEAN
     ' der Name des Musters ist kein Text der Oberflaeche
     IF musterTitel <> "" THEN t = REPLACE$(t, musterTitel, "")
     IF lwHat AND lwMuster.name <> "" THEN t = REPLACE$(t, lwMuster.name, "")
     IF lwHat THEN t = REPLACE$(t, vsTitelSchluessel$(), "")
+    ' Namen von Ebenen und Garnen sind Daten aus der Datei
+    IF lwHat THEN
+        DIM en AS INTEGER
+        FOR en = 0 TO lwMuster.ebenen.anzahl() - 1
+            IF lwMuster.ebenen.ebenen[en].name <> "" THEN t = REPLACE$(t, lwMuster.ebenen.ebenen[en].name, "")
+        NEXT
+    END IF
     ' Dateinamen und Pfade sind Daten, keine Oberflaeche (ein Schraegstrich
     ' allein nicht: "stitches/inch")
     IF REGEX_TEST(t, "\.pxs|^[A-Za-z]:|^/|[\\]") THEN RETURN FALSE
     IF REGEX_TEST(t, "[äöüÄÖÜß]") THEN RETURN TRUE
+    IF vsUebersehen(t) THEN RETURN TRUE
     ' Tausenderpunkt (2.500) oder Dezimalkomma (2,5 cm) -- die deutsche Zahl
     IF REGEX_TEST(t, "(^|[^0-9.,])[0-9]{1,3}([.][0-9]{3})+([^0-9]|$)") THEN RETURN TRUE
     RETURN REGEX_TEST(" " + t + " ", "(?i)[^a-z](und|der|die|das|mit|nicht|ist|zum|zur|für|oder|aus|auf|alle|eine?|Muster|Farbe|Farben|Ebene|Ebenen|Stiche?|Sichern|Einstellungen|Garn|Zeile|Spalte|Klicken|Rückgängig|Werkzeug)[^a-z]")
@@ -2965,6 +2995,11 @@ FUNCTION vsDialogZu(daten AS INTEGER) AS BOOLEAN
     DIM d AS INTEGER : d = gtk_widget_get_toplevel(w)
     vsTexte = []
     vsSammeln(d)
+    ' Neues Projekt: dazu die Karten der Vorlagen (Kategorie Lesezeichen)
+    IF vsDialogName = "neu" THEN
+        gtk_toggle_button_set_active(nmKategorien[2], TRUE)
+        vsSammeln(d)
+    END IF
     vsDialogTexte = vsTexte
     vsGefeuert = TRUE
     DIM ok AS BOOLEAN : ok = vfFoto(d, "dlg_" + REPLACE$(vsDialogName, " ", "_"))
