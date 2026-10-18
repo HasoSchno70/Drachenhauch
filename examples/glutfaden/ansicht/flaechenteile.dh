@@ -36,7 +36,7 @@ FUNCTION flLinealNeu(links AS BOOLEAN) AS INTEGER
     signalEreignis(l, "motion-notify-event", flLinealBewegung, IIF(links, 1, 0), 0, 0)
     signalEreignis(l, "button-press-event", flLinealDruck, IIF(links, 1, 0), 0, 0)
     signalEreignis(l, "leave-notify-event", flLinealVerlassen, IIF(links, 1, 0), 0, 0)
-    tipp(l, trf$("Klicken holt diese {0} in die Mitte", [IIF(links, "Zeile", "Spalte")]))
+    tipp(l, IIF(links, tr$("Klicken holt diese Zeile in die Mitte"), tr$("Klicken holt diese Spalte in die Mitte")))
     RETURN l
 END FUNCTION
 

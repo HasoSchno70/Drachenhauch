@@ -455,11 +455,24 @@ FUNCTION dateiWaehlen(sichern AS BOOLEAN) AS STRING
 END FUNCTION
 
 ' Ungesichertes? Sichern, Verwerfen oder Abbrechen. TRUE = weitermachen.
+' Die Frage als ganzer Satz -- "Vor dem {0} sichern?" liesse sich nicht
+' uebersetzen (Englisch: "Save before opening?", nicht "before Open")
+FUNCTION ungesichertFrage$(was AS STRING) AS STRING
+    SELECT CASE was
+        CASE "Öffnen" : RETURN tr$("Vor dem Öffnen sichern?")
+        CASE "Schließen" : RETURN tr$("Vor dem Schließen sichern?")
+        CASE "Importieren" : RETURN tr$("Vor dem Importieren sichern?")
+        CASE "erneuten Importieren" : RETURN tr$("Vor dem erneuten Importieren sichern?")
+        CASE "Anlegen" : RETURN tr$("Vor dem Anlegen sichern?")
+    END SELECT
+    RETURN trf$("Vor dem {0} sichern?", [was])
+END FUNCTION
+
 FUNCTION ungesichertFragen(was AS STRING) AS BOOLEAN
     IF NOT istGeaendert() THEN RETURN TRUE
     DIM d AS INTEGER : d = gtk_message_dialog_new(fenster, GTK_DIALOG_MODAL, GTK_NACHRICHT_FRAGE, GTK_KNOEPFE_KEINE, _
         "%s", trf$("„{0}“ hat ungesicherte Änderungen.", [musterTitel]))
-    gtk_message_dialog_format_secondary_text(d, "%s", trf$("Vor dem {0} sichern?", [was]))
+    gtk_message_dialog_format_secondary_text(d, "%s", ungesichertFrage$(was))
     DIM k AS INTEGER
     k = gtk_dialog_add_button(d, tr$("Verwerfen"), 2)
     k = gtk_dialog_add_button(d, tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN)
@@ -472,7 +485,7 @@ FUNCTION ungesichertFragen(was AS STRING) AS BOOLEAN
 END FUNCTION
 
 SUB oeffnenGeklickt(knopf AS INTEGER, daten AS INTEGER)
-    IF NOT ungesichertFragen(tr$("Öffnen")) THEN RETURN
+    IF NOT ungesichertFragen("Öffnen") THEN RETURN
     DIM pfad AS STRING : pfad = dateiWaehlen(FALSE)
     IF pfad <> "" THEN
         DIM ok AS BOOLEAN : ok = musterOeffnen(pfad)
@@ -548,7 +561,7 @@ FUNCTION schliessenAngefragt(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER
     END IF
     fensterMessen()
     stickzeitBeenden(FALSE)
-    RETURN NOT ungesichertFragen(tr$("Schließen"))
+    RETURN NOT ungesichertFragen("Schließen")
 END FUNCTION
 
 ' Der Logo-Knopf: ein kleines Menue mit Ueber, Neuigkeiten und Tastenkuerzeln

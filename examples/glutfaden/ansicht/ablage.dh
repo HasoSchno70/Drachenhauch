@@ -60,7 +60,7 @@ SUB ablageAusfuehren()
     DIM p AS STRING : p = abPfad
     abPfad = ""
     IF abArt = kern.ABLAGE_MUSTER THEN
-        IF NOT ungesichertFragen(tr$("Öffnen")) THEN RETURN
+        IF NOT ungesichertFragen("Öffnen") THEN RETURN
         DIM ok AS BOOLEAN : ok = musterOeffnen(p)
     ELSEIF abArt = kern.ABLAGE_BILD THEN
         bildImportierenVon(p)

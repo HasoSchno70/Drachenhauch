@@ -14,7 +14,7 @@ DIM txKursiv AS BOOLEAN
 ' uebrig bleibt. Zeilenumbrueche im Text gehen mit.
 FUNCTION textAusschnitt(text AS STRING, schrift AS STRING, groesse AS INTEGER, fett AS BOOLEAN, kursiv AS BOOLEAN, farbe AS INTEGER, art AS INTEGER) AS kern.Ausschnitt
     groesse = CLAMP(groesse, 6, 72)
-    DIM beschreibung AS STRING : beschreibung = schrift + IIF(fett, tr$(" Bold"), "") + IIF(kursiv, tr$(" Italic"), "") + " " + STR$(groesse)
+    DIM beschreibung AS STRING : beschreibung = schrift + IIF(fett, " Bold", "") + IIF(kursiv, " Italic", "") + " " + STR$(groesse)
     ' messen an einer kleinen Flaeche
     DIM probe AS INTEGER : probe = cairo_image_surface_create(CAIRO_A8, 1, 1)
     DIM pcr AS INTEGER : pcr = cairo_create(probe)
@@ -95,7 +95,7 @@ END SUB
 
 ' Die Schriften der Auswahl
 FUNCTION textSchriften() AS ARRAY OF STRING
-    RETURN ["Sans", "Serif", "Monospace", "Arial", tr$("Georgia"), tr$("Courier New")]
+    RETURN ["Sans", "Serif", "Monospace", "Arial", "Georgia", "Courier New"]
 END FUNCTION
 
 SUB textAnhaengen()

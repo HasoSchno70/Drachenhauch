@@ -446,7 +446,7 @@ SUB farbleisteAktion(i AS INTEGER, was AS INTEGER)
             DIM an AS BOOLEAN : an = NOT lwMuster.farben[i].auslassen
             IF kern.farbeAuslassen(lwMuster, wzVerlauf, i, an) THEN
                 allesNeu()
-                statusMeldung(trf$("Farbe „{0}“ wird {1}gestickt.", [lwMuster.farben[i].garn.name, IIF(an, "nicht ", "")]))
+                statusMeldung(IIF(an, trf$("Farbe „{0}“ wird nicht gestickt.", [lwMuster.farben[i].garn.name]), trf$("Farbe „{0}“ wird gestickt.", [lwMuster.farben[i].garn.name])))
             END IF
         CASE 4
             farbeWaehlen(i)

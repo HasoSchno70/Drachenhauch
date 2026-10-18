@@ -181,7 +181,7 @@ SUB wkZeileAktiviert(liste AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
 END SUB
 
 SUB willkommenOeffnen(pfad AS STRING)
-    IF NOT ungesichertFragen(tr$("Öffnen")) THEN RETURN
+    IF NOT ungesichertFragen("Öffnen") THEN RETURN
     DIM ok AS BOOLEAN : ok = musterOeffnen(pfad)
 END SUB
 
@@ -200,7 +200,7 @@ END SUB
 ' Das mitgelieferte Beispiel als NEUES Muster (ohne Datei), wie
 ' _on_open_demo: Sichern legt eine eigene Kopie an, das Beispiel bleibt
 SUB demoOeffnen()
-    IF NOT ungesichertFragen(tr$("Öffnen")) THEN RETURN
+    IF NOT ungesichertFragen("Öffnen") THEN RETURN
     DIM pfad AS STRING : pfad = PATHJOIN(CWD$(), "daten/muster/demo_kreuzstich.pxs")
     IF NOT FILEEXISTS(pfad) THEN
         statusMeldung(trf$("Demo-Datei nicht gefunden: {0}", [pfad]))
