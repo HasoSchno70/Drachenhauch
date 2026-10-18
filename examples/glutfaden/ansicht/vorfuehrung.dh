@@ -2716,3 +2716,138 @@ FUNCTION vorfuehrenStufe22(daten AS INTEGER) AS BOOLEAN
     END SELECT
     RETURN TRUE
 END FUNCTION
+
+
+' --- Stufe 23: magnetisches Raster, Pinsel nach Stiftdruck, Pinch-Zoom ------------
+
+' Wie viele Zellen der aktiven Ebene einen Stich haben
+FUNCTION v23Stiche() AS INTEGER
+    RETURN lwMuster.ebenen.aktiveEbene().stichzahl()
+END FUNCTION
+
+' Ein Zug mit dem aktuellen Werkzeug von (x1, y1) nach (x2, y2), linke Taste
+SUB v23Zug(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    DIM z AS INTEGER : z = wzDruck(x1, y1, 1, FALSE)
+    wzZiehen(x2, y2, FALSE)
+    wzLos(x2, y2, FALSE)
+END SUB
+
+FUNCTION vorfuehrenStufe23(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    SELECT CASE schritt
+        CASE 1
+            PRINT "vorgaben: einrasten "; einst.einrasten; " alle "; einst.rasterSchritt; " | druck "; einst.stiftDruck; " pinsel "; einst.pinselGroesse; " | gesten "; einst.gesten
+            PRINT "knopf: "; gtk_toggle_button_get_active(wzRasterKnopf); " | tipp '"; LEFT$(TEXT_AUS_ZEIGER$(gtk_widget_get_tooltip_text(wzRasterKnopf)), 22); "' | kuerzel-befehl "; kern.kuerzelVon$(einst, "einrasten") = ""
+            befehlAusfuehren("einrasten")
+            PRINT "umgeschaltet: "; einst.einrasten; " | knopf "; gtk_toggle_button_get_active(wzRasterKnopf); " | "; meldung
+            ' Eine leere Ebene, damit nur der Zug zaehlt
+            ebenenBefehl(0)
+            farbeWaehlen(0)
+            werkzeugWaehlen(WZ_LINIE, FALSE)
+            v23Zug(3, 4, 12, 7)
+            PRINT "linie eingerastet: stiche "; v23Stiche(); " | (5,5) "; lwMuster.stich(5, 5) = 0; " (10,5) "; lwMuster.stich(10, 5) = 0; " | (3,4) leer "; lwMuster.ebenen.aktiveEbene().raster[4 * lwMuster.breite + 3] < 0
+            befehlAusfuehren("zurueck")
+            werkzeugWaehlen(WZ_RECHTECK, FALSE)
+            v23Zug(1, 1, 8, 6)
+            PRINT "rechteck: stiche "; v23Stiche(); " | ecke (0,0) "; lwMuster.ebenen.aktiveEbene().raster[0] = 0; " | (10,5) "; lwMuster.ebenen.aktiveEbene().raster[5 * lwMuster.breite + 10] = 0
+            befehlAusfuehren("zurueck")
+            ' am Rand geklemmt: 13 / 5 = 2,6 -> 15, im Muster 13; 7 / 5 = 1,4 -> 5
+            werkzeugWaehlen(WZ_LINIE, FALSE)
+            v23Zug(13, 7, 13, 7)
+            PRINT "am rand: stiche "; v23Stiche(); " | (13,5) "; lwMuster.ebenen.aktiveEbene().raster[5 * lwMuster.breite + 13] = 0
+            befehlAusfuehren("zurueck")
+            ' Vieleck: die Linie zur Maus zeigt auf die eingerastete Ecke
+            werkzeugWaehlen(WZ_VIELECK, FALSE)
+            mehrBewegung(3, 4)
+            PRINT "vieleck: maus "; mrMausX; ","; mrMausY;
+            DIM z AS INTEGER : z = wzDruck(7, 7, 1, FALSE)
+            PRINT " | ecke "; mrEcken[0]; ","; mrEcken[1]
+            mehrAbbrechen()
+            ' Andere Werkzeuge rasten nicht ein
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            v23Zug(3, 4, 3, 4)
+            PRINT "stift rastet nicht: (3,4) "; lwMuster.ebenen.aktiveEbene().raster[4 * lwMuster.breite + 3] = 0
+            befehlAusfuehren("zurueck")
+            ' Aus: wieder genau dort
+            befehlAusfuehren("einrasten")
+            werkzeugWaehlen(WZ_LINIE, FALSE)
+            v23Zug(3, 4, 3, 4)
+            PRINT "aus: (3,4) "; lwMuster.ebenen.aktiveEbene().raster[4 * lwMuster.breite + 3] = 0; " | "; meldung
+            befehlAusfuehren("zurueck")
+        CASE 2
+            ' Stiftdruck: was lwDruckLesen bei einem Stift hinterlaesst
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            lwStiftAuf = TRUE
+            lwStiftDruck = 0.5
+            v23Zug(7, 4, 7, 4)
+            PRINT "stift halber druck: stiche "; v23Stiche();
+            befehlAusfuehren("zurueck")
+            lwStiftDruck = 1.0
+            v23Zug(7, 4, 7, 4)
+            PRINT " | voller druck: "; v23Stiche();
+            befehlAusfuehren("zurueck")
+            lwStiftDruck = 0.1
+            v23Zug(7, 4, 7, 4)
+            PRINT " | leichter druck: "; v23Stiche()
+            befehlAusfuehren("zurueck")
+            lwStiftDruck = 0.5
+            v23Zug(2, 4, 6, 4)
+            PRINT "strich mit druck: stiche "; v23Stiche()
+            befehlAusfuehren("zurueck")
+            werkzeugWaehlen(WZ_RADIERER, FALSE)
+            PRINT "radierer ohne pinsel: "; wzPinsel();
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            einst.stiftDruck = FALSE
+            PRINT " | druck aus: "; wzPinsel();
+            einst.stiftDruck = TRUE
+            einst.pinselGroesse = 1
+            PRINT " | pinsel 1: "; wzPinsel()
+            einst.pinselGroesse = 5
+            ' Eine Maus hat keine Druck-Achse
+            DIM ev AS INTEGER : ev = gdk_event_new(GDK_KNOPF_DRUCK)
+            gdk_event_set_device(ev, gdk_seat_get_pointer(gdk_display_get_default_seat(gdk_display_get_default())))
+            PRINT "maus-ereignis: stift "; lwDruckLesen(ev); " druck "; lwStiftDruck
+            gdk_event_free(ev)
+            lwStiftAuf = FALSE
+            v23Zug(7, 4, 7, 4)
+            PRINT "maus: stiche "; v23Stiche()
+            befehlAusfuehren("zurueck")
+        CASE 3
+            ' Pinch-Zoom: aus per Vorgabe
+            PRINT "pinch: phase "; gtk_event_controller_get_propagation_phase(lwPinch);
+            einst.gesten = TRUE
+            pinchAnwenden()
+            PRINT " -> "; gtk_event_controller_get_propagation_phase(lwPinch)
+            befehlAusfuehren("zoom_100")
+            lwPinchBeginn(lwPinch, 0, 0)
+            DIM f AS FLOAT
+            DIM folge AS STRING : folge = ""
+            FOR EACH f IN [1.1, 1.2, 1.3, 1.4, 1.2, 1.15, 0.9]
+                DIM p0 AS INTEGER : p0 = leinwandZoomProzent()
+                pinchGeaendert(f)
+                folge = folge + IIF(leinwandZoomProzent() > p0, "+", IIF(leinwandZoomProzent() < p0, "-", "0"))
+            NEXT
+            PRINT "pinch-folge: "; folge; " | zuletzt "; lwPinchLetzte
+            leinwandEinpassen()
+        CASE 4
+            ' Einstellungen im Dialog
+            DIM ed AS INTEGER : ed = edBauen()
+            PRINT "dialog: einrasten "; gtk_toggle_button_get_active(edMagnet); " alle "; gtk_spin_button_get_value_as_int(edRasterSchritt); " grau "; NOT gtk_widget_get_sensitive(edRasterSchritt); " | druck "; gtk_toggle_button_get_active(edDruck); " pinsel "; gtk_spin_button_get_value_as_int(edPinsel); " | gesten "; gtk_toggle_button_get_active(edGesten); " | rueckstich unberuehrt "; gtk_toggle_button_get_active(edEinrasten) = einst.rueckEinrasten
+            gtk_toggle_button_set_active(edMagnet, TRUE)
+            gtk_spin_button_set_value(edRasterSchritt, 10)
+            gtk_spin_button_set_value(edPinsel, 8)
+            gtk_toggle_button_set_active(edGesten, FALSE)
+            PRINT "  schritt frei: "; gtk_widget_get_sensitive(edRasterSchritt)
+            edUebernehmen()
+            gtk_widget_destroy(ed)
+            DIM gem AS kern.Einstellungen : gem = kern.einstellungenLaden(einst.pfad)
+            PRINT "uebernommen: "; einst.einrasten; " "; einst.rasterSchritt; " "; einst.pinselGroesse; " "; einst.gesten; " | knopf "; gtk_toggle_button_get_active(wzRasterKnopf); " | phase "; gtk_event_controller_get_propagation_phase(lwPinch); " | gemerkt "; gem.einrasten; " "; gem.rasterSchritt; " "; gem.pinselGroesse; " "; gem.gesten
+            ok = vfFoto(fenster, "leiste")
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION

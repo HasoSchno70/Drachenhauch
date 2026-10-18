@@ -95,6 +95,12 @@ DECLARE SUB gdk_drag_status LIB GDK (kontext AS ZEIGER, aktion AS LONG, zeit AS 
 ' Stiftdruck: FALSE, wenn das Geraet keine Druck-Achse hat (Maus)
 DECLARE FUNCTION gdk_event_get_axis LIB GDK (ereignis AS ZEIGER, achse AS LONG, BYREF wert AS FLOAT) AS BOOLEAN
 CONST GDK_ACHSE_DRUCK = 3             ' GDK_AXIS_PRESSURE
+DECLARE FUNCTION gdk_event_new LIB GDK (art AS LONG) AS ZEIGER
+DECLARE SUB gdk_event_free LIB GDK (ereignis AS ZEIGER)
+CONST GDK_KNOPF_DRUCK = 4             ' GDK_BUTTON_PRESS
+DECLARE SUB gdk_event_set_device LIB GDK (ereignis AS ZEIGER, geraet AS ZEIGER)
+DECLARE FUNCTION gdk_display_get_default_seat LIB GDK (anzeige AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gdk_seat_get_pointer LIB GDK (sitz AS ZEIGER) AS ZEIGER
 ' Pinch-Zoom: GtkGestureZoom nimmt Touchscreen und Touchpad
 DECLARE FUNCTION gtk_gesture_zoom_new LIB GTK (w AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_gesture_zoom_get_scale_delta LIB GTK (geste AS ZEIGER) AS FLOAT
