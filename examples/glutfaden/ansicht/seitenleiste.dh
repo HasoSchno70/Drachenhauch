@@ -90,6 +90,10 @@ END FUNCTION
 
 ' Alles neu -- nach dem Laden und nach Umbauten.
 SUB seitenleisteMuster(m AS kern.Muster)
+    ' eine Notiz, die noch im Feld steht, vor dem Abbau uebernehmen -- danach
+    ' gibt es das Feld nicht mehr
+    DIM nu AS BOOLEAN : nu = slNotizUebernehmen()
+    slNotiz = 0
     IF slInhalt <> 0 THEN gtk_widget_destroy(slInhalt)
     slInhalt = gtk_box_new(GTK_SENKRECHT, 2)
     gtk_box_pack_start(slMusterSeite, slInhalt, FALSE, FALSE, 0)
@@ -210,8 +214,6 @@ SUB seitenleisteMuster(m AS kern.Muster)
     slKatalogFuellen()
 
     ' --- Ebenen
-    DIM nu AS BOOLEAN : nu = slNotizUebernehmen()
-    slNotiz = 0
     gtk_box_pack_start(slInhalt, slUeberschrift("Ebenen"), FALSE, FALSE, 0)
     slEbenenListe = gtk_list_box_new()
     gtk_list_box_set_selection_mode(slEbenenListe, GTK_AUSWAHL_EINE)
@@ -293,8 +295,15 @@ SUB seitenleisteMuster(m AS kern.Muster)
     gtk_text_view_set_wrap_mode(slNotiz, GTK_UMBRUCH_WORT)
     gtkKlasse(slNotiz, "notiz")
     gtk_widget_set_size_request(slNotiz, -1, 60)
+    gtk_widget_set_margin_start(slNotiz, 12)
+    gtk_widget_set_margin_end(slNotiz, 12)
+    gtk_widget_set_margin_bottom(slNotiz, 8)
+    gtk_text_view_set_left_margin(slNotiz, 6)
+    gtk_text_view_set_right_margin(slNotiz, 6)
+    gtk_text_view_set_top_margin(slNotiz, 4)
     gtk_widget_set_tooltip_text(slNotiz, "Notiz zur aktiven Ebene -- erscheint als Tipp an ihrem Namen. Gilt beim Verlassen des Feldes; Strg+Z nimmt sie zurück.")
     signalEreignis(slNotiz, "focus-out-event", slNotizVerlassen, 0, 0, 0)
+    signal(slNotiz, "destroy", slNotizWeg, 0, 0, 0)
     gtk_box_pack_start(slInhalt, slNotiz, FALSE, FALSE, 0)
     ' Ansicht der Ebenen -- nur die Anzeige
     DIM az AS INTEGER : az = gtk_box_new(GTK_WAAGERECHT, 10)
@@ -601,6 +610,10 @@ FUNCTION slNotizUebernehmen() AS BOOLEAN
     statusMeldung("Notiz der Ebene „" + slNotizEbene.name + "“ geändert.")
     RETURN TRUE
 END FUNCTION
+
+SUB slNotizWeg(w AS INTEGER, daten AS INTEGER)
+    IF slNotiz = w THEN slNotiz = 0
+END SUB
 
 FUNCTION slNotizVerlassen(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM ok AS BOOLEAN : ok = slNotizUebernehmen()

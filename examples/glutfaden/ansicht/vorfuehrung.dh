@@ -2141,3 +2141,256 @@ FUNCTION vorfuehrenStufe19(daten AS INTEGER) AS BOOLEAN
     END SELECT
     RETURN TRUE
 END FUNCTION
+
+
+' --- Stufe 20: Ebene leeren, Notiz, Ansichtsschalter, Pfeile, Rollbalken, Ablegen, F1 ---
+
+DIM v20Vorher AS STRING
+DIM v20F1Offen AS BOOLEAN
+DIM v20Grund AS INTEGER               ' Leinwand-Bild zum Vergleichen (cairo_surface_t)
+
+' Die Leinwand, so wie sie gezeichnet wird, in ein Bild
+FUNCTION v20Bild() AS INTEGER
+    DIM f AS INTEGER : f = cairo_image_surface_create(CAIRO_ARGB32, gtk_widget_get_allocated_width(lwFlaeche), gtk_widget_get_allocated_height(lwFlaeche))
+    DIM cr AS INTEGER : cr = cairo_create(f)
+    DIM ok AS BOOLEAN : ok = lwZeichnen(lwFlaeche, cr, 0)
+    cairo_destroy(cr)
+    cairo_surface_flush(f)
+    RETURN f
+END FUNCTION
+
+FUNCTION v20Daten(f AS INTEGER) AS BUFFER
+    RETURN BUFFER_AUS_ZEIGER(cairo_image_surface_get_data(f), cairo_image_surface_get_stride(f) * cairo_image_surface_get_height(f))
+END FUNCTION
+
+FUNCTION v20Punkt(f AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM d AS BUFFER : d = BUFFER_AUS_ZEIGER(cairo_image_surface_get_data(f) + y * cairo_image_surface_get_stride(f) + x * 4, 4)
+    RETURN BUFFER_GET_U32(d, 0) BAND &HFFFFFF
+END FUNCTION
+
+' Wie viele Punkte zwei gleich grosse Bilder unterscheiden
+FUNCTION v20Anders(a AS INTEGER, b AS INTEGER) AS INTEGER
+    DIM pa AS BUFFER : pa = v20Daten(a)
+    DIM pb AS BUFFER : pb = v20Daten(b)
+    DIM n AS INTEGER : n = BUFFER_LEN(pa) \ 4
+    DIM i AS INTEGER, c AS INTEGER
+    FOR i = 0 TO n - 1
+        IF BUFFER_GET_U32(pa, i * 4) <> BUFFER_GET_U32(pb, i * 4) THEN c = c + 1
+    NEXT
+    RETURN c
+END FUNCTION
+
+' Wie viele von k Punkten auf der Strecke (x1,y1)-(x2,y2) sich in a und b unterscheiden
+FUNCTION v20AndersAuf(a AS INTEGER, b AS INTEGER, x1 AS FLOAT, y1 AS FLOAT, x2 AS FLOAT, y2 AS FLOAT, k AS INTEGER) AS INTEGER
+    DIM i AS INTEGER, c AS INTEGER
+    FOR i = 1 TO k
+        DIM x AS INTEGER : x = INT(x1 + (x2 - x1) * i / (k + 1))
+        DIM y AS INTEGER : y = INT(y1 + (y2 - y1) * i / (k + 1))
+        IF v20Punkt(a, x, y) <> v20Punkt(b, x, y) THEN c = c + 1
+    NEXT
+    RETURN c
+END FUNCTION
+
+FUNCTION v20Roetlich(farbe AS INTEGER) AS BOOLEAN
+    RETURN ((farbe SHR 16) BAND 255) > 220 AND ((farbe SHR 8) BAND 255) < 150 AND (farbe BAND 255) < 150
+END FUNCTION
+
+FUNCTION v20Blaeulich(farbe AS INTEGER) AS BOOLEAN
+    RETURN ((farbe SHR 16) BAND 255) < 150 AND ((farbe SHR 8) BAND 255) > 140 AND (farbe BAND 255) > 190
+END FUNCTION
+
+' Die Leinwand gegen den Grund: wie viele Punkte anders
+FUNCTION v20GegenGrund() AS INTEGER
+    DIM f AS INTEGER : f = v20Bild()
+    DIM n AS INTEGER : n = v20Anders(v20Grund, f)
+    cairo_surface_destroy(f)
+    RETURN n
+END FUNCTION
+
+FUNCTION v20Tipp$(w AS INTEGER) AS STRING
+    DIM z AS INTEGER : z = gtk_widget_get_tooltip_text(w)
+    IF z = 0 THEN RETURN ""
+    DIM t AS STRING : t = TEXT_AUS_ZEIGER$(z)
+    g_free(z)
+    RETURN t
+END FUNCTION
+
+' Die Zeile einer Ebene in der Seitenleiste (oben im Stapel = oben)
+FUNCTION v20EbenenText(nr AS INTEGER) AS INTEGER
+    RETURN slEbenenTexte[lwMuster.ebenen.anzahl() - 1 - nr]
+END FUNCTION
+
+FUNCTION v20F1Zu(daten AS INTEGER) AS BOOLEAN
+    v20F1Offen = kuDialog <> 0
+    IF kuDialog <> 0 THEN
+        DIM ok AS BOOLEAN : ok = vfFoto(kuDialog, "f1")
+        gtk_dialog_response(kuDialog, GTK_ANTWORT_ABBRECHEN)
+    END IF
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION v20Uri$(name AS STRING) AS STRING
+    DIM p AS STRING : p = REPLACE$(REPLACE$(v19Ort$(name), CHR$(92), "/"), " ", "%20")
+    IF LEFT$(p, 1) = "/" THEN RETURN "file://" + p
+    RETURN "file:///" + p
+END FUNCTION
+
+FUNCTION vorfuehrenStufe20(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM e AS kern.Ebene
+    DIM n AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            v20Vorher = vfAlles$()
+            PRINT "kuerzel: f1 "; kern.kuerzelVon$(einst, "tastenkuerzel"); " | leeren '"; kern.kuerzelVon$(einst, "ebene_leeren"); "' | tafel "; LEN(kern.kuerzelAktionen())
+            ' Ebene leeren: die mittlere ("Oben")
+            lwMuster.ebenen.aktiv = 1
+            slEbeneMarkieren()
+            e = lwMuster.ebenen.ebenen[1]
+            n = e.stichzahl()
+            ebeneLeerenBefehl(FALSE)
+            PRINT "geleert: "; n; " -> "; e.stichzahl(); " | zeile '"; gtk_label_get_text(v20EbenenText(1)); "' | rueckstiche "; LEN(lwMuster.rueckstiche); " | '"; wzVerlauf.textZurueck$(); "' | "; meldung
+            ebeneLeerenBefehl(FALSE)
+            PRINT "noch einmal: "; meldung
+            werkzeugZurueck()
+            PRINT "zurueck: wie vorher "; vfAlles$() = v20Vorher
+            lwMuster.ebenen.ebenen[1].gesperrt = TRUE
+            ebeneLeerenBefehl(FALSE)
+            PRINT "gesperrt: "; meldung; " | stiche "; lwMuster.ebenen.ebenen[1].stichzahl()
+            lwMuster.ebenen.ebenen[1].gesperrt = FALSE
+            ' Notiz: ins Feld, beim Verlassen ein Schritt
+            DIM s0 AS INTEGER : s0 = LEN(wzVerlauf.rueck)
+            gtk_text_buffer_set_text(gtk_text_view_get_buffer(slNotiz), "Schatten links", -1)
+            PRINT "notiz: geschrieben "; slNotizUebernehmen(); " | ebene '"; lwMuster.ebenen.ebenen[1].notiz; "' | tipp '"; v20Tipp$(v20EbenenText(1)); "' | schritte +"; LEN(wzVerlauf.rueck) - s0; " '"; wzVerlauf.textZurueck$(); "' | geaendert "; istGeaendert()
+            PRINT "noch einmal: "; slNotizUebernehmen(); " | schritte +"; LEN(wzVerlauf.rueck) - s0
+        CASE 2
+            ok = vfFoto(fenster, "notiz")
+            werkzeugZurueck()
+            PRINT "zurueck: notiz '"; lwMuster.ebenen.ebenen[1].notiz; "' feld '"; textSichtText$(slNotiz); "' tipp '"; v20Tipp$(v20EbenenText(1)); "'"
+            werkzeugVor()
+            DIM s1 AS INTEGER : s1 = LEN(wzVerlauf.rueck)
+            allesNeu()
+            PRINT "vor: notiz '"; lwMuster.ebenen.ebenen[1].notiz; "' feld '"; textSichtText$(slNotiz); "' | neu gebaut, schritte +"; LEN(wzVerlauf.rueck) - s1
+            ' Getippt, dann eine andere Ebene gewaehlt: die Notiz gehoert der alten
+            gtk_text_buffer_set_text(gtk_text_view_get_buffer(slNotiz), "Vordergrund", -1)
+            gtk_list_box_select_row(slEbenenListe, gtk_list_box_get_row_at_index(slEbenenListe, lwMuster.ebenen.anzahl() - 1))
+            PRINT "ebene gewechselt: aktiv "; lwMuster.ebenen.aktiv; " | oben '"; lwMuster.ebenen.ebenen[1].notiz; "' | feld jetzt '"; textSichtText$(slNotiz); "'"
+            ' Getippt, dann ein Befehl: erst die Notiz, dann der Befehl
+            gtk_text_buffer_set_text(gtk_text_view_get_buffer(slNotiz), "Grund", -1)
+            befehlAusfuehren("zoom_rein")
+            PRINT "vor dem befehl: unten '"; lwMuster.ebenen.ebenen[0].notiz; "'"
+            werkzeugZurueck()
+            werkzeugZurueck()
+            werkzeugZurueck()
+            PRINT "dreimal zurueck: wie vorher "; vfAlles$() = v20Vorher; " | notizen '"; lwMuster.ebenen.ebenen[0].notiz; "' '"; lwMuster.ebenen.ebenen[1].notiz; "'"
+            leinwandEinpassen()
+            ' F1: die Uebersicht geht auf und wieder zu
+            DIM t AS INTEGER : t = g_timeout_add(400, v20F1Zu, 0)
+            befehlAusfuehren("tastenkuerzel")
+            PRINT "f1: war offen "; v20F1Offen; " | zeilen "; LEN(kern.kuerzelListe(einst))
+        CASE 3
+            ' Ansichtsschalter: gegen das Bild davor
+            lwMausX = -1
+            v20Grund = v20Bild()
+            PRINT "schalter: rueck "; lwRueckZeigen; " fortschritt "; lwFortschrittZeigen; " mitte "; lwMittelkreuz; " | knoepfe "; gtk_toggle_button_get_active(wzAnsichtKnoepfe[0]); " "; gtk_toggle_button_get_active(wzAnsichtKnoepfe[1]); " "; gtk_toggle_button_get_active(wzAnsichtKnoepfe[2])
+            befehlAusfuehren("rueckstiche_zeigen")
+            PRINT "ohne rueckstiche: "; lwRueckZeigen; " knopf "; gtk_toggle_button_get_active(wzAnsichtKnoepfe[0]); " | anders "; v20GegenGrund() > 0; " | "; meldung
+            befehlAusfuehren("wz_rueckstich")
+            PRINT "rueckstich-werkzeug: zeigt wieder "; lwRueckZeigen; " knopf "; gtk_toggle_button_get_active(wzAnsichtKnoepfe[0]); " | wie vorher "; v20GegenGrund() = 0
+            befehlAusfuehren("wz_stift")
+            gtk_toggle_button_set_active(wzAnsichtKnoepfe[1], FALSE)
+            PRINT "ohne fortschritt (knopf): "; lwFortschrittZeigen; " | anders "; v20GegenGrund() > 0
+            befehlAusfuehren("wz_fortschritt")
+            PRINT "fortschritt-werkzeug: zeigt wieder "; lwFortschrittZeigen; " | wie vorher "; v20GegenGrund() = 0
+            befehlAusfuehren("wz_stift")
+            ' Zentrierhilfe: der Ring um die Mitte ist rot
+            DIM mx AS FLOAT : mx = lwX + lwMuster.breite * lwZelle / 2
+            DIM my AS FLOAT : my = lwY + lwMuster.hoehe * lwZelle / 2
+            befehlAusfuehren("mittelkreuz")
+            DIM f AS INTEGER : f = v20Bild()
+            PRINT "zentrierhilfe: "; lwMittelkreuz; " | ring rot "; v20Roetlich(v20Punkt(f, INT(mx + 6), INT(my))); " | vorher rot "; v20Roetlich(v20Punkt(v20Grund, INT(mx + 6), INT(my))); " | anders "; v20Anders(v20Grund, f) > 0
+            cairo_surface_destroy(f)
+            befehlAusfuehren("mittelkreuz")
+            PRINT "zentrierhilfe aus: wie vorher "; v20GegenGrund() = 0
+        CASE 4
+            ' Spiegelachsen: senkrecht blau bei Links/Rechts
+            DIM ax AS FLOAT : ax = lwX + lwMuster.breite * lwZelle / 2
+            DIM k AS INTEGER, blau AS INTEGER
+            gtk_combo_box_set_active(wzSpiegelWahl, kern.SPIEGEL_WAAGERECHT)
+            DIM fw AS INTEGER : fw = v20Bild()
+            FOR k = 1 TO 40
+                IF v20Blaeulich(v20Punkt(fw, INT(ax), INT(lwY + lwMuster.hoehe * lwZelle * k / 41))) THEN blau = blau + 1
+            NEXT
+            PRINT "spiegel ↔: achse blau "; blau; " von 40 | waagerechte achse "; v20AndersAuf(v20Grund, fw, lwX + 3, lwY + lwMuster.hoehe * lwZelle / 2, lwX + lwMuster.breite * lwZelle - 3, lwY + lwMuster.hoehe * lwZelle / 2, 40) > 30
+            cairo_surface_destroy(fw)
+            ' Achtfach auf einem 14 x 8: gilt als vierfach, und so sieht es aus
+            gtk_combo_box_set_active(wzSpiegelWahl, kern.SPIEGEL_VIERFACH)
+            DIM f4 AS INTEGER : f4 = v20Bild()
+            gtk_combo_box_set_active(wzSpiegelWahl, kern.SPIEGEL_ACHTFACH)
+            DIM f8 AS INTEGER : f8 = v20Bild()
+            PRINT "achtfach auf "; lwMuster.breite; "x"; lwMuster.hoehe; ": wie vierfach "; v20Anders(f4, f8) = 0; " | wirksam "; kern.spiegelKurz$(kern.spiegelWirksam(wzSpiegel, lwMuster.breite, lwMuster.hoehe))
+            ok = vfFoto(fenster, "achsen")
+            cairo_surface_destroy(f4)
+            cairo_surface_destroy(f8)
+            ' auf einem quadratischen kommen die Diagonalen dazu
+            ok = kern.groesseAendern(lwMuster, wzVerlauf, 8, 8)
+            allesNeu()
+            leinwandEinpassen()
+            gtk_combo_box_set_active(wzSpiegelWahl, kern.SPIEGEL_VIERFACH)
+            f4 = v20Bild()
+            gtk_combo_box_set_active(wzSpiegelWahl, kern.SPIEGEL_ACHTFACH)
+            f8 = v20Bild()
+            PRINT "achtfach auf 8x8: diagonale anders "; v20AndersAuf(f4, f8, lwX + lwZelle * 0.6, lwY + lwZelle * 0.6, lwX + lwZelle * 7.4, lwY + lwZelle * 7.4, 40) > 10; " | wirksam "; kern.spiegelKurz$(kern.spiegelWirksam(wzSpiegel, lwMuster.breite, lwMuster.hoehe))
+            cairo_surface_destroy(f4)
+            cairo_surface_destroy(f8)
+            gtk_combo_box_set_active(wzSpiegelWahl, kern.SPIEGEL_AUS)
+            werkzeugZurueck()
+            allesNeu()
+            leinwandEinpassen()
+            PRINT "ohne spiegel: wie vorher "; vfAlles$() = v20Vorher; " | bild wie vorher "; v20GegenGrund() = 0
+        CASE 5
+            ' Pfeile: 20 Punkte, nur mit dem Fokus auf der Flaeche
+            gtk_widget_grab_focus(lwFlaeche)
+            DIM x0 AS FLOAT : x0 = lwX
+            DIM y0 AS FLOAT : y0 = lwY
+            ok = leinwandPfeil(&HFF51)
+            PRINT "pfeil links: "; lwX - x0; " "; ok;
+            ok = leinwandPfeil(&HFF53)
+            ok = leinwandPfeil(&HFF54)
+            PRINT " | rechts runter: "; lwX - x0; " "; lwY - y0;
+            ok = leinwandPfeil(&HFF52)
+            PRINT " | hoch: "; lwY - y0; " | anderes zeichen "; leinwandPfeil(&H61)
+            gtk_widget_grab_focus(slNotiz)
+            PRINT "im notizfeld: "; leinwandPfeil(&HFF51); " | lage "; lwX - x0
+            gtk_widget_grab_focus(lwFlaeche)
+            ' Rollbalken: folgen der Lage, ziehen sie mit
+            flRollNachziehen()
+            PRINT "rollbalken: wert "; gtk_adjustment_get_value(flRollW) = -lwX; " "; gtk_adjustment_get_value(flRollS) = -lwY; " | seite "; gtk_adjustment_get_page_size(flRollW) = gtk_widget_get_allocated_width(lwFlaeche)
+            gtk_adjustment_set_value(flRollW, gtk_adjustment_get_value(flRollW) + 30)
+            gtk_adjustment_set_value(flRollS, gtk_adjustment_get_value(flRollS) + 10)
+            PRINT "gezogen: "; lwX - x0; " "; lwY - y0
+            lwX = 5000
+            flRollNachziehen()
+            PRINT "weit weg: wert "; gtk_adjustment_get_value(flRollW); " | unten "; gtk_adjustment_get_lower(flRollW); " | lage bleibt "; lwX
+            leinwandEinpassen()
+            ' Ablegen
+            ok = ablageMerken("# Kommentar" + CHR$(13) + CHR$(10) + v20Uri$("notiz.txt") + CHR$(13) + CHR$(10) + v20Uri$("mit leer.pxs") + CHR$(13) + CHR$(10))
+            PRINT "ablage: "; ok; " | "; BASENAME(abPfad); " art "; abArt
+            ok = ablageMerken(v20Uri$("bild.PNG"))
+            PRINT "bild: "; ok; " art "; abArt
+            ok = ablageMerken(v20Uri$("notiz.txt"))
+            PRINT "nichts: "; ok; " | "; meldung
+            ok = ablageMerken("https://example.com/muster.pxs")
+            PRINT "keine datei: "; ok
+            ok = musterSichern(v19Ort$("zwischen.pxs"))
+            ok = ablageMerken(v20Uri$("mit leer.pxs"))
+            ablageAusfuehren()
+            PRINT "abgelegt geoeffnet: "; lwMuster.breite; "x"; lwMuster.hoehe; " | "; BASENAME(musterPfad); " | offen "; abPfad = ""
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION

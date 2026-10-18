@@ -51,6 +51,9 @@ DECLARE SUB gtk_spin_button_set_digits LIB GTK (s AS ZEIGER, stellen AS ULONG)
 DECLARE FUNCTION gtk_spin_button_get_value LIB GTK (s AS ZEIGER) AS FLOAT
 DECLARE SUB gtk_spin_button_set_range LIB GTK (s AS ZEIGER, von AS FLOAT, bis AS FLOAT)
 DECLARE SUB gtk_widget_set_margin_top LIB GTK (w AS ZEIGER, rand AS LONG)
+DECLARE SUB gtk_widget_set_margin_start LIB GTK (w AS ZEIGER, rand AS LONG)
+DECLARE SUB gtk_widget_set_margin_end LIB GTK (w AS ZEIGER, rand AS LONG)
+DECLARE SUB gtk_widget_set_margin_bottom LIB GTK (w AS ZEIGER, rand AS LONG)
 DECLARE SUB gtk_paned_pack1 LIB GTK (p AS ZEIGER, kind AS ZEIGER, dehnen AS BOOLEAN, schrumpfen AS BOOLEAN)
 DECLARE SUB gtk_paned_pack2 LIB GTK (p AS ZEIGER, kind AS ZEIGER, dehnen AS BOOLEAN, schrumpfen AS BOOLEAN)
 DECLARE SUB gtk_paned_set_position LIB GTK (p AS ZEIGER, pos AS LONG)
@@ -150,6 +153,9 @@ DECLARE SUB gtk_entry_set_placeholder_text LIB GTK (feld AS ZEIGER, text AS TEXT
 DECLARE FUNCTION gtk_text_view_new LIB GTK () AS ZEIGER
 DECLARE FUNCTION gtk_text_view_get_buffer LIB GTK (sicht AS ZEIGER) AS ZEIGER
 DECLARE SUB gtk_text_view_set_wrap_mode LIB GTK (sicht AS ZEIGER, art AS LONG)
+DECLARE SUB gtk_text_view_set_left_margin LIB GTK (sicht AS ZEIGER, rand AS LONG)
+DECLARE SUB gtk_text_view_set_right_margin LIB GTK (sicht AS ZEIGER, rand AS LONG)
+DECLARE SUB gtk_text_view_set_top_margin LIB GTK (sicht AS ZEIGER, rand AS LONG)
 DECLARE SUB gtk_text_buffer_set_text LIB GTK (puffer AS ZEIGER, text AS TEXT, laenge AS LONG)
 DECLARE SUB gtk_text_buffer_get_bounds LIB GTK (puffer AS ZEIGER, anfang AS ZEIGER, ende AS ZEIGER)
 DECLARE FUNCTION gtk_text_buffer_get_text LIB GTK (puffer AS ZEIGER, anfang AS ZEIGER, ende AS ZEIGER, verborgen AS BOOLEAN) AS ZEIGER
@@ -340,6 +346,7 @@ DECLARE SUB cairo_surface_mark_dirty LIB CAIRO (flaeche AS ZEIGER)
 DECLARE SUB cairo_surface_flush LIB CAIRO (flaeche AS ZEIGER)
 DECLARE FUNCTION cairo_image_surface_get_data LIB CAIRO (flaeche AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION cairo_image_surface_get_stride LIB CAIRO (flaeche AS ZEIGER) AS LONG
+DECLARE FUNCTION cairo_image_surface_get_height LIB CAIRO (flaeche AS ZEIGER) AS LONG
 DECLARE FUNCTION cairo_create LIB CAIRO (flaeche AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION cairo_surface_write_to_png LIB CAIRO (flaeche AS ZEIGER, pfad AS TEXT) AS LONG
 DECLARE SUB cairo_destroy LIB CAIRO (cr AS ZEIGER)
