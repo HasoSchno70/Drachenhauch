@@ -841,7 +841,15 @@ gtk_header_bar_pack_end(kopf, kKleiner)
 DIM spalte AS INTEGER : spalte = gtk_box_new(GTK_SENKRECHT, 0)
 DIM werkzeugzeile AS INTEGER : werkzeugzeile = gtk_box_new(GTK_WAAGERECHT, 0)
 gtkKlasse(werkzeugzeile, "werkzeugzeile")
-gtk_box_pack_start(werkzeugzeile, werkzeugleisteNeu(), FALSE, FALSE, 0)
+' Die Leiste waechst mit jeder Stufe; in einem rollbaren Bereich erzwingt sie
+' keine Mindestbreite -- sonst passte eine gemerkte Fenstergroesse nicht mehr
+' (gemessen: 1150 gemerkt, 1166 bekommen, als der Magnet dazukam)
+DIM leisteRolle AS INTEGER : leisteRolle = gtk_scrolled_window_new(0, 0)
+gtk_scrolled_window_set_policy(leisteRolle, GTK_POLITIK_AUTO, GTK_POLITIK_NIE)
+gtk_scrolled_window_set_propagate_natural_width(leisteRolle, TRUE)
+gtk_scrolled_window_set_propagate_natural_height(leisteRolle, TRUE)
+gtk_container_add(leisteRolle, werkzeugleisteNeu())
+gtk_box_pack_start(werkzeugzeile, leisteRolle, TRUE, TRUE, 0)
 DIM teilung AS INTEGER : teilung = gtk_paned_new(GTK_WAAGERECHT)
 ' Links: Zeichenflaeche mit Farbleiste darunter -- oder die Willkommensseite
 DIM linksBox AS INTEGER : linksBox = gtk_box_new(GTK_SENKRECHT, 0)
