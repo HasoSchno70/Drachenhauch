@@ -48,6 +48,8 @@ CLASS Einstellungen
     DIM hintergrund AS INTEGER           ' canvas_bg
     DIM stoff AS INTEGER                 ' empty_cell_color
     DIM stoffTextur AS BOOLEAN           ' fabric_texture: Aida-Punkt in leeren Zellen
+    DIM einrasten AS BOOLEAN             ' snap_enabled: Formen rasten ein
+    DIM rasterSchritt AS INTEGER         ' snap_interval 1..20
     ' Werkzeuge
     DIM startWerkzeug AS INTEGER         ' default_tool (Nummer wie WZ_*)
     DIM werkzeugMerken AS BOOLEAN        ' remember_tool
@@ -62,6 +64,9 @@ CLASS Einstellungen
     DIM rueckKappe AS INTEGER            ' backstitch_cap_style 0 rund, 1 eckig, 2 flach
     DIM ameisen AS BOOLEAN               ' marching_ants: Auswahlkante laeuft
     DIM stickzeit AS BOOLEAN             ' stitch_timer_enabled
+    DIM stiftDruck AS BOOLEAN            ' tablet/pressure_enabled: Pinsel waechst mit dem Druck
+    DIM pinselGroesse AS INTEGER         ' tablet/max_brush_size 1..20 (1 = immer ein Stich)
+    DIM gesten AS BOOLEAN                ' touch/gestures_enabled: Pinch-Zoom
     ' Farben
     DIM palette AS STRING                ' default_palette
     DIM thema AS STRING                  ' theme: dark / light
@@ -126,6 +131,8 @@ SUB einstellungenVorgabe(e AS Einstellungen)
     e.hintergrund = &H1A1A2E
     e.stoff = &HFAFAF5
     e.stoffTextur = TRUE
+    e.einrasten = FALSE
+    e.rasterSchritt = 5
     e.startWerkzeug = 0
     e.werkzeugMerken = FALSE
     e.letztesWerkzeug = 0
@@ -137,6 +144,9 @@ SUB einstellungenVorgabe(e AS Einstellungen)
     e.rueckEinrasten = TRUE
     e.ameisen = TRUE
     e.stickzeit = TRUE
+    e.stiftDruck = TRUE
+    e.pinselGroesse = 5
+    e.gesten = FALSE
     e.palette = "DMC"                    ' PySticky: Anchor; Glutfaden nahm schon immer DMC
     e.thema = "dark"
     e.katalog = TRUE
@@ -192,6 +202,8 @@ SUB einstellungenOrdnen(e AS Einstellungen)
     e.zelleMax = CLAMP(e.zelleMax, 30, 100)
     e.zelleStandard = CLAMP(e.zelleStandard, e.zelleMin, e.zelleMax)
     e.zoomTempo = CLAMP(e.zoomTempo, 10, 50)
+    e.rasterSchritt = CLAMP(e.rasterSchritt, 1, 20)
+    e.pinselGroesse = CLAMP(e.pinselGroesse, 1, 20)
     e.startWerkzeug = CLAMP(e.startWerkzeug, 0, LEN(werkzeugNamen()) - 1)
     e.letztesWerkzeug = CLAMP(e.letztesWerkzeug, 0, LEN(werkzeugNamen()) - 1)
     e.pipetteDanach = CLAMP(e.pipetteDanach, 0, 2)
@@ -296,6 +308,8 @@ FUNCTION einstellungenLaden(pfad AS STRING) AS Einstellungen
     IF esFarbe(j, "canvas_bg", f) THEN e.hintergrund = f
     IF esFarbe(j, "empty_cell_color", f) THEN e.stoff = f
     IF esBool(j, "fabric_texture", b) THEN e.stoffTextur = b
+    IF esBool(j, "snap_enabled", b) THEN e.einrasten = b
+    IF jsonGanz(j, "snap_interval", z) THEN e.rasterSchritt = z
     DIM namen AS ARRAY OF STRING : namen = werkzeugNamen()
     IF esText(j, "default_tool", t) THEN
         z = ARRAY_INDEXOF(namen, UPPER$(TRIM$(t)))
@@ -316,6 +330,9 @@ FUNCTION einstellungenLaden(pfad AS STRING) AS Einstellungen
     IF jsonGanz(j, "backstitch_cap_style", z) THEN e.rueckKappe = z
     IF esBool(j, "marching_ants", b) THEN e.ameisen = b
     IF esBool(j, "stitch_timer_enabled", b) THEN e.stickzeit = b
+    IF esBool(j, "tablet/pressure_enabled", b) THEN e.stiftDruck = b
+    IF jsonGanz(j, "tablet/max_brush_size", z) THEN e.pinselGroesse = z
+    IF esBool(j, "touch/gestures_enabled", b) THEN e.gesten = b
     IF esText(j, "theme", t) THEN e.thema = t
     IF esText(j, "default_palette", t) THEN
         IF TRIM$(t) <> "" THEN e.palette = TRIM$(t)
@@ -391,6 +408,8 @@ FUNCTION einstellungenJson$(e AS Einstellungen) AS STRING
     JSON_SET_STRING(j, "canvas_bg", LOWER$(farbeAlsHex$(e.hintergrund)))
     JSON_SET_STRING(j, "empty_cell_color", LOWER$(farbeAlsHex$(e.stoff)))
     JSON_SET_BOOL(j, "fabric_texture", e.stoffTextur)
+    JSON_SET_BOOL(j, "snap_enabled", e.einrasten)
+    JSON_SET_INT(j, "snap_interval", e.rasterSchritt)
     JSON_SET_STRING(j, "default_tool", werkzeugNamen()[e.startWerkzeug])
     JSON_SET_BOOL(j, "remember_tool", e.werkzeugMerken)
     JSON_SET_STRING(j, "last_tool", werkzeugNamen()[e.letztesWerkzeug])
@@ -404,6 +423,9 @@ FUNCTION einstellungenJson$(e AS Einstellungen) AS STRING
     JSON_SET_INT(j, "backstitch_cap_style", e.rueckKappe)
     JSON_SET_BOOL(j, "marching_ants", e.ameisen)
     JSON_SET_BOOL(j, "stitch_timer_enabled", e.stickzeit)
+    JSON_SET_BOOL(j, JSON_KEY$("tablet/pressure_enabled"), e.stiftDruck)
+    JSON_SET_INT(j, JSON_KEY$("tablet/max_brush_size"), e.pinselGroesse)
+    JSON_SET_BOOL(j, JSON_KEY$("touch/gestures_enabled"), e.gesten)
     JSON_SET_STRING(j, "default_palette", e.palette)
     JSON_SET_STRING(j, "theme", e.thema)
     JSON_SET_BOOL(j, "show_catalog", e.katalog)
@@ -586,6 +608,7 @@ FUNCTION kuerzelAktionen() AS ARRAY OF Kuerzelaktion
         ka("rueckstiche_zeigen", "Rückstiche anzeigen", ""), _
         ka("fortschritt_zeigen", "Fortschritt anzeigen", ""), _
         ka("mittelkreuz", "Zentrierhilfe", ""), _
+        ka("einrasten", "Magnetisches Raster", ""), _
         ka("tastenkuerzel", "Tastenkürzel anzeigen", "F1"), _
         ka("drucken", "Drucken", "Strg+P"), _
         ka("bildschirm_pipette", "Farbe vom Bildschirm picken", ""), _

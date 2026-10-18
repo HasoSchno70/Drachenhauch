@@ -39,6 +39,8 @@ DIM edZoom AS INTEGER
 DIM edHintergrund AS INTEGER
 DIM edStoff AS INTEGER
 DIM edTextur AS INTEGER
+DIM edEinrasten AS INTEGER
+DIM edRasterSchritt AS INTEGER
 ' Werkzeuge
 DIM edStartWz AS INTEGER
 DIM edWzMerken AS INTEGER
@@ -50,6 +52,9 @@ DIM edRueckBreite AS INTEGER
 DIM edEinrasten AS INTEGER
 DIM edAmeisen AS INTEGER
 DIM edStickzeit AS INTEGER
+DIM edDruck AS INTEGER
+DIM edPinsel AS INTEGER
+DIM edGesten AS INTEGER
 ' Farben
 DIM edPalette AS INTEGER
 DIM edPalNamen AS ARRAY OF STRING
@@ -240,6 +245,11 @@ FUNCTION edBauen() AS INTEGER
     edRein(s, edZeile("Größtes Kästchen (Pixel):", edZelleMax, ""))
     edZoom = adSpin(1.0, 5.0, 0.1, 1.2, 1)
     edRein(s, edZeile("Faktor je Zoomschritt:", edZoom, "Mausrad, + und - und die Knöpfe"))
+    edAbschnitt(s, "Magnetisches Raster")
+    edEinrasten = edKaestchen("Formen rasten ein", "Linie, Rechteck, Ellipse und Vieleck setzen ihre Ecken nur auf jedes n-te Kästchen (auch über den Knopf mit dem Magneten)")
+    edRein(s, edEinrasten)
+    edRasterSchritt = adSpin(1, 20, 1, 5, 0)
+    edRein(s, edZeile("Alle (Stiche):", edRasterSchritt, "Intervall für das magnetische Einrasten"))
     edAbschnitt(s, "Hintergrund")
     edHintergrund = edFarbknopf()
     edRein(s, edZeile("Um das Muster:", edHintergrund, ""))
@@ -273,6 +283,13 @@ FUNCTION edBauen() AS INTEGER
     edRein(s, edZeile("Linienstärke (2 = normal):", edRueckBreite, ""))
     edEinrasten = edKaestchen("Auch an Kantenmitten und in der Mitte ansetzen", "Aus: nur an den Ecken der Kästchen")
     edRein(s, edEinrasten)
+    edAbschnitt(s, "Tablet und Stift")
+    edDruck = edKaestchen("Druck nutzen (Wacom, Surface Pen …)", "Mit einem Stift wächst der Pinsel des Stift-Werkzeugs mit dem Druck; die Maus setzt weiter einen Stich je Kästchen")
+    edRein(s, edDruck)
+    edPinsel = adSpin(1, 20, 1, 5, 0)
+    edRein(s, edZeile("Größter Pinsel (Radius + 1):", edPinsel, "Bei vollem Druck; 1 = immer ein einzelner Stich"))
+    edGesten = edKaestchen("Zoomen mit zwei Fingern (Touchscreen, Touchpad)", "Aus per Vorgabe -- Windows zeigt sonst auf manchen Geräten beim langen Ziehen einen Hinweis")
+    edRein(s, edGesten)
     edAbschnitt(s, "Auswahl")
     edAmeisen = edKaestchen("Laufende Auswahlkante", "Die gestrichelte Kante der Auswahl läuft, solange ein Auswahlwerkzeug gewählt ist")
     edRein(s, edAmeisen)
@@ -373,6 +390,8 @@ FUNCTION edBauen() AS INTEGER
     signal(edHaupt, "value-changed", edAbhaengig, 0, 0, 0)
     signal(edAutosichern, "toggled", edAbhaengig, 0, 0, 0)
     signal(edWzMerken, "toggled", edAbhaengig, 0, 0, 0)
+    signal(edEinrasten, "toggled", edAbhaengig, 0, 0, 0)
+    signal(edDruck, "toggled", edAbhaengig, 0, 0, 0)
     edFuellen(einst)
     gtk_widget_show_all(edDialog)
     RETURN edDialog
@@ -389,6 +408,8 @@ SUB edAbhaengig(w AS INTEGER, daten AS INTEGER)
     gtk_spin_button_set_range(edNeben, 1, MIN(20, MAX(1, h - 1)))
     gtk_widget_set_sensitive(edAutoMin, gtk_toggle_button_get_active(edAutosichern))
     gtk_widget_set_sensitive(edStartWz, NOT gtk_toggle_button_get_active(edWzMerken))
+    gtk_widget_set_sensitive(edRasterSchritt, gtk_toggle_button_get_active(edEinrasten))
+    gtk_widget_set_sensitive(edPinsel, gtk_toggle_button_get_active(edDruck))
 END SUB
 
 ' Die Felder aus einem Stand fuellen (beim Oeffnen und "Zurücksetzen")
@@ -423,6 +444,11 @@ SUB edFuellen(e AS kern.Einstellungen)
     edFarbeSetzen(edHintergrund, e.hintergrund)
     edFarbeSetzen(edStoff, e.stoff)
     gtk_toggle_button_set_active(edTextur, e.stoffTextur)
+    gtk_toggle_button_set_active(edEinrasten, e.einrasten)
+    gtk_spin_button_set_value(edRasterSchritt, e.rasterSchritt)
+    gtk_toggle_button_set_active(edDruck, e.stiftDruck)
+    gtk_spin_button_set_value(edPinsel, e.pinselGroesse)
+    gtk_toggle_button_set_active(edGesten, e.gesten)
     gtk_toggle_button_set_active(edAmeisen, e.ameisen)
     gtk_toggle_button_set_active(edStickzeit, e.stickzeit)
     gtk_toggle_button_set_active(edHervorheben, e.hervorheben)
@@ -490,6 +516,11 @@ SUB edUebernehmen()
     einst.hintergrund = edFarbe(edHintergrund)
     einst.stoff = edFarbe(edStoff)
     einst.stoffTextur = gtk_toggle_button_get_active(edTextur)
+    einst.einrasten = gtk_toggle_button_get_active(edEinrasten)
+    einst.rasterSchritt = gtk_spin_button_get_value_as_int(edRasterSchritt)
+    einst.stiftDruck = gtk_toggle_button_get_active(edDruck)
+    einst.pinselGroesse = gtk_spin_button_get_value_as_int(edPinsel)
+    einst.gesten = gtk_toggle_button_get_active(edGesten)
     einst.ameisen = gtk_toggle_button_get_active(edAmeisen)
     einst.stickzeit = gtk_toggle_button_get_active(edStickzeit)
     einst.hervorheben = gtk_toggle_button_get_active(edHervorheben)
@@ -681,6 +712,8 @@ SUB einstellungenAnwenden()
     minikarteZeigen(einst.uebersicht)
     farbleisteZeigen(einst.farbleiste)
     farbleisteNachziehen()
+    pinchAnwenden()
+    rasterKnopfNachziehen()
     IF lwHat THEN
         lwZelle = CLAMP(lwZelle, einst.zelleMin, einst.zelleMax)
         seitenleisteMuster(lwMuster)

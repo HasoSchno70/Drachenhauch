@@ -209,6 +209,8 @@ SUB mehrLos(x AS INTEGER, y AS INTEGER, umschalt AS BOOLEAN)
 END SUB
 
 SUB mehrBewegung(x AS INTEGER, y AS INTEGER)
+    ' das Vieleck zeigt die Linie zur eingerasteten Ecke
+    IF wzAktiv = WZ_VIELECK AND wzRastet() THEN wzEinrasten(x, y)
     IF x = mrMausX AND y = mrMausY THEN
         IF wzAktiv <> WZ_RUECKSTICH THEN RETURN
     END IF

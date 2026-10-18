@@ -57,6 +57,8 @@ DIM wzStichWahl AS INTEGER            ' GtkComboBoxText
 DIM wzFarbeLeiste AS INTEGER          ' Farbfeld der aktuellen Farbe
 DIM wzSpiegel AS INTEGER              ' kern.SPIEGEL_*
 DIM wzSpiegelWahl AS INTEGER
+DIM wzRasterKnopf AS INTEGER             ' 🧲 magnetisches Raster
+DIM wzRasterSperre AS BOOLEAN
 DIM wzAnsichtKnoepfe AS ARRAY OF INTEGER   ' Rueckstiche, Fortschritt, Zentrierhilfe
 DIM wzAnsichtSperre AS BOOLEAN
 
@@ -157,6 +159,50 @@ SUB werkzeugWaehlen(nr AS INTEGER, gefuellt AS BOOLEAN)
 END SUB
 
 ' Die Sinnbilder der Ansichtsschalter, an: in Glut, aus: gedaempft
+' Ein Hufeisenmagnet: Bogen mit zwei Polen, an = in Glut
+FUNCTION wzRasterZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    IF einst.einrasten THEN
+        cairo_set_source_rgb(cr, 1.0, 0.60, 0.25)
+    ELSE
+        uiSymbol(cr, 0.55)
+    END IF
+    cairo_set_line_width(cr, 4.0)
+    cairo_arc(cr, 10, 9, 5.5, 0, PI)
+    cairo_move_to(cr, 15.5, 9) : cairo_line_to(cr, 15.5, 3)
+    cairo_move_to(cr, 4.5, 9) : cairo_line_to(cr, 4.5, 3)
+    cairo_stroke(cr)
+    cairo_set_line_width(cr, 1.5)
+    cairo_move_to(cr, 2.5, 5) : cairo_line_to(cr, 6.5, 5)
+    cairo_move_to(cr, 13.5, 5) : cairo_line_to(cr, 17.5, 5)
+    cairo_stroke(cr)
+    RETURN TRUE
+END FUNCTION
+
+SUB rasterKnopfNachziehen()
+    IF wzRasterKnopf = 0 THEN RETURN
+    wzRasterSperre = TRUE
+    gtk_toggle_button_set_active(wzRasterKnopf, einst.einrasten)
+    wzRasterSperre = FALSE
+    gtk_widget_queue_draw(wzRasterKnopf)
+END SUB
+
+SUB wzRasterGeklickt(knopf AS INTEGER, daten AS INTEGER)
+    IF wzRasterSperre THEN RETURN
+    rasterUmschalten(gtk_toggle_button_get_active(knopf))
+END SUB
+
+' Magnetisches Raster an/aus (Knopf und Befehl "einrasten"), Meldung wie PySticky
+SUB rasterUmschalten(an AS BOOLEAN)
+    einst.einrasten = an
+    IF wzRasterKnopf <> 0 THEN
+        wzRasterSperre = TRUE
+        gtk_toggle_button_set_active(wzRasterKnopf, an)
+        wzRasterSperre = FALSE
+        gtk_widget_queue_draw(wzRasterKnopf)
+    END IF
+    statusMeldung(IIF(an, "Magnetisches Raster aktiviert (alle " + STR$(einst.rasterSchritt) + " Zellen)", "Magnetisches Raster deaktiviert"))
+END SUB
+
 FUNCTION wzAnsichtZeichnen(w AS INTEGER, cr AS INTEGER, was AS INTEGER) AS BOOLEAN
     IF ansichtAn(was) THEN
         cairo_set_source_rgb(cr, 1.0, 0.60, 0.25)
@@ -292,6 +338,9 @@ FUNCTION wzDruck(x AS INTEGER, y AS INTEGER, taste AS INTEGER, umschalt AS BOOLE
         wzZug = ZUG_HAND
         RETURN ZUG_HAND
     END IF
+    ' Magnetisches Raster (PySticky snap_position): Linie, Rechteck,
+    ' Ellipse und Vieleck rasten ein -- beim Vieleck auch das Schliessen rechts
+    IF wzRastet() AND (taste = 1 OR wzAktiv = WZ_VIELECK) THEN wzEinrasten(x, y)
     IF mehrIstWerkzeug(wzAktiv) THEN
         ' rechts radiert auch hier, ausser dort, wo die rechte Taste etwas tut
         IF taste = 3 AND (wzAktiv = WZ_AUSWAHL OR wzAktiv = WZ_LASSO OR wzAktiv = WZ_TEXT) AND NOT mrEinfuegen THEN
@@ -353,6 +402,7 @@ FUNCTION wzDruck(x AS INTEGER, y AS INTEGER, taste AS INTEGER, umschalt AS BOOLE
 END FUNCTION
 
 SUB wzZiehen(x AS INTEGER, y AS INTEGER, umschalt AS BOOLEAN)
+    IF wzZug = ZUG_WERKZEUG AND wzRastet() THEN wzEinrasten(x, y)
     SELECT CASE wzZug
         CASE ZUG_MEHR
             mehrZiehen(x, y, umschalt)
@@ -371,6 +421,7 @@ END SUB
 SUB wzLos(x AS INTEGER, y AS INTEGER, umschalt AS BOOLEAN)
     DIM zug AS INTEGER : zug = wzZug
     wzZug = ZUG_KEINER
+    IF zug = ZUG_WERKZEUG AND wzRastet() THEN wzEinrasten(x, y)
     SELECT CASE zug
         CASE ZUG_MEHR
             mehrLos(x, y, umschalt)
@@ -404,10 +455,40 @@ SUB wzLos(x AS INTEGER, y AS INTEGER, umschalt AS BOOLEAN)
     END SELECT
 END SUB
 
+' Malt der Stift mit dem Druck? (PySticky PencilTool._brush_cells: nur der
+' Stift, nur mit aufliegendem Stift, Einstellung tablet/pressure_enabled)
+FUNCTION wzPinsel() AS BOOLEAN
+    RETURN wzAktiv = WZ_STIFT AND einst.stiftDruck AND einst.pinselGroesse > 1 AND lwStiftAuf AND lwStiftDruck > 0
+END FUNCTION
+
+' Jeden Punkt einer Linie zum Pinsel um ihn aufweiten
+FUNCTION wzPinselZellen(l AS ARRAY OF INTEGER) AS ARRAY OF INTEGER
+    DIM aus AS ARRAY OF INTEGER : aus = []
+    DIM k AS INTEGER, z AS INTEGER
+    FOR k = 0 TO LEN(l) - 2 STEP 2
+        FOR EACH z IN kern.pinselZellen(l[k], l[k + 1], lwStiftDruck, einst.pinselGroesse)
+            ARRAY_PUSH(aus, z)
+        NEXT
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Rastet das aktuelle Werkzeug ein? (Einstellung snap_enabled, Knopf 🧲)
+FUNCTION wzRastet() AS BOOLEAN
+    IF NOT einst.einrasten OR NOT lwHat THEN RETURN FALSE
+    RETURN wzAktiv = WZ_LINIE OR wzAktiv = WZ_RECHTECK OR wzAktiv = WZ_ELLIPSE OR wzAktiv = WZ_VIELECK
+END FUNCTION
+
+SUB wzEinrasten(BYREF x AS INTEGER, BYREF y AS INTEGER)
+    (x, y) = kern.einrasten(x, y, einst.rasterSchritt, lwMuster.breite, lwMuster.hoehe)
+END SUB
+
 ' Ein Strich von (x1, y1) nach (x2, y2) im offenen Zug -- jeder Punkt der
 ' Linie, damit ein schneller Zug keine Luecken laesst.
 SUB wzStrich(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, farbe AS INTEGER)
-    DIM p AS ARRAY OF INTEGER : p = kern.gespiegelt(kern.linie(x1, y1, x2, y2), lwMuster.breite, lwMuster.hoehe, wzSpiegel)
+    DIM l AS ARRAY OF INTEGER : l = kern.linie(x1, y1, x2, y2)
+    IF farbe >= 0 AND wzPinsel() THEN l = wzPinselZellen(l)
+    DIM p AS ARRAY OF INTEGER : p = kern.gespiegelt(l, lwMuster.breite, lwMuster.hoehe, wzSpiegel)
     DIM geaendert AS ARRAY OF INTEGER : geaendert = []
     DIM k AS INTEGER
     FOR k = 0 TO LEN(p) - 2 STEP 2
@@ -612,6 +693,17 @@ FUNCTION werkzeugleisteNeu() AS INTEGER
     gtk_combo_box_set_active(wzSpiegelWahl, 0)
     signal(wzSpiegelWahl, "changed", wzSpiegelGeaendert, 0, 0, 0)
     gtk_box_pack_start(box, wzSpiegelWahl, FALSE, FALSE, 4)
+    ' Magnetisches Raster (PySticky "Snap" neben der Symmetrie)
+    wzRasterKnopf = gtk_toggle_button_new()
+    gtk_widget_set_can_focus(wzRasterKnopf, FALSE)
+    DIM rbild AS INTEGER : rbild = gtk_drawing_area_new()
+    gtk_widget_set_size_request(rbild, 20, 20)
+    signalZeichnen(rbild, "draw", wzRasterZeichnen, 0, 0, 0)
+    gtk_container_add(wzRasterKnopf, rbild)
+    tipp(wzRasterKnopf, "Magnetisches Raster: Linie, Rechteck, Ellipse und Vieleck rasten alle paar Stiche ein ({einrasten})")
+    gtk_toggle_button_set_active(wzRasterKnopf, einst.einrasten)
+    signal(wzRasterKnopf, "toggled", wzRasterGeklickt, 0, 0, 0)
+    gtk_box_pack_start(box, wzRasterKnopf, FALSE, FALSE, 0)
     DIM av AS INTEGER
     DIM ak[3] AS INTEGER
     wzAnsichtKnoepfe = ak
