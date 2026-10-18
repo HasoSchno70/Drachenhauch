@@ -12,6 +12,21 @@
 ' Seite: links rechts oben unten (auch l r o u)        -- Vorgabe links
 ' Typ:   passiv ein aus bidir vin vout nc (und Langformen) -- Vorgabe passiv
 ' Leere Zeilen und Zeilen mit # oder ' sind Kommentare.
+'
+' Freie Grafik und frei gesetzte Pins (Masse in mm, Komma oder Punkt,
+' y nach unten, Nullpunkt = Bauteil-Ursprung):
+'     linie    x1 y1 x2 y2 [x3 y3 ...] [voll]   Polylinie, "voll" = gefuellt
+'     rechteck x1 y1 x2 y2 [voll]
+'     kreis    x y r [voll]
+'     bogen    x y r w1 w2                       Winkel in Grad, 0 = rechts, im Uhrzeigersinn
+'     text     x y Inhalt ...
+'     pin      Nummer Name x y Seite [Typ] [Laenge]
+' Ein freier Pin: (x, y) ist der elektrische Punkt (auf dem 1-mm-Raster),
+' die Seite sagt, wohin er vom Koerper absteht (links = Stummel nach rechts
+' zum Koerper), Name "-" = ohne Namen, Laenge in mm (Vorgabe 3). Seine
+' Nummer wird gezeichnet, der Name nicht (er gilt fuer ERC und Netzliste).
+' Gibt es Seiten-Pins, baut der Generator sein Rechteck und die Grafik kommt
+' dazu; ohne Seiten-Pins ist das Symbol ganz frei (kein Rechteck).
 
 CONST SEITE_LINKS = 0
 CONST SEITE_RECHTS = 1
@@ -31,12 +46,155 @@ END CLASS
 
 CLASS Pinliste
     DIM pins AS ARRAY OF PinAngabe
+    DIM freiePins AS ARRAY OF Pin
+    DIM grafik AS ARRAY OF Primitiv
     DIM fehler AS ARRAY OF STRING
     SUB Init()
         pins = []
+        freiePins = []
+        grafik = []
         fehler = []
     END SUB
+    FUNCTION pinAnzahl() AS INTEGER
+        RETURN LEN(pins) + LEN(freiePins)
+    END FUNCTION
 END CLASS
+
+' Ein Mass in mm ("1.5", "-2", "0,5") in Einheiten (0.01 mm). FALSE, wenn
+' es keine Zahl ist.
+FUNCTION mmLesen(w AS STRING, BYREF wert AS INTEGER) AS BOOLEAN
+    DIM s AS STRING : s = REPLACE$(w, ",", ".")
+    DIM punkte AS INTEGER : punkte = 0
+    DIM ziffern AS INTEGER : ziffern = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(s) - 1
+        DIM c AS STRING : c = MID$(s, i, 1)
+        IF c = "-" AND i = 0 THEN CONTINUE
+        IF c = "." THEN
+            punkte = punkte + 1
+        ELSEIF istZiffer(c) THEN
+            ziffern = ziffern + 1
+        ELSE
+            RETURN FALSE
+        END IF
+    NEXT
+    IF punkte > 1 OR ziffern = 0 THEN RETURN FALSE
+    wert = ROUND(VAL(s) * 100)
+    RETURN TRUE
+END FUNCTION
+
+' Liest die Zahlen t[ab..] (ohne ein abschliessendes "voll") als Masse.
+FUNCTION masseLesen(t AS ARRAY OF STRING, ab AS INTEGER, BYREF werte AS ARRAY OF INTEGER, BYREF voll AS BOOLEAN, BYREF falsch AS STRING) AS BOOLEAN
+    werte = []
+    voll = FALSE
+    DIM bis AS INTEGER : bis = LEN(t) - 1
+    IF bis >= ab AND LOWER$(t[bis]) = "voll" THEN
+        voll = TRUE
+        bis = bis - 1
+    END IF
+    DIM i AS INTEGER
+    FOR i = ab TO bis
+        DIM v AS INTEGER
+        IF NOT mmLesen(t[i], v) THEN
+            falsch = t[i]
+            RETURN FALSE
+        END IF
+        ARRAY_PUSH(werte, v)
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+' Eine Grafik- oder freie Pin-Zeile. "" = in Ordnung, sonst der Fehler.
+FUNCTION grafikZeile$(pl AS Pinliste, t AS ARRAY OF STRING, BYREF gesehen AS MAP OF INTEGER, zeile AS INTEGER) AS STRING
+    DIM wort AS STRING : wort = LOWER$(t[0])
+    DIM w AS ARRAY OF INTEGER
+    DIM voll AS BOOLEAN
+    DIM falsch AS STRING
+    DIM g AS Primitiv
+    DIM i AS INTEGER
+    SELECT CASE wort
+        CASE "linie"
+            IF NOT masseLesen(t, 1, w, voll, falsch) THEN RETURN "'" + falsch + "' ist keine Zahl (mm)"
+            IF LEN(w) < 4 OR LEN(w) MOD 2 <> 0 THEN RETURN "linie braucht Punktpaare: x1 y1 x2 y2 [...]"
+            g = NEW Primitiv(PR_POLYLINIE)
+            i = 0
+            WHILE i < LEN(w)
+                ARRAY_PUSH(g.punkte, NEW Punkt(w[i], w[i + 1]))
+                i = i + 2
+            WEND
+            g.fuellen = voll
+        CASE "rechteck"
+            IF NOT masseLesen(t, 1, w, voll, falsch) THEN RETURN "'" + falsch + "' ist keine Zahl (mm)"
+            IF LEN(w) <> 4 THEN RETURN "rechteck braucht x1 y1 x2 y2"
+            g = prRechteck(MIN(w[0], w[2]), MIN(w[1], w[3]), MAX(w[0], w[2]), MAX(w[1], w[3]))
+            g.fuellen = voll
+        CASE "kreis"
+            IF NOT masseLesen(t, 1, w, voll, falsch) THEN RETURN "'" + falsch + "' ist keine Zahl (mm)"
+            IF LEN(w) <> 3 OR w[2] <= 0 THEN RETURN "kreis braucht x y r (r > 0)"
+            g = prKreis(w[0], w[1], w[2])
+            g.fuellen = voll
+        CASE "bogen"
+            IF NOT masseLesen(t, 1, w, voll, falsch) THEN RETURN "'" + falsch + "' ist keine Zahl"
+            IF LEN(w) <> 5 OR w[2] <= 0 OR voll THEN RETURN "bogen braucht x y r w1 w2 (Winkel in Grad)"
+            ' masseLesen rechnet mm*100 -- Winkel zurueck in Grad, dann Bogenmass
+            g = prBogen(w[0], w[1], w[2], w[3] / 100.0 * PI / 180.0, w[4] / 100.0 * PI / 180.0)
+        CASE "text"
+            IF LEN(t) < 4 THEN RETURN "text braucht x y und den Inhalt"
+            DIM tx AS INTEGER, ty AS INTEGER
+            IF NOT mmLesen(t[1], tx) OR NOT mmLesen(t[2], ty) THEN RETURN "text: x und y muessen Zahlen sein (mm)"
+            g = NEW Primitiv(PR_TEXT)
+            ARRAY_PUSH(g.punkte, NEW Punkt(tx, ty))
+            DIM rest AS ARRAY OF STRING : rest = []
+            FOR i = 3 TO LEN(t) - 1
+                ARRAY_PUSH(rest, t[i])
+            NEXT
+            g.text = JOIN$(rest, " ")
+        CASE "pin"
+            IF LEN(t) < 6 OR LEN(t) > 8 THEN RETURN "pin braucht Nummer Name x y Seite [Typ] [Laenge]"
+            DIM px AS INTEGER, py AS INTEGER, laenge AS INTEGER
+            IF NOT mmLesen(t[3], px) OR NOT mmLesen(t[4], py) THEN RETURN "pin: x und y muessen Zahlen sein (mm)"
+            IF px MOD RASTER <> 0 OR py MOD RASTER <> 0 THEN RETURN "pin " + t[1] + ": der Punkt liegt nicht auf dem 1-mm-Raster -- so liesse er sich nicht anschliessen"
+            DIM se AS INTEGER : se = seiteAusWort(t[5])
+            IF se < 0 THEN RETURN "unbekannte Seite '" + t[5] + "' (links, rechts, oben, unten)"
+            DIM typ AS INTEGER : typ = PIN_PASSIV
+            IF LEN(t) >= 7 THEN
+                typ = pinTypAusWort(t[6])
+                IF typ < 0 THEN RETURN "unbekannter Typ '" + t[6] + "' (passiv, ein, aus, bidir, vin, vout, nc)"
+            END IF
+            laenge = IC_PINLAENGE
+            IF LEN(t) = 8 THEN
+                IF NOT mmLesen(t[7], laenge) OR laenge < 0 THEN RETURN "pin: Laenge '" + t[7] + "' ist keine Zahl (mm)"
+            END IF
+            IF MAPHAS(gesehen, t[1]) THEN RETURN "Pin-Nummer " + t[1] + " gibt es schon (Zeile " + STR$(MAPGET(gesehen, t[1])) + ")"
+            MAPPUT(gesehen, t[1], zeile)
+            ' Stummel zeigt vom Pin zum Koerper: ein links abstehender Pin zeigt nach rechts
+            DIM ri AS INTEGER
+            SELECT CASE se
+                CASE SEITE_LINKS : ri = 0
+                CASE SEITE_RECHTS : ri = 180
+                CASE SEITE_OBEN : ri = 90
+                CASE ELSE : ri = 270
+            END SELECT
+            DIM fp AS Pin : fp = NEW Pin(t[1], IIF(t[2] = "-", "", t[2]), NEW Punkt(px, py), laenge, ri, typ)
+            ' Namen frei gesetzter Pins stehen nicht im Bild -- die Grafik sagt,
+            ' was der Pin ist; ohne Rechteck gibt es kein "innen" fuer den Namen.
+            ' Fuer ERC-Meldungen und die Netzliste bleibt er erhalten.
+            fp.zeigeName = FALSE
+            ARRAY_PUSH(pl.freiePins, fp)
+            RETURN ""
+        CASE ELSE
+            RETURN "?"
+    END SELECT
+    ARRAY_PUSH(pl.grafik, g)
+    RETURN ""
+END FUNCTION
+
+FUNCTION istGrafikWort(w AS STRING) AS BOOLEAN
+    SELECT CASE LOWER$(w)
+        CASE "linie", "rechteck", "kreis", "bogen", "text", "pin" : RETURN TRUE
+    END SELECT
+    RETURN FALSE
+END FUNCTION
 
 FUNCTION pinTypAusWort(w AS STRING) AS INTEGER
     SELECT CASE LOWER$(w)
@@ -88,6 +246,11 @@ FUNCTION pinlisteLesen(text AS STRING) AS Pinliste
             IF roh[k] <> "" THEN ARRAY_PUSH(t, roh[k])
         NEXT
         DIM nr AS STRING : nr = "Zeile " + STR$(i + 1) + ": "
+        IF istGrafikWort(t[0]) THEN
+            DIM gf AS STRING : gf = grafikZeile$(pl, t, gesehen, i + 1)
+            IF gf <> "" THEN ARRAY_PUSH(pl.fehler, nr + gf)
+            CONTINUE
+        END IF
         IF LEN(t) > 4 THEN
             ARRAY_PUSH(pl.fehler, nr + "zu viele Angaben (Nummer Name Seite Typ)")
             CONTINUE
@@ -145,6 +308,12 @@ FUNCTION icErzeugen(id AS STRING, name AS STRING, praefix AS STRING, wert AS STR
         anz[se] = anz[se] + 1
         IF LEN(sichtbarerText$(pl.pins[i].name)) > lang[se] THEN lang[se] = LEN(sichtbarerText$(pl.pins[i].name))
     NEXT
+    ' ganz frei gezeichnet: keine Seiten-Pins -> kein Rechteck
+    IF LEN(pl.pins) = 0 THEN
+        freiDazu(s, pl)
+        freieTextOrte(s)
+        RETURN s
+    END IF
     DIM oben AS INTEGER : oben = IIF(anz[SEITE_OBEN] > 0, IC_ABSTAND, 0)
     DIM unten AS INTEGER : unten = IIF(anz[SEITE_UNTEN] > 0, IC_ABSTAND, 0)
     DIM w AS INTEGER : w = MAX((MAX(anz[SEITE_OBEN], anz[SEITE_UNTEN]) + 1) * IC_ABSTAND, (lang[SEITE_LINKS] + lang[SEITE_RECHTS]) * IC_ZEICHEN + 400)
@@ -172,8 +341,48 @@ FUNCTION icErzeugen(id AS STRING, name AS STRING, praefix AS STRING, wert AS STR
     NEXT
     s.refOrt = NEW Punkt(-hw, -hh - 80 - IIF(anz[SEITE_OBEN] > 0, IC_PINLAENGE, 0))
     s.wertOrt = NEW Punkt(-hw, hh + 80 + IIF(anz[SEITE_UNTEN] > 0, IC_PINLAENGE, 0))
+    freiDazu(s, pl)
     RETURN s
 END FUNCTION
+
+' Freie Grafik und frei gesetzte Pins ins Symbol.
+SUB freiDazu(s AS Symbol, pl AS Pinliste)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(pl.grafik) - 1
+        s.grafikHinzu(pl.grafik[i])
+    NEXT
+    FOR i = 0 TO LEN(pl.freiePins) - 1
+        ARRAY_PUSH(s.pins, pl.freiePins[i])
+    NEXT
+END SUB
+
+' Referenz ueber, Wert unter die Umgrenzung von Grafik und Pins.
+SUB freieTextOrte(s AS Symbol)
+    DIM x0 AS INTEGER : x0 = 0
+    DIM y0 AS INTEGER : y0 = 0
+    DIM y1 AS INTEGER : y1 = 0
+    DIM erst AS BOOLEAN : erst = TRUE
+    DIM i AS INTEGER, k AS INTEGER
+    FOR i = 0 TO LEN(s.grafik) - 1
+        DIM r AS INTEGER : r = 0
+        IF s.grafik[i].art = PR_KREIS OR s.grafik[i].art = PR_BOGEN THEN r = s.grafik[i].radius
+        FOR k = 0 TO LEN(s.grafik[i].punkte) - 1
+            DIM p AS Punkt : p = s.grafik[i].punkte[k]
+            IF erst OR p.x - r < x0 THEN x0 = p.x - r
+            IF erst OR p.y - r < y0 THEN y0 = p.y - r
+            IF erst OR p.y + r > y1 THEN y1 = p.y + r
+            erst = FALSE
+        NEXT
+    NEXT
+    FOR i = 0 TO LEN(s.pins) - 1
+        IF erst OR s.pins[i].pos.x < x0 THEN x0 = s.pins[i].pos.x
+        IF erst OR s.pins[i].pos.y < y0 THEN y0 = s.pins[i].pos.y
+        IF erst OR s.pins[i].pos.y > y1 THEN y1 = s.pins[i].pos.y
+        erst = FALSE
+    NEXT
+    s.refOrt = NEW Punkt(x0, y0 - 80)
+    s.wertOrt = NEW Punkt(x0, y1 + 80)
+END SUB
 
 ' Eine neue, praktisch kollisionsfreie Id fuer ein eigenes Symbol.
 FUNCTION neueSymbolId$() AS STRING
@@ -211,6 +420,7 @@ FUNCTION symbolNachJson(s AS Symbol) AS JSON_HANDLE
         JSON_SET_INT(pj, "len", p.laenge)
         JSON_SET_INT(pj, "ri", p.richtung)
         JSON_SET_INT(pj, "typ", p.typ)
+        IF NOT p.zeigeName AND p.name <> "" THEN JSON_SET_BOOL(pj, "zn", FALSE)
         JSON_APPEND_JSON(j, "pins", pj)
     NEXT
     JSON_SET_JSON(j, "grafik", JSON_NEW_ARRAY())
@@ -258,7 +468,8 @@ FUNCTION symbolAusJson(j AS JSON_HANDLE, b AS STRING) AS Symbol
     DIM i AS INTEGER, k AS INTEGER
     FOR i = 0 TO JSON_LEN(j, v + "pins") - 1
         DIM pv AS STRING : pv = v + "pins." + STR$(i) + "."
-        s.pinHinzu(JSON_GET_STRING(j, pv + "nr"), jsonText$(j, pv + "name", ""), NEW Punkt(JSON_GET_INT(j, pv + "x"), JSON_GET_INT(j, pv + "y")), JSON_GET_INT(j, pv + "len"), JSON_GET_INT(j, pv + "ri"), JSON_GET_INT(j, pv + "typ"))
+        DIM jp AS Pin : jp = s.pinHinzu(JSON_GET_STRING(j, pv + "nr"), jsonText$(j, pv + "name", ""), NEW Punkt(JSON_GET_INT(j, pv + "x"), JSON_GET_INT(j, pv + "y")), JSON_GET_INT(j, pv + "len"), JSON_GET_INT(j, pv + "ri"), JSON_GET_INT(j, pv + "typ"))
+        IF JSON_HAS(j, pv + "zn") THEN jp.zeigeName = JSON_GET_BOOL(j, pv + "zn")
     NEXT
     FOR i = 0 TO JSON_LEN(j, v + "grafik") - 1
         DIM gv AS STRING : gv = v + "grafik." + STR$(i) + "."

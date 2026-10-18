@@ -327,6 +327,8 @@ SUB gruppeTransformieren(art AS INTEGER)
             ARRAY_PUSH(alt, b.pinPunkt(j))
         NEXT
         b.lage = kern.lageGruppe(b.lage, pivot, art)
+        b.refVersatz = kern.punktGruppe(b.refVersatz, NEW kern.Punkt(0, 0), art)
+        b.wertVersatz = kern.punktGruppe(b.wertVersatz, NEW kern.Punkt(0, 0), art)
         FOR j = 0 TO LEN(b.sym.pins) - 1
             DIM nu AS kern.Punkt : nu = b.pinPunkt(j)
             MAPPUT(neuX, kern.netzKey(alt[j].x, alt[j].y), nu.x)

@@ -335,6 +335,32 @@ ARRAY_PUSH(fd.blaetter[0].labels, NEW kern.Label("~{RESET}", fd.blaetter[0].baut
 DIM fn AS kern.Netze : fn = kern.netzeBerechnen(fd.blaetter[0])
 PRINT "Netzname bleibt der geschriebene Text: "; fn.liste[fn.netzAn(fd.blaetter[0].bauteile[0].pinPunkt(0).x, fd.blaetter[0].bauteile[0].pinPunkt(0).y)].name; "  (erwartet ~{RESET})"
 
+' --- Freie Symbolgrafik und frei gesetzte Pins
+DIM lf AS STRING : lf = CHR$(10)
+DIM opvText AS STRING : opvText = "# Operationsverstaerker, frei gezeichnet" + lf + "linie -2 -3 3 0 -2 3 -2 -3" + lf + "kreis 0 0 0,5 voll" + lf + "bogen 0 0 4 0 90" + lf + "text 0 -4 OPV" + lf + "pin 1 IN- -5 -1 links ein" + lf + "pin 2 IN+ -5 1 links ein" + lf + "pin 3 OUT 5 0 rechts aus 2"
+DIM opv AS kern.Symbol : opv = kern.icErzeugen("E_OPV", "OPV", "U", "", opvText)
+DIM opvPl AS kern.Pinliste : opvPl = kern.pinlisteLesen(opvText)
+PRINT "Frei: Fehler "; LEN(opvPl.fehler); ", Grafik "; LEN(opv.grafik); ", Pins "; LEN(opv.pins); ", kein Rechteck "; opv.grafik[0].art = kern.PR_POLYLINIE; "  (erwartet 0, 4, 3, TRUE)"
+PRINT "Frei: Polylinie "; LEN(opv.grafik[0].punkte); " Punkte, Kreis voll "; opv.grafik[1].fuellen; " r "; opv.grafik[1].radius; ", Bogen bis "; ROUND(opv.grafik[2].winkel2 * 180 / PI); " Grad, Text "; opv.grafik[3].text; "  (erwartet 4 Punkte, TRUE r 50, 90 Grad, OPV)"
+PRINT "Frei: Pin 3 bei "; opv.pins[2].pos.x; ","; opv.pins[2].pos.y; " Laenge "; opv.pins[2].laenge; " Richtung "; opv.pins[2].richtung; " Typ aus "; opv.pins[2].typ = kern.PIN_AUSGANG; ", Pin 1 Richtung "; opv.pins[0].richtung; "  (erwartet 500,0 Laenge 200 Richtung 180 Typ aus TRUE, Pin 1 Richtung 0)"
+PRINT "Frei: Texte ueber/unter der Grafik "; opv.refOrt.y < -300; " "; opv.wertOrt.y > 300; "  (erwartet TRUE TRUE)"
+DIM opvJ AS kern.Symbol : opvJ = kern.symbolAusJson(kern.symbolNachJson(opv), "")
+PRINT "Frei JSON: "; LEN(opvJ.grafik); " "; opvJ.grafik[1].fuellen; " "; opvJ.grafik[3].text; " "; LEN(opvJ.pins); " Name "; opvJ.pins[0].name; " versteckt "; NOT opvJ.pins[0].zeigeName; "  (erwartet 4 TRUE OPV 3 Name IN- versteckt TRUE)"
+DIM fpl AS kern.Pinliste : fpl = kern.pinlisteLesen("1 A links" + lf + "pin 1 B 0 0 links" + lf + "pin 2 C 1,5 0 links" + lf + "kreis 0 0" + lf + "linie 0 0 x 1" + lf + "bogen 0 0 1 0 90 voll")
+DIM fft AS STRING : fft = JOIN$(fpl.fehler, "|")
+PRINT "Frei Fehler: "; LEN(fpl.fehler); " doppelt "; CONTAINS(fft, "Zeile 2: Pin-Nummer 1 gibt es schon"); " Raster "; CONTAINS(fft, "Zeile 3: pin 2: der Punkt liegt nicht auf dem 1-mm-Raster"); " Kreis "; CONTAINS(fft, "Zeile 4: kreis braucht"); " Zahl "; CONTAINS(fft, "Zeile 5: 'x' ist keine Zahl"); " Bogen "; CONTAINS(fft, "Zeile 6: bogen braucht"); "  (erwartet 5 TRUE TRUE TRUE TRUE TRUE)"
+DIM gem AS kern.Symbol : gem = kern.icErzeugen("E_GEM", "Logo-IC", "U", "", "1 A links" + lf + "2 B rechts" + lf + "text 0 0 LOGO")
+PRINT "Gemischt: "; LEN(gem.grafik); " Grafik (Rechteck + Text), erstes Rechteck "; gem.grafik[0].art = kern.PR_RECHTECK; "  (erwartet 2, TRUE)"
+
+' --- Referenz/Wert-Versatz wird gespeichert
+DIM vd AS kern.Dokument : vd = NEW kern.Dokument()
+DIM vb AS kern.Bauteil : vb = kern.neuesBauteil("R", kern.neueLage(0, 0))
+vb.referenz = "R1"
+vb.refVersatz = NEW kern.Punkt(250, -150)
+ARRAY_PUSH(vd.blaetter[0].bauteile, vb)
+DIM vd2 AS kern.Dokument : vd2 = kern.dokumentAusJson(kern.dokumentNachJson(vd))
+PRINT "Versatz JSON: "; vd2.blaetter[0].bauteile[0].refVersatz.x; ","; vd2.blaetter[0].bauteile[0].refVersatz.y; " Wert "; vd2.blaetter[0].bauteile[0].wertVersatz.x; ","; vd2.blaetter[0].bauteile[0].wertVersatz.y; "  (erwartet 250,-150 Wert 0,0)"
+
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
 PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)

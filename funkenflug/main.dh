@@ -1428,6 +1428,73 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
                 verlaufZurueck()
             WEND
             pruefe("Label wieder weg", STR$(LEN(gBlatt.labels) > 0 AND gBlatt.labels[LEN(gBlatt.labels) - 1].text = "~{RESET}"), STR$(FALSE))
+        CASE 21
+            ' Referenz anfassen und ziehen: nur der Text wandert, ein Undo-Schritt
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            auswahlAufheben()
+            DIM tr7 AS kern.Bauteil : tr7 = gBlatt.bauteile[1]
+            DIM tlage AS STRING : tlage = STR$(tr7.lage.pos.x) + "," + STR$(tr7.lage.pos.y)
+            DIM ttx AS FLOAT, tty AS FLOAT, tta AS INTEGER
+            pruefe("R7 zeigt seine Referenz", STR$(textOrt(tr7, 0, ttx, tty, tta)), STR$(TRUE))
+            DIM twelche AS INTEGER
+            pruefe("Treffer auf dem Referenz-Text", STR$(textIndexUnter(ttx, tty, twelche)) + " " + STR$(twelche), "1 0")
+            probeUndo0 = LEN(gUndo)
+            mausSetzen(ttx, tty)
+            klickAuswahl(ttx, tty, FALSE)
+            pruefe("Text-Zug beginnt, R7 gewaehlt", STR$(gTextZug) + " " + STR$(gHatGewaehlt AND gGewaehlt = tr7), STR$(TRUE) + " " + STR$(TRUE))
+            mausSetzen(ttx + 210 * vZoom, tty + 95 * vZoom)
+            textZiehenUm(gMausRX - gTextMausX, gMausRY - gTextMausY)
+            DIM lz AS BOOLEAN : lz = lwLos(0, 0, 0)
+            pruefe("Referenz verschoben (0,5-mm-Raster)", STR$(tr7.refVersatz.x) + "," + STR$(tr7.refVersatz.y) + " Wert " + STR$(tr7.wertVersatz.x) + "," + STR$(tr7.wertVersatz.y), "200,100 Wert 0,0")
+            pruefe("Bauteil bleibt stehen", STR$(tr7.lage.pos.x) + "," + STR$(tr7.lage.pos.y), tlage)
+            pruefe("Text ziehen = ein Undo-Schritt", STR$(LEN(gUndo) - probeUndo0), "1")
+            DIM ttx2 AS FLOAT, tty2 AS FLOAT
+            lz = textOrt(tr7, 0, ttx2, tty2, tta)
+            pruefe("Text steht an der neuen Stelle", STR$(ROUND(ttx2 - ttx)) + "," + STR$(ROUND(tty2 - tty)), STR$(ROUND(200 * vZoom)) + "," + STR$(ROUND(100 * vZoom)))
+            pruefe("Treffer an der neuen Stelle", STR$(textIndexUnter(ttx2, tty2, twelche)), "1")
+            ' Drehen nimmt den Versatz mit
+            waehleB(tr7)
+            auswahlDrehen()
+            pruefe("Versatz dreht mit", STR$(gBlatt.bauteile[1].refVersatz.x) + "," + STR$(gBlatt.bauteile[1].refVersatz.y), "-100,200")
+            verlaufZurueck()
+            ' T setzt zurueck, Rueckgaengig holt den Versatz wieder (er steckt im Schnappschuss)
+            tr7 = gBlatt.bauteile[1]
+            waehleB(tr7)
+            texteZuruecksetzen()
+            pruefe("T setzt die Texte zurueck", STR$(tr7.refVersatz.x) + "," + STR$(tr7.refVersatz.y), "0,0")
+            verlaufZurueck()
+            pruefe("Rueckgaengig: Versatz wieder da", STR$(gBlatt.bauteile[1].refVersatz.x) + "," + STR$(gBlatt.bauteile[1].refVersatz.y), "200,100")
+            ' frei gezeichnetes Symbol: platzieren, anschliessen, zeigen
+            DIM lff AS STRING : lff = CHR$(10)
+            DIM fsym AS kern.Symbol : fsym = kern.icErzeugen("E_PROBE_OPV", "OPV frei", "U", "LM358", "linie -2 -3 3 0 -2 3 -2 -3" + lff + "text 0 -4 ~{EN}" + lff + "kreis 3,5 0 0,5" + lff + "pin 1 IN- -5 -1 links ein" + lff + "pin 2 IN+ -5 1 links ein" + lff + "pin 3 OUT 6 0 rechts aus 2" + lff + "pin 4 V+ 0 -5 oben vin 2,5")
+            fsym = kern.symbolRegistrieren(fsym)
+            verlaufMerken()
+            DIM fb AS kern.Bauteil : fb = kern.neuesBauteil("E_PROBE_OPV", NEW kern.Lage(NEW kern.Punkt(5000, 2400), 0, FALSE))
+            fb.referenz = naechsteReferenz("U")
+            ARRAY_PUSH(gBlatt.bauteile, fb)
+            DIM fw AS kern.Draht : fw = NEW kern.Draht()
+            ARRAY_PUSH(fw.punkte, fb.pinPunkt(2))
+            ARRAY_PUSH(fw.punkte, NEW kern.Punkt(fb.pinPunkt(2).x + 600, fb.pinPunkt(2).y))
+            ARRAY_PUSH(gBlatt.draehte, fw)
+            geaendert()
+            pruefe("Freies Symbol platziert", fb.sym.name + " " + fb.referenz + " " + STR$(LEN(fb.sym.pins)), "OPV frei U1 4")
+            pruefe("OUT-Pin bei", STR$(fb.pinPunkt(2).x) + "," + STR$(fb.pinPunkt(2).y), "5600,2400")
+            DIM fn AS kern.Netze : fn = aktuelleNetze()
+            pruefe("Draht haengt am OUT-Pin", STR$(fn.liste[fn.netzAn(5600, 2400)].echtePins()), "1")
+            zentrieren(4200, 2200)
+        CASE 22
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel + ".frei.png") THEN PRINT "Foto freies Symbol gesichert"
+            END IF
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
+            DIM nOpv AS INTEGER : nOpv = 0
+            DIM ko AS INTEGER
+            FOR ko = 0 TO LEN(gBlatt.bauteile) - 1
+                IF gBlatt.bauteile[ko].symbolRef = "E_PROBE_OPV" THEN nOpv = nOpv + 1
+            NEXT
+            pruefe("Alles zurueck (Versatz, freies Symbol)", STR$(gBlatt.bauteile[1].refVersatz.x) + " " + STR$(nOpv), "0 0")
         CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()

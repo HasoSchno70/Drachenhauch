@@ -44,6 +44,16 @@ FUNCTION dokumentNachJson(dok AS Dokument) AS JSON_HANDLE
             IF bt.wert <> bt.sym.wertVorgabe THEN JSON_SET_STRING(c, "wert", bt.wert)
             IF bt.gehaeuse <> "" THEN JSON_SET_STRING(c, "geh", bt.gehaeuse)
             IF bt.bestellnr <> "" THEN JSON_SET_STRING(c, "best", bt.bestellnr)
+            IF bt.refVersatz.x <> 0 OR bt.refVersatz.y <> 0 THEN
+                JSON_SET_JSON(c, "refV", JSON_NEW_ARRAY())
+                JSON_APPEND_INT(c, "refV", bt.refVersatz.x)
+                JSON_APPEND_INT(c, "refV", bt.refVersatz.y)
+            END IF
+            IF bt.wertVersatz.x <> 0 OR bt.wertVersatz.y <> 0 THEN
+                JSON_SET_JSON(c, "wertV", JSON_NEW_ARRAY())
+                JSON_APPEND_INT(c, "wertV", bt.wertVersatz.x)
+                JSON_APPEND_INT(c, "wertV", bt.wertVersatz.y)
+            END IF
             JSON_APPEND_JSON(b, "bauteile", c)
         NEXT
         JSON_SET_JSON(b, "draehte", JSON_NEW_ARRAY())
@@ -114,6 +124,8 @@ FUNCTION dokumentAusJson(j AS JSON_HANDLE) AS Dokument
             IF JSON_HAS(j, cp + ".wert") THEN bt.wert = JSON_GET_STRING(j, cp + ".wert")
             IF JSON_HAS(j, cp + ".geh") THEN bt.gehaeuse = JSON_GET_STRING(j, cp + ".geh")
             IF JSON_HAS(j, cp + ".best") THEN bt.bestellnr = JSON_GET_STRING(j, cp + ".best")
+            IF JSON_HAS(j, cp + ".refV") THEN bt.refVersatz = NEW Punkt(JSON_GET_INT(j, cp + ".refV.0"), JSON_GET_INT(j, cp + ".refV.1"))
+            IF JSON_HAS(j, cp + ".wertV") THEN bt.wertVersatz = NEW Punkt(JSON_GET_INT(j, cp + ".wertV.0"), JSON_GET_INT(j, cp + ".wertV.1"))
             ARRAY_PUSH(bl.bauteile, bt)
         NEXT
         ' Draehte

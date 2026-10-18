@@ -8,7 +8,9 @@ CONST SE_BEISPIEL = "# Nummer  Name  Seite  Typ" + CHR$(10) + _
     "1  VCC  oben   vin" + CHR$(10) + _
     "2  IN   links  ein" + CHR$(10) + _
     "3  OUT  rechts aus" + CHR$(10) + _
-    "4  GND  unten  vin"
+    "4  GND  unten  vin" + CHR$(10) + _
+    "# Freie Grafik (mm): linie x1 y1 x2 y2 .. [voll], rechteck, kreis x y r," + CHR$(10) + _
+    "#   bogen x y r w1 w2, text x y Inhalt, pin Nr Name x y Seite [Typ] [Laenge]"
 
 DIM seDlg AS INTEGER
 DIM seName AS INTEGER
@@ -56,7 +58,10 @@ SUB seMeldungNachziehen()
         FOR i = 0 TO LEN(pl.pins) - 1
             n[pl.pins[i].seite] = n[pl.pins[i].seite] + 1
         NEXT
-        gtk_label_set_text(seMeldung, STR$(LEN(pl.pins)) + " Pins: " + STR$(n[0]) + " links, " + STR$(n[1]) + " rechts, " + STR$(n[2]) + " oben, " + STR$(n[3]) + " unten")
+        DIM frei AS STRING : frei = ""
+        IF LEN(pl.freiePins) > 0 THEN frei = ", " + STR$(LEN(pl.freiePins)) + " frei gesetzt"
+        IF LEN(pl.grafik) > 0 THEN frei = frei + ", " + STR$(LEN(pl.grafik)) + " Grafik-Elemente" + IIF(LEN(pl.pins) = 0, " (ohne Rechteck)", "")
+        gtk_label_set_text(seMeldung, STR$(pl.pinAnzahl()) + " Pins: " + STR$(n[0]) + " links, " + STR$(n[1]) + " rechts, " + STR$(n[2]) + " oben, " + STR$(n[3]) + " unten" + frei)
     END IF
 END SUB
 
@@ -126,7 +131,7 @@ FUNCTION symbolEditor(vorlage AS kern.Symbol, bearbeiten AS BOOLEAN) AS STRING
     gtk_grid_attach(g, etikettNeu("Beschreibung:"), 0, 3, 1, 1)
     gtk_grid_attach(g, seBeschr, 1, 3, 1, 1)
     gtk_box_pack_start(links, g, FALSE, FALSE, 0)
-    gtk_box_pack_start(links, etikettNeu("Pinliste -- eine Zeile je Pin: Nummer Name Seite Typ"), FALSE, FALSE, 0)
+    gtk_box_pack_start(links, etikettNeu("Pinliste -- eine Zeile je Pin: Nummer Name Seite Typ; dazu freie Grafik"), FALSE, FALSE, 0)
     DIM sw AS INTEGER : sw = gtk_scrolled_window_new(0, 0)
     gtk_scrolled_window_set_min_content_height(sw, 240)
     seText = gtk_text_view_new()
@@ -178,7 +183,7 @@ FUNCTION symbolEditor(vorlage AS kern.Symbol, bearbeiten AS BOOLEAN) AS STRING
         IF TRIM$(gtk_entry_get_text(seName)) = "" THEN problem = "Das Symbol braucht einen Namen."
         IF problem = "" AND TRIM$(gtk_entry_get_text(sePraefix)) = "" THEN problem = "Das Symbol braucht einen Praefix (U, IC, X ...)."
         IF problem = "" AND LEN(pl.fehler) > 0 THEN problem = "Die Pinliste hat Fehler (siehe oben)."
-        IF problem = "" AND LEN(pl.pins) = 0 THEN problem = "Das Symbol braucht mindestens einen Pin."
+        IF problem = "" AND pl.pinAnzahl() = 0 THEN problem = "Das Symbol braucht mindestens einen Pin."
         IF problem <> "" THEN
             gtk_label_set_markup(seMeldung, "<span foreground='#ff5a5a'><b>" + markupSicher$(problem) + "</b></span>" + IIF(LEN(pl.fehler) > 0, CHR$(10) + "<span foreground='#ff5a5a'>" + markupSicher$(JOIN$(pl.fehler, CHR$(10))) + "</span>", ""))
             CONTINUE

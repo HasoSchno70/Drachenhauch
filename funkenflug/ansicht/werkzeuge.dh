@@ -27,6 +27,7 @@ CONST K_G = &H67
 CONST K_C = &H63
 CONST K_V = &H76
 CONST K_X = &H78
+CONST K_T = &H74
 CONST K_BILD_AUF = &HFF55              ' GDK_KEY_Page_Up
 CONST K_BILD_AB = &HFF56
 
@@ -446,6 +447,45 @@ END SUB
 
 ' Doppelklick / E / Enter: das Gewaehlte bearbeiten. Label und Draht:
 ' Netz umbenennen; Bauteil: Eigenschaften.
+' --- Referenz/Wert verschieben -----------------------------------------------
+DIM gTextZug AS BOOLEAN
+DIM gTextStart AS kern.Punkt
+DIM gTextMausX AS FLOAT
+DIM gTextMausY AS FLOAT
+
+' Den gegriffenen Text um (dx, dy) Blatt-Einheiten ab Zugbeginn schieben, auf
+' dem feinen Raster (0.5 mm). Rein Anzeige -- kein Netz aendert sich.
+SUB textZiehenUm(dx AS FLOAT, dy AS FLOAT)
+    DIM rx AS INTEGER : rx = kern.rastern(ROUND(dx), kern.RASTER_FEIN)
+    DIM ry AS INTEGER : ry = kern.rastern(ROUND(dy), kern.RASTER_FEIN)
+    IF rx = 0 AND ry = 0 AND NOT gZiehGemerkt THEN RETURN
+    IF NOT gZiehGemerkt THEN verlaufMerken() : gZiehGemerkt = TRUE
+    DIM v AS kern.Punkt : v = NEW kern.Punkt(gTextStart.x + rx, gTextStart.y + ry)
+    IF gTextZugWelche = 0 THEN
+        gTextZugTeil.refVersatz = v
+    ELSE
+        gTextZugTeil.wertVersatz = v
+    END IF
+    gGeaendert = TRUE
+    titelNachziehen()
+END SUB
+
+' T: Referenz und Wert der gewaehlten Bauteile zurueck an ihre Vorgabe.
+SUB texteZuruecksetzen()
+    DIM i AS INTEGER, n AS INTEGER
+    n = 0
+    FOR i = 0 TO LEN(gSelB) - 1
+        IF gSelB[i].refVersatz.x <> 0 OR gSelB[i].refVersatz.y <> 0 OR gSelB[i].wertVersatz.x <> 0 OR gSelB[i].wertVersatz.y <> 0 THEN n = n + 1
+    NEXT
+    IF n = 0 THEN RETURN
+    verlaufMerken()
+    FOR i = 0 TO LEN(gSelB) - 1
+        gSelB[i].refVersatz = NEW kern.Punkt(0, 0)
+        gSelB[i].wertVersatz = NEW kern.Punkt(0, 0)
+    NEXT
+    geaendert()
+END SUB
+
 SUB auswahlBearbeiten()
     gZieht = FALSE
     IF LEN(gSelB) > 1 THEN
@@ -516,7 +556,26 @@ END FUNCTION
 SUB klickAuswahl(px AS FLOAT, py AS FLOAT, umsch AS BOOLEAN)
     gZiehGemerkt = FALSE
     gSegmentZug = FALSE
+    gTextZug = FALSE
     DIM li AS INTEGER : li = labelIndexUnter(px, py)
+    ' Referenz/Wert anfassen: nur der Text wandert (vor dem Bauteil-Treffer,
+    ' denn der Text liegt oft im Bauteil-Rechteck)
+    IF li < 0 AND NOT umsch THEN
+        DIM welche AS INTEGER
+        DIM ti AS INTEGER : ti = textIndexUnter(px, py, welche)
+        IF ti >= 0 THEN
+            DIM tb AS kern.Bauteil : tb = gBlatt.bauteile[ti]
+            waehleB(tb)
+            gTextZug = TRUE
+            gTextZugTeil = tb
+            gTextZugWelche = welche
+            gTextStart = IIF(welche = 0, tb.refVersatz, tb.wertVersatz)
+            gTextMausX = gMausRX
+            gTextMausY = gMausRY
+            gZieht = TRUE
+            RETURN
+        END IF
+    END IF
     DIM idx AS INTEGER : idx = -1
     DIM wi AS INTEGER : wi = -1
     DIM si AS INTEGER : si = -1
@@ -572,7 +631,10 @@ FUNCTION lwLos(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
         statusAktualisieren()
     END IF
     IF gZieht THEN
-        IF gSegmentZug THEN
+        IF gTextZug THEN
+            IF gZiehGemerkt THEN geaendert()
+            gTextZug = FALSE
+        ELSEIF gSegmentZug THEN
             drahtZiehEnde()
         ELSE
             gruppenZugEnde()
@@ -600,7 +662,9 @@ FUNCTION lwBewegung(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
         gRahmenEX = px
         gRahmenEY = py
     ELSEIF gZieht THEN
-        IF gSegmentZug THEN
+        IF gTextZug THEN
+            textZiehenUm(gMausRX - gTextMausX, gMausRY - gTextMausY)
+        ELSEIF gSegmentZug THEN
             drahtZiehenUm(gMausWX - gZiehStartX, gMausWY - gZiehStartY)
         ELSE
             gruppenZiehenUm(gMausWX - gzStartX, gMausWY - gzStartY)
@@ -658,6 +722,8 @@ FUNCTION lwTaste(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
         RETURN TRUE
     END IF
     SELECT CASE taste
+        CASE K_T
+            texteZuruecksetzen()
         CASE K_BILD_AUF
             blattWechseln(aktuellerBlattIndex() - 1)
         CASE K_BILD_AB

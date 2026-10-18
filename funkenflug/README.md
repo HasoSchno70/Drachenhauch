@@ -24,7 +24,7 @@ einem Programm, das es mitbringt (**Inkscape**, GIMP). Die Bibliotheks-Namen in
 
 | Werkzeug | |
 |---|---|
-| **Auswahl** (Taste `A`) | Bauteil, Label oder Draht anklicken, ziehen zum Verschieben; auf freier Fläche einen **Rahmen** aufziehen (wählt alles ganz Umschlossene), `Umschalt` ergänzt bzw. schaltet einzelne Elemente um; **Doppelklick**, `E` oder `Enter` bearbeitet (Bauteil: Referenz/Wert; Label und Draht: Netz umbenennen) |
+| **Auswahl** (Taste `A`) | Bauteil, Label oder Draht anklicken, ziehen zum Verschieben; auf freier Fläche einen **Rahmen** aufziehen (wählt alles ganz Umschlossene), `Umschalt` ergänzt bzw. schaltet einzelne Elemente um; **Doppelklick**, `E` oder `Enter` bearbeitet (Bauteil: Referenz/Wert; Label und Draht: Netz umbenennen). **Referenz oder Wert anfassen** verschiebt nur den Text (0,5-mm-Raster, dreht mit dem Bauteil mit); `T` setzt die Texte der gewählten Bauteile zurück |
 | **Draht** (Taste `W`) | klicken setzt Eckpunkte, Doppelklick / `Enter` / rechte Maustaste schließt ab, `Esc` bricht ab. Enden fangen an Pins und Drahtenden |
 | **Label** (Taste `L`) | klicken, Netznamen eingeben. Der Anker ist der elektrische Punkt; **gleichnamige Labels sind ein Netz**. Mit dem Haken „global" wird es ein globales Label (Fahne) und verbindet über alle Blätter; `G` schaltet gewählte Labels um. `R`/`X`/`Y` legen die Richtung fest (rechts, unten, links, oben) – vorher für das nächste Label, danach für das gewählte, das um seinen Anker dreht |
 | **Bauteil** | in der Leiste aus der Liste wählen, dann auf die Fläche klicken; rechte Maustaste oder `R` dreht die Vorschau |
@@ -97,6 +97,28 @@ werden mitgezeichnet. Die Pin-Typen gehen in den ERC (Eingang ohne Treiber,
 Ausgänge gegeneinander …).
 
 ![Eigenes IC](ic.png)
+
+**Freie Grafik:** In dieselbe Liste dürfen Zeichenbefehle (Maße in mm, Komma
+oder Punkt, y nach unten, 0/0 = Bauteil-Ursprung):
+
+```
+linie    -2 -3  3 0  -2 3  -2 -3     # Polylinie, "voll" am Ende füllt
+rechteck x1 y1 x2 y2 [voll]
+kreis    3,5 0 0,5 [voll]
+bogen    0 0 4 0 90                  # Mitte, Radius, Winkel (Grad, im Uhrzeigersinn)
+text     0 -4 ~{EN}
+pin 1 IN-  -5 -1 links ein           # Nummer Name x y Seite [Typ] [Länge]
+pin 3 OUT   6  0 rechts aus 2
+```
+
+Ein `pin` sitzt mit seinem elektrischen Punkt auf (x, y) – der muss auf dem
+1-mm-Raster liegen, sonst ließe er sich nicht anschließen; die Seite sagt,
+wohin er absteht. Gibt es Seiten-Pins, baut der Generator sein Rechteck und
+die Grafik kommt dazu (Logo, Innenleben); ohne Seiten-Pins ist das Symbol ganz
+frei. Frei gesetzte Pins zeigen ihre Nummer, den Namen nicht (er gilt weiter
+für ERC und Netzliste). Text-Elemente bleiben beim Drehen aufrecht.
+
+![Frei gezeichnetes Symbol](frei.png)
 
 Eigene Symbole **stecken in der `.fkn`** – eine Datei bleibt eigenständig,
 auch auf einem anderen Rechner. Mit dem Haken „auch in meiner Bibliothek
@@ -186,14 +208,15 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (159 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (174 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
 Kopieren/Einfügen, Umbenennen, ERC und SPICE, mehrere Blätter mit Reitern,
 globalem Label über den Dialog-Haken, ERC-Sprung aufs Blatt und mehrseitigem
 PDF/Druck, gedrehte Labels samt Treffer-Test, Gehäuse/Bestellnummer einzeln
-und für mehrere Bauteile). `pruef_kern.dh` prüft u. a. die
+und für mehrere Bauteile, Referenz ziehen/drehen/zurücksetzen, frei
+gezeichnetes Symbol platzieren und anschließen). `pruef_kern.dh` prüft u. a. die
 Gruppen-Lage in allen 8 Orientierungen × 3 Arten (72 Pin-Prüfungen). Der Selbsttest
 lässt die Zwischenablage des Systems in Ruhe und schreibt seine Bibliothek in
 eine Wegwerf-Datei neben dem Bild. `--nur-foto bild.png` macht nur das Bild.
@@ -240,6 +263,5 @@ zweiten Kondensator wieder „C1".
 
 ## Noch offen (nächste Runden)
 
-Hierarchische Blätter (Blatt-Symbole mit Ports), Symbole mit freier Grafik
-(bisher Rechteck-Gehäuse aus dem Generator), Referenz/Wert eines Bauteils
-verschieben, Platinen-Layout.
+Hierarchische Blätter (Blatt-Symbole mit Ports), Symbol-Grafik mit der Maus
+zeichnen (bisher als Text), Platinen-Layout.

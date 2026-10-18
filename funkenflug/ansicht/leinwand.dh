@@ -622,11 +622,11 @@ SUB bauteilZeichnen(cr AS INTEGER, b AS kern.Bauteil, geist AS BOOLEAN, gewaehlt
                 cairo_stroke(cr)
             CASE kern.PR_RECHTECK
                 cairo_rectangle(cr, pr.punkte[0].x, pr.punkte[0].y, pr.punkte[1].x - pr.punkte[0].x, pr.punkte[1].y - pr.punkte[0].y)
-                cairo_stroke(cr)
+                IF pr.fuellen THEN cairo_fill(cr) ELSE cairo_stroke(cr)
             CASE kern.PR_KREIS
                 cairo_new_sub_path(cr)
                 cairo_arc(cr, pr.punkte[0].x, pr.punkte[0].y, pr.radius, 0, 2 * PI)
-                cairo_stroke(cr)
+                IF pr.fuellen THEN cairo_fill(cr) ELSE cairo_stroke(cr)
             CASE kern.PR_BOGEN
                 cairo_new_sub_path(cr)
                 cairo_arc(cr, pr.punkte[0].x, pr.punkte[0].y, pr.radius, pr.winkel1, pr.winkel2)
@@ -647,6 +647,13 @@ SUB bauteilZeichnen(cr AS INTEGER, b AS kern.Bauteil, geist AS BOOLEAN, gewaehlt
     NEXT
     cairo_restore(cr)
     IF b.sym.pinTexte THEN pinTexteZeichnen(cr, b, geist)
+    ' Text-Primitive aufrecht, auch im gedrehten Bauteil
+    FOR j = 0 TO LEN(b.sym.grafik) - 1
+        IF b.sym.grafik[j].art = kern.PR_TEXT AND LEN(b.sym.grafik[j].punkte) > 0 THEN
+            DIM tp AS kern.Punkt : tp = kern.transformPunkt(b.lage, b.sym.grafik[j].punkte[0])
+            lwTextAusU(cr, sx(tp.x), sy(tp.y), b.sym.grafik[j].text, koerper, 1, gSchrift, TRUE)
+        END IF
+    NEXT
     ' Text (Referenz/Wert) in Schirmkoordinaten
     IF NOT geist THEN
         DIM mitte AS kern.Punkt : mitte = b.lage.pos
@@ -656,23 +663,76 @@ SUB bauteilZeichnen(cr AS INTEGER, b AS kern.Bauteil, geist AS BOOLEAN, gewaehlt
             lwText(cr, sx(mitte.x), sy(mitte.y), "?", C_ERC_FEHLER, TRUE)
             lwText(cr, sx(mitte.x), sy(mitte.y) - 200 * vZoom - 12, b.sym.name, C_ERC_FEHLER, TRUE)
         END IF
-        IF b.sym.textOrte THEN
-            IF b.referenz <> "" THEN ankerText(cr, b, b.sym.refOrt, b.referenz, tf)
-            IF b.wert <> "" THEN ankerText(cr, b, b.sym.wertOrt, b.wert, C_WERT)
-        ELSEIF NOT b.sym.einheitLeistung THEN
-            IF b.lage.drehung = 90 OR b.lage.drehung = 270 THEN
-                ' senkrecht: Text daneben, sonst laege er auf den Pin-Stummeln
-                IF b.referenz <> "" THEN lwText(cr, sx(mitte.x) + 16, sy(mitte.y) - 8, b.referenz, tf, FALSE)
-                IF b.wert <> "" THEN lwText(cr, sx(mitte.x) + 16, sy(mitte.y) + 8, b.wert, C_WERT, FALSE)
-            ELSE
-                IF b.referenz <> "" THEN lwText(cr, sx(mitte.x), sy(mitte.y) - 34, b.referenz, tf, TRUE)
-                IF b.wert <> "" THEN lwText(cr, sx(mitte.x), sy(mitte.y) + 20, b.wert, C_WERT, TRUE)
-            END IF
-        ELSE
-            IF b.wert <> "" THEN lwText(cr, sx(mitte.x) + 14, sy(mitte.y) - 10, b.wert, tf, FALSE)
-        END IF
+        DIM tx AS FLOAT, ty AS FLOAT, ta AS INTEGER
+        IF textOrt(b, 0, tx, ty, ta) THEN lwTextAus(cr, tx, ty, b.referenz, IIF(gTextZug AND gTextZugTeil = b AND gTextZugWelche = 0, C_AUSWAHL, tf), ta, gSchrift)
+        IF textOrt(b, 1, tx, ty, ta) THEN lwTextAus(cr, tx, ty, b.wert, IIF(gTextZug AND gTextZugTeil = b AND gTextZugWelche = 1, C_AUSWAHL, IIF(b.sym.einheitLeistung, tf, C_WERT)), ta, gSchrift)
     END IF
 END SUB
+
+' Wo Referenz (welche = 0) bzw. Wert (1) eines Bauteils steht -- am Schirm,
+' samt Ausrichtung (0 links buendig, 1 mittig, 2 rechts buendig) und dem
+' vom Nutzer gezogenen Versatz. FALSE = dieser Text wird nicht gezeigt.
+' Zeichnen und Treffer-Test rechnen beide hiermit.
+DIM gTextZugTeil AS kern.Bauteil     ' gerade gezogener Text (Hervorhebung)
+DIM gTextZugWelche AS INTEGER
+
+FUNCTION textOrt(b AS kern.Bauteil, welche AS INTEGER, BYREF x AS FLOAT, BYREF y AS FLOAT, BYREF ausr AS INTEGER) AS BOOLEAN
+    DIM t AS STRING : t = IIF(welche = 0, b.referenz, b.wert)
+    IF t = "" THEN RETURN FALSE
+    DIM m AS kern.Punkt : m = b.lage.pos
+    IF b.sym.textOrte THEN
+        DIM a AS kern.Punkt : a = kern.transformPunkt(b.lage, IIF(welche = 0, b.sym.refOrt, b.sym.wertOrt))
+        DIM dx AS INTEGER : dx = a.x - m.x
+        DIM dy AS INTEGER : dy = a.y - m.y
+        ' ueber oder unter dem Koerper beginnt der Text am Anker; links daneben
+        ' endet er dort -- so landet er nie im Koerper
+        ausr = IIF(ABS(dx) > ABS(dy) AND dx < 0, 2, 0)
+        x = sx(a.x)
+        y = sy(a.y)
+    ELSEIF NOT b.sym.einheitLeistung THEN
+        IF b.lage.drehung = 90 OR b.lage.drehung = 270 THEN
+            ' senkrecht: Text daneben, sonst laege er auf den Pin-Stummeln
+            ausr = 0
+            x = sx(m.x) + 16
+            y = sy(m.y) + IIF(welche = 0, -8, 8)
+        ELSE
+            ausr = 1
+            x = sx(m.x)
+            y = sy(m.y) + IIF(welche = 0, -34, 20)
+        END IF
+    ELSE
+        IF welche = 0 THEN RETURN FALSE                 ' Versorgung: nur der Name
+        ausr = 0
+        x = sx(m.x) + 14
+        y = sy(m.y) - 10
+    END IF
+    DIM v AS kern.Punkt : v = IIF(welche = 0, b.refVersatz, b.wertVersatz)
+    x = x + v.x * vZoom
+    y = y + v.y * vZoom
+    RETURN TRUE
+END FUNCTION
+
+' Referenz- oder Wert-Text unter dem Schirmpunkt: Index des Bauteils (welche
+' sagt, welcher Text), sonst -1. Breite geschaetzt wie beim Label.
+FUNCTION textIndexUnter(px AS FLOAT, py AS FLOAT, BYREF welche AS INTEGER) AS INTEGER
+    DIM i AS INTEGER, k AS INTEGER
+    FOR i = LEN(gBlatt.bauteile) - 1 TO 0 STEP -1
+        DIM b AS kern.Bauteil : b = gBlatt.bauteile[i]
+        FOR k = 0 TO 1
+            DIM x AS FLOAT, y AS FLOAT, ausr AS INTEGER
+            IF NOT textOrt(b, k, x, y, ausr) THEN CONTINUE
+            DIM br AS FLOAT : br = LEN(IIF(k = 0, b.referenz, b.wert)) * LABEL_ZEICHEN + 4
+            DIM x0 AS FLOAT : x0 = x
+            IF ausr = 1 THEN x0 = x - br / 2.0
+            IF ausr = 2 THEN x0 = x - br
+            IF px >= x0 - 2 AND px <= x0 + br + 2 AND py >= y - 8 AND py <= y + 8 THEN
+                welche = k
+                RETURN i
+            END IF
+        NEXT
+    NEXT
+    RETURN -1
+END FUNCTION
 
 SUB lwText(cr AS INTEGER, x AS FLOAT, y AS FLOAT, text AS STRING, farbe AS INTEGER, mitte AS BOOLEAN)
     lwTextAus(cr, x, y, text, farbe, IIF(mitte, 1, 0), gSchrift)
@@ -705,18 +765,6 @@ SUB lwTextAusU(cr AS INTEGER, x AS FLOAT, y AS FLOAT, text AS STRING, farbe AS I
     g_object_unref(layout)
 END SUB
 
-' Referenz/Wert an einem Anker des Symbols. Liegt der Anker (nach Drehung)
-' ueber oder unter dem Koerper, beginnt der Text dort; links daneben endet
-' er dort, rechts daneben beginnt er -- so landet er nie im Koerper.
-SUB ankerText(cr AS INTEGER, b AS kern.Bauteil, ort AS kern.Punkt, text AS STRING, farbe AS INTEGER)
-    DIM a AS kern.Punkt : a = kern.transformPunkt(b.lage, ort)
-    DIM dx AS INTEGER : dx = a.x - b.lage.pos.x
-    DIM dy AS INTEGER : dy = a.y - b.lage.pos.y
-    DIM ausr AS INTEGER : ausr = 0
-    IF ABS(dx) > ABS(dy) AND dx < 0 THEN ausr = 2
-    lwTextAus(cr, sx(a.x), sy(a.y), text, farbe, ausr, gSchrift)
-END SUB
-
 ' Pin-Nummern (am Stummel) und -Namen (innen am Koerper). Die Schrift waechst
 ' mit dem Zoom wie das Symbol; zu klein wird sie weggelassen.
 CONST PIN_SCHRIFT = 110               ' Schrifthoehe in Einheiten (1.1 mm)
@@ -743,7 +791,7 @@ SUB pinTexteZeichnen(cr AS INTEGER, b AS kern.Bauteil, geist AS BOOLEAN)
             lwTextAus(cr, mx + 3, my, pin.nummer, fNr, 0, gSchriftPin)
         END IF
         ' Name innen am Koerper
-        IF pin.name <> "" THEN
+        IF pin.name <> "" AND pin.zeigeName THEN
             DIM qx AS FLOAT : qx = sx(p.x + dx * (pin.laenge + 60))
             DIM qy AS FLOAT : qy = sy(p.y + dy * (pin.laenge + 60))
             SELECT CASE r

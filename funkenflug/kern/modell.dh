@@ -134,6 +134,8 @@ CLASS Bauteil
     DIM wert AS STRING
     DIM gehaeuse AS STRING            ' z. B. 0805, DIP-8, TO-92 (Stueckliste)
     DIM bestellnr AS STRING           ' Bestellnummer / Hersteller-Teilenummer
+    DIM refVersatz AS Punkt           ' Referenz-Text verschoben (Blatt-Einheiten), 0,0 = Vorgabe
+    DIM wertVersatz AS Punkt
     DIM sym AS Symbol                 ' aufgeloest, nicht gespeichert
     SUB Init(ref AS STRING, l AS Lage)
         id = LEFT$(UUID4$(), 10)
@@ -143,6 +145,8 @@ CLASS Bauteil
         wert = ""
         gehaeuse = ""
         bestellnr = ""
+        refVersatz = NEW Punkt(0, 0)
+        wertVersatz = NEW Punkt(0, 0)
     END SUB
     ' Blattkoordinate des i-ten Pins (elektrisch, = gezeichnet).
     FUNCTION pinPunkt(i AS INTEGER) AS Punkt
