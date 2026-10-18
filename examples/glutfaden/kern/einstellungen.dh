@@ -556,6 +556,7 @@ FUNCTION kuerzelAktionen() AS ARRAY OF Kuerzelaktion
         ka("rueckstiche_zeigen", "Rückstiche anzeigen", ""), _
         ka("fortschritt_zeigen", "Fortschritt anzeigen", ""), _
         ka("mittelkreuz", "Zentrierhilfe", ""), _
+        ka("tastenkuerzel", "Tastenkürzel anzeigen", "F1"), _
         ka("drucken", "Drucken", "Strg+P"), _
         ka("bildschirm_pipette", "Farbe vom Bildschirm picken", ""), _
         ka("palette_export", "Palette exportieren", ""), _
@@ -783,4 +784,18 @@ FUNCTION fuellPassend(farben AS ARRAY OF INTEGER, ziel AS INTEGER, toleranz AS I
         IF farbAbstand(farben[ziel], farben[k]) <= grenze THEN passt[k + 1] = 1
     NEXT
     RETURN passt
+END FUNCTION
+
+' Die Tastenkuerzel-Uebersicht (PySticky _on_show_shortcuts): je Aktion
+' "Name<TAB>Kuerzel" mit dem WIRKSAMEN Kuerzel -- dieselbe Tafel wie der
+' Einstellungsreiter, sonst zeigte die Hilfe nach einem Umlegen die alte Taste.
+FUNCTION kuerzelListe(e AS Einstellungen) AS ARRAY OF STRING
+    DIM aktionen AS ARRAY OF Kuerzelaktion : aktionen = kuerzelAktionen()
+    DIM w AS ARRAY OF STRING : w = kuerzelWirksam(e)
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(aktionen) - 1
+        ARRAY_PUSH(aus, aktionen[i].name + CHR$(9) + w[i])
+    NEXT
+    RETURN aus
 END FUNCTION

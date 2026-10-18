@@ -596,6 +596,16 @@ SUB bildImportieren()
     IF NOT ungesichertFragen("Importieren") THEN RETURN
     DIM pfad AS STRING : pfad = bildWaehlen()
     IF pfad = "" THEN RETURN
+    bildImportDialog(pfad)
+END SUB
+
+' Ein schon bekanntes Bild importieren (abgelegt) -- mit derselben Rueckfrage
+SUB bildImportierenVon(pfad AS STRING)
+    IF NOT ungesichertFragen("Importieren") THEN RETURN
+    bildImportDialog(pfad)
+END SUB
+
+SUB bildImportDialog(pfad AS STRING)
     IF imDialogBauen(pfad, NIL) THEN
         DIM ok AS BOOLEAN : ok = imDialogLaufen()
     END IF

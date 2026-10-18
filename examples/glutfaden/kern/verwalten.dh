@@ -804,3 +804,34 @@ FUNCTION stoffBezeichnung$(m AS Muster) AS STRING
     IF m.stoff = 8 THEN RETURN "3.0 mm Round"
     RETURN s + " (Drill-Pitch)"
 END FUNCTION
+
+' --- Abgelegte Dateien (PySticky dragEnterEvent/dropEvent) ------------------------
+
+CONST ABLAGE_KEINE = 0
+CONST ABLAGE_MUSTER = 1               ' .pxs und die fremden Formate
+CONST ABLAGE_BILD = 2                 ' geht in den Bild-Import
+
+' Was mit einer Datei geschieht, nach ihrer Endung. Bilder nur die, die der
+' Import liest (PySticky nimmt dazu WebP und TIFF -- Glutfaden liest sie nicht).
+FUNCTION ablageArt(pfad AS STRING) AS INTEGER
+    DIM e AS STRING : e = LOWER$(pfad)
+    DIM p AS INTEGER : p = INSTRREV(e, ".")
+    IF p < 0 THEN RETURN ABLAGE_KEINE
+    e = MID$(e, p)
+    IF e = ".pxs" OR e = ".oxs" OR e = ".xsd" OR e = ".pat" THEN RETURN ABLAGE_MUSTER
+    IF e = ".png" OR e = ".jpg" OR e = ".jpeg" OR e = ".bmp" OR e = ".gif" OR e = ".tga" OR e = ".qoi" THEN RETURN ABLAGE_BILD
+    RETURN ABLAGE_KEINE
+END FUNCTION
+
+' Die Zeilen einer text/uri-list (RFC 2483): getrennt durch CR LF, Zeilen mit
+' "#" sind Kommentare, leere fallen weg.
+FUNCTION uriListe(text AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(text, CHR$(13), ""), CHR$(10))
+        z = TRIM$(z)
+        IF z = "" OR LEFT$(z, 1) = "#" THEN CONTINUE
+        ARRAY_PUSH(aus, z)
+    NEXT
+    RETURN aus
+END FUNCTION

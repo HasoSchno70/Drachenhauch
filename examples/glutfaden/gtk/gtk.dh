@@ -62,6 +62,14 @@ DECLARE SUB gtk_adjustment_configure LIB GTK (a AS ZEIGER, wert AS FLOAT, unten 
 DECLARE FUNCTION gtk_adjustment_get_lower LIB GTK (a AS ZEIGER) AS FLOAT
 DECLARE FUNCTION gtk_scrollbar_new LIB GTK (richtung AS LONG, a AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_window_get_focus LIB GTK (fenster AS ZEIGER) AS ZEIGER
+' Ziehen und Ablegen von Dateien (text/uri-list)
+DECLARE SUB gtk_drag_dest_set LIB GTK (w AS ZEIGER, flags AS LONG, ziele AS ZEIGER, n AS LONG, aktionen AS LONG)
+DECLARE SUB gtk_drag_dest_add_uri_targets LIB GTK (w AS ZEIGER)
+DECLARE FUNCTION gtk_selection_data_get_data LIB GTK (sel AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_selection_data_get_length LIB GTK (sel AS ZEIGER) AS LONG
+DECLARE FUNCTION g_filename_from_uri LIB GLIB (uri AS TEXT, BYREF rechner AS ZEIGER, BYREF fehler AS ZEIGER) AS ZEIGER
+CONST GTK_ZIEL_ALLES = 7              ' GTK_DEST_DEFAULT_ALL
+CONST GDK_AKTION_KOPIEREN = 2         ' GDK_ACTION_COPY
 DECLARE SUB gtk_adjustment_set_value LIB GTK (a AS ZEIGER, wert AS FLOAT)
 DECLARE FUNCTION gtk_adjustment_get_upper LIB GTK (a AS ZEIGER) AS FLOAT
 DECLARE FUNCTION gtk_adjustment_get_page_size LIB GTK (a AS ZEIGER) AS FLOAT
@@ -386,6 +394,10 @@ DECLARE FUNCTION signalEreignis LIB GOBJECT ALIAS "g_signal_connect_data" _
 ' draw-page: Druckvorgang, Kontext, Seitennummer
 DECLARE FUNCTION signalSeite LIB GOBJECT ALIAS "g_signal_connect_data" _
     (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, kontext AS ZEIGER, seite AS LONG, daten AS ZEIGER), _
+     daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
+' drag-data-received: Kontext, x, y, Auswahl, Art, Zeit
+DECLARE FUNCTION signalAblage LIB GOBJECT ALIAS "g_signal_connect_data" _
+    (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, kontext AS ZEIGER, x AS LONG, y AS LONG, auswahl AS ZEIGER, art AS ULONG, zeit AS ULONG, daten AS ZEIGER), _
      daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
 DECLARE FUNCTION signalZeile LIB GOBJECT ALIAS "g_signal_connect_data" _
     (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, zeile AS ZEIGER, daten AS ZEIGER), _

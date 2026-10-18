@@ -1,0 +1,99 @@
+' Dateien aufs Fenster ziehen (PySticky dragEnterEvent/dropEvent) und die
+' Tastenkuerzel-Uebersicht (F1, PySticky _on_show_shortcuts).
+'
+' Abgelegt wird eine text/uri-list. Der Rueckruf merkt sich nur den Pfad und
+' arbeitet ihn einen Augenblick spaeter ab: eine Rueckfrage oder der
+' Import-Dialog mitten im Ziehen liefe sonst in der Ziehen-Schleife des
+' Systems.
+
+DIM abPfad AS STRING
+DIM abArt AS INTEGER
+
+SUB ablageEinrichten(w AS INTEGER)
+    gtk_drag_dest_set(w, GTK_ZIEL_ALLES, 0, 0, GDK_AKTION_KOPIEREN)
+    gtk_drag_dest_add_uri_targets(w)
+    signalAblage(w, "drag-data-received", abEmpfangen, 0, 0, 0)
+END SUB
+
+SUB abEmpfangen(w AS INTEGER, kontext AS INTEGER, x AS INTEGER, y AS INTEGER, auswahl AS INTEGER, art AS INTEGER, zeit AS INTEGER, daten AS INTEGER)
+    IF gtk_selection_data_get_length(auswahl) <= 0 THEN RETURN
+    DIM text AS STRING : text = TEXT_AUS_ZEIGER$(gtk_selection_data_get_data(auswahl))
+    IF ablageMerken(text) THEN g_timeout_add(30, abAbarbeiten, 0)
+END SUB
+
+' Aus einer uri-list die erste Datei, mit der Glutfaden etwas anfangen kann
+' (wie PySticky: die erste passende gewinnt). TRUE, wenn eine dabei war.
+FUNCTION ablageMerken(text AS STRING) AS BOOLEAN
+    abPfad = ""
+    abArt = kern.ABLAGE_KEINE
+    DIM u AS STRING
+    FOR EACH u IN kern.uriListe(text)
+        DIM rechner AS INTEGER, fehler AS INTEGER
+        DIM z AS INTEGER : z = g_filename_from_uri(u, rechner, fehler)
+        IF z = 0 THEN
+            IF fehler <> 0 THEN g_error_free(fehler)
+            CONTINUE
+        END IF
+        DIM p AS STRING : p = TEXT_AUS_ZEIGER$(z)
+        g_free(z)
+        IF rechner <> 0 THEN g_free(rechner)
+        DIM a AS INTEGER : a = kern.ablageArt(p)
+        IF a <> kern.ABLAGE_KEINE THEN
+            abPfad = p
+            abArt = a
+            RETURN TRUE
+        END IF
+    NEXT
+    statusMeldung("Abgelegt: nichts, was Glutfaden öffnen kann (Muster .pxs/.oxs/.xsd/.pat oder ein Bild).")
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION abAbarbeiten(daten AS INTEGER) AS BOOLEAN
+    ablageAusfuehren()
+    RETURN FALSE
+END FUNCTION
+
+' Den gemerkten Pfad oeffnen: ein Muster ersetzt das jetzige (nach der
+' Rueckfrage bei Ungesichertem), ein Bild geht in den Bild-Import.
+SUB ablageAusfuehren()
+    IF abPfad = "" THEN RETURN
+    DIM p AS STRING : p = abPfad
+    abPfad = ""
+    IF abArt = kern.ABLAGE_MUSTER THEN
+        IF NOT ungesichertFragen("Öffnen") THEN RETURN
+        DIM ok AS BOOLEAN : ok = musterOeffnen(p)
+    ELSEIF abArt = kern.ABLAGE_BILD THEN
+        bildImportierenVon(p)
+    END IF
+END SUB
+
+' --- Tastenkuerzel (F1) -----------------------------------------------------------
+
+SUB kuerzelUebersicht()
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Tastenkürzel", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        "Schließen", GTK_ANTWORT_ABBRECHEN, 0)
+    gtk_window_set_default_size(d, 520, 620)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
+    DIM s AS INTEGER : s = adSeite()
+    gtk_box_pack_start(innen, s, TRUE, TRUE, 0)
+    DIM breiten AS ARRAY OF INTEGER : breiten = [0, 190]
+    DIM liste AS INTEGER : liste = adTabelle(s, ["Aktion", "Tastenkürzel"], breiten, "ll")
+    DIM zeile AS STRING
+    FOR EACH zeile IN kern.kuerzelListe(einst)
+        DIM teile AS ARRAY OF STRING : teile = SPLIT$(zeile, CHR$(9))
+        DIM k AS STRING : k = teile[1]
+        IF k = "" THEN k = "<span alpha='45%'>—</span>" ELSE k = kern.htmlKodiere$(k)
+        DIM r AS INTEGER : r = adZeile(liste, [kern.htmlKodiere$(teile[0]), k], breiten, "ll")
+    NEXT
+    DIM hinweis AS INTEGER : hinweis = gtk_label_new("Umlegen unter Einstellungen → Tastenkürzel.")
+    gtkKlasse(hinweis, "nebensache")
+    gtk_label_set_xalign(hinweis, 0.0)
+    gtk_box_pack_start(s, hinweis, FALSE, FALSE, 0)
+    gtk_widget_show_all(d)
+    kuDialog = d
+    DIM a AS INTEGER : a = gtk_dialog_run(d)
+    kuDialog = 0
+    gtk_widget_destroy(d)
+END SUB
+
+DIM kuDialog AS INTEGER               ' offen (fuer die Vorfuehrung)

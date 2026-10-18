@@ -92,6 +92,7 @@ IMPORT "ansicht/infoleiste.dh"
 IMPORT "ansicht/optionsleisten.dh"
 IMPORT "ansicht/farbquellen.dh"
 IMPORT "ansicht/drucken.dh"
+IMPORT "ansicht/ablage.dh"
 
 ' Farben: dunkel wie das Logo, Glut (#ff8a3d) fuer alles, was gewaehlt ist
 CONST STIL = "window, .flaeche { background-color: #1b1c20; color: #e4e5ea; }" + _
@@ -592,6 +593,7 @@ SUB befehlAusfuehren(kennung AS STRING)
         CASE "rueckstiche_zeigen" : ansichtSchalter(0, NOT lwRueckZeigen)
         CASE "fortschritt_zeigen" : ansichtSchalter(1, NOT lwFortschrittZeigen)
         CASE "mittelkreuz" : ansichtSchalter(2, NOT lwMittelkreuz)
+        CASE "tastenkuerzel" : kuerzelUebersicht()
         CASE "drucken" : druckenDialog()
         CASE "bildschirm_pipette" : bildschirmPipette()
         CASE "palette_export" : paletteExportieren()
@@ -799,6 +801,7 @@ signal(kKleiner, "clicked", kleinerGeklickt, 0, 0, 0)
 signal(kGroesser, "clicked", groesserGeklickt, 0, 0, 0)
 signal(kEinpassen, "clicked", einpassenGeklickt, 0, 0, 0)
 signalEreignis(fenster, "key-press-event", taste, 0, 0, 0)
+ablageEinrichten(fenster)
 signalEreignis(fenster, "delete-event", schliessenAngefragt, 0, 0, 0)
 signal(fenster, "destroy", fensterZu, 0, 0, 0)
 gtk_widget_show_all(fenster)
