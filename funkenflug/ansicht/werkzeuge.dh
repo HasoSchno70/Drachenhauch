@@ -1,16 +1,23 @@
 ' Maus, Tastatur und Werkzeug-Logik. Globaler Namensraum (teilt Zustand mit
-' leinwand.dh und main.dh).
+' leinwand.dh, verlauf.dh und main.dh).
+'
+' Jede Aenderung am Dokument ruft VORHER verlaufMerken() (verlauf.dh) auf.
 
 ' GDK-Tastenwerte
 CONST K_ESC = &HFF1B
 CONST K_RETURN = &HFF0D
 CONST K_DELETE = &HFFFF
 CONST K_BACKSPACE = &HFF08
-CONST K_R = &H72
-CONST K_W = &H77
 CONST K_A = &H61
-CONST K_S = &H73
+CONST K_E = &H65
+CONST K_L = &H6C
 CONST K_O = &H6F
+CONST K_R = &H72
+CONST K_S = &H73
+CONST K_W = &H77
+CONST K_Y = &H79
+CONST K_Z = &H7A
+CONST K_Z_GROSS = &H5A              ' Strg+Umschalt+Z liefert das grosse Z
 CONST K_PLUS = &H2B
 CONST K_GLEICH = &H3D
 CONST K_MINUS = &H2D
@@ -22,10 +29,10 @@ FUNCTION evKnopf(ev AS INTEGER) AS INTEGER
     RETURN k
 END FUNCTION
 
-FUNCTION evStrg(ev AS INTEGER) AS BOOLEAN
+FUNCTION evZustand(ev AS INTEGER) AS INTEGER
     DIM z AS INTEGER
-    IF NOT gdk_event_get_state(ev, z) THEN RETURN FALSE
-    RETURN (z BAND GDK_STRG) <> 0
+    IF NOT gdk_event_get_state(ev, z) THEN RETURN 0
+    RETURN z
 END FUNCTION
 
 ' Mausposition aktualisieren (roh + gefangen je nach Werkzeug)
@@ -33,7 +40,7 @@ SUB mausSetzen(px AS FLOAT, py AS FLOAT)
     gMausRX = weltX(px)
     gMausRY = weltY(py)
     gMausDrin = TRUE
-    IF gWerkzeug = WZ_DRAHT THEN
+    IF gWerkzeug = WZ_DRAHT OR gWerkzeug = WZ_LABEL THEN
         DIM f AS kern.Punkt : f = fangPunkt(gMausRX, gMausRY)
         gMausWX = f.x
         gMausWY = f.y
@@ -43,11 +50,26 @@ SUB mausSetzen(px AS FLOAT, py AS FLOAT)
     END IF
 END SUB
 
+SUB auswahlAufheben()
+    gHatGewaehlt = FALSE
+    gHatLabel = FALSE
+END SUB
+
 SUB werkzeugWaehlen(wz AS INTEGER, ref AS STRING)
     gWerkzeug = wz
     IF ref <> "" THEN gSymbolRef = ref
-    IF wz <> WZ_DRAHT THEN gDrahtAktiv = FALSE
+    IF wz <> WZ_DRAHT THEN
+        gDrahtAktiv = FALSE
+        gDrahtPunkte = []
+    END IF
     werkzeugKnoepfeNachziehen()
+    statusAktualisieren()
+    neuZeichnen()
+END SUB
+
+SUB geaendert()
+    gGeaendert = TRUE
+    titelNachziehen()
     statusAktualisieren()
     neuZeichnen()
 END SUB
@@ -66,30 +88,48 @@ FUNCTION naechsteReferenz(praefix AS STRING) AS STRING
     RETURN praefix + STR$(groesste + 1)
 END FUNCTION
 
+' Gibt es die Referenz schon bei einem ANDEREN Bauteil?
+FUNCTION referenzBelegt(ref AS STRING, ausser AS kern.Bauteil) AS BOOLEAN
+    IF ref = "" THEN RETURN FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gBlatt.bauteile) - 1
+        IF gBlatt.bauteile[i] <> ausser AND gBlatt.bauteile[i].referenz = ref THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
 SUB bauteilPlatzieren()
+    verlaufMerken()
     DIM l AS kern.Lage : l = NEW kern.Lage(NEW kern.Punkt(gMausWX, gMausWY), gPlatzDreh, FALSE)
     DIM b AS kern.Bauteil : b = kern.neuesBauteil(gSymbolRef, l)
     b.referenz = naechsteReferenz(b.sym.praefix)
     ARRAY_PUSH(gBlatt.bauteile, b)
+    auswahlAufheben()
     gGewaehlt = b
     gHatGewaehlt = TRUE
-    gGeaendert = TRUE
-    titelNachziehen()
-    neuZeichnen()
+    geaendert()
 END SUB
 
+' Den gezeichneten Draht uebernehmen. Doppelte Eckpunkte (der Doppelklick
+' setzt den letzten Punkt zweimal) fallen weg; unter zwei Punkten kein Draht.
 SUB drahtEndePunkt()
-    ' Doppelt-Punkt am Ende vermeiden, Draht abschliessen.
-    IF gDrahtAktiv AND LEN(gDrahtPunkte) >= 2 THEN
+    IF gDrahtAktiv THEN
         DIM w AS kern.Draht : w = NEW kern.Draht()
         DIM i AS INTEGER
         FOR i = 0 TO LEN(gDrahtPunkte) - 1
-            ARRAY_PUSH(w.punkte, gDrahtPunkte[i])
+            DIM p AS kern.Punkt : p = gDrahtPunkte[i]
+            IF LEN(w.punkte) = 0 THEN
+                ARRAY_PUSH(w.punkte, p)
+            ELSEIF NOT kern.punktGleich(w.punkte[LEN(w.punkte) - 1], p) THEN
+                ARRAY_PUSH(w.punkte, p)
+            END IF
         NEXT
-        ARRAY_PUSH(gBlatt.draehte, w)
-        kern.autoKnoten(gBlatt)
-        gGeaendert = TRUE
-        titelNachziehen()
+        IF LEN(w.punkte) >= 2 THEN
+            verlaufMerken()
+            ARRAY_PUSH(gBlatt.draehte, w)
+            kern.autoKnoten(gBlatt)
+            geaendert()
+        END IF
     END IF
     gDrahtAktiv = FALSE
     gDrahtPunkte = []
@@ -97,29 +137,69 @@ SUB drahtEndePunkt()
 END SUB
 
 SUB auswahlLoeschen()
-    IF NOT gHatGewaehlt THEN RETURN
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(gBlatt.bauteile) - 1
-        IF gBlatt.bauteile[i] = gGewaehlt THEN
-            ARRAY_REMOVE_AT(gBlatt.bauteile, i)
-            gHatGewaehlt = FALSE
-            gGeaendert = TRUE
-            titelNachziehen()
-            neuZeichnen()
-            RETURN
-        END IF
-    NEXT
+    IF gHatLabel THEN
+        FOR i = 0 TO LEN(gBlatt.labels) - 1
+            IF gBlatt.labels[i] = gLabelGewaehlt THEN
+                verlaufMerken()
+                ARRAY_REMOVE_AT(gBlatt.labels, i)
+                auswahlAufheben()
+                geaendert()
+                RETURN
+            END IF
+        NEXT
+    ELSEIF gHatGewaehlt THEN
+        FOR i = 0 TO LEN(gBlatt.bauteile) - 1
+            IF gBlatt.bauteile[i] = gGewaehlt THEN
+                verlaufMerken()
+                ARRAY_REMOVE_AT(gBlatt.bauteile, i)
+                auswahlAufheben()
+                geaendert()
+                RETURN
+            END IF
+        NEXT
+    END IF
 END SUB
 
 SUB auswahlDrehen()
     IF gHatGewaehlt THEN
+        verlaufMerken()
         gGewaehlt.lage.drehung = (gGewaehlt.lage.drehung + 90) MOD 360
-        gGeaendert = TRUE
-        titelNachziehen()
-    ELSE
-        gPlatzDreh = (gPlatzDreh + 90) MOD 360
+        geaendert()
+    ELSEIF NOT gHatLabel THEN
+        gPlatzDreh = (gPlatzDreh + 90) MOD 360     ' Vorschau beim Platzieren
+        neuZeichnen()
     END IF
-    neuZeichnen()
+END SUB
+
+SUB labelSetzen()
+    ' Position VOR dem Dialog festhalten: waehrend er offen ist, koennen
+    ' Mausereignisse gMausWX/WY schon verschieben.
+    DIM ort AS kern.Punkt : ort = NEW kern.Punkt(gMausWX, gMausWY)
+    DIM text AS STRING : text = TRIM$(textAbfrage$("Label setzen", "Netzname:", ""))
+    IF text = "" THEN RETURN
+    verlaufMerken()
+    DIM la AS kern.Label : la = NEW kern.Label(text, ort, kern.LA_LOKAL)
+    ARRAY_PUSH(gBlatt.labels, la)
+    auswahlAufheben()
+    gLabelGewaehlt = la
+    gHatLabel = TRUE
+    geaendert()
+END SUB
+
+' Doppelklick / E / Enter: das Gewaehlte bearbeiten.
+SUB auswahlBearbeiten()
+    gZieht = FALSE
+    IF gHatLabel THEN
+        DIM text AS STRING : text = TRIM$(textAbfrage$("Label bearbeiten", "Netzname:", gLabelGewaehlt.text))
+        IF text <> "" AND text <> gLabelGewaehlt.text THEN
+            verlaufMerken()
+            gLabelGewaehlt.text = text
+            geaendert()
+        END IF
+    ELSEIF gHatGewaehlt THEN
+        eigenschaftenDialog(gGewaehlt)
+    END IF
 END SUB
 
 ' --- Ereignisse
@@ -147,19 +227,35 @@ FUNCTION lwDruck(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM doppel AS BOOLEAN : doppel = gdk_event_get_event_type(ev) = GDK_DOPPELKLICK
     SELECT CASE gWerkzeug
         CASE WZ_AUSWAHL
-            DIM idx AS INTEGER : idx = bauteilIndexUnter(gMausRX, gMausRY)
-            IF idx >= 0 THEN
-                gGewaehlt = gBlatt.bauteile[idx]
-                gHatGewaehlt = TRUE
+            IF doppel THEN
+                ' der erste Klick hat schon gewaehlt
+                auswahlBearbeiten()
+                RETURN TRUE
+            END IF
+            auswahlAufheben()
+            gZiehGemerkt = FALSE
+            DIM li AS INTEGER : li = labelIndexUnter(px, py)
+            IF li >= 0 THEN
+                gLabelGewaehlt = gBlatt.labels[li]
+                gHatLabel = TRUE
                 gZieht = TRUE
-                gZiehDX = gGewaehlt.lage.pos.x - gMausWX
-                gZiehDY = gGewaehlt.lage.pos.y - gMausWY
+                gZiehDX = gLabelGewaehlt.anker.x - gMausWX
+                gZiehDY = gLabelGewaehlt.anker.y - gMausWY
             ELSE
-                gHatGewaehlt = FALSE
+                DIM idx AS INTEGER : idx = bauteilIndexUnter(gMausRX, gMausRY)
+                IF idx >= 0 THEN
+                    gGewaehlt = gBlatt.bauteile[idx]
+                    gHatGewaehlt = TRUE
+                    gZieht = TRUE
+                    gZiehDX = gGewaehlt.lage.pos.x - gMausWX
+                    gZiehDY = gGewaehlt.lage.pos.y - gMausWY
+                END IF
             END IF
             neuZeichnen()
         CASE WZ_BAUTEIL
             bauteilPlatzieren()
+        CASE WZ_LABEL
+            IF NOT doppel THEN labelSetzen()
         CASE WZ_DRAHT
             IF doppel THEN
                 drahtEndePunkt()
@@ -179,8 +275,27 @@ END FUNCTION
 FUNCTION lwLos(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
     gPan = FALSE
     gZieht = FALSE
+    gZiehGemerkt = FALSE
     RETURN TRUE
 END FUNCTION
+
+' Ziehen: der Undo-Schnappschuss faellt erst bei der ersten echten Bewegung,
+' ein blosser Klick erzeugt keinen leeren Verlaufsschritt.
+SUB ziehenNach(nx AS INTEGER, ny AS INTEGER)
+    IF gHatLabel THEN
+        IF gLabelGewaehlt.anker.x = nx AND gLabelGewaehlt.anker.y = ny THEN RETURN
+        IF NOT gZiehGemerkt THEN verlaufMerken() : gZiehGemerkt = TRUE
+        gLabelGewaehlt.anker = NEW kern.Punkt(nx, ny)
+    ELSEIF gHatGewaehlt THEN
+        IF gGewaehlt.lage.pos.x = nx AND gGewaehlt.lage.pos.y = ny THEN RETURN
+        IF NOT gZiehGemerkt THEN verlaufMerken() : gZiehGemerkt = TRUE
+        gGewaehlt.lage.pos = NEW kern.Punkt(nx, ny)
+    ELSE
+        RETURN
+    END IF
+    gGeaendert = TRUE
+    titelNachziehen()
+END SUB
 
 FUNCTION lwBewegung(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM px AS FLOAT, py AS FLOAT
@@ -194,10 +309,7 @@ FUNCTION lwBewegung(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
         RETURN TRUE
     END IF
     mausSetzen(px, py)
-    IF gZieht AND gHatGewaehlt THEN
-        gGewaehlt.lage.pos = NEW kern.Punkt(gMausWX + gZiehDX, gMausWY + gZiehDY)
-        gGeaendert = TRUE
-    END IF
+    IF gZieht THEN ziehenNach(gMausWX + gZiehDX, gMausWY + gZiehDY)
     neuZeichnen()
     statusAktualisieren()
     RETURN TRUE
@@ -231,27 +343,39 @@ END FUNCTION
 FUNCTION lwTaste(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM taste AS INTEGER
     IF NOT gdk_event_get_keyval(ev, taste) THEN RETURN FALSE
-    DIM strg AS BOOLEAN : strg = evStrg(ev)
-    IF strg THEN
+    DIM z AS INTEGER : z = evZustand(ev)
+    IF (z BAND GDK_STRG) <> 0 THEN
         SELECT CASE taste
-            CASE K_S : dateiSpeichern() : RETURN TRUE
-            CASE K_O : dateiOeffnen() : RETURN TRUE
+            CASE K_S : dateiSpeichern()
+            CASE K_O : dateiOeffnen()
+            CASE K_Z : verlaufZurueck()
+            CASE K_Y, K_Z_GROSS : verlaufVor()
+            CASE ELSE : RETURN FALSE
         END SELECT
+        RETURN TRUE
     END IF
     SELECT CASE taste
         CASE K_ESC
             gDrahtAktiv = FALSE
             gDrahtPunkte = []
-            gHatGewaehlt = FALSE
+            auswahlAufheben()
             neuZeichnen()
         CASE K_RETURN
-            IF gDrahtAktiv THEN drahtEndePunkt()
+            IF gDrahtAktiv THEN
+                drahtEndePunkt()
+            ELSE
+                auswahlBearbeiten()
+            END IF
+        CASE K_E
+            auswahlBearbeiten()
         CASE K_DELETE, K_BACKSPACE
             auswahlLoeschen()
         CASE K_R
             auswahlDrehen()
         CASE K_W
             werkzeugWaehlen(WZ_DRAHT, "")
+        CASE K_L
+            werkzeugWaehlen(WZ_LABEL, "")
         CASE K_A
             werkzeugWaehlen(WZ_AUSWAHL, "")
         CASE K_PLUS, K_GLEICH

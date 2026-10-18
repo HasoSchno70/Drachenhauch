@@ -84,6 +84,17 @@ FUNCTION netzeBerechnen(bl AS Blatt) AS Netze
             DIM dummy AS INTEGER : dummy = n.punkt(pp.x, pp.y)
         NEXT
     NEXT
+    ' Labels: der Anker ist ein Netzpunkt; gleichnamige Labels sind EIN Netz.
+    DIM ersterMitText AS MAP OF INTEGER
+    FOR i = 0 TO LEN(bl.labels) - 1
+        DIM la AS Label : la = bl.labels[i]
+        DIM li AS INTEGER : li = n.punkt(la.anker.x, la.anker.y)
+        IF MAPHAS(ersterMitText, la.text) THEN
+            n.eins(MAPGET(ersterMitText, la.text), li)
+        ELSE
+            MAPPUT(ersterMitText, la.text, li)
+        END IF
+    NEXT
     ' T-Verbindungen: jeder Punkt, der innen auf einem Segment liegt, wird mit
     ' dessen Enden verbunden.
     DIM alle AS ARRAY OF STRING : alle = MAPKEYS(n.idx)

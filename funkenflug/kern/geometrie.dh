@@ -57,13 +57,14 @@ FUNCTION punktGleich(a AS Punkt, b AS Punkt) AS BOOLEAN
     RETURN a.x = b.x AND a.y = b.y
 END FUNCTION
 
-' Auf ein Raster runden (symmetrisch um 0).
+' Auf ein Raster runden (symmetrisch um 0). Achtung: "\" ist die
+' Ganzzahl-Division -- "/" liefert in Drachenhauch IMMER eine Kommazahl.
 FUNCTION rastern(wert AS INTEGER, raster AS INTEGER) AS INTEGER
     IF raster <= 1 THEN RETURN wert
     IF wert >= 0 THEN
-        RETURN ((wert + raster / 2) / raster) * raster
+        RETURN ((wert + raster \ 2) \ raster) * raster
     ELSE
-        RETURN -((-wert + raster / 2) / raster) * raster
+        RETURN -(((-wert + raster \ 2) \ raster) * raster)
     END IF
 END FUNCTION
 

@@ -2,7 +2,8 @@
 ' Sparsam: Drehung nur wenn <>0, Spiegelung nur wenn gesetzt, Wert nur bei
 ' Abweichung vom Symbol-Vorgabewert. Knoten werden beim Laden neu berechnet.
 
-FUNCTION dokumentSpeichern(dok AS Dokument, pfad AS STRING) AS BOOLEAN
+' Ein Dokument in einen JSON-Baum bauen (auch fuer Undo-Schnappschuesse).
+FUNCTION dokumentNachJson(dok AS Dokument) AS JSON_HANDLE
     DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
     JSON_SET_STRING(j, "version", "1")
     JSON_SET_STRING(j, "id", dok.id)
@@ -55,16 +56,20 @@ FUNCTION dokumentSpeichern(dok AS Dokument, pfad AS STRING) AS BOOLEAN
         NEXT
         JSON_APPEND_JSON(j, "blaetter", b)
     NEXT
+    RETURN j
+END FUNCTION
+
+FUNCTION dokumentSpeichern(dok AS Dokument, pfad AS STRING) AS BOOLEAN
     TRY
-        WRITEALL(pfad, JSON_STRINGIFY(j))
+        WRITEALL(pfad, JSON_STRINGIFY(dokumentNachJson(dok)))
     CATCH e
         RETURN FALSE
     END TRY
     RETURN TRUE
 END FUNCTION
 
-FUNCTION dokumentLaden(pfad AS STRING) AS Dokument
-    DIM j AS JSON_HANDLE : j = JSON_LOAD(pfad)
+' Einen JSON-Baum zurueck in ein Dokument (auch fuer Undo).
+FUNCTION dokumentAusJson(j AS JSON_HANDLE) AS Dokument
     DIM dok AS Dokument : dok = NEW Dokument()
     dok.blaetter = []
     IF JSON_HAS(j, "id") THEN dok.id = JSON_GET_STRING(j, "id")
@@ -114,4 +119,8 @@ FUNCTION dokumentLaden(pfad AS STRING) AS Dokument
         ARRAY_PUSH(dok.blaetter, bl)
     NEXT
     RETURN dok
+END FUNCTION
+
+FUNCTION dokumentLaden(pfad AS STRING) AS Dokument
+    RETURN dokumentAusJson(JSON_LOAD(pfad))
 END FUNCTION

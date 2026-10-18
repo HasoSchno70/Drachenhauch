@@ -1,0 +1,82 @@
+' Rueckgaengig / Wiederholen -- globaler Namensraum.
+'
+' Bewusst mit Schnappschuessen (das ganze Dokument als JSON-Text) statt mit
+' einzelnen Befehlen: SparkNodes Undo-Fehler kamen daher, dass Befehle nur
+' einen Teil des Zustands kannten (welches Blatt, Annotation ...). Ein
+' Schnappschuss kennt immer alles. Jede aendernde Aktion ruft VORHER
+' verlaufMerken() auf.
+IMPORT "json"
+
+CONST VERLAUF_MAX = 60
+
+DIM gUndo AS ARRAY OF STRING
+DIM gUndoBlatt AS ARRAY OF INTEGER
+DIM gRedo AS ARRAY OF STRING
+DIM gRedoBlatt AS ARRAY OF INTEGER
+
+FUNCTION aktuellerBlattIndex() AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gDok.blaetter) - 1
+        IF gDok.blaetter[i] = gBlatt THEN RETURN i
+    NEXT
+    RETURN 0
+END FUNCTION
+
+FUNCTION schnappschuss$() AS STRING
+    RETURN JSON_STRINGIFY(kern.dokumentNachJson(gDok))
+END FUNCTION
+
+' Den jetzigen Stand merken -- VOR einer Aenderung aufrufen.
+SUB verlaufMerken()
+    ARRAY_PUSH(gUndo, schnappschuss$())
+    ARRAY_PUSH(gUndoBlatt, aktuellerBlattIndex())
+    IF LEN(gUndo) > VERLAUF_MAX THEN
+        ARRAY_REMOVE_AT(gUndo, 0)
+        ARRAY_REMOVE_AT(gUndoBlatt, 0)
+    END IF
+    gRedo = []
+    gRedoBlatt = []
+    verlaufKnoepfeNachziehen()
+END SUB
+
+SUB verlaufRuecksetzen()
+    gUndo = []
+    gUndoBlatt = []
+    gRedo = []
+    gRedoBlatt = []
+    verlaufKnoepfeNachziehen()
+END SUB
+
+FUNCTION kannZurueck() AS BOOLEAN : RETURN LEN(gUndo) > 0 : END FUNCTION
+FUNCTION kannVor() AS BOOLEAN : RETURN LEN(gRedo) > 0 : END FUNCTION
+
+SUB wiederherstellen(json AS STRING, idx AS INTEGER)
+    gDok = kern.dokumentAusJson(JSON_PARSE(json))
+    IF idx < 0 OR idx >= LEN(gDok.blaetter) THEN idx = 0
+    gBlatt = gDok.blaetter[idx]
+    gHatGewaehlt = FALSE
+    gZieht = FALSE
+    gDrahtAktiv = FALSE
+    gDrahtPunkte = []
+    gGeaendert = TRUE
+    neuZeichnen()
+    titelNachziehen()
+    statusAktualisieren()
+    verlaufKnoepfeNachziehen()
+END SUB
+
+SUB verlaufZurueck()
+    IF NOT kannZurueck() THEN RETURN
+    ARRAY_PUSH(gRedo, schnappschuss$())
+    ARRAY_PUSH(gRedoBlatt, aktuellerBlattIndex())
+    DIM idx AS INTEGER : idx = ARRAY_POP(gUndoBlatt)
+    wiederherstellen(ARRAY_POP(gUndo), idx)
+END SUB
+
+SUB verlaufVor()
+    IF NOT kannVor() THEN RETURN
+    ARRAY_PUSH(gUndo, schnappschuss$())
+    ARRAY_PUSH(gUndoBlatt, aktuellerBlattIndex())
+    DIM idx AS INTEGER : idx = ARRAY_POP(gRedoBlatt)
+    wiederherstellen(ARRAY_POP(gRedo), idx)
+END SUB

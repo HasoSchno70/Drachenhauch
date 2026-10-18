@@ -28,6 +28,23 @@ DIM n AS kern.Netze : n = kern.netzeBerechnen(bl)
 PRINT "Pin1(1200,1000) ~ Drahtende(2000,1000)? "; n.gleich(1200, 1000, 2000, 1000); " (erwartet TRUE)"
 PRINT "Pin0(800,1000)  ~ Drahtende(2000,1000)? "; n.gleich(800, 1000, 2000, 1000); " (erwartet FALSE)"
 
+' Raster: "\" statt "/" (in Drachenhauch ist "/" immer Kommazahl)
+PRINT "rastern 0/49/50/149/-49/-50: "; kern.rastern(0, 100); " "; kern.rastern(49, 100); " "; kern.rastern(50, 100); " "; kern.rastern(149, 100); " "; kern.rastern(-49, 100); " "; kern.rastern(-50, 100); "  (erwartet 0 0 100 100 0 -100)"
+
+' Labels: Label A innen auf dem Draht (T), Label B frei bei (5000,5000),
+' beide "NETZ" -> Draht und B im selben Netz.
+DIM lb AS kern.Blatt : lb = NEW kern.Blatt("L")
+DIM w2 AS kern.Draht : w2 = NEW kern.Draht()
+ARRAY_PUSH(w2.punkte, NEW kern.Punkt(0, 0))
+ARRAY_PUSH(w2.punkte, NEW kern.Punkt(0, 1000))
+ARRAY_PUSH(lb.draehte, w2)
+ARRAY_PUSH(lb.labels, NEW kern.Label("NETZ", NEW kern.Punkt(0, 500), kern.LA_LOKAL))
+ARRAY_PUSH(lb.labels, NEW kern.Label("NETZ", NEW kern.Punkt(5000, 5000), kern.LA_LOKAL))
+DIM nl AS kern.Netze : nl = kern.netzeBerechnen(lb)
+PRINT "Label A ~ Drahtende (T)?   "; nl.gleich(0, 500, 0, 0); " (erwartet TRUE)"
+PRINT "Label A ~ Label B (Name)?  "; nl.gleich(0, 500, 5000, 5000); " (erwartet TRUE)"
+PRINT "Drahtende ~ Label B?       "; nl.gleich(0, 0, 5000, 5000); " (erwartet TRUE)"
+
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
 PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)

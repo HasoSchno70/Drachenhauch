@@ -13,6 +13,7 @@ CONST PI = 3.141592653589793
 CONST WZ_AUSWAHL = 0
 CONST WZ_DRAHT = 1
 CONST WZ_BAUTEIL = 2
+CONST WZ_LABEL = 3
 
 ' Farben (dunkles Thema)
 CONST C_HG = &H12131A
@@ -26,6 +27,7 @@ CONST C_WERT = &HE6E6F0
 CONST C_AUSWAHL = &HFF8A3D
 CONST C_GEIST = &H556070
 CONST C_KNOTEN = &H4FA3FF
+CONST C_LABEL = &H8FE0A0
 
 ' Fangradius in Einheiten (fuer Pin-/Drahtende-Fang)
 CONST FANG = 150
@@ -53,6 +55,10 @@ DIM gHatGewaehlt AS BOOLEAN
 DIM gZieht AS BOOLEAN
 DIM gZiehDX AS INTEGER
 DIM gZiehDY AS INTEGER
+DIM gZiehGemerkt AS BOOLEAN      ' Undo-Schnappschuss fuer diesen Zug schon genommen?
+
+DIM gLabelGewaehlt AS kern.Label ' Auswahl ist entweder ein Bauteil ODER ein Label
+DIM gHatLabel AS BOOLEAN
 
 DIM gPan AS BOOLEAN
 DIM gPanSX AS FLOAT
@@ -97,6 +103,7 @@ SUB leinwandDokument(d AS kern.Dokument)
     gDok = d
     gBlatt = d.blaetter[0]
     gHatGewaehlt = FALSE
+    gHatLabel = FALSE
     gDrahtAktiv = FALSE
     vEingepasst = FALSE
     neuZeichnen()
@@ -229,13 +236,50 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
         DIM geist AS kern.Bauteil : geist = kern.neuesBauteil(gSymbolRef, NEW kern.Lage(NEW kern.Punkt(gMausWX, gMausWY), gPlatzDreh, FALSE))
         bauteilZeichnen(cr, geist, TRUE, FALSE)
     END IF
+    ' Labels
+    FOR i = 0 TO LEN(gBlatt.labels) - 1
+        DIM lgew AS BOOLEAN : lgew = gHatLabel AND gBlatt.labels[i] = gLabelGewaehlt
+        labelZeichnen(cr, sx(gBlatt.labels[i].anker.x), sy(gBlatt.labels[i].anker.y), gBlatt.labels[i].text, IIF(lgew, C_AUSWAHL, C_LABEL))
+    NEXT
+    IF gWerkzeug = WZ_LABEL AND gMausDrin THEN
+        labelZeichnen(cr, sx(gMausWX), sy(gMausWY), "Label", C_GEIST)
+    END IF
     ' Fang-Markierung
-    IF gMausDrin AND (gWerkzeug = WZ_DRAHT) THEN
+    IF gMausDrin AND (gWerkzeug = WZ_DRAHT OR gWerkzeug = WZ_LABEL) THEN
         cairoFarbe(cr, C_PIN)
         cairo_arc(cr, sx(gMausWX), sy(gMausWY), 4, 0, 2 * PI)
         cairo_stroke(cr)
     END IF
     RETURN TRUE
+END FUNCTION
+
+' Ein Netz-Label: Punkt am elektrischen Anker, Text darueber, Unterstrich.
+' Der Text verschiebt den Anker nie (SparkNode-Lehre).
+CONST LABEL_DX = 6
+CONST LABEL_DY = 9
+CONST LABEL_ZEICHEN = 7              ' ungefaehre Breite je Zeichen (Treffer-Test)
+
+SUB labelZeichnen(cr AS INTEGER, ax AS FLOAT, ay AS FLOAT, text AS STRING, farbe AS INTEGER)
+    cairoFarbe(cr, farbe)
+    cairo_arc(cr, ax, ay, 3.5, 0, 2 * PI)
+    cairo_fill(cr)
+    cairo_set_line_width(cr, 1.2)
+    cairo_move_to(cr, ax, ay)
+    cairo_line_to(cr, ax + LABEL_DX + LEN(text) * LABEL_ZEICHEN, ay)
+    cairo_stroke(cr)
+    lwText(cr, ax + LABEL_DX, ay - LABEL_DY, text, farbe, FALSE)
+END SUB
+
+' Index des Labels unter dem Bildschirmpunkt (px, py), sonst -1.
+FUNCTION labelIndexUnter(px AS FLOAT, py AS FLOAT) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = LEN(gBlatt.labels) - 1 TO 0 STEP -1
+        DIM la AS kern.Label : la = gBlatt.labels[i]
+        DIM ax AS FLOAT : ax = sx(la.anker.x)
+        DIM ay AS FLOAT : ay = sy(la.anker.y)
+        IF px >= ax - 6 AND px <= ax + LABEL_DX + LEN(la.text) * LABEL_ZEICHEN + 6 AND py >= ay - 2 * LABEL_DY - 4 AND py <= ay + 6 THEN RETURN i
+    NEXT
+    RETURN -1
 END FUNCTION
 
 SUB einpassen(bw AS FLOAT, bh AS FLOAT)
@@ -254,7 +298,7 @@ SUB gitterZeichnen(cr AS INTEGER, bw AS FLOAT, bh AS FLOAT)
     DIM gx AS INTEGER : gx = startX
     WHILE sx(gx) < bw
         IF sx(gx) >= 0 THEN
-            IF (gx / kern.RASTER) MOD 10 = 0 THEN cairoFarbe(cr, C_RASTER_GROB) ELSE cairoFarbe(cr, C_RASTER)
+            IF (gx \ kern.RASTER) MOD 10 = 0 THEN cairoFarbe(cr, C_RASTER_GROB) ELSE cairoFarbe(cr, C_RASTER)
             cairo_move_to(cr, sx(gx), 0)
             cairo_line_to(cr, sx(gx), bh)
             cairo_stroke(cr)
@@ -264,7 +308,7 @@ SUB gitterZeichnen(cr AS INTEGER, bw AS FLOAT, bh AS FLOAT)
     DIM gy AS INTEGER : gy = startY
     WHILE sy(gy) < bh
         IF sy(gy) >= 0 THEN
-            IF (gy / kern.RASTER) MOD 10 = 0 THEN cairoFarbe(cr, C_RASTER_GROB) ELSE cairoFarbe(cr, C_RASTER)
+            IF (gy \ kern.RASTER) MOD 10 = 0 THEN cairoFarbe(cr, C_RASTER_GROB) ELSE cairoFarbe(cr, C_RASTER)
             cairo_move_to(cr, 0, sy(gy))
             cairo_line_to(cr, bw, sy(gy))
             cairo_stroke(cr)
@@ -349,8 +393,14 @@ SUB bauteilZeichnen(cr AS INTEGER, b AS kern.Bauteil, geist AS BOOLEAN, gewaehlt
         DIM tf AS INTEGER : tf = C_TEXT
         IF gewaehlt THEN tf = C_AUSWAHL
         IF NOT b.sym.einheitLeistung THEN
-            IF b.referenz <> "" THEN lwText(cr, sx(mitte.x), sy(mitte.y) - 34, b.referenz, tf, TRUE)
-            IF b.wert <> "" THEN lwText(cr, sx(mitte.x), sy(mitte.y) + 20, b.wert, C_WERT, TRUE)
+            IF b.lage.drehung = 90 OR b.lage.drehung = 270 THEN
+                ' senkrecht: Text daneben, sonst laege er auf den Pin-Stummeln
+                IF b.referenz <> "" THEN lwText(cr, sx(mitte.x) + 16, sy(mitte.y) - 8, b.referenz, tf, FALSE)
+                IF b.wert <> "" THEN lwText(cr, sx(mitte.x) + 16, sy(mitte.y) + 8, b.wert, C_WERT, FALSE)
+            ELSE
+                IF b.referenz <> "" THEN lwText(cr, sx(mitte.x), sy(mitte.y) - 34, b.referenz, tf, TRUE)
+                IF b.wert <> "" THEN lwText(cr, sx(mitte.x), sy(mitte.y) + 20, b.wert, C_WERT, TRUE)
+            END IF
         ELSE
             IF b.wert <> "" THEN lwText(cr, sx(mitte.x) + 14, sy(mitte.y) - 10, b.wert, tf, FALSE)
         END IF
