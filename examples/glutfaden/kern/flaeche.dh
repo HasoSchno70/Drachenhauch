@@ -186,3 +186,18 @@ FUNCTION kachelZelle(b AS INTEGER, h AS INTEGER, bw AS INTEGER, bh AS INTEGER, t
     DIM zh AS INTEGER : zh = FLOOR((bh - 30) / (h * ty))
     RETURN MAX(1, MIN(MIN(zw, zh), 12))
 END FUNCTION
+
+' Rollbalken der Zeichenflaeche (PySticky CanvasContainer._update_scrollbars):
+' Bereich -50 .. max(0, Muster - Sicht + 100) in Pixeln, Seite = Sicht, Wert =
+' minus die Lage des Musters. Liefert (unten, oben, seite, wert). Anders als
+' dort waechst der Bereich mit, wenn das Muster weiter verschoben ist (Hand,
+' Mausrad, Pfeile): Qt klemmte den Wert still an den Rand, und der erste Griff
+' an den Balken liess das Muster dorthin springen.
+FUNCTION rollBereich(musterPx AS FLOAT, sichtPx AS FLOAT, lage AS FLOAT) AS TUPLE
+    DIM unten AS FLOAT : unten = -50
+    DIM oben AS FLOAT : oben = MAX(0, musterPx - sichtPx + 100)
+    DIM wert AS FLOAT : wert = -lage
+    unten = MIN(unten, wert)
+    oben = MAX(oben, wert)
+    RETURN (unten, oben, sichtPx, wert)
+END FUNCTION

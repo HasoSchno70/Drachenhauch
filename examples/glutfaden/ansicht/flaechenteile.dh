@@ -16,6 +16,9 @@ DIM flUeber AS INTEGER                ' Lineal-Position unter der Maus (-1 = kei
 DIM flUeberLinks AS BOOLEAN           ' ... auf dem linken Lineal
 DIM flStand AS STRING                 ' zuletzt gezeichnet: Lage, Zelle, Maus, Groesse
 DIM flSchrift AS INTEGER
+DIM flRollW AS INTEGER                ' GtkAdjustment waagerecht / senkrecht
+DIM flRollS AS INTEGER
+DIM flRollSperre AS BOOLEAN
 
 ' --- Lineale ----------------------------------------------------------------------------
 
@@ -52,6 +55,17 @@ FUNCTION flaecheMitLinealen(flaeche AS INTEGER) AS INTEGER
     gtk_grid_attach(flRaster, flOben, 1, 0, 1, 1)
     gtk_grid_attach(flRaster, flLinks, 0, 1, 1, 1)
     gtk_grid_attach(flRaster, flaeche, 1, 1, 1, 1)
+    ' Rollbalken (PySticky CanvasContainer): rechts und unten
+    flRollW = gtk_adjustment_new(0, 0, 1, 20, 100, 1)
+    flRollS = gtk_adjustment_new(0, 0, 1, 20, 100, 1)
+    signal(flRollW, "value-changed", flGerollt, 0, 0, 0)
+    signal(flRollS, "value-changed", flGerollt, 1, 0, 0)
+    DIM rw AS INTEGER : rw = gtk_scrollbar_new(GTK_WAAGERECHT, flRollW)
+    DIM rs AS INTEGER : rs = gtk_scrollbar_new(GTK_SENKRECHT, flRollS)
+    gtk_widget_set_can_focus(rw, FALSE)
+    gtk_widget_set_can_focus(rs, FALSE)
+    gtk_grid_attach(flRaster, rs, 2, 1, 1, 1)
+    gtk_grid_attach(flRaster, rw, 1, 2, 1, 1)
     flUeber = -1
     flSchrift = pango_font_description_from_string("DejaVu Sans 8")
     RETURN flRaster
@@ -66,9 +80,30 @@ SUB flaecheNachziehen()
         STR$(gtk_widget_get_allocated_width(lwFlaeche)) + "|" + STR$(gtk_widget_get_allocated_height(lwFlaeche)) + "|" + STR$(einst.rasterHaupt)
     IF s = flStand THEN RETURN
     flStand = s
+    flRollNachziehen()
     IF flOben <> 0 THEN gtk_widget_queue_draw(flOben)
     IF flLinks <> 0 THEN gtk_widget_queue_draw(flLinks)
     IF mkFeld <> 0 THEN gtk_widget_queue_draw(mkFeld)
+END SUB
+
+' Die Rollbalken auf Lage und Zoom der Flaeche setzen (ohne zurueckzuschreiben)
+SUB flRollNachziehen()
+    IF flRollW = 0 OR NOT lwHat THEN RETURN
+    DIM bw AS FLOAT : bw = gtk_widget_get_allocated_width(lwFlaeche)
+    DIM bh AS FLOAT : bh = gtk_widget_get_allocated_height(lwFlaeche)
+    DIM u AS FLOAT, o AS FLOAT, s AS FLOAT, v AS FLOAT
+    flRollSperre = TRUE
+    (u, o, s, v) = kern.rollBereich(lwMuster.breite * lwZelle, bw, lwX)
+    gtk_adjustment_configure(flRollW, v, u, o + s, 20, s * 0.9, s)
+    (u, o, s, v) = kern.rollBereich(lwMuster.hoehe * lwZelle, bh, lwY)
+    gtk_adjustment_configure(flRollS, v, u, o + s, 20, s * 0.9, s)
+    flRollSperre = FALSE
+END SUB
+
+SUB flGerollt(a AS INTEGER, senkrecht AS INTEGER)
+    IF flRollSperre OR NOT lwHat THEN RETURN
+    IF senkrecht = 1 THEN lwY = -gtk_adjustment_get_value(a) ELSE lwX = -gtk_adjustment_get_value(a)
+    gtk_widget_queue_draw(lwFlaeche)
 END SUB
 
 SUB flLinealeZeigen(an AS BOOLEAN)

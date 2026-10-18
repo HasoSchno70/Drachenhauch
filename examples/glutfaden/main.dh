@@ -637,6 +637,9 @@ FUNCTION taste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
         befehlAusfuehren(einstTafel[k])
         RETURN TRUE
     END IF
+    IF NOT strg AND NOT alt AND NOT umschalt THEN
+        IF leinwandPfeil(t) THEN RETURN TRUE
+    END IF
     RETURN werkzeugTaste(t, strg, alt)
 END FUNCTION
 

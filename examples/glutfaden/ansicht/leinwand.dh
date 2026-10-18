@@ -625,6 +625,26 @@ FUNCTION ansichtAn(was AS INTEGER) AS BOOLEAN
     RETURN lwMittelkreuz
 END FUNCTION
 
+' Pfeiltasten schieben die Flaeche um 20 Punkte (PySticky keyPressEvent) --
+' nur, wenn die Flaeche den Fokus hat oder gar nichts: in einer Liste, einem
+' Feld oder einer Klappliste gehoeren die Pfeile dem Element.
+CONST LW_PFEILSCHRITT = 20
+
+FUNCTION leinwandPfeil(t AS INTEGER) AS BOOLEAN
+    IF NOT lwHat THEN RETURN FALSE
+    DIM f AS INTEGER : f = gtk_window_get_focus(fenster)
+    IF f <> 0 AND f <> lwFlaeche THEN RETURN FALSE
+    SELECT CASE t
+        CASE &HFF51 : lwX = lwX + LW_PFEILSCHRITT          ' links: das Muster wandert nach rechts
+        CASE &HFF53 : lwX = lwX - LW_PFEILSCHRITT
+        CASE &HFF52 : lwY = lwY + LW_PFEILSCHRITT          ' hoch
+        CASE &HFF54 : lwY = lwY - LW_PFEILSCHRITT
+        CASE ELSE : RETURN FALSE
+    END SELECT
+    gtk_widget_queue_draw(lwFlaeche)
+    RETURN TRUE
+END FUNCTION
+
 ' Ein Kaestchen mit besonderem Stichtyp an (px, py), Groesse z.
 SUB lwSonderstich(cr AS INTEGER, px AS FLOAT, py AS FLOAT, z AS FLOAT, t AS INTEGER, farbe AS INTEGER)
     cairoFarbe(cr, einst.stoff)
