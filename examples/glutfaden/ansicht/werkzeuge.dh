@@ -273,6 +273,9 @@ SUB farbeWaehlen(nr AS INTEGER)
     IF NOT lwHat THEN RETURN
     IF nr >= lwMuster.farbanzahl() THEN nr = -1
     wzFarbe = nr
+    ' Einstellungen -> Farben -> "Gewählte Farbe hervorheben" (highlight_selected):
+    ' jede gewaehlte Farbe wie mit Strg+H isolieren
+    IF einst.hervorheben AND nr >= 0 AND nr <> lwHervor THEN farbeHervorheben(nr)
     seitenleisteFarbeMarkieren()
     farbleisteMarkieren()
     IF wzFarbeLeiste <> 0 THEN gtk_widget_queue_draw(wzFarbeLeiste)

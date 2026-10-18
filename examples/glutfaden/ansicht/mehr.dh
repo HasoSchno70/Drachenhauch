@@ -513,11 +513,11 @@ END SUB
 ' waehlen auf 2000 x 2000 waeren sonst vier Millionen Zellen je Bild).
 SUB mehrMaskeZeichnen(cr AS INTEGER, a AS kern.Auswahl, dx AS INTEGER, dy AS INTEGER)
     DIM z AS FLOAT : z = lwZelle
-    cairo_set_line_width(cr, 2.0)
-    cairo_set_source_rgba(cr, 1.0, 0.54, 0.24, 0.95)
+    mrAmeisenStarten()
+    cairo_new_path(cr)
     IF a.istRechteck THEN
         cairo_rectangle(cr, lwX + (a.x0 + dx) * z, lwY + (a.y0 + dy) * z, (a.x1 - a.x0 + 1) * z, (a.y1 - a.y0 + 1) * z)
-        cairo_stroke(cr)
+        mrAmeisenStriche(cr)
         RETURN
     END IF
     DIM bw AS FLOAT : bw = gtk_widget_get_allocated_width(lwFlaeche)
@@ -550,5 +550,50 @@ SUB mehrMaskeZeichnen(cr AS INTEGER, a AS kern.Auswahl, dx AS INTEGER, dy AS INT
             END IF
         NEXT
     NEXT
+    mrAmeisenStriche(cr)
+END SUB
+
+' --- Laufende Auswahlkante (marching_ants) ------------------------------------------
+' Wie PySticky: zwei gegenlaeufige Strichel (8 Punkte an, 8 aus) in Glut und
+' Dunkel, so ist die Kante auf jedem Grund zu sehen. Laeuft die Kante, rueckt
+' sie alle 120 ms um zwei Punkte weiter -- nur solange eine Auswahl da ist
+' und ein Auswahlwerkzeug gewaehlt (bei jedem anderen waere es nur
+' Zeichenarbeit fuer nichts); ohne die Einstellung steht sie still.
+
+DIM mrAmeisenStand AS INTEGER        ' 0..7, Versatz in Schritten zu zwei Punkten
+DIM mrAmeisenNr AS INTEGER           ' laufender Takt, 0 = keiner
+
+FUNCTION mrAmeisenLaufen() AS BOOLEAN
+    IF NOT einst.ameisen OR mrAuswahl IS NIL OR NOT lwHat THEN RETURN FALSE
+    RETURN wzAktiv = WZ_AUSWAHL OR wzAktiv = WZ_LASSO
+END FUNCTION
+
+SUB mrAmeisenStarten()
+    IF mrAmeisenNr = 0 AND mrAmeisenLaufen() THEN mrAmeisenNr = g_timeout_add(120, mrAmeisenTakt, 0)
+END SUB
+
+FUNCTION mrAmeisenTakt(daten AS INTEGER) AS BOOLEAN
+    IF NOT mrAmeisenLaufen() THEN
+        mrAmeisenNr = 0
+        RETURN FALSE
+    END IF
+    mrAmeisenStand = (mrAmeisenStand + 1) MOD 8
+    gtk_widget_queue_draw(lwFlaeche)
+    RETURN TRUE
+END FUNCTION
+
+' Den Pfad zweimal strichen; er ist danach verbraucht
+SUB mrAmeisenStriche(cr AS INTEGER)
+    DIM b AS BUFFER : b = BUFFER_NEW(16)
+    BUFFER_SET_F64(b, 0, 8.0)
+    BUFFER_SET_F64(b, 8, 8.0)
+    DIM v AS FLOAT : v = IIF(einst.ameisen, mrAmeisenStand * 2.0, 0.0)
+    cairo_set_line_width(cr, 2.0)
+    cairo_set_dash(cr, BUFFER_ZEIGER(b), 2, v)
+    cairo_set_source_rgba(cr, 1.0, 0.54, 0.24, 0.95)
+    cairo_stroke_preserve(cr)
+    cairo_set_dash(cr, BUFFER_ZEIGER(b), 2, v + 8.0)
+    cairo_set_source_rgba(cr, 0.10, 0.10, 0.18, 0.95)
     cairo_stroke(cr)
+    cairo_set_dash(cr, 0, 0, 0.0)
 END SUB

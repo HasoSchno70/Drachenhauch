@@ -1,0 +1,364 @@
+' Glutfaden Stufe 22: Kleinigkeiten aus PySticky -- laufende Auswahlkante
+' (marching_ants), Aida-Punkt in leeren Zellen (fabric_texture), ein Garn aus
+' dem Katalog auf die Farbleiste ziehen, Ebenen in der Liste verschieben oder
+' zusammenfuehren (ansicht/ziehen.dh, kern.ebenenZug,
+' kern.ebenenZusammenfuehren), eigene Ordner fuer Bibliothek und Vorlagen,
+' "Gewaehlte Farbe hervorheben", Stickzeit abschaltbar und "Neu in Glutfaden".
+'
+' Der erste Fall ist gegen PySticky aufgezeichnet: je Zug die Entscheidung aus
+' LayerListWidget.dragMoveEvent/dropEvent (woertlich uebernommen -- sie
+' braucht ein QListWidget mit echtem Ziehen) und ihre Ausfuehrung mit
+' PyStickys Kern (LayerStack.move_layer_to/merge_layers), dazu der Abzug der
+' Ebenen wie in Stufe 20.
+
+=== ebenen ziehen wie pysticky
+IMPORT "helfer.dh"
+FUNCTION kurz$(t AS STRING) AS STRING
+    RETURN LEFT$(LOWER$(MD5$(t)), 12)
+END FUNCTION
+
+SUB abzug(m AS kern.Muster)
+    DIM i AS INTEGER, x AS INTEGER, y AS INTEGER
+    FOR i = 0 TO m.ebenen.anzahl() - 1
+        DIM e AS kern.Ebene : e = m.ebenen.ebenen[i]
+        DIM z AS ARRAY OF STRING : z = []
+        FOR y = 0 TO m.hoehe - 1
+            FOR x = 0 TO m.breite - 1
+                DIM q AS INTEGER : q = y * m.breite + x
+                IF e.raster[q] < 0 THEN CONTINUE
+                ARRAY_PUSH(z, STR$(x) + "," + STR$(y) + "," + STR$(e.raster[q]) + "," + STR$(e.art[q]) + "," + STR$(IIF(e.erledigt[q] <> 0, 1, 0)))
+            NEXT
+        NEXT
+        PRINT "  ebene "; i; " "; e.name; ": "; LEN(z); " "; kurz$(JOIN$(z, ";"))
+    NEXT
+END SUB
+
+SUB zuege(pfad AS STRING, liste AS ARRAY OF STRING)
+    DIM spec AS STRING
+    FOR EACH spec IN liste
+        DIM m AS kern.Muster : m = kern.pxsLaden(pfad)
+        DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+        DIM t AS ARRAY OF STRING : t = SPLIT$(spec, ",")
+        DIM art AS INTEGER, a AS INTEGER, b AS INTEGER
+        (art, a, b) = kern.ebenenZug(m.ebenen.anzahl(), VAL(t[0]), VAL(t[1]), VAL(t[2]))
+        DIM ok AS BOOLEAN : ok = FALSE
+        IF art = 1 THEN ok = kern.ebeneVerschieben(m, v, a, b)
+        IF art = 2 THEN ok = kern.ebenenZusammenfuehren(m, v, a, b)
+        DIM namen AS ARRAY OF STRING : namen = []
+        DIM e AS kern.Ebene
+        FOR EACH e IN m.ebenen.ebenen
+            ARRAY_PUSH(namen, e.name)
+        NEXT
+        PRINT BASENAME(pfad); " "; spec; ": "; ["nichts", "verschieben", "zusammen"][art]; " "; IIF(ok, "True", "False"); " | "; JOIN$(namen, " "); " | aktiv "; m.ebenen.aktiv
+        abzug(m)
+    NEXT
+END SUB
+
+zuege("alle.pxs", ["0,1,0.5", "0,2,0.5", "2,0,0.5", "1,1,0.5", "0,1,0.1", "0,1,0.9", "0,2,0.9", "2,0,0.1", "2,-1,0", "0,-1,0", "1,0,0.26", "1,0,0.74", "1,2,0.24", "1,2,0.76", "2,1,0.25", "2,1,0.75"])
+zuege("farbprobe.pxs", ["0,1,0.5", "0,2,0.5", "1,2,0.5", "1,0,0.5", "1,0,0.1", "0,1,0.9", "2,0,0.2"])
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- datei alle.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- datei farbprobe.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T17:40:16.211663","pattern":{"name":"Farbprobe","width":12,"height":9,"fabric_count":14,"metadata":{},"colors":[{"name":"rot","color":"#C81E28","manufacturer":"DMC","catalog_number":"321","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"e218043a"},{"name":"Blau","color":"#2846BE","manufacturer":"Anchor","catalog_number":"132","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b1845328"},{"name":"grün","color":"#28A046","manufacturer":"","catalog_number":"","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"d04ed6fa"},{"name":"Gelb","color":"#F0D21E","manufacturer":"DMC","catalog_number":"444","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"2d3927c7"},{"name":"blau","color":"#2846BE","manufacturer":"DMC","catalog_number":"820","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"1556fc18"},{"name":"Perle Gold","color":"#C8A03C","manufacturer":"Mill Hill","catalog_number":"00557","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":true,"is_diamond":false,"color_id":"1631db04"},{"name":"Drill Weiss","color":"#FAFAFA","manufacturer":"DMC Diamond","catalog_number":"B5200","symbol":"◆","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":true,"color_id":"f5c8425d"},{"name":"Ungenutzt","color":"#0A0A0A","manufacturer":"DMC","catalog_number":"310","symbol":"◇","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"ba5fb24e"},{"name":"Zimt","color":"#A05A28","manufacturer":"Madeira","catalog_number":"2306","symbol":"★","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"f3660dd9"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,1],[3,0,4],[4,0,0],[5,0,1],[7,0,3],[8,0,8],[9,0,2],[11,0,0],[0,1,4],[1,1,8],[2,1,8],[3,1,8],[5,1,1],[6,1,0],[7,1,1],[8,1,2],[9,1,5],[10,1,8],[0,2,3],[1,2,5],[2,2,3],[3,2,5],[6,2,8],[7,2,8],[8,2,8],[9,2,3],[2,3,6],[3,3,0],[4,3,5],[6,3,3],[7,3,0],[8,3,8],[9,3,8],[10,3,0],[11,3,4],[0,4,4],[1,4,8],[3,4,0],[4,4,1],[5,4,0],[6,4,3],[7,4,8],[8,4,0],[9,4,0],[0,5,0],[2,5,1],[3,5,8],[4,5,4],[5,5,0],[6,5,6],[7,5,0],[8,5,8],[9,5,6],[10,5,5],[11,5,0],[2,6,0],[3,6,2],[4,6,4],[5,6,0],[6,6,4],[8,6,4],[9,6,5],[10,6,6],[11,6,3],[0,7,2],[2,7,0],[3,7,4],[4,7,3],[5,7,3],[7,7,2],[8,7,5],[9,7,8],[10,7,0],[11,7,0],[0,8,5],[1,8,0],[2,8,0],[4,8,5],[5,8,8],[6,8,8],[7,8,8],[8,8,8],[9,8,2],[10,8,2],[11,8,3]],"completed_stitches":[[3,1],[10,1],[1,2],[8,2],[9,2],[2,3],[9,3],[5,5],[7,5],[9,5],[0,7],[5,7],[9,7],[0,8],[1,8],[6,8],[8,8],[10,8]],"stitch_types":[[1,0,9],[2,0,1],[4,0,1],[11,0,3],[1,1,1],[2,1,7],[3,1,1],[5,1,2],[6,1,3],[8,1,1],[9,1,10],[10,1,7],[0,2,2],[1,2,10],[3,2,10],[6,2,7],[7,2,1],[8,2,1],[2,3,11],[3,3,2],[4,3,10],[7,3,3],[8,3,3],[9,3,1],[10,3,3],[11,3,2],[3,4,2],[4,4,7],[6,4,7],[0,5,2],[2,5,9],[3,5,1],[6,5,11],[9,5,11],[10,5,10],[11,5,2],[3,6,7],[5,6,7],[6,6,2],[9,6,10],[10,6,11],[11,6,7],[0,7,9],[2,7,7],[4,7,9],[7,7,7],[8,7,10],[9,7,1],[0,8,10],[2,8,2],[4,8,10],[5,8,2],[6,8,1],[7,8,9],[8,8,2],[9,8,1]]},{"name":"Oben","visible":true,"locked":true,"opacity":1.0,"stitches":[[0,0,0],[3,0,1],[4,0,3],[10,0,0],[4,2,3],[5,3,1],[8,3,1],[11,3,4],[2,4,0],[4,4,2],[7,4,2],[11,4,0],[0,5,5],[4,5,1],[5,5,1],[6,5,8],[11,5,5],[1,6,8],[5,6,2],[7,6,5],[10,6,2],[11,6,0],[0,7,8],[8,7,3],[3,8,6],[4,8,8]],"completed_stitches":[[4,2],[8,3],[7,4],[11,4],[0,5],[11,5],[0,7]],"stitch_types":[[4,0,1],[10,0,7],[11,3,1],[2,4,9],[4,4,2],[7,4,3],[0,5,10],[5,5,2],[6,5,9],[11,5,10],[1,6,7],[7,6,10],[10,6,3],[11,6,2],[8,7,7],[3,8,11],[4,8,9]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,0,5],[1,0,2],[8,0,0],[0,1,4],[1,1,1],[5,1,2],[8,1,0],[10,1,3],[3,2,3],[5,2,8],[6,2,0],[10,2,4],[1,3,2],[1,4,8],[3,4,8],[4,4,0],[11,4,6],[9,6,5],[2,7,1],[8,7,3],[11,7,6],[4,8,2],[6,8,8],[10,8,2]],"completed_stitches":[[0,0],[8,1],[10,1],[1,4],[4,4],[9,6],[8,7]],"stitch_types":[[0,0,10],[8,0,1],[1,1,7],[5,1,3],[8,1,1],[3,2,1],[5,2,3],[6,2,9],[10,2,3],[1,3,7],[1,4,3],[3,4,1],[11,4,11],[9,6,10],[8,7,7],[11,7,11],[4,8,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":6,"y2":6,"color_index":0},{"x1":2,"y1":2,"x2":8,"y2":2,"color_index":2},{"x1":4,"y1":0,"x2":4,"y2":10,"color_index":4},{"x1":1,"y1":9,"x2":9,"y2":1,"color_index":8},{"x1":3,"y1":3,"x2":5,"y2":7,"color_index":1}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- erwartet
+alle.pxs 0,1,0.5: zusammen True | Hintergrund Oben | aktiv 1
+  ebene 0 Hintergrund: 96 e655bda85366
+  ebene 1 Oben: 18 fe9a3e5385eb
+alle.pxs 0,2,0.5: zusammen True | Hintergrund Oben | aktiv 0
+  ebene 0 Hintergrund: 98 91fa421b1acb
+  ebene 1 Oben: 5 fc577b184818
+alle.pxs 2,0,0.5: zusammen True | Oben Versteckt | aktiv 1
+  ebene 0 Oben: 5 fc577b184818
+  ebene 1 Versteckt: 98 e41722b93ce2
+alle.pxs 1,1,0.5: nichts False | Hintergrund Oben Versteckt | aktiv 2
+  ebene 0 Hintergrund: 96 e655bda85366
+  ebene 1 Oben: 5 fc577b184818
+  ebene 2 Versteckt: 14 1806d1496e68
+alle.pxs 0,1,0.1: nichts False | Hintergrund Oben Versteckt | aktiv 2
+  ebene 0 Hintergrund: 96 e655bda85366
+  ebene 1 Oben: 5 fc577b184818
+  ebene 2 Versteckt: 14 1806d1496e68
+alle.pxs 0,1,0.9: verschieben True | Hintergrund Versteckt Oben | aktiv 1
+  ebene 0 Hintergrund: 96 e655bda85366
+  ebene 1 Versteckt: 14 1806d1496e68
+  ebene 2 Oben: 5 fc577b184818
+alle.pxs 0,2,0.9: verschieben True | Versteckt Hintergrund Oben | aktiv 0
+  ebene 0 Versteckt: 14 1806d1496e68
+  ebene 1 Hintergrund: 96 e655bda85366
+  ebene 2 Oben: 5 fc577b184818
+alle.pxs 2,0,0.1: verschieben True | Oben Versteckt Hintergrund | aktiv 1
+  ebene 0 Oben: 5 fc577b184818
+  ebene 1 Versteckt: 14 1806d1496e68
+  ebene 2 Hintergrund: 96 e655bda85366
+alle.pxs 2,-1,0: nichts False | Hintergrund Oben Versteckt | aktiv 2
+  ebene 0 Hintergrund: 96 e655bda85366
+  ebene 1 Oben: 5 fc577b184818
+  ebene 2 Versteckt: 14 1806d1496e68
+alle.pxs 0,-1,0: verschieben True | Versteckt Hintergrund Oben | aktiv 0
+  ebene 0 Versteckt: 14 1806d1496e68
+  ebene 1 Hintergrund: 96 e655bda85366
+  ebene 2 Oben: 5 fc577b184818
+alle.pxs 1,0,0.26: zusammen True | Hintergrund Versteckt | aktiv 1
+  ebene 0 Hintergrund: 96 e655bda85366
+  ebene 1 Versteckt: 18 d8a917cf687a
+alle.pxs 1,0,0.74: zusammen True | Hintergrund Versteckt | aktiv 1
+  ebene 0 Hintergrund: 96 e655bda85366
+  ebene 1 Versteckt: 18 d8a917cf687a
+alle.pxs 1,2,0.24: nichts False | Hintergrund Oben Versteckt | aktiv 2
+  ebene 0 Hintergrund: 96 e655bda85366
+  ebene 1 Oben: 5 fc577b184818
+  ebene 2 Versteckt: 14 1806d1496e68
+alle.pxs 1,2,0.76: verschieben True | Oben Hintergrund Versteckt | aktiv 2
+  ebene 0 Oben: 5 fc577b184818
+  ebene 1 Hintergrund: 96 e655bda85366
+  ebene 2 Versteckt: 14 1806d1496e68
+alle.pxs 2,1,0.25: verschieben True | Oben Hintergrund Versteckt | aktiv 2
+  ebene 0 Oben: 5 fc577b184818
+  ebene 1 Hintergrund: 96 e655bda85366
+  ebene 2 Versteckt: 14 1806d1496e68
+alle.pxs 2,1,0.75: nichts False | Hintergrund Oben Versteckt | aktiv 2
+  ebene 0 Hintergrund: 96 e655bda85366
+  ebene 1 Oben: 5 fc577b184818
+  ebene 2 Versteckt: 14 1806d1496e68
+farbprobe.pxs 0,1,0.5: zusammen False | Hintergrund Oben Versteckt | aktiv 2
+  ebene 0 Hintergrund: 86 27f17ee85d24
+  ebene 1 Oben: 26 de13a28d9a4a
+  ebene 2 Versteckt: 24 7433260cdd51
+farbprobe.pxs 0,2,0.5: zusammen True | Hintergrund Oben | aktiv 0
+  ebene 0 Hintergrund: 91 c2950f063a26
+  ebene 1 Oben: 26 de13a28d9a4a
+farbprobe.pxs 1,2,0.5: zusammen False | Hintergrund Oben Versteckt | aktiv 2
+  ebene 0 Hintergrund: 86 27f17ee85d24
+  ebene 1 Oben: 26 de13a28d9a4a
+  ebene 2 Versteckt: 24 7433260cdd51
+farbprobe.pxs 1,0,0.5: zusammen False | Hintergrund Oben Versteckt | aktiv 2
+  ebene 0 Hintergrund: 86 27f17ee85d24
+  ebene 1 Oben: 26 de13a28d9a4a
+  ebene 2 Versteckt: 24 7433260cdd51
+farbprobe.pxs 1,0,0.1: verschieben True | Hintergrund Versteckt Oben | aktiv 1
+  ebene 0 Hintergrund: 86 27f17ee85d24
+  ebene 1 Versteckt: 24 7433260cdd51
+  ebene 2 Oben: 26 de13a28d9a4a
+farbprobe.pxs 0,1,0.9: verschieben True | Hintergrund Versteckt Oben | aktiv 1
+  ebene 0 Hintergrund: 86 27f17ee85d24
+  ebene 1 Versteckt: 24 7433260cdd51
+  ebene 2 Oben: 26 de13a28d9a4a
+farbprobe.pxs 2,0,0.2: verschieben True | Oben Versteckt Hintergrund | aktiv 1
+  ebene 0 Oben: 26 de13a28d9a4a
+  ebene 1 Versteckt: 24 7433260cdd51
+  ebene 2 Hintergrund: 86 27f17ee85d24
+
+=== kern: entscheidung, ziehtext, zusammenfuehren, neuigkeiten, einstellungen, ordner
+IMPORT "helfer.dh"
+' Die Entscheidung an den Raendern
+DIM art AS INTEGER, a AS INTEGER, b AS INTEGER
+(art, a, b) = kern.ebenenZug(1, 0, -1, 0.0)
+PRINT "eine ebene, darunter: "; art; " "; a; " "; b
+(art, a, b) = kern.ebenenZug(3, 3, 0, 0.5)
+PRINT "quelle ausserhalb: "; art;
+(art, a, b) = kern.ebenenZug(3, 0, 3, 0.5)
+PRINT " | ziel ausserhalb: "; art;
+(art, a, b) = kern.ebenenZug(3, -1, 0, 0.5)
+PRINT " | quelle -1: "; art
+(art, a, b) = kern.ebenenZug(4, 3, 0, 0.0)
+PRINT "unterste nach ganz oben: "; art; " "; a; " -> "; b;
+(art, a, b) = kern.ebenenZug(4, 0, -1, 0.0)
+PRINT " | oberste nach ganz unten: "; art; " "; a; " -> "; b
+' Der Text, mit dem gezogen wird
+PRINT kern.ziehText$("garn", 2, 117); " | "; kern.ziehText$("ebene", 1, 0)
+DIM w AS STRING, x AS INTEGER, y AS INTEGER
+DIM t AS STRING
+FOR EACH t IN ["glutfaden:garn:2:117", " glutfaden:ebene:1:0 ", "hallo", "glutfaden:garn:1", "glutfaden:x:1:2", "glutfaden:garn:-1:2", "glutfaden:garn:1:2:3", "file:///c/a.pxs", "glutfaden:garn:1.5:2"]
+    (w, x, y) = kern.ziehLesen(t)
+    PRINT "'"; t; "' -> '"; w; "' "; x; " "; y
+NEXT
+' Zusammenfuehren: Rueckgaengig, Wiederholen, was abgelehnt wird
+DIM m AS kern.Muster : m = kern.pxsLaden("alle.pxs")
+m.stichzahlenNeu()
+DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+DIM zahlen AS STRING : zahlen = ""
+DIM f AS kern.Farbeintrag
+FOR EACH f IN m.farben
+    zahlen = zahlen + STR$(f.stichzahl) + ","
+NEXT
+PRINT "vorher: ebenen "; m.ebenen.anzahl(); " aktiv "; m.ebenen.aktiv; " | stiche "; zahlen
+PRINT "versteckt auf hintergrund: "; kern.ebenenZusammenfuehren(m, v, 2, 0); " | ebenen "; m.ebenen.anzahl(); " aktiv "; m.ebenen.aktiv; " | unten "; m.ebenen.ebenen[0].stichzahl(); " | '"; v.textZurueck$(); "'"
+zahlen = ""
+FOR EACH f IN m.farben
+    zahlen = zahlen + STR$(f.stichzahl) + ","
+NEXT
+PRINT "  stiche "; zahlen
+PRINT "zurueck: "; v.zurueckNehmen(m); " | ebenen "; m.ebenen.anzahl(); " aktiv "; m.ebenen.aktiv; " | "; m.ebenen.ebenen[0].stichzahl(); " "; m.ebenen.ebenen[2].stichzahl()
+PRINT "wieder: "; v.wiederholen(m); " | ebenen "; m.ebenen.anzahl(); " aktiv "; m.ebenen.aktiv; " | "; m.ebenen.ebenen[0].stichzahl()
+DIM schritte AS INTEGER : schritte = LEN(v.rueck)
+PRINT "dieselbe: "; kern.ebenenZusammenfuehren(m, v, 1, 1); " | ausserhalb: "; kern.ebenenZusammenfuehren(m, v, 0, 5); " | schritte gleich "; LEN(v.rueck) = schritte
+m.ebenen.ebenen[1].gesperrt = TRUE
+PRINT "gesperrtes ziel: "; kern.ebenenZusammenfuehren(m, v, 0, 1); " | gesperrte quelle: "; kern.ebenenZusammenfuehren(m, v, 1, 0)
+m.ebenen.ebenen[1].gesperrt = FALSE
+PRINT "aktiv bleibt dieselbe: aktiv "; m.ebenen.aktiv; " '"; m.ebenen.aktiveEbene().name; "' -> ";
+DIM ok AS BOOLEAN : ok = kern.ebenenZusammenfuehren(m, v, 1, 0)
+PRINT m.ebenen.aktiv; " '"; m.ebenen.aktiveEbene().name; "' | nur noch eine: "; kern.ebenenZusammenfuehren(m, v, 0, 0)
+' Neu in Glutfaden
+DIM ti AS ARRAY OF STRING, te AS ARRAY OF STRING
+(ti, te) = kern.neuigkeitenLesen("neu.txt")
+PRINT "neuigkeiten: "; LEN(ti); " | "; JOIN$(ti, " / ")
+DIM k AS INTEGER
+FOR k = 0 TO LEN(te) - 1
+    PRINT "  "; k; ": "; REPLACE$(te[k], CHR$(10), "|")
+NEXT
+(ti, te) = kern.neuigkeitenLesen("gibtsnicht.txt")
+PRINT "ohne datei: "; LEN(ti); " "; LEN(te)
+(ti, te) = kern.neuigkeitenLesen(GLUTORDNER + "/daten/neuigkeiten.txt")
+PRINT "die echte: oben '"; ti[0]; "' | jeder abschnitt hat text "; ARRAY_INDEXOF(te, "") < 0
+' Die neuen Einstellungen
+DIM es AS kern.Einstellungen : es = NEW kern.Einstellungen()
+PRINT "vorgaben: "; es.ameisen; " "; es.stoffTextur; " "; es.stickzeit; " "; es.hervorheben; " '"; es.bibliothekPfad; "' '"; es.vorlagenPfad; "'"
+es.ameisen = FALSE : es.stoffTextur = FALSE : es.stickzeit = FALSE : es.hervorheben = TRUE
+es.bibliothekPfad = "C:/Muster/Bib" : es.vorlagenPfad = "/home/x/vorlagen"
+WRITEALL("es.json", kern.einstellungenJson$(es))
+DIM z AS STRING
+FOR EACH z IN READLINES("es.json")
+    IF INSTR(z, "marching") >= 0 OR INSTR(z, "fabric") >= 0 OR INSTR(z, "stitch_timer") >= 0 OR INSTR(z, "highlight") >= 0 OR INSTR(z, "library_path") >= 0 OR INSTR(z, "templates_path") >= 0 THEN PRINT TRIM$(z)
+NEXT
+DIM g AS kern.Einstellungen : g = kern.einstellungenLaden("es.json")
+PRINT "gelesen: "; g.ameisen; " "; g.stoffTextur; " "; g.stickzeit; " "; g.hervorheben; " '"; g.bibliothekPfad; "' '"; g.vorlagenPfad; "'"
+WRITEALL("krumm.json", "{" + CHR$(34) + "marching_ants" + CHR$(34) + ": 1, " + CHR$(34) + "fabric_texture" + CHR$(34) + ": " + CHR$(34) + "nein" + CHR$(34) + ", " + CHR$(34) + "library_path" + CHR$(34) + ": 5, " + CHR$(34) + "templates_path" + CHR$(34) + ": " + CHR$(34) + "  /da  " + CHR$(34) + "}")
+g = kern.einstellungenLaden("krumm.json")
+PRINT "krumm: "; g.ameisen; " "; g.stoffTextur; " '"; g.bibliothekPfad; "' '"; g.vorlagenPfad; "'"
+' Eingestellte Ordner: leer, angelegt, schon da, eine Datei
+WRITEALL("eine datei", "x")
+MKDIR("schon da")
+PRINT "ordner: '"; kern.eigenerOrdner$("", "vorgabe"); "' '"; kern.eigenerOrdner$("   ", "vorgabe"); "' '"; kern.eigenerOrdner$("schon da", "vorgabe"); "' '"; kern.eigenerOrdner$(" neu/tief ", "vorgabe"); "' angelegt "; DIREXISTS("neu/tief"); " '"; kern.eigenerOrdner$("eine datei", "vorgabe"); "'"
+PRINT "bibliothek: "; BASENAME(kern.bibliothekOrdner$()); " | "; kern.bibliothekOrdner$("schon da"); " | "; BASENAME(kern.bibliothekOrdner$("eine datei"))
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- datei alle.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- datei neu.txt
+# Kommentar oben
+Text vor dem ersten Abschnitt faellt weg.
+
+## Erster
+Eine Zeile,
+die weitergeht.
+
+# ein Kommentar mittendrin
+
+Zweiter Absatz.
+## Zweiter
+
+## Dritter
+nur einer
+--- erwartet
+eine ebene, darunter: 0 -1 -1
+quelle ausserhalb: 0 | ziel ausserhalb: 0 | quelle -1: 0
+unterste nach ganz oben: 1 0 -> 3 | oberste nach ganz unten: 1 3 -> 0
+glutfaden:garn:2:117 | glutfaden:ebene:1:0
+'glutfaden:garn:2:117' -> 'garn' 2 117
+' glutfaden:ebene:1:0 ' -> 'ebene' 1 0
+'hallo' -> '' 0 0
+'glutfaden:garn:1' -> '' 0 0
+'glutfaden:x:1:2' -> '' 0 0
+'glutfaden:garn:-1:2' -> '' 0 0
+'glutfaden:garn:1:2:3' -> '' 0 0
+'file:///c/a.pxs' -> '' 0 0
+'glutfaden:garn:1.5:2' -> '' 0 0
+vorher: ebenen 3 aktiv 2 | stiche 15,17,17,15,21,30,
+versteckt auf hintergrund: TRUE | ebenen 2 aktiv 0 | unten 98 | 'Ebenen zusammenführen'
+  stiche 13,15,15,13,19,28,
+zurueck: TRUE | ebenen 3 aktiv 2 | 96 14
+wieder: TRUE | ebenen 2 aktiv 0 | 98
+dieselbe: FALSE | ausserhalb: FALSE | schritte gleich TRUE
+gesperrtes ziel: FALSE | gesperrte quelle: FALSE
+aktiv bleibt dieselbe: aktiv 0 'Hintergrund' -> 0 'Hintergrund' | nur noch eine: FALSE
+neuigkeiten: 3 | Erster / Zweiter / Dritter
+  0: Eine Zeile, die weitergeht.||Zweiter Absatz.
+  1: 
+  2: nur einer
+ohne datei: 0 0
+die echte: oben '🧵 Stufe 22: Kleinigkeiten aus PySticky' | jeder abschnitt hat text TRUE
+vorgaben: TRUE TRUE TRUE FALSE '' ''
+"fabric_texture": false,
+"marching_ants": false,
+"stitch_timer_enabled": false,
+"highlight_selected": true,
+"library_path": "C:/Muster/Bib",
+"templates_path": "/home/x/vorlagen",
+gelesen: FALSE FALSE FALSE TRUE 'C:/Muster/Bib' '/home/x/vorlagen'
+krumm: TRUE TRUE '' '/da'
+ordner: 'vorgabe' 'vorgabe' 'schon da' 'neu/tief' angelegt TRUE 'vorgabe'
+bibliothek: Bibliothek | schon da | Bibliothek
+
+=== probe: textur, kante, ziehen, hervorheben, stickzeit, ordner, neu
+IMPORT "helfer.dh"
+' --probe-stufe22 mit alle.pxs: Aida-Punkt, laufende Kante, Ziehen (Quellen,
+' Ziele, Garn, Ebenen samt Rueckgaengig und gesperrt), Hervorheben,
+' Stickzeit, Ordner, Neu in Glutfaden, Einstellungsdialog.
+MKDIR("app")
+SETENV("APPDATA", CWD$() + "/app")
+SETENV("HOME", CWD$() + "/app")
+dlStarten(["run", BEISPIEL, "--", "--probe-stufe22", "--foto", "d", "alle.pxs"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT REPLACE$(dlAus, CHR$(13), "");
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    PRINT "neu "; FILEEXISTS("d_neu.png")
+    PRINT "datei unveraendert: "; READLINES("alle.pxs")[0] = READLINES("vorher.pxs")[0]
+END IF
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- datei alle.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- datei vorher.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- erwartet
+rueckgabe 0
+vorgaben: ameisen TRUE | textur TRUE | stickzeit TRUE | hervorheben FALSE | bibliothek '' | vorlagen ''
+textur an: leere zelle 7,7 mitte punkt | dunkler TRUE
+textur aus: leere mitte stoff | volle zelle 10,7 gleich wie mit textur TRUE
+unter 8 punkten: stoff
+auswahl: takt laeuft TRUE | kante glut ja dunkel ja | beide etwa gleich ja | ohne luecke TRUE
+nach 300 ms: weitergerueckt TRUE | kante bewegt TRUE
+anderes werkzeug: takt aus TRUE | auswahl weg TRUE
+ohne einstellung: takt FALSE | kante glut ja dunkel ja | beide etwa gleich ja
+ohne einstellung nach 300 ms: steht TRUE
+ziehen: katalogzeile TRUE | ebenenzeile TRUE | farbleiste nimmt TRUE | ebenenliste nimmt TRUE
+garn abgelegt: farben 7 | neu 'Ecru' | aktuell TRUE
+falsche nummern: farben 7
+stelle: zeile 1 | mitte TRUE | darunter -1
+vorher: Hintergrund(96) Oben(5) Versteckt(14) | aktiv 2
+hinweis: Loslassen: „Versteckt“ mit „Oben“ zusammenführen
+zusammen: Hintergrund(96) Oben(18) | aktiv 1 | „Versteckt“ mit „Oben“ zusammengeführt (Strg+Z nimmt es zurü
+zurueck: Hintergrund(96) Oben(5) Versteckt(14) | aktiv 2
+verschoben: Versteckt(14) Hintergrund(96) Oben(5) | aktiv 0
+gesperrt: Hintergrund(96) Oben(5) Versteckt(14) | aktiv 2 | Gesperrte Ebenen lassen sich nicht zusammenführen 
+vorgemerkt zusammen: Hintergrund(98) Oben(5) | aktiv 0
+hervorheben aus: -1
+hervorheben an: 2 -> 3
+stickzeit aus: laeuft FALSE | an: laeuft TRUE
+bibliothek: eigene bib angelegt TRUE | vorlagen: vorl/user_templates.json
+geht nicht: bibliothek Bibliothek | vorlagen user_templates.json im einstellungsordner TRUE
+neu: 5 abschnitte | oben '🧵 Stufe 22: Kleinigkeiten aus PySticky' | absaetze oben 3
+dialog: textur TRUE | ameisen TRUE | stickzeit TRUE | hervorheben FALSE
+uebernommen: textur FALSE | hervorheben TRUE | bibliothek bib2 | gemerkt FALSE TRUE bib2
+neu TRUE
+datei unveraendert: TRUE

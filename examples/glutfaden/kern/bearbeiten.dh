@@ -301,6 +301,79 @@ FUNCTION ebeneNachUnten(m AS Muster, v AS Verlauf, nr AS INTEGER) AS BOOLEAN
     RETURN TRUE
 END FUNCTION
 
+' Eine beliebige Ebene auf eine andere (PySticky LayerStack.merge_layers,
+' Ziehen in der Ebenenliste): die Stiche der Quelle ueberschreiben das Ziel,
+' die Quelle verschwindet. Gesperrte Ebenen weder als Quelle noch als Ziel
+' -- PyStickys Liste lehnt beide ab, auch wenn der Stapel selbst nur das
+' Ziel prueft. Die aktive Ebene bleibt dieselbe; war es die Quelle, wird
+' es das Ziel.
+FUNCTION ebenenZusammenfuehren(m AS Muster, v AS Verlauf, quelle AS INTEGER, ziel AS INTEGER) AS BOOLEAN
+    DIM n AS INTEGER : n = m.ebenen.anzahl()
+    IF n <= 1 OR quelle = ziel THEN RETURN FALSE
+    IF quelle < 0 OR quelle >= n OR ziel < 0 OR ziel >= n THEN RETURN FALSE
+    DIM q AS Ebene : q = m.ebenen.ebenen[quelle]
+    DIM z AS Ebene : z = m.ebenen.ebenen[ziel]
+    IF q.gesperrt OR z.gesperrt THEN RETURN FALSE
+    v.beginnen("Ebenen zusammenführen")
+    zellenUebernehmen(v, q, z)
+    DIM t AS Aenderung : t = v.teil(TEIL_EBENEN)
+    t.ebenenVorher = ARRAY_COPY(m.ebenen.ebenen)
+    t.aktivVorher = m.ebenen.aktiv
+    DIM a AS INTEGER : a = m.ebenen.aktiv
+    ARRAY_REMOVE_AT(m.ebenen.ebenen, quelle)
+    IF a = quelle THEN
+        a = IIF(ziel > quelle, ziel - 1, ziel)
+    ELSEIF a > quelle THEN
+        a = a - 1
+    END IF
+    m.ebenen.aktiv = a
+    m.stichzahlenNeu()
+    t.ebenenNachher = ARRAY_COPY(m.ebenen.ebenen)
+    t.aktivNachher = m.ebenen.aktiv
+    v.beenden()
+    RETURN TRUE
+END FUNCTION
+
+' Was ein Zug in der Ebenenliste bedeutet (PySticky LayerListWidget
+' dragMoveEvent/dropEvent). quelle und ziel sind ZEILEN der Liste (oben = 0
+' = die oberste Ebene), ziel -1 = unter allen Zeilen; anteil ist die Lage im
+' Ziel von 0 (oben) bis 1 (unten). Die mittlere Haelfte einer anderen Zeile
+' heisst zusammenfuehren, darueber oder darunter verschieben.
+' Liefert (art, a, b): art 0 nichts, 1 verschieben von a nach b, 2 a auf b
+' zusammenfuehren -- a und b schon als Nummern im Stapel (0 = unten).
+FUNCTION ebenenZug(n AS INTEGER, quelle AS INTEGER, ziel AS INTEGER, anteil AS FLOAT) AS TUPLE
+    IF quelle < 0 OR quelle >= n OR ziel >= n THEN RETURN (0, -1, -1)
+    DIM marke AS INTEGER
+    IF ziel < 0 THEN
+        marke = n
+    ELSEIF ziel = quelle THEN
+        RETURN (0, -1, -1)
+    ELSEIF ABS(anteil - 0.5) < 0.25 THEN
+        RETURN (2, n - 1 - quelle, n - 1 - ziel)
+    ELSEIF anteil < 0.5 THEN
+        marke = ziel
+    ELSE
+        marke = ziel + 1
+    END IF
+    IF marke > quelle THEN marke = marke - 1
+    IF marke = quelle THEN RETURN (0, -1, -1)
+    RETURN (1, n - 1 - quelle, n - 1 - marke)
+END FUNCTION
+
+' Der Text, mit dem ein Zug innerhalb von Glutfaden reist, und zurueck.
+' Etwas anderes (Text aus einem fremden Programm) liefert die Art "".
+FUNCTION ziehText$(art AS STRING, a AS INTEGER, b AS INTEGER) AS STRING
+    RETURN "glutfaden:" + art + ":" + STR$(a) + ":" + STR$(b)
+END FUNCTION
+
+FUNCTION ziehLesen(text AS STRING) AS TUPLE
+    DIM t AS ARRAY OF STRING : t = SPLIT$(TRIM$(text), ":")
+    IF LEN(t) <> 4 THEN RETURN ("", 0, 0)
+    IF t[0] <> "glutfaden" OR (t[1] <> "garn" AND t[1] <> "ebene") THEN RETURN ("", 0, 0)
+    IF NOT REGEX_TEST(t[2], "^[0-9]+$") OR NOT REGEX_TEST(t[3], "^[0-9]+$") THEN RETURN ("", 0, 0)
+    RETURN (t[1], VAL(t[2]), VAL(t[3]))
+END FUNCTION
+
 ' Alle Stiche von quelle auf ziel schreiben (Farbe, Typ, erledigt), als ein
 ' Stiche-Teil im offenen Schritt. Stichzahlen aendern sich nicht (dieselben
 ' Farben, nur auf einer anderen Ebene) -- der Umbau zaehlt danach neu.

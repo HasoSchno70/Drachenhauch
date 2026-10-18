@@ -94,6 +94,7 @@ IMPORT "ansicht/farbquellen.dh"
 IMPORT "ansicht/drucken.dh"
 IMPORT "ansicht/ablage.dh"
 IMPORT "ansicht/fremdimport.dh"
+IMPORT "ansicht/ziehen.dh"
 
 ' Farben: dunkel wie das Logo, Glut (#ff8a3d) fuer alles, was gewaehlt ist
 CONST STIL = "window, .flaeche { background-color: @gf_fenster; color: @gf_text; }" + _
@@ -551,11 +552,35 @@ FUNCTION schliessenAngefragt(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER
     RETURN NOT ungesichertFragen("Schließen")
 END FUNCTION
 
+' Der Logo-Knopf: ein kleines Menue mit Ueber, Neuigkeiten und Tastenkuerzeln
 SUB ueberGeklickt(knopf AS INTEGER, daten AS INTEGER)
+    DIM m AS INTEGER : m = gtk_menu_new()
+    ueberPunkt(m, "Über Glutfaden …", 0)
+    ueberPunkt(m, "Neu in Glutfaden …", 1)
+    ueberPunkt(m, "Tastenkürzel (" + kern.kuerzelVon$(einst, "tastenkuerzel") + ") …", 2)
+    gtk_widget_show_all(m)
+    gtk_menu_popup_at_widget(m, knopf, GDK_SCHWERE_UNTEN_LINKS, GDK_SCHWERE_OBEN_LINKS, 0)
+END SUB
+
+SUB ueberPunkt(m AS INTEGER, text AS STRING, was AS INTEGER)
+    DIM e AS INTEGER : e = gtk_menu_item_new_with_label(text)
+    signal(e, "activate", ueberGewaehlt, was, 0, 0)
+    gtk_menu_shell_append(m, e)
+END SUB
+
+SUB ueberGewaehlt(w AS INTEGER, was AS INTEGER)
+    SELECT CASE was
+        CASE 0 : ueberZeigen()
+        CASE 1 : neuigkeitenDialog()
+        CASE 2 : befehlAusfuehren("tastenkuerzel")
+    END SELECT
+END SUB
+
+SUB ueberZeigen()
     DIM f AS INTEGER
     DIM bild AS INTEGER : bild = gdk_pixbuf_new_from_file_at_size(PATHJOIN(CWD$(), LOGO), 128, 128, f)
     IF bild = 0 THEN g_error_free(f)
-    gtk_show_about_dialog(fenster, "program-name", "Glutfaden", "logo", bild, "version", "Stufe 13", _
+    gtk_show_about_dialog(fenster, "program-name", "Glutfaden", "logo", bild, "version", "Stufe 22", _
         "comments", "Kreuzstich-Muster ansehen und bearbeiten -- eine Portierung von PySticky nach Drachenhauch und GTK 3.", _
         "website", "https://github.com/HasoSchno70/Pysticky", "website-label", "PySticky (das Original)", 0)
 END SUB
@@ -923,6 +948,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe20"
     ELSEIF ARG$(a) = "--probe-stufe21" THEN
         probe = "stufe21"
+    ELSEIF ARG$(a) = "--probe-stufe22" THEN
+        probe = "stufe22"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -989,6 +1016,7 @@ IF probe = "stufe18" THEN g_timeout_add(300, vorfuehrenStufe18, 0)
 IF probe = "stufe19" THEN g_timeout_add(300, vorfuehrenStufe19, 0)
 IF probe = "stufe20" THEN g_timeout_add(300, vorfuehrenStufe20, 0)
 IF probe = "stufe21" THEN g_timeout_add(300, vorfuehrenStufe21, 0)
+IF probe = "stufe22" THEN g_timeout_add(300, vorfuehrenStufe22, 0)
 ' Alle fuenf Minuten ein Schnappschuss, wenn etwas ungesichert ist
 DIM takt AS INTEGER : takt = g_timeout_add(300000, vwTakt, 0)
 

@@ -1,0 +1,198 @@
+' Ziehen innerhalb von Glutfaden (PySticky color_bar / layer_panel):
+' ein Garn aus dem Katalog auf die Farbleiste nimmt es ins Muster, eine Ebene
+' in der Ebenenliste wird verschoben oder -- in der mittleren Haelfte einer
+' anderen Zeile losgelassen -- mit ihr zusammengefuehrt.
+'
+' Getragen wird ein Text (kern.ziehText$), damit es ohne eigene Zielarten
+' geht. Die Zeilen einer GtkListBox haben in GTK 3 kein eigenes Fenster und
+' bekaemen den Druck nie; deshalb liegt in jeder Zeile ein unsichtbarer
+' Ereigniskasten, und der ist die Quelle. Ausgefuehrt wird einen Augenblick
+' nach dem Ablegen: das Muster neu aufzubauen hiesse, die Liste mitten im
+' Ziehen des Systems zu zerstoeren.
+
+DIM zhEbeneQuelle AS INTEGER : zhEbeneQuelle = -1   ' Zeile, die gerade gezogen wird
+DIM zhHinweis AS STRING                             ' zuletzt gezeigter Hinweis beim Ziehen
+DIM zhArt AS INTEGER                                ' vorgemerkt: 1 verschieben, 2 zusammenfuehren, 3 Garn
+DIM zhA AS INTEGER
+DIM zhB AS INTEGER
+
+' Den Inhalt einer Listenzeile in einen Ereigniskasten, der gezogen werden kann
+FUNCTION ziehQuelle(inhalt AS INTEGER, aktion AS INTEGER) AS INTEGER
+    DIM k AS INTEGER : k = gtk_event_box_new()
+    gtk_event_box_set_visible_window(k, FALSE)
+    gtk_container_add(k, inhalt)
+    gtk_drag_source_set(k, GDK_KNOPF1_MASKE, 0, 0, aktion)
+    gtk_drag_source_add_text_targets(k)
+    RETURN k
+END FUNCTION
+
+' --- Garn auf die Farbleiste --------------------------------------------------------
+
+SUB zhGarnDaten(w AS INTEGER, kontext AS INTEGER, auswahl AS INTEGER, art AS INTEGER, zeit AS INTEGER, k AS INTEGER)
+    IF k < 0 OR k >= LEN(slKatGarne) THEN RETURN
+    DIM ok AS BOOLEAN : ok = gtk_selection_data_set_text(auswahl, kern.ziehText$("garn", slPalette, slKatGarne[k]), -1)
+END SUB
+
+SUB farbleisteAblageEinrichten(w AS INTEGER)
+    gtk_drag_dest_set(w, GTK_ZIEL_ALLES, 0, 0, GDK_AKTION_KOPIEREN)
+    ' Dateien zuerst: eine Datei, die hier landet, soll weiter geoeffnet werden
+    gtk_drag_dest_add_uri_targets(w)
+    gtk_drag_dest_add_text_targets(w)
+    signalAblage(w, "drag-data-received", zhFarbleisteAbgelegt, 0, 0, 0)
+END SUB
+
+SUB zhFarbleisteAbgelegt(w AS INTEGER, kontext AS INTEGER, x AS INTEGER, y AS INTEGER, auswahl AS INTEGER, art AS INTEGER, zeit AS INTEGER, daten AS INTEGER)
+    DIM z AS INTEGER : z = gtk_selection_data_get_text(auswahl)
+    IF z = 0 THEN
+        ' keine Text-Daten: eine Datei -- wie ueberall im Fenster
+        abEmpfangen(w, kontext, x, y, auswahl, art, zeit, daten)
+        RETURN
+    END IF
+    DIM text AS STRING : text = TEXT_AUS_ZEIGER$(z)
+    g_free(z)
+    DIM was AS STRING, a AS INTEGER, b AS INTEGER
+    (was, a, b) = kern.ziehLesen(text)
+    IF was = "garn" THEN
+        zhVormerken(3, a, b)
+    ELSEIF was = "" AND LEFT$(text, 7) = "file://" THEN
+        abEmpfangen(w, kontext, x, y, auswahl, art, zeit, daten)
+    END IF
+END SUB
+
+' Ein Garn ablegen (auch fuer die Probe): Palette und Nummer pruefen, dann
+' wie ein Doppelklick im Katalog
+SUB garnAbgelegt(pal AS INTEGER, garn AS INTEGER)
+    IF NOT lwHat OR pal < 0 OR pal >= LEN(slPaletten) THEN RETURN
+    IF garn < 0 OR garn >= LEN(slPaletten[pal].garne) THEN RETURN
+    garnHinzufuegen(pal, garn)
+END SUB
+
+' --- Ebenen ------------------------------------------------------------------------
+
+SUB zhEbeneBeginn(w AS INTEGER, kontext AS INTEGER, zeile AS INTEGER)
+    zhEbeneQuelle = zeile
+    zhHinweis = ""
+END SUB
+
+SUB zhEbeneEnde(w AS INTEGER, kontext AS INTEGER, zeile AS INTEGER)
+    zhEbeneQuelle = -1
+    IF slEbenenListe <> 0 THEN gtk_list_box_drag_unhighlight_row(slEbenenListe)
+END SUB
+
+SUB zhEbeneDaten(w AS INTEGER, kontext AS INTEGER, auswahl AS INTEGER, art AS INTEGER, zeit AS INTEGER, zeile AS INTEGER)
+    DIM ok AS BOOLEAN : ok = gtk_selection_data_set_text(auswahl, kern.ziehText$("ebene", zeile, 0), -1)
+END SUB
+
+SUB ebenenAblageEinrichten(liste AS INTEGER)
+    gtk_drag_dest_set(liste, GTK_ZIEL_ABLEGEN, 0, 0, GDK_AKTION_VERSCHIEBEN)
+    gtk_drag_dest_add_text_targets(liste)
+    signalZiehBewegung(liste, "drag-motion", zhEbeneBewegung, 0, 0, 0)
+    signalZiehWeg(liste, "drag-leave", zhEbeneWeg, 0, 0, 0)
+    signalAblage(liste, "drag-data-received", zhEbeneAbgelegt, 0, 0, 0)
+END SUB
+
+' Die Zeile unter y und wo darin (0 oben .. 1 unten); Zeile -1 = darunter
+FUNCTION zhEbeneStelle(liste AS INTEGER, y AS INTEGER) AS TUPLE
+    DIM r AS INTEGER : r = gtk_list_box_get_row_at_y(liste, y)
+    IF r = 0 THEN RETURN (-1, 0.0)
+    DIM lage AS PangoRechteck
+    gtk_widget_get_allocation(r, lage)
+    DIM anteil AS FLOAT : anteil = IIF(lage.hoehe > 0, (y - lage.y) / lage.hoehe, 0.5)
+    RETURN (gtk_list_box_row_get_index(r), anteil)
+END FUNCTION
+
+FUNCTION zhEbeneBewegung(w AS INTEGER, kontext AS INTEGER, x AS INTEGER, y AS INTEGER, zeit AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    IF zhEbeneQuelle < 0 OR NOT lwHat THEN RETURN FALSE
+    gdk_drag_status(kontext, GDK_AKTION_VERSCHIEBEN, zeit)
+    DIM ziel AS INTEGER, anteil AS FLOAT
+    (ziel, anteil) = zhEbeneStelle(w, y)
+    DIM art AS INTEGER, a AS INTEGER, b AS INTEGER
+    (art, a, b) = kern.ebenenZug(lwMuster.ebenen.anzahl(), zhEbeneQuelle, ziel, anteil)
+    IF art = 2 THEN
+        gtk_list_box_drag_highlight_row(w, gtk_list_box_get_row_at_index(w, ziel))
+    ELSE
+        gtk_list_box_drag_unhighlight_row(w)
+    END IF
+    DIM h AS STRING : h = ebenenZugText$(art, a, b)
+    IF h <> zhHinweis THEN
+        zhHinweis = h
+        IF h <> "" THEN statusMeldung(h)
+    END IF
+    RETURN TRUE
+END FUNCTION
+
+SUB zhEbeneWeg(w AS INTEGER, kontext AS INTEGER, zeit AS INTEGER, daten AS INTEGER)
+    gtk_list_box_drag_unhighlight_row(w)
+END SUB
+
+SUB zhEbeneAbgelegt(w AS INTEGER, kontext AS INTEGER, x AS INTEGER, y AS INTEGER, auswahl AS INTEGER, art AS INTEGER, zeit AS INTEGER, daten AS INTEGER)
+    gtk_list_box_drag_unhighlight_row(w)
+    DIM z AS INTEGER : z = gtk_selection_data_get_text(auswahl)
+    IF z = 0 OR NOT lwHat THEN RETURN
+    DIM text AS STRING : text = TEXT_AUS_ZEIGER$(z)
+    g_free(z)
+    DIM was AS STRING, quelle AS INTEGER, rest AS INTEGER
+    (was, quelle, rest) = kern.ziehLesen(text)
+    IF was <> "ebene" THEN RETURN
+    DIM ziel AS INTEGER, anteil AS FLOAT
+    (ziel, anteil) = zhEbeneStelle(w, y)
+    DIM zug AS INTEGER, a AS INTEGER, b AS INTEGER
+    (zug, a, b) = kern.ebenenZug(lwMuster.ebenen.anzahl(), quelle, ziel, anteil)
+    IF zug <> 0 THEN zhVormerken(zug, a, b)
+END SUB
+
+' Was ein Loslassen hier taete, fuer die Statuszeile
+FUNCTION ebenenZugText$(art AS INTEGER, a AS INTEGER, b AS INTEGER) AS STRING
+    IF art = 0 OR NOT lwHat THEN RETURN ""
+    DIM ez AS ARRAY OF kern.Ebene : ez = lwMuster.ebenen.ebenen
+    IF art = 2 THEN RETURN "Loslassen: „" + ez[a].name + "“ mit „" + ez[b].name + "“ zusammenführen"
+    RETURN "Loslassen: „" + ez[a].name + "“ an Stelle " + STR$(lwMuster.ebenen.anzahl() - b) + " von oben"
+END FUNCTION
+
+' Ein Zug in der Ebenenliste, mit Zeilen wie die Liste sie zeigt (auch fuer die Probe)
+SUB ebenenZiehen(quelle AS INTEGER, ziel AS INTEGER, anteil AS FLOAT)
+    IF NOT lwHat THEN RETURN
+    DIM art AS INTEGER, a AS INTEGER, b AS INTEGER
+    (art, a, b) = kern.ebenenZug(lwMuster.ebenen.anzahl(), quelle, ziel, anteil)
+    ebenenZugAusfuehren(art, a, b)
+END SUB
+
+SUB ebenenZugAusfuehren(art AS INTEGER, a AS INTEGER, b AS INTEGER)
+    IF NOT lwHat OR art = 0 OR wzZug <> ZUG_KEINER THEN RETURN
+    DIM n AS INTEGER : n = lwMuster.ebenen.anzahl()
+    IF a < 0 OR a >= n OR b < 0 OR b >= n THEN RETURN
+    IF art = 1 THEN
+        IF kern.ebeneVerschieben(lwMuster, wzVerlauf, a, b) THEN allesNeu()
+        RETURN
+    END IF
+    DIM qn AS STRING : qn = lwMuster.ebenen.ebenen[a].name
+    DIM zn AS STRING : zn = lwMuster.ebenen.ebenen[b].name
+    IF lwMuster.ebenen.ebenen[a].gesperrt OR lwMuster.ebenen.ebenen[b].gesperrt THEN
+        statusMeldung("Gesperrte Ebenen lassen sich nicht zusammenführen -- erst entsperren.")
+        RETURN
+    END IF
+    IF kern.ebenenZusammenfuehren(lwMuster, wzVerlauf, a, b) THEN
+        allesNeu()
+        statusMeldung("„" + qn + "“ mit „" + zn + "“ zusammengeführt (" + kern.kuerzelVon$(einst, "zurueck") + " nimmt es zurück)")
+    END IF
+END SUB
+
+' --- Ausfuehren nach dem Ziehen -------------------------------------------------------
+
+SUB zhVormerken(art AS INTEGER, a AS INTEGER, b AS INTEGER)
+    zhArt = art
+    zhA = a
+    zhB = b
+    g_timeout_add(30, zhAbarbeiten, 0)
+END SUB
+
+FUNCTION zhAbarbeiten(daten AS INTEGER) AS BOOLEAN
+    DIM art AS INTEGER : art = zhArt
+    zhArt = 0
+    IF art = 3 THEN
+        garnAbgelegt(zhA, zhB)
+    ELSEIF art > 0 THEN
+        ebenenZugAusfuehren(art, zhA, zhB)
+    END IF
+    RETURN FALSE
+END FUNCTION

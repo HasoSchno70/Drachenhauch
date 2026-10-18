@@ -862,7 +862,7 @@ SUB bbOeffnenGeklickt(w AS INTEGER, daten AS INTEGER)
 END SUB
 
 FUNCTION bbBauen() AS INTEGER
-    DIM ordner AS STRING : ordner = kern.bibliothekOrdner$()
+    DIM ordner AS STRING : ordner = kern.bibliothekOrdner$(einst.bibliothekPfad)
     bbBib = kern.bibliothekLaden(PATHJOIN(ordner, "library.json"))
     bbGewaehlt = -1
     bbWarte = []

@@ -18,7 +18,7 @@ DIM vwKennung AS STRING              ' fuer den Schnappschuss-Ordner ungesichert
 
 SUB vwNeuesMuster()
     vwKennung = LEFT$(UUID4$(), 8)
-    IF lwHat AND wzAktiv = WZ_FORTSCHRITT THEN kern.stickzeitStart(lwMuster, ZEIT_UNIX())
+    IF lwHat AND wzAktiv = WZ_FORTSCHRITT AND einst.stickzeit THEN kern.stickzeitStart(lwMuster, ZEIT_UNIX())
 END SUB
 
 FUNCTION vwSchluessel$() AS STRING
@@ -30,7 +30,8 @@ END FUNCTION
 SUB stickzeitWerkzeug(alt AS INTEGER, neu AS INTEGER)
     IF NOT lwHat THEN RETURN
     IF neu = WZ_FORTSCHRITT THEN
-        kern.stickzeitStart(lwMuster, ZEIT_UNIX())
+        ' Einstellungen -> Allgemein -> Stickzeit messen (stitch_timer_enabled)
+        IF einst.stickzeit THEN kern.stickzeitStart(lwMuster, ZEIT_UNIX())
     ELSEIF alt = WZ_FORTSCHRITT THEN
         stickzeitBeenden(TRUE)
     END IF
@@ -95,7 +96,8 @@ FUNCTION nmStoffZahl() AS INTEGER
 END FUNCTION
 
 FUNCTION vwVorlagenDatei$() AS STRING
-    RETURN kern.einstellungsDatei$("user_templates.json")
+    DIM vorgabe AS STRING : vorgabe = DIRNAME(kern.einstellungsDatei$("user_templates.json"))
+    RETURN PATHJOIN(kern.eigenerOrdner$(einst.vorlagenPfad, vorgabe), "user_templates.json")
 END FUNCTION
 
 SUB nmInfoNachziehen()
@@ -1180,3 +1182,47 @@ FUNCTION musterKnopf() AS INTEGER
     gtk_menu_button_set_popover(mb, musterPopover)
     RETURN mb
 END FUNCTION
+
+' --- Neu in Glutfaden (PySticky "Neu in dieser Version") ------------------------------
+
+CONST NEUIGKEITEN = "daten/neuigkeiten.txt"
+
+' Liefert den Dialog, ohne ihn laufen zu lassen (die Probe schaut hinein)
+FUNCTION neuigkeitenBauen() AS INTEGER
+    DIM titel AS ARRAY OF STRING, texte AS ARRAY OF STRING
+    (titel, texte) = kern.neuigkeitenLesen(PATHJOIN(CWD$(), NEUIGKEITEN))
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Neu in Glutfaden", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        "Schließen", GTK_ANTWORT_OK, 0)
+    gtk_window_set_default_size(d, 640, 580)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
+    gtk_container_set_border_width(innen, 12)
+    DIM roll AS INTEGER : roll = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_policy(roll, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+    DIM box AS INTEGER : box = gtk_box_new(GTK_SENKRECHT, 6)
+    gtk_container_set_border_width(box, 8)
+    gtk_container_add(roll, box)
+    gtk_box_pack_start(innen, roll, TRUE, TRUE, 0)
+    IF LEN(titel) = 0 THEN
+        DIM leer AS INTEGER : leer = gtk_label_new("Die Liste der Neuigkeiten fehlt (" + NEUIGKEITEN + ").")
+        gtk_box_pack_start(box, leer, FALSE, FALSE, 0)
+    END IF
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(titel) - 1
+        DIM u AS INTEGER : u = adUeberschrift(titel[i])
+        IF i > 0 THEN gtk_widget_set_margin_top(u, 14)
+        gtk_box_pack_start(box, u, FALSE, FALSE, 0)
+        DIM t AS INTEGER : t = gtk_label_new(texte[i])
+        gtk_label_set_xalign(t, 0.0)
+        gtk_label_set_line_wrap(t, TRUE)
+        gtk_label_set_max_width_chars(t, 70)
+        gtk_box_pack_start(box, t, FALSE, FALSE, 0)
+    NEXT
+    gtk_widget_show_all(d)
+    RETURN d
+END FUNCTION
+
+SUB neuigkeitenDialog()
+    DIM d AS INTEGER : d = neuigkeitenBauen()
+    DIM a AS INTEGER : a = gtk_dialog_run(d)
+    gtk_widget_destroy(d)
+END SUB

@@ -83,6 +83,8 @@ FUNCTION farbleisteNeu() AS INTEGER
     signalEreignis(fbFeld, "scroll-event", fbRad, 0, 0, 0)
     gtk_container_add(fbRolle, fbFeld)
     gtk_box_pack_start(fbBox, fbRolle, FALSE, FALSE, 0)
+    ' Ein Garn aus dem Katalog hierher ziehen (Dateien gehen weiter durch)
+    farbleisteAblageEinrichten(fbBox)
     fbUeber = -1
     fbDruck = -1
     fbZiel = -1

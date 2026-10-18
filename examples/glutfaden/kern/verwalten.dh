@@ -924,3 +924,41 @@ FUNCTION fremdInfo(f AS FremdImport) AS ARRAY OF STRING
     RETURN [m.name, STR$(m.breite) + " × " + STR$(m.hoehe) + " Stiche (" + ZAHL$(m.breiteCm(), 1) + " × " + ZAHL$(m.hoeheCm(), 1) + " cm)", _
         STR$(m.farbanzahl()), STR$(statistikVon(m).sticheGesamt), f.format]
 END FUNCTION
+
+' --- Neu in Glutfaden (daten/neuigkeiten.txt) ----------------------------------------
+' Abschnitte mit "## Titel", darunter Absaetze (Leerzeilen trennen sie), "#" am
+' Zeilenanfang ist Kommentar. Liefert (Titel, Texte); ein Text haelt seine
+' Absaetze mit einer Leerzeile dazwischen. Ohne Datei: zwei leere Listen.
+FUNCTION neuigkeitenLesen(pfad AS STRING) AS TUPLE
+    DIM titel AS ARRAY OF STRING : titel = []
+    DIM texte AS ARRAY OF STRING : texte = []
+    IF NOT FILEEXISTS(pfad) THEN RETURN (titel, texte)
+    DIM nl AS STRING : nl = CHR$(10)
+    DIM absatz AS STRING, text AS STRING, z AS STRING
+    FOR EACH z IN READLINES(pfad)
+        z = RTRIM$(z)
+        IF LEFT$(z, 3) = "## " THEN
+            IF LEN(titel) > 0 THEN ARRAY_PUSH(texte, neuAbsatz$(text, absatz))
+            ARRAY_PUSH(titel, TRIM$(MID$(z, 3)))
+            text = ""
+            absatz = ""
+        ELSEIF LEFT$(z, 1) = "#" THEN
+            CONTINUE
+        ELSEIF LEN(titel) = 0 THEN
+            CONTINUE
+        ELSEIF TRIM$(z) = "" THEN
+            text = neuAbsatz$(text, absatz)
+            absatz = ""
+        ELSE
+            absatz = IIF(absatz = "", TRIM$(z), absatz + " " + TRIM$(z))
+        END IF
+    NEXT
+    IF LEN(titel) > 0 THEN ARRAY_PUSH(texte, neuAbsatz$(text, absatz))
+    RETURN (titel, texte)
+END FUNCTION
+
+FUNCTION neuAbsatz$(text AS STRING, absatz AS STRING) AS STRING
+    IF absatz = "" THEN RETURN text
+    IF text = "" THEN RETURN absatz
+    RETURN text + CHR$(10) + CHR$(10) + absatz
+END FUNCTION
