@@ -3,7 +3,7 @@
 # below, blank lines separate paragraphs, lines starting with # are comments.
 # The newest stage is at the top.
 
-## 🌐 Language: German and English
+## 🌐 Stage 24: German and English
 Glutfaden speaks English: Settings → General → Language (automatic follows the system language). The change takes effect at the next start. Keyboard shortcuts are shown as Ctrl and Shift, numbers with a decimal point.
 
 ## 🧲 Stage 23: grid, pen and fingers

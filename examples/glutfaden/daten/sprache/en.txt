@@ -331,7 +331,6 @@ Glutfaden beenden?	Quit Glutfaden?
 Über Glutfaden …	About Glutfaden …
 Neu in Glutfaden …	New in Glutfaden …
 Tastenkürzel ({0}) …	Keyboard shortcuts ({0}) …
-Stufe 23	Stage 23
 Kreuzstich-Muster ansehen und bearbeiten -- eine Portierung von PySticky nach Drachenhauch und GTK 3.	View and edit cross-stitch patterns -- a port of PySticky to Drachenhauch and GTK 3.
 PySticky (das Original)	PySticky (the original)
 Erst ein Muster öffnen oder anlegen.	Open or create a pattern first.
@@ -355,7 +354,6 @@ Keine Simulation	No simulation
 Protanopie (Rot-Blindheit)	Protanopia (red blindness)
 Deuteranopie (Grün-Blindheit)	Deuteranopia (green blindness)
 Tritanopie (Blau-Blindheit)	Tritanopia (blue blindness)
-Ebene „{0}“ ist gesperrt.	Layer “{0}” is locked.
 Sichern unter	Save as
 Exportieren	Export
 Bild importieren	Import image
@@ -415,3 +413,4 @@ Auswahl	Selection
 Lasso	Lasso
 Vieleck gefüllt	Filled polygon
 Rückstich	Backstitch
+Stufe 24	Stage 24

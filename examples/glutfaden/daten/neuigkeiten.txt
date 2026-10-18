@@ -3,7 +3,7 @@
 # darunter der Text; Leerzeilen trennen Absätze. Zeilen mit # sind Kommentar.
 # Die neueste Stufe steht oben.
 
-## 🌐 Sprache: Deutsch und Englisch
+## 🌐 Stufe 24: Deutsch und Englisch
 Glutfaden spricht Englisch: Einstellungen → Allgemein → Sprache (automatisch richtet sich nach der Systemsprache). Gewechselt wird beim nächsten Start. Tastenkürzel heißen dann Ctrl und Shift, Zahlen haben einen Dezimalpunkt.
 
 ## 🧲 Stufe 23: Raster, Stift und Finger
