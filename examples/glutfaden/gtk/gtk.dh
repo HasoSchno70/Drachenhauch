@@ -67,6 +67,8 @@ DECLARE FUNCTION gtk_scrollbar_new LIB GTK (richtung AS LONG, a AS ZEIGER) AS ZE
 DECLARE FUNCTION gtk_window_get_focus LIB GTK (fenster AS ZEIGER) AS ZEIGER
 DECLARE SUB gtk_range_set_range LIB GTK (r AS ZEIGER, von AS FLOAT, bis AS FLOAT)
 DECLARE SUB gtk_dialog_set_response_sensitive LIB GTK (d AS ZEIGER, antwort AS LONG, an AS BOOLEAN)
+DECLARE FUNCTION gtk_dialog_get_widget_for_response LIB GTK (d AS ZEIGER, antwort AS LONG) AS ZEIGER
+DECLARE FUNCTION gtk_range_get_adjustment LIB GTK (r AS ZEIGER) AS ZEIGER
 DECLARE SUB gtk_text_view_set_editable LIB GTK (sicht AS ZEIGER, an AS BOOLEAN)
 DECLARE SUB gtk_text_view_set_cursor_visible LIB GTK (sicht AS ZEIGER, an AS BOOLEAN)
 DECLARE SUB gtk_scrolled_window_set_min_content_height LIB GTK (sw AS ZEIGER, h AS LONG)
