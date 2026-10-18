@@ -57,6 +57,8 @@ CLASS Einstellungen
     DIM fuellToleranz AS INTEGER         ' fill_tolerance 0..100 %
     DIM rueckBreite AS INTEGER           ' backstitch_width 1..5
     DIM rueckEinrasten AS BOOLEAN        ' backstitch_snap: Ecken, Kantenmitten, Mitte; aus = nur Ecken
+    DIM rueckLinie AS INTEGER            ' backstitch_line_style 0 durchgezogen, 1 gestrichelt, 2 gepunktet, 3 Strich-Punkt
+    DIM rueckKappe AS INTEGER            ' backstitch_cap_style 0 rund, 1 eckig, 2 flach
     ' Farben
     DIM palette AS STRING                ' default_palette
     DIM katalog AS BOOLEAN               ' show_catalog
@@ -180,6 +182,8 @@ SUB einstellungenOrdnen(e AS Einstellungen)
     e.pipetteDanach = CLAMP(e.pipetteDanach, 0, 2)
     e.fuellToleranz = CLAMP(e.fuellToleranz, 0, 100)
     e.rueckBreite = CLAMP(e.rueckBreite, 1, 5)
+    e.rueckLinie = CLAMP(e.rueckLinie, 0, 3)
+    e.rueckKappe = CLAMP(e.rueckKappe, 0, 2)
     e.symbolGroesse = CLAMP(e.symbolGroesse, 6, 20)
     e.farbleisteGroesse = CLAMP(e.farbleisteGroesse, 20, 60)
     e.farbAnzeige = CLAMP(e.farbAnzeige, 0, 2)
@@ -292,6 +296,8 @@ FUNCTION einstellungenLaden(pfad AS STRING) AS Einstellungen
     IF jsonGanz(j, "fill_tolerance", z) THEN e.fuellToleranz = z
     IF jsonGanz(j, "backstitch_width", z) THEN e.rueckBreite = z
     IF esBool(j, "backstitch_snap", b) THEN e.rueckEinrasten = b
+    IF jsonGanz(j, "backstitch_line_style", z) THEN e.rueckLinie = z
+    IF jsonGanz(j, "backstitch_cap_style", z) THEN e.rueckKappe = z
     IF esText(j, "default_palette", t) THEN
         IF TRIM$(t) <> "" THEN e.palette = TRIM$(t)
     END IF
@@ -371,6 +377,8 @@ FUNCTION einstellungenJson$(e AS Einstellungen) AS STRING
     JSON_SET_INT(j, "fill_tolerance", e.fuellToleranz)
     JSON_SET_INT(j, "backstitch_width", e.rueckBreite)
     JSON_SET_BOOL(j, "backstitch_snap", e.rueckEinrasten)
+    JSON_SET_INT(j, "backstitch_line_style", e.rueckLinie)
+    JSON_SET_INT(j, "backstitch_cap_style", e.rueckKappe)
     JSON_SET_STRING(j, "default_palette", e.palette)
     JSON_SET_BOOL(j, "show_catalog", e.katalog)
     JSON_SET_BOOL(j, "show_color_bar", e.farbleiste)
@@ -544,6 +552,10 @@ FUNCTION kuerzelAktionen() AS ARRAY OF Kuerzelaktion
         ka("vereinen", "Alle Ebenen vereinen", ""), _
         ka("nur_aktive", "Nur aktive Ebene", ""), _
         ka("abdunkeln", "Andere Ebenen abdunkeln", ""), _
+        ka("drucken", "Drucken", "Strg+P"), _
+        ka("bildschirm_pipette", "Farbe vom Bildschirm picken", ""), _
+        ka("palette_export", "Palette exportieren", ""), _
+        ka("palette_import", "Palette importieren", ""), _
         ka("zoom_rein", "Vergrößern", "Plus, ="), _
         ka("zoom_raus", "Verkleinern", "Minus"), _
         ka("einpassen", "Einpassen", "0"), _
