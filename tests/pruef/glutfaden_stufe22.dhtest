@@ -216,7 +216,8 @@ NEXT
 (ti, te) = kern.neuigkeitenLesen("gibtsnicht.txt")
 PRINT "ohne datei: "; LEN(ti); " "; LEN(te)
 (ti, te) = kern.neuigkeitenLesen(GLUTORDNER + "/daten/neuigkeiten.txt")
-PRINT "die echte: oben '"; ti[0]; "' | jeder abschnitt hat text "; ARRAY_INDEXOF(te, "") < 0
+' Die echte waechst mit jeder Stufe: die neueste oben, jede mit Text
+PRINT "die echte: mindestens 5 "; LEN(ti) >= 5; " | oben eine stufe "; INSTR(ti[0], "Stufe ") >= 0; " | jeder abschnitt hat text "; ARRAY_INDEXOF(te, "") < 0
 ' Die neuen Einstellungen
 DIM es AS kern.Einstellungen : es = NEW kern.Einstellungen()
 PRINT "vorgaben: "; es.ameisen; " "; es.stoffTextur; " "; es.stickzeit; " "; es.hervorheben; " '"; es.bibliothekPfad; "' '"; es.vorlagenPfad; "'"
@@ -288,7 +289,7 @@ neuigkeiten: 3 | Erster / Zweiter / Dritter
   1: 
   2: nur einer
 ohne datei: 0 0
-die echte: oben '🧵 Stufe 22: Kleinigkeiten aus PySticky' | jeder abschnitt hat text TRUE
+die echte: mindestens 5 TRUE | oben eine stufe TRUE | jeder abschnitt hat text TRUE
 vorgaben: TRUE TRUE TRUE FALSE '' ''
 "fabric_texture": false,
 "marching_ants": false,
@@ -357,7 +358,7 @@ hervorheben an: 2 -> 3
 stickzeit aus: laeuft FALSE | an: laeuft TRUE
 bibliothek: eigene bib angelegt TRUE | vorlagen: vorl/user_templates.json
 geht nicht: bibliothek Bibliothek | vorlagen user_templates.json im einstellungsordner TRUE
-neu: 5 abschnitte | oben '🧵 Stufe 22: Kleinigkeiten aus PySticky' | absaetze oben 3
+neu: mindestens 5 abschnitte TRUE | stufe 22 '🧵 Stufe 22: Kleinigkeiten aus PySticky' | absaetze 3
 dialog: textur TRUE | ameisen TRUE | stickzeit TRUE | hervorheben FALSE
 uebernommen: textur FALSE | hervorheben TRUE | bibliothek bib2 | gemerkt FALSE TRUE bib2
 neu TRUE

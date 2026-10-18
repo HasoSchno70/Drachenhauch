@@ -2696,7 +2696,13 @@ FUNCTION vorfuehrenStufe22(daten AS INTEGER) AS BOOLEAN
             DIM d AS INTEGER : d = neuigkeitenBauen()
             DIM titel AS ARRAY OF STRING, texte AS ARRAY OF STRING
             (titel, texte) = kern.neuigkeitenLesen(PATHJOIN(CWD$(), NEUIGKEITEN))
-            PRINT "neu: "; LEN(titel); " abschnitte | oben '"; titel[0]; "' | absaetze oben "; LEN(SPLIT$(texte[0], CHR$(10) + CHR$(10)))
+            ' Die Datei waechst mit jeder Stufe -- geprueft wird der Abschnitt dieser
+            DIM s22 AS INTEGER : s22 = -1
+            DIM ti AS INTEGER
+            FOR ti = 0 TO LEN(titel) - 1
+                IF INSTR(titel[ti], "Stufe 22:") >= 0 THEN s22 = ti
+            NEXT
+            PRINT "neu: mindestens 5 abschnitte "; LEN(titel) >= 5; " | stufe 22 '"; titel[s22]; "' | absaetze "; LEN(SPLIT$(texte[s22], CHR$(10) + CHR$(10)))
             ok = vfFoto(d, "neu")
             gtk_widget_destroy(d)
             ' Die Einstellungen im Dialog

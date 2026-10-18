@@ -3,6 +3,11 @@
 # darunter der Text; Leerzeilen trennen Absätze. Zeilen mit # sind Kommentar.
 # Die neueste Stufe steht oben.
 
+## 🧲 Stufe 23: Raster, Stift und Finger
+Mit dem Magneten in der Werkzeugleiste rasten Linie, Rechteck, Ellipse und Vieleck auf jedes fünfte Kästchen ein (der Abstand steht in den Einstellungen).
+
+Mit einem Zeichenstift (Wacom, Surface Pen …) wächst der Pinsel des Stift-Werkzeugs mit dem Druck; die Maus setzt weiter einen Stich je Kästchen. Auf Touchscreen und Touchpad zoomen zwei Finger, sobald es in den Einstellungen eingeschaltet ist.
+
 ## 🧵 Stufe 22: Kleinigkeiten aus PySticky
 Die Kante einer Auswahl läuft, solange ein Auswahlwerkzeug gewählt ist, und leere Kästchen zeigen den feinen Punkt eines Aida-Stoffs.
 
