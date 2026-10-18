@@ -79,7 +79,22 @@ DECLARE FUNCTION gtk_selection_data_get_data LIB GTK (sel AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_selection_data_get_length LIB GTK (sel AS ZEIGER) AS LONG
 DECLARE FUNCTION g_filename_from_uri LIB GLIB (uri AS TEXT, BYREF rechner AS ZEIGER, BYREF fehler AS ZEIGER) AS ZEIGER
 CONST GTK_ZIEL_ALLES = 7              ' GTK_DEST_DEFAULT_ALL
+CONST GTK_ZIEL_ABLEGEN = 4            ' GTK_DEST_DEFAULT_DROP: die Bewegung beantwortet das Programm selbst
 CONST GDK_AKTION_KOPIEREN = 2         ' GDK_ACTION_COPY
+CONST GDK_AKTION_VERSCHIEBEN = 4      ' GDK_ACTION_MOVE
+CONST GDK_KNOPF1_MASKE = 256          ' GDK_BUTTON1_MASK
+' Ziehen innerhalb des Programms: Text traegt, was gezogen wird (glutfaden:garn:..., glutfaden:ebene:...)
+DECLARE SUB gtk_drag_source_set LIB GTK (w AS ZEIGER, knoepfe AS LONG, ziele AS ZEIGER, n AS LONG, aktionen AS LONG)
+DECLARE SUB gtk_drag_source_add_text_targets LIB GTK (w AS ZEIGER)
+DECLARE SUB gtk_drag_dest_add_text_targets LIB GTK (w AS ZEIGER)
+DECLARE FUNCTION gtk_drag_source_get_target_list LIB GTK (w AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_drag_dest_get_target_list LIB GTK (w AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_selection_data_set_text LIB GTK (sel AS ZEIGER, text AS TEXT, laenge AS LONG) AS BOOLEAN
+DECLARE FUNCTION gtk_selection_data_get_text LIB GTK (sel AS ZEIGER) AS ZEIGER
+DECLARE SUB gdk_drag_status LIB GDK (kontext AS ZEIGER, aktion AS LONG, zeit AS ULONG)
+DECLARE SUB gtk_list_box_drag_highlight_row LIB GTK (liste AS ZEIGER, zeile AS ZEIGER)
+DECLARE SUB gtk_list_box_drag_unhighlight_row LIB GTK (liste AS ZEIGER)
+DECLARE FUNCTION gtk_list_box_get_row_at_y LIB GTK (liste AS ZEIGER, y AS LONG) AS ZEIGER
 DECLARE SUB gtk_adjustment_set_value LIB GTK (a AS ZEIGER, wert AS FLOAT)
 DECLARE FUNCTION gtk_adjustment_get_upper LIB GTK (a AS ZEIGER) AS FLOAT
 DECLARE FUNCTION gtk_adjustment_get_page_size LIB GTK (a AS ZEIGER) AS FLOAT
@@ -227,6 +242,7 @@ DECLARE FUNCTION g_slist_length LIB GLIB (liste AS ZEIGER) AS ULONG
 DECLARE FUNCTION g_slist_nth_data LIB GLIB (liste AS ZEIGER, n AS ULONG) AS ZEIGER
 DECLARE SUB g_slist_free LIB GLIB (liste AS ZEIGER)
 DECLARE FUNCTION gtk_event_box_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_event_box_set_visible_window LIB GTK (k AS ZEIGER, sichtbar AS BOOLEAN)
 DECLARE FUNCTION gtk_menu_new LIB GTK () AS ZEIGER
 DECLARE FUNCTION gtk_menu_item_new_with_label LIB GTK (text AS TEXT) AS ZEIGER
 DECLARE FUNCTION gtk_check_menu_item_new_with_label LIB GTK (text AS TEXT) AS ZEIGER
@@ -371,6 +387,7 @@ STRUCT PangoRechteck LAYOUT C
     hoehe AS LONG
 END STRUCT
 ' GdkRectangle hat dieselbe Lage
+DECLARE SUB gtk_widget_get_allocation LIB GTK (w AS ZEIGER, lage AS PangoRechteck)
 STRUCT GdkRGBA LAYOUT C
     rot AS FLOAT
     gruen AS FLOAT
@@ -418,6 +435,18 @@ DECLARE FUNCTION signalSeite LIB GOBJECT ALIAS "g_signal_connect_data" _
 ' drag-data-received: Kontext, x, y, Auswahl, Art, Zeit
 DECLARE FUNCTION signalAblage LIB GOBJECT ALIAS "g_signal_connect_data" _
     (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, kontext AS ZEIGER, x AS LONG, y AS LONG, auswahl AS ZEIGER, art AS ULONG, zeit AS ULONG, daten AS ZEIGER), _
+     daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
+' drag-data-get: Kontext, Auswahl, Art, Zeit
+DECLARE FUNCTION signalZiehDaten LIB GOBJECT ALIAS "g_signal_connect_data" _
+    (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, kontext AS ZEIGER, auswahl AS ZEIGER, art AS ULONG, zeit AS ULONG, daten AS ZEIGER), _
+     daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
+' drag-motion: Kontext, x, y, Zeit -- TRUE = hier darf abgelegt werden
+DECLARE FUNCTION signalZiehBewegung LIB GOBJECT ALIAS "g_signal_connect_data" _
+    (objekt AS ZEIGER, name AS TEXT, rueckruf AS FUNCTION(objekt AS ZEIGER, kontext AS ZEIGER, x AS LONG, y AS LONG, zeit AS ULONG, daten AS ZEIGER) AS BOOLEAN, _
+     daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
+' drag-leave: Kontext, Zeit
+DECLARE FUNCTION signalZiehWeg LIB GOBJECT ALIAS "g_signal_connect_data" _
+    (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, kontext AS ZEIGER, zeit AS ULONG, daten AS ZEIGER), _
      daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
 DECLARE FUNCTION signalZeile LIB GOBJECT ALIAS "g_signal_connect_data" _
     (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, zeile AS ZEIGER, daten AS ZEIGER), _

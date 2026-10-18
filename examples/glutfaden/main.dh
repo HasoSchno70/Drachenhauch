@@ -94,6 +94,7 @@ IMPORT "ansicht/farbquellen.dh"
 IMPORT "ansicht/drucken.dh"
 IMPORT "ansicht/ablage.dh"
 IMPORT "ansicht/fremdimport.dh"
+IMPORT "ansicht/ziehen.dh"
 
 ' Farben: dunkel wie das Logo, Glut (#ff8a3d) fuer alles, was gewaehlt ist
 CONST STIL = "window, .flaeche { background-color: @gf_fenster; color: @gf_text; }" + _
