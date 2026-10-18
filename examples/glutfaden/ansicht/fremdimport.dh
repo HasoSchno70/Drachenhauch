@@ -186,14 +186,14 @@ END SUB
 FUNCTION fiZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM b AS FLOAT : b = gtk_widget_get_allocated_width(w)
     DIM h AS FLOAT : h = gtk_widget_get_allocated_height(w)
-    cairo_set_source_rgb(cr, 0.16, 0.17, 0.20)
+    cairoFarbe(cr, uiFarbe(&H202228))
     cairo_paint(cr)
     IF fiBild = 0 OR fiErgebnis IS NIL THEN
         DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
         pango_layout_set_text(layout, "Keine Vorschau verfügbar", -1)
         DIM tb AS INTEGER, th AS INTEGER
         pango_layout_get_pixel_size(layout, tb, th)
-        cairo_set_source_rgb(cr, 0.55, 0.58, 0.63)
+        cairoFarbe(cr, uiFarbe(&H8D93A1))
         cairo_move_to(cr, (b - tb) / 2, (h - th) / 2)
         pango_cairo_show_layout(cr, layout)
         g_object_unref(layout)

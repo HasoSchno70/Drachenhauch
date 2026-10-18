@@ -14,6 +14,7 @@ DIM edAutoMin AS INTEGER
 DIM edBak AS INTEGER
 DIM edSchnapp AS INTEGER
 DIM edStart AS INTEGER
+DIM edThema AS INTEGER
 DIM edZuletzt AS INTEGER
 DIM edFenster AS INTEGER
 DIM edBeenden AS INTEGER
@@ -184,6 +185,8 @@ FUNCTION edBauen() AS INTEGER
     edRein(s, edZeile("Zuletzt geöffnet (Anzahl):", edZuletzt, "So viele Dateien stehen unter Muster -> Zuletzt geöffnet; 0 = keine Liste"))
     edFenster = edKaestchen("Fenstergröße wiederherstellen", "Startet in der Größe, in der Glutfaden zuletzt geschlossen wurde")
     edRein(s, edFenster)
+    edThema = imKlappliste(["Dunkel", "Hell"], 0)
+    edRein(s, edZeile("Erscheinungsbild:", edThema, "Gilt sofort nach Übernehmen"))
     edAbschnitt(s, "Nachfragen und Meldungen")
     edBeenden = edKaestchen("Vor dem Beenden fragen", "Fragt auch dann, wenn nichts ungesichert ist")
     edRein(s, edBeenden)
@@ -379,6 +382,7 @@ SUB edFuellen(e AS kern.Einstellungen)
     gtk_toggle_button_set_active(edBak, e.sicherungskopie)
     gtk_spin_button_set_value(edSchnapp, e.schnappschussMinuten)
     gtk_combo_box_set_active(edStart, e.startAktion)
+    gtk_combo_box_set_active(edThema, IIF(e.thema = "light", 1, 0))
     gtk_spin_button_set_value(edZuletzt, e.zuletztAnzahl)
     gtk_toggle_button_set_active(edFenster, e.fensterMerken)
     gtk_toggle_button_set_active(edBeenden, e.beendenFragen)
@@ -440,6 +444,7 @@ SUB edUebernehmen()
     einst.sicherungskopie = gtk_toggle_button_get_active(edBak)
     einst.schnappschussMinuten = gtk_spin_button_get_value_as_int(edSchnapp)
     einst.startAktion = MAX(0, gtk_combo_box_get_active(edStart))
+    einst.thema = IIF(gtk_combo_box_get_active(edThema) = 1, "light", "dark")
     einst.zuletztAnzahl = gtk_spin_button_get_value_as_int(edZuletzt)
     einst.fensterMerken = gtk_toggle_button_get_active(edFenster)
     einst.beendenFragen = gtk_toggle_button_get_active(edBeenden)
@@ -623,6 +628,7 @@ END SUB
 
 ' Nach dem Laden oder Uebernehmen: alles, was Einstellungen liest, nachziehen.
 SUB einstellungenAnwenden()
+    themaAnwenden()
     einstTafel = kern.kuerzelTafel(einst)
     tippsAuffrischen()
     IF lwSchrift <> 0 THEN pango_font_description_free(lwSchrift)

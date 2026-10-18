@@ -61,6 +61,7 @@ CLASS Einstellungen
     DIM rueckKappe AS INTEGER            ' backstitch_cap_style 0 rund, 1 eckig, 2 flach
     ' Farben
     DIM palette AS STRING                ' default_palette
+    DIM thema AS STRING                  ' theme: dark / light
     DIM katalog AS BOOLEAN               ' show_catalog
     DIM farbleiste AS BOOLEAN            ' show_color_bar (eigener Schluessel, PySticky: Dock)
     DIM farbleisteGroesse AS INTEGER     ' color_bar_size 20..60
@@ -128,6 +129,7 @@ SUB einstellungenVorgabe(e AS Einstellungen)
     e.rueckBreite = 2
     e.rueckEinrasten = TRUE
     e.palette = "DMC"                    ' PySticky: Anchor; Glutfaden nahm schon immer DMC
+    e.thema = "dark"
     e.katalog = TRUE
     e.farbleiste = TRUE
     e.farbleisteGroesse = 48
@@ -170,6 +172,7 @@ SUB einstellungenOrdnen(e AS Einstellungen)
     e.schnappschussMinuten = CLAMP(e.schnappschussMinuten, 5, 240)
     e.startAktion = CLAMP(e.startAktion, 0, LEN(startAktionen()) - 1)
     e.zuletztAnzahl = CLAMP(e.zuletztAnzahl, 0, 20)
+    IF e.thema <> "light" THEN e.thema = "dark"
     e.meldungSekunden = CLAMP(e.meldungSekunden, 1, 30)
     e.rasterHaupt = CLAMP(e.rasterHaupt, 5, 50)
     e.rasterNeben = CLAMP(e.rasterNeben, 1, MIN(20, e.rasterHaupt - 1))
@@ -298,6 +301,7 @@ FUNCTION einstellungenLaden(pfad AS STRING) AS Einstellungen
     IF esBool(j, "backstitch_snap", b) THEN e.rueckEinrasten = b
     IF jsonGanz(j, "backstitch_line_style", z) THEN e.rueckLinie = z
     IF jsonGanz(j, "backstitch_cap_style", z) THEN e.rueckKappe = z
+    IF esText(j, "theme", t) THEN e.thema = t
     IF esText(j, "default_palette", t) THEN
         IF TRIM$(t) <> "" THEN e.palette = TRIM$(t)
     END IF
@@ -380,6 +384,7 @@ FUNCTION einstellungenJson$(e AS Einstellungen) AS STRING
     JSON_SET_INT(j, "backstitch_line_style", e.rueckLinie)
     JSON_SET_INT(j, "backstitch_cap_style", e.rueckKappe)
     JSON_SET_STRING(j, "default_palette", e.palette)
+    JSON_SET_STRING(j, "theme", e.thema)
     JSON_SET_BOOL(j, "show_catalog", e.katalog)
     JSON_SET_BOOL(j, "show_color_bar", e.farbleiste)
     JSON_SET_INT(j, "color_bar_size", e.farbleisteGroesse)
@@ -810,4 +815,67 @@ FUNCTION zoomBereich(e AS Einstellungen) AS TUPLE
     DIM von AS INTEGER : von = MAX(1, ROUND(e.zelleMin * 100.0 / s))
     DIM bis AS INTEGER : bis = MAX(von + 1, ROUND(e.zelleMax * 100.0 / s))
     RETURN (von, bis)
+END FUNCTION
+
+' --- Erscheinungsbild (PySticky styles: DARK_THEME / LIGHT_THEME) -------------------
+
+' Je Rolle: Name, dunkel, hell. Das Stylesheet benutzt die Namen (@gf_name,
+' GTKs @define-color); die gezeichneten Teile um die Flaeche fragen
+' themaFarbe mit der dunklen Farbe -- so steht jede Farbe genau einmal hier.
+FUNCTION themaTafel() AS ARRAY OF STRING
+    RETURN ["fenster", "1b1c20", "fbfbfd",
+        "kopf_oben", "2c2e35", "f3f4f8",
+        "kopf_unten", "22242a", "e6e8ef",
+        "linie", "0c0d10", "b8bccf",
+        "titel", "f2f3f7", "1a1a2e",
+        "leise2", "9aa0ad", "6a6a8a",
+        "knopf_text", "d6d9e1", "3a3a60",
+        "leiste", "202228", "ecedf3",
+        "feld", "2a2c33", "ffffff",
+        "text", "e4e5ea", "1a1a2e",
+        "rand", "3a3c44", "9aa1bd",
+        "zoom", "c9ccd4", "3a3a60",
+        "leise", "8d93a1", "6a6a8a",
+        "akzent", "ff8a3d", "d4661a",
+        "benutzt", "ffb27a", "b8601e",
+        "flaeche2", "33363e", "dde0eb",
+        "status", "16171b", "e6e8ef",
+        "zahl", "5c606b", "9aa0ad",
+        "karte", "26282f", "f3f4f8",
+        "reiter", "b9bdc8", "4a4a6a",
+        "warn", "e0b040", "a87a10",
+        "ok", "40c870", "22a060",
+        "t_orange", "4a3527", "fbe3d2",
+        "t_blau", "263547", "dbe6f5",
+        "t_tuerkis", "234240", "d6efec",
+        "t_lila", "3a2f4a", "ece2f7",
+        "lineal_text", "6a6e78", "9aa0ad"]
+END FUNCTION
+
+FUNCTION themaHell(e AS Einstellungen) AS BOOLEAN
+    RETURN e.thema = "light"
+END FUNCTION
+
+' Die Farbdefinitionen vor dem Stylesheet
+FUNCTION stilFarben$(hell AS BOOLEAN) AS STRING
+    DIM t AS ARRAY OF STRING : t = themaTafel()
+    DIM aus AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1 STEP 3
+        aus = aus + "@define-color gf_" + t[i] + " #" + t[i + IIF(hell, 2, 1)] + ";" + CHR$(10)
+    NEXT
+    aus = aus + "@define-color gf_hover " + IIF(hell, "alpha(#000000, 0.06)", "alpha(#ffffff, 0.08)") + ";" + CHR$(10)
+    aus = aus + "@define-color gf_gewaehlt_text " + IIF(hell, "#1a1a2e", "#ffffff") + ";" + CHR$(10)
+    RETURN aus
+END FUNCTION
+
+' Eine Farbe der dunklen Oberflaeche im gewaehlten Thema (unbekannte bleiben)
+FUNCTION themaFarbe(f AS INTEGER, hell AS BOOLEAN) AS INTEGER
+    IF NOT hell THEN RETURN f
+    DIM t AS ARRAY OF STRING : t = themaTafel()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1 STEP 3
+        IF VAL("&H" + t[i + 1]) = f THEN RETURN VAL("&H" + t[i + 2])
+    NEXT
+    RETURN f
 END FUNCTION

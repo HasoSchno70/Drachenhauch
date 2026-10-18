@@ -500,11 +500,16 @@ SUB cairoFarbe(cr AS INTEGER, f AS INTEGER)
 END SUB
 
 ' Ein Stylesheet fuer den ganzen Bildschirm laden; Rueckgabe "" oder der Fehler.
+' Ein zweiter Aufruf laedt denselben Anbieter neu (Themawechsel), statt
+' einen weiteren obenauf zu legen.
+DIM gtkStilAnbieter AS INTEGER
+
 FUNCTION gtkStil$(css AS STRING) AS STRING
-    DIM p AS INTEGER : p = gtk_css_provider_new()
+    DIM neu AS BOOLEAN : neu = gtkStilAnbieter = 0
+    IF neu THEN gtkStilAnbieter = gtk_css_provider_new()
     DIM f AS INTEGER
-    IF NOT gtk_css_provider_load_from_data(p, css, -1, f) THEN RETURN gtkFehler$(f)
-    gtk_style_context_add_provider_for_screen(gdk_screen_get_default(), p, GTK_VORRANG_ANWENDUNG)
+    IF NOT gtk_css_provider_load_from_data(gtkStilAnbieter, css, -1, f) THEN RETURN gtkFehler$(f)
+    IF neu THEN gtk_style_context_add_provider_for_screen(gdk_screen_get_default(), gtkStilAnbieter, GTK_VORRANG_ANWENDUNG)
     RETURN ""
 END FUNCTION
 
