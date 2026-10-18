@@ -336,7 +336,7 @@ vorgaben: ameisen TRUE | textur TRUE | stickzeit TRUE | hervorheben FALSE | bibl
 textur an: leere zelle 7,7 mitte punkt | dunkler TRUE
 textur aus: leere mitte stoff | volle zelle 10,7 gleich wie mit textur TRUE
 unter 8 punkten: stoff
-auswahl: takt laeuft TRUE | kante glut ja dunkel ja | beide etwa gleich ja
+auswahl: takt laeuft TRUE | kante glut ja dunkel ja | beide etwa gleich ja | ohne luecke TRUE
 nach 300 ms: weitergerueckt TRUE | kante bewegt TRUE
 anderes werkzeug: takt aus TRUE | auswahl weg TRUE
 ohne einstellung: takt FALSE | kante glut ja dunkel ja | beide etwa gleich ja

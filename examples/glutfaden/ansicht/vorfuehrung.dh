@@ -2586,7 +2586,16 @@ FUNCTION vorfuehrenStufe22(daten AS INTEGER) AS BOOLEAN
             mrAuswahl = kern.auswahlRechteck(lwMuster.breite, lwMuster.hoehe, 2, 2, 9, 5)
             v22Bild = v20Bild()
             v22Stand = mrAmeisenStand
-            PRINT "auswahl: takt laeuft "; mrAmeisenNr <> 0; " | kante "; v22Kante$(v22Bild)
+            ' Zwei Farben ohne Luecke: entlang der oberen Kante weicht jeder Punkt
+            ' vom Bild ohne Auswahl ab (einfarbig zeigten die Luecken den Grund)
+            DIM aw AS kern.Auswahl : aw = mrAuswahl
+            mrAuswahl = NIL
+            DIM ohne AS INTEGER : ohne = v20Bild()
+            mrAuswahl = aw
+            DIM ky AS FLOAT : ky = lwY + 2 * lwZelle
+            DIM gedeckt AS INTEGER : gedeckt = v20AndersAuf(ohne, v22Bild, lwX + 2 * lwZelle + 2, ky, lwX + 10 * lwZelle - 2, ky, 60)
+            cairo_surface_destroy(ohne)
+            PRINT "auswahl: takt laeuft "; mrAmeisenNr <> 0; " | kante "; v22Kante$(v22Bild); " | ohne luecke "; gedeckt >= 57
         CASE 3
             DIM g AS INTEGER : g = v20Bild()
             PRINT "nach 300 ms: weitergerueckt "; mrAmeisenStand <> v22Stand; " | kante bewegt "; v20AndersAuf(v22Bild, g, lwX + 2 * lwZelle + 2, lwY + 2 * lwZelle, lwX + 10 * lwZelle - 2, lwY + 2 * lwZelle, 60) > 0

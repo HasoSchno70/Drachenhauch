@@ -2458,6 +2458,42 @@ Standardlader von GdkPixbuf. Kuerzel-Tafel 76. Sammlung
 `tests/pruef/glutfaden_stufe21.dhtest` (3); Stufen 13 und 20 nachgezogen; 18
 Verfaelschungen fallen je in ihrem Fall.
 
+**Stufe 22: Kleinigkeiten aus PySticky** (2026-10-18). **Laufende
+Auswahlkante** (`marching_ants`, Vorgabe an): die Kante wird zweimal
+gestrichelt (8 an, 8 aus) in Glut und Dunkel, gegeneinander versetzt, und
+rueckt alle 120 ms um zwei Punkte weiter (`mrAmeisen*` in `ansicht/mehr.dh`)
+-- der Takt laeuft nur, solange eine Auswahl da ist und ein Auswahlwerkzeug
+gewaehlt; er beendet sich selbst. **Aida-Textur** (`fabric_texture`): ein
+Punkt (180,170,150, Deckkraft 70) in jeder leeren Zelle ab 8 Pixeln, nicht
+beim Diamond Painting, EIN Pfad fuer den ganzen Ausschnitt
+(`lwStoffTextur`). **Ziehen** (`ansicht/ziehen.dh`): ein Garn aus dem Katalog
+auf die Farbleiste nimmt es ins Muster; eine Ebene in der Liste wird
+verschoben oder in der mittleren Haelfte einer anderen Zeile mit ihr
+zusammengefuehrt (`kern.ebenenZug` = PyStickys dragMoveEvent/dropEvent,
+`kern.ebenenZusammenfuehren` = `merge_layers`; gesperrte Quelle ODER Ziel
+abgelehnt wie PyStickys Liste, ohne PyStickys Rueckfrage -- Strg+Z nimmt es
+zurueck). **Zwei GTK-Fallen:** die Zeilen einer GtkListBox haben in GTK 3 kein
+eigenes Fenster und bekaemen den Druck fuer ein Ziehen nie -- jede Zeile hat
+darum einen unsichtbaren `GtkEventBox` als Quelle (`ziehQuelle`); und
+ausgefuehrt wird erst nach dem Ziehen (`zhVormerken`, 30 ms), weil
+`allesNeu` die Liste mitten im Ziehen des Systems zerstoeren wuerde.
+Getragen wird ein Text (`kern.ziehText$`/`ziehLesen`); fremder Text auf der
+Farbleiste geht als Datei an die Ablage weiter. **Einstellungen**
+`library_path`/`templates_path` (ein Ordner, der nicht geht, faellt auf die
+Vorgabe zurueck, `kern.eigenerOrdner$`), `highlight_selected` (**Vorgabe
+AUS**, PySticky: an -- dort daempft dann jede Farbwahl alle anderen Farben,
+was ohne die Einstellung zu kennen wie ein Fehler aussieht) und
+`stitch_timer_enabled`. **"Neu in Glutfaden"** am Logo-Knopf (der jetzt ein
+Menue zeigt: Ueber, Neu, Tastenkuerzel), Inhalt in `daten/neuigkeiten.txt`
+(`kern.neuigkeitenLesen`). Sammlung `tests/pruef/glutfaden_stufe22.dhtest` (3,
+der erste gegen PySticky: 23 Zuege auf zwei Mustern, Entscheidung und
+Ausfuehrung gleich); Stufe 13 nachgezogen. 24 von 25 Verfaelschungen fallen;
+die 25. (`eigenerOrdner$` nimmt eine Datei als Ordner) ist gleichwertig, weil
+`MKDIR` auf eine vorhandene Datei schon vorher wirft. Eine fiel erst nach
+einem Nachtrag: die Kante mit nur EINER Farbe -- die Probe "glut und dunkel
+vorhanden" traf dunkle Stiche unter den Luecken; jetzt muss jeder Punkt der
+Kante vom Bild ohne Auswahl abweichen.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als
