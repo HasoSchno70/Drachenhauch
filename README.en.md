@@ -74,7 +74,7 @@ Details in the [manual](docs/en/README.md); how it got there is in the
 
 ## Download
 
-**[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 55 MB, currently version 2026.31.
+**[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 56 MB, currently version 2026.32.
 
 You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 225 examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
 
@@ -97,8 +97,8 @@ rust\drachenhauch_runtime\target\release\dhrt test tests\pruef         # all che
 
 | Edition | For printing (A4) | For e-readers |
 |---|---|---|
-| **English** — 535 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
-| **Deutsch** — 544 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
+| **English** — 539 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
+| **Deutsch** — 548 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
 
 Both languages come out of the **same** chapter sources (`content/NN_*.js`): the renderers are handed an `H` that puts every string through the catalogue `i18n/en.json` first. A second set of English chapter files would have drifted from the German inside a month — this way it cannot. If an entry is missing, the German sentence stays and the book still builds; `node fehlend.js en` counts what is still outstanding.
 
@@ -277,6 +277,9 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 | `98_coroutines.dh` | **coroutines/`YIELD`**: generators, `FOR EACH` drain, send/return dialog, `CORO_RESULT`, method coroutine |
 | `154_chart.dh` | **charts**: all six kinds, themes, mouse interaction |
 | `156_gui_alle_widgets.dh` | **all 22 GUI widgets** in one fullscreen application, each with a real job |
+| `glutfaden/main.dh` | **Glutfaden** — the cross-stitch editor PySticky in Drachenhauch, with GTK 3 through foreign libraries: part and back stitches, layers, image import, PDF/HTML/OXS export, PCStitch and Pattern Maker, printing, light and dark theme |
+| `texteditor/main.dh` | **text editor** — tabs, find and replace, encoding and line endings kept on save |
+| `fotos/main.dh` | **photo viewer with GTK 3** — overview, single view, rotation from camera data, slideshow |
 | `157_gui_tabelle.dh`, `158_gui_tabelle_sqlite.dh` | **professional table** — sort, filter, edit cells; the second one against a real SQLite database |
 | `159_esp32_bruecke.dh` | **connect an ESP32** — receive readings, send commands back (sketch in [esp32/](esp32/)) |
 | `160_musik_seek.dh` | **Jumping through music** (`AUDIO_MUSIC_SEEK`) — clickable progress bar, ±10 s, and the buffered lead a jump has to play out first |
