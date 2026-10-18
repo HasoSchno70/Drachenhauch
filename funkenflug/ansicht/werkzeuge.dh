@@ -23,6 +23,9 @@ CONST K_GLEICH = &H3D
 CONST K_MINUS = &H2D
 CONST K_NULL = &H30
 CONST K_F2 = &HFFBF
+CONST K_C = &H63
+CONST K_V = &H76
+CONST K_X = &H78
 
 FUNCTION evKnopf(ev AS INTEGER) AS INTEGER
     DIM k AS INTEGER
@@ -52,15 +55,19 @@ SUB mausSetzen(px AS FLOAT, py AS FLOAT)
 END SUB
 
 SUB auswahlAufheben()
+    mengeLeeren()
     gHatGewaehlt = FALSE
     gHatLabel = FALSE
     gHatDraht = FALSE
 END SUB
 
+DIM gSegmentZug AS BOOLEAN        ' laeuft gerade ein Segment-Zug (statt Gruppen-Zug)?
+
 ' --- Draehte waehlen und ziehen ------------------------------------------
 
 SUB drahtWaehlen(wi AS INTEGER, si AS INTEGER)
     auswahlAufheben()
+    ARRAY_PUSH(gSelD, gBlatt.draehte[wi])
     gDrahtGewaehlt = gBlatt.draehte[wi]
     gHatDraht = TRUE
     gSegment = si
@@ -283,9 +290,7 @@ SUB bauteilPlatzieren()
     DIM b AS kern.Bauteil : b = kern.neuesBauteil(gSymbolRef, l)
     b.referenz = naechsteReferenz(b.sym.praefix)
     ARRAY_PUSH(gBlatt.bauteile, b)
-    auswahlAufheben()
-    gGewaehlt = b
-    gHatGewaehlt = TRUE
+    waehleB(b)
     geaendert()
 END SUB
 
@@ -320,6 +325,11 @@ END SUB
 ' bis zu zwei Teile), mit ganzerDraht der ganze Draht.
 SUB auswahlLoeschen(ganzerDraht AS BOOLEAN)
     DIM i AS INTEGER, k AS INTEGER
+    IF auswahlAnzahl() > 1 THEN
+        mengeLoeschen()
+        RETURN
+    END IF
+    IF gHatDraht AND gSegment < 0 THEN ganzerDraht = TRUE     ' per Rahmen gewaehlt
     IF gHatDraht THEN
         FOR i = 0 TO LEN(gBlatt.draehte) - 1
             IF gBlatt.draehte[i] = gDrahtGewaehlt THEN
@@ -373,7 +383,7 @@ SUB auswahlDrehen()
         verlaufMerken()
         gGewaehlt.lage.drehung = (gGewaehlt.lage.drehung + 90) MOD 360
         geaendert()
-    ELSEIF NOT gHatLabel AND NOT gHatDraht THEN
+    ELSEIF auswahlAnzahl() = 0 THEN
         gPlatzDreh = (gPlatzDreh + 90) MOD 360     ' Vorschau beim Platzieren
         neuZeichnen()
     END IF
@@ -388,9 +398,7 @@ SUB labelSetzen()
     verlaufMerken()
     DIM la AS kern.Label : la = NEW kern.Label(text, ort, kern.LA_LOKAL)
     ARRAY_PUSH(gBlatt.labels, la)
-    auswahlAufheben()
-    gLabelGewaehlt = la
-    gHatLabel = TRUE
+    waehleL(la)
     geaendert()
 END SUB
 
@@ -435,32 +443,7 @@ FUNCTION lwDruck(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
                 auswahlBearbeiten()
                 RETURN TRUE
             END IF
-            auswahlAufheben()
-            gZiehGemerkt = FALSE
-            DIM li AS INTEGER : li = labelIndexUnter(px, py)
-            IF li >= 0 THEN
-                gLabelGewaehlt = gBlatt.labels[li]
-                gHatLabel = TRUE
-                gZieht = TRUE
-                gZiehDX = gLabelGewaehlt.anker.x - gMausWX
-                gZiehDY = gLabelGewaehlt.anker.y - gMausWY
-            ELSE
-                DIM idx AS INTEGER : idx = bauteilIndexUnter(gMausRX, gMausRY)
-                IF idx >= 0 THEN
-                    gGewaehlt = gBlatt.bauteile[idx]
-                    gHatGewaehlt = TRUE
-                    gZieht = TRUE
-                    gZiehDX = gGewaehlt.lage.pos.x - gMausWX
-                    gZiehDY = gGewaehlt.lage.pos.y - gMausWY
-                ELSE
-                    DIM wi AS INTEGER, si AS INTEGER
-                    IF drahtUnter(px, py, wi, si) THEN
-                        drahtWaehlen(wi, si)
-                        gZieht = TRUE
-                        drahtZiehBeginn()
-                    END IF
-                END IF
-            END IF
+            klickAuswahl(px, py, (evZustand(ev) BAND GDK_UMSCHALT) <> 0)
             neuZeichnen()
         CASE WZ_BAUTEIL
             bauteilPlatzieren()
@@ -482,32 +465,80 @@ FUNCTION lwDruck(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
     RETURN TRUE
 END FUNCTION
 
+' Klick mit dem Auswahl-Werkzeug. Getroffen wird in dieser Reihenfolge:
+' Label, Bauteil, Draht. Umschalt schaltet das Getroffene in der Auswahl um.
+' Klick auf ein Element einer Mehrfachauswahl zieht die ganze Auswahl; ein
+' einzelner Draht zieht nur sein Segment; leere Flaeche zieht einen Rahmen.
+SUB klickAuswahl(px AS FLOAT, py AS FLOAT, umsch AS BOOLEAN)
+    gZiehGemerkt = FALSE
+    gSegmentZug = FALSE
+    DIM li AS INTEGER : li = labelIndexUnter(px, py)
+    DIM idx AS INTEGER : idx = -1
+    DIM wi AS INTEGER : wi = -1
+    DIM si AS INTEGER : si = -1
+    IF li < 0 THEN idx = bauteilIndexUnter(gMausRX, gMausRY)
+    IF li < 0 AND idx < 0 THEN
+        IF NOT drahtUnter(px, py, wi, si) THEN wi = -1
+    END IF
+    IF li < 0 AND idx < 0 AND wi < 0 THEN
+        IF NOT umsch THEN auswahlAufheben()
+        gRahmen = TRUE
+        gRahmenSX = px : gRahmenSY = py
+        gRahmenEX = px : gRahmenEY = py
+        RETURN
+    END IF
+    IF umsch THEN
+        IF li >= 0 THEN umschaltenL(gBlatt.labels[li])
+        IF idx >= 0 THEN umschaltenB(gBlatt.bauteile[idx])
+        IF wi >= 0 THEN umschaltenD(gBlatt.draehte[wi])
+        einzelAusMenge()
+        RETURN
+    END IF
+    DIM schonDrin AS BOOLEAN : schonDrin = FALSE
+    IF li >= 0 THEN schonDrin = istGewaehltL(gBlatt.labels[li])
+    IF idx >= 0 THEN schonDrin = istGewaehltB(gBlatt.bauteile[idx])
+    IF wi >= 0 THEN schonDrin = istGewaehltD(gBlatt.draehte[wi])
+    IF schonDrin AND auswahlAnzahl() > 1 THEN
+        gZieht = TRUE
+        gruppenZugBeginn()
+    ELSEIF wi >= 0 THEN
+        drahtWaehlen(wi, si)
+        gZieht = TRUE
+        gSegmentZug = TRUE
+        drahtZiehBeginn()
+    ELSE
+        IF li >= 0 THEN
+            waehleL(gBlatt.labels[li])
+        ELSE
+            waehleB(gBlatt.bauteile[idx])
+        END IF
+        gZieht = TRUE
+        gruppenZugBeginn()
+    END IF
+END SUB
+
 FUNCTION lwLos(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
     gPan = FALSE
-    IF gZieht AND gHatDraht THEN drahtZiehEnde()
+    IF gRahmen THEN
+        gRahmen = FALSE
+        IF ABS(gRahmenEX - gRahmenSX) > 3 OR ABS(gRahmenEY - gRahmenSY) > 3 THEN
+            rahmenAnwendenWelt(weltX(gRahmenSX), weltY(gRahmenSY), weltX(gRahmenEX), weltY(gRahmenEY))
+        END IF
+        neuZeichnen()
+        statusAktualisieren()
+    END IF
+    IF gZieht THEN
+        IF gSegmentZug THEN
+            drahtZiehEnde()
+        ELSE
+            gruppenZugEnde()
+        END IF
+    END IF
     gZieht = FALSE
+    gSegmentZug = FALSE
     gZiehGemerkt = FALSE
     RETURN TRUE
 END FUNCTION
-
-' Ziehen: der Undo-Schnappschuss faellt erst bei der ersten echten Bewegung,
-' ein blosser Klick erzeugt keinen leeren Verlaufsschritt.
-SUB ziehenNach(nx AS INTEGER, ny AS INTEGER)
-    IF gHatLabel THEN
-        IF gLabelGewaehlt.anker.x = nx AND gLabelGewaehlt.anker.y = ny THEN RETURN
-        IF NOT gZiehGemerkt THEN verlaufMerken() : gZiehGemerkt = TRUE
-        gLabelGewaehlt.anker = NEW kern.Punkt(nx, ny)
-    ELSEIF gHatGewaehlt THEN
-        IF gGewaehlt.lage.pos.x = nx AND gGewaehlt.lage.pos.y = ny THEN RETURN
-        IF NOT gZiehGemerkt THEN verlaufMerken() : gZiehGemerkt = TRUE
-        gGewaehlt.lage.pos = NEW kern.Punkt(nx, ny)
-    ELSE
-        RETURN
-    END IF
-    netzeVeraltet()
-    gGeaendert = TRUE
-    titelNachziehen()
-END SUB
 
 FUNCTION lwBewegung(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM px AS FLOAT, py AS FLOAT
@@ -521,11 +552,14 @@ FUNCTION lwBewegung(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
         RETURN TRUE
     END IF
     mausSetzen(px, py)
-    IF gZieht THEN
-        IF gHatDraht THEN
+    IF gRahmen THEN
+        gRahmenEX = px
+        gRahmenEY = py
+    ELSEIF gZieht THEN
+        IF gSegmentZug THEN
             drahtZiehenUm(gMausWX - gZiehStartX, gMausWY - gZiehStartY)
         ELSE
-            ziehenNach(gMausWX + gZiehDX, gMausWY + gZiehDY)
+            gruppenZiehenUm(gMausWX - gzStartX, gMausWY - gzStartY)
         END IF
     END IF
     hoverBestimmen(px, py)
@@ -571,6 +605,10 @@ FUNCTION lwTaste(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
             CASE K_O : dateiOeffnen()
             CASE K_Z : verlaufZurueck()
             CASE K_Y, K_Z_GROSS : verlaufVor()
+            CASE K_C : ablageKopieren()
+            CASE K_X : ablageAusschneiden()
+            CASE K_V : ablageEinfuegen()
+            CASE K_A : alleWaehlen()
             CASE ELSE : RETURN FALSE
         END SELECT
         RETURN TRUE
@@ -579,8 +617,10 @@ FUNCTION lwTaste(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
         CASE K_ESC
             gDrahtAktiv = FALSE
             gDrahtPunkte = []
+            gRahmen = FALSE
             auswahlAufheben()
             neuZeichnen()
+            statusAktualisieren()
         CASE K_RETURN
             IF gDrahtAktiv THEN
                 drahtEndePunkt()

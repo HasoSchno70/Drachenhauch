@@ -24,7 +24,7 @@ einem Programm, das es mitbringt (**Inkscape**, GIMP). Die Bibliotheks-Namen in
 
 | Werkzeug | |
 |---|---|
-| **Auswahl** (Taste `A`) | Bauteil, Label oder Draht anklicken, ziehen zum Verschieben; **Doppelklick**, `E` oder `Enter` bearbeitet (Bauteil: Referenz/Wert; Label und Draht: Netz umbenennen) |
+| **Auswahl** (Taste `A`) | Bauteil, Label oder Draht anklicken, ziehen zum Verschieben; auf freier Fläche einen **Rahmen** aufziehen (wählt alles ganz Umschlossene), `Umschalt` ergänzt bzw. schaltet einzelne Elemente um; **Doppelklick**, `E` oder `Enter` bearbeitet (Bauteil: Referenz/Wert; Label und Draht: Netz umbenennen) |
 | **Draht** (Taste `W`) | klicken setzt Eckpunkte, Doppelklick / `Enter` / rechte Maustaste schließt ab, `Esc` bricht ab. Enden fangen an Pins und Drahtenden |
 | **Label** (Taste `L`) | klicken, Netznamen eingeben. Der Anker ist der elektrische Punkt; **gleichnamige Labels sind ein Netz** |
 | **Bauteil** | in der Leiste aus der Liste wählen, dann auf die Fläche klicken; rechte Maustaste oder `R` dreht die Vorschau |
@@ -34,6 +34,18 @@ Kopfleiste machen rückgängig und wiederholen. `R` dreht die Auswahl, `Entf`
 löscht sie, Mausrad zoomt um den Zeiger, mittlere Maustaste schiebt,
 `+`/`-`/`0` zoomen, `Strg+S` speichert, `Strg+O` öffnet. Eine schon vergebene
 Referenz lehnt der Eigenschaften-Dialog ab.
+
+**Gummiband:** Zieht man Bauteile (einzeln oder als Auswahl), wandern die
+angeschlossenen Drahtenden mit. Damit die Leitung rechtwinklig bleibt, rückt
+die Nachbarecke mit oder es entsteht ein Knick; Drähte, deren beide Enden
+mitwandern, verschieben sich starr, ebenso Labels an bewegten Pins.
+
+**Ablage:** `Strg+C` kopiert, `Strg+X` schneidet aus, `Strg+V` fügt an der
+Mausposition ein, `Strg+A` wählt alles. Das läuft über die Zwischenablage des
+Systems, also auch zwischen zwei Funkenflug-Fenstern. Eingefügte Bauteile
+bekommen freie Referenzen (eine Kopie von R1 wird z. B. R8), Labels und
+Versorgungen behalten ihre Namen und hängen damit am selben Netz wie das
+Original. Das Eingefügte ist danach gewählt und lässt sich gleich verschieben.
 
 **Drähte:** Ein Klick wählt das Segment unter der Maus. Ziehen verschiebt nur
 dieses Segment – waagrechte senkrecht, senkrechte waagrecht, damit die Nachbarn
@@ -87,6 +99,7 @@ ansicht/    Zeichenfläche und Werkzeuge – globaler Namensraum
   leinwand.dh    Welt↔Schirm, Grid, Zeichnen von Bauteilen/Drähten/Knoten/Labels
   werkzeuge.dh   Maus, Tastatur, Werkzeug-Logik
   verlauf.dh     Rückgängig/Wiederholen
+  auswahl.dh     Auswahl als Menge, Rahmen, Gruppen-Zug mit Gummiband, Ablage
 main.dh     Fenster, Kopfleiste, Werkzeugleiste, Statuszeile, Dialoge
 ```
 
@@ -94,9 +107,11 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (48 Prüfungen,
-darunter Draht ziehen/löschen, Umbenennen samt Rückfrage, ERC, Netz unter der
-Maus und SPICE-Export).
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (74 Prüfungen,
+darunter Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
+Kopieren/Ausschneiden/Einfügen, Draht ziehen/löschen, Umbenennen samt
+Rückfrage, ERC und SPICE-Export). Der Selbsttest benutzt nur die interne
+Ablage und lässt die Zwischenablage des Systems in Ruhe.
 
 ## Was gegenüber SparkNode bewusst anders ist
 
@@ -139,6 +154,5 @@ zweiten Kondensator wieder „C1".
 
 ## Noch offen (nächste Runden)
 
-Bauteile mit angeschlossenen Drähten ziehen (Gummiband), Mehrfachauswahl,
-Kopieren/Einfügen, mehrere Blätter in der Oberfläche, eigene Symbole und ICs mit Pin-Typen,
+Gruppe drehen/spiegeln, mehrere Blätter in der Oberfläche, eigene Symbole und ICs mit Pin-Typen,
 Stückliste (BOM), Bild-/PDF-Export, Platinen-Layout.

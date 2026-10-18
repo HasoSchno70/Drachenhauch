@@ -452,6 +452,11 @@ DECLARE SUB pango_font_description_free LIB PANGO (schrift AS ZEIGER)
 DECLARE FUNCTION pango_font_description_from_string LIB PANGO (text AS TEXT) AS ZEIGER
 DECLARE SUB pango_font_description_set_absolute_size LIB PANGO (schrift AS ZEIGER, groesse AS FLOAT)
 DECLARE SUB pango_font_description_set_weight LIB PANGO (schrift AS ZEIGER, gewicht AS LONG)
+' --- Zwischenablage
+DECLARE FUNCTION gdk_atom_intern LIB GDK (name AS TEXT, nurVorhanden AS BOOLEAN) AS ZEIGER
+DECLARE FUNCTION gtk_clipboard_get LIB GTK (auswahl AS ZEIGER) AS ZEIGER
+DECLARE SUB gtk_clipboard_set_text LIB GTK (ablage AS ZEIGER, text AS TEXT, laenge AS LONG)
+DECLARE FUNCTION gtk_clipboard_wait_for_text LIB GTK (ablage AS ZEIGER) AS ZEIGER
 ' --- GObject und GLib
 ' g_signal_connect ist in C ein Makro; je Form des Rueckrufs ein Name.
 DECLARE FUNCTION signal LIB GOBJECT ALIAS "g_signal_connect_data" _

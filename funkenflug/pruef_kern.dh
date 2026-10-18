@@ -126,6 +126,28 @@ kern.drahtAufraeumen(wsp)
 PRINT "Spitze bleibt: "; LEN(wsp.punkte); " Ecken  (erwartet 3)"
 PRINT "Pin angeschlossen: "; kern.punktAngeschlossen(sb, 2000, 1800, wa); "  frei: "; kern.punktAngeschlossen(sb, 9000, 9000, wa); "  (erwartet TRUE FALSE)"
 
+' Gummiband
+FUNCTION pl$(p AS ARRAY OF kern.Punkt) AS STRING
+    DIM t AS STRING : t = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(p) - 1
+        IF i > 0 THEN t = t + " "
+        t = t + STR$(p[i].x) + "," + STR$(p[i].y)
+    NEXT
+    RETURN t
+END FUNCTION
+DIM g1 AS ARRAY OF kern.Punkt : g1 = []
+ARRAY_PUSH(g1, NEW kern.Punkt(2000, 1200)) : ARRAY_PUSH(g1, NEW kern.Punkt(2000, 1800))
+PRINT "Gummiband Ende  : "; pl$(kern.gummiband(g1, 2, 500, 0)); "  (erwartet 2000,1200 2000,1800 2500,1800)"
+DIM g2 AS ARRAY OF kern.Punkt : g2 = []
+ARRAY_PUSH(g2, NEW kern.Punkt(2000, 2200)) : ARRAY_PUSH(g2, NEW kern.Punkt(2000, 2800))
+PRINT "Gummiband Anfang: "; pl$(kern.gummiband(g2, 1, 500, 0)); "  (erwartet 2500,2200 2000,2200 2000,2800)"
+DIM g3 AS ARRAY OF kern.Punkt : g3 = []
+ARRAY_PUSH(g3, NEW kern.Punkt(0, 0)) : ARRAY_PUSH(g3, NEW kern.Punkt(0, 1000)) : ARRAY_PUSH(g3, NEW kern.Punkt(1000, 1000))
+PRINT "Nachbar rueckt  : "; pl$(kern.gummiband(g3, 2, 0, 300)); "  (erwartet 0,0 0,1300 1000,1300)"
+PRINT "Gleiten         : "; pl$(kern.gummiband(g3, 2, 200, 0)); "  (erwartet 0,0 0,1000 1200,1000)"
+PRINT "Original bleibt : "; pl$(g3); "  (erwartet 0,0 0,1000 1000,1000)"
+
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
 PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)

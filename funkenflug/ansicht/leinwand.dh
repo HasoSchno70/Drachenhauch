@@ -127,9 +127,7 @@ END FUNCTION
 SUB leinwandDokument(d AS kern.Dokument)
     gDok = d
     gBlatt = d.blaetter[0]
-    gHatGewaehlt = FALSE
-    gHatLabel = FALSE
-    gHatDraht = FALSE
+    auswahlAufheben()
     gDrahtAktiv = FALSE
     vEingepasst = FALSE
     netzeVeraltet()
@@ -236,10 +234,10 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
         DIM dr AS kern.Draht : dr = gBlatt.draehte[i]
         DIM hell AS BOOLEAN : hell = FALSE
         IF hw >= 0 AND LEN(dr.punkte) > 0 THEN hell = aktuelleNetze().wurzelAn(dr.punkte[0].x, dr.punkte[0].y) = hw
-        IF gHatDraht AND dr = gDrahtGewaehlt THEN
+        IF istGewaehltD(dr) THEN
             drahtZeichnen(cr, dr, C_AUSWAHL, 2.5)
             ' das gegriffene Segment kraeftiger
-            IF gSegment >= 0 AND gSegment < LEN(dr.punkte) - 1 THEN
+            IF gHatDraht AND dr = gDrahtGewaehlt AND gSegment >= 0 AND gSegment < LEN(dr.punkte) - 1 THEN
                 cairo_set_line_width(cr, 5.0)
                 cairo_move_to(cr, sx(dr.punkte[gSegment].x), sy(dr.punkte[gSegment].y))
                 cairo_line_to(cr, sx(dr.punkte[gSegment + 1].x), sy(dr.punkte[gSegment + 1].y))
@@ -272,7 +270,7 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     NEXT
     ' Bauteile
     FOR i = 0 TO LEN(gBlatt.bauteile) - 1
-        DIM gew AS BOOLEAN : gew = gHatGewaehlt AND gBlatt.bauteile[i] = gGewaehlt
+        DIM gew AS BOOLEAN : gew = istGewaehltB(gBlatt.bauteile[i])
         bauteilZeichnen(cr, gBlatt.bauteile[i], FALSE, gew)
     NEXT
     ' Geist bei Platzierung
@@ -282,7 +280,7 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     END IF
     ' Labels
     FOR i = 0 TO LEN(gBlatt.labels) - 1
-        DIM lgew AS BOOLEAN : lgew = gHatLabel AND gBlatt.labels[i] = gLabelGewaehlt
+        DIM lgew AS BOOLEAN : lgew = istGewaehltL(gBlatt.labels[i])
         labelZeichnen(cr, sx(gBlatt.labels[i].anker.x), sy(gBlatt.labels[i].anker.y), gBlatt.labels[i].text, IIF(lgew, C_AUSWAHL, C_LABEL))
     NEXT
     IF gWerkzeug = WZ_LABEL AND gMausDrin THEN
@@ -295,6 +293,7 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
         cairo_stroke(cr)
     END IF
     ercMarkerZeichnen(cr)
+    rahmenZeichnen(cr)
     RETURN TRUE
 END FUNCTION
 

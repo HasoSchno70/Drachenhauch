@@ -1,0 +1,412 @@
+' Auswahl als Menge, Rahmen, Gruppen-Zug mit Gummiband, Ablage.
+' Globaler Namensraum (teilt Zustand mit leinwand.dh, werkzeuge.dh, main.dh).
+'
+' Die Auswahl ist eine Menge aus Bauteilen, Labels und Draehten. Die
+' Einzel-Auswahl (gGewaehlt / gLabelGewaehlt / gDrahtGewaehlt in leinwand.dh)
+' gilt nur, wenn GENAU ein Element gewaehlt ist -- fuer Eigenschaften,
+' Umbenennen und das Ziehen eines einzelnen Draht-Segments.
+IMPORT "json"
+
+DIM gSelB AS ARRAY OF kern.Bauteil
+DIM gSelL AS ARRAY OF kern.Label
+DIM gSelD AS ARRAY OF kern.Draht
+
+DIM gRahmen AS BOOLEAN
+DIM gRahmenSX AS FLOAT
+DIM gRahmenSY AS FLOAT
+DIM gRahmenEX AS FLOAT
+DIM gRahmenEY AS FLOAT
+
+DIM gAblage AS STRING             ' interne Ablage (wenn das System keine liefert)
+DIM gAblageSystem AS BOOLEAN      ' auch die Zwischenablage des Systems nutzen
+
+FUNCTION auswahlAnzahl() AS INTEGER
+    RETURN LEN(gSelB) + LEN(gSelL) + LEN(gSelD)
+END FUNCTION
+
+FUNCTION istGewaehltB(b AS kern.Bauteil) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gSelB) - 1
+        IF gSelB[i] = b THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION istGewaehltL(l AS kern.Label) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gSelL) - 1
+        IF gSelL[i] = l THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION istGewaehltD(d AS kern.Draht) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gSelD) - 1
+        IF gSelD[i] = d THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+SUB mengeLeeren()
+    gSelB = []
+    gSelL = []
+    gSelD = []
+END SUB
+
+SUB umschaltenB(b AS kern.Bauteil)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gSelB) - 1
+        IF gSelB[i] = b THEN
+            ARRAY_REMOVE_AT(gSelB, i)
+            RETURN
+        END IF
+    NEXT
+    ARRAY_PUSH(gSelB, b)
+END SUB
+
+SUB umschaltenL(l AS kern.Label)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gSelL) - 1
+        IF gSelL[i] = l THEN
+            ARRAY_REMOVE_AT(gSelL, i)
+            RETURN
+        END IF
+    NEXT
+    ARRAY_PUSH(gSelL, l)
+END SUB
+
+SUB umschaltenD(d AS kern.Draht)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gSelD) - 1
+        IF gSelD[i] = d THEN
+            ARRAY_REMOVE_AT(gSelD, i)
+            RETURN
+        END IF
+    NEXT
+    ARRAY_PUSH(gSelD, d)
+END SUB
+
+' Die Einzel-Auswahl aus der Menge ableiten (nur bei genau einem Element).
+' Ein Draht aus Rahmen oder Umschalt-Klick hat kein Segment (-1 = ganz).
+SUB einzelAusMenge()
+    gHatGewaehlt = FALSE
+    gHatLabel = FALSE
+    gHatDraht = FALSE
+    IF auswahlAnzahl() <> 1 THEN RETURN
+    IF LEN(gSelB) = 1 THEN
+        gGewaehlt = gSelB[0]
+        gHatGewaehlt = TRUE
+    ELSEIF LEN(gSelL) = 1 THEN
+        gLabelGewaehlt = gSelL[0]
+        gHatLabel = TRUE
+    ELSE
+        gDrahtGewaehlt = gSelD[0]
+        gHatDraht = TRUE
+        gSegment = -1
+    END IF
+END SUB
+
+SUB waehleB(b AS kern.Bauteil)
+    auswahlAufheben()
+    ARRAY_PUSH(gSelB, b)
+    einzelAusMenge()
+END SUB
+
+SUB waehleL(l AS kern.Label)
+    auswahlAufheben()
+    ARRAY_PUSH(gSelL, l)
+    einzelAusMenge()
+END SUB
+
+SUB alleWaehlen()
+    gSelB = ARRAY_COPY(gBlatt.bauteile)
+    gSelL = ARRAY_COPY(gBlatt.labels)
+    gSelD = ARRAY_COPY(gBlatt.draehte)
+    einzelAusMenge()
+    neuZeichnen()
+    statusAktualisieren()
+END SUB
+
+' --- Rahmen: alles, was ganz drin liegt ------------------------------------
+
+SUB rahmenAnwendenWelt(ax AS FLOAT, ay AS FLOAT, bx AS FLOAT, by AS FLOAT)
+    DIM x0 AS FLOAT : x0 = MIN(ax, bx)
+    DIM x1 AS FLOAT : x1 = MAX(ax, bx)
+    DIM y0 AS FLOAT : y0 = MIN(ay, by)
+    DIM y1 AS FLOAT : y1 = MAX(ay, by)
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(gBlatt.bauteile) - 1
+        DIM b AS kern.Bauteil : b = gBlatt.bauteile[i]
+        DIM bx0 AS INTEGER, by0 AS INTEGER, bx1 AS INTEGER, by1 AS INTEGER
+        bauteilBox(b, bx0, by0, bx1, by1)
+        IF bx0 >= x0 AND bx1 <= x1 AND by0 >= y0 AND by1 <= y1 AND NOT istGewaehltB(b) THEN ARRAY_PUSH(gSelB, b)
+    NEXT
+    FOR i = 0 TO LEN(gBlatt.labels) - 1
+        DIM l AS kern.Label : l = gBlatt.labels[i]
+        IF l.anker.x >= x0 AND l.anker.x <= x1 AND l.anker.y >= y0 AND l.anker.y <= y1 AND NOT istGewaehltL(l) THEN ARRAY_PUSH(gSelL, l)
+    NEXT
+    FOR i = 0 TO LEN(gBlatt.draehte) - 1
+        DIM w AS kern.Draht : w = gBlatt.draehte[i]
+        DIM drin AS BOOLEAN : drin = LEN(w.punkte) > 0
+        FOR j = 0 TO LEN(w.punkte) - 1
+            IF w.punkte[j].x < x0 OR w.punkte[j].x > x1 OR w.punkte[j].y < y0 OR w.punkte[j].y > y1 THEN drin = FALSE
+        NEXT
+        IF drin AND NOT istGewaehltD(w) THEN ARRAY_PUSH(gSelD, w)
+    NEXT
+    einzelAusMenge()
+END SUB
+
+SUB rahmenZeichnen(cr AS INTEGER)
+    IF NOT gRahmen THEN RETURN
+    DIM x AS FLOAT : x = MIN(gRahmenSX, gRahmenEX)
+    DIM y AS FLOAT : y = MIN(gRahmenSY, gRahmenEY)
+    DIM b AS FLOAT : b = ABS(gRahmenEX - gRahmenSX)
+    DIM h AS FLOAT : h = ABS(gRahmenEY - gRahmenSY)
+    cairo_set_source_rgba(cr, 0.31, 0.64, 1.0, 0.12)
+    cairo_rectangle(cr, x, y, b, h)
+    cairo_fill(cr)
+    cairo_set_source_rgba(cr, 0.31, 0.64, 1.0, 0.85)
+    cairo_set_line_width(cr, 1.0)
+    cairo_rectangle(cr, x + 0.5, y + 0.5, b, h)
+    cairo_stroke(cr)
+END SUB
+
+' --- Gruppen-Zug: Auswahl verschieben, angeschlossene Draehte als Gummiband -
+
+DIM gzB AS ARRAY OF kern.Bauteil
+DIM gzBOrig AS ARRAY OF kern.Punkt
+DIM gzL AS ARRAY OF kern.Label
+DIM gzLOrig AS ARRAY OF kern.Punkt
+DIM gzD AS ARRAY OF kern.Draht        ' Draehte, die mitgehen (gewaehlt oder beide Enden folgen)
+DIM gzDOrig AS ARRAY OF kern.Draht    ' ... ihre Ecken bei Zugbeginn
+DIM gzDArt AS ARRAY OF INTEGER        ' 1 Anfang folgt, 2 Ende folgt, 3 starr
+DIM gzStartX AS INTEGER
+DIM gzStartY AS INTEGER
+
+FUNCTION drahtKopie(w AS kern.Draht) AS kern.Draht
+    DIM k AS kern.Draht : k = NEW kern.Draht()
+    k.punkte = ARRAY_COPY(w.punkte)
+    RETURN k
+END FUNCTION
+
+SUB gruppenZugBeginn()
+    gzStartX = gMausWX
+    gzStartY = gMausWY
+    gZiehGemerkt = FALSE
+    gzB = ARRAY_COPY(gSelB)
+    gzBOrig = []
+    DIM i AS INTEGER, j AS INTEGER
+    ' Punkte, die wandern: Pins der Bauteile und Anker der gewaehlten Labels
+    DIM wandert AS MAP OF INTEGER
+    MAPCLEAR(wandert)
+    FOR i = 0 TO LEN(gzB) - 1
+        ARRAY_PUSH(gzBOrig, gzB[i].lage.pos)
+        FOR j = 0 TO LEN(gzB[i].sym.pins) - 1
+            DIM pp AS kern.Punkt : pp = gzB[i].pinPunkt(j)
+            MAPPUT(wandert, kern.netzKey(pp.x, pp.y), 1)
+        NEXT
+    NEXT
+    gzL = ARRAY_COPY(gSelL)
+    FOR i = 0 TO LEN(gzL) - 1
+        MAPPUT(wandert, kern.netzKey(gzL[i].anker.x, gzL[i].anker.y), 1)
+    NEXT
+    ' ungewaehlte Labels, die an einem wandernden Pin sitzen, gehen mit
+    FOR i = 0 TO LEN(gBlatt.labels) - 1
+        DIM la AS kern.Label : la = gBlatt.labels[i]
+        IF NOT istGewaehltL(la) AND MAPHAS(wandert, kern.netzKey(la.anker.x, la.anker.y)) THEN ARRAY_PUSH(gzL, la)
+    NEXT
+    gzLOrig = []
+    FOR i = 0 TO LEN(gzL) - 1
+        ARRAY_PUSH(gzLOrig, gzL[i].anker)
+    NEXT
+    ' Draehte: gewaehlte starr, sonst je nach angeschlossenen Enden
+    gzD = []
+    gzDOrig = []
+    gzDArt = []
+    FOR i = 0 TO LEN(gBlatt.draehte) - 1
+        DIM w AS kern.Draht : w = gBlatt.draehte[i]
+        IF LEN(w.punkte) < 2 THEN CONTINUE
+        DIM art AS INTEGER : art = 0
+        IF istGewaehltD(w) THEN
+            art = 3
+        ELSE
+            IF MAPHAS(wandert, kern.netzKey(w.punkte[0].x, w.punkte[0].y)) THEN art = art + 1
+            IF MAPHAS(wandert, kern.netzKey(w.punkte[LEN(w.punkte) - 1].x, w.punkte[LEN(w.punkte) - 1].y)) THEN art = art + 2
+        END IF
+        IF art > 0 THEN
+            ARRAY_PUSH(gzD, w)
+            ARRAY_PUSH(gzDOrig, drahtKopie(w))
+            ARRAY_PUSH(gzDArt, art)
+        END IF
+    NEXT
+END SUB
+
+' Um (dx, dy) gegenueber dem Zugbeginn verschieben. Der Undo-Schnappschuss
+' faellt erst bei der ersten echten Bewegung.
+SUB gruppenZiehenUm(dx AS INTEGER, dy AS INTEGER)
+    IF dx = 0 AND dy = 0 AND NOT gZiehGemerkt THEN RETURN
+    IF NOT gZiehGemerkt THEN
+        verlaufMerken()
+        gZiehGemerkt = TRUE
+    END IF
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gzB) - 1
+        gzB[i].lage.pos = NEW kern.Punkt(gzBOrig[i].x + dx, gzBOrig[i].y + dy)
+    NEXT
+    FOR i = 0 TO LEN(gzL) - 1
+        gzL[i].anker = NEW kern.Punkt(gzLOrig[i].x + dx, gzLOrig[i].y + dy)
+    NEXT
+    FOR i = 0 TO LEN(gzD) - 1
+        gzD[i].punkte = kern.gummiband(gzDOrig[i].punkte, gzDArt[i], dx, dy)
+    NEXT
+    netzeVeraltet()
+    gGeaendert = TRUE
+    titelNachziehen()
+END SUB
+
+SUB gruppenZugEnde()
+    IF NOT gZiehGemerkt THEN RETURN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gzD) - 1
+        IF gzDArt[i] <> 3 THEN kern.drahtAufraeumen(gzD[i])
+    NEXT
+    kern.autoKnoten(gBlatt)
+    geaendert()
+END SUB
+
+' --- Loeschen der ganzen Menge ---------------------------------------------
+
+SUB mengeLoeschen()
+    IF auswahlAnzahl() = 0 THEN RETURN
+    verlaufMerken()
+    DIM i AS INTEGER
+    DIM nb AS ARRAY OF kern.Bauteil : nb = []
+    FOR i = 0 TO LEN(gBlatt.bauteile) - 1
+        IF NOT istGewaehltB(gBlatt.bauteile[i]) THEN ARRAY_PUSH(nb, gBlatt.bauteile[i])
+    NEXT
+    gBlatt.bauteile = nb
+    DIM nl AS ARRAY OF kern.Label : nl = []
+    FOR i = 0 TO LEN(gBlatt.labels) - 1
+        IF NOT istGewaehltL(gBlatt.labels[i]) THEN ARRAY_PUSH(nl, gBlatt.labels[i])
+    NEXT
+    gBlatt.labels = nl
+    DIM nd AS ARRAY OF kern.Draht : nd = []
+    FOR i = 0 TO LEN(gBlatt.draehte) - 1
+        IF NOT istGewaehltD(gBlatt.draehte[i]) THEN ARRAY_PUSH(nd, gBlatt.draehte[i])
+    NEXT
+    gBlatt.draehte = nd
+    kern.autoKnoten(gBlatt)
+    auswahlAufheben()
+    geaendert()
+END SUB
+
+' --- Ablage ---------------------------------------------------------------
+' Format: ein Funkenflug-Dokument (JSON) mit dem Merkmal "funkenflugAblage",
+' damit fremder Text in der Zwischenablage nicht als Schaltung gilt.
+
+FUNCTION ablageText$() AS STRING
+    DIM d AS kern.Dokument : d = NEW kern.Dokument()
+    DIM bl AS kern.Blatt : bl = d.blaetter[0]
+    bl.bauteile = ARRAY_COPY(gSelB)
+    bl.labels = ARRAY_COPY(gSelL)
+    bl.draehte = ARRAY_COPY(gSelD)
+    DIM j AS JSON_HANDLE : j = kern.dokumentNachJson(d)
+    JSON_SET_BOOL(j, "funkenflugAblage", TRUE)
+    RETURN JSON_STRINGIFY(j)
+END FUNCTION
+
+FUNCTION systemAblage() AS INTEGER
+    RETURN gtk_clipboard_get(gdk_atom_intern("CLIPBOARD", FALSE))
+END FUNCTION
+
+SUB ablageKopieren()
+    IF auswahlAnzahl() = 0 THEN RETURN
+    gAblage = ablageText$()
+    IF gAblageSystem THEN gtk_clipboard_set_text(systemAblage(), gAblage, -1)
+END SUB
+
+SUB ablageAusschneiden()
+    IF auswahlAnzahl() = 0 THEN RETURN
+    ablageKopieren()
+    mengeLoeschen()
+END SUB
+
+FUNCTION ablageLesen$() AS STRING
+    IF gAblageSystem THEN
+        DIM z AS INTEGER : z = gtk_clipboard_wait_for_text(systemAblage())
+        IF z <> 0 THEN
+            DIM t AS STRING : t = TEXT_AUS_ZEIGER$(z)
+            g_free(z)
+            IF CONTAINS(t, "funkenflugAblage") THEN RETURN t
+        END IF
+    END IF
+    RETURN gAblage
+END FUNCTION
+
+' Einfuegen: an die Mausposition (sonst um 5 mm versetzt), mit neuen Ids
+' und -- wo noetig -- neuen Referenzen. Das Eingefuegte ist danach gewaehlt.
+SUB ablageEinfuegen()
+    DIM t AS STRING : t = ablageLesen$()
+    IF NOT CONTAINS(t, "funkenflugAblage") THEN RETURN
+    DIM d AS kern.Dokument
+    TRY
+        d = kern.dokumentAusJson(JSON_PARSE(t))
+    CATCH e
+        RETURN
+    END TRY
+    IF LEN(d.blaetter) = 0 THEN RETURN
+    DIM q AS kern.Blatt : q = d.blaetter[0]
+    DIM i AS INTEGER, j AS INTEGER
+    ' linke obere Ecke der Ablage
+    DIM mx AS INTEGER : mx = 2000000000
+    DIM my AS INTEGER : my = 2000000000
+    FOR i = 0 TO LEN(q.bauteile) - 1
+        mx = MIN(mx, q.bauteile[i].lage.pos.x) : my = MIN(my, q.bauteile[i].lage.pos.y)
+    NEXT
+    FOR i = 0 TO LEN(q.labels) - 1
+        mx = MIN(mx, q.labels[i].anker.x) : my = MIN(my, q.labels[i].anker.y)
+    NEXT
+    FOR i = 0 TO LEN(q.draehte) - 1
+        FOR j = 0 TO LEN(q.draehte[i].punkte) - 1
+            mx = MIN(mx, q.draehte[i].punkte[j].x) : my = MIN(my, q.draehte[i].punkte[j].y)
+        NEXT
+    NEXT
+    IF mx = 2000000000 THEN RETURN
+    DIM dx AS INTEGER, dy AS INTEGER
+    IF gMausDrin THEN
+        dx = kern.rastern(gMausWX, kern.RASTER) - mx
+        dy = kern.rastern(gMausWY, kern.RASTER) - my
+    ELSE
+        dx = 500 : dy = 500
+    END IF
+    verlaufMerken()
+    auswahlAufheben()
+    FOR i = 0 TO LEN(q.bauteile) - 1
+        DIM b AS kern.Bauteil : b = q.bauteile[i]
+        b.id = LEFT$(UUID4$(), 10)
+        b.lage.pos = NEW kern.Punkt(b.lage.pos.x + dx, b.lage.pos.y + dy)
+        IF NOT b.sym.einheitLeistung THEN
+            IF b.referenz = "" OR referenzBelegt(b.referenz, b) THEN b.referenz = naechsteReferenz(b.sym.praefix)
+        END IF
+        ARRAY_PUSH(gBlatt.bauteile, b)
+        ARRAY_PUSH(gSelB, b)
+    NEXT
+    FOR i = 0 TO LEN(q.labels) - 1
+        DIM l AS kern.Label : l = q.labels[i]
+        l.id = LEFT$(UUID4$(), 10)
+        l.anker = NEW kern.Punkt(l.anker.x + dx, l.anker.y + dy)
+        ARRAY_PUSH(gBlatt.labels, l)
+        ARRAY_PUSH(gSelL, l)
+    NEXT
+    FOR i = 0 TO LEN(q.draehte) - 1
+        DIM w AS kern.Draht : w = q.draehte[i]
+        w.id = LEFT$(UUID4$(), 10)
+        w.punkte = kern.punkteVerschoben(w.punkte, dx, dy)
+        ARRAY_PUSH(gBlatt.draehte, w)
+        ARRAY_PUSH(gSelD, w)
+    NEXT
+    kern.autoKnoten(gBlatt)
+    einzelAusMenge()
+    geaendert()
+END SUB

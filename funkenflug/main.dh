@@ -19,6 +19,7 @@ IMPORT "gtk/gtk.dh"
 IMPORT "ansicht/leinwand.dh"
 IMPORT "ansicht/werkzeuge.dh"
 IMPORT "ansicht/verlauf.dh"
+IMPORT "ansicht/auswahl.dh"
 
 CONST STIL = "window { background-color: #12131a; color: #e6e6f0; }" + _
     " headerbar { background-color: #1a1c26; color: #e6e6f0; }" + _
@@ -71,7 +72,14 @@ SUB statusAktualisieren()
     DIM wahl AS STRING : wahl = ""
     IF gHatGewaehlt THEN wahl = "   Auswahl: " + gGewaehlt.referenz + " " + gGewaehlt.wert + " (" + gGewaehlt.sym.name + ")"
     IF gHatLabel THEN wahl = "   Label: " + gLabelGewaehlt.text + " (F2 benennt um)"
-    IF gHatDraht THEN wahl = "   Draht: Segment " + STR$(gSegment + 1) + " von " + STR$(LEN(gDrahtGewaehlt.punkte) - 1) + " (Entf: Segment, Umschalt+Entf: Draht, F2: Netz umbenennen)"
+    IF gHatDraht THEN
+        IF gSegment >= 0 THEN
+            wahl = "   Draht: Segment " + STR$(gSegment + 1) + " von " + STR$(LEN(gDrahtGewaehlt.punkte) - 1) + " (Entf: Segment, Umschalt+Entf: Draht, F2: Netz umbenennen)"
+        ELSE
+            wahl = "   Draht (Entf loescht ihn, F2: Netz umbenennen)"
+        END IF
+    END IF
+    IF auswahlAnzahl() > 1 THEN wahl = "   Auswahl: " + STR$(LEN(gSelB)) + " Bauteile, " + STR$(LEN(gSelD)) + " Draehte, " + STR$(LEN(gSelL)) + " Labels (ziehen verschiebt, Strg+C kopiert, Entf loescht)"
     DIM netz AS STRING : netz = hoverText$()
     IF netz <> "" THEN netz = "   " + netz
     gtk_label_set_text(gStatus, wz + "   Zoom " + STR$(zoom) + "%" + pos + netz + wahl + "   [" + STR$(LEN(gBlatt.bauteile)) + " Bauteile, " + STR$(LEN(gBlatt.draehte)) + " Draehte, " + STR$(LEN(gBlatt.labels)) + " Labels]")
@@ -598,21 +606,18 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             pruefe("Redo: Labels wieder", STR$(LEN(gBlatt.labels)), "2")
             ' Verschieben = EIN Undo-Schritt, auch ueber viele Bewegungen
             DIM vorher AS INTEGER : vorher = LEN(gUndo)
-            auswahlAufheben()
-            gGewaehlt = gBlatt.bauteile[4]
-            gHatGewaehlt = TRUE
-            gZieht = TRUE
-            gZiehGemerkt = FALSE
-            ziehenNach(3000, 2000)                 ' keine Bewegung: kein Schritt
-            ziehenNach(3100, 2000)
-            ziehenNach(3200, 2100)
-            gZieht = FALSE
+            waehleB(gBlatt.bauteile[4])
+            gMausWX = 3000 : gMausWY = 2000
+            gruppenZugBeginn()
+            gruppenZiehenUm(0, 0)                  ' keine Bewegung: kein Schritt
+            gruppenZiehenUm(100, 0)
+            gruppenZiehenUm(200, 100)
+            gruppenZugEnde()
             pruefe("Ziehen = ein Undo-Schritt", STR$(LEN(gUndo) - vorher), "1")
             verlaufZurueck()
             pruefe("Undo Ziehen: x zurueck", STR$(gBlatt.bauteile[4].lage.pos.x), "3000")
             ' fuers Bild: R7 gewaehlt
-            gGewaehlt = gBlatt.bauteile[1]
-            gHatGewaehlt = TRUE
+            waehleB(gBlatt.bauteile[1])
             statusAktualisieren()
         CASE 6
             ' Draehte: treffen, Segment ziehen (Verbindung bleibt), Segment und
@@ -647,8 +652,7 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             ' automatisches Netz bekommt ein Label, Zusammenfuehren fragt nach
             DIM fragenVorher AS INTEGER : fragenVorher = gFragen
             auswahlAufheben()
-            gLabelGewaehlt = gBlatt.labels[0]
-            gHatLabel = TRUE
+            waehleL(gBlatt.labels[0])
             probeText1 = "SIG"
             g_timeout_add(150, dialogBestaetigen, 0)
             umbenennenAuswahl()
@@ -672,8 +676,7 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             pruefe("ohne Rueckfrage bisher", STR$(gFragen - fragenVorher), "0")
             ' LED_A -> SIG: SIG liegt auf dem VCC-Netz -> Rueckfrage, dann verbunden
             auswahlAufheben()
-            gLabelGewaehlt = gBlatt.labels[2]
-            gHatLabel = TRUE
+            waehleL(gBlatt.labels[2])
             probeText1 = "SIG"
             g_timeout_add(150, dialogBestaetigen, 0)
             g_timeout_add(400, dialogBestaetigen, 0)
@@ -687,6 +690,83 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             verlaufZurueck()
             pruefe("Undo: Namen zurueck", gBlatt.labels[0].text + " " + gBlatt.bauteile[3].wert + "|" + STR$(LEN(gBlatt.labels)), "VCC5 |2")
         CASE 8
+            ' Gummiband: R7 nach rechts ziehen, beide Draehte folgen mit Knick
+            waehleB(gBlatt.bauteile[1])
+            gMausWX = 2000 : gMausWY = 2000
+            gruppenZugBeginn()
+            gruppenZiehenUm(300, 0)
+            gruppenZiehenUm(500, 0)
+            gruppenZugEnde()
+            pruefe("R7 verschoben", STR$(gBlatt.bauteile[1].lage.pos.x) + "," + STR$(gBlatt.bauteile[1].lage.pos.y), "2500,2000")
+            pruefe("Draht oben folgt", ptListe$(gBlatt.draehte[0]), "2000,1200 2000,1800 2500,1800")
+            pruefe("Draht unten folgt", ptListe$(gBlatt.draehte[1]), "2500,2200 2000,2200 2000,2800")
+            pruefe("R7 bleibt an VCC", STR$(aktuelleNetze().gleich(2500, 1800, 2000, 1200)), STR$(TRUE))
+            pruefe("R7 bleibt an D1", STR$(aktuelleNetze().gleich(2500, 2200, 2000, 2800)), STR$(TRUE))
+            verlaufZurueck()
+            pruefe("Undo Gummiband", ptListe$(gBlatt.draehte[0]) + " | " + STR$(gBlatt.bauteile[1].lage.pos.x), "2000,1200 2000,1800 | 2000")
+        CASE 9
+            ' Rahmen waehlt alles ganz Umschlossene
+            auswahlAufheben()
+            rahmenAnwendenWelt(1500, 1000, 2600, 3000)
+            pruefe("Rahmen", STR$(LEN(gSelB)) + " Bauteile, " + STR$(LEN(gSelD)) + " Draehte, " + STR$(LEN(gSelL)) + " Labels", "2 Bauteile, 2 Draehte, 1 Labels")
+            umschaltenB(gBlatt.bauteile[2])
+            pruefe("Umschalten dazu", STR$(LEN(gSelB)), "3")
+            umschaltenB(gBlatt.bauteile[2])
+            pruefe("Umschalten weg", STR$(LEN(gSelB)), "2")
+            ' kopieren und an der Maus einfuegen
+            ablageKopieren()
+            gMausDrin = TRUE : gMausWX = 5000 : gMausWY = 1000
+            ablageEinfuegen()
+            pruefe("eingefuegt (Bauteile/Draehte/Labels)", STR$(LEN(gBlatt.bauteile)) + "/" + STR$(LEN(gBlatt.draehte)) + "/" + STR$(LEN(gBlatt.labels)), "7/6/3")
+            pruefe("neue Referenz", gBlatt.bauteile[6].referenz, "R8")
+            pruefe("Kopie an der Maus", STR$(gBlatt.bauteile[5].lage.pos.x) + "," + STR$(gBlatt.bauteile[5].lage.pos.y), "5000,1000")
+            pruefe("Kopie haengt am VCC-Netz", STR$(aktuelleNetze().gleich(5000, 1600, 2000, 1200)), STR$(TRUE))
+            pruefe("Eingefuegtes ist gewaehlt", STR$(auswahlAnzahl()), "5")
+            ' die Kopie als Gruppe ziehen, dann loeschen
+            gMausWX = 5000 : gMausWY = 1800
+            gruppenZugBeginn()
+            gruppenZiehenUm(0, 200)
+            gruppenZugEnde()
+            pruefe("Gruppe gezogen", STR$(gBlatt.bauteile[6].lage.pos.y) + " " + ptListe$(gBlatt.draehte[4]), "2000 5000,1200 5000,1800")
+            auswahlLoeschen(FALSE)
+            pruefe("Gruppe geloescht", STR$(LEN(gBlatt.bauteile)) + "/" + STR$(LEN(gBlatt.draehte)) + "/" + STR$(LEN(gBlatt.labels)), "5/4/2")
+            verlaufZurueck()
+            verlaufZurueck()
+            verlaufZurueck()
+            pruefe("Undo bis vor das Einfuegen", STR$(LEN(gBlatt.bauteile)) + "/" + STR$(LEN(gBlatt.draehte)), "5/4")
+            ' ausschneiden und wieder einfuegen: R7 behaelt seine Referenz
+            waehleB(gBlatt.bauteile[1])
+            ablageAusschneiden()
+            pruefe("ausgeschnitten", STR$(LEN(gBlatt.bauteile)), "4")
+            gMausWX = 2000 : gMausWY = 2000
+            ablageEinfuegen()
+            pruefe("wieder eingefuegt, Referenz", gBlatt.bauteile[4].referenz, "R7")
+            verlaufZurueck()
+            verlaufZurueck()
+            pruefe("Undo Ausschneiden", gBlatt.bauteile[1].referenz + "/" + STR$(LEN(gBlatt.bauteile)), "R7/5")
+            ' der Weg ueber den Klick-Handler: Klick ins Leere zieht einen
+            ' Rahmen, Loslassen waehlt; Umschalt-Klick nimmt D1 dazu; Klick auf
+            ' ein gewaehltes Element zieht die ganze Gruppe
+            gMausRX = 1500 : gMausRY = 1000
+            klickAuswahl(sx(1500), sy(1000), FALSE)
+            pruefe("Klick ins Leere startet Rahmen", STR$(gRahmen), STR$(TRUE))
+            gRahmenEX = sx(2600) : gRahmenEY = sy(3000)
+            DIM los AS BOOLEAN : los = lwLos(0, 0, 0)
+            pruefe("Rahmen per Maus", STR$(auswahlAnzahl()), "5")
+            gMausRX = 2000 : gMausRY = 3000
+            klickAuswahl(sx(2000), sy(3000), TRUE)
+            pruefe("Umschalt-Klick nimmt D1 dazu", STR$(LEN(gSelB)), "3")
+            gMausWX = 2000 : gMausWY = 3000
+            klickAuswahl(sx(2000), sy(3000), FALSE)
+            gruppenZiehenUm(1000, 0)
+            los = lwLos(0, 0, 0)
+            pruefe("Gruppe per Klick gezogen", STR$(gBlatt.bauteile[1].lage.pos.x) + "/" + STR$(gBlatt.bauteile[2].lage.pos.x) + "/" + STR$(gBlatt.bauteile[3].lage.pos.x), "3000/3000/2000")
+            pruefe("GND bleibt per Gummiband dran", STR$(aktuelleNetze().gleich(3000, 3200, 2000, 3600)), STR$(TRUE))
+            verlaufZurueck()
+            alleWaehlen()
+            pruefe("Strg+A", STR$(auswahlAnzahl()), "11")
+            auswahlAufheben()
+        CASE 10
             ' Netz unter der Maus: VCC-Draht, GND-Draht, Statuszeile
             gMausDrin = TRUE
             hoverBestimmen(sx(2000), sy(1650))
@@ -696,7 +776,7 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             hoverBestimmen(sx(2000), sy(1650))
             statusAktualisieren()
             pruefe("Statuszeile nennt das Netz", STR$(CONTAINS(gtk_label_get_text(gStatus), "Netz: VCC")), STR$(TRUE))
-        CASE 9
+        CASE 11
             ' ERC: genau zwei Warnungen; Zeile 2 anklicken springt zu C1.1
             ercAusfuehren()
             pruefe("ERC-Verstoesse", STR$(LEN(gErc)), "2")
@@ -767,6 +847,9 @@ FOR i = 0 TO ARGC() - 1
         startPfad = ARG$(i)
     END IF
 NEXT
+
+' Der Selbsttest laesst die Zwischenablage des Systems in Ruhe.
+gAblageSystem = fotoZiel = ""
 
 IF startPfad <> "" THEN
     startDok = kern.dokumentLaden(startPfad)
