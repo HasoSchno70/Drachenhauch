@@ -117,6 +117,7 @@ CONST STIL = "window, .flaeche { background-color: #1b1c20; color: #e4e5ea; }" +
     " .ebene { padding: 2px 10px; color: #d6d9e1; }" + _
     " .innen { margin: 2px 14px; }" + _
     " .seitenleiste entry, .seitenleiste combobox button { background-image: none; background-color: #2a2c33; color: #e4e5ea; border: 1px solid #3a3c44; box-shadow: none; text-shadow: none; }" + _
+    " textview.notiz { margin: 2px 12px 6px 12px; border: 1px solid #3a3c44; font-size: 9pt; } textview.notiz text { background-color: #2a2c33; color: #e4e5ea; }" + _
     " .werkzeugzeile combobox cellview, .werkzeugzeile combobox button label, .seitenleiste combobox cellview, .seitenleiste combobox button label { color: #e4e5ea; }" + _
     " .abschnitt { font-weight: 700; margin-top: 4px; }" + _
     " button.klein { background-image: none; background-color: #2a2c33; color: #d6d9e1; border: 1px solid #3a3c44; border-radius: 6px; padding: 2px 6px; box-shadow: none; text-shadow: none; }" + _
@@ -516,6 +517,8 @@ END SUB
 ' die Tasten selbst stehen in den Einstellungen und lassen sich umlegen.
 SUB befehlAusfuehren(kennung AS STRING)
     DIM ok AS BOOLEAN
+    ' eine Notiz, die noch im Feld steht, gehoert vor jeden Befehl ins Muster
+    ok = slNotizUebernehmen()
     ' Ohne Muster (Willkommensseite) nur, was keins braucht
     IF NOT lwHat AND NOT ohneMusterErlaubt(kennung) THEN
         statusMeldung("Erst ein Muster öffnen oder anlegen.")
@@ -585,6 +588,7 @@ SUB befehlAusfuehren(kennung AS STRING)
         CASE "vereinen" : ebenenVereinenBefehl(TRUE)
         CASE "nur_aktive" : ebenenAnsicht(0, NOT lwNurAktiv)
         CASE "abdunkeln" : ebenenAnsicht(1, NOT lwAbdunkeln)
+        CASE "ebene_leeren" : ebeneLeerenBefehl(TRUE)
         CASE "drucken" : druckenDialog()
         CASE "bildschirm_pipette" : bildschirmPipette()
         CASE "palette_export" : paletteExportieren()

@@ -30,6 +30,13 @@ DIM slPalette AS INTEGER              ' gewaehlte Palette
 DIM slEbenenListe AS INTEGER
 DIM slEbenenKnoepfe AS ARRAY OF INTEGER   ' Augen-Kaestchen, oben im Stapel zuerst
 DIM slEbenenTexte AS ARRAY OF INTEGER
+' Notiz der aktiven Ebene (PySticky edit_note): geschrieben wird beim
+' Verlassen des Feldes, beim Wechsel der Ebene und bevor die Leiste neu
+' entsteht -- aber nur, wenn im Feld etwas anderes steht als geladen (sonst
+' schriebe ein Neuaufbau nach Strg+Z die alte Notiz gleich wieder hinein).
+DIM slNotiz AS INTEGER
+DIM slNotizEbene AS kern.Ebene
+DIM slNotizGeladen AS STRING
 DIM slDeckkraft AS INTEGER
 DIM slKnoepfe AS ARRAY OF INTEGER         ' neu, loeschen, duplizieren, hoch, runter, zusammen, alle vereinen
 DIM slNurAktiv AS INTEGER                 ' Kaestchen "Nur aktive"
@@ -203,6 +210,8 @@ SUB seitenleisteMuster(m AS kern.Muster)
     slKatalogFuellen()
 
     ' --- Ebenen
+    DIM nu AS BOOLEAN : nu = slNotizUebernehmen()
+    slNotiz = 0
     gtk_box_pack_start(slInhalt, slUeberschrift("Ebenen"), FALSE, FALSE, 0)
     slEbenenListe = gtk_list_box_new()
     gtk_list_box_set_selection_mode(slEbenenListe, GTK_AUSWAHL_EINE)
@@ -254,6 +263,7 @@ SUB seitenleisteMuster(m AS kern.Muster)
     ARRAY_PUSH(slKnoepfe, slKnopf("↓", "Nach hinten"))
     ARRAY_PUSH(slKnoepfe, slKnopf("⤓", "Mit der Ebene darunter zusammenführen"))
     ARRAY_PUSH(slKnoepfe, slKnopf("⧈", "Alle Ebenen vereinen ({vereinen}) -- ausgeblendete fallen weg"))
+    ARRAY_PUSH(slKnoepfe, slKnopf("⌫", "Ebene leeren -- alle Stiche der aktiven weg ({ebene_leeren})"))
     FOR i = 0 TO LEN(slKnoepfe) - 1
         signal(slKnoepfe[i], "clicked", slEbenenKnopf, i, 0, 0)
         gtk_box_pack_start(leiste, slKnoepfe[i], TRUE, TRUE, 0)
@@ -272,6 +282,20 @@ SUB seitenleisteMuster(m AS kern.Muster)
     gtk_box_pack_start(dz, dl, FALSE, FALSE, 0)
     gtk_box_pack_start(dz, slDeckkraft, TRUE, TRUE, 0)
     gtk_box_pack_start(slInhalt, dz, FALSE, FALSE, 0)
+    ' Notiz der aktiven Ebene
+    DIM nl AS INTEGER : nl = gtk_label_new("Notiz (z.B. Vordergrund, Schatten, Rückstich-Linien)")
+    gtkKlasse(nl, "nebensache")
+    gtk_label_set_xalign(nl, 0.0)
+    gtk_label_set_ellipsize(nl, GTK_ELLIPSE_ENDE)
+    gtkKlasse(nl, "innen")
+    gtk_box_pack_start(slInhalt, nl, FALSE, FALSE, 0)
+    slNotiz = gtk_text_view_new()
+    gtk_text_view_set_wrap_mode(slNotiz, GTK_UMBRUCH_WORT)
+    gtkKlasse(slNotiz, "notiz")
+    gtk_widget_set_size_request(slNotiz, -1, 60)
+    gtk_widget_set_tooltip_text(slNotiz, "Notiz zur aktiven Ebene -- erscheint als Tipp an ihrem Namen. Gilt beim Verlassen des Feldes; Strg+Z nimmt sie zurück.")
+    signalEreignis(slNotiz, "focus-out-event", slNotizVerlassen, 0, 0, 0)
+    gtk_box_pack_start(slInhalt, slNotiz, FALSE, FALSE, 0)
     ' Ansicht der Ebenen -- nur die Anzeige
     DIM az AS INTEGER : az = gtk_box_new(GTK_WAAGERECHT, 10)
     gtkKlasse(az, "innen")
@@ -536,11 +560,56 @@ SUB slEbeneMarkieren()
     DIM z AS INTEGER : z = gtk_list_box_get_row_at_index(slEbenenListe, lwMuster.ebenen.anzahl() - 1 - lwMuster.ebenen.aktiv)
     IF z <> 0 THEN gtk_list_box_select_row(slEbenenListe, z)
     gtk_range_set_value(slDeckkraft, lwMuster.ebenen.aktiveEbene().deckkraft * 100)
+    slNotizLaden()
     slSperre = FALSE
 END SUB
 
+' Die Notiz der aktiven Ebene ins Feld
+SUB slNotizLaden()
+    IF slNotiz = 0 OR NOT lwHat THEN RETURN
+    slNotizEbene = lwMuster.ebenen.aktiveEbene()
+    slNotizGeladen = slNotizEbene.notiz
+    gtk_text_buffer_set_text(gtk_text_view_get_buffer(slNotiz), slNotizGeladen, -1)
+END SUB
+
+FUNCTION textSichtText$(sicht AS INTEGER) AS STRING
+    DIM puffer AS INTEGER : puffer = gtk_text_view_get_buffer(sicht)
+    DIM a AS BUFFER : a = BUFFER_NEW(256)
+    DIM e AS BUFFER : e = BUFFER_NEW(256)
+    gtk_text_buffer_get_bounds(puffer, BUFFER_ZEIGER(a), BUFFER_ZEIGER(e))
+    DIM z AS INTEGER : z = gtk_text_buffer_get_text(puffer, BUFFER_ZEIGER(a), BUFFER_ZEIGER(e), FALSE)
+    DIM t AS STRING : t = TEXT_AUS_ZEIGER$(z)
+    g_free(z)
+    RETURN t
+END FUNCTION
+
+' Was im Notizfeld steht, auf seine Ebene schreiben -- ein Schritt, nur wenn
+' es sich seit dem Laden geaendert hat. TRUE, wenn geschrieben.
+FUNCTION slNotizUebernehmen() AS BOOLEAN
+    IF slNotiz = 0 OR NOT lwHat THEN RETURN FALSE
+    IF slNotizEbene IS NIL THEN RETURN FALSE
+    DIM t AS STRING : t = textSichtText$(slNotiz)
+    IF t = slNotizGeladen THEN RETURN FALSE
+    slNotizGeladen = t
+    DIM nr AS INTEGER : nr = kern.ebenenNummer(lwMuster, slNotizEbene)
+    IF nr < 0 THEN RETURN FALSE
+    IF NOT kern.ebeneNotizSetzen(lwMuster, wzVerlauf, nr, t) THEN RETURN FALSE
+    ' Tipp am Namen nachziehen, ohne die Leiste (und das Feld) neu zu bauen
+    DIM zeile AS INTEGER : zeile = lwMuster.ebenen.anzahl() - 1 - nr
+    IF zeile >= 0 AND zeile < LEN(slEbenenTexte) THEN gtk_widget_set_tooltip_text(slEbenenTexte[zeile], t)
+    zustandNachziehen()
+    statusMeldung("Notiz der Ebene „" + slNotizEbene.name + "“ geändert.")
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION slNotizVerlassen(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM ok AS BOOLEAN : ok = slNotizUebernehmen()
+    RETURN FALSE
+END FUNCTION
+
 SUB slEbeneGewaehlt(liste AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
     IF slSperre OR zeile = 0 OR NOT lwHat THEN RETURN
+    DIM nu AS BOOLEAN : nu = slNotizUebernehmen()
     lwMuster.ebenen.aktiv = lwMuster.ebenen.anzahl() - 1 - gtk_list_box_row_get_index(zeile)
     slEbeneMarkieren()
     IF lwNurAktiv OR lwAbdunkeln THEN
@@ -608,7 +677,8 @@ SUB slEbenenKnopf(knopf AS INTEGER, nr AS INTEGER)
 END SUB
 
 ' Die Ebenen-Befehle -- auch fuer die Tastatur und die Vorfuehrung.
-' 0 neu, 1 loeschen, 2 duplizieren, 3 nach vorne, 4 nach hinten, 5 zusammenfuehren
+' 0 neu, 1 loeschen, 2 duplizieren, 3 nach vorne, 4 nach hinten, 5 zusammenfuehren,
+' 6 vereinen, 7 leeren
 SUB ebenenBefehl(nr AS INTEGER)
     IF NOT lwHat OR wzZug <> ZUG_KEINER THEN RETURN
     DIM a AS INTEGER : a = lwMuster.ebenen.aktiv
@@ -624,6 +694,9 @@ SUB ebenenBefehl(nr AS INTEGER)
             IF NOT ok AND a > 0 THEN statusMeldung("Die Ebene darunter ist gesperrt.")
         CASE 6
             ebenenVereinenBefehl(TRUE)
+            RETURN
+        CASE 7
+            ebeneLeerenBefehl(TRUE)
             RETURN
     END SELECT
     IF ok THEN allesNeu()

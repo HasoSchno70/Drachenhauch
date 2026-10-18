@@ -1062,6 +1062,28 @@ SUB ebenenVereinenBefehl(fragen AS BOOLEAN)
     statusMeldung("Alle Ebenen vereint.")
 END SUB
 
+' Die aktive Ebene leeren (PySticky "Leeren" im Kontextmenue der Ebenen) --
+' mit Rueckfrage, ein Schritt.
+SUB ebeneLeerenBefehl(fragen AS BOOLEAN)
+    IF NOT lwHat OR wzZug <> ZUG_KEINER THEN RETURN
+    DIM e AS kern.Ebene : e = lwMuster.ebenen.aktiveEbene()
+    IF e.gesperrt THEN
+        statusMeldung("Die Ebene „" + e.name + "“ ist gesperrt.")
+        RETURN
+    END IF
+    DIM n AS INTEGER : n = e.stichzahl()
+    IF n = 0 THEN
+        statusMeldung("Die Ebene „" + e.name + "“ ist schon leer.")
+        RETURN
+    END IF
+    IF fragen THEN
+        IF NOT pdFrage(fenster, "Ebene leeren", "Alle " + ZAHL$(n, 0) + IIF(lwMuster.modus = "diamond", " Drills", " Stiche") + " aus „" + e.name + "“ entfernen?" + CHR$(10) + CHR$(10) + "Rückstiche bleiben; Rückgängig holt die Stiche zurück.") THEN RETURN
+    END IF
+    IF kern.ebeneLeeren(lwMuster, wzVerlauf, lwMuster.ebenen.aktiv) = 0 THEN RETURN
+    allesNeu()
+    statusMeldung("Ebene „" + e.name + "“ geleert.")
+END SUB
+
 ' Zuletzt geoeffnet (PySticky "Kürzlich geöffnet"): die Liste unter den
 ' Eintraegen des Knopfs, neu gebaut, wann immer sie sich aendert.
 DIM zlHalter AS INTEGER

@@ -241,5 +241,8 @@ FUNCTION eingabeHatFokus() AS BOOLEAN
     IF tlFeld <> 0 THEN
         IF gtk_widget_has_focus(tlFeld) THEN RETURN TRUE
     END IF
+    IF slNotiz <> 0 THEN
+        IF gtk_widget_has_focus(slNotiz) THEN RETURN TRUE
+    END IF
     RETURN FALSE
 END FUNCTION
