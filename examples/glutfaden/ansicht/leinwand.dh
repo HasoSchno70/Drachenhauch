@@ -332,6 +332,10 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM y1 AS INTEGER : y1 = MIN(h - 1, FLOOR((bh - lwY) / z))
     DIM x AS INTEGER, y AS INTEGER, c AS INTEGER, t AS INTEGER, i AS INTEGER
 
+    ' Aida-Optik (fabric_texture): ein dezenter Punkt in jeder leeren Zelle,
+    ' wie PySticky erst ab 8 Pixeln und nicht beim Diamond Painting
+    IF einst.stoffTextur AND z >= 8 AND lwMuster.modus <> "diamond" THEN lwStoffTextur(cr, x0, y0, x1, y1)
+
     ' Besondere Stichtypen: die Zelle zuerst wieder Stoff, dann die Form
     DIM gemischt AS BOOLEAN : gemischt = lwMischen()
     ' Diamond Painting: auch ein ganzer Stich ist ein Drill (PySticky diamond_view)
@@ -644,6 +648,28 @@ FUNCTION leinwandPfeil(t AS INTEGER) AS BOOLEAN
     gtk_widget_queue_draw(lwFlaeche)
     RETURN TRUE
 END FUNCTION
+
+' Die Aida-Punkte im Ausschnitt: (180,170,150) mit Deckkraft 70 von 255,
+' Radius ein Zwoelftel der Zelle, ein Pfad fuer alle -- je Punkt ein cairo_fill waere bei
+' hundert mal hundert Zellen zehntausend Zeichenauftraege.
+SUB lwStoffTextur(cr AS INTEGER, x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER)
+    DIM z AS FLOAT : z = lwZelle
+    DIM b AS INTEGER : b = lwMuster.breite
+    DIM r AS FLOAT : r = MAX(1, FLOOR(z) \ 12)
+    DIM x AS INTEGER, y AS INTEGER, mx AS FLOAT, my AS FLOAT
+    cairo_new_path(cr)
+    FOR y = y0 TO y1
+        FOR x = x0 TO x1
+            IF lwFarbe[y * b + x] >= 0 THEN CONTINUE
+            mx = lwX + x * z + z / 2
+            my = lwY + y * z + z / 2
+            cairo_move_to(cr, mx + r, my)
+            cairo_arc(cr, mx, my, r, 0, TAU)
+        NEXT
+    NEXT
+    cairo_set_source_rgba(cr, 180 / 255.0, 170 / 255.0, 150 / 255.0, 70 / 255.0)
+    cairo_fill(cr)
+END SUB
 
 ' Ein Kaestchen mit besonderem Stichtyp an (px, py), Groesse z.
 SUB lwSonderstich(cr AS INTEGER, px AS FLOAT, py AS FLOAT, z AS FLOAT, t AS INTEGER, farbe AS INTEGER)

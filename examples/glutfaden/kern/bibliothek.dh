@@ -64,9 +64,10 @@ FUNCTION leereBibliothek(pfad AS STRING) AS Bibliothek
     RETURN b
 END FUNCTION
 
-' Der Ordner der Bibliothek im Einstellungsordner
-FUNCTION bibliothekOrdner$() AS STRING
-    RETURN PATHJOIN(DIRNAME(einstellungsDatei$("x")), "Bibliothek")
+' Der Ordner der Bibliothek: der eingestellte (library_path), sonst im
+' Einstellungsordner
+FUNCTION bibliothekOrdner$(eigener AS STRING = "") AS STRING
+    RETURN eigenerOrdner$(eigener, PATHJOIN(DIRNAME(einstellungsDatei$("x")), "Bibliothek"))
 END FUNCTION
 
 FUNCTION jsonText$(j AS JSON_HANDLE, w AS STRING) AS STRING

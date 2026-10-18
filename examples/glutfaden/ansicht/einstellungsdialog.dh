@@ -38,6 +38,7 @@ DIM edZelleMax AS INTEGER
 DIM edZoom AS INTEGER
 DIM edHintergrund AS INTEGER
 DIM edStoff AS INTEGER
+DIM edTextur AS INTEGER
 ' Werkzeuge
 DIM edStartWz AS INTEGER
 DIM edWzMerken AS INTEGER
@@ -47,6 +48,8 @@ DIM edDiagonal AS INTEGER
 DIM edToleranz AS INTEGER
 DIM edRueckBreite AS INTEGER
 DIM edEinrasten AS INTEGER
+DIM edAmeisen AS INTEGER
+DIM edStickzeit AS INTEGER
 ' Farben
 DIM edPalette AS INTEGER
 DIM edPalNamen AS ARRAY OF STRING
@@ -57,8 +60,11 @@ DIM edSymSchrift AS INTEGER
 DIM edSymGroesse AS INTEGER
 DIM edSymAuto AS INTEGER
 DIM edAnzeige AS INTEGER
+DIM edHervorheben AS INTEGER
 ' Dateien
 DIM edOrdner AS INTEGER
+DIM edBibOrdner AS INTEGER
+DIM edVorlOrdner AS INTEGER
 DIM edPdfZellen AS INTEGER
 DIM edUeber AS INTEGER
 DIM edMystery AS INTEGER
@@ -185,6 +191,8 @@ FUNCTION edBauen() AS INTEGER
     edRein(s, edZeile("Zuletzt geöffnet (Anzahl):", edZuletzt, "So viele Dateien stehen unter Muster -> Zuletzt geöffnet; 0 = keine Liste"))
     edFenster = edKaestchen("Fenstergröße wiederherstellen", "Startet in der Größe, in der Glutfaden zuletzt geschlossen wurde")
     edRein(s, edFenster)
+    edStickzeit = edKaestchen("Stickzeit messen", "Solange das Werkzeug Fortschritt gewählt ist, zählt Glutfaden die Zeit (Muster -> Stickzeit)")
+    edRein(s, edStickzeit)
     edThema = imKlappliste(["Dunkel", "Hell"], 0)
     edRein(s, edZeile("Erscheinungsbild:", edThema, "Gilt sofort nach Übernehmen"))
     edAbschnitt(s, "Nachfragen und Meldungen")
@@ -237,6 +245,8 @@ FUNCTION edBauen() AS INTEGER
     edRein(s, edZeile("Um das Muster:", edHintergrund, ""))
     edStoff = edFarbknopf()
     edRein(s, edZeile("Leere Kästchen (Stoff):", edStoff, ""))
+    edTextur = edKaestchen("Stoff-Textur (Aida)", "Ein feiner Punkt in jedem leeren Kästchen, ab 8 Pixel je Kästchen")
+    edRein(s, edTextur)
 
     ' Werkzeuge
     s = edSeite("Werkzeuge")
@@ -263,6 +273,9 @@ FUNCTION edBauen() AS INTEGER
     edRein(s, edZeile("Linienstärke (2 = normal):", edRueckBreite, ""))
     edEinrasten = edKaestchen("Auch an Kantenmitten und in der Mitte ansetzen", "Aus: nur an den Ecken der Kästchen")
     edRein(s, edEinrasten)
+    edAbschnitt(s, "Auswahl")
+    edAmeisen = edKaestchen("Laufende Auswahlkante", "Die gestrichelte Kante der Auswahl läuft, solange ein Auswahlwerkzeug gewählt ist")
+    edRein(s, edAmeisen)
 
     ' Farben
     s = edSeite("Farben")
@@ -291,18 +304,21 @@ FUNCTION edBauen() AS INTEGER
     edAbschnitt(s, "Anzeige")
     edAnzeige = imKlappliste(kern.farbAnzeigen(), 1)
     edRein(s, edZeile("Auf der Zeichenfläche:", edAnzeige, "Symbole erscheinen ab 12 Pixel je Kästchen"))
+    edHervorheben = edKaestchen("Gewählte Farbe hervorheben", "Jede gewählte Farbe wie mit " + kern.kuerzelVon$(einst, "hervorheben") + " voll zeigen, die anderen gedämpft")
+    edRein(s, edHervorheben)
 
     ' Dateien
     s = edSeite("Dateien")
     edAbschnitt(s, "Ordner")
     edOrdner = gtk_entry_new()
     gtk_entry_set_placeholder_text(edOrdner, "leer = was das System vorschlägt")
-    DIM oz AS INTEGER : oz = edZeile("Öffnen und Sichern in:", edOrdner, "Wo die Datei-Dialoge anfangen, solange das Muster noch keine Datei hat")
-    gtk_widget_set_size_request(edOrdner, 360, -1)
-    DIM wahl AS INTEGER : wahl = gtk_button_new_with_label("…")
-    signal(wahl, "clicked", edOrdnerWaehlen, 0, 0, 0)
-    gtk_box_pack_start(oz, wahl, FALSE, FALSE, 0)
-    edRein(s, oz)
+    edRein(s, edOrdnerZeile("Öffnen und Sichern in:", edOrdner, 0, "Wo die Datei-Dialoge anfangen, solange das Muster noch keine Datei hat"))
+    edBibOrdner = gtk_entry_new()
+    gtk_entry_set_placeholder_text(edBibOrdner, "leer = im Einstellungsordner")
+    edRein(s, edOrdnerZeile("Muster-Bibliothek:", edBibOrdner, 1, "Wo die Muster-Bibliothek (library.json) liegt; ein Ordner, der nicht geht, fällt auf die Vorgabe zurück"))
+    edVorlOrdner = gtk_entry_new()
+    gtk_entry_set_placeholder_text(edVorlOrdner, "leer = im Einstellungsordner")
+    edRein(s, edOrdnerZeile("Eigene Vorlagen:", edVorlOrdner, 2, "Wo die eigenen Vorlagen (user_templates.json) liegen"))
     edAbschnitt(s, "Export (Vorgaben)")
     edPdfZellen = adSpin(0, 60, 1, 0, 0)
     edRein(s, edZeile("PDF: Stiche je Seite:", edPdfZellen, "0 = die Vorgabe des Formats, sonst 20 bis 60"))
@@ -406,6 +422,12 @@ SUB edFuellen(e AS kern.Einstellungen)
     gtk_spin_button_set_value(edZoom, e.zoomTempo / 10.0)
     edFarbeSetzen(edHintergrund, e.hintergrund)
     edFarbeSetzen(edStoff, e.stoff)
+    gtk_toggle_button_set_active(edTextur, e.stoffTextur)
+    gtk_toggle_button_set_active(edAmeisen, e.ameisen)
+    gtk_toggle_button_set_active(edStickzeit, e.stickzeit)
+    gtk_toggle_button_set_active(edHervorheben, e.hervorheben)
+    gtk_entry_set_text(edBibOrdner, e.bibliothekPfad)
+    gtk_entry_set_text(edVorlOrdner, e.vorlagenPfad)
     gtk_combo_box_set_active(edStartWz, e.startWerkzeug)
     gtk_toggle_button_set_active(edWzMerken, e.werkzeugMerken)
     gtk_combo_box_set_active(edPipette, e.pipetteDanach)
@@ -467,6 +489,12 @@ SUB edUebernehmen()
     einst.zoomTempo = ROUND(gtk_spin_button_get_value(edZoom) * 10)
     einst.hintergrund = edFarbe(edHintergrund)
     einst.stoff = edFarbe(edStoff)
+    einst.stoffTextur = gtk_toggle_button_get_active(edTextur)
+    einst.ameisen = gtk_toggle_button_get_active(edAmeisen)
+    einst.stickzeit = gtk_toggle_button_get_active(edStickzeit)
+    einst.hervorheben = gtk_toggle_button_get_active(edHervorheben)
+    einst.bibliothekPfad = TRIM$(gtk_entry_get_text(edBibOrdner))
+    einst.vorlagenPfad = TRIM$(gtk_entry_get_text(edVorlOrdner))
     einst.startWerkzeug = MAX(0, gtk_combo_box_get_active(edStartWz))
     einst.werkzeugMerken = gtk_toggle_button_get_active(edWzMerken)
     einst.pipetteDanach = MAX(0, gtk_combo_box_get_active(edPipette))
@@ -502,14 +530,28 @@ SUB edUebernehmen()
     edFuellen(einst)                ' was geordnet wurde, steht jetzt auch im Dialog
 END SUB
 
+' Eine Zeile mit Ordnerfeld und Waehlknopf; nr sagt edOrdnerWaehlen, welches Feld
+FUNCTION edOrdnerZeile(text AS STRING, feld AS INTEGER, nr AS INTEGER, tippText AS STRING) AS INTEGER
+    DIM oz AS INTEGER : oz = edZeile(text, feld, tippText)
+    gtk_widget_set_size_request(feld, 360, -1)
+    DIM wahl AS INTEGER : wahl = gtk_button_new_with_label("…")
+    signal(wahl, "clicked", edOrdnerWaehlen, nr, 0, 0)
+    gtk_box_pack_start(oz, wahl, FALSE, FALSE, 0)
+    RETURN oz
+END FUNCTION
+
 SUB edOrdnerWaehlen(w AS INTEGER, daten AS INTEGER)
+    DIM feld AS INTEGER : feld = edOrdner
+    IF daten = 1 THEN feld = edBibOrdner
+    IF daten = 2 THEN feld = edVorlOrdner
     DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("Ordner wählen", edDialog, GTK_DATEI_ORDNER, _
         "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Wählen", GTK_ANTWORT_ANNEHMEN, 0)
     DIM ok AS BOOLEAN
-    IF TRIM$(gtk_entry_get_text(edOrdner)) <> "" AND DIREXISTS(TRIM$(gtk_entry_get_text(edOrdner))) THEN ok = gtk_file_chooser_set_current_folder(d, TRIM$(gtk_entry_get_text(edOrdner)))
+    DIM jetzt AS STRING : jetzt = TRIM$(gtk_entry_get_text(feld))
+    IF jetzt <> "" AND DIREXISTS(jetzt) THEN ok = gtk_file_chooser_set_current_folder(d, jetzt)
     IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
         DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
-        gtk_entry_set_text(edOrdner, TEXT_AUS_ZEIGER$(z))
+        gtk_entry_set_text(feld, TEXT_AUS_ZEIGER$(z))
         g_free(z)
     END IF
     gtk_widget_destroy(d)

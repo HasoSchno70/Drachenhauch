@@ -18,7 +18,7 @@ DIM vwKennung AS STRING              ' fuer den Schnappschuss-Ordner ungesichert
 
 SUB vwNeuesMuster()
     vwKennung = LEFT$(UUID4$(), 8)
-    IF lwHat AND wzAktiv = WZ_FORTSCHRITT THEN kern.stickzeitStart(lwMuster, ZEIT_UNIX())
+    IF lwHat AND wzAktiv = WZ_FORTSCHRITT AND einst.stickzeit THEN kern.stickzeitStart(lwMuster, ZEIT_UNIX())
 END SUB
 
 FUNCTION vwSchluessel$() AS STRING
@@ -30,7 +30,8 @@ END FUNCTION
 SUB stickzeitWerkzeug(alt AS INTEGER, neu AS INTEGER)
     IF NOT lwHat THEN RETURN
     IF neu = WZ_FORTSCHRITT THEN
-        kern.stickzeitStart(lwMuster, ZEIT_UNIX())
+        ' Einstellungen -> Allgemein -> Stickzeit messen (stitch_timer_enabled)
+        IF einst.stickzeit THEN kern.stickzeitStart(lwMuster, ZEIT_UNIX())
     ELSEIF alt = WZ_FORTSCHRITT THEN
         stickzeitBeenden(TRUE)
     END IF
@@ -95,7 +96,8 @@ FUNCTION nmStoffZahl() AS INTEGER
 END FUNCTION
 
 FUNCTION vwVorlagenDatei$() AS STRING
-    RETURN kern.einstellungsDatei$("user_templates.json")
+    DIM vorgabe AS STRING : vorgabe = DIRNAME(kern.einstellungsDatei$("user_templates.json"))
+    RETURN PATHJOIN(kern.eigenerOrdner$(einst.vorlagenPfad, vorgabe), "user_templates.json")
 END FUNCTION
 
 SUB nmInfoNachziehen()

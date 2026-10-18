@@ -15,6 +15,24 @@ FUNCTION einstellungsDatei$(name AS STRING) AS STRING
     RETURN PATHJOIN(PATHJOIN(basis, "Glutfaden"), name)
 END FUNCTION
 
+' Ein eingestellter Ordner (library_path, templates_path): leer oder nicht
+' anzulegen (abgestecktes Laufwerk, keine Rechte) = die Vorgabe. Wie
+' PySticky: ein Ordner, der nicht mehr geht, darf das Programm nicht
+' aussperren -- sonst kaeme man nicht einmal an die Einstellung heran.
+FUNCTION eigenerOrdner$(eigener AS STRING, vorgabe AS STRING) AS STRING
+    DIM o AS STRING : o = TRIM$(eigener)
+    IF o = "" THEN RETURN vorgabe
+    IF NOT DIREXISTS(o) THEN
+        TRY
+            MKDIR(o)
+        CATCH fehler
+            RETURN vorgabe
+        END TRY
+    END IF
+    IF DIREXISTS(o) THEN RETURN o
+    RETURN vorgabe
+END FUNCTION
+
 ' Eine Datei schreiben, den Ordner davor anlegen (MKDIR legt auch Eltern an).
 SUB textSchreiben(pfad AS STRING, text AS STRING)
     IF DIRNAME(pfad) <> "" AND NOT DIREXISTS(DIRNAME(pfad)) THEN MKDIR(DIRNAME(pfad))

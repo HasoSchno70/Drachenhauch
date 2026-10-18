@@ -47,6 +47,7 @@ CLASS Einstellungen
     DIM zoomTempo AS INTEGER             ' zoom_speed 10..50 = Faktor 1,0..5,0 je Schritt
     DIM hintergrund AS INTEGER           ' canvas_bg
     DIM stoff AS INTEGER                 ' empty_cell_color
+    DIM stoffTextur AS BOOLEAN           ' fabric_texture: Aida-Punkt in leeren Zellen
     ' Werkzeuge
     DIM startWerkzeug AS INTEGER         ' default_tool (Nummer wie WZ_*)
     DIM werkzeugMerken AS BOOLEAN        ' remember_tool
@@ -59,6 +60,8 @@ CLASS Einstellungen
     DIM rueckEinrasten AS BOOLEAN        ' backstitch_snap: Ecken, Kantenmitten, Mitte; aus = nur Ecken
     DIM rueckLinie AS INTEGER            ' backstitch_line_style 0 durchgezogen, 1 gestrichelt, 2 gepunktet, 3 Strich-Punkt
     DIM rueckKappe AS INTEGER            ' backstitch_cap_style 0 rund, 1 eckig, 2 flach
+    DIM ameisen AS BOOLEAN               ' marching_ants: Auswahlkante laeuft
+    DIM stickzeit AS BOOLEAN             ' stitch_timer_enabled
     ' Farben
     DIM palette AS STRING                ' default_palette
     DIM thema AS STRING                  ' theme: dark / light
@@ -69,8 +72,11 @@ CLASS Einstellungen
     DIM symbolGroesse AS INTEGER         ' symbol_size 6..20 (10 = wie vorgesehen)
     DIM symboleAuto AS BOOLEAN           ' auto_symbols
     DIM farbAnzeige AS INTEGER           ' color_display: 0 Farbe, 1 Farbe+Symbol, 2 Symbol
+    DIM hervorheben AS BOOLEAN           ' highlight_selected: andere Farben beim Waehlen daempfen
     ' Dateien
     DIM ordner AS STRING                 ' default_path
+    DIM bibliothekPfad AS STRING         ' library_path, leer = im Einstellungsordner
+    DIM vorlagenPfad AS STRING           ' templates_path, leer = im Einstellungsordner
     DIM pdfZellen AS INTEGER             ' pdf_cells_per_page 0 (Vorgabe des Formats), 20..60
     DIM ueberlappung AS INTEGER          ' export/page_overlap_stitches 0..20
     DIM mystery AS BOOLEAN               ' export/mystery_mode
@@ -119,6 +125,7 @@ SUB einstellungenVorgabe(e AS Einstellungen)
     e.zoomTempo = 12
     e.hintergrund = &H1A1A2E
     e.stoff = &HFAFAF5
+    e.stoffTextur = TRUE
     e.startWerkzeug = 0
     e.werkzeugMerken = FALSE
     e.letztesWerkzeug = 0
@@ -128,6 +135,8 @@ SUB einstellungenVorgabe(e AS Einstellungen)
     e.fuellToleranz = 0
     e.rueckBreite = 2
     e.rueckEinrasten = TRUE
+    e.ameisen = TRUE
+    e.stickzeit = TRUE
     e.palette = "DMC"                    ' PySticky: Anchor; Glutfaden nahm schon immer DMC
     e.thema = "dark"
     e.katalog = TRUE
@@ -137,7 +146,10 @@ SUB einstellungenVorgabe(e AS Einstellungen)
     e.symbolGroesse = 10
     e.symboleAuto = TRUE
     e.farbAnzeige = 1
+    e.hervorheben = FALSE
     e.ordner = ""
+    e.bibliothekPfad = ""
+    e.vorlagenPfad = ""
     e.pdfZellen = 0
     e.ueberlappung = 0
     e.mystery = FALSE
@@ -283,6 +295,7 @@ FUNCTION einstellungenLaden(pfad AS STRING) AS Einstellungen
     IF jsonGanz(j, "zoom_speed", z) THEN e.zoomTempo = z
     IF esFarbe(j, "canvas_bg", f) THEN e.hintergrund = f
     IF esFarbe(j, "empty_cell_color", f) THEN e.stoff = f
+    IF esBool(j, "fabric_texture", b) THEN e.stoffTextur = b
     DIM namen AS ARRAY OF STRING : namen = werkzeugNamen()
     IF esText(j, "default_tool", t) THEN
         z = ARRAY_INDEXOF(namen, UPPER$(TRIM$(t)))
@@ -301,6 +314,8 @@ FUNCTION einstellungenLaden(pfad AS STRING) AS Einstellungen
     IF esBool(j, "backstitch_snap", b) THEN e.rueckEinrasten = b
     IF jsonGanz(j, "backstitch_line_style", z) THEN e.rueckLinie = z
     IF jsonGanz(j, "backstitch_cap_style", z) THEN e.rueckKappe = z
+    IF esBool(j, "marching_ants", b) THEN e.ameisen = b
+    IF esBool(j, "stitch_timer_enabled", b) THEN e.stickzeit = b
     IF esText(j, "theme", t) THEN e.thema = t
     IF esText(j, "default_palette", t) THEN
         IF TRIM$(t) <> "" THEN e.palette = TRIM$(t)
@@ -314,7 +329,10 @@ FUNCTION einstellungenLaden(pfad AS STRING) AS Einstellungen
     IF jsonGanz(j, "symbol_size", z) THEN e.symbolGroesse = z
     IF esBool(j, "auto_symbols", b) THEN e.symboleAuto = b
     IF jsonGanz(j, "color_display", z) THEN e.farbAnzeige = z
+    IF esBool(j, "highlight_selected", b) THEN e.hervorheben = b
     IF esText(j, "default_path", t) THEN e.ordner = TRIM$(t)
+    IF esText(j, "library_path", t) THEN e.bibliothekPfad = TRIM$(t)
+    IF esText(j, "templates_path", t) THEN e.vorlagenPfad = TRIM$(t)
     IF jsonGanz(j, "pdf_cells_per_page", z) THEN e.pdfZellen = z
     IF jsonGanz(j, "export/page_overlap_stitches", z) THEN e.ueberlappung = z
     IF esBool(j, "export/mystery_mode", b) THEN e.mystery = b
@@ -372,6 +390,7 @@ FUNCTION einstellungenJson$(e AS Einstellungen) AS STRING
     JSON_SET_INT(j, "zoom_speed", e.zoomTempo)
     JSON_SET_STRING(j, "canvas_bg", LOWER$(farbeAlsHex$(e.hintergrund)))
     JSON_SET_STRING(j, "empty_cell_color", LOWER$(farbeAlsHex$(e.stoff)))
+    JSON_SET_BOOL(j, "fabric_texture", e.stoffTextur)
     JSON_SET_STRING(j, "default_tool", werkzeugNamen()[e.startWerkzeug])
     JSON_SET_BOOL(j, "remember_tool", e.werkzeugMerken)
     JSON_SET_STRING(j, "last_tool", werkzeugNamen()[e.letztesWerkzeug])
@@ -383,6 +402,8 @@ FUNCTION einstellungenJson$(e AS Einstellungen) AS STRING
     JSON_SET_BOOL(j, "backstitch_snap", e.rueckEinrasten)
     JSON_SET_INT(j, "backstitch_line_style", e.rueckLinie)
     JSON_SET_INT(j, "backstitch_cap_style", e.rueckKappe)
+    JSON_SET_BOOL(j, "marching_ants", e.ameisen)
+    JSON_SET_BOOL(j, "stitch_timer_enabled", e.stickzeit)
     JSON_SET_STRING(j, "default_palette", e.palette)
     JSON_SET_STRING(j, "theme", e.thema)
     JSON_SET_BOOL(j, "show_catalog", e.katalog)
@@ -392,7 +413,10 @@ FUNCTION einstellungenJson$(e AS Einstellungen) AS STRING
     JSON_SET_INT(j, "symbol_size", e.symbolGroesse)
     JSON_SET_BOOL(j, "auto_symbols", e.symboleAuto)
     JSON_SET_INT(j, "color_display", e.farbAnzeige)
+    JSON_SET_BOOL(j, "highlight_selected", e.hervorheben)
     JSON_SET_STRING(j, "default_path", e.ordner)
+    JSON_SET_STRING(j, "library_path", e.bibliothekPfad)
+    JSON_SET_STRING(j, "templates_path", e.vorlagenPfad)
     JSON_SET_INT(j, "pdf_cells_per_page", e.pdfZellen)
     JSON_SET_INT(j, JSON_KEY$("export/page_overlap_stitches"), e.ueberlappung)
     JSON_SET_BOOL(j, JSON_KEY$("export/mystery_mode"), e.mystery)
