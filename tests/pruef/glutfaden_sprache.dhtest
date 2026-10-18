@@ -92,6 +92,34 @@ FOR EACH a IN kern.kuerzelAktionen()
     MAPPUT(gesehen, a.name, "ka")
     IF NOT MAPHAS(tafel, a.name) THEN ARRAY_PUSH(fehlt, "kuerzel " + a.kennung + " " + a.name)
 NEXT
+' Listen aus dem Kern sind dort Schluessel und bleiben deutsch -- die
+' Ansicht uebersetzt sie beim Anzeigen (tr$(t), trListe), also muss jeder
+' Eintrag in der Tafel stehen
+DIM listenZahl AS INTEGER : listenZahl = 0
+SUB listeDazu(l AS ARRAY OF STRING)
+    DIM t AS STRING
+    FOR EACH t IN l
+        listenZahl = listenZahl + 1
+        MAPPUT(gesehen, t, "liste")
+        IF NOT MAPHAS(tafel, t) THEN ARRAY_PUSH(fehlt, "liste " + t)
+    NEXT
+END SUB
+listeDazu(kern.erfahrungsstufen())
+listeDazu(kern.bibliothekKategorien())
+listeDazu(kern.bibliothekSortierungen())
+listeDazu(kern.harmonieArten())
+listeDazu(kern.vorlagenKategorien())
+listeDazu(kern.farbSortierungen())
+listeDazu(kern.startAktionen())
+listeDazu(kern.pipettenArten())
+listeDazu(kern.farbAnzeigen())
+listeDazu(kern.dpVorlagenNamen())
+listeDazu(kern.rasterVoreinstellungen())
+listeDazu(["Eigene"])
+DIM vl AS kern.Vorlage
+FOR EACH vl IN kern.vorlagen()
+    listeDazu([vl.kategorie, vl.name, vl.beschreibung])
+NEXT
 DIM anders AS ARRAY OF STRING : anders = []
 DIM verwaist AS ARRAY OF STRING : verwaist = []
 DIM k AS STRING
@@ -99,8 +127,8 @@ FOR EACH k IN MAPKEYS(tafel)
     IF platz$(k) <> platz$(tafel[k]) THEN ARRAY_PUSH(anders, k + " -> " + tafel[k])
     IF NOT MAPHAS(gesehen, k) THEN ARRAY_PUSH(verwaist, k)
 NEXT
-PRINT "tafel ueber 400: "; LEN(MAPKEYS(tafel)) > 400; " | doppelt "; LEN(doppelt); " | leer "; LEN(leer)
-PRINT "dateien ueber 20: "; dateien > 20; " | texte ueber 350: "; LEN(MAPKEYS(gesehen)) > 350; " | kuerzel-namen "; namen
+PRINT "tafel ueber 1500: "; LEN(MAPKEYS(tafel)) > 1500; " | doppelt "; LEN(doppelt); " | leer "; LEN(leer)
+PRINT "dateien ueber 20: "; dateien > 20; " | texte ueber 1500: "; LEN(MAPKEYS(gesehen)) > 1500; " | kuerzel-namen "; namen; " | aus kern-listen ueber 100: "; listenZahl > 100
 PRINT "fehlen in der tafel: "; LEN(fehlt)
 FOR EACH k IN fehlt
     PRINT "  "; k
@@ -128,8 +156,8 @@ IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
 CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
 --- erwartet
-tafel ueber 400: TRUE | doppelt 0 | leer 0
-dateien ueber 20: TRUE | texte ueber 350: TRUE | kuerzel-namen 77
+tafel ueber 1500: TRUE | doppelt 0 | leer 0
+dateien ueber 20: TRUE | texte ueber 1500: TRUE | kuerzel-namen 77 | aus kern-listen ueber 100: TRUE
 fehlen in der tafel: 0
 andere platzhalter: 0
 falsch eingepackt: 0
@@ -245,5 +273,38 @@ f1: 143 texte, deutsch aussehend 0
   f1-zeile: Undo -> Ctrl+Z
 einstellungen: sprache 0 'Automatic (system language)'
 uebernommen: 'de' | gemerkt 'de' | The language changes at the next start. | oberflaeche bleibt en
+dialoge:
+  neu: 25 texte, deutsch aussehend 0
+  eigenschaften: 19 texte, deutsch aussehend 0
+  groesse: 8 texte, deutsch aussehend 0
+  versionen: 9 texte, deutsch aussehend 0
+  vorlage sichern: 9 texte, deutsch aussehend 0
+  vorlagen: 4 texte, deutsch aussehend 0
+  neuigkeiten: 16 texte, deutsch aussehend 0
+  einstellungen: 284 texte, deutsch aussehend 0
+  raster: 18 texte, deutsch aussehend 0
+  statistik: 118 texte, deutsch aussehend 0
+  heatmap: 8 texte, deutsch aussehend 0
+  aehnliche: 9 texte, deutsch aussehend 0
+  ersetzen: 9 texte, deutsch aussehend 0
+  seltene: 5 texte, deutsch aussehend 0
+  symbol: 98 texte, deutsch aussehend 0
+  blend: 14 texte, deutsch aussehend 0
+  export: 37 texte, deutsch aussehend 0
+  farbverwaltung: 56 texte, deutsch aussehend 0
+  kacheln: 7 texte, deutsch aussehend 0
+  palette: 41 texte, deutsch aussehend 0
+  tauschen: 10 texte, deutsch aussehend 0
+  rahmen: 34 texte, deutsch aussehend 0
+  harmonie: 16 texte, deutsch aussehend 0
+  bibliothek: 27 texte, deutsch aussehend 0
+  stickpfad: 66 texte, deutsch aussehend 0
+  vorschau: 28 texte, deutsch aussehend 0
+  vorrat: 39 texte, deutsch aussehend 0
+  fremdimport: 15 texte, deutsch aussehend 0
+pdf: stile CenterText Normal SmallCenter Title1 Title2 | erster titel '✂ CROSS-STITCH PATTERN' | datei TRUE
+html: <html lang='en'> | deutsch aussehende zeilen 0
+oxs: <?xml version='1.0' encoding='utf-8'?> | in beiden sprachen gleich TRUE | wieder en
+csv: ﻿Symbol,Name,Manufacturer,Catalog number,Stitches,Percent,Skeins,Cost,Do not stitch
 hauptfenster TRUE
 datei unveraendert: TRUE

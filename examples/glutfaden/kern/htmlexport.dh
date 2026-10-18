@@ -83,18 +83,18 @@ END FUNCTION
 
 ' Ein Stich als SVG (svg_shape_for_stitch, 0,5 Punkte Ueberstand).
 FUNCTION svgStich$(t AS INTEGER, x AS FLOAT, y AS FLOAT, w AS FLOAT, h AS FLOAT, farbe AS INTEGER, alsDrill AS BOOLEAN) AS STRING
-    DIM grund AS STRING : grund = trf$("<rect x='{0}' y='{1}' width='{2}' height='{3}' fill='", [hf2$(x), hf2$(y), hf2$(w + 0.5), hf2$(h + 0.5)])
+    DIM grund AS STRING : grund = "<rect x='" + hf2$(x) + "' y='" + hf2$(y) + "' width='" + hf2$(w + 0.5) + "' height='" + hf2$(h + 0.5) + "' fill='"
     IF t = DIAMANT OR (alsDrill AND t = VOLL) THEN RETURN grund + "#ebe8dc'/>" + svgDrill$(x, y, w, h, farbe)
     DIM cx AS FLOAT : cx = x + w / 2
     DIM cy AS FLOAT : cy = y + h / 2
     IF t = KNOTEN THEN
         DIM rk AS FLOAT : rk = MAX(0.5, MIN(w, h) * KNOTEN_RADIUS)
-        RETURN trf$("{0}#fafafa'/><circle cx='{1}' cy='{2}' r='{3}' fill='{4}'/>", [grund, hf2$(cx), hf2$(cy), hf2$(rk), cssRgb$(farbe)])
+        RETURN grund + "#fafafa'/><circle cx='" + hf2$(cx) + "' cy='" + hf2$(cy) + "' r='" + hf2$(rk) + "' fill='" + cssRgb$(farbe) + "'/>"
     END IF
     IF t = PERLE THEN
         DIM rp AS FLOAT : rp = MAX(1.0, MIN(w, h) * PERLE_RADIUS)
         DIM gl AS STRING : gl = "rgb(" + STR$(rotAnteil(farbe) + (255 - rotAnteil(farbe)) \ 2) + "," + STR$(gruenAnteil(farbe) + (255 - gruenAnteil(farbe)) \ 2) + "," + STR$(blauAnteil(farbe) + (255 - blauAnteil(farbe)) \ 2) + ")"
-        RETURN trf$("{0}#fafafa'/><circle cx='{1}' cy='{2}' r='{3}' fill='{4}'/><circle cx='{5}' cy='{6}' r='{7}' fill='{8}' opacity='0.85'/>", [grund, hf2$(cx), hf2$(cy), hf2$(rp), cssRgb$(farbe), hf2$(cx - rp / 2.5), hf2$(cy - rp / 2.5), hf2$(rp / 3.0), gl])
+        RETURN grund + "#fafafa'/><circle cx='" + hf2$(cx) + "' cy='" + hf2$(cy) + "' r='" + hf2$(rp) + "' fill='" + cssRgb$(farbe) + "'/><circle cx='" + hf2$(cx - rp / 2.5) + "' cy='" + hf2$(cy - rp / 2.5) + "' r='" + hf2$(rp / 3.0) + "' fill='" + gl + "' opacity='0.85'/>"
     END IF
     IF NOT istTeilstich(t) THEN RETURN grund + cssRgb$(farbe) + "'/>"
     DIM p AS ARRAY OF FLOAT : p = teilstichPunkte(t)
@@ -463,7 +463,7 @@ FUNCTION htmlVorschau$(r AS HtmlLauf) AS STRING
     ARRAY_PUSH(t, tr$("<h1>Vorschau des fertigen Musters</h1>"))
     ARRAY_PUSH(t, trf$("<h3>Fertige Gr&ouml;&szlig;e auf {0}: {1} cm</h3>", [htmlKodiere$(stoffName$(m)), htmlGroesse$(r)]))
     ARRAY_PUSH(t, "<div class='preview-container'>")
-    ARRAY_PUSH(t, trf$("<svg class='preview-svg' width='{0}' height='{1}'", [hf1$(tw), hf1$(th)]))
+    ARRAY_PUSH(t, "<svg class='preview-svg' width='" + hf1$(tw) + "' height='" + hf1$(th) + "'")
     ARRAY_PUSH(t, "     shape-rendering='crispEdges'>")
     ARRAY_PUSH(t, svg)
     ARRAY_PUSH(t, rueck)
