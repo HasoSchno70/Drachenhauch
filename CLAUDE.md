@@ -2341,6 +2341,45 @@ volle Laeufe gruen. Sammlung `tests/pruef/glutfaden_stufe18.dhtest` (3:
 gegen PySticky, Grenzen samt Abweichungen und Schritten, Probe); 13
 Verfaelschungen fallen je in ihrem Fall.
 
+**Stufe 19: Optionsleisten, Bildschirm-Pipette, Paletten-Dateien, Drucken**
+(2026-10-18). Unter der Werkzeugleiste erscheint je nach Werkzeug eine
+Leiste (`ansicht/optionsleisten.dh`): Rueckstich mit Dicke, Linienart
+(durchgezogen/gestrichelt/gepunktet), Enden (rund/eckig/flach), Einrasten
+und Vorschau -- gemerkt als `backstitch_line_style`/`_cap_style` (geklemmt)
+und von Leinwand, Vorschau und Druck gleich gezeichnet (`vbStrich`); Text
+mit Eingabefeld, Schrift, Groesse, fett/kursiv -- der Text haengt beim
+Tippen an der Maus und wird bei jeder Aenderung neu gesetzt, ohne Text
+haengt nichts (vorher drei Fragekaesten). **Bildschirm-Pipette** (💧,
+`ansicht/farbquellen.dh`): ein Foto des Monitors
+(`gdk_pixbuf_get_from_window` auf das Wurzelfenster), randlos darueber, ein
+Klick nimmt den Punkt, ESC bricht ab; die Farbe wird das naechste Garn der
+gewaehlten Palette (`naechstesGarnIn`, mit Delta E in der Meldung), ohne
+Palette ein Garn "#RRGGBB". Die Pipette dreht ein eigenes `gtk_main` --
+**ein `destroy`-Handler, der `gtk_main_quit` ruft, beendete dabei die
+AEUSSERE Schleife und damit das Programm**; jetzt mit Laufmerker
+(`bpLaeuft`). **Paletten-Dateien** (Exportieren…/Importieren… unter der
+Farbliste): `paletteDateiText$` schreibt Byte fuer Byte PyStickys
+`pysticky_palette`-JSON (gegen dessen Ausgabe geprueft), der Import ist EIN
+Rueckgaengig-Schritt, nimmt nur Farben, die noch fehlen, setzt ein Symbol
+nur, wenn es frei ist, und lehnt fremde Dateien mit PyStickys Meldung ab.
+**Drucken** (Strg+P, `ansicht/drucken.dh`): GTKs Druckdialog
+(`GtkPrintOperation` + `draw-page`, neu `signalSeite`), eine Seite, quer
+bei breitem Muster, 5 % Rand (`kern.druckLage`), Teilstiche/Knoten/Perlen
+wie auf der Leinwand, Symbole ab 8 Punkten je Kaestchen, graues Raster --
+**und anders als PySticky die Rueckstiche** (ohne sie fehlen die Konturen
+auf dem Blatt). `druckenNach` schreibt dieselbe Seite ohne Dialog als PDF
+(GTKs Export), so laesst sich der Druck ohne Drucker pruefen. **GTK-Falle:**
+`gtk_widget_set_no_show_all` erst NACH `show_all` + `hide` der Leiste --
+vorher blieben ihre Kinder fuer immer unsichtbar. Kuerzel-Tafel 70 (elf ohne
+Vorgabe). Die Repo-Pruefung in `dhrt_check.dhtest` laesst
+`examples/glutfaden/ansicht/` aus: das sind Teile von main.dh, kein eigenes
+Programm. Sammlung `tests/pruef/glutfaden_stufe19.dhtest` (4: Export gegen
+PySticky, Lesen samt Rundweg und Grenzen, Drucklage und Einstellungen,
+Probe); 16 Verfaelschungen fallen je in ihrem Fall -- zwei erst, nachdem
+die Probe die Lage des DRUCKAUFTRAGS (nicht die Rechnung des Kerns) und die
+Kanalfolge der Pipette an einem gefuellten Pixbuf prueft; vorher verglich
+sie `bpPunkt` mit sich selbst.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als
