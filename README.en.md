@@ -277,6 +277,9 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 | `98_coroutines.dh` | **coroutines/`YIELD`**: generators, `FOR EACH` drain, send/return dialog, `CORO_RESULT`, method coroutine |
 | `154_chart.dh` | **charts**: all six kinds, themes, mouse interaction |
 | `156_gui_alle_widgets.dh` | **all 22 GUI widgets** in one fullscreen application, each with a real job |
+| `glutfaden/main.dh` | **Glutfaden** — the cross-stitch editor PySticky in Drachenhauch, with GTK 3 through foreign libraries: part and back stitches, layers, image import, PDF/HTML/OXS export, PCStitch and Pattern Maker, printing, light and dark theme |
+| `texteditor/main.dh` | **text editor** — tabs, find and replace, encoding and line endings kept on save |
+| `fotos/main.dh` | **photo viewer with GTK 3** — overview, single view, rotation from camera data, slideshow |
 | `157_gui_tabelle.dh`, `158_gui_tabelle_sqlite.dh` | **professional table** — sort, filter, edit cells; the second one against a real SQLite database |
 | `159_esp32_bruecke.dh` | **connect an ESP32** — receive readings, send commands back (sketch in [esp32/](esp32/)) |
 | `160_musik_seek.dh` | **Jumping through music** (`AUDIO_MUSIC_SEEK`) — clickable progress bar, ±10 s, and the buffered lead a jump has to play out first |
