@@ -28,6 +28,13 @@ DIM lwHervor AS INTEGER : lwHervor = -1   ' hervorgehobene Farbe, -1 = keine
 ' nur die Anzeige, das Muster bleibt
 DIM lwNurAktiv AS BOOLEAN             ' nur die aktive Ebene, auch wenn sie ausgeblendet ist
 DIM lwAbdunkeln AS BOOLEAN            ' die anderen mit halber Deckkraft
+' Ansichtsschalter (PySticky "Rückstiche anzeigen", "Fortschritt anzeigen",
+' "Zentrierhilfe") -- wie dort nur fuer die Sitzung, nicht gemerkt. Rueckstiche
+' sind hier per Vorgabe AN (PySticky: aus, bis man das Werkzeug waehlt -- ein
+' geoeffnetes Muster zeigte dort seine Konturen zunaechst nicht).
+DIM lwRueckZeigen AS BOOLEAN : lwRueckZeigen = TRUE
+DIM lwFortschrittZeigen AS BOOLEAN : lwFortschrittZeigen = TRUE
+DIM lwMittelkreuz AS BOOLEAN
 ' Waehrend einer Probe zaehlt die echte Maus nicht: Proben rufen die Werkzeuge
 ' selbst, und ein Fenster, das unter dem Zeiger auf- oder zugeht, schickt
 ' Bewegungen, die einen laufenden Zug an eine fremde Stelle setzten (unter
@@ -397,13 +404,14 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     ' vorgesehen); dieselbe Strichroutine wie die Muster-Vorschau
     DIM rbreite AS FLOAT : rbreite = rueckLinienbreite(z)
     FOR EACH r IN lwMuster.rueckstiche
+        IF NOT lwRueckZeigen THEN EXIT FOR
         IF r.farbe < 0 OR r.farbe >= LEN(lwRgb) - 1 THEN CONTINUE
         vbStrich(cr, lwX + r.x1 * z / 2, lwY + r.y1 * z / 2, lwX + r.x2 * z / 2, lwY + r.y2 * z / 2, lwRgb[r.farbe], 1, rbreite, einst.rueckLinie, einst.rueckKappe)
     NEXT
 
     ' Erledigte Stiche: Stoff halb darueber und ein Haken -- so sieht man, was
     ' noch zu sticken ist (PySticky blendet sie ebenso ab)
-    IF z >= 4 THEN
+    IF z >= 4 AND lwFortschrittZeigen THEN
         cairo_set_source_rgba(cr, 0.98, 0.98, 0.96, 0.62)
         DIM erl AS BOOLEAN
         FOR y = y0 TO y1
@@ -432,6 +440,10 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
             cairo_stroke(cr)
         END IF
     END IF
+
+    ' Zentrierhilfe und Spiegelachsen
+    IF lwMittelkreuz THEN lwMittelkreuzZeichnen(cr)
+    IF wzSpiegel <> kern.SPIEGEL_AUS THEN lwSpiegelachsenZeichnen(cr)
 
     ' Der Farbverlauf, der gerade gezogen wird: je Punkt seine Farbe
     IF LEN(wzVorschauFarben) > 0 AND LEN(wzVorschauFarben) * 2 = LEN(wzVorschau) THEN
@@ -481,6 +493,136 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     END IF
     flaecheNachziehen()
     RETURN TRUE
+END FUNCTION
+
+' Zentrierhilfe (PySticky _draw_center_crosshair): rot gestrichelt durch die
+' Mitte des Musters, ein Punkt im Schnitt.
+SUB lwMittelkreuzZeichnen(cr AS INTEGER)
+    DIM l AS FLOAT : l = lwX
+    DIM o AS FLOAT : o = lwY
+    DIM r AS FLOAT : r = lwX + lwMuster.breite * lwZelle
+    DIM u AS FLOAT : u = lwY + lwMuster.hoehe * lwZelle
+    DIM mx AS FLOAT : mx = lwX + lwMuster.breite * lwZelle / 2
+    DIM my AS FLOAT : my = lwY + lwMuster.hoehe * lwZelle / 2
+    cairo_set_source_rgba(cr, 1.0, 100 / 255, 100 / 255, 180 / 255)
+    cairo_set_line_width(cr, 2.0)
+    sdStrichel(cr, 6.0, 4.0)
+    cairo_move_to(cr, l, my) : cairo_line_to(cr, r, my)
+    cairo_move_to(cr, mx, o) : cairo_line_to(cr, mx, u)
+    cairo_stroke(cr)
+    sdStrichel(cr, 0.0, 0.0)
+    cairo_arc(cr, mx, my, 6, 0, TAU)
+    cairo_set_source_rgba(cr, 1.0, 100 / 255, 100 / 255, 100 / 255)
+    cairo_fill_preserve(cr)
+    cairo_set_source_rgb(cr, 1.0, 100 / 255, 100 / 255)
+    cairo_stroke(cr)
+END SUB
+
+' Spiegelachsen (PySticky _draw_mirror_axes): blau senkrecht bei
+' Links/Rechts-Spiegel, orange waagerecht bei Oben/Unten, bei Achtfach die
+' Diagonalen gestrichelt -- Achtfach gilt nur bei quadratischen Mustern,
+' sonst ist es vierfach, und so wird es auch gezeichnet. In der Mitte der Modus.
+SUB lwSpiegelachsenZeichnen(cr AS INTEGER)
+    DIM modus AS INTEGER : modus = kern.spiegelWirksam(wzSpiegel, lwMuster.breite, lwMuster.hoehe)
+    IF modus = kern.SPIEGEL_AUS THEN RETURN
+    DIM l AS FLOAT : l = lwX
+    DIM o AS FLOAT : o = lwY
+    DIM r AS FLOAT : r = lwX + lwMuster.breite * lwZelle
+    DIM u AS FLOAT : u = lwY + lwMuster.hoehe * lwZelle
+    DIM mx AS FLOAT : mx = lwX + lwMuster.breite * lwZelle / 2
+    DIM my AS FLOAT : my = lwY + lwMuster.hoehe * lwZelle / 2
+    IF modus = kern.SPIEGEL_WAAGERECHT OR modus >= kern.SPIEGEL_VIERFACH THEN
+        cairo_set_source_rgba(cr, 100 / 255, 200 / 255, 1.0, 200 / 255)
+        cairo_set_line_width(cr, 3.0)
+        cairo_move_to(cr, mx, o) : cairo_line_to(cr, mx, u)
+        cairo_stroke(cr)
+        cairo_set_source_rgb(cr, 100 / 255, 200 / 255, 1.0)
+        lwText(cr, mx + 5, o - 20, "↔", FALSE)
+    END IF
+    IF modus = kern.SPIEGEL_SENKRECHT OR modus >= kern.SPIEGEL_VIERFACH THEN
+        cairo_set_source_rgba(cr, 1.0, 180 / 255, 100 / 255, 200 / 255)
+        cairo_set_line_width(cr, 3.0)
+        cairo_move_to(cr, l, my) : cairo_line_to(cr, r, my)
+        cairo_stroke(cr)
+        cairo_set_source_rgb(cr, 1.0, 180 / 255, 100 / 255)
+        lwText(cr, r + 5, my - 8, "↕", FALSE)
+    END IF
+    IF modus = kern.SPIEGEL_ACHTFACH THEN
+        cairo_set_line_width(cr, 2.0)
+        sdStrichel(cr, 6.0, 4.0)
+        cairo_set_source_rgba(cr, 180 / 255, 100 / 255, 1.0, 150 / 255)
+        cairo_move_to(cr, l, o) : cairo_line_to(cr, r, u)
+        cairo_stroke(cr)
+        cairo_set_source_rgba(cr, 100 / 255, 1.0, 200 / 255, 150 / 255)
+        cairo_move_to(cr, r, o) : cairo_line_to(cr, l, u)
+        cairo_stroke(cr)
+        sdStrichel(cr, 0.0, 0.0)
+    END IF
+    ' Modus in der Mitte
+    cairo_arc(cr, mx, my, 18, 0, TAU)
+    cairo_set_source_rgba(cr, 50 / 255, 50 / 255, 80 / 255, 200 / 255)
+    cairo_fill_preserve(cr)
+    cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 200 / 255)
+    cairo_set_line_width(cr, 2.0)
+    cairo_stroke(cr)
+    cairo_set_source_rgb(cr, 1.0, 1.0, 1.0)
+    lwTextMitte(cr, mx, my, kern.spiegelKurz$(modus), TRUE)
+END SUB
+
+DIM lwBeschriftung AS INTEGER          ' PangoFontDescription fuer Achsen und Modus
+
+FUNCTION lwTextLayout(cr AS INTEGER, text AS STRING, fett AS BOOLEAN) AS INTEGER
+    IF lwBeschriftung <> 0 THEN pango_font_description_free(lwBeschriftung)
+    lwBeschriftung = pango_font_description_from_string(IIF(fett, "Sans Bold", "Sans"))
+    pango_font_description_set_absolute_size(lwBeschriftung, 14 * PANGO_SCALE)
+    DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
+    pango_layout_set_font_description(layout, lwBeschriftung)
+    pango_layout_set_text(layout, text, -1)
+    RETURN layout
+END FUNCTION
+
+SUB lwText(cr AS INTEGER, x AS FLOAT, y AS FLOAT, text AS STRING, fett AS BOOLEAN)
+    DIM layout AS INTEGER : layout = lwTextLayout(cr, text, fett)
+    cairo_move_to(cr, x, y)
+    pango_cairo_show_layout(cr, layout)
+    g_object_unref(layout)
+END SUB
+
+SUB lwTextMitte(cr AS INTEGER, x AS FLOAT, y AS FLOAT, text AS STRING, fett AS BOOLEAN)
+    DIM layout AS INTEGER : layout = lwTextLayout(cr, text, fett)
+    DIM tb AS INTEGER, th AS INTEGER
+    pango_layout_get_pixel_size(layout, tb, th)
+    cairo_move_to(cr, x - tb / 2, y - th / 2)
+    pango_cairo_show_layout(cr, layout)
+    g_object_unref(layout)
+END SUB
+
+' Einen Ansichtsschalter setzen: 0 Rueckstiche, 1 Fortschritt, 2 Zentrierhilfe.
+SUB ansichtSchalter(was AS INTEGER, an AS BOOLEAN)
+    SELECT CASE was
+        CASE 0 : lwRueckZeigen = an
+        CASE 1 : lwFortschrittZeigen = an
+        CASE 2 : lwMittelkreuz = an
+    END SELECT
+    ansichtKnoepfeNachziehen()
+    IF lwFlaeche <> 0 THEN gtk_widget_queue_draw(lwFlaeche)
+    statusMeldung(ansichtName$(was) + ": " + IIF(an, "an", "aus"))
+END SUB
+
+FUNCTION ansichtName$(was AS INTEGER) AS STRING
+    SELECT CASE was
+        CASE 0 : RETURN "Rückstiche anzeigen"
+        CASE 1 : RETURN "Fortschritt anzeigen"
+    END SELECT
+    RETURN "Zentrierhilfe"
+END FUNCTION
+
+FUNCTION ansichtAn(was AS INTEGER) AS BOOLEAN
+    SELECT CASE was
+        CASE 0 : RETURN lwRueckZeigen
+        CASE 1 : RETURN lwFortschrittZeigen
+    END SELECT
+    RETURN lwMittelkreuz
 END FUNCTION
 
 ' Ein Kaestchen mit besonderem Stichtyp an (px, py), Groesse z.

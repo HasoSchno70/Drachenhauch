@@ -57,6 +57,8 @@ DIM wzStichWahl AS INTEGER            ' GtkComboBoxText
 DIM wzFarbeLeiste AS INTEGER          ' Farbfeld der aktuellen Farbe
 DIM wzSpiegel AS INTEGER              ' kern.SPIEGEL_*
 DIM wzSpiegelWahl AS INTEGER
+DIM wzAnsichtKnoepfe AS ARRAY OF INTEGER   ' Rueckstiche, Fortschritt, Zentrierhilfe
+DIM wzAnsichtSperre AS BOOLEAN
 
 ' Die Sticharten der Auswahl, in der Reihenfolge der Kuerzel Alt+1 .. Alt+0
 FUNCTION wzSticharten() AS ARRAY OF INTEGER
@@ -144,12 +146,29 @@ SUB werkzeugWaehlen(nr AS INTEGER, gefuellt AS BOOLEAN)
         gtk_widget_queue_draw(wzKnoepfe[i])
     NEXT
     wzKnopfSperre = FALSE
+    IF nr = WZ_RUECKSTICH AND NOT lwRueckZeigen THEN ansichtSchalter(0, TRUE)
+    IF nr = WZ_FORTSCHRITT AND NOT lwFortschrittZeigen THEN ansichtSchalter(1, TRUE)
     verlaufLeisteZeigen(nr = WZ_FARBVERLAUF)
     rueckLeisteZeigen(nr = WZ_RUECKSTICH)
     textLeisteZeigen(nr = WZ_TEXT)
     fortschrittModusNachziehen()
     leinwandZeiger()
     statusNachziehen()
+END SUB
+
+SUB wzAnsichtGeklickt(knopf AS INTEGER, was AS INTEGER)
+    IF wzAnsichtSperre THEN RETURN
+    ansichtSchalter(was, gtk_toggle_button_get_active(knopf))
+END SUB
+
+SUB ansichtKnoepfeNachziehen()
+    IF LEN(wzAnsichtKnoepfe) < 3 THEN RETURN
+    wzAnsichtSperre = TRUE
+    DIM i AS INTEGER
+    FOR i = 0 TO 2
+        IF wzAnsichtKnoepfe[i] <> 0 THEN gtk_toggle_button_set_active(wzAnsichtKnoepfe[i], ansichtAn(i))
+    NEXT
+    wzAnsichtSperre = FALSE
 END SUB
 
 SUB wzKnopfGeklickt(knopf AS INTEGER, nr AS INTEGER)
@@ -168,6 +187,7 @@ END FUNCTION
 
 SUB spiegelWaehlen(modus AS INTEGER)
     wzSpiegel = CLAMP(modus, 0, 4)
+    IF lwFlaeche <> 0 THEN gtk_widget_queue_draw(lwFlaeche)
     IF wzSpiegelWahl <> 0 THEN
         IF gtk_combo_box_get_active(wzSpiegelWahl) <> wzSpiegel THEN gtk_combo_box_set_active(wzSpiegelWahl, wzSpiegel)
     END IF
@@ -549,6 +569,20 @@ FUNCTION werkzeugleisteNeu() AS INTEGER
     gtk_combo_box_set_active(wzSpiegelWahl, 0)
     signal(wzSpiegelWahl, "changed", wzSpiegelGeaendert, 0, 0, 0)
     gtk_box_pack_start(box, wzSpiegelWahl, FALSE, FALSE, 4)
+    DIM av AS INTEGER
+    DIM ak[3] AS INTEGER
+    wzAnsichtKnoepfe = ak
+    DIM azeichen AS ARRAY OF STRING : azeichen = ["↙", "✓", "✞"]
+    DIM akennung AS ARRAY OF STRING : akennung = ["rueckstiche_zeigen", "fortschritt_zeigen", "mittelkreuz"]
+    FOR av = 0 TO 2
+        DIM kk AS INTEGER : kk = gtk_toggle_button_new_with_label(azeichen[av])
+        gtk_widget_set_can_focus(kk, FALSE)
+        tipp(kk, ansichtName$(av) + " ({" + akennung[av] + "})")
+        gtk_toggle_button_set_active(kk, ansichtAn(av))
+        signal(kk, "toggled", wzAnsichtGeklickt, av, 0, 0)
+        gtk_box_pack_start(box, kk, FALSE, FALSE, 0)
+        wzAnsichtKnoepfe[av] = kk
+    NEXT
     gtk_box_pack_start(box, verlaufLeisteNeu(), FALSE, FALSE, 4)
     gtk_box_pack_start(box, rueckLeisteNeu(), FALSE, FALSE, 4)
     gtk_box_pack_start(box, textLeisteNeu(), FALSE, FALSE, 4)

@@ -553,6 +553,9 @@ FUNCTION kuerzelAktionen() AS ARRAY OF Kuerzelaktion
         ka("nur_aktive", "Nur aktive Ebene", ""), _
         ka("abdunkeln", "Andere Ebenen abdunkeln", ""), _
         ka("ebene_leeren", "Ebene leeren", ""), _
+        ka("rueckstiche_zeigen", "Rückstiche anzeigen", ""), _
+        ka("fortschritt_zeigen", "Fortschritt anzeigen", ""), _
+        ka("mittelkreuz", "Zentrierhilfe", ""), _
         ka("drucken", "Drucken", "Strg+P"), _
         ka("bildschirm_pipette", "Farbe vom Bildschirm picken", ""), _
         ka("palette_export", "Palette exportieren", ""), _

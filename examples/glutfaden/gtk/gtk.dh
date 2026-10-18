@@ -91,6 +91,7 @@ DECLARE FUNCTION gtk_label_get_text LIB GTK (label AS ZEIGER) AS TEXT
 DECLARE SUB gtk_label_set_xalign LIB GTK (label AS ZEIGER, x AS SINGLE)
 DECLARE SUB gtk_label_set_ellipsize LIB GTK (label AS ZEIGER, art AS LONG)
 DECLARE FUNCTION gtk_toggle_button_new LIB GTK () AS ZEIGER
+DECLARE FUNCTION gtk_toggle_button_new_with_label LIB GTK (text AS TEXT) AS ZEIGER
 DECLARE FUNCTION gtk_list_box_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_list_box_set_selection_mode LIB GTK (box AS ZEIGER, art AS LONG)
 DECLARE SUB gtk_list_box_set_activate_on_single_click LIB GTK (box AS ZEIGER, an AS BOOLEAN)
