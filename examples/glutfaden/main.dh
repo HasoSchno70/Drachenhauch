@@ -103,6 +103,7 @@ CONST STIL = "window, .flaeche { background-color: #1b1c20; color: #e4e5ea; }" +
     " .werkzeugzeile { background-color: #202228; border-bottom: 1px solid #0c0d10; padding: 3px 8px; }" + _
     " .werkzeugzeile button:checked { background-color: rgba(255,138,61,0.20); box-shadow: inset 0 -2px #ff8a3d; }" + _
     " .werkzeugzeile combobox button { background-image: none; background-color: #2a2c33; color: #d6d9e1; padding: 2px 8px; }" + _
+    " .werkzeugzeile entry, .werkzeugzeile spinbutton { background-image: none; background-color: #2a2c33; color: #e4e5ea; border: 1px solid #3a3c44; box-shadow: none; } .werkzeugzeile spinbutton button { color: #d6d9e1; border: none; background-color: transparent; }" + _
     " .werkzeugzeile separator { background-color: #3a3c44; min-width: 1px; margin: 4px 2px; }" + _
     " .zoom { color: #c9ccd4; min-width: 52px; }" + _
     " .seitenleiste { background-color: #202228; border-left: 1px solid #0c0d10; }" + _
@@ -840,6 +841,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe17"
     ELSEIF ARG$(a) = "--probe-stufe18" THEN
         probe = "stufe18"
+    ELSEIF ARG$(a) = "--probe-stufe19" THEN
+        probe = "stufe19"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -903,6 +906,7 @@ IF probe = "stufe15" THEN g_timeout_add(300, vorfuehrenStufe15, 0)
 IF probe = "stufe16" THEN g_timeout_add(300, vorfuehrenStufe16, 0)
 IF probe = "stufe17" THEN g_timeout_add(300, vorfuehrenStufe17, 0)
 IF probe = "stufe18" THEN g_timeout_add(300, vorfuehrenStufe18, 0)
+IF probe = "stufe19" THEN g_timeout_add(300, vorfuehrenStufe19, 0)
 ' Alle fuenf Minuten ein Schnappschuss, wenn etwas ungesichert ist
 DIM takt AS INTEGER : takt = g_timeout_add(300000, vwTakt, 0)
 

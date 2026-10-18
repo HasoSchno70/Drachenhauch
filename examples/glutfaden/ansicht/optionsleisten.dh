@@ -52,9 +52,9 @@ END FUNCTION
 
 FUNCTION rueckLeisteNeu() AS INTEGER
     rlBox = gtk_box_new(GTK_WAAGERECHT, 4)
-    gtk_widget_set_no_show_all(rlBox, TRUE)
     gtk_box_pack_start(rlBox, olBeschriftung("Dicke"), FALSE, FALSE, 4)
     rlDicke = gtk_spin_button_new_with_range(1, 5, 1)
+    gtk_entry_set_width_chars(rlDicke, 2)
     gtk_widget_set_can_focus(rlDicke, FALSE)
     gtk_widget_set_tooltip_text(rlDicke, "Linienbreite der Rückstiche (2 = wie vorgesehen)")
     gtk_box_pack_start(rlBox, rlDicke, FALSE, FALSE, 0)
@@ -74,6 +74,11 @@ FUNCTION rueckLeisteNeu() AS INTEGER
     gtk_widget_set_tooltip_text(rlVorschau, "Vorschau in der aktuellen Farbe")
     signalZeichnen(rlVorschau, "draw", rlVorschauZeichnen, 0, 0, 0)
     gtk_box_pack_start(rlBox, rlVorschau, FALSE, FALSE, 4)
+    ' erst alles zeigen, dann die Leiste selbst verbergen: mit no_show_all
+    ' zeigte das show_all des Fensters ihre Kinder nie
+    gtk_widget_show_all(rlBox)
+    gtk_widget_hide(rlBox)
+    gtk_widget_set_no_show_all(rlBox, TRUE)
     rueckLeisteNachziehen()
     signal(rlDicke, "value-changed", rlGeaendert, 0, 0, 0)
     signal(rlLinie, "changed", rlGeaendert, 0, 0, 0)
@@ -144,7 +149,6 @@ FUNCTION textLeisteNeu() AS INTEGER
         txGroesse = 12
     END IF
     tlBox = gtk_box_new(GTK_WAAGERECHT, 4)
-    gtk_widget_set_no_show_all(tlBox, TRUE)
     tlFeld = gtk_entry_new()
     gtk_entry_set_placeholder_text(tlFeld, "Text eingeben…")
     gtk_entry_set_width_chars(tlFeld, 14)
@@ -153,6 +157,7 @@ FUNCTION textLeisteNeu() AS INTEGER
     tlSchrift = olWahl(textSchriften(), "Schriftart")
     gtk_box_pack_start(tlBox, tlSchrift, FALSE, FALSE, 0)
     tlGroesse = gtk_spin_button_new_with_range(6, 72, 1)
+    gtk_entry_set_width_chars(tlGroesse, 3)
     gtk_widget_set_can_focus(tlGroesse, FALSE)
     gtk_widget_set_tooltip_text(tlGroesse, "Größe in Punkt (12 Punkt = 16 Kästchen hoch)")
     gtk_box_pack_start(tlBox, tlGroesse, FALSE, FALSE, 0)
@@ -162,6 +167,11 @@ FUNCTION textLeisteNeu() AS INTEGER
     tlKursiv = gtk_check_button_new_with_label("Kursiv")
     gtk_widget_set_can_focus(tlKursiv, FALSE)
     gtk_box_pack_start(tlBox, tlKursiv, FALSE, FALSE, 0)
+    ' erst alles zeigen, dann die Leiste selbst verbergen: mit no_show_all
+    ' zeigte das show_all des Fensters ihre Kinder nie
+    gtk_widget_show_all(tlBox)
+    gtk_widget_hide(tlBox)
+    gtk_widget_set_no_show_all(tlBox, TRUE)
     textLeisteNachziehen()
     signal(tlFeld, "changed", tlGeaendert, 0, 0, 0)
     signal(tlFeld, "activate", tlEnter, 0, 0, 0)
