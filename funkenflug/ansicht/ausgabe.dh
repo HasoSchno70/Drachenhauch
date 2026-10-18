@@ -90,18 +90,37 @@ SUB schriftfeldZeichnen(cr AS INTEGER, rechts AS FLOAT, unten AS FLOAT, h AS FLO
     cairo_line_to(cr, x + b * 0.62, y + h)
     cairo_stroke(cr)
     lwTextAus(cr, x + 6, y + h / 4, exportTitel$(), &H1F1F1F, 0, gSchrift)
-    lwTextAus(cr, x + 6, y + h * 3 / 4, "Blatt: " + gBlatt.name, &H333333, 0, gSchrift)
+    DIM blatt AS STRING : blatt = "Blatt: " + gBlatt.name
+    IF LEN(gDok.blaetter) > 1 THEN blatt = blatt + "  (" + STR$(aktuellerBlattIndex() + 1) + " von " + STR$(LEN(gDok.blaetter)) + ")"
+    lwTextAus(cr, x + 6, y + h * 3 / 4, blatt, &H333333, 0, gSchrift)
     lwTextAus(cr, x + b * 0.62 + 6, y + h * 3 / 4, DATE$(), &H333333, 0, gSchrift)
     lwTextAus(cr, x + b - 6, y + h / 4, "Funkenflug", &H777777, 2, gSchrift)
 END SUB
 
 ' --- Dateien ------------------------------------------------------------------
 
+' Ein bestimmtes Blatt ausgeben: gBlatt kurz umstellen, damit Zeichnen,
+' Netze und Schriftfeld dieses Blatt meinen; danach zurueck.
+DIM gAusgabeSeiten AS INTEGER     ' ausgegebene Seiten (Selbsttest)
+
+SUB ausgabeBlattZeichnen(cr AS INTEGER, breite AS FLOAT, hoehe AS FLOAT, i AS INTEGER)
+    gAusgabeSeiten = gAusgabeSeiten + 1
+    DIM alt AS kern.Blatt : alt = gBlatt
+    IF i >= 0 AND i < LEN(gDok.blaetter) THEN gBlatt = gDok.blaetter[i]
+    ausgabeZeichnen(cr, breite, hoehe)
+    gBlatt = alt
+END SUB
+
+' PDF: jedes Blatt eine Seite. SVG und PNG kennen nur eine Seite -- dort
+' das aktuelle Blatt.
 FUNCTION ausgabePdf(pfad AS STRING) AS BOOLEAN
     DIM fl AS INTEGER : fl = cairo_pdf_surface_create(pfad, A4_B, A4_H)
     DIM cr AS INTEGER : cr = cairo_create(fl)
-    ausgabeZeichnen(cr, A4_B, A4_H)
-    cairo_show_page(cr)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gDok.blaetter) - 1
+        ausgabeBlattZeichnen(cr, A4_B, A4_H, i)
+        cairo_show_page(cr)
+    NEXT
     cairo_destroy(cr)
     cairo_surface_finish(fl)
     DIM ok AS BOOLEAN : ok = cairo_surface_status(fl) = 0
@@ -151,14 +170,14 @@ END SUB
 ' --- Drucken ------------------------------------------------------------------
 
 SUB druckSeite(op AS INTEGER, kontext AS INTEGER, seite AS INTEGER, daten AS INTEGER)
-    ausgabeZeichnen(gtk_print_context_get_cairo_context(kontext), gtk_print_context_get_width(kontext), gtk_print_context_get_height(kontext))
+    ausgabeBlattZeichnen(gtk_print_context_get_cairo_context(kontext), gtk_print_context_get_width(kontext), gtk_print_context_get_height(kontext), seite)
 END SUB
 
 ' Ueber GTKs Druckdialog drucken. Mit pdfPfad statt Dialog in diese PDF --
 ' derselbe Weg ohne Drucker (fuer den Selbsttest). Rueckgabe: "" oder Fehler.
 FUNCTION drucken$(pdfPfad AS STRING) AS STRING
     DIM op AS INTEGER : op = gtk_print_operation_new()
-    gtk_print_operation_set_n_pages(op, 1)
+    gtk_print_operation_set_n_pages(op, LEN(gDok.blaetter))    ' je Blatt eine Seite
     gtk_print_operation_set_job_name(op, exportTitel$())
     gtk_print_operation_set_unit(op, GTK_EINHEIT_PUNKT)
     DIM seite AS INTEGER : seite = gtk_page_setup_new()

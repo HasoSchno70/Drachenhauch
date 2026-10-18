@@ -161,6 +161,7 @@ SUB leinwandDokument(d AS kern.Dokument)
     gDrahtAktiv = FALSE
     vEingepasst = FALSE
     netzeVeraltet()
+    reiterAktualisieren()
     neuZeichnen()
 END SUB
 
@@ -275,7 +276,7 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
         bauteilZeichnen(cr, geist, TRUE, FALSE)
     END IF
     IF gWerkzeug = WZ_LABEL AND gMausDrin THEN
-        labelZeichnen(cr, sx(gMausWX), sy(gMausWY), "Label", C_GEIST)
+        labelZeichnen(cr, sx(gMausWX), sy(gMausWY), "Label", C_GEIST, gLabelGlobal)
     END IF
     ' Fang-Markierung
     IF gMausDrin AND (gWerkzeug = WZ_DRAHT OR gWerkzeug = WZ_LABEL) THEN
@@ -325,7 +326,7 @@ SUB inhaltZeichnen(cr AS INTEGER)
     NEXT
     FOR i = 0 TO LEN(gBlatt.labels) - 1
         DIM lgew AS BOOLEAN : lgew = NOT gDruck AND istGewaehltL(gBlatt.labels[i])
-        labelZeichnen(cr, sx(gBlatt.labels[i].anker.x), sy(gBlatt.labels[i].anker.y), gBlatt.labels[i].text, IIF(lgew, C_AUSWAHL, C_LABEL))
+        labelZeichnen(cr, sx(gBlatt.labels[i].anker.x), sy(gBlatt.labels[i].anker.y), gBlatt.labels[i].text, IIF(lgew, C_AUSWAHL, C_LABEL), gBlatt.labels[i].art = kern.LA_GLOBAL)
     NEXT
 END SUB
 
@@ -335,7 +336,7 @@ CONST LABEL_DX = 6
 CONST LABEL_DY = 9
 CONST LABEL_ZEICHEN = 7              ' ungefaehre Breite je Zeichen (Treffer-Test)
 
-SUB labelZeichnen(cr AS INTEGER, ax AS FLOAT, ay AS FLOAT, text AS STRING, farbe AS INTEGER)
+SUB labelZeichnen(cr AS INTEGER, ax AS FLOAT, ay AS FLOAT, text AS STRING, farbe AS INTEGER, global AS BOOLEAN)
     zeichenFarbe(cr, farbe)
     ' der Anker-Punkt nur am Bildschirm: auf Papier hiesse ein Punkt "Knoten"
     IF NOT gDruck THEN
@@ -343,10 +344,23 @@ SUB labelZeichnen(cr AS INTEGER, ax AS FLOAT, ay AS FLOAT, text AS STRING, farbe
         cairo_fill(cr)
     END IF
     cairo_set_line_width(cr, 1.2)
-    cairo_move_to(cr, ax, ay)
-    cairo_line_to(cr, ax + LABEL_DX + LEN(text) * LABEL_ZEICHEN, ay)
-    cairo_stroke(cr)
-    lwText(cr, ax + LABEL_DX, ay - LABEL_DY, text, farbe, FALSE)
+    DIM rechts AS FLOAT : rechts = ax + LABEL_DX + LEN(text) * LABEL_ZEICHEN
+    IF global THEN
+        ' globales Label: ein Faehnchen mit Spitze am Anker (gilt auf allen Blaettern)
+        DIM oben AS FLOAT : oben = ay - 2 * LABEL_DY - 2
+        cairo_move_to(cr, ax, ay)
+        cairo_line_to(cr, ax + 8, oben)
+        cairo_line_to(cr, rechts + 6, oben)
+        cairo_line_to(cr, rechts + 6, ay)
+        cairo_close_path(cr)
+        cairo_stroke(cr)
+        lwText(cr, ax + LABEL_DX + 4, ay - LABEL_DY, text, farbe, FALSE)
+    ELSE
+        cairo_move_to(cr, ax, ay)
+        cairo_line_to(cr, rechts, ay)
+        cairo_stroke(cr)
+        lwText(cr, ax + LABEL_DX, ay - LABEL_DY, text, farbe, FALSE)
+    END IF
 END SUB
 
 ' --- Netze (Cache) ---------------------------------------------------------
@@ -355,11 +369,14 @@ SUB netzeVeraltet()
     gErcSichtbar = FALSE              ' alte ERC-Marker passen nicht mehr
 END SUB
 
+' Die Netze des ganzen Dokuments (globale Labels verbinden ueber Blaetter),
+' Abfragen bezogen auf das aktuelle Blatt.
 FUNCTION aktuelleNetze() AS kern.Netze
     IF NOT gNetzeGueltig THEN
-        gNetze = kern.netzeBerechnen(gBlatt)
+        gNetze = kern.netzeDokument(gDok)
         gNetzeGueltig = TRUE
     END IF
+    gNetze.blattWaehlen(aktuellerBlattIndex())
     RETURN gNetze
 END FUNCTION
 
@@ -448,8 +465,10 @@ END SUB
 SUB ercMarkerZeichnen(cr AS INTEGER)
     IF NOT gErcSichtbar THEN RETURN
     DIM i AS INTEGER
+    DIM hier AS INTEGER : hier = aktuellerBlattIndex()
     FOR i = 0 TO LEN(gErc) - 1
         DIM v AS kern.Verstoss : v = gErc[i]
+        IF v.blatt <> hier THEN CONTINUE              ' Marker nur auf ihrem Blatt
         DIM r AS FLOAT : r = 9
         IF i = gErcGewaehlt THEN r = 14
         zeichenFarbe(cr, IIF(v.schwere = kern.ERC_FEHLER, C_ERC_FEHLER, C_ERC_WARNUNG))

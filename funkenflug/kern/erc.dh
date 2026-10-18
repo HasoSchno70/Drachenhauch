@@ -1,6 +1,7 @@
 ' Elektrische Regelpruefung (ERC) -- Namensraum "kern".
-' Arbeitet ausschliesslich auf netzeBerechnen() -- dieselbe Quelle wie
-' Netzliste und Anzeige, damit ERC und Export nie auseinanderlaufen.
+' Arbeitet ausschliesslich auf netzeDokument() -- dieselbe Quelle wie
+' Netzliste und Anzeige, damit ERC und Export nie auseinanderlaufen. Geprueft
+' wird immer das ganze Dokument; jeder Verstoss weiss sein Blatt.
 '
 ' Versorgungssymbole (GND, VCC ...) gelten als Quelle: anders als in KiCad
 ' braucht es kein PWR_FLAG. Dafuer meldet der ERC, wenn zwei verschiedene
@@ -12,11 +13,13 @@ CONST ERC_FEHLER = 2
 CLASS Verstoss
     DIM schwere AS INTEGER
     DIM text AS STRING
+    DIM blatt AS INTEGER
     DIM x AS INTEGER
     DIM y AS INTEGER
-    SUB Init(s AS INTEGER, t AS STRING, px AS INTEGER, py AS INTEGER)
+    SUB Init(s AS INTEGER, t AS STRING, b AS INTEGER, px AS INTEGER, py AS INTEGER)
         schwere = s
         text = t
+        blatt = b
         x = px
         y = py
     END SUB
@@ -30,41 +33,51 @@ FUNCTION pinText$(p AS NetzPin) AS STRING
     RETURN t
 END FUNCTION
 
+' Ein einzelnes Blatt pruefen (als Dokument mit nur diesem Blatt).
 FUNCTION ercPruefen(bl AS Blatt) AS ARRAY OF Verstoss
+    RETURN ercPruefenDok(einBlattDokument(bl))
+END FUNCTION
+
+FUNCTION ercPruefenDok(dok AS Dokument) AS ARRAY OF Verstoss
     DIM fehler AS ARRAY OF Verstoss : fehler = []
     DIM warnungen AS ARRAY OF Verstoss : warnungen = []
-    DIM n AS Netze : n = netzeBerechnen(bl)
-    DIM i AS INTEGER, j AS INTEGER, k AS INTEGER
+    DIM n AS Netze : n = netzeDokument(dok)
+    DIM bi AS INTEGER, i AS INTEGER, j AS INTEGER, k AS INTEGER
+    DIM bl AS Blatt
 
-    ' --- Referenzen: fehlend oder doppelt
+    ' --- Referenzen: fehlend oder doppelt -- ueber alle Blaetter
     DIM gesehen AS MAP OF INTEGER
-    FOR i = 0 TO LEN(bl.bauteile) - 1
-        DIM b AS Bauteil : b = bl.bauteile[i]
-        IF b.sym.fehlt THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Symbol " + b.symbolRef + " fehlt (" + IIF(b.referenz = "", "ohne Referenz", b.referenz) + ")", b.lage.pos.x, b.lage.pos.y))
-        IF b.sym.einheitLeistung THEN CONTINUE
-        IF b.referenz = "" THEN
-            ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, b.sym.name + " ohne Referenz", b.lage.pos.x, b.lage.pos.y))
-        ELSEIF MAPHAS(gesehen, b.referenz) THEN
-            ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Referenz " + b.referenz + " ist doppelt vergeben", b.lage.pos.x, b.lage.pos.y))
-        ELSE
-            MAPPUT(gesehen, b.referenz, i)
-        END IF
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        bl = dok.blaetter[bi]
+        FOR i = 0 TO LEN(bl.bauteile) - 1
+            DIM b AS Bauteil : b = bl.bauteile[i]
+            IF b.sym.fehlt THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Symbol " + b.symbolRef + " fehlt (" + IIF(b.referenz = "", "ohne Referenz", b.referenz) + ")", bi, b.lage.pos.x, b.lage.pos.y))
+            IF b.sym.einheitLeistung THEN CONTINUE
+            IF b.referenz = "" THEN
+                ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, b.sym.name + " ohne Referenz", bi, b.lage.pos.x, b.lage.pos.y))
+            ELSEIF MAPHAS(gesehen, b.referenz) THEN
+                ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Referenz " + b.referenz + " ist doppelt vergeben", bi, b.lage.pos.x, b.lage.pos.y))
+            ELSE
+                MAPPUT(gesehen, b.referenz, i)
+            END IF
+        NEXT
     NEXT
 
     ' --- je Netz
     FOR i = 0 TO LEN(n.liste) - 1
         DIM nz AS Netz : nz = n.liste[i]
+        DIM ob AS INTEGER : ob = MAX(nz.blatt, 0)
         DIM ox AS INTEGER : ox = 0
         DIM oy AS INTEGER : oy = 0
-        IF LEN(nz.pins) > 0 THEN ox = nz.pins[0].x : oy = nz.pins[0].y
+        IF LEN(nz.pins) > 0 THEN ob = nz.pins[0].blatt : ox = nz.pins[0].x : oy = nz.pins[0].y
 
         ' Kurzschluss zwischen Versorgungen
         IF LEN(nz.versorgungen) > 1 THEN
-            ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Kurzschluss: " + JOIN$(nz.versorgungen, " und ") + " liegen im selben Netz", ox, oy))
+            ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Kurzschluss: " + JOIN$(nz.versorgungen, " und ") + " liegen im selben Netz", ob, ox, oy))
         END IF
         ' Namen, die nicht zusammenpassen
         IF LEN(nz.labelNamen) > 1 THEN
-            ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Netz hat mehrere Labels: " + JOIN$(nz.labelNamen, ", "), ox, oy))
+            ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Netz hat mehrere Labels: " + JOIN$(nz.labelNamen, ", "), ob, ox, oy))
         END IF
         IF LEN(nz.versorgungen) > 0 THEN
             FOR j = 0 TO LEN(nz.labelNamen) - 1
@@ -72,7 +85,7 @@ FUNCTION ercPruefen(bl AS Blatt) AS ARRAY OF Verstoss
                 FOR k = 0 TO LEN(nz.versorgungen) - 1
                     IF nz.versorgungen[k] = nz.labelNamen[j] THEN passt = TRUE
                 NEXT
-                IF NOT passt THEN ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Label " + nz.labelNamen[j] + " liegt auf der Versorgung " + nz.versorgungen[0], ox, oy))
+                IF NOT passt THEN ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Label " + nz.labelNamen[j] + " liegt auf der Versorgung " + nz.versorgungen[0], ob, ox, oy))
             NEXT
         END IF
 
@@ -80,9 +93,9 @@ FUNCTION ercPruefen(bl AS Blatt) AS ARRAY OF Verstoss
         IF LEN(nz.pins) = 1 THEN
             DIM p AS NetzPin : p = nz.pins[0]
             IF p.versorgung THEN
-                ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Versorgungssymbol " + nz.name + " ist nirgends angeschlossen", p.x, p.y))
+                ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Versorgungssymbol " + nz.name + " ist nirgends angeschlossen", p.blatt, p.x, p.y))
             ELSEIF p.typ <> PIN_FREI THEN
-                ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Pin " + pinText$(p) + " ist nicht verbunden", p.x, p.y))
+                ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Pin " + pinText$(p) + " ist nicht verbunden", p.blatt, p.x, p.y))
             END IF
         END IF
 
@@ -102,58 +115,80 @@ FUNCTION ercPruefen(bl AS Blatt) AS ARRAY OF Verstoss
                     CASE PIN_LEISTUNG_EIN : lEin = lEin + 1
                     CASE PIN_PASSIV : passiv = passiv + 1
                     CASE PIN_FREI
-                        IF LEN(nz.pins) > 1 THEN ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Pin " + pinText$(q) + " ist als nicht anzuschliessen markiert, aber verbunden", q.x, q.y))
+                        IF LEN(nz.pins) > 1 THEN ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Pin " + pinText$(q) + " ist als nicht anzuschliessen markiert, aber verbunden", q.blatt, q.x, q.y))
                 END SELECT
             END IF
         NEXT
-        IF aus >= 2 THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Netz " + nz.name + ": " + STR$(aus) + " Ausgaenge treiben gegeneinander", ox, oy))
-        IF aus >= 1 AND (lAus + quelle) >= 1 THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Netz " + nz.name + ": Ausgang treibt gegen eine Versorgung", ox, oy))
-        IF lAus >= 2 THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Netz " + nz.name + ": mehrere Versorgungsausgaenge", ox, oy))
-        IF ein >= 1 AND aus + lAus + bidir + passiv + quelle = 0 THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Netz " + nz.name + ": Eingang ohne Treiber", ox, oy))
-        IF lEin >= 1 AND lAus + quelle = 0 THEN ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Netz " + nz.name + ": Versorgungseingang ohne Versorgung", ox, oy))
+        IF aus >= 2 THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Netz " + nz.name + ": " + STR$(aus) + " Ausgaenge treiben gegeneinander", ob, ox, oy))
+        IF aus >= 1 AND (lAus + quelle) >= 1 THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Netz " + nz.name + ": Ausgang treibt gegen eine Versorgung", ob, ox, oy))
+        IF lAus >= 2 THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Netz " + nz.name + ": mehrere Versorgungsausgaenge", ob, ox, oy))
+        IF ein >= 1 AND aus + lAus + bidir + passiv + quelle = 0 THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Netz " + nz.name + ": Eingang ohne Treiber", ob, ox, oy))
+        IF lEin >= 1 AND lAus + quelle = 0 THEN ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Netz " + nz.name + ": Versorgungseingang ohne Versorgung", ob, ox, oy))
     NEXT
 
-    ' --- Bauteil kurzgeschlossen: zwei Pins desselben Bauteils im selben Netz
-    FOR i = 0 TO LEN(bl.bauteile) - 1
-        DIM bt AS Bauteil : bt = bl.bauteile[i]
-        IF bt.sym.einheitLeistung THEN CONTINUE
-        DIM nachNetz AS MAP OF INTEGER
-        MAPCLEAR(nachNetz)
-        FOR j = 0 TO LEN(bt.sym.pins) - 1
-            DIM pp AS Punkt : pp = bt.pinPunkt(j)
-            DIM nk AS STRING : nk = STR$(n.netzAn(pp.x, pp.y))
-            IF MAPHAS(nachNetz, nk) THEN
-                DIM erster AS INTEGER : erster = MAPGET(nachNetz, nk)
-                ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, bt.referenz + ": Pin " + bt.sym.pins[erster].nummer + " und " + bt.sym.pins[j].nummer + " sind kurzgeschlossen", bt.lage.pos.x, bt.lage.pos.y))
-            ELSE
-                MAPPUT(nachNetz, nk, j)
+    ' --- globale Labels, die nur einmal vorkommen, verbinden nichts
+    DIM globAnzahl AS MAP OF INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        FOR i = 0 TO LEN(dok.blaetter[bi].labels) - 1
+            DIM gl AS Label : gl = dok.blaetter[bi].labels[i]
+            IF gl.art = LA_GLOBAL THEN MAPPUT(globAnzahl, gl.text, MAPGETOR(globAnzahl, gl.text, 0) + 1)
+        NEXT
+    NEXT
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        FOR i = 0 TO LEN(dok.blaetter[bi].labels) - 1
+            DIM g2 AS Label : g2 = dok.blaetter[bi].labels[i]
+            IF g2.art = LA_GLOBAL AND MAPGETOR(globAnzahl, g2.text, 0) = 1 THEN
+                ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Globales Label " + g2.text + " gibt es nur einmal -- es verbindet nichts", bi, g2.anker.x, g2.anker.y))
             END IF
         NEXT
     NEXT
 
-    ' --- offene Drahtenden: endet hier nur dieser Draht, ohne Pin, Label
-    ' oder fremdes Segment, haengt das Ende in der Luft.
-    DIM festpunkte AS MAP OF INTEGER
-    FOR i = 0 TO LEN(bl.bauteile) - 1
-        FOR j = 0 TO LEN(bl.bauteile[i].sym.pins) - 1
-            DIM fp AS Punkt : fp = bl.bauteile[i].pinPunkt(j)
-            MAPPUT(festpunkte, netzKey(fp.x, fp.y), 1)
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        bl = dok.blaetter[bi]
+        n.blattWaehlen(bi)
+        ' --- Bauteil kurzgeschlossen: zwei Pins desselben Bauteils im selben Netz
+        FOR i = 0 TO LEN(bl.bauteile) - 1
+            DIM bt AS Bauteil : bt = bl.bauteile[i]
+            IF bt.sym.einheitLeistung THEN CONTINUE
+            DIM nachNetz AS MAP OF INTEGER
+            MAPCLEAR(nachNetz)
+            FOR j = 0 TO LEN(bt.sym.pins) - 1
+                DIM pp AS Punkt : pp = bt.pinPunkt(j)
+                DIM nk AS STRING : nk = STR$(n.netzAn(pp.x, pp.y))
+                IF MAPHAS(nachNetz, nk) THEN
+                    DIM erster AS INTEGER : erster = MAPGET(nachNetz, nk)
+                    ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, bt.referenz + ": Pin " + bt.sym.pins[erster].nummer + " und " + bt.sym.pins[j].nummer + " sind kurzgeschlossen", bi, bt.lage.pos.x, bt.lage.pos.y))
+                ELSE
+                    MAPPUT(nachNetz, nk, j)
+                END IF
+            NEXT
         NEXT
-    NEXT
-    FOR i = 0 TO LEN(bl.labels) - 1
-        MAPPUT(festpunkte, netzKey(bl.labels[i].anker.x, bl.labels[i].anker.y), 1)
-    NEXT
-    FOR i = 0 TO LEN(bl.draehte) - 1
-        DIM w AS Draht : w = bl.draehte[i]
-        IF LEN(w.punkte) < 2 THEN CONTINUE
-        DIM ende AS INTEGER
-        FOR ende = 0 TO 1
-            DIM e AS Punkt
-            IF ende = 0 THEN e = w.punkte[0] ELSE e = w.punkte[LEN(w.punkte) - 1]
-            IF MAPHAS(festpunkte, netzKey(e.x, e.y)) THEN CONTINUE
-            IF endenAn(bl, e.x, e.y) >= 2 THEN CONTINUE
-            IF istTPunkt(bl, e.x, e.y) THEN CONTINUE
-            ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Offenes Drahtende", e.x, e.y))
+
+        ' --- offene Drahtenden: endet hier nur dieser Draht, ohne Pin, Label
+        ' oder fremdes Segment, haengt das Ende in der Luft.
+        DIM festpunkte AS MAP OF INTEGER
+        MAPCLEAR(festpunkte)
+        FOR i = 0 TO LEN(bl.bauteile) - 1
+            FOR j = 0 TO LEN(bl.bauteile[i].sym.pins) - 1
+                DIM fp AS Punkt : fp = bl.bauteile[i].pinPunkt(j)
+                MAPPUT(festpunkte, netzKey(fp.x, fp.y), 1)
+            NEXT
+        NEXT
+        FOR i = 0 TO LEN(bl.labels) - 1
+            MAPPUT(festpunkte, netzKey(bl.labels[i].anker.x, bl.labels[i].anker.y), 1)
+        NEXT
+        FOR i = 0 TO LEN(bl.draehte) - 1
+            DIM w AS Draht : w = bl.draehte[i]
+            IF LEN(w.punkte) < 2 THEN CONTINUE
+            DIM ende AS INTEGER
+            FOR ende = 0 TO 1
+                DIM e AS Punkt
+                IF ende = 0 THEN e = w.punkte[0] ELSE e = w.punkte[LEN(w.punkte) - 1]
+                IF MAPHAS(festpunkte, netzKey(e.x, e.y)) THEN CONTINUE
+                IF endenAn(bl, e.x, e.y) >= 2 THEN CONTINUE
+                IF istTPunkt(bl, e.x, e.y) THEN CONTINUE
+                ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Offenes Drahtende", bi, e.x, e.y))
+            NEXT
         NEXT
     NEXT
 

@@ -26,7 +26,7 @@ einem Programm, das es mitbringt (**Inkscape**, GIMP). Die Bibliotheks-Namen in
 |---|---|
 | **Auswahl** (Taste `A`) | Bauteil, Label oder Draht anklicken, ziehen zum Verschieben; auf freier Fläche einen **Rahmen** aufziehen (wählt alles ganz Umschlossene), `Umschalt` ergänzt bzw. schaltet einzelne Elemente um; **Doppelklick**, `E` oder `Enter` bearbeitet (Bauteil: Referenz/Wert; Label und Draht: Netz umbenennen) |
 | **Draht** (Taste `W`) | klicken setzt Eckpunkte, Doppelklick / `Enter` / rechte Maustaste schließt ab, `Esc` bricht ab. Enden fangen an Pins und Drahtenden |
-| **Label** (Taste `L`) | klicken, Netznamen eingeben. Der Anker ist der elektrische Punkt; **gleichnamige Labels sind ein Netz** |
+| **Label** (Taste `L`) | klicken, Netznamen eingeben. Der Anker ist der elektrische Punkt; **gleichnamige Labels sind ein Netz**. Mit dem Haken „global" wird es ein globales Label (Fahne) und verbindet über alle Blätter; `G` schaltet gewählte Labels um |
 | **Bauteil** | in der Leiste aus der Liste wählen, dann auf die Fläche klicken; rechte Maustaste oder `R` dreht die Vorschau |
 
 Weiteres: `Strg+Z` / `Strg+Y` (oder `Strg+Umschalt+Z`) bzw. die Pfeile in der
@@ -50,11 +50,22 @@ dem Raster, damit alle Pins auf dem Raster bleiben). Angeschlossene Drähte
 folgen per Gummiband, ein Rückgängig-Schritt. Beim Platzieren gelten
 `R`/`X`/`Y` der Vorschau.
 
+**Blätter:** Reiter über der Zeichenfläche, `Bild↑`/`Bild↓` blättern, Knopf
+„Blatt ▾" legt an, benennt um und löscht (jeweils ein Rückgängig-Schritt; ein
+volles Blatt fragt vorher, das letzte bleibt). **Globale Labels** (Fahne) und
+Versorgungssymbole verbinden gleichnamige Netze auf allen Blättern, **lokale
+Labels nur auf ihrem Blatt** – gleiche lokale Namen auf zwei Blättern sind zwei
+Netze und heißen dann `Blatt/Name`. Referenzen zählen über alle Blätter (kein
+zweites R1), Netzliste, Stückliste und ERC umfassen das ganze Dokument; eine
+ERC-Zeile springt auch aufs richtige Blatt. Die Statuszeile nennt das Blatt.
+
 **Ausgabe** (Knopf „Ausgabe ▾" in der Kopfleiste): **PDF**, **SVG** und
 **PNG** (150 dpi), **Drucken** über den Druckdialog des Systems, dazu
 Stückliste und Netzliste. Alles läuft durch dieselbe Zeichenroutine wie der
 Bildschirm, nur mit Druckfarben auf Weiß, ohne Raster, Auswahl und Pin-Punkte,
 auf A4 quer eingepasst (kleine Schaltungen höchstens 3:1) und mit Schriftfeld.
+PDF und Druck haben **eine Seite je Blatt** („Blatt: Takt (2 von 3)"), SVG und
+PNG zeigen das aktuelle Blatt.
 
 ![Ausgabe als PDF/PNG](druck.png)
 
@@ -115,8 +126,8 @@ Netz den neuen Namen schon, fragt es vorher – Umbenennen würde beide verbinde
 
 **Netze:** Fährt die Maus über einen Draht, einen Pin oder ein Label, zeigt die
 Statuszeile den Netznamen samt Pinzahl und die Drähte des Netzes leuchten auf.
-Namen: Versorgungssymbol (GND, VCC, auch ein umbenanntes wie `+5V`) vor Label vor
-automatisch (`N1`, `N2` …). Gleichnamige Versorgungen und Labels sind ein Netz,
+Namen: Versorgungssymbol (GND, VCC, auch ein umbenanntes wie `+5V`) vor globalem
+vor lokalem Label vor automatisch (`N1`, `N2` …). Gleichnamige Versorgungen und Labels sind ein Netz,
 auch ohne Draht.
 
 **ERC** (Kopfleiste): listet Fehler und Warnungen in einem Fenster, das offen
@@ -125,7 +136,8 @@ markieren Kreise jede Stelle. Geprüft werden doppelte und fehlende Referenzen,
 offene Pins, offene Drahtenden, kurzgeschlossene Bauteile (zwei Pins im selben
 Netz), mehrere Labels an einem Netz, Labels auf einer fremden Versorgung,
 **Kurzschlüsse zwischen Versorgungen** und die Pin-Typen gegeneinander (zwei
-Ausgänge, Ausgang gegen Versorgung, Eingang ohne Treiber …). Versorgungssymbole
+Ausgänge, Ausgang gegen Versorgung, Eingang ohne Treiber …), dazu globale Labels,
+die es nur einmal gibt (sie verbinden nichts). Versorgungssymbole
 gelten als Quelle – ein PWR_FLAG wie in KiCad braucht es nicht.
 
 **Netzliste** (Kopfleiste): das Format folgt der Endung – `.cir`/`.sp` SPICE
@@ -155,6 +167,7 @@ ansicht/    Zeichenfläche und Werkzeuge – globaler Namensraum
   auswahl.dh     Auswahl als Menge, Rahmen, Gruppen-Zug mit Gummiband, Ablage
   symboleditor.dh  Symbol-Editor mit Vorschau
   ausgabe.dh     PDF, SVG, PNG, Drucken, Menü „Ausgabe"
+  blaetter.dh    Reiter, Menü „Blatt": neu, umbenennen, löschen
 main.dh     Fenster, Kopfleiste, Werkzeugleiste, Statuszeile, Dialoge
 ```
 
@@ -162,11 +175,13 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (119 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (144 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
-Kopieren/Einfügen, Umbenennen, ERC und SPICE). `pruef_kern.dh` prüft u. a. die
+Kopieren/Einfügen, Umbenennen, ERC und SPICE, mehrere Blätter mit Reitern,
+globalem Label über den Dialog-Haken, ERC-Sprung aufs Blatt und mehrseitigem
+PDF/Druck). `pruef_kern.dh` prüft u. a. die
 Gruppen-Lage in allen 8 Orientierungen × 3 Arten (72 Pin-Prüfungen). Der Selbsttest
 lässt die Zwischenablage des Systems in Ruhe und schreibt seine Bibliothek in
 eine Wegwerf-Datei neben dem Bild. `--nur-foto bild.png` macht nur das Bild.
@@ -185,8 +200,9 @@ SparkNode hatte mehrere Konzeptfehler, die hier von Anfang an vermieden sind:
 2. **Pin-Punkt eindeutig.** `pin.pos` IST der elektrische Andockpunkt;
    `pin.laenge` ist nur der gezeichnete Stummel. Kein Nebeneinander von
    „position" und „connection point".
-3. **Eine Netz-Erkennung.** `kern.netzeBerechnen` ist die einzige Quelle für
-   Konnektivität (später auch ERC/Netzliste). Alle Punkte aufs Raster
+3. **Eine Netz-Erkennung.** `kern.netzeDokument` ist die einzige Quelle für
+   Konnektivität – fürs ganze Dokument, ERC, Netzliste, Stückliste und
+   Anzeige nutzen dieselbe Rechnung. Alle Punkte aufs Raster
    quantisiert; T-Verbindung zählt, eine reine Kreuzung ohne Knoten nicht.
 4. **Label-Anker getrennt von Darstellung.** Der Anker ist der elektrische
    Punkt; Text und Unterstrich sind nur Anzeige und verschieben ihn nie.
@@ -212,7 +228,7 @@ zweiten Kondensator wieder „C1".
 
 ## Noch offen (nächste Runden)
 
-Mehrere Blätter in der Oberfläche, Symbole mit freier Grafik (bisher
+Hierarchische Blätter (Blatt-Symbole mit Ports), Symbole mit freier Grafik (bisher
 Rechteck-Gehäuse aus dem Generator), Überstrich für aktiv-low (`~RESET`),
 Bauteil-Felder wie Gehäuse/Bestellnummer für die Stückliste, Labels drehen,
 Platinen-Layout.

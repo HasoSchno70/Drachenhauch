@@ -23,9 +23,12 @@ CONST K_GLEICH = &H3D
 CONST K_MINUS = &H2D
 CONST K_NULL = &H30
 CONST K_F2 = &HFFBF
+CONST K_G = &H67
 CONST K_C = &H63
 CONST K_V = &H76
 CONST K_X = &H78
+CONST K_BILD_AUF = &HFF55              ' GDK_KEY_Page_Up
+CONST K_BILD_AB = &HFF56
 
 FUNCTION evKnopf(ev AS INTEGER) AS INTEGER
     DIM k AS INTEGER
@@ -180,15 +183,15 @@ END FUNCTION
 SUB labelUmbenennen()
     DIM la AS kern.Label : la = gLabelGewaehlt
     DIM alt AS STRING : alt = la.text
-    DIM stellen AS INTEGER : stellen = kern.namensStellen(gBlatt, alt)
+    DIM stellen AS INTEGER : stellen = kern.namensStellenDok(gDok, aktuellerBlattIndex(), alt)
     DIM haken AS STRING : haken = ""
     IF stellen > 1 THEN haken = "alle " + STR$(stellen) + " Stellen namens " + alt + " umbenennen"
-    DIM neu AS STRING : neu = TRIM$(umbenennenDialog$("Netz umbenennen", "Neuer Name:", alt, haken))
+    DIM neu AS STRING : neu = TRIM$(umbenennenDialog$("Netz umbenennen", "Neuer Name:", alt, haken, TRUE))
     IF neu = "" OR neu = alt THEN RETURN
     IF NOT umbenennenErlaubt(neu, la.anker.x, la.anker.y) THEN RETURN
     verlaufMerken()
     IF stellen > 1 AND gDlgHakenWert THEN
-        DIM z AS INTEGER : z = kern.namenUmbenennen(gBlatt, alt, neu)
+        DIM z AS INTEGER : z = kern.namenUmbenennenDok(gDok, aktuellerBlattIndex(), alt, neu)
     ELSE
         la.text = neu
     END IF
@@ -204,20 +207,21 @@ SUB netzUmbenennenBei(vx AS INTEGER, vy AS INTEGER, ortX AS INTEGER, ortY AS INT
     DIM alt AS STRING : alt = ""
     DIM benannt AS BOOLEAN : benannt = FALSE
     IF i >= 0 THEN
-        alt = n.liste[i].name
-        benannt = NOT n.liste[i].automatisch
+        alt = kern.netzQuellName$(n.liste[i])      ' "L", nicht der angezeigte "Haupt/L"
+        benannt = alt <> ""
+        IF NOT benannt THEN alt = n.liste[i].name
     END IF
     DIM hinweis AS STRING : hinweis = "Neuer Name:"
     IF benannt THEN
-        DIM st AS INTEGER : st = kern.namensStellen(gBlatt, alt)
+        DIM st AS INTEGER : st = kern.namensStellenDok(gDok, aktuellerBlattIndex(), alt)
         hinweis = "Neuer Name (" + STR$(st) + IIF(st = 1, " Stelle", " Stellen") + "):"
     END IF
-    DIM neu AS STRING : neu = TRIM$(umbenennenDialog$("Netz umbenennen", hinweis, alt, ""))
+    DIM neu AS STRING : neu = TRIM$(umbenennenDialog$("Netz umbenennen", hinweis, alt, "", FALSE))
     IF neu = "" OR neu = alt THEN RETURN
     IF NOT umbenennenErlaubt(neu, vx, vy) THEN RETURN
     verlaufMerken()
     IF benannt THEN
-        DIM z AS INTEGER : z = kern.namenUmbenennen(gBlatt, alt, neu)
+        DIM z AS INTEGER : z = kern.namenUmbenennenDok(gDok, aktuellerBlattIndex(), alt, neu)
     ELSE
         ARRAY_PUSH(gBlatt.labels, NEW kern.Label(neu, NEW kern.Punkt(ortX, ortY), kern.LA_LOKAL))
     END IF
@@ -263,13 +267,15 @@ END SUB
 FUNCTION naechsteReferenz(praefix AS STRING) AS STRING
     IF LEFT$(praefix, 1) = "#" THEN RETURN ""        ' Leistungssymbole ohne Referenz
     DIM groesste AS INTEGER : groesste = 0
-    DIM i AS INTEGER
-    FOR i = 0 TO LEN(gBlatt.bauteile) - 1
-        DIM r AS STRING : r = gBlatt.bauteile[i].referenz
-        IF LEN(r) > LEN(praefix) AND LEFT$(r, LEN(praefix)) = praefix THEN
-            DIM n AS INTEGER : n = VAL(MID$(r, LEN(praefix)))     ' MID$ zaehlt ab 0
-            IF n > groesste THEN groesste = n
-        END IF
+    DIM bi AS INTEGER, i AS INTEGER
+    FOR bi = 0 TO LEN(gDok.blaetter) - 1                 ' ueber alle Blaetter
+        FOR i = 0 TO LEN(gDok.blaetter[bi].bauteile) - 1
+            DIM r AS STRING : r = gDok.blaetter[bi].bauteile[i].referenz
+            IF LEN(r) > LEN(praefix) AND LEFT$(r, LEN(praefix)) = praefix THEN
+                DIM n AS INTEGER : n = VAL(MID$(r, LEN(praefix)))     ' MID$ zaehlt ab 0
+                IF n > groesste THEN groesste = n
+            END IF
+        NEXT
     NEXT
     RETURN praefix + STR$(groesste + 1)
 END FUNCTION
@@ -277,9 +283,12 @@ END FUNCTION
 ' Gibt es die Referenz schon bei einem ANDEREN Bauteil?
 FUNCTION referenzBelegt(ref AS STRING, ausser AS kern.Bauteil) AS BOOLEAN
     IF ref = "" THEN RETURN FALSE
-    DIM i AS INTEGER
-    FOR i = 0 TO LEN(gBlatt.bauteile) - 1
-        IF gBlatt.bauteile[i] <> ausser AND gBlatt.bauteile[i].referenz = ref THEN RETURN TRUE
+    DIM bi AS INTEGER, i AS INTEGER
+    FOR bi = 0 TO LEN(gDok.blaetter) - 1                 ' ueber alle Blaetter
+        FOR i = 0 TO LEN(gDok.blaetter[bi].bauteile) - 1
+            DIM b AS kern.Bauteil : b = gDok.blaetter[bi].bauteile[i]
+            IF b <> ausser AND b.referenz = ref THEN RETURN TRUE
+        NEXT
     NEXT
     RETURN FALSE
 END FUNCTION
@@ -401,14 +410,28 @@ SUB auswahlSpiegeln(art AS INTEGER)
     END IF
 END SUB
 
+DIM gLabelGlobal AS BOOLEAN       ' Vorgabe des Hakens beim naechsten Label
+
+' G: die gewaehlten Labels zwischen lokal und global umschalten.
+SUB labelsGlobalUmschalten()
+    IF LEN(gSelL) = 0 THEN RETURN
+    verlaufMerken()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gSelL) - 1
+        gSelL[i].art = IIF(gSelL[i].art = kern.LA_GLOBAL, kern.LA_LOKAL, kern.LA_GLOBAL)
+    NEXT
+    geaendert()
+END SUB
+
 SUB labelSetzen()
     ' Position VOR dem Dialog festhalten: waehrend er offen ist, koennen
     ' Mausereignisse gMausWX/WY schon verschieben.
     DIM ort AS kern.Punkt : ort = NEW kern.Punkt(gMausWX, gMausWY)
-    DIM text AS STRING : text = TRIM$(textAbfrage$("Label setzen", "Netzname:", ""))
+    DIM text AS STRING : text = TRIM$(umbenennenDialog$("Label setzen", "Netzname:", "", "global -- verbindet gleichnamige Labels auf allen Blaettern", gLabelGlobal))
     IF text = "" THEN RETURN
+    gLabelGlobal = gDlgHakenWert                       ' das naechste Label wie dieses
     verlaufMerken()
-    DIM la AS kern.Label : la = NEW kern.Label(text, ort, kern.LA_LOKAL)
+    DIM la AS kern.Label : la = NEW kern.Label(text, ort, IIF(gDlgHakenWert, kern.LA_GLOBAL, kern.LA_LOKAL))
     ARRAY_PUSH(gBlatt.labels, la)
     waehleL(la)
     geaendert()
@@ -626,6 +649,10 @@ FUNCTION lwTaste(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
         RETURN TRUE
     END IF
     SELECT CASE taste
+        CASE K_BILD_AUF
+            blattWechseln(aktuellerBlattIndex() - 1)
+        CASE K_BILD_AB
+            blattWechseln(aktuellerBlattIndex() + 1)
         CASE K_ESC
             gDrahtAktiv = FALSE
             gDrahtPunkte = []
@@ -645,6 +672,8 @@ FUNCTION lwTaste(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
             auswahlLoeschen((z BAND GDK_UMSCHALT) <> 0)   ' Umschalt: ganzer Draht
         CASE K_F2
             umbenennenAuswahl()
+        CASE K_G
+            labelsGlobalUmschalten()
         CASE K_R
             auswahlDrehen()
         CASE K_X

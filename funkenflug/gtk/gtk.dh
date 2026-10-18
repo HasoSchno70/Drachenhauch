@@ -36,6 +36,11 @@ DECLARE FUNCTION gtk_paned_new LIB GTK (richtung AS LONG) AS ZEIGER
 DECLARE FUNCTION gtk_notebook_new LIB GTK () AS ZEIGER
 DECLARE FUNCTION gtk_notebook_append_page LIB GTK (nb AS ZEIGER, kind AS ZEIGER, reiter AS ZEIGER) AS LONG
 DECLARE SUB gtk_notebook_set_current_page LIB GTK (nb AS ZEIGER, seite AS LONG)
+DECLARE SUB gtk_notebook_remove_page LIB GTK (nb AS ZEIGER, seite AS LONG)
+DECLARE FUNCTION gtk_notebook_get_n_pages LIB GTK (nb AS ZEIGER) AS LONG
+DECLARE FUNCTION gtk_notebook_get_current_page LIB GTK (nb AS ZEIGER) AS LONG
+DECLARE SUB gtk_notebook_set_scrollable LIB GTK (nb AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_notebook_set_show_border LIB GTK (nb AS ZEIGER, an AS BOOLEAN)
 DECLARE FUNCTION gtk_grid_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_grid_attach LIB GTK (g AS ZEIGER, kind AS ZEIGER, x AS LONG, y AS LONG, b AS LONG, h AS LONG)
 DECLARE SUB gtk_grid_set_row_spacing LIB GTK (g AS ZEIGER, abstand AS ULONG)
@@ -168,6 +173,7 @@ DECLARE SUB gtk_list_box_set_activate_on_single_click LIB GTK (box AS ZEIGER, an
 DECLARE SUB gtk_list_box_insert LIB GTK (box AS ZEIGER, kind AS ZEIGER, stelle AS LONG)
 DECLARE FUNCTION gtk_list_box_get_row_at_index LIB GTK (box AS ZEIGER, nr AS LONG) AS ZEIGER
 DECLARE SUB gtk_list_box_select_row LIB GTK (box AS ZEIGER, zeile AS ZEIGER)
+DECLARE SUB gtk_menu_item_activate LIB GTK (eintrag AS ZEIGER)
 DECLARE SUB gtk_list_box_unselect_all LIB GTK (box AS ZEIGER)
 DECLARE FUNCTION gtk_list_box_row_is_selected LIB GTK (zeile AS ZEIGER) AS BOOLEAN
 DECLARE FUNCTION gtk_list_box_row_get_index LIB GTK (zeile AS ZEIGER) AS LONG

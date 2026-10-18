@@ -1,6 +1,7 @@
-' Netzlisten-Export -- Namensraum "kern". Alle Formate lesen netzeBerechnen(),
-' dieselbe Quelle wie ERC und Anzeige. Versorgungssymbole sind keine
-' Bauteile; sie geben nur dem Netz seinen Namen.
+' Netzlisten-Export -- Namensraum "kern". Alle Formate lesen netzeDokument(),
+' dieselbe Quelle wie ERC und Anzeige, und umfassen alle Blaetter.
+' Versorgungssymbole sind keine Bauteile; sie geben nur dem Netz seinen Namen.
+' Die ...(bl AS Blatt)-Fassungen sind Huellen fuer ein einzelnes Blatt.
 
 CONST NL_ZEILE = CHR$(10)
 
@@ -25,12 +26,18 @@ END FUNCTION
 
 ' --- Lesbarer Text
 FUNCTION netzlisteText$(bl AS Blatt) AS STRING
-    DIM n AS Netze : n = netzeBerechnen(bl)
-    DIM t AS STRING : t = "# Funkenflug-Netzliste, Blatt " + bl.name + NL_ZEILE + NL_ZEILE + "# Bauteile" + NL_ZEILE
-    DIM i AS INTEGER, j AS INTEGER
-    FOR i = 0 TO LEN(bl.bauteile) - 1
-        DIM b AS Bauteil : b = bl.bauteile[i]
-        IF NOT b.sym.einheitLeistung THEN t = t + b.referenz + CHR$(9) + b.wert + CHR$(9) + b.sym.name + NL_ZEILE
+    RETURN netzlisteTextDok$(einBlattDokument(bl))
+END FUNCTION
+
+FUNCTION netzlisteTextDok$(dok AS Dokument) AS STRING
+    DIM n AS Netze : n = netzeDokument(dok)
+    DIM t AS STRING : t = "# Funkenflug-Netzliste, " + STR$(LEN(dok.blaetter)) + IIF(LEN(dok.blaetter) = 1, " Blatt", " Blaetter") + NL_ZEILE + NL_ZEILE + "# Bauteile" + NL_ZEILE
+    DIM bi AS INTEGER, i AS INTEGER, j AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        FOR i = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
+            DIM b AS Bauteil : b = dok.blaetter[bi].bauteile[i]
+            IF NOT b.sym.einheitLeistung THEN t = t + b.referenz + CHR$(9) + b.wert + CHR$(9) + b.sym.name + CHR$(9) + dok.blaetter[bi].name + NL_ZEILE
+        NEXT
     NEXT
     t = t + NL_ZEILE + "# Netze" + NL_ZEILE
     DIM netze AS ARRAY OF Netz : netze = nlNetze(n)
@@ -51,14 +58,18 @@ FUNCTION csvFeld$(s AS STRING) AS STRING
 END FUNCTION
 
 FUNCTION netzlisteCsv$(bl AS Blatt) AS STRING
-    DIM n AS Netze : n = netzeBerechnen(bl)
+    RETURN netzlisteCsvDok$(einBlattDokument(bl))
+END FUNCTION
+
+FUNCTION netzlisteCsvDok$(dok AS Dokument) AS STRING
+    DIM n AS Netze : n = netzeDokument(dok)
     DIM t AS STRING : t = "Netz;Referenz;Pin;Pinname;Wert" + NL_ZEILE
     DIM netze AS ARRAY OF Netz : netze = nlNetze(n)
     DIM i AS INTEGER, j AS INTEGER
     FOR i = 0 TO LEN(netze) - 1
         FOR j = 0 TO LEN(netze[i].pins) - 1
             DIM p AS NetzPin : p = netze[i].pins[j]
-            IF NOT p.versorgung THEN t = t + csvFeld$(netze[i].name) + ";" + csvFeld$(p.ref) + ";" + csvFeld$(p.nummer) + ";" + csvFeld$(p.pinName) + ";" + csvFeld$(bl.bauteile[p.bauteil].wert) + NL_ZEILE
+            IF NOT p.versorgung THEN t = t + csvFeld$(netze[i].name) + ";" + csvFeld$(p.ref) + ";" + csvFeld$(p.nummer) + ";" + csvFeld$(p.pinName) + ";" + csvFeld$(dok.blaetter[p.blatt].bauteile[p.bauteil].wert) + NL_ZEILE
         NEXT
     NEXT
     RETURN t
@@ -114,14 +125,14 @@ END FUNCTION
 
 ' SPICE-Knoten je Netz: Knoten 0 ist das Netz mit einem GND-Symbol (auch
 ' wenn es umbenannt wurde, etwa in AGND) oder dem Namen GND.
-FUNCTION spiceKnotenListe(bl AS Blatt, n AS Netze) AS ARRAY OF STRING
+FUNCTION spiceKnotenListe(dok AS Dokument, n AS Netze) AS ARRAY OF STRING
     DIM k AS ARRAY OF STRING : k = []
     DIM i AS INTEGER, j AS INTEGER
     FOR i = 0 TO LEN(n.liste) - 1
         DIM masse AS BOOLEAN : masse = UPPER$(n.liste[i].name) = "GND"
         FOR j = 0 TO LEN(n.liste[i].pins) - 1
             IF n.liste[i].pins[j].versorgung THEN
-                IF bl.bauteile[n.liste[i].pins[j].bauteil].sym.id = "GND" THEN masse = TRUE
+                IF dok.blaetter[n.liste[i].pins[j].blatt].bauteile[n.liste[i].pins[j].bauteil].sym.id = "GND" THEN masse = TRUE
             END IF
         NEXT
         IF masse THEN ARRAY_PUSH(k, "0") ELSE ARRAY_PUSH(k, spiceKnoten$(n.liste[i].name))
@@ -130,13 +141,19 @@ FUNCTION spiceKnotenListe(bl AS Blatt, n AS Netze) AS ARRAY OF STRING
 END FUNCTION
 
 FUNCTION netzlisteSpice$(bl AS Blatt, titel AS STRING) AS STRING
-    DIM n AS Netze : n = netzeBerechnen(bl)
-    DIM knoten AS ARRAY OF STRING : knoten = spiceKnotenListe(bl, n)
+    RETURN netzlisteSpiceDok$(einBlattDokument(bl), titel)
+END FUNCTION
+
+FUNCTION netzlisteSpiceDok$(dok AS Dokument, titel AS STRING) AS STRING
+    DIM n AS Netze : n = netzeDokument(dok)
+    DIM knoten AS ARRAY OF STRING : knoten = spiceKnotenListe(dok, n)
     DIM t AS STRING : t = "* " + titel + " -- Funkenflug" + NL_ZEILE
     DIM modelle AS MAP OF STRING
-    DIM i AS INTEGER, j AS INTEGER
-    FOR i = 0 TO LEN(bl.bauteile) - 1
-        DIM b AS Bauteil : b = bl.bauteile[i]
+    DIM bi AS INTEGER, i AS INTEGER, j AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+    n.blattWaehlen(bi)
+    FOR i = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
+        DIM b AS Bauteil : b = dok.blaetter[bi].bauteile[i]
         IF b.sym.einheitLeistung THEN CONTINUE
         ' Knoten je Pin-Index
         DIM k AS ARRAY OF STRING : k = []
@@ -171,6 +188,7 @@ FUNCTION netzlisteSpice$(bl AS Blatt, titel AS STRING) AS STRING
             CASE ELSE
                 t = t + "* " + b.referenz + " (" + b.sym.name + ") hat kein SPICE-Modell" + NL_ZEILE
         END SELECT
+    NEXT
     NEXT
     DIM namen AS ARRAY OF STRING : namen = MAPKEYS(modelle)
     SORT(namen)

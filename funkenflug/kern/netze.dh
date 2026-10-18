@@ -1,5 +1,5 @@
-' Netz-Erkennung -- EINE reine Funktion ueber das Blatt, von allen genutzt
-' (Hervorhebung, spaeter ERC/Netzliste). SparkNode-Lehre: nie zwei Quellen.
+' Netz-Erkennung -- EINE reine Funktion ueber das Dokument, von allen genutzt
+' (Hervorhebung, ERC, Netzliste, Stueckliste). SparkNode-Lehre: nie zwei Quellen.
 '
 ' Regeln: alle Punkte aufs RASTER quantisiert. Zwei Drahtecken eines Drahtes
 ' sind verbunden (Segment). Ein Drahtende/Pin auf einem fremden Segment =
@@ -7,13 +7,18 @@
 ' verbunden. Ein Knoten entsteht automatisch, wo >=3 Enden treffen oder ein
 ' Ende auf einem Segment liegt.
 '
-' Namen: gleichnamige Labels UND gleichnamige Versorgungssymbole (GND, VCC,
-' +5V ...) sind jeweils EIN Netz, auch ohne Draht; ein Label "VCC" gehoert
-' zum Netz des VCC-Symbols. Der Netzname kommt von der Versorgung, sonst vom
-' Label, sonst automatisch (N1, N2 ...).
+' Mehrere Blaetter: ein Punkt gilt nur auf seinem Blatt (intern "2/x:y").
+' Ueber Blaetter hinweg verbinden nur GLOBALE Labels und Versorgungssymbole
+' (GND, VCC, +5V ...), jeweils ueber den Namen. Lokale Labels verbinden nur
+' auf ihrem Blatt; ein lokales Label "VCC" gehoert zum VCC-Symbol desselben
+' Blatts. Netzname: Versorgung > globales Label > lokales Label > automatisch
+' (N1, N2 ...). Heissen zwei verschiedene Netze nach lokalen Labels gleich,
+' bekommen sie den Blattnamen davor ("Blatt2/TAKT") -- sonst verbaende eine
+' Netzliste sie still.
 
 ' Ein Pin in einem Netz (fuer Netzliste und ERC)
 CLASS NetzPin
+    DIM blatt AS INTEGER              ' Index in dok.blaetter
     DIM bauteil AS INTEGER            ' Index in blatt.bauteile
     DIM pin AS INTEGER                ' Index in sym.pins
     DIM ref AS STRING
@@ -28,20 +33,31 @@ END CLASS
 CLASS Netz
     DIM name AS STRING
     DIM automatisch AS BOOLEAN
+    DIM blatt AS INTEGER              ' wo es zuerst vorkommt (fuer lokale Namen)
     DIM pins AS ARRAY OF NetzPin
     DIM labelNamen AS ARRAY OF STRING ' verschiedene Label-Texte an diesem Netz
+    DIM globaleNamen AS ARRAY OF STRING
     DIM versorgungen AS ARRAY OF STRING
     SUB Init()
         pins = []
         labelNamen = []
+        globaleNamen = []
         versorgungen = []
+        blatt = -1
     END SUB
-    SUB labelDazu(t AS STRING)
+    SUB labelDazu(t AS STRING, global AS BOOLEAN)
         DIM i AS INTEGER
+        DIM da AS BOOLEAN : da = FALSE
         FOR i = 0 TO LEN(labelNamen) - 1
-            IF labelNamen[i] = t THEN RETURN
+            IF labelNamen[i] = t THEN da = TRUE
         NEXT
-        ARRAY_PUSH(labelNamen, t)
+        IF NOT da THEN ARRAY_PUSH(labelNamen, t)
+        IF global THEN
+            FOR i = 0 TO LEN(globaleNamen) - 1
+                IF globaleNamen[i] = t THEN RETURN
+            NEXT
+            ARRAY_PUSH(globaleNamen, t)
+        END IF
     END SUB
     SUB versorgungDazu(t AS STRING)
         DIM i AS INTEGER
@@ -83,11 +99,12 @@ FUNCTION aufSegment(ax AS INTEGER, ay AS INTEGER, bx AS INTEGER, by AS INTEGER, 
 END FUNCTION
 
 CLASS Netze
-    DIM idx AS MAP OF INTEGER         ' key -> Index
+    DIM idx AS MAP OF INTEGER         ' "blatt/x:y" -> Index
     DIM schluessel AS ARRAY OF STRING
     DIM eltern AS ARRAY OF INTEGER
-    DIM liste AS ARRAY OF Netz        ' die benannten Netze (nach benennen())
+    DIM liste AS ARRAY OF Netz        ' die benannten Netze
     DIM wurzelZuNetz AS MAP OF INTEGER
+    DIM praefix AS STRING             ' das Blatt, auf das sich x/y beziehen
 
     SUB Init()
         idx = {}
@@ -95,7 +112,17 @@ CLASS Netze
         eltern = []
         liste = []
         wurzelZuNetz = {}
+        praefix = "0/"
     END SUB
+
+    ' Auf welches Blatt beziehen sich Punkte in den Abfragen?
+    SUB blattWaehlen(bi AS INTEGER)
+        praefix = STR$(bi) + "/"
+    END SUB
+
+    FUNCTION schl$(x AS INTEGER, y AS INTEGER) AS STRING
+        RETURN praefix + netzKey(x, y)
+    END FUNCTION
 
     ' Das Netz zu einer Wurzel, bei Bedarf neu angelegt.
     FUNCTION netzFuerWurzel(r AS INTEGER) AS INTEGER
@@ -107,25 +134,25 @@ CLASS Netze
         RETURN i
     END FUNCTION
 
-    ' Index des benannten Netzes an einem Blattpunkt, -1 wenn keins (etwa ein
-    ' Draht ohne Pin und Label).
+    ' Index des benannten Netzes an einem Punkt des gewaehlten Blatts, -1 wenn
+    ' keins (etwa ein Draht ohne Pin und Label).
     FUNCTION netzAn(x AS INTEGER, y AS INTEGER) AS INTEGER
-        DIM k AS STRING : k = netzKey(x, y)
+        DIM k AS STRING : k = schl$(x, y)
         IF NOT MAPHAS(idx, k) THEN RETURN -1
         DIM w AS STRING : w = STR$(wurzel(MAPGET(idx, k)))
         IF NOT MAPHAS(wurzelZuNetz, w) THEN RETURN -1
         RETURN MAPGET(wurzelZuNetz, w)
     END FUNCTION
 
-    ' Wurzel eines Blattpunkts, -1 wenn der Punkt nicht vorkommt.
+    ' Wurzel eines Punkts des gewaehlten Blatts, -1 wenn er nicht vorkommt.
     FUNCTION wurzelAn(x AS INTEGER, y AS INTEGER) AS INTEGER
-        DIM k AS STRING : k = netzKey(x, y)
+        DIM k AS STRING : k = schl$(x, y)
         IF NOT MAPHAS(idx, k) THEN RETURN -1
         RETURN wurzel(MAPGET(idx, k))
     END FUNCTION
 
     FUNCTION punkt(x AS INTEGER, y AS INTEGER) AS INTEGER
-        DIM k AS STRING : k = netzKey(x, y)
+        DIM k AS STRING : k = schl$(x, y)
         IF MAPHAS(idx, k) THEN RETURN MAPGET(idx, k)
         DIM i AS INTEGER : i = LEN(schluessel)
         ARRAY_PUSH(schluessel, k)
@@ -148,62 +175,80 @@ CLASS Netze
         IF ra <> rb THEN eltern[rb] = ra
     END SUB
 
-    ' Gehoeren zwei Blattpunkte zum selben Netz?
+    ' Gehoeren zwei Punkte des gewaehlten Blatts zum selben Netz?
     FUNCTION gleich(ax AS INTEGER, ay AS INTEGER, bx AS INTEGER, by AS INTEGER) AS BOOLEAN
-        DIM ka AS STRING : ka = netzKey(ax, ay)
-        DIM kb AS STRING : kb = netzKey(bx, by)
+        DIM ka AS STRING : ka = schl$(ax, ay)
+        DIM kb AS STRING : kb = schl$(bx, by)
+        IF NOT MAPHAS(idx, ka) OR NOT MAPHAS(idx, kb) THEN RETURN FALSE
+        RETURN wurzel(MAPGET(idx, ka)) = wurzel(MAPGET(idx, kb))
+    END FUNCTION
+
+    ' Wie gleich(), aber ueber zwei Blaetter hinweg.
+    FUNCTION gleichUeber(ba AS INTEGER, ax AS INTEGER, ay AS INTEGER, bb AS INTEGER, bx AS INTEGER, by AS INTEGER) AS BOOLEAN
+        DIM ka AS STRING : ka = STR$(ba) + "/" + netzKey(ax, ay)
+        DIM kb AS STRING : kb = STR$(bb) + "/" + netzKey(bx, by)
         IF NOT MAPHAS(idx, ka) OR NOT MAPHAS(idx, kb) THEN RETURN FALSE
         RETURN wurzel(MAPGET(idx, ka)) = wurzel(MAPGET(idx, kb))
     END FUNCTION
 END CLASS
 
-' Alle Punkte verknuepfen und das Ergebnis zurueckgeben.
-FUNCTION netzeBerechnen(bl AS Blatt) AS Netze
-    DIM n AS Netze : n = NEW Netze()
+' Ein Name in einer Tabelle Name -> erster Punkt: verbinden oder eintragen.
+SUB namensVerbund(n AS Netze, tabelle AS MAP OF INTEGER, name AS STRING, p AS INTEGER)
+    IF MAPHAS(tabelle, name) THEN
+        n.eins(MAPGET(tabelle, name), p)
+    ELSE
+        MAPPUT(tabelle, name, p)
+    END IF
+END SUB
+
+' Ein Blatt in die Netze eintragen (n muss auf dem Blatt stehen). global:
+' die Namen-Tabelle fuer Versorgungen und globale Labels, ueber alle Blaetter
+' dieselbe.
+SUB blattVerbinden(bl AS Blatt, n AS Netze, global AS MAP OF INTEGER)
     DIM w AS Draht, b AS Bauteil, j AS INTEGER, i AS INTEGER
+    DIM punkte AS ARRAY OF Punkt : punkte = []
     ' Drahtsegmente verbinden ihre Ecken
     FOR i = 0 TO LEN(bl.draehte) - 1
         w = bl.draehte[i]
-        FOR j = 0 TO LEN(w.punkte) - 2
-            n.eins(n.punkt(w.punkte[j].x, w.punkte[j].y), n.punkt(w.punkte[j + 1].x, w.punkte[j + 1].y))
+        FOR j = 0 TO LEN(w.punkte) - 1
+            ARRAY_PUSH(punkte, w.punkte[j])
+            IF j < LEN(w.punkte) - 1 THEN n.eins(n.punkt(w.punkte[j].x, w.punkte[j].y), n.punkt(w.punkte[j + 1].x, w.punkte[j + 1].y))
         NEXT
     NEXT
-    ' Pins als Punkte aufnehmen; Versorgungssymbole verbinden sich ueber den
-    ' Namen (in derselben Tabelle wie die Labels).
-    DIM ersterMitText AS MAP OF INTEGER
+    ' Pins; Versorgungssymbole verbinden sich ueber den Namen, dokumentweit
+    DIM lokal AS MAP OF INTEGER
+    DIM versorgungHier AS MAP OF INTEGER
     FOR i = 0 TO LEN(bl.bauteile) - 1
         b = bl.bauteile[i]
         FOR j = 0 TO LEN(b.sym.pins) - 1
             DIM pp AS Punkt : pp = b.pinPunkt(j)
+            ARRAY_PUSH(punkte, pp)
             DIM pidx AS INTEGER : pidx = n.punkt(pp.x, pp.y)
             IF b.sym.einheitLeistung THEN
-                DIM vn AS STRING : vn = versorgungsName(b)
-                IF MAPHAS(ersterMitText, vn) THEN
-                    n.eins(MAPGET(ersterMitText, vn), pidx)
-                ELSE
-                    MAPPUT(ersterMitText, vn, pidx)
-                END IF
+                namensVerbund(n, global, versorgungsName(b), pidx)
+                MAPPUT(versorgungHier, versorgungsName(b), 1)
             END IF
         NEXT
     NEXT
-    ' Labels: der Anker ist ein Netzpunkt; gleichnamige Labels sind EIN Netz.
+    ' Labels: globale dokumentweit, lokale nur hier (ein lokales "VCC" haengt
+    ' am VCC-Symbol desselben Blatts)
     FOR i = 0 TO LEN(bl.labels) - 1
         DIM la AS Label : la = bl.labels[i]
+        ARRAY_PUSH(punkte, la.anker)
         DIM li AS INTEGER : li = n.punkt(la.anker.x, la.anker.y)
-        IF MAPHAS(ersterMitText, la.text) THEN
-            n.eins(MAPGET(ersterMitText, la.text), li)
+        IF la.art = LA_GLOBAL THEN
+            namensVerbund(n, global, la.text, li)
         ELSE
-            MAPPUT(ersterMitText, la.text, li)
+            namensVerbund(n, lokal, la.text, li)
+            IF MAPHAS(versorgungHier, la.text) THEN namensVerbund(n, global, la.text, li)
         END IF
     NEXT
     ' T-Verbindungen: jeder Punkt, der innen auf einem Segment liegt, wird mit
     ' dessen Enden verbunden.
-    DIM alle AS ARRAY OF STRING : alle = MAPKEYS(n.idx)
     DIM k AS INTEGER
-    FOR k = 0 TO LEN(alle) - 1
-        DIM teile AS ARRAY OF STRING : teile = SPLIT$(alle[k], ":")
-        DIM qx AS INTEGER : qx = VAL(teile[0])
-        DIM qy AS INTEGER : qy = VAL(teile[1])
+    FOR k = 0 TO LEN(punkte) - 1
+        DIM qx AS INTEGER : qx = rastern(punkte[k].x, RASTER)
+        DIM qy AS INTEGER : qy = rastern(punkte[k].y, RASTER)
         FOR i = 0 TO LEN(bl.draehte) - 1
             w = bl.draehte[i]
             FOR j = 0 TO LEN(w.punkte) - 2
@@ -213,47 +258,93 @@ FUNCTION netzeBerechnen(bl AS Blatt) AS Netze
             NEXT
         NEXT
     NEXT
-    netzeBenennen(bl, n)
+END SUB
+
+' Alle Blaetter des Dokuments verknuepfen und benennen.
+FUNCTION netzeDokument(dok AS Dokument) AS Netze
+    DIM n AS Netze : n = NEW Netze()
+    DIM global AS MAP OF INTEGER
+    DIM bi AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        n.blattWaehlen(bi)
+        blattVerbinden(dok.blaetter[bi], n, global)
+    NEXT
+    netzeBenennen(dok, n)
+    n.blattWaehlen(0)
     RETURN n
 END FUNCTION
 
+' Ein einzelnes Blatt als Dokument mit nur diesem Blatt.
+FUNCTION einBlattDokument(bl AS Blatt) AS Dokument
+    DIM d AS Dokument : d = NEW Dokument()
+    d.blaetter = []
+    ARRAY_PUSH(d.blaetter, bl)
+    RETURN d
+END FUNCTION
+
+FUNCTION netzeBerechnen(bl AS Blatt) AS Netze
+    RETURN netzeDokument(einBlattDokument(bl))
+END FUNCTION
+
 ' Die Netze mit Pins, Labels und Namen fuellen.
-SUB netzeBenennen(bl AS Blatt, n AS Netze)
-    DIM i AS INTEGER, j AS INTEGER, ni AS INTEGER
-    FOR i = 0 TO LEN(bl.bauteile) - 1
-        DIM b AS Bauteil : b = bl.bauteile[i]
-        FOR j = 0 TO LEN(b.sym.pins) - 1
-            DIM pp AS Punkt : pp = b.pinPunkt(j)
-            ni = n.netzFuerWurzel(n.wurzelAn(pp.x, pp.y))
-            DIM np AS NetzPin : np = NEW NetzPin()
-            np.bauteil = i
-            np.pin = j
-            np.ref = b.referenz
-            np.nummer = b.sym.pins[j].nummer
-            np.pinName = b.sym.pins[j].name
-            np.typ = b.sym.pins[j].typ
-            np.versorgung = b.sym.einheitLeistung
-            np.x = pp.x
-            np.y = pp.y
-            ARRAY_PUSH(n.liste[ni].pins, np)
-            IF b.sym.einheitLeistung THEN n.liste[ni].versorgungDazu(versorgungsName(b))
+SUB netzeBenennen(dok AS Dokument, n AS Netze)
+    DIM bi AS INTEGER, i AS INTEGER, j AS INTEGER, ni AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        DIM bl AS Blatt : bl = dok.blaetter[bi]
+        n.blattWaehlen(bi)
+        FOR i = 0 TO LEN(bl.bauteile) - 1
+            DIM b AS Bauteil : b = bl.bauteile[i]
+            FOR j = 0 TO LEN(b.sym.pins) - 1
+                DIM pp AS Punkt : pp = b.pinPunkt(j)
+                ni = n.netzFuerWurzel(n.wurzelAn(pp.x, pp.y))
+                DIM np AS NetzPin : np = NEW NetzPin()
+                np.blatt = bi
+                np.bauteil = i
+                np.pin = j
+                np.ref = b.referenz
+                np.nummer = b.sym.pins[j].nummer
+                np.pinName = b.sym.pins[j].name
+                np.typ = b.sym.pins[j].typ
+                np.versorgung = b.sym.einheitLeistung
+                np.x = pp.x
+                np.y = pp.y
+                ARRAY_PUSH(n.liste[ni].pins, np)
+                IF n.liste[ni].blatt < 0 THEN n.liste[ni].blatt = bi
+                IF b.sym.einheitLeistung THEN n.liste[ni].versorgungDazu(versorgungsName(b))
+            NEXT
+        NEXT
+        FOR i = 0 TO LEN(bl.labels) - 1
+            ni = n.netzFuerWurzel(n.wurzelAn(bl.labels[i].anker.x, bl.labels[i].anker.y))
+            IF n.liste[ni].blatt < 0 THEN n.liste[ni].blatt = bi
+            n.liste[ni].labelDazu(bl.labels[i].text, bl.labels[i].art = LA_GLOBAL)
         NEXT
     NEXT
-    FOR i = 0 TO LEN(bl.labels) - 1
-        ni = n.netzFuerWurzel(n.wurzelAn(bl.labels[i].anker.x, bl.labels[i].anker.y))
-        n.liste[ni].labelDazu(bl.labels[i].text)
-    NEXT
-    ' Namen: Versorgung > Label > automatisch. Automatische Namen weichen
-    ' vergebenen aus (ein Label "N1" bleibt eindeutig).
-    DIM vergeben AS MAP OF INTEGER
+    ' Namen: Versorgung > globales Label > lokales Label > automatisch.
+    DIM lokalerName AS ARRAY OF BOOLEAN : lokalerName = []
+    DIM zahl AS MAP OF INTEGER
     FOR i = 0 TO LEN(n.liste) - 1
         DIM nz AS Netz : nz = n.liste[i]
+        DIM lok AS BOOLEAN : lok = FALSE
         IF LEN(nz.versorgungen) > 0 THEN
             nz.name = nz.versorgungen[0]
+        ELSEIF LEN(nz.globaleNamen) > 0 THEN
+            nz.name = nz.globaleNamen[0]
         ELSEIF LEN(nz.labelNamen) > 0 THEN
             nz.name = nz.labelNamen[0]
+            lok = TRUE
         END IF
-        IF nz.name <> "" THEN MAPPUT(vergeben, nz.name, 1)
+        ARRAY_PUSH(lokalerName, lok)
+        IF nz.name <> "" THEN MAPPUT(zahl, nz.name, MAPGETOR(zahl, nz.name, 0) + 1)
+    NEXT
+    ' doppelte Namen aus lokalen Labels: Blattname davor
+    FOR i = 0 TO LEN(n.liste) - 1
+        IF lokalerName[i] AND MAPGETOR(zahl, n.liste[i].name, 0) > 1 AND n.liste[i].blatt >= 0 THEN
+            n.liste[i].name = dok.blaetter[n.liste[i].blatt].name + "/" + n.liste[i].name
+        END IF
+    NEXT
+    DIM vergeben AS MAP OF INTEGER
+    FOR i = 0 TO LEN(n.liste) - 1
+        IF n.liste[i].name <> "" THEN MAPPUT(vergeben, n.liste[i].name, 1)
     NEXT
     DIM zaehler AS INTEGER : zaehler = 0
     FOR i = 0 TO LEN(n.liste) - 1
@@ -543,6 +634,59 @@ FUNCTION namenUmbenennen(bl AS Blatt, alt AS STRING, neu AS STRING) AS INTEGER
         END IF
     NEXT
     RETURN c
+END FUNCTION
+
+' --- Umbenennen im ganzen Dokument -----------------------------------------
+' Globale Labels und Versorgungen gelten auf allen Blaettern, lokale Labels
+' nur auf ihrem (blatt = Index des aktuellen Blatts).
+
+FUNCTION namensStellenDok(dok AS Dokument, blatt AS INTEGER, name AS STRING) AS INTEGER
+    DIM c AS INTEGER : c = 0
+    DIM bi AS INTEGER, i AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        DIM bl AS Blatt : bl = dok.blaetter[bi]
+        FOR i = 0 TO LEN(bl.labels) - 1
+            IF bl.labels[i].text = name AND (bl.labels[i].art = LA_GLOBAL OR bi = blatt) THEN c = c + 1
+        NEXT
+        FOR i = 0 TO LEN(bl.bauteile) - 1
+            IF bl.bauteile[i].sym.einheitLeistung THEN
+                IF versorgungsName(bl.bauteile[i]) = name THEN c = c + 1
+            END IF
+        NEXT
+    NEXT
+    RETURN c
+END FUNCTION
+
+FUNCTION namenUmbenennenDok(dok AS Dokument, blatt AS INTEGER, alt AS STRING, neu AS STRING) AS INTEGER
+    DIM c AS INTEGER : c = 0
+    DIM bi AS INTEGER, i AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        DIM bl AS Blatt : bl = dok.blaetter[bi]
+        FOR i = 0 TO LEN(bl.labels) - 1
+            IF bl.labels[i].text = alt AND (bl.labels[i].art = LA_GLOBAL OR bi = blatt) THEN
+                bl.labels[i].text = neu
+                c = c + 1
+            END IF
+        NEXT
+        FOR i = 0 TO LEN(bl.bauteile) - 1
+            IF bl.bauteile[i].sym.einheitLeistung THEN
+                IF versorgungsName(bl.bauteile[i]) = alt THEN
+                    bl.bauteile[i].wert = neu
+                    c = c + 1
+                END IF
+            END IF
+        NEXT
+    NEXT
+    RETURN c
+END FUNCTION
+
+' Der gespeicherte Name, der ein Netz benennt (nicht der angezeigte mit
+' Blatt-Vorsatz): Versorgung > globales Label > lokales Label, sonst "".
+FUNCTION netzQuellName$(nz AS Netz) AS STRING
+    IF LEN(nz.versorgungen) > 0 THEN RETURN nz.versorgungen[0]
+    IF LEN(nz.globaleNamen) > 0 THEN RETURN nz.globaleNamen[0]
+    IF LEN(nz.labelNamen) > 0 THEN RETURN nz.labelNamen[0]
+    RETURN ""
 END FUNCTION
 
 ' Knoten neu bestimmen: wo >=3 Enden treffen oder ein Ende auf einem Segment.

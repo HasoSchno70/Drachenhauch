@@ -193,7 +193,7 @@ FOR bi2 = 0 TO LEN(bomRefs) - 1
 NEXT
 ARRAY_PUSH(bb.bauteile, kern.neuesBauteil("GND", kern.neueLage(0, 2000)))
 PRINT "--- Stueckliste ---"
-PRINT kern.stuecklisteText$(bb);
+PRINT kern.stuecklisteText$(kern.einBlattDokument(bb));
 DIM bz AS ARRAY OF kern.BomZeile : bz = kern.stueckliste(bb)
 PRINT "Zeilen: "; LEN(bz); "  erste: "; bz[0].referenzen[0]; "  4k7: "; kern.referenzBereiche$(bz[1].referenzen); " x"; bz[1].menge; "  (erwartet 3, C1, R1-R3, R10 x4)"
 
@@ -257,6 +257,49 @@ wu.punkte = kern.gummibandSicher(kz, wu, wu.punkte, neuU.x - altU.x, neuU.y - al
 DIM nkz AS kern.Netze : nkz = kern.netzeBerechnen(kz)
 PRINT "Drehen: oben "; pl$(wo.punkte); " | unten "; pl$(wu.punkte)
 PRINT "  Enden an den neuen Pins: "; kern.punktGleich(wo.punkte[LEN(wo.punkte) - 1], neuO) AND kern.punktGleich(wu.punkte[0], neuU); "  kein Kurzschluss: "; NOT nkz.gleich(2000, 1200, 2000, 2800); "  (erwartet TRUE TRUE)"
+
+' --- Mehrere Blaetter: global/lokal, Namen, ERC, Netzliste, Stueckliste
+DIM md AS kern.Dokument : md = NEW kern.Dokument()
+md.blaetter[0].name = "Haupt"
+DIM mb2 AS kern.Blatt : mb2 = NEW kern.Blatt("Takt")
+ARRAY_PUSH(md.blaetter, mb2)
+DIM mbi AS INTEGER
+FOR mbi = 0 TO 1
+    DIM mr AS kern.Bauteil : mr = kern.neuesBauteil("R", kern.neueLage(0, 0))
+    mr.referenz = "R" + STR$(mbi + 1)
+    ARRAY_PUSH(md.blaetter[mbi].bauteile, mr)
+    ARRAY_PUSH(md.blaetter[mbi].bauteile, kern.neuesBauteil("VCC", kern.neueLage(1000, 0)))
+    ARRAY_PUSH(md.blaetter[mbi].labels, NEW kern.Label("SIG", NEW kern.Punkt(200, 0), kern.LA_GLOBAL))
+    ARRAY_PUSH(md.blaetter[mbi].labels, NEW kern.Label("L", NEW kern.Punkt(-200, 0), kern.LA_LOKAL))
+NEXT
+DIM mn AS kern.Netze : mn = kern.netzeDokument(md)
+PRINT "Blaetter: SIG verbunden "; mn.gleichUeber(0, 200, 0, 1, 200, 0); ", lokales L getrennt "; NOT mn.gleichUeber(0, -200, 0, 1, -200, 0); ", VCC verbunden "; mn.gleichUeber(0, 1000, 0, 1, 1000, 0); "  (erwartet TRUE TRUE TRUE)"
+mn.blattWaehlen(0)
+DIM nameH AS STRING : nameH = mn.liste[mn.netzAn(-200, 0)].name
+mn.blattWaehlen(1)
+DIM nameT AS STRING : nameT = mn.liste[mn.netzAn(-200, 0)].name
+PRINT "Namen der lokalen L: "; nameH; " / "; nameT; "  (erwartet Haupt/L / Takt/L)"
+DIM msp AS STRING : msp = kern.netzlisteSpiceDok$(md, "Mehr")
+PRINT "SPICE ueber Blaetter: "; CONTAINS(msp, "R1 Haupt_L SIG 1k") AND CONTAINS(msp, "R2 Takt_L SIG 1k"); "  (erwartet TRUE)"
+DIM mbz AS ARRAY OF kern.BomZeile : mbz = kern.stuecklisteDok(md)
+PRINT "Stueckliste ueber Blaetter: "; kern.referenzBereiche$(mbz[0].referenzen); " x"; mbz[0].menge; "  (erwartet R1, R2 x2)"
+' lokale L verbinden NICHT ueber Blaetter -> R1.1 und R2.1 sind wirklich offen
+DIM mev0 AS ARRAY OF kern.Verstoss : mev0 = kern.ercPruefenDok(md)
+DIM mtx0 AS STRING : mtx0 = ""
+DIM mv0 AS INTEGER
+FOR mv0 = 0 TO LEN(mev0) - 1
+    mtx0 = mtx0 + mev0[mv0].text + "|"
+NEXT
+PRINT "ERC: "; LEN(mev0); " Verstoesse, R1.1 offen "; CONTAINS(mtx0, "Pin R1.1 ist nicht verbunden"); ", R2.1 offen "; CONTAINS(mtx0, "Pin R2.1 ist nicht verbunden"); "  (erwartet 2, TRUE, TRUE)"
+md.blaetter[1].bauteile[0].referenz = "R1"
+ARRAY_PUSH(md.blaetter[1].labels, NEW kern.Label("EINZELN", NEW kern.Punkt(3000, 3000), kern.LA_GLOBAL))
+DIM mev AS ARRAY OF kern.Verstoss : mev = kern.ercPruefenDok(md)
+DIM mtx AS STRING : mtx = ""
+DIM mvi AS INTEGER
+FOR mvi = 0 TO LEN(mev) - 1
+    mtx = mtx + mev[mvi].text + " [Blatt " + STR$(mev[mvi].blatt) + "]|"
+NEXT
+PRINT "ERC doppelte Ref ueber Blaetter: "; CONTAINS(mtx, "Referenz R1 ist doppelt vergeben [Blatt 1]"); "  einzelnes globales Label: "; CONTAINS(mtx, "Globales Label EINZELN gibt es nur einmal"); "  (erwartet TRUE TRUE)"
 
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"

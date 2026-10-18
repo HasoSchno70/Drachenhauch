@@ -22,6 +22,7 @@ IMPORT "ansicht/verlauf.dh"
 IMPORT "ansicht/auswahl.dh"
 IMPORT "ansicht/symboleditor.dh"
 IMPORT "ansicht/ausgabe.dh"
+IMPORT "ansicht/blaetter.dh"
 
 CONST STIL = "window { background-color: #12131a; color: #e6e6f0; }" + _
     " headerbar { background-color: #1a1c26; color: #e6e6f0; }" + _
@@ -56,6 +57,7 @@ DIM gDlgFeld1 AS INTEGER
 DIM gDlgFeld2 AS INTEGER
 DIM gDlgHakenWert AS BOOLEAN      ' Ergebnis des Hakens im Umbenennen-Dialog
 DIM gFragen AS INTEGER            ' wie oft bestaetigen() gefragt hat (Selbsttest)
+DIM gDlgHaken AS INTEGER          ' der Haken im offenen Umbenennen-Dialog
 
 FUNCTION basisName$(p AS STRING) AS STRING
     DIM i AS INTEGER
@@ -89,7 +91,9 @@ SUB statusAktualisieren()
     IF auswahlAnzahl() > 1 THEN wahl = "   Auswahl: " + STR$(LEN(gSelB)) + " Bauteile, " + STR$(LEN(gSelD)) + " Draehte, " + STR$(LEN(gSelL)) + " Labels (ziehen verschiebt, Strg+C kopiert, Entf loescht)"
     DIM netz AS STRING : netz = hoverText$()
     IF netz <> "" THEN netz = "   " + netz
-    gtk_label_set_text(gStatus, wz + "   Zoom " + STR$(zoom) + "%" + pos + netz + wahl + "   [" + STR$(LEN(gBlatt.bauteile)) + " Bauteile, " + STR$(LEN(gBlatt.draehte)) + " Draehte, " + STR$(LEN(gBlatt.labels)) + " Labels]")
+    DIM blatt AS STRING : blatt = gBlatt.name
+    IF LEN(gDok.blaetter) > 1 THEN blatt = blatt + " (" + STR$(aktuellerBlattIndex() + 1) + "/" + STR$(LEN(gDok.blaetter)) + ")"
+    gtk_label_set_text(gStatus, blatt + "   " + wz + "   Zoom " + STR$(zoom) + "%" + pos + netz + wahl + "   [" + STR$(LEN(gBlatt.bauteile)) + " Bauteile, " + STR$(LEN(gBlatt.draehte)) + " Draehte, " + STR$(LEN(gBlatt.labels)) + " Labels]")
 END SUB
 
 SUB titelNachziehen()
@@ -170,7 +174,7 @@ END FUNCTION
 
 ' Neuen Netznamen abfragen; mit hakenText einen Haken darunter (Vorgabe: an),
 ' dessen Stand danach in gDlgHakenWert steht. "" bei Abbruch.
-FUNCTION umbenennenDialog$(titel AS STRING, frage AS STRING, vorgabe AS STRING, hakenText AS STRING) AS STRING
+FUNCTION umbenennenDialog$(titel AS STRING, frage AS STRING, vorgabe AS STRING, hakenText AS STRING, hakenAn AS BOOLEAN) AS STRING
     DIM d AS INTEGER : d = dialogNeu(titel)
     DIM vb AS INTEGER : vb = gtk_box_new(GTK_SENKRECHT, 8)
     gtk_container_set_border_width(vb, 12)
@@ -182,16 +186,17 @@ FUNCTION umbenennenDialog$(titel AS STRING, frage AS STRING, vorgabe AS STRING, 
     DIM haken AS INTEGER : haken = 0
     IF hakenText <> "" THEN
         haken = gtk_check_button_new_with_label(hakenText)
-        gtk_toggle_button_set_active(haken, TRUE)
+        gtk_toggle_button_set_active(haken, hakenAn)
         gtk_box_pack_start(vb, haken, FALSE, FALSE, 0)
     END IF
     gtk_box_pack_start(gtk_dialog_get_content_area(d), vb, TRUE, TRUE, 0)
     gtk_widget_show_all(d)
-    gDlg = d : gDlgFeld1 = feld : gDlgFeld2 = 0
+    gDlg = d : gDlgFeld1 = feld : gDlgFeld2 = 0 : gDlgHaken = haken
     DIM text AS STRING : text = ""
     IF gtk_dialog_run(d) = GTK_ANTWORT_OK THEN text = gtk_entry_get_text(feld)
     gDlgHakenWert = FALSE
     IF haken <> 0 THEN gDlgHakenWert = gtk_toggle_button_get_active(haken)
+    gDlgHaken = 0
     gDlg = 0 : gDlgFeld1 = 0
     gtk_widget_destroy(d)
     RETURN text
@@ -265,6 +270,7 @@ SUB ercZeile(box AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
     DIM i AS INTEGER : i = gtk_list_box_row_get_index(zeile)
     IF i < 0 OR i >= LEN(gErc) THEN RETURN
     gErcGewaehlt = i
+    IF gErc[i].blatt >= 0 THEN blattWechseln(gErc[i].blatt)
     zentrieren(gErc[i].x, gErc[i].y)
 END SUB
 
@@ -281,7 +287,7 @@ SUB ercAusfuehren()
         gtk_widget_destroy(gErcDlg)
         gErcDlg = 0
     END IF
-    gErc = kern.ercPruefen(gBlatt)
+    gErc = kern.ercPruefenDok(gDok)
     gErcSichtbar = TRUE
     gErcGewaehlt = -1
     DIM nf AS INTEGER : nf = 0
@@ -315,7 +321,9 @@ SUB ercAusfuehren()
             ELSE
                 art = "<span foreground='#ffc23d'><b>Warnung</b></span>"
             END IF
-            gtk_label_set_markup(zeile, art + "   " + markupSicher$(gErc[i].text))
+            DIM wo AS STRING : wo = ""
+            IF LEN(gDok.blaetter) > 1 AND gErc[i].blatt >= 0 AND gErc[i].blatt < LEN(gDok.blaetter) THEN wo = "<span foreground='#8a90a2'>[" + markupSicher$(gDok.blaetter[gErc[i].blatt].name) + "]</span> "
+            gtk_label_set_markup(zeile, art + "   " + wo + markupSicher$(gErc[i].text))
             gtk_label_set_xalign(zeile, 0.0)
             gtk_widget_set_margin_start(zeile, 6)
             gtk_widget_set_margin_top(zeile, 3)
@@ -343,12 +351,12 @@ FUNCTION exportNach(pfad AS STRING) AS BOOLEAN
     DIM klein AS STRING : klein = LOWER$(pfad)
     DIM text AS STRING
     IF ENDSWITH(klein, ".csv") THEN
-        text = kern.netzlisteCsv$(gBlatt)
+        text = kern.netzlisteCsvDok$(gDok)
     ELSEIF ENDSWITH(klein, ".net") OR ENDSWITH(klein, ".txt") THEN
-        text = kern.netzlisteText$(gBlatt)
+        text = kern.netzlisteTextDok$(gDok)
     ELSE
         IF NOT CONTAINS(basisName$(pfad), ".") THEN pfad = pfad + ".cir"
-        text = kern.netzlisteSpice$(gBlatt, exportTitel$())
+        text = kern.netzlisteSpiceDok$(gDok, exportTitel$())
     END IF
     TRY
         WRITEALL(pfad, text)
@@ -508,12 +516,12 @@ FUNCTION stuecklisteNach(pfad AS STRING) AS BOOLEAN
     DIM klein AS STRING : klein = LOWER$(pfad)
     DIM text AS STRING
     IF ENDSWITH(klein, ".md") THEN
-        text = kern.stuecklisteMarkdown$(gBlatt, exportTitel$())
+        text = kern.stuecklisteMarkdown$(gDok, exportTitel$())
     ELSEIF ENDSWITH(klein, ".txt") THEN
-        text = kern.stuecklisteText$(gBlatt)
+        text = kern.stuecklisteText$(gDok)
     ELSE
         IF NOT CONTAINS(basisName$(pfad), ".") THEN pfad = pfad + ".csv"
-        text = kern.stuecklisteCsv$(gBlatt)
+        text = kern.stuecklisteCsv$(gDok)
     END IF
     TRY
         WRITEALL(pfad, text)
@@ -526,7 +534,7 @@ END FUNCTION
 CONST ANTWORT_EXPORT = 1
 
 SUB stuecklisteZeigen()
-    DIM z AS ARRAY OF kern.BomZeile : z = kern.stueckliste(gBlatt)
+    DIM z AS ARRAY OF kern.BomZeile : z = kern.stuecklisteDok(gDok)
     DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Stueckliste", gFenster, GTK_DIALOG_MODAL, "Exportieren ...", ANTWORT_EXPORT, "Schliessen", GTK_ANTWORT_OK, NIL)
     gtk_window_set_default_size(d, 620, 420)
     DIM vb AS INTEGER : vb = gtk_box_new(GTK_SENKRECHT, 8)
@@ -687,6 +695,15 @@ END SUB
 DIM probeSchritt AS INTEGER
 DIM probeText1 AS STRING
 DIM probeText2 AS STRING
+DIM probeHaken AS INTEGER         ' 0: Haken lassen, 1: setzen, 2: loesen
+DIM probeUndo0 AS INTEGER
+DIM probeName0 AS STRING
+
+FUNCTION vorzeichen(a AS INTEGER) AS INTEGER
+    IF a > 0 THEN RETURN 1
+    IF a < 0 THEN RETURN -1
+    RETURN 0
+END FUNCTION
 DIM probeFehler AS INTEGER
 
 SUB pruefe(was AS STRING, ist AS STRING, soll AS STRING)
@@ -740,6 +757,7 @@ FUNCTION dialogBestaetigen(daten AS INTEGER) AS BOOLEAN
     IF gDlg = 0 THEN RETURN TRUE                 ' noch nicht offen: nochmal
     IF gDlgFeld1 <> 0 THEN gtk_entry_set_text(gDlgFeld1, probeText1)
     IF gDlgFeld2 <> 0 THEN gtk_entry_set_text(gDlgFeld2, probeText2)
+    IF gDlgHaken <> 0 AND probeHaken > 0 THEN gtk_toggle_button_set_active(gDlgHaken, probeHaken = 1)
     gtk_dialog_response(gDlg, GTK_ANTWORT_OK)
     RETURN FALSE
 END FUNCTION
@@ -886,7 +904,7 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             umbenennenAuswahl()
             pruefe("Versorgung umbenannt", gBlatt.bauteile[3].wert, "AGND")
             pruefe("Netzname am Draht", aktuelleNetze().liste[aktuelleNetze().netzAn(2000, 3200)].name, "AGND")
-            pruefe("AGND bleibt SPICE-Masse", STR$(CONTAINS(kern.netzlisteSpice$(gBlatt, "P"), " 0 D_LED")), STR$(TRUE))
+            pruefe("AGND bleibt SPICE-Masse", STR$(CONTAINS(kern.netzlisteSpiceDok$(gDok, "P"), " 0 D_LED")), STR$(TRUE))
             ' automatisches Netz R7-D1: ein Label entsteht am Klickpunkt
             gMausRX = 2000 : gMausRY = 2500
             drahtWaehlen(1, 0)
@@ -1004,7 +1022,7 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             bauteilPlatzieren()
             pruefe("Referenz", gBlatt.bauteile[5].referenz, "U1")
             ' die Pin-Typen kommen beim ERC an
-            DIM ercU AS ARRAY OF kern.Verstoss : ercU = kern.ercPruefen(gBlatt)
+            DIM ercU AS ARRAY OF kern.Verstoss : ercU = kern.ercPruefenDok(gDok)
             DIM ercT AS STRING : ercT = ""
             DIM eu AS INTEGER
             FOR eu = 0 TO LEN(ercU) - 1
@@ -1030,11 +1048,11 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             g_timeout_add(200, dialogBestaetigen, 0)
             stuecklisteZeigen()
             pruefe("Stueckliste-Dialog wieder zu", STR$(gDlg), "0")
-            DIM bz AS ARRAY OF kern.BomZeile : bz = kern.stueckliste(gBlatt)
+            DIM bz AS ARRAY OF kern.BomZeile : bz = kern.stuecklisteDok(gDok)
             pruefe("Stueckliste: Positionen", STR$(LEN(bz)), "3")
             pruefe("Stueckliste: Reihenfolge", bz[0].referenzen[0] + " " + bz[1].referenzen[0] + " " + bz[2].referenzen[0], "C1 D1 R7")
             IF fotoZiel <> "" THEN pruefe("Stueckliste als Markdown", STR$(stuecklisteNach(fotoZiel + ".md")), STR$(TRUE))
-            pruefe("Markdown-Tabelle", STR$(CONTAINS(kern.stuecklisteMarkdown$(gBlatt, "P"), "| 1 | R7 | 4k7 | Widerstand |")), STR$(TRUE))
+            pruefe("Markdown-Tabelle", STR$(CONTAINS(kern.stuecklisteMarkdown$(gDok, "P"), "| 1 | R7 | 4k7 | Widerstand |")), STR$(TRUE))
         CASE 12
             ' Drehen: R7 einzeln um 90 Grad -- beide Draehte folgen, ohne Kurzschluss
             werkzeugWaehlen(WZ_AUSWAHL, "")
@@ -1123,10 +1141,10 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             IF fotoZiel <> "" THEN
                 pruefe("SPICE-Export geschrieben", STR$(exportNach(fotoZiel + ".cir")), STR$(TRUE))
             END IF
-            DIM sp AS STRING : sp = kern.netzlisteSpice$(gBlatt, "Probe")
+            DIM sp AS STRING : sp = kern.netzlisteSpiceDok$(gDok, "Probe")
             pruefe("SPICE: R7 an VCC", STR$(CONTAINS(sp, "R7 VCC ")), STR$(TRUE))
             pruefe("SPICE: D1 an Masse", STR$(CONTAINS(sp, " 0 D_LED")), STR$(TRUE))
-        CASE ELSE
+        CASE 16
             IF fotoZiel <> "" THEN
                 IF gtkFoto(gFlaeche, fotoZiel) THEN
                     PRINT "Foto gesichert: "; fotoZiel
@@ -1137,6 +1155,123 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             ' ERC-Dialog schliessen: Marker verschwinden
             IF gErcDlg <> 0 THEN gtk_dialog_response(gErcDlg, GTK_ANTWORT_OK)
             pruefe("ERC-Dialog zu, Marker weg", STR$(gErcSichtbar), STR$(FALSE))
+        CASE 17
+            ' Mehrere Blaetter: neues Blatt ueber das Menue, Reiter wechseln
+            probeUndo0 = LEN(gUndo)
+            probeName0 = gDok.blaetter[0].name
+            gtk_menu_item_activate(gBlattMenueNeu)
+            pruefe("Neues Blatt", STR$(LEN(gDok.blaetter)) + " " + STR$(aktuellerBlattIndex()) + " " + gBlatt.name, "2 1 Blatt2")
+            pruefe("Neues Blatt = ein Undo-Schritt", STR$(LEN(gUndo) - probeUndo0), "1")
+            pruefe("Reiter", STR$(gtk_notebook_get_n_pages(gReiter)) + " " + STR$(gtk_notebook_get_current_page(gReiter)), "2 1")
+            pruefe("Neues Blatt leer", STR$(LEN(gBlatt.bauteile)) + " " + STR$(auswahlAnzahl()), "0 0")
+            statusAktualisieren()
+            pruefe("Statuszeile nennt das Blatt", STR$(STARTSWITH(gtk_label_get_text(gStatus), "Blatt2 (2/2)")), STR$(TRUE))
+            gtk_notebook_set_current_page(gReiter, 0)
+            pruefe("Reiter 1 -> Blatt 1", STR$(aktuellerBlattIndex()), "0")
+            ' Blatt 1: globales Label BUS auf den Knoten R7-D1 (Haken im Dialog)
+            gMausWX = 2000 : gMausWY = 2800
+            probeText1 = "BUS" : probeHaken = 1
+            g_timeout_add(150, dialogBestaetigen, 0)
+            labelSetzen()
+            DIM lb AS kern.Label : lb = gBlatt.labels[LEN(gBlatt.labels) - 1]
+            pruefe("Haken macht das Label global", STR$(lb.art = kern.LA_GLOBAL) + " " + lb.text, STR$(TRUE) + " BUS")
+            gtk_notebook_set_current_page(gReiter, 1)
+            pruefe("Reiter 2 -> Blatt 2", STR$(aktuellerBlattIndex()), "1")
+            ' Blatt 2: R mit Draht nach aussen, dort wieder BUS; dazu ein offenes R
+            verlaufMerken()
+            DIM r2 AS kern.Bauteil : r2 = kern.neuesBauteil("R", NEW kern.Lage(NEW kern.Punkt(2000, 2000), 0, FALSE))
+            r2.referenz = naechsteReferenz("R")
+            ARRAY_PUSH(gBlatt.bauteile, r2)
+            DIM r3 AS kern.Bauteil : r3 = kern.neuesBauteil("R", NEW kern.Lage(NEW kern.Punkt(5000, 2000), 0, FALSE))
+            r3.referenz = naechsteReferenz("R")
+            ARRAY_PUSH(gBlatt.bauteile, r3)
+            DIM q0 AS kern.Punkt : q0 = r2.pinPunkt(0)
+            DIM q1 AS kern.Punkt : q1 = r2.pinPunkt(1)
+            DIM ende AS kern.Punkt : ende = NEW kern.Punkt(q1.x + 400 * vorzeichen(q1.x - q0.x), q1.y + 400 * vorzeichen(q1.y - q0.y))
+            DIM w2 AS kern.Draht : w2 = NEW kern.Draht()
+            ARRAY_PUSH(w2.punkte, NEW kern.Punkt(q1.x, q1.y))
+            ARRAY_PUSH(w2.punkte, ende)
+            ARRAY_PUSH(gBlatt.draehte, w2)
+            geaendert()
+            pruefe("Referenzen zaehlen ueber alle Blaetter", r2.referenz + " " + r3.referenz, "R8 R9")
+            gMausWX = ende.x : gMausWY = ende.y
+            probeText1 = "BUS" : probeHaken = 0          ' Haken unberuehrt: Vorgabe vom letzten Label
+            g_timeout_add(150, dialogBestaetigen, 0)
+            labelSetzen()
+            pruefe("Haken merkt sich global", STR$(gBlatt.labels[0].art = kern.LA_GLOBAL), STR$(TRUE))
+            DIM nb AS kern.Netze : nb = kern.netzeDokument(gDok)
+            pruefe("BUS verbindet Blatt 1 und 2", STR$(nb.gleichUeber(0, 2000, 2800, 1, q1.x, q1.y)), STR$(TRUE))
+            gMausDrin = TRUE
+            hoverBestimmen(sx((q1.x + ende.x) / 2.0), sy((q1.y + ende.y) / 2.0))
+            pruefe("Netz unter der Maus auf Blatt 2", LEFT$(hoverText$(), 11), "Netz: BUS (")
+            ' ein lokales Label gleichen Namens wie auf Blatt 1 verbindet NICHT
+            DIM lokal AS STRING : lokal = ""
+            DIM lx AS INTEGER, ly AS INTEGER, li AS INTEGER
+            FOR li = 0 TO LEN(gDok.blaetter[0].labels) - 1
+                IF gDok.blaetter[0].labels[li].art = kern.LA_LOKAL AND lokal = "" THEN
+                    lokal = gDok.blaetter[0].labels[li].text
+                    lx = gDok.blaetter[0].labels[li].anker.x : ly = gDok.blaetter[0].labels[li].anker.y
+                END IF
+            NEXT
+            gMausWX = q0.x : gMausWY = q0.y
+            probeText1 = lokal : probeHaken = 2
+            g_timeout_add(150, dialogBestaetigen, 0)
+            labelSetzen()
+            probeHaken = 0
+            nb = kern.netzeDokument(gDok)
+            pruefe("Lokales " + lokal + " bleibt auf seinem Blatt", STR$(lokal <> "" AND NOT nb.gleichUeber(0, lx, ly, 1, q0.x, q0.y)), STR$(TRUE))
+            ' ERC von Blatt 1 aus: eine Zeile von Blatt 2 anklicken wechselt dorthin
+            gtk_notebook_set_current_page(gReiter, 0)
+            ercAusfuehren()
+            DIM ziel2 AS INTEGER : ziel2 = -1
+            FOR li = 0 TO LEN(gErc) - 1
+                IF gErc[li].blatt = 1 AND ziel2 < 0 THEN ziel2 = li
+            NEXT
+            pruefe("ERC meldet auch Blatt 2", STR$(ziel2 >= 0), STR$(TRUE))
+            IF ziel2 >= 0 THEN
+                gtk_list_box_select_row(gErcListe, gtk_list_box_get_row_at_index(gErcListe, ziel2))
+                pruefe("ERC-Zeile wechselt aufs Blatt", STR$(aktuellerBlattIndex()), "1")
+            END IF
+            gtk_dialog_response(gErcDlg, GTK_ANTWORT_OK)
+            ' Ausgabe: PDF und Druck mit je einer Seite pro Blatt
+            IF fotoZiel <> "" THEN
+                gAusgabeSeiten = 0
+                pruefe("PDF mit allen Blaettern", STR$(ausgabeNach(fotoZiel + ".blaetter.pdf")) + " " + STR$(gAusgabeSeiten), STR$(TRUE) + " 2")
+                gAusgabeSeiten = 0
+                pruefe("Druck: je Blatt eine Seite", drucken$(fotoZiel + ".blaetter.druck.pdf") + STR$(gAusgabeSeiten), "2")
+            END IF
+            pruefe("Ausgabe laesst das Blatt stehen", STR$(aktuellerBlattIndex()), "1")
+            zentrieren(3500, 2000)
+        CASE 18
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel + ".blatt2.png") THEN PRINT "Foto Blatt 2 gesichert"
+            END IF
+            ' Umbenennen: doppelter Name wird abgelehnt, dann "Takt"
+            probeText1 = probeName0
+            g_timeout_add(150, dialogBestaetigen, 0)
+            g_timeout_add(400, dialogBestaetigen, 0)     ' die Meldung
+            blattUmbenennen()
+            pruefe("Doppelter Blattname abgelehnt", gBlatt.name, "Blatt2")
+            probeText1 = "Takt"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            blattUmbenennen()
+            pruefe("Blatt umbenannt", gBlatt.name + " " + STR$(gtk_notebook_get_current_page(gReiter)), "Takt 1")
+            ' Loeschen: volles Blatt fragt nach, Rueckgaengig holt es zurueck
+            DIM fr AS INTEGER : fr = gFragen
+            g_timeout_add(150, dialogBestaetigen, 0)
+            blattLoeschen()
+            pruefe("Loeschen fragt bei vollem Blatt", STR$(gFragen - fr), "1")
+            pruefe("Blatt geloescht", STR$(LEN(gDok.blaetter)) + " " + STR$(gtk_notebook_get_n_pages(gReiter)) + " " + STR$(aktuellerBlattIndex()), "1 1 0")
+            verlaufZurueck()
+            pruefe("Rueckgaengig holt das Blatt zurueck", STR$(LEN(gDok.blaetter)) + " " + gBlatt.name + " " + STR$(gtk_notebook_get_n_pages(gReiter)) + " " + STR$(gtk_notebook_get_current_page(gReiter)), "2 Takt 2 1")
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
+            pruefe("Rueckgaengig bis vor das neue Blatt", STR$(LEN(gDok.blaetter)) + " " + STR$(gtk_notebook_get_n_pages(gReiter)) + " " + STR$(aktuellerBlattIndex()), "1 1 0")
+            g_timeout_add(150, dialogBestaetigen, 0)
+            blattLoeschen()
+            pruefe("Letztes Blatt bleibt", STR$(LEN(gDok.blaetter)), "1")
+        CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()
             RETURN FALSE
@@ -1221,6 +1356,10 @@ gtk_widget_set_tooltip_text(knopfAusgabe, "PDF/SVG/PNG, Drucken, Stueckliste, Ne
 gtk_header_bar_pack_end(gKopf, knopfErc)
 gtk_header_bar_pack_end(gKopf, knopfAusgabe)
 ausgabeMenueBauen()
+DIM knopfBlatt AS INTEGER : knopfBlatt = gtk_button_new_with_label("Blatt ▾")
+gtk_widget_set_tooltip_text(knopfBlatt, "Blaetter anlegen, umbenennen, loeschen (Bild auf/ab wechselt)")
+gtk_header_bar_pack_end(gKopf, knopfBlatt)
+blattMenueBauen()
 
 DIM vbox AS INTEGER : vbox = gtk_box_new(GTK_SENKRECHT, 0)
 DIM leiste AS INTEGER : leiste = gtk_box_new(GTK_WAAGERECHT, 6)
@@ -1242,6 +1381,7 @@ DIM knopfSymbol AS INTEGER : knopfSymbol = gtk_button_new_with_label("Symbol ...
 gtk_widget_set_tooltip_text(knopfSymbol, "Eigenes Bauteil/IC anlegen; ist ein eigenes gewaehlt, es bearbeiten")
 gtk_box_pack_start(leiste, knopfSymbol, FALSE, FALSE, 0)
 gtk_box_pack_start(vbox, leiste, FALSE, FALSE, 0)
+gtk_box_pack_start(vbox, reiterNeu(), FALSE, FALSE, 0)
 
 DIM flaeche AS INTEGER : flaeche = leinwandNeu()
 gtk_box_pack_start(vbox, flaeche, TRUE, TRUE, 0)
@@ -1263,6 +1403,7 @@ signal(gKnopfZurueck, "clicked", aufZurueck, 0, 0, 0)
 signal(gKnopfVor, "clicked", aufVor, 0, 0, 0)
 signal(knopfErc, "clicked", aufErc, 0, 0, 0)
 signal(knopfAusgabe, "clicked", aufAusgabeKnopf, 0, 0, 0)
+signal(knopfBlatt, "clicked", aufBlattKnopf, 0, 0, 0)
 signal(knopfSymbol, "clicked", aufSymbolEditor, 0, 0, 0)
 signal(gFenster, "destroy", fensterZu, 0, 0, 0)
 
