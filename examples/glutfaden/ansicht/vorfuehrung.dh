@@ -2926,6 +2926,8 @@ FUNCTION vsDeutsch(t AS STRING) AS BOOLEAN
     ' Dateinamen und Pfade sind Daten, keine Oberflaeche
     IF REGEX_TEST(t, "\.pxs|[\\/]") THEN RETURN FALSE
     IF REGEX_TEST(t, "[äöüÄÖÜß]") THEN RETURN TRUE
+    ' Tausenderpunkt (2.500) oder Dezimalkomma (2,5 cm) -- die deutsche Zahl
+    IF REGEX_TEST(t, "(^|[^0-9.,])[0-9]{1,3}([.][0-9]{3})+([^0-9]|$)") THEN RETURN TRUE
     RETURN REGEX_TEST(" " + t + " ", "(?i)[^a-z](und|der|die|das|mit|nicht|ist|zum|zur|für|oder|aus|auf|alle|eine?|Muster|Farbe|Farben|Ebene|Ebenen|Stiche?|Sichern|Einstellungen|Garn|Zeile|Spalte|Klicken|Rückgängig|Werkzeug)[^a-z]")
 END FUNCTION
 
