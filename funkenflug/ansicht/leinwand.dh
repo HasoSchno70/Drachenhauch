@@ -60,6 +60,23 @@ DIM gZiehGemerkt AS BOOLEAN      ' Undo-Schnappschuss fuer diesen Zug schon geno
 DIM gLabelGewaehlt AS kern.Label ' Auswahl ist entweder ein Bauteil ODER ein Label
 DIM gHatLabel AS BOOLEAN
 
+' Netze: einmal je Aenderung berechnet (netzeVeraltet() macht sie ungueltig)
+DIM gNetze AS kern.Netze
+DIM gNetzeGueltig AS BOOLEAN
+' Netz unter der Maus: ein Blattpunkt des Netzes, -1 = keins
+DIM gHoverX AS INTEGER
+DIM gHoverY AS INTEGER
+DIM gHoverAktiv AS BOOLEAN
+
+' ERC-Ergebnis, solange der ERC-Dialog offen ist
+DIM gErc AS ARRAY OF kern.Verstoss
+DIM gErcSichtbar AS BOOLEAN
+DIM gErcGewaehlt AS INTEGER
+
+CONST C_HOVER = &H9CD2FF
+CONST C_ERC_FEHLER = &HFF5A5A
+CONST C_ERC_WARNUNG = &HFFC23D
+
 DIM gPan AS BOOLEAN
 DIM gPanSX AS FLOAT
 DIM gPanSY AS FLOAT
@@ -106,6 +123,7 @@ SUB leinwandDokument(d AS kern.Dokument)
     gHatLabel = FALSE
     gDrahtAktiv = FALSE
     vEingepasst = FALSE
+    netzeVeraltet()
     neuZeichnen()
 END SUB
 
@@ -203,9 +221,17 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     cairo_set_line_cap(cr, 1)
     cairo_set_line_join(cr, 1)
     DIM i AS INTEGER
-    ' Draehte
+    ' Draehte; die des Netzes unter der Maus hervorgehoben
+    DIM hw AS INTEGER : hw = hoverWurzel()
     FOR i = 0 TO LEN(gBlatt.draehte) - 1
-        drahtZeichnen(cr, gBlatt.draehte[i], C_DRAHT)
+        DIM dr AS kern.Draht : dr = gBlatt.draehte[i]
+        DIM hell AS BOOLEAN : hell = FALSE
+        IF hw >= 0 AND LEN(dr.punkte) > 0 THEN hell = aktuelleNetze().wurzelAn(dr.punkte[0].x, dr.punkte[0].y) = hw
+        IF hell THEN
+            drahtZeichnen(cr, dr, C_HOVER, 3.5)
+        ELSE
+            drahtZeichnen(cr, dr, C_DRAHT, 2.0)
+        END IF
     NEXT
     ' aktiver Draht (Gummiband)
     IF gDrahtAktiv THEN
@@ -250,6 +276,7 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
         cairo_arc(cr, sx(gMausWX), sy(gMausWY), 4, 0, 2 * PI)
         cairo_stroke(cr)
     END IF
+    ercMarkerZeichnen(cr)
     RETURN TRUE
 END FUNCTION
 
@@ -268,6 +295,102 @@ SUB labelZeichnen(cr AS INTEGER, ax AS FLOAT, ay AS FLOAT, text AS STRING, farbe
     cairo_line_to(cr, ax + LABEL_DX + LEN(text) * LABEL_ZEICHEN, ay)
     cairo_stroke(cr)
     lwText(cr, ax + LABEL_DX, ay - LABEL_DY, text, farbe, FALSE)
+END SUB
+
+' --- Netze (Cache) ---------------------------------------------------------
+SUB netzeVeraltet()
+    gNetzeGueltig = FALSE
+    gErcSichtbar = FALSE              ' alte ERC-Marker passen nicht mehr
+END SUB
+
+FUNCTION aktuelleNetze() AS kern.Netze
+    IF NOT gNetzeGueltig THEN
+        gNetze = kern.netzeBerechnen(gBlatt)
+        gNetzeGueltig = TRUE
+    END IF
+    RETURN gNetze
+END FUNCTION
+
+' Abstand im Quadrat von (px,py) zur Strecke a..b (alles Bildschirm).
+FUNCTION abstandQ(px AS FLOAT, py AS FLOAT, ax AS FLOAT, ay AS FLOAT, bx AS FLOAT, by AS FLOAT) AS FLOAT
+    DIM dx AS FLOAT : dx = bx - ax
+    DIM dy AS FLOAT : dy = by - ay
+    DIM l2 AS FLOAT : l2 = dx * dx + dy * dy
+    DIM t AS FLOAT : t = 0
+    IF l2 > 0 THEN t = CLAMP(((px - ax) * dx + (py - ay) * dy) / l2, 0.0, 1.0)
+    DIM qx AS FLOAT : qx = ax + t * dx - px
+    DIM qy AS FLOAT : qy = ay + t * dy - py
+    RETURN qx * qx + qy * qy
+END FUNCTION
+
+' Welches Netz liegt unter dem Bildschirmpunkt? Draht, Pin oder Label in
+' 6 Pixel Naehe; merkt sich einen Blattpunkt dieses Netzes.
+SUB hoverBestimmen(px AS FLOAT, py AS FLOAT)
+    gHoverAktiv = FALSE
+    DIM grenze AS FLOAT : grenze = 36.0
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(gBlatt.draehte) - 1
+        DIM w AS kern.Draht : w = gBlatt.draehte[i]
+        FOR j = 0 TO LEN(w.punkte) - 2
+            IF abstandQ(px, py, sx(w.punkte[j].x), sy(w.punkte[j].y), sx(w.punkte[j + 1].x), sy(w.punkte[j + 1].y)) <= grenze THEN
+                gHoverX = w.punkte[j].x : gHoverY = w.punkte[j].y : gHoverAktiv = TRUE
+                RETURN
+            END IF
+        NEXT
+    NEXT
+    FOR i = 0 TO LEN(gBlatt.bauteile) - 1
+        FOR j = 0 TO LEN(gBlatt.bauteile[i].sym.pins) - 1
+            DIM pp AS kern.Punkt : pp = gBlatt.bauteile[i].pinPunkt(j)
+            DIM ex AS FLOAT : ex = sx(pp.x) - px
+            DIM ey AS FLOAT : ey = sy(pp.y) - py
+            IF ex * ex + ey * ey <= grenze THEN
+                gHoverX = pp.x : gHoverY = pp.y : gHoverAktiv = TRUE
+                RETURN
+            END IF
+        NEXT
+    NEXT
+    DIM li AS INTEGER : li = labelIndexUnter(px, py)
+    IF li >= 0 THEN
+        gHoverX = gBlatt.labels[li].anker.x : gHoverY = gBlatt.labels[li].anker.y : gHoverAktiv = TRUE
+    END IF
+END SUB
+
+FUNCTION hoverWurzel() AS INTEGER
+    IF NOT gHoverAktiv THEN RETURN -1
+    RETURN aktuelleNetze().wurzelAn(gHoverX, gHoverY)
+END FUNCTION
+
+' "Netz: VCC (3 Pins)" fuer die Statuszeile, "" ohne Netz unter der Maus.
+FUNCTION hoverText$() AS STRING
+    IF NOT gHoverAktiv THEN RETURN ""
+    DIM n AS kern.Netze : n = aktuelleNetze()
+    DIM i AS INTEGER : i = n.netzAn(gHoverX, gHoverY)
+    IF i < 0 THEN RETURN "Netz: offen (Draht ohne Pin)"
+    DIM e AS INTEGER : e = n.liste[i].echtePins()
+    RETURN "Netz: " + n.liste[i].name + " (" + STR$(e) + IIF(e = 1, " Pin)", " Pins)")
+END FUNCTION
+
+' Einen Blattpunkt in die Mitte der Flaeche holen.
+SUB zentrieren(x AS INTEGER, y AS INTEGER)
+    vX = gtk_widget_get_allocated_width(gFlaeche) / 2.0 - x * vZoom
+    vY = gtk_widget_get_allocated_height(gFlaeche) / 2.0 - y * vZoom
+    neuZeichnen()
+END SUB
+
+SUB ercMarkerZeichnen(cr AS INTEGER)
+    IF NOT gErcSichtbar THEN RETURN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gErc) - 1
+        DIM v AS kern.Verstoss : v = gErc[i]
+        DIM r AS FLOAT : r = 9
+        IF i = gErcGewaehlt THEN r = 14
+        cairoFarbe(cr, IIF(v.schwere = kern.ERC_FEHLER, C_ERC_FEHLER, C_ERC_WARNUNG))
+        cairo_set_line_width(cr, IIF(i = gErcGewaehlt, 3.0, 2.0))
+        cairo_new_sub_path(cr)
+        cairo_arc(cr, sx(v.x), sy(v.y), r, 0, 2 * PI)
+        cairo_stroke(cr)
+        lwText(cr, sx(v.x), sy(v.y), "!", IIF(v.schwere = kern.ERC_FEHLER, C_ERC_FEHLER, C_ERC_WARNUNG), TRUE)
+    NEXT
 END SUB
 
 ' Index des Labels unter dem Bildschirmpunkt (px, py), sonst -1.
@@ -317,10 +440,10 @@ SUB gitterZeichnen(cr AS INTEGER, bw AS FLOAT, bh AS FLOAT)
     WEND
 END SUB
 
-SUB drahtZeichnen(cr AS INTEGER, w AS kern.Draht, farbe AS INTEGER)
+SUB drahtZeichnen(cr AS INTEGER, w AS kern.Draht, farbe AS INTEGER, breite AS FLOAT)
     IF LEN(w.punkte) < 2 THEN RETURN
     cairoFarbe(cr, farbe)
-    cairo_set_line_width(cr, 2.0)
+    cairo_set_line_width(cr, breite)
     cairo_move_to(cr, sx(w.punkte[0].x), sy(w.punkte[0].y))
     DIM i AS INTEGER
     FOR i = 1 TO LEN(w.punkte) - 1

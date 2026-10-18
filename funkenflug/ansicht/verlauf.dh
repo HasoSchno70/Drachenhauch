@@ -54,6 +54,7 @@ SUB wiederherstellen(json AS STRING, idx AS INTEGER)
     gDok = kern.dokumentAusJson(JSON_PARSE(json))
     IF idx < 0 OR idx >= LEN(gDok.blaetter) THEN idx = 0
     gBlatt = gDok.blaetter[idx]
+    netzeVeraltet()
     gHatGewaehlt = FALSE
     gZieht = FALSE
     gDrahtAktiv = FALSE

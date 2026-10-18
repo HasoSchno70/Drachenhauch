@@ -6,6 +6,67 @@
 ' T-Verbindung (verbunden). Reine Kreuzung ohne gemeinsamen Punkt = NICHT
 ' verbunden. Ein Knoten entsteht automatisch, wo >=3 Enden treffen oder ein
 ' Ende auf einem Segment liegt.
+'
+' Namen: gleichnamige Labels UND gleichnamige Versorgungssymbole (GND, VCC,
+' +5V ...) sind jeweils EIN Netz, auch ohne Draht; ein Label "VCC" gehoert
+' zum Netz des VCC-Symbols. Der Netzname kommt von der Versorgung, sonst vom
+' Label, sonst automatisch (N1, N2 ...).
+
+' Ein Pin in einem Netz (fuer Netzliste und ERC)
+CLASS NetzPin
+    DIM bauteil AS INTEGER            ' Index in blatt.bauteile
+    DIM pin AS INTEGER                ' Index in sym.pins
+    DIM ref AS STRING
+    DIM nummer AS STRING
+    DIM pinName AS STRING
+    DIM typ AS INTEGER
+    DIM versorgung AS BOOLEAN         ' Pin eines Versorgungssymbols, kein echtes Bauteil
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END CLASS
+
+CLASS Netz
+    DIM name AS STRING
+    DIM automatisch AS BOOLEAN
+    DIM pins AS ARRAY OF NetzPin
+    DIM labelNamen AS ARRAY OF STRING ' verschiedene Label-Texte an diesem Netz
+    DIM versorgungen AS ARRAY OF STRING
+    SUB Init()
+        pins = []
+        labelNamen = []
+        versorgungen = []
+    END SUB
+    SUB labelDazu(t AS STRING)
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(labelNamen) - 1
+            IF labelNamen[i] = t THEN RETURN
+        NEXT
+        ARRAY_PUSH(labelNamen, t)
+    END SUB
+    SUB versorgungDazu(t AS STRING)
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(versorgungen) - 1
+            IF versorgungen[i] = t THEN RETURN
+        NEXT
+        ARRAY_PUSH(versorgungen, t)
+    END SUB
+    ' Pins echter Bauteile (ohne Versorgungssymbole)
+    FUNCTION echtePins() AS INTEGER
+        DIM c AS INTEGER : c = 0
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(pins) - 1
+            IF NOT pins[i].versorgung THEN c = c + 1
+        NEXT
+        RETURN c
+    END FUNCTION
+END CLASS
+
+' Der Netzname, den ein Versorgungssymbol stiftet: sein Wert (VCC, +5V),
+' sonst die Symbol-Id (GND).
+FUNCTION versorgungsName(b AS Bauteil) AS STRING
+    IF b.wert <> "" THEN RETURN b.wert
+    RETURN b.sym.id
+END FUNCTION
 
 FUNCTION netzKey(x AS INTEGER, y AS INTEGER) AS STRING
     RETURN STR$(rastern(x, RASTER)) + ":" + STR$(rastern(y, RASTER))
@@ -25,12 +86,43 @@ CLASS Netze
     DIM idx AS MAP OF INTEGER         ' key -> Index
     DIM schluessel AS ARRAY OF STRING
     DIM eltern AS ARRAY OF INTEGER
+    DIM liste AS ARRAY OF Netz        ' die benannten Netze (nach benennen())
+    DIM wurzelZuNetz AS MAP OF INTEGER
 
     SUB Init()
         idx = {}
         schluessel = []
         eltern = []
+        liste = []
+        wurzelZuNetz = {}
     END SUB
+
+    ' Das Netz zu einer Wurzel, bei Bedarf neu angelegt.
+    FUNCTION netzFuerWurzel(r AS INTEGER) AS INTEGER
+        DIM k AS STRING : k = STR$(r)
+        IF MAPHAS(wurzelZuNetz, k) THEN RETURN MAPGET(wurzelZuNetz, k)
+        DIM i AS INTEGER : i = LEN(liste)
+        ARRAY_PUSH(liste, NEW Netz())
+        MAPPUT(wurzelZuNetz, k, i)
+        RETURN i
+    END FUNCTION
+
+    ' Index des benannten Netzes an einem Blattpunkt, -1 wenn keins (etwa ein
+    ' Draht ohne Pin und Label).
+    FUNCTION netzAn(x AS INTEGER, y AS INTEGER) AS INTEGER
+        DIM k AS STRING : k = netzKey(x, y)
+        IF NOT MAPHAS(idx, k) THEN RETURN -1
+        DIM w AS STRING : w = STR$(wurzel(MAPGET(idx, k)))
+        IF NOT MAPHAS(wurzelZuNetz, w) THEN RETURN -1
+        RETURN MAPGET(wurzelZuNetz, w)
+    END FUNCTION
+
+    ' Wurzel eines Blattpunkts, -1 wenn der Punkt nicht vorkommt.
+    FUNCTION wurzelAn(x AS INTEGER, y AS INTEGER) AS INTEGER
+        DIM k AS STRING : k = netzKey(x, y)
+        IF NOT MAPHAS(idx, k) THEN RETURN -1
+        RETURN wurzel(MAPGET(idx, k))
+    END FUNCTION
 
     FUNCTION punkt(x AS INTEGER, y AS INTEGER) AS INTEGER
         DIM k AS STRING : k = netzKey(x, y)
@@ -76,16 +168,25 @@ FUNCTION netzeBerechnen(bl AS Blatt) AS Netze
             n.eins(n.punkt(w.punkte[j].x, w.punkte[j].y), n.punkt(w.punkte[j + 1].x, w.punkte[j + 1].y))
         NEXT
     NEXT
-    ' Pins als Punkte aufnehmen
+    ' Pins als Punkte aufnehmen; Versorgungssymbole verbinden sich ueber den
+    ' Namen (in derselben Tabelle wie die Labels).
+    DIM ersterMitText AS MAP OF INTEGER
     FOR i = 0 TO LEN(bl.bauteile) - 1
         b = bl.bauteile[i]
         FOR j = 0 TO LEN(b.sym.pins) - 1
             DIM pp AS Punkt : pp = b.pinPunkt(j)
-            DIM dummy AS INTEGER : dummy = n.punkt(pp.x, pp.y)
+            DIM pidx AS INTEGER : pidx = n.punkt(pp.x, pp.y)
+            IF b.sym.einheitLeistung THEN
+                DIM vn AS STRING : vn = versorgungsName(b)
+                IF MAPHAS(ersterMitText, vn) THEN
+                    n.eins(MAPGET(ersterMitText, vn), pidx)
+                ELSE
+                    MAPPUT(ersterMitText, vn, pidx)
+                END IF
+            END IF
         NEXT
     NEXT
     ' Labels: der Anker ist ein Netzpunkt; gleichnamige Labels sind EIN Netz.
-    DIM ersterMitText AS MAP OF INTEGER
     FOR i = 0 TO LEN(bl.labels) - 1
         DIM la AS Label : la = bl.labels[i]
         DIM li AS INTEGER : li = n.punkt(la.anker.x, la.anker.y)
@@ -112,8 +213,63 @@ FUNCTION netzeBerechnen(bl AS Blatt) AS Netze
             NEXT
         NEXT
     NEXT
+    netzeBenennen(bl, n)
     RETURN n
 END FUNCTION
+
+' Die Netze mit Pins, Labels und Namen fuellen.
+SUB netzeBenennen(bl AS Blatt, n AS Netze)
+    DIM i AS INTEGER, j AS INTEGER, ni AS INTEGER
+    FOR i = 0 TO LEN(bl.bauteile) - 1
+        DIM b AS Bauteil : b = bl.bauteile[i]
+        FOR j = 0 TO LEN(b.sym.pins) - 1
+            DIM pp AS Punkt : pp = b.pinPunkt(j)
+            ni = n.netzFuerWurzel(n.wurzelAn(pp.x, pp.y))
+            DIM np AS NetzPin : np = NEW NetzPin()
+            np.bauteil = i
+            np.pin = j
+            np.ref = b.referenz
+            np.nummer = b.sym.pins[j].nummer
+            np.pinName = b.sym.pins[j].name
+            np.typ = b.sym.pins[j].typ
+            np.versorgung = b.sym.einheitLeistung
+            np.x = pp.x
+            np.y = pp.y
+            ARRAY_PUSH(n.liste[ni].pins, np)
+            IF b.sym.einheitLeistung THEN n.liste[ni].versorgungDazu(versorgungsName(b))
+        NEXT
+    NEXT
+    FOR i = 0 TO LEN(bl.labels) - 1
+        ni = n.netzFuerWurzel(n.wurzelAn(bl.labels[i].anker.x, bl.labels[i].anker.y))
+        n.liste[ni].labelDazu(bl.labels[i].text)
+    NEXT
+    ' Namen: Versorgung > Label > automatisch. Automatische Namen weichen
+    ' vergebenen aus (ein Label "N1" bleibt eindeutig).
+    DIM vergeben AS MAP OF INTEGER
+    FOR i = 0 TO LEN(n.liste) - 1
+        DIM nz AS Netz : nz = n.liste[i]
+        IF LEN(nz.versorgungen) > 0 THEN
+            nz.name = nz.versorgungen[0]
+        ELSEIF LEN(nz.labelNamen) > 0 THEN
+            nz.name = nz.labelNamen[0]
+        END IF
+        IF nz.name <> "" THEN MAPPUT(vergeben, nz.name, 1)
+    NEXT
+    DIM zaehler AS INTEGER : zaehler = 0
+    FOR i = 0 TO LEN(n.liste) - 1
+        IF n.liste[i].name = "" THEN
+            zaehler = zaehler + 1
+            DIM kandidat AS STRING : kandidat = "N" + STR$(zaehler)
+            WHILE MAPHAS(vergeben, kandidat)
+                zaehler = zaehler + 1
+                kandidat = "N" + STR$(zaehler)
+            WEND
+            n.liste[i].name = kandidat
+            n.liste[i].automatisch = TRUE
+            MAPPUT(vergeben, kandidat, 1)
+        END IF
+    NEXT
+END SUB
 
 ' Wie oft endet ein Draht genau an diesem Blattpunkt?
 FUNCTION endenAn(bl AS Blatt, x AS INTEGER, y AS INTEGER) AS INTEGER

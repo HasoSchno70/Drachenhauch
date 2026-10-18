@@ -49,7 +49,7 @@ DIM gDlgFeld2 AS INTEGER
 
 FUNCTION basisName$(p AS STRING) AS STRING
     DIM i AS INTEGER
-    FOR i = LEN(p) TO 1 STEP -1
+    FOR i = LEN(p) - 1 TO 0 STEP -1                ' MID$ zaehlt ab 0
         DIM c AS STRING : c = MID$(p, i, 1)
         IF c = "/" OR c = "\" THEN RETURN MID$(p, i + 1)
     NEXT
@@ -69,7 +69,9 @@ SUB statusAktualisieren()
     DIM wahl AS STRING : wahl = ""
     IF gHatGewaehlt THEN wahl = "   Auswahl: " + gGewaehlt.referenz + " " + gGewaehlt.wert + " (" + gGewaehlt.sym.name + ")"
     IF gHatLabel THEN wahl = "   Label: " + gLabelGewaehlt.text
-    gtk_label_set_text(gStatus, wz + "   Zoom " + STR$(zoom) + "%" + pos + wahl + "   [" + STR$(LEN(gBlatt.bauteile)) + " Bauteile, " + STR$(LEN(gBlatt.draehte)) + " Draehte, " + STR$(LEN(gBlatt.labels)) + " Labels]")
+    DIM netz AS STRING : netz = hoverText$()
+    IF netz <> "" THEN netz = "   " + netz
+    gtk_label_set_text(gStatus, wz + "   Zoom " + STR$(zoom) + "%" + pos + netz + wahl + "   [" + STR$(LEN(gBlatt.bauteile)) + " Bauteile, " + STR$(LEN(gBlatt.draehte)) + " Draehte, " + STR$(LEN(gBlatt.labels)) + " Labels]")
 END SUB
 
 SUB titelNachziehen()
@@ -174,6 +176,143 @@ SUB eigenschaftenDialog(b AS kern.Bauteil)
     b.referenz = neuRef
     b.wert = neuWert
     geaendert()
+END SUB
+
+' --- ERC: nicht-modaler Dialog mit der Liste der Verstoesse; eine Zeile
+' anklicken holt die Stelle in die Mitte und hebt ihren Marker hervor.
+DIM gErcDlg AS INTEGER
+DIM gErcListe AS INTEGER
+
+FUNCTION markupSicher$(s AS STRING) AS STRING
+    RETURN REPLACE$(REPLACE$(REPLACE$(s, "&", "&amp;"), "<", "&lt;"), ">", "&gt;")
+END FUNCTION
+
+SUB ercZeile(box AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
+    IF zeile = 0 THEN RETURN
+    DIM i AS INTEGER : i = gtk_list_box_row_get_index(zeile)
+    IF i < 0 OR i >= LEN(gErc) THEN RETURN
+    gErcGewaehlt = i
+    zentrieren(gErc[i].x, gErc[i].y)
+END SUB
+
+SUB ercZu(dlg AS INTEGER, antwort AS INTEGER, daten AS INTEGER)
+    gErcSichtbar = FALSE
+    gErcDlg = 0
+    gErcListe = 0
+    gtk_widget_destroy(dlg)
+    neuZeichnen()
+END SUB
+
+SUB ercAusfuehren()
+    IF gErcDlg <> 0 THEN
+        gtk_widget_destroy(gErcDlg)
+        gErcDlg = 0
+    END IF
+    gErc = kern.ercPruefen(gBlatt)
+    gErcSichtbar = TRUE
+    gErcGewaehlt = -1
+    DIM nf AS INTEGER : nf = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gErc) - 1
+        IF gErc[i].schwere = kern.ERC_FEHLER THEN nf = nf + 1
+    NEXT
+    DIM nw AS INTEGER : nw = LEN(gErc) - nf
+    gErcDlg = gtk_dialog_new_with_buttons("Elektrische Regelpruefung", gFenster, 0, "Schliessen", GTK_ANTWORT_OK, NIL)
+    DIM vb AS INTEGER : vb = gtk_box_new(GTK_SENKRECHT, 8)
+    gtk_container_set_border_width(vb, 12)
+    DIM kopf AS STRING
+    IF LEN(gErc) = 0 THEN
+        kopf = "Keine Verstoesse gefunden."
+    ELSE
+        kopf = STR$(nf) + " Fehler, " + STR$(nw) + " Warnungen -- eine Zeile anklicken springt hin."
+    END IF
+    gtk_box_pack_start(vb, etikettNeu(kopf), FALSE, FALSE, 0)
+    IF LEN(gErc) > 0 THEN
+        DIM sw AS INTEGER : sw = gtk_scrolled_window_new(0, 0)
+        gtk_scrolled_window_set_policy(sw, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+        gtk_scrolled_window_set_min_content_height(sw, 220)
+        gtk_widget_set_size_request(sw, 480, -1)
+        gErcListe = gtk_list_box_new()
+        gtk_list_box_set_selection_mode(gErcListe, GTK_AUSWAHL_EINE)
+        FOR i = 0 TO LEN(gErc) - 1
+            DIM zeile AS INTEGER : zeile = gtk_label_new("")
+            DIM art AS STRING
+            IF gErc[i].schwere = kern.ERC_FEHLER THEN
+                art = "<span foreground='#ff5a5a'><b>Fehler</b></span>"
+            ELSE
+                art = "<span foreground='#ffc23d'><b>Warnung</b></span>"
+            END IF
+            gtk_label_set_markup(zeile, art + "   " + markupSicher$(gErc[i].text))
+            gtk_label_set_xalign(zeile, 0.0)
+            gtk_widget_set_margin_start(zeile, 6)
+            gtk_widget_set_margin_top(zeile, 3)
+            gtk_widget_set_margin_bottom(zeile, 3)
+            gtk_list_box_insert(gErcListe, zeile, -1)
+        NEXT
+        gtk_container_add(sw, gErcListe)
+        gtk_box_pack_start(vb, sw, TRUE, TRUE, 0)
+        signalZeile(gErcListe, "row-selected", ercZeile, 0, 0, 0)
+    END IF
+    gtk_box_pack_start(gtk_dialog_get_content_area(gErcDlg), vb, TRUE, TRUE, 0)
+    signalAntwort(gErcDlg, "response", ercZu, 0, 0, 0)
+    gtk_widget_show_all(gErcDlg)
+    neuZeichnen()
+END SUB
+
+' --- Netzliste: das Format folgt der Endung (.cir/.sp SPICE, .csv, .net/.txt)
+FUNCTION exportTitel$() AS STRING
+    IF gDok.titel <> "" THEN RETURN gDok.titel
+    IF gPfad <> "" THEN RETURN basisName$(gPfad)
+    RETURN "Schaltplan"
+END FUNCTION
+
+FUNCTION exportNach(pfad AS STRING) AS BOOLEAN
+    DIM klein AS STRING : klein = LOWER$(pfad)
+    DIM text AS STRING
+    IF ENDSWITH(klein, ".csv") THEN
+        text = kern.netzlisteCsv$(gBlatt)
+    ELSEIF ENDSWITH(klein, ".net") OR ENDSWITH(klein, ".txt") THEN
+        text = kern.netzlisteText$(gBlatt)
+    ELSE
+        IF NOT CONTAINS(basisName$(pfad), ".") THEN pfad = pfad + ".cir"
+        text = kern.netzlisteSpice$(gBlatt, exportTitel$())
+    END IF
+    TRY
+        WRITEALL(pfad, text)
+    CATCH e
+        RETURN FALSE
+    END TRY
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION exportWahl() AS STRING
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("Netzliste exportieren", gFenster, GTK_DATEI_SICHERN, "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Exportieren", GTK_ANTWORT_ANNEHMEN, NIL)
+    DIM f AS INTEGER
+    f = gtk_file_filter_new() : gtk_file_filter_set_name(f, "SPICE (*.cir, *.sp)") : gtk_file_filter_add_pattern(f, "*.cir") : gtk_file_filter_add_pattern(f, "*.sp") : gtk_file_chooser_add_filter(d, f)
+    f = gtk_file_filter_new() : gtk_file_filter_set_name(f, "CSV (*.csv)") : gtk_file_filter_add_pattern(f, "*.csv") : gtk_file_chooser_add_filter(d, f)
+    f = gtk_file_filter_new() : gtk_file_filter_set_name(f, "Text (*.net, *.txt)") : gtk_file_filter_add_pattern(f, "*.net") : gtk_file_filter_add_pattern(f, "*.txt") : gtk_file_chooser_add_filter(d, f)
+    gtk_file_chooser_set_do_overwrite_confirmation(d, TRUE)
+    gtk_file_chooser_set_current_name(d, "netzliste.cir")
+    DIM pfad AS STRING : pfad = ""
+    IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
+        DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
+        IF z <> 0 THEN
+            pfad = TEXT_AUS_ZEIGER$(z)
+            g_free(z)
+        END IF
+    END IF
+    gtk_widget_destroy(d)
+    RETURN pfad
+END FUNCTION
+
+SUB aufErc(knopf AS INTEGER, daten AS INTEGER)
+    ercAusfuehren()
+END SUB
+
+SUB aufExport(knopf AS INTEGER, daten AS INTEGER)
+    DIM pfad AS STRING : pfad = exportWahl()
+    IF pfad = "" THEN RETURN
+    IF NOT exportNach(pfad) THEN meldung("Die Netzliste liess sich nicht nach " + pfad + " schreiben.")
 END SUB
 
 ' --- Werkzeug-Knoepfe
@@ -336,6 +475,12 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             gMausWX = 3000 : gMausWY = 2000 : gMausDrin = TRUE
             bauteilPlatzieren()
             pruefe("C platziert, Referenz", gBlatt.bauteile[4].referenz, "C1")
+            ' zweites C: fortlaufende Referenz, dann wieder loeschen
+            gMausWX = 3000 : gMausWY = 4400
+            bauteilPlatzieren()
+            pruefe("zweites C, Referenz", gBlatt.bauteile[5].referenz, "C2")
+            auswahlLoeschen()
+            pruefe("C2 geloescht, Bauteile", STR$(LEN(gBlatt.bauteile)), "5")
         CASE 2
             ' Draht mit doppeltem Endpunkt (wie beim Doppelklick)
             werkzeugWaehlen(WZ_DRAHT, "")
@@ -409,6 +554,41 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             gGewaehlt = gBlatt.bauteile[1]
             gHatGewaehlt = TRUE
             statusAktualisieren()
+        CASE 6
+            ' Netz unter der Maus: VCC-Draht, GND-Draht, Statuszeile
+            gMausDrin = TRUE
+            hoverBestimmen(sx(2000), sy(1650))
+            pruefe("Netz unter der Maus (VCC-Draht)", hoverText$(), "Netz: VCC (2 Pins)")
+            hoverBestimmen(sx(2000), sy(3400))
+            pruefe("Netz unter der Maus (GND-Draht)", hoverText$(), "Netz: GND (1 Pin)")
+            hoverBestimmen(sx(2000), sy(1650))
+            statusAktualisieren()
+            pruefe("Statuszeile nennt das Netz", STR$(CONTAINS(gtk_label_get_text(gStatus), "Netz: VCC")), STR$(TRUE))
+        CASE 7
+            ' ERC: genau zwei Warnungen; Zeile 2 anklicken springt zu C1.1
+            ercAusfuehren()
+            pruefe("ERC-Verstoesse", STR$(LEN(gErc)), "2")
+            DIM texte AS STRING : texte = ""
+            DIM ei AS INTEGER
+            FOR ei = 0 TO LEN(gErc) - 1
+                texte = texte + gErc[ei].text + "|"
+            NEXT
+            pruefe("ERC: Label auf Versorgung", STR$(CONTAINS(texte, "Label VCC5 liegt auf der Versorgung VCC")), STR$(TRUE))
+            pruefe("ERC: offener Pin", STR$(CONTAINS(texte, "Pin C1.1 ist nicht verbunden")), STR$(TRUE))
+            DIM zielZeile AS INTEGER : zielZeile = -1
+            FOR ei = 0 TO LEN(gErc) - 1
+                IF CONTAINS(gErc[ei].text, "C1.1") THEN zielZeile = ei
+            NEXT
+            gtk_list_box_select_row(gErcListe, gtk_list_box_get_row_at_index(gErcListe, zielZeile))
+            pruefe("Zeilenklick waehlt Verstoss", STR$(gErcGewaehlt), STR$(zielZeile))
+            pruefe("Zeilenklick zentriert", STR$(ROUND(weltX(gtk_widget_get_allocated_width(gFlaeche) / 2.0))), "2800")
+            ' Netzliste als SPICE
+            IF fotoZiel <> "" THEN
+                pruefe("SPICE-Export geschrieben", STR$(exportNach(fotoZiel + ".cir")), STR$(TRUE))
+            END IF
+            DIM sp AS STRING : sp = kern.netzlisteSpice$(gBlatt, "Probe")
+            pruefe("SPICE: R7 an VCC", STR$(CONTAINS(sp, "R7 VCC ")), STR$(TRUE))
+            pruefe("SPICE: D1 an Masse", STR$(CONTAINS(sp, " 0 D_LED")), STR$(TRUE))
         CASE ELSE
             IF fotoZiel <> "" THEN
                 IF gtkFoto(gFlaeche, fotoZiel) THEN
@@ -417,6 +597,9 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
                     PRINT "Foto fehlgeschlagen"
                 END IF
             END IF
+            ' ERC-Dialog schliessen: Marker verschwinden
+            IF gErcDlg <> 0 THEN gtk_dialog_response(gErcDlg, GTK_ANTWORT_OK)
+            pruefe("ERC-Dialog zu, Marker weg", STR$(gErcSichtbar), STR$(FALSE))
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()
             RETURN FALSE
@@ -478,6 +661,12 @@ gtk_header_bar_pack_start(gKopf, knopfOeffnen)
 gtk_header_bar_pack_start(gKopf, knopfSpeichern)
 gtk_header_bar_pack_start(gKopf, gKnopfZurueck)
 gtk_header_bar_pack_start(gKopf, gKnopfVor)
+DIM knopfErc AS INTEGER : knopfErc = gtk_button_new_with_label("ERC")
+DIM knopfExport AS INTEGER : knopfExport = gtk_button_new_with_label("Netzliste")
+gtk_widget_set_tooltip_text(knopfErc, "Elektrische Regelpruefung")
+gtk_widget_set_tooltip_text(knopfExport, "Netzliste exportieren: SPICE, CSV oder Text")
+gtk_header_bar_pack_end(gKopf, knopfErc)
+gtk_header_bar_pack_end(gKopf, knopfExport)
 
 DIM vbox AS INTEGER : vbox = gtk_box_new(GTK_SENKRECHT, 0)
 DIM leiste AS INTEGER : leiste = gtk_box_new(GTK_WAAGERECHT, 6)
@@ -519,6 +708,8 @@ signal(knopfOeffnen, "clicked", aufOeffnen, 0, 0, 0)
 signal(knopfSpeichern, "clicked", aufSpeichern, 0, 0, 0)
 signal(gKnopfZurueck, "clicked", aufZurueck, 0, 0, 0)
 signal(gKnopfVor, "clicked", aufVor, 0, 0, 0)
+signal(knopfErc, "clicked", aufErc, 0, 0, 0)
+signal(knopfExport, "clicked", aufExport, 0, 0, 0)
 signal(gFenster, "destroy", fensterZu, 0, 0, 0)
 
 leinwandDokument(startDok)

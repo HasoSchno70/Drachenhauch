@@ -488,6 +488,10 @@ DECLARE FUNCTION signalZiehWeg LIB GOBJECT ALIAS "g_signal_connect_data" _
 DECLARE FUNCTION signalFaktor LIB GOBJECT ALIAS "g_signal_connect_data" _
     (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, faktor AS FLOAT, daten AS ZEIGER), _
      daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
+' response eines Dialogs: Dialog, Antwort-Nummer
+DECLARE FUNCTION signalAntwort LIB GOBJECT ALIAS "g_signal_connect_data" _
+    (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, antwort AS LONG, daten AS ZEIGER), _
+     daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
 DECLARE FUNCTION signalZeile LIB GOBJECT ALIAS "g_signal_connect_data" _
     (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, zeile AS ZEIGER, daten AS ZEIGER), _
      daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG

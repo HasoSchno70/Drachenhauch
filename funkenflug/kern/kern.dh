@@ -6,4 +6,6 @@ IMPORT "geometrie.dh" AS kern
 IMPORT "modell.dh" AS kern
 IMPORT "bibliothek.dh" AS kern
 IMPORT "netze.dh" AS kern
+IMPORT "erc.dh" AS kern
+IMPORT "netzliste.dh" AS kern
 IMPORT "datei.dh" AS kern

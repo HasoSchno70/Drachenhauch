@@ -68,6 +68,7 @@ SUB werkzeugWaehlen(wz AS INTEGER, ref AS STRING)
 END SUB
 
 SUB geaendert()
+    netzeVeraltet()
     gGeaendert = TRUE
     titelNachziehen()
     statusAktualisieren()
@@ -81,7 +82,7 @@ FUNCTION naechsteReferenz(praefix AS STRING) AS STRING
     FOR i = 0 TO LEN(gBlatt.bauteile) - 1
         DIM r AS STRING : r = gBlatt.bauteile[i].referenz
         IF LEN(r) > LEN(praefix) AND LEFT$(r, LEN(praefix)) = praefix THEN
-            DIM n AS INTEGER : n = VAL(MID$(r, LEN(praefix) + 1))
+            DIM n AS INTEGER : n = VAL(MID$(r, LEN(praefix)))     ' MID$ zaehlt ab 0
             IF n > groesste THEN groesste = n
         END IF
     NEXT
@@ -293,6 +294,7 @@ SUB ziehenNach(nx AS INTEGER, ny AS INTEGER)
     ELSE
         RETURN
     END IF
+    netzeVeraltet()
     gGeaendert = TRUE
     titelNachziehen()
 END SUB
@@ -310,6 +312,7 @@ FUNCTION lwBewegung(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
     END IF
     mausSetzen(px, py)
     IF gZieht THEN ziehenNach(gMausWX + gZiehDX, gMausWY + gZiehDY)
+    hoverBestimmen(px, py)
     neuZeichnen()
     statusAktualisieren()
     RETURN TRUE
@@ -317,6 +320,8 @@ END FUNCTION
 
 FUNCTION lwVerlassen(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
     gMausDrin = FALSE
+    gHoverAktiv = FALSE
+    statusAktualisieren()
     neuZeichnen()
     RETURN FALSE
 END FUNCTION

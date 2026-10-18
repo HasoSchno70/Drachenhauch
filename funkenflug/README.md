@@ -35,6 +35,26 @@ löscht sie, Mausrad zoomt um den Zeiger, mittlere Maustaste schiebt,
 `+`/`-`/`0` zoomen, `Strg+S` speichert, `Strg+O` öffnet. Eine schon vergebene
 Referenz lehnt der Eigenschaften-Dialog ab.
 
+**Netze:** Fährt die Maus über einen Draht, einen Pin oder ein Label, zeigt die
+Statuszeile den Netznamen samt Pinzahl und die Drähte des Netzes leuchten auf.
+Namen: Versorgungssymbol (GND, VCC, auch ein umbenanntes wie `+5V`) vor Label vor
+automatisch (`N1`, `N2` …). Gleichnamige Versorgungen und Labels sind ein Netz,
+auch ohne Draht.
+
+**ERC** (Kopfleiste): listet Fehler und Warnungen in einem Fenster, das offen
+bleiben darf; eine Zeile anklicken holt die Stelle in die Mitte, auf der Fläche
+markieren Kreise jede Stelle. Geprüft werden doppelte und fehlende Referenzen,
+offene Pins, offene Drahtenden, kurzgeschlossene Bauteile (zwei Pins im selben
+Netz), mehrere Labels an einem Netz, Labels auf einer fremden Versorgung,
+**Kurzschlüsse zwischen Versorgungen** und die Pin-Typen gegeneinander (zwei
+Ausgänge, Ausgang gegen Versorgung, Eingang ohne Treiber …). Versorgungssymbole
+gelten als Quelle – ein PWR_FLAG wie in KiCad braucht es nicht.
+
+**Netzliste** (Kopfleiste): das Format folgt der Endung – `.cir`/`.sp` SPICE
+(direkt für ngspice: GND wird Knoten `0`, `4k7` → `4.7k`, `1M` → `1Meg`, denn
+`M` heißt in SPICE *milli*; Dioden und Transistoren bekommen `.model`-Zeilen),
+`.csv` (Semikolon) oder `.net`/`.txt` als lesbarer Text.
+
 ## Aufbau
 
 ```
@@ -43,7 +63,9 @@ kern/       Modell, Geometrie, Bibliothek, Netze, Datei – ohne Oberfläche,
   geometrie.dh   Punkt, Lage (Transform), Raster/Snap, Konstanten
   modell.dh      Pin, Primitiv, Symbol, Bauteil, Draht, Knoten, Label, Blatt, Dokument
   bibliothek.dh  10 eingebaute Symbole (R, C, Elko, L, Diode, LED, NPN, Schalter, GND, VCC)
-  netze.dh       Netz-Erkennung (eine reine Funktion) + Auto-Knoten
+  netze.dh       Netz-Erkennung (eine reine Funktion), benannte Netze, Auto-Knoten
+  erc.dh         Elektrische Regelpruefung
+  netzliste.dh   Export: SPICE, CSV, Text
   datei.dh       Speichern/Laden als .fkn (JSON, Version 1)
 gtk/        Deklarationen für GTK 3, GDK, Cairo, Pango, GLib (aus Glutfaden)
 ansicht/    Zeichenfläche und Werkzeuge – globaler Namensraum
@@ -57,7 +79,8 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG.
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (32 Prüfungen,
+darunter ERC, Netz unter der Maus und SPICE-Export).
 
 ## Was gegenüber SparkNode bewusst anders ist
 
@@ -93,7 +116,13 @@ bei zwei ganzen Zahlen; ganzzahlig teilt `\`. `rastern()` hatte das falsch und
 verschob jeden Punkt um ein halbes Raster – unbemerkt, weil `RETURN` eines
 ganzzahligen Kommawerts aus einer `AS INTEGER`-Funktion still durchgeht.
 
+`MID$` zählt ab **0**, und `INSTR` liefert die 0-basierte Position oder **-1** –
+anders als QBasic/VB. `INSTR(...) > 0` übersieht deshalb einen Treffer ganz
+vorn; besser `CONTAINS(s, teil)`. Genau daran vergab Funkenflug anfangs jedem
+zweiten Kondensator wieder „C1".
+
 ## Noch offen (nächste Runden)
 
-ERC, Netzlisten-Export, Netznamen in der Statuszeile, Drähte auswählen und
-löschen, mehrere Blätter in der Oberfläche, eigene Symbole, Platinen-Layout.
+Drähte auswählen und löschen, Netze/Labels umbenennen über alle Stellen,
+mehrere Blätter in der Oberfläche, eigene Symbole und ICs mit Pin-Typen,
+Stückliste (BOM), Bild-/PDF-Export, Platinen-Layout.

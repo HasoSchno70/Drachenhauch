@@ -1,0 +1,163 @@
+' Netzlisten-Export -- Namensraum "kern". Alle Formate lesen netzeBerechnen(),
+' dieselbe Quelle wie ERC und Anzeige. Versorgungssymbole sind keine
+' Bauteile; sie geben nur dem Netz seinen Namen.
+
+CONST NL_ZEILE = CHR$(10)
+
+' Netze nach Namen sortiert, nur solche mit echten Pins.
+FUNCTION nlNetze(n AS Netze) AS ARRAY OF Netz
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM nachName AS MAP OF INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(n.liste) - 1
+        IF n.liste[i].echtePins() > 0 THEN
+            ARRAY_PUSH(namen, n.liste[i].name)
+            MAPPUT(nachName, n.liste[i].name, i)
+        END IF
+    NEXT
+    SORT(namen)
+    DIM r AS ARRAY OF Netz : r = []
+    FOR i = 0 TO LEN(namen) - 1
+        ARRAY_PUSH(r, n.liste[MAPGET(nachName, namen[i])])
+    NEXT
+    RETURN r
+END FUNCTION
+
+' --- Lesbarer Text
+FUNCTION netzlisteText$(bl AS Blatt) AS STRING
+    DIM n AS Netze : n = netzeBerechnen(bl)
+    DIM t AS STRING : t = "# Funkenflug-Netzliste, Blatt " + bl.name + NL_ZEILE + NL_ZEILE + "# Bauteile" + NL_ZEILE
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(bl.bauteile) - 1
+        DIM b AS Bauteil : b = bl.bauteile[i]
+        IF NOT b.sym.einheitLeistung THEN t = t + b.referenz + CHR$(9) + b.wert + CHR$(9) + b.sym.name + NL_ZEILE
+    NEXT
+    t = t + NL_ZEILE + "# Netze" + NL_ZEILE
+    DIM netze AS ARRAY OF Netz : netze = nlNetze(n)
+    FOR i = 0 TO LEN(netze) - 1
+        t = t + netze[i].name + ":"
+        FOR j = 0 TO LEN(netze[i].pins) - 1
+            IF NOT netze[i].pins[j].versorgung THEN t = t + " " + netze[i].pins[j].ref + "." + netze[i].pins[j].nummer
+        NEXT
+        t = t + NL_ZEILE
+    NEXT
+    RETURN t
+END FUNCTION
+
+' --- CSV (Semikolon, wie es eine deutsche Tabellenkalkulation erwartet)
+FUNCTION csvFeld$(s AS STRING) AS STRING
+    IF CONTAINS(s, ";") OR CONTAINS(s, CHR$(34)) THEN RETURN CHR$(34) + REPLACE$(s, CHR$(34), CHR$(34) + CHR$(34)) + CHR$(34)
+    RETURN s
+END FUNCTION
+
+FUNCTION netzlisteCsv$(bl AS Blatt) AS STRING
+    DIM n AS Netze : n = netzeBerechnen(bl)
+    DIM t AS STRING : t = "Netz;Referenz;Pin;Pinname;Wert" + NL_ZEILE
+    DIM netze AS ARRAY OF Netz : netze = nlNetze(n)
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(netze) - 1
+        FOR j = 0 TO LEN(netze[i].pins) - 1
+            DIM p AS NetzPin : p = netze[i].pins[j]
+            IF NOT p.versorgung THEN t = t + csvFeld$(netze[i].name) + ";" + csvFeld$(p.ref) + ";" + csvFeld$(p.nummer) + ";" + csvFeld$(p.pinName) + ";" + csvFeld$(bl.bauteile[p.bauteil].wert) + NL_ZEILE
+        NEXT
+    NEXT
+    RETURN t
+END FUNCTION
+
+' --- SPICE
+' Knotenname: GND wird 0, sonst nur Buchstaben, Ziffern und _.
+FUNCTION spiceKnoten$(name AS STRING) AS STRING
+    IF UPPER$(name) = "GND" OR name = "0" THEN RETURN "0"
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(name) - 1                     ' MID$ zaehlt ab 0
+        DIM c AS STRING : c = MID$(name, i, 1)
+        IF (c >= "A" AND c <= "Z") OR (c >= "a" AND c <= "z") OR (c >= "0" AND c <= "9") THEN r = r + c ELSE r = r + "_"
+    NEXT
+    RETURN r
+END FUNCTION
+
+FUNCTION istZiffer(c AS STRING) AS BOOLEAN
+    RETURN c >= "0" AND c <= "9"
+END FUNCTION
+
+' Wert in SPICE-Schreibweise: RKM-Notation (4k7 -> 4.7k, 2R2 -> 2.2),
+' Einheiten-R weg, "M" (Mega) -> "Meg" (in SPICE heisst M milli!), u statt µ.
+FUNCTION spiceWert$(w AS STRING) AS STRING
+    DIM s AS STRING : s = REPLACE$(REPLACE$(TRIM$(w), "µ", "u"), "Ω", "")
+    IF s = "" THEN RETURN "0"
+    ' RKM: Ziffer, Buchstabe, Ziffer (MID$ zaehlt ab 0)
+    DIM i AS INTEGER
+    FOR i = 1 TO LEN(s) - 2
+        DIM c AS STRING : c = MID$(s, i, 1)
+        IF istZiffer(MID$(s, i - 1, 1)) AND istZiffer(MID$(s, i + 1, 1)) AND CONTAINS("RrkKMmunpG", c) THEN
+            DIM einheit AS STRING : einheit = c
+            IF UPPER$(c) = "R" THEN einheit = ""
+            s = LEFT$(s, i) + "." + MID$(s, i + 1) + einheit
+            BREAK
+        END IF
+    NEXT
+    IF UPPER$(RIGHT$(s, 1)) = "R" AND LEN(s) > 1 THEN s = LEFT$(s, LEN(s) - 1)
+    IF RIGHT$(s, 1) = "M" THEN s = LEFT$(s, LEN(s) - 1) + "Meg"
+    RETURN s
+END FUNCTION
+
+' Instanzname muss mit dem Elementbuchstaben beginnen.
+FUNCTION spiceName$(buchstabe AS STRING, ref AS STRING) AS STRING
+    IF UPPER$(LEFT$(ref, 1)) = buchstabe THEN RETURN ref
+    RETURN buchstabe + ref
+END FUNCTION
+
+FUNCTION spiceModell$(praefix AS STRING, wert AS STRING) AS STRING
+    RETURN praefix + "_" + spiceKnoten$(wert)
+END FUNCTION
+
+FUNCTION netzlisteSpice$(bl AS Blatt, titel AS STRING) AS STRING
+    DIM n AS Netze : n = netzeBerechnen(bl)
+    DIM t AS STRING : t = "* " + titel + " -- Funkenflug" + NL_ZEILE
+    DIM modelle AS MAP OF STRING
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(bl.bauteile) - 1
+        DIM b AS Bauteil : b = bl.bauteile[i]
+        IF b.sym.einheitLeistung THEN CONTINUE
+        ' Knoten je Pin-Index
+        DIM k AS ARRAY OF STRING : k = []
+        FOR j = 0 TO LEN(b.sym.pins) - 1
+            DIM pp AS Punkt : pp = b.pinPunkt(j)
+            ARRAY_PUSH(k, spiceKnoten$(n.liste[n.netzAn(pp.x, pp.y)].name))
+        NEXT
+        SELECT CASE b.sym.id
+            CASE "R"
+                t = t + spiceName$("R", b.referenz) + " " + k[0] + " " + k[1] + " " + spiceWert$(b.wert) + NL_ZEILE
+            CASE "C", "CP"
+                t = t + spiceName$("C", b.referenz) + " " + k[0] + " " + k[1] + " " + spiceWert$(b.wert) + NL_ZEILE
+            CASE "L"
+                t = t + spiceName$("L", b.referenz) + " " + k[0] + " " + k[1] + " " + spiceWert$(b.wert) + NL_ZEILE
+            CASE "D", "LED"
+                DIM dm AS STRING : dm = spiceModell$("D", b.wert)
+                MAPPUT(modelle, dm, ".model " + dm + " D")
+                t = t + spiceName$("D", b.referenz) + " " + k[0] + " " + k[1] + " " + dm + NL_ZEILE
+            CASE "Q_NPN"
+                ' SPICE-Reihenfolge Kollektor, Basis, Emitter -- nach Pin-Namen
+                DIM kc AS STRING, kb AS STRING, ke AS STRING
+                FOR j = 0 TO LEN(b.sym.pins) - 1
+                    SELECT CASE b.sym.pins[j].name
+                        CASE "C" : kc = k[j]
+                        CASE "B" : kb = k[j]
+                        CASE "E" : ke = k[j]
+                    END SELECT
+                NEXT
+                DIM qm AS STRING : qm = spiceModell$("Q", b.wert)
+                MAPPUT(modelle, qm, ".model " + qm + " NPN")
+                t = t + spiceName$("Q", b.referenz) + " " + kc + " " + kb + " " + ke + " " + qm + NL_ZEILE
+            CASE ELSE
+                t = t + "* " + b.referenz + " (" + b.sym.name + ") hat kein SPICE-Modell" + NL_ZEILE
+        END SELECT
+    NEXT
+    DIM namen AS ARRAY OF STRING : namen = MAPKEYS(modelle)
+    SORT(namen)
+    FOR i = 0 TO LEN(namen) - 1
+        t = t + MAPGET(modelle, namen[i]) + NL_ZEILE
+    NEXT
+    RETURN t + ".end" + NL_ZEILE
+END FUNCTION
