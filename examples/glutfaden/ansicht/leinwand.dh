@@ -24,6 +24,10 @@ DIM lwFertig AS ARRAY OF INTEGER
 DIM lwRgb AS ARRAY OF INTEGER         ' je Farbindex, so wie gezeichnet (gedimmt beim Hervorheben)
 DIM lwRgbEcht AS ARRAY OF INTEGER     ' je Farbindex ohne Hervorheben (Uebersicht, Kacheln)
 DIM lwHervor AS INTEGER : lwHervor = -1   ' hervorgehobene Farbe, -1 = keine
+' Ansicht der Ebenen (PySticky "Nur aktive Ebene", "Andere Ebenen abdunkeln"):
+' nur die Anzeige, das Muster bleibt
+DIM lwNurAktiv AS BOOLEAN             ' nur die aktive Ebene, auch wenn sie ausgeblendet ist
+DIM lwAbdunkeln AS BOOLEAN            ' die anderen mit halber Deckkraft
 DIM lwPuffer AS BUFFER
 DIM lwBild AS INTEGER                 ' cairo_surface_t, 0 = keins
 DIM lwZelle AS FLOAT
@@ -72,7 +76,7 @@ END SUB
 ' Rueckgaengig und wenn sich an Ebenen oder Farben etwas aendert.
 SUB leinwandAufbauen()
     IF NOT lwHat THEN RETURN
-    lwMuster.ebenen.zusammensetzen(lwFarbe, lwTyp, lwFertig)
+    lwZusammensetzen()
     DIM n AS INTEGER : n = lwMuster.farbanzahl()
     DIM rgb[n + 1] AS INTEGER
     DIM i AS INTEGER
@@ -110,11 +114,50 @@ SUB leinwandAufbauen()
     minikarteAuffrischen()
 END SUB
 
-' Hat eine sichtbare Ebene weniger als volle Deckkraft?
+' Wird diese Ebene gezeigt? Sonst gilt "sichtbar"; bei "Nur aktive Ebene"
+' genau die aktive (PySticky zeigt sie dann auch ausgeblendet).
+FUNCTION lwZeigt(e AS kern.Ebene) AS BOOLEAN
+    IF lwNurAktiv THEN RETURN e = lwMuster.ebenen.aktiveEbene()
+    RETURN e.sichtbar
+END FUNCTION
+
+' Deckkraft beim Zeichnen: abgedunkelt die anderen zur Haelfte
+FUNCTION lwDeckkraft(e AS kern.Ebene) AS FLOAT
+    DIM a AS FLOAT : a = CLAMP(e.deckkraft, 0.0, 1.0)
+    IF lwAbdunkeln AND NOT (e = lwMuster.ebenen.aktiveEbene()) THEN a = a * 0.5
+    RETURN a
+END FUNCTION
+
+' Wie Ebenenstapel.zusammensetzen, aber mit den gezeigten Ebenen
+SUB lwZusammensetzen()
+    DIM n AS INTEGER : n = lwMuster.breite * lwMuster.hoehe
+    DIM f[n] AS INTEGER
+    DIM t[n] AS INTEGER
+    DIM d[n] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1 : f[i] = kern.KEIN_STICH : NEXT
+    DIM e AS kern.Ebene
+    FOR EACH e IN lwMuster.ebenen.ebenen
+        IF NOT lwZeigt(e) THEN CONTINUE
+        DIM r AS ARRAY OF INTEGER : r = e.raster
+        DIM a AS ARRAY OF INTEGER : a = e.art
+        DIM er AS ARRAY OF INTEGER : er = e.erledigt
+        FOR i = 0 TO n - 1
+            IF r[i] <> kern.KEIN_STICH THEN
+                f[i] = r[i] : t[i] = a[i] : d[i] = er[i]
+            END IF
+        NEXT
+    NEXT
+    lwFarbe = f
+    lwTyp = t
+    lwFertig = d
+END SUB
+
+' Muss gemischt werden? Eine gezeigte Ebene unter voller Deckkraft
 FUNCTION lwMischen() AS BOOLEAN
     DIM e AS kern.Ebene
     FOR EACH e IN lwMuster.ebenen.ebenen
-        IF e.sichtbar AND e.deckkraft < 0.999 THEN RETURN TRUE
+        IF lwZeigt(e) AND lwDeckkraft(e) < 0.999 THEN RETURN TRUE
     NEXT
     RETURN FALSE
 END FUNCTION
@@ -128,7 +171,7 @@ FUNCTION lwMischfarbe(x AS INTEGER, y AS INTEGER) AS INTEGER
     DIM n AS INTEGER : n = lwMuster.farbanzahl()
     DIM e AS kern.Ebene
     FOR EACH e IN lwMuster.ebenen.ebenen
-        IF NOT e.sichtbar THEN CONTINUE
+        IF NOT lwZeigt(e) THEN CONTINUE
         DIM c AS INTEGER : c = e.raster[y * e.breite + x]
         IF c < 0 OR c >= n THEN CONTINUE
         IF NOT da THEN
@@ -136,7 +179,7 @@ FUNCTION lwMischfarbe(x AS INTEGER, y AS INTEGER) AS INTEGER
             da = TRUE
         END IF
         DIM f AS INTEGER : f = lwRgb[c]
-        DIM a AS FLOAT : a = CLAMP(e.deckkraft, 0.0, 1.0)
+        DIM a AS FLOAT : a = lwDeckkraft(e)
         r = r + (((f SHR 16) BAND 255) - r) * a
         g = g + (((f SHR 8) BAND 255) - g) * a
         bl = bl + ((f BAND 255) - bl) * a
@@ -168,7 +211,7 @@ SUB leinwandZellen(p AS ARRAY OF INTEGER)
         lwFarbe[i] = kern.KEIN_STICH : lwTyp[i] = 0 : lwFertig[i] = 0
         DIM e AS kern.Ebene
         FOR EACH e IN lwMuster.ebenen.ebenen
-            IF e.sichtbar AND e.raster[i] <> kern.KEIN_STICH THEN
+            IF lwZeigt(e) AND e.raster[i] <> kern.KEIN_STICH THEN
                 lwFarbe[i] = e.raster[i] : lwTyp[i] = e.art[i] : lwFertig[i] = e.erledigt[i]
             END IF
         NEXT

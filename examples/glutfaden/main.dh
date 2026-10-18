@@ -572,6 +572,15 @@ SUB befehlAusfuehren(kennung AS STRING)
         CASE "wz_farbverlauf" : werkzeugWaehlen(WZ_FARBVERLAUF, FALSE)
         CASE "hervorheben" : hervorhebenUmschalten()
         CASE "stickmodus" : stickenModusUmschalten()
+        CASE "drehen_rechts" : musterUmlegenBefehl(kern.UMLEGEN_RECHTS)
+        CASE "drehen_links" : musterUmlegenBefehl(kern.UMLEGEN_LINKS)
+        CASE "drehen_180" : musterUmlegenBefehl(kern.UMLEGEN_180)
+        CASE "spiegeln_h" : musterUmlegenBefehl(kern.UMLEGEN_WAAGERECHT)
+        CASE "spiegeln_v" : musterUmlegenBefehl(kern.UMLEGEN_SENKRECHT)
+        CASE "zuschneiden" : autoZuschneidenBefehl()
+        CASE "vereinen" : ebenenVereinenBefehl(TRUE)
+        CASE "nur_aktive" : ebenenAnsicht(0, NOT lwNurAktiv)
+        CASE "abdunkeln" : ebenenAnsicht(1, NOT lwAbdunkeln)
         CASE "willkommen" : willkommenZeigen()
         CASE "farbleiste"
             einst.farbleiste = NOT einst.farbleiste
@@ -821,6 +830,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe16"
     ELSEIF ARG$(a) = "--probe-stufe17" THEN
         probe = "stufe17"
+    ELSEIF ARG$(a) = "--probe-stufe18" THEN
+        probe = "stufe18"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -882,6 +893,7 @@ IF probe = "stufe14" THEN g_timeout_add(300, vorfuehrenStufe14, 0)
 IF probe = "stufe15" THEN g_timeout_add(300, vorfuehrenStufe15, 0)
 IF probe = "stufe16" THEN g_timeout_add(300, vorfuehrenStufe16, 0)
 IF probe = "stufe17" THEN g_timeout_add(300, vorfuehrenStufe17, 0)
+IF probe = "stufe18" THEN g_timeout_add(300, vorfuehrenStufe18, 0)
 ' Alle fuenf Minuten ein Schnappschuss, wenn etwas ungesichert ist
 DIM takt AS INTEGER : takt = g_timeout_add(300000, vwTakt, 0)
 
