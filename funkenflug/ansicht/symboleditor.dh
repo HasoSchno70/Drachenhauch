@@ -1,0 +1,203 @@
+' Symbol-Editor: eigene Bauteile und ICs aus einer Pinliste, mit Vorschau.
+' Globaler Namensraum. Die Vorschau zeichnet mit bauteilZeichnen() -- genau
+' so, wie das Symbol spaeter im Schaltplan erscheint.
+
+CONST SE_BEISPIEL = "# Nummer  Name  Seite  Typ" + CHR$(10) + _
+    "#   Seite: links rechts oben unten" + CHR$(10) + _
+    "#   Typ:   passiv ein aus bidir vin vout nc" + CHR$(10) + _
+    "1  VCC  oben   vin" + CHR$(10) + _
+    "2  IN   links  ein" + CHR$(10) + _
+    "3  OUT  rechts aus" + CHR$(10) + _
+    "4  GND  unten  vin"
+
+DIM seDlg AS INTEGER
+DIM seName AS INTEGER
+DIM sePraefix AS INTEGER
+DIM seWert AS INTEGER
+DIM seBeschr AS INTEGER
+DIM seText AS INTEGER             ' GtkTextView
+DIM seVorschau AS INTEGER
+DIM seMeldung AS INTEGER
+DIM seHaken AS INTEGER
+DIM seId AS STRING                ' bearbeitetes Symbol, "" = neu
+
+FUNCTION seTextLesen$() AS STRING
+    DIM puffer AS INTEGER : puffer = gtk_text_view_get_buffer(seText)
+    ' GtkTextIter fuellt GTK selbst; 128 Bytes reichen auf jeder Plattform
+    DIM anfang AS BUFFER : anfang = BUFFER_NEW(128)
+    DIM ende AS BUFFER : ende = BUFFER_NEW(128)
+    gtk_text_buffer_get_bounds(puffer, BUFFER_ZEIGER(anfang), BUFFER_ZEIGER(ende))
+    DIM z AS INTEGER : z = gtk_text_buffer_get_text(puffer, BUFFER_ZEIGER(anfang), BUFFER_ZEIGER(ende), FALSE)
+    DIM t AS STRING : t = TEXT_AUS_ZEIGER$(z)
+    g_free(z)
+    RETURN t
+END FUNCTION
+
+SUB seTextSetzen(t AS STRING)
+    gtk_text_buffer_set_text(gtk_text_view_get_buffer(seText), t, -1)
+END SUB
+
+FUNCTION seSymbol() AS kern.Symbol
+    DIM id AS STRING : id = seId
+    IF id = "" THEN id = "E_VORSCHAU"
+    DIM s AS kern.Symbol : s = kern.icErzeugen(id, TRIM$(gtk_entry_get_text(seName)), TRIM$(gtk_entry_get_text(sePraefix)), TRIM$(gtk_entry_get_text(seWert)), seTextLesen$())
+    s.beschreibung = TRIM$(gtk_entry_get_text(seBeschr))
+    RETURN s
+END FUNCTION
+
+' Zeile unter der Pinliste: Fehler rot, sonst die Pinzahl je Seite.
+SUB seMeldungNachziehen()
+    DIM pl AS kern.Pinliste : pl = kern.pinlisteLesen(seTextLesen$())
+    IF LEN(pl.fehler) > 0 THEN
+        gtk_label_set_markup(seMeldung, "<span foreground='#ff5a5a'>" + markupSicher$(JOIN$(pl.fehler, CHR$(10))) + "</span>")
+    ELSE
+        DIM n[4] AS INTEGER
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(pl.pins) - 1
+            n[pl.pins[i].seite] = n[pl.pins[i].seite] + 1
+        NEXT
+        gtk_label_set_text(seMeldung, STR$(LEN(pl.pins)) + " Pins: " + STR$(n[0]) + " links, " + STR$(n[1]) + " rechts, " + STR$(n[2]) + " oben, " + STR$(n[3]) + " unten")
+    END IF
+END SUB
+
+SUB seGeaendert(objekt AS INTEGER, daten AS INTEGER)
+    seMeldungNachziehen()
+    IF seVorschau <> 0 THEN gtk_widget_queue_draw(seVorschau)
+END SUB
+
+' Vorschau: das Symbol eingepasst. Die Zeichenroutine der Flaeche rechnet mit
+' vX/vY/vZoom -- die werden fuer die Dauer des Zeichnens umgestellt.
+FUNCTION seZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM bw AS FLOAT : bw = gtk_widget_get_allocated_width(w)
+    DIM bh AS FLOAT : bh = gtk_widget_get_allocated_height(w)
+    cairoFarbe(cr, C_HG)
+    cairo_rectangle(cr, 0, 0, bw, bh)
+    cairo_fill(cr)
+    DIM s AS kern.Symbol : s = seSymbol()
+    DIM b AS kern.Bauteil : b = NEW kern.Bauteil(s.id, kern.neueLage(0, 0))
+    b.sym = s
+    b.referenz = s.praefix + "?"
+    b.wert = s.wertVorgabe
+    DIM x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER
+    bauteilBox(b, x0, y0, x1, y1)
+    IF x1 < x0 THEN RETURN TRUE
+    y0 = MIN(y0, s.refOrt.y) - 150
+    y1 = MAX(y1, s.wertOrt.y) + 150
+    x0 = x0 - 150
+    x1 = x1 + 150
+    DIM altX AS FLOAT : altX = vX
+    DIM altY AS FLOAT : altY = vY
+    DIM altZ AS FLOAT : altZ = vZoom
+    vZoom = CLAMP(MIN((bw - 20) / (x1 - x0), (bh - 20) / (y1 - y0)), 0.03, 0.5)
+    vX = bw / 2.0 - (x0 + x1) / 2.0 * vZoom
+    vY = bh / 2.0 - (y0 + y1) / 2.0 * vZoom
+    cairo_set_line_cap(cr, 1)
+    bauteilZeichnen(cr, b, FALSE, FALSE)
+    vX = altX
+    vY = altY
+    vZoom = altZ
+    RETURN TRUE
+END FUNCTION
+
+' Den Editor oeffnen. Mit vorlage wird dieses Symbol bearbeitet (alle
+' Bauteile, die es benutzen, aendern sich mit -- ein Undo-Schritt), sonst
+' entsteht ein neues. Rueckgabe: die Id des Symbols, "" bei Abbruch.
+FUNCTION symbolEditor(vorlage AS kern.Symbol, bearbeiten AS BOOLEAN) AS STRING
+    seDlg = gtk_dialog_new_with_buttons(IIF(bearbeiten, "Symbol bearbeiten", "Neues Symbol"), gFenster, GTK_DIALOG_MODAL, "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Uebernehmen", GTK_ANTWORT_OK, NIL)
+    gtk_window_set_default_size(seDlg, 900, 580)
+    gtk_dialog_set_default_response(seDlg, GTK_ANTWORT_OK)
+    DIM hb AS INTEGER : hb = gtk_box_new(GTK_WAAGERECHT, 12)
+    gtk_container_set_border_width(hb, 12)
+    DIM links AS INTEGER : links = gtk_box_new(GTK_SENKRECHT, 8)
+    DIM g AS INTEGER : g = gtk_grid_new()
+    gtk_grid_set_row_spacing(g, 6)
+    gtk_grid_set_column_spacing(g, 10)
+    seName = feldNeu("")
+    sePraefix = feldNeu("U")
+    seWert = feldNeu("")
+    seBeschr = feldNeu("")
+    gtk_entry_set_activates_default(seName, FALSE)
+    gtk_grid_attach(g, etikettNeu("Name:"), 0, 0, 1, 1)
+    gtk_grid_attach(g, seName, 1, 0, 1, 1)
+    gtk_grid_attach(g, etikettNeu("Praefix:"), 0, 1, 1, 1)
+    gtk_grid_attach(g, sePraefix, 1, 1, 1, 1)
+    gtk_grid_attach(g, etikettNeu("Wert:"), 0, 2, 1, 1)
+    gtk_grid_attach(g, seWert, 1, 2, 1, 1)
+    gtk_grid_attach(g, etikettNeu("Beschreibung:"), 0, 3, 1, 1)
+    gtk_grid_attach(g, seBeschr, 1, 3, 1, 1)
+    gtk_box_pack_start(links, g, FALSE, FALSE, 0)
+    gtk_box_pack_start(links, etikettNeu("Pinliste -- eine Zeile je Pin: Nummer Name Seite Typ"), FALSE, FALSE, 0)
+    DIM sw AS INTEGER : sw = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_min_content_height(sw, 240)
+    seText = gtk_text_view_new()
+    gtkKlasse(seText, "pinliste")
+    gtk_text_view_set_left_margin(seText, 6)
+    gtk_text_view_set_top_margin(seText, 4)
+    gtk_container_add(sw, seText)
+    gtk_box_pack_start(links, sw, TRUE, TRUE, 0)
+    seMeldung = etikettNeu("")
+    gtk_label_set_line_wrap(seMeldung, TRUE)
+    gtk_box_pack_start(links, seMeldung, FALSE, FALSE, 0)
+    seHaken = gtk_check_button_new_with_label("auch in meiner Bibliothek speichern (fuer andere Projekte)")
+    gtk_box_pack_start(links, seHaken, FALSE, FALSE, 0)
+    gtk_widget_set_size_request(links, 420, -1)
+    gtk_box_pack_start(hb, links, FALSE, TRUE, 0)
+    seVorschau = gtk_drawing_area_new()
+    gtk_widget_set_size_request(seVorschau, 380, 380)
+    gtk_widget_set_hexpand(seVorschau, TRUE)
+    gtk_widget_set_vexpand(seVorschau, TRUE)
+    signalZeichnen(seVorschau, "draw", seZeichnen, 0, 0, 0)
+    gtk_box_pack_start(hb, seVorschau, TRUE, TRUE, 0)
+    gtk_box_pack_start(gtk_dialog_get_content_area(seDlg), hb, TRUE, TRUE, 0)
+    IF bearbeiten THEN
+        seId = vorlage.id
+        gtk_entry_set_text(seName, vorlage.name)
+        gtk_entry_set_text(sePraefix, vorlage.praefix)
+        gtk_entry_set_text(seWert, vorlage.wertVorgabe)
+        gtk_entry_set_text(seBeschr, vorlage.beschreibung)
+        seTextSetzen(vorlage.quelltext)
+        gtk_toggle_button_set_active(seHaken, kern.inBibliothek(vorlage.id))
+    ELSE
+        seId = ""
+        seTextSetzen(SE_BEISPIEL)
+    END IF
+    signal(gtk_text_view_get_buffer(seText), "changed", seGeaendert, 0, 0, 0)
+    signal(seName, "changed", seGeaendert, 0, 0, 0)
+    signal(sePraefix, "changed", seGeaendert, 0, 0, 0)
+    signal(seWert, "changed", seGeaendert, 0, 0, 0)
+    seMeldungNachziehen()
+    gtk_widget_show_all(seDlg)
+    gDlg = seDlg : gDlgFeld1 = 0 : gDlgFeld2 = 0
+    ' Uebernehmen erst, wenn alles stimmt -- sonst bleibt der Dialog offen
+    DIM fertig AS BOOLEAN : fertig = FALSE
+    DIM s AS kern.Symbol
+    WHILE NOT fertig
+        IF gtk_dialog_run(seDlg) <> GTK_ANTWORT_OK THEN BREAK
+        DIM pl AS kern.Pinliste : pl = kern.pinlisteLesen(seTextLesen$())
+        DIM problem AS STRING : problem = ""
+        IF TRIM$(gtk_entry_get_text(seName)) = "" THEN problem = "Das Symbol braucht einen Namen."
+        IF problem = "" AND TRIM$(gtk_entry_get_text(sePraefix)) = "" THEN problem = "Das Symbol braucht einen Praefix (U, IC, X ...)."
+        IF problem = "" AND LEN(pl.fehler) > 0 THEN problem = "Die Pinliste hat Fehler (siehe oben)."
+        IF problem = "" AND LEN(pl.pins) = 0 THEN problem = "Das Symbol braucht mindestens einen Pin."
+        IF problem <> "" THEN
+            gtk_label_set_markup(seMeldung, "<span foreground='#ff5a5a'><b>" + markupSicher$(problem) + "</b></span>" + IIF(LEN(pl.fehler) > 0, CHR$(10) + "<span foreground='#ff5a5a'>" + markupSicher$(JOIN$(pl.fehler, CHR$(10))) + "</span>", ""))
+            CONTINUE
+        END IF
+        IF seId = "" THEN seId = kern.neueSymbolId$()
+        s = seSymbol()
+        fertig = TRUE
+    WEND
+    DIM inBib AS BOOLEAN : inBib = gtk_toggle_button_get_active(seHaken)
+    gDlg = 0
+    gtk_widget_destroy(seDlg)
+    seDlg = 0
+    seVorschau = 0
+    IF NOT fertig THEN RETURN ""
+    IF bearbeiten THEN verlaufMerken()          ' Bauteile mit diesem Symbol aendern sich
+    DIM reg AS kern.Symbol : reg = kern.symbolRegistrieren(s)
+    IF inBib THEN
+        IF NOT bibliothekSichern(reg) THEN meldung("Die Bibliothek liess sich nicht nach " + gBibPfad + " schreiben.")
+    END IF
+    IF bearbeiten THEN geaendert()
+    RETURN reg.id
+END FUNCTION

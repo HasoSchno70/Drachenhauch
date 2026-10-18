@@ -55,6 +55,7 @@ SUB wiederherstellen(json AS STRING, idx AS INTEGER)
     IF idx < 0 OR idx >= LEN(gDok.blaetter) THEN idx = 0
     gBlatt = gDok.blaetter[idx]
     netzeVeraltet()
+    symbolListeAktualisieren(FALSE)
     auswahlAufheben()
     gZieht = FALSE
     gDrahtAktiv = FALSE

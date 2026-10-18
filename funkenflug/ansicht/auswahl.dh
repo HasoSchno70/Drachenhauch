@@ -408,5 +408,6 @@ SUB ablageEinfuegen()
     NEXT
     kern.autoKnoten(gBlatt)
     einzelAusMenge()
+    symbolListeAktualisieren(FALSE)       ' die Ablage kann eigene Symbole mitbringen
     geaendert()
 END SUB

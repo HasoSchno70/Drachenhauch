@@ -148,6 +148,55 @@ PRINT "Nachbar rueckt  : "; pl$(kern.gummiband(g3, 2, 0, 300)); "  (erwartet 0,0
 PRINT "Gleiten         : "; pl$(kern.gummiband(g3, 2, 200, 0)); "  (erwartet 0,0 0,1000 1200,1000)"
 PRINT "Original bleibt : "; pl$(g3); "  (erwartet 0,0 0,1000 1000,1000)"
 
+' --- Eigene Symbole
+DIM fl AS kern.Pinliste : fl = kern.pinlisteLesen("# Kommentar" + CHR$(10) + "1 A links ein" + CHR$(10) + "2 B seitwaerts" + CHR$(10) + "3 C r quatsch" + CHR$(10) + "1 D" + CHR$(10) + "4 E r aus zuviel" + CHR$(10) + CHR$(10) + "5 F")
+PRINT "Pinliste: "; LEN(fl.pins); " Pins, "; LEN(fl.fehler); " Fehler  (erwartet 2 Pins, 4 Fehler)"
+DIM fi AS INTEGER
+FOR fi = 0 TO LEN(fl.fehler) - 1
+    PRINT "  "; fl.fehler[fi]
+NEXT
+DIM nePins AS STRING : nePins = "1 GND unten vin" + CHR$(10) + "2 TRIG links ein" + CHR$(10) + "3 OUT rechts aus" + CHR$(10) + "4 RESET links ein" + CHR$(10) + "5 CTRL links ein" + CHR$(10) + "6 THR links ein" + CHR$(10) + "7 DIS rechts aus" + CHR$(10) + "8 VCC oben vin"
+DIM ne AS kern.Symbol : ne = kern.icErzeugen("E_TEST555", "NE555", "U", "NE555", nePins)
+DIM aufRaster AS BOOLEAN : aufRaster = TRUE
+DIM pi2 AS INTEGER
+FOR pi2 = 0 TO LEN(ne.pins) - 1
+    IF ne.pins[pi2].pos.x MOD 100 <> 0 OR ne.pins[pi2].pos.y MOD 100 <> 0 THEN aufRaster = FALSE
+NEXT
+PRINT "NE555: "; LEN(ne.pins); " Pins, alle auf dem Raster: "; aufRaster; "  (erwartet 8 TRUE)"
+PRINT "  Pin 3 OUT: "; ne.pins[2].pos.x; ","; ne.pins[2].pos.y; " Typ "; kern.pinTypName$(ne.pins[2].typ); " Richtung "; ne.pins[2].richtung
+DIM nj AS kern.Symbol : nj = kern.symbolAusJson(kern.symbolNachJson(ne), "")
+PRINT "JSON hin und zurueck: "; LEN(nj.pins); " Pins, Pin 8 bei "; nj.pins[7].pos.x; ","; nj.pins[7].pos.y; ", Quelle gleich: "; nj.quelltext = nePins; "  (erwartet 8, wie oben, TRUE)"
+' fehlendes Symbol -> Platzhalter; taucht es auf, heilt das Bauteil
+DIM eb AS kern.Blatt : eb = NEW kern.Blatt("E")
+DIM ub AS kern.Bauteil : ub = kern.neuesBauteil("E_TEST555", kern.neueLage(0, 0))
+ub.referenz = "U1"
+ARRAY_PUSH(eb.bauteile, ub)
+PRINT "unbekannt -> Platzhalter: "; ub.sym.fehlt; "  ERC: "; kern.ercPruefen(eb)[0].text
+DIM reg AS kern.Symbol : reg = kern.symbolRegistrieren(ne)
+PRINT "nach Registrieren geheilt: "; NOT ub.sym.fehlt; ", "; LEN(ub.sym.pins); " Pins  (erwartet TRUE, 8)"
+' eingebettet in die Datei
+DIM ed AS kern.Dokument : ed = NEW kern.Dokument()
+ARRAY_PUSH(ed.blaetter[0].bauteile, ub)
+DIM ejs AS STRING : ejs = JSON_STRINGIFY(kern.dokumentNachJson(ed))
+PRINT "Symbol steckt in der Datei: "; CONTAINS(ejs, "E_TEST555") AND CONTAINS(ejs, "TRIG"); "  (erwartet TRUE)"
+
+' --- Stueckliste
+DIM bb AS kern.Blatt : bb = NEW kern.Blatt("B")
+DIM bomRefs AS ARRAY OF STRING : bomRefs = ["R10", "R2", "R1", "R3", "R4", "C1"]
+DIM bomWerte AS ARRAY OF STRING : bomWerte = ["4k7", "4k7", "4k7", "4k7", "1k", "100n"]
+DIM bi2 AS INTEGER
+FOR bi2 = 0 TO LEN(bomRefs) - 1
+    DIM bt2 AS kern.Bauteil : bt2 = kern.neuesBauteil(IIF(LEFT$(bomRefs[bi2], 1) = "C", "C", "R"), kern.neueLage(bi2 * 1000, 0))
+    bt2.referenz = bomRefs[bi2]
+    bt2.wert = bomWerte[bi2]
+    ARRAY_PUSH(bb.bauteile, bt2)
+NEXT
+ARRAY_PUSH(bb.bauteile, kern.neuesBauteil("GND", kern.neueLage(0, 2000)))
+PRINT "--- Stueckliste ---"
+PRINT kern.stuecklisteText$(bb);
+DIM bz AS ARRAY OF kern.BomZeile : bz = kern.stueckliste(bb)
+PRINT "Zeilen: "; LEN(bz); "  erste: "; bz[0].referenzen[0]; "  4k7: "; kern.referenzBereiche$(bz[1].referenzen); " x"; bz[1].menge; "  (erwartet 3, C1, R1-R3, R10 x4)"
+
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
 PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)

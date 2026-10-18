@@ -40,6 +40,39 @@ angeschlossenen Drahtenden mit. Damit die Leitung rechtwinklig bleibt, rückt
 die Nachbarecke mit oder es entsteht ein Knick; Drähte, deren beide Enden
 mitwandern, verschieben sich starr, ebenso Labels an bewegten Pins.
 
+**Eigene Bauteile und ICs** (Knopf „Symbol …" in der Leiste; ist ein eigenes
+Bauteil gewählt, bearbeitet er dessen Symbol): Name, Präfix, Wert und eine
+**Pinliste**, eine Zeile je Pin –
+
+```
+# Nummer  Name   Seite   Typ
+1  GND    unten   vin
+2  TRIG   links   ein
+3  OUT    rechts  aus
+8  VCC    oben    vin
+```
+
+Seite: `links rechts oben unten` (Vorgabe links), Typ: `passiv ein aus bidir
+vin vout nc` (Vorgabe passiv). Fehler stehen zeilengenau unter der Liste,
+rechts zeigt eine Vorschau das Symbol, genau wie es im Schaltplan erscheint.
+Gehäuse und Pins legt der Generator rasterfest an, Pin-Nummern und -Namen
+werden mitgezeichnet. Die Pin-Typen gehen in den ERC (Eingang ohne Treiber,
+Ausgänge gegeneinander …).
+
+![Eigenes IC](ic.png)
+
+Eigene Symbole **stecken in der `.fkn`** – eine Datei bleibt eigenständig,
+auch auf einem anderen Rechner. Mit dem Haken „auch in meiner Bibliothek
+speichern" landen sie zusätzlich in `%APPDATA%\Funkenflug\symbole.fkl`
+(Linux: `~/.config/funkenflug/`, abweichend per `FUNKENFLUG_BIBLIOTHEK`) und
+stehen in jedem Projekt in der Bauteilliste. Ein Symbol bearbeiten ändert alle
+Bauteile, die es benutzen – ein Rückgängig-Schritt. Fehlt ein Symbol wirklich,
+erscheint ein roter Platzhalter, und der ERC meldet es.
+
+**Stückliste** (Kopfleiste): gruppiert nach Bauteil und Wert, natürlich
+sortiert (R2 vor R10), Bereiche zusammengefasst (`R1-R3, R10`), ohne
+Versorgungssymbole; Export als CSV (Semikolon), Markdown oder Text.
+
 **Ablage:** `Strg+C` kopiert, `Strg+X` schneidet aus, `Strg+V` fügt an der
 Mausposition ein, `Strg+A` wählt alles. Das läuft über die Zwischenablage des
 Systems, also auch zwischen zwei Funkenflug-Fenstern. Eingefügte Bauteile
@@ -93,6 +126,8 @@ kern/       Modell, Geometrie, Bibliothek, Netze, Datei – ohne Oberfläche,
   netze.dh       Netz-Erkennung (eine reine Funktion), benannte Netze, Auto-Knoten
   erc.dh         Elektrische Regelpruefung
   netzliste.dh   Export: SPICE, CSV, Text
+  symbole.dh     eigene Symbole: Pinliste, IC-Generator, JSON, Register, Bibliothek
+  stueckliste.dh Stückliste: Gruppen, natürliche Sortierung, CSV/Markdown/Text
   datei.dh       Speichern/Laden als .fkn (JSON, Version 1)
 gtk/        Deklarationen für GTK 3, GDK, Cairo, Pango, GLib (aus Glutfaden)
 ansicht/    Zeichenfläche und Werkzeuge – globaler Namensraum
@@ -100,6 +135,7 @@ ansicht/    Zeichenfläche und Werkzeuge – globaler Namensraum
   werkzeuge.dh   Maus, Tastatur, Werkzeug-Logik
   verlauf.dh     Rückgängig/Wiederholen
   auswahl.dh     Auswahl als Menge, Rahmen, Gruppen-Zug mit Gummiband, Ablage
+  symboleditor.dh  Symbol-Editor mit Vorschau
 main.dh     Fenster, Kopfleiste, Werkzeugleiste, Statuszeile, Dialoge
 ```
 
@@ -107,11 +143,12 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (74 Prüfungen,
-darunter Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
-Kopieren/Ausschneiden/Einfügen, Draht ziehen/löschen, Umbenennen samt
-Rückfrage, ERC und SPICE-Export). Der Selbsttest benutzt nur die interne
-Ablage und lässt die Zwischenablage des Systems in Ruhe.
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (99 Prüfungen,
+darunter die echten Werkzeug-Knöpfe, Symbol-Editor samt Fehlerweg und
+Bearbeiten, Stückliste, Gummiband, Rahmen und Gruppen-Zug über den
+Klick-Handler, Kopieren/Einfügen, Umbenennen, ERC und SPICE). Der Selbsttest
+lässt die Zwischenablage des Systems in Ruhe und schreibt seine Bibliothek in
+eine Wegwerf-Datei neben dem Bild. `--nur-foto bild.png` macht nur das Bild.
 
 ## Was gegenüber SparkNode bewusst anders ist
 
@@ -154,5 +191,7 @@ zweiten Kondensator wieder „C1".
 
 ## Noch offen (nächste Runden)
 
-Gruppe drehen/spiegeln, mehrere Blätter in der Oberfläche, eigene Symbole und ICs mit Pin-Typen,
-Stückliste (BOM), Bild-/PDF-Export, Platinen-Layout.
+Gruppe drehen/spiegeln, mehrere Blätter in der Oberfläche, Symbole mit freier
+Grafik (bisher Rechteck-Gehäuse aus dem Generator), Überstrich für aktiv-low
+(`~RESET`), Bauteil-Felder wie Gehäuse/Bestellnummer für die Stückliste,
+Bild-/PDF-Export, Platinen-Layout.

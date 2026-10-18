@@ -5,12 +5,16 @@
 
 DIM gBib AS ARRAY OF Symbol
 
+' Ein Symbol nach Id: eigene (Dokument, persoenliche Bibliothek), dann die
+' eingebauten. Unbekannt -> ein sichtbarer Platzhalter, NIE still ein anderes
+' Symbol (bis hierher wurde aus einem unbekannten Symbol ein Widerstand).
 FUNCTION bibliothekSymbol(id AS STRING) AS Symbol
+    IF istEigenBekannt(id) THEN RETURN eigenesSymbol(id)
     DIM i AS INTEGER
     FOR i = 0 TO LEN(gBib) - 1
         IF gBib[i].id = id THEN RETURN gBib[i]
     NEXT
-    RETURN gBib[0]
+    RETURN symbolPlatzhalter(id)
 END FUNCTION
 
 FUNCTION bibliothekListe() AS ARRAY OF Symbol

@@ -95,13 +95,25 @@ CLASS Symbol
     DIM pins AS ARRAY OF Pin
     DIM grafik AS ARRAY OF Primitiv
     DIM einheitLeistung AS BOOLEAN    ' Leistungssymbol (GND/VCC): kein sichtbarer Wert
+    ' eigene Symbole (Symbol-Editor)
+    DIM eigen AS BOOLEAN              ' vom Nutzer, wird in der .fkn mitgespeichert
+    DIM fehlt AS BOOLEAN              ' Platzhalter: das Symbol ist nirgends zu finden
+    DIM pinTexte AS BOOLEAN           ' Pin-Nummern und -Namen zeichnen
+    DIM quelltext AS STRING           ' die Pinliste, aus der es entstand
+    DIM textOrte AS BOOLEAN           ' Referenz/Wert an refOrt/wertOrt statt um die Mitte
+    DIM refOrt AS Punkt
+    DIM wertOrt AS Punkt
     SUB Init(i AS STRING, nm AS STRING, pre AS STRING)
         id = i
         name = nm
         praefix = pre
         wertVorgabe = ""
+        beschreibung = ""
+        quelltext = ""
         pins = []
         grafik = []
+        refOrt = NEW Punkt(0, 0)
+        wertOrt = NEW Punkt(0, 0)
     END SUB
     FUNCTION pinHinzu(nr AS STRING, nm AS STRING, p AS Punkt, laen AS INTEGER, ri AS INTEGER, ty AS INTEGER) AS Pin
         DIM pin AS Pin : pin = NEW Pin(nr, nm, p, laen, ri, ty)

@@ -20,6 +20,7 @@ IMPORT "ansicht/leinwand.dh"
 IMPORT "ansicht/werkzeuge.dh"
 IMPORT "ansicht/verlauf.dh"
 IMPORT "ansicht/auswahl.dh"
+IMPORT "ansicht/symboleditor.dh"
 
 CONST STIL = "window { background-color: #12131a; color: #e6e6f0; }" + _
     " headerbar { background-color: #1a1c26; color: #e6e6f0; }" + _
@@ -27,7 +28,8 @@ CONST STIL = "window { background-color: #12131a; color: #e6e6f0; }" + _
     " .leiste { background-color: #1a1c26; border-bottom: 1px solid #2c2f3c; padding: 4px 8px; }" + _
     " .leiste button, .leiste combobox button { background-color: #262a38; color: #e6e6f0; border: 1px solid #333848; border-radius: 6px; padding: 3px 10px; }" + _
     " .leiste button:checked { background-color: #ff8a3d; color: #1a1a2e; }" + _
-    " .status { background-color: #1a1c26; color: #aeb4c4; padding: 3px 10px; font-size: 9pt; }"
+    " .status { background-color: #1a1c26; color: #aeb4c4; padding: 3px 10px; font-size: 9pt; }" + _
+    " .pinliste { font-family: monospace; font-size: 10pt; }"
 
 CONST GTK_KNOEPFE_OK = 1              ' GTK_BUTTONS_OK
 
@@ -40,6 +42,9 @@ DIM gKnopfLabel AS INTEGER
 DIM gKnopfZurueck AS INTEGER
 DIM gKnopfVor AS INTEGER
 DIM gSymbolWahl AS INTEGER
+DIM gComboIds AS ARRAY OF STRING  ' Symbol-Id je Eintrag der Bauteilliste
+DIM gComboEigene AS INTEGER       ' wie viele eigene Symbole die Liste zeigt
+DIM gBibPfad AS STRING            ' persoenliche Symbol-Bibliothek
 DIM fotoZiel AS STRING
 
 ' Der gerade offene Dialog und seine Eingabefelder -- damit der Selbsttest
@@ -93,11 +98,19 @@ SUB titelNachziehen()
     gtk_header_bar_set_subtitle(gKopf, name)
 END SUB
 
+' Achtung GTK: gtk_toggle_button_set_active loest bei einer Aenderung auch
+' "clicked" aus. Ohne Sperre setzte das Ausschalten von "Auswahl" gleich
+' wieder das Auswahl-Werkzeug -- ein gewaehltes Bauteil liess sich so nie
+' platzieren, Draht/Label pendelten hin und her.
+DIM gKnoepfeSetzen AS BOOLEAN
+
 SUB werkzeugKnoepfeNachziehen()
     IF gKnopfAuswahl = 0 THEN RETURN
+    gKnoepfeSetzen = TRUE
     gtk_toggle_button_set_active(gKnopfAuswahl, gWerkzeug = WZ_AUSWAHL)
     gtk_toggle_button_set_active(gKnopfDraht, gWerkzeug = WZ_DRAHT)
     gtk_toggle_button_set_active(gKnopfLabel, gWerkzeug = WZ_LABEL)
+    gKnoepfeSetzen = FALSE
 END SUB
 
 SUB verlaufKnoepfeNachziehen()
@@ -343,14 +356,22 @@ FUNCTION exportNach(pfad AS STRING) AS BOOLEAN
     RETURN TRUE
 END FUNCTION
 
-FUNCTION exportWahl() AS STRING
-    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("Netzliste exportieren", gFenster, GTK_DATEI_SICHERN, "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Exportieren", GTK_ANTWORT_ANNEHMEN, NIL)
-    DIM f AS INTEGER
-    f = gtk_file_filter_new() : gtk_file_filter_set_name(f, "SPICE (*.cir, *.sp)") : gtk_file_filter_add_pattern(f, "*.cir") : gtk_file_filter_add_pattern(f, "*.sp") : gtk_file_chooser_add_filter(d, f)
-    f = gtk_file_filter_new() : gtk_file_filter_set_name(f, "CSV (*.csv)") : gtk_file_filter_add_pattern(f, "*.csv") : gtk_file_chooser_add_filter(d, f)
-    f = gtk_file_filter_new() : gtk_file_filter_set_name(f, "Text (*.net, *.txt)") : gtk_file_filter_add_pattern(f, "*.net") : gtk_file_filter_add_pattern(f, "*.txt") : gtk_file_chooser_add_filter(d, f)
+' Datei zum Exportieren waehlen. Je Filter ein Name und seine Muster
+' (mehrere durch ; getrennt). "" bei Abbruch.
+FUNCTION dateiExportWahl(titel AS STRING, vorschlag AS STRING, namen AS ARRAY OF STRING, muster AS ARRAY OF STRING) AS STRING
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new(titel, gFenster, GTK_DATEI_SICHERN, "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Exportieren", GTK_ANTWORT_ANNEHMEN, NIL)
+    DIM i AS INTEGER, k AS INTEGER
+    FOR i = 0 TO LEN(namen) - 1
+        DIM f AS INTEGER : f = gtk_file_filter_new()
+        gtk_file_filter_set_name(f, namen[i])
+        DIM m AS ARRAY OF STRING : m = SPLIT$(muster[i], ";")
+        FOR k = 0 TO LEN(m) - 1
+            gtk_file_filter_add_pattern(f, m[k])
+        NEXT
+        gtk_file_chooser_add_filter(d, f)
+    NEXT
     gtk_file_chooser_set_do_overwrite_confirmation(d, TRUE)
-    gtk_file_chooser_set_current_name(d, "netzliste.cir")
+    gtk_file_chooser_set_current_name(d, vorschlag)
     DIM pfad AS STRING : pfad = ""
     IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
         DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
@@ -368,29 +389,188 @@ SUB aufErc(knopf AS INTEGER, daten AS INTEGER)
 END SUB
 
 SUB aufExport(knopf AS INTEGER, daten AS INTEGER)
-    DIM pfad AS STRING : pfad = exportWahl()
+    DIM pfad AS STRING : pfad = dateiExportWahl("Netzliste exportieren", "netzliste.cir", ["SPICE (*.cir, *.sp)", "CSV (*.csv)", "Text (*.net, *.txt)"], ["*.cir;*.sp", "*.csv", "*.net;*.txt"])
     IF pfad = "" THEN RETURN
     IF NOT exportNach(pfad) THEN meldung("Die Netzliste liess sich nicht nach " + pfad + " schreiben.")
 END SUB
 
 ' --- Werkzeug-Knoepfe
 SUB aufAuswahl(knopf AS INTEGER, daten AS INTEGER)
+    IF gKnoepfeSetzen THEN RETURN
     werkzeugWaehlen(WZ_AUSWAHL, "")
 END SUB
 
 SUB aufDraht(knopf AS INTEGER, daten AS INTEGER)
+    IF gKnoepfeSetzen THEN RETURN
     werkzeugWaehlen(WZ_DRAHT, "")
 END SUB
 
 SUB aufLabel(knopf AS INTEGER, daten AS INTEGER)
+    IF gKnoepfeSetzen THEN RETURN
     werkzeugWaehlen(WZ_LABEL, "")
 END SUB
 
 SUB aufSymbol(combo AS INTEGER, daten AS INTEGER)
     DIM idx AS INTEGER : idx = gtk_combo_box_get_active(combo)
-    IF idx < 0 THEN RETURN
+    IF idx < 0 OR idx >= LEN(gComboIds) THEN RETURN
+    werkzeugWaehlen(WZ_BAUTEIL, gComboIds[idx])
+END SUB
+
+' --- Bauteilliste und eigene Symbole ----------------------------------------
+
+' Die Bauteilliste neu fuellen: eingebaute, dann eigene (ohne Platzhalter).
+' Ohne erzwingen nur, wenn neue eigene Symbole dazukamen (Laden, Einfuegen).
+SUB symbolListeAktualisieren(erzwingen AS BOOLEAN)
+    IF gSymbolWahl = 0 THEN RETURN
+    DIM eigene AS ARRAY OF kern.Symbol : eigene = kern.eigeneSymbole()
+    IF NOT erzwingen AND LEN(eigene) = gComboEigene THEN RETURN
+    gComboEigene = LEN(eigene)
+    gtk_combo_box_text_remove_all(gSymbolWahl)
+    gComboIds = []
     DIM liste AS ARRAY OF kern.Symbol : liste = kern.bibliothekListe()
-    IF idx < LEN(liste) THEN werkzeugWaehlen(WZ_BAUTEIL, liste[idx].id)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(liste) - 1
+        gtk_combo_box_text_append_text(gSymbolWahl, liste[i].name)
+        ARRAY_PUSH(gComboIds, liste[i].id)
+    NEXT
+    FOR i = 0 TO LEN(eigene) - 1
+        IF eigene[i].fehlt THEN CONTINUE
+        gtk_combo_box_text_append_text(gSymbolWahl, eigene[i].name + "  (eigen)")
+        ARRAY_PUSH(gComboIds, eigene[i].id)
+    NEXT
+END SUB
+
+FUNCTION listeHat(id AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gComboIds) - 1
+        IF gComboIds[i] = id THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Das Symbol in der Liste waehlen -- das stellt das Werkzeug aufs Platzieren.
+SUB symbolInListeWaehlen(id AS STRING)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gComboIds) - 1
+        IF gComboIds[i] = id THEN gtk_combo_box_set_active(gSymbolWahl, i)
+    NEXT
+END SUB
+
+FUNCTION bibliotheksPfad$() AS STRING
+    DIM eigen AS STRING : eigen = GETENV$("FUNKENFLUG_BIBLIOTHEK", "")
+    IF eigen <> "" THEN RETURN eigen
+    DIM a AS STRING : a = GETENV$("APPDATA", "")
+    IF a <> "" THEN RETURN PATHJOIN(PATHJOIN(a, "Funkenflug"), "symbole.fkl")
+    DIM x AS STRING : x = GETENV$("XDG_CONFIG_HOME", "")
+    IF x = "" THEN x = PATHJOIN(GETENV$("HOME", "."), ".config")
+    RETURN PATHJOIN(PATHJOIN(x, "funkenflug"), "symbole.fkl")
+END FUNCTION
+
+FUNCTION bibliothekSichern(s AS kern.Symbol) AS BOOLEAN
+    DIM ordner AS STRING : ordner = LEFT$(gBibPfad, LEN(gBibPfad) - LEN(basisName$(gBibPfad)))
+    IF ordner <> "" THEN
+        IF NOT DIREXISTS(ordner) THEN MKDIR(ordner)
+    END IF
+    RETURN kern.bibliothekAufnehmen(s, gBibPfad)
+END FUNCTION
+
+FUNCTION neuesSymbolUI() AS STRING
+    DIM id AS STRING : id = symbolEditor(NEW kern.Symbol("", "", ""), FALSE)
+    IF id = "" THEN RETURN ""
+    symbolListeAktualisieren(TRUE)
+    symbolInListeWaehlen(id)
+    RETURN id
+END FUNCTION
+
+FUNCTION symbolBearbeitenUI(s AS kern.Symbol) AS STRING
+    DIM id AS STRING : id = symbolEditor(s, TRUE)
+    IF id <> "" THEN symbolListeAktualisieren(TRUE)
+    RETURN id
+END FUNCTION
+
+' Knopf "Symbol ...": ein gewaehltes eigenes Symbol bearbeiten, sonst ein
+' neues anlegen.
+SUB aufSymbolEditor(knopf AS INTEGER, daten AS INTEGER)
+    IF gHatGewaehlt THEN
+        IF gGewaehlt.sym.eigen AND NOT gGewaehlt.sym.fehlt THEN
+            DIM r AS STRING : r = symbolBearbeitenUI(gGewaehlt.sym)
+            RETURN
+        END IF
+    END IF
+    DIM n AS STRING : n = neuesSymbolUI()
+END SUB
+
+' --- Stueckliste -------------------------------------------------------------
+
+FUNCTION stuecklisteNach(pfad AS STRING) AS BOOLEAN
+    DIM klein AS STRING : klein = LOWER$(pfad)
+    DIM text AS STRING
+    IF ENDSWITH(klein, ".md") THEN
+        text = kern.stuecklisteMarkdown$(gBlatt, exportTitel$())
+    ELSEIF ENDSWITH(klein, ".txt") THEN
+        text = kern.stuecklisteText$(gBlatt)
+    ELSE
+        IF NOT CONTAINS(basisName$(pfad), ".") THEN pfad = pfad + ".csv"
+        text = kern.stuecklisteCsv$(gBlatt)
+    END IF
+    TRY
+        WRITEALL(pfad, text)
+    CATCH e
+        RETURN FALSE
+    END TRY
+    RETURN TRUE
+END FUNCTION
+
+CONST ANTWORT_EXPORT = 1
+
+SUB stuecklisteZeigen()
+    DIM z AS ARRAY OF kern.BomZeile : z = kern.stueckliste(gBlatt)
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Stueckliste", gFenster, GTK_DIALOG_MODAL, "Exportieren ...", ANTWORT_EXPORT, "Schliessen", GTK_ANTWORT_OK, NIL)
+    gtk_window_set_default_size(d, 620, 420)
+    DIM vb AS INTEGER : vb = gtk_box_new(GTK_SENKRECHT, 8)
+    gtk_container_set_border_width(vb, 12)
+    DIM sw AS INTEGER : sw = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_min_content_height(sw, 280)
+    DIM g AS INTEGER : g = gtk_grid_new()
+    gtk_grid_set_column_spacing(g, 18)
+    gtk_grid_set_row_spacing(g, 4)
+    DIM kopf AS ARRAY OF STRING : kopf = ["Menge", "Referenzen", "Wert", "Bauteil"]
+    DIM i AS INTEGER, summe AS INTEGER
+    FOR i = 0 TO 3
+        DIM k AS INTEGER : k = gtk_label_new("")
+        gtk_label_set_markup(k, "<b>" + kopf[i] + "</b>")
+        gtk_label_set_xalign(k, 0.0)
+        gtk_grid_attach(g, k, i, 0, 1, 1)
+    NEXT
+    summe = 0
+    FOR i = 0 TO LEN(z) - 1
+        gtk_grid_attach(g, etikettNeu(STR$(z[i].menge)), 0, i + 1, 1, 1)
+        DIM refs AS INTEGER : refs = etikettNeu(kern.referenzBereiche$(z[i].referenzen))
+        gtk_label_set_line_wrap(refs, TRUE)
+        gtk_label_set_max_width_chars(refs, 34)
+        gtk_grid_attach(g, refs, 1, i + 1, 1, 1)
+        gtk_grid_attach(g, etikettNeu(z[i].wert), 2, i + 1, 1, 1)
+        gtk_grid_attach(g, etikettNeu(z[i].bauteil), 3, i + 1, 1, 1)
+        summe = summe + z[i].menge
+    NEXT
+    gtk_container_add(sw, g)
+    gtk_box_pack_start(vb, sw, TRUE, TRUE, 0)
+    gtk_box_pack_start(vb, etikettNeu(STR$(summe) + " Bauteile in " + STR$(LEN(z)) + " Positionen (ohne Versorgungssymbole)"), FALSE, FALSE, 0)
+    gtk_box_pack_start(gtk_dialog_get_content_area(d), vb, TRUE, TRUE, 0)
+    gtk_widget_show_all(d)
+    gDlg = d : gDlgFeld1 = 0 : gDlgFeld2 = 0
+    WHILE gtk_dialog_run(d) = ANTWORT_EXPORT
+        DIM pfad AS STRING : pfad = dateiExportWahl("Stueckliste exportieren", "stueckliste.csv", ["CSV (*.csv)", "Markdown (*.md)", "Text (*.txt)"], ["*.csv", "*.md", "*.txt"])
+        IF pfad <> "" THEN
+            IF NOT stuecklisteNach(pfad) THEN meldung("Die Stueckliste liess sich nicht nach " + pfad + " schreiben.")
+        END IF
+    WEND
+    gDlg = 0
+    gtk_widget_destroy(d)
+END SUB
+
+SUB aufStueckliste(knopf AS INTEGER, daten AS INTEGER)
+    stuecklisteZeigen()
 END SUB
 
 SUB aufZurueck(knopf AS INTEGER, daten AS INTEGER)
@@ -454,6 +634,7 @@ SUB dateiOeffnen()
     gPfad = pfad
     gGeaendert = FALSE
     leinwandDokument(d)
+    symbolListeAktualisieren(FALSE)
     verlaufRuecksetzen()
     titelNachziehen()
     statusAktualisieren()
@@ -525,6 +706,33 @@ FUNCTION ptListe$(w AS kern.Draht) AS STRING
     RETURN t
 END FUNCTION
 
+' Fuellt den Symbol-Editor aus (laeuft in dessen Schleife). Schritt 1: eine
+' Pinliste mit doppelter Nummer -- der Dialog muss offen bleiben. Schritt 2:
+' eine gute. Schritt 11: beim Bearbeiten einen Pin anhaengen.
+DIM seProbeSchritt AS INTEGER
+FUNCTION seProbe(daten AS INTEGER) AS BOOLEAN
+    IF seDlg = 0 THEN RETURN TRUE
+    DIM lf AS STRING : lf = CHR$(10)
+    seProbeSchritt = seProbeSchritt + 1
+    SELECT CASE seProbeSchritt
+        CASE 1
+            gtk_entry_set_text(seName, "LM358H")
+            gtk_entry_set_text(seWert, "LM358")
+            seTextSetzen("1 OUTA rechts aus" + lf + "2 INA- links ein" + lf + "2 INA+ links ein")
+            gtk_toggle_button_set_active(seHaken, TRUE)
+            gtk_dialog_response(seDlg, GTK_ANTWORT_OK)
+            RETURN TRUE
+        CASE 2
+            pruefe("Editor zeigt den Fehler", STR$(CONTAINS(gtk_label_get_text(seMeldung), "gibt es schon")), STR$(TRUE))
+            seTextSetzen("1 OUTA rechts aus" + lf + "2 INA- links ein" + lf + "3 INA+ links ein" + lf + "4 GND unten vin" + lf + "8 VCC oben vin")
+            gtk_dialog_response(seDlg, GTK_ANTWORT_OK)
+        CASE 11
+            seTextSetzen(seTextLesen$() + lf + "5 INB+ links ein")
+            gtk_dialog_response(seDlg, GTK_ANTWORT_OK)
+    END SELECT
+    RETURN FALSE
+END FUNCTION
+
 ' Fuellt den offenen Dialog aus und bestaetigt ihn (laeuft in dessen Schleife).
 FUNCTION dialogBestaetigen(daten AS INTEGER) AS BOOLEAN
     IF gDlg = 0 THEN RETURN TRUE                 ' noch nicht offen: nochmal
@@ -538,6 +746,17 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
     probeSchritt = probeSchritt + 1
     SELECT CASE probeSchritt
         CASE 1
+            ' die echten Knoepfe und die Bauteilliste (wie ein Mausklick)
+            gtk_button_clicked(gKnopfDraht)
+            pruefe("Knopf Draht", STR$(gWerkzeug) + " " + STR$(gtk_toggle_button_get_active(gKnopfAuswahl)) + "/" + STR$(gtk_toggle_button_get_active(gKnopfDraht)), STR$(WZ_DRAHT) + " " + STR$(FALSE) + "/" + STR$(TRUE))
+            gtk_button_clicked(gKnopfLabel)
+            pruefe("Knopf Label", STR$(gWerkzeug) + " " + STR$(gtk_toggle_button_get_active(gKnopfDraht)) + "/" + STR$(gtk_toggle_button_get_active(gKnopfLabel)), STR$(WZ_LABEL) + " " + STR$(FALSE) + "/" + STR$(TRUE))
+            gtk_combo_box_set_active(gSymbolWahl, 1)
+            pruefe("Bauteilliste waehlt Platzieren", STR$(gWerkzeug) + " " + gSymbolRef + " " + STR$(gtk_toggle_button_get_active(gKnopfLabel)), STR$(WZ_BAUTEIL) + " C " + STR$(FALSE))
+            gtk_button_clicked(gKnopfAuswahl)
+            pruefe("Knopf Auswahl", STR$(gWerkzeug) + " " + STR$(gtk_toggle_button_get_active(gKnopfAuswahl)), STR$(WZ_AUSWAHL) + " " + STR$(TRUE))
+            gtk_button_clicked(gKnopfAuswahl)
+            pruefe("Auswahl nochmal: bleibt an", STR$(gWerkzeug) + " " + STR$(gtk_toggle_button_get_active(gKnopfAuswahl)), STR$(WZ_AUSWAHL) + " " + STR$(TRUE))
             ' ein Bauteil per Werkzeug setzen
             werkzeugWaehlen(WZ_BAUTEIL, "C")
             gMausWX = 3000 : gMausWY = 2000 : gMausDrin = TRUE
@@ -767,6 +986,54 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             pruefe("Strg+A", STR$(auswahlAnzahl()), "11")
             auswahlAufheben()
         CASE 10
+            ' Symbol-Editor: erst eine fehlerhafte Pinliste (Dialog bleibt
+            ' offen, Fehler steht da), dann eine gute
+            seProbeSchritt = 0
+            g_timeout_add(200, seProbe, 0)
+            DIM neueId AS STRING : neueId = neuesSymbolUI()
+            pruefe("Editor: Fehler hielt den Dialog offen", STR$(seProbeSchritt), "2")
+            pruefe("Editor: neue Id", LEFT$(neueId, 2), "E_")
+            DIM es AS kern.Symbol : es = kern.bibliothekSymbol(neueId)
+            pruefe("Symbol: Name/Pins", es.name + "/" + STR$(LEN(es.pins)), "LM358H/5")
+            pruefe("in der Bauteilliste", STR$(listeHat(neueId)), STR$(TRUE))
+            pruefe("in der Bibliothek gesichert", STR$(FILEEXISTS(gBibPfad) AND kern.inBibliothek(neueId)), STR$(TRUE))
+            pruefe("Werkzeug steht aufs Platzieren", STR$(gWerkzeug = WZ_BAUTEIL AND gSymbolRef = neueId), STR$(TRUE))
+            gMausWX = 5000 : gMausWY = 2000 : gMausDrin = TRUE
+            bauteilPlatzieren()
+            pruefe("Referenz", gBlatt.bauteile[5].referenz, "U1")
+            ' die Pin-Typen kommen beim ERC an
+            DIM ercU AS ARRAY OF kern.Verstoss : ercU = kern.ercPruefen(gBlatt)
+            DIM ercT AS STRING : ercT = ""
+            DIM eu AS INTEGER
+            FOR eu = 0 TO LEN(ercU) - 1
+                ercT = ercT + ercU[eu].text + "|"
+            NEXT
+            pruefe("ERC kennt den Eingang", STR$(CONTAINS(ercT, "Eingang ohne Treiber")), STR$(TRUE))
+            pruefe("ERC nennt den Pin", STR$(CONTAINS(ercT, "Pin U1.1 (OUTA) ist nicht verbunden")), STR$(TRUE))
+            pruefe("Symbol reist in der Datei mit", STR$(CONTAINS(JSON_STRINGIFY(kern.dokumentNachJson(gDok)), neueId)), STR$(TRUE))
+            ' bearbeiten: ein Pin mehr -> das Bauteil aendert sich mit, ein Undo-Schritt
+            waehleB(gBlatt.bauteile[5])
+            seProbeSchritt = 10
+            g_timeout_add(200, seProbe, 0)
+            DIM eid AS STRING : eid = symbolBearbeitenUI(gGewaehlt.sym)
+            pruefe("Bearbeiten: gleiche Id", STR$(eid = neueId), STR$(TRUE))
+            pruefe("Bearbeiten: Bauteil hat jetzt 6 Pins", STR$(LEN(gBlatt.bauteile[5].sym.pins)), "6")
+            verlaufZurueck()
+            pruefe("Undo Bearbeiten: wieder 5 Pins", STR$(LEN(gBlatt.bauteile[5].sym.pins)), "5")
+            verlaufZurueck()
+            pruefe("Undo Platzieren", STR$(LEN(gBlatt.bauteile)), "5")
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+        CASE 11
+            ' Stueckliste: Dialog oeffnen und schliessen, Inhalt, Export
+            g_timeout_add(200, dialogBestaetigen, 0)
+            stuecklisteZeigen()
+            pruefe("Stueckliste-Dialog wieder zu", STR$(gDlg), "0")
+            DIM bz AS ARRAY OF kern.BomZeile : bz = kern.stueckliste(gBlatt)
+            pruefe("Stueckliste: Positionen", STR$(LEN(bz)), "3")
+            pruefe("Stueckliste: Reihenfolge", bz[0].referenzen[0] + " " + bz[1].referenzen[0] + " " + bz[2].referenzen[0], "C1 D1 R7")
+            IF fotoZiel <> "" THEN pruefe("Stueckliste als Markdown", STR$(stuecklisteNach(fotoZiel + ".md")), STR$(TRUE))
+            pruefe("Markdown-Tabelle", STR$(CONTAINS(kern.stuecklisteMarkdown$(gBlatt, "P"), "| 1 | R7 | 4k7 | Widerstand |")), STR$(TRUE))
+        CASE 12
             ' Netz unter der Maus: VCC-Draht, GND-Draht, Statuszeile
             gMausDrin = TRUE
             hoverBestimmen(sx(2000), sy(1650))
@@ -776,7 +1043,7 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             hoverBestimmen(sx(2000), sy(1650))
             statusAktualisieren()
             pruefe("Statuszeile nennt das Netz", STR$(CONTAINS(gtk_label_get_text(gStatus), "Netz: VCC")), STR$(TRUE))
-        CASE 11
+        CASE 13
             ' ERC: genau zwei Warnungen; Zeile 2 anklicken springt zu C1.1
             ercAusfuehren()
             pruefe("ERC-Verstoesse", STR$(LEN(gErc)), "2")
@@ -841,15 +1108,25 @@ DIM i AS INTEGER
 DIM startDok AS kern.Dokument
 DIM startPfad AS STRING : startPfad = ""
 FOR i = 0 TO ARGC() - 1
-    IF ARG$(i) = "--foto" AND i + 1 < ARGC() THEN
+    IF ARG$(i) = "--nur-foto" THEN probeSchritt = 100      ' nur das Bild, keine Pruefungen
+    IF (ARG$(i) = "--foto" OR ARG$(i) = "--nur-foto") AND i + 1 < ARGC() THEN
         fotoZiel = ARG$(i + 1)
     ELSEIF RIGHT$(LOWER$(ARG$(i)), 4) = ".fkn" THEN
         startPfad = ARG$(i)
     END IF
 NEXT
 
-' Der Selbsttest laesst die Zwischenablage des Systems in Ruhe.
+' Der Selbsttest laesst die Zwischenablage des Systems in Ruhe und benutzt
+' eine eigene Wegwerf-Bibliothek statt der persoenlichen.
 gAblageSystem = fotoZiel = ""
+IF fotoZiel <> "" THEN
+    gBibPfad = fotoZiel + ".fkl"
+ELSE
+    gBibPfad = bibliotheksPfad$()
+END IF
+' erst die Bibliothek, dann das Dokument: gleiche Ids -> die Fassung im
+' Dokument gilt fuer dieses Dokument
+IF kern.bibliothekLaden(gBibPfad) < 0 THEN PRINT "Bibliothek "; gBibPfad; " ist nicht lesbar -- sie bleibt unangetastet."
 
 IF startPfad <> "" THEN
     startDok = kern.dokumentLaden(startPfad)
@@ -880,8 +1157,11 @@ DIM knopfErc AS INTEGER : knopfErc = gtk_button_new_with_label("ERC")
 DIM knopfExport AS INTEGER : knopfExport = gtk_button_new_with_label("Netzliste")
 gtk_widget_set_tooltip_text(knopfErc, "Elektrische Regelpruefung")
 gtk_widget_set_tooltip_text(knopfExport, "Netzliste exportieren: SPICE, CSV oder Text")
+DIM knopfBom AS INTEGER : knopfBom = gtk_button_new_with_label("Stueckliste")
+gtk_widget_set_tooltip_text(knopfBom, "Stueckliste (BOM) ansehen und exportieren")
 gtk_header_bar_pack_end(gKopf, knopfErc)
 gtk_header_bar_pack_end(gKopf, knopfExport)
+gtk_header_bar_pack_end(gKopf, knopfBom)
 
 DIM vbox AS INTEGER : vbox = gtk_box_new(GTK_SENKRECHT, 0)
 DIM leiste AS INTEGER : leiste = gtk_box_new(GTK_WAAGERECHT, 6)
@@ -898,11 +1178,10 @@ gtk_box_pack_start(leiste, gKnopfLabel, FALSE, FALSE, 0)
 DIM etikett AS INTEGER : etikett = gtk_label_new("  Bauteil:")
 gtk_box_pack_start(leiste, etikett, FALSE, FALSE, 0)
 gSymbolWahl = gtk_combo_box_text_new()
-DIM liste AS ARRAY OF kern.Symbol : liste = kern.bibliothekListe()
-FOR i = 0 TO LEN(liste) - 1
-    gtk_combo_box_text_append_text(gSymbolWahl, liste[i].name)
-NEXT
 gtk_box_pack_start(leiste, gSymbolWahl, FALSE, FALSE, 0)
+DIM knopfSymbol AS INTEGER : knopfSymbol = gtk_button_new_with_label("Symbol ...")
+gtk_widget_set_tooltip_text(knopfSymbol, "Eigenes Bauteil/IC anlegen; ist ein eigenes gewaehlt, es bearbeiten")
+gtk_box_pack_start(leiste, knopfSymbol, FALSE, FALSE, 0)
 gtk_box_pack_start(vbox, leiste, FALSE, FALSE, 0)
 
 DIM flaeche AS INTEGER : flaeche = leinwandNeu()
@@ -925,8 +1204,11 @@ signal(gKnopfZurueck, "clicked", aufZurueck, 0, 0, 0)
 signal(gKnopfVor, "clicked", aufVor, 0, 0, 0)
 signal(knopfErc, "clicked", aufErc, 0, 0, 0)
 signal(knopfExport, "clicked", aufExport, 0, 0, 0)
+signal(knopfBom, "clicked", aufStueckliste, 0, 0, 0)
+signal(knopfSymbol, "clicked", aufSymbolEditor, 0, 0, 0)
 signal(gFenster, "destroy", fensterZu, 0, 0, 0)
 
+symbolListeAktualisieren(TRUE)
 leinwandDokument(startDok)
 verlaufRuecksetzen()
 gWerkzeug = WZ_AUSWAHL

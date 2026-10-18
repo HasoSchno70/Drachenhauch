@@ -1,0 +1,163 @@
+' Stueckliste (BOM) -- Namensraum "kern".
+' Gruppiert nach Symbol und Wert; Versorgungssymbole sind keine Bauteile.
+' Referenzen natuerlich sortiert (R2 vor R10) und, wo es sich lohnt, als
+' Bereich zusammengefasst (R1-R4).
+
+CLASS BomZeile
+    DIM menge AS INTEGER
+    DIM referenzen AS ARRAY OF STRING
+    DIM wert AS STRING
+    DIM bauteil AS STRING
+    DIM beschreibung AS STRING
+    DIM schluessel AS STRING
+    SUB Init()
+        referenzen = []
+    END SUB
+END CLASS
+
+' Sortierschluessel: Praefix, dann die Zahl mit fuehrenden Nullen.
+FUNCTION refSchluessel$(r AS STRING) AS STRING
+    IF r = "" THEN RETURN "~"
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(r)
+        IF istZiffer(MID$(r, i, 1)) THEN BREAK
+        i = i + 1
+    WEND
+    DIM zahl AS INTEGER : zahl = 0
+    IF i < LEN(r) THEN zahl = VAL(MID$(r, i))
+    RETURN UPPER$(LEFT$(r, i)) + "|" + PADL$(STR$(zahl), 9, "0") + "|" + r
+END FUNCTION
+
+FUNCTION refsSortiert(refs AS ARRAY OF STRING) AS ARRAY OF STRING
+    DIM k AS ARRAY OF STRING : k = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(refs) - 1
+        ARRAY_PUSH(k, refSchluessel$(refs[i]) + CHR$(1) + refs[i])
+    NEXT
+    SORT(k)
+    DIM r AS ARRAY OF STRING : r = []
+    FOR i = 0 TO LEN(k) - 1
+        DIM teil AS ARRAY OF STRING : teil = SPLIT$(k[i], CHR$(1))
+        ARRAY_PUSH(r, teil[1])
+    NEXT
+    RETURN r
+END FUNCTION
+
+' Praefix und Zahl einer Referenz; zahl = -1, wenn sie nicht auf Ziffern endet.
+SUB refZerlegen(r AS STRING, BYREF praefix AS STRING, BYREF zahl AS INTEGER)
+    DIM i AS INTEGER : i = LEN(r)
+    WHILE i > 0
+        IF NOT istZiffer(MID$(r, i - 1, 1)) THEN BREAK
+        i = i - 1
+    WEND
+    praefix = LEFT$(r, i)
+    IF i = LEN(r) THEN
+        zahl = -1
+    ELSE
+        zahl = VAL(MID$(r, i))
+    END IF
+END SUB
+
+' "R1-R3, R5" -- ab drei aufeinanderfolgenden Nummern ein Bereich.
+FUNCTION referenzBereiche$(refs AS ARRAY OF STRING) AS STRING
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(refs)
+        DIM p0 AS STRING, z0 AS INTEGER
+        refZerlegen(refs[i], p0, z0)
+        DIM j AS INTEGER : j = i
+        IF z0 >= 0 THEN
+            WHILE j + 1 < LEN(refs)
+                DIM p1 AS STRING, z1 AS INTEGER
+                refZerlegen(refs[j + 1], p1, z1)
+                IF p1 <> p0 OR z1 <> z0 + (j + 1 - i) THEN BREAK
+                j = j + 1
+            WEND
+        END IF
+        IF j - i >= 2 THEN
+            ARRAY_PUSH(teile, refs[i] + "-" + refs[j])
+            i = j + 1
+        ELSE
+            ARRAY_PUSH(teile, refs[i])
+            i = i + 1
+        END IF
+    WEND
+    RETURN JOIN$(teile, ", ")
+END FUNCTION
+
+FUNCTION stueckliste(bl AS Blatt) AS ARRAY OF BomZeile
+    DIM zeilen AS ARRAY OF BomZeile : zeilen = []
+    DIM nachSchluessel AS MAP OF INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bl.bauteile) - 1
+        DIM b AS Bauteil : b = bl.bauteile[i]
+        IF b.sym.einheitLeistung THEN CONTINUE
+        DIM k AS STRING : k = b.sym.id + CHR$(1) + b.wert
+        DIM zi AS INTEGER
+        IF MAPHAS(nachSchluessel, k) THEN
+            zi = MAPGET(nachSchluessel, k)
+        ELSE
+            zi = LEN(zeilen)
+            DIM z AS BomZeile : z = NEW BomZeile()
+            z.wert = b.wert
+            z.bauteil = b.sym.name
+            z.beschreibung = b.sym.beschreibung
+            ARRAY_PUSH(zeilen, z)
+            MAPPUT(nachSchluessel, k, zi)
+        END IF
+        zeilen[zi].menge = zeilen[zi].menge + 1
+        ARRAY_PUSH(zeilen[zi].referenzen, IIF(b.referenz = "", "?", b.referenz))
+    NEXT
+    ' je Zeile sortieren, dann die Zeilen nach ihrer ersten Referenz
+    DIM sk AS ARRAY OF STRING : sk = []
+    FOR i = 0 TO LEN(zeilen) - 1
+        zeilen[i].referenzen = refsSortiert(zeilen[i].referenzen)
+        zeilen[i].schluessel = refSchluessel$(zeilen[i].referenzen[0])
+        ARRAY_PUSH(sk, zeilen[i].schluessel + CHR$(1) + STR$(i))
+    NEXT
+    SORT(sk)
+    DIM r AS ARRAY OF BomZeile : r = []
+    FOR i = 0 TO LEN(sk) - 1
+        DIM teil AS ARRAY OF STRING : teil = SPLIT$(sk[i], CHR$(1))
+        DIM idx AS INTEGER : idx = VAL(teil[1])
+        ARRAY_PUSH(r, zeilen[idx])
+    NEXT
+    RETURN r
+END FUNCTION
+
+FUNCTION stuecklisteCsv$(bl AS Blatt) AS STRING
+    DIM z AS ARRAY OF BomZeile : z = stueckliste(bl)
+    DIM t AS STRING : t = "Menge;Referenzen;Wert;Bauteil;Beschreibung" + NL_ZEILE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        t = t + STR$(z[i].menge) + ";" + csvFeld$(JOIN$(z[i].referenzen, ", ")) + ";" + csvFeld$(z[i].wert) + ";" + csvFeld$(z[i].bauteil) + ";" + csvFeld$(z[i].beschreibung) + NL_ZEILE
+    NEXT
+    RETURN t
+END FUNCTION
+
+FUNCTION mdZelle$(s AS STRING) AS STRING
+    RETURN REPLACE$(s, "|", "\|")
+END FUNCTION
+
+FUNCTION stuecklisteMarkdown$(bl AS Blatt, titel AS STRING) AS STRING
+    DIM z AS ARRAY OF BomZeile : z = stueckliste(bl)
+    DIM t AS STRING : t = "# Stueckliste: " + titel + NL_ZEILE + NL_ZEILE
+    t = t + "| Menge | Referenzen | Wert | Bauteil |" + NL_ZEILE + "|---:|---|---|---|" + NL_ZEILE
+    DIM summe AS INTEGER : summe = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        t = t + "| " + STR$(z[i].menge) + " | " + mdZelle$(referenzBereiche$(z[i].referenzen)) + " | " + mdZelle$(z[i].wert) + " | " + mdZelle$(z[i].bauteil) + " |" + NL_ZEILE
+        summe = summe + z[i].menge
+    NEXT
+    RETURN t + NL_ZEILE + STR$(summe) + " Bauteile in " + STR$(LEN(z)) + " Positionen" + NL_ZEILE
+END FUNCTION
+
+FUNCTION stuecklisteText$(bl AS Blatt) AS STRING
+    DIM z AS ARRAY OF BomZeile : z = stueckliste(bl)
+    DIM t AS STRING : t = PADR$("Menge", 6) + PADR$("Referenzen", 28) + PADR$("Wert", 14) + "Bauteil" + NL_ZEILE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        t = t + PADR$(STR$(z[i].menge), 6) + PADR$(referenzBereiche$(z[i].referenzen), 28) + PADR$(z[i].wert, 14) + z[i].bauteil + NL_ZEILE
+    NEXT
+    RETURN t
+END FUNCTION

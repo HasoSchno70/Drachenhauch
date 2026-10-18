@@ -38,6 +38,7 @@ DIM gWerkzeug AS INTEGER
 DIM gSymbolRef AS STRING
 DIM gFlaeche AS INTEGER
 DIM gSchrift AS INTEGER
+DIM gSchriftPin AS INTEGER       ' Pin-Texte, Groesse folgt dem Zoom
 
 DIM vX AS FLOAT
 DIM vY AS FLOAT
@@ -116,6 +117,7 @@ FUNCTION leinwandNeu() AS INTEGER
     signalEreignis(gFlaeche, "leave-notify-event", lwVerlassen, 0, 0, 0)
     signalEreignis(gFlaeche, "key-press-event", lwTaste, 0, 0, 0)
     gSchrift = pango_font_description_from_string("Sans 9")
+    gSchriftPin = pango_font_description_from_string("Sans")
     vZoom = 0.12
     vX = 60
     vY = 60
@@ -487,6 +489,7 @@ END SUB
 
 SUB bauteilZeichnen(cr AS INTEGER, b AS kern.Bauteil, geist AS BOOLEAN, gewaehlt AS BOOLEAN)
     DIM koerper AS INTEGER : koerper = C_BAUTEIL
+    IF b.sym.fehlt THEN koerper = C_ERC_FEHLER      ' Platzhalter: nicht zu uebersehen
     IF geist THEN koerper = C_GEIST
     IF gewaehlt THEN koerper = C_AUSWAHL
     cairo_save(cr)
@@ -543,12 +546,20 @@ SUB bauteilZeichnen(cr AS INTEGER, b AS kern.Bauteil, geist AS BOOLEAN, gewaehlt
         END SELECT
     NEXT
     cairo_restore(cr)
+    IF b.sym.pinTexte THEN pinTexteZeichnen(cr, b, geist)
     ' Text (Referenz/Wert) in Schirmkoordinaten
     IF NOT geist THEN
         DIM mitte AS kern.Punkt : mitte = b.lage.pos
         DIM tf AS INTEGER : tf = C_TEXT
         IF gewaehlt THEN tf = C_AUSWAHL
-        IF NOT b.sym.einheitLeistung THEN
+        IF b.sym.fehlt THEN
+            lwText(cr, sx(mitte.x), sy(mitte.y), "?", C_ERC_FEHLER, TRUE)
+            lwText(cr, sx(mitte.x), sy(mitte.y) - 200 * vZoom - 12, b.sym.name, C_ERC_FEHLER, TRUE)
+        END IF
+        IF b.sym.textOrte THEN
+            IF b.referenz <> "" THEN ankerText(cr, b, b.sym.refOrt, b.referenz, tf)
+            IF b.wert <> "" THEN ankerText(cr, b, b.sym.wertOrt, b.wert, C_WERT)
+        ELSEIF NOT b.sym.einheitLeistung THEN
             IF b.lage.drehung = 90 OR b.lage.drehung = 270 THEN
                 ' senkrecht: Text daneben, sonst laege er auf den Pin-Stummeln
                 IF b.referenz <> "" THEN lwText(cr, sx(mitte.x) + 16, sy(mitte.y) - 8, b.referenz, tf, FALSE)
@@ -564,15 +575,73 @@ SUB bauteilZeichnen(cr AS INTEGER, b AS kern.Bauteil, geist AS BOOLEAN, gewaehlt
 END SUB
 
 SUB lwText(cr AS INTEGER, x AS FLOAT, y AS FLOAT, text AS STRING, farbe AS INTEGER, mitte AS BOOLEAN)
+    lwTextAus(cr, x, y, text, farbe, IIF(mitte, 1, 0), gSchrift)
+END SUB
+
+' Text, senkrecht mittig um y; ausr 0 = links buendig an x, 1 = mittig,
+' 2 = rechts buendig (endet bei x).
+SUB lwTextAus(cr AS INTEGER, x AS FLOAT, y AS FLOAT, text AS STRING, farbe AS INTEGER, ausr AS INTEGER, schrift AS INTEGER)
     DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
-    pango_layout_set_font_description(layout, gSchrift)
+    pango_layout_set_font_description(layout, schrift)
     pango_layout_set_text(layout, text, -1)
     DIM tb AS INTEGER, th AS INTEGER
     pango_layout_get_pixel_size(layout, tb, th)
     DIM zx AS FLOAT : zx = x
-    IF mitte THEN zx = x - tb / 2.0
+    IF ausr = 1 THEN zx = x - tb / 2.0
+    IF ausr = 2 THEN zx = x - tb
     cairoFarbe(cr, farbe)
     cairo_move_to(cr, zx, y - th / 2.0)
     pango_cairo_show_layout(cr, layout)
     g_object_unref(layout)
+END SUB
+
+' Referenz/Wert an einem Anker des Symbols. Liegt der Anker (nach Drehung)
+' ueber oder unter dem Koerper, beginnt der Text dort; links daneben endet
+' er dort, rechts daneben beginnt er -- so landet er nie im Koerper.
+SUB ankerText(cr AS INTEGER, b AS kern.Bauteil, ort AS kern.Punkt, text AS STRING, farbe AS INTEGER)
+    DIM a AS kern.Punkt : a = kern.transformPunkt(b.lage, ort)
+    DIM dx AS INTEGER : dx = a.x - b.lage.pos.x
+    DIM dy AS INTEGER : dy = a.y - b.lage.pos.y
+    DIM ausr AS INTEGER : ausr = 0
+    IF ABS(dx) > ABS(dy) AND dx < 0 THEN ausr = 2
+    lwTextAus(cr, sx(a.x), sy(a.y), text, farbe, ausr, gSchrift)
+END SUB
+
+' Pin-Nummern (am Stummel) und -Namen (innen am Koerper). Die Schrift waechst
+' mit dem Zoom wie das Symbol; zu klein wird sie weggelassen.
+CONST PIN_SCHRIFT = 110               ' Schrifthoehe in Einheiten (1.1 mm)
+
+SUB pinTexteZeichnen(cr AS INTEGER, b AS kern.Bauteil, geist AS BOOLEAN)
+    DIM px AS FLOAT : px = PIN_SCHRIFT * vZoom
+    IF px < 6 THEN RETURN
+    pango_font_description_set_absolute_size(gSchriftPin, px * PANGO_SCALE)
+    DIM fName AS INTEGER : fName = IIF(geist, C_GEIST, C_WERT)
+    DIM fNr AS INTEGER : fNr = IIF(geist, C_GEIST, C_TEXT)
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(b.sym.pins) - 1
+        DIM pin AS kern.Pin : pin = b.sym.pins[j]
+        DIM p AS kern.Punkt : p = kern.transformPunkt(b.lage, pin.pos)
+        DIM r AS INTEGER : r = kern.transformRichtung(b.lage, pin.richtung)
+        DIM dx AS INTEGER : dx = kern.richtungDx(r)
+        DIM dy AS INTEGER : dy = kern.richtungDy(r)
+        ' Nummer an der Mitte des Stummels
+        DIM mx AS FLOAT : mx = sx(p.x + dx * pin.laenge / 2.0)
+        DIM my AS FLOAT : my = sy(p.y + dy * pin.laenge / 2.0)
+        IF dy = 0 THEN
+            lwTextAus(cr, mx, my - px * 0.6, pin.nummer, fNr, 1, gSchriftPin)
+        ELSE
+            lwTextAus(cr, mx + 3, my, pin.nummer, fNr, 0, gSchriftPin)
+        END IF
+        ' Name innen am Koerper
+        IF pin.name <> "" THEN
+            DIM qx AS FLOAT : qx = sx(p.x + dx * (pin.laenge + 60))
+            DIM qy AS FLOAT : qy = sy(p.y + dy * (pin.laenge + 60))
+            SELECT CASE r
+                CASE 0 : lwTextAus(cr, qx, qy, pin.name, fName, 0, gSchriftPin)
+                CASE 180 : lwTextAus(cr, qx, qy, pin.name, fName, 2, gSchriftPin)
+                CASE 90 : lwTextAus(cr, qx, qy + px * 0.4, pin.name, fName, 1, gSchriftPin)
+                CASE 270 : lwTextAus(cr, qx, qy - px * 0.4, pin.name, fName, 1, gSchriftPin)
+            END SELECT
+        END IF
+    NEXT
 END SUB
