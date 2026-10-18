@@ -41,11 +41,11 @@ END FUNCTION
 
 FUNCTION spName$(s AS INTEGER) AS STRING
     SELECT CASE s
-        CASE SP_ZEILEN : RETURN "Zeilenweise (Schlangenlinie)"
-        CASE SP_NACHBAR : RETURN "Nächster Nachbar"
-        CASE SP_DAENISCH : RETURN "Dänische Methode"
-        CASE SP_SPALTEN : RETURN "Spaltenweise"
-        CASE SP_DIAGONAL : RETURN "Diagonal"
+        CASE SP_ZEILEN : RETURN tr$("Zeilenweise (Schlangenlinie)")
+        CASE SP_NACHBAR : RETURN tr$("Nächster Nachbar")
+        CASE SP_DAENISCH : RETURN tr$("Dänische Methode")
+        CASE SP_SPALTEN : RETURN tr$("Spaltenweise")
+        CASE SP_DIAGONAL : RETURN tr$("Diagonal")
     END SELECT
     RETURN "?"
 END FUNCTION
@@ -326,40 +326,40 @@ END FUNCTION
 FUNCTION stickplanText$(m AS Muster, sp AS Stickpfad) AS STRING
     DIM z AS ARRAY OF STRING : z = []
     ARRAY_PUSH(z, "=" * 60)
-    ARRAY_PUSH(z, "STICKPLAN - Optimierte Stichreihenfolge")
+    ARRAY_PUSH(z, tr$("STICKPLAN - Optimierte Stichreihenfolge"))
     ARRAY_PUSH(z, "=" * 60)
     ARRAY_PUSH(z, "")
-    ARRAY_PUSH(z, "Strategie: " + spKennung$(sp.strategie))
-    ARRAY_PUSH(z, "Gesamtstiche: " + STR$(sp.stiche))
-    ARRAY_PUSH(z, "Geschätzter Garnverbrauch: " + FORMAT$(sp.garnCm, "%.0f") + " cm")
-    ARRAY_PUSH(z, "Anzahl Sprünge: " + STR$(sp.spruenge))
+    ARRAY_PUSH(z, trf$("Strategie: {0}", [spKennung$(sp.strategie)]))
+    ARRAY_PUSH(z, trf$("Gesamtstiche: {0}", [STR$(sp.stiche)]))
+    ARRAY_PUSH(z, trf$("Geschätzter Garnverbrauch: {0} cm", [FORMAT$(sp.garnCm, "%.0f")]))
+    ARRAY_PUSH(z, trf$("Anzahl Sprünge: {0}", [STR$(sp.spruenge)]))
     ARRAY_PUSH(z, "")
     DIM p AS Farbpfad
     FOR EACH p IN sp.pfade
         ARRAY_PUSH(z, "-" * 60)
-        ARRAY_PUSH(z, "FARBE: " + m.farben[p.farbe].garn.name)
-        ARRAY_PUSH(z, "Stiche: " + STR$(p.stiche()) + ", Sprünge: " + STR$(p.spruenge))
+        ARRAY_PUSH(z, trf$("FARBE: {0}", [m.farben[p.farbe].garn.name]))
+        ARRAY_PUSH(z, trf$("Stiche: {0}, Sprünge: {1}", [STR$(p.stiche()), STR$(p.spruenge)]))
         ARRAY_PUSH(z, "-" * 60)
         ARRAY_PUSH(z, "")
-        ARRAY_PUSH(z, "Nr.   Position    Distanz   Hinweis")
+        ARRAY_PUSH(z, tr$("Nr.   Position    Distanz   Hinweis"))
         ARRAY_PUSH(z, "-" * 40)
         DIM i AS INTEGER
         FOR i = 0 TO p.stiche() - 1
-            ARRAY_PUSH(z, FORMAT$(i + 1, "%4d") + "  (" + FORMAT$(p.xs[i], "%3d") + "," + FORMAT$(p.ys[i], "%3d") + ")   " + FORMAT$(p.abstand(i), "%6.1f") + "   " + IIF(p.istSprung(i), " ← SPRUNG", ""))
+            ARRAY_PUSH(z, FORMAT$(i + 1, "%4d") + "  (" + FORMAT$(p.xs[i], "%3d") + "," + FORMAT$(p.ys[i], "%3d") + ")   " + FORMAT$(p.abstand(i), "%6.1f") + "   " + IIF(p.istSprung(i), tr$(" ← SPRUNG"), ""))
         NEXT
         ARRAY_PUSH(z, "")
     NEXT
     ARRAY_PUSH(z, "=" * 60)
-    ARRAY_PUSH(z, "Ende des Stickplans")
+    ARRAY_PUSH(z, tr$("Ende des Stickplans"))
     RETURN JOIN$(z, CHR$(10)) + CHR$(10)
 END FUNCTION
 
 ' Wie gut eine Strategie gegen die beste ist (PySticky _update_comparison_table).
 FUNCTION spBewertung$(distanz AS FLOAT, beste AS FLOAT) AS STRING
     DIM v AS FLOAT : v = IIF(beste > 0, distanz / beste, 1.0)
-    IF v < 1.05 THEN RETURN "★★★ Beste"
-    IF v < 1.15 THEN RETURN "★★ Gut"
-    IF v < 1.30 THEN RETURN "★ OK"
+    IF v < 1.05 THEN RETURN tr$("★★★ Beste")
+    IF v < 1.15 THEN RETURN tr$("★★ Gut")
+    IF v < 1.30 THEN RETURN tr$("★ OK")
     RETURN "—"
 END FUNCTION
 

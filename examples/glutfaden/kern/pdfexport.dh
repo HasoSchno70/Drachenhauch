@@ -683,12 +683,12 @@ END FUNCTION
 SUB pdfDeckblatt(s AS PdfSatz, r AS PdfLauf2)
     DIM m AS Muster : m = r.m
     pdfAbstand(s, 30)
-    pdfAbsatz(s, "Title1", IIF(r.dp, "◆ DIAMOND-PAINTING-VORLAGE", "✂ KREUZSTICH-MUSTER"))
+    pdfAbsatz(s, "Title1", IIF(r.dp, tr$("◆ DIAMOND-PAINTING-VORLAGE"), tr$("✂ KREUZSTICH-MUSTER")))
     pdfAbsatz(s, "Title2", pdfMaske$(r.titel))
     DIM autor AS STRING : autor = pdfMeta$(m, "author")
     IF autor = "" THEN autor = TRIM$(r.o.autor)
-    IF autor <> "" THEN pdfAbsatz(s, "CenterText", "von " + pdfMaske$(autor))
-    pdfAbsatz(s, "SmallCenter", "Erstellt am " + r.datum)
+    IF autor <> "" THEN pdfAbsatz(s, "CenterText", trf$("von {0}", [pdfMaske$(autor)]))
+    pdfAbsatz(s, "SmallCenter", trf$("Erstellt am {0}", [r.datum]))
     IF s.copyright <> "" THEN pdfAbsatz(s, "SmallCenter", pdfMaske$(s.copyright))
     pdfAbstand(s, 15)
     DIM pw AS FLOAT : pw = s.aw * 0.8
@@ -696,22 +696,22 @@ SUB pdfDeckblatt(s AS PdfSatz, r AS PdfLauf2)
     pdfAbstand(s, 15)
     DIM einheit AS STRING : einheit = pdfEinheit$(r)
     DIM farbenText AS STRING : farbenText = STR$(LEN(m.farben)) + " verschiedene"
-    IF r.b.ausgelassen > 0 THEN farbenText = farbenText + " (" + STR$(r.b.ausgelassen) + " " + IIF(r.dp, "nicht kleben", "nicht sticken") + ")"
+    IF r.b.ausgelassen > 0 THEN farbenText = farbenText + " (" + STR$(r.b.ausgelassen) + " " + IIF(r.dp, tr$("nicht kleben"), tr$("nicht sticken")) + ")"
     DIM sticheText AS STRING : sticheText = STR$(r.b.stiche) + " " + einheit
-    IF r.b.ausgelassen > 0 THEN sticheText = STR$(r.b.zuSticken) + " " + einheit + " (+ " + STR$(r.b.stiche - r.b.zuSticken) + " Stofffarbe)"
+    IF r.b.ausgelassen > 0 THEN sticheText = trf$("{0} {1} (+ {2} Stofffarbe)", [STR$(r.b.zuSticken), einheit, STR$(r.b.stiche - r.b.zuSticken)])
     DIM t AS PdfTabelle : t = pdfTabelleNeu([60.0, 80.0])
-    ARRAY_PUSH(t.zeilen, "Mustergröße" + CHR$(9) + STR$(m.breite) + " × " + STR$(m.hoehe) + " " + einheit)
+    ARRAY_PUSH(t.zeilen, trf$("Mustergröße{0}{1} × {2} {3}", [CHR$(9), STR$(m.breite), STR$(m.hoehe), einheit]))
     ARRAY_PUSH(t.zeilen, begriff$(m, "stoff") + CHR$(9) + pdfStoffLabel$(r))
-    ARRAY_PUSH(t.zeilen, "Fertige Größe" + CHR$(9) + pdfGroesse$(r) + " cm")
-    ARRAY_PUSH(t.zeilen, "Anzahl Farben" + CHR$(9) + farbenText)
-    ARRAY_PUSH(t.zeilen, "Gesamt-" + einheit + CHR$(9) + sticheText)
-    IF NOT r.dp AND NOT r.o.mystery AND LEN(m.rueckstiche) > 0 THEN ARRAY_PUSH(t.zeilen, "Rückstiche" + CHR$(9) + STR$(LEN(m.rueckstiche)) + " Linien")
+    ARRAY_PUSH(t.zeilen, trf$("Fertige Größe{0}{1} cm", [CHR$(9), pdfGroesse$(r)]))
+    ARRAY_PUSH(t.zeilen, trf$("Anzahl Farben{0}{1}", [CHR$(9), farbenText]))
+    ARRAY_PUSH(t.zeilen, trf$("Gesamt-{0}{1}{2}", [einheit, CHR$(9), sticheText]))
+    IF NOT r.dp AND NOT r.o.mystery AND LEN(m.rueckstiche) > 0 THEN ARRAY_PUSH(t.zeilen, trf$("Rückstiche{0}{1} Linien", [CHR$(9), STR$(LEN(m.rueckstiche))]))
     ARRAY_PUSH(t.zeilen, begriff$(m, "bedarf") + CHR$(9) + "ca. " + STR$(r.b.straenge) + " " + begriff$(m, "bedarfseinheit"))
-    ARRAY_PUSH(t.zeilen, "Musterseiten" + CHR$(9) + STR$(r.plan.anzahl()) + " Seiten")
+    ARRAY_PUSH(t.zeilen, trf$("Musterseiten{0}{1} Seiten", [CHR$(9), STR$(r.plan.anzahl())]))
     DIM begonnen AS STRING : begonnen = pdfMeta$(m, "started_date")
     IF begonnen <> "" THEN
         IF LEN(begonnen) = 10 AND MID$(begonnen, 4, 1) = "-" AND MID$(begonnen, 7, 1) = "-" THEN begonnen = RIGHT$(begonnen, 2) + "." + MID$(begonnen, 5, 2) + "." + LEFT$(begonnen, 4)
-        ARRAY_PUSH(t.zeilen, "Begonnen am" + CHR$(9) + begonnen)
+        ARRAY_PUSH(t.zeilen, trf$("Begonnen am{0}{1}", [CHR$(9), begonnen]))
     END IF
     t.oben = 6 : t.unten = 6 : t.links = 10 : t.gitter = &HE0E0E0
     DIM z AS INTEGER
@@ -722,7 +722,7 @@ SUB pdfDeckblatt(s AS PdfSatz, r AS PdfLauf2)
 END SUB
 
 SUB pdfNotizen(s AS PdfSatz, r AS PdfLauf2)
-    pdfAbsatz(s, "Title2", "Notizen")
+    pdfAbsatz(s, "Title2", tr$("Notizen"))
     pdfAbstand(s, 6)
     DIM zl AS STRING
     FOR EACH zl IN SPLIT$(TRIM$(REPLACE$(r.o.notizen, CHR$(13), "")), CHR$(10))
@@ -732,12 +732,12 @@ END SUB
 
 SUB pdfVorschauSeite(s AS PdfSatz, r AS PdfLauf2)
     pdfAbsatz(s, "Title1", begriff$(r.m, "vorschau"))
-    pdfAbsatz(s, "CenterText", "Fertige Größe auf " + pdfStoffLabel$(r) + ": " + pdfGroesse$(r) + " cm")
+    pdfAbsatz(s, "CenterText", trf$("Fertige Größe auf {0}: {1} cm", [pdfStoffLabel$(r), pdfGroesse$(r)]))
     pdfAbstand(s, 10)
     pdfVorschau(s, r, s.aw - 5 * PDF_PT, s.ah - 40 * PDF_PT, FALSE)
     IF NOT r.dp AND NOT r.o.mystery AND LEN(r.m.rueckstiche) > 0 THEN
         pdfAbstand(s, 5)
-        pdfAbsatz(s, "SmallCenter", "Rückstiche: " + STR$(LEN(r.m.rueckstiche)) + " Linien werden über dem Muster gezeigt.")
+        pdfAbsatz(s, "SmallCenter", trf$("Rückstiche: {0} Linien werden über dem Muster gezeigt.", [STR$(LEN(r.m.rueckstiche))]))
     END IF
 END SUB
 
@@ -763,7 +763,7 @@ END FUNCTION
 
 SUB pdfLegende(s AS PdfSatz, r AS PdfLauf2)
     DIM m AS Muster : m = r.m
-    pdfAbsatz(s, "Title1", IIF(r.dp, "Drill-Legende und Material", "Legende und Materialbedarf"))
+    pdfAbsatz(s, "Title1", IIF(r.dp, tr$("Drill-Legende und Material"), tr$("Legende und Materialbedarf")))
     DIM einheit AS STRING : einheit = pdfEinheit$(r)
     DIM vorrat AS STRING : vorrat = begriff$(m, "bedarfseinheit")
     DIM faeden AS INTEGER, perlen AS INTEGER
@@ -771,14 +771,14 @@ SUB pdfLegende(s AS PdfSatz, r AS PdfLauf2)
     FOR EACH fb IN r.b.farben
         IF fb.perle THEN perlen = perlen + 1 ELSE faeden = faeden + 1
     NEXT
-    DIM zus AS STRING : zus = STR$(faeden) + " Farben"
+    DIM zus AS STRING : zus = trf$("{0} Farben", [STR$(faeden)])
     IF r.b.ausgelassen > 0 THEN
-        zus = zus + " · " + STR$(r.b.zuSticken) + " " + IIF(r.dp, "zu klebende", "zu stickende") + " " + einheit
-        zus = zus + " · " + STR$(r.b.ausgelassen) + " Farbe(n) = Stofffarbe"
+        zus = zus + " · " + STR$(r.b.zuSticken) + " " + IIF(r.dp, tr$("zu klebende"), tr$("zu stickende")) + " " + einheit
+        zus = trf$("{0} · {1} Farbe(n) = Stofffarbe", [zus, STR$(r.b.ausgelassen)])
     ELSE
         zus = zus + " · " + STR$(r.b.stiche) + " " + einheit
     END IF
-    zus = zus + " · ca. " + STR$(r.b.straenge) + " " + vorrat + " benötigt"
+    zus = trf$("{0} · ca. {1} {2} benötigt", [zus, STR$(r.b.straenge), vorrat])
     pdfAbsatz(s, "CenterText", zus)
     pdfAbstand(s, 8)
     ' Paletten der Entsprechungen
@@ -791,7 +791,7 @@ SUB pdfLegende(s AS PdfSatz, r AS PdfLauf2)
         FOR EACH p IN r.o.paletten
             IF LOWER$(p.name) = LOWER$(kn) THEN gefunden = p
         NEXT
-        IF IS_NIL(gefunden) THEN THROW "PDF-Export: Palette '" + kn + "' gibt es nicht"
+        IF IS_NIL(gefunden) THEN THROW trf$("PDF-Export: Palette '{0}' gibt es nicht", [kn])
         ARRAY_PUSH(kpal, gefunden)
         ARRAY_PUSH(kgf, garnfarbenVon(gefunden.garne))
     NEXT
@@ -809,7 +809,7 @@ SUB pdfLegende(s AS PdfSatz, r AS PdfLauf2)
     FOR i = ss TO ss + 2
         t.ausrichtung[i] = "r"
     NEXT
-    DIM kopf AS STRING : kopf = "Nr." + CHR$(9) + "Sym." + CHR$(9) + "Farbe" + CHR$(9) + begriff$(m, "nummer") + CHR$(9) + "Farbname"
+    DIM kopf AS STRING : kopf = trf$("Nr.{0}Sym.{1}Farbe{2}{3}{4}Farbname", [CHR$(9), CHR$(9), CHR$(9), begriff$(m, "nummer"), CHR$(9)])
     FOR EACH kn IN r.o.kreuz
         kopf = kopf + CHR$(9) + kn
     NEXT
@@ -842,7 +842,7 @@ SUB pdfLegende(s AS PdfSatz, r AS PdfLauf2)
             NEXT
         END IF
     NEXT
-    DIM summe AS STRING : summe = "" + CHR$(9) + "" + CHR$(9) + "" + CHR$(9) + "" + CHR$(9) + IIF(r.b.ausgelassen > 0, IIF(r.dp, "Zu kleben:", "Zu sticken:"), "Gesamt:")
+    DIM summe AS STRING : summe = "" + CHR$(9) + "" + CHR$(9) + "" + CHR$(9) + "" + CHR$(9) + IIF(r.b.ausgelassen > 0, IIF(r.dp, tr$("Zu kleben:"), tr$("Zu sticken:")), tr$("Gesamt:"))
     FOR i = 1 TO nk
         summe = summe + CHR$(9) + ""
     NEXT
@@ -851,18 +851,18 @@ SUB pdfLegende(s AS PdfSatz, r AS PdfLauf2)
     pdfTabelleSetzen(s, t)
     IF r.b.ausgelassen > 0 THEN
         pdfAbstand(s, 3)
-        pdfAbsatz(s, "Normal", "<font size='8' color='#ff9800'>⊘ = Stofffarbe, wird nicht gestickt</font>")
+        pdfAbsatz(s, "Normal", tr$("<font size='8' color='#ff9800'>⊘ = Stofffarbe, wird nicht gestickt</font>"))
     END IF
     ' Rueckstiche je Farbe
     IF NOT r.dp AND LEN(m.rueckstiche) > 0 THEN
         pdfAbstand(s, 10)
-        pdfAbsatz(s, "Title2", "Rückstiche")
+        pdfAbsatz(s, "Title2", tr$("Rückstiche"))
         DIM je[MAX(1, LEN(m.farben))] AS INTEGER
         DIM rs AS Rueckstich
         FOR EACH rs IN m.rueckstiche
             IF rs.farbe >= 0 AND rs.farbe < LEN(m.farben) THEN je[rs.farbe] = je[rs.farbe] + 1
         NEXT
-        DIM tb AS PdfTabelle : tb = pdfLegendeKlein(&H667EEA, "Garnnummer")
+        DIM tb AS PdfTabelle : tb = pdfLegendeKlein(&H667EEA, tr$("Garnnummer"))
         DIM zz AS INTEGER
         FOR i = 0 TO LEN(m.farben) - 1
             IF je[i] = 0 THEN CONTINUE
@@ -870,14 +870,14 @@ SUB pdfLegende(s AS PdfSatz, r AS PdfLauf2)
             ARRAY_PUSH(tb.zeilen, "" + CHR$(9) + m.farben[i].symbol + CHR$(9) + pdfHerstellerNummer$(m.farben[i].garn) + CHR$(9) + LEFT$(m.farben[i].garn.name, 25) + CHR$(9) + STR$(je[i]))
             tb.zelleSetzen(zz, 0, m.farben[i].garn.farbe, -2, -2)
         NEXT
-        ARRAY_PUSH(tb.zeilen, "" + CHR$(9) + "" + CHR$(9) + "" + CHR$(9) + "Gesamt:" + CHR$(9) + STR$(LEN(m.rueckstiche)))
+        ARRAY_PUSH(tb.zeilen, trf$("{0}{1}{2}Gesamt:{3}{4}", [CHR$(9), CHR$(9), CHR$(9), CHR$(9), STR$(LEN(m.rueckstiche))]))
         pdfTabelleSetzen(s, tb)
     END IF
     ' Perlen
     IF perlen > 0 THEN
         pdfAbstand(s, 10)
-        pdfAbsatz(s, "Title2", "Perlen (Beads)")
-        DIM tp AS PdfTabelle : tp = pdfLegendeKlein(&H8B5CF6, "Perlen-Nr.")
+        pdfAbsatz(s, "Title2", tr$("Perlen (Beads)"))
+        DIM tp AS PdfTabelle : tp = pdfLegendeKlein(&H8B5CF6, tr$("Perlen-Nr."))
         DIM pz2 AS INTEGER, gesamtP AS INTEGER
         FOR EACH fb IN r.b.farben
             IF NOT fb.perle THEN CONTINUE
@@ -887,7 +887,7 @@ SUB pdfLegende(s AS PdfSatz, r AS PdfLauf2)
             ARRAY_PUSH(tp.zeilen, "" + CHR$(9) + ep.symbol + CHR$(9) + pdfHerstellerNummer$(ep.garn) + CHR$(9) + LEFT$(ep.garn.name, 25) + CHR$(9) + STR$(fb.zahl))
             tp.zelleSetzen(pz2, 0, ep.garn.farbe, -2, -2)
         NEXT
-        ARRAY_PUSH(tp.zeilen, "" + CHR$(9) + "" + CHR$(9) + "" + CHR$(9) + "Gesamt:" + CHR$(9) + STR$(gesamtP))
+        ARRAY_PUSH(tp.zeilen, trf$("{0}{1}{2}Gesamt:{3}{4}", [CHR$(9), CHR$(9), CHR$(9), CHR$(9), STR$(gesamtP)]))
         pdfTabelleSetzen(s, tp)
     END IF
 END SUB
@@ -896,14 +896,14 @@ FUNCTION pdfLegendeKlein(kopfFarbe AS INTEGER, nummer AS STRING) AS PdfTabelle
     DIM t AS PdfTabelle : t = pdfTabelleNeu([10.0, 15, 40, 55, 20])
     t.groesse = 9 : t.oben = 4 : t.unten = 4 : t.kopfGrund = kopfFarbe : t.summe = TRUE
     t.ausrichtung[0] = "m" : t.ausrichtung[1] = "m" : t.ausrichtung[4] = "r"
-    ARRAY_PUSH(t.zeilen, "Farbe" + CHR$(9) + "Symbol" + CHR$(9) + nummer + CHR$(9) + "Farbname" + CHR$(9) + "Anzahl")
+    ARRAY_PUSH(t.zeilen, trf$("Farbe{0}Symbol{1}{2}{3}Farbname{4}Anzahl", [CHR$(9), CHR$(9), nummer, CHR$(9), CHR$(9)]))
     RETURN t
 END FUNCTION
 
 SUB pdfUebersicht(s AS PdfSatz, r AS PdfLauf2)
     DIM pl AS Seitenplan : pl = r.plan
-    pdfAbsatz(s, "Title1", "Seitenübersicht")
-    pdfAbsatz(s, "CenterText", STR$(pl.anzahl()) + " Musterseiten · " + STR$(pl.seitenX) + " Spalten × " + STR$(pl.seitenY) + " Zeilen · je " + STR$(pl.jeX) + "×" + STR$(pl.jeY) + " " + pdfEinheit$(r) + " · " + pl.papier.name)
+    pdfAbsatz(s, "Title1", tr$("Seitenübersicht"))
+    pdfAbsatz(s, "CenterText", trf$("{0} Musterseiten · {1} Spalten × {2} Zeilen · je {3}×{4} {5} · {6}", [STR$(pl.anzahl()), STR$(pl.seitenX), STR$(pl.seitenY), STR$(pl.jeX), STR$(pl.jeY), pdfEinheit$(r), pl.papier.name]))
     pdfAbstand(s, 10)
     DIM mw AS FLOAT : mw = s.aw * 0.6
     DIM mh AS FLOAT : mh = s.ah * 0.35
@@ -929,7 +929,7 @@ SUB pdfUebersicht(s AS PdfSatz, r AS PdfLauf2)
     FOR sy = 0 TO pl.seitenY - 1
         DIM zeile AS STRING : zeile = ""
         FOR sx = 0 TO pl.seitenX - 1
-            DIM zelle AS STRING : zelle = "Seite " + STR$(n) + CHR$(10) + "X: " + STR$(sx * pl.jeX + 1) + "-" + STR$(MIN((sx + 1) * pl.jeX, r.m.breite)) + CHR$(10) + "Y: " + STR$(sy * pl.jeY + 1) + "-" + STR$(MIN((sy + 1) * pl.jeY, r.m.hoehe))
+            DIM zelle AS STRING : zelle = trf$("Seite {0}{1}X: {2}-{3}{4}Y: {5}-{6}", [STR$(n), CHR$(10), STR$(sx * pl.jeX + 1), STR$(MIN((sx + 1) * pl.jeX, r.m.breite)), CHR$(10), STR$(sy * pl.jeY + 1), STR$(MIN((sy + 1) * pl.jeY, r.m.hoehe))])
             zeile = zeile + IIF(sx > 0, CHR$(9), "") + zelle
             n = n + 1
         NEXT
@@ -1041,7 +1041,7 @@ SUB pdfMusterseite(s AS PdfSatz, r AS PdfLauf2, n AS INTEGER)
     IF nb[1] > 0 THEN ARRAY_PUSH(teile, "S. " + STR$(nb[1]) + " &rarr;")
     IF nb[2] > 0 THEN ARRAY_PUSH(teile, "&uarr; S. " + STR$(nb[2]))
     IF nb[3] > 0 THEN ARRAY_PUSH(teile, "&darr; S. " + STR$(nb[3]))
-    DIM kopf AS STRING : kopf = "<b>Seite " + STR$(n + 1) + " von " + STR$(r.plan.anzahl()) + "</b>  |  Spalten " + STR$(x0 + 1) + "-" + STR$(x1 + 1) + "  ·  Zeilen " + STR$(y0 + 1) + "-" + STR$(y1 + 1)
+    DIM kopf AS STRING : kopf = trf$("<b>Seite {0} von {1}</b>  |  Spalten {2}-{3}  ·  Zeilen {4}-{5}", [STR$(n + 1), STR$(r.plan.anzahl()), STR$(x0 + 1), STR$(x1 + 1), STR$(y0 + 1), STR$(y1 + 1)])
     IF LEN(teile) > 0 THEN kopf = kopf + "  |  <font size='8' color='#888'>" + JOIN$(teile, "  ") + "</font>"
     pdfAbsatz(s, "CenterText", kopf)
     pdfAbstand(s, 3)
@@ -1070,7 +1070,7 @@ SUB pdfMusterseite(s AS PdfSatz, r AS PdfLauf2, n AS INTEGER)
         NEXT
         DIM lt AS STRING : lt = JOIN$(sichtbar, "  |  ")
         IF da > 12 THEN lt = lt + "  |  ... (+" + STR$(da - 12) + " weitere)"
-        pdfAbsatz(s, "Normal", "<font size='7'><b>Farben:</b> " + lt + "</font>")
+        pdfAbsatz(s, "Normal", trf$("<font size='7'><b>Farben:</b> {0}</font>", [lt]))
     END IF
     ' im Diamond-Modus nicht: Drills folgen keinem Stickpfad
     IF LEN(r.seitenPfade) > 0 AND NOT r.dp THEN
@@ -1080,10 +1080,10 @@ SUB pdfMusterseite(s AS PdfSatz, r AS PdfLauf2, n AS INTEGER)
             pst = pst + sp.stiche()
             psp = psp + sp.spruenge
         NEXT
-        pdfAbsatz(s, "Normal", "<font size='7'><b>Stickpfad:</b> " + STR$(pst) + " Stiche  |  " + STR$(LEN(r.seitenPfade)) + " Farben  |  " + STR$(psp) + " Sprünge  |  <font color='#dd5555'>- - -</font> = Sprung</font>")
+        pdfAbsatz(s, "Normal", trf$("<font size='7'><b>Stickpfad:</b> {0} Stiche  |  {1} Farben  |  {2} Sprünge  |  <font color='#dd5555'>- - -</font> = Sprung</font>", [STR$(pst), STR$(LEN(r.seitenPfade)), STR$(psp)]))
     END IF
     pdfAbstand(s, 2)
-    pdfAbsatz(s, "CenterText", "<font size='7' color='#999999'>" + pdfMaske$(r.titel) + " · Seite " + STR$(n + 1) + "/" + STR$(r.plan.anzahl()) + " · " + r.datum + "</font>")
+    pdfAbsatz(s, "CenterText", trf$("<font size='7' color='#999999'>{0} · Seite {1}/{2} · {3}</font>", [pdfMaske$(r.titel), STR$(n + 1), STR$(r.plan.anzahl()), r.datum]))
 END SUB
 
 ' --- Einstieg ------------------------------------------------------------------------
@@ -1152,7 +1152,7 @@ FUNCTION pdfExportieren(m AS Muster, pfad AS STRING, o AS PdfOptionen) AS ARRAY 
         PDF_SAVE(s.pdf, pfad)
     CATCH f
         PDF_CLOSE(s.pdf)
-        THROW "PDF nicht gesichert: " + f
+        THROW trf$("PDF nicht gesichert: {0}", [f])
     END TRY
     PDF_CLOSE(s.pdf)
     RETURN s.ablauf

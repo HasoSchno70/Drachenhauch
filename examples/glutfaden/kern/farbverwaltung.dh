@@ -303,7 +303,7 @@ END SUB
 
 ' Liefert TRUE, wenn sich etwas geaendert hat
 FUNCTION planAnwenden(m AS Muster, v AS Verlauf, p AS Farbplan) AS BOOLEAN
-    RETURN farbplanAnwenden(m, v, p.folge, p.ziel, p.straenge, "Farben verwalten")
+    RETURN farbplanAnwenden(m, v, p.folge, p.ziel, p.straenge, tr$("Farben verwalten"))
 END FUNCTION
 
 ' --- Palette als Datei (PySticky _on_export_palette / _on_import_palette) -----------
@@ -357,21 +357,21 @@ FUNCTION paletteImportieren(m AS Muster, v AS Verlauf, text AS STRING, symbole A
     TRY
         j = JSON_PARSE(text)
     CATCH fehler
-        THROW "Datei konnte nicht gelesen werden: " + fehler
+        THROW trf$("Datei konnte nicht gelesen werden: {0}", [fehler])
     END TRY
-    IF JSON_TYPE(j, "") <> "object" THEN THROW "Die Datei ist keine gültige PySticky-Palettendatei."
-    IF paletteText$(j, "format", "") <> "pysticky_palette" THEN THROW "Die Datei ist keine gültige PySticky-Palettendatei."
+    IF JSON_TYPE(j, "") <> "object" THEN THROW tr$("Die Datei ist keine gültige PySticky-Palettendatei.")
+    IF paletteText$(j, "format", "") <> "pysticky_palette" THEN THROW tr$("Die Datei ist keine gültige PySticky-Palettendatei.")
     DIM n AS INTEGER
     IF JSON_HAS(j, "colors") THEN
         IF JSON_TYPE(j, "colors") = "array" THEN n = JSON_LEN(j, "colors")
     END IF
-    IF n = 0 THEN THROW "Die Palettendatei enthält keine Farben."
-    v.beginnen("Palette importieren")
+    IF n = 0 THEN THROW tr$("Die Palettendatei enthält keine Farben.")
+    v.beginnen(tr$("Palette importieren"))
     DIM i AS INTEGER
     FOR i = 0 TO n - 1
         DIM w AS STRING : w = "colors." + STR$(i)
         DIM farbe AS INTEGER : farbe = (paletteGanz(j, w + ".color.r", 128) SHL 16) BOR (paletteGanz(j, w + ".color.g", 128) SHL 8) BOR paletteGanz(j, w + ".color.b", 128)
-        DIM g AS Garn : g = neuesGarn(paletteText$(j, w + ".name", "Unbekannt"), farbe, paletteText$(j, w + ".manufacturer", ""), paletteText$(j, w + ".catalog_number", ""))
+        DIM g AS Garn : g = neuesGarn(paletteText$(j, w + ".name", tr$("Unbekannt")), farbe, paletteText$(j, w + ".manufacturer", ""), paletteText$(j, w + ".catalog_number", ""))
         DIM nr AS INTEGER : nr = farbeHinzufuegen(m, v, g, symbole, FALSE, FALSE)
         DIM s AS STRING : s = TRIM$(paletteText$(j, w + ".symbol", ""))
         IF s <> "" AND nr >= 0 THEN

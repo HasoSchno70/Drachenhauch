@@ -48,7 +48,7 @@ CLASS PatLeser
     END SUB
 
     SUB brauche(n AS INTEGER)
-        IF n < 0 OR p + n > BUFFER_LEN(daten) THEN THROW "PAT: Datei endet vorzeitig (bei Byte " + STR$(p) + ")"
+        IF n < 0 OR p + n > BUFFER_LEN(daten) THEN THROW trf$("PAT: Datei endet vorzeitig (bei Byte {0})", [STR$(p)])
     END SUB
 
     FUNCTION u16() AS INTEGER
@@ -79,7 +79,7 @@ CLASS PatLeser
 
     FUNCTION text$() AS STRING
         DIM n AS INTEGER : n = u32()
-        IF n > 1000000 THEN THROW "PAT: unglaubwürdige Textlänge " + STR$(n) + " bei Byte " + STR$(p - 4)
+        IF n > 1000000 THEN THROW trf$("PAT: unglaubwürdige Textlänge {0} bei Byte {1}", [STR$(n), STR$(p - 4)])
         brauche(n)
         DIM t AS STRING : t = patCp1252$(daten, p, n)
         p = p + n
@@ -202,16 +202,16 @@ FUNCTION patLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
     TRY
         roh = READALL_BYTES(pfad)
     CATCH e
-        THROW "PAT: Datei nicht lesbar – " + e
+        THROW trf$("PAT: Datei nicht lesbar – {0}", [e])
     END TRY
     DIM r AS PatLeser : r = NEW PatLeser(roh)
     ' Kennung
     DIM kopf AS STRING : kopf = patCp1252$(roh, 0, MIN(BUFFER_LEN(roh), 40))
-    IF LEFT$(kopf, 9) <> "PCStitch " THEN THROW "PAT: keine PCStitch-Datei (die Kennung 'PCStitch' fehlt)"
+    IF LEFT$(kopf, 9) <> "PCStitch " THEN THROW tr$("PAT: keine PCStitch-Datei (die Kennung 'PCStitch' fehlt)")
     DIM ende AS INTEGER : ende = INSTR(kopf, " Pattern File")
-    IF ende < 0 THEN THROW "PAT: keine PCStitch-Musterdatei"
+    IF ende < 0 THEN THROW tr$("PAT: keine PCStitch-Musterdatei")
     erg.fassung = MID$(kopf, 9, ende - 9)
-    IF erg.fassung <> "8" THEN THROW "PAT: PCStitch " + erg.fassung + " wird noch nicht gelesen (bekannt ist PCStitch 8)"
+    IF erg.fassung <> "8" THEN THROW trf$("PAT: PCStitch {0} wird noch nicht gelesen (bekannt ist PCStitch 8)", [erg.fassung])
     r.p = &H2D
     r.ueber(8)                                      ' Kennzahl, 2
     DIM h AS INTEGER : h = r.u32()
@@ -219,8 +219,8 @@ FUNCTION patLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
     DIM stoffX AS INTEGER : stoffX = r.u32()
     DIM stoffY AS INTEGER : stoffY = r.u32()
     r.ueber(4)
-    IF b < 1 OR h < 1 THEN THROW "PAT: ungültige Größe " + STR$(b) + "x" + STR$(h)
-    IF b > GROESSTES_MUSTER OR h > GROESSTES_MUSTER THEN THROW "PAT: Muster zu groß: " + STR$(b) + "x" + STR$(h) + " (höchstens " + STR$(GROESSTES_MUSTER) + ")"
+    IF b < 1 OR h < 1 THEN THROW trf$("PAT: ungültige Größe {0}x{1}", [STR$(b), STR$(h)])
+    IF b > GROESSTES_MUSTER OR h > GROESSTES_MUSTER THEN THROW trf$("PAT: Muster zu groß: {0}x{1} (höchstens {2})", [STR$(b), STR$(h), STR$(GROESSTES_MUSTER)])
     DIM notizen AS STRING : notizen = patRtfText$(r.text$())
     r.text$()
     DIM webseite AS STRING : webseite = TRIM$(r.text$())
@@ -233,7 +233,7 @@ FUNCTION patLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
     END IF
     DIM m AS Muster : m = NEW Muster(titel, b, h)
     m.stoff = stoffX
-    IF stoffY <> stoffX THEN ARRAY_PUSH(erg.warnungen, "Der Stoff zählt waagerecht " + STR$(stoffX) + " und senkrecht " + STR$(stoffY) + " Stiche je Zoll – übernommen ist " + STR$(stoffX))
+    IF stoffY <> stoffX THEN ARRAY_PUSH(erg.warnungen, trf$("Der Stoff zählt waagerecht {0} und senkrecht {1} Stiche je Zoll – übernommen ist {2}", [STR$(stoffX), STR$(stoffY), STR$(stoffX)]))
     IF autor <> "" THEN JSON_SET_STRING(m.metadaten, "author", autor)
     IF recht <> "" THEN JSON_SET_STRING(m.metadaten, "copyright", recht)
     IF notizen <> "" THEN JSON_SET_STRING(m.metadaten, "notes", notizen)
@@ -244,12 +244,12 @@ FUNCTION patLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
 
     ' Die Palette
     DIM pal AS INTEGER : pal = BUFFER_INDEXOF(roh, BUFFER_FROM_STRING(" Floss Palette"), r.p)
-    IF pal < 0 THEN THROW "PAT: keine Garnpalette gefunden"
+    IF pal < 0 THEN THROW tr$("PAT: keine Garnpalette gefunden")
     r.p = pal + 14
     DIM i AS INTEGER
     FOR i = 1 TO 13 : r.u32() : NEXT
     DIM nf AS INTEGER : nf = r.u32()
-    IF nf < 0 OR nf > 1000 THEN THROW "PAT: unglaubwürdige Farbzahl " + STR$(nf)
+    IF nf < 0 OR nf > 1000 THEN THROW trf$("PAT: unglaubwürdige Farbzahl {0}", [STR$(nf)])
     DIM bekannt AS MAP OF INTEGER : bekannt = garnVerzeichnis(paletten)
     DIM ohneSymbol AS ARRAY OF STRING : ohneSymbol = []
     DIM doppelt AS ARRAY OF STRING : doppelt = []
@@ -269,7 +269,7 @@ FUNCTION patLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
         r.text$()                                       ' Symbolschrift
         DIM code AS INTEGER : code = r.u32()
         r.ueber(446)
-        IF r.u32() <> &HFFFFFFFF THEN THROW "PAT: unbekannter Aufbau der Farbe " + STR$(i + 1) + " (" + hst + " " + nummer + ")"
+        IF r.u32() <> &HFFFFFFFF THEN THROW trf$("PAT: unbekannter Aufbau der Farbe {0} ({1} {2})", [STR$(i + 1), hst, nummer])
         r.ueber(32)
         DIM garn AS Garn
         DIM istP AS BOOLEAN, istD AS BOOLEAN
@@ -282,7 +282,7 @@ FUNCTION patLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
                 istD = paletten[wo \ 100000].istDiamant
             END IF
         END IF
-        IF IS_NIL(garn) THEN garn = neuesGarn(IIF(name <> "", name, "Farbe " + STR$(i + 1)), RGB(rot BAND 255, gruen BAND 255, blau BAND 255), hst, nummer)
+        IF IS_NIL(garn) THEN garn = neuesGarn(IIF(name <> "", name, trf$("Farbe {0}", [STR$(i + 1)])), RGB(rot BAND 255, gruen BAND 255, blau BAND 255), hst, nummer)
         DIM sym AS STRING : sym = patSymbol$(code)
         IF sym = "" THEN
             ARRAY_PUSH(ohneSymbol, hst + " " + nummer)
@@ -299,15 +299,15 @@ FUNCTION patLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
         fe.istDiamant = istD
         ARRAY_PUSH(m.farben, fe)
     NEXT
-    IF LEN(ohneSymbol) > 0 THEN ARRAY_PUSH(erg.warnungen, "Neues Symbol für " + JOIN$(ohneSymbol, ", ") + " (das Zeichen aus PCStitchs Symbolschrift ist nicht darstellbar)")
-    IF LEN(doppelt) > 0 THEN ARRAY_PUSH(erg.warnungen, "Neues Symbol für " + JOIN$(doppelt, ", ") + " (das Zeichen ist schon vergeben)")
+    IF LEN(ohneSymbol) > 0 THEN ARRAY_PUSH(erg.warnungen, trf$("Neues Symbol für {0} (das Zeichen aus PCStitchs Symbolschrift ist nicht darstellbar)", [JOIN$(ohneSymbol, ", ")]))
+    IF LEN(doppelt) > 0 THEN ARRAY_PUSH(erg.warnungen, trf$("Neues Symbol für {0} (das Zeichen ist schon vergeben)", [JOIN$(doppelt, ", ")]))
 
     ' Das Gitter: sein Kopf steht kurz hinter der Palette
     DIM suche AS BUFFER : suche = BUFFER_NEW(8)
     BUFFER_SET_U32(suche, 0, b)
     BUFFER_SET_U32(suche, 4, h)
     DIM g AS INTEGER : g = BUFFER_INDEXOF(roh, suche, r.p)
-    IF g < 0 OR g - r.p > 64 THEN THROW "PAT: Gitter nicht gefunden"
+    IF g < 0 OR g - r.p > 64 THEN THROW tr$("PAT: Gitter nicht gefunden")
     r.p = g + 20
     DIM ebenen AS ARRAY OF Ebene : ebenen = [m.ebenen.aktiveEbene()]
     DIM unbekannt AS MAP OF INTEGER : unbekannt = {}
@@ -318,8 +318,8 @@ FUNCTION patLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
     WHILE pos < zellen
         DIM lauf AS INTEGER : lauf = r.u32()
         DIM zahl AS INTEGER : zahl = r.i32()
-        IF lauf < 1 OR pos + lauf > zellen THEN THROW "PAT: kaputter Lauf im Gitter bei Byte " + STR$(r.p - 8)
-        IF zahl < -1 OR zahl > 16 THEN THROW "PAT: unglaubwürdige Stichzahl " + STR$(zahl) + " bei Byte " + STR$(r.p - 4)
+        IF lauf < 1 OR pos + lauf > zellen THEN THROW trf$("PAT: kaputter Lauf im Gitter bei Byte {0}", [STR$(r.p - 8)])
+        IF zahl < -1 OR zahl > 16 THEN THROW trf$("PAT: unglaubwürdige Stichzahl {0} bei Byte {1}", [STR$(zahl), STR$(r.p - 4)])
         DIM k AS INTEGER
         FOR k = 0 TO zahl - 1
             DIM sx AS INTEGER : sx = r.u16()
@@ -339,7 +339,7 @@ FUNCTION patLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
                 CONTINUE
             END IF
             WHILE LEN(ebenen) <= k
-                DIM neu AS Ebene : neu = neueEbene("Teilstiche " + STR$(LEN(ebenen) + 1), b, h)
+                DIM neu AS Ebene : neu = neueEbene(trf$("Teilstiche {0}", [STR$(LEN(ebenen) + 1)]), b, h)
                 ARRAY_PUSH(m.ebenen.ebenen, neu)
                 ARRAY_PUSH(ebenen, neu)
             WEND
@@ -350,17 +350,17 @@ FUNCTION patLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
         NEXT
         pos = pos + lauf
     WEND
-    IF verschoben THEN ARRAY_PUSH(erg.warnungen, "Stiche nennen eine andere Zelle als ihr Platz im Gitter – es zählt der Platz")
-    IF falscheFarbe > 0 THEN ARRAY_PUSH(erg.warnungen, STR$(falscheFarbe) + " Stich(e) mit unbekannter Farbe übersprungen")
+    IF verschoben THEN ARRAY_PUSH(erg.warnungen, tr$("Stiche nennen eine andere Zelle als ihr Platz im Gitter – es zählt der Platz"))
+    IF falscheFarbe > 0 THEN ARRAY_PUSH(erg.warnungen, trf$("{0} Stich(e) mit unbekannter Farbe übersprungen", [STR$(falscheFarbe)]))
     DIM uks AS STRING
     FOR EACH uks IN MAPKEYS(unbekannt)
-        ARRAY_PUSH(erg.warnungen, STR$(MAPGET(unbekannt, uks)) + " Stich(e) unbekannter Art " + uks + " übersprungen")
+        ARRAY_PUSH(erg.warnungen, trf$("{0} Stich(e) unbekannter Art {1} übersprungen", [STR$(MAPGET(unbekannt, uks)), uks]))
     NEXT
-    IF LEN(ebenen) > 1 THEN ARRAY_PUSH(erg.warnungen, "Zellen mit zwei Teilstichen: der zweite liegt auf der Ebene '" + ebenen[1].name + "'")
+    IF LEN(ebenen) > 1 THEN ARRAY_PUSH(erg.warnungen, trf$("Zellen mit zwei Teilstichen: der zweite liegt auf der Ebene '{0}'", [ebenen[1].name]))
 
     ' Rueckstiche
     DIM nr AS INTEGER : nr = r.u32()
-    IF nr < 0 OR nr > 1000000 THEN THROW "PAT: unglaubwürdige Zahl der Rückstiche " + STR$(nr)
+    IF nr < 0 OR nr > 1000000 THEN THROW trf$("PAT: unglaubwürdige Zahl der Rückstiche {0}", [STR$(nr)])
     DIM gewarnt AS BOOLEAN
     FOR i = 1 TO nr
         DIM x1 AS INTEGER : x1 = r.u16()
@@ -372,7 +372,7 @@ FUNCTION patLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
         DIM rf AS INTEGER : rf = r.u32()
         r.ueber(8)
         IF l1 < 1 OR l1 > 9 OR l2 < 1 OR l2 > 9 OR rf >= nf THEN
-            IF NOT gewarnt THEN ARRAY_PUSH(erg.warnungen, "Rückstiche mit unbekannter Farbe oder Lage verworfen")
+            IF NOT gewarnt THEN ARRAY_PUSH(erg.warnungen, tr$("Rückstiche mit unbekannter Farbe oder Lage verworfen"))
             gewarnt = TRUE
             CONTINUE
         END IF
@@ -381,7 +381,7 @@ FUNCTION patLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
         DIM hx2 AS INTEGER : hx2 = 2 * x2 + (l2 - 1) MOD 3
         DIM hy2 AS INTEGER : hy2 = 2 * y2 + (l2 - 1) \ 3
         IF hx1 > 2 * b OR hx2 > 2 * b OR hy1 > 2 * h OR hy2 > 2 * h THEN
-            IF NOT gewarnt THEN ARRAY_PUSH(erg.warnungen, "Rückstich-Koordinaten außerhalb der Mustergrenzen — betroffene Rückstiche werden verworfen")
+            IF NOT gewarnt THEN ARRAY_PUSH(erg.warnungen, tr$("Rückstich-Koordinaten außerhalb der Mustergrenzen — betroffene Rückstiche werden verworfen"))
             gewarnt = TRUE
             CONTINUE
         END IF
@@ -395,7 +395,7 @@ FUNCTION patLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
             BREAK
         END IF
     NEXT
-    IF rest THEN ARRAY_PUSH(erg.warnungen, "Hinter den Rückstichen stehen noch Daten (Knoten oder Perlen?) – nicht gelesen")
+    IF rest THEN ARRAY_PUSH(erg.warnungen, tr$("Hinter den Rückstichen stehen noch Daten (Knoten oder Perlen?) – nicht gelesen"))
     m.stichzahlenNeu()
     RETURN erg
 END FUNCTION

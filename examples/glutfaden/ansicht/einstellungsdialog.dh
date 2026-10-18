@@ -822,7 +822,7 @@ FUNCTION roBauen() AS INTEGER
     DIM i AS INTEGER
     DIM namen AS ARRAY OF STRING : namen = kern.rasterVoreinstellungen()
     FOR i = 0 TO LEN(namen) - 1
-        DIM k AS INTEGER : k = gtk_button_new_with_label(namen[i])
+        DIM k AS INTEGER : k = gtk_button_new_with_label(tr$(namen[i]))
         signal(k, "clicked", roVoreinstellung, i, 0, 0)
         gtk_box_pack_start(vz, k, TRUE, TRUE, 0)
     NEXT

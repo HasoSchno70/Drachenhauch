@@ -54,9 +54,9 @@ FUNCTION garnlisteCsv$(m AS Muster) AS STRING
     DIM sps AS INTEGER : sps = stichJeStrang(INT(m.stoff))
     DIM z AS ARRAY OF STRING : z = []
     IF dp THEN
-        ARRAY_PUSH(z, "Symbol;Hersteller;Nr.;Name;Hex;Drills")
+        ARRAY_PUSH(z, tr$("Symbol;Hersteller;Nr.;Name;Hex;Drills"))
     ELSE
-        ARRAY_PUSH(z, "Symbol;Hersteller;Nr.;Name;Hex;Stiche;Strange (~)")
+        ARRAY_PUSH(z, tr$("Symbol;Hersteller;Nr.;Name;Hex;Stiche;Strange (~)"))
     END IF
     DIM f AS Farbeintrag
     FOR EACH f IN m.farben
@@ -71,23 +71,23 @@ END FUNCTION
 
 FUNCTION leseMich$(m AS Muster, inhalt AS ARRAY OF STRING) AS STRING
     DIM z AS ARRAY OF STRING : z = []
-    ARRAY_PUSH(z, "Glutfaden-Paket: " + m.name)
+    ARRAY_PUSH(z, trf$("Glutfaden-Paket: {0}", [m.name]))
     ARRAY_PUSH(z, "=" * 60)
-    ARRAY_PUSH(z, "Größe: " + STR$(m.breite) + " × " + STR$(m.hoehe) + " " + begriff$(m, "einheit"))
+    ARRAY_PUSH(z, trf$("Größe: {0} × {1} {2}", [STR$(m.breite), STR$(m.hoehe), begriff$(m, "einheit")]))
     IF m.modus = "diamond" THEN
         ARRAY_PUSH(z, begriff$(m, "stoff") + ": " + stoffName$(m))
     ELSE
-        ARRAY_PUSH(z, "Stoffzaehlung: " + STR$(INT(m.stoff)) + " ct")
+        ARRAY_PUSH(z, trf$("Stoffzaehlung: {0} ct", [STR$(INT(m.stoff))]))
     END IF
-    ARRAY_PUSH(z, "Farben: " + STR$(LEN(m.farben)))
+    ARRAY_PUSH(z, trf$("Farben: {0}", [STR$(LEN(m.farben))]))
     ARRAY_PUSH(z, "")
-    ARRAY_PUSH(z, "Enthaltene Dateien:")
+    ARRAY_PUSH(z, tr$("Enthaltene Dateien:"))
     DIM n AS STRING
     FOR EACH n IN inhalt
         ARRAY_PUSH(z, "  - " + n)
     NEXT
     ARRAY_PUSH(z, "")
-    ARRAY_PUSH(z, "Das .pxs öffnen Glutfaden und PySticky.")
+    ARRAY_PUSH(z, tr$("Das .pxs öffnen Glutfaden und PySticky."))
     RETURN JOIN$(z, CHR$(10))
 END FUNCTION
 
@@ -115,7 +115,7 @@ FUNCTION paketExportieren(m AS Muster, zipPfad AS STRING, papier AS STRING, myst
             ARRAY_PUSH(inhalte, BUFFER_FROM_STRING(htmlText$(m, ho, basis)))
             ARRAY_PUSH(namen, basis + ".html")
         CATCH f1
-            ARRAY_PUSH(erg.fehlt, "html (" + f1 + ")")
+            ARRAY_PUSH(erg.fehlt, trf$("html ({0})", [f1]))
         END TRY
         ' 3. PNG
         TRY
@@ -124,7 +124,7 @@ FUNCTION paketExportieren(m AS Muster, zipPfad AS STRING, papier AS STRING, myst
             ARRAY_PUSH(inhalte, READALL_BYTES(pn))
             ARRAY_PUSH(namen, basis + ".png")
         CATCH f2
-            ARRAY_PUSH(erg.fehlt, "png (" + f2 + ")")
+            ARRAY_PUSH(erg.fehlt, trf$("png ({0})", [f2]))
         END TRY
         ' 4. PDF
         IF papier <> "" THEN
@@ -140,7 +140,7 @@ FUNCTION paketExportieren(m AS Muster, zipPfad AS STRING, papier AS STRING, myst
                 ARRAY_PUSH(inhalte, READALL_BYTES(pd))
                 ARRAY_PUSH(namen, basis + ".pdf")
             CATCH f3
-                ARRAY_PUSH(erg.fehlt, "pdf (" + f3 + ")")
+                ARRAY_PUSH(erg.fehlt, trf$("pdf ({0})", [f3]))
             END TRY
         END IF
         ' 5. Garnliste
@@ -152,10 +152,10 @@ FUNCTION paketExportieren(m AS Muster, zipPfad AS STRING, papier AS STRING, myst
                     ARRAY_PUSH(inhalte, READALL_BYTES(m.quellBild))
                     ARRAY_PUSH(namen, "original/" + BASENAME(m.quellBild))
                 CATCH f4
-                    ARRAY_PUSH(erg.fehlt, "original (" + f4 + ")")
+                    ARRAY_PUSH(erg.fehlt, trf$("original ({0})", [f4]))
                 END TRY
             ELSE
-                ARRAY_PUSH(erg.fehlt, "original (" + BASENAME(m.quellBild) + " nicht gefunden)")
+                ARRAY_PUSH(erg.fehlt, trf$("original ({0} nicht gefunden)", [BASENAME(m.quellBild)]))
             END IF
         END IF
         ' 7. LIESMICH
@@ -168,7 +168,7 @@ FUNCTION paketExportieren(m AS Muster, zipPfad AS STRING, papier AS STRING, myst
     CATCH f
         IF FILEEXISTS(zipPfad + ".tmp") THEN DELETEFILE(zipPfad + ".tmp")
         RMDIR(arbeit, TRUE)
-        THROW "Paket nicht geschrieben: " + f
+        THROW trf$("Paket nicht geschrieben: {0}", [f])
     END TRY
     RMDIR(arbeit, TRUE)
     erg.dateien = namen

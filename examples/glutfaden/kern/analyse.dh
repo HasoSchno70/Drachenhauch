@@ -135,14 +135,14 @@ END FUNCTION
 ' Die Arbeitszeit wie _calculate_stitch_time: 20 s je Kreuzstich (mit
 ' Fadenwechsel), 3 s je Drill im Diamond-Modus.
 FUNCTION stickzeitText$(stiche AS INTEGER, modus AS STRING) AS STRING
-    IF stiche = 0 THEN RETURN "0 Min"
+    IF stiche = 0 THEN RETURN tr$("0 Min")
     DIM minuten AS FLOAT : minuten = stiche * IIF(modus = "diamond", 3.0, 20.0) / 60
     DIM h AS INTEGER : h = INT(minuten / 60)
     DIM mi AS INTEGER : mi = INT(minuten - h * 60.0)
-    IF h >= 100 THEN RETURN "~" + STR$(h) + " Std"
+    IF h >= 100 THEN RETURN trf$("~{0} Std", [STR$(h)])
     IF h > 0 THEN RETURN "~" + STR$(h) + "h " + STR$(mi) + "m"
-    IF mi > 0 THEN RETURN "~" + STR$(mi) + " Min"
-    RETURN "< 1 Min"
+    IF mi > 0 THEN RETURN trf$("~{0} Min", [STR$(mi)])
+    RETURN tr$("< 1 Min")
 END FUNCTION
 
 ' Garn je Stich in cm: 5 cm bei 14 ct, auf feinerem Stoff entsprechend weniger
@@ -159,7 +159,7 @@ FUNCTION garnbedarfText$(m AS Muster, modus AS STRING) AS STRING
         IF NOT f.auslassen THEN n = n + f.stichzahl
     NEXT
     IF n = 0 THEN RETURN "0"
-    IF modus = "diamond" THEN RETURN "~" + ZAHL$(INT(n * 1.10), 0) + " Drills"
+    IF modus = "diamond" THEN RETURN trf$("~{0} Drills", [ZAHL$(INT(n * 1.10), 0)])
     DIM meter AS FLOAT : meter = n * garnJeStichCm(m.stoff) / 100 * 1.15
     IF meter >= 100 THEN RETURN "~" + FORMAT$(meter, "%.0f") + " m"
     IF meter >= 10 THEN RETURN "~" + FORMAT$(meter, "%.1f") + " m"
@@ -179,7 +179,7 @@ END FUNCTION
 ' Der Text rechts in der Farbliste der Info-Leiste (_ColorListItem)
 FUNCTION farbeInfoText$(m AS Muster, nr AS INTEGER, modus AS STRING) AS STRING
     DIM f AS Farbeintrag : f = m.farben[nr]
-    IF f.auslassen THEN RETURN "übersp."
+    IF f.auslassen THEN RETURN tr$("übersp.")
     IF f.stichzahl = 0 THEN RETURN "0"
     RETURN STR$(f.stichzahl) + "  ·  " + garnJeFarbeText$(f.stichzahl, m.stoff, modus)
 END FUNCTION
@@ -192,12 +192,12 @@ FUNCTION infoKarten(m AS Muster, modus AS STRING) AS ARRAY OF STRING
     DIM d AS Schwierigkeit : d = schwierigkeitVon(m)
     DIM k AS ARRAY OF STRING : k = []
     IF s.ausgelassen > 0 THEN
-        ARRAY_PUSH(k, ZAHL$(s.zuSticken, 0) + " (+" + STR$(s.ausgelassen) + " überspr.)")
+        ARRAY_PUSH(k, trf$("{0} (+{1} überspr.)", [ZAHL$(s.zuSticken, 0), STR$(s.ausgelassen)]))
     ELSE
         ARRAY_PUSH(k, ZAHL$(s.sticheGesamt, 0))
     END IF
     DIM fa AS STRING : fa = STR$(s.benutzt) + " / " + STR$(s.farbanzahl)
-    IF s.ausgelasseneFarben > 0 THEN fa = fa + " (" + STR$(s.ausgelasseneFarben) + " überspr.)"
+    IF s.ausgelasseneFarben > 0 THEN fa = trf$("{0} ({1} überspr.)", [fa, STR$(s.ausgelasseneFarben)])
     ARRAY_PUSH(k, fa)
     ARRAY_PUSH(k, STR$(s.breite) + " × " + STR$(s.hoehe))
     ARRAY_PUSH(k, FORMAT$(s.breiteCm, "%.1f") + " × " + FORMAT$(s.hoeheCm, "%.1f") + " cm")
@@ -215,8 +215,7 @@ END FUNCTION
 
 ' Der Tooltip der Schwierigkeits-Karte
 FUNCTION schwierigkeitTipp$(d AS Schwierigkeit) AS STRING
-    RETURN "Score " + STR$(d.punkte) + "/12  —  Farben " + STR$(d.pFarben) + "/3, Größe " + STR$(d.pGroesse) + "/3, Sonderstiche " + STR$(d.pSonder) + "/3, Backstitches " + STR$(d.pRueck) + "/3" + CHR$(10) + _
-        "(" + STR$(d.benutzt) + " Farben, " + ZAHL$(d.zuSticken, 0) + " Stiche, " + FORMAT$(d.sonderAnteil * 100, "%.1f") + "% Sonder, " + STR$(d.rueckstiche) + " Linien)"
+    RETURN trf$("Score {0}/12  —  Farben {1}/3, Größe {2}/3, Sonderstiche {3}/3, Backstitches {4}/3{5}({6} Farben, {7} Stiche, {8}% Sonder, {9} Linien)", [STR$(d.punkte), STR$(d.pFarben), STR$(d.pGroesse), STR$(d.pSonder), STR$(d.pRueck), CHR$(10), STR$(d.benutzt), ZAHL$(d.zuSticken, 0), FORMAT$(d.sonderAnteil * 100, "%.1f"), STR$(d.rueckstiche)])
 END FUNCTION
 
 ' Prozent einer Farbe in der Fortschritts-Leiste ("{percent:.0f}%") -- aus dem
@@ -291,7 +290,7 @@ FUNCTION punkteRueck(n AS INTEGER) AS INTEGER
 END FUNCTION
 
 FUNCTION stufeFuer$(punkte AS INTEGER) AS STRING
-    RETURN IIF(punkte <= 2, "Anfänger", IIF(punkte <= 5, "Mittel", IIF(punkte <= 8, "Fortgeschritten", "Profi")))
+    RETURN IIF(punkte <= 2, tr$("Anfänger"), IIF(punkte <= 5, tr$("Mittel"), IIF(punkte <= 8, tr$("Fortgeschritten"), tr$("Profi"))))
 END FUNCTION
 
 ' --- Garnverbrauch -----------------------------------------------------------------
@@ -409,21 +408,21 @@ FUNCTION zeitRechnen(m AS Muster, stufe AS STRING, stundenJeTag AS FLOAT) AS Zei
     DIM sek AS FLOAT : sek = summe * sps
     DIM std AS FLOAT : std = sek / 3600
     IF std < 1 THEN
-        z.gesamt = STR$(INT(sek / 60)) + " Minuten"
+        z.gesamt = trf$("{0} Minuten", [STR$(INT(sek / 60))])
     ELSEIF std < 24 THEN
-        z.gesamt = FORMAT$(std, "%.1f") + " Stunden"
+        z.gesamt = trf$("{0} Stunden", [FORMAT$(std, "%.1f")])
     ELSE
-        z.gesamt = FORMAT$(std, "%.0f") + " Stunden"
+        z.gesamt = trf$("{0} Stunden", [FORMAT$(std, "%.0f")])
     END IF
     DIM tage AS FLOAT : tage = std / stundenJeTag
     IF tage < 1 THEN
-        z.tage = "< 1 Tag"
+        z.tage = tr$("< 1 Tag")
     ELSEIF tage < 7 THEN
-        z.tage = FORMAT$(tage, "%.1f") + " Tage"
+        z.tage = trf$("{0} Tage", [FORMAT$(tage, "%.1f")])
     ELSEIF tage < 30 THEN
-        z.tage = FORMAT$(tage / 7, "%.1f") + " Wochen"
+        z.tage = trf$("{0} Wochen", [FORMAT$(tage / 7, "%.1f")])
     ELSE
-        z.tage = FORMAT$(tage / 30, "%.1f") + " Monate"
+        z.tage = trf$("{0} Monate", [FORMAT$(tage / 30, "%.1f")])
     END IF
     z.jeStunde = INT(3600 / sps)
     IF LEN(z.farben) > 0 THEN
@@ -462,12 +461,12 @@ END FUNCTION
 FUNCTION statistikCsv$(m AS Muster, stoff AS INTEGER, zuschlag AS FLOAT, preis AS FLOAT) AS STRING
     m.stichzahlenNeu()
     DIM dp AS BOOLEAN : dp = m.modus = "diamond"
-    DIM kopf AS ARRAY OF STRING : kopf = ["Symbol", "Name", "Hersteller", "Katalognummer", "Stiche", "Prozent"]
+    DIM kopf AS ARRAY OF STRING : kopf = [tr$("Symbol"), tr$("Name"), tr$("Hersteller"), tr$("Katalognummer"), tr$("Stiche"), tr$("Prozent")]
     IF NOT dp THEN
-        ARRAY_PUSH(kopf, "Stränge")
-        ARRAY_PUSH(kopf, "Kosten")
+        ARRAY_PUSH(kopf, tr$("Stränge"))
+        ARRAY_PUSH(kopf, tr$("Kosten"))
     END IF
-    ARRAY_PUSH(kopf, "Nicht sticken")
+    ARRAY_PUSH(kopf, tr$("Nicht sticken"))
     DIM t AS STRING : t = CHR$(&HFEFF) + csvZeile$(kopf)
     DIM summe AS INTEGER
     DIM f AS Farbeintrag
@@ -493,7 +492,7 @@ FUNCTION statistikCsv$(m AS Muster, stoff AS INTEGER, zuschlag AS FLOAT, preis A
                 ARRAY_PUSH(z, STR$(stueck))
                 ARRAY_PUSH(z, FORMAT$(kosten, "%.2f"))
             END IF
-            ARRAY_PUSH(z, IIF(f.auslassen, "Ja", "Nein"))
+            ARRAY_PUSH(z, IIF(f.auslassen, tr$("Ja"), tr$("Nein")))
             t = t + csvZeile$(z)
         NEXT
     NEXT
@@ -619,7 +618,7 @@ FUNCTION heatmapFarben(h AS Heatmap) AS ARRAY OF INTEGER
 END FUNCTION
 
 FUNCTION heatmapText$(h AS Heatmap, achse AS INTEGER) AS STRING
-    RETURN IIF(achse = HEATMAP_VIELFALT, "Farbenvielfalt", "Stichdichte") + ": " + STR$(h.bb) + "×" + STR$(h.bh) + " Blöcke à " + STR$(h.bloecke) + " Stich(e), " + STR$(h.aktiv) + " aktive Blöcke"
+    RETURN trf$("{0}: {1}×{2} Blöcke à {3} Stich(e), {4} aktive Blöcke", [IIF(achse = HEATMAP_VIELFALT, tr$("Farbenvielfalt"), tr$("Stichdichte")), STR$(h.bb), STR$(h.bh), STR$(h.bloecke), STR$(h.aktiv)])
 END FUNCTION
 
 ' --- Farbenblindheit ---------------------------------------------------------------
@@ -713,7 +712,7 @@ END FUNCTION
 ' warum nicht (eine Farbe soll in zwei Paaren gehen).
 FUNCTION farbenZusammenfuehren$(m AS Muster, v AS Verlauf, paare AS ARRAY OF INTEGER, BYREF umgefaerbt AS INTEGER) AS STRING
     umgefaerbt = 0
-    IF LEN(paare) = 0 THEN RETURN "Keine Paare zum Zusammenführen ausgewählt."
+    IF LEN(paare) = 0 THEN RETURN tr$("Keine Paare zum Zusammenführen ausgewählt.")
     DIM n AS INTEGER : n = m.farbanzahl()
     DIM ziel[n] AS INTEGER
     DIM k AS INTEGER
@@ -721,7 +720,7 @@ FUNCTION farbenZusammenfuehren$(m AS Muster, v AS Verlauf, paare AS ARRAY OF INT
         ziel[k] = -1
     NEXT
     FOR k = 0 TO LEN(paare) - 2 STEP 2
-        IF ziel[paare[k + 1]] >= 0 THEN RETURN "Mindestens eine Farbe ist in mehreren ausgewählten Paaren als zu ersetzende Farbe markiert. Bitte pro Farbe nur ein Paar auswählen."
+        IF ziel[paare[k + 1]] >= 0 THEN RETURN tr$("Mindestens eine Farbe ist in mehreren ausgewählten Paaren als zu ersetzende Farbe markiert. Bitte pro Farbe nur ein Paar auswählen.")
         ziel[paare[k + 1]] = paare[k]
     NEXT
     ' Ketten aufloesen: geht a in b und b in c, landet a in c
@@ -733,13 +732,13 @@ FUNCTION farbenZusammenfuehren$(m AS Muster, v AS Verlauf, paare AS ARRAY OF INT
             schritte = schritte + 1
         WEND
     NEXT
-    v.beginnen("Ähnliche Farben zusammenführen")
+    v.beginnen(tr$("Ähnliche Farben zusammenführen"))
     umgefaerbt = alleUmfaerben(m, v, ziel)
     DIM behalten[n] AS INTEGER
     FOR i = 0 TO n - 1
         IF ziel[i] < 0 THEN behalten[i] = 1
     NEXT
-    DIM weg AS INTEGER : weg = farbenBehalten(m, v, behalten, ziel, "Ähnliche Farben zusammenführen")
+    DIM weg AS INTEGER : weg = farbenBehalten(m, v, behalten, ziel, tr$("Ähnliche Farben zusammenführen"))
     v.beenden()
     m.stichzahlenNeu()
     RETURN ""

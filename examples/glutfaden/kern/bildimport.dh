@@ -904,7 +904,7 @@ END CLASS
 
 ' Einen Import vorbereiten (Pixel stehen schon fest). Gerechnet wird mit schritt().
 FUNCTION importBeginnen(bild AS Pixelbild, grau AS Pixelbild, e AS Importeinstellung, name AS STRING, symbole AS ARRAY OF STRING) AS Bildimport
-    IF IS_NIL(e.palette) OR LEN(e.palette.garne) = 0 THEN THROW "Bildimport: keine Palette mit Garnen gewaehlt"
+    IF IS_NIL(e.palette) OR LEN(e.palette.garne) = 0 THEN THROW tr$("Bildimport: keine Palette mit Garnen gewaehlt")
     DIM im AS Bildimport : im = NEW Bildimport()
     im.e = e
     im.bild = bild

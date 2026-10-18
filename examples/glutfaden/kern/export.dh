@@ -34,27 +34,27 @@ FUNCTION stoffName$(m AS Muster) AS STRING
         END SELECT
         RETURN STR$(INT(m.stoff)) + " (Drill-Pitch)"
     END IF
-    RETURN "Aida " + STR$(INT(m.stoff))
+    RETURN trf$("Aida {0}", [STR$(INT(m.stoff))])
 END FUNCTION
 
 ' Die Begriffe je Modus (export_common _MODE_TERMS).
 FUNCTION begriff$(m AS Muster, schluessel AS STRING) AS STRING
     DIM dp AS BOOLEAN : dp = m.modus = "diamond"
     SELECT CASE schluessel
-        CASE "einheit" : RETURN IIF(dp, "Drills", "Stiche")
-        CASE "einheit1" : RETURN IIF(dp, "Drill", "Stich")
-        CASE "zeit" : RETURN IIF(dp, "Klebezeit", "Stickzeit")
-        CASE "bedarf" : RETURN IIF(dp, "Drill-Bedarf", "Garnbedarf")
-        CASE "bedarfseinheit" : RETURN IIF(dp, "Drills", "Stränge")
-        CASE "bedarfkurz" : RETURN IIF(dp, "Dr.", "Str.")
-        CASE "stoff" : RETURN IIF(dp, "Drill-Raster", "Stoffempfehlung")
-        CASE "legende" : RETURN IIF(dp, "Drill-Legende", "Garn-Legende")
-        CASE "nummer" : RETURN IIF(dp, "Drill-Code", "Garnnummer")
-        CASE "vorschau" : RETURN IIF(dp, "Vorschau der fertigen Vorlage", "Vorschau des fertigen Musters")
-        CASE "titelzusatz" : RETURN IIF(dp, "Diamond-Painting-Vorlage", "Kreuzstich-Muster")
-        CASE "untertitel" : RETURN IIF(dp, "Diamond-Painting-Anleitung", "Kreuzstich-Anleitung")
+        CASE "einheit" : RETURN IIF(dp, tr$("Drills"), tr$("Stiche"))
+        CASE "einheit1" : RETURN IIF(dp, tr$("Drill"), tr$("Stich"))
+        CASE "zeit" : RETURN IIF(dp, tr$("Klebezeit"), tr$("Stickzeit"))
+        CASE "bedarf" : RETURN IIF(dp, tr$("Drill-Bedarf"), tr$("Garnbedarf"))
+        CASE "bedarfseinheit" : RETURN IIF(dp, tr$("Drills"), tr$("Stränge"))
+        CASE "bedarfkurz" : RETURN IIF(dp, tr$("Dr."), tr$("Str."))
+        CASE "stoff" : RETURN IIF(dp, tr$("Drill-Raster"), tr$("Stoffempfehlung"))
+        CASE "legende" : RETURN IIF(dp, tr$("Drill-Legende"), tr$("Garn-Legende"))
+        CASE "nummer" : RETURN IIF(dp, tr$("Drill-Code"), tr$("Garnnummer"))
+        CASE "vorschau" : RETURN IIF(dp, tr$("Vorschau der fertigen Vorlage"), tr$("Vorschau des fertigen Musters"))
+        CASE "titelzusatz" : RETURN IIF(dp, tr$("Diamond-Painting-Vorlage"), tr$("Kreuzstich-Muster"))
+        CASE "untertitel" : RETURN IIF(dp, tr$("Diamond-Painting-Anleitung"), tr$("Kreuzstich-Anleitung"))
     END SELECT
-    THROW "begriff$: unbekannter Schluessel " + schluessel
+    THROW trf$("begriff$: unbekannter Schluessel {0}", [schluessel])
 END FUNCTION
 
 ' --- Komposit: je Zelle der oberste sichtbare Stich ------------------------------------

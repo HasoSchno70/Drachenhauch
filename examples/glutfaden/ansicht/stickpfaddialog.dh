@@ -499,7 +499,7 @@ SUB sdVergleichZeigen()
     DIM r AS kern.Stickpfad
     FOR EACH r IN sdVergleiche
         DIM bew AS STRING : bew = kern.spBewertung$(r.distanz, beste)
-        IF INSTR(bew, "Beste") >= 0 THEN bew = "<span foreground='#64ff64'>" + bew + "</span>"
+        IF INSTR(bew, "★★★") = 0 THEN bew = "<span foreground='#64ff64'>" + bew + "</span>"
         gtk_list_box_insert(sdVergleichListe, sdTabellenzeile([sdKurzname$(r.strategie), FORMAT$(r.distanz, "%.1f"), STR$(r.spruenge), FORMAT$(r.garnCm, "%.0f"), bew], [0, 80, 70, 90, 110]), -1)
     NEXT
     gtk_widget_set_visible(sdVergleich, TRUE)

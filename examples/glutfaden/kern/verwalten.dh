@@ -173,8 +173,8 @@ END FUNCTION
 ' "5 Sek", "47 Min", "3h", "12h 33min"
 FUNCTION dauerKurz$(sekunden AS INTEGER) AS STRING
     DIM s AS INTEGER : s = MAX(0, sekunden)
-    IF s < 60 THEN RETURN STR$(s) + " Sek"
-    IF s < 3600 THEN RETURN STR$(s \ 60) + " Min"
+    IF s < 60 THEN RETURN trf$("{0} Sek", [STR$(s)])
+    IF s < 3600 THEN RETURN trf$("{0} Min", [STR$(s \ 60)])
     DIM h AS INTEGER : h = s \ 3600
     DIM mi AS INTEGER : mi = (s MOD 3600) \ 60
     IF mi = 0 THEN RETURN STR$(h) + "h"
@@ -317,7 +317,7 @@ END SUB
 ' Rueckstich mit einem Ende ausserhalb faellt ganz weg. FALSE, wenn sich
 ' nichts aendert.
 FUNCTION groesseAendern(m AS Muster, v AS Verlauf, b AS INTEGER, h AS INTEGER) AS BOOLEAN
-    IF b < 1 OR h < 1 THEN THROW "Ungültige Größe: " + STR$(b) + "x" + STR$(h) + " (min. 1x1)"
+    IF b < 1 OR h < 1 THEN THROW trf$("Ungültige Größe: {0}x{1} (min. 1x1)", [STR$(b), STR$(h)])
     IF b = m.breite AND h = m.hoehe THEN RETURN FALSE
     DIM neu AS ARRAY OF Ebene : neu = []
     DIM e AS Ebene
@@ -346,7 +346,7 @@ FUNCTION groesseAendern(m AS Muster, v AS Verlauf, b AS INTEGER, h AS INTEGER) A
         IF MIN(rs.x1, rs.x2) < 0 OR MAX(rs.x1, rs.x2) > 2 * b OR MIN(rs.y1, rs.y2) < 0 OR MAX(rs.y1, rs.y2) > 2 * h THEN CONTINUE
         ARRAY_PUSH(rueck, rs)
     NEXT
-    groesseUebernehmen(m, v, b, h, neu, rueck, "Größe ändern")
+    groesseUebernehmen(m, v, b, h, neu, rueck, tr$("Größe ändern"))
     RETURN TRUE
 END FUNCTION
 
@@ -354,7 +354,7 @@ END FUNCTION
 ' die naechstliegende alte (abgerundet, keine Mischung, keine neuen Farben),
 ' Rueckstiche werden mitgestreckt (Pythons round).
 FUNCTION groesseSkalieren(m AS Muster, v AS Verlauf, b AS INTEGER, h AS INTEGER) AS BOOLEAN
-    IF b < 1 OR h < 1 THEN THROW "Ungültige Größe: " + STR$(b) + "x" + STR$(h)
+    IF b < 1 OR h < 1 THEN THROW trf$("Ungültige Größe: {0}x{1}", [STR$(b), STR$(h)])
     IF b = m.breite AND h = m.hoehe THEN RETURN FALSE
     DIM sx AS FLOAT : sx = m.breite / b
     DIM sy AS FLOAT : sy = m.hoehe / h
@@ -392,7 +392,7 @@ FUNCTION groesseSkalieren(m AS Muster, v AS Verlauf, b AS INTEGER, h AS INTEGER)
     FOR EACH rs IN m.rueckstiche
         ARRAY_PUSH(rueck, neuerRueckstich(pyRunden(rs.x1 * rx), pyRunden(rs.y1 * ry), pyRunden(rs.x2 * rx), pyRunden(rs.y2 * ry), rs.farbe))
     NEXT
-    groesseUebernehmen(m, v, b, h, neu, rueck, "Größe ändern")
+    groesseUebernehmen(m, v, b, h, neu, rueck, tr$("Größe ändern"))
     RETURN TRUE
 END FUNCTION
 
@@ -409,11 +409,11 @@ CONST UMLEGEN_SENKRECHT = 4           ' oben <-> unten
 
 FUNCTION umlegenText$(art AS INTEGER) AS STRING
     SELECT CASE art
-        CASE UMLEGEN_RECHTS : RETURN "90° rechts gedreht"
-        CASE UMLEGEN_LINKS : RETURN "90° links gedreht"
-        CASE UMLEGEN_180 : RETURN "180° gedreht"
-        CASE UMLEGEN_WAAGERECHT : RETURN "Horizontal gespiegelt"
-        CASE UMLEGEN_SENKRECHT : RETURN "Vertikal gespiegelt"
+        CASE UMLEGEN_RECHTS : RETURN tr$("90° rechts gedreht")
+        CASE UMLEGEN_LINKS : RETURN tr$("90° links gedreht")
+        CASE UMLEGEN_180 : RETURN tr$("180° gedreht")
+        CASE UMLEGEN_WAAGERECHT : RETURN tr$("Horizontal gespiegelt")
+        CASE UMLEGEN_SENKRECHT : RETURN tr$("Vertikal gespiegelt")
     END SELECT
     RETURN ""
 END FUNCTION
@@ -574,7 +574,7 @@ FUNCTION autoZuschneiden(m AS Muster, v AS Verlauf) AS ARRAY OF INTEGER
     DIM h AS INTEGER : h = g[3] - g[1] + 1
     DIM aw AS INTEGER : aw = m.breite
     DIM ahh AS INTEGER : ahh = m.hoehe
-    IF NOT musterZuschneiden(m, v, g[0], g[1], b, h, "Auto-Zuschneiden") THEN RETURN []
+    IF NOT musterZuschneiden(m, v, g[0], g[1], b, h, tr$("Auto-Zuschneiden")) THEN RETURN []
     RETURN [g[0], g[1], aw - g[2] - 1, ahh - g[3] - 1]
 END FUNCTION
 
@@ -725,7 +725,7 @@ END FUNCTION
 ' Anchor), im Diamond-Modus das erste der alphabetisch ersten
 ' Diamond-Palette.
 FUNCTION musterAnlegen(b AS INTEGER, h AS INTEGER, stoff AS INTEGER, diamant AS BOOLEAN, vorlage AS STRING, paletten AS ARRAY OF Palette, palette AS STRING, symbole AS ARRAY OF STRING) AS Muster
-    DIM m AS Muster : m = neuesMuster("Neues Muster", b, h)
+    DIM m AS Muster : m = neuesMuster(tr$("Neues Muster"), b, h)
     m.stoff = IIF(diamant, 10, stoff)
     IF diamant THEN m.modus = "diamond"
     IF vorlage <> "" THEN m.name = vorlage
@@ -798,7 +798,7 @@ END FUNCTION
 ' Wie PyStickys fabric_label_for
 FUNCTION stoffBezeichnung$(m AS Muster) AS STRING
     DIM s AS STRING : s = IIF(m.stoff = INT(m.stoff), STR$(INT(m.stoff)), STR$(m.stoff))
-    IF m.modus <> "diamond" THEN RETURN "Aida " + s
+    IF m.modus <> "diamond" THEN RETURN trf$("Aida {0}", [s])
     IF m.stoff = 10 THEN RETURN "2.5 mm Square"
     IF m.stoff = 9 THEN RETURN "2.8 mm Round"
     IF m.stoff = 8 THEN RETURN "3.0 mm Round"
@@ -887,9 +887,9 @@ FUNCTION fremdFormat$(pfad AS STRING) AS STRING
     DIM p AS INTEGER : p = INSTRREV(e, ".")
     IF p < 0 THEN RETURN ""
     SELECT CASE MID$(e, p)
-        CASE ".xsd" : RETURN "Pattern Maker (XSD)"
-        CASE ".pat" : RETURN "PCStitch (PAT)"
-        CASE ".oxs" : RETURN "Open Cross Stitch (OXS)"
+        CASE ".xsd" : RETURN tr$("Pattern Maker (XSD)")
+        CASE ".pat" : RETURN tr$("PCStitch (PAT)")
+        CASE ".oxs" : RETURN tr$("Open Cross Stitch (OXS)")
     END SELECT
     RETURN ""
 END FUNCTION
@@ -902,7 +902,7 @@ FUNCTION fremdLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARR
     DIM e AS STRING : e = LOWER$(pfad)
     IF f.format = "" THEN
         DIM p AS INTEGER : p = INSTRREV(e, ".")
-        THROW "Unbekanntes Format: " + IIF(p < 0, "(ohne Endung)", MID$(e, p))
+        THROW trf$("Unbekanntes Format: {0}", [IIF(p < 0, tr$("(ohne Endung)"), MID$(e, p))])
     END IF
     IF RIGHT$(e, 4) = ".oxs" THEN
         DIM o AS OxsImport : o = oxsLaden(pfad, paletten, symbole)
@@ -921,7 +921,7 @@ END FUNCTION
 ' und Zentimetern, Farben, Stiche ueber alle Ebenen, Format.
 FUNCTION fremdInfo(f AS FremdImport) AS ARRAY OF STRING
     DIM m AS Muster : m = f.muster
-    RETURN [m.name, STR$(m.breite) + " × " + STR$(m.hoehe) + " Stiche (" + ZAHL$(m.breiteCm(), 1) + " × " + ZAHL$(m.hoeheCm(), 1) + " cm)", _
+    RETURN [m.name, trf$("{0} × {1} Stiche ({2} × {3} cm)", [STR$(m.breite), STR$(m.hoehe), ZAHL$(m.breiteCm(), 1), ZAHL$(m.hoeheCm(), 1)]), _
         STR$(m.farbanzahl()), STR$(statistikVon(m).sticheGesamt), f.format]
 END FUNCTION
 

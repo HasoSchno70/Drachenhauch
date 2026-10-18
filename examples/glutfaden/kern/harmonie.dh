@@ -17,11 +17,11 @@ END FUNCTION
 
 FUNCTION harmonieBeschreibung$(art AS STRING) AS STRING
     SELECT CASE art
-        CASE "Komplementär" : RETURN "Eine Farbe — direkt gegenüber im Farbkreis. Maximaler Kontrast."
-        CASE "Analog" : RETURN "Zwei Nachbarfarben (±30°). Sanfter, harmonischer Übergang."
-        CASE "Triade" : RETURN "Zwei Farben gleichmäßig verteilt (±120°). Lebhaft, ausgewogen."
-        CASE "Split-Komplementär" : RETURN "Zwei Farben neben dem Komplementär (±150°). Spannung ohne Kollision."
-        CASE "Tetrade" : RETURN "Drei Farben im Rechteck (90°/180°/270°). Reichhaltiges Schema."
+        CASE "Komplementär" : RETURN tr$("Eine Farbe — direkt gegenüber im Farbkreis. Maximaler Kontrast.")
+        CASE "Analog" : RETURN tr$("Zwei Nachbarfarben (±30°). Sanfter, harmonischer Übergang.")
+        CASE "Triade" : RETURN tr$("Zwei Farben gleichmäßig verteilt (±120°). Lebhaft, ausgewogen.")
+        CASE "Split-Komplementär" : RETURN tr$("Zwei Farben neben dem Komplementär (±150°). Spannung ohne Kollision.")
+        CASE "Tetrade" : RETURN tr$("Drei Farben im Rechteck (90°/180°/270°). Reichhaltiges Schema.")
     END SELECT
     RETURN ""
 END FUNCTION
@@ -33,15 +33,15 @@ SUB harmonieVersaetze(art AS STRING, BYREF namen AS ARRAY OF STRING, BYREF grad 
     grad = []
     SELECT CASE art
         CASE "Komplementär"
-            namen = ["Komplementär"] : grad = [180]
+            namen = [tr$("Komplementär")] : grad = [180]
         CASE "Analog"
-            namen = ["Analog −30°", "Analog +30°"] : grad = [-30, 30]
+            namen = [tr$("Analog −30°"), tr$("Analog +30°")] : grad = [-30, 30]
         CASE "Triade"
-            namen = ["Triade +120°", "Triade −120°"] : grad = [120, -120]
+            namen = [tr$("Triade +120°"), tr$("Triade −120°")] : grad = [120, -120]
         CASE "Split-Komplementär"
-            namen = ["Split +150°", "Split −150°"] : grad = [150, -150]
+            namen = [tr$("Split +150°"), tr$("Split −150°")] : grad = [150, -150]
         CASE "Tetrade"
-            namen = ["Tetrade +90°", "Tetrade +180°", "Tetrade +270°"] : grad = [90, 180, 270]
+            namen = [tr$("Tetrade +90°"), tr$("Tetrade +180°"), tr$("Tetrade +270°")] : grad = [90, 180, 270]
     END SELECT
 END SUB
 
@@ -147,10 +147,10 @@ END FUNCTION
 
 ' Die Bewertung eines Abstands: (Punkte, Text, Stufe 1..4)
 FUNCTION harmonieBewertung(d AS FLOAT) AS TUPLE
-    IF d < 5 THEN RETURN ("●●●●", "Perfekt", 4)
-    IF d < 10 THEN RETURN ("●●●○", "Sehr nah", 3)
-    IF d < 20 THEN RETURN ("●●○○", "Akzeptabel", 2)
-    RETURN ("●○○○", "Weit weg", 1)
+    IF d < 5 THEN RETURN ("●●●●", tr$("Perfekt"), 4)
+    IF d < 10 THEN RETURN ("●●●○", tr$("Sehr nah"), 3)
+    IF d < 20 THEN RETURN ("●●○○", tr$("Akzeptabel"), 2)
+    RETURN ("●○○○", tr$("Weit weg"), 1)
 END FUNCTION
 
 ' Welche Palette der Dialog zuerst zeigt: die des Herstellers (genau so
