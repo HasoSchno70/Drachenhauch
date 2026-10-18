@@ -45,6 +45,17 @@ FUNCTION trf$(t AS STRING, werte AS ARRAY OF STRING) AS STRING
     RETURN kern.trf$(t, werte)
 END FUNCTION
 
+' Eine Liste aus dem Kern zum Anzeigen: die Eintraege sind dort Schluessel
+' und bleiben deutsch, angezeigt wird jeder uebersetzt
+FUNCTION trListe(l AS ARRAY OF STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM t AS STRING
+    FOR EACH t IN l
+        ARRAY_PUSH(aus, kern.tr$(t))
+    NEXT
+    RETURN aus
+END FUNCTION
+
 ' Eine Zahl so, wie sie angezeigt wird (1.234,5 / 1,234.5)
 FUNCTION zahlText$(x AS FLOAT, stellen AS INTEGER) AS STRING
     RETURN kern.zahlAnzeige$(x, stellen)

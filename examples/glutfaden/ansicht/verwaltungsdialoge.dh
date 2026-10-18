@@ -45,9 +45,9 @@ SUB stickzeitBeenden(melden AS BOOLEAN)
     IF d > 0 THEN extraAenderung()
     IF NOT melden THEN RETURN
     IF d > 0 THEN
-        statusMeldung("Fortschritt beendet — Sitzung " + kern.dauerKurz$(d) + ", insgesamt " + kern.dauerKurz$(kern.stickzeitGesamt(lwMuster)))
+        statusMeldung(trf$("Fortschritt beendet — Sitzung {0}, insgesamt {1}", [kern.dauerKurz$(d), kern.dauerKurz$(kern.stickzeitGesamt(lwMuster))]))
     ELSE
-        statusMeldung("Fortschritt beendet")
+        statusMeldung(tr$("Fortschritt beendet"))
     END IF
 END SUB
 
@@ -104,8 +104,7 @@ SUB nmInfoNachziehen()
     DIM w AS INTEGER : w = gtk_spin_button_get_value_as_int(nmBreite)
     DIM h AS INTEGER : h = gtk_spin_button_get_value_as_int(nmHoehe)
     DIM st AS INTEGER : st = nmStoffZahl()
-    gtk_label_set_text(nmInfo, "📐 Fertige Größe: " + FORMAT$(kern.fertigCm(w, st), "%.1f") + " × " + FORMAT$(kern.fertigCm(h, st), "%.1f") + " cm" + CHR$(10) + _
-        "🔢 Max. Stiche: " + ZAHL$(w * h) + CHR$(10) + "🧵 Stoff: " + STR$(st) + " Stiche/Zoll")
+    gtk_label_set_text(nmInfo, trf$("📐 Fertige Größe: {0} × {1} cm{2}🔢 Max. Stiche: {3}{4}🧵 Stoff: {5} Stiche/Zoll", [FORMAT$(kern.fertigCm(w, st), "%.1f"), FORMAT$(kern.fertigCm(h, st), "%.1f"), CHR$(10), zahlText$(w * h, -1), CHR$(10), STR$(st)]))
     gtk_widget_queue_draw(nmVorschau)
 END SUB
 
@@ -165,7 +164,7 @@ FUNCTION nmZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     sdFarbe(cr, &HE4E5EA, 1)
     sdTextMitte(cr, name, 14, TRUE, 0, h - 46, b, 22)
     sdFarbe(cr, &H9AA0AD, 1)
-    sdTextMitte(cr, STR$(pw) + " × " + STR$(ph) + " Stiche", 12, FALSE, 0, h - 24, b, 20)
+    sdTextMitte(cr, trf$("{0} × {1} Stiche", [STR$(pw), STR$(ph)]), 12, FALSE, 0, h - 24, b, 20)
     RETURN FALSE
 END FUNCTION
 
@@ -212,7 +211,7 @@ SUB nmKategorieGewaehlt(w AS INTEGER, kat AS INTEGER)
     nmListe = []
     DIM frei AS BOOLEAN : frei = TRUE
     IF kat = 0 THEN
-        DIM l AS INTEGER : l = gtk_label_new("Geben Sie die gewünschte Größe ein oder wählen Sie eine Kategorie für vorgefertigte Templates.")
+        DIM l AS INTEGER : l = gtk_label_new(tr$("Geben Sie die gewünschte Größe ein oder wählen Sie eine Kategorie für vorgefertigte Templates."))
         gtk_label_set_line_wrap(l, TRUE)
         gtk_label_set_max_width_chars(l, 34)
         gtk_grid_attach(nmRaster, l, 0, 0, 2, 1)
@@ -227,7 +226,7 @@ SUB nmKategorieGewaehlt(w AS INTEGER, kat AS INTEGER)
             NEXT
         END IF
         IF LEN(nmListe) = 0 THEN
-            DIM leer AS INTEGER : leer = gtk_label_new("Noch keine eigenen Templates vorhanden." + CHR$(10) + CHR$(10) + "Erstellen Sie ein Projekt und speichern Sie es" + CHR$(10) + "über Muster → Als Vorlage speichern …")
+            DIM leer AS INTEGER : leer = gtk_label_new(trf$("Noch keine eigenen Templates vorhanden.{0}{1}Erstellen Sie ein Projekt und speichern Sie es{2}über Muster → Als Vorlage speichern …", [CHR$(10), CHR$(10), CHR$(10)]))
             gtk_grid_attach(nmRaster, leer, 0, 0, 2, 1)
             ARRAY_PUSH(nmKarten, leer)
         ELSE
@@ -237,8 +236,8 @@ SUB nmKategorieGewaehlt(w AS INTEGER, kat AS INTEGER)
                 DIM vv AS kern.Vorlage : vv = nmListe[i]
                 DIM k AS INTEGER : k = gtk_toggle_button_new()
                 DIM t AS INTEGER : t = gtk_label_new("")
-                DIM besch AS STRING : besch = IIF(vv.beschreibung <> "", vv.beschreibung, vv.kategorie)
-                gtk_label_set_markup(t, sdMaske$(vv.zeichen) + " <b>" + sdMaske$(vv.name) + "</b>" + CHR$(10) + "<span foreground='#ff8a3d'>" + STR$(vv.breite) + " × " + STR$(vv.hoehe) + "</span>" + CHR$(10) + "<small>" + sdMaske$(besch) + "</small>")
+                DIM besch AS STRING : besch = tr$(IIF(vv.beschreibung <> "", vv.beschreibung, vv.kategorie))
+                gtk_label_set_markup(t, sdMaske$(vv.zeichen) + " <b>" + sdMaske$(tr$(vv.name)) + "</b>" + CHR$(10) + "<span foreground='#ff8a3d'>" + STR$(vv.breite) + " × " + STR$(vv.hoehe) + "</span>" + CHR$(10) + "<small>" + sdMaske$(besch) + "</small>")
                 gtk_label_set_line_wrap(t, TRUE)
                 gtk_label_set_max_width_chars(t, 18)
                 gtk_container_add(k, t)
@@ -277,8 +276,8 @@ SUB nmDpGewaehlt(w AS INTEGER, daten AS INTEGER)
 END SUB
 
 FUNCTION nmBauen() AS INTEGER
-    nmDialog = gtk_dialog_new_with_buttons("Neues Projekt", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Erstellen", GTK_ANTWORT_OK, 0)
+    nmDialog = gtk_dialog_new_with_buttons(tr$("Neues Projekt"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Erstellen"), GTK_ANTWORT_OK, 0)
     gtk_dialog_set_default_response(nmDialog, GTK_ANTWORT_OK)
     gtk_window_set_default_size(nmDialog, 820, 600)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(nmDialog)
@@ -286,12 +285,12 @@ FUNCTION nmBauen() AS INTEGER
     DIM koerper AS INTEGER : koerper = gtk_box_new(GTK_WAAGERECHT, 14)
     ' links: Kategorien und Vorlagen
     DIM links AS INTEGER : links = gtk_box_new(GTK_SENKRECHT, 6)
-    gtk_box_pack_start(links, adUeberschrift("Kategorie"), FALSE, FALSE, 0)
+    gtk_box_pack_start(links, adUeberschrift(tr$("Kategorie")), FALSE, FALSE, 0)
     nmKategorien = []
-    DIM namen AS ARRAY OF STRING : namen = ["✏️ Benutzerdefiniert", "⭐ Eigene Templates"]
+    DIM namen AS ARRAY OF STRING : namen = [tr$("✏️ Benutzerdefiniert"), tr$("⭐ Eigene Templates")]
     DIM t AS STRING
     FOR EACH t IN kern.vorlagenKategorien()
-        ARRAY_PUSH(namen, t)
+        ARRAY_PUSH(namen, tr$(t))
     NEXT
     DIM gruppe AS INTEGER : gruppe = 0
     DIM i AS INTEGER
@@ -313,29 +312,29 @@ FUNCTION nmBauen() AS INTEGER
     gtk_box_pack_start(koerper, links, FALSE, FALSE, 0)
     ' rechts: Groesse, Stoff, Vorschau
     DIM rechts AS INTEGER : rechts = gtk_box_new(GTK_SENKRECHT, 6)
-    gtk_box_pack_start(rechts, adUeberschrift("Größe"), FALSE, FALSE, 0)
+    gtk_box_pack_start(rechts, adUeberschrift(tr$("Größe")), FALSE, FALSE, 0)
     nmDpWahl = gtk_combo_box_text_new()
     FOR EACH t IN kern.dpVorlagenNamen()
-        gtk_combo_box_text_append_text(nmDpWahl, t)
+        gtk_combo_box_text_append_text(nmDpWahl, tr$(t))
     NEXT
     gtk_combo_box_set_active(nmDpWahl, 0)
-    gtk_widget_set_tooltip_text(nmDpWahl, "Vorgefertigte Diamond-Painting-Größen, die 1:1 auf das jeweilige DIN-Format passen (bei 2.5mm Drill-Pitch).")
-    gtk_box_pack_start(rechts, dlZeile("DP-Preset:", nmDpWahl), FALSE, FALSE, 0)
+    gtk_widget_set_tooltip_text(nmDpWahl, tr$("Vorgefertigte Diamond-Painting-Größen, die 1:1 auf das jeweilige DIN-Format passen (bei 2.5mm Drill-Pitch)."))
+    gtk_box_pack_start(rechts, dlZeile(tr$("DP-Preset:"), nmDpWahl), FALSE, FALSE, 0)
     nmBreite = adSpin(10, kern.GROESSTES_MUSTER \ 2, 1, 50, 0)
     nmHoehe = adSpin(10, kern.GROESSTES_MUSTER \ 2, 1, 50, 0)
-    gtk_box_pack_start(rechts, dlZeile("Breite:", nmBreite), FALSE, FALSE, 0)
-    gtk_box_pack_start(rechts, dlZeile("Höhe:", nmHoehe), FALSE, FALSE, 0)
-    gtk_box_pack_start(rechts, adUeberschrift("Stoff"), FALSE, FALSE, 4)
+    gtk_box_pack_start(rechts, dlZeile(tr$("Breite:"), nmBreite), FALSE, FALSE, 0)
+    gtk_box_pack_start(rechts, dlZeile(tr$("Höhe:"), nmHoehe), FALSE, FALSE, 0)
+    gtk_box_pack_start(rechts, adUeberschrift(tr$("Stoff")), FALSE, FALSE, 4)
     nmStoff = gtk_combo_box_text_new()
     FOR EACH t IN adStoffNamen()
         gtk_combo_box_text_append_text(nmStoff, t)
     NEXT
     gtk_combo_box_set_active(nmStoff, 1)
-    gtk_box_pack_start(rechts, dlZeile("Stoffart:", nmStoff), FALSE, FALSE, 0)
+    gtk_box_pack_start(rechts, dlZeile(tr$("Stoffart:"), nmStoff), FALSE, FALSE, 0)
     nmInfo = gtk_label_new("")
     gtk_label_set_xalign(nmInfo, 0.0)
     gtk_box_pack_start(rechts, nmInfo, FALSE, FALSE, 6)
-    gtk_box_pack_start(rechts, adUeberschrift("Vorschau"), FALSE, FALSE, 0)
+    gtk_box_pack_start(rechts, adUeberschrift(tr$("Vorschau")), FALSE, FALSE, 0)
     nmVorschau = gtk_drawing_area_new()
     gtk_widget_set_size_request(nmVorschau, 220, 220)
     gtk_box_pack_start(rechts, nmVorschau, TRUE, TRUE, 0)
@@ -363,9 +362,9 @@ SUB nmAnlegen()
     DIM m AS kern.Muster : m = kern.musterAnlegen(w, h, nmStoffZahl(), nmDp, name, slPaletten, "Anchor", slSymbole)
     musterZeigen(m, "", m.name)
     IF name <> "" THEN
-        statusMeldung("Neues Muster: " + name)
+        statusMeldung(trf$("Neues Muster: {0}", [name]))
     ELSE
-        statusMeldung("Neues Muster: " + STR$(w) + "×" + STR$(h) + IIF(nmDp, " Drills", " Stiche"))
+        statusMeldung(trf$("Neues Muster: {0}×{1}{2}", [STR$(w), STR$(h), IIF(nmDp, tr$(" Drills"), tr$(" Stiche"))]))
     END IF
 END SUB
 
@@ -411,29 +410,29 @@ END FUNCTION
 FUNCTION ehBauen() AS INTEGER
     IF NOT lwHat THEN RETURN 0
     DIM m AS kern.Muster : m = lwMuster
-    ehDialog = gtk_dialog_new_with_buttons("Eigenschaften", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "OK", GTK_ANTWORT_OK, 0)
+    ehDialog = gtk_dialog_new_with_buttons(tr$("Eigenschaften"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, "OK", GTK_ANTWORT_OK, 0)
     gtk_window_set_default_size(ehDialog, 520, -1)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(ehDialog)
     gtk_container_set_border_width(innen, 12)
     DIM info AS INTEGER : info = gtk_box_new(GTK_SENKRECHT, 2)
     gtkKlasse(info, "karte")
-    gtk_box_pack_start(info, adUeberschrift("MUSTER"), FALSE, FALSE, 0)
-    gtk_box_pack_start(info, dlZeile("Größe:", ehWert(STR$(m.breite) + " × " + STR$(m.hoehe) + " Stiche")), FALSE, FALSE, 0)
-    gtk_box_pack_start(info, dlZeile("Farben:", ehWert(STR$(m.farbanzahl()) + " Farben")), FALSE, FALSE, 0)
-    gtk_box_pack_start(info, dlZeile("Stoff:", ehWert(kern.stoffBezeichnung$(m))), FALSE, FALSE, 0)
+    gtk_box_pack_start(info, adUeberschrift(tr$("MUSTER")), FALSE, FALSE, 0)
+    gtk_box_pack_start(info, dlZeile(tr$("Größe:"), ehWert(trf$("{0} × {1} Stiche", [STR$(m.breite), STR$(m.hoehe)]))), FALSE, FALSE, 0)
+    gtk_box_pack_start(info, dlZeile(tr$("Farben:"), ehWert(trf$("{0} Farben", [STR$(m.farbanzahl())]))), FALSE, FALSE, 0)
+    gtk_box_pack_start(info, dlZeile(tr$("Stoff:"), ehWert(kern.stoffBezeichnung$(m))), FALSE, FALSE, 0)
     gtk_box_pack_start(innen, info, FALSE, FALSE, 0)
     ehAutor = gtk_entry_new()
-    gtk_entry_set_placeholder_text(ehAutor, "z.B. Anna Schmidt")
+    gtk_entry_set_placeholder_text(ehAutor, tr$("z.B. Anna Schmidt"))
     gtk_entry_set_text(ehAutor, kern.eigenschaft$(m, "author"))
     ehCopyright = gtk_entry_new()
-    gtk_entry_set_placeholder_text(ehCopyright, "z.B. © 2026 Anna Schmidt")
+    gtk_entry_set_placeholder_text(ehCopyright, tr$("z.B. © 2026 Anna Schmidt"))
     gtk_entry_set_text(ehCopyright, kern.eigenschaft$(m, "copyright"))
-    gtk_box_pack_start(innen, dlZeile("Autor:", ehAutor), FALSE, FALSE, 6)
-    gtk_box_pack_start(innen, dlZeile("Copyright:", ehCopyright), FALSE, FALSE, 0)
-    ehBegonnen = gtk_check_button_new_with_label("Begonnen am:")
+    gtk_box_pack_start(innen, dlZeile(tr$("Autor:"), ehAutor), FALSE, FALSE, 6)
+    gtk_box_pack_start(innen, dlZeile(tr$("Copyright:"), ehCopyright), FALSE, FALSE, 0)
+    ehBegonnen = gtk_check_button_new_with_label(tr$("Begonnen am:"))
     ehDatum = gtk_entry_new()
-    gtk_entry_set_placeholder_text(ehDatum, "TT.MM.JJJJ")
+    gtk_entry_set_placeholder_text(ehDatum, tr$("TT.MM.JJJJ"))
     DIM d AS STRING : d = kern.eigenschaft$(m, "started_date")
     IF REGEX_TEST(d, "^[0-9]{4}-[0-9]{2}-[0-9]{2}$") AND ZEIT_LESBAR(d) THEN
         gtk_entry_set_text(ehDatum, ZEIT_FORMAT$(ZEIT_PARSE(d), "TT.MM.JJJJ"))
@@ -445,14 +444,14 @@ FUNCTION ehBauen() AS INTEGER
     DIM dz AS INTEGER : dz = gtk_box_new(GTK_WAAGERECHT, 8)
     gtk_box_pack_start(dz, ehBegonnen, FALSE, FALSE, 0)
     gtk_box_pack_start(dz, ehDatum, FALSE, FALSE, 0)
-    gtk_box_pack_start(innen, dlZeile("Stickdatum:", dz), FALSE, FALSE, 0)
+    gtk_box_pack_start(innen, dlZeile(tr$("Stickdatum:"), dz), FALSE, FALSE, 0)
     ehNotizen = gtk_text_view_new()
     gtk_text_view_set_wrap_mode(ehNotizen, GTK_UMBRUCH_WORT)
     gtk_widget_set_size_request(ehNotizen, -1, 120)
-    gtk_widget_set_tooltip_text(ehNotizen, "Freie Notizen — werden auch im HTML/PDF-Export auf dem Deckblatt angezeigt.")
+    gtk_widget_set_tooltip_text(ehNotizen, tr$("Freie Notizen — werden auch im HTML/PDF-Export auf dem Deckblatt angezeigt."))
     DIM nt AS STRING : nt = kern.notizen$(m)
     gtk_text_buffer_set_text(gtk_text_view_get_buffer(ehNotizen), nt, -1)
-    gtk_box_pack_start(innen, dlZeile("Notizen:", ehNotizen), TRUE, TRUE, 6)
+    gtk_box_pack_start(innen, dlZeile(tr$("Notizen:"), ehNotizen), TRUE, TRUE, 6)
     ehMeldung = gtk_label_new("")
     gtk_label_set_xalign(ehMeldung, 0.0)
     gtkKlasse(ehMeldung, "benutzt")
@@ -467,14 +466,14 @@ FUNCTION ehUebernehmen$(BYREF geaendert AS BOOLEAN) AS STRING
     DIM datum AS STRING
     IF gtk_toggle_button_get_active(ehBegonnen) THEN
         DIM t AS STRING : t = TRIM$(gtk_entry_get_text(ehDatum))
-        IF NOT REGEX_TEST(t, "^[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{4}$") THEN RETURN "Das Stickdatum bitte als TT.MM.JJJJ."
+        IF NOT REGEX_TEST(t, "^[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{4}$") THEN RETURN tr$("Das Stickdatum bitte als TT.MM.JJJJ.")
         DIM teile AS ARRAY OF STRING : teile = SPLIT$(t, ".")
         DIM tg AS INTEGER : tg = VAL(teile[0])
         DIM mo AS INTEGER : mo = VAL(teile[1])
         DIM jr AS INTEGER : jr = VAL(teile[2])
-        IF mo < 1 OR mo > 12 OR tg < 1 THEN RETURN "„" + t + "“ ist kein Datum."
+        IF mo < 1 OR mo > 12 OR tg < 1 THEN RETURN trf$("„{0}“ ist kein Datum.", [t])
         DIM zp AS INTEGER : zp = ZEIT_AUS_TEILEN(jr, mo, tg)
-        IF ZEIT_TEIL(zp, "tag") <> tg THEN RETURN "„" + t + "“ ist kein Datum."
+        IF ZEIT_TEIL(zp, "tag") <> tg THEN RETURN trf$("„{0}“ ist kein Datum.", [t])
         datum = ZEIT_FORMAT$(zp, "JJJJ-MM-TT")
     END IF
     geaendert = FALSE
@@ -496,7 +495,7 @@ SUB eigenschaftenDialog()
         END IF
         IF geaendert THEN
             extraAenderung()
-            statusMeldung("Eigenschaften aktualisiert")
+            statusMeldung(tr$("Eigenschaften aktualisiert"))
         END IF
         EXIT WHILE
     WEND
@@ -513,23 +512,23 @@ DIM grSmart AS INTEGER
 
 FUNCTION grBauen() AS INTEGER
     IF NOT lwHat THEN RETURN 0
-    DIM einheit AS STRING : einheit = IIF(lwMuster.modus = "diamond", "Drills", "Stiche")
-    grDialog = gtk_dialog_new_with_buttons("Mustergröße ändern", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "OK", GTK_ANTWORT_OK, 0)
+    DIM einheit AS STRING : einheit = IIF(lwMuster.modus = "diamond", tr$("Drills"), tr$("Stiche"))
+    grDialog = gtk_dialog_new_with_buttons(tr$("Mustergröße ändern"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, "OK", GTK_ANTWORT_OK, 0)
     gtk_dialog_set_default_response(grDialog, GTK_ANTWORT_OK)
     gtk_window_set_default_size(grDialog, 420, -1)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(grDialog)
     gtk_container_set_border_width(innen, 12)
     grBreite = adSpin(10, 1000, 1, lwMuster.breite, 0)
     grHoehe = adSpin(10, 1000, 1, lwMuster.hoehe, 0)
-    DIM zb AS INTEGER : zb = dlZeile("Breite:", grBreite)
+    DIM zb AS INTEGER : zb = dlZeile(tr$("Breite:"), grBreite)
     gtk_box_pack_start(zb, gtk_label_new(einheit), FALSE, FALSE, 0)
-    DIM zh AS INTEGER : zh = dlZeile("Höhe:", grHoehe)
+    DIM zh AS INTEGER : zh = dlZeile(tr$("Höhe:"), grHoehe)
     gtk_box_pack_start(zh, gtk_label_new(einheit), FALSE, FALSE, 0)
     gtk_box_pack_start(innen, zb, FALSE, FALSE, 4)
     gtk_box_pack_start(innen, zh, FALSE, FALSE, 4)
-    grSmart = gtk_check_button_new_with_label("Stiche neu verteilen (Smart-Resize)")
-    gtk_widget_set_tooltip_text(grSmart, "Aktiv: Muster wird wie ein Pixelbild per Nearest-Neighbor" + CHR$(10) + "skaliert, Stiche neu auf die Zellgröße verteilt. Ideal beim" + CHR$(10) + "Hochskalieren." + CHR$(10) + CHR$(10) + "Aus: klassisches Zuschneiden/Auffüllen mit leeren Zellen am Rand.")
+    grSmart = gtk_check_button_new_with_label(tr$("Stiche neu verteilen (Smart-Resize)"))
+    gtk_widget_set_tooltip_text(grSmart, trf$("Aktiv: Muster wird wie ein Pixelbild per Nearest-Neighbor{0}skaliert, Stiche neu auf die Zellgröße verteilt. Ideal beim{1}Hochskalieren.{2}{3}Aus: klassisches Zuschneiden/Auffüllen mit leeren Zellen am Rand.", [CHR$(10), CHR$(10), CHR$(10), CHR$(10)]))
     gtk_box_pack_start(innen, grSmart, FALSE, FALSE, 6)
     gtk_widget_show_all(grDialog)
     RETURN grDialog
@@ -539,7 +538,7 @@ END FUNCTION
 FUNCTION grAusfuehren(w AS INTEGER, h AS INTEGER, smart AS BOOLEAN) AS BOOLEAN
     IF w = lwMuster.breite AND h = lwMuster.hoehe THEN RETURN FALSE
     IF NOT smart AND (w < lwMuster.breite OR h < lwMuster.hoehe) AND grDialog <> 0 THEN
-        IF NOT pdFrage(grDialog, "Größe ändern", "Das Muster wird verkleinert. " + IIF(lwMuster.modus = "diamond", "Drills", "Stiche") + " außerhalb des neuen Bereichs gehen verloren." + CHR$(10) + CHR$(10) + "Fortfahren?") THEN RETURN FALSE
+        IF NOT pdFrage(grDialog, tr$("Größe ändern"), trf$("Das Muster wird verkleinert. {0} außerhalb des neuen Bereichs gehen verloren.{1}{2}Fortfahren?", [IIF(lwMuster.modus = "diamond", tr$("Drills"), tr$("Stiche")), CHR$(10), CHR$(10)])) THEN RETURN FALSE
     END IF
     DIM ok AS BOOLEAN
     IF smart THEN
@@ -549,7 +548,7 @@ FUNCTION grAusfuehren(w AS INTEGER, h AS INTEGER, smart AS BOOLEAN) AS BOOLEAN
     END IF
     allesNeu()
     leinwandEinpassen()
-    statusMeldung("Größe geändert: " + STR$(w) + " × " + STR$(h) + IIF(smart, " (smart)", ""))
+    statusMeldung(trf$("Größe geändert: {0} × {1}{2}", [STR$(w), STR$(h), IIF(smart, " (smart)", "")]))
     RETURN TRUE
 END FUNCTION
 
@@ -579,7 +578,7 @@ SUB vsFuellen()
     adLeeren(vsListe)
     vsDateien = kern.schnappschuesse(vwSchluessel$())
     IF LEN(vsDateien) = 0 THEN
-        DIM l AS INTEGER : l = gtk_label_new("Noch keine Versionen vorhanden." + CHR$(10) + "Sichern oder warten bis die nächste Auto-Version erstellt wird.")
+        DIM l AS INTEGER : l = gtk_label_new(trf$("Noch keine Versionen vorhanden.{0}Sichern oder warten bis die nächste Auto-Version erstellt wird.", [CHR$(10)]))
         gtk_list_box_insert(vsListe, l, -1)
         gtk_widget_set_sensitive(gtk_widget_get_parent(l), FALSE)
     END IF
@@ -589,16 +588,16 @@ SUB vsFuellen()
         DIM z AS INTEGER : z = kern.schnappschussZeit(d)
         DIM t AS STRING
         IF z >= 0 THEN
-            t = "📅  " + ZEIT_FORMAT$(z, "TT.MM.JJJJ hh:mm:ss") + "    (" + STR$(kb) + " KB)"
+            t = trf$("📅  {0}    ({1} KB)", [ZEIT_FORMAT$(z, "TT.MM.JJJJ hh:mm:ss"), STR$(kb)])
         ELSE
-            t = "📄  " + BASENAME(d) + "    (" + STR$(kb) + " KB)"
+            t = trf$("📄  {0}    ({1} KB)", [BASENAME(d), STR$(kb)])
         END IF
         DIM e AS INTEGER : e = sdZelle(sdMaske$(t), 0, FALSE)
         IF z >= 0 THEN gtk_widget_set_tooltip_text(e, ZEIT_FORMAT$(z, "WTAG, TT.MM.JJJJ hh:mm:ss") + CHR$(10) + d)
         gtk_list_box_insert(vsListe, e, -1)
     NEXT
     gtk_widget_show_all(vsListe)
-    gtk_label_set_text(vsDetail, "Wähle eine Version aus der Liste.")
+    gtk_label_set_text(vsDetail, tr$("Wähle eine Version aus der Liste."))
     vsKnoepfeSchalten(FALSE)
 END SUB
 
@@ -625,10 +624,9 @@ SUB vsAuswahl(liste AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
     TRY
         DIM m AS kern.Muster : m = kern.pxsLaden(d)
         m.stichzahlenNeu()
-        gtk_label_set_text(vsDetail, "Datum: " + ZEIT_FORMAT$(kern.schnappschussZeit(d), "TT.MM.JJJJ hh:mm:ss") + CHR$(10) + _
-            "Größe: " + STR$(m.breite) + " × " + STR$(m.hoehe) + "    ·    " + IIF(m.modus = "diamond", "Drills", "Stiche") + ": " + STR$(m.sticheGesamt()) + "    ·    Farben: " + STR$(m.farbanzahl()))
+        gtk_label_set_text(vsDetail, trf$("Datum: {0}{1}Größe: {2} × {3}    ·    {4}: {5}    ·    Farben: {6}", [ZEIT_FORMAT$(kern.schnappschussZeit(d), "TT.MM.JJJJ hh:mm:ss"), CHR$(10), STR$(m.breite), STR$(m.hoehe), IIF(m.modus = "diamond", tr$("Drills"), tr$("Stiche")), STR$(m.sticheGesamt()), STR$(m.farbanzahl())]))
     CATCH e
-        gtk_label_set_text(vsDetail, "⚠ Diese Version konnte nicht gelesen werden (" + BASENAME(d) + ").")
+        gtk_label_set_text(vsDetail, trf$("⚠ Diese Version konnte nicht gelesen werden ({0}).", [BASENAME(d)]))
     END TRY
 END SUB
 
@@ -643,12 +641,12 @@ END SUB
 
 FUNCTION vsBauen() AS INTEGER
     IF NOT lwHat THEN RETURN 0
-    vsDialog = gtk_dialog_new_with_buttons("Versionen für " + vsTitelSchluessel$(), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Schließen", GTK_ANTWORT_OK, 0)
+    vsDialog = gtk_dialog_new_with_buttons(trf$("Versionen für {0}", [vsTitelSchluessel$()]), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Schließen"), GTK_ANTWORT_OK, 0)
     gtk_window_set_default_size(vsDialog, 560, 480)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(vsDialog)
     gtk_container_set_border_width(innen, 12)
-    DIM intro AS INTEGER : intro = gtk_label_new("Automatische Versionen werden alle 30 Minuten angelegt, sobald ungesicherte Änderungen vorhanden sind, und beim Sichern. Der Knopf „Wiederherstellen“ lädt eine Version wieder als aktives Muster.")
+    DIM intro AS INTEGER : intro = gtk_label_new(tr$("Automatische Versionen werden alle 30 Minuten angelegt, sobald ungesicherte Änderungen vorhanden sind, und beim Sichern. Der Knopf „Wiederherstellen“ lädt eine Version wieder als aktives Muster."))
     gtk_label_set_line_wrap(intro, TRUE)
     gtk_label_set_xalign(intro, 0.0)
     gtkKlasse(intro, "nebensache")
@@ -667,7 +665,7 @@ FUNCTION vsBauen() AS INTEGER
     ' Die Knoepfe unter der Liste -- in der Kopfleiste verdraengten sie den Titel
     DIM knoepfe AS INTEGER : knoepfe = gtk_box_new(GTK_WAAGERECHT, 8)
     vsKnoepfe = []
-    DIM texte AS ARRAY OF STRING : texte = ["⟲ Wiederherstellen", "Löschen", "⇄ Mit aktuellem vergleichen"]
+    DIM texte AS ARRAY OF STRING : texte = [tr$("⟲ Wiederherstellen"), tr$("Löschen"), tr$("⇄ Mit aktuellem vergleichen")]
     DIM i AS INTEGER
     FOR i = 0 TO 2
         DIM k AS INTEGER : k = gtk_button_new_with_label(texte[i])
@@ -678,7 +676,7 @@ FUNCTION vsBauen() AS INTEGER
         ARRAY_PUSH(vsKnoepfe, k)
     NEXT
     gtk_box_pack_start(innen, knoepfe, FALSE, FALSE, 6)
-    gtk_widget_set_tooltip_text(vsKnoepfe[2], "Vergleicht die ausgewählte Version mit dem geöffneten Muster -- markiert hinzugefügte, entfernte und geänderte Stiche.")
+    gtk_widget_set_tooltip_text(vsKnoepfe[2], tr$("Vergleicht die ausgewählte Version mit dem geöffneten Muster -- markiert hinzugefügte, entfernte und geänderte Stiche."))
     DIM s AS INTEGER : s = signalZeile(vsListe, "row-selected", vsAuswahl, 0, 0, 0)
     vsFuellen()
     gtk_widget_show_all(vsDialog)
@@ -693,7 +691,7 @@ FUNCTION vsAntwort(a AS INTEGER, fragen AS BOOLEAN) AS BOOLEAN
     SELECT CASE a
         CASE VS_WIEDER
             IF fragen THEN
-                IF NOT pdFrage(vsDialog, "Version wiederherstellen", "Aktuelles Muster durch diese Version ersetzen?" + CHR$(10) + CHR$(10) + "Nicht gesicherte Änderungen gehen verloren.") THEN RETURN TRUE
+                IF NOT pdFrage(vsDialog, tr$("Version wiederherstellen"), trf$("Aktuelles Muster durch diese Version ersetzen?{0}{1}Nicht gesicherte Änderungen gehen verloren.", [CHR$(10), CHR$(10)])) THEN RETURN TRUE
             END IF
             TRY
                 DIM m AS kern.Muster : m = kern.pxsLaden(d)
@@ -701,14 +699,14 @@ FUNCTION vsAntwort(a AS INTEGER, fragen AS BOOLEAN) AS BOOLEAN
                 musterZeigen(m, "", IIF(m.name <> "", m.name, BASENAME(d)))
                 vwKennung = kennung
                 extraAenderung()
-                statusMeldung("Version geladen: " + BASENAME(d))
+                statusMeldung(trf$("Version geladen: {0}", [BASENAME(d)]))
             CATCH e
-                statusMeldung("Nicht geladen: " + e)
+                statusMeldung(trf$("Nicht geladen: {0}", [e]))
             END TRY
             RETURN FALSE
         CASE VS_LOESCHEN
             IF fragen THEN
-                IF NOT pdFrage(vsDialog, "Version löschen", "Diese Version dauerhaft löschen?" + CHR$(10) + CHR$(10) + BASENAME(d)) THEN RETURN TRUE
+                IF NOT pdFrage(vsDialog, tr$("Version löschen"), trf$("Diese Version dauerhaft löschen?{0}{1}{2}", [CHR$(10), CHR$(10), BASENAME(d)])) THEN RETURN TRUE
             END IF
             TRY
                 DELETEFILE(d)
@@ -721,7 +719,7 @@ FUNCTION vsAntwort(a AS INTEGER, fragen AS BOOLEAN) AS BOOLEAN
                 DIM alt AS kern.Muster : alt = kern.pxsLaden(d)
                 vgDialog(alt, BASENAME(d), fragen)
             CATCH e
-                pdWarnung(vsDialog, "Vergleich fehlgeschlagen", "Die Version konnte nicht geladen werden:" + CHR$(10) + e)
+                pdWarnung(vsDialog, tr$("Vergleich fehlgeschlagen"), trf$("Die Version konnte nicht geladen werden:{0}{1}", [CHR$(10), e]))
             END TRY
             RETURN TRUE
     END SELECT
@@ -792,17 +790,17 @@ FUNCTION vgZeichnen(w AS INTEGER, cr AS INTEGER, welche AS INTEGER) AS BOOLEAN
 END FUNCTION
 
 FUNCTION vgZusammenfassung$(alt AS kern.Muster, neu AS kern.Muster, v AS kern.Vergleich) AS STRING
-    DIM t AS STRING : t = "<b>Vergleich:</b> <span foreground='#33cc88'>+" + STR$(v.neu) + " hinzugefügt</span> · <span foreground='#dd4444'>-" + STR$(v.weg) + " entfernt</span> · <span foreground='#ddbbaa'>~" + STR$(v.anders) + " geändert</span> · " + STR$(v.gleich) + " unverändert"
-    IF v.rueckNeu + v.rueckWeg > 0 THEN t = t + " · <span foreground='#888888'>Rückstiche: +" + STR$(v.rueckNeu) + "/-" + STR$(v.rueckWeg) + "</span>"
-    IF v.groesseAnders THEN t = t + " · <span foreground='#888888'>Größe: alt " + STR$(alt.breite) + "×" + STR$(alt.hoehe) + " → neu " + STR$(neu.breite) + "×" + STR$(neu.hoehe) + "</span>"
+    DIM t AS STRING : t = trf$("<b>Vergleich:</b> <span foreground='#33cc88'>+{0} hinzugefügt</span> · <span foreground='#dd4444'>-{1} entfernt</span> · <span foreground='#ddbbaa'>~{2} geändert</span> · {3} unverändert", [STR$(v.neu), STR$(v.weg), STR$(v.anders), STR$(v.gleich)])
+    IF v.rueckNeu + v.rueckWeg > 0 THEN t = trf$("{0} · <span foreground='#888888'>Rückstiche: +{1}/-{2}</span>", [t, STR$(v.rueckNeu), STR$(v.rueckWeg)])
+    IF v.groesseAnders THEN t = trf$("{0} · <span foreground='#888888'>Größe: alt {1}×{2} → neu {3}×{4}</span>", [t, STR$(alt.breite), STR$(alt.hoehe), STR$(neu.breite), STR$(neu.hoehe)])
     RETURN t
 END FUNCTION
 
 FUNCTION vgBauen(alt AS kern.Muster, name AS STRING) AS INTEGER
     vgAlt = alt
     vgErgebnis = kern.musterVergleichen(alt, lwMuster)
-    vgFenster = gtk_dialog_new_with_buttons("Muster-Vergleich" + IIF(name <> "", " — " + name, ""), IIF(vsDialog <> 0, vsDialog, fenster), GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Schließen", GTK_ANTWORT_OK, 0)
+    vgFenster = gtk_dialog_new_with_buttons(trf$("Muster-Vergleich{0}", [IIF(name <> "", " — " + name, "")]), IIF(vsDialog <> 0, vsDialog, fenster), GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Schließen"), GTK_ANTWORT_OK, 0)
     gtk_window_set_default_size(vgFenster, 900, 560)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(vgFenster)
     gtk_container_set_border_width(innen, 10)
@@ -813,7 +811,7 @@ FUNCTION vgBauen(alt AS kern.Muster, name AS STRING) AS INTEGER
     gtk_box_pack_start(innen, z, FALSE, FALSE, 0)
     DIM spalten AS INTEGER : spalten = gtk_box_new(GTK_WAAGERECHT, 8)
     gtk_box_set_homogeneous(spalten, TRUE)
-    DIM namen AS ARRAY OF STRING : namen = ["Alt", "Neu", "Diff"]
+    DIM namen AS ARRAY OF STRING : namen = [tr$("Alt"), tr$("Neu"), tr$("Diff")]
     DIM i AS INTEGER
     FOR i = 0 TO 2
         DIM s AS INTEGER : s = gtk_box_new(GTK_SENKRECHT, 4)
@@ -847,17 +845,17 @@ END SUB
 ' --- Eigene Vorlagen ---------------------------------------------------------------------
 
 FUNCTION vlKategorien() AS ARRAY OF STRING
-    RETURN ["Eigene", "Lesezeichen", "Deckchen", "Bordüren", "Bilder", "Kissen", "Accessoires", "Saisonal"]
+    RETURN [tr$("Eigene"), tr$("Lesezeichen"), tr$("Deckchen"), tr$("Bordüren"), tr$("Bilder"), tr$("Kissen"), tr$("Accessoires"), tr$("Saisonal")]
 END FUNCTION
 
 ' Eine Vorlage sichern; "" = gesichert, sonst warum nicht
 FUNCTION vlSichern$(name AS STRING, kategorie AS STRING, beschreibung AS STRING) AS STRING
     DIM n AS STRING : n = TRIM$(name)
-    IF n = "" THEN RETURN "Bitte gib einen Namen ein."
+    IF n = "" THEN RETURN tr$("Bitte gib einen Namen ein.")
     DIM l AS ARRAY OF kern.Vorlage : l = kern.eigeneVorlagen(vwVorlagenDatei$())
     DIM v AS kern.Vorlage
     FOR EACH v IN l
-        IF v.name = n THEN RETURN "Es existiert bereits eine Vorlage mit diesem Namen."
+        IF v.name = n THEN RETURN tr$("Es existiert bereits eine Vorlage mit diesem Namen.")
     NEXT
     DIM neu AS kern.Vorlage : neu = NEW kern.Vorlage()
     neu.name = n
@@ -877,16 +875,16 @@ END FUNCTION
 
 SUB vorlageSichernDialog()
     IF NOT lwHat THEN RETURN
-    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Als Vorlage speichern", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Speichern", GTK_ANTWORT_OK, 0)
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons(tr$("Als Vorlage speichern"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Speichern"), GTK_ANTWORT_OK, 0)
     gtk_dialog_set_default_response(d, GTK_ANTWORT_OK)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
     gtk_container_set_border_width(innen, 12)
-    DIM kopf AS INTEGER : kopf = gtk_label_new(STR$(lwMuster.breite) + " × " + STR$(lwMuster.hoehe) + " Stiche" + CHR$(10) + "Stoffzahl: " + STR$(INT(lwMuster.stoff)))
+    DIM kopf AS INTEGER : kopf = gtk_label_new(trf$("{0} × {1} Stiche{2}Stoffzahl: {3}", [STR$(lwMuster.breite), STR$(lwMuster.hoehe), CHR$(10), STR$(INT(lwMuster.stoff))]))
     gtk_label_set_xalign(kopf, 0.0)
     gtk_box_pack_start(innen, kopf, FALSE, FALSE, 0)
     DIM name AS INTEGER : name = gtk_entry_new()
-    gtk_entry_set_placeholder_text(name, "Mein Template")
+    gtk_entry_set_placeholder_text(name, tr$("Mein Template"))
     gtk_entry_set_activates_default(name, TRUE)
     DIM kat AS INTEGER : kat = gtk_combo_box_text_new_with_entry()
     DIM t AS STRING
@@ -895,9 +893,9 @@ SUB vorlageSichernDialog()
     NEXT
     gtk_combo_box_set_active(kat, 0)
     DIM besch AS INTEGER : besch = gtk_entry_new()
-    gtk_box_pack_start(innen, dlZeile("Name:", name), FALSE, FALSE, 4)
-    gtk_box_pack_start(innen, dlZeile("Kategorie:", kat), FALSE, FALSE, 4)
-    gtk_box_pack_start(innen, dlZeile("Beschreibung (optional):", besch), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlZeile(tr$("Name:"), name), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlZeile(tr$("Kategorie:"), kat), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlZeile(tr$("Beschreibung (optional):"), besch), FALSE, FALSE, 4)
     DIM meldung AS INTEGER : meldung = gtk_label_new("")
     gtk_label_set_xalign(meldung, 0.0)
     gtkKlasse(meldung, "benutzt")
@@ -906,7 +904,7 @@ SUB vorlageSichernDialog()
     WHILE gtk_dialog_run(d) = GTK_ANTWORT_OK
         DIM f AS STRING : f = vlSichern$(gtk_entry_get_text(name), gtk_entry_get_text(gtk_bin_get_child(kat)), gtk_entry_get_text(besch))
         IF f = "" THEN
-            statusMeldung("Vorlage „" + TRIM$(gtk_entry_get_text(name)) + "“ gespeichert")
+            statusMeldung(trf$("Vorlage „{0}“ gespeichert", [TRIM$(gtk_entry_get_text(name))]))
             EXIT WHILE
         END IF
         gtk_label_set_text(meldung, f)
@@ -935,15 +933,15 @@ END FUNCTION
 
 ' Umbenennen oder loeschen; "" = erledigt, sonst warum nicht
 FUNCTION vlAendern$(i AS INTEGER, neuerName AS STRING, loeschen AS BOOLEAN) AS STRING
-    IF i < 0 OR i >= LEN(vlDaten) THEN RETURN "Keine Vorlage gewählt."
+    IF i < 0 OR i >= LEN(vlDaten) THEN RETURN tr$("Keine Vorlage gewählt.")
     IF loeschen THEN
         ARRAY_REMOVE_AT(vlDaten, i)
     ELSE
         DIM n AS STRING : n = TRIM$(neuerName)
-        IF n = "" THEN RETURN "Bitte gib einen Namen ein."
+        IF n = "" THEN RETURN tr$("Bitte gib einen Namen ein.")
         DIM j AS INTEGER
         FOR j = 0 TO LEN(vlDaten) - 1
-            IF j <> i AND vlDaten[j].name = n THEN RETURN "Es existiert bereits eine Vorlage mit diesem Namen."
+            IF j <> i AND vlDaten[j].name = n THEN RETURN tr$("Es existiert bereits eine Vorlage mit diesem Namen.")
         NEXT
         vlDaten[i].name = n
     END IF
@@ -952,8 +950,8 @@ FUNCTION vlAendern$(i AS INTEGER, neuerName AS STRING, loeschen AS BOOLEAN) AS S
 END FUNCTION
 
 SUB vorlagenDialog()
-    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Vorlagen verwalten", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Schließen", GTK_ANTWORT_OK, 0)
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons(tr$("Vorlagen verwalten"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Schließen"), GTK_ANTWORT_OK, 0)
     gtk_window_set_default_size(d, 420, 360)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
     gtk_container_set_border_width(innen, 12)
@@ -965,8 +963,8 @@ SUB vorlagenDialog()
     gtk_container_add(rolle, vlListe)
     gtk_box_pack_start(innen, rolle, TRUE, TRUE, 0)
     DIM k AS INTEGER
-    k = gtk_dialog_add_button(d, "Umbenennen", 1)
-    k = gtk_dialog_add_button(d, "Löschen", 2)
+    k = gtk_dialog_add_button(d, tr$("Umbenennen"), 1)
+    k = gtk_dialog_add_button(d, tr$("Löschen"), 2)
     vlFuellen()
     gtk_widget_show_all(d)
     WHILE TRUE
@@ -976,13 +974,13 @@ SUB vorlagenDialog()
         IF i < 0 THEN CONTINUE
         DIM f AS STRING
         IF a = 2 THEN
-            IF NOT pdFrage(d, "Vorlage löschen", "Vorlage „" + vlDaten[i].name + "“ wirklich löschen?") THEN CONTINUE
+            IF NOT pdFrage(d, tr$("Vorlage löschen"), trf$("Vorlage „{0}“ wirklich löschen?", [vlDaten[i].name])) THEN CONTINUE
             f = vlAendern$(i, "", TRUE)
         ELSE
-            DIM n AS STRING : n = textFragen("Umbenennen", "Neuer Name:", vlDaten[i].name)
+            DIM n AS STRING : n = textFragen(tr$("Umbenennen"), tr$("Neuer Name:"), vlDaten[i].name)
             IF n = "" THEN CONTINUE
             f = vlAendern$(i, n, FALSE)
-            IF f <> "" THEN pdWarnung(d, "Umbenennen", f)
+            IF f <> "" THEN pdWarnung(d, tr$("Umbenennen"), f)
         END IF
         vlFuellen()
     WEND
@@ -1036,13 +1034,13 @@ SUB autoZuschneidenBefehl()
     DIM ah AS INTEGER : ah = lwMuster.hoehe
     DIM r AS ARRAY OF INTEGER : r = kern.autoZuschneiden(lwMuster, wzVerlauf)
     IF LEN(r) = 0 THEN
-        statusMeldung("Keine leeren Ränder zum Entfernen")
+        statusMeldung(tr$("Keine leeren Ränder zum Entfernen"))
         RETURN
     END IF
     mrAuswahl = NIL
     allesNeu()
     leinwandEinpassen()
-    statusMeldung("Zugeschnitten: " + STR$(ab) + "×" + STR$(ah) + " → " + STR$(lwMuster.breite) + "×" + STR$(lwMuster.hoehe) + " (L:" + STR$(r[0]) + " O:" + STR$(r[1]) + " R:" + STR$(r[2]) + " U:" + STR$(r[3]) + " entfernt)")
+    statusMeldung(trf$("Zugeschnitten: {0}×{1} → {2}×{3} (L:{4} O:{5} R:{6} U:{7} entfernt)", [STR$(ab), STR$(ah), STR$(lwMuster.breite), STR$(lwMuster.hoehe), STR$(r[0]), STR$(r[1]), STR$(r[2]), STR$(r[3])]))
 END SUB
 
 ' Alle Ebenen vereinen -- mit Rueckfrage, die sagt, was auf ausgeblendeten
@@ -1050,19 +1048,19 @@ END SUB
 SUB ebenenVereinenBefehl(fragen AS BOOLEAN)
     IF NOT lwHat OR wzZug <> ZUG_KEINER THEN RETURN
     IF lwMuster.ebenen.anzahl() < 2 THEN
-        statusMeldung("Nur eine Ebene -- nichts zu vereinen.")
+        statusMeldung(tr$("Nur eine Ebene -- nichts zu vereinen."))
         RETURN
     END IF
     IF fragen THEN
         DIM weg AS INTEGER : weg = kern.ausgeblendeteStiche(lwMuster)
-        DIM text AS STRING : text = "Alle " + STR$(lwMuster.ebenen.anzahl()) + " Ebenen zu einer vereinen?"
-        IF weg > 0 THEN text = text + CHR$(10) + CHR$(10) + ZAHL$(weg, 0) + IIF(lwMuster.modus = "diamond", " Drills", " Stiche") + " auf ausgeblendeten Ebenen gehen dabei verloren."
-        text = text + CHR$(10) + CHR$(10) + "Rückgängig holt die Ebenen zurück."
-        IF NOT pdFrage(fenster, "Vereinen", text) THEN RETURN
+        DIM text AS STRING : text = trf$("Alle {0} Ebenen zu einer vereinen?", [STR$(lwMuster.ebenen.anzahl())])
+        IF weg > 0 THEN text = trf$("{0}{1}{2}{3}{4} auf ausgeblendeten Ebenen gehen dabei verloren.", [text, CHR$(10), CHR$(10), zahlText$(weg, 0), IIF(lwMuster.modus = "diamond", tr$(" Drills"), tr$(" Stiche"))])
+        text = trf$("{0}{1}{2}Rückgängig holt die Ebenen zurück.", [text, CHR$(10), CHR$(10)])
+        IF NOT pdFrage(fenster, tr$("Vereinen"), text) THEN RETURN
     END IF
     IF NOT kern.ebenenVereinen(lwMuster, wzVerlauf) THEN RETURN
     allesNeu()
-    statusMeldung("Alle Ebenen vereint.")
+    statusMeldung(tr$("Alle Ebenen vereint."))
 END SUB
 
 ' Die aktive Ebene leeren (PySticky "Leeren" im Kontextmenue der Ebenen) --
@@ -1071,20 +1069,20 @@ SUB ebeneLeerenBefehl(fragen AS BOOLEAN)
     IF NOT lwHat OR wzZug <> ZUG_KEINER THEN RETURN
     DIM e AS kern.Ebene : e = lwMuster.ebenen.aktiveEbene()
     IF e.gesperrt THEN
-        statusMeldung("Die Ebene „" + e.name + "“ ist gesperrt.")
+        statusMeldung(trf$("Die Ebene „{0}“ ist gesperrt.", [e.name]))
         RETURN
     END IF
     DIM n AS INTEGER : n = e.stichzahl()
     IF n = 0 THEN
-        statusMeldung("Die Ebene „" + e.name + "“ ist schon leer.")
+        statusMeldung(trf$("Die Ebene „{0}“ ist schon leer.", [e.name]))
         RETURN
     END IF
     IF fragen THEN
-        IF NOT pdFrage(fenster, "Ebene leeren", "Alle " + ZAHL$(n, 0) + IIF(lwMuster.modus = "diamond", " Drills", " Stiche") + " aus „" + e.name + "“ entfernen?" + CHR$(10) + CHR$(10) + "Rückstiche bleiben; Rückgängig holt die Stiche zurück.") THEN RETURN
+        IF NOT pdFrage(fenster, tr$("Ebene leeren"), trf$("Alle {0}{1} aus „{2}“ entfernen?{3}{4}Rückstiche bleiben; Rückgängig holt die Stiche zurück.", [zahlText$(n, 0), IIF(lwMuster.modus = "diamond", tr$(" Drills"), tr$(" Stiche")), e.name, CHR$(10), CHR$(10)])) THEN RETURN
     END IF
     IF kern.ebeneLeeren(lwMuster, wzVerlauf, lwMuster.ebenen.aktiv) = 0 THEN RETURN
     allesNeu()
-    statusMeldung("Ebene „" + e.name + "“ geleert.")
+    statusMeldung(trf$("Ebene „{0}“ geleert.", [e.name]))
 END SUB
 
 ' Zuletzt geoeffnet (PySticky "Kürzlich geöffnet"): die Liste unter den
@@ -1105,7 +1103,7 @@ SUB zuletztGeklickt(w AS INTEGER, i AS INTEGER)
     DIM p AS STRING : p = zlPfade[i]
     IF NOT ungesichertFragen("Öffnen") THEN RETURN
     IF NOT FILEEXISTS(p) THEN
-        pdWarnung(fenster, "Datei nicht gefunden", "Die Datei gibt es nicht mehr:" + CHR$(10) + p)
+        pdWarnung(fenster, tr$("Datei nicht gefunden"), trf$("Die Datei gibt es nicht mehr:{0}{1}", [CHR$(10), p]))
         zuletztNachziehen()
         RETURN
     END IF
@@ -1124,7 +1122,7 @@ SUB zuletztNachziehen()
         gtkKlasse(ue, "dim-label")
         gtk_box_pack_start(zlBox, ue, FALSE, FALSE, 2)
         IF LEN(zlPfade) = 0 THEN
-            DIM leer AS INTEGER : leer = gtk_label_new("(keine)")
+            DIM leer AS INTEGER : leer = gtk_label_new(tr$("(keine)"))
             gtk_label_set_xalign(leer, 0.0)
             gtk_widget_set_sensitive(leer, FALSE)
             gtk_box_pack_start(zlBox, leer, FALSE, FALSE, 2)

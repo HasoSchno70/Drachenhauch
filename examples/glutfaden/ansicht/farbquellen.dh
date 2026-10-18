@@ -37,7 +37,7 @@ SUB bildschirmPipette()
     IF NOT lwHat THEN RETURN
     DIM f AS INTEGER : f = bpWaehlen()
     IF f < 0 THEN
-        statusMeldung("Bildschirm-Pipette abgebrochen.")
+        statusMeldung(tr$("Bildschirm-Pipette abgebrochen."))
         RETURN
     END IF
     bildschirmFarbeUebernehmen(f)
@@ -48,7 +48,7 @@ FUNCTION bpWaehlen() AS INTEGER
     DIM x0 AS INTEGER, y0 AS INTEGER
     bpBild = bpFoto(x0, y0)
     IF bpBild = 0 THEN
-        statusMeldung("Kein Bildschirmfoto möglich.")
+        statusMeldung(tr$("Kein Bildschirmfoto möglich."))
         RETURN -1
     END IF
     bpFarbe = -1
@@ -81,7 +81,7 @@ FUNCTION bpZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     cairo_paint(cr)
     ' der Hinweis oben, wie im Original
     DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
-    pango_layout_set_text(layout, "Klicke irgendwo auf den Bildschirm, um eine Farbe zu picken. Esc = abbrechen.", -1)
+    pango_layout_set_text(layout, tr$("Klicke irgendwo auf den Bildschirm, um eine Farbe zu picken. Esc = abbrechen."), -1)
     DIM tb AS INTEGER, th AS INTEGER
     pango_layout_get_pixel_size(layout, tb, th)
     DIM b AS FLOAT : b = gtk_widget_get_allocated_width(w)
@@ -138,12 +138,12 @@ SUB bildschirmFarbeUebernehmen(farbe AS INTEGER)
     IF slPalette >= 0 AND slPalette < LEN(slPaletten) THEN nr = kern.naechstesGarnIn(farbe, slPaletten[slPalette], abstand)
     IF nr >= 0 THEN
         garnHinzufuegen(slPalette, nr)
-        statusMeldung("Bildschirmfarbe " + hex + " → " + TRIM$(slPaletten[slPalette].garne[nr].hersteller + " " + slPaletten[slPalette].garne[nr].nummer) + " " + slPaletten[slPalette].garne[nr].name + " (ΔE " + FORMAT$(abstand, "%.1f") + ")")
+        statusMeldung(trf$("Bildschirmfarbe {0} → {1} {2} (ΔE {3})", [hex, TRIM$(slPaletten[slPalette].garne[nr].hersteller + " " + slPaletten[slPalette].garne[nr].nummer), slPaletten[slPalette].garne[nr].name, FORMAT$(abstand, "%.1f")]))
     ELSE
         DIM g AS kern.Garn : g = kern.neuesGarn(hex, farbe, "", "")
         wzFarbe = kern.farbeHinzufuegen(lwMuster, wzVerlauf, g, slSymbole, FALSE, FALSE, NOT einst.symboleAuto)
         allesNeu()
-        statusMeldung("Bildschirmfarbe " + hex + " ist jetzt im Muster.")
+        statusMeldung(trf$("Bildschirmfarbe {0} ist jetzt im Muster.", [hex]))
     END IF
 END SUB
 
@@ -152,19 +152,19 @@ END SUB
 FUNCTION palettePfad$(sichern AS BOOLEAN) AS STRING
     DIM d AS INTEGER
     IF sichern THEN
-        d = gtk_file_chooser_dialog_new("Palette exportieren", fenster, GTK_DATEI_SICHERN, _
-            "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Sichern", GTK_ANTWORT_ANNEHMEN, 0)
+        d = gtk_file_chooser_dialog_new(tr$("Palette exportieren"), fenster, GTK_DATEI_SICHERN, _
+            tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Sichern"), GTK_ANTWORT_ANNEHMEN, 0)
         gtk_file_chooser_set_do_overwrite_confirmation(d, TRUE)
         gtk_file_chooser_set_current_name(d, lwMuster.name + "_palette.json")
     ELSE
-        d = gtk_file_chooser_dialog_new("Palette importieren", fenster, GTK_DATEI_OEFFNEN, _
-            "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Öffnen", GTK_ANTWORT_ANNEHMEN, 0)
+        d = gtk_file_chooser_dialog_new(tr$("Palette importieren"), fenster, GTK_DATEI_OEFFNEN, _
+            tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Öffnen"), GTK_ANTWORT_ANNEHMEN, 0)
     END IF
     IF musterPfad <> "" THEN
         DIM ok AS BOOLEAN : ok = gtk_file_chooser_set_current_folder(d, DIRNAME(musterPfad))
     END IF
     DIM filter AS INTEGER : filter = gtk_file_filter_new()
-    gtk_file_filter_set_name(filter, "JSON-Dateien (*.json)")
+    gtk_file_filter_set_name(filter, tr$("JSON-Dateien (*.json)"))
     gtk_file_filter_add_pattern(filter, "*.json")
     gtk_file_chooser_add_filter(d, filter)
     DIM pfad AS STRING
@@ -180,7 +180,7 @@ END FUNCTION
 SUB paletteExportieren()
     IF NOT lwHat THEN RETURN
     IF lwMuster.farbanzahl() = 0 THEN
-        pdWarnung(fenster, "Keine Farben", "Das Muster enthält keine Farben zum Exportieren.")
+        pdWarnung(fenster, tr$("Keine Farben"), tr$("Das Muster enthält keine Farben zum Exportieren."))
         RETURN
     END IF
     DIM pfad AS STRING : pfad = palettePfad$(TRUE)
@@ -192,10 +192,10 @@ FUNCTION paletteExportNach(pfad AS STRING) AS STRING
     TRY
         kern.textSchreiben(pfad, kern.paletteDateiText$(lwMuster))
     CATCH f
-        pdWarnung(fenster, "Fehler", "Palette konnte nicht exportiert werden:" + CHR$(10) + f)
+        pdWarnung(fenster, tr$("Fehler"), trf$("Palette konnte nicht exportiert werden:{0}{1}", [CHR$(10), f]))
         RETURN f
     END TRY
-    statusMeldung("Palette exportiert: " + STR$(lwMuster.farbanzahl()) + " Farben → " + pfad)
+    statusMeldung(trf$("Palette exportiert: {0} Farben → {1}", [STR$(lwMuster.farbanzahl()), pfad]))
     RETURN ""
 END FUNCTION
 
@@ -210,19 +210,19 @@ END SUB
 FUNCTION paletteImportVon(pfad AS STRING, fragen AS BOOLEAN) AS INTEGER
     DIM text AS STRING
     DIM n AS INTEGER
-    DIM name AS STRING : name = "Unbekannt"
+    DIM name AS STRING : name = tr$("Unbekannt")
     TRY
         DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(pfad)
         text = JOIN$(zeilen, CHR$(10))
         n = kern.paletteImportieren(lwMuster, wzVerlauf, text, slSymbole)
         DIM j AS JSON_HANDLE : j = JSON_PARSE(text)
-        name = kern.paletteText$(j, "name", "Unbekannt")
+        name = kern.paletteText$(j, "name", tr$("Unbekannt"))
     CATCH f
         statusMeldung(f)
-        IF fragen THEN pdWarnung(fenster, "Palette importieren", f)
+        IF fragen THEN pdWarnung(fenster, tr$("Palette importieren"), f)
         RETURN -1
     END TRY
     allesNeu()
-    statusMeldung("Palette importiert: " + STR$(n) + " Farben aus " + name)
+    statusMeldung(trf$("Palette importiert: {0} Farben aus {1}", [STR$(n), name]))
     RETURN n
 END FUNCTION

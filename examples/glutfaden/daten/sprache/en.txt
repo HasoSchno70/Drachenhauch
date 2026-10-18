@@ -6,8 +6,102 @@ Abgelegt: nichts, was Glutfaden öffnen kann (Muster .pxs/.oxs/.xsd/.pat oder ei
 Tastenkürzel	Keyboard shortcuts
 Schließen	Close
 Aktion	Action
-<span alpha='45%'>—</span>	<span alpha='45%'>—</span>
 Umlegen unter Einstellungen → Tastenkürzel.	Change them under Settings → Keyboard shortcuts.
+Aida 11 (4,3 St/cm)	Aida 11 (4.3 st/cm)
+Aida 14 (5,5 St/cm)	Aida 14 (5.5 st/cm)
+Aida 16 (6,3 St/cm)	Aida 16 (6.3 st/cm)
+Aida 18 (7,1 St/cm)	Aida 18 (7.1 st/cm)
+Evenweave 28 (11 St/cm)	Evenweave 28 (11 st/cm)
+Leinen 32 (12,6 St/cm)	Linen 32 (12.6 st/cm)
+ (+{0} übersp.)	 (+{0} skipped)
+Score: {0} / 12{1}  Farben: {2}/3 ({3} verwendet){4}  Stiche: {5}/3 ({6} zu sticken){7}  Sonderstiche: {8}/3 ({9}% Anteil){10}  Backstitches: {11}/3 ({12} Linien)	Score: {0} / 12{1}  Colors: {2}/3 ({3} used){4}  Stitches: {5}/3 ({6} to stitch){7}  Special stitches: {8}/3 ({9}% share){10}  Backstitches: {11}/3 ({12} lines)
+nicht kleben	not glued
+nicht sticken	not stitched
+<b>Gesamt: {0} Stränge{1}</b>	<b>Total: {0} skeins{1}</b>
+ ({0} Farbe(n) übersprungen)	 ({0} color(s) skipped)
+<b>Geschätzte Kosten: {0} €</b>	<b>Estimated cost: {0} €</b>
+<i>Das Muster enthält keine gestickte Farbe — keine Einkaufsliste.</i>	<i>The pattern contains no stitched color — no shopping list.</i>
+<span foreground='#e74c3c'><b>{0}</b> Stränge insgesamt zu kaufen</span>	<span foreground='#e74c3c'><b>{0}</b> skeins to buy in total</span>
+<span foreground='#2ecc71'>✓ Du hast alles im Vorrat!</span>	<span foreground='#2ecc71'>✓ You have everything in stock!</span>
+ Diamanten gesetzt	 diamonds placed
+ Stiche gestickt	 stitches stitched
+<span foreground='#2ecc71'>✓ Fertig</span>	<span foreground='#2ecc71'>✓ Done</span>
+<span foreground='#f39c12'>In Arbeit</span>	<span foreground='#f39c12'>In progress</span>
+<span foreground='#8d93a1'>Offen</span>	<span foreground='#8d93a1'>Open</span>
+Statistiken exportieren	Export Statistics
+Abbrechen	Cancel
+Sichern	Save
+Statistiken exportiert nach {0}	Statistics exported to {0}
+Export fehlgeschlagen: {0}	Export failed: {0}
+Muster-Statistiken & Garnverbrauch	Pattern Statistics & Thread Usage
+Größe	Size
+Gesamt-Drills	Total drills
+Gesamtstiche	Total Stitches
+Farben	Colors
+Rückstiche	Backstitches
+Abdeckung	Coverage
+Ebenen	Layers
+Schwierigkeit	Difficulty
+Top 5 Farben	Top 5 Colors
+Übersicht	Overview
+Farbe	Color
+Symbol	Symbol
+Name	Name
+Hersteller	Manufacturer
+Nr.	No.
+Drills	Drills
+Stiche	Stitches
+Stoffart:	Fabric Type:
+   Sicherheitszuschlag:	   Safety Margin:
+%   Preis pro Strang:	%   Price per skein:
+Stränge	Skeins
+Stränge (+Zuschlag)	Skeins (+Margin)
+Kosten	Cost
+Garnverbrauch	Thread usage
+Stickerfahrung:	Stitching Experience:
+   Stunden pro Tag:	   Hours per Day:
+Geschätzte Gesamtzeit	Estimated Total Time
+Bei täglichem Kleben	With Daily Gluing
+Bei täglichem Sticken	With Daily Stitching
+Drills pro Stunde	Drills per Hour
+Stiche pro Stunde	Stitches per Hour
+Durchschn. pro Farbe	Avg. per Color
+Zeitaufwand pro Farbe (geschätzt)	Time per Color (estimated)
+Geschätzte Zeit	Estimated Time
+Zeitschätzung	Time estimate
+Gesamtfortschritt	Overall Progress
+Erledigt	Done
+Verbleibend	Remaining
+Farben fertig	Colors Done
+Fortschritt pro Farbe	Progress per Color
+Gesamt	Total
+Status	Status
+Fortschritt	Progress
+Vergleich des Garnbedarfs für dieses Muster mit deinem hinterlegten Vorrat (Zuschlag wie im Reiter „Garnverbrauch“).	Compares the thread needed for this pattern with your stored inventory (margin as on the “Thread usage” tab).
+Benötigt	Needed
+Vorrat	In Stock
+Zu kaufen	To Buy
+Garn-Vorrat bearbeiten …	Edit thread inventory …
+🛒 Einkaufsliste	🛒 Shopping List
+Als CSV exportieren …	Export as CSV …
+Je Garn Symbol, Name, Hersteller, Nummer, Stiche, Anteil{0}	Per thread: symbol, name, manufacturer, number, stitches, share{0}
+, Stränge und Kosten (Einstellungen des Garn-Reiters)	, skeins and cost (settings of the thread tab)
+{0} Stich	{0} stitch
+{0} Stiche	{0} stitches
+Pattern-Heatmap	Pattern Heatmap
+Farbenvielfalt (verschiedene Farben pro Block)	Color variety (distinct colors per block)
+Stichdichte (Anzahl Stiche pro Block)	Stitch density (number of stitches per block)
+Achse	Axis
+Block-Größe	Block size
+Links: niedrig — Rechts: hoch (höchster Wert im Muster)	Left: low — right: high (highest value in the pattern)
+{0} Paar(e) gefunden	{0} pair(s) found
+{0} Farbe(n) zusammengeführt, {1} Stiche umgefärbt ({2} nimmt es zurück).	{0} color(s) merged, {1} stitches recolored ({2} undoes it).
+Ähnliche Farben zusammenführen	Merge Similar Colors
+Zusammenführen	Merge
+Schwellwert	Threshold
+Niedrigerer Wert = nur sehr ähnliche Farben (CIEDE2000). Höherer Wert = mehr Paare. Die zweite Farbe jedes Paars geht in die erste über.	Lower value = only very similar colors (CIEDE2000). Higher value = more pairs. The second color of each pair is merged into the first.
+Alle auswählen	Select all
+Keine auswählen	Select none
 Farben wieder wie gestickt.	Colors as stitched again.
 Ansicht: {0} -- nur die Anzeige, die Farben bleiben.	View: {0} -- display only, the colors stay.
 Auswerten und planen -- Statistik ({statistik}), Heatmap, ähnliche Farben, Garn-Vorrat, Palette ({palette}), Farben tauschen ({tauschen}), Rahmen, Farbenblindheit	Analyze and plan -- statistics ({statistik}), heatmap, similar colors, thread inventory, palette ({palette}), swap colors ({tauschen}), frames, color blindness
@@ -20,11 +114,303 @@ Farben tauschen …	Swap colors …
 Rahmenaufteilung …	Split across frames …
 Planen & Vorrat	Planning & inventory
 Farbenblindheit simulieren	Simulate color blindness
+Automatisch sichern ging nicht: {0}	Autosave failed: {0}
+Automatisch gesichert: {0}	Autosaved: {0}
+Es gibt einen automatisch gesicherten Stand	There is an autosaved state
+{0} von „{1}“, neuer als die Datei	{0} of “{1}”, newer than the file
+{0} eines nie gesicherten Musters	{0} of a pattern that was never saved
+{0} ({1}).{2}Wiederherstellen?	{0} ({1}).{2}Restore it?
+Automatisch gesicherter Stand	Autosaved state
+Wiederhergestellt	Restored
+Wiederhergestellt -- noch nicht gesichert.	Restored -- not saved yet.
+Nicht wiederhergestellt	Not restored
+Der Stand ließ sich nicht laden: {0}	The saved state could not be loaded: {0}
+Zum Ersetzen braucht es eine zweite Farbe.	Replacing needs a second color.
+Farbe ersetzen	Replace color
+Ersetzen	Replace
+0 = nur diese Farbe; sonst auch alle, die so ähnlich sind (CIEDE2000)	0 = only this color; otherwise all colors this similar too (CIEDE2000)
+durch	with
+Toleranz	Tolerance
+{0} Stiche ersetzt. Die alte Farbe bleibt in der Liste -- „Unbenutzte entfernen“ räumt sie weg.	{0} stitches replaced. The old color stays in the list -- “Remove unused” clears it away.
+{0}{1} mit zusammen {2} Stichen (verdeckte und ausgeblendete bleiben).	{0}{1} with {2} stitches in total (covered and hidden ones stay).
+ Farbe	 color
+ Farben	 colors
+Seltene Farben zusammenlegen	Merge rare colors
+Zusammenlegen	Merge
+Höchstens	At most
+{0} Stiche umgefärbt.	{0} stitches recolored.
+{0} Farben mit so wenigen Stichen gehen in die ähnlichste häufige über.	{0} colors with this few stitches are merged into the most similar frequent one.
+Symbol bereits vergeben	Symbol already in use
+Symbol bearbeiten - {0}	Edit symbol - {0}
+Übernehmen	Apply
+Aktuelles Symbol: <span size='x-large'>{0}</span>	Current symbol: <span size='x-large'>{0}</span>
+Eigenes Symbol	Custom Symbol
+Beliebiges Zeichen eingeben	Enter any character
+Symbol auswählen	Select Symbol
+Suche: Zeichen, Name oder U+25CF / 25CF	Search: character, name or U+25CF / 25CF
+Keine Treffer.	No matches.
+Das Symbol „{0}“ wird schon von einer anderen Farbe verwendet ({1}){2}Bitte ein anderes Symbol wählen.	The symbol “{0}” is already used by another color ({1}){2}Please choose a different symbol.
+Symbol von {0}: {1}	Symbol of {0}: {1}
+Tweed-Blend erzeugen	Create Tweed Blend
+Zum Muster hinzufügen	Add to pattern
+Zwei Garne in einer Nadel ergeben einen Tweed: 1 Strang DMC 310 (schwarz) und 1 Strang DMC 745 (creme) etwa einen warmen Pfeffer-und-Salz-Ton. Die Mischfarbe ist das Mittel in Lab, so wie das Auge sie sieht.	Two threads in one needle make a tweed: 1 strand of DMC 310 (black) and 1 strand of DMC 745 (cream), for example, give a warm salt-and-pepper tone. The blended color is the mean in Lab, the way the eye sees it.
+Palette A	Palette A
+Garn A	Thread A
+Stränge A	Strands A
+Palette B	Palette B
+Garn B	Thread B
+Stränge B	Strands B
+Vorschau	Preview
+(beide Garne wählen)	(choose both threads)
+{0}{1}Mischfarbe {2}	{0}{1}Blended color {2}
+Tweed-Blend hinzugefügt: {0} (Symbol {1}).	Tweed blend added: {0} (symbol {1}).
+Diesen Blend gibt es schon im Muster -- er ist jetzt die aktuelle Farbe.	This blend is already in the pattern -- it is now the current color.
+Im Diamond-Modus gibt es keine Blends -- ein Drill ist eine Farbe.	There are no blends in diamond mode -- a drill is one color.
+Muster wurde gedruckt.	Pattern was printed.
+Druckfehler	Print Error
+Fehler beim Drucken:{0}{1}	Printing failed:{0}{1}
+kein Muster	no pattern
+Einstellungen	Settings
+Alles zurücksetzen	Reset everything
+Alle Einstellungen auf die Vorgaben -- gesichert wird erst mit Übernehmen oder OK	All settings back to the defaults -- saved only with Apply or OK
+Allgemein	General
+Automatisch sichern	Autosave
+Sichert ungesicherte Änderungen regelmäßig neben die Datei (<name>.pxs.autosave) bzw. in den Einstellungsordner. Nach einem Absturz bietet Glutfaden den Stand an.	Regularly saves unsaved changes next to the file (<name>.pxs.autosave) or into the settings folder. After a crash Glutfaden offers that state.
+Alle (Minuten):	Every (minutes):
+Abstand zwischen zwei automatischen Sicherungen	Interval between two autosaves
+Vor dem Überschreiben eine .bak anlegen	Create a .bak before overwriting
+Beim Sichern wandert die vorige Fassung nach <name>.pxs.bak	When saving, the previous version moves to <name>.pxs.bak
+Versionen höchstens alle (Minuten):	Versions at most every (minutes):
+Wie oft beim Arbeiten eine Version (Muster -> Versionen) angelegt wird	How often a version (Pattern -> Versions) is created while you work
+Programmstart	Startup
+Ohne Datei beim Start:	At startup without a file:
+Was Glutfaden zeigt, wenn es ohne Datei gestartet wird	What Glutfaden shows when started without a file
+Zuletzt geöffnet (Anzahl):	Recently opened (count):
+So viele Dateien stehen unter Muster -> Zuletzt geöffnet; 0 = keine Liste	This many files are listed under Pattern -> Recently opened; 0 = no list
+Fenstergröße wiederherstellen	Restore window size
+Startet in der Größe, in der Glutfaden zuletzt geschlossen wurde	Starts at the size Glutfaden had when it was last closed
+Stickzeit messen	Measure stitching time
+Solange das Werkzeug Fortschritt gewählt ist, zählt Glutfaden die Zeit (Muster -> Stickzeit)	While the Progress tool is selected, Glutfaden counts the time (Pattern -> Stitching time)
+Dunkel	Dark
+Hell	Light
+Erscheinungsbild:	Appearance:
+Gilt sofort nach Übernehmen	Takes effect right after Apply
 Automatisch (Systemsprache)	Automatic (system language)
 Sprache / Language:	Language / Sprache:
 Gilt ab dem nächsten Start	Takes effect at the next start
+Nachfragen und Meldungen	Questions and messages
+Vor dem Beenden fragen	Ask before quitting
+Fragt auch dann, wenn nichts ungesichert ist	Asks even when nothing is unsaved
+Vor dem Überschreiben warnen	Warn before overwriting
+Fragt im Sichern-Dialog, bevor eine vorhandene Datei ersetzt wird	Asks in the save dialog before an existing file is replaced
+Meldungen stehen (Sekunden):	Messages stay (seconds):
+Wie lange eine Meldung vorn in der Statuszeile steht	How long a message stays in front in the status bar
+Wasserzeichen im Export	Watermark in exports
+z. B. Anna Müller	e.g. Anna Miller
+Autor:	Author:
+Steht in PDF und HTML, wenn das Muster selbst keinen Autor hat	Shown in PDF and HTML when the pattern has no author of its own
+z. B. © 2026 Anna Müller	e.g. © 2026 Anna Miller
+Copyright:	Copyright:
+Fußzeile in PDF und HTML, wenn das Muster selbst keins hat	Footer in PDF and HTML when the pattern has none of its own
+Zeichenfläche	Canvas
+Raster	Grid
+Raster zeigen	Show grid
+Lineale oben und links	Rulers at the top and left
+Stichnummern am Rand; ein Klick holt Spalte oder Zeile in die Mitte	Stitch numbers at the edge; a click brings the column or row to the center
+Übersicht in der Seitenleiste	Overview in the sidebar
+Das ganze Muster klein, mit dem sichtbaren Ausschnitt	The whole pattern in small, with the visible area
+Kräftige Linie alle (Stiche):	Bold line every (stitches):
+Neben-Raster zeigen	Show minor grid
+Eine zweite, eigene Linie zwischen den kräftigen	A second line of its own between the bold ones
+Neben-Linie alle (Stiche):	Minor line every (stitches):
+Muss kleiner sein als der Abstand der kräftigen Linien -- sonst fiele jede Neben-Linie auf eine kräftige	Must be smaller than the spacing of the bold lines -- otherwise every minor line would fall on a bold one
+Farbe der Linien:	Line color:
+Farbe der Neben-Linien:	Minor line color:
+Farbe der kräftigen Linien:	Bold line color:
+Eine Farbe, die auf dem Stoff kaum zu sehen wäre, wird beim Zeichnen durch Grau ersetzt	A color that would hardly show on the fabric is drawn in gray instead
+Zoom	Zoom
+Kästchen bei 100 % (Pixel):	Square at 100 % (pixels):
+Kleinstes Kästchen (Pixel):	Smallest square (pixels):
+Größtes Kästchen (Pixel):	Largest square (pixels):
+Faktor je Zoomschritt:	Factor per zoom step:
+Mausrad, + und - und die Knöpfe	Mouse wheel, + and - and the buttons
+Magnetisches Raster	Magnetic grid
+Formen rasten ein	Shapes snap
+Linie, Rechteck, Ellipse und Vieleck setzen ihre Ecken nur auf jedes n-te Kästchen (auch über den Knopf mit dem Magneten)	Line, rectangle, ellipse and polygon put their corners only on every nth square (also via the button with the magnet)
+Alle (Stiche):	Every (stitches):
+Intervall für das magnetische Einrasten	Interval for magnetic snapping
+Hintergrund	Background
+Um das Muster:	Around the pattern:
+Leere Kästchen (Stoff):	Empty squares (fabric):
+Stoff-Textur (Aida)	Fabric texture (Aida)
+Ein feiner Punkt in jedem leeren Kästchen, ab 8 Pixel je Kästchen	A fine dot in every empty square, from 8 pixels per square
+Werkzeuge	Tools
+Beim Start	On startup
+Werkzeug:	Tool:
+Stattdessen das zuletzt benutzte	Instead the last one used
+Pipette	Eyedropper
+Nach dem Aufnehmen:	After picking:
+Farbe in der Statuszeile nennen	Name the color in the status bar
+Beim Aufnehmen und für das Kästchen unter der Maus	When picking and for the square under the mouse
+Füllen	Fill
+Auch über Ecken füllen (diagonal)	Also fill across corners (diagonal)
+Toleranz (%):	Tolerance (%):
+Füllt auch ähnliche Farben mit -- 100 % sind ein Farbabstand (CIEDE2000) von 50	Also fills similar colors -- 100 % is a color distance (CIEDE2000) of 50
+Rückstich	Backstitch
+Linienstärke (2 = normal):	Line width (2 = normal):
+Auch an Kantenmitten und in der Mitte ansetzen	Also start at edge midpoints and in the center
+Aus: nur an den Ecken der Kästchen	Off: only at the corners of the squares
+Tablet und Stift	Tablet and pen
+Druck nutzen (Wacom, Surface Pen …)	Use pressure (Wacom, Surface Pen …)
+Mit einem Stift wächst der Pinsel des Stift-Werkzeugs mit dem Druck; die Maus setzt weiter einen Stich je Kästchen	With a pen the brush of the pencil tool grows with the pressure; the mouse still sets one stitch per square
+Größter Pinsel (Radius + 1):	Largest brush (radius + 1):
+Bei vollem Druck; 1 = immer ein einzelner Stich	At full pressure; 1 = always a single stitch
+Zoomen mit zwei Fingern (Touchscreen, Touchpad)	Zoom with two fingers (touchscreen, touchpad)
+Aus per Vorgabe -- Windows zeigt sonst auf manchen Geräten beim langen Ziehen einen Hinweis	Off by default -- otherwise Windows shows a hint on some devices during long drags
+Auswahl	Selection
+Laufende Auswahlkante	Marching ants
+Die gestrichelte Kante der Auswahl läuft, solange ein Auswahlwerkzeug gewählt ist	The dashed edge of the selection moves while a selection tool is selected
+Palette	Palette
+Für Muster ohne Farben:	For patterns without colors:
+Welche Palette die Seitenleiste zeigt, solange das Muster noch keine Farbe hat	Which palette the sidebar shows while the pattern has no color yet
+Katalognummern zeigen	Show catalog numbers
+In der Farbliste und im Katalog	In the color list and in the catalog
+Farbleiste unter der Zeichenfläche	Color bar below the canvas
+Alle Farben des Musters als Felder: klicken wählt, ziehen tauscht	All colors of the pattern as fields: click selects, drag swaps
+Farbleisten-Größe (px):	Color bar size (px):
+Größe der Farbfelder in der Farbleiste	Size of color fields in the color bar
+Symbole	Symbols
+Schrift:	Font:
+Name einer installierten Schrift, z. B. Segoe UI Symbol oder DejaVu Sans	Name of an installed font, e.g. Segoe UI Symbol or DejaVu Sans
+Größe (10 = normal):	Size (10 = normal):
+Neuen Farben automatisch ein Symbol geben	Give new colors a symbol automatically
+Aus: neue Farben bekommen „?“ und das Symbol wird von Hand vergeben	Off: new colors get “?” and the symbol is assigned by hand
+Anzeige	Display
+Auf der Zeichenfläche:	On the canvas:
+Symbole erscheinen ab 12 Pixel je Kästchen	Symbols appear from 12 pixels per square
+Gewählte Farbe hervorheben	Highlight selected color
+Jede gewählte Farbe wie mit {0} voll zeigen, die anderen gedämpft	Show every selected color in full as with {0}, the others dimmed
+Dateien	Files
+Ordner	Folders
+leer = was das System vorschlägt	empty = what the system suggests
+Öffnen und Sichern in:	Open and save in:
+Wo die Datei-Dialoge anfangen, solange das Muster noch keine Datei hat	Where the file dialogs start while the pattern has no file yet
+leer = im Einstellungsordner	empty = in the settings folder
+Muster-Bibliothek:	Pattern Library:
+Wo die Muster-Bibliothek (library.json) liegt; ein Ordner, der nicht geht, fällt auf die Vorgabe zurück	Where the pattern library (library.json) is stored; a folder that does not work falls back to the default
+Eigene Vorlagen:	My templates:
+Wo die eigenen Vorlagen (user_templates.json) liegen	Where your own templates (user_templates.json) are stored
+Export (Vorgaben)	Export (defaults)
+PDF: Stiche je Seite:	PDF: stitches per page:
+0 = die Vorgabe des Formats, sonst 20 bis 60	0 = the default of the format, otherwise 20 to 60
+Überlappung (Stiche):	Overlap (stitches):
+Mystery: Vorschau ohne Bild	Mystery: preview without picture
+Bildimport (Vorgaben)	Image import (defaults)
+Höchstens Farben:	At most colors:
+Kein Dithering	No dithering
+Floyd-Steinberg	Floyd-Steinberg
+Geordnet (Bayer)	Ordered (Bayer)
+Dithering:	Dithering:
+Doppelklick auf eine Zeile (oder „Ändern …“) und dann die neue Taste drücken. Eine Taste, die schon ein anderer Befehl hat, wird abgelehnt.	Double-click a row (or “Change …”) and then press the new key. A key that another command already has is refused.
+Ändern …	Change …
+Vorgabe	Default
+Alle zurücksetzen	Reset all
 Die Sprache wechselt beim nächsten Start.	The language changes at the next start.
+Ordner wählen	Select folder
+Wählen	Choose
   (eigen)	  (custom)
+Keine Zeile gewählt.	No row selected.
+„{0}“ ist kein Tastenkürzel.	“{0}” is not a shortcut.
+„{0}“ hat schon „{1}“.	“{1}” already has “{0}”.
+Tastenkürzel zurücksetzen	Reset Shortcuts
+Alle Tastenkürzel auf die Vorgaben zurücksetzen?	Reset all shortcuts to the defaults?
+Tastenkürzel: {0}	Shortcut: {0}
+Neue Taste für „{0}“ drücken:	Press the new key for “{0}”:
+Tastenkürzel bereits vergeben	Shortcut already in use
+Einstellungen zurücksetzen	Reset Settings
+Alle Einstellungen auf die Vorgaben zurücksetzen?{0}Gesichert wird erst mit Übernehmen oder OK.	Reset all settings to the defaults?{0}They are saved only with Apply or OK.
+Einstellungen übernommen.	Settings applied.
+Einstellungen gesichert.	Settings saved.
+Raster-Optionen	Grid options
+Linien	Lines
+Kräftig alle (Stiche):	Bold every (stitches):
+Kleiner als der Abstand der kräftigen Linien	Smaller than the spacing of the bold lines
+Normal:	Normal:
+Neben-Linien:	Minor lines:
+Kräftige Linien:	Bold lines:
+Voreinstellungen	Presets
+{0}~{1}×{2} Drills/Seite → {3} Seiten)	{0}~{1}×{2} drills/page → {3} pages)
+{0} ✓ empfohlen für 1:1	{0} ✓ recommended for 1:1
+{0}{1}×{2} Stiche/Seite)	{0}{1}×{2} stitches/page)
+Bildgröße: {0} × {1} Pixel	Image size: {0} × {1} pixels
+PDF-Dateien (*.pdf)	PDF files (*.pdf)
+HTML-Dateien (*.html)	HTML files (*.html)
+Bilder (*.png, *.jpg, *.bmp)	Images (*.png, *.jpg, *.bmp)
+Open Cross Stitch (*.oxs)	Open Cross Stitch (*.oxs)
+ZIP-Dateien (*.zip)	ZIP files (*.zip)
+Exportieren	Export
+PDF exportiert ({0} Seiten, {1}): {2}	PDF exported ({0} pages, {1}): {2}
+HTML exportiert: {0}	HTML exported: {0}
+Bild exportiert ({0} × {1}): {2}	Image exported ({0} × {1}): {2}
+OXS exportiert: {0}	OXS exported: {0}
+Paket exportiert ({0} Dateien): {1}	Package exported ({0} files): {1}
+{0} -- fehlt: {1}	{0} -- missing: {1}
+Exportieren …	Export …
+PDF-Anleitung	PDF instructions
+HTML-Anleitung (Webseite)	HTML instructions (web page)
+Bild (PNG, JPG oder BMP)	Image (PNG, JPG or BMP)
+Open Cross Stitch (.oxs)	Open Cross Stitch (.oxs)
+Paket (ZIP mit allem)	Package (ZIP with everything)
+Stiche je Seite und Richtung -- 0 nimmt die Vorgabe des Formats. Im Diamond-Modus bestimmt die Drill-Kante (1:1) die Seite.	Stitches per page and direction -- 0 takes the default of the format. In diamond mode the drill edge (1:1) determines the page.
+So viele Stiche der Nachbarseite stehen zusätzlich rechts und unten -- zum Aneinanderlegen.	This many stitches of the neighboring page are repeated on the right and bottom -- for lining pages up.
+z. B. ENTWURF -- leer = keins	e.g. DRAFT -- empty = none
+Mystery: Vorschau ohne Bild, Musterseiten nur mit Symbolen	Mystery: preview without picture, pattern pages with symbols only
+Stickpfad auf den Musterseiten (nächster Nachbar, Sprünge rot gestrichelt)	Stitch path on the pattern pages (nearest neighbor, jumps dashed in red)
+Rasterlinien	Grid lines
+Format	Format
+Papier	Paper
+Zellen/Seite	Cells/Page
+Überlappung	Overlap
+Wasserzeichen	Watermark
+Notizen	Notes
+Entsprechungen	Equivalents
+Pixel je Stich	Pixels per stitch
+Ohne Passwortschutz: die PDF-Bibliothek verschlüsselt nicht.	No password protection: the PDF library does not encrypt.
+Exportiere …	Exporting …
+Nicht exportiert: {0}	Not exported: {0}
+{0} F.	{0} str.
+{0}{1}Hersteller: {2}{3}Nr: {4}{5}Fäden: {6}	{0}{1}Manufacturer: {2}{3}No: {4}{5}Strands: {6}
+{0} Farben ({1} verwendet){2}	{0} colors ({1} used){2}
+ -- vorher {0}	 -- before {0}
+Keine Farbe gewählt	No color selected
+<b>{0} {1}</b>{2}{3}{4}{5} Stiche	<b>{0} {1}</b>{2}{3}{4}{5} stitches
+{0} Farben gewählt{1}Zusammenführen: „{2}“ bleibt	{0} colors selected{1}Merge: “{2}” stays
+Farben in Verwendung	Colors in use
+Noch verwendet: {0}{1}Beim Löschen werden alle Stiche und Rückstiche dieser Farben entfernt. Fortfahren?	Still in use: {0}{1}Deleting removes all stitches and backstitches of these colors. Continue?
+Keine ungenutzten Farben	No unused colors
+Alle Farben haben Stiche oder Rückstiche.	All colors have stitches or backstitches.
+Farben verwalten — {0}	Manage colors — {0}
+Sortieren:	Sort:
+Stellt die Reihenfolge der Farben um -- die Stiche behalten ihre Farbe	Reorders the colors -- the stitches keep their color
+Name, Hersteller, Nummer …	Name, manufacturer, number …
+Ungenutzte entfernen	Remove unused
+Farben ohne Stich und ohne Rückstich	Colors without stitches and backstitches
+Strg- und Umschalt-Klick wählen mehrere. Erst „Übernehmen“ ändert das Muster -- als ein Schritt, den Rückgängig zurücknimmt.	Ctrl- and Shift-click select several. Only “Apply” changes the pattern -- as one step that Undo takes back.
+Gewählte Farbe	Selected color
+Fäden:	Strands:
+Fäden für alle Farben	Threads for all colors
+Auf alle anwenden	Apply to all
+Aktionen	Actions
+Nach oben	Move up
+Nach unten	Move down
+An den Anfang	To the top
+An das Ende	To the bottom
+Farbe löschen	Delete color
+Mehrere wählen: alle Stiche gehen auf die oberste.	Select several: all stitches go to the topmost.
+Gewählte zusammenführen	Merge selected
+Zurücksetzen	Reset
+Alle Änderungen in diesem Dialog verwerfen	Discard all changes in this dialog
+Farben verwaltet: {0} Farben ({1} nimmt es zurück).	Colors managed: {0} colors ({1} undoes it).
 ● MUSTERFARBEN	● PATTERN COLORS
 {0} {1}{2}{3}{4}Nr.: {5}{6}{7} Stiche	{0} {1}{2}{3}{4}No.: {5}{6}{7} stitches
 {0}{1}⊘ Wird nicht gestickt	{0}{1}⊘ Not stitched
@@ -40,46 +426,124 @@ Farbe „{0}“ wird nicht gestickt.	Color “{0}” will not be stitched.
 Farbe „{0}“ wird gestickt.	Color “{0}” will be stitched.
 Farb-Hervorhebung aufgehoben	Color highlight removed
 Hervorgehoben: {0} ({1} zum Aufheben)	Highlighted: {0} ({1} to remove)
+Bildschirm-Pipette abgebrochen.	Screen eyedropper canceled.
+Kein Bildschirmfoto möglich.	Could not take a screenshot.
+Klicke irgendwo auf den Bildschirm, um eine Farbe zu picken. Esc = abbrechen.	Click anywhere on the screen to pick a color. Esc = cancel.
+Bildschirmfarbe {0} → {1} {2} (ΔE {3})	Screen color {0} → {1} {2} (ΔE {3})
+Bildschirmfarbe {0} ist jetzt im Muster.	Screen color {0} is now in the pattern.
+Palette exportieren	Export palette
+Palette importieren	Import palette
+Öffnen	Open
+JSON-Dateien (*.json)	JSON files (*.json)
+Keine Farben	No colors
+Das Muster enthält keine Farben zum Exportieren.	The pattern contains no colors to export.
+Fehler	Error
+Palette konnte nicht exportiert werden:{0}{1}	The palette could not be exported:{0}{1}
+Palette exportiert: {0} Farben → {1}	Palette exported: {0} colors → {1}
+Unbekannt	Unknown
+Palette importiert: {0} Farben aus {1}	Palette imported: {0} colors from {1}
 Klicken holt diese Zeile in die Mitte	Click to bring this row to the center
 Klicken holt diese Spalte in die Mitte	Click to bring this column to the center
 Klicken zentriert das Muster	Click to center the pattern
-Übersicht	Overview
 Klicken oder ziehen: diese Stelle in die Mitte holen	Click or drag: bring this spot to the center
 {0} × {1} Stiche	{0} × {1} stitches
 Kachel-Vorschau — {0}	Tile preview — {0}
 Das Muster mehrfach nebeneinander -- für Wiederholungsmuster und Bordüren: passen die Ränder aneinander?	The pattern repeated side by side -- for repeating patterns and borders: do the edges match?
 Kacheln:	Tiles:
+waagerecht	horizontal
+senkrecht	vertical
 Kachelgrenzen anzeigen	Show tile borders
 {0}×{1} Stiche | {2}×{3} Kacheln	{0}×{1} stitches | {2}×{3} tiles
 Verlauf von	Gradient from
 Startfarbe -- der erste Punkt der gezogenen Linie	Start color -- the first point of the dragged line
+nach	to
 Endfarbe -- dazwischen nimmt jeder Punkt die nächste Farbe der Palette	End color -- in between, each point takes the nearest color of the palette
 Start- und Endfarbe tauschen	Swap start and end color
+Muster importieren	Import pattern
+Importieren	Import
+Importiere Kreuzstich-Muster aus Pattern Maker (.xsd), PCStitch (.pat) oder Open Cross Stitch (.oxs) Dateien.	Import cross-stitch patterns from Pattern Maker (.xsd), PCStitch (.pat) or Open Cross Stitch (.oxs) files.
+Datei	File
+Keine Datei ausgewählt	No file selected
+Durchsuchen …	Browse …
+Informationen	Information
+Name:	Name:
+Größe:	Size:
+Farben:	Colors:
+Stiche:	Stitches:
+Format:	Format:
+Muster-Datei öffnen	Open pattern file
+Kreuzstich-Muster (*.xsd, *.pat, *.oxs)	Cross-stitch patterns (*.xsd, *.pat, *.oxs)
+Pattern Maker (*.xsd)	Pattern Maker (*.xsd)
+PCStitch (*.pat)	PCStitch (*.pat)
+❌ FEHLER: Import-Fehler: {0}	❌ ERROR: Import error: {0}
+⚠️ Warnung: {0}	⚠️ Warning: {0}
+Keine Vorschau verfügbar	No preview available
+Klein (Lesezeichen)	Small (bookmark)
+Mittel (Bild)	Medium (picture)
+Groß (Wandbild)	Large (wall picture)
+Foto (detailreich)	Photo (detailed)
+💎 DP A4 quadratisch (60×60)	💎 DP A4 square (60×60)
+💎 DP A3 (100×100)	💎 DP A3 (100×100)
+💎 DP A2 (150×150)	💎 DP A2 (150×150)
+💎 DP A1 (200×200)	💎 DP A1 (200×200)
+💎 DP A0 (300×300)	💎 DP A0 (300×300)
+Eigene Voreinstellungen nicht lesbar: {0}	Custom presets not readable: {0}
+Voreinstellung sichern	Save preset
+Name der Voreinstellung:	Preset name:
+Voreinstellung „{0}“ gesichert.	Preset “{0}” saved.
+Voreinstellung nicht gesichert: {0}	Preset not saved: {0}
+{0} × {1} Stiche  ·  ≈ {2} × {3} cm bei {4}  ·  Ausschnitt {5}	{0} × {1} stitches  ·  ≈ {2} × {3} cm at {4}  ·  crop {5}
+14ct Aida	14ct Aida
+ganzes Bild	whole image
+Bild vorbereiten …	Preparing image …
+Farben zuordnen … {0} %	Matching colors … {0} %
+{0} × {1}, {2} Farben{3}	{0} × {1}, {2} colors{3}
+, {0} Rückstiche	, {0} backstitches
+Fehler: {0}	Error: {0}
+Bild nicht lesbar: {0}	Image not readable: {0}
+Bild importieren	Import image
+— keine —	— none —
+Die jetzigen Einstellungen als eigene Voreinstellung sichern	Save the current settings as a custom preset
+Voreinstellung	Preset
+Mustergröße	Pattern size
+Seitenverhältnis beibehalten	Keep aspect ratio
+Breite	Width
+Höhe	Height
+Die häufigsten	The most frequent
+Median-Cut (bessere Verteilung)	Median cut (better distribution)
+Inseln kleiner als das bekommen die Farbe ihrer Nachbarn (1 = aus; 2 dezent, 3 kräftig)	Islands smaller than this take the color of their neighbors (1 = off; 2 subtle, 3 strong)
+Farbwahl	Color choice
+Dithering	Dithering
+Confetti	Confetti
+Bild anpassen	Adjust image
+Helligkeit	Brightness
+Kontrast	Contrast
+Sättigung	Saturation
+Konturen als Rückstiche	Outlines as backstitches
+{0}  ({1} × {2}) -- Ausschnitt aufziehen, Doppelklick = ganzes Bild	{0}  ({1} × {2}) -- drag a crop, double-click = whole image
+Noch nicht gerechnet	Not calculated yet
+Importiert: {0} × {1} Stiche, {2} Farben.	Imported: {0} × {1} stitches, {2} colors.
+Weiter	Next
+Bilder ({0})	Images ({0})
+Dieses Muster stammt nicht aus einem Bild.	This pattern does not come from an image.
+Das Quellbild ist nicht mehr da: {0}	The source image is gone: {0}
 Stoffzählung	Fabric count
 Kästchen je Zoll -- bestimmt Maße und Garnbedarf	Squares per inch -- determines size and thread usage
 Muster	Pattern
-Stiche	Stitches
-Farben	Colors
-Größe	Size
 Maße	Dimensions
-Ebenen	Layers
 Stickzeit	Stitching time
 Garnbedarf	Thread usage
-Fortschritt	Progress
-Schwierigkeit	Difficulty
-<span foreground='{0}'>{1}</span>	<span foreground='{0}'>{1}</span>
 Heuristik aus Farbanzahl, Spezial-Stichen, Backstitches und Größe.	Heuristic from color count, special stitches, backstitches and size.
 Farbübersicht	Color overview
 Symbol: {0}{1}	Symbol: {0}{1}
 Drills: 	Drills: 
 Stiche: 	Stitches: 
 {0}Wird nicht gestickt	{0}Not stitched
-Keine Farben	No colors
 {0} ct Aida	{0} ct Aida
 Stoff: {0} ct	Fabric: {0} ct
-  <span foreground='#40c870'><b>✓</b></span>	  <span foreground='#40c870'><b>✓</b></span>
-  <span foreground='#e0b040'><b>⚠</b></span>	  <span foreground='#e0b040'><b>⚠</b></span>
 Importiert von:{0}{1}{2}{3}{4}Palette: {5}	Imported from:{0}{1}{2}{3}{4}Palette: {5}
+✓ Datei vorhanden	✓ File present
+⚠ Datei nicht gefunden	⚠ File not found
 Konzentrierter Modus zum Sticken: Klick auf Zelle = abhaken ({wz_fortschritt})	Focused stitching mode: click a cell = check it off ({wz_fortschritt})
 0 / 0 Stiche	0 / 0 stitches
 Pro Farbe	Per color
@@ -95,11 +559,11 @@ Farbe „{0}“ komplett als erledigt markiert ({1} Stiche).	Color “{0}” mar
 Kein Fortschritt zum Zurücksetzen.	No progress to reset.
 Gesamten Stickfortschritt zurücksetzen?{0}Bearbeiten → Rückgängig holt ihn zurück.	Reset all stitching progress?{0}Edit → Undo brings it back.
 Fortschritt zurückgesetzt ({0} Stiche).	Progress reset ({0} stitches).
+an	on
+aus	off
 Rückstiche anzeigen	Show backstitches
 Fortschritt anzeigen	Show progress
 Zentrierhilfe	Centering aid
-Einfügen	Paste
-Text	Text
 Fortschritt markieren	Mark progress
 Fortschritt zurücknehmen	Unmark progress
 Die Ebene „{0}“ ist gesperrt.	The layer “{0}” is locked.
@@ -112,6 +576,7 @@ Auswahl füllen	Fill selection
 Drehen	Rotate
 Spiegeln	Mirror
 Die Zwischenablage ist leer.	The clipboard is empty.
+Einfügen	Paste
 Klicken setzt ein, ESC bricht ab.	Click to place, ESC cancels.
 Alle Stiche dieser Farbe sind erledigt.	All stitches of this color are done.
 Dicke	Thickness
@@ -136,7 +601,153 @@ Schriftart	Font
 Größe in Punkt (12 Punkt = 16 Kästchen hoch)	Size in points (12 points = 16 squares high)
 Fett	Bold
 Kursiv	Italic
+Text	Text
 Erst einen Text eingeben -- oben in der Leiste.	Enter a text first -- at the top in the bar.
+Nein	No
+Ja	Yes
+Farbe hinzufügen	Add color
+Verfügbar, sobald ein bekannter Hersteller gewählt ist.	Available once a known manufacturer is selected.
+Wird beim Wählen einer Farbe automatisch ausgefüllt.	Filled in automatically when a color is chosen.
+Hersteller:	Manufacturer:
+Farbe:	Color:
+Nr.:	No.:
+Bestand (Drills):	Stock (drills):
+Bestand (Stränge):	Stock (strands):
+⚠ Nicht ladbar: {0}	⚠ Not loadable: {0}
+Muster hinzufügen	Add patterns
+Hinzufügen	Add
+Muster (*.pxs, *.oxs, *.pat, *.xsd)	Patterns (*.pxs, *.oxs, *.pat, *.xsd)
+Garn-Vorratsliste	Thread Inventory
+{0}„Benötigt“ und „Zu kaufen“ zeigen direkt, wie viel das aktuelle Muster braucht — die gleiche Rechnung wie im Statistik-Dialog.	{0}“Needed” and “To buy” show right away how much the current pattern needs — the same calculation as in the statistics dialog.
+Trage hier ein, wieviele Drills du von jeder Farbe noch besitzt. 	Enter here how many drills of each color you still have. 
+Trage hier ein, wieviele Stränge du von jeder Farbe noch besitzt. 	Enter here how many skeins of each color you still have. 
+Bestand (Drills)	Stock (drills)
+Bestand (Stränge)	Stock (strands)
+🧵 Im Muster	🧵 In the pattern
+Dein kompletter Garn-Vorrat, unabhängig vom gerade geöffneten Muster. Farben aus dem aktuellen Muster landen hier automatisch, sobald du im Reiter „Im Muster“ einen Bestand einträgst. Vorrat für Farben, die du noch in keinem Muster benutzt hast, kannst du unten von Hand hinzufügen.	Your complete thread inventory, independent of the pattern that is open. Colors from the current pattern land here automatically as soon as you enter a stock on the “In the pattern” tab. You can add stock for colors you have not used in any pattern yet by hand below.
+Name, Hersteller oder Nr. suchen …	Search name, manufacturer or no. …
+Bestand	Stock
+➕ Farbe hinzufügen …	➕ Add color …
+Vorrat für eine Farbe eintragen, die noch in keinem Muster vorkommt.	Enter stock for a color that doesn't appear in any pattern yet.
+🗑 Leere Einträge entfernen	🗑 Remove empty entries
+Einträge mit 0 Strängen aus der Liste löschen.	Delete entries with 0 skeins from the list.
+📋 Alle Einträge	📋 All entries
+Registriere hier deine laufenden Projekte. Darunter siehst du eine kombinierte Einkaufsliste über alle registrierten Projekte hinweg, verglichen mit deinem Vorrat.	Register your ongoing projects here. Below you see a combined shopping list across all registered projects, compared with your inventory.
+➕ Muster hinzufügen …	➕ Add pattern …
+📌 Aktuelles Muster hinzufügen	📌 Add current pattern
+✖ Entfernen	✖ Remove
+📁 Mehrere Projekte	📁 Several projects
+Nicht gesichert	Not saved
+Änderungen verwerfen?	Discard changes?
+Es gibt ungespeicherte Änderungen. Wirklich verwerfen?	There are unsaved changes. Really discard them?
+Garn-Vorrat gesichert ({0} Einträge).	Thread inventory saved ({0} entries).
+({0} Farben)	({0} colors)
+Ändern	Change
+Zusammenfassung: <span foreground='#4CAF50'>🟢 {0} gut</span>, <span foreground='#FF9800'>🟡 {1} akzeptabel</span>, <span foreground='#F44336'>🔴 {2} schlecht</span>	Summary: <span foreground='#4CAF50'>🟢 {0} good</span>, <span foreground='#FF9800'>🟡 {1} acceptable</span>, <span foreground='#F44336'>🔴 {2} poor</span>
+Ziel-Garn wählen	Choose target thread
+Auswählen	Select
+Quellfarbe: <b>{0}</b> ({1})	Source color: <b>{0}</b> ({1})
+Nach Name oder Nummer suchen …	Search by name or number …
+Abstand	Distance
+Fehlende Zuordnungen	Missing assignments
+{0} Farbe(n) haben keine Zuordnung.{1}Bitte weisen Sie allen Farben ein Ziel-Garn zu.	{0} color(s) have no assignment.{1}Please assign a target thread to every color.
+Mehrfachzuordnung	Duplicate assignment
+Mehrere Quellfarben werden auf dieselbe Zielfarbe abgebildet:{0}{1}{2}{3}{4}Das Muster enthält danach nicht mehr unterscheidbare Farbeinträge. Trotzdem fortfahren?	Several source colors map to the same target color:{0}{1}{2}{3}{4}Afterwards the pattern contains color entries that can no longer be told apart. Continue anyway?
+Schlechte Zuordnungen	Poor assignments
+{0} Farbe(n) haben einen hohen Farbabstand (>25).{1}Trotzdem konvertieren?	{0} color(s) have a high color distance (>25).{1}Convert anyway?
+Das Muster enthält keine Farben zum Konvertieren.	The pattern contains no colors to convert.
+Palette konvertieren	Convert palette
+Alle konvertieren	Convert all
+Ziel-Palette:	Target palette:
+Quellfarbe	Source color
+Hersteller/Nr.	Manufacturer/No.
+Zielfarbe	Target color
+Palette konvertiert ({0}, {1} Farben). Rückgängig nimmt es zurück.	Palette converted ({0}, {1} colors). Undo takes it back.
+Keine Stiche in beiden Farben	No stitches in either color
+{0} ↔ {1}{2} werden getauscht	{0} ↔ {1}{2} will be swapped
+ Drills	 drills
+ Stiche	 stitches
+Mindestens 2 Farben benötigt	At least 2 colors required
+Farben tauschen	Swap colors
+Tauscht alle Stiche zweier Farben gegenseitig.{0}Symbole und Listenreihenfolge bleiben erhalten.	Swaps all stitches of two colors with each other.{0}Symbols and list order are kept.
+Farbe A:	Color A:
+Farbe B:	Color B:
+Hinweis	Note
+Bitte zwei unterschiedliche Farben wählen.	Please choose two different colors.
+Keine Stiche zum Tauschen	No stitches to swap
+{0} ↔ {1} Stiche getauscht	{0} ↔ {1} stitches swapped
+✓ Passt in einen Rahmen	✓ Fits in a single hoop
+⚠ Diese Kombination ergäbe {0} Sektoren ({1} × {2}) — zu viel für eine sinnvolle Darstellung. Bitte einen größeren Rahmen oder eine kleinere Überlappung wählen.	⚠ This combination would give {0} sections ({1} × {2}) — too many for a useful display. Please choose a larger hoop or a smaller overlap.
+✓ Das gesamte Muster passt in <b>einen</b> Stickrahmen ({0}×{1}).	✓ The whole pattern fits in <b>one</b> hoop ({0}×{1}).
+<b>{0}</b> Stickrahmen-Sektoren benötigt ({1} Reihen × {2} Spalten, Überlappung {3} {4}).	<b>{0}</b> hoop sections needed ({1} rows × {2} columns, overlap {3} {4}).
+R{0} S{1}	R{0} C{1}
+Rahmenaufteilung	Split Across Frames
+Muster-Größe: <b>{0} × {1}</b> {2} ({3} ct). Wähle deine Stickrahmen-Größe und die Überlappungs-Zone — die Aufteilung wird automatisch berechnet.	Pattern size: <b>{0} × {1}</b> {2} ({3} ct). Choose your hoop size and the overlap zone — the split is calculated automatically.
+Schnellwahl:	Quick select:
+Anzahl {0}, die zwei benachbarte Sektoren teilen — verhindert sichtbare Nähte. Empfehlung: 2-5.	Number of {0} shared by two neighboring sections — prevents visible seams. Recommended: 2-5.
+Rahmen-Breite:	Hoop width:
+Rahmen-Höhe:	Hoop height:
+Überlappung:	Overlap:
+Position	Position
+X-Bereich	X range
+Y-Bereich	Y range
+Vorschau:	Preview:
+Hinzufügen ({0})	Add ({0})
+Wunsch	Wanted
+Garn	Thread
+Kein passendes Garn	No matching thread
++ wählen	+ select
+{0} Farben verfügbar	{0} colors available
+Keine Farbe	No color
+Bitte füge zuerst eine Farbe zum Muster hinzu.	Please add a color to the pattern first.
+Farb-Harmonien	Color harmonies
+Hinzufügen (0)	Add (0)
+Diese Funktion schlägt Garne vor, die mit der gewählten Ausgangsfarbe nach <b>Farbtheorie</b> harmonieren. Wähle den Harmonie-Typ und klicke auf die Karten, die du in deine Palette übernehmen willst.	This feature suggests threads that harmonize with the selected source color according to <b>color theory</b>. Choose the harmony type and click the cards you want to add to your palette.
+AUSGANGSFARBE	BASE COLOR
+EINSTELLUNGEN	SETTINGS
+Harmonie-Typ:	Harmony type:
+Garn-Palette:	Thread palette:
+VORSCHLÄGE — KARTE ANKLICKEN ZUM AUSWÄHLEN	SUGGESTIONS — CLICK A CARD TO SELECT IT
+{0} harmonische Farbe(n) hinzugefügt	{0} harmonious color(s) added
+Die gewählten Garne sind schon im Muster	The selected threads are already in the pattern
+Änderung an der Bibliothek konnte nicht gespeichert werden:{0}{1}	The change to the library could not be saved:{0}{1}
+{0} von {1} Muster	{0} of {1} patterns
+{0} Muster	{0} patterns
+Wähle ein Muster aus	Select a pattern
+Alle Muster (*.pxs, *.xsd, *.pat, *.oxs)	All patterns (*.pxs, *.xsd, *.pat, *.oxs)
+{0}  ·  {1} neu	{0}  ·  {1} new
+Verzeichnis scannen	Scan directory
+Scannen	Scan
+Scan abgeschlossen	Scan complete
+{0} neue Muster zur Bibliothek hinzugefügt.	{0} new patterns added to the library.
+Neue Kategorie	New category
+Name der Kategorie:	Category name:
+Nicht möglich	Not possible
+Diese Kategorie kann nicht gelöscht werden.	This category cannot be deleted.
+Kategorie löschen	Delete category
+Kategorie '{0}' wirklich löschen?{1}{2}Die Muster werden nicht gelöscht, nur die Kategorie-Zuordnung.	Really delete category '{0}'?{1}{2}The patterns are not deleted, only the category assignment.
+Tags bearbeiten	Edit tags
+Tags für '{0}' (kommagetrennt):	Tags for '{0}' (comma-separated):
+Eintrag entfernen	Remove entry
+'{0}' aus der Bibliothek entfernen?{1}{2}Die Datei selbst wird nicht gelöscht.	Remove '{0}' from the library?{1}{2}The file itself is not deleted.
+★ Aus Favoriten entfernen	★ Remove from favorites
+☆ Zu Favoriten hinzufügen	☆ Add to favorites
+Kategorie zuweisen	Assign category
+🏷️ Tags bearbeiten …	🏷️ Edit tags …
+Im Ordner anzeigen	Show in folder
+Aus Bibliothek entfernen	Remove from library
+Datei konnte nicht geöffnet werden:{0}{1}	The file could not be opened:{0}{1}
+Aus Bibliothek geöffnet: {0}	Opened from library: {0}
+Muster-Bibliothek	Pattern Library
+➕ Hinzufügen …	➕ Add …
+📁 Verzeichnis scannen …	📁 Scan Directory …
+KATEGORIEN	CATEGORIES
+Kategorie hinzufügen	Add category
+Suchen …	Search …
+0 Muster	0 patterns
+Tags:	Tags:
+Tags (kommagetrennt) …	Tags (comma-separated) …
+Notizen:	Notes:
 Info	Info
 Farben im Muster	Colors in the pattern
  -- Perle	 -- bead
@@ -183,8 +794,6 @@ Andere abdunkeln	Dim others
 Die übrigen Ebenen mit halber Deckkraft zeigen ({abdunkeln})	Show the other layers at half opacity ({abdunkeln})
 {0} Stiche als erledigt markiert.	{0} stitches marked as done.
 Alle Farben werden benutzt.	All colors are in use.
- Farbe	 color
- Farben	 colors
 {0} {1} ist jetzt im Muster (Symbol {2}).	{0} {1} is now in the pattern (symbol {2}).
 Notiz der Ebene „{0}“ geändert.	Note of layer “{0}” changed.
 Ebene umbenennen	Rename layer
@@ -192,9 +801,162 @@ Name der Ebene	Layer name
 Die Ebene darunter ist gesperrt.	The layer below is locked.
 Nur aktive Ebene: 	Active layer only: 
 Andere Ebenen abdunkeln: 	Dim other layers: 
+Zoom: {0}%  |  Mausrad: Zoom  |  Ziehen: Verschieben	Zoom: {0}%  |  Mouse wheel: zoom  |  Drag: move
+{0}  |  {1} Stiche, {2} Sprünge	{0}  |  {1} stitches, {2} jumps
+Schritt {0}  |  Position ({1}, {2})  |  Distanz: {3}	Step {0}  |  Position ({1}, {2})  |  Distance: {3}
+{0}  |  ⚠ Sprung!	{0}  |  ⚠ Jump!
+Zeilenweise	Row by Row
+Dänische Methode	Danish method
+<b>{0} cm ({1} m)</b>	<b>{0} cm ({1} m)</b>
+Beste Strategie: {0}	Best strategy: {0}
+Farbe: {0}	Color: {0}
+Stiche: {0}  |  Sprünge: {1}  |  Distanz: {2}	Stitches: {0}  |  Jumps: {1}  |  Distance: {2}
+○ S = Start  |  □ E = Ende  |  - - - = Sprung	○ S = Start  |  □ E = End  |  - - - = Jump
+Stickplan als Text exportieren	Export Stitch Plan as Text
+Stickplan exportiert: {0}	Stitch plan exported: {0}
+Fehler beim Export: {0}	Export error: {0}
+Bitte zuerst eine Farbe wählen.	Please choose a color first.
+Pfad als Bild exportieren	Export Path as Image
+Pfad-Bild exportiert: {0}	Path image exported: {0}
+Bild konnte nicht gesichert werden.	The image could not be saved.
+Ordner für Pfad-Bilder wählen	Choose a folder for path images
+Alle {0} Pfad-Bilder exportiert nach {1}	All {0} path images exported to {1}
+{0} von {1} Bildern exportiert -- Fehler bei: {2}	{0} of {1} images exported -- errors with: {2}
+Stickpfad-Optimierung	Stitch Path Optimization
+Strategie:	Strategy:
+     Stoffzählung:	     Fabric Count:
+Alle vergleichen	Compare All
+Alle fünf Strategien rechnen, die beste wählen	Calculate all five strategies, choose the best
+Optimieren	Optimize
+Den Pfad mit der gewählten Strategie neu rechnen	Recalculate the path with the selected strategy
+Pfad-Vorschau	Path Preview
+Einpassen	Fit
+Größer	Larger
+Kleiner	Smaller
+Kontext	Context
+Sprünge	Jumps
+Nummern	Numbers
+Farben und Pfade	Colors and Paths
+<b>Farbe</b>	<b>Color</b>
+<b>Stiche</b>	<b>Stitches</b>
+<b>Distanz</b>	<b>Distance</b>
+<b>Sprünge</b>	<b>Jumps</b>
+<b>Garn (cm)</b>	<b>Thread (cm)</b>
+Rückseiten-Distanz:	Back Distance:
+Sprünge:	Jumps:
+Geschätzter Garnverbrauch:	Estimated Thread Usage:
+Strategievergleich	Strategy Comparison
+<b>Strategie</b>	<b>Strategy</b>
+<b>Bewertung</b>	<b>Rating</b>
+Als Text …	As text …
+Den Stickplan als Textdatei: je Farbe jeder Stich mit Lage, Abstand und Sprung	The stitch plan as a text file: per color every stitch with position, distance and jump
+Pfad als Bild …	Path as image …
+Den Pfad der gewählten Farbe als PNG	The path of the selected color as PNG
+Alle als Bilder …	All as images …
+Jede Farbe als eigenes PNG in einen Ordner	Each color as its own PNG in a folder
 Der Text ergibt keine Stiche -- groesser schreiben?	The text yields no stitches -- write it larger?
 {0} Stiche, {1} x {2} -- klicken setzt, ESC bricht ab.	{0} stitches, {1} x {2} -- click to place, ESC cancels.
+Fortschritt beendet — Sitzung {0}, insgesamt {1}	Progress finished — session {0}, total {1}
+Fortschritt beendet	Progress finished
+📐 Fertige Größe: {0} × {1} cm{2}🔢 Max. Stiche: {3}{4}🧵 Stoff: {5} Stiche/Zoll	📐 Finished size: {0} × {1} cm{2}🔢 Max. stitches: {3}{4}🧵 Fabric: {5} stitches/inch
+Geben Sie die gewünschte Größe ein oder wählen Sie eine Kategorie für vorgefertigte Templates.	Enter the desired size or choose a category for preset templates.
+Noch keine eigenen Templates vorhanden.{0}{1}Erstellen Sie ein Projekt und speichern Sie es{2}über Muster → Als Vorlage speichern …	No templates of your own yet.{0}{1}Create a project and save it{2}via Pattern → Save as template …
+Neues Projekt	New Project
+Erstellen	Create
+Kategorie	Category
+✏️ Benutzerdefiniert	✏️ Custom
+⭐ Eigene Templates	⭐ My Templates
+Vorgefertigte Diamond-Painting-Größen, die 1:1 auf das jeweilige DIN-Format passen (bei 2.5mm Drill-Pitch).	Preset Diamond Painting sizes that fit the respective DIN format 1:1 (at 2.5mm drill pitch).
+DP-Preset:	DP Preset:
+Breite:	Width:
+Höhe:	Height:
+Stoff	Fabric
+Neues Muster: {0}	New pattern: {0}
+Neues Muster: {0}×{1}{2}	New pattern: {0}×{1}{2}
+Eigenschaften	Properties
+MUSTER	PATTERN
+{0} Farben	{0} colors
+Stoff:	Fabric:
+z.B. Anna Schmidt	e.g. Anna Schmidt
+z.B. © 2026 Anna Schmidt	e.g. © 2026 Anna Schmidt
+Begonnen am:	Started on:
+TT.MM.JJJJ	DD.MM.YYYY
+Stickdatum:	Stitching date:
+Freie Notizen — werden auch im HTML/PDF-Export auf dem Deckblatt angezeigt.	Free notes — also shown on the cover page of the HTML/PDF export.
+Das Stickdatum bitte als TT.MM.JJJJ.	Please enter the stitching date as DD.MM.YYYY.
+„{0}“ ist kein Datum.	“{0}” is not a date.
+Eigenschaften aktualisiert	Properties Updated
+Mustergröße ändern	Change pattern size
+Stiche neu verteilen (Smart-Resize)	Redistribute stitches (smart resize)
+Aktiv: Muster wird wie ein Pixelbild per Nearest-Neighbor{0}skaliert, Stiche neu auf die Zellgröße verteilt. Ideal beim{1}Hochskalieren.{2}{3}Aus: klassisches Zuschneiden/Auffüllen mit leeren Zellen am Rand.	On: the pattern is scaled like a pixel image with nearest neighbor{0}and the stitches are redistributed to the cell size. Ideal for{1}scaling up.{2}{3}Off: classic cropping/padding with empty cells at the edge.
+Größe ändern	Change size
+Das Muster wird verkleinert. {0} außerhalb des neuen Bereichs gehen verloren.{1}{2}Fortfahren?	The pattern gets smaller. {0} outside the new area are lost.{1}{2}Continue?
+Größe geändert: {0} × {1}{2}	Size changed: {0} × {1}{2}
+Noch keine Versionen vorhanden.{0}Sichern oder warten bis die nächste Auto-Version erstellt wird.	No versions yet.{0}Save or wait until the next automatic version is created.
+📅  {0}    ({1} KB)	📅  {0}    ({1} KB)
+📄  {0}    ({1} KB)	📄  {0}    ({1} KB)
+Wähle eine Version aus der Liste.	Select a version from the list.
+Datum: {0}{1}Größe: {2} × {3}    ·    {4}: {5}    ·    Farben: {6}	Date: {0}{1}Size: {2} × {3}    ·    {4}: {5}    ·    Colors: {6}
+⚠ Diese Version konnte nicht gelesen werden ({0}).	⚠ This version could not be read ({0}).
+Versionen für {0}	Versions of {0}
+Automatische Versionen werden alle 30 Minuten angelegt, sobald ungesicherte Änderungen vorhanden sind, und beim Sichern. Der Knopf „Wiederherstellen“ lädt eine Version wieder als aktives Muster.	Automatic versions are created every 30 minutes while there are unsaved changes, and when saving. The “Restore” button loads a version back as the active pattern.
+⟲ Wiederherstellen	⟲ Restore
+⇄ Mit aktuellem vergleichen	⇄ Compare with current
+Vergleicht die ausgewählte Version mit dem geöffneten Muster -- markiert hinzugefügte, entfernte und geänderte Stiche.	Compares the selected version with the open pattern -- marks added, removed and changed stitches.
+Version wiederherstellen	Restore Version
+Aktuelles Muster durch diese Version ersetzen?{0}{1}Nicht gesicherte Änderungen gehen verloren.	Replace the current pattern with this version?{0}{1}Unsaved changes are lost.
+Version geladen: {0}	Version loaded: {0}
+Nicht geladen: {0}	Not loaded: {0}
+Version löschen	Delete Version
+Diese Version dauerhaft löschen?{0}{1}{2}	Delete this version permanently?{0}{1}{2}
+Vergleich fehlgeschlagen	Comparison Failed
+Die Version konnte nicht geladen werden:{0}{1}	The version could not be loaded:{0}{1}
+<b>Vergleich:</b> <span foreground='#33cc88'>+{0} hinzugefügt</span> · <span foreground='#dd4444'>-{1} entfernt</span> · <span foreground='#ddbbaa'>~{2} geändert</span> · {3} unverändert	<b>Comparison:</b> <span foreground='#33cc88'>+{0} added</span> · <span foreground='#dd4444'>-{1} removed</span> · <span foreground='#ddbbaa'>~{2} changed</span> · {3} unchanged
+{0} · <span foreground='#888888'>Rückstiche: +{1}/-{2}</span>	{0} · <span foreground='#888888'>Backstitches: +{1}/-{2}</span>
+{0} · <span foreground='#888888'>Größe: alt {1}×{2} → neu {3}×{4}</span>	{0} · <span foreground='#888888'>Size: old {1}×{2} → new {3}×{4}</span>
+Muster-Vergleich{0}	Pattern comparison{0}
+Alt	Old
+Neu	New
+Diff	Diff
+Eigene	Custom
+Lesezeichen	Bookmarks
+Deckchen	Doilies
+Bordüren	Borders
+Bilder	Pictures
+Kissen	Cushions
+Accessoires	Accessories
+Saisonal	Seasonal
+Bitte gib einen Namen ein.	Please enter a name.
+Es existiert bereits eine Vorlage mit diesem Namen.	A template with this name already exists.
+Als Vorlage speichern	Save as template
+Speichern	Save
+{0} × {1} Stiche{2}Stoffzahl: {3}	{0} × {1} stitches{2}Fabric count: {3}
+Mein Template	My template
+Kategorie:	Category:
+Beschreibung (optional):	Description (optional):
+Vorlage „{0}“ gespeichert	Template “{0}” saved
+Keine Vorlage gewählt.	No template selected.
+Vorlagen verwalten	Manage templates
+Umbenennen	Rename
+Vorlage löschen	Delete template
+Vorlage „{0}“ wirklich löschen?	Really delete template “{0}”?
+Neuer Name:	New name:
+Keine leeren Ränder zum Entfernen	No empty margins to remove
+Zugeschnitten: {0}×{1} → {2}×{3} (L:{4} O:{5} R:{6} U:{7} entfernt)	Cropped: {0}×{1} → {2}×{3} (L:{4} T:{5} R:{6} B:{7} removed)
+Nur eine Ebene -- nichts zu vereinen.	Only one layer -- nothing to flatten.
+Alle {0} Ebenen zu einer vereinen?	Flatten all {0} layers into one?
+{0}{1}{2}{3}{4} auf ausgeblendeten Ebenen gehen dabei verloren.	{0}{1}{2}{3}{4} on hidden layers are lost.
+{0}{1}{2}Rückgängig holt die Ebenen zurück.	{0}{1}{2}Undo brings the layers back.
+Vereinen	Flatten
+Alle Ebenen vereint.	All layers flattened.
+Die Ebene „{0}“ ist schon leer.	The layer “{0}” is already empty.
+Ebene leeren	Clear layer
+Alle {0}{1} aus „{2}“ entfernen?{3}{4}Rückstiche bleiben; Rückgängig holt die Stiche zurück.	Remove all {0}{1} from “{2}”?{3}{4}Backstitches stay; Undo brings the stitches back.
+Ebene „{0}“ geleert.	Layer “{0}” cleared.
+Datei nicht gefunden	File not found
+Die Datei gibt es nicht mehr:{0}{1}	The file no longer exists:{0}{1}
 Zuletzt geöffnet	Recently opened
+(keine)	(none)
 Liste leeren	Clear list
 Muster -- neu ({neu}), Eigenschaften ({eigenschaften}), Größe, Versionen ({versionen}), Vorlagen, Bibliothek ({bibliothek}), Einstellungen ({einstellungen}), Kachel-Vorschau ({kacheln}), drehen, spiegeln, Auto-Zuschneiden ({zuschneiden}), Drucken ({drucken}), Muster importieren ({fremd_import})	Pattern -- new ({neu}), properties ({eigenschaften}), size, versions ({versionen}), templates, library ({bibliothek}), settings ({einstellungen}), tile preview ({kacheln}), rotate, mirror, auto-crop ({zuschneiden}), print ({drucken}), import pattern ({fremd_import})
 Neues Muster …	New pattern …
@@ -218,6 +980,54 @@ Startseite …	Start page …
 Muster importieren (XSD/PAT/OXS) …	Import pattern (XSD/PAT/OXS) …
 Neu in Glutfaden	New in Glutfaden
 Die Liste der Neuigkeiten fehlt ({0}).	The list of news is missing ({0}).
+Weiß	White
+Ecru	Ecru
+Beige	Beige
+Hellblau	Light blue
+Hellgrün	Light green
+Hellrosa	Light pink
+Schwarz	Black
+Dunkelblau	Dark blue
+Drill-Vorschau: facettierte Quadrate mit Glanzlicht und Schatten — so sieht die fertige DP-Vorlage geklebt aus.	Drill preview: faceted squares with highlight and shadow — this is how the finished diamond painting template looks once glued.
+Pixel-Vorschau: flache Farbflächen — schnell zur Kontroll-Ansicht ohne Drill-Detail.	Pixel preview: flat color areas — a quick check view without drill detail.
+Realistische Vorschau mit Aida-Stoff-Textur und Kreuzstich-Symbolen — so sieht es im Stickrahmen aus.	Realistic preview with Aida fabric texture and cross-stitch symbols — this is how it looks in the embroidery hoop.
+Pixel-Vorschau mit flachen Farben — schnell und klar wie im Editor.	Pixel preview with flat colors — fast and clear, like in the editor.
+Schwarz-weißer Symbol-Plan — ideal zum Drucken und unterwegs benutzen.	Black-and-white symbol chart — ideal for printing and using on the go.
+Aida 11	Aida 11
+Aida 14	Aida 14
+Aida 16	Aida 16
+Aida 18	Aida 18
+Evenweave 28	Evenweave 28
+Leinen 32	Linen 32
+Kein Muster geladen	No pattern loaded
+Vorlagen-Vorschau	Template Preview
+Muster-Vorschau	Pattern preview
+So sieht deine Vorlage fertig geklebt aus. Die Drills haben die typische Glanz-Optik mit hellerer Oberseite und dunklerem Schatten. Mit dem Mausrad zoomst du, mit Ziehen verschiebst du die Ansicht.	This is how your template looks when finished. The drills have the typical glossy look with a lighter top and a darker shadow. Zoom with the mouse wheel, drag to move the view.
+So sieht dein Muster gestickt aus. Wechsle die <b>Darstellung</b> für verschiedene Ansichten, probiere unterschiedliche <b>Stoffe</b> und <b>Stoff-Farben</b>. Mit dem Mausrad zoomst du, mit Ziehen verschiebst du die Ansicht.	This is how your pattern looks when stitched. Switch the <b>display</b> for different views, try different <b>fabrics</b> and <b>fabric colors</b>. Zoom with the mouse wheel, drag to move the view.
+DRILL-DARSTELLUNG	DRILL DISPLAY
+DARSTELLUNG	DISPLAY
+Drill-Vorschau	Drill Preview
+Pixel-Vorschau	Pixel Preview
+Stoff-Vorschau	Fabric Preview
+Symbol-Plan	Symbol Chart
+STOFF	FABRIC
+Stoffart — höhere Zahl = feiner gewebt = kleineres fertiges Muster	Fabric type — higher number = finer weave = smaller finished pattern
+Farbe des Stoff-Hintergrunds	Color of the fabric background
+Rückstich-Linien in der Vorschau zeigen	Show backstitch lines in the preview
+Bereits erledigte Stiche markieren	Highlight already completed stitches
+Auf 100% Zoom setzen	Set zoom to 100%
+Zoom so anpassen, dass das ganze Muster sichtbar ist	Adjust the zoom so the whole pattern is visible
+Zoom — auch per Mausrad im Vorschau-Bereich möglich	Zoom — also available via the mouse wheel in the preview area
+📷 Als Bild speichern …	📷 Save as Image …
+Auflösung	Resolution
+Pixel pro Stich:	Pixels per stitch:
+Als Bild speichern	Save as Image
+PNG (*.png)	PNG (*.png)
+Bild konnte nicht gespeichert werden.	Image could not be saved.
+Großes Bild	Large picture
+Das Bild wird {0} × {1} Pixel groß.{2}Fortfahren?	The image will be {0} × {1} pixels.{2}Continue?
+Export erfolgreich	Export Successful
+Bild gespeichert:{0}{1}{2}{3}Größe: {4} × {5} Pixel	Image saved:{0}{1}{2}{3}Size: {4} × {5} pixels
 Voller Stich	Full stitch
 Halbstich ╲	Half stitch ╲
 Halbstich ╱	Half stitch ╱
@@ -254,7 +1064,6 @@ ohne Spiegel	no mirror
 Radieren	Erase
 Stift	Pencil
 Radierer	Eraser
-Füllen	Fill
 Farbe aufgenommen: {0} ({1})	Color picked: {0} ({1})
 Erst Farben ins Muster holen -- der Verlauf nimmt sie aus der Palette.	Add colors to the pattern first -- the gradient takes them from the palette.
 Rechteck	Rectangle
@@ -290,7 +1099,6 @@ Loslassen: „{0}“ mit „{1}“ zusammenführen	Release: merge “{0}” with
 Loslassen: „{0}“ an Stelle {1} von oben	Release: “{0}” at position {1} from the top
 Gesperrte Ebenen lassen sich nicht zusammenführen -- erst entsperren.	Locked layers cannot be merged -- unlock them first.
 „{0}“ mit „{1}“ zusammengeführt ({2} nimmt es zurück)	“{0}” merged with “{1}” ({2} undoes it)
-Kein Muster geladen	No pattern loaded
 {0}, Auswahl {1}	{0}, selection {1}
 {0} auf „{1}“   ·   	{0} on “{1}”   ·   
 {0}{1} × {2} Stiche, {3} × {4} cm auf {5}er Stoff	{0}{1} × {2} stitches, {3} × {4} cm on {5} count fabric
@@ -301,7 +1109,6 @@ Rückgängig: {0}{1}	Undo: {0}{1}
 Nichts zurückzunehmen	Nothing to undo
 Wiederholen: {0}{1}	Redo: {0}{1}
 Nichts zu wiederholen	Nothing to redo
-Abbrechen	Cancel
 PCStitch	PCStitch
 Pattern Maker	Pattern Maker
 Aus {0} eingelesen -- Sichern legt eine .pxs an.	Read from {0} -- saving creates a .pxs.
@@ -309,9 +1116,7 @@ Nicht geöffnet: {0}	Not opened: {0}
 Nicht gesichert: {0}	Not saved: {0}
 Gesichert: {0}	Saved: {0}
 Muster sichern unter	Save pattern as
-Sichern	Save
 Muster öffnen	Open pattern
-Öffnen	Open
 Kreuzstich-Muster (*.pxs)	Cross-stitch patterns (*.pxs)
 Kreuzstich-Muster (*.pxs, *.oxs, *.pat, *.xsd)	Cross-stitch patterns (*.pxs, *.oxs, *.pat, *.xsd)
 Vor dem Öffnen sichern?	Save before opening?
@@ -331,6 +1136,7 @@ Glutfaden beenden?	Quit Glutfaden?
 Über Glutfaden …	About Glutfaden …
 Neu in Glutfaden …	New in Glutfaden …
 Tastenkürzel ({0}) …	Keyboard shortcuts ({0}) …
+Stufe 25	Stage 25
 Kreuzstich-Muster ansehen und bearbeiten -- eine Portierung von PySticky nach Drachenhauch und GTK 3.	View and edit cross-stitch patterns -- a port of PySticky to Drachenhauch and GTK 3.
 PySticky (das Original)	PySticky (the original)
 Erst ein Muster öffnen oder anlegen.	Open or create a pattern first.
@@ -347,16 +1153,344 @@ Kreuzstich oder Diamond Painting ({modus}) -- die Farben wechseln in die passend
 Einpassen (0)	Fit (0)
 Größer (+)	Larger (+)
 Kleiner (-)	Smaller (-)
-Zoom	Zoom
 Klicken für 100 % ({zoom_100})	Click for 100 % ({zoom_100})
 Unbenannt	Untitled
+0 Min	0 min
+~{0} Std	~{0} h
+~{0} Min	~{0} min
+< 1 Min	< 1 min
+~{0} Drills	~{0} drills
+übersp.	skipped
+{0} (+{1} überspr.)	{0} (+{1} skipped)
+{0} ({1} überspr.)	{0} ({1} skipped)
+Score {0}/12  —  Farben {1}/3, Größe {2}/3, Sonderstiche {3}/3, Backstitches {4}/3{5}({6} Farben, {7} Stiche, {8}% Sonder, {9} Linien)	Score {0}/12  —  colors {1}/3, size {2}/3, special stitches {3}/3, backstitches {4}/3{5}({6} colors, {7} stitches, {8}% special, {9} lines)
+Anfänger	Beginner
+Mittel	Medium
+Fortgeschritten	Intermediate
+Profi	Expert
+{0} Minuten	{0} minutes
+{0} Stunden	{0} hours
+< 1 Tag	< 1 day
+{0} Tage	{0} days
+{0} Wochen	{0} weeks
+{0} Monate	{0} months
+Katalognummer	Catalog number
+Prozent	Percent
+Nicht sticken	Do not stitch
+{0}: {1}×{2} Blöcke à {3} Stich(e), {4} aktive Blöcke	{0}: {1}×{2} blocks of {3} stitch(es), {4} active blocks
+Farbenvielfalt	Color variety
+Stichdichte	Stitch density
 Keine Simulation	No simulation
 Protanopie (Rot-Blindheit)	Protanopia (red blindness)
 Deuteranopie (Grün-Blindheit)	Deuteranopia (green blindness)
 Tritanopie (Blau-Blindheit)	Tritanopia (blue blindness)
+Keine Paare zum Zusammenführen ausgewählt.	No pairs selected for merging.
+Mindestens eine Farbe ist in mehreren ausgewählten Paaren als zu ersetzende Farbe markiert. Bitte pro Farbe nur ein Paar auswählen.	At least one color is marked for replacement in several selected pairs. Please select only one pair per color.
+Stich entfernen	Remove stitch
+Stich setzen	Place stitch
+Ebene {0}	Layer {0}
+Ebene anlegen	Add layer
+Ebene löschen	Delete layer
+Ebene verschieben	Move layer
+Zusammengeführt	Merged
+Alle Ebenen vereinen	Flatten all layers
+Ebenen zusammenführen	Merge layers
+Ebene '{0}' geleert	Layer '{0}' cleared
+Ebenen-Notiz ändern	Change layer note
+Unbenutzte Farben entfernen	Remove unused colors
+Farbe sticken	Stitch color
+Rückstich entfernen	Remove backstitch
+Farbe als erledigt	Color as done
+Stoff ändern	Change fabric
+Keine solche Farbe.	No such color.
+Ein Symbol braucht ein Zeichen.	A symbol needs a character.
+{0} hat schon {1}.	{1} already has {0}.
+Symbol ändern	Change symbol
+<b>{0}</b> | {1}×{2} Stiche ({3}×{4} cm) | {5} Farben | {6} Stiche	<b>{0}</b> | {1}×{2} stitches ({3}×{4} cm) | {5} colors | {6} stitches
+Bild-Export: unbekannte Endung -- .png, .jpg oder .bmp	Image export: unknown extension -- .png, .jpg or .bmp
+Bild nicht gesichert: {0}	Image not saved: {0}
+Bildimport: keine Palette mit Garnen gewaehlt	Image import: no palette with threads selected
+Ebenenstapel braucht mindestens eine Ebene	A layer stack needs at least one layer
+Aida {0}	Aida {0}
+Drill	Drill
+Stich	Stitch
+Klebezeit	Gluing time
+Drill-Bedarf	Drill Requirement
+Dr.	Dr.
+Str.	Str.
+Drill-Raster	Drill Grid
+Stoffempfehlung	Recommended Fabric
+Drill-Legende	Drill Legend
+Garn-Legende	Thread Legend
+Drill-Code	Drill Code
+Garnnummer	Thread Number
+Vorschau der fertigen Vorlage	Preview of the Finished Template
+Vorschau des fertigen Musters	Preview of the Finished Pattern
+Diamond-Painting-Vorlage	Diamond Painting Template
+Kreuzstich-Muster	Cross-Stitch Pattern
+Diamond-Painting-Anleitung	Diamond Painting Instructions
+Kreuzstich-Anleitung	Cross-Stitch Instructions
+begriff$: unbekannter Schluessel {0}	begriff$: unknown key {0}
+Farben verwalten	Manage colors
+Datei konnte nicht gelesen werden: {0}	The file could not be read: {0}
+Die Datei ist keine gültige PySticky-Palettendatei.	The file is not a valid PySticky palette file.
+Die Palettendatei enthält keine Farben.	The palette file contains no colors.
+Palette {0}: Liste von Farb-Objekten erwartet	Palette {0}: list of color objects expected
+Blend braucht mindestens 2 Garne	A blend needs at least 2 threads
+Blend: Zahl der Anteile passt nicht zu den Garnen	Blend: the number of parts does not match the threads
+Blend: Anteile müssen mindestens 1 sein	Blend: parts must be at least 1
+Eine Farbe — direkt gegenüber im Farbkreis. Maximaler Kontrast.	One color — directly opposite on the color wheel. Maximum contrast.
+Zwei Nachbarfarben (±30°). Sanfter, harmonischer Übergang.	Two neighboring colors (±30°). Soft, harmonious transition.
+Zwei Farben gleichmäßig verteilt (±120°). Lebhaft, ausgewogen.	Two colors evenly distributed (±120°). Vivid, balanced.
+Zwei Farben neben dem Komplementär (±150°). Spannung ohne Kollision.	Two colors next to the complementary (±150°). Tension without clashing.
+Drei Farben im Rechteck (90°/180°/270°). Reichhaltiges Schema.	Three colors in a rectangle (90°/180°/270°). Rich scheme.
+Komplementär	Complementary
+Analog −30°	Analogous −30°
+Analog +30°	Analogous +30°
+Triade +120°	Triad +120°
+Triade −120°	Triad −120°
+Split +150°	Split +150°
+Split −150°	Split −150°
+Tetrade +90°	Tetradic +90°
+Tetrade +180°	Tetradic +180°
+Tetrade +270°	Tetradic +270°
+Perfekt	Perfect
+Sehr nah	Very close
+Akzeptabel	Acceptable
+Weit weg	Far off
+<a href='#deckblatt'>Deckblatt</a>	<a href='#deckblatt'>Cover</a>
+<a href='#vorschau'>Vorschau</a>	<a href='#vorschau'>Preview</a>
+<a href='#legende'>Legende</a>	<a href='#legende'>Legend</a>
+<a href='#uebersicht'>&Uuml;bersicht</a>	<a href='#uebersicht'>Overview</a>
+<a href='#seite1'>Muster &rarr;</a>	<a href='#seite1'>Pattern &rarr;</a>
+<div><a href='javascript:window.print()' class='btn-print'>&#128424; Als PDF drucken</a></div>	<div><a href='javascript:window.print()' class='btn-print'>&#128424; Print as PDF</a></div>
+<tr><td>&#128197; Begonnen am</td><td>{0}</td></tr>	<tr><td>&#128197; Started on</td><td>{0}</td></tr>
+<div class='cover-info' style='margin-top: 16px;'><table><tr><td style='vertical-align: top;'>&#128221; Notizen</td><td>{0}</td></tr></table></div>	<div class='cover-info' style='margin-top: 16px;'><table><tr><td style='vertical-align: top;'>&#128221; Notes</td><td>{0}</td></tr></table></div>
+<tr><td>&#8600; R&uuml;ckstiche</td><td>{0} Linien</td></tr>	<tr><td>&#8600; Backstitches</td><td>{0} lines</td></tr>
+<p class='cover-date'>von {0}</p>	<p class='cover-date'>by {0}</p>
+<tr><td>&#10010; {0}</td><td>{1}</td></tr><tr><td>&#128683; Stofffarbe</td><td>{2} Farbe(n), wird nicht gestickt</td></tr>	<tr><td>&#10010; {0}</td><td>{1}</td></tr><tr><td>&#128683; Fabric color</td><td>{2} color(s), not stitched</td></tr>
+Zu kleben:	To glue:
+Zu sticken:	To stitch:
+<div class='stat-item'><div class='stat-icon'>&#8600;</div><div class='stat-value'>{0}</div><div class='stat-label'>R&uuml;ckstiche</div></div>	<div class='stat-item'><div class='stat-icon'>&#8600;</div><div class='stat-value'>{0}</div><div class='stat-label'>Backstitches</div></div>
+DIAMOND-PAINTING-VORLAGE	DIAMOND PAINTING TEMPLATE
+KREUZSTICH-MUSTER	CROSS-STITCH PATTERN
+<p class='cover-date'>Erstellt am {0}</p>	<p class='cover-date'>Created on {0}</p>
+ (inkl. R&uuml;ckstiche)	 (incl. backstitches)
+<div class='stat-item'><div class='stat-icon'>&#127912;</div><div class='stat-value'>{0}</div><div class='stat-label'>Farben</div></div>	<div class='stat-item'><div class='stat-icon'>&#127912;</div><div class='stat-value'>{0}</div><div class='stat-label'>Colors</div></div>
+<div class='stat-item'><div class='stat-icon'>&#128196;</div><div class='stat-value'>{0}</div><div class='stat-label'>Seiten</div></div>	<div class='stat-item'><div class='stat-icon'>&#128196;</div><div class='stat-value'>{0}</div><div class='stat-label'>Pages</div></div>
+<tr><td>&#128207; Mustergr&ouml;&szlig;e</td><td>{0} × {1} {2}</td></tr>	<tr><td>&#128207; Pattern size</td><td>{0} × {1} {2}</td></tr>
+<tr><td>&#128207; Fertige Gr&ouml;&szlig;e</td><td>{0} cm</td></tr>	<tr><td>&#128207; Finished size</td><td>{0} cm</td></tr>
+<tr><td>&#127912; Anzahl Farben</td><td>{0} verschiedene Farben</td></tr>	<tr><td>&#127912; Number of colors</td><td>{0} different colors</td></tr>
+<tr><td>&#10010; Gesamt</td><td>{0}{1}</td></tr>	<tr><td>&#10010; Total</td><td>{0}{1}</td></tr>
+ Kreuze	 crosses
+<tr><td>&#128196; Musterseiten</td><td>{0} Seiten</td></tr>	<tr><td>&#128196; Pattern pages</td><td>{0} pages</td></tr>
+<p class='cover-footer-text'>Erstellt mit Glutfaden &middot; {0}{1}</p>	<p class='cover-footer-text'>Created with Glutfaden &middot; {0}{1}</p>
+<div class='backstitch-info'><strong>&#8600; R&uuml;ckstiche:</strong> {0} Linien werden &uuml;ber dem Muster gezeigt.</div>	<div class='backstitch-info'><strong>&#8600; Backstitches:</strong> {0} lines are shown over the pattern.</div>
+<h1>Vorschau des fertigen Musters</h1>	<h1>Preview of the finished pattern</h1>
+<h3>Fertige Gr&ouml;&szlig;e auf {0}: {1} cm</h3>	<h3>Finished size on {0}: {1} cm</h3>
+HTML-Export: Palette '{0}' gibt es nicht	HTML export: palette '{0}' does not exist
+<h2 style='margin-top:30px;'>&#9679; Perlen (Beads)</h2>	<h2 style='margin-top:30px;'>&#9679; Beads</h2>
+<p style='text-align:center;color:#666;font-size:12px;'>Perlen werden über dem Stoff angenaeht und kommen meist am Ende der Stickarbeit dran.</p>	<p style='text-align:center;color:#666;font-size:12px;'>Beads are sewn on top of the fabric and usually come at the end of the stitching.</p>
+<td colspan='4' style='text-align:right;'>Gesamt:</td>	<td colspan='4' style='text-align:right;'>Total:</td>
+<h2 style='margin-top:30px;'>&#8600; R&uuml;ckstiche</h2>	<h2 style='margin-top:30px;'>&#8600; Backstitches</h2>
+<p style='text-align:center;color:#666;font-size:12px;'>R&uuml;ckstiche werden nach den Kreuzstichen gearbeitet und bilden Konturen und Details.</p>	<p style='text-align:center;color:#666;font-size:12px;'>Backstitches are worked after the cross stitches and form outlines and details.</p>
+Gesamt:	Total:
+<p style='color:#ff9800;font-size:12px;'>&#8856; = Stofffarbe, wird nicht gestickt</p>	<p style='color:#ff9800;font-size:12px;'>&#8856; = fabric color, not stitched</p>
+Drill-Legende und Material	Drill Legend and Materials
+Legende und Materialbedarf	Legend and Material Requirements
+<h3>{0} Farben &middot; {1} {2} &middot; ca. {3} {4} ben&ouml;tigt</h3>	<h3>{0} colors &middot; {1} {2} &middot; approx. {3} {4} needed</h3>
+<p><strong>&#8600; R&uuml;ckstiche:</strong> {0} R&uuml;ckstiche werden auf den Musterseiten als Linien angezeigt.</p>	<p><strong>&#8600; Backstitches:</strong> {0} backstitches are shown as lines on the pattern pages.</p>
+<h1>&#128506; Seiten&uuml;bersicht</h1>	<h1>&#128506; Page overview</h1>
+<p>{0} Musterseiten &middot; {1} Spalten &times; {2} Zeilen &middot; je {3}&times;{4} {5}</p>	<p>{0} pattern pages &middot; {1} columns &times; {2} rows &middot; {3}&times;{4} {5} each</p>
+<div class='overview-preview-title'>&#128444; Muster&uuml;bersicht</div>	<div class='overview-preview-title'>&#128444; Pattern overview</div>
+<div class='overview-grid-title'>&#128196; Seiten ausw&auml;hlen</div>	<div class='overview-grid-title'>&#128196; Choose a page</div>
+<p><strong>&#128161; Tipp:</strong> Klicken Sie auf eine Seitennummer um direkt zur entsprechenden Musterseite zu springen.</p>	<p><strong>&#128161; Tip:</strong> Click a page number to jump straight to that pattern page.</p>
+<p><strong>&#128209; Seitenformat:</strong> Jede Seite zeigt einen Bereich von {0}&times;{1} {2} mit 10er-Rasterlinien.</p>	<p><strong>&#128209; Page format:</strong> Each page shows an area of {0}&times;{1} {2} with grid lines every 10.</p>
+{0}&uarr; Seite {1}</span>	{0}&uarr; Page {1}</span>
+{0}&darr; Seite {1}</span>	{0}&darr; Page {1}</span>
+{0}&larr; Seite {1}</span>	{0}&larr; Page {1}</span>
+{0}Seite {1} &rarr;</span>	{0}Page {1} &rarr;</span>
+<div class='page-navigator' style='float:right;margin-left:12px;'><div style='font-size:9px;color:#666;margin-bottom:2px;text-align:center;'>Seiten-Index</div><table style='border-collapse:separate;border-spacing:4px;'><tr><td></td><td style='text-align:center;'>{0}</td><td></td></tr><tr><td style='text-align:right;'>{1}</td><td><table style='border-collapse:collapse;margin:0 auto;'>{2}</table></td><td style='text-align:left;'>{3}</td></tr><tr><td></td><td style='text-align:center;'>{4}</td><td></td></tr></table></div>	<div class='page-navigator' style='float:right;margin-left:12px;'><div style='font-size:9px;color:#666;margin-bottom:2px;text-align:center;'>Page index</div><table style='border-collapse:separate;border-spacing:4px;'><tr><td></td><td style='text-align:center;'>{0}</td><td></td></tr><tr><td style='text-align:right;'>{1}</td><td><table style='border-collapse:collapse;margin:0 auto;'>{2}</table></td><td style='text-align:left;'>{3}</td></tr><tr><td></td><td style='text-align:center;'>{4}</td><td></td></tr></table></div>
+ &middot; {0} R&uuml;ckstiche	 &middot; {0} backstitches
+<br><b>R&uuml;ckstiche:</b> {0} Linien (als farbige Linien im Muster dargestellt)	<br><b>Backstitches:</b> {0} lines (shown as colored lines in the pattern)
+<div class='title'>Seite {0} von {1}</div>	<div class='title'>Page {0} of {1}</div>
+<div class='info'>Spalten {0}-{1} &middot; Zeilen {2}-{3} &middot; {4} Stiche{5}</div>	<div class='info'>Columns {0}-{1} &middot; rows {2}-{3} &middot; {4} stitches{5}</div>
+<b>Farben dieser Seite ({0}):</b> {1}	<b>Colors on this page ({0}):</b> {1}
+<div class='page-footer'>{0} &middot; Seite {1}/{2} &middot; {3}{4}</div>	<div class='page-footer'>{0} &middot; page {1}/{2} &middot; {3}{4}</div>
+Ungueltige Mustergroesse: {0}x{1} (min. 1x1)	Invalid pattern size: {0}x{1} (min. 1x1)
+OXS: kein lesbares XML -- {0}	OXS: no readable XML -- {0}
+OXS: Wurzel ist '{0}', erwartet 'chart'	OXS: root is '{0}', expected 'chart'
+OXS: ungueltige Groesse {0}x{1}	OXS: invalid size {0}x{1}
+OXS: Muster zu gross: {0}x{1} (hoechstens {2})	OXS: pattern too large: {0}x{1} (at most {2})
+OXS: keine <palette>	OXS: no <palette>
+Palette-Item ohne gueltigen Index: {0}	Palette item without a valid index: {0}
+Doppelter Palette-Index {0} in <palette> — letzter Eintrag gewinnt	Duplicate palette index {0} in <palette> — the last entry wins
+Ungueltige Farbe '{0}' für Palette-Item {1}	Invalid color '{0}' for palette item {1}
+Rückstich-Koordinaten außerhalb der Mustergrenzen — betroffene Rückstiche werden verworfen	Backstitch coordinates outside the pattern bounds — the affected backstitches are dropped
+Unbekannter Ornament-Typ: {0}	Unknown ornament type: {0}
+Stich(e) mit unbekanntem palindex={0} (kein passendes palette_item gefunden) übersprungen	Stitch(es) with unknown palindex={0} (no matching palette_item found) skipped
+Symbol;Hersteller;Nr.;Name;Hex;Drills	Symbol;Manufacturer;No.;Name;Hex;Drills
+Symbol;Hersteller;Nr.;Name;Hex;Stiche;Strange (~)	Symbol;Manufacturer;No.;Name;Hex;Stitches;Skeins (~)
+Glutfaden-Paket: {0}	Glutfaden package: {0}
+Größe: {0} × {1} {2}	Size: {0} × {1} {2}
+Stoffzaehlung: {0} ct	Fabric count: {0} ct
+Farben: {0}	Colors: {0}
+Enthaltene Dateien:	Included files:
+Das .pxs öffnen Glutfaden und PySticky.	Glutfaden and PySticky open the .pxs.
+html ({0})	html ({0})
+png ({0})	png ({0})
+pdf ({0})	pdf ({0})
+original ({0})	original ({0})
+original ({0} nicht gefunden)	original ({0} not found)
+Paket nicht geschrieben: {0}	Package not written: {0}
+PAT: Datei endet vorzeitig (bei Byte {0})	PAT: file ends early (at byte {0})
+PAT: unglaubwürdige Textlänge {0} bei Byte {1}	PAT: implausible text length {0} at byte {1}
+PAT: Datei nicht lesbar – {0}	PAT: file not readable – {0}
+PAT: keine PCStitch-Datei (die Kennung 'PCStitch' fehlt)	PAT: not a PCStitch file (the 'PCStitch' marker is missing)
+PAT: keine PCStitch-Musterdatei	PAT: not a PCStitch pattern file
+PAT: PCStitch {0} wird noch nicht gelesen (bekannt ist PCStitch 8)	PAT: PCStitch {0} cannot be read yet (PCStitch 8 is known)
+PAT: ungültige Größe {0}x{1}	PAT: invalid size {0}x{1}
+PAT: Muster zu groß: {0}x{1} (höchstens {2})	PAT: pattern too large: {0}x{1} (at most {2})
+Der Stoff zählt waagerecht {0} und senkrecht {1} Stiche je Zoll – übernommen ist {2}	The fabric counts {0} stitches per inch horizontally and {1} vertically – {2} was taken
+PAT: keine Garnpalette gefunden	PAT: no thread palette found
+PAT: unglaubwürdige Farbzahl {0}	PAT: implausible number of colors {0}
+PAT: unbekannter Aufbau der Farbe {0} ({1} {2})	PAT: unknown structure of color {0} ({1} {2})
+Farbe {0}	Color {0}
+Neues Symbol für {0} (das Zeichen aus PCStitchs Symbolschrift ist nicht darstellbar)	New symbol for {0} (the character from PCStitch's symbol font cannot be displayed)
+Neues Symbol für {0} (das Zeichen ist schon vergeben)	New symbol for {0} (the character is already taken)
+PAT: Gitter nicht gefunden	PAT: grid not found
+PAT: kaputter Lauf im Gitter bei Byte {0}	PAT: broken run in the grid at byte {0}
+PAT: unglaubwürdige Stichzahl {0} bei Byte {1}	PAT: implausible stitch count {0} at byte {1}
+Teilstiche {0}	Partial stitches {0}
+Stiche nennen eine andere Zelle als ihr Platz im Gitter – es zählt der Platz	Stitches name a different cell than their place in the grid – the place counts
+{0} Stich(e) mit unbekannter Farbe übersprungen	{0} stitch(es) with unknown color skipped
+{0} Stich(e) unbekannter Art {1} übersprungen	{0} stitch(es) of unknown kind {1} skipped
+Zellen mit zwei Teilstichen: der zweite liegt auf der Ebene '{0}'	Cells with two partial stitches: the second is on the layer '{0}'
+PAT: unglaubwürdige Zahl der Rückstiche {0}	PAT: implausible number of backstitches {0}
+Rückstiche mit unbekannter Farbe oder Lage verworfen	Backstitches with unknown color or position dropped
+Hinter den Rückstichen stehen noch Daten (Knoten oder Perlen?) – nicht gelesen	There is more data after the backstitches (knots or beads?) – not read
+◆ DIAMOND-PAINTING-VORLAGE	◆ DIAMOND PAINTING TEMPLATE
+✂ KREUZSTICH-MUSTER	✂ CROSS-STITCH PATTERN
+von {0}	by {0}
+Erstellt am {0}	Created on {0}
+{0} {1} (+ {2} Stofffarbe)	{0} {1} (+ {2} fabric color)
+Mustergröße{0}{1} × {2} {3}	Pattern size{0}{1} × {2} {3}
+Fertige Größe{0}{1} cm	Finished size{0}{1} cm
+Anzahl Farben{0}{1}	Number of colors{0}{1}
+Gesamt-{0}{1}{2}	Total {0}{1}{2}
+Rückstiche{0}{1} Linien	Backstitches{0}{1} lines
+Musterseiten{0}{1} Seiten	Pattern pages{0}{1} pages
+Begonnen am{0}{1}	Started on{0}{1}
+Fertige Größe auf {0}: {1} cm	Finished size on {0}: {1} cm
+Rückstiche: {0} Linien werden über dem Muster gezeigt.	Backstitches: {0} lines are shown over the pattern.
+zu klebende	to-glue
+zu stickende	to-stitch
+{0} · {1} Farbe(n) = Stofffarbe	{0} · {1} color(s) = fabric color
+{0} · ca. {1} {2} benötigt	{0} · approx. {1} {2} needed
+PDF-Export: Palette '{0}' gibt es nicht	PDF export: palette '{0}' does not exist
+Nr.{0}Sym.{1}Farbe{2}{3}{4}Farbname	No.{0}Sym.{1}Color{2}{3}{4}Color name
+<font size='8' color='#ff9800'>⊘ = Stofffarbe, wird nicht gestickt</font>	<font size='8' color='#ff9800'>⊘ = fabric color, not stitched</font>
+{0}{1}{2}Gesamt:{3}{4}	{0}{1}{2}Total:{3}{4}
+Perlen (Beads)	Beads
+Perlen-Nr.	Bead No.
+Farbe{0}Symbol{1}{2}{3}Farbname{4}Anzahl	Color{0}Symbol{1}{2}{3}Color name{4}Count
+Seitenübersicht	Page Overview
+{0} Musterseiten · {1} Spalten × {2} Zeilen · je {3}×{4} {5} · {6}	{0} pattern pages · {1} columns × {2} rows · {3}×{4} {5} each · {6}
+Seite {0}{1}X: {2}-{3}{4}Y: {5}-{6}	Page {0}{1}X: {2}-{3}{4}Y: {5}-{6}
+<b>Seite {0} von {1}</b>  |  Spalten {2}-{3}  ·  Zeilen {4}-{5}	<b>Page {0} of {1}</b>  |  columns {2}-{3}  ·  rows {4}-{5}
+<font size='7'><b>Farben:</b> {0}</font>	<font size='7'><b>Colors:</b> {0}</font>
+<font size='7'><b>Stickpfad:</b> {0} Stiche  |  {1} Farben  |  {2} Sprünge  |  <font color='#dd5555'>- - -</font> = Sprung</font>	<font size='7'><b>Stitch path:</b> {0} stitches  |  {1} colors  |  {2} jumps  |  <font color='#dd5555'>- - -</font> = jump</font>
+<font size='7' color='#999999'>{0} · Seite {1}/{2} · {3}</font>	<font size='7' color='#999999'>{0} · page {1}/{2} · {3}</font>
+PDF nicht gesichert: {0}	PDF not saved: {0}
+Drills insgesamt zu kaufen	drills to buy in total
+Stränge insgesamt zu kaufen	skeins to buy in total
+Farben insgesamt zu kaufen	colors to buy in total
+Rahmenbreite und -höhe müssen größer als 0 sein	Hoop width and height must be greater than 0
+Die Überlappung darf nicht negativ sein	The overlap must not be negative
+Die Überlappung muss kleiner als der Rahmen sein	The overlap must be smaller than the hoop
+4 Zoll (10 cm)	4 inch (10 cm)
+5 Zoll (13 cm)	5 inch (13 cm)
+6 Zoll (15 cm)	6 inch (15 cm)
+7 Zoll (18 cm)	7 inch (18 cm)
+8 Zoll (20 cm)	8 inch (20 cm)
+10 Zoll (25 cm)	10 inch (25 cm)
+12 Zoll (30 cm)	12 inch (30 cm)
+Datei nicht gefunden: {0}	File not found: {0}
+Fehlerhafte Datei-Syntax: {0}	Faulty file syntax: {0}
+Ungültiges Dateiformat: JSON-Objekt erwartet, gefunden {0}	Invalid file format: JSON object expected, found {0}
+Ungültiges Dateiformat: erwartet 'pysticky', gefunden '{0}'	Invalid file format: expected 'pysticky', found '{0}'
+Datei enthält keine Muster-Daten	The file contains no pattern data
+Ungültige Musterdaten: Objekt erwartet, gefunden {0}	Invalid pattern data: object expected, found {0}
+Pflichtfeld '{0}' fehlt in der Datei	Required field '{0}' is missing in the file
+Ungültige Mustergröße (ganze Zahlen erwartet)	Invalid pattern size (whole numbers expected)
+Ungültige Mustergröße: {0}x{1} (min. 1x1)	Invalid pattern size: {0}x{1} (min. 1x1)
+Mustergröße zu groß: {0}x{1} (max. 2000x2000)	Pattern size too large: {0}x{1} (max. 2000x2000)
+Ungültiges Farbformat: Liste erwartet	Invalid color format: list expected
+Mindestens ein Layer erforderlich	At least one layer required
+Ungültiger Farbeintrag bei Index {0}: Objekt erwartet, gefunden {1}	Invalid color entry at index {0}: object expected, found {1}
+Ungültiger Layer bei Index {0}: Objekt erwartet, gefunden {1}	Invalid layer at index {0}: object expected, found {1}
+Ungültiges Rückstich-Format: Liste erwartet	Invalid backstitch format: list expected
+Ungültiger Rückstich bei Index {0}: Objekt erwartet, gefunden {1}	Invalid backstitch at index {0}: object expected, found {1}
+Rückstich: Pflichtfeld '{0}' fehlt	Backstitch: required field '{0}' is missing
+Ungültige Hex-Farbe: '{0}'	Invalid hex color: '{0}'
+Farbeintrag: Pflichtfeld '{0}' fehlt	Color entry: required field '{0}' is missing
+Ungültige Blend-Komponente bei Index {0}: Objekt erwartet	Invalid blend component at index {0}: object expected
+Blend-Komponente bei Index {0}: Pflichtfeld '{1}' fehlt	Blend component at index {0}: required field '{1}' is missing
+Zeilenweise (Schlangenlinie)	Row by Row (Serpentine)
+Nächster Nachbar	Nearest Neighbor
+Spaltenweise	Column by Column
+Diagonal	Diagonal
+STICKPLAN - Optimierte Stichreihenfolge	STITCH PLAN - optimized stitch order
+Strategie: {0}	Strategy: {0}
+Gesamtstiche: {0}	Total stitches: {0}
+Geschätzter Garnverbrauch: {0} cm	Estimated thread usage: {0} cm
+Anzahl Sprünge: {0}	Number of jumps: {0}
+FARBE: {0}	COLOR: {0}
+Stiche: {0}, Sprünge: {1}	Stitches: {0}, jumps: {1}
+Nr.   Position    Distanz   Hinweis	No.   Position    Distance  Note
+ ← SPRUNG	 ← JUMP
+Ende des Stickplans	End of the stitch plan
+★★★ Beste	★★★ Best
+★★ Gut	★★ Good
+★ OK	★ OK
+{0} Sek	{0} s
+{0} Min	{0} min
+Ungültige Größe: {0}x{1} (min. 1x1)	Invalid size: {0}x{1} (min. 1x1)
+Ungültige Größe: {0}x{1}	Invalid size: {0}x{1}
+90° rechts gedreht	Rotated 90° clockwise
+90° links gedreht	Rotated 90° counterclockwise
+180° gedreht	Rotated 180°
+Horizontal gespiegelt	Flipped horizontally
+Vertikal gespiegelt	Flipped vertically
+Auto-Zuschneiden	Auto-crop
+Pattern Maker (XSD)	Pattern Maker (XSD)
+PCStitch (PAT)	PCStitch (PAT)
+Open Cross Stitch (OXS)	Open Cross Stitch (OXS)
+Unbekanntes Format: {0}	Unknown format: {0}
+(ohne Endung)	(no extension)
+{0} × {1} Stiche ({2} × {3} cm)	{0} × {1} stitches ({2} × {3} cm)
+XSD: Datei endet vorzeitig (bei Byte {0})	XSD: file ends early (at byte {0})
+Knoten und Perlen	Knots and beads
+XSD: unbekannte Joint-Art {0} bei Byte {1}	XSD: unknown joint kind {0} at byte {1}
+XSD: Datei nicht lesbar – {0}	XSD: file not readable – {0}
+XSD: keine Pattern-Maker-Datei	XSD: not a Pattern Maker file
+XSD: keine Pattern-Maker-Datei (die Kennung 0x0510 fehlt)	XSD: not a Pattern Maker file (the marker 0x0510 is missing)
+XSD: ungültige Größe {0}x{1}	XSD: invalid size {0}x{1}
+XSD: Muster zu groß: {0}x{1} (höchstens {2})	XSD: pattern too large: {0}x{1} (at most {2})
+XSD: unglaubwürdige Farbzahl {0}	XSD: implausible number of colors {0}
+XSD: unglaubwürdiger Blend mit {0} Garnen (Farbe {1})	XSD: implausible blend with {0} threads (color {1})
+Neues Symbol für {0} (das Zeichen aus Pattern Makers Symbolschrift ist nicht darstellbar)	New symbol for {0} (the character from Pattern Maker's symbol font cannot be displayed)
+XSD: unglaubwürdiger Stichblock bei Byte {0}	XSD: implausible stitch block at byte {0}
+XSD: kaputter Stichblock bei Byte {0}	XSD: broken stitch block at byte {0}
+XSD: zu viele Stiche (mehr als {0} Zellen)	XSD: too many stitches (more than {0} cells)
+XSD: Teilstich-Satz {0} fehlt (es gibt {1})	XSD: partial stitch set {0} is missing (there are {1})
+{0} Petite-Stich(e) als Viertelstiche übernommen	{0} petite stitch(es) taken as quarter stitches
+Zellen mit mehreren Teilstichen: die weiteren liegen auf eigenen Ebenen	Cells with several partial stitches: the others are on layers of their own
+{0} Spannstich(e) als Rückstiche übernommen	{0} long stitch(es) taken as backstitches
+{0} Sonderstich(e) nicht übernommen (kennt Glutfaden nicht)	{0} special stitch(es) not taken (Glutfaden does not know them)
+{0} gebogene(r) Stich(e) nicht übernommen (kennt Glutfaden nicht)	{0} curved stitch(es) not taken (Glutfaden does not know them)
+{0} Rückstich(e), Knoten oder Perle(n) mit unbekannter Farbe übersprungen	{0} backstitch(es), knot(s) or bead(s) with unknown color skipped
 Sichern unter	Save as
-Exportieren	Export
-Bild importieren	Import image
 Erneut aus dem Quellbild	Again from the source image
 Muster importieren (XSD/PAT/OXS)	Import pattern (XSD/PAT/OXS)
 Rückgängig	Undo
@@ -364,22 +1498,14 @@ Wiederholen	Redo
 Kopieren	Copy
 Ausschneiden	Cut
 Alles auswählen	Select all
-Farbe ersetzen	Replace color
 Kreuzstich / Diamond Painting	Cross stitch / diamond painting
 Garn-Blend	Thread blend
 Statistik	Statistics
 Neue Ebene	New layer
-Farben tauschen	Swap colors
 Palette umwandeln	Convert palette
 Bibliothek	Library
-Farb-Harmonien	Color harmonies
-Farben verwalten	Manage colors
 Stickpfad	Stitch path
-Eigenschaften	Properties
 Versionen	Versions
-Muster-Vorschau	Pattern preview
-Einstellungen	Settings
-Raster-Optionen	Grid options
 Kachel-Vorschau	Tile preview
 Lineale ein/aus	Rulers on/off
 Übersicht ein/aus	Overview on/off
@@ -391,26 +1517,125 @@ Sticken-Modus	Stitching mode
 180° drehen	Rotate 180°
 Horizontal spiegeln	Mirror horizontally
 Vertikal spiegeln	Mirror vertically
-Auto-Zuschneiden	Auto-crop
-Alle Ebenen vereinen	Flatten all layers
 Nur aktive Ebene	Active layer only
 Andere Ebenen abdunkeln	Dim other layers
-Ebene leeren	Clear layer
-Magnetisches Raster	Magnetic grid
 Tastenkürzel anzeigen	Show keyboard shortcuts
 Drucken	Print
 Farbe vom Bildschirm picken	Pick color from screen
-Palette exportieren	Export palette
-Palette importieren	Import palette
 Vergrößern	Zoom in
 Verkleinern	Zoom out
-Einpassen	Fit
 100 %	100 %
-Pipette	Eyedropper
 Rechteck gefüllt	Filled rectangle
 Ellipse gefüllt	Filled ellipse
-Auswahl	Selection
 Lasso	Lasso
 Vieleck gefüllt	Filled polygon
-Rückstich	Backstitch
-Stufe 24	Stage 24
+Erfahren	Experienced
+Alle	All
+Favoriten	Favorites
+Blumen	Flowers
+Tiere	Animals
+Landschaften	Landscapes
+Alphabete	Alphabets
+Weihnachten	Christmas
+Ostern	Easter
+Sonstiges	Other
+Datum	Date
+Beispielmuster öffnen	Open sample pattern
+Leeres Muster	Empty pattern
+Neues Muster (Dialog)	New pattern (dialog)
+Letzte Datei öffnen	Open last file
+Willkommensseite	Welcome page
+Zum Stift wechseln	Switch to pencil
+Beim Werkzeug bleiben	Stay with tool
+Zur Auswahl wechseln	Switch to selection
+Nur Farbe	Color only
+Farbe + Symbol	Color + Symbol
+Nur Symbol	Symbol only
+Standard	Default
+Blau	Blue
+Rot	Red
+Original	Original
+Nach Name (A-Z)	By name (A-Z)
+Nach Name (Z-A)	By name (Z-A)
+Nach Hersteller	By manufacturer
+Nach Helligkeit (hell → dunkel)	By brightness (light → dark)
+Nach Helligkeit (dunkel → hell)	By brightness (dark → light)
+Nach Verwendung (meiste zuerst)	By usage (most first)
+Nach Verwendung (wenigste zuerst)	By usage (fewest first)
+Analog	Analogous
+Triade	Triad
+Split-Komplementär	Split Complementary
+Tetrade	Tetradic
+— Keine Auswahl (eigene Werte) —	— No selection (own values) —
+DP A4 quadratisch (60×60 = 15×15 cm)	DP A4 square (60×60 = 15×15 cm)
+DP A4 hoch (60×80 = 15×20 cm)	DP A4 portrait (60×80 = 15×20 cm)
+DP A4 quer (80×60 = 20×15 cm)	DP A4 landscape (80×60 = 20×15 cm)
+DP A3 (100×100 = 25×25 cm)	DP A3 (100×100 = 25×25 cm)
+DP A3 quer (140×100 = 35×25 cm)	DP A3 landscape (140×100 = 35×25 cm)
+DP A2 (150×150 = 38×38 cm)	DP A2 (150×150 = 38×38 cm)
+DP A2 quer (200×150 = 50×38 cm)	DP A2 landscape (200×150 = 50×38 cm)
+DP A1 (200×200 = 50×50 cm)	DP A1 (200×200 = 50×50 cm)
+DP A1 quer (280×200 = 70×50 cm)	DP A1 landscape (280×200 = 70×50 cm)
+DP A0 (300×300 = 75×75 cm)	DP A0 (300×300 = 75×75 cm)
+DP Gross (400×400 = 100×100 cm)	DP Large (400×400 = 100×100 cm)
+Lesezeichen Klein	Bookmark small
+Schmales Lesezeichen	Narrow bookmark
+Lesezeichen Standard	Bookmark standard
+Klassisches Format	Classic format
+Lesezeichen Breit	Bookmark wide
+Breites Lesezeichen mit Platz für Motive	Wide bookmark with room for motifs
+Untersetzer Rund	Coaster round
+Quadratisch für runde Untersetzer	Square for round coasters
+Untersetzer Groß	Coaster large
+Größerer Untersetzer	Larger coaster
+Deckchen Klein	Doily small
+Kleines Zierdeckchen	Small decorative doily
+Deckchen Mittel	Doily medium
+Mittleres Deckchen für Tische	Medium doily for tables
+Tischläufer Kurz	Table runner short
+Kurzer Tischläufer	Short table runner
+Tischläufer Lang	Table runner long
+Langer Tischläufer	Long table runner
+Bordüre Schmal	Border narrow
+Schmale Zierbordüre	Narrow decorative border
+Bordüre Mittel	Border medium
+Mittlere Bordüre	Medium border
+Bordüre Breit	Border wide
+Breite Bordüre für Handtücher	Wide border for towels
+Borte Endlos	Endless trim
+Lange Borte zum Wiederholen	Long trim for repeating
+Mini-Bild	Mini picture
+Kleines Motiv, Ornament	Small motif, ornament
+Kleines Bild	Small picture
+Postkartengröße	Postcard size
+Mittleres Bild	Medium picture
+A5-Format	A5 format
+A4-Format	A4 format
+Wandbild	Wall picture
+Großes Wandbild	Large wall picture
+Nadelkissen	Pincushion
+Kleines Nadelkissen	Small pincushion
+Duftkissen	Scented sachet
+Lavendelkissen	Lavender sachet
+Sofakissen Klein	Sofa cushion small
+30×30 cm Kissen	30×30 cm cushion
+Sofakissen Groß	Sofa cushion large
+40×40 cm Kissen	40×40 cm cushion
+Schlüsselanhänger	Key ring
+Mini-Anhänger	Mini pendant
+Taschenspiegel	Pocket mirror
+Rund, für Spiegel	Round, for mirrors
+Brillenetui	Glasses case
+Für Brillenetui-Einsatz	For a glasses case insert
+Handytasche	Phone case
+Smartphone-Hülle	Smartphone sleeve
+Geldbörse	Purse
+Für Geldbörsen-Einsatz	For a purse insert
+Baumschmuck Klein	Tree ornament small
+Kleiner Anhänger	Small pendant
+Baumschmuck Groß	Tree ornament large
+Größerer Schmuck	Larger ornament
+Nikolausstiefel	Christmas stocking
+Stiefelform	Boot shape
+Adventskalender	Advent calendar
+24 Felder	24 fields

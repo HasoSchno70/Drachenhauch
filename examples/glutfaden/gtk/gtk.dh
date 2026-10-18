@@ -36,6 +36,10 @@ DECLARE FUNCTION gtk_paned_new LIB GTK (richtung AS LONG) AS ZEIGER
 DECLARE FUNCTION gtk_notebook_new LIB GTK () AS ZEIGER
 DECLARE FUNCTION gtk_notebook_append_page LIB GTK (nb AS ZEIGER, kind AS ZEIGER, reiter AS ZEIGER) AS LONG
 DECLARE SUB gtk_notebook_set_current_page LIB GTK (nb AS ZEIGER, seite AS LONG)
+DECLARE FUNCTION gtk_notebook_get_n_pages LIB GTK (nb AS ZEIGER) AS LONG
+DECLARE FUNCTION gtk_notebook_get_nth_page LIB GTK (nb AS ZEIGER, seite AS LONG) AS ZEIGER
+DECLARE FUNCTION gtk_notebook_get_tab_label LIB GTK (nb AS ZEIGER, kind AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_grab_get_current LIB GTK () AS ZEIGER
 DECLARE FUNCTION gtk_grid_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_grid_attach LIB GTK (g AS ZEIGER, kind AS ZEIGER, x AS LONG, y AS LONG, b AS LONG, h AS LONG)
 DECLARE SUB gtk_grid_set_row_spacing LIB GTK (g AS ZEIGER, abstand AS ULONG)
@@ -493,6 +497,7 @@ DECLARE FUNCTION signalZeile LIB GOBJECT ALIAS "g_signal_connect_data" _
 DECLARE SUB g_object_unref LIB GOBJECT (objekt AS ZEIGER)
 DECLARE FUNCTION g_timeout_add LIB GLIB (ms AS ULONG, rueckruf AS FUNCTION(daten AS ZEIGER) AS BOOLEAN, daten AS ZEIGER) AS ULONG
 DECLARE SUB g_free LIB GLIB (z AS ZEIGER)
+DECLARE FUNCTION g_source_remove LIB GLIB (kennung AS ULONG) AS BOOLEAN
 DECLARE SUB g_error_free LIB GLIB (fehler AS ZEIGER)
 
 STRUCT GError LAYOUT C

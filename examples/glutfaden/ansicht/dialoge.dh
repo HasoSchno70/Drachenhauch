@@ -32,13 +32,13 @@ END FUNCTION
 SUB farbeErsetzenDialog()
     IF NOT lwHat OR NOT wzFarbeDa() THEN RETURN
     IF lwMuster.farbanzahl() < 2 THEN
-        statusMeldung("Zum Ersetzen braucht es eine zweite Farbe.")
+        statusMeldung(tr$("Zum Ersetzen braucht es eine zweite Farbe."))
         RETURN
     END IF
     dlQuelle = wzFarbe
     dlZiele = kern.aehnlicheFarben(lwMuster, dlQuelle)
-    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Farbe ersetzen", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Ersetzen", GTK_ANTWORT_OK, 0)
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons(tr$("Farbe ersetzen"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Ersetzen"), GTK_ANTWORT_OK, 0)
     gtk_dialog_set_default_response(d, GTK_ANTWORT_OK)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
     gtk_container_set_border_width(innen, 12)
@@ -46,17 +46,17 @@ SUB farbeErsetzenDialog()
     DIM qf AS INTEGER : qf = lwMuster.farben[dlQuelle].garn.farbe
     DIM z AS INTEGER
     FOR EACH z IN dlZiele
-        gtk_combo_box_text_append_text(dlZielWahl, dlGarnName$(z) + "   (ΔE " + ZAHL$(kern.farbAbstand(qf, lwMuster.farben[z].garn.farbe), 1) + ")")
+        gtk_combo_box_text_append_text(dlZielWahl, dlGarnName$(z) + "   (ΔE " + zahlText$(kern.farbAbstand(qf, lwMuster.farben[z].garn.farbe), 1) + ")")
     NEXT
     gtk_combo_box_set_active(dlZielWahl, 0)
     dlToleranz = gtk_scale_new_with_range(GTK_WAAGERECHT, 0.0, 50.0, 1.0)
     gtk_scale_set_digits(dlToleranz, 0)
-    gtk_widget_set_tooltip_text(dlToleranz, "0 = nur diese Farbe; sonst auch alle, die so ähnlich sind (CIEDE2000)")
+    gtk_widget_set_tooltip_text(dlToleranz, tr$("0 = nur diese Farbe; sonst auch alle, die so ähnlich sind (CIEDE2000)"))
     dlHinweis = gtk_label_new("")
     gtk_label_set_xalign(dlHinweis, 0.0)
-    gtk_box_pack_start(innen, dlZeile("Ersetzen", gtk_label_new(dlGarnName$(dlQuelle))), FALSE, FALSE, 4)
-    gtk_box_pack_start(innen, dlZeile("durch", dlZielWahl), FALSE, FALSE, 4)
-    gtk_box_pack_start(innen, dlZeile("Toleranz", dlToleranz), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlZeile(tr$("Ersetzen"), gtk_label_new(dlGarnName$(dlQuelle))), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlZeile(tr$("durch"), dlZielWahl), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlZeile(tr$("Toleranz"), dlToleranz), FALSE, FALSE, 4)
     gtk_box_pack_start(innen, dlHinweis, FALSE, FALSE, 8)
     signal(dlZielWahl, "changed", dlErsetzenGeaendert, 0, 0, 0)
     signal(dlToleranz, "value-changed", dlErsetzenGeaendert, 0, 0, 0)
@@ -68,7 +68,7 @@ SUB farbeErsetzenDialog()
         DIM n AS INTEGER : n = kern.farbeErsetzen(lwMuster, wzVerlauf, q, ziel)
         wzFarbe = ziel
         allesNeu()
-        statusMeldung(STR$(n) + " Stiche ersetzt. Die alte Farbe bleibt in der Liste -- „Unbenutzte entfernen“ räumt sie weg.")
+        statusMeldung(trf$("{0} Stiche ersetzt. Die alte Farbe bleibt in der Liste -- „Unbenutzte entfernen“ räumt sie weg.", [STR$(n)]))
     END IF
     gtk_widget_destroy(d)
 END SUB
@@ -81,15 +81,15 @@ SUB dlErsetzenGeaendert(w AS INTEGER, daten AS INTEGER)
     FOR EACH c IN q
         s = s + lwMuster.farben[c].stichzahl
     NEXT
-    gtk_label_set_text(dlHinweis, STR$(LEN(q)) + IIF(LEN(q) = 1, " Farbe", " Farben") + " mit zusammen " + ZAHL$(s, 0) + " Stichen (verdeckte und ausgeblendete bleiben).")
+    gtk_label_set_text(dlHinweis, trf$("{0}{1} mit zusammen {2} Stichen (verdeckte und ausgeblendete bleiben).", [STR$(LEN(q)), IIF(LEN(q) = 1, tr$(" Farbe"), tr$(" Farben")), zahlText$(s, 0)]))
 END SUB
 
 ' --- Seltene Farben ----------------------------------------------------------------
 
 SUB selteneDialog()
     IF NOT lwHat THEN RETURN
-    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Seltene Farben zusammenlegen", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Zusammenlegen", GTK_ANTWORT_OK, 0)
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons(tr$("Seltene Farben zusammenlegen"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Zusammenlegen"), GTK_ANTWORT_OK, 0)
     gtk_dialog_set_default_response(d, GTK_ANTWORT_OK)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
     gtk_container_set_border_width(innen, 12)
@@ -97,7 +97,7 @@ SUB selteneDialog()
     gtk_spin_button_set_value(dlSelten, 10)
     dlHinweis = gtk_label_new("")
     gtk_label_set_xalign(dlHinweis, 0.0)
-    gtk_box_pack_start(innen, dlZeile("Höchstens", dlSelten), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlZeile(tr$("Höchstens"), dlSelten), FALSE, FALSE, 4)
     gtk_box_pack_start(innen, dlHinweis, FALSE, FALSE, 8)
     signal(dlSelten, "value-changed", dlSeltenGeaendert, 0, 0, 0)
     dlSeltenGeaendert(0, 0)
@@ -105,14 +105,14 @@ SUB selteneDialog()
     IF gtk_dialog_run(d) = GTK_ANTWORT_OK THEN
         DIM n AS INTEGER : n = seltenZusammenlegen(gtk_spin_button_get_value_as_int(dlSelten))
         allesNeu()
-        statusMeldung(STR$(n) + " Stiche umgefärbt.")
+        statusMeldung(trf$("{0} Stiche umgefärbt.", [STR$(n)]))
     END IF
     gtk_widget_destroy(d)
 END SUB
 
 SUB dlSeltenGeaendert(w AS INTEGER, daten AS INTEGER)
     DIM p AS ARRAY OF INTEGER : p = kern.selteneErsetzungen(lwMuster, gtk_spin_button_get_value_as_int(dlSelten))
-    gtk_label_set_text(dlHinweis, STR$(LEN(p) \ 2) + " Farben mit so wenigen Stichen gehen in die ähnlichste häufige über.")
+    gtk_label_set_text(dlHinweis, trf$("{0} Farben mit so wenigen Stichen gehen in die ähnlichste häufige über.", [STR$(LEN(p) \ 2)]))
 END SUB
 
 ' Alle Paare in EINEM Schritt (auch fuer die Vorfuehrung).
@@ -120,7 +120,7 @@ FUNCTION seltenZusammenlegen(hoechstens AS INTEGER) AS INTEGER
     DIM p AS ARRAY OF INTEGER : p = kern.selteneErsetzungen(lwMuster, hoechstens)
     IF LEN(p) = 0 THEN RETURN 0
     DIM n AS INTEGER, k AS INTEGER
-    wzVerlauf.beginnen("Seltene Farben zusammenlegen")
+    wzVerlauf.beginnen(tr$("Seltene Farben zusammenlegen"))
     FOR k = 0 TO LEN(p) - 2 STEP 2
         n = n + kern.farbeErsetzen(lwMuster, wzVerlauf, [p[k]], p[k + 1])
     NEXT
@@ -163,7 +163,7 @@ SUB symbolEditor(nr AS INTEGER)
         IF a <> GTK_ANTWORT_OK THEN EXIT DO
         DIM fehler AS STRING : fehler = seUebernehmen()
         IF fehler = "" THEN EXIT DO
-        pdWarnung(d, "Symbol bereits vergeben", fehler)
+        pdWarnung(d, tr$("Symbol bereits vergeben"), fehler)
     LOOP
     gtk_widget_destroy(d)
     seDialog = 0
@@ -178,8 +178,8 @@ FUNCTION seDialogBauen(nr AS INTEGER) AS INTEGER
         seNamen = kern.symbolnamenLaden(PATHJOIN(CWD$(), "daten/symbolnamen.txt"))
         seSchrift = pango_font_description_from_string("DejaVu Sans 36")
     END IF
-    seDialog = gtk_dialog_new_with_buttons("Symbol bearbeiten - " + f.garn.name, fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Übernehmen", GTK_ANTWORT_OK, 0)
+    seDialog = gtk_dialog_new_with_buttons(trf$("Symbol bearbeiten - {0}", [f.garn.name]), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Übernehmen"), GTK_ANTWORT_OK, 0)
     gtk_dialog_set_default_response(seDialog, GTK_ANTWORT_OK)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(seDialog)
     gtk_container_set_border_width(innen, 15)
@@ -203,19 +203,19 @@ FUNCTION seDialogBauen(nr AS INTEGER) AS INTEGER
         gtk_label_set_xalign(l, 0.0)
         gtk_box_pack_start(info, l, FALSE, FALSE, 0)
     END IF
-    l = gtk_label_new(STR$(f.stichzahl) + " Stiche")
+    l = gtk_label_new(trf$("{0} Stiche", [STR$(f.stichzahl)]))
     gtkKlasse(l, "se-leise")
     gtk_label_set_xalign(l, 0.0)
     gtk_box_pack_start(info, l, FALSE, FALSE, 0)
     l = gtk_label_new("")
-    gtk_label_set_markup(l, "Aktuelles Symbol: <span size='x-large'>" + ilMaske$(f.symbol) + "</span>")
+    gtk_label_set_markup(l, trf$("Aktuelles Symbol: <span size='x-large'>{0}</span>", [ilMaske$(f.symbol)]))
     gtk_label_set_xalign(l, 0.0)
     gtk_box_pack_start(info, l, FALSE, FALSE, 0)
     gtk_box_pack_start(kopfz, info, TRUE, TRUE, 0)
     gtk_box_pack_start(innen, kopfz, FALSE, FALSE, 0)
 
     ' Eigenes Symbol
-    DIM rahmen AS INTEGER : rahmen = gtk_frame_new("Eigenes Symbol")
+    DIM rahmen AS INTEGER : rahmen = gtk_frame_new(tr$("Eigenes Symbol"))
     DIM ez AS INTEGER : ez = gtk_box_new(GTK_WAAGERECHT, 10)
     gtk_container_set_border_width(ez, 8)
     seEigen = gtk_entry_new()
@@ -226,21 +226,21 @@ FUNCTION seDialogBauen(nr AS INTEGER) AS INTEGER
     gtkKlasse(seEigen, "se-eigen")
     signal(seEigen, "changed", seEigenGeaendert, 0, 0, 0)
     gtk_box_pack_start(ez, seEigen, FALSE, FALSE, 0)
-    l = gtk_label_new("Beliebiges Zeichen eingeben")
+    l = gtk_label_new(tr$("Beliebiges Zeichen eingeben"))
     gtkKlasse(l, "se-leise")
     gtk_box_pack_start(ez, l, FALSE, FALSE, 0)
     gtk_container_add(rahmen, ez)
     gtk_box_pack_start(innen, rahmen, FALSE, FALSE, 0)
 
     ' Auswahl
-    rahmen = gtk_frame_new("Symbol auswählen")
+    rahmen = gtk_frame_new(tr$("Symbol auswählen"))
     DIM az AS INTEGER : az = gtk_box_new(GTK_SENKRECHT, 6)
     gtk_container_set_border_width(az, 8)
     seSuche = gtk_search_entry_new()
-    gtk_entry_set_placeholder_text(seSuche, "Suche: Zeichen, Name oder U+25CF / 25CF")
+    gtk_entry_set_placeholder_text(seSuche, tr$("Suche: Zeichen, Name oder U+25CF / 25CF"))
     signal(seSuche, "search-changed", seSucheGeaendert, 0, 0, 0)
     gtk_box_pack_start(az, seSuche, FALSE, FALSE, 0)
-    seLeer = gtk_label_new("Keine Treffer.")
+    seLeer = gtk_label_new(tr$("Keine Treffer."))
     gtkKlasse(seLeer, "se-leise")
     gtk_widget_set_no_show_all(seLeer, TRUE)
     gtk_box_pack_start(az, seLeer, FALSE, FALSE, 0)
@@ -348,9 +348,9 @@ END FUNCTION
 FUNCTION seUebernehmen() AS STRING
     IF seWahl = lwMuster.farben[seNr].symbol THEN RETURN ""
     DIM fehler AS STRING : fehler = kern.symbolSetzen(lwMuster, wzVerlauf, seNr, seWahl)
-    IF fehler <> "" THEN RETURN "Das Symbol „" + seWahl + "“ wird schon von einer anderen Farbe verwendet (" + fehler + ")" + CHR$(10) + "Bitte ein anderes Symbol wählen."
+    IF fehler <> "" THEN RETURN trf$("Das Symbol „{0}“ wird schon von einer anderen Farbe verwendet ({1}){2}Bitte ein anderes Symbol wählen.", [seWahl, fehler, CHR$(10)])
     allesNeu()
-    statusMeldung("Symbol von " + lwMuster.farben[seNr].garn.name + ": " + seWahl)
+    statusMeldung(trf$("Symbol von {0}: {1}", [lwMuster.farben[seNr].garn.name, seWahl]))
     RETURN ""
 END FUNCTION
 
@@ -370,12 +370,12 @@ DIM blVorschau AS INTEGER
 DIM blText AS INTEGER
 
 FUNCTION blDialogBauen() AS INTEGER
-    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Tweed-Blend erzeugen", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Zum Muster hinzufügen", GTK_ANTWORT_OK, 0)
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons(tr$("Tweed-Blend erzeugen"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Zum Muster hinzufügen"), GTK_ANTWORT_OK, 0)
     gtk_dialog_set_default_response(d, GTK_ANTWORT_OK)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
     gtk_container_set_border_width(innen, 12)
-    DIM info AS INTEGER : info = gtk_label_new("Zwei Garne in einer Nadel ergeben einen Tweed: 1 Strang DMC 310 (schwarz) und 1 Strang DMC 745 (creme) etwa einen warmen Pfeffer-und-Salz-Ton. Die Mischfarbe ist das Mittel in Lab, so wie das Auge sie sieht.")
+    DIM info AS INTEGER : info = gtk_label_new(tr$("Zwei Garne in einer Nadel ergeben einen Tweed: 1 Strang DMC 310 (schwarz) und 1 Strang DMC 745 (creme) etwa einen warmen Pfeffer-und-Salz-Ton. Die Mischfarbe ist das Mittel in Lab, so wie das Auge sie sieht."))
     gtk_label_set_line_wrap(info, TRUE)
     gtk_label_set_xalign(info, 0.0)
     gtk_label_set_max_width_chars(info, 58)
@@ -399,12 +399,12 @@ FUNCTION blDialogBauen() AS INTEGER
     blPalB = blPaletteWahl()
     blGarnB = gtk_combo_box_text_new()
     blStrB = gtk_spin_button_new_with_range(1, 6, 1)
-    gtk_box_pack_start(innen, dlZeile("Palette A", blPalA), FALSE, FALSE, 3)
-    gtk_box_pack_start(innen, dlZeile("Garn A", blGarnA), FALSE, FALSE, 3)
-    gtk_box_pack_start(innen, dlZeile("Stränge A", blStrA), FALSE, FALSE, 3)
-    gtk_box_pack_start(innen, dlZeile("Palette B", blPalB), FALSE, FALSE, 3)
-    gtk_box_pack_start(innen, dlZeile("Garn B", blGarnB), FALSE, FALSE, 3)
-    gtk_box_pack_start(innen, dlZeile("Stränge B", blStrB), FALSE, FALSE, 3)
+    gtk_box_pack_start(innen, dlZeile(tr$("Palette A"), blPalA), FALSE, FALSE, 3)
+    gtk_box_pack_start(innen, dlZeile(tr$("Garn A"), blGarnA), FALSE, FALSE, 3)
+    gtk_box_pack_start(innen, dlZeile(tr$("Stränge A"), blStrA), FALSE, FALSE, 3)
+    gtk_box_pack_start(innen, dlZeile(tr$("Palette B"), blPalB), FALSE, FALSE, 3)
+    gtk_box_pack_start(innen, dlZeile(tr$("Garn B"), blGarnB), FALSE, FALSE, 3)
+    gtk_box_pack_start(innen, dlZeile(tr$("Stränge B"), blStrB), FALSE, FALSE, 3)
     blVorschau = gtk_label_new("")
     blText = gtk_label_new("")
     gtk_label_set_xalign(blText, 0.0)
@@ -412,7 +412,7 @@ FUNCTION blDialogBauen() AS INTEGER
     DIM zeile AS INTEGER : zeile = gtk_box_new(GTK_WAAGERECHT, 10)
     gtk_box_pack_start(zeile, blVorschau, FALSE, FALSE, 0)
     gtk_box_pack_start(zeile, blText, TRUE, TRUE, 0)
-    gtk_box_pack_start(innen, dlZeile("Vorschau", zeile), FALSE, FALSE, 8)
+    gtk_box_pack_start(innen, dlZeile(tr$("Vorschau"), zeile), FALSE, FALSE, 8)
     blGarneFuellen(blPalA, blGarnA)
     blGarneFuellen(blPalB, blGarnB)
     signal(blPalA, "changed", blPaletteGeaendert, 0, 0, 0)
@@ -477,11 +477,11 @@ END FUNCTION
 SUB blGeaendert(w AS INTEGER, daten AS INTEGER)
     DIM g AS kern.Garn : g = blBlend()
     IF IS_NIL(g) THEN
-        gtk_label_set_text(blText, "(beide Garne wählen)")
+        gtk_label_set_text(blText, tr$("(beide Garne wählen)"))
         RETURN
     END IF
     gtk_label_set_markup(blVorschau, "<span background='" + kern.farbeAlsHex$(g.farbe) + "' font='26'>" + CHR$(&H2003) * 3 + "</span>")
-    gtk_label_set_text(blText, g.name + CHR$(10) + "Mischfarbe " + kern.farbeAlsHex$(g.farbe))
+    gtk_label_set_text(blText, trf$("{0}{1}Mischfarbe {2}", [g.name, CHR$(10), kern.farbeAlsHex$(g.farbe)]))
 END SUB
 
 ' Den Blend ins Muster (ein Schritt im Verlauf; derselbe Blend ein zweites
@@ -494,16 +494,16 @@ SUB blUebernehmen()
     wzFarbe = nr
     allesNeu()
     IF lwMuster.farbanzahl() > vorher THEN
-        statusMeldung("Tweed-Blend hinzugefügt: " + g.name + " (Symbol " + lwMuster.farben[nr].symbol + ").")
+        statusMeldung(trf$("Tweed-Blend hinzugefügt: {0} (Symbol {1}).", [g.name, lwMuster.farben[nr].symbol]))
     ELSE
-        statusMeldung("Diesen Blend gibt es schon im Muster -- er ist jetzt die aktuelle Farbe.")
+        statusMeldung(tr$("Diesen Blend gibt es schon im Muster -- er ist jetzt die aktuelle Farbe."))
     END IF
 END SUB
 
 SUB blendDialog()
     IF NOT lwHat THEN RETURN
     IF lwMuster.modus = "diamond" THEN
-        statusMeldung("Im Diamond-Modus gibt es keine Blends -- ein Drill ist eine Farbe.")
+        statusMeldung(tr$("Im Diamond-Modus gibt es keine Blends -- ein Drill ist eine Farbe."))
         RETURN
     END IF
     DIM d AS INTEGER : d = blDialogBauen()

@@ -125,7 +125,7 @@ CLASS Ebenenstapel
         breite = b
         hoehe = h
         ebenen = []
-        ARRAY_PUSH(ebenen, neueEbene("Hintergrund", b, h))
+        ARRAY_PUSH(ebenen, neueEbene(tr$("Hintergrund"), b, h))
     END SUB
 
     FUNCTION anzahl() AS INTEGER
@@ -139,7 +139,7 @@ CLASS Ebenenstapel
 
     ' Alle Ebenen ersetzen (beim Laden); aktiv wird geklemmt.
     SUB ersetzen(neu AS ARRAY OF Ebene, aktivNr AS INTEGER)
-        IF LEN(neu) = 0 THEN THROW "Ebenenstapel braucht mindestens eine Ebene"
+        IF LEN(neu) = 0 THEN THROW tr$("Ebenenstapel braucht mindestens eine Ebene")
         ebenen = neu
         aktiv = CLAMP(aktivNr, 0, LEN(neu) - 1)
     END SUB

@@ -33,39 +33,39 @@ PRIVATE FUNCTION istGanzeZahl(j AS JSON_HANDLE, pfad AS STRING) AS BOOLEAN
 END FUNCTION
 
 FUNCTION pxsLaden(pfad AS STRING) AS Muster
-    IF NOT FILEEXISTS(pfad) THEN THROW "Datei nicht gefunden: " + pfad
+    IF NOT FILEEXISTS(pfad) THEN THROW trf$("Datei nicht gefunden: {0}", [pfad])
     DIM j AS JSON_HANDLE
     TRY
         j = JSON_LOAD(pfad)
     CATCH e
-        THROW "Fehlerhafte Datei-Syntax: " + e
+        THROW trf$("Fehlerhafte Datei-Syntax: {0}", [e])
     END TRY
-    IF JSON_TYPE(j, "") <> "object" THEN THROW "Ungültiges Dateiformat: JSON-Objekt erwartet, gefunden " + JSON_TYPE(j, "")
+    IF JSON_TYPE(j, "") <> "object" THEN THROW trf$("Ungültiges Dateiformat: JSON-Objekt erwartet, gefunden {0}", [JSON_TYPE(j, "")])
     IF textOder$(j, "format", "unbekannt") <> PXS_FORMAT THEN
-        THROW "Ungültiges Dateiformat: erwartet 'pysticky', gefunden '" + textOder$(j, "format", "unbekannt") + "'"
+        THROW trf$("Ungültiges Dateiformat: erwartet 'pysticky', gefunden '{0}'", [textOder$(j, "format", "unbekannt")])
     END IF
-    IF NOT JSON_HAS(j, "pattern") THEN THROW "Datei enthält keine Muster-Daten"
-    IF JSON_TYPE(j, "pattern") <> "object" THEN THROW "Ungültige Musterdaten: Objekt erwartet, gefunden " + JSON_TYPE(j, "pattern")
+    IF NOT JSON_HAS(j, "pattern") THEN THROW tr$("Datei enthält keine Muster-Daten")
+    IF JSON_TYPE(j, "pattern") <> "object" THEN THROW trf$("Ungültige Musterdaten: Objekt erwartet, gefunden {0}", [JSON_TYPE(j, "pattern")])
     RETURN musterAusJson(JSON_GET_JSON(j, "pattern"))
 END FUNCTION
 
 FUNCTION musterAusJson(p AS JSON_HANDLE) AS Muster
     DIM feld AS STRING
     FOR EACH feld IN ["name", "width", "height", "colors", "layers"]
-        IF NOT JSON_HAS(p, feld) THEN THROW "Pflichtfeld '" + feld + "' fehlt in der Datei"
+        IF NOT JSON_HAS(p, feld) THEN THROW trf$("Pflichtfeld '{0}' fehlt in der Datei", [feld])
     NEXT
     IF NOT istGanzeZahl(p, "width") OR NOT istGanzeZahl(p, "height") THEN
-        THROW "Ungültige Mustergröße (ganze Zahlen erwartet)"
+        THROW tr$("Ungültige Mustergröße (ganze Zahlen erwartet)")
     END IF
     DIM b AS INTEGER : b = INT(JSON_GET_FLOAT(p, "width"))
     DIM h AS INTEGER : h = INT(JSON_GET_FLOAT(p, "height"))
-    IF b < 1 OR h < 1 THEN THROW "Ungültige Mustergröße: " + STR$(b) + "x" + STR$(h) + " (min. 1x1)"
+    IF b < 1 OR h < 1 THEN THROW trf$("Ungültige Mustergröße: {0}x{1} (min. 1x1)", [STR$(b), STR$(h)])
     IF b > GROESSTES_MUSTER OR h > GROESSTES_MUSTER THEN
-        THROW "Mustergröße zu groß: " + STR$(b) + "x" + STR$(h) + " (max. 2000x2000)"
+        THROW trf$("Mustergröße zu groß: {0}x{1} (max. 2000x2000)", [STR$(b), STR$(h)])
     END IF
-    IF JSON_TYPE(p, "colors") <> "array" THEN THROW "Ungültiges Farbformat: Liste erwartet"
-    IF JSON_TYPE(p, "layers") <> "array" THEN THROW "Mindestens ein Layer erforderlich"
-    IF JSON_LEN(p, "layers") = 0 THEN THROW "Mindestens ein Layer erforderlich"
+    IF JSON_TYPE(p, "colors") <> "array" THEN THROW tr$("Ungültiges Farbformat: Liste erwartet")
+    IF JSON_TYPE(p, "layers") <> "array" THEN THROW tr$("Mindestens ein Layer erforderlich")
+    IF JSON_LEN(p, "layers") = 0 THEN THROW tr$("Mindestens ein Layer erforderlich")
 
     DIM m AS Muster : m = neuesMuster(textOder$(p, "name", ""), b, h)
     ' Stoff: eine kaputte Angabe (<= 0) faellt auf die Vorgabe zurueck
@@ -89,7 +89,7 @@ FUNCTION musterAusJson(p AS JSON_HANDLE) AS Muster
     DIM i AS INTEGER
     FOR i = 0 TO JSON_LEN(p, "colors") - 1
         DIM w AS STRING : w = "colors." + STR$(i)
-        IF JSON_TYPE(p, w) <> "object" THEN THROW "Ungültiger Farbeintrag bei Index " + STR$(i) + ": Objekt erwartet, gefunden " + JSON_TYPE(p, w)
+        IF JSON_TYPE(p, w) <> "object" THEN THROW trf$("Ungültiger Farbeintrag bei Index {0}: Objekt erwartet, gefunden {1}", [STR$(i), JSON_TYPE(p, w)])
         ARRAY_PUSH(m.farben, farbeintragAusJson(p, w))
     NEXT
 
@@ -97,19 +97,19 @@ FUNCTION musterAusJson(p AS JSON_HANDLE) AS Muster
     DIM neu AS ARRAY OF Ebene : neu = []
     FOR i = 0 TO JSON_LEN(p, "layers") - 1
         DIM l AS STRING : l = "layers." + STR$(i)
-        IF JSON_TYPE(p, l) <> "object" THEN THROW "Ungültiger Layer bei Index " + STR$(i) + ": Objekt erwartet, gefunden " + JSON_TYPE(p, l)
+        IF JSON_TYPE(p, l) <> "object" THEN THROW trf$("Ungültiger Layer bei Index {0}: Objekt erwartet, gefunden {1}", [STR$(i), JSON_TYPE(p, l)])
         ARRAY_PUSH(neu, ebeneAusJson(p, l, b, h))
     NEXT
     m.ebenen.ersetzen(neu, ganzOder(p, "active_layer", 0))
 
     ' Rueckstiche (seit 1.1)
     IF JSON_HAS(p, "backstitches") THEN
-        IF JSON_TYPE(p, "backstitches") <> "array" THEN THROW "Ungültiges Rückstich-Format: Liste erwartet"
+        IF JSON_TYPE(p, "backstitches") <> "array" THEN THROW tr$("Ungültiges Rückstich-Format: Liste erwartet")
         FOR i = 0 TO JSON_LEN(p, "backstitches") - 1
             DIM r AS STRING : r = "backstitches." + STR$(i)
-            IF JSON_TYPE(p, r) <> "object" THEN THROW "Ungültiger Rückstich bei Index " + STR$(i) + ": Objekt erwartet, gefunden " + JSON_TYPE(p, r)
+            IF JSON_TYPE(p, r) <> "object" THEN THROW trf$("Ungültiger Rückstich bei Index {0}: Objekt erwartet, gefunden {1}", [STR$(i), JSON_TYPE(p, r)])
             FOR EACH feld IN ["x1", "y1", "x2", "y2", "color_index"]
-                IF NOT JSON_HAS(p, r + "." + feld) THEN THROW "Rückstich: Pflichtfeld '" + feld + "' fehlt"
+                IF NOT JSON_HAS(p, r + "." + feld) THEN THROW trf$("Rückstich: Pflichtfeld '{0}' fehlt", [feld])
             NEXT
             ARRAY_PUSH(m.rueckstiche, neuerRueckstich(JSON_GET_INT(p, r + ".x1"), JSON_GET_INT(p, r + ".y1"), _
                 JSON_GET_INT(p, r + ".x2"), JSON_GET_INT(p, r + ".y2"), JSON_GET_INT(p, r + ".color_index")))
@@ -123,23 +123,23 @@ END FUNCTION
 PRIVATE FUNCTION garnAusJson(p AS JSON_HANDLE, w AS STRING) AS Garn
     DIM hex AS STRING : hex = textOder$(p, w + ".color", "")
     DIM f AS INTEGER : f = farbeAusHex(hex)
-    IF f < 0 THEN THROW "Ungültige Hex-Farbe: '" + hex + "'"
+    IF f < 0 THEN THROW trf$("Ungültige Hex-Farbe: '{0}'", [hex])
     RETURN neuesGarn(JSON_GET_STRING(p, w + ".name"), f, textOder$(p, w + ".manufacturer", ""), textOder$(p, w + ".catalog_number", ""))
 END FUNCTION
 
 FUNCTION farbeintragAusJson(p AS JSON_HANDLE, w AS STRING) AS Farbeintrag
     DIM feld AS STRING
     FOR EACH feld IN ["name", "color", "symbol"]
-        IF NOT JSON_HAS(p, w + "." + feld) THEN THROW "Farbeintrag: Pflichtfeld '" + feld + "' fehlt"
+        IF NOT JSON_HAS(p, w + "." + feld) THEN THROW trf$("Farbeintrag: Pflichtfeld '{0}' fehlt", [feld])
     NEXT
     DIM g AS Garn : g = garnAusJson(p, w)
     IF JSON_HAS(p, w + ".blend_components") AND JSON_TYPE(p, w + ".blend_components") = "array" THEN
         DIM k AS INTEGER
         FOR k = 0 TO JSON_LEN(p, w + ".blend_components") - 1
             DIM t AS STRING : t = w + ".blend_components." + STR$(k)
-            IF JSON_TYPE(p, t) <> "object" THEN THROW "Ungültige Blend-Komponente bei Index " + STR$(k) + ": Objekt erwartet"
+            IF JSON_TYPE(p, t) <> "object" THEN THROW trf$("Ungültige Blend-Komponente bei Index {0}: Objekt erwartet", [STR$(k)])
             FOR EACH feld IN ["name", "color"]
-                IF NOT JSON_HAS(p, t + "." + feld) THEN THROW "Blend-Komponente bei Index " + STR$(k) + ": Pflichtfeld '" + feld + "' fehlt"
+                IF NOT JSON_HAS(p, t + "." + feld) THEN THROW trf$("Blend-Komponente bei Index {0}: Pflichtfeld '{1}' fehlt", [STR$(k), feld])
             NEXT
             ARRAY_PUSH(g.teile, garnAusJson(p, t))
             ARRAY_PUSH(g.anteile, 1)

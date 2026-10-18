@@ -63,8 +63,8 @@ FUNCTION imVorlagenDatei$() AS STRING
 END FUNCTION
 
 SUB imVorlagenLaden()
-    imVorlagen = ["Klein (Lesezeichen)", "Mittel (Bild)", "Groß (Wandbild)", "Foto (detailreich)", _
-        "💎 DP A4 quadratisch (60×60)", "💎 DP A3 (100×100)", "💎 DP A2 (150×150)", "💎 DP A1 (200×200)", "💎 DP A0 (300×300)"]
+    imVorlagen = [tr$("Klein (Lesezeichen)"), tr$("Mittel (Bild)"), tr$("Groß (Wandbild)"), tr$("Foto (detailreich)"), _
+        tr$("💎 DP A4 quadratisch (60×60)"), tr$("💎 DP A3 (100×100)"), tr$("💎 DP A2 (150×150)"), tr$("💎 DP A1 (200×200)"), tr$("💎 DP A0 (300×300)")]
     imVorlagenJson = [imVorlage$(40, 60, 10, "none", "nearest", FALSE, ""), _
         imVorlage$(100, 100, 25, "floyd_steinberg", "nearest", FALSE, ""), _
         imVorlage$(200, 250, 40, "floyd_steinberg", "median_cut", FALSE, ""), _
@@ -90,7 +90,7 @@ SUB imVorlagenLaden()
             ARRAY_PUSH(imVorlagenJson, JSON_STRINGIFY(JSON_GET_JSON(j, w)))
         NEXT
     CATCH e
-        statusMeldung("Eigene Voreinstellungen nicht lesbar: " + e)
+        statusMeldung(trf$("Eigene Voreinstellungen nicht lesbar: {0}", [e]))
     END TRY
 END SUB
 
@@ -121,7 +121,7 @@ END FUNCTION
 
 ' Die jetzigen Einstellungen als eigene Voreinstellung sichern.
 SUB imVorlageSichern(w AS INTEGER, daten AS INTEGER)
-    DIM name AS STRING : name = textFragen("Voreinstellung sichern", "Name der Voreinstellung:", "")
+    DIM name AS STRING : name = textFragen(tr$("Voreinstellung sichern"), tr$("Name der Voreinstellung:"), "")
     IF name = "" THEN RETURN
     DIM e AS kern.Importeinstellung : e = imEinstellung()
     DIM j AS JSON_HANDLE : j = JSON_PARSE(imVorlage$(e.breite, e.hoehe, e.maxFarben, e.ditherName$(), IIF(e.farbwahl = kern.WAHL_MEDIAN, "median_cut", "nearest"), e.konturen, e.palette.name))
@@ -139,9 +139,9 @@ SUB imVorlageSichern(w AS INTEGER, daten AS INTEGER)
     END TRY
     TRY
         WRITEALL(imVorlagenDatei$(), JSON_STRINGIFY(alle))
-        statusMeldung("Voreinstellung „" + name + "“ gesichert.")
+        statusMeldung(trf$("Voreinstellung „{0}“ gesichert.", [name]))
     CATCH f
-        statusMeldung("Voreinstellung nicht gesichert: " + f)
+        statusMeldung(trf$("Voreinstellung nicht gesichert: {0}", [f]))
     END TRY
 END SUB
 
@@ -174,8 +174,7 @@ SUB imInfoNachziehen(w AS INTEGER, daten AS INTEGER)
     DIM tb AS INTEGER, th AS INTEGER
     (tb, th) = kern.zielGroesse(ab, ah, e)
     DIM stoff AS FLOAT : stoff = IIF(e.palette.istDiamant, 10.0, 14.0)
-    gtk_label_set_text(imInfo, STR$(tb) + " × " + STR$(th) + " Stiche  ·  ≈ " + ZAHL$(tb / stoff * 2.54, 1) + " × " + ZAHL$(th / stoff * 2.54, 1) + " cm bei " + IIF(e.palette.istDiamant, "2,5-mm-Drills", "14ct Aida") + _
-        "  ·  Ausschnitt " + IIF(ab = imBildB AND ah = imBildH, "ganzes Bild", STR$(ab) + " × " + STR$(ah) + " px"))
+    gtk_label_set_text(imInfo, trf$("{0} × {1} Stiche  ·  ≈ {2} × {3} cm bei {4}  ·  Ausschnitt {5}", [STR$(tb), STR$(th), zahlText$(tb / stoff * 2.54, 1), zahlText$(th / stoff * 2.54, 1), IIF(e.palette.istDiamant, "2,5-mm-Drills", tr$("14ct Aida")), IIF(ab = imBildB AND ah = imBildH, tr$("ganzes Bild"), STR$(ab) + " × " + STR$(ah) + " px")]))
 END SUB
 
 ' --- Das Bild mit dem Ausschnitt -------------------------------------------------------------
@@ -301,7 +300,7 @@ FUNCTION imRechnen() AS kern.Muster
     DIM ergebnis AS kern.Muster
     TRY
         DIM e AS kern.Importeinstellung : e = imEinstellung()
-        gtk_progress_bar_set_text(imBalken, "Bild vorbereiten …")
+        gtk_progress_bar_set_text(imBalken, tr$("Bild vorbereiten …"))
         gtk_progress_bar_set_fraction(imBalken, 0.0)
         gtkAbarbeiten()
         DIM grau AS kern.Pixelbild
@@ -313,7 +312,7 @@ FUNCTION imRechnen() AS kern.Muster
         WHILE im.schritt(4)
             IF MILLIS() - t0 > 40 THEN
                 gtk_progress_bar_set_fraction(imBalken, im.fortschritt())
-                gtk_progress_bar_set_text(imBalken, "Farben zuordnen … " + STR$(INT(im.fortschritt() * 100)) + " %")
+                gtk_progress_bar_set_text(imBalken, trf$("Farben zuordnen … {0} %", [STR$(INT(im.fortschritt() * 100))]))
                 gtkAbarbeiten()
                 t0 = MILLIS()
             END IF
@@ -321,10 +320,9 @@ FUNCTION imRechnen() AS kern.Muster
         ergebnis = im.ergebnis
         ergebnis.quellBild = REALPATH$(imPfad)
         gtk_progress_bar_set_fraction(imBalken, 1.0)
-        gtk_progress_bar_set_text(imBalken, STR$(ergebnis.breite) + " × " + STR$(ergebnis.hoehe) + ", " + STR$(ergebnis.farbanzahl()) + " Farben" + _
-            IIF(LEN(ergebnis.rueckstiche) > 0, ", " + STR$(LEN(ergebnis.rueckstiche)) + " Rückstiche", ""))
+        gtk_progress_bar_set_text(imBalken, trf$("{0} × {1}, {2} Farben{3}", [STR$(ergebnis.breite), STR$(ergebnis.hoehe), STR$(ergebnis.farbanzahl()), IIF(LEN(ergebnis.rueckstiche) > 0, trf$(", {0} Rückstiche", [STR$(LEN(ergebnis.rueckstiche))]), "")]))
     CATCH f
-        gtk_progress_bar_set_text(imBalken, "Fehler: " + f)
+        gtk_progress_bar_set_text(imBalken, trf$("Fehler: {0}", [f]))
         ergebnis = NIL
     END TRY
     imLaeuft = FALSE
@@ -395,7 +393,7 @@ FUNCTION imDialogBauen(pfad AS STRING, vorher AS kern.Importeinstellung) AS BOOL
             imBild = LOADIMAGE(pfad)
         END IF
     CATCH f
-        statusMeldung("Bild nicht lesbar: " + f)
+        statusMeldung(trf$("Bild nicht lesbar: {0}", [f]))
         RETURN FALSE
     END TRY
     imBildB = IMAGE_WIDTH(imBild)
@@ -403,15 +401,15 @@ FUNCTION imDialogBauen(pfad AS STRING, vorher AS kern.Importeinstellung) AS BOOL
     DIM fehler AS INTEGER
     imPixbuf = gdk_pixbuf_new_from_file_at_size(pfad, IM_QUELLE_B, IM_QUELLE_H, fehler)
     IF imPixbuf = 0 THEN
-        statusMeldung("Bild nicht lesbar: " + gtkFehler$(fehler))
+        statusMeldung(trf$("Bild nicht lesbar: {0}", [gtkFehler$(fehler)]))
         RETURN FALSE
     END IF
     imAusschnitt = [0.0, 0.0, 1.0, 1.0]
     imErgebnis = NIL
     imVorlagenLaden()
 
-    imDialog = gtk_dialog_new_with_buttons("Bild importieren", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Importieren", GTK_ANTWORT_OK, 0)
+    imDialog = gtk_dialog_new_with_buttons(tr$("Bild importieren"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Importieren"), GTK_ANTWORT_OK, 0)
     gtk_dialog_set_default_response(imDialog, GTK_ANTWORT_OK)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(imDialog)
     gtk_container_set_border_width(innen, 12)
@@ -420,31 +418,31 @@ FUNCTION imDialogBauen(pfad AS STRING, vorher AS kern.Importeinstellung) AS BOOL
     DIM rechts AS INTEGER : rechts = gtk_box_new(GTK_SENKRECHT, 6)
     gtk_widget_set_size_request(links, 330, -1)
 
-    DIM namen AS ARRAY OF STRING : namen = ["— keine —"]
+    DIM namen AS ARRAY OF STRING : namen = [tr$("— keine —")]
     DIM n AS STRING
     FOR EACH n IN imVorlagen
         ARRAY_PUSH(namen, n)
     NEXT
     imVorein = imKlappliste(namen, 0)
     DIM kSichern AS INTEGER : kSichern = gtk_button_new_from_icon_name("document-save-symbolic", GTK_ICON_KNOPF)
-    gtk_widget_set_tooltip_text(kSichern, "Die jetzigen Einstellungen als eigene Voreinstellung sichern")
+    gtk_widget_set_tooltip_text(kSichern, tr$("Die jetzigen Einstellungen als eigene Voreinstellung sichern"))
     DIM vz AS INTEGER : vz = gtk_box_new(GTK_WAAGERECHT, 4)
     gtk_box_pack_start(vz, imVorein, TRUE, TRUE, 0)
     gtk_box_pack_start(vz, kSichern, FALSE, FALSE, 0)
-    gtk_box_pack_start(links, imUeberschrift("Voreinstellung"), FALSE, FALSE, 2)
+    gtk_box_pack_start(links, imUeberschrift(tr$("Voreinstellung")), FALSE, FALSE, 2)
     gtk_box_pack_start(links, vz, FALSE, FALSE, 2)
 
-    gtk_box_pack_start(links, imUeberschrift("Mustergröße"), FALSE, FALSE, 6)
+    gtk_box_pack_start(links, imUeberschrift(tr$("Mustergröße")), FALSE, FALSE, 6)
     imBreite = imSpin(1, kern.GROESSTER_IMPORT, 50)
     imHoehe = imSpin(1, kern.GROESSTER_IMPORT, 50)
-    imSeite = gtk_check_button_new_with_label("Seitenverhältnis beibehalten")
+    imSeite = gtk_check_button_new_with_label(tr$("Seitenverhältnis beibehalten"))
     gtk_toggle_button_set_active(imSeite, TRUE)
     signal(imSeite, "toggled", imInfoNachziehen, 0, 0, 0)
-    gtk_box_pack_start(links, dlZeile("Breite", imBreite), FALSE, FALSE, 2)
-    gtk_box_pack_start(links, dlZeile("Höhe", imHoehe), FALSE, FALSE, 2)
+    gtk_box_pack_start(links, dlZeile(tr$("Breite"), imBreite), FALSE, FALSE, 2)
+    gtk_box_pack_start(links, dlZeile(tr$("Höhe"), imHoehe), FALSE, FALSE, 2)
     gtk_box_pack_start(links, imSeite, FALSE, FALSE, 2)
 
-    gtk_box_pack_start(links, imUeberschrift("Farben"), FALSE, FALSE, 6)
+    gtk_box_pack_start(links, imUeberschrift(tr$("Farben")), FALSE, FALSE, 6)
     DIM pn AS ARRAY OF STRING : pn = []
     DIM pal AS kern.Palette
     DIM dmc AS INTEGER : dmc = 0
@@ -455,29 +453,29 @@ FUNCTION imDialogBauen(pfad AS STRING, vorher AS kern.Importeinstellung) AS BOOL
     imPalette = imKlappliste(pn, dmc)
     signal(imPalette, "changed", imInfoNachziehen, 0, 0, 0)
     imFarben = imSpin(1, kern.MEISTE_FARBEN, MIN(einst.importFarben, kern.MEISTE_FARBEN))
-    imWahl = imKlappliste(["Die häufigsten", "Median-Cut (bessere Verteilung)"], 0)
-    imDither = imKlappliste(["Kein Dithering", "Floyd-Steinberg", "Geordnet (Bayer)"], einst.dithering)
+    imWahl = imKlappliste([tr$("Die häufigsten"), tr$("Median-Cut (bessere Verteilung)")], 0)
+    imDither = imKlappliste([tr$("Kein Dithering"), tr$("Floyd-Steinberg"), tr$("Geordnet (Bayer)")], einst.dithering)
     imConfetti = imSpin(1, 10, 1)
-    gtk_widget_set_tooltip_text(imConfetti, "Inseln kleiner als das bekommen die Farbe ihrer Nachbarn (1 = aus; 2 dezent, 3 kräftig)")
-    gtk_box_pack_start(links, dlZeile("Palette", imPalette), FALSE, FALSE, 2)
-    gtk_box_pack_start(links, dlZeile("Höchstens", imFarben), FALSE, FALSE, 2)
-    gtk_box_pack_start(links, dlZeile("Farbwahl", imWahl), FALSE, FALSE, 2)
-    gtk_box_pack_start(links, dlZeile("Dithering", imDither), FALSE, FALSE, 2)
-    gtk_box_pack_start(links, dlZeile("Confetti", imConfetti), FALSE, FALSE, 2)
+    gtk_widget_set_tooltip_text(imConfetti, tr$("Inseln kleiner als das bekommen die Farbe ihrer Nachbarn (1 = aus; 2 dezent, 3 kräftig)"))
+    gtk_box_pack_start(links, dlZeile(tr$("Palette"), imPalette), FALSE, FALSE, 2)
+    gtk_box_pack_start(links, dlZeile(tr$("Höchstens"), imFarben), FALSE, FALSE, 2)
+    gtk_box_pack_start(links, dlZeile(tr$("Farbwahl"), imWahl), FALSE, FALSE, 2)
+    gtk_box_pack_start(links, dlZeile(tr$("Dithering"), imDither), FALSE, FALSE, 2)
+    gtk_box_pack_start(links, dlZeile(tr$("Confetti"), imConfetti), FALSE, FALSE, 2)
 
-    gtk_box_pack_start(links, imUeberschrift("Bild anpassen"), FALSE, FALSE, 6)
+    gtk_box_pack_start(links, imUeberschrift(tr$("Bild anpassen")), FALSE, FALSE, 6)
     imHell = imRegler() : imKontr = imRegler() : imSatt = imRegler()
-    gtk_box_pack_start(links, dlZeile("Helligkeit", imHell), FALSE, FALSE, 0)
-    gtk_box_pack_start(links, dlZeile("Kontrast", imKontr), FALSE, FALSE, 0)
-    gtk_box_pack_start(links, dlZeile("Sättigung", imSatt), FALSE, FALSE, 0)
-    DIM kZurueck AS INTEGER : kZurueck = gtk_button_new_with_label("Zurücksetzen")
+    gtk_box_pack_start(links, dlZeile(tr$("Helligkeit"), imHell), FALSE, FALSE, 0)
+    gtk_box_pack_start(links, dlZeile(tr$("Kontrast"), imKontr), FALSE, FALSE, 0)
+    gtk_box_pack_start(links, dlZeile(tr$("Sättigung"), imSatt), FALSE, FALSE, 0)
+    DIM kZurueck AS INTEGER : kZurueck = gtk_button_new_with_label(tr$("Zurücksetzen"))
     gtk_widget_set_halign(kZurueck, GTK_AUSRICHTEN_ENDE)
     gtk_box_pack_start(links, kZurueck, FALSE, FALSE, 2)
 
-    imKonturen = gtk_check_button_new_with_label("Konturen als Rückstiche")
+    imKonturen = gtk_check_button_new_with_label(tr$("Konturen als Rückstiche"))
     gtk_box_pack_start(links, imKonturen, FALSE, FALSE, 6)
 
-    gtk_box_pack_start(rechts, imUeberschrift(BASENAME(pfad) + "  (" + STR$(imBildB) + " × " + STR$(imBildH) + ") -- Ausschnitt aufziehen, Doppelklick = ganzes Bild"), FALSE, FALSE, 0)
+    gtk_box_pack_start(rechts, imUeberschrift(trf$("{0}  ({1} × {2}) -- Ausschnitt aufziehen, Doppelklick = ganzes Bild", [BASENAME(pfad), STR$(imBildB), STR$(imBildH)])), FALSE, FALSE, 0)
     imQuelle = gtk_drawing_area_new()
     gtk_widget_set_size_request(imQuelle, IM_QUELLE_B + 8, IM_QUELLE_H + 8)
     gtk_widget_add_events(imQuelle, GDK_MASKE_DRUCK BOR GDK_MASKE_LOSLASSEN BOR GDK_MASKE_BEWEGUNG)
@@ -486,10 +484,10 @@ FUNCTION imDialogBauen(pfad AS STRING, vorher AS kern.Importeinstellung) AS BOOL
     gtk_label_set_xalign(imInfo, 0.0)
     gtk_box_pack_start(rechts, imInfo, FALSE, FALSE, 2)
     DIM vk AS INTEGER : vk = gtk_box_new(GTK_WAAGERECHT, 6)
-    DIM kVorschau AS INTEGER : kVorschau = gtk_button_new_with_label("Vorschau")
+    DIM kVorschau AS INTEGER : kVorschau = gtk_button_new_with_label(tr$("Vorschau"))
     imBalken = gtk_progress_bar_new()
     gtk_progress_bar_set_show_text(imBalken, TRUE)
-    gtk_progress_bar_set_text(imBalken, "Noch nicht gerechnet")
+    gtk_progress_bar_set_text(imBalken, tr$("Noch nicht gerechnet"))
     gtk_box_pack_start(vk, kVorschau, FALSE, FALSE, 0)
     gtk_box_pack_start(vk, imBalken, TRUE, TRUE, 0)
     gtk_box_pack_start(rechts, vk, FALSE, FALSE, 2)
@@ -573,7 +571,7 @@ FUNCTION imDialogLaufen() AS BOOLEAN
         DIM m AS kern.Muster : m = imRechnen()
         IF IS_NIL(m) THEN CONTINUE
         musterUebernehmen(m)
-        statusMeldung("Importiert: " + STR$(m.breite) + " × " + STR$(m.hoehe) + " Stiche, " + STR$(m.farbanzahl()) + " Farben.")
+        statusMeldung(trf$("Importiert: {0} × {1} Stiche, {2} Farben.", [STR$(m.breite), STR$(m.hoehe), STR$(m.farbanzahl())]))
         fertig = TRUE
         EXIT WHILE
     WEND
@@ -622,8 +620,8 @@ END FUNCTION
 
 ' Ein Bild waehlen; "" bei Abbrechen.
 FUNCTION bildWaehlen() AS STRING
-    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("Bild importieren", fenster, GTK_DATEI_OEFFNEN, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Weiter", GTK_ANTWORT_ANNEHMEN, 0)
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new(tr$("Bild importieren"), fenster, GTK_DATEI_OEFFNEN, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Weiter"), GTK_ANTWORT_ANNEHMEN, 0)
     DIM filter AS INTEGER : filter = gtk_file_filter_new()
     DIM endungen AS ARRAY OF STRING : endungen = bildEndungen()
     DIM gross AS ARRAY OF STRING : gross = []
@@ -633,7 +631,7 @@ FUNCTION bildWaehlen() AS STRING
         gtk_file_filter_add_pattern(filter, "*." + m)
         gtk_file_filter_add_pattern(filter, "*." + UPPER$(m))
     NEXT
-    gtk_file_filter_set_name(filter, "Bilder (" + JOIN$(gross, ", ") + ")")
+    gtk_file_filter_set_name(filter, trf$("Bilder ({0})", [JOIN$(gross, ", ")]))
     gtk_file_chooser_add_filter(d, filter)
     DIM pfad AS STRING
     IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
@@ -704,7 +702,7 @@ END FUNCTION
 SUB bildNeuImportieren()
     IF NOT lwHat THEN RETURN
     IF lwMuster.quellBild = "" OR NOT FILEEXISTS(lwMuster.quellBild) THEN
-        statusMeldung(IIF(lwMuster.quellBild = "", "Dieses Muster stammt nicht aus einem Bild.", "Das Quellbild ist nicht mehr da: " + lwMuster.quellBild))
+        statusMeldung(IIF(lwMuster.quellBild = "", tr$("Dieses Muster stammt nicht aus einem Bild."), trf$("Das Quellbild ist nicht mehr da: {0}", [lwMuster.quellBild])))
         RETURN
     END IF
     IF NOT ungesichertFragen("erneuten Importieren") THEN RETURN

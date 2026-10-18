@@ -740,5 +740,5 @@ SUB ebenenAnsicht(was AS INTEGER, an AS BOOLEAN)
     IF NOT lwHat THEN RETURN
     leinwandAufbauen()
     gtk_widget_queue_draw(lwFlaeche)
-    statusMeldung(IIF(was = 0, tr$("Nur aktive Ebene: "), tr$("Andere Ebenen abdunkeln: ")) + IIF(an, "an", "aus"))
+    statusMeldung(IIF(was = 0, tr$("Nur aktive Ebene: "), tr$("Andere Ebenen abdunkeln: ")) + IIF(an, tr$("an"), tr$("aus")))
 END SUB

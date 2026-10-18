@@ -303,8 +303,8 @@ FUNCTION sdZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     cairo_paint(cr)
     sdInhalt(cr, sdOx, sdOy, SD_ZELLE * sdZoom)
     ' die Zeile unten
-    DIM t AS STRING : t = "Zoom: " + STR$(INT(sdZoom * 100)) + "%  |  Mausrad: Zoom  |  Ziehen: Verschieben"
-    IF NOT IS_NIL(sdErg) AND sdAktiv >= 0 THEN t = t + "  |  " + STR$(sdErg.pfade[sdAktiv].stiche()) + " Stiche, " + STR$(sdErg.pfade[sdAktiv].spruenge) + " Sprünge"
+    DIM t AS STRING : t = trf$("Zoom: {0}%  |  Mausrad: Zoom  |  Ziehen: Verschieben", [STR$(INT(sdZoom * 100))])
+    IF NOT IS_NIL(sdErg) AND sdAktiv >= 0 THEN t = trf$("{0}  |  {1} Stiche, {2} Sprünge", [t, STR$(sdErg.pfade[sdAktiv].stiche()), STR$(sdErg.pfade[sdAktiv].spruenge)])
     sdFarbe(cr, sdTextfarbe(), 1)
     sdTextGrund(cr, t, 11, FALSE, 5, h - 5)
     RETURN FALSE
@@ -328,8 +328,8 @@ END FUNCTION
 
 FUNCTION sdTipp$(i AS INTEGER) AS STRING
     DIM p AS kern.Farbpfad : p = sdErg.pfade[sdAktiv]
-    DIM t AS STRING : t = "Schritt " + STR$(i + 1) + "  |  Position (" + STR$(p.xs[i]) + ", " + STR$(p.ys[i]) + ")  |  Distanz: " + FORMAT$(p.abstand(i), "%.1f")
-    IF p.istSprung(i) THEN t = t + "  |  ⚠ Sprung!"
+    DIM t AS STRING : t = trf$("Schritt {0}  |  Position ({1}, {2})  |  Distanz: {3}", [STR$(i + 1), STR$(p.xs[i]), STR$(p.ys[i]), FORMAT$(p.abstand(i), "%.1f")])
+    IF p.istSprung(i) THEN t = trf$("{0}  |  ⚠ Sprung!", [t])
     RETURN t
 END FUNCTION
 
@@ -433,8 +433,8 @@ END FUNCTION
 
 FUNCTION sdKurzname$(s AS INTEGER) AS STRING
     SELECT CASE s
-        CASE kern.SP_ZEILEN : RETURN "Zeilenweise"
-        CASE kern.SP_DAENISCH : RETURN "Dänische Methode"
+        CASE kern.SP_ZEILEN : RETURN tr$("Zeilenweise")
+        CASE kern.SP_DAENISCH : RETURN tr$("Dänische Methode")
     END SELECT
     RETURN kern.spName$(s)
 END FUNCTION
@@ -446,7 +446,7 @@ SUB sdAnzeigen()
     gtk_label_set_markup(sdSumme[1], "<b>" + STR$(LEN(r.pfade)) + "</b>")
     gtk_label_set_markup(sdSumme[2], "<b>" + FORMAT$(r.distanz, "%.1f") + "</b>")
     gtk_label_set_markup(sdSumme[3], "<b>" + STR$(r.spruenge) + "</b>")
-    gtk_label_set_markup(sdSumme[4], "<b>" + FORMAT$(r.garnCm, "%.0f") + " cm (" + FORMAT$(r.garnCm / 100, "%.1f") + " m)</b>")
+    gtk_label_set_markup(sdSumme[4], trf$("<b>{0} cm ({1} m)</b>", [FORMAT$(r.garnCm, "%.0f"), FORMAT$(r.garnCm / 100, "%.1f")]))
     sdSperre = TRUE
     DIM z AS INTEGER
     FOR EACH z IN sdZeilen
@@ -499,7 +499,7 @@ SUB sdVergleichZeigen()
     DIM r AS kern.Stickpfad
     FOR EACH r IN sdVergleiche
         DIM bew AS STRING : bew = kern.spBewertung$(r.distanz, beste)
-        IF INSTR(bew, "Beste") >= 0 THEN bew = "<span foreground='#64ff64'>" + bew + "</span>"
+        IF INSTR(bew, "★★★") = 0 THEN bew = "<span foreground='#64ff64'>" + bew + "</span>"
         gtk_list_box_insert(sdVergleichListe, sdTabellenzeile([sdKurzname$(r.strategie), FORMAT$(r.distanz, "%.1f"), STR$(r.spruenge), FORMAT$(r.garnCm, "%.0f"), bew], [0, 80, 70, 90, 110]), -1)
     NEXT
     gtk_widget_set_visible(sdVergleich, TRUE)
@@ -529,7 +529,7 @@ SUB sdAlleVergleichen(w AS INTEGER, daten AS INTEGER)
     sdErg = sdVergleiche[0]
     sdAnzeigen()
     sdVergleichZeigen()
-    sdMelden("Beste Strategie: " + kern.spName$(sdErg.strategie))
+    sdMelden(trf$("Beste Strategie: {0}", [kern.spName$(sdErg.strategie)]))
 END SUB
 
 SUB sdMelden(text AS STRING)
@@ -551,9 +551,9 @@ FUNCTION sdBildSichern(pfad AS STRING) AS BOOLEAN
     cairo_paint(cr)
     sdInhalt(cr, 30, 30, z)
     sdFarbe(cr, sdTextfarbe(), 1)
-    sdTextGrund(cr, "Farbe: " + sdGarnName$(p), 14, TRUE, 30, h - 50)
-    sdTextGrund(cr, "Stiche: " + STR$(p.stiche()) + "  |  Sprünge: " + STR$(p.spruenge) + "  |  Distanz: " + FORMAT$(p.distanz, "%.1f"), 12, FALSE, 30, h - 32)
-    sdTextGrund(cr, "○ S = Start  |  □ E = Ende  |  - - - = Sprung", 12, FALSE, 30, h - 14)
+    sdTextGrund(cr, trf$("Farbe: {0}", [sdGarnName$(p)]), 14, TRUE, 30, h - 50)
+    sdTextGrund(cr, trf$("Stiche: {0}  |  Sprünge: {1}  |  Distanz: {2}", [STR$(p.stiche()), STR$(p.spruenge), FORMAT$(p.distanz, "%.1f")]), 12, FALSE, 30, h - 32)
+    sdTextGrund(cr, tr$("○ S = Start  |  □ E = Ende  |  - - - = Sprung"), 12, FALSE, 30, h - 14)
     DIM st AS INTEGER : st = cairo_surface_write_to_png(fl, pfad)
     cairo_destroy(cr)
     cairo_surface_destroy(fl)
@@ -567,7 +567,7 @@ END FUNCTION
 
 FUNCTION sdZiel$(titel AS STRING, vorschlag AS STRING, ordner AS BOOLEAN) AS STRING
     DIM d AS INTEGER : d = gtk_file_chooser_dialog_new(titel, sdDialog, IIF(ordner, GTK_DATEI_ORDNER, GTK_DATEI_SICHERN), _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, IIF(ordner, "Wählen", "Sichern"), GTK_ANTWORT_ANNEHMEN, 0)
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, IIF(ordner, tr$("Wählen"), tr$("Sichern")), GTK_ANTWORT_ANNEHMEN, 0)
     IF NOT ordner THEN
         gtk_file_chooser_set_do_overwrite_confirmation(d, TRUE)
         gtk_file_chooser_set_current_name(d, vorschlag)
@@ -616,27 +616,27 @@ SUB sdExport(w AS INTEGER, art AS INTEGER)
     DIM pfad AS STRING
     SELECT CASE art
         CASE 0
-            pfad = sdZiel$("Stickplan als Text exportieren", "stickplan.txt", FALSE)
+            pfad = sdZiel$(tr$("Stickplan als Text exportieren"), "stickplan.txt", FALSE)
             IF pfad = "" THEN RETURN
             DIM f AS STRING : f = sdTextSichern$(pfad)
-            sdMelden(IIF(f = "", "Stickplan exportiert: " + BASENAME(pfad), "Fehler beim Export: " + f))
+            sdMelden(IIF(f = "", trf$("Stickplan exportiert: {0}", [BASENAME(pfad)]), trf$("Fehler beim Export: {0}", [f])))
         CASE 1
             IF sdAktiv < 0 THEN
-                sdMelden("Bitte zuerst eine Farbe wählen.")
+                sdMelden(tr$("Bitte zuerst eine Farbe wählen."))
                 RETURN
             END IF
-            pfad = sdZiel$("Pfad als Bild exportieren", "stickpfad_" + sdDateiname$(sdErg.pfade[sdAktiv]) + ".png", FALSE)
+            pfad = sdZiel$(tr$("Pfad als Bild exportieren"), "stickpfad_" + sdDateiname$(sdErg.pfade[sdAktiv]) + ".png", FALSE)
             IF pfad = "" THEN RETURN
-            sdMelden(IIF(sdBildSichern(pfad), "Pfad-Bild exportiert: " + BASENAME(pfad), "Bild konnte nicht gesichert werden."))
+            sdMelden(IIF(sdBildSichern(pfad), trf$("Pfad-Bild exportiert: {0}", [BASENAME(pfad)]), tr$("Bild konnte nicht gesichert werden.")))
         CASE 2
-            pfad = sdZiel$("Ordner für Pfad-Bilder wählen", "", TRUE)
+            pfad = sdZiel$(tr$("Ordner für Pfad-Bilder wählen"), "", TRUE)
             IF pfad = "" THEN RETURN
             DIM fehler AS ARRAY OF STRING
             DIM n AS INTEGER : n = sdAlleBilder(pfad, fehler)
             IF LEN(fehler) = 0 THEN
-                sdMelden("Alle " + STR$(n) + " Pfad-Bilder exportiert nach " + pfad)
+                sdMelden(trf$("Alle {0} Pfad-Bilder exportiert nach {1}", [STR$(n), pfad]))
             ELSE
-                sdMelden(STR$(n) + " von " + STR$(LEN(sdErg.pfade)) + " Bildern exportiert -- Fehler bei: " + JOIN$(fehler, ", "))
+                sdMelden(trf$("{0} von {1} Bildern exportiert -- Fehler bei: {2}", [STR$(n), STR$(LEN(sdErg.pfade)), JOIN$(fehler, ", ")]))
             END IF
     END SELECT
 END SUB
@@ -672,15 +672,15 @@ FUNCTION sdDialogBauen() AS INTEGER
     sdAktiv = -1
     sdFlB = -1 : sdFlH = -1
     sdZiehen = FALSE
-    sdDialog = gtk_dialog_new_with_buttons("Stickpfad-Optimierung", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Schließen", GTK_ANTWORT_OK, 0)
+    sdDialog = gtk_dialog_new_with_buttons(tr$("Stickpfad-Optimierung"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Schließen"), GTK_ANTWORT_OK, 0)
     gtk_window_set_default_size(sdDialog, 1100, 840)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(sdDialog)
     gtk_container_set_border_width(innen, 12)
 
     ' Einstellungen
     DIM ein AS INTEGER : ein = gtk_box_new(GTK_WAAGERECHT, 8)
-    gtk_box_pack_start(ein, gtk_label_new("Strategie:"), FALSE, FALSE, 0)
+    gtk_box_pack_start(ein, gtk_label_new(tr$("Strategie:")), FALSE, FALSE, 0)
     sdStrategie = gtk_combo_box_text_new()
     DIM s AS INTEGER
     FOR s = kern.SP_ZEILEN TO kern.SP_DIAGONAL
@@ -688,34 +688,34 @@ FUNCTION sdDialogBauen() AS INTEGER
     NEXT
     gtk_combo_box_set_active(sdStrategie, kern.SP_ZEILEN)
     gtk_box_pack_start(ein, sdStrategie, FALSE, FALSE, 0)
-    gtk_box_pack_start(ein, gtk_label_new("     Stoffzählung:"), FALSE, FALSE, 0)
+    gtk_box_pack_start(ein, gtk_label_new(tr$("     Stoffzählung:")), FALSE, FALSE, 0)
     sdStoff = gtk_spin_button_new_with_range(6, 32, 1)
     gtk_spin_button_set_value(sdStoff, CLAMP(INT(sdMuster.stoff + 0.5), 6, 32))
     gtk_box_pack_start(ein, sdStoff, FALSE, FALSE, 0)
     gtk_box_pack_start(ein, gtk_label_new("ct"), FALSE, FALSE, 0)
-    DIM kVergleich AS INTEGER : kVergleich = sdKnopf("Alle vergleichen", "Alle fünf Strategien rechnen, die beste wählen")
-    DIM kOpt AS INTEGER : kOpt = sdKnopf("Optimieren", "Den Pfad mit der gewählten Strategie neu rechnen")
+    DIM kVergleich AS INTEGER : kVergleich = sdKnopf(tr$("Alle vergleichen"), tr$("Alle fünf Strategien rechnen, die beste wählen"))
+    DIM kOpt AS INTEGER : kOpt = sdKnopf(tr$("Optimieren"), tr$("Den Pfad mit der gewählten Strategie neu rechnen"))
     gtk_box_pack_end(ein, kVergleich, FALSE, FALSE, 0)
     gtk_box_pack_end(ein, kOpt, FALSE, FALSE, 0)
     gtk_box_pack_start(innen, ein, FALSE, FALSE, 4)
 
     ' Kopf der Vorschau
     DIM kopfzeile AS INTEGER : kopfzeile = gtk_box_new(GTK_WAAGERECHT, 6)
-    DIM vt AS INTEGER : vt = gtk_label_new("Pfad-Vorschau")
+    DIM vt AS INTEGER : vt = gtk_label_new(tr$("Pfad-Vorschau"))
     gtkKlasse(vt, "abschnitt")
     gtk_box_pack_start(kopfzeile, vt, FALSE, FALSE, 0)
-    DIM kEin AS INTEGER : kEin = sdSymbolknopf("zoom-fit-best-symbolic", "Einpassen")
-    DIM kPlus AS INTEGER : kPlus = sdSymbolknopf("zoom-in-symbolic", "Größer")
+    DIM kEin AS INTEGER : kEin = sdSymbolknopf("zoom-fit-best-symbolic", tr$("Einpassen"))
+    DIM kPlus AS INTEGER : kPlus = sdSymbolknopf("zoom-in-symbolic", tr$("Größer"))
     sdZoomText = gtk_label_new("100 %")
     gtk_widget_set_size_request(sdZoomText, 56, -1)
-    DIM kMinus AS INTEGER : kMinus = sdSymbolknopf("zoom-out-symbolic", "Kleiner")
+    DIM kMinus AS INTEGER : kMinus = sdSymbolknopf("zoom-out-symbolic", tr$("Kleiner"))
     gtk_box_pack_end(kopfzeile, kEin, FALSE, FALSE, 0)
     gtk_box_pack_end(kopfzeile, kPlus, FALSE, FALSE, 0)
     gtk_box_pack_end(kopfzeile, sdZoomText, FALSE, FALSE, 0)
     gtk_box_pack_end(kopfzeile, kMinus, FALSE, FALSE, 0)
-    sdKontext = sdKaestchen("Kontext", TRUE)
-    sdSpruenge = sdKaestchen("Sprünge", TRUE)
-    sdNummern = sdKaestchen("Nummern", FALSE)
+    sdKontext = sdKaestchen(tr$("Kontext"), TRUE)
+    sdSpruenge = sdKaestchen(tr$("Sprünge"), TRUE)
+    sdNummern = sdKaestchen(tr$("Nummern"), FALSE)
     gtk_box_pack_end(kopfzeile, sdKontext, FALSE, FALSE, 8)
     gtk_box_pack_end(kopfzeile, sdSpruenge, FALSE, FALSE, 0)
     gtk_box_pack_end(kopfzeile, sdNummern, FALSE, FALSE, 0)
@@ -728,11 +728,11 @@ FUNCTION sdDialogBauen() AS INTEGER
     gtk_widget_add_events(sdFlaeche, GDK_MASKE_BEWEGUNG BOR GDK_MASKE_DRUCK BOR GDK_MASKE_LOSLASSEN BOR GDK_MASKE_RAD BOR GDK_MASKE_RAD_FEIN)
     gtk_paned_pack1(teil, sdFlaeche, TRUE, FALSE)
     DIM unten AS INTEGER : unten = gtk_box_new(GTK_SENKRECHT, 4)
-    DIM ft AS INTEGER : ft = gtk_label_new("Farben und Pfade")
+    DIM ft AS INTEGER : ft = gtk_label_new(tr$("Farben und Pfade"))
     gtk_label_set_xalign(ft, 0.0)
     gtkKlasse(ft, "abschnitt")
     gtk_box_pack_start(unten, ft, FALSE, FALSE, 0)
-    gtk_box_pack_start(unten, sdTabellenzeile(["<b>Farbe</b>", "<b>Stiche</b>", "<b>Distanz</b>", "<b>Sprünge</b>", "<b>Garn (cm)</b>"], [0, 70, 80, 70, 90]), FALSE, FALSE, 0)
+    gtk_box_pack_start(unten, sdTabellenzeile([tr$("<b>Farbe</b>"), tr$("<b>Stiche</b>"), tr$("<b>Distanz</b>"), tr$("<b>Sprünge</b>"), tr$("<b>Garn (cm)</b>")], [0, 70, 80, 70, 90]), FALSE, FALSE, 0)
     DIM rolle AS INTEGER : rolle = gtk_scrolled_window_new(0, 0)
     gtk_scrolled_window_set_policy(rolle, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
     sdListe = gtk_list_box_new()
@@ -749,7 +749,7 @@ FUNCTION sdDialogBauen() AS INTEGER
     DIM summe AS INTEGER : summe = gtk_box_new(GTK_WAAGERECHT, 6)
     sdSumme = []
     DIM t AS STRING
-    FOR EACH t IN ["Stiche:", "Farben:", "Rückseiten-Distanz:", "Sprünge:", "Geschätzter Garnverbrauch:"]
+    FOR EACH t IN [tr$("Stiche:"), tr$("Farben:"), tr$("Rückseiten-Distanz:"), tr$("Sprünge:"), tr$("Geschätzter Garnverbrauch:")]
         gtk_box_pack_start(summe, gtk_label_new(t), FALSE, FALSE, 0)
         DIM wert AS INTEGER : wert = gtk_label_new("-")
         gtkKlasse(wert, "wert")
@@ -761,11 +761,11 @@ FUNCTION sdDialogBauen() AS INTEGER
 
     ' Vergleich, versteckt bis zum ersten Vergleich
     sdVergleich = gtk_box_new(GTK_SENKRECHT, 4)
-    DIM vk AS INTEGER : vk = gtk_label_new("Strategievergleich")
+    DIM vk AS INTEGER : vk = gtk_label_new(tr$("Strategievergleich"))
     gtk_label_set_xalign(vk, 0.0)
     gtkKlasse(vk, "abschnitt")
     gtk_box_pack_start(sdVergleich, vk, FALSE, FALSE, 0)
-    gtk_box_pack_start(sdVergleich, sdTabellenzeile(["<b>Strategie</b>", "<b>Distanz</b>", "<b>Sprünge</b>", "<b>Garn (cm)</b>", "<b>Bewertung</b>"], [0, 80, 70, 90, 110]), FALSE, FALSE, 0)
+    gtk_box_pack_start(sdVergleich, sdTabellenzeile([tr$("<b>Strategie</b>"), tr$("<b>Distanz</b>"), tr$("<b>Sprünge</b>"), tr$("<b>Garn (cm)</b>"), tr$("<b>Bewertung</b>")], [0, 80, 70, 90, 110]), FALSE, FALSE, 0)
     sdVergleichListe = gtk_list_box_new()
     gtk_box_pack_start(sdVergleich, sdVergleichListe, FALSE, FALSE, 0)
     gtk_box_pack_start(innen, sdVergleich, FALSE, FALSE, 0)
@@ -778,9 +778,9 @@ FUNCTION sdDialogBauen() AS INTEGER
     gtk_widget_set_hexpand(sdMeldung, TRUE)
     gtkKlasse(sdMeldung, "nebensache")
     gtk_box_pack_start(fuss, sdMeldung, TRUE, TRUE, 0)
-    DIM kText AS INTEGER : kText = sdKnopf("Als Text …", "Den Stickplan als Textdatei: je Farbe jeder Stich mit Lage, Abstand und Sprung")
-    DIM kBild AS INTEGER : kBild = sdKnopf("Pfad als Bild …", "Den Pfad der gewählten Farbe als PNG")
-    DIM kAlle AS INTEGER : kAlle = sdKnopf("Alle als Bilder …", "Jede Farbe als eigenes PNG in einen Ordner")
+    DIM kText AS INTEGER : kText = sdKnopf(tr$("Als Text …"), tr$("Den Stickplan als Textdatei: je Farbe jeder Stich mit Lage, Abstand und Sprung"))
+    DIM kBild AS INTEGER : kBild = sdKnopf(tr$("Pfad als Bild …"), tr$("Den Pfad der gewählten Farbe als PNG"))
+    DIM kAlle AS INTEGER : kAlle = sdKnopf(tr$("Alle als Bilder …"), tr$("Jede Farbe als eigenes PNG in einen Ordner"))
     gtk_box_pack_start(fuss, kText, FALSE, FALSE, 0)
     gtk_box_pack_start(fuss, kBild, FALSE, FALSE, 0)
     gtk_box_pack_start(fuss, kAlle, FALSE, FALSE, 0)

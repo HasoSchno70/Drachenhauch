@@ -27,8 +27,8 @@ FUNCTION pdFrage(eltern AS INTEGER, titel AS STRING, text AS STRING) AS BOOLEAN
     DIM d AS INTEGER : d = gtk_message_dialog_new(eltern, GTK_DIALOG_MODAL, GTK_NACHRICHT_FRAGE, GTK_KNOEPFE_KEINE, "%s", titel)
     gtk_message_dialog_format_secondary_text(d, "%s", text)
     DIM k AS INTEGER
-    k = gtk_dialog_add_button(d, "Nein", GTK_ANTWORT_ABBRECHEN)
-    k = gtk_dialog_add_button(d, "Ja", GTK_ANTWORT_OK)
+    k = gtk_dialog_add_button(d, tr$("Nein"), GTK_ANTWORT_ABBRECHEN)
+    k = gtk_dialog_add_button(d, tr$("Ja"), GTK_ANTWORT_OK)
     DIM a AS INTEGER : a = gtk_dialog_run(d)
     gtk_widget_destroy(d)
     RETURN a = GTK_ANTWORT_OK
@@ -314,8 +314,8 @@ SUB vdFarbeGewaehlt(w AS INTEGER, daten AS INTEGER)
 END SUB
 
 SUB vdHandEintragen(w AS INTEGER, daten AS INTEGER)
-    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Farbe hinzufügen", vdDialog, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "OK", GTK_ANTWORT_OK, 0)
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons(tr$("Farbe hinzufügen"), vdDialog, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, "OK", GTK_ANTWORT_OK, 0)
     gtk_dialog_set_default_response(d, GTK_ANTWORT_OK)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
     gtk_container_set_border_width(innen, 12)
@@ -339,14 +339,14 @@ SUB vdHandEintragen(w AS INTEGER, daten AS INTEGER)
     NEXT
     vdHFarbe = gtk_combo_box_text_new()
     gtk_widget_set_sensitive(vdHFarbe, FALSE)
-    gtk_widget_set_tooltip_text(vdHFarbe, "Verfügbar, sobald ein bekannter Hersteller gewählt ist.")
+    gtk_widget_set_tooltip_text(vdHFarbe, tr$("Verfügbar, sobald ein bekannter Hersteller gewählt ist."))
     vdHNummer = gtk_entry_new()
-    gtk_widget_set_tooltip_text(vdHNummer, "Wird beim Wählen einer Farbe automatisch ausgefüllt.")
+    gtk_widget_set_tooltip_text(vdHNummer, tr$("Wird beim Wählen einer Farbe automatisch ausgefüllt."))
     DIM bestand AS INTEGER : bestand = pdBestand(0)
-    gtk_box_pack_start(innen, dlZeile("Hersteller:", vdHHersteller), FALSE, FALSE, 4)
-    gtk_box_pack_start(innen, dlZeile("Farbe:", vdHFarbe), FALSE, FALSE, 4)
-    gtk_box_pack_start(innen, dlZeile("Nr.:", vdHNummer), FALSE, FALSE, 4)
-    gtk_box_pack_start(innen, dlZeile(IIF(vdDp, "Bestand (Drills):", "Bestand (Stränge):"), bestand), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlZeile(tr$("Hersteller:"), vdHHersteller), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlZeile(tr$("Farbe:"), vdHFarbe), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlZeile(tr$("Nr.:"), vdHNummer), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlZeile(IIF(vdDp, tr$("Bestand (Drills):"), tr$("Bestand (Stränge):")), bestand), FALSE, FALSE, 4)
     signal(vdHHersteller, "changed", vdHerstellerGeaendert, 0, 0, 0)
     signal(vdHFarbe, "changed", vdFarbeGewaehlt, 0, 0, 0)
     gtk_widget_show_all(d)
@@ -384,7 +384,7 @@ SUB vdProjekteLaden()
             ARRAY_PUSH(fehler, BASENAME(p) + ": " + e)
         END TRY
     NEXT
-    gtk_label_set_text(vdPWarnung, IIF(LEN(fehler) > 0, "⚠ Nicht ladbar: " + JOIN$(fehler, " · "), ""))
+    gtk_label_set_text(vdPWarnung, IIF(LEN(fehler) > 0, trf$("⚠ Nicht ladbar: {0}", [JOIN$(fehler, " · ")]), ""))
     gtk_widget_set_visible(vdPWarnung, LEN(fehler) > 0)
 END SUB
 
@@ -418,15 +418,15 @@ SUB vdMehrereRechnen()
     IF summe > 0 THEN
         gtk_label_set_markup(vdPSumme, "<span foreground='#e74c3c'><b>" + STR$(summe) + "</b> " + kern.einkaufEinheit$(liste) + "</span>")
     ELSE
-        gtk_label_set_markup(vdPSumme, "<span foreground='#2ecc71'>✓ Du hast alles im Vorrat!</span>")
+        gtk_label_set_markup(vdPSumme, tr$("<span foreground='#2ecc71'>✓ Du hast alles im Vorrat!</span>"))
     END IF
 END SUB
 
 SUB vdProjektHinzu(w AS INTEGER, daten AS INTEGER)
-    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("Muster hinzufügen", vdDialog, GTK_DATEI_OEFFNEN, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Hinzufügen", GTK_ANTWORT_ANNEHMEN, 0)
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new(tr$("Muster hinzufügen"), vdDialog, GTK_DATEI_OEFFNEN, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Hinzufügen"), GTK_ANTWORT_ANNEHMEN, 0)
     DIM f AS INTEGER : f = gtk_file_filter_new()
-    gtk_file_filter_set_name(f, "Muster (*.pxs, *.oxs, *.pat, *.xsd)")
+    gtk_file_filter_set_name(f, tr$("Muster (*.pxs, *.oxs, *.pat, *.xsd)"))
     DIM e AS STRING
     FOR EACH e IN ["*.pxs", "*.PXS", "*.oxs", "*.OXS", "*.pat", "*.PAT", "*.xsd", "*.XSD"]
         gtk_file_filter_add_pattern(f, e)
@@ -477,13 +477,12 @@ FUNCTION vdBauen() AS INTEGER
     vdVorrat = kern.vorratLaden(pdVorratDatei$())
     vdProjekte = kern.projektlisteLaden(pdProjekteDatei$())
     vdGeaendert = FALSE
-    vdDialog = gtk_dialog_new_with_buttons("Garn-Vorratsliste", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Sichern", GTK_ANTWORT_OK, 0)
+    vdDialog = gtk_dialog_new_with_buttons(tr$("Garn-Vorratsliste"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Sichern"), GTK_ANTWORT_OK, 0)
     gtk_window_set_default_size(vdDialog, 820, 600)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(vdDialog)
     gtk_container_set_border_width(innen, 10)
-    DIM intro AS INTEGER : intro = gtk_label_new(IIF(vdDp, "Trage hier ein, wieviele Drills du von jeder Farbe noch besitzt. ", "Trage hier ein, wieviele Stränge du von jeder Farbe noch besitzt. ") + _
-        "„Benötigt“ und „Zu kaufen“ zeigen direkt, wie viel das aktuelle Muster braucht — die gleiche Rechnung wie im Statistik-Dialog.")
+    DIM intro AS INTEGER : intro = gtk_label_new(trf$("{0}„Benötigt“ und „Zu kaufen“ zeigen direkt, wie viel das aktuelle Muster braucht — die gleiche Rechnung wie im Statistik-Dialog.", [IIF(vdDp, tr$("Trage hier ein, wieviele Drills du von jeder Farbe noch besitzt. "), tr$("Trage hier ein, wieviele Stränge du von jeder Farbe noch besitzt. "))]))
     gtk_label_set_line_wrap(intro, TRUE)
     gtk_label_set_xalign(intro, 0.0)
     gtkKlasse(intro, "nebensache")
@@ -493,29 +492,29 @@ FUNCTION vdBauen() AS INTEGER
 
     ' Im Muster
     DIM s1 AS INTEGER : s1 = adSeite()
-    vdMListe = adTabelle(s1, ["Farbe", "Name", "Hersteller", "Nr.", "Benötigt", IIF(vdDp, "Bestand (Drills)", "Bestand (Stränge)"), "Zu kaufen"], [44, 0, 110, 70, 70, 110, 70], "llllrlr")
-    DIM n AS INTEGER : n = gtk_notebook_append_page(vdReiter, s1, gtk_label_new("🧵 Im Muster"))
+    vdMListe = adTabelle(s1, [tr$("Farbe"), tr$("Name"), tr$("Hersteller"), tr$("Nr."), tr$("Benötigt"), IIF(vdDp, tr$("Bestand (Drills)"), tr$("Bestand (Stränge)")), tr$("Zu kaufen")], [44, 0, 110, 70, 70, 110, 70], "llllrlr")
+    DIM n AS INTEGER : n = gtk_notebook_append_page(vdReiter, s1, gtk_label_new(tr$("🧵 Im Muster")))
 
     ' Alle Eintraege
     DIM s2 AS INTEGER : s2 = adSeite()
-    gtk_box_pack_start(s2, vdKarte("Dein kompletter Garn-Vorrat, unabhängig vom gerade geöffneten Muster. Farben aus dem aktuellen Muster landen hier automatisch, sobald du im Reiter „Im Muster“ einen Bestand einträgst. Vorrat für Farben, die du noch in keinem Muster benutzt hast, kannst du unten von Hand hinzufügen."), FALSE, FALSE, 0)
+    gtk_box_pack_start(s2, vdKarte(tr$("Dein kompletter Garn-Vorrat, unabhängig vom gerade geöffneten Muster. Farben aus dem aktuellen Muster landen hier automatisch, sobald du im Reiter „Im Muster“ einen Bestand einträgst. Vorrat für Farben, die du noch in keinem Muster benutzt hast, kannst du unten von Hand hinzufügen.")), FALSE, FALSE, 0)
     vdASuche = gtk_search_entry_new()
-    gtk_entry_set_placeholder_text(vdASuche, "Name, Hersteller oder Nr. suchen …")
+    gtk_entry_set_placeholder_text(vdASuche, tr$("Name, Hersteller oder Nr. suchen …"))
     gtk_box_pack_start(s2, vdASuche, FALSE, FALSE, 0)
-    vdAListe = adTabelle(s2, ["Farbe", "Name", "Hersteller", "Nr.", "Bestand"], [44, 0, 160, 80, 110], "lllll")
+    vdAListe = adTabelle(s2, [tr$("Farbe"), tr$("Name"), tr$("Hersteller"), tr$("Nr."), tr$("Bestand")], [44, 0, 160, 80, 110], "lllll")
     DIM knoepfe AS INTEGER : knoepfe = gtk_box_new(GTK_WAAGERECHT, 8)
-    DIM kHand AS INTEGER : kHand = gtk_button_new_with_label("➕ Farbe hinzufügen …")
-    gtk_widget_set_tooltip_text(kHand, "Vorrat für eine Farbe eintragen, die noch in keinem Muster vorkommt.")
-    DIM kLeer AS INTEGER : kLeer = gtk_button_new_with_label("🗑 Leere Einträge entfernen")
-    gtk_widget_set_tooltip_text(kLeer, "Einträge mit 0 Strängen aus der Liste löschen.")
+    DIM kHand AS INTEGER : kHand = gtk_button_new_with_label(tr$("➕ Farbe hinzufügen …"))
+    gtk_widget_set_tooltip_text(kHand, tr$("Vorrat für eine Farbe eintragen, die noch in keinem Muster vorkommt."))
+    DIM kLeer AS INTEGER : kLeer = gtk_button_new_with_label(tr$("🗑 Leere Einträge entfernen"))
+    gtk_widget_set_tooltip_text(kLeer, tr$("Einträge mit 0 Strängen aus der Liste löschen."))
     gtk_box_pack_start(knoepfe, kHand, FALSE, FALSE, 0)
     gtk_box_pack_start(knoepfe, kLeer, FALSE, FALSE, 0)
     gtk_box_pack_start(s2, knoepfe, FALSE, FALSE, 0)
-    n = gtk_notebook_append_page(vdReiter, s2, gtk_label_new("📋 Alle Einträge"))
+    n = gtk_notebook_append_page(vdReiter, s2, gtk_label_new(tr$("📋 Alle Einträge")))
 
     ' Mehrere Projekte
     DIM s3 AS INTEGER : s3 = adSeite()
-    gtk_box_pack_start(s3, vdKarte("Registriere hier deine laufenden Projekte. Darunter siehst du eine kombinierte Einkaufsliste über alle registrierten Projekte hinweg, verglichen mit deinem Vorrat."), FALSE, FALSE, 0)
+    gtk_box_pack_start(s3, vdKarte(tr$("Registriere hier deine laufenden Projekte. Darunter siehst du eine kombinierte Einkaufsliste über alle registrierten Projekte hinweg, verglichen mit deinem Vorrat.")), FALSE, FALSE, 0)
     DIM rolle AS INTEGER : rolle = gtk_scrolled_window_new(0, 0)
     gtk_scrolled_window_set_policy(rolle, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
     gtk_widget_set_size_request(rolle, -1, 110)
@@ -525,10 +524,10 @@ FUNCTION vdBauen() AS INTEGER
     gtk_container_add(rolle, vdPListe)
     gtk_box_pack_start(s3, rolle, FALSE, FALSE, 0)
     DIM pk AS INTEGER : pk = gtk_box_new(GTK_WAAGERECHT, 8)
-    DIM kDazu AS INTEGER : kDazu = gtk_button_new_with_label("➕ Muster hinzufügen …")
-    vdPAktuell = gtk_button_new_with_label("📌 Aktuelles Muster hinzufügen")
+    DIM kDazu AS INTEGER : kDazu = gtk_button_new_with_label(tr$("➕ Muster hinzufügen …"))
+    vdPAktuell = gtk_button_new_with_label(tr$("📌 Aktuelles Muster hinzufügen"))
     gtk_widget_set_sensitive(vdPAktuell, musterPfad <> "")
-    DIM kWeg AS INTEGER : kWeg = gtk_button_new_with_label("✖ Entfernen")
+    DIM kWeg AS INTEGER : kWeg = gtk_button_new_with_label(tr$("✖ Entfernen"))
     gtk_box_pack_start(pk, kDazu, FALSE, FALSE, 0)
     gtk_box_pack_start(pk, vdPAktuell, FALSE, FALSE, 0)
     gtk_box_pack_start(pk, kWeg, FALSE, FALSE, 0)
@@ -538,10 +537,10 @@ FUNCTION vdBauen() AS INTEGER
     gtk_label_set_xalign(vdPWarnung, 0.0)
     gtkKlasse(vdPWarnung, "benutzt")
     gtk_box_pack_start(s3, vdPWarnung, FALSE, FALSE, 0)
-    vdPTabelle = adTabelle(s3, ["Farbe", "Name", "Nr.", "Benötigt", "Zu kaufen"], [44, 0, 80, 80, 80], "lllrr")
+    vdPTabelle = adTabelle(s3, [tr$("Farbe"), tr$("Name"), tr$("Nr."), tr$("Benötigt"), tr$("Zu kaufen")], [44, 0, 80, 80, 80], "lllrr")
     vdPSumme = gtk_label_new("")
     gtk_box_pack_start(s3, vdPSumme, FALSE, FALSE, 4)
-    n = gtk_notebook_append_page(vdReiter, s3, gtk_label_new("📁 Mehrere Projekte"))
+    n = gtk_notebook_append_page(vdReiter, s3, gtk_label_new(tr$("📁 Mehrere Projekte")))
 
     signal(vdASuche, "search-changed", vdFiltern, 0, 0, 0)
     signal(kHand, "clicked", vdHandEintragen, 0, 0, 0)
@@ -564,7 +563,7 @@ FUNCTION vdAntwort(a AS INTEGER) AS BOOLEAN
             vdVorrat.sichern()
             vdProjekte.sichern()
         CATCH f
-            pdWarnung(vdDialog, "Nicht gesichert", f)
+            pdWarnung(vdDialog, tr$("Nicht gesichert"), f)
             RETURN FALSE
         END TRY
         RETURN TRUE
@@ -582,13 +581,13 @@ FUNCTION vorratDialog() AS BOOLEAN
             IF gesichert THEN EXIT WHILE
         ELSE
             IF NOT vdGeaendert THEN EXIT WHILE
-            IF pdFrage(vdDialog, "Änderungen verwerfen?", "Es gibt ungespeicherte Änderungen. Wirklich verwerfen?") THEN EXIT WHILE
+            IF pdFrage(vdDialog, tr$("Änderungen verwerfen?"), tr$("Es gibt ungespeicherte Änderungen. Wirklich verwerfen?")) THEN EXIT WHILE
         END IF
     WEND
     gtk_widget_destroy(vdDialog)
     vdDialog = 0
     vdPTabelle = 0
-    IF gesichert THEN statusMeldung("Garn-Vorrat gesichert (" + STR$(vdVorrat.anzahl()) + " Einträge).")
+    IF gesichert THEN statusMeldung(trf$("Garn-Vorrat gesichert ({0} Einträge).", [STR$(vdVorrat.anzahl())]))
     RETURN gesichert
 END FUNCTION
 
@@ -623,7 +622,7 @@ SUB pkPaletteGewaehlt(w AS INTEGER, daten AS INTEGER)
     IF i < 0 THEN RETURN
     pkPalette = pdPalette(pkNamen[i])
     IF IS_NIL(pkPalette) THEN RETURN
-    gtk_label_set_text(pkInfo, "(" + STR$(LEN(pkPalette.garne)) + " Farben)")
+    gtk_label_set_text(pkInfo, trf$("({0} Farben)", [STR$(LEN(pkPalette.garne))]))
     DIM ab AS ARRAY OF FLOAT
     pkZiele = kern.umwandlungRechnen(lwMuster, pkPalette, ab)
     pkAbstaende = ab
@@ -650,7 +649,7 @@ SUB pkTabelle()
             sch = sch + 1
         END IF
         DIM r AS INTEGER : r = pdReihe(texte, [44, 0, 130, 44, 0, 130, 60], "lllllll")
-        DIM k AS INTEGER : k = gtk_button_new_with_label("Ändern")
+        DIM k AS INTEGER : k = gtk_button_new_with_label(tr$("Ändern"))
         gtk_widget_set_size_request(k, 70, -1)
         gtkKlasse(k, "klein")
         gtk_box_pack_start(r, k, FALSE, FALSE, 0)
@@ -658,7 +657,7 @@ SUB pkTabelle()
         gtk_list_box_insert(pkListe, r, -1)
     NEXT
     gtk_widget_show_all(pkListe)
-    gtk_label_set_markup(pkSumme, "Zusammenfassung: <span foreground='#4CAF50'>🟢 " + STR$(gut) + " gut</span>, <span foreground='#FF9800'>🟡 " + STR$(ak) + " akzeptabel</span>, <span foreground='#F44336'>🔴 " + STR$(sch) + " schlecht</span>")
+    gtk_label_set_markup(pkSumme, trf$("Zusammenfassung: <span foreground='#4CAF50'>🟢 {0} gut</span>, <span foreground='#FF9800'>🟡 {1} akzeptabel</span>, <span foreground='#F44336'>🔴 {2} schlecht</span>", [STR$(gut), STR$(ak), STR$(sch)]))
 END SUB
 
 ' --- das Ziel einer Farbe von Hand waehlen
@@ -683,19 +682,19 @@ END SUB
 
 SUB pkAendern(w AS INTEGER, i AS INTEGER)
     DIM q AS kern.Garn : q = lwMuster.farben[i].garn
-    pzDialog = gtk_dialog_new_with_buttons("Ziel-Garn wählen", pkDialog, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Auswählen", GTK_ANTWORT_OK, 0)
+    pzDialog = gtk_dialog_new_with_buttons(tr$("Ziel-Garn wählen"), pkDialog, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Auswählen"), GTK_ANTWORT_OK, 0)
     gtk_window_set_default_size(pzDialog, 560, 520)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(pzDialog)
     gtk_container_set_border_width(innen, 12)
     DIM info AS INTEGER : info = gtk_label_new("")
-    gtk_label_set_markup(info, "Quellfarbe: <b>" + sdMaske$(q.name) + "</b> (" + sdMaske$(pkGarnInfo$(q)) + ")")
+    gtk_label_set_markup(info, trf$("Quellfarbe: <b>{0}</b> ({1})", [sdMaske$(q.name), sdMaske$(pkGarnInfo$(q))]))
     gtk_label_set_xalign(info, 0.0)
     gtk_box_pack_start(innen, info, FALSE, FALSE, 0)
     pzSuche = gtk_search_entry_new()
-    gtk_entry_set_placeholder_text(pzSuche, "Nach Name oder Nummer suchen …")
+    gtk_entry_set_placeholder_text(pzSuche, tr$("Nach Name oder Nummer suchen …"))
     gtk_box_pack_start(innen, pzSuche, FALSE, FALSE, 6)
-    pzListe = adTabelle(innen, ["", "Name", "Hersteller", "Nr.", "Abstand"], [44, 0, 120, 70, 70], "llllr")
+    pzListe = adTabelle(innen, ["", tr$("Name"), tr$("Hersteller"), tr$("Nr."), tr$("Abstand")], [44, 0, 120, 70, 70], "llllr")
     gtk_list_box_set_selection_mode(pzListe, GTK_AUSWAHL_EINE)
     DIM ab AS ARRAY OF FLOAT
     pzReihe = kern.paletteNachNaehe(pkPalette, q.farbe, ab)
@@ -731,7 +730,7 @@ FUNCTION pkPruefen() AS BOOLEAN
         IF pkZiele[i] < 0 THEN fehlt = fehlt + 1
     NEXT
     IF fehlt > 0 THEN
-        pdWarnung(pkDialog, "Fehlende Zuordnungen", STR$(fehlt) + " Farbe(n) haben keine Zuordnung." + CHR$(10) + "Bitte weisen Sie allen Farben ein Ziel-Garn zu.")
+        pdWarnung(pkDialog, tr$("Fehlende Zuordnungen"), trf$("{0} Farbe(n) haben keine Zuordnung.{1}Bitte weisen Sie allen Farben ein Ziel-Garn zu.", [STR$(fehlt), CHR$(10)]))
         RETURN FALSE
     END IF
     DIM kol AS ARRAY OF STRING : kol = kern.umwandlungKollisionen(lwMuster, pkPalette, pkZiele)
@@ -741,14 +740,14 @@ FUNCTION pkPruefen() AS BOOLEAN
         FOR EACH t IN kol
             ARRAY_PUSH(z, "- " + t)
         NEXT
-        IF NOT pdFrage(pkDialog, "Mehrfachzuordnung", "Mehrere Quellfarben werden auf dieselbe Zielfarbe abgebildet:" + CHR$(10) + CHR$(10) + JOIN$(z, CHR$(10)) + CHR$(10) + CHR$(10) + "Das Muster enthält danach nicht mehr unterscheidbare Farbeinträge. Trotzdem fortfahren?") THEN RETURN FALSE
+        IF NOT pdFrage(pkDialog, tr$("Mehrfachzuordnung"), trf$("Mehrere Quellfarben werden auf dieselbe Zielfarbe abgebildet:{0}{1}{2}{3}{4}Das Muster enthält danach nicht mehr unterscheidbare Farbeinträge. Trotzdem fortfahren?", [CHR$(10), CHR$(10), JOIN$(z, CHR$(10)), CHR$(10), CHR$(10)])) THEN RETURN FALSE
     END IF
     DIM schlecht AS INTEGER
     FOR i = 0 TO LEN(pkAbstaende) - 1
         IF pkAbstaende[i] > 25 THEN schlecht = schlecht + 1
     NEXT
     IF schlecht > 0 THEN
-        IF NOT pdFrage(pkDialog, "Schlechte Zuordnungen", STR$(schlecht) + " Farbe(n) haben einen hohen Farbabstand (>25)." + CHR$(10) + "Trotzdem konvertieren?") THEN RETURN FALSE
+        IF NOT pdFrage(pkDialog, tr$("Schlechte Zuordnungen"), trf$("{0} Farbe(n) haben einen hohen Farbabstand (>25).{1}Trotzdem konvertieren?", [STR$(schlecht), CHR$(10)])) THEN RETURN FALSE
     END IF
     RETURN TRUE
 END FUNCTION
@@ -756,16 +755,16 @@ END FUNCTION
 FUNCTION pkBauen() AS INTEGER
     IF NOT lwHat THEN RETURN 0
     IF lwMuster.farbanzahl() = 0 THEN
-        statusMeldung("Das Muster enthält keine Farben zum Konvertieren.")
+        statusMeldung(tr$("Das Muster enthält keine Farben zum Konvertieren."))
         RETURN 0
     END IF
-    pkDialog = gtk_dialog_new_with_buttons("Palette konvertieren", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Alle konvertieren", GTK_ANTWORT_OK, 0)
+    pkDialog = gtk_dialog_new_with_buttons(tr$("Palette konvertieren"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Alle konvertieren"), GTK_ANTWORT_OK, 0)
     gtk_window_set_default_size(pkDialog, 900, 560)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(pkDialog)
     gtk_container_set_border_width(innen, 12)
     DIM oben AS INTEGER : oben = gtk_box_new(GTK_WAAGERECHT, 8)
-    gtk_box_pack_start(oben, gtk_label_new("Ziel-Palette:"), FALSE, FALSE, 0)
+    gtk_box_pack_start(oben, gtk_label_new(tr$("Ziel-Palette:")), FALSE, FALSE, 0)
     pkWahl = gtk_combo_box_text_new()
     pkNamen = []
     DIM p AS kern.Palette
@@ -782,7 +781,7 @@ FUNCTION pkBauen() AS INTEGER
     gtkKlasse(pkInfo, "nebensache")
     gtk_box_pack_start(oben, pkInfo, FALSE, FALSE, 0)
     gtk_box_pack_start(innen, oben, FALSE, FALSE, 0)
-    pkListe = pdTabelle(innen, ["", "Quellfarbe", "Hersteller/Nr.", "", "Zielfarbe", "Hersteller/Nr.", "Abstand", ""], [44, 0, 130, 44, 0, 130, 60, 70], "llllllll")
+    pkListe = pdTabelle(innen, ["", tr$("Quellfarbe"), tr$("Hersteller/Nr."), "", tr$("Zielfarbe"), tr$("Hersteller/Nr."), tr$("Abstand"), ""], [44, 0, 130, 44, 0, 130, 60, 70], "llllllll")
     pkSumme = gtk_label_new("")
     gtk_label_set_xalign(pkSumme, 0.0)
     gtk_box_pack_start(innen, pkSumme, FALSE, FALSE, 6)
@@ -796,7 +795,7 @@ END FUNCTION
 SUB pkKonvertieren()
     DIM n AS INTEGER : n = kern.paletteUmwandeln(lwMuster, wzVerlauf, pkPalette, pkZiele)
     allesNeu()
-    statusMeldung("Palette konvertiert (" + pkPalette.name + ", " + STR$(n) + " Farben). Rückgängig nimmt es zurück.")
+    statusMeldung(trf$("Palette konvertiert ({0}, {1} Farben). Rückgängig nimmt es zurück.", [pkPalette.name, STR$(n)]))
 END SUB
 
 SUB paletteDialog()
@@ -838,26 +837,26 @@ SUB ftGeaendert(w AS INTEGER, daten AS INTEGER)
         nb = lwMuster.farben[b].stichzahl
     END IF
     IF na = 0 AND nb = 0 THEN
-        gtk_label_set_text(ftInfo, "Keine Stiche in beiden Farben")
+        gtk_label_set_text(ftInfo, tr$("Keine Stiche in beiden Farben"))
     ELSE
-        gtk_label_set_text(ftInfo, STR$(na) + " ↔ " + STR$(nb) + IIF(lwMuster.modus = "diamond", " Drills", " Stiche") + " werden getauscht")
+        gtk_label_set_text(ftInfo, trf$("{0} ↔ {1}{2} werden getauscht", [STR$(na), STR$(nb), IIF(lwMuster.modus = "diamond", tr$(" Drills"), tr$(" Stiche"))]))
     END IF
 END SUB
 
 FUNCTION ftBauen() AS INTEGER
     IF NOT lwHat THEN RETURN 0
     IF lwMuster.farbanzahl() < 2 THEN
-        statusMeldung("Mindestens 2 Farben benötigt")
+        statusMeldung(tr$("Mindestens 2 Farben benötigt"))
         RETURN 0
     END IF
     lwMuster.stichzahlenNeu()
-    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Farben tauschen", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "OK", GTK_ANTWORT_OK, 0)
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons(tr$("Farben tauschen"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, "OK", GTK_ANTWORT_OK, 0)
     gtk_dialog_set_default_response(d, GTK_ANTWORT_OK)
     gtk_window_set_default_size(d, 460, -1)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
     gtk_container_set_border_width(innen, 15)
-    DIM besch AS INTEGER : besch = gtk_label_new("Tauscht alle Stiche zweier Farben gegenseitig." + CHR$(10) + "Symbole und Listenreihenfolge bleiben erhalten.")
+    DIM besch AS INTEGER : besch = gtk_label_new(trf$("Tauscht alle Stiche zweier Farben gegenseitig.{0}Symbole und Listenreihenfolge bleiben erhalten.", [CHR$(10)]))
     gtk_label_set_xalign(besch, 0.0)
     gtkKlasse(besch, "nebensache")
     gtk_box_pack_start(innen, besch, FALSE, FALSE, 0)
@@ -873,9 +872,9 @@ FUNCTION ftBauen() AS INTEGER
     gtk_combo_box_set_active(ftB, IIF(erste = 0, 1, 0))
     ftFeldA = gtk_label_new("")
     ftFeldB = gtk_label_new("")
-    DIM ra AS INTEGER : ra = dlZeile("Farbe A:", ftA)
+    DIM ra AS INTEGER : ra = dlZeile(tr$("Farbe A:"), ftA)
     gtk_box_pack_start(ra, ftFeldA, FALSE, FALSE, 0)
-    DIM rb AS INTEGER : rb = dlZeile("Farbe B:", ftB)
+    DIM rb AS INTEGER : rb = dlZeile(tr$("Farbe B:"), ftB)
     gtk_box_pack_start(rb, ftFeldB, FALSE, FALSE, 0)
     gtk_box_pack_start(innen, ra, FALSE, FALSE, 8)
     DIM pfeil AS INTEGER : pfeil = gtk_label_new("")
@@ -900,7 +899,7 @@ SUB tauschenDialog()
         DIM a AS INTEGER : a = gtk_combo_box_get_active(ftA)
         DIM b AS INTEGER : b = gtk_combo_box_get_active(ftB)
         IF a = b THEN
-            pdWarnung(d, "Hinweis", "Bitte zwei unterschiedliche Farben wählen.")
+            pdWarnung(d, tr$("Hinweis"), tr$("Bitte zwei unterschiedliche Farben wählen."))
             CONTINUE
         END IF
         tauschenAusfuehren(a, b)
@@ -912,12 +911,12 @@ END SUB
 SUB tauschenAusfuehren(a AS INTEGER, b AS INTEGER)
     DIM sicht AS ARRAY OF INTEGER : sicht = kern.sichtbareZaehlen(lwMuster)
     IF sicht[a] + sicht[b] = 0 THEN
-        statusMeldung("Keine Stiche zum Tauschen")
+        statusMeldung(tr$("Keine Stiche zum Tauschen"))
         RETURN
     END IF
     DIM n AS INTEGER : n = kern.farbenTauschen(lwMuster, wzVerlauf, a, b)
     allesNeu()
-    statusMeldung(STR$(sicht[a]) + " ↔ " + STR$(sicht[b]) + " Stiche getauscht")
+    statusMeldung(trf$("{0} ↔ {1} Stiche getauscht", [STR$(sicht[a]), STR$(sicht[b])]))
 END SUB
 
 ' --- Rahmenaufteilung ------------------------------------------------------------------
@@ -989,7 +988,7 @@ FUNCTION rdZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     IF IS_NIL(rdPlan) THEN RETURN FALSE
     IF rdPlan.einRahmen() THEN
         sdFarbe(cr, &H2ECC71, 1)
-        sdTextMitte(cr, "✓ Passt in einen Rahmen", 13, TRUE, 0, 6, b, 20)
+        sdTextMitte(cr, tr$("✓ Passt in einen Rahmen"), 13, TRUE, 0, 6, b, 20)
         RETURN FALSE
     END IF
     DIM se AS kern.Rahmensektor
@@ -1049,19 +1048,19 @@ SUB rdRechnen(w AS INTEGER, daten AS INTEGER)
         RETURN
     END TRY
     IF reihen * spalten > kern.RAHMEN_HOECHSTENS THEN
-        gtk_label_set_markup(rdSumme, "⚠ Diese Kombination ergäbe " + ZAHL$(reihen * spalten) + " Sektoren (" + STR$(reihen) + " × " + STR$(spalten) + ") — zu viel für eine sinnvolle Darstellung. Bitte einen größeren Rahmen oder eine kleinere Überlappung wählen.")
+        gtk_label_set_markup(rdSumme, trf$("⚠ Diese Kombination ergäbe {0} Sektoren ({1} × {2}) — zu viel für eine sinnvolle Darstellung. Bitte einen größeren Rahmen oder eine kleinere Überlappung wählen.", [zahlText$(reihen * spalten, -1), STR$(reihen), STR$(spalten)]))
         gtk_widget_queue_draw(rdFlaeche)
         RETURN
     END IF
     rdPlan = kern.rahmenPlanen(lwMuster, hw, hh, ov)
     IF rdPlan.einRahmen() THEN
-        gtk_label_set_markup(rdSumme, "✓ Das gesamte Muster passt in <b>einen</b> Stickrahmen (" + STR$(rdPlan.rahmenB) + "×" + STR$(rdPlan.rahmenH) + ").")
+        gtk_label_set_markup(rdSumme, trf$("✓ Das gesamte Muster passt in <b>einen</b> Stickrahmen ({0}×{1}).", [STR$(rdPlan.rahmenB), STR$(rdPlan.rahmenH)]))
     ELSE
-        gtk_label_set_markup(rdSumme, "<b>" + STR$(rdPlan.reihen * rdPlan.spalten) + "</b> Stickrahmen-Sektoren benötigt (" + STR$(rdPlan.reihen) + " Reihen × " + STR$(rdPlan.spalten) + " Spalten, Überlappung " + STR$(rdPlan.ueberlappung) + " " + rdWort + ").")
+        gtk_label_set_markup(rdSumme, trf$("<b>{0}</b> Stickrahmen-Sektoren benötigt ({1} Reihen × {2} Spalten, Überlappung {3} {4}).", [STR$(rdPlan.reihen * rdPlan.spalten), STR$(rdPlan.reihen), STR$(rdPlan.spalten), STR$(rdPlan.ueberlappung), rdWort]))
     END IF
     DIM se AS kern.Rahmensektor
     FOR EACH se IN rdPlan.sektoren
-        DIM z AS INTEGER : z = adZeile(rdListe, [STR$(se.nr + 1), "R" + STR$(se.reihe + 1) + " S" + STR$(se.spalte + 1), STR$(se.x0) + " … " + STR$(se.x1 - 1), STR$(se.y0) + " … " + STR$(se.y1 - 1), STR$(se.stiche)], [40, 70, 110, 110, 0], "llllr")
+        DIM z AS INTEGER : z = adZeile(rdListe, [STR$(se.nr + 1), trf$("R{0} S{1}", [STR$(se.reihe + 1), STR$(se.spalte + 1)]), STR$(se.x0) + " … " + STR$(se.x1 - 1), STR$(se.y0) + " … " + STR$(se.y1 - 1), STR$(se.stiche)], [40, 70, 110, 110, 0], "llllr")
     NEXT
     gtk_widget_show_all(rdListe)
     gtk_widget_queue_draw(rdFlaeche)
@@ -1085,15 +1084,15 @@ FUNCTION rdBauen() AS INTEGER
     IF NOT lwHat THEN RETURN 0
     DIM m AS kern.Muster : m = lwMuster
     DIM dp AS BOOLEAN : dp = m.modus = "diamond"
-    rdWort = IIF(dp, "Drills", "Stiche")
+    rdWort = IIF(dp, tr$("Drills"), tr$("Stiche"))
     rdPlan = NIL
-    rdDialog = gtk_dialog_new_with_buttons("Rahmenaufteilung", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Schließen", GTK_ANTWORT_OK, 0)
+    rdDialog = gtk_dialog_new_with_buttons(tr$("Rahmenaufteilung"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Schließen"), GTK_ANTWORT_OK, 0)
     gtk_window_set_default_size(rdDialog, 920, 620)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(rdDialog)
     gtk_container_set_border_width(innen, 12)
     DIM intro AS INTEGER : intro = gtk_label_new("")
-    gtk_label_set_markup(intro, "Muster-Größe: <b>" + STR$(m.breite) + " × " + STR$(m.hoehe) + "</b> " + rdWort + " (" + rdStoff$(m.stoff) + " ct). Wähle deine Stickrahmen-Größe und die Überlappungs-Zone — die Aufteilung wird automatisch berechnet.")
+    gtk_label_set_markup(intro, trf$("Muster-Größe: <b>{0} × {1}</b> {2} ({3} ct). Wähle deine Stickrahmen-Größe und die Überlappungs-Zone — die Aufteilung wird automatisch berechnet.", [STR$(m.breite), STR$(m.hoehe), rdWort, rdStoff$(m.stoff)]))
     gtk_label_set_line_wrap(intro, TRUE)
     gtk_label_set_xalign(intro, 0.0)
     gtk_box_pack_start(innen, intro, FALSE, FALSE, 0)
@@ -1104,7 +1103,7 @@ FUNCTION rdBauen() AS INTEGER
     FOR i = 0 TO LEN(namen) - 1
         IF i = 0 OR i = 4 THEN
             DIM reihe AS INTEGER : reihe = gtk_box_new(GTK_WAAGERECHT, 4)
-            gtk_box_pack_start(reihe, sdZelle(IIF(i = 0, "Schnellwahl:", ""), 90, FALSE), FALSE, FALSE, 0)
+            gtk_box_pack_start(reihe, sdZelle(IIF(i = 0, tr$("Schnellwahl:"), ""), 90, FALSE), FALSE, FALSE, 0)
             gtk_box_pack_start(links, reihe, FALSE, FALSE, 0)
         END IF
         DIM k AS INTEGER : k = gtk_button_new_with_label(namen[i])
@@ -1118,19 +1117,19 @@ FUNCTION rdBauen() AS INTEGER
     rdBreite = adSpin(10, 500, 1, vorgabe, 0)
     rdHoehe = adSpin(10, 500, 1, vorgabe, 0)
     rdUeber = adSpin(0, 50, 1, 3, 0)
-    gtk_widget_set_tooltip_text(rdUeber, "Anzahl " + rdWort + ", die zwei benachbarte Sektoren teilen — verhindert sichtbare Nähte. Empfehlung: 2-5.")
-    gtk_box_pack_start(links, dlZeile("Rahmen-Breite:", rdBreite), FALSE, FALSE, 0)
-    gtk_box_pack_start(links, dlZeile("Rahmen-Höhe:", rdHoehe), FALSE, FALSE, 0)
-    gtk_box_pack_start(links, dlZeile("Überlappung:", rdUeber), FALSE, FALSE, 0)
+    gtk_widget_set_tooltip_text(rdUeber, trf$("Anzahl {0}, die zwei benachbarte Sektoren teilen — verhindert sichtbare Nähte. Empfehlung: 2-5.", [rdWort]))
+    gtk_box_pack_start(links, dlZeile(tr$("Rahmen-Breite:"), rdBreite), FALSE, FALSE, 0)
+    gtk_box_pack_start(links, dlZeile(tr$("Rahmen-Höhe:"), rdHoehe), FALSE, FALSE, 0)
+    gtk_box_pack_start(links, dlZeile(tr$("Überlappung:"), rdUeber), FALSE, FALSE, 0)
     rdSumme = gtk_label_new("")
     gtk_label_set_line_wrap(rdSumme, TRUE)
     gtk_label_set_xalign(rdSumme, 0.0)
     gtkKlasse(rdSumme, "wert")
     gtk_box_pack_start(links, rdSumme, FALSE, FALSE, 4)
-    rdListe = adTabelle(links, ["#", "Position", "X-Bereich", "Y-Bereich", rdWort], [40, 70, 110, 110, 0], "llllr")
+    rdListe = adTabelle(links, ["#", tr$("Position"), tr$("X-Bereich"), tr$("Y-Bereich"), rdWort], [40, 70, 110, 110, 0], "llllr")
     gtk_box_pack_start(koerper, links, TRUE, TRUE, 0)
     DIM rechts AS INTEGER : rechts = gtk_box_new(GTK_SENKRECHT, 4)
-    DIM vl AS INTEGER : vl = gtk_label_new("Vorschau:")
+    DIM vl AS INTEGER : vl = gtk_label_new(tr$("Vorschau:"))
     gtk_label_set_xalign(vl, 0.0)
     gtk_box_pack_start(rechts, vl, FALSE, FALSE, 0)
     rdFlaeche = gtk_drawing_area_new()

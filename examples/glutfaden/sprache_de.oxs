@@ -1,0 +1,139 @@
+<?xml version='1.0' encoding='utf-8'?>
+<chart>
+  <format comments_about_this_chart_format="OXS — Open Cross Stitch XML">
+    <FormatVersion value="1.0" />
+  </format>
+  <chart_info>
+    <title value="Vorschauprobe" />
+    <author value="" />
+    <copyright value="" />
+    <chartwidth value="14" />
+    <chartheight value="8" />
+    <stitchesperinch value="14" />
+    <stitchesperinch_y value="14" />
+  </chart_info>
+  <palette>
+    <palette_item index="0" number="cloth" name="cloth" symbol="" color="FFFFFF" />
+    <palette_item index="1" number="100" name="DMC 100 - F0" symbol="●" color="C72B3B" />
+    <palette_item index="2" number="101" name="DMC 101 - F1" symbol="○" color="5AA0D2" />
+    <palette_item index="3" number="102" name="DMC 102 - F2" symbol="■" color="141414" />
+    <palette_item index="4" number="103" name="DMC 103 - F3" symbol="□" color="F0EADA" />
+    <palette_item index="5" number="104" name="DMC 104 - F4" symbol="▲" color="3CAA50" />
+    <palette_item index="6" number="105" name="DMC 105 - F5" symbol="△" color="FAC81E" />
+  </palette>
+  <fullstitches>
+    <stitch x="9" y="1" palindex="3" />
+    <stitch x="12" y="1" palindex="6" />
+    <stitch x="13" y="1" palindex="1" />
+    <stitch x="2" y="2" palindex="5" />
+    <stitch x="7" y="2" palindex="2" />
+    <stitch x="11" y="2" palindex="6" />
+    <stitch x="8" y="3" palindex="4" />
+    <stitch x="9" y="3" palindex="5" />
+    <stitch x="3" y="4" palindex="6" />
+    <stitch x="6" y="4" palindex="3" />
+    <stitch x="7" y="4" palindex="5" />
+    <stitch x="1" y="5" palindex="5" />
+    <stitch x="4" y="5" palindex="2" />
+    <stitch x="5" y="5" palindex="3" />
+    <stitch x="13" y="5" palindex="5" />
+    <stitch x="2" y="6" palindex="1" />
+    <stitch x="3" y="6" palindex="2" />
+    <stitch x="14" y="6" palindex="1" />
+    <stitch x="1" y="7" palindex="1" />
+    <stitch x="9" y="7" palindex="3" />
+    <stitch x="12" y="7" palindex="6" />
+    <stitch x="7" y="8" palindex="2" />
+    <stitch x="10" y="8" palindex="5" />
+    <stitch x="11" y="8" palindex="6" />
+  </fullstitches>
+  <halfstitches>
+    <halfstitch x="2" y="1" palindex="2" direction="1" />
+    <halfstitch x="3" y="1" palindex="3" direction="2" />
+    <halfstitch x="14" y="1" palindex="2" direction="1" />
+    <halfstitch x="1" y="2" palindex="2" direction="2" />
+    <halfstitch x="3" y="2" palindex="5" direction="2" />
+    <halfstitch x="12" y="2" palindex="1" direction="1" />
+    <halfstitch x="13" y="2" palindex="2" direction="2" />
+    <halfstitch x="10" y="3" palindex="6" direction="1" />
+    <halfstitch x="11" y="3" palindex="1" direction="2" />
+    <halfstitch x="8" y="4" palindex="5" direction="1" />
+    <halfstitch x="9" y="4" palindex="6" direction="2" />
+    <halfstitch x="6" y="5" palindex="4" direction="1" />
+    <halfstitch x="7" y="5" palindex="5" direction="2" />
+    <halfstitch x="5" y="6" palindex="4" direction="2" />
+    <halfstitch x="2" y="7" palindex="2" direction="1" />
+    <halfstitch x="3" y="7" palindex="3" direction="2" />
+    <halfstitch x="14" y="7" palindex="2" direction="1" />
+    <halfstitch x="12" y="8" palindex="1" direction="1" />
+    <halfstitch x="13" y="8" palindex="2" direction="2" />
+  </halfstitches>
+  <quarterstitches>
+    <quarterstitch x="4" y="1" palindex="4" position="TL" />
+    <quarterstitch x="5" y="1" palindex="5" position="TR" />
+    <quarterstitch x="6" y="1" palindex="6" position="BL" />
+    <quarterstitch x="7" y="1" palindex="1" position="BR" />
+    <quarterstitch x="4" y="2" palindex="5" position="BL" />
+    <quarterstitch x="5" y="2" palindex="6" position="BR" />
+    <quarterstitch x="14" y="2" palindex="3" position="TL" />
+    <quarterstitch x="1" y="3" palindex="3" position="TR" />
+    <quarterstitch x="2" y="3" palindex="4" position="BL" />
+    <quarterstitch x="3" y="3" palindex="5" position="BR" />
+    <quarterstitch x="13" y="3" palindex="3" position="TR" />
+    <quarterstitch x="14" y="3" palindex="4" position="BL" />
+    <quarterstitch x="1" y="4" palindex="4" position="BR" />
+    <quarterstitch x="10" y="4" palindex="1" position="TL" />
+    <quarterstitch x="11" y="4" palindex="2" position="TR" />
+    <quarterstitch x="12" y="4" palindex="3" position="BL" />
+    <quarterstitch x="13" y="4" palindex="4" position="BR" />
+    <quarterstitch x="8" y="5" palindex="6" position="TL" />
+    <quarterstitch x="10" y="5" palindex="2" position="BL" />
+    <quarterstitch x="11" y="5" palindex="3" position="BR" />
+    <quarterstitch x="6" y="6" palindex="5" position="TL" />
+    <quarterstitch x="7" y="6" palindex="6" position="TR" />
+    <quarterstitch x="8" y="6" palindex="1" position="BL" />
+    <quarterstitch x="9" y="6" palindex="2" position="BR" />
+    <quarterstitch x="4" y="7" palindex="4" position="TL" />
+    <quarterstitch x="5" y="7" palindex="5" position="TR" />
+    <quarterstitch x="7" y="7" palindex="1" position="BR" />
+    <quarterstitch x="2" y="8" palindex="3" position="TL" />
+    <quarterstitch x="3" y="8" palindex="4" position="TR" />
+    <quarterstitch x="4" y="8" palindex="5" position="BL" />
+    <quarterstitch x="5" y="8" palindex="6" position="BR" />
+  </quarterstitches>
+  <threequarterstitches>
+    <threequarterstitch x="6" y="2" palindex="1" />
+    <threequarterstitch x="4" y="3" palindex="6" />
+    <threequarterstitch x="2" y="4" palindex="5" />
+    <threequarterstitch x="12" y="5" palindex="4" />
+    <threequarterstitch x="10" y="6" palindex="3" />
+    <threequarterstitch x="8" y="7" palindex="2" />
+    <threequarterstitch x="6" y="8" palindex="1" />
+  </threequarterstitches>
+  <backstitches>
+    <backstitch x1="1" y1="1" x2="3" y2="3" palindex="2" />
+    <backstitch x1="2" y1="4" x2="6" y2="4" palindex="4" />
+    <backstitch x1="3.5" y1="1.5" x2="3.5" y2="5.5" palindex="10" />
+    <backstitch x1="14.5" y1="8.5" x2="11" y2="2" palindex="1" />
+  </backstitches>
+  <ornaments_inc_knots_and_beads>
+    <object x1="10.5" y1="1.5" palindex="4" objecttype="knot" />
+    <object x1="11.5" y1="1.5" palindex="5" objecttype="bead" />
+    <object x1="8.5" y1="2.5" palindex="3" objecttype="knot" />
+    <object x1="9.5" y1="2.5" palindex="4" objecttype="bead" />
+    <object x1="6.5" y1="3.5" palindex="2" objecttype="knot" />
+    <object x1="7.5" y1="3.5" palindex="3" objecttype="bead" />
+    <object x1="4.5" y1="4.5" palindex="1" objecttype="knot" />
+    <object x1="5.5" y1="4.5" palindex="2" objecttype="bead" />
+    <object x1="3.5" y1="5.5" palindex="1" objecttype="bead" />
+    <object x1="14.5" y1="5.5" palindex="6" objecttype="knot" />
+    <object x1="1.5" y1="6.5" palindex="6" objecttype="bead" />
+    <object x1="12.5" y1="6.5" palindex="5" objecttype="knot" />
+    <object x1="13.5" y1="6.5" palindex="6" objecttype="bead" />
+    <object x1="10.5" y1="7.5" palindex="4" objecttype="knot" />
+    <object x1="11.5" y1="7.5" palindex="5" objecttype="bead" />
+    <object x1="13.5" y1="7.5" palindex="5" objecttype="knot" />
+    <object x1="9.5" y1="8.5" palindex="4" objecttype="bead" />
+    <object x1="14.5" y1="8.5" palindex="5" objecttype="bead" />
+  </ornaments_inc_knots_and_beads>
+</chart>

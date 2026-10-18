@@ -49,11 +49,11 @@ FUNCTION exPapierText$(m AS kern.Muster, name AS STRING, empfohlen AS STRING) AS
     DIM t AS STRING : t = p.name + " (" + STR$(ROUND(p.breite)) + "×" + STR$(ROUND(p.hoehe)) + " mm, "
     IF m.modus = "diamond" THEN
         DIM s AS kern.Seitenplan : s = kern.seitenplanFuer(m, name, 0, 0)
-        t = t + "~" + STR$(s.jeX) + "×" + STR$(s.jeY) + " Drills/Seite → " + STR$(s.anzahl()) + " Seiten)"
-        IF name = empfohlen THEN t = t + " ✓ empfohlen für 1:1"
+        t = trf$("{0}~{1}×{2} Drills/Seite → {3} Seiten)", [t, STR$(s.jeX), STR$(s.jeY), STR$(s.anzahl())])
+        IF name = empfohlen THEN t = trf$("{0} ✓ empfohlen für 1:1", [t])
         RETURN t
     END IF
-    RETURN t + STR$(p.stiche) + "×" + STR$(p.stiche) + " Stiche/Seite)"
+    RETURN trf$("{0}{1}×{2} Stiche/Seite)", [t, STR$(p.stiche), STR$(p.stiche)])
 END FUNCTION
 
 ' Eine Zeile mit Beschriftung; `gilt` nennt die Formate, fuer die sie zaehlt.
@@ -75,7 +75,7 @@ END SUB
 
 SUB exBildGeaendert(w AS INTEGER, daten AS INTEGER)
     DIM z AS INTEGER : z = gtk_spin_button_get_value_as_int(exZelle)
-    gtk_label_set_text(exBildInfo, "Bildgröße: " + STR$(lwMuster.breite * z) + " × " + STR$(lwMuster.hoehe * z) + " Pixel")
+    gtk_label_set_text(exBildInfo, trf$("Bildgröße: {0} × {1} Pixel", [STR$(lwMuster.breite * z), STR$(lwMuster.hoehe * z)]))
 END SUB
 
 FUNCTION exNotizenText$() AS STRING
@@ -98,10 +98,10 @@ END FUNCTION
 ' Wohin? "" bei Abbrechen; die Endung des Formats kommt dazu.
 FUNCTION exZielWaehlen(format AS INTEGER) AS STRING
     DIM endungen AS ARRAY OF STRING : endungen = [".pdf", ".html", ".png", ".oxs", "_paket.zip"]
-    DIM namen AS ARRAY OF STRING : namen = ["PDF-Dateien (*.pdf)", "HTML-Dateien (*.html)", "Bilder (*.png, *.jpg, *.bmp)", "Open Cross Stitch (*.oxs)", "ZIP-Dateien (*.zip)"]
+    DIM namen AS ARRAY OF STRING : namen = [tr$("PDF-Dateien (*.pdf)"), tr$("HTML-Dateien (*.html)"), tr$("Bilder (*.png, *.jpg, *.bmp)"), tr$("Open Cross Stitch (*.oxs)"), tr$("ZIP-Dateien (*.zip)")]
     DIM muster AS ARRAY OF STRING : muster = ["*.pdf", "*.html", "*.png", "*.oxs", "*.zip"]
-    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("Exportieren", fenster, GTK_DATEI_SICHERN, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Exportieren", GTK_ANTWORT_ANNEHMEN, 0)
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new(tr$("Exportieren"), fenster, GTK_DATEI_SICHERN, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Exportieren"), GTK_ANTWORT_ANNEHMEN, 0)
     gtk_file_chooser_set_do_overwrite_confirmation(d, TRUE)
     DIM basis AS STRING : basis = musterTitel
     IF musterPfad <> "" THEN
@@ -160,7 +160,7 @@ FUNCTION exAusfuehren(format AS INTEGER, pfad AS STRING) AS STRING
             o.autor = einst.autor
             o.copyright = einst.copyright
             DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(m, pfad, o)
-            RETURN "PDF exportiert (" + MID$(ab[LEN(ab) - 1], 7, 9) + " Seiten, " + papier + "): " + BASENAME(pfad)
+            RETURN trf$("PDF exportiert ({0} Seiten, {1}): {2}", [MID$(ab[LEN(ab) - 1], 7, 9), papier, BASENAME(pfad)])
         CASE EX_HTML
             DIM h AS kern.HtmlOptionen : h = NEW kern.HtmlOptionen()
             h.ueberlappung = exWahlUeb
@@ -170,17 +170,17 @@ FUNCTION exAusfuehren(format AS INTEGER, pfad AS STRING) AS STRING
             h.autor = einst.autor
             h.copyright = einst.copyright
             kern.htmlExportieren(m, pfad, h)
-            RETURN "HTML exportiert: " + BASENAME(pfad)
+            RETURN trf$("HTML exportiert: {0}", [BASENAME(pfad)])
         CASE EX_BILD
             kern.bildExportieren(m, pfad, exWahlZelle, exWahlRaster, exWahlSymbole)
-            RETURN "Bild exportiert (" + STR$(m.breite * exWahlZelle) + " × " + STR$(m.hoehe * exWahlZelle) + "): " + BASENAME(pfad)
+            RETURN trf$("Bild exportiert ({0} × {1}): {2}", [STR$(m.breite * exWahlZelle), STR$(m.hoehe * exWahlZelle), BASENAME(pfad)])
         CASE EX_OXS
             kern.oxsSpeichern(m, pfad)
-            RETURN "OXS exportiert: " + BASENAME(pfad)
+            RETURN trf$("OXS exportiert: {0}", [BASENAME(pfad)])
         CASE EX_PAKET
             DIM e AS kern.PaketErgebnis : e = kern.paketExportieren(m, pfad, papier, exWahlMystery, slPaletten, einst.autor, einst.copyright)
-            DIM t AS STRING : t = "Paket exportiert (" + STR$(LEN(e.dateien)) + " Dateien): " + BASENAME(pfad)
-            IF LEN(e.fehlt) > 0 THEN t = t + " -- fehlt: " + JOIN$(e.fehlt, ", ")
+            DIM t AS STRING : t = trf$("Paket exportiert ({0} Dateien): {1}", [STR$(LEN(e.dateien)), BASENAME(pfad)])
+            IF LEN(e.fehlt) > 0 THEN t = trf$("{0} -- fehlt: {1}", [t, JOIN$(e.fehlt, ", ")])
             RETURN t
     END SELECT
     RETURN ""
@@ -210,14 +210,14 @@ END SUB
 FUNCTION exDialogBauen() AS INTEGER
     DIM m AS kern.Muster : m = lwMuster
     exZeilen = [] : exGilt = []
-    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Exportieren", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Exportieren …", GTK_ANTWORT_OK, 0)
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons(tr$("Exportieren"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Exportieren …"), GTK_ANTWORT_OK, 0)
     gtk_dialog_set_default_response(d, GTK_ANTWORT_OK)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
     gtk_container_set_border_width(innen, 12)
     exFormat = gtk_combo_box_text_new()
     DIM f AS STRING
-    FOR EACH f IN ["PDF-Anleitung", "HTML-Anleitung (Webseite)", "Bild (PNG, JPG oder BMP)", "Open Cross Stitch (.oxs)", "Paket (ZIP mit allem)"]
+    FOR EACH f IN [tr$("PDF-Anleitung"), tr$("HTML-Anleitung (Webseite)"), tr$("Bild (PNG, JPG oder BMP)"), tr$("Open Cross Stitch (.oxs)"), tr$("Paket (ZIP mit allem)")]
         gtk_combo_box_text_append_text(exFormat, f)
     NEXT
     exPapier = gtk_combo_box_text_new()
@@ -238,16 +238,16 @@ FUNCTION exDialogBauen() AS INTEGER
     END IF
     exZellen = gtk_spin_button_new_with_range(0, 300, 5)
     gtk_spin_button_set_value(exZellen, exWahlZellen)
-    gtk_widget_set_tooltip_text(exZellen, "Stiche je Seite und Richtung -- 0 nimmt die Vorgabe des Formats. Im Diamond-Modus bestimmt die Drill-Kante (1:1) die Seite.")
+    gtk_widget_set_tooltip_text(exZellen, tr$("Stiche je Seite und Richtung -- 0 nimmt die Vorgabe des Formats. Im Diamond-Modus bestimmt die Drill-Kante (1:1) die Seite."))
     exUeb = gtk_spin_button_new_with_range(0, 20, 1)
     gtk_spin_button_set_value(exUeb, exWahlUeb)
-    gtk_widget_set_tooltip_text(exUeb, "So viele Stiche der Nachbarseite stehen zusätzlich rechts und unten -- zum Aneinanderlegen.")
+    gtk_widget_set_tooltip_text(exUeb, tr$("So viele Stiche der Nachbarseite stehen zusätzlich rechts und unten -- zum Aneinanderlegen."))
     exWasser = gtk_entry_new()
     gtk_entry_set_text(exWasser, exWahlWasser)
-    gtk_entry_set_placeholder_text(exWasser, "z. B. ENTWURF -- leer = keins")
-    exMystery = gtk_check_button_new_with_label("Mystery: Vorschau ohne Bild, Musterseiten nur mit Symbolen")
+    gtk_entry_set_placeholder_text(exWasser, tr$("z. B. ENTWURF -- leer = keins"))
+    exMystery = gtk_check_button_new_with_label(tr$("Mystery: Vorschau ohne Bild, Musterseiten nur mit Symbolen"))
     gtk_toggle_button_set_active(exMystery, exWahlMystery)
-    exStickpfad = gtk_check_button_new_with_label("Stickpfad auf den Musterseiten (nächster Nachbar, Sprünge rot gestrichelt)")
+    exStickpfad = gtk_check_button_new_with_label(tr$("Stickpfad auf den Musterseiten (nächster Nachbar, Sprünge rot gestrichelt)"))
     gtk_toggle_button_set_active(exStickpfad, exWahlStickpfad)
     exNotizen = gtk_text_view_new()
     gtk_text_view_set_wrap_mode(exNotizen, GTK_UMBRUCH_WORT)
@@ -279,9 +279,9 @@ FUNCTION exDialogBauen() AS INTEGER
     gtk_container_add(kr, kreuzBox)
     exZelle = gtk_spin_button_new_with_range(4, 100, 1)
     gtk_spin_button_set_value(exZelle, exWahlZelle)
-    exRaster = gtk_check_button_new_with_label("Rasterlinien")
+    exRaster = gtk_check_button_new_with_label(tr$("Rasterlinien"))
     gtk_toggle_button_set_active(exRaster, exWahlRaster)
-    exSymbole = gtk_check_button_new_with_label("Symbole")
+    exSymbole = gtk_check_button_new_with_label(tr$("Symbole"))
     gtk_toggle_button_set_active(exSymbole, exWahlSymbole)
     exBildInfo = gtk_label_new("")
     gtk_label_set_xalign(exBildInfo, 0.0)
@@ -289,18 +289,18 @@ FUNCTION exDialogBauen() AS INTEGER
     gtk_box_pack_start(bildZeile, exZelle, FALSE, FALSE, 0)
     gtk_box_pack_start(bildZeile, exRaster, FALSE, FALSE, 0)
     gtk_box_pack_start(bildZeile, exSymbole, FALSE, FALSE, 0)
-    gtk_box_pack_start(innen, dlZeile("Format", exFormat), FALSE, FALSE, 4)
-    gtk_box_pack_start(innen, exZeile("Papier", exPapier, "04"), FALSE, FALSE, 4)
-    gtk_box_pack_start(innen, exZeile("Zellen/Seite", exZellen, "0"), FALSE, FALSE, 4)
-    gtk_box_pack_start(innen, exZeile("Überlappung", exUeb, "01"), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlZeile(tr$("Format"), exFormat), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile(tr$("Papier"), exPapier, "04"), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile(tr$("Zellen/Seite"), exZellen, "0"), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile(tr$("Überlappung"), exUeb, "01"), FALSE, FALSE, 4)
     gtk_box_pack_start(innen, exZeile("", exMystery, "014"), FALSE, FALSE, 4)
     gtk_box_pack_start(innen, exZeile("", exStickpfad, "0"), FALSE, FALSE, 4)
-    gtk_box_pack_start(innen, exZeile("Wasserzeichen", exWasser, "0"), FALSE, FALSE, 4)
-    gtk_box_pack_start(innen, exZeile("Notizen", nr, "0"), FALSE, FALSE, 4)
-    gtk_box_pack_start(innen, exZeile("Entsprechungen", kr, "01"), FALSE, FALSE, 4)
-    gtk_box_pack_start(innen, exZeile("Pixel je Stich", bildZeile, "2"), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile(tr$("Wasserzeichen"), exWasser, "0"), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile(tr$("Notizen"), nr, "0"), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile(tr$("Entsprechungen"), kr, "01"), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile(tr$("Pixel je Stich"), bildZeile, "2"), FALSE, FALSE, 4)
     gtk_box_pack_start(innen, exZeile("", exBildInfo, "2"), FALSE, FALSE, 0)
-    DIM hinweis AS INTEGER : hinweis = gtk_label_new("Ohne Passwortschutz: die PDF-Bibliothek verschlüsselt nicht.")
+    DIM hinweis AS INTEGER : hinweis = gtk_label_new(tr$("Ohne Passwortschutz: die PDF-Bibliothek verschlüsselt nicht."))
     gtk_label_set_xalign(hinweis, 0.0)
     gtkKlasse(hinweis, "nebensache")
     gtk_box_pack_start(innen, exZeile("", hinweis, "0"), FALSE, FALSE, 4)
@@ -338,13 +338,13 @@ END SUB
 ' Ausfuehren mit Meldung -- auch fuer die Vorfuehrung, ohne Dialog.
 SUB exExportieren(format AS INTEGER, pfad AS STRING, notizen AS STRING)
     exLetzteNotizen = notizen
-    statusMeldung("Exportiere …")
+    statusMeldung(tr$("Exportiere …"))
     WHILE gtk_events_pending()
         DIM n AS BOOLEAN : n = gtk_main_iteration_do(FALSE)
     WEND
     TRY
         statusMeldung(exAusfuehren(format, pfad))
     CATCH e
-        statusMeldung("Nicht exportiert: " + e)
+        statusMeldung(trf$("Nicht exportiert: {0}", [e]))
     END TRY
 END SUB

@@ -19,43 +19,43 @@ SUB fremdImportDialog(pfad AS STRING)
     IF NOT ungesichertFragen("Importieren") THEN RETURN
     fiErgebnis = NIL
     fiPfad = ""
-    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Muster importieren", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Importieren", GTK_ANTWORT_OK, 0)
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons(tr$("Muster importieren"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Importieren"), GTK_ANTWORT_OK, 0)
     fiDialog = d
     gtk_window_set_default_size(d, 480, -1)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
     DIM s AS INTEGER : s = adSeite()
     gtk_box_pack_start(innen, s, TRUE, TRUE, 0)
-    DIM t AS INTEGER : t = gtk_label_new("Importiere Kreuzstich-Muster aus Pattern Maker (.xsd), PCStitch (.pat) oder Open Cross Stitch (.oxs) Dateien.")
+    DIM t AS INTEGER : t = gtk_label_new(tr$("Importiere Kreuzstich-Muster aus Pattern Maker (.xsd), PCStitch (.pat) oder Open Cross Stitch (.oxs) Dateien."))
     gtk_label_set_line_wrap(t, TRUE)
     gtk_label_set_xalign(t, 0.0)
     gtkKlasse(t, "nebensache")
     gtk_box_pack_start(s, t, FALSE, FALSE, 0)
     ' Datei
-    gtk_box_pack_start(s, adUeberschrift("Datei"), FALSE, FALSE, 0)
+    gtk_box_pack_start(s, adUeberschrift(tr$("Datei")), FALSE, FALSE, 0)
     DIM z AS INTEGER : z = gtk_box_new(GTK_WAAGERECHT, 8)
-    fiDatei = gtk_label_new("Keine Datei ausgewählt")
+    fiDatei = gtk_label_new(tr$("Keine Datei ausgewählt"))
     gtk_label_set_xalign(fiDatei, 0.0)
     gtk_label_set_ellipsize(fiDatei, GTK_ELLIPSE_MITTE)
     gtk_widget_set_hexpand(fiDatei, TRUE)
-    DIM k AS INTEGER : k = gtk_button_new_with_label("Durchsuchen …")
+    DIM k AS INTEGER : k = gtk_button_new_with_label(tr$("Durchsuchen …"))
     signal(k, "clicked", fiDurchsuchen, 0, 0, 0)
     gtk_box_pack_start(z, fiDatei, TRUE, TRUE, 0)
     gtk_box_pack_start(z, k, FALSE, FALSE, 0)
     gtk_box_pack_start(s, z, FALSE, FALSE, 0)
     ' Vorschau
-    gtk_box_pack_start(s, adUeberschrift("Vorschau"), FALSE, FALSE, 0)
+    gtk_box_pack_start(s, adUeberschrift(tr$("Vorschau")), FALSE, FALSE, 0)
     fiFlaeche = gtk_drawing_area_new()
     gtk_widget_set_size_request(fiFlaeche, -1, 200)
     signalZeichnen(fiFlaeche, "draw", fiZeichnen, 0, 0, 0)
     gtk_box_pack_start(s, fiFlaeche, FALSE, FALSE, 0)
     ' Angaben
-    gtk_box_pack_start(s, adUeberschrift("Informationen"), FALSE, FALSE, 0)
+    gtk_box_pack_start(s, adUeberschrift(tr$("Informationen")), FALSE, FALSE, 0)
     DIM g AS INTEGER : g = gtk_grid_new()
     gtk_grid_set_column_spacing(g, 12)
     gtk_grid_set_row_spacing(g, 4)
     fiWerte = []
-    DIM namen AS ARRAY OF STRING : namen = ["Name:", "Größe:", "Farben:", "Stiche:", "Format:"]
+    DIM namen AS ARRAY OF STRING : namen = [tr$("Name:"), tr$("Größe:"), tr$("Farben:"), tr$("Stiche:"), tr$("Format:")]
     DIM i AS INTEGER
     FOR i = 0 TO 4
         DIM l AS INTEGER : l = gtk_label_new(namen[i])
@@ -98,12 +98,12 @@ SUB fremdImportDialog(pfad AS STRING)
 END SUB
 
 SUB fiDurchsuchen(w AS INTEGER, daten AS INTEGER)
-    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("Muster-Datei öffnen", fiDialog, GTK_DATEI_OEFFNEN, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Öffnen", GTK_ANTWORT_ANNEHMEN, 0)
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new(tr$("Muster-Datei öffnen"), fiDialog, GTK_DATEI_OEFFNEN, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Öffnen"), GTK_ANTWORT_ANNEHMEN, 0)
     DIM ok AS BOOLEAN
     IF einstOrdner$() <> "" THEN ok = gtk_file_chooser_set_current_folder(d, einstOrdner$())
     DIM f AS INTEGER
-    DIM namen AS ARRAY OF STRING : namen = ["Kreuzstich-Muster (*.xsd, *.pat, *.oxs)", "Pattern Maker (*.xsd)", "PCStitch (*.pat)", "Open Cross Stitch (*.oxs)"]
+    DIM namen AS ARRAY OF STRING : namen = [tr$("Kreuzstich-Muster (*.xsd, *.pat, *.oxs)"), tr$("Pattern Maker (*.xsd)"), tr$("PCStitch (*.pat)"), tr$("Open Cross Stitch (*.oxs)")]
     DIM muster AS ARRAY OF STRING : muster = ["*.xsd *.pat *.oxs", "*.xsd", "*.pat", "*.oxs"]
     DIM i AS INTEGER
     FOR i = 0 TO 3
@@ -135,7 +135,7 @@ SUB fiLaden(pfad AS STRING)
         fiErgebnis = kern.fremdLaden(pfad, slPaletten, slSymbole)
     CATCH e
         fiErgebnis = NIL
-        ARRAY_PUSH(zeilen, "❌ FEHLER: Import-Fehler: " + e)
+        ARRAY_PUSH(zeilen, trf$("❌ FEHLER: Import-Fehler: {0}", [e]))
     END TRY
     DIM i AS INTEGER
     IF fiErgebnis IS NIL THEN
@@ -145,7 +145,7 @@ SUB fiLaden(pfad AS STRING)
         FOR i = 0 TO 4 : gtk_label_set_text(fiWerte[i], info[i]) : NEXT
         DIM wn AS STRING
         FOR EACH wn IN fiErgebnis.warnungen
-            ARRAY_PUSH(zeilen, "⚠️ Warnung: " + wn)
+            ARRAY_PUSH(zeilen, trf$("⚠️ Warnung: {0}", [wn]))
         NEXT
     END IF
     fiVorschauBauen()
@@ -190,7 +190,7 @@ FUNCTION fiZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     cairo_paint(cr)
     IF fiBild = 0 OR fiErgebnis IS NIL THEN
         DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
-        pango_layout_set_text(layout, "Keine Vorschau verfügbar", -1)
+        pango_layout_set_text(layout, tr$("Keine Vorschau verfügbar"), -1)
         DIM tb AS INTEGER, th AS INTEGER
         pango_layout_get_pixel_size(layout, tb, th)
         cairoFarbe(cr, uiFarbe(&H8D93A1))

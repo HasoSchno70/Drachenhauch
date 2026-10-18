@@ -82,7 +82,7 @@ SUB kuerzelUebersicht()
     FOR EACH zeile IN kern.kuerzelListe(einst)
         DIM teile AS ARRAY OF STRING : teile = SPLIT$(zeile, CHR$(9))
         DIM k AS STRING : k = teile[1]
-        IF k = "" THEN k = tr$("<span alpha='45%'>—</span>") ELSE k = kern.htmlKodiere$(k)
+        IF k = "" THEN k = "<span alpha='45%'>—</span>" ELSE k = kern.htmlKodiere$(k)
         DIM r AS INTEGER : r = adZeile(liste, [kern.htmlKodiere$(teile[0]), k], breiten, "ll")
     NEXT
     DIM hinweis AS INTEGER : hinweis = gtk_label_new(tr$("Umlegen unter Einstellungen → Tastenkürzel."))

@@ -91,7 +91,7 @@ END FUNCTION
 
 SUB hdKnopfNachziehen()
     DIM n AS INTEGER : n = LEN(hdAuswahl())
-    gtk_button_set_label(hdHinzu, "Hinzufügen (" + STR$(n) + ")")
+    gtk_button_set_label(hdHinzu, trf$("Hinzufügen ({0})", [STR$(n)]))
     gtk_widget_set_sensitive(hdHinzu, n > 0)
 END SUB
 
@@ -135,7 +135,7 @@ FUNCTION hdKarteZeichnen(w AS INTEGER, cr AS INTEGER, i AS INTEGER) AS BOOLEAN
     DIM felder AS ARRAY OF INTEGER : felder = [v.ziel, garnFarbe]
     DIM xs AS ARRAY OF INTEGER : xs = [14, 68]
     DIM bs AS ARRAY OF INTEGER : bs = [50, 102]
-    DIM texte AS ARRAY OF STRING : texte = ["Wunsch", "Garn"]
+    DIM texte AS ARRAY OF STRING : texte = [tr$("Wunsch"), tr$("Garn")]
     DIM k AS INTEGER
     FOR k = 0 TO 1
         sdFarbe(cr, felder[k], 1)
@@ -149,7 +149,7 @@ FUNCTION hdKarteZeichnen(w AS INTEGER, cr AS INTEGER, i AS INTEGER) AS BOOLEAN
     NEXT
     IF g IS NIL THEN
         sdFarbe(cr, SG_AUS, 1)
-        sgTextLinks(cr, "Kein passendes Garn", 10, FALSE, 14, 98, 16)
+        sgTextLinks(cr, tr$("Kein passendes Garn"), 10, FALSE, 14, 98, 16)
     ELSE
         DIM herst AS STRING : herst = IIF(g.hersteller <> "", LEFT$(g.hersteller, 8), "—")
         sdFarbe(cr, SG_TEXT, 1)
@@ -180,7 +180,7 @@ FUNCTION hdKarteZeichnen(w AS INTEGER, cr AS INTEGER, i AS INTEGER) AS BOOLEAN
         cairo_stroke(cr)
     ELSEIF ueber AND NOT (g IS NIL) THEN
         sdFarbe(cr, SG_AKZENT, 1)
-        sgTextRechts(cr, "+ wählen", 10, TRUE, 169, 8)
+        sgTextRechts(cr, tr$("+ wählen"), 10, TRUE, 169, 8)
     END IF
     RETURN FALSE
 END FUNCTION
@@ -227,7 +227,7 @@ SUB hdNeu()
     DIM p AS INTEGER : p = gtk_combo_box_get_active(hdPalWahl)
     hdPal = NIL
     IF p >= 0 AND p < LEN(slPaletten) THEN hdPal = slPaletten[p]
-    gtk_label_set_text(hdInfo, IIF(hdPal IS NIL, "", STR$(IIF(hdPal IS NIL, 0, LEN(hdPal.garne))) + " Farben verfügbar"))
+    gtk_label_set_text(hdInfo, IIF(hdPal IS NIL, "", trf$("{0} Farben verfügbar", [STR$(IIF(hdPal IS NIL, 0, LEN(hdPal.garne)))])))
     hdVorschlaege = []
     IF NOT (hdPal IS NIL) THEN hdVorschlaege = kern.harmonieVorschlaege(lwMuster.farben[hdQuelle].garn.farbe, art, hdPal)
     DIM i AS INTEGER
@@ -263,21 +263,21 @@ END SUB
 FUNCTION hdBauen() AS INTEGER
     IF NOT lwHat THEN RETURN 0
     IF lwMuster.farbanzahl() = 0 THEN
-        pdWarnung(fenster, "Keine Farbe", "Bitte füge zuerst eine Farbe zum Muster hinzu.")
+        pdWarnung(fenster, tr$("Keine Farbe"), tr$("Bitte füge zuerst eine Farbe zum Muster hinzu."))
         RETURN 0
     END IF
     hdQuelle = IIF(wzFarbe >= 0 AND wzFarbe < lwMuster.farbanzahl(), wzFarbe, 0)
     DIM g AS kern.Garn : g = lwMuster.farben[hdQuelle].garn
-    hdDialog = gtk_dialog_new_with_buttons("Farb-Harmonien", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, 0)
-    hdHinzu = gtk_dialog_add_button(hdDialog, "Hinzufügen (0)", GTK_ANTWORT_OK)
+    hdDialog = gtk_dialog_new_with_buttons(tr$("Farb-Harmonien"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, 0)
+    hdHinzu = gtk_dialog_add_button(hdDialog, tr$("Hinzufügen (0)"), GTK_ANTWORT_OK)
     gtkKlasse(hdHinzu, "suggested-action")
     gtk_window_set_default_size(hdDialog, 820, 620)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(hdDialog)
     gtk_container_set_border_width(innen, 14)
     gtk_box_set_spacing(innen, 10)
     DIM intro AS INTEGER : intro = gtk_label_new("")
-    gtk_label_set_markup(intro, "Diese Funktion schlägt Garne vor, die mit der gewählten Ausgangsfarbe nach <b>Farbtheorie</b> harmonieren. Wähle den Harmonie-Typ und klicke auf die Karten, die du in deine Palette übernehmen willst.")
+    gtk_label_set_markup(intro, tr$("Diese Funktion schlägt Garne vor, die mit der gewählten Ausgangsfarbe nach <b>Farbtheorie</b> harmonieren. Wähle den Harmonie-Typ und klicke auf die Karten, die du in deine Palette übernehmen willst."))
     gtk_label_set_line_wrap(intro, TRUE)
     gtk_label_set_xalign(intro, 0.0)
     gtkKlasse(intro, "karte")
@@ -286,7 +286,7 @@ FUNCTION hdBauen() AS INTEGER
     ' Ausgangsfarbe
     DIM qb AS INTEGER : qb = gtk_box_new(GTK_SENKRECHT, 6)
     gtkKlasse(qb, "karte")
-    gtk_box_pack_start(qb, adUeberschrift("AUSGANGSFARBE"), FALSE, FALSE, 0)
+    gtk_box_pack_start(qb, adUeberschrift(tr$("AUSGANGSFARBE")), FALSE, FALSE, 0)
     DIM qf AS INTEGER : qf = gtk_drawing_area_new()
     gtk_widget_set_size_request(qf, 120, 80)
     gtk_widget_set_halign(qf, 3)
@@ -301,14 +301,14 @@ FUNCTION hdBauen() AS INTEGER
     ' Einstellungen
     DIM eb AS INTEGER : eb = gtk_box_new(GTK_SENKRECHT, 8)
     gtkKlasse(eb, "karte")
-    gtk_box_pack_start(eb, adUeberschrift("EINSTELLUNGEN"), FALSE, FALSE, 0)
+    gtk_box_pack_start(eb, adUeberschrift(tr$("EINSTELLUNGEN")), FALSE, FALSE, 0)
     hdArt = gtk_combo_box_text_new()
     DIM t AS STRING
     FOR EACH t IN kern.harmonieArten()
-        gtk_combo_box_text_append_text(hdArt, t)
+        gtk_combo_box_text_append_text(hdArt, tr$(t))
     NEXT
     gtk_combo_box_set_active(hdArt, 0)
-    gtk_box_pack_start(eb, dlZeile("Harmonie-Typ:", hdArt), FALSE, FALSE, 0)
+    gtk_box_pack_start(eb, dlZeile(tr$("Harmonie-Typ:"), hdArt), FALSE, FALSE, 0)
     hdBeschreibung = gtk_label_new("")
     gtk_label_set_xalign(hdBeschreibung, 0.0)
     gtk_label_set_line_wrap(hdBeschreibung, TRUE)
@@ -320,7 +320,7 @@ FUNCTION hdBauen() AS INTEGER
         gtk_combo_box_text_append_text(hdPalWahl, p.name)
     NEXT
     gtk_combo_box_set_active(hdPalWahl, kern.harmoniePalette(slPaletten, g.hersteller))
-    gtk_box_pack_start(eb, dlZeile("Garn-Palette:", hdPalWahl), FALSE, FALSE, 0)
+    gtk_box_pack_start(eb, dlZeile(tr$("Garn-Palette:"), hdPalWahl), FALSE, FALSE, 0)
     hdInfo = gtk_label_new("")
     gtk_label_set_xalign(hdInfo, 0.0)
     gtkKlasse(hdInfo, "nebensache")
@@ -330,13 +330,13 @@ FUNCTION hdBauen() AS INTEGER
     ' Vorschlaege
     DIM vb AS INTEGER : vb = gtk_box_new(GTK_SENKRECHT, 8)
     gtkKlasse(vb, "karte")
-    gtk_box_pack_start(vb, adUeberschrift("VORSCHLÄGE — KARTE ANKLICKEN ZUM AUSWÄHLEN"), FALSE, FALSE, 0)
+    gtk_box_pack_start(vb, adUeberschrift(tr$("VORSCHLÄGE — KARTE ANKLICKEN ZUM AUSWÄHLEN")), FALSE, FALSE, 0)
     hdKartenBox = gtk_box_new(GTK_WAAGERECHT, 12)
     gtk_box_pack_start(vb, hdKartenBox, TRUE, TRUE, 0)
     gtk_box_pack_start(innen, vb, TRUE, TRUE, 0)
     DIM kz AS INTEGER : kz = gtk_box_new(GTK_WAAGERECHT, 8)
-    DIM ka AS INTEGER : ka = gtk_button_new_with_label("Alle auswählen")
-    DIM kk AS INTEGER : kk = gtk_button_new_with_label("Keine auswählen")
+    DIM ka AS INTEGER : ka = gtk_button_new_with_label(tr$("Alle auswählen"))
+    DIM kk AS INTEGER : kk = gtk_button_new_with_label(tr$("Keine auswählen"))
     gtk_box_pack_start(kz, ka, FALSE, FALSE, 0)
     gtk_box_pack_start(kz, kk, FALSE, FALSE, 0)
     gtk_box_pack_start(innen, kz, FALSE, FALSE, 0)
@@ -360,7 +360,7 @@ FUNCTION hdHinzufuegen() AS INTEGER
         IF lwMuster.farbanzahl() > vorher THEN neu = neu + 1
     NEXT
     IF neu > 0 THEN allesNeu()
-    statusMeldung(IIF(neu > 0, STR$(neu) + " harmonische Farbe(n) hinzugefügt", "Die gewählten Garne sind schon im Muster"))
+    statusMeldung(IIF(neu > 0, trf$("{0} harmonische Farbe(n) hinzugefügt", [STR$(neu)]), tr$("Die gewählten Garne sind schon im Muster")))
     RETURN neu
 END FUNCTION
 
@@ -410,7 +410,7 @@ SUB bbSichern()
     TRY
         kern.bibliothekSichern(bbBib)
     CATCH fehler
-        pdWarnung(bbDialog, "Fehler", "Änderung an der Bibliothek konnte nicht gespeichert werden:" + CHR$(10) + fehler)
+        pdWarnung(bbDialog, tr$("Fehler"), trf$("Änderung an der Bibliothek konnte nicht gespeichert werden:{0}{1}", [CHR$(10), fehler]))
     END TRY
 END SUB
 
@@ -424,7 +424,7 @@ SUB bbKategorienFuellen()
     DIM i AS INTEGER
     FOR i = 0 TO LEN(bbBib.kategorien) - 1
         k = bbBib.kategorien[i]
-        gtk_list_box_insert(bbKatListe, sdZelle(sdMaske$(k + " (" + STR$(kern.kategorieZahl(bbBib, k)) + ")"), 0, FALSE), -1)
+        gtk_list_box_insert(bbKatListe, sdZelle(sdMaske$(tr$(k) + " (" + STR$(kern.kategorieZahl(bbBib, k)) + ")"), 0, FALSE), -1)
         IF k = alt THEN wahl = i
     NEXT
     gtk_widget_show_all(bbKatListe)
@@ -571,9 +571,9 @@ SUB bbFuellen()
     NEXT
     gtk_widget_show_all(bbRaster)
     IF suche <> "" THEN
-        gtk_label_set_text(bbInfo, STR$(LEN(bbPlaetze)) + " von " + STR$(LEN(bbBib.eintraege)) + " Muster")
+        gtk_label_set_text(bbInfo, trf$("{0} von {1} Muster", [STR$(LEN(bbPlaetze)), STR$(LEN(bbBib.eintraege))]))
     ELSE
-        gtk_label_set_text(bbInfo, STR$(LEN(bbPlaetze)) + " Muster")
+        gtk_label_set_text(bbInfo, trf$("{0} Muster", [STR$(LEN(bbPlaetze))]))
     END IF
     bbAuswahlZeigen()
 END SUB
@@ -617,7 +617,7 @@ SUB bbWaehlen(i AS INTEGER)
         gtk_entry_set_text(bbTags, JOIN$(e.tags, ", "))
         gtk_text_buffer_set_text(gtk_text_view_get_buffer(bbNotizen), e.notizen, -1)
     ELSE
-        gtk_label_set_text(bbDetail, "Wähle ein Muster aus")
+        gtk_label_set_text(bbDetail, tr$("Wähle ein Muster aus"))
         gtk_entry_set_text(bbTags, "")
         gtk_text_buffer_set_text(gtk_text_view_get_buffer(bbNotizen), "", -1)
     END IF
@@ -671,11 +671,11 @@ FUNCTION bbAufnehmenAlle(pfade AS ARRAY OF STRING) AS INTEGER
 END FUNCTION
 
 SUB bbHinzufuegenGeklickt(w AS INTEGER, daten AS INTEGER)
-    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("Muster hinzufügen", bbDialog, GTK_DATEI_OEFFNEN, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Hinzufügen", GTK_ANTWORT_ANNEHMEN, 0)
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new(tr$("Muster hinzufügen"), bbDialog, GTK_DATEI_OEFFNEN, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Hinzufügen"), GTK_ANTWORT_ANNEHMEN, 0)
     gtk_file_chooser_set_select_multiple(d, TRUE)
     DIM filter AS INTEGER : filter = gtk_file_filter_new()
-    gtk_file_filter_set_name(filter, "Alle Muster (*.pxs, *.xsd, *.pat, *.oxs)")
+    gtk_file_filter_set_name(filter, tr$("Alle Muster (*.pxs, *.xsd, *.pat, *.oxs)"))
     DIM m AS STRING
     FOR EACH m IN ["*.pxs", "*.xsd", "*.pat", "*.oxs"]
         gtk_file_filter_add_pattern(filter, m)
@@ -695,12 +695,12 @@ SUB bbHinzufuegenGeklickt(w AS INTEGER, daten AS INTEGER)
     gtk_widget_destroy(d)
     IF LEN(pfade) = 0 THEN RETURN
     DIM n AS INTEGER : n = bbAufnehmenAlle(pfade)
-    gtk_label_set_text(bbInfo, gtk_label_get_text(bbInfo) + "  ·  " + STR$(n) + " neu")
+    gtk_label_set_text(bbInfo, trf$("{0}  ·  {1} neu", [gtk_label_get_text(bbInfo), STR$(n)]))
 END SUB
 
 SUB bbScannenGeklickt(w AS INTEGER, daten AS INTEGER)
-    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("Verzeichnis scannen", bbDialog, GTK_DATEI_ORDNER, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Scannen", GTK_ANTWORT_ANNEHMEN, 0)
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new(tr$("Verzeichnis scannen"), bbDialog, GTK_DATEI_ORDNER, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Scannen"), GTK_ANTWORT_ANNEHMEN, 0)
     DIM ordner AS STRING
     IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
         DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
@@ -710,11 +710,11 @@ SUB bbScannenGeklickt(w AS INTEGER, daten AS INTEGER)
     gtk_widget_destroy(d)
     IF ordner = "" THEN RETURN
     DIM n AS INTEGER : n = bbAufnehmenAlle(kern.musterDateien(ordner))
-    pdWarnung(bbDialog, "Scan abgeschlossen", STR$(n) + " neue Muster zur Bibliothek hinzugefügt.")
+    pdWarnung(bbDialog, tr$("Scan abgeschlossen"), trf$("{0} neue Muster zur Bibliothek hinzugefügt.", [STR$(n)]))
 END SUB
 
 SUB bbKategorieNeu(w AS INTEGER, daten AS INTEGER)
-    DIM n AS STRING : n = TRIM$(textFragen("Neue Kategorie", "Name der Kategorie:", ""))
+    DIM n AS STRING : n = TRIM$(textFragen(tr$("Neue Kategorie"), tr$("Name der Kategorie:"), ""))
     IF n = "" OR ARRAY_INDEXOF(bbBib.kategorien, n) >= 0 THEN RETURN
     ARRAY_PUSH(bbBib.kategorien, n)
     bbSichern()
@@ -724,12 +724,12 @@ END SUB
 ' Eine Kategorie loeschen -- die ersten beiden (Alle, Favoriten) nicht
 FUNCTION bbKategorieLoeschen(nr AS INTEGER, fragen AS BOOLEAN) AS BOOLEAN
     IF nr < 2 OR nr >= LEN(bbBib.kategorien) THEN
-        IF fragen THEN pdWarnung(bbDialog, "Nicht möglich", "Diese Kategorie kann nicht gelöscht werden.")
+        IF fragen THEN pdWarnung(bbDialog, tr$("Nicht möglich"), tr$("Diese Kategorie kann nicht gelöscht werden."))
         RETURN FALSE
     END IF
     DIM k AS STRING : k = bbBib.kategorien[nr]
     IF fragen THEN
-        IF NOT pdFrage(bbDialog, "Kategorie löschen", "Kategorie '" + k + "' wirklich löschen?" + CHR$(10) + CHR$(10) + "Die Muster werden nicht gelöscht, nur die Kategorie-Zuordnung.") THEN RETURN FALSE
+        IF NOT pdFrage(bbDialog, tr$("Kategorie löschen"), trf$("Kategorie '{0}' wirklich löschen?{1}{2}Die Muster werden nicht gelöscht, nur die Kategorie-Zuordnung.", [k, CHR$(10), CHR$(10)])) THEN RETURN FALSE
     END IF
     ARRAY_REMOVE_AT(bbBib.kategorien, nr)
     DIM e AS kern.Bibliothekseintrag
@@ -783,7 +783,7 @@ SUB bbMenueGewaehlt(w AS INTEGER, was AS INTEGER)
         CASE 0 : bbOeffnenGeklickt(0, 0)
         CASE 1 : bbFavorit(i)
         CASE 2
-            DIM t AS STRING : t = textFragen("Tags bearbeiten", "Tags für '" + e.name + "' (kommagetrennt):", JOIN$(e.tags, ", "))
+            DIM t AS STRING : t = textFragen(tr$("Tags bearbeiten"), trf$("Tags für '{0}' (kommagetrennt):", [e.name]), JOIN$(e.tags, ", "))
             IF t <> "" OR LEN(e.tags) > 0 THEN
                 e.tags = kern.tagsLesen(t)
                 bbSichern()
@@ -796,7 +796,7 @@ SUB bbMenueGewaehlt(w AS INTEGER, was AS INTEGER)
         CASE 3
             IF FILEEXISTS(e.pfad) THEN OPENDOC(DIRNAME(e.pfad))
         CASE 4
-            IF pdFrage(bbDialog, "Eintrag entfernen", "'" + e.name + "' aus der Bibliothek entfernen?" + CHR$(10) + CHR$(10) + "Die Datei selbst wird nicht gelöscht.") THEN bbEntfernen(i)
+            IF pdFrage(bbDialog, tr$("Eintrag entfernen"), trf$("'{0}' aus der Bibliothek entfernen?{1}{2}Die Datei selbst wird nicht gelöscht.", [e.name, CHR$(10), CHR$(10)])) THEN bbEntfernen(i)
         CASE ELSE
             ' 100 + n: Kategorie n (ab der dritten) kippen
             IF was >= 100 AND was - 100 < LEN(bbBib.kategorien) THEN bbKategorieKippen(i, bbBib.kategorien[was - 100])
@@ -807,9 +807,9 @@ SUB bbMenue(i AS INTEGER, ereignis AS INTEGER)
     bbMenueEintrag = i
     DIM e AS kern.Bibliothekseintrag : e = bbBib.eintraege[i]
     DIM m AS INTEGER : m = gtk_menu_new()
-    DIM texte AS ARRAY OF STRING : texte = ["Öffnen", IIF(e.favorit, "★ Aus Favoriten entfernen", "☆ Zu Favoriten hinzufügen")]
+    DIM texte AS ARRAY OF STRING : texte = [tr$("Öffnen"), IIF(e.favorit, tr$("★ Aus Favoriten entfernen"), tr$("☆ Zu Favoriten hinzufügen"))]
     DIM eintrag AS INTEGER
-    eintrag = gtk_menu_item_new_with_label("Öffnen")
+    eintrag = gtk_menu_item_new_with_label(tr$("Öffnen"))
     signal(eintrag, "activate", bbMenueGewaehlt, 0, 0, 0)
     gtk_menu_shell_append(m, eintrag)
     gtk_menu_shell_append(m, gtk_separator_menu_item_new())
@@ -819,24 +819,24 @@ SUB bbMenue(i AS INTEGER, ereignis AS INTEGER)
     DIM unter AS INTEGER : unter = gtk_menu_new()
     DIM k AS INTEGER
     FOR k = 2 TO LEN(bbBib.kategorien) - 1
-        DIM c AS INTEGER : c = gtk_check_menu_item_new_with_label(bbBib.kategorien[k])
+        DIM c AS INTEGER : c = gtk_check_menu_item_new_with_label(tr$(bbBib.kategorien[k]))
         gtk_check_menu_item_set_active(c, ARRAY_INDEXOF(e.kategorien, bbBib.kategorien[k]) >= 0)
         signal(c, "activate", bbMenueGewaehlt, 100 + k, 0, 0)
         gtk_menu_shell_append(unter, c)
     NEXT
-    eintrag = gtk_menu_item_new_with_label("Kategorie zuweisen")
+    eintrag = gtk_menu_item_new_with_label(tr$("Kategorie zuweisen"))
     gtk_menu_item_set_submenu(eintrag, unter)
     gtk_menu_shell_append(m, eintrag)
-    eintrag = gtk_menu_item_new_with_label("🏷️ Tags bearbeiten …")
+    eintrag = gtk_menu_item_new_with_label(tr$("🏷️ Tags bearbeiten …"))
     signal(eintrag, "activate", bbMenueGewaehlt, 2, 0, 0)
     gtk_menu_shell_append(m, eintrag)
     gtk_menu_shell_append(m, gtk_separator_menu_item_new())
-    eintrag = gtk_menu_item_new_with_label("Im Ordner anzeigen")
+    eintrag = gtk_menu_item_new_with_label(tr$("Im Ordner anzeigen"))
     gtk_widget_set_sensitive(eintrag, FILEEXISTS(e.pfad))
     signal(eintrag, "activate", bbMenueGewaehlt, 3, 0, 0)
     gtk_menu_shell_append(m, eintrag)
     gtk_menu_shell_append(m, gtk_separator_menu_item_new())
-    eintrag = gtk_menu_item_new_with_label("Aus Bibliothek entfernen")
+    eintrag = gtk_menu_item_new_with_label(tr$("Aus Bibliothek entfernen"))
     signal(eintrag, "activate", bbMenueGewaehlt, 4, 0, 0)
     gtk_menu_shell_append(m, eintrag)
     gtk_widget_show_all(m)
@@ -850,13 +850,13 @@ SUB bbOeffnenGeklickt(w AS INTEGER, daten AS INTEGER)
     DIM e AS kern.Bibliothekseintrag : e = bbBib.eintraege[bbGewaehlt]
     IF NOT ungesichertFragen("Öffnen") THEN RETURN
     IF NOT FILEEXISTS(e.pfad) THEN
-        pdWarnung(bbDialog, "Fehler", "Datei konnte nicht geöffnet werden:" + CHR$(10) + e.pfad)
+        pdWarnung(bbDialog, tr$("Fehler"), trf$("Datei konnte nicht geöffnet werden:{0}{1}", [CHR$(10), e.pfad]))
         RETURN
     END IF
     e.geoeffnet = kern.isoJetzt$()
     bbSichern()
     IF musterOeffnen(e.pfad) THEN
-        statusMeldung("Aus Bibliothek geöffnet: " + e.name)
+        statusMeldung(trf$("Aus Bibliothek geöffnet: {0}", [e.name]))
         gtk_dialog_response(bbDialog, GTK_ANTWORT_OK)
     END IF
 END SUB
@@ -869,17 +869,17 @@ FUNCTION bbBauen() AS INTEGER
     bbKarten = []
     bbBilder = []
     bbPlaetze = []
-    bbDialog = gtk_dialog_new_with_buttons("Muster-Bibliothek", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Schließen", GTK_ANTWORT_ABBRECHEN, 0)
+    bbDialog = gtk_dialog_new_with_buttons(tr$("Muster-Bibliothek"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Schließen"), GTK_ANTWORT_ABBRECHEN, 0)
     gtk_window_set_default_size(bbDialog, 1000, 700)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(bbDialog)
     gtk_container_set_border_width(innen, 12)
     gtk_box_set_spacing(innen, 10)
     ' oben: hinzufuegen, scannen
     DIM oben AS INTEGER : oben = gtk_box_new(GTK_WAAGERECHT, 8)
-    DIM kh AS INTEGER : kh = gtk_button_new_with_label("➕ Hinzufügen …")
+    DIM kh AS INTEGER : kh = gtk_button_new_with_label(tr$("➕ Hinzufügen …"))
     gtkKlasse(kh, "suggested-action")
-    DIM ks AS INTEGER : ks = gtk_button_new_with_label("📁 Verzeichnis scannen …")
+    DIM ks AS INTEGER : ks = gtk_button_new_with_label(tr$("📁 Verzeichnis scannen …"))
     gtk_box_pack_end(oben, ks, FALSE, FALSE, 0)
     gtk_box_pack_end(oben, kh, FALSE, FALSE, 0)
     gtk_box_pack_start(innen, oben, FALSE, FALSE, 0)
@@ -888,7 +888,7 @@ FUNCTION bbBauen() AS INTEGER
     DIM links AS INTEGER : links = gtk_box_new(GTK_SENKRECHT, 6)
     gtkKlasse(links, "karte")
     gtk_widget_set_size_request(links, 190, -1)
-    gtk_box_pack_start(links, adUeberschrift("KATEGORIEN"), FALSE, FALSE, 0)
+    gtk_box_pack_start(links, adUeberschrift(tr$("KATEGORIEN")), FALSE, FALSE, 0)
     DIM kr AS INTEGER : kr = gtk_scrolled_window_new(0, 0)
     gtk_scrolled_window_set_policy(kr, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
     bbKatListe = gtk_list_box_new()
@@ -898,9 +898,9 @@ FUNCTION bbBauen() AS INTEGER
     gtk_box_pack_start(links, kr, TRUE, TRUE, 0)
     DIM kz AS INTEGER : kz = gtk_box_new(GTK_WAAGERECHT, 4)
     DIM kplus AS INTEGER : kplus = gtk_button_new_with_label("+")
-    gtk_widget_set_tooltip_text(kplus, "Kategorie hinzufügen")
+    gtk_widget_set_tooltip_text(kplus, tr$("Kategorie hinzufügen"))
     DIM kminus AS INTEGER : kminus = gtk_button_new_with_label("−")
-    gtk_widget_set_tooltip_text(kminus, "Kategorie löschen")
+    gtk_widget_set_tooltip_text(kminus, tr$("Kategorie löschen"))
     gtk_box_pack_start(kz, kplus, FALSE, FALSE, 0)
     gtk_box_pack_start(kz, kminus, FALSE, FALSE, 0)
     gtk_box_pack_start(links, kz, FALSE, FALSE, 0)
@@ -910,17 +910,17 @@ FUNCTION bbBauen() AS INTEGER
     gtkKlasse(rechts, "karte")
     DIM sz AS INTEGER : sz = gtk_box_new(GTK_WAAGERECHT, 8)
     bbSuche = gtk_search_entry_new()
-    gtk_entry_set_placeholder_text(bbSuche, "Suchen …")
+    gtk_entry_set_placeholder_text(bbSuche, tr$("Suchen …"))
     gtk_box_pack_start(sz, bbSuche, TRUE, TRUE, 0)
     bbSort = gtk_combo_box_text_new()
     DIM t AS STRING
     FOR EACH t IN kern.bibliothekSortierungen()
-        gtk_combo_box_text_append_text(bbSort, t)
+        gtk_combo_box_text_append_text(bbSort, tr$(t))
     NEXT
     gtk_combo_box_set_active(bbSort, 0)
     gtk_box_pack_start(sz, bbSort, FALSE, FALSE, 0)
     gtk_box_pack_start(rechts, sz, FALSE, FALSE, 0)
-    bbInfo = gtk_label_new("0 Muster")
+    bbInfo = gtk_label_new(tr$("0 Muster"))
     gtk_label_set_xalign(bbInfo, 0.0)
     gtkKlasse(bbInfo, "nebensache")
     gtk_box_pack_start(rechts, bbInfo, FALSE, FALSE, 0)
@@ -937,11 +937,11 @@ FUNCTION bbBauen() AS INTEGER
     DIM unten AS INTEGER : unten = gtk_box_new(GTK_SENKRECHT, 6)
     gtkKlasse(unten, "karte")
     DIM uz AS INTEGER : uz = gtk_box_new(GTK_WAAGERECHT, 8)
-    bbDetail = gtk_label_new("Wähle ein Muster aus")
+    bbDetail = gtk_label_new(tr$("Wähle ein Muster aus"))
     gtk_label_set_xalign(bbDetail, 0.0)
     gtk_label_set_ellipsize(bbDetail, 3)
     gtk_box_pack_start(uz, bbDetail, TRUE, TRUE, 0)
-    bbOeffnen = gtk_button_new_with_label("Öffnen")
+    bbOeffnen = gtk_button_new_with_label(tr$("Öffnen"))
     gtkKlasse(bbOeffnen, "suggested-action")
     gtk_widget_set_sensitive(bbOeffnen, FALSE)
     gtk_box_pack_start(uz, bbOeffnen, FALSE, FALSE, 0)
@@ -949,17 +949,17 @@ FUNCTION bbBauen() AS INTEGER
     DIM uf AS INTEGER : uf = gtk_box_new(GTK_WAAGERECHT, 10)
     gtk_box_set_homogeneous(uf, TRUE)
     DIM tb AS INTEGER : tb = gtk_box_new(GTK_SENKRECHT, 4)
-    DIM tl AS INTEGER : tl = gtk_label_new("Tags:")
+    DIM tl AS INTEGER : tl = gtk_label_new(tr$("Tags:"))
     gtk_label_set_xalign(tl, 0.0)
     gtkKlasse(tl, "nebensache")
     gtk_box_pack_start(tb, tl, FALSE, FALSE, 0)
     bbTags = gtk_entry_new()
-    gtk_entry_set_placeholder_text(bbTags, "Tags (kommagetrennt) …")
+    gtk_entry_set_placeholder_text(bbTags, tr$("Tags (kommagetrennt) …"))
     gtk_widget_set_sensitive(bbTags, FALSE)
     gtk_box_pack_start(tb, bbTags, FALSE, FALSE, 0)
     gtk_box_pack_start(uf, tb, TRUE, TRUE, 0)
     DIM nb AS INTEGER : nb = gtk_box_new(GTK_SENKRECHT, 4)
-    DIM nl AS INTEGER : nl = gtk_label_new("Notizen:")
+    DIM nl AS INTEGER : nl = gtk_label_new(tr$("Notizen:"))
     gtk_label_set_xalign(nl, 0.0)
     gtkKlasse(nl, "nebensache")
     gtk_box_pack_start(nb, nl, FALSE, FALSE, 0)

@@ -592,7 +592,7 @@ SUB ueberZeigen()
     DIM f AS INTEGER
     DIM bild AS INTEGER : bild = gdk_pixbuf_new_from_file_at_size(PATHJOIN(CWD$(), LOGO), 128, 128, f)
     IF bild = 0 THEN g_error_free(f)
-    gtk_show_about_dialog(fenster, "program-name", tr$("Glutfaden"), "logo", bild, "version", tr$("Stufe 24"), _
+    gtk_show_about_dialog(fenster, "program-name", tr$("Glutfaden"), "logo", bild, "version", tr$("Stufe 25"), _
         "comments", tr$("Kreuzstich-Muster ansehen und bearbeiten -- eine Portierung von PySticky nach Drachenhauch und GTK 3."), _
         "website", "https://github.com/HasoSchno70/Pysticky", "website-label", tr$("PySticky (das Original)"), 0)
 END SUB

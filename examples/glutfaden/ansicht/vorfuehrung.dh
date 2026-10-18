@@ -2900,6 +2900,12 @@ SUB vsSammeln(w AS INTEGER)
             END IF
     END SELECT
     IF typ = "GtkMenuButton" THEN vsSammeln(gtk_menu_button_get_popover(w))
+    IF typ = "GtkNotebook" THEN
+        DIM sn AS INTEGER
+        FOR sn = 0 TO gtk_notebook_get_n_pages(w) - 1
+            vsSammeln(gtk_notebook_get_tab_label(w, gtk_notebook_get_nth_page(w, sn)))
+        NEXT
+    END IF
     IF NOT g_type_check_instance_is_a(w, gtk_container_get_type()) THEN RETURN
     DIM liste AS INTEGER : liste = gtk_container_get_children(w)
     DIM knoten AS INTEGER : knoten = liste
@@ -2911,11 +2917,48 @@ SUB vsSammeln(w AS INTEGER)
     IF liste <> 0 THEN g_list_free(liste)
 END SUB
 
-' Sieht der Text deutsch aus? Umlaute, ß und haeufige deutsche Woerter
+' Die deutschen Saetze der Tafel, die eine eigene englische Fassung haben --
+' steht einer davon woertlich im Fenster, ist er nicht uebersetzt worden.
+' Nur laengere (Leerzeichen oder ab 8 Zeichen): "Alt" stuende sonst in "Alt+PgUp".
+DIM vsSaetze AS ARRAY OF STRING
+
+FUNCTION vsUebersehen(t AS STRING) AS BOOLEAN
+    IF LEN(vsSaetze) = 0 THEN
+        DIM tf AS MAP OF STRING : tf = kern.spracheTafel(PATHJOIN(CWD$(), "daten/sprache/en.txt"))
+        DIM k AS STRING
+        FOR EACH k IN MAPKEYS(tf)
+            DIM kk AS STRING : kk = TRIM$(REGEX_REPLACE(k, "\{[0-9]+\}", ""))
+            IF tf[k] <> k AND INSTR(k, "{") < 0 AND (INSTR(kk, " ") > 0 OR LEN(kk) >= 8) THEN ARRAY_PUSH(vsSaetze, k)
+        NEXT
+    END IF
+    DIM sz AS STRING
+    FOR EACH sz IN vsSaetze
+        IF INSTR(t, sz) >= 0 THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Sieht der Text deutsch aus? Umlaute, ß, haeufige deutsche Woerter oder ein
+' Satz der Tafel, der nicht uebersetzt wurde
 FUNCTION vsDeutsch(t AS STRING) AS BOOLEAN
-    ' Dateinamen und Pfade sind Daten, keine Oberflaeche
-    IF REGEX_TEST(t, "\.pxs|[\\/]") THEN RETURN FALSE
+    ' der Name des Musters ist kein Text der Oberflaeche
+    IF musterTitel <> "" THEN t = REPLACE$(t, musterTitel, "")
+    IF lwHat AND lwMuster.name <> "" THEN t = REPLACE$(t, lwMuster.name, "")
+    IF lwHat THEN t = REPLACE$(t, vsTitelSchluessel$(), "")
+    ' Namen von Ebenen und Garnen sind Daten aus der Datei
+    IF lwHat THEN
+        DIM en AS INTEGER
+        FOR en = 0 TO lwMuster.ebenen.anzahl() - 1
+            IF lwMuster.ebenen.ebenen[en].name <> "" THEN t = REPLACE$(t, lwMuster.ebenen.ebenen[en].name, "")
+        NEXT
+    END IF
+    ' Dateinamen und Pfade sind Daten, keine Oberflaeche (ein Schraegstrich
+    ' allein nicht: "stitches/inch")
+    IF REGEX_TEST(t, "\.pxs|^[A-Za-z]:|^/|[\\]") THEN RETURN FALSE
     IF REGEX_TEST(t, "[äöüÄÖÜß]") THEN RETURN TRUE
+    IF vsUebersehen(t) THEN RETURN TRUE
+    ' Tausenderpunkt (2.500) oder Dezimalkomma (2,5 cm) -- die deutsche Zahl
+    IF REGEX_TEST(t, "(^|[^0-9.,])[0-9]{1,3}([.][0-9]{3})+([^0-9]|$)") THEN RETURN TRUE
     RETURN REGEX_TEST(" " + t + " ", "(?i)[^a-z](und|der|die|das|mit|nicht|ist|zum|zur|für|oder|aus|auf|alle|eine?|Muster|Farbe|Farben|Ebene|Ebenen|Stiche?|Sichern|Einstellungen|Garn|Zeile|Spalte|Klicken|Rückgängig|Werkzeug)[^a-z]")
 END FUNCTION
 
@@ -2938,6 +2981,74 @@ SUB vsDeutscheZeigen(titel AS STRING, liste AS ARRAY OF STRING)
     FOR EACH t IN d
         PRINT "  "; LEFT$(t, 110)
     NEXT
+END SUB
+
+' Ein Dialog mit eigener Schleife (gtk_dialog_run): sobald er den Griff hat,
+' seine Texte sammeln und ihn schliessen wie mit dem Fensterkreuz
+DIM vsGefeuert AS BOOLEAN
+DIM vsDialogTexte AS ARRAY OF STRING
+DIM vsDialogName AS STRING
+
+FUNCTION vsDialogZu(daten AS INTEGER) AS BOOLEAN
+    DIM w AS INTEGER : w = gtk_grab_get_current()
+    IF w = 0 THEN RETURN TRUE
+    DIM d AS INTEGER : d = gtk_widget_get_toplevel(w)
+    vsTexte = []
+    vsSammeln(d)
+    ' Neues Projekt: dazu die Karten der Vorlagen (Kategorie Lesezeichen)
+    IF vsDialogName = "neu" THEN
+        gtk_toggle_button_set_active(nmKategorien[2], TRUE)
+        vsSammeln(d)
+    END IF
+    vsDialogTexte = vsTexte
+    vsGefeuert = TRUE
+    DIM ok AS BOOLEAN : ok = vfFoto(d, "dlg_" + REPLACE$(vsDialogName, " ", "_"))
+    gtk_dialog_response(d, -4)
+    RETURN FALSE
+END FUNCTION
+
+SUB vsDialogPruefen(name AS STRING, nr AS INTEGER)
+    vsGefeuert = FALSE
+    vsDialogTexte = []
+    vsDialogName = name
+    DIM id AS INTEGER : id = g_timeout_add(300, vsDialogZu, 0)
+    SELECT CASE nr
+        CASE 0 : neuDialog()
+        CASE 1 : eigenschaftenDialog()
+        CASE 2 : groesseDialog()
+        CASE 3 : versionenDialog()
+        CASE 4 : vorlageSichernDialog()
+        CASE 5 : vorlagenDialog()
+        CASE 6 : neuigkeitenDialog()
+        CASE 7 : einstellungenDialog()
+        CASE 8 : rasterDialog()
+        CASE 9 : statistikDialog()
+        CASE 10 : heatmapDialog()
+        CASE 11 : aehnlicheDialog()
+        CASE 12 : farbeErsetzenDialog()
+        CASE 13 : selteneDialog()
+        CASE 14 : symbolDialog()
+        CASE 15 : blendDialog()
+        CASE 16 : exportDialog()
+        CASE 17 : farbverwaltungDialog()
+        CASE 18 : kachelDialog()
+        CASE 19 : paletteDialog()
+        CASE 20 : tauschenDialog()
+        CASE 21 : rahmenDialog()
+        CASE 22 : harmonieDialog()
+        CASE 23 : bibliothekDialog()
+        CASE 24 : stickpfadDialog()
+        CASE 25 : vorschauDialog()
+        CASE 26
+            DIM vr AS BOOLEAN : vr = vorratDialog()
+        CASE 27 : fremdImportDialog("")
+    END SELECT
+    IF NOT vsGefeuert THEN
+        DIM weg AS BOOLEAN : weg = g_source_remove(id)
+        PRINT "  "; name; ": kein Dialog"
+        RETURN
+    END IF
+    vsDeutscheZeigen("  " + name, vsDialogTexte)
 END SUB
 
 FUNCTION vorfuehrenSprache(daten AS INTEGER) AS BOOLEAN
@@ -2971,6 +3082,53 @@ FUNCTION vorfuehrenSprache(daten AS INTEGER) AS BOOLEAN
             edUebernehmen()
             gtk_widget_destroy(ed)
             PRINT "uebernommen: '"; einst.sprache; "' | gemerkt '"; kern.einstellungenLaden(einst.pfad).sprache; "' | "; meldung; " | oberflaeche bleibt "; kern.spracheJetzt$()
+        CASE 4
+            ' Jeder Dialog einmal: Texte sammeln, deutsch aussehende zeigen
+            PRINT "dialoge:"
+            DIM dn AS ARRAY OF STRING : dn = ["neu", "eigenschaften", "groesse", "versionen", "vorlage sichern", "vorlagen", "neuigkeiten", _
+                "einstellungen", "raster", "statistik", "heatmap", "aehnliche", "ersetzen", "seltene", "symbol", "blend", "export", _
+                "farbverwaltung", "kacheln", "palette", "tauschen", "rahmen", "harmonie", "bibliothek", "stickpfad", "vorschau", "vorrat", "fremdimport"]
+            DIM di AS INTEGER
+            FOR di = 0 TO LEN(dn) - 1
+                vsDialogPruefen(dn[di], di)
+            NEXT
+        CASE 5
+            ' Ausgaben auf Englisch: Schluessel (Stilnamen, OXS-Elemente)
+            ' duerfen nicht mituebersetzt sein -- auf Deutsch fiele das nie auf
+            DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(lwMuster, "sprache.pdf", NEW kern.PdfOptionen())
+            DIM stile AS ARRAY OF STRING : stile = []
+            DIM zl AS STRING
+            DIM titelZeile AS STRING : titelZeile = ""
+            FOR EACH zl IN ab
+                IF LEFT$(zl, 2) = "P " THEN
+                    DIM st AS STRING : st = MID$(zl, 2, INSTR(zl, " | ") - 2)
+                    IF ARRAY_INDEXOF(stile, st) < 0 THEN ARRAY_PUSH(stile, st)
+                    IF titelZeile = "" AND st = "Title1" THEN titelZeile = MID$(zl, INSTR(zl, " | ") + 3)
+                END IF
+            NEXT
+            SORT(stile)
+            PRINT "pdf: stile "; JOIN$(stile, " "); " | erster titel '"; titelZeile; "' | datei "; FILEEXISTS("sprache.pdf")
+            kern.htmlExportieren(lwMuster, "sprache.html", NEW kern.HtmlOptionen())
+            DIM hz AS ARRAY OF STRING : hz = READLINES("sprache.html")
+            DIM hd AS ARRAY OF STRING : hd = []
+            DIM sprachZeile AS STRING : sprachZeile = ""
+            FOR EACH zl IN hz
+                IF INSTR(zl, "<html") >= 0 THEN sprachZeile = TRIM$(zl)
+                IF LEFT$(TRIM$(zl), 2) <> "/*" AND REGEX_TEST(zl, "[äöüÄÖÜß]|&[aouAOU]uml;|&szlig;") THEN ARRAY_PUSH(hd, LEFT$(TRIM$(zl), 90))
+            NEXT
+            PRINT "html: "; sprachZeile; " | deutsch aussehende zeilen "; LEN(hd)
+            FOR EACH zl IN hd
+                PRINT "  "; zl
+            NEXT
+            ' Eine OXS-Datei ist ein Austauschformat: in beiden Sprachen dieselbe
+            kern.oxsSpeichern(lwMuster, "sprache_en.oxs")
+            ok = kern.spracheLaden("de", "")
+            kern.oxsSpeichern(lwMuster, "sprache_de.oxs")
+            ok = kern.spracheLaden("en", PATHJOIN(CWD$(), "daten/sprache/en.txt"))
+            DIM ox AS STRING : ox = JOIN$(READLINES("sprache_en.oxs"), CHR$(10))
+            PRINT "oxs: "; LEFT$(ox, 38); " | in beiden sprachen gleich "; ox = JOIN$(READLINES("sprache_de.oxs"), CHR$(10)); " | wieder "; kern.spracheJetzt$()
+            DIM csv AS STRING : csv = kern.statistikCsv$(lwMuster, 14, 10.0, 0.0)
+            PRINT "csv: "; LEFT$(csv, INSTR(csv, CHR$(10)))
         CASE ELSE
             schliessenErlaubt = TRUE
             gtk_widget_destroy(fenster)

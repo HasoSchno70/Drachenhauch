@@ -2560,6 +2560,42 @@ Hauptfensters und der F1-Uebersicht und listet deutsch aussehende (0 von
 eine davon (Wiederholen-Tooltip) nur im Quelltext-Fall, weil das Programm
 den Tooltip der Verlaufsknoepfe ohnehin ueberschreibt.
 
+**Stufe 25: Englisch in jedem Dialog, Teile 2 und 3** (2026-10-18): alle
+28 Dialoge, dazu die Texte aus dem Kern -- Verlauf (`v.beginnen(tr$(...))`),
+PDF/HTML/CSV/Stickplan/Paket, Meldungen der PAT/XSD/OXS/PXS-Leser,
+Ebenen- und Mustervorgaben ("Ebene {0}", "Hintergrund"). Tafel 1637
+Eintraege. **Die Regel: Schluessel bleiben deutsch, uebersetzt wird beim
+ANZEIGEN.** Listen aus dem Kern (Bibliothek-Kategorien samt "Alle"/
+"Favoriten", Sortierungen, Harmonie-Arten, Vorlagen-Kategorien und -Namen,
+Startaktionen, Pipetten-Arten, Rastervoreinstellungen ...) sind dort
+Schluessel -- gespeichert, verglichen (`CASE "Groesse"`), in `library.json`
+geschrieben; die Ansicht zeigt sie ueber `tr$(t)` bzw. `trListe(liste)`
+(einstellungsstand.dh). Ebenso nie uebersetzt: PDF-Stilnamen (`pdfAbsatz(s,
+"Title1", ...)`), Zaehlerarten, OXS-Elemente (`oxsText$` ganz ausgenommen),
+Palettennamen ("DMC Diamond Painting", "Anchor"), Dateikennungen
+(`" Floss Palette"` im PAT-Leser), `ZEIT_FORMAT$`-Muster, CSS. `<html
+lang>` folgt der Sprache. **Was das Werkzeug falsch machte** (und jetzt
+nicht mehr): (1) ein Text in einem IIF mitten in einer Kette ergab zwei
+ueberlappende Ersetzungen (jetzt verschachtelt: die innere steht im Wert der
+aeusseren); (2) `"<span>" + CHR$(&H2003) * 3 + "</span>"` -- die Kette brach
+vor dem `*` ab, `trf$(...) * 3` haette den GANZEN Text verdreifacht (staerker
+bindende Operatoren an der Kette = nicht anfassen); (3) reines Markup/CSS
+wurde eingepackt (`markup_zurueck.py` macht es rueckgaengig). **Ein Fund im
+Bild:** "Max. stitches: 2.500" -- auch Dialoge und Kern gehen jetzt ueber
+`zahlText$`/`zahlAnzeige$`. Und `INSTR(bew, "Beste")` im Stickpfad-Dialog
+verglich mit einem uebersetzten Text (jetzt `"★★★"`). **Die Probe**
+(`--probe-sprache`) oeffnet jeden Dialog ueber `g_timeout_add` +
+`gtk_grab_get_current` (sammelt, fotografiert, schliesst mit -4), liest auch
+Reiterbeschriftungen, waehlt beim Neuen Projekt eine Vorlagen-Kategorie und
+erkennt Deutsches an Umlauten, Woertern, Tausenderpunkten UND an Saetzen der
+Tafel, die woertlich stehen geblieben sind (Ebenen-, Muster- und Dateinamen
+sind Daten und fallen heraus). Weil ein uebersetzter SCHLUESSEL auf Deutsch
+nie auffaellt, exportiert sie auf Englisch: PDF-Stile, `lang='en'`, CSV-Kopf,
+und die OXS-Datei muss in beiden Sprachen Byte fuer Byte gleich sein. Der
+Quelltext-Fall prueft zusaetzlich jede Kern-Liste gegen die Tafel. Auf
+Deutsch blieben alle 25 Glutfaden-Sammlungen unveraendert gruen; 20 von 20
+Verfaelschungen fallen.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

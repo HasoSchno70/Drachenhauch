@@ -620,7 +620,7 @@ SUB ansichtSchalter(was AS INTEGER, an AS BOOLEAN)
     END SELECT
     ansichtKnoepfeNachziehen()
     IF lwFlaeche <> 0 THEN gtk_widget_queue_draw(lwFlaeche)
-    statusMeldung(ansichtName$(was) + ": " + IIF(an, "an", "aus"))
+    statusMeldung(ansichtName$(was) + ": " + IIF(an, tr$("an"), tr$("aus")))
 END SUB
 
 FUNCTION ansichtName$(was AS INTEGER) AS STRING

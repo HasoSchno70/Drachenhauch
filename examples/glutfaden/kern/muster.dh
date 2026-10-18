@@ -56,7 +56,7 @@ CLASS Muster
     DIM modus AS STRING                ' "stitch" oder "diamond"
 
     SUB Init(n AS STRING, b AS INTEGER, h AS INTEGER)
-        IF b < 1 OR h < 1 THEN THROW "Ungueltige Mustergroesse: " + STR$(b) + "x" + STR$(h) + " (min. 1x1)"
+        IF b < 1 OR h < 1 THEN THROW trf$("Ungueltige Mustergroesse: {0}x{1} (min. 1x1)", [STR$(b), STR$(h)])
         name = n
         breite = b
         hoehe = h

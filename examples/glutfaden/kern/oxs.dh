@@ -244,9 +244,9 @@ FUNCTION oxsLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
     TRY
         x = XML_LOAD(pfad)
     CATCH e
-        THROW "OXS: kein lesbares XML -- " + e
+        THROW trf$("OXS: kein lesbares XML -- {0}", [e])
     END TRY
-    IF LOWER$(XML_NAME$(x)) <> "chart" THEN THROW "OXS: Wurzel ist '" + XML_NAME$(x) + "', erwartet 'chart'"
+    IF LOWER$(XML_NAME$(x)) <> "chart" THEN THROW trf$("OXS: Wurzel ist '{0}', erwartet 'chart'", [XML_NAME$(x)])
     DIM titel AS STRING, autor AS STRING, recht AS STRING
     DIM b AS INTEGER, h AS INTEGER, spi AS INTEGER : spi = 14
     IF XML_HAS(x, "chart_info") THEN
@@ -262,8 +262,8 @@ FUNCTION oxsLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
         titel = BASENAME(pfad)
         IF INSTRREV(titel, ".") > 0 THEN titel = LEFT$(titel, INSTRREV(titel, "."))
     END IF
-    IF b < 1 OR h < 1 THEN THROW "OXS: ungueltige Groesse " + STR$(b) + "x" + STR$(h)
-    IF b > GROESSTES_MUSTER OR h > GROESSTES_MUSTER THEN THROW "OXS: Muster zu gross: " + STR$(b) + "x" + STR$(h) + " (hoechstens " + STR$(GROESSTES_MUSTER) + ")"
+    IF b < 1 OR h < 1 THEN THROW trf$("OXS: ungueltige Groesse {0}x{1}", [STR$(b), STR$(h)])
+    IF b > GROESSTES_MUSTER OR h > GROESSTES_MUSTER THEN THROW trf$("OXS: Muster zu gross: {0}x{1} (hoechstens {2})", [STR$(b), STR$(h), STR$(GROESSTES_MUSTER)])
     DIM m AS Muster : m = NEW Muster(titel, b, h)
     m.stoff = spi
     IF autor <> "" THEN JSON_SET_STRING(m.metadaten, "author", autor)
@@ -274,7 +274,7 @@ FUNCTION oxsLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
     ' Garne aller Paletten nach (hersteller, nummer), klein
     DIM bekannt AS MAP OF INTEGER : bekannt = garnVerzeichnis(paletten)
     DIM i AS INTEGER
-    IF NOT XML_HAS(x, "palette") THEN THROW "OXS: keine <palette>"
+    IF NOT XML_HAS(x, "palette") THEN THROW tr$("OXS: keine <palette>")
     DIM pal AS XML_HANDLE : pal = XML_FIND(x, "palette")
     DIM zuordnung AS MAP OF INTEGER : zuordnung = {}   ' palindex -> Farbnummer
     DIM gesehen AS MAP OF BOOLEAN : gesehen = {}
@@ -282,11 +282,11 @@ FUNCTION oxsLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
         DIM it AS XML_HANDLE : it = XML_AT(pal, "palette_item", i)
         DIM ix AS STRING : ix = XML_ATTR$(it, "index", "")
         IF NOT REGEX_TEST(TRIM$(ix), "^[+-]?[0-9]+$") THEN
-            ARRAY_PUSH(erg.warnungen, "Palette-Item ohne gueltigen Index: " + ix)
+            ARRAY_PUSH(erg.warnungen, trf$("Palette-Item ohne gueltigen Index: {0}", [ix]))
             CONTINUE
         END IF
         DIM pidx AS INTEGER : pidx = VAL(TRIM$(ix))
-        IF MAPHAS(gesehen, STR$(pidx)) THEN ARRAY_PUSH(erg.warnungen, "Doppelter Palette-Index " + STR$(pidx) + " in <palette> — letzter Eintrag gewinnt")
+        IF MAPHAS(gesehen, STR$(pidx)) THEN ARRAY_PUSH(erg.warnungen, trf$("Doppelter Palette-Index {0} in <palette> — letzter Eintrag gewinnt", [STR$(pidx)]))
         MAPPUT(gesehen, STR$(pidx), TRUE)
         DIM nummer AS STRING : nummer = TRIM$(XML_ATTR$(it, "number", ""))
         DIM name AS STRING : name = TRIM$(XML_ATTR$(it, "name", ""))
@@ -311,7 +311,7 @@ FUNCTION oxsLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
             IF REGEX_TEST(farbe, "^#?[0-9A-Fa-f]{6}$") OR REGEX_TEST(farbe, "^#?[0-9A-Fa-f]{3}$") THEN
                 fw = oxsFarbwert(farbe)
             ELSEIF farbe <> "" THEN
-                ARRAY_PUSH(erg.warnungen, "Ungueltige Farbe '" + farbe + "' für Palette-Item " + STR$(pidx))
+                ARRAY_PUSH(erg.warnungen, trf$("Ungueltige Farbe '{0}' für Palette-Item {1}", [farbe, STR$(pidx)]))
             END IF
             ' Der Schreiber nennt ein Garn "Hersteller Nummer - Name". Ohne
             ' Palette dazu macht PySticky den ganzen Text zum Namen -- und bei
@@ -395,7 +395,7 @@ FUNCTION oxsLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
             DIM hx2 AS INTEGER : hx2 = ROUND((VAL(w3) - 1) * 2)
             DIM hy2 AS INTEGER : hy2 = ROUND((VAL(w4) - 1) * 2)
             IF hx1 < 0 OR hy1 < 0 OR hx2 < 0 OR hy2 < 0 OR hx1 > 2 * b OR hx2 > 2 * b OR hy1 > 2 * h OR hy2 > 2 * h THEN
-                IF NOT gewarnt THEN ARRAY_PUSH(erg.warnungen, "Rückstich-Koordinaten außerhalb der Mustergrenzen — betroffene Rückstiche werden verworfen")
+                IF NOT gewarnt THEN ARRAY_PUSH(erg.warnungen, tr$("Rückstich-Koordinaten außerhalb der Mustergrenzen — betroffene Rückstiche werden verworfen"))
                 gewarnt = TRUE
                 CONTINUE
             END IF
@@ -426,7 +426,7 @@ FUNCTION oxsLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
             ELSEIF ot = "bead" THEN
                 art = PERLE
             ELSE
-                ARRAY_PUSH(erg.warnungen, "Unbekannter Ornament-Typ: " + ot)
+                ARRAY_PUSH(erg.warnungen, trf$("Unbekannter Ornament-Typ: {0}", [ot]))
                 CONTINUE
             END IF
             ' int(x1 - 1): Richtung null, wie Python
@@ -442,7 +442,7 @@ FUNCTION oxsFarbe(pidx AS INTEGER, erg AS OxsImport, zuordnung AS MAP OF INTEGER
     IF MAPHAS(zuordnung, STR$(pidx)) THEN RETURN MAPGET(zuordnung, STR$(pidx))
     IF NOT MAPHAS(gesehen, STR$(pidx)) AND NOT MAPHAS(gemeldet, STR$(pidx)) THEN
         MAPPUT(gemeldet, STR$(pidx), TRUE)
-        ARRAY_PUSH(erg.warnungen, "Stich(e) mit unbekanntem palindex=" + STR$(pidx) + " (kein passendes palette_item gefunden) übersprungen")
+        ARRAY_PUSH(erg.warnungen, trf$("Stich(e) mit unbekanntem palindex={0} (kein passendes palette_item gefunden) übersprungen", [STR$(pidx)]))
     END IF
     RETURN -1
 END FUNCTION

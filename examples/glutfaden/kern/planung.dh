@@ -365,9 +365,9 @@ FUNCTION einkaufEinheit$(liste AS ARRAY OF Einkaufszeile) AS STRING
         IF z.kaufen <= 0 THEN CONTINUE
         IF z.diamant THEN dp = TRUE ELSE kreuz = TRUE
     NEXT
-    IF dp AND NOT kreuz THEN RETURN "Drills insgesamt zu kaufen"
-    IF kreuz AND NOT dp THEN RETURN "Stränge insgesamt zu kaufen"
-    RETURN "Farben insgesamt zu kaufen"
+    IF dp AND NOT kreuz THEN RETURN tr$("Drills insgesamt zu kaufen")
+    IF kreuz AND NOT dp THEN RETURN tr$("Stränge insgesamt zu kaufen")
+    RETURN tr$("Farben insgesamt zu kaufen")
 END FUNCTION
 
 ' --- Palette umwandeln ---------------------------------------------------------------
@@ -470,7 +470,7 @@ FUNCTION paletteUmwandeln(m AS Muster, v AS Verlauf, p AS Palette, ziele AS ARRA
     FOR i = 0 TO LEN(ziele) - 1
         IF ziele[i] < 0 THEN RETURN 0
     NEXT
-    DIM t AS Aenderung : t = listenVorher(m, v, "Palette konvertieren")
+    DIM t AS Aenderung : t = listenVorher(m, v, tr$("Palette konvertieren"))
     FOR i = 0 TO m.farbanzahl() - 1
         DIM alt AS Farbeintrag : alt = m.farben[i]
         DIM neu AS Farbeintrag : neu = neuerFarbeintrag(p.garne[ziele[i]], alt.symbol)
@@ -510,7 +510,7 @@ FUNCTION farbenTauschen(m AS Muster, v AS Verlauf, a AS INTEGER, b AS INTEGER) A
     FOR i = 0 TO m.farbanzahl() - 1 : ziel[i] = -1 : NEXT
     ziel[a] = b
     ziel[b] = a
-    RETURN farbenUmsetzen(m, v, ziel, "Farben tauschen")
+    RETURN farbenUmsetzen(m, v, ziel, tr$("Farben tauschen"))
 END FUNCTION
 
 ' --- Rahmenaufteilung ----------------------------------------------------------------
@@ -549,9 +549,9 @@ CONST RAHMEN_HOECHSTENS = 2000      ' mehr Sektoren zeigt der Dialog nicht
 
 ' Nur (Reihen, Spalten), ohne die Sektoren -- fuer die Vorpruefung.
 FUNCTION rahmenRaster(pb AS INTEGER, ph AS INTEGER, rb AS INTEGER, rh AS INTEGER, ueber AS INTEGER) AS TUPLE
-    IF rb <= 0 OR rh <= 0 THEN THROW "Rahmenbreite und -höhe müssen größer als 0 sein"
-    IF ueber < 0 THEN THROW "Die Überlappung darf nicht negativ sein"
-    IF ueber >= rb OR ueber >= rh THEN THROW "Die Überlappung muss kleiner als der Rahmen sein"
+    IF rb <= 0 OR rh <= 0 THEN THROW tr$("Rahmenbreite und -höhe müssen größer als 0 sein")
+    IF ueber < 0 THEN THROW tr$("Die Überlappung darf nicht negativ sein")
+    IF ueber >= rb OR ueber >= rh THEN THROW tr$("Die Überlappung muss kleiner als der Rahmen sein")
     DIM sx AS INTEGER : sx = rb - ueber
     DIM sy AS INTEGER : sy = rh - ueber
     DIM spalten AS INTEGER : spalten = 1
@@ -618,7 +618,7 @@ END FUNCTION
 
 ' Die ueblichen Rahmen (Name, Seitenlaenge in Stichen bei Aida 14).
 FUNCTION rahmenVorlagen() AS ARRAY OF STRING
-    RETURN ["4 Zoll (10 cm)", "5 Zoll (13 cm)", "6 Zoll (15 cm)", "7 Zoll (18 cm)", "8 Zoll (20 cm)", "10 Zoll (25 cm)", "12 Zoll (30 cm)"]
+    RETURN [tr$("4 Zoll (10 cm)"), tr$("5 Zoll (13 cm)"), tr$("6 Zoll (15 cm)"), tr$("7 Zoll (18 cm)"), tr$("8 Zoll (20 cm)"), tr$("10 Zoll (25 cm)"), tr$("12 Zoll (30 cm)")]
 END FUNCTION
 
 FUNCTION rahmenVorlagenStiche() AS ARRAY OF INTEGER

@@ -3,6 +3,9 @@
 # darunter der Text; Leerzeilen trennen Absätze. Zeilen mit # sind Kommentar.
 # Die neueste Stufe steht oben.
 
+## 🌍 Stufe 25: Englisch in jedem Dialog
+Jetzt sprechen auch alle Dialoge Englisch, dazu die Ausgaben: PDF- und HTML-Anleitung, Statistik als CSV, Stickplan und Paket. Meldungen beim Lesen fremder Muster und der Verlauf (Rückgängig: …) folgen der Sprache ebenso.
+
 ## 🌐 Stufe 24: Deutsch und Englisch
 Glutfaden spricht Englisch: Einstellungen → Allgemein → Sprache (automatisch richtet sich nach der Systemsprache). Gewechselt wird beim nächsten Start. Tastenkürzel heißen dann Ctrl und Shift, Zahlen haben einen Dezimalpunkt.
 

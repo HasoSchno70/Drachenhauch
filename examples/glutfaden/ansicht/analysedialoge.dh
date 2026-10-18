@@ -132,7 +132,7 @@ FUNCTION adStoffe() AS ARRAY OF INTEGER
 END FUNCTION
 
 FUNCTION adStoffNamen() AS ARRAY OF STRING
-    RETURN ["Aida 11 (4,3 St/cm)", "Aida 14 (5,5 St/cm)", "Aida 16 (6,3 St/cm)", "Aida 18 (7,1 St/cm)", "Evenweave 28 (11 St/cm)", "Leinen 32 (12,6 St/cm)"]
+    RETURN [tr$("Aida 11 (4,3 St/cm)"), tr$("Aida 14 (5,5 St/cm)"), tr$("Aida 16 (6,3 St/cm)"), tr$("Aida 18 (7,1 St/cm)"), tr$("Evenweave 28 (11 St/cm)"), tr$("Leinen 32 (12,6 St/cm)")]
 END FUNCTION
 
 FUNCTION adKarteIn(g AS INTEGER, name AS STRING, titel AS STRING, x AS INTEGER, y AS INTEGER, b AS INTEGER) AS INTEGER
@@ -156,18 +156,14 @@ SUB adFuellen()
     DIM dp AS BOOLEAN : dp = m.modus = "diamond"
     DIM s AS kern.Statistik : s = kern.statistikVon(m)
     adSetzen("groesse", STR$(s.breite) + " × " + STR$(s.hoehe))
-    adSetzen("stiche", ZAHL$(IIF(s.ausgelassen > 0, s.zuSticken, s.sticheGesamt)))
-    adSetzen("farben", STR$(s.benutzt - s.ausgelasseneFarben) + IIF(s.ausgelasseneFarben > 0, " (+" + STR$(s.ausgelasseneFarben) + " übersp.)", ""))
+    adSetzen("stiche", zahlText$(IIF(s.ausgelassen > 0, s.zuSticken, s.sticheGesamt), -1))
+    adSetzen("farben", STR$(s.benutzt - s.ausgelasseneFarben) + IIF(s.ausgelasseneFarben > 0, trf$(" (+{0} übersp.)", [STR$(s.ausgelasseneFarben)]), ""))
     adSetzen("rueckstiche", STR$(LEN(m.rueckstiche)))
     adSetzen("abdeckung", IIF(s.breite * s.hoehe > 0, FORMAT$(s.bedeckt / (s.breite * s.hoehe) * 100, "%.1f") + "%", "0%"))
     adSetzen("ebenen", STR$(s.ebenen))
     DIM d AS kern.Schwierigkeit : d = kern.schwierigkeitVon(m)
     adSetzen("schwierigkeit", d.stufe)
-    gtk_widget_set_tooltip_text(MAPGET(adKarten, "schwierigkeit"), "Score: " + STR$(d.punkte) + " / 12" + CHR$(10) + _
-        "  Farben: " + STR$(d.pFarben) + "/3 (" + STR$(d.benutzt) + " verwendet)" + CHR$(10) + _
-        "  Stiche: " + STR$(d.pGroesse) + "/3 (" + ZAHL$(d.zuSticken) + " zu sticken)" + CHR$(10) + _
-        "  Sonderstiche: " + STR$(d.pSonder) + "/3 (" + FORMAT$(d.sonderAnteil * 100, "%.1f") + "% Anteil)" + CHR$(10) + _
-        "  Backstitches: " + STR$(d.pRueck) + "/3 (" + STR$(d.rueckstiche) + " Linien)")
+    gtk_widget_set_tooltip_text(MAPGET(adKarten, "schwierigkeit"), trf$("Score: {0} / 12{1}  Farben: {2}/3 ({3} verwendet){4}  Stiche: {5}/3 ({6} zu sticken){7}  Sonderstiche: {8}/3 ({9}% Anteil){10}  Backstitches: {11}/3 ({12} Linien)", [STR$(d.punkte), CHR$(10), STR$(d.pFarben), STR$(d.benutzt), CHR$(10), STR$(d.pGroesse), zahlText$(d.zuSticken, -1), CHR$(10), STR$(d.pSonder), FORMAT$(d.sonderAnteil * 100, "%.1f"), CHR$(10), STR$(d.pRueck), STR$(d.rueckstiche)]))
     ' die fuenf haeufigsten (ohne ausgelassene), stabil wie Pythons sorted
     DIM nr AS ARRAY OF INTEGER : nr = []
     DIM i AS INTEGER, j AS INTEGER
@@ -191,7 +187,7 @@ SUB adFuellen()
             gtk_label_set_text(name, f.symbol + " " + f.garn.name)
             DIM pz AS INTEGER : pz = INT(f.stichzahl / summe * 100)
             gtk_progress_bar_set_fraction(balken, pz / 100)
-            gtk_progress_bar_set_text(balken, ZAHL$(f.stichzahl) + " (" + STR$(pz) + "%)")
+            gtk_progress_bar_set_text(balken, zahlText$(f.stichzahl, -1) + " (" + STR$(pz) + "%)")
         ELSE
             gtk_label_set_text(feld, "")
             gtk_label_set_text(name, "-")
@@ -208,7 +204,7 @@ SUB adFuellen()
         DIM pr AS STRING
         IF f.auslassen THEN
             symbol = "<span foreground='#ff9800'>⊘ " + symbol + "</span>"
-            nm = "<span foreground='#ff9800'>" + nm + " (" + IIF(dp, "nicht kleben", "nicht sticken") + ")</span>"
+            nm = "<span foreground='#ff9800'>" + nm + " (" + IIF(dp, tr$("nicht kleben"), tr$("nicht sticken")) + ")</span>"
             pr = "-"
         ELSE
             pr = FORMAT$(f.stichzahl / summe * 100, "%.1f") + "%"
@@ -233,8 +229,8 @@ SUB adGarn(w AS INTEGER, daten AS INTEGER)
         DIM r AS INTEGER : r = adZeile(adGarnListe, [adFeld$(z.garn.farbe), sdMaske$(z.garn.name), STR$(z.stiche), FORMAT$(z.genau, "%.2f"), STR$(z.mitZuschlag), FORMAT$(z.kosten, "%.2f") + " €"], [44, 0, 70, 80, 130, 90], "llrrrr")
     NEXT
     gtk_widget_show_all(adGarnListe)
-    gtk_label_set_markup(adGarnSumme, "<b>Gesamt: " + STR$(g.straenge) + " Stränge" + IIF(g.ausgelasseneFarben > 0, " (" + STR$(g.ausgelasseneFarben) + " Farbe(n) übersprungen)", "") + "</b>")
-    gtk_label_set_markup(adGarnKosten, "<b>Geschätzte Kosten: " + FORMAT$(g.kosten, "%.2f") + " €</b>")
+    gtk_label_set_markup(adGarnSumme, trf$("<b>Gesamt: {0} Stränge{1}</b>", [STR$(g.straenge), IIF(g.ausgelasseneFarben > 0, trf$(" ({0} Farbe(n) übersprungen)", [STR$(g.ausgelasseneFarben)]), "")]))
+    gtk_label_set_markup(adGarnKosten, trf$("<b>Geschätzte Kosten: {0} €</b>", [FORMAT$(g.kosten, "%.2f")]))
     adEinkauf()
 END SUB
 
@@ -252,11 +248,11 @@ SUB adEinkauf()
     gtk_widget_show_all(adEinkaufListe)
     DIM summe AS INTEGER : summe = kern.einkaufSumme(liste)
     IF LEN(liste) = 0 THEN
-        gtk_label_set_markup(adEinkaufSumme, "<i>Das Muster enthält keine gestickte Farbe — keine Einkaufsliste.</i>")
+        gtk_label_set_markup(adEinkaufSumme, tr$("<i>Das Muster enthält keine gestickte Farbe — keine Einkaufsliste.</i>"))
     ELSEIF summe > 0 THEN
-        gtk_label_set_markup(adEinkaufSumme, "<span foreground='#e74c3c'><b>" + STR$(summe) + "</b> Stränge insgesamt zu kaufen</span>")
+        gtk_label_set_markup(adEinkaufSumme, trf$("<span foreground='#e74c3c'><b>{0}</b> Stränge insgesamt zu kaufen</span>", [STR$(summe)]))
     ELSE
-        gtk_label_set_markup(adEinkaufSumme, "<span foreground='#2ecc71'>✓ Du hast alles im Vorrat!</span>")
+        gtk_label_set_markup(adEinkaufSumme, tr$("<span foreground='#2ecc71'>✓ Du hast alles im Vorrat!</span>"))
     END IF
 END SUB
 
@@ -291,9 +287,9 @@ SUB adFortschritt()
     DIM p AS kern.Fortschritt : p = kern.fortschrittVon(m)
     gtk_progress_bar_set_fraction(adBalken, p.prozent / 100)
     gtk_progress_bar_set_text(adBalken, FORMAT$(p.prozent, "%.1f") + "%")
-    gtk_label_set_text(adBalkenText, ZAHL$(p.erledigt) + " / " + ZAHL$(p.gesamt) + IIF(dp, " Diamanten gesetzt", " Stiche gestickt"))
-    adSetzen("erledigt", ZAHL$(p.erledigt))
-    adSetzen("verbleibend", ZAHL$(p.gesamt - p.erledigt))
+    gtk_label_set_text(adBalkenText, zahlText$(p.erledigt, -1) + " / " + zahlText$(p.gesamt, -1) + IIF(dp, tr$(" Diamanten gesetzt"), tr$(" Stiche gestickt")))
+    adSetzen("erledigt", zahlText$(p.erledigt, -1))
+    adSetzen("verbleibend", zahlText$(p.gesamt - p.erledigt, -1))
     DIM fertig AS INTEGER, alle AS INTEGER
     DIM i AS INTEGER
     adLeeren(adFortListe)
@@ -303,11 +299,11 @@ SUB adFortschritt()
         DIM status AS STRING
         IF p.farbeErledigt[i] = p.farbeGesamt[i] THEN
             fertig = fertig + 1
-            status = "<span foreground='#2ecc71'>✓ Fertig</span>"
+            status = tr$("<span foreground='#2ecc71'>✓ Fertig</span>")
         ELSEIF p.farbeErledigt[i] > 0 THEN
-            status = "<span foreground='#f39c12'>In Arbeit</span>"
+            status = tr$("<span foreground='#f39c12'>In Arbeit</span>")
         ELSE
-            status = "<span foreground='#8d93a1'>Offen</span>"
+            status = tr$("<span foreground='#8d93a1'>Offen</span>")
         END IF
         DIM z AS INTEGER : z = adZeile(adFortListe, [adFeld$(m.farben[i].garn.farbe), sdMaske$(m.farben[i].garn.name), STR$(p.farbeErledigt[i]), STR$(p.farbeGesamt[i]), FORMAT$(p.farbeProzent[i], "%.1f") + "%", status], [44, 0, 80, 80, 70, 100], "llrrrl")
     NEXT
@@ -316,8 +312,8 @@ SUB adFortschritt()
 END SUB
 
 FUNCTION adCsvZiel$() AS STRING
-    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("Statistiken exportieren", adDialog, GTK_DATEI_SICHERN, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Sichern", GTK_ANTWORT_ANNEHMEN, 0)
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new(tr$("Statistiken exportieren"), adDialog, GTK_DATEI_SICHERN, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Sichern"), GTK_ANTWORT_ANNEHMEN, 0)
     gtk_file_chooser_set_do_overwrite_confirmation(d, TRUE)
     gtk_file_chooser_set_current_name(d, lwMuster.name + "_statistik.csv")
     IF musterPfad <> "" THEN
@@ -348,7 +344,7 @@ SUB adCsvGeklickt(w AS INTEGER, daten AS INTEGER)
     DIM pfad AS STRING : pfad = adCsvZiel$()
     IF pfad = "" THEN RETURN
     DIM f AS STRING : f = adCsvSichern$(pfad)
-    gtk_label_set_text(adMeldung, IIF(f = "", "Statistiken exportiert nach " + pfad, "Export fehlgeschlagen: " + f))
+    gtk_label_set_text(adMeldung, IIF(f = "", trf$("Statistiken exportiert nach {0}", [pfad]), trf$("Export fehlgeschlagen: {0}", [f])))
 END SUB
 
 FUNCTION adStatistikBauen() AS INTEGER
@@ -357,8 +353,8 @@ FUNCTION adStatistikBauen() AS INTEGER
     DIM dp AS BOOLEAN : dp = m.modus = "diamond"
     adKarten = {}
     adTop = []
-    adDialog = gtk_dialog_new_with_buttons("Muster-Statistiken & Garnverbrauch", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Schließen", GTK_ANTWORT_OK, 0)
+    adDialog = gtk_dialog_new_with_buttons(tr$("Muster-Statistiken & Garnverbrauch"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Schließen"), GTK_ANTWORT_OK, 0)
     gtk_window_set_default_size(adDialog, 900, 640)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(adDialog)
     gtk_container_set_border_width(innen, 10)
@@ -372,15 +368,15 @@ FUNCTION adStatistikBauen() AS INTEGER
     gtk_grid_set_column_spacing(g, 10)
     gtk_grid_set_column_homogeneous(g, TRUE)
     DIM w AS INTEGER
-    w = adKarteIn(g, "groesse", "Größe", 0, 0, 1)
-    w = adKarteIn(g, "stiche", IIF(dp, "Gesamt-Drills", "Gesamtstiche"), 1, 0, 1)
-    w = adKarteIn(g, "farben", "Farben", 2, 0, 1)
-    w = adKarteIn(g, "rueckstiche", "Rückstiche", 0, 1, 1)
-    w = adKarteIn(g, "abdeckung", "Abdeckung", 1, 1, 1)
-    w = adKarteIn(g, "ebenen", "Ebenen", 2, 1, 1)
-    w = adKarteIn(g, "schwierigkeit", "Schwierigkeit", 0, 2, 3)
+    w = adKarteIn(g, "groesse", tr$("Größe"), 0, 0, 1)
+    w = adKarteIn(g, "stiche", IIF(dp, tr$("Gesamt-Drills"), tr$("Gesamtstiche")), 1, 0, 1)
+    w = adKarteIn(g, "farben", tr$("Farben"), 2, 0, 1)
+    w = adKarteIn(g, "rueckstiche", tr$("Rückstiche"), 0, 1, 1)
+    w = adKarteIn(g, "abdeckung", tr$("Abdeckung"), 1, 1, 1)
+    w = adKarteIn(g, "ebenen", tr$("Ebenen"), 2, 1, 1)
+    w = adKarteIn(g, "schwierigkeit", tr$("Schwierigkeit"), 0, 2, 3)
     gtk_box_pack_start(s1, g, FALSE, FALSE, 0)
-    gtk_box_pack_start(s1, adUeberschrift("Top 5 Farben"), FALSE, FALSE, 6)
+    gtk_box_pack_start(s1, adUeberschrift(tr$("Top 5 Farben")), FALSE, FALSE, 6)
     DIM i AS INTEGER
     FOR i = 0 TO 4
         DIM reihe AS INTEGER : reihe = gtk_box_new(GTK_WAAGERECHT, 8)
@@ -397,17 +393,17 @@ FUNCTION adStatistikBauen() AS INTEGER
         gtk_box_pack_start(s1, reihe, FALSE, FALSE, 2)
         ARRAY_PUSH(adTop, feld) : ARRAY_PUSH(adTop, name) : ARRAY_PUSH(adTop, balken)
     NEXT
-    DIM n AS INTEGER : n = gtk_notebook_append_page(adReiter, s1, gtk_label_new("Übersicht"))
+    DIM n AS INTEGER : n = gtk_notebook_append_page(adReiter, s1, gtk_label_new(tr$("Übersicht")))
 
     ' Farben
     DIM s2 AS INTEGER : s2 = adSeite()
-    adFarbListe = adTabelle(s2, ["Farbe", "Symbol", "Name", "Hersteller", "Nr.", IIF(dp, "Drills", "Stiche"), "%"], [44, 50, 0, 110, 70, 70, 60], "lllllrr")
-    n = gtk_notebook_append_page(adReiter, s2, gtk_label_new("Farben"))
+    adFarbListe = adTabelle(s2, [tr$("Farbe"), tr$("Symbol"), tr$("Name"), tr$("Hersteller"), tr$("Nr."), IIF(dp, tr$("Drills"), tr$("Stiche")), "%"], [44, 50, 0, 110, 70, 70, 60], "lllllrr")
+    n = gtk_notebook_append_page(adReiter, s2, gtk_label_new(tr$("Farben")))
 
     ' Garnverbrauch (im Diamond-Modus nicht -- Drills gibt es nicht in Straengen)
     DIM s3 AS INTEGER : s3 = adSeite()
     DIM ein AS INTEGER : ein = gtk_box_new(GTK_WAAGERECHT, 8)
-    gtk_box_pack_start(ein, gtk_label_new("Stoffart:"), FALSE, FALSE, 0)
+    gtk_box_pack_start(ein, gtk_label_new(tr$("Stoffart:")), FALSE, FALSE, 0)
     adStoff = gtk_combo_box_text_new()
     DIM t AS STRING
     FOR EACH t IN adStoffNamen()
@@ -419,15 +415,15 @@ FUNCTION adStatistikBauen() AS INTEGER
     NEXT
     gtk_combo_box_set_active(adStoff, wahl)
     gtk_box_pack_start(ein, adStoff, FALSE, FALSE, 0)
-    gtk_box_pack_start(ein, gtk_label_new("   Sicherheitszuschlag:"), FALSE, FALSE, 0)
+    gtk_box_pack_start(ein, gtk_label_new(tr$("   Sicherheitszuschlag:")), FALSE, FALSE, 0)
     adZuschlag = adSpin(0, 50, 1, 20, 0)
     gtk_box_pack_start(ein, adZuschlag, FALSE, FALSE, 0)
-    gtk_box_pack_start(ein, gtk_label_new("%   Preis pro Strang:"), FALSE, FALSE, 0)
+    gtk_box_pack_start(ein, gtk_label_new(tr$("%   Preis pro Strang:")), FALSE, FALSE, 0)
     adPreis = adSpin(0, 50, 0.05, 1.5, 2)
     gtk_box_pack_start(ein, adPreis, FALSE, FALSE, 0)
     gtk_box_pack_start(ein, gtk_label_new("€"), FALSE, FALSE, 0)
     gtk_box_pack_start(s3, ein, FALSE, FALSE, 0)
-    adGarnListe = adTabelle(s3, ["Farbe", "Name", "Stiche", "Stränge", "Stränge (+Zuschlag)", "Kosten"], [44, 0, 70, 80, 130, 90], "llrrrr")
+    adGarnListe = adTabelle(s3, [tr$("Farbe"), tr$("Name"), tr$("Stiche"), tr$("Stränge"), tr$("Stränge (+Zuschlag)"), tr$("Kosten")], [44, 0, 70, 80, 130, 90], "llrrrr")
     DIM fuss AS INTEGER : fuss = gtk_box_new(GTK_WAAGERECHT, 8)
     adGarnSumme = gtk_label_new("")
     adGarnKosten = gtk_label_new("")
@@ -435,20 +431,20 @@ FUNCTION adStatistikBauen() AS INTEGER
     gtk_box_pack_start(fuss, adGarnSumme, FALSE, FALSE, 0)
     gtk_box_pack_end(fuss, adGarnKosten, FALSE, FALSE, 0)
     gtk_box_pack_start(s3, fuss, FALSE, FALSE, 4)
-    IF NOT dp THEN n = gtk_notebook_append_page(adReiter, s3, gtk_label_new("Garnverbrauch"))
+    IF NOT dp THEN n = gtk_notebook_append_page(adReiter, s3, gtk_label_new(tr$("Garnverbrauch")))
 
     ' Zeitschaetzung
     DIM s4 AS INTEGER : s4 = adSeite()
     DIM ze AS INTEGER : ze = gtk_box_new(GTK_WAAGERECHT, 8)
-    gtk_box_pack_start(ze, gtk_label_new("Stickerfahrung:"), FALSE, FALSE, 0)
+    gtk_box_pack_start(ze, gtk_label_new(tr$("Stickerfahrung:")), FALSE, FALSE, 0)
     adErfahrung = gtk_combo_box_text_new()
     FOR EACH t IN kern.erfahrungsstufen()
-        gtk_combo_box_text_append_text(adErfahrung, t)
+        gtk_combo_box_text_append_text(adErfahrung, tr$(t))
     NEXT
     gtk_combo_box_set_active(adErfahrung, 1)
     gtk_widget_set_sensitive(adErfahrung, NOT dp)
     gtk_box_pack_start(ze, adErfahrung, FALSE, FALSE, 0)
-    gtk_box_pack_start(ze, gtk_label_new("   Stunden pro Tag:"), FALSE, FALSE, 0)
+    gtk_box_pack_start(ze, gtk_label_new(tr$("   Stunden pro Tag:")), FALSE, FALSE, 0)
     adStunden = adSpin(0.5, 12, 0.5, 2, 1)
     gtk_box_pack_start(ze, adStunden, FALSE, FALSE, 0)
     gtk_box_pack_start(s4, ze, FALSE, FALSE, 0)
@@ -456,18 +452,18 @@ FUNCTION adStatistikBauen() AS INTEGER
     gtk_grid_set_row_spacing(g4, 10)
     gtk_grid_set_column_spacing(g4, 10)
     gtk_grid_set_column_homogeneous(g4, TRUE)
-    w = adKarteIn(g4, "gesamtzeit", "Geschätzte Gesamtzeit", 0, 0, 1)
-    w = adKarteIn(g4, "tage", IIF(dp, "Bei täglichem Kleben", "Bei täglichem Sticken"), 1, 0, 1)
-    w = adKarteIn(g4, "jestunde", IIF(dp, "Drills pro Stunde", "Stiche pro Stunde"), 0, 1, 1)
-    w = adKarteIn(g4, "jefarbe", "Durchschn. pro Farbe", 1, 1, 1)
+    w = adKarteIn(g4, "gesamtzeit", tr$("Geschätzte Gesamtzeit"), 0, 0, 1)
+    w = adKarteIn(g4, "tage", IIF(dp, tr$("Bei täglichem Kleben"), tr$("Bei täglichem Sticken")), 1, 0, 1)
+    w = adKarteIn(g4, "jestunde", IIF(dp, tr$("Drills pro Stunde"), tr$("Stiche pro Stunde")), 0, 1, 1)
+    w = adKarteIn(g4, "jefarbe", tr$("Durchschn. pro Farbe"), 1, 1, 1)
     gtk_box_pack_start(s4, g4, FALSE, FALSE, 6)
-    gtk_box_pack_start(s4, adUeberschrift("Zeitaufwand pro Farbe (geschätzt)"), FALSE, FALSE, 0)
-    adZeitListe = adTabelle(s4, ["Farbe", "Name", IIF(dp, "Drills", "Stiche"), "Geschätzte Zeit"], [44, 0, 80, 120], "llrr")
-    n = gtk_notebook_append_page(adReiter, s4, gtk_label_new("Zeitschätzung"))
+    gtk_box_pack_start(s4, adUeberschrift(tr$("Zeitaufwand pro Farbe (geschätzt)")), FALSE, FALSE, 0)
+    adZeitListe = adTabelle(s4, [tr$("Farbe"), tr$("Name"), IIF(dp, tr$("Drills"), tr$("Stiche")), tr$("Geschätzte Zeit")], [44, 0, 80, 120], "llrr")
+    n = gtk_notebook_append_page(adReiter, s4, gtk_label_new(tr$("Zeitschätzung")))
 
     ' Fortschritt
     DIM s5 AS INTEGER : s5 = adSeite()
-    gtk_box_pack_start(s5, adUeberschrift("Gesamtfortschritt"), FALSE, FALSE, 0)
+    gtk_box_pack_start(s5, adUeberschrift(tr$("Gesamtfortschritt")), FALSE, FALSE, 0)
     adBalken = gtk_progress_bar_new()
     gtk_progress_bar_set_show_text(adBalken, TRUE)
     gtk_box_pack_start(s5, adBalken, FALSE, FALSE, 0)
@@ -477,39 +473,39 @@ FUNCTION adStatistikBauen() AS INTEGER
     DIM g5 AS INTEGER : g5 = gtk_grid_new()
     gtk_grid_set_column_spacing(g5, 10)
     gtk_grid_set_column_homogeneous(g5, TRUE)
-    w = adKarteIn(g5, "erledigt", "Erledigt", 0, 0, 1)
-    w = adKarteIn(g5, "verbleibend", "Verbleibend", 1, 0, 1)
-    w = adKarteIn(g5, "farbenfertig", "Farben fertig", 2, 0, 1)
+    w = adKarteIn(g5, "erledigt", tr$("Erledigt"), 0, 0, 1)
+    w = adKarteIn(g5, "verbleibend", tr$("Verbleibend"), 1, 0, 1)
+    w = adKarteIn(g5, "farbenfertig", tr$("Farben fertig"), 2, 0, 1)
     gtk_box_pack_start(s5, g5, FALSE, FALSE, 6)
-    gtk_box_pack_start(s5, adUeberschrift("Fortschritt pro Farbe"), FALSE, FALSE, 0)
-    adFortListe = adTabelle(s5, ["Farbe", "Name", "Erledigt", "Gesamt", "%", "Status"], [44, 0, 80, 80, 70, 100], "llrrrl")
-    n = gtk_notebook_append_page(adReiter, s5, gtk_label_new("Fortschritt"))
+    gtk_box_pack_start(s5, adUeberschrift(tr$("Fortschritt pro Farbe")), FALSE, FALSE, 0)
+    adFortListe = adTabelle(s5, [tr$("Farbe"), tr$("Name"), tr$("Erledigt"), tr$("Gesamt"), "%", tr$("Status")], [44, 0, 80, 80, 70, 100], "llrrrl")
+    n = gtk_notebook_append_page(adReiter, s5, gtk_label_new(tr$("Fortschritt")))
 
     ' Einkaufsliste (nur Kreuzstich, wie der Garn-Reiter)
     adVorrat = kern.vorratLaden(pdVorratDatei$())
     adEinkaufListe = 0
     IF NOT dp THEN
         DIM s6 AS INTEGER : s6 = adSeite()
-        DIM ei AS INTEGER : ei = gtk_label_new("Vergleich des Garnbedarfs für dieses Muster mit deinem hinterlegten Vorrat (Zuschlag wie im Reiter „Garnverbrauch“).")
+        DIM ei AS INTEGER : ei = gtk_label_new(tr$("Vergleich des Garnbedarfs für dieses Muster mit deinem hinterlegten Vorrat (Zuschlag wie im Reiter „Garnverbrauch“)."))
         gtk_label_set_line_wrap(ei, TRUE)
         gtk_label_set_xalign(ei, 0.0)
         gtkKlasse(ei, "nebensache")
         gtk_box_pack_start(s6, ei, FALSE, FALSE, 0)
-        adEinkaufListe = adTabelle(s6, ["Farbe", "Name", "Nr.", "Benötigt", "Vorrat", "Zu kaufen"], [44, 0, 80, 80, 80, 80], "lllrrr")
+        adEinkaufListe = adTabelle(s6, [tr$("Farbe"), tr$("Name"), tr$("Nr."), tr$("Benötigt"), tr$("Vorrat"), tr$("Zu kaufen")], [44, 0, 80, 80, 80, 80], "lllrrr")
         DIM ef AS INTEGER : ef = gtk_box_new(GTK_WAAGERECHT, 8)
         adEinkaufSumme = gtk_label_new("")
         gtk_box_pack_start(ef, adEinkaufSumme, TRUE, TRUE, 0)
-        DIM kVorrat AS INTEGER : kVorrat = gtk_button_new_with_label("Garn-Vorrat bearbeiten …")
+        DIM kVorrat AS INTEGER : kVorrat = gtk_button_new_with_label(tr$("Garn-Vorrat bearbeiten …"))
         gtk_box_pack_end(ef, kVorrat, FALSE, FALSE, 0)
         signal(kVorrat, "clicked", adVorratGeklickt, 0, 0, 0)
         gtk_box_pack_start(s6, ef, FALSE, FALSE, 4)
-        n = gtk_notebook_append_page(adReiter, s6, gtk_label_new("🛒 Einkaufsliste"))
+        n = gtk_notebook_append_page(adReiter, s6, gtk_label_new(tr$("🛒 Einkaufsliste")))
     END IF
 
     ' unten: CSV und Meldung
     DIM unten AS INTEGER : unten = gtk_box_new(GTK_WAAGERECHT, 8)
-    DIM kCsv AS INTEGER : kCsv = gtk_button_new_with_label("Als CSV exportieren …")
-    gtk_widget_set_tooltip_text(kCsv, "Je Garn Symbol, Name, Hersteller, Nummer, Stiche, Anteil" + IIF(dp, "", ", Stränge und Kosten (Einstellungen des Garn-Reiters)"))
+    DIM kCsv AS INTEGER : kCsv = gtk_button_new_with_label(tr$("Als CSV exportieren …"))
+    gtk_widget_set_tooltip_text(kCsv, trf$("Je Garn Symbol, Name, Hersteller, Nummer, Stiche, Anteil{0}", [IIF(dp, "", tr$(", Stränge und Kosten (Einstellungen des Garn-Reiters)"))]))
     gtk_box_pack_start(unten, kCsv, FALSE, FALSE, 0)
     adMeldung = gtk_label_new("")
     gtk_label_set_xalign(adMeldung, 0.0)
@@ -555,7 +551,7 @@ END FUNCTION
 
 SUB hmRechnen(w AS INTEGER, daten AS INTEGER)
     DIM bs AS INTEGER : bs = MAX(1, INT(gtk_range_get_value(hmBloecke) + 0.5))
-    gtk_label_set_text(hmBlockText, STR$(bs) + " Stich" + IIF(bs = 1, "", "e"))
+    gtk_label_set_text(hmBlockText, IIF(bs = 1, trf$("{0} Stich", [STR$(bs)]), trf$("{0} Stiche", [STR$(bs)])))
     hmKarte = kern.heatmapRechnen(lwMuster, hmAchseNr(), bs)
     hmFarben = kern.heatmapFarben(hmKarte)
     gtk_label_set_text(hmText, kern.heatmapText$(hmKarte, hmAchseNr()))
@@ -598,16 +594,16 @@ END FUNCTION
 FUNCTION hmBauen() AS INTEGER
     IF NOT lwHat THEN RETURN 0
     hmKarte = NIL
-    hmDialog = gtk_dialog_new_with_buttons("Pattern-Heatmap", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Schließen", GTK_ANTWORT_OK, 0)
+    hmDialog = gtk_dialog_new_with_buttons(tr$("Pattern-Heatmap"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Schließen"), GTK_ANTWORT_OK, 0)
     gtk_window_set_default_size(hmDialog, 720, 640)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(hmDialog)
     gtk_container_set_border_width(innen, 12)
     hmAchse = gtk_combo_box_text_new()
-    gtk_combo_box_text_append_text(hmAchse, "Farbenvielfalt (verschiedene Farben pro Block)")
-    gtk_combo_box_text_append_text(hmAchse, "Stichdichte (Anzahl Stiche pro Block)")
+    gtk_combo_box_text_append_text(hmAchse, tr$("Farbenvielfalt (verschiedene Farben pro Block)"))
+    gtk_combo_box_text_append_text(hmAchse, tr$("Stichdichte (Anzahl Stiche pro Block)"))
     gtk_combo_box_set_active(hmAchse, 0)
-    gtk_box_pack_start(innen, dlZeile("Achse", hmAchse), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlZeile(tr$("Achse"), hmAchse), FALSE, FALSE, 4)
     DIM reihe AS INTEGER : reihe = gtk_box_new(GTK_WAAGERECHT, 8)
     hmBloecke = gtk_scale_new_with_range(GTK_WAAGERECHT, 1, 32, 1)
     gtk_scale_set_digits(hmBloecke, 0)
@@ -617,7 +613,7 @@ FUNCTION hmBauen() AS INTEGER
     gtk_widget_set_size_request(hmBlockText, 80, -1)
     gtk_box_pack_start(reihe, hmBloecke, TRUE, TRUE, 0)
     gtk_box_pack_start(reihe, hmBlockText, FALSE, FALSE, 0)
-    gtk_box_pack_start(innen, dlZeile("Block-Größe", reihe), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlZeile(tr$("Block-Größe"), reihe), FALSE, FALSE, 4)
     hmText = gtk_label_new("")
     gtk_label_set_xalign(hmText, 0.0)
     gtkKlasse(hmText, "nebensache")
@@ -627,7 +623,7 @@ FUNCTION hmBauen() AS INTEGER
     gtk_box_pack_start(innen, hmFlaeche, TRUE, TRUE, 0)
     DIM leg AS INTEGER : leg = gtk_drawing_area_new()
     gtk_widget_set_size_request(leg, -1, 18)
-    gtk_widget_set_tooltip_text(leg, "Links: niedrig — Rechts: hoch (höchster Wert im Muster)")
+    gtk_widget_set_tooltip_text(leg, tr$("Links: niedrig — Rechts: hoch (höchster Wert im Muster)"))
     gtk_box_pack_start(innen, leg, FALSE, FALSE, 6)
     signalZeichnen(hmFlaeche, "draw", hmZeichnen, 0, 0, 0)
     signalZeichnen(leg, "draw", hmLegende, 0, 0, 0)
@@ -680,7 +676,7 @@ SUB aePaareZeigen(w AS INTEGER, daten AS INTEGER)
         gtk_list_box_insert(aeListe, z, -1)
     NEXT
     gtk_widget_show_all(aeListe)
-    gtk_label_set_text(aeZahl, STR$(LEN(ab)) + " Paar(e) gefunden")
+    gtk_label_set_text(aeZahl, trf$("{0} Paar(e) gefunden", [STR$(LEN(ab))]))
     gtk_widget_set_sensitive(aeKnopf, LEN(ab) > 0)
 END SUB
 
@@ -706,15 +702,15 @@ FUNCTION aeZusammenfuehren$() AS STRING
     IF f <> "" THEN RETURN f
     IF wzFarbe >= lwMuster.farbanzahl() THEN wzFarbe = lwMuster.farbanzahl() - 1
     allesNeu()
-    statusMeldung(STR$(vorher - lwMuster.farbanzahl()) + " Farbe(n) zusammengeführt, " + STR$(n) + " Stiche umgefärbt (" + kz$("zurueck") + " nimmt es zurück).")
+    statusMeldung(trf$("{0} Farbe(n) zusammengeführt, {1} Stiche umgefärbt ({2} nimmt es zurück).", [STR$(vorher - lwMuster.farbanzahl()), STR$(n), kz$("zurueck")]))
     RETURN ""
 END FUNCTION
 
 FUNCTION aeBauen() AS INTEGER
     IF NOT lwHat THEN RETURN 0
-    aeDialog = gtk_dialog_new_with_buttons("Ähnliche Farben zusammenführen", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, 0)
-    aeKnopf = gtk_dialog_add_button(aeDialog, "Zusammenführen", GTK_ANTWORT_OK)
+    aeDialog = gtk_dialog_new_with_buttons(tr$("Ähnliche Farben zusammenführen"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, 0)
+    aeKnopf = gtk_dialog_add_button(aeDialog, tr$("Zusammenführen"), GTK_ANTWORT_OK)
     gtk_window_set_default_size(aeDialog, 640, 480)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(aeDialog)
     gtk_container_set_border_width(innen, 12)
@@ -727,8 +723,8 @@ FUNCTION aeBauen() AS INTEGER
     gtk_widget_set_size_request(aeSchwelleText, 30, -1)
     gtk_box_pack_start(reihe, aeSchwelle, TRUE, TRUE, 0)
     gtk_box_pack_start(reihe, aeSchwelleText, FALSE, FALSE, 0)
-    gtk_box_pack_start(innen, dlZeile("Schwellwert", reihe), FALSE, FALSE, 4)
-    DIM info AS INTEGER : info = gtk_label_new("Niedrigerer Wert = nur sehr ähnliche Farben (CIEDE2000). Höherer Wert = mehr Paare. Die zweite Farbe jedes Paars geht in die erste über.")
+    gtk_box_pack_start(innen, dlZeile(tr$("Schwellwert"), reihe), FALSE, FALSE, 4)
+    DIM info AS INTEGER : info = gtk_label_new(tr$("Niedrigerer Wert = nur sehr ähnliche Farben (CIEDE2000). Höherer Wert = mehr Paare. Die zweite Farbe jedes Paars geht in die erste über."))
     gtk_label_set_xalign(info, 0.0)
     gtk_label_set_line_wrap(info, TRUE)
     gtkKlasse(info, "nebensache")
@@ -743,8 +739,8 @@ FUNCTION aeBauen() AS INTEGER
     DIM unten AS INTEGER : unten = gtk_box_new(GTK_WAAGERECHT, 8)
     aeZahl = gtk_label_new("")
     gtkKlasse(aeZahl, "nebensache")
-    DIM kAlle AS INTEGER : kAlle = gtk_button_new_with_label("Alle auswählen")
-    DIM kKeine AS INTEGER : kKeine = gtk_button_new_with_label("Keine auswählen")
+    DIM kAlle AS INTEGER : kAlle = gtk_button_new_with_label(tr$("Alle auswählen"))
+    DIM kKeine AS INTEGER : kKeine = gtk_button_new_with_label(tr$("Keine auswählen"))
     gtk_box_pack_start(unten, aeZahl, FALSE, FALSE, 0)
     gtk_box_pack_end(unten, kKeine, FALSE, FALSE, 0)
     gtk_box_pack_end(unten, kAlle, FALSE, FALSE, 0)

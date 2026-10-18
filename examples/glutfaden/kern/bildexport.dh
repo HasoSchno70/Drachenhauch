@@ -169,13 +169,13 @@ END FUNCTION
 ' Als Datei; das Format folgt der Endung (.png, .jpg, .bmp).
 SUB bildExportieren(m AS Muster, pfad AS STRING, zelle AS INTEGER, raster AS BOOLEAN, symbole AS BOOLEAN)
     DIM e AS STRING : e = LOWER$(pfad)
-    IF NOT (RIGHT$(e, 4) = ".png" OR RIGHT$(e, 4) = ".jpg" OR RIGHT$(e, 5) = ".jpeg" OR RIGHT$(e, 4) = ".bmp") THEN THROW "Bild-Export: unbekannte Endung -- .png, .jpg oder .bmp"
+    IF NOT (RIGHT$(e, 4) = ".png" OR RIGHT$(e, 4) = ".jpg" OR RIGHT$(e, 5) = ".jpeg" OR RIGHT$(e, 4) = ".bmp") THEN THROW tr$("Bild-Export: unbekannte Endung -- .png, .jpg oder .bmp")
     DIM b AS IMAGE : b = musterBild(m, zelle, raster, symbole)
     TRY
         IMAGE_SAVE(b, pfad, FALSE)
     CATCH f
         IMAGE_FREE(b)
-        THROW "Bild nicht gesichert: " + f
+        THROW trf$("Bild nicht gesichert: {0}", [f])
     END TRY
     IMAGE_FREE(b)
 END SUB
