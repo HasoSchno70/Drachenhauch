@@ -2954,6 +2954,7 @@ END SUB
 ' seine Texte sammeln und ihn schliessen wie mit dem Fensterkreuz
 DIM vsGefeuert AS BOOLEAN
 DIM vsDialogTexte AS ARRAY OF STRING
+DIM vsDialogName AS STRING
 
 FUNCTION vsDialogZu(daten AS INTEGER) AS BOOLEAN
     DIM w AS INTEGER : w = gtk_grab_get_current()
@@ -2963,6 +2964,7 @@ FUNCTION vsDialogZu(daten AS INTEGER) AS BOOLEAN
     vsSammeln(d)
     vsDialogTexte = vsTexte
     vsGefeuert = TRUE
+    DIM ok AS BOOLEAN : ok = vfFoto(d, "dlg_" + REPLACE$(vsDialogName, " ", "_"))
     gtk_dialog_response(d, -4)
     RETURN FALSE
 END FUNCTION
@@ -2970,6 +2972,7 @@ END FUNCTION
 SUB vsDialogPruefen(name AS STRING, nr AS INTEGER)
     vsGefeuert = FALSE
     vsDialogTexte = []
+    vsDialogName = name
     DIM id AS INTEGER : id = g_timeout_add(300, vsDialogZu, 0)
     SELECT CASE nr
         CASE 0 : neuDialog()

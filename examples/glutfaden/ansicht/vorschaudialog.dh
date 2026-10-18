@@ -75,7 +75,7 @@ SUB vdlInfoNachziehen()
     DIM zahl AS INTEGER : zahl = vdlStoffZahlen()[MAX(0, gtk_combo_box_get_active(vdlStoff))]
     DIM jeCm AS FLOAT : jeCm = zahl / 2.54
     gtk_label_set_text(vdlInfo[0], FORMAT$(vdlMuster.breite / jeCm, "%.1f") + " × " + FORMAT$(vdlMuster.hoehe / jeCm, "%.1f") + " cm")
-    gtk_label_set_text(vdlInfo[1], ZAHL$(st.sticheGesamt) + IIF(vdlDp, tr$(" Drills"), tr$(" Stiche")))
+    gtk_label_set_text(vdlInfo[1], zahlText$(st.sticheGesamt, -1) + IIF(vdlDp, tr$(" Drills"), tr$(" Stiche")))
     gtk_label_set_text(vdlInfo[2], trf$("{0} Farben", [STR$(st.benutzt)]))
     gtk_label_set_text(vdlInfo[3], FORMAT$(kern.fortschrittVon(vdlMuster).prozent, "%.1f") + "%")
 END SUB

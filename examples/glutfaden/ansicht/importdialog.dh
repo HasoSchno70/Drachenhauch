@@ -174,7 +174,7 @@ SUB imInfoNachziehen(w AS INTEGER, daten AS INTEGER)
     DIM tb AS INTEGER, th AS INTEGER
     (tb, th) = kern.zielGroesse(ab, ah, e)
     DIM stoff AS FLOAT : stoff = IIF(e.palette.istDiamant, 10.0, 14.0)
-    gtk_label_set_text(imInfo, trf$("{0} × {1} Stiche  ·  ≈ {2} × {3} cm bei {4}  ·  Ausschnitt {5}", [STR$(tb), STR$(th), ZAHL$(tb / stoff * 2.54, 1), ZAHL$(th / stoff * 2.54, 1), IIF(e.palette.istDiamant, "2,5-mm-Drills", tr$("14ct Aida")), IIF(ab = imBildB AND ah = imBildH, tr$("ganzes Bild"), STR$(ab) + " × " + STR$(ah) + " px")]))
+    gtk_label_set_text(imInfo, trf$("{0} × {1} Stiche  ·  ≈ {2} × {3} cm bei {4}  ·  Ausschnitt {5}", [STR$(tb), STR$(th), zahlText$(tb / stoff * 2.54, 1), zahlText$(th / stoff * 2.54, 1), IIF(e.palette.istDiamant, "2,5-mm-Drills", tr$("14ct Aida")), IIF(ab = imBildB AND ah = imBildH, tr$("ganzes Bild"), STR$(ab) + " × " + STR$(ah) + " px")]))
 END SUB
 
 ' --- Das Bild mit dem Ausschnitt -------------------------------------------------------------

@@ -82,7 +82,7 @@ SUB fvListeBauen(waehle AS ARRAY OF INTEGER)
         gtk_box_pack_start(zeile, fvSpalte(f.garn.name, 190, FALSE), FALSE, FALSE, 0)
         gtk_box_pack_start(zeile, fvSpalte(TRIM$(f.garn.hersteller + " " + f.garn.nummer), 130, FALSE), FALSE, FALSE, 0)
         gtk_box_pack_start(zeile, fvSpalte(trf$("{0} F.", [STR$(fvPlan.straenge[fvPlan.folge[k]])]), 40, TRUE), FALSE, FALSE, 0)
-        gtk_box_pack_start(zeile, fvSpalte(trf$("{0} Stiche", [ZAHL$(kern.planStiche(lwMuster, fvPlan, k), 0)]), 100, TRUE), FALSE, FALSE, 0)
+        gtk_box_pack_start(zeile, fvSpalte(trf$("{0} Stiche", [zahlText$(kern.planStiche(lwMuster, fvPlan, k), 0)]), 100, TRUE), FALSE, FALSE, 0)
         gtk_widget_set_tooltip_text(zeile, trf$("{0}{1}Hersteller: {2}{3}Nr: {4}{5}Fäden: {6}", [f.garn.name, CHR$(10), IIF(f.garn.hersteller = "", "-", f.garn.hersteller), CHR$(10), IIF(f.garn.nummer = "", "-", f.garn.nummer), CHR$(10), STR$(fvPlan.straenge[fvPlan.folge[k]])]))
         gtk_list_box_insert(fvListe, zeile, -1)
         DIM row AS INTEGER : row = gtk_list_box_get_row_at_index(fvListe, k)
@@ -135,7 +135,7 @@ SUB fvAuswahlGeaendert(w AS INTEGER, daten AS INTEGER)
         DIM f AS kern.Farbeintrag : f = lwMuster.farben[alt]
         fvVorschauFarbe = IIF(LEN(g) = 1, f.garn.farbe, &H808080)
         IF LEN(g) = 1 THEN
-            gtk_label_set_markup(fvInfo, trf$("<b>{0} {1}</b>{2}{3}{4}{5} Stiche", [sdMaske$(f.symbol), sdMaske$(f.garn.name), CHR$(10), sdMaske$(IIF(f.garn.hersteller = "", "-", TRIM$(f.garn.hersteller + " " + f.garn.nummer))), CHR$(10), ZAHL$(kern.planStiche(lwMuster, fvPlan, g[0]), 0)]))
+            gtk_label_set_markup(fvInfo, trf$("<b>{0} {1}</b>{2}{3}{4}{5} Stiche", [sdMaske$(f.symbol), sdMaske$(f.garn.name), CHR$(10), sdMaske$(IIF(f.garn.hersteller = "", "-", TRIM$(f.garn.hersteller + " " + f.garn.nummer))), CHR$(10), zahlText$(kern.planStiche(lwMuster, fvPlan, g[0]), 0)]))
         ELSE
             gtk_label_set_text(fvInfo, trf$("{0} Farben gewählt{1}Zusammenführen: „{2}“ bleibt", [STR$(LEN(g)), CHR$(10), f.garn.name]))
         END IF

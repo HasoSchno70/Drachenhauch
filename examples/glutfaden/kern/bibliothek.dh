@@ -352,7 +352,7 @@ END FUNCTION
 ' Die Zeile unter der Liste: "<b>Name</b> | 100×80 Stiche (15.9×12.7 cm) | ..."
 FUNCTION eintragDetail$(e AS Bibliothekseintrag) AS STRING
     DIM st AS INTEGER : st = IIF(e.stoff > 0, e.stoff, 14)
-    RETURN trf$("<b>{0}</b> | {1}×{2} Stiche ({3}×{4} cm) | {5} Farben | {6} Stiche", [e.name, STR$(e.breite), STR$(e.hoehe), FORMAT$(e.breite / st * 2.54, "%.1f"), FORMAT$(e.hoehe / st * 2.54, "%.1f"), STR$(e.farben), ZAHL$(e.stiche)])
+    RETURN trf$("<b>{0}</b> | {1}×{2} Stiche ({3}×{4} cm) | {5} Farben | {6} Stiche", [e.name, STR$(e.breite), STR$(e.hoehe), FORMAT$(e.breite / st * 2.54, "%.1f"), FORMAT$(e.hoehe / st * 2.54, "%.1f"), STR$(e.farben), zahlAnzeige$(e.stiche, -1)])
 END FUNCTION
 
 ' --- Vorschaubilder ------------------------------------------------------------------------

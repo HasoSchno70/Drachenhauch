@@ -921,7 +921,7 @@ END FUNCTION
 ' und Zentimetern, Farben, Stiche ueber alle Ebenen, Format.
 FUNCTION fremdInfo(f AS FremdImport) AS ARRAY OF STRING
     DIM m AS Muster : m = f.muster
-    RETURN [m.name, trf$("{0} × {1} Stiche ({2} × {3} cm)", [STR$(m.breite), STR$(m.hoehe), ZAHL$(m.breiteCm(), 1), ZAHL$(m.hoeheCm(), 1)]), _
+    RETURN [m.name, trf$("{0} × {1} Stiche ({2} × {3} cm)", [STR$(m.breite), STR$(m.hoehe), zahlAnzeige$(m.breiteCm(), 1), zahlAnzeige$(m.hoeheCm(), 1)]), _
         STR$(m.farbanzahl()), STR$(statistikVon(m).sticheGesamt), f.format]
 END FUNCTION
 

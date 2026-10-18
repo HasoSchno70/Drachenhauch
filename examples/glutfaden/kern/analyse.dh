@@ -159,7 +159,7 @@ FUNCTION garnbedarfText$(m AS Muster, modus AS STRING) AS STRING
         IF NOT f.auslassen THEN n = n + f.stichzahl
     NEXT
     IF n = 0 THEN RETURN "0"
-    IF modus = "diamond" THEN RETURN trf$("~{0} Drills", [ZAHL$(INT(n * 1.10), 0)])
+    IF modus = "diamond" THEN RETURN trf$("~{0} Drills", [zahlAnzeige$(INT(n * 1.10), 0)])
     DIM meter AS FLOAT : meter = n * garnJeStichCm(m.stoff) / 100 * 1.15
     IF meter >= 100 THEN RETURN "~" + FORMAT$(meter, "%.0f") + " m"
     IF meter >= 10 THEN RETURN "~" + FORMAT$(meter, "%.1f") + " m"
@@ -170,7 +170,7 @@ END FUNCTION
 ' im Diamond-Modus die Drills.
 FUNCTION garnJeFarbeText$(stiche AS INTEGER, stoff AS FLOAT, modus AS STRING) AS STRING
     IF stiche = 0 THEN RETURN ""
-    IF modus = "diamond" THEN RETURN "~" + ZAHL$(INT(stiche * 1.10), 0)
+    IF modus = "diamond" THEN RETURN "~" + zahlAnzeige$(INT(stiche * 1.10), 0)
     DIM cm AS FLOAT : cm = stiche * garnJeStichCm(stoff) * 1.15
     IF cm / 100 >= 1 THEN RETURN FORMAT$(cm / 100, "%.1f") + "m"
     RETURN FORMAT$(cm, "%.0f") + "cm"
@@ -192,9 +192,9 @@ FUNCTION infoKarten(m AS Muster, modus AS STRING) AS ARRAY OF STRING
     DIM d AS Schwierigkeit : d = schwierigkeitVon(m)
     DIM k AS ARRAY OF STRING : k = []
     IF s.ausgelassen > 0 THEN
-        ARRAY_PUSH(k, trf$("{0} (+{1} überspr.)", [ZAHL$(s.zuSticken, 0), STR$(s.ausgelassen)]))
+        ARRAY_PUSH(k, trf$("{0} (+{1} überspr.)", [zahlAnzeige$(s.zuSticken, 0), STR$(s.ausgelassen)]))
     ELSE
-        ARRAY_PUSH(k, ZAHL$(s.sticheGesamt, 0))
+        ARRAY_PUSH(k, zahlAnzeige$(s.sticheGesamt, 0))
     END IF
     DIM fa AS STRING : fa = STR$(s.benutzt) + " / " + STR$(s.farbanzahl)
     IF s.ausgelasseneFarben > 0 THEN fa = trf$("{0} ({1} überspr.)", [fa, STR$(s.ausgelasseneFarben)])
@@ -215,7 +215,7 @@ END FUNCTION
 
 ' Der Tooltip der Schwierigkeits-Karte
 FUNCTION schwierigkeitTipp$(d AS Schwierigkeit) AS STRING
-    RETURN trf$("Score {0}/12  —  Farben {1}/3, Größe {2}/3, Sonderstiche {3}/3, Backstitches {4}/3{5}({6} Farben, {7} Stiche, {8}% Sonder, {9} Linien)", [STR$(d.punkte), STR$(d.pFarben), STR$(d.pGroesse), STR$(d.pSonder), STR$(d.pRueck), CHR$(10), STR$(d.benutzt), ZAHL$(d.zuSticken, 0), FORMAT$(d.sonderAnteil * 100, "%.1f"), STR$(d.rueckstiche)])
+    RETURN trf$("Score {0}/12  —  Farben {1}/3, Größe {2}/3, Sonderstiche {3}/3, Backstitches {4}/3{5}({6} Farben, {7} Stiche, {8}% Sonder, {9} Linien)", [STR$(d.punkte), STR$(d.pFarben), STR$(d.pGroesse), STR$(d.pSonder), STR$(d.pRueck), CHR$(10), STR$(d.benutzt), zahlAnzeige$(d.zuSticken, 0), FORMAT$(d.sonderAnteil * 100, "%.1f"), STR$(d.rueckstiche)])
 END FUNCTION
 
 ' Prozent einer Farbe in der Fortschritts-Leiste ("{percent:.0f}%") -- aus dem

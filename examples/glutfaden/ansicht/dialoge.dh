@@ -46,7 +46,7 @@ SUB farbeErsetzenDialog()
     DIM qf AS INTEGER : qf = lwMuster.farben[dlQuelle].garn.farbe
     DIM z AS INTEGER
     FOR EACH z IN dlZiele
-        gtk_combo_box_text_append_text(dlZielWahl, dlGarnName$(z) + "   (ΔE " + ZAHL$(kern.farbAbstand(qf, lwMuster.farben[z].garn.farbe), 1) + ")")
+        gtk_combo_box_text_append_text(dlZielWahl, dlGarnName$(z) + "   (ΔE " + zahlText$(kern.farbAbstand(qf, lwMuster.farben[z].garn.farbe), 1) + ")")
     NEXT
     gtk_combo_box_set_active(dlZielWahl, 0)
     dlToleranz = gtk_scale_new_with_range(GTK_WAAGERECHT, 0.0, 50.0, 1.0)
@@ -81,7 +81,7 @@ SUB dlErsetzenGeaendert(w AS INTEGER, daten AS INTEGER)
     FOR EACH c IN q
         s = s + lwMuster.farben[c].stichzahl
     NEXT
-    gtk_label_set_text(dlHinweis, trf$("{0}{1} mit zusammen {2} Stichen (verdeckte und ausgeblendete bleiben).", [STR$(LEN(q)), IIF(LEN(q) = 1, tr$(" Farbe"), tr$(" Farben")), ZAHL$(s, 0)]))
+    gtk_label_set_text(dlHinweis, trf$("{0}{1} mit zusammen {2} Stichen (verdeckte und ausgeblendete bleiben).", [STR$(LEN(q)), IIF(LEN(q) = 1, tr$(" Farbe"), tr$(" Farben")), zahlText$(s, 0)]))
 END SUB
 
 ' --- Seltene Farben ----------------------------------------------------------------

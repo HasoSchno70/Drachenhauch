@@ -156,14 +156,14 @@ SUB adFuellen()
     DIM dp AS BOOLEAN : dp = m.modus = "diamond"
     DIM s AS kern.Statistik : s = kern.statistikVon(m)
     adSetzen("groesse", STR$(s.breite) + " × " + STR$(s.hoehe))
-    adSetzen("stiche", ZAHL$(IIF(s.ausgelassen > 0, s.zuSticken, s.sticheGesamt)))
+    adSetzen("stiche", zahlText$(IIF(s.ausgelassen > 0, s.zuSticken, s.sticheGesamt), -1))
     adSetzen("farben", STR$(s.benutzt - s.ausgelasseneFarben) + IIF(s.ausgelasseneFarben > 0, trf$(" (+{0} übersp.)", [STR$(s.ausgelasseneFarben)]), ""))
     adSetzen("rueckstiche", STR$(LEN(m.rueckstiche)))
     adSetzen("abdeckung", IIF(s.breite * s.hoehe > 0, FORMAT$(s.bedeckt / (s.breite * s.hoehe) * 100, "%.1f") + "%", "0%"))
     adSetzen("ebenen", STR$(s.ebenen))
     DIM d AS kern.Schwierigkeit : d = kern.schwierigkeitVon(m)
     adSetzen("schwierigkeit", d.stufe)
-    gtk_widget_set_tooltip_text(MAPGET(adKarten, "schwierigkeit"), trf$("Score: {0} / 12{1}  Farben: {2}/3 ({3} verwendet){4}  Stiche: {5}/3 ({6} zu sticken){7}  Sonderstiche: {8}/3 ({9}% Anteil){10}  Backstitches: {11}/3 ({12} Linien)", [STR$(d.punkte), CHR$(10), STR$(d.pFarben), STR$(d.benutzt), CHR$(10), STR$(d.pGroesse), ZAHL$(d.zuSticken), CHR$(10), STR$(d.pSonder), FORMAT$(d.sonderAnteil * 100, "%.1f"), CHR$(10), STR$(d.pRueck), STR$(d.rueckstiche)]))
+    gtk_widget_set_tooltip_text(MAPGET(adKarten, "schwierigkeit"), trf$("Score: {0} / 12{1}  Farben: {2}/3 ({3} verwendet){4}  Stiche: {5}/3 ({6} zu sticken){7}  Sonderstiche: {8}/3 ({9}% Anteil){10}  Backstitches: {11}/3 ({12} Linien)", [STR$(d.punkte), CHR$(10), STR$(d.pFarben), STR$(d.benutzt), CHR$(10), STR$(d.pGroesse), zahlText$(d.zuSticken, -1), CHR$(10), STR$(d.pSonder), FORMAT$(d.sonderAnteil * 100, "%.1f"), CHR$(10), STR$(d.pRueck), STR$(d.rueckstiche)]))
     ' die fuenf haeufigsten (ohne ausgelassene), stabil wie Pythons sorted
     DIM nr AS ARRAY OF INTEGER : nr = []
     DIM i AS INTEGER, j AS INTEGER
@@ -187,7 +187,7 @@ SUB adFuellen()
             gtk_label_set_text(name, f.symbol + " " + f.garn.name)
             DIM pz AS INTEGER : pz = INT(f.stichzahl / summe * 100)
             gtk_progress_bar_set_fraction(balken, pz / 100)
-            gtk_progress_bar_set_text(balken, ZAHL$(f.stichzahl) + " (" + STR$(pz) + "%)")
+            gtk_progress_bar_set_text(balken, zahlText$(f.stichzahl, -1) + " (" + STR$(pz) + "%)")
         ELSE
             gtk_label_set_text(feld, "")
             gtk_label_set_text(name, "-")
@@ -287,9 +287,9 @@ SUB adFortschritt()
     DIM p AS kern.Fortschritt : p = kern.fortschrittVon(m)
     gtk_progress_bar_set_fraction(adBalken, p.prozent / 100)
     gtk_progress_bar_set_text(adBalken, FORMAT$(p.prozent, "%.1f") + "%")
-    gtk_label_set_text(adBalkenText, ZAHL$(p.erledigt) + " / " + ZAHL$(p.gesamt) + IIF(dp, tr$(" Diamanten gesetzt"), tr$(" Stiche gestickt")))
-    adSetzen("erledigt", ZAHL$(p.erledigt))
-    adSetzen("verbleibend", ZAHL$(p.gesamt - p.erledigt))
+    gtk_label_set_text(adBalkenText, zahlText$(p.erledigt, -1) + " / " + zahlText$(p.gesamt, -1) + IIF(dp, tr$(" Diamanten gesetzt"), tr$(" Stiche gestickt")))
+    adSetzen("erledigt", zahlText$(p.erledigt, -1))
+    adSetzen("verbleibend", zahlText$(p.gesamt - p.erledigt, -1))
     DIM fertig AS INTEGER, alle AS INTEGER
     DIM i AS INTEGER
     adLeeren(adFortListe)

@@ -104,7 +104,7 @@ SUB nmInfoNachziehen()
     DIM w AS INTEGER : w = gtk_spin_button_get_value_as_int(nmBreite)
     DIM h AS INTEGER : h = gtk_spin_button_get_value_as_int(nmHoehe)
     DIM st AS INTEGER : st = nmStoffZahl()
-    gtk_label_set_text(nmInfo, trf$("📐 Fertige Größe: {0} × {1} cm{2}🔢 Max. Stiche: {3}{4}🧵 Stoff: {5} Stiche/Zoll", [FORMAT$(kern.fertigCm(w, st), "%.1f"), FORMAT$(kern.fertigCm(h, st), "%.1f"), CHR$(10), ZAHL$(w * h), CHR$(10), STR$(st)]))
+    gtk_label_set_text(nmInfo, trf$("📐 Fertige Größe: {0} × {1} cm{2}🔢 Max. Stiche: {3}{4}🧵 Stoff: {5} Stiche/Zoll", [FORMAT$(kern.fertigCm(w, st), "%.1f"), FORMAT$(kern.fertigCm(h, st), "%.1f"), CHR$(10), zahlText$(w * h, -1), CHR$(10), STR$(st)]))
     gtk_widget_queue_draw(nmVorschau)
 END SUB
 
@@ -1054,7 +1054,7 @@ SUB ebenenVereinenBefehl(fragen AS BOOLEAN)
     IF fragen THEN
         DIM weg AS INTEGER : weg = kern.ausgeblendeteStiche(lwMuster)
         DIM text AS STRING : text = trf$("Alle {0} Ebenen zu einer vereinen?", [STR$(lwMuster.ebenen.anzahl())])
-        IF weg > 0 THEN text = trf$("{0}{1}{2}{3}{4} auf ausgeblendeten Ebenen gehen dabei verloren.", [text, CHR$(10), CHR$(10), ZAHL$(weg, 0), IIF(lwMuster.modus = "diamond", tr$(" Drills"), tr$(" Stiche"))])
+        IF weg > 0 THEN text = trf$("{0}{1}{2}{3}{4} auf ausgeblendeten Ebenen gehen dabei verloren.", [text, CHR$(10), CHR$(10), zahlText$(weg, 0), IIF(lwMuster.modus = "diamond", tr$(" Drills"), tr$(" Stiche"))])
         text = trf$("{0}{1}{2}Rückgängig holt die Ebenen zurück.", [text, CHR$(10), CHR$(10)])
         IF NOT pdFrage(fenster, tr$("Vereinen"), text) THEN RETURN
     END IF
@@ -1078,7 +1078,7 @@ SUB ebeneLeerenBefehl(fragen AS BOOLEAN)
         RETURN
     END IF
     IF fragen THEN
-        IF NOT pdFrage(fenster, tr$("Ebene leeren"), trf$("Alle {0}{1} aus „{2}“ entfernen?{3}{4}Rückstiche bleiben; Rückgängig holt die Stiche zurück.", [ZAHL$(n, 0), IIF(lwMuster.modus = "diamond", tr$(" Drills"), tr$(" Stiche")), e.name, CHR$(10), CHR$(10)])) THEN RETURN
+        IF NOT pdFrage(fenster, tr$("Ebene leeren"), trf$("Alle {0}{1} aus „{2}“ entfernen?{3}{4}Rückstiche bleiben; Rückgängig holt die Stiche zurück.", [zahlText$(n, 0), IIF(lwMuster.modus = "diamond", tr$(" Drills"), tr$(" Stiche")), e.name, CHR$(10), CHR$(10)])) THEN RETURN
     END IF
     IF kern.ebeneLeeren(lwMuster, wzVerlauf, lwMuster.ebenen.aktiv) = 0 THEN RETURN
     allesNeu()

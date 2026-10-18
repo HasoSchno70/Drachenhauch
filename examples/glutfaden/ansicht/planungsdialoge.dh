@@ -1048,7 +1048,7 @@ SUB rdRechnen(w AS INTEGER, daten AS INTEGER)
         RETURN
     END TRY
     IF reihen * spalten > kern.RAHMEN_HOECHSTENS THEN
-        gtk_label_set_markup(rdSumme, trf$("⚠ Diese Kombination ergäbe {0} Sektoren ({1} × {2}) — zu viel für eine sinnvolle Darstellung. Bitte einen größeren Rahmen oder eine kleinere Überlappung wählen.", [ZAHL$(reihen * spalten), STR$(reihen), STR$(spalten)]))
+        gtk_label_set_markup(rdSumme, trf$("⚠ Diese Kombination ergäbe {0} Sektoren ({1} × {2}) — zu viel für eine sinnvolle Darstellung. Bitte einen größeren Rahmen oder eine kleinere Überlappung wählen.", [zahlText$(reihen * spalten, -1), STR$(reihen), STR$(spalten)]))
         gtk_widget_queue_draw(rdFlaeche)
         RETURN
     END IF
