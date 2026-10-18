@@ -47,7 +47,7 @@ END FUNCTION
 
 ' Die Stofffarben der Vorschau
 FUNCTION vbStoffNamen() AS ARRAY OF STRING
-    RETURN ["Weiß", "Ecru", "Beige", "Hellblau", "Hellgrün", "Hellrosa", "Schwarz", "Dunkelblau"]
+    RETURN [tr$("Weiß"), tr$("Ecru"), tr$("Beige"), tr$("Hellblau"), tr$("Hellgrün"), tr$("Hellrosa"), tr$("Schwarz"), tr$("Dunkelblau")]
 END FUNCTION
 
 FUNCTION vbStoffFarben() AS ARRAY OF INTEGER

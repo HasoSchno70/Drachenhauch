@@ -28,16 +28,16 @@ SUB druckenDialog()
     DIM fehler AS INTEGER
     DIM r AS INTEGER : r = gtk_print_operation_run(op, GTK_DRUCK_DIALOG, fenster, fehler)
     IF r = GTK_DRUCK_GEDRUCKT THEN
-        statusMeldung("Muster wurde gedruckt.")
+        statusMeldung(tr$("Muster wurde gedruckt."))
     ELSEIF r = GTK_DRUCK_FEHLER THEN
-        pdWarnung(fenster, "Druckfehler", "Fehler beim Drucken:" + CHR$(10) + gtkFehler$(fehler))
+        pdWarnung(fenster, tr$("Druckfehler"), trf$("Fehler beim Drucken:{0}{1}", [CHR$(10), gtkFehler$(fehler)]))
     END IF
     g_object_unref(op)
 END SUB
 
 ' Dieselbe Seite ohne Dialog als PDF; "" = geschrieben, sonst der Fehler
 FUNCTION druckenNach(pfad AS STRING) AS STRING
-    IF NOT lwHat THEN RETURN "kein Muster"
+    IF NOT lwHat THEN RETURN tr$("kein Muster")
     DIM op AS INTEGER : op = drOperation()
     gtk_print_operation_set_export_filename(op, pfad)
     DIM fehler AS INTEGER

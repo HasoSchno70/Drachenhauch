@@ -60,11 +60,11 @@ FUNCTION autosichernJetzt() AS BOOLEAN
         IF FILEEXISTS(ziel) THEN DELETEFILE(ziel)
         RENAME(neben, ziel)
     CATCH fehler
-        statusMeldung("Automatisch sichern ging nicht: " + fehler)
+        statusMeldung(trf$("Automatisch sichern ging nicht: {0}", [fehler]))
         IF FILEEXISTS(neben) THEN DELETEFILE(neben)
         RETURN FALSE
     END TRY
-    statusMeldung("Automatisch gesichert: " + BASENAME(ziel))
+    statusMeldung(trf$("Automatisch gesichert: {0}", [BASENAME(ziel)]))
     RETURN TRUE
 END FUNCTION
 
@@ -100,20 +100,20 @@ END SUB
 ' pfad = die Datei, zu der er gehoert ("" = nie gesichert).
 FUNCTION asAnbieten(stand AS STRING, pfad AS STRING) AS BOOLEAN
     DIM ok AS BOOLEAN
-    DIM text AS STRING : text = "Es gibt einen automatisch gesicherten Stand"
-    IF pfad <> "" THEN text = text + " von „" + BASENAME(pfad) + "“, neuer als die Datei" ELSE text = text + " eines nie gesicherten Musters"
-    text = text + " (" + ZEIT_FORMAT$(ZEIT_AUS_UNIX(FILETIME(stand)), "%d.%m.%Y %H:%M") + ")." + CHR$(10) + "Wiederherstellen?"
+    DIM text AS STRING : text = tr$("Es gibt einen automatisch gesicherten Stand")
+    IF pfad <> "" THEN text = trf$("{0} von „{1}“, neuer als die Datei", [text, BASENAME(pfad)]) ELSE text = trf$("{0} eines nie gesicherten Musters", [text])
+    text = trf$("{0} ({1}).{2}Wiederherstellen?", [text, ZEIT_FORMAT$(ZEIT_AUS_UNIX(FILETIME(stand)), "%d.%m.%Y %H:%M"), CHR$(10)])
     DIM geladen AS BOOLEAN
-    IF pdFrage(fenster, "Automatisch gesicherter Stand", text) THEN
+    IF pdFrage(fenster, tr$("Automatisch gesicherter Stand"), text) THEN
         TRY
             DIM m AS kern.Muster : m = kern.pxsLaden(stand)
-            musterZeigen(m, pfad, IIF(m.name <> "", m.name, IIF(pfad <> "", BASENAME(pfad), "Wiederhergestellt")))
+            musterZeigen(m, pfad, IIF(m.name <> "", m.name, IIF(pfad <> "", BASENAME(pfad), tr$("Wiederhergestellt"))))
             extraGeaendert = TRUE
             zustandNachziehen()
-            statusMeldung("Wiederhergestellt -- noch nicht gesichert.")
+            statusMeldung(tr$("Wiederhergestellt -- noch nicht gesichert."))
             geladen = TRUE
         CATCH fehler
-            pdWarnung(fenster, "Nicht wiederhergestellt", "Der Stand ließ sich nicht laden: " + fehler)
+            pdWarnung(fenster, tr$("Nicht wiederhergestellt"), trf$("Der Stand ließ sich nicht laden: {0}", [fehler]))
         END TRY
     END IF
     TRY
