@@ -2551,6 +2551,10 @@ FUNCTION v22Ebenen$() AS STRING
 END FUNCTION
 
 FUNCTION vorfuehrenStufe22(daten AS INTEGER) AS BOOLEAN
+    ' Erst, wenn das Vorgemerkte (nach dem Ablegen) gelaufen ist: dauert ein
+    ' Schritt laenger als der Takt, sind beide zugleich faellig, und GLib
+    ' nimmt mal den einen, mal den anderen zuerst
+    IF zhArt <> 0 THEN RETURN TRUE
     schritt = schritt + 1
     DIM ok AS BOOLEAN
     SELECT CASE schritt
