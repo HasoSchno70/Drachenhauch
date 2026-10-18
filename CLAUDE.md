@@ -2423,6 +2423,41 @@ einem Nachtrag: ohne das Uebernehmen vor dem Abbau ging getippter Text bei
 einem Neuaufbau verloren, der nicht ueber `befehlAusfuehren` laeuft
 (Rueckgaengig in der Kopfleiste ruft `werkzeugZurueck` direkt).
 
+**Stufe 21: Muster importieren, weitere Bildformate, Zoom-Regler, helles
+Thema** (2026-10-18). **Muster importieren (XSD/PAT/OXS)** (Strg+Alt+I,
+Muster-Knopf; `ansicht/fremdimport.dh`, PySticky `PatternImportDialog`):
+Datei, Vorschau (das zusammengesetzte Bild als Pixel, skaliert ohne
+Glaetten), Name, Groesse, Farben, Stiche ueber alle Ebenen, Format und die
+Warnungen des Lesers, BEVOR das Muster uebernommen wird; ein Fehler sperrt
+"Importieren". Gelesen ueber `kern.fremdLaden` -- dieselbe Stelle nimmt
+jetzt auch `musterOeffnen`. Gegen PySticky nur an OXS verglichen (drei
+Muster aus Glutfadens Schreiber, zwei kaputte): gleich; **PyStickys PAT- und
+XSD-Leser lesen keine echte Datei** (Stufe 6, sie scheitern auch an den
+Stufe-6-Dateien), dort gelten die Stufe-6-Pruefungen. **Bildformate:** was
+`LOADIMAGE` nicht liest, geht ueber GTKs Bildlader (`gdk_pixbuf_new_from_file`
+-> PNG in eine `TEMPFILE$` -> `LOADIMAGE`); angeboten werden PyStickys WebP,
+TIFF, AVIF (dazu HEIC/HEIF, JPEG XL), **aber nur, was der Lader auf dieser
+Installation kennt** -- gefragt ueber `gdk_pixbuf_get_formats`. Gemessen: die
+GTK aus Inkscape liest TIFF, AVIF, HEIC, JXL, **aber kein WebP**. Der Umweg
+ist an deckenden Punkten exakt; halbdurchsichtige weichen ab (bei Deckkraft
+2 traegt die Farbe kaum Stellen), fuer den Import ohne Belang. **Zoom-Regler**
+in der Statusleiste (PySticky `ZoomSlider`): Bereich aus den Zellgroessen
+der Einstellungen (`kern.zoomBereich` -- das, was PySticky mit
+`set_zoom_range` nachtragen musste), ein Klick auf die Prozent = 100 %.
+**Helles Erscheinungsbild** (Einstellung `theme` dark/light wie PySticky,
+Allgemein -> Erscheinungsbild, sofort): das Stylesheet benutzt Namen
+(`@gf_...`, GTKs `@define-color`), die Werte stehen EINMAL in
+`kern.themaTafel` (27 Rollen, hell nach PyStickys LIGHT_THEME); die um die
+Flaeche gezeichneten Teile fragen `uiFarbe`/`uiSymbol`. `gtkStil$` laedt
+beim Wechsel denselben Anbieter neu, statt einen weiteren obenauf zu legen.
+Die Leinwand behaelt ihre eigene Farbe (`canvas_bg`, auch in PySticky
+unabhaengig vom Thema). **Proben, die an der Installation haengen, sind
+vermieden:** die Ablage-Meldung nennt die gefundenen Formate, die Stufe-20-
+Probe prueft nur ihren Anfang; die Stufe-21-Probe benutzt TIFF, einen
+Standardlader von GdkPixbuf. Kuerzel-Tafel 76. Sammlung
+`tests/pruef/glutfaden_stufe21.dhtest` (3); Stufen 13 und 20 nachgezogen; 18
+Verfaelschungen fallen je in ihrem Fall.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

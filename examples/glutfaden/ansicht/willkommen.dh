@@ -168,7 +168,7 @@ END SUB
 
 ' Befehle, die ohne Muster gehen (alles andere meldet sich, statt abzubrechen)
 FUNCTION ohneMusterErlaubt(kennung AS STRING) AS BOOLEAN
-    RETURN ARRAY_INDEXOF(["neu", "oeffnen", "import", "bibliothek", "einstellungen", "raster", "lineale", "uebersicht", "farbleiste", "willkommen", "tastenkuerzel"], kennung) >= 0
+    RETURN ARRAY_INDEXOF(["neu", "oeffnen", "import", "bibliothek", "einstellungen", "raster", "lineale", "uebersicht", "farbleiste", "willkommen", "tastenkuerzel", "fremd_import"], kennung) >= 0
 END FUNCTION
 
 SUB wkGeklickt(w AS INTEGER, was AS INTEGER)

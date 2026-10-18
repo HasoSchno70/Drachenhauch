@@ -37,14 +37,14 @@ FUNCTION ablageMerken(text AS STRING) AS BOOLEAN
         DIM p AS STRING : p = TEXT_AUS_ZEIGER$(z)
         g_free(z)
         IF rechner <> 0 THEN g_free(rechner)
-        DIM a AS INTEGER : a = kern.ablageArt(p)
+        DIM a AS INTEGER : a = kern.ablageArtMit(p, bildEndungen())
         IF a <> kern.ABLAGE_KEINE THEN
             abPfad = p
             abArt = a
             RETURN TRUE
         END IF
     NEXT
-    statusMeldung("Abgelegt: nichts, was Glutfaden öffnen kann (Muster .pxs/.oxs/.xsd/.pat oder ein Bild).")
+    statusMeldung("Abgelegt: nichts, was Glutfaden öffnen kann (Muster .pxs/.oxs/.xsd/.pat oder ein Bild: " + JOIN$(bildEndungen(), ", ") + ").")
     RETURN FALSE
 END FUNCTION
 

@@ -1,0 +1,303 @@
+' Glutfaden Stufe 21: Muster aus XSD/PAT/OXS mit Vorschau importieren
+' (ansicht/fremdimport.dh, kern.fremdLaden), weitere Bildformate ueber GTKs
+' Bildlader (ansicht/importdialog.dh), Zoom-Regler in der Statusleiste und
+' das helle Erscheinungsbild (kern.themaTafel, Einstellung theme).
+'
+' Der erste Fall ist gegen PySticky aufgezeichnet: drei OXS-Dateien aus
+' Glutfadens Schreiber und zwei kaputte durch import_oxs/import_pat -- Name,
+' Groesse, Farben, Stiche ueber alle Ebenen, Formatname und Zentimeter, so
+' wie PatternImportDialog sie zeigt. PAT und XSD nicht: PyStickys Leser lesen
+' keine echte Datei (Stufe 6); sie stehen im zweiten Fall an den Dateien aus
+' Stufe 6. Danach die Probe.
+
+=== fremde muster wie pysticky
+IMPORT "helfer.dh"
+' PyStickys PAT- und XSD-Leser lesen keine echte Datei (Stufe 6) -- verglichen
+' wird darum an OXS: drei Muster durch Glutfadens Schreiber, dazu kaputte
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(GLUTORDNER + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = ["A", "B", "C", "D"]
+kern.oxsSpeichern(kern.pxsLaden("alle.pxs"), "probe.oxs")
+kern.oxsSpeichern(kern.pxsLaden("farbprobe.pxs"), "farbe.oxs")
+kern.oxsSpeichern(kern.pxsLaden(GLUTORDNER + "/daten/muster/demo_kreuzstich.pxs"), "demo.oxs")
+WRITEALL("kaputt.oxs", "<chart><format")
+WRITEALL("kaputt.pat", "PCStitch? nein")
+DIM pfad AS STRING
+FOR EACH pfad IN ["probe.oxs", "farbe.oxs", "demo.oxs", "kaputt.oxs", "kaputt.pat"]
+    TRY
+        DIM f AS kern.FremdImport : f = kern.fremdLaden(pfad, pal, sym)
+        DIM m AS kern.Muster : m = f.muster
+        PRINT pfad; ": "; m.name; " | "; m.breite; "x"; m.hoehe; " | farben "; m.farbanzahl(); " | stiche "; kern.statistikVon(m).sticheGesamt; " | "; f.format; " | "; FORMAT$(m.breiteCm(), "%.1f"); " x "; FORMAT$(m.hoeheCm(), "%.1f"); " cm"
+    CATCH e
+        PRINT pfad; ": fehler"
+    END TRY
+NEXT
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- datei alle.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- datei farbprobe.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T17:40:16.211663","pattern":{"name":"Farbprobe","width":12,"height":9,"fabric_count":14,"metadata":{},"colors":[{"name":"rot","color":"#C81E28","manufacturer":"DMC","catalog_number":"321","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"e218043a"},{"name":"Blau","color":"#2846BE","manufacturer":"Anchor","catalog_number":"132","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b1845328"},{"name":"grün","color":"#28A046","manufacturer":"","catalog_number":"","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"d04ed6fa"},{"name":"Gelb","color":"#F0D21E","manufacturer":"DMC","catalog_number":"444","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"2d3927c7"},{"name":"blau","color":"#2846BE","manufacturer":"DMC","catalog_number":"820","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"1556fc18"},{"name":"Perle Gold","color":"#C8A03C","manufacturer":"Mill Hill","catalog_number":"00557","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":true,"is_diamond":false,"color_id":"1631db04"},{"name":"Drill Weiss","color":"#FAFAFA","manufacturer":"DMC Diamond","catalog_number":"B5200","symbol":"◆","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":true,"color_id":"f5c8425d"},{"name":"Ungenutzt","color":"#0A0A0A","manufacturer":"DMC","catalog_number":"310","symbol":"◇","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"ba5fb24e"},{"name":"Zimt","color":"#A05A28","manufacturer":"Madeira","catalog_number":"2306","symbol":"★","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"f3660dd9"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,1],[3,0,4],[4,0,0],[5,0,1],[7,0,3],[8,0,8],[9,0,2],[11,0,0],[0,1,4],[1,1,8],[2,1,8],[3,1,8],[5,1,1],[6,1,0],[7,1,1],[8,1,2],[9,1,5],[10,1,8],[0,2,3],[1,2,5],[2,2,3],[3,2,5],[6,2,8],[7,2,8],[8,2,8],[9,2,3],[2,3,6],[3,3,0],[4,3,5],[6,3,3],[7,3,0],[8,3,8],[9,3,8],[10,3,0],[11,3,4],[0,4,4],[1,4,8],[3,4,0],[4,4,1],[5,4,0],[6,4,3],[7,4,8],[8,4,0],[9,4,0],[0,5,0],[2,5,1],[3,5,8],[4,5,4],[5,5,0],[6,5,6],[7,5,0],[8,5,8],[9,5,6],[10,5,5],[11,5,0],[2,6,0],[3,6,2],[4,6,4],[5,6,0],[6,6,4],[8,6,4],[9,6,5],[10,6,6],[11,6,3],[0,7,2],[2,7,0],[3,7,4],[4,7,3],[5,7,3],[7,7,2],[8,7,5],[9,7,8],[10,7,0],[11,7,0],[0,8,5],[1,8,0],[2,8,0],[4,8,5],[5,8,8],[6,8,8],[7,8,8],[8,8,8],[9,8,2],[10,8,2],[11,8,3]],"completed_stitches":[[3,1],[10,1],[1,2],[8,2],[9,2],[2,3],[9,3],[5,5],[7,5],[9,5],[0,7],[5,7],[9,7],[0,8],[1,8],[6,8],[8,8],[10,8]],"stitch_types":[[1,0,9],[2,0,1],[4,0,1],[11,0,3],[1,1,1],[2,1,7],[3,1,1],[5,1,2],[6,1,3],[8,1,1],[9,1,10],[10,1,7],[0,2,2],[1,2,10],[3,2,10],[6,2,7],[7,2,1],[8,2,1],[2,3,11],[3,3,2],[4,3,10],[7,3,3],[8,3,3],[9,3,1],[10,3,3],[11,3,2],[3,4,2],[4,4,7],[6,4,7],[0,5,2],[2,5,9],[3,5,1],[6,5,11],[9,5,11],[10,5,10],[11,5,2],[3,6,7],[5,6,7],[6,6,2],[9,6,10],[10,6,11],[11,6,7],[0,7,9],[2,7,7],[4,7,9],[7,7,7],[8,7,10],[9,7,1],[0,8,10],[2,8,2],[4,8,10],[5,8,2],[6,8,1],[7,8,9],[8,8,2],[9,8,1]]},{"name":"Oben","visible":true,"locked":true,"opacity":1.0,"stitches":[[0,0,0],[3,0,1],[4,0,3],[10,0,0],[4,2,3],[5,3,1],[8,3,1],[11,3,4],[2,4,0],[4,4,2],[7,4,2],[11,4,0],[0,5,5],[4,5,1],[5,5,1],[6,5,8],[11,5,5],[1,6,8],[5,6,2],[7,6,5],[10,6,2],[11,6,0],[0,7,8],[8,7,3],[3,8,6],[4,8,8]],"completed_stitches":[[4,2],[8,3],[7,4],[11,4],[0,5],[11,5],[0,7]],"stitch_types":[[4,0,1],[10,0,7],[11,3,1],[2,4,9],[4,4,2],[7,4,3],[0,5,10],[5,5,2],[6,5,9],[11,5,10],[1,6,7],[7,6,10],[10,6,3],[11,6,2],[8,7,7],[3,8,11],[4,8,9]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,0,5],[1,0,2],[8,0,0],[0,1,4],[1,1,1],[5,1,2],[8,1,0],[10,1,3],[3,2,3],[5,2,8],[6,2,0],[10,2,4],[1,3,2],[1,4,8],[3,4,8],[4,4,0],[11,4,6],[9,6,5],[2,7,1],[8,7,3],[11,7,6],[4,8,2],[6,8,8],[10,8,2]],"completed_stitches":[[0,0],[8,1],[10,1],[1,4],[4,4],[9,6],[8,7]],"stitch_types":[[0,0,10],[8,0,1],[1,1,7],[5,1,3],[8,1,1],[3,2,1],[5,2,3],[6,2,9],[10,2,3],[1,3,7],[1,4,3],[3,4,1],[11,4,11],[9,6,10],[8,7,7],[11,7,11],[4,8,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":6,"y2":6,"color_index":0},{"x1":2,"y1":2,"x2":8,"y2":2,"color_index":2},{"x1":4,"y1":0,"x2":4,"y2":10,"color_index":4},{"x1":1,"y1":9,"x2":9,"y2":1,"color_index":8},{"x1":3,"y1":3,"x2":5,"y2":7,"color_index":1}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- erwartet
+probe.oxs: Vorschauprobe | 14x8 | farben 6 | stiche 99 | Open Cross Stitch (OXS) | 2.5 x 1.5 cm
+farbe.oxs: Farbprobe | 12x9 | farben 9 | stiche 95 | Open Cross Stitch (OXS) | 2.2 x 1.6 cm
+demo.oxs: Demo Kreuzstich | 40x40 | farben 6 | stiche 185 | Open Cross Stitch (OXS) | 7.3 x 7.3 cm
+kaputt.oxs: fehler
+kaputt.pat: fehler
+
+=== kern: format, angaben, bildformate, zoombereich, thema
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(GLUTORDNER + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = ["A", "B", "C", "D"]
+SUB patBauen()
+DIM fa AS STRING : fa = phFarbe$("DMC", "310", "black", &H000000, ASC("X"))
+fa = fa + phFarbe$("Foo", "9999", "Testgarn", &H0C2238, &H8A)
+fa = fa + phFarbe$("DMC", "5200", "snow white", &HE6E6E6, ASC("X"))
+' spaltenweise, 4 x 3: (0,0) voll Farbe 0 | 3 leer ueber die Spaltengrenze |
+' (1,1) Viertel oben rechts + Dreiviertel unten links | (1,2) Viertel unten
+' rechts | (2,0..2) voll Farbe 2 | (3,0) unbekannte Art | (3,1) Farbe 7 | (3,2) leer
+DIM gi AS STRING : gi = phLauf$(1, 1, phStich$(0, 0, 5, 0, 1)) + phLeer$(3)
+gi = gi + phLauf$(1, 2, phStich$(1, 1, 3, 1, 32) + phStich$(1, 1, 5, 2, 33))
+gi = gi + phLauf$(1, 1, phStich$(1, 2, 9, 0, 34))
+gi = gi + phLauf$(3, 1, phStich$(2, 0, 5, 2, 1))
+gi = gi + phLauf$(1, 1, phStich$(3, 0, 5, 0, 7))
+gi = gi + phLauf$(1, 1, phStich$(3, 1, 5, 7, 1)) + phLeer$(1)
+DIM ru AS STRING : ru = phRueck$(0, 0, 1, 4, 3, 1, 0) + phRueck$(1, 1, 5, 2, 1, 6, 1) + phRueck$(2, 0, 3, 1, 2, 7, 2) + phRueck$(0, 0, 0, 1, 1, 1, 0)
+
+DIM b AS BUFFER : b = phDatei("8", 4, 3, 16, "{\rtf1\ansi{\fonttbl{\f0\fnil Arial;}}\viewkind4\pard\f0\fs20 Erste Zeile\par Zweite \'e4 \{x\}\par}", "Probe", "Hans", 3, fa, gi, 4, ru, phNull$(14))
+WRITEALL_BYTES("probe.pat", b)
+END SUB
+SUB xsdBauen()
+DIM fa AS STRING : fa = xhFarbe$(0, "310", "Black", &H101010, FALSE, "")
+fa = fa + xhFarbe$(1, "9403", "Schwarz " + CHR$(&HD7) + CHR$(&HE5), &H202020, TRUE, "")
+fa = fa + xhFarbe$(252, "11", "", &H884444, FALSE, "0:310:1;0:321:2")
+DIM sy AS ARRAY OF INTEGER : sy = [ASC("S"), &HFFFF, ASC("S")]
+' zeilenweise, 4 x 3: voll Farbe 0 | Lauf 2 x Blend | leer | Teilstich-Satz 0 |
+' Satz 1 | Lauf 4 leer | Perle (Farbe 1) | Farbe 9
+DIM wo AS ARRAY OF INTEGER : wo = [&H00000000, &H40020000, &H00020000, &H0F000000, &H80000000, &H80010000, &H40040000, &H0F000000, &H00010000, &H00090000]
+DIM st AS STRING : st = xhStiche$(wo, [&H12345678, &H0BADCAFE, &H31415926, &H27182818])
+' Satz 0: halber Stich oben (Farbe 0) + Viertel oben rechts (Farbe 2); Satz 1: Petite unten rechts (Farbe 0)
+DIM kl AS STRING : kl = "11000000000002000000" + "00080000000000000000"
+' Knoten, Rueckstich, Spannstich, Kurve, Sonderstich, Perle, Rueckstich mit Farbe 9
+DIM jo AS STRING : jo = ph16$(1) + "0000" + ph16$(3) + ph16$(1) + "00000000" + "00" + "00"
+jo = jo + ph16$(2) + "0000" + ph16$(0) + ph16$(0) + ph16$(8) + ph16$(6) + "02" + "00"
+jo = jo + ph16$(5) + "0000" + ph16$(2) + ph16$(2) + ph16$(4) + ph16$(2) + "00" + "00"
+jo = jo + ph16$(3) + "000000" + ph16$(2) + "0100020003000400"
+jo = jo + ph16$(4) + phNull$(23)
+jo = jo + ph16$(6) + "0000" + ph16$(7) + ph16$(5) + "01" + "00" + ph16$(90)
+jo = jo + ph16$(2) + "0000" + ph16$(0) + ph16$(0) + ph16$(2) + ph16$(0) + "09" + "00"
+
+DIM b AS BUFFER : b = xhDatei(4, 3, 18, "Probe XSD", "Hans", "Notiz", 3, fa, sy, st, kl, 7, jo)
+WRITEALL_BYTES("probe.xsd", b)
+END SUB
+patBauen()
+xsdBauen()
+DIM quelle AS kern.Muster : quelle = kern.pxsLaden("alle.pxs")
+kern.oxsSpeichern(quelle, "probe.oxs")
+WRITEALL("kaputt.pat", "PCStitch? nein")
+
+' Formatname nach der Endung, fremde Endung ist ein Fehler
+DIM d AS STRING
+FOR EACH d IN ["a.xsd", "B.PAT", "c.oxs", "d.pxs", "ohne", "e.tar.oxs"]
+    PRINT d; " '"; kern.fremdFormat$(d); "' | ";
+NEXT
+PRINT
+TRY
+    DIM f AS kern.FremdImport : f = kern.fremdLaden("notiz.txt", pal, sym)
+CATCH e
+    PRINT "notiz.txt: "; e
+END TRY
+' Die Angaben, wie der Dialog sie zeigt
+PRINT JOIN$(kern.fremdInfo(kern.fremdLaden("probe.pat", pal, sym)), " | ")
+PRINT JOIN$(kern.fremdInfo(kern.fremdLaden("probe.xsd", pal, sym)), " | ")
+PRINT "warnungen: "; LEN(kern.fremdLaden("probe.pat", pal, sym).warnungen)
+' Bildformate: die eigenen, dazu, was der Lader liest
+PRINT "eigene: "; JOIN$(kern.bildEndungenEigen(), ",")
+PRINT "ohne lader: "; JOIN$(kern.bildEndungen([]), ",")
+PRINT "mit lader: "; JOIN$(kern.bildEndungen(["png", "tiff", "tif", "avif", "svg", "ico", "jxl"]), ",")
+PRINT "umweg: "; kern.bildUeberGtk("a.PNG"); " "; kern.bildUeberGtk("b.tiff"); " "; kern.bildUeberGtk("c.avif"); " "; kern.bildUeberGtk("ohne")
+PRINT "ablage: "; kern.ablageArt("x.avif"); " "; kern.ablageArtMit("x.avif", kern.bildEndungen(["avif"])); " "; kern.ablageArtMit("x.svg", kern.bildEndungen(["svg"])); " "; kern.ablageArtMit("x.PXS", [])
+' Zoom-Regler: Bereich aus den Zellgroessen
+DIM es AS kern.Einstellungen : es = NEW kern.Einstellungen()
+DIM von AS INTEGER, bis AS INTEGER
+(von, bis) = kern.zoomBereich(es)
+PRINT "zoom vorgabe: "; von; " .. "; bis;
+es.zelleStandard = 10 : es.zelleMin = 2 : es.zelleMax = 100
+(von, bis) = kern.zoomBereich(es)
+PRINT " | 10/2/100: "; von; " .. "; bis;
+es.zelleStandard = 0 : es.zelleMin = 0 : es.zelleMax = 0
+(von, bis) = kern.zoomBereich(es)
+PRINT " | krumm: "; von; " .. "; bis
+' Erscheinungsbild: die Tafel, die Definitionen, die Zuordnung
+DIM t AS ARRAY OF STRING : t = kern.themaTafel()
+PRINT "rollen: "; LEN(t) \ 3;
+DIM dunkel AS ARRAY OF STRING : dunkel = SPLIT$(kern.stilFarben$(FALSE), CHR$(10))
+DIM hell AS ARRAY OF STRING : hell = SPLIT$(kern.stilFarben$(TRUE), CHR$(10))
+PRINT " | zeilen "; LEN(dunkel); " "; LEN(hell)
+PRINT dunkel[0]; " / "; hell[0]
+PRINT dunkel[LEN(dunkel) - 3]; " / "; hell[LEN(hell) - 3]
+PRINT "zuordnung: "; HEX$(kern.themaFarbe(&H202228, TRUE)); " "; HEX$(kern.themaFarbe(&H202228, FALSE)); " "; HEX$(kern.themaFarbe(&HD6D9E1, TRUE)); " "; HEX$(kern.themaFarbe(&H123456, TRUE))
+DIM doppelt AS INTEGER, i AS INTEGER, j AS INTEGER
+FOR i = 0 TO LEN(t) - 1 STEP 3
+    FOR j = i + 3 TO LEN(t) - 1 STEP 3
+        IF t[i] = t[j] OR t[i + 1] = t[j + 1] THEN doppelt = doppelt + 1
+    NEXT
+NEXT
+PRINT "doppelte namen oder dunkle farben: "; doppelt
+' gemerkt und geprueft
+es = NEW kern.Einstellungen()
+PRINT "vorgabe: "; es.thema;
+es.thema = "light"
+WRITEALL("es.json", kern.einstellungenJson$(es))
+PRINT " | gemerkt "; kern.einstellungenLaden("es.json").thema;
+WRITEALL("krumm.json", "{" + CHR$(34) + "theme" + CHR$(34) + ": " + CHR$(34) + "blau" + CHR$(34) + "}")
+PRINT " | krumm "; kern.einstellungenLaden("krumm.json").thema
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- datei alle.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- erwartet
+a.xsd 'Pattern Maker (XSD)' | B.PAT 'PCStitch (PAT)' | c.oxs 'Open Cross Stitch (OXS)' | d.pxs '' | ohne '' | e.tar.oxs 'Open Cross Stitch (OXS)' | 
+notiz.txt: Unbekanntes Format: .txt
+Probe | 4 × 3 Stiche (0,6 × 0,5 cm) | 3 | 7 | PCStitch (PAT)
+Probe XSD | 4 × 3 Stiche (0,6 × 0,4 cm) | 3 | 9 | Pattern Maker (XSD)
+warnungen: 6
+eigene: png,jpg,jpeg,bmp,gif,tga,qoi
+ohne lader: png,jpg,jpeg,bmp,gif,tga,qoi
+mit lader: png,jpg,jpeg,bmp,gif,tga,qoi,tif,tiff,avif,jxl
+umweg: FALSE TRUE TRUE TRUE
+ablage: 0 2 0 1
+zoom vorgabe: 5 .. 300 | 10/2/100: 20 .. 1000 | krumm: 1 .. 2
+rollen: 27 | zeilen 30 30
+@define-color gf_fenster #1b1c20; / @define-color gf_fenster #fbfbfd;
+@define-color gf_hover alpha(#ffffff, 0.08); / @define-color gf_hover alpha(#000000, 0.06);
+zuordnung: ECEDF3 202228 3A3A60 123456
+doppelte namen oder dunkle farben: 0
+vorgabe: dark | gemerkt light | krumm dark
+
+=== probe: thema, zoomregler, import, bildformate
+IMPORT "helfer.dh"
+' --probe-stufe21 mit alle.pxs: Thema hell und dunkel (Fotos), Zoom-Regler,
+' Muster importieren (probe.pat, kaputt.pat), ein TIFF ueber den Umweg.
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(GLUTORDNER + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = ["A", "B", "C", "D"]
+SUB patBauen()
+DIM fa AS STRING : fa = phFarbe$("DMC", "310", "black", &H000000, ASC("X"))
+fa = fa + phFarbe$("Foo", "9999", "Testgarn", &H0C2238, &H8A)
+fa = fa + phFarbe$("DMC", "5200", "snow white", &HE6E6E6, ASC("X"))
+' spaltenweise, 4 x 3: (0,0) voll Farbe 0 | 3 leer ueber die Spaltengrenze |
+' (1,1) Viertel oben rechts + Dreiviertel unten links | (1,2) Viertel unten
+' rechts | (2,0..2) voll Farbe 2 | (3,0) unbekannte Art | (3,1) Farbe 7 | (3,2) leer
+DIM gi AS STRING : gi = phLauf$(1, 1, phStich$(0, 0, 5, 0, 1)) + phLeer$(3)
+gi = gi + phLauf$(1, 2, phStich$(1, 1, 3, 1, 32) + phStich$(1, 1, 5, 2, 33))
+gi = gi + phLauf$(1, 1, phStich$(1, 2, 9, 0, 34))
+gi = gi + phLauf$(3, 1, phStich$(2, 0, 5, 2, 1))
+gi = gi + phLauf$(1, 1, phStich$(3, 0, 5, 0, 7))
+gi = gi + phLauf$(1, 1, phStich$(3, 1, 5, 7, 1)) + phLeer$(1)
+DIM ru AS STRING : ru = phRueck$(0, 0, 1, 4, 3, 1, 0) + phRueck$(1, 1, 5, 2, 1, 6, 1) + phRueck$(2, 0, 3, 1, 2, 7, 2) + phRueck$(0, 0, 0, 1, 1, 1, 0)
+
+DIM b AS BUFFER : b = phDatei("8", 4, 3, 16, "{\rtf1\ansi{\fonttbl{\f0\fnil Arial;}}\viewkind4\pard\f0\fs20 Erste Zeile\par Zweite \'e4 \{x\}\par}", "Probe", "Hans", 3, fa, gi, 4, ru, phNull$(14))
+WRITEALL_BYTES("probe.pat", b)
+END SUB
+SUB xsdBauen()
+DIM fa AS STRING : fa = xhFarbe$(0, "310", "Black", &H101010, FALSE, "")
+fa = fa + xhFarbe$(1, "9403", "Schwarz " + CHR$(&HD7) + CHR$(&HE5), &H202020, TRUE, "")
+fa = fa + xhFarbe$(252, "11", "", &H884444, FALSE, "0:310:1;0:321:2")
+DIM sy AS ARRAY OF INTEGER : sy = [ASC("S"), &HFFFF, ASC("S")]
+' zeilenweise, 4 x 3: voll Farbe 0 | Lauf 2 x Blend | leer | Teilstich-Satz 0 |
+' Satz 1 | Lauf 4 leer | Perle (Farbe 1) | Farbe 9
+DIM wo AS ARRAY OF INTEGER : wo = [&H00000000, &H40020000, &H00020000, &H0F000000, &H80000000, &H80010000, &H40040000, &H0F000000, &H00010000, &H00090000]
+DIM st AS STRING : st = xhStiche$(wo, [&H12345678, &H0BADCAFE, &H31415926, &H27182818])
+' Satz 0: halber Stich oben (Farbe 0) + Viertel oben rechts (Farbe 2); Satz 1: Petite unten rechts (Farbe 0)
+DIM kl AS STRING : kl = "11000000000002000000" + "00080000000000000000"
+' Knoten, Rueckstich, Spannstich, Kurve, Sonderstich, Perle, Rueckstich mit Farbe 9
+DIM jo AS STRING : jo = ph16$(1) + "0000" + ph16$(3) + ph16$(1) + "00000000" + "00" + "00"
+jo = jo + ph16$(2) + "0000" + ph16$(0) + ph16$(0) + ph16$(8) + ph16$(6) + "02" + "00"
+jo = jo + ph16$(5) + "0000" + ph16$(2) + ph16$(2) + ph16$(4) + ph16$(2) + "00" + "00"
+jo = jo + ph16$(3) + "000000" + ph16$(2) + "0100020003000400"
+jo = jo + ph16$(4) + phNull$(23)
+jo = jo + ph16$(6) + "0000" + ph16$(7) + ph16$(5) + "01" + "00" + ph16$(90)
+jo = jo + ph16$(2) + "0000" + ph16$(0) + ph16$(0) + ph16$(2) + ph16$(0) + "09" + "00"
+
+DIM b AS BUFFER : b = xhDatei(4, 3, 18, "Probe XSD", "Hans", "Notiz", 3, fa, sy, st, kl, 7, jo)
+WRITEALL_BYTES("probe.xsd", b)
+END SUB
+patBauen()
+xsdBauen()
+DIM quelle AS kern.Muster : quelle = kern.pxsLaden("alle.pxs")
+kern.oxsSpeichern(quelle, "probe.oxs")
+WRITEALL("kaputt.pat", "PCStitch? nein")
+
+MKDIR("app")
+SETENV("APPDATA", CWD$() + "/app")
+SETENV("HOME", CWD$() + "/app")
+dlStarten(["run", BEISPIEL, "--", "--probe-stufe21", "--foto", "d", "alle.pxs"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT REPLACE$(dlAus, CHR$(13), "");
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    ' Die Statusleiste: von unten herauf der erste deckende Punkt (darunter
+    ' liegt der durchsichtige Schatten des Fensters), dann ein Stueck hinein
+    DIM n AS STRING
+    FOR EACH n IN ["hell", "dunkel"]
+        DIM b AS IMAGE : b = LOADIMAGE("d_" + n + ".png")
+        DIM sx AS INTEGER : sx = IMAGE_WIDTH(b) \ 4
+        DIM sy AS INTEGER : sy = IMAGE_HEIGHT(b) - 1
+        WHILE sy > 0 AND GETALPHA(b, sx, sy) < 255
+            sy = sy - 1
+        WEND
+        DIM p AS INTEGER : p = GETPIXEL(b, sx, sy - 6) BAND &HFFFFFF
+        DIM s AS INTEGER : s = ((p SHR 16) BAND 255) + ((p SHR 8) BAND 255) + (p BAND 255)
+        PRINT n; ": statusleiste "; IIF(s > 600, "hell", IIF(s < 120, "dunkel", "mittel"))
+    NEXT
+    PRINT "import "; FILEEXISTS("d_import.png")
+    PRINT "datei unveraendert: "; READLINES("alle.pxs")[0] = READLINES("vorher.pxs")[0]
+END IF
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- datei alle.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- datei vorher.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- erwartet
+rueckgabe 0
+thema: dark | leiste 202228 | einstellung gemerkt 'dark'
+hell: leiste ECEDF3 | rand 9AA1BD | unbekannt bleibt 123456 | gemerkt 'light'
+dunkel: leiste 202228 | gemerkt 'dark'
+zoomregler: 5.0 .. 300.0 | steht TRUE | knopf '300 %' = 300
+auf 200: flaeche 200 | knopf '200 %'
+zoom rein: regler folgt TRUE
+klick auf die prozent: 100
+dialog: probe.pat | Probe | 4 × 3 Stiche (0,6 × 0,5 cm) | 3 | 7 | PCStitch (PAT) | importieren TRUE
+  meldungen: ⚠️ Warnung: Neues Symbol für Foo 9999 (das Zeichen aus PCStitchs Symbolschrift ist nicht darstellbar) / ⚠️ Warnung: Neues Symbol für DMC 520
+kaputt: - | - | - | - | - | importieren FALSE | ❌ FEHLER: Import-Fehler: PAT: keine PCStitch-Datei (die Kennung 'PCStitch' fehlt)
+importiert: Probe 4x3 | datei '' | Aus PCStitch eingelesen -- Sichern legt eine .pxs an. Neues 
+bildformate: eigene 7 | tiff (Standardlader) TRUE | svg nie TRUE
+tiff geschrieben: TRUE | gelesen TRUE | 256x256 deckkraft gleich TRUE | deckende punkte gleich TRUE
+kein bild: FALSE | Bild nicht lesbar: C
+hell: statusleiste hell
+dunkel: statusleiste dunkel
+import TRUE
+datei unveraendert: TRUE
