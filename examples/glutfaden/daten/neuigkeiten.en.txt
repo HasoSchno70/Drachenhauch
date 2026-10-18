@@ -3,6 +3,9 @@
 # below, blank lines separate paragraphs, lines starting with # are comments.
 # The newest stage is at the top.
 
+## 🌍 Stage 25: English in every dialog
+All dialogs now speak English too, and so do the outputs: PDF and HTML instructions, statistics as CSV, stitch plan and package. Messages while reading other pattern formats and the history (Undo: …) follow the language as well.
+
 ## 🌐 Stage 24: German and English
 Glutfaden speaks English: Settings → General → Language (automatic follows the system language). The change takes effect at the next start. Keyboard shortcuts are shown as Ctrl and Shift, numbers with a decimal point.
 
