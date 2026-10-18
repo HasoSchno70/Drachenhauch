@@ -1,0 +1,57 @@
+' Eingabe jenseits der Maus (PySticky Stufe 23): magnetisches Raster,
+' Pinsel nach Stiftdruck und Pinch-Zoom -- nur die Rechnungen, ohne GTK.
+
+' Pythons round(): bei genau .5 zur geraden Zahl. PySticky rundet damit
+' Einrasten und Pinselradius; ein gewoehnliches ROUND gaebe bei geradem
+' Intervall andere Punkte (1 / 2 = 0.5 -> 0, nicht 1).
+FUNCTION rundenGerade(z AS FLOAT) AS INTEGER
+    DIM f AS INTEGER : f = FLOOR(z)
+    DIM rest AS FLOAT : rest = z - f
+    IF rest > 0.5 THEN RETURN f + 1
+    IF rest < 0.5 THEN RETURN f
+    IF f MOD 2 = 0 THEN RETURN f
+    RETURN f + 1
+END FUNCTION
+
+' Eine Zelle auf das magnetische Raster (PySticky snap_position): auf das
+' naechste Vielfache von intervall, dann ins Muster geklemmt.
+FUNCTION einrasten(x AS INTEGER, y AS INTEGER, intervall AS INTEGER, b AS INTEGER, h AS INTEGER) AS TUPLE
+    DIM i AS INTEGER : i = MAX(1, intervall)
+    DIM sx AS INTEGER : sx = rundenGerade(x / i) * i
+    DIM sy AS INTEGER : sy = rundenGerade(y / i) * i
+    IF b > 0 THEN sx = CLAMP(sx, 0, b - 1)
+    IF h > 0 THEN sy = CLAMP(sy, 0, h - 1)
+    RETURN (sx, sy)
+END FUNCTION
+
+' Die Zellen eines Pinsels um (cx, cy) (PySticky PencilTool._brush_cells):
+' Radius = Druck * (groesse - 1), gerundet; ohne Druck oder bei Groesse 1
+' nur die Mitte. Liefert x, y, x, y, ...
+FUNCTION pinselZellen(cx AS INTEGER, cy AS INTEGER, druck AS FLOAT, groesse AS INTEGER) AS ARRAY OF INTEGER
+    DIM aus AS ARRAY OF INTEGER : aus = [cx, cy]
+    IF druck <= 0 OR groesse <= 1 THEN RETURN aus
+    DIM r AS INTEGER : r = rundenGerade(MIN(druck, 1.0) * (groesse - 1))
+    IF r <= 0 THEN RETURN aus
+    aus = []
+    DIM dx AS INTEGER, dy AS INTEGER
+    FOR dy = -r TO r
+        FOR dx = -r TO r
+            IF dx * dx + dy * dy <= r * r THEN
+                ARRAY_PUSH(aus, cx + dx)
+                ARRAY_PUSH(aus, cy + dy)
+            END IF
+        NEXT
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Ein Schritt beim Pinch-Zoom (PySticky _handle_gesture): gesamt ist der
+' Faktor seit Beginn der Geste, letzte der beim letzten Schritt. 1 = naeher,
+' -1 = weiter weg, 0 = noch nichts (Schwelle 1,15, damit nicht jedes Zittern
+' zoomt).
+FUNCTION pinchSchritt(gesamt AS FLOAT, letzte AS FLOAT) AS INTEGER
+    DIM v AS FLOAT : v = gesamt / MAX(letzte, 0.000001)
+    IF v > 1.15 THEN RETURN 1
+    IF v < 1 / 1.15 THEN RETURN -1
+    RETURN 0
+END FUNCTION

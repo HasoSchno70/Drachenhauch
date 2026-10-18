@@ -2494,6 +2494,37 @@ einem Nachtrag: die Kante mit nur EINER Farbe -- die Probe "glut und dunkel
 vorhanden" traf dunkle Stiche unter den Luecken; jetzt muss jeder Punkt der
 Kante vom Bild ohne Auswahl abweichen.
 
+**Stufe 23: magnetisches Raster, Pinsel nach Stiftdruck, Pinch-Zoom**
+(2026-10-18). **Einrasten** (`snap_enabled`/`snap_interval`, Vorgabe aus/5,
+Knopf mit gezeichnetem Magneten neben der Symmetrie, Befehl `einrasten` ohne
+Vorgabe-Kuerzel; Kuerzel-Tafel 77): Linie, Rechteck, Ellipse und Vieleck
+setzen Anfang, Zwischenstand und Ende auf das naechste Vielfache
+(`kern.einrasten`, ins Muster geklemmt); beim Vieleck auch die Linie zur Maus
+und das Schliessen rechts. **Gerundet wird wie Pythons round** (bei .5 zur
+geraden Zahl, `kern.rundenGerade`) -- bei geradem Intervall ergaebe ROUND
+andere Punkte (1/2 -> 0, nicht 1). **Stiftdruck** (`tablet/pressure_enabled`,
+`tablet/max_brush_size`): `lwDruckLesen` fragt `gdk_event_get_axis(...,
+GDK_AXIS_PRESSURE)` -- eine Maus hat die Achse nicht und bleibt bei einem
+Stich; mit Stift wird jeder Punkt des Strichs zum Kreis mit Radius
+Druck * (Groesse - 1) (`kern.pinselZellen` = PyStickys `_brush_cells`), vor
+der Symmetrie, nur beim Stift-Werkzeug. **Falle:** ein kuenstliches
+GdkEvent ohne Geraet laesst `gdk_event_get_axis` in ein Gdk-CRITICAL laufen
+-- die Probe setzt den Zeiger des Sitzes (`gdk_seat_get_pointer`).
+**Pinch** (`touch/gestures_enabled`, Vorgabe AUS wie PySticky):
+`GtkGestureZoom` auf der Flaeche, aus = Phase NONE; ab Faktor 1,15 gegen den
+letzten Schritt ein Zoomschritt (`kern.pinchSchritt`). Ohne Geraet nicht
+auszuloesen: die Probe setzt den Zustand, den Stift bzw. Geste hinterlassen.
+**Der Fund dieser Stufe:** der Magnet-Knopf machte die Werkzeugleiste
+breiter als eine gemerkte Fenstergroesse von 1150 -- GTK machte das Fenster
+1166 breit (Stufe 13 sah es). Die Leiste liegt jetzt in einem waagerecht
+rollbaren Bereich mit natuerlicher Breite; sie waechst mit jeder Stufe und
+darf die Fenstergroesse nicht mehr bestimmen. Und: `daten/neuigkeiten.txt`
+waechst mit jeder Stufe -- die Stufe-22-Proben suchen ihren eigenen
+Abschnitt, statt Zahl und Reihenfolge festzuhalten. Sammlung
+`tests/pruef/glutfaden_stufe23.dhtest` (3, der erste ruft PyStickys
+`snap_position`, `_brush_cells` und `_handle_gesture` mit Stellvertretern auf:
+gleich); Stufen 13 und 20 nachgezogen; 20 von 20 Verfaelschungen fallen.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

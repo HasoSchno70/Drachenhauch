@@ -92,6 +92,24 @@ DECLARE FUNCTION gtk_drag_dest_get_target_list LIB GTK (w AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_selection_data_set_text LIB GTK (sel AS ZEIGER, text AS TEXT, laenge AS LONG) AS BOOLEAN
 DECLARE FUNCTION gtk_selection_data_get_text LIB GTK (sel AS ZEIGER) AS ZEIGER
 DECLARE SUB gdk_drag_status LIB GDK (kontext AS ZEIGER, aktion AS LONG, zeit AS ULONG)
+' Stiftdruck: FALSE, wenn das Geraet keine Druck-Achse hat (Maus)
+DECLARE FUNCTION gdk_event_get_axis LIB GDK (ereignis AS ZEIGER, achse AS LONG, BYREF wert AS FLOAT) AS BOOLEAN
+CONST GDK_ACHSE_DRUCK = 3             ' GDK_AXIS_PRESSURE
+DECLARE FUNCTION gdk_event_new LIB GDK (art AS LONG) AS ZEIGER
+DECLARE SUB gdk_event_free LIB GDK (ereignis AS ZEIGER)
+CONST GDK_KNOPF_DRUCK = 4             ' GDK_BUTTON_PRESS
+DECLARE SUB gdk_event_set_device LIB GDK (ereignis AS ZEIGER, geraet AS ZEIGER)
+DECLARE FUNCTION gdk_display_get_default_seat LIB GDK (anzeige AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gdk_seat_get_pointer LIB GDK (sitz AS ZEIGER) AS ZEIGER
+' Pinch-Zoom: GtkGestureZoom nimmt Touchscreen und Touchpad
+DECLARE FUNCTION gtk_gesture_zoom_new LIB GTK (w AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_gesture_zoom_get_scale_delta LIB GTK (geste AS ZEIGER) AS FLOAT
+DECLARE SUB gtk_event_controller_set_propagation_phase LIB GTK (c AS ZEIGER, phase AS LONG)
+DECLARE FUNCTION gtk_event_controller_get_propagation_phase LIB GTK (c AS ZEIGER) AS LONG
+CONST GTK_PHASE_KEINE = 0             ' GTK_PHASE_NONE: die Geste ist aus
+CONST GTK_PHASE_BLASE = 2             ' GTK_PHASE_BUBBLE
+CONST GDK_MASKE_BERUEHRUNG = 4194304  ' GDK_TOUCH_MASK
+CONST GDK_MASKE_TOUCHPAD = 16777216   ' GDK_TOUCHPAD_GESTURE_MASK
 DECLARE SUB gtk_list_box_drag_highlight_row LIB GTK (liste AS ZEIGER, zeile AS ZEIGER)
 DECLARE SUB gtk_list_box_drag_unhighlight_row LIB GTK (liste AS ZEIGER)
 DECLARE FUNCTION gtk_list_box_get_row_at_y LIB GTK (liste AS ZEIGER, y AS LONG) AS ZEIGER
@@ -451,6 +469,10 @@ DECLARE FUNCTION signalZiehBewegung LIB GOBJECT ALIAS "g_signal_connect_data" _
 DECLARE FUNCTION signalZiehWeg LIB GOBJECT ALIAS "g_signal_connect_data" _
     (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, kontext AS ZEIGER, zeit AS ULONG, daten AS ZEIGER), _
      daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
+' scale-changed: der Faktor seit Beginn der Geste
+DECLARE FUNCTION signalFaktor LIB GOBJECT ALIAS "g_signal_connect_data" _
+    (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, faktor AS FLOAT, daten AS ZEIGER), _
+     daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
 DECLARE FUNCTION signalZeile LIB GOBJECT ALIAS "g_signal_connect_data" _
     (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, zeile AS ZEIGER, daten AS ZEIGER), _
      daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
@@ -471,6 +493,8 @@ CONST GTK_WAAGERECHT = 0
 CONST GTK_ICON_KNOPF = 4
 CONST GTK_POLITIK_AUTO = 1
 CONST GTK_POLITIK_NIE = 2
+DECLARE SUB gtk_scrolled_window_set_propagate_natural_width LIB GTK (sw AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_scrolled_window_set_propagate_natural_height LIB GTK (sw AS ZEIGER, an AS BOOLEAN)
 CONST GTK_AUSRICHTEN_START = 1
 CONST GTK_AUSRICHTEN_ENDE = 2
 CONST GTK_AUSRICHTEN_MITTE = 3

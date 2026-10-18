@@ -24,6 +24,10 @@ DIM lwFertig AS ARRAY OF INTEGER
 DIM lwRgb AS ARRAY OF INTEGER         ' je Farbindex, so wie gezeichnet (gedimmt beim Hervorheben)
 DIM lwRgbEcht AS ARRAY OF INTEGER     ' je Farbindex ohne Hervorheben (Uebersicht, Kacheln)
 DIM lwHervor AS INTEGER : lwHervor = -1   ' hervorgehobene Farbe, -1 = keine
+DIM lwStiftDruck AS FLOAT                 ' 0..1, solange ein Stift aufliegt (PySticky _tablet_pressure)
+DIM lwStiftAuf AS BOOLEAN                 ' ein Geraet mit Druck-Achse hat gedrueckt
+DIM lwPinch AS INTEGER                    ' GtkGestureZoom auf der Flaeche
+DIM lwPinchLetzte AS FLOAT                ' Faktor beim letzten Zoomschritt der Geste
 ' Ansicht der Ebenen (PySticky "Nur aktive Ebene", "Andere Ebenen abdunkeln"):
 ' nur die Anzeige, das Muster bleibt
 DIM lwNurAktiv AS BOOLEAN             ' nur die aktive Ebene, auch wenn sie ausgeblendet ist
@@ -69,6 +73,12 @@ FUNCTION leinwandNeu() AS INTEGER
     signalEreignis(lwFlaeche, "button-release-event", lwLoslassen, 0, 0, 0)
     signalEreignis(lwFlaeche, "motion-notify-event", lwBewegung, 0, 0, 0)
     signalEreignis(lwFlaeche, "leave-notify-event", lwVerlassen, 0, 0, 0)
+    ' Pinch-Zoom (PySticky QPinchGesture): Touchscreen und Touchpad
+    gtk_widget_add_events(lwFlaeche, GDK_MASKE_BERUEHRUNG BOR GDK_MASKE_TOUCHPAD)
+    lwPinch = gtk_gesture_zoom_new(lwFlaeche)
+    signalZeile(lwPinch, "begin", lwPinchBeginn, 0, 0, 0)
+    signalFaktor(lwPinch, "scale-changed", lwPinchFaktor, 0, 0, 0)
+    pinchAnwenden()
     gtk_widget_set_can_focus(lwFlaeche, TRUE)
     lwSchrift = pango_font_description_from_string(einst.symbolSchrift + " Bold 10")
     lwZelle = einst.zelleStandard
@@ -816,6 +826,7 @@ FUNCTION lwDruck(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM px AS FLOAT, py AS FLOAT
     DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
     gtk_widget_grab_focus(lwFlaeche)
+    lwStiftAuf = lwDruckLesen(ereignis)
     IF lwHat THEN lwHalbRechnen(px, py)
     IF wzDruck(lwRohX(px), lwRohY(py), lwTaste(ereignis), lwUmschalt(ereignis)) = ZUG_HAND THEN
         lwZiehX = px
@@ -825,12 +836,53 @@ FUNCTION lwDruck(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
     RETURN TRUE
 END FUNCTION
 
+' --- Pinch-Zoom (Einstellung touch/gestures_enabled, Vorgabe aus wie PySticky:
+' Windows zeigt sonst auf manchen Geraeten beim langen Ziehen einen Hinweis) ---
+
+SUB pinchAnwenden()
+    IF lwPinch = 0 THEN RETURN
+    gtk_event_controller_set_propagation_phase(lwPinch, IIF(einst.gesten, GTK_PHASE_BLASE, GTK_PHASE_KEINE))
+END SUB
+
+SUB lwPinchBeginn(geste AS INTEGER, folge AS INTEGER, daten AS INTEGER)
+    lwPinchLetzte = 1.0
+END SUB
+
+SUB lwPinchFaktor(geste AS INTEGER, faktor AS FLOAT, daten AS INTEGER)
+    pinchGeaendert(faktor)
+END SUB
+
+' Ein neuer Faktor der Geste (auch fuer die Probe): ab 15 % ein Zoomschritt
+SUB pinchGeaendert(faktor AS FLOAT)
+    IF NOT lwHat THEN RETURN
+    DIM s AS INTEGER : s = kern.pinchSchritt(faktor, lwPinchLetzte)
+    IF s = 0 THEN RETURN
+    befehlAusfuehren(IIF(s > 0, "zoom_rein", "zoom_raus"))
+    lwPinchLetzte = faktor
+END SUB
+
+' Der Druck aus dem Ereignis (Stift, Wacom, Surface Pen): TRUE, wenn das
+' Geraet eine Druck-Achse hat -- eine Maus hat keine, dann bleibt es beim
+' einzelnen Stich (PySticky: Maus-Eingabe unveraendert)
+FUNCTION lwDruckLesen(ereignis AS INTEGER) AS BOOLEAN
+    DIM d AS FLOAT
+    IF ereignis = 0 THEN RETURN FALSE
+    IF NOT gdk_event_get_axis(ereignis, GDK_ACHSE_DRUCK, d) THEN
+        lwStiftDruck = 0.0
+        RETURN FALSE
+    END IF
+    lwStiftDruck = CLAMP(d, 0.0, 1.0)
+    RETURN TRUE
+END FUNCTION
+
 FUNCTION lwLoslassen(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
     IF lwOhneMaus THEN RETURN TRUE
     DIM px AS FLOAT, py AS FLOAT
     DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
     lwZiehen = FALSE
     wzLos(lwRohX(px), lwRohY(py), lwUmschalt(ereignis))
+    lwStiftAuf = FALSE
+    lwStiftDruck = 0.0
     RETURN TRUE
 END FUNCTION
 
@@ -845,6 +897,7 @@ FUNCTION lwBewegung(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOL
         lwZiehX = px
         lwZiehY = py
     ELSEIF wzZug <> ZUG_KEINER THEN
+        IF lwStiftAuf THEN lwStiftAuf = lwDruckLesen(ereignis)
         DIM rx AS INTEGER : rx = lwRohX(px)
         DIM ry AS INTEGER : ry = lwRohY(py)
         IF rx <> wzLetzteX OR ry <> wzLetzteY THEN wzZiehen(rx, ry, lwUmschalt(ereignis))

@@ -580,7 +580,7 @@ SUB ueberZeigen()
     DIM f AS INTEGER
     DIM bild AS INTEGER : bild = gdk_pixbuf_new_from_file_at_size(PATHJOIN(CWD$(), LOGO), 128, 128, f)
     IF bild = 0 THEN g_error_free(f)
-    gtk_show_about_dialog(fenster, "program-name", "Glutfaden", "logo", bild, "version", "Stufe 22", _
+    gtk_show_about_dialog(fenster, "program-name", "Glutfaden", "logo", bild, "version", "Stufe 23", _
         "comments", "Kreuzstich-Muster ansehen und bearbeiten -- eine Portierung von PySticky nach Drachenhauch und GTK 3.", _
         "website", "https://github.com/HasoSchno70/Pysticky", "website-label", "PySticky (das Original)", 0)
 END SUB
@@ -664,6 +664,7 @@ SUB befehlAusfuehren(kennung AS STRING)
         CASE "rueckstiche_zeigen" : ansichtSchalter(0, NOT lwRueckZeigen)
         CASE "fortschritt_zeigen" : ansichtSchalter(1, NOT lwFortschrittZeigen)
         CASE "mittelkreuz" : ansichtSchalter(2, NOT lwMittelkreuz)
+        CASE "einrasten" : rasterUmschalten(NOT einst.einrasten)
         CASE "tastenkuerzel" : kuerzelUebersicht()
         CASE "fremd_import" : fremdImportDialog("")
         CASE "drucken" : druckenDialog()
@@ -840,7 +841,15 @@ gtk_header_bar_pack_end(kopf, kKleiner)
 DIM spalte AS INTEGER : spalte = gtk_box_new(GTK_SENKRECHT, 0)
 DIM werkzeugzeile AS INTEGER : werkzeugzeile = gtk_box_new(GTK_WAAGERECHT, 0)
 gtkKlasse(werkzeugzeile, "werkzeugzeile")
-gtk_box_pack_start(werkzeugzeile, werkzeugleisteNeu(), FALSE, FALSE, 0)
+' Die Leiste waechst mit jeder Stufe; in einem rollbaren Bereich erzwingt sie
+' keine Mindestbreite -- sonst passte eine gemerkte Fenstergroesse nicht mehr
+' (gemessen: 1150 gemerkt, 1166 bekommen, als der Magnet dazukam)
+DIM leisteRolle AS INTEGER : leisteRolle = gtk_scrolled_window_new(0, 0)
+gtk_scrolled_window_set_policy(leisteRolle, GTK_POLITIK_AUTO, GTK_POLITIK_NIE)
+gtk_scrolled_window_set_propagate_natural_width(leisteRolle, TRUE)
+gtk_scrolled_window_set_propagate_natural_height(leisteRolle, TRUE)
+gtk_container_add(leisteRolle, werkzeugleisteNeu())
+gtk_box_pack_start(werkzeugzeile, leisteRolle, TRUE, TRUE, 0)
 DIM teilung AS INTEGER : teilung = gtk_paned_new(GTK_WAAGERECHT)
 ' Links: Zeichenflaeche mit Farbleiste darunter -- oder die Willkommensseite
 DIM linksBox AS INTEGER : linksBox = gtk_box_new(GTK_SENKRECHT, 0)
@@ -950,6 +959,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe21"
     ELSEIF ARG$(a) = "--probe-stufe22" THEN
         probe = "stufe22"
+    ELSEIF ARG$(a) = "--probe-stufe23" THEN
+        probe = "stufe23"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -1017,6 +1028,7 @@ IF probe = "stufe19" THEN g_timeout_add(300, vorfuehrenStufe19, 0)
 IF probe = "stufe20" THEN g_timeout_add(300, vorfuehrenStufe20, 0)
 IF probe = "stufe21" THEN g_timeout_add(300, vorfuehrenStufe21, 0)
 IF probe = "stufe22" THEN g_timeout_add(300, vorfuehrenStufe22, 0)
+IF probe = "stufe23" THEN g_timeout_add(300, vorfuehrenStufe23, 0)
 ' Alle fuenf Minuten ein Schnappschuss, wenn etwas ungesichert ist
 DIM takt AS INTEGER : takt = g_timeout_add(300000, vwTakt, 0)
 
