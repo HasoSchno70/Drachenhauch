@@ -893,12 +893,15 @@ PRINT kern.kuerzelAusTaste$(&HFFE1, FALSE, FALSE, TRUE); "|"; kern.kuerzelAusTas
 DIM e AS kern.Einstellungen : e = NEW kern.Einstellungen()
 DIM w AS ARRAY OF STRING : w = kern.kuerzelWirksam(e)
 DIM a AS ARRAY OF kern.Kuerzelaktion : a = kern.kuerzelAktionen()
-DIM i AS INTEGER, krumm AS INTEGER, zusammen AS INTEGER
+' krumm = eine Vorgabe, die nicht wirkt; ohne Vorgabe ist Absicht (Drehen,
+' Spiegeln ... haben auch in PySticky keins)
+DIM i AS INTEGER, krumm AS INTEGER, zusammen AS INTEGER, ohne AS INTEGER
 FOR i = 0 TO LEN(a) - 1
-    IF w[i] = "" THEN krumm = krumm + 1
+    IF a[i].vorgabe = "" THEN ohne = ohne + 1
+    IF a[i].vorgabe <> "" AND w[i] = "" THEN krumm = krumm + 1
     IF kern.kuerzelKonflikt(w, w[i], i) >= 0 THEN zusammen = zusammen + 1
 NEXT
-PRINT "aktionen "; LEN(a); " | krumme vorgaben "; krumm; " | zusammenstoesse "; zusammen
+PRINT "aktionen "; LEN(a); " | ohne vorgabe "; ohne; " | krumme vorgaben "; krumm; " | zusammenstoesse "; zusammen
 DIM tafel AS MAP OF STRING : tafel = kern.kuerzelTafel(e)
 PRINT "tafel "; LEN(MAPKEYS(tafel)); " | Strg+S "; tafel["Strg+S"]; " | = "; tafel["="]; " | Plus "; tafel["Plus"]; " | Strg+Umschalt+Z "; tafel["Strg+Umschalt+Z"]; " | Umschalt+R "; tafel["Umschalt+R"]; " | R "; tafel["R"]
 ' Eigene: der Reihe nach, ein Zusammenstoss behaelt die Vorgabe
@@ -943,8 +946,8 @@ CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 'Del' -> 'Entf' TRUE
 Strg+S | Strg+Umschalt+S | R | = | Plus | 1
 |F5 | Umschalt+Entf | Ä | Strg+Komma | Alt+Enter
-aktionen 57 | krumme vorgaben 0 | zusammenstoesse 0
-tafel 59 | Strg+S sichern | = zoom_rein | Plus zoom_rein | Strg+Umschalt+Z vor | Umschalt+R wz_rechteck_voll | R wz_rechteck
+aktionen 66 | ohne vorgabe 8 | krumme vorgaben 0 | zusammenstoesse 0
+tafel 60 | Strg+S sichern | = zoom_rein | Plus zoom_rein | Strg+Umschalt+Z vor | Umschalt+R wz_rechteck_voll | R wz_rechteck
 sichern F2 | export Strg+E | bibliothek Strg+L | vorschau Strg+S | F9 FALSE
 
 === export: autor und copyright aus den einstellungen, das muster geht vor
@@ -1045,7 +1048,7 @@ CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 rueckgabe 0
 vorgaben: raster 10/5 zelle 20 zoom 1.2 pipette 0 anzeige 1 palette DMC
 farben: 2D2D2D 303050 404060 | stoff FAFAF5
-kuerzel: sichern Strg+S | vor Strg+Y, Strg+Umschalt+Z | zoom_rein Plus, = | 57 Befehle
+kuerzel: sichern Strg+S | vor Strg+Y, Strg+Umschalt+Z | zoom_rein Plus, = | 66 Befehle
 neben nach haupt 8: 7
 kuerzel setzen: '' | '„F2“ hat schon „Sichern“.' | '„Hyper+X“ ist kein Tastenkürzel.' | ''
 angezeigt: F2  (eigen) | Strg+S  (eigen)
