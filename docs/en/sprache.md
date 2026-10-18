@@ -844,7 +844,7 @@ PRINT q, r       ' "3 2"
 
 **Restrictions:**
 - `BYREF` may **not** be combined with a default value (what would it mean to pass a default variable by reference?).
-- `BYREF` is supported by `dhrt`: at the call site the compiler inserts an lvalue capture plus a post-call write-back (copy-in/copy-out), and the VM returns the final parameter values. (Currently only for direct `SUB`/`FUNCTION` calls — not via `FUNCREF` or method calls whose class is only known at run time.)
+- `BYREF` is supported by `dhrt`: at the call site the compiler inserts an lvalue capture plus a post-call write-back (copy-in/copy-out), and the VM returns the final parameter values. This holds for `SUB`/`FUNCTION` and for **methods** whose class is known at compile time (`DIM s AS Stapel` ... `s.fuellen(a, n)`, also calls on `Self`). If the class is only known at run time (the variable of `FOR EACH` over a `TUPLE`, a value without a type), calling a method with `BYREF` is an error that suggests holding the object in a typed variable — running it silently as `BYVAL` would lose the change. An override must take the same parameters `BYREF` as the method it overrides. There is no `BYREF` through a `FUNCREF`.
 
 **Recursion** works:
 
@@ -1490,6 +1490,9 @@ END FUNCTION
 ```
 
 Pass the value in as a parameter or declare it in the file itself.
+The fields of a class are not affected: in a method a bare `e` means the
+field (an inherited one too), even if the main program or the file itself
+also has an `e`.
 Without `AS`, the old flat access remains allowed — existing programs
 do not change.
 
@@ -1538,6 +1541,26 @@ f = mathe.Farbe.ROT
 
 As a type, an ENUM is an `INTEGER`, just like a flat ENUM. This lets
 both files have a `Farbe` without getting in each other's way.
+
+**A namespace made of several files:** files imported under the same name
+form ONE namespace and see each other. That way a library can be split into
+parts and included through a collecting file:
+
+```basic
+' kern/kern.dh -- the collecting file
+IMPORT "muster.dh" AS kern
+IMPORT "ebene.dh" AS kern
+IMPORT "pxs.dh" AS kern
+
+' main.dh
+IMPORT "kern/kern.dh" AS kern
+DIM m AS kern.Muster
+m = kern.pxsLaden("herz.pxs")
+```
+
+What a file of the namespace imports **without** `AS` does not belong to it —
+it stays outside, like any flat import. `kern.Name` then reports in which file
+the name is and that `IMPORT "datei.dh" AS kern` is missing there.
 
 **Not to be confused** with `AS` on a built-in module: `IMPORT "json" AS
 j` replaces the prefix there (`J_PARSE` instead of `JSON_PARSE`). For `.dh` files

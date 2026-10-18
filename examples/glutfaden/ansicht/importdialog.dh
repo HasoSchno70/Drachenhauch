@@ -1,0 +1,665 @@
+' Bildimport (PySticky ui/dialogs/image_import/): Bild waehlen, Groesse,
+' Palette, Farbzahl, Farbwahl, Dithering, Confetti, Helligkeit/Kontrast/
+' Saettigung, Konturen, Voreinstellungen; links das Bild mit dem Ausschnitt
+' zum Aufziehen (Doppelklick = alles), rechts die Vorschau des Musters.
+' Gerechnet wird im Kern (kern/bildimport.dh) in Schritten, waehrenddessen
+' laeuft der Balken.
+
+DIM imDialog AS INTEGER
+DIM imPfad AS STRING
+DIM imBild AS IMAGE
+DIM imBildB AS INTEGER
+DIM imBildH AS INTEGER
+DIM imPixbuf AS INTEGER
+DIM imVorein AS INTEGER
+DIM imBreite AS INTEGER
+DIM imHoehe AS INTEGER
+DIM imSeite AS INTEGER
+DIM imPalette AS INTEGER
+DIM imFarben AS INTEGER
+DIM imWahl AS INTEGER
+DIM imDither AS INTEGER
+DIM imConfetti AS INTEGER
+DIM imHell AS INTEGER
+DIM imKontr AS INTEGER
+DIM imSatt AS INTEGER
+DIM imKonturen AS INTEGER
+DIM imQuelle AS INTEGER
+DIM imVorschau AS INTEGER
+DIM imInfo AS INTEGER
+DIM imBalken AS INTEGER
+DIM imAusschnitt AS ARRAY OF FLOAT
+DIM imZiehen AS BOOLEAN
+DIM imZugX AS FLOAT
+DIM imZugY AS FLOAT
+DIM imErgebnis AS kern.Muster
+DIM imVorlagen AS ARRAY OF STRING      ' Namen, je als JSON in imVorlagenJson
+DIM imVorlagenJson AS ARRAY OF STRING
+DIM imEigeneAb AS INTEGER              ' ab hier stehen die eigenen
+DIM imLaeuft AS BOOLEAN
+
+CONST IM_QUELLE_B = 360
+CONST IM_QUELLE_H = 300
+CONST IM_ANTWORT_VORSCHAU = 1
+
+' --- Voreinstellungen (PySticky image_import_presets.py) ---------------------------------
+
+FUNCTION imVorlage$(b AS INTEGER, h AS INTEGER, farben AS INTEGER, dither AS STRING, wahl AS STRING, konturen AS BOOLEAN, palette AS STRING) AS STRING
+    DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+    JSON_SET_INT(j, "width", b)
+    JSON_SET_INT(j, "height", h)
+    JSON_SET_INT(j, "max_colors", farben)
+    JSON_SET_STRING(j, "dithering_mode", dither)
+    JSON_SET_STRING(j, "quantization_method", wahl)
+    JSON_SET_BOOL(j, "auto_backstitches", konturen)
+    IF palette <> "" THEN JSON_SET_STRING(j, "palette", palette)
+    RETURN JSON_STRINGIFY(j)
+END FUNCTION
+
+FUNCTION imVorlagenDatei$() AS STRING
+    DIM basis AS STRING : basis = GETENV$("APPDATA", "")
+    IF basis = "" THEN basis = PATHJOIN(GETENV$("HOME", TEMPDIR$()), ".config")
+    RETURN PATHJOIN(PATHJOIN(basis, "Glutfaden"), "importvorlagen.json")
+END FUNCTION
+
+SUB imVorlagenLaden()
+    imVorlagen = ["Klein (Lesezeichen)", "Mittel (Bild)", "Groß (Wandbild)", "Foto (detailreich)", _
+        "💎 DP A4 quadratisch (60×60)", "💎 DP A3 (100×100)", "💎 DP A2 (150×150)", "💎 DP A1 (200×200)", "💎 DP A0 (300×300)"]
+    imVorlagenJson = [imVorlage$(40, 60, 10, "none", "nearest", FALSE, ""), _
+        imVorlage$(100, 100, 25, "floyd_steinberg", "nearest", FALSE, ""), _
+        imVorlage$(200, 250, 40, "floyd_steinberg", "median_cut", FALSE, ""), _
+        imVorlage$(150, 150, 50, "ordered", "median_cut", TRUE, ""), _
+        imVorlage$(60, 60, 30, "floyd_steinberg", "median_cut", FALSE, "DMC Diamond Painting"), _
+        imVorlage$(100, 100, 35, "floyd_steinberg", "median_cut", FALSE, "DMC Diamond Painting"), _
+        imVorlage$(150, 150, 40, "floyd_steinberg", "median_cut", FALSE, "DMC Diamond Painting"), _
+        imVorlage$(200, 200, 45, "floyd_steinberg", "median_cut", FALSE, "DMC Diamond Painting"), _
+        imVorlage$(300, 300, 50, "floyd_steinberg", "median_cut", FALSE, "DMC Diamond Painting")]
+    imEigeneAb = LEN(imVorlagen)
+    DIM d AS STRING : d = imVorlagenDatei$()
+    IF NOT FILEEXISTS(d) THEN RETURN
+    TRY
+        DIM j AS JSON_HANDLE : j = JSON_LOAD(d)
+        DIM i AS INTEGER
+        FOR i = 0 TO JSON_LEN(j, "") - 1
+            DIM w AS STRING : w = STR$(i)
+            ' eine krumme Vorlage wird uebergangen, wie im Original
+            IF JSON_TYPE(j, w) <> "object" THEN CONTINUE
+            IF NOT JSON_HAS(j, w + ".name") THEN CONTINUE
+            IF JSON_TYPE(j, w + ".name") <> "string" THEN CONTINUE
+            ARRAY_PUSH(imVorlagen, JSON_GET_STRING(j, w + ".name"))
+            ARRAY_PUSH(imVorlagenJson, JSON_STRINGIFY(JSON_GET_JSON(j, w)))
+        NEXT
+    CATCH e
+        statusMeldung("Eigene Voreinstellungen nicht lesbar: " + e)
+    END TRY
+END SUB
+
+SUB imVorlageAnwenden(w AS INTEGER, daten AS INTEGER)
+    DIM i AS INTEGER : i = gtk_combo_box_get_active(imVorein) - 1
+    IF i < 0 OR i >= LEN(imVorlagenJson) THEN RETURN
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(imVorlagenJson[i])
+    IF JSON_HAS(j, "width") THEN gtk_spin_button_set_value(imBreite, JSON_GET_INT(j, "width"))
+    IF JSON_HAS(j, "height") THEN gtk_spin_button_set_value(imHoehe, JSON_GET_INT(j, "height"))
+    IF JSON_HAS(j, "max_colors") THEN gtk_spin_button_set_value(imFarben, JSON_GET_INT(j, "max_colors"))
+    IF JSON_HAS(j, "dithering_mode") THEN gtk_combo_box_set_active(imDither, imDitherNr(JSON_GET_STRING(j, "dithering_mode")))
+    IF JSON_HAS(j, "quantization_method") THEN gtk_combo_box_set_active(imWahl, IIF(JSON_GET_STRING(j, "quantization_method") = "median_cut", 1, 0))
+    IF JSON_HAS(j, "auto_backstitches") THEN gtk_toggle_button_set_active(imKonturen, JSON_GET_BOOL(j, "auto_backstitches"))
+    IF JSON_HAS(j, "palette") THEN
+        DIM p AS INTEGER
+        FOR p = 0 TO LEN(slPaletten) - 1
+            IF slPaletten[p].name = JSON_GET_STRING(j, "palette") THEN gtk_combo_box_set_active(imPalette, p)
+        NEXT
+    END IF
+    IF JSON_HAS(j, "confetti_min_run_size") THEN gtk_spin_button_set_value(imConfetti, JSON_GET_INT(j, "confetti_min_run_size"))
+END SUB
+
+FUNCTION imDitherNr(n AS STRING) AS INTEGER
+    IF n = "floyd_steinberg" THEN RETURN 1
+    IF n = "ordered" THEN RETURN 2
+    RETURN 0
+END FUNCTION
+
+' Die jetzigen Einstellungen als eigene Voreinstellung sichern.
+SUB imVorlageSichern(w AS INTEGER, daten AS INTEGER)
+    DIM name AS STRING : name = textFragen("Voreinstellung sichern", "Name der Voreinstellung:", "")
+    IF name = "" THEN RETURN
+    DIM e AS kern.Importeinstellung : e = imEinstellung()
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(imVorlage$(e.breite, e.hoehe, e.maxFarben, e.ditherName$(), IIF(e.farbwahl = kern.WAHL_MEDIAN, "median_cut", "nearest"), e.konturen, e.palette.name))
+    JSON_SET_STRING(j, "name", name)
+    JSON_SET_INT(j, "confetti_min_run_size", e.confetti)
+    DIM alle AS JSON_HANDLE : alle = JSON_NEW_ARRAY()
+    DIM i AS INTEGER
+    FOR i = imEigeneAb TO LEN(imVorlagenJson) - 1
+        IF imVorlagen[i] <> name THEN JSON_APPEND_JSON(alle, "", JSON_PARSE(imVorlagenJson[i]))
+    NEXT
+    JSON_APPEND_JSON(alle, "", j)
+    TRY
+        MKDIR(DIRNAME(imVorlagenDatei$()))
+    CATCH f
+    END TRY
+    TRY
+        WRITEALL(imVorlagenDatei$(), JSON_STRINGIFY(alle))
+        statusMeldung("Voreinstellung „" + name + "“ gesichert.")
+    CATCH f
+        statusMeldung("Voreinstellung nicht gesichert: " + f)
+    END TRY
+END SUB
+
+' --- Einstellungen aus den Feldern -------------------------------------------------------
+
+FUNCTION imEinstellung() AS kern.Importeinstellung
+    DIM e AS kern.Importeinstellung : e = NEW kern.Importeinstellung()
+    e.breite = gtk_spin_button_get_value_as_int(imBreite)
+    e.hoehe = gtk_spin_button_get_value_as_int(imHoehe)
+    e.seitenverhaeltnis = gtk_toggle_button_get_active(imSeite)
+    e.palette = slPaletten[MAX(0, gtk_combo_box_get_active(imPalette))]
+    e.maxFarben = gtk_spin_button_get_value_as_int(imFarben)
+    e.farbwahl = IIF(gtk_combo_box_get_active(imWahl) = 1, kern.WAHL_MEDIAN, kern.WAHL_HAEUFIGSTE)
+    e.dithering = MAX(0, gtk_combo_box_get_active(imDither))
+    e.confetti = gtk_spin_button_get_value_as_int(imConfetti)
+    e.helligkeit = gtk_range_get_value(imHell)
+    e.kontrast = gtk_range_get_value(imKontr)
+    e.saettigung = gtk_range_get_value(imSatt)
+    e.konturen = gtk_toggle_button_get_active(imKonturen)
+    e.ausschnitt = [imAusschnitt[0], imAusschnitt[1], imAusschnitt[2], imAusschnitt[3]]
+    RETURN e
+END FUNCTION
+
+' Groesse in Stichen und Zentimetern (bei 14ct Aida), aus dem Ausschnitt.
+SUB imInfoNachziehen(w AS INTEGER, daten AS INTEGER)
+    IF imInfo = 0 OR imBildB = 0 THEN RETURN
+    DIM e AS kern.Importeinstellung : e = imEinstellung()
+    DIM ax AS INTEGER, ay AS INTEGER, ab AS INTEGER, ah AS INTEGER
+    (ax, ay, ab, ah) = kern.ausschnittPunkte(imBildB, imBildH, e.ausschnitt)
+    DIM tb AS INTEGER, th AS INTEGER
+    (tb, th) = kern.zielGroesse(ab, ah, e)
+    DIM stoff AS FLOAT : stoff = IIF(e.palette.istDiamant, 10.0, 14.0)
+    gtk_label_set_text(imInfo, STR$(tb) + " × " + STR$(th) + " Stiche  ·  ≈ " + ZAHL$(tb / stoff * 2.54, 1) + " × " + ZAHL$(th / stoff * 2.54, 1) + " cm bei " + IIF(e.palette.istDiamant, "2,5-mm-Drills", "14ct Aida") + _
+        "  ·  Ausschnitt " + IIF(ab = imBildB AND ah = imBildH, "ganzes Bild", STR$(ab) + " × " + STR$(ah) + " px"))
+END SUB
+
+' --- Das Bild mit dem Ausschnitt -------------------------------------------------------------
+
+' Wo das Bild in der Flaeche liegt: (x, y, massstab).
+FUNCTION imLage() AS TUPLE
+    DIM b AS INTEGER : b = gtk_widget_get_allocated_width(imQuelle)
+    DIM h AS INTEGER : h = gtk_widget_get_allocated_height(imQuelle)
+    DIM pb AS INTEGER : pb = gdk_pixbuf_get_width(imPixbuf)
+    DIM ph AS INTEGER : ph = gdk_pixbuf_get_height(imPixbuf)
+    RETURN ((b - pb) / 2.0, (h - ph) / 2.0, pb / imBildB)
+END FUNCTION
+
+FUNCTION imQuelleZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    cairo_set_source_rgb(cr, 0.16, 0.15, 0.14)
+    cairo_paint(cr)
+    IF imPixbuf = 0 THEN RETURN FALSE
+    DIM ox AS FLOAT, oy AS FLOAT, m AS FLOAT
+    (ox, oy, m) = imLage()
+    gdk_cairo_set_source_pixbuf(cr, imPixbuf, ox, oy)
+    cairo_paint(cr)
+    DIM pb AS FLOAT : pb = gdk_pixbuf_get_width(imPixbuf)
+    DIM ph AS FLOAT : ph = gdk_pixbuf_get_height(imPixbuf)
+    DIM x1 AS FLOAT : x1 = ox + imAusschnitt[0] * pb
+    DIM y1 AS FLOAT : y1 = oy + imAusschnitt[1] * ph
+    DIM x2 AS FLOAT : x2 = ox + imAusschnitt[2] * pb
+    DIM y2 AS FLOAT : y2 = oy + imAusschnitt[3] * ph
+    IF imAusschnitt[0] > 0 OR imAusschnitt[1] > 0 OR imAusschnitt[2] < 1 OR imAusschnitt[3] < 1 THEN
+        ' ausserhalb abdunkeln, dann ein Rahmen
+        cairo_set_source_rgba(cr, 0, 0, 0, 0.55)
+        cairo_rectangle(cr, ox, oy, pb, y1 - oy)
+        cairo_rectangle(cr, ox, y2, pb, oy + ph - y2)
+        cairo_rectangle(cr, ox, y1, x1 - ox, y2 - y1)
+        cairo_rectangle(cr, x2, y1, ox + pb - x2, y2 - y1)
+        cairo_fill(cr)
+        cairo_set_source_rgb(cr, 1.0, 0.62, 0.25)
+        cairo_set_line_width(cr, 2.0)
+        cairo_rectangle(cr, x1, y1, x2 - x1, y2 - y1)
+        cairo_stroke(cr)
+    END IF
+    RETURN FALSE
+END FUNCTION
+
+' Bildschirmpunkt -> Anteil im Bild (0..1).
+FUNCTION imAnteil(x AS FLOAT, y AS FLOAT) AS TUPLE
+    DIM ox AS FLOAT, oy AS FLOAT, m AS FLOAT
+    (ox, oy, m) = imLage()
+    RETURN (CLAMP((x - ox) / gdk_pixbuf_get_width(imPixbuf), 0.0, 1.0), CLAMP((y - oy) / gdk_pixbuf_get_height(imPixbuf), 0.0, 1.0))
+END FUNCTION
+
+FUNCTION imDruck(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    IF imPixbuf = 0 THEN RETURN FALSE
+    IF gdk_event_get_event_type(ereignis) = GDK_DOPPELKLICK THEN
+        imAusschnitt = [0.0, 0.0, 1.0, 1.0]
+        imZiehen = FALSE
+        imAusschnittGeaendert()
+        RETURN TRUE
+    END IF
+    DIM x AS FLOAT, y AS FLOAT
+    IF NOT gdk_event_get_coords(ereignis, x, y) THEN RETURN FALSE
+    (imZugX, imZugY) = imAnteil(x, y)
+    imZiehen = TRUE
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION imZug(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    IF NOT imZiehen THEN RETURN FALSE
+    DIM x AS FLOAT, y AS FLOAT
+    IF NOT gdk_event_get_coords(ereignis, x, y) THEN RETURN FALSE
+    DIM ax AS FLOAT, ay AS FLOAT
+    (ax, ay) = imAnteil(x, y)
+    ' ein Klick ohne Zug laesst den Ausschnitt, wie er ist
+    IF ABS(ax - imZugX) < 0.01 AND ABS(ay - imZugY) < 0.01 THEN RETURN TRUE
+    imAusschnitt = [MIN(ax, imZugX), MIN(ay, imZugY), MAX(ax, imZugX), MAX(ay, imZugY)]
+    gtk_widget_queue_draw(imQuelle)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION imLos(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    IF NOT imZiehen THEN RETURN FALSE
+    imZiehen = FALSE
+    imAusschnittGeaendert()
+    RETURN TRUE
+END FUNCTION
+
+SUB imAusschnittGeaendert()
+    gtk_widget_queue_draw(imQuelle)
+    imInfoNachziehen(0, 0)
+END SUB
+
+' --- Die Vorschau des Musters -----------------------------------------------------------------
+
+FUNCTION imVorschauZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    cairo_set_source_rgb(cr, 0.98, 0.98, 0.96)
+    cairo_paint(cr)
+    IF IS_NIL(imErgebnis) THEN RETURN FALSE
+    DIM b AS INTEGER : b = gtk_widget_get_allocated_width(w)
+    DIM h AS INTEGER : h = gtk_widget_get_allocated_height(w)
+    DIM m AS kern.Muster : m = imErgebnis
+    DIM z AS FLOAT : z = MIN(b / m.breite, h / m.hoehe)
+    DIM ox AS FLOAT : ox = (b - z * m.breite) / 2
+    DIM oy AS FLOAT : oy = (h - z * m.hoehe) / 2
+    DIM ras AS ARRAY OF INTEGER : ras = m.ebenen.aktiveEbene().raster
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO m.hoehe - 1
+        FOR x = 0 TO m.breite - 1
+            DIM f AS INTEGER : f = ras[y * m.breite + x]
+            IF f < 0 THEN CONTINUE
+            cairoFarbe(cr, m.farben[f].garn.farbe)
+            cairo_rectangle(cr, ox + x * z, oy + y * z, z + 0.4, z + 0.4)
+            cairo_fill(cr)
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' --- Rechnen --------------------------------------------------------------------------------------
+
+' Das Muster aus den jetzigen Einstellungen rechnen, mit Balken. NIL bei Fehler.
+FUNCTION imRechnen() AS kern.Muster
+    IF imLaeuft THEN RETURN NIL
+    imLaeuft = TRUE
+    DIM ergebnis AS kern.Muster
+    TRY
+        DIM e AS kern.Importeinstellung : e = imEinstellung()
+        gtk_progress_bar_set_text(imBalken, "Bild vorbereiten …")
+        gtk_progress_bar_set_fraction(imBalken, 0.0)
+        gtkAbarbeiten()
+        DIM grau AS kern.Pixelbild
+        DIM p AS kern.Pixelbild : p = kern.bildVorbereiten(imBild, e, grau)
+        DIM name AS STRING : name = BASENAME(imPfad)
+        IF INSTRREV(name, ".") > 0 THEN name = LEFT$(name, INSTRREV(name, "."))
+        DIM im AS kern.Bildimport : im = kern.importBeginnen(p, grau, e, name, slSymbole)
+        DIM t0 AS INTEGER : t0 = MILLIS()
+        WHILE im.schritt(4)
+            IF MILLIS() - t0 > 40 THEN
+                gtk_progress_bar_set_fraction(imBalken, im.fortschritt())
+                gtk_progress_bar_set_text(imBalken, "Farben zuordnen … " + STR$(INT(im.fortschritt() * 100)) + " %")
+                gtkAbarbeiten()
+                t0 = MILLIS()
+            END IF
+        WEND
+        ergebnis = im.ergebnis
+        ergebnis.quellBild = REALPATH$(imPfad)
+        gtk_progress_bar_set_fraction(imBalken, 1.0)
+        gtk_progress_bar_set_text(imBalken, STR$(ergebnis.breite) + " × " + STR$(ergebnis.hoehe) + ", " + STR$(ergebnis.farbanzahl()) + " Farben" + _
+            IIF(LEN(ergebnis.rueckstiche) > 0, ", " + STR$(LEN(ergebnis.rueckstiche)) + " Rückstiche", ""))
+    CATCH f
+        gtk_progress_bar_set_text(imBalken, "Fehler: " + f)
+        ergebnis = NIL
+    END TRY
+    imLaeuft = FALSE
+    RETURN ergebnis
+END FUNCTION
+
+SUB imVorschauGeklickt(w AS INTEGER, daten AS INTEGER)
+    DIM m AS kern.Muster : m = imRechnen()
+    IF NOT IS_NIL(m) THEN
+        imErgebnis = m
+        gtk_widget_queue_draw(imVorschau)
+    END IF
+END SUB
+
+SUB imZuruecksetzen(w AS INTEGER, daten AS INTEGER)
+    gtk_range_set_value(imHell, 1.0)
+    gtk_range_set_value(imKontr, 1.0)
+    gtk_range_set_value(imSatt, 1.0)
+END SUB
+
+' --- Der Dialog ---------------------------------------------------------------------------------
+
+FUNCTION imSpin(von AS FLOAT, bis AS FLOAT, wert AS FLOAT) AS INTEGER
+    DIM s AS INTEGER : s = gtk_spin_button_new_with_range(von, bis, 1.0)
+    gtk_spin_button_set_value(s, wert)
+    signal(s, "value-changed", imInfoNachziehen, 0, 0, 0)
+    RETURN s
+END FUNCTION
+
+FUNCTION imRegler() AS INTEGER
+    DIM r AS INTEGER : r = gtk_scale_new_with_range(GTK_WAAGERECHT, 0.0, 2.0, 0.05)
+    gtk_scale_set_digits(r, 2)
+    gtk_range_set_value(r, 1.0)
+    RETURN r
+END FUNCTION
+
+FUNCTION imKlappliste(texte AS ARRAY OF STRING, wahl AS INTEGER) AS INTEGER
+    DIM k AS INTEGER : k = gtk_combo_box_text_new()
+    DIM t AS STRING
+    FOR EACH t IN texte
+        gtk_combo_box_text_append_text(k, t)
+    NEXT
+    gtk_combo_box_set_active(k, wahl)
+    RETURN k
+END FUNCTION
+
+FUNCTION imUeberschrift(text AS STRING) AS INTEGER
+    DIM l AS INTEGER : l = gtk_label_new(text)
+    gtk_label_set_xalign(l, 0.0)
+    gtkKlasse(l, "abschnitt")
+    RETURN l
+END FUNCTION
+
+' Den Dialog fuer ein Bild bauen (noch nicht laufen lassen). `vorher` sind die
+' Einstellungen eines frueheren Imports (Bildimport wiederholen) oder NIL.
+FUNCTION imDialogBauen(pfad AS STRING, vorher AS kern.Importeinstellung) AS BOOLEAN
+    imPfad = pfad
+    TRY
+        imBild = LOADIMAGE(pfad)
+    CATCH f
+        statusMeldung("Bild nicht lesbar: " + f)
+        RETURN FALSE
+    END TRY
+    imBildB = IMAGE_WIDTH(imBild)
+    imBildH = IMAGE_HEIGHT(imBild)
+    DIM fehler AS INTEGER
+    imPixbuf = gdk_pixbuf_new_from_file_at_size(pfad, IM_QUELLE_B, IM_QUELLE_H, fehler)
+    IF imPixbuf = 0 THEN
+        statusMeldung("Bild nicht lesbar: " + gtkFehler$(fehler))
+        RETURN FALSE
+    END IF
+    imAusschnitt = [0.0, 0.0, 1.0, 1.0]
+    imErgebnis = NIL
+    imVorlagenLaden()
+
+    imDialog = gtk_dialog_new_with_buttons("Bild importieren", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Importieren", GTK_ANTWORT_OK, 0)
+    gtk_dialog_set_default_response(imDialog, GTK_ANTWORT_OK)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(imDialog)
+    gtk_container_set_border_width(innen, 12)
+    DIM reihe AS INTEGER : reihe = gtk_box_new(GTK_WAAGERECHT, 16)
+    DIM links AS INTEGER : links = gtk_box_new(GTK_SENKRECHT, 4)
+    DIM rechts AS INTEGER : rechts = gtk_box_new(GTK_SENKRECHT, 6)
+    gtk_widget_set_size_request(links, 330, -1)
+
+    DIM namen AS ARRAY OF STRING : namen = ["— keine —"]
+    DIM n AS STRING
+    FOR EACH n IN imVorlagen
+        ARRAY_PUSH(namen, n)
+    NEXT
+    imVorein = imKlappliste(namen, 0)
+    DIM kSichern AS INTEGER : kSichern = gtk_button_new_from_icon_name("document-save-symbolic", GTK_ICON_KNOPF)
+    gtk_widget_set_tooltip_text(kSichern, "Die jetzigen Einstellungen als eigene Voreinstellung sichern")
+    DIM vz AS INTEGER : vz = gtk_box_new(GTK_WAAGERECHT, 4)
+    gtk_box_pack_start(vz, imVorein, TRUE, TRUE, 0)
+    gtk_box_pack_start(vz, kSichern, FALSE, FALSE, 0)
+    gtk_box_pack_start(links, imUeberschrift("Voreinstellung"), FALSE, FALSE, 2)
+    gtk_box_pack_start(links, vz, FALSE, FALSE, 2)
+
+    gtk_box_pack_start(links, imUeberschrift("Mustergröße"), FALSE, FALSE, 6)
+    imBreite = imSpin(1, kern.GROESSTER_IMPORT, 50)
+    imHoehe = imSpin(1, kern.GROESSTER_IMPORT, 50)
+    imSeite = gtk_check_button_new_with_label("Seitenverhältnis beibehalten")
+    gtk_toggle_button_set_active(imSeite, TRUE)
+    signal(imSeite, "toggled", imInfoNachziehen, 0, 0, 0)
+    gtk_box_pack_start(links, dlZeile("Breite", imBreite), FALSE, FALSE, 2)
+    gtk_box_pack_start(links, dlZeile("Höhe", imHoehe), FALSE, FALSE, 2)
+    gtk_box_pack_start(links, imSeite, FALSE, FALSE, 2)
+
+    gtk_box_pack_start(links, imUeberschrift("Farben"), FALSE, FALSE, 6)
+    DIM pn AS ARRAY OF STRING : pn = []
+    DIM pal AS kern.Palette
+    DIM dmc AS INTEGER : dmc = 0
+    FOR EACH pal IN slPaletten
+        IF pal.name = "DMC" THEN dmc = LEN(pn)
+        ARRAY_PUSH(pn, pal.name + "  (" + STR$(LEN(pal.garne)) + ")")
+    NEXT
+    imPalette = imKlappliste(pn, dmc)
+    signal(imPalette, "changed", imInfoNachziehen, 0, 0, 0)
+    imFarben = imSpin(1, kern.MEISTE_FARBEN, MIN(einst.importFarben, kern.MEISTE_FARBEN))
+    imWahl = imKlappliste(["Die häufigsten", "Median-Cut (bessere Verteilung)"], 0)
+    imDither = imKlappliste(["Kein Dithering", "Floyd-Steinberg", "Geordnet (Bayer)"], einst.dithering)
+    imConfetti = imSpin(1, 10, 1)
+    gtk_widget_set_tooltip_text(imConfetti, "Inseln kleiner als das bekommen die Farbe ihrer Nachbarn (1 = aus; 2 dezent, 3 kräftig)")
+    gtk_box_pack_start(links, dlZeile("Palette", imPalette), FALSE, FALSE, 2)
+    gtk_box_pack_start(links, dlZeile("Höchstens", imFarben), FALSE, FALSE, 2)
+    gtk_box_pack_start(links, dlZeile("Farbwahl", imWahl), FALSE, FALSE, 2)
+    gtk_box_pack_start(links, dlZeile("Dithering", imDither), FALSE, FALSE, 2)
+    gtk_box_pack_start(links, dlZeile("Confetti", imConfetti), FALSE, FALSE, 2)
+
+    gtk_box_pack_start(links, imUeberschrift("Bild anpassen"), FALSE, FALSE, 6)
+    imHell = imRegler() : imKontr = imRegler() : imSatt = imRegler()
+    gtk_box_pack_start(links, dlZeile("Helligkeit", imHell), FALSE, FALSE, 0)
+    gtk_box_pack_start(links, dlZeile("Kontrast", imKontr), FALSE, FALSE, 0)
+    gtk_box_pack_start(links, dlZeile("Sättigung", imSatt), FALSE, FALSE, 0)
+    DIM kZurueck AS INTEGER : kZurueck = gtk_button_new_with_label("Zurücksetzen")
+    gtk_widget_set_halign(kZurueck, GTK_AUSRICHTEN_ENDE)
+    gtk_box_pack_start(links, kZurueck, FALSE, FALSE, 2)
+
+    imKonturen = gtk_check_button_new_with_label("Konturen als Rückstiche")
+    gtk_box_pack_start(links, imKonturen, FALSE, FALSE, 6)
+
+    gtk_box_pack_start(rechts, imUeberschrift(BASENAME(pfad) + "  (" + STR$(imBildB) + " × " + STR$(imBildH) + ") -- Ausschnitt aufziehen, Doppelklick = ganzes Bild"), FALSE, FALSE, 0)
+    imQuelle = gtk_drawing_area_new()
+    gtk_widget_set_size_request(imQuelle, IM_QUELLE_B + 8, IM_QUELLE_H + 8)
+    gtk_widget_add_events(imQuelle, GDK_MASKE_DRUCK BOR GDK_MASKE_LOSLASSEN BOR GDK_MASKE_BEWEGUNG)
+    gtk_box_pack_start(rechts, imQuelle, FALSE, FALSE, 0)
+    imInfo = gtk_label_new("")
+    gtk_label_set_xalign(imInfo, 0.0)
+    gtk_box_pack_start(rechts, imInfo, FALSE, FALSE, 2)
+    DIM vk AS INTEGER : vk = gtk_box_new(GTK_WAAGERECHT, 6)
+    DIM kVorschau AS INTEGER : kVorschau = gtk_button_new_with_label("Vorschau")
+    imBalken = gtk_progress_bar_new()
+    gtk_progress_bar_set_show_text(imBalken, TRUE)
+    gtk_progress_bar_set_text(imBalken, "Noch nicht gerechnet")
+    gtk_box_pack_start(vk, kVorschau, FALSE, FALSE, 0)
+    gtk_box_pack_start(vk, imBalken, TRUE, TRUE, 0)
+    gtk_box_pack_start(rechts, vk, FALSE, FALSE, 2)
+    imVorschau = gtk_drawing_area_new()
+    gtk_widget_set_size_request(imVorschau, IM_QUELLE_B + 8, 260)
+    gtk_box_pack_start(rechts, imVorschau, TRUE, TRUE, 0)
+
+    gtk_box_pack_start(reihe, links, FALSE, FALSE, 0)
+    gtk_box_pack_start(reihe, rechts, TRUE, TRUE, 0)
+    gtk_box_pack_start(innen, reihe, TRUE, TRUE, 0)
+
+    ' Einstellungen eines frueheren Imports uebernehmen
+    IF NOT IS_NIL(vorher) THEN
+        gtk_spin_button_set_value(imBreite, vorher.breite)
+        gtk_spin_button_set_value(imHoehe, vorher.hoehe)
+        gtk_toggle_button_set_active(imSeite, vorher.seitenverhaeltnis)
+        gtk_spin_button_set_value(imFarben, vorher.maxFarben)
+        gtk_combo_box_set_active(imWahl, IIF(vorher.farbwahl = kern.WAHL_MEDIAN, 1, 0))
+        gtk_combo_box_set_active(imDither, vorher.dithering)
+        gtk_spin_button_set_value(imConfetti, vorher.confetti)
+        gtk_range_set_value(imHell, vorher.helligkeit)
+        gtk_range_set_value(imKontr, vorher.kontrast)
+        gtk_range_set_value(imSatt, vorher.saettigung)
+        gtk_toggle_button_set_active(imKonturen, vorher.konturen)
+        imAusschnitt = [vorher.ausschnitt[0], vorher.ausschnitt[1], vorher.ausschnitt[2], vorher.ausschnitt[3]]
+        DIM p AS INTEGER
+        FOR p = 0 TO LEN(slPaletten) - 1
+            IF NOT IS_NIL(vorher.palette) THEN
+                IF slPaletten[p].name = vorher.palette.name THEN gtk_combo_box_set_active(imPalette, p)
+            END IF
+        NEXT
+    END IF
+
+    signal(imVorein, "changed", imVorlageAnwenden, 0, 0, 0)
+    signal(kSichern, "clicked", imVorlageSichern, 0, 0, 0)
+    signal(kZurueck, "clicked", imZuruecksetzen, 0, 0, 0)
+    signal(kVorschau, "clicked", imVorschauGeklickt, 0, 0, 0)
+    signalZeichnen(imQuelle, "draw", imQuelleZeichnen, 0, 0, 0)
+    signalZeichnen(imVorschau, "draw", imVorschauZeichnen, 0, 0, 0)
+    signalEreignis(imQuelle, "button-press-event", imDruck, 0, 0, 0)
+    signalEreignis(imQuelle, "motion-notify-event", imZug, 0, 0, 0)
+    signalEreignis(imQuelle, "button-release-event", imLos, 0, 0, 0)
+    imInfoNachziehen(0, 0)
+    gtk_widget_show_all(imDialog)
+    RETURN TRUE
+END FUNCTION
+
+SUB imDialogWeg()
+    IF imDialog <> 0 THEN gtk_widget_destroy(imDialog)
+    imDialog = 0
+    IF imPixbuf <> 0 THEN g_object_unref(imPixbuf)
+    imPixbuf = 0
+    imInfo = 0
+END SUB
+
+' Ein fertiges Muster uebernehmen (wie Oeffnen, aber noch ohne Datei).
+SUB musterUebernehmen(m AS kern.Muster)
+    musterPfad = ""
+    musterTitel = m.name
+    wzVerlauf.leeren()
+    extraGeaendert = TRUE
+    wzFarbe = IIF(m.farbanzahl() > 0, 0, -1)
+    lwHervor = -1
+    leinwandMuster(m)
+    seitenleisteMuster(m)
+    modusKnopfNachziehen()
+    willkommenVerbergen()
+    leinwandEinpassen()
+    zustandNachziehen()
+    statusNachziehen()
+END SUB
+
+' Den Dialog laufen lassen; TRUE, wenn ein Muster uebernommen wurde.
+FUNCTION imDialogLaufen() AS BOOLEAN
+    DIM fertig AS BOOLEAN
+    WHILE imDialog <> 0
+        DIM a AS INTEGER : a = gtk_dialog_run(imDialog)
+        IF a <> GTK_ANTWORT_OK THEN EXIT WHILE
+        ' Vorschau und Import rechnen dasselbe; ist sie aktuell, gilt sie nicht --
+        ' die Felder koennen sich seither geaendert haben.
+        DIM m AS kern.Muster : m = imRechnen()
+        IF IS_NIL(m) THEN CONTINUE
+        musterUebernehmen(m)
+        statusMeldung("Importiert: " + STR$(m.breite) + " × " + STR$(m.hoehe) + " Stiche, " + STR$(m.farbanzahl()) + " Farben.")
+        fertig = TRUE
+        EXIT WHILE
+    WEND
+    imDialogWeg()
+    RETURN fertig
+END FUNCTION
+
+' Ein Bild waehlen; "" bei Abbrechen.
+FUNCTION bildWaehlen() AS STRING
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("Bild importieren", fenster, GTK_DATEI_OEFFNEN, _
+        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Weiter", GTK_ANTWORT_ANNEHMEN, 0)
+    DIM filter AS INTEGER : filter = gtk_file_filter_new()
+    gtk_file_filter_set_name(filter, "Bilder (PNG, JPG, BMP, GIF, TGA, QOI)")
+    DIM m AS STRING
+    FOR EACH m IN ["*.png", "*.PNG", "*.jpg", "*.JPG", "*.jpeg", "*.JPEG", "*.bmp", "*.BMP", "*.gif", "*.GIF", "*.tga", "*.qoi"]
+        gtk_file_filter_add_pattern(filter, m)
+    NEXT
+    gtk_file_chooser_add_filter(d, filter)
+    DIM pfad AS STRING
+    IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
+        DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
+        pfad = TEXT_AUS_ZEIGER$(z)
+        g_free(z)
+    END IF
+    gtk_widget_destroy(d)
+    RETURN pfad
+END FUNCTION
+
+SUB bildImportieren()
+    IF NOT ungesichertFragen("Importieren") THEN RETURN
+    DIM pfad AS STRING : pfad = bildWaehlen()
+    IF pfad = "" THEN RETURN
+    bildImportDialog(pfad)
+END SUB
+
+' Ein schon bekanntes Bild importieren (abgelegt) -- mit derselben Rueckfrage
+SUB bildImportierenVon(pfad AS STRING)
+    IF NOT ungesichertFragen("Importieren") THEN RETURN
+    bildImportDialog(pfad)
+END SUB
+
+SUB bildImportDialog(pfad AS STRING)
+    IF imDialogBauen(pfad, NIL) THEN
+        DIM ok AS BOOLEAN : ok = imDialogLaufen()
+    END IF
+END SUB
+
+SUB bildImportierenGeklickt(w AS INTEGER, daten AS INTEGER)
+    bildImportieren()
+END SUB
+
+' Die Einstellungen, mit denen das jetzige Muster importiert wurde (aus den
+' Metadaten wie PySticky change_palette), oder NIL.
+FUNCTION imEinstellungAusMuster(m AS kern.Muster) AS kern.Importeinstellung
+    IF m.quellBild = "" THEN RETURN NIL
+    DIM e AS kern.Importeinstellung : e = NEW kern.Importeinstellung()
+    e.breite = m.breite
+    e.hoehe = m.hoehe
+    e.seitenverhaeltnis = FALSE           ' Groesse genau beibehalten
+    DIM md AS JSON_HANDLE : md = m.metadaten
+    IF JSON_HAS(md, "max_colors") THEN e.maxFarben = JSON_GET_INT(md, "max_colors") ELSE e.maxFarben = MAX(1, m.farbanzahl())
+    DIM dm AS STRING : dm = ""
+    IF JSON_HAS(md, "dithering_mode") THEN dm = JSON_GET_STRING(md, "dithering_mode")
+    IF dm = "" AND JSON_HAS(md, "dithering") THEN
+        IF JSON_GET_BOOL(md, "dithering") THEN dm = "floyd_steinberg"
+    END IF
+    e.dithering = imDitherNr(dm)
+    IF JSON_HAS(md, "quantization_method") THEN
+        IF JSON_GET_STRING(md, "quantization_method") = "median_cut" THEN e.farbwahl = kern.WAHL_MEDIAN
+    END IF
+    IF JSON_HAS(md, "auto_backstitches") THEN e.konturen = JSON_GET_BOOL(md, "auto_backstitches")
+    IF JSON_HAS(md, "confetti_min_run_size") THEN e.confetti = JSON_GET_INT(md, "confetti_min_run_size")
+    IF JSON_HAS(md, "brightness") THEN e.helligkeit = JSON_GET_FLOAT(md, "brightness")
+    IF JSON_HAS(md, "contrast") THEN e.kontrast = JSON_GET_FLOAT(md, "contrast")
+    IF JSON_HAS(md, "saturation") THEN e.saettigung = JSON_GET_FLOAT(md, "saturation")
+    e.ausschnitt = [m.quellAusschnitt[0], m.quellAusschnitt[1], m.quellAusschnitt[2], m.quellAusschnitt[3]]
+    DIM pal AS kern.Palette
+    FOR EACH pal IN slPaletten
+        IF pal.name = m.quellPalette THEN e.palette = pal
+    NEXT
+    RETURN e
+END FUNCTION
+
+' Bildimport wiederholen (auch: Palette wechseln) -- mit den Einstellungen von damals.
+SUB bildNeuImportieren()
+    IF NOT lwHat THEN RETURN
+    IF lwMuster.quellBild = "" OR NOT FILEEXISTS(lwMuster.quellBild) THEN
+        statusMeldung(IIF(lwMuster.quellBild = "", "Dieses Muster stammt nicht aus einem Bild.", "Das Quellbild ist nicht mehr da: " + lwMuster.quellBild))
+        RETURN
+    END IF
+    IF NOT ungesichertFragen("erneuten Importieren") THEN RETURN
+    IF imDialogBauen(lwMuster.quellBild, imEinstellungAusMuster(lwMuster)) THEN
+        DIM ok AS BOOLEAN : ok = imDialogLaufen()
+    END IF
+END SUB
+
+SUB bildNeuGeklickt(w AS INTEGER, daten AS INTEGER)
+    bildNeuImportieren()
+END SUB

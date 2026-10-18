@@ -1,0 +1,70 @@
+' Baut kleine Pattern-Maker-Dateien (.xsd) im Aufbau, den kern/xsd.dh liest,
+' samt der Verschluesselung des Stichblocks. Was der Leser ueberspringt, ist
+' Null. An einer echten Datei geprueft ist der Leser mit Embroiderlys
+' Beispiel (siehe den Kopf von kern/xsd.dh).
+' Braucht glutfaden_pat.dh (davor importiert).
+
+FUNCTION xhText$(t AS STRING, n AS INTEGER) AS STRING
+    RETURN phRoh$(LEFT$(t, n)) + phNull$(n + 1 - MIN(LEN(t), n))
+END FUNCTION
+
+' Eine Farbe: Hersteller-Nummer, Garnnummer, Name, &HRRGGBB, Perle?,
+' Blend-Teile als "hersteller:nummer:straenge;..." (leer = kein Blend)
+FUNCTION xhFarbe$(hst AS INTEGER, nr AS STRING, name AS STRING, farbe AS INTEGER, perle AS BOOLEAN, blend AS STRING) AS STRING
+    DIM h AS STRING : h = "0000" + RIGHT$("0" + HEX$(hst), 2) + xhText$(nr, 10) + xhText$(name, 40)
+    h = h + RIGHT$("00000" + HEX$(farbe), 6) + "00"
+    DIM teile AS ARRAY OF STRING : teile = []
+    IF blend <> "" THEN teile = SPLIT$(blend, ";")
+    h = h + ph16$(LEN(teile))
+    DIM s AS STRING, staerken AS STRING : staerken = ""
+    FOR EACH s IN teile
+        DIM f AS ARRAY OF STRING : f = SPLIT$(s, ":")
+        h = h + RIGHT$("0" + HEX$(VAL(f[0])), 2) + xhText$(f[1], 10)
+        staerken = staerken + RIGHT$("0" + HEX$(VAL(f[2])), 2)
+    NEXT
+    h = h + phNull$((4 - LEN(teile)) * 12) + staerken + phNull$(4 - LEN(teile))
+    h = h + ph32$(IIF(perle, 1, 0)) + phNull$(6)
+    RETURN h
+END FUNCTION
+
+' Die Stiche verschluesseln: `worte` sind die Zellenworte (samt Lauf-Worten
+' &H40000000 + Zahl SHL 16), `z` die vier Schluesselzahlen.
+FUNCTION xhStiche$(worte AS ARRAY OF INTEGER, z AS ARRAY OF INTEGER) AS STRING
+    DIM h AS STRING : h = ph32$(z[0]) + ph32$(z[1]) + ph32$(z[2]) + ph32$(z[3])
+    DIM schl AS INTEGER : schl = ((z[0] BAND 255) SHL 24) BOR (((z[1] SHR 8) BAND 255) SHL 16) BOR (((z[2] SHR 16) BAND 255) SHL 8) BOR (z[3] BAND 255)
+    DIM laufend AS INTEGER : laufend = z[0]
+    DIM i AS INTEGER, si AS INTEGER
+    h = h + ph32$(LEN(worte))
+    FOR i = 0 TO LEN(worte) - 1
+        h = h + ph32$(worte[i] BXOR schl BXOR laufend)
+        DIM s AS INTEGER : s = (z[si \ 4] SHR (si MOD 4)) MOD 32
+        IF s > 0 THEN schl = ((schl SHL s) BOR (schl SHR (32 - s))) BAND &HFFFFFFFF
+        laufend = (laufend + z[1]) BAND &HFFFFFFFF
+        si = (si + 1) MOD 16
+    NEXT
+    RETURN h
+END FUNCTION
+
+' Die ganze Datei. `farben` = aneinandergehaengte xhFarbe$, `symbole` = ein
+' Code je Farbe, `klein` = Teilstich-Saetze als Hex (je 10 Bytes), `joints`
+' = Hex der Joints.
+FUNCTION xhDatei(b AS INTEGER, h AS INTEGER, stoff AS INTEGER, titel AS STRING, autor AS STRING, notiz AS STRING, nf AS INTEGER, farben AS STRING, symbole AS ARRAY OF INTEGER, stiche AS STRING, klein AS STRING, nj AS INTEGER, joints AS STRING) AS BUFFER
+    DIM x AS STRING : x = "1005" + phNull$(4) + ph16$(8) + ph16$(4) + ph16$(0) + ph16$(4) + phNull$(727)
+    x = x + ph16$(b) + ph16$(h) + ph32$(LEN(klein) \ 20) + ph16$(nj) + ph16$(stoff) + ph16$(stoff) + phNull$(6)
+    x = x + ph16$(nf) + farben + phNull$(nf * 2) + phNull$(nf * 18) + phNull$(nf * 16)
+    x = x + phNull$(240 * 10 * 2 + 240 * 4 + 240 * 10 * 4 + 240 * 53)
+    DIM c AS INTEGER
+    FOR EACH c IN symbole
+        x = x + ph16$(c) + "FFFF" * 5
+    NEXT
+    x = x + phNull$(33 + 20 + 33 + 34 + 120 + 120 + 20 + 56 + 41 + 68)
+    x = x + xhText$(titel, 40) + xhText$(autor, 40) + xhText$("", 40) + xhText$("(c) 2026", 200) + xhText$(notiz, 2048)
+    x = x + phNull$(6 + 41 + 206 + 52 + 32 + 16412 + 512)
+    x = x + stiche + klein + "0000" + "0000" + joints
+    RETURN BUFFER_FROM_HEX(x)
+END FUNCTION
+
+SUB xhZeigen(imp AS kern.XsdImport)
+    PRINT "fassung "; imp.fassung
+    phMuster(imp.muster, imp.warnungen)
+END SUB

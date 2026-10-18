@@ -1,0 +1,4880 @@
+[
+ {
+  "CosmoNumber": "100",
+  "Color": {
+   "R": 244,
+   "G": 244,
+   "B": 244
+  },
+  "Name": "White"
+ },
+ {
+  "CosmoNumber": "101",
+  "Color": {
+   "R": 249,
+   "G": 233,
+   "B": 222
+  },
+  "Name": "Off White"
+ },
+ {
+  "CosmoNumber": "102",
+  "Color": {
+   "R": 248,
+   "G": 223,
+   "B": 215
+  },
+  "Name": "Ecru"
+ },
+ {
+  "CosmoNumber": "103",
+  "Color": {
+   "R": 245,
+   "G": 235,
+   "B": 210
+  },
+  "Name": "Cream"
+ },
+ {
+  "CosmoNumber": "103A",
+  "Color": {
+   "R": 244,
+   "G": 199,
+   "B": 201
+  },
+  "Name": "Cosmo 103A"
+ },
+ {
+  "CosmoNumber": "104",
+  "Color": {
+   "R": 239,
+   "G": 163,
+   "B": 175
+  },
+  "Name": "Cosmo 104"
+ },
+ {
+  "CosmoNumber": "105",
+  "Color": {
+   "R": 229,
+   "G": 127,
+   "B": 149
+  },
+  "Name": "Cosmo 105"
+ },
+ {
+  "CosmoNumber": "106",
+  "Color": {
+   "R": 190,
+   "G": 55,
+   "B": 76
+  },
+  "Name": "Cosmo 106"
+ },
+ {
+  "CosmoNumber": "107",
+  "Color": {
+   "R": 179,
+   "G": 43,
+   "B": 65
+  },
+  "Name": "Cosmo 107"
+ },
+ {
+  "CosmoNumber": "108",
+  "Color": {
+   "R": 168,
+   "G": 34,
+   "B": 49
+  },
+  "Name": "Cosmo 108"
+ },
+ {
+  "CosmoNumber": "110",
+  "Color": {
+   "R": 252,
+   "G": 252,
+   "B": 242
+  },
+  "Name": "Cosmo 110"
+ },
+ {
+  "CosmoNumber": "111",
+  "Color": {
+   "R": 249,
+   "G": 229,
+   "B": 233
+  },
+  "Name": "Black"
+ },
+ {
+  "CosmoNumber": "112",
+  "Color": {
+   "R": 242,
+   "G": 165,
+   "B": 204
+  },
+  "Name": "Charcoal Gray"
+ },
+ {
+  "CosmoNumber": "113",
+  "Color": {
+   "R": 238,
+   "G": 138,
+   "B": 191
+  },
+  "Name": "Dark Gray"
+ },
+ {
+  "CosmoNumber": "114",
+  "Color": {
+   "R": 235,
+   "G": 96,
+   "B": 167
+  },
+  "Name": "Medium Gray"
+ },
+ {
+  "CosmoNumber": "115",
+  "Color": {
+   "R": 175,
+   "G": 175,
+   "B": 175
+  },
+  "Name": "Light Gray"
+ },
+ {
+  "CosmoNumber": "115A",
+  "Color": {
+   "R": 230,
+   "G": 50,
+   "B": 112
+  },
+  "Name": "Cosmo 115A"
+ },
+ {
+  "CosmoNumber": "116",
+  "Color": {
+   "R": 209,
+   "G": 221,
+   "B": 140
+  },
+  "Name": "Pearl Gray"
+ },
+ {
+  "CosmoNumber": "117",
+  "Color": {
+   "R": 170,
+   "G": 190,
+   "B": 105
+  },
+  "Name": "Cosmo 117"
+ },
+ {
+  "CosmoNumber": "118",
+  "Color": {
+   "R": 118,
+   "G": 158,
+   "B": 69
+  },
+  "Name": "Cosmo 118"
+ },
+ {
+  "CosmoNumber": "119",
+  "Color": {
+   "R": 85,
+   "G": 117,
+   "B": 53
+  },
+  "Name": "Cosmo 119"
+ },
+ {
+  "CosmoNumber": "120",
+  "Color": {
+   "R": 65,
+   "G": 110,
+   "B": 54
+  },
+  "Name": "Cosmo 120"
+ },
+ {
+  "CosmoNumber": "121",
+  "Color": {
+   "R": 37,
+   "G": 70,
+   "B": 40
+  },
+  "Name": "Cosmo 121"
+ },
+ {
+  "CosmoNumber": "122",
+  "Color": {
+   "R": 28,
+   "G": 44,
+   "B": 27
+  },
+  "Name": "Cosmo 122"
+ },
+ {
+  "CosmoNumber": "126A",
+  "Color": {
+   "R": 224,
+   "G": 165,
+   "B": 129
+  },
+  "Name": "Cosmo 126A"
+ },
+ {
+  "CosmoNumber": "127",
+  "Color": {
+   "R": 218,
+   "G": 135,
+   "B": 101
+  },
+  "Name": "Cosmo 127"
+ },
+ {
+  "CosmoNumber": "128",
+  "Color": {
+   "R": 190,
+   "G": 95,
+   "B": 66
+  },
+  "Name": "Cosmo 128"
+ },
+ {
+  "CosmoNumber": "129",
+  "Color": {
+   "R": 154,
+   "G": 65,
+   "B": 43
+  },
+  "Name": "Cosmo 129"
+ },
+ {
+  "CosmoNumber": "130",
+  "Color": {
+   "R": 109,
+   "G": 48,
+   "B": 34
+  },
+  "Name": "Cosmo 130"
+ },
+ {
+  "CosmoNumber": "131",
+  "Color": {
+   "R": 88,
+   "G": 37,
+   "B": 31
+  },
+  "Name": "Cosmo 131"
+ },
+ {
+  "CosmoNumber": "140",
+  "Color": {
+   "R": 250,
+   "G": 243,
+   "B": 213
+  },
+  "Name": "Cosmo 140"
+ },
+ {
+  "CosmoNumber": "141",
+  "Color": {
+   "R": 251,
+   "G": 246,
+   "B": 199
+  },
+  "Name": "Cosmo 141"
+ },
+ {
+  "CosmoNumber": "142",
+  "Color": {
+   "R": 251,
+   "G": 237,
+   "B": 154
+  },
+  "Name": "Cosmo 142"
+ },
+ {
+  "CosmoNumber": "143",
+  "Color": {
+   "R": 250,
+   "G": 227,
+   "B": 118
+  },
+  "Name": "Cosmo 143"
+ },
+ {
+  "CosmoNumber": "144A",
+  "Color": {
+   "R": 248,
+   "G": 195,
+   "B": 84
+  },
+  "Name": "Cosmo 144A"
+ },
+ {
+  "CosmoNumber": "145",
+  "Color": {
+   "R": 246,
+   "G": 167,
+   "B": 58
+  },
+  "Name": "Cosmo 145"
+ },
+ {
+  "CosmoNumber": "146",
+  "Color": {
+   "R": 242,
+   "G": 126,
+   "B": 54
+  },
+  "Name": "Cosmo 146"
+ },
+ {
+  "CosmoNumber": "147",
+  "Color": {
+   "R": 238,
+   "G": 107,
+   "B": 47
+  },
+  "Name": "Cosmo 147"
+ },
+ {
+  "CosmoNumber": "151",
+  "Color": {
+   "R": 203,
+   "G": 196,
+   "B": 179
+  },
+  "Name": "Deep Rose"
+ },
+ {
+  "CosmoNumber": "152",
+  "Color": {
+   "R": 200,
+   "G": 50,
+   "B": 100
+  },
+  "Name": "Dark Rose"
+ },
+ {
+  "CosmoNumber": "152A",
+  "Color": {
+   "R": 147,
+   "G": 145,
+   "B": 138
+  },
+  "Name": "Cosmo 152A"
+ },
+ {
+  "CosmoNumber": "153",
+  "Color": {
+   "R": 220,
+   "G": 80,
+   "B": 130
+  },
+  "Name": "Medium Rose"
+ },
+ {
+  "CosmoNumber": "153A",
+  "Color": {
+   "R": 122,
+   "G": 122,
+   "B": 120
+  },
+  "Name": "Cosmo 153A"
+ },
+ {
+  "CosmoNumber": "154",
+  "Color": {
+   "R": 105,
+   "G": 103,
+   "B": 103
+  },
+  "Name": "Light Rose"
+ },
+ {
+  "CosmoNumber": "155",
+  "Color": {
+   "R": 69,
+   "G": 69,
+   "B": 75
+  },
+  "Name": "Pale Rose"
+ },
+ {
+  "CosmoNumber": "156",
+  "Color": {
+   "R": 50,
+   "G": 49,
+   "B": 51
+  },
+  "Name": "Cosmo 156"
+ },
+ {
+  "CosmoNumber": "161",
+  "Color": {
+   "R": 150,
+   "G": 20,
+   "B": 60
+  },
+  "Name": "Dark Crimson"
+ },
+ {
+  "CosmoNumber": "162",
+  "Color": {
+   "R": 180,
+   "G": 40,
+   "B": 80
+  },
+  "Name": "Crimson"
+ },
+ {
+  "CosmoNumber": "162A",
+  "Color": {
+   "R": 175,
+   "G": 198,
+   "B": 212
+  },
+  "Name": "Cosmo 162A"
+ },
+ {
+  "CosmoNumber": "163",
+  "Color": {
+   "R": 148,
+   "G": 185,
+   "B": 215
+  },
+  "Name": "Medium Crimson"
+ },
+ {
+  "CosmoNumber": "164",
+  "Color": {
+   "R": 107,
+   "G": 147,
+   "B": 191
+  },
+  "Name": "Light Crimson"
+ },
+ {
+  "CosmoNumber": "165",
+  "Color": {
+   "R": 245,
+   "G": 150,
+   "B": 175
+  },
+  "Name": "Pale Crimson"
+ },
+ {
+  "CosmoNumber": "165A",
+  "Color": {
+   "R": 87,
+   "G": 116,
+   "B": 161
+  },
+  "Name": "Cosmo 165A"
+ },
+ {
+  "CosmoNumber": "166",
+  "Color": {
+   "R": 54,
+   "G": 81,
+   "B": 134
+  },
+  "Name": "Cosmo 166"
+ },
+ {
+  "CosmoNumber": "167",
+  "Color": {
+   "R": 46,
+   "G": 66,
+   "B": 119
+  },
+  "Name": "Cosmo 167"
+ },
+ {
+  "CosmoNumber": "168",
+  "Color": {
+   "R": 40,
+   "G": 43,
+   "B": 84
+  },
+  "Name": "Cosmo 168"
+ },
+ {
+  "CosmoNumber": "169",
+  "Color": {
+   "R": 31,
+   "G": 32,
+   "B": 59
+  },
+  "Name": "Cosmo 169"
+ },
+ {
+  "CosmoNumber": "171A",
+  "Color": {
+   "R": 193,
+   "G": 188,
+   "B": 219
+  },
+  "Name": "Cosmo 171A"
+ },
+ {
+  "CosmoNumber": "172A",
+  "Color": {
+   "R": 166,
+   "G": 157,
+   "B": 206
+  },
+  "Name": "Cosmo 172A"
+ },
+ {
+  "CosmoNumber": "173",
+  "Color": {
+   "R": 124,
+   "G": 115,
+   "B": 183
+  },
+  "Name": "Cosmo 173"
+ },
+ {
+  "CosmoNumber": "174",
+  "Color": {
+   "R": 101,
+   "G": 90,
+   "B": 169
+  },
+  "Name": "Cosmo 174"
+ },
+ {
+  "CosmoNumber": "175",
+  "Color": {
+   "R": 95,
+   "G": 80,
+   "B": 163
+  },
+  "Name": "Cosmo 175"
+ },
+ {
+  "CosmoNumber": "176",
+  "Color": {
+   "R": 84,
+   "G": 71,
+   "B": 153
+  },
+  "Name": "Cosmo 176"
+ },
+ {
+  "CosmoNumber": "185A",
+  "Color": {
+   "R": 245,
+   "G": 189,
+   "B": 153
+  },
+  "Name": "Cosmo 185A"
+ },
+ {
+  "CosmoNumber": "186",
+  "Color": {
+   "R": 218,
+   "G": 103,
+   "B": 70
+  },
+  "Name": "Cosmo 186"
+ },
+ {
+  "CosmoNumber": "187",
+  "Color": {
+   "R": 195,
+   "G": 63,
+   "B": 44
+  },
+  "Name": "Cosmo 187"
+ },
+ {
+  "CosmoNumber": "188",
+  "Color": {
+   "R": 164,
+   "G": 51,
+   "B": 40
+  },
+  "Name": "Cosmo 188"
+ },
+ {
+  "CosmoNumber": "203",
+  "Color": {
+   "R": 238,
+   "G": 104,
+   "B": 164
+  },
+  "Name": "Cosmo 203"
+ },
+ {
+  "CosmoNumber": "204",
+  "Color": {
+   "R": 237,
+   "G": 87,
+   "B": 158
+  },
+  "Name": "Cosmo 204"
+ },
+ {
+  "CosmoNumber": "205A",
+  "Color": {
+   "R": 232,
+   "G": 66,
+   "B": 122
+  },
+  "Name": "Cosmo 205A"
+ },
+ {
+  "CosmoNumber": "206",
+  "Color": {
+   "R": 224,
+   "G": 44,
+   "B": 79
+  },
+  "Name": "Cosmo 206"
+ },
+ {
+  "CosmoNumber": "211",
+  "Color": {
+   "R": 233,
+   "G": 241,
+   "B": 239
+  },
+  "Name": "Flesh Light"
+ },
+ {
+  "CosmoNumber": "212",
+  "Color": {
+   "R": 250,
+   "G": 180,
+   "B": 160
+  },
+  "Name": "Flesh Medium"
+ },
+ {
+  "CosmoNumber": "213",
+  "Color": {
+   "R": 235,
+   "G": 155,
+   "B": 135
+  },
+  "Name": "Flesh Dark"
+ },
+ {
+  "CosmoNumber": "214",
+  "Color": {
+   "R": 79,
+   "G": 112,
+   "B": 179
+  },
+  "Name": "Cosmo 214"
+ },
+ {
+  "CosmoNumber": "216",
+  "Color": {
+   "R": 45,
+   "G": 56,
+   "B": 128
+  },
+  "Name": "Cosmo 216"
+ },
+ {
+  "CosmoNumber": "218",
+  "Color": {
+   "R": 45,
+   "G": 47,
+   "B": 94
+  },
+  "Name": "Cosmo 218"
+ },
+ {
+  "CosmoNumber": "220",
+  "Color": {
+   "R": 247,
+   "G": 219,
+   "B": 226
+  },
+  "Name": "Cosmo 220"
+ },
+ {
+  "CosmoNumber": "221",
+  "Color": {
+   "R": 244,
+   "G": 193,
+   "B": 217
+  },
+  "Name": "Deep Orange"
+ },
+ {
+  "CosmoNumber": "222",
+  "Color": {
+   "R": 220,
+   "G": 128,
+   "B": 172
+  },
+  "Name": "Orange"
+ },
+ {
+  "CosmoNumber": "223",
+  "Color": {
+   "R": 170,
+   "G": 66,
+   "B": 123
+  },
+  "Name": "Light Orange"
+ },
+ {
+  "CosmoNumber": "224",
+  "Color": {
+   "R": 145,
+   "G": 55,
+   "B": 91
+  },
+  "Name": "Pale Orange"
+ },
+ {
+  "CosmoNumber": "225",
+  "Color": {
+   "R": 90,
+   "G": 21,
+   "B": 38
+  },
+  "Name": "Cosmo 225"
+ },
+ {
+  "CosmoNumber": "226",
+  "Color": {
+   "R": 79,
+   "G": 20,
+   "B": 38
+  },
+  "Name": "Cosmo 226"
+ },
+ {
+  "CosmoNumber": "231",
+  "Color": {
+   "R": 200,
+   "G": 100,
+   "B": 20
+  },
+  "Name": "Rust Dark"
+ },
+ {
+  "CosmoNumber": "232",
+  "Color": {
+   "R": 218,
+   "G": 182,
+   "B": 183
+  },
+  "Name": "Rust Medium"
+ },
+ {
+  "CosmoNumber": "233",
+  "Color": {
+   "R": 206,
+   "G": 167,
+   "B": 174
+  },
+  "Name": "Rust Light"
+ },
+ {
+  "CosmoNumber": "234",
+  "Color": {
+   "R": 176,
+   "G": 130,
+   "B": 148
+  },
+  "Name": "Cosmo 234"
+ },
+ {
+  "CosmoNumber": "235",
+  "Color": {
+   "R": 143,
+   "G": 102,
+   "B": 114
+  },
+  "Name": "Cosmo 235"
+ },
+ {
+  "CosmoNumber": "236",
+  "Color": {
+   "R": 124,
+   "G": 71,
+   "B": 79
+  },
+  "Name": "Cosmo 236"
+ },
+ {
+  "CosmoNumber": "240",
+  "Color": {
+   "R": 207,
+   "G": 36,
+   "B": 72
+  },
+  "Name": "Cosmo 240"
+ },
+ {
+  "CosmoNumber": "241",
+  "Color": {
+   "R": 255,
+   "G": 230,
+   "B": 0
+  },
+  "Name": "Bright Yellow"
+ },
+ {
+  "CosmoNumber": "241A",
+  "Color": {
+   "R": 176,
+   "G": 32,
+   "B": 47
+  },
+  "Name": "Cosmo 241A"
+ },
+ {
+  "CosmoNumber": "242",
+  "Color": {
+   "R": 146,
+   "G": 27,
+   "B": 54
+  },
+  "Name": "Light Yellow"
+ },
+ {
+  "CosmoNumber": "243",
+  "Color": {
+   "R": 255,
+   "G": 240,
+   "B": 140
+  },
+  "Name": "Pale Yellow"
+ },
+ {
+  "CosmoNumber": "244",
+  "Color": {
+   "R": 255,
+   "G": 245,
+   "B": 180
+  },
+  "Name": "Cream Yellow"
+ },
+ {
+  "CosmoNumber": "245",
+  "Color": {
+   "R": 97,
+   "G": 25,
+   "B": 33
+  },
+  "Name": "Cosmo 245"
+ },
+ {
+  "CosmoNumber": "246",
+  "Color": {
+   "R": 107,
+   "G": 24,
+   "B": 40
+  },
+  "Name": "Cosmo 246"
+ },
+ {
+  "CosmoNumber": "247",
+  "Color": {
+   "R": 53,
+   "G": 29,
+   "B": 33
+  },
+  "Name": "Cosmo 247"
+ },
+ {
+  "CosmoNumber": "251",
+  "Color": {
+   "R": 200,
+   "G": 170,
+   "B": 0
+  },
+  "Name": "Deep Gold"
+ },
+ {
+  "CosmoNumber": "252",
+  "Color": {
+   "R": 146,
+   "G": 194,
+   "B": 207
+  },
+  "Name": "Gold"
+ },
+ {
+  "CosmoNumber": "253",
+  "Color": {
+   "R": 89,
+   "G": 143,
+   "B": 176
+  },
+  "Name": "Light Gold"
+ },
+ {
+  "CosmoNumber": "254",
+  "Color": {
+   "R": 53,
+   "G": 88,
+   "B": 143
+  },
+  "Name": "Pale Gold"
+ },
+ {
+  "CosmoNumber": "261",
+  "Color": {
+   "R": 198,
+   "G": 162,
+   "B": 203
+  },
+  "Name": "Cosmo 261"
+ },
+ {
+  "CosmoNumber": "262",
+  "Color": {
+   "R": 165,
+   "G": 128,
+   "B": 188
+  },
+  "Name": "Cosmo 262"
+ },
+ {
+  "CosmoNumber": "263",
+  "Color": {
+   "R": 109,
+   "G": 76,
+   "B": 147
+  },
+  "Name": "Cosmo 263"
+ },
+ {
+  "CosmoNumber": "264",
+  "Color": {
+   "R": 98,
+   "G": 66,
+   "B": 131
+  },
+  "Name": "Cosmo 264"
+ },
+ {
+  "CosmoNumber": "265",
+  "Color": {
+   "R": 103,
+   "G": 60,
+   "B": 132
+  },
+  "Name": "Cosmo 265"
+ },
+ {
+  "CosmoNumber": "266",
+  "Color": {
+   "R": 85,
+   "G": 50,
+   "B": 115
+  },
+  "Name": "Cosmo 266"
+ },
+ {
+  "CosmoNumber": "269",
+  "Color": {
+   "R": 194,
+   "G": 222,
+   "B": 112
+  },
+  "Name": "Cosmo 269"
+ },
+ {
+  "CosmoNumber": "270",
+  "Color": {
+   "R": 175,
+   "G": 215,
+   "B": 98
+  },
+  "Name": "Cosmo 270"
+ },
+ {
+  "CosmoNumber": "271",
+  "Color": {
+   "R": 141,
+   "G": 198,
+   "B": 78
+  },
+  "Name": "Cosmo 271"
+ },
+ {
+  "CosmoNumber": "272",
+  "Color": {
+   "R": 99,
+   "G": 170,
+   "B": 68
+  },
+  "Name": "Cosmo 272"
+ },
+ {
+  "CosmoNumber": "273",
+  "Color": {
+   "R": 77,
+   "G": 152,
+   "B": 62
+  },
+  "Name": "Cosmo 273"
+ },
+ {
+  "CosmoNumber": "274",
+  "Color": {
+   "R": 64,
+   "G": 135,
+   "B": 61
+  },
+  "Name": "Cosmo 274"
+ },
+ {
+  "CosmoNumber": "275",
+  "Color": {
+   "R": 55,
+   "G": 126,
+   "B": 62
+  },
+  "Name": "Cosmo 275"
+ },
+ {
+  "CosmoNumber": "276",
+  "Color": {
+   "R": 49,
+   "G": 116,
+   "B": 61
+  },
+  "Name": "Cosmo 276"
+ },
+ {
+  "CosmoNumber": "281",
+  "Color": {
+   "R": 211,
+   "G": 178,
+   "B": 213
+  },
+  "Name": "Cosmo 281"
+ },
+ {
+  "CosmoNumber": "282",
+  "Color": {
+   "R": 166,
+   "G": 116,
+   "B": 186
+  },
+  "Name": "Cosmo 282"
+ },
+ {
+  "CosmoNumber": "283",
+  "Color": {
+   "R": 125,
+   "G": 77,
+   "B": 162
+  },
+  "Name": "Cosmo 283"
+ },
+ {
+  "CosmoNumber": "284",
+  "Color": {
+   "R": 114,
+   "G": 62,
+   "B": 148
+  },
+  "Name": "Cosmo 284"
+ },
+ {
+  "CosmoNumber": "285",
+  "Color": {
+   "R": 101,
+   "G": 52,
+   "B": 136
+  },
+  "Name": "Cosmo 285"
+ },
+ {
+  "CosmoNumber": "286",
+  "Color": {
+   "R": 77,
+   "G": 42,
+   "B": 104
+  },
+  "Name": "Cosmo 286"
+ },
+ {
+  "CosmoNumber": "287A",
+  "Color": {
+   "R": 72,
+   "G": 42,
+   "B": 103
+  },
+  "Name": "Cosmo 287A"
+ },
+ {
+  "CosmoNumber": "297",
+  "Color": {
+   "R": 250,
+   "G": 245,
+   "B": 176
+  },
+  "Name": "Cosmo 297"
+ },
+ {
+  "CosmoNumber": "298",
+  "Color": {
+   "R": 251,
+   "G": 241,
+   "B": 131
+  },
+  "Name": "Cosmo 298"
+ },
+ {
+  "CosmoNumber": "299",
+  "Color": {
+   "R": 246,
+   "G": 239,
+   "B": 114
+  },
+  "Name": "Cosmo 299"
+ },
+ {
+  "CosmoNumber": "300",
+  "Color": {
+   "R": 250,
+   "G": 236,
+   "B": 77
+  },
+  "Name": "Cosmo 300"
+ },
+ {
+  "CosmoNumber": "301",
+  "Color": {
+   "R": 251,
+   "G": 227,
+   "B": 57
+  },
+  "Name": "Cosmo 301"
+ },
+ {
+  "CosmoNumber": "302",
+  "Color": {
+   "R": 250,
+   "G": 213,
+   "B": 50
+  },
+  "Name": "Cosmo 302"
+ },
+ {
+  "CosmoNumber": "305",
+  "Color": {
+   "R": 226,
+   "G": 200,
+   "B": 163
+  },
+  "Name": "Cosmo 305"
+ },
+ {
+  "CosmoNumber": "306",
+  "Color": {
+   "R": 212,
+   "G": 181,
+   "B": 146
+  },
+  "Name": "Cosmo 306"
+ },
+ {
+  "CosmoNumber": "307",
+  "Color": {
+   "R": 188,
+   "G": 151,
+   "B": 105
+  },
+  "Name": "Cosmo 307"
+ },
+ {
+  "CosmoNumber": "308",
+  "Color": {
+   "R": 155,
+   "G": 100,
+   "B": 56
+  },
+  "Name": "Cosmo 308"
+ },
+ {
+  "CosmoNumber": "309",
+  "Color": {
+   "R": 133,
+   "G": 84,
+   "B": 48
+  },
+  "Name": "Cosmo 309"
+ },
+ {
+  "CosmoNumber": "310",
+  "Color": {
+   "R": 87,
+   "G": 62,
+   "B": 47
+  },
+  "Name": "Cosmo 310"
+ },
+ {
+  "CosmoNumber": "311",
+  "Color": {
+   "R": 79,
+   "G": 64,
+   "B": 54
+  },
+  "Name": "Deep Green"
+ },
+ {
+  "CosmoNumber": "312",
+  "Color": {
+   "R": 43,
+   "G": 35,
+   "B": 32
+  },
+  "Name": "Dark Green"
+ },
+ {
+  "CosmoNumber": "313",
+  "Color": {
+   "R": 30,
+   "G": 160,
+   "B": 100
+  },
+  "Name": "Medium Green"
+ },
+ {
+  "CosmoNumber": "314",
+  "Color": {
+   "R": 80,
+   "G": 190,
+   "B": 130
+  },
+  "Name": "Light Green"
+ },
+ {
+  "CosmoNumber": "315",
+  "Color": {
+   "R": 140,
+   "G": 215,
+   "B": 170
+  },
+  "Name": "Pale Green"
+ },
+ {
+  "CosmoNumber": "316A",
+  "Color": {
+   "R": 169,
+   "G": 203,
+   "B": 168
+  },
+  "Name": "Cosmo 316A"
+ },
+ {
+  "CosmoNumber": "317",
+  "Color": {
+   "R": 143,
+   "G": 185,
+   "B": 142
+  },
+  "Name": "Cosmo 317"
+ },
+ {
+  "CosmoNumber": "318",
+  "Color": {
+   "R": 101,
+   "G": 153,
+   "B": 113
+  },
+  "Name": "Cosmo 318"
+ },
+ {
+  "CosmoNumber": "319",
+  "Color": {
+   "R": 69,
+   "G": 117,
+   "B": 74
+  },
+  "Name": "Cosmo 319"
+ },
+ {
+  "CosmoNumber": "320",
+  "Color": {
+   "R": 45,
+   "G": 83,
+   "B": 51
+  },
+  "Name": "Cosmo 320"
+ },
+ {
+  "CosmoNumber": "321",
+  "Color": {
+   "R": 50,
+   "G": 80,
+   "B": 40
+  },
+  "Name": "Forest Dark"
+ },
+ {
+  "CosmoNumber": "322",
+  "Color": {
+   "R": 70,
+   "G": 110,
+   "B": 60
+  },
+  "Name": "Forest Medium"
+ },
+ {
+  "CosmoNumber": "323",
+  "Color": {
+   "R": 204,
+   "G": 224,
+   "B": 139
+  },
+  "Name": "Forest Light"
+ },
+ {
+  "CosmoNumber": "324",
+  "Color": {
+   "R": 156,
+   "G": 196,
+   "B": 72
+  },
+  "Name": "Cosmo 324"
+ },
+ {
+  "CosmoNumber": "325A",
+  "Color": {
+   "R": 125,
+   "G": 172,
+   "B": 62
+  },
+  "Name": "Cosmo 325A"
+ },
+ {
+  "CosmoNumber": "326",
+  "Color": {
+   "R": 96,
+   "G": 156,
+   "B": 55
+  },
+  "Name": "Cosmo 326"
+ },
+ {
+  "CosmoNumber": "327",
+  "Color": {
+   "R": 76,
+   "G": 135,
+   "B": 56
+  },
+  "Name": "Cosmo 327"
+ },
+ {
+  "CosmoNumber": "328",
+  "Color": {
+   "R": 59,
+   "G": 108,
+   "B": 54
+  },
+  "Name": "Cosmo 328"
+ },
+ {
+  "CosmoNumber": "329",
+  "Color": {
+   "R": 50,
+   "G": 97,
+   "B": 50
+  },
+  "Name": "Cosmo 329"
+ },
+ {
+  "CosmoNumber": "331",
+  "Color": {
+   "R": 100,
+   "G": 150,
+   "B": 30
+  },
+  "Name": "Chartreuse Dark"
+ },
+ {
+  "CosmoNumber": "332",
+  "Color": {
+   "R": 140,
+   "G": 180,
+   "B": 60
+  },
+  "Name": "Chartreuse"
+ },
+ {
+  "CosmoNumber": "333",
+  "Color": {
+   "R": 179,
+   "G": 221,
+   "B": 179
+  },
+  "Name": "Chartreuse Light"
+ },
+ {
+  "CosmoNumber": "334",
+  "Color": {
+   "R": 139,
+   "G": 200,
+   "B": 149
+  },
+  "Name": "Cosmo 334"
+ },
+ {
+  "CosmoNumber": "335",
+  "Color": {
+   "R": 94,
+   "G": 173,
+   "B": 109
+  },
+  "Name": "Cosmo 335"
+ },
+ {
+  "CosmoNumber": "336",
+  "Color": {
+   "R": 86,
+   "G": 162,
+   "B": 101
+  },
+  "Name": "Cosmo 336"
+ },
+ {
+  "CosmoNumber": "337",
+  "Color": {
+   "R": 65,
+   "G": 135,
+   "B": 81
+  },
+  "Name": "Cosmo 337"
+ },
+ {
+  "CosmoNumber": "338",
+  "Color": {
+   "R": 42,
+   "G": 99,
+   "B": 55
+  },
+  "Name": "Cosmo 338"
+ },
+ {
+  "CosmoNumber": "340",
+  "Color": {
+   "R": 245,
+   "G": 189,
+   "B": 154
+  },
+  "Name": "Cosmo 340"
+ },
+ {
+  "CosmoNumber": "341",
+  "Color": {
+   "R": 246,
+   "G": 204,
+   "B": 167
+  },
+  "Name": "Teal Dark"
+ },
+ {
+  "CosmoNumber": "342",
+  "Color": {
+   "R": 230,
+   "G": 106,
+   "B": 90
+  },
+  "Name": "Teal"
+ },
+ {
+  "CosmoNumber": "343",
+  "Color": {
+   "R": 226,
+   "G": 73,
+   "B": 69
+  },
+  "Name": "Teal Light"
+ },
+ {
+  "CosmoNumber": "344",
+  "Color": {
+   "R": 202,
+   "G": 45,
+   "B": 50
+  },
+  "Name": "Teal Pale"
+ },
+ {
+  "CosmoNumber": "345",
+  "Color": {
+   "R": 182,
+   "G": 35,
+   "B": 42
+  },
+  "Name": "Cosmo 345"
+ },
+ {
+  "CosmoNumber": "346",
+  "Color": {
+   "R": 174,
+   "G": 34,
+   "B": 41
+  },
+  "Name": "Cosmo 346"
+ },
+ {
+  "CosmoNumber": "351",
+  "Color": {
+   "R": 248,
+   "G": 223,
+   "B": 216
+  },
+  "Name": "Cosmo 351"
+ },
+ {
+  "CosmoNumber": "352",
+  "Color": {
+   "R": 249,
+   "G": 209,
+   "B": 223
+  },
+  "Name": "Cosmo 352"
+ },
+ {
+  "CosmoNumber": "353",
+  "Color": {
+   "R": 244,
+   "G": 157,
+   "B": 199
+  },
+  "Name": "Cosmo 353"
+ },
+ {
+  "CosmoNumber": "354",
+  "Color": {
+   "R": 242,
+   "G": 135,
+   "B": 188
+  },
+  "Name": "Cosmo 354"
+ },
+ {
+  "CosmoNumber": "364",
+  "Color": {
+   "R": 234,
+   "G": 233,
+   "B": 214
+  },
+  "Name": "Cosmo 364"
+ },
+ {
+  "CosmoNumber": "365",
+  "Color": {
+   "R": 211,
+   "G": 210,
+   "B": 187
+  },
+  "Name": "Cosmo 365"
+ },
+ {
+  "CosmoNumber": "366",
+  "Color": {
+   "R": 178,
+   "G": 177,
+   "B": 148
+  },
+  "Name": "Cosmo 366"
+ },
+ {
+  "CosmoNumber": "367",
+  "Color": {
+   "R": 137,
+   "G": 129,
+   "B": 107
+  },
+  "Name": "Cosmo 367"
+ },
+ {
+  "CosmoNumber": "368",
+  "Color": {
+   "R": 108,
+   "G": 100,
+   "B": 84
+  },
+  "Name": "Cosmo 368"
+ },
+ {
+  "CosmoNumber": "369",
+  "Color": {
+   "R": 71,
+   "G": 67,
+   "B": 51
+  },
+  "Name": "Cosmo 369"
+ },
+ {
+  "CosmoNumber": "370",
+  "Color": {
+   "R": 74,
+   "G": 62,
+   "B": 36
+  },
+  "Name": "Cosmo 370"
+ },
+ {
+  "CosmoNumber": "371",
+  "Color": {
+   "R": 156,
+   "G": 200,
+   "B": 199
+  },
+  "Name": "Cosmo 371"
+ },
+ {
+  "CosmoNumber": "372",
+  "Color": {
+   "R": 144,
+   "G": 198,
+   "B": 207
+  },
+  "Name": "Cosmo 372"
+ },
+ {
+  "CosmoNumber": "373",
+  "Color": {
+   "R": 119,
+   "G": 184,
+   "B": 190
+  },
+  "Name": "Cosmo 373"
+ },
+ {
+  "CosmoNumber": "374",
+  "Color": {
+   "R": 90,
+   "G": 153,
+   "B": 166
+  },
+  "Name": "Cosmo 374"
+ },
+ {
+  "CosmoNumber": "375",
+  "Color": {
+   "R": 61,
+   "G": 116,
+   "B": 140
+  },
+  "Name": "Cosmo 375"
+ },
+ {
+  "CosmoNumber": "376",
+  "Color": {
+   "R": 47,
+   "G": 92,
+   "B": 131
+  },
+  "Name": "Cosmo 376"
+ },
+ {
+  "CosmoNumber": "380",
+  "Color": {
+   "R": 201,
+   "G": 181,
+   "B": 172
+  },
+  "Name": "Cosmo 380"
+ },
+ {
+  "CosmoNumber": "382",
+  "Color": {
+   "R": 182,
+   "G": 155,
+   "B": 145
+  },
+  "Name": "Cosmo 382"
+ },
+ {
+  "CosmoNumber": "383",
+  "Color": {
+   "R": 146,
+   "G": 124,
+   "B": 109
+  },
+  "Name": "Cosmo 383"
+ },
+ {
+  "CosmoNumber": "384",
+  "Color": {
+   "R": 118,
+   "G": 91,
+   "B": 81
+  },
+  "Name": "Cosmo 384"
+ },
+ {
+  "CosmoNumber": "386",
+  "Color": {
+   "R": 97,
+   "G": 72,
+   "B": 61
+  },
+  "Name": "Cosmo 386"
+ },
+ {
+  "CosmoNumber": "402",
+  "Color": {
+   "R": 246,
+   "G": 194,
+   "B": 139
+  },
+  "Name": "Cosmo 402"
+ },
+ {
+  "CosmoNumber": "403",
+  "Color": {
+   "R": 239,
+   "G": 116,
+   "B": 71
+  },
+  "Name": "Cosmo 403"
+ },
+ {
+  "CosmoNumber": "404",
+  "Color": {
+   "R": 230,
+   "G": 83,
+   "B": 45
+  },
+  "Name": "Cosmo 404"
+ },
+ {
+  "CosmoNumber": "405",
+  "Color": {
+   "R": 218,
+   "G": 65,
+   "B": 37
+  },
+  "Name": "Cosmo 405"
+ },
+ {
+  "CosmoNumber": "406",
+  "Color": {
+   "R": 192,
+   "G": 54,
+   "B": 39
+  },
+  "Name": "Cosmo 406"
+ },
+ {
+  "CosmoNumber": "410A",
+  "Color": {
+   "R": 218,
+   "G": 239,
+   "B": 246
+  },
+  "Name": "Cosmo 410A"
+ },
+ {
+  "CosmoNumber": "411",
+  "Color": {
+   "R": 189,
+   "G": 228,
+   "B": 242
+  },
+  "Name": "Navy Dark"
+ },
+ {
+  "CosmoNumber": "412",
+  "Color": {
+   "R": 155,
+   "G": 210,
+   "B": 238
+  },
+  "Name": "Navy"
+ },
+ {
+  "CosmoNumber": "413",
+  "Color": {
+   "R": 79,
+   "G": 139,
+   "B": 205
+  },
+  "Name": "Navy Light"
+ },
+ {
+  "CosmoNumber": "414A",
+  "Color": {
+   "R": 62,
+   "G": 121,
+   "B": 193
+  },
+  "Name": "Cosmo 414A"
+ },
+ {
+  "CosmoNumber": "415A",
+  "Color": {
+   "R": 51,
+   "G": 101,
+   "B": 177
+  },
+  "Name": "Cosmo 415A"
+ },
+ {
+  "CosmoNumber": "421",
+  "Color": {
+   "R": 0,
+   "G": 100,
+   "B": 180
+  },
+  "Name": "Royal Blue Dark"
+ },
+ {
+  "CosmoNumber": "422",
+  "Color": {
+   "R": 30,
+   "G": 130,
+   "B": 210
+  },
+  "Name": "Royal Blue"
+ },
+ {
+  "CosmoNumber": "423",
+  "Color": {
+   "R": 223,
+   "G": 181,
+   "B": 160
+  },
+  "Name": "Royal Blue Light"
+ },
+ {
+  "CosmoNumber": "424",
+  "Color": {
+   "R": 211,
+   "G": 157,
+   "B": 135
+  },
+  "Name": "Royal Blue Pale"
+ },
+ {
+  "CosmoNumber": "425",
+  "Color": {
+   "R": 161,
+   "G": 109,
+   "B": 91
+  },
+  "Name": "Cosmo 425"
+ },
+ {
+  "CosmoNumber": "426",
+  "Color": {
+   "R": 116,
+   "G": 71,
+   "B": 61
+  },
+  "Name": "Cosmo 426"
+ },
+ {
+  "CosmoNumber": "431",
+  "Color": {
+   "R": 218,
+   "G": 165,
+   "B": 183
+  },
+  "Name": "Steel Blue Dark"
+ },
+ {
+  "CosmoNumber": "432",
+  "Color": {
+   "R": 130,
+   "G": 175,
+   "B": 215
+  },
+  "Name": "Steel Blue"
+ },
+ {
+  "CosmoNumber": "432A",
+  "Color": {
+   "R": 214,
+   "G": 159,
+   "B": 183
+  },
+  "Name": "Cosmo 432A"
+ },
+ {
+  "CosmoNumber": "433",
+  "Color": {
+   "R": 177,
+   "G": 109,
+   "B": 138
+  },
+  "Name": "Steel Blue Light"
+ },
+ {
+  "CosmoNumber": "434",
+  "Color": {
+   "R": 142,
+   "G": 78,
+   "B": 97
+  },
+  "Name": "Cosmo 434"
+ },
+ {
+  "CosmoNumber": "435",
+  "Color": {
+   "R": 113,
+   "G": 59,
+   "B": 72
+  },
+  "Name": "Cosmo 435"
+ },
+ {
+  "CosmoNumber": "437",
+  "Color": {
+   "R": 101,
+   "G": 26,
+   "B": 40
+  },
+  "Name": "Cosmo 437"
+ },
+ {
+  "CosmoNumber": "440",
+  "Color": {
+   "R": 246,
+   "G": 166,
+   "B": 161
+  },
+  "Name": "Cosmo 440"
+ },
+ {
+  "CosmoNumber": "441",
+  "Color": {
+   "R": 242,
+   "G": 137,
+   "B": 129
+  },
+  "Name": "Sky Blue Light"
+ },
+ {
+  "CosmoNumber": "442",
+  "Color": {
+   "R": 200,
+   "G": 225,
+   "B": 245
+  },
+  "Name": "Sky Blue Pale"
+ },
+ {
+  "CosmoNumber": "443",
+  "Color": {
+   "R": 240,
+   "G": 96,
+   "B": 81
+  },
+  "Name": "Cosmo 443"
+ },
+ {
+  "CosmoNumber": "444A",
+  "Color": {
+   "R": 240,
+   "G": 81,
+   "B": 68
+  },
+  "Name": "Cosmo 444A"
+ },
+ {
+  "CosmoNumber": "445A",
+  "Color": {
+   "R": 236,
+   "G": 63,
+   "B": 53
+  },
+  "Name": "Cosmo 445A"
+ },
+ {
+  "CosmoNumber": "461",
+  "Color": {
+   "R": 225,
+   "G": 162,
+   "B": 154
+  },
+  "Name": "Cosmo 461"
+ },
+ {
+  "CosmoNumber": "462",
+  "Color": {
+   "R": 210,
+   "G": 137,
+   "B": 132
+  },
+  "Name": "Cosmo 462"
+ },
+ {
+  "CosmoNumber": "463",
+  "Color": {
+   "R": 191,
+   "G": 112,
+   "B": 107
+  },
+  "Name": "Cosmo 463"
+ },
+ {
+  "CosmoNumber": "464",
+  "Color": {
+   "R": 174,
+   "G": 83,
+   "B": 79
+  },
+  "Name": "Cosmo 464"
+ },
+ {
+  "CosmoNumber": "465",
+  "Color": {
+   "R": 158,
+   "G": 63,
+   "B": 61
+  },
+  "Name": "Cosmo 465"
+ },
+ {
+  "CosmoNumber": "466",
+  "Color": {
+   "R": 143,
+   "G": 50,
+   "B": 52
+  },
+  "Name": "Cosmo 466"
+ },
+ {
+  "CosmoNumber": "467",
+  "Color": {
+   "R": 121,
+   "G": 34,
+   "B": 36
+  },
+  "Name": "Cosmo 467"
+ },
+ {
+  "CosmoNumber": "472",
+  "Color": {
+   "R": 193,
+   "G": 174,
+   "B": 174
+  },
+  "Name": "Cosmo 472"
+ },
+ {
+  "CosmoNumber": "473",
+  "Color": {
+   "R": 177,
+   "G": 159,
+   "B": 162
+  },
+  "Name": "Cosmo 473"
+ },
+ {
+  "CosmoNumber": "474",
+  "Color": {
+   "R": 155,
+   "G": 136,
+   "B": 141
+  },
+  "Name": "Cosmo 474"
+ },
+ {
+  "CosmoNumber": "475",
+  "Color": {
+   "R": 120,
+   "G": 100,
+   "B": 108
+  },
+  "Name": "Cosmo 475"
+ },
+ {
+  "CosmoNumber": "476",
+  "Color": {
+   "R": 97,
+   "G": 75,
+   "B": 88
+  },
+  "Name": "Cosmo 476"
+ },
+ {
+  "CosmoNumber": "477",
+  "Color": {
+   "R": 59,
+   "G": 46,
+   "B": 55
+  },
+  "Name": "Cosmo 477"
+ },
+ {
+  "CosmoNumber": "478",
+  "Color": {
+   "R": 54,
+   "G": 49,
+   "B": 60
+  },
+  "Name": "Cosmo 478"
+ },
+ {
+  "CosmoNumber": "480A",
+  "Color": {
+   "R": 244,
+   "G": 214,
+   "B": 227
+  },
+  "Name": "Cosmo 480A"
+ },
+ {
+  "CosmoNumber": "481A",
+  "Color": {
+   "R": 237,
+   "G": 179,
+   "B": 215
+  },
+  "Name": "Cosmo 481A"
+ },
+ {
+  "CosmoNumber": "482",
+  "Color": {
+   "R": 214,
+   "G": 119,
+   "B": 185
+  },
+  "Name": "Cosmo 482"
+ },
+ {
+  "CosmoNumber": "483",
+  "Color": {
+   "R": 188,
+   "G": 74,
+   "B": 155
+  },
+  "Name": "Cosmo 483"
+ },
+ {
+  "CosmoNumber": "484A",
+  "Color": {
+   "R": 166,
+   "G": 60,
+   "B": 138
+  },
+  "Name": "Cosmo 484A"
+ },
+ {
+  "CosmoNumber": "485A",
+  "Color": {
+   "R": 158,
+   "G": 38,
+   "B": 121
+  },
+  "Name": "Cosmo 485A"
+ },
+ {
+  "CosmoNumber": "486",
+  "Color": {
+   "R": 128,
+   "G": 32,
+   "B": 100
+  },
+  "Name": "Cosmo 486"
+ },
+ {
+  "CosmoNumber": "499",
+  "Color": {
+   "R": 241,
+   "G": 168,
+   "B": 208
+  },
+  "Name": "Cosmo 499"
+ },
+ {
+  "CosmoNumber": "500",
+  "Color": {
+   "R": 247,
+   "G": 247,
+   "B": 247
+  },
+  "Name": "Cosmo 500"
+ },
+ {
+  "CosmoNumber": "501",
+  "Color": {
+   "R": 237,
+   "G": 139,
+   "B": 196
+  },
+  "Name": "Cosmo 501"
+ },
+ {
+  "CosmoNumber": "502",
+  "Color": {
+   "R": 228,
+   "G": 91,
+   "B": 171
+  },
+  "Name": "Cosmo 502"
+ },
+ {
+  "CosmoNumber": "503",
+  "Color": {
+   "R": 211,
+   "G": 59,
+   "B": 146
+  },
+  "Name": "Cosmo 503"
+ },
+ {
+  "CosmoNumber": "504",
+  "Color": {
+   "R": 215,
+   "G": 51,
+   "B": 134
+  },
+  "Name": "Cosmo 504"
+ },
+ {
+  "CosmoNumber": "505A",
+  "Color": {
+   "R": 205,
+   "G": 44,
+   "B": 113
+  },
+  "Name": "Cosmo 505A"
+ },
+ {
+  "CosmoNumber": "506",
+  "Color": {
+   "R": 185,
+   "G": 29,
+   "B": 88
+  },
+  "Name": "Cosmo 506"
+ },
+ {
+  "CosmoNumber": "511",
+  "Color": {
+   "R": 80,
+   "G": 40,
+   "B": 120
+  },
+  "Name": "Deep Purple"
+ },
+ {
+  "CosmoNumber": "512",
+  "Color": {
+   "R": 110,
+   "G": 60,
+   "B": 150
+  },
+  "Name": "Dark Purple"
+ },
+ {
+  "CosmoNumber": "513",
+  "Color": {
+   "R": 140,
+   "G": 90,
+   "B": 175
+  },
+  "Name": "Medium Purple"
+ },
+ {
+  "CosmoNumber": "514",
+  "Color": {
+   "R": 175,
+   "G": 130,
+   "B": 200
+  },
+  "Name": "Light Purple"
+ },
+ {
+  "CosmoNumber": "515",
+  "Color": {
+   "R": 210,
+   "G": 175,
+   "B": 225
+  },
+  "Name": "Pale Purple"
+ },
+ {
+  "CosmoNumber": "520",
+  "Color": {
+   "R": 217,
+   "G": 225,
+   "B": 229
+  },
+  "Name": "Cosmo 520"
+ },
+ {
+  "CosmoNumber": "521",
+  "Color": {
+   "R": 150,
+   "G": 50,
+   "B": 150
+  },
+  "Name": "Violet Dark"
+ },
+ {
+  "CosmoNumber": "521A",
+  "Color": {
+   "R": 205,
+   "G": 224,
+   "B": 226
+  },
+  "Name": "Cosmo 521A"
+ },
+ {
+  "CosmoNumber": "522",
+  "Color": {
+   "R": 177,
+   "G": 201,
+   "B": 222
+  },
+  "Name": "Violet"
+ },
+ {
+  "CosmoNumber": "523",
+  "Color": {
+   "R": 150,
+   "G": 182,
+   "B": 218
+  },
+  "Name": "Violet Light"
+ },
+ {
+  "CosmoNumber": "524",
+  "Color": {
+   "R": 230,
+   "G": 180,
+   "B": 230
+  },
+  "Name": "Violet Pale"
+ },
+ {
+  "CosmoNumber": "525",
+  "Color": {
+   "R": 82,
+   "G": 114,
+   "B": 183
+  },
+  "Name": "Cosmo 525"
+ },
+ {
+  "CosmoNumber": "526",
+  "Color": {
+   "R": 73,
+   "G": 102,
+   "B": 177
+  },
+  "Name": "Cosmo 526"
+ },
+ {
+  "CosmoNumber": "531",
+  "Color": {
+   "R": 200,
+   "G": 150,
+   "B": 200
+  },
+  "Name": "Lavender Dark"
+ },
+ {
+  "CosmoNumber": "532",
+  "Color": {
+   "R": 220,
+   "G": 180,
+   "B": 220
+  },
+  "Name": "Lavender"
+ },
+ {
+  "CosmoNumber": "533",
+  "Color": {
+   "R": 235,
+   "G": 210,
+   "B": 235
+  },
+  "Name": "Lavender Light"
+ },
+ {
+  "CosmoNumber": "533A",
+  "Color": {
+   "R": 166,
+   "G": 196,
+   "B": 158
+  },
+  "Name": "Cosmo 533A"
+ },
+ {
+  "CosmoNumber": "534A",
+  "Color": {
+   "R": 137,
+   "G": 169,
+   "B": 140
+  },
+  "Name": "Cosmo 534A"
+ },
+ {
+  "CosmoNumber": "535",
+  "Color": {
+   "R": 96,
+   "G": 140,
+   "B": 119
+  },
+  "Name": "Cosmo 535"
+ },
+ {
+  "CosmoNumber": "536A",
+  "Color": {
+   "R": 70,
+   "G": 100,
+   "B": 87
+  },
+  "Name": "Cosmo 536A"
+ },
+ {
+  "CosmoNumber": "537",
+  "Color": {
+   "R": 33,
+   "G": 67,
+   "B": 49
+  },
+  "Name": "Cosmo 537"
+ },
+ {
+  "CosmoNumber": "538",
+  "Color": {
+   "R": 38,
+   "G": 54,
+   "B": 44
+  },
+  "Name": "Cosmo 538"
+ },
+ {
+  "CosmoNumber": "551",
+  "Color": {
+   "R": 201,
+   "G": 188,
+   "B": 216
+  },
+  "Name": "Cosmo 551"
+ },
+ {
+  "CosmoNumber": "552",
+  "Color": {
+   "R": 168,
+   "G": 156,
+   "B": 203
+  },
+  "Name": "Cosmo 552"
+ },
+ {
+  "CosmoNumber": "553",
+  "Color": {
+   "R": 142,
+   "G": 131,
+   "B": 184
+  },
+  "Name": "Cosmo 553"
+ },
+ {
+  "CosmoNumber": "554",
+  "Color": {
+   "R": 120,
+   "G": 104,
+   "B": 162
+  },
+  "Name": "Cosmo 554"
+ },
+ {
+  "CosmoNumber": "555",
+  "Color": {
+   "R": 86,
+   "G": 78,
+   "B": 136
+  },
+  "Name": "Cosmo 555"
+ },
+ {
+  "CosmoNumber": "556",
+  "Color": {
+   "R": 64,
+   "G": 59,
+   "B": 113
+  },
+  "Name": "Cosmo 556"
+ },
+ {
+  "CosmoNumber": "557",
+  "Color": {
+   "R": 53,
+   "G": 46,
+   "B": 86
+  },
+  "Name": "Cosmo 557"
+ },
+ {
+  "CosmoNumber": "561",
+  "Color": {
+   "R": 190,
+   "G": 229,
+   "B": 208
+  },
+  "Name": "Cosmo 561"
+ },
+ {
+  "CosmoNumber": "562",
+  "Color": {
+   "R": 163,
+   "G": 209,
+   "B": 194
+  },
+  "Name": "Cosmo 562"
+ },
+ {
+  "CosmoNumber": "563",
+  "Color": {
+   "R": 132,
+   "G": 185,
+   "B": 179
+  },
+  "Name": "Cosmo 563"
+ },
+ {
+  "CosmoNumber": "564",
+  "Color": {
+   "R": 92,
+   "G": 148,
+   "B": 148
+  },
+  "Name": "Cosmo 564"
+ },
+ {
+  "CosmoNumber": "566",
+  "Color": {
+   "R": 69,
+   "G": 122,
+   "B": 136
+  },
+  "Name": "Cosmo 566"
+ },
+ {
+  "CosmoNumber": "572",
+  "Color": {
+   "R": 231,
+   "G": 203,
+   "B": 152
+  },
+  "Name": "Cosmo 572"
+ },
+ {
+  "CosmoNumber": "573",
+  "Color": {
+   "R": 205,
+   "G": 170,
+   "B": 109
+  },
+  "Name": "Cosmo 573"
+ },
+ {
+  "CosmoNumber": "574",
+  "Color": {
+   "R": 197,
+   "G": 152,
+   "B": 75
+  },
+  "Name": "Cosmo 574"
+ },
+ {
+  "CosmoNumber": "575A",
+  "Color": {
+   "R": 178,
+   "G": 128,
+   "B": 52
+  },
+  "Name": "Cosmo 575A"
+ },
+ {
+  "CosmoNumber": "576",
+  "Color": {
+   "R": 139,
+   "G": 97,
+   "B": 41
+  },
+  "Name": "Cosmo 576"
+ },
+ {
+  "CosmoNumber": "577A",
+  "Color": {
+   "R": 133,
+   "G": 91,
+   "B": 42
+  },
+  "Name": "Cosmo 577A"
+ },
+ {
+  "CosmoNumber": "578",
+  "Color": {
+   "R": 113,
+   "G": 67,
+   "B": 36
+  },
+  "Name": "Cosmo 578"
+ },
+ {
+  "CosmoNumber": "600",
+  "Color": {
+   "R": 16,
+   "G": 17,
+   "B": 19
+  },
+  "Name": "Cosmo 600"
+ },
+ {
+  "CosmoNumber": "601",
+  "Color": {
+   "R": 46,
+   "G": 42,
+   "B": 49
+  },
+  "Name": "Cosmo 601"
+ },
+ {
+  "CosmoNumber": "602",
+  "Color": {
+   "R": 21,
+   "G": 25,
+   "B": 46
+  },
+  "Name": "Cosmo 602"
+ },
+ {
+  "CosmoNumber": "603",
+  "Color": {
+   "R": 32,
+   "G": 24,
+   "B": 35
+  },
+  "Name": "Cosmo 603"
+ },
+ {
+  "CosmoNumber": "611",
+  "Color": {
+   "R": 100,
+   "G": 60,
+   "B": 30
+  },
+  "Name": "Brown Dark"
+ },
+ {
+  "CosmoNumber": "612",
+  "Color": {
+   "R": 130,
+   "G": 85,
+   "B": 50
+  },
+  "Name": "Brown Medium"
+ },
+ {
+  "CosmoNumber": "613",
+  "Color": {
+   "R": 160,
+   "G": 115,
+   "B": 80
+  },
+  "Name": "Brown Light"
+ },
+ {
+  "CosmoNumber": "614",
+  "Color": {
+   "R": 190,
+   "G": 150,
+   "B": 115
+  },
+  "Name": "Brown Pale"
+ },
+ {
+  "CosmoNumber": "621",
+  "Color": {
+   "R": 80,
+   "G": 50,
+   "B": 30
+  },
+  "Name": "Coffee Dark"
+ },
+ {
+  "CosmoNumber": "622",
+  "Color": {
+   "R": 110,
+   "G": 75,
+   "B": 50
+  },
+  "Name": "Coffee"
+ },
+ {
+  "CosmoNumber": "623",
+  "Color": {
+   "R": 145,
+   "G": 110,
+   "B": 80
+  },
+  "Name": "Coffee Light"
+ },
+ {
+  "CosmoNumber": "629",
+  "Color": {
+   "R": 206,
+   "G": 215,
+   "B": 142
+  },
+  "Name": "Cosmo 629"
+ },
+ {
+  "CosmoNumber": "630A",
+  "Color": {
+   "R": 184,
+   "G": 204,
+   "B": 120
+  },
+  "Name": "Cosmo 630A"
+ },
+ {
+  "CosmoNumber": "631",
+  "Color": {
+   "R": 142,
+   "G": 170,
+   "B": 75
+  },
+  "Name": "Beige Dark"
+ },
+ {
+  "CosmoNumber": "632",
+  "Color": {
+   "R": 104,
+   "G": 142,
+   "B": 56
+  },
+  "Name": "Beige"
+ },
+ {
+  "CosmoNumber": "633",
+  "Color": {
+   "R": 81,
+   "G": 119,
+   "B": 52
+  },
+  "Name": "Beige Light"
+ },
+ {
+  "CosmoNumber": "634",
+  "Color": {
+   "R": 67,
+   "G": 94,
+   "B": 46
+  },
+  "Name": "Beige Pale"
+ },
+ {
+  "CosmoNumber": "635A",
+  "Color": {
+   "R": 57,
+   "G": 80,
+   "B": 41
+  },
+  "Name": "Cosmo 635A"
+ },
+ {
+  "CosmoNumber": "636",
+  "Color": {
+   "R": 50,
+   "G": 67,
+   "B": 36
+  },
+  "Name": "Cosmo 636"
+ },
+ {
+  "CosmoNumber": "637",
+  "Color": {
+   "R": 47,
+   "G": 63,
+   "B": 35
+  },
+  "Name": "Cosmo 637"
+ },
+ {
+  "CosmoNumber": "652",
+  "Color": {
+   "R": 210,
+   "G": 150,
+   "B": 163
+  },
+  "Name": "Cosmo 652"
+ },
+ {
+  "CosmoNumber": "653",
+  "Color": {
+   "R": 170,
+   "G": 96,
+   "B": 116
+  },
+  "Name": "Cosmo 653"
+ },
+ {
+  "CosmoNumber": "654",
+  "Color": {
+   "R": 153,
+   "G": 70,
+   "B": 90
+  },
+  "Name": "Cosmo 654"
+ },
+ {
+  "CosmoNumber": "655",
+  "Color": {
+   "R": 117,
+   "G": 38,
+   "B": 47
+  },
+  "Name": "Cosmo 655"
+ },
+ {
+  "CosmoNumber": "656",
+  "Color": {
+   "R": 82,
+   "G": 32,
+   "B": 34
+  },
+  "Name": "Cosmo 656"
+ },
+ {
+  "CosmoNumber": "662",
+  "Color": {
+   "R": 146,
+   "G": 158,
+   "B": 197
+  },
+  "Name": "Cosmo 662"
+ },
+ {
+  "CosmoNumber": "663",
+  "Color": {
+   "R": 100,
+   "G": 111,
+   "B": 175
+  },
+  "Name": "Cosmo 663"
+ },
+ {
+  "CosmoNumber": "664A",
+  "Color": {
+   "R": 79,
+   "G": 86,
+   "B": 156
+  },
+  "Name": "Cosmo 664A"
+ },
+ {
+  "CosmoNumber": "665",
+  "Color": {
+   "R": 53,
+   "G": 58,
+   "B": 125
+  },
+  "Name": "Cosmo 665"
+ },
+ {
+  "CosmoNumber": "667A",
+  "Color": {
+   "R": 42,
+   "G": 42,
+   "B": 83
+  },
+  "Name": "Cosmo 667A"
+ },
+ {
+  "CosmoNumber": "668",
+  "Color": {
+   "R": 46,
+   "G": 47,
+   "B": 82
+  },
+  "Name": "Cosmo 668"
+ },
+ {
+  "CosmoNumber": "669A",
+  "Color": {
+   "R": 25,
+   "G": 25,
+   "B": 44
+  },
+  "Name": "Cosmo 669A"
+ },
+ {
+  "CosmoNumber": "671",
+  "Color": {
+   "R": 178,
+   "G": 175,
+   "B": 80
+  },
+  "Name": "Cosmo 671"
+ },
+ {
+  "CosmoNumber": "673",
+  "Color": {
+   "R": 133,
+   "G": 143,
+   "B": 55
+  },
+  "Name": "Cosmo 673"
+ },
+ {
+  "CosmoNumber": "674",
+  "Color": {
+   "R": 102,
+   "G": 109,
+   "B": 45
+  },
+  "Name": "Cosmo 674"
+ },
+ {
+  "CosmoNumber": "675A",
+  "Color": {
+   "R": 91,
+   "G": 95,
+   "B": 42
+  },
+  "Name": "Cosmo 675A"
+ },
+ {
+  "CosmoNumber": "676",
+  "Color": {
+   "R": 74,
+   "G": 79,
+   "B": 43
+  },
+  "Name": "Cosmo 676"
+ },
+ {
+  "CosmoNumber": "681",
+  "Color": {
+   "R": 222,
+   "G": 224,
+   "B": 185
+  },
+  "Name": "Cosmo 681"
+ },
+ {
+  "CosmoNumber": "682",
+  "Color": {
+   "R": 210,
+   "G": 213,
+   "B": 161
+  },
+  "Name": "Cosmo 682"
+ },
+ {
+  "CosmoNumber": "683",
+  "Color": {
+   "R": 171,
+   "G": 174,
+   "B": 113
+  },
+  "Name": "Cosmo 683"
+ },
+ {
+  "CosmoNumber": "684",
+  "Color": {
+   "R": 129,
+   "G": 135,
+   "B": 81
+  },
+  "Name": "Cosmo 684"
+ },
+ {
+  "CosmoNumber": "685",
+  "Color": {
+   "R": 94,
+   "G": 98,
+   "B": 51
+  },
+  "Name": "Cosmo 685"
+ },
+ {
+  "CosmoNumber": "686",
+  "Color": {
+   "R": 74,
+   "G": 76,
+   "B": 38
+  },
+  "Name": "Cosmo 686"
+ },
+ {
+  "CosmoNumber": "687",
+  "Color": {
+   "R": 54,
+   "G": 56,
+   "B": 30
+  },
+  "Name": "Cosmo 687"
+ },
+ {
+  "CosmoNumber": "700",
+  "Color": {
+   "R": 246,
+   "G": 228,
+   "B": 123
+  },
+  "Name": "Metallic Gold"
+ },
+ {
+  "CosmoNumber": "701",
+  "Color": {
+   "R": 244,
+   "G": 217,
+   "B": 106
+  },
+  "Name": "Metallic Silver"
+ },
+ {
+  "CosmoNumber": "702",
+  "Color": {
+   "R": 235,
+   "G": 197,
+   "B": 70
+  },
+  "Name": "Metallic Bronze"
+ },
+ {
+  "CosmoNumber": "703",
+  "Color": {
+   "R": 198,
+   "G": 128,
+   "B": 48
+  },
+  "Name": "Cosmo 703"
+ },
+ {
+  "CosmoNumber": "704",
+  "Color": {
+   "R": 193,
+   "G": 120,
+   "B": 43
+  },
+  "Name": "Cosmo 704"
+ },
+ {
+  "CosmoNumber": "705A",
+  "Color": {
+   "R": 174,
+   "G": 111,
+   "B": 41
+  },
+  "Name": "Cosmo 705A"
+ },
+ {
+  "CosmoNumber": "706",
+  "Color": {
+   "R": 154,
+   "G": 93,
+   "B": 38
+  },
+  "Name": "Cosmo 706"
+ },
+ {
+  "CosmoNumber": "711",
+  "Color": {
+   "R": 216,
+   "G": 208,
+   "B": 191
+  },
+  "Name": "Cosmo 711"
+ },
+ {
+  "CosmoNumber": "712",
+  "Color": {
+   "R": 197,
+   "G": 191,
+   "B": 178
+  },
+  "Name": "Cosmo 712"
+ },
+ {
+  "CosmoNumber": "713",
+  "Color": {
+   "R": 170,
+   "G": 162,
+   "B": 144
+  },
+  "Name": "Cosmo 713"
+ },
+ {
+  "CosmoNumber": "714",
+  "Color": {
+   "R": 144,
+   "G": 135,
+   "B": 115
+  },
+  "Name": "Cosmo 714"
+ },
+ {
+  "CosmoNumber": "715",
+  "Color": {
+   "R": 120,
+   "G": 110,
+   "B": 91
+  },
+  "Name": "Cosmo 715"
+ },
+ {
+  "CosmoNumber": "716",
+  "Color": {
+   "R": 100,
+   "G": 91,
+   "B": 70
+  },
+  "Name": "Cosmo 716"
+ },
+ {
+  "CosmoNumber": "717",
+  "Color": {
+   "R": 97,
+   "G": 87,
+   "B": 64
+  },
+  "Name": "Cosmo 717"
+ },
+ {
+  "CosmoNumber": "718",
+  "Color": {
+   "R": 68,
+   "G": 62,
+   "B": 43
+  },
+  "Name": "Cosmo 718"
+ },
+ {
+  "CosmoNumber": "730",
+  "Color": {
+   "R": 192,
+   "G": 213,
+   "B": 222
+  },
+  "Name": "Cosmo 730"
+ },
+ {
+  "CosmoNumber": "731",
+  "Color": {
+   "R": 152,
+   "G": 179,
+   "B": 200
+  },
+  "Name": "Cosmo 731"
+ },
+ {
+  "CosmoNumber": "732",
+  "Color": {
+   "R": 129,
+   "G": 157,
+   "B": 187
+  },
+  "Name": "Cosmo 732"
+ },
+ {
+  "CosmoNumber": "733",
+  "Color": {
+   "R": 94,
+   "G": 126,
+   "B": 157
+  },
+  "Name": "Cosmo 733"
+ },
+ {
+  "CosmoNumber": "734",
+  "Color": {
+   "R": 70,
+   "G": 95,
+   "B": 128
+  },
+  "Name": "Cosmo 734"
+ },
+ {
+  "CosmoNumber": "735",
+  "Color": {
+   "R": 51,
+   "G": 71,
+   "B": 104
+  },
+  "Name": "Cosmo 735"
+ },
+ {
+  "CosmoNumber": "750A",
+  "Color": {
+   "R": 246,
+   "G": 172,
+   "B": 137
+  },
+  "Name": "Cosmo 750A"
+ },
+ {
+  "CosmoNumber": "752",
+  "Color": {
+   "R": 245,
+   "G": 160,
+   "B": 128
+  },
+  "Name": "Cosmo 752"
+ },
+ {
+  "CosmoNumber": "753",
+  "Color": {
+   "R": 241,
+   "G": 115,
+   "B": 77
+  },
+  "Name": "Cosmo 753"
+ },
+ {
+  "CosmoNumber": "754",
+  "Color": {
+   "R": 237,
+   "G": 80,
+   "B": 49
+  },
+  "Name": "Cosmo 754"
+ },
+ {
+  "CosmoNumber": "757",
+  "Color": {
+   "R": 236,
+   "G": 57,
+   "B": 43
+  },
+  "Name": "Cosmo 757"
+ },
+ {
+  "CosmoNumber": "758",
+  "Color": {
+   "R": 232,
+   "G": 45,
+   "B": 42
+  },
+  "Name": "Cosmo 758"
+ },
+ {
+  "CosmoNumber": "761",
+  "Color": {
+   "R": 192,
+   "G": 169,
+   "B": 188
+  },
+  "Name": "Cosmo 761"
+ },
+ {
+  "CosmoNumber": "762",
+  "Color": {
+   "R": 156,
+   "G": 132,
+   "B": 157
+  },
+  "Name": "Cosmo 762"
+ },
+ {
+  "CosmoNumber": "763",
+  "Color": {
+   "R": 136,
+   "G": 105,
+   "B": 138
+  },
+  "Name": "Cosmo 763"
+ },
+ {
+  "CosmoNumber": "764",
+  "Color": {
+   "R": 108,
+   "G": 77,
+   "B": 113
+  },
+  "Name": "Cosmo 764"
+ },
+ {
+  "CosmoNumber": "765",
+  "Color": {
+   "R": 79,
+   "G": 53,
+   "B": 86
+  },
+  "Name": "Cosmo 765"
+ },
+ {
+  "CosmoNumber": "766",
+  "Color": {
+   "R": 66,
+   "G": 45,
+   "B": 71
+  },
+  "Name": "Cosmo 766"
+ },
+ {
+  "CosmoNumber": "771",
+  "Color": {
+   "R": 200,
+   "G": 176,
+   "B": 96
+  },
+  "Name": "Cosmo 771"
+ },
+ {
+  "CosmoNumber": "772",
+  "Color": {
+   "R": 184,
+   "G": 155,
+   "B": 70
+  },
+  "Name": "Cosmo 772"
+ },
+ {
+  "CosmoNumber": "773",
+  "Color": {
+   "R": 163,
+   "G": 139,
+   "B": 53
+  },
+  "Name": "Cosmo 773"
+ },
+ {
+  "CosmoNumber": "774",
+  "Color": {
+   "R": 135,
+   "G": 108,
+   "B": 43
+  },
+  "Name": "Cosmo 774"
+ },
+ {
+  "CosmoNumber": "775A",
+  "Color": {
+   "R": 114,
+   "G": 87,
+   "B": 39
+  },
+  "Name": "Cosmo 775A"
+ },
+ {
+  "CosmoNumber": "776",
+  "Color": {
+   "R": 99,
+   "G": 80,
+   "B": 37
+  },
+  "Name": "Cosmo 776"
+ },
+ {
+  "CosmoNumber": "798",
+  "Color": {
+   "R": 221,
+   "G": 31,
+   "B": 44
+  },
+  "Name": "Cosmo 798"
+ },
+ {
+  "CosmoNumber": "800",
+  "Color": {
+   "R": 192,
+   "G": 33,
+   "B": 41
+  },
+  "Name": "Cosmo 800"
+ },
+ {
+  "CosmoNumber": "811",
+  "Color": {
+   "R": 232,
+   "G": 172,
+   "B": 190
+  },
+  "Name": "Cosmo 811"
+ },
+ {
+  "CosmoNumber": "812",
+  "Color": {
+   "R": 221,
+   "G": 144,
+   "B": 165
+  },
+  "Name": "Cosmo 812"
+ },
+ {
+  "CosmoNumber": "813",
+  "Color": {
+   "R": 206,
+   "G": 107,
+   "B": 139
+  },
+  "Name": "Cosmo 813"
+ },
+ {
+  "CosmoNumber": "814",
+  "Color": {
+   "R": 187,
+   "G": 65,
+   "B": 112
+  },
+  "Name": "Cosmo 814"
+ },
+ {
+  "CosmoNumber": "815",
+  "Color": {
+   "R": 164,
+   "G": 47,
+   "B": 91
+  },
+  "Name": "Cosmo 815"
+ },
+ {
+  "CosmoNumber": "816A",
+  "Color": {
+   "R": 156,
+   "G": 43,
+   "B": 84
+  },
+  "Name": "Cosmo 816A"
+ },
+ {
+  "CosmoNumber": "820",
+  "Color": {
+   "R": 215,
+   "G": 210,
+   "B": 127
+  },
+  "Name": "Cosmo 820"
+ },
+ {
+  "CosmoNumber": "821",
+  "Color": {
+   "R": 192,
+   "G": 182,
+   "B": 91
+  },
+  "Name": "Cosmo 821"
+ },
+ {
+  "CosmoNumber": "822",
+  "Color": {
+   "R": 165,
+   "G": 154,
+   "B": 62
+  },
+  "Name": "Cosmo 822"
+ },
+ {
+  "CosmoNumber": "823",
+  "Color": {
+   "R": 136,
+   "G": 129,
+   "B": 51
+  },
+  "Name": "Cosmo 823"
+ },
+ {
+  "CosmoNumber": "825",
+  "Color": {
+   "R": 111,
+   "G": 107,
+   "B": 44
+  },
+  "Name": "Cosmo 825"
+ },
+ {
+  "CosmoNumber": "826",
+  "Color": {
+   "R": 83,
+   "G": 82,
+   "B": 39
+  },
+  "Name": "Cosmo 826"
+ },
+ {
+  "CosmoNumber": "832",
+  "Color": {
+   "R": 248,
+   "G": 210,
+   "B": 221
+  },
+  "Name": "Cosmo 832"
+ },
+ {
+  "CosmoNumber": "833",
+  "Color": {
+   "R": 244,
+   "G": 165,
+   "B": 188
+  },
+  "Name": "Cosmo 833"
+ },
+ {
+  "CosmoNumber": "834A",
+  "Color": {
+   "R": 219,
+   "G": 102,
+   "B": 132
+  },
+  "Name": "Cosmo 834A"
+ },
+ {
+  "CosmoNumber": "836",
+  "Color": {
+   "R": 233,
+   "G": 83,
+   "B": 89
+  },
+  "Name": "Cosmo 836"
+ },
+ {
+  "CosmoNumber": "838",
+  "Color": {
+   "R": 226,
+   "G": 44,
+   "B": 51
+  },
+  "Name": "Cosmo 838"
+ },
+ {
+  "CosmoNumber": "842",
+  "Color": {
+   "R": 157,
+   "G": 213,
+   "B": 183
+  },
+  "Name": "Cosmo 842"
+ },
+ {
+  "CosmoNumber": "843",
+  "Color": {
+   "R": 115,
+   "G": 190,
+   "B": 156
+  },
+  "Name": "Cosmo 843"
+ },
+ {
+  "CosmoNumber": "844",
+  "Color": {
+   "R": 84,
+   "G": 161,
+   "B": 129
+  },
+  "Name": "Cosmo 844"
+ },
+ {
+  "CosmoNumber": "845",
+  "Color": {
+   "R": 60,
+   "G": 126,
+   "B": 97
+  },
+  "Name": "Cosmo 845"
+ },
+ {
+  "CosmoNumber": "846",
+  "Color": {
+   "R": 48,
+   "G": 103,
+   "B": 83
+  },
+  "Name": "Cosmo 846"
+ },
+ {
+  "CosmoNumber": "851",
+  "Color": {
+   "R": 240,
+   "G": 180,
+   "B": 171
+  },
+  "Name": "Cosmo 851"
+ },
+ {
+  "CosmoNumber": "852",
+  "Color": {
+   "R": 250,
+   "G": 151,
+   "B": 143
+  },
+  "Name": "Cosmo 852"
+ },
+ {
+  "CosmoNumber": "853",
+  "Color": {
+   "R": 223,
+   "G": 114,
+   "B": 106
+  },
+  "Name": "Cosmo 853"
+ },
+ {
+  "CosmoNumber": "854",
+  "Color": {
+   "R": 214,
+   "G": 86,
+   "B": 80
+  },
+  "Name": "Cosmo 854"
+ },
+ {
+  "CosmoNumber": "855",
+  "Color": {
+   "R": 190,
+   "G": 59,
+   "B": 57
+  },
+  "Name": "Cosmo 855"
+ },
+ {
+  "CosmoNumber": "857",
+  "Color": {
+   "R": 184,
+   "G": 41,
+   "B": 49
+  },
+  "Name": "Cosmo 857"
+ },
+ {
+  "CosmoNumber": "858",
+  "Color": {
+   "R": 164,
+   "G": 35,
+   "B": 42
+  },
+  "Name": "Cosmo 858"
+ },
+ {
+  "CosmoNumber": "890",
+  "Color": {
+   "R": 172,
+   "G": 169,
+   "B": 156
+  },
+  "Name": "Cosmo 890"
+ },
+ {
+  "CosmoNumber": "891",
+  "Color": {
+   "R": 151,
+   "G": 146,
+   "B": 131
+  },
+  "Name": "Cosmo 891"
+ },
+ {
+  "CosmoNumber": "892",
+  "Color": {
+   "R": 133,
+   "G": 129,
+   "B": 119
+  },
+  "Name": "Cosmo 892"
+ },
+ {
+  "CosmoNumber": "893",
+  "Color": {
+   "R": 108,
+   "G": 108,
+   "B": 102
+  },
+  "Name": "Cosmo 893"
+ },
+ {
+  "CosmoNumber": "894",
+  "Color": {
+   "R": 88,
+   "G": 85,
+   "B": 80
+  },
+  "Name": "Cosmo 894"
+ },
+ {
+  "CosmoNumber": "895",
+  "Color": {
+   "R": 56,
+   "G": 54,
+   "B": 51
+  },
+  "Name": "Cosmo 895"
+ },
+ {
+  "CosmoNumber": "896",
+  "Color": {
+   "R": 169,
+   "G": 219,
+   "B": 208
+  },
+  "Name": "Cosmo 896"
+ },
+ {
+  "CosmoNumber": "897",
+  "Color": {
+   "R": 139,
+   "G": 205,
+   "B": 189
+  },
+  "Name": "Cosmo 897"
+ },
+ {
+  "CosmoNumber": "898",
+  "Color": {
+   "R": 97,
+   "G": 173,
+   "B": 156
+  },
+  "Name": "Cosmo 898"
+ },
+ {
+  "CosmoNumber": "899",
+  "Color": {
+   "R": 77,
+   "G": 157,
+   "B": 139
+  },
+  "Name": "Cosmo 899"
+ },
+ {
+  "CosmoNumber": "900",
+  "Color": {
+   "R": 54,
+   "G": 123,
+   "B": 110
+  },
+  "Name": "Cosmo 900"
+ },
+ {
+  "CosmoNumber": "902",
+  "Color": {
+   "R": 44,
+   "G": 103,
+   "B": 93
+  },
+  "Name": "Cosmo 902"
+ },
+ {
+  "CosmoNumber": "921",
+  "Color": {
+   "R": 185,
+   "G": 200,
+   "B": 163
+  },
+  "Name": "Cosmo 921"
+ },
+ {
+  "CosmoNumber": "922",
+  "Color": {
+   "R": 167,
+   "G": 184,
+   "B": 142
+  },
+  "Name": "Cosmo 922"
+ },
+ {
+  "CosmoNumber": "923",
+  "Color": {
+   "R": 133,
+   "G": 153,
+   "B": 108
+  },
+  "Name": "Cosmo 923"
+ },
+ {
+  "CosmoNumber": "924",
+  "Color": {
+   "R": 105,
+   "G": 126,
+   "B": 82
+  },
+  "Name": "Cosmo 924"
+ },
+ {
+  "CosmoNumber": "925",
+  "Color": {
+   "R": 72,
+   "G": 89,
+   "B": 48
+  },
+  "Name": "Cosmo 925"
+ },
+ {
+  "CosmoNumber": "926",
+  "Color": {
+   "R": 52,
+   "G": 66,
+   "B": 35
+  },
+  "Name": "Cosmo 926"
+ },
+ {
+  "CosmoNumber": "927",
+  "Color": {
+   "R": 45,
+   "G": 48,
+   "B": 27
+  },
+  "Name": "Cosmo 927"
+ },
+ {
+  "CosmoNumber": "980",
+  "Color": {
+   "R": 167,
+   "G": 191,
+   "B": 192
+  },
+  "Name": "Cosmo 980"
+ },
+ {
+  "CosmoNumber": "981A",
+  "Color": {
+   "R": 129,
+   "G": 159,
+   "B": 162
+  },
+  "Name": "Cosmo 981A"
+ },
+ {
+  "CosmoNumber": "982",
+  "Color": {
+   "R": 89,
+   "G": 126,
+   "B": 137
+  },
+  "Name": "Cosmo 982"
+ },
+ {
+  "CosmoNumber": "983",
+  "Color": {
+   "R": 60,
+   "G": 94,
+   "B": 106
+  },
+  "Name": "Cosmo 983"
+ },
+ {
+  "CosmoNumber": "984",
+  "Color": {
+   "R": 43,
+   "G": 74,
+   "B": 83
+  },
+  "Name": "Cosmo 984"
+ },
+ {
+  "CosmoNumber": "1000",
+  "Color": {
+   "R": 231,
+   "G": 214,
+   "B": 182
+  },
+  "Name": "Cosmo 1000"
+ },
+ {
+  "CosmoNumber": "1105",
+  "Color": {
+   "R": 224,
+   "G": 96,
+   "B": 128
+  },
+  "Name": "Cosmo 1105"
+ },
+ {
+  "CosmoNumber": "1241",
+  "Color": {
+   "R": 170,
+   "G": 22,
+   "B": 60
+  },
+  "Name": "Cosmo 1241"
+ },
+ {
+  "CosmoNumber": "1402",
+  "Color": {
+   "R": 245,
+   "G": 169,
+   "B": 102
+  },
+  "Name": "Cosmo 1402"
+ },
+ {
+  "CosmoNumber": "2001",
+  "Color": {
+   "R": 232,
+   "G": 38,
+   "B": 112
+  },
+  "Name": "Cosmo 2001"
+ },
+ {
+  "CosmoNumber": "2002",
+  "Color": {
+   "R": 179,
+   "G": 35,
+   "B": 112
+  },
+  "Name": "Cosmo 2002"
+ },
+ {
+  "CosmoNumber": "2003",
+  "Color": {
+   "R": 123,
+   "G": 35,
+   "B": 95
+  },
+  "Name": "Cosmo 2003"
+ },
+ {
+  "CosmoNumber": "2004",
+  "Color": {
+   "R": 218,
+   "G": 198,
+   "B": 84
+  },
+  "Name": "Cosmo 2004"
+ },
+ {
+  "CosmoNumber": "2005",
+  "Color": {
+   "R": 198,
+   "G": 178,
+   "B": 68
+  },
+  "Name": "Cosmo 2005"
+ },
+ {
+  "CosmoNumber": "2006",
+  "Color": {
+   "R": 197,
+   "G": 170,
+   "B": 51
+  },
+  "Name": "Cosmo 2006"
+ },
+ {
+  "CosmoNumber": "2007",
+  "Color": {
+   "R": 216,
+   "G": 226,
+   "B": 102
+  },
+  "Name": "Cosmo 2007"
+ },
+ {
+  "CosmoNumber": "2008",
+  "Color": {
+   "R": 227,
+   "G": 231,
+   "B": 63
+  },
+  "Name": "Cosmo 2008"
+ },
+ {
+  "CosmoNumber": "2009",
+  "Color": {
+   "R": 180,
+   "G": 174,
+   "B": 63
+  },
+  "Name": "Cosmo 2009"
+ },
+ {
+  "CosmoNumber": "2010",
+  "Color": {
+   "R": 204,
+   "G": 222,
+   "B": 82
+  },
+  "Name": "Cosmo 2010"
+ },
+ {
+  "CosmoNumber": "2011",
+  "Color": {
+   "R": 169,
+   "G": 209,
+   "B": 80
+  },
+  "Name": "Cosmo 2011"
+ },
+ {
+  "CosmoNumber": "2012",
+  "Color": {
+   "R": 117,
+   "G": 120,
+   "B": 77
+  },
+  "Name": "Cosmo 2012"
+ },
+ {
+  "CosmoNumber": "2013",
+  "Color": {
+   "R": 99,
+   "G": 109,
+   "B": 52
+  },
+  "Name": "Cosmo 2013"
+ },
+ {
+  "CosmoNumber": "2014",
+  "Color": {
+   "R": 80,
+   "G": 92,
+   "B": 46
+  },
+  "Name": "Cosmo 2014"
+ },
+ {
+  "CosmoNumber": "2015",
+  "Color": {
+   "R": 97,
+   "G": 110,
+   "B": 83
+  },
+  "Name": "Cosmo 2015"
+ },
+ {
+  "CosmoNumber": "2016",
+  "Color": {
+   "R": 50,
+   "G": 66,
+   "B": 39
+  },
+  "Name": "Cosmo 2016"
+ },
+ {
+  "CosmoNumber": "2017",
+  "Color": {
+   "R": 146,
+   "G": 183,
+   "B": 184
+  },
+  "Name": "Cosmo 2017"
+ },
+ {
+  "CosmoNumber": "2018",
+  "Color": {
+   "R": 128,
+   "G": 155,
+   "B": 165
+  },
+  "Name": "Cosmo 2018"
+ },
+ {
+  "CosmoNumber": "2019",
+  "Color": {
+   "R": 62,
+   "G": 99,
+   "B": 126
+  },
+  "Name": "Cosmo 2019"
+ },
+ {
+  "CosmoNumber": "2020",
+  "Color": {
+   "R": 83,
+   "G": 86,
+   "B": 86
+  },
+  "Name": "Cosmo 2020"
+ },
+ {
+  "CosmoNumber": "2021",
+  "Color": {
+   "R": 174,
+   "G": 226,
+   "B": 233
+  },
+  "Name": "Cosmo 2021"
+ },
+ {
+  "CosmoNumber": "2022",
+  "Color": {
+   "R": 116,
+   "G": 202,
+   "B": 230
+  },
+  "Name": "Cosmo 2022"
+ },
+ {
+  "CosmoNumber": "2023",
+  "Color": {
+   "R": 70,
+   "G": 159,
+   "B": 198
+  },
+  "Name": "Cosmo 2023"
+ },
+ {
+  "CosmoNumber": "2024",
+  "Color": {
+   "R": 50,
+   "G": 102,
+   "B": 131
+  },
+  "Name": "Cosmo 2024"
+ },
+ {
+  "CosmoNumber": "2025",
+  "Color": {
+   "R": 125,
+   "G": 171,
+   "B": 203
+  },
+  "Name": "Cosmo 2025"
+ },
+ {
+  "CosmoNumber": "2026",
+  "Color": {
+   "R": 80,
+   "G": 135,
+   "B": 176
+  },
+  "Name": "Cosmo 2026"
+ },
+ {
+  "CosmoNumber": "2027",
+  "Color": {
+   "R": 58,
+   "G": 103,
+   "B": 180
+  },
+  "Name": "Cosmo 2027"
+ },
+ {
+  "CosmoNumber": "2028",
+  "Color": {
+   "R": 108,
+   "G": 103,
+   "B": 124
+  },
+  "Name": "Cosmo 2028"
+ },
+ {
+  "CosmoNumber": "2029",
+  "Color": {
+   "R": 62,
+   "G": 58,
+   "B": 78
+  },
+  "Name": "Cosmo 2029"
+ },
+ {
+  "CosmoNumber": "2030",
+  "Color": {
+   "R": 40,
+   "G": 31,
+   "B": 36
+  },
+  "Name": "Cosmo 2030"
+ },
+ {
+  "CosmoNumber": "2031",
+  "Color": {
+   "R": 174,
+   "G": 107,
+   "B": 166
+  },
+  "Name": "Cosmo 2031"
+ },
+ {
+  "CosmoNumber": "2032",
+  "Color": {
+   "R": 130,
+   "G": 72,
+   "B": 119
+  },
+  "Name": "Cosmo 2032"
+ },
+ {
+  "CosmoNumber": "2033",
+  "Color": {
+   "R": 111,
+   "G": 57,
+   "B": 97
+  },
+  "Name": "Cosmo 2033"
+ },
+ {
+  "CosmoNumber": "2034",
+  "Color": {
+   "R": 172,
+   "G": 147,
+   "B": 166
+  },
+  "Name": "Cosmo 2034"
+ },
+ {
+  "CosmoNumber": "2035",
+  "Color": {
+   "R": 94,
+   "G": 72,
+   "B": 90
+  },
+  "Name": "Cosmo 2035"
+ },
+ {
+  "CosmoNumber": "2036",
+  "Color": {
+   "R": 165,
+   "G": 144,
+   "B": 135
+  },
+  "Name": "Cosmo 2036"
+ },
+ {
+  "CosmoNumber": "2037",
+  "Color": {
+   "R": 124,
+   "G": 104,
+   "B": 95
+  },
+  "Name": "Cosmo 2037"
+ },
+ {
+  "CosmoNumber": "2038",
+  "Color": {
+   "R": 96,
+   "G": 80,
+   "B": 66
+  },
+  "Name": "Cosmo 2038"
+ },
+ {
+  "CosmoNumber": "2039",
+  "Color": {
+   "R": 109,
+   "G": 93,
+   "B": 67
+  },
+  "Name": "Cosmo 2039"
+ },
+ {
+  "CosmoNumber": "2040",
+  "Color": {
+   "R": 79,
+   "G": 61,
+   "B": 46
+  },
+  "Name": "Cosmo 2040"
+ },
+ {
+  "CosmoNumber": "2041",
+  "Color": {
+   "R": 71,
+   "G": 70,
+   "B": 57
+  },
+  "Name": "Cosmo 2041"
+ },
+ {
+  "CosmoNumber": "2105",
+  "Color": {
+   "R": 219,
+   "G": 79,
+   "B": 110
+  },
+  "Name": "Cosmo 2105"
+ },
+ {
+  "CosmoNumber": "2111",
+  "Color": {
+   "R": 245,
+   "G": 194,
+   "B": 218
+  },
+  "Name": "Cosmo 2111"
+ },
+ {
+  "CosmoNumber": "2114",
+  "Color": {
+   "R": 233,
+   "G": 63,
+   "B": 130
+  },
+  "Name": "Cosmo 2114"
+ },
+ {
+  "CosmoNumber": "2115",
+  "Color": {
+   "R": 217,
+   "G": 34,
+   "B": 93
+  },
+  "Name": "Cosmo 2115"
+ },
+ {
+  "CosmoNumber": "2117",
+  "Color": {
+   "R": 153,
+   "G": 176,
+   "B": 96
+  },
+  "Name": "Cosmo 2117"
+ },
+ {
+  "CosmoNumber": "2118",
+  "Color": {
+   "R": 107,
+   "G": 143,
+   "B": 66
+  },
+  "Name": "Cosmo 2118"
+ },
+ {
+  "CosmoNumber": "2120",
+  "Color": {
+   "R": 50,
+   "G": 89,
+   "B": 48
+  },
+  "Name": "Cosmo 2120"
+ },
+ {
+  "CosmoNumber": "2129",
+  "Color": {
+   "R": 149,
+   "G": 67,
+   "B": 44
+  },
+  "Name": "Cosmo 2129"
+ },
+ {
+  "CosmoNumber": "2151",
+  "Color": {
+   "R": 178,
+   "G": 173,
+   "B": 163
+  },
+  "Name": "Cosmo 2151"
+ },
+ {
+  "CosmoNumber": "2154",
+  "Color": {
+   "R": 84,
+   "G": 83,
+   "B": 88
+  },
+  "Name": "Cosmo 2154"
+ },
+ {
+  "CosmoNumber": "2167",
+  "Color": {
+   "R": 54,
+   "G": 61,
+   "B": 100
+  },
+  "Name": "Cosmo 2167"
+ },
+ {
+  "CosmoNumber": "2172",
+  "Color": {
+   "R": 142,
+   "G": 135,
+   "B": 194
+  },
+  "Name": "Cosmo 2172"
+ },
+ {
+  "CosmoNumber": "2185",
+  "Color": {
+   "R": 236,
+   "G": 161,
+   "B": 137
+  },
+  "Name": "Cosmo 2185"
+ },
+ {
+  "CosmoNumber": "2186",
+  "Color": {
+   "R": 203,
+   "G": 84,
+   "B": 53
+  },
+  "Name": "Cosmo 2186"
+ },
+ {
+  "CosmoNumber": "2211",
+  "Color": {
+   "R": 216,
+   "G": 233,
+   "B": 223
+  },
+  "Name": "Cosmo 2211"
+ },
+ {
+  "CosmoNumber": "2212",
+  "Color": {
+   "R": 123,
+   "G": 162,
+   "B": 210
+  },
+  "Name": "Cosmo 2212"
+ },
+ {
+  "CosmoNumber": "2214",
+  "Color": {
+   "R": 59,
+   "G": 84,
+   "B": 161
+  },
+  "Name": "Cosmo 2214"
+ },
+ {
+  "CosmoNumber": "2221",
+  "Color": {
+   "R": 231,
+   "G": 157,
+   "B": 185
+  },
+  "Name": "Cosmo 2221"
+ },
+ {
+  "CosmoNumber": "2222",
+  "Color": {
+   "R": 201,
+   "G": 104,
+   "B": 153
+  },
+  "Name": "Cosmo 2222"
+ },
+ {
+  "CosmoNumber": "2223",
+  "Color": {
+   "R": 158,
+   "G": 48,
+   "B": 97
+  },
+  "Name": "Cosmo 2223"
+ },
+ {
+  "CosmoNumber": "2224",
+  "Color": {
+   "R": 132,
+   "G": 31,
+   "B": 74
+  },
+  "Name": "Cosmo 2224"
+ },
+ {
+  "CosmoNumber": "2241",
+  "Color": {
+   "R": 137,
+   "G": 33,
+   "B": 43
+  },
+  "Name": "Cosmo 2241"
+ },
+ {
+  "CosmoNumber": "2242",
+  "Color": {
+   "R": 182,
+   "G": 45,
+   "B": 83
+  },
+  "Name": "Cosmo 2242"
+ },
+ {
+  "CosmoNumber": "2245",
+  "Color": {
+   "R": 113,
+   "G": 19,
+   "B": 49
+  },
+  "Name": "Cosmo 2245"
+ },
+ {
+  "CosmoNumber": "2251",
+  "Color": {
+   "R": 185,
+   "G": 220,
+   "B": 221
+  },
+  "Name": "Cosmo 2251"
+ },
+ {
+  "CosmoNumber": "2253",
+  "Color": {
+   "R": 82,
+   "G": 129,
+   "B": 169
+  },
+  "Name": "Cosmo 2253"
+ },
+ {
+  "CosmoNumber": "2262",
+  "Color": {
+   "R": 137,
+   "G": 97,
+   "B": 168
+  },
+  "Name": "Cosmo 2262"
+ },
+ {
+  "CosmoNumber": "2281",
+  "Color": {
+   "R": 193,
+   "G": 155,
+   "B": 201
+  },
+  "Name": "Cosmo 2281"
+ },
+ {
+  "CosmoNumber": "2297",
+  "Color": {
+   "R": 250,
+   "G": 245,
+   "B": 133
+  },
+  "Name": "Cosmo 2297"
+ },
+ {
+  "CosmoNumber": "2299",
+  "Color": {
+   "R": 246,
+   "G": 240,
+   "B": 84
+  },
+  "Name": "Cosmo 2299"
+ },
+ {
+  "CosmoNumber": "2301",
+  "Color": {
+   "R": 251,
+   "G": 216,
+   "B": 33
+  },
+  "Name": "Cosmo 2301"
+ },
+ {
+  "CosmoNumber": "2307",
+  "Color": {
+   "R": 164,
+   "G": 115,
+   "B": 72
+  },
+  "Name": "Cosmo 2307"
+ },
+ {
+  "CosmoNumber": "2310",
+  "Color": {
+   "R": 118,
+   "G": 66,
+   "B": 43
+  },
+  "Name": "Cosmo 2310"
+ },
+ {
+  "CosmoNumber": "2311",
+  "Color": {
+   "R": 64,
+   "G": 39,
+   "B": 30
+  },
+  "Name": "Cosmo 2311"
+ },
+ {
+  "CosmoNumber": "2317",
+  "Color": {
+   "R": 121,
+   "G": 171,
+   "B": 127
+  },
+  "Name": "Cosmo 2317"
+ },
+ {
+  "CosmoNumber": "2319",
+  "Color": {
+   "R": 55,
+   "G": 101,
+   "B": 65
+  },
+  "Name": "Cosmo 2319"
+ },
+ {
+  "CosmoNumber": "2323",
+  "Color": {
+   "R": 191,
+   "G": 215,
+   "B": 113
+  },
+  "Name": "Cosmo 2323"
+ },
+ {
+  "CosmoNumber": "2341",
+  "Color": {
+   "R": 236,
+   "G": 145,
+   "B": 111
+  },
+  "Name": "Cosmo 2341"
+ },
+ {
+  "CosmoNumber": "2343",
+  "Color": {
+   "R": 221,
+   "G": 59,
+   "B": 60
+  },
+  "Name": "Cosmo 2343"
+ },
+ {
+  "CosmoNumber": "2402",
+  "Color": {
+   "R": 242,
+   "G": 149,
+   "B": 97
+  },
+  "Name": "Cosmo 2402"
+ },
+ {
+  "CosmoNumber": "2412",
+  "Color": {
+   "R": 108,
+   "G": 175,
+   "B": 224
+  },
+  "Name": "Cosmo 2412"
+ },
+ {
+  "CosmoNumber": "2424",
+  "Color": {
+   "R": 189,
+   "G": 133,
+   "B": 111
+  },
+  "Name": "Cosmo 2424"
+ },
+ {
+  "CosmoNumber": "2480",
+  "Color": {
+   "R": 239,
+   "G": 183,
+   "B": 217
+  },
+  "Name": "Cosmo 2480"
+ },
+ {
+  "CosmoNumber": "2500",
+  "Color": {
+   "R": 245,
+   "G": 245,
+   "B": 245
+  },
+  "Name": "Cosmo 2500"
+ },
+ {
+  "CosmoNumber": "2535",
+  "Color": {
+   "R": 88,
+   "G": 136,
+   "B": 115
+  },
+  "Name": "Cosmo 2535"
+ },
+ {
+  "CosmoNumber": "2536A",
+  "Color": {
+   "R": 47,
+   "G": 90,
+   "B": 68
+  },
+  "Name": "Cosmo 2536A"
+ },
+ {
+  "CosmoNumber": "2563",
+  "Color": {
+   "R": 113,
+   "G": 173,
+   "B": 168
+  },
+  "Name": "Cosmo 2563"
+ },
+ {
+  "CosmoNumber": "2573",
+  "Color": {
+   "R": 213,
+   "G": 163,
+   "B": 84
+  },
+  "Name": "Cosmo 2573"
+ },
+ {
+  "CosmoNumber": "2631",
+  "Color": {
+   "R": 122,
+   "G": 159,
+   "B": 61
+  },
+  "Name": "Cosmo 2631"
+ },
+ {
+  "CosmoNumber": "2652",
+  "Color": {
+   "R": 204,
+   "G": 127,
+   "B": 145
+  },
+  "Name": "Cosmo 2652"
+ },
+ {
+  "CosmoNumber": "2662",
+  "Color": {
+   "R": 122,
+   "G": 133,
+   "B": 183
+  },
+  "Name": "Cosmo 2662"
+ },
+ {
+  "CosmoNumber": "2664",
+  "Color": {
+   "R": 60,
+   "G": 67,
+   "B": 138
+  },
+  "Name": "Cosmo 2664"
+ },
+ {
+  "CosmoNumber": "2702",
+  "Color": {
+   "R": 216,
+   "G": 155,
+   "B": 49
+  },
+  "Name": "Cosmo 2702"
+ },
+ {
+  "CosmoNumber": "2762",
+  "Color": {
+   "R": 142,
+   "G": 113,
+   "B": 147
+  },
+  "Name": "Cosmo 2762"
+ },
+ {
+  "CosmoNumber": "2835",
+  "Color": {
+   "R": 211,
+   "G": 70,
+   "B": 104
+  },
+  "Name": "Cosmo 2835"
+ },
+ {
+  "CosmoNumber": "2924",
+  "Color": {
+   "R": 89,
+   "G": 112,
+   "B": 55
+  },
+  "Name": "Cosmo 2924"
+ },
+ {
+  "CosmoNumber": "2981",
+  "Color": {
+   "R": 117,
+   "G": 152,
+   "B": 157
+  },
+  "Name": "Cosmo 2981"
+ },
+ {
+  "CosmoNumber": "3115",
+  "Color": {
+   "R": 200,
+   "G": 27,
+   "B": 69
+  },
+  "Name": "Cosmo 3115"
+ },
+ {
+  "CosmoNumber": "3185",
+  "Color": {
+   "R": 232,
+   "G": 143,
+   "B": 117
+  },
+  "Name": "Cosmo 3185"
+ },
+ {
+  "CosmoNumber": "3297",
+  "Color": {
+   "R": 251,
+   "G": 248,
+   "B": 164
+  },
+  "Name": "Cosmo 3297"
+ },
+ {
+  "CosmoNumber": "3299",
+  "Color": {
+   "R": 248,
+   "G": 229,
+   "B": 36
+  },
+  "Name": "Cosmo 3299"
+ },
+ {
+  "CosmoNumber": "3311",
+  "Color": {
+   "R": 108,
+   "G": 55,
+   "B": 42
+  },
+  "Name": "Cosmo 3311"
+ },
+ {
+  "CosmoNumber": "3651",
+  "Color": {
+   "R": 235,
+   "G": 199,
+   "B": 199
+  },
+  "Name": "Cosmo 3651"
+ },
+ {
+  "CosmoNumber": "4300",
+  "Color": {
+   "R": 113,
+   "G": 32,
+   "B": 43
+  },
+  "Name": "Cosmo 4300"
+ },
+ {
+  "CosmoNumber": "4311",
+  "Color": {
+   "R": 66,
+   "G": 37,
+   "B": 32
+  },
+  "Name": "Cosmo 4311"
+ },
+ {
+  "CosmoNumber": "4792",
+  "Color": {
+   "R": 49,
+   "G": 51,
+   "B": 109
+  },
+  "Name": "Cosmo 4792"
+ },
+ {
+  "CosmoNumber": "4905",
+  "Color": {
+   "R": 40,
+   "G": 77,
+   "B": 44
+  },
+  "Name": "Cosmo 4905"
+ }
+]

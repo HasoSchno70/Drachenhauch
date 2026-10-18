@@ -1826,7 +1826,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "typeof" => {
             arity!(1);
             Ok(match &a[0] {
-                Value::Instance(rc) => Value::str_rc(&rc.borrow().class_name.to_uppercase()),
+                // Eine Klasse aus einem Namensraum heisst intern `alias@klasse`;
+                // nach aussen `ALIAS.KLASSE`, wie man sie schreibt.
+                Value::Instance(rc) => Value::str_rc(crate::namensraum::lesbar_text(&rc.borrow().class_name).to_uppercase()),
                 v => Value::str_rc(v.type_name()),
             })
         }
@@ -2359,14 +2361,16 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(2);
             if let Value::Array(arr) = &a[0] {
                 let arr = arr.borrow();
-                // Ein LEERES Array kann keinen falschen Wert enthalten.
-                if arr.element_type != "string" && arr.cells.len() > 0 {
-                    return err("JOIN$: ARRAY OF STRING noetig".to_string());
+                // Texte, Zahlen und Wahrheitswerte -- je wie STR$ geschrieben.
+                // Vorher nur ARRAY OF STRING: wer Zahlen verbinden wollte,
+                // musste sie erst einzeln umwandeln (Glutfaden, 2026-10-15).
+                if arr.cells.iter().any(|v| !matches!(v, Value::Str(_) | Value::Int(_) | Value::Float(_) | Value::Bool(_))) {
+                    return err("JOIN$: Feld aus Texten, Zahlen oder Wahrheitswerten noetig".to_string());
                 }
                 let delim = need_str(&a[1], "JOIN$")?;
                 let parts: Vec<String> = arr.cells.iter().map(|v| match v { Value::Str(s) => s.to_string(), o => o.fmt() }).collect();
                 Ok(Value::str_rc(&parts.join(delim)))
-            } else { err("JOIN$ erwartet ARRAY OF STRING".to_string()) }
+            } else { err("JOIN$ erwartet ein Feld".to_string()) }
         }
         // --- String-Erweiterungen (WP3) ---
         "ltrim$" | "ltrim" => { arity!(1); Ok(Value::str_rc(need_str(&a[0], "LTRIM$")?.trim_start())) }
@@ -3619,14 +3623,33 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(3);
             let pfad = need_str(&a[0], "ZIP_WRITE")?;
             let namen = str_array(&a[1], "ZIP_WRITE")?;
-            let inhalte = str_array(&a[2], "ZIP_WRITE")?;
+            // Texte ODER Puffer: bis 2026-10-16 ging jede Zelle durch
+            // `str_of`, und ein BUFFER (ein PNG, ein PDF) landete still als
+            // Text "<BUFFER 123 Bytes>" im Archiv.
+            let inhalte: Vec<Vec<u8>> = match &a[2] {
+                Value::Array(arr) => {
+                    let arr = arr.borrow();
+                    let mut v = Vec::with_capacity(arr.cells.len());
+                    for i in 0..arr.cells.len() {
+                        match arr.cells.get(i) {
+                            Value::Str(t) => v.push(t.as_bytes().to_vec()),
+                            Value::Buffer(b) => v.push(b.borrow().clone()),
+                            andere => return err(format!(
+                                "ZIP_WRITE: Inhalt {} ist {} -- erwartet wird ein Text oder ein BUFFER",
+                                i, andere.type_name())),
+                        }
+                    }
+                    v
+                }
+                _ => return err("ZIP_WRITE: erwartet ein ARRAY OF STRING oder ARRAY OF BUFFER".to_string()),
+            };
             if namen.len() != inhalte.len() {
                 return err(format!(
                     "ZIP_WRITE: {} Namen, aber {} Inhalte -- die Arrays muessen \
                      gleich lang sein", namen.len(), inhalte.len()));
             }
             let paare: Vec<(String, Vec<u8>)> = namen.into_iter()
-                .zip(inhalte.into_iter().map(|s| s.into_bytes()))
+                .zip(inhalte)
                 .collect();
             Ok(Value::Int(crate::zipdatei::packe_daten(
                 std::path::Path::new(pfad), &paare)?))
@@ -4473,6 +4496,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 }
                 _ => Ok(Value::Bool(false)),
             }
+        }
+        // JSON_KEY$(name$) -- ein Schluessel als Pfad-Segment: ein Punkt darin
+        // trennt dann nicht mehr ("a.b" -> "a\.b"), ein Rueckstrich wird "\\".
+        // Fuer Schluessel, die man nicht selbst gewaehlt hat (aus JSON_KEYS,
+        // Nutzertext).
+        "json_key$" => {
+            arity!(1);
+            Ok(Value::str_rc(json_schluessel_segment(need_str(&a[0], "JSON_KEY$")?)))
         }
         "json_keys" => {
             // Zugabe beim Schreib-Ausbau: JSON_LEN lieferte fuer ein Objekt
@@ -5743,16 +5774,43 @@ fn json_resolve<'a>(root: &'a serde_json::Value, path: &str, fn_: &str) -> Resul
     json_try_resolve(root, path).ok_or_else(|| format!("{}: Pfad '{}' nicht aufloesbar", fn_, path))
 }
 
+/// Die Segmente eines Pfads: getrennt an `.`, aber `\.` ist ein Punkt IM
+/// Schluessel und `\\` ein Rueckstrich (JSON_KEY$ schreibt einen Schluessel
+/// so). Ohne das war ein Schluessel mit Punkt weder les- noch schreibbar --
+/// der Garn-Vorrat in Glutfaden hat welche ("unknown::unknown::Farbe 1.5").
+/// Ein Rueckstrich vor etwas anderem bleibt stehen, wie er ist.
+pub(crate) fn json_segmente(path: &str) -> Vec<String> {
+    let mut teile = vec![String::new()];
+    let mut it = path.chars();
+    while let Some(c) = it.next() {
+        match c {
+            '\\' => match it.next() {
+                Some(n @ ('.' | '\\')) => teile.last_mut().unwrap().push(n),
+                Some(n) => { let s = teile.last_mut().unwrap(); s.push('\\'); s.push(n); }
+                None => teile.last_mut().unwrap().push('\\'),
+            },
+            '.' => teile.push(String::new()),
+            _ => teile.last_mut().unwrap().push(c),
+        }
+    }
+    teile
+}
+
+/// Ein Schluessel als Pfad-Segment: Punkt und Rueckstrich geschuetzt (JSON_KEY$).
+pub(crate) fn json_schluessel_segment(name: &str) -> String {
+    name.replace('\\', "\\\\").replace('.', "\\.")
+}
+
 fn json_try_resolve<'a>(root: &'a serde_json::Value, path: &str) -> Option<&'a serde_json::Value> {
     if path.is_empty() { return Some(root); }
     let mut cur = root;
-    for part in path.split('.') {
+    for part in json_segmente(path) {
         match cur {
             serde_json::Value::Array(arr) => {
                 let idx: usize = part.parse().ok()?;
                 cur = arr.get(idx)?;
             }
-            serde_json::Value::Object(obj) => { cur = obj.get(part)?; }
+            serde_json::Value::Object(obj) => { cur = obj.get(&part)?; }
             _ => return None,
         }
     }
@@ -5966,7 +6024,7 @@ fn json_wert(v: serde_json::Value) -> Value {
 fn json_eltern<'a>(root: &'a mut serde_json::Value, path: &str, fn_: &str)
     -> Result<(&'a mut serde_json::Value, String, bool), String>
 {
-    let teile: Vec<&str> = path.split('.').collect();
+    let teile: Vec<String> = json_segmente(path);
     let (letztes, zwischen) = teile.split_last().unwrap();   // split immer >= 1
     let mut cur = root;
     let mut bisher = String::new();
@@ -5979,14 +6037,14 @@ fn json_eltern<'a>(root: &'a mut serde_json::Value, path: &str, fn_: &str)
         if cur.is_null() { *cur = serde_json::json!({}); }
         match cur {
             serde_json::Value::Object(obj) => {
-                if !obj.contains_key(*seg) {
+                if !obj.contains_key(seg.as_str()) {
                     if seg.parse::<usize>().is_ok() {
                         return Err(json_zahl_hinweis(fn_, &bisher, seg));
                     }
                     obj.insert(seg.to_string(), serde_json::json!({}));
                     neu_angelegt = true;
                 }
-                cur = obj.get_mut(*seg).unwrap();
+                cur = obj.get_mut(seg.as_str()).unwrap();
             }
             serde_json::Value::Array(arr) => {
                 let laenge = arr.len();
@@ -6957,4 +7015,23 @@ pub fn echter_pfad(p: &str) -> String {
         }
     };
     s.strip_prefix(r"\\?\").map(|x| x.to_string()).unwrap_or(s)
+}
+
+#[cfg(test)]
+mod json_segment_tests {
+    use super::{json_schluessel_segment, json_segmente};
+
+    #[test]
+    fn punkt_im_schluessel_und_rueckweg() {
+        assert_eq!(json_segmente("a.b"), vec!["a", "b"]);
+        assert_eq!(json_segmente(r"a\.b.c"), vec!["a.b", "c"]);
+        assert_eq!(json_segmente(r"a\\.b"), vec![r"a\", "b"]);
+        assert_eq!(json_segmente(r"a\xb"), vec![r"a\xb"]);
+        assert_eq!(json_segmente(""), vec![""]);
+        for name in ["Farbe 1.5", r"C:\pfad\x.y", "ohne", "..", r"\"] {
+            let seg = json_schluessel_segment(name);
+            assert_eq!(json_segmente(&seg), vec![name.to_string()], "{}", name);
+            assert_eq!(json_segmente(&format!("stock.{}", seg)), vec!["stock".to_string(), name.to_string()]);
+        }
+    }
 }

@@ -1,0 +1,212 @@
+' Die Oberflaeche des Glutfaden-Ports (examples/glutfaden, GTK 3) -- ueber
+' --probe bzw. --probe-bearbeiten, das sich selbst vorfuehrt, mit
+' Bildschirmfotos (--foto). Ohne GTK mit Bildschirm ueberspringt sich der Fall.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== glutfaden zeigt das demo muster
+IMPORT "helfer.dh"
+dlStarten(["run", BEISPIEL, "--", "--probe", "--foto", "s"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT dlAus;
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    ' Das Herz ist Anchor 47 (#A9152C): auf dem nahen Bild viele solche
+    ' Punkte, nach dem Ausblenden der Ebene keiner mehr.
+    PRINT "herz nah: "; punkte("s_nah.png", &HA9152C) > 500
+    PRINT "herz ausgeblendet: "; punkte("s_ohne_herz.png", &HA9152C)
+    PRINT "eingepasst: "; punkte("s_eingepasst.png", &HA9152C) > 200
+END IF
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_bild.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- erwartet
+rueckgabe 0
+geladen: TRUE, eingepasst: TRUE
+40 x 40, 7,3 cm
+zoom: 150 %
+zelle 17,12: 1 -> -1
+wieder da: 1
+herz nah: TRUE
+herz ausgeblendet: 0
+eingepasst: TRUE
+
+=== glutfaden bearbeitet, nimmt zurueck und sichert
+' Ein Katalog-Garn (DMC 996, #0097E1) ins Muster, ein gefuelltes Rechteck auf
+' einer neuen Ebene, zurueck und wieder vor, Linie mit Umschalt, Stift mit
+' Halbstich, rechte Taste radiert, Pipette, Fuellen in EINEM Schritt, gesperrte
+' Ebene, Ebene loeschen und zurueckholen, halbe Deckkraft, sichern und laden,
+' umbenennen. Die Fotos zeigen, dass das Bild mitgeht: nach dem Zurueck kein
+' Blau mehr, bei halber Deckkraft ein gemischtes statt des reinen.
+IMPORT "helfer.dh"
+dlStarten(["run", BEISPIEL, "--", "--probe-bearbeiten", "--foto", "b"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT dlAus;
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    PRINT "blau im rechteck: "; punkte("b_rechteck.png", &H0097E1) > 1000
+    PRINT "blau nach zurueck: "; punkte("b_zurueck.png", &H0097E1)
+    PRINT "blau wieder: "; punkte("b_wieder.png", &H0097E1) > 1000
+    ' halb ueber dem Stoff (#FAFAF5): (0+250)/2, (151+250)/2, (225+245)/2
+    PRINT "halb: rein "; punkte("b_halb.png", &H0097E1) < 50; " gemischt "; punkte("b_halb.png", &H7DC8EB) > 1000
+END IF
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_bild.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- erwartet
+rueckgabe 0
+geladen: TRUE farben 6 geaendert FALSE
+farbe 6 Electric Blue medium symbol ◆ farben 7
+noch einmal: farben 7 katalogzeilen TRUE
+ebenen 4 aktiv Ebene 4 blau 48
+schritte 3 oben Rechteck geaendert TRUE
+titel Demo Kreuzstich •
+zurueck: blau 0 ebenen 4
+linie gerade: TRUE -1
+stift: TRUE art 1
+radiert: FALSE
+pipette: 1 1
+gefuellt: 1600 schritte +1
+fuellen zurueck: 68
+gesperrt: TRUE
+geloescht: ebenen 3 blau 0
+zurueckgeholt: ebenen 4 blau 68
+deckkraft 0.5 geaendert TRUE
+gesichert: TRUE geaendert FALSE titel Demo Kreuzstich
+geladen: ebenen 4 farben 7 stiche 253 = 253
+zelle 5,4: TRUE DMC 996
+nach zurueck TRUE
+nach vor FALSE
+ebene umbenannt: TRUE
+oben Ebene umbenennen liste Blau  (68)
+blau im rechteck: TRUE
+blau nach zurueck: 0
+blau wieder: TRUE
+halb: rein TRUE gemischt TRUE
+
+=== glutfaden stufe 3 auswahl vieleck rueckstich fortschritt text
+' Auswahl (nur die aktive Ebene) kopieren, einfuegen, verschieben (ein
+' Schritt), drehen, loeschen; gefuelltes Vieleck; vierfache Symmetrie;
+' Rueckstiche setzen, rechts entfernen, zurueck; Fortschritt ziehen, Pfeil und
+' Enter; Text ohne Dialog; seltene Farben; sichern und laden (Rueckstiche und
+' erledigt kommen mit). Bilder: das Blau des Texts, die gruenen Haken.
+IMPORT "helfer.dh"
+dlStarten(["run", BEISPIEL, "--", "--probe-stufe3", "--foto", "d"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT dlAus;
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    PRINT "text blau: "; punkte("d_text.png", &H0097E1) > 1500
+    ' gruen gibt es vorher schon an den Kanten der blauen Rueckstiche ueber Gelb
+    PRINT "haken: "; gruenePunkte("d_fortschritt.png") - gruenePunkte("d_rueckstich.png") > 400
+END IF
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_bild.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- erwartet
+rueckgabe 0
+geladen: TRUE blau 6 stiche 185
+aktive ebene Herz
+auswahl 108 14,12-25,20
+eingefuegt: +52 oben Einfügen auswahl jetzt 3,3
+verschoben: auswahl 8,3 schritte +1 zelle 4,5 -1
+gedreht: Drehen breite 9 hoehe 12 stiche gleich TRUE
+geloescht: Löschen stiche -49
+esc: auswahl weg TRUE
+vieleck: blau 52 oben Vieleck ecken 0
+vierfach: +4 TRUE TRUE TRUE
+rueckstiche 2 oben Rückstich
+entfernt: 1 oben Rückstich entfernen
+zurueck: 2
+erledigt 1 1 oben Fortschritt markieren
+naechster offen 11,3
+nach enter 12,3 erster offen 12,3
+zurueckgenommen 10,5: 0
+text: an der maus TRUE groesse 15x12 stiche > 20 TRUE
+text gesetzt: +TRUE oben Text haengt FALSE
+selten: 15 oben Seltene Farben zusammenlegen
+geladen: rueckstiche 2 erledigt 30,5 TRUE stiche TRUE
+text blau: TRUE
+haken: TRUE
+
+=== glutfaden stufe 4 bild importieren
+' --probe-stufe4: den Import-Dialog fuer das Logo bauen und einstellen (60x60,
+' 12 Farben, Floyd-Steinberg, Confetti 2, Ausschnitt 10..90 %), Vorschau,
+' uebernehmen, erneut aus dem Quellbild mit den Einstellungen von damals
+' (muss dasselbe Muster geben), Voreinstellung "DP A4", sichern und laden.
+' Bildproben: der orange Ausschnittrahmen im Dialog, das dunkle Navy des
+' Logos auf der Zeichenflaeche (das Demo-Muster hat davon fast nichts).
+IMPORT "helfer.dh"
+dlStarten(["run", BEISPIEL, "--", "--probe-stufe4", "--foto", "d"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT dlAus;
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    PRINT "rahmen: "; punkteGanz("d_importdialog.png", &HFF9E40) > 800
+    PRINT "navy: "; punkte("d_importiert.png", &H1B1B2C) > 8000
+END IF
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_bild.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- erwartet
+rueckgabe 0
+dialog: TRUE bild 256x256
+info: 60 × 60 Stiche  ·  ≈ 10,9 × 10,9 cm bei 14ct Aida  ·  Ausschnitt 205 × 205 px
+vorschau: 60x60 farben 12 stiche 3600
+importiert: 60x60 farben 12 titel glutfaden_256 ungesichert TRUE datei leer TRUE
+quelle: glutfaden_256.png palette DMC dithering floyd_steinberg
+wieder: 60x60 farben 12 dither 1 confetti 2 ausschnitt 0.1 palette DMC
+dasselbe muster: TRUE
+vorlage: 60x60 farben 30 dither 1 median TRUE palette DMC Diamond Painting
+geladen: quelle glutfaden_256.png palette DMC max 12 ausschnitt 0.9 stiche TRUE gesichert TRUE
+rahmen: TRUE
+navy: TRUE
+
+=== glutfaden stufe 5 exportieren
+' --probe-stufe5: der Export-Dialog (wie viele Zeilen je Format gelten), dann
+' PDF mit Ueberlappung, Wasserzeichen, Anchor und Notizen, HTML, Bild mit
+' Symbolen, OXS -- und dasselbe OXS wieder geoeffnet (gleiche Stichzahl, als
+' neue Datei) --, das Paket, und im Diamond-Modus das empfohlene Papier
+' vorgewaehlt. Dazu die Dateien selbst.
+IMPORT "helfer.dh"
+dlStarten(["run", BEISPIEL, "--", "--probe-stufe5", "--foto", "d"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT dlAus;
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    DIM pdf AS BUFFER : pdf = READALL_BYTES("d_muster.pdf")
+    PRINT "pdf: "; CHR$(BUFFER_GET(pdf, 0)) + CHR$(BUFFER_GET(pdf, 1)) + CHR$(BUFFER_GET(pdf, 2)) + CHR$(BUFFER_GET(pdf, 3)); " wasserzeichen "; INSTR(LOWER$(BUFFER_TO_HEX$(pdf)), "2f636120302e3335") >= 0
+    PRINT "oxs: "; LEFT$(READALL$("d_muster.oxs"), 38)
+    PRINT "fotos: "; FILEEXISTS("d_exportdialog.png"); " "; FILEEXISTS("d_aus_oxs.png")
+END IF
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_bild.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- erwartet
+rueckgabe 0
+dialog: zeilen je format 9 3 2 0 2 papiere 6 entsprechungen 15
+pdf: PDF exportiert (6 Seiten, A4): d_muster.pdf | Anchor ueb 2
+html: HTML exportiert: d_muster.html | beginnt <!DOCTYPE html>
+bild: Bild exportiert (320 × 320): d_muster.png | 320x320
+oxs: OXS exportiert: d_muster.oxs
+wieder eingelesen: TRUE stiche gleich TRUE datei leer TRUE | Aus OXS eingelesen -- Sichern
+paket: Paket exportiert (6 Dateien): d_muster.zip
+  Demo_Kreuzstich.pxs, Demo_Kreuzstich.html, Demo_Kreuzstich.png, Demo_Kreuzstich.pdf, garnliste.csv, LIESMICH.txt
+diamond: vorgewaehlt A4 = empfehlung A4
+pdf: %PDF wasserzeichen TRUE
+oxs: <?xml version='1.0' encoding='utf-8'?>
+fotos: TRUE TRUE

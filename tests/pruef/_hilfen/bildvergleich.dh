@@ -1,0 +1,21 @@
+' Zwei Bilder Punkt fuer Punkt vergleichen: Groesse, Zahl abweichender Punkte,
+' groesste Abweichung eines Kanals (Deckkraft eingeschlossen).
+FUNCTION bvAbweichung$(a AS IMAGE, b AS IMAGE) AS STRING
+    IF IMAGE_WIDTH(a) <> IMAGE_WIDTH(b) OR IMAGE_HEIGHT(a) <> IMAGE_HEIGHT(b) THEN
+        RETURN "groesse " + STR$(IMAGE_WIDTH(a)) + "x" + STR$(IMAGE_HEIGHT(a)) + " gegen " + STR$(IMAGE_WIDTH(b)) + "x" + STR$(IMAGE_HEIGHT(b))
+    END IF
+    DIM bvN AS INTEGER, bvMax AS INTEGER, bvX AS INTEGER, bvY AS INTEGER
+    FOR bvY = 0 TO IMAGE_HEIGHT(a) - 1
+        FOR bvX = 0 TO IMAGE_WIDTH(a) - 1
+            DIM bvP AS INTEGER : bvP = GETPIXEL(a, bvX, bvY)
+            DIM bvQ AS INTEGER : bvQ = GETPIXEL(b, bvX, bvY)
+            DIM bvD AS INTEGER
+            bvD = MAX(ABS((bvP \ 65536) MOD 256 - (bvQ \ 65536) MOD 256), ABS((bvP \ 256) MOD 256 - (bvQ \ 256) MOD 256))
+            bvD = MAX(bvD, ABS(bvP MOD 256 - bvQ MOD 256))
+            bvD = MAX(bvD, ABS(GETALPHA(a, bvX, bvY) - GETALPHA(b, bvX, bvY)))
+            IF bvD > 0 THEN bvN = bvN + 1
+            IF bvD > bvMax THEN bvMax = bvD
+        NEXT
+    NEXT
+    RETURN STR$(IMAGE_WIDTH(a)) + "x" + STR$(IMAGE_HEIGHT(a)) + " abw " + STR$(bvN) + " max " + STR$(bvMax)
+END FUNCTION

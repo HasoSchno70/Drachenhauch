@@ -1,0 +1,392 @@
+' Garne, Farben und Paletten (PySticky core/thread.py + core/palette.py).
+'
+' Eine Farbe ist eine Zahl &HRRGGBB. Ein Garn hat Namen, Farbe, Hersteller und
+' Katalognummer; ein Tweed-Blend besteht aus zwei oder mehr Garnen.
+IMPORT "json"
+
+' "#RRGGBB" (auch "#RGB") -> Farbe; -1 bei krummem Text.
+FUNCTION farbeAusHex(text AS STRING) AS INTEGER
+    DIM t AS STRING : t = TRIM$(text)
+    IF LEFT$(t, 1) <> "#" OR (LEN(t) <> 4 AND LEN(t) <> 7) THEN RETURN -1
+    TRY
+        RETURN COLOR_FROM_HEX(t)
+    CATCH e
+        RETURN -1
+    END TRY
+END FUNCTION
+
+' Farbe -> "#RRGGBB" in Grossbuchstaben, wie PySticky schreibt.
+FUNCTION farbeAlsHex$(f AS INTEGER) AS STRING
+    RETURN "#" + RIGHT$("000000" + UPPER$(HEX$(f BAND &HFFFFFF)), 6)
+END FUNCTION
+
+FUNCTION rotAnteil(f AS INTEGER) AS INTEGER
+    RETURN (f SHR 16) BAND 255
+END FUNCTION
+FUNCTION gruenAnteil(f AS INTEGER) AS INTEGER
+    RETURN (f SHR 8) BAND 255
+END FUNCTION
+FUNCTION blauAnteil(f AS INTEGER) AS INTEGER
+    RETURN f BAND 255
+END FUNCTION
+
+' Helligkeit 0..1 nach ITU-R BT.601 (wie ThreadColor.luminance).
+FUNCTION helligkeit(f AS INTEGER) AS FLOAT
+    RETURN (0.299 * rotAnteil(f) + 0.587 * gruenAnteil(f) + 0.114 * blauAnteil(f)) / 255.0
+END FUNCTION
+
+CLASS Garn
+    DIM name AS STRING
+    DIM farbe AS INTEGER
+    DIM hersteller AS STRING
+    DIM nummer AS STRING
+    DIM staerke AS INTEGER
+    ' Tweed-Blend: die echten Garne und ihre Strang-Anteile
+    DIM teile AS ARRAY OF Garn
+    DIM anteile AS ARRAY OF INTEGER
+
+    SUB Init()
+        staerke = 40
+        teile = []
+        anteile = []
+    END SUB
+
+    FUNCTION istBlend() AS BOOLEAN
+        RETURN LEN(teile) >= 2
+    END FUNCTION
+END CLASS
+
+FUNCTION neuesGarn(name AS STRING, farbe AS INTEGER, hersteller AS STRING, nummer AS STRING) AS Garn
+    DIM g AS Garn : g = NEW Garn()
+    g.name = name
+    g.farbe = farbe
+    g.hersteller = hersteller
+    g.nummer = nummer
+    RETURN g
+END FUNCTION
+
+CLASS Palette
+    DIM name AS STRING
+    DIM hersteller AS STRING
+    DIM garne AS ARRAY OF Garn
+    DIM istPerlen AS BOOLEAN
+    DIM istDiamant AS BOOLEAN
+
+    SUB Init()
+        garne = []
+    END SUB
+
+    FUNCTION nachNummer(nummer AS STRING) AS Garn
+        DIM g AS Garn
+        FOR EACH g IN garne
+            IF g.nummer = nummer THEN RETURN g
+        NEXT
+        RETURN NIL
+    END FUNCTION
+END CLASS
+
+' Die Garne aller Paletten nach "hersteller|nummer" (klein): der Wert ist
+' p * 100000 + i (Palette p, Garn i). Bei gleichem Schluessel gewinnt das
+' erste -- so ordnen OXS und PAT ein Garn aus der Datei einer Palette zu.
+FUNCTION garnVerzeichnis(paletten AS ARRAY OF Palette) AS MAP OF INTEGER
+    DIM bekannt AS MAP OF INTEGER : bekannt = {}
+    DIM p AS INTEGER, i AS INTEGER
+    FOR p = 0 TO LEN(paletten) - 1
+        FOR i = 0 TO LEN(paletten[p].garne) - 1
+            DIM gg AS Garn : gg = paletten[p].garne[i]
+            IF gg.hersteller = "" OR gg.nummer = "" THEN CONTINUE
+            DIM sk AS STRING : sk = LOWER$(gg.hersteller) + "|" + LOWER$(gg.nummer)
+            IF NOT MAPHAS(bekannt, sk) THEN MAPPUT(bekannt, sk, p * 100000 + i)
+        NEXT
+    NEXT
+    RETURN bekannt
+END FUNCTION
+
+' Herstellername aus dem Dateinamen: "Mill_Hill_Beads_Farben" -> "Mill Hill Beads".
+FUNCTION herstellerAusDatei$(pfad AS STRING) AS STRING
+    DIM n AS STRING : n = BASENAME(pfad)
+    DIM p AS INTEGER : p = INSTRREV(n, ".")
+    IF p >= 0 THEN n = LEFT$(n, p)
+    n = REPLACE$(n, "_Farben", "")
+    n = REPLACE$(n, "_Stickgarn", "")
+    n = REPLACE$(n, "_Stick", "")
+    RETURN TRIM$(REPLACE$(n, "_", " "))
+END FUNCTION
+
+' Eine Paletten-Datei: Liste von {"<X>Number": "...", "Color": {R,G,B}, "Name": "..."}.
+' Ein krummer Eintrag wird uebergangen, wie im Original.
+FUNCTION paletteLaden(pfad AS STRING) AS Palette
+    DIM pal AS Palette : pal = NEW Palette()
+    pal.hersteller = herstellerAusDatei$(pfad)
+    pal.name = pal.hersteller
+    pal.istPerlen = INSTR(LOWER$(pal.hersteller), "bead") >= 0
+    pal.istDiamant = NOT pal.istPerlen AND INSTR(LOWER$(pal.hersteller), "diamond") >= 0
+    DIM j AS JSON_HANDLE : j = JSON_LOAD(pfad)
+    IF JSON_TYPE(j, "") <> "array" THEN THROW "Palette " + BASENAME(pfad) + ": Liste von Farb-Objekten erwartet"
+    DIM n AS INTEGER : n = JSON_LEN(j, "")
+    IF n = 0 THEN RETURN pal
+    ' Das Nummernfeld heisst je Hersteller anders (DmcNumber, BeadNumber, Code ...)
+    DIM nummernFeld AS STRING
+    DIM k AS STRING
+    FOR EACH k IN JSON_KEYS(j, "0")
+        IF RIGHT$(LOWER$(k), 6) = "number" OR k = "Code" THEN
+            nummernFeld = k
+            BREAK
+        END IF
+    NEXT
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM w AS STRING : w = STR$(i)
+        IF JSON_TYPE(j, w) <> "object" THEN CONTINUE
+        IF JSON_TYPE(j, w + ".Color") <> "object" THEN CONTINUE
+        DIM r AS INTEGER : r = 128
+        DIM gr AS INTEGER : gr = 128
+        DIM b AS INTEGER : b = 128
+        TRY
+            IF JSON_HAS(j, w + ".Color.R") THEN r = JSON_GET_INT(j, w + ".Color.R")
+            IF JSON_HAS(j, w + ".Color.G") THEN gr = JSON_GET_INT(j, w + ".Color.G")
+            IF JSON_HAS(j, w + ".Color.B") THEN b = JSON_GET_INT(j, w + ".Color.B")
+        CATCH e
+            CONTINUE
+        END TRY
+        DIM name AS STRING : name = "Unknown"
+        IF JSON_HAS(j, w + ".Name") THEN name = JSON_GET_STRING(j, w + ".Name")
+        DIM nummer AS STRING
+        IF nummernFeld <> "" AND JSON_HAS(j, w + "." + nummernFeld) THEN
+            IF JSON_TYPE(j, w + "." + nummernFeld) = "string" THEN
+                nummer = JSON_GET_STRING(j, w + "." + nummernFeld)
+            ELSE
+                nummer = STR$(JSON_GET_INT(j, w + "." + nummernFeld))
+            END IF
+        END IF
+        ARRAY_PUSH(pal.garne, neuesGarn(name, RGB(CLAMP(r, 0, 255), CLAMP(gr, 0, 255), CLAMP(b, 0, 255)), pal.hersteller, nummer))
+    NEXT
+    RETURN pal
+END FUNCTION
+
+' Alle Paletten eines Ordners, nach Namen sortiert.
+FUNCTION palettenLaden(ordner AS STRING) AS ARRAY OF Palette
+    DIM ergebnis AS ARRAY OF Palette : ergebnis = []
+    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(ordner, "*.json")
+    SORT(dateien)
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        ARRAY_PUSH(ergebnis, paletteLaden(PATHJOIN(ordner, d)))
+    NEXT
+    RETURN ergebnis
+END FUNCTION
+
+' Die Symbole fuer neue Farben (eins je Zeile).
+FUNCTION symboleLaden(pfad AS STRING) AS ARRAY OF STRING
+    DIM z AS ARRAY OF STRING : z = []
+    DIM zeile AS STRING
+    FOR EACH zeile IN READLINES(pfad)
+        IF TRIM$(zeile) <> "" THEN ARRAY_PUSH(z, TRIM$(zeile))
+    NEXT
+    RETURN z
+END FUNCTION
+
+' Die Unicode-Namen der Symbole (daten/symbolnamen.txt, Zeichen TAB Name) --
+' PySticky fragt dafuer unicodedata.name, das gibt es hier nicht.
+FUNCTION symbolnamenLaden(pfad AS STRING) AS MAP OF STRING
+    DIM m AS MAP OF STRING : m = {}
+    IF NOT FILEEXISTS(pfad) THEN RETURN m
+    DIM zeile AS STRING
+    FOR EACH zeile IN READLINES(pfad)
+        IF LEFT$(zeile, 1) = "#" THEN CONTINUE
+        DIM t AS INTEGER : t = INSTR(zeile, CHR$(9))
+        IF t < 1 THEN CONTINUE
+        MAPPUT(m, LEFT$(zeile, t), TRIM$(MID$(zeile, t + 1)))
+    NEXT
+    RETURN m
+END FUNCTION
+
+' Passt ein Symbol zur Suche (PySticky _symbol_matches_query)? Teiltext des
+' Zeichens oder seines Unicode-Namens, sonst der Codepunkt als "U+25CF",
+' "25CF" oder dezimal "9679" -- Gross/klein egal, Leerraum aussen auch.
+FUNCTION symbolPasst(symbol AS STRING, name AS STRING, suche AS STRING) AS BOOLEAN
+    DIM q AS STRING : q = LOWER$(TRIM$(suche))
+    IF q = "" THEN RETURN TRUE
+    IF INSTR(LOWER$(symbol), q) >= 0 THEN RETURN TRUE
+    IF name <> "" AND INSTR(LOWER$(name), q) >= 0 THEN RETURN TRUE
+    IF symbol = "" THEN RETURN FALSE
+    DIM cp AS INTEGER : cp = ASC(symbol)
+    DIM h AS STRING : h = LOWER$(HEX$(cp))
+    IF LEN(h) < 4 THEN h = "0" * (4 - LEN(h)) + h
+    IF LEFT$(q, 2) = "u+" AND MID$(q, 2) = h THEN RETURN TRUE
+    IF q = h THEN RETURN TRUE
+    IF REGEX_TEST(q, "^[0-9]+$") THEN
+        IF LEN(q) < 10 THEN
+            IF VAL(q) = cp THEN RETURN TRUE
+        END IF
+    END IF
+    RETURN FALSE
+END FUNCTION
+
+' --- Farbabstand (PySticky core/color_math.py) -----------------------------------
+' CIEDE2000 nach Sharma, Wu und Dalal (2005), sRGB -> Lab mit Weisspunkt D65 --
+' dieselben Konstanten wie das Original, damit "Farbe ersetzen" mit Toleranz
+' dieselben Farben trifft.
+FUNCTION srgbLinear(c AS INTEGER) AS FLOAT
+    DIM v AS FLOAT : v = c / 255.0
+    IF v > 0.04045 THEN RETURN ((v + 0.055) / 1.055) ^ 2.4
+    RETURN v / 12.92
+END FUNCTION
+
+FUNCTION labF(t AS FLOAT) AS FLOAT
+    IF t > 0.008856 THEN RETURN t ^ (1.0 / 3.0)
+    RETURN (903.3 * t + 16) / 116
+END FUNCTION
+
+' &HRRGGBB -> (L, a, b)
+FUNCTION farbeLab(f AS INTEGER) AS TUPLE
+    DIM rl AS FLOAT : rl = srgbLinear(rotAnteil(f))
+    DIM gl AS FLOAT : gl = srgbLinear(gruenAnteil(f))
+    DIM bl AS FLOAT : bl = srgbLinear(blauAnteil(f))
+    DIM x AS FLOAT : x = 0.4124564 * rl + 0.3575761 * gl + 0.1804375 * bl
+    DIM y AS FLOAT : y = 0.2126729 * rl + 0.7151522 * gl + 0.0721750 * bl
+    DIM z AS FLOAT : z = 0.0193339 * rl + 0.1191920 * gl + 0.9503041 * bl
+    DIM fx AS FLOAT : fx = labF(x / 0.95047)
+    DIM fy AS FLOAT : fy = labF(y / 1.0)
+    DIM fz AS FLOAT : fz = labF(z / 1.08883)
+    RETURN (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
+END FUNCTION
+
+' Pythons round(): bei genau .5 zur geraden Zahl.
+FUNCTION pyRunden(v AS FLOAT) AS INTEGER
+    DIM n AS INTEGER : n = FLOOR(v)
+    DIM d AS FLOAT : d = v - n
+    IF d > 0.5 THEN RETURN n + 1
+    IF d < 0.5 THEN RETURN n
+    IF n MOD 2 = 0 THEN RETURN n
+    RETURN n + 1
+END FUNCTION
+
+FUNCTION srgbAusLinear(c AS FLOAT) AS INTEGER
+    DIM v AS FLOAT : v = CLAMP(c, 0.0, 1.0)
+    IF v > 0.0031308 THEN
+        v = 1.055 * v ^ (1.0 / 2.4) - 0.055
+    ELSE
+        v = 12.92 * v
+    END IF
+    RETURN CLAMP(pyRunden(v * 255), 0, 255)
+END FUNCTION
+
+FUNCTION labFUmkehr(t AS FLOAT) AS FLOAT
+    IF t ^ 3 > 0.008856 THEN RETURN t ^ 3
+    RETURN (116 * t - 16) / 903.3
+END FUNCTION
+
+' (L, a, b) -> &HRRGGBB, die Umkehrung von farbeLab (PySticky lab_to_rgb).
+FUNCTION labFarbe(l AS FLOAT, a AS FLOAT, b AS FLOAT) AS INTEGER
+    DIM fy AS FLOAT : fy = (l + 16) / 116
+    DIM fx AS FLOAT : fx = a / 500 + fy
+    DIM fz AS FLOAT : fz = fy - b / 200
+    DIM x AS FLOAT : x = labFUmkehr(fx) * 0.95047
+    DIM y AS FLOAT : y = labFUmkehr(fy)
+    DIM z AS FLOAT : z = labFUmkehr(fz) * 1.08883
+    DIM r AS INTEGER : r = srgbAusLinear(3.2404542 * x - 1.5371385 * y - 0.4985314 * z)
+    DIM g AS INTEGER : g = srgbAusLinear(-0.9692660 * x + 1.8760108 * y + 0.0415560 * z)
+    DIM bb AS INTEGER : bb = srgbAusLinear(0.0556434 * x - 0.2040259 * y + 1.0572252 * z)
+    RETURN RGB(r, g, bb)
+END FUNCTION
+
+' Ein Tweed-Blend aus zwei oder mehr Garnen (PySticky Thread.blend): die Farbe
+' ist das nach Straengen gewichtete Mittel in Lab, der Name "DMC 310 / DMC
+' 3799 (1+1)", der Hersteller der gemeinsame oder "Blend", die Nummer die
+' Nummern mit "+".
+FUNCTION garnBlend(teile AS ARRAY OF Garn, anteile AS ARRAY OF INTEGER) AS Garn
+    IF LEN(teile) < 2 THEN THROW "Blend braucht mindestens 2 Garne"
+    IF LEN(anteile) <> LEN(teile) THEN THROW "Blend: Zahl der Anteile passt nicht zu den Garnen"
+    DIM summe AS INTEGER : summe = 0
+    DIM sl AS FLOAT, sa AS FLOAT, sb AS FLOAT
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM nummern AS ARRAY OF STRING : nummern = []
+    DIM anteilText AS ARRAY OF STRING : anteilText = []
+    DIM hst AS MAP OF BOOLEAN : hst = {}
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 1
+        IF anteile[i] < 1 THEN THROW "Blend: Anteile müssen mindestens 1 sein"
+        DIM l AS FLOAT, a AS FLOAT, b AS FLOAT
+        (l, a, b) = farbeLab(teile[i].farbe)
+        sl = sl + l * anteile[i]
+        sa = sa + a * anteile[i]
+        sb = sb + b * anteile[i]
+        summe = summe + anteile[i]
+        DIM g AS Garn : g = teile[i]
+        ARRAY_PUSH(namen, TRIM$(g.hersteller + " " + IIF(g.nummer <> "", g.nummer, g.name)))
+        ARRAY_PUSH(nummern, g.nummer)
+        ARRAY_PUSH(anteilText, STR$(anteile[i]))
+        IF g.hersteller <> "" THEN MAPPUT(hst, g.hersteller, TRUE)
+    NEXT
+    DIM hersteller AS STRING : hersteller = "Blend"
+    IF LEN(MAPKEYS(hst)) = 1 THEN hersteller = MAPKEYS(hst)[0]
+    DIM erg AS Garn : erg = neuesGarn(JOIN$(namen, " / ") + " (" + JOIN$(anteilText, "+") + ")", labFarbe(sl / summe, sa / summe, sb / summe), hersteller, JOIN$(nummern, "+"))
+    erg.teile = teile
+    erg.anteile = anteile
+    RETURN erg
+END FUNCTION
+
+FUNCTION labWinkel(ap AS FLOAT, b AS FLOAT) AS FLOAT
+    IF ap = 0 AND b = 0 THEN RETURN 0.0
+    DIM h AS FLOAT : h = DEG(ATAN2(b, ap))
+    IF h < 0 THEN h = h + 360.0
+    RETURN h
+END FUNCTION
+
+FUNCTION deltaE2000(l1 AS FLOAT, a1 AS FLOAT, b1 AS FLOAT, l2 AS FLOAT, a2 AS FLOAT, b2 AS FLOAT) AS FLOAT
+    DIM c1 AS FLOAT : c1 = HYPOT(a1, b1)
+    DIM c2 AS FLOAT : c2 = HYPOT(a2, b2)
+    DIM cq AS FLOAT : cq = (c1 + c2) / 2.0
+    DIM cq7 AS FLOAT : cq7 = cq ^ 7
+    DIM g AS FLOAT : g = 0.5 * (1 - SQR(cq7 / (cq7 + 25.0 ^ 7)))
+    DIM a1p AS FLOAT : a1p = (1 + g) * a1
+    DIM a2p AS FLOAT : a2p = (1 + g) * a2
+    DIM c1p AS FLOAT : c1p = HYPOT(a1p, b1)
+    DIM c2p AS FLOAT : c2p = HYPOT(a2p, b2)
+    DIM h1p AS FLOAT : h1p = labWinkel(a1p, b1)
+    DIM h2p AS FLOAT : h2p = labWinkel(a2p, b2)
+    DIM dlp AS FLOAT : dlp = l2 - l1
+    DIM dcp AS FLOAT : dcp = c2p - c1p
+    DIM prod AS FLOAT : prod = c1p * c2p
+    DIM dhg AS FLOAT
+    IF prod <> 0 THEN
+        dhg = h2p - h1p
+        IF dhg > 180 THEN
+            dhg = dhg - 360
+        ELSEIF dhg < -180 THEN
+            dhg = dhg + 360
+        END IF
+    END IF
+    DIM dhp AS FLOAT : dhp = 2 * SQR(prod) * SIN(RAD(dhg) / 2)
+    DIM lqp AS FLOAT : lqp = (l1 + l2) / 2.0
+    DIM cqp AS FLOAT : cqp = (c1p + c2p) / 2.0
+    DIM hqp AS FLOAT
+    IF prod = 0 THEN
+        hqp = h1p + h2p
+    ELSEIF ABS(h1p - h2p) > 180 THEN
+        IF h1p + h2p < 360 THEN hqp = (h1p + h2p + 360) / 2 ELSE hqp = (h1p + h2p - 360) / 2
+    ELSE
+        hqp = (h1p + h2p) / 2
+    END IF
+    DIM t AS FLOAT : t = 1 - 0.17 * COS(RAD(hqp - 30)) + 0.24 * COS(RAD(2 * hqp)) + 0.32 * COS(RAD(3 * hqp + 6)) - 0.20 * COS(RAD(4 * hqp - 63))
+    DIM dth AS FLOAT : dth = 30 * EXP(-(((hqp - 275) / 25) ^ 2))
+    DIM cqp7 AS FLOAT : cqp7 = cqp ^ 7
+    DIM rc AS FLOAT : rc = 2 * SQR(cqp7 / (cqp7 + 25.0 ^ 7))
+    DIM sl AS FLOAT : sl = 1 + (0.015 * (lqp - 50) ^ 2) / SQR(20 + (lqp - 50) ^ 2)
+    DIM sc AS FLOAT : sc = 1 + 0.045 * cqp
+    DIM sh AS FLOAT : sh = 1 + 0.015 * cqp * t
+    DIM rt AS FLOAT : rt = -SIN(RAD(2 * dth)) * rc
+    DIM dl AS FLOAT : dl = dlp / sl
+    DIM dc AS FLOAT : dc = dcp / sc
+    DIM dh AS FLOAT : dh = dhp / sh
+    RETURN SQR(dl * dl + dc * dc + dh * dh + rt * dc * dh)
+END FUNCTION
+
+' Abstand zweier Farben &HRRGGBB.
+FUNCTION farbAbstand(f1 AS INTEGER, f2 AS INTEGER) AS FLOAT
+    DIM l1 AS FLOAT, a1 AS FLOAT, b1 AS FLOAT, l2 AS FLOAT, a2 AS FLOAT, b2 AS FLOAT
+    (l1, a1, b1) = farbeLab(f1)
+    (l2, a2, b2) = farbeLab(f2)
+    RETURN deltaE2000(l1, a1, b1, l2, a2, b2)
+END FUNCTION

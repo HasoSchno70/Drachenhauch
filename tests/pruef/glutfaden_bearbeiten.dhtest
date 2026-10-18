@@ -1,0 +1,256 @@
+' Glutfaden Stufe 2: das Muster bearbeiten und zuruecknehmen
+' (examples/glutfaden/kern/bearbeiten.dh + verlauf.dh). Jeder Fall prueft den
+' Stand nach dem Befehl UND nach Zurueck/Vor -- ein Rueckgaengig, das nur den
+' Endstand stimmen laesst, faellt sonst nicht auf.
+' Der Kern kommt ueber eine Beilage, weil Platzhalter nur dort gelten.
+
+=== stiche setzen, ein zug ist ein schritt
+IMPORT "k.dh"
+DIM m AS kern.Muster : m = neuesTestmuster()
+DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+PRINT "start "; zustand$(m)
+DIM ok AS BOOLEAN
+ok = kern.stichSetzen(m, v, 1, 1, 0, kern.VOLL)
+PRINT "ein stich "; ok; " "; zustand$(m); " schritte "; LEN(v.rueck)
+' ein Zug: drei Zellen, eine davon zweimal (zurueck muss beim ersten Stand landen)
+v.beginnen("Stift")
+ok = kern.stichSetzen(m, v, 2, 1, 1, kern.VOLL)
+ok = kern.stichSetzen(m, v, 3, 1, 1, kern.VOLL)
+ok = kern.stichSetzen(m, v, 1, 1, 1, kern.VOLL)
+ok = kern.stichSetzen(m, v, 1, 1, 0, kern.HALB_OL_UR)
+v.beenden()
+PRINT "zug "; zustand$(m); " schritte "; LEN(v.rueck); " "; v.textZurueck$()
+' dieselbe Zelle noch einmal gleich: kein Schritt
+ok = kern.stichSetzen(m, v, 2, 1, 1, kern.VOLL)
+PRINT "gleich "; ok; " schritte "; LEN(v.rueck)
+ok = v.zurueckNehmen(m)
+PRINT "zurueck "; zustand$(m)
+ok = v.zurueckNehmen(m)
+PRINT "zurueck "; zustand$(m); " noch "; v.kannZurueck()
+ok = v.wiederholen(m)
+ok = v.wiederholen(m)
+PRINT "vor vor "; zustand$(m); " noch vor "; v.kannVor()
+' radieren
+ok = kern.stichSetzen(m, v, 1, 1, -1, kern.VOLL)
+PRINT "radiert "; zustand$(m)
+' ein neuer Schritt nimmt die Vor-Liste weg
+ok = v.zurueckNehmen(m)
+ok = kern.stichSetzen(m, v, 4, 4, 2, kern.VOLL)
+PRINT "neu nach zurueck: vor "; v.kannVor(); " "; zustand$(m)
+' Perle und Diamant erzwingen ihre Form, ein gewaehlter Teilstich bleibt
+DIM e AS kern.Ebene : e = m.ebenen.aktiveEbene()
+PRINT "typen "; e.stichArt(1, 1); " "; e.stichArt(2, 1); " "; e.stichArt(4, 4)
+ok = kern.stichSetzen(m, v, 5, 4, 1, kern.VIERTEL_OL)
+PRINT "perle als viertel "; e.stichArt(5, 4)
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+
+--- erwartet
+start [*Hintergrund:0] farben A=0 B=0 C=0 summe 0
+ein stich TRUE [*Hintergrund:1] farben A=1 B=0 C=0 summe 1000710 schritte 1
+zug [*Hintergrund:3] farben A=1 B=2 C=0 summe 993712430 schritte 2 Stift
+gleich FALSE schritte 2
+zurueck [*Hintergrund:1] farben A=1 B=0 C=0 summe 1000710
+zurueck [*Hintergrund:0] farben A=0 B=0 C=0 summe 0 noch FALSE
+vor vor [*Hintergrund:3] farben A=1 B=2 C=0 summe 993712430 noch vor FALSE
+radiert [*Hintergrund:2] farben A=0 B=2 C=0 summe 32027237
+neu nach zurueck: vor FALSE [*Hintergrund:4] farben A=1 B=2 C=1 summe 806087998
+typen 1 10 11
+perle als viertel 3
+
+=== ebenen umbauen und zuruecknehmen
+IMPORT "k.dh"
+DIM m AS kern.Muster : m = neuesTestmuster()
+DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+DIM ok AS BOOLEAN
+DIM n AS INTEGER
+ok = kern.stichSetzen(m, v, 0, 0, 0, kern.VOLL)
+n = kern.ebeneNeu(m, v, "")
+ok = kern.stichSetzen(m, v, 1, 0, 1, kern.VOLL)
+ok = kern.stichSetzen(m, v, 0, 0, 1, kern.VOLL)
+PRINT "neu "; n; " "; zustand$(m)
+n = kern.ebeneDuplizieren(m, v, 1)
+PRINT "dupliziert "; n; " "; zustand$(m)
+ok = kern.ebeneUmbenennen(m, v, 2, "Oben")
+ok = kern.ebeneVerschieben(m, v, 2, 0)
+PRINT "verschoben "; zustand$(m)
+' ein Stich auf die verschobene Ebene, dann zurueck: er muss aus DIESER Ebene
+' verschwinden, nicht aus der, die jetzt an ihrer alten Stelle steht
+m.ebenen.aktiv = 0
+ok = kern.stichSetzen(m, v, 5, 4, 2, kern.VOLL)
+PRINT "stich unten "; zustand$(m)
+ok = v.zurueckNehmen(m)
+ok = v.zurueckNehmen(m)
+PRINT "zurueck vor verschieben "; zustand$(m)
+ok = v.zurueckNehmen(m)
+PRINT "zurueck vor umbenennen "; zustand$(m)
+ok = v.wiederholen(m) : ok = v.wiederholen(m) : ok = v.wiederholen(m)
+PRINT "wieder vor "; zustand$(m)
+' loeschen und zurueckholen -- samt Stichen
+ok = kern.ebeneLoeschen(m, v, 1)
+PRINT "geloescht "; zustand$(m)
+ok = v.zurueckNehmen(m)
+PRINT "zurueckgeholt "; zustand$(m)
+' zusammenfuehren nach unten: oben gewinnt, die untere behaelt ihre anderen Zellen
+ok = kern.ebeneNachUnten(m, v, 2)
+PRINT "zusammen "; ok; " "; zustand$(m)
+ok = v.zurueckNehmen(m)
+PRINT "getrennt "; zustand$(m)
+' die unterste laesst sich nicht nach unten fuehren, die letzte nicht loeschen
+PRINT "unterste "; kern.ebeneNachUnten(m, v, 0)
+DIM s AS INTEGER : s = LEN(v.rueck)
+WHILE m.ebenen.anzahl() > 1
+    ok = kern.ebeneLoeschen(m, v, 0)
+WEND
+PRINT "letzte "; kern.ebeneLoeschen(m, v, 0); " "; zustand$(m)
+WHILE v.kannZurueck()
+    ok = v.zurueckNehmen(m)
+WEND
+PRINT "alles zurueck "; zustand$(m)
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+
+--- erwartet
+neu 1 [Hintergrund:1 *Ebene 2:2] farben A=1 B=2 C=0 summe 25004353
+dupliziert 2 [Hintergrund:1 Ebene 2:2 *Ebene 2 (Kopie):2] farben A=1 B=4 C=0 summe 125184638
+verschoben [*Oben:2 Hintergrund:1 Ebene 2:2] farben A=1 B=4 C=0 summe 371142025
+stich unten [*Oben:3 Hintergrund:1 Ebene 2:2] farben A=1 B=4 C=1 summe 844930134
+zurueck vor verschieben [Hintergrund:1 Ebene 2:2 *Oben:2] farben A=1 B=4 C=0 summe 125184638
+zurueck vor umbenennen [Hintergrund:1 Ebene 2:2 *Ebene 2 (Kopie):2] farben A=1 B=4 C=0 summe 125184638
+wieder vor [*Oben:3 Hintergrund:1 Ebene 2:2] farben A=1 B=4 C=1 summe 844930134
+geloescht [*Oben:3 Ebene 2:2] farben A=0 B=4 C=1 summe 380998989
+zurueckgeholt [*Oben:3 Hintergrund:1 Ebene 2:2] farben A=1 B=4 C=1 summe 844930134
+zusammen TRUE [Oben:3 *Hintergrund:2] farben A=0 B=4 C=1 summe 380998989
+getrennt [*Oben:3 Hintergrund:1 Ebene 2:2] farben A=1 B=4 C=1 summe 844930134
+unterste FALSE
+letzte FALSE [*Ebene 2:2] farben A=0 B=2 C=0 summe 32001381
+alles zurueck [*Hintergrund:0] farben A=0 B=0 C=0 summe 0
+
+=== gesperrte ebene nimmt nichts an
+IMPORT "k.dh"
+DIM m AS kern.Muster : m = neuesTestmuster()
+DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+DIM ok AS BOOLEAN
+ok = kern.stichSetzen(m, v, 0, 0, 0, kern.VOLL)
+m.ebenen.aktiveEbene().gesperrt = TRUE
+PRINT "gesperrt setzen "; kern.stichSetzen(m, v, 1, 0, 0, kern.VOLL); " radieren "; kern.stichSetzen(m, v, 0, 0, -1, kern.VOLL)
+PRINT "fuellen "; kern.zellenSetzen(m, v, kern.fuellung(m.ebenen.aktiveEbene(), 3, 3, 1), 1, kern.VOLL, "Fuellen")
+PRINT "schritte "; LEN(v.rueck); " "; zustand$(m)
+' eine gesperrte untere Ebene laesst sich nicht hineinfuehren
+DIM n AS INTEGER : n = kern.ebeneNeu(m, v, "")
+ok = kern.stichSetzen(m, v, 2, 2, 1, kern.VOLL)
+PRINT "nach unten in gesperrte "; kern.ebeneNachUnten(m, v, 1); " "; zustand$(m)
+' ausserhalb und unbekannte Farbe
+PRINT "ausserhalb "; kern.stichSetzen(m, v, 6, 0, 0, kern.VOLL); " farbe 9 "; kern.stichSetzen(m, v, 0, 1, 9, kern.VOLL)
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+
+--- erwartet
+gesperrt setzen FALSE radieren FALSE
+fuellen 0
+schritte 1 [*Hintergrund:1] farben A=1 B=0 C=0 summe 1000003
+nach unten in gesperrte FALSE [Hintergrund:1 *Ebene 2:1] farben A=1 B=1 C=0 summe 33001550
+ausserhalb FALSE farbe 9 FALSE
+
+=== farben hinzufuegen und unbenutzte entfernen
+IMPORT "k.dh"
+DIM m AS kern.Muster : m = neuesTestmuster()
+DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+DIM sym AS ARRAY OF STRING : sym = ["A", "B", "C", "D"]
+DIM ok AS BOOLEAN
+' dasselbe Garn noch einmal: keine neue Farbe, kein Schritt
+PRINT "doppelt "; kern.farbeHinzufuegen(m, v, kern.neuesGarn("Rot", &HFF0000, "DMC", "321"), sym, FALSE, FALSE); " schritte "; LEN(v.rueck)
+DIM i AS INTEGER
+i = kern.farbeHinzufuegen(m, v, kern.neuesGarn("Gruen", &H00FF00, "DMC", "700"), sym, FALSE, FALSE)
+i = kern.farbeHinzufuegen(m, v, kern.neuesGarn("Weiss", &HFFFFFF, "DMC", "B5200"), sym, FALSE, FALSE)
+i = kern.farbeHinzufuegen(m, v, kern.neuesGarn("Grau", &H808080, "DMC", "415"), sym, FALSE, FALSE)
+PRINT "neu "; i; " "; zustand$(m)
+' Zellen in Farbe 2 (Diamant) und 4 (Weiss), Rueckstich in Farbe 3; 0, 1 und 5 bleiben leer
+ok = kern.stichSetzen(m, v, 0, 0, 2, kern.VOLL)
+ok = kern.stichSetzen(m, v, 1, 0, 4, kern.VOLL)
+DIM n AS INTEGER : n = kern.ebeneNeu(m, v, "")
+ok = kern.stichSetzen(m, v, 2, 0, 4, kern.VOLL)
+m.ebenen.ebenen[1].sichtbar = FALSE
+ARRAY_PUSH(m.rueckstiche, kern.neuerRueckstich(0, 0, 4, 4, 3))
+PRINT "vorher "; zustand$(m); " rueckstich "; m.rueckstiche[0].farbe
+PRINT "entfernt "; kern.unbenutzteEntfernen(m, v); " "; zustand$(m); " rueckstich "; m.rueckstiche[0].farbe
+PRINT "zellen "; m.ebenen.ebenen[0].stich(0, 0); " "; m.ebenen.ebenen[0].stich(1, 0); " "; m.ebenen.ebenen[1].stich(2, 0)
+ok = v.zurueckNehmen(m)
+PRINT "zurueck "; zustand$(m); " rueckstich "; m.rueckstiche[0].farbe
+ok = v.wiederholen(m)
+PRINT "wieder "; zustand$(m); " rueckstich "; m.rueckstiche[0].farbe
+PRINT "nichts mehr "; kern.unbenutzteEntfernen(m, v)
+' Symbole aufgebraucht: #1, #2
+DIM w AS kern.Muster : w = kern.neuesMuster("w", 2, 2)
+DIM z AS ARRAY OF STRING : z = ["X"]
+FOR i = 1 TO 3
+    n = kern.farbeHinzufuegen(w, v, kern.neuesGarn("g", 0, "H", STR$(i)), z, FALSE, FALSE)
+NEXT
+PRINT "symbole "; w.farben[0].symbol; " "; w.farben[1].symbol; " "; w.farben[2].symbol
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+
+--- erwartet
+doppelt 0 schritte 0
+neu 5 [*Hintergrund:0] farben A=0 B=0 C=0 D=0 #1=0 #2=0 summe 0
+vorher [Hintergrund:2 *Ebene 2:1] farben A=0 B=0 C=1 D=0 #1=2 #2=0 summe 994052378 rueckstich 3
+entfernt 3 [Hintergrund:2 *Ebene 2:1] farben C=1 D=0 #1=2 summe 994038476 rueckstich 1
+zellen 0 2 2
+zurueck [Hintergrund:2 *Ebene 2:1] farben A=0 B=0 C=1 D=0 #1=2 #2=0 summe 994052378 rueckstich 3
+wieder [Hintergrund:2 *Ebene 2:1] farben C=1 D=0 #1=2 summe 994038476 rueckstich 1
+nichts mehr 0
+symbole X #1 #2
+
+=== verlauf hat eine grenze und weiss was gesichert ist
+IMPORT "k.dh"
+DIM m AS kern.Muster : m = kern.neuesMuster("g", 20, 20)
+DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+DIM sym AS ARRAY OF STRING : sym = ["A"]
+DIM i AS INTEGER
+i = kern.farbeHinzufuegen(m, v, kern.neuesGarn("Rot", &HFF0000, "DMC", "321"), sym, FALSE, FALSE)
+PRINT "geaendert "; v.geaendert()
+v.alsGesichert()
+PRINT "gesichert "; v.geaendert()
+DIM ok AS BOOLEAN
+ok = kern.stichSetzen(m, v, 0, 0, 0, kern.VOLL)
+PRINT "nach stich "; v.geaendert()
+ok = v.zurueckNehmen(m)
+PRINT "zurueck "; v.geaendert()
+ok = v.wiederholen(m)
+PRINT "vor "; v.geaendert()
+' 150 Schritte, behalten werden 100
+FOR i = 1 TO 150
+    ok = kern.stichSetzen(m, v, i MOD 20, i \ 20, 0, kern.VOLL)
+NEXT
+PRINT "schritte "; LEN(v.rueck)
+DIM k AS INTEGER
+WHILE v.zurueckNehmen(m)
+    k = k + 1
+WEND
+PRINT "zurueck "; k; " stiche "; m.sticheGesamt()
+' ein leerer Zug ist kein Schritt; verschachtelt zaehlt der aeussere
+v.beginnen("leer") : v.beenden()
+v.beginnen("aussen") : v.beginnen("innen")
+ok = kern.stichSetzen(m, v, 19, 19, 0, kern.VOLL)
+v.beenden()
+PRINT "innen offen "; v.istOffen(); " kann zurueck "; v.kannZurueck()
+v.beenden()
+PRINT "zu "; v.istOffen(); " oben "; v.textZurueck$()
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+
+--- erwartet
+geaendert TRUE
+gesichert FALSE
+nach stich TRUE
+zurueck FALSE
+vor TRUE
+schritte 100
+zurueck 100 stiche 51
+innen offen TRUE kann zurueck FALSE
+zu FALSE oben aussen

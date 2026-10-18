@@ -1,0 +1,142 @@
+' Das Muster (PySticky core/pattern.py, core/backstitch_manager.py).
+CONST STANDARD_STOFF = 14            ' Stiche je Zoll (Aida 14)
+CONST GROESSTES_MUSTER = 2000
+
+' Eine Farbe im Muster: das Garn, sein Symbol und wie oft es vorkommt.
+CLASS Farbeintrag
+    DIM garn AS Garn
+    DIM symbol AS STRING
+    DIM stichzahl AS INTEGER
+    DIM auslassen AS BOOLEAN          ' z. B. weil sie der Stofffarbe entspricht
+    DIM straenge AS INTEGER
+    DIM istPerle AS BOOLEAN
+    DIM istDiamant AS BOOLEAN
+    DIM farbId AS STRING               ' bleibt bei Umsortieren gleich
+
+    SUB Init()
+        straenge = 2
+        farbId = LEFT$(UUID4$(), 8)
+    END SUB
+END CLASS
+
+FUNCTION neuerFarbeintrag(g AS Garn, symbol AS STRING) AS Farbeintrag
+    DIM f AS Farbeintrag : f = NEW Farbeintrag()
+    f.garn = g
+    f.symbol = symbol
+    RETURN f
+END FUNCTION
+
+' Ein Rueckstich: eine Linie in Halbstich-Einheiten (0..2*breite).
+CLASS Rueckstich
+    DIM x1 AS INTEGER
+    DIM y1 AS INTEGER
+    DIM x2 AS INTEGER
+    DIM y2 AS INTEGER
+    DIM farbe AS INTEGER
+END CLASS
+
+FUNCTION neuerRueckstich(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, farbe AS INTEGER) AS Rueckstich
+    DIM r AS Rueckstich : r = NEW Rueckstich()
+    r.x1 = x1 : r.y1 = y1 : r.x2 = x2 : r.y2 = y2 : r.farbe = farbe
+    RETURN r
+END FUNCTION
+
+CLASS Muster
+    DIM name AS STRING
+    DIM breite AS INTEGER
+    DIM hoehe AS INTEGER
+    DIM ebenen AS Ebenenstapel
+    DIM farben AS ARRAY OF Farbeintrag
+    DIM rueckstiche AS ARRAY OF Rueckstich
+    DIM stoff AS FLOAT                 ' Stiche je Zoll
+    DIM metadaten AS JSON_HANDLE       ' frei, wird unveraendert mitgetragen
+    DIM quellBild AS STRING
+    DIM quellAusschnitt AS ARRAY OF FLOAT
+    DIM quellPalette AS STRING
+    DIM modus AS STRING                ' "stitch" oder "diamond"
+
+    SUB Init(n AS STRING, b AS INTEGER, h AS INTEGER)
+        IF b < 1 OR h < 1 THEN THROW "Ungueltige Mustergroesse: " + STR$(b) + "x" + STR$(h) + " (min. 1x1)"
+        name = n
+        breite = b
+        hoehe = h
+        ebenen = neuerStapel(b, h)
+        farben = []
+        rueckstiche = []
+        stoff = STANDARD_STOFF
+        metadaten = JSON_NEW_OBJECT()
+        quellAusschnitt = [0.0, 0.0, 1.0, 1.0]
+        modus = "stitch"
+    END SUB
+
+    FUNCTION farbanzahl() AS INTEGER
+        RETURN LEN(farben)
+    END FUNCTION
+
+    ' Die Farbe des sichtbaren Stichs, -1 ohne.
+    FUNCTION stich(x AS INTEGER, y AS INTEGER) AS INTEGER
+        RETURN ebenen.stich(x, y)
+    END FUNCTION
+
+    ' Stiche je Farbe aus den Rastern neu zaehlen (ueber alle Ebenen, auch
+    ' unsichtbare -- wie das Original).
+    SUB stichzahlenNeu()
+        DIM f AS Farbeintrag
+        FOR EACH f IN farben
+            f.stichzahl = 0
+        NEXT
+        DIM n AS INTEGER : n = LEN(farben)
+        DIM zaehler[n + 1] AS INTEGER
+        DIM eb AS Ebene
+        DIM v AS INTEGER
+        FOR EACH eb IN ebenen.ebenen
+            FOR EACH v IN eb.raster
+                IF v >= 0 AND v < n THEN zaehler[v] = zaehler[v] + 1
+            NEXT
+        NEXT
+        DIM i AS INTEGER
+        FOR i = 0 TO n - 1
+            farben[i].stichzahl = zaehler[i]
+        NEXT
+    END SUB
+
+    ' Eine Zelle wechselt von Farbe alt zu Farbe neu (je -1 = kein Stich).
+    SUB zaehlen(alt AS INTEGER, neu AS INTEGER)
+        IF alt = neu THEN RETURN
+        DIM n AS INTEGER : n = LEN(farben)
+        IF alt >= 0 AND alt < n THEN farben[alt].stichzahl = farben[alt].stichzahl - 1
+        IF neu >= 0 AND neu < n THEN farben[neu].stichzahl = farben[neu].stichzahl + 1
+    END SUB
+
+    ' Der Stichtyp, den eine Farbe erzwingt: ein voller Stich in einer Perlen-
+    ' oder Diamantfarbe wird Perle bzw. Drill (wie PlaceStitchCommand im
+    ' Original); ein ausdruecklich gewaehlter Teilstich bleibt.
+    FUNCTION typFuer(farbe AS INTEGER, gewaehlt AS INTEGER) AS INTEGER
+        IF gewaehlt <> VOLL OR farbe < 0 OR farbe >= LEN(farben) THEN RETURN gewaehlt
+        IF farben[farbe].istPerle THEN RETURN PERLE
+        IF farben[farbe].istDiamant THEN RETURN DIAMANT
+        RETURN gewaehlt
+    END FUNCTION
+
+    FUNCTION sticheGesamt() AS INTEGER
+        DIM s AS INTEGER
+        DIM f AS Farbeintrag
+        FOR EACH f IN farben
+            s = s + f.stichzahl
+        NEXT
+        RETURN s
+    END FUNCTION
+
+    ' Groesse auf dem Stoff in cm
+    FUNCTION breiteCm() AS FLOAT
+        RETURN breite / stoff * 2.54
+    END FUNCTION
+    FUNCTION hoeheCm() AS FLOAT
+        RETURN hoehe / stoff * 2.54
+    END FUNCTION
+END CLASS
+
+FUNCTION neuesMuster(name AS STRING, b AS INTEGER, h AS INTEGER) AS Muster
+    DIM m AS Muster : m = NEW Muster(name, b, h)
+    RETURN m
+END FUNCTION

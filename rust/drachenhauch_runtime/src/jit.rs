@@ -646,6 +646,25 @@ extern "C" fn w_op(k: *mut Kontext, o: u64, a_i: u64, b_i: u64, ziel: u64, lokal
             return 0;
         }
     }
+    // Bit-Operatoren nur auf zwei INTEGER, Schiebeweite 0..63 -- alles andere
+    // meldet die VM (int_pair2 und die Grenzen in SHL/SHR).
+    if matches!(o, op::BAND | op::BOR | op::BXOR | op::SHL | op::SHR) {
+        let r = match (&a, &b) {
+            (Value::Int(x), Value::Int(y)) => match o {
+                op::BAND => Some(x & y),
+                op::BOR => Some(x | y),
+                op::BXOR => Some(x ^ y),
+                op::SHL if (0..64).contains(y) => Some(x << y),
+                op::SHR if (0..64).contains(y) => Some(x >> y),
+                _ => None,
+            },
+            _ => None,
+        };
+        return match r {
+            Some(v) => { *w_platz(k, ziel) = Value::Int(v); 0 }
+            None => { zurueck(k, a, b, abgegeben); 0 }
+        };
+    }
     let zeichen = match o {
         op::ADD => "+", op::SUB => "-", op::MUL => "*", op::DIV => "/",
         op::INT_DIV => "\\", op::MOD => "mod", op::POW => "^", _ => { zurueck(k, a, b, abgegeben); return 0; }
@@ -925,7 +944,7 @@ fn gerufenes_harmlos<'a>(prog: &'a Program, f: &'a Func, b: &Bereich, start: Vec
                     offen.extend(methoden(&format!("__get_{}", n)));
                     offen.extend(methoden(&format!("__set_{}", n)));
                 },
-                op::CALL_VALUE | op::CALL_SUPER =>
+                op::CALL_VALUE | op::CALL_SUPER | op::CALL_METHOD_BYREF =>
                     return Err(format!("{}: {} ruft {}", name, g.name, befehl_name(ins.op))),
                 op::CALL_BUILTIN => if let Arg::Call(n, _, _) = &ins.arg {
                     let n: &str = n;
@@ -1834,6 +1853,26 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 if a != Art::I || b != Art::I { return Err("\\ ohne zwei INTEGER".into()); }
                 z.stapel.push(Art::I);
             }
+            // Bit-Operatoren: nur zwei INTEGER (wie int_pair2 in der VM), mit
+            // einem Wert dabei rechnet der Wertemodus. Vorher blieb JEDE
+            // Schleife mit BAND/BOR/SHL/SHR in der VM -- also fast jeder
+            // Code, der Farben in Bytes zerlegt (Glutfaden, 2026-10-15).
+            op::BAND | op::BOR | op::BXOR | op::SHL | op::SHR
+                if modus_w && z.stapel.len() >= 2 && z.stapel[z.stapel.len() - 2..].iter().any(|&a| a == Art::W) => {
+                let b = pop!(); let a = pop!();
+                if !w_oder_skalar(a) || !w_oder_skalar(b) { return Err("Bit-Operator mit NIL".into()); }
+                z.stapel.push(Art::W);
+            }
+            op::BAND | op::BOR | op::BXOR | op::SHL | op::SHR => {
+                let b = pop!(); let a = pop!();
+                if a != Art::I || b != Art::I { return Err("Bit-Operator ohne zwei INTEGER".into()); }
+                z.stapel.push(Art::I);
+            }
+            op::BNOT => {
+                let a = pop!();
+                if a != Art::I { return Err("BNOT ohne INTEGER".into()); }
+                z.stapel.push(Art::I);
+            }
             op::NEG => {
                 let a = pop!();
                 if !zahl(a) { return Err("Vorzeichen eines Nicht-Zahl-Werts".into()); }
@@ -1943,7 +1982,7 @@ fn befehl_name(o: u16) -> String {
         op::LOAD_GLOBAL_SLOT | op::STORE_GLOBAL_SLOT | op::ADD_STORE_GLOBAL_SLOT
         | op::LOAD_NAME | op::STORE_NAME => "globale Variable".into(),
         op::CALL_BUILTIN => "eingebauter Befehl".into(),
-        op::CALL_METHOD | op::LOAD_MEMBER | op::STORE_MEMBER | op::LOAD_FIELD
+        op::CALL_METHOD | op::CALL_METHOD_BYREF | op::LOAD_MEMBER | op::STORE_MEMBER | op::LOAD_FIELD
         | op::STORE_FIELD | op::NEW_INSTANCE | op::LOAD_SELF => "Objekt".into(),
         op::LOAD_INDEX | op::STORE_INDEX | op::DECLARE_ARRAY_LOCAL => "Feld".into(),
         op::CALL_VALUE | op::LOAD_FUNCREF => "FUNCREF".into(),
@@ -2529,6 +2568,7 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         bau.global_schreiben(g, w);
                     }
                     op::ADD | op::SUB | op::MUL | op::DIV | op::MOD | op::INT_DIV | op::POW
+                    | op::BAND | op::BOR | op::BXOR | op::SHL | op::SHR
                     | op::LT | op::GT | op::LEQ | op::GEQ | op::EQ | op::NEQ if an.modus_w && zwei_w => {
                         let d = st.len() - 2;
                         bau.w_boxen(&st, d);
@@ -2902,6 +2942,25 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                     op::ADD | op::SUB | op::MUL | op::DIV | op::MOD | op::INT_DIV | op::POW => {
                         let (y, ya) = st.pop().unwrap(); let (x, xa) = st.pop().unwrap();
                         st.push(rechnen(&mut bau, ins.op, x, xa, y, ya));
+                    }
+                    op::BAND | op::BOR | op::BXOR | op::SHL | op::SHR => {
+                        let (y, _) = st.pop().unwrap(); let (x, _) = st.pop().unwrap();
+                        let r = match ins.op {
+                            op::BAND => bau.b.ins().band(x, y),
+                            op::BOR => bau.b.ins().bor(x, y),
+                            op::BXOR => bau.b.ins().bxor(x, y),
+                            _ => {
+                                // Schiebeweite ausserhalb 0..63: aussteigen, die VM meldet es
+                                let weit = bau.b.ins().icmp_imm(IntCC::UnsignedGreaterThan, y, 63);
+                                bau.aussteigen_wenn(weit);
+                                if ins.op == op::SHL { bau.b.ins().ishl(x, y) } else { bau.b.ins().sshr(x, y) }
+                            }
+                        };
+                        st.push((r, Art::I));
+                    }
+                    op::BNOT => {
+                        let (x, _) = st.pop().unwrap();
+                        st.push((bau.b.ins().bnot(x), Art::I));
                     }
                     op::NEG => {
                         let (x, a) = st.pop().unwrap();

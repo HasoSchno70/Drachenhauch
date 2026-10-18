@@ -1,0 +1,565 @@
+' Der Kern des Glutfaden-Ports (examples/glutfaden/kern): Paletten, Muster, Ebenen
+' und das .pxs-Format von PySticky. Die Zahlen sind am Original abgelesen
+' (PySticky, file_io.py) -- das Demo-Muster hat drei Ebenen und sechs Farben.
+' Der Kern wird ueber eine Beilage eingebunden, weil Platzhalter nur dort gelten.
+
+=== paletten werden gelesen wie im original
+IMPORT "k.dh"
+DIM ordner AS STRING : ordner = PATHJOIN(ARG$(0), "daten/paletten")
+DIM ps AS ARRAY OF kern.Palette : ps = kern.palettenLaden(ordner)
+PRINT "paletten "; LEN(ps)
+DIM p AS kern.Palette
+FOR EACH p IN ps
+    IF p.hersteller = "DMC" OR p.hersteller = "Mill Hill Beads" OR p.hersteller = "DMC Diamond Painting" THEN
+        PRINT p.hersteller; " "; LEN(p.garne); " perlen "; p.istPerlen; " diamant "; p.istDiamant
+        DIM g AS kern.Garn : g = p.garne[0]
+        PRINT "  "; g.nummer; " "; g.name; " "; kern.farbeAlsHex$(g.farbe)
+    END IF
+NEXT
+DIM d AS kern.Palette : d = kern.paletteLaden(PATHJOIN(ordner, "DMC_Farben.json"))
+PRINT "310: "; d.nachNummer("310").name
+PRINT "gibt es nicht: "; d.nachNummer("xyz") IS NIL
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+
+--- erwartet
+paletten 19
+DMC Diamond Painting 450 perlen FALSE diamant TRUE
+  150 dusty rose #AB0249
+DMC 492 perlen FALSE diamant FALSE
+  01 White Tin #C5C5C5
+Mill Hill Beads 105 perlen TRUE diamant FALSE
+  00020 Crystal #F0F0F0
+310: Black
+gibt es nicht: TRUE
+
+=== das demo muster
+IMPORT "k.dh"
+DIM m AS kern.Muster : m = kern.pxsLaden(PATHJOIN(ARG$(0), "daten/muster/demo_kreuzstich.pxs"))
+PRINT m.name; " "; m.breite; "x"; m.hoehe; " stoff "; m.stoff
+PRINT "farben "; m.farbanzahl(); " stiche "; m.sticheGesamt()
+DIM i AS INTEGER
+FOR i = 0 TO m.farbanzahl() - 1
+    PRINT "  "; m.farben[i].garn.hersteller; " "; m.farben[i].garn.nummer; " "; m.farben[i].symbol; " "; m.farben[i].stichzahl
+NEXT
+FOR i = 0 TO m.ebenen.anzahl() - 1
+    PRINT "  ebene "; m.ebenen.ebenen[i].name; " "; m.ebenen.ebenen[i].stichzahl(); " sichtbar "; m.ebenen.ebenen[i].sichtbar
+NEXT
+PRINT "zelle 5,5: "; m.stich(5, 5); "  zelle 17,12: "; m.stich(17, 12); "  zelle 0,0: "; m.stich(0, 0)
+' Die Ebene "Herz" ausblenden: der oberste sichtbare Stich verschwindet
+m.ebenen.ebenen[1].sichtbar = FALSE
+PRINT "ohne herz 17,12: "; m.stich(17, 12)
+DIM f AS ARRAY OF INTEGER
+DIM t AS ARRAY OF INTEGER
+DIM e AS ARRAY OF INTEGER
+m.ebenen.zusammensetzen(f, t, e)
+PRINT "zusammengesetzt "; LEN(f); " "; f[5 * m.breite + 5]; " "; f[12 * m.breite + 17]
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+
+--- erwartet
+Demo Kreuzstich 40x40 stoff 14.0
+farben 6 stiche 185
+  Anchor 403 ● 0
+  Anchor 47 ○ 52
+  Anchor 309 ■ 17
+  Anchor 228 □ 0
+  Anchor 134 ▲ 116
+  Anchor 1 △ 0
+  ebene Rahmen 128 sichtbar TRUE
+  ebene Herz 52 sichtbar TRUE
+  ebene Details 5 sichtbar TRUE
+zelle 5,5: 4  zelle 17,12: 1  zelle 0,0: -1
+ohne herz 17,12: -1
+zusammengesetzt 1600 4 -1
+
+=== sichern und wieder laden ergibt dasselbe muster
+IMPORT "k.dh"
+DIM m AS kern.Muster : m = kern.pxsLaden(PATHJOIN(ARG$(0), "daten/muster/demo_kreuzstich.pxs"))
+m.ebenen.ebenen[0].setzeStich(1, 2, 3, kern.HALB_OL_UR)
+m.ebenen.ebenen[0].setzeErledigt(5, 5, TRUE)
+kern.pxsSpeichern(m, "kopie.pxs")
+DIM n AS kern.Muster : n = kern.pxsLaden("kopie.pxs")
+DIM gleich AS BOOLEAN : gleich = n.breite = m.breite AND n.hoehe = m.hoehe AND n.farbanzahl() = m.farbanzahl()
+DIM k AS INTEGER, x AS INTEGER, y AS INTEGER
+FOR k = 0 TO m.ebenen.anzahl() - 1
+    DIM a AS kern.Ebene : a = m.ebenen.ebenen[k]
+    DIM b AS kern.Ebene : b = n.ebenen.ebenen[k]
+    IF a.name <> b.name OR a.sichtbar <> b.sichtbar THEN gleich = FALSE
+    FOR y = 0 TO m.hoehe - 1
+        FOR x = 0 TO m.breite - 1
+            IF a.stich(x, y) <> b.stich(x, y) OR a.stichArt(x, y) <> b.stichArt(x, y) OR a.istErledigt(x, y) <> b.istErledigt(x, y) THEN gleich = FALSE
+        NEXT
+    NEXT
+NEXT
+FOR k = 0 TO m.farbanzahl() - 1
+    IF m.farben[k].symbol <> n.farben[k].symbol OR m.farben[k].garn.farbe <> n.farben[k].garn.farbe THEN gleich = FALSE
+NEXT
+PRINT "gleich: "; gleich
+PRINT "halbstich: "; n.ebenen.ebenen[0].stichArt(1, 2); " erledigt: "; n.ebenen.ebenen[0].istErledigt(5, 5)
+PRINT "keine nebendatei: "; NOT FILEEXISTS("kopie.pxs.tmp")
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+
+--- erwartet
+gleich: TRUE
+halbstich: 1 erledigt: TRUE
+keine nebendatei: TRUE
+
+=== wahrheitswerte kommen beim laden an
+' Bis 2026-10-16 verglich pxsLaden JSON_TYPE mit "bool" -- die Laufzeit sagt
+' "boolean". Jeder Wahrheitswert fiel auf die Vorgabe: Perle, Diamant,
+' ausgelassen, Sichtbarkeit und Sperre der Ebenen. Der Rundweg oben sah es
+' nicht, weil im Demo-Muster alles auf der Vorgabe steht. probe.pxs hat
+' PySticky geschrieben (eine Perlenfarbe).
+IMPORT "k.dh"
+DIM m AS kern.Muster : m = kern.pxsLaden(PATHJOIN(ARG$(0), "daten/muster/demo_kreuzstich.pxs"))
+m.farben[1].auslassen = TRUE
+m.farben[2].istPerle = TRUE
+m.farben[3].istDiamant = TRUE
+m.ebenen.ebenen[0].sichtbar = FALSE
+m.ebenen.ebenen[1].gesperrt = TRUE
+kern.pxsSpeichern(m, "schalter.pxs")
+DIM n AS kern.Muster : n = kern.pxsLaden("schalter.pxs")
+PRINT "aus "; n.farben[1].auslassen; " perle "; n.farben[2].istPerle; " drill "; n.farben[3].istDiamant; " sichtbar "; n.ebenen.ebenen[0].sichtbar; " gesperrt "; n.ebenen.ebenen[1].gesperrt
+PRINT "sonst vorgabe "; NOT n.farben[0].auslassen AND NOT n.farben[0].istPerle AND n.ebenen.ebenen[1].sichtbar AND NOT n.ebenen.ebenen[0].gesperrt
+DIM q AS kern.Muster : q = kern.pxsLaden("probe.pxs")
+PRINT "fremd: perle "; q.farben[4].istPerle; " "; q.farben[0].istPerle
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+
+--- datei probe.pxs
+{
+  "format": "pysticky",
+  "version": "1.5",
+  "saved_at": "2026-10-16T16:51:23.335371",
+  "pattern": {
+    "name": "Probe <&> \"OXS\"",
+    "width": 12,
+    "height": 9,
+    "fabric_count": 16,
+    "metadata": {
+      "author": "Hans & Co",
+      "copyright": "(c) 2026\tTab"
+    },
+    "colors": [
+      {
+        "name": "Black",
+        "color": "#000000",
+        "manufacturer": "DMC",
+        "catalog_number": "310",
+        "symbol": "●",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "2f09588d"
+      },
+      {
+        "name": "Christmas Red",
+        "color": "#C72B3B",
+        "manufacturer": "DMC",
+        "catalog_number": "321",
+        "symbol": "○",
+        "stitch_count": 7,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "19e0c3a5"
+      },
+      {
+        "name": "Eigene Farbe",
+        "color": "#123456",
+        "manufacturer": null,
+        "catalog_number": null,
+        "symbol": "■",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "735d4695"
+      },
+      {
+        "name": "Tweed",
+        "color": "#804020",
+        "manufacturer": "DMC",
+        "catalog_number": "TW1",
+        "symbol": "□",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "f2110c3e",
+        "blend_components": [
+          {
+            "name": "Black",
+            "color": "#000000",
+            "manufacturer": "DMC",
+            "catalog_number": "310"
+          },
+          {
+            "name": "White",
+            "color": "#FFFFFF",
+            "manufacturer": "DMC",
+            "catalog_number": "B5200"
+          }
+        ],
+        "strand_ratios": [
+          2,
+          1
+        ]
+      },
+      {
+        "name": "Gold",
+        "color": "#D4AF37",
+        "manufacturer": "Mill Hill Beads",
+        "catalog_number": "00557",
+        "symbol": "▲",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": true,
+        "is_diamond": false,
+        "color_id": "4c50854b"
+      }
+    ],
+    "layers": [
+      {
+        "name": "Hintergrund",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            0
+          ],
+          [
+            4,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0
+          ],
+          [
+            6,
+            0,
+            0
+          ],
+          [
+            7,
+            0,
+            0
+          ],
+          [
+            8,
+            0,
+            0
+          ],
+          [
+            9,
+            0,
+            0
+          ],
+          [
+            10,
+            0,
+            0
+          ],
+          [
+            11,
+            0,
+            0
+          ],
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            1
+          ],
+          [
+            3,
+            2,
+            1
+          ],
+          [
+            4,
+            2,
+            1
+          ],
+          [
+            5,
+            2,
+            1
+          ],
+          [
+            6,
+            2,
+            1
+          ],
+          [
+            7,
+            2,
+            1
+          ],
+          [
+            1,
+            4,
+            2
+          ],
+          [
+            3,
+            4,
+            4
+          ],
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ],
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            8,
+            5,
+            3
+          ],
+          [
+            5,
+            6,
+            3
+          ],
+          [
+            6,
+            6,
+            3
+          ],
+          [
+            7,
+            6,
+            3
+          ],
+          [
+            8,
+            6,
+            3
+          ],
+          [
+            5,
+            7,
+            3
+          ],
+          [
+            6,
+            7,
+            3
+          ],
+          [
+            7,
+            7,
+            3
+          ],
+          [
+            8,
+            7,
+            3
+          ]
+        ],
+        "completed_stitches": [],
+        "stitch_types": [
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            3,
+            2,
+            3
+          ],
+          [
+            4,
+            2,
+            4
+          ],
+          [
+            5,
+            2,
+            5
+          ],
+          [
+            6,
+            2,
+            6
+          ],
+          [
+            7,
+            2,
+            7
+          ],
+          [
+            1,
+            4,
+            9
+          ],
+          [
+            3,
+            4,
+            10
+          ]
+        ]
+      },
+      {
+        "name": "Oben",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "completed_stitches": []
+      }
+    ],
+    "active_layer": 1,
+    "backstitches": [
+      {
+        "x1": 0,
+        "y1": 0,
+        "x2": 4,
+        "y2": 0,
+        "color_index": 0
+      },
+      {
+        "x1": 2,
+        "y1": 3,
+        "x2": 5,
+        "y2": 9,
+        "color_index": 1
+      },
+      {
+        "x1": 24,
+        "y1": 18,
+        "x2": 23,
+        "y2": 17,
+        "color_index": 2
+      }
+    ],
+    "source_image_path": null,
+    "source_image_crop": [
+      0,
+      0,
+      1,
+      1
+    ],
+    "source_palette_name": null,
+    "mode": "stitch"
+  }
+}
+
+--- erwartet
+aus TRUE perle TRUE drill TRUE sichtbar FALSE gesperrt TRUE
+sonst vorgabe TRUE
+fremd: perle TRUE FALSE
+
+=== kaputte dateien werden mit der meldung des originals abgelehnt
+IMPORT "k.dh"
+SUB versuch(pfad AS STRING)
+    TRY
+        DIM m AS kern.Muster : m = kern.pxsLaden(pfad)
+        PRINT "geladen?"
+    CATCH e
+        ' Die Meldung des JSON-Lesers haengt am System -- nur der eigene Teil
+        IF INSTR(e, "JSON_LOAD") >= 0 THEN PRINT LEFT$(e, INSTR(e, "JSON_LOAD") + 9) ELSE PRINT e
+    END TRY
+END SUB
+versuch("gibtsnicht.pxs")
+versuch("kein_json.pxs")
+versuch("fremd.pxs")
+versuch("ohne_muster.pxs")
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+
+--- datei kein_json.pxs
+das ist kein json
+--- datei fremd.pxs
+{"format": "anderes", "pattern": {}}
+--- datei ohne_muster.pxs
+{"format": "pysticky", "version": "1.0"}
+--- erwartet
+Datei nicht gefunden: gibtsnicht.pxs
+Fehlerhafte Datei-Syntax: JSON_LOAD
+Ungültiges Dateiformat: erwartet 'pysticky', gefunden 'anderes'
+Datei enthält keine Muster-Daten
+
+=== stichtypen drehen und spiegeln
+' Die Tabellen von PySticky (core/stitch.py ROTATE_CW_MAP, FLIP_H_MAP, FLIP_V_MAP)
+IMPORT "k.dh"
+DIM d AS STRING, h AS STRING, v AS STRING
+DIM t AS INTEGER
+FOR t = 0 TO kern.STICHTYP_MAX
+    d = d + STR$(kern.stichGedreht(t)) + " "
+    h = h + STR$(kern.stichGespiegeltH(t)) + " "
+    v = v + STR$(kern.stichGespiegeltV(t)) + " "
+NEXT
+PRINT TRIM$(d) : PRINT TRIM$(h) : PRINT TRIM$(v)
+PRINT kern.istTeilstich(kern.VOLL); " "; kern.istTeilstich(kern.VIERTEL_OL); " "; LEN(kern.teilstichPunkte(kern.VIERTEL_OL))
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+
+--- erwartet
+0 2 1 4 6 3 5 7 8 9 10 11
+0 2 1 4 3 6 5 7 8 9 10 11
+0 2 1 5 6 3 4 7 8 9 10 11
+FALSE TRUE 6

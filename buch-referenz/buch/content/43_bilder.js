@@ -95,12 +95,14 @@ module.exports = (H) => [
 
   H.h2("Bilder umrechnen: das Modul imgfx"),
   H.p("Das Modul imgfx erzeugt aus einem Bild ein NEUES, verändertes Bild – skaliert, gedreht, gespiegelt oder eingefärbt. Das Original bleibt unverändert. Mache solche Umrechnungen einmalig vor dem Game-Loop (nicht jeden Frame), denn sie kosten etwas Zeit."),
-  H.cmd("IMAGE_SCALE", 'IMAGE_SCALE(img, breite, höhe)',
-    "Liefert eine in der angegebenen Größe skalierte Kopie des Bildes.",
+  H.cmd("IMAGE_SCALE", 'IMAGE_SCALE(img, breite, höhe [, filter$])',
+    "Liefert eine in der angegebenen Größe skalierte Kopie des Bildes. Ohne filter$ wird geglättet; mit \"lanczos\", \"bikubisch\", \"box\", \"hamming\" oder \"linear\" rechnet IMAGE_SCALE genau wie Pillow (Python) – nimm \"lanczos\", wenn du ein Foto stark verkleinerst.",
     [
       'IMPORT "imgfx"',
       'DIM gross AS IMAGE',
       'gross = IMAGE_SCALE(held, 64, 64)   \' auf 64x64 vergrößern',
+      'DIM klein AS IMAGE',
+      'klein = IMAGE_SCALE(held, 8, 8, "lanczos")   \' scharf verkleinern',
     ]),
   H.cmd("IMAGE_FLIP", 'IMAGE_FLIP(img, flipX, flipY)',
     "Liefert eine gespiegelte Kopie – flipX spiegelt waagerecht (links/rechts), flipY senkrecht (oben/unten). Klassisch, um eine nach rechts laufende Figur auch nach links blicken zu lassen.",
@@ -219,6 +221,15 @@ module.exports = (H) => [
     [
       'DIM gross AS IMAGE',
       'gross = IMAGE_SCALE_NN(held, IMAGEWIDTH(held) * 4, IMAGEHEIGHT(held) * 4)',
+    ]),
+  H.cmd("IMAGE_ENHANCE", 'IMAGE_ENHANCE(img, art$, faktor)',
+    "Helligkeit, Kontrast oder Sättigung als Faktor – genau wie ImageEnhance in Pillow (Python). 1.0 lässt das Bild, wie es ist; 0.0 ergibt Schwarz, ein einheitliches Grau bzw. Graustufen; Werte über 1.0 verstärken. art$ ist \"helligkeit\", \"kontrast\" oder \"saettigung\".",
+    [
+      'IMPORT "imgfx"',
+      'DIM satt AS IMAGE',
+      'satt = IMAGE_ENHANCE(img, "saettigung", 1.5)   \' kräftigere Farben',
+      'DIM grau AS IMAGE',
+      'grau = IMAGE_ENHANCE(img, "saettigung", 0.0)   \' Graustufen',
     ]),
   H.cmd("IMAGE_CONVOLVE", 'IMAGE_CONVOLVE(bild, kern)',
     "Freie Faltung mit einem quadratischen Kern (3×3, 5×5 …) als flachem ARRAY OF FLOAT in Zeilenfolge. Damit baust du Schärfen, Kantenerkennung oder Prägen selbst – IMAGE_BLUR kann nur weichzeichnen.",

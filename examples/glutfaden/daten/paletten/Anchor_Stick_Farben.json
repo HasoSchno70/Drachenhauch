@@ -1,0 +1,4556 @@
+[
+ {
+  "AnchorNumber": "1",
+  "Color": {
+   "R": 255,
+   "G": 255,
+   "B": 255
+  },
+  "Name": "White Bright"
+ },
+ {
+  "AnchorNumber": "2",
+  "Color": {
+   "R": 250,
+   "G": 250,
+   "B": 250
+  },
+  "Name": "White"
+ },
+ {
+  "AnchorNumber": "6",
+  "Color": {
+   "R": 255,
+   "G": 194,
+   "B": 177
+  },
+  "Name": "Peach Very Light"
+ },
+ {
+  "AnchorNumber": "8",
+  "Color": {
+   "R": 253,
+   "G": 172,
+   "B": 144
+  },
+  "Name": "Peach Light"
+ },
+ {
+  "AnchorNumber": "9",
+  "Color": {
+   "R": 236,
+   "G": 136,
+   "B": 125
+  },
+  "Name": "Coral Very Light"
+ },
+ {
+  "AnchorNumber": "10",
+  "Color": {
+   "R": 233,
+   "G": 124,
+   "B": 117
+  },
+  "Name": "Coral Light"
+ },
+ {
+  "AnchorNumber": "11",
+  "Color": {
+   "R": 216,
+   "G": 87,
+   "B": 79
+  },
+  "Name": "Coral Medium"
+ },
+ {
+  "AnchorNumber": "12",
+  "Color": {
+   "R": 210,
+   "G": 27,
+   "B": 55
+  },
+  "Name": "Coral-DK"
+ },
+ {
+  "AnchorNumber": "13",
+  "Color": {
+   "R": 182,
+   "G": 8,
+   "B": 0
+  },
+  "Name": "Coral Dark"
+ },
+ {
+  "AnchorNumber": "19",
+  "Color": {
+   "R": 174,
+   "G": 26,
+   "B": 60
+  },
+  "Name": "Pink Bright Ultra Very"
+ },
+ {
+  "AnchorNumber": "20",
+  "Color": {
+   "R": 153,
+   "G": 17,
+   "B": 46
+  },
+  "Name": "Garnet Light"
+ },
+ {
+  "AnchorNumber": "22",
+  "Color": {
+   "R": 126,
+   "G": 5,
+   "B": 32
+  },
+  "Name": "Garnet"
+ },
+ {
+  "AnchorNumber": "23",
+  "Color": {
+   "R": 253,
+   "G": 200,
+   "B": 201
+  },
+  "Name": "Baby Pink Very Light"
+ },
+ {
+  "AnchorNumber": "24",
+  "Color": {
+   "R": 251,
+   "G": 168,
+   "B": 171
+  },
+  "Name": "Baby Pink Light"
+ },
+ {
+  "AnchorNumber": "25",
+  "Color": {
+   "R": 236,
+   "G": 158,
+   "B": 174
+  },
+  "Name": "Baby Pink"
+ },
+ {
+  "AnchorNumber": "26",
+  "Color": {
+   "R": 242,
+   "G": 124,
+   "B": 136
+  },
+  "Name": "Baby Pink Medium"
+ },
+ {
+  "AnchorNumber": "27",
+  "Color": {
+   "R": 235,
+   "G": 89,
+   "B": 110
+  },
+  "Name": "Baby Pink Dark"
+ },
+ {
+  "AnchorNumber": "28",
+  "Color": {
+   "R": 219,
+   "G": 62,
+   "B": 86
+  },
+  "Name": "Baby Pink Very Dark"
+ },
+ {
+  "AnchorNumber": "29",
+  "Color": {
+   "R": 195,
+   "G": 30,
+   "B": 55
+  },
+  "Name": "Baby Pink Ultra Very Dark"
+ },
+ {
+  "AnchorNumber": "31",
+  "Color": {
+   "R": 238,
+   "G": 124,
+   "B": 141
+  },
+  "Name": "Pink Bright Light"
+ },
+ {
+  "AnchorNumber": "33",
+  "Color": {
+   "R": 250,
+   "G": 121,
+   "B": 149
+  },
+  "Name": "Pink Bright"
+ },
+ {
+  "AnchorNumber": "35",
+  "Color": {
+   "R": 206,
+   "G": 64,
+   "B": 96
+  },
+  "Name": "Pink Bright Dark"
+ },
+ {
+  "AnchorNumber": "36",
+  "Color": {
+   "R": 240,
+   "G": 146,
+   "B": 160
+  },
+  "Name": "Pink Bright Very Light"
+ },
+ {
+  "AnchorNumber": "38",
+  "Color": {
+   "R": 182,
+   "G": 71,
+   "B": 88
+  },
+  "Name": "Dusty Pink"
+ },
+ {
+  "AnchorNumber": "39",
+  "Color": {
+   "R": 136,
+   "G": 46,
+   "B": 60
+  },
+  "Name": "Dusty Pink Dark"
+ },
+ {
+  "AnchorNumber": "40",
+  "Color": {
+   "R": 239,
+   "G": 112,
+   "B": 138
+  },
+  "Name": "Rose"
+ },
+ {
+  "AnchorNumber": "41",
+  "Color": {
+   "R": 198,
+   "G": 78,
+   "B": 103
+  },
+  "Name": "Rose Dark"
+ },
+ {
+  "AnchorNumber": "42",
+  "Color": {
+   "R": 187,
+   "G": 64,
+   "B": 89
+  },
+  "Name": "Rose Very Dark"
+ },
+ {
+  "AnchorNumber": "43",
+  "Color": {
+   "R": 136,
+   "G": 38,
+   "B": 57
+  },
+  "Name": "Garnet Medium"
+ },
+ {
+  "AnchorNumber": "44",
+  "Color": {
+   "R": 130,
+   "G": 45,
+   "B": 60
+  },
+  "Name": "Garnet Dark"
+ },
+ {
+  "AnchorNumber": "45",
+  "Color": {
+   "R": 111,
+   "G": 37,
+   "B": 49
+  },
+  "Name": "Garnet Very Dark"
+ },
+ {
+  "AnchorNumber": "46",
+  "Color": {
+   "R": 211,
+   "G": 36,
+   "B": 0
+  },
+  "Name": "Christmas Red Light"
+ },
+ {
+  "AnchorNumber": "47",
+  "Color": {
+   "R": 165,
+   "G": 28,
+   "B": 0
+  },
+  "Name": "Christmas Red"
+ },
+ {
+  "AnchorNumber": "48",
+  "Color": {
+   "R": 253,
+   "G": 188,
+   "B": 209
+  },
+  "Name": "Pink Very Light"
+ },
+ {
+  "AnchorNumber": "49",
+  "Color": {
+   "R": 244,
+   "G": 174,
+   "B": 197
+  },
+  "Name": "Pink Light"
+ },
+ {
+  "AnchorNumber": "50",
+  "Color": {
+   "R": 255,
+   "G": 159,
+   "B": 188
+  },
+  "Name": "Pink"
+ },
+ {
+  "AnchorNumber": "51",
+  "Color": {
+   "R": 255,
+   "G": 180,
+   "B": 192
+  },
+  "Name": "Cranberry-LT"
+ },
+ {
+  "AnchorNumber": "52",
+  "Color": {
+   "R": 252,
+   "G": 125,
+   "B": 163
+  },
+  "Name": "Pink Dark"
+ },
+ {
+  "AnchorNumber": "54",
+  "Color": {
+   "R": 225,
+   "G": 82,
+   "B": 125
+  },
+  "Name": "Pink Very Dark"
+ },
+ {
+  "AnchorNumber": "55",
+  "Color": {
+   "R": 249,
+   "G": 156,
+   "B": 200
+  },
+  "Name": "Pink Mauve Light"
+ },
+ {
+  "AnchorNumber": "57",
+  "Color": {
+   "R": 210,
+   "G": 74,
+   "B": 138
+  },
+  "Name": "Pink Mauve Medium Dark"
+ },
+ {
+  "AnchorNumber": "59",
+  "Color": {
+   "R": 141,
+   "G": 1,
+   "B": 66
+  },
+  "Name": "Pink Mauve Ultra Very Dark"
+ },
+ {
+  "AnchorNumber": "60",
+  "Color": {
+   "R": 221,
+   "G": 156,
+   "B": 180
+  },
+  "Name": "Cerise Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "62",
+  "Color": {
+   "R": 195,
+   "G": 76,
+   "B": 132
+  },
+  "Name": "Cerise Light"
+ },
+ {
+  "AnchorNumber": "63",
+  "Color": {
+   "R": 163,
+   "G": 44,
+   "B": 100
+  },
+  "Name": "Cerise"
+ },
+ {
+  "AnchorNumber": "65",
+  "Color": {
+   "R": 114,
+   "G": 25,
+   "B": 68
+  },
+  "Name": "Cerise Ultra Very Dark"
+ },
+ {
+  "AnchorNumber": "66",
+  "Color": {
+   "R": 240,
+   "G": 139,
+   "B": 187
+  },
+  "Name": "Dusty Plum Light"
+ },
+ {
+  "AnchorNumber": "68",
+  "Color": {
+   "R": 172,
+   "G": 57,
+   "B": 111
+  },
+  "Name": "Dusty Plum Medium"
+ },
+ {
+  "AnchorNumber": "69",
+  "Color": {
+   "R": 112,
+   "G": 0,
+   "B": 64
+  },
+  "Name": "Dusty Plum Medium Dark"
+ },
+ {
+  "AnchorNumber": "70",
+  "Color": {
+   "R": 73,
+   "G": 0,
+   "B": 41
+  },
+  "Name": "Dusty Plum Very Dark"
+ },
+ {
+  "AnchorNumber": "72",
+  "Color": {
+   "R": 54,
+   "G": 1,
+   "B": 30
+  },
+  "Name": "Dusty Plum Ultra Very Dark"
+ },
+ {
+  "AnchorNumber": "73",
+  "Color": {
+   "R": 255,
+   "G": 197,
+   "B": 215
+  },
+  "Name": "Plum Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "74",
+  "Color": {
+   "R": 239,
+   "G": 161,
+   "B": 187
+  },
+  "Name": "Plum Very Light"
+ },
+ {
+  "AnchorNumber": "75",
+  "Color": {
+   "R": 230,
+   "G": 139,
+   "B": 168
+  },
+  "Name": "Plum Light"
+ },
+ {
+  "AnchorNumber": "76",
+  "Color": {
+   "R": 163,
+   "G": 70,
+   "B": 99
+  },
+  "Name": "Plum Medium Light"
+ },
+ {
+  "AnchorNumber": "77",
+  "Color": {
+   "R": 151,
+   "G": 52,
+   "B": 94
+  },
+  "Name": "Plum Medium"
+ },
+ {
+  "AnchorNumber": "78",
+  "Color": {
+   "R": 128,
+   "G": 41,
+   "B": 78
+  },
+  "Name": "Plum Medium Dark"
+ },
+ {
+  "AnchorNumber": "83",
+  "Color": {
+   "R": 188,
+   "G": 147,
+   "B": 172
+  },
+  "Name": "Grape-LT"
+ },
+ {
+  "AnchorNumber": "84",
+  "Color": {
+   "R": 150,
+   "G": 98,
+   "B": 133
+  },
+  "Name": "Grape-MD"
+ },
+ {
+  "AnchorNumber": "85",
+  "Color": {
+   "R": 255,
+   "G": 172,
+   "B": 233
+  },
+  "Name": "Mauve Very Light"
+ },
+ {
+  "AnchorNumber": "86",
+  "Color": {
+   "R": 234,
+   "G": 123,
+   "B": 206
+  },
+  "Name": "Mauve Medium Light"
+ },
+ {
+  "AnchorNumber": "87",
+  "Color": {
+   "R": 195,
+   "G": 75,
+   "B": 153
+  },
+  "Name": "Mauve"
+ },
+ {
+  "AnchorNumber": "88",
+  "Color": {
+   "R": 157,
+   "G": 47,
+   "B": 110
+  },
+  "Name": "Mauve Medium"
+ },
+ {
+  "AnchorNumber": "89",
+  "Color": {
+   "R": 125,
+   "G": 7,
+   "B": 77
+  },
+  "Name": "Mauve Dark"
+ },
+ {
+  "AnchorNumber": "90",
+  "Color": {
+   "R": 193,
+   "G": 151,
+   "B": 181
+  },
+  "Name": "Purple Light"
+ },
+ {
+  "AnchorNumber": "92",
+  "Color": {
+   "R": 146,
+   "G": 76,
+   "B": 137
+  },
+  "Name": "Purple Medium"
+ },
+ {
+  "AnchorNumber": "94",
+  "Color": {
+   "R": 112,
+   "G": 12,
+   "B": 99
+  },
+  "Name": "Purple Dark"
+ },
+ {
+  "AnchorNumber": "95",
+  "Color": {
+   "R": 217,
+   "G": 187,
+   "B": 221
+  },
+  "Name": "Violet Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "96",
+  "Color": {
+   "R": 201,
+   "G": 140,
+   "B": 184
+  },
+  "Name": "Violet Very Light"
+ },
+ {
+  "AnchorNumber": "97",
+  "Color": {
+   "R": 168,
+   "G": 104,
+   "B": 150
+  },
+  "Name": "Violet Light"
+ },
+ {
+  "AnchorNumber": "98",
+  "Color": {
+   "R": 151,
+   "G": 82,
+   "B": 132
+  },
+  "Name": "Violet Medium Light"
+ },
+ {
+  "AnchorNumber": "99",
+  "Color": {
+   "R": 124,
+   "G": 57,
+   "B": 105
+  },
+  "Name": "Violet Medium Dark"
+ },
+ {
+  "AnchorNumber": "100",
+  "Color": {
+   "R": 100,
+   "G": 45,
+   "B": 85
+  },
+  "Name": "Violet Dark"
+ },
+ {
+  "AnchorNumber": "101",
+  "Color": {
+   "R": 75,
+   "G": 20,
+   "B": 59
+  },
+  "Name": "Violet Very Dark"
+ },
+ {
+  "AnchorNumber": "102",
+  "Color": {
+   "R": 49,
+   "G": 3,
+   "B": 49
+  },
+  "Name": "Lavender Ultra Very Dark"
+ },
+ {
+  "AnchorNumber": "103",
+  "Color": {
+   "R": 242,
+   "G": 215,
+   "B": 234
+  },
+  "Name": "Purple Very Light"
+ },
+ {
+  "AnchorNumber": "108",
+  "Color": {
+   "R": 181,
+   "G": 142,
+   "B": 195
+  },
+  "Name": "Lavender Very Light"
+ },
+ {
+  "AnchorNumber": "109",
+  "Color": {
+   "R": 155,
+   "G": 105,
+   "B": 172
+  },
+  "Name": "Lavender Light"
+ },
+ {
+  "AnchorNumber": "110",
+  "Color": {
+   "R": 124,
+   "G": 74,
+   "B": 141
+  },
+  "Name": "Lavender Medium"
+ },
+ {
+  "AnchorNumber": "111",
+  "Color": {
+   "R": 93,
+   "G": 44,
+   "B": 110
+  },
+  "Name": "Lavender Dark"
+ },
+ {
+  "AnchorNumber": "112",
+  "Color": {
+   "R": 66,
+   "G": 31,
+   "B": 78
+  },
+  "Name": "Lavender Very Dark"
+ },
+ {
+  "AnchorNumber": "117",
+  "Color": {
+   "R": 182,
+   "G": 195,
+   "B": 229
+  },
+  "Name": "Blue Violet Very Light"
+ },
+ {
+  "AnchorNumber": "118",
+  "Color": {
+   "R": 129,
+   "G": 117,
+   "B": 173
+  },
+  "Name": "Blue Violet Light"
+ },
+ {
+  "AnchorNumber": "119",
+  "Color": {
+   "R": 83,
+   "G": 56,
+   "B": 114
+  },
+  "Name": "Blue Violet Dark"
+ },
+ {
+  "AnchorNumber": "120",
+  "Color": {
+   "R": 191,
+   "G": 207,
+   "B": 233
+  },
+  "Name": "Blue Purple Very Light"
+ },
+ {
+  "AnchorNumber": "121",
+  "Color": {
+   "R": 104,
+   "G": 110,
+   "B": 140
+  },
+  "Name": "Blue Purple Light"
+ },
+ {
+  "AnchorNumber": "122",
+  "Color": {
+   "R": 63,
+   "G": 61,
+   "B": 90
+  },
+  "Name": "Blue Purple Medium"
+ },
+ {
+  "AnchorNumber": "123",
+  "Color": {
+   "R": 27,
+   "G": 24,
+   "B": 58
+  },
+  "Name": "Blue Purple Dark"
+ },
+ {
+  "AnchorNumber": "124",
+  "Color": {
+   "R": 72,
+   "G": 108,
+   "B": 144
+  },
+  "Name": "Delft Blue-DK"
+ },
+ {
+  "AnchorNumber": "127",
+  "Color": {
+   "R": 5,
+   "G": 0,
+   "B": 42
+  },
+  "Name": "Navy Blue Very Dark"
+ },
+ {
+  "AnchorNumber": "128",
+  "Color": {
+   "R": 194,
+   "G": 214,
+   "B": 248
+  },
+  "Name": "Sky Blue Very Light"
+ },
+ {
+  "AnchorNumber": "129",
+  "Color": {
+   "R": 159,
+   "G": 180,
+   "B": 216
+  },
+  "Name": "Sky Blue Light"
+ },
+ {
+  "AnchorNumber": "130",
+  "Color": {
+   "R": 133,
+   "G": 154,
+   "B": 190
+  },
+  "Name": "Sky Blue"
+ },
+ {
+  "AnchorNumber": "131",
+  "Color": {
+   "R": 83,
+   "G": 93,
+   "B": 134
+  },
+  "Name": "Sky Blue Medium"
+ },
+ {
+  "AnchorNumber": "132",
+  "Color": {
+   "R": 54,
+   "G": 62,
+   "B": 103
+  },
+  "Name": "Sky Blue Dark"
+ },
+ {
+  "AnchorNumber": "133",
+  "Color": {
+   "R": 11,
+   "G": 24,
+   "B": 88
+  },
+  "Name": "Sky Blue Very Dark"
+ },
+ {
+  "AnchorNumber": "134",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 64
+  },
+  "Name": "Sky Blue Ultra Dark"
+ },
+ {
+  "AnchorNumber": "136",
+  "Color": {
+   "R": 117,
+   "G": 130,
+   "B": 168
+  },
+  "Name": "Delft Medium"
+ },
+ {
+  "AnchorNumber": "137",
+  "Color": {
+   "R": 70,
+   "G": 83,
+   "B": 128
+  },
+  "Name": "Delft Medium Dark"
+ },
+ {
+  "AnchorNumber": "139",
+  "Color": {
+   "R": 37,
+   "G": 49,
+   "B": 86
+  },
+  "Name": "Delft Very Dark"
+ },
+ {
+  "AnchorNumber": "140",
+  "Color": {
+   "R": 153,
+   "G": 180,
+   "B": 215
+  },
+  "Name": "Royal Blue Light"
+ },
+ {
+  "AnchorNumber": "142",
+  "Color": {
+   "R": 44,
+   "G": 74,
+   "B": 124
+  },
+  "Name": "Royal Blue Medium"
+ },
+ {
+  "AnchorNumber": "143",
+  "Color": {
+   "R": 22,
+   "G": 44,
+   "B": 81
+  },
+  "Name": "Royal Blue Dark"
+ },
+ {
+  "AnchorNumber": "144",
+  "Color": {
+   "R": 166,
+   "G": 189,
+   "B": 217
+  },
+  "Name": "Navy Blue Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "145",
+  "Color": {
+   "R": 120,
+   "G": 132,
+   "B": 164
+  },
+  "Name": "Navy Blue Very Light"
+ },
+ {
+  "AnchorNumber": "146",
+  "Color": {
+   "R": 66,
+   "G": 85,
+   "B": 128
+  },
+  "Name": "Navy Blue Light"
+ },
+ {
+  "AnchorNumber": "147",
+  "Color": {
+   "R": 32,
+   "G": 48,
+   "B": 86
+  },
+  "Name": "Navy Blue Medium Light"
+ },
+ {
+  "AnchorNumber": "148",
+  "Color": {
+   "R": 14,
+   "G": 32,
+   "B": 75
+  },
+  "Name": "Navy Blue Medium"
+ },
+ {
+  "AnchorNumber": "149",
+  "Color": {
+   "R": 2,
+   "G": 2,
+   "B": 79
+  },
+  "Name": "Navy Blue Medium Dark"
+ },
+ {
+  "AnchorNumber": "150",
+  "Color": {
+   "R": 9,
+   "G": 9,
+   "B": 76
+  },
+  "Name": "Navy Blue Dark"
+ },
+ {
+  "AnchorNumber": "152",
+  "Color": {
+   "R": 8,
+   "G": 0,
+   "B": 49
+  },
+  "Name": "Navy Blue Ultra Very Dark"
+ },
+ {
+  "AnchorNumber": "158",
+  "Color": {
+   "R": 209,
+   "G": 243,
+   "B": 245
+  },
+  "Name": "Baby Blue Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "159",
+  "Color": {
+   "R": 176,
+   "G": 212,
+   "B": 233
+  },
+  "Name": "Baby Blue Light"
+ },
+ {
+  "AnchorNumber": "160",
+  "Color": {
+   "R": 159,
+   "G": 200,
+   "B": 226
+  },
+  "Name": "Baby Blue"
+ },
+ {
+  "AnchorNumber": "161",
+  "Color": {
+   "R": 87,
+   "G": 129,
+   "B": 156
+  },
+  "Name": "Baby Blue Dark"
+ },
+ {
+  "AnchorNumber": "162",
+  "Color": {
+   "R": 38,
+   "G": 86,
+   "B": 115
+  },
+  "Name": "Baby Blue Very Dark"
+ },
+ {
+  "AnchorNumber": "163",
+  "Color": {
+   "R": 185,
+   "G": 193,
+   "B": 223
+  },
+  "Name": "Blue Violet-LT"
+ },
+ {
+  "AnchorNumber": "164",
+  "Color": {
+   "R": 18,
+   "G": 53,
+   "B": 75
+  },
+  "Name": "Baby Blue Ultra Very Dark"
+ },
+ {
+  "AnchorNumber": "167",
+  "Color": {
+   "R": 136,
+   "G": 189,
+   "B": 202
+  },
+  "Name": "Blue Green Light"
+ },
+ {
+  "AnchorNumber": "168",
+  "Color": {
+   "R": 95,
+   "G": 133,
+   "B": 143
+  },
+  "Name": "Blue Green Medium"
+ },
+ {
+  "AnchorNumber": "169",
+  "Color": {
+   "R": 45,
+   "G": 79,
+   "B": 89
+  },
+  "Name": "Blue Green Dark"
+ },
+ {
+  "AnchorNumber": "170",
+  "Color": {
+   "R": 22,
+   "G": 61,
+   "B": 72
+  },
+  "Name": "Blue Green Very Dark"
+ },
+ {
+  "AnchorNumber": "175",
+  "Color": {
+   "R": 141,
+   "G": 158,
+   "B": 195
+  },
+  "Name": "Cornflower Blue Light"
+ },
+ {
+  "AnchorNumber": "176",
+  "Color": {
+   "R": 99,
+   "G": 95,
+   "B": 149
+  },
+  "Name": "Cornflower Blue Medium"
+ },
+ {
+  "AnchorNumber": "177",
+  "Color": {
+   "R": 58,
+   "G": 45,
+   "B": 97
+  },
+  "Name": "Cornflower Blue Dark"
+ },
+ {
+  "AnchorNumber": "178",
+  "Color": {
+   "R": 43,
+   "G": 29,
+   "B": 83
+  },
+  "Name": "Cornflower Blue Very D"
+ },
+ {
+  "AnchorNumber": "179",
+  "Color": {
+   "R": 65,
+   "G": 126,
+   "B": 135
+  },
+  "Name": "Turquoise-VY DK"
+ },
+ {
+  "AnchorNumber": "185",
+  "Color": {
+   "R": 142,
+   "G": 209,
+   "B": 193
+  },
+  "Name": "Turquoise Very Light"
+ },
+ {
+  "AnchorNumber": "186",
+  "Color": {
+   "R": 105,
+   "G": 181,
+   "B": 163
+  },
+  "Name": "Turquoise Light"
+ },
+ {
+  "AnchorNumber": "187",
+  "Color": {
+   "R": 54,
+   "G": 139,
+   "B": 120
+  },
+  "Name": "Turquoise Medium"
+ },
+ {
+  "AnchorNumber": "188",
+  "Color": {
+   "R": 36,
+   "G": 98,
+   "B": 83
+  },
+  "Name": "Turquoise Dark"
+ },
+ {
+  "AnchorNumber": "189",
+  "Color": {
+   "R": 38,
+   "G": 68,
+   "B": 60
+  },
+  "Name": "Turquoise Very Dark"
+ },
+ {
+  "AnchorNumber": "203",
+  "Color": {
+   "R": 143,
+   "G": 192,
+   "B": 149
+  },
+  "Name": "Emerald Green Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "204",
+  "Color": {
+   "R": 106,
+   "G": 153,
+   "B": 111
+  },
+  "Name": "Emerald Green Very Light"
+ },
+ {
+  "AnchorNumber": "205",
+  "Color": {
+   "R": 78,
+   "G": 113,
+   "B": 82
+  },
+  "Name": "Emerald Green Light"
+ },
+ {
+  "AnchorNumber": "206",
+  "Color": {
+   "R": 160,
+   "G": 205,
+   "B": 177
+  },
+  "Name": "Jade Very Light"
+ },
+ {
+  "AnchorNumber": "208",
+  "Color": {
+   "R": 102,
+   "G": 158,
+   "B": 124
+  },
+  "Name": "Jade Light"
+ },
+ {
+  "AnchorNumber": "209",
+  "Color": {
+   "R": 79,
+   "G": 136,
+   "B": 102
+  },
+  "Name": "Jade Medium"
+ },
+ {
+  "AnchorNumber": "210",
+  "Color": {
+   "R": 47,
+   "G": 88,
+   "B": 63
+  },
+  "Name": "Jade Medium Dark"
+ },
+ {
+  "AnchorNumber": "211",
+  "Color": {
+   "R": 35,
+   "G": 77,
+   "B": 52
+  },
+  "Name": "Jade Dark"
+ },
+ {
+  "AnchorNumber": "212",
+  "Color": {
+   "R": 29,
+   "G": 63,
+   "B": 42
+  },
+  "Name": "Jade Very Dark"
+ },
+ {
+  "AnchorNumber": "213",
+  "Color": {
+   "R": 197,
+   "G": 199,
+   "B": 182
+  },
+  "Name": "Misty Green Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "214",
+  "Color": {
+   "R": 150,
+   "G": 179,
+   "B": 155
+  },
+  "Name": "Misty Green Very Light"
+ },
+ {
+  "AnchorNumber": "215",
+  "Color": {
+   "R": 83,
+   "G": 123,
+   "B": 90
+  },
+  "Name": "Misty Green Light"
+ },
+ {
+  "AnchorNumber": "216",
+  "Color": {
+   "R": 58,
+   "G": 93,
+   "B": 64
+  },
+  "Name": "Misty Green Medium"
+ },
+ {
+  "AnchorNumber": "217",
+  "Color": {
+   "R": 46,
+   "G": 76,
+   "B": 60
+  },
+  "Name": "Misty Green Dark"
+ },
+ {
+  "AnchorNumber": "218",
+  "Color": {
+   "R": 34,
+   "G": 61,
+   "B": 46
+  },
+  "Name": "Misty Green Very Dark"
+ },
+ {
+  "AnchorNumber": "225",
+  "Color": {
+   "R": 121,
+   "G": 164,
+   "B": 94
+  },
+  "Name": "Christmas Green Very Light"
+ },
+ {
+  "AnchorNumber": "226",
+  "Color": {
+   "R": 91,
+   "G": 133,
+   "B": 66
+  },
+  "Name": "Christmas Green Light"
+ },
+ {
+  "AnchorNumber": "227",
+  "Color": {
+   "R": 58,
+   "G": 116,
+   "B": 45
+  },
+  "Name": "Christmas Green"
+ },
+ {
+  "AnchorNumber": "228",
+  "Color": {
+   "R": 44,
+   "G": 93,
+   "B": 34
+  },
+  "Name": "Christmas Green Medium"
+ },
+ {
+  "AnchorNumber": "229",
+  "Color": {
+   "R": 32,
+   "G": 79,
+   "B": 22
+  },
+  "Name": "Christmas Green Dark"
+ },
+ {
+  "AnchorNumber": "230",
+  "Color": {
+   "R": 22,
+   "G": 55,
+   "B": 41
+  },
+  "Name": "Emerald Green"
+ },
+ {
+  "AnchorNumber": "231",
+  "Color": {
+   "R": 189,
+   "G": 170,
+   "B": 167
+  },
+  "Name": "Shell Grey Light"
+ },
+ {
+  "AnchorNumber": "232",
+  "Color": {
+   "R": 142,
+   "G": 128,
+   "B": 127
+  },
+  "Name": "Shell Grey Medium"
+ },
+ {
+  "AnchorNumber": "233",
+  "Color": {
+   "R": 109,
+   "G": 97,
+   "B": 94
+  },
+  "Name": "Shell Grey Dark"
+ },
+ {
+  "AnchorNumber": "234",
+  "Color": {
+   "R": 193,
+   "G": 191,
+   "B": 196
+  },
+  "Name": "Pearl Grey Very Light"
+ },
+ {
+  "AnchorNumber": "235",
+  "Color": {
+   "R": 72,
+   "G": 72,
+   "B": 72
+  },
+  "Name": "Pewter Grey"
+ },
+ {
+  "AnchorNumber": "236",
+  "Color": {
+   "R": 31,
+   "G": 31,
+   "B": 31
+  },
+  "Name": "Pewter Grey Very Dark"
+ },
+ {
+  "AnchorNumber": "238",
+  "Color": {
+   "R": 109,
+   "G": 154,
+   "B": 59
+  },
+  "Name": "Chartreuse"
+ },
+ {
+  "AnchorNumber": "239",
+  "Color": {
+   "R": 74,
+   "G": 134,
+   "B": 38
+  },
+  "Name": "Chartreuse Very Dark"
+ },
+ {
+  "AnchorNumber": "240",
+  "Color": {
+   "R": 165,
+   "G": 191,
+   "B": 150
+  },
+  "Name": "Pistachio Green Light"
+ },
+ {
+  "AnchorNumber": "241",
+  "Color": {
+   "R": 133,
+   "G": 172,
+   "B": 110
+  },
+  "Name": "Pistachio Green"
+ },
+ {
+  "AnchorNumber": "242",
+  "Color": {
+   "R": 107,
+   "G": 141,
+   "B": 88
+  },
+  "Name": "Pistachio Green Medium"
+ },
+ {
+  "AnchorNumber": "243",
+  "Color": {
+   "R": 90,
+   "G": 115,
+   "B": 74
+  },
+  "Name": "Pistachio Green Medium Dark"
+ },
+ {
+  "AnchorNumber": "244",
+  "Color": {
+   "R": 71,
+   "G": 92,
+   "B": 59
+  },
+  "Name": "Pistachio Green Dark"
+ },
+ {
+  "AnchorNumber": "245",
+  "Color": {
+   "R": 52,
+   "G": 78,
+   "B": 36
+  },
+  "Name": "Pistachio Green Dark"
+ },
+ {
+  "AnchorNumber": "246",
+  "Color": {
+   "R": 34,
+   "G": 57,
+   "B": 21
+  },
+  "Name": "Pistachio Green Very Dark"
+ },
+ {
+  "AnchorNumber": "253",
+  "Color": {
+   "R": 180,
+   "G": 187,
+   "B": 142
+  },
+  "Name": "Forest Green Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "254",
+  "Color": {
+   "R": 158,
+   "G": 166,
+   "B": 104
+  },
+  "Name": "Forest Green Very Light"
+ },
+ {
+  "AnchorNumber": "255",
+  "Color": {
+   "R": 116,
+   "G": 133,
+   "B": 5
+  },
+  "Name": "Forest Green Light"
+ },
+ {
+  "AnchorNumber": "256",
+  "Color": {
+   "R": 99,
+   "G": 114,
+   "B": 1
+  },
+  "Name": "Forest Green Medium"
+ },
+ {
+  "AnchorNumber": "257",
+  "Color": {
+   "R": 87,
+   "G": 99,
+   "B": 1
+  },
+  "Name": "Forest Green Dark"
+ },
+ {
+  "AnchorNumber": "258",
+  "Color": {
+   "R": 69,
+   "G": 79,
+   "B": 1
+  },
+  "Name": "Forest Green Very Dark"
+ },
+ {
+  "AnchorNumber": "259",
+  "Color": {
+   "R": 233,
+   "G": 248,
+   "B": 199
+  },
+  "Name": "Laurel Green Very Light"
+ },
+ {
+  "AnchorNumber": "260",
+  "Color": {
+   "R": 181,
+   "G": 193,
+   "B": 155
+  },
+  "Name": "Laurel Green Light"
+ },
+ {
+  "AnchorNumber": "261",
+  "Color": {
+   "R": 130,
+   "G": 143,
+   "B": 103
+  },
+  "Name": "Laurel Green Medium"
+ },
+ {
+  "AnchorNumber": "262",
+  "Color": {
+   "R": 73,
+   "G": 81,
+   "B": 54
+  },
+  "Name": "Laurel Green Dark"
+ },
+ {
+  "AnchorNumber": "263",
+  "Color": {
+   "R": 47,
+   "G": 55,
+   "B": 32
+  },
+  "Name": "Loden Green Dark"
+ },
+ {
+  "AnchorNumber": "264",
+  "Color": {
+   "R": 173,
+   "G": 187,
+   "B": 133
+  },
+  "Name": "Avocado Green Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "265",
+  "Color": {
+   "R": 140,
+   "G": 158,
+   "B": 71
+  },
+  "Name": "Avocado Green Very Light"
+ },
+ {
+  "AnchorNumber": "266",
+  "Color": {
+   "R": 113,
+   "G": 128,
+   "B": 54
+  },
+  "Name": "Avocado Green Light"
+ },
+ {
+  "AnchorNumber": "267",
+  "Color": {
+   "R": 82,
+   "G": 94,
+   "B": 39
+  },
+  "Name": "Avocado Green Medium"
+ },
+ {
+  "AnchorNumber": "268",
+  "Color": {
+   "R": 65,
+   "G": 76,
+   "B": 27
+  },
+  "Name": "Avocado Green Dark"
+ },
+ {
+  "AnchorNumber": "269",
+  "Color": {
+   "R": 40,
+   "G": 46,
+   "B": 15
+  },
+  "Name": "Avocado Green Very Dark"
+ },
+ {
+  "AnchorNumber": "271",
+  "Color": {
+   "R": 240,
+   "G": 207,
+   "B": 207
+  },
+  "Name": "Baby Pink Ultra Very L"
+ },
+ {
+  "AnchorNumber": "273",
+  "Color": {
+   "R": 48,
+   "G": 45,
+   "B": 40
+  },
+  "Name": "Beaver Grey Very Dark"
+ },
+ {
+  "AnchorNumber": "274",
+  "Color": {
+   "R": 167,
+   "G": 178,
+   "B": 181
+  },
+  "Name": "Grey Blue Very Light"
+ },
+ {
+  "AnchorNumber": "275",
+  "Color": {
+   "R": 255,
+   "G": 248,
+   "B": 206
+  },
+  "Name": "Off White"
+ },
+ {
+  "AnchorNumber": "276",
+  "Color": {
+   "R": 233,
+   "G": 222,
+   "B": 190
+  },
+  "Name": "Coffee Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "277",
+  "Color": {
+   "R": 78,
+   "G": 48,
+   "B": 8
+  },
+  "Name": "Gold Dark"
+ },
+ {
+  "AnchorNumber": "278",
+  "Color": {
+   "R": 215,
+   "G": 207,
+   "B": 109
+  },
+  "Name": "Lime Green Light"
+ },
+ {
+  "AnchorNumber": "279",
+  "Color": {
+   "R": 171,
+   "G": 155,
+   "B": 71
+  },
+  "Name": "Lime Green"
+ },
+ {
+  "AnchorNumber": "280",
+  "Color": {
+   "R": 128,
+   "G": 113,
+   "B": 56
+  },
+  "Name": "Yellow Green"
+ },
+ {
+  "AnchorNumber": "281",
+  "Color": {
+   "R": 76,
+   "G": 68,
+   "B": 22
+  },
+  "Name": "Yellow Green Dark"
+ },
+ {
+  "AnchorNumber": "282",
+  "Color": {
+   "R": 218,
+   "G": 220,
+   "B": 154
+  },
+  "Name": "Avocado Green-UL LT"
+ },
+ {
+  "AnchorNumber": "288",
+  "Color": {
+   "R": 255,
+   "G": 244,
+   "B": 114
+  },
+  "Name": "Lemon Light"
+ },
+ {
+  "AnchorNumber": "289",
+  "Color": {
+   "R": 250,
+   "G": 229,
+   "B": 85
+  },
+  "Name": "Lemon Medium"
+ },
+ {
+  "AnchorNumber": "290",
+  "Color": {
+   "R": 252,
+   "G": 195,
+   "B": 24
+  },
+  "Name": "Lemon Dark"
+ },
+ {
+  "AnchorNumber": "291",
+  "Color": {
+   "R": 241,
+   "G": 176,
+   "B": 7
+  },
+  "Name": "Canary Yellow Bright"
+ },
+ {
+  "AnchorNumber": "292",
+  "Color": {
+   "R": 255,
+   "G": 232,
+   "B": 143
+  },
+  "Name": "Golden Brown Very Light"
+ },
+ {
+  "AnchorNumber": "293",
+  "Color": {
+   "R": 248,
+   "G": 216,
+   "B": 108
+  },
+  "Name": "Golden Yellow Light"
+ },
+ {
+  "AnchorNumber": "294",
+  "Color": {
+   "R": 168,
+   "G": 196,
+   "B": 154
+  },
+  "Name": "Pistachio Green-LT"
+ },
+ {
+  "AnchorNumber": "295",
+  "Color": {
+   "R": 246,
+   "G": 206,
+   "B": 66
+  },
+  "Name": "Golden Yellow Medium Light"
+ },
+ {
+  "AnchorNumber": "296",
+  "Color": {
+   "R": 99,
+   "G": 124,
+   "B": 84
+  },
+  "Name": "Pistachio Green-DK"
+ },
+ {
+  "AnchorNumber": "297",
+  "Color": {
+   "R": 241,
+   "G": 177,
+   "B": 10
+  },
+  "Name": "Golden Yellow Medium"
+ },
+ {
+  "AnchorNumber": "298",
+  "Color": {
+   "R": 247,
+   "G": 166,
+   "B": 19
+  },
+  "Name": "Golden Yellow Dark"
+ },
+ {
+  "AnchorNumber": "300",
+  "Color": {
+   "R": 252,
+   "G": 230,
+   "B": 171
+  },
+  "Name": "Yellow Very Light"
+ },
+ {
+  "AnchorNumber": "301",
+  "Color": {
+   "R": 255,
+   "G": 205,
+   "B": 124
+  },
+  "Name": "Burnt Orange Very Light"
+ },
+ {
+  "AnchorNumber": "302",
+  "Color": {
+   "R": 255,
+   "G": 181,
+   "B": 82
+  },
+  "Name": "Burnt Orange Light"
+ },
+ {
+  "AnchorNumber": "303",
+  "Color": {
+   "R": 255,
+   "G": 148,
+   "B": 19
+  },
+  "Name": "Burnt Orange Medium"
+ },
+ {
+  "AnchorNumber": "304",
+  "Color": {
+   "R": 229,
+   "G": 131,
+   "B": 0
+  },
+  "Name": "Burnt Orange"
+ },
+ {
+  "AnchorNumber": "305",
+  "Color": {
+   "R": 253,
+   "G": 200,
+   "B": 104
+  },
+  "Name": "Topaz Very Light"
+ },
+ {
+  "AnchorNumber": "306",
+  "Color": {
+   "R": 243,
+   "G": 157,
+   "B": 53
+  },
+  "Name": "Gold"
+ },
+ {
+  "AnchorNumber": "307",
+  "Color": {
+   "R": 214,
+   "G": 128,
+   "B": 23
+  },
+  "Name": "Topaz Light"
+ },
+ {
+  "AnchorNumber": "308",
+  "Color": {
+   "R": 178,
+   "G": 92,
+   "B": 7
+  },
+  "Name": "Topaz Medium"
+ },
+ {
+  "AnchorNumber": "309",
+  "Color": {
+   "R": 151,
+   "G": 68,
+   "B": 0
+  },
+  "Name": "Topaz Medium Dark"
+ },
+ {
+  "AnchorNumber": "310",
+  "Color": {
+   "R": 125,
+   "G": 59,
+   "B": 0
+  },
+  "Name": "Topaz Very Dark"
+ },
+ {
+  "AnchorNumber": "311",
+  "Color": {
+   "R": 234,
+   "G": 176,
+   "B": 105
+  },
+  "Name": "Tangerine Very Light"
+ },
+ {
+  "AnchorNumber": "312",
+  "Color": {
+   "R": 249,
+   "G": 191,
+   "B": 152
+  },
+  "Name": "Pumpkin-Pale"
+ },
+ {
+  "AnchorNumber": "313",
+  "Color": {
+   "R": 247,
+   "G": 151,
+   "B": 89
+  },
+  "Name": "Tangerine Light"
+ },
+ {
+  "AnchorNumber": "314",
+  "Color": {
+   "R": 246,
+   "G": 128,
+   "B": 51
+  },
+  "Name": "Tangerine Medium"
+ },
+ {
+  "AnchorNumber": "316",
+  "Color": {
+   "R": 232,
+   "G": 96,
+   "B": 39
+  },
+  "Name": "Tangerine Dark"
+ },
+ {
+  "AnchorNumber": "317",
+  "Color": {
+   "R": 237,
+   "G": 101,
+   "B": 9
+  },
+  "Name": "Burnt Orange-MD"
+ },
+ {
+  "AnchorNumber": "321",
+  "Color": {
+   "R": 211,
+   "G": 90,
+   "B": 9
+  },
+  "Name": "Burnt Orange-DK"
+ },
+ {
+  "AnchorNumber": "323",
+  "Color": {
+   "R": 232,
+   "G": 125,
+   "B": 79
+  },
+  "Name": "Orange Spice Light"
+ },
+ {
+  "AnchorNumber": "324",
+  "Color": {
+   "R": 222,
+   "G": 103,
+   "B": 52
+  },
+  "Name": "Orange Spice Medium"
+ },
+ {
+  "AnchorNumber": "326",
+  "Color": {
+   "R": 182,
+   "G": 76,
+   "B": 31
+  },
+  "Name": "Orange Spice Dark"
+ },
+ {
+  "AnchorNumber": "327",
+  "Color": {
+   "R": 244,
+   "G": 122,
+   "B": 68
+  },
+  "Name": "Orange Spice-MD"
+ },
+ {
+  "AnchorNumber": "328",
+  "Color": {
+   "R": 251,
+   "G": 131,
+   "B": 102
+  },
+  "Name": "Peach Medium"
+ },
+ {
+  "AnchorNumber": "329",
+  "Color": {
+   "R": 251,
+   "G": 120,
+   "B": 70
+  },
+  "Name": "Peach Dark"
+ },
+ {
+  "AnchorNumber": "330",
+  "Color": {
+   "R": 246,
+   "G": 111,
+   "B": 30
+  },
+  "Name": "Orange"
+ },
+ {
+  "AnchorNumber": "331",
+  "Color": {
+   "R": 200,
+   "G": 100,
+   "B": 26
+  },
+  "Name": "Copper"
+ },
+ {
+  "AnchorNumber": "332",
+  "Color": {
+   "R": 225,
+   "G": 82,
+   "B": 14
+  },
+  "Name": "Orange Dark"
+ },
+ {
+  "AnchorNumber": "333",
+  "Color": {
+   "R": 212,
+   "G": 72,
+   "B": 5
+  },
+  "Name": "Orange Very Dark"
+ },
+ {
+  "AnchorNumber": "334",
+  "Color": {
+   "R": 202,
+   "G": 60,
+   "B": 0
+  },
+  "Name": "Orange Red Very Dark"
+ },
+ {
+  "AnchorNumber": "335",
+  "Color": {
+   "R": 210,
+   "G": 57,
+   "B": 24
+  },
+  "Name": "Orange Red"
+ },
+ {
+  "AnchorNumber": "336",
+  "Color": {
+   "R": 243,
+   "G": 158,
+   "B": 126
+  },
+  "Name": "Mahogany Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "337",
+  "Color": {
+   "R": 224,
+   "G": 123,
+   "B": 94
+  },
+  "Name": "Mahogany Very Light"
+ },
+ {
+  "AnchorNumber": "338",
+  "Color": {
+   "R": 204,
+   "G": 97,
+   "B": 68
+  },
+  "Name": "Mahogany Light"
+ },
+ {
+  "AnchorNumber": "339",
+  "Color": {
+   "R": 180,
+   "G": 74,
+   "B": 34
+  },
+  "Name": "Mahogany"
+ },
+ {
+  "AnchorNumber": "340",
+  "Color": {
+   "R": 158,
+   "G": 56,
+   "B": 18
+  },
+  "Name": "Mahogany Medium Dark"
+ },
+ {
+  "AnchorNumber": "341",
+  "Color": {
+   "R": 140,
+   "G": 49,
+   "B": 15
+  },
+  "Name": "Mahogany Dark"
+ },
+ {
+  "AnchorNumber": "342",
+  "Color": {
+   "R": 215,
+   "G": 179,
+   "B": 224
+  },
+  "Name": "Lavender Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "343",
+  "Color": {
+   "R": 185,
+   "G": 192,
+   "B": 205
+  },
+  "Name": "Antique Blue Light"
+ },
+ {
+  "AnchorNumber": "347",
+  "Color": {
+   "R": 211,
+   "G": 165,
+   "B": 128
+  },
+  "Name": "Chocolate Light"
+ },
+ {
+  "AnchorNumber": "348",
+  "Color": {
+   "R": 190,
+   "G": 143,
+   "B": 16
+  },
+  "Name": "Old Gold-DK"
+ },
+ {
+  "AnchorNumber": "349",
+  "Color": {
+   "R": 148,
+   "G": 87,
+   "B": 49
+  },
+  "Name": "Chocolate Medium"
+ },
+ {
+  "AnchorNumber": "350",
+  "Color": {
+   "R": 231,
+   "G": 208,
+   "B": 153
+  },
+  "Name": "Old Gold-LT"
+ },
+ {
+  "AnchorNumber": "351",
+  "Color": {
+   "R": 102,
+   "G": 51,
+   "B": 14
+  },
+  "Name": "Copper Dark"
+ },
+ {
+  "AnchorNumber": "352",
+  "Color": {
+   "R": 89,
+   "G": 40,
+   "B": 14
+  },
+  "Name": "Copper Very Dark"
+ },
+ {
+  "AnchorNumber": "354",
+  "Color": {
+   "R": 185,
+   "G": 121,
+   "B": 84
+  },
+  "Name": "Desert Sand-DK"
+ },
+ {
+  "AnchorNumber": "355",
+  "Color": {
+   "R": 113,
+   "G": 63,
+   "B": 34
+  },
+  "Name": "Chocolate Medium Dark"
+ },
+ {
+  "AnchorNumber": "357",
+  "Color": {
+   "R": 91,
+   "G": 44,
+   "B": 17
+  },
+  "Name": "Chocolate Dark"
+ },
+ {
+  "AnchorNumber": "358",
+  "Color": {
+   "R": 98,
+   "G": 57,
+   "B": 27
+  },
+  "Name": "Coffee Dark"
+ },
+ {
+  "AnchorNumber": "359",
+  "Color": {
+   "R": 85,
+   "G": 47,
+   "B": 20
+  },
+  "Name": "Coffee Very Dark"
+ },
+ {
+  "AnchorNumber": "360",
+  "Color": {
+   "R": 76,
+   "G": 39,
+   "B": 12
+  },
+  "Name": "Black Brown Medium"
+ },
+ {
+  "AnchorNumber": "361",
+  "Color": {
+   "R": 231,
+   "G": 193,
+   "B": 151
+  },
+  "Name": "Tan Very Light"
+ },
+ {
+  "AnchorNumber": "362",
+  "Color": {
+   "R": 181,
+   "G": 142,
+   "B": 99
+  },
+  "Name": "Tan Medium Light"
+ },
+ {
+  "AnchorNumber": "363",
+  "Color": {
+   "R": 185,
+   "G": 131,
+   "B": 71
+  },
+  "Name": "Golden Brown Light"
+ },
+ {
+  "AnchorNumber": "364",
+  "Color": {
+   "R": 154,
+   "G": 96,
+   "B": 53
+  },
+  "Name": "Brown-LT"
+ },
+ {
+  "AnchorNumber": "365",
+  "Color": {
+   "R": 116,
+   "G": 72,
+   "B": 23
+  },
+  "Name": "Golden Brown Medium"
+ },
+ {
+  "AnchorNumber": "366",
+  "Color": {
+   "R": 225,
+   "G": 198,
+   "B": 173
+  },
+  "Name": "Coffee Very Light"
+ },
+ {
+  "AnchorNumber": "367",
+  "Color": {
+   "R": 217,
+   "G": 180,
+   "B": 144
+  },
+  "Name": "Coffee Light"
+ },
+ {
+  "AnchorNumber": "368",
+  "Color": {
+   "R": 187,
+   "G": 143,
+   "B": 110
+  },
+  "Name": "Coffee"
+ },
+ {
+  "AnchorNumber": "369",
+  "Color": {
+   "R": 139,
+   "G": 93,
+   "B": 60
+  },
+  "Name": "Coffee Medium Light"
+ },
+ {
+  "AnchorNumber": "370",
+  "Color": {
+   "R": 123,
+   "G": 71,
+   "B": 31
+  },
+  "Name": "Coffee Medium"
+ },
+ {
+  "AnchorNumber": "371",
+  "Color": {
+   "R": 99,
+   "G": 58,
+   "B": 27
+  },
+  "Name": "Coffee Medium Dark"
+ },
+ {
+  "AnchorNumber": "372",
+  "Color": {
+   "R": 194,
+   "G": 159,
+   "B": 108
+  },
+  "Name": "Tan"
+ },
+ {
+  "AnchorNumber": "373",
+  "Color": {
+   "R": 136,
+   "G": 98,
+   "B": 58
+  },
+  "Name": "Tan Medium Dark"
+ },
+ {
+  "AnchorNumber": "374",
+  "Color": {
+   "R": 109,
+   "G": 66,
+   "B": 19
+  },
+  "Name": "Tan Dark"
+ },
+ {
+  "AnchorNumber": "375",
+  "Color": {
+   "R": 85,
+   "G": 51,
+   "B": 14
+  },
+  "Name": "Hazelnut Brown Medium"
+ },
+ {
+  "AnchorNumber": "376",
+  "Color": {
+   "R": 228,
+   "G": 189,
+   "B": 176
+  },
+  "Name": "Dusty Flesh Light"
+ },
+ {
+  "AnchorNumber": "377",
+  "Color": {
+   "R": 105,
+   "G": 87,
+   "B": 67
+  },
+  "Name": "Beige Brown-DK"
+ },
+ {
+  "AnchorNumber": "378",
+  "Color": {
+   "R": 162,
+   "G": 117,
+   "B": 103
+  },
+  "Name": "Dusty Flesh Medium"
+ },
+ {
+  "AnchorNumber": "379",
+  "Color": {
+   "R": 146,
+   "G": 104,
+   "B": 90
+  },
+  "Name": "Dusty Flesh Dark"
+ },
+ {
+  "AnchorNumber": "380",
+  "Color": {
+   "R": 66,
+   "G": 34,
+   "B": 10
+  },
+  "Name": "Black Brown Medium Dark"
+ },
+ {
+  "AnchorNumber": "381",
+  "Color": {
+   "R": 54,
+   "G": 26,
+   "B": 6
+  },
+  "Name": "Black Brown Dark"
+ },
+ {
+  "AnchorNumber": "382",
+  "Color": {
+   "R": 48,
+   "G": 20,
+   "B": 0
+  },
+  "Name": "Black Brown Very Dark"
+ },
+ {
+  "AnchorNumber": "386",
+  "Color": {
+   "R": 250,
+   "G": 244,
+   "B": 201
+  },
+  "Name": "Yellow Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "387",
+  "Color": {
+   "R": 218,
+   "G": 210,
+   "B": 193
+  },
+  "Name": "Beige Brown Very Light"
+ },
+ {
+  "AnchorNumber": "388",
+  "Color": {
+   "R": 195,
+   "G": 177,
+   "B": 167
+  },
+  "Name": "Beige Brown Light"
+ },
+ {
+  "AnchorNumber": "389",
+  "Color": {
+   "R": 166,
+   "G": 154,
+   "B": 122
+  },
+  "Name": "Beige Gray-DK"
+ },
+ {
+  "AnchorNumber": "390",
+  "Color": {
+   "R": 219,
+   "G": 214,
+   "B": 201
+  },
+  "Name": "Beige Grey Light"
+ },
+ {
+  "AnchorNumber": "391",
+  "Color": {
+   "R": 170,
+   "G": 158,
+   "B": 146
+  },
+  "Name": "Beige Grey Medium"
+ },
+ {
+  "AnchorNumber": "392",
+  "Color": {
+   "R": 128,
+   "G": 110,
+   "B": 93
+  },
+  "Name": "Beige Grey Dark"
+ },
+ {
+  "AnchorNumber": "393",
+  "Color": {
+   "R": 85,
+   "G": 73,
+   "B": 61
+  },
+  "Name": "Beige Grey Ultra Very Dark"
+ },
+ {
+  "AnchorNumber": "397",
+  "Color": {
+   "R": 213,
+   "G": 212,
+   "B": 201
+  },
+  "Name": "Pearl Grey Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "398",
+  "Color": {
+   "R": 137,
+   "G": 136,
+   "B": 138
+  },
+  "Name": "Pearl Grey"
+ },
+ {
+  "AnchorNumber": "399",
+  "Color": {
+   "R": 100,
+   "G": 98,
+   "B": 99
+  },
+  "Name": "Steel Grey Light"
+ },
+ {
+  "AnchorNumber": "400",
+  "Color": {
+   "R": 58,
+   "G": 58,
+   "B": 58
+  },
+  "Name": "Pewter Grey Dark"
+ },
+ {
+  "AnchorNumber": "401",
+  "Color": {
+   "R": 53,
+   "G": 44,
+   "B": 42
+  },
+  "Name": "Shell Grey Very Dark"
+ },
+ {
+  "AnchorNumber": "402",
+  "Color": {
+   "R": 213,
+   "G": 213,
+   "B": 216
+  },
+  "Name": "Pearl Gray"
+ },
+ {
+  "AnchorNumber": "403",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Black"
+ },
+ {
+  "AnchorNumber": "408",
+  "Color": {
+   "R": 255,
+   "G": 228,
+   "B": 220
+  },
+  "Name": "Shell Pink-UL VY LT"
+ },
+ {
+  "AnchorNumber": "410",
+  "Color": {
+   "R": 29,
+   "G": 88,
+   "B": 160
+  },
+  "Name": "Electric Blue Dark"
+ },
+ {
+  "AnchorNumber": "433",
+  "Color": {
+   "R": 107,
+   "G": 173,
+   "B": 255
+  },
+  "Name": "Electric Blue Medium"
+ },
+ {
+  "AnchorNumber": "681",
+  "Color": {
+   "R": 55,
+   "G": 54,
+   "B": 31
+  },
+  "Name": "Green Grey"
+ },
+ {
+  "AnchorNumber": "683",
+  "Color": {
+   "R": 31,
+   "G": 47,
+   "B": 39
+  },
+  "Name": "Misty Green Ultra Very Dark"
+ },
+ {
+  "AnchorNumber": "778",
+  "Color": {
+   "R": 224,
+   "G": 180,
+   "B": 157
+  },
+  "Name": "Flesh Very Light"
+ },
+ {
+  "AnchorNumber": "779",
+  "Color": {
+   "R": 65,
+   "G": 82,
+   "B": 104
+  },
+  "Name": "Grey Blue Very Dark"
+ },
+ {
+  "AnchorNumber": "829",
+  "Color": {
+   "R": 221,
+   "G": 192,
+   "B": 129
+  },
+  "Name": "Golden Olive-VY LT"
+ },
+ {
+  "AnchorNumber": "830",
+  "Color": {
+   "R": 204,
+   "G": 195,
+   "B": 188
+  },
+  "Name": "Drab Brown Very Light"
+ },
+ {
+  "AnchorNumber": "831",
+  "Color": {
+   "R": 166,
+   "G": 147,
+   "B": 128
+  },
+  "Name": "Drab Brown Light"
+ },
+ {
+  "AnchorNumber": "832",
+  "Color": {
+   "R": 112,
+   "G": 87,
+   "B": 65
+  },
+  "Name": "Drab Brown Medium"
+ },
+ {
+  "AnchorNumber": "833",
+  "Color": {
+   "R": 143,
+   "G": 122,
+   "B": 77
+  },
+  "Name": "Golden Olive-DK"
+ },
+ {
+  "AnchorNumber": "834",
+  "Color": {
+   "R": 128,
+   "G": 109,
+   "B": 68
+  },
+  "Name": "Golden Olive-VY DK"
+ },
+ {
+  "AnchorNumber": "842",
+  "Color": {
+   "R": 196,
+   "G": 190,
+   "B": 156
+  },
+  "Name": "Khaki Green Light"
+ },
+ {
+  "AnchorNumber": "843",
+  "Color": {
+   "R": 125,
+   "G": 117,
+   "B": 76
+  },
+  "Name": "Khaki Green Medium Light"
+ },
+ {
+  "AnchorNumber": "844",
+  "Color": {
+   "R": 94,
+   "G": 88,
+   "B": 55
+  },
+  "Name": "Khaki Green Medium"
+ },
+ {
+  "AnchorNumber": "845",
+  "Color": {
+   "R": 68,
+   "G": 62,
+   "B": 36
+  },
+  "Name": "Khaki Green Medium Dark"
+ },
+ {
+  "AnchorNumber": "846",
+  "Color": {
+   "R": 46,
+   "G": 43,
+   "B": 26
+  },
+  "Name": "Khaki Green Dark"
+ },
+ {
+  "AnchorNumber": "847",
+  "Color": {
+   "R": 184,
+   "G": 195,
+   "B": 198
+  },
+  "Name": "Grey Blue Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "848",
+  "Color": {
+   "R": 156,
+   "G": 162,
+   "B": 158
+  },
+  "Name": "Grey Blue Light"
+ },
+ {
+  "AnchorNumber": "849",
+  "Color": {
+   "R": 127,
+   "G": 131,
+   "B": 129
+  },
+  "Name": "Grey Blue Medium"
+ },
+ {
+  "AnchorNumber": "850",
+  "Color": {
+   "R": 96,
+   "G": 109,
+   "B": 116
+  },
+  "Name": "Grey Blue Dark"
+ },
+ {
+  "AnchorNumber": "851",
+  "Color": {
+   "R": 51,
+   "G": 64,
+   "B": 81
+  },
+  "Name": "Grey Blue Ultra Very Dark"
+ },
+ {
+  "AnchorNumber": "852",
+  "Color": {
+   "R": 204,
+   "G": 194,
+   "B": 165
+  },
+  "Name": "Avocado Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "853",
+  "Color": {
+   "R": 145,
+   "G": 136,
+   "B": 107
+  },
+  "Name": "Avocado Very Light"
+ },
+ {
+  "AnchorNumber": "854",
+  "Color": {
+   "R": 123,
+   "G": 112,
+   "B": 82
+  },
+  "Name": "Avocado Light"
+ },
+ {
+  "AnchorNumber": "855",
+  "Color": {
+   "R": 112,
+   "G": 99,
+   "B": 62
+  },
+  "Name": "Avocado Medium"
+ },
+ {
+  "AnchorNumber": "856",
+  "Color": {
+   "R": 72,
+   "G": 64,
+   "B": 32
+  },
+  "Name": "Yellow Green Medium"
+ },
+ {
+  "AnchorNumber": "857",
+  "Color": {
+   "R": 255,
+   "G": 224,
+   "B": 215
+  },
+  "Name": "Apricot-VY LT"
+ },
+ {
+  "AnchorNumber": "858",
+  "Color": {
+   "R": 188,
+   "G": 201,
+   "B": 177
+  },
+  "Name": "Fern Green Very Light"
+ },
+ {
+  "AnchorNumber": "859",
+  "Color": {
+   "R": 111,
+   "G": 125,
+   "B": 99
+  },
+  "Name": "Fern Green Light"
+ },
+ {
+  "AnchorNumber": "860",
+  "Color": {
+   "R": 80,
+   "G": 91,
+   "B": 71
+  },
+  "Name": "Fern Green Medium"
+ },
+ {
+  "AnchorNumber": "861",
+  "Color": {
+   "R": 57,
+   "G": 65,
+   "B": 49
+  },
+  "Name": "Fern Green Dark"
+ },
+ {
+  "AnchorNumber": "862",
+  "Color": {
+   "R": 0,
+   "G": 42,
+   "B": 27
+  },
+  "Name": "Fern Green Very Dark"
+ },
+ {
+  "AnchorNumber": "863",
+  "Color": {
+   "R": 181,
+   "G": 77,
+   "B": 83
+  },
+  "Name": "Shell Pink-DK"
+ },
+ {
+  "AnchorNumber": "864",
+  "Color": {
+   "R": 207,
+   "G": 134,
+   "B": 126
+  },
+  "Name": "Shell Pink-LT"
+ },
+ {
+  "AnchorNumber": "868",
+  "Color": {
+   "R": 211,
+   "G": 134,
+   "B": 112
+  },
+  "Name": "Peach Flesh"
+ },
+ {
+  "AnchorNumber": "869",
+  "Color": {
+   "R": 180,
+   "G": 162,
+   "B": 174
+  },
+  "Name": "Antique Violet Very Light"
+ },
+ {
+  "AnchorNumber": "870",
+  "Color": {
+   "R": 141,
+   "G": 110,
+   "B": 131
+  },
+  "Name": "Antique Violet Light"
+ },
+ {
+  "AnchorNumber": "871",
+  "Color": {
+   "R": 93,
+   "G": 69,
+   "B": 86
+  },
+  "Name": "Antique Violet Medium"
+ },
+ {
+  "AnchorNumber": "872",
+  "Color": {
+   "R": 78,
+   "G": 57,
+   "B": 72
+  },
+  "Name": "Antique Violet Medium Dark"
+ },
+ {
+  "AnchorNumber": "873",
+  "Color": {
+   "R": 66,
+   "G": 37,
+   "B": 57
+  },
+  "Name": "Antique Violet Dark"
+ },
+ {
+  "AnchorNumber": "874",
+  "Color": {
+   "R": 179,
+   "G": 147,
+   "B": 96
+  },
+  "Name": "Gold Very Light"
+ },
+ {
+  "AnchorNumber": "875",
+  "Color": {
+   "R": 148,
+   "G": 180,
+   "B": 166
+  },
+  "Name": "Sea Foam Green Light"
+ },
+ {
+  "AnchorNumber": "876",
+  "Color": {
+   "R": 88,
+   "G": 113,
+   "B": 103
+  },
+  "Name": "Sea Foam Green Medium"
+ },
+ {
+  "AnchorNumber": "877",
+  "Color": {
+   "R": 52,
+   "G": 91,
+   "B": 74
+  },
+  "Name": "Sea Foam Green Dark"
+ },
+ {
+  "AnchorNumber": "878",
+  "Color": {
+   "R": 27,
+   "G": 61,
+   "B": 48
+  },
+  "Name": "Sea Foam Green Very Dark"
+ },
+ {
+  "AnchorNumber": "879",
+  "Color": {
+   "R": 25,
+   "G": 52,
+   "B": 40
+  },
+  "Name": "Sea Foam Green Ultra Very Dark"
+ },
+ {
+  "AnchorNumber": "880",
+  "Color": {
+   "R": 229,
+   "G": 192,
+   "B": 164
+  },
+  "Name": "Cream Medium"
+ },
+ {
+  "AnchorNumber": "881",
+  "Color": {
+   "R": 227,
+   "G": 187,
+   "B": 146
+  },
+  "Name": "Cream Dark"
+ },
+ {
+  "AnchorNumber": "882",
+  "Color": {
+   "R": 230,
+   "G": 158,
+   "B": 133
+  },
+  "Name": "Antique Mahogany Light"
+ },
+ {
+  "AnchorNumber": "883",
+  "Color": {
+   "R": 200,
+   "G": 117,
+   "B": 90
+  },
+  "Name": "Antique Mahogany"
+ },
+ {
+  "AnchorNumber": "884",
+  "Color": {
+   "R": 141,
+   "G": 76,
+   "B": 55
+  },
+  "Name": "Antique Mahogany Dark"
+ },
+ {
+  "AnchorNumber": "885",
+  "Color": {
+   "R": 239,
+   "G": 228,
+   "B": 199
+  },
+  "Name": "Yellow Beige Very Light"
+ },
+ {
+  "AnchorNumber": "886",
+  "Color": {
+   "R": 211,
+   "G": 195,
+   "B": 167
+  },
+  "Name": "Yellow Beige Light"
+ },
+ {
+  "AnchorNumber": "887",
+  "Color": {
+   "R": 188,
+   "G": 174,
+   "B": 132
+  },
+  "Name": "Yellow Beige Medium"
+ },
+ {
+  "AnchorNumber": "888",
+  "Color": {
+   "R": 136,
+   "G": 105,
+   "B": 64
+  },
+  "Name": "Hazelnut Brown Light"
+ },
+ {
+  "AnchorNumber": "889",
+  "Color": {
+   "R": 92,
+   "G": 58,
+   "B": 24
+  },
+  "Name": "Drab Brown Very Dark"
+ },
+ {
+  "AnchorNumber": "890",
+  "Color": {
+   "R": 195,
+   "G": 133,
+   "B": 49
+  },
+  "Name": "Old Gold Medium"
+ },
+ {
+  "AnchorNumber": "891",
+  "Color": {
+   "R": 247,
+   "G": 193,
+   "B": 104
+  },
+  "Name": "Old Gold Light"
+ },
+ {
+  "AnchorNumber": "892",
+  "Color": {
+   "R": 244,
+   "G": 219,
+   "B": 207
+  },
+  "Name": "Shell Pink Very Light"
+ },
+ {
+  "AnchorNumber": "893",
+  "Color": {
+   "R": 215,
+   "G": 170,
+   "B": 168
+  },
+  "Name": "Shell Pink Light"
+ },
+ {
+  "AnchorNumber": "894",
+  "Color": {
+   "R": 209,
+   "G": 146,
+   "B": 145
+  },
+  "Name": "Shell Pink Medium Light"
+ },
+ {
+  "AnchorNumber": "895",
+  "Color": {
+   "R": 185,
+   "G": 116,
+   "B": 114
+  },
+  "Name": "Shell Pink Medium"
+ },
+ {
+  "AnchorNumber": "896",
+  "Color": {
+   "R": 110,
+   "G": 51,
+   "B": 53
+  },
+  "Name": "Shell Pink"
+ },
+ {
+  "AnchorNumber": "897",
+  "Color": {
+   "R": 90,
+   "G": 2,
+   "B": 0
+  },
+  "Name": "Shell Pink Very Dark"
+ },
+ {
+  "AnchorNumber": "898",
+  "Color": {
+   "R": 92,
+   "G": 71,
+   "B": 54
+  },
+  "Name": "Drab Brown Dark"
+ },
+ {
+  "AnchorNumber": "899",
+  "Color": {
+   "R": 147,
+   "G": 131,
+   "B": 117
+  },
+  "Name": "Brown Grey Light"
+ },
+ {
+  "AnchorNumber": "900",
+  "Color": {
+   "R": 128,
+   "G": 126,
+   "B": 121
+  },
+  "Name": "Beaver Grey Light"
+ },
+ {
+  "AnchorNumber": "901",
+  "Color": {
+   "R": 160,
+   "G": 95,
+   "B": 0
+  },
+  "Name": "Old Gold Dark"
+ },
+ {
+  "AnchorNumber": "903",
+  "Color": {
+   "R": 97,
+   "G": 79,
+   "B": 64
+  },
+  "Name": "Brown Grey Medium"
+ },
+ {
+  "AnchorNumber": "904",
+  "Color": {
+   "R": 77,
+   "G": 57,
+   "B": 39
+  },
+  "Name": "Brown Grey Medium"
+ },
+ {
+  "AnchorNumber": "905",
+  "Color": {
+   "R": 53,
+   "G": 39,
+   "B": 27
+  },
+  "Name": "Brown Grey Dark"
+ },
+ {
+  "AnchorNumber": "906",
+  "Color": {
+   "R": 66,
+   "G": 44,
+   "B": 20
+  },
+  "Name": "Hazelnut Brown Dark"
+ },
+ {
+  "AnchorNumber": "907",
+  "Color": {
+   "R": 126,
+   "G": 91,
+   "B": 39
+  },
+  "Name": "Gold Medium"
+ },
+ {
+  "AnchorNumber": "914",
+  "Color": {
+   "R": 163,
+   "G": 107,
+   "B": 91
+  },
+  "Name": "Flesh Dark"
+ },
+ {
+  "AnchorNumber": "920",
+  "Color": {
+   "R": 128,
+   "G": 139,
+   "B": 153
+  },
+  "Name": "Antique Blue Medium Light"
+ },
+ {
+  "AnchorNumber": "921",
+  "Color": {
+   "R": 88,
+   "G": 97,
+   "B": 114
+  },
+  "Name": "Antique Blue Medium"
+ },
+ {
+  "AnchorNumber": "922",
+  "Color": {
+   "R": 45,
+   "G": 49,
+   "B": 59
+  },
+  "Name": "Antique Blue Dark"
+ },
+ {
+  "AnchorNumber": "923",
+  "Color": {
+   "R": 10,
+   "G": 60,
+   "B": 1
+  },
+  "Name": "Christmas Green Very Dark"
+ },
+ {
+  "AnchorNumber": "924",
+  "Color": {
+   "R": 73,
+   "G": 63,
+   "B": 13
+  },
+  "Name": "Yellow Green Very Dark"
+ },
+ {
+  "AnchorNumber": "925",
+  "Color": {
+   "R": 228,
+   "G": 86,
+   "B": 52
+  },
+  "Name": "Tangerine"
+ },
+ {
+  "AnchorNumber": "926",
+  "Color": {
+   "R": 243,
+   "G": 236,
+   "B": 223
+  },
+  "Name": "Beige Brown Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "927",
+  "Color": {
+   "R": 191,
+   "G": 205,
+   "B": 205
+  },
+  "Name": "Gray Green-LT"
+ },
+ {
+  "AnchorNumber": "928",
+  "Color": {
+   "R": 172,
+   "G": 218,
+   "B": 230
+  },
+  "Name": "Blue Green Very Light"
+ },
+ {
+  "AnchorNumber": "929",
+  "Color": {
+   "R": 103,
+   "G": 129,
+   "B": 129
+  },
+  "Name": "Gray Green-DK"
+ },
+ {
+  "AnchorNumber": "930",
+  "Color": {
+   "R": 88,
+   "G": 108,
+   "B": 108
+  },
+  "Name": "Gray Green-VY DK"
+ },
+ {
+  "AnchorNumber": "932",
+  "Color": {
+   "R": 164,
+   "G": 183,
+   "B": 200
+  },
+  "Name": "Antique Blue-LT"
+ },
+ {
+  "AnchorNumber": "933",
+  "Color": {
+   "R": 233,
+   "G": 214,
+   "B": 199
+  },
+  "Name": "Dusty Flesh Very Light"
+ },
+ {
+  "AnchorNumber": "934",
+  "Color": {
+   "R": 71,
+   "G": 94,
+   "B": 115
+  },
+  "Name": "Antique Blue-DK"
+ },
+ {
+  "AnchorNumber": "935",
+  "Color": {
+   "R": 58,
+   "G": 78,
+   "B": 96
+  },
+  "Name": "Antique Blue-VY DK"
+ },
+ {
+  "AnchorNumber": "936",
+  "Color": {
+   "R": 80,
+   "G": 51,
+   "B": 41
+  },
+  "Name": "Dusty Flesh Very Dark"
+ },
+ {
+  "AnchorNumber": "937",
+  "Color": {
+   "R": 221,
+   "G": 228,
+   "B": 235
+  },
+  "Name": "Antique Blue-UL VY LT"
+ },
+ {
+  "AnchorNumber": "938",
+  "Color": {
+   "R": 201,
+   "G": 204,
+   "B": 217
+  },
+  "Name": "Blue Gray-LT"
+ },
+ {
+  "AnchorNumber": "939",
+  "Color": {
+   "R": 102,
+   "G": 109,
+   "B": 123
+  },
+  "Name": "Blue Grey"
+ },
+ {
+  "AnchorNumber": "940",
+  "Color": {
+   "R": 55,
+   "G": 61,
+   "B": 99
+  },
+  "Name": "Delft Dark"
+ },
+ {
+  "AnchorNumber": "941",
+  "Color": {
+   "R": 37,
+   "G": 41,
+   "B": 73
+  },
+  "Name": "Cornflower Blue Medium"
+ },
+ {
+  "AnchorNumber": "942",
+  "Color": {
+   "R": 217,
+   "G": 171,
+   "B": 130
+  },
+  "Name": "Tan Light"
+ },
+ {
+  "AnchorNumber": "943",
+  "Color": {
+   "R": 165,
+   "G": 113,
+   "B": 72
+  },
+  "Name": "Tan Medium"
+ },
+ {
+  "AnchorNumber": "944",
+  "Color": {
+   "R": 120,
+   "G": 58,
+   "B": 13
+  },
+  "Name": "Tan Very Dark"
+ },
+ {
+  "AnchorNumber": "945",
+  "Color": {
+   "R": 164,
+   "G": 151,
+   "B": 94
+  },
+  "Name": "Yellow Green Very Light"
+ },
+ {
+  "AnchorNumber": "946",
+  "Color": {
+   "R": 238,
+   "G": 238,
+   "B": 238
+  },
+  "Name": "Pearl Gray-VY LT"
+ },
+ {
+  "AnchorNumber": "948",
+  "Color": {
+   "R": 255,
+   "G": 253,
+   "B": 229
+  },
+  "Name": "Yellow-UL Pale"
+ },
+ {
+  "AnchorNumber": "950",
+  "Color": {
+   "R": 255,
+   "G": 253,
+   "B": 241
+  },
+  "Name": "Cream"
+ },
+ {
+  "AnchorNumber": "951",
+  "Color": {
+   "R": 254,
+   "G": 251,
+   "B": 141
+  },
+  "Name": "Lemon-LT"
+ },
+ {
+  "AnchorNumber": "952",
+  "Color": {
+   "R": 255,
+   "G": 239,
+   "B": 86
+  },
+  "Name": "Lemon"
+ },
+ {
+  "AnchorNumber": "955",
+  "Color": {
+   "R": 254,
+   "G": 243,
+   "B": 207
+  },
+  "Name": "Golden Yellow-VY LT"
+ },
+ {
+  "AnchorNumber": "956",
+  "Color": {
+   "R": 196,
+   "G": 188,
+   "B": 150
+  },
+  "Name": "Yellow Green Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "957",
+  "Color": {
+   "R": 245,
+   "G": 208,
+   "B": 119
+  },
+  "Name": "Straw"
+ },
+ {
+  "AnchorNumber": "958",
+  "Color": {
+   "R": 225,
+   "G": 184,
+   "B": 97
+  },
+  "Name": "Straw-DK"
+ },
+ {
+  "AnchorNumber": "959",
+  "Color": {
+   "R": 207,
+   "G": 159,
+   "B": 57
+  },
+  "Name": "Straw-VY DK"
+ },
+ {
+  "AnchorNumber": "968",
+  "Color": {
+   "R": 244,
+   "G": 192,
+   "B": 193
+  },
+  "Name": "Dusty Violet Light"
+ },
+ {
+  "AnchorNumber": "969",
+  "Color": {
+   "R": 193,
+   "G": 140,
+   "B": 141
+  },
+  "Name": "Dusty Violet Medium"
+ },
+ {
+  "AnchorNumber": "970",
+  "Color": {
+   "R": 131,
+   "G": 78,
+   "B": 80
+  },
+  "Name": "Dusty Violet Dark"
+ },
+ {
+  "AnchorNumber": "972",
+  "Color": {
+   "R": 104,
+   "G": 47,
+   "B": 53
+  },
+  "Name": "Dusty Violet Very Dark"
+ },
+ {
+  "AnchorNumber": "973",
+  "Color": {
+   "R": 230,
+   "G": 182,
+   "B": 106
+  },
+  "Name": "Topaz"
+ },
+ {
+  "AnchorNumber": "974",
+  "Color": {
+   "R": 208,
+   "G": 147,
+   "B": 38
+  },
+  "Name": "Topaz-MD"
+ },
+ {
+  "AnchorNumber": "975",
+  "Color": {
+   "R": 197,
+   "G": 205,
+   "B": 214
+  },
+  "Name": "Blue Very Light"
+ },
+ {
+  "AnchorNumber": "976",
+  "Color": {
+   "R": 136,
+   "G": 151,
+   "B": 171
+  },
+  "Name": "Blue Light"
+ },
+ {
+  "AnchorNumber": "977",
+  "Color": {
+   "R": 87,
+   "G": 106,
+   "B": 131
+  },
+  "Name": "Blue Medium"
+ },
+ {
+  "AnchorNumber": "978",
+  "Color": {
+   "R": 70,
+   "G": 87,
+   "B": 107
+  },
+  "Name": "Blue Dark"
+ },
+ {
+  "AnchorNumber": "979",
+  "Color": {
+   "R": 45,
+   "G": 58,
+   "B": 75
+  },
+  "Name": "Blue Very Dark"
+ },
+ {
+  "AnchorNumber": "980",
+  "Color": {
+   "R": 139,
+   "G": 140,
+   "B": 90
+  },
+  "Name": "Khaki Green-DK"
+ },
+ {
+  "AnchorNumber": "1001",
+  "Color": {
+   "R": 167,
+   "G": 83,
+   "B": 39
+  },
+  "Name": "Golden Brown"
+ },
+ {
+  "AnchorNumber": "1002",
+  "Color": {
+   "R": 221,
+   "G": 120,
+   "B": 65
+  },
+  "Name": "Golden Brown Very Light"
+ },
+ {
+  "AnchorNumber": "1003",
+  "Color": {
+   "R": 177,
+   "G": 88,
+   "B": 36
+  },
+  "Name": "Salmon"
+ },
+ {
+  "AnchorNumber": "1004",
+  "Color": {
+   "R": 134,
+   "G": 58,
+   "B": 26
+  },
+  "Name": "Orange Spice Very Dark"
+ },
+ {
+  "AnchorNumber": "1005",
+  "Color": {
+   "R": 123,
+   "G": 2,
+   "B": 0
+  },
+  "Name": "Christmas Red Ultra Very Dark"
+ },
+ {
+  "AnchorNumber": "1006",
+  "Color": {
+   "R": 143,
+   "G": 24,
+   "B": 0
+  },
+  "Name": "Dusty Rose Very Dark"
+ },
+ {
+  "AnchorNumber": "1007",
+  "Color": {
+   "R": 120,
+   "G": 79,
+   "B": 66
+  },
+  "Name": "Flesh Very Dark"
+ },
+ {
+  "AnchorNumber": "1008",
+  "Color": {
+   "R": 182,
+   "G": 133,
+   "B": 113
+  },
+  "Name": "Flesh Medium"
+ },
+ {
+  "AnchorNumber": "1009",
+  "Color": {
+   "R": 255,
+   "G": 227,
+   "B": 199
+  },
+  "Name": "Cream"
+ },
+ {
+  "AnchorNumber": "1010",
+  "Color": {
+   "R": 255,
+   "G": 218,
+   "B": 187
+  },
+  "Name": "Copper Very Light"
+ },
+ {
+  "AnchorNumber": "1011",
+  "Color": {
+   "R": 240,
+   "G": 218,
+   "B": 196
+  },
+  "Name": "Peach Flesh Very Light"
+ },
+ {
+  "AnchorNumber": "1012",
+  "Color": {
+   "R": 241,
+   "G": 187,
+   "B": 164
+  },
+  "Name": "Flesh"
+ },
+ {
+  "AnchorNumber": "1013",
+  "Color": {
+   "R": 184,
+   "G": 103,
+   "B": 76
+  },
+  "Name": "Terracotta"
+ },
+ {
+  "AnchorNumber": "1014",
+  "Color": {
+   "R": 146,
+   "G": 39,
+   "B": 0
+  },
+  "Name": "Mahogany Very Dark"
+ },
+ {
+  "AnchorNumber": "1015",
+  "Color": {
+   "R": 150,
+   "G": 24,
+   "B": 21
+  },
+  "Name": "Mahogany Ultra Very Dark"
+ },
+ {
+  "AnchorNumber": "1016",
+  "Color": {
+   "R": 202,
+   "G": 151,
+   "B": 161
+  },
+  "Name": "Antique Mauve Very Light"
+ },
+ {
+  "AnchorNumber": "1017",
+  "Color": {
+   "R": 164,
+   "G": 110,
+   "B": 121
+  },
+  "Name": "Antique Mauve Medium"
+ },
+ {
+  "AnchorNumber": "1018",
+  "Color": {
+   "R": 121,
+   "G": 69,
+   "B": 79
+  },
+  "Name": "Antique Mauve Light"
+ },
+ {
+  "AnchorNumber": "1019",
+  "Color": {
+   "R": 104,
+   "G": 39,
+   "B": 52
+  },
+  "Name": "Antique Mauve Dark"
+ },
+ {
+  "AnchorNumber": "1020",
+  "Color": {
+   "R": 242,
+   "G": 183,
+   "B": 188
+  },
+  "Name": "Dusty Rose Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "1021",
+  "Color": {
+   "R": 227,
+   "G": 147,
+   "B": 155
+  },
+  "Name": "Dusty Rose Very Light"
+ },
+ {
+  "AnchorNumber": "1022",
+  "Color": {
+   "R": 227,
+   "G": 129,
+   "B": 139
+  },
+  "Name": "Dusty Rose Light"
+ },
+ {
+  "AnchorNumber": "1023",
+  "Color": {
+   "R": 193,
+   "G": 96,
+   "B": 106
+  },
+  "Name": "Dusty Rose"
+ },
+ {
+  "AnchorNumber": "1024",
+  "Color": {
+   "R": 172,
+   "G": 68,
+   "B": 77
+  },
+  "Name": "Dusty Rose Medium"
+ },
+ {
+  "AnchorNumber": "1025",
+  "Color": {
+   "R": 142,
+   "G": 39,
+   "B": 49
+  },
+  "Name": "Dusty Rose Dark"
+ },
+ {
+  "AnchorNumber": "1026",
+  "Color": {
+   "R": 242,
+   "G": 210,
+   "B": 211
+  },
+  "Name": "Dusty Violet Very Light"
+ },
+ {
+  "AnchorNumber": "1027",
+  "Color": {
+   "R": 145,
+   "G": 78,
+   "B": 76
+  },
+  "Name": "Shell Pink Medium Dark"
+ },
+ {
+  "AnchorNumber": "1028",
+  "Color": {
+   "R": 95,
+   "G": 1,
+   "B": 55
+  },
+  "Name": "Dusty Plum Dark"
+ },
+ {
+  "AnchorNumber": "1029",
+  "Color": {
+   "R": 97,
+   "G": 20,
+   "B": 64
+  },
+  "Name": "Plum Dark"
+ },
+ {
+  "AnchorNumber": "1030",
+  "Color": {
+   "R": 117,
+   "G": 103,
+   "B": 163
+  },
+  "Name": "Blue Violet Medium"
+ },
+ {
+  "AnchorNumber": "1031",
+  "Color": {
+   "R": 210,
+   "G": 224,
+   "B": 240
+  },
+  "Name": "Antique Blue Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "1032",
+  "Color": {
+   "R": 182,
+   "G": 199,
+   "B": 213
+  },
+  "Name": "Antique Blue Very Light"
+ },
+ {
+  "AnchorNumber": "1033",
+  "Color": {
+   "R": 144,
+   "G": 154,
+   "B": 174
+  },
+  "Name": "Antique Blue"
+ },
+ {
+  "AnchorNumber": "1034",
+  "Color": {
+   "R": 83,
+   "G": 94,
+   "B": 115
+  },
+  "Name": "Antique Blue Medium Dark"
+ },
+ {
+  "AnchorNumber": "1035",
+  "Color": {
+   "R": 48,
+   "G": 53,
+   "B": 70
+  },
+  "Name": "Antique Blue Very Dark"
+ },
+ {
+  "AnchorNumber": "1036",
+  "Color": {
+   "R": 29,
+   "G": 37,
+   "B": 76
+  },
+  "Name": "Antique Blue Ultra Very Dark"
+ },
+ {
+  "AnchorNumber": "1037",
+  "Color": {
+   "R": 215,
+   "G": 229,
+   "B": 234
+  },
+  "Name": "Blue Ultra Very Light"
+ },
+ {
+  "AnchorNumber": "1038",
+  "Color": {
+   "R": 137,
+   "G": 176,
+   "B": 200
+  },
+  "Name": "Baby Blue Medium"
+ },
+ {
+  "AnchorNumber": "1039",
+  "Color": {
+   "R": 100,
+   "G": 147,
+   "B": 176
+  },
+  "Name": "Baby Blue Medium Dark"
+ },
+ {
+  "AnchorNumber": "1040",
+  "Color": {
+   "R": 69,
+   "G": 66,
+   "B": 63
+  },
+  "Name": "Beaver Grey Dark"
+ },
+ {
+  "AnchorNumber": "1041",
+  "Color": {
+   "R": 42,
+   "G": 40,
+   "B": 36
+  },
+  "Name": "Beaver Grey Ultra Dark"
+ },
+ {
+  "AnchorNumber": "1042",
+  "Color": {
+   "R": 215,
+   "G": 240,
+   "B": 214
+  },
+  "Name": "Sea Foam Green Very Light"
+ },
+ {
+  "AnchorNumber": "1043",
+  "Color": {
+   "R": 218,
+   "G": 246,
+   "B": 202
+  },
+  "Name": "Pistachio Green Very Light"
+ },
+ {
+  "AnchorNumber": "1044",
+  "Color": {
+   "R": 17,
+   "G": 46,
+   "B": 0
+  },
+  "Name": "Pistachio Green Ultra Very Dark"
+ },
+ {
+  "AnchorNumber": "1045",
+  "Color": {
+   "R": 165,
+   "G": 117,
+   "B": 60
+  },
+  "Name": "Golden Brown Medium Light"
+ },
+ {
+  "AnchorNumber": "1046",
+  "Color": {
+   "R": 119,
+   "G": 74,
+   "B": 26
+  },
+  "Name": "Golden Brown Medium Dark"
+ },
+ {
+  "AnchorNumber": "1047",
+  "Color": {
+   "R": 221,
+   "G": 154,
+   "B": 110
+  },
+  "Name": "Copper Light"
+ },
+ {
+  "AnchorNumber": "1048",
+  "Color": {
+   "R": 172,
+   "G": 103,
+   "B": 53
+  },
+  "Name": "Copper Medium"
+ },
+ {
+  "AnchorNumber": "1049",
+  "Color": {
+   "R": 137,
+   "G": 74,
+   "B": 28
+  },
+  "Name": "Copper Medium Dark"
+ },
+ {
+  "AnchorNumber": "1050",
+  "Color": {
+   "R": 54,
+   "G": 31,
+   "B": 12
+  },
+  "Name": "Mocha Brown Dark"
+ },
+ {
+  "AnchorNumber": "1051",
+  "Color": {
+   "R": 181,
+   "G": 172,
+   "B": 153
+  },
+  "Name": "Brown Gray-LT"
+ },
+ {
+  "AnchorNumber": "1052",
+  "Color": {
+   "R": 144,
+   "G": 146,
+   "B": 122
+  },
+  "Name": "Brown Gray-MD"
+ },
+ {
+  "AnchorNumber": "1053",
+  "Color": {
+   "R": 81,
+   "G": 77,
+   "B": 67
+  },
+  "Name": "Brown Gray-VY DK"
+ },
+ {
+  "AnchorNumber": "1055",
+  "Color": {
+   "R": 237,
+   "G": 236,
+   "B": 233
+  },
+  "Name": "Brown Gray-VY LT"
+ },
+ {
+  "AnchorNumber": "1060",
+  "Color": {
+   "R": 187,
+   "G": 227,
+   "B": 234
+  },
+  "Name": "Teal Ultra Light"
+ },
+ {
+  "AnchorNumber": "1062",
+  "Color": {
+   "R": 136,
+   "G": 195,
+   "B": 207
+  },
+  "Name": "Teal Light"
+ },
+ {
+  "AnchorNumber": "1064",
+  "Color": {
+   "R": 91,
+   "G": 163,
+   "B": 178
+  },
+  "Name": "Teal Medium Light"
+ },
+ {
+  "AnchorNumber": "1066",
+  "Color": {
+   "R": 33,
+   "G": 107,
+   "B": 122
+  },
+  "Name": "Teal Medium"
+ },
+ {
+  "AnchorNumber": "1068",
+  "Color": {
+   "R": 12,
+   "G": 83,
+   "B": 96
+  },
+  "Name": "Teal"
+ },
+ {
+  "AnchorNumber": "1070",
+  "Color": {
+   "R": 131,
+   "G": 207,
+   "B": 180
+  },
+  "Name": "Jade Light"
+ },
+ {
+  "AnchorNumber": "1072",
+  "Color": {
+   "R": 75,
+   "G": 175,
+   "B": 135
+  },
+  "Name": "Jade Medium Light"
+ },
+ {
+  "AnchorNumber": "1074",
+  "Color": {
+   "R": 69,
+   "G": 168,
+   "B": 154
+  },
+  "Name": "Jade Medium"
+ },
+ {
+  "AnchorNumber": "1076",
+  "Color": {
+   "R": 44,
+   "G": 137,
+   "B": 123
+  },
+  "Name": "Jade"
+ },
+ {
+  "AnchorNumber": "1080",
+  "Color": {
+   "R": 235,
+   "G": 199,
+   "B": 163
+  },
+  "Name": "Taupe Ultra Light"
+ },
+ {
+  "AnchorNumber": "1082",
+  "Color": {
+   "R": 202,
+   "G": 174,
+   "B": 140
+  },
+  "Name": "Taupe Medium Light"
+ },
+ {
+  "AnchorNumber": "1084",
+  "Color": {
+   "R": 169,
+   "G": 137,
+   "B": 102
+  },
+  "Name": "Taupe"
+ },
+ {
+  "AnchorNumber": "1085",
+  "Color": {
+   "R": 145,
+   "G": 116,
+   "B": 82
+  },
+  "Name": "Taupe Dark"
+ },
+ {
+  "AnchorNumber": "1086",
+  "Color": {
+   "R": 85,
+   "G": 61,
+   "B": 52
+  },
+  "Name": "Taupe Medium Dark"
+ },
+ {
+  "AnchorNumber": "1088",
+  "Color": {
+   "R": 109,
+   "G": 73,
+   "B": 30
+  },
+  "Name": "Taupe Very Dark"
+ },
+ {
+  "AnchorNumber": "1089",
+  "Color": {
+   "R": 9,
+   "G": 165,
+   "B": 180
+  },
+  "Name": "Electric Blue Medium"
+ },
+ {
+  "AnchorNumber": "1090",
+  "Color": {
+   "R": 19,
+   "G": 191,
+   "B": 224
+  },
+  "Name": "Electric Blue Light"
+ },
+ {
+  "AnchorNumber": "1092",
+  "Color": {
+   "R": 153,
+   "G": 216,
+   "B": 210
+  },
+  "Name": "Teal Light"
+ },
+ {
+  "AnchorNumber": "1094",
+  "Color": {
+   "R": 252,
+   "G": 158,
+   "B": 197
+  },
+  "Name": "Pink Medium Light"
+ },
+ {
+  "AnchorNumber": "1096",
+  "Color": {
+   "R": 159,
+   "G": 179,
+   "B": 193
+  },
+  "Name": "Blue Grey Light"
+ },
+ {
+  "AnchorNumber": "1098",
+  "Color": {
+   "R": 212,
+   "G": 24,
+   "B": 41
+  },
+  "Name": "Red"
+ },
+ {
+  "AnchorNumber": "1100",
+  "Color": {
+   "R": 255,
+   "G": 225,
+   "B": 219
+  },
+  "Name": "Shell Pink-UL VY LT"
+ },
+ {
+  "AnchorNumber": "1102",
+  "Color": {
+   "R": 245,
+   "G": 238,
+   "B": 207
+  },
+  "Name": "Old Gold-VY LT"
+ },
+ {
+  "AnchorNumber": "1104",
+  "Color": {
+   "R": 228,
+   "G": 238,
+   "B": 216
+  },
+  "Name": "Yellow Green-VY LT"
+ },
+ {
+  "AnchorNumber": "1106",
+  "Color": {
+   "R": 200,
+   "G": 224,
+   "B": 218
+  },
+  "Name": "Sea Green-LT"
+ },
+ {
+  "AnchorNumber": "1108",
+  "Color": {
+   "R": 180,
+   "G": 229,
+   "B": 232
+  },
+  "Name": "Turquoise-VY LT"
+ },
+ {
+  "AnchorNumber": "1110",
+  "Color": {
+   "R": 199,
+   "G": 234,
+   "B": 239
+  },
+  "Name": "Sky Blue-VY LT"
+ },
+ {
+  "AnchorNumber": "1112",
+  "Color": {
+   "R": 219,
+   "G": 238,
+   "B": 247
+  },
+  "Name": "Blue-UL VY LT"
+ },
+ {
+  "AnchorNumber": "1201",
+  "Color": {
+   "R": 229,
+   "G": 172,
+   "B": 141
+  },
+  "Name": "Desert Sand Light"
+ },
+ {
+  "AnchorNumber": "4146",
+  "Color": {
+   "R": 216,
+   "G": 157,
+   "B": 140
+  },
+  "Name": "Flesh Light"
+ },
+ {
+  "AnchorNumber": "5975",
+  "Color": {
+   "R": 143,
+   "G": 56,
+   "B": 26
+  },
+  "Name": "Terracotta Dark"
+ },
+ {
+  "AnchorNumber": "8581",
+  "Color": {
+   "R": 64,
+   "G": 62,
+   "B": 58
+  },
+  "Name": "Beaver Grey Medium"
+ },
+ {
+  "AnchorNumber": "9046",
+  "Color": {
+   "R": 200,
+   "G": 35,
+   "B": 0
+  },
+  "Name": "Christmas Red Bright"
+ },
+ {
+  "AnchorNumber": "9159",
+  "Color": {
+   "R": 200,
+   "G": 241,
+   "B": 255
+  },
+  "Name": "Baby Blue Very Light"
+ },
+ {
+  "AnchorNumber": "9575",
+  "Color": {
+   "R": 230,
+   "G": 142,
+   "B": 113
+  },
+  "Name": "Terracotta Light"
+ }
+]

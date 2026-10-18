@@ -36,6 +36,9 @@ und `ZEIT_PARSE("…Z")` rechnete nicht um.
 | Funktion | Wirkung |
 |---|---|
 | `ZEIT_JETZT()` → INTEGER | jetzt, als Zeitpunkt |
+| `ZEIT_UNIX()` → FLOAT | jetzt als **Unix-Zeit**: Sekunden seit 1970 in UTC, mit Bruchteil (wie Pythons `time.time()`) |
+| `ZEIT_AUS_UNIX(sekunden)` → INTEGER | Unix-Sekunden zu Zeitpunkt in Ortszeit (samt Sommerzeit jenes Tages) |
+| `ZEIT_NACH_UNIX(zeit)` → INTEGER | Zeitpunkt in Ortszeit zu Unix-Sekunden |
 | `ZEIT_PARSE(text$)` → INTEGER | Text zu Zeitpunkt; bricht bei Unlesbarem ab |
 | `ZEIT_LESBAR(text$)` → BOOLEAN | ließe sich der Text lesen? (fragt, bricht nicht ab) |
 | `ZEIT_TEXT$(zeit)` → STRING | Zeitpunkt als `JJJJ-MM-TT hh:mm:ss` |
@@ -212,6 +215,13 @@ WEND
   gemessen am 16.08.2026 in Mitteleuropa: `MILLIS()/1000 = 1786883970`,
   `ZEIT_JETZT() = 1786891170`, also **zwei Stunden Unterschied**. Für Datum
   und Uhrzeit immer `ZEIT_JETZT()`.
+- **Unix-Zeit ist UTC, ein Zeitpunkt ist Ortszeit.** Andere Programme, Web-APIs
+  und viele Dateiformate schreiben Unix-Sekunden. Die liest man mit
+  `ZEIT_AUS_UNIX` ein und schreibt sie mit `ZEIT_NACH_UNIX` (oder für
+  „jetzt“ mit `ZEIT_UNIX()`) -- die Zahl von `ZEIT_JETZT()` dort
+  hineinzuschreiben, läge um den Zeitzonen-Versatz daneben. In der Stunde,
+  die es bei der Umstellung auf Sommerzeit nicht gibt, oder der doppelten im
+  Herbst liefert `ZEIT_NACH_UNIX` eine der beiden möglichen Antworten.
 - **Ein Tag ist nicht immer 86400 Sekunden.** An den Umstellungstagen sind es
   23 oder 25 Stunden. `ZEIT_PLUS(t, 86400)` addiert exakt 86400 Sekunden — das
   ist an diesen zwei Tagen im Jahr nicht dieselbe Uhrzeit am Folgetag. Wenn es

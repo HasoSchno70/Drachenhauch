@@ -1,0 +1,183 @@
+' Helfer fuer glutfaden_stufe5.dhtest: Zusammenfassungen im Format der
+' Aufzeichnungen von PySticky (export_ref.py, oxs_ref.py) und ein
+' zeilenweiser Vergleich. Eingebunden NACH dem Kern (IMPORT ... AS kern).
+IMPORT "json"
+
+' Zeile fuer Zeile, ohne CR; ein Zeilenende am Schluss zaehlt nicht (eine
+' Beilage bekommt eins, PyStickys OXS hat keins).
+FUNCTION geVergleich$(a AS STRING, b AS STRING) AS STRING
+    a = REPLACE$(a, CHR$(13), "") : b = REPLACE$(b, CHR$(13), "")
+    IF RIGHT$(a, 1) = CHR$(10) THEN a = LEFT$(a, LEN(a) - 1)
+    IF RIGHT$(b, 1) = CHR$(10) THEN b = LEFT$(b, LEN(b) - 1)
+    DIM za AS ARRAY OF STRING : za = SPLIT$(a, CHR$(10))
+    DIM zb AS ARRAY OF STRING : zb = SPLIT$(b, CHR$(10))
+    ' gezaehlt werden ALLE abweichenden Zeilen -- eine erwartete Abweichung
+    ' vorn darf keine spaetere verdecken
+    DIM i AS INTEGER, n AS INTEGER
+    DIM erste AS STRING
+    FOR i = 0 TO MIN(LEN(za), LEN(zb)) - 1
+        IF za[i] <> zb[i] THEN
+            n = n + 1
+            IF erste = "" THEN erste = "Zeile " + STR$(i + 1) + ": [" + za[i] + "] gegen [" + zb[i] + "]"
+        END IF
+    NEXT
+    IF LEN(za) <> LEN(zb) THEN RETURN "Zeilenzahl " + STR$(LEN(za)) + " gegen " + STR$(LEN(zb)) + IIF(n > 0, ", " + erste, "")
+    IF n = 0 THEN RETURN "gleich (" + STR$(LEN(za)) + " Zeilen)"
+    RETURN STR$(n) + " abweichend, " + erste
+END FUNCTION
+
+FUNCTION geLies$(p AS STRING) AS STRING
+    RETURN BUFFER_TO_STRING$(READALL_BYTES(p))
+END FUNCTION
+
+FUNCTION geWahr$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "True", "False")
+END FUNCTION
+
+FUNCTION gePy$(t AS STRING) AS STRING
+    IF t = "" THEN RETURN "None"
+    RETURN t
+END FUNCTION
+
+' Seiten, Farben und Rueckstiche je Seite, Bedarf, Papier, Entsprechungen.
+FUNCTION geExport$(m AS kern.Muster, paletten AS ARRAY OF kern.Palette) AS STRING
+    DIM z AS ARRAY OF STRING : z = []
+    DIM k AS kern.Komposit : k = kern.kompositVon(m)
+    ARRAY_PUSH(z, "stoff " + kern.stoffName$(m))
+    DIM fmt AS STRING
+    DIM ueb AS ARRAY OF INTEGER : ueb = [0, 3, 0, 1]
+    DIM zel AS ARRAY OF INTEGER : zel = [0, 0, 25, 5]
+    FOR EACH fmt IN kern.papierNamen()
+        DIM v AS INTEGER
+        FOR v = 0 TO 3
+            DIM s AS kern.Seitenplan : s = kern.seitenplanFuer(m, fmt, zel[v], ueb[v])
+            ARRAY_PUSH(z, fmt + " ueb " + STR$(ueb[v]) + " zellen " + STR$(zel[v]) + ": je " + STR$(s.jeX) + "x" + STR$(s.jeY) + " seiten " + STR$(s.seitenX) + "x" + STR$(s.seitenY))
+            IF fmt = "A4" AND (zel[v] = 0 OR zel[v] = 5) THEN
+                DIM n AS INTEGER
+                FOR n = 0 TO s.anzahl() - 1
+                    DIM x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER
+                    (x0, y0, x1, y1) = kern.seitenBereich(m, s, n)
+                    DIM zf AS ARRAY OF INTEGER : zf = kern.seitenFarben(k, LEN(m.farben), x0, y0, x1, y1)
+                    DIM t AS STRING : t = "  seite " + STR$(n + 1) + ": " + STR$(x0) + "," + STR$(y0) + "-" + STR$(x1) + "," + STR$(y1) + " farben "
+                    DIM erste AS BOOLEAN : erste = TRUE
+                    DIM i AS INTEGER
+                    FOR i = 0 TO LEN(zf) - 1
+                        IF zf[i] > 0 THEN
+                            IF NOT erste THEN t = t + " "
+                            t = t + STR$(i) + ":" + STR$(zf[i])
+                            erste = FALSE
+                        END IF
+                    NEXT
+                    ARRAY_PUSH(z, t + " rueck " + STR$(LEN(kern.seitenRueckstiche(m, x0, y0, x1, y1))))
+                NEXT
+            END IF
+        NEXT
+    NEXT
+    DIM b AS kern.Bedarf : b = kern.bedarfVon(m, k)
+    ARRAY_PUSH(z, "bedarf stiche " + STR$(b.stiche) + " straenge " + STR$(b.straenge) + " zusticken " + STR$(b.zuSticken) + " ausgelassen " + STR$(b.ausgelassen))
+    DIM fb AS kern.Farbbedarf
+    FOR EACH fb IN b.farben
+        ARRAY_PUSH(z, "  farbe " + STR$(fb.nr) + " zahl " + STR$(fb.zahl) + " straenge " + STR$(fb.straenge) + " perle " + geWahr$(fb.perle) + " aus " + geWahr$(fb.auslassen))
+    NEXT
+    DIM h AS INTEGER
+    FOR EACH h IN [1, 2, 4]
+        ARRAY_PUSH(z, "empfehlung " + STR$(h) + ": " + kern.papierEmpfehlung$(m, h))
+    NEXT
+    DIM ziel AS STRING
+    FOR EACH ziel IN ["Anchor", "Madeira", "DMC"]
+        DIM p AS kern.Palette
+        DIM zp AS kern.Palette
+        FOR EACH p IN paletten
+            IF p.name = ziel THEN zp = p
+        NEXT
+        DIM gf AS kern.Garnfarben : gf = kern.garnfarbenVon(zp.garne)
+        DIM e AS STRING : e = "entsprechung " + ziel + ":"
+        DIM f AS kern.Farbeintrag
+        FOR EACH f IN m.farben
+            DIM g AS kern.Garn : g = kern.entsprechung(f.garn, zp, gf)
+            e = e + " " + IIF(IS_NIL(g), "-", g.nummer)
+        NEXT
+        ARRAY_PUSH(z, e)
+    NEXT
+    RETURN JOIN$(z, CHR$(10)) + CHR$(10)
+END FUNCTION
+
+' Ein Muster so zusammengefasst, wie oxs_ref.py es tut.
+FUNCTION geMuster$(m AS kern.Muster) AS STRING
+    DIM z AS ARRAY OF STRING : z = []
+    ARRAY_PUSH(z, "name " + m.name)
+    ARRAY_PUSH(z, "groesse " + STR$(m.breite) + "x" + STR$(m.hoehe) + " stoff " + STR$(INT(m.stoff)))
+    DIM au AS STRING, co AS STRING, im AS STRING
+    IF JSON_HAS(m.metadaten, "author") THEN au = JSON_GET_STRING(m.metadaten, "author")
+    IF JSON_HAS(m.metadaten, "copyright") THEN co = JSON_GET_STRING(m.metadaten, "copyright")
+    IF JSON_HAS(m.metadaten, "imported_from") THEN im = JSON_GET_STRING(m.metadaten, "imported_from")
+    ARRAY_PUSH(z, "meta " + au + "|" + co + "|" + im)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(m.farben) - 1
+        DIM f AS kern.Farbeintrag : f = m.farben[i]
+        DIM g AS kern.Garn : g = f.garn
+        DIM bl AS STRING
+        IF g.istBlend() THEN
+            DIM k AS INTEGER
+            bl = " blend "
+            FOR k = 0 TO LEN(g.teile) - 1
+                IF k > 0 THEN bl = bl + ";"
+                bl = bl + g.teile[k].hersteller + "|" + g.teile[k].nummer + "|" + kern.farbeAlsHex$(g.teile[k].farbe) + "|" + g.teile[k].name
+            NEXT
+            bl = bl + " "
+            FOR k = 0 TO LEN(g.anteile) - 1
+                IF k > 0 THEN bl = bl + ","
+                bl = bl + STR$(g.anteile[k])
+            NEXT
+        END IF
+        ARRAY_PUSH(z, "farbe " + STR$(i) + " " + gePy$(g.hersteller) + "|" + gePy$(g.nummer) + "|" + g.name + "|" + kern.farbeAlsHex$(g.farbe) + "|" + f.symbol + "|perle " + geWahr$(f.istPerle) + "|drill " + geWahr$(f.istDiamant) + bl)
+    NEXT
+    DIM eb AS kern.Ebene : eb = m.ebenen.aktiveEbene()
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO m.hoehe - 1
+        FOR x = 0 TO m.breite - 1
+            DIM v AS INTEGER : v = eb.raster[y * m.breite + x]
+            IF v >= 0 THEN ARRAY_PUSH(z, "stich " + STR$(x) + "," + STR$(y) + " " + STR$(v) + " " + STR$(eb.art[y * m.breite + x]))
+        NEXT
+    NEXT
+    DIM r AS kern.Rueckstich
+    FOR EACH r IN m.rueckstiche
+        ARRAY_PUSH(z, "rueck " + STR$(r.x1) + "," + STR$(r.y1) + "," + STR$(r.x2) + "," + STR$(r.y2) + " " + STR$(r.farbe))
+    NEXT
+    RETURN JOIN$(z, CHR$(10)) + CHR$(10)
+END FUNCTION
+
+' Alle abweichenden Zeilen, je eine Zeile "n: [a] gegen [b]" -- fuer
+' Vergleiche, in denen bekannte Abweichungen stehen: die Erwartung nennt dann
+' jede einzeln, und eine neue faellt auf.
+FUNCTION geAbweichungen$(a AS STRING, b AS STRING) AS STRING
+    a = REPLACE$(a, CHR$(13), "") : b = REPLACE$(b, CHR$(13), "")
+    IF RIGHT$(a, 1) = CHR$(10) THEN a = LEFT$(a, LEN(a) - 1)
+    IF RIGHT$(b, 1) = CHR$(10) THEN b = LEFT$(b, LEN(b) - 1)
+    DIM za AS ARRAY OF STRING : za = SPLIT$(a, CHR$(10))
+    DIM zb AS ARRAY OF STRING : zb = SPLIT$(b, CHR$(10))
+    DIM r AS ARRAY OF STRING : r = []
+    IF LEN(za) <> LEN(zb) THEN ARRAY_PUSH(r, "Zeilenzahl " + STR$(LEN(za)) + " gegen " + STR$(LEN(zb)))
+    DIM i AS INTEGER
+    FOR i = 0 TO MIN(LEN(za), LEN(zb)) - 1
+        IF za[i] <> zb[i] THEN ARRAY_PUSH(r, STR$(i + 1) + ": [" + za[i] + "] gegen [" + zb[i] + "]")
+    NEXT
+    IF LEN(r) = 0 THEN RETURN "gleich (" + STR$(LEN(za)) + " Zeilen)"
+    RETURN JOIN$(r, CHR$(10))
+END FUNCTION
+
+' PDF-Optionen wie die Aufzeichnungen von ref_pdf.py (Datum fest).
+FUNCTION gePdfOptionen(pal AS ARRAY OF kern.Palette, papier AS STRING, zellen AS INTEGER, ueb AS INTEGER, kreuz AS STRING, notizen AS STRING, mystery AS BOOLEAN, wasser AS STRING) AS kern.PdfOptionen
+    DIM o AS kern.PdfOptionen : o = NEW kern.PdfOptionen()
+    o.datum = "16.10.2026"
+    o.paletten = pal
+    o.papier = papier
+    o.zellen = zellen
+    o.ueberlappung = ueb
+    IF kreuz <> "" THEN o.kreuz = SPLIT$(kreuz, ",")
+    o.notizen = notizen
+    o.mystery = mystery
+    o.wasserzeichen = wasser
+    o.stickpfad = FALSE              ' die Referenzen sind ohne Pfadlinien aufgenommen
+    RETURN o
+END FUNCTION

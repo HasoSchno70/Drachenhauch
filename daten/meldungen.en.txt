@@ -223,8 +223,9 @@ Der Ausdruck endet mitten drin -- geht er in der naechsten Zeile weiter, die Zei
 IMPORT: Datei nicht gefunden: {} (gesucht: {})	IMPORT: file not found: {} (searched: {})
 IMPORT: Lesefehler bei {}: {}	IMPORT: error reading {}: {}
 Hardware-Modul '{}' ist in diesem dhrt-Build nicht enthalten -- Funktionsaufrufe schlagen zur Laufzeit fehl. Neu bauen mit: python rust\build_runtime.py --hardware	Hardware module '{}' is not included in this dhrt build -- calls will fail at run time. Rebuild with: python rust\build_runtime.py --hardware
-{} kennt keine Klasse {}.	{} has no class {}.
-{} kennt keinen Namen {}.	{} has no name {}.
+{} kennt keine Klasse {}.{}	{} has no class {}.{}
+{} kennt keinen Namen {}.{}	{} has no name {}.{}
+{} steht in {}, und diese Datei gehoert nicht zum Namensraum {} -- was eine Datei des Namensraums ohne AS einbindet, bleibt draussen. Dort IMPORT "{}" AS {} schreiben.	{} is in {}, and that file does not belong to the namespace {} -- what a file of the namespace imports without AS stays outside. Write IMPORT "{}" AS {} there.
 {} kommt aus dem Hauptprogramm. Eine mit AS importierte Datei [[]]sieht dessen Globals nicht -- reiche den Wert als Parameter [[]]herein oder deklariere ihn in der Datei selbst.	{} comes from the main program. A file imported with AS does not see its globals -- pass the value in as a parameter or declare it in the file itself.
 {}.{} ist eine Klasse. Zum Erzeugen `NEW {}.{}(...)`, als Typ `DIM x AS {}.{}`.	{}.{} is a class. To create one `NEW {}.{}(...)`, as a type `DIM x AS {}.{}`.
 {}.{} ist PRIVATE und nur innerhalb der eigenen Datei verwendbar.	{}.{} is PRIVATE and can only be used inside its own file.
@@ -318,6 +319,7 @@ Default-Parameter muessen Literale sein (VM-Pfad)	Default parameters must be lit
 DATA: '-' nur auf Zahlen	DATA: '-' only on numbers
 DATA: ungueltiges Literal	DATA: invalid literal
 IS: unbekannter Typ '{}' (keine Klasse, kein Werttyp)	IS: unknown type '{}' (not a class, not a value type)
+IS: '{}' ist eine Variable, kein Typ -- IS prueft den Typ (x IS Klasse); ob zwei Variablen dasselbe Objekt meinen, sagt =	IS: '{}' is a variable, not a type -- IS checks the type (x IS Class); whether two variables refer to the same object is answered by =
 IS: unbekannter Typ '{}' -- fehlt ein IMPORT? (z.B. {})	IS: unknown type '{}' -- is an IMPORT missing? (e.g. {})
 Unbekannter Typ '{}' (keine Klasse, kein Werttyp, kein importiertes Modul)	Unknown type '{}' (not a class, not a value type, not an imported module)
 Unbekannter Typ '{}' -- fehlt IMPORT "{}"?	Unknown type '{}' -- is IMPORT "{}" missing?
@@ -937,7 +939,7 @@ GUI_FORM_VERSION: '{}' ist an ein Widget gebunden -- die Versionsspalte fuehrt d
 {}: '{}' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden, nur Datum oder mit Zeitzone) oder 'Sat, 28 Aug 2026 20:30:00 +0200'	{}: '{}' is not a point in time -- expected 'YYYY-MM-DD hh:mm:ss' (also with T, without seconds, just the date or with a time zone) or 'Sat, 28 Aug 2026 20:30:00 +0200'
 {}: '{}' kenne ich nicht -- "hoch" oder "quer"	{}: '{}' is unknown -- "hoch" (portrait) or "quer" (landscape)
 {}: 2. Argument ist "hoch" oder "quer"	{}: the 2nd argument is "hoch" (portrait) or "quer" (landscape)
-{}: Seitengroesse '{}' kenne ich nicht -- a3, a4, a5, a6, letter, legal	{}: unknown page size '{}' -- a3, a4, a5, a6, letter, legal
+{}: Seitengroesse '{}' kenne ich nicht -- a0 bis a6, letter, legal	{}: unknown page size '{}' -- a0 to a6, letter, legal
 {}: Seite {} gibt es nicht (1..{})	{}: page {} does not exist (1..{})
 {}: 0 bis 4 Nachkommastellen (mehr haelt ein Betrag nicht)	{}: 0 to 4 decimal places (an amount holds no more)
 {}: Betrag zu gross	{}: amount too large
@@ -1748,6 +1750,8 @@ RENDERTARGET_IMAGE: das Ziel ist noch offen -- erst RENDERTARGET_END	RENDERTARGE
 PDF_IMAGE: erwartet 5 oder 6 Argumente (pdf, bild, x, y, b [, h]), nicht {}	PDF_IMAGE: expects 5 or 6 arguments (pdf, image, x, y, w [, h]), not {}
 PDF_IMAGE: kein Bild geladen -- ein Bild kommt aus LOADIMAGE, IMAGE_NEW oder RENDERTARGET_IMAGE	PDF_IMAGE: no image loaded -- an image comes from LOADIMAGE, IMAGE_NEW or RENDERTARGET_IMAGE
 PDF_IMAGE: dieser Bau hat keine Grafik	PDF_IMAGE: this build has no graphics
+PDF_DASH: erwartet 2 oder 3 Argumente (pdf, strich_mm [, luecke_mm]), nicht {}	PDF_DASH: expects 2 or 3 arguments (pdf, dash_mm [, gap_mm]), not {}
+Strich und Luecke muessen beide groesser als 0 sein (oder beide 0 fuer durchgezogen), nicht {} und {}	dash and gap must both be greater than 0 (or both 0 for solid), not {} and {}
 die Breite muss groesser als 0 sein, nicht {}	the width must be greater than 0, not {}
 das Bild ist leer	the image is empty
 {}: das Bild ist leer	{}: the image is empty
@@ -1758,3 +1762,14 @@ GENTEX_RADIAL: dichte {} liegt nicht in 0..1 -- sie ist der Anteil des Radius in
 {}: '{}' ist eine eingebaute Schrift, aber dieser Bau hat keine (Feature "schriften") -- eine .ttf-Datei angeben	{}: '{}' is a built-in font, but this build has none (feature "schriften") -- give a .ttf file
 {} -- {} ist eine Sekunde spaeter noch nicht zurueckgekehrt, darum steht der Fehler schon jetzt hier; Rueckrufe, die scheitern duerfen, mit TRY ... CATCH umgeben	{} -- {} has not returned one second later, so the error is shown here already; wrap callbacks that may fail in TRY ... CATCH
 {} (Zeile {})	{} (line {})
+{}.{} hat BYREF-Parameter, aber beim Uebersetzen war die Klasse des Objekts nicht bekannt -- die Werte kaemen nicht zurueck. Das Objekt in einer Variablen mit Typ halten (DIM x AS {}) und darueber aufrufen.	{}.{} has BYREF parameters, but the class of the object was not known at compile time -- the values would not come back. Hold the object in a typed variable (DIM x AS {}) and call through it.
+{}.{}: die Methode der Klasse {} hat ihre BYREF-Parameter an anderen Stellen als die, nach der der Aufruf uebersetzt ist -- eine Ueberschreibung muss dieselben Parameter BYREF nehmen	{}.{}: the method of class {} has its BYREF parameters in other places than the one the call was compiled for -- an override must take the same parameters BYREF
+{}: eine Coroutine kann keine BYREF-Parameter zurueckschreiben	{}: a coroutine cannot write back BYREF parameters
+JOIN$: Feld aus Texten, Zahlen oder Wahrheitswerten noetig	JOIN$: needs an array of strings, numbers or booleans
+JOIN$ erwartet ein Feld	JOIN$ expects an array
+IMAGE_SCALE: erwartet (bild, breite, hoehe [, filter$])	IMAGE_SCALE: expects (image, width, height [, filter$])
+IMAGE_SCALE: unbekannter Filter '{}' -- moeglich sind lanczos, bikubisch, box, hamming, linear	IMAGE_SCALE: unknown filter '{}' -- possible are lanczos, bicubic, box, hamming, linear
+IMAGE_ENHANCE: erwartet (bild, art$, faktor)	IMAGE_ENHANCE: expects (image, kind$, factor)
+IMAGE_ENHANCE: unbekannte Art '{}' -- moeglich sind helligkeit, kontrast, saettigung	IMAGE_ENHANCE: unknown kind '{}' -- possible are brightness, contrast, saturation
+IMAGE_ENHANCE: der Faktor muss eine Zahl ab 0 sein	IMAGE_ENHANCE: the factor must be a number from 0 up
+{} liefert nie "{}" -- der Vergleich trifft nie. Moeglich sind: {}.	{} never returns "{}" -- the comparison never matches. Possible are: {}.

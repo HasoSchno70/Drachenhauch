@@ -1,0 +1,228 @@
+' Farben von ausserhalb des Musters: die Bildschirm-Pipette (PySticky
+' ui/dialogs/screen_eyedropper_dialog.py) und Paletten als Datei (PySticky
+' "Palette exportieren/importieren", Format pysticky_palette).
+'
+' Pipette: ein Bildschirmfoto des Hauptbildschirms (GDK), darueber ein
+' Vollbild-Fenster ohne Rahmen; ein Klick nimmt die Farbe des Punkts, Esc
+' bricht ab. Ins Muster kommt das naechste Garn der Palette, die in der
+' Seitenleiste gewaehlt ist (CIEDE2000, kern.naechstesGarnIn) -- ohne
+' Palette ein Garn "#RRGGBB" in genau der Farbe.
+
+DIM bpFenster AS INTEGER
+DIM bpBild AS INTEGER                 ' GdkPixbuf des Bildschirms
+DIM bpFarbe AS INTEGER                ' Ergebnis, -1 = abgebrochen
+DIM bpLaeuft AS BOOLEAN               ' die eigene gtk_main-Schleife laeuft -- nur sie darf enden
+
+' Das Bildschirmfoto des Hauptbildschirms, 0 wenn es nicht geht
+FUNCTION bpFoto(BYREF x0 AS INTEGER, BYREF y0 AS INTEGER) AS INTEGER
+    DIM anzeige AS INTEGER : anzeige = gdk_display_get_default()
+    DIM mon AS INTEGER : mon = gdk_display_get_primary_monitor(anzeige)
+    IF mon = 0 THEN mon = gdk_display_get_monitor(anzeige, 0)
+    IF mon = 0 THEN RETURN 0
+    DIM g AS PangoRechteck
+    gdk_monitor_get_geometry(mon, g)
+    x0 = g.x : y0 = g.y
+    RETURN gdk_pixbuf_get_from_window(gdk_get_default_root_window(), g.x, g.y, g.breite, g.hoehe)
+END FUNCTION
+
+' Die Farbe eines Punkts im Foto (&HRRGGBB), -1 ausserhalb
+FUNCTION bpPunkt(bild AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    IF bild = 0 THEN RETURN -1
+    IF x < 0 OR y < 0 OR x >= gdk_pixbuf_get_width(bild) OR y >= gdk_pixbuf_get_height(bild) THEN RETURN -1
+    DIM p AS BUFFER : p = BUFFER_AUS_ZEIGER(gdk_pixbuf_get_pixels(bild) + y * gdk_pixbuf_get_rowstride(bild) + x * gdk_pixbuf_get_n_channels(bild), 3)
+    RETURN (BUFFER_GET(p, 0) SHL 16) BOR (BUFFER_GET(p, 1) SHL 8) BOR BUFFER_GET(p, 2)
+END FUNCTION
+
+SUB bildschirmPipette()
+    IF NOT lwHat THEN RETURN
+    DIM f AS INTEGER : f = bpWaehlen()
+    IF f < 0 THEN
+        statusMeldung("Bildschirm-Pipette abgebrochen.")
+        RETURN
+    END IF
+    bildschirmFarbeUebernehmen(f)
+END SUB
+
+' Das Vollbild-Fenster ueber dem Foto; liefert die Farbe oder -1
+FUNCTION bpWaehlen() AS INTEGER
+    DIM x0 AS INTEGER, y0 AS INTEGER
+    bpBild = bpFoto(x0, y0)
+    IF bpBild = 0 THEN
+        statusMeldung("Kein Bildschirmfoto möglich.")
+        RETURN -1
+    END IF
+    bpFarbe = -1
+    bpFenster = gtk_window_new(0)
+    gtk_window_set_decorated(bpFenster, FALSE)
+    gtk_window_set_keep_above(bpFenster, TRUE)
+    gtk_window_move(bpFenster, x0, y0)
+    gtk_window_set_default_size(bpFenster, gdk_pixbuf_get_width(bpBild), gdk_pixbuf_get_height(bpBild))
+    DIM f AS INTEGER : f = gtk_drawing_area_new()
+    gtk_widget_add_events(f, GDK_MASKE_DRUCK)
+    signalZeichnen(f, "draw", bpZeichnen, 0, 0, 0)
+    signalEreignis(f, "button-press-event", bpKlick, 0, 0, 0)
+    signalEreignis(bpFenster, "key-press-event", bpTaste, 0, 0, 0)
+    signal(bpFenster, "destroy", bpZu, 0, 0, 0)
+    gtk_container_add(bpFenster, f)
+    gtk_widget_show_all(bpFenster)
+    gtk_window_fullscreen(bpFenster)
+    bpLaeuft = TRUE
+    gtk_main()
+    bpLaeuft = FALSE
+    IF bpFenster <> 0 THEN gtk_widget_destroy(bpFenster)
+    bpFenster = 0
+    g_object_unref(bpBild)
+    bpBild = 0
+    RETURN bpFarbe
+END FUNCTION
+
+FUNCTION bpZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    gdk_cairo_set_source_pixbuf(cr, bpBild, 0, 0)
+    cairo_paint(cr)
+    ' der Hinweis oben, wie im Original
+    DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
+    pango_layout_set_text(layout, "Klicke irgendwo auf den Bildschirm, um eine Farbe zu picken. Esc = abbrechen.", -1)
+    DIM tb AS INTEGER, th AS INTEGER
+    pango_layout_get_pixel_size(layout, tb, th)
+    DIM b AS FLOAT : b = gtk_widget_get_allocated_width(w)
+    cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.7)
+    cairo_rectangle(cr, (b - tb) / 2 - 14, 12, tb + 28, th + 14)
+    cairo_fill(cr)
+    cairo_set_source_rgb(cr, 1.0, 1.0, 1.0)
+    cairo_move_to(cr, (b - tb) / 2, 19)
+    pango_cairo_show_layout(cr, layout)
+    g_object_unref(layout)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION bpKlick(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
+    bpFarbe = bpPunkt(bpBild, INT(px), INT(py))
+    bpEnde()
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION bpTaste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM t AS INTEGER
+    IF gdk_event_get_keyval(ereignis, t) THEN
+        IF t = &HFF1B THEN
+            bpFarbe = -1
+            bpEnde()
+        END IF
+    END IF
+    RETURN TRUE
+END FUNCTION
+
+' Das Fenster ist zu (Alt+F4 o. ae.) -- die eigene Schleife endet; nach dem
+' Ende der Schleife zerstoert bpWaehlen es selbst, dann darf hier nichts
+' mehr enden (sonst endete die AEUSSERE Schleife, also das Programm)
+SUB bpZu(w AS INTEGER, daten AS INTEGER)
+    bpFenster = 0
+    bpEnde()
+END SUB
+
+SUB bpEnde()
+    IF NOT bpLaeuft THEN RETURN
+    bpLaeuft = FALSE
+    gtk_main_quit()
+END SUB
+
+' Eine gepickte Farbe ins Muster: das naechste Garn der Palette aus der
+' Seitenleiste, sonst ein Garn in genau der Farbe
+SUB bildschirmFarbeUebernehmen(farbe AS INTEGER)
+    IF NOT lwHat OR farbe < 0 THEN RETURN
+    DIM hex AS STRING : hex = "#" + RIGHT$("000000" + HEX$(farbe BAND &HFFFFFF), 6)
+    DIM abstand AS FLOAT
+    DIM nr AS INTEGER : nr = -1
+    IF slPalette >= 0 AND slPalette < LEN(slPaletten) THEN nr = kern.naechstesGarnIn(farbe, slPaletten[slPalette], abstand)
+    IF nr >= 0 THEN
+        garnHinzufuegen(slPalette, nr)
+        statusMeldung("Bildschirmfarbe " + hex + " → " + TRIM$(slPaletten[slPalette].garne[nr].hersteller + " " + slPaletten[slPalette].garne[nr].nummer) + " " + slPaletten[slPalette].garne[nr].name + " (ΔE " + FORMAT$(abstand, "%.1f") + ")")
+    ELSE
+        DIM g AS kern.Garn : g = kern.neuesGarn(hex, farbe, "", "")
+        wzFarbe = kern.farbeHinzufuegen(lwMuster, wzVerlauf, g, slSymbole, FALSE, FALSE, NOT einst.symboleAuto)
+        allesNeu()
+        statusMeldung("Bildschirmfarbe " + hex + " ist jetzt im Muster.")
+    END IF
+END SUB
+
+' --- Palette als Datei -----------------------------------------------------------------
+
+FUNCTION palettePfad$(sichern AS BOOLEAN) AS STRING
+    DIM d AS INTEGER
+    IF sichern THEN
+        d = gtk_file_chooser_dialog_new("Palette exportieren", fenster, GTK_DATEI_SICHERN, _
+            "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Sichern", GTK_ANTWORT_ANNEHMEN, 0)
+        gtk_file_chooser_set_do_overwrite_confirmation(d, TRUE)
+        gtk_file_chooser_set_current_name(d, lwMuster.name + "_palette.json")
+    ELSE
+        d = gtk_file_chooser_dialog_new("Palette importieren", fenster, GTK_DATEI_OEFFNEN, _
+            "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Öffnen", GTK_ANTWORT_ANNEHMEN, 0)
+    END IF
+    IF musterPfad <> "" THEN
+        DIM ok AS BOOLEAN : ok = gtk_file_chooser_set_current_folder(d, DIRNAME(musterPfad))
+    END IF
+    DIM filter AS INTEGER : filter = gtk_file_filter_new()
+    gtk_file_filter_set_name(filter, "JSON-Dateien (*.json)")
+    gtk_file_filter_add_pattern(filter, "*.json")
+    gtk_file_chooser_add_filter(d, filter)
+    DIM pfad AS STRING
+    IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
+        DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
+        pfad = TEXT_AUS_ZEIGER$(z)
+        g_free(z)
+    END IF
+    gtk_widget_destroy(d)
+    RETURN pfad
+END FUNCTION
+
+SUB paletteExportieren()
+    IF NOT lwHat THEN RETURN
+    IF lwMuster.farbanzahl() = 0 THEN
+        pdWarnung(fenster, "Keine Farben", "Das Muster enthält keine Farben zum Exportieren.")
+        RETURN
+    END IF
+    DIM pfad AS STRING : pfad = palettePfad$(TRUE)
+    IF pfad <> "" THEN paletteExportNach(pfad)
+END SUB
+
+' "" = geschrieben, sonst der Fehler (auch in der Statuszeile)
+FUNCTION paletteExportNach(pfad AS STRING) AS STRING
+    TRY
+        kern.textSchreiben(pfad, kern.paletteDateiText$(lwMuster))
+    CATCH f
+        pdWarnung(fenster, "Fehler", "Palette konnte nicht exportiert werden:" + CHR$(10) + f)
+        RETURN f
+    END TRY
+    statusMeldung("Palette exportiert: " + STR$(lwMuster.farbanzahl()) + " Farben → " + pfad)
+    RETURN ""
+END FUNCTION
+
+SUB paletteImportieren()
+    IF NOT lwHat THEN RETURN
+    DIM pfad AS STRING : pfad = palettePfad$(FALSE)
+    IF pfad <> "" THEN paletteImportVon(pfad, TRUE)
+END SUB
+
+' Liefert die Zahl der gelesenen Farben, -1 bei einem Fehler (mit Meldung
+' im Kasten, wenn fragen, sonst nur in der Statuszeile)
+FUNCTION paletteImportVon(pfad AS STRING, fragen AS BOOLEAN) AS INTEGER
+    DIM text AS STRING
+    DIM n AS INTEGER
+    DIM name AS STRING : name = "Unbekannt"
+    TRY
+        DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(pfad)
+        text = JOIN$(zeilen, CHR$(10))
+        n = kern.paletteImportieren(lwMuster, wzVerlauf, text, slSymbole)
+        DIM j AS JSON_HANDLE : j = JSON_PARSE(text)
+        name = kern.paletteText$(j, "name", "Unbekannt")
+    CATCH f
+        statusMeldung(f)
+        IF fragen THEN pdWarnung(fenster, "Palette importieren", f)
+        RETURN -1
+    END TRY
+    allesNeu()
+    statusMeldung("Palette importiert: " + STR$(n) + " Farben aus " + name)
+    RETURN n
+END FUNCTION

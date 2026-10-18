@@ -1,0 +1,192 @@
+' Ebenen und der Ebenenstapel (PySticky core/layer.py).
+'
+' Eine Ebene ist ein Raster breite x hoehe: je Zelle ein Farbindex (-1 = kein
+' Stich), ob der Stich erledigt ist, und sein Stichtyp. Die Raster liegen als
+' flache Felder, Zelle (x, y) an der Stelle y * breite + x.
+CONST KEIN_STICH = -1
+
+CLASS Ebene
+    DIM name AS STRING
+    DIM breite AS INTEGER
+    DIM hoehe AS INTEGER
+    DIM id AS STRING
+    DIM sichtbar AS BOOLEAN
+    DIM gesperrt AS BOOLEAN
+    DIM deckkraft AS FLOAT
+    DIM notiz AS STRING
+    DIM raster AS ARRAY OF INTEGER
+    DIM erledigt AS ARRAY OF INTEGER       ' 0 / 1
+    DIM art AS ARRAY OF INTEGER            ' Stichtyp
+
+    SUB Init(n AS STRING, b AS INTEGER, h AS INTEGER)
+        name = n
+        breite = b
+        hoehe = h
+        id = LEFT$(UUID4$(), 8)
+        sichtbar = TRUE
+        deckkraft = 1.0
+        leeren()
+    END SUB
+
+    ' Alle Zellen leer. FALSE, wenn die Ebene gesperrt ist.
+    FUNCTION leeren() AS BOOLEAN
+        IF gesperrt THEN RETURN FALSE
+        DIM n AS INTEGER : n = breite * hoehe
+        DIM r[n] AS INTEGER
+        DIM e[n] AS INTEGER
+        DIM a[n] AS INTEGER
+        DIM i AS INTEGER
+        FOR i = 0 TO n - 1 : r[i] = KEIN_STICH : NEXT
+        raster = r
+        erledigt = e
+        art = a
+        RETURN TRUE
+    END FUNCTION
+
+    FUNCTION drin(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+        RETURN x >= 0 AND x < breite AND y >= 0 AND y < hoehe
+    END FUNCTION
+
+    ' Farbindex an (x, y), -1 = kein Stich (auch ausserhalb).
+    FUNCTION stich(x AS INTEGER, y AS INTEGER) AS INTEGER
+        IF NOT drin(x, y) THEN RETURN KEIN_STICH
+        RETURN raster[y * breite + x]
+    END FUNCTION
+
+    FUNCTION stichArt(x AS INTEGER, y AS INTEGER) AS INTEGER
+        IF NOT drin(x, y) THEN RETURN 0
+        RETURN art[y * breite + x]
+    END FUNCTION
+
+    FUNCTION istErledigt(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+        IF NOT drin(x, y) THEN RETURN FALSE
+        RETURN erledigt[y * breite + x] <> 0
+    END FUNCTION
+
+    ' Stich setzen (farbe -1 = loeschen). FALSE, wenn gesperrt oder ausserhalb.
+    FUNCTION setzeStich(x AS INTEGER, y AS INTEGER, farbe AS INTEGER, typ AS INTEGER = 0) AS BOOLEAN
+        IF gesperrt OR NOT drin(x, y) THEN RETURN FALSE
+        DIM i AS INTEGER : i = y * breite + x
+        IF farbe < 0 THEN
+            raster[i] = KEIN_STICH
+            erledigt[i] = 0
+            art[i] = 0
+        ELSE
+            raster[i] = farbe
+            art[i] = typ
+        END IF
+        RETURN TRUE
+    END FUNCTION
+
+    FUNCTION setzeErledigt(x AS INTEGER, y AS INTEGER, an AS BOOLEAN) AS BOOLEAN
+        IF NOT drin(x, y) THEN RETURN FALSE
+        erledigt[y * breite + x] = IIF(an, 1, 0)
+        RETURN TRUE
+    END FUNCTION
+
+    FUNCTION stichzahl() AS INTEGER
+        DIM n AS INTEGER, v AS INTEGER
+        FOR EACH v IN raster
+            IF v <> KEIN_STICH THEN n = n + 1
+        NEXT
+        RETURN n
+    END FUNCTION
+
+    FUNCTION istLeer() AS BOOLEAN
+        RETURN stichzahl() = 0
+    END FUNCTION
+
+    ' Eine eigene Kopie samt Rastern, nie gesperrt (wie layer.copy im Original).
+    FUNCTION kopie(neuerName AS STRING) AS Ebene
+        DIM k AS Ebene : k = NEW Ebene(neuerName, breite, hoehe)
+        k.sichtbar = sichtbar
+        k.deckkraft = deckkraft
+        k.notiz = notiz
+        k.raster = ARRAY_COPY(raster)
+        k.erledigt = ARRAY_COPY(erledigt)
+        k.art = ARRAY_COPY(art)
+        RETURN k
+    END FUNCTION
+END CLASS
+
+FUNCTION neueEbene(name AS STRING, b AS INTEGER, h AS INTEGER) AS Ebene
+    DIM e AS Ebene : e = NEW Ebene(name, b, h)
+    RETURN e
+END FUNCTION
+
+' Der Stapel: unten zuerst; die oberste sichtbare Ebene mit einem Stich gewinnt.
+CLASS Ebenenstapel
+    DIM breite AS INTEGER
+    DIM hoehe AS INTEGER
+    DIM ebenen AS ARRAY OF Ebene
+    DIM aktiv AS INTEGER
+
+    SUB Init(b AS INTEGER, h AS INTEGER)
+        breite = b
+        hoehe = h
+        ebenen = []
+        ARRAY_PUSH(ebenen, neueEbene("Hintergrund", b, h))
+    END SUB
+
+    FUNCTION anzahl() AS INTEGER
+        RETURN LEN(ebenen)
+    END FUNCTION
+
+    FUNCTION aktiveEbene() AS Ebene
+        IF aktiv < 0 OR aktiv >= LEN(ebenen) THEN RETURN NIL
+        RETURN ebenen[aktiv]
+    END FUNCTION
+
+    ' Alle Ebenen ersetzen (beim Laden); aktiv wird geklemmt.
+    SUB ersetzen(neu AS ARRAY OF Ebene, aktivNr AS INTEGER)
+        IF LEN(neu) = 0 THEN THROW "Ebenenstapel braucht mindestens eine Ebene"
+        ebenen = neu
+        aktiv = CLAMP(aktivNr, 0, LEN(neu) - 1)
+    END SUB
+
+    ' Der sichtbare Farbindex an (x, y): von oben nach unten die erste Ebene,
+    ' die sichtbar ist und dort einen Stich hat.
+    FUNCTION stich(x AS INTEGER, y AS INTEGER) AS INTEGER
+        DIM i AS INTEGER
+        FOR i = LEN(ebenen) - 1 TO 0 STEP -1
+            IF ebenen[i].sichtbar THEN
+                DIM s AS INTEGER : s = ebenen[i].stich(x, y)
+                IF s <> KEIN_STICH THEN RETURN s
+            END IF
+        NEXT
+        RETURN KEIN_STICH
+    END FUNCTION
+
+    ' Zusammengesetzte Raster aller sichtbaren Ebenen (Farbe, Art, erledigt)
+    ' in einem Zug -- fuer das Zeichnen.
+    SUB zusammensetzen(BYREF farbe AS ARRAY OF INTEGER, BYREF typ AS ARRAY OF INTEGER, BYREF fertig AS ARRAY OF INTEGER)
+        DIM n AS INTEGER : n = breite * hoehe
+        DIM f[n] AS INTEGER
+        DIM t[n] AS INTEGER
+        DIM e[n] AS INTEGER
+        DIM i AS INTEGER
+        FOR i = 0 TO n - 1 : f[i] = KEIN_STICH : NEXT
+        DIM eb AS Ebene
+        FOR EACH eb IN ebenen
+            IF NOT eb.sichtbar THEN CONTINUE
+            DIM r AS ARRAY OF INTEGER : r = eb.raster
+            DIM a AS ARRAY OF INTEGER : a = eb.art
+            DIM d AS ARRAY OF INTEGER : d = eb.erledigt
+            FOR i = 0 TO n - 1
+                IF r[i] <> KEIN_STICH THEN
+                    f[i] = r[i]
+                    t[i] = a[i]
+                    e[i] = d[i]
+                END IF
+            NEXT
+        NEXT
+        farbe = f
+        typ = t
+        fertig = e
+    END SUB
+END CLASS
+
+FUNCTION neuerStapel(b AS INTEGER, h AS INTEGER) AS Ebenenstapel
+    DIM s AS Ebenenstapel : s = NEW Ebenenstapel(b, h)
+    RETURN s
+END FUNCTION

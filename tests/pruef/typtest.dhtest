@@ -158,6 +158,41 @@ PRINT x IS VEC2
 --- fehler
 IS: unbekannter Typ 'vec2' -- fehlt ein IMPORT? (z.B. "vec2")
 
+=== eine variable rechts von is sagt, dass = dasselbe objekt prueft
+' Gemeint ist fast immer "dasselbe Objekt" -- vorher hiess es nur
+' "unbekannter Typ 'b'" (Glutfaden, 2026-10-15).
+CLASS Knoten
+END CLASS
+DIM a AS Knoten : a = NEW Knoten()
+DIM b AS Knoten : b = a
+PRINT a IS b
+--- fehler
+IS: 'b' ist eine Variable, kein Typ -- IS prueft den Typ (x IS Klasse); ob zwei Variablen dasselbe Objekt meinen, sagt =
+
+=== auch lokal und als feld
+CLASS Knoten
+    DIM naechster AS Knoten
+    FUNCTION istNaechster(k AS Knoten) AS BOOLEAN
+        RETURN k IS naechster
+    END FUNCTION
+END CLASS
+--- fehler
+IS: 'naechster' ist eine Variable, kein Typ
+
+=== dasselbe objekt mit gleich
+CLASS Knoten
+END CLASS
+SUB vergleich(x AS Knoten, y AS Knoten)
+    PRINT x = y
+END SUB
+DIM a AS Knoten : a = NEW Knoten()
+DIM c AS Knoten : c = NEW Knoten()
+vergleich(a, a)
+vergleich(a, c)
+--- erwartet
+TRUE
+FALSE
+
 === select case is bleibt unberuehrt
 ' `CASE IS > 5` verschluckt sein IS im Case-Parser -- der neue Operator
 DIM i AS INTEGER

@@ -1,0 +1,4052 @@
+[
+    {
+        "DpDmcNumber": "150",
+        "Color": {
+            "R": 171,
+            "G": 2,
+            "B": 73
+        },
+        "Name": "dusty rose"
+    },
+    {
+        "DpDmcNumber": "151",
+        "Color": {
+            "R": 240,
+            "G": 206,
+            "B": 212
+        },
+        "Name": "dusty rose very lite"
+    },
+    {
+        "DpDmcNumber": "152",
+        "Color": {
+            "R": 226,
+            "G": 160,
+            "B": 153
+        },
+        "Name": "Shell Pink Med Light"
+    },
+    {
+        "DpDmcNumber": "153",
+        "Color": {
+            "R": 230,
+            "G": 204,
+            "B": 217
+        },
+        "Name": "Violet verry light"
+    },
+    {
+        "DpDmcNumber": "154",
+        "Color": {
+            "R": 87,
+            "G": 36,
+            "B": 51
+        },
+        "Name": "Grape verry dark"
+    },
+    {
+        "DpDmcNumber": "155",
+        "Color": {
+            "R": 152,
+            "G": 145,
+            "B": 182
+        },
+        "Name": "Blue Violet med dark"
+    },
+    {
+        "DpDmcNumber": "156",
+        "Color": {
+            "R": 163,
+            "G": 174,
+            "B": 209
+        },
+        "Name": "Blue Violet Med lt"
+    },
+    {
+        "DpDmcNumber": "157",
+        "Color": {
+            "R": 187,
+            "G": 195,
+            "B": 217
+        },
+        "Name": "Cornflower Blue Vy Lt"
+    },
+    {
+        "DpDmcNumber": "158",
+        "Color": {
+            "R": 76,
+            "G": 82,
+            "B": 110
+        },
+        "Name": "Cornflower Blu M V D"
+    },
+    {
+        "DpDmcNumber": "159",
+        "Color": {
+            "R": 199,
+            "G": 202,
+            "B": 215
+        },
+        "Name": "Blue Gray lite"
+    },
+    {
+        "DpDmcNumber": "160",
+        "Color": {
+            "R": 153,
+            "G": 159,
+            "B": 183
+        },
+        "Name": "Blue Gray medium"
+    },
+    {
+        "DpDmcNumber": "161",
+        "Color": {
+            "R": 120,
+            "G": 128,
+            "B": 164
+        },
+        "Name": "Blu Gray"
+    },
+    {
+        "DpDmcNumber": "162",
+        "Color": {
+            "R": 219,
+            "G": 236,
+            "B": 245
+        },
+        "Name": "Blue Ultra Verry Light"
+    },
+    {
+        "DpDmcNumber": "163",
+        "Color": {
+            "R": 77,
+            "G": 131,
+            "B": 97
+        },
+        "Name": "Celadon Green"
+    },
+    {
+        "DpDmcNumber": "164",
+        "Color": {
+            "R": 200,
+            "G": 216,
+            "B": 184
+        },
+        "Name": "Forest green lite"
+    },
+    {
+        "DpDmcNumber": "165",
+        "Color": {
+            "R": 239,
+            "G": 244,
+            "B": 164
+        },
+        "Name": "Moss green Vy Lt"
+    },
+    {
+        "DpDmcNumber": "166",
+        "Color": {
+            "R": 192,
+            "G": 200,
+            "B": 64
+        },
+        "Name": "Moss green MD Lt"
+    },
+    {
+        "DpDmcNumber": "167",
+        "Color": {
+            "R": 167,
+            "G": 124,
+            "B": 73
+        },
+        "Name": "Yellow beige V Dk"
+    },
+    {
+        "DpDmcNumber": "168",
+        "Color": {
+            "R": 209,
+            "G": 209,
+            "B": 209
+        },
+        "Name": "Pewter Verry Light"
+    },
+    {
+        "DpDmcNumber": "169",
+        "Color": {
+            "R": 132,
+            "G": 132,
+            "B": 132
+        },
+        "Name": "Pewter light"
+    },
+    {
+        "DpDmcNumber": "208",
+        "Color": {
+            "R": 131,
+            "G": 91,
+            "B": 139
+        },
+        "Name": "Lavender Very Dark"
+    },
+    {
+        "DpDmcNumber": "209",
+        "Color": {
+            "R": 163,
+            "G": 123,
+            "B": 167
+        },
+        "Name": "Lavender Dark"
+    },
+    {
+        "DpDmcNumber": "210",
+        "Color": {
+            "R": 195,
+            "G": 159,
+            "B": 195
+        },
+        "Name": "Lavender Medium"
+    },
+    {
+        "DpDmcNumber": "211",
+        "Color": {
+            "R": 227,
+            "G": 203,
+            "B": 227
+        },
+        "Name": "Lavender Light"
+    },
+    {
+        "DpDmcNumber": "221",
+        "Color": {
+            "R": 136,
+            "G": 62,
+            "B": 67
+        },
+        "Name": "Shell Pink Very Dark"
+    },
+    {
+        "DpDmcNumber": "223",
+        "Color": {
+            "R": 204,
+            "G": 132,
+            "B": 124
+        },
+        "Name": "Shell Pink Lite"
+    },
+    {
+        "DpDmcNumber": "224",
+        "Color": {
+            "R": 235,
+            "G": 183,
+            "B": 175
+        },
+        "Name": "Shell Pink Very Light"
+    },
+    {
+        "DpDmcNumber": "225",
+        "Color": {
+            "R": 255,
+            "G": 223,
+            "B": 213
+        },
+        "Name": "Shell Pink Ultra very Light"
+    },
+    {
+        "DpDmcNumber": "300",
+        "Color": {
+            "R": 111,
+            "G": 47,
+            "B": 0
+        },
+        "Name": "Mahagony Very dark"
+    },
+    {
+        "DpDmcNumber": "301",
+        "Color": {
+            "R": 179,
+            "G": 95,
+            "B": 43
+        },
+        "Name": "Mahagony med"
+    },
+    {
+        "DpDmcNumber": "304",
+        "Color": {
+            "R": 183,
+            "G": 31,
+            "B": 51
+        },
+        "Name": "Red Medium"
+    },
+    {
+        "DpDmcNumber": "307",
+        "Color": {
+            "R": 255,
+            "G": 239,
+            "B": 82
+        },
+        "Name": "Lemon"
+    },
+    {
+        "DpDmcNumber": "309",
+        "Color": {
+            "R": 214,
+            "G": 43,
+            "B": 91
+        },
+        "Name": "Rose Dark"
+    },
+    {
+        "DpDmcNumber": "310",
+        "Color": {
+            "R": 0,
+            "G": 0,
+            "B": 0
+        },
+        "Name": "Black"
+    },
+    {
+        "DpDmcNumber": "311",
+        "Color": {
+            "R": 28,
+            "G": 80,
+            "B": 102
+        },
+        "Name": "Wedgewood Ultra very dark"
+    },
+    {
+        "DpDmcNumber": "312",
+        "Color": {
+            "R": 53,
+            "G": 102,
+            "B": 139
+        },
+        "Name": "Baby Blue Very Dark"
+    },
+    {
+        "DpDmcNumber": "315",
+        "Color": {
+            "R": 129,
+            "G": 73,
+            "B": 82
+        },
+        "Name": "Antique Mauve Mid dark"
+    },
+    {
+        "DpDmcNumber": "316",
+        "Color": {
+            "R": 183,
+            "G": 115,
+            "B": 127
+        },
+        "Name": "Antique Mauve Med"
+    },
+    {
+        "DpDmcNumber": "317",
+        "Color": {
+            "R": 108,
+            "G": 108,
+            "B": 108
+        },
+        "Name": "Pewder gray"
+    },
+    {
+        "DpDmcNumber": "318",
+        "Color": {
+            "R": 171,
+            "G": 171,
+            "B": 171
+        },
+        "Name": "Steel Gray Lt"
+    },
+    {
+        "DpDmcNumber": "319",
+        "Color": {
+            "R": 32,
+            "G": 95,
+            "B": 46
+        },
+        "Name": "Pistacio Green Very Dark"
+    },
+    {
+        "DpDmcNumber": "320",
+        "Color": {
+            "R": 105,
+            "G": 136,
+            "B": 90
+        },
+        "Name": "Pistacio Green Med"
+    },
+    {
+        "DpDmcNumber": "321",
+        "Color": {
+            "R": 202,
+            "G": 41,
+            "B": 57
+        },
+        "Name": "Red"
+    },
+    {
+        "DpDmcNumber": "322",
+        "Color": {
+            "R": 90,
+            "G": 143,
+            "B": 184
+        },
+        "Name": "Baby Blue Dark"
+    },
+    {
+        "DpDmcNumber": "326",
+        "Color": {
+            "R": 179,
+            "G": 59,
+            "B": 75
+        },
+        "Name": "Rose very dark"
+    },
+    {
+        "DpDmcNumber": "327",
+        "Color": {
+            "R": 99,
+            "G": 54,
+            "B": 102
+        },
+        "Name": "Violet Dark"
+    },
+    {
+        "DpDmcNumber": "333",
+        "Color": {
+            "R": 92,
+            "G": 84,
+            "B": 120
+        },
+        "Name": "Blue Violet Very Dark"
+    },
+    {
+        "DpDmcNumber": "334",
+        "Color": {
+            "R": 115,
+            "G": 159,
+            "B": 193
+        },
+        "Name": "Baby Blue medium"
+    },
+    {
+        "DpDmcNumber": "335",
+        "Color": {
+            "R": 238,
+            "G": 84,
+            "B": 110
+        },
+        "Name": "Rose"
+    },
+    {
+        "DpDmcNumber": "336",
+        "Color": {
+            "R": 37,
+            "G": 59,
+            "B": 115
+        },
+        "Name": "Navy Blue"
+    },
+    {
+        "DpDmcNumber": "340",
+        "Color": {
+            "R": 173,
+            "G": 167,
+            "B": 199
+        },
+        "Name": "Blue Violet Medium"
+    },
+    {
+        "DpDmcNumber": "341",
+        "Color": {
+            "R": 183,
+            "G": 191,
+            "B": 221
+        },
+        "Name": "Blue Violet Light"
+    },
+    {
+        "DpDmcNumber": "347",
+        "Color": {
+            "R": 191,
+            "G": 45,
+            "B": 45
+        },
+        "Name": "Salmon very Dark"
+    },
+    {
+        "DpDmcNumber": "349",
+        "Color": {
+            "R": 213,
+            "G": 14,
+            "B": 51
+        },
+        "Name": "Coral dark"
+    },
+    {
+        "DpDmcNumber": "350",
+        "Color": {
+            "R": 224,
+            "G": 72,
+            "B": 72
+        },
+        "Name": "Coral Medium"
+    },
+    {
+        "DpDmcNumber": "351",
+        "Color": {
+            "R": 233,
+            "G": 106,
+            "B": 103
+        },
+        "Name": "Coral"
+    },
+    {
+        "DpDmcNumber": "352",
+        "Color": {
+            "R": 253,
+            "G": 156,
+            "B": 151
+        },
+        "Name": "Coral Light"
+    },
+    {
+        "DpDmcNumber": "353",
+        "Color": {
+            "R": 254,
+            "G": 215,
+            "B": 204
+        },
+        "Name": "Peach"
+    },
+    {
+        "DpDmcNumber": "355",
+        "Color": {
+            "R": 152,
+            "G": 68,
+            "B": 54
+        },
+        "Name": "Terra Cotta Dark"
+    },
+    {
+        "DpDmcNumber": "356",
+        "Color": {
+            "R": 197,
+            "G": 106,
+            "B": 91
+        },
+        "Name": "Terra Cotta Med"
+    },
+    {
+        "DpDmcNumber": "367",
+        "Color": {
+            "R": 97,
+            "G": 122,
+            "B": 82
+        },
+        "Name": "Pistachio Green dark"
+    },
+    {
+        "DpDmcNumber": "368",
+        "Color": {
+            "R": 166,
+            "G": 194,
+            "B": 152
+        },
+        "Name": "Pistachio Green light"
+    },
+    {
+        "DpDmcNumber": "369",
+        "Color": {
+            "R": 215,
+            "G": 237,
+            "B": 204
+        },
+        "Name": "Pistachio Green very light"
+    },
+    {
+        "DpDmcNumber": "370",
+        "Color": {
+            "R": 184,
+            "G": 157,
+            "B": 100
+        },
+        "Name": "Mustard Medium"
+    },
+    {
+        "DpDmcNumber": "371",
+        "Color": {
+            "R": 191,
+            "G": 166,
+            "B": 113
+        },
+        "Name": "Mustard"
+    },
+    {
+        "DpDmcNumber": "372",
+        "Color": {
+            "R": 204,
+            "G": 183,
+            "B": 132
+        },
+        "Name": "Mustard light"
+    },
+    {
+        "DpDmcNumber": "400",
+        "Color": {
+            "R": 143,
+            "G": 67,
+            "B": 15
+        },
+        "Name": "Mahagony dark"
+    },
+    {
+        "DpDmcNumber": "407",
+        "Color": {
+            "R": 187,
+            "G": 129,
+            "B": 97
+        },
+        "Name": "Desert sand Medium"
+    },
+    {
+        "DpDmcNumber": "413",
+        "Color": {
+            "R": 86,
+            "G": 86,
+            "B": 86
+        },
+        "Name": "Pewder Gray Dark"
+    },
+    {
+        "DpDmcNumber": "414",
+        "Color": {
+            "R": 140,
+            "G": 140,
+            "B": 140
+        },
+        "Name": "Steel Gray Dark"
+    },
+    {
+        "DpDmcNumber": "415",
+        "Color": {
+            "R": 211,
+            "G": 211,
+            "B": 214
+        },
+        "Name": "Pearl Gray"
+    },
+    {
+        "DpDmcNumber": "420",
+        "Color": {
+            "R": 160,
+            "G": 112,
+            "B": 66
+        },
+        "Name": "Hazelnut Brown dark"
+    },
+    {
+        "DpDmcNumber": "422",
+        "Color": {
+            "R": 198,
+            "G": 159,
+            "B": 123
+        },
+        "Name": "Hazelnut Brown light"
+    },
+    {
+        "DpDmcNumber": "433",
+        "Color": {
+            "R": 122,
+            "G": 69,
+            "B": 31
+        },
+        "Name": "Brown med"
+    },
+    {
+        "DpDmcNumber": "434",
+        "Color": {
+            "R": 152,
+            "G": 94,
+            "B": 51
+        },
+        "Name": "Brown light"
+    },
+    {
+        "DpDmcNumber": "435",
+        "Color": {
+            "R": 184,
+            "G": 119,
+            "B": 72
+        },
+        "Name": "Brown very Light"
+    },
+    {
+        "DpDmcNumber": "436",
+        "Color": {
+            "R": 203,
+            "G": 144,
+            "B": 81
+        },
+        "Name": "Tan"
+    },
+    {
+        "DpDmcNumber": "437",
+        "Color": {
+            "R": 228,
+            "G": 187,
+            "B": 142
+        },
+        "Name": "Tan light"
+    },
+    {
+        "DpDmcNumber": "444",
+        "Color": {
+            "R": 255,
+            "G": 216,
+            "B": 0
+        },
+        "Name": "Lemon dark"
+    },
+    {
+        "DpDmcNumber": "445",
+        "Color": {
+            "R": 255,
+            "G": 251,
+            "B": 139
+        },
+        "Name": "Lemon Light"
+    },
+    {
+        "DpDmcNumber": "451",
+        "Color": {
+            "R": 145,
+            "G": 123,
+            "B": 115
+        },
+        "Name": "Shell gray Dark"
+    },
+    {
+        "DpDmcNumber": "452",
+        "Color": {
+            "R": 192,
+            "G": 179,
+            "B": 174
+        },
+        "Name": "Shell gray med"
+    },
+    {
+        "DpDmcNumber": "453",
+        "Color": {
+            "R": 215,
+            "G": 206,
+            "B": 203
+        },
+        "Name": "Shell Gray Light"
+    },
+    {
+        "DpDmcNumber": "469",
+        "Color": {
+            "R": 114,
+            "G": 132,
+            "B": 60
+        },
+        "Name": "Avocado green"
+    },
+    {
+        "DpDmcNumber": "470",
+        "Color": {
+            "R": 148,
+            "G": 171,
+            "B": 79
+        },
+        "Name": "Avokado green Light"
+    },
+    {
+        "DpDmcNumber": "471",
+        "Color": {
+            "R": 174,
+            "G": 191,
+            "B": 121
+        },
+        "Name": "Avokado green very light"
+    },
+    {
+        "DpDmcNumber": "472",
+        "Color": {
+            "R": 216,
+            "G": 228,
+            "B": 152
+        },
+        "Name": "Avokado green ultra Light"
+    },
+    {
+        "DpDmcNumber": "498",
+        "Color": {
+            "R": 170,
+            "G": 17,
+            "B": 41
+        },
+        "Name": "Red Dark"
+    },
+    {
+        "DpDmcNumber": "500",
+        "Color": {
+            "R": 4,
+            "G": 77,
+            "B": 51
+        },
+        "Name": "Blue green very Dark"
+    },
+    {
+        "DpDmcNumber": "501",
+        "Color": {
+            "R": 57,
+            "G": 111,
+            "B": 82
+        },
+        "Name": "Blue Green Dark"
+    },
+    {
+        "DpDmcNumber": "502",
+        "Color": {
+            "R": 91,
+            "G": 144,
+            "B": 113
+        },
+        "Name": "Blue green"
+    },
+    {
+        "DpDmcNumber": "503",
+        "Color": {
+            "R": 123,
+            "G": 172,
+            "B": 148
+        },
+        "Name": "Blue green medium"
+    },
+    {
+        "DpDmcNumber": "504",
+        "Color": {
+            "R": 196,
+            "G": 222,
+            "B": 204
+        },
+        "Name": "Blue green Very Light"
+    },
+    {
+        "DpDmcNumber": "505",
+        "Color": {
+            "R": 51,
+            "G": 131,
+            "B": 98
+        },
+        "Name": "Jade green"
+    },
+    {
+        "DpDmcNumber": "517",
+        "Color": {
+            "R": 59,
+            "G": 118,
+            "B": 143
+        },
+        "Name": "Wedgewood dark"
+    },
+    {
+        "DpDmcNumber": "518",
+        "Color": {
+            "R": 79,
+            "G": 147,
+            "B": 167
+        },
+        "Name": "Wdgewood Light"
+    },
+    {
+        "DpDmcNumber": "519",
+        "Color": {
+            "R": 126,
+            "G": 177,
+            "B": 200
+        },
+        "Name": "Sky Blue"
+    },
+    {
+        "DpDmcNumber": "520",
+        "Color": {
+            "R": 102,
+            "G": 109,
+            "B": 79
+        },
+        "Name": "Fern green Dark"
+    },
+    {
+        "DpDmcNumber": "522",
+        "Color": {
+            "R": 150,
+            "G": 158,
+            "B": 126
+        },
+        "Name": "Fern Green"
+    },
+    {
+        "DpDmcNumber": "523",
+        "Color": {
+            "R": 171,
+            "G": 177,
+            "B": 151
+        },
+        "Name": "Fern green Light"
+    },
+    {
+        "DpDmcNumber": "524",
+        "Color": {
+            "R": 196,
+            "G": 205,
+            "B": 172
+        },
+        "Name": "Fern Green Very Light"
+    },
+    {
+        "DpDmcNumber": "535",
+        "Color": {
+            "R": 99,
+            "G": 100,
+            "B": 88
+        },
+        "Name": "Ash Grex Very Light"
+    },
+    {
+        "DpDmcNumber": "543",
+        "Color": {
+            "R": 242,
+            "G": 227,
+            "B": 206
+        },
+        "Name": "Beige Brown Ultra Very Light"
+    },
+    {
+        "DpDmcNumber": "550",
+        "Color": {
+            "R": 94,
+            "G": 23,
+            "B": 81
+        },
+        "Name": "Violet Very Dark"
+    },
+    {
+        "DpDmcNumber": "552",
+        "Color": {
+            "R": 128,
+            "G": 58,
+            "B": 107
+        },
+        "Name": "Violet medium"
+    },
+    {
+        "DpDmcNumber": "553",
+        "Color": {
+            "R": 163,
+            "G": 99,
+            "B": 139
+        },
+        "Name": "Violet"
+    },
+    {
+        "DpDmcNumber": "554",
+        "Color": {
+            "R": 219,
+            "G": 179,
+            "B": 203
+        },
+        "Name": "Violet Light"
+    },
+    {
+        "DpDmcNumber": "561",
+        "Color": {
+            "R": 44,
+            "G": 106,
+            "B": 69
+        },
+        "Name": "Caladon Green Very Dark"
+    },
+    {
+        "DpDmcNumber": "562",
+        "Color": {
+            "R": 83,
+            "G": 151,
+            "B": 106
+        },
+        "Name": "Jade Medium"
+    },
+    {
+        "DpDmcNumber": "563",
+        "Color": {
+            "R": 143,
+            "G": 192,
+            "B": 152
+        },
+        "Name": "Jade Light"
+    },
+    {
+        "DpDmcNumber": "564",
+        "Color": {
+            "R": 167,
+            "G": 205,
+            "B": 175
+        },
+        "Name": "Jade very Light"
+    },
+    {
+        "DpDmcNumber": "580",
+        "Color": {
+            "R": 136,
+            "G": 141,
+            "B": 51
+        },
+        "Name": "Moss Green Dark"
+    },
+    {
+        "DpDmcNumber": "581",
+        "Color": {
+            "R": 167,
+            "G": 174,
+            "B": 56
+        },
+        "Name": "Moss Green"
+    },
+    {
+        "DpDmcNumber": "597",
+        "Color": {
+            "R": 91,
+            "G": 163,
+            "B": 179
+        },
+        "Name": "Turquoise"
+    },
+    {
+        "DpDmcNumber": "598",
+        "Color": {
+            "R": 144,
+            "G": 195,
+            "B": 204
+        },
+        "Name": "Turquoise Light"
+    },
+    {
+        "DpDmcNumber": "600",
+        "Color": {
+            "R": 205,
+            "G": 47,
+            "B": 99
+        },
+        "Name": "Cranberry very Dark"
+    },
+    {
+        "DpDmcNumber": "601",
+        "Color": {
+            "R": 209,
+            "G": 40,
+            "B": 106
+        },
+        "Name": "Cranberry dark"
+    },
+    {
+        "DpDmcNumber": "602",
+        "Color": {
+            "R": 226,
+            "G": 72,
+            "B": 116
+        },
+        "Name": "Cranberry medium"
+    },
+    {
+        "DpDmcNumber": "603",
+        "Color": {
+            "R": 255,
+            "G": 164,
+            "B": 190
+        },
+        "Name": "Cranberry"
+    },
+    {
+        "DpDmcNumber": "604",
+        "Color": {
+            "R": 255,
+            "G": 176,
+            "B": 190
+        },
+        "Name": "Cranberry Light"
+    },
+    {
+        "DpDmcNumber": "605",
+        "Color": {
+            "R": 255,
+            "G": 192,
+            "B": 205
+        },
+        "Name": "Cranberry Very Light"
+    },
+    {
+        "DpDmcNumber": "606",
+        "Color": {
+            "R": 250,
+            "G": 50,
+            "B": 3
+        },
+        "Name": "Orange? Red Bright"
+    },
+    {
+        "DpDmcNumber": "608",
+        "Color": {
+            "R": 253,
+            "G": 93,
+            "B": 53
+        },
+        "Name": "Burnt Orange Bright"
+    },
+    {
+        "DpDmcNumber": "610",
+        "Color": {
+            "R": 121,
+            "G": 96,
+            "B": 71
+        },
+        "Name": "Drap Brown dark"
+    },
+    {
+        "DpDmcNumber": "611",
+        "Color": {
+            "R": 150,
+            "G": 118,
+            "B": 86
+        },
+        "Name": "Drap Brown"
+    },
+    {
+        "DpDmcNumber": "612",
+        "Color": {
+            "R": 188,
+            "G": 154,
+            "B": 120
+        },
+        "Name": "Drap Brown Light"
+    },
+    {
+        "DpDmcNumber": "613",
+        "Color": {
+            "R": 220,
+            "G": 196,
+            "B": 170
+        },
+        "Name": "Drap Brown Very Light"
+    },
+    {
+        "DpDmcNumber": "632",
+        "Color": {
+            "R": 135,
+            "G": 85,
+            "B": 57
+        },
+        "Name": "Deset Sand Ultra Very Dark"
+    },
+    {
+        "DpDmcNumber": "640",
+        "Color": {
+            "R": 133,
+            "G": 123,
+            "B": 97
+        },
+        "Name": "Beige Gray Very Dark"
+    },
+    {
+        "DpDmcNumber": "642",
+        "Color": {
+            "R": 164,
+            "G": 152,
+            "B": 120
+        },
+        "Name": "Beige Gray Dark"
+    },
+    {
+        "DpDmcNumber": "644",
+        "Color": {
+            "R": 221,
+            "G": 216,
+            "B": 203
+        },
+        "Name": "Beige Grey Med"
+    },
+    {
+        "DpDmcNumber": "645",
+        "Color": {
+            "R": 110,
+            "G": 101,
+            "B": 92
+        },
+        "Name": "Beaver Gray Very Dark"
+    },
+    {
+        "DpDmcNumber": "646",
+        "Color": {
+            "R": 135,
+            "G": 125,
+            "B": 115
+        },
+        "Name": "Beaver Gray Dark"
+    },
+    {
+        "DpDmcNumber": "647",
+        "Color": {
+            "R": 176,
+            "G": 166,
+            "B": 156
+        },
+        "Name": "Beaver Grey Med"
+    },
+    {
+        "DpDmcNumber": "648",
+        "Color": {
+            "R": 188,
+            "G": 180,
+            "B": 172
+        },
+        "Name": "Beaver Gray Light"
+    },
+    {
+        "DpDmcNumber": "666",
+        "Color": {
+            "R": 229,
+            "G": 26,
+            "B": 64
+        },
+        "Name": "Bright Red"
+    },
+    {
+        "DpDmcNumber": "676",
+        "Color": {
+            "R": 229,
+            "G": 206,
+            "B": 151
+        },
+        "Name": "Old Gold Light"
+    },
+    {
+        "DpDmcNumber": "677",
+        "Color": {
+            "R": 245,
+            "G": 236,
+            "B": 203
+        },
+        "Name": "Old Gold Very Light"
+    },
+    {
+        "DpDmcNumber": "680",
+        "Color": {
+            "R": 188,
+            "G": 141,
+            "B": 14
+        },
+        "Name": "Old Gold Dark"
+    },
+    {
+        "DpDmcNumber": "699",
+        "Color": {
+            "R": 3,
+            "G": 104,
+            "B": 22
+        },
+        "Name": "Green"
+    },
+    {
+        "DpDmcNumber": "700",
+        "Color": {
+            "R": 7,
+            "G": 115,
+            "B": 27
+        },
+        "Name": "Green Bright"
+    },
+    {
+        "DpDmcNumber": "701",
+        "Color": {
+            "R": 63,
+            "G": 143,
+            "B": 41
+        },
+        "Name": "Green Light"
+    },
+    {
+        "DpDmcNumber": "702",
+        "Color": {
+            "R": 71,
+            "G": 167,
+            "B": 47
+        },
+        "Name": "Kelly Green"
+    },
+    {
+        "DpDmcNumber": "703",
+        "Color": {
+            "R": 121,
+            "G": 186,
+            "B": 69
+        },
+        "Name": "Charteuse"
+    },
+    {
+        "DpDmcNumber": "704",
+        "Color": {
+            "R": 158,
+            "G": 207,
+            "B": 52
+        },
+        "Name": "Charteuse Bright"
+    },
+    {
+        "DpDmcNumber": "712",
+        "Color": {
+            "R": 255,
+            "G": 251,
+            "B": 239
+        },
+        "Name": "Cream"
+    },
+    {
+        "DpDmcNumber": "718",
+        "Color": {
+            "R": 156,
+            "G": 36,
+            "B": 98
+        },
+        "Name": "Plum"
+    },
+    {
+        "DpDmcNumber": "720",
+        "Color": {
+            "R": 229,
+            "G": 92,
+            "B": 31
+        },
+        "Name": "Orange Spice Dark"
+    },
+    {
+        "DpDmcNumber": "721",
+        "Color": {
+            "R": 242,
+            "G": 120,
+            "B": 66
+        },
+        "Name": "Orange Spice Med"
+    },
+    {
+        "DpDmcNumber": "722",
+        "Color": {
+            "R": 247,
+            "G": 151,
+            "B": 111
+        },
+        "Name": "Orange Spice Light"
+    },
+    {
+        "DpDmcNumber": "725",
+        "Color": {
+            "R": 255,
+            "G": 200,
+            "B": 64
+        },
+        "Name": "Topaz Medium Light"
+    },
+    {
+        "DpDmcNumber": "726",
+        "Color": {
+            "R": 253,
+            "G": 215,
+            "B": 85
+        },
+        "Name": "Topaz Light"
+    },
+    {
+        "DpDmcNumber": "727",
+        "Color": {
+            "R": 255,
+            "G": 241,
+            "B": 175
+        },
+        "Name": "Topaz Very Light"
+    },
+    {
+        "DpDmcNumber": "728",
+        "Color": {
+            "R": 228,
+            "G": 180,
+            "B": 104
+        },
+        "Name": "Topaz"
+    },
+    {
+        "DpDmcNumber": "729",
+        "Color": {
+            "R": 208,
+            "G": 165,
+            "B": 62
+        },
+        "Name": "Old Gold Medium"
+    },
+    {
+        "DpDmcNumber": "730",
+        "Color": {
+            "R": 130,
+            "G": 123,
+            "B": 48
+        },
+        "Name": "Olive Green Very Dark"
+    },
+    {
+        "DpDmcNumber": "731",
+        "Color": {
+            "R": 147,
+            "G": 139,
+            "B": 55
+        },
+        "Name": "Olive Green Dark"
+    },
+    {
+        "DpDmcNumber": "732",
+        "Color": {
+            "R": 148,
+            "G": 140,
+            "B": 54
+        },
+        "Name": "Olive Green"
+    },
+    {
+        "DpDmcNumber": "733",
+        "Color": {
+            "R": 188,
+            "G": 179,
+            "B": 76
+        },
+        "Name": "Olive Green Medium"
+    },
+    {
+        "DpDmcNumber": "734",
+        "Color": {
+            "R": 199,
+            "G": 192,
+            "B": 119
+        },
+        "Name": "Olive Green Light"
+    },
+    {
+        "DpDmcNumber": "738",
+        "Color": {
+            "R": 236,
+            "G": 204,
+            "B": 158
+        },
+        "Name": "Tan very Light"
+    },
+    {
+        "DpDmcNumber": "739",
+        "Color": {
+            "R": 248,
+            "G": 228,
+            "B": 200
+        },
+        "Name": "Tan Ultra Very Light"
+    },
+    {
+        "DpDmcNumber": "740",
+        "Color": {
+            "R": 255,
+            "G": 137,
+            "B": 0
+        },
+        "Name": "Tangerine"
+    },
+    {
+        "DpDmcNumber": "741",
+        "Color": {
+            "R": 255,
+            "G": 163,
+            "B": 43
+        },
+        "Name": "Tangerine Medium"
+    },
+    {
+        "DpDmcNumber": "742",
+        "Color": {
+            "R": 255,
+            "G": 191,
+            "B": 87
+        },
+        "Name": "Tangerine Light"
+    },
+    {
+        "DpDmcNumber": "743",
+        "Color": {
+            "R": 254,
+            "G": 211,
+            "B": 118
+        },
+        "Name": "Yellow Medium"
+    },
+    {
+        "DpDmcNumber": "744",
+        "Color": {
+            "R": 255,
+            "G": 231,
+            "B": 147
+        },
+        "Name": "Yellow Pale"
+    },
+    {
+        "DpDmcNumber": "745",
+        "Color": {
+            "R": 255,
+            "G": 233,
+            "B": 173
+        },
+        "Name": "Yellow Pale Light"
+    },
+    {
+        "DpDmcNumber": "746",
+        "Color": {
+            "R": 252,
+            "G": 252,
+            "B": 238
+        },
+        "Name": "Off white"
+    },
+    {
+        "DpDmcNumber": "747",
+        "Color": {
+            "R": 229,
+            "G": 252,
+            "B": 253
+        },
+        "Name": "Peacock Blue Very Light"
+    },
+    {
+        "DpDmcNumber": "754",
+        "Color": {
+            "R": 247,
+            "G": 203,
+            "B": 191
+        },
+        "Name": "Peach Light"
+    },
+    {
+        "DpDmcNumber": "758",
+        "Color": {
+            "R": 238,
+            "G": 170,
+            "B": 155
+        },
+        "Name": "Terra Cota Very Light"
+    },
+    {
+        "DpDmcNumber": "760",
+        "Color": {
+            "R": 245,
+            "G": 173,
+            "B": 173
+        },
+        "Name": "Salmon"
+    },
+    {
+        "DpDmcNumber": "761",
+        "Color": {
+            "R": 255,
+            "G": 201,
+            "B": 201
+        },
+        "Name": "Salmon Light"
+    },
+    {
+        "DpDmcNumber": "762",
+        "Color": {
+            "R": 236,
+            "G": 236,
+            "B": 236
+        },
+        "Name": "Pearl Gray Very Light"
+    },
+    {
+        "DpDmcNumber": "772",
+        "Color": {
+            "R": 228,
+            "G": 236,
+            "B": 212
+        },
+        "Name": "Yellow Green Very Light"
+    },
+    {
+        "DpDmcNumber": "775",
+        "Color": {
+            "R": 217,
+            "G": 235,
+            "B": 241
+        },
+        "Name": "Baby Blue Very Light"
+    },
+    {
+        "DpDmcNumber": "776",
+        "Color": {
+            "R": 252,
+            "G": 176,
+            "B": 185
+        },
+        "Name": "Pink Medium"
+    },
+    {
+        "DpDmcNumber": "777",
+        "Color": {
+            "R": 145,
+            "G": 53,
+            "B": 70
+        },
+        "Name": "Rasberry very Dark"
+    },
+    {
+        "DpDmcNumber": "778",
+        "Color": {
+            "R": 223,
+            "G": 179,
+            "B": 187
+        },
+        "Name": "Antique MauweVery Light"
+    },
+    {
+        "DpDmcNumber": "779",
+        "Color": {
+            "R": 98,
+            "G": 75,
+            "B": 69
+        },
+        "Name": "Cocoa Dark"
+    },
+    {
+        "DpDmcNumber": "780",
+        "Color": {
+            "R": 148,
+            "G": 99,
+            "B": 26
+        },
+        "Name": "Topaz Ultra Very Dark"
+    },
+    {
+        "DpDmcNumber": "781",
+        "Color": {
+            "R": 162,
+            "G": 109,
+            "B": 32
+        },
+        "Name": "Topaz Very Dark"
+    },
+    {
+        "DpDmcNumber": "782",
+        "Color": {
+            "R": 174,
+            "G": 119,
+            "B": 32
+        },
+        "Name": "Topaz Dark"
+    },
+    {
+        "DpDmcNumber": "783",
+        "Color": {
+            "R": 206,
+            "G": 145,
+            "B": 36
+        },
+        "Name": "Topaz medium"
+    },
+    {
+        "DpDmcNumber": "791",
+        "Color": {
+            "R": 70,
+            "G": 69,
+            "B": 99
+        },
+        "Name": "Cornflower Blue Very dark"
+    },
+    {
+        "DpDmcNumber": "792",
+        "Color": {
+            "R": 85,
+            "G": 91,
+            "B": 123
+        },
+        "Name": "Cornflower Blue dark"
+    },
+    {
+        "DpDmcNumber": "793",
+        "Color": {
+            "R": 112,
+            "G": 125,
+            "B": 162
+        },
+        "Name": "Cornflower Blue Medium"
+    },
+    {
+        "DpDmcNumber": "794",
+        "Color": {
+            "R": 143,
+            "G": 156,
+            "B": 193
+        },
+        "Name": "Cornflower Blue Light"
+    },
+    {
+        "DpDmcNumber": "796",
+        "Color": {
+            "R": 17,
+            "G": 65,
+            "B": 109
+        },
+        "Name": "Royal Blue Dark"
+    },
+    {
+        "DpDmcNumber": "797",
+        "Color": {
+            "R": 18,
+            "G": 70,
+            "B": 129
+        },
+        "Name": "Royal Blue"
+    },
+    {
+        "DpDmcNumber": "798",
+        "Color": {
+            "R": 69,
+            "G": 105,
+            "B": 145
+        },
+        "Name": "Delft Blue Dark"
+    },
+    {
+        "DpDmcNumber": "799",
+        "Color": {
+            "R": 116,
+            "G": 142,
+            "B": 182
+        },
+        "Name": "Deldt Blue Medium"
+    },
+    {
+        "DpDmcNumber": "800",
+        "Color": {
+            "R": 192,
+            "G": 204,
+            "B": 222
+        },
+        "Name": "Delft Blue Pale"
+    },
+    {
+        "DpDmcNumber": "801",
+        "Color": {
+            "R": 101,
+            "G": 57,
+            "B": 25
+        },
+        "Name": "Coffee Brown Dark"
+    },
+    {
+        "DpDmcNumber": "803",
+        "Color": {
+            "R": 44,
+            "G": 89,
+            "B": 124
+        },
+        "Name": "Baby Blue Ultra Very Dark"
+    },
+    {
+        "DpDmcNumber": "806",
+        "Color": {
+            "R": 61,
+            "G": 149,
+            "B": 165
+        },
+        "Name": "Peacock Blue Dark"
+    },
+    {
+        "DpDmcNumber": "807",
+        "Color": {
+            "R": 100,
+            "G": 171,
+            "B": 186
+        },
+        "Name": "Peacock Blue"
+    },
+    {
+        "DpDmcNumber": "809",
+        "Color": {
+            "R": 148,
+            "G": 168,
+            "B": 198
+        },
+        "Name": "Delft Blue"
+    },
+    {
+        "DpDmcNumber": "813",
+        "Color": {
+            "R": 161,
+            "G": 194,
+            "B": 215
+        },
+        "Name": "Blue Light"
+    },
+    {
+        "DpDmcNumber": "814",
+        "Color": {
+            "R": 125,
+            "G": 0,
+            "B": 26
+        },
+        "Name": "Garnet Dark"
+    },
+    {
+        "DpDmcNumber": "815",
+        "Color": {
+            "R": 137,
+            "G": 5,
+            "B": 30
+        },
+        "Name": "Garnet Medium"
+    },
+    {
+        "DpDmcNumber": "816",
+        "Color": {
+            "R": 151,
+            "G": 11,
+            "B": 35
+        },
+        "Name": "Garnet"
+    },
+    {
+        "DpDmcNumber": "817",
+        "Color": {
+            "R": 190,
+            "G": 2,
+            "B": 29
+        },
+        "Name": "Coral Red Very Dark"
+    },
+    {
+        "DpDmcNumber": "818",
+        "Color": {
+            "R": 255,
+            "G": 223,
+            "B": 217
+        },
+        "Name": "Baby Pink"
+    },
+    {
+        "DpDmcNumber": "819",
+        "Color": {
+            "R": 255,
+            "G": 238,
+            "B": 235
+        },
+        "Name": "Baby Pink Light"
+    },
+    {
+        "DpDmcNumber": "820",
+        "Color": {
+            "R": 13,
+            "G": 52,
+            "B": 95
+        },
+        "Name": "Royal Blue Very Dark"
+    },
+    {
+        "DpDmcNumber": "822",
+        "Color": {
+            "R": 231,
+            "G": 226,
+            "B": 211
+        },
+        "Name": "Beige Gray Light"
+    },
+    {
+        "DpDmcNumber": "823",
+        "Color": {
+            "R": 33,
+            "G": 48,
+            "B": 99
+        },
+        "Name": "Navy Blue Dark"
+    },
+    {
+        "DpDmcNumber": "824",
+        "Color": {
+            "R": 57,
+            "G": 105,
+            "B": 135
+        },
+        "Name": "Blue Very dark"
+    },
+    {
+        "DpDmcNumber": "825",
+        "Color": {
+            "R": 71,
+            "G": 129,
+            "B": 165
+        },
+        "Name": "Blue Dark"
+    },
+    {
+        "DpDmcNumber": "826",
+        "Color": {
+            "R": 107,
+            "G": 158,
+            "B": 191
+        },
+        "Name": "Blue Medium"
+    },
+    {
+        "DpDmcNumber": "827",
+        "Color": {
+            "R": 189,
+            "G": 221,
+            "B": 237
+        },
+        "Name": "Blue Very Light"
+    },
+    {
+        "DpDmcNumber": "828",
+        "Color": {
+            "R": 197,
+            "G": 232,
+            "B": 237
+        },
+        "Name": "Sky Blue Very Light"
+    },
+    {
+        "DpDmcNumber": "829",
+        "Color": {
+            "R": 126,
+            "G": 107,
+            "B": 66
+        },
+        "Name": "Golden Olive Very Dark"
+    },
+    {
+        "DpDmcNumber": "830",
+        "Color": {
+            "R": 141,
+            "G": 120,
+            "B": 75
+        },
+        "Name": "Golden Olive Dark"
+    },
+    {
+        "DpDmcNumber": "831",
+        "Color": {
+            "R": 170,
+            "G": 143,
+            "B": 86
+        },
+        "Name": "Golden Olive Medium"
+    },
+    {
+        "DpDmcNumber": "832",
+        "Color": {
+            "R": 189,
+            "G": 155,
+            "B": 81
+        },
+        "Name": "Golden Olive"
+    },
+    {
+        "DpDmcNumber": "833",
+        "Color": {
+            "R": 200,
+            "G": 171,
+            "B": 108
+        },
+        "Name": "Golden Olive Light"
+    },
+    {
+        "DpDmcNumber": "834",
+        "Color": {
+            "R": 219,
+            "G": 190,
+            "B": 127
+        },
+        "Name": "Golden Olive Very Light"
+    },
+    {
+        "DpDmcNumber": "838",
+        "Color": {
+            "R": 89,
+            "G": 73,
+            "B": 55
+        },
+        "Name": "Beige Brown very Dark"
+    },
+    {
+        "DpDmcNumber": "839",
+        "Color": {
+            "R": 103,
+            "G": 85,
+            "B": 65
+        },
+        "Name": "Beige Brown dark"
+    },
+    {
+        "DpDmcNumber": "840",
+        "Color": {
+            "R": 154,
+            "G": 124,
+            "B": 92
+        },
+        "Name": "Beige Brown Medium"
+    },
+    {
+        "DpDmcNumber": "841",
+        "Color": {
+            "R": 182,
+            "G": 155,
+            "B": 126
+        },
+        "Name": "Beige Brown Light"
+    },
+    {
+        "DpDmcNumber": "842",
+        "Color": {
+            "R": 209,
+            "G": 186,
+            "B": 161
+        },
+        "Name": "Beige Brown very Light"
+    },
+    {
+        "DpDmcNumber": "844",
+        "Color": {
+            "R": 72,
+            "G": 72,
+            "B": 72
+        },
+        "Name": "Beaver Gray Ultra dark"
+    },
+    {
+        "DpDmcNumber": "869",
+        "Color": {
+            "R": 131,
+            "G": 94,
+            "B": 57
+        },
+        "Name": "Hazelnut Brown Very dark"
+    },
+    {
+        "DpDmcNumber": "890",
+        "Color": {
+            "R": 23,
+            "G": 73,
+            "B": 35
+        },
+        "Name": "Pistachio Green Ultra Very Dark"
+    },
+    {
+        "DpDmcNumber": "891",
+        "Color": {
+            "R": 255,
+            "G": 85,
+            "B": 114
+        },
+        "Name": "Carnation Dark"
+    },
+    {
+        "DpDmcNumber": "892",
+        "Color": {
+            "R": 255,
+            "G": 121,
+            "B": 140
+        },
+        "Name": "Carnation Medium"
+    },
+    {
+        "DpDmcNumber": "893",
+        "Color": {
+            "R": 252,
+            "G": 144,
+            "B": 162
+        },
+        "Name": "Carnation Light"
+    },
+    {
+        "DpDmcNumber": "894",
+        "Color": {
+            "R": 255,
+            "G": 178,
+            "B": 187
+        },
+        "Name": "Carnation Very Light"
+    },
+    {
+        "DpDmcNumber": "895",
+        "Color": {
+            "R": 27,
+            "G": 83,
+            "B": 0
+        },
+        "Name": "Hunter Green Very dark"
+    },
+    {
+        "DpDmcNumber": "898",
+        "Color": {
+            "R": 73,
+            "G": 42,
+            "B": 19
+        },
+        "Name": "Coffee Brown Very Dark"
+    },
+    {
+        "DpDmcNumber": "899",
+        "Color": {
+            "R": 242,
+            "G": 118,
+            "B": 136
+        },
+        "Name": "Rose medium"
+    },
+    {
+        "DpDmcNumber": "900",
+        "Color": {
+            "R": 209,
+            "G": 88,
+            "B": 7
+        },
+        "Name": "Burnt Orange Dark"
+    },
+    {
+        "DpDmcNumber": "902",
+        "Color": {
+            "R": 130,
+            "G": 38,
+            "B": 55
+        },
+        "Name": "Garnet very Dark"
+    },
+    {
+        "DpDmcNumber": "904",
+        "Color": {
+            "R": 85,
+            "G": 120,
+            "B": 34
+        },
+        "Name": "Parrot Green Very Dark"
+    },
+    {
+        "DpDmcNumber": "905",
+        "Color": {
+            "R": 98,
+            "G": 138,
+            "B": 40
+        },
+        "Name": "Parrot green Dark"
+    },
+    {
+        "DpDmcNumber": "906",
+        "Color": {
+            "R": 125,
+            "G": 183,
+            "B": 51
+        },
+        "Name": "Parrot Green Medium"
+    },
+    {
+        "DpDmcNumber": "907",
+        "Color": {
+            "R": 199,
+            "G": 230,
+            "B": 102
+        },
+        "Name": "Parrot Green Light"
+    },
+    {
+        "DpDmcNumber": "909",
+        "Color": {
+            "R": 19,
+            "G": 115,
+            "B": 72
+        },
+        "Name": "Emerald Green Very Dark"
+    },
+    {
+        "DpDmcNumber": "910",
+        "Color": {
+            "R": 24,
+            "G": 126,
+            "B": 86
+        },
+        "Name": "Emerald Green Dark"
+    },
+    {
+        "DpDmcNumber": "911",
+        "Color": {
+            "R": 22,
+            "G": 148,
+            "B": 100
+        },
+        "Name": "Emerald Green Medium"
+    },
+    {
+        "DpDmcNumber": "912",
+        "Color": {
+            "R": 27,
+            "G": 157,
+            "B": 107
+        },
+        "Name": "Emerald Green Light"
+    },
+    {
+        "DpDmcNumber": "913",
+        "Color": {
+            "R": 108,
+            "G": 174,
+            "B": 118
+        },
+        "Name": "Nile Green Medium"
+    },
+    {
+        "DpDmcNumber": "915",
+        "Color": {
+            "R": 130,
+            "G": 0,
+            "B": 67
+        },
+        "Name": "Plum dark"
+    },
+    {
+        "DpDmcNumber": "917",
+        "Color": {
+            "R": 155,
+            "G": 19,
+            "B": 89
+        },
+        "Name": "Plum Medium"
+    },
+    {
+        "DpDmcNumber": "918",
+        "Color": {
+            "R": 130,
+            "G": 52,
+            "B": 10
+        },
+        "Name": "Red Copper Dark"
+    },
+    {
+        "DpDmcNumber": "919",
+        "Color": {
+            "R": 166,
+            "G": 69,
+            "B": 16
+        },
+        "Name": "Red Copper"
+    },
+    {
+        "DpDmcNumber": "920",
+        "Color": {
+            "R": 172,
+            "G": 84,
+            "B": 20
+        },
+        "Name": "Copper medium"
+    },
+    {
+        "DpDmcNumber": "921",
+        "Color": {
+            "R": 198,
+            "G": 98,
+            "B": 24
+        },
+        "Name": "Copper"
+    },
+    {
+        "DpDmcNumber": "922",
+        "Color": {
+            "R": 226,
+            "G": 115,
+            "B": 35
+        },
+        "Name": "Copper Light"
+    },
+    {
+        "DpDmcNumber": "924",
+        "Color": {
+            "R": 86,
+            "G": 106,
+            "B": 106
+        },
+        "Name": "Gray Greeb Very Dark"
+    },
+    {
+        "DpDmcNumber": "926",
+        "Color": {
+            "R": 152,
+            "G": 174,
+            "B": 174
+        },
+        "Name": "Gray Green Medium"
+    },
+    {
+        "DpDmcNumber": "927",
+        "Color": {
+            "R": 189,
+            "G": 203,
+            "B": 203
+        },
+        "Name": "Gray Green Light"
+    },
+    {
+        "DpDmcNumber": "928",
+        "Color": {
+            "R": 221,
+            "G": 227,
+            "B": 227
+        },
+        "Name": "Gray Green Very Light"
+    },
+    {
+        "DpDmcNumber": "930",
+        "Color": {
+            "R": 69,
+            "G": 92,
+            "B": 113
+        },
+        "Name": "Antique Blue Dark"
+    },
+    {
+        "DpDmcNumber": "931",
+        "Color": {
+            "R": 106,
+            "G": 133,
+            "B": 158
+        },
+        "Name": "Antique Blue Medium"
+    },
+    {
+        "DpDmcNumber": "932",
+        "Color": {
+            "R": 162,
+            "G": 181,
+            "B": 198
+        },
+        "Name": "Antique Blue Light"
+    },
+    {
+        "DpDmcNumber": "934",
+        "Color": {
+            "R": 49,
+            "G": 57,
+            "B": 25
+        },
+        "Name": "Avocado Green Black"
+    },
+    {
+        "DpDmcNumber": "935",
+        "Color": {
+            "R": 66,
+            "G": 77,
+            "B": 33
+        },
+        "Name": "Avocado Green Dark"
+    },
+    {
+        "DpDmcNumber": "936",
+        "Color": {
+            "R": 76,
+            "G": 88,
+            "B": 38
+        },
+        "Name": "Avocado Green Very Dark"
+    },
+    {
+        "DpDmcNumber": "937",
+        "Color": {
+            "R": 98,
+            "G": 113,
+            "B": 51
+        },
+        "Name": "Avocado Green Medium"
+    },
+    {
+        "DpDmcNumber": "938",
+        "Color": {
+            "R": 54,
+            "G": 31,
+            "B": 14
+        },
+        "Name": "Coffee Beown Ultra Dark"
+    },
+    {
+        "DpDmcNumber": "939",
+        "Color": {
+            "R": 27,
+            "G": 40,
+            "B": 83
+        },
+        "Name": "Navy Blue Very Dark"
+    },
+    {
+        "DpDmcNumber": "943",
+        "Color": {
+            "R": 61,
+            "G": 147,
+            "B": 132
+        },
+        "Name": "Green Bright Medium"
+    },
+    {
+        "DpDmcNumber": "945",
+        "Color": {
+            "R": 251,
+            "G": 213,
+            "B": 187
+        },
+        "Name": "Tawny"
+    },
+    {
+        "DpDmcNumber": "946",
+        "Color": {
+            "R": 235,
+            "G": 99,
+            "B": 7
+        },
+        "Name": "Burnt Orange Medium"
+    },
+    {
+        "DpDmcNumber": "947",
+        "Color": {
+            "R": 255,
+            "G": 123,
+            "B": 77
+        },
+        "Name": "Burn Orange"
+    },
+    {
+        "DpDmcNumber": "948",
+        "Color": {
+            "R": 254,
+            "G": 231,
+            "B": 218
+        },
+        "Name": "Peach very Light"
+    },
+    {
+        "DpDmcNumber": "950",
+        "Color": {
+            "R": 238,
+            "G": 211,
+            "B": 196
+        },
+        "Name": "Desert Sand Light"
+    },
+    {
+        "DpDmcNumber": "951",
+        "Color": {
+            "R": 255,
+            "G": 226,
+            "B": 207
+        },
+        "Name": "Tawny Light"
+    },
+    {
+        "DpDmcNumber": "954",
+        "Color": {
+            "R": 136,
+            "G": 186,
+            "B": 145
+        },
+        "Name": "Nile Green"
+    },
+    {
+        "DpDmcNumber": "955",
+        "Color": {
+            "R": 162,
+            "G": 214,
+            "B": 173
+        },
+        "Name": "Nile Green Light"
+    },
+    {
+        "DpDmcNumber": "956",
+        "Color": {
+            "R": 255,
+            "G": 145,
+            "B": 145
+        },
+        "Name": "Geranium"
+    },
+    {
+        "DpDmcNumber": "957",
+        "Color": {
+            "R": 253,
+            "G": 181,
+            "B": 181
+        },
+        "Name": "Germanium Pale"
+    },
+    {
+        "DpDmcNumber": "958",
+        "Color": {
+            "R": 62,
+            "G": 182,
+            "B": 161
+        },
+        "Name": "Sea green dark"
+    },
+    {
+        "DpDmcNumber": "959",
+        "Color": {
+            "R": 89,
+            "G": 199,
+            "B": 180
+        },
+        "Name": "Sea Green Medium"
+    },
+    {
+        "DpDmcNumber": "961",
+        "Color": {
+            "R": 207,
+            "G": 115,
+            "B": 115
+        },
+        "Name": "Dusty Rose Dark"
+    },
+    {
+        "DpDmcNumber": "962",
+        "Color": {
+            "R": 230,
+            "G": 138,
+            "B": 138
+        },
+        "Name": "Dusty Rose Medium"
+    },
+    {
+        "DpDmcNumber": "963",
+        "Color": {
+            "R": 255,
+            "G": 215,
+            "B": 215
+        },
+        "Name": "Dusty Rose Ultra Very Light"
+    },
+    {
+        "DpDmcNumber": "964",
+        "Color": {
+            "R": 169,
+            "G": 226,
+            "B": 216
+        },
+        "Name": "Sea Green Light"
+    },
+    {
+        "DpDmcNumber": "966",
+        "Color": {
+            "R": 185,
+            "G": 215,
+            "B": 192
+        },
+        "Name": "Jade Ultra Very Light"
+    },
+    {
+        "DpDmcNumber": "967",
+        "Color": {
+            "R": 255,
+            "G": 222,
+            "B": 213
+        },
+        "Name": "Apricot Very Light"
+    },
+    {
+        "DpDmcNumber": "970",
+        "Color": {
+            "R": 247,
+            "G": 139,
+            "B": 19
+        },
+        "Name": "Pumpkin Light"
+    },
+    {
+        "DpDmcNumber": "971",
+        "Color": {
+            "R": 246,
+            "G": 127,
+            "B": 0
+        },
+        "Name": "Pumpkin"
+    },
+    {
+        "DpDmcNumber": "972",
+        "Color": {
+            "R": 255,
+            "G": 182,
+            "B": 18
+        },
+        "Name": "Canary Deep"
+    },
+    {
+        "DpDmcNumber": "973",
+        "Color": {
+            "R": 255,
+            "G": 227,
+            "B": 0
+        },
+        "Name": "Canary Bright"
+    },
+    {
+        "DpDmcNumber": "975",
+        "Color": {
+            "R": 145,
+            "G": 79,
+            "B": 18
+        },
+        "Name": "Golden Brown Dark"
+    },
+    {
+        "DpDmcNumber": "976",
+        "Color": {
+            "R": 194,
+            "G": 129,
+            "B": 66
+        },
+        "Name": "Golden Brown Medium"
+    },
+    {
+        "DpDmcNumber": "977",
+        "Color": {
+            "R": 220,
+            "G": 156,
+            "B": 86
+        },
+        "Name": "Golden Brown Light"
+    },
+    {
+        "DpDmcNumber": "986",
+        "Color": {
+            "R": 64,
+            "G": 82,
+            "B": 48
+        },
+        "Name": "Forest Green Very Dark"
+    },
+    {
+        "DpDmcNumber": "987",
+        "Color": {
+            "R": 88,
+            "G": 113,
+            "B": 65
+        },
+        "Name": "Forest Green Dark"
+    },
+    {
+        "DpDmcNumber": "988",
+        "Color": {
+            "R": 115,
+            "G": 139,
+            "B": 91
+        },
+        "Name": "Forest green Medium"
+    },
+    {
+        "DpDmcNumber": "989",
+        "Color": {
+            "R": 141,
+            "G": 166,
+            "B": 117
+        },
+        "Name": "Forest green"
+    },
+    {
+        "DpDmcNumber": "991",
+        "Color": {
+            "R": 71,
+            "G": 123,
+            "B": 110
+        },
+        "Name": "Aquamarine Dark"
+    },
+    {
+        "DpDmcNumber": "992",
+        "Color": {
+            "R": 111,
+            "G": 174,
+            "B": 159
+        },
+        "Name": "Aquamarin Light"
+    },
+    {
+        "DpDmcNumber": "993",
+        "Color": {
+            "R": 144,
+            "G": 192,
+            "B": 180
+        },
+        "Name": "Aquamarine Very Light"
+    },
+    {
+        "DpDmcNumber": "995",
+        "Color": {
+            "R": 36,
+            "G": 151,
+            "B": 187
+        },
+        "Name": "Electriv Blue Dark"
+    },
+    {
+        "DpDmcNumber": "996",
+        "Color": {
+            "R": 47,
+            "G": 196,
+            "B": 241
+        },
+        "Name": "Electric Blue Medium"
+    },
+    {
+        "DpDmcNumber": "3011",
+        "Color": {
+            "R": 137,
+            "G": 138,
+            "B": 88
+        },
+        "Name": "Khaki Green Dark"
+    },
+    {
+        "DpDmcNumber": "3012",
+        "Color": {
+            "R": 166,
+            "G": 167,
+            "B": 93
+        },
+        "Name": "Khaki Green Medium"
+    },
+    {
+        "DpDmcNumber": "3013",
+        "Color": {
+            "R": 185,
+            "G": 185,
+            "B": 130
+        },
+        "Name": "Khaki green Light"
+    },
+    {
+        "DpDmcNumber": "3021",
+        "Color": {
+            "R": 79,
+            "G": 75,
+            "B": 65
+        },
+        "Name": "Brown Gray Very Dark"
+    },
+    {
+        "DpDmcNumber": "3022",
+        "Color": {
+            "R": 142,
+            "G": 144,
+            "B": 120
+        },
+        "Name": "Brown Gray Medium"
+    },
+    {
+        "DpDmcNumber": "3023",
+        "Color": {
+            "R": 177,
+            "G": 170,
+            "B": 151
+        },
+        "Name": "Brown Gray Light"
+    },
+    {
+        "DpDmcNumber": "3024",
+        "Color": {
+            "R": 235,
+            "G": 234,
+            "B": 231
+        },
+        "Name": "Brown Gray very Light"
+    },
+    {
+        "DpDmcNumber": "3031",
+        "Color": {
+            "R": 75,
+            "G": 60,
+            "B": 42
+        },
+        "Name": "Mocha Brown Very dark"
+    },
+    {
+        "DpDmcNumber": "3032",
+        "Color": {
+            "R": 179,
+            "G": 159,
+            "B": 139
+        },
+        "Name": "Mocha Brown Medium"
+    },
+    {
+        "DpDmcNumber": "3033",
+        "Color": {
+            "R": 227,
+            "G": 216,
+            "B": 204
+        },
+        "Name": "Mocha Brown very Light"
+    },
+    {
+        "DpDmcNumber": "3041",
+        "Color": {
+            "R": 149,
+            "G": 111,
+            "B": 124
+        },
+        "Name": "Antique Violet medium"
+    },
+    {
+        "DpDmcNumber": "3042",
+        "Color": {
+            "R": 183,
+            "G": 157,
+            "B": 167
+        },
+        "Name": "Antique Violet Light"
+    },
+    {
+        "DpDmcNumber": "3045",
+        "Color": {
+            "R": 188,
+            "G": 150,
+            "B": 106
+        },
+        "Name": "Yellow Beige dark"
+    },
+    {
+        "DpDmcNumber": "3046",
+        "Color": {
+            "R": 216,
+            "G": 188,
+            "B": 154
+        },
+        "Name": "YellowBeige medium"
+    },
+    {
+        "DpDmcNumber": "3047",
+        "Color": {
+            "R": 231,
+            "G": 214,
+            "B": 193
+        },
+        "Name": "Yellow Beige Light"
+    },
+    {
+        "DpDmcNumber": "3051",
+        "Color": {
+            "R": 95,
+            "G": 102,
+            "B": 72
+        },
+        "Name": "Green Gray dark"
+    },
+    {
+        "DpDmcNumber": "3052",
+        "Color": {
+            "R": 136,
+            "G": 146,
+            "B": 104
+        },
+        "Name": "Green Gray medium"
+    },
+    {
+        "DpDmcNumber": "3053",
+        "Color": {
+            "R": 156,
+            "G": 164,
+            "B": 130
+        },
+        "Name": "Green Gray"
+    },
+    {
+        "DpDmcNumber": "3064",
+        "Color": {
+            "R": 196,
+            "G": 142,
+            "B": 112
+        },
+        "Name": "Desert Sand"
+    },
+    {
+        "DpDmcNumber": "3072",
+        "Color": {
+            "R": 230,
+            "G": 232,
+            "B": 232
+        },
+        "Name": "Beaver Gray Very Light"
+    },
+    {
+        "DpDmcNumber": "3078",
+        "Color": {
+            "R": 255,
+            "G": 251,
+            "B": 204
+        },
+        "Name": "Golden Yellow Very Light"
+    },
+    {
+        "DpDmcNumber": "3325",
+        "Color": {
+            "R": 184,
+            "G": 210,
+            "B": 230
+        },
+        "Name": "Baby Blue Light"
+    },
+    {
+        "DpDmcNumber": "3326",
+        "Color": {
+            "R": 251,
+            "G": 173,
+            "B": 180
+        },
+        "Name": "Rose Light"
+    },
+    {
+        "DpDmcNumber": "3328",
+        "Color": {
+            "R": 227,
+            "G": 109,
+            "B": 109
+        },
+        "Name": "Salmon Dark"
+    },
+    {
+        "DpDmcNumber": "3340",
+        "Color": {
+            "R": 255,
+            "G": 131,
+            "B": 111
+        },
+        "Name": "Apricot Medium"
+    },
+    {
+        "DpDmcNumber": "3341",
+        "Color": {
+            "R": 252,
+            "G": 171,
+            "B": 152
+        },
+        "Name": "Apricot"
+    },
+    {
+        "DpDmcNumber": "3345",
+        "Color": {
+            "R": 27,
+            "G": 89,
+            "B": 21
+        },
+        "Name": "Hunter Green Dark"
+    },
+    {
+        "DpDmcNumber": "3346",
+        "Color": {
+            "R": 64,
+            "G": 106,
+            "B": 58
+        },
+        "Name": "Hunter Green"
+    },
+    {
+        "DpDmcNumber": "3347",
+        "Color": {
+            "R": 113,
+            "G": 147,
+            "B": 92
+        },
+        "Name": "Yellow Green Medium"
+    },
+    {
+        "DpDmcNumber": "3348",
+        "Color": {
+            "R": 204,
+            "G": 217,
+            "B": 177
+        },
+        "Name": "Yellow Green Light"
+    },
+    {
+        "DpDmcNumber": "3350",
+        "Color": {
+            "R": 188,
+            "G": 67,
+            "B": 101
+        },
+        "Name": "Dusty Rose Ultra Dark"
+    },
+    {
+        "DpDmcNumber": "3354",
+        "Color": {
+            "R": 228,
+            "G": 166,
+            "B": 172
+        },
+        "Name": "Dusty Rose Light"
+    },
+    {
+        "DpDmcNumber": "3362",
+        "Color": {
+            "R": 94,
+            "G": 107,
+            "B": 71
+        },
+        "Name": "Pine Green dark"
+    },
+    {
+        "DpDmcNumber": "3363",
+        "Color": {
+            "R": 114,
+            "G": 130,
+            "B": 86
+        },
+        "Name": "Pine green Medium"
+    },
+    {
+        "DpDmcNumber": "3364",
+        "Color": {
+            "R": 131,
+            "G": 151,
+            "B": 95
+        },
+        "Name": "Pine green"
+    },
+    {
+        "DpDmcNumber": "3371",
+        "Color": {
+            "R": 30,
+            "G": 17,
+            "B": 8
+        },
+        "Name": "Black Brown"
+    },
+    {
+        "DpDmcNumber": "3607",
+        "Color": {
+            "R": 197,
+            "G": 73,
+            "B": 137
+        },
+        "Name": "Plum Light"
+    },
+    {
+        "DpDmcNumber": "3608",
+        "Color": {
+            "R": 234,
+            "G": 156,
+            "B": 196
+        },
+        "Name": "Plum very Light"
+    },
+    {
+        "DpDmcNumber": "3609",
+        "Color": {
+            "R": 244,
+            "G": 174,
+            "B": 213
+        },
+        "Name": "Plum ultra Light"
+    },
+    {
+        "DpDmcNumber": "3685",
+        "Color": {
+            "R": 136,
+            "G": 21,
+            "B": 49
+        },
+        "Name": "Mauve Very Dark"
+    },
+    {
+        "DpDmcNumber": "3687",
+        "Color": {
+            "R": 201,
+            "G": 107,
+            "B": 112
+        },
+        "Name": "Mauve"
+    },
+    {
+        "DpDmcNumber": "3688",
+        "Color": {
+            "R": 231,
+            "G": 169,
+            "B": 172
+        },
+        "Name": "Mauve Medium"
+    },
+    {
+        "DpDmcNumber": "3689",
+        "Color": {
+            "R": 251,
+            "G": 191,
+            "B": 194
+        },
+        "Name": "Mauve Light"
+    },
+    {
+        "DpDmcNumber": "3705",
+        "Color": {
+            "R": 255,
+            "G": 121,
+            "B": 146
+        },
+        "Name": "Melon Dark"
+    },
+    {
+        "DpDmcNumber": "3706",
+        "Color": {
+            "R": 255,
+            "G": 173,
+            "B": 188
+        },
+        "Name": "Melon Medium"
+    },
+    {
+        "DpDmcNumber": "3708",
+        "Color": {
+            "R": 255,
+            "G": 203,
+            "B": 213
+        },
+        "Name": "Melon light"
+    },
+    {
+        "DpDmcNumber": "3712",
+        "Color": {
+            "R": 241,
+            "G": 135,
+            "B": 135
+        },
+        "Name": "Salmon Medium"
+    },
+    {
+        "DpDmcNumber": "3713",
+        "Color": {
+            "R": 255,
+            "G": 226,
+            "B": 226
+        },
+        "Name": "Salmon Very Light"
+    },
+    {
+        "DpDmcNumber": "3716",
+        "Color": {
+            "R": 255,
+            "G": 189,
+            "B": 189
+        },
+        "Name": "Dusty Rose Medium Very Light"
+    },
+    {
+        "DpDmcNumber": "3721",
+        "Color": {
+            "R": 161,
+            "G": 75,
+            "B": 81
+        },
+        "Name": "Shell Pink dark"
+    },
+    {
+        "DpDmcNumber": "3722",
+        "Color": {
+            "R": 188,
+            "G": 108,
+            "B": 100
+        },
+        "Name": "Shell Pink Medium"
+    },
+    {
+        "DpDmcNumber": "3726",
+        "Color": {
+            "R": 155,
+            "G": 91,
+            "B": 102
+        },
+        "Name": "Antique Mauve Dark"
+    },
+    {
+        "DpDmcNumber": "3727",
+        "Color": {
+            "R": 219,
+            "G": 169,
+            "B": 178
+        },
+        "Name": "Antique Mauve Light"
+    },
+    {
+        "DpDmcNumber": "3731",
+        "Color": {
+            "R": 218,
+            "G": 103,
+            "B": 131
+        },
+        "Name": "Dusty Rose Very Dark"
+    },
+    {
+        "DpDmcNumber": "3733",
+        "Color": {
+            "R": 232,
+            "G": 135,
+            "B": 155
+        },
+        "Name": "Dusty Rose"
+    },
+    {
+        "DpDmcNumber": "3740",
+        "Color": {
+            "R": 120,
+            "G": 87,
+            "B": 98
+        },
+        "Name": "Antique Violet Dark"
+    },
+    {
+        "DpDmcNumber": "3743",
+        "Color": {
+            "R": 215,
+            "G": 203,
+            "B": 21
+        },
+        "Name": "Antique Violet Very Light"
+    },
+    {
+        "DpDmcNumber": "3746",
+        "Color": {
+            "R": 119,
+            "G": 107,
+            "B": 152
+        },
+        "Name": "Blue Violet Dark"
+    },
+    {
+        "DpDmcNumber": "3747",
+        "Color": {
+            "R": 211,
+            "G": 215,
+            "B": 237
+        },
+        "Name": "Blue Violet Very Light"
+    },
+    {
+        "DpDmcNumber": "3750",
+        "Color": {
+            "R": 56,
+            "G": 76,
+            "B": 94
+        },
+        "Name": "Antique Blue Very Dark"
+    },
+    {
+        "DpDmcNumber": "3752",
+        "Color": {
+            "R": 199,
+            "G": 209,
+            "B": 219
+        },
+        "Name": "Antique Blue Very Light"
+    },
+    {
+        "DpDmcNumber": "3753",
+        "Color": {
+            "R": 219,
+            "G": 226,
+            "B": 233
+        },
+        "Name": "Antique Blue Ultra Very Light"
+    },
+    {
+        "DpDmcNumber": "3755",
+        "Color": {
+            "R": 147,
+            "G": 180,
+            "B": 206
+        },
+        "Name": "Baby Blue"
+    },
+    {
+        "DpDmcNumber": "3756",
+        "Color": {
+            "R": 238,
+            "G": 252,
+            "B": 252
+        },
+        "Name": "Baby Blue Ultra very Light"
+    },
+    {
+        "DpDmcNumber": "3760",
+        "Color": {
+            "R": 62,
+            "G": 133,
+            "B": 162
+        },
+        "Name": "Wdgewood Medium"
+    },
+    {
+        "DpDmcNumber": "3761",
+        "Color": {
+            "R": 172,
+            "G": 216,
+            "B": 226
+        },
+        "Name": "Sky Blue Light"
+    },
+    {
+        "DpDmcNumber": "3765",
+        "Color": {
+            "R": 52,
+            "G": 127,
+            "B": 140
+        },
+        "Name": "Peacock Blue Very Dark"
+    },
+    {
+        "DpDmcNumber": "3766",
+        "Color": {
+            "R": 153,
+            "G": 207,
+            "B": 217
+        },
+        "Name": "Peacock Blue Light"
+    },
+    {
+        "DpDmcNumber": "3768",
+        "Color": {
+            "R": 101,
+            "G": 127,
+            "B": 127
+        },
+        "Name": "Gray Green Dark"
+    },
+    {
+        "DpDmcNumber": "3770",
+        "Color": {
+            "R": 255,
+            "G": 238,
+            "B": 237
+        },
+        "Name": "Tawny Very Light"
+    },
+    {
+        "DpDmcNumber": "3771",
+        "Color": {
+            "R": 244,
+            "G": 187,
+            "B": 169
+        },
+        "Name": "Terra Cotta Ultra Very Light"
+    },
+    {
+        "DpDmcNumber": "3772",
+        "Color": {
+            "R": 160,
+            "G": 108,
+            "B": 80
+        },
+        "Name": "Deset Sans Very Dark"
+    },
+    {
+        "DpDmcNumber": "3773",
+        "Color": {
+            "R": 182,
+            "G": 117,
+            "B": 82
+        },
+        "Name": "Desert Sand Dark"
+    },
+    {
+        "DpDmcNumber": "3774",
+        "Color": {
+            "R": 243,
+            "G": 225,
+            "B": 215
+        },
+        "Name": "Desert Sand Very Light"
+    },
+    {
+        "DpDmcNumber": "3776",
+        "Color": {
+            "R": 207,
+            "G": 121,
+            "B": 57
+        },
+        "Name": "Mahagony Light"
+    },
+    {
+        "DpDmcNumber": "3777",
+        "Color": {
+            "R": 134,
+            "G": 48,
+            "B": 34
+        },
+        "Name": "Terra Cotta Very Dark"
+    },
+    {
+        "DpDmcNumber": "3778",
+        "Color": {
+            "R": 217,
+            "G": 137,
+            "B": 120
+        },
+        "Name": "Terra Cotta Light"
+    },
+    {
+        "DpDmcNumber": "3779",
+        "Color": {
+            "R": 248,
+            "G": 202,
+            "B": 200
+        },
+        "Name": "Rosewood Ultra Very Light"
+    },
+    {
+        "DpDmcNumber": "3781",
+        "Color": {
+            "R": 107,
+            "G": 87,
+            "B": 67
+        },
+        "Name": "Mocha Brown Dark"
+    },
+    {
+        "DpDmcNumber": "3782",
+        "Color": {
+            "R": 210,
+            "G": 188,
+            "B": 166
+        },
+        "Name": "Mocha Brown Light"
+    },
+    {
+        "DpDmcNumber": "3787",
+        "Color": {
+            "R": 98,
+            "G": 93,
+            "B": 80
+        },
+        "Name": "Brown Gray Dark"
+    },
+    {
+        "DpDmcNumber": "3790",
+        "Color": {
+            "R": 127,
+            "G": 106,
+            "B": 85
+        },
+        "Name": "Beige Gray Ultra Dark"
+    },
+    {
+        "DpDmcNumber": "3799",
+        "Color": {
+            "R": 65,
+            "G": 65,
+            "B": 65
+        },
+        "Name": "Pewter Gray Very Dark"
+    },
+    {
+        "DpDmcNumber": "3801",
+        "Color": {
+            "R": 231,
+            "G": 73,
+            "B": 103
+        },
+        "Name": "Melon very Dark"
+    },
+    {
+        "DpDmcNumber": "3802",
+        "Color": {
+            "R": 113,
+            "G": 65,
+            "B": 73
+        },
+        "Name": "Antique Mauve Very Dark"
+    },
+    {
+        "DpDmcNumber": "3803",
+        "Color": {
+            "R": 171,
+            "G": 51,
+            "B": 87
+        },
+        "Name": "Mauve Dark"
+    },
+    {
+        "DpDmcNumber": "3804",
+        "Color": {
+            "R": 224,
+            "G": 40,
+            "B": 118
+        },
+        "Name": "Cyclamen Pink Dark"
+    },
+    {
+        "DpDmcNumber": "3805",
+        "Color": {
+            "R": 243,
+            "G": 71,
+            "B": 139
+        },
+        "Name": "Cyclamen Pink"
+    },
+    {
+        "DpDmcNumber": "3806",
+        "Color": {
+            "R": 255,
+            "G": 140,
+            "B": 174
+        },
+        "Name": "Cyclamen Pink Light"
+    },
+    {
+        "DpDmcNumber": "3807",
+        "Color": {
+            "R": 96,
+            "G": 103,
+            "B": 140
+        },
+        "Name": "Cornflower Blue"
+    },
+    {
+        "DpDmcNumber": "3808",
+        "Color": {
+            "R": 54,
+            "G": 105,
+            "B": 112
+        },
+        "Name": "Turquise Ultra very Dark"
+    },
+    {
+        "DpDmcNumber": "3809",
+        "Color": {
+            "R": 63,
+            "G": 124,
+            "B": 133
+        },
+        "Name": "Turquise very Dark"
+    },
+    {
+        "DpDmcNumber": "3810",
+        "Color": {
+            "R": 72,
+            "G": 142,
+            "B": 154
+        },
+        "Name": "Turquise Dark"
+    },
+    {
+        "DpDmcNumber": "3811",
+        "Color": {
+            "R": 188,
+            "G": 227,
+            "B": 230
+        },
+        "Name": "Turquised Very Light"
+    },
+    {
+        "DpDmcNumber": "3812",
+        "Color": {
+            "R": 47,
+            "G": 140,
+            "B": 132
+        },
+        "Name": "Sea Green Very Dark"
+    },
+    {
+        "DpDmcNumber": "3813",
+        "Color": {
+            "R": 178,
+            "G": 212,
+            "B": 189
+        },
+        "Name": "Blue Green light"
+    },
+    {
+        "DpDmcNumber": "3814",
+        "Color": {
+            "R": 80,
+            "G": 139,
+            "B": 125
+        },
+        "Name": "Aquamarine"
+    },
+    {
+        "DpDmcNumber": "3815",
+        "Color": {
+            "R": 71,
+            "G": 119,
+            "B": 88
+        },
+        "Name": "Caladon green Dark"
+    },
+    {
+        "DpDmcNumber": "3816",
+        "Color": {
+            "R": 101,
+            "G": 165,
+            "B": 125
+        },
+        "Name": "Caladon Green"
+    },
+    {
+        "DpDmcNumber": "3817",
+        "Color": {
+            "R": 153,
+            "G": 195,
+            "B": 170
+        },
+        "Name": "Caladon Green light"
+    },
+    {
+        "DpDmcNumber": "3818",
+        "Color": {
+            "R": 17,
+            "G": 90,
+            "B": 59
+        },
+        "Name": "Emerald green Ultra Very Dark"
+    },
+    {
+        "DpDmcNumber": "3819",
+        "Color": {
+            "R": 224,
+            "G": 232,
+            "B": 104
+        },
+        "Name": "Mossx green Light"
+    },
+    {
+        "DpDmcNumber": "3820",
+        "Color": {
+            "R": 223,
+            "G": 182,
+            "B": 95
+        },
+        "Name": "Straw Dark"
+    },
+    {
+        "DpDmcNumber": "3821",
+        "Color": {
+            "R": 243,
+            "G": 206,
+            "B": 117
+        },
+        "Name": "Straw"
+    },
+    {
+        "DpDmcNumber": "3822",
+        "Color": {
+            "R": 246,
+            "G": 220,
+            "B": 152
+        },
+        "Name": "Straw Light"
+    },
+    {
+        "DpDmcNumber": "3823",
+        "Color": {
+            "R": 255,
+            "G": 253,
+            "B": 227
+        },
+        "Name": "Yellow Ultra Pale"
+    },
+    {
+        "DpDmcNumber": "3824",
+        "Color": {
+            "R": 254,
+            "G": 205,
+            "B": 194
+        },
+        "Name": "Apricot Light"
+    },
+    {
+        "DpDmcNumber": "3825",
+        "Color": {
+            "R": 253,
+            "G": 189,
+            "B": 150
+        },
+        "Name": "Pumpkin Pale"
+    },
+    {
+        "DpDmcNumber": "3826",
+        "Color": {
+            "R": 173,
+            "G": 114,
+            "B": 57
+        },
+        "Name": "Golden Brown"
+    },
+    {
+        "DpDmcNumber": "3827",
+        "Color": {
+            "R": 247,
+            "G": 187,
+            "B": 119
+        },
+        "Name": "Golden Brown Pale"
+    },
+    {
+        "DpDmcNumber": "3828",
+        "Color": {
+            "R": 183,
+            "G": 139,
+            "B": 97
+        },
+        "Name": "Hazelnut Brown"
+    },
+    {
+        "DpDmcNumber": "3829",
+        "Color": {
+            "R": 169,
+            "G": 130,
+            "B": 4
+        },
+        "Name": "Old Gold Very dark"
+    },
+    {
+        "DpDmcNumber": "3830",
+        "Color": {
+            "R": 185,
+            "G": 85,
+            "B": 68
+        },
+        "Name": "Terra Cotta"
+    },
+    {
+        "DpDmcNumber": "3831",
+        "Color": {
+            "R": 179,
+            "G": 47,
+            "B": 72
+        },
+        "Name": "Rasberry Dark"
+    },
+    {
+        "DpDmcNumber": "3832",
+        "Color": {
+            "R": 219,
+            "G": 85,
+            "B": 110
+        },
+        "Name": "Rasberry Medium"
+    },
+    {
+        "DpDmcNumber": "3833",
+        "Color": {
+            "R": 234,
+            "G": 134,
+            "B": 153
+        },
+        "Name": "Rasberry Light"
+    },
+    {
+        "DpDmcNumber": "3834",
+        "Color": {
+            "R": 114,
+            "G": 55,
+            "B": 93
+        },
+        "Name": "Grape Dark"
+    },
+    {
+        "DpDmcNumber": "3835",
+        "Color": {
+            "R": 148,
+            "G": 96,
+            "B": 131
+        },
+        "Name": "Grape Medium"
+    },
+    {
+        "DpDmcNumber": "3836",
+        "Color": {
+            "R": 186,
+            "G": 145,
+            "B": 170
+        },
+        "Name": "Grape Light"
+    },
+    {
+        "DpDmcNumber": "3837",
+        "Color": {
+            "R": 108,
+            "G": 58,
+            "B": 110
+        },
+        "Name": "Lavender Ultra Dark"
+    },
+    {
+        "DpDmcNumber": "3838",
+        "Color": {
+            "R": 92,
+            "G": 114,
+            "B": 148
+        },
+        "Name": "Lavender Blue Dark"
+    },
+    {
+        "DpDmcNumber": "3839",
+        "Color": {
+            "R": 123,
+            "G": 142,
+            "B": 171
+        },
+        "Name": "Lavender Blue Medium"
+    },
+    {
+        "DpDmcNumber": "3840",
+        "Color": {
+            "R": 176,
+            "G": 192,
+            "B": 218
+        },
+        "Name": "Lavender Blue Light"
+    },
+    {
+        "DpDmcNumber": "3841",
+        "Color": {
+            "R": 205,
+            "G": 223,
+            "B": 237
+        },
+        "Name": "Baby Blue Pale"
+    },
+    {
+        "DpDmcNumber": "3842",
+        "Color": {
+            "R": 50,
+            "G": 102,
+            "B": 124
+        },
+        "Name": "Wedgewood Very Dark"
+    },
+    {
+        "DpDmcNumber": "3843",
+        "Color": {
+            "R": 20,
+            "G": 170,
+            "B": 208
+        },
+        "Name": "Electric Blue"
+    },
+    {
+        "DpDmcNumber": "3844",
+        "Color": {
+            "R": 18,
+            "G": 174,
+            "B": 186
+        },
+        "Name": "Torquise Bright Dark"
+    },
+    {
+        "DpDmcNumber": "3845",
+        "Color": {
+            "R": 4,
+            "G": 196,
+            "B": 202
+        },
+        "Name": "Torquise Bright Medium"
+    },
+    {
+        "DpDmcNumber": "3846",
+        "Color": {
+            "R": 6,
+            "G": 227,
+            "B": 230
+        },
+        "Name": "Torquise Bright light"
+    },
+    {
+        "DpDmcNumber": "3847",
+        "Color": {
+            "R": 52,
+            "G": 125,
+            "B": 117
+        },
+        "Name": "Teal green Dark"
+    },
+    {
+        "DpDmcNumber": "3848",
+        "Color": {
+            "R": 85,
+            "G": 147,
+            "B": 146
+        },
+        "Name": "Teal green medium"
+    },
+    {
+        "DpDmcNumber": "3849",
+        "Color": {
+            "R": 81,
+            "G": 181,
+            "B": 167
+        },
+        "Name": "Teal Green Light"
+    },
+    {
+        "DpDmcNumber": "3850",
+        "Color": {
+            "R": 54,
+            "G": 135,
+            "B": 122
+        },
+        "Name": "Green Bright Dark"
+    },
+    {
+        "DpDmcNumber": "3851",
+        "Color": {
+            "R": 73,
+            "G": 179,
+            "B": 161
+        },
+        "Name": "Green Bright Light"
+    },
+    {
+        "DpDmcNumber": "3852",
+        "Color": {
+            "R": 205,
+            "G": 157,
+            "B": 55
+        },
+        "Name": "Straw very Dark"
+    },
+    {
+        "DpDmcNumber": "3853",
+        "Color": {
+            "R": 242,
+            "G": 151,
+            "B": 70
+        },
+        "Name": "Autum Gold Dark"
+    },
+    {
+        "DpDmcNumber": "3854",
+        "Color": {
+            "R": 242,
+            "G": 175,
+            "B": 104
+        },
+        "Name": "Autum Gold Medium"
+    },
+    {
+        "DpDmcNumber": "3855",
+        "Color": {
+            "R": 250,
+            "G": 211,
+            "B": 150
+        },
+        "Name": "Autum Gold Light"
+    },
+    {
+        "DpDmcNumber": "3856",
+        "Color": {
+            "R": 255,
+            "G": 211,
+            "B": 181
+        },
+        "Name": "Mahagony Ultra Very light"
+    },
+    {
+        "DpDmcNumber": "3857",
+        "Color": {
+            "R": 104,
+            "G": 37,
+            "B": 26
+        },
+        "Name": "Rosewood Dark"
+    },
+    {
+        "DpDmcNumber": "3858",
+        "Color": {
+            "R": 150,
+            "G": 74,
+            "B": 63
+        },
+        "Name": "Rosewood medium"
+    },
+    {
+        "DpDmcNumber": "3859",
+        "Color": {
+            "R": 186,
+            "G": 139,
+            "B": 124
+        },
+        "Name": "Rosewood Light"
+    },
+    {
+        "DpDmcNumber": "3860",
+        "Color": {
+            "R": 125,
+            "G": 93,
+            "B": 87
+        },
+        "Name": "Cocoa"
+    },
+    {
+        "DpDmcNumber": "3861",
+        "Color": {
+            "R": 166,
+            "G": 136,
+            "B": 129
+        },
+        "Name": "Cocoa Light"
+    },
+    {
+        "DpDmcNumber": "3862",
+        "Color": {
+            "R": 138,
+            "G": 110,
+            "B": 78
+        },
+        "Name": "Mocha Beige Dark"
+    },
+    {
+        "DpDmcNumber": "3863",
+        "Color": {
+            "R": 164,
+            "G": 131,
+            "B": 92
+        },
+        "Name": "Mocha Beige Medium"
+    },
+    {
+        "DpDmcNumber": "3864",
+        "Color": {
+            "R": 203,
+            "G": 182,
+            "B": 156
+        },
+        "Name": "Mocha Beige Light"
+    },
+    {
+        "DpDmcNumber": "3865",
+        "Color": {
+            "R": 249,
+            "G": 247,
+            "B": 241
+        },
+        "Name": "Winter white"
+    },
+    {
+        "DpDmcNumber": "3866",
+        "Color": {
+            "R": 250,
+            "G": 246,
+            "B": 240
+        },
+        "Name": "Mocha Brown Ultra very Light"
+    }
+]

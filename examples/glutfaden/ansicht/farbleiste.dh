@@ -1,0 +1,483 @@
+' Die Farbleiste unter der Zeichenflaeche (PyStickys ColorBar): je Farbe
+' des Musters ein Feld mit Verlauf, Glanz und Symbol. Klick waehlt die
+' Farbe, Doppelklick aendert das Symbol, die rechte Taste oeffnet ein Menue
+' (Symbol, Harmonien, hervorheben, nicht sticken, ersetzen, tauschen), ein
+' Feld auf ein anderes gezogen tauscht die beiden Farben im Muster. Am Rand
+' rollt die Leiste von selbst, das Mausrad rollt sie seitwaerts.
+'
+' Gezeichnet wird EIN Feld (statt eines Widgets je Farbe wie im Original):
+' die Lage jedes Farbfelds rechnet fbFeldX, und Zeichnen, Treffer und
+' Tooltip fragen dieselbe Stelle.
+
+CONST FB_ABSTAND = 4
+CONST FB_ROLLZONE = 28                ' HOVER_ZONE_PX
+CONST FB_ROLLSCHRITT = 6              ' SCROLL_STEP_PX je 16 ms
+CONST FB_ZIEHSCHWELLE = 25            ' _SWAP_DRAG_THRESHOLD (Manhattan)
+CONST FB_WARNUNG = &HFFB020           ' Ring einer hervorgehobenen Farbe
+CONST FB_AUSLASSEN = &HFF9800         ' "Nicht sticken"
+
+DIM fbBox AS INTEGER                  ' Kopfzeile und rollende Leiste
+DIM fbRolle AS INTEGER                ' GtkScrolledWindow
+DIM fbFeld AS INTEGER                 ' GtkDrawingArea mit allen Farbfeldern
+DIM fbZahl AS INTEGER                 ' Label: Zahl der Farben
+DIM fbAktuell AS INTEGER              ' Label: aktuelle Farbe
+DIM fbUeber AS INTEGER                ' Farbe unter der Maus (-1)
+DIM fbDruck AS INTEGER                ' wo die linke Taste gedrueckt wurde (-1)
+DIM fbDruckX AS FLOAT
+DIM fbDruckY AS FLOAT
+DIM fbZiehen AS BOOLEAN               ' Tauschen per Ziehen laeuft
+DIM fbZiel AS INTEGER                 ' Farbe unter dem gezogenen Feld (-1)
+DIM fbMausX AS FLOAT                  ' in der Rolle (fuer das Rollen am Rand)
+DIM fbRollt AS BOOLEAN
+DIM fbMenueFarbe AS INTEGER
+DIM fbSchrift AS INTEGER
+DIM fbTipp AS STRING
+DIM fbMass AS STRING                  ' zuletzt gesetzte Groesse (nur bei Aenderung neu)
+DIM fbProbeAus AS BOOLEAN             ' Fotoproben vor Stufe 16: immer verborgen
+
+FUNCTION fbBreite() AS INTEGER
+    RETURN CLAMP(einst.farbleisteGroesse, 20, 60)
+END FUNCTION
+
+' Hoehe wie im Original: 62 bei 48 breit, mitwachsend
+FUNCTION fbHoehe() AS INTEGER
+    RETURN ROUND(62 * fbBreite() / 48)
+END FUNCTION
+
+FUNCTION fbFeldX(i AS INTEGER) AS INTEGER
+    RETURN i * (fbBreite() + FB_ABSTAND)
+END FUNCTION
+
+' Farbe an der Stelle (px, py) im Feld, -1 = keine (auch im Abstand dazwischen)
+FUNCTION fbTreffer(px AS FLOAT, py AS FLOAT) AS INTEGER
+    IF NOT lwHat OR px < 0 OR py < 0 OR py >= fbHoehe() THEN RETURN -1
+    DIM i AS INTEGER : i = FLOOR(px / (fbBreite() + FB_ABSTAND))
+    IF i >= lwMuster.farbanzahl() THEN RETURN -1
+    IF px - fbFeldX(i) >= fbBreite() THEN RETURN -1
+    RETURN i
+END FUNCTION
+
+FUNCTION farbleisteNeu() AS INTEGER
+    fbBox = gtk_box_new(GTK_SENKRECHT, 0)
+    gtkKlasse(fbBox, "farbleiste")
+    DIM kopf AS INTEGER : kopf = gtk_box_new(GTK_WAAGERECHT, 8)
+    DIM titel AS INTEGER : titel = gtk_label_new("● MUSTERFARBEN")
+    gtkKlasse(titel, "fb-titel")
+    gtk_box_pack_start(kopf, titel, FALSE, FALSE, 0)
+    fbZahl = gtk_label_new("0")
+    gtkKlasse(fbZahl, "fb-zahl")
+    gtk_box_pack_start(kopf, fbZahl, FALSE, FALSE, 0)
+    fbAktuell = gtk_label_new("")
+    gtkKlasse(fbAktuell, "fb-aktuell")
+    gtk_box_pack_start(kopf, fbAktuell, FALSE, FALSE, 0)
+    gtk_box_pack_start(fbBox, kopf, FALSE, FALSE, 0)
+    fbRolle = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_policy(fbRolle, GTK_POLITIK_AUTO, GTK_POLITIK_NIE)
+    fbFeld = gtk_drawing_area_new()
+    gtk_widget_add_events(fbFeld, GDK_MASKE_BEWEGUNG BOR GDK_MASKE_DRUCK BOR GDK_MASKE_LOSLASSEN BOR GDK_MASKE_RAD BOR GDK_MASKE_RAD_FEIN BOR GDK_MASKE_VERLASSEN)
+    signalZeichnen(fbFeld, "draw", fbZeichnen, 0, 0, 0)
+    signalEreignis(fbFeld, "button-press-event", fbDruecken, 0, 0, 0)
+    signalEreignis(fbFeld, "button-release-event", fbLoslassen, 0, 0, 0)
+    signalEreignis(fbFeld, "motion-notify-event", fbBewegung, 0, 0, 0)
+    signalEreignis(fbFeld, "leave-notify-event", fbVerlassen, 0, 0, 0)
+    signalEreignis(fbFeld, "scroll-event", fbRad, 0, 0, 0)
+    gtk_container_add(fbRolle, fbFeld)
+    gtk_box_pack_start(fbBox, fbRolle, FALSE, FALSE, 0)
+    fbUeber = -1
+    fbDruck = -1
+    fbZiel = -1
+    fbSchrift = pango_font_description_from_string("DejaVu Sans 9")
+    farbleisteNachziehen()
+    RETURN fbBox
+END FUNCTION
+
+SUB farbleisteZeigen(an AS BOOLEAN)
+    IF fbProbeAus THEN an = FALSE
+    IF fbBox <> 0 THEN gtk_widget_set_visible(fbBox, an)
+END SUB
+
+' Nach dem Laden und jedem Umbau: Groesse, Zahl, aktuelle Farbe
+SUB farbleisteNachziehen()
+    IF fbFeld = 0 THEN RETURN
+    DIM n AS INTEGER : n = IIF(lwHat, lwMuster.farbanzahl(), 0)
+    DIM b AS INTEGER : b = MAX(1, n * (fbBreite() + FB_ABSTAND) - FB_ABSTAND)
+    ' Groesse nur, wenn sie sich aendert -- jedes Setzen laesst GTK neu
+    ' vermessen, und das Auffrischen kommt oft (siehe verlaufLeisteNachziehen)
+    DIM mass AS STRING : mass = STR$(b) + "x" + STR$(fbHoehe())
+    IF mass <> fbMass THEN
+        fbMass = mass
+        gtk_widget_set_size_request(fbFeld, b, fbHoehe())
+        gtk_widget_set_size_request(fbRolle, -1, fbHoehe() + 8)
+    END IF
+    DIM z AS STRING : z = STR$(n)
+    IF z <> gtk_label_get_text(fbZahl) THEN gtk_label_set_text(fbZahl, z)
+    IF fbUeber >= n THEN fbUeber = -1
+    farbleisteMarkieren()
+END SUB
+
+' Die aktuelle Farbe hat sich geaendert: Kopfzeile, ins Bild rollen, zeichnen
+SUB farbleisteMarkieren()
+    IF fbFeld = 0 THEN RETURN
+    DIM t AS STRING
+    IF lwHat AND wzFarbe >= 0 AND wzFarbe < lwMuster.farbanzahl() THEN t = "✎ " + lwMuster.farben[wzFarbe].symbol + " " + lwMuster.farben[wzFarbe].garn.name
+    IF t <> gtk_label_get_text(fbAktuell) THEN gtk_label_set_text(fbAktuell, t)
+    IF lwHat AND wzFarbe >= 0 THEN fbSichtbar(wzFarbe)
+    gtk_widget_queue_draw(fbFeld)
+END SUB
+
+' Farbe i ganz ins Bild rollen (ensureWidgetVisible)
+SUB fbSichtbar(i AS INTEGER)
+    DIM a AS INTEGER : a = gtk_scrolled_window_get_hadjustment(fbRolle)
+    DIM v AS FLOAT : v = gtk_adjustment_get_value(a)
+    DIM seite AS FLOAT : seite = gtk_adjustment_get_page_size(a)
+    IF seite <= 0 THEN RETURN
+    DIM x0 AS FLOAT : x0 = fbFeldX(i)
+    DIM x1 AS FLOAT : x1 = x0 + fbBreite()
+    IF x0 < v THEN gtk_adjustment_set_value(a, x0)
+    IF x1 > v + seite THEN gtk_adjustment_set_value(a, x1 - seite)
+END SUB
+
+' Ein Rechteck mit runden Ecken als Pfad
+SUB fbRund(cr AS INTEGER, x AS FLOAT, y AS FLOAT, b AS FLOAT, h AS FLOAT, r AS FLOAT)
+    r = MIN(r, MIN(b, h) / 2)
+    cairo_new_path(cr)
+    cairo_arc(cr, x + b - r, y + r, r, -PI / 2, 0)
+    cairo_arc(cr, x + b - r, y + h - r, r, 0, PI / 2)
+    cairo_arc(cr, x + r, y + h - r, r, PI / 2, PI)
+    cairo_arc(cr, x + r, y + r, r, PI, 3 * PI / 2)
+    cairo_close_path(cr)
+END SUB
+
+SUB fbFarbe(cr AS INTEGER, f AS INTEGER, a AS FLOAT)
+    cairo_set_source_rgba(cr, ((f SHR 16) BAND 255) / 255.0, ((f SHR 8) BAND 255) / 255.0, (f BAND 255) / 255.0, a)
+END SUB
+
+SUB fbFarbfeld(cr AS INTEGER, i AS INTEGER)
+    DIM f AS kern.Farbeintrag : f = lwMuster.farben[i]
+    DIM w AS INTEGER : w = fbBreite()
+    DIM ox AS FLOAT : ox = fbFeldX(i)
+    DIM rx AS FLOAT : rx = ox + 4
+    DIM ry AS FLOAT : ry = 4
+    DIM rb AS FLOAT : rb = w - 8
+    DIM rh AS FLOAT : rh = fbHoehe() - 22
+    DIM gewaehlt AS BOOLEAN : gewaehlt = i = wzFarbe
+    DIM ueber AS BOOLEAN : ueber = i = fbUeber AND NOT fbZiehen
+    DIM k AS INTEGER
+    ' Leuchten um die gewaehlte, Dreieck oben
+    IF gewaehlt THEN
+        FOR k = 0 TO 2
+            fbFarbe(cr, FL_AKZENT, 0.2 - k * 0.05)
+            fbRund(cr, rx - 3 - k * 2, ry - 3 - k * 2, rb + 6 + k * 4, rh + 6 + k * 4, 8 + k)
+            cairo_fill(cr)
+        NEXT
+        cairoFarbe(cr, FL_AKZENT)
+        DIM cx AS FLOAT : cx = ox + w \ 2
+        cairo_move_to(cr, cx - 5, 0) : cairo_line_to(cr, cx + 5, 0) : cairo_line_to(cr, cx, 5)
+        cairo_close_path(cr)
+        cairo_fill(cr)
+    END IF
+    IF gewaehlt OR ueber THEN
+        cairo_set_source_rgba(cr, 0, 0, 0, IIF(gewaehlt, 60, 40) / 255.0)
+        fbRund(cr, rx + 2, ry + 2, rb, rh, 6)
+        cairo_fill(cr)
+    END IF
+    ' Verlauf heller -> Farbe -> dunkler (lighter(115), darker(110))
+    DIM c AS INTEGER : c = f.garn.farbe
+    DIM v AS INTEGER : v = cairo_pattern_create_linear(rx, ry, rx + rb, ry + rh)
+    DIM fs AS ARRAY OF INTEGER : fs = [kern.farbeHeller(c, 115), c, kern.farbeDunkler(c, 110)]
+    FOR k = 0 TO 2
+        cairo_pattern_add_color_stop_rgba(v, k * 0.5, ((fs[k] SHR 16) BAND 255) / 255.0, ((fs[k] SHR 8) BAND 255) / 255.0, (fs[k] BAND 255) / 255.0, 1.0)
+    NEXT
+    fbRund(cr, rx, ry, rb, rh, 6)
+    cairo_set_source(cr, v)
+    cairo_fill_preserve(cr)
+    cairo_pattern_destroy(v)
+    ' Rand: Ablageziel gestrichelt, gewaehlt Akzent, unter der Maus gruen
+    IF fbZiehen AND i = fbZiel AND i <> fbDruck THEN
+        cairoFarbe(cr, FL_AKZENT)
+        cairo_set_line_width(cr, 3)
+        sdStrichel(cr, 5, 3)
+    ELSEIF gewaehlt THEN
+        cairoFarbe(cr, FL_AKZENT)
+        cairo_set_line_width(cr, 3)
+    ELSEIF ueber THEN
+        cairoFarbe(cr, FL_MARKE)
+        cairo_set_line_width(cr, 2)
+    ELSE
+        cairoFarbe(cr, &H3A3C44)
+        cairo_set_line_width(cr, 1)
+    END IF
+    cairo_stroke(cr)
+    sdStrichel(cr, 0, 0)
+    ' Glanz in der oberen Haelfte
+    DIM gl AS INTEGER : gl = cairo_pattern_create_linear(0, ry + 3, 0, ry + rh / 2)
+    cairo_pattern_add_color_stop_rgba(gl, 0, 1, 1, 1, 45 / 255.0)
+    cairo_pattern_add_color_stop_rgba(gl, 1, 1, 1, 1, 0)
+    fbRund(cr, rx + 3, ry + 3, rb - 6, rh / 2 - 3, 4)
+    cairo_set_source(cr, gl)
+    cairo_fill(cr)
+    cairo_pattern_destroy(gl)
+    ' Haken unten rechts
+    IF gewaehlt THEN
+        DIM hx AS FLOAT : hx = rx + rb - 12
+        DIM hy AS FLOAT : hy = ry + rh - 12
+        cairoFarbe(cr, FL_AKZENT)
+        cairo_arc(cr, hx + 7, hy + 7, 7, 0, TAU)
+        cairo_fill(cr)
+        cairo_set_source_rgb(cr, 1, 1, 1)
+        cairo_set_line_width(cr, 2)
+        cairo_move_to(cr, hx + 3, hy + 7) : cairo_line_to(cr, hx + 6, hy + 10) : cairo_line_to(cr, hx + 11, hy + 4)
+        cairo_stroke(cr)
+    END IF
+    ' Hervorgehoben: Ring und Punkt oben links
+    IF i = lwHervor THEN
+        cairoFarbe(cr, FB_WARNUNG)
+        cairo_set_line_width(cr, 2)
+        fbRund(cr, rx - 3, ry - 3, rb + 6, rh + 6, 8)
+        cairo_stroke(cr)
+        cairo_arc(cr, rx + 3, ry + 3, 7, 0, TAU)
+        cairo_fill(cr)
+    END IF
+    ' Nicht sticken: orangefarbener Schraegstrich
+    IF f.auslassen THEN
+        fbFarbe(cr, FB_AUSLASSEN, 200 / 255.0)
+        cairo_set_line_width(cr, 3)
+        cairo_move_to(cr, rx + 4, ry + 4) : cairo_line_to(cr, rx + rb - 4, ry + rh - 4)
+        cairo_stroke(cr)
+        cairo_arc(cr, rx + 4, ry + 4, 6, 0, TAU)
+        cairo_fill(cr)
+    END IF
+    ' Das Symbol darunter
+    DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
+    pango_font_description_set_absolute_size(fbSchrift, IIF(gewaehlt, 13, 12) * PANGO_SCALE)
+    pango_font_description_set_weight(fbSchrift, IIF(gewaehlt, 700, 400))
+    pango_layout_set_font_description(layout, fbSchrift)
+    pango_layout_set_text(layout, f.symbol, -1)
+    DIM tw AS INTEGER, th AS INTEGER
+    pango_layout_get_pixel_size(layout, tw, th)
+    IF gewaehlt THEN cairoFarbe(cr, FL_AKZENT) ELSE cairoFarbe(cr, &H8D93A1)
+    cairo_move_to(cr, ox + (w - tw) / 2, ry + rh + 2 + (14 - th) / 2)
+    pango_cairo_show_layout(cr, layout)
+    g_object_unref(layout)
+END SUB
+
+FUNCTION fbZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    IF NOT lwHat THEN RETURN TRUE
+    DIM i AS INTEGER
+    FOR i = 0 TO lwMuster.farbanzahl() - 1
+        fbFarbfeld(cr, i)
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+' Der Tooltip zur Farbe unter der Maus (nur neu gesetzt, wenn er sich aendert)
+SUB fbTippSetzen(i AS INTEGER)
+    DIM t AS STRING
+    IF i >= 0 THEN
+        DIM f AS kern.Farbeintrag : f = lwMuster.farben[i]
+        t = f.symbol + " " + f.garn.name + CHR$(10) + f.garn.hersteller + CHR$(10) + "Nr.: " + IIF(f.garn.nummer = "", "-", f.garn.nummer) + CHR$(10) + ZAHL$(f.stichzahl, 0) + " Stiche"
+        IF f.auslassen THEN t = t + CHR$(10) + "⊘ Wird nicht gestickt"
+    END IF
+    IF t = fbTipp THEN RETURN
+    fbTipp = t
+    IF t = "" THEN
+        gtk_widget_set_has_tooltip(fbFeld, FALSE)
+    ELSE
+        gtk_widget_set_tooltip_text(fbFeld, t)
+    END IF
+END SUB
+
+FUNCTION fbDruecken(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
+    DIM i AS INTEGER : i = fbTreffer(px, py)
+    DIM taste AS INTEGER : taste = lwTaste(ereignis)
+    IF i < 0 THEN RETURN TRUE
+    IF taste = 1 THEN
+        IF gdk_event_get_event_type(ereignis) = GDK_DOPPELKLICK THEN
+            fbDruck = -1
+            farbeWaehlen(i)
+            symbolDialog()
+            RETURN TRUE
+        END IF
+        fbDruck = i
+        fbDruckX = px
+        fbDruckY = py
+        farbeWaehlen(i)
+    ELSEIF taste = 3 THEN
+        fbMenue(i, ereignis)
+    END IF
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION fbBewegung(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
+    DIM i AS INTEGER : i = fbTreffer(px, py)
+    ' Ziehen zum Tauschen: erst ab der Schwelle; ausserhalb der Leiste bricht es ab
+    IF fbDruck >= 0 THEN
+        DIM a AS INTEGER : a = gtk_scrolled_window_get_hadjustment(fbRolle)
+        DIM sx AS FLOAT : sx = px - gtk_adjustment_get_value(a)
+        IF sx < 0 OR sx > gtk_widget_get_allocated_width(fbRolle) OR py < 0 OR py > fbHoehe() THEN
+            fbDruck = -1
+            fbZiehen = FALSE
+            fbZiel = -1
+        ELSEIF NOT fbZiehen AND ABS(px - fbDruckX) + ABS(py - fbDruckY) >= FB_ZIEHSCHWELLE THEN
+            fbZiehen = TRUE
+        END IF
+        IF fbZiehen THEN fbZiel = i
+    END IF
+    IF i <> fbUeber THEN
+        fbUeber = i
+        fbTippSetzen(i)
+    END IF
+    fbMausX = px - gtk_adjustment_get_value(gtk_scrolled_window_get_hadjustment(fbRolle))
+    IF NOT fbRollt AND (fbMausX < FB_ROLLZONE OR fbMausX > gtk_widget_get_allocated_width(fbRolle) - FB_ROLLZONE) THEN
+        fbRollt = TRUE
+        DIM t AS INTEGER : t = g_timeout_add(16, fbRollen, 0)
+    END IF
+    gtk_widget_queue_draw(fbFeld)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION fbLoslassen(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM von AS INTEGER : von = fbDruck
+    DIM nach AS INTEGER : nach = fbZiel
+    DIM gezogen AS BOOLEAN : gezogen = fbZiehen
+    fbDruck = -1
+    fbZiehen = FALSE
+    fbZiel = -1
+    IF gezogen AND von >= 0 AND nach >= 0 AND von <> nach THEN farbleisteTauschen(von, nach)
+    gtk_widget_queue_draw(fbFeld)
+    RETURN TRUE
+END FUNCTION
+
+' Zwei Farben per Ziehen tauschen -- derselbe Weg wie Farben tauschen
+' (_on_color_swap_dropped -> _swap_color_pair)
+SUB farbleisteTauschen(a AS INTEGER, b AS INTEGER)
+    IF NOT lwHat OR a = b OR a < 0 OR b < 0 OR a >= lwMuster.farbanzahl() OR b >= lwMuster.farbanzahl() THEN RETURN
+    tauschenAusfuehren(a, b)
+END SUB
+
+FUNCTION fbVerlassen(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    IF fbDruck < 0 THEN fbUeber = -1
+    fbMausX = -1000
+    gtk_widget_queue_draw(fbFeld)
+    RETURN FALSE
+END FUNCTION
+
+' Am Rand von selbst rollen, solange die Maus dort steht (_poll_auto_scroll)
+FUNCTION fbRollen(daten AS INTEGER) AS BOOLEAN
+    DIM a AS INTEGER : a = gtk_scrolled_window_get_hadjustment(fbRolle)
+    DIM v AS FLOAT : v = gtk_adjustment_get_value(a)
+    DIM breite AS FLOAT : breite = gtk_widget_get_allocated_width(fbRolle)
+    IF fbMausX >= 0 AND fbMausX < FB_ROLLZONE THEN
+        gtk_adjustment_set_value(a, v - FB_ROLLSCHRITT)
+        RETURN TRUE
+    END IF
+    IF fbMausX > breite - FB_ROLLZONE AND fbMausX <= breite THEN
+        gtk_adjustment_set_value(a, v + FB_ROLLSCHRITT)
+        RETURN TRUE
+    END IF
+    fbRollt = FALSE
+    RETURN FALSE
+END FUNCTION
+
+' Das Rad rollt seitwaerts: 30 je Raste, 50 bei grossen Schritten
+FUNCTION fbRad(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM a AS INTEGER : a = gtk_scrolled_window_get_hadjustment(fbRolle)
+    DIM richtung AS INTEGER, dx AS FLOAT, dy AS FLOAT
+    DIM schritt AS FLOAT
+    IF gdk_event_get_scroll_deltas(ereignis, dx, dy) THEN
+        IF dy = 0 THEN dy = dx
+        IF dy = 0 THEN RETURN TRUE
+        schritt = IIF(ABS(dy) > 1, 50, 30) * SGN(dy)
+    ELSEIF gdk_event_get_scroll_direction(ereignis, richtung) THEN
+        schritt = IIF(richtung = 0 OR richtung = 2, -30, 30)
+    END IF
+    gtk_adjustment_set_value(a, gtk_adjustment_get_value(a) + schritt)
+    RETURN TRUE
+END FUNCTION
+
+' --- Das Menue der rechten Taste ---------------------------------------------------------
+
+SUB fbMenue(i AS INTEGER, ereignis AS INTEGER)
+    fbMenueFarbe = i
+    DIM f AS kern.Farbeintrag : f = lwMuster.farben[i]
+    DIM m AS INTEGER : m = gtk_menu_new()
+    fbMenuePunkt(m, "🔤 Symbol ändern …", 0)
+    fbMenuePunkt(m, "🎨 Farb-Harmonien suchen …", 1)
+    gtk_menu_shell_append(m, gtk_separator_menu_item_new())
+    fbMenuePunkt(m, IIF(lwHervor = i, "❌ Farb-Hervorhebung aufheben", "🔍 Nur diese Farbe hervorheben"), 2)
+    gtk_menu_shell_append(m, gtk_separator_menu_item_new())
+    fbMenuePunkt(m, IIF(f.auslassen, "✓ Farbe sticken", "⊘ Nicht sticken (Stofffarbe)"), 3)
+    gtk_menu_shell_append(m, gtk_separator_menu_item_new())
+    fbMenuePunkt(m, "⇄ Farbe ersetzen …", 4)
+    IF lwMuster.farbanzahl() >= 2 THEN fbMenuePunkt(m, "⇅ Mit anderer Farbe tauschen …", 5)
+    gtk_widget_show_all(m)
+    gtk_menu_popup_at_pointer(m, ereignis)
+END SUB
+
+SUB fbMenuePunkt(m AS INTEGER, text AS STRING, was AS INTEGER)
+    DIM e AS INTEGER : e = gtk_menu_item_new_with_label(text)
+    signal(e, "activate", fbMenueGewaehlt, was, 0, 0)
+    gtk_menu_shell_append(m, e)
+END SUB
+
+SUB fbMenueGewaehlt(w AS INTEGER, was AS INTEGER)
+    farbleisteAktion(fbMenueFarbe, was)
+END SUB
+
+' Eine Aktion des Menues fuer die Farbe i (auch fuer die Probe)
+SUB farbleisteAktion(i AS INTEGER, was AS INTEGER)
+    IF NOT lwHat OR i < 0 OR i >= lwMuster.farbanzahl() THEN RETURN
+    SELECT CASE was
+        CASE 0
+            farbeWaehlen(i)
+            symbolDialog()
+        CASE 1
+            farbeWaehlen(i)
+            harmonieDialog()
+        CASE 2
+            farbeHervorheben(IIF(lwHervor = i, -1, i))
+        CASE 3
+            DIM an AS BOOLEAN : an = NOT lwMuster.farben[i].auslassen
+            IF kern.farbeAuslassen(lwMuster, wzVerlauf, i, an) THEN
+                allesNeu()
+                statusMeldung("Farbe „" + lwMuster.farben[i].garn.name + "“ wird " + IIF(an, "nicht ", "") + "gestickt.")
+            END IF
+        CASE 4
+            farbeWaehlen(i)
+            farbeErsetzenDialog()
+        CASE 5
+            farbeWaehlen(i)
+            tauschenDialog()
+    END SELECT
+END SUB
+
+' --- Hervorheben (Strg+H) -------------------------------------------------------------
+
+' Nur diese Farbe voll, die anderen gedimmt (-1 = aufheben)
+SUB farbeHervorheben(i AS INTEGER)
+    IF NOT lwHat THEN RETURN
+    IF i >= lwMuster.farbanzahl() THEN i = -1
+    lwHervor = i
+    leinwandAufbauen()
+    gtk_widget_queue_draw(lwFlaeche)
+    IF fbFeld <> 0 THEN gtk_widget_queue_draw(fbFeld)
+    IF i < 0 THEN
+        statusMeldung("Farb-Hervorhebung aufgehoben")
+    ELSE
+        statusMeldung("Hervorgehoben: " + lwMuster.farben[i].garn.name + " (" + kern.kuerzelVon$(einst, "hervorheben") + " zum Aufheben)")
+    END IF
+END SUB
+
+' Strg+H: die aktuelle Farbe hervorheben oder die Hervorhebung aufheben
+SUB hervorhebenUmschalten()
+    IF NOT lwHat OR lwMuster.farbanzahl() = 0 THEN RETURN
+    IF lwHervor >= 0 AND lwHervor = wzFarbe THEN
+        farbeHervorheben(-1)
+    ELSE
+        farbeHervorheben(MAX(0, wzFarbe))
+    END IF
+END SUB

@@ -1,0 +1,120 @@
+' Baut kleine PCStitch-8-Dateien (.pat) im Aufbau, den kern/pat.dh liest.
+' Die Werte ausserhalb dessen, was der Leser auswertet, sind Nullen -- eine
+' echte Datei traegt dort Zahlen, die niemand kennt; geprueft ist der Leser
+' an einer echten Datei samt PDF (siehe den Kopf von kern/pat.dh).
+
+FUNCTION ph16$(v AS INTEGER) AS STRING
+    RETURN RIGHT$("0" + HEX$(v BAND 255), 2) + RIGHT$("0" + HEX$((v SHR 8) BAND 255), 2)
+END FUNCTION
+
+FUNCTION ph32$(v AS INTEGER) AS STRING
+    RETURN ph16$(v BAND 65535) + ph16$((v SHR 16) BAND 65535)
+END FUNCTION
+
+FUNCTION phNull$(n AS INTEGER) AS STRING
+    RETURN "00" * n
+END FUNCTION
+
+' Bytes eines Textes (nur ASCII) ohne Laenge
+FUNCTION phRoh$(t AS STRING) AS STRING
+    DIM h AS STRING : h = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        h = h + RIGHT$("0" + HEX$(ASC(MID$(t, i, 1))), 2)
+    NEXT
+    RETURN h
+END FUNCTION
+
+FUNCTION phText$(t AS STRING) AS STRING
+    RETURN ph32$(LEN(t)) + phRoh$(t)
+END FUNCTION
+
+' Eine Farbe: Hersteller, Nummer, Name, Farbe als 0xRRGGBB, Zeichen
+FUNCTION phFarbe$(hst AS STRING, nr AS STRING, name AS STRING, farbe AS INTEGER, zeichen AS INTEGER) AS STRING
+    DIM r AS INTEGER : r = (farbe SHR 16) BAND 255
+    DIM g AS INTEGER : g = (farbe SHR 8) BAND 255
+    DIM b AS INTEGER : b = farbe BAND 255
+    DIM h AS STRING : h = ph32$(0) + phText$(nr) + phText$(name) + phNull$(6)
+    h = h + phText$(hst) + phText$(nr) + phText$(LEFT$(hst + " " * 30, 30)) + phText$("") + phText$(name)
+    h = h + ph16$(r) + ph16$(g) + ph16$(b) + "FF" + RIGHT$("0" + HEX$(r), 2) + RIGHT$("0" + HEX$(g), 2) + RIGHT$("0" + HEX$(b), 2)
+    h = h + phNull$(32) + phText$("PCStitch Symbols 2") + ph32$(zeichen) + phNull$(446)
+    h = h + "FFFFFFFF" + "02000000" * 6 + "FFFFFFFF" + "02000000"
+    RETURN h
+END FUNCTION
+
+' Ein Stich im Gitter: Spalte, Zeile, Lage, Farbe, Art
+FUNCTION phStich$(x AS INTEGER, y AS INTEGER, lage AS INTEGER, farbe AS INTEGER, art AS INTEGER) AS STRING
+    RETURN ph16$(x) + ph16$(y) + ph16$(lage) + ph32$(farbe) + ph32$(art)
+END FUNCTION
+
+FUNCTION phLeer$(n AS INTEGER) AS STRING
+    RETURN ph32$(n) + "FFFFFFFF"
+END FUNCTION
+
+' Ein Lauf von n Zellen mit den Stichen in `stiche` (aneinandergehaengt)
+FUNCTION phLauf$(n AS INTEGER, zahl AS INTEGER, stiche AS STRING) AS STRING
+    RETURN ph32$(n) + ph32$(zahl) + stiche
+END FUNCTION
+
+FUNCTION phRueck$(x1 AS INTEGER, y1 AS INTEGER, l1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, l2 AS INTEGER, farbe AS INTEGER) AS STRING
+    RETURN ph16$(x1) + ph16$(y1) + ph16$(l1) + ph16$(x2) + ph16$(y2) + ph16$(l2) + ph32$(farbe) + ph32$(0) + ph32$(20)
+END FUNCTION
+
+' Die ganze Datei. `farben` = aneinandergehaengte phFarbe$, `gitter` = Laeufe,
+' `rueck` = aneinandergehaengte phRueck$.
+FUNCTION phDatei(fassung AS STRING, b AS INTEGER, h AS INTEGER, stoff AS INTEGER, rtf AS STRING, titel AS STRING, autor AS STRING, nf AS INTEGER, farben AS STRING, gitter AS STRING, nr AS INTEGER, rueck AS STRING, schluss AS STRING) AS BUFFER
+    DIM x AS STRING : x = phRoh$("PCStitch " + fassung + " Pattern File")
+    x = x + phNull$(&H2D - (LEN(x) \ 2))
+    x = x + ph32$(&H139B4) + ph32$(2) + ph32$(h) + ph32$(b) + ph32$(stoff) + ph32$(stoff) + ph32$(0)
+    x = x + phText$(rtf) + phText$("") + phText$("www.example.org") + phText$("2026") + phText$(autor) + phText$(titel) + phText$("") + phText$("Arial")
+    x = x + phNull$(24)
+    x = x + phRoh$("PCStitch 8a Floss Palette") + ph32$(&H139B4) + ph32$(2) + ph32$(20) + ph32$(75) + ph32$(75) + ph32$(150) + ph32$(2) * 7
+    x = x + ph32$(nf) + farben + phNull$(18)
+    x = x + ph32$(b) + ph32$(h) + ph32$(stoff) + ph32$(stoff) + ph32$(0) + gitter
+    x = x + ph32$(nr) + rueck + schluss
+    RETURN BUFFER_FROM_HEX(x)
+END FUNCTION
+
+' Alles, was der Leser aus einer Datei macht, als Text.
+SUB phZeigen(imp AS kern.PatImport)
+    PRINT "fassung "; imp.fassung
+    phMuster(imp.muster, imp.warnungen)
+END SUB
+
+SUB phMuster(m AS kern.Muster, warnungen AS ARRAY OF STRING)
+    PRINT m.name; " "; m.breite; "x"; m.hoehe; " stoff "; m.stoff; " ebenen "; m.ebenen.anzahl()
+    DIM f AS kern.Farbeintrag
+    FOR EACH f IN m.farben
+        PRINT "farbe "; f.symbol; " "; f.garn.hersteller; " "; f.garn.nummer; " "; f.garn.name; " #"; RIGHT$("00000" + HEX$(f.garn.farbe), 6); " stiche "; f.stichzahl; IIF(f.istPerle, " perle", "")
+        DIM tg AS kern.Garn
+        FOR EACH tg IN f.garn.teile
+            PRINT "  teil "; tg.hersteller; " "; tg.nummer; " #"; RIGHT$("00000" + HEX$(tg.farbe), 6)
+        NEXT
+        IF LEN(f.garn.anteile) > 0 THEN PRINT "  anteile "; JOIN$(f.garn.anteile, "+")
+    NEXT
+    DIM e AS INTEGER, y AS INTEGER, x AS INTEGER
+    FOR e = 0 TO m.ebenen.anzahl() - 1
+        DIM eb AS kern.Ebene : eb = m.ebenen.ebenen[e]
+        PRINT "ebene "; eb.name
+        FOR y = 0 TO m.hoehe - 1
+            DIM z AS STRING : z = " "
+            FOR x = 0 TO m.breite - 1
+                IF eb.stich(x, y) < 0 THEN
+                    z = z + " ."
+                ELSE
+                    z = z + " " + STR$(eb.stich(x, y)) + ":" + STR$(eb.stichArt(x, y))
+                END IF
+            NEXT
+            PRINT z
+        NEXT
+    NEXT
+    DIM r AS kern.Rueckstich
+    FOR EACH r IN m.rueckstiche
+        PRINT "rueckstich "; r.x1; ","; r.y1; " - "; r.x2; ","; r.y2; " farbe "; r.farbe
+    NEXT
+    PRINT JSON_STRINGIFY(m.metadaten)
+    DIM w AS STRING
+    FOR EACH w IN warnungen
+        PRINT "warnung: "; w
+    NEXT
+END SUB

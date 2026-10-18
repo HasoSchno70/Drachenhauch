@@ -100,7 +100,8 @@ pub mod op {
     pub const ADD_STORE_LOCAL: u16 = 120;       // x = x + e: addieren und in den lokalen Platz schreiben
     pub const ADD_STORE_GLOBAL_SLOT: u16 = 121; // dasselbe fuer einen globalen Platz
     pub const BIND_GLOBAL_SLOT: u16 = 122;      // globalen Eintrag (Feld/Map/Struktur) in seinen Platz haengen
-    pub const TYP_PRUEFEN: u16 = 123;           // nur DHRT_TYPEN_PRUEFEN: Typ des Stapelwerts gegen den Compiler pruefen
+    pub const TYP_PRUEFEN: u16 = 123;
+    pub const CALL_METHOD_BYREF: u16 = 124;     // Methode mit BYREF-Parametern: [name, argc, [byref-Stellen]]           // nur DHRT_TYPEN_PRUEFEN: Typ des Stapelwerts gegen den Compiler pruefen
 
     // OOP / Member
     pub const NEW_INSTANCE: u16 = 80;

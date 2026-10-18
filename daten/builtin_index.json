@@ -6575,7 +6575,13 @@
   {
    "name": "IMAGE_SCALE",
    "kind": "core",
-   "signature": "IMAGE_SCALE(img, w, h)",
+   "signature": "IMAGE_SCALE(img, w, h [, filter$])",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_ENHANCE",
+   "kind": "core",
+   "signature": "IMAGE_ENHANCE(img, art$, faktor)",
    "module": "imgfx"
   },
   {
@@ -6906,6 +6912,12 @@
    "name": "JSON_KEYS",
    "kind": "core",
    "signature": "JSON_KEYS(h: JSON_HANDLE, pfad: STRING) AS ARRAY OF STRING",
+   "module": "json"
+  },
+  {
+   "name": "JSON_KEY$",
+   "kind": "core",
+   "signature": "JSON_KEY$(name: STRING) AS STRING",
    "module": "json"
   },
   {
@@ -8343,6 +8355,18 @@
    "module": "dhrt"
   },
   {
+   "name": "PDF_CIRCLE",
+   "kind": "core",
+   "signature": "PDF_CIRCLE(p: PDF, x, y, r)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_CIRCLE_FILL",
+   "kind": "core",
+   "signature": "PDF_CIRCLE_FILL(p: PDF, x, y, r)",
+   "module": "pdf"
+  },
+  {
    "name": "PDF_CLOSE",
    "kind": "core",
    "signature": "PDF_CLOSE(p: PDF)",
@@ -8355,6 +8379,12 @@
    "module": "pdf"
   },
   {
+   "name": "PDF_DASH",
+   "kind": "core",
+   "signature": "PDF_DASH(p: PDF, strich_mm [, luecke_mm])",
+   "module": "pdf"
+  },
+  {
    "name": "PDF_FONT",
    "kind": "core",
    "signature": "PDF_FONT(p: PDF, schrift$, groesse_pt)",
@@ -8364,6 +8394,12 @@
    "name": "PDF_FONT_LOAD",
    "kind": "core",
    "signature": "PDF_FONT_LOAD(p: PDF, pfad$, name$)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_GET_OPACITY",
+   "kind": "core",
+   "signature": "PDF_GET_OPACITY(p: PDF) AS FLOAT",
    "module": "pdf"
   },
   {
@@ -8391,6 +8427,12 @@
    "module": "pdf"
   },
   {
+   "name": "PDF_OPACITY",
+   "kind": "core",
+   "signature": "PDF_OPACITY(p: PDF, deckkraft)",
+   "module": "pdf"
+  },
+  {
    "name": "PDF_PAGE",
    "kind": "core",
    "signature": "PDF_PAGE(p: PDF)",
@@ -8412,6 +8454,18 @@
    "name": "PDF_PAGE_WIDTH",
    "kind": "core",
    "signature": "PDF_PAGE_WIDTH(p: PDF) AS FLOAT",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_POLYGON",
+   "kind": "core",
+   "signature": "PDF_POLYGON(p: PDF, xs, ys)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_POLYGON_FILL",
+   "kind": "core",
+   "signature": "PDF_POLYGON_FILL(p: PDF, xs, ys)",
    "module": "pdf"
   },
   {
@@ -8447,7 +8501,7 @@
   {
    "name": "PDF_TEXT",
    "kind": "core",
-   "signature": "PDF_TEXT(p: PDF, x_mm, y_mm, text$)",
+   "signature": "PDF_TEXT(p: PDF, x_mm, y_mm, text$ [, winkel])",
    "module": "pdf"
   },
   {
@@ -12318,6 +12372,24 @@
    "name": "ZEIT_JETZT",
    "kind": "core",
    "signature": "ZEIT_JETZT() AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_UNIX",
+   "kind": "core",
+   "signature": "ZEIT_UNIX() AS FLOAT",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_AUS_UNIX",
+   "kind": "core",
+   "signature": "ZEIT_AUS_UNIX(unix_sekunden) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_NACH_UNIX",
+   "kind": "core",
+   "signature": "ZEIT_NACH_UNIX(zeit) AS INTEGER",
    "module": "zeit"
   },
   {

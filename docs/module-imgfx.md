@@ -10,7 +10,7 @@ IMPORT "imgfx"
 
 | Funktion | Rückgabe |
 |---|---|
-| `IMAGE_SCALE(img, w, h)` | IMAGE (neu, in `w × h`) — **bilinear geglättet** |
+| `IMAGE_SCALE(img, w, h [, filter$])` | IMAGE (neu, in `w × h`) — **bilinear geglättet**; mit `filter$` (`lanczos`, `bikubisch`, `box`, `hamming`, `linear`) gerechnet wie Pillows `Image.resize`, Zahl für Zahl |
 | `IMAGE_SCALE_NN(img, w, h)` | IMAGE (neu, in `w × h`) — **ohne Interpolation** (Nearest-Neighbour), für Pixelgrafik |
 | `IMAGE_ROTATE(img, grad)` | IMAGE (neu, Bounding-Box wächst ggf.) — **tastet neu ab**, siehe unten |
 | `IMAGE_ROTATE_CW(img)` | IMAGE (neu, um 90° im Uhrzeigersinn) — **exakt**, `w × h` → `h × w` |
@@ -28,6 +28,7 @@ IMPORT "imgfx"
 | `IMAGE_BLUR(img, radius)` | IMAGE (neu, Gauß-Weichzeichner, `radius` in px) |
 | `IMAGE_BRIGHTNESS(img, n)` | IMAGE (neu): Helligkeit, `n` = `-255..255` |
 | `IMAGE_CONTRAST(img, n)` | IMAGE (neu): Kontrast, `n` = `-100..100` |
+| `IMAGE_ENHANCE(img, art$, faktor)` | IMAGE (neu): `helligkeit`, `kontrast` oder `saettigung` wie Pillows `ImageEnhance` — `1.0` lässt das Bild, `0.0` ergibt Schwarz, Grau (Mittelwert) bzw. Graustufen, über `1.0` verstärkt; die Deckkraft bleibt |
 | `IMAGE_GRAYSCALE(img)` | IMAGE (neu, in Graustufen) |
 | `IMAGE_INVERT(img)` | IMAGE (neu, Farben invertiert) |
 | `IMAGE_REPLACE_COLOR(img, from, to)` | IMAGE (neu): tauscht **exakt** die Farbe `from` gegen `to` |

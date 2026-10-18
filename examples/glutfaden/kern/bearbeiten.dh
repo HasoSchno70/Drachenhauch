@@ -1,0 +1,899 @@
+' Das Muster bearbeiten -- jede Aenderung geht durch diese Datei und landet
+' im Verlauf. Wer Zellen oder Ebenen anders anfasst, hat kein Rueckgaengig.
+'
+' Steht kein Zug offen (Verlauf.beginnen), oeffnet jeder Befehl seinen
+' eigenen Schritt; in einem Zug sammeln sich alle Aenderungen in EINEM.
+
+' Eine Zelle der aktiven Ebene setzen (farbe -1 = Stich entfernen). FALSE,
+' wenn nichts geschah: ausserhalb, gesperrte Ebene oder schon so.
+FUNCTION stichSetzen(m AS Muster, v AS Verlauf, x AS INTEGER, y AS INTEGER, farbe AS INTEGER, typ AS INTEGER) AS BOOLEAN
+    DIM e AS Ebene : e = m.ebenen.aktiveEbene()
+    IF e IS NIL THEN RETURN FALSE
+    IF e.gesperrt OR NOT e.drin(x, y) THEN RETURN FALSE
+    IF farbe >= m.farbanzahl() THEN RETURN FALSE
+    DIM i AS INTEGER : i = y * e.breite + x
+    DIM af AS INTEGER : af = e.raster[i]
+    DIM aa AS INTEGER : aa = e.art[i]
+    DIM ae AS INTEGER : ae = e.erledigt[i]
+    DIM nf AS INTEGER, na AS INTEGER, ne AS INTEGER
+    IF farbe < 0 THEN
+        nf = KEIN_STICH                       ' entfernen: auch erledigt und Typ weg
+    ELSE
+        nf = farbe
+        na = m.typFuer(farbe, typ)
+        ne = ae                               ' setzen laesst "erledigt" stehen
+    END IF
+    IF nf = af AND na = aa AND ne = ae THEN RETURN FALSE
+    DIM eigen AS BOOLEAN : eigen = NOT v.istOffen()
+    IF eigen THEN v.beginnen(IIF(farbe < 0, "Stich entfernen", "Stich setzen"))
+    v.zelle(e, i, af, aa, ae, nf, na, ne)
+    m.zaehlen(af, nf)
+    e.raster[i] = nf : e.art[i] = na : e.erledigt[i] = ne
+    IF eigen THEN v.beenden()
+    RETURN TRUE
+END FUNCTION
+
+' Viele Zellen auf einmal, [x0, y0, x1, y1, ...], in EINEM Schritt (Formen,
+' Fuellen). Dieselben Regeln wie stichSetzen, aber ohne Aufruf je Zelle: die
+' Schleife arbeitet auf festen Zahlenfeldern und laeuft als Maschinencode --
+' eine gefuellte Flaeche von einer Million Zellen kostete Zelle fuer Zelle
+' ueber stichSetzen dreieinhalb Sekunden. Liefert, wie viele sich geaendert
+' haben.
+FUNCTION zellenSetzen(m AS Muster, v AS Verlauf, punkte AS ARRAY OF INTEGER, farbe AS INTEGER, typ AS INTEGER, text AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = LEN(punkte) \ 2
+    DIM f[n] AS INTEGER
+    DIM a[n] AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO n - 1
+        f[k] = farbe
+        a[k] = typ
+    NEXT
+    RETURN zellenSetzenJe(m, v, punkte, f, a, text)
+END FUNCTION
+
+' Wie zellenSetzen, aber Farbe und Stichtyp je Zelle (-1 = Stich entfernen) --
+' fuer Einfuegen, Drehen, Spiegeln, Farbe ersetzen. Ein voller Stich in einer
+' Perlen- oder Diamantfarbe wird Perle bzw. Drill (typFuer).
+FUNCTION zellenSetzenJe(m AS Muster, v AS Verlauf, punkte AS ARRAY OF INTEGER, farben AS ARRAY OF INTEGER, arten AS ARRAY OF INTEGER, text AS STRING) AS INTEGER
+    DIM e AS Ebene : e = m.ebenen.aktiveEbene()
+    IF e IS NIL THEN RETURN 0
+    RETURN zellenAufEbene(m, v, e, punkte, farben, arten, text)
+END FUNCTION
+
+' Dasselbe auf einer bestimmten Ebene (Farbe ersetzen trifft jeweils die
+' oberste sichtbare mit Stich, nicht die aktive).
+FUNCTION zellenAufEbene(m AS Muster, v AS Verlauf, e AS Ebene, punkte AS ARRAY OF INTEGER, farben AS ARRAY OF INTEGER, arten AS ARRAY OF INTEGER, text AS STRING) AS INTEGER
+    IF e.gesperrt THEN RETURN 0
+    DIM nfarben AS INTEGER : nfarben = m.farbanzahl()
+    ' was eine Farbe erzwingt (Perle, Drill), einmal je Farbe statt je Zelle
+    DIM zwang[nfarben + 1] AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO nfarben - 1
+        zwang[k] = m.typFuer(k, VOLL)
+    NEXT
+    DIM b AS INTEGER : b = e.breite
+    DIM h AS INTEGER : h = e.hoehe
+    DIM r AS ARRAY OF INTEGER : r = e.raster
+    DIM a AS ARRAY OF INTEGER : a = e.art
+    DIM d AS ARRAY OF INTEGER : d = e.erledigt
+    DIM n AS INTEGER : n = LEN(punkte) \ 2
+    DIM zi[n] AS INTEGER
+    DIM af[n] AS INTEGER
+    DIM aa[n] AS INTEGER
+    DIM ae[n] AS INTEGER
+    DIM nf[n] AS INTEGER
+    DIM na[n] AS INTEGER
+    DIM ne[n] AS INTEGER
+    DIM zaehl[nfarben + 1] AS INTEGER
+    DIM x AS INTEGER, y AS INTEGER, i AS INTEGER, c AS INTEGER, alt AS INTEGER, fe AS INTEGER
+    DIM fn AS INTEGER, tn AS INTEGER
+    FOR k = 0 TO n - 1
+        x = punkte[2 * k]
+        y = punkte[2 * k + 1]
+        IF x < 0 OR y < 0 OR x >= b OR y >= h THEN CONTINUE
+        fn = farben[k]
+        IF fn >= nfarben THEN CONTINUE
+        tn = 0
+        fe = 0
+        IF fn < 0 THEN
+            fn = KEIN_STICH
+        ELSE
+            tn = arten[k]
+            IF tn = VOLL THEN tn = zwang[fn]
+        END IF
+        i = y * b + x
+        alt = r[i]
+        IF fn >= 0 THEN fe = d[i]            ' setzen laesst "erledigt" stehen
+        IF alt = fn AND a[i] = tn AND d[i] = fe THEN CONTINUE
+        zi[c] = i
+        af[c] = alt
+        aa[c] = a[i]
+        ae[c] = d[i]
+        nf[c] = fn
+        na[c] = tn
+        ne[c] = fe
+        IF alt >= 0 AND alt < nfarben THEN zaehl[alt] = zaehl[alt] - 1
+        IF fn >= 0 THEN zaehl[fn] = zaehl[fn] + 1
+        r[i] = fn
+        a[i] = tn
+        d[i] = fe
+        c = c + 1
+    NEXT
+    IF c = 0 THEN RETURN 0
+    FOR k = 0 TO nfarben - 1
+        IF zaehl[k] <> 0 THEN m.farben[k].stichzahl = m.farben[k].stichzahl + zaehl[k]
+    NEXT
+    v.beginnen(text)
+    DIM t AS Aenderung : t = v.teil(TEIL_STICHE)
+    t.ebene = e
+    t.zellen = zi[0:c]
+    t.altFarbe = af[0:c]
+    t.altArt = aa[0:c]
+    t.altFertig = ae[0:c]
+    t.neuFarbe = nf[0:c]
+    t.neuArt = na[0:c]
+    t.neuFertig = ne[0:c]
+    v.beenden()
+    RETURN c
+END FUNCTION
+
+' --- Ebenen ---------------------------------------------------------------------
+
+' Vorher-Stand eines Umbaus festhalten; ebenenNachher() schliesst ihn ab.
+FUNCTION ebenenVorher(m AS Muster, v AS Verlauf, text AS STRING) AS Aenderung
+    v.beginnen(text)
+    DIM t AS Aenderung : t = v.teil(TEIL_EBENEN)
+    t.ebenenVorher = ARRAY_COPY(m.ebenen.ebenen)
+    t.aktivVorher = m.ebenen.aktiv
+    RETURN t
+END FUNCTION
+
+SUB ebenenNachher(m AS Muster, v AS Verlauf, t AS Aenderung)
+    t.ebenenNachher = ARRAY_COPY(m.ebenen.ebenen)
+    t.aktivNachher = m.ebenen.aktiv
+    v.beenden()
+END SUB
+
+' Ein freier Name "Ebene n".
+FUNCTION ebenenName$(m AS Muster) AS STRING
+    DIM n AS INTEGER : n = m.ebenen.anzahl() + 1
+    DO
+        DIM name AS STRING : name = "Ebene " + STR$(n)
+        DIM frei AS BOOLEAN : frei = TRUE
+        DIM e AS Ebene
+        FOR EACH e IN m.ebenen.ebenen
+            IF e.name = name THEN frei = FALSE
+        NEXT
+        IF frei THEN RETURN name
+        n = n + 1
+    LOOP
+END FUNCTION
+
+' Neue leere Ebene ueber der aktiven; sie wird aktiv. Liefert ihre Nummer.
+FUNCTION ebeneNeu(m AS Muster, v AS Verlauf, name AS STRING) AS INTEGER
+    DIM t AS Aenderung : t = ebenenVorher(m, v, "Ebene anlegen")
+    IF name = "" THEN name = ebenenName$(m)
+    DIM nr AS INTEGER : nr = m.ebenen.aktiv + 1
+    ARRAY_INSERT(m.ebenen.ebenen, nr, neueEbene(name, m.breite, m.hoehe))
+    m.ebenen.aktiv = nr
+    ebenenNachher(m, v, t)
+    RETURN nr
+END FUNCTION
+
+' Eine Ebene loeschen; die letzte bleibt. FALSE, wenn nicht geloescht.
+FUNCTION ebeneLoeschen(m AS Muster, v AS Verlauf, nr AS INTEGER) AS BOOLEAN
+    IF m.ebenen.anzahl() <= 1 OR nr < 0 OR nr >= m.ebenen.anzahl() THEN RETURN FALSE
+    DIM t AS Aenderung : t = ebenenVorher(m, v, "Ebene löschen")
+    ARRAY_REMOVE_AT(m.ebenen.ebenen, nr)
+    DIM a AS INTEGER : a = m.ebenen.aktiv
+    IF a >= m.ebenen.anzahl() THEN
+        a = m.ebenen.anzahl() - 1
+    ELSEIF a > nr THEN
+        a = a - 1
+    END IF
+    m.ebenen.aktiv = a
+    m.stichzahlenNeu()
+    ebenenNachher(m, v, t)
+    RETURN TRUE
+END FUNCTION
+
+' Kopie direkt ueber der Ebene, die Kopie wird aktiv.
+FUNCTION ebeneDuplizieren(m AS Muster, v AS Verlauf, nr AS INTEGER) AS INTEGER
+    IF nr < 0 OR nr >= m.ebenen.anzahl() THEN RETURN -1
+    DIM t AS Aenderung : t = ebenenVorher(m, v, "Ebene duplizieren")
+    DIM q AS Ebene : q = m.ebenen.ebenen[nr]
+    ARRAY_INSERT(m.ebenen.ebenen, nr + 1, q.kopie(q.name + " (Kopie)"))
+    m.ebenen.aktiv = nr + 1
+    m.stichzahlenNeu()
+    ebenenNachher(m, v, t)
+    RETURN nr + 1
+END FUNCTION
+
+' Eine Ebene an eine andere Stelle; die aktive folgt ihrer Ebene.
+FUNCTION ebeneVerschieben(m AS Muster, v AS Verlauf, von AS INTEGER, nach AS INTEGER) AS BOOLEAN
+    DIM n AS INTEGER : n = m.ebenen.anzahl()
+    IF von < 0 OR von >= n OR nach < 0 OR nach >= n OR von = nach THEN RETURN FALSE
+    DIM t AS Aenderung : t = ebenenVorher(m, v, "Ebene verschieben")
+    DIM aktivE AS Ebene : aktivE = m.ebenen.aktiveEbene()
+    DIM e AS Ebene : e = m.ebenen.ebenen[von]
+    ARRAY_REMOVE_AT(m.ebenen.ebenen, von)
+    ARRAY_INSERT(m.ebenen.ebenen, nach, e)
+    m.ebenen.aktiv = ebenenNummer(m, aktivE)
+    ebenenNachher(m, v, t)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION ebenenNummer(m AS Muster, e AS Ebene) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO m.ebenen.anzahl() - 1
+        IF m.ebenen.ebenen[i] = e THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Alle Ebenen zu einer vereinen (PySticky LayerStack.flatten): von unten nach
+' oben gewinnt der oberste Stich samt Typ und erledigt. Wie im Original nur
+' die SICHTBAREN -- was auf einer ausgeblendeten Ebene liegt, faellt weg
+' (der Dialog sagt das vorher, ausgeblendeteStiche zaehlt es). Ein Schritt;
+' PySticky leert dafuer den Verlauf. FALSE bei nur einer Ebene.
+FUNCTION ebenenVereinen(m AS Muster, v AS Verlauf) AS BOOLEAN
+    IF m.ebenen.anzahl() < 2 THEN RETURN FALSE
+    DIM n AS Ebene : n = neueEbene("Zusammengeführt", m.breite, m.hoehe)
+    DIM r AS ARRAY OF INTEGER : r = n.raster
+    DIM d AS ARRAY OF INTEGER : d = n.erledigt
+    DIM a AS ARRAY OF INTEGER : a = n.art
+    DIM e AS Ebene
+    DIM i AS INTEGER
+    FOR EACH e IN m.ebenen.ebenen
+        IF NOT e.sichtbar THEN CONTINUE
+        DIM er AS ARRAY OF INTEGER : er = e.raster
+        DIM ed AS ARRAY OF INTEGER : ed = e.erledigt
+        DIM ea AS ARRAY OF INTEGER : ea = e.art
+        FOR i = 0 TO LEN(er) - 1
+            IF er[i] <> KEIN_STICH THEN
+                r[i] = er[i] : d[i] = ed[i] : a[i] = ea[i]
+            END IF
+        NEXT
+    NEXT
+    DIM t AS Aenderung : t = ebenenVorher(m, v, "Alle Ebenen vereinen")
+    m.ebenen.ebenen = [n]
+    m.ebenen.aktiv = 0
+    m.stichzahlenNeu()
+    ebenenNachher(m, v, t)
+    RETURN TRUE
+END FUNCTION
+
+' Stiche auf ausgeblendeten Ebenen -- die gehen beim Vereinen verloren
+FUNCTION ausgeblendeteStiche(m AS Muster) AS INTEGER
+    DIM n AS INTEGER, i AS INTEGER
+    DIM e AS Ebene
+    FOR EACH e IN m.ebenen.ebenen
+        IF e.sichtbar THEN CONTINUE
+        DIM r AS ARRAY OF INTEGER : r = e.raster
+        FOR i = 0 TO LEN(r) - 1
+            IF r[i] <> KEIN_STICH THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+
+' Mit der Ebene darunter zusammenfuehren: ihre Stiche gehen nach unten (samt
+' Typ und erledigt), dann verschwindet sie. FALSE bei der untersten oder wenn
+' die untere gesperrt ist.
+FUNCTION ebeneNachUnten(m AS Muster, v AS Verlauf, nr AS INTEGER) AS BOOLEAN
+    IF nr <= 0 OR nr >= m.ebenen.anzahl() THEN RETURN FALSE
+    DIM oben AS Ebene : oben = m.ebenen.ebenen[nr]
+    DIM unten AS Ebene : unten = m.ebenen.ebenen[nr - 1]
+    IF unten.gesperrt THEN RETURN FALSE
+    v.beginnen("Ebenen zusammenführen")
+    ' Die Stiche der oberen als Zellen auf die untere -- ueber zellenUebernehmen,
+    ' damit es ein Stiche-Teil wird, den Rueckgaengig zuruecknimmt
+    zellenUebernehmen(v, oben, unten)
+    DIM t AS Aenderung : t = v.teil(TEIL_EBENEN)
+    t.ebenenVorher = ARRAY_COPY(m.ebenen.ebenen)
+    t.aktivVorher = m.ebenen.aktiv
+    ARRAY_REMOVE_AT(m.ebenen.ebenen, nr)
+    m.ebenen.aktiv = nr - 1
+    m.stichzahlenNeu()
+    t.ebenenNachher = ARRAY_COPY(m.ebenen.ebenen)
+    t.aktivNachher = m.ebenen.aktiv
+    v.beenden()
+    RETURN TRUE
+END FUNCTION
+
+' Alle Stiche von quelle auf ziel schreiben (Farbe, Typ, erledigt), als ein
+' Stiche-Teil im offenen Schritt. Stichzahlen aendern sich nicht (dieselben
+' Farben, nur auf einer anderen Ebene) -- der Umbau zaehlt danach neu.
+SUB zellenUebernehmen(v AS Verlauf, quelle AS Ebene, ziel AS Ebene)
+    DIM qr AS ARRAY OF INTEGER : qr = quelle.raster
+    DIM qa AS ARRAY OF INTEGER : qa = quelle.art
+    DIM qd AS ARRAY OF INTEGER : qd = quelle.erledigt
+    DIM r AS ARRAY OF INTEGER : r = ziel.raster
+    DIM a AS ARRAY OF INTEGER : a = ziel.art
+    DIM d AS ARRAY OF INTEGER : d = ziel.erledigt
+    DIM n AS INTEGER : n = LEN(qr)
+    DIM c AS INTEGER, i AS INTEGER
+    FOR i = 0 TO n - 1
+        IF qr[i] <> KEIN_STICH THEN
+            IF r[i] <> qr[i] OR a[i] <> qa[i] OR d[i] <> qd[i] THEN c = c + 1
+        END IF
+    NEXT
+    IF c = 0 THEN RETURN
+    DIM zi[c] AS INTEGER
+    DIM af[c] AS INTEGER
+    DIM aa[c] AS INTEGER
+    DIM ae[c] AS INTEGER
+    DIM nf[c] AS INTEGER
+    DIM na[c] AS INTEGER
+    DIM ne[c] AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO n - 1
+        IF qr[i] = KEIN_STICH THEN CONTINUE
+        IF r[i] = qr[i] AND a[i] = qa[i] AND d[i] = qd[i] THEN CONTINUE
+        zi[k] = i
+        af[k] = r[i] : aa[k] = a[i] : ae[k] = d[i]
+        nf[k] = qr[i] : na[k] = qa[i] : ne[k] = qd[i]
+        r[i] = qr[i] : a[i] = qa[i] : d[i] = qd[i]
+        k = k + 1
+    NEXT
+    DIM t AS Aenderung : t = v.teil(TEIL_STICHE)
+    t.ebene = ziel
+    t.zellen = zi
+    t.altFarbe = af : t.altArt = aa : t.altFertig = ae
+    t.neuFarbe = nf : t.neuArt = na : t.neuFertig = ne
+END SUB
+
+FUNCTION ebeneUmbenennen(m AS Muster, v AS Verlauf, nr AS INTEGER, name AS STRING) AS BOOLEAN
+    IF nr < 0 OR nr >= m.ebenen.anzahl() THEN RETURN FALSE
+    name = TRIM$(name)
+    DIM e AS Ebene : e = m.ebenen.ebenen[nr]
+    IF name = "" OR name = e.name THEN RETURN FALSE
+    v.beginnen("Ebene umbenennen")
+    DIM t AS Aenderung : t = v.teil(TEIL_NAME)
+    t.ebene = e
+    t.textVorher = e.name
+    t.textNachher = name
+    e.name = name
+    v.beenden()
+    RETURN TRUE
+END FUNCTION
+
+' Eine Ebene leeren (PySticky ClearLayerCommand): alle Zellen ohne Stich,
+' Typ und erledigt weg, als EIN Schritt. Rueckstiche gehoeren dem Muster und
+' bleiben. Liefert die Zahl entfernter Stiche; 0 bei gesperrter oder schon
+' leerer Ebene (PySticky legte auch dann einen Schritt an).
+FUNCTION ebeneLeeren(m AS Muster, v AS Verlauf, nr AS INTEGER) AS INTEGER
+    IF nr < 0 OR nr >= m.ebenen.anzahl() THEN RETURN 0
+    DIM e AS Ebene : e = m.ebenen.ebenen[nr]
+    IF e.gesperrt THEN RETURN 0
+    DIM r AS ARRAY OF INTEGER : r = e.raster
+    DIM n AS INTEGER : n = LEN(r)
+    DIM c AS INTEGER, i AS INTEGER
+    FOR i = 0 TO n - 1
+        IF r[i] <> KEIN_STICH THEN c = c + 1
+    NEXT
+    IF c = 0 THEN RETURN 0
+    DIM p[2 * c] AS INTEGER
+    DIM f[c] AS INTEGER
+    DIM a[c] AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO n - 1
+        IF r[i] = KEIN_STICH THEN CONTINUE
+        p[2 * k] = i MOD e.breite
+        p[2 * k + 1] = i \ e.breite
+        f[k] = -1
+        k = k + 1
+    NEXT
+    RETURN zellenAufEbene(m, v, e, p, f, a, "Ebene '" + e.name + "' geleert")
+END FUNCTION
+
+' Die Notiz einer Ebene setzen (PySticky: beim Verlassen des Notizfelds).
+' Ein Schritt, damit Strg+Z sie zuruecknimmt; FALSE, wenn gleich.
+FUNCTION ebeneNotizSetzen(m AS Muster, v AS Verlauf, nr AS INTEGER, notiz AS STRING) AS BOOLEAN
+    IF nr < 0 OR nr >= m.ebenen.anzahl() THEN RETURN FALSE
+    DIM e AS Ebene : e = m.ebenen.ebenen[nr]
+    IF notiz = e.notiz THEN RETURN FALSE
+    v.beginnen("Ebenen-Notiz ändern")
+    DIM t AS Aenderung : t = v.teil(TEIL_NOTIZ)
+    t.ebene = e
+    t.textVorher = e.notiz
+    t.textNachher = notiz
+    e.notiz = notiz
+    v.beenden()
+    RETURN TRUE
+END FUNCTION
+
+' --- Farben ---------------------------------------------------------------------
+
+' Ein Garn ins Muster nehmen. Gibt es dasselbe (Hersteller und Nummer) schon,
+' liefert es dessen Nummer und aendert nichts. Neue Farben bekommen das erste
+' freie Symbol, danach "#1", "#2" ... (nie "?" -- das hiesse "nicht vergeben").
+' Die Strang-Anteile eines Blends als Text ("1+2"), leer ohne.
+FUNCTION anteileText$(g AS Garn) AS STRING
+    DIM t AS STRING : t = ""
+    DIM a AS INTEGER
+    FOR EACH a IN g.anteile
+        t = t + IIF(t = "", "", "+") + STR$(a)
+    NEXT
+    RETURN t
+END FUNCTION
+
+' ohneSymbol (Einstellungen -> Farben -> "Symbole automatisch" aus): "?" als
+' Platzhalter wie PySticky add_color(auto_symbol=False) -- zum Vergeben von Hand.
+FUNCTION farbeHinzufuegen(m AS Muster, v AS Verlauf, g AS Garn, symbole AS ARRAY OF STRING, perle AS BOOLEAN, diamant AS BOOLEAN, ohneSymbol AS BOOLEAN = FALSE) AS INTEGER
+    DIM i AS INTEGER
+    ' schon im Muster? (PySticky add_color_to_pattern): gleicher Hersteller und
+    ' gleiche Nummer -- bei Blends auch dasselbe Strangverhaeltnis, denn die
+    ' Nummer "310+745" nennt nur die Garne --, ohne Nummer gleiche Farbe
+    FOR i = 0 TO m.farbanzahl() - 1
+        DIM h AS Garn : h = m.farben[i].garn
+        IF h.hersteller <> g.hersteller THEN CONTINUE
+        IF g.nummer = "" AND h.nummer = "" THEN
+            IF h.farbe = g.farbe THEN RETURN i
+        ELSEIF h.nummer = g.nummer AND anteileText$(h) = anteileText$(g) THEN
+            RETURN i
+        END IF
+    NEXT
+    DIM benutzt AS MAP OF BOOLEAN : benutzt = {}
+    DIM f AS Farbeintrag
+    FOR EACH f IN m.farben
+        MAPPUT(benutzt, f.symbol, TRUE)
+    NEXT
+    DIM symbol AS STRING
+    IF ohneSymbol THEN symbol = "?"
+    DIM s AS STRING
+    FOR EACH s IN symbole
+        IF symbol <> "" THEN EXIT FOR
+        IF NOT MAPHAS(benutzt, s) THEN
+            symbol = s
+            BREAK
+        END IF
+    NEXT
+    IF symbol = "" THEN
+        DIM k AS INTEGER : k = 1
+        WHILE MAPHAS(benutzt, "#" + STR$(k)) : k = k + 1 : WEND
+        symbol = "#" + STR$(k)
+    END IF
+    DIM neu AS Farbeintrag : neu = neuerFarbeintrag(g, symbol)
+    neu.istPerle = perle
+    neu.istDiamant = diamant
+    v.beginnen("Farbe hinzufügen")
+    DIM t AS Aenderung : t = v.teil(TEIL_FARBEN)
+    t.farbenVorher = ARRAY_COPY(m.farben)
+    t.rueckVorher = ARRAY_COPY(m.rueckstiche)
+    ARRAY_PUSH(m.farben, neu)
+    t.farbenNachher = ARRAY_COPY(m.farben)
+    t.rueckNachher = ARRAY_COPY(m.rueckstiche)
+    t.hin = gleicheAbbildung(m.farbanzahl())
+    t.zurueck = t.hin
+    v.beenden()
+    RETURN m.farbanzahl() - 1
+END FUNCTION
+
+FUNCTION gleicheAbbildung(n AS INTEGER) AS ARRAY OF INTEGER
+    DIM a[n] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1 : a[i] = i : NEXT
+    RETURN a
+END FUNCTION
+
+' Farben ohne Stich in irgendeiner Ebene (auch unsichtbaren) und ohne
+' Rueckstich entfernen; die uebrigen ruecken auf. Liefert, wie viele weg sind.
+FUNCTION unbenutzteEntfernen(m AS Muster, v AS Verlauf) AS INTEGER
+    m.stichzahlenNeu()
+    DIM n AS INTEGER : n = m.farbanzahl()
+    DIM genutzt[n] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        IF m.farben[i].stichzahl > 0 THEN genutzt[i] = 1
+    NEXT
+    DIM r AS Rueckstich
+    FOR EACH r IN m.rueckstiche
+        IF r.farbe >= 0 AND r.farbe < n THEN genutzt[r.farbe] = 1
+    NEXT
+    DIM umleiten[n] AS INTEGER
+    FOR i = 0 TO n - 1
+        umleiten[i] = -1
+    NEXT
+    RETURN farbenBehalten(m, v, genutzt, umleiten, "Unbenutzte Farben entfernen")
+END FUNCTION
+
+' Nur die Farben mit behalten[i] = 1 bleiben, die Nummern ruecken auf. Ein
+' Rueckstich einer weggenommenen Farbe geht an umleiten[i] (-1 = kein Ziel,
+' nur fuer Farben ohne Rueckstich gedacht). Liefert die Zahl der entfernten.
+FUNCTION farbenBehalten(m AS Muster, v AS Verlauf, behalten AS ARRAY OF INTEGER, umleiten AS ARRAY OF INTEGER, titel AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = m.farbanzahl()
+    DIM i AS INTEGER
+    DIM r AS Rueckstich
+    DIM hin[n] AS INTEGER
+    DIM zurueck AS ARRAY OF INTEGER : zurueck = []
+    DIM neueFarben AS ARRAY OF Farbeintrag : neueFarben = []
+    FOR i = 0 TO n - 1
+        IF behalten[i] = 1 THEN
+            hin[i] = LEN(neueFarben)
+            ARRAY_PUSH(zurueck, i)
+            ARRAY_PUSH(neueFarben, m.farben[i])
+        ELSE
+            hin[i] = KEIN_STICH
+        END IF
+    NEXT
+    DIM weg AS INTEGER : weg = n - LEN(neueFarben)
+    IF weg = 0 THEN RETURN 0
+    ' Rueckstiche: weggenommene Farbe -> ihr Ziel
+    DIM rueckZiel[n] AS INTEGER
+    FOR i = 0 TO n - 1
+        rueckZiel[i] = hin[i]
+        IF behalten[i] <> 1 AND umleiten[i] >= 0 AND umleiten[i] < n THEN rueckZiel[i] = hin[umleiten[i]]
+    NEXT
+    v.beginnen(titel)
+    DIM t AS Aenderung : t = v.teil(TEIL_FARBEN)
+    t.farbenVorher = ARRAY_COPY(m.farben)
+    t.rueckVorher = ARRAY_COPY(m.rueckstiche)
+    t.farbenNachher = neueFarben
+    ' Rueckstiche sind Objekte: neue anlegen statt die alten umzuschreiben,
+    ' sonst stuende nach einem Rueckgaengig die neue Nummer im alten Stich.
+    DIM rn AS ARRAY OF Rueckstich : rn = []
+    FOR EACH r IN m.rueckstiche
+        ARRAY_PUSH(rn, neuerRueckstich(r.x1, r.y1, r.x2, r.y2, IIF(r.farbe >= 0 AND r.farbe < n, rueckZiel[r.farbe], r.farbe)))
+    NEXT
+    t.rueckNachher = rn
+    t.hin = hin
+    t.zurueck = zurueck
+    v.beenden()
+    teilAnwenden(m, t, TRUE)
+    RETURN weg
+END FUNCTION
+
+' --- Listen: Farben und Rueckstiche ------------------------------------------------
+
+' Vorher-Stand von Farben und Rueckstichen; listenNachher schliesst den Schritt.
+' "Nicht sticken" (PyStickys skip_stitching): die Farbe bleibt im Muster,
+' zaehlt aber in Garnliste, Einkauf und Fortschritt nicht mit -- ein
+' Schritt, den Rueckgaengig nimmt (PySticky setzt das Feld nur und
+' markiert ungesichert). FALSE, wenn sich nichts aendert.
+FUNCTION farbeAuslassen(m AS Muster, v AS Verlauf, nr AS INTEGER, an AS BOOLEAN) AS BOOLEAN
+    IF nr < 0 OR nr >= m.farbanzahl() THEN RETURN FALSE
+    IF m.farben[nr].auslassen = an THEN RETURN FALSE
+    DIM neu AS Farbeintrag : neu = farbeintragKopie(m.farben[nr])
+    neu.auslassen = an
+    DIM t AS Aenderung : t = listenVorher(m, v, IIF(an, "Nicht sticken", "Farbe sticken"))
+    m.farben[nr] = neu
+    listenNachher(m, v, t)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION listenVorher(m AS Muster, v AS Verlauf, text AS STRING) AS Aenderung
+    v.beginnen(text)
+    DIM t AS Aenderung : t = v.teil(TEIL_LISTEN)
+    t.farbenVorher = ARRAY_COPY(m.farben)
+    t.rueckVorher = ARRAY_COPY(m.rueckstiche)
+    RETURN t
+END FUNCTION
+
+SUB listenNachher(m AS Muster, v AS Verlauf, t AS Aenderung)
+    t.farbenNachher = ARRAY_COPY(m.farben)
+    t.rueckNachher = ARRAY_COPY(m.rueckstiche)
+    v.beenden()
+END SUB
+
+' Rueckstiche in Halbstich-Einheiten ([x1, y1, x2, y2, ...], mehrere bei
+' Symmetrie) -- ein Schritt. Eine Linie der Laenge null zaehlt nicht.
+FUNCTION ruecksticheSetzen(m AS Muster, v AS Verlauf, linien AS ARRAY OF INTEGER, farbe AS INTEGER) AS INTEGER
+    IF farbe < 0 OR farbe >= m.farbanzahl() THEN RETURN 0
+    DIM n AS INTEGER, k AS INTEGER
+    FOR k = 0 TO LEN(linien) - 4 STEP 4
+        IF linien[k] <> linien[k + 2] OR linien[k + 1] <> linien[k + 3] THEN n = n + 1
+    NEXT
+    IF n = 0 THEN RETURN 0
+    DIM t AS Aenderung : t = listenVorher(m, v, "Rückstich")
+    FOR k = 0 TO LEN(linien) - 4 STEP 4
+        IF linien[k] = linien[k + 2] AND linien[k + 1] = linien[k + 3] THEN CONTINUE
+        ARRAY_PUSH(m.rueckstiche, neuerRueckstich(linien[k], linien[k + 1], linien[k + 2], linien[k + 3], farbe))
+    NEXT
+    listenNachher(m, v, t)
+    RETURN n
+END FUNCTION
+
+FUNCTION rueckstichEntfernen(m AS Muster, v AS Verlauf, nr AS INTEGER) AS BOOLEAN
+    IF nr < 0 OR nr >= LEN(m.rueckstiche) THEN RETURN FALSE
+    DIM t AS Aenderung : t = listenVorher(m, v, "Rückstich entfernen")
+    ARRAY_REMOVE_AT(m.rueckstiche, nr)
+    listenNachher(m, v, t)
+    RETURN TRUE
+END FUNCTION
+
+' Der Rueckstich nahe (hx, hy) in Halbstich-Einheiten: kleinster Abstand zur
+' Strecke, hoechstens tol; bei Gleichstand der erste. -1 = keiner.
+FUNCTION rueckstichBei(m AS Muster, hx AS FLOAT, hy AS FLOAT, tol AS FLOAT) AS INTEGER
+    DIM best AS INTEGER : best = -1
+    DIM bestD AS FLOAT : bestD = tol
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(m.rueckstiche) - 1
+        DIM r AS Rueckstich : r = m.rueckstiche[i]
+        DIM d AS FLOAT : d = abstandZurStrecke(hx, hy, r.x1, r.y1, r.x2, r.y2)
+        IF d <= bestD AND (best < 0 OR d < bestD) THEN
+            best = i
+            bestD = d
+        END IF
+    NEXT
+    RETURN best
+END FUNCTION
+
+FUNCTION abstandZurStrecke(px AS FLOAT, py AS FLOAT, ax AS FLOAT, ay AS FLOAT, bx AS FLOAT, by AS FLOAT) AS FLOAT
+    DIM dx AS FLOAT : dx = bx - ax
+    DIM dy AS FLOAT : dy = by - ay
+    DIM ll AS FLOAT : ll = dx * dx + dy * dy
+    IF ll = 0 THEN RETURN HYPOT(px - ax, py - ay)
+    DIM t AS FLOAT : t = CLAMP(((px - ax) * dx + (py - ay) * dy) / ll, 0.0, 1.0)
+    RETURN HYPOT(px - (ax + t * dx), py - (ay + t * dy))
+END FUNCTION
+
+' --- Fortschritt -------------------------------------------------------------------
+
+' Die oberste sichtbare Ebene mit einem Stich an (x, y), NIL ohne.
+FUNCTION ebeneMitStich(m AS Muster, x AS INTEGER, y AS INTEGER) AS Ebene
+    DIM i AS INTEGER
+    FOR i = m.ebenen.anzahl() - 1 TO 0 STEP -1
+        DIM e AS Ebene : e = m.ebenen.ebenen[i]
+        IF e.sichtbar AND e.stich(x, y) <> KEIN_STICH THEN RETURN e
+    NEXT
+    RETURN NIL
+END FUNCTION
+
+' Zellen als erledigt markieren (an) oder nicht, je auf der obersten
+' sichtbaren Ebene mit Stich -- wie das Original; leere Zellen zaehlen nicht.
+' Ein Schritt. Liefert die geaenderten.
+FUNCTION erledigtSetzen(m AS Muster, v AS Verlauf, punkte AS ARRAY OF INTEGER, an AS BOOLEAN) AS INTEGER
+    DIM n AS INTEGER, k AS INTEGER
+    DIM wert AS INTEGER : wert = IIF(an, 1, 0)
+    v.beginnen(IIF(an, "Fortschritt markieren", "Fortschritt zurücknehmen"))
+    FOR k = 0 TO LEN(punkte) - 2 STEP 2
+        DIM e AS Ebene : e = ebeneMitStich(m, punkte[k], punkte[k + 1])
+        IF e IS NIL THEN CONTINUE
+        DIM i AS INTEGER : i = punkte[k + 1] * e.breite + punkte[k]
+        IF e.erledigt[i] = wert THEN CONTINUE
+        v.zelle(e, i, e.raster[i], e.art[i], e.erledigt[i], e.raster[i], e.art[i], wert)
+        e.erledigt[i] = wert
+        n = n + 1
+    NEXT
+    v.beenden()
+    RETURN n
+END FUNCTION
+
+' Eine ganze Farbe als erledigt -- auf ALLEN Ebenen, auch unsichtbaren (wie
+' MarkColorCompletedCommand). Ein Schritt.
+FUNCTION farbeErledigt(m AS Muster, v AS Verlauf, farbe AS INTEGER) AS INTEGER
+    DIM n AS INTEGER
+    v.beginnen("Farbe als erledigt")
+    DIM e AS Ebene
+    FOR EACH e IN m.ebenen.ebenen
+        DIM r AS ARRAY OF INTEGER : r = e.raster
+        DIM d AS ARRAY OF INTEGER : d = e.erledigt
+        DIM a AS ARRAY OF INTEGER : a = e.art
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(r) - 1
+            IF r[i] = farbe AND d[i] = 0 THEN
+                v.zelle(e, i, r[i], a[i], 0, r[i], a[i], 1)
+                d[i] = 1
+                n = n + 1
+            END IF
+        NEXT
+    NEXT
+    v.beenden()
+    RETURN n
+END FUNCTION
+
+' Den ganzen Fortschritt zuruecksetzen -- auf ALLEN Ebenen, auch unsichtbaren
+' (wie Pattern.reset_progress). PySticky leert dabei den Verlauf, weil es
+' sich nicht zuruecknehmen laesst; hier ist es ein Schritt wie jeder andere.
+' Liefert die zurueckgesetzten Zellen.
+FUNCTION fortschrittZuruecksetzen(m AS Muster, v AS Verlauf) AS INTEGER
+    DIM n AS INTEGER
+    v.beginnen("Fortschritt zurücksetzen")
+    DIM e AS Ebene
+    FOR EACH e IN m.ebenen.ebenen
+        DIM r AS ARRAY OF INTEGER : r = e.raster
+        DIM d AS ARRAY OF INTEGER : d = e.erledigt
+        DIM a AS ARRAY OF INTEGER : a = e.art
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(d) - 1
+            IF d[i] <> 0 THEN
+                v.zelle(e, i, r[i], a[i], d[i], r[i], a[i], 0)
+                d[i] = 0
+                n = n + 1
+            END IF
+        NEXT
+    NEXT
+    v.beenden()
+    RETURN n
+END FUNCTION
+
+' Die Stoffzaehlung (Kaestchen je Zoll; PySticky: die Klappliste der
+' Info-Leiste setzt fabric_count). Ein Schritt; FALSE ohne Aenderung.
+FUNCTION stoffSetzen(m AS Muster, v AS Verlauf, stoff AS FLOAT) AS BOOLEAN
+    IF stoff <= 0 OR stoff = m.stoff THEN RETURN FALSE
+    v.beginnen("Stoff ändern")
+    DIM t AS Aenderung : t = v.teil(TEIL_STOFF)
+    t.stoffVorher = m.stoff
+    t.stoffNachher = stoff
+    m.stoff = stoff
+    v.beenden()
+    RETURN TRUE
+END FUNCTION
+
+' Der naechste noch offene Stich einer Farbe in Lesereihenfolge (y * b + x),
+' sichtbar betrachtet; vorwaerts oder rueckwaerts, mit Umlauf. von = -1:
+' von vorn (bzw. von hinten). Liefert die Stelle oder -1.
+FUNCTION naechsterOffen(m AS Muster, farbe AS INTEGER, von AS INTEGER, vorwaerts AS BOOLEAN) AS INTEGER
+    DIM f AS ARRAY OF INTEGER, t AS ARRAY OF INTEGER, d AS ARRAY OF INTEGER
+    m.ebenen.zusammensetzen(f, t, d)
+    DIM n AS INTEGER : n = LEN(f)
+    IF n = 0 THEN RETURN -1
+    DIM i AS INTEGER, k AS INTEGER
+    FOR k = 1 TO n
+        IF von < 0 THEN
+            i = IIF(vorwaerts, k - 1, n - k)
+        ELSE
+            i = IIF(vorwaerts, von + k, von - k)
+        END IF
+        i = ((i MOD n) + n) MOD n
+        IF f[i] = farbe AND d[i] = 0 THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' --- Farbe ersetzen ------------------------------------------------------------------
+
+' Die Farben, die eine Quelle bei einer Toleranz mitnimmt: bei 0 nur sie,
+' sonst alle mit Abstand <= tol (CIEDE2000), ohne das Ziel.
+FUNCTION ersetzenQuellen(m AS Muster, quelle AS INTEGER, ziel AS INTEGER, tol AS FLOAT) AS ARRAY OF INTEGER
+    DIM q AS ARRAY OF INTEGER : q = [quelle]
+    IF tol <= 0 THEN RETURN q
+    DIM qf AS INTEGER : qf = m.farben[quelle].garn.farbe
+    DIM i AS INTEGER
+    FOR i = 0 TO m.farbanzahl() - 1
+        IF i = quelle OR i = ziel THEN CONTINUE
+        IF farbAbstand(qf, m.farben[i].garn.farbe) <= tol THEN ARRAY_PUSH(q, i)
+    NEXT
+    RETURN q
+END FUNCTION
+
+' Die anderen Farben nach Naehe zur Quelle, die aehnlichste zuerst (bei
+' gleichem Abstand in ihrer Reihenfolge, wie Pythons stabiles sort).
+FUNCTION aehnlicheFarben(m AS Muster, quelle AS INTEGER) AS ARRAY OF INTEGER
+    DIM nr AS ARRAY OF INTEGER : nr = []
+    DIM ab AS ARRAY OF FLOAT : ab = []
+    DIM qf AS INTEGER : qf = m.farben[quelle].garn.farbe
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO m.farbanzahl() - 1
+        IF i = quelle THEN CONTINUE
+        DIM d AS FLOAT : d = farbAbstand(qf, m.farben[i].garn.farbe)
+        j = LEN(ab)
+        WHILE j > 0
+            IF ab[j - 1] <= d THEN EXIT WHILE
+            j = j - 1
+        WEND
+        ARRAY_INSERT(ab, j, d)
+        ARRAY_INSERT(nr, j, i)
+    NEXT
+    RETURN nr
+END FUNCTION
+
+' Jede SICHTBARE Zelle mit einer der Quellfarben bekommt das Ziel, auf der
+' obersten sichtbaren Ebene mit Stich (verdeckte und unsichtbare bleiben, wie
+' im Original). Die alte Farbe bleibt in der Liste. Ein Schritt.
+FUNCTION farbeErsetzen(m AS Muster, v AS Verlauf, quellen AS ARRAY OF INTEGER, ziel AS INTEGER) AS INTEGER
+    IF ziel < 0 OR ziel >= m.farbanzahl() THEN RETURN 0
+    DIM nfarben AS INTEGER : nfarben = m.farbanzahl()
+    DIM abb[nfarben] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO nfarben - 1 : abb[i] = -1 : NEXT
+    DIM q AS INTEGER
+    FOR EACH q IN quellen
+        IF q >= 0 AND q < nfarben AND q <> ziel THEN abb[q] = ziel
+    NEXT
+    RETURN farbenUmsetzen(m, v, abb, "Farbe ersetzen")
+END FUNCTION
+
+' Jede SICHTBARE Zelle einer Farbe c mit abb[c] >= 0 bekommt abb[c] -- auf
+' ihrer Ursprungs-Ebene (der obersten sichtbaren mit Stich). Perle/Drill im
+' Ziel erzwingen ihre Form, eine Perle oder ein Drill in eine gewoehnliche
+' Farbe wird ein voller Stich, sonst bleibt der Typ (PySticky
+' _apply_color_changes_per_origin_layer). Ein Schritt; liefert die Zellen.
+FUNCTION farbenUmsetzen(m AS Muster, v AS Verlauf, abb AS ARRAY OF INTEGER, text AS STRING) AS INTEGER
+    DIM nfarben AS INTEGER : nfarben = m.farbanzahl()
+    DIM n AS INTEGER
+    v.beginnen(text)
+    DIM ne AS INTEGER : ne = m.ebenen.anzahl()
+    DIM b AS INTEGER : b = m.breite
+    ' wo eine sichtbare Ebene darueber schon einen Stich hat, gilt die untere nicht
+    DIM verdeckt[b * m.hoehe] AS INTEGER
+    DIM nr AS INTEGER
+    FOR nr = ne - 1 TO 0 STEP -1
+        DIM e AS Ebene : e = m.ebenen.ebenen[nr]
+        IF NOT e.sichtbar THEN CONTINUE
+        DIM r AS ARRAY OF INTEGER : r = e.raster
+        DIM a AS ARRAY OF INTEGER : a = e.art
+        DIM p AS ARRAY OF INTEGER : p = []
+        DIM fa AS ARRAY OF INTEGER : fa = []
+        DIM ta AS ARRAY OF INTEGER : ta = []
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(r) - 1
+            DIM c AS INTEGER : c = r[i]
+            IF c < 0 OR verdeckt[i] <> 0 THEN CONTINUE
+            verdeckt[i] = 1
+            IF c >= nfarben OR c >= LEN(abb) THEN CONTINUE
+            DIM ziel AS INTEGER : ziel = abb[c]
+            IF ziel < 0 OR ziel >= nfarben OR ziel = c THEN CONTINUE
+            DIM zf AS Farbeintrag : zf = m.farben[ziel]
+            DIM typ AS INTEGER : typ = a[i]
+            IF zf.istPerle THEN
+                typ = PERLE
+            ELSEIF zf.istDiamant THEN
+                typ = DIAMANT
+            ELSEIF typ = PERLE OR typ = DIAMANT THEN
+                typ = VOLL
+            END IF
+            ARRAY_PUSH(p, i MOD b) : ARRAY_PUSH(p, i \ b)
+            ARRAY_PUSH(fa, ziel) : ARRAY_PUSH(ta, typ)
+        NEXT
+        IF LEN(p) > 0 THEN n = n + zellenAufEbene(m, v, e, p, fa, ta, text)
+    NEXT
+    v.beenden()
+    RETURN n
+END FUNCTION
+
+' Seltene Farben (1 bis hoechstens Stiche) je der aehnlichsten haeufigen
+' zuordnen -- PySticky compute_rare_color_replacements. Liefert [quelle, ziel, ...].
+FUNCTION selteneErsetzungen(m AS Muster, hoechstens AS INTEGER) AS ARRAY OF INTEGER
+    m.stichzahlenNeu()
+    DIM paare AS ARRAY OF INTEGER : paare = []
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO m.farbanzahl() - 1
+        DIM s AS INTEGER : s = m.farben[i].stichzahl
+        IF s < 1 OR s > hoechstens THEN CONTINUE
+        DIM best AS INTEGER : best = -1
+        DIM bestD AS FLOAT
+        FOR j = 0 TO m.farbanzahl() - 1
+            IF m.farben[j].stichzahl <= hoechstens THEN CONTINUE
+            DIM d AS FLOAT : d = farbAbstand(m.farben[i].garn.farbe, m.farben[j].garn.farbe)
+            IF best < 0 OR d < bestD THEN
+                best = j
+                bestD = d
+            END IF
+        NEXT
+        IF best >= 0 THEN
+            ARRAY_PUSH(paare, i) : ARRAY_PUSH(paare, best)
+        END IF
+    NEXT
+    RETURN paare
+END FUNCTION
+
+' --- Symbol ---------------------------------------------------------------------------
+
+' Ein Zeichen als Symbol einer Farbe; leer oder schon bei einer anderen Farbe:
+' Fehlertext statt Aenderung, wie der Symbol-Editor. Der Eintrag wird
+' ersetzt, nicht veraendert -- sonst naehme der Vorher-Stand im Verlauf das
+' neue Symbol mit. "" = gesetzt (oder unveraendert).
+FUNCTION symbolSetzen(m AS Muster, v AS Verlauf, nr AS INTEGER, symbol AS STRING) AS STRING
+    IF nr < 0 OR nr >= m.farbanzahl() THEN RETURN "Keine solche Farbe."
+    symbol = TRIM$(symbol)
+    IF symbol = "" THEN RETURN "Ein Symbol braucht ein Zeichen."
+    IF symbol = m.farben[nr].symbol THEN RETURN ""
+    DIM i AS INTEGER
+    FOR i = 0 TO m.farbanzahl() - 1
+        IF i <> nr AND m.farben[i].symbol = symbol THEN RETURN symbol + " hat schon " + TRIM$(m.farben[i].garn.hersteller + " " + m.farben[i].garn.nummer) + "."
+    NEXT
+    DIM alt AS Farbeintrag : alt = m.farben[nr]
+    DIM neu AS Farbeintrag : neu = neuerFarbeintrag(alt.garn, symbol)
+    neu.stichzahl = alt.stichzahl
+    neu.auslassen = alt.auslassen
+    neu.straenge = alt.straenge
+    neu.istPerle = alt.istPerle
+    neu.istDiamant = alt.istDiamant
+    neu.farbId = alt.farbId
+    DIM t AS Aenderung : t = listenVorher(m, v, "Symbol ändern")
+    m.farben[nr] = neu
+    listenNachher(m, v, t)
+    RETURN ""
+END FUNCTION

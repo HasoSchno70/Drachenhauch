@@ -1,0 +1,216 @@
+' Die Willkommensseite (PyStickys WelcomeWidget): an der Stelle der
+' Zeichenflaeche, wenn kein Muster geladen ist -- Startaktion
+' "Willkommensseite", die letzte Datei fehlt, eine Datei im Aufruf liess sich
+' nicht oeffnen -- oder ueber den Muster-Knopf (dann mit "Zurueck zum
+' Muster"). Vier Kacheln (Neu, Oeffnen, Aus Bild, Demo) und die zuletzt
+' geoeffneten Dateien, die es noch gibt.
+
+DIM wkStapel AS INTEGER               ' GtkStack: "flaeche" oder "willkommen"
+DIM wkSeite AS INTEGER
+DIM wkListe AS INTEGER                ' GtkListBox der zuletzt geoeffneten
+DIM wkLeer AS INTEGER                 ' "Noch keine Dateien geoeffnet."
+DIM wkZurueck AS INTEGER              ' nur, wenn ein Muster da ist
+DIM wkPfade AS ARRAY OF STRING        ' je Zeile der Liste
+DIM wkKacheln AS ARRAY OF INTEGER     ' fuer die Probe
+
+FUNCTION willkommenStapel(flaeche AS INTEGER) AS INTEGER
+    wkStapel = gtk_stack_new()
+    gtk_stack_add_named(wkStapel, flaeche, "flaeche")
+    ' in einer Rolle: sonst zwaenge die Seite (vier Kacheln nebeneinander)
+    ' dem Fenster ihre Mindestgroesse auf, auch wenn sie nicht zu sehen ist
+    DIM rolle AS INTEGER : rolle = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_policy(rolle, GTK_POLITIK_AUTO, GTK_POLITIK_AUTO)
+    gtk_container_add(rolle, wkBauen())
+    gtk_stack_add_named(wkStapel, rolle, "willkommen")
+    wkPfade = []
+    RETURN wkStapel
+END FUNCTION
+
+FUNCTION wkKachel(icon AS STRING, titel AS STRING, text AS STRING, art AS STRING, was AS INTEGER) AS INTEGER
+    DIM k AS INTEGER : k = gtk_button_new()
+    gtkKlasse(k, "wk-kachel")
+    gtkKlasse(k, "wk-" + art)
+    gtk_widget_set_size_request(k, 220, 120)
+    gtk_widget_set_can_focus(k, FALSE)
+    DIM box AS INTEGER : box = gtk_box_new(GTK_SENKRECHT, 4)
+    DIM bild AS INTEGER : bild = gtk_image_new_from_icon_name(icon, GTK_ICON_KNOPF)
+    gtk_image_set_pixel_size(bild, 32)
+    gtk_widget_set_halign(bild, GTK_AUSRICHTEN_START)
+    gtk_box_pack_start(box, bild, FALSE, FALSE, 0)
+    DIM t AS INTEGER : t = gtk_label_new(titel)
+    gtk_label_set_xalign(t, 0.0)
+    gtkKlasse(t, "wk-ktitel")
+    gtk_box_pack_start(box, t, FALSE, FALSE, 0)
+    DIM u AS INTEGER : u = gtk_label_new(text)
+    gtk_label_set_xalign(u, 0.0)
+    gtk_label_set_line_wrap(u, TRUE)
+    gtk_label_set_max_width_chars(u, 26)
+    gtkKlasse(u, "wk-ktext")
+    gtk_box_pack_start(box, u, FALSE, FALSE, 0)
+    gtk_container_add(k, box)
+    signal(k, "clicked", wkGeklickt, was, 0, 0)
+    ARRAY_PUSH(wkKacheln, k)
+    RETURN k
+END FUNCTION
+
+FUNCTION wkBauen() AS INTEGER
+    wkKacheln = []
+    wkSeite = gtk_box_new(GTK_SENKRECHT, 16)
+    gtkKlasse(wkSeite, "willkommen")
+
+    DIM innen AS INTEGER : innen = gtk_box_new(GTK_SENKRECHT, 14)
+    gtk_widget_set_valign(innen, GTK_AUSRICHTEN_MITTE)
+    gtk_widget_set_halign(innen, GTK_AUSRICHTEN_MITTE)
+    gtk_widget_set_vexpand(innen, TRUE)
+    DIM t AS INTEGER : t = gtk_label_new("Glutfaden")
+    gtkKlasse(t, "wk-titel")
+    gtk_box_pack_start(innen, t, FALSE, FALSE, 0)
+    DIM u AS INTEGER : u = gtk_label_new("KREUZSTICH-MUSTER EDITOR")
+    gtkKlasse(u, "wk-unter")
+    gtk_box_pack_start(innen, u, FALSE, FALSE, 0)
+    DIM reihe AS INTEGER : reihe = gtk_box_new(GTK_WAAGERECHT, 16)
+    gtk_widget_set_halign(reihe, GTK_AUSRICHTEN_MITTE)
+    gtk_widget_set_margin_top(reihe, 20)
+    gtk_box_pack_start(reihe, wkKachel("document-new-symbolic", "Neues Muster", "Leinwand mit Standardgröße erstellen.", "neu", 0), FALSE, FALSE, 0)
+    gtk_box_pack_start(reihe, wkKachel("document-open-symbolic", "Datei öffnen", "Bestehendes Muster laden (.pxs, .oxs, .pat, .xsd).", "oeffnen", 1), FALSE, FALSE, 0)
+    gtk_box_pack_start(reihe, wkKachel("insert-image-symbolic", "Aus Bild", "Foto / Grafik in ein Muster umwandeln.", "bild", 2), FALSE, FALSE, 0)
+    gtk_box_pack_start(reihe, wkKachel("applications-graphics-symbolic", "Demo-Muster", "Beispiel zum Ausprobieren.", "demo", 3), FALSE, FALSE, 0)
+    gtk_box_pack_start(innen, reihe, FALSE, FALSE, 0)
+    DIM zl AS INTEGER : zl = gtk_label_new("ZULETZT GEÖFFNET")
+    gtkKlasse(zl, "wk-zuletzt")
+    gtk_widget_set_margin_top(zl, 16)
+    gtk_box_pack_start(innen, zl, FALSE, FALSE, 0)
+    wkListe = gtk_list_box_new()
+    gtkKlasse(wkListe, "wk-liste")
+    gtk_list_box_set_activate_on_single_click(wkListe, FALSE)
+    gtk_widget_set_size_request(wkListe, 640, -1)
+    gtk_widget_set_halign(wkListe, GTK_AUSRICHTEN_MITTE)
+    DIM s AS INTEGER : s = signalZeile(wkListe, "row-activated", wkZeileAktiviert, 0, 0, 0)
+    gtk_box_pack_start(innen, wkListe, FALSE, FALSE, 0)
+    wkLeer = gtk_label_new("Noch keine Dateien geöffnet.")
+    gtkKlasse(wkLeer, "wk-leer")
+    gtk_box_pack_start(innen, wkLeer, FALSE, FALSE, 0)
+    wkZurueck = gtk_button_new_with_label("← Zurück zum Muster")
+    gtkKlasse(wkZurueck, "klein")
+    gtk_widget_set_halign(wkZurueck, GTK_AUSRICHTEN_MITTE)
+    gtk_widget_set_no_show_all(wkZurueck, TRUE)
+    signal(wkZurueck, "clicked", wkGeklickt, 4, 0, 0)
+    gtk_box_pack_start(innen, wkZurueck, FALSE, FALSE, 8)
+    gtk_box_pack_start(wkSeite, innen, TRUE, TRUE, 0)
+    RETURN wkSeite
+END FUNCTION
+
+' Die Liste der zuletzt geoeffneten Dateien neu (nur, was es noch gibt)
+SUB wkListeFuellen()
+    DIM kinder AS INTEGER : kinder = gtk_list_box_get_row_at_index(wkListe, 0)
+    WHILE kinder <> 0
+        gtk_widget_destroy(kinder)
+        kinder = gtk_list_box_get_row_at_index(wkListe, 0)
+    WEND
+    wkPfade = []
+    DIM p AS STRING
+    FOR EACH p IN kern.zuletztVorhanden(einst)
+        DIM box AS INTEGER : box = gtk_box_new(GTK_SENKRECHT, 1)
+        gtkKlasse(box, "wk-zeile")
+        DIM n AS INTEGER : n = gtk_label_new(BASENAME(p))
+        gtk_label_set_xalign(n, 0.0)
+        gtkKlasse(n, "wk-name")
+        gtk_box_pack_start(box, n, FALSE, FALSE, 0)
+        DIM o AS INTEGER : o = gtk_label_new(DIRNAME(p))
+        gtk_label_set_xalign(o, 0.0)
+        gtk_label_set_ellipsize(o, GTK_ELLIPSE_MITTE)
+        gtkKlasse(o, "wk-ort")
+        gtk_box_pack_start(box, o, FALSE, FALSE, 0)
+        gtk_widget_set_tooltip_text(box, p)
+        gtk_list_box_insert(wkListe, box, -1)
+        ARRAY_PUSH(wkPfade, p)
+    NEXT
+    gtk_widget_show_all(wkListe)
+    gtk_widget_set_visible(wkListe, LEN(wkPfade) > 0)
+    gtk_widget_set_visible(wkLeer, LEN(wkPfade) = 0)
+END SUB
+
+FUNCTION willkommenSichtbar() AS BOOLEAN
+    IF wkStapel = 0 THEN RETURN FALSE
+    RETURN gtk_stack_get_visible_child_name(wkStapel) = "willkommen"
+END FUNCTION
+
+SUB willkommenZeigen()
+    IF wkStapel = 0 THEN RETURN
+    wkListeFuellen()
+    gtk_widget_set_visible(wkZurueck, lwHat)
+    gtk_stack_set_visible_child_name(wkStapel, "willkommen")
+    wkSperren(NOT lwHat)
+    statusNachziehen()
+END SUB
+
+SUB willkommenVerbergen()
+    IF wkStapel = 0 THEN RETURN
+    IF NOT willkommenSichtbar() THEN RETURN
+    gtk_stack_set_visible_child_name(wkStapel, "flaeche")
+    wkSperren(FALSE)
+END SUB
+
+' Ohne Muster: alles, was eins braucht, gesperrt (Werkzeuge, Sichern, Export,
+' Ansicht ...); Oeffnen, Neu, Import, Muster-Knopf bleiben
+SUB wkSperren(an AS BOOLEAN)
+    DIM w AS INTEGER
+    FOR EACH w IN [werkzeugzeile, kSichern, kExport, kPfad, kVorschau, kAuswerten, kModus, kKleiner, kGroesser, kEinpassen]
+        IF w <> 0 THEN gtk_widget_set_sensitive(w, NOT an)
+    NEXT
+    minikarteZeigen(einst.uebersicht AND NOT an)        ' ohne Muster gibt es nichts zu ueberblicken
+    IF NOT an THEN zustandNachziehen()
+    IF an THEN
+        gtk_widget_set_sensitive(kZurueck, FALSE)
+        gtk_widget_set_sensitive(kVor, FALSE)
+    END IF
+END SUB
+
+' Befehle, die ohne Muster gehen (alles andere meldet sich, statt abzubrechen)
+FUNCTION ohneMusterErlaubt(kennung AS STRING) AS BOOLEAN
+    RETURN ARRAY_INDEXOF(["neu", "oeffnen", "import", "bibliothek", "einstellungen", "raster", "lineale", "uebersicht", "farbleiste", "willkommen", "tastenkuerzel"], kennung) >= 0
+END FUNCTION
+
+SUB wkGeklickt(w AS INTEGER, was AS INTEGER)
+    willkommenAktion(was)
+END SUB
+
+SUB wkZeileAktiviert(liste AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
+    DIM i AS INTEGER : i = gtk_list_box_row_get_index(zeile)
+    IF i >= 0 AND i < LEN(wkPfade) THEN willkommenOeffnen(wkPfade[i])
+END SUB
+
+SUB willkommenOeffnen(pfad AS STRING)
+    IF NOT ungesichertFragen("Öffnen") THEN RETURN
+    DIM ok AS BOOLEAN : ok = musterOeffnen(pfad)
+END SUB
+
+' 0 Neu, 1 Oeffnen, 2 Aus Bild, 3 Demo, 4 Zurueck zum Muster
+SUB willkommenAktion(was AS INTEGER)
+    SELECT CASE was
+        CASE 0 : neuDialog()
+        CASE 1 : oeffnenGeklickt(0, 0)
+        CASE 2 : bildImportieren()
+        CASE 3 : demoOeffnen()
+        CASE 4
+            IF lwHat THEN willkommenVerbergen()
+    END SELECT
+END SUB
+
+' Das mitgelieferte Beispiel als NEUES Muster (ohne Datei), wie
+' _on_open_demo: Sichern legt eine eigene Kopie an, das Beispiel bleibt
+SUB demoOeffnen()
+    IF NOT ungesichertFragen("Öffnen") THEN RETURN
+    DIM pfad AS STRING : pfad = PATHJOIN(CWD$(), "daten/muster/demo_kreuzstich.pxs")
+    IF NOT FILEEXISTS(pfad) THEN
+        statusMeldung("Demo-Datei nicht gefunden: " + pfad)
+        RETURN
+    END IF
+    TRY
+        DIM m AS kern.Muster : m = kern.pxsLaden(pfad)
+        m.stichzahlenNeu()
+        musterZeigen(m, "", m.name)
+    CATCH fehler
+        statusMeldung("Demo konnte nicht geladen werden: " + fehler)
+    END TRY
+END SUB

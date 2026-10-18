@@ -3670,6 +3670,7 @@ impl<'p> Vm<'p> {
                                 let cn = rc.borrow().class_name.clone();
                                 let m = self.resolve_method(&cn, method)
                                     .ok_or_else(|| format!("Methode '{}' existiert nicht in {}", method, cn))?;
+                                byref_ohne_typ(m, method, &cn, argc)?;
                                 instr.merk.set((Rc::as_ptr(&rc.borrow().layout), m as *const Func as usize));
                                 m
                             };
@@ -3701,6 +3702,7 @@ impl<'p> Vm<'p> {
                             let cn = rc.borrow().class_name.clone();
                             let m = self.resolve_method(&cn, method)
                                 .ok_or_else(|| format!("Methode '{}' existiert nicht in {}", method, cn))?;
+                            byref_ohne_typ(m, method, &cn, argc)?;
                             if m.is_coroutine {
                                 stack.push(make_coro(m, margs, Some(obj.clone())));
                             } else {
@@ -4179,6 +4181,53 @@ impl<'p> Vm<'p> {
                 // (der Elternklasse der Aufrufstelle) statt bei der Klasse
                 // des Objekts. Sonst fande sie die ueberschreibende Methode
                 // wieder und riefe sich selbst, bis der Stapel voll ist.
+                op::CALL_METHOD_BYREF => {
+                    let l = arg.list();
+                    let method = l[0].str();
+                    let argc = l[1].as_usize();
+                    let stellen: Vec<usize> = match &l[2] {
+                        Arg::List(s) => s.iter().map(|a| a.as_usize()).collect(),
+                        Arg::Ints(s) => s.iter().map(|&a| a as usize).collect(),
+                        _ => Vec::new(),
+                    };
+                    let split = stack.len() - argc;
+                    let margs = stack.split_off(split);
+                    let obj = vm_pop(stack)?;
+                    let rc = match &obj {
+                        Value::Instance(rc) => rc.clone(),
+                        Value::Nil => return Err(format!(
+                            "Methodenaufruf '.{}' bei NIL-Referenz{}", method, NIL_NEW)),
+                        _ => return Err(format!("Methodenaufruf '.{}' bei nicht-Objekt ({})", method, obj.type_name())),
+                    };
+                    let cn = rc.borrow().class_name.clone();
+                    let m = self.resolve_method(&cn, method)
+                        .ok_or_else(|| format!("Methode '{}' existiert nicht in {}", method, cn))?;
+                    // Eine Unterklasse, die die Methode mit anderen BYREF-Stellen
+                    // ueberschreibt, passt nicht zu dem, was der Compiler erfasst hat.
+                    let hier: Vec<usize> = (0..argc).filter(|&i| m.param_byref.get(i).copied().unwrap_or(false)).collect();
+                    if hier != stellen {
+                        return Err(format!(
+                            "{}.{}: die Methode der Klasse {} hat ihre BYREF-Parameter an anderen Stellen \
+                             als die, nach der der Aufruf uebersetzt ist -- eine Ueberschreibung muss \
+                             dieselben Parameter BYREF nehmen", crate::namensraum::lesbar_text(&cn).to_uppercase(), method,
+                            crate::namensraum::lesbar_text(&cn).to_uppercase()));
+                    }
+                    if m.is_coroutine {
+                        return Err(format!("{}: eine Coroutine kann keine BYREF-Parameter zurueckschreiben", method));
+                    }
+                    let (ret, werte) = self.exec_byref(m, margs, Some(obj))?;
+                    // exec_byref liefert ALLE BYREF-Parameter; zurueck geht nur,
+                    // was der Aufruf uebergeben hat.
+                    let mut k = 0;
+                    for (i, &br) in m.param_byref.iter().enumerate() {
+                        if br {
+                            if i < argc { stack.push(werte[k].clone()); }
+                            k += 1;
+                        }
+                    }
+                    if !m.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
+                }
+
                 op::CALL_SUPER => {
                     let l = arg.list();
                     let start_class = l[0].str();
@@ -5099,7 +5148,7 @@ impl<'p> Vm<'p> {
                     Some(_) => return Err("PDF_NEW: 2. Argument ist \"hoch\" oder \"quer\"".to_string()),
                 };
                 let (b, h) = pdf::seitenmass(&art, quer).ok_or_else(|| format!(
-                    "PDF_NEW: Seitengroesse '{}' kenne ich nicht -- a3, a4, a5, a6, letter, legal", art))?;
+                    "PDF_NEW: Seitengroesse '{}' kenne ich nicht -- a0 bis a6, letter, legal", art))?;
                 self.pdf_dok.push(Some(pdf::Dokument::neu(b, h)));
                 Value::Int((self.pdf_dok.len() - 1) as i64)
             }
@@ -5150,11 +5199,62 @@ impl<'p> Vm<'p> {
                 self.pdf_d(i)?.setze_strich(mm.max(0.0));
                 Value::Nil
             }
+            // PDF_TEXT(p, x, y, text$ [, winkel]) -- der Winkel in Grad gegen
+            // den Uhrzeigersinn, gedreht um (x, y). Fuer Wasserzeichen und
+            // senkrechte Achsenbeschriftungen (Glutfaden, 2026-10-16).
             "pdf_text" => {
+                if a.len() != 4 && a.len() != 5 {
+                    return Err(format!("PDF_TEXT: erwartet 4 oder 5 Argumente (pdf, x, y, text$ [, winkel]), nicht {}", a.len()));
+                }
                 let i = bi_int(a, 0, "PDF_TEXT")?;
                 let (x, y) = (bi_num(a, 1, "PDF_TEXT")?, bi_num(a, 2, "PDF_TEXT")?);
                 let t = bi_str(a, 3, "PDF_TEXT")?.to_string();
-                self.pdf_d(i)?.text(x, y, &t).map_err(|e| format!("PDF_TEXT: {}", e))?;
+                let w = if a.len() > 4 { bi_num(a, 4, "PDF_TEXT")? } else { 0.0 };
+                self.pdf_d(i)?.text(x, y, &t, w).map_err(|e| format!("PDF_TEXT: {}", e))?;
+                Value::Nil
+            }
+            // PDF_OPACITY(p, deckkraft) -- 0..1 fuer alles, was danach kommt;
+            // PDF_GET_OPACITY liest sie zurueck.
+            "pdf_opacity" => {
+                let i = bi_int(a, 0, "PDF_OPACITY")?;
+                let d = bi_num(a, 1, "PDF_OPACITY")?;
+                self.pdf_d(i)?.setze_deckkraft(d).map_err(|e| format!("PDF_OPACITY: {}", e))?;
+                Value::Nil
+            }
+            "pdf_get_opacity" => { let i = bi_int(a, 0, "PDF_GET_OPACITY")?; Value::Float(self.pdf_d(i)?.deckkraft()) }
+            // PDF_DASH(p, strich_mm [, luecke_mm]) -- gestrichelt fuer alle
+            // folgenden Linien und Umrisse; ohne Luecke so lang wie der
+            // Strich, PDF_DASH(p, 0) zieht wieder durch (Glutfaden Stufe 7:
+            // die Spruenge im Stickpfad).
+            "pdf_dash" => {
+                if a.len() != 2 && a.len() != 3 {
+                    return Err(format!("PDF_DASH: erwartet 2 oder 3 Argumente (pdf, strich_mm [, luecke_mm]), nicht {}", a.len()));
+                }
+                let i = bi_int(a, 0, "PDF_DASH")?;
+                let an = bi_num(a, 1, "PDF_DASH")?;
+                let aus = if a.len() > 2 { bi_num(a, 2, "PDF_DASH")? } else { an };
+                self.pdf_d(i)?.setze_strichel(an, aus).map_err(|e| format!("PDF_DASH: {}", e))?;
+                Value::Nil
+            }
+            "pdf_circle" | "pdf_circle_fill" => {
+                let fn_ = if name == "pdf_circle" { "PDF_CIRCLE" } else { "PDF_CIRCLE_FILL" };
+                let i = bi_int(a, 0, fn_)?;
+                let (x, y, r) = (bi_num(a, 1, fn_)?, bi_num(a, 2, fn_)?, bi_num(a, 3, fn_)?);
+                self.pdf_d(i)?.kreis(x, y, r, name == "pdf_circle_fill").map_err(|e| format!("{}: {}", fn_, e))?;
+                Value::Nil
+            }
+            // PDF_POLYGON(p, xs, ys) -- ein geschlossener Zug; die Felder
+            // muessen gleich lang sein.
+            "pdf_polygon" | "pdf_polygon_fill" => {
+                let fn_ = if name == "pdf_polygon" { "PDF_POLYGON" } else { "PDF_POLYGON_FILL" };
+                let i = bi_int(a, 0, fn_)?;
+                let xs = gfloats(a, 1, fn_)?;
+                let ys = gfloats(a, 2, fn_)?;
+                if xs.len() != ys.len() {
+                    return Err(format!("{}: xs und ys muessen gleich lang sein ({} gegen {})", fn_, xs.len(), ys.len()));
+                }
+                let pkt: Vec<(f64, f64)> = xs.into_iter().zip(ys).collect();
+                self.pdf_d(i)?.vieleck(pkt, name == "pdf_polygon_fill").map_err(|e| format!("{}: {}", fn_, e))?;
                 Value::Nil
             }
             "pdf_text_width" => {
@@ -6250,6 +6350,26 @@ impl<'p> Vm<'p> {
             "zeit_jetzt" => {
                 let (j, mo, d, h, mi, s) = crate::builtins::local_datetime();
                 Value::Int(zeit::aus_teilen(j, mo, d, h, mi, s))
+            }
+            // Unix-Zeit (UTC, mit Bruchteil) -- die Zahl, die andere Programme,
+            // Web-APIs und Dateiformate meinen (Pythons time.time())
+            "zeit_unix" => {
+                if !a.is_empty() { return Err("ZEIT_UNIX: erwartet keine Argumente".into()); }
+                let d = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+                Value::Float(d.as_secs_f64())
+            }
+            "zeit_aus_unix" => {
+                let u = match a.first() {
+                    Some(Value::Int(n)) if a.len() == 1 => *n,
+                    Some(Value::Float(f)) if a.len() == 1 && f.is_finite() => f.floor() as i64,
+                    _ => return Err("ZEIT_AUS_UNIX: erwartet Unix-Sekunden (eine Zahl)".into()),
+                };
+                Value::Int(zeit::aus_unix_mit(u, crate::builtins::lokaler_versatz))
+            }
+            "zeit_nach_unix" => {
+                if a.len() != 1 { return Err("ZEIT_NACH_UNIX: erwartet einen Zeitpunkt".into()); }
+                let t = z_int(a, 0, "ZEIT_NACH_UNIX")?;
+                Value::Int(zeit::nach_unix_mit(t, crate::builtins::lokaler_versatz))
             }
             "zeit_parse" => {
                 let text = z_str(a, 0, "ZEIT_PARSE")?;
@@ -11255,7 +11375,27 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             // --- Modul: imgfx (immutable, liefern neues IMAGE-Handle) ---
-            "image_scale" => Value::Int(g!().image_scale(gi(a,0,"IMAGE_SCALE")?, gi(a,1,"IMAGE_SCALE")? as i32, gi(a,2,"IMAGE_SCALE")? as i32)?),
+            "image_scale" => {
+                let (b, h) = (gi(a,1,"IMAGE_SCALE")? as i32, gi(a,2,"IMAGE_SCALE")? as i32);
+                if a.len() > 4 { return Err("IMAGE_SCALE: erwartet (bild, breite, hoehe [, filter$])".into()); }
+                if a.len() == 4 {
+                    let name = gs(a, 3, "IMAGE_SCALE")?;
+                    let f = crate::resample::Filter::aus_namen(&name).ok_or_else(|| format!(
+                        "IMAGE_SCALE: unbekannter Filter '{}' -- moeglich sind lanczos, bikubisch, box, hamming, linear", name))?;
+                    Value::Int(g!().image_scale_filter(gi(a,0,"IMAGE_SCALE")?, b, h, f)?)
+                } else {
+                    Value::Int(g!().image_scale(gi(a,0,"IMAGE_SCALE")?, b, h)?)
+                }
+            }
+            "image_enhance" => {
+                if a.len() != 3 { return Err("IMAGE_ENHANCE: erwartet (bild, art$, faktor)".into()); }
+                let name = gs(a, 1, "IMAGE_ENHANCE")?;
+                let art = crate::resample::Anpassung::aus_namen(&name).ok_or_else(|| format!(
+                    "IMAGE_ENHANCE: unbekannte Art '{}' -- moeglich sind helligkeit, kontrast, saettigung", name))?;
+                let f = need_f(a, 2, "IMAGE_ENHANCE")?;
+                if !f.is_finite() || f < 0.0 { return Err("IMAGE_ENHANCE: der Faktor muss eine Zahl ab 0 sein".into()); }
+                Value::Int(g!().image_enhance(gi(a,0,"IMAGE_ENHANCE")?, art, f)?)
+            }
             "image_scale_nn" => Value::Int(g!().image_scale_nn(gi(a,0,"IMAGE_SCALE_NN")?, gi(a,1,"IMAGE_SCALE_NN")? as i32, gi(a,2,"IMAGE_SCALE_NN")? as i32)?),
             "image_rotate" => Value::Int(g!().image_rotate(gi(a,0,"IMAGE_ROTATE")?, need_f(a,1,"IMAGE_ROTATE")? as f32)?),
             "image_rotate_cw" => Value::Int(g!().image_rotate_cw(gi(a,0,"IMAGE_ROTATE_CW")?)?),
@@ -12919,4 +13059,19 @@ fn feld_platz(instr: &crate::model::Instr, obj: &Instance, name: &str) -> Option
 
 thread_local! {
     static LEERE_LAGE: Rc<crate::value::Layout> = Rc::new(crate::value::Layout::default());
+}
+
+/// CALL_METHOD auf eine Methode mit BYREF-Parametern: der Compiler kannte die
+/// Klasse nicht (`DIM x` ohne Typ, Feldelement ohne Typ), konnte die Argumente
+/// also nicht erfassen. Still als BYVAL zu laufen hiesse, die Aenderungen zu
+/// verlieren -- darum ein Fehler mit dem Weg hinaus.
+fn byref_ohne_typ(m: &Func, method: &str, cn: &str, argc: usize) -> Result<(), String> {
+    if m.param_byref.iter().take(argc).any(|&b| b) {
+        let k = crate::namensraum::lesbar_text(cn).to_uppercase();
+        return Err(format!(
+            "{}.{} hat BYREF-Parameter, aber beim Uebersetzen war die Klasse des Objekts \
+             nicht bekannt -- die Werte kaemen nicht zurueck. Das Objekt in einer \
+             Variablen mit Typ halten (DIM x AS {}) und darueber aufrufen.", k, method, k));
+    }
+    Ok(())
 }

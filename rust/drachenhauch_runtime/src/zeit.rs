@@ -54,6 +54,22 @@ pub fn aus_teilen(jahr: i64, monat: i64, tag: i64, stunde: i64, minute: i64, sek
     tage_aus_datum(jahr, monat, tag) * SEK_PRO_TAG + stunde * 3600 + minute * 60 + sekunde
 }
 
+/// Unix-Sekunden (UTC) -> Zeitwert in Ortszeit; `versatz` ist der Abstand
+/// der Ortszeit zu UTC fuer einen UTC-Zeitpunkt (samt Sommerzeit).
+pub fn aus_unix_mit(unix: i64, versatz: impl Fn(i64) -> i64) -> i64 {
+    unix + versatz(unix)
+}
+
+/// Zeitwert in Ortszeit -> Unix-Sekunden. Der Versatz haengt am UTC-Zeitpunkt,
+/// den man erst sucht: einmal mit dem Versatz der Ortszeit geschaetzt, dann
+/// mit dem Versatz an der Schaetzung. In der Stunde, die es bei der Umstellung
+/// auf Sommerzeit nicht gibt, oder der doppelten im Herbst ist das Ergebnis
+/// eine der beiden moeglichen Antworten.
+pub fn nach_unix_mit(t: i64, versatz: impl Fn(i64) -> i64) -> i64 {
+    let schaetzung = t - versatz(t);
+    t - versatz(schaetzung)
+}
+
 /// Zeitwert in seine Felder zerlegen: (Jahr, Monat, Tag, Stunde, Minute, Sekunde).
 pub fn in_teile(t: i64) -> (i64, i64, i64, i64, i64, i64) {
     let tage = t.div_euclid(SEK_PRO_TAG);
@@ -469,5 +485,21 @@ mod tests {
         let t = aus_teilen(1969, 7, 20, 20, 17, 0);
         assert!(t < 0);
         assert_eq!(in_teile(t), (1969, 7, 20, 20, 17, 0));
+    }
+
+    #[test]
+    fn unix_hin_und_zurueck_ueber_die_sommerzeit() {
+        // Mitteleuropa 2026: Sommerzeit ab 29.3. 01:00 UTC, bis 25.10. 01:00 UTC
+        let anfang = aus_teilen(2026, 3, 29, 1, 0, 0);
+        let ende = aus_teilen(2026, 10, 25, 1, 0, 0);
+        let versatz = |u: i64| if u >= anfang && u < ende { 7200 } else { 3600 };
+        for (j, mo, d, h) in [(2026, 1, 15, 12), (2026, 7, 1, 0), (2026, 3, 29, 0), (2026, 3, 29, 3), (2026, 10, 25, 3), (2026, 12, 31, 23)] {
+            let u = aus_teilen(j, mo, d, h, 30, 0);
+            let t = aus_unix_mit(u, versatz);
+            assert_eq!(nach_unix_mit(t, versatz), u, "{}-{}-{} {}h", j, mo, d, h);
+        }
+        // Sommer: 12:00 UTC ist 14:00 Ortszeit
+        let u = aus_teilen(2026, 7, 1, 12, 0, 0);
+        assert_eq!(in_teile(aus_unix_mit(u, versatz)), (2026, 7, 1, 14, 0, 0));
     }
 }

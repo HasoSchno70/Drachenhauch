@@ -50,6 +50,8 @@ mod gifschreiber;
 #[allow(dead_code)]
 mod leinwand;
 #[allow(dead_code)]
+mod resample;
+#[allow(dead_code)]
 mod objschreiber;
 mod schnitt;
 mod geld;
@@ -1691,6 +1693,7 @@ fn compile_source_mit<T>(raw_source: &str, base: &std::path::Path, label: &str,
     // Zeile, die der Nutzer VOR SICH HAT -- nicht auf die gemergte Quelle.
     // Ohne IMPORT ist beides dasselbe, mit IMPORT war es bisher irrefuehrend.
     let wo = |zeile: u32| preprocess::stelle(&herkunft, zeile, label);
+    preprocess::lauf_merken(&herkunft, label);
     let (ext_types, aliases, module) = preprocess::compile_env(&imports);
     // E1: Hardware-Module (serial/usb/bt/wifi) sind zwar importierbar, fehlen aber
     // im Default-Build. Frueh (beim IMPORT) warnen statt erst beim ersten Aufruf --
@@ -1952,6 +1955,7 @@ fn check_main(pfade: &[String]) -> ExitCode {
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| pfad.to_string());
         let mut diags = check_source(&raw_source, &base, &label);
+        auf_dateien_umrechnen(&mut diags, &raw_source, &base);
         // Erst hier uebersetzen: check_source liefert auch dem Sprachserver
         // zu, und dessen Schnellkorrekturen lesen den deutschen Satz.
         if meldung::englisch() {
@@ -1970,11 +1974,48 @@ fn check_main(pfade: &[String]) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// `--check` meldete Zeilen des ZUSAMMENGEFUEGTEN Quelltexts (IMPORTs
+/// eingesetzt) -- bei einem Programm aus mehreren Dateien also eine Zeile, die
+/// es in keiner Datei gibt, und keine Datei (Glutfaden, 2026-10-15). Jetzt die
+/// Zeile in ihrer eigenen Datei, bei einer importierten dazu `file`. Der
+/// Sprachserver und CODE_CHECK$ rechnen selbst zurueck und bekommen
+/// check_source unveraendert. Die Hardware-Warnungen der Vorverarbeitung
+/// zaehlen schon nach der Hauptdatei.
+fn auf_dateien_umrechnen(diags: &mut [serde_json::Value], raw_source: &str, base: &std::path::Path) {
+    let herkunft = match preprocess::process(raw_source, base) { Ok(r) => r.2, Err(_) => return };
+    for d in diags.iter_mut() {
+        if d.get("phase").and_then(|p| p.as_str()) == Some("preprocess") { continue; }
+        let z = d.get("line").and_then(|l| l.as_u64()).unwrap_or(0) as usize;
+        if z == 0 { continue; }
+        if let Some(h) = herkunft.get(z - 1) {
+            d["line"] = serde_json::json!(h.zeile);
+            if !h.datei.is_empty() {
+                let datei = if h.pfad.is_empty() { h.datei.clone() } else { h.pfad.clone() };
+                d["file"] = serde_json::json!(datei);
+            }
+        }
+    }
+}
+
 /// Front-End-Kette (preprocess -> lex -> parse -> compile) als Diagnostik.
 /// MVP: bricht bei der ersten Fehlerstelle ab und liefert genau eine Diagnose
 /// (wie error_check.py einen ParseProblem liefert). Leeres Array = fehlerfrei.
 /// Compiler-Fehler tragen heute keine Zeile -> `line: 0` (spaetere Verfeinerung).
 fn check_source(raw_source: &str, base: &std::path::Path, label: &str) -> Vec<serde_json::Value> {
+    // Interne Namen (`kern@eintrag`) lesbar machen wie beim Lauf auf stderr
+    // (2026-10-17: --check, der Sprachserver und CODE_CHECK$ zeigten
+    // "KERN@BIBLIOTHEKSEINTRAG" in einer Typ-Warnung).
+    let mut diags = check_source_roh(raw_source, base, label);
+    for d in diags.iter_mut() {
+        if let Some(m) = d.get("message").and_then(|m| m.as_str()) {
+            let lesbar = namensraum::lesbar_text(m);
+            d["message"] = serde_json::Value::String(lesbar);
+        }
+    }
+    diags
+}
+
+fn check_source_roh(raw_source: &str, base: &std::path::Path, label: &str) -> Vec<serde_json::Value> {
     let (source, imports, herkunft, namensraeume) = match preprocess::process(raw_source, base) {
         Ok(r) => r,
         Err(e) => return vec![serde_json::json!({
@@ -2666,7 +2707,9 @@ fn run_program(prog: model::Program, source_label: &str) -> ExitCode {
             let e = meldung::t(&crate::vm::mit_signatur(&e));
             let art = meldung::wort("Laufzeitfehler in", "Runtime error in");
             if line != 0 {
-                eprintln!("{} {}:{}: {}", art, source_label, line, e);
+                let wo = preprocess::lauf_stelle(line)
+                    .unwrap_or_else(|| format!("{}:{}", source_label, line));
+                eprintln!("{} {}: {}", art, wo, e);
             } else {
                 eprintln!("{} {}: {}", art, source_label, e);
             }

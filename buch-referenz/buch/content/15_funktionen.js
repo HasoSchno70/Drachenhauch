@@ -56,6 +56,7 @@ module.exports = (H) => [
       'PRINT wert',
     ],
     { out: ["42"] }),
+  H.note("BYREF gilt auch bei Methoden einer Klasse – vorausgesetzt, Drachenhauch weiß beim Übersetzen, welche Klasse das Objekt hat, etwa weil du es mit DIM s AS Stapel deklariert hast. Ist das nicht bekannt, meldet der Aufruf einen Fehler, statt die Änderung still zu verlieren."),
   H.tip("Mehrere Ergebnisse?", "Wenn du mehr als einen Wert zurückgeben willst, gibt es neben BYREF eine elegantere Möglichkeit: ein Tupel zurückgeben und es beim Aufruf zerlegen. Das lernst du im Kapitel „Tupel & Destructuring“."),
 
   H.h2("Vorgabewerte (Defaults)"),

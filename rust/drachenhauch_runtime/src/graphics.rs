@@ -4636,6 +4636,31 @@ impl Graphics {
         img.resize(w, h);
         self.push_tex_from_image(img)
     }
+    /// IMAGE_SCALE mit Filter (`lanczos`, `bikubisch`, `box`, `hamming`,
+    /// `linear`): gerechnet wie Pillows `Image.resize` (resample.rs), nicht
+    /// mit raylibs stb_image_resize -- ein Muster aus einem Foto haengt an
+    /// diesen Zahlen. Ohne Filter bleibt es bei raylibs Glaetten.
+    pub fn image_scale_filter(&mut self, idx: i64, w: i32, h: i32, filter: crate::resample::Filter) -> Result<i64, String> {
+        if w <= 0 || h <= 0 { return Err("IMAGE_SCALE: w und h muessen > 0 sein".into()); }
+        let (px, b, hh) = self.image_rgba(idx, "IMAGE_SCALE")?;
+        let neu = crate::resample::skalieren(&px, b as usize, hh as usize, w as usize, h as usize, filter);
+        self.bild_aus_rgba(&neu, w, h, "IMAGE_SCALE")
+    }
+    /// IMAGE_ENHANCE: Helligkeit, Kontrast, Saettigung wie Pillows
+    /// `ImageEnhance` (1.0 = unveraendert, 0.0 = schwarz / grau / Graustufen).
+    pub fn image_enhance(&mut self, idx: i64, art: crate::resample::Anpassung, faktor: f64) -> Result<i64, String> {
+        let (px, b, hh) = self.image_rgba(idx, "IMAGE_ENHANCE")?;
+        let neu = crate::resample::anpassen(&px, art, faktor);
+        self.bild_aus_rgba(&neu, b as i32, hh as i32, "IMAGE_ENHANCE")
+    }
+    /// Ein neues IMAGE aus RGBA-Bytes (Zeile fuer Zeile).
+    fn bild_aus_rgba(&mut self, px: &[u8], w: i32, h: i32, fn_: &str) -> Result<i64, String> {
+        let img = Image::gen_image_color(w, h, Color::new(0, 0, 0, 0));
+        let n = (w.max(0) as usize) * (h.max(0) as usize) * 4;
+        if px.len() != n { return Err(format!("{}: {} Bytes statt {}", fn_, px.len(), n)); }
+        unsafe { std::slice::from_raw_parts_mut(img.data as *mut u8, n) }.copy_from_slice(px);
+        self.push_tex_from_image(img)
+    }
     /// IMAGE_SCALE_NN: Skalieren OHNE Interpolation (Nearest-Neighbour).
     /// `IMAGE_SCALE` glaettet bilinear -- fuer Pixelgrafik ist das falsch: aus
     /// harten Kanten werden Farbverlaeufe, ein 8x8-Sprite auf 32x32 ist danach
@@ -5038,34 +5063,116 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         let f = breite_px as f64 / breite_mm.max(1.0);
         let hoehe_px = ((hoehe_mm * f).round() as i32).max(1);
         let mut img = Image::gen_image_color(breite_px, hoehe_px, Color::WHITE);
-        let farbe = |c: (f64, f64, f64)| Color::new((c.0 * 255.0) as u8, (c.1 * 255.0) as u8, (c.2 * 255.0) as u8, 255);
+        // Durchsicht kennt die Vorschau nicht -- die Farbe wird gegen das
+        // weisse Papier gemischt (dasselbe Bild, solange darunter nichts liegt).
+        let farbe = |c: (f64, f64, f64), d: f64| {
+            let c = crate::pdf::gegen_weiss(c, d);
+            Color::new((c.0 * 255.0).round() as u8, (c.1 * 255.0).round() as u8, (c.2 * 255.0).round() as u8, 255)
+        };
         let px = |mm: f64| (mm * f).round() as i32;
+        let (bw, bh) = (img.width, img.height);
         for op in ops {
             match op {
-                Op::Text { x, y, text, groesse_pt, farbe: c, .. } => {
-                    let groesse = ((groesse_pt * 25.4 / 72.0) * f).round() as i32;
-                    img.draw_text(text, px(*x), px(*y), groesse.max(4), farbe(*c));
-                }
-                Op::Linie { x1, y1, x2, y2, farbe: c, .. } => {
-                    img.draw_line(px(*x1), px(*y1), px(*x2), px(*y2), farbe(*c));
-                }
-                Op::Rechteck { x, y, b, h, fuellen, farbe: c, .. } => {
-                    if *fuellen {
-                        img.draw_rectangle(px(*x), px(*y), px(*b).max(1), px(*h).max(1), farbe(*c));
-                    } else {
-                        img.draw_rectangle_lines(Rectangle::new(px(*x) as f32, px(*y) as f32, px(*b) as f32, px(*h) as f32), 1, farbe(*c));
+                Op::Text { x, y, text, groesse_pt, farbe: c, winkel, deck, .. } => {
+                    let groesse = (((groesse_pt * 25.4 / 72.0) * f).round() as i32).max(4);
+                    if *winkel == 0.0 {
+                        img.draw_text(text, px(*x), px(*y), groesse, farbe(*c, *deck));
+                        continue;
+                    }
+                    // gedreht: den Text als Bild setzen und Punkt fuer Punkt
+                    // um (x, y) gedreht hineinmischen (gegen den Uhrzeigersinn;
+                    // y zeigt nach unten)
+                    let mut t = Image::image_text(text, groesse, farbe(*c, *deck));
+                    t.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+                    let (tw, th) = (t.width, t.height);
+                    let quelle = unsafe { std::slice::from_raw_parts(t.data as *const u8, (tw * th * 4).max(0) as usize) };
+                    let ziel = unsafe { std::slice::from_raw_parts_mut(img.data as *mut u8, (bw * bh * 4).max(0) as usize) };
+                    let (sn, cs) = (winkel.to_radians().sin(), winkel.to_radians().cos());
+                    let (ax, ay) = (*x * f, *y * f);
+                    let ecken = [(0.0, 0.0), (tw as f64, 0.0), (0.0, th as f64), (tw as f64, th as f64)];
+                    let lage: Vec<(f64, f64)> = ecken.iter().map(|(u, v)| (ax + u * cs + v * sn, ay - u * sn + v * cs)).collect();
+                    let x0 = lage.iter().map(|q| q.0).fold(f64::INFINITY, f64::min).floor().max(0.0) as i32;
+                    let x1 = lage.iter().map(|q| q.0).fold(f64::NEG_INFINITY, f64::max).ceil().min(bw as f64 - 1.0) as i32;
+                    let y0 = lage.iter().map(|q| q.1).fold(f64::INFINITY, f64::min).floor().max(0.0) as i32;
+                    let y1 = lage.iter().map(|q| q.1).fold(f64::NEG_INFINITY, f64::max).ceil().min(bh as f64 - 1.0) as i32;
+                    for yy in y0..=y1 {
+                        for xx in x0..=x1 {
+                            let (dx, dy) = (xx as f64 + 0.5 - ax, yy as f64 + 0.5 - ay);
+                            let u = (dx * cs - dy * sn).floor() as i32;
+                            let v = (dx * sn + dy * cs).floor() as i32;
+                            if u < 0 || v < 0 || u >= tw || v >= th { continue; }
+                            let q = ((v * tw + u) * 4) as usize;
+                            let al = quelle[q + 3] as u32;
+                            if al == 0 { continue; }
+                            let z = ((yy * bw + xx) * 4) as usize;
+                            for k in 0..3 {
+                                ziel[z + k] = ((quelle[q + k] as u32 * al + ziel[z + k] as u32 * (255 - al)) / 255) as u8;
+                            }
+                        }
                     }
                 }
-                Op::Bild { x, y, b, h, rgba, pw, ph } => {
+                Op::Linie { x1, y1, x2, y2, farbe: c, deck, strichel, .. } if strichel.0 > 0.0 => {
+                    vorschau_strichzug(&mut img, &[(*x1 * f, *y1 * f), (*x2 * f, *y2 * f)], (strichel.0 * f, strichel.1 * f), farbe(*c, *deck));
+                }
+                Op::Linie { x1, y1, x2, y2, farbe: c, deck, .. } => {
+                    img.draw_line(px(*x1), px(*y1), px(*x2), px(*y2), farbe(*c, *deck));
+                }
+                // gestrichelte Umrisse: als Zug, die Strichfolge laeuft ueber
+                // die Ecken weiter
+                Op::Rechteck { x, y, b, h, fuellen: false, farbe: c, deck, strichel, .. } if strichel.0 > 0.0 => {
+                    let z = [(*x, *y), (*x + *b, *y), (*x + *b, *y + *h), (*x, *y + *h), (*x, *y)];
+                    let z: Vec<(f64, f64)> = z.iter().map(|q| (q.0 * f, q.1 * f)).collect();
+                    vorschau_strichzug(&mut img, &z, (strichel.0 * f, strichel.1 * f), farbe(*c, *deck));
+                }
+                Op::Kreis { x, y, r, fuellen: false, farbe: c, deck, strichel, .. } if strichel.0 > 0.0 => {
+                    let z: Vec<(f64, f64)> = (0..=72).map(|k| {
+                        let w = k as f64 / 72.0 * std::f64::consts::TAU;
+                        ((*x + *r * w.cos()) * f, (*y + *r * w.sin()) * f)
+                    }).collect();
+                    vorschau_strichzug(&mut img, &z, (strichel.0 * f, strichel.1 * f), farbe(*c, *deck));
+                }
+                Op::Vieleck { punkte, fuellen: false, farbe: c, deck, strichel, .. } if strichel.0 > 0.0 => {
+                    let mut z: Vec<(f64, f64)> = punkte.iter().map(|q| (q.0 * f, q.1 * f)).collect();
+                    z.push(z[0]);
+                    vorschau_strichzug(&mut img, &z, (strichel.0 * f, strichel.1 * f), farbe(*c, *deck));
+                }
+                Op::Rechteck { x, y, b, h, fuellen, farbe: c, deck, .. } => {
+                    if *fuellen {
+                        img.draw_rectangle(px(*x), px(*y), px(*b).max(1), px(*h).max(1), farbe(*c, *deck));
+                    } else {
+                        img.draw_rectangle_lines(Rectangle::new(px(*x) as f32, px(*y) as f32, px(*b) as f32, px(*h) as f32), 1, farbe(*c, *deck));
+                    }
+                }
+                Op::Kreis { x, y, r, fuellen, farbe: c, deck, .. } => {
+                    let k = farbe(*c, *deck);
+                    let ziel = unsafe { std::slice::from_raw_parts_mut(img.data as *mut u8, (bw * bh * 4).max(0) as usize) };
+                    if let Some(mut l) = crate::leinwand::Leinwand::neu(ziel, bw, bh) {
+                        // die Leinwand zaehlt an Punktmitten, das Blatt an Kanten
+                        let (cx, cy, rr) = ((*x * f - 0.5) as f32, (*y * f - 0.5) as f32, (*r * f) as f32);
+                        if *fuellen { l.ellipse(cx, cy, rr, rr, [k.r, k.g, k.b, 255]); }
+                        else { l.ring(cx, cy, rr, 1.0, [k.r, k.g, k.b, 255]); }
+                    }
+                }
+                Op::Vieleck { punkte, fuellen, farbe: c, deck, .. } => {
+                    let k = farbe(*c, *deck);
+                    let ziel = unsafe { std::slice::from_raw_parts_mut(img.data as *mut u8, (bw * bh * 4).max(0) as usize) };
+                    if let Some(mut l) = crate::leinwand::Leinwand::neu(ziel, bw, bh) {
+                        let mut pkt: Vec<(f32, f32)> = punkte.iter().map(|q| ((q.0 * f - 0.5) as f32, (q.1 * f - 0.5) as f32)).collect();
+                        if *fuellen { l.vieleck(&pkt, [k.r, k.g, k.b, 255]); }
+                        else { pkt.push(pkt[0]); l.linie(&pkt, 1.0, [k.r, k.g, k.b, 255]); }
+                    }
+                }
+                Op::Bild { x, y, b, h, rgba, pw, ph, deck } => {
                     let mut quelle = Image::gen_image_color(*pw as i32, *ph as i32, Color::BLANK);
                     quelle.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
                     let n = rgba.len();
                     let ziel = unsafe { std::slice::from_raw_parts_mut(quelle.data as *mut u8, n) };
                     ziel.copy_from_slice(rgba);
+                    let a = (deck.clamp(0.0, 1.0) * 255.0).round() as u8;
                     img.draw(&quelle,
                         Rectangle::new(0.0, 0.0, *pw as f32, *ph as f32),
                         Rectangle::new(px(*x) as f32, px(*y) as f32, px(*b) as f32, px(*h) as f32),
-                        Color::WHITE);
+                        Color::new(255, 255, 255, a));
                 }
             }
         }
@@ -8933,3 +9040,30 @@ pub fn zeiger_form(name: &str) -> Option<&'static str> {
         _ => return None,
     })
 }
+
+/// Ein gestrichelter Zug fuer die PDF-Vorschau: Punkte, Strich und Luecke in
+/// Bildpunkten; die Folge laeuft ueber die Ecken weiter wie im PDF.
+#[cfg(feature = "pdf")]
+fn vorschau_strichzug(img: &mut Image, punkte: &[(f64, f64)], strichel: (f64, f64), farbe: Color) {
+    let (an, aus) = (strichel.0.max(1.0), strichel.1.max(1.0));
+    let mut stand = 0.0_f64;              // Lage in der Folge an + aus
+    for w in punkte.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        let laenge = ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt();
+        if laenge <= 0.0 { continue; }
+        let mut s = 0.0;
+        while s < laenge {
+            let in_folge = stand % (an + aus);
+            let (strich, rest) = if in_folge < an { (true, an - in_folge) } else { (false, an + aus - in_folge) };
+            let e = (s + rest).min(laenge);
+            if strich {
+                let p = |t: f64| (a.0 + (b.0 - a.0) * t / laenge, a.1 + (b.1 - a.1) * t / laenge);
+                let (p1, p2) = (p(s), p(e));
+                img.draw_line(p1.0.round() as i32, p1.1.round() as i32, p2.0.round() as i32, p2.1.round() as i32, farbe);
+            }
+            stand += e - s;
+            s = e;
+        }
+    }
+}
+

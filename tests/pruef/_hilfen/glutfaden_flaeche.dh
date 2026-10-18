@@ -1,0 +1,79 @@
+' Zeichenflaeche als Text -- dieselben Zeilen, die ref_flaeche.py aus
+' PyStickys GradientTool, MinimapWidget und TilePreviewWidget aufzeichnet.
+' Die Minikarte als MD5 ueber ihre Punkte in Hex (zeilenweise, Umbruch
+' dazwischen), eine Groesse auch Punkt fuer Punkt.
+IMPORT "../../../examples/glutfaden/kern/kern.dh" AS kern
+
+FUNCTION gfHex$(f AS INTEGER) AS STRING
+    RETURN RIGHT$("000000" + HEX$(f BAND &HFFFFFF), 6)
+END FUNCTION
+
+FUNCTION flaecheText$(ref AS STRING, ordner AS STRING) AS STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM geladen AS MAP OF INTEGER : geladen = {}
+    DIM muster AS ARRAY OF kern.Muster : muster = []
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(ref, CHR$(10))
+        IF z = "" THEN CONTINUE
+        DIM kopf AS STRING : kopf = LEFT$(z, INSTR(z, ":"))
+        DIM w AS ARRAY OF STRING : w = SPLIT$(kopf, " ")
+        DIM art AS STRING : art = w[0]
+        DIM name AS STRING : name = w[1]
+        IF NOT MAPHAS(geladen, name) THEN
+            DIM neu AS kern.Muster : neu = kern.pxsLaden(PATHJOIN(ordner, name))
+            MAPPUT(geladen, name, LEN(muster))
+            ARRAY_PUSH(muster, neu)
+        END IF
+        DIM m AS kern.Muster : m = muster[MAPGET(geladen, name)]
+        DIM f AS ARRAY OF INTEGER, t AS ARRAY OF INTEGER, e AS ARRAY OF INTEGER
+        m.ebenen.zusammensetzen(f, t, e)
+        DIM rgb AS ARRAY OF INTEGER : rgb = []
+        DIM fe AS kern.Farbeintrag
+        FOR EACH fe IN m.farben
+            ARRAY_PUSH(rgb, fe.garn.farbe)
+        NEXT
+        DIM iw AS INTEGER, ih AS INTEGER, bx AS INTEGER, by AS INTEGER
+        SELECT CASE art
+            CASE "verlauf"
+                DIM p AS ARRAY OF INTEGER, c AS ARRAY OF INTEGER
+                (p, c) = kern.farbverlauf(m, VAL(w[2]), VAL(w[3]), VAL(w[4]), VAL(w[5]), VAL(w[6]), VAL(w[7]))
+                DIM s AS ARRAY OF STRING : s = []
+                DIM i AS INTEGER
+                FOR i = 0 TO LEN(c) - 1
+                    ARRAY_PUSH(s, STR$(p[2 * i]) + "," + STR$(p[2 * i + 1]) + "=" + STR$(c[i]))
+                NEXT
+                ARRAY_PUSH(aus, kopf + ": " + JOIN$(s, " "))
+            CASE "minikarte", "minikarte_punkte"
+                IF art = "minikarte_punkte" THEN
+                    (iw, ih, bx, by) = kern.minikarteMass(m.breite, m.hoehe, 36, 36)
+                ELSE
+                    (iw, ih, bx, by) = kern.minikarteMass(m.breite, m.hoehe, VAL(w[2]), VAL(w[3]))
+                END IF
+                DIM pk AS ARRAY OF INTEGER : pk = kern.minikartePunkte(f, m.breite, m.hoehe, rgb, iw, ih)
+                DIM zeilen AS ARRAY OF STRING : zeilen = []
+                DIM y AS INTEGER, x AS INTEGER
+                FOR y = 0 TO ih - 1
+                    DIM zt AS STRING : zt = ""
+                    FOR x = 0 TO iw - 1
+                        zt = zt + gfHex$(pk[y * iw + x])
+                    NEXT
+                    ARRAY_PUSH(zeilen, zt)
+                NEXT
+                IF art = "minikarte_punkte" THEN
+                    ARRAY_PUSH(aus, kopf + ": " + JOIN$(zeilen, " "))
+                ELSE
+                    ARRAY_PUSH(aus, kopf + ": " + STR$(iw) + " " + STR$(ih) + " lage " + STR$(bx) + " " + STR$(by) + " md5 " + MD5$(JOIN$(zeilen, CHR$(10))))
+                END IF
+            CASE "ausschnitt"
+                (iw, ih, bx, by) = kern.minikarteMass(m.breite, m.hoehe, VAL(w[2]), VAL(w[3]))
+                DIM qx AS INTEGER, qy AS INTEGER, qw AS INTEGER, qh AS INTEGER
+                (qx, qy, qw, qh) = kern.minikarteAusschnitt(VAL(w[4]), VAL(w[5]), VAL(w[6]), VAL(w[7]), bx, by, iw, ih)
+                ARRAY_PUSH(aus, kopf + ": " + STR$(qx) + " " + STR$(qy) + " " + STR$(qw) + " " + STR$(qh))
+            CASE "kachel"
+                DIM tx AS INTEGER : tx = CLAMP(VAL(w[4]), 1, 5)
+                DIM ty AS INTEGER : ty = CLAMP(VAL(w[5]), 1, 5)
+                ARRAY_PUSH(aus, kopf + ": " + STR$(tx) + " " + STR$(ty) + " " + STR$(kern.kachelZelle(m.breite, m.hoehe, VAL(w[2]), VAL(w[3]), tx, ty)))
+        END SELECT
+    NEXT
+    RETURN JOIN$(aus, CHR$(10))
+END FUNCTION

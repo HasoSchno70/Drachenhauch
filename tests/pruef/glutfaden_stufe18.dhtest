@@ -1,0 +1,438 @@
+' Glutfaden Stufe 18: das ganze Muster drehen, spiegeln, zuschneiden und
+' auto-zuschneiden (kern/verwalten.dh, PySticky Pattern.rotate_*, flip_*,
+' crop, auto_crop), alle Ebenen vereinen (kern/bearbeiten.dh,
+' LayerStack.flatten) und die Ansicht der Ebenen ("Nur aktive", "Andere
+' abdunkeln" in ansicht/leinwand.dh).
+'
+' Der erste Fall ist gegen PySticky aufgezeichnet: je Muster und Wandlung
+' Groesse, je Ebene die belegten Zellen (x, y, Farbe, Typ, erledigt) als MD5,
+' die Rueckstiche als MD5 und die Stichzahlen. 180 Grad ist dort zweimal
+' rechts -- PyStickys eigenes rotate_180 laesst die Teilstich-Typen stehen
+' (siehe zweiten Fall).
+
+=== drehen, spiegeln, zuschneiden, vereinen wie pysticky
+IMPORT "helfer.dh"
+FUNCTION kurz$(t AS STRING) AS STRING
+    RETURN LEFT$(LOWER$(MD5$(t)), 12)
+END FUNCTION
+
+SUB abzug(name AS STRING, m AS kern.Muster)
+    PRINT name; ": "; m.breite; "x"; m.hoehe
+    DIM i AS INTEGER, x AS INTEGER, y AS INTEGER
+    FOR i = 0 TO m.ebenen.anzahl() - 1
+        DIM e AS kern.Ebene : e = m.ebenen.ebenen[i]
+        DIM z AS ARRAY OF STRING : z = []
+        FOR y = 0 TO m.hoehe - 1
+            FOR x = 0 TO m.breite - 1
+                DIM q AS INTEGER : q = y * m.breite + x
+                IF e.raster[q] < 0 THEN CONTINUE
+                ARRAY_PUSH(z, STR$(x) + "," + STR$(y) + "," + STR$(e.raster[q]) + "," + STR$(e.art[q]) + "," + STR$(IIF(e.erledigt[q] <> 0, 1, 0)))
+            NEXT
+        NEXT
+        PRINT "  ebene "; i; " "; e.name; " "; IIF(e.sichtbar, "an", "aus"); ": "; LEN(z); " "; kurz$(JOIN$(z, ";"))
+    NEXT
+    DIM b AS ARRAY OF STRING : b = []
+    DIM r AS kern.Rueckstich
+    FOR EACH r IN m.rueckstiche
+        ARRAY_PUSH(b, STR$(r.x1) + "," + STR$(r.y1) + "," + STR$(r.x2) + "," + STR$(r.y2) + "," + STR$(r.farbe))
+    NEXT
+    PRINT "  rueck "; LEN(b); " "; kurz$(JOIN$(b, ";"))
+    m.stichzahlenNeu()
+    DIM zl AS ARRAY OF STRING : zl = []
+    DIM f AS kern.Farbeintrag
+    FOR EACH f IN m.farben
+        ARRAY_PUSH(zl, STR$(f.stichzahl))
+    NEXT
+    PRINT "  zahlen "; JOIN$(zl, ",")
+END SUB
+
+DIM pfad AS STRING
+FOR EACH pfad IN ["alle.pxs", "farbprobe.pxs", GLUTORDNER + "/daten/muster/demo_kreuzstich.pxs"]
+    DIM name AS STRING : name = BASENAME(pfad)
+    abzug(name + " geladen", kern.pxsLaden(pfad))
+    DIM m AS kern.Muster
+    DIM v AS kern.Verlauf
+    DIM ok AS BOOLEAN
+    DIM k AS INTEGER
+    m = kern.pxsLaden(pfad) : v = kern.neuerVerlauf() : ok = kern.musterUmlegen(m, v, kern.UMLEGEN_RECHTS) : abzug(name + " rechts", m)
+    m = kern.pxsLaden(pfad) : v = kern.neuerVerlauf() : ok = kern.musterUmlegen(m, v, kern.UMLEGEN_LINKS) : abzug(name + " links", m)
+    m = kern.pxsLaden(pfad) : v = kern.neuerVerlauf() : ok = kern.musterUmlegen(m, v, kern.UMLEGEN_180) : abzug(name + " 180", m)
+    m = kern.pxsLaden(pfad) : v = kern.neuerVerlauf() : ok = kern.musterUmlegen(m, v, kern.UMLEGEN_WAAGERECHT) : abzug(name + " waagerecht", m)
+    m = kern.pxsLaden(pfad) : v = kern.neuerVerlauf() : ok = kern.musterUmlegen(m, v, kern.UMLEGEN_SENKRECHT) : abzug(name + " senkrecht", m)
+    m = kern.pxsLaden(pfad) : v = kern.neuerVerlauf()
+    FOR k = 1 TO 4 : ok = kern.musterUmlegen(m, v, kern.UMLEGEN_RECHTS) : NEXT
+    abzug(name + " rechts viermal", m)
+    m = kern.pxsLaden(pfad) : v = kern.neuerVerlauf() : ok = kern.musterZuschneiden(m, v, 1, 1, m.breite - 2, m.hoehe - 2, "x") : abzug(name + " zuschneiden 1 1", m)
+    m = kern.pxsLaden(pfad) : v = kern.neuerVerlauf() : ok = kern.musterZuschneiden(m, v, 2, 0, 5, 4, "x") : abzug(name + " zuschneiden 2 0", m)
+    m = kern.pxsLaden(pfad) : v = kern.neuerVerlauf()
+    DIM ra AS ARRAY OF INTEGER : ra = kern.autoZuschneiden(m, v)
+    PRINT "  auto -> "; IIF(LEN(ra) = 0, "None", "(" + JOIN$(ra, ", ") + ")")
+    abzug(name + " auto", m)
+    m = kern.pxsLaden(pfad) : v = kern.neuerVerlauf() : ok = kern.ebenenVereinen(m, v) : abzug(name + " vereinen", m)
+    m = kern.pxsLaden(pfad) : v = kern.neuerVerlauf() : m.ebenen.ebenen[0].sichtbar = FALSE : ok = kern.ebenenVereinen(m, v) : abzug(name + " vereinen ohne ebene 0", m)
+NEXT
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- datei alle.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- datei farbprobe.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T17:40:16.211663","pattern":{"name":"Farbprobe","width":12,"height":9,"fabric_count":14,"metadata":{},"colors":[{"name":"rot","color":"#C81E28","manufacturer":"DMC","catalog_number":"321","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"e218043a"},{"name":"Blau","color":"#2846BE","manufacturer":"Anchor","catalog_number":"132","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b1845328"},{"name":"grün","color":"#28A046","manufacturer":"","catalog_number":"","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"d04ed6fa"},{"name":"Gelb","color":"#F0D21E","manufacturer":"DMC","catalog_number":"444","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"2d3927c7"},{"name":"blau","color":"#2846BE","manufacturer":"DMC","catalog_number":"820","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"1556fc18"},{"name":"Perle Gold","color":"#C8A03C","manufacturer":"Mill Hill","catalog_number":"00557","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":true,"is_diamond":false,"color_id":"1631db04"},{"name":"Drill Weiss","color":"#FAFAFA","manufacturer":"DMC Diamond","catalog_number":"B5200","symbol":"◆","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":true,"color_id":"f5c8425d"},{"name":"Ungenutzt","color":"#0A0A0A","manufacturer":"DMC","catalog_number":"310","symbol":"◇","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"ba5fb24e"},{"name":"Zimt","color":"#A05A28","manufacturer":"Madeira","catalog_number":"2306","symbol":"★","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"f3660dd9"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,1],[3,0,4],[4,0,0],[5,0,1],[7,0,3],[8,0,8],[9,0,2],[11,0,0],[0,1,4],[1,1,8],[2,1,8],[3,1,8],[5,1,1],[6,1,0],[7,1,1],[8,1,2],[9,1,5],[10,1,8],[0,2,3],[1,2,5],[2,2,3],[3,2,5],[6,2,8],[7,2,8],[8,2,8],[9,2,3],[2,3,6],[3,3,0],[4,3,5],[6,3,3],[7,3,0],[8,3,8],[9,3,8],[10,3,0],[11,3,4],[0,4,4],[1,4,8],[3,4,0],[4,4,1],[5,4,0],[6,4,3],[7,4,8],[8,4,0],[9,4,0],[0,5,0],[2,5,1],[3,5,8],[4,5,4],[5,5,0],[6,5,6],[7,5,0],[8,5,8],[9,5,6],[10,5,5],[11,5,0],[2,6,0],[3,6,2],[4,6,4],[5,6,0],[6,6,4],[8,6,4],[9,6,5],[10,6,6],[11,6,3],[0,7,2],[2,7,0],[3,7,4],[4,7,3],[5,7,3],[7,7,2],[8,7,5],[9,7,8],[10,7,0],[11,7,0],[0,8,5],[1,8,0],[2,8,0],[4,8,5],[5,8,8],[6,8,8],[7,8,8],[8,8,8],[9,8,2],[10,8,2],[11,8,3]],"completed_stitches":[[3,1],[10,1],[1,2],[8,2],[9,2],[2,3],[9,3],[5,5],[7,5],[9,5],[0,7],[5,7],[9,7],[0,8],[1,8],[6,8],[8,8],[10,8]],"stitch_types":[[1,0,9],[2,0,1],[4,0,1],[11,0,3],[1,1,1],[2,1,7],[3,1,1],[5,1,2],[6,1,3],[8,1,1],[9,1,10],[10,1,7],[0,2,2],[1,2,10],[3,2,10],[6,2,7],[7,2,1],[8,2,1],[2,3,11],[3,3,2],[4,3,10],[7,3,3],[8,3,3],[9,3,1],[10,3,3],[11,3,2],[3,4,2],[4,4,7],[6,4,7],[0,5,2],[2,5,9],[3,5,1],[6,5,11],[9,5,11],[10,5,10],[11,5,2],[3,6,7],[5,6,7],[6,6,2],[9,6,10],[10,6,11],[11,6,7],[0,7,9],[2,7,7],[4,7,9],[7,7,7],[8,7,10],[9,7,1],[0,8,10],[2,8,2],[4,8,10],[5,8,2],[6,8,1],[7,8,9],[8,8,2],[9,8,1]]},{"name":"Oben","visible":true,"locked":true,"opacity":1.0,"stitches":[[0,0,0],[3,0,1],[4,0,3],[10,0,0],[4,2,3],[5,3,1],[8,3,1],[11,3,4],[2,4,0],[4,4,2],[7,4,2],[11,4,0],[0,5,5],[4,5,1],[5,5,1],[6,5,8],[11,5,5],[1,6,8],[5,6,2],[7,6,5],[10,6,2],[11,6,0],[0,7,8],[8,7,3],[3,8,6],[4,8,8]],"completed_stitches":[[4,2],[8,3],[7,4],[11,4],[0,5],[11,5],[0,7]],"stitch_types":[[4,0,1],[10,0,7],[11,3,1],[2,4,9],[4,4,2],[7,4,3],[0,5,10],[5,5,2],[6,5,9],[11,5,10],[1,6,7],[7,6,10],[10,6,3],[11,6,2],[8,7,7],[3,8,11],[4,8,9]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,0,5],[1,0,2],[8,0,0],[0,1,4],[1,1,1],[5,1,2],[8,1,0],[10,1,3],[3,2,3],[5,2,8],[6,2,0],[10,2,4],[1,3,2],[1,4,8],[3,4,8],[4,4,0],[11,4,6],[9,6,5],[2,7,1],[8,7,3],[11,7,6],[4,8,2],[6,8,8],[10,8,2]],"completed_stitches":[[0,0],[8,1],[10,1],[1,4],[4,4],[9,6],[8,7]],"stitch_types":[[0,0,10],[8,0,1],[1,1,7],[5,1,3],[8,1,1],[3,2,1],[5,2,3],[6,2,9],[10,2,3],[1,3,7],[1,4,3],[3,4,1],[11,4,11],[9,6,10],[8,7,7],[11,7,11],[4,8,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":6,"y2":6,"color_index":0},{"x1":2,"y1":2,"x2":8,"y2":2,"color_index":2},{"x1":4,"y1":0,"x2":4,"y2":10,"color_index":4},{"x1":1,"y1":9,"x2":9,"y2":1,"color_index":8},{"x1":3,"y1":3,"x2":5,"y2":7,"color_index":1}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- erwartet
+alle.pxs geladen: 14x8
+  ebene 0 Hintergrund an: 96 e655bda85366
+  ebene 1 Oben an: 5 fc577b184818
+  ebene 2 Versteckt aus: 14 1806d1496e68
+  rueck 4 e7ecef2116be
+  zahlen 15,17,17,15,21,30
+alle.pxs rechts: 8x14
+  ebene 0 Hintergrund an: 96 774b2dd8f2a5
+  ebene 1 Oben an: 5 72bf2261cfdd
+  ebene 2 Versteckt aus: 14 708f37c572f0
+  rueck 4 e308f6f5f929
+  zahlen 15,17,17,15,21,30
+alle.pxs links: 8x14
+  ebene 0 Hintergrund an: 96 a2d95bbf9138
+  ebene 1 Oben an: 5 c6b8c2d57a4a
+  ebene 2 Versteckt aus: 14 46a38b5d20f4
+  rueck 4 70c458e1e0f0
+  zahlen 15,17,17,15,21,30
+alle.pxs 180: 14x8
+  ebene 0 Hintergrund an: 96 b342e6401201
+  ebene 1 Oben an: 5 68d743f3260c
+  ebene 2 Versteckt aus: 14 34783ffd8c92
+  rueck 4 cc65d3f0435a
+  zahlen 15,17,17,15,21,30
+alle.pxs waagerecht: 14x8
+  ebene 0 Hintergrund an: 96 5367a7a883a0
+  ebene 1 Oben an: 5 aa6adb4e28d3
+  ebene 2 Versteckt aus: 14 1806d1496e68
+  rueck 4 85f916133ded
+  zahlen 15,17,17,15,21,30
+alle.pxs senkrecht: 14x8
+  ebene 0 Hintergrund an: 96 6ba2209aab7f
+  ebene 1 Oben an: 5 9eb204632427
+  ebene 2 Versteckt aus: 14 34783ffd8c92
+  rueck 4 50ffc53388ba
+  zahlen 15,17,17,15,21,30
+alle.pxs rechts viermal: 14x8
+  ebene 0 Hintergrund an: 96 e655bda85366
+  ebene 1 Oben an: 5 fc577b184818
+  ebene 2 Versteckt aus: 14 1806d1496e68
+  rueck 4 e7ecef2116be
+  zahlen 15,17,17,15,21,30
+alle.pxs zuschneiden 1 1: 12x6
+  ebene 0 Hintergrund an: 61 f5e9ecb34e7a
+  ebene 1 Oben an: 4 ba1d7c9e6d75
+  ebene 2 Versteckt aus: 0 d41d8cd98f00
+  rueck 1 90baf3997af0
+  zahlen 9,11,11,9,15,10
+alle.pxs zuschneiden 2 0: 5x4
+  ebene 0 Hintergrund an: 17 c5289a2ed747
+  ebene 1 Oben an: 2 ff329ab2b161
+  ebene 2 Versteckt aus: 0 d41d8cd98f00
+  rueck 0 d41d8cd98f00
+  zahlen 3,3,3,1,5,4
+  auto -> None
+alle.pxs auto: 14x8
+  ebene 0 Hintergrund an: 96 e655bda85366
+  ebene 1 Oben an: 5 fc577b184818
+  ebene 2 Versteckt aus: 14 1806d1496e68
+  rueck 4 e7ecef2116be
+  zahlen 15,17,17,15,21,30
+alle.pxs vereinen: 14x8
+  ebene 0 Zusammengeführt an: 99 beb8c383f9d4
+  rueck 4 e7ecef2116be
+  zahlen 15,17,15,15,21,16
+alle.pxs vereinen ohne ebene 0: 14x8
+  ebene 0 Zusammengeführt an: 5 fc577b184818
+  rueck 4 e7ecef2116be
+  zahlen 0,0,0,0,5,0
+farbprobe.pxs geladen: 12x9
+  ebene 0 Hintergrund an: 86 27f17ee85d24
+  ebene 1 Oben an: 26 de13a28d9a4a
+  ebene 2 Versteckt aus: 24 7433260cdd51
+  rueck 5 b3405845871b
+  zahlen 30,14,16,16,12,14,7,0,27
+farbprobe.pxs rechts: 9x12
+  ebene 0 Hintergrund an: 86 6f77dc48ae94
+  ebene 1 Oben an: 26 7c0c6b1f690e
+  ebene 2 Versteckt aus: 24 632e89311a8e
+  rueck 5 62ce97910d12
+  zahlen 30,14,16,16,12,14,7,0,27
+farbprobe.pxs links: 9x12
+  ebene 0 Hintergrund an: 86 8e3189603750
+  ebene 1 Oben an: 26 06c62808c6db
+  ebene 2 Versteckt aus: 24 3139d0df7345
+  rueck 5 e3681a5dbd34
+  zahlen 30,14,16,16,12,14,7,0,27
+farbprobe.pxs 180: 12x9
+  ebene 0 Hintergrund an: 86 ec52f1db89a3
+  ebene 1 Oben an: 26 e13935546650
+  ebene 2 Versteckt aus: 24 466de3852def
+  rueck 5 933f181421f7
+  zahlen 30,14,16,16,12,14,7,0,27
+farbprobe.pxs waagerecht: 12x9
+  ebene 0 Hintergrund an: 86 4b4da843ed8f
+  ebene 1 Oben an: 26 98a7e1e38e9f
+  ebene 2 Versteckt aus: 24 a6624e6c1408
+  rueck 5 887bf2667fe1
+  zahlen 30,14,16,16,12,14,7,0,27
+farbprobe.pxs senkrecht: 12x9
+  ebene 0 Hintergrund an: 86 451b423e8e0b
+  ebene 1 Oben an: 26 247cadf8517b
+  ebene 2 Versteckt aus: 24 f08b186ecb08
+  rueck 5 d7d22ad6c27f
+  zahlen 30,14,16,16,12,14,7,0,27
+farbprobe.pxs rechts viermal: 12x9
+  ebene 0 Hintergrund an: 86 27f17ee85d24
+  ebene 1 Oben an: 26 de13a28d9a4a
+  ebene 2 Versteckt aus: 24 7433260cdd51
+  rueck 5 b3405845871b
+  zahlen 30,14,16,16,12,14,7,0,27
+farbprobe.pxs zuschneiden 1 1: 10x7
+  ebene 0 Hintergrund an: 57 bedc688fa9a2
+  ebene 1 Oben an: 14 31c6d2bb362f
+  ebene 2 Versteckt aus: 15 1e9dd43776fa
+  rueck 2 7f9ec4b40d94
+  zahlen 18,10,9,11,6,9,4,0,19
+farbprobe.pxs zuschneiden 2 0: 5x4
+  ebene 0 Hintergrund an: 15 9bbae0040bdd
+  ebene 1 Oben an: 4 81ed2836edda
+  ebene 2 Versteckt aus: 4 ea25e2b58de3
+  rueck 0 d41d8cd98f00
+  zahlen 4,5,1,5,1,2,1,0,4
+  auto -> None
+farbprobe.pxs auto: 12x9
+  ebene 0 Hintergrund an: 86 27f17ee85d24
+  ebene 1 Oben an: 26 de13a28d9a4a
+  ebene 2 Versteckt aus: 24 7433260cdd51
+  rueck 5 b3405845871b
+  zahlen 30,14,16,16,12,14,7,0,27
+farbprobe.pxs vereinen: 12x9
+  ebene 0 Zusammengeführt an: 95 f345423520d1
+  rueck 5 b3405845871b
+  zahlen 21,11,10,12,7,10,3,0,21
+farbprobe.pxs vereinen ohne ebene 0: 12x9
+  ebene 0 Zusammengeführt an: 26 de13a28d9a4a
+  rueck 5 b3405845871b
+  zahlen 5,5,4,3,1,3,1,0,4
+demo_kreuzstich.pxs geladen: 40x40
+  ebene 0 Rahmen an: 128 d75efbf5af18
+  ebene 1 Herz an: 52 70ecca7b70e4
+  ebene 2 Details an: 5 82edb40f51e6
+  rueck 0 d41d8cd98f00
+  zahlen 0,52,17,0,116,0
+demo_kreuzstich.pxs rechts: 40x40
+  ebene 0 Rahmen an: 128 d75efbf5af18
+  ebene 1 Herz an: 52 607bb3ffdb59
+  ebene 2 Details an: 5 53de495a6ed0
+  rueck 0 d41d8cd98f00
+  zahlen 0,52,17,0,116,0
+demo_kreuzstich.pxs links: 40x40
+  ebene 0 Rahmen an: 128 d75efbf5af18
+  ebene 1 Herz an: 52 234df378ca8a
+  ebene 2 Details an: 5 dda2c69c6112
+  rueck 0 d41d8cd98f00
+  zahlen 0,52,17,0,116,0
+demo_kreuzstich.pxs 180: 40x40
+  ebene 0 Rahmen an: 128 d75efbf5af18
+  ebene 1 Herz an: 52 605adcbbd5b9
+  ebene 2 Details an: 5 2468717b4c8d
+  rueck 0 d41d8cd98f00
+  zahlen 0,52,17,0,116,0
+demo_kreuzstich.pxs waagerecht: 40x40
+  ebene 0 Rahmen an: 128 d75efbf5af18
+  ebene 1 Herz an: 52 70ecca7b70e4
+  ebene 2 Details an: 5 9ce5dc3a6b36
+  rueck 0 d41d8cd98f00
+  zahlen 0,52,17,0,116,0
+demo_kreuzstich.pxs senkrecht: 40x40
+  ebene 0 Rahmen an: 128 d75efbf5af18
+  ebene 1 Herz an: 52 605adcbbd5b9
+  ebene 2 Details an: 5 35da4147ac16
+  rueck 0 d41d8cd98f00
+  zahlen 0,52,17,0,116,0
+demo_kreuzstich.pxs rechts viermal: 40x40
+  ebene 0 Rahmen an: 128 d75efbf5af18
+  ebene 1 Herz an: 52 70ecca7b70e4
+  ebene 2 Details an: 5 82edb40f51e6
+  rueck 0 d41d8cd98f00
+  zahlen 0,52,17,0,116,0
+demo_kreuzstich.pxs zuschneiden 1 1: 38x38
+  ebene 0 Rahmen an: 128 1184c837703c
+  ebene 1 Herz an: 52 8390174c2619
+  ebene 2 Details an: 5 e791885c5ed7
+  rueck 0 d41d8cd98f00
+  zahlen 0,52,17,0,116,0
+demo_kreuzstich.pxs zuschneiden 2 0: 5x4
+  ebene 0 Rahmen an: 0 d41d8cd98f00
+  ebene 1 Herz an: 0 d41d8cd98f00
+  ebene 2 Details an: 0 d41d8cd98f00
+  rueck 0 d41d8cd98f00
+  zahlen 0,0,0,0,0,0
+  auto -> (5, 5, 5, 5)
+demo_kreuzstich.pxs auto: 30x30
+  ebene 0 Rahmen an: 128 a6c53f5bf3dc
+  ebene 1 Herz an: 52 9dfd9f6c42ec
+  ebene 2 Details an: 5 6367af6b5e50
+  rueck 0 d41d8cd98f00
+  zahlen 0,52,17,0,116,0
+demo_kreuzstich.pxs vereinen: 40x40
+  ebene 0 Zusammengeführt an: 185 d9480f14cd76
+  rueck 0 d41d8cd98f00
+  zahlen 0,52,17,0,116,0
+demo_kreuzstich.pxs vereinen ohne ebene 0: 40x40
+  ebene 0 Zusammengeführt an: 57 26c3fa4875a0
+  rueck 0 d41d8cd98f00
+  zahlen 0,52,5,0,0,0
+
+=== grenzen: teilstiche bei 180, leer, ausgeblendet, schritte
+IMPORT "helfer.dh"
+' Ein kleines Muster 4 x 3 mit einem Viertelstich oben links, einem halben
+' Stich, einem Rueckstich und einer erledigten Zelle
+DIM m AS kern.Muster : m = kern.neuesMuster("Klein", 4, 3)
+DIM vs AS kern.Verlauf : vs = kern.neuerVerlauf()          ' nur fuer den Aufbau
+DIM g AS kern.Garn : g = kern.neuesGarn("Rot", &HC00000, "DMC", "321")
+DIM nr AS INTEGER : nr = kern.farbeHinzufuegen(m, vs, g, ["●"], FALSE, FALSE)
+DIM e AS kern.Ebene : e = m.ebenen.ebenen[0]
+e.raster[0] = nr : e.art[0] = kern.VIERTEL_OL
+e.raster[5] = nr : e.art[5] = kern.HALB_OL_UR : e.erledigt[5] = 1
+ARRAY_PUSH(m.rueckstiche, kern.neuerRueckstich(0, 0, 2, 2, nr))
+DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+DIM ok AS BOOLEAN
+FUNCTION zellen$(m AS kern.Muster) AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM e AS kern.Ebene : e = m.ebenen.ebenen[0]
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(e.raster) - 1
+        IF e.raster[i] >= 0 THEN ARRAY_PUSH(t, STR$(i MOD m.breite) + "," + STR$(i \ m.breite) + " typ " + STR$(e.art[i]) + IIF(e.erledigt[i] <> 0, " erledigt", ""))
+    NEXT
+    DIM r AS kern.Rueckstich
+    FOR EACH r IN m.rueckstiche
+        ARRAY_PUSH(t, "rueck " + STR$(r.x1) + "," + STR$(r.y1) + "-" + STR$(r.x2) + "," + STR$(r.y2))
+    NEXT
+    RETURN STR$(m.breite) + "x" + STR$(m.hoehe) + ": " + JOIN$(t, " | ")
+END FUNCTION
+DIM vorher AS STRING : vorher = zellen$(m)
+PRINT "vorher "; vorher
+' 180 Grad: der Viertelstich oben links (3) wird unten rechts (6) -- PySticky
+' liesse ihn 3, obwohl sein Kaestchen jetzt unten rechts liegt
+ok = kern.musterUmlegen(m, v, kern.UMLEGEN_180)
+PRINT "180     "; zellen$(m); " | '"; v.textZurueck$(); "'"
+ok = v.zurueckNehmen(m)
+PRINT "zurueck gleich "; zellen$(m) = vorher
+ok = kern.musterUmlegen(m, v, kern.UMLEGEN_RECHTS)
+PRINT "rechts  "; zellen$(m)
+ok = v.zurueckNehmen(m)
+ok = kern.musterUmlegen(m, v, kern.UMLEGEN_WAAGERECHT)
+PRINT "waager. "; zellen$(m)
+ok = v.zurueckNehmen(m)
+ok = v.wiederholen(m)
+PRINT "vor     "; zellen$(m)
+ok = v.zurueckNehmen(m)
+PRINT "unbekannte art: "; kern.musterUmlegen(m, v, 7); " | schritte "; LEN(v.rueck)
+' Zuschneiden: Bereich ausserhalb und unveraendert sind keine Schritte
+PRINT "zuschneiden: aussen "; kern.musterZuschneiden(m, v, 2, 0, 3, 3, "x"); " negativ "; kern.musterZuschneiden(m, v, -1, 0, 2, 2, "x"); " alles "; kern.musterZuschneiden(m, v, 0, 0, 4, 3, "x"); " leer "; kern.musterZuschneiden(m, v, 0, 0, 0, 2, "x"); " | schritte "; LEN(v.rueck)
+' Auto-Zuschneiden: ein leeres Muster bleibt (PySticky schnitt es auf 1 x 1),
+' ein Stich auf einer ausgeblendeten Ebene zaehlt mit (PySticky nur sichtbare)
+DIM leer AS kern.Muster : leer = kern.neuesMuster("Leer", 6, 5)
+PRINT "auto leer: "; LEN(kern.autoZuschneiden(leer, v)); " "; leer.breite; "x"; leer.hoehe
+DIM h AS kern.Muster : h = kern.neuesMuster("Versteckt", 8, 6)
+nr = kern.farbeHinzufuegen(h, vs, g, ["●"], FALSE, FALSE)
+h.ebenen.ebenen[0].raster[2 * 8 + 3] = nr
+DIM i2 AS INTEGER : i2 = kern.ebeneNeu(h, vs, "Versteckt")
+h.ebenen.ebenen[1].raster[5 * 8 + 7] = nr
+h.ebenen.ebenen[1].sichtbar = FALSE
+DIM ra AS ARRAY OF INTEGER : ra = kern.autoZuschneiden(h, v)
+PRINT "auto mit ausgeblendeter: ("; JOIN$(ra, ", "); ") "; h.breite; "x"; h.hoehe; " | stich unten rechts erhalten "; h.ebenen.ebenen[1].raster[h.breite * h.hoehe - 1] = nr
+' Vereinen: eine Ebene ist nichts, ausgeblendete werden gezaehlt
+PRINT "vereinen eine ebene: "; kern.ebenenVereinen(m, v); " | ausgeblendete stiche "; kern.ausgeblendeteStiche(h)
+ok = kern.ebenenVereinen(h, v)
+PRINT "vereint: "; h.ebenen.anzahl(); " "; h.ebenen.ebenen[0].name; " sichtbar "; h.ebenen.ebenen[0].sichtbar; " | aktiv "; h.ebenen.aktiv; " | '"; v.textZurueck$(); "'"
+ok = v.zurueckNehmen(h)
+PRINT "zurueck: "; h.ebenen.anzahl(); " ebenen, die obere ausgeblendet "; NOT h.ebenen.ebenen[1].sichtbar
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- erwartet
+vorher 4x3: 0,0 typ 3 | 1,1 typ 1 erledigt | rueck 0,0-2,2
+180     4x3: 2,1 typ 1 erledigt | 3,2 typ 6 | rueck 8,6-6,4 | '180° gedreht'
+zurueck gleich TRUE
+rechts  3x4: 2,0 typ 4 | 1,1 typ 2 erledigt | rueck 6,0-4,2
+waager. 4x3: 3,0 typ 4 | 2,1 typ 2 erledigt | rueck 8,0-6,2
+vor     4x3: 3,0 typ 4 | 2,1 typ 2 erledigt | rueck 8,0-6,2
+unbekannte art: FALSE | schritte 0
+zuschneiden: aussen FALSE negativ FALSE alles FALSE leer FALSE | schritte 0
+auto leer: 0 6x5
+auto mit ausgeblendeter: (3, 2, 0, 0) 5x4 | stich unten rechts erhalten TRUE
+vereinen eine ebene: FALSE | ausgeblendete stiche 1
+vereint: 1 Zusammengeführt sichtbar TRUE | aktiv 0 | 'Alle Ebenen vereinen'
+zurueck: 2 ebenen, die obere ausgeblendet TRUE
+
+=== probe: drehen, zuschneiden, vereinen, ebenen-ansicht
+IMPORT "helfer.dh"
+' --probe-stufe18 mit alle.pxs: Drehen und Spiegeln ueber Befehl und
+' Muster-Knopf samt Rueckgaengig, Auto-Zuschneiden, Vereinen, "Nur aktive"
+' und "Andere abdunkeln".
+MKDIR("app")
+SETENV("APPDATA", CWD$() + "/app")
+SETENV("HOME", CWD$() + "/app")
+dlStarten(["run", BEISPIEL, "--", "--probe-stufe18", "--foto", "d", "alle.pxs"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT REPLACE$(dlAus, CHR$(13), "");
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    DIM f AS STRING
+    FOR EACH f IN ["gedreht", "vereint", "nur_aktive", "abgedunkelt"]
+        PRINT f; " "; FILEEXISTS("d_" + f + ".png")
+    NEXT
+    PRINT "datei unveraendert: "; READLINES("alle.pxs")[0] = READLINES("vorher.pxs")[0]
+END IF
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- datei alle.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- datei vorher.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- erwartet
+rueckgabe 0
+geladen: 14x8 | ebenen 3 | kuerzel zuschneiden Strg+Umschalt+C
+rechts: 8x14 | schritt '90° rechts gedreht' | geaendert TRUE | 90° rechts gedreht: 8×14
+zurueck: wie vorher TRUE
+knopf spiegeln: 14x8 'Horizontal gespiegelt' | Horizontal gespiegelt: 14×8
+zweimal gespiegelt: wie vorher TRUE | schritte 2
+links links 180: wie vorher TRUE
+senkrecht zweimal: wie vorher TRUE
+zuschneiden ohne rand: Keine leeren Ränder zum Entfernen
+zuschneiden: Zugeschnitten: 20×12 → 14×8 (L:0 O:0 R:6 U:4 entfernt) | 'Auto-Zuschneiden' | wie vorher TRUE
+ausgeblendete stiche: 14
+vereint: 1 Zusammengeführt | stiche 115 -> 99 | ebenenzeilen 1 | 'Alle Ebenen vereinen' | Alle Ebenen vereint.
+noch einmal: Nur eine Ebene -- nichts zu vereinen.
+zurueck: wie vorher TRUE | ebenenzeilen 3
+nur aktive: TRUE | kaestchen TRUE | belegt 99 -> 14 = ebene 2 14 | Nur aktive Ebene: an
+aktiv 0: belegt 96 = ebene 0 96
+aus per kaestchen: FALSE | belegt 99 = 99
+abdunkeln: TRUE | kaestchen TRUE | gemischt TRUE | deckkraft unten 0.5 aktiv 1.0
+zelle 1,0: halb TRUE
+abdunkeln aus: FALSE | gemischt FALSE | datei unberuehrt TRUE
+gedreht TRUE
+vereint TRUE
+nur_aktive TRUE
+abgedunkelt TRUE
+datei unveraendert: TRUE

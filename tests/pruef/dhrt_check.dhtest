@@ -25,6 +25,31 @@ sauber 0
 rueckgabe 0
 parse 1 parse Zeile 2
 
+=== befunde in importierten dateien nennen datei und zeile
+' Vorher die Zeile des zusammengefuegten Quelltexts und keine Datei -- der
+' Fehler in teil.dh Zeile 2 hiess "Zeile 4" einer Hauptdatei mit drei Zeilen
+' (Glutfaden, 2026-10-15).
+IMPORT "helfer.dh"
+IMPORT "json"
+WRITEALL("teil.dh", !"' Kopf\n' noch eine\nSUB f()\n    PRINT GIBTSNICHT_X(1)\nEND SUB\n")
+DIM d AS JSON_HANDLE : d = dlCheck(!"IMPORT \"teil.dh\"\nPRINT UNBEKANNT_Y(2)\n")
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(d, "d") - 1
+    DIM w AS STRING : w = "d." + STR$(i)
+    DIM datei AS STRING : datei = "haupt"
+    IF JSON_HAS(d, w + ".file") THEN datei = BASENAME(JSON_GET_STRING(d, w + ".file"))
+    PRINT datei; " Zeile "; JSON_GET_INT(d, w + ".line"); " "; LEFT$(JSON_GET_STRING(d, w + ".message"), 32)
+NEXT
+WRITEALL("teil.dh", !"SUB g()\n    PRINT 1 +\nEND SUB\n")
+d = dlCheck(!"' eins\n' zwei\nIMPORT \"teil.dh\"\n")
+PRINT BASENAME(JSON_GET_STRING(d, "d.0.file")); " Zeile "; JSON_GET_INT(d, "d.0.line"); " "; JSON_GET_STRING(d, "d.0.phase")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+teil.dh Zeile 4 Unbekanntes Builtin 'GIBTSNICHT_
+haupt Zeile 2 Unbekanntes Builtin 'UNBEKANNT_Y
+teil.dh Zeile 2 parse
+
 === break und return am falschen ort nennen die zeile
 IMPORT "helfer.dh"
 IMPORT "json"
@@ -199,13 +224,32 @@ IMPORT "json"
 DIM ordner AS STRING : ordner = ARG$(0)
 DIM roh AS ARRAY OF STRING : roh = DIRLIST_REC(ordner, "*.dh")
 DIM dateien AS ARRAY OF STRING : dateien = []
+' Ein Programm aus Unterordnern (examples/glutfaden: kern/, gtk/, ansicht/)
+' prueft man ueber seine main.dh -- die Teile eines Namensraums sprechen
+' einander ohne Praefix an und uebersetzen allein nicht.
+DIM programme AS MAP OF BOOLEAN
 DIM i AS INTEGER
+FOR i = 0 TO LEN(roh) - 1
+    IF BASENAME(roh[i]) = "main.dh" THEN MAPPUT(programme, DIRNAME(roh[i]), TRUE)
+NEXT
+DIM teile AS INTEGER
 FOR i = 0 TO LEN(roh) - 1
     IF INSTR(roh[i], "_smoketest") >= 0 THEN CONTINUE
     IF LEFT$(BASENAME(roh[i]), 7) = "_dhtmp_" THEN CONTINUE
+    DIM d AS STRING : d = DIRNAME(DIRNAME(roh[i]))
+    DIM teil AS BOOLEAN : teil = FALSE
+    WHILE d <> "" AND d <> "."
+        IF MAPHAS(programme, d) THEN teil = TRUE
+        d = DIRNAME(d)
+    WEND
+    IF teil THEN
+        teile = teile + 1
+        CONTINUE
+    END IF
     ARRAY_PUSH(dateien, ordner + "/" + roh[i])
 NEXT
 PRINT "genug dateien "; (LEN(dateien) > 150)
+PRINT "teile von programmen uebergangen "; (teile > 0)
 DIM zeilen AS ARRAY OF STRING : zeilen = dlCheckViele(dateien)
 PRINT "je datei eine zeile "; (LEN(zeilen) = LEN(dateien))
 DIM fehler AS INTEGER : fehler = 0
@@ -242,6 +286,7 @@ PRINT "doppelte dims "; doppelt
 IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
 --- erwartet
 genug dateien TRUE
+teile von programmen uebergangen TRUE
 je datei eine zeile TRUE
 fehler 0
 unbekannte builtins 0
@@ -264,6 +309,11 @@ DIM i AS INTEGER
 FOR i = 0 TO LEN(roh) - 1
     IF INSTR(roh[i], "target/") >= 0 OR INSTR(roh[i], "target" + CHR$(92)) >= 0 THEN CONTINUE
     IF LEFT$(BASENAME(roh[i]), 7) = "_dhtmp_" THEN CONTINUE
+    ' Glutfadens Ansicht-Dateien sind TEILE von main.dh: ihre globalen Namen
+    ' (einst, lwHat ...) legt ein anderer Teil an. Allein uebersetzt ist die
+    ' Warnung dort richtig, keine Falschmeldung -- bis Stufe 18 fiel das nur
+    ' nicht auf, weil jede Datei vorher an einem unbekannten kern.-Typ scheiterte.
+    IF INSTR(REPLACE$(roh[i], CHR$(92), "/"), "examples/glutfaden/ansicht/") >= 0 THEN CONTINUE
     ARRAY_PUSH(dateien, wurzel + "/" + roh[i])
 NEXT
 PRINT "genug dateien "; (LEN(dateien) > 300)

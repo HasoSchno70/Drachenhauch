@@ -1,0 +1,350 @@
+' Exportieren (Strg+E): PDF, HTML, Bild, OXS oder Paket -- PySticky fragt das
+' in mehreren kleinen Dialogen und liest den Rest aus seinen Einstellungen;
+' hier steht alles in einem Fenster, und was fuer das gewaehlte Format nicht
+' gilt, ist ausgegraut. Die Arbeit tut der Kern (kern/pdfexport.dh,
+' htmlexport.dh, bildexport.dh, oxs.dh, paket.dh). Die Wahl bleibt fuer die
+' Sitzung stehen.
+
+CONST EX_PDF = 0
+CONST EX_HTML = 1
+CONST EX_BILD = 2
+CONST EX_OXS = 3
+CONST EX_PAKET = 4
+
+DIM exFormat AS INTEGER
+DIM exPapier AS INTEGER
+DIM exZellen AS INTEGER
+DIM exUeb AS INTEGER
+DIM exWasser AS INTEGER
+DIM exMystery AS INTEGER
+DIM exStickpfad AS INTEGER
+DIM exNotizen AS INTEGER
+DIM exKreuz AS ARRAY OF INTEGER        ' Kaestchen je Palette in exKreuzNamen
+DIM exKreuzNamen AS ARRAY OF STRING
+DIM exZelle AS INTEGER
+DIM exRaster AS INTEGER
+DIM exSymbole AS INTEGER
+DIM exBildInfo AS INTEGER
+DIM exZeilen AS ARRAY OF INTEGER       ' die Zeilen, die je nach Format gelten
+DIM exGilt AS ARRAY OF STRING          ' je Zeile: fuer welche Formate (Ziffern)
+' was beim naechsten Oeffnen wieder dasteht
+DIM exWahlFormat AS INTEGER
+DIM exWahlPapier AS INTEGER : exWahlPapier = -1
+DIM exWahlZellen AS INTEGER
+DIM exVorbelegt AS BOOLEAN           ' die Wahl aus den Einstellungen schon uebernommen?
+DIM exWahlUeb AS INTEGER
+DIM exWahlWasser AS STRING
+DIM exWahlMystery AS BOOLEAN
+DIM exWahlStickpfad AS BOOLEAN : exWahlStickpfad = TRUE
+DIM exWahlKreuz AS ARRAY OF STRING : exWahlKreuz = []
+DIM exWahlZelle AS INTEGER : exWahlZelle = 10
+DIM exWahlRaster AS BOOLEAN : exWahlRaster = TRUE
+DIM exWahlSymbole AS BOOLEAN
+DIM exLetzteNotizen AS STRING          ' die Notizen des letzten Dialogs (er ist dann schon zu)
+
+' Wie PySticky den Papierwaehler beschriftet: im Diamond-Modus die Drills je
+' Seite 1:1 und die Seitenzahl, das empfohlene Format mit Haken.
+FUNCTION exPapierText$(m AS kern.Muster, name AS STRING, empfohlen AS STRING) AS STRING
+    DIM p AS kern.Papier : p = kern.papierFuer(name)
+    DIM t AS STRING : t = p.name + " (" + STR$(ROUND(p.breite)) + "×" + STR$(ROUND(p.hoehe)) + " mm, "
+    IF m.modus = "diamond" THEN
+        DIM s AS kern.Seitenplan : s = kern.seitenplanFuer(m, name, 0, 0)
+        t = t + "~" + STR$(s.jeX) + "×" + STR$(s.jeY) + " Drills/Seite → " + STR$(s.anzahl()) + " Seiten)"
+        IF name = empfohlen THEN t = t + " ✓ empfohlen für 1:1"
+        RETURN t
+    END IF
+    RETURN t + STR$(p.stiche) + "×" + STR$(p.stiche) + " Stiche/Seite)"
+END FUNCTION
+
+' Eine Zeile mit Beschriftung; `gilt` nennt die Formate, fuer die sie zaehlt.
+FUNCTION exZeile(text AS STRING, w AS INTEGER, gilt AS STRING) AS INTEGER
+    DIM z AS INTEGER : z = dlZeile(text, w)
+    ARRAY_PUSH(exZeilen, z)
+    ARRAY_PUSH(exGilt, gilt)
+    RETURN z
+END FUNCTION
+
+SUB exFormatGeaendert(w AS INTEGER, daten AS INTEGER)
+    DIM f AS STRING : f = STR$(MAX(0, gtk_combo_box_get_active(exFormat)))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(exZeilen) - 1
+        gtk_widget_set_sensitive(exZeilen[i], INSTR(exGilt[i], f) >= 0)
+    NEXT
+    exBildGeaendert(0, 0)
+END SUB
+
+SUB exBildGeaendert(w AS INTEGER, daten AS INTEGER)
+    DIM z AS INTEGER : z = gtk_spin_button_get_value_as_int(exZelle)
+    gtk_label_set_text(exBildInfo, "Bildgröße: " + STR$(lwMuster.breite * z) + " × " + STR$(lwMuster.hoehe * z) + " Pixel")
+END SUB
+
+FUNCTION exNotizenText$() AS STRING
+    DIM puffer AS INTEGER : puffer = gtk_text_view_get_buffer(exNotizen)
+    DIM a AS BUFFER : a = BUFFER_NEW(256)
+    DIM e AS BUFFER : e = BUFFER_NEW(256)
+    gtk_text_buffer_get_bounds(puffer, BUFFER_ZEIGER(a), BUFFER_ZEIGER(e))
+    DIM z AS INTEGER : z = gtk_text_buffer_get_text(puffer, BUFFER_ZEIGER(a), BUFFER_ZEIGER(e), FALSE)
+    DIM t AS STRING : t = TEXT_AUS_ZEIGER$(z)
+    g_free(z)
+    RETURN t
+END FUNCTION
+
+FUNCTION exMeta$(m AS kern.Muster, schluessel AS STRING) AS STRING
+    IF NOT JSON_HAS(m.metadaten, schluessel) THEN RETURN ""
+    IF JSON_TYPE(m.metadaten, schluessel) <> "string" THEN RETURN ""
+    RETURN JSON_GET_STRING(m.metadaten, schluessel)
+END FUNCTION
+
+' Wohin? "" bei Abbrechen; die Endung des Formats kommt dazu.
+FUNCTION exZielWaehlen(format AS INTEGER) AS STRING
+    DIM endungen AS ARRAY OF STRING : endungen = [".pdf", ".html", ".png", ".oxs", "_paket.zip"]
+    DIM namen AS ARRAY OF STRING : namen = ["PDF-Dateien (*.pdf)", "HTML-Dateien (*.html)", "Bilder (*.png, *.jpg, *.bmp)", "Open Cross Stitch (*.oxs)", "ZIP-Dateien (*.zip)"]
+    DIM muster AS ARRAY OF STRING : muster = ["*.pdf", "*.html", "*.png", "*.oxs", "*.zip"]
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("Exportieren", fenster, GTK_DATEI_SICHERN, _
+        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Exportieren", GTK_ANTWORT_ANNEHMEN, 0)
+    gtk_file_chooser_set_do_overwrite_confirmation(d, TRUE)
+    DIM basis AS STRING : basis = musterTitel
+    IF musterPfad <> "" THEN
+        basis = BASENAME(musterPfad)
+        IF LOWER$(RIGHT$(basis, 4)) = ".pxs" OR LOWER$(RIGHT$(basis, 4)) = ".oxs" THEN basis = LEFT$(basis, LEN(basis) - 4)
+        DIM ok AS BOOLEAN : ok = gtk_file_chooser_set_current_folder(d, DIRNAME(musterPfad))
+    END IF
+    gtk_file_chooser_set_current_name(d, basis + endungen[format])
+    DIM filter AS INTEGER : filter = gtk_file_filter_new()
+    gtk_file_filter_set_name(filter, namen[format])
+    gtk_file_filter_add_pattern(filter, muster[format])
+    IF format = EX_BILD THEN
+        gtk_file_filter_add_pattern(filter, "*.jpg")
+        gtk_file_filter_add_pattern(filter, "*.jpeg")
+        gtk_file_filter_add_pattern(filter, "*.bmp")
+    END IF
+    gtk_file_chooser_add_filter(d, filter)
+    DIM pfad AS STRING
+    IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
+        DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
+        pfad = TEXT_AUS_ZEIGER$(z)
+        g_free(z)
+    END IF
+    gtk_widget_destroy(d)
+    IF pfad = "" THEN RETURN ""
+    DIM klein AS STRING : klein = LOWER$(pfad)
+    SELECT CASE format
+        CASE EX_BILD
+            IF NOT (RIGHT$(klein, 4) = ".png" OR RIGHT$(klein, 4) = ".jpg" OR RIGHT$(klein, 5) = ".jpeg" OR RIGHT$(klein, 4) = ".bmp") THEN pfad = pfad + ".png"
+        CASE EX_PAKET
+            IF RIGHT$(klein, 4) <> ".zip" THEN pfad = pfad + ".zip"
+        CASE ELSE
+            DIM en AS STRING : en = endungen[format]
+            IF RIGHT$(klein, LEN(en)) <> en THEN pfad = pfad + en
+    END SELECT
+    RETURN pfad
+END FUNCTION
+
+' Das gewaehlte Format in eine Datei. Liefert eine Meldung fuer die Statuszeile.
+FUNCTION exAusfuehren(format AS INTEGER, pfad AS STRING) AS STRING
+    DIM m AS kern.Muster : m = lwMuster
+    DIM namen AS ARRAY OF STRING : namen = kern.papierNamen()
+    DIM papier AS STRING : papier = namen[MAX(0, exWahlPapier)]
+    SELECT CASE format
+        CASE EX_PDF
+            DIM o AS kern.PdfOptionen : o = NEW kern.PdfOptionen()
+            o.papier = papier
+            o.zellen = exWahlZellen
+            o.ueberlappung = exWahlUeb
+            o.wasserzeichen = exWahlWasser
+            o.mystery = exWahlMystery
+            o.stickpfad = exWahlStickpfad
+            o.kreuz = exWahlKreuz
+            o.paletten = slPaletten
+            o.notizen = exLetzteNotizen
+            o.autor = einst.autor
+            o.copyright = einst.copyright
+            DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(m, pfad, o)
+            RETURN "PDF exportiert (" + MID$(ab[LEN(ab) - 1], 7, 9) + " Seiten, " + papier + "): " + BASENAME(pfad)
+        CASE EX_HTML
+            DIM h AS kern.HtmlOptionen : h = NEW kern.HtmlOptionen()
+            h.ueberlappung = exWahlUeb
+            h.mystery = exWahlMystery
+            h.kreuz = exWahlKreuz
+            h.paletten = slPaletten
+            h.autor = einst.autor
+            h.copyright = einst.copyright
+            kern.htmlExportieren(m, pfad, h)
+            RETURN "HTML exportiert: " + BASENAME(pfad)
+        CASE EX_BILD
+            kern.bildExportieren(m, pfad, exWahlZelle, exWahlRaster, exWahlSymbole)
+            RETURN "Bild exportiert (" + STR$(m.breite * exWahlZelle) + " × " + STR$(m.hoehe * exWahlZelle) + "): " + BASENAME(pfad)
+        CASE EX_OXS
+            kern.oxsSpeichern(m, pfad)
+            RETURN "OXS exportiert: " + BASENAME(pfad)
+        CASE EX_PAKET
+            DIM e AS kern.PaketErgebnis : e = kern.paketExportieren(m, pfad, papier, exWahlMystery, slPaletten, einst.autor, einst.copyright)
+            DIM t AS STRING : t = "Paket exportiert (" + STR$(LEN(e.dateien)) + " Dateien): " + BASENAME(pfad)
+            IF LEN(e.fehlt) > 0 THEN t = t + " -- fehlt: " + JOIN$(e.fehlt, ", ")
+            RETURN t
+    END SELECT
+    RETURN ""
+END FUNCTION
+
+' Die Wahl aus dem Dialog in die Sitzung uebernehmen.
+SUB exWahlMerken()
+    exWahlFormat = MAX(0, gtk_combo_box_get_active(exFormat))
+    exWahlPapier = MAX(0, gtk_combo_box_get_active(exPapier))
+    exWahlZellen = gtk_spin_button_get_value_as_int(exZellen)
+    exWahlUeb = gtk_spin_button_get_value_as_int(exUeb)
+    exWahlWasser = TRIM$(gtk_entry_get_text(exWasser))
+    exWahlMystery = gtk_toggle_button_get_active(exMystery)
+    exWahlStickpfad = gtk_toggle_button_get_active(exStickpfad)
+    exWahlKreuz = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(exKreuz) - 1
+        IF gtk_toggle_button_get_active(exKreuz[i]) THEN ARRAY_PUSH(exWahlKreuz, exKreuzNamen[i])
+    NEXT
+    exWahlZelle = gtk_spin_button_get_value_as_int(exZelle)
+    exWahlRaster = gtk_toggle_button_get_active(exRaster)
+    exWahlSymbole = gtk_toggle_button_get_active(exSymbole)
+END SUB
+
+' Den Dialog bauen (noch nicht zeigen) -- die Vorfuehrung stellt ihn so ein,
+' ohne dass er auf eine Antwort wartet.
+FUNCTION exDialogBauen() AS INTEGER
+    DIM m AS kern.Muster : m = lwMuster
+    exZeilen = [] : exGilt = []
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Exportieren", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Exportieren …", GTK_ANTWORT_OK, 0)
+    gtk_dialog_set_default_response(d, GTK_ANTWORT_OK)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
+    gtk_container_set_border_width(innen, 12)
+    exFormat = gtk_combo_box_text_new()
+    DIM f AS STRING
+    FOR EACH f IN ["PDF-Anleitung", "HTML-Anleitung (Webseite)", "Bild (PNG, JPG oder BMP)", "Open Cross Stitch (.oxs)", "Paket (ZIP mit allem)"]
+        gtk_combo_box_text_append_text(exFormat, f)
+    NEXT
+    exPapier = gtk_combo_box_text_new()
+    DIM empf AS STRING : empf = kern.papierEmpfehlung$(m, 1)
+    DIM namen AS ARRAY OF STRING : namen = kern.papierNamen()
+    DIM i AS INTEGER, vorgabe AS INTEGER
+    FOR i = 0 TO LEN(namen) - 1
+        gtk_combo_box_text_append_text(exPapier, exPapierText$(m, namen[i], empf))
+        IF m.modus = "diamond" AND namen[i] = empf THEN vorgabe = i
+    NEXT
+    gtk_combo_box_set_active(exPapier, IIF(exWahlPapier >= 0, exWahlPapier, vorgabe))
+    ' Beim ersten Mal (und nach den Einstellungen) die Vorgaben von dort
+    IF NOT exVorbelegt THEN
+        exWahlZellen = einst.pdfZellen
+        exWahlUeb = einst.ueberlappung
+        exWahlMystery = einst.mystery
+        exVorbelegt = TRUE
+    END IF
+    exZellen = gtk_spin_button_new_with_range(0, 300, 5)
+    gtk_spin_button_set_value(exZellen, exWahlZellen)
+    gtk_widget_set_tooltip_text(exZellen, "Stiche je Seite und Richtung -- 0 nimmt die Vorgabe des Formats. Im Diamond-Modus bestimmt die Drill-Kante (1:1) die Seite.")
+    exUeb = gtk_spin_button_new_with_range(0, 20, 1)
+    gtk_spin_button_set_value(exUeb, exWahlUeb)
+    gtk_widget_set_tooltip_text(exUeb, "So viele Stiche der Nachbarseite stehen zusätzlich rechts und unten -- zum Aneinanderlegen.")
+    exWasser = gtk_entry_new()
+    gtk_entry_set_text(exWasser, exWahlWasser)
+    gtk_entry_set_placeholder_text(exWasser, "z. B. ENTWURF -- leer = keins")
+    exMystery = gtk_check_button_new_with_label("Mystery: Vorschau ohne Bild, Musterseiten nur mit Symbolen")
+    gtk_toggle_button_set_active(exMystery, exWahlMystery)
+    exStickpfad = gtk_check_button_new_with_label("Stickpfad auf den Musterseiten (nächster Nachbar, Sprünge rot gestrichelt)")
+    gtk_toggle_button_set_active(exStickpfad, exWahlStickpfad)
+    exNotizen = gtk_text_view_new()
+    gtk_text_view_set_wrap_mode(exNotizen, GTK_UMBRUCH_WORT)
+    DIM nz AS STRING : nz = exMeta$(m, "notes")
+    IF nz = "" THEN nz = exMeta$(m, "pdf_notes")
+    gtk_text_buffer_set_text(gtk_text_view_get_buffer(exNotizen), nz, -1)
+    DIM nr AS INTEGER : nr = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_policy(nr, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+    gtk_widget_set_size_request(nr, 360, 64)
+    gtk_container_add(nr, exNotizen)
+    ' Entsprechungen: die Garnpaletten (keine Perlen, keine Drills)
+    exKreuz = [] : exKreuzNamen = []
+    DIM kreuzBox AS INTEGER : kreuzBox = gtk_box_new(GTK_SENKRECHT, 0)
+    DIM pal AS kern.Palette
+    FOR EACH pal IN slPaletten
+        IF pal.istPerlen OR pal.istDiamant THEN CONTINUE
+        DIM k AS INTEGER : k = gtk_check_button_new_with_label(pal.name)
+        DIM w AS STRING
+        FOR EACH w IN exWahlKreuz
+            IF w = pal.name THEN gtk_toggle_button_set_active(k, TRUE)
+        NEXT
+        gtk_box_pack_start(kreuzBox, k, FALSE, FALSE, 0)
+        ARRAY_PUSH(exKreuz, k)
+        ARRAY_PUSH(exKreuzNamen, pal.name)
+    NEXT
+    DIM kr AS INTEGER : kr = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_policy(kr, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+    gtk_widget_set_size_request(kr, 360, 96)
+    gtk_container_add(kr, kreuzBox)
+    exZelle = gtk_spin_button_new_with_range(4, 100, 1)
+    gtk_spin_button_set_value(exZelle, exWahlZelle)
+    exRaster = gtk_check_button_new_with_label("Rasterlinien")
+    gtk_toggle_button_set_active(exRaster, exWahlRaster)
+    exSymbole = gtk_check_button_new_with_label("Symbole")
+    gtk_toggle_button_set_active(exSymbole, exWahlSymbole)
+    exBildInfo = gtk_label_new("")
+    gtk_label_set_xalign(exBildInfo, 0.0)
+    DIM bildZeile AS INTEGER : bildZeile = gtk_box_new(GTK_WAAGERECHT, 12)
+    gtk_box_pack_start(bildZeile, exZelle, FALSE, FALSE, 0)
+    gtk_box_pack_start(bildZeile, exRaster, FALSE, FALSE, 0)
+    gtk_box_pack_start(bildZeile, exSymbole, FALSE, FALSE, 0)
+    gtk_box_pack_start(innen, dlZeile("Format", exFormat), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile("Papier", exPapier, "04"), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile("Zellen/Seite", exZellen, "0"), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile("Überlappung", exUeb, "01"), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile("", exMystery, "014"), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile("", exStickpfad, "0"), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile("Wasserzeichen", exWasser, "0"), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile("Notizen", nr, "0"), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile("Entsprechungen", kr, "01"), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile("Pixel je Stich", bildZeile, "2"), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile("", exBildInfo, "2"), FALSE, FALSE, 0)
+    DIM hinweis AS INTEGER : hinweis = gtk_label_new("Ohne Passwortschutz: die PDF-Bibliothek verschlüsselt nicht.")
+    gtk_label_set_xalign(hinweis, 0.0)
+    gtkKlasse(hinweis, "nebensache")
+    gtk_box_pack_start(innen, exZeile("", hinweis, "0"), FALSE, FALSE, 4)
+    signal(exFormat, "changed", exFormatGeaendert, 0, 0, 0)
+    signal(exZelle, "value-changed", exBildGeaendert, 0, 0, 0)
+    gtk_combo_box_set_active(exFormat, exWahlFormat)
+    exFormatGeaendert(0, 0)
+    gtk_widget_show_all(d)
+    RETURN d
+END FUNCTION
+
+' Wie viele der Zeilen gelten fuer das gewaehlte Format (fuer die Vorfuehrung).
+FUNCTION exZeilenAktiv() AS INTEGER
+    DIM f AS STRING : f = STR$(MAX(0, gtk_combo_box_get_active(exFormat)))
+    DIM n AS INTEGER, i AS INTEGER
+    FOR i = 0 TO LEN(exGilt) - 1
+        IF INSTR(exGilt[i], f) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+
+SUB exportDialog()
+    IF NOT lwHat THEN RETURN
+    DIM d AS INTEGER : d = exDialogBauen()
+    DIM antwort AS INTEGER : antwort = gtk_dialog_run(d)
+    IF antwort = GTK_ANTWORT_OK THEN exWahlMerken()
+    DIM notizen AS STRING : notizen = exNotizenText$()
+    gtk_widget_destroy(d)
+    IF antwort <> GTK_ANTWORT_OK THEN RETURN
+    DIM pfad AS STRING : pfad = exZielWaehlen(exWahlFormat)
+    IF pfad = "" THEN RETURN
+    exExportieren(exWahlFormat, pfad, notizen)
+END SUB
+
+' Ausfuehren mit Meldung -- auch fuer die Vorfuehrung, ohne Dialog.
+SUB exExportieren(format AS INTEGER, pfad AS STRING, notizen AS STRING)
+    exLetzteNotizen = notizen
+    statusMeldung("Exportiere …")
+    WHILE gtk_events_pending()
+        DIM n AS BOOLEAN : n = gtk_main_iteration_do(FALSE)
+    WEND
+    TRY
+        statusMeldung(exAusfuehren(format, pfad))
+    CATCH e
+        statusMeldung("Nicht exportiert: " + e)
+    END TRY
+END SUB

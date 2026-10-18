@@ -845,7 +845,7 @@ PRINT q, r       ' "3 2"
 
 **Einschränkungen:**
 - `BYREF` darf **nicht** mit einem Default-Wert kombiniert werden (was würde es heißen, eine Default-Variable per Referenz zu übergeben?).
-- `BYREF` wird von `dhrt` unterstützt: der Compiler setzt an der Aufruf­stelle eine lvalue-Erfassung plus Post-Call-Write-Back (Copy-In/Copy-Out), die VM gibt die finalen Parameter­werte zurück. (Aktuell nur bei direkten `SUB`/`FUNCTION`-Aufrufen — nicht über `FUNCREF` oder Methoden­aufrufe, deren Klasse erst zur Laufzeit feststeht.)
+- `BYREF` wird von `dhrt` unterstützt: der Compiler setzt an der Aufruf­stelle eine lvalue-Erfassung plus Post-Call-Write-Back (Copy-In/Copy-Out), die VM gibt die finalen Parameter­werte zurück. Das gilt für `SUB`/`FUNCTION` und für **Methoden**, deren Klasse beim Übersetzen feststeht (`DIM s AS Stapel` ... `s.fuellen(a, n)`, auch der Aufruf auf `Self`). Steht die Klasse erst zur Laufzeit fest (die Variable von `FOR EACH` über ein `TUPLE`, ein Wert ohne Typ), ist der Aufruf einer Methode mit `BYREF` ein Fehler mit dem Hinweis, das Objekt in einer Variablen mit Typ zu halten — still als `BYVAL` zu laufen hieße, die Änderung zu verlieren. Eine Überschreibung muss dieselben Parameter `BYREF` nehmen wie die Methode, die sie überschreibt. Über `FUNCREF` gibt es kein `BYREF`.
 
 **Rekursion** funktioniert:
 
@@ -1492,6 +1492,9 @@ END FUNCTION
 ```
 
 Reiche den Wert als Parameter herein oder deklariere ihn in der Datei selbst.
+Die Felder einer Klasse sind davon nicht betroffen: in einer Methode meint ein
+nacktes `e` das Feld (auch ein geerbtes), selbst wenn das Hauptprogramm oder
+die Datei ebenfalls ein `e` hat.
 Ohne `AS` bleibt der alte, flache Zugriff erlaubt — bestehende Programme
 ändern sich nicht.
 
@@ -1540,6 +1543,26 @@ f = mathe.Farbe.ROT
 
 Als Typ ist ein ENUM ein `INTEGER`, wie ein flaches ENUM auch. Damit können
 beide Dateien ein `Farbe` haben, ohne sich in die Quere zu kommen.
+
+**Ein Namensraum aus mehreren Dateien:** Dateien, die mit demselben Namen
+eingebunden werden, bilden EINEN Namensraum und sehen einander. So lässt sich
+eine Bibliothek in Teile zerlegen und über eine Sammeldatei einbinden:
+
+```basic
+' kern/kern.dh -- die Sammeldatei
+IMPORT "muster.dh" AS kern
+IMPORT "ebene.dh" AS kern
+IMPORT "pxs.dh" AS kern
+
+' main.dh
+IMPORT "kern/kern.dh" AS kern
+DIM m AS kern.Muster
+m = kern.pxsLaden("herz.pxs")
+```
+
+Was eine Datei des Namensraums **ohne** `AS` einbindet, gehört nicht dazu —
+es bleibt draußen, wie jeder flache Import. `kern.Name` meldet dann, in welcher
+Datei der Name steht und dass dort `IMPORT "datei.dh" AS kern` fehlt.
 
 **Nicht zu verwechseln** mit `AS` an einem eingebauten Modul: `IMPORT "json" AS
 j` ersetzt dort das Präfix (`J_PARSE` statt `JSON_PARSE`). Für `.dh`-Dateien
