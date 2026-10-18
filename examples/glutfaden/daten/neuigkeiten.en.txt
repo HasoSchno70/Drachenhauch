@@ -1,0 +1,31 @@
+# What is new in Glutfaden -- the English version of neuigkeiten.txt (logo
+# button -> "New in Glutfaden"). Same format: "## " and the title, the text
+# below, blank lines separate paragraphs, lines starting with # are comments.
+# The newest stage is at the top.
+
+## 🌐 Language: German and English
+Glutfaden speaks English: Settings → General → Language (automatic follows the system language). The change takes effect at the next start. Keyboard shortcuts are shown as Ctrl and Shift, numbers with a decimal point.
+
+## 🧲 Stage 23: grid, pen and fingers
+With the magnet in the toolbar, line, rectangle, ellipse and polygon snap to every fifth square (the distance is in the settings).
+
+With a drawing pen (Wacom, Surface Pen …) the brush of the pencil tool grows with the pressure; the mouse still sets one stitch per square. On touchscreen and touchpad two fingers zoom once it is switched on in the settings.
+
+## 🧵 Stage 22: little things from PySticky
+The edge of a selection moves while a selection tool is active, and empty squares show the fine dot of an Aida fabric.
+
+A thread can be dragged from the catalog onto the color bar. Layers are dragged in the list: released above or below they move, released in the middle of another row they are merged with it.
+
+New in the settings: own folders for the library and templates, "Highlight selected color" and whether the stitching time is measured.
+
+## 📥 Stage 21: import patterns
+XSD, PAT and OXS files show a preview, size, colors and the reader's warnings before the pattern is taken over. Images also work in the formats GTK can read (TIFF, AVIF, HEIC …). Plus a zoom slider in the status bar and a light appearance.
+
+## 🗂 Stage 20: layers and view
+Layers can be cleared and given a note. Center cross, mirror axes, arrow keys, scrollbars, dropping files onto the window and the keyboard shortcut overview (F1).
+
+## 🎨 Stage 19: tools
+Option bars per tool, an eyedropper for the whole screen, palette files and printing.
+
+## ✂ Stage 18: reshaping patterns
+Rotate, mirror and crop; flatten layers and view them one by one.
