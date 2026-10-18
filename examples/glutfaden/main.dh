@@ -89,6 +89,9 @@ IMPORT "ansicht/flaechenteile.dh"
 IMPORT "ansicht/farbleiste.dh"
 IMPORT "ansicht/willkommen.dh"
 IMPORT "ansicht/infoleiste.dh"
+IMPORT "ansicht/optionsleisten.dh"
+IMPORT "ansicht/farbquellen.dh"
+IMPORT "ansicht/drucken.dh"
 
 ' Farben: dunkel wie das Logo, Glut (#ff8a3d) fuer alles, was gewaehlt ist
 CONST STIL = "window, .flaeche { background-color: #1b1c20; color: #e4e5ea; }" + _
@@ -581,6 +584,10 @@ SUB befehlAusfuehren(kennung AS STRING)
         CASE "vereinen" : ebenenVereinenBefehl(TRUE)
         CASE "nur_aktive" : ebenenAnsicht(0, NOT lwNurAktiv)
         CASE "abdunkeln" : ebenenAnsicht(1, NOT lwAbdunkeln)
+        CASE "drucken" : druckenDialog()
+        CASE "bildschirm_pipette" : bildschirmPipette()
+        CASE "palette_export" : paletteExportieren()
+        CASE "palette_import" : paletteImportieren()
         CASE "willkommen" : willkommenZeigen()
         CASE "farbleiste"
             einst.farbleiste = NOT einst.farbleiste
@@ -607,8 +614,9 @@ FUNCTION taste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM umschalt AS BOOLEAN : umschalt = (z BAND GDK_UMSCHALT) <> 0
     DIM alt AS BOOLEAN : alt = (z BAND GDK_ALT) <> 0
     DIM k AS STRING : k = kern.kuerzelAusTaste$(t, strg, alt, umschalt)
-    ' Im Suchfeld gehoeren Zeichen und Kopieren/Einfuegen/Alles dem Feld
-    IF gtk_widget_has_focus(slSuche) THEN
+    ' Im Suchfeld und im Textfeld der Text-Leiste gehoeren Zeichen und
+    ' Kopieren/Einfuegen/Alles dem Feld
+    IF eingabeHatFokus() THEN
         IF NOT strg AND NOT alt AND (LEN(k) = 1 OR k = "Plus" OR k = "Minus" OR k = "Leertaste") THEN RETURN FALSE
         IF k = "Strg+C" OR k = "Strg+X" OR k = "Strg+V" OR k = "Strg+A" THEN RETURN FALSE
     END IF

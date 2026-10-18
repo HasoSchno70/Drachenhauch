@@ -1,0 +1,127 @@
+' Direkt drucken (PySticky _on_print) ueber GTKs eigenen Druckdialog: eine
+' Seite, quer bei einem breiten Muster, das Muster mit 5 % Rand eingepasst
+' (kern.druckLage), jede Zelle in ihrer Farbe (Teilstiche, Knoten, Perlen
+' wie auf der Zeichenflaeche), ab 8 Punkten je Kaestchen das Symbol, darueber
+' ein graues Raster. Anders als im Original kommen die Rueckstiche mit --
+' ohne sie fehlen die Konturen auf dem Blatt.
+'
+' druckenNach schickt dieselbe Seite ohne Dialog in eine PDF-Datei (GTKs
+' Export) -- so laesst sich der Druck pruefen, ohne einen Drucker zu haben.
+
+DIM drSchrift AS INTEGER
+
+FUNCTION drOperation() AS INTEGER
+    DIM op AS INTEGER : op = gtk_print_operation_new()
+    gtk_print_operation_set_n_pages(op, 1)
+    gtk_print_operation_set_job_name(op, musterTitel)
+    DIM seite AS INTEGER : seite = gtk_page_setup_new()
+    gtk_page_setup_set_orientation(seite, IIF(kern.druckQuer(lwMuster.breite, lwMuster.hoehe), GTK_SEITE_QUER, GTK_SEITE_HOCH))
+    gtk_print_operation_set_default_page_setup(op, seite)
+    g_object_unref(seite)
+    signalSeite(op, "draw-page", drSeite, 0, 0, 0)
+    RETURN op
+END FUNCTION
+
+SUB druckenDialog()
+    IF NOT lwHat THEN RETURN
+    DIM op AS INTEGER : op = drOperation()
+    DIM fehler AS INTEGER
+    DIM r AS INTEGER : r = gtk_print_operation_run(op, GTK_DRUCK_DIALOG, fenster, fehler)
+    IF r = GTK_DRUCK_GEDRUCKT THEN
+        statusMeldung("Muster wurde gedruckt.")
+    ELSEIF r = GTK_DRUCK_FEHLER THEN
+        pdWarnung(fenster, "Druckfehler", "Fehler beim Drucken:" + CHR$(10) + gtkFehler$(fehler))
+    END IF
+    g_object_unref(op)
+END SUB
+
+' Dieselbe Seite ohne Dialog als PDF; "" = geschrieben, sonst der Fehler
+FUNCTION druckenNach(pfad AS STRING) AS STRING
+    IF NOT lwHat THEN RETURN "kein Muster"
+    DIM op AS INTEGER : op = drOperation()
+    gtk_print_operation_set_export_filename(op, pfad)
+    DIM fehler AS INTEGER
+    DIM r AS INTEGER : r = gtk_print_operation_run(op, GTK_DRUCK_EXPORT, fenster, fehler)
+    g_object_unref(op)
+    IF r = GTK_DRUCK_FEHLER THEN RETURN gtkFehler$(fehler)
+    RETURN ""
+END FUNCTION
+
+SUB drSeite(op AS INTEGER, kontext AS INTEGER, seite AS INTEGER, daten AS INTEGER)
+    druckZeichnen(gtk_print_context_get_cairo_context(kontext), gtk_print_context_get_width(kontext), gtk_print_context_get_height(kontext))
+END SUB
+
+' Die Seite auf einen Cairo-Kontext der Groesse w x h
+SUB druckZeichnen(cr AS INTEGER, w AS FLOAT, h AS FLOAT)
+    DIM b AS INTEGER : b = lwMuster.breite
+    DIM hh AS INTEGER : hh = lwMuster.hoehe
+    DIM z AS FLOAT, ox AS FLOAT, oy AS FLOAT
+    (z, ox, oy) = kern.druckLage(b, hh, w, h)
+    DIM f AS ARRAY OF INTEGER, t AS ARRAY OF INTEGER, e AS ARRAY OF INTEGER
+    lwMuster.ebenen.zusammensetzen(f, t, e)
+    DIM n AS INTEGER : n = lwMuster.farbanzahl()
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO hh - 1
+        FOR x = 0 TO b - 1
+            DIM c AS INTEGER : c = f[y * b + x]
+            DIM px AS FLOAT : px = ox + x * z
+            DIM py AS FLOAT : py = oy + y * z
+            IF c >= 0 AND c < n THEN
+                DIM farbe AS INTEGER : farbe = lwMuster.farben[c].garn.farbe
+                DIM art AS INTEGER : art = t[y * b + x]
+                IF art = kern.VOLL THEN
+                    cairoFarbe(cr, farbe)
+                    cairo_rectangle(cr, px, py, z, z)
+                    cairo_fill(cr)
+                ELSE
+                    lwSonderstich(cr, px, py, z, art, farbe)
+                END IF
+            ELSE
+                cairoFarbe(cr, einst.stoff)
+                cairo_rectangle(cr, px, py, z, z)
+                cairo_fill(cr)
+            END IF
+        NEXT
+    NEXT
+    ' Symbole ab 8 Punkten je Kaestchen
+    IF z > 8 THEN
+        IF drSchrift <> 0 THEN pango_font_description_free(drSchrift)
+        drSchrift = pango_font_description_from_string("Sans")
+        pango_font_description_set_absolute_size(drSchrift, MAX(4, INT(z * 0.6)) * PANGO_SCALE)
+        DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
+        pango_layout_set_font_description(layout, drSchrift)
+        FOR y = 0 TO hh - 1
+            FOR x = 0 TO b - 1
+                c = f[y * b + x]
+                IF c < 0 OR c >= n THEN CONTINUE
+                DIM s AS STRING : s = lwMuster.farben[c].symbol
+                IF s = "" THEN CONTINUE
+                IF kern.helligkeit(lwMuster.farben[c].garn.farbe) > 0.55 THEN cairo_set_source_rgb(cr, 0.0, 0.0, 0.0) ELSE cairo_set_source_rgb(cr, 1.0, 1.0, 1.0)
+                pango_layout_set_text(layout, s, -1)
+                DIM tb AS INTEGER, th AS INTEGER
+                pango_layout_get_pixel_size(layout, tb, th)
+                cairo_move_to(cr, ox + x * z + (z - tb) / 2, oy + y * z + (z - th) / 2)
+                pango_cairo_show_layout(cr, layout)
+            NEXT
+        NEXT
+        g_object_unref(layout)
+    END IF
+    ' das Raster
+    cairo_set_source_rgb(cr, 200 / 255, 200 / 255, 200 / 255)
+    cairo_set_line_width(cr, MAX(0.5, z / 30))
+    FOR x = 0 TO b
+        cairo_move_to(cr, ox + x * z, oy)
+        cairo_line_to(cr, ox + x * z, oy + hh * z)
+    NEXT
+    FOR y = 0 TO hh
+        cairo_move_to(cr, ox, oy + y * z)
+        cairo_line_to(cr, ox + b * z, oy + y * z)
+    NEXT
+    cairo_stroke(cr)
+    ' die Rueckstiche (Halbstich-Einheiten)
+    DIM r AS kern.Rueckstich
+    FOR EACH r IN lwMuster.rueckstiche
+        IF r.farbe < 0 OR r.farbe >= n THEN CONTINUE
+        vbStrich(cr, ox + r.x1 * z / 2, oy + r.y1 * z / 2, ox + r.x2 * z / 2, oy + r.y2 * z / 2, lwMuster.farben[r.farbe].garn.farbe, 1, rueckLinienbreite(z), einst.rueckLinie, einst.rueckKappe)
+    NEXT
+END SUB

@@ -393,14 +393,12 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
 
     ' Rueckstiche (Halbstich-Einheiten)
     DIM r AS kern.Rueckstich
-    ' Einstellungen -> Werkzeuge -> Rueckstich: Breite 2 = wie vorgesehen
-    cairo_set_line_width(cr, MAX(1.0, MAX(1.5, z / 6) + einst.rueckBreite - 2))
+    ' Breite, Linienart und Enden aus der Rueckstich-Leiste (Breite 2 = wie
+    ' vorgesehen); dieselbe Strichroutine wie die Muster-Vorschau
+    DIM rbreite AS FLOAT : rbreite = rueckLinienbreite(z)
     FOR EACH r IN lwMuster.rueckstiche
         IF r.farbe < 0 OR r.farbe >= LEN(lwRgb) - 1 THEN CONTINUE
-        cairoFarbe(cr, lwRgb[r.farbe])
-        cairo_move_to(cr, lwX + r.x1 * z / 2, lwY + r.y1 * z / 2)
-        cairo_line_to(cr, lwX + r.x2 * z / 2, lwY + r.y2 * z / 2)
-        cairo_stroke(cr)
+        vbStrich(cr, lwX + r.x1 * z / 2, lwY + r.y1 * z / 2, lwX + r.x2 * z / 2, lwY + r.y2 * z / 2, lwRgb[r.farbe], 1, rbreite, einst.rueckLinie, einst.rueckKappe)
     NEXT
 
     ' Erledigte Stiche: Stoff halb darueber und ein Haken -- so sieht man, was

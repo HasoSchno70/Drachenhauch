@@ -81,12 +81,22 @@ FUNCTION textAusschnitt(text AS STRING, schrift AS STRING, groesse AS INTEGER, f
     RETURN s
 END FUNCTION
 
-' Klick mit dem Text-Werkzeug: fragen, rastern, an die Maus haengen.
+' Klick mit dem Text-Werkzeug: der Text aus der Leiste haengt an der Maus
+' (ansicht/optionsleisten.dh); ohne Text geht der Fokus ins Textfeld.
 SUB textBeginnen(x AS INTEGER, y AS INTEGER)
+    IF TRIM$(txText) = "" THEN
+        IF tlFeld <> 0 THEN gtk_widget_grab_focus(tlFeld)
+        statusMeldung("Erst einen Text eingeben -- oben in der Leiste.")
+        RETURN
+    END IF
     IF NOT wzFarbeDa() THEN RETURN
-    IF NOT textFragen3() THEN RETURN
     textAnhaengen()
 END SUB
+
+' Die Schriften der Auswahl
+FUNCTION textSchriften() AS ARRAY OF STRING
+    RETURN ["Sans", "Serif", "Monospace", "Arial", "Georgia", "Courier New"]
+END FUNCTION
 
 SUB textAnhaengen()
     DIM s AS kern.Ausschnitt : s = textAusschnitt(txText, txSchrift, txGroesse, txFett, txKursiv, wzFarbe, wzStichart)
@@ -101,52 +111,3 @@ SUB textAnhaengen()
     gtk_widget_queue_draw(lwFlaeche)
 END SUB
 
-' Der Dialog: Text, Schrift, Groesse, fett, kursiv. FALSE = abgebrochen.
-FUNCTION textFragen3() AS BOOLEAN
-    IF txSchrift = "" THEN
-        txSchrift = "Sans"
-        txGroesse = 12
-    END IF
-    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Text sticken", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Übernehmen", GTK_ANTWORT_OK, 0)
-    gtk_dialog_set_default_response(d, GTK_ANTWORT_OK)
-    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
-    gtk_container_set_border_width(innen, 12)
-    DIM feld AS INTEGER : feld = gtk_entry_new()
-    gtk_entry_set_text(feld, txText)
-    gtk_entry_set_placeholder_text(feld, "Text")
-    gtk_entry_set_activates_default(feld, TRUE)
-    DIM zeile AS INTEGER : zeile = gtk_box_new(GTK_WAAGERECHT, 8)
-    DIM schrift AS INTEGER : schrift = gtk_combo_box_text_new()
-    DIM namen AS ARRAY OF STRING : namen = ["Sans", "Serif", "Monospace", "Arial", "Georgia", "Courier New"]
-    DIM i AS INTEGER, wahl AS INTEGER
-    FOR i = 0 TO LEN(namen) - 1
-        gtk_combo_box_text_append_text(schrift, namen[i])
-        IF namen[i] = txSchrift THEN wahl = i
-    NEXT
-    gtk_combo_box_set_active(schrift, wahl)
-    DIM groesse AS INTEGER : groesse = gtk_spin_button_new_with_range(6, 72, 1)
-    gtk_spin_button_set_value(groesse, txGroesse)
-    gtk_widget_set_tooltip_text(groesse, "Größe in Punkt (12 Punkt = 16 Kästchen hoch)")
-    DIM fett AS INTEGER : fett = gtk_check_button_new_with_label("fett")
-    gtk_toggle_button_set_active(fett, txFett)
-    DIM kursiv AS INTEGER : kursiv = gtk_check_button_new_with_label("kursiv")
-    gtk_toggle_button_set_active(kursiv, txKursiv)
-    gtk_box_pack_start(zeile, schrift, TRUE, TRUE, 0)
-    gtk_box_pack_start(zeile, groesse, FALSE, FALSE, 0)
-    gtk_box_pack_start(zeile, fett, FALSE, FALSE, 0)
-    gtk_box_pack_start(zeile, kursiv, FALSE, FALSE, 0)
-    gtk_box_pack_start(innen, feld, FALSE, FALSE, 4)
-    gtk_box_pack_start(innen, zeile, FALSE, FALSE, 4)
-    gtk_widget_show_all(d)
-    DIM ok AS BOOLEAN : ok = gtk_dialog_run(d) = GTK_ANTWORT_OK
-    IF ok THEN
-        txText = gtk_entry_get_text(feld)
-        txSchrift = namen[MAX(0, gtk_combo_box_get_active(schrift))]
-        txGroesse = gtk_spin_button_get_value_as_int(groesse)
-        txFett = gtk_toggle_button_get_active(fett)
-        txKursiv = gtk_toggle_button_get_active(kursiv)
-    END IF
-    gtk_widget_destroy(d)
-    RETURN ok AND TRIM$(txText) <> ""
-END FUNCTION

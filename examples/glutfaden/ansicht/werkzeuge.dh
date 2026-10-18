@@ -145,6 +145,8 @@ SUB werkzeugWaehlen(nr AS INTEGER, gefuellt AS BOOLEAN)
     NEXT
     wzKnopfSperre = FALSE
     verlaufLeisteZeigen(nr = WZ_FARBVERLAUF)
+    rueckLeisteZeigen(nr = WZ_RUECKSTICH)
+    textLeisteZeigen(nr = WZ_TEXT)
     fortschrittModusNachziehen()
     leinwandZeiger()
     statusNachziehen()
@@ -548,6 +550,8 @@ FUNCTION werkzeugleisteNeu() AS INTEGER
     signal(wzSpiegelWahl, "changed", wzSpiegelGeaendert, 0, 0, 0)
     gtk_box_pack_start(box, wzSpiegelWahl, FALSE, FALSE, 4)
     gtk_box_pack_start(box, verlaufLeisteNeu(), FALSE, FALSE, 4)
+    gtk_box_pack_start(box, rueckLeisteNeu(), FALSE, FALSE, 4)
+    gtk_box_pack_start(box, textLeisteNeu(), FALSE, FALSE, 4)
     werkzeugWaehlen(WZ_STIFT, FALSE)
     RETURN box
 END FUNCTION
