@@ -204,7 +204,7 @@ SUB fbFarbfeld(cr AS INTEGER, i AS INTEGER)
         cairoFarbe(cr, FL_MARKE)
         cairo_set_line_width(cr, 2)
     ELSE
-        cairoFarbe(cr, &H3A3C44)
+        cairoFarbe(cr, uiFarbe(&H3A3C44))
         cairo_set_line_width(cr, 1)
     END IF
     cairo_stroke(cr)
@@ -255,7 +255,7 @@ SUB fbFarbfeld(cr AS INTEGER, i AS INTEGER)
     pango_layout_set_text(layout, f.symbol, -1)
     DIM tw AS INTEGER, th AS INTEGER
     pango_layout_get_pixel_size(layout, tw, th)
-    IF gewaehlt THEN cairoFarbe(cr, FL_AKZENT) ELSE cairoFarbe(cr, &H8D93A1)
+    IF gewaehlt THEN cairoFarbe(cr, FL_AKZENT) ELSE cairoFarbe(cr, uiFarbe(&H8D93A1))
     cairo_move_to(cr, ox + (w - tw) / 2, ry + rh + 2 + (14 - th) / 2)
     pango_cairo_show_layout(cr, layout)
     g_object_unref(layout)

@@ -1012,6 +1012,7 @@ SUB musterGeklickt(w AS INTEGER, was AS INTEGER)
         CASE 15 : befehlAusfuehren("spiegeln_v")
         CASE 16 : befehlAusfuehren("zuschneiden")
         CASE 17 : befehlAusfuehren("drucken")
+        CASE 18 : befehlAusfuehren("fremd_import")
     END SELECT
 END SUB
 
@@ -1156,13 +1157,13 @@ END SUB
 FUNCTION musterKnopf() AS INTEGER
     DIM mb AS INTEGER : mb = gtk_menu_button_new()
     gtk_container_add(mb, gtk_image_new_from_icon_name("document-new-symbolic", GTK_ICON_KNOPF))
-    tipp(mb, "Muster -- neu ({neu}), Eigenschaften ({eigenschaften}), Größe, Versionen ({versionen}), Vorlagen, Bibliothek ({bibliothek}), Einstellungen ({einstellungen}), Kachel-Vorschau ({kacheln}), drehen, spiegeln, Auto-Zuschneiden ({zuschneiden}), Drucken ({drucken})")
+    tipp(mb, "Muster -- neu ({neu}), Eigenschaften ({eigenschaften}), Größe, Versionen ({versionen}), Vorlagen, Bibliothek ({bibliothek}), Einstellungen ({einstellungen}), Kachel-Vorschau ({kacheln}), drehen, spiegeln, Auto-Zuschneiden ({zuschneiden}), Drucken ({drucken}), Muster importieren ({fremd_import})")
     gtk_widget_set_can_focus(mb, FALSE)
     musterPopover = gtk_popover_new(mb)
     DIM box AS INTEGER : box = gtk_box_new(GTK_SENKRECHT, 2)
     gtk_container_set_border_width(box, 8)
     DIM texte AS ARRAY OF STRING : texte = ["Neues Muster …", "Eigenschaften …", "Größe ändern …", "Versionen …", "Als Vorlage speichern …", "Vorlagen verwalten …", "Bibliothek …", "Einstellungen …", "Raster-Optionen …", "Kachel-Vorschau …", "Startseite …", _
-        "↻ 90° rechts drehen", "↺ 90° links drehen", "⟲ 180° drehen", "⇆ Horizontal spiegeln", "⇅ Vertikal spiegeln", "✂ Auto-Zuschneiden", "🖶 Drucken …"]
+        "↻ 90° rechts drehen", "↺ 90° links drehen", "⟲ 180° drehen", "⇆ Horizontal spiegeln", "⇅ Vertikal spiegeln", "✂ Auto-Zuschneiden", "🖶 Drucken …", "Muster importieren (XSD/PAT/OXS) …"]
     DIM i AS INTEGER
     FOR i = 0 TO LEN(texte) - 1
         IF i = 4 OR i = 6 OR i = 7 OR i = 11 OR i = 17 THEN gtk_box_pack_start(box, gtk_separator_new(GTK_WAAGERECHT), FALSE, FALSE, 4)

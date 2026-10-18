@@ -663,7 +663,7 @@ END SUB
 FUNCTION slSchlossZeichnen(w AS INTEGER, cr AS INTEGER, i AS INTEGER) AS BOOLEAN
     IF NOT lwHat OR i >= lwMuster.ebenen.anzahl() THEN RETURN TRUE
     DIM zu AS BOOLEAN : zu = lwMuster.ebenen.ebenen[i].gesperrt
-    IF zu THEN cairo_set_source_rgb(cr, 1.0, 0.60, 0.25) ELSE cairo_set_source_rgba(cr, 0.84, 0.85, 0.88, 0.45)
+    IF zu THEN cairo_set_source_rgb(cr, 1.0, 0.60, 0.25) ELSE uiSymbol(cr, 0.45)
     cairo_set_line_width(cr, 1.5)
     ' Buegel (offen: zur Seite gerueckt), Koerper
     IF zu THEN

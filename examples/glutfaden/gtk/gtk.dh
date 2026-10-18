@@ -65,6 +65,13 @@ DECLARE SUB gtk_adjustment_configure LIB GTK (a AS ZEIGER, wert AS FLOAT, unten 
 DECLARE FUNCTION gtk_adjustment_get_lower LIB GTK (a AS ZEIGER) AS FLOAT
 DECLARE FUNCTION gtk_scrollbar_new LIB GTK (richtung AS LONG, a AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_window_get_focus LIB GTK (fenster AS ZEIGER) AS ZEIGER
+DECLARE SUB gtk_range_set_range LIB GTK (r AS ZEIGER, von AS FLOAT, bis AS FLOAT)
+DECLARE SUB gtk_dialog_set_response_sensitive LIB GTK (d AS ZEIGER, antwort AS LONG, an AS BOOLEAN)
+DECLARE FUNCTION gtk_dialog_get_widget_for_response LIB GTK (d AS ZEIGER, antwort AS LONG) AS ZEIGER
+DECLARE FUNCTION gtk_range_get_adjustment LIB GTK (r AS ZEIGER) AS ZEIGER
+DECLARE SUB gtk_text_view_set_editable LIB GTK (sicht AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_text_view_set_cursor_visible LIB GTK (sicht AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_scrolled_window_set_min_content_height LIB GTK (sw AS ZEIGER, h AS LONG)
 ' Ziehen und Ablegen von Dateien (text/uri-list)
 DECLARE SUB gtk_drag_dest_set LIB GTK (w AS ZEIGER, flags AS LONG, ziele AS ZEIGER, n AS LONG, aktionen AS LONG)
 DECLARE SUB gtk_drag_dest_add_uri_targets LIB GTK (w AS ZEIGER)
@@ -254,6 +261,11 @@ DECLARE FUNCTION gdk_pixbuf_get_from_window LIB GDK (fenster AS ZEIGER, x AS LON
 DECLARE FUNCTION gdk_pixbuf_get_pixels LIB PIXBUF (bild AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gdk_pixbuf_get_rowstride LIB PIXBUF (bild AS ZEIGER) AS LONG
 DECLARE FUNCTION gdk_pixbuf_get_n_channels LIB PIXBUF (bild AS ZEIGER) AS LONG
+DECLARE FUNCTION gdk_pixbuf_new_from_file LIB PIXBUF (pfad AS TEXT, BYREF fehler AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gdk_pixbuf_savev LIB PIXBUF (bild AS ZEIGER, pfad AS TEXT, art AS TEXT, schluessel AS ZEIGER, werte AS ZEIGER, BYREF fehler AS ZEIGER) AS BOOLEAN
+DECLARE FUNCTION gdk_pixbuf_get_formats LIB PIXBUF () AS ZEIGER
+DECLARE FUNCTION gdk_pixbuf_format_get_extensions LIB PIXBUF (f AS ZEIGER) AS ZEIGER
+DECLARE SUB g_strfreev LIB GLIB (feld AS ZEIGER)
 DECLARE FUNCTION gdk_pixbuf_new LIB PIXBUF (farbraum AS LONG, alpha AS BOOLEAN, bits AS LONG, b AS LONG, h AS LONG) AS ZEIGER
 DECLARE SUB gdk_pixbuf_fill LIB PIXBUF (bild AS ZEIGER, punkt AS ULONG)
 DECLARE SUB gtk_window_fullscreen LIB GTK (fenster AS ZEIGER)
@@ -490,11 +502,16 @@ SUB cairoFarbe(cr AS INTEGER, f AS INTEGER)
 END SUB
 
 ' Ein Stylesheet fuer den ganzen Bildschirm laden; Rueckgabe "" oder der Fehler.
+' Ein zweiter Aufruf laedt denselben Anbieter neu (Themawechsel), statt
+' einen weiteren obenauf zu legen.
+DIM gtkStilAnbieter AS INTEGER
+
 FUNCTION gtkStil$(css AS STRING) AS STRING
-    DIM p AS INTEGER : p = gtk_css_provider_new()
+    DIM neu AS BOOLEAN : neu = gtkStilAnbieter = 0
+    IF neu THEN gtkStilAnbieter = gtk_css_provider_new()
     DIM f AS INTEGER
-    IF NOT gtk_css_provider_load_from_data(p, css, -1, f) THEN RETURN gtkFehler$(f)
-    gtk_style_context_add_provider_for_screen(gdk_screen_get_default(), p, GTK_VORRANG_ANWENDUNG)
+    IF NOT gtk_css_provider_load_from_data(gtkStilAnbieter, css, -1, f) THEN RETURN gtkFehler$(f)
+    IF neu THEN gtk_style_context_add_provider_for_screen(gdk_screen_get_default(), gtkStilAnbieter, GTK_VORRANG_ANWENDUNG)
     RETURN ""
 END FUNCTION
 

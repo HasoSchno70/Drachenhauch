@@ -93,62 +93,63 @@ IMPORT "ansicht/optionsleisten.dh"
 IMPORT "ansicht/farbquellen.dh"
 IMPORT "ansicht/drucken.dh"
 IMPORT "ansicht/ablage.dh"
+IMPORT "ansicht/fremdimport.dh"
 
 ' Farben: dunkel wie das Logo, Glut (#ff8a3d) fuer alles, was gewaehlt ist
-CONST STIL = "window, .flaeche { background-color: #1b1c20; color: #e4e5ea; }" + _
-    " headerbar { background-image: linear-gradient(to bottom, #2c2e35, #22242a); border-bottom: 1px solid #0c0d10; color: #e4e5ea; box-shadow: none; }" + _
-    " headerbar .title { font-weight: 700; color: #f2f3f7; } headerbar .subtitle { color: #9aa0ad; opacity: 1; }" + _
-    " headerbar button, .werkzeugzeile button { background-image: none; background-color: transparent; border: none; border-radius: 8px; color: #d6d9e1; box-shadow: none; text-shadow: none; -gtk-icon-shadow: none; }" + _
-    " headerbar button:hover, .werkzeugzeile button:hover { background-color: rgba(255,255,255,0.08); }" + _
+CONST STIL = "window, .flaeche { background-color: @gf_fenster; color: @gf_text; }" + _
+    " headerbar { background-image: linear-gradient(to bottom, @gf_kopf_oben, @gf_kopf_unten); border-bottom: 1px solid @gf_linie; color: @gf_text; box-shadow: none; }" + _
+    " headerbar .title { font-weight: 700; color: @gf_titel; } headerbar .subtitle { color: @gf_leise2; opacity: 1; }" + _
+    " headerbar button, .werkzeugzeile button { background-image: none; background-color: transparent; border: none; border-radius: 8px; color: @gf_knopf_text; box-shadow: none; text-shadow: none; -gtk-icon-shadow: none; }" + _
+    " headerbar button:hover, .werkzeugzeile button:hover { background-color: @gf_hover; }" + _
     " headerbar button:disabled { opacity: 0.35; }" + _
-    " .werkzeugzeile { background-color: #202228; border-bottom: 1px solid #0c0d10; padding: 3px 8px; }" + _
-    " .werkzeugzeile button:checked { background-color: rgba(255,138,61,0.20); box-shadow: inset 0 -2px #ff8a3d; }" + _
-    " .werkzeugzeile combobox button { background-image: none; background-color: #2a2c33; color: #d6d9e1; padding: 2px 8px; }" + _
-    " .werkzeugzeile entry, .werkzeugzeile spinbutton { background-image: none; background-color: #2a2c33; color: #e4e5ea; border: 1px solid #3a3c44; box-shadow: none; } .werkzeugzeile spinbutton button { color: #d6d9e1; border: none; background-color: transparent; }" + _
-    " .werkzeugzeile separator { background-color: #3a3c44; min-width: 1px; margin: 4px 2px; }" + _
-    " .zoom { color: #c9ccd4; min-width: 52px; }" + _
-    " .seitenleiste { background-color: #202228; border-left: 1px solid #0c0d10; }" + _
-    " .seitenleiste list, .seitenleiste row { background-color: transparent; color: #d6d9e1; }" + _
+    " .werkzeugzeile { background-color: @gf_leiste; border-bottom: 1px solid @gf_linie; padding: 3px 8px; }" + _
+    " .werkzeugzeile button:checked { background-color: rgba(255,138,61,0.20); box-shadow: inset 0 -2px @gf_akzent; }" + _
+    " .werkzeugzeile combobox button { background-image: none; background-color: @gf_feld; color: @gf_knopf_text; padding: 2px 8px; }" + _
+    " .werkzeugzeile entry, .werkzeugzeile spinbutton { background-image: none; background-color: @gf_feld; color: @gf_text; border: 1px solid @gf_rand; box-shadow: none; } .werkzeugzeile spinbutton button { color: @gf_knopf_text; border: none; background-color: transparent; }" + _
+    " .werkzeugzeile separator { background-color: @gf_rand; min-width: 1px; margin: 4px 2px; }" + _
+    " .zoom { color: @gf_zoom; min-width: 52px; }" + _
+    " .seitenleiste { background-color: @gf_leiste; border-left: 1px solid @gf_linie; }" + _
+    " .seitenleiste list, .seitenleiste row { background-color: transparent; color: @gf_knopf_text; }" + _
     " .seitenleiste row:selected { background-color: rgba(255,138,61,0.22); }" + _
-    " .seitenleiste row:selected label { color: #ffffff; }" + _
-    " .ueberschrift { color: #8d93a1; font-weight: 700; font-size: 9pt; margin: 14px 14px 4px 14px; }" + _
+    " .seitenleiste row:selected label { color: @gf_gewaehlt_text; }" + _
+    " .ueberschrift { color: @gf_leise; font-weight: 700; font-size: 9pt; margin: 14px 14px 4px 14px; }" + _
     " .farbzeile { padding: 3px 14px; }" + _
-    " .farbzeile label { color: #d6d9e1; } .nebensache { color: #8d93a1; } .wert { color: #ff8a3d; } .karte { border: 1px solid alpha(#8d93a1, 0.35); border-radius: 8px; padding: 8px 12px; } .kartenwert { font-size: 15pt; font-weight: 700; } .benutzt { color: #ffb27a; }" + _
+    " .farbzeile label { color: @gf_knopf_text; } .nebensache { color: @gf_leise; } .wert { color: @gf_akzent; } .karte { border: 1px solid alpha(@gf_leise, 0.35); border-radius: 8px; padding: 8px 12px; } .kartenwert { font-size: 15pt; font-weight: 700; } .benutzt { color: @gf_benutzt; }" + _
     " .bkarte { border: 1px solid #b8bccf; border-radius: 8px; padding: 6px; background-color: #ecedf3; color: #1a1a2e; } .bkarte.gewaehlt { border: 2px solid #e8701e; background-color: #fff1e6; } .bbild { background-color: #fbfbfd; border: 1px solid #b8bccf; border-radius: 4px; color: #6a6a8a; font-size: 9pt; }" + _
-    " .ebene { padding: 2px 10px; color: #d6d9e1; }" + _
+    " .ebene { padding: 2px 10px; color: @gf_knopf_text; }" + _
     " .innen { margin: 2px 14px; }" + _
-    " .seitenleiste entry, .seitenleiste combobox button { background-image: none; background-color: #2a2c33; color: #e4e5ea; border: 1px solid #3a3c44; box-shadow: none; text-shadow: none; }" + _
-    " textview.notiz { border: 1px solid #3a3c44; font-size: 9pt; } textview.notiz text { background-color: #2a2c33; color: #e4e5ea; }" + _
-    " .werkzeugzeile combobox cellview, .werkzeugzeile combobox button label, .seitenleiste combobox cellview, .seitenleiste combobox button label { color: #e4e5ea; }" + _
+    " .seitenleiste entry, .seitenleiste combobox button { background-image: none; background-color: @gf_feld; color: @gf_text; border: 1px solid @gf_rand; box-shadow: none; text-shadow: none; }" + _
+    " textview.notiz { border: 1px solid @gf_rand; font-size: 9pt; } textview.notiz text { background-color: @gf_feld; color: @gf_text; }" + _
+    " .werkzeugzeile combobox cellview, .werkzeugzeile combobox button label, .seitenleiste combobox cellview, .seitenleiste combobox button label { color: @gf_text; }" + _
     " .abschnitt { font-weight: 700; margin-top: 4px; }" + _
-    " button.klein { background-image: none; background-color: #2a2c33; color: #d6d9e1; border: 1px solid #3a3c44; border-radius: 6px; padding: 2px 6px; box-shadow: none; text-shadow: none; }" + _
-    " button.klein:hover { background-color: #33363e; }" + _
+    " button.klein { background-image: none; background-color: @gf_feld; color: @gf_knopf_text; border: 1px solid @gf_rand; border-radius: 6px; padding: 2px 6px; box-shadow: none; text-shadow: none; }" + _
+    " button.klein:hover { background-color: @gf_flaeche2; }" + _
     " button.schloss { background-image: none; background-color: transparent; border: none; box-shadow: none; padding: 2px; min-height: 0; min-width: 0; }" + _
-    " scale trough { background-color: #33363e; } scale highlight { background-color: #ff8a3d; } scale value { color: #8d93a1; }" + _
-    " .status { background-color: #16171b; color: #9aa0ad; padding: 4px 12px; border-top: 1px solid #0c0d10; font-size: 9pt; }" + _
-    " .farbleiste { background-color: #202228; border-top: 1px solid #0c0d10; padding: 4px 8px 2px 8px; }" + _
-    " .fb-titel { font-size: 8pt; font-weight: 700; color: #8d93a1; letter-spacing: 1px; } .fb-zahl { font-size: 8pt; color: #5c606b; } .fb-aktuell { font-size: 8pt; color: #ff8a3d; font-weight: 700; padding-left: 10px; }" + _
-    " .willkommen { background-image: linear-gradient(to bottom, #16171b, #22242a); }" + _
-    " .wk-titel { font-size: 36px; font-weight: 700; color: #ff8a3d; letter-spacing: 2px; } .wk-unter { font-size: 13px; color: #8d93a1; letter-spacing: 3px; }" + _
-    " button.wk-kachel { background-image: linear-gradient(to bottom right, #2a2c33, #2a2c33); border: 1px solid #3a3c44; border-left: 5px solid #ff8a3d; border-radius: 12px; padding: 12px 14px 10px 16px; color: #e4e5ea; box-shadow: none; text-shadow: none; }" + _
-    " button.wk-kachel:hover { border-color: #ff8a3d; background-image: linear-gradient(to bottom right, #2a2c33, #4a3527); }" + _
-    " button.wk-oeffnen { border-left-color: #4a90d9; } button.wk-oeffnen:hover { border-color: #4a90d9; background-image: linear-gradient(to bottom right, #2a2c33, #263547); }" + _
-    " button.wk-bild { border-left-color: #2fb5a6; } button.wk-bild:hover { border-color: #2fb5a6; background-image: linear-gradient(to bottom right, #2a2c33, #234240); }" + _
-    " button.wk-demo { border-left-color: #a77bd8; } button.wk-demo:hover { border-color: #a77bd8; background-image: linear-gradient(to bottom right, #2a2c33, #3a2f4a); }" + _
-    " .wk-ktitel { font-size: 13pt; font-weight: 700; } .wk-ktext { font-size: 9pt; color: #8d93a1; }" + _
-    " .wk-zuletzt { font-size: 10px; font-weight: 600; color: #8d93a1; letter-spacing: 2px; }" + _
-    " .wk-liste { background-color: #22242a; border: 1px solid #3a3c44; border-radius: 8px; padding: 4px; } .wk-liste row { padding: 6px 10px; border-radius: 4px; } .wk-liste row:hover { background-color: #2a2c33; } .wk-liste row:selected { background-color: rgba(255,138,61,0.30); }" + _
-    " .wk-name { font-size: 10pt; font-weight: 600; color: #e4e5ea; } .wk-ort { font-size: 8pt; color: #8d93a1; } .wk-leer { color: #5c606b; font-style: italic; }" + _
-    " .reiter button { background-image: none; background-color: #2a2c33; color: #b9bdc8; border: 1px solid #3a3c44; box-shadow: none; text-shadow: none; padding: 2px 12px; }" + _
-    " .reiter button:checked { background-color: rgba(255,138,61,0.22); color: #ffffff; border-color: #ff8a3d; }" + _
-    " .ikarte { margin: 1px 14px; padding: 5px 10px; background-color: #26282f; border: 1px solid #33363e; border-radius: 7px; } .ikwert { color: #f2f3f7; font-weight: 700; }" + _
-    " .warnung { color: #e0b040; } .erfolg { color: #40c870; font-weight: 700; }" + _
-    " .fs-zeile { padding: 5px 8px; background-color: #26282f; border: 1px solid #33363e; border-radius: 7px; }" + _
+    " scale trough { background-color: @gf_flaeche2; } scale highlight { background-color: @gf_akzent; } scale value { color: @gf_leise; }" + _
+    " .status { background-color: @gf_status; color: @gf_leise2; padding: 4px 12px; border-top: 1px solid @gf_linie; font-size: 9pt; }" + _
+    " .farbleiste { background-color: @gf_leiste; border-top: 1px solid @gf_linie; padding: 4px 8px 2px 8px; }" + _
+    " .fb-titel { font-size: 8pt; font-weight: 700; color: @gf_leise; letter-spacing: 1px; } .fb-zahl { font-size: 8pt; color: @gf_zahl; } .fb-aktuell { font-size: 8pt; color: @gf_akzent; font-weight: 700; padding-left: 10px; }" + _
+    " .willkommen { background-image: linear-gradient(to bottom, @gf_status, @gf_kopf_unten); }" + _
+    " .wk-titel { font-size: 36px; font-weight: 700; color: @gf_akzent; letter-spacing: 2px; } .wk-unter { font-size: 13px; color: @gf_leise; letter-spacing: 3px; }" + _
+    " button.wk-kachel { background-image: linear-gradient(to bottom right, @gf_feld, @gf_feld); border: 1px solid @gf_rand; border-left: 5px solid @gf_akzent; border-radius: 12px; padding: 12px 14px 10px 16px; color: @gf_text; box-shadow: none; text-shadow: none; }" + _
+    " button.wk-kachel:hover { border-color: @gf_akzent; background-image: linear-gradient(to bottom right, @gf_feld, @gf_t_orange); }" + _
+    " button.wk-oeffnen { border-left-color: #4a90d9; } button.wk-oeffnen:hover { border-color: #4a90d9; background-image: linear-gradient(to bottom right, @gf_feld, @gf_t_blau); }" + _
+    " button.wk-bild { border-left-color: #2fb5a6; } button.wk-bild:hover { border-color: #2fb5a6; background-image: linear-gradient(to bottom right, @gf_feld, @gf_t_tuerkis); }" + _
+    " button.wk-demo { border-left-color: #a77bd8; } button.wk-demo:hover { border-color: #a77bd8; background-image: linear-gradient(to bottom right, @gf_feld, @gf_t_lila); }" + _
+    " .wk-ktitel { font-size: 13pt; font-weight: 700; } .wk-ktext { font-size: 9pt; color: @gf_leise; }" + _
+    " .wk-zuletzt { font-size: 10px; font-weight: 600; color: @gf_leise; letter-spacing: 2px; }" + _
+    " .wk-liste { background-color: @gf_kopf_unten; border: 1px solid @gf_rand; border-radius: 8px; padding: 4px; } .wk-liste row { padding: 6px 10px; border-radius: 4px; } .wk-liste row:hover { background-color: @gf_feld; } .wk-liste row:selected { background-color: rgba(255,138,61,0.30); }" + _
+    " .wk-name { font-size: 10pt; font-weight: 600; color: @gf_text; } .wk-ort { font-size: 8pt; color: @gf_leise; } .wk-leer { color: @gf_zahl; font-style: italic; }" + _
+    " .reiter button { background-image: none; background-color: @gf_feld; color: @gf_reiter; border: 1px solid @gf_rand; box-shadow: none; text-shadow: none; padding: 2px 12px; }" + _
+    " .reiter button:checked { background-color: rgba(255,138,61,0.22); color: @gf_gewaehlt_text; border-color: @gf_akzent; }" + _
+    " .ikarte { margin: 1px 14px; padding: 5px 10px; background-color: @gf_karte; border: 1px solid @gf_flaeche2; border-radius: 7px; } .ikwert { color: @gf_titel; font-weight: 700; }" + _
+    " .warnung { color: @gf_warn; } .erfolg { color: @gf_ok; font-weight: 700; }" + _
+    " .fs-zeile { padding: 5px 8px; background-color: @gf_karte; border: 1px solid @gf_flaeche2; border-radius: 7px; }" + _
     " button.fs-modus { background-image: none; background-color: #2f6b45; color: #ffffff; border: none; border-radius: 8px; padding: 8px; font-weight: 700; box-shadow: none; text-shadow: none; } button.fs-modus:hover { background-color: #378050; }" + _
     " button.fs-modus.fs-an { background-color: #8a3a2a; } button.fs-modus.fs-an:hover { background-color: #a04530; }" + _
-    " progressbar.fs-gesamt trough { min-height: 14px; background-color: #33363e; border: none; } progressbar.fs-gesamt progress { min-height: 14px; background-color: #40c870; border: none; } progressbar.fs-gesamt text { color: #d6d9e1; }" + _
-    " .se-symbol { font-size: 18px; } .se-leise { color: #8d93a1; font-size: 9pt; } entry.se-eigen { font-size: 18px; }" + _
-    " progressbar.fs-klein trough { min-height: 5px; background-color: #33363e; border: none; } progressbar.fs-klein progress { min-height: 5px; background-color: #ff8a3d; border: none; }"
+    " progressbar.fs-gesamt trough { min-height: 14px; background-color: @gf_flaeche2; border: none; } progressbar.fs-gesamt progress { min-height: 14px; background-color: @gf_ok; border: none; } progressbar.fs-gesamt text { color: @gf_knopf_text; }" + _
+    " .se-symbol { font-size: 18px; } .se-leise { color: @gf_leise; font-size: 9pt; } entry.se-eigen { font-size: 18px; }" + _
+    " progressbar.fs-klein trough { min-height: 5px; background-color: @gf_flaeche2; border: none; } progressbar.fs-klein progress { min-height: 5px; background-color: @gf_akzent; border: none; }"
 
 CONST LOGO = "daten/bilder/glutfaden_256.png"
 CONST LOGO_KLEIN = "daten/bilder/glutfaden_32.png"
@@ -157,6 +158,11 @@ DIM fenster AS INTEGER
 DIM kopf AS INTEGER
 DIM zoomText AS INTEGER
 DIM status AS INTEGER
+' Zoom in der Statusleiste (PySticky ZoomSlider): Regler und Prozent, ein
+' Klick auf die Prozent = 100 %
+DIM zoomRegler AS INTEGER
+DIM zoomProzent AS INTEGER
+DIM zoomSperre AS BOOLEAN
 DIM kZurueck AS INTEGER
 DIM kVor AS INTEGER
 DIM kSichern AS INTEGER
@@ -170,10 +176,35 @@ DIM schliessenErlaubt AS BOOLEAN
 
 ' --- Was andere Teile rufen ---------------------------------------------------------
 
+SUB zoomReglerNachziehen()
+    IF zoomRegler = 0 THEN RETURN
+    DIM von AS INTEGER, bis AS INTEGER
+    (von, bis) = kern.zoomBereich(einst)
+    zoomSperre = TRUE
+    gtk_range_set_range(zoomRegler, von, bis)
+    gtk_range_set_value(zoomRegler, leinwandZoomProzent())
+    zoomSperre = FALSE
+    gtk_button_set_label(zoomProzent, STR$(leinwandZoomProzent()) + " %")
+    gtk_widget_set_sensitive(zoomRegler, lwHat)
+    gtk_widget_set_sensitive(zoomProzent, lwHat)
+END SUB
+
+SUB zoomReglerGezogen(regler AS INTEGER, daten AS INTEGER)
+    IF zoomSperre OR NOT lwHat THEN RETURN
+    DIM p AS FLOAT : p = gtk_range_get_value(regler)
+    IF ROUND(p) = leinwandZoomProzent() THEN RETURN
+    leinwandZoomMitte(einst.zelleStandard * p / 100.0 / lwZelle)
+END SUB
+
+SUB zoomProzentGeklickt(k AS INTEGER, daten AS INTEGER)
+    befehlAusfuehren("zoom_100")
+END SUB
+
 ' Statuszeile und Zoom nachfuehren -- die Zeichenflaeche und die Werkzeuge rufen das.
 SUB statusNachziehen()
     IF zoomText = 0 THEN RETURN
     gtk_label_set_text(zoomText, STR$(leinwandZoomProzent()) + " %")
+    zoomReglerNachziehen()
     IF status = 0 THEN RETURN          ' die Werkzeugleiste ruft schon beim Aufbau
     IF NOT lwHat THEN
         ' ohne Muster: nur eine Meldung, solange sie gilt
@@ -298,6 +329,34 @@ SUB musterZeigen(m AS kern.Muster, pfad AS STRING, titel AS STRING)
     statusNachziehen()
 END SUB
 
+' Eine Farbe der (dunkel entworfenen) Oberflaeche im eingestellten Thema
+FUNCTION uiFarbe(f AS INTEGER) AS INTEGER
+    RETURN kern.themaFarbe(f, kern.themaHell(einst))
+END FUNCTION
+
+' Die Farbe der Sinnbilder (Werkzeuge, Schloss, Ansichtsschalter)
+SUB uiSymbol(cr AS INTEGER, deckkraft AS FLOAT)
+    DIM f AS INTEGER : f = uiFarbe(&HD6D9E1)
+    cairo_set_source_rgba(cr, ((f SHR 16) BAND 255) / 255.0, ((f SHR 8) BAND 255) / 255.0, (f BAND 255) / 255.0, deckkraft)
+END SUB
+
+' Das Thema anwenden (Start und Einstellungen): Stylesheet neu, alles neu zeichnen
+SUB themaAnwenden()
+    DIM fe AS STRING : fe = gtkStil$(kern.stilFarben$(kern.themaHell(einst)) + STIL)
+    IF fe <> "" THEN PRINT "Stylesheet: "; fe
+    IF fenster <> 0 THEN gtk_widget_queue_draw(fenster)
+END SUB
+
+' Die Statuszeile nach einem fremden Format
+FUNCTION fremdHinweis$(fi AS kern.FremdImport) AS STRING
+    DIM kurz AS STRING : kurz = "OXS"
+    IF LEFT$(fi.format, 8) = "PCStitch" THEN kurz = "PCStitch"
+    IF LEFT$(fi.format, 7) = "Pattern" THEN kurz = "Pattern Maker"
+    DIM h AS STRING : h = "Aus " + kurz + " eingelesen -- Sichern legt eine .pxs an."
+    IF LEN(fi.warnungen) > 0 THEN h = h + " " + JOIN$(fi.warnungen, " ")
+    RETURN h
+END FUNCTION
+
 FUNCTION musterOeffnen(pfad AS STRING) AS BOOLEAN
     DIM m AS kern.Muster
     DIM fremdHinweis AS STRING
@@ -305,26 +364,13 @@ FUNCTION musterOeffnen(pfad AS STRING) AS BOOLEAN
     DIM fremd AS BOOLEAN : fremd = endung = ".oxs" OR endung = ".pat" OR endung = ".xsd"
     TRY
         ' ein fremdes Format: eingelesen, gesichert wird als .pxs
-        DIM warnungen AS ARRAY OF STRING : warnungen = []
-        IF endung = ".oxs" THEN
-            DIM imp AS kern.OxsImport : imp = kern.oxsLaden(pfad, slPaletten, slSymbole)
-            m = imp.muster
-            warnungen = imp.warnungen
-            fremdHinweis = "Aus OXS eingelesen -- Sichern legt eine .pxs an."
-        ELSEIF endung = ".pat" THEN
-            DIM pimp AS kern.PatImport : pimp = kern.patLaden(pfad, slPaletten, slSymbole)
-            m = pimp.muster
-            warnungen = pimp.warnungen
-            fremdHinweis = "Aus PCStitch eingelesen -- Sichern legt eine .pxs an."
-        ELSEIF endung = ".xsd" THEN
-            DIM ximp AS kern.XsdImport : ximp = kern.xsdLaden(pfad, slPaletten, slSymbole)
-            m = ximp.muster
-            warnungen = ximp.warnungen
-            fremdHinweis = "Aus Pattern Maker eingelesen -- Sichern legt eine .pxs an."
+        IF fremd THEN
+            DIM fi AS kern.FremdImport : fi = kern.fremdLaden(pfad, slPaletten, slSymbole)
+            m = fi.muster
+            fremdHinweis = fremdHinweis$(fi)
         ELSE
             m = kern.pxsLaden(pfad)
         END IF
-        IF LEN(warnungen) > 0 THEN fremdHinweis = fremdHinweis + " " + JOIN$(warnungen, " ")
     CATCH e
         statusMeldung("Nicht geöffnet: " + e)
         RETURN FALSE
@@ -594,6 +640,7 @@ SUB befehlAusfuehren(kennung AS STRING)
         CASE "fortschritt_zeigen" : ansichtSchalter(1, NOT lwFortschrittZeigen)
         CASE "mittelkreuz" : ansichtSchalter(2, NOT lwMittelkreuz)
         CASE "tastenkuerzel" : kuerzelUebersicht()
+        CASE "fremd_import" : fremdImportDialog("")
         CASE "drucken" : druckenDialog()
         CASE "bildschirm_pipette" : bildschirmPipette()
         CASE "palette_export" : paletteExportieren()
@@ -664,7 +711,7 @@ IF NOT bereit THEN
     PRINT "GTK ist da, findet aber keinen Bildschirm."
     END
 END IF
-DIM stilFehler AS STRING : stilFehler = gtkStil$(STIL)
+DIM stilFehler AS STRING : stilFehler = gtkStil$(kern.stilFarben$(kern.themaHell(einst)) + STIL)
 IF stilFehler <> "" THEN PRINT "Stylesheet: "; stilFehler
 werkzeugeStart()
 
@@ -781,10 +828,26 @@ gtk_paned_set_position(teilung, MAX(600, fensterBreite - 400))
 status = gtk_label_new("")
 gtk_label_set_xalign(status, 0.0)
 gtk_label_set_ellipsize(status, GTK_ELLIPSE_ENDE)
-gtkKlasse(status, "status")
+gtk_widget_set_hexpand(status, TRUE)
+DIM statuszeile AS INTEGER : statuszeile = gtk_box_new(GTK_WAAGERECHT, 6)
+gtkKlasse(statuszeile, "status")
+zoomRegler = gtk_scale_new_with_range(GTK_WAAGERECHT, 5.0, 300.0, 5.0)
+gtk_scale_set_draw_value(zoomRegler, FALSE)
+gtk_widget_set_size_request(zoomRegler, 120, -1)
+gtk_widget_set_can_focus(zoomRegler, FALSE)
+tipp(zoomRegler, "Zoom")
+signal(zoomRegler, "value-changed", zoomReglerGezogen, 0, 0, 0)
+zoomProzent = gtk_button_new_with_label("100 %")
+gtkKlasse(zoomProzent, "flat")
+gtk_widget_set_can_focus(zoomProzent, FALSE)
+tipp(zoomProzent, "Klicken für 100 % ({zoom_100})")
+signal(zoomProzent, "clicked", zoomProzentGeklickt, 0, 0, 0)
+gtk_box_pack_start(statuszeile, status, TRUE, TRUE, 0)
+gtk_box_pack_start(statuszeile, zoomRegler, FALSE, FALSE, 0)
+gtk_box_pack_start(statuszeile, zoomProzent, FALSE, FALSE, 0)
 gtk_box_pack_start(spalte, werkzeugzeile, FALSE, FALSE, 0)
 gtk_box_pack_start(spalte, teilung, TRUE, TRUE, 0)
-gtk_box_pack_start(spalte, status, FALSE, FALSE, 0)
+gtk_box_pack_start(spalte, statuszeile, FALSE, FALSE, 0)
 gtk_container_add(fenster, spalte)
 
 signal(kUeber, "clicked", ueberGeklickt, 0, 0, 0)
@@ -858,6 +921,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe19"
     ELSEIF ARG$(a) = "--probe-stufe20" THEN
         probe = "stufe20"
+    ELSEIF ARG$(a) = "--probe-stufe21" THEN
+        probe = "stufe21"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -923,6 +988,7 @@ IF probe = "stufe17" THEN g_timeout_add(300, vorfuehrenStufe17, 0)
 IF probe = "stufe18" THEN g_timeout_add(300, vorfuehrenStufe18, 0)
 IF probe = "stufe19" THEN g_timeout_add(300, vorfuehrenStufe19, 0)
 IF probe = "stufe20" THEN g_timeout_add(300, vorfuehrenStufe20, 0)
+IF probe = "stufe21" THEN g_timeout_add(300, vorfuehrenStufe21, 0)
 ' Alle fuenf Minuten ein Schnappschuss, wenn etwas ungesichert ist
 DIM takt AS INTEGER : takt = g_timeout_add(300000, vwTakt, 0)
 

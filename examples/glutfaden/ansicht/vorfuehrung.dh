@@ -2386,13 +2386,114 @@ FUNCTION vorfuehrenStufe20(daten AS INTEGER) AS BOOLEAN
             ok = ablageMerken(v20Uri$("bild.PNG"))
             PRINT "bild: "; ok; " art "; abArt
             ok = ablageMerken(v20Uri$("notiz.txt"))
-            PRINT "nichts: "; ok; " | "; meldung
+            PRINT "nichts: "; ok; " | "; LEFT$(meldung, 70)
             ok = ablageMerken("https://example.com/muster.pxs")
             PRINT "keine datei: "; ok
             ok = musterSichern(v19Ort$("zwischen.pxs"))
             ok = ablageMerken(v20Uri$("mit leer.pxs"))
             ablageAusfuehren()
             PRINT "abgelegt geoeffnet: "; lwMuster.breite; "x"; lwMuster.hoehe; " | "; BASENAME(musterPfad); " | offen "; abPfad = ""
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+
+' --- Stufe 21: Erscheinungsbild, Zoom-Regler, Muster importieren, Bildformate --------
+
+DIM v21Gelesen AS STRING
+
+FUNCTION v21Werte$() AS STRING
+    DIM a AS ARRAY OF STRING : a = []
+    DIM w AS INTEGER
+    FOR EACH w IN fiWerte
+        ARRAY_PUSH(a, gtk_label_get_text(w))
+    NEXT
+    RETURN JOIN$(a, " | ")
+END FUNCTION
+
+FUNCTION v21Meldungen$() AS STRING
+    IF NOT gtk_widget_get_visible(fiRolle) THEN RETURN "(keine)"
+    RETURN REPLACE$(textSichtText$(fiMeldungen), CHR$(10), " / ")
+END FUNCTION
+
+FUNCTION v21Importieren(daten AS INTEGER) AS BOOLEAN
+    DIM ok AS BOOLEAN
+    DIM knopf AS INTEGER : knopf = gtk_dialog_get_widget_for_response(fiDialog, GTK_ANTWORT_OK)
+    PRINT "dialog: "; gtk_label_get_text(fiDatei); " | "; v21Werte$(); " | importieren "; gtk_widget_get_sensitive(knopf)
+    PRINT "  meldungen: "; LEFT$(v21Meldungen$(), 140)
+    ok = vfFoto(fiDialog, "import")
+    fiLaden(v19Ort$("kaputt.pat"))
+    PRINT "kaputt: "; v21Werte$(); " | importieren "; gtk_widget_get_sensitive(knopf); " | "; LEFT$(v21Meldungen$(), 90)
+    fiLaden(v19Ort$("probe.pat"))
+    gtk_dialog_response(fiDialog, GTK_ANTWORT_OK)
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION vorfuehrenStufe21(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    SELECT CASE schritt
+        CASE 1
+            ' Erscheinungsbild
+            PRINT "thema: "; einst.thema; " | leiste "; HEX$(uiFarbe(&H202228)); " | einstellung gemerkt '"; kern.einstellungenLaden(einst.pfad).thema; "'"
+            einst.thema = "light"
+            einstellungenAnwenden()
+            einstellungenMerken()
+            PRINT "hell: leiste "; HEX$(uiFarbe(&H202228)); " | rand "; HEX$(uiFarbe(&H3A3C44)); " | unbekannt bleibt "; HEX$(uiFarbe(&H123456)); " | gemerkt '"; kern.einstellungenLaden(einst.pfad).thema; "'"
+        CASE 2
+            ok = vfFoto(fenster, "hell")
+            einst.thema = "dark"
+            einstellungenAnwenden()
+            einstellungenMerken()
+            PRINT "dunkel: leiste "; HEX$(uiFarbe(&H202228)); " | gemerkt '"; kern.einstellungenLaden(einst.pfad).thema; "'"
+        CASE 3
+            ok = vfFoto(fenster, "dunkel")
+            ' Zoom-Regler: Bereich aus den Zellgroessen, folgt der Flaeche, zieht sie mit
+            DIM a AS INTEGER : a = gtk_range_get_adjustment(zoomRegler)
+            PRINT "zoomregler: "; gtk_adjustment_get_lower(a); " .. "; gtk_adjustment_get_upper(a); " | steht "; gtk_range_get_value(zoomRegler) = leinwandZoomProzent(); " | knopf '"; TEXT_AUS_ZEIGER$(gtk_button_get_label(zoomProzent)); "' = "; leinwandZoomProzent()
+            gtk_range_set_value(zoomRegler, 200)
+            PRINT "auf 200: flaeche "; leinwandZoomProzent(); " | knopf '"; TEXT_AUS_ZEIGER$(gtk_button_get_label(zoomProzent)); "'"
+            befehlAusfuehren("zoom_rein")
+            PRINT "zoom rein: regler folgt "; ROUND(gtk_range_get_value(zoomRegler)) = leinwandZoomProzent()
+            gtk_button_clicked(zoomProzent)
+            PRINT "klick auf die prozent: "; leinwandZoomProzent()
+            leinwandEinpassen()
+        CASE 4
+            ' Muster importieren: Datei, Angaben, Warnungen; kaputt; dann uebernehmen
+            DIM t AS INTEGER : t = g_timeout_add(400, v21Importieren, 0)
+            fremdImportDialog(v19Ort$("probe.pat"))
+            PRINT "importiert: "; lwMuster.name; " "; lwMuster.breite; "x"; lwMuster.hoehe; " | datei '"; musterPfad; "' | "; LEFT$(meldung, 60)
+            ' Bildformate: was GTKs Lader liest, kommt dazu
+            DIM e AS ARRAY OF STRING : e = bildEndungen()
+            PRINT "bildformate: eigene "; LEN(kern.bildEndungenEigen()); " | tiff (Standardlader) "; ARRAY_INDEXOF(e, "tiff") >= 0; " | svg nie "; ARRAY_INDEXOF(e, "svg") < 0
+            ' Ein TIFF, das GTK selbst schreibt, geht ueber den Umweg Punkt fuer Punkt durch
+            DIM fe AS INTEGER
+            DIM pb AS INTEGER : pb = gdk_pixbuf_new_from_file(PATHJOIN(CWD$(), LOGO), fe)
+            ok = gdk_pixbuf_savev(pb, v19Ort$("logo.tiff"), "tiff", 0, 0, fe)
+            g_object_unref(pb)
+            DIM png AS IMAGE : png = LOADIMAGE(PATHJOIN(CWD$(), LOGO))
+            PRINT "tiff geschrieben: "; ok; " | gelesen "; imDialogBauen(v19Ort$("logo.tiff"), NIL);
+            ' verglichen wird, was zu sehen ist: die Deckkraft ueberall, die Farbe
+            ' an den deckenden Punkten. Halbdurchsichtige weichen ab (bei Deckkraft 2
+            ' traegt die Farbe kaum noch Stellen) -- fuer den Import ohne Belang.
+            DIM gleich AS BOOLEAN : gleich = imBildB = IMAGE_WIDTH(png) AND imBildH = IMAGE_HEIGHT(png)
+            DIM deckend AS BOOLEAN : deckend = TRUE
+            DIM x AS INTEGER, y AS INTEGER
+            FOR y = 0 TO imBildH - 1 STEP 3
+                FOR x = 0 TO imBildB - 1 STEP 3
+                    IF GETALPHA(imBild, x, y) <> GETALPHA(png, x, y) THEN gleich = FALSE
+                    IF GETALPHA(png, x, y) = 255 AND GETPIXEL(imBild, x, y) <> GETPIXEL(png, x, y) THEN deckend = FALSE
+                NEXT
+            NEXT
+            PRINT " | "; imBildB; "x"; imBildH; " deckkraft gleich "; gleich; " | deckende punkte gleich "; deckend
+            imDialogWeg()
+            WRITEALL(v19Ort$("falsch.tiff"), "kein Bild")
+            PRINT "kein bild: "; imDialogBauen(v19Ort$("falsch.tiff"), NIL); " | "; LEFT$(meldung, 20)
+            imDialogWeg()
         CASE ELSE
             schliessenErlaubt = TRUE
             gtk_widget_destroy(fenster)

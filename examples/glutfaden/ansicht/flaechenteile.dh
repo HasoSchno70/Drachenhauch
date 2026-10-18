@@ -127,7 +127,7 @@ END FUNCTION
 FUNCTION flLinealZeichnen(w AS INTEGER, cr AS INTEGER, links AS INTEGER) AS BOOLEAN
     DIM bw AS FLOAT : bw = gtk_widget_get_allocated_width(w)
     DIM bh AS FLOAT : bh = gtk_widget_get_allocated_height(w)
-    cairoFarbe(cr, &H202228)
+    cairoFarbe(cr, uiFarbe(&H202228))
     cairo_paint(cr)
     IF NOT lwHat THEN RETURN TRUE
     DIM z AS FLOAT : z = lwZelle
@@ -179,7 +179,7 @@ FUNCTION flLinealZeichnen(w AS INTEGER, cr AS INTEGER, links AS INTEGER) AS BOOL
         ELSEIF gross THEN
             cairoFarbe(cr, FL_AKZENT)
         ELSE
-            cairoFarbe(cr, &H6A6E78)
+            cairoFarbe(cr, uiFarbe(&H6A6E78))
         END IF
         DIM strich AS FLOAT : strich = IIF(gross, 12, 6)
         IF links = 1 THEN
@@ -189,7 +189,7 @@ FUNCTION flLinealZeichnen(w AS INTEGER, cr AS INTEGER, links AS INTEGER) AS BOOL
         END IF
         cairo_stroke(cr)
         IF gross AND i MOD schritt = 0 THEN
-            IF NOT hervor THEN cairoFarbe(cr, &H9AA0AD)
+            IF NOT hervor THEN cairoFarbe(cr, uiFarbe(&H9AA0AD))
             pango_layout_set_text(layout, STR$(i), -1)
             DIM tw AS INTEGER, th AS INTEGER
             pango_layout_get_pixel_size(layout, tw, th)
@@ -203,7 +203,7 @@ FUNCTION flLinealZeichnen(w AS INTEGER, cr AS INTEGER, links AS INTEGER) AS BOOL
     NEXT
     g_object_unref(layout)
     ' Kante zur Flaeche
-    cairoFarbe(cr, &H3A3C44)
+    cairoFarbe(cr, uiFarbe(&H3A3C44))
     IF links = 1 THEN
         cairo_move_to(cr, quer - 0.5, 0) : cairo_line_to(cr, quer - 0.5, laenge)
     ELSE
@@ -271,15 +271,15 @@ SUB linealSpringen(links AS BOOLEAN, p AS INTEGER)
 END SUB
 
 FUNCTION flEckeZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
-    cairoFarbe(cr, &H202228)
+    cairoFarbe(cr, uiFarbe(&H202228))
     cairo_paint(cr)
     ' Fadenkreuz
-    cairoFarbe(cr, &H9AA0AD)
+    cairoFarbe(cr, uiFarbe(&H9AA0AD))
     cairo_set_line_width(cr, 1.0)
     cairo_arc(cr, 12.5, 12.5, 5, 0, TAU) : cairo_stroke(cr)
     cairo_move_to(cr, 12.5, 4) : cairo_line_to(cr, 12.5, 21) : cairo_stroke(cr)
     cairo_move_to(cr, 4, 12.5) : cairo_line_to(cr, 21, 12.5) : cairo_stroke(cr)
-    cairoFarbe(cr, &H3A3C44)
+    cairoFarbe(cr, uiFarbe(&H3A3C44))
     cairo_move_to(cr, FL_LINEAL - 0.5, 0) : cairo_line_to(cr, FL_LINEAL - 0.5, FL_LINEAL)
     cairo_move_to(cr, 0, FL_LINEAL - 0.5) : cairo_line_to(cr, FL_LINEAL, FL_LINEAL - 0.5)
     cairo_stroke(cr)
@@ -381,7 +381,7 @@ END FUNCTION
 FUNCTION mkZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM bw AS INTEGER : bw = gtk_widget_get_allocated_width(w)
     DIM bh AS INTEGER : bh = gtk_widget_get_allocated_height(w)
-    cairoFarbe(cr, &H16171B)
+    cairoFarbe(cr, uiFarbe(&H16171B))
     cairo_rectangle(cr, 0, 0, bw, bh)
     cairo_fill(cr)
     IF NOT lwHat THEN RETURN TRUE
@@ -392,7 +392,7 @@ FUNCTION mkZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     END IF
     cairo_set_source_surface(cr, mkBild, mkX, mkY)
     cairo_paint(cr)
-    cairoFarbe(cr, &H3A3C44)
+    cairoFarbe(cr, uiFarbe(&H3A3C44))
     cairo_set_line_width(cr, 1.0)
     cairo_rectangle(cr, mkX - 0.5, mkY - 0.5, mkB + 1, mkH + 1)
     cairo_stroke(cr)
@@ -525,7 +525,7 @@ END SUB
 FUNCTION kvZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM bw AS INTEGER : bw = gtk_widget_get_allocated_width(w)
     DIM bh AS INTEGER : bh = gtk_widget_get_allocated_height(w)
-    cairoFarbe(cr, &H16171B)
+    cairoFarbe(cr, uiFarbe(&H16171B))
     cairo_paint(cr)
     DIM pw AS INTEGER : pw = lwMuster.breite
     DIM ph AS INTEGER : ph = lwMuster.hoehe
@@ -577,7 +577,7 @@ FUNCTION kvZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     cairo_set_line_width(cr, 2.0)
     cairo_rectangle(cr, sx + mx * pw * cs - 1, sy + my * ph * cs - 1, pw * cs + 2, ph * cs + 2)
     cairo_stroke(cr)
-    cairoFarbe(cr, &H9AA0AD)
+    cairoFarbe(cr, uiFarbe(&H9AA0AD))
     DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
     pango_layout_set_font_description(layout, flSchrift)
     pango_layout_set_text(layout, STR$(pw) + "×" + STR$(ph) + " Stiche | " + STR$(tx) + "×" + STR$(ty) + " Kacheln", -1)

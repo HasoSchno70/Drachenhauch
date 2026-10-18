@@ -811,15 +811,52 @@ CONST ABLAGE_KEINE = 0
 CONST ABLAGE_MUSTER = 1               ' .pxs und die fremden Formate
 CONST ABLAGE_BILD = 2                 ' geht in den Bild-Import
 
-' Was mit einer Datei geschieht, nach ihrer Endung. Bilder nur die, die der
-' Import liest (PySticky nimmt dazu WebP und TIFF -- Glutfaden liest sie nicht).
-FUNCTION ablageArt(pfad AS STRING) AS INTEGER
+' Bildformate: was die Laufzeit selbst liest (LOADIMAGE), und was dazu
+' kommen kann, wenn GTKs Bildlader es hat (PySticky: WebP, TIFF, AVIF; dazu
+' HEIC/HEIF und JPEG XL). Ob ein Lader da ist, haengt an der Installation --
+' die GTK aus Inkscape kann TIFF und AVIF, aber kein WebP.
+FUNCTION bildEndungenEigen() AS ARRAY OF STRING
+    RETURN ["png", "jpg", "jpeg", "bmp", "gif", "tga", "qoi"]
+END FUNCTION
+
+FUNCTION bildEndungenZusatz() AS ARRAY OF STRING
+    RETURN ["webp", "tif", "tiff", "avif", "heic", "heif", "jxl"]
+END FUNCTION
+
+' Die eigenen und die zusaetzlichen, die der Bildlader kennt (system: seine
+' Endungen, klein geschrieben)
+FUNCTION bildEndungen(system AS ARRAY OF STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = bildEndungenEigen()
+    DIM e AS STRING
+    FOR EACH e IN bildEndungenZusatz()
+        IF ARRAY_INDEXOF(system, e) >= 0 THEN ARRAY_PUSH(aus, e)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+FUNCTION endung$(pfad AS STRING) AS STRING
     DIM e AS STRING : e = LOWER$(pfad)
     DIM p AS INTEGER : p = INSTRREV(e, ".")
-    IF p < 0 THEN RETURN ABLAGE_KEINE
-    e = MID$(e, p)
-    IF e = ".pxs" OR e = ".oxs" OR e = ".xsd" OR e = ".pat" THEN RETURN ABLAGE_MUSTER
-    IF e = ".png" OR e = ".jpg" OR e = ".jpeg" OR e = ".bmp" OR e = ".gif" OR e = ".tga" OR e = ".qoi" THEN RETURN ABLAGE_BILD
+    IF p < 0 THEN RETURN ""
+    RETURN MID$(e, p + 1)
+END FUNCTION
+
+' Liest die Laufzeit das Bild nicht selbst, geht es ueber GTKs Bildlader
+FUNCTION bildUeberGtk(pfad AS STRING) AS BOOLEAN
+    RETURN ARRAY_INDEXOF(bildEndungenEigen(), endung$(pfad)) < 0
+END FUNCTION
+
+' Was mit einer Datei geschieht, nach ihrer Endung -- Bilder die, die die
+' Laufzeit liest (ablageArt) bzw. dazu die aus bildEndungen (ablageArtMit).
+FUNCTION ablageArt(pfad AS STRING) AS INTEGER
+    RETURN ablageArtMit(pfad, bildEndungenEigen())
+END FUNCTION
+
+FUNCTION ablageArtMit(pfad AS STRING, bilder AS ARRAY OF STRING) AS INTEGER
+    DIM e AS STRING : e = endung$(pfad)
+    IF e = "" THEN RETURN ABLAGE_KEINE
+    IF e = "pxs" OR e = "oxs" OR e = "xsd" OR e = "pat" THEN RETURN ABLAGE_MUSTER
+    IF ARRAY_INDEXOF(bilder, e) >= 0 THEN RETURN ABLAGE_BILD
     RETURN ABLAGE_KEINE
 END FUNCTION
 
@@ -834,4 +871,56 @@ FUNCTION uriListe(text AS STRING) AS ARRAY OF STRING
         ARRAY_PUSH(aus, z)
     NEXT
     RETURN aus
+END FUNCTION
+
+' --- Fremde Muster (PySticky PatternImportDialog) ---------------------------------
+
+CLASS FremdImport
+    DIM muster AS Muster
+    DIM warnungen AS ARRAY OF STRING
+    DIM format AS STRING                ' wie PySticky: "PCStitch (PAT)" ...
+END CLASS
+
+' Der Formatname zur Endung (PySticky _PatternImportWorker), "" = keins davon
+FUNCTION fremdFormat$(pfad AS STRING) AS STRING
+    DIM e AS STRING : e = LOWER$(pfad)
+    DIM p AS INTEGER : p = INSTRREV(e, ".")
+    IF p < 0 THEN RETURN ""
+    SELECT CASE MID$(e, p)
+        CASE ".xsd" : RETURN "Pattern Maker (XSD)"
+        CASE ".pat" : RETURN "PCStitch (PAT)"
+        CASE ".oxs" : RETURN "Open Cross Stitch (OXS)"
+    END SELECT
+    RETURN ""
+END FUNCTION
+
+' Eine XSD-, PAT- oder OXS-Datei lesen; ein Fehler ist ein THROW mit der
+' Meldung des Lesers. Die Warnungen bleiben, wie der Leser sie schreibt.
+FUNCTION fremdLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY OF STRING) AS FremdImport
+    DIM f AS FremdImport : f = NEW FremdImport()
+    f.format = fremdFormat$(pfad)
+    DIM e AS STRING : e = LOWER$(pfad)
+    IF f.format = "" THEN
+        DIM p AS INTEGER : p = INSTRREV(e, ".")
+        THROW "Unbekanntes Format: " + IIF(p < 0, "(ohne Endung)", MID$(e, p))
+    END IF
+    IF RIGHT$(e, 4) = ".oxs" THEN
+        DIM o AS OxsImport : o = oxsLaden(pfad, paletten, symbole)
+        f.muster = o.muster : f.warnungen = o.warnungen
+    ELSEIF RIGHT$(e, 4) = ".pat" THEN
+        DIM pa AS PatImport : pa = patLaden(pfad, paletten, symbole)
+        f.muster = pa.muster : f.warnungen = pa.warnungen
+    ELSE
+        DIM x AS XsdImport : x = xsdLaden(pfad, paletten, symbole)
+        f.muster = x.muster : f.warnungen = x.warnungen
+    END IF
+    RETURN f
+END FUNCTION
+
+' Die Angaben des Dialogs (PySticky _update_info): Name, Groesse in Stichen
+' und Zentimetern, Farben, Stiche ueber alle Ebenen, Format.
+FUNCTION fremdInfo(f AS FremdImport) AS ARRAY OF STRING
+    DIM m AS Muster : m = f.muster
+    RETURN [m.name, STR$(m.breite) + " × " + STR$(m.hoehe) + " Stiche (" + ZAHL$(m.breiteCm(), 1) + " × " + ZAHL$(m.hoeheCm(), 1) + " cm)", _
+        STR$(m.farbanzahl()), STR$(statistikVon(m).sticheGesamt), f.format]
 END FUNCTION
