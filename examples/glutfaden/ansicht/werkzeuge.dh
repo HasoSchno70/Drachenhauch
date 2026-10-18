@@ -70,37 +70,37 @@ END FUNCTION
 
 FUNCTION wzStichartName$(t AS INTEGER) AS STRING
     SELECT CASE t
-        CASE kern.VOLL : RETURN "Voller Stich"
-        CASE kern.HALB_OL_UR : RETURN "Halbstich ╲"
-        CASE kern.HALB_OR_UL : RETURN "Halbstich ╱"
-        CASE kern.VIERTEL_OL : RETURN "Viertel oben links"
-        CASE kern.VIERTEL_OR : RETURN "Viertel oben rechts"
-        CASE kern.VIERTEL_UL : RETURN "Viertel unten links"
-        CASE kern.VIERTEL_UR : RETURN "Viertel unten rechts"
-        CASE kern.DREIVIERTEL : RETURN "Dreiviertelstich"
-        CASE kern.KNOTEN : RETURN "Französischer Knoten"
-        CASE kern.PERLE : RETURN "Perle"
+        CASE kern.VOLL : RETURN tr$("Voller Stich")
+        CASE kern.HALB_OL_UR : RETURN tr$("Halbstich ╲")
+        CASE kern.HALB_OR_UL : RETURN tr$("Halbstich ╱")
+        CASE kern.VIERTEL_OL : RETURN tr$("Viertel oben links")
+        CASE kern.VIERTEL_OR : RETURN tr$("Viertel oben rechts")
+        CASE kern.VIERTEL_UL : RETURN tr$("Viertel unten links")
+        CASE kern.VIERTEL_UR : RETURN tr$("Viertel unten rechts")
+        CASE kern.DREIVIERTEL : RETURN tr$("Dreiviertelstich")
+        CASE kern.KNOTEN : RETURN tr$("Französischer Knoten")
+        CASE kern.PERLE : RETURN tr$("Perle")
     END SELECT
-    RETURN "Stich " + STR$(t)
+    RETURN trf$("Stich {0}", [STR$(t)])
 END FUNCTION
 
 FUNCTION wzName$(nr AS INTEGER) AS STRING
     SELECT CASE nr
-        CASE WZ_STIFT : RETURN "Stift ({wz_stift})"
-        CASE WZ_RADIERER : RETURN "Radierer ({wz_radierer})"
-        CASE WZ_FUELLEN : RETURN "Füllen ({wz_fuellen})"
-        CASE WZ_PIPETTE : RETURN "Pipette ({wz_pipette})"
-        CASE WZ_LINIE : RETURN "Linie ({wz_linie}) -- Umschalt: 0/45/90 Grad"
-        CASE WZ_RECHTECK : RETURN "Rechteck ({wz_rechteck}, gefüllt {wz_rechteck_voll}) -- Umschalt beim Ziehen: Quadrat"
-        CASE WZ_ELLIPSE : RETURN "Ellipse ({wz_ellipse}, gefüllt {wz_ellipse_voll}) -- Umschalt beim Ziehen: Kreis"
-        CASE WZ_HAND : RETURN "Hand ({wz_hand}) -- Ansicht verschieben, auch mit der mittleren Maustaste"
-        CASE WZ_AUSWAHL : RETURN "Auswahl ({wz_auswahl}) -- ziehen wählt, in die Auswahl ziehen verschiebt; {kopieren}/{ausschneiden}/{einfuegen}, Entf, F füllen, R drehen, H/V spiegeln"
-        CASE WZ_LASSO : RETURN "Lasso ({wz_lasso}) -- freie Auswahl"
-        CASE WZ_VIELECK : RETURN "Vieleck ({wz_vieleck}, gefüllt {wz_vieleck_voll}) -- Klick = Ecke, rechte Taste schließt, Rücktaste nimmt die letzte"
-        CASE WZ_TEXT : RETURN "Text ({wz_text})"
-        CASE WZ_RUECKSTICH : RETURN "Rückstich ({wz_rueckstich}) -- Klick für Klick eine Linie, rechte Taste entfernt"
-        CASE WZ_FORTSCHRITT : RETURN "Fortschritt ({wz_fortschritt}) -- ziehen markiert erledigt, rechts zurück; Pfeile springen, Enter markiert"
-        CASE WZ_FARBVERLAUF : RETURN "Farbverlauf ({wz_farbverlauf}) -- eine Linie ziehen: von der Start- zur Endfarbe, dazwischen die nächsten Farben der Palette"
+        CASE WZ_STIFT : RETURN tr$("Stift ({wz_stift})")
+        CASE WZ_RADIERER : RETURN tr$("Radierer ({wz_radierer})")
+        CASE WZ_FUELLEN : RETURN tr$("Füllen ({wz_fuellen})")
+        CASE WZ_PIPETTE : RETURN tr$("Pipette ({wz_pipette})")
+        CASE WZ_LINIE : RETURN tr$("Linie ({wz_linie}) -- Umschalt: 0/45/90 Grad")
+        CASE WZ_RECHTECK : RETURN tr$("Rechteck ({wz_rechteck}, gefüllt {wz_rechteck_voll}) -- Umschalt beim Ziehen: Quadrat")
+        CASE WZ_ELLIPSE : RETURN tr$("Ellipse ({wz_ellipse}, gefüllt {wz_ellipse_voll}) -- Umschalt beim Ziehen: Kreis")
+        CASE WZ_HAND : RETURN tr$("Hand ({wz_hand}) -- Ansicht verschieben, auch mit der mittleren Maustaste")
+        CASE WZ_AUSWAHL : RETURN tr$("Auswahl ({wz_auswahl}) -- ziehen wählt, in die Auswahl ziehen verschiebt; {kopieren}/{ausschneiden}/{einfuegen}, Entf, F füllen, R drehen, H/V spiegeln")
+        CASE WZ_LASSO : RETURN tr$("Lasso ({wz_lasso}) -- freie Auswahl")
+        CASE WZ_VIELECK : RETURN tr$("Vieleck ({wz_vieleck}, gefüllt {wz_vieleck_voll}) -- Klick = Ecke, rechte Taste schließt, Rücktaste nimmt die letzte")
+        CASE WZ_TEXT : RETURN tr$("Text ({wz_text})")
+        CASE WZ_RUECKSTICH : RETURN tr$("Rückstich ({wz_rueckstich}) -- Klick für Klick eine Linie, rechte Taste entfernt")
+        CASE WZ_FORTSCHRITT : RETURN tr$("Fortschritt ({wz_fortschritt}) -- ziehen markiert erledigt, rechts zurück; Pfeile springen, Enter markiert")
+        CASE WZ_FARBVERLAUF : RETURN tr$("Farbverlauf ({wz_farbverlauf}) -- eine Linie ziehen: von der Start- zur Endfarbe, dazwischen die nächsten Farben der Palette")
     END SELECT
     RETURN ""
 END FUNCTION
@@ -200,7 +200,7 @@ SUB rasterUmschalten(an AS BOOLEAN)
         wzRasterSperre = FALSE
         gtk_widget_queue_draw(wzRasterKnopf)
     END IF
-    statusMeldung(IIF(an, "Magnetisches Raster aktiviert (alle " + STR$(einst.rasterSchritt) + " Zellen)", "Magnetisches Raster deaktiviert"))
+    statusMeldung(IIF(an, trf$("Magnetisches Raster aktiviert (alle {0} Zellen)", [STR$(einst.rasterSchritt)]), tr$("Magnetisches Raster deaktiviert")))
 END SUB
 
 FUNCTION wzAnsichtZeichnen(w AS INTEGER, cr AS INTEGER, was AS INTEGER) AS BOOLEAN
@@ -283,12 +283,12 @@ END SUB
 
 FUNCTION spiegelName$(modus AS INTEGER) AS STRING
     SELECT CASE modus
-        CASE 1 : RETURN "Spiegel ↔"
-        CASE 2 : RETURN "Spiegel ↕"
-        CASE 3 : RETURN "vierfach gespiegelt"
-        CASE 4 : RETURN "achtfach gespiegelt"
+        CASE 1 : RETURN tr$("Spiegel ↔")
+        CASE 2 : RETURN tr$("Spiegel ↕")
+        CASE 3 : RETURN tr$("vierfach gespiegelt")
+        CASE 4 : RETURN tr$("achtfach gespiegelt")
     END SELECT
-    RETURN "ohne Spiegel"
+    RETURN tr$("ohne Spiegel")
 END FUNCTION
 
 SUB wzSpiegelGeaendert(wahl AS INTEGER, daten AS INTEGER)
@@ -345,7 +345,7 @@ FUNCTION wzDruck(x AS INTEGER, y AS INTEGER, taste AS INTEGER, umschalt AS BOOLE
         ' rechts radiert auch hier, ausser dort, wo die rechte Taste etwas tut
         IF taste = 3 AND (wzAktiv = WZ_AUSWAHL OR wzAktiv = WZ_LASSO OR wzAktiv = WZ_TEXT) AND NOT mrEinfuegen THEN
             wzZug = ZUG_RADIEREN
-            wzVerlauf.beginnen("Radieren")
+            wzVerlauf.beginnen(tr$("Radieren"))
             wzStrich(x, y, x, y, -1)
             RETURN wzZug
         END IF
@@ -354,7 +354,7 @@ FUNCTION wzDruck(x AS INTEGER, y AS INTEGER, taste AS INTEGER, umschalt AS BOOLE
     END IF
     IF taste = 3 THEN
         wzZug = ZUG_RADIEREN
-        wzVerlauf.beginnen("Radieren")
+        wzVerlauf.beginnen(tr$("Radieren"))
         wzStrich(x, y, x, y, -1)
         RETURN wzZug
     END IF
@@ -365,22 +365,22 @@ FUNCTION wzDruck(x AS INTEGER, y AS INTEGER, taste AS INTEGER, umschalt AS BOOLE
         CASE WZ_STIFT, WZ_RADIERER
             IF wzAktiv = WZ_STIFT AND NOT wzFarbeDa() THEN RETURN ZUG_KEINER
             wzZug = ZUG_WERKZEUG
-            wzVerlauf.beginnen(IIF(wzAktiv = WZ_STIFT, "Stift", "Radierer"))
+            wzVerlauf.beginnen(IIF(wzAktiv = WZ_STIFT, tr$("Stift"), tr$("Radierer")))
             wzStrich(x, y, x, y, IIF(wzAktiv = WZ_STIFT, wzFarbe, -1))
         CASE WZ_FUELLEN
             IF NOT wzFarbeDa() THEN RETURN ZUG_KEINER
             DIM e AS kern.Ebene : e = lwMuster.ebenen.aktiveEbene()
             IF e.gesperrt THEN
-                statusMeldung("Die Ebene „" + e.name + "“ ist gesperrt.")
+                statusMeldung(trf$("Die Ebene „{0}“ ist gesperrt.", [e.name]))
                 RETURN ZUG_KEINER
             END IF
-            wzAnwenden(wzFuellung(e, x, y), wzFarbe, "Füllen")
+            wzAnwenden(wzFuellung(e, x, y), wzFarbe, tr$("Füllen"))
         CASE WZ_PIPETTE
             DIM c AS INTEGER : c = lwMuster.stich(x, y)
             IF c >= 0 THEN
                 farbeWaehlen(c)
                 ' Einstellungen -> Werkzeuge -> Pipette
-                IF einst.pipetteInfo THEN statusMeldung("Farbe aufgenommen: " + lwMuster.farben[c].garn.name + " (" + lwMuster.farben[c].symbol + ")")
+                IF einst.pipetteInfo THEN statusMeldung(trf$("Farbe aufgenommen: {0} ({1})", [lwMuster.farben[c].garn.name, lwMuster.farben[c].symbol]))
                 IF einst.pipetteDanach = 0 THEN werkzeugWaehlen(WZ_STIFT, FALSE)
                 IF einst.pipetteDanach = 2 THEN werkzeugWaehlen(WZ_AUSWAHL, FALSE)
             END IF
@@ -392,7 +392,7 @@ FUNCTION wzDruck(x AS INTEGER, y AS INTEGER, taste AS INTEGER, umschalt AS BOOLE
             ' wie im Original: nur im Muster beginnen, das Ende wird hineingezogen
             IF x < 0 OR y < 0 OR x >= lwMuster.breite OR y >= lwMuster.hoehe THEN RETURN ZUG_KEINER
             IF lwMuster.farbanzahl() = 0 THEN
-                statusMeldung("Erst Farben ins Muster holen -- der Verlauf nimmt sie aus der Palette.")
+                statusMeldung(tr$("Erst Farben ins Muster holen -- der Verlauf nimmt sie aus der Palette."))
                 RETURN ZUG_KEINER
             END IF
             wzZug = ZUG_WERKZEUG
@@ -445,9 +445,9 @@ SUB wzLos(x AS INTEGER, y AS INTEGER, umschalt AS BOOLEAN)
                 END IF
                 DIM text AS STRING
                 SELECT CASE wzAktiv
-                    CASE WZ_LINIE : text = "Linie"
-                    CASE WZ_RECHTECK : text = "Rechteck"
-                    CASE ELSE : text = "Ellipse"
+                    CASE WZ_LINIE : text = tr$("Linie")
+                    CASE WZ_RECHTECK : text = tr$("Rechteck")
+                    CASE ELSE : text = tr$("Ellipse")
                 END SELECT
                 wzAnwenden(p, wzFarbe, text)
                 gtk_widget_queue_draw(lwFlaeche)
@@ -502,7 +502,7 @@ SUB wzStrich(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, farbe A
     ELSEIF NOT lwMuster.ebenen.aktiveEbene().gesperrt THEN
         RETURN
     ELSE
-        statusMeldung("Die Ebene „" + lwMuster.ebenen.aktiveEbene().name + "“ ist gesperrt.")
+        statusMeldung(trf$("Die Ebene „{0}“ ist gesperrt.", [lwMuster.ebenen.aktiveEbene().name]))
     END IF
 END SUB
 
@@ -515,11 +515,11 @@ END SUB
 ' Spiegelbild in der Farbe seines Punkts, wie _apply_changes_with_mirror)
 SUB wzVerlaufAnwenden(p AS ARRAY OF INTEGER, f AS ARRAY OF INTEGER)
     IF LEN(p) = 0 THEN
-        statusMeldung("Start- oder Endfarbe fehlt -- in der Leiste wählen.")
+        statusMeldung(tr$("Start- oder Endfarbe fehlt -- in der Leiste wählen."))
         RETURN
     END IF
     IF lwMuster.ebenen.aktiveEbene().gesperrt THEN
-        statusMeldung("Die Ebene „" + lwMuster.ebenen.aktiveEbene().name + "“ ist gesperrt.")
+        statusMeldung(trf$("Die Ebene „{0}“ ist gesperrt.", [lwMuster.ebenen.aktiveEbene().name]))
         RETURN
     END IF
     DIM pp AS ARRAY OF INTEGER : pp = []
@@ -534,7 +534,7 @@ SUB wzVerlaufAnwenden(p AS ARRAY OF INTEGER, f AS ARRAY OF INTEGER)
             ARRAY_PUSH(aa, wzStichart)
         NEXT
     NEXT
-    DIM n AS INTEGER : n = kern.zellenSetzenJe(lwMuster, wzVerlauf, pp, ff, aa, "Farbverlauf")
+    DIM n AS INTEGER : n = kern.zellenSetzenJe(lwMuster, wzVerlauf, pp, ff, aa, tr$("Farbverlauf"))
     IF n > 0 THEN leinwandZellen(pp)
     nachAenderung()
 END SUB
@@ -542,7 +542,7 @@ END SUB
 SUB wzAnwendenOhneSpiegel(p AS ARRAY OF INTEGER, farbe AS INTEGER, text AS STRING)
     IF LEN(p) = 0 THEN RETURN
     IF lwMuster.ebenen.aktiveEbene().gesperrt THEN
-        statusMeldung("Die Ebene „" + lwMuster.ebenen.aktiveEbene().name + "“ ist gesperrt.")
+        statusMeldung(trf$("Die Ebene „{0}“ ist gesperrt.", [lwMuster.ebenen.aktiveEbene().name]))
         RETURN
     END IF
     DIM n AS INTEGER : n = kern.zellenSetzen(lwMuster, wzVerlauf, p, farbe, wzStichart, text)
@@ -574,7 +574,7 @@ END SUB
 
 FUNCTION wzFarbeDa() AS BOOLEAN
     IF wzFarbe >= 0 AND wzFarbe < lwMuster.farbanzahl() THEN RETURN TRUE
-    statusMeldung("Erst eine Farbe wählen -- rechts in der Liste oder aus dem Katalog.")
+    statusMeldung(tr$("Erst eine Farbe wählen -- rechts in der Liste oder aus dem Katalog."))
     RETURN FALSE
 END FUNCTION
 
@@ -622,7 +622,7 @@ SUB werkzeugZurueck()
     IF wzVerlauf.zurueckNehmen(lwMuster) THEN
         wzKennungenWiederfinden(kennung)
         allesNeu()
-        statusMeldung("Zurückgenommen: " + text)
+        statusMeldung(trf$("Zurückgenommen: {0}", [text]))
     END IF
 END SUB
 
@@ -633,7 +633,7 @@ SUB werkzeugVor()
     IF wzVerlauf.wiederholen(lwMuster) THEN
         wzKennungenWiederfinden(kennung)
         allesNeu()
-        statusMeldung("Wiederholt: " + text)
+        statusMeldung(trf$("Wiederholt: {0}", [text]))
     END IF
 END SUB
 
@@ -670,12 +670,12 @@ FUNCTION werkzeugleisteNeu() AS INTEGER
     wzFarbeLeiste = gtk_drawing_area_new()
     gtk_widget_set_size_request(wzFarbeLeiste, 26, 26)
     gtk_widget_set_valign(wzFarbeLeiste, GTK_AUSRICHTEN_MITTE)
-    gtk_widget_set_tooltip_text(wzFarbeLeiste, "Aktuelle Farbe")
+    gtk_widget_set_tooltip_text(wzFarbeLeiste, tr$("Aktuelle Farbe"))
     signalZeichnen(wzFarbeLeiste, "draw", wzFarbeZeichnen, 0, 0, 0)
     gtk_box_pack_start(box, wzFarbeLeiste, FALSE, FALSE, 4)
     wzStichWahl = gtk_combo_box_text_new()
     gtk_widget_set_can_focus(wzStichWahl, FALSE)
-    gtk_widget_set_tooltip_text(wzStichWahl, "Stichart (Alt+1 … Alt+0)")
+    gtk_widget_set_tooltip_text(wzStichWahl, tr$("Stichart (Alt+1 … Alt+0)"))
     DIM t AS INTEGER
     FOR EACH t IN wzSticharten()
         gtk_combo_box_text_append_text(wzStichWahl, wzStichartName$(t))
@@ -685,9 +685,9 @@ FUNCTION werkzeugleisteNeu() AS INTEGER
     gtk_box_pack_start(box, wzStichWahl, FALSE, FALSE, 0)
     wzSpiegelWahl = gtk_combo_box_text_new()
     gtk_widget_set_can_focus(wzSpiegelWahl, FALSE)
-    gtk_widget_set_tooltip_text(wzSpiegelWahl, "Symmetrie: Striche, Formen und Rückstiche gespiegelt (Achtfach nur bei quadratischen Mustern)")
+    gtk_widget_set_tooltip_text(wzSpiegelWahl, tr$("Symmetrie: Striche, Formen und Rückstiche gespiegelt (Achtfach nur bei quadratischen Mustern)"))
     DIM sn AS STRING
-    FOR EACH sn IN ["Ohne Spiegel", "Spiegel ↔", "Spiegel ↕", "Vierfach", "Achtfach"]
+    FOR EACH sn IN [tr$("Ohne Spiegel"), tr$("Spiegel ↔"), tr$("Spiegel ↕"), tr$("Vierfach"), tr$("Achtfach")]
         gtk_combo_box_text_append_text(wzSpiegelWahl, sn)
     NEXT
     gtk_combo_box_set_active(wzSpiegelWahl, 0)
@@ -700,7 +700,7 @@ FUNCTION werkzeugleisteNeu() AS INTEGER
     gtk_widget_set_size_request(rbild, 20, 20)
     signalZeichnen(rbild, "draw", wzRasterZeichnen, 0, 0, 0)
     gtk_container_add(wzRasterKnopf, rbild)
-    tipp(wzRasterKnopf, "Magnetisches Raster: Linie, Rechteck, Ellipse und Vieleck rasten alle paar Stiche ein ({einrasten})")
+    tipp(wzRasterKnopf, tr$("Magnetisches Raster: Linie, Rechteck, Ellipse und Vieleck rasten alle paar Stiche ein ({einrasten})"))
     gtk_toggle_button_set_active(wzRasterKnopf, einst.einrasten)
     signal(wzRasterKnopf, "toggled", wzRasterGeklickt, 0, 0, 0)
     gtk_box_pack_start(box, wzRasterKnopf, FALSE, FALSE, 0)

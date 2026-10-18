@@ -44,7 +44,7 @@ FUNCTION ablageMerken(text AS STRING) AS BOOLEAN
             RETURN TRUE
         END IF
     NEXT
-    statusMeldung("Abgelegt: nichts, was Glutfaden öffnen kann (Muster .pxs/.oxs/.xsd/.pat oder ein Bild: " + JOIN$(bildEndungen(), ", ") + ").")
+    statusMeldung(trf$("Abgelegt: nichts, was Glutfaden öffnen kann (Muster .pxs/.oxs/.xsd/.pat oder ein Bild: {0}).", [JOIN$(bildEndungen(), ", ")]))
     RETURN FALSE
 END FUNCTION
 
@@ -60,7 +60,7 @@ SUB ablageAusfuehren()
     DIM p AS STRING : p = abPfad
     abPfad = ""
     IF abArt = kern.ABLAGE_MUSTER THEN
-        IF NOT ungesichertFragen("Öffnen") THEN RETURN
+        IF NOT ungesichertFragen(tr$("Öffnen")) THEN RETURN
         DIM ok AS BOOLEAN : ok = musterOeffnen(p)
     ELSEIF abArt = kern.ABLAGE_BILD THEN
         bildImportierenVon(p)
@@ -70,22 +70,22 @@ END SUB
 ' --- Tastenkuerzel (F1) -----------------------------------------------------------
 
 SUB kuerzelUebersicht()
-    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Tastenkürzel", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Schließen", GTK_ANTWORT_ABBRECHEN, 0)
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons(tr$("Tastenkürzel"), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Schließen"), GTK_ANTWORT_ABBRECHEN, 0)
     gtk_window_set_default_size(d, 520, 620)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
     DIM s AS INTEGER : s = adSeite()
     gtk_box_pack_start(innen, s, TRUE, TRUE, 0)
     DIM breiten AS ARRAY OF INTEGER : breiten = [0, 190]
-    DIM liste AS INTEGER : liste = adTabelle(s, ["Aktion", "Tastenkürzel"], breiten, "ll")
+    DIM liste AS INTEGER : liste = adTabelle(s, [tr$("Aktion"), tr$("Tastenkürzel")], breiten, "ll")
     DIM zeile AS STRING
     FOR EACH zeile IN kern.kuerzelListe(einst)
         DIM teile AS ARRAY OF STRING : teile = SPLIT$(zeile, CHR$(9))
         DIM k AS STRING : k = teile[1]
-        IF k = "" THEN k = "<span alpha='45%'>—</span>" ELSE k = kern.htmlKodiere$(k)
+        IF k = "" THEN k = tr$("<span alpha='45%'>—</span>") ELSE k = kern.htmlKodiere$(k)
         DIM r AS INTEGER : r = adZeile(liste, [kern.htmlKodiere$(teile[0]), k], breiten, "ll")
     NEXT
-    DIM hinweis AS INTEGER : hinweis = gtk_label_new("Umlegen unter Einstellungen → Tastenkürzel.")
+    DIM hinweis AS INTEGER : hinweis = gtk_label_new(tr$("Umlegen unter Einstellungen → Tastenkürzel."))
     gtkKlasse(hinweis, "nebensache")
     gtk_label_set_xalign(hinweis, 0.0)
     gtk_box_pack_start(s, hinweis, FALSE, FALSE, 0)

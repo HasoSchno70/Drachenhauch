@@ -209,23 +209,22 @@ SUB statusNachziehen()
     IF status = 0 THEN RETURN          ' die Werkzeugleiste ruft schon beim Aufbau
     IF NOT lwHat THEN
         ' ohne Muster: nur eine Meldung, solange sie gilt
-        IF meldung <> "" AND MILLIS() - meldungZeit < einst.meldungSekunden * 1000 THEN gtk_label_set_text(status, meldung) ELSE gtk_label_set_text(status, "Kein Muster geladen")
+        IF meldung <> "" AND MILLIS() - meldungZeit < einst.meldungSekunden * 1000 THEN gtk_label_set_text(status, meldung) ELSE gtk_label_set_text(status, tr$("Kein Muster geladen"))
         RETURN
     END IF
     DIM t AS STRING
     IF meldung <> "" AND MILLIS() - meldungZeit < einst.meldungSekunden * 1000 THEN t = meldung + "   ·   "
     t = t + wzKurzname$(wzAktiv) + ", " + wzStichartName$(wzStichart)
     IF wzSpiegel > 0 THEN t = t + ", " + spiegelName$(wzSpiegel)
-    IF NOT (mrAuswahl IS NIL) THEN t = t + ", Auswahl " + STR$(mrAuswahl.anzahl)
+    IF NOT (mrAuswahl IS NIL) THEN t = trf$("{0}, Auswahl {1}", [t, STR$(mrAuswahl.anzahl)])
     IF wzFarbe >= 0 AND wzFarbe < lwMuster.farbanzahl() THEN
         DIM gf AS kern.Garn : gf = lwMuster.farben[wzFarbe].garn
         t = t + ", " + TRIM$(gf.hersteller + " " + gf.nummer)
     END IF
-    t = t + " auf „" + lwMuster.ebenen.aktiveEbene().name + "“   ·   "
-    t = t + STR$(lwMuster.breite) + " × " + STR$(lwMuster.hoehe) + " Stiche, " + _
-        ZAHL$(lwMuster.breiteCm(), 1) + " × " + ZAHL$(lwMuster.hoeheCm(), 1) + " cm auf " + ZAHL$(lwMuster.stoff, 0) + "er Stoff"
+    t = trf$("{0} auf „{1}“   ·   ", [t, lwMuster.ebenen.aktiveEbene().name])
+    t = trf$("{0}{1} × {2} Stiche, {3} × {4} cm auf {5}er Stoff", [t, STR$(lwMuster.breite), STR$(lwMuster.hoehe), ZAHL$(lwMuster.breiteCm(), 1), ZAHL$(lwMuster.hoeheCm(), 1), ZAHL$(lwMuster.stoff, 0)])
     IF lwMausX >= 0 THEN
-        t = t + "   ·   Stich " + STR$(lwMausX + 1) + ", " + STR$(lwMausY + 1)
+        t = trf$("{0}   ·   Stich {1}, {2}", [t, STR$(lwMausX + 1), STR$(lwMausY + 1)])
         DIM c AS INTEGER : c = lwFarbe[lwMausY * lwMuster.breite + lwMausX]
         IF einst.pipetteInfo AND c >= 0 AND c < lwMuster.farbanzahl() THEN
             DIM g AS kern.Garn : g = lwMuster.farben[c].garn
@@ -239,7 +238,7 @@ FUNCTION wzKurzname$(nr AS INTEGER) AS STRING
     DIM n AS STRING : n = wzName$(nr)
     DIM p AS INTEGER : p = INSTR(n, " (")
     IF p >= 0 THEN n = LEFT$(n, p)
-    IF wzKannGefuellt(nr) AND wzGefuellt THEN n = n + " gefüllt"
+    IF wzKannGefuellt(nr) AND wzGefuellt THEN n = trf$("{0} gefüllt", [n])
     RETURN n
 END FUNCTION
 
@@ -258,11 +257,11 @@ END FUNCTION
 SUB zustandNachziehen()
     IF kopf = 0 OR NOT lwHat THEN RETURN
     gtk_header_bar_set_title(kopf, musterTitel + IIF(istGeaendert(), " •", ""))
-    gtk_header_bar_set_subtitle(kopf, BASENAME(musterPfad) + "  ·  " + STR$(lwMuster.farbanzahl()) + " Farben  ·  " + ZAHL$(lwMuster.sticheGesamt(), 0) + " Stiche")
+    gtk_header_bar_set_subtitle(kopf, trf$("{0}  ·  {1} Farben  ·  {2} Stiche", [BASENAME(musterPfad), STR$(lwMuster.farbanzahl()), ZAHL$(lwMuster.sticheGesamt(), 0)]))
     gtk_widget_set_sensitive(kZurueck, wzVerlauf.kannZurueck())
     gtk_widget_set_sensitive(kVor, wzVerlauf.kannVor())
-    gtk_widget_set_tooltip_text(kZurueck, IIF(wzVerlauf.kannZurueck(), "Rückgängig: " + wzVerlauf.textZurueck$() + kuerzelHinweis$("zurueck"), "Nichts zurückzunehmen"))
-    gtk_widget_set_tooltip_text(kVor, IIF(wzVerlauf.kannVor(), "Wiederholen: " + wzVerlauf.textVor$() + kuerzelHinweis$("vor"), "Nichts zu wiederholen"))
+    gtk_widget_set_tooltip_text(kZurueck, IIF(wzVerlauf.kannZurueck(), trf$("Rückgängig: {0}{1}", [wzVerlauf.textZurueck$(), kuerzelHinweis$("zurueck")]), tr$("Nichts zurückzunehmen")))
+    gtk_widget_set_tooltip_text(kVor, IIF(wzVerlauf.kannVor(), trf$("Wiederholen: {0}{1}", [wzVerlauf.textVor$(), kuerzelHinweis$("vor")]), tr$("Nichts zu wiederholen")))
 END SUB
 
 SUB extraAenderung()
@@ -291,7 +290,7 @@ END SUB
 ' Ein Text vom Benutzer; "" bei Abbrechen.
 FUNCTION textFragen(titel AS STRING, frage AS STRING, vorgabe AS STRING) AS STRING
     DIM d AS INTEGER : d = gtk_dialog_new_with_buttons(titel, fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "OK", GTK_ANTWORT_OK, 0)
+        tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, "OK", GTK_ANTWORT_OK, 0)
     gtk_dialog_set_default_response(d, GTK_ANTWORT_OK)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
     gtk_container_set_border_width(innen, 12)
@@ -351,9 +350,9 @@ END SUB
 ' Die Statuszeile nach einem fremden Format
 FUNCTION fremdHinweis$(fi AS kern.FremdImport) AS STRING
     DIM kurz AS STRING : kurz = "OXS"
-    IF LEFT$(fi.format, 8) = "PCStitch" THEN kurz = "PCStitch"
-    IF LEFT$(fi.format, 7) = "Pattern" THEN kurz = "Pattern Maker"
-    DIM h AS STRING : h = "Aus " + kurz + " eingelesen -- Sichern legt eine .pxs an."
+    IF LEFT$(fi.format, 8) = "PCStitch" THEN kurz = tr$("PCStitch")
+    IF LEFT$(fi.format, 7) = "Pattern" THEN kurz = tr$("Pattern Maker")
+    DIM h AS STRING : h = trf$("Aus {0} eingelesen -- Sichern legt eine .pxs an.", [kurz])
     IF LEN(fi.warnungen) > 0 THEN h = h + " " + JOIN$(fi.warnungen, " ")
     RETURN h
 END FUNCTION
@@ -373,7 +372,7 @@ FUNCTION musterOeffnen(pfad AS STRING) AS BOOLEAN
             m = kern.pxsLaden(pfad)
         END IF
     CATCH e
-        statusMeldung("Nicht geöffnet: " + e)
+        statusMeldung(trf$("Nicht geöffnet: {0}", [e]))
         RETURN FALSE
     END TRY
     musterZeigen(m, IIF(fremd, "", pfad), IIF(m.name <> "", m.name, BASENAME(pfad)))
@@ -395,14 +394,14 @@ FUNCTION musterSichern(pfad AS STRING) AS BOOLEAN
         IF einst.sicherungskopie AND FILEEXISTS(pfad) THEN COPYFILE(pfad, pfad + ".bak")
         kern.pxsSpeichern(lwMuster, pfad)
     CATCH e
-        statusMeldung("Nicht gesichert: " + e)
+        statusMeldung(trf$("Nicht gesichert: {0}", [e]))
         RETURN FALSE
     END TRY
     musterPfad = pfad
     wzVerlauf.alsGesichert()
     extraGeaendert = FALSE
     zustandNachziehen()
-    statusMeldung("Gesichert: " + BASENAME(pfad))
+    statusMeldung(trf$("Gesichert: {0}", [BASENAME(pfad)]))
     IF schonDa THEN vwSchnappschussWennFaellig()
     autosicherungWeg(pfad)
     zuletztMerken(pfad)
@@ -413,8 +412,8 @@ END FUNCTION
 FUNCTION dateiWaehlen(sichern AS BOOLEAN) AS STRING
     DIM d AS INTEGER
     IF sichern THEN
-        d = gtk_file_chooser_dialog_new("Muster sichern unter", fenster, GTK_DATEI_SICHERN, _
-            "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Sichern", GTK_ANTWORT_ANNEHMEN, 0)
+        d = gtk_file_chooser_dialog_new(tr$("Muster sichern unter"), fenster, GTK_DATEI_SICHERN, _
+            tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Sichern"), GTK_ANTWORT_ANNEHMEN, 0)
         gtk_file_chooser_set_do_overwrite_confirmation(d, einst.ueberschreibenFragen)
         DIM ok AS BOOLEAN
         IF musterPfad = "" THEN
@@ -430,13 +429,13 @@ FUNCTION dateiWaehlen(sichern AS BOOLEAN) AS STRING
             ok = gtk_file_chooser_set_current_folder(d, DIRNAME(musterPfad))
         END IF
     ELSE
-        d = gtk_file_chooser_dialog_new("Muster öffnen", fenster, GTK_DATEI_OEFFNEN, _
-            "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Öffnen", GTK_ANTWORT_ANNEHMEN, 0)
+        d = gtk_file_chooser_dialog_new(tr$("Muster öffnen"), fenster, GTK_DATEI_OEFFNEN, _
+            tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN, tr$("Öffnen"), GTK_ANTWORT_ANNEHMEN, 0)
         DIM ok2 AS BOOLEAN
         IF einstOrdner$() <> "" THEN ok2 = gtk_file_chooser_set_current_folder(d, einstOrdner$())
     END IF
     DIM filter AS INTEGER : filter = gtk_file_filter_new()
-    gtk_file_filter_set_name(filter, IIF(sichern, "Kreuzstich-Muster (*.pxs)", "Kreuzstich-Muster (*.pxs, *.oxs, *.pat, *.xsd)"))
+    gtk_file_filter_set_name(filter, IIF(sichern, tr$("Kreuzstich-Muster (*.pxs)"), tr$("Kreuzstich-Muster (*.pxs, *.oxs, *.pat, *.xsd)")))
     gtk_file_filter_add_pattern(filter, "*.pxs")
     IF NOT sichern THEN
         gtk_file_filter_add_pattern(filter, "*.oxs")
@@ -459,12 +458,12 @@ END FUNCTION
 FUNCTION ungesichertFragen(was AS STRING) AS BOOLEAN
     IF NOT istGeaendert() THEN RETURN TRUE
     DIM d AS INTEGER : d = gtk_message_dialog_new(fenster, GTK_DIALOG_MODAL, GTK_NACHRICHT_FRAGE, GTK_KNOEPFE_KEINE, _
-        "%s", "„" + musterTitel + "“ hat ungesicherte Änderungen.")
-    gtk_message_dialog_format_secondary_text(d, "%s", "Vor dem " + was + " sichern?")
+        "%s", trf$("„{0}“ hat ungesicherte Änderungen.", [musterTitel]))
+    gtk_message_dialog_format_secondary_text(d, "%s", trf$("Vor dem {0} sichern?", [was]))
     DIM k AS INTEGER
-    k = gtk_dialog_add_button(d, "Verwerfen", 2)
-    k = gtk_dialog_add_button(d, "Abbrechen", GTK_ANTWORT_ABBRECHEN)
-    k = gtk_dialog_add_button(d, "Sichern", 1)
+    k = gtk_dialog_add_button(d, tr$("Verwerfen"), 2)
+    k = gtk_dialog_add_button(d, tr$("Abbrechen"), GTK_ANTWORT_ABBRECHEN)
+    k = gtk_dialog_add_button(d, tr$("Sichern"), 1)
     gtk_dialog_set_default_response(d, 1)
     DIM a AS INTEGER : a = gtk_dialog_run(d)
     gtk_widget_destroy(d)
@@ -473,7 +472,7 @@ FUNCTION ungesichertFragen(was AS STRING) AS BOOLEAN
 END FUNCTION
 
 SUB oeffnenGeklickt(knopf AS INTEGER, daten AS INTEGER)
-    IF NOT ungesichertFragen("Öffnen") THEN RETURN
+    IF NOT ungesichertFragen(tr$("Öffnen")) THEN RETURN
     DIM pfad AS STRING : pfad = dateiWaehlen(FALSE)
     IF pfad <> "" THEN
         DIM ok AS BOOLEAN : ok = musterOeffnen(pfad)
@@ -506,7 +505,7 @@ SUB modusUmschalten()
     extraGeaendert = TRUE
     allesNeu()
     modusKnopfNachziehen()
-    statusMeldung(IIF(ziel = "diamond", "Diamond Painting -- die Farben sind jetzt Drills der Palette DMC Diamond Painting (" + kz$("modus") + " zurück).", "Kreuzstich -- die Garne von vorher sind zurück (" + kz$("modus") + ": wieder Diamond Painting)."))
+    statusMeldung(IIF(ziel = "diamond", trf$("Diamond Painting -- die Farben sind jetzt Drills der Palette DMC Diamond Painting ({0} zurück).", [kz$("modus")]), trf$("Kreuzstich -- die Garne von vorher sind zurück ({0}: wieder Diamond Painting).", [kz$("modus")])))
 END SUB
 
 SUB modusGeklickt(knopf AS INTEGER, daten AS INTEGER) : modusUmschalten() : END SUB
@@ -515,7 +514,7 @@ SUB modusKnopfNachziehen()
     IF kModus = 0 THEN RETURN
     DIM dp AS BOOLEAN : dp = lwHat
     IF dp THEN dp = lwMuster.modus = "diamond"
-    gtk_button_set_label(kModus, IIF(dp, "◆ Diamond", "✕ Kreuzstich"))
+    gtk_button_set_label(kModus, IIF(dp, tr$("◆ Diamond"), tr$("✕ Kreuzstich")))
 END SUB
 
 SUB sichernUnter()
@@ -545,19 +544,19 @@ FUNCTION schliessenAngefragt(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER
     ' Einstellungen -> Allgemein -> "Vor Beenden bestätigen" (nur, wenn nicht
     ' ohnehin nach Ungesichertem gefragt wird)
     IF einst.beendenFragen AND NOT istGeaendert() THEN
-        IF NOT pdFrage(fenster, "Beenden", "Glutfaden beenden?") THEN RETURN TRUE
+        IF NOT pdFrage(fenster, tr$("Beenden"), tr$("Glutfaden beenden?")) THEN RETURN TRUE
     END IF
     fensterMessen()
     stickzeitBeenden(FALSE)
-    RETURN NOT ungesichertFragen("Schließen")
+    RETURN NOT ungesichertFragen(tr$("Schließen"))
 END FUNCTION
 
 ' Der Logo-Knopf: ein kleines Menue mit Ueber, Neuigkeiten und Tastenkuerzeln
 SUB ueberGeklickt(knopf AS INTEGER, daten AS INTEGER)
     DIM m AS INTEGER : m = gtk_menu_new()
-    ueberPunkt(m, "Über Glutfaden …", 0)
-    ueberPunkt(m, "Neu in Glutfaden …", 1)
-    ueberPunkt(m, "Tastenkürzel (" + kz$("tastenkuerzel") + ") …", 2)
+    ueberPunkt(m, tr$("Über Glutfaden …"), 0)
+    ueberPunkt(m, tr$("Neu in Glutfaden …"), 1)
+    ueberPunkt(m, trf$("Tastenkürzel ({0}) …", [kz$("tastenkuerzel")]), 2)
     gtk_widget_show_all(m)
     gtk_menu_popup_at_widget(m, knopf, GDK_SCHWERE_UNTEN_LINKS, GDK_SCHWERE_OBEN_LINKS, 0)
 END SUB
@@ -580,9 +579,9 @@ SUB ueberZeigen()
     DIM f AS INTEGER
     DIM bild AS INTEGER : bild = gdk_pixbuf_new_from_file_at_size(PATHJOIN(CWD$(), LOGO), 128, 128, f)
     IF bild = 0 THEN g_error_free(f)
-    gtk_show_about_dialog(fenster, "program-name", "Glutfaden", "logo", bild, "version", "Stufe 23", _
-        "comments", "Kreuzstich-Muster ansehen und bearbeiten -- eine Portierung von PySticky nach Drachenhauch und GTK 3.", _
-        "website", "https://github.com/HasoSchno70/Pysticky", "website-label", "PySticky (das Original)", 0)
+    gtk_show_about_dialog(fenster, "program-name", tr$("Glutfaden"), "logo", bild, "version", tr$("Stufe 23"), _
+        "comments", tr$("Kreuzstich-Muster ansehen und bearbeiten -- eine Portierung von PySticky nach Drachenhauch und GTK 3."), _
+        "website", "https://github.com/HasoSchno70/Pysticky", "website-label", tr$("PySticky (das Original)"), 0)
 END SUB
 
 ' Ein Befehl aus der Kuerzel-Tafel (kern/einstellungen.dh kuerzelAktionen) --
@@ -593,7 +592,7 @@ SUB befehlAusfuehren(kennung AS STRING)
     ok = slNotizUebernehmen()
     ' Ohne Muster (Willkommensseite) nur, was keins braucht
     IF NOT lwHat AND NOT ohneMusterErlaubt(kennung) THEN
-        statusMeldung("Erst ein Muster öffnen oder anlegen.")
+        statusMeldung(tr$("Erst ein Muster öffnen oder anlegen."))
         RETURN
     END IF
     SELECT CASE kennung
@@ -792,27 +791,27 @@ END SUB
 
 fenster = gtk_window_new(0)
 fensterGroesseSetzen()
-gtk_window_set_title(fenster, "Glutfaden")
+gtk_window_set_title(fenster, tr$("Glutfaden"))
 gtkKlasse(fenster, "flaeche")
 DIM symFehler AS INTEGER
 IF NOT gtk_window_set_icon_from_file(fenster, PATHJOIN(CWD$(), LOGO), symFehler) THEN PRINT "Logo: "; gtkFehler$(symFehler)
 kopf = gtk_header_bar_new()
-gtk_header_bar_set_title(kopf, "Glutfaden")
+gtk_header_bar_set_title(kopf, tr$("Glutfaden"))
 gtk_header_bar_set_show_close_button(kopf, TRUE)
 gtk_window_set_titlebar(fenster, kopf)
 DIM kUeber AS INTEGER : kUeber = gtk_button_new()
 gtk_container_add(kUeber, gtk_image_new_from_file(PATHJOIN(CWD$(), LOGO_KLEIN)))
-gtk_widget_set_tooltip_text(kUeber, "Über Glutfaden")
+gtk_widget_set_tooltip_text(kUeber, tr$("Über Glutfaden"))
 gtk_widget_set_can_focus(kUeber, FALSE)
 gtk_header_bar_pack_start(kopf, kUeber)
-DIM kOeffnen AS INTEGER : kOeffnen = knopf("document-open-symbolic", "Muster öffnen ({oeffnen})")
-DIM kImport AS INTEGER : kImport = knopf("insert-image-symbolic", "Bild importieren ({import}) -- erneut aus dem Quellbild: {import_neu}")
-kSichern = knopf("document-save-symbolic", "Sichern ({sichern}) -- Sichern unter: {sichern_unter}")
-DIM kExport AS INTEGER : kExport = knopf("document-send-symbolic", "Exportieren ({export}) -- PDF, HTML, Bild, OXS oder Paket")
-DIM kPfad AS INTEGER : kPfad = knopf("mark-location-symbolic", "Stickpfad ({stickpfad}) -- in welcher Reihenfolge die Stiche jeder Farbe gesetzt werden")
-DIM kVorschau AS INTEGER : kVorschau = knopf("document-print-preview-symbolic", "Muster-Vorschau ({vorschau}) -- gestickt auf Stoff, als Pixel oder als Symbol-Plan")
-kZurueck = knopf("edit-undo-symbolic", "Rückgängig ({zurueck})")
-kVor = knopf("edit-redo-symbolic", "Wiederholen ({vor})")
+DIM kOeffnen AS INTEGER : kOeffnen = knopf("document-open-symbolic", tr$("Muster öffnen ({oeffnen})"))
+DIM kImport AS INTEGER : kImport = knopf("insert-image-symbolic", tr$("Bild importieren ({import}) -- erneut aus dem Quellbild: {import_neu}"))
+kSichern = knopf("document-save-symbolic", tr$("Sichern ({sichern}) -- Sichern unter: {sichern_unter}"))
+DIM kExport AS INTEGER : kExport = knopf("document-send-symbolic", tr$("Exportieren ({export}) -- PDF, HTML, Bild, OXS oder Paket"))
+DIM kPfad AS INTEGER : kPfad = knopf("mark-location-symbolic", tr$("Stickpfad ({stickpfad}) -- in welcher Reihenfolge die Stiche jeder Farbe gesetzt werden"))
+DIM kVorschau AS INTEGER : kVorschau = knopf("document-print-preview-symbolic", tr$("Muster-Vorschau ({vorschau}) -- gestickt auf Stoff, als Pixel oder als Symbol-Plan"))
+kZurueck = knopf("edit-undo-symbolic", tr$("Rückgängig ({zurueck})"))
+kVor = knopf("edit-redo-symbolic", tr$("Wiederholen ({vor})"))
 gtk_header_bar_pack_start(kopf, kOeffnen)
 gtk_header_bar_pack_start(kopf, kImport)
 gtk_header_bar_pack_start(kopf, kSichern)
@@ -824,13 +823,13 @@ DIM kAuswerten AS INTEGER : kAuswerten = auswertenKnopf()
 gtk_header_bar_pack_start(kopf, kAuswerten)
 gtk_header_bar_pack_start(kopf, kZurueck)
 gtk_header_bar_pack_start(kopf, kVor)
-kModus = gtk_button_new_with_label("✕ Kreuzstich")
-tipp(kModus, "Kreuzstich oder Diamond Painting ({modus}) -- die Farben wechseln in die passende Palette, zurück kommen dieselben Garne")
+kModus = gtk_button_new_with_label(tr$("✕ Kreuzstich"))
+tipp(kModus, tr$("Kreuzstich oder Diamond Painting ({modus}) -- die Farben wechseln in die passende Palette, zurück kommen dieselben Garne"))
 gtk_widget_set_can_focus(kModus, FALSE)
 gtk_header_bar_pack_start(kopf, kModus)
-DIM kEinpassen AS INTEGER : kEinpassen = knopf("zoom-fit-best-symbolic", "Einpassen (0)")
-DIM kGroesser AS INTEGER : kGroesser = knopf("zoom-in-symbolic", "Größer (+)")
-DIM kKleiner AS INTEGER : kKleiner = knopf("zoom-out-symbolic", "Kleiner (-)")
+DIM kEinpassen AS INTEGER : kEinpassen = knopf("zoom-fit-best-symbolic", tr$("Einpassen (0)"))
+DIM kGroesser AS INTEGER : kGroesser = knopf("zoom-in-symbolic", tr$("Größer (+)"))
+DIM kKleiner AS INTEGER : kKleiner = knopf("zoom-out-symbolic", tr$("Kleiner (-)"))
 zoomText = gtk_label_new("100 %")
 gtkKlasse(zoomText, "zoom")
 gtk_header_bar_pack_end(kopf, kEinpassen)
@@ -869,12 +868,12 @@ zoomRegler = gtk_scale_new_with_range(GTK_WAAGERECHT, 5.0, 300.0, 5.0)
 gtk_scale_set_draw_value(zoomRegler, FALSE)
 gtk_widget_set_size_request(zoomRegler, 120, -1)
 gtk_widget_set_can_focus(zoomRegler, FALSE)
-tipp(zoomRegler, "Zoom")
+tipp(zoomRegler, tr$("Zoom"))
 signal(zoomRegler, "value-changed", zoomReglerGezogen, 0, 0, 0)
 zoomProzent = gtk_button_new_with_label("100 %")
 gtkKlasse(zoomProzent, "flat")
 gtk_widget_set_can_focus(zoomProzent, FALSE)
-tipp(zoomProzent, "Klicken für 100 % ({zoom_100})")
+tipp(zoomProzent, tr$("Klicken für 100 % ({zoom_100})"))
 signal(zoomProzent, "clicked", zoomProzentGeklickt, 0, 0, 0)
 gtk_box_pack_start(statuszeile, status, TRUE, TRUE, 0)
 gtk_box_pack_start(statuszeile, zoomRegler, FALSE, FALSE, 0)
@@ -980,9 +979,9 @@ ELSE
     IF NOT lwHat THEN
         SELECT CASE einst.startAktion
             CASE 1
-                musterZeigen(kern.neuesMuster("Unbenannt", 50, 50), "", "Unbenannt")
+                musterZeigen(kern.neuesMuster(tr$("Unbenannt"), 50, 50), "", tr$("Unbenannt"))
             CASE 2
-                musterZeigen(kern.neuesMuster("Unbenannt", 50, 50), "", "Unbenannt")
+                musterZeigen(kern.neuesMuster(tr$("Unbenannt"), 50, 50), "", tr$("Unbenannt"))
                 neuDialog()
             CASE 3
                 DIM liste AS ARRAY OF STRING : liste = kern.zuletztVorhanden(einst)

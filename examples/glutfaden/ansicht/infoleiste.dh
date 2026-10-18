@@ -58,15 +58,15 @@ END FUNCTION
 
 FUNCTION infoleisteNeu() AS INTEGER
     ilSeite = gtk_box_new(GTK_SENKRECHT, 2)
-    gtk_box_pack_start(ilSeite, slUeberschrift("Stoffzählung"), FALSE, FALSE, 0)
+    gtk_box_pack_start(ilSeite, slUeberschrift(tr$("Stoffzählung")), FALSE, FALSE, 0)
     ilStoff = gtk_combo_box_text_new()
     gtkKlasse(ilStoff, "innen")
-    tipp(ilStoff, "Kästchen je Zoll -- bestimmt Maße und Garnbedarf")
+    tipp(ilStoff, tr$("Kästchen je Zoll -- bestimmt Maße und Garnbedarf"))
     ilStoffe = []
     signal(ilStoff, "changed", ilStoffGeaendert, 0, 0, 0)
     gtk_box_pack_start(ilSeite, ilStoff, FALSE, FALSE, 0)
 
-    gtk_box_pack_start(ilSeite, slUeberschrift("Muster"), FALSE, FALSE, 0)
+    gtk_box_pack_start(ilSeite, slUeberschrift(tr$("Muster")), FALSE, FALSE, 0)
     DIM titel AS ARRAY OF STRING : titel = SPLIT$(IL_TITEL, "|")
     DIM zeichen AS ARRAY OF STRING : zeichen = SPLIT$(IL_ZEICHEN, "|")
     DIM farben AS ARRAY OF STRING : farben = SPLIT$(IL_FARBEN, "|")
@@ -77,7 +77,7 @@ FUNCTION infoleisteNeu() AS INTEGER
         DIM z AS INTEGER : z = gtk_box_new(GTK_WAAGERECHT, 8)
         gtkKlasse(z, "ikarte")
         DIM ic AS INTEGER : ic = gtk_label_new("")
-        gtk_label_set_markup(ic, "<span foreground='" + farben[i] + "'>" + zeichen[i] + "</span>")
+        gtk_label_set_markup(ic, trf$("<span foreground='{0}'>{1}</span>", [farben[i], zeichen[i]]))
         gtk_widget_set_size_request(ic, 20, -1)
         DIM tl AS INTEGER : tl = gtk_label_new(titel[i])
         gtkKlasse(tl, "nebensache")
@@ -95,7 +95,7 @@ FUNCTION infoleisteNeu() AS INTEGER
         ARRAY_PUSH(ilStand, "")
         IF i = 8 THEN ilSchwierig = z
     NEXT
-    tipp(ilSchwierig, "Heuristik aus Farbanzahl, Spezial-Stichen, Backstitches und Größe.")
+    tipp(ilSchwierig, tr$("Heuristik aus Farbanzahl, Spezial-Stichen, Backstitches und Größe."))
 
     ' Quellbild -- eine Zeile, die Einzelheiten im Tooltip
     ilQuelle = gtk_box_new(GTK_WAAGERECHT, 6)
@@ -110,7 +110,7 @@ FUNCTION infoleisteNeu() AS INTEGER
     gtk_widget_set_no_show_all(ilQuelle, TRUE)
     gtk_box_pack_start(ilSeite, ilQuelle, FALSE, FALSE, 4)
 
-    gtk_box_pack_start(ilSeite, slUeberschrift("Farbübersicht"), FALSE, FALSE, 0)
+    gtk_box_pack_start(ilSeite, slUeberschrift(tr$("Farbübersicht")), FALSE, FALSE, 0)
     ilFarbListe = gtk_list_box_new()
     gtk_list_box_set_selection_mode(ilFarbListe, GTK_AUSWAHL_EINE)
     gtkKlasse(ilFarbListe, "liste")
@@ -181,12 +181,12 @@ SUB ilFarbenBauen()
         gtkKlasse(wl, IIF(f.auslassen, "warnung", "nebensache"))
         gtk_box_pack_end(z, wl, FALSE, FALSE, 0)
         gtk_widget_set_tooltip_text(z, f.garn.name + CHR$(10) + IIF(TRIM$(f.garn.hersteller + " " + f.garn.nummer) = "", "—", TRIM$(f.garn.hersteller + " " + f.garn.nummer)) + CHR$(10) + _
-            IIF(diamant, "", "Symbol: " + f.symbol + CHR$(10)) + IIF(diamant, "Drills: ", "Stiche: ") + STR$(f.stichzahl) + IIF(f.auslassen, CHR$(10) + "Wird nicht gestickt", ""))
+            IIF(diamant, "", trf$("Symbol: {0}{1}", [f.symbol, CHR$(10)])) + IIF(diamant, tr$("Drills: "), tr$("Stiche: ")) + STR$(f.stichzahl) + IIF(f.auslassen, trf$("{0}Wird nicht gestickt", [CHR$(10)]), ""))
         gtk_list_box_insert(ilFarbListe, z, -1)
         ARRAY_PUSH(ilFarbTexte, wl)
     NEXT
     IF lwMuster.farbanzahl() = 0 THEN
-        DIM leer AS INTEGER : leer = gtk_label_new("Keine Farben")
+        DIM leer AS INTEGER : leer = gtk_label_new(tr$("Keine Farben"))
         gtkKlasse(leer, "nebensache")
         gtk_list_box_insert(ilFarbListe, leer, -1)
     END IF
@@ -216,7 +216,7 @@ SUB ilStoffeFuellen()
     IF NOT gleich THEN
         gtk_combo_box_text_remove_all(ilStoff)
         FOR i = 0 TO LEN(liste) - 1
-            gtk_combo_box_text_append_text(ilStoff, IIF(liste[i] = INT(liste[i]), STR$(INT(liste[i])), FORMAT$(liste[i], "%.1f")) + " ct Aida")
+            gtk_combo_box_text_append_text(ilStoff, trf$("{0} ct Aida", [IIF(liste[i] = INT(liste[i]), STR$(INT(liste[i])), FORMAT$(liste[i], "%.1f"))]))
         NEXT
         ilStoffe = liste
     END IF
@@ -237,7 +237,7 @@ SUB stoffAendern(stoff AS FLOAT)
     IF NOT lwHat THEN RETURN
     IF kern.stoffSetzen(lwMuster, wzVerlauf, stoff) THEN
         nachAenderung()
-        statusMeldung("Stoff: " + IIF(stoff = INT(stoff), STR$(INT(stoff)), FORMAT$(stoff, "%.1f")) + " ct")
+        statusMeldung(trf$("Stoff: {0} ct", [IIF(stoff = INT(stoff), STR$(INT(stoff)), FORMAT$(stoff, "%.1f"))]))
     END IF
 END SUB
 
@@ -258,8 +258,8 @@ SUB infoleisteNachziehen()
         gtk_widget_hide(ilQuelle)
     ELSE
         DIM da AS BOOLEAN : da = FILEEXISTS(lwMuster.quellBild)
-        gtk_label_set_markup(ilQuelleText, ilMaske$(BASENAME(lwMuster.quellBild)) + IIF(da, "  <span foreground='#40c870'><b>✓</b></span>", "  <span foreground='#e0b040'><b>⚠</b></span>"))
-        gtk_widget_set_tooltip_text(ilQuelle, "Importiert von:" + CHR$(10) + lwMuster.quellBild + CHR$(10) + IIF(da, "✓ Datei vorhanden", "⚠ Datei nicht gefunden") + CHR$(10) + "Palette: " + IIF(lwMuster.quellPalette = "", "—", lwMuster.quellPalette))
+        gtk_label_set_markup(ilQuelleText, ilMaske$(BASENAME(lwMuster.quellBild)) + IIF(da, tr$("  <span foreground='#40c870'><b>✓</b></span>"), tr$("  <span foreground='#e0b040'><b>⚠</b></span>")))
+        gtk_widget_set_tooltip_text(ilQuelle, trf$("Importiert von:{0}{1}{2}{3}{4}Palette: {5}", [CHR$(10), lwMuster.quellBild, CHR$(10), IIF(da, "✓ Datei vorhanden", "⚠ Datei nicht gefunden"), CHR$(10), IIF(lwMuster.quellPalette = "", "—", lwMuster.quellPalette)]))
         gtk_widget_show(ilQuelle)
         gtk_widget_show_all(ilQuelle)
     END IF
@@ -303,23 +303,23 @@ FUNCTION fortschrittleisteNeu() AS INTEGER
     gtkKlasse(fsModus, "fs-modus")
     gtkKlasse(fsModus, "innen")
     gtk_widget_set_can_focus(fsModus, FALSE)
-    tipp(fsModus, "Konzentrierter Modus zum Sticken: Klick auf Zelle = abhaken ({wz_fortschritt})")
+    tipp(fsModus, tr$("Konzentrierter Modus zum Sticken: Klick auf Zelle = abhaken ({wz_fortschritt})"))
     signal(fsModus, "clicked", fsModusGeklickt, 0, 0, 0)
     gtk_box_pack_start(fsSeite, fsModus, FALSE, FALSE, 8)
-    gtk_box_pack_start(fsSeite, slUeberschrift("Fortschritt"), FALSE, FALSE, 0)
+    gtk_box_pack_start(fsSeite, slUeberschrift(tr$("Fortschritt")), FALSE, FALSE, 0)
     fsBalken = gtk_progress_bar_new()
     gtk_progress_bar_set_show_text(fsBalken, TRUE)
     gtkKlasse(fsBalken, "innen")
     gtkKlasse(fsBalken, "fs-gesamt")
     gtk_box_pack_start(fsSeite, fsBalken, FALSE, FALSE, 0)
-    fsZahl = gtk_label_new("0 / 0 Stiche")
+    fsZahl = gtk_label_new(tr$("0 / 0 Stiche"))
     gtkKlasse(fsZahl, "nebensache")
     gtk_box_pack_start(fsSeite, fsZahl, FALSE, FALSE, 2)
-    gtk_box_pack_start(fsSeite, slUeberschrift("Pro Farbe"), FALSE, FALSE, 0)
+    gtk_box_pack_start(fsSeite, slUeberschrift(tr$("Pro Farbe")), FALSE, FALSE, 0)
     fsListe = gtk_box_new(GTK_SENKRECHT, 4)
     gtkKlasse(fsListe, "innen")
     gtk_box_pack_start(fsSeite, fsListe, FALSE, FALSE, 0)
-    DIM zk AS INTEGER : zk = slKnopf("Fortschritt zurücksetzen", "Alle Stiche wieder als offen -- ein Schritt, Rückgängig holt ihn zurück")
+    DIM zk AS INTEGER : zk = slKnopf(tr$("Fortschritt zurücksetzen"), tr$("Alle Stiche wieder als offen -- ein Schritt, Rückgängig holt ihn zurück"))
     gtkKlasse(zk, "innen")
     signal(zk, "clicked", fsZuruecksetzenGeklickt, 0, 0, 0)
     gtk_box_pack_start(fsSeite, zk, FALSE, FALSE, 10)
@@ -332,7 +332,7 @@ END FUNCTION
 SUB fortschrittModusNachziehen()
     IF fsModus = 0 THEN RETURN
     DIM an AS BOOLEAN : an = wzAktiv = WZ_FORTSCHRITT
-    DIM t AS STRING : t = IIF(an, "◼  Sticken-Modus beenden", "✓  Sticken-Modus starten")
+    DIM t AS STRING : t = IIF(an, tr$("◼  Sticken-Modus beenden"), tr$("✓  Sticken-Modus starten"))
     IF fsModusText <> t THEN
         gtk_button_set_label(fsModus, t)
         fsModusText = t
@@ -406,7 +406,7 @@ SUB fsZeilenBauen(p AS kern.Fortschritt)
         gtkKlasse(zl, "nebensache")
         gtk_box_pack_start(unten, zl, FALSE, FALSE, 0)
         IF p.farbeErledigt[i] < p.farbeGesamt[i] THEN
-            DIM ak AS INTEGER : ak = slKnopf("✓ Alle erledigt", "Alle " + STR$(p.farbeGesamt[i] - p.farbeErledigt[i]) + " verbleibenden Stiche dieser Farbe als gestickt markieren.")
+            DIM ak AS INTEGER : ak = slKnopf(tr$("✓ Alle erledigt"), trf$("Alle {0} verbleibenden Stiche dieser Farbe als gestickt markieren.", [STR$(p.farbeGesamt[i] - p.farbeErledigt[i])]))
             signal(ak, "clicked", fsAlleGeklickt, i, 0, 0)
             gtk_box_pack_start(unten, ak, FALSE, FALSE, 0)
         END IF
@@ -419,7 +419,7 @@ SUB fsZeilenBauen(p AS kern.Fortschritt)
         ARRAY_PUSH(fsZahlJe, zl)
     NEXT
     IF LEN(fsNr) = 0 THEN
-        DIM leer AS INTEGER : leer = gtk_label_new("Noch keine Stiche")
+        DIM leer AS INTEGER : leer = gtk_label_new(tr$("Noch keine Stiche"))
         gtkKlasse(leer, "nebensache")
         gtk_box_pack_start(fsListe, leer, FALSE, FALSE, 4)
         ARRAY_PUSH(fsZeilen, leer)
@@ -433,7 +433,7 @@ SUB fortschrittleisteNachziehen()
     DIM p AS kern.Fortschritt : p = kern.fortschrittVon(lwMuster)
     gtk_progress_bar_set_fraction(fsBalken, p.prozent / 100.0)
     gtk_progress_bar_set_text(fsBalken, FORMAT$(p.prozent, "%.1f") + " %")
-    gtk_label_set_text(fsZahl, ZAHL$(p.erledigt, 0) + " / " + ZAHL$(p.gesamt, 0) + " Stiche")
+    gtk_label_set_text(fsZahl, trf$("{0} / {1} Stiche", [ZAHL$(p.erledigt, 0), ZAHL$(p.gesamt, 0)]))
     DIM b AS STRING : b = fsBestand$(p)
     IF b <> fsStand THEN
         fsZeilenBauen(p)
@@ -458,7 +458,7 @@ SUB farbeAlsErledigtNr(nr AS INTEGER)
     leinwandAufbauen()
     gtk_widget_queue_draw(lwFlaeche)
     nachAenderung()
-    statusMeldung("Farbe „" + lwMuster.farben[nr].garn.name + "“ komplett als erledigt markiert (" + STR$(n) + " Stiche).")
+    statusMeldung(trf$("Farbe „{0}“ komplett als erledigt markiert ({1} Stiche).", [lwMuster.farben[nr].garn.name, STR$(n)]))
 END SUB
 
 SUB fsZuruecksetzenGeklickt(knopf AS INTEGER, daten AS INTEGER)
@@ -474,15 +474,15 @@ SUB fortschrittZuruecksetzen(fragen AS BOOLEAN)
         erl = erl + z
     NEXT
     IF erl = 0 THEN
-        statusMeldung("Kein Fortschritt zum Zurücksetzen.")
+        statusMeldung(tr$("Kein Fortschritt zum Zurücksetzen."))
         RETURN
     END IF
     IF fragen THEN
-        IF NOT pdFrage(fenster, "Fortschritt zurücksetzen", "Gesamten Stickfortschritt zurücksetzen?" + CHR$(10) + "Bearbeiten → Rückgängig holt ihn zurück.") THEN RETURN
+        IF NOT pdFrage(fenster, tr$("Fortschritt zurücksetzen"), trf$("Gesamten Stickfortschritt zurücksetzen?{0}Bearbeiten → Rückgängig holt ihn zurück.", [CHR$(10)])) THEN RETURN
     END IF
     DIM n AS INTEGER : n = kern.fortschrittZuruecksetzen(lwMuster, wzVerlauf)
     leinwandAufbauen()
     gtk_widget_queue_draw(lwFlaeche)
     nachAenderung()
-    statusMeldung("Fortschritt zurückgesetzt (" + ZAHL$(n, 0) + " Stiche).")
+    statusMeldung(trf$("Fortschritt zurückgesetzt ({0} Stiche).", [ZAHL$(n, 0)]))
 END SUB

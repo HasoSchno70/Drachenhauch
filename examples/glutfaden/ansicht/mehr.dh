@@ -34,7 +34,7 @@ DIM mrRueckAktiv AS BOOLEAN           ' Rueckstich: Anfang gesetzt
 DIM mrRueckX AS INTEGER
 DIM mrRueckY AS INTEGER
 DIM mrEinfuegen AS BOOLEAN            ' Ablage (oder Text) haengt an der Maus
-DIM mrEinfuegenText AS STRING         ' "Einfügen" oder "Text"
+DIM mrEinfuegenText AS STRING         ' tr$("Einfügen") oder tr$("Text") -- verglichen wird uebersetzt
 DIM mrEinfuegenAus AS kern.Ausschnitt
 DIM mrMausX AS INTEGER                ' letzte Zelle unter der Maus (auch draussen)
 DIM mrMausY AS INTEGER
@@ -144,7 +144,7 @@ FUNCTION mehrDruck(x AS INTEGER, y AS INTEGER, taste AS INTEGER, umschalt AS BOO
         CASE WZ_FORTSCHRITT
             IF taste <> 1 AND taste <> 3 THEN RETURN ZUG_KEINER
             mrModus = IIF(taste = 1, MR_FORTSCHRITT, MR_ZURUECK)
-            wzVerlauf.beginnen(IIF(taste = 1, "Fortschritt markieren", "Fortschritt zurücknehmen"))
+            wzVerlauf.beginnen(IIF(taste = 1, tr$("Fortschritt markieren"), tr$("Fortschritt zurücknehmen")))
             mehrFortschritt(x, y, x, y)
             mrStartX = x : mrStartY = y
             RETURN ZUG_MEHR
@@ -191,9 +191,9 @@ SUB mehrLos(x AS INTEGER, y AS INTEGER, umschalt AS BOOLEAN)
         CASE MR_VERSCHIEBEN
             IF mrDx <> 0 OR mrDy <> 0 THEN
                 IF lwMuster.ebenen.aktiveEbene().gesperrt THEN
-                    statusMeldung("Die Ebene „" + lwMuster.ebenen.aktiveEbene().name + "“ ist gesperrt.")
+                    statusMeldung(trf$("Die Ebene „{0}“ ist gesperrt.", [lwMuster.ebenen.aktiveEbene().name]))
                 ELSE
-                    DIM n AS INTEGER : n = kern.ausschnittSetzen(lwMuster, wzVerlauf, mrAuswahl, mrInhalt, mrAuswahl.x0 + mrDx, mrAuswahl.y0 + mrDy, "Verschieben")
+                    DIM n AS INTEGER : n = kern.ausschnittSetzen(lwMuster, wzVerlauf, mrAuswahl, mrInhalt, mrAuswahl.x0 + mrDx, mrAuswahl.y0 + mrDy, tr$("Verschieben"))
                     mrAuswahl = kern.auswahlVerschoben(mrAuswahl, mrDx, mrDy)
                     IF mrAuswahl.leer() THEN mrAuswahl = NIL
                     allesNeu()
@@ -240,12 +240,12 @@ END SUB
 
 SUB vieleckSchliessen()
     IF LEN(mrEcken) < 6 THEN
-        statusMeldung("Ein Vieleck braucht mindestens drei Ecken.")
+        statusMeldung(tr$("Ein Vieleck braucht mindestens drei Ecken."))
         RETURN
     END IF
     DIM p AS ARRAY OF INTEGER : p = kern.vieleck(mrEcken, wzGefuellt, lwMuster.breite, lwMuster.hoehe)
     mrEcken = []
-    wzAnwenden(p, wzFarbe, "Vieleck")
+    wzAnwenden(p, wzFarbe, tr$("Vieleck"))
     gtk_widget_queue_draw(lwFlaeche)
 END SUB
 
@@ -267,7 +267,7 @@ SUB auswahlKopieren()
     IF mrAuswahl IS NIL THEN RETURN
     mrAblage = kern.ausschnittVon(lwMuster.ebenen.aktiveEbene(), mrAuswahl)
     mrAblageRechteck = mrAuswahl.istRechteck
-    statusMeldung("Kopiert: " + STR$(mrAblage.stiche()) + " Stiche.")
+    statusMeldung(trf$("Kopiert: {0} Stiche.", [STR$(mrAblage.stiche())]))
 END SUB
 
 SUB auswahlAusschneiden()
@@ -278,12 +278,12 @@ END SUB
 
 SUB auswahlLoeschen()
     IF mrAuswahl IS NIL THEN RETURN
-    wzAnwendenOhneSpiegel(mrAuswahl.zellen(), -1, "Löschen")
+    wzAnwendenOhneSpiegel(mrAuswahl.zellen(), -1, tr$("Löschen"))
 END SUB
 
 SUB auswahlFuellen()
     IF mrAuswahl IS NIL OR NOT wzFarbeDa() THEN RETURN
-    DIM n AS INTEGER : n = kern.zellenSetzen(lwMuster, wzVerlauf, mrAuswahl.zellen(), wzFarbe, kern.VOLL, "Auswahl füllen")
+    DIM n AS INTEGER : n = kern.zellenSetzen(lwMuster, wzVerlauf, mrAuswahl.zellen(), wzFarbe, kern.VOLL, tr$("Auswahl füllen"))
     IF n > 0 THEN leinwandZellen(mrAuswahl.zellen())
     nachAenderung()
 END SUB
@@ -292,16 +292,16 @@ END SUB
 SUB auswahlWandeln(art AS STRING)
     IF mrAuswahl IS NIL THEN RETURN
     IF lwMuster.ebenen.aktiveEbene().gesperrt THEN
-        statusMeldung("Die Ebene „" + lwMuster.ebenen.aktiveEbene().name + "“ ist gesperrt.")
+        statusMeldung(trf$("Die Ebene „{0}“ ist gesperrt.", [lwMuster.ebenen.aktiveEbene().name]))
         RETURN
     END IF
     DIM s AS kern.Ausschnitt : s = kern.ausschnittVon(lwMuster.ebenen.aktiveEbene(), mrAuswahl)
     DIM text AS STRING
     SELECT CASE art
-        CASE "rechts" : s = kern.ausschnittGedreht(s, TRUE) : text = "Drehen"
-        CASE "links" : s = kern.ausschnittGedreht(s, FALSE) : text = "Drehen"
-        CASE "waagerecht" : s = kern.ausschnittGespiegelt(s, TRUE) : text = "Spiegeln"
-        CASE ELSE : s = kern.ausschnittGespiegelt(s, FALSE) : text = "Spiegeln"
+        CASE "rechts" : s = kern.ausschnittGedreht(s, TRUE) : text = tr$("Drehen")
+        CASE "links" : s = kern.ausschnittGedreht(s, FALSE) : text = tr$("Drehen")
+        CASE "waagerecht" : s = kern.ausschnittGespiegelt(s, TRUE) : text = tr$("Spiegeln")
+        CASE ELSE : s = kern.ausschnittGespiegelt(s, FALSE) : text = tr$("Spiegeln")
     END SELECT
     DIM x AS INTEGER : x = mrAuswahl.x0
     DIM y AS INTEGER : y = mrAuswahl.y0
@@ -314,26 +314,26 @@ END SUB
 ' Einfuegen: die Ablage haengt an der Maus, der naechste Klick setzt sie.
 SUB einfuegenBeginnen()
     IF mrAblage IS NIL THEN
-        statusMeldung("Die Zwischenablage ist leer.")
+        statusMeldung(tr$("Die Zwischenablage ist leer."))
         RETURN
     END IF
     IF wzAktiv <> WZ_AUSWAHL AND wzAktiv <> WZ_LASSO THEN werkzeugWaehlen(IIF(mrAblageRechteck, WZ_AUSWAHL, WZ_LASSO), FALSE)
     mrEinfuegen = TRUE
-    mrEinfuegenText = "Einfügen"
+    mrEinfuegenText = tr$("Einfügen")
     mrEinfuegenAus = mrAblage
-    statusMeldung("Klicken setzt ein, ESC bricht ab.")
+    statusMeldung(tr$("Klicken setzt ein, ESC bricht ab."))
     gtk_widget_queue_draw(lwFlaeche)
 END SUB
 
 SUB mehrAbsetzen(x AS INTEGER, y AS INTEGER)
     mrEinfuegen = FALSE
     IF lwMuster.ebenen.aktiveEbene().gesperrt THEN
-        statusMeldung("Die Ebene „" + lwMuster.ebenen.aktiveEbene().name + "“ ist gesperrt.")
+        statusMeldung(trf$("Die Ebene „{0}“ ist gesperrt.", [lwMuster.ebenen.aktiveEbene().name]))
         RETURN
     END IF
     DIM s AS kern.Ausschnitt : s = mrEinfuegenAus
     DIM n AS INTEGER : n = kern.ausschnittSetzen(lwMuster, wzVerlauf, NIL, s, x, y, mrEinfuegenText)
-    IF mrEinfuegenText = "Einfügen" THEN
+    IF mrEinfuegenText = tr$("Einfügen") THEN
         mrAuswahl = kern.auswahlVonAusschnitt(lwMuster.breite, lwMuster.hoehe, s, x, y, mrAblageRechteck)
         IF mrAuswahl.leer() THEN mrAuswahl = NIL
     END IF
@@ -401,7 +401,7 @@ SUB fortschrittSpringen(vor AS BOOLEAN)
     IF NOT wzFarbeDa() THEN RETURN
     DIM i AS INTEGER : i = kern.naechsterOffen(lwMuster, wzFarbe, mrCursor, vor)
     IF i < 0 THEN
-        statusMeldung("Alle Stiche dieser Farbe sind erledigt.")
+        statusMeldung(tr$("Alle Stiche dieser Farbe sind erledigt."))
         mrCursor = -1
     ELSE
         mrCursor = i

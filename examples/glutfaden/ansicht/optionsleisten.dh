@@ -52,26 +52,26 @@ END FUNCTION
 
 FUNCTION rueckLeisteNeu() AS INTEGER
     rlBox = gtk_box_new(GTK_WAAGERECHT, 4)
-    gtk_box_pack_start(rlBox, olBeschriftung("Dicke"), FALSE, FALSE, 4)
+    gtk_box_pack_start(rlBox, olBeschriftung(tr$("Dicke")), FALSE, FALSE, 4)
     rlDicke = gtk_spin_button_new_with_range(1, 5, 1)
     gtk_entry_set_width_chars(rlDicke, 2)
     gtk_widget_set_can_focus(rlDicke, FALSE)
-    gtk_widget_set_tooltip_text(rlDicke, "Linienbreite der Rückstiche (2 = wie vorgesehen)")
+    gtk_widget_set_tooltip_text(rlDicke, tr$("Linienbreite der Rückstiche (2 = wie vorgesehen)"))
     gtk_box_pack_start(rlBox, rlDicke, FALSE, FALSE, 0)
-    gtk_box_pack_start(rlBox, olBeschriftung("Linie"), FALSE, FALSE, 4)
-    rlLinie = olWahl(["Durchgezogen", "Gestrichelt", "Gepunktet", "Strich-Punkt"], "Linienart der Rückstiche")
+    gtk_box_pack_start(rlBox, olBeschriftung(tr$("Linie")), FALSE, FALSE, 4)
+    rlLinie = olWahl([tr$("Durchgezogen"), tr$("Gestrichelt"), tr$("Gepunktet"), tr$("Strich-Punkt")], tr$("Linienart der Rückstiche"))
     gtk_box_pack_start(rlBox, rlLinie, FALSE, FALSE, 0)
-    gtk_box_pack_start(rlBox, olBeschriftung("Enden"), FALSE, FALSE, 4)
-    rlEnden = olWahl(["Rund", "Eckig", "Flach"], "Form der Linienenden")
+    gtk_box_pack_start(rlBox, olBeschriftung(tr$("Enden")), FALSE, FALSE, 4)
+    rlEnden = olWahl([tr$("Rund"), tr$("Eckig"), tr$("Flach")], tr$("Form der Linienenden"))
     gtk_box_pack_start(rlBox, rlEnden, FALSE, FALSE, 0)
-    rlEinrasten = gtk_check_button_new_with_label("Einrasten")
+    rlEinrasten = gtk_check_button_new_with_label(tr$("Einrasten"))
     gtk_widget_set_can_focus(rlEinrasten, FALSE)
-    gtk_widget_set_tooltip_text(rlEinrasten, "An Rasterpunkte einrasten: Ecken, Kantenmitten und Mitte der Kästchen -- aus = nur Ecken")
+    gtk_widget_set_tooltip_text(rlEinrasten, tr$("An Rasterpunkte einrasten: Ecken, Kantenmitten und Mitte der Kästchen -- aus = nur Ecken"))
     gtk_box_pack_start(rlBox, rlEinrasten, FALSE, FALSE, 4)
     rlVorschau = gtk_drawing_area_new()
     gtk_widget_set_size_request(rlVorschau, 60, 22)
     gtk_widget_set_valign(rlVorschau, GTK_AUSRICHTEN_MITTE)
-    gtk_widget_set_tooltip_text(rlVorschau, "Vorschau in der aktuellen Farbe")
+    gtk_widget_set_tooltip_text(rlVorschau, tr$("Vorschau in der aktuellen Farbe"))
     signalZeichnen(rlVorschau, "draw", rlVorschauZeichnen, 0, 0, 0)
     gtk_box_pack_start(rlBox, rlVorschau, FALSE, FALSE, 4)
     ' erst alles zeigen, dann die Leiste selbst verbergen: mit no_show_all
@@ -150,21 +150,21 @@ FUNCTION textLeisteNeu() AS INTEGER
     END IF
     tlBox = gtk_box_new(GTK_WAAGERECHT, 4)
     tlFeld = gtk_entry_new()
-    gtk_entry_set_placeholder_text(tlFeld, "Text eingeben…")
+    gtk_entry_set_placeholder_text(tlFeld, tr$("Text eingeben…"))
     gtk_entry_set_width_chars(tlFeld, 14)
-    gtk_widget_set_tooltip_text(tlFeld, "Der Text -- Enter hängt ihn an die Maus, ein Klick ins Muster setzt ihn, Esc bricht ab")
+    gtk_widget_set_tooltip_text(tlFeld, tr$("Der Text -- Enter hängt ihn an die Maus, ein Klick ins Muster setzt ihn, Esc bricht ab"))
     gtk_box_pack_start(tlBox, tlFeld, FALSE, FALSE, 4)
-    tlSchrift = olWahl(textSchriften(), "Schriftart")
+    tlSchrift = olWahl(textSchriften(), tr$("Schriftart"))
     gtk_box_pack_start(tlBox, tlSchrift, FALSE, FALSE, 0)
     tlGroesse = gtk_spin_button_new_with_range(6, 72, 1)
     gtk_entry_set_width_chars(tlGroesse, 3)
     gtk_widget_set_can_focus(tlGroesse, FALSE)
-    gtk_widget_set_tooltip_text(tlGroesse, "Größe in Punkt (12 Punkt = 16 Kästchen hoch)")
+    gtk_widget_set_tooltip_text(tlGroesse, tr$("Größe in Punkt (12 Punkt = 16 Kästchen hoch)"))
     gtk_box_pack_start(tlBox, tlGroesse, FALSE, FALSE, 0)
-    tlFett = gtk_check_button_new_with_label("Fett")
+    tlFett = gtk_check_button_new_with_label(tr$("Fett"))
     gtk_widget_set_can_focus(tlFett, FALSE)
     gtk_box_pack_start(tlBox, tlFett, FALSE, FALSE, 0)
-    tlKursiv = gtk_check_button_new_with_label("Kursiv")
+    tlKursiv = gtk_check_button_new_with_label(tr$("Kursiv"))
     gtk_widget_set_can_focus(tlKursiv, FALSE)
     gtk_box_pack_start(tlBox, tlKursiv, FALSE, FALSE, 0)
     ' erst alles zeigen, dann die Leiste selbst verbergen: mit no_show_all
@@ -202,7 +202,7 @@ SUB tlGeaendert(w AS INTEGER, daten AS INTEGER)
     txFett = gtk_toggle_button_get_active(tlFett)
     txKursiv = gtk_toggle_button_get_active(tlKursiv)
     ' haengt schon ein Text an der Maus, haengt jetzt der neue
-    IF mrEinfuegen AND mrEinfuegenText = "Text" THEN
+    IF mrEinfuegen AND mrEinfuegenText = tr$("Text") THEN
         IF TRIM$(txText) = "" THEN
             mehrAbbrechen()
         ELSE
@@ -219,7 +219,7 @@ END SUB
 SUB textAusLeiste()
     IF NOT lwHat THEN RETURN
     IF TRIM$(txText) = "" THEN
-        statusMeldung("Erst einen Text eingeben -- oben in der Leiste.")
+        statusMeldung(tr$("Erst einen Text eingeben -- oben in der Leiste."))
         RETURN
     END IF
     IF NOT wzFarbeDa() THEN RETURN
