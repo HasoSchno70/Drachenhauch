@@ -258,6 +258,11 @@ DECLARE FUNCTION gdk_pixbuf_get_from_window LIB GDK (fenster AS ZEIGER, x AS LON
 DECLARE FUNCTION gdk_pixbuf_get_pixels LIB PIXBUF (bild AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gdk_pixbuf_get_rowstride LIB PIXBUF (bild AS ZEIGER) AS LONG
 DECLARE FUNCTION gdk_pixbuf_get_n_channels LIB PIXBUF (bild AS ZEIGER) AS LONG
+DECLARE FUNCTION gdk_pixbuf_new_from_file LIB PIXBUF (pfad AS TEXT, BYREF fehler AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gdk_pixbuf_savev LIB PIXBUF (bild AS ZEIGER, pfad AS TEXT, art AS TEXT, schluessel AS ZEIGER, werte AS ZEIGER, BYREF fehler AS ZEIGER) AS BOOLEAN
+DECLARE FUNCTION gdk_pixbuf_get_formats LIB PIXBUF () AS ZEIGER
+DECLARE FUNCTION gdk_pixbuf_format_get_extensions LIB PIXBUF (f AS ZEIGER) AS ZEIGER
+DECLARE SUB g_strfreev LIB GLIB (feld AS ZEIGER)
 DECLARE FUNCTION gdk_pixbuf_new LIB PIXBUF (farbraum AS LONG, alpha AS BOOLEAN, bits AS LONG, b AS LONG, h AS LONG) AS ZEIGER
 DECLARE SUB gdk_pixbuf_fill LIB PIXBUF (bild AS ZEIGER, punkt AS ULONG)
 DECLARE SUB gtk_window_fullscreen LIB GTK (fenster AS ZEIGER)

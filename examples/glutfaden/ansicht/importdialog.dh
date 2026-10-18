@@ -383,7 +383,17 @@ END FUNCTION
 FUNCTION imDialogBauen(pfad AS STRING, vorher AS kern.Importeinstellung) AS BOOLEAN
     imPfad = pfad
     TRY
-        imBild = LOADIMAGE(pfad)
+        IF kern.bildUeberGtk(pfad) THEN
+            ' ueber GTKs Bildlader, als PNG in eine eigene Datei (LOADIMAGE
+            ' merkt sich Pfade -- dieselbe zweimal hiesse das alte Bild)
+            DIM zwischen AS STRING : zwischen = TEMPFILE$("glutfaden", ".png")
+            DIM fu AS STRING : fu = bildUmweg$(pfad, zwischen)
+            IF fu <> "" THEN THROW fu
+            imBild = LOADIMAGE(zwischen)
+            DELETEFILE(zwischen)
+        ELSE
+            imBild = LOADIMAGE(pfad)
+        END IF
     CATCH f
         statusMeldung("Bild nicht lesbar: " + f)
         RETURN FALSE
@@ -571,16 +581,59 @@ FUNCTION imDialogLaufen() AS BOOLEAN
     RETURN fertig
 END FUNCTION
 
+' Was GTKs Bildlader liest (einmal gefragt), samt den eigenen
+DIM imEndungen AS ARRAY OF STRING
+
+FUNCTION bildEndungen() AS ARRAY OF STRING
+    IF LEN(imEndungen) > 0 THEN RETURN imEndungen
+    DIM system AS ARRAY OF STRING : system = []
+    DIM liste AS INTEGER : liste = gdk_pixbuf_get_formats()
+    DIM knoten AS INTEGER : knoten = liste
+    WHILE knoten <> 0
+        DIM b AS BUFFER : b = BUFFER_AUS_ZEIGER(knoten, 16)
+        DIM e AS INTEGER : e = gdk_pixbuf_format_get_extensions(BUFFER_GET_I64(b, 0))
+        DIM i AS INTEGER : i = 0
+        WHILE e <> 0
+            DIM p AS INTEGER : p = BUFFER_GET_I64(BUFFER_AUS_ZEIGER(e + i * 8, 8), 0)
+            IF p = 0 THEN EXIT WHILE
+            DIM n AS STRING : n = LOWER$(TEXT_AUS_ZEIGER$(p))
+            IF ARRAY_INDEXOF(system, n) < 0 THEN ARRAY_PUSH(system, n)
+            i = i + 1
+        WEND
+        IF e <> 0 THEN g_strfreev(e)
+        knoten = BUFFER_GET_I64(b, 8)
+    WEND
+    IF liste <> 0 THEN g_slist_free(liste)
+    imEndungen = kern.bildEndungen(system)
+    RETURN imEndungen
+END FUNCTION
+
+' Ein Bild, das die Laufzeit nicht liest (TIFF, AVIF ...): GTKs Bildlader
+' liest es und gibt es als PNG weiter. "" = gelesen nach ziel, sonst der Fehler.
+FUNCTION bildUmweg$(pfad AS STRING, ziel AS STRING) AS STRING
+    DIM fehler AS INTEGER
+    DIM pb AS INTEGER : pb = gdk_pixbuf_new_from_file(pfad, fehler)
+    IF pb = 0 THEN RETURN gtkFehler$(fehler)
+    DIM ok AS BOOLEAN : ok = gdk_pixbuf_savev(pb, ziel, "png", 0, 0, fehler)
+    g_object_unref(pb)
+    IF NOT ok THEN RETURN gtkFehler$(fehler)
+    RETURN ""
+END FUNCTION
+
 ' Ein Bild waehlen; "" bei Abbrechen.
 FUNCTION bildWaehlen() AS STRING
     DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("Bild importieren", fenster, GTK_DATEI_OEFFNEN, _
         "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Weiter", GTK_ANTWORT_ANNEHMEN, 0)
     DIM filter AS INTEGER : filter = gtk_file_filter_new()
-    gtk_file_filter_set_name(filter, "Bilder (PNG, JPG, BMP, GIF, TGA, QOI)")
+    DIM endungen AS ARRAY OF STRING : endungen = bildEndungen()
+    DIM gross AS ARRAY OF STRING : gross = []
     DIM m AS STRING
-    FOR EACH m IN ["*.png", "*.PNG", "*.jpg", "*.JPG", "*.jpeg", "*.JPEG", "*.bmp", "*.BMP", "*.gif", "*.GIF", "*.tga", "*.qoi"]
-        gtk_file_filter_add_pattern(filter, m)
+    FOR EACH m IN endungen
+        IF m <> "jpeg" AND m <> "tif" AND m <> "heif" THEN ARRAY_PUSH(gross, UPPER$(m))
+        gtk_file_filter_add_pattern(filter, "*." + m)
+        gtk_file_filter_add_pattern(filter, "*." + UPPER$(m))
     NEXT
+    gtk_file_filter_set_name(filter, "Bilder (" + JOIN$(gross, ", ") + ")")
     gtk_file_chooser_add_filter(d, filter)
     DIM pfad AS STRING
     IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
