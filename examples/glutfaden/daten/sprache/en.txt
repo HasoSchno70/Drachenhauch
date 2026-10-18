@@ -8,6 +8,18 @@ Schließen	Close
 Aktion	Action
 <span alpha='45%'>—</span>	<span alpha='45%'>—</span>
 Umlegen unter Einstellungen → Tastenkürzel.	Change them under Settings → Keyboard shortcuts.
+Farben wieder wie gestickt.	Colors as stitched again.
+Ansicht: {0} -- nur die Anzeige, die Farben bleiben.	View: {0} -- display only, the colors stay.
+Auswerten und planen -- Statistik ({statistik}), Heatmap, ähnliche Farben, Garn-Vorrat, Palette ({palette}), Farben tauschen ({tauschen}), Rahmen, Farbenblindheit	Analyze and plan -- statistics ({statistik}), heatmap, similar colors, thread inventory, palette ({palette}), swap colors ({tauschen}), frames, color blindness
+Statistik & Garnverbrauch …	Statistics & thread usage …
+Heatmap …	Heatmap …
+Ähnliche Farben zusammenführen …	Merge similar colors …
+Garn-Vorrat …	Thread inventory …
+Palette konvertieren …	Convert palette …
+Farben tauschen …	Swap colors …
+Rahmenaufteilung …	Split across frames …
+Planen & Vorrat	Planning & inventory
+Farbenblindheit simulieren	Simulate color blindness
 Automatisch (Systemsprache)	Automatic (system language)
 Sprache / Language:	Language / Sprache:
 Gilt ab dem nächsten Start	Takes effect at the next start
@@ -46,6 +58,15 @@ Start- und Endfarbe tauschen	Swap start and end color
 Stoffzählung	Fabric count
 Kästchen je Zoll -- bestimmt Maße und Garnbedarf	Squares per inch -- determines size and thread usage
 Muster	Pattern
+Stiche	Stitches
+Farben	Colors
+Größe	Size
+Maße	Dimensions
+Ebenen	Layers
+Stickzeit	Stitching time
+Garnbedarf	Thread usage
+Fortschritt	Progress
+Schwierigkeit	Difficulty
 <span foreground='{0}'>{1}</span>	<span foreground='{0}'>{1}</span>
 Heuristik aus Farbanzahl, Spezial-Stichen, Backstitches und Größe.	Heuristic from color count, special stitches, backstitches and size.
 Farbübersicht	Color overview
@@ -60,7 +81,6 @@ Stoff: {0} ct	Fabric: {0} ct
   <span foreground='#e0b040'><b>⚠</b></span>	  <span foreground='#e0b040'><b>⚠</b></span>
 Importiert von:{0}{1}{2}{3}{4}Palette: {5}	Imported from:{0}{1}{2}{3}{4}Palette: {5}
 Konzentrierter Modus zum Sticken: Klick auf Zelle = abhaken ({wz_fortschritt})	Focused stitching mode: click a cell = check it off ({wz_fortschritt})
-Fortschritt	Progress
 0 / 0 Stiche	0 / 0 stitches
 Pro Farbe	Per color
 Fortschritt zurücksetzen	Reset progress
@@ -144,7 +164,6 @@ Nummer oder Name	Number or name
 Blend…	Blend…
 Zwei Garne zu einem Tweed-Blend mischen ({blend})	Mix two threads into a tweed blend ({blend})
 Farbe vom Bildschirm picken -- das nächste Garn dieser Palette ({bildschirm_pipette})	Pick a color from the screen -- the nearest thread of this palette ({bildschirm_pipette})
-Ebenen	Layers
 Sichtbar	Visible
 Gesperrt -- nimmt keine Stiche an	Locked -- accepts no stitches
 Neue Ebene über der aktiven ({ebene})	New layer above the active one ({ebene})
@@ -332,6 +351,10 @@ Kleiner (-)	Smaller (-)
 Zoom	Zoom
 Klicken für 100 % ({zoom_100})	Click for 100 % ({zoom_100})
 Unbenannt	Untitled
+Keine Simulation	No simulation
+Protanopie (Rot-Blindheit)	Protanopia (red blindness)
+Deuteranopie (Grün-Blindheit)	Deuteranopia (green blindness)
+Tritanopie (Blau-Blindheit)	Tritanopia (blue blindness)
 Ebene „{0}“ ist gesperrt.	Layer “{0}” is locked.
 Sichern unter	Save as
 Exportieren	Export

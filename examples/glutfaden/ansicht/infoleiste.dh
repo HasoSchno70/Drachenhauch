@@ -41,7 +41,6 @@ DIM fsProzent AS ARRAY OF INTEGER
 DIM fsBalkenJe AS ARRAY OF INTEGER
 DIM fsZahlJe AS ARRAY OF INTEGER
 
-CONST IL_TITEL = "Stiche|Farben|Größe|Maße|Ebenen|Stickzeit|Garnbedarf|Fortschritt|Schwierigkeit"
 CONST IL_ZEICHEN = "✦|🎨|📐|📏|📑|⏱|🧵|✅|🎯"
 CONST IL_FARBEN = "#ff8a3d|#4a90d9|#2fb5a6|#a77bd8|#e05c5c|#40c8b0|#c878a8|#40c870|#e0b040"
 
@@ -67,7 +66,7 @@ FUNCTION infoleisteNeu() AS INTEGER
     gtk_box_pack_start(ilSeite, ilStoff, FALSE, FALSE, 0)
 
     gtk_box_pack_start(ilSeite, slUeberschrift(tr$("Muster")), FALSE, FALSE, 0)
-    DIM titel AS ARRAY OF STRING : titel = SPLIT$(IL_TITEL, "|")
+    DIM titel AS ARRAY OF STRING : titel = [tr$("Stiche"), tr$("Farben"), tr$("Größe"), tr$("Maße"), tr$("Ebenen"), tr$("Stickzeit"), tr$("Garnbedarf"), tr$("Fortschritt"), tr$("Schwierigkeit")]
     DIM zeichen AS ARRAY OF STRING : zeichen = SPLIT$(IL_ZEICHEN, "|")
     DIM farben AS ARRAY OF STRING : farben = SPLIT$(IL_FARBEN, "|")
     ilKarten = []
