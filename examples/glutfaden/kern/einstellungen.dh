@@ -853,7 +853,8 @@ FUNCTION kuerzelListe(e AS Einstellungen) AS ARRAY OF STRING
     DIM aus AS ARRAY OF STRING : aus = []
     DIM i AS INTEGER
     FOR i = 0 TO LEN(aktionen) - 1
-        ARRAY_PUSH(aus, aktionen[i].name + CHR$(9) + w[i])
+        ' angezeigt: der Name in der Sprache der Oberflaeche, Tasten wie Ctrl/Shift
+        ARRAY_PUSH(aus, tr$(aktionen[i].name) + CHR$(9) + kuerzelAnzeige$(w[i]))
     NEXT
     RETURN aus
 END FUNCTION

@@ -366,7 +366,7 @@ FUNCTION edBauen() AS INTEGER
     FOR EACH a IN kern.kuerzelAktionen()
         DIM z AS INTEGER : z = gtk_box_new(GTK_WAAGERECHT, 10)
         gtk_container_set_border_width(z, 4)
-        DIM n AS INTEGER : n = gtk_label_new(a.name)
+        DIM n AS INTEGER : n = gtk_label_new(tr$(a.name))
         gtk_label_set_xalign(n, 0.0)
         gtk_widget_set_hexpand(n, TRUE)
         DIM t AS INTEGER : t = gtk_label_new("")
@@ -611,8 +611,8 @@ SUB edKuAnzeigen()
     DIM aktionen AS ARRAY OF kern.Kuerzelaktion : aktionen = kern.kuerzelAktionen()
     DIM i AS INTEGER
     FOR i = 0 TO LEN(edKuText) - 1
-        DIM t AS STRING : t = w[i]
-        IF t <> kern.kuerzelNormal$(aktionen[i].vorgabe) THEN t = t + "  (eigen)"
+        DIM t AS STRING : t = kern.kuerzelAnzeige$(w[i])
+        IF w[i] <> kern.kuerzelNormal$(aktionen[i].vorgabe) THEN t = t + tr$("  (eigen)")
         gtk_label_set_text(edKuText[i], t)
     NEXT
 END SUB
@@ -680,7 +680,7 @@ FUNCTION ekTaste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
     IF k = "Esc" THEN RETURN FALSE             ' bricht ab
     IF k = "Enter" AND ekText <> "" THEN RETURN FALSE
     ekText = k
-    gtk_label_set_text(ekAnzeige, k)
+    gtk_label_set_text(ekAnzeige, kern.kuerzelAnzeige$(k))
     RETURN TRUE
 END FUNCTION
 
@@ -694,7 +694,7 @@ SUB edKuAendern(i AS INTEGER)
     gtk_container_set_border_width(innen, 14)
     gtk_box_pack_start(innen, gtk_label_new("Neue Taste für „" + aktionen[i].name + "“ drücken:"), FALSE, FALSE, 4)
     ekText = ""
-    ekAnzeige = gtk_label_new(kern.kuerzelWirksam(edKuStand())[i])
+    ekAnzeige = gtk_label_new(kern.kuerzelAnzeige$(kern.kuerzelWirksam(edKuStand())[i]))
     gtkKlasse(ekAnzeige, "kartenwert")
     gtk_box_pack_start(innen, ekAnzeige, FALSE, FALSE, 8)
     signalEreignis(d, "key-press-event", ekTaste, 0, 0, 0)
