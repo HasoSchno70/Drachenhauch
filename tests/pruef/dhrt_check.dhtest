@@ -309,6 +309,11 @@ DIM i AS INTEGER
 FOR i = 0 TO LEN(roh) - 1
     IF INSTR(roh[i], "target/") >= 0 OR INSTR(roh[i], "target" + CHR$(92)) >= 0 THEN CONTINUE
     IF LEFT$(BASENAME(roh[i]), 7) = "_dhtmp_" THEN CONTINUE
+    ' Glutfadens Ansicht-Dateien sind TEILE von main.dh: ihre globalen Namen
+    ' (einst, lwHat ...) legt ein anderer Teil an. Allein uebersetzt ist die
+    ' Warnung dort richtig, keine Falschmeldung -- bis Stufe 18 fiel das nur
+    ' nicht auf, weil jede Datei vorher an einem unbekannten kern.-Typ scheiterte.
+    IF INSTR(REPLACE$(roh[i], CHR$(92), "/"), "examples/glutfaden/ansicht/") >= 0 THEN CONTINUE
     ARRAY_PUSH(dateien, wurzel + "/" + roh[i])
 NEXT
 PRINT "genug dateien "; (LEN(dateien) > 300)

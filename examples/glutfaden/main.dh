@@ -89,6 +89,9 @@ IMPORT "ansicht/flaechenteile.dh"
 IMPORT "ansicht/farbleiste.dh"
 IMPORT "ansicht/willkommen.dh"
 IMPORT "ansicht/infoleiste.dh"
+IMPORT "ansicht/optionsleisten.dh"
+IMPORT "ansicht/farbquellen.dh"
+IMPORT "ansicht/drucken.dh"
 
 ' Farben: dunkel wie das Logo, Glut (#ff8a3d) fuer alles, was gewaehlt ist
 CONST STIL = "window, .flaeche { background-color: #1b1c20; color: #e4e5ea; }" + _
@@ -100,6 +103,7 @@ CONST STIL = "window, .flaeche { background-color: #1b1c20; color: #e4e5ea; }" +
     " .werkzeugzeile { background-color: #202228; border-bottom: 1px solid #0c0d10; padding: 3px 8px; }" + _
     " .werkzeugzeile button:checked { background-color: rgba(255,138,61,0.20); box-shadow: inset 0 -2px #ff8a3d; }" + _
     " .werkzeugzeile combobox button { background-image: none; background-color: #2a2c33; color: #d6d9e1; padding: 2px 8px; }" + _
+    " .werkzeugzeile entry, .werkzeugzeile spinbutton { background-image: none; background-color: #2a2c33; color: #e4e5ea; border: 1px solid #3a3c44; box-shadow: none; } .werkzeugzeile spinbutton button { color: #d6d9e1; border: none; background-color: transparent; }" + _
     " .werkzeugzeile separator { background-color: #3a3c44; min-width: 1px; margin: 4px 2px; }" + _
     " .zoom { color: #c9ccd4; min-width: 52px; }" + _
     " .seitenleiste { background-color: #202228; border-left: 1px solid #0c0d10; }" + _
@@ -581,6 +585,10 @@ SUB befehlAusfuehren(kennung AS STRING)
         CASE "vereinen" : ebenenVereinenBefehl(TRUE)
         CASE "nur_aktive" : ebenenAnsicht(0, NOT lwNurAktiv)
         CASE "abdunkeln" : ebenenAnsicht(1, NOT lwAbdunkeln)
+        CASE "drucken" : druckenDialog()
+        CASE "bildschirm_pipette" : bildschirmPipette()
+        CASE "palette_export" : paletteExportieren()
+        CASE "palette_import" : paletteImportieren()
         CASE "willkommen" : willkommenZeigen()
         CASE "farbleiste"
             einst.farbleiste = NOT einst.farbleiste
@@ -607,8 +615,9 @@ FUNCTION taste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM umschalt AS BOOLEAN : umschalt = (z BAND GDK_UMSCHALT) <> 0
     DIM alt AS BOOLEAN : alt = (z BAND GDK_ALT) <> 0
     DIM k AS STRING : k = kern.kuerzelAusTaste$(t, strg, alt, umschalt)
-    ' Im Suchfeld gehoeren Zeichen und Kopieren/Einfuegen/Alles dem Feld
-    IF gtk_widget_has_focus(slSuche) THEN
+    ' Im Suchfeld und im Textfeld der Text-Leiste gehoeren Zeichen und
+    ' Kopieren/Einfuegen/Alles dem Feld
+    IF eingabeHatFokus() THEN
         IF NOT strg AND NOT alt AND (LEN(k) = 1 OR k = "Plus" OR k = "Minus" OR k = "Leertaste") THEN RETURN FALSE
         IF k = "Strg+C" OR k = "Strg+X" OR k = "Strg+V" OR k = "Strg+A" THEN RETURN FALSE
     END IF
@@ -832,6 +841,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe17"
     ELSEIF ARG$(a) = "--probe-stufe18" THEN
         probe = "stufe18"
+    ELSEIF ARG$(a) = "--probe-stufe19" THEN
+        probe = "stufe19"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -895,6 +906,7 @@ IF probe = "stufe15" THEN g_timeout_add(300, vorfuehrenStufe15, 0)
 IF probe = "stufe16" THEN g_timeout_add(300, vorfuehrenStufe16, 0)
 IF probe = "stufe17" THEN g_timeout_add(300, vorfuehrenStufe17, 0)
 IF probe = "stufe18" THEN g_timeout_add(300, vorfuehrenStufe18, 0)
+IF probe = "stufe19" THEN g_timeout_add(300, vorfuehrenStufe19, 0)
 ' Alle fuenf Minuten ein Schnappschuss, wenn etwas ungesichert ist
 DIM takt AS INTEGER : takt = g_timeout_add(300000, vwTakt, 0)
 

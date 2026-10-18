@@ -844,6 +844,8 @@ CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
   "fill_tolerance": 0,
   "backstitch_width": 2,
   "backstitch_snap": true,
+  "backstitch_line_style": 0,
+  "backstitch_cap_style": 0,
   "default_palette": "DMC",
   "show_catalog": true,
   "show_color_bar": true,
@@ -946,8 +948,8 @@ CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 'Del' -> 'Entf' TRUE
 Strg+S | Strg+Umschalt+S | R | = | Plus | 1
 |F5 | Umschalt+Entf | Ä | Strg+Komma | Alt+Enter
-aktionen 66 | ohne vorgabe 8 | krumme vorgaben 0 | zusammenstoesse 0
-tafel 60 | Strg+S sichern | = zoom_rein | Plus zoom_rein | Strg+Umschalt+Z vor | Umschalt+R wz_rechteck_voll | R wz_rechteck
+aktionen 70 | ohne vorgabe 11 | krumme vorgaben 0 | zusammenstoesse 0
+tafel 61 | Strg+S sichern | = zoom_rein | Plus zoom_rein | Strg+Umschalt+Z vor | Umschalt+R wz_rechteck_voll | R wz_rechteck
 sichern F2 | export Strg+E | bibliothek Strg+L | vorschau Strg+S | F9 FALSE
 
 === export: autor und copyright aus den einstellungen, das muster geht vor
@@ -1048,7 +1050,7 @@ CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 rueckgabe 0
 vorgaben: raster 10/5 zelle 20 zoom 1.2 pipette 0 anzeige 1 palette DMC
 farben: 2D2D2D 303050 404060 | stoff FAFAF5
-kuerzel: sichern Strg+S | vor Strg+Y, Strg+Umschalt+Z | zoom_rein Plus, = | 66 Befehle
+kuerzel: sichern Strg+S | vor Strg+Y, Strg+Umschalt+Z | zoom_rein Plus, = | 70 Befehle
 neben nach haupt 8: 7
 kuerzel setzen: '' | '„F2“ hat schon „Sichern“.' | '„Hyper+X“ ist kein Tastenkürzel.' | ''
 angezeigt: F2  (eigen) | Strg+S  (eigen)

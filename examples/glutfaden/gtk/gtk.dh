@@ -226,6 +226,41 @@ DECLARE FUNCTION gdk_pixbuf_get_width LIB PIXBUF (bild AS ZEIGER) AS LONG
 DECLARE FUNCTION gdk_pixbuf_get_height LIB PIXBUF (bild AS ZEIGER) AS LONG
 DECLARE FUNCTION gdk_pixbuf_new_from_file_at_scale LIB PIXBUF (pfad AS TEXT, b AS LONG, h AS LONG, seitenverhaeltnis AS BOOLEAN, BYREF fehler AS ZEIGER) AS ZEIGER
 DECLARE SUB gdk_cairo_set_source_pixbuf LIB GDK (cr AS ZEIGER, bild AS ZEIGER, x AS FLOAT, y AS FLOAT)
+' Bildschirmfoto fuer die Bildschirm-Pipette
+DECLARE FUNCTION gdk_get_default_root_window LIB GDK () AS ZEIGER
+DECLARE FUNCTION gdk_window_get_width LIB GDK (fenster AS ZEIGER) AS LONG
+DECLARE FUNCTION gdk_window_get_height LIB GDK (fenster AS ZEIGER) AS LONG
+DECLARE FUNCTION gdk_pixbuf_get_from_window LIB GDK (fenster AS ZEIGER, x AS LONG, y AS LONG, b AS LONG, h AS LONG) AS ZEIGER
+DECLARE FUNCTION gdk_pixbuf_get_pixels LIB PIXBUF (bild AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gdk_pixbuf_get_rowstride LIB PIXBUF (bild AS ZEIGER) AS LONG
+DECLARE FUNCTION gdk_pixbuf_get_n_channels LIB PIXBUF (bild AS ZEIGER) AS LONG
+DECLARE FUNCTION gdk_pixbuf_new LIB PIXBUF (farbraum AS LONG, alpha AS BOOLEAN, bits AS LONG, b AS LONG, h AS LONG) AS ZEIGER
+DECLARE SUB gdk_pixbuf_fill LIB PIXBUF (bild AS ZEIGER, punkt AS ULONG)
+DECLARE SUB gtk_window_fullscreen LIB GTK (fenster AS ZEIGER)
+DECLARE SUB gtk_window_set_decorated LIB GTK (fenster AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_window_set_keep_above LIB GTK (fenster AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_window_move LIB GTK (fenster AS ZEIGER, x AS LONG, y AS LONG)
+' Drucken (GtkPrintOperation)
+DECLARE FUNCTION gtk_print_operation_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_print_operation_set_n_pages LIB GTK (op AS ZEIGER, seiten AS LONG)
+DECLARE SUB gtk_print_operation_set_job_name LIB GTK (op AS ZEIGER, name AS TEXT)
+DECLARE SUB gtk_print_operation_set_export_filename LIB GTK (op AS ZEIGER, pfad AS TEXT)
+DECLARE SUB gtk_print_operation_set_default_page_setup LIB GTK (op AS ZEIGER, seite AS ZEIGER)
+DECLARE FUNCTION gtk_print_operation_run LIB GTK (op AS ZEIGER, aktion AS LONG, eltern AS ZEIGER, BYREF fehler AS ZEIGER) AS LONG
+DECLARE FUNCTION gtk_page_setup_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_page_setup_set_orientation LIB GTK (seite AS ZEIGER, lage AS LONG)
+DECLARE FUNCTION gtk_page_setup_get_orientation LIB GTK (seite AS ZEIGER) AS LONG
+DECLARE FUNCTION gtk_print_operation_get_default_page_setup LIB GTK (op AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_print_context_get_cairo_context LIB GTK (kontext AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_print_context_get_width LIB GTK (kontext AS ZEIGER) AS FLOAT
+DECLARE FUNCTION gtk_print_context_get_height LIB GTK (kontext AS ZEIGER) AS FLOAT
+CONST GTK_DRUCK_DIALOG = 0                 ' GTK_PRINT_OPERATION_ACTION_PRINT_DIALOG
+CONST GTK_DRUCK_EXPORT = 3                 ' GTK_PRINT_OPERATION_ACTION_EXPORT
+CONST GTK_DRUCK_FEHLER = 0                 ' GtkPrintOperationResult
+CONST GTK_DRUCK_GEDRUCKT = 1
+CONST GTK_DRUCK_ABGEBROCHEN = 2
+CONST GTK_SEITE_HOCH = 0
+CONST GTK_SEITE_QUER = 1
 ' --- Fortschritt und Ereignisse abarbeiten (fuer lange Rechnungen ohne zweiten Faden)
 DECLARE FUNCTION gtk_progress_bar_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_progress_bar_set_fraction LIB GTK (balken AS ZEIGER, anteil AS FLOAT)
@@ -314,6 +349,7 @@ DECLARE SUB gtk_color_chooser_set_rgba LIB GTK (wahl AS ZEIGER, farbe AS GdkRGBA
 DECLARE FUNCTION gdk_display_get_primary_monitor LIB GDK (anzeige AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gdk_display_get_monitor LIB GDK (anzeige AS ZEIGER, n AS LONG) AS ZEIGER
 DECLARE SUB gdk_monitor_get_workarea LIB GDK (monitor AS ZEIGER, flaeche AS PangoRechteck)
+DECLARE SUB gdk_monitor_get_geometry LIB GDK (monitor AS ZEIGER, flaeche AS PangoRechteck)
 DECLARE SUB gtk_window_set_position LIB GTK (w AS ZEIGER, lage AS LONG)
 
 ' --- Pango (Text mit Schriftersatz -- die Symbole stammen aus vielen Bloecken)
@@ -341,6 +377,10 @@ DECLARE FUNCTION signalEreignis LIB GOBJECT ALIAS "g_signal_connect_data" _
     (objekt AS ZEIGER, name AS TEXT, rueckruf AS FUNCTION(objekt AS ZEIGER, ereignis AS ZEIGER, daten AS ZEIGER) AS BOOLEAN, _
      daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
 ' Signale mit einem Wert zwischen Objekt und Daten (row-selected, row-activated)
+' draw-page: Druckvorgang, Kontext, Seitennummer
+DECLARE FUNCTION signalSeite LIB GOBJECT ALIAS "g_signal_connect_data" _
+    (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, kontext AS ZEIGER, seite AS LONG, daten AS ZEIGER), _
+     daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
 DECLARE FUNCTION signalZeile LIB GOBJECT ALIAS "g_signal_connect_data" _
     (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, zeile AS ZEIGER, daten AS ZEIGER), _
      daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG

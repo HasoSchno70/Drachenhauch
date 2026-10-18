@@ -1,0 +1,245 @@
+' Optionsleisten der Werkzeuge in der Werkzeugzeile (PySticky
+' ui/panels/backstitch_options_panel.py und text_options_panel.py) -- wie die
+' Verlaufsleiste nur beim passenden Werkzeug zu sehen.
+'
+' Rueckstich: Dicke, Linienart, Enden, Einrasten und eine kleine Vorschau.
+' Sie wirken auf Zeichenflaeche und Muster-Vorschau und werden gemerkt
+' (backstitch_width, _line_style, _cap_style, _snap); PySticky merkt nur
+' Breite und Einrasten.
+' Text: Text, Schrift, Groesse, fett, kursiv. Ein Klick ins Muster haengt den
+' Text an die Maus, ein zweiter setzt ihn (wie bisher) -- statt erst einen
+' Dialog zu fragen. Aendert sich etwas, waehrend der Text an der Maus haengt,
+' haengt der neue.
+'
+' Drehfelder und Klapplisten nehmen keinen Tastaturfokus: eine getippte "1"
+' im Drehfeld schaltete sonst den Zoom auf 100 %. Das Textfeld nimmt ihn --
+' main.dh/taste laesst ihm dann die Zeichen (eingabeHatFokus).
+
+DIM rlBox AS INTEGER
+DIM rlDicke AS INTEGER
+DIM rlLinie AS INTEGER
+DIM rlEnden AS INTEGER
+DIM rlEinrasten AS INTEGER
+DIM rlVorschau AS INTEGER
+DIM rlSperre AS BOOLEAN
+
+DIM tlBox AS INTEGER
+DIM tlFeld AS INTEGER
+DIM tlSchrift AS INTEGER
+DIM tlGroesse AS INTEGER
+DIM tlFett AS INTEGER
+DIM tlKursiv AS INTEGER
+DIM tlSperre AS BOOLEAN
+
+FUNCTION olBeschriftung(text AS STRING) AS INTEGER
+    DIM l AS INTEGER : l = gtk_label_new(text)
+    gtkKlasse(l, "nebensache")
+    RETURN l
+END FUNCTION
+
+FUNCTION olWahl(eintraege AS ARRAY OF STRING, tippText AS STRING) AS INTEGER
+    DIM w AS INTEGER : w = gtk_combo_box_text_new()
+    gtk_widget_set_can_focus(w, FALSE)
+    gtk_widget_set_tooltip_text(w, tippText)
+    DIM s AS STRING
+    FOR EACH s IN eintraege
+        gtk_combo_box_text_append_text(w, s)
+    NEXT
+    RETURN w
+END FUNCTION
+
+' --- Rueckstich -----------------------------------------------------------------------
+
+FUNCTION rueckLeisteNeu() AS INTEGER
+    rlBox = gtk_box_new(GTK_WAAGERECHT, 4)
+    gtk_box_pack_start(rlBox, olBeschriftung("Dicke"), FALSE, FALSE, 4)
+    rlDicke = gtk_spin_button_new_with_range(1, 5, 1)
+    gtk_entry_set_width_chars(rlDicke, 2)
+    gtk_widget_set_can_focus(rlDicke, FALSE)
+    gtk_widget_set_tooltip_text(rlDicke, "Linienbreite der Rückstiche (2 = wie vorgesehen)")
+    gtk_box_pack_start(rlBox, rlDicke, FALSE, FALSE, 0)
+    gtk_box_pack_start(rlBox, olBeschriftung("Linie"), FALSE, FALSE, 4)
+    rlLinie = olWahl(["Durchgezogen", "Gestrichelt", "Gepunktet", "Strich-Punkt"], "Linienart der Rückstiche")
+    gtk_box_pack_start(rlBox, rlLinie, FALSE, FALSE, 0)
+    gtk_box_pack_start(rlBox, olBeschriftung("Enden"), FALSE, FALSE, 4)
+    rlEnden = olWahl(["Rund", "Eckig", "Flach"], "Form der Linienenden")
+    gtk_box_pack_start(rlBox, rlEnden, FALSE, FALSE, 0)
+    rlEinrasten = gtk_check_button_new_with_label("Einrasten")
+    gtk_widget_set_can_focus(rlEinrasten, FALSE)
+    gtk_widget_set_tooltip_text(rlEinrasten, "An Rasterpunkte einrasten: Ecken, Kantenmitten und Mitte der Kästchen -- aus = nur Ecken")
+    gtk_box_pack_start(rlBox, rlEinrasten, FALSE, FALSE, 4)
+    rlVorschau = gtk_drawing_area_new()
+    gtk_widget_set_size_request(rlVorschau, 60, 22)
+    gtk_widget_set_valign(rlVorschau, GTK_AUSRICHTEN_MITTE)
+    gtk_widget_set_tooltip_text(rlVorschau, "Vorschau in der aktuellen Farbe")
+    signalZeichnen(rlVorschau, "draw", rlVorschauZeichnen, 0, 0, 0)
+    gtk_box_pack_start(rlBox, rlVorschau, FALSE, FALSE, 4)
+    ' erst alles zeigen, dann die Leiste selbst verbergen: mit no_show_all
+    ' zeigte das show_all des Fensters ihre Kinder nie
+    gtk_widget_show_all(rlBox)
+    gtk_widget_hide(rlBox)
+    gtk_widget_set_no_show_all(rlBox, TRUE)
+    rueckLeisteNachziehen()
+    signal(rlDicke, "value-changed", rlGeaendert, 0, 0, 0)
+    signal(rlLinie, "changed", rlGeaendert, 0, 0, 0)
+    signal(rlEnden, "changed", rlGeaendert, 0, 0, 0)
+    signal(rlEinrasten, "toggled", rlGeaendert, 0, 0, 0)
+    RETURN rlBox
+END FUNCTION
+
+' Die Leiste aus den Einstellungen (auch nach dem Einstellungs-Dialog)
+SUB rueckLeisteNachziehen()
+    IF rlBox = 0 THEN RETURN
+    rlSperre = TRUE
+    IF gtk_spin_button_get_value_as_int(rlDicke) <> einst.rueckBreite THEN gtk_spin_button_set_value(rlDicke, einst.rueckBreite)
+    IF gtk_combo_box_get_active(rlLinie) <> einst.rueckLinie THEN gtk_combo_box_set_active(rlLinie, einst.rueckLinie)
+    IF gtk_combo_box_get_active(rlEnden) <> einst.rueckKappe THEN gtk_combo_box_set_active(rlEnden, einst.rueckKappe)
+    IF gtk_toggle_button_get_active(rlEinrasten) <> einst.rueckEinrasten THEN gtk_toggle_button_set_active(rlEinrasten, einst.rueckEinrasten)
+    rlSperre = FALSE
+    gtk_widget_queue_draw(rlVorschau)
+END SUB
+
+SUB rlGeaendert(w AS INTEGER, daten AS INTEGER)
+    IF rlSperre THEN RETURN
+    rueckOptionenSetzen(gtk_spin_button_get_value_as_int(rlDicke), MAX(0, gtk_combo_box_get_active(rlLinie)), MAX(0, gtk_combo_box_get_active(rlEnden)), gtk_toggle_button_get_active(rlEinrasten))
+END SUB
+
+' Setzen, merken, neu zeichnen -- der eine Weg fuer Leiste und Proben
+SUB rueckOptionenSetzen(dicke AS INTEGER, linie AS INTEGER, kappe AS INTEGER, einrasten AS BOOLEAN)
+    einst.rueckBreite = CLAMP(dicke, 1, 5)
+    einst.rueckLinie = CLAMP(linie, 0, 3)
+    einst.rueckKappe = CLAMP(kappe, 0, 2)
+    einst.rueckEinrasten = einrasten
+    einstellungenMerken()
+    rueckLeisteNachziehen()
+    IF lwFlaeche <> 0 THEN gtk_widget_queue_draw(lwFlaeche)
+END SUB
+
+FUNCTION rlVorschauZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM b AS FLOAT : b = gtk_widget_get_allocated_width(w)
+    DIM h AS FLOAT : h = gtk_widget_get_allocated_height(w)
+    cairoFarbe(cr, einst.stoff)
+    cairo_rectangle(cr, 0, 0, b, h)
+    cairo_fill(cr)
+    DIM farbe AS INTEGER : farbe = &H202020
+    IF lwHat THEN
+        IF wzFarbe >= 0 AND wzFarbe < lwMuster.farbanzahl() THEN farbe = lwMuster.farben[wzFarbe].garn.farbe
+    END IF
+    ' so breit wie auf der Zeichenflaeche bei 20 Punkten je Kaestchen
+    vbStrich(cr, 8, h / 2, b - 8, h / 2, farbe, 1, rueckLinienbreite(20), einst.rueckLinie, einst.rueckKappe)
+    RETURN TRUE
+END FUNCTION
+
+' Linienbreite bei z Punkten je Kaestchen (Breite 2 = wie vorgesehen)
+FUNCTION rueckLinienbreite(z AS FLOAT) AS FLOAT
+    RETURN MAX(1.0, MAX(1.5, z / 6) + einst.rueckBreite - 2)
+END FUNCTION
+
+SUB rueckLeisteZeigen(an AS BOOLEAN)
+    IF rlBox = 0 THEN RETURN
+    gtk_widget_set_visible(rlBox, an)
+    IF an THEN rueckLeisteNachziehen()
+END SUB
+
+' --- Text -----------------------------------------------------------------------------
+
+FUNCTION textLeisteNeu() AS INTEGER
+    IF txSchrift = "" THEN
+        txSchrift = "Sans"
+        txGroesse = 12
+    END IF
+    tlBox = gtk_box_new(GTK_WAAGERECHT, 4)
+    tlFeld = gtk_entry_new()
+    gtk_entry_set_placeholder_text(tlFeld, "Text eingeben…")
+    gtk_entry_set_width_chars(tlFeld, 14)
+    gtk_widget_set_tooltip_text(tlFeld, "Der Text -- Enter hängt ihn an die Maus, ein Klick ins Muster setzt ihn, Esc bricht ab")
+    gtk_box_pack_start(tlBox, tlFeld, FALSE, FALSE, 4)
+    tlSchrift = olWahl(textSchriften(), "Schriftart")
+    gtk_box_pack_start(tlBox, tlSchrift, FALSE, FALSE, 0)
+    tlGroesse = gtk_spin_button_new_with_range(6, 72, 1)
+    gtk_entry_set_width_chars(tlGroesse, 3)
+    gtk_widget_set_can_focus(tlGroesse, FALSE)
+    gtk_widget_set_tooltip_text(tlGroesse, "Größe in Punkt (12 Punkt = 16 Kästchen hoch)")
+    gtk_box_pack_start(tlBox, tlGroesse, FALSE, FALSE, 0)
+    tlFett = gtk_check_button_new_with_label("Fett")
+    gtk_widget_set_can_focus(tlFett, FALSE)
+    gtk_box_pack_start(tlBox, tlFett, FALSE, FALSE, 0)
+    tlKursiv = gtk_check_button_new_with_label("Kursiv")
+    gtk_widget_set_can_focus(tlKursiv, FALSE)
+    gtk_box_pack_start(tlBox, tlKursiv, FALSE, FALSE, 0)
+    ' erst alles zeigen, dann die Leiste selbst verbergen: mit no_show_all
+    ' zeigte das show_all des Fensters ihre Kinder nie
+    gtk_widget_show_all(tlBox)
+    gtk_widget_hide(tlBox)
+    gtk_widget_set_no_show_all(tlBox, TRUE)
+    textLeisteNachziehen()
+    signal(tlFeld, "changed", tlGeaendert, 0, 0, 0)
+    signal(tlFeld, "activate", tlEnter, 0, 0, 0)
+    signal(tlSchrift, "changed", tlGeaendert, 0, 0, 0)
+    signal(tlGroesse, "value-changed", tlGeaendert, 0, 0, 0)
+    signal(tlFett, "toggled", tlGeaendert, 0, 0, 0)
+    signal(tlKursiv, "toggled", tlGeaendert, 0, 0, 0)
+    RETURN tlBox
+END FUNCTION
+
+SUB textLeisteNachziehen()
+    IF tlBox = 0 THEN RETURN
+    tlSperre = TRUE
+    IF gtk_entry_get_text(tlFeld) <> txText THEN gtk_entry_set_text(tlFeld, txText)
+    DIM i AS INTEGER : i = MAX(0, ARRAY_INDEXOF(textSchriften(), txSchrift))
+    IF gtk_combo_box_get_active(tlSchrift) <> i THEN gtk_combo_box_set_active(tlSchrift, i)
+    IF gtk_spin_button_get_value_as_int(tlGroesse) <> txGroesse THEN gtk_spin_button_set_value(tlGroesse, txGroesse)
+    IF gtk_toggle_button_get_active(tlFett) <> txFett THEN gtk_toggle_button_set_active(tlFett, txFett)
+    IF gtk_toggle_button_get_active(tlKursiv) <> txKursiv THEN gtk_toggle_button_set_active(tlKursiv, txKursiv)
+    tlSperre = FALSE
+END SUB
+
+SUB tlGeaendert(w AS INTEGER, daten AS INTEGER)
+    IF tlSperre THEN RETURN
+    txText = gtk_entry_get_text(tlFeld)
+    txSchrift = textSchriften()[MAX(0, gtk_combo_box_get_active(tlSchrift))]
+    txGroesse = gtk_spin_button_get_value_as_int(tlGroesse)
+    txFett = gtk_toggle_button_get_active(tlFett)
+    txKursiv = gtk_toggle_button_get_active(tlKursiv)
+    ' haengt schon ein Text an der Maus, haengt jetzt der neue
+    IF mrEinfuegen AND mrEinfuegenText = "Text" THEN
+        IF TRIM$(txText) = "" THEN
+            mehrAbbrechen()
+        ELSE
+            textAnhaengen()
+        END IF
+    END IF
+END SUB
+
+' Enter im Textfeld: an die Maus haengen; der Fokus geht zurueck aufs Muster
+SUB tlEnter(w AS INTEGER, daten AS INTEGER)
+    textAusLeiste()
+END SUB
+
+SUB textAusLeiste()
+    IF NOT lwHat THEN RETURN
+    IF TRIM$(txText) = "" THEN
+        statusMeldung("Erst einen Text eingeben -- oben in der Leiste.")
+        RETURN
+    END IF
+    IF NOT wzFarbeDa() THEN RETURN
+    textAnhaengen()
+    IF lwFlaeche <> 0 THEN gtk_widget_grab_focus(lwFlaeche)
+END SUB
+
+SUB textLeisteZeigen(an AS BOOLEAN)
+    IF tlBox = 0 THEN RETURN
+    gtk_widget_set_visible(tlBox, an)
+    IF an THEN textLeisteNachziehen()
+END SUB
+
+' Hat ein Eingabefeld den Fokus, das die Zeichen selbst braucht?
+FUNCTION eingabeHatFokus() AS BOOLEAN
+    IF slSuche <> 0 THEN
+        IF gtk_widget_has_focus(slSuche) THEN RETURN TRUE
+    END IF
+    IF tlFeld <> 0 THEN
+        IF gtk_widget_has_focus(tlFeld) THEN RETURN TRUE
+    END IF
+    RETURN FALSE
+END FUNCTION
