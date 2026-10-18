@@ -1,0 +1,223 @@
+' Glutfaden Stufe 23: magnetisches Raster (Linie, Rechteck, Ellipse und
+' Vieleck rasten ein, kern.einrasten, Knopf mit Magnet), Pinsel nach
+' Stiftdruck (kern.pinselZellen, lwDruckLesen) und Pinch-Zoom (GtkGestureZoom,
+' kern.pinchSchritt).
+'
+' Der erste Fall ist gegen PySticky aufgezeichnet: CoordinatesMixin.
+' snap_position, PencilTool._brush_cells und TabletGestureMixin.
+' _handle_gesture, mit Stellvertretern fuer Leinwand, Werkzeug und Geste
+' aufgerufen -- PySticky rundet mit Pythons round (bei .5 zur geraden Zahl).
+' Stiftdruck und Geste lassen sich ohne Geraet nicht ausloesen; die Probe
+' setzt den Zustand, den ein Stift hinterlaesst, und prueft, dass ein
+' Maus-Ereignis keinen Druck liefert.
+
+=== einrasten, pinsel und pinch wie pysticky
+IMPORT "helfer.dh"
+FUNCTION kurz$(t AS STRING) AS STRING
+    RETURN LEFT$(LOWER$(MD5$(t)), 12)
+END FUNCTION
+
+DIM st AS ARRAY OF INTEGER : st = [5, 14, 8, 2, 30, 30, 4, 30, 30, 1, 9, 9, 7, 40, 20, 10, 23, 17]
+DIM pk AS ARRAY OF INTEGER : pk = [0, 0, 1, 1, 2, 3, 3, 4, 5, 5, 6, 7, 9, 9, 12, 7, 13, 7, 15, 2, 22, 16, -3, 4, 40, 40]
+DIM i AS INTEGER, k AS INTEGER, sx AS INTEGER, sy AS INTEGER
+FOR i = 0 TO LEN(st) - 3 STEP 3
+    DIM teile AS ARRAY OF STRING : teile = []
+    FOR k = 0 TO LEN(pk) - 2 STEP 2
+        (sx, sy) = kern.einrasten(pk[k], pk[k + 1], st[i], st[i + 1], st[i + 2])
+        ARRAY_PUSH(teile, STR$(pk[k]) + "," + STR$(pk[k + 1]) + "->" + STR$(sx) + "," + STR$(sy))
+    NEXT
+    PRINT "einrasten "; st[i]; " in "; st[i + 1]; "x"; st[i + 2]; ": "; JOIN$(teile, " ")
+NEXT
+DIM g AS INTEGER, d AS STRING
+FOR EACH g IN [1, 2, 5, 8, 20]
+    FOR EACH d IN ["0.0", "0.1", "0.125", "0.25", "0.375", "0.5", "0.75", "1.0"]
+        DIM z AS ARRAY OF INTEGER : z = kern.pinselZellen(10, 10, VAL(d), g)
+        DIM s AS ARRAY OF STRING : s = []
+        FOR k = 0 TO LEN(z) - 2 STEP 2
+            ARRAY_PUSH(s, STR$(z[k]) + "," + STR$(z[k + 1]))
+        NEXT
+        PRINT "pinsel "; g; " druck "; d; ": "; LEN(s); " "; kurz$(JOIN$(s, ";"))
+    NEXT
+NEXT
+DIM folgen AS ARRAY OF STRING : folgen = ["1.1 1.2 1.3 1.4 1.2 1.15 0.9", "1.15 1.16 1.33 1.34", "0.87 0.86 0.75 0.74", "2.0 4.0 1.0 0.5", "1.0 1.0001 0.99"]
+DIM f AS STRING
+FOR EACH f IN folgen
+    DIM letzte AS FLOAT : letzte = 1.0
+    DIM aus AS STRING : aus = ""
+    DIM w AS STRING
+    FOR EACH w IN SPLIT$(f, " ")
+        DIM sch AS INTEGER : sch = kern.pinchSchritt(VAL(w), letzte)
+        aus = aus + IIF(sch > 0, "+", IIF(sch < 0, "-", "0"))
+        IF sch <> 0 THEN letzte = VAL(w)
+    NEXT
+    PRINT "pinch "; f; ": "; aus
+NEXT
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- erwartet
+einrasten 5 in 14x8: 0,0->0,0 1,1->0,0 2,3->0,5 3,4->5,5 5,5->5,5 6,7->5,5 9,9->10,7 12,7->10,5 13,7->13,5 15,2->13,0 22,16->13,7 -3,4->0,5 40,40->13,7
+einrasten 2 in 30x30: 0,0->0,0 1,1->0,0 2,3->2,4 3,4->4,4 5,5->4,4 6,7->6,8 9,9->8,8 12,7->12,8 13,7->12,8 15,2->16,2 22,16->22,16 -3,4->0,4 40,40->29,29
+einrasten 4 in 30x30: 0,0->0,0 1,1->0,0 2,3->0,4 3,4->4,4 5,5->4,4 6,7->8,8 9,9->8,8 12,7->12,8 13,7->12,8 15,2->16,0 22,16->24,16 -3,4->0,4 40,40->29,29
+einrasten 1 in 9x9: 0,0->0,0 1,1->1,1 2,3->2,3 3,4->3,4 5,5->5,5 6,7->6,7 9,9->8,8 12,7->8,7 13,7->8,7 15,2->8,2 22,16->8,8 -3,4->0,4 40,40->8,8
+einrasten 7 in 40x20: 0,0->0,0 1,1->0,0 2,3->0,0 3,4->0,7 5,5->7,7 6,7->7,7 9,9->7,7 12,7->14,7 13,7->14,7 15,2->14,0 22,16->21,14 -3,4->0,7 40,40->39,19
+einrasten 10 in 23x17: 0,0->0,0 1,1->0,0 2,3->0,0 3,4->0,0 5,5->0,0 6,7->10,10 9,9->10,10 12,7->10,10 13,7->10,10 15,2->20,0 22,16->20,16 -3,4->0,0 40,40->22,16
+pinsel 1 druck 0.0: 1 9fe0f7c2d9f0
+pinsel 1 druck 0.1: 1 9fe0f7c2d9f0
+pinsel 1 druck 0.125: 1 9fe0f7c2d9f0
+pinsel 1 druck 0.25: 1 9fe0f7c2d9f0
+pinsel 1 druck 0.375: 1 9fe0f7c2d9f0
+pinsel 1 druck 0.5: 1 9fe0f7c2d9f0
+pinsel 1 druck 0.75: 1 9fe0f7c2d9f0
+pinsel 1 druck 1.0: 1 9fe0f7c2d9f0
+pinsel 2 druck 0.0: 1 9fe0f7c2d9f0
+pinsel 2 druck 0.1: 1 9fe0f7c2d9f0
+pinsel 2 druck 0.125: 1 9fe0f7c2d9f0
+pinsel 2 druck 0.25: 1 9fe0f7c2d9f0
+pinsel 2 druck 0.375: 1 9fe0f7c2d9f0
+pinsel 2 druck 0.5: 1 9fe0f7c2d9f0
+pinsel 2 druck 0.75: 5 48440b2a5789
+pinsel 2 druck 1.0: 5 48440b2a5789
+pinsel 5 druck 0.0: 1 9fe0f7c2d9f0
+pinsel 5 druck 0.1: 1 9fe0f7c2d9f0
+pinsel 5 druck 0.125: 1 9fe0f7c2d9f0
+pinsel 5 druck 0.25: 5 48440b2a5789
+pinsel 5 druck 0.375: 13 6ca5a87cd9ba
+pinsel 5 druck 0.5: 13 6ca5a87cd9ba
+pinsel 5 druck 0.75: 29 7ed8fba89747
+pinsel 5 druck 1.0: 49 672774a928fb
+pinsel 8 druck 0.0: 1 9fe0f7c2d9f0
+pinsel 8 druck 0.1: 5 48440b2a5789
+pinsel 8 druck 0.125: 5 48440b2a5789
+pinsel 8 druck 0.25: 13 6ca5a87cd9ba
+pinsel 8 druck 0.375: 29 7ed8fba89747
+pinsel 8 druck 0.5: 49 672774a928fb
+pinsel 8 druck 0.75: 81 8cef3822ac44
+pinsel 8 druck 1.0: 149 8c2ca282a363
+pinsel 20 druck 0.0: 1 9fe0f7c2d9f0
+pinsel 20 druck 0.1: 13 6ca5a87cd9ba
+pinsel 20 druck 0.125: 13 6ca5a87cd9ba
+pinsel 20 druck 0.25: 81 8cef3822ac44
+pinsel 20 druck 0.375: 149 8c2ca282a363
+pinsel 20 druck 0.5: 317 5eaa7d7dd643
+pinsel 20 druck 0.75: 613 b07370aed871
+pinsel 20 druck 1.0: 1129 362a04506538
+pinch 1.1 1.2 1.3 1.4 1.2 1.15 0.9: 0+0+-0-
+pinch 1.15 1.16 1.33 1.34: 0+0+
+pinch 0.87 0.86 0.75 0.74: 0-0-
+pinch 2.0 4.0 1.0 0.5: ++--
+pinch 1.0 1.0001 0.99: 000
+
+=== kern: rundung, raender, einstellungen, befehl
+IMPORT "helfer.dh"
+' Pythons round: bei .5 zur geraden Zahl, auch negativ
+DIM z AS FLOAT
+FOR EACH z IN [0.5, 1.5, 2.5, -0.5, -1.5, 2.4999, 2.5001, 0.0, -2.6]
+    PRINT z; " -> "; kern.rundenGerade(z); " | ";
+NEXT
+PRINT
+' Intervall unter 1 gilt als 1, ohne Mustergroesse kein Klemmen
+DIM x AS INTEGER, y AS INTEGER
+(x, y) = kern.einrasten(7, 8, 0, 20, 20)
+PRINT "intervall 0: "; x; ","; y;
+(x, y) = kern.einrasten(97, -12, 10, 0, 0)
+PRINT " | ohne muster: "; x; ","; y
+' Druck ueber 1 zaehlt wie 1, darunter 0 wie die Maus
+PRINT "druck 3: "; LEN(kern.pinselZellen(0, 0, 3.0, 5)) \ 2; " | druck -1: "; LEN(kern.pinselZellen(4, 4, -1.0, 5)) \ 2; " | groesse 0: "; LEN(kern.pinselZellen(4, 4, 1.0, 0)) \ 2
+' Ohne vorigen Faktor (0) zaehlt der erste Schritt
+PRINT "pinch ohne vorher: "; kern.pinchSchritt(1.0, 0.0); " "; kern.pinchSchritt(0.0, 1.0)
+' Die neuen Einstellungen
+DIM es AS kern.Einstellungen : es = NEW kern.Einstellungen()
+PRINT "vorgaben: "; es.einrasten; " "; es.rasterSchritt; " "; es.stiftDruck; " "; es.pinselGroesse; " "; es.gesten
+es.einrasten = TRUE : es.rasterSchritt = 7 : es.stiftDruck = FALSE : es.pinselGroesse = 12 : es.gesten = TRUE
+WRITEALL("es.json", kern.einstellungenJson$(es))
+DIM zl AS STRING
+FOR EACH zl IN READLINES("es.json")
+    IF INSTR(zl, "snap_") >= 0 OR INSTR(zl, "tablet") >= 0 OR INSTR(zl, "touch") >= 0 THEN PRINT TRIM$(zl)
+NEXT
+DIM gl AS kern.Einstellungen : gl = kern.einstellungenLaden("es.json")
+PRINT "gelesen: "; gl.einrasten; " "; gl.rasterSchritt; " "; gl.stiftDruck; " "; gl.pinselGroesse; " "; gl.gesten
+WRITEALL("krumm.json", "{" + CHR$(34) + "snap_interval" + CHR$(34) + ": 0, " + CHR$(34) + "tablet/max_brush_size" + CHR$(34) + ": 99, " + CHR$(34) + "touch/gestures_enabled" + CHR$(34) + ": " + CHR$(34) + "ja" + CHR$(34) + "}")
+gl = kern.einstellungenLaden("krumm.json")
+PRINT "krumm: schritt "; gl.rasterSchritt; " | pinsel "; gl.pinselGroesse; " | gesten "; gl.gesten
+' Der Befehl in der Kuerzel-Tafel
+PRINT "befehl einrasten: "; kern.kuerzelVon$(es, "einrasten") = ""; " | tafel "; LEN(kern.kuerzelAktionen())
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- erwartet
+0.5 -> 0 | 1.5 -> 2 | 2.5 -> 2 | -0.5 -> 0 | -1.5 -> -2 | 2.4999 -> 2 | 2.5001 -> 3 | 0.0 -> 0 | -2.6 -> -3 | 
+intervall 0: 7,8 | ohne muster: 100,-10
+druck 3: 49 | druck -1: 1 | groesse 0: 1
+pinch ohne vorher: 1 -1
+vorgaben: FALSE 5 TRUE 5 FALSE
+"snap_enabled": true,
+"snap_interval": 7,
+"tablet/pressure_enabled": false,
+"tablet/max_brush_size": 12,
+"touch/gestures_enabled": true,
+gelesen: TRUE 7 FALSE 12 TRUE
+krumm: schritt 1 | pinsel 20 | gesten FALSE
+befehl einrasten: TRUE | tafel 77
+
+=== probe: einrasten, druck, pinch, dialog
+IMPORT "helfer.dh"
+' --probe-stufe23 mit alle.pxs: Knopf und Befehl, Linie/Rechteck/Rand/
+' Vieleck eingerastet, Stift nicht, aus wieder genau; Pinsel nach Druck
+' (Zustand wie nach einem Stift), Maus-Ereignis ohne Druck; Pinch an/aus und
+' eine Folge; die Felder im Einstellungsdialog.
+MKDIR("app")
+SETENV("APPDATA", CWD$() + "/app")
+SETENV("HOME", CWD$() + "/app")
+dlStarten(["run", BEISPIEL, "--", "--probe-stufe23", "--foto", "d", "alle.pxs"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT REPLACE$(dlAus, CHR$(13), "");
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    PRINT "leiste "; FILEEXISTS("d_leiste.png")
+    PRINT "datei unveraendert: "; READLINES("alle.pxs")[0] = READLINES("vorher.pxs")[0]
+END IF
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- datei alle.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- datei vorher.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- erwartet
+rueckgabe 0
+vorgaben: einrasten FALSE alle 5 | druck TRUE pinsel 5 | gesten FALSE
+knopf: FALSE | tipp 'Magnetisches Raster: L' | kuerzel-befehl TRUE
+umgeschaltet: TRUE | knopf TRUE | Magnetisches Raster aktiviert (alle 5 Zellen)
+linie eingerastet: stiche 6 | (5,5) TRUE (10,5) TRUE | (3,4) leer TRUE
+rechteck: stiche 30 | ecke (0,0) TRUE | (10,5) TRUE
+am rand: stiche 1 | (13,5) TRUE
+vieleck: maus 5,5 | ecke 5,5
+stift rastet nicht: (3,4) TRUE
+aus: (3,4) TRUE | Magnetisches Raster deaktiviert
+stift halber druck: stiche 13 | voller druck: 48 | leichter druck: 1
+strich mit druck: stiche 33
+radierer ohne pinsel: FALSE | druck aus: FALSE | pinsel 1: FALSE
+maus-ereignis: stift FALSE druck 0.0
+maus: stiche 1
+pinch: phase 0 -> 2
+pinch-folge: 0+0+-0- | zuletzt 0.9
+dialog: einrasten FALSE alle 5 grau TRUE | druck TRUE pinsel 5 | gesten TRUE | rueckstich unberuehrt TRUE
+  schritt frei: TRUE
+uebernommen: TRUE 10 8 FALSE | knopf TRUE | phase 0 | gemerkt TRUE 10 8 FALSE
+leiste TRUE
+datei unveraendert: TRUE

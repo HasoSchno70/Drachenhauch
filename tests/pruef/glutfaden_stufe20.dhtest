@@ -328,7 +328,7 @@ a.pxs 1 | B.PXS 1 | x.oxs 1 | x.xsd 1 | x.pat 1 | foto.JPEG 2 | f.jpg 2 | f.png 
 uri: 'file:///C:/a.pxs'
 uri: 'file:///tmp/b%20c.png'
 leer: 0 0
-kuerzel: 76 = tafel 76 | ohne 15
+kuerzel: 77 = tafel 77 | ohne 16
 erste: Neues Muster -> Strg+N
   Ebene leeren -> 
   Zentrierhilfe -> 
@@ -375,7 +375,7 @@ CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
 nur Text
 --- erwartet
 rueckgabe 0
-kuerzel: f1 F1 | leeren '' | tafel 76
+kuerzel: f1 F1 | leeren '' | tafel 77
 geleert: 5 -> 0 | zeile 'Oben  (0)' | rueckstiche 4 | 'Ebene 'Oben' geleert' | Ebene „Oben“ geleert.
 noch einmal: Die Ebene „Oben“ ist schon leer.
 zurueck: wie vorher TRUE
@@ -388,7 +388,7 @@ ebene gewechselt: aktiv 0 | oben 'Vordergrund' | feld jetzt ''
 vor dem befehl: unten 'Grund'
 vor dem neuaufbau: unten 'Rand' | feld 'Rand'
 viermal zurueck: wie vorher TRUE | notizen '' ''
-f1: war offen TRUE | zeilen 76
+f1: war offen TRUE | zeilen 77
 schalter: rueck TRUE fortschritt TRUE mitte FALSE | knoepfe TRUE TRUE FALSE
 ohne rueckstiche: FALSE knopf FALSE | anders TRUE | Rückstiche anzeigen: aus
 rueckstich-werkzeug: zeigt wieder TRUE knopf TRUE | wie vorher TRUE
