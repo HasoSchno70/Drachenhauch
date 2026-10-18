@@ -1,0 +1,117 @@
+' Speichern und Laden -- Namensraum "kern". Format .fkn = JSON (Version 1).
+' Sparsam: Drehung nur wenn <>0, Spiegelung nur wenn gesetzt, Wert nur bei
+' Abweichung vom Symbol-Vorgabewert. Knoten werden beim Laden neu berechnet.
+
+FUNCTION dokumentSpeichern(dok AS Dokument, pfad AS STRING) AS BOOLEAN
+    DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+    JSON_SET_STRING(j, "version", "1")
+    JSON_SET_STRING(j, "id", dok.id)
+    JSON_SET_STRING(j, "titel", dok.titel)
+    JSON_SET_JSON(j, "blaetter", JSON_NEW_ARRAY())
+    DIM bi AS INTEGER, ci AS INTEGER, wi AS INTEGER, li AS INTEGER, pk AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        DIM bl AS Blatt : bl = dok.blaetter[bi]
+        DIM b AS JSON_HANDLE : b = JSON_NEW_OBJECT()
+        JSON_SET_STRING(b, "id", bl.id)
+        JSON_SET_STRING(b, "name", bl.name)
+        JSON_SET_INT(b, "breite", bl.breite)
+        JSON_SET_INT(b, "hoehe", bl.hoehe)
+        JSON_SET_JSON(b, "bauteile", JSON_NEW_ARRAY())
+        FOR ci = 0 TO LEN(bl.bauteile) - 1
+            DIM bt AS Bauteil : bt = bl.bauteile[ci]
+            DIM c AS JSON_HANDLE : c = JSON_NEW_OBJECT()
+            JSON_SET_STRING(c, "id", bt.id)
+            JSON_SET_STRING(c, "sym", bt.symbolRef)
+            JSON_SET_STRING(c, "ref", bt.referenz)
+            JSON_SET_INT(c, "x", bt.lage.pos.x)
+            JSON_SET_INT(c, "y", bt.lage.pos.y)
+            IF bt.lage.drehung <> 0 THEN JSON_SET_INT(c, "rot", bt.lage.drehung)
+            IF bt.lage.gespiegelt THEN JSON_SET_BOOL(c, "sp", TRUE)
+            IF bt.wert <> bt.sym.wertVorgabe THEN JSON_SET_STRING(c, "wert", bt.wert)
+            JSON_APPEND_JSON(b, "bauteile", c)
+        NEXT
+        JSON_SET_JSON(b, "draehte", JSON_NEW_ARRAY())
+        FOR wi = 0 TO LEN(bl.draehte) - 1
+            DIM w AS Draht : w = bl.draehte[wi]
+            DIM wj AS JSON_HANDLE : wj = JSON_NEW_OBJECT()
+            JSON_SET_STRING(wj, "id", w.id)
+            JSON_SET_JSON(wj, "pts", JSON_NEW_ARRAY())
+            FOR pk = 0 TO LEN(w.punkte) - 1
+                JSON_APPEND_INT(wj, "pts", w.punkte[pk].x)
+                JSON_APPEND_INT(wj, "pts", w.punkte[pk].y)
+            NEXT
+            JSON_APPEND_JSON(b, "draehte", wj)
+        NEXT
+        JSON_SET_JSON(b, "labels", JSON_NEW_ARRAY())
+        FOR li = 0 TO LEN(bl.labels) - 1
+            DIM la AS Label : la = bl.labels[li]
+            DIM lj AS JSON_HANDLE : lj = JSON_NEW_OBJECT()
+            JSON_SET_STRING(lj, "txt", la.text)
+            JSON_SET_INT(lj, "x", la.anker.x)
+            JSON_SET_INT(lj, "y", la.anker.y)
+            JSON_SET_INT(lj, "art", la.art)
+            IF la.drehung <> 0 THEN JSON_SET_INT(lj, "rot", la.drehung)
+            JSON_APPEND_JSON(b, "labels", lj)
+        NEXT
+        JSON_APPEND_JSON(j, "blaetter", b)
+    NEXT
+    TRY
+        WRITEALL(pfad, JSON_STRINGIFY(j))
+    CATCH e
+        RETURN FALSE
+    END TRY
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION dokumentLaden(pfad AS STRING) AS Dokument
+    DIM j AS JSON_HANDLE : j = JSON_LOAD(pfad)
+    DIM dok AS Dokument : dok = NEW Dokument()
+    dok.blaetter = []
+    IF JSON_HAS(j, "id") THEN dok.id = JSON_GET_STRING(j, "id")
+    IF JSON_HAS(j, "titel") THEN dok.titel = JSON_GET_STRING(j, "titel")
+    DIM bi AS INTEGER, ci AS INTEGER, wi AS INTEGER, li AS INTEGER, pk AS INTEGER
+    FOR bi = 0 TO JSON_LEN(j, "blaetter") - 1
+        DIM bp AS STRING : bp = "blaetter." + STR$(bi)
+        DIM bl AS Blatt : bl = NEW Blatt(JSON_GET_STRING(j, bp + ".name"))
+        IF JSON_HAS(j, bp + ".id") THEN bl.id = JSON_GET_STRING(j, bp + ".id")
+        IF JSON_HAS(j, bp + ".breite") THEN bl.breite = JSON_GET_INT(j, bp + ".breite")
+        IF JSON_HAS(j, bp + ".hoehe") THEN bl.hoehe = JSON_GET_INT(j, bp + ".hoehe")
+        ' Bauteile
+        FOR ci = 0 TO JSON_LEN(j, bp + ".bauteile") - 1
+            DIM cp AS STRING : cp = bp + ".bauteile." + STR$(ci)
+            DIM l AS Lage : l = neueLage(JSON_GET_INT(j, cp + ".x"), JSON_GET_INT(j, cp + ".y"))
+            IF JSON_HAS(j, cp + ".rot") THEN l.drehung = JSON_GET_INT(j, cp + ".rot")
+            IF JSON_HAS(j, cp + ".sp") THEN l.gespiegelt = JSON_GET_BOOL(j, cp + ".sp")
+            DIM bt AS Bauteil : bt = neuesBauteil(JSON_GET_STRING(j, cp + ".sym"), l)
+            IF JSON_HAS(j, cp + ".id") THEN bt.id = JSON_GET_STRING(j, cp + ".id")
+            IF JSON_HAS(j, cp + ".ref") THEN bt.referenz = JSON_GET_STRING(j, cp + ".ref")
+            IF JSON_HAS(j, cp + ".wert") THEN bt.wert = JSON_GET_STRING(j, cp + ".wert")
+            ARRAY_PUSH(bl.bauteile, bt)
+        NEXT
+        ' Draehte
+        FOR wi = 0 TO JSON_LEN(j, bp + ".draehte") - 1
+            DIM wp AS STRING : wp = bp + ".draehte." + STR$(wi)
+            DIM w AS Draht : w = NEW Draht()
+            IF JSON_HAS(j, wp + ".id") THEN w.id = JSON_GET_STRING(j, wp + ".id")
+            DIM anz AS INTEGER : anz = JSON_LEN(j, wp + ".pts")
+            pk = 0
+            WHILE pk + 1 < anz
+                ARRAY_PUSH(w.punkte, NEW Punkt(JSON_GET_INT(j, wp + ".pts." + STR$(pk)), JSON_GET_INT(j, wp + ".pts." + STR$(pk + 1))))
+                pk = pk + 2
+            WEND
+            ARRAY_PUSH(bl.draehte, w)
+        NEXT
+        ' Labels
+        IF JSON_HAS(j, bp + ".labels") THEN
+            FOR li = 0 TO JSON_LEN(j, bp + ".labels") - 1
+                DIM lp AS STRING : lp = bp + ".labels." + STR$(li)
+                DIM la AS Label : la = NEW Label(JSON_GET_STRING(j, lp + ".txt"), NEW Punkt(JSON_GET_INT(j, lp + ".x"), JSON_GET_INT(j, lp + ".y")), JSON_GET_INT(j, lp + ".art"))
+                IF JSON_HAS(j, lp + ".rot") THEN la.drehung = JSON_GET_INT(j, lp + ".rot")
+                ARRAY_PUSH(bl.labels, la)
+            NEXT
+        END IF
+        autoKnoten(bl)
+        ARRAY_PUSH(dok.blaetter, bl)
+    NEXT
+    RETURN dok
+END FUNCTION

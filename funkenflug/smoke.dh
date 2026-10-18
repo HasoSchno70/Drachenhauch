@@ -1,0 +1,145 @@
+' Smoke-Test fuer Funkenflug: prueft, dass die GTK/Cairo/Pango-Bruecke mit der
+' installierten Runtime alles kann, was der Editor braucht --
+'   * Draw-Callback (signalZeichnen) mit Cairo
+'   * Struct als Wert (GdkRGBA) als Parameter
+'   * Buffer -> Cairo-Surface (cairo_image_surface_create_for_data)
+'   * Pango-Text
+'   * Widget -> PNG (gtkFoto), damit sich der Editor ohne Mensch pruefen laesst
+'
+'   dhrt run funkenflug/smoke.dh -- --foto funkenflug/smoke.png
+IMPORT "gtk/gtk.dh"
+
+DIM flaeche AS INTEGER
+DIM fenster AS INTEGER
+DIM fotoZiel AS STRING
+
+' Ein kleines Buffer-Bild (rot/gruen-Schachbrett), um den Buffer->Surface-Weg zu pruefen.
+FUNCTION pruefBild() AS INTEGER
+    DIM b AS INTEGER : b = 8
+    DIM h AS INTEGER : h = 8
+    DIM zeile AS INTEGER : zeile = cairo_format_stride_for_width(CAIRO_ARGB32, b)
+    DIM puffer AS BUFFER : puffer = BUFFER_NEW(zeile * h)
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO h - 1
+        FOR x = 0 TO b - 1
+            DIM c AS INTEGER
+            IF ((x + y) BAND 1) = 0 THEN c = &HFFE04040 ELSE c = &HFF40E040
+            BUFFER_SET_U32(puffer, y * zeile + x * 4, c)
+        NEXT
+    NEXT
+    RETURN cairo_image_surface_create_for_data(BUFFER_ZEIGER(puffer), CAIRO_ARGB32, b, h, zeile)
+END FUNCTION
+
+FUNCTION zeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM bw AS FLOAT : bw = gtk_widget_get_allocated_width(w)
+    DIM bh AS FLOAT : bh = gtk_widget_get_allocated_height(w)
+    ' Hintergrund
+    cairoFarbe(cr, &H12131A)
+    cairo_rectangle(cr, 0, 0, bw, bh)
+    cairo_fill(cr)
+    ' Raster
+    cairoFarbe(cr, &H2A2C3A)
+    cairo_set_line_width(cr, 1.0)
+    DIM gx AS FLOAT
+    gx = 0
+    WHILE gx < bw
+        cairo_move_to(cr, gx, 0)
+        cairo_line_to(cr, gx, bh)
+        gx = gx + 20
+    WEND
+    DIM gy AS FLOAT
+    gy = 0
+    WHILE gy < bh
+        cairo_move_to(cr, 0, gy)
+        cairo_line_to(cr, bw, gy)
+        gy = gy + 20
+    WEND
+    cairo_stroke(cr)
+    ' Eine Linie (Draht) + Pin-Punkt
+    cairoFarbe(cr, &H4FA3FF)
+    cairo_set_line_width(cr, 2.5)
+    cairo_move_to(cr, 40, 60)
+    cairo_line_to(cr, 160, 60)
+    cairo_stroke(cr)
+    cairoFarbe(cr, &HFF8A3D)
+    cairo_arc(cr, 160, 60, 4, 0, 6.2832)
+    cairo_fill(cr)
+    ' Buffer-Bild skaliert zeichnen
+    DIM bild AS INTEGER : bild = pruefBild()
+    cairo_save(cr)
+    cairo_translate(cr, 40, 90)
+    cairo_scale(cr, 6, 6)
+    cairo_set_source_surface(cr, bild, 0, 0)
+    cairo_pattern_set_filter(cairo_get_source(cr), CAIRO_FILTER_NAECHST)
+    cairo_paint(cr)
+    cairo_restore(cr)
+    cairo_surface_destroy(bild)
+    ' Pango-Text
+    DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
+    DIM schrift AS INTEGER : schrift = pango_font_description_from_string("Sans Bold 12")
+    pango_layout_set_font_description(layout, schrift)
+    pango_layout_set_text(layout, "Funkenflug", -1)
+    cairoFarbe(cr, &HE6E6F0)
+    cairo_move_to(cr, 40, 160)
+    pango_cairo_show_layout(cr, layout)
+    pango_font_description_free(schrift)
+    g_object_unref(layout)
+    RETURN TRUE
+END FUNCTION
+
+SUB beenden(objekt AS INTEGER, daten AS INTEGER)
+    gtk_main_quit()
+END SUB
+
+' Fuer --foto: ein Bild sichern und beenden.
+FUNCTION probe(daten AS INTEGER) AS BOOLEAN
+    PRINT "Allokation: "; gtk_widget_get_allocated_width(flaeche); "x"; gtk_widget_get_allocated_height(flaeche)
+    IF fotoZiel <> "" THEN
+        IF gtkFoto(flaeche, fotoZiel) THEN
+            PRINT "Foto gesichert: "; fotoZiel
+        ELSE
+            PRINT "Foto fehlgeschlagen"
+        END IF
+    END IF
+    gtk_main_quit()
+    RETURN FALSE
+END FUNCTION
+
+' Struct-als-Wert pruefen: GdkRGBA an gtk_color_button_new_with_rgba
+DIM farbe AS GdkRGBA
+farbe.rot = 1.0
+farbe.gruen = 0.54
+farbe.blau = 0.24
+farbe.deckkraft = 1.0
+
+DIM bereit AS BOOLEAN
+TRY
+    bereit = gtk_init_check(0, 0)
+CATCH e
+    PRINT "GTK nicht gefunden"
+    END
+END TRY
+IF NOT bereit THEN
+    PRINT "GTK ohne Bildschirm"
+    END
+END IF
+
+DIM i AS INTEGER
+FOR i = 0 TO ARGC() - 1
+    IF ARG$(i) = "--foto" AND i + 1 < ARGC() THEN fotoZiel = ARG$(i + 1)
+NEXT
+
+fenster = gtk_window_new(0)
+gtk_window_set_title(fenster, "Funkenflug Smoke")
+gtk_window_set_default_size(fenster, 240, 200)
+flaeche = gtk_drawing_area_new()
+gtk_widget_set_size_request(flaeche, 240, 200)
+signalZeichnen(flaeche, "draw", zeichnen, 0, 0, 0)
+gtk_container_add(fenster, flaeche)
+DIM knopf AS INTEGER : knopf = gtk_color_button_new_with_rgba(farbe)   ' Struct-als-Wert
+PRINT "Farbknopf: "; knopf
+signal(fenster, "destroy", beenden, 0, 0, 0)
+gtk_widget_show_all(fenster)
+g_timeout_add(300, probe, 0)
+gtk_main()
+PRINT "fertig"

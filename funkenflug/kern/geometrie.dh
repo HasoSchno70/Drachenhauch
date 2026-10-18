@@ -1,0 +1,133 @@
+' Geometrie und Grundkonstanten -- ohne Oberflaeche, Namensraum "kern".
+'
+' EINHEIT: 1 Einheit = 0.01 mm (100 = 1 mm), ganzzahlige Koordinaten.
+' Das vermeidet Rundungsdrift (SparkNode-Lehre: Netz-Endpunkte kanonisch
+' quantisieren).
+'
+' ROTATION -- EINE Konvention fuer Modell UND Zeichnen (der zentrale Bug in
+' SparkNode: Modell drehte gegen, QPainter mit dem Uhrzeigersinn, Pins lagen
+' gespiegelt). Hier gilt ueberall: Bildschirm-/Cairo-Koordinaten (Y nach
+' UNTEN), Drehung IM Uhrzeigersinn (sichtbar), und ALLES geht durch
+' transformPunkt() / transformRichtung(). Gezeichnet == elektrisch, per
+' Konstruktion.
+'
+' WINKEL: 0 = rechts (+x), 90 = unten (+y), 180 = links (-x), 270 = oben (-y).
+
+CONST RASTER = 100               ' Zeichenraster 1 mm
+CONST RASTER_FEIN = 50
+CONST LOCHRASTER = 254           ' 2.54 mm (fuer Platine spaeter)
+
+' Pin-Typen (fuer ERC spaeter; jetzt nur gespeichert)
+CONST PIN_PASSIV = 0
+CONST PIN_EINGANG = 1
+CONST PIN_AUSGANG = 2
+CONST PIN_BIDIR = 3
+CONST PIN_LEISTUNG_EIN = 4
+CONST PIN_LEISTUNG_AUS = 5
+CONST PIN_FREI = 6               ' nicht angeschlossen (NC)
+
+' Primitiv-Arten
+CONST PR_LINIE = 0
+CONST PR_RECHTECK = 1
+CONST PR_KREIS = 2
+CONST PR_BOGEN = 3
+CONST PR_POLYLINIE = 4
+CONST PR_TEXT = 5
+
+' Label-Arten
+CONST LA_LOKAL = 0
+CONST LA_GLOBAL = 1
+CONST LA_LEISTUNG = 2
+
+CLASS Punkt
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    SUB Init(px AS INTEGER, py AS INTEGER)
+        x = px
+        y = py
+    END SUB
+END CLASS
+
+' Kurz-Konstruktor.
+FUNCTION P(x AS INTEGER, y AS INTEGER) AS Punkt
+    RETURN NEW Punkt(x, y)
+END FUNCTION
+
+FUNCTION punktGleich(a AS Punkt, b AS Punkt) AS BOOLEAN
+    RETURN a.x = b.x AND a.y = b.y
+END FUNCTION
+
+' Auf ein Raster runden (symmetrisch um 0).
+FUNCTION rastern(wert AS INTEGER, raster AS INTEGER) AS INTEGER
+    IF raster <= 1 THEN RETURN wert
+    IF wert >= 0 THEN
+        RETURN ((wert + raster / 2) / raster) * raster
+    ELSE
+        RETURN -((-wert + raster / 2) / raster) * raster
+    END IF
+END FUNCTION
+
+FUNCTION rasterPunkt(p AS Punkt, raster AS INTEGER) AS Punkt
+    RETURN NEW Punkt(rastern(p.x, raster), rastern(p.y, raster))
+END FUNCTION
+
+' --- Lage eines Bauteils: Drehung (0/90/180/270) + eine Spiegelung + Position.
+' Deckt alle acht Orientierungen ab (SparkNode: eine Spiegelachse reicht).
+CLASS Lage
+    DIM pos AS Punkt
+    DIM drehung AS INTEGER            ' 0 / 90 / 180 / 270
+    DIM gespiegelt AS BOOLEAN         ' an der senkrechten Achse (x negiert)
+    SUB Init(p AS Punkt, d AS INTEGER, sp AS BOOLEAN)
+        pos = p
+        drehung = d
+        gespiegelt = sp
+    END SUB
+END CLASS
+
+FUNCTION neueLage(x AS INTEGER, y AS INTEGER) AS Lage
+    RETURN NEW Lage(NEW Punkt(x, y), 0, FALSE)
+END FUNCTION
+
+' Einen lokalen Symbolpunkt in Blattkoordinaten bringen:
+' drehen (im Uhrzeigersinn, Y unten) -> spiegeln -> verschieben.
+FUNCTION transformPunkt(l AS Lage, p AS Punkt) AS Punkt
+    DIM x AS INTEGER : x = p.x
+    DIM y AS INTEGER : y = p.y
+    DIM rx AS INTEGER, ry AS INTEGER
+    SELECT CASE l.drehung
+        CASE 90
+            rx = -y : ry = x
+        CASE 180
+            rx = -x : ry = -y
+        CASE 270
+            rx = y : ry = -x
+        CASE ELSE
+            rx = x : ry = y
+    END SELECT
+    IF l.gespiegelt THEN rx = -rx
+    RETURN NEW Punkt(rx + l.pos.x, ry + l.pos.y)
+END FUNCTION
+
+' Eine Richtung (Pin-Stummel) genauso mitdrehen/spiegeln -- OHNE Verschieben.
+FUNCTION transformRichtung(l AS Lage, richtung AS INTEGER) AS INTEGER
+    DIM r AS INTEGER : r = (richtung + l.drehung) MOD 360
+    IF l.gespiegelt THEN r = (180 - r) MOD 360
+    IF r < 0 THEN r = r + 360
+    RETURN r
+END FUNCTION
+
+' Einheitsvektor einer Richtung (fuer gezeichnete Stummel/Pfeile).
+FUNCTION richtungDx(richtung AS INTEGER) AS INTEGER
+    SELECT CASE richtung
+        CASE 0 : RETURN 1
+        CASE 180 : RETURN -1
+        CASE ELSE : RETURN 0
+    END SELECT
+END FUNCTION
+FUNCTION richtungDy(richtung AS INTEGER) AS INTEGER
+    SELECT CASE richtung
+        CASE 90 : RETURN 1
+        CASE 270 : RETURN -1
+        CASE ELSE : RETURN 0
+    END SELECT
+END FUNCTION

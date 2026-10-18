@@ -1,0 +1,311 @@
+' Funkenflug -- ein Schaltplan-Editor in Drachenhauch mit GTK 3.
+'
+' Eine Neufassung der Idee hinter SparkNode (Python/PySide6), bewusst ohne
+' dessen Stolperfallen: EINE Rotations-/Transform-Konvention (gezeichnete ==
+' elektrische Pins), EINE Netz-Erkennung, Pin-Punkt eindeutig als elektrischer
+' Andockpunkt. GTK/Cairo wie in Glutfaden (der GTK-Portierung von PySticky).
+'
+'   dhrt run funkenflug/main.dh                 (Demo-Schaltung)
+'   dhrt run funkenflug/main.dh -- datei.fkn    (diese Datei oeffnen)
+'   dhrt run funkenflug/main.dh -- --foto C:/.../bild.png   (Selbsttest)
+'
+' Aufbau:
+'   kern/      Modell, Geometrie, Bibliothek, Netze, Datei (Namensraum kern)
+'   gtk/       Deklarationen fuer GTK, GDK, Cairo, Pango
+'   ansicht/   Zeichenflaeche und Werkzeuge (globaler Namensraum)
+IMPORT "kern/kern.dh" AS kern
+IMPORT "gtk/gtk.dh"
+IMPORT "ansicht/leinwand.dh"
+IMPORT "ansicht/werkzeuge.dh"
+
+CONST STIL = "window { background-color: #12131a; color: #e6e6f0; }" + _
+    " headerbar { background-color: #1a1c26; color: #e6e6f0; }" + _
+    " headerbar .title { font-weight: 700; }" + _
+    " .leiste { background-color: #1a1c26; border-bottom: 1px solid #2c2f3c; padding: 4px 8px; }" + _
+    " .leiste button, .leiste combobox button { background-color: #262a38; color: #e6e6f0; border: 1px solid #333848; border-radius: 6px; padding: 3px 10px; }" + _
+    " .leiste button:checked { background-color: #ff8a3d; color: #1a1a2e; }" + _
+    " .status { background-color: #1a1c26; color: #aeb4c4; padding: 3px 10px; font-size: 9pt; }"
+
+DIM gFenster AS INTEGER
+DIM gKopf AS INTEGER
+DIM gStatus AS INTEGER
+DIM gKnopfAuswahl AS INTEGER
+DIM gKnopfDraht AS INTEGER
+DIM gSymbolWahl AS INTEGER
+DIM fotoZiel AS STRING
+
+FUNCTION basisName$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = LEN(p) TO 1 STEP -1
+        DIM c AS STRING : c = MID$(p, i, 1)
+        IF c = "/" OR c = "\" THEN RETURN MID$(p, i + 1)
+    NEXT
+    RETURN p
+END FUNCTION
+
+' --- Statuszeile und Titel
+SUB statusAktualisieren()
+    IF gStatus = 0 THEN RETURN
+    DIM wz AS STRING : wz = "Auswahl"
+    IF gWerkzeug = WZ_DRAHT THEN wz = "Draht"
+    IF gWerkzeug = WZ_BAUTEIL THEN wz = "Bauteil"
+    DIM zoom AS INTEGER : zoom = ROUND(vZoom / 0.12 * 100)
+    DIM pos AS STRING : pos = ""
+    IF gMausDrin THEN pos = "   X " + STR$(gMausWX / 100) + " mm   Y " + STR$(gMausWY / 100) + " mm"
+    gtk_label_set_text(gStatus, wz + "   Zoom " + STR$(zoom) + "%" + pos + "   [" + STR$(LEN(gBlatt.bauteile)) + " Bauteile, " + STR$(LEN(gBlatt.draehte)) + " Draehte]")
+END SUB
+
+SUB titelNachziehen()
+    IF gKopf = 0 THEN RETURN
+    DIM name AS STRING : name = "ohne Namen"
+    IF gPfad <> "" THEN name = basisName$(gPfad)
+    IF gGeaendert THEN name = name + " *"
+    gtk_header_bar_set_subtitle(gKopf, name)
+END SUB
+
+SUB werkzeugKnoepfeNachziehen()
+    IF gKnopfAuswahl = 0 THEN RETURN
+    gtk_toggle_button_set_active(gKnopfAuswahl, gWerkzeug = WZ_AUSWAHL)
+    gtk_toggle_button_set_active(gKnopfDraht, gWerkzeug = WZ_DRAHT)
+END SUB
+
+' --- Werkzeug-Knoepfe
+SUB aufAuswahl(knopf AS INTEGER, daten AS INTEGER)
+    werkzeugWaehlen(WZ_AUSWAHL, "")
+END SUB
+
+SUB aufDraht(knopf AS INTEGER, daten AS INTEGER)
+    werkzeugWaehlen(WZ_DRAHT, "")
+END SUB
+
+SUB aufSymbol(combo AS INTEGER, daten AS INTEGER)
+    DIM idx AS INTEGER : idx = gtk_combo_box_get_active(combo)
+    IF idx < 0 THEN RETURN
+    DIM liste AS ARRAY OF kern.Symbol : liste = kern.bibliothekListe()
+    IF idx < LEN(liste) THEN werkzeugWaehlen(WZ_BAUTEIL, liste[idx].id)
+END SUB
+
+' --- Datei
+FUNCTION dateiWahl(sichern AS BOOLEAN) AS STRING
+    DIM titel AS STRING : titel = "Oeffnen"
+    DIM aktion AS INTEGER : aktion = GTK_DATEI_OEFFNEN
+    DIM knopf AS STRING : knopf = "Oeffnen"
+    IF sichern THEN titel = "Speichern" : aktion = GTK_DATEI_SICHERN : knopf = "Speichern"
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new(titel, gFenster, aktion, "Abbrechen", GTK_ANTWORT_ABBRECHEN, knopf, GTK_ANTWORT_ANNEHMEN, NIL)
+    DIM filter AS INTEGER : filter = gtk_file_filter_new()
+    gtk_file_filter_set_name(filter, "Funkenflug (*.fkn)")
+    gtk_file_filter_add_pattern(filter, "*.fkn")
+    gtk_file_chooser_add_filter(d, filter)
+    IF sichern THEN
+        gtk_file_chooser_set_do_overwrite_confirmation(d, TRUE)
+        gtk_file_chooser_set_current_name(d, "schaltplan.fkn")
+    END IF
+    DIM pfad AS STRING : pfad = ""
+    IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
+        DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
+        IF z <> 0 THEN
+            pfad = TEXT_AUS_ZEIGER$(z)
+            g_free(z)
+        END IF
+    END IF
+    gtk_widget_destroy(d)
+    RETURN pfad
+END FUNCTION
+
+SUB dateiSpeichern()
+    DIM pfad AS STRING : pfad = dateiWahl(TRUE)
+    IF pfad = "" THEN RETURN
+    IF LOWER$(RIGHT$(pfad, 4)) <> ".fkn" THEN pfad = pfad + ".fkn"
+    IF kern.dokumentSpeichern(gDok, pfad) THEN
+        gPfad = pfad
+        gGeaendert = FALSE
+        titelNachziehen()
+    END IF
+END SUB
+
+SUB dateiOeffnen()
+    DIM pfad AS STRING : pfad = dateiWahl(FALSE)
+    IF pfad = "" THEN RETURN
+    DIM d AS kern.Dokument : d = kern.dokumentLaden(pfad)
+    gPfad = pfad
+    gGeaendert = FALSE
+    leinwandDokument(d)
+    titelNachziehen()
+    statusAktualisieren()
+END SUB
+
+SUB aufSpeichern(knopf AS INTEGER, daten AS INTEGER)
+    dateiSpeichern()
+END SUB
+
+SUB aufOeffnen(knopf AS INTEGER, daten AS INTEGER)
+    dateiOeffnen()
+END SUB
+
+SUB fensterZu(objekt AS INTEGER, daten AS INTEGER)
+    gtk_main_quit()
+END SUB
+
+' --- Demo-Schaltung: VCC -> R -> LED -> GND
+FUNCTION demoDokument() AS kern.Dokument
+    DIM d AS kern.Dokument : d = NEW kern.Dokument()
+    DIM bl AS kern.Blatt : bl = d.blaetter[0]
+    DIM vcc AS kern.Bauteil : vcc = kern.neuesBauteil("VCC", kern.neueLage(2000, 1200))
+    ARRAY_PUSH(bl.bauteile, vcc)
+    DIM r AS kern.Bauteil : r = kern.neuesBauteil("R", kern.neueLage(2000, 2000))
+    r.lage.drehung = 90 : r.referenz = "R1" : r.wert = "330"
+    ARRAY_PUSH(bl.bauteile, r)
+    DIM led AS kern.Bauteil : led = kern.neuesBauteil("LED", kern.neueLage(2000, 3000))
+    led.lage.drehung = 90 : led.referenz = "D1"
+    ARRAY_PUSH(bl.bauteile, led)
+    DIM gnd AS kern.Bauteil : gnd = kern.neuesBauteil("GND", kern.neueLage(2000, 3600))
+    ARRAY_PUSH(bl.bauteile, gnd)
+    ' Draehte verbinden die Pins senkrecht
+    draht2(bl, 2000, 1200, 2000, 1800)       ' VCC -> R oben
+    draht2(bl, 2000, 2200, 2000, 2800)       ' R unten -> LED oben
+    draht2(bl, 2000, 3200, 2000, 3600)       ' LED unten -> GND
+    kern.autoKnoten(bl)
+    RETURN d
+END FUNCTION
+
+SUB draht2(bl AS kern.Blatt, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    DIM w AS kern.Draht : w = NEW kern.Draht()
+    ARRAY_PUSH(w.punkte, NEW kern.Punkt(x1, y1))
+    ARRAY_PUSH(w.punkte, NEW kern.Punkt(x2, y2))
+    ARRAY_PUSH(bl.draehte, w)
+END SUB
+
+' --- Selbsttest: ein Bild sichern und beenden.
+DIM probeSchritt AS INTEGER
+FUNCTION probe(daten AS INTEGER) AS BOOLEAN
+    probeSchritt = probeSchritt + 1
+    SELECT CASE probeSchritt
+        CASE 1
+            ' ein Bauteil per Werkzeug setzen
+            werkzeugWaehlen(WZ_BAUTEIL, "C")
+            gMausWX = 3000 : gMausWY = 2000 : gMausDrin = TRUE
+            bauteilPlatzieren()
+        CASE 2
+            ' einen Draht ziehen und abschliessen
+            werkzeugWaehlen(WZ_DRAHT, "")
+            gDrahtAktiv = TRUE
+            gDrahtPunkte = []
+            ARRAY_PUSH(gDrahtPunkte, NEW kern.Punkt(3000, 2200))
+            ARRAY_PUSH(gDrahtPunkte, NEW kern.Punkt(3600, 2200))
+            ARRAY_PUSH(gDrahtPunkte, NEW kern.Punkt(3600, 2800))
+            drahtEndePunkt()
+        CASE 3
+            ' auswaehlen und drehen
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            gGewaehlt = gBlatt.bauteile[1]
+            gHatGewaehlt = TRUE
+            auswahlDrehen()
+        CASE ELSE
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel) THEN
+                    PRINT "Foto gesichert: "; fotoZiel
+                ELSE
+                    PRINT "Foto fehlgeschlagen"
+                END IF
+            END IF
+            gtk_main_quit()
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' --- Knopf mit Symbol und Beschriftung in der Leiste
+FUNCTION leistenKnopf(text AS STRING) AS INTEGER
+    DIM k AS INTEGER : k = gtk_toggle_button_new_with_label(text)
+    RETURN k
+END FUNCTION
+
+DIM bereit AS BOOLEAN
+TRY
+    bereit = gtk_init_check(0, 0)
+CATCH e
+    PRINT "GTK nicht gefunden -- unter Windows GTK aus MSYS2 im PATH oder aus Inkscape."
+    END
+END TRY
+IF NOT bereit THEN
+    PRINT "GTK ist da, findet aber keinen Bildschirm."
+    END
+END IF
+
+kern.bibliothekAufbauen()
+
+DIM i AS INTEGER
+DIM startDok AS kern.Dokument
+DIM startPfad AS STRING : startPfad = ""
+FOR i = 0 TO ARGC() - 1
+    IF ARG$(i) = "--foto" AND i + 1 < ARGC() THEN
+        fotoZiel = ARG$(i + 1)
+    ELSEIF RIGHT$(LOWER$(ARG$(i)), 4) = ".fkn" THEN
+        startPfad = ARG$(i)
+    END IF
+NEXT
+
+IF startPfad <> "" THEN
+    startDok = kern.dokumentLaden(startPfad)
+    gPfad = startPfad
+ELSE
+    startDok = demoDokument()
+END IF
+
+DIM stilFehler AS STRING : stilFehler = gtkStil$(STIL)
+
+gFenster = gtk_window_new(0)
+gtk_window_set_default_size(gFenster, 1000, 700)
+gKopf = gtk_header_bar_new()
+gtk_header_bar_set_show_close_button(gKopf, TRUE)
+gtk_header_bar_set_title(gKopf, "Funkenflug")
+gtk_window_set_titlebar(gFenster, gKopf)
+DIM knopfOeffnen AS INTEGER : knopfOeffnen = gtk_button_new_with_label("Oeffnen")
+DIM knopfSpeichern AS INTEGER : knopfSpeichern = gtk_button_new_with_label("Speichern")
+gtk_header_bar_pack_start(gKopf, knopfOeffnen)
+gtk_header_bar_pack_start(gKopf, knopfSpeichern)
+
+DIM vbox AS INTEGER : vbox = gtk_box_new(GTK_SENKRECHT, 0)
+DIM leiste AS INTEGER : leiste = gtk_box_new(GTK_WAAGERECHT, 6)
+gtkKlasse(leiste, "leiste")
+gKnopfAuswahl = leistenKnopf("Auswahl")
+gKnopfDraht = leistenKnopf("Draht")
+gtk_box_pack_start(leiste, gKnopfAuswahl, FALSE, FALSE, 0)
+gtk_box_pack_start(leiste, gKnopfDraht, FALSE, FALSE, 0)
+DIM etikett AS INTEGER : etikett = gtk_label_new("  Bauteil:")
+gtk_box_pack_start(leiste, etikett, FALSE, FALSE, 0)
+gSymbolWahl = gtk_combo_box_text_new()
+DIM liste AS ARRAY OF kern.Symbol : liste = kern.bibliothekListe()
+FOR i = 0 TO LEN(liste) - 1
+    gtk_combo_box_text_append_text(gSymbolWahl, liste[i].name)
+NEXT
+gtk_box_pack_start(leiste, gSymbolWahl, FALSE, FALSE, 0)
+gtk_box_pack_start(vbox, leiste, FALSE, FALSE, 0)
+
+DIM flaeche AS INTEGER : flaeche = leinwandNeu()
+gtkKlasse(flaeche, "flaeche")
+gtk_box_pack_start(vbox, flaeche, TRUE, TRUE, 0)
+
+gStatus = gtk_label_new("")
+gtk_label_set_xalign(gStatus, 0.0)
+gtkKlasse(gStatus, "status")
+gtk_box_pack_start(vbox, gStatus, FALSE, FALSE, 0)
+
+gtk_container_add(gFenster, vbox)
+
+signal(gKnopfAuswahl, "clicked", aufAuswahl, 0, 0, 0)
+signal(gKnopfDraht, "clicked", aufDraht, 0, 0, 0)
+signal(gSymbolWahl, "changed", aufSymbol, 0, 0, 0)
+signal(knopfOeffnen, "clicked", aufOeffnen, 0, 0, 0)
+signal(knopfSpeichern, "clicked", aufSpeichern, 0, 0, 0)
+signal(gFenster, "destroy", fensterZu, 0, 0, 0)
+
+leinwandDokument(startDok)
+gWerkzeug = WZ_AUSWAHL
+werkzeugKnoepfeNachziehen()
+titelNachziehen()
+statusAktualisieren()
+
+gtk_widget_show_all(gFenster)
+IF fotoZiel <> "" THEN g_timeout_add(400, probe, 0)
+gtk_main()

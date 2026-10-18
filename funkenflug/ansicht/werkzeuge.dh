@@ -1,0 +1,267 @@
+' Maus, Tastatur und Werkzeug-Logik. Globaler Namensraum (teilt Zustand mit
+' leinwand.dh und main.dh).
+
+' GDK-Tastenwerte
+CONST K_ESC = &HFF1B
+CONST K_RETURN = &HFF0D
+CONST K_DELETE = &HFFFF
+CONST K_BACKSPACE = &HFF08
+CONST K_R = &H72
+CONST K_W = &H77
+CONST K_A = &H61
+CONST K_S = &H73
+CONST K_O = &H6F
+CONST K_PLUS = &H2B
+CONST K_GLEICH = &H3D
+CONST K_MINUS = &H2D
+CONST K_NULL = &H30
+
+FUNCTION evKnopf(ev AS INTEGER) AS INTEGER
+    DIM k AS INTEGER
+    IF NOT gdk_event_get_button(ev, k) THEN RETURN 0
+    RETURN k
+END FUNCTION
+
+FUNCTION evStrg(ev AS INTEGER) AS BOOLEAN
+    DIM z AS INTEGER
+    IF NOT gdk_event_get_state(ev, z) THEN RETURN FALSE
+    RETURN (z BAND GDK_STRG) <> 0
+END FUNCTION
+
+' Mausposition aktualisieren (roh + gefangen je nach Werkzeug)
+SUB mausSetzen(px AS FLOAT, py AS FLOAT)
+    gMausRX = weltX(px)
+    gMausRY = weltY(py)
+    gMausDrin = TRUE
+    IF gWerkzeug = WZ_DRAHT THEN
+        DIM f AS kern.Punkt : f = fangPunkt(gMausRX, gMausRY)
+        gMausWX = f.x
+        gMausWY = f.y
+    ELSE
+        gMausWX = kern.rastern(ROUND(gMausRX), kern.RASTER)
+        gMausWY = kern.rastern(ROUND(gMausRY), kern.RASTER)
+    END IF
+END SUB
+
+SUB werkzeugWaehlen(wz AS INTEGER, ref AS STRING)
+    gWerkzeug = wz
+    IF ref <> "" THEN gSymbolRef = ref
+    IF wz <> WZ_DRAHT THEN gDrahtAktiv = FALSE
+    werkzeugKnoepfeNachziehen()
+    statusAktualisieren()
+    neuZeichnen()
+END SUB
+
+FUNCTION naechsteReferenz(praefix AS STRING) AS STRING
+    IF LEFT$(praefix, 1) = "#" THEN RETURN ""        ' Leistungssymbole ohne Referenz
+    DIM groesste AS INTEGER : groesste = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gBlatt.bauteile) - 1
+        DIM r AS STRING : r = gBlatt.bauteile[i].referenz
+        IF LEN(r) > LEN(praefix) AND LEFT$(r, LEN(praefix)) = praefix THEN
+            DIM n AS INTEGER : n = VAL(MID$(r, LEN(praefix) + 1))
+            IF n > groesste THEN groesste = n
+        END IF
+    NEXT
+    RETURN praefix + STR$(groesste + 1)
+END FUNCTION
+
+SUB bauteilPlatzieren()
+    DIM l AS kern.Lage : l = NEW kern.Lage(NEW kern.Punkt(gMausWX, gMausWY), gPlatzDreh, FALSE)
+    DIM b AS kern.Bauteil : b = kern.neuesBauteil(gSymbolRef, l)
+    b.referenz = naechsteReferenz(b.sym.praefix)
+    ARRAY_PUSH(gBlatt.bauteile, b)
+    gGewaehlt = b
+    gHatGewaehlt = TRUE
+    gGeaendert = TRUE
+    titelNachziehen()
+    neuZeichnen()
+END SUB
+
+SUB drahtEndePunkt()
+    ' Doppelt-Punkt am Ende vermeiden, Draht abschliessen.
+    IF gDrahtAktiv AND LEN(gDrahtPunkte) >= 2 THEN
+        DIM w AS kern.Draht : w = NEW kern.Draht()
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(gDrahtPunkte) - 1
+            ARRAY_PUSH(w.punkte, gDrahtPunkte[i])
+        NEXT
+        ARRAY_PUSH(gBlatt.draehte, w)
+        kern.autoKnoten(gBlatt)
+        gGeaendert = TRUE
+        titelNachziehen()
+    END IF
+    gDrahtAktiv = FALSE
+    gDrahtPunkte = []
+    neuZeichnen()
+END SUB
+
+SUB auswahlLoeschen()
+    IF NOT gHatGewaehlt THEN RETURN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gBlatt.bauteile) - 1
+        IF gBlatt.bauteile[i] = gGewaehlt THEN
+            ARRAY_REMOVE_AT(gBlatt.bauteile, i)
+            gHatGewaehlt = FALSE
+            gGeaendert = TRUE
+            titelNachziehen()
+            neuZeichnen()
+            RETURN
+        END IF
+    NEXT
+END SUB
+
+SUB auswahlDrehen()
+    IF gHatGewaehlt THEN
+        gGewaehlt.lage.drehung = (gGewaehlt.lage.drehung + 90) MOD 360
+        gGeaendert = TRUE
+        titelNachziehen()
+    ELSE
+        gPlatzDreh = (gPlatzDreh + 90) MOD 360
+    END IF
+    neuZeichnen()
+END SUB
+
+' --- Ereignisse
+FUNCTION lwDruck(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ev, px, py)
+    gtk_widget_grab_focus(gFlaeche)
+    mausSetzen(px, py)
+    DIM knopf AS INTEGER : knopf = evKnopf(ev)
+    IF knopf = 2 THEN
+        gPan = TRUE
+        gPanSX = px
+        gPanSY = py
+        RETURN TRUE
+    END IF
+    IF knopf = 3 THEN
+        IF gWerkzeug = WZ_DRAHT AND gDrahtAktiv THEN
+            drahtEndePunkt()
+        ELSEIF gWerkzeug = WZ_BAUTEIL THEN
+            auswahlDrehen()
+        END IF
+        RETURN TRUE
+    END IF
+    IF knopf <> 1 THEN RETURN TRUE
+    DIM doppel AS BOOLEAN : doppel = gdk_event_get_event_type(ev) = GDK_DOPPELKLICK
+    SELECT CASE gWerkzeug
+        CASE WZ_AUSWAHL
+            DIM idx AS INTEGER : idx = bauteilIndexUnter(gMausRX, gMausRY)
+            IF idx >= 0 THEN
+                gGewaehlt = gBlatt.bauteile[idx]
+                gHatGewaehlt = TRUE
+                gZieht = TRUE
+                gZiehDX = gGewaehlt.lage.pos.x - gMausWX
+                gZiehDY = gGewaehlt.lage.pos.y - gMausWY
+            ELSE
+                gHatGewaehlt = FALSE
+            END IF
+            neuZeichnen()
+        CASE WZ_BAUTEIL
+            bauteilPlatzieren()
+        CASE WZ_DRAHT
+            IF doppel THEN
+                drahtEndePunkt()
+            ELSE
+                IF NOT gDrahtAktiv THEN
+                    gDrahtAktiv = TRUE
+                    gDrahtPunkte = []
+                END IF
+                ARRAY_PUSH(gDrahtPunkte, NEW kern.Punkt(gMausWX, gMausWY))
+                neuZeichnen()
+            END IF
+    END SELECT
+    statusAktualisieren()
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION lwLos(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    gPan = FALSE
+    gZieht = FALSE
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION lwBewegung(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ev, px, py)
+    IF gPan THEN
+        vX = vX + (px - gPanSX)
+        vY = vY + (py - gPanSY)
+        gPanSX = px
+        gPanSY = py
+        neuZeichnen()
+        RETURN TRUE
+    END IF
+    mausSetzen(px, py)
+    IF gZieht AND gHatGewaehlt THEN
+        gGewaehlt.lage.pos = NEW kern.Punkt(gMausWX + gZiehDX, gMausWY + gZiehDY)
+        gGeaendert = TRUE
+    END IF
+    neuZeichnen()
+    statusAktualisieren()
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION lwVerlassen(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    gMausDrin = FALSE
+    neuZeichnen()
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION lwRad(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ev, px, py)
+    DIM richtung AS INTEGER
+    ok = gdk_event_get_scroll_direction(ev, richtung)
+    DIM schritt AS FLOAT : schritt = 0
+    IF richtung = GDK_RAD_HOCH THEN
+        schritt = 1
+    ELSEIF richtung = GDK_RAD_RUNTER THEN
+        schritt = -1
+    ELSE
+        DIM dx AS FLOAT, dy AS FLOAT
+        ok = gdk_event_get_scroll_deltas(ev, dx, dy)
+        schritt = -dy
+    END IF
+    IF schritt <> 0 THEN zoomUm(vZoom * (1.15 ^ schritt), px, py)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION lwTaste(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM taste AS INTEGER
+    IF NOT gdk_event_get_keyval(ev, taste) THEN RETURN FALSE
+    DIM strg AS BOOLEAN : strg = evStrg(ev)
+    IF strg THEN
+        SELECT CASE taste
+            CASE K_S : dateiSpeichern() : RETURN TRUE
+            CASE K_O : dateiOeffnen() : RETURN TRUE
+        END SELECT
+    END IF
+    SELECT CASE taste
+        CASE K_ESC
+            gDrahtAktiv = FALSE
+            gDrahtPunkte = []
+            gHatGewaehlt = FALSE
+            neuZeichnen()
+        CASE K_RETURN
+            IF gDrahtAktiv THEN drahtEndePunkt()
+        CASE K_DELETE, K_BACKSPACE
+            auswahlLoeschen()
+        CASE K_R
+            auswahlDrehen()
+        CASE K_W
+            werkzeugWaehlen(WZ_DRAHT, "")
+        CASE K_A
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+        CASE K_PLUS, K_GLEICH
+            zoomMitte(1.2)
+        CASE K_MINUS
+            zoomMitte(1.0 / 1.2)
+        CASE K_NULL
+            zoomUm(0.12, gtk_widget_get_allocated_width(gFlaeche) / 2.0, gtk_widget_get_allocated_height(gFlaeche) / 2.0)
+        CASE ELSE
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION

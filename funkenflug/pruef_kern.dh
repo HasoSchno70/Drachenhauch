@@ -1,0 +1,39 @@
+' Kern-Pruefung ohne Oberflaeche: Transform, Save/Load, Netze.
+IMPORT "kern/kern.dh" AS kern
+
+kern.bibliothekAufbauen()
+PRINT "Symbole: "; LEN(kern.bibliothekListe())
+
+DIM dok AS kern.Dokument : dok = NEW kern.Dokument()
+DIM bl AS kern.Blatt : bl = dok.blaetter[0]
+
+DIM r AS kern.Bauteil : r = kern.neuesBauteil("R", kern.neueLage(1000, 1000))
+r.referenz = "R1"
+ARRAY_PUSH(bl.bauteile, r)
+
+DIM w AS kern.Draht : w = NEW kern.Draht()
+ARRAY_PUSH(w.punkte, NEW kern.Punkt(1200, 1000))
+ARRAY_PUSH(w.punkte, NEW kern.Punkt(2000, 1000))
+ARRAY_PUSH(bl.draehte, w)
+kern.autoKnoten(bl)
+
+' Transform: Pin 0 (lokal -200,0) bei pos 1000,1000
+PRINT "Pin0 rot0:  "; r.pinPunkt(0).x; ","; r.pinPunkt(0).y; "  (erwartet 800,1000)"
+r.lage.drehung = 90
+PRINT "Pin0 rot90: "; r.pinPunkt(0).x; ","; r.pinPunkt(0).y; "  (erwartet 1000,800)"
+r.lage.drehung = 0
+
+' Netz: Pin 1 des R bei (1200,1000) == Drahtende (2000,1000)?
+DIM n AS kern.Netze : n = kern.netzeBerechnen(bl)
+PRINT "Pin1(1200,1000) ~ Drahtende(2000,1000)? "; n.gleich(1200, 1000, 2000, 1000); " (erwartet TRUE)"
+PRINT "Pin0(800,1000)  ~ Drahtende(2000,1000)? "; n.gleich(800, 1000, 2000, 1000); " (erwartet FALSE)"
+
+' Save / Load
+DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
+PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)
+DIM dok2 AS kern.Dokument : dok2 = kern.dokumentLaden(pfad)
+PRINT "Geladen Bauteile: "; LEN(dok2.blaetter[0].bauteile)
+PRINT "Geladen Ref:      "; dok2.blaetter[0].bauteile[0].referenz
+PRINT "Geladen Wert:     "; dok2.blaetter[0].bauteile[0].wert
+PRINT "Geladen Draehte:  "; LEN(dok2.blaetter[0].draehte)
+PRINT "fertig"

@@ -1,0 +1,151 @@
+' Netz-Erkennung -- EINE reine Funktion ueber das Blatt, von allen genutzt
+' (Hervorhebung, spaeter ERC/Netzliste). SparkNode-Lehre: nie zwei Quellen.
+'
+' Regeln: alle Punkte aufs RASTER quantisiert. Zwei Drahtecken eines Drahtes
+' sind verbunden (Segment). Ein Drahtende/Pin auf einem fremden Segment =
+' T-Verbindung (verbunden). Reine Kreuzung ohne gemeinsamen Punkt = NICHT
+' verbunden. Ein Knoten entsteht automatisch, wo >=3 Enden treffen oder ein
+' Ende auf einem Segment liegt.
+
+FUNCTION netzKey(x AS INTEGER, y AS INTEGER) AS STRING
+    RETURN STR$(rastern(x, RASTER)) + ":" + STR$(rastern(y, RASTER))
+END FUNCTION
+
+' Liegt q (quantisiert) echt INNEN auf der Strecke a..b (ohne die Enden)?
+FUNCTION aufSegment(ax AS INTEGER, ay AS INTEGER, bx AS INTEGER, by AS INTEGER, qx AS INTEGER, qy AS INTEGER) AS BOOLEAN
+    IF (qx = ax AND qy = ay) OR (qx = bx AND qy = by) THEN RETURN FALSE
+    DIM kreuz AS INTEGER : kreuz = (bx - ax) * (qy - ay) - (by - ay) * (qx - ax)
+    IF kreuz <> 0 THEN RETURN FALSE
+    IF qx < MIN(ax, bx) OR qx > MAX(ax, bx) THEN RETURN FALSE
+    IF qy < MIN(ay, by) OR qy > MAX(ay, by) THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+
+CLASS Netze
+    DIM idx AS MAP OF INTEGER         ' key -> Index
+    DIM schluessel AS ARRAY OF STRING
+    DIM eltern AS ARRAY OF INTEGER
+
+    SUB Init()
+        idx = {}
+        schluessel = []
+        eltern = []
+    END SUB
+
+    FUNCTION punkt(x AS INTEGER, y AS INTEGER) AS INTEGER
+        DIM k AS STRING : k = netzKey(x, y)
+        IF MAPHAS(idx, k) THEN RETURN MAPGET(idx, k)
+        DIM i AS INTEGER : i = LEN(schluessel)
+        ARRAY_PUSH(schluessel, k)
+        ARRAY_PUSH(eltern, i)
+        MAPPUT(idx, k, i)
+        RETURN i
+    END FUNCTION
+
+    FUNCTION wurzel(i AS INTEGER) AS INTEGER
+        WHILE eltern[i] <> i
+            eltern[i] = eltern[eltern[i]]
+            i = eltern[i]
+        WEND
+        RETURN i
+    END FUNCTION
+
+    SUB eins(a AS INTEGER, b AS INTEGER)
+        DIM ra AS INTEGER : ra = wurzel(a)
+        DIM rb AS INTEGER : rb = wurzel(b)
+        IF ra <> rb THEN eltern[rb] = ra
+    END SUB
+
+    ' Gehoeren zwei Blattpunkte zum selben Netz?
+    FUNCTION gleich(ax AS INTEGER, ay AS INTEGER, bx AS INTEGER, by AS INTEGER) AS BOOLEAN
+        DIM ka AS STRING : ka = netzKey(ax, ay)
+        DIM kb AS STRING : kb = netzKey(bx, by)
+        IF NOT MAPHAS(idx, ka) OR NOT MAPHAS(idx, kb) THEN RETURN FALSE
+        RETURN wurzel(MAPGET(idx, ka)) = wurzel(MAPGET(idx, kb))
+    END FUNCTION
+END CLASS
+
+' Alle Punkte verknuepfen und das Ergebnis zurueckgeben.
+FUNCTION netzeBerechnen(bl AS Blatt) AS Netze
+    DIM n AS Netze : n = NEW Netze()
+    DIM w AS Draht, b AS Bauteil, j AS INTEGER, i AS INTEGER
+    ' Drahtsegmente verbinden ihre Ecken
+    FOR i = 0 TO LEN(bl.draehte) - 1
+        w = bl.draehte[i]
+        FOR j = 0 TO LEN(w.punkte) - 2
+            n.eins(n.punkt(w.punkte[j].x, w.punkte[j].y), n.punkt(w.punkte[j + 1].x, w.punkte[j + 1].y))
+        NEXT
+    NEXT
+    ' Pins als Punkte aufnehmen
+    FOR i = 0 TO LEN(bl.bauteile) - 1
+        b = bl.bauteile[i]
+        FOR j = 0 TO LEN(b.sym.pins) - 1
+            DIM pp AS Punkt : pp = b.pinPunkt(j)
+            DIM dummy AS INTEGER : dummy = n.punkt(pp.x, pp.y)
+        NEXT
+    NEXT
+    ' T-Verbindungen: jeder Punkt, der innen auf einem Segment liegt, wird mit
+    ' dessen Enden verbunden.
+    DIM alle AS ARRAY OF STRING : alle = MAPKEYS(n.idx)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(alle) - 1
+        DIM teile AS ARRAY OF STRING : teile = SPLIT$(alle[k], ":")
+        DIM qx AS INTEGER : qx = VAL(teile[0])
+        DIM qy AS INTEGER : qy = VAL(teile[1])
+        FOR i = 0 TO LEN(bl.draehte) - 1
+            w = bl.draehte[i]
+            FOR j = 0 TO LEN(w.punkte) - 2
+                IF aufSegment(w.punkte[j].x, w.punkte[j].y, w.punkte[j + 1].x, w.punkte[j + 1].y, qx, qy) THEN
+                    n.eins(n.punkt(qx, qy), n.punkt(w.punkte[j].x, w.punkte[j].y))
+                END IF
+            NEXT
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+
+' Wie oft endet ein Draht genau an diesem Blattpunkt?
+FUNCTION endenAn(bl AS Blatt, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM c AS INTEGER : c = 0
+    DIM w AS Draht, i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(bl.draehte) - 1
+        w = bl.draehte[i]
+        FOR j = 0 TO LEN(w.punkte) - 1
+            IF rastern(w.punkte[j].x, RASTER) = rastern(x, RASTER) AND rastern(w.punkte[j].y, RASTER) = rastern(y, RASTER) THEN c = c + 1
+        NEXT
+    NEXT
+    RETURN c
+END FUNCTION
+
+' Liegt irgendein Drahtende innen auf einem anderen Segment, am Punkt (x,y)?
+FUNCTION istTPunkt(bl AS Blatt, x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    DIM w AS Draht, i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(bl.draehte) - 1
+        w = bl.draehte[i]
+        FOR j = 0 TO LEN(w.punkte) - 2
+            IF aufSegment(w.punkte[j].x, w.punkte[j].y, w.punkte[j + 1].x, w.punkte[j + 1].y, rastern(x, RASTER), rastern(y, RASTER)) THEN RETURN TRUE
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Knoten neu bestimmen: wo >=3 Enden treffen oder ein Ende auf einem Segment.
+SUB autoKnoten(bl AS Blatt)
+    DIM neu AS ARRAY OF Knoten : neu = []
+    DIM gesehen AS MAP OF INTEGER
+    DIM w AS Draht, i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(bl.draehte) - 1
+        w = bl.draehte[i]
+        FOR j = 0 TO LEN(w.punkte) - 1
+            DIM x AS INTEGER : x = rastern(w.punkte[j].x, RASTER)
+            DIM y AS INTEGER : y = rastern(w.punkte[j].y, RASTER)
+            DIM k AS STRING : k = netzKey(x, y)
+            IF MAPHAS(gesehen, k) THEN CONTINUE
+            IF endenAn(bl, x, y) >= 3 OR istTPunkt(bl, x, y) THEN
+                MAPPUT(gesehen, k, 1)
+                ARRAY_PUSH(neu, NEW Knoten(NEW Punkt(x, y)))
+            END IF
+        NEXT
+    NEXT
+    bl.knoten = neu
+END SUB
