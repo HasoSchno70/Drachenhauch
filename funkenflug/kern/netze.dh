@@ -345,6 +345,12 @@ FUNCTION punkteVerschoben(p AS ARRAY OF Punkt, dx AS INTEGER, dy AS INTEGER) AS 
 END FUNCTION
 
 FUNCTION gummibandEnde(q AS ARRAY OF Punkt, dx AS INTEGER, dy AS INTEGER) AS ARRAY OF Punkt
+    RETURN gummibandEndeModus(q, dx, dy, 0)
+END FUNCTION
+
+' modus 0: wie oben beschrieben; 1: den Knick andersherum legen (ohne die
+' Nachbarecke zu ruecken); 2: schraeg, nur das Ende versetzen.
+FUNCTION gummibandEndeModus(q AS ARRAY OF Punkt, dx AS INTEGER, dy AS INTEGER, modus AS INTEGER) AS ARRAY OF Punkt
     DIM n AS INTEGER : n = LEN(q)
     IF n < 2 THEN RETURN q
     DIM e AS Punkt : e = q[n - 1]
@@ -355,19 +361,27 @@ FUNCTION gummibandEnde(q AS ARRAY OF Punkt, dx AS INTEGER, dy AS INTEGER) AS ARR
     FOR i = 0 TO n - 3
         ARRAY_PUSH(r, q[i])
     NEXT
-    IF e.y = nb.y AND dy <> 0 THEN
-        IF n >= 3 AND q[n - 3].x = nb.x THEN
+    IF modus = 2 THEN
+        ARRAY_PUSH(r, nb)
+    ELSEIF e.y = nb.y AND dy <> 0 THEN
+        IF modus = 0 AND n >= 3 AND q[n - 3].x = nb.x THEN
             ARRAY_PUSH(r, NEW Punkt(nb.x, nb.y + dy))
-        ELSE
+        ELSEIF modus = 0 THEN
             ARRAY_PUSH(r, nb)
             ARRAY_PUSH(r, NEW Punkt(e2.x, nb.y))
-        END IF
-    ELSEIF e.x = nb.x AND dx <> 0 THEN
-        IF n >= 3 AND q[n - 3].y = nb.y THEN
-            ARRAY_PUSH(r, NEW Punkt(nb.x + dx, nb.y))
         ELSE
             ARRAY_PUSH(r, nb)
             ARRAY_PUSH(r, NEW Punkt(nb.x, e2.y))
+        END IF
+    ELSEIF e.x = nb.x AND dx <> 0 THEN
+        IF modus = 0 AND n >= 3 AND q[n - 3].y = nb.y THEN
+            ARRAY_PUSH(r, NEW Punkt(nb.x + dx, nb.y))
+        ELSEIF modus = 0 THEN
+            ARRAY_PUSH(r, nb)
+            ARRAY_PUSH(r, NEW Punkt(nb.x, e2.y))
+        ELSE
+            ARRAY_PUSH(r, nb)
+            ARRAY_PUSH(r, NEW Punkt(e2.x, nb.y))
         END IF
     ELSE
         ARRAY_PUSH(r, nb)
@@ -377,11 +391,95 @@ FUNCTION gummibandEnde(q AS ARRAY OF Punkt, dx AS INTEGER, dy AS INTEGER) AS ARR
 END FUNCTION
 
 FUNCTION gummiband(p AS ARRAY OF Punkt, art AS INTEGER, dx AS INTEGER, dy AS INTEGER) AS ARRAY OF Punkt
+    RETURN gummibandModus(p, art, dx, dy, 0)
+END FUNCTION
+
+FUNCTION gummibandModus(p AS ARRAY OF Punkt, art AS INTEGER, dx AS INTEGER, dy AS INTEGER, modus AS INTEGER) AS ARRAY OF Punkt
     IF art = 3 THEN RETURN punkteVerschoben(p, dx, dy)
     DIM q AS ARRAY OF Punkt : q = ARRAY_COPY(p)
     IF art = 1 THEN REVERSE(q)
-    q = gummibandEnde(q, dx, dy)
+    q = gummibandEndeModus(q, dx, dy, modus)
     IF art = 1 THEN REVERSE(q)
+    RETURN q
+END FUNCTION
+
+' Liegt p auf der Polylinie (auf einer Ecke oder innen auf einem Segment)?
+FUNCTION aufPolylinie(p AS Punkt, q AS ARRAY OF Punkt) AS BOOLEAN
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(q) - 1
+        IF punktGleich(p, q[j]) THEN RETURN TRUE
+        IF j < LEN(q) - 1 THEN
+            IF aufSegment(q[j].x, q[j].y, q[j + 1].x, q[j + 1].y, p.x, p.y) THEN RETURN TRUE
+        END IF
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Beruehrt der neue Verlauf q des Drahtes w etwas NEU -- etwas, das weder
+' eins seiner beiden Enden ist noch schon vorher (orig) auf dem Draht lag?
+' Dann wuerde das Gummiband eine Verbindung erfinden. Was vorher schon
+' darauf sass (ein Label auf dem Draht, ein T-Anschluss), bleibt erlaubt.
+FUNCTION neuBeruehrt(p AS Punkt, a AS Punkt, e AS Punkt, q AS ARRAY OF Punkt, orig AS ARRAY OF Punkt) AS BOOLEAN
+    IF punktGleich(p, a) OR punktGleich(p, e) THEN RETURN FALSE
+    IF NOT aufPolylinie(p, q) THEN RETURN FALSE
+    RETURN NOT aufPolylinie(p, orig)
+END FUNCTION
+
+FUNCTION gummibandKollision(bl AS Blatt, w AS Draht, q AS ARRAY OF Punkt, orig AS ARRAY OF Punkt) AS BOOLEAN
+    DIM a AS Punkt : a = q[0]
+    DIM e AS Punkt : e = q[LEN(q) - 1]
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(bl.bauteile) - 1
+        FOR j = 0 TO LEN(bl.bauteile[i].sym.pins) - 1
+            IF neuBeruehrt(bl.bauteile[i].pinPunkt(j), a, e, q, orig) THEN RETURN TRUE
+        NEXT
+    NEXT
+    FOR i = 0 TO LEN(bl.labels) - 1
+        IF neuBeruehrt(bl.labels[i].anker, a, e, q, orig) THEN RETURN TRUE
+    NEXT
+    FOR i = 0 TO LEN(bl.draehte) - 1
+        DIM ow AS Draht : ow = bl.draehte[i]
+        IF ow = w THEN CONTINUE
+        ' fremde Ecken auf dem neuen Verlauf
+        FOR j = 0 TO LEN(ow.punkte) - 1
+            IF neuBeruehrt(ow.punkte[j], a, e, q, orig) THEN RETURN TRUE
+        NEXT
+        ' eigene neue Ecken auf einem fremden Draht
+        FOR j = 1 TO LEN(q) - 2
+            IF aufPolylinie(q[j], ow.punkte) AND NOT aufPolylinie(q[j], orig) THEN RETURN TRUE
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Gummiband, das nie eine Verbindung erfindet: versucht den gewohnten Knick,
+' dann den anderen herum (je Ende), zuletzt schraeg -- und nimmt den ersten
+' Verlauf, der nichts beruehrt ausser seinen beiden Enden. Rechnet ab orig
+' (den Ecken bei Zugbeginn).
+FUNCTION gummibandSicher(bl AS Blatt, w AS Draht, orig AS ARRAY OF Punkt, dxA AS INTEGER, dyA AS INTEGER, dxE AS INTEGER, dyE AS INTEGER) AS ARRAY OF Punkt
+    IF dxA = dxE AND dyA = dyE THEN RETURN punkteVerschoben(orig, dxA, dyA)
+    DIM mA AS ARRAY OF INTEGER : mA = [0, 1, 0, 1, 2]
+    DIM mE AS ARRAY OF INTEGER : mE = [0, 0, 1, 1, 2]
+    DIM k AS INTEGER
+    DIM tmp AS Draht : tmp = NEW Draht()
+    FOR k = 0 TO LEN(mA) - 1
+        DIM q AS ARRAY OF Punkt : q = orig
+        IF dxA <> 0 OR dyA <> 0 THEN q = gummibandModus(q, 1, dxA, dyA, mA[k])
+        IF dxE <> 0 OR dyE <> 0 THEN q = gummibandModus(q, 2, dxE, dyE, mE[k])
+        tmp.punkte = q
+        drahtAufraeumen(tmp)
+        IF NOT gummibandKollision(bl, w, tmp.punkte, orig) THEN RETURN tmp.punkte
+    NEXT
+    RETURN tmp.punkte
+END FUNCTION
+
+' Beide Enden folgen je ihrem Pin (beim Drehen wandern sie verschieden).
+' Wandern beide gleich weit, geht der Draht starr mit.
+FUNCTION gummibandEnden(p AS ARRAY OF Punkt, dxA AS INTEGER, dyA AS INTEGER, dxE AS INTEGER, dyE AS INTEGER) AS ARRAY OF Punkt
+    IF dxA = dxE AND dyA = dyE THEN RETURN punkteVerschoben(p, dxA, dyA)
+    DIM q AS ARRAY OF Punkt : q = p
+    IF dxA <> 0 OR dyA <> 0 THEN q = gummiband(q, 1, dxA, dyA)
+    IF dxE <> 0 OR dyE <> 0 THEN q = gummiband(q, 2, dxE, dyE)
     RETURN q
 END FUNCTION
 

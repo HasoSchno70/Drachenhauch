@@ -286,7 +286,7 @@ END FUNCTION
 
 SUB bauteilPlatzieren()
     verlaufMerken()
-    DIM l AS kern.Lage : l = NEW kern.Lage(NEW kern.Punkt(gMausWX, gMausWY), gPlatzDreh, FALSE)
+    DIM l AS kern.Lage : l = NEW kern.Lage(NEW kern.Punkt(gMausWX, gMausWY), gPlatzDreh, gPlatzSpiegel)
     DIM b AS kern.Bauteil : b = kern.neuesBauteil(gSymbolRef, l)
     b.referenz = naechsteReferenz(b.sym.praefix)
     ARRAY_PUSH(gBlatt.bauteile, b)
@@ -378,13 +378,25 @@ SUB auswahlLoeschen(ganzerDraht AS BOOLEAN)
     END IF
 END SUB
 
+' R: die Auswahl drehen (angeschlossene Draehte folgen); ohne Auswahl die
+' Vorschau beim Platzieren. Vorher drehte ein gespiegeltes Bauteil hier
+' sichtbar falsch herum, und Draehte rissen ab.
 SUB auswahlDrehen()
-    IF gHatGewaehlt THEN
-        verlaufMerken()
-        gGewaehlt.lage.drehung = (gGewaehlt.lage.drehung + 90) MOD 360
-        geaendert()
-    ELSEIF auswahlAnzahl() = 0 THEN
-        gPlatzDreh = (gPlatzDreh + 90) MOD 360     ' Vorschau beim Platzieren
+    IF auswahlAnzahl() > 0 AND gWerkzeug <> WZ_BAUTEIL THEN
+        gruppeTransformieren(kern.GR_DREHEN)
+    ELSE
+        gPlatzDreh = (gPlatzDreh + 90) MOD 360
+        neuZeichnen()
+    END IF
+END SUB
+
+' X / Y: links/rechts bzw. oben/unten spiegeln -- die Auswahl oder die Vorschau.
+SUB auswahlSpiegeln(art AS INTEGER)
+    IF auswahlAnzahl() > 0 AND gWerkzeug <> WZ_BAUTEIL THEN
+        gruppeTransformieren(art)
+    ELSE
+        gPlatzSpiegel = NOT gPlatzSpiegel
+        IF art = kern.GR_SPIEGELN_Y THEN gPlatzDreh = (gPlatzDreh + 180) MOD 360
         neuZeichnen()
     END IF
 END SUB
@@ -635,6 +647,10 @@ FUNCTION lwTaste(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
             umbenennenAuswahl()
         CASE K_R
             auswahlDrehen()
+        CASE K_X
+            auswahlSpiegeln(kern.GR_SPIEGELN_X)
+        CASE K_Y
+            auswahlSpiegeln(kern.GR_SPIEGELN_Y)
         CASE K_W
             werkzeugWaehlen(WZ_DRAHT, "")
         CASE K_L

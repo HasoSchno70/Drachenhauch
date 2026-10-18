@@ -38,7 +38,25 @@ Referenz lehnt der Eigenschaften-Dialog ab.
 **Gummiband:** Zieht man Bauteile (einzeln oder als Auswahl), wandern die
 angeschlossenen Drahtenden mit. Damit die Leitung rechtwinklig bleibt, rückt
 die Nachbarecke mit oder es entsteht ein Knick; Drähte, deren beide Enden
-mitwandern, verschieben sich starr, ebenso Labels an bewegten Pins.
+mitwandern, verschieben sich starr, ebenso Labels an bewegten Pins. Das
+Gummiband **erfindet nie eine Verbindung**: Würde ein Knick einen fremden Pin,
+ein Label oder einen anderen Draht berühren (etwa wenn beim Drehen beide
+Anschlüsse eines Widerstands zum selben Punkt knicken), nimmt es den Knick
+andersherum oder zuletzt eine Schräge.
+
+**Drehen und Spiegeln:** `R` dreht um 90°, `X` spiegelt links/rechts, `Y`
+oben/unten – ein Bauteil um seinen Ursprung, eine Auswahl um ihre Mitte (auf
+dem Raster, damit alle Pins auf dem Raster bleiben). Angeschlossene Drähte
+folgen per Gummiband, ein Rückgängig-Schritt. Beim Platzieren gelten
+`R`/`X`/`Y` der Vorschau.
+
+**Ausgabe** (Knopf „Ausgabe ▾" in der Kopfleiste): **PDF**, **SVG** und
+**PNG** (150 dpi), **Drucken** über den Druckdialog des Systems, dazu
+Stückliste und Netzliste. Alles läuft durch dieselbe Zeichenroutine wie der
+Bildschirm, nur mit Druckfarben auf Weiß, ohne Raster, Auswahl und Pin-Punkte,
+auf A4 quer eingepasst (kleine Schaltungen höchstens 3:1) und mit Schriftfeld.
+
+![Ausgabe als PDF/PNG](druck.png)
 
 **Eigene Bauteile und ICs** (Knopf „Symbol …" in der Leiste; ist ein eigenes
 Bauteil gewählt, bearbeitet er dessen Symbol): Name, Präfix, Wert und eine
@@ -136,6 +154,7 @@ ansicht/    Zeichenfläche und Werkzeuge – globaler Namensraum
   verlauf.dh     Rückgängig/Wiederholen
   auswahl.dh     Auswahl als Menge, Rahmen, Gruppen-Zug mit Gummiband, Ablage
   symboleditor.dh  Symbol-Editor mit Vorschau
+  ausgabe.dh     PDF, SVG, PNG, Drucken, Menü „Ausgabe"
 main.dh     Fenster, Kopfleiste, Werkzeugleiste, Statuszeile, Dialoge
 ```
 
@@ -143,10 +162,12 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (99 Prüfungen,
-darunter die echten Werkzeug-Knöpfe, Symbol-Editor samt Fehlerweg und
-Bearbeiten, Stückliste, Gummiband, Rahmen und Gruppen-Zug über den
-Klick-Handler, Kopieren/Einfügen, Umbenennen, ERC und SPICE). Der Selbsttest
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (119 Prüfungen,
+darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
+und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
+Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
+Kopieren/Einfügen, Umbenennen, ERC und SPICE). `pruef_kern.dh` prüft u. a. die
+Gruppen-Lage in allen 8 Orientierungen × 3 Arten (72 Pin-Prüfungen). Der Selbsttest
 lässt die Zwischenablage des Systems in Ruhe und schreibt seine Bibliothek in
 eine Wegwerf-Datei neben dem Bild. `--nur-foto bild.png` macht nur das Bild.
 
@@ -191,7 +212,7 @@ zweiten Kondensator wieder „C1".
 
 ## Noch offen (nächste Runden)
 
-Gruppe drehen/spiegeln, mehrere Blätter in der Oberfläche, Symbole mit freier
-Grafik (bisher Rechteck-Gehäuse aus dem Generator), Überstrich für aktiv-low
-(`~RESET`), Bauteil-Felder wie Gehäuse/Bestellnummer für die Stückliste,
-Bild-/PDF-Export, Platinen-Layout.
+Mehrere Blätter in der Oberfläche, Symbole mit freier Grafik (bisher
+Rechteck-Gehäuse aus dem Generator), Überstrich für aktiv-low (`~RESET`),
+Bauteil-Felder wie Gehäuse/Bestellnummer für die Stückliste, Labels drehen,
+Platinen-Layout.

@@ -258,7 +258,11 @@ SUB gruppenZiehenUm(dx AS INTEGER, dy AS INTEGER)
         gzL[i].anker = NEW kern.Punkt(gzLOrig[i].x + dx, gzLOrig[i].y + dy)
     NEXT
     FOR i = 0 TO LEN(gzD) - 1
-        gzD[i].punkte = kern.gummiband(gzDOrig[i].punkte, gzDArt[i], dx, dy)
+        SELECT CASE gzDArt[i]
+            CASE 1 : gzD[i].punkte = kern.gummibandSicher(gBlatt, gzD[i], gzDOrig[i].punkte, dx, dy, 0, 0)
+            CASE 2 : gzD[i].punkte = kern.gummibandSicher(gBlatt, gzD[i], gzDOrig[i].punkte, 0, 0, dx, dy)
+            CASE ELSE : gzD[i].punkte = kern.punkteVerschoben(gzDOrig[i].punkte, dx, dy)
+        END SELECT
     NEXT
     netzeVeraltet()
     gGeaendert = TRUE
@@ -270,6 +274,101 @@ SUB gruppenZugEnde()
     DIM i AS INTEGER
     FOR i = 0 TO LEN(gzD) - 1
         IF gzDArt[i] <> 3 THEN kern.drahtAufraeumen(gzD[i])
+    NEXT
+    kern.autoKnoten(gBlatt)
+    geaendert()
+END SUB
+
+' --- Drehen und Spiegeln ----------------------------------------------------
+' Die Auswahl um ihre Mitte (aufs Raster gelegt) drehen oder spiegeln; ein
+' einzelnes Bauteil dreht um seinen eigenen Ursprung. Drahtenden, die an
+' einem bewegten Pin oder gewaehlten Label haengen, folgen per Gummiband --
+' jedes zu SEINEM Pin, denn beim Drehen wandern die Pins verschieden weit.
+SUB gruppeTransformieren(art AS INTEGER)
+    IF auswahlAnzahl() = 0 THEN RETURN
+    DIM i AS INTEGER, j AS INTEGER
+    DIM pivot AS kern.Punkt
+    IF LEN(gSelB) = 1 AND auswahlAnzahl() = 1 THEN
+        pivot = gSelB[0].lage.pos
+    ELSE
+        DIM x0 AS INTEGER : x0 = 2000000000
+        DIM y0 AS INTEGER : y0 = 2000000000
+        DIM x1 AS INTEGER : x1 = -2000000000
+        DIM y1 AS INTEGER : y1 = -2000000000
+        FOR i = 0 TO LEN(gSelB) - 1
+            DIM bx0 AS INTEGER, by0 AS INTEGER, bx1 AS INTEGER, by1 AS INTEGER
+            bauteilBox(gSelB[i], bx0, by0, bx1, by1)
+            x0 = MIN(x0, bx0) : y0 = MIN(y0, by0) : x1 = MAX(x1, bx1) : y1 = MAX(y1, by1)
+        NEXT
+        FOR i = 0 TO LEN(gSelL) - 1
+            x0 = MIN(x0, gSelL[i].anker.x) : y0 = MIN(y0, gSelL[i].anker.y)
+            x1 = MAX(x1, gSelL[i].anker.x) : y1 = MAX(y1, gSelL[i].anker.y)
+        NEXT
+        FOR i = 0 TO LEN(gSelD) - 1
+            FOR j = 0 TO LEN(gSelD[i].punkte) - 1
+                x0 = MIN(x0, gSelD[i].punkte[j].x) : y0 = MIN(y0, gSelD[i].punkte[j].y)
+                x1 = MAX(x1, gSelD[i].punkte[j].x) : y1 = MAX(y1, gSelD[i].punkte[j].y)
+            NEXT
+        NEXT
+        pivot = NEW kern.Punkt(kern.rastern((x0 + x1) \ 2, kern.RASTER), kern.rastern((y0 + y1) \ 2, kern.RASTER))
+    END IF
+    verlaufMerken()
+    ' wohin wandert jeder bewegte Punkt? alt (Netz-Schluessel) -> neu
+    DIM neuX AS MAP OF INTEGER
+    DIM neuY AS MAP OF INTEGER
+    MAPCLEAR(neuX)
+    MAPCLEAR(neuY)
+    FOR i = 0 TO LEN(gSelB) - 1
+        DIM b AS kern.Bauteil : b = gSelB[i]
+        DIM alt AS ARRAY OF kern.Punkt : alt = []
+        FOR j = 0 TO LEN(b.sym.pins) - 1
+            ARRAY_PUSH(alt, b.pinPunkt(j))
+        NEXT
+        b.lage = kern.lageGruppe(b.lage, pivot, art)
+        FOR j = 0 TO LEN(b.sym.pins) - 1
+            DIM nu AS kern.Punkt : nu = b.pinPunkt(j)
+            MAPPUT(neuX, kern.netzKey(alt[j].x, alt[j].y), nu.x)
+            MAPPUT(neuY, kern.netzKey(alt[j].x, alt[j].y), nu.y)
+        NEXT
+    NEXT
+    FOR i = 0 TO LEN(gSelL) - 1
+        DIM la AS kern.Label : la = gSelL[i]
+        DIM ln AS kern.Punkt : ln = kern.punktGruppe(la.anker, pivot, art)
+        MAPPUT(neuX, kern.netzKey(la.anker.x, la.anker.y), ln.x)
+        MAPPUT(neuY, kern.netzKey(la.anker.x, la.anker.y), ln.y)
+        la.anker = ln
+    NEXT
+    ' ungewaehlte Labels an einem bewegten Pin gehen mit
+    FOR i = 0 TO LEN(gBlatt.labels) - 1
+        DIM lu AS kern.Label : lu = gBlatt.labels[i]
+        DIM lk AS STRING : lk = kern.netzKey(lu.anker.x, lu.anker.y)
+        IF NOT istGewaehltL(lu) AND MAPHAS(neuX, lk) THEN lu.anker = NEW kern.Punkt(MAPGET(neuX, lk), MAPGET(neuY, lk))
+    NEXT
+    ' Draehte: gewaehlte mitdrehen, angeschlossene per Gummiband
+    FOR i = 0 TO LEN(gBlatt.draehte) - 1
+        DIM w AS kern.Draht : w = gBlatt.draehte[i]
+        IF LEN(w.punkte) < 2 THEN CONTINUE
+        IF istGewaehltD(w) THEN
+            DIM np AS ARRAY OF kern.Punkt : np = []
+            FOR j = 0 TO LEN(w.punkte) - 1
+                ARRAY_PUSH(np, kern.punktGruppe(w.punkte[j], pivot, art))
+            NEXT
+            w.punkte = np
+        ELSE
+            DIM a AS kern.Punkt : a = w.punkte[0]
+            DIM e AS kern.Punkt : e = w.punkte[LEN(w.punkte) - 1]
+            DIM ka AS STRING : ka = kern.netzKey(a.x, a.y)
+            DIM ke AS STRING : ke = kern.netzKey(e.x, e.y)
+            DIM dxA AS INTEGER : dxA = 0
+            DIM dyA AS INTEGER : dyA = 0
+            DIM dxE AS INTEGER : dxE = 0
+            DIM dyE AS INTEGER : dyE = 0
+            IF MAPHAS(neuX, ka) THEN dxA = MAPGET(neuX, ka) - a.x : dyA = MAPGET(neuY, ka) - a.y
+            IF MAPHAS(neuX, ke) THEN dxE = MAPGET(neuX, ke) - e.x : dyE = MAPGET(neuY, ke) - e.y
+            IF dxA <> 0 OR dyA <> 0 OR dxE <> 0 OR dyE <> 0 THEN
+                w.punkte = kern.gummibandSicher(gBlatt, w, w.punkte, dxA, dyA, dxE, dyE)
+            END IF
+        END IF
     NEXT
     kern.autoKnoten(gBlatt)
     geaendert()

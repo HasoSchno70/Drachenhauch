@@ -337,6 +337,14 @@ DECLARE FUNCTION gtk_print_operation_get_default_page_setup LIB GTK (op AS ZEIGE
 DECLARE FUNCTION gtk_print_context_get_cairo_context LIB GTK (kontext AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_print_context_get_width LIB GTK (kontext AS ZEIGER) AS FLOAT
 DECLARE FUNCTION gtk_print_context_get_height LIB GTK (kontext AS ZEIGER) AS FLOAT
+DECLARE SUB gtk_print_operation_set_unit LIB GTK (op AS ZEIGER, einheit AS LONG)
+CONST GTK_EINHEIT_PUNKT = 1                ' GTK_UNIT_POINTS
+' Vektor-Ausgabe
+DECLARE FUNCTION cairo_pdf_surface_create LIB CAIRO (pfad AS TEXT, b AS FLOAT, h AS FLOAT) AS ZEIGER
+DECLARE FUNCTION cairo_svg_surface_create LIB CAIRO (pfad AS TEXT, b AS FLOAT, h AS FLOAT) AS ZEIGER
+DECLARE SUB cairo_show_page LIB CAIRO (cr AS ZEIGER)
+DECLARE SUB cairo_surface_finish LIB CAIRO (flaeche AS ZEIGER)
+DECLARE FUNCTION cairo_surface_status LIB CAIRO (flaeche AS ZEIGER) AS LONG
 CONST GTK_DRUCK_DIALOG = 0                 ' GTK_PRINT_OPERATION_ACTION_PRINT_DIALOG
 CONST GTK_DRUCK_EXPORT = 3                 ' GTK_PRINT_OPERATION_ACTION_EXPORT
 CONST GTK_DRUCK_FEHLER = 0                 ' GtkPrintOperationResult

@@ -21,6 +21,7 @@ IMPORT "ansicht/werkzeuge.dh"
 IMPORT "ansicht/verlauf.dh"
 IMPORT "ansicht/auswahl.dh"
 IMPORT "ansicht/symboleditor.dh"
+IMPORT "ansicht/ausgabe.dh"
 
 CONST STIL = "window { background-color: #12131a; color: #e6e6f0; }" + _
     " headerbar { background-color: #1a1c26; color: #e6e6f0; }" + _
@@ -1034,6 +1035,62 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             IF fotoZiel <> "" THEN pruefe("Stueckliste als Markdown", STR$(stuecklisteNach(fotoZiel + ".md")), STR$(TRUE))
             pruefe("Markdown-Tabelle", STR$(CONTAINS(kern.stuecklisteMarkdown$(gBlatt, "P"), "| 1 | R7 | 4k7 | Widerstand |")), STR$(TRUE))
         CASE 12
+            ' Drehen: R7 einzeln um 90 Grad -- beide Draehte folgen, ohne Kurzschluss
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            waehleB(gBlatt.bauteile[1])
+            DIM vorD AS INTEGER : vorD = LEN(gUndo)
+            auswahlDrehen()
+            DIM nd AS kern.Netze : nd = aktuelleNetze()
+            pruefe("R7 gedreht", STR$(gBlatt.bauteile[1].lage.drehung), "180")
+            pruefe("Drehen = ein Undo-Schritt", STR$(LEN(gUndo) - vorD), "1")
+            DIM p0 AS kern.Punkt : p0 = gBlatt.bauteile[1].pinPunkt(0)
+            DIM p1 AS kern.Punkt : p1 = gBlatt.bauteile[1].pinPunkt(1)
+            pruefe("R7 Pin 1 bleibt an VCC", STR$(nd.gleich(p0.x, p0.y, 2000, 1200)), STR$(TRUE))
+            pruefe("R7 Pin 2 bleibt an D1", STR$(nd.gleich(p1.x, p1.y, 2000, 2800)), STR$(TRUE))
+            pruefe("kein Kurzschluss VCC-D1", STR$(nd.gleich(2000, 1200, 2000, 2800)), STR$(FALSE))
+            verlaufZurueck()
+            ' Spiegeln: C1 oben/unten -- Lage und Anschluss stimmen
+            waehleB(gBlatt.bauteile[4])
+            auswahlSpiegeln(kern.GR_SPIEGELN_Y)
+            pruefe("C1 gespiegelt (Y)", STR$(gBlatt.bauteile[4].lage.gespiegelt) + " " + STR$(gBlatt.bauteile[4].lage.drehung), STR$(TRUE) + " 180")
+            pruefe("C1 Pin 2 noch am Draht", STR$(aktuelleNetze().gleich(3200, 2000, 3600, 2600)), STR$(TRUE))
+            verlaufZurueck()
+            ' Gruppe: R7, D1 und der Draht dazwischen um ihre Mitte drehen
+            auswahlAufheben()
+            rahmenAnwendenWelt(1500, 1700, 2600, 3300)
+            pruefe("Gruppe gewaehlt", STR$(LEN(gSelB)) + "/" + STR$(LEN(gSelD)), "2/1")
+            gruppeTransformieren(kern.GR_DREHEN)
+            DIM ng AS kern.Netze : ng = aktuelleNetze()
+            DIM r0 AS kern.Punkt : r0 = gBlatt.bauteile[1].pinPunkt(0)
+            DIM d1 AS kern.Punkt : d1 = gBlatt.bauteile[2].pinPunkt(1)
+            pruefe("Gruppe: R7 haengt an VCC", STR$(ng.gleich(r0.x, r0.y, 2000, 1200)), STR$(TRUE))
+            pruefe("Gruppe: D1 haengt an GND", STR$(ng.gleich(d1.x, d1.y, 2000, 3600)), STR$(TRUE))
+            pruefe("Gruppe: R7-D1 verbunden", STR$(ng.gleich(gBlatt.bauteile[1].pinPunkt(1).x, gBlatt.bauteile[1].pinPunkt(1).y, gBlatt.bauteile[2].pinPunkt(0).x, gBlatt.bauteile[2].pinPunkt(0).y)), STR$(TRUE))
+            pruefe("Gruppe: kein Kurzschluss VCC-GND", STR$(ng.gleich(2000, 1200, 2000, 3600)), STR$(FALSE))
+            verlaufZurueck()
+            ' Beim Platzieren drehen R und X die Vorschau, nicht das eben Gesetzte
+            werkzeugWaehlen(WZ_BAUTEIL, "R")
+            waehleB(gBlatt.bauteile[1])
+            auswahlDrehen()
+            auswahlSpiegeln(kern.GR_SPIEGELN_X)
+            pruefe("Vorschau statt Auswahl", STR$(gBlatt.bauteile[1].lage.drehung) + " " + STR$(gPlatzDreh) + " " + STR$(gPlatzSpiegel), "90 90 " + STR$(TRUE))
+            gPlatzDreh = 0
+            gPlatzSpiegel = FALSE
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            auswahlAufheben()
+        CASE 13
+            ' Ausgabe: PDF, SVG, PNG und Drucken (ueber GTKs Export, ohne Drucker)
+            DIM zoomVor AS FLOAT : zoomVor = vZoom
+            IF fotoZiel <> "" THEN
+                pruefe("PDF geschrieben", STR$(ausgabeNach(fotoZiel + ".pdf")), STR$(TRUE))
+                pruefe("SVG geschrieben", STR$(ausgabeNach(fotoZiel + ".svg")), STR$(TRUE))
+                pruefe("PNG geschrieben", STR$(ausgabeNach(fotoZiel + ".ausgabe.png")), STR$(TRUE))
+                pruefe("Drucken (Export-Weg)", drucken$(fotoZiel + ".druck.pdf"), "")
+                pruefe("Druck-PDF da", STR$(FILEEXISTS(fotoZiel + ".druck.pdf")), STR$(TRUE))
+            END IF
+            pruefe("Bildschirm danach unveraendert", STR$(vZoom = zoomVor AND NOT gDruck), STR$(TRUE))
+            pruefe("Menue Ausgabe gebaut", STR$(gAusgabeMenue <> 0), STR$(TRUE))
+        CASE 14
             ' Netz unter der Maus: VCC-Draht, GND-Draht, Statuszeile
             gMausDrin = TRUE
             hoverBestimmen(sx(2000), sy(1650))
@@ -1043,7 +1100,7 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             hoverBestimmen(sx(2000), sy(1650))
             statusAktualisieren()
             pruefe("Statuszeile nennt das Netz", STR$(CONTAINS(gtk_label_get_text(gStatus), "Netz: VCC")), STR$(TRUE))
-        CASE 13
+        CASE 15
             ' ERC: genau zwei Warnungen; Zeile 2 anklicken springt zu C1.1
             ercAusfuehren()
             pruefe("ERC-Verstoesse", STR$(LEN(gErc)), "2")
@@ -1154,14 +1211,12 @@ gtk_header_bar_pack_start(gKopf, knopfSpeichern)
 gtk_header_bar_pack_start(gKopf, gKnopfZurueck)
 gtk_header_bar_pack_start(gKopf, gKnopfVor)
 DIM knopfErc AS INTEGER : knopfErc = gtk_button_new_with_label("ERC")
-DIM knopfExport AS INTEGER : knopfExport = gtk_button_new_with_label("Netzliste")
+DIM knopfAusgabe AS INTEGER : knopfAusgabe = gtk_button_new_with_label("Ausgabe ▾")
 gtk_widget_set_tooltip_text(knopfErc, "Elektrische Regelpruefung")
-gtk_widget_set_tooltip_text(knopfExport, "Netzliste exportieren: SPICE, CSV oder Text")
-DIM knopfBom AS INTEGER : knopfBom = gtk_button_new_with_label("Stueckliste")
-gtk_widget_set_tooltip_text(knopfBom, "Stueckliste (BOM) ansehen und exportieren")
+gtk_widget_set_tooltip_text(knopfAusgabe, "PDF/SVG/PNG, Drucken, Stueckliste, Netzliste")
 gtk_header_bar_pack_end(gKopf, knopfErc)
-gtk_header_bar_pack_end(gKopf, knopfExport)
-gtk_header_bar_pack_end(gKopf, knopfBom)
+gtk_header_bar_pack_end(gKopf, knopfAusgabe)
+ausgabeMenueBauen()
 
 DIM vbox AS INTEGER : vbox = gtk_box_new(GTK_SENKRECHT, 0)
 DIM leiste AS INTEGER : leiste = gtk_box_new(GTK_WAAGERECHT, 6)
@@ -1203,8 +1258,7 @@ signal(knopfSpeichern, "clicked", aufSpeichern, 0, 0, 0)
 signal(gKnopfZurueck, "clicked", aufZurueck, 0, 0, 0)
 signal(gKnopfVor, "clicked", aufVor, 0, 0, 0)
 signal(knopfErc, "clicked", aufErc, 0, 0, 0)
-signal(knopfExport, "clicked", aufExport, 0, 0, 0)
-signal(knopfBom, "clicked", aufStueckliste, 0, 0, 0)
+signal(knopfAusgabe, "clicked", aufAusgabeKnopf, 0, 0, 0)
 signal(knopfSymbol, "clicked", aufSymbolEditor, 0, 0, 0)
 signal(gFenster, "destroy", fensterZu, 0, 0, 0)
 

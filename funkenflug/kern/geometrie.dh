@@ -117,6 +117,45 @@ FUNCTION transformRichtung(l AS Lage, richtung AS INTEGER) AS INTEGER
     RETURN r
 END FUNCTION
 
+' --- Gruppen drehen und spiegeln ------------------------------------------
+' Um einen Drehpunkt (pivot): Drehen um 90 Grad im Uhrzeigersinn (wie
+' transformPunkt), Spiegeln links/rechts (X) bzw. oben/unten (Y). Liegt der
+' Drehpunkt auf dem Raster, bleiben alle Rasterpunkte auf dem Raster.
+CONST GR_DREHEN = 1
+CONST GR_SPIEGELN_X = 2
+CONST GR_SPIEGELN_Y = 3
+
+FUNCTION punktGruppe(p AS Punkt, pivot AS Punkt, art AS INTEGER) AS Punkt
+    DIM dx AS INTEGER : dx = p.x - pivot.x
+    DIM dy AS INTEGER : dy = p.y - pivot.y
+    SELECT CASE art
+        CASE GR_DREHEN : RETURN NEW Punkt(pivot.x - dy, pivot.y + dx)
+        CASE GR_SPIEGELN_X : RETURN NEW Punkt(pivot.x - dx, p.y)
+        CASE GR_SPIEGELN_Y : RETURN NEW Punkt(p.x, pivot.y - dy)
+    END SELECT
+    RETURN p
+END FUNCTION
+
+' Die Lage eines Bauteils, das mit der Gruppe gedreht/gespiegelt wird.
+' Die Falle: transformPunkt dreht erst und spiegelt dann. Dreht man ein
+' GESPIEGELTES Bauteil mit, gilt R90 * M = M * R(-90) -- seine eigene Drehung
+' laeuft also ZURUECK. Spiegeln oben/unten ist Spiegeln links/rechts plus
+' 180 Grad. pruef_kern prueft alle acht Lagen gegen punktGruppe.
+FUNCTION lageGruppe(l AS Lage, pivot AS Punkt, art AS INTEGER) AS Lage
+    DIM n AS Lage : n = NEW Lage(punktGruppe(l.pos, pivot, art), l.drehung, l.gespiegelt)
+    SELECT CASE art
+        CASE GR_DREHEN
+            IF l.gespiegelt THEN n.drehung = l.drehung - 90 ELSE n.drehung = l.drehung + 90
+        CASE GR_SPIEGELN_X
+            n.gespiegelt = NOT l.gespiegelt
+        CASE GR_SPIEGELN_Y
+            n.gespiegelt = NOT l.gespiegelt
+            n.drehung = l.drehung + 180
+    END SELECT
+    n.drehung = ((n.drehung MOD 360) + 360) MOD 360
+    RETURN n
+END FUNCTION
+
 ' Einheitsvektor einer Richtung (fuer gezeichnete Stummel/Pfeile).
 FUNCTION richtungDx(richtung AS INTEGER) AS INTEGER
     SELECT CASE richtung

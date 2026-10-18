@@ -197,6 +197,67 @@ PRINT kern.stuecklisteText$(bb);
 DIM bz AS ARRAY OF kern.BomZeile : bz = kern.stueckliste(bb)
 PRINT "Zeilen: "; LEN(bz); "  erste: "; bz[0].referenzen[0]; "  4k7: "; kern.referenzBereiche$(bz[1].referenzen); " x"; bz[1].menge; "  (erwartet 3, C1, R1-R3, R10 x4)"
 
+' Gruppen drehen/spiegeln: in allen 8 Lagen x 3 Arten muss jeder Pin (und
+' seine Stummel-Richtung) genau dort landen, wo punktGruppe ihn hinbringt.
+DIM gq AS kern.Symbol : gq = kern.bibliothekSymbol("Q_NPN")
+DIM piv AS kern.Punkt : piv = NEW kern.Punkt(1000, 200)
+DIM fehlerG AS INTEGER : fehlerG = 0
+DIM pruefG AS INTEGER : pruefG = 0
+DIM gsp AS INTEGER, gdr AS INTEGER, gart AS INTEGER, gpn AS INTEGER
+FOR gsp = 0 TO 1
+    FOR gdr = 0 TO 270 STEP 90
+        FOR gart = 1 TO 3
+            DIM gl AS kern.Lage : gl = NEW kern.Lage(NEW kern.Punkt(300, -500), gdr, gsp = 1)
+            DIM gn AS kern.Lage : gn = kern.lageGruppe(gl, piv, gart)
+            FOR gpn = 0 TO LEN(gq.pins) - 1
+                DIM pv AS kern.Pin : pv = gq.pins[gpn]
+                DIM soll AS kern.Punkt : soll = kern.punktGruppe(kern.transformPunkt(gl, pv.pos), piv, gart)
+                DIM ist AS kern.Punkt : ist = kern.transformPunkt(gn, pv.pos)
+                ' Richtung: wohin zeigt der Stummel nach der Gruppenbewegung?
+                DIM rv AS INTEGER : rv = kern.transformRichtung(gl, pv.richtung)
+                DIM spitze2 AS kern.Punkt : spitze2 = kern.punktGruppe(NEW kern.Punkt(kern.transformPunkt(gl, pv.pos).x + kern.richtungDx(rv) * 100, kern.transformPunkt(gl, pv.pos).y + kern.richtungDy(rv) * 100), piv, gart)
+                DIM rnn AS INTEGER : rnn = kern.transformRichtung(gn, pv.richtung)
+                pruefG = pruefG + 1
+                IF NOT kern.punktGleich(soll, ist) OR kern.richtungDx(rnn) * 100 <> spitze2.x - soll.x OR kern.richtungDy(rnn) * 100 <> spitze2.y - soll.y THEN
+                    fehlerG = fehlerG + 1
+                    PRINT "  FEHLER sp="; gsp; " d="; gdr; " art="; gart; " pin "; pv.nummer; ": soll "; soll.x; ","; soll.y; " ist "; ist.x; ","; ist.y
+                END IF
+            NEXT
+        NEXT
+    NEXT
+NEXT
+PRINT "Gruppen-Lage: "; pruefG; " Pin-Pruefungen, Fehler: "; fehlerG; "  (erwartet 72, 0)"
+DIM gb AS ARRAY OF kern.Punkt : gb = []
+ARRAY_PUSH(gb, NEW kern.Punkt(0, 0)) : ARRAY_PUSH(gb, NEW kern.Punkt(1000, 0))
+PRINT "Gummiband beide Enden gleich: "; pl$(kern.gummibandEnden(gb, 100, 200, 100, 200)); "  (erwartet 100,200 1100,200)"
+PRINT "Gummiband beide verschieden : "; pl$(kern.gummibandEnden(gb, 0, 200, 0, -200)); "  (erwartet 0,200 0,-200 1000,-200: Enden am Ziel, rechtwinklig)"
+
+' Gummiband darf keinen Kurzschluss erfinden: senkrechter R mit Draehten
+' oben und unten, um 90 Grad gedreht -- beide Leitungen wuerden sonst zum
+' selben Mittelpunkt knicken.
+DIM kz AS kern.Blatt : kz = NEW kern.Blatt("KZ")
+DIM rk AS kern.Bauteil : rk = kern.neuesBauteil("R", kern.neueLage(2000, 2000))
+rk.lage.drehung = 90
+ARRAY_PUSH(kz.bauteile, rk)
+DIM wo AS kern.Draht : wo = NEW kern.Draht()
+ARRAY_PUSH(wo.punkte, NEW kern.Punkt(2000, 1200)) : ARRAY_PUSH(wo.punkte, NEW kern.Punkt(2000, 1800))
+DIM wu AS kern.Draht : wu = NEW kern.Draht()
+ARRAY_PUSH(wu.punkte, NEW kern.Punkt(2000, 2200)) : ARRAY_PUSH(wu.punkte, NEW kern.Punkt(2000, 2800))
+ARRAY_PUSH(kz.draehte, wo) : ARRAY_PUSH(kz.draehte, wu)
+' ein Label, das schon vorher auf dem oberen Draht sitzt, ist KEINE neue
+' Beruehrung -- es darf den gewohnten Knick nicht verhindern
+ARRAY_PUSH(kz.labels, NEW kern.Label("OBEN", NEW kern.Punkt(2000, 1500), kern.LA_LOKAL))
+DIM altO AS kern.Punkt : altO = rk.pinPunkt(0)
+DIM altU AS kern.Punkt : altU = rk.pinPunkt(1)
+rk.lage = kern.lageGruppe(rk.lage, rk.lage.pos, kern.GR_DREHEN)
+DIM neuO AS kern.Punkt : neuO = rk.pinPunkt(0)
+DIM neuU AS kern.Punkt : neuU = rk.pinPunkt(1)
+wo.punkte = kern.gummibandSicher(kz, wo, wo.punkte, 0, 0, neuO.x - altO.x, neuO.y - altO.y)
+wu.punkte = kern.gummibandSicher(kz, wu, wu.punkte, neuU.x - altU.x, neuU.y - altU.y, 0, 0)
+DIM nkz AS kern.Netze : nkz = kern.netzeBerechnen(kz)
+PRINT "Drehen: oben "; pl$(wo.punkte); " | unten "; pl$(wu.punkte)
+PRINT "  Enden an den neuen Pins: "; kern.punktGleich(wo.punkte[LEN(wo.punkte) - 1], neuO) AND kern.punktGleich(wu.punkte[0], neuU); "  kein Kurzschluss: "; NOT nkz.gleich(2000, 1200, 2000, 2800); "  (erwartet TRUE TRUE)"
+
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
 PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)
