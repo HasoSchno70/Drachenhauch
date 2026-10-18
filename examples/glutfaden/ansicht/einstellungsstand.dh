@@ -10,19 +10,25 @@ einstTafel = kern.kuerzelTafel(einst)
 
 ' --- Sprache der Oberflaeche -----------------------------------------------------------
 ' Gilt ab dem Start: die Fenster sind danach gebaut (wie PySticky). Eine Probe
-' (--probe-...) bleibt deutsch, auch wenn das System englisch ist -- ihre
-' Erwartungen stehen deutsch da; DH_GLUT_SPRACHE ueberstimmt beides.
+' (--probe, --probe-...) bleibt deutsch, auch wenn das System englisch ist --
+' ihre Erwartungen stehen deutsch da; DH_GLUT_SPRACHE ueberstimmt beides.
+' Ohne GTK gibt es keine Systemsprache: das Programm muss bis zur Pruefung in
+' main.dh kommen, die sagt, was fehlt (vorher brach es hier ab).
 FUNCTION systemSprache$() AS STRING
-    DIM l AS INTEGER : l = gtk_get_default_language()
-    IF l = 0 THEN RETURN ""
-    RETURN TEXT_AUS_ZEIGER$(pango_language_to_string(l))
+    TRY
+        DIM l AS INTEGER : l = gtk_get_default_language()
+        IF l = 0 THEN RETURN ""
+        RETURN TEXT_AUS_ZEIGER$(pango_language_to_string(l))
+    CATCH e
+        RETURN ""
+    END TRY
 END FUNCTION
 
 FUNCTION spracheBeimStart$() AS STRING
     IF GETENV$("DH_GLUT_SPRACHE", "") <> "" THEN RETURN kern.spracheAufloesen$(GETENV$("DH_GLUT_SPRACHE", ""), "de")
     DIM a AS INTEGER
     FOR a = 0 TO ARGC() - 1
-        IF LEFT$(ARG$(a), 8) = "--probe-" THEN RETURN "de"
+        IF LEFT$(ARG$(a), 7) = "--probe" THEN RETURN "de"
     NEXT
     RETURN kern.spracheAufloesen$(einst.sprache, systemSprache$())
 END FUNCTION
