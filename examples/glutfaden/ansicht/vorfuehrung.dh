@@ -2923,8 +2923,9 @@ FUNCTION vsDeutsch(t AS STRING) AS BOOLEAN
     IF musterTitel <> "" THEN t = REPLACE$(t, musterTitel, "")
     IF lwHat AND lwMuster.name <> "" THEN t = REPLACE$(t, lwMuster.name, "")
     IF lwHat THEN t = REPLACE$(t, vsTitelSchluessel$(), "")
-    ' Dateinamen und Pfade sind Daten, keine Oberflaeche
-    IF REGEX_TEST(t, "\.pxs|[\\/]") THEN RETURN FALSE
+    ' Dateinamen und Pfade sind Daten, keine Oberflaeche (ein Schraegstrich
+    ' allein nicht: "stitches/inch")
+    IF REGEX_TEST(t, "\.pxs|^[A-Za-z]:|^/|[\\]") THEN RETURN FALSE
     IF REGEX_TEST(t, "[äöüÄÖÜß]") THEN RETURN TRUE
     ' Tausenderpunkt (2.500) oder Dezimalkomma (2,5 cm) -- die deutsche Zahl
     IF REGEX_TEST(t, "(^|[^0-9.,])[0-9]{1,3}([.][0-9]{3})+([^0-9]|$)") THEN RETURN TRUE
