@@ -391,7 +391,10 @@ END SUB
 ' Vorschau beim Platzieren. Vorher drehte ein gespiegeltes Bauteil hier
 ' sichtbar falsch herum, und Draehte rissen ab.
 SUB auswahlDrehen()
-    IF auswahlAnzahl() > 0 AND gWerkzeug <> WZ_BAUTEIL THEN
+    IF gWerkzeug = WZ_LABEL THEN
+        gLabelDreh = kern.richtungGruppe(gLabelDreh, kern.GR_DREHEN)
+        neuZeichnen()
+    ELSEIF auswahlAnzahl() > 0 AND gWerkzeug <> WZ_BAUTEIL THEN
         gruppeTransformieren(kern.GR_DREHEN)
     ELSE
         gPlatzDreh = (gPlatzDreh + 90) MOD 360
@@ -401,7 +404,10 @@ END SUB
 
 ' X / Y: links/rechts bzw. oben/unten spiegeln -- die Auswahl oder die Vorschau.
 SUB auswahlSpiegeln(art AS INTEGER)
-    IF auswahlAnzahl() > 0 AND gWerkzeug <> WZ_BAUTEIL THEN
+    IF gWerkzeug = WZ_LABEL THEN
+        gLabelDreh = kern.richtungGruppe(gLabelDreh, art)
+        neuZeichnen()
+    ELSEIF auswahlAnzahl() > 0 AND gWerkzeug <> WZ_BAUTEIL THEN
         gruppeTransformieren(art)
     ELSE
         gPlatzSpiegel = NOT gPlatzSpiegel
@@ -432,6 +438,7 @@ SUB labelSetzen()
     gLabelGlobal = gDlgHakenWert                       ' das naechste Label wie dieses
     verlaufMerken()
     DIM la AS kern.Label : la = NEW kern.Label(text, ort, IIF(gDlgHakenWert, kern.LA_GLOBAL, kern.LA_LOKAL))
+    la.drehung = gLabelDreh
     ARRAY_PUSH(gBlatt.labels, la)
     waehleL(la)
     geaendert()
@@ -441,7 +448,9 @@ END SUB
 ' Netz umbenennen; Bauteil: Eigenschaften.
 SUB auswahlBearbeiten()
     gZieht = FALSE
-    IF gHatLabel OR gHatDraht THEN
+    IF LEN(gSelB) > 1 THEN
+        eigenschaftenMehrere(gSelB)
+    ELSEIF gHatLabel OR gHatDraht THEN
         umbenennenAuswahl()
     ELSEIF gHatGewaehlt THEN
         eigenschaftenDialog(gGewaehlt)

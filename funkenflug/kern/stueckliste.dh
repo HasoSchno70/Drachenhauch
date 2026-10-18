@@ -1,5 +1,7 @@
 ' Stueckliste (BOM) -- Namensraum "kern".
-' Gruppiert nach Symbol und Wert; Versorgungssymbole sind keine Bauteile.
+' Gruppiert nach Symbol, Wert, Gehaeuse und Bestellnummer (ein 10k in 0805
+' und einer in 1206 sind zwei Positionen); Versorgungssymbole sind keine
+' Bauteile.
 ' Referenzen natuerlich sortiert (R2 vor R10) und, wo es sich lohnt, als
 ' Bereich zusammengefasst (R1-R4).
 
@@ -8,6 +10,8 @@ CLASS BomZeile
     DIM referenzen AS ARRAY OF STRING
     DIM wert AS STRING
     DIM bauteil AS STRING
+    DIM gehaeuse AS STRING
+    DIM bestellnr AS STRING
     DIM beschreibung AS STRING
     DIM schluessel AS STRING
     SUB Init()
@@ -98,7 +102,7 @@ FUNCTION stuecklisteDok(dok AS Dokument) AS ARRAY OF BomZeile
     FOR i = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
         DIM b AS Bauteil : b = dok.blaetter[bi].bauteile[i]
         IF b.sym.einheitLeistung THEN CONTINUE
-        DIM k AS STRING : k = b.sym.id + CHR$(1) + b.wert
+        DIM k AS STRING : k = b.sym.id + CHR$(1) + b.wert + CHR$(1) + b.gehaeuse + CHR$(1) + b.bestellnr
         DIM zi AS INTEGER
         IF MAPHAS(nachSchluessel, k) THEN
             zi = MAPGET(nachSchluessel, k)
@@ -107,6 +111,8 @@ FUNCTION stuecklisteDok(dok AS Dokument) AS ARRAY OF BomZeile
             DIM z AS BomZeile : z = NEW BomZeile()
             z.wert = b.wert
             z.bauteil = b.sym.name
+            z.gehaeuse = b.gehaeuse
+            z.bestellnr = b.bestellnr
             z.beschreibung = b.sym.beschreibung
             ARRAY_PUSH(zeilen, z)
             MAPPUT(nachSchluessel, k, zi)
@@ -134,13 +140,25 @@ END FUNCTION
 
 FUNCTION stuecklisteCsv$(dok AS Dokument) AS STRING
     DIM z AS ARRAY OF BomZeile : z = stuecklisteDok(dok)
-    DIM t AS STRING : t = "Menge;Referenzen;Wert;Bauteil;Beschreibung" + NL_ZEILE
+    DIM t AS STRING : t = "Menge;Referenzen;Wert;Bauteil;Gehaeuse;Bestellnummer;Beschreibung" + NL_ZEILE
     DIM i AS INTEGER
     FOR i = 0 TO LEN(z) - 1
-        t = t + STR$(z[i].menge) + ";" + csvFeld$(JOIN$(z[i].referenzen, ", ")) + ";" + csvFeld$(z[i].wert) + ";" + csvFeld$(z[i].bauteil) + ";" + csvFeld$(z[i].beschreibung) + NL_ZEILE
+        t = t + STR$(z[i].menge) + ";" + csvFeld$(JOIN$(z[i].referenzen, ", ")) + ";" + csvFeld$(z[i].wert) + ";" + csvFeld$(z[i].bauteil) + ";" + csvFeld$(z[i].gehaeuse) + ";" + csvFeld$(z[i].bestellnr) + ";" + csvFeld$(z[i].beschreibung) + NL_ZEILE
     NEXT
     RETURN t
 END FUNCTION
+
+' Hat irgendeine Position ein Gehaeuse bzw. eine Bestellnummer? Nur dann
+' bekommen Markdown und Text die Spalte -- sonst bliebe sie leer.
+SUB bomSpalten(z AS ARRAY OF BomZeile, BYREF geh AS BOOLEAN, BYREF best AS BOOLEAN)
+    geh = FALSE
+    best = FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        IF z[i].gehaeuse <> "" THEN geh = TRUE
+        IF z[i].bestellnr <> "" THEN best = TRUE
+    NEXT
+END SUB
 
 FUNCTION mdZelle$(s AS STRING) AS STRING
     RETURN REPLACE$(s, "|", "\|")
@@ -149,11 +167,17 @@ END FUNCTION
 FUNCTION stuecklisteMarkdown$(dok AS Dokument, titel AS STRING) AS STRING
     DIM z AS ARRAY OF BomZeile : z = stuecklisteDok(dok)
     DIM t AS STRING : t = "# Stueckliste: " + titel + NL_ZEILE + NL_ZEILE
-    t = t + "| Menge | Referenzen | Wert | Bauteil |" + NL_ZEILE + "|---:|---|---|---|" + NL_ZEILE
+    DIM geh AS BOOLEAN, best AS BOOLEAN
+    bomSpalten(z, geh, best)
+    t = t + "| Menge | Referenzen | Wert | Bauteil |" + IIF(geh, " Gehaeuse |", "") + IIF(best, " Bestellnummer |", "") + NL_ZEILE
+    t = t + "|---:|---|---|---|" + IIF(geh, "---|", "") + IIF(best, "---|", "") + NL_ZEILE
     DIM summe AS INTEGER : summe = 0
     DIM i AS INTEGER
     FOR i = 0 TO LEN(z) - 1
-        t = t + "| " + STR$(z[i].menge) + " | " + mdZelle$(referenzBereiche$(z[i].referenzen)) + " | " + mdZelle$(z[i].wert) + " | " + mdZelle$(z[i].bauteil) + " |" + NL_ZEILE
+        t = t + "| " + STR$(z[i].menge) + " | " + mdZelle$(referenzBereiche$(z[i].referenzen)) + " | " + mdZelle$(z[i].wert) + " | " + mdZelle$(z[i].bauteil) + " |"
+        IF geh THEN t = t + " " + mdZelle$(z[i].gehaeuse) + " |"
+        IF best THEN t = t + " " + mdZelle$(z[i].bestellnr) + " |"
+        t = t + NL_ZEILE
         summe = summe + z[i].menge
     NEXT
     RETURN t + NL_ZEILE + STR$(summe) + " Bauteile in " + STR$(LEN(z)) + " Positionen" + NL_ZEILE
@@ -161,10 +185,15 @@ END FUNCTION
 
 FUNCTION stuecklisteText$(dok AS Dokument) AS STRING
     DIM z AS ARRAY OF BomZeile : z = stuecklisteDok(dok)
-    DIM t AS STRING : t = PADR$("Menge", 6) + PADR$("Referenzen", 28) + PADR$("Wert", 14) + "Bauteil" + NL_ZEILE
+    DIM geh AS BOOLEAN, best AS BOOLEAN
+    bomSpalten(z, geh, best)
+    DIM t AS STRING : t = PADR$("Menge", 6) + PADR$("Referenzen", 28) + PADR$("Wert", 14) + IIF(geh, PADR$("Gehaeuse", 12), "") + IIF(best, PADR$("Bestellnummer", 22), "") + "Bauteil" + NL_ZEILE
     DIM i AS INTEGER
     FOR i = 0 TO LEN(z) - 1
-        t = t + PADR$(STR$(z[i].menge), 6) + PADR$(referenzBereiche$(z[i].referenzen), 28) + PADR$(z[i].wert, 14) + z[i].bauteil + NL_ZEILE
+        t = t + PADR$(STR$(z[i].menge), 6) + PADR$(referenzBereiche$(z[i].referenzen), 28) + PADR$(z[i].wert, 14)
+        IF geh THEN t = t + PADR$(z[i].gehaeuse, 12)
+        IF best THEN t = t + PADR$(z[i].bestellnr, 22)
+        t = t + z[i].bauteil + NL_ZEILE
     NEXT
     RETURN t
 END FUNCTION

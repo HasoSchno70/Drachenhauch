@@ -121,6 +121,7 @@ DIM gDrahtPunkte AS ARRAY OF kern.Punkt
 
 DIM gPlatzDreh AS INTEGER
 DIM gPlatzSpiegel AS BOOLEAN
+DIM gLabelDreh AS INTEGER         ' Richtung des naechsten Labels (R/X/Y im Label-Werkzeug)
 DIM gGeaendert AS BOOLEAN
 DIM gPfad AS STRING
 
@@ -276,7 +277,7 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
         bauteilZeichnen(cr, geist, TRUE, FALSE)
     END IF
     IF gWerkzeug = WZ_LABEL AND gMausDrin THEN
-        labelZeichnen(cr, sx(gMausWX), sy(gMausWY), "Label", C_GEIST, gLabelGlobal)
+        labelZeichnen(cr, sx(gMausWX), sy(gMausWY), "Label", C_GEIST, gLabelGlobal, gLabelDreh)
     END IF
     ' Fang-Markierung
     IF gMausDrin AND (gWerkzeug = WZ_DRAHT OR gWerkzeug = WZ_LABEL) THEN
@@ -326,41 +327,85 @@ SUB inhaltZeichnen(cr AS INTEGER)
     NEXT
     FOR i = 0 TO LEN(gBlatt.labels) - 1
         DIM lgew AS BOOLEAN : lgew = NOT gDruck AND istGewaehltL(gBlatt.labels[i])
-        labelZeichnen(cr, sx(gBlatt.labels[i].anker.x), sy(gBlatt.labels[i].anker.y), gBlatt.labels[i].text, IIF(lgew, C_AUSWAHL, C_LABEL), gBlatt.labels[i].art = kern.LA_GLOBAL)
+        labelZeichnen(cr, sx(gBlatt.labels[i].anker.x), sy(gBlatt.labels[i].anker.y), gBlatt.labels[i].text, IIF(lgew, C_AUSWAHL, C_LABEL), gBlatt.labels[i].art = kern.LA_GLOBAL, gBlatt.labels[i].drehung)
     NEXT
 END SUB
 
-' Ein Netz-Label: Punkt am elektrischen Anker, Text darueber, Unterstrich.
-' Der Text verschiebt den Anker nie (SparkNode-Lehre).
+' Ein Netz-Label: Punkt am elektrischen Anker, Text in Richtung dreh davon
+' weg (0 rechts, 90 unten, 180 links, 270 oben), lokal mit Unterstrich,
+' global als Faehnchen. Der Text verschiebt den Anker nie (SparkNode-Lehre).
+' Senkrechte Labels liest man von unten nach oben wie in jedem Schaltplan;
+' links/unten laeuft der Text auf den Anker zu statt auf dem Kopf zu stehen.
 CONST LABEL_DX = 6
 CONST LABEL_DY = 9
 CONST LABEL_ZEICHEN = 7              ' ungefaehre Breite je Zeichen (Treffer-Test)
 
-SUB labelZeichnen(cr AS INTEGER, ax AS FLOAT, ay AS FLOAT, text AS STRING, farbe AS INTEGER, global AS BOOLEAN)
+' Gemessene Breite eines Textes in Pixeln (Pango), mit Ueberstrich-Markup.
+FUNCTION textBreite(cr AS INTEGER, text AS STRING, schrift AS INTEGER, ueber AS BOOLEAN) AS FLOAT
+    DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
+    pango_layout_set_font_description(layout, schrift)
+    IF ueber AND kern.hatUeberstrich(text) THEN
+        pango_layout_set_markup(layout, kern.ueberstrichMarkup$(text), -1)
+    ELSE
+        pango_layout_set_text(layout, text, -1)
+    END IF
+    DIM tb AS INTEGER, th AS INTEGER
+    pango_layout_get_pixel_size(layout, tb, th)
+    g_object_unref(layout)
+    RETURN tb
+END FUNCTION
+
+' Geschaetzte Laenge (ohne Kairo-Kontext) -- fuer Treffer-Test und Rahmen.
+FUNCTION labelLaenge(text AS STRING, global AS BOOLEAN) AS FLOAT
+    RETURN LABEL_DX + LEN(kern.sichtbarerText$(text)) * LABEL_ZEICHEN + IIF(global, 10, 0)
+END FUNCTION
+
+SUB labelZeichnen(cr AS INTEGER, ax AS FLOAT, ay AS FLOAT, text AS STRING, farbe AS INTEGER, global AS BOOLEAN, dreh AS INTEGER)
     zeichenFarbe(cr, farbe)
     ' der Anker-Punkt nur am Bildschirm: auf Papier hiesse ein Punkt "Knoten"
     IF NOT gDruck THEN
         cairo_arc(cr, ax, ay, 3.5, 0, 2 * PI)
         cairo_fill(cr)
     END IF
+    ' im lokalen Rahmen laeuft das Label immer an der x-Achse entlang, s = Seite
+    DIM s AS FLOAT : s = 1.0
+    IF dreh = 180 OR dreh = 90 THEN s = -1.0
+    cairo_save(cr)
+    cairo_translate(cr, ax, ay)
+    IF dreh = 90 OR dreh = 270 THEN cairo_rotate(cr, -PI / 2)    ' lokal +x = oben
     cairo_set_line_width(cr, 1.2)
-    DIM rechts AS FLOAT : rechts = ax + LABEL_DX + LEN(text) * LABEL_ZEICHEN
+    DIM breite AS FLOAT : breite = LABEL_DX + textBreite(cr, text, gSchrift, TRUE)
+    DIM ausr AS INTEGER : ausr = IIF(s > 0, 0, 2)
     IF global THEN
-        ' globales Label: ein Faehnchen mit Spitze am Anker (gilt auf allen Blaettern)
-        DIM oben AS FLOAT : oben = ay - 2 * LABEL_DY - 2
-        cairo_move_to(cr, ax, ay)
-        cairo_line_to(cr, ax + 8, oben)
-        cairo_line_to(cr, rechts + 6, oben)
-        cairo_line_to(cr, rechts + 6, ay)
+        DIM oben AS FLOAT : oben = -2 * LABEL_DY - 2
+        cairo_move_to(cr, 0, 0)
+        cairo_line_to(cr, s * 8, oben)
+        cairo_line_to(cr, s * (breite + 6), oben)
+        cairo_line_to(cr, s * (breite + 6), 0)
         cairo_close_path(cr)
         cairo_stroke(cr)
-        lwText(cr, ax + LABEL_DX + 4, ay - LABEL_DY, text, farbe, FALSE)
+        lwTextAusU(cr, s * (LABEL_DX + 4), -LABEL_DY, text, farbe, ausr, gSchrift, TRUE)
     ELSE
-        cairo_move_to(cr, ax, ay)
-        cairo_line_to(cr, rechts, ay)
+        cairo_move_to(cr, 0, 0)
+        cairo_line_to(cr, s * breite, 0)
         cairo_stroke(cr)
-        lwText(cr, ax + LABEL_DX, ay - LABEL_DY, text, farbe, FALSE)
+        lwTextAusU(cr, s * LABEL_DX, -LABEL_DY, text, farbe, ausr, gSchrift, TRUE)
     END IF
+    cairo_restore(cr)
+END SUB
+
+' Bildschirm-Rechteck eines Labels (Treffer-Test), passend zu labelZeichnen.
+SUB labelRechteck(la AS kern.Label, BYREF x0 AS FLOAT, BYREF y0 AS FLOAT, BYREF x1 AS FLOAT, BYREF y1 AS FLOAT)
+    DIM ax AS FLOAT : ax = sx(la.anker.x)
+    DIM ay AS FLOAT : ay = sy(la.anker.y)
+    DIM l AS FLOAT : l = labelLaenge(la.text, la.art = kern.LA_GLOBAL) + 6
+    DIM t AS FLOAT : t = 2 * LABEL_DY + 4
+    SELECT CASE la.drehung
+        CASE 180 : x0 = ax - l : x1 = ax + 6 : y0 = ay - t : y1 = ay + 6
+        CASE 270 : x0 = ax - t : x1 = ax + 6 : y0 = ay - l : y1 = ay + 6
+        CASE 90 : x0 = ax - t : x1 = ax + 6 : y0 = ay - 6 : y1 = ay + l
+        CASE ELSE : x0 = ax - 6 : x1 = ax + l : y0 = ay - t : y1 = ay + 6
+    END SELECT
 END SUB
 
 ' --- Netze (Cache) ---------------------------------------------------------
@@ -485,9 +530,9 @@ FUNCTION labelIndexUnter(px AS FLOAT, py AS FLOAT) AS INTEGER
     DIM i AS INTEGER
     FOR i = LEN(gBlatt.labels) - 1 TO 0 STEP -1
         DIM la AS kern.Label : la = gBlatt.labels[i]
-        DIM ax AS FLOAT : ax = sx(la.anker.x)
-        DIM ay AS FLOAT : ay = sy(la.anker.y)
-        IF px >= ax - 6 AND px <= ax + LABEL_DX + LEN(la.text) * LABEL_ZEICHEN + 6 AND py >= ay - 2 * LABEL_DY - 4 AND py <= ay + 6 THEN RETURN i
+        DIM x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT
+        labelRechteck(la, x0, y0, x1, y1)
+        IF px >= x0 AND px <= x1 AND py >= y0 AND py <= y1 THEN RETURN i
     NEXT
     RETURN -1
 END FUNCTION
@@ -636,9 +681,19 @@ END SUB
 ' Text, senkrecht mittig um y; ausr 0 = links buendig an x, 1 = mittig,
 ' 2 = rechts buendig (endet bei x).
 SUB lwTextAus(cr AS INTEGER, x AS FLOAT, y AS FLOAT, text AS STRING, farbe AS INTEGER, ausr AS INTEGER, schrift AS INTEGER)
+    lwTextAusU(cr, x, y, text, farbe, ausr, schrift, FALSE)
+END SUB
+
+' Wie lwTextAus; mit ueber = TRUE wird ~{RESET} / ~RESET ueberstrichen
+' (Pin-Namen, Labels). Titel, Werte und Referenzen bleiben woertlich.
+SUB lwTextAusU(cr AS INTEGER, x AS FLOAT, y AS FLOAT, text AS STRING, farbe AS INTEGER, ausr AS INTEGER, schrift AS INTEGER, ueber AS BOOLEAN)
     DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
     pango_layout_set_font_description(layout, schrift)
-    pango_layout_set_text(layout, text, -1)
+    IF ueber AND kern.hatUeberstrich(text) THEN
+        pango_layout_set_markup(layout, kern.ueberstrichMarkup$(text), -1)
+    ELSE
+        pango_layout_set_text(layout, text, -1)
+    END IF
     DIM tb AS INTEGER, th AS INTEGER
     pango_layout_get_pixel_size(layout, tb, th)
     DIM zx AS FLOAT : zx = x
@@ -692,10 +747,10 @@ SUB pinTexteZeichnen(cr AS INTEGER, b AS kern.Bauteil, geist AS BOOLEAN)
             DIM qx AS FLOAT : qx = sx(p.x + dx * (pin.laenge + 60))
             DIM qy AS FLOAT : qy = sy(p.y + dy * (pin.laenge + 60))
             SELECT CASE r
-                CASE 0 : lwTextAus(cr, qx, qy, pin.name, fName, 0, gSchriftPin)
-                CASE 180 : lwTextAus(cr, qx, qy, pin.name, fName, 2, gSchriftPin)
-                CASE 90 : lwTextAus(cr, qx, qy + px * 0.4, pin.name, fName, 1, gSchriftPin)
-                CASE 270 : lwTextAus(cr, qx, qy - px * 0.4, pin.name, fName, 1, gSchriftPin)
+                CASE 0 : lwTextAusU(cr, qx, qy, pin.name, fName, 0, gSchriftPin, TRUE)
+                CASE 180 : lwTextAusU(cr, qx, qy, pin.name, fName, 2, gSchriftPin, TRUE)
+                CASE 90 : lwTextAusU(cr, qx, qy + px * 0.4, pin.name, fName, 1, gSchriftPin, TRUE)
+                CASE 270 : lwTextAusU(cr, qx, qy - px * 0.4, pin.name, fName, 1, gSchriftPin, TRUE)
             END SELECT
         END IF
     NEXT

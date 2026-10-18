@@ -132,6 +132,8 @@ CLASS Bauteil
     DIM lage AS Lage
     DIM referenz AS STRING            ' R1, C3, ...
     DIM wert AS STRING
+    DIM gehaeuse AS STRING            ' z. B. 0805, DIP-8, TO-92 (Stueckliste)
+    DIM bestellnr AS STRING           ' Bestellnummer / Hersteller-Teilenummer
     DIM sym AS Symbol                 ' aufgeloest, nicht gespeichert
     SUB Init(ref AS STRING, l AS Lage)
         id = LEFT$(UUID4$(), 10)
@@ -139,6 +141,8 @@ CLASS Bauteil
         lage = l
         referenz = ""
         wert = ""
+        gehaeuse = ""
+        bestellnr = ""
     END SUB
     ' Blattkoordinate des i-ten Pins (elektrisch, = gezeichnet).
     FUNCTION pinPunkt(i AS INTEGER) AS Punkt
@@ -170,7 +174,7 @@ CLASS Label
     DIM id AS STRING
     DIM text AS STRING
     DIM anker AS Punkt                ' elektrischer Anschlusspunkt (fest)
-    DIM drehung AS INTEGER
+    DIM drehung AS INTEGER            ' Richtung des Textes vom Anker weg (0 rechts, 90 unten ...)
     DIM art AS INTEGER
     SUB Init(t AS STRING, p AS Punkt, a AS INTEGER)
         id = LEFT$(UUID4$(), 10)

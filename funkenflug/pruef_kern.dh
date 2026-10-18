@@ -301,6 +301,40 @@ FOR mvi = 0 TO LEN(mev) - 1
 NEXT
 PRINT "ERC doppelte Ref ueber Blaetter: "; CONTAINS(mtx, "Referenz R1 ist doppelt vergeben [Blatt 1]"); "  einzelnes globales Label: "; CONTAINS(mtx, "Globales Label EINZELN gibt es nur einmal"); "  (erwartet TRUE TRUE)"
 
+' --- Ueberstrich (aktiv-low)
+PRINT "Ueberstrich sichtbar: "; kern.sichtbarerText$("~{RESET}"); " "; kern.sichtbarerText$("~CS~/WR"); " "; kern.sichtbarerText$("A~~B"); " "; kern.sichtbarerText$("~{WR}/RD"); "  (erwartet RESET CS/WR A~B WR/RD)"
+DIM ue1 AS STRING : ue1 = kern.ueberstrichMarkup$("~{RESET}")
+DIM ue2 AS STRING : ue2 = kern.ueberstrichMarkup$("~CS~/WR")
+DIM ue3 AS STRING : ue3 = kern.ueberstrichMarkup$("R&D<1>")
+PRINT "Markup: "; ue1 = "<span overline=" + CHR$(34) + "single" + CHR$(34) + ">RESET</span>"; " "; ue2 = "<span overline=" + CHR$(34) + "single" + CHR$(34) + ">CS</span>/WR"; " "; ue3; "  (erwartet TRUE TRUE R&amp;D&lt;1&gt;)"
+PRINT "Ohne Tilde unveraendert: "; kern.sichtbarerText$("VCC"); " "; kern.hatUeberstrich("VCC"); "  (erwartet VCC FALSE)"
+
+' --- Label-Richtungen folgen der Gruppe wie Pins
+PRINT "Label-Richtung: R "; kern.richtungGruppe(0, kern.GR_DREHEN); " "; kern.richtungGruppe(270, kern.GR_DREHEN); "  X "; kern.richtungGruppe(0, kern.GR_SPIEGELN_X); " "; kern.richtungGruppe(90, kern.GR_SPIEGELN_X); "  Y "; kern.richtungGruppe(90, kern.GR_SPIEGELN_Y); " "; kern.richtungGruppe(180, kern.GR_SPIEGELN_Y); "  (erwartet R 90 0  X 180 90  Y 270 180)"
+
+' --- Bauteil-Felder: Gehaeuse/Bestellnummer, Stueckliste trennt danach
+DIM fd AS kern.Dokument : fd = NEW kern.Dokument()
+DIM fi AS INTEGER
+FOR fi = 1 TO 3
+    DIM fr AS kern.Bauteil : fr = kern.neuesBauteil("R", kern.neueLage(fi * 1000, 0))
+    fr.referenz = "R" + STR$(fi)
+    fr.wert = "10k"
+    fr.gehaeuse = IIF(fi = 3, "1206", "0805")
+    IF fi = 1 THEN fr.bestellnr = "RC0805-10K"
+    ARRAY_PUSH(fd.blaetter[0].bauteile, fr)
+NEXT
+DIM fl AS kern.Label : fl = NEW kern.Label("~{RESET}", NEW kern.Punkt(0, 500), kern.LA_LOKAL)
+fl.drehung = 270
+ARRAY_PUSH(fd.blaetter[0].labels, fl)
+DIM fz AS ARRAY OF kern.BomZeile : fz = kern.stuecklisteDok(fd)
+PRINT "Stueckliste nach Gehaeuse: "; LEN(fz); " Positionen  "; JOIN$(fz[0].referenzen, ","); "/"; fz[0].gehaeuse; "/"; fz[0].bestellnr; "  "; JOIN$(fz[1].referenzen, ","); "/"; fz[1].gehaeuse; "  "; JOIN$(fz[2].referenzen, ","); "/"; fz[2].gehaeuse; "  (erwartet 3 Positionen  R1/0805/RC0805-10K  R2/0805  R3/1206)"
+PRINT "CSV-Kopf: "; STARTSWITH(kern.stuecklisteCsv$(fd), "Menge;Referenzen;Wert;Bauteil;Gehaeuse;Bestellnummer;Beschreibung"); "  Markdown-Spalten: "; CONTAINS(kern.stuecklisteMarkdown$(fd, "F"), "| Gehaeuse | Bestellnummer |"); " "; CONTAINS(kern.stuecklisteMarkdown$(fd, "F"), "| 1 | R3 | 10k | Widerstand | 1206 |  |"); "  (erwartet TRUE TRUE TRUE)"
+DIM fd2 AS kern.Dokument : fd2 = kern.dokumentAusJson(kern.dokumentNachJson(fd))
+PRINT "JSON: "; fd2.blaetter[0].bauteile[0].gehaeuse; " "; fd2.blaetter[0].bauteile[0].bestellnr; " "; fd2.blaetter[0].bauteile[1].bestellnr = ""; " "; fd2.blaetter[0].labels[0].text; " "; fd2.blaetter[0].labels[0].drehung; "  (erwartet 0805 RC0805-10K TRUE ~{RESET} 270)"
+ARRAY_PUSH(fd.blaetter[0].labels, NEW kern.Label("~{RESET}", fd.blaetter[0].bauteile[0].pinPunkt(0), kern.LA_LOKAL))
+DIM fn AS kern.Netze : fn = kern.netzeBerechnen(fd.blaetter[0])
+PRINT "Netzname bleibt der geschriebene Text: "; fn.liste[fn.netzAn(fd.blaetter[0].bauteile[0].pinPunkt(0).x, fd.blaetter[0].bauteile[0].pinPunkt(0).y)].name; "  (erwartet ~{RESET})"
+
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
 PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)

@@ -26,14 +26,22 @@ einem Programm, das es mitbringt (**Inkscape**, GIMP). Die Bibliotheks-Namen in
 |---|---|
 | **Auswahl** (Taste `A`) | Bauteil, Label oder Draht anklicken, ziehen zum Verschieben; auf freier Fläche einen **Rahmen** aufziehen (wählt alles ganz Umschlossene), `Umschalt` ergänzt bzw. schaltet einzelne Elemente um; **Doppelklick**, `E` oder `Enter` bearbeitet (Bauteil: Referenz/Wert; Label und Draht: Netz umbenennen) |
 | **Draht** (Taste `W`) | klicken setzt Eckpunkte, Doppelklick / `Enter` / rechte Maustaste schließt ab, `Esc` bricht ab. Enden fangen an Pins und Drahtenden |
-| **Label** (Taste `L`) | klicken, Netznamen eingeben. Der Anker ist der elektrische Punkt; **gleichnamige Labels sind ein Netz**. Mit dem Haken „global" wird es ein globales Label (Fahne) und verbindet über alle Blätter; `G` schaltet gewählte Labels um |
+| **Label** (Taste `L`) | klicken, Netznamen eingeben. Der Anker ist der elektrische Punkt; **gleichnamige Labels sind ein Netz**. Mit dem Haken „global" wird es ein globales Label (Fahne) und verbindet über alle Blätter; `G` schaltet gewählte Labels um. `R`/`X`/`Y` legen die Richtung fest (rechts, unten, links, oben) – vorher für das nächste Label, danach für das gewählte, das um seinen Anker dreht |
 | **Bauteil** | in der Leiste aus der Liste wählen, dann auf die Fläche klicken; rechte Maustaste oder `R` dreht die Vorschau |
+
+**Aktiv-low:** `~{RESET}` in Pin-Namen und Labels wird überstrichen gezeichnet,
+ebenso die ältere Schreibweise `~CS~/WR` (die Tilde schaltet den Strich um; `~~`
+ist eine echte Tilde). Der Netzname bleibt der geschriebene Text.
 
 Weiteres: `Strg+Z` / `Strg+Y` (oder `Strg+Umschalt+Z`) bzw. die Pfeile in der
 Kopfleiste machen rückgängig und wiederholen. `R` dreht die Auswahl, `Entf`
 löscht sie, Mausrad zoomt um den Zeiger, mittlere Maustaste schiebt,
 `+`/`-`/`0` zoomen, `Strg+S` speichert, `Strg+O` öffnet. Eine schon vergebene
-Referenz lehnt der Eigenschaften-Dialog ab.
+Referenz lehnt der Eigenschaften-Dialog ab. Er kennt auch **Gehäuse** und
+**Bestellnummer** für die Stückliste. Sind mehrere Bauteile gewählt, bearbeitet
+`E` Wert, Gehäuse und Bestellnummer aller zugleich – ein Feld, das man nicht
+anfasst, bleibt je Bauteil, wie es war (etwa: allen Widerständen `0805` geben,
+die Werte bleiben).
 
 **Gummiband:** Zieht man Bauteile (einzeln oder als Auswahl), wandern die
 angeschlossenen Drahtenden mit. Damit die Leitung rechtwinklig bleibt, rückt
@@ -98,9 +106,11 @@ stehen in jedem Projekt in der Bauteilliste. Ein Symbol bearbeiten ändert alle
 Bauteile, die es benutzen – ein Rückgängig-Schritt. Fehlt ein Symbol wirklich,
 erscheint ein roter Platzhalter, und der ERC meldet es.
 
-**Stückliste** (Kopfleiste): gruppiert nach Bauteil und Wert, natürlich
+**Stückliste** (Kopfleiste): gruppiert nach Bauteil, Wert, Gehäuse und
+Bestellnummer (10k in 0805 und in 1206 sind zwei Positionen), natürlich
 sortiert (R2 vor R10), Bereiche zusammengefasst (`R1-R3, R10`), ohne
-Versorgungssymbole; Export als CSV (Semikolon), Markdown oder Text.
+Versorgungssymbole; Export als CSV (Semikolon, immer mit Gehäuse- und
+Bestellnummer-Spalte), Markdown oder Text (diese Spalten nur, wenn belegt).
 
 **Ablage:** `Strg+C` kopiert, `Strg+X` schneidet aus, `Strg+V` fügt an der
 Mausposition ein, `Strg+A` wählt alles. Das läuft über die Zwischenablage des
@@ -151,6 +161,7 @@ gelten als Quelle – ein PWR_FLAG wie in KiCad braucht es nicht.
 kern/       Modell, Geometrie, Bibliothek, Netze, Datei – ohne Oberfläche,
             Namensraum "kern"
   geometrie.dh   Punkt, Lage (Transform), Raster/Snap, Konstanten
+  text.dh        Überstrich ~{RESET}: sichtbarer Text, Pango-Markup
   modell.dh      Pin, Primitiv, Symbol, Bauteil, Draht, Knoten, Label, Blatt, Dokument
   bibliothek.dh  10 eingebaute Symbole (R, C, Elko, L, Diode, LED, NPN, Schalter, GND, VCC)
   netze.dh       Netz-Erkennung (eine reine Funktion), benannte Netze, Auto-Knoten
@@ -175,13 +186,14 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (144 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (159 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
 Kopieren/Einfügen, Umbenennen, ERC und SPICE, mehrere Blätter mit Reitern,
 globalem Label über den Dialog-Haken, ERC-Sprung aufs Blatt und mehrseitigem
-PDF/Druck). `pruef_kern.dh` prüft u. a. die
+PDF/Druck, gedrehte Labels samt Treffer-Test, Gehäuse/Bestellnummer einzeln
+und für mehrere Bauteile). `pruef_kern.dh` prüft u. a. die
 Gruppen-Lage in allen 8 Orientierungen × 3 Arten (72 Pin-Prüfungen). Der Selbsttest
 lässt die Zwischenablage des Systems in Ruhe und schreibt seine Bibliothek in
 eine Wegwerf-Datei neben dem Bild. `--nur-foto bild.png` macht nur das Bild.
@@ -228,7 +240,6 @@ zweiten Kondensator wieder „C1".
 
 ## Noch offen (nächste Runden)
 
-Hierarchische Blätter (Blatt-Symbole mit Ports), Symbole mit freier Grafik (bisher
-Rechteck-Gehäuse aus dem Generator), Überstrich für aktiv-low (`~RESET`),
-Bauteil-Felder wie Gehäuse/Bestellnummer für die Stückliste, Labels drehen,
-Platinen-Layout.
+Hierarchische Blätter (Blatt-Symbole mit Ports), Symbole mit freier Grafik
+(bisher Rechteck-Gehäuse aus dem Generator), Referenz/Wert eines Bauteils
+verschieben, Platinen-Layout.

@@ -55,6 +55,8 @@ DIM fotoZiel AS STRING
 DIM gDlg AS INTEGER
 DIM gDlgFeld1 AS INTEGER
 DIM gDlgFeld2 AS INTEGER
+DIM gDlgFeld3 AS INTEGER
+DIM gDlgFeld4 AS INTEGER
 DIM gDlgHakenWert AS BOOLEAN      ' Ergebnis des Hakens im Umbenennen-Dialog
 DIM gFragen AS INTEGER            ' wie oft bestaetigen() gefragt hat (Selbsttest)
 DIM gDlgHaken AS INTEGER          ' der Haken im offenen Umbenennen-Dialog
@@ -230,22 +232,32 @@ SUB eigenschaftenDialog(b AS kern.Bauteil)
     gtk_container_set_border_width(g, 12)
     DIM feldRef AS INTEGER : feldRef = feldNeu(b.referenz)
     DIM feldWert AS INTEGER : feldWert = feldNeu(b.wert)
+    DIM feldGeh AS INTEGER : feldGeh = feldNeu(b.gehaeuse)
+    DIM feldBest AS INTEGER : feldBest = feldNeu(b.bestellnr)
+    gtk_entry_set_placeholder_text(feldGeh, "z. B. 0805, DIP-8, TO-92")
+    gtk_entry_set_placeholder_text(feldBest, "fuer die Stueckliste")
     gtk_grid_attach(g, etikettNeu("Symbol:"), 0, 0, 1, 1)
     gtk_grid_attach(g, etikettNeu(b.sym.name), 1, 0, 1, 1)
     gtk_grid_attach(g, etikettNeu("Referenz:"), 0, 1, 1, 1)
     gtk_grid_attach(g, feldRef, 1, 1, 1, 1)
     gtk_grid_attach(g, etikettNeu("Wert:"), 0, 2, 1, 1)
     gtk_grid_attach(g, feldWert, 1, 2, 1, 1)
+    gtk_grid_attach(g, etikettNeu("Gehaeuse:"), 0, 3, 1, 1)
+    gtk_grid_attach(g, feldGeh, 1, 3, 1, 1)
+    gtk_grid_attach(g, etikettNeu("Bestellnummer:"), 0, 4, 1, 1)
+    gtk_grid_attach(g, feldBest, 1, 4, 1, 1)
     gtk_box_pack_start(gtk_dialog_get_content_area(d), g, TRUE, TRUE, 0)
     gtk_widget_show_all(d)
-    gDlg = d : gDlgFeld1 = feldRef : gDlgFeld2 = feldWert
+    gDlg = d : gDlgFeld1 = feldRef : gDlgFeld2 = feldWert : gDlgFeld3 = feldGeh : gDlgFeld4 = feldBest
     DIM ok AS BOOLEAN : ok = gtk_dialog_run(d) = GTK_ANTWORT_OK
     DIM neuRef AS STRING : neuRef = TRIM$(gtk_entry_get_text(feldRef))
     DIM neuWert AS STRING : neuWert = TRIM$(gtk_entry_get_text(feldWert))
-    gDlg = 0 : gDlgFeld1 = 0 : gDlgFeld2 = 0
+    DIM neuGeh AS STRING : neuGeh = TRIM$(gtk_entry_get_text(feldGeh))
+    DIM neuBest AS STRING : neuBest = TRIM$(gtk_entry_get_text(feldBest))
+    gDlg = 0 : gDlgFeld1 = 0 : gDlgFeld2 = 0 : gDlgFeld3 = 0 : gDlgFeld4 = 0
     gtk_widget_destroy(d)
     IF NOT ok THEN RETURN
-    IF neuRef = b.referenz AND neuWert = b.wert THEN RETURN
+    IF neuRef = b.referenz AND neuWert = b.wert AND neuGeh = b.gehaeuse AND neuBest = b.bestellnr THEN RETURN
     IF referenzBelegt(neuRef, b) THEN
         meldung("Die Referenz " + neuRef + " ist schon vergeben.")
         RETURN
@@ -253,6 +265,74 @@ SUB eigenschaftenDialog(b AS kern.Bauteil)
     verlaufMerken()
     b.referenz = neuRef
     b.wert = neuWert
+    b.gehaeuse = neuGeh
+    b.bestellnr = neuBest
+    geaendert()
+END SUB
+
+' Gemeinsamer Wert eines Feldes ueber mehrere Bauteile, "" wenn verschieden.
+FUNCTION gemeinsam$(liste AS ARRAY OF kern.Bauteil, feld AS INTEGER, BYREF gleich AS BOOLEAN) AS STRING
+    DIM w AS STRING
+    DIM i AS INTEGER
+    gleich = TRUE
+    FOR i = 0 TO LEN(liste) - 1
+        DIM v AS STRING
+        SELECT CASE feld
+            CASE 0 : v = liste[i].wert
+            CASE 1 : v = liste[i].gehaeuse
+            CASE ELSE : v = liste[i].bestellnr
+        END SELECT
+        IF i = 0 THEN
+            w = v
+        ELSEIF v <> w THEN
+            gleich = FALSE
+            RETURN ""
+        END IF
+    NEXT
+    RETURN w
+END FUNCTION
+
+' Mehrere Bauteile auf einmal: Wert, Gehaeuse, Bestellnummer. Ein Feld, das
+' man nicht anfasst, bleibt je Bauteil, wie es war -- auch wenn die Werte
+' verschieden waren (dann steht dort "verschieden" als Platzhalter).
+SUB eigenschaftenMehrere(liste AS ARRAY OF kern.Bauteil)
+    DIM d AS INTEGER : d = dialogNeu("Eigenschaften von " + STR$(LEN(liste)) + " Bauteilen")
+    DIM g AS INTEGER : g = gtk_grid_new()
+    gtk_grid_set_row_spacing(g, 6)
+    gtk_grid_set_column_spacing(g, 10)
+    gtk_container_set_border_width(g, 12)
+    DIM namen AS ARRAY OF STRING : namen = ["Wert:", "Gehaeuse:", "Bestellnummer:"]
+    DIM felder AS ARRAY OF INTEGER : felder = []
+    DIM vorher AS ARRAY OF STRING : vorher = []
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO 2
+        DIM gleich AS BOOLEAN
+        DIM v AS STRING : v = gemeinsam$(liste, i, gleich)
+        DIM f AS INTEGER : f = feldNeu(v)
+        IF NOT gleich THEN gtk_entry_set_placeholder_text(f, "verschieden -- bleibt, wenn leer")
+        ARRAY_PUSH(felder, f)
+        ARRAY_PUSH(vorher, v)
+        gtk_grid_attach(g, etikettNeu(namen[i]), 0, i, 1, 1)
+        gtk_grid_attach(g, f, 1, i, 1, 1)
+    NEXT
+    gtk_box_pack_start(gtk_dialog_get_content_area(d), g, TRUE, TRUE, 0)
+    gtk_widget_show_all(d)
+    gDlg = d : gDlgFeld1 = felder[0] : gDlgFeld2 = felder[1] : gDlgFeld3 = felder[2]
+    DIM ok AS BOOLEAN : ok = gtk_dialog_run(d) = GTK_ANTWORT_OK
+    DIM neu AS ARRAY OF STRING : neu = []
+    FOR i = 0 TO 2
+        ARRAY_PUSH(neu, TRIM$(gtk_entry_get_text(felder[i])))
+    NEXT
+    gDlg = 0 : gDlgFeld1 = 0 : gDlgFeld2 = 0 : gDlgFeld3 = 0
+    gtk_widget_destroy(d)
+    IF NOT ok THEN RETURN
+    IF neu[0] = vorher[0] AND neu[1] = vorher[1] AND neu[2] = vorher[2] THEN RETURN
+    verlaufMerken()
+    FOR j = 0 TO LEN(liste) - 1
+        IF neu[0] <> vorher[0] THEN liste[j].wert = neu[0]
+        IF neu[1] <> vorher[1] THEN liste[j].gehaeuse = neu[1]
+        IF neu[2] <> vorher[2] THEN liste[j].bestellnr = neu[2]
+    NEXT
     geaendert()
 END SUB
 
@@ -544,9 +624,14 @@ SUB stuecklisteZeigen()
     DIM g AS INTEGER : g = gtk_grid_new()
     gtk_grid_set_column_spacing(g, 18)
     gtk_grid_set_row_spacing(g, 4)
-    DIM kopf AS ARRAY OF STRING : kopf = ["Menge", "Referenzen", "Wert", "Bauteil"]
+    DIM geh AS BOOLEAN, best AS BOOLEAN
+    kern.bomSpalten(z, geh, best)
+    DIM kopf AS ARRAY OF STRING : kopf = ["Menge", "Referenzen", "Wert"]
+    IF geh THEN ARRAY_PUSH(kopf, "Gehaeuse")
+    IF best THEN ARRAY_PUSH(kopf, "Bestellnummer")
+    ARRAY_PUSH(kopf, "Bauteil")
     DIM i AS INTEGER, summe AS INTEGER
-    FOR i = 0 TO 3
+    FOR i = 0 TO LEN(kopf) - 1
         DIM k AS INTEGER : k = gtk_label_new("")
         gtk_label_set_markup(k, "<b>" + kopf[i] + "</b>")
         gtk_label_set_xalign(k, 0.0)
@@ -560,7 +645,10 @@ SUB stuecklisteZeigen()
         gtk_label_set_max_width_chars(refs, 34)
         gtk_grid_attach(g, refs, 1, i + 1, 1, 1)
         gtk_grid_attach(g, etikettNeu(z[i].wert), 2, i + 1, 1, 1)
-        gtk_grid_attach(g, etikettNeu(z[i].bauteil), 3, i + 1, 1, 1)
+        DIM sp AS INTEGER : sp = 3
+        IF geh THEN gtk_grid_attach(g, etikettNeu(z[i].gehaeuse), sp, i + 1, 1, 1) : sp = sp + 1
+        IF best THEN gtk_grid_attach(g, etikettNeu(z[i].bestellnr), sp, i + 1, 1, 1) : sp = sp + 1
+        gtk_grid_attach(g, etikettNeu(z[i].bauteil), sp, i + 1, 1, 1)
         summe = summe + z[i].menge
     NEXT
     gtk_container_add(sw, g)
@@ -695,6 +783,9 @@ END SUB
 DIM probeSchritt AS INTEGER
 DIM probeText1 AS STRING
 DIM probeText2 AS STRING
+DIM probeText3 AS STRING
+DIM probeText4 AS STRING
+CONST PROBE_LASSEN = "<lassen>"     ' dieses Feld nicht anfassen
 DIM probeHaken AS INTEGER         ' 0: Haken lassen, 1: setzen, 2: loesen
 DIM probeUndo0 AS INTEGER
 DIM probeName0 AS STRING
@@ -755,8 +846,10 @@ END FUNCTION
 ' Fuellt den offenen Dialog aus und bestaetigt ihn (laeuft in dessen Schleife).
 FUNCTION dialogBestaetigen(daten AS INTEGER) AS BOOLEAN
     IF gDlg = 0 THEN RETURN TRUE                 ' noch nicht offen: nochmal
-    IF gDlgFeld1 <> 0 THEN gtk_entry_set_text(gDlgFeld1, probeText1)
-    IF gDlgFeld2 <> 0 THEN gtk_entry_set_text(gDlgFeld2, probeText2)
+    IF gDlgFeld1 <> 0 AND probeText1 <> PROBE_LASSEN THEN gtk_entry_set_text(gDlgFeld1, probeText1)
+    IF gDlgFeld2 <> 0 AND probeText2 <> PROBE_LASSEN THEN gtk_entry_set_text(gDlgFeld2, probeText2)
+    IF gDlgFeld3 <> 0 AND probeText3 <> PROBE_LASSEN THEN gtk_entry_set_text(gDlgFeld3, probeText3)
+    IF gDlgFeld4 <> 0 AND probeText4 <> PROBE_LASSEN THEN gtk_entry_set_text(gDlgFeld4, probeText4)
     IF gDlgHaken <> 0 AND probeHaken > 0 THEN gtk_toggle_button_set_active(gDlgHaken, probeHaken = 1)
     gtk_dialog_response(gDlg, GTK_ANTWORT_OK)
     RETURN FALSE
@@ -1271,6 +1364,70 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             g_timeout_add(150, dialogBestaetigen, 0)
             blattLoeschen()
             pruefe("Letztes Blatt bleibt", STR$(LEN(gDok.blaetter)), "1")
+        CASE 19
+            ' Label-Werkzeug: R/Y drehen die Vorschau, das Label kommt so gedreht
+            werkzeugWaehlen(WZ_LABEL, "")
+            gLabelDreh = 0
+            auswahlDrehen()
+            DIM lr1 AS INTEGER : lr1 = gLabelDreh
+            auswahlSpiegeln(kern.GR_SPIEGELN_Y)
+            pruefe("Label-Vorschau R, dann Y", STR$(lr1) + " " + STR$(gLabelDreh), "90 270")
+            probeUndo0 = LEN(gUndo)
+            gMausWX = 5000 : gMausWY = 1000
+            probeText1 = "~{RESET}" : probeHaken = 2
+            g_timeout_add(150, dialogBestaetigen, 0)
+            labelSetzen()
+            probeHaken = 0
+            DIM lrs AS kern.Label : lrs = gBlatt.labels[LEN(gBlatt.labels) - 1]
+            pruefe("Label senkrecht gesetzt", lrs.text + " " + STR$(lrs.drehung), "~{RESET} 270")
+            DIM lax AS FLOAT : lax = sx(5000)
+            DIM lay AS FLOAT : lay = sy(1000)
+            pruefe("Treffer ueber dem Anker", STR$(labelIndexUnter(lax - 8, lay - 30) = LEN(gBlatt.labels) - 1), STR$(TRUE))
+            pruefe("kein Treffer rechts daneben", STR$(labelIndexUnter(lax + 40, lay - 9) = LEN(gBlatt.labels) - 1), STR$(FALSE))
+            ' ein gewaehltes Label dreht um seinen Anker, nur die Richtung aendert sich
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            waehleL(lrs)
+            auswahlDrehen()
+            pruefe("Label dreht um den Anker", STR$(lrs.anker.x) + "," + STR$(lrs.anker.y) + " " + STR$(lrs.drehung), "5000,1000 0")
+            auswahlSpiegeln(kern.GR_SPIEGELN_X)
+            pruefe("Label gespiegelt (X)", STR$(lrs.drehung), "180")
+            pruefe("Label: drei Undo-Schritte", STR$(LEN(gUndo) - probeUndo0), "3")
+            ' Eigenschaften: Gehaeuse und Bestellnummer
+            DIM r7 AS kern.Bauteil : r7 = gBlatt.bauteile[1]
+            probeText1 = "R7" : probeText2 = "4k7" : probeText3 = "0805" : probeText4 = "RC0805-4K7"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            eigenschaftenDialog(r7)
+            probeText3 = "" : probeText4 = ""
+            pruefe("Gehaeuse/Bestellnummer gesetzt", r7.gehaeuse + " " + r7.bestellnr + " " + r7.wert, "0805 RC0805-4K7 4k7")
+            ' mehrere Bauteile: nur das Gehaeuse aendern, Wert und Bestellnummer bleiben je Bauteil
+            DIM c1 AS kern.Bauteil : c1 = gBlatt.bauteile[4]
+            DIM c1wert AS STRING : c1wert = c1.wert
+            auswahlAufheben()
+            waehleB(r7)
+            umschaltenB(c1)
+            pruefe("Zwei Bauteile gewaehlt", STR$(LEN(gSelB)), "2")
+            probeText1 = PROBE_LASSEN : probeText2 = "SMD" : probeText3 = PROBE_LASSEN
+            g_timeout_add(150, dialogBestaetigen, 0)
+            auswahlBearbeiten()
+            probeText1 = "" : probeText2 = "" : probeText3 = ""
+            pruefe("Gemeinsames Gehaeuse", r7.gehaeuse + " " + c1.gehaeuse, "SMD SMD")
+            pruefe("Werte und Bestellnummer unberuehrt", r7.wert + " " + c1.wert + " " + r7.bestellnr, "4k7 " + c1wert + " RC0805-4K7")
+            pruefe("Markdown mit Gehaeuse-Spalte", STR$(CONTAINS(kern.stuecklisteMarkdown$(gDok, "P"), "| 1 | R7 | 4k7 | Widerstand | SMD | RC0805-4K7 |")), STR$(TRUE))
+            ' Rueckgaengig: Mehrfach-Aenderung und Eigenschaften in je einem Schritt
+            verlaufZurueck()
+            pruefe("Rueckgaengig Mehrfach", gBlatt.bauteile[1].gehaeuse + "/" + gBlatt.bauteile[4].gehaeuse, "0805/")
+            verlaufZurueck()
+            pruefe("Rueckgaengig Eigenschaften", "[" + gBlatt.bauteile[1].gehaeuse + gBlatt.bauteile[1].bestellnr + "]", "[]")
+            auswahlAufheben()
+            zentrieren(4000, 1800)
+        CASE 20
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel + ".label.png") THEN PRINT "Foto Label gesichert"
+            END IF
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
+            pruefe("Label wieder weg", STR$(LEN(gBlatt.labels) > 0 AND gBlatt.labels[LEN(gBlatt.labels) - 1].text = "~{RESET}"), STR$(FALSE))
         CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()

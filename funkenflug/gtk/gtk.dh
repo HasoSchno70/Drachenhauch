@@ -458,6 +458,7 @@ DECLARE FUNCTION pango_cairo_create_layout LIB PANGOCAIRO (cr AS ZEIGER) AS ZEIG
 DECLARE SUB pango_cairo_show_layout LIB PANGOCAIRO (cr AS ZEIGER, layout AS ZEIGER)
 DECLARE SUB pango_cairo_update_layout LIB PANGOCAIRO (cr AS ZEIGER, layout AS ZEIGER)
 DECLARE SUB pango_layout_set_text LIB PANGO (layout AS ZEIGER, text AS TEXT, laenge AS LONG)
+DECLARE SUB pango_layout_set_markup LIB PANGO (layout AS ZEIGER, markup AS TEXT, laenge AS LONG)
 DECLARE SUB pango_layout_set_font_description LIB PANGO (layout AS ZEIGER, schrift AS ZEIGER)
 DECLARE SUB pango_layout_get_pixel_size LIB PANGO (layout AS ZEIGER, BYREF b AS LONG, BYREF h AS LONG)
 DECLARE FUNCTION pango_layout_get_baseline LIB PANGO (layout AS ZEIGER) AS LONG

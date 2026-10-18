@@ -290,6 +290,8 @@ SUB gruppeTransformieren(art AS INTEGER)
     DIM pivot AS kern.Punkt
     IF LEN(gSelB) = 1 AND auswahlAnzahl() = 1 THEN
         pivot = gSelB[0].lage.pos
+    ELSEIF LEN(gSelL) = 1 AND auswahlAnzahl() = 1 THEN
+        pivot = gSelL[0].anker                     ' ein Label dreht um seinen Anker
     ELSE
         DIM x0 AS INTEGER : x0 = 2000000000
         DIM y0 AS INTEGER : y0 = 2000000000
@@ -337,6 +339,7 @@ SUB gruppeTransformieren(art AS INTEGER)
         MAPPUT(neuX, kern.netzKey(la.anker.x, la.anker.y), ln.x)
         MAPPUT(neuY, kern.netzKey(la.anker.x, la.anker.y), ln.y)
         la.anker = ln
+        la.drehung = kern.richtungGruppe(la.drehung, art)
     NEXT
     ' ungewaehlte Labels an einem bewegten Pin gehen mit
     FOR i = 0 TO LEN(gBlatt.labels) - 1

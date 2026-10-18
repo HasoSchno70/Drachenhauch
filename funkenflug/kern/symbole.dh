@@ -143,7 +143,7 @@ FUNCTION icErzeugen(id AS STRING, name AS STRING, praefix AS STRING, wert AS STR
     FOR i = 0 TO LEN(pl.pins) - 1
         DIM se AS INTEGER : se = pl.pins[i].seite
         anz[se] = anz[se] + 1
-        IF LEN(pl.pins[i].name) > lang[se] THEN lang[se] = LEN(pl.pins[i].name)
+        IF LEN(sichtbarerText$(pl.pins[i].name)) > lang[se] THEN lang[se] = LEN(sichtbarerText$(pl.pins[i].name))
     NEXT
     DIM oben AS INTEGER : oben = IIF(anz[SEITE_OBEN] > 0, IC_ABSTAND, 0)
     DIM unten AS INTEGER : unten = IIF(anz[SEITE_UNTEN] > 0, IC_ABSTAND, 0)

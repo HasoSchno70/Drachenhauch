@@ -3,6 +3,7 @@
 ' Alle Teile teilen den Namensraum "kern" und sehen einander ohne Vorsatz.
 IMPORT "json"
 IMPORT "geometrie.dh" AS kern
+IMPORT "text.dh" AS kern
 IMPORT "modell.dh" AS kern
 IMPORT "symbole.dh" AS kern
 IMPORT "bibliothek.dh" AS kern

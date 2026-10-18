@@ -157,6 +157,13 @@ FUNCTION lageGruppe(l AS Lage, pivot AS Punkt, art AS INTEGER) AS Lage
 END FUNCTION
 
 ' Einheitsvektor einer Richtung (fuer gezeichnete Stummel/Pfeile).
+' Eine Richtung (etwa die eines Labels), mitgedreht/-gespiegelt wie die
+' Pins eines Bauteils der Gruppe -- dieselbe Rechnung, kein Sonderfall.
+FUNCTION richtungGruppe(richtung AS INTEGER, art AS INTEGER) AS INTEGER
+    DIM null AS Punkt : null = NEW Punkt(0, 0)
+    RETURN transformRichtung(lageGruppe(NEW Lage(null, 0, FALSE), null, art), richtung)
+END FUNCTION
+
 FUNCTION richtungDx(richtung AS INTEGER) AS INTEGER
     SELECT CASE richtung
         CASE 0 : RETURN 1
