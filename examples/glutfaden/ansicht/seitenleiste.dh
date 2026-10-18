@@ -121,7 +121,7 @@ SUB seitenleisteMuster(m AS kern.Muster)
         gtk_label_set_ellipsize(text, GTK_ELLIPSE_ENDE)
         gtk_widget_set_hexpand(text, TRUE)
         gtk_widget_set_tooltip_text(zeile, f.garn.name + IIF(f.garn.istBlend(), " (Blend)", "") + IIF(f.istPerle, tr$(" -- Perle"), "") + IIF(f.istDiamant, tr$(" -- Diamant"), ""))
-        DIM zahl AS INTEGER : zahl = gtk_label_new(ZAHL$(f.stichzahl, 0))
+        DIM zahl AS INTEGER : zahl = gtk_label_new(zahlText$(f.stichzahl, 0))
         gtkKlasse(zahl, "nebensache")
         gtk_box_pack_start(zeile, feld, FALSE, FALSE, 0)
         gtk_box_pack_start(zeile, text, TRUE, TRUE, 0)
@@ -239,7 +239,7 @@ SUB seitenleisteMuster(m AS kern.Muster)
         gtk_container_add(schloss, sb)
         gtk_toggle_button_set_active(schloss, e.gesperrt)
         signal(schloss, "toggled", slSchlossUmgeschaltet, i, 0, 0)
-        DIM et AS INTEGER : et = gtk_label_new(e.name + "  (" + ZAHL$(e.stichzahl(), 0) + ")")
+        DIM et AS INTEGER : et = gtk_label_new(e.name + "  (" + zahlText$(e.stichzahl(), 0) + ")")
         gtk_label_set_xalign(et, 0.0)
         gtk_label_set_ellipsize(et, GTK_ELLIPSE_ENDE)
         gtk_widget_set_hexpand(et, TRUE)
@@ -377,14 +377,14 @@ SUB seitenleisteZahlen()
     IF NOT lwHat THEN RETURN
     DIM i AS INTEGER
     FOR i = 0 TO MIN(LEN(slFarbZahlen), lwMuster.farbanzahl()) - 1
-        gtk_label_set_text(slFarbZahlen[i], ZAHL$(lwMuster.farben[i].stichzahl, 0))
+        gtk_label_set_text(slFarbZahlen[i], zahlText$(lwMuster.farben[i].stichzahl, 0))
     NEXT
     ' die aktive Ebene (die anderen haben sich nicht geaendert)
     DIM a AS INTEGER : a = lwMuster.ebenen.aktiv
     DIM zeile AS INTEGER : zeile = lwMuster.ebenen.anzahl() - 1 - a
     IF zeile >= 0 AND zeile < LEN(slEbenenTexte) THEN
         DIM e AS kern.Ebene : e = lwMuster.ebenen.ebenen[a]
-        gtk_label_set_text(slEbenenTexte[zeile], e.name + "  (" + ZAHL$(e.stichzahl(), 0) + ")")
+        gtk_label_set_text(slEbenenTexte[zeile], e.name + "  (" + zahlText$(e.stichzahl(), 0) + ")")
     END IF
     ilNachziehen()
 END SUB

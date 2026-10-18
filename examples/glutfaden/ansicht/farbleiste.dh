@@ -277,7 +277,7 @@ SUB fbTippSetzen(i AS INTEGER)
     DIM t AS STRING
     IF i >= 0 THEN
         DIM f AS kern.Farbeintrag : f = lwMuster.farben[i]
-        t = trf$("{0} {1}{2}{3}{4}Nr.: {5}{6}{7} Stiche", [f.symbol, f.garn.name, CHR$(10), f.garn.hersteller, CHR$(10), IIF(f.garn.nummer = "", "-", f.garn.nummer), CHR$(10), ZAHL$(f.stichzahl, 0)])
+        t = trf$("{0} {1}{2}{3}{4}Nr.: {5}{6}{7} Stiche", [f.symbol, f.garn.name, CHR$(10), f.garn.hersteller, CHR$(10), IIF(f.garn.nummer = "", "-", f.garn.nummer), CHR$(10), zahlText$(f.stichzahl, 0)])
         IF f.auslassen THEN t = trf$("{0}{1}⊘ Wird nicht gestickt", [t, CHR$(10)])
     END IF
     IF t = fbTipp THEN RETURN

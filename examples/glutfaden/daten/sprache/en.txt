@@ -2,3 +2,369 @@
 # der englische (kern/sprache.dh). Zeilen ohne Tabulator sind Kommentar.
 # {0}, {1} ... sind Werte (trf$), {kennung} ist ein Tastenkuerzel -- beide
 # stehen in der Uebersetzung wie im Original.
+Abgelegt: nichts, was Glutfaden öffnen kann (Muster .pxs/.oxs/.xsd/.pat oder ein Bild: {0}).	Dropped: nothing Glutfaden can open (patterns .pxs/.oxs/.xsd/.pat or an image: {0}).
+Tastenkürzel	Keyboard shortcuts
+Schließen	Close
+Aktion	Action
+<span alpha='45%'>—</span>	<span alpha='45%'>—</span>
+Umlegen unter Einstellungen → Tastenkürzel.	Change them under Settings → Keyboard shortcuts.
+Automatisch (Systemsprache)	Automatic (system language)
+Sprache / Language:	Language / Sprache:
+Gilt ab dem nächsten Start	Takes effect at the next start
+Die Sprache wechselt beim nächsten Start.	The language changes at the next start.
+  (eigen)	  (custom)
+● MUSTERFARBEN	● PATTERN COLORS
+{0} {1}{2}{3}{4}Nr.: {5}{6}{7} Stiche	{0} {1}{2}{3}{4}No.: {5}{6}{7} stitches
+{0}{1}⊘ Wird nicht gestickt	{0}{1}⊘ Not stitched
+🔤 Symbol ändern …	🔤 Change symbol …
+🎨 Farb-Harmonien suchen …	🎨 Find color harmonies …
+❌ Farb-Hervorhebung aufheben	❌ Remove color highlight
+🔍 Nur diese Farbe hervorheben	🔍 Highlight only this color
+✓ Farbe sticken	✓ Stitch this color
+⊘ Nicht sticken (Stofffarbe)	⊘ Do not stitch (fabric color)
+⇄ Farbe ersetzen …	⇄ Replace color …
+⇅ Mit anderer Farbe tauschen …	⇅ Swap with another color …
+Farbe „{0}“ wird nicht gestickt.	Color “{0}” will not be stitched.
+Farbe „{0}“ wird gestickt.	Color “{0}” will be stitched.
+Farb-Hervorhebung aufgehoben	Color highlight removed
+Hervorgehoben: {0} ({1} zum Aufheben)	Highlighted: {0} ({1} to remove)
+Klicken holt diese Zeile in die Mitte	Click to bring this row to the center
+Klicken holt diese Spalte in die Mitte	Click to bring this column to the center
+Klicken zentriert das Muster	Click to center the pattern
+Übersicht	Overview
+Klicken oder ziehen: diese Stelle in die Mitte holen	Click or drag: bring this spot to the center
+{0} × {1} Stiche	{0} × {1} stitches
+Kachel-Vorschau — {0}	Tile preview — {0}
+Das Muster mehrfach nebeneinander -- für Wiederholungsmuster und Bordüren: passen die Ränder aneinander?	The pattern repeated side by side -- for repeating patterns and borders: do the edges match?
+Kacheln:	Tiles:
+Kachelgrenzen anzeigen	Show tile borders
+{0}×{1} Stiche | {2}×{3} Kacheln	{0}×{1} stitches | {2}×{3} tiles
+Verlauf von	Gradient from
+Startfarbe -- der erste Punkt der gezogenen Linie	Start color -- the first point of the dragged line
+Endfarbe -- dazwischen nimmt jeder Punkt die nächste Farbe der Palette	End color -- in between, each point takes the nearest color of the palette
+Start- und Endfarbe tauschen	Swap start and end color
+Stoffzählung	Fabric count
+Kästchen je Zoll -- bestimmt Maße und Garnbedarf	Squares per inch -- determines size and thread usage
+Muster	Pattern
+<span foreground='{0}'>{1}</span>	<span foreground='{0}'>{1}</span>
+Heuristik aus Farbanzahl, Spezial-Stichen, Backstitches und Größe.	Heuristic from color count, special stitches, backstitches and size.
+Farbübersicht	Color overview
+Symbol: {0}{1}	Symbol: {0}{1}
+Drills: 	Drills: 
+Stiche: 	Stitches: 
+{0}Wird nicht gestickt	{0}Not stitched
+Keine Farben	No colors
+{0} ct Aida	{0} ct Aida
+Stoff: {0} ct	Fabric: {0} ct
+  <span foreground='#40c870'><b>✓</b></span>	  <span foreground='#40c870'><b>✓</b></span>
+  <span foreground='#e0b040'><b>⚠</b></span>	  <span foreground='#e0b040'><b>⚠</b></span>
+Importiert von:{0}{1}{2}{3}{4}Palette: {5}	Imported from:{0}{1}{2}{3}{4}Palette: {5}
+Konzentrierter Modus zum Sticken: Klick auf Zelle = abhaken ({wz_fortschritt})	Focused stitching mode: click a cell = check it off ({wz_fortschritt})
+Fortschritt	Progress
+0 / 0 Stiche	0 / 0 stitches
+Pro Farbe	Per color
+Fortschritt zurücksetzen	Reset progress
+Alle Stiche wieder als offen -- ein Schritt, Rückgängig holt ihn zurück	Mark all stitches as open again -- one step, Undo brings it back
+◼  Sticken-Modus beenden	◼  End stitching mode
+✓  Sticken-Modus starten	✓  Start stitching mode
+✓ Alle erledigt	✓ All done
+Alle {0} verbleibenden Stiche dieser Farbe als gestickt markieren.	Mark all {0} remaining stitches of this color as stitched.
+Noch keine Stiche	No stitches yet
+{0} / {1} Stiche	{0} / {1} stitches
+Farbe „{0}“ komplett als erledigt markiert ({1} Stiche).	Color “{0}” marked as completely done ({1} stitches).
+Kein Fortschritt zum Zurücksetzen.	No progress to reset.
+Gesamten Stickfortschritt zurücksetzen?{0}Bearbeiten → Rückgängig holt ihn zurück.	Reset all stitching progress?{0}Edit → Undo brings it back.
+Fortschritt zurückgesetzt ({0} Stiche).	Progress reset ({0} stitches).
+Rückstiche anzeigen	Show backstitches
+Fortschritt anzeigen	Show progress
+Zentrierhilfe	Centering aid
+Einfügen	Paste
+Text	Text
+Fortschritt markieren	Mark progress
+Fortschritt zurücknehmen	Unmark progress
+Die Ebene „{0}“ ist gesperrt.	The layer “{0}” is locked.
+Verschieben	Move
+Ein Vieleck braucht mindestens drei Ecken.	A polygon needs at least three corners.
+Vieleck	Polygon
+Kopiert: {0} Stiche.	Copied: {0} stitches.
+Löschen	Delete
+Auswahl füllen	Fill selection
+Drehen	Rotate
+Spiegeln	Mirror
+Die Zwischenablage ist leer.	The clipboard is empty.
+Klicken setzt ein, ESC bricht ab.	Click to place, ESC cancels.
+Alle Stiche dieser Farbe sind erledigt.	All stitches of this color are done.
+Dicke	Thickness
+Linienbreite der Rückstiche (2 = wie vorgesehen)	Line width of the backstitches (2 = as intended)
+Linie	Line
+Durchgezogen	Solid
+Gestrichelt	Dashed
+Gepunktet	Dotted
+Strich-Punkt	Dash-dot
+Linienart der Rückstiche	Line style of the backstitches
+Enden	Caps
+Rund	Round
+Eckig	Square
+Flach	Flat
+Form der Linienenden	Shape of the line ends
+Einrasten	Snap
+An Rasterpunkte einrasten: Ecken, Kantenmitten und Mitte der Kästchen -- aus = nur Ecken	Snap to grid points: corners, edge centers and the center of the squares -- off = corners only
+Vorschau in der aktuellen Farbe	Preview in the current color
+Text eingeben…	Enter text…
+Der Text -- Enter hängt ihn an die Maus, ein Klick ins Muster setzt ihn, Esc bricht ab	The text -- Enter attaches it to the mouse, a click into the pattern places it, Esc cancels
+Schriftart	Font
+Größe in Punkt (12 Punkt = 16 Kästchen hoch)	Size in points (12 points = 16 squares high)
+Fett	Bold
+Kursiv	Italic
+Erst einen Text eingeben -- oben in der Leiste.	Enter a text first -- at the top in the bar.
+Info	Info
+Farben im Muster	Colors in the pattern
+ -- Perle	 -- bead
+ -- Diamant	 -- diamond
+Ersetzen…	Replace…
+Die aktuelle Farbe durch eine andere ersetzen ({ersetzen})	Replace the current color with another one ({ersetzen})
+Symbol…	Symbol…
+Das Symbol der aktuellen Farbe ändern	Change the symbol of the current color
+✓ Erledigt	✓ Done
+Alle Stiche der aktuellen Farbe als erledigt markieren	Mark all stitches of the current color as done
+Seltene zusammenlegen…	Merge rare colors…
+Farben mit wenigen Stichen in die ähnlichste häufige übernehmen	Move colors with few stitches into the most similar frequent one
+Unbenutzte entfernen	Remove unused
+Farben ohne Stich und ohne Rückstich aus dem Muster nehmen	Remove colors without stitches and backstitches from the pattern
+Harmonien…	Harmonies…
+Garne, die nach Farbtheorie zur aktuellen Farbe passen ({harmonie})	Threads that match the current color by color theory ({harmonie})
+Verwalten…	Manage…
+Farben sortieren, umordnen, löschen, zusammenführen, Fäden ({farben})	Sort, reorder, delete, merge colors, strands ({farben})
+Palette exportieren…	Export palette…
+Die Farben des Musters als Palettendatei (JSON, wie PySticky) ({palette_export})	The pattern's colors as a palette file (JSON, like PySticky) ({palette_export})
+Importieren…	Import…
+Die Farben einer Palettendatei ins Muster nehmen ({palette_import})	Take the colors of a palette file into the pattern ({palette_import})
+Garn hinzufügen	Add thread
+Nummer oder Name	Number or name
+Blend…	Blend…
+Zwei Garne zu einem Tweed-Blend mischen ({blend})	Mix two threads into a tweed blend ({blend})
+Farbe vom Bildschirm picken -- das nächste Garn dieser Palette ({bildschirm_pipette})	Pick a color from the screen -- the nearest thread of this palette ({bildschirm_pipette})
+Ebenen	Layers
+Sichtbar	Visible
+Gesperrt -- nimmt keine Stiche an	Locked -- accepts no stitches
+Neue Ebene über der aktiven ({ebene})	New layer above the active one ({ebene})
+Ebene löschen -- die letzte bleibt	Delete layer -- the last one stays
+Ebene duplizieren	Duplicate layer
+Nach vorne (weiter oben im Stapel)	Bring forward (higher in the stack)
+Nach hinten	Send backward
+Mit der Ebene darunter zusammenführen	Merge with the layer below
+Alle Ebenen vereinen ({vereinen}) -- ausgeblendete fallen weg	Flatten all layers ({vereinen}) -- hidden ones are dropped
+Ebene leeren -- alle Stiche der aktiven weg ({ebene_leeren})	Clear layer -- remove all stitches of the active one ({ebene_leeren})
+Deckkraft	Opacity
+Notiz (z.B. Vordergrund, Schatten, Rückstich-Linien)	Note (e.g. foreground, shadow, backstitch lines)
+Notiz zur aktiven Ebene -- erscheint als Tipp an ihrem Namen. Gilt beim Verlassen des Feldes; Strg+Z nimmt sie zurück.	Note on the active layer -- shown as a tooltip on its name. Takes effect when leaving the field; Ctrl+Z undoes it.
+Nur aktive	Active only
+Nur die aktive Ebene zeigen, auch wenn sie ausgeblendet ist ({nur_aktive})	Show only the active layer, even if it is hidden ({nur_aktive})
+Andere abdunkeln	Dim others
+Die übrigen Ebenen mit halber Deckkraft zeigen ({abdunkeln})	Show the other layers at half opacity ({abdunkeln})
+{0} Stiche als erledigt markiert.	{0} stitches marked as done.
+Alle Farben werden benutzt.	All colors are in use.
+ Farbe	 color
+ Farben	 colors
+{0} {1} ist jetzt im Muster (Symbol {2}).	{0} {1} is now in the pattern (symbol {2}).
+Notiz der Ebene „{0}“ geändert.	Note of layer “{0}” changed.
+Ebene umbenennen	Rename layer
+Name der Ebene	Layer name
+Die Ebene darunter ist gesperrt.	The layer below is locked.
+Nur aktive Ebene: 	Active layer only: 
+Andere Ebenen abdunkeln: 	Dim other layers: 
+Der Text ergibt keine Stiche -- groesser schreiben?	The text yields no stitches -- write it larger?
+{0} Stiche, {1} x {2} -- klicken setzt, ESC bricht ab.	{0} stitches, {1} x {2} -- click to place, ESC cancels.
+Voller Stich	Full stitch
+Halbstich ╲	Half stitch ╲
+Halbstich ╱	Half stitch ╱
+Viertel oben links	Quarter top left
+Viertel oben rechts	Quarter top right
+Viertel unten links	Quarter bottom left
+Viertel unten rechts	Quarter bottom right
+Dreiviertelstich	Three-quarter stitch
+Französischer Knoten	French knot
+Perle	Bead
+Stich {0}	Stitch {0}
+Stift ({wz_stift})	Pencil ({wz_stift})
+Radierer ({wz_radierer})	Eraser ({wz_radierer})
+Füllen ({wz_fuellen})	Fill ({wz_fuellen})
+Pipette ({wz_pipette})	Eyedropper ({wz_pipette})
+Linie ({wz_linie}) -- Umschalt: 0/45/90 Grad	Line ({wz_linie}) -- Shift: 0/45/90 degrees
+Rechteck ({wz_rechteck}, gefüllt {wz_rechteck_voll}) -- Umschalt beim Ziehen: Quadrat	Rectangle ({wz_rechteck}, filled {wz_rechteck_voll}) -- Shift while dragging: square
+Ellipse ({wz_ellipse}, gefüllt {wz_ellipse_voll}) -- Umschalt beim Ziehen: Kreis	Ellipse ({wz_ellipse}, filled {wz_ellipse_voll}) -- Shift while dragging: circle
+Hand ({wz_hand}) -- Ansicht verschieben, auch mit der mittleren Maustaste	Hand ({wz_hand}) -- move the view, also with the middle mouse button
+Auswahl ({wz_auswahl}) -- ziehen wählt, in die Auswahl ziehen verschiebt; {kopieren}/{ausschneiden}/{einfuegen}, Entf, F füllen, R drehen, H/V spiegeln	Selection ({wz_auswahl}) -- drag to select, drag inside the selection to move; {kopieren}/{ausschneiden}/{einfuegen}, Del, F fill, R rotate, H/V mirror
+Lasso ({wz_lasso}) -- freie Auswahl	Lasso ({wz_lasso}) -- free-form selection
+Vieleck ({wz_vieleck}, gefüllt {wz_vieleck_voll}) -- Klick = Ecke, rechte Taste schließt, Rücktaste nimmt die letzte	Polygon ({wz_vieleck}, filled {wz_vieleck_voll}) -- click = corner, right button closes, Backspace removes the last one
+Text ({wz_text})	Text ({wz_text})
+Rückstich ({wz_rueckstich}) -- Klick für Klick eine Linie, rechte Taste entfernt	Backstitch ({wz_rueckstich}) -- a line click by click, right button removes
+Fortschritt ({wz_fortschritt}) -- ziehen markiert erledigt, rechts zurück; Pfeile springen, Enter markiert	Progress ({wz_fortschritt}) -- drag marks as done, right button undoes; arrows jump, Enter marks
+Farbverlauf ({wz_farbverlauf}) -- eine Linie ziehen: von der Start- zur Endfarbe, dazwischen die nächsten Farben der Palette	Gradient ({wz_farbverlauf}) -- drag a line: from the start to the end color, in between the nearest colors of the palette
+Magnetisches Raster aktiviert (alle {0} Zellen)	Magnetic grid enabled (every {0} cells)
+Magnetisches Raster deaktiviert	Magnetic grid disabled
+Spiegel ↔	Mirror ↔
+Spiegel ↕	Mirror ↕
+vierfach gespiegelt	mirrored four ways
+achtfach gespiegelt	mirrored eight ways
+ohne Spiegel	no mirror
+Radieren	Erase
+Stift	Pencil
+Radierer	Eraser
+Füllen	Fill
+Farbe aufgenommen: {0} ({1})	Color picked: {0} ({1})
+Erst Farben ins Muster holen -- der Verlauf nimmt sie aus der Palette.	Add colors to the pattern first -- the gradient takes them from the palette.
+Rechteck	Rectangle
+Ellipse	Ellipse
+Start- oder Endfarbe fehlt -- in der Leiste wählen.	Start or end color missing -- choose it in the bar.
+Farbverlauf	Gradient
+Erst eine Farbe wählen -- rechts in der Liste oder aus dem Katalog.	Choose a color first -- in the list on the right or from the catalog.
+Zurückgenommen: {0}	Undone: {0}
+Wiederholt: {0}	Redone: {0}
+Aktuelle Farbe	Current color
+Stichart (Alt+1 … Alt+0)	Stitch type (Alt+1 … Alt+0)
+Symmetrie: Striche, Formen und Rückstiche gespiegelt (Achtfach nur bei quadratischen Mustern)	Symmetry: strokes, shapes and backstitches mirrored (eightfold only for square patterns)
+Ohne Spiegel	No mirror
+Vierfach	Fourfold
+Achtfach	Eightfold
+Magnetisches Raster: Linie, Rechteck, Ellipse und Vieleck rasten alle paar Stiche ein ({einrasten})	Magnetic grid: line, rectangle, ellipse and polygon snap every few stitches ({einrasten})
+Glutfaden	Glutfaden
+KREUZSTICH-MUSTER EDITOR	CROSS-STITCH PATTERN EDITOR
+Neues Muster	New pattern
+Leinwand mit Standardgröße erstellen.	Create a canvas with the default size.
+Datei öffnen	Open file
+Bestehendes Muster laden (.pxs, .oxs, .pat, .xsd).	Load an existing pattern (.pxs, .oxs, .pat, .xsd).
+Aus Bild	From image
+Foto / Grafik in ein Muster umwandeln.	Convert a photo / image into a pattern.
+Demo-Muster	Demo pattern
+Beispiel zum Ausprobieren.	An example to try out.
+ZULETZT GEÖFFNET	RECENTLY OPENED
+Noch keine Dateien geöffnet.	No files opened yet.
+← Zurück zum Muster	← Back to the pattern
+Demo-Datei nicht gefunden: {0}	Demo file not found: {0}
+Demo konnte nicht geladen werden: {0}	Demo could not be loaded: {0}
+Loslassen: „{0}“ mit „{1}“ zusammenführen	Release: merge “{0}” with “{1}”
+Loslassen: „{0}“ an Stelle {1} von oben	Release: “{0}” at position {1} from the top
+Gesperrte Ebenen lassen sich nicht zusammenführen -- erst entsperren.	Locked layers cannot be merged -- unlock them first.
+„{0}“ mit „{1}“ zusammengeführt ({2} nimmt es zurück)	“{0}” merged with “{1}” ({2} undoes it)
+Kein Muster geladen	No pattern loaded
+{0}, Auswahl {1}	{0}, selection {1}
+{0} auf „{1}“   ·   	{0} on “{1}”   ·   
+{0}{1} × {2} Stiche, {3} × {4} cm auf {5}er Stoff	{0}{1} × {2} stitches, {3} × {4} cm on {5} count fabric
+{0}   ·   Stich {1}, {2}	{0}   ·   stitch {1}, {2}
+{0} gefüllt	{0} filled
+{0}  ·  {1} Farben  ·  {2} Stiche	{0}  ·  {1} colors  ·  {2} stitches
+Rückgängig: {0}{1}	Undo: {0}{1}
+Nichts zurückzunehmen	Nothing to undo
+Wiederholen: {0}{1}	Redo: {0}{1}
+Nichts zu wiederholen	Nothing to redo
+Abbrechen	Cancel
+PCStitch	PCStitch
+Pattern Maker	Pattern Maker
+Aus {0} eingelesen -- Sichern legt eine .pxs an.	Read from {0} -- saving creates a .pxs.
+Nicht geöffnet: {0}	Not opened: {0}
+Nicht gesichert: {0}	Not saved: {0}
+Gesichert: {0}	Saved: {0}
+Muster sichern unter	Save pattern as
+Sichern	Save
+Muster öffnen	Open pattern
+Öffnen	Open
+Kreuzstich-Muster (*.pxs)	Cross-stitch patterns (*.pxs)
+Kreuzstich-Muster (*.pxs, *.oxs, *.pat, *.xsd)	Cross-stitch patterns (*.pxs, *.oxs, *.pat, *.xsd)
+Vor dem Öffnen sichern?	Save before opening?
+Vor dem Schließen sichern?	Save before closing?
+Vor dem Importieren sichern?	Save before importing?
+Vor dem erneuten Importieren sichern?	Save before importing again?
+Vor dem Anlegen sichern?	Save before creating a new pattern?
+Vor dem {0} sichern?	Save before {0}?
+„{0}“ hat ungesicherte Änderungen.	“{0}” has unsaved changes.
+Verwerfen	Discard
+Diamond Painting -- die Farben sind jetzt Drills der Palette DMC Diamond Painting ({0} zurück).	Diamond painting -- the colors are now drills of the palette DMC Diamond Painting ({0} to go back).
+Kreuzstich -- die Garne von vorher sind zurück ({0}: wieder Diamond Painting).	Cross stitch -- the threads from before are back ({0}: diamond painting again).
+◆ Diamond	◆ Diamond
+✕ Kreuzstich	✕ Cross stitch
+Beenden	Quit
+Glutfaden beenden?	Quit Glutfaden?
+Über Glutfaden …	About Glutfaden …
+Neu in Glutfaden …	New in Glutfaden …
+Tastenkürzel ({0}) …	Keyboard shortcuts ({0}) …
+Stufe 23	Stage 23
+Kreuzstich-Muster ansehen und bearbeiten -- eine Portierung von PySticky nach Drachenhauch und GTK 3.	View and edit cross-stitch patterns -- a port of PySticky to Drachenhauch and GTK 3.
+PySticky (das Original)	PySticky (the original)
+Erst ein Muster öffnen oder anlegen.	Open or create a pattern first.
+Über Glutfaden	About Glutfaden
+Muster öffnen ({oeffnen})	Open pattern ({oeffnen})
+Bild importieren ({import}) -- erneut aus dem Quellbild: {import_neu}	Import image ({import}) -- again from the source image: {import_neu}
+Sichern ({sichern}) -- Sichern unter: {sichern_unter}	Save ({sichern}) -- Save as: {sichern_unter}
+Exportieren ({export}) -- PDF, HTML, Bild, OXS oder Paket	Export ({export}) -- PDF, HTML, image, OXS or package
+Stickpfad ({stickpfad}) -- in welcher Reihenfolge die Stiche jeder Farbe gesetzt werden	Stitch path ({stickpfad}) -- in which order the stitches of each color are made
+Muster-Vorschau ({vorschau}) -- gestickt auf Stoff, als Pixel oder als Symbol-Plan	Pattern preview ({vorschau}) -- stitched on fabric, as pixels or as a symbol chart
+Rückgängig ({zurueck})	Undo ({zurueck})
+Wiederholen ({vor})	Redo ({vor})
+Kreuzstich oder Diamond Painting ({modus}) -- die Farben wechseln in die passende Palette, zurück kommen dieselben Garne	Cross stitch or diamond painting ({modus}) -- the colors switch to the matching palette, the same threads come back
+Einpassen (0)	Fit (0)
+Größer (+)	Larger (+)
+Kleiner (-)	Smaller (-)
+Zoom	Zoom
+Klicken für 100 % ({zoom_100})	Click for 100 % ({zoom_100})
+Unbenannt	Untitled
+Ebene „{0}“ ist gesperrt.	Layer “{0}” is locked.
+Sichern unter	Save as
+Exportieren	Export
+Bild importieren	Import image
+Erneut aus dem Quellbild	Again from the source image
+Muster importieren (XSD/PAT/OXS)	Import pattern (XSD/PAT/OXS)
+Rückgängig	Undo
+Wiederholen	Redo
+Kopieren	Copy
+Ausschneiden	Cut
+Alles auswählen	Select all
+Farbe ersetzen	Replace color
+Kreuzstich / Diamond Painting	Cross stitch / diamond painting
+Garn-Blend	Thread blend
+Statistik	Statistics
+Neue Ebene	New layer
+Farben tauschen	Swap colors
+Palette umwandeln	Convert palette
+Bibliothek	Library
+Farb-Harmonien	Color harmonies
+Farben verwalten	Manage colors
+Stickpfad	Stitch path
+Eigenschaften	Properties
+Versionen	Versions
+Muster-Vorschau	Pattern preview
+Einstellungen	Settings
+Raster-Optionen	Grid options
+Kachel-Vorschau	Tile preview
+Lineale ein/aus	Rulers on/off
+Übersicht ein/aus	Overview on/off
+Farbleiste ein/aus	Color bar on/off
+Farbe hervorheben	Highlight color
+Sticken-Modus	Stitching mode
+90° rechts drehen	Rotate 90° right
+90° links drehen	Rotate 90° left
+180° drehen	Rotate 180°
+Horizontal spiegeln	Mirror horizontally
+Vertikal spiegeln	Mirror vertically
+Auto-Zuschneiden	Auto-crop
+Alle Ebenen vereinen	Flatten all layers
+Nur aktive Ebene	Active layer only
+Andere Ebenen abdunkeln	Dim other layers
+Ebene leeren	Clear layer
+Magnetisches Raster	Magnetic grid
+Tastenkürzel anzeigen	Show keyboard shortcuts
+Drucken	Print
+Farbe vom Bildschirm picken	Pick color from screen
+Palette exportieren	Export palette
+Palette importieren	Import palette
+Vergrößern	Zoom in
+Verkleinern	Zoom out
+Einpassen	Fit
+100 %	100 %
+Pipette	Eyedropper
+Rechteck gefüllt	Filled rectangle
+Ellipse gefüllt	Filled ellipse
+Auswahl	Selection
+Lasso	Lasso
+Vieleck gefüllt	Filled polygon
+Rückstich	Backstitch

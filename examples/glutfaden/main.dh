@@ -222,7 +222,7 @@ SUB statusNachziehen()
         t = t + ", " + TRIM$(gf.hersteller + " " + gf.nummer)
     END IF
     t = trf$("{0} auf „{1}“   ·   ", [t, lwMuster.ebenen.aktiveEbene().name])
-    t = trf$("{0}{1} × {2} Stiche, {3} × {4} cm auf {5}er Stoff", [t, STR$(lwMuster.breite), STR$(lwMuster.hoehe), ZAHL$(lwMuster.breiteCm(), 1), ZAHL$(lwMuster.hoeheCm(), 1), ZAHL$(lwMuster.stoff, 0)])
+    t = trf$("{0}{1} × {2} Stiche, {3} × {4} cm auf {5}er Stoff", [t, STR$(lwMuster.breite), STR$(lwMuster.hoehe), zahlText$(lwMuster.breiteCm(), 1), zahlText$(lwMuster.hoeheCm(), 1), zahlText$(lwMuster.stoff, 0)])
     IF lwMausX >= 0 THEN
         t = trf$("{0}   ·   Stich {1}, {2}", [t, STR$(lwMausX + 1), STR$(lwMausY + 1)])
         DIM c AS INTEGER : c = lwFarbe[lwMausY * lwMuster.breite + lwMausX]
@@ -257,7 +257,7 @@ END FUNCTION
 SUB zustandNachziehen()
     IF kopf = 0 OR NOT lwHat THEN RETURN
     gtk_header_bar_set_title(kopf, musterTitel + IIF(istGeaendert(), " •", ""))
-    gtk_header_bar_set_subtitle(kopf, trf$("{0}  ·  {1} Farben  ·  {2} Stiche", [BASENAME(musterPfad), STR$(lwMuster.farbanzahl()), ZAHL$(lwMuster.sticheGesamt(), 0)]))
+    gtk_header_bar_set_subtitle(kopf, trf$("{0}  ·  {1} Farben  ·  {2} Stiche", [BASENAME(musterPfad), STR$(lwMuster.farbanzahl()), zahlText$(lwMuster.sticheGesamt(), 0)]))
     gtk_widget_set_sensitive(kZurueck, wzVerlauf.kannZurueck())
     gtk_widget_set_sensitive(kVor, wzVerlauf.kannVor())
     gtk_widget_set_tooltip_text(kZurueck, IIF(wzVerlauf.kannZurueck(), trf$("Rückgängig: {0}{1}", [wzVerlauf.textZurueck$(), kuerzelHinweis$("zurueck")]), tr$("Nichts zurückzunehmen")))

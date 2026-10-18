@@ -72,6 +72,15 @@ FUNCTION trf$(t AS STRING, werte AS ARRAY OF STRING) AS STRING
     RETURN aus
 END FUNCTION
 
+' Eine Zahl zum Anzeigen: ZAHL$ schreibt immer deutsch (1.234,5) -- auf
+' Englisch werden Punkt und Komma getauscht (1,234.5). stellen -1 = wie ZAHL$(x)
+FUNCTION zahlAnzeige$(x AS FLOAT, stellen AS INTEGER) AS STRING
+    DIM s AS STRING
+    IF stellen < 0 THEN s = ZAHL$(x) ELSE s = ZAHL$(x, stellen)
+    IF spSprache = "de" THEN RETURN s
+    RETURN REPLACE$(REPLACE$(REPLACE$(s, ".", "#"), ",", "."), "#", ",")
+END FUNCTION
+
 ' Ein Kuerzel zum Anzeigen: gespeichert wird es immer in Glutfadens deutscher
 ' Schreibweise (kuerzelNormal$), auf Englisch heisst "Strg+Umschalt+Entf"
 ' dann "Ctrl+Shift+Del". Mehrere durch Komma.
