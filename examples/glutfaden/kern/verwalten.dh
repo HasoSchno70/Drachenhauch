@@ -835,3 +835,55 @@ FUNCTION uriListe(text AS STRING) AS ARRAY OF STRING
     NEXT
     RETURN aus
 END FUNCTION
+
+' --- Fremde Muster (PySticky PatternImportDialog) ---------------------------------
+
+CLASS FremdImport
+    DIM muster AS Muster
+    DIM warnungen AS ARRAY OF STRING
+    DIM format AS STRING                ' wie PySticky: "PCStitch (PAT)" ...
+END CLASS
+
+' Der Formatname zur Endung (PySticky _PatternImportWorker), "" = keins davon
+FUNCTION fremdFormat$(pfad AS STRING) AS STRING
+    DIM e AS STRING : e = LOWER$(pfad)
+    DIM p AS INTEGER : p = INSTRREV(e, ".")
+    IF p < 0 THEN RETURN ""
+    SELECT CASE MID$(e, p)
+        CASE ".xsd" : RETURN "Pattern Maker (XSD)"
+        CASE ".pat" : RETURN "PCStitch (PAT)"
+        CASE ".oxs" : RETURN "Open Cross Stitch (OXS)"
+    END SELECT
+    RETURN ""
+END FUNCTION
+
+' Eine XSD-, PAT- oder OXS-Datei lesen; ein Fehler ist ein THROW mit der
+' Meldung des Lesers. Die Warnungen bleiben, wie der Leser sie schreibt.
+FUNCTION fremdLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY OF STRING) AS FremdImport
+    DIM f AS FremdImport : f = NEW FremdImport()
+    f.format = fremdFormat$(pfad)
+    DIM e AS STRING : e = LOWER$(pfad)
+    IF f.format = "" THEN
+        DIM p AS INTEGER : p = INSTRREV(e, ".")
+        THROW "Unbekanntes Format: " + IIF(p < 0, "(ohne Endung)", MID$(e, p))
+    END IF
+    IF RIGHT$(e, 4) = ".oxs" THEN
+        DIM o AS OxsImport : o = oxsLaden(pfad, paletten, symbole)
+        f.muster = o.muster : f.warnungen = o.warnungen
+    ELSEIF RIGHT$(e, 4) = ".pat" THEN
+        DIM pa AS PatImport : pa = patLaden(pfad, paletten, symbole)
+        f.muster = pa.muster : f.warnungen = pa.warnungen
+    ELSE
+        DIM x AS XsdImport : x = xsdLaden(pfad, paletten, symbole)
+        f.muster = x.muster : f.warnungen = x.warnungen
+    END IF
+    RETURN f
+END FUNCTION
+
+' Die Angaben des Dialogs (PySticky _update_info): Name, Groesse in Stichen
+' und Zentimetern, Farben, Stiche ueber alle Ebenen, Format.
+FUNCTION fremdInfo(f AS FremdImport) AS ARRAY OF STRING
+    DIM m AS Muster : m = f.muster
+    RETURN [m.name, STR$(m.breite) + " × " + STR$(m.hoehe) + " Stiche (" + ZAHL$(m.breiteCm(), 1) + " × " + ZAHL$(m.hoeheCm(), 1) + " cm)", _
+        STR$(m.farbanzahl()), STR$(statistikVon(m).sticheGesamt), f.format]
+END FUNCTION

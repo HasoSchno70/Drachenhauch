@@ -93,6 +93,7 @@ IMPORT "ansicht/optionsleisten.dh"
 IMPORT "ansicht/farbquellen.dh"
 IMPORT "ansicht/drucken.dh"
 IMPORT "ansicht/ablage.dh"
+IMPORT "ansicht/fremdimport.dh"
 
 ' Farben: dunkel wie das Logo, Glut (#ff8a3d) fuer alles, was gewaehlt ist
 CONST STIL = "window, .flaeche { background-color: #1b1c20; color: #e4e5ea; }" + _
@@ -298,6 +299,16 @@ SUB musterZeigen(m AS kern.Muster, pfad AS STRING, titel AS STRING)
     statusNachziehen()
 END SUB
 
+' Die Statuszeile nach einem fremden Format
+FUNCTION fremdHinweis$(fi AS kern.FremdImport) AS STRING
+    DIM kurz AS STRING : kurz = "OXS"
+    IF LEFT$(fi.format, 8) = "PCStitch" THEN kurz = "PCStitch"
+    IF LEFT$(fi.format, 7) = "Pattern" THEN kurz = "Pattern Maker"
+    DIM h AS STRING : h = "Aus " + kurz + " eingelesen -- Sichern legt eine .pxs an."
+    IF LEN(fi.warnungen) > 0 THEN h = h + " " + JOIN$(fi.warnungen, " ")
+    RETURN h
+END FUNCTION
+
 FUNCTION musterOeffnen(pfad AS STRING) AS BOOLEAN
     DIM m AS kern.Muster
     DIM fremdHinweis AS STRING
@@ -305,26 +316,13 @@ FUNCTION musterOeffnen(pfad AS STRING) AS BOOLEAN
     DIM fremd AS BOOLEAN : fremd = endung = ".oxs" OR endung = ".pat" OR endung = ".xsd"
     TRY
         ' ein fremdes Format: eingelesen, gesichert wird als .pxs
-        DIM warnungen AS ARRAY OF STRING : warnungen = []
-        IF endung = ".oxs" THEN
-            DIM imp AS kern.OxsImport : imp = kern.oxsLaden(pfad, slPaletten, slSymbole)
-            m = imp.muster
-            warnungen = imp.warnungen
-            fremdHinweis = "Aus OXS eingelesen -- Sichern legt eine .pxs an."
-        ELSEIF endung = ".pat" THEN
-            DIM pimp AS kern.PatImport : pimp = kern.patLaden(pfad, slPaletten, slSymbole)
-            m = pimp.muster
-            warnungen = pimp.warnungen
-            fremdHinweis = "Aus PCStitch eingelesen -- Sichern legt eine .pxs an."
-        ELSEIF endung = ".xsd" THEN
-            DIM ximp AS kern.XsdImport : ximp = kern.xsdLaden(pfad, slPaletten, slSymbole)
-            m = ximp.muster
-            warnungen = ximp.warnungen
-            fremdHinweis = "Aus Pattern Maker eingelesen -- Sichern legt eine .pxs an."
+        IF fremd THEN
+            DIM fi AS kern.FremdImport : fi = kern.fremdLaden(pfad, slPaletten, slSymbole)
+            m = fi.muster
+            fremdHinweis = fremdHinweis$(fi)
         ELSE
             m = kern.pxsLaden(pfad)
         END IF
-        IF LEN(warnungen) > 0 THEN fremdHinweis = fremdHinweis + " " + JOIN$(warnungen, " ")
     CATCH e
         statusMeldung("Nicht geöffnet: " + e)
         RETURN FALSE
@@ -594,6 +592,7 @@ SUB befehlAusfuehren(kennung AS STRING)
         CASE "fortschritt_zeigen" : ansichtSchalter(1, NOT lwFortschrittZeigen)
         CASE "mittelkreuz" : ansichtSchalter(2, NOT lwMittelkreuz)
         CASE "tastenkuerzel" : kuerzelUebersicht()
+        CASE "fremd_import" : fremdImportDialog("")
         CASE "drucken" : druckenDialog()
         CASE "bildschirm_pipette" : bildschirmPipette()
         CASE "palette_export" : paletteExportieren()

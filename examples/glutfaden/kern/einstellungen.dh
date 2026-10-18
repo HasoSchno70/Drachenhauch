@@ -515,6 +515,7 @@ FUNCTION kuerzelAktionen() AS ARRAY OF Kuerzelaktion
         ka("export", "Exportieren", "Strg+E"), _
         ka("import", "Bild importieren", "Strg+I"), _
         ka("import_neu", "Erneut aus dem Quellbild", "Strg+Umschalt+I"), _
+        ka("fremd_import", "Muster importieren (XSD/PAT/OXS)", "Strg+Alt+I"), _
         ka("zurueck", "Rückgängig", "Strg+Z"), _
         ka("vor", "Wiederholen", "Strg+Y, Strg+Umschalt+Z"), _
         ka("kopieren", "Kopieren", "Strg+C"), _
