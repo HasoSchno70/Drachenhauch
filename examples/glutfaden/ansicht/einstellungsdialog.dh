@@ -49,7 +49,7 @@ DIM edPipInfo AS INTEGER
 DIM edDiagonal AS INTEGER
 DIM edToleranz AS INTEGER
 DIM edRueckBreite AS INTEGER
-DIM edEinrasten AS INTEGER
+DIM edMagnet AS INTEGER
 DIM edAmeisen AS INTEGER
 DIM edStickzeit AS INTEGER
 DIM edDruck AS INTEGER
@@ -246,8 +246,8 @@ FUNCTION edBauen() AS INTEGER
     edZoom = adSpin(1.0, 5.0, 0.1, 1.2, 1)
     edRein(s, edZeile("Faktor je Zoomschritt:", edZoom, "Mausrad, + und - und die Knöpfe"))
     edAbschnitt(s, "Magnetisches Raster")
-    edEinrasten = edKaestchen("Formen rasten ein", "Linie, Rechteck, Ellipse und Vieleck setzen ihre Ecken nur auf jedes n-te Kästchen (auch über den Knopf mit dem Magneten)")
-    edRein(s, edEinrasten)
+    edMagnet = edKaestchen("Formen rasten ein", "Linie, Rechteck, Ellipse und Vieleck setzen ihre Ecken nur auf jedes n-te Kästchen (auch über den Knopf mit dem Magneten)")
+    edRein(s, edMagnet)
     edRasterSchritt = adSpin(1, 20, 1, 5, 0)
     edRein(s, edZeile("Alle (Stiche):", edRasterSchritt, "Intervall für das magnetische Einrasten"))
     edAbschnitt(s, "Hintergrund")
@@ -390,7 +390,7 @@ FUNCTION edBauen() AS INTEGER
     signal(edHaupt, "value-changed", edAbhaengig, 0, 0, 0)
     signal(edAutosichern, "toggled", edAbhaengig, 0, 0, 0)
     signal(edWzMerken, "toggled", edAbhaengig, 0, 0, 0)
-    signal(edEinrasten, "toggled", edAbhaengig, 0, 0, 0)
+    signal(edMagnet, "toggled", edAbhaengig, 0, 0, 0)
     signal(edDruck, "toggled", edAbhaengig, 0, 0, 0)
     edFuellen(einst)
     gtk_widget_show_all(edDialog)
@@ -408,7 +408,7 @@ SUB edAbhaengig(w AS INTEGER, daten AS INTEGER)
     gtk_spin_button_set_range(edNeben, 1, MIN(20, MAX(1, h - 1)))
     gtk_widget_set_sensitive(edAutoMin, gtk_toggle_button_get_active(edAutosichern))
     gtk_widget_set_sensitive(edStartWz, NOT gtk_toggle_button_get_active(edWzMerken))
-    gtk_widget_set_sensitive(edRasterSchritt, gtk_toggle_button_get_active(edEinrasten))
+    gtk_widget_set_sensitive(edRasterSchritt, gtk_toggle_button_get_active(edMagnet))
     gtk_widget_set_sensitive(edPinsel, gtk_toggle_button_get_active(edDruck))
 END SUB
 
@@ -444,7 +444,7 @@ SUB edFuellen(e AS kern.Einstellungen)
     edFarbeSetzen(edHintergrund, e.hintergrund)
     edFarbeSetzen(edStoff, e.stoff)
     gtk_toggle_button_set_active(edTextur, e.stoffTextur)
-    gtk_toggle_button_set_active(edEinrasten, e.einrasten)
+    gtk_toggle_button_set_active(edMagnet, e.einrasten)
     gtk_spin_button_set_value(edRasterSchritt, e.rasterSchritt)
     gtk_toggle_button_set_active(edDruck, e.stiftDruck)
     gtk_spin_button_set_value(edPinsel, e.pinselGroesse)
@@ -516,7 +516,7 @@ SUB edUebernehmen()
     einst.hintergrund = edFarbe(edHintergrund)
     einst.stoff = edFarbe(edStoff)
     einst.stoffTextur = gtk_toggle_button_get_active(edTextur)
-    einst.einrasten = gtk_toggle_button_get_active(edEinrasten)
+    einst.einrasten = gtk_toggle_button_get_active(edMagnet)
     einst.rasterSchritt = gtk_spin_button_get_value_as_int(edRasterSchritt)
     einst.stiftDruck = gtk_toggle_button_get_active(edDruck)
     einst.pinselGroesse = gtk_spin_button_get_value_as_int(edPinsel)
