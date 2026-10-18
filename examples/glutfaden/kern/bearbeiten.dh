@@ -231,6 +231,52 @@ FUNCTION ebenenNummer(m AS Muster, e AS Ebene) AS INTEGER
     RETURN -1
 END FUNCTION
 
+' Alle Ebenen zu einer vereinen (PySticky LayerStack.flatten): von unten nach
+' oben gewinnt der oberste Stich samt Typ und erledigt. Wie im Original nur
+' die SICHTBAREN -- was auf einer ausgeblendeten Ebene liegt, faellt weg
+' (der Dialog sagt das vorher, ausgeblendeteStiche zaehlt es). Ein Schritt;
+' PySticky leert dafuer den Verlauf. FALSE bei nur einer Ebene.
+FUNCTION ebenenVereinen(m AS Muster, v AS Verlauf) AS BOOLEAN
+    IF m.ebenen.anzahl() < 2 THEN RETURN FALSE
+    DIM n AS Ebene : n = neueEbene("Zusammengeführt", m.breite, m.hoehe)
+    DIM r AS ARRAY OF INTEGER : r = n.raster
+    DIM d AS ARRAY OF INTEGER : d = n.erledigt
+    DIM a AS ARRAY OF INTEGER : a = n.art
+    DIM e AS Ebene
+    DIM i AS INTEGER
+    FOR EACH e IN m.ebenen.ebenen
+        IF NOT e.sichtbar THEN CONTINUE
+        DIM er AS ARRAY OF INTEGER : er = e.raster
+        DIM ed AS ARRAY OF INTEGER : ed = e.erledigt
+        DIM ea AS ARRAY OF INTEGER : ea = e.art
+        FOR i = 0 TO LEN(er) - 1
+            IF er[i] <> KEIN_STICH THEN
+                r[i] = er[i] : d[i] = ed[i] : a[i] = ea[i]
+            END IF
+        NEXT
+    NEXT
+    DIM t AS Aenderung : t = ebenenVorher(m, v, "Alle Ebenen vereinen")
+    m.ebenen.ebenen = [n]
+    m.ebenen.aktiv = 0
+    m.stichzahlenNeu()
+    ebenenNachher(m, v, t)
+    RETURN TRUE
+END FUNCTION
+
+' Stiche auf ausgeblendeten Ebenen -- die gehen beim Vereinen verloren
+FUNCTION ausgeblendeteStiche(m AS Muster) AS INTEGER
+    DIM n AS INTEGER, i AS INTEGER
+    DIM e AS Ebene
+    FOR EACH e IN m.ebenen.ebenen
+        IF e.sichtbar THEN CONTINUE
+        DIM r AS ARRAY OF INTEGER : r = e.raster
+        FOR i = 0 TO LEN(r) - 1
+            IF r[i] <> KEIN_STICH THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+
 ' Mit der Ebene darunter zusammenfuehren: ihre Stiche gehen nach unten (samt
 ' Typ und erledigt), dann verschwindet sie. FALSE bei der untersten oder wenn
 ' die untere gesperrt ist.

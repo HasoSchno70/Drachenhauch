@@ -2308,6 +2308,39 @@ Verfaelschungen fallen je in ihrem Fall -- "fremde Zaehlung hinten
 angehaengt" blieb im ersten Anlauf gruen, weil die Probe nur 25 ct
 (einsortiert) pruefte; jetzt auch 40.
 
+**Stufe 18: Muster drehen, spiegeln, zuschneiden; Ebenen vereinen und
+ansehen** (2026-10-18). Im Muster-Knopf 90 Grad rechts/links, 180 Grad,
+waagerecht/senkrecht spiegeln und Auto-Zuschneiden (Strg+Umschalt+C), in
+der Ebenen-Leiste "Alle vereinen" und die Kaestchen "Nur aktive"/"Andere
+abdunkeln". Kern `musterUmlegen`, `musterZuschneiden`, `autoZuschneiden`
+(kern/verwalten.dh, ueber den vorhandenen Groessen-Teil des Verlaufs) und
+`ebenenVereinen` (kern/bearbeiten.dh, Ebenen-Teil) -- **jedes ein
+Rueckgaengig-Schritt**, PySticky leert dafuer den Verlauf. Gegen PySticky
+aufgezeichnet (Groesse, je Ebene die belegten Zellen samt Typ und
+erledigt, Rueckstiche, Stichzahlen; drei Muster, 36 Abzuege): gleich.
+**Drei bewusste Abweichungen**, je mit Fall: (1) PyStickys `rotate_180`
+laesst die Teilstich-Typen stehen -- ein Viertelstich oben links bliebe
+"oben links", obwohl sein Kaestchen jetzt unten rechts liegt; hier ist 180
+Grad zweimal rechts. (2) Auto-Zuschneiden misst ueber ALLE Ebenen, PySticky
+nur ueber die sichtbaren -- ein Stich auf einer ausgeblendeten Ebene
+ausserhalb ging dort still verloren. (3) Ein leeres Muster bleibt; PySticky
+schnitt es auf 1 x 1 (`get_bounds` liefert fuer leer (0,0,0,0)). Vereinen
+nimmt wie das Original nur die sichtbaren Ebenen; die Rueckfrage nennt, wie
+viele Stiche dabei verloren gehen (`ausgeblendeteStiche`). Die Ansicht der
+Ebenen ist nur Anzeige (`lwZeigt`/`lwDeckkraft`/`lwZusammensetzen` in
+ansicht/leinwand.dh): "Nur aktive" zeigt die aktive auch ausgeblendet,
+"Abdunkeln" halbiert die Deckkraft der anderen wie PySticky; ein Wechsel
+der aktiven Ebene zieht die Leinwand nach. Kuerzel-Tafel 66, acht Befehle
+ohne Vorgabe (wie in PySticky) -- die Stufe-13-Pruefung zaehlt sie jetzt
+nicht mehr als "krumm". **Fund beim vollen Lauf:** die Farbverlauf-Probe
+der Stufe 15 fiel unter voller Last (2 von 2, allein nie) -- ein Fenster,
+das unter dem Zeiger auf- oder zugeht, schickt Bewegungen, und
+`lwBewegung` setzte damit den laufenden Zug um. Waehrend einer Probe
+uebergeht die Leinwand jetzt die echte Maus (`lwOhneMaus`), danach zwei
+volle Laeufe gruen. Sammlung `tests/pruef/glutfaden_stufe18.dhtest` (3:
+gegen PySticky, Grenzen samt Abweichungen und Schritten, Probe); 13
+Verfaelschungen fallen je in ihrem Fall.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

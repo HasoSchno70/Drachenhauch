@@ -1005,7 +1005,60 @@ SUB musterGeklickt(w AS INTEGER, was AS INTEGER)
         CASE 8 : rasterDialog()
         CASE 9 : kachelDialog()
         CASE 10 : willkommenZeigen()
+        CASE 11 : befehlAusfuehren("drehen_rechts")
+        CASE 12 : befehlAusfuehren("drehen_links")
+        CASE 13 : befehlAusfuehren("drehen_180")
+        CASE 14 : befehlAusfuehren("spiegeln_h")
+        CASE 15 : befehlAusfuehren("spiegeln_v")
+        CASE 16 : befehlAusfuehren("zuschneiden")
     END SELECT
+END SUB
+
+' --- Drehen, Spiegeln, Zuschneiden, Vereinen (PySticky Transformieren und
+' Ebenen) -- je ein Schritt, PySticky leert dafuer den Verlauf -------------
+
+SUB musterUmlegenBefehl(art AS INTEGER)
+    IF NOT lwHat OR wzZug <> ZUG_KEINER THEN RETURN
+    IF NOT kern.musterUmlegen(lwMuster, wzVerlauf, art) THEN RETURN
+    mrAuswahl = NIL
+    allesNeu()
+    leinwandEinpassen()
+    statusMeldung(kern.umlegenText$(art) + ": " + STR$(lwMuster.breite) + "×" + STR$(lwMuster.hoehe))
+END SUB
+
+SUB autoZuschneidenBefehl()
+    IF NOT lwHat OR wzZug <> ZUG_KEINER THEN RETURN
+    DIM ab AS INTEGER : ab = lwMuster.breite
+    DIM ah AS INTEGER : ah = lwMuster.hoehe
+    DIM r AS ARRAY OF INTEGER : r = kern.autoZuschneiden(lwMuster, wzVerlauf)
+    IF LEN(r) = 0 THEN
+        statusMeldung("Keine leeren Ränder zum Entfernen")
+        RETURN
+    END IF
+    mrAuswahl = NIL
+    allesNeu()
+    leinwandEinpassen()
+    statusMeldung("Zugeschnitten: " + STR$(ab) + "×" + STR$(ah) + " → " + STR$(lwMuster.breite) + "×" + STR$(lwMuster.hoehe) + " (L:" + STR$(r[0]) + " O:" + STR$(r[1]) + " R:" + STR$(r[2]) + " U:" + STR$(r[3]) + " entfernt)")
+END SUB
+
+' Alle Ebenen vereinen -- mit Rueckfrage, die sagt, was auf ausgeblendeten
+' Ebenen verloren geht
+SUB ebenenVereinenBefehl(fragen AS BOOLEAN)
+    IF NOT lwHat OR wzZug <> ZUG_KEINER THEN RETURN
+    IF lwMuster.ebenen.anzahl() < 2 THEN
+        statusMeldung("Nur eine Ebene -- nichts zu vereinen.")
+        RETURN
+    END IF
+    IF fragen THEN
+        DIM weg AS INTEGER : weg = kern.ausgeblendeteStiche(lwMuster)
+        DIM text AS STRING : text = "Alle " + STR$(lwMuster.ebenen.anzahl()) + " Ebenen zu einer vereinen?"
+        IF weg > 0 THEN text = text + CHR$(10) + CHR$(10) + ZAHL$(weg, 0) + IIF(lwMuster.modus = "diamond", " Drills", " Stiche") + " auf ausgeblendeten Ebenen gehen dabei verloren."
+        text = text + CHR$(10) + CHR$(10) + "Rückgängig holt die Ebenen zurück."
+        IF NOT pdFrage(fenster, "Vereinen", text) THEN RETURN
+    END IF
+    IF NOT kern.ebenenVereinen(lwMuster, wzVerlauf) THEN RETURN
+    allesNeu()
+    statusMeldung("Alle Ebenen vereint.")
 END SUB
 
 ' Zuletzt geoeffnet (PySticky "Kürzlich geöffnet"): die Liste unter den
@@ -1080,15 +1133,16 @@ END SUB
 FUNCTION musterKnopf() AS INTEGER
     DIM mb AS INTEGER : mb = gtk_menu_button_new()
     gtk_container_add(mb, gtk_image_new_from_icon_name("document-new-symbolic", GTK_ICON_KNOPF))
-    tipp(mb, "Muster -- neu ({neu}), Eigenschaften ({eigenschaften}), Größe, Versionen ({versionen}), Vorlagen, Bibliothek ({bibliothek}), Einstellungen ({einstellungen}), Kachel-Vorschau ({kacheln})")
+    tipp(mb, "Muster -- neu ({neu}), Eigenschaften ({eigenschaften}), Größe, Versionen ({versionen}), Vorlagen, Bibliothek ({bibliothek}), Einstellungen ({einstellungen}), Kachel-Vorschau ({kacheln}), drehen, spiegeln, Auto-Zuschneiden ({zuschneiden})")
     gtk_widget_set_can_focus(mb, FALSE)
     musterPopover = gtk_popover_new(mb)
     DIM box AS INTEGER : box = gtk_box_new(GTK_SENKRECHT, 2)
     gtk_container_set_border_width(box, 8)
-    DIM texte AS ARRAY OF STRING : texte = ["Neues Muster …", "Eigenschaften …", "Größe ändern …", "Versionen …", "Als Vorlage speichern …", "Vorlagen verwalten …", "Bibliothek …", "Einstellungen …", "Raster-Optionen …", "Kachel-Vorschau …", "Startseite …"]
+    DIM texte AS ARRAY OF STRING : texte = ["Neues Muster …", "Eigenschaften …", "Größe ändern …", "Versionen …", "Als Vorlage speichern …", "Vorlagen verwalten …", "Bibliothek …", "Einstellungen …", "Raster-Optionen …", "Kachel-Vorschau …", "Startseite …", _
+        "↻ 90° rechts drehen", "↺ 90° links drehen", "⟲ 180° drehen", "⇆ Horizontal spiegeln", "⇅ Vertikal spiegeln", "✂ Auto-Zuschneiden"]
     DIM i AS INTEGER
     FOR i = 0 TO LEN(texte) - 1
-        IF i = 4 OR i = 6 OR i = 7 THEN gtk_box_pack_start(box, gtk_separator_new(GTK_WAAGERECHT), FALSE, FALSE, 4)
+        IF i = 4 OR i = 6 OR i = 7 OR i = 11 THEN gtk_box_pack_start(box, gtk_separator_new(GTK_WAAGERECHT), FALSE, FALSE, 4)
         DIM k AS INTEGER : k = gtk_button_new_with_label(texte[i])
         gtkKlasse(k, "flat")
         gtk_box_pack_start(box, k, FALSE, FALSE, 0)

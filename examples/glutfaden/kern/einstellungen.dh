@@ -535,6 +535,15 @@ FUNCTION kuerzelAktionen() AS ARRAY OF Kuerzelaktion
         ka("farbleiste", "Farbleiste ein/aus", "Strg+Umschalt+B"), _
         ka("hervorheben", "Farbe hervorheben", "Strg+H"), _
         ka("stickmodus", "Sticken-Modus", "Strg+M"), _
+        ka("drehen_rechts", "90° rechts drehen", ""), _
+        ka("drehen_links", "90° links drehen", ""), _
+        ka("drehen_180", "180° drehen", ""), _
+        ka("spiegeln_h", "Horizontal spiegeln", ""), _
+        ka("spiegeln_v", "Vertikal spiegeln", ""), _
+        ka("zuschneiden", "Auto-Zuschneiden", "Strg+Umschalt+C"), _
+        ka("vereinen", "Alle Ebenen vereinen", ""), _
+        ka("nur_aktive", "Nur aktive Ebene", ""), _
+        ka("abdunkeln", "Andere Ebenen abdunkeln", ""), _
         ka("zoom_rein", "Vergrößern", "Plus, ="), _
         ka("zoom_raus", "Verkleinern", "Minus"), _
         ka("einpassen", "Einpassen", "0"), _

@@ -396,6 +396,189 @@ FUNCTION groesseSkalieren(m AS Muster, v AS Verlauf, b AS INTEGER, h AS INTEGER)
     RETURN TRUE
 END FUNCTION
 
+' --- Drehen, Spiegeln, Zuschneiden (PySticky Pattern.rotate_*, flip_*, crop,
+' auto_crop) -----------------------------------------------------------------
+' Jede Wandlung ist EIN Schritt ueber den Groessen-Teil (Ebenen und
+' Rueckstiche vorher/nachher) -- PySticky leert dafuer den Verlauf.
+
+CONST UMLEGEN_RECHTS = 0              ' 90 Grad im Uhrzeigersinn
+CONST UMLEGEN_LINKS = 1               ' 90 Grad gegen den Uhrzeigersinn
+CONST UMLEGEN_180 = 2
+CONST UMLEGEN_WAAGERECHT = 3          ' links <-> rechts
+CONST UMLEGEN_SENKRECHT = 4           ' oben <-> unten
+
+FUNCTION umlegenText$(art AS INTEGER) AS STRING
+    SELECT CASE art
+        CASE UMLEGEN_RECHTS : RETURN "90° rechts gedreht"
+        CASE UMLEGEN_LINKS : RETURN "90° links gedreht"
+        CASE UMLEGEN_180 : RETURN "180° gedreht"
+        CASE UMLEGEN_WAAGERECHT : RETURN "Horizontal gespiegelt"
+        CASE UMLEGEN_SENKRECHT : RETURN "Vertikal gespiegelt"
+    END SELECT
+    RETURN ""
+END FUNCTION
+
+' Was aus einem Stichtyp wird. 180 Grad sind zweimal rechts -- PySticky
+' laesst die Typen dort stehen, und ein Viertelstich oben links bliebe oben
+' links, obwohl sein Kaestchen jetzt unten rechts liegt.
+FUNCTION umlegenTyp(art AS INTEGER, t AS INTEGER) AS INTEGER
+    SELECT CASE art
+        CASE UMLEGEN_RECHTS : RETURN stichGedreht(t)
+        CASE UMLEGEN_LINKS : RETURN stichGedrehtLinks(t)
+        CASE UMLEGEN_180 : RETURN stichGedreht(stichGedreht(t))
+        CASE UMLEGEN_WAAGERECHT : RETURN stichGespiegeltH(t)
+        CASE UMLEGEN_SENKRECHT : RETURN stichGespiegeltV(t)
+    END SELECT
+    RETURN t
+END FUNCTION
+
+' Das ganze Muster drehen oder spiegeln: alle Ebenen samt Stichtyp und
+' erledigt, die Rueckstiche (Halbstich-Koordinaten) mit derselben Abbildung.
+' Liefert FALSE bei einer unbekannten Art.
+FUNCTION musterUmlegen(m AS Muster, v AS Verlauf, art AS INTEGER) AS BOOLEAN
+    IF art < UMLEGEN_RECHTS OR art > UMLEGEN_SENKRECHT THEN RETURN FALSE
+    DIM ab AS INTEGER : ab = m.breite
+    DIM ah AS INTEGER : ah = m.hoehe
+    DIM b AS INTEGER : b = IIF(art = UMLEGEN_RECHTS OR art = UMLEGEN_LINKS, ah, ab)
+    DIM h AS INTEGER : h = IIF(art = UMLEGEN_RECHTS OR art = UMLEGEN_LINKS, ab, ah)
+    ' Je Stichtyp das Ergebnis einmal, nicht je Zelle
+    DIM typ[STICHTYP_MAX + 1] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO STICHTYP_MAX : typ[i] = umlegenTyp(art, i) : NEXT
+    DIM neu AS ARRAY OF Ebene : neu = []
+    DIM e AS Ebene
+    DIM x AS INTEGER, y AS INTEGER, z AS INTEGER, q AS INTEGER
+    FOR EACH e IN m.ebenen.ebenen
+        DIM n AS Ebene : n = ebeneInGroesse(e, b, h)
+        DIM r AS ARRAY OF INTEGER : r = n.raster
+        DIM d AS ARRAY OF INTEGER : d = n.erledigt
+        DIM a AS ARRAY OF INTEGER : a = n.art
+        DIM er AS ARRAY OF INTEGER : er = e.raster
+        DIM ed AS ARRAY OF INTEGER : ed = e.erledigt
+        DIM ea AS ARRAY OF INTEGER : ea = e.art
+        FOR y = 0 TO ah - 1
+            FOR x = 0 TO ab - 1
+                q = y * ab + x
+                IF art = UMLEGEN_RECHTS THEN
+                    z = x * b + (ah - 1 - y)
+                ELSEIF art = UMLEGEN_LINKS THEN
+                    z = (ab - 1 - x) * b + y
+                ELSEIF art = UMLEGEN_180 THEN
+                    z = (ah - 1 - y) * b + (ab - 1 - x)
+                ELSEIF art = UMLEGEN_WAAGERECHT THEN
+                    z = y * b + (ab - 1 - x)
+                ELSE
+                    z = (ah - 1 - y) * b + x
+                END IF
+                r[z] = er[q]
+                d[z] = ed[q]
+                IF ea[q] >= 0 AND ea[q] <= STICHTYP_MAX THEN a[z] = typ[ea[q]] ELSE a[z] = ea[q]
+            NEXT
+        NEXT
+        ARRAY_PUSH(neu, n)
+    NEXT
+    DIM rueck AS ARRAY OF Rueckstich : rueck = []
+    DIM rs AS Rueckstich
+    FOR EACH rs IN m.rueckstiche
+        DIM k AS Rueckstich : k = neuerRueckstich(rs.x1, rs.y1, rs.x2, rs.y2, rs.farbe)
+        IF art = UMLEGEN_RECHTS THEN
+            k.x1 = 2 * ah - rs.y1 : k.y1 = rs.x1 : k.x2 = 2 * ah - rs.y2 : k.y2 = rs.x2
+        ELSEIF art = UMLEGEN_LINKS THEN
+            k.x1 = rs.y1 : k.y1 = 2 * ab - rs.x1 : k.x2 = rs.y2 : k.y2 = 2 * ab - rs.x2
+        ELSEIF art = UMLEGEN_180 THEN
+            k.x1 = 2 * ab - rs.x1 : k.y1 = 2 * ah - rs.y1 : k.x2 = 2 * ab - rs.x2 : k.y2 = 2 * ah - rs.y2
+        ELSEIF art = UMLEGEN_WAAGERECHT THEN
+            k.x1 = 2 * ab - rs.x1 : k.x2 = 2 * ab - rs.x2
+        ELSE
+            k.y1 = 2 * ah - rs.y1 : k.y2 = 2 * ah - rs.y2
+        END IF
+        ARRAY_PUSH(rueck, k)
+    NEXT
+    groesseUebernehmen(m, v, b, h, neu, rueck, umlegenText$(art))
+    RETURN TRUE
+END FUNCTION
+
+' Auf einen Bereich zuschneiden (PySticky Pattern.crop): Rueckstiche werden
+' mitverschoben, einer mit einem Ende ausserhalb faellt weg. FALSE bei einem
+' Bereich ausserhalb oder ohne Aenderung.
+FUNCTION musterZuschneiden(m AS Muster, v AS Verlauf, x0 AS INTEGER, y0 AS INTEGER, b AS INTEGER, h AS INTEGER, text AS STRING) AS BOOLEAN
+    IF b < 1 OR h < 1 OR x0 < 0 OR y0 < 0 OR x0 + b > m.breite OR y0 + h > m.hoehe THEN RETURN FALSE
+    IF x0 = 0 AND y0 = 0 AND b = m.breite AND h = m.hoehe THEN RETURN FALSE
+    DIM neu AS ARRAY OF Ebene : neu = []
+    DIM e AS Ebene
+    DIM x AS INTEGER, y AS INTEGER
+    DIM ab AS INTEGER : ab = m.breite
+    FOR EACH e IN m.ebenen.ebenen
+        DIM n AS Ebene : n = ebeneInGroesse(e, b, h)
+        DIM r AS ARRAY OF INTEGER : r = n.raster
+        DIM d AS ARRAY OF INTEGER : d = n.erledigt
+        DIM a AS ARRAY OF INTEGER : a = n.art
+        DIM er AS ARRAY OF INTEGER : er = e.raster
+        DIM ed AS ARRAY OF INTEGER : ed = e.erledigt
+        DIM ea AS ARRAY OF INTEGER : ea = e.art
+        FOR y = 0 TO h - 1
+            FOR x = 0 TO b - 1
+                r[y * b + x] = er[(y + y0) * ab + x + x0]
+                d[y * b + x] = ed[(y + y0) * ab + x + x0]
+                a[y * b + x] = ea[(y + y0) * ab + x + x0]
+            NEXT
+        NEXT
+        ARRAY_PUSH(neu, n)
+    NEXT
+    DIM rueck AS ARRAY OF Rueckstich : rueck = []
+    DIM rs AS Rueckstich
+    FOR EACH rs IN m.rueckstiche
+        DIM k AS Rueckstich : k = neuerRueckstich(rs.x1 - 2 * x0, rs.y1 - 2 * y0, rs.x2 - 2 * x0, rs.y2 - 2 * y0, rs.farbe)
+        IF MIN(k.x1, k.x2) < 0 OR MAX(k.x1, k.x2) > 2 * b OR MIN(k.y1, k.y2) < 0 OR MAX(k.y1, k.y2) > 2 * h THEN CONTINUE
+        ARRAY_PUSH(rueck, k)
+    NEXT
+    groesseUebernehmen(m, v, b, h, neu, rueck, text)
+    RETURN TRUE
+END FUNCTION
+
+' Der Bereich mit Stichen [x0, y0, x1, y1] ueber ALLE Ebenen, leer = [].
+' PySticky nimmt nur die sichtbaren -- ein Stich auf einer ausgeblendeten
+' Ebene ausserhalb waere beim Zuschneiden still verloren.
+FUNCTION stichBereich(m AS Muster) AS ARRAY OF INTEGER
+    DIM x0 AS INTEGER : x0 = m.breite
+    DIM y0 AS INTEGER : y0 = m.hoehe
+    DIM x1 AS INTEGER : x1 = -1
+    DIM y1 AS INTEGER : y1 = -1
+    DIM e AS Ebene
+    DIM x AS INTEGER, y AS INTEGER
+    DIM b AS INTEGER : b = m.breite
+    FOR EACH e IN m.ebenen.ebenen
+        DIM r AS ARRAY OF INTEGER : r = e.raster
+        FOR y = 0 TO m.hoehe - 1
+            FOR x = 0 TO b - 1
+                IF r[y * b + x] <> KEIN_STICH THEN
+                    IF x < x0 THEN x0 = x
+                    IF x > x1 THEN x1 = x
+                    IF y < y0 THEN y0 = y
+                    IF y > y1 THEN y1 = y
+                END IF
+            NEXT
+        NEXT
+    NEXT
+    IF x1 < 0 THEN RETURN []
+    RETURN [x0, y0, x1, y1]
+END FUNCTION
+
+' Leere Raender abschneiden (Auto-Zuschneiden). Liefert die entfernten
+' Raender [links, oben, rechts, unten] oder [] ohne Aenderung -- auch bei
+' einem leeren Muster (PySticky schnitt das auf 1 x 1).
+FUNCTION autoZuschneiden(m AS Muster, v AS Verlauf) AS ARRAY OF INTEGER
+    DIM g AS ARRAY OF INTEGER : g = stichBereich(m)
+    IF LEN(g) = 0 THEN RETURN []
+    DIM b AS INTEGER : b = g[2] - g[0] + 1
+    DIM h AS INTEGER : h = g[3] - g[1] + 1
+    DIM aw AS INTEGER : aw = m.breite
+    DIM ahh AS INTEGER : ahh = m.hoehe
+    IF NOT musterZuschneiden(m, v, g[0], g[1], b, h, "Auto-Zuschneiden") THEN RETURN []
+    RETURN [g[0], g[1], aw - g[2] - 1, ahh - g[3] - 1]
+END FUNCTION
+
+
 ' --- Neues Muster ---------------------------------------------------------------------------
 
 CLASS Vorlage

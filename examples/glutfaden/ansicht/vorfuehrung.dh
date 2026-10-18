@@ -1890,3 +1890,115 @@ FUNCTION vorfuehrenStufe17(daten AS INTEGER) AS BOOLEAN
     END SELECT
     RETURN TRUE
 END FUNCTION
+
+
+' --- Stufe 18: Muster drehen, spiegeln, zuschneiden; Ebenen vereinen und ansehen ---
+
+DIM v18Vorher AS STRING
+DIM v18Alle AS INTEGER                ' belegte Zellen mit allen sichtbaren Ebenen
+
+FUNCTION v18Stand$() AS STRING
+    RETURN STR$(lwMuster.breite) + "x" + STR$(lwMuster.hoehe) + " " + STR$(lwMuster.ebenen.anzahl()) + " ebenen # " + vfAlles$()
+END FUNCTION
+
+' Zellen mit Stich im zusammengesetzten Bild der Leinwand
+FUNCTION v18Belegt() AS INTEGER
+    DIM n AS INTEGER, c AS INTEGER
+    FOR EACH c IN lwFarbe
+        IF c <> kern.KEIN_STICH THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+
+FUNCTION v18Stiche(e AS kern.Ebene) AS INTEGER
+    DIM n AS INTEGER, c AS INTEGER
+    FOR EACH c IN e.raster
+        IF c <> kern.KEIN_STICH THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+
+FUNCTION vorfuehrenStufe18(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM i AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            v18Vorher = v18Stand$()
+            PRINT "geladen: "; lwMuster.breite; "x"; lwMuster.hoehe; " | ebenen "; lwMuster.ebenen.anzahl(); " | kuerzel zuschneiden "; kern.kuerzelVon$(einst, "zuschneiden")
+            befehlAusfuehren("drehen_rechts")
+            PRINT "rechts: "; lwMuster.breite; "x"; lwMuster.hoehe; " | schritt '"; wzVerlauf.textZurueck$(); "' | geaendert "; istGeaendert(); " | "; meldung
+        CASE 2
+            ok = vfFoto(fenster, "gedreht")
+            werkzeugZurueck()
+            PRINT "zurueck: wie vorher "; v18Stand$() = v18Vorher
+            ' ueber den Muster-Knopf: dieselben Befehle
+            musterGeklickt(0, 14)
+            PRINT "knopf spiegeln: "; lwMuster.breite; "x"; lwMuster.hoehe; " '"; wzVerlauf.textZurueck$(); "' | "; meldung
+            musterGeklickt(0, 14)
+            PRINT "zweimal gespiegelt: wie vorher "; v18Stand$() = v18Vorher; " | schritte "; LEN(wzVerlauf.rueck)
+            befehlAusfuehren("drehen_links")
+            befehlAusfuehren("drehen_links")
+            befehlAusfuehren("drehen_180")
+            PRINT "links links 180: wie vorher "; v18Stand$() = v18Vorher
+            befehlAusfuehren("spiegeln_v")
+            befehlAusfuehren("spiegeln_v")
+            PRINT "senkrecht zweimal: wie vorher "; v18Stand$() = v18Vorher
+            ' Auto-Zuschneiden: erst nichts, dann nach dem Vergroessern zurueck
+            befehlAusfuehren("zuschneiden")
+            PRINT "zuschneiden ohne rand: "; meldung
+            ok = kern.groesseAendern(lwMuster, wzVerlauf, 20, 12)
+            allesNeu()
+            befehlAusfuehren("zuschneiden")
+            PRINT "zuschneiden: "; meldung; " | '"; wzVerlauf.textZurueck$(); "' | wie vorher "; v18Stand$() = v18Vorher
+        CASE 3
+            ' Ebenen vereinen: die ausgeblendete faellt weg, Rueckgaengig holt sie
+            DIM vorher AS INTEGER : vorher = kern.statistikVon(lwMuster).sticheGesamt
+            PRINT "ausgeblendete stiche: "; kern.ausgeblendeteStiche(lwMuster)
+            ebenenVereinenBefehl(FALSE)
+            PRINT "vereint: "; lwMuster.ebenen.anzahl(); " "; lwMuster.ebenen.ebenen[0].name; " | stiche "; vorher; " -> "; kern.statistikVon(lwMuster).sticheGesamt; " | ebenenzeilen "; LEN(slEbenenTexte); " | '"; wzVerlauf.textZurueck$(); "' | "; meldung
+            ebenenVereinenBefehl(FALSE)
+            PRINT "noch einmal: "; meldung
+            ok = vfFoto(fenster, "vereint")
+            werkzeugZurueck()
+            PRINT "zurueck: wie vorher "; v18Stand$() = v18Vorher; " | ebenenzeilen "; LEN(slEbenenTexte)
+            ' Nur aktive Ebene -- hier die ausgeblendete oberste
+            lwMuster.ebenen.aktiv = 2
+            slEbeneMarkieren()
+            v18Alle = v18Belegt()
+            befehlAusfuehren("nur_aktive")
+            PRINT "nur aktive: "; lwNurAktiv; " | kaestchen "; gtk_toggle_button_get_active(slNurAktiv); " | belegt "; v18Alle; " -> "; v18Belegt(); " = ebene 2 "; v18Stiche(lwMuster.ebenen.ebenen[2]); " | "; meldung
+        CASE 4
+            ok = vfFoto(fenster, "nur_aktive")
+            ' Wechsel der aktiven Ebene zieht die Anzeige mit
+            gtk_list_box_select_row(slEbenenListe, gtk_list_box_get_row_at_index(slEbenenListe, 2))
+            PRINT "aktiv "; lwMuster.ebenen.aktiv; ": belegt "; v18Belegt(); " = ebene 0 "; v18Stiche(lwMuster.ebenen.ebenen[0])
+            gtk_toggle_button_set_active(slNurAktiv, FALSE)
+            PRINT "aus per kaestchen: "; lwNurAktiv; " | belegt "; v18Belegt(); " = "; v18Alle
+            ' Andere abdunkeln: aktiv ist die unterste, die mittlere halb
+            lwMuster.ebenen.aktiv = 1
+            slEbeneMarkieren()
+            befehlAusfuehren("abdunkeln")
+            PRINT "abdunkeln: "; lwAbdunkeln; " | kaestchen "; gtk_toggle_button_get_active(slAbdunkeln); " | gemischt "; lwMischen(); " | deckkraft unten "; lwDeckkraft(lwMuster.ebenen.ebenen[0]); " aktiv "; lwDeckkraft(lwMuster.ebenen.ebenen[1])
+            ' eine Zelle nur auf der untersten: halb ueber dem Stoff
+            DIM e0 AS kern.Ebene : e0 = lwMuster.ebenen.ebenen[0]
+            FOR i = 0 TO LEN(e0.raster) - 1
+                IF e0.raster[i] <> kern.KEIN_STICH AND lwMuster.ebenen.ebenen[1].raster[i] = kern.KEIN_STICH THEN EXIT FOR
+            NEXT
+            DIM px AS INTEGER : px = i MOD lwMuster.breite
+            DIM py AS INTEGER : py = i \ lwMuster.breite
+            DIM f AS INTEGER : f = lwRgb[e0.raster[i]]
+            DIM s AS INTEGER : s = einst.stoff
+            DIM erw AS INTEGER : erw = &HFF000000 BOR (ROUND((((s SHR 16) BAND 255) + ((f SHR 16) BAND 255)) / 2.0) SHL 16) BOR (ROUND((((s SHR 8) BAND 255) + ((f SHR 8) BAND 255)) / 2.0) SHL 8) BOR ROUND(((s BAND 255) + (f BAND 255)) / 2.0)
+            PRINT "zelle "; px; ","; py; ": halb "; lwMischfarbe(px, py) = erw
+        CASE 5
+            ok = vfFoto(fenster, "abgedunkelt")
+            befehlAusfuehren("abdunkeln")
+            PRINT "abdunkeln aus: "; lwAbdunkeln; " | gemischt "; lwMischen(); " | datei unberuehrt "; v18Stand$() = v18Vorher
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION

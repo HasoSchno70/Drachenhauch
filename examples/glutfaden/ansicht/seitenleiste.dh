@@ -31,7 +31,9 @@ DIM slEbenenListe AS INTEGER
 DIM slEbenenKnoepfe AS ARRAY OF INTEGER   ' Augen-Kaestchen, oben im Stapel zuerst
 DIM slEbenenTexte AS ARRAY OF INTEGER
 DIM slDeckkraft AS INTEGER
-DIM slKnoepfe AS ARRAY OF INTEGER         ' neu, loeschen, duplizieren, hoch, runter, zusammen
+DIM slKnoepfe AS ARRAY OF INTEGER         ' neu, loeschen, duplizieren, hoch, runter, zusammen, alle vereinen
+DIM slNurAktiv AS INTEGER                 ' Kaestchen "Nur aktive"
+DIM slAbdunkeln AS INTEGER                ' Kaestchen "Andere abdunkeln"
 
 FUNCTION seitenleisteNeu() AS INTEGER
     DIM rolle AS INTEGER : rolle = gtk_scrolled_window_new(0, 0)
@@ -239,6 +241,7 @@ SUB seitenleisteMuster(m AS kern.Muster)
     ARRAY_PUSH(slKnoepfe, slKnopf("↑", "Nach vorne (weiter oben im Stapel)"))
     ARRAY_PUSH(slKnoepfe, slKnopf("↓", "Nach hinten"))
     ARRAY_PUSH(slKnoepfe, slKnopf("⤓", "Mit der Ebene darunter zusammenführen"))
+    ARRAY_PUSH(slKnoepfe, slKnopf("⧈", "Alle Ebenen vereinen ({vereinen}) -- ausgeblendete fallen weg"))
     FOR i = 0 TO LEN(slKnoepfe) - 1
         signal(slKnoepfe[i], "clicked", slEbenenKnopf, i, 0, 0)
         gtk_box_pack_start(leiste, slKnoepfe[i], TRUE, TRUE, 0)
@@ -257,6 +260,20 @@ SUB seitenleisteMuster(m AS kern.Muster)
     gtk_box_pack_start(dz, dl, FALSE, FALSE, 0)
     gtk_box_pack_start(dz, slDeckkraft, TRUE, TRUE, 0)
     gtk_box_pack_start(slInhalt, dz, FALSE, FALSE, 0)
+    ' Ansicht der Ebenen -- nur die Anzeige
+    DIM az AS INTEGER : az = gtk_box_new(GTK_WAAGERECHT, 10)
+    gtkKlasse(az, "innen")
+    slNurAktiv = gtk_check_button_new_with_label("Nur aktive")
+    tipp(slNurAktiv, "Nur die aktive Ebene zeigen, auch wenn sie ausgeblendet ist ({nur_aktive})")
+    gtk_toggle_button_set_active(slNurAktiv, lwNurAktiv)
+    signal(slNurAktiv, "toggled", slAnsichtUmgeschaltet, 0, 0, 0)
+    slAbdunkeln = gtk_check_button_new_with_label("Andere abdunkeln")
+    tipp(slAbdunkeln, "Die übrigen Ebenen mit halber Deckkraft zeigen ({abdunkeln})")
+    gtk_toggle_button_set_active(slAbdunkeln, lwAbdunkeln)
+    signal(slAbdunkeln, "toggled", slAnsichtUmgeschaltet, 1, 0, 0)
+    gtk_box_pack_start(az, slNurAktiv, FALSE, FALSE, 0)
+    gtk_box_pack_start(az, slAbdunkeln, FALSE, FALSE, 0)
+    gtk_box_pack_start(slInhalt, az, FALSE, FALSE, 0)
 
     gtk_widget_show_all(slInhalt)
     slSperre = FALSE
@@ -511,6 +528,10 @@ SUB slEbeneGewaehlt(liste AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
     IF slSperre OR zeile = 0 OR NOT lwHat THEN RETURN
     lwMuster.ebenen.aktiv = lwMuster.ebenen.anzahl() - 1 - gtk_list_box_row_get_index(zeile)
     slEbeneMarkieren()
+    IF lwNurAktiv OR lwAbdunkeln THEN
+        leinwandAufbauen()
+        gtk_widget_queue_draw(lwFlaeche)
+    END IF
     statusNachziehen()
 END SUB
 
@@ -586,6 +607,27 @@ SUB ebenenBefehl(nr AS INTEGER)
         CASE 5
             ok = kern.ebeneNachUnten(lwMuster, wzVerlauf, a)
             IF NOT ok AND a > 0 THEN statusMeldung("Die Ebene darunter ist gesperrt.")
+        CASE 6
+            ebenenVereinenBefehl(TRUE)
+            RETURN
     END SELECT
     IF ok THEN allesNeu()
+END SUB
+
+SUB slAnsichtUmgeschaltet(knopf AS INTEGER, was AS INTEGER)
+    IF slSperre THEN RETURN
+    ebenenAnsicht(was, gtk_toggle_button_get_active(knopf))
+END SUB
+
+' Nur aktive (was 0) oder andere abdunkeln (1) setzen; Kaestchen ziehen nach
+SUB ebenenAnsicht(was AS INTEGER, an AS BOOLEAN)
+    IF was = 0 THEN lwNurAktiv = an ELSE lwAbdunkeln = an
+    slSperre = TRUE
+    IF slNurAktiv <> 0 THEN gtk_toggle_button_set_active(slNurAktiv, lwNurAktiv)
+    IF slAbdunkeln <> 0 THEN gtk_toggle_button_set_active(slAbdunkeln, lwAbdunkeln)
+    slSperre = FALSE
+    IF NOT lwHat THEN RETURN
+    leinwandAufbauen()
+    gtk_widget_queue_draw(lwFlaeche)
+    statusMeldung(IIF(was = 0, "Nur aktive Ebene: ", "Andere Ebenen abdunkeln: ") + IIF(an, "an", "aus"))
 END SUB
