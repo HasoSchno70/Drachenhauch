@@ -506,7 +506,7 @@ SUB modusUmschalten()
     extraGeaendert = TRUE
     allesNeu()
     modusKnopfNachziehen()
-    statusMeldung(IIF(ziel = "diamond", "Diamond Painting -- die Farben sind jetzt Drills der Palette DMC Diamond Painting (" + kern.kuerzelVon$(einst, "modus") + " zurück).", "Kreuzstich -- die Garne von vorher sind zurück (" + kern.kuerzelVon$(einst, "modus") + ": wieder Diamond Painting)."))
+    statusMeldung(IIF(ziel = "diamond", "Diamond Painting -- die Farben sind jetzt Drills der Palette DMC Diamond Painting (" + kz$("modus") + " zurück).", "Kreuzstich -- die Garne von vorher sind zurück (" + kz$("modus") + ": wieder Diamond Painting)."))
 END SUB
 
 SUB modusGeklickt(knopf AS INTEGER, daten AS INTEGER) : modusUmschalten() : END SUB
@@ -557,7 +557,7 @@ SUB ueberGeklickt(knopf AS INTEGER, daten AS INTEGER)
     DIM m AS INTEGER : m = gtk_menu_new()
     ueberPunkt(m, "Über Glutfaden …", 0)
     ueberPunkt(m, "Neu in Glutfaden …", 1)
-    ueberPunkt(m, "Tastenkürzel (" + kern.kuerzelVon$(einst, "tastenkuerzel") + ") …", 2)
+    ueberPunkt(m, "Tastenkürzel (" + kz$("tastenkuerzel") + ") …", 2)
     gtk_widget_show_all(m)
     gtk_menu_popup_at_widget(m, knopf, GDK_SCHWERE_UNTEN_LINKS, GDK_SCHWERE_OBEN_LINKS, 0)
 END SUB

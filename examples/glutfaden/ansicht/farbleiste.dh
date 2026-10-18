@@ -470,7 +470,7 @@ SUB farbeHervorheben(i AS INTEGER)
     IF i < 0 THEN
         statusMeldung("Farb-Hervorhebung aufgehoben")
     ELSE
-        statusMeldung("Hervorgehoben: " + lwMuster.farben[i].garn.name + " (" + kern.kuerzelVon$(einst, "hervorheben") + " zum Aufheben)")
+        statusMeldung("Hervorgehoben: " + lwMuster.farben[i].garn.name + " (" + kz$("hervorheben") + " zum Aufheben)")
     END IF
 END SUB
 

@@ -706,7 +706,7 @@ FUNCTION aeZusammenfuehren$() AS STRING
     IF f <> "" THEN RETURN f
     IF wzFarbe >= lwMuster.farbanzahl() THEN wzFarbe = lwMuster.farbanzahl() - 1
     allesNeu()
-    statusMeldung(STR$(vorher - lwMuster.farbanzahl()) + " Farbe(n) zusammengeführt, " + STR$(n) + " Stiche umgefärbt (" + kern.kuerzelVon$(einst, "zurueck") + " nimmt es zurück).")
+    statusMeldung(STR$(vorher - lwMuster.farbanzahl()) + " Farbe(n) zusammengeführt, " + STR$(n) + " Stiche umgefärbt (" + kz$("zurueck") + " nimmt es zurück).")
     RETURN ""
 END FUNCTION
 

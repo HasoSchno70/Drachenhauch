@@ -1,0 +1,99 @@
+' Sprache der Oberflaeche (PySticky core/i18n.py): jeder Anzeigetext geht
+' durch tr$("deutscher Text") -- auf Deutsch kommt er unveraendert zurueck,
+' auf Englisch aus daten/sprache/en.txt. Was die Tafel nicht kennt, bleibt
+' deutsch: ein fehlender Eintrag ist ein Schoenheitsfehler, kein Absturz.
+'
+' Die Tafel ist keine JSON-Datei wie bei PySticky: das json-Modul liest einen
+' Punkt im Schluessel als Pfad, und "Öffnen …" hat drei. Je Zeile Deutsch,
+' Tabulator, Englisch (wie die IDE, ide/sprache/en.txt); eine Zeile ohne
+' Tabulator ist Kommentar.
+'
+' Texte mit Werten gehen durch trf$("Ebene „{0}“ ist gesperrt.", [name]) --
+' PySticky schrieb t(f"..."), und weil sich der Schluessel mit jedem Wert
+' aendert, wurden diese Texte nie uebersetzt.
+
+DIM spSprache AS STRING : spSprache = "de"
+DIM spTafel AS MAP OF STRING : spTafel = {}
+
+' "auto" nach der Systemsprache (beginnt sie mit "de" -> Deutsch, sonst
+' Englisch, wie PyStickys app.py), sonst die eingestellte; Unbekanntes = auto
+FUNCTION spracheAufloesen$(einstellung AS STRING, system AS STRING) AS STRING
+    DIM e AS STRING : e = LOWER$(TRIM$(einstellung))
+    IF e = "de" OR e = "en" THEN RETURN e
+    IF LEFT$(LOWER$(TRIM$(system)), 2) = "de" THEN RETURN "de"
+    RETURN "en"
+END FUNCTION
+
+' Die Sprache setzen; fuer "en" die Tafel lesen. Fehlt die Datei, bleibt es
+' deutsch (FALSE).
+FUNCTION spracheLaden(sprache AS STRING, pfad AS STRING) AS BOOLEAN
+    spTafel = {}
+    spSprache = "de"
+    IF sprache <> "en" THEN RETURN TRUE
+    IF NOT FILEEXISTS(pfad) THEN RETURN FALSE
+    spTafel = spracheTafel(pfad)
+    spSprache = "en"
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION spracheTafel(pfad AS STRING) AS MAP OF STRING
+    DIM t AS MAP OF STRING : t = {}
+    DIM z AS STRING
+    FOR EACH z IN READLINES(pfad)
+        z = REPLACE$(z, CHR$(13), "")
+        DIM tab AS INTEGER : tab = INSTR(z, CHR$(9))
+        IF tab > 0 THEN MAPPUT(t, LEFT$(z, tab), MID$(z, tab + 1))
+    NEXT
+    RETURN t
+END FUNCTION
+
+FUNCTION spracheJetzt$() AS STRING
+    RETURN spSprache
+END FUNCTION
+
+FUNCTION englisch() AS BOOLEAN
+    RETURN spSprache = "en"
+END FUNCTION
+
+FUNCTION tr$(t AS STRING) AS STRING
+    IF spSprache = "de" THEN RETURN t
+    IF MAPHAS(spTafel, t) THEN RETURN spTafel[t]
+    RETURN t
+END FUNCTION
+
+' Ein Text mit {0}, {1}, ... -- die Werte werden nach dem Uebersetzen
+' eingesetzt, damit die Tafel den Text ohne Werte kennt
+FUNCTION trf$(t AS STRING, werte AS ARRAY OF STRING) AS STRING
+    DIM aus AS STRING : aus = tr$(t)
+    DIM i AS INTEGER
+    FOR i = LEN(werte) - 1 TO 0 STEP -1
+        aus = REPLACE$(aus, "{" + STR$(i) + "}", werte[i])
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Ein Kuerzel zum Anzeigen: gespeichert wird es immer in Glutfadens deutscher
+' Schreibweise (kuerzelNormal$), auf Englisch heisst "Strg+Umschalt+Entf"
+' dann "Ctrl+Shift+Del". Mehrere durch Komma.
+FUNCTION kuerzelAnzeige$(text AS STRING) AS STRING
+    IF spSprache = "de" OR text = "" THEN RETURN text
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM s AS STRING
+    FOR EACH s IN SPLIT$(text, ", ")
+        DIM teile AS ARRAY OF STRING : teile = SPLIT$(s, "+")
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(teile) - 1
+            teile[k] = tasteEnglisch$(teile[k])
+        NEXT
+        ARRAY_PUSH(aus, JOIN$(teile, "+"))
+    NEXT
+    RETURN JOIN$(aus, ", ")
+END FUNCTION
+
+FUNCTION tasteEnglisch$(n AS STRING) AS STRING
+    DIM de AS ARRAY OF STRING : de = ["Strg", "Umschalt", "Entf", "Einfg", "Pos1", "Ende", "Bild auf", "Bild ab", "Leertaste", "Rücktaste", "Links", "Rechts", "Hoch", "Runter", "Komma", "Punkt"]
+    DIM en AS ARRAY OF STRING : en = ["Ctrl", "Shift", "Del", "Ins", "Home", "End", "PgUp", "PgDown", "Space", "Backspace", "Left", "Right", "Up", "Down", "Comma", "Period"]
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(de, n)
+    IF i >= 0 THEN RETURN en[i]
+    RETURN n
+END FUNCTION

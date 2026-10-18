@@ -173,7 +173,7 @@ SUB ebenenZugAusfuehren(art AS INTEGER, a AS INTEGER, b AS INTEGER)
     END IF
     IF kern.ebenenZusammenfuehren(lwMuster, wzVerlauf, a, b) THEN
         allesNeu()
-        statusMeldung("„" + qn + "“ mit „" + zn + "“ zusammengeführt (" + kern.kuerzelVon$(einst, "zurueck") + " nimmt es zurück)")
+        statusMeldung("„" + qn + "“ mit „" + zn + "“ zusammengeführt (" + kz$("zurueck") + " nimmt es zurück)")
     END IF
 END SUB
 

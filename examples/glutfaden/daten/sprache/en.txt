@@ -1,0 +1,4 @@
+# Glutfaden: Englische Oberflaeche. Je Zeile der deutsche Text, ein Tabulator,
+# der englische (kern/sprache.dh). Zeilen ohne Tabulator sind Kommentar.
+# {0}, {1} ... sind Werte (trf$), {kennung} ist ein Tastenkuerzel -- beide
+# stehen in der Uebersetzung wie im Original.
