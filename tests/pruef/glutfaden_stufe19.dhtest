@@ -459,6 +459,8 @@ zurueck: wie vorher TRUE
 drucken als pdf: '' | da TRUE | quer TRUE
 druckbild: TRUE
 lage: zelle 51.04 links 39.70 oben 357.33
+auftrag: quer TRUE
+punkt: 3A6E2A
 rueckstich TRUE
 text TRUE
 pipette TRUE

@@ -2125,6 +2125,15 @@ FUNCTION vorfuehrenStufe19(daten AS INTEGER) AS BOOLEAN
             DIM zz AS FLOAT, ox AS FLOAT, oy AS FLOAT
             (zz, ox, oy) = kern.druckLage(lwMuster.breite, lwMuster.hoehe, 794, 1123)
             PRINT "lage: zelle "; FORMAT$(zz, "%.2f"); " links "; FORMAT$(ox, "%.2f"); " oben "; FORMAT$(oy, "%.2f")
+            ' Die Lage, die der Druckauftrag selbst traegt (nicht die Rechnung des Kerns)
+            DIM dop AS INTEGER : dop = drOperation()
+            PRINT "auftrag: quer "; gtk_page_setup_get_orientation(gtk_print_operation_get_default_page_setup(dop)) = GTK_SEITE_QUER
+            g_object_unref(dop)
+            ' Die Pipette liest Rot, Gruen, Blau in dieser Reihenfolge
+            DIM pb AS INTEGER : pb = gdk_pixbuf_new(0, FALSE, 8, 4, 4)
+            gdk_pixbuf_fill(pb, &H3A6E2AFF)
+            PRINT "punkt: "; HEX$(bpPunkt(pb, 1, 2))
+            g_object_unref(pb)
         CASE ELSE
             schliessenErlaubt = TRUE
             gtk_widget_destroy(fenster)

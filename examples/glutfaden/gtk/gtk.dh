@@ -234,6 +234,8 @@ DECLARE FUNCTION gdk_pixbuf_get_from_window LIB GDK (fenster AS ZEIGER, x AS LON
 DECLARE FUNCTION gdk_pixbuf_get_pixels LIB PIXBUF (bild AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gdk_pixbuf_get_rowstride LIB PIXBUF (bild AS ZEIGER) AS LONG
 DECLARE FUNCTION gdk_pixbuf_get_n_channels LIB PIXBUF (bild AS ZEIGER) AS LONG
+DECLARE FUNCTION gdk_pixbuf_new LIB PIXBUF (farbraum AS LONG, alpha AS BOOLEAN, bits AS LONG, b AS LONG, h AS LONG) AS ZEIGER
+DECLARE SUB gdk_pixbuf_fill LIB PIXBUF (bild AS ZEIGER, punkt AS ULONG)
 DECLARE SUB gtk_window_fullscreen LIB GTK (fenster AS ZEIGER)
 DECLARE SUB gtk_window_set_decorated LIB GTK (fenster AS ZEIGER, an AS BOOLEAN)
 DECLARE SUB gtk_window_set_keep_above LIB GTK (fenster AS ZEIGER, an AS BOOLEAN)
@@ -247,6 +249,8 @@ DECLARE SUB gtk_print_operation_set_default_page_setup LIB GTK (op AS ZEIGER, se
 DECLARE FUNCTION gtk_print_operation_run LIB GTK (op AS ZEIGER, aktion AS LONG, eltern AS ZEIGER, BYREF fehler AS ZEIGER) AS LONG
 DECLARE FUNCTION gtk_page_setup_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_page_setup_set_orientation LIB GTK (seite AS ZEIGER, lage AS LONG)
+DECLARE FUNCTION gtk_page_setup_get_orientation LIB GTK (seite AS ZEIGER) AS LONG
+DECLARE FUNCTION gtk_print_operation_get_default_page_setup LIB GTK (op AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_print_context_get_cairo_context LIB GTK (kontext AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_print_context_get_width LIB GTK (kontext AS ZEIGER) AS FLOAT
 DECLARE FUNCTION gtk_print_context_get_height LIB GTK (kontext AS ZEIGER) AS FLOAT
