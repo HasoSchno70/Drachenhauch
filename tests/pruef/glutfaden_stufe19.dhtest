@@ -1,0 +1,467 @@
+' Glutfaden Stufe 19: Optionsleisten fuer Rueckstich und Text
+' (ansicht/optionsleisten.dh), Bildschirm-Pipette und Paletten als Datei
+' (ansicht/farbquellen.dh, kern/farbverwaltung.dh) und Drucken
+' (ansicht/drucken.dh, GtkPrintOperation).
+'
+' Der erste Fall ist gegen PySticky aufgezeichnet: der Text von
+' _on_export_palette (json.dump mit indent=2) fuer drei Muster -- die
+' Erwartung IST diese Aufzeichnung. Danach Lesen, Grenzen, Drucklage und
+' die Probe.
+
+=== palette exportieren wie pysticky
+IMPORT "helfer.dh"
+DIM pfad AS STRING
+FOR EACH pfad IN ["alle.pxs", "farbprobe.pxs", GLUTORDNER + "/daten/muster/demo_kreuzstich.pxs"]
+    PRINT "## "; BASENAME(pfad)
+    PRINT kern.paletteDateiText$(kern.pxsLaden(pfad))
+NEXT
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- datei alle.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- datei farbprobe.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T17:40:16.211663","pattern":{"name":"Farbprobe","width":12,"height":9,"fabric_count":14,"metadata":{},"colors":[{"name":"rot","color":"#C81E28","manufacturer":"DMC","catalog_number":"321","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"e218043a"},{"name":"Blau","color":"#2846BE","manufacturer":"Anchor","catalog_number":"132","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b1845328"},{"name":"grün","color":"#28A046","manufacturer":"","catalog_number":"","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"d04ed6fa"},{"name":"Gelb","color":"#F0D21E","manufacturer":"DMC","catalog_number":"444","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"2d3927c7"},{"name":"blau","color":"#2846BE","manufacturer":"DMC","catalog_number":"820","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"1556fc18"},{"name":"Perle Gold","color":"#C8A03C","manufacturer":"Mill Hill","catalog_number":"00557","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":true,"is_diamond":false,"color_id":"1631db04"},{"name":"Drill Weiss","color":"#FAFAFA","manufacturer":"DMC Diamond","catalog_number":"B5200","symbol":"◆","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":true,"color_id":"f5c8425d"},{"name":"Ungenutzt","color":"#0A0A0A","manufacturer":"DMC","catalog_number":"310","symbol":"◇","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"ba5fb24e"},{"name":"Zimt","color":"#A05A28","manufacturer":"Madeira","catalog_number":"2306","symbol":"★","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"f3660dd9"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,1],[3,0,4],[4,0,0],[5,0,1],[7,0,3],[8,0,8],[9,0,2],[11,0,0],[0,1,4],[1,1,8],[2,1,8],[3,1,8],[5,1,1],[6,1,0],[7,1,1],[8,1,2],[9,1,5],[10,1,8],[0,2,3],[1,2,5],[2,2,3],[3,2,5],[6,2,8],[7,2,8],[8,2,8],[9,2,3],[2,3,6],[3,3,0],[4,3,5],[6,3,3],[7,3,0],[8,3,8],[9,3,8],[10,3,0],[11,3,4],[0,4,4],[1,4,8],[3,4,0],[4,4,1],[5,4,0],[6,4,3],[7,4,8],[8,4,0],[9,4,0],[0,5,0],[2,5,1],[3,5,8],[4,5,4],[5,5,0],[6,5,6],[7,5,0],[8,5,8],[9,5,6],[10,5,5],[11,5,0],[2,6,0],[3,6,2],[4,6,4],[5,6,0],[6,6,4],[8,6,4],[9,6,5],[10,6,6],[11,6,3],[0,7,2],[2,7,0],[3,7,4],[4,7,3],[5,7,3],[7,7,2],[8,7,5],[9,7,8],[10,7,0],[11,7,0],[0,8,5],[1,8,0],[2,8,0],[4,8,5],[5,8,8],[6,8,8],[7,8,8],[8,8,8],[9,8,2],[10,8,2],[11,8,3]],"completed_stitches":[[3,1],[10,1],[1,2],[8,2],[9,2],[2,3],[9,3],[5,5],[7,5],[9,5],[0,7],[5,7],[9,7],[0,8],[1,8],[6,8],[8,8],[10,8]],"stitch_types":[[1,0,9],[2,0,1],[4,0,1],[11,0,3],[1,1,1],[2,1,7],[3,1,1],[5,1,2],[6,1,3],[8,1,1],[9,1,10],[10,1,7],[0,2,2],[1,2,10],[3,2,10],[6,2,7],[7,2,1],[8,2,1],[2,3,11],[3,3,2],[4,3,10],[7,3,3],[8,3,3],[9,3,1],[10,3,3],[11,3,2],[3,4,2],[4,4,7],[6,4,7],[0,5,2],[2,5,9],[3,5,1],[6,5,11],[9,5,11],[10,5,10],[11,5,2],[3,6,7],[5,6,7],[6,6,2],[9,6,10],[10,6,11],[11,6,7],[0,7,9],[2,7,7],[4,7,9],[7,7,7],[8,7,10],[9,7,1],[0,8,10],[2,8,2],[4,8,10],[5,8,2],[6,8,1],[7,8,9],[8,8,2],[9,8,1]]},{"name":"Oben","visible":true,"locked":true,"opacity":1.0,"stitches":[[0,0,0],[3,0,1],[4,0,3],[10,0,0],[4,2,3],[5,3,1],[8,3,1],[11,3,4],[2,4,0],[4,4,2],[7,4,2],[11,4,0],[0,5,5],[4,5,1],[5,5,1],[6,5,8],[11,5,5],[1,6,8],[5,6,2],[7,6,5],[10,6,2],[11,6,0],[0,7,8],[8,7,3],[3,8,6],[4,8,8]],"completed_stitches":[[4,2],[8,3],[7,4],[11,4],[0,5],[11,5],[0,7]],"stitch_types":[[4,0,1],[10,0,7],[11,3,1],[2,4,9],[4,4,2],[7,4,3],[0,5,10],[5,5,2],[6,5,9],[11,5,10],[1,6,7],[7,6,10],[10,6,3],[11,6,2],[8,7,7],[3,8,11],[4,8,9]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,0,5],[1,0,2],[8,0,0],[0,1,4],[1,1,1],[5,1,2],[8,1,0],[10,1,3],[3,2,3],[5,2,8],[6,2,0],[10,2,4],[1,3,2],[1,4,8],[3,4,8],[4,4,0],[11,4,6],[9,6,5],[2,7,1],[8,7,3],[11,7,6],[4,8,2],[6,8,8],[10,8,2]],"completed_stitches":[[0,0],[8,1],[10,1],[1,4],[4,4],[9,6],[8,7]],"stitch_types":[[0,0,10],[8,0,1],[1,1,7],[5,1,3],[8,1,1],[3,2,1],[5,2,3],[6,2,9],[10,2,3],[1,3,7],[1,4,3],[3,4,1],[11,4,11],[9,6,10],[8,7,7],[11,7,11],[4,8,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":6,"y2":6,"color_index":0},{"x1":2,"y1":2,"x2":8,"y2":2,"color_index":2},{"x1":4,"y1":0,"x2":4,"y2":10,"color_index":4},{"x1":1,"y1":9,"x2":9,"y2":1,"color_index":8},{"x1":3,"y1":3,"x2":5,"y2":7,"color_index":1}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- erwartet
+## alle.pxs
+{
+  "format": "pysticky_palette",
+  "version": "1.0",
+  "name": "Vorschauprobe",
+  "colors": [
+    {
+      "name": "F0",
+      "color": {
+        "r": 199,
+        "g": 43,
+        "b": 59
+      },
+      "manufacturer": "DMC",
+      "catalog_number": "100",
+      "symbol": "●"
+    },
+    {
+      "name": "F1",
+      "color": {
+        "r": 90,
+        "g": 160,
+        "b": 210
+      },
+      "manufacturer": "DMC",
+      "catalog_number": "101",
+      "symbol": "○"
+    },
+    {
+      "name": "F2",
+      "color": {
+        "r": 20,
+        "g": 20,
+        "b": 20
+      },
+      "manufacturer": "DMC",
+      "catalog_number": "102",
+      "symbol": "■"
+    },
+    {
+      "name": "F3",
+      "color": {
+        "r": 240,
+        "g": 234,
+        "b": 218
+      },
+      "manufacturer": "DMC",
+      "catalog_number": "103",
+      "symbol": "□"
+    },
+    {
+      "name": "F4",
+      "color": {
+        "r": 60,
+        "g": 170,
+        "b": 80
+      },
+      "manufacturer": "DMC",
+      "catalog_number": "104",
+      "symbol": "▲"
+    },
+    {
+      "name": "F5",
+      "color": {
+        "r": 250,
+        "g": 200,
+        "b": 30
+      },
+      "manufacturer": "DMC",
+      "catalog_number": "105",
+      "symbol": "△"
+    }
+  ]
+}
+## farbprobe.pxs
+{
+  "format": "pysticky_palette",
+  "version": "1.0",
+  "name": "Farbprobe",
+  "colors": [
+    {
+      "name": "rot",
+      "color": {
+        "r": 200,
+        "g": 30,
+        "b": 40
+      },
+      "manufacturer": "DMC",
+      "catalog_number": "321",
+      "symbol": "●"
+    },
+    {
+      "name": "Blau",
+      "color": {
+        "r": 40,
+        "g": 70,
+        "b": 190
+      },
+      "manufacturer": "Anchor",
+      "catalog_number": "132",
+      "symbol": "○"
+    },
+    {
+      "name": "grün",
+      "color": {
+        "r": 40,
+        "g": 160,
+        "b": 70
+      },
+      "manufacturer": "",
+      "catalog_number": "",
+      "symbol": "■"
+    },
+    {
+      "name": "Gelb",
+      "color": {
+        "r": 240,
+        "g": 210,
+        "b": 30
+      },
+      "manufacturer": "DMC",
+      "catalog_number": "444",
+      "symbol": "□"
+    },
+    {
+      "name": "blau",
+      "color": {
+        "r": 40,
+        "g": 70,
+        "b": 190
+      },
+      "manufacturer": "DMC",
+      "catalog_number": "820",
+      "symbol": "▲"
+    },
+    {
+      "name": "Perle Gold",
+      "color": {
+        "r": 200,
+        "g": 160,
+        "b": 60
+      },
+      "manufacturer": "Mill Hill",
+      "catalog_number": "00557",
+      "symbol": "△"
+    },
+    {
+      "name": "Drill Weiss",
+      "color": {
+        "r": 250,
+        "g": 250,
+        "b": 250
+      },
+      "manufacturer": "DMC Diamond",
+      "catalog_number": "B5200",
+      "symbol": "◆"
+    },
+    {
+      "name": "Ungenutzt",
+      "color": {
+        "r": 10,
+        "g": 10,
+        "b": 10
+      },
+      "manufacturer": "DMC",
+      "catalog_number": "310",
+      "symbol": "◇"
+    },
+    {
+      "name": "Zimt",
+      "color": {
+        "r": 160,
+        "g": 90,
+        "b": 40
+      },
+      "manufacturer": "Madeira",
+      "catalog_number": "2306",
+      "symbol": "★"
+    }
+  ]
+}
+## demo_kreuzstich.pxs
+{
+  "format": "pysticky_palette",
+  "version": "1.0",
+  "name": "Demo Kreuzstich",
+  "colors": [
+    {
+      "name": "Black",
+      "color": {
+        "r": 0,
+        "g": 0,
+        "b": 0
+      },
+      "manufacturer": "Anchor",
+      "catalog_number": "403",
+      "symbol": "●"
+    },
+    {
+      "name": "Red-DK",
+      "color": {
+        "r": 169,
+        "g": 21,
+        "b": 44
+      },
+      "manufacturer": "Anchor",
+      "catalog_number": "47",
+      "symbol": "○"
+    },
+    {
+      "name": "Lemon-DK",
+      "color": {
+        "r": 255,
+        "g": 216,
+        "b": 2
+      },
+      "manufacturer": "Anchor",
+      "catalog_number": "309",
+      "symbol": "■"
+    },
+    {
+      "name": "Celadon Green-DK",
+      "color": {
+        "r": 73,
+        "g": 121,
+        "b": 90
+      },
+      "manufacturer": "Anchor",
+      "catalog_number": "228",
+      "symbol": "□"
+    },
+    {
+      "name": "Blue-DK",
+      "color": {
+        "r": 73,
+        "g": 131,
+        "b": 167
+      },
+      "manufacturer": "Anchor",
+      "catalog_number": "134",
+      "symbol": "▲"
+    },
+    {
+      "name": "Snow White",
+      "color": {
+        "r": 253,
+        "g": 252,
+        "b": 249
+      },
+      "manufacturer": "Anchor",
+      "catalog_number": "1",
+      "symbol": "△"
+    }
+  ]
+}
+
+=== palette lesen: rundweg, schon da, fremdes symbol, keine palette
+IMPORT "helfer.dh"
+' Die exportierte Palette in ein leeres Muster: dieselben Garne, Farben und
+' Symbole; ein Schritt, Rueckgaengig nimmt alles
+DIM quelle AS kern.Muster : quelle = kern.pxsLaden("farbprobe.pxs")
+DIM text AS STRING : text = kern.paletteDateiText$(quelle)
+DIM sy AS ARRAY OF STRING : sy = kern.symboleLaden(GLUTORDNER + "/daten/symbole.txt")
+DIM m AS kern.Muster : m = kern.neuesMuster("Leer", 10, 10)
+DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+PRINT "gelesen: "; kern.paletteImportieren(m, v, text, sy); " | farben "; m.farbanzahl(); " | schritte "; LEN(v.rueck); " '"; v.textZurueck$(); "'"
+DIM i AS INTEGER, gleich AS BOOLEAN : gleich = m.farbanzahl() = quelle.farbanzahl()
+FOR i = 0 TO MIN(m.farbanzahl(), quelle.farbanzahl()) - 1
+    DIM a AS kern.Farbeintrag : a = m.farben[i]
+    DIM b AS kern.Farbeintrag : b = quelle.farben[i]
+    IF a.garn.name <> b.garn.name OR a.garn.farbe <> b.garn.farbe OR a.garn.hersteller <> b.garn.hersteller OR a.garn.nummer <> b.garn.nummer OR a.symbol <> b.symbol THEN gleich = FALSE
+NEXT
+PRINT "wie die quelle: "; gleich; " | wieder geschrieben gleich "; kern.paletteDateiText$(m) = REPLACE$(text, CHR$(34) + quelle.name + CHR$(34), CHR$(34) + "Leer" + CHR$(34))
+DIM ok AS BOOLEAN : ok = v.zurueckNehmen(m)
+PRINT "zurueck: farben "; m.farbanzahl()
+' Noch einmal in ein Muster, das sie schon hat: nichts Neues, kein Schritt
+ok = v.wiederholen(m)
+DIM n0 AS INTEGER : n0 = LEN(v.rueck)
+PRINT "schon da: "; kern.paletteImportieren(m, v, text, sy); " gelesen | farben "; m.farbanzahl(); " | neue schritte "; LEN(v.rueck) - n0
+' Ein Symbol, das eine andere Farbe traegt, kommt nicht (PySticky setzte es)
+DIM q AS STRING : q = "{" + CHR$(34) + "format" + CHR$(34) + ":" + CHR$(34) + "pysticky_palette" + CHR$(34) + "," + CHR$(34) + "colors" + CHR$(34) + ":[{" + CHR$(34) + "name" + CHR$(34) + ":" + CHR$(34) + "Neu" + CHR$(34) + "," + CHR$(34) + "color" + CHR$(34) + ":{" + CHR$(34) + "r" + CHR$(34) + ":1," + CHR$(34) + "g" + CHR$(34) + ":2," + CHR$(34) + "b" + CHR$(34) + ":3}," + CHR$(34) + "symbol" + CHR$(34) + ":" + CHR$(34) + m.farben[0].symbol + CHR$(34) + "}]}"
+PRINT "fremdes symbol: "; kern.paletteImportieren(m, v, q, sy); " | neu "; m.farben[m.farbanzahl() - 1].garn.name; " "; HEX$(m.farben[m.farbanzahl() - 1].garn.farbe); " symbol anders "; m.farben[m.farbanzahl() - 1].symbol <> m.farben[0].symbol
+' Was fehlt, nimmt die Vorgabe des Originals: Name Unbekannt, Farbe 128
+q = "{" + CHR$(34) + "format" + CHR$(34) + ":" + CHR$(34) + "pysticky_palette" + CHR$(34) + "," + CHR$(34) + "colors" + CHR$(34) + ":[{}]}"
+PRINT "leerer eintrag: "; kern.paletteImportieren(m, v, q, sy); " | "; m.farben[m.farbanzahl() - 1].garn.name; " "; HEX$(m.farben[m.farbanzahl() - 1].garn.farbe)
+' Was keine Palette ist
+DIM t AS STRING
+FOR EACH t IN ["kein json", "[1, 2]", "{" + CHR$(34) + "format" + CHR$(34) + ":" + CHR$(34) + "andere" + CHR$(34) + "}", "{" + CHR$(34) + "format" + CHR$(34) + ":" + CHR$(34) + "pysticky_palette" + CHR$(34) + "," + CHR$(34) + "colors" + CHR$(34) + ":[]}", "{" + CHR$(34) + "format" + CHR$(34) + ":" + CHR$(34) + "pysticky_palette" + CHR$(34) + "}"]
+    TRY
+        PRINT "angenommen?? "; kern.paletteImportieren(m, v, t, sy)
+    CATCH f
+        PRINT "abgewiesen: "; LEFT$(f, 52)
+    END TRY
+NEXT
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- datei farbprobe.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T17:40:16.211663","pattern":{"name":"Farbprobe","width":12,"height":9,"fabric_count":14,"metadata":{},"colors":[{"name":"rot","color":"#C81E28","manufacturer":"DMC","catalog_number":"321","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"e218043a"},{"name":"Blau","color":"#2846BE","manufacturer":"Anchor","catalog_number":"132","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b1845328"},{"name":"grün","color":"#28A046","manufacturer":"","catalog_number":"","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"d04ed6fa"},{"name":"Gelb","color":"#F0D21E","manufacturer":"DMC","catalog_number":"444","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"2d3927c7"},{"name":"blau","color":"#2846BE","manufacturer":"DMC","catalog_number":"820","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"1556fc18"},{"name":"Perle Gold","color":"#C8A03C","manufacturer":"Mill Hill","catalog_number":"00557","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":true,"is_diamond":false,"color_id":"1631db04"},{"name":"Drill Weiss","color":"#FAFAFA","manufacturer":"DMC Diamond","catalog_number":"B5200","symbol":"◆","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":true,"color_id":"f5c8425d"},{"name":"Ungenutzt","color":"#0A0A0A","manufacturer":"DMC","catalog_number":"310","symbol":"◇","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"ba5fb24e"},{"name":"Zimt","color":"#A05A28","manufacturer":"Madeira","catalog_number":"2306","symbol":"★","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"f3660dd9"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,1],[3,0,4],[4,0,0],[5,0,1],[7,0,3],[8,0,8],[9,0,2],[11,0,0],[0,1,4],[1,1,8],[2,1,8],[3,1,8],[5,1,1],[6,1,0],[7,1,1],[8,1,2],[9,1,5],[10,1,8],[0,2,3],[1,2,5],[2,2,3],[3,2,5],[6,2,8],[7,2,8],[8,2,8],[9,2,3],[2,3,6],[3,3,0],[4,3,5],[6,3,3],[7,3,0],[8,3,8],[9,3,8],[10,3,0],[11,3,4],[0,4,4],[1,4,8],[3,4,0],[4,4,1],[5,4,0],[6,4,3],[7,4,8],[8,4,0],[9,4,0],[0,5,0],[2,5,1],[3,5,8],[4,5,4],[5,5,0],[6,5,6],[7,5,0],[8,5,8],[9,5,6],[10,5,5],[11,5,0],[2,6,0],[3,6,2],[4,6,4],[5,6,0],[6,6,4],[8,6,4],[9,6,5],[10,6,6],[11,6,3],[0,7,2],[2,7,0],[3,7,4],[4,7,3],[5,7,3],[7,7,2],[8,7,5],[9,7,8],[10,7,0],[11,7,0],[0,8,5],[1,8,0],[2,8,0],[4,8,5],[5,8,8],[6,8,8],[7,8,8],[8,8,8],[9,8,2],[10,8,2],[11,8,3]],"completed_stitches":[[3,1],[10,1],[1,2],[8,2],[9,2],[2,3],[9,3],[5,5],[7,5],[9,5],[0,7],[5,7],[9,7],[0,8],[1,8],[6,8],[8,8],[10,8]],"stitch_types":[[1,0,9],[2,0,1],[4,0,1],[11,0,3],[1,1,1],[2,1,7],[3,1,1],[5,1,2],[6,1,3],[8,1,1],[9,1,10],[10,1,7],[0,2,2],[1,2,10],[3,2,10],[6,2,7],[7,2,1],[8,2,1],[2,3,11],[3,3,2],[4,3,10],[7,3,3],[8,3,3],[9,3,1],[10,3,3],[11,3,2],[3,4,2],[4,4,7],[6,4,7],[0,5,2],[2,5,9],[3,5,1],[6,5,11],[9,5,11],[10,5,10],[11,5,2],[3,6,7],[5,6,7],[6,6,2],[9,6,10],[10,6,11],[11,6,7],[0,7,9],[2,7,7],[4,7,9],[7,7,7],[8,7,10],[9,7,1],[0,8,10],[2,8,2],[4,8,10],[5,8,2],[6,8,1],[7,8,9],[8,8,2],[9,8,1]]},{"name":"Oben","visible":true,"locked":true,"opacity":1.0,"stitches":[[0,0,0],[3,0,1],[4,0,3],[10,0,0],[4,2,3],[5,3,1],[8,3,1],[11,3,4],[2,4,0],[4,4,2],[7,4,2],[11,4,0],[0,5,5],[4,5,1],[5,5,1],[6,5,8],[11,5,5],[1,6,8],[5,6,2],[7,6,5],[10,6,2],[11,6,0],[0,7,8],[8,7,3],[3,8,6],[4,8,8]],"completed_stitches":[[4,2],[8,3],[7,4],[11,4],[0,5],[11,5],[0,7]],"stitch_types":[[4,0,1],[10,0,7],[11,3,1],[2,4,9],[4,4,2],[7,4,3],[0,5,10],[5,5,2],[6,5,9],[11,5,10],[1,6,7],[7,6,10],[10,6,3],[11,6,2],[8,7,7],[3,8,11],[4,8,9]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,0,5],[1,0,2],[8,0,0],[0,1,4],[1,1,1],[5,1,2],[8,1,0],[10,1,3],[3,2,3],[5,2,8],[6,2,0],[10,2,4],[1,3,2],[1,4,8],[3,4,8],[4,4,0],[11,4,6],[9,6,5],[2,7,1],[8,7,3],[11,7,6],[4,8,2],[6,8,8],[10,8,2]],"completed_stitches":[[0,0],[8,1],[10,1],[1,4],[4,4],[9,6],[8,7]],"stitch_types":[[0,0,10],[8,0,1],[1,1,7],[5,1,3],[8,1,1],[3,2,1],[5,2,3],[6,2,9],[10,2,3],[1,3,7],[1,4,3],[3,4,1],[11,4,11],[9,6,10],[8,7,7],[11,7,11],[4,8,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":6,"y2":6,"color_index":0},{"x1":2,"y1":2,"x2":8,"y2":2,"color_index":2},{"x1":4,"y1":0,"x2":4,"y2":10,"color_index":4},{"x1":1,"y1":9,"x2":9,"y2":1,"color_index":8},{"x1":3,"y1":3,"x2":5,"y2":7,"color_index":1}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- erwartet
+gelesen: 9 | farben 9 | schritte 1 'Palette importieren'
+wie die quelle: TRUE | wieder geschrieben gleich TRUE
+zurueck: farben 0
+schon da: 9 gelesen | farben 9 | neue schritte 0
+fremdes symbol: 1 | neu Neu 10203 symbol anders TRUE
+leerer eintrag: 1 | Unbekannt 808080
+abgewiesen: Datei konnte nicht gelesen werden: JSON_PARSE: expec
+abgewiesen: Die Datei ist keine gültige PySticky-Palettendatei.
+abgewiesen: Die Datei ist keine gültige PySticky-Palettendatei.
+abgewiesen: Die Palettendatei enthält keine Farben.
+abgewiesen: Die Palettendatei enthält keine Farben.
+
+=== drucklage, linienart und enden in den einstellungen
+IMPORT "helfer.dh"
+' Die Drucklage (PySticky _on_print): 5 % der Seitenbreite Rand, mittig
+DIM z AS FLOAT, x AS FLOAT, y AS FLOAT
+DIM g AS ARRAY OF INTEGER
+FOR EACH g IN [[14, 8], [8, 14], [100, 100], [1, 1], [300, 20]]
+    (z, x, y) = kern.druckLage(g[0], g[1], 595.0, 842.0)
+    PRINT g[0]; "x"; g[1]; ": zelle "; FORMAT$(z, "%.3f"); " links "; FORMAT$(x, "%.3f"); " oben "; FORMAT$(y, "%.3f"); " | quer "; kern.druckQuer(g[0], g[1])
+NEXT
+' Linienart und Enden: gemerkt und geklemmt
+DIM e AS kern.Einstellungen : e = NEW kern.Einstellungen()
+PRINT "vorgabe: linie "; e.rueckLinie; " enden "; e.rueckKappe
+e.rueckLinie = 3 : e.rueckKappe = 2
+WRITEALL("e.json", kern.einstellungenJson$(e))
+DIM l AS kern.Einstellungen : l = kern.einstellungenLaden("e.json")
+PRINT "gemerkt: "; l.rueckLinie; " "; l.rueckKappe
+WRITEALL("krumm.json", "{" + CHR$(34) + "backstitch_line_style" + CHR$(34) + ": 9, " + CHR$(34) + "backstitch_cap_style" + CHR$(34) + ": -4}")
+l = kern.einstellungenLaden("krumm.json")
+PRINT "geklemmt: "; l.rueckLinie; " "; l.rueckKappe
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- erwartet
+14x8: zelle 38.250 links 29.750 oben 268.000 | quer TRUE
+8x14: zelle 55.893 links 73.929 oben 29.750 | quer FALSE
+100x100: zelle 5.355 links 29.750 oben 153.250 | quer FALSE
+1x1: zelle 535.500 links 29.750 oben 153.250 | quer FALSE
+300x20: zelle 1.785 links 29.750 oben 403.150 | quer TRUE
+vorgabe: linie 0 enden 0
+gemerkt: 3 2
+geklemmt: 3 0
+
+=== probe: leisten, pipette, paletten, drucken
+IMPORT "helfer.dh"
+' --probe-stufe19 mit alle.pxs: Rueckstich- und Text-Leiste, Bildschirm-
+' Pipette (schliesst sich selbst), Farbe uebernehmen, Palette schreiben und
+' lesen, Drucken als PDF und als Bild.
+MKDIR("app")
+SETENV("APPDATA", CWD$() + "/app")
+SETENV("HOME", CWD$() + "/app")
+dlStarten(["run", BEISPIEL, "--", "--probe-stufe19", "--foto", "d", "alle.pxs"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT REPLACE$(dlAus, CHR$(13), "");
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    DIM f AS STRING
+    FOR EACH f IN ["rueckstich", "text", "pipette"]
+        PRINT f; " "; FILEEXISTS("d_" + f + ".png")
+    NEXT
+    PRINT "pdf: "; LEFT$(JOIN$(READLINES("druck.pdf", "latin1"), " "), 5)
+    ' Das Druckbild (794 x 1123): eine Zelle mit vollem Stich in ihrer Farbe
+    ' (nahe der Ecke gemessen, weg vom Symbol), der Rand weiss, das Raster grau.
+    ' Zwei der neun Ecken liegen unter einer Rueckstichlinie (1,1 blau, 10,1
+    ' rot) und zeigen deren Farbe -- die Rueckstiche kommen also mit aufs Blatt
+    DIM b AS IMAGE : b = LOADIMAGE("d_druck.png")
+    DIM m AS kern.Muster : m = kern.pxsLaden("alle.pxs")
+    DIM fa AS ARRAY OF INTEGER, ta AS ARRAY OF INTEGER, ea AS ARRAY OF INTEGER
+    m.ebenen.zusammensetzen(fa, ta, ea)
+    DIM z AS FLOAT, ox AS FLOAT, oy AS FLOAT
+    (z, ox, oy) = kern.druckLage(m.breite, m.hoehe, 794.0, 1123.0)
+    DIM i AS INTEGER, treffer AS INTEGER, geprueft AS INTEGER
+    FOR i = 0 TO LEN(fa) - 1
+        IF fa[i] < 0 OR ta[i] <> kern.VOLL THEN CONTINUE
+        DIM px AS INTEGER : px = INT(ox + (i MOD m.breite) * z + 5)
+        DIM py AS INTEGER : py = INT(oy + (i \ m.breite) * z + 5)
+        geprueft = geprueft + 1
+        IF (GETPIXEL(b, px, py) BAND &HFFFFFF) = m.farben[fa[i]].garn.farbe THEN treffer = treffer + 1
+    NEXT
+    PRINT "druck: "; IMAGE_WIDTH(b); "x"; IMAGE_HEIGHT(b); " | volle zellen in ihrer farbe "; treffer; " von "; geprueft; " | rand "; HEX$(GETPIXEL(b, 10, 10) BAND &HFFFFFF); " | raster grau "; HEX$(GETPIXEL(b, INT(ox + z), INT(oy + z / 2)) BAND &HFFFFFF)
+    PRINT "datei unveraendert: "; READLINES("alle.pxs")[0] = READLINES("vorher.pxs")[0]
+END IF
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
+--- datei alle.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- datei vorher.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- erwartet
+rueckgabe 0
+kuerzel drucken Strg+P
+rueckstich: leiste TRUE text FALSE | dicke 2 linie 0 enden 0 einrasten TRUE
+gesetzt: 4 1 2 FALSE | gemerkt 4 1 2 FALSE
+zurueck: linie 0 dicke 2 einrasten TRUE
+text: leiste TRUE rueck FALSE | schrift 0 groesse 12
+ohne text: haengt FALSE | Erst einen Text eingeben -- oben in der Leiste.
+eingetippt: Hi haengt FALSE
+klick: haengt TRUE breite > 0 TRUE
+laenger: haengt TRUE breiter TRUE
+fett: TRUE haengt TRUE
+geleert: haengt FALSE
+enter: haengt TRUE
+stift: leisten FALSE FALSE | muster unberuehrt TRUE
+foto: TRUE | ausserhalb -1 -1 | innen TRUE
+pipette: TRUE | fenster weg TRUE
+uebernommen: TRUE | farben 6 -> 7 | 'Farbe hinzufügen' | Bildschirmfarbe #3A6E2A → DMC 905 Parrot Green dark (ΔE 2.1)
+ohne palette: #123456 123456 | Bildschirmfarbe #123456 ist jetzt im Muster.
+zurueck: wie vorher TRUE
+export: '' | gleich dem kern TRUE
+gleiche palette: 6 farben, im muster 6 | schritte 0 | Palette importiert: 6 Farben aus Vorschauprobe
+neue farbe: 1 | im muster 7 Moos symbol M | 'Palette importieren' | Palette importiert: 1 Farben aus Probe
+kaputt: -1 | Die Datei ist keine gültige PySticky-Palettendatei.
+zurueck: wie vorher TRUE
+drucken als pdf: '' | da TRUE | quer TRUE
+druckbild: TRUE
+lage: zelle 51.04 links 39.70 oben 357.33
+rueckstich TRUE
+text TRUE
+pipette TRUE
+pdf: %PDF-
+druck: 794x1123 | volle zellen in ihrer farbe 7 von 9 | rand FFFFFF | raster grau C8C8C8
+datei unveraendert: TRUE
