@@ -800,3 +800,14 @@ FUNCTION kuerzelListe(e AS Einstellungen) AS ARRAY OF STRING
     NEXT
     RETURN aus
 END FUNCTION
+
+' Der Bereich des Zoom-Reglers in Prozent (PySticky ZoomSlider.set_zoom_range):
+' aus den Zellgroessen der Einstellungen, 100 % = Standardzelle. Ein fester
+' Bereich liesse den Regler bei eigenen Groessen etwas anderes zeigen, als die
+' Flaeche tut.
+FUNCTION zoomBereich(e AS Einstellungen) AS TUPLE
+    DIM s AS INTEGER : s = MAX(1, e.zelleStandard)
+    DIM von AS INTEGER : von = MAX(1, ROUND(e.zelleMin * 100.0 / s))
+    DIM bis AS INTEGER : bis = MAX(von + 1, ROUND(e.zelleMax * 100.0 / s))
+    RETURN (von, bis)
+END FUNCTION

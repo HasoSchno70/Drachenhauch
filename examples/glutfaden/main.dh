@@ -158,6 +158,11 @@ DIM fenster AS INTEGER
 DIM kopf AS INTEGER
 DIM zoomText AS INTEGER
 DIM status AS INTEGER
+' Zoom in der Statusleiste (PySticky ZoomSlider): Regler und Prozent, ein
+' Klick auf die Prozent = 100 %
+DIM zoomRegler AS INTEGER
+DIM zoomProzent AS INTEGER
+DIM zoomSperre AS BOOLEAN
 DIM kZurueck AS INTEGER
 DIM kVor AS INTEGER
 DIM kSichern AS INTEGER
@@ -171,10 +176,35 @@ DIM schliessenErlaubt AS BOOLEAN
 
 ' --- Was andere Teile rufen ---------------------------------------------------------
 
+SUB zoomReglerNachziehen()
+    IF zoomRegler = 0 THEN RETURN
+    DIM von AS INTEGER, bis AS INTEGER
+    (von, bis) = kern.zoomBereich(einst)
+    zoomSperre = TRUE
+    gtk_range_set_range(zoomRegler, von, bis)
+    gtk_range_set_value(zoomRegler, leinwandZoomProzent())
+    zoomSperre = FALSE
+    gtk_button_set_label(zoomProzent, STR$(leinwandZoomProzent()) + " %")
+    gtk_widget_set_sensitive(zoomRegler, lwHat)
+    gtk_widget_set_sensitive(zoomProzent, lwHat)
+END SUB
+
+SUB zoomReglerGezogen(regler AS INTEGER, daten AS INTEGER)
+    IF zoomSperre OR NOT lwHat THEN RETURN
+    DIM p AS FLOAT : p = gtk_range_get_value(regler)
+    IF ROUND(p) = leinwandZoomProzent() THEN RETURN
+    leinwandZoomMitte(einst.zelleStandard * p / 100.0 / lwZelle)
+END SUB
+
+SUB zoomProzentGeklickt(k AS INTEGER, daten AS INTEGER)
+    befehlAusfuehren("zoom_100")
+END SUB
+
 ' Statuszeile und Zoom nachfuehren -- die Zeichenflaeche und die Werkzeuge rufen das.
 SUB statusNachziehen()
     IF zoomText = 0 THEN RETURN
     gtk_label_set_text(zoomText, STR$(leinwandZoomProzent()) + " %")
+    zoomReglerNachziehen()
     IF status = 0 THEN RETURN          ' die Werkzeugleiste ruft schon beim Aufbau
     IF NOT lwHat THEN
         ' ohne Muster: nur eine Meldung, solange sie gilt
@@ -780,10 +810,26 @@ gtk_paned_set_position(teilung, MAX(600, fensterBreite - 400))
 status = gtk_label_new("")
 gtk_label_set_xalign(status, 0.0)
 gtk_label_set_ellipsize(status, GTK_ELLIPSE_ENDE)
-gtkKlasse(status, "status")
+gtk_widget_set_hexpand(status, TRUE)
+DIM statuszeile AS INTEGER : statuszeile = gtk_box_new(GTK_WAAGERECHT, 6)
+gtkKlasse(statuszeile, "status")
+zoomRegler = gtk_scale_new_with_range(GTK_WAAGERECHT, 5.0, 300.0, 5.0)
+gtk_scale_set_draw_value(zoomRegler, FALSE)
+gtk_widget_set_size_request(zoomRegler, 120, -1)
+gtk_widget_set_can_focus(zoomRegler, FALSE)
+tipp(zoomRegler, "Zoom")
+signal(zoomRegler, "value-changed", zoomReglerGezogen, 0, 0, 0)
+zoomProzent = gtk_button_new_with_label("100 %")
+gtkKlasse(zoomProzent, "flat")
+gtk_widget_set_can_focus(zoomProzent, FALSE)
+tipp(zoomProzent, "Klicken für 100 % ({zoom_100})")
+signal(zoomProzent, "clicked", zoomProzentGeklickt, 0, 0, 0)
+gtk_box_pack_start(statuszeile, status, TRUE, TRUE, 0)
+gtk_box_pack_start(statuszeile, zoomRegler, FALSE, FALSE, 0)
+gtk_box_pack_start(statuszeile, zoomProzent, FALSE, FALSE, 0)
 gtk_box_pack_start(spalte, werkzeugzeile, FALSE, FALSE, 0)
 gtk_box_pack_start(spalte, teilung, TRUE, TRUE, 0)
-gtk_box_pack_start(spalte, status, FALSE, FALSE, 0)
+gtk_box_pack_start(spalte, statuszeile, FALSE, FALSE, 0)
 gtk_container_add(fenster, spalte)
 
 signal(kUeber, "clicked", ueberGeklickt, 0, 0, 0)
