@@ -10,6 +10,7 @@ IMPORT "bibliothek.dh" AS kern
 IMPORT "stueckliste.dh" AS kern
 IMPORT "netze.dh" AS kern
 IMPORT "erc.dh" AS kern
+IMPORT "hierarchie.dh" AS kern
 IMPORT "netzliste.dh" AS kern
 IMPORT "platine.dh" AS kern
 IMPORT "datei.dh" AS kern

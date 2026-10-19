@@ -51,8 +51,8 @@ FUNCTION ercPruefenDok(dok AS Dokument) AS ARRAY OF Verstoss
         bl = dok.blaetter[bi]
         FOR i = 0 TO LEN(bl.bauteile) - 1
             DIM b AS Bauteil : b = bl.bauteile[i]
-            IF b.sym.fehlt THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Symbol " + b.symbolRef + " fehlt (" + IIF(b.referenz = "", "ohne Referenz", b.referenz) + ")", bi, b.lage.pos.x, b.lage.pos.y))
-            IF b.sym.einheitLeistung THEN CONTINUE
+            IF b.sym.fehlt AND NOT istBlattVerweis(b.symbolRef) THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Symbol " + b.symbolRef + " fehlt (" + IIF(b.referenz = "", "ohne Referenz", b.referenz) + ")", bi, b.lage.pos.x, b.lage.pos.y))
+            IF b.sym.einheitLeistung OR b.sym.blattSymbol OR istBlattVerweis(b.symbolRef) THEN CONTINUE
             IF b.referenz = "" THEN
                 ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, b.sym.name + " ohne Referenz", bi, b.lage.pos.x, b.lage.pos.y))
             ELSEIF MAPHAS(gesehen, b.referenz) THEN
@@ -126,6 +126,8 @@ FUNCTION ercPruefenDok(dok AS Dokument) AS ARRAY OF Verstoss
         IF lEin >= 1 AND lAus + quelle = 0 THEN ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Netz " + nz.name + ": Versorgungseingang ohne Versorgung", ob, ox, oy))
     NEXT
 
+    ercHierarchie(dok, fehler, warnungen)
+
     ' --- globale Labels, die nur einmal vorkommen, verbinden nichts
     DIM globAnzahl AS MAP OF INTEGER
     FOR bi = 0 TO LEN(dok.blaetter) - 1
@@ -149,7 +151,7 @@ FUNCTION ercPruefenDok(dok AS Dokument) AS ARRAY OF Verstoss
         ' --- Bauteil kurzgeschlossen: zwei Pins desselben Bauteils im selben Netz
         FOR i = 0 TO LEN(bl.bauteile) - 1
             DIM bt AS Bauteil : bt = bl.bauteile[i]
-            IF bt.sym.einheitLeistung THEN CONTINUE
+            IF bt.sym.einheitLeistung OR bt.sym.blattSymbol THEN CONTINUE
             DIM nachNetz AS MAP OF INTEGER
             MAPCLEAR(nachNetz)
             FOR j = 0 TO LEN(bt.sym.pins) - 1

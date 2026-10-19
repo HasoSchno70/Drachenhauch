@@ -101,7 +101,7 @@ FUNCTION stuecklisteDok(dok AS Dokument) AS ARRAY OF BomZeile
     FOR bi = 0 TO LEN(dok.blaetter) - 1
     FOR i = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
         DIM b AS Bauteil : b = dok.blaetter[bi].bauteile[i]
-        IF b.sym.einheitLeistung THEN CONTINUE
+        IF b.sym.einheitLeistung OR b.sym.blattSymbol THEN CONTINUE
         DIM k AS STRING : k = b.sym.id + CHR$(1) + b.wert + CHR$(1) + b.gehaeuse + CHR$(1) + b.bestellnr
         DIM zi AS INTEGER
         IF MAPHAS(nachSchluessel, k) THEN

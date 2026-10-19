@@ -29,6 +29,7 @@ CONST K_V = &H76
 CONST K_X = &H78
 CONST K_T = &H74
 CONST K_B = &H62
+CONST K_H = &H68
 CONST K_BILD_AUF = &HFF55              ' GDK_KEY_Page_Up
 CONST K_BILD_AB = &HFF56
 
@@ -259,6 +260,7 @@ SUB werkzeugWaehlen(wz AS INTEGER, ref AS STRING)
 END SUB
 
 SUB geaendert()
+    kern.blattSymboleAktualisieren(gDok)   ' Ports folgen den Labels der Unterblaetter
     netzeVeraltet()
     gGeaendert = TRUE
     titelNachziehen()
@@ -431,6 +433,18 @@ SUB labelsGlobalUmschalten()
     geaendert()
 END SUB
 
+' H: die gewaehlten Labels zwischen lokal und hierarchisch umschalten. Ein
+' hierarchisches Label ist ein Port: im Elternblatt erscheint es am Blattsymbol.
+SUB labelsHierUmschalten()
+    IF LEN(gSelL) = 0 THEN RETURN
+    verlaufMerken()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gSelL) - 1
+        gSelL[i].art = IIF(gSelL[i].art = kern.LA_HIER, kern.LA_LOKAL, kern.LA_HIER)
+    NEXT
+    geaendert()
+END SUB
+
 SUB labelSetzen()
     ' Position VOR dem Dialog festhalten: waehrend er offen ist, koennen
     ' Mausereignisse gMausWX/WY schon verschieben.
@@ -494,6 +508,12 @@ SUB auswahlBearbeiten()
     ELSEIF gHatLabel OR gHatDraht THEN
         umbenennenAuswahl()
     ELSEIF gHatGewaehlt THEN
+        ' ein Blattsymbol oeffnet sein Unterblatt
+        IF gGewaehlt.sym.blattSymbol THEN
+            DIM ki AS INTEGER : ki = kern.kindIndex(gDok, gGewaehlt)
+            IF ki >= 0 THEN blattWechseln(ki)
+            RETURN
+        END IF
         eigenschaftenDialog(gGewaehlt)
     END IF
 END SUB
@@ -770,6 +790,8 @@ FUNCTION lwTaste(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
             umbenennenAuswahl()
         CASE K_G
             labelsGlobalUmschalten()
+        CASE K_H
+            labelsHierUmschalten()
         CASE K_R
             auswahlDrehen()
         CASE K_X

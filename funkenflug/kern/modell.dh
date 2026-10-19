@@ -95,6 +95,8 @@ CLASS Symbol
     DIM pins AS ARRAY OF Pin
     DIM grafik AS ARRAY OF Primitiv
     DIM einheitLeistung AS BOOLEAN    ' Leistungssymbol (GND/VCC): kein sichtbarer Wert
+    DIM blattSymbol AS BOOLEAN        ' Blattsymbol eines Unterblatts (kein Bauteil)
+    DIM blattKind AS STRING           ' dessen Blatt-Id
     ' eigene Symbole (Symbol-Editor)
     DIM eigen AS BOOLEAN              ' vom Nutzer, wird in der .fkn mitgespeichert
     DIM fehlt AS BOOLEAN              ' Platzhalter: das Symbol ist nirgends zu finden

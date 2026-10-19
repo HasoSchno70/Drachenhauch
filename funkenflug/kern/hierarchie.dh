@@ -1,0 +1,200 @@
+' Hierarchische Blaetter -- Namensraum "kern".
+'
+' Ein Unterblatt wird im Elternblatt als Blattsymbol eingesetzt: ein Bauteil
+' mit dem Verweis "#BLATT:<Blatt-Id>". Sein Symbol wird NICHT gespeichert,
+' sondern jedes Mal aus den hierarchischen Labels des Unterblatts erzeugt --
+' ein Port je Label-Name. So gibt es keine zweite Port-Liste, die mit dem
+' Unterblatt auseinanderlaufen kann (SparkNode hielt beides getrennt).
+'
+' Verbunden wird ueber den Namen: der Port im Elternblatt und alle
+' hierarchischen Labels gleichen Namens im Unterblatt sind ein Netz.
+' Bewusst einfach: ein Blatt steckt hoechstens EINMAL als Unterblatt in einem
+' anderen (keine Mehrfach-Instanzen mit Referenz-Pfaden); der ERC meldet
+' Doppeltes, Zyklen und fehlende Unterblaetter.
+'
+' Seite eines Ports nach der Richtung des Labels im Unterblatt: Text nach
+' rechts (0) -> links am Symbol, nach links (180) -> rechts, nach oben (270)
+' -> unten, nach unten (90) -> oben.
+
+CONST BLATT_VORSATZ = "#BLATT:"
+
+FUNCTION istBlattVerweis(ref AS STRING) AS BOOLEAN
+    RETURN STARTSWITH(ref, BLATT_VORSATZ)
+END FUNCTION
+
+FUNCTION blattIndexMitId(dok AS Dokument, id AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(dok.blaetter) - 1
+        IF dok.blaetter[i].id = id THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Index des Unterblatts, auf das ein Blattsymbol zeigt (-1 = fehlt/kein Verweis).
+FUNCTION kindIndex(dok AS Dokument, b AS Bauteil) AS INTEGER
+    IF NOT istBlattVerweis(b.symbolRef) THEN RETURN -1
+    RETURN blattIndexMitId(dok, MID$(b.symbolRef, LEN(BLATT_VORSATZ)))
+END FUNCTION
+
+' Die Ports eines Blatts: Namen der hierarchischen Labels (je Name einmal,
+' in Reihenfolge des Auftretens) und ihre Seite.
+SUB blattPorts(kind AS Blatt, BYREF namen AS ARRAY OF STRING, BYREF seiten AS ARRAY OF STRING)
+    namen = []
+    seiten = []
+    DIM da AS MAP OF INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(kind.labels) - 1
+        DIM la AS Label : la = kind.labels[i]
+        IF la.art <> LA_HIER OR MAPHAS(da, la.text) THEN CONTINUE
+        MAPPUT(da, la.text, 1)
+        ARRAY_PUSH(namen, la.text)
+        SELECT CASE la.drehung
+            CASE 180 : ARRAY_PUSH(seiten, "rechts")
+            CASE 270 : ARRAY_PUSH(seiten, "unten")
+            CASE 90 : ARRAY_PUSH(seiten, "oben")
+            CASE ELSE : ARRAY_PUSH(seiten, "links")
+        END SELECT
+    NEXT
+END SUB
+
+' Das Symbol eines Blattsymbols: Rechteck mit innerer Linie, ein Port je Name.
+FUNCTION blattSymbolErzeugen(kind AS Blatt) AS Symbol
+    DIM namen AS ARRAY OF STRING, seiten AS ARRAY OF STRING
+    blattPorts(kind, namen, seiten)
+    ' der Generator braucht Woerter ohne Leerzeichen -- Platzhalter gleicher
+    ' Laenge, die echten Namen kommen danach hinein
+    DIM t AS STRING : t = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(namen) - 1
+        t = t + "P" + STR$(i + 1) + " " + REPLACE$(namen[i], " ", "_") + " " + seiten[i] + CHR$(10)
+    NEXT
+    DIM s AS Symbol : s = icErzeugen(BLATT_VORSATZ + kind.id, "Unterblatt", "", "", t)
+    s.eigen = FALSE
+    s.quelltext = ""
+    s.blattSymbol = TRUE
+    s.blattKind = kind.id
+    s.beschreibung = "Unterblatt " + kind.name
+    FOR i = 0 TO LEN(s.pins) - 1
+        s.pins[i].name = namen[i]
+        s.pins[i].nummer = namen[i]
+        s.pins[i].zeigeNummer = FALSE
+    NEXT
+    ' innere Linie: ein Blattsymbol sieht man auf einen Blick
+    IF LEN(s.grafik) > 0 AND s.grafik[0].art = PR_RECHTECK THEN
+        DIM r AS Primitiv : r = s.grafik[0]
+        s.grafikHinzu(prRechteck(r.punkte[0].x + 40, r.punkte[0].y + 40, r.punkte[1].x - 40, r.punkte[1].y - 40))
+    END IF
+    RETURN s
+END FUNCTION
+
+' Symbole und Referenzen aller Blattsymbole neu erzeugen (nach Laden und
+' jeder Aenderung): Referenz = Name des Unterblatts.
+SUB blattSymboleAktualisieren(dok AS Dokument)
+    DIM bi AS INTEGER, i AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        FOR i = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
+            DIM b AS Bauteil : b = dok.blaetter[bi].bauteile[i]
+            IF NOT istBlattVerweis(b.symbolRef) THEN CONTINUE
+            DIM ki AS INTEGER : ki = kindIndex(dok, b)
+            IF ki < 0 THEN
+                IF NOT b.sym.fehlt THEN
+                    b.sym = symbolPlatzhalter(b.symbolRef)
+                    b.sym.name = "Unterblatt fehlt"
+                    b.sym.blattSymbol = TRUE
+                END IF
+            ELSE
+                b.sym = blattSymbolErzeugen(dok.blaetter[ki])
+                b.referenz = dok.blaetter[ki].name
+                b.wert = ""
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+' Ports mit den hierarchischen Labels der Unterblaetter verbinden.
+SUB portsVerbinden(dok AS Dokument, n AS Netze)
+    DIM bi AS INTEGER, i AS INTEGER, j AS INTEGER, k AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        FOR i = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
+            DIM b AS Bauteil : b = dok.blaetter[bi].bauteile[i]
+            IF NOT b.sym.blattSymbol OR b.sym.fehlt THEN CONTINUE
+            DIM ki AS INTEGER : ki = kindIndex(dok, b)
+            IF ki < 0 THEN CONTINUE
+            FOR j = 0 TO LEN(b.sym.pins) - 1
+                DIM pp AS Punkt : pp = b.pinPunkt(j)
+                n.blattWaehlen(bi)
+                DIM pidx AS INTEGER : pidx = n.punkt(pp.x, pp.y)
+                n.blattWaehlen(ki)
+                FOR k = 0 TO LEN(dok.blaetter[ki].labels) - 1
+                    DIM la AS Label : la = dok.blaetter[ki].labels[k]
+                    IF la.art = LA_HIER AND la.text = b.sym.pins[j].name THEN n.eins(pidx, n.punkt(la.anker.x, la.anker.y))
+                NEXT
+            NEXT
+        NEXT
+    NEXT
+END SUB
+
+' In welchem Blatt steckt Blatt bi als Unterblatt? -1 = in keinem (Wurzel).
+FUNCTION elternVon(dok AS Dokument, bi AS INTEGER) AS INTEGER
+    DIM ei AS INTEGER, i AS INTEGER
+    FOR ei = 0 TO LEN(dok.blaetter) - 1
+        FOR i = 0 TO LEN(dok.blaetter[ei].bauteile) - 1
+            IF kindIndex(dok, dok.blaetter[ei].bauteile[i]) = bi THEN RETURN ei
+        NEXT
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' "Haupt > Netzteil > Regler" -- hoechstens so tief, wie es Blaetter gibt
+' (ein Zyklus haengt sonst; den meldet der ERC).
+FUNCTION blattPfad$(dok AS Dokument, bi AS INTEGER) AS STRING
+    DIM t AS STRING : t = dok.blaetter[bi].name
+    DIM e AS INTEGER : e = elternVon(dok, bi)
+    DIM schritte AS INTEGER : schritte = 0
+    WHILE e >= 0 AND schritte < LEN(dok.blaetter)
+        t = dok.blaetter[e].name + " > " + t
+        e = elternVon(dok, e)
+        schritte = schritte + 1
+    WEND
+    RETURN t
+END FUNCTION
+
+' ERC der Hierarchie: mehrfach eingesetzt, Zyklus, fehlendes Unterblatt,
+' hierarchische Labels auf einem Blatt, das nirgends eingesetzt ist.
+SUB ercHierarchie(dok AS Dokument, BYREF fehler AS ARRAY OF Verstoss, BYREF warnungen AS ARRAY OF Verstoss)
+    DIM bi AS INTEGER, i AS INTEGER
+    DIM wie AS MAP OF INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        FOR i = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
+            DIM b AS Bauteil : b = dok.blaetter[bi].bauteile[i]
+            IF NOT istBlattVerweis(b.symbolRef) THEN CONTINUE
+            DIM ki AS INTEGER : ki = kindIndex(dok, b)
+            IF ki < 0 THEN
+                ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Unterblatt fehlt -- das Blatt wurde geloescht (Blattsymbol " + b.referenz + ")", bi, b.lage.pos.x, b.lage.pos.y))
+                CONTINUE
+            END IF
+            DIM k AS STRING : k = STR$(ki)
+            MAPPUT(wie, k, MAPGETOR(wie, k, 0) + 1)
+            IF MAPGET(wie, k) = 2 THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Blatt " + dok.blaetter[ki].name + " ist mehrfach als Unterblatt eingesetzt -- Mehrfach-Instanzen gibt es nicht", bi, b.lage.pos.x, b.lage.pos.y))
+            IF ki = bi THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Blatt " + dok.blaetter[bi].name + " enthaelt sich selbst als Unterblatt", bi, b.lage.pos.x, b.lage.pos.y))
+        NEXT
+    NEXT
+    ' Zyklen ueber mehrere Ebenen
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        DIM e AS INTEGER : e = elternVon(dok, bi)
+        DIM schritte AS INTEGER : schritte = 0
+        WHILE e >= 0 AND e <> bi AND schritte <= LEN(dok.blaetter)
+            e = elternVon(dok, e)
+            schritte = schritte + 1
+        WEND
+        IF e = bi AND elternVon(dok, bi) <> bi THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Blatt " + dok.blaetter[bi].name + " steckt ueber mehrere Ebenen in sich selbst", bi, 0, 0))
+    NEXT
+    ' hierarchische Labels auf einem Wurzelblatt verbinden nichts
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        IF elternVon(dok, bi) >= 0 THEN CONTINUE
+        FOR i = 0 TO LEN(dok.blaetter[bi].labels) - 1
+            DIM la AS Label : la = dok.blaetter[bi].labels[i]
+            IF la.art = LA_HIER THEN ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Hierarchisches Label " + la.text + ": das Blatt " + dok.blaetter[bi].name + " ist nirgends als Unterblatt eingesetzt", bi, la.anker.x, la.anker.y))
+        NEXT
+    NEXT
+END SUB

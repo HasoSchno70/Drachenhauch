@@ -38,12 +38,21 @@ CLASS Netz
     DIM labelNamen AS ARRAY OF STRING ' verschiedene Label-Texte an diesem Netz
     DIM globaleNamen AS ARRAY OF STRING
     DIM versorgungen AS ARRAY OF STRING
+    DIM hierNamen AS ARRAY OF STRING  ' hierarchische Labels (zuletzt im Rang)
     SUB Init()
         pins = []
         labelNamen = []
         globaleNamen = []
         versorgungen = []
+        hierNamen = []
         blatt = -1
+    END SUB
+    SUB hierDazu(t AS STRING)
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(hierNamen) - 1
+            IF hierNamen[i] = t THEN RETURN
+        NEXT
+        ARRAY_PUSH(hierNamen, t)
     END SUB
     SUB labelDazu(t AS STRING, global AS BOOLEAN)
         DIM i AS INTEGER
@@ -265,10 +274,12 @@ FUNCTION netzeDokument(dok AS Dokument) AS Netze
     DIM n AS Netze : n = NEW Netze()
     DIM global AS MAP OF INTEGER
     DIM bi AS INTEGER
+    blattSymboleAktualisieren(dok)
     FOR bi = 0 TO LEN(dok.blaetter) - 1
         n.blattWaehlen(bi)
         blattVerbinden(dok.blaetter[bi], n, global)
     NEXT
+    portsVerbinden(dok, n)
     netzeBenennen(dok, n)
     n.blattWaehlen(0)
     RETURN n
@@ -294,6 +305,8 @@ SUB netzeBenennen(dok AS Dokument, n AS Netze)
         n.blattWaehlen(bi)
         FOR i = 0 TO LEN(bl.bauteile) - 1
             DIM b AS Bauteil : b = bl.bauteile[i]
+            ' ein Blattsymbol ist kein Bauteil: seine Ports verbinden nur
+            IF b.sym.blattSymbol THEN CONTINUE
             FOR j = 0 TO LEN(b.sym.pins) - 1
                 DIM pp AS Punkt : pp = b.pinPunkt(j)
                 ni = n.netzFuerWurzel(n.wurzelAn(pp.x, pp.y))
@@ -316,10 +329,15 @@ SUB netzeBenennen(dok AS Dokument, n AS Netze)
         FOR i = 0 TO LEN(bl.labels) - 1
             ni = n.netzFuerWurzel(n.wurzelAn(bl.labels[i].anker.x, bl.labels[i].anker.y))
             IF n.liste[ni].blatt < 0 THEN n.liste[ni].blatt = bi
-            n.liste[ni].labelDazu(bl.labels[i].text, bl.labels[i].art = LA_GLOBAL)
+            IF bl.labels[i].art = LA_HIER THEN
+                n.liste[ni].hierDazu(bl.labels[i].text)
+            ELSE
+                n.liste[ni].labelDazu(bl.labels[i].text, bl.labels[i].art = LA_GLOBAL)
+            END IF
         NEXT
     NEXT
-    ' Namen: Versorgung > globales Label > lokales Label > automatisch.
+    ' Namen: Versorgung > globales > lokales > hierarchisches Label (der Name
+    ' im Elternblatt geht vor dem Port-Namen) > automatisch.
     DIM lokalerName AS ARRAY OF BOOLEAN : lokalerName = []
     DIM zahl AS MAP OF INTEGER
     FOR i = 0 TO LEN(n.liste) - 1
@@ -331,6 +349,9 @@ SUB netzeBenennen(dok AS Dokument, n AS Netze)
             nz.name = nz.globaleNamen[0]
         ELSEIF LEN(nz.labelNamen) > 0 THEN
             nz.name = nz.labelNamen[0]
+            lok = TRUE
+        ELSEIF LEN(nz.hierNamen) > 0 THEN
+            nz.name = nz.hierNamen[0]
             lok = TRUE
         END IF
         ARRAY_PUSH(lokalerName, lok)

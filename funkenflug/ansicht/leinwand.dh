@@ -283,7 +283,7 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
         bauteilZeichnen(cr, geist, TRUE, FALSE)
     END IF
     IF gWerkzeug = WZ_LABEL AND gMausDrin THEN
-        labelZeichnen(cr, sx(gMausWX), sy(gMausWY), "Label", C_GEIST, gLabelGlobal, gLabelDreh)
+        labelZeichnen(cr, sx(gMausWX), sy(gMausWY), "Label", C_GEIST, IIF(gLabelGlobal, kern.LA_GLOBAL, kern.LA_LOKAL), gLabelDreh)
     END IF
     ' Fang-Markierung
     IF gMausDrin AND (gWerkzeug = WZ_DRAHT OR gWerkzeug = WZ_LABEL) THEN
@@ -333,7 +333,7 @@ SUB inhaltZeichnen(cr AS INTEGER)
     NEXT
     FOR i = 0 TO LEN(gBlatt.labels) - 1
         DIM lgew AS BOOLEAN : lgew = NOT gDruck AND istGewaehltL(gBlatt.labels[i])
-        labelZeichnen(cr, sx(gBlatt.labels[i].anker.x), sy(gBlatt.labels[i].anker.y), gBlatt.labels[i].text, IIF(lgew, C_AUSWAHL, C_LABEL), gBlatt.labels[i].art = kern.LA_GLOBAL, gBlatt.labels[i].drehung)
+        labelZeichnen(cr, sx(gBlatt.labels[i].anker.x), sy(gBlatt.labels[i].anker.y), gBlatt.labels[i].text, IIF(lgew, C_AUSWAHL, C_LABEL), gBlatt.labels[i].art, gBlatt.labels[i].drehung)
     NEXT
 END SUB
 
@@ -366,7 +366,7 @@ FUNCTION labelLaenge(text AS STRING, global AS BOOLEAN) AS FLOAT
     RETURN LABEL_DX + LEN(kern.sichtbarerText$(text)) * LABEL_ZEICHEN + IIF(global, 10, 0)
 END FUNCTION
 
-SUB labelZeichnen(cr AS INTEGER, ax AS FLOAT, ay AS FLOAT, text AS STRING, farbe AS INTEGER, global AS BOOLEAN, dreh AS INTEGER)
+SUB labelZeichnen(cr AS INTEGER, ax AS FLOAT, ay AS FLOAT, text AS STRING, farbe AS INTEGER, art AS INTEGER, dreh AS INTEGER)
     zeichenFarbe(cr, farbe)
     ' der Anker-Punkt nur am Bildschirm: auf Papier hiesse ein Punkt "Knoten"
     IF NOT gDruck THEN
@@ -382,7 +382,18 @@ SUB labelZeichnen(cr AS INTEGER, ax AS FLOAT, ay AS FLOAT, text AS STRING, farbe
     cairo_set_line_width(cr, 1.2)
     DIM breite AS FLOAT : breite = LABEL_DX + textBreite(cr, text, gSchrift, TRUE)
     DIM ausr AS INTEGER : ausr = IIF(s > 0, 0, 2)
-    IF global THEN
+    IF art = kern.LA_HIER THEN
+        ' hierarchisch (Port zum Elternblatt): Kasten, mit einem Keil am Anker
+        DIM ho AS FLOAT : ho = -2 * LABEL_DY - 2
+        cairo_rectangle(cr, IIF(s > 0, 6, -(breite + 8)), ho, breite + 2, -ho)
+        cairo_stroke(cr)
+        cairo_move_to(cr, 0, 0)
+        cairo_line_to(cr, s * 6, 0)
+        cairo_line_to(cr, s * 6, ho)
+        cairo_close_path(cr)
+        cairo_fill(cr)
+        lwTextAusU(cr, s * (LABEL_DX + 4), -LABEL_DY, text, farbe, ausr, gSchrift, TRUE)
+    ELSEIF art = kern.LA_GLOBAL THEN
         DIM oben AS FLOAT : oben = -2 * LABEL_DY - 2
         cairo_move_to(cr, 0, 0)
         cairo_line_to(cr, s * 8, oben)
@@ -404,7 +415,7 @@ END SUB
 SUB labelRechteck(la AS kern.Label, BYREF x0 AS FLOAT, BYREF y0 AS FLOAT, BYREF x1 AS FLOAT, BYREF y1 AS FLOAT)
     DIM ax AS FLOAT : ax = sx(la.anker.x)
     DIM ay AS FLOAT : ay = sy(la.anker.y)
-    DIM l AS FLOAT : l = labelLaenge(la.text, la.art = kern.LA_GLOBAL) + 6
+    DIM l AS FLOAT : l = labelLaenge(la.text, la.art <> kern.LA_LOKAL) + 6
     DIM t AS FLOAT : t = 2 * LABEL_DY + 4
     SELECT CASE la.drehung
         CASE 180 : x0 = ax - l : x1 = ax + 6 : y0 = ay - t : y1 = ay + 6
@@ -792,7 +803,9 @@ SUB pinTexteZeichnen(cr AS INTEGER, b AS kern.Bauteil, geist AS BOOLEAN)
         ' Nummer an der Mitte des Stummels
         DIM mx AS FLOAT : mx = sx(p.x + dx * pin.laenge / 2.0)
         DIM my AS FLOAT : my = sy(p.y + dy * pin.laenge / 2.0)
-        IF dy = 0 THEN
+        IF NOT pin.zeigeNummer THEN
+            ' (Ports eines Blattsymbols: die Nummer ist der Name)
+        ELSEIF dy = 0 THEN
             lwTextAus(cr, mx, my - px * 0.6, pin.nummer, fNr, 1, gSchriftPin)
         ELSE
             lwTextAus(cr, mx + 3, my, pin.nummer, fNr, 0, gSchriftPin)

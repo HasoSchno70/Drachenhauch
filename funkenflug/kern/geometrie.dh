@@ -38,6 +38,7 @@ CONST PR_TEXT = 5
 CONST LA_LOKAL = 0
 CONST LA_GLOBAL = 1
 CONST LA_LEISTUNG = 2
+CONST LA_HIER = 3                 ' hierarchisch: Port zum Elternblatt
 
 CLASS Punkt
     DIM x AS INTEGER

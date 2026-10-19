@@ -9,6 +9,8 @@ DIM gReiter AS INTEGER            ' das GtkNotebook
 DIM gReiterBauen AS BOOLEAN       ' waehrend des Neuaufbaus: Seitenwechsel ignorieren
 DIM gBlattMenue AS INTEGER
 DIM gBlattMenueNeu AS INTEGER
+DIM gBlattMenueUnter AS INTEGER
+DIM gBlattMenueEltern AS INTEGER
 
 FUNCTION reiterNeu() AS INTEGER
     gReiter = gtk_notebook_new()
@@ -29,7 +31,9 @@ SUB reiterAktualisieren()
     DIM i AS INTEGER
     FOR i = 0 TO LEN(gDok.blaetter) - 1
         DIM leer AS INTEGER : leer = gtk_box_new(GTK_WAAGERECHT, 0)
-        DIM r AS INTEGER : r = gtk_notebook_append_page(gReiter, leer, gtk_label_new(gDok.blaetter[i].name))
+        ' Unterblaetter mit Pfeil davor: die Ebene sieht man im Reiter
+        DIM rn AS STRING : rn = IIF(kern.elternVon(gDok, i) >= 0, "> " + gDok.blaetter[i].name, gDok.blaetter[i].name)
+        DIM r AS INTEGER : r = gtk_notebook_append_page(gReiter, leer, gtk_label_new(rn))
     NEXT
     gtk_widget_show_all(gReiter)
     gtk_notebook_set_current_page(gReiter, aktuellerBlattIndex())
@@ -104,7 +108,9 @@ SUB blattLoeschen()
     END IF
     DIM i AS INTEGER : i = aktuellerBlattIndex()
     IF LEN(gBlatt.bauteile) + LEN(gBlatt.draehte) + LEN(gBlatt.labels) > 0 THEN
-        IF NOT bestaetigen("Blatt loeschen?", "Das Blatt " + gBlatt.name + " ist nicht leer." + CHR$(10) + "Es laesst sich mit Rueckgaengig zurueckholen.", "Loeschen") THEN RETURN
+        DIM zusatz AS STRING : zusatz = ""
+        IF kern.elternVon(gDok, i) >= 0 THEN zusatz = CHR$(10) + "Es ist ein Unterblatt -- sein Blattsymbol bleibt rot stehen, bis Sie es loeschen."
+        IF NOT bestaetigen("Blatt loeschen?", "Das Blatt " + gBlatt.name + " ist nicht leer." + zusatz + CHR$(10) + "Es laesst sich mit Rueckgaengig zurueckholen.", "Loeschen") THEN RETURN
     END IF
     verlaufMerken()
     ARRAY_REMOVE_AT(gDok.blaetter, i)
@@ -112,6 +118,51 @@ SUB blattLoeschen()
     auswahlAufheben()
     reiterAktualisieren()
     geaendert()
+END SUB
+
+' Ein neues Blatt als Unterblatt des aktuellen: es bekommt ein Blattsymbol in
+' der Mitte des Ausschnitts. Seine Ports entstehen aus den hierarchischen
+' Labels (H), die man im Unterblatt setzt. Ein Rueckgaengig-Schritt.
+SUB blattUnterEinsetzen()
+    DIM k AS INTEGER : k = LEN(gDok.blaetter) + 1
+    WHILE NOT blattNameFrei("Blatt" + STR$(k), -1)
+        k = k + 1
+    WEND
+    DIM name AS STRING : name = TRIM$(textAbfrage$("Unterblatt einsetzen", "Name des Unterblatts:", "Blatt" + STR$(k)))
+    IF name = "" THEN RETURN
+    IF CONTAINS(name, "/") THEN
+        meldung("Ein Blattname darf kein / enthalten (er steht vor lokalen Netznamen).")
+        RETURN
+    END IF
+    IF NOT blattNameFrei(name, -1) THEN
+        meldung("Ein Blatt namens " + name + " gibt es schon.")
+        RETURN
+    END IF
+    verlaufMerken()
+    DIM kind AS kern.Blatt : kind = NEW kern.Blatt(name)
+    ARRAY_PUSH(gDok.blaetter, kind)
+    DIM mx AS INTEGER : mx = kern.rastern(ROUND(weltX(gtk_widget_get_allocated_width(gFlaeche) / 2.0)), kern.RASTER)
+    DIM my AS INTEGER : my = kern.rastern(ROUND(weltY(gtk_widget_get_allocated_height(gFlaeche) / 2.0)), kern.RASTER)
+    DIM bs AS kern.Bauteil : bs = kern.neuesBauteil(kern.BLATT_VORSATZ + kind.id, NEW kern.Lage(NEW kern.Punkt(mx, my), 0, FALSE))
+    ARRAY_PUSH(gBlatt.bauteile, bs)
+    kern.blattSymboleAktualisieren(gDok)
+    reiterAktualisieren()
+    waehleB(bs)
+    geaendert()
+END SUB
+
+' Zurueck ins Blatt, in dem das aktuelle als Unterblatt steckt.
+SUB blattZumEltern()
+    DIM e AS INTEGER : e = kern.elternVon(gDok, aktuellerBlattIndex())
+    IF e >= 0 THEN blattWechseln(e)
+END SUB
+
+SUB aufMenueBlattUnter(e AS INTEGER, d AS INTEGER)
+    blattUnterEinsetzen()
+END SUB
+
+SUB aufMenueBlattEltern(e AS INTEGER, d AS INTEGER)
+    blattZumEltern()
 END SUB
 
 SUB aufMenueBlattNeu(e AS INTEGER, d AS INTEGER)
@@ -130,6 +181,10 @@ SUB blattMenueBauen()
     gBlattMenue = gtk_menu_new()
     gBlattMenueNeu = menueEintrag(gBlattMenue, "Neues Blatt")
     signal(gBlattMenueNeu, "activate", aufMenueBlattNeu, 0, 0, 0)
+    gBlattMenueUnter = menueEintrag(gBlattMenue, "Unterblatt einsetzen ...")
+    signal(gBlattMenueUnter, "activate", aufMenueBlattUnter, 0, 0, 0)
+    gBlattMenueEltern = menueEintrag(gBlattMenue, "Zum Elternblatt")
+    signal(gBlattMenueEltern, "activate", aufMenueBlattEltern, 0, 0, 0)
     signal(menueEintrag(gBlattMenue, "Blatt umbenennen ..."), "activate", aufMenueBlattUmbenennen, 0, 0, 0)
     gtk_menu_shell_append(gBlattMenue, gtk_separator_menu_item_new())
     signal(menueEintrag(gBlattMenue, "Blatt loeschen ..."), "activate", aufMenueBlattLoeschen, 0, 0, 0)

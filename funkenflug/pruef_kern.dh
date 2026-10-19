@@ -560,6 +560,78 @@ PRINT pal
 ARRAY_REMOVE_AT(pbl.bauteile, 1)
 PRINT "Abgleich nach Loeschen von D1: "; kern.platineAbgleichen(pdok); " entfernt, "; LEN(pdok.platine.teile); " bleiben  (erwartet 1 entfernt, 2 bleiben)"
 
+' --- Hierarchische Blaetter
+DIM hd AS kern.Dokument : hd = NEW kern.Dokument()
+hd.blaetter[0].name = "Haupt"
+DIM hk AS kern.Blatt : hk = NEW kern.Blatt("Takt")
+ARRAY_PUSH(hd.blaetter, hk)
+DIM hr2 AS kern.Bauteil : hr2 = kern.neuesBauteil("R", kern.neueLage(1000, 0))
+hr2.referenz = "R2"
+ARRAY_PUSH(hk.bauteile, hr2)
+DIM hl1 AS kern.Label : hl1 = NEW kern.Label("CLK", NEW kern.Punkt(800, 0), kern.LA_HIER)
+ARRAY_PUSH(hk.labels, hl1)
+DIM hl2 AS kern.Label : hl2 = NEW kern.Label("EN", NEW kern.Punkt(1200, 0), kern.LA_HIER)
+hl2.drehung = 180
+ARRAY_PUSH(hk.labels, hl2)
+DIM hr1 AS kern.Bauteil : hr1 = kern.neuesBauteil("R", kern.neueLage(0, 0))
+hr1.referenz = "R1"
+ARRAY_PUSH(hd.blaetter[0].bauteile, hr1)
+DIM hs AS kern.Bauteil : hs = kern.neuesBauteil(kern.BLATT_VORSATZ + hk.id, kern.neueLage(2000, 0))
+ARRAY_PUSH(hd.blaetter[0].bauteile, hs)
+kern.blattSymboleAktualisieren(hd)
+PRINT "Blattsymbol: "; hs.sym.blattSymbol; " Ref "; hs.referenz; " Ports "; LEN(hs.sym.pins); " "; hs.sym.pins[0].name; " Richtung "; hs.sym.pins[0].richtung; " "; hs.sym.pins[1].name; " Richtung "; hs.sym.pins[1].richtung; "  (erwartet TRUE Ref Takt Ports 2 CLK Richtung 0 EN Richtung 180)"
+DIM hp AS kern.Punkt : hp = hs.pinPunkt(0)
+DIM hw AS kern.Draht : hw = NEW kern.Draht()
+ARRAY_PUSH(hw.punkte, NEW kern.Punkt(200, 0))
+ARRAY_PUSH(hw.punkte, NEW kern.Punkt(200, hp.y))
+ARRAY_PUSH(hw.punkte, NEW kern.Punkt(hp.x, hp.y))
+ARRAY_PUSH(hd.blaetter[0].draehte, hw)
+DIM hn AS kern.Netze : hn = kern.netzeDokument(hd)
+hn.blattWaehlen(1)
+PRINT "Port verbindet ueber die Blattgrenze: "; hn.gleichUeber(0, 200, 0, 1, 800, 0); "  Name "; hn.liste[hn.netzAn(800, 0)].name; "  echte Pins "; hn.liste[hn.netzAn(800, 0)].echtePins(); "  (erwartet TRUE  Name CLK  echte Pins 2)"
+ARRAY_PUSH(hd.blaetter[0].labels, NEW kern.Label("TAKT", NEW kern.Punkt(200, 0), kern.LA_LOKAL))
+hn = kern.netzeDokument(hd)
+hn.blattWaehlen(1)
+PRINT "Label im Elternblatt geht vor: "; hn.liste[hn.netzAn(800, 0)].name; "  (erwartet TAKT)"
+DIM hsp AS STRING : hsp = kern.netzlisteSpiceDok$(hd, "H")
+PRINT "SPICE: R2 an TAKT "; CONTAINS(hsp, "R2 TAKT EN 1k"); "  kein Blattsymbol als Bauteil "; NOT CONTAINS(hsp, CHR$(10) + "Takt"); "  Stueckliste "; kern.stuecklisteDok(hd)[0].menge; " Positionen "; LEN(kern.stuecklisteDok(hd)); "  Platine "; LEN(kern.platinenBauteile(hd)); "  (erwartet TRUE  TRUE  Stueckliste 2 Positionen 1  Platine 2)"
+DIM hev AS ARRAY OF kern.Verstoss : hev = kern.ercPruefenDok(hd)
+DIM hfz AS INTEGER : hfz = 0
+DIM hvi AS INTEGER
+FOR hvi = 0 TO LEN(hev) - 1
+    IF hev[hvi].schwere = kern.ERC_FEHLER THEN hfz = hfz + 1
+NEXT
+PRINT "ERC sauber: "; hfz; " Fehler  Pfad "; kern.blattPfad$(hd, 1); "  (erwartet 0 Fehler  Pfad Haupt > Takt)"
+' zweimal eingesetzt, hierarchisches Label auf dem Wurzelblatt
+DIM hs2 AS kern.Bauteil : hs2 = kern.neuesBauteil(kern.BLATT_VORSATZ + hk.id, kern.neueLage(5000, 0))
+ARRAY_PUSH(hd.blaetter[0].bauteile, hs2)
+ARRAY_PUSH(hd.blaetter[0].labels, NEW kern.Label("WURZEL", NEW kern.Punkt(9000, 9000), kern.LA_HIER))
+DIM het AS STRING : het = ""
+hev = kern.ercPruefenDok(hd)
+FOR hvi = 0 TO LEN(hev) - 1
+    het = het + hev[hvi].text + "|"
+NEXT
+PRINT "ERC Hierarchie: mehrfach "; CONTAINS(het, "Blatt Takt ist mehrfach als Unterblatt eingesetzt"); "  Wurzel-Label "; CONTAINS(het, "Hierarchisches Label WURZEL: das Blatt Haupt ist nirgends"); "  (erwartet TRUE TRUE)"
+ARRAY_POP(hd.blaetter[0].labels)
+ARRAY_POP(hd.blaetter[0].bauteile)
+' Speichern/Laden: das Blattsymbol wird aus dem Unterblatt neu erzeugt
+DIM hd2 AS kern.Dokument : hd2 = kern.dokumentAusJson(kern.dokumentNachJson(hd))
+DIM hs3 AS kern.Bauteil : hs3 = hd2.blaetter[0].bauteile[1]
+DIM hn2 AS kern.Netze : hn2 = kern.netzeDokument(hd2)
+PRINT "JSON: "; hs3.sym.blattSymbol; " "; hs3.referenz; " "; LEN(hs3.sym.pins); " verbunden "; hn2.gleichUeber(0, 200, 0, 1, 800, 0); "  (erwartet TRUE Takt 2 verbunden TRUE)"
+' Label im Unterblatt umbenennen -> Port heisst mit; Unterblatt loeschen -> ERC
+hl2.text = "ENA"
+kern.blattSymboleAktualisieren(hd)
+PRINT "Port folgt dem Label: "; hs.sym.pins[1].name; "  (erwartet ENA)"
+ARRAY_REMOVE_AT(hd.blaetter, 1)
+kern.blattSymboleAktualisieren(hd)
+het = ""
+hev = kern.ercPruefenDok(hd)
+FOR hvi = 0 TO LEN(hev) - 1
+    het = het + hev[hvi].text + "|"
+NEXT
+PRINT "Unterblatt geloescht: "; hs.sym.fehlt; " "; CONTAINS(het, "Unterblatt fehlt"); " kein 'Symbol fehlt' "; NOT CONTAINS(het, "Symbol #BLATT"); "  (erwartet TRUE TRUE kein 'Symbol fehlt' TRUE)"
+
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
 PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)

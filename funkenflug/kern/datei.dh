@@ -155,6 +155,7 @@ FUNCTION dokumentAusJson(j AS JSON_HANDLE) AS Dokument
         ARRAY_PUSH(dok.blaetter, bl)
     NEXT
     IF JSON_HAS(j, "platine") THEN dok.platine = platineAusJson(j, "platine")
+    blattSymboleAktualisieren(dok)
     RETURN dok
 END FUNCTION
 

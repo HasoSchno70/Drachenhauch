@@ -99,7 +99,7 @@ SUB statusAktualisieren()
     IF auswahlAnzahl() > 1 THEN wahl = "   Auswahl: " + STR$(LEN(gSelB)) + " Bauteile, " + STR$(LEN(gSelD)) + " Draehte, " + STR$(LEN(gSelL)) + " Labels (ziehen verschiebt, Strg+C kopiert, Entf loescht)"
     DIM netz AS STRING : netz = hoverText$()
     IF netz <> "" THEN netz = "   " + netz
-    DIM blatt AS STRING : blatt = gBlatt.name
+    DIM blatt AS STRING : blatt = kern.blattPfad$(gDok, aktuellerBlattIndex())
     IF LEN(gDok.blaetter) > 1 THEN blatt = blatt + " (" + STR$(aktuellerBlattIndex() + 1) + "/" + STR$(LEN(gDok.blaetter)) + ")"
     gtk_label_set_text(gStatus, blatt + "   " + wz + "   Zoom " + STR$(zoom) + "%" + pos + netz + wahl + "   [" + STR$(LEN(gBlatt.bauteile)) + " Bauteile, " + STR$(LEN(gBlatt.draehte)) + " Draehte, " + STR$(LEN(gBlatt.labels)) + " Labels]")
 END SUB
@@ -914,6 +914,7 @@ DIM probeHaken AS INTEGER         ' 0: Haken lassen, 1: setzen, 2: loesen
 DIM probeUndo0 AS INTEGER
 DIM probeName0 AS STRING
 DIM probeSpZoom AS FLOAT
+DIM probeZahl0 AS INTEGER
 
 FUNCTION vorzeichen(a AS INTEGER) AS INTEGER
     IF a > 0 THEN RETURN 1
@@ -1879,6 +1880,60 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             DIM zsym AS kern.Symbol : zsym = kern.bibliothekSymbol(zid)
             pruefe("Grafik und Pins aus der Maus", STR$(LEN(zsym.grafik)) + " " + STR$(LEN(zsym.pins)) + " " + zsym.name, "5 2 Gezeichnet")
             werkzeugWaehlen(WZ_AUSWAHL, "")
+        CASE 26
+            ' Unterblatt ueber das Menue einsetzen, hineinspringen, Port anlegen
+            probeUndo0 = LEN(gUndo)
+            blattWechseln(0)
+            DIM hb0 AS INTEGER : hb0 = LEN(gDok.blaetter)
+            probeZahl0 = hb0
+            DIM hbt0 AS INTEGER : hbt0 = LEN(gBlatt.bauteile)
+            probeText1 = "Netzteil"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            gtk_menu_item_activate(gBlattMenueUnter)
+            DIM hsb AS kern.Bauteil : hsb = gBlatt.bauteile[LEN(gBlatt.bauteile) - 1]
+            pruefe("Unterblatt eingesetzt", STR$(LEN(gDok.blaetter) - hb0) + " " + STR$(LEN(gBlatt.bauteile) - hbt0) + " " + STR$(hsb.sym.blattSymbol) + " " + hsb.referenz + " " + STR$(aktuellerBlattIndex()), "1 1 " + STR$(TRUE) + " Netzteil 0")
+            pruefe("Einsetzen = ein Undo-Schritt", STR$(LEN(gUndo) - probeUndo0), "1")
+            waehleB(hsb)
+            auswahlBearbeiten()
+            pruefe("Doppelklick oeffnet das Unterblatt", gBlatt.name, "Netzteil")
+            statusAktualisieren()
+            pruefe("Statuszeile zeigt den Pfad", STR$(STARTSWITH(gtk_label_get_text(gStatus), gDok.blaetter[0].name + " > Netzteil")), STR$(TRUE))
+            ' Label setzen und mit H zum Port machen
+            werkzeugWaehlen(WZ_LABEL, "")
+            gMausWX = 2000 : gMausWY = 2000
+            probeText1 = "VIN" : probeHaken = 2
+            g_timeout_add(150, dialogBestaetigen, 0)
+            labelSetzen()
+            probeHaken = 0
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            waehleL(gBlatt.labels[0])
+            labelsHierUmschalten()
+            pruefe("H macht das Label hierarchisch", STR$(gBlatt.labels[0].art), STR$(kern.LA_HIER))
+            gtk_menu_item_activate(gBlattMenueEltern)
+            pruefe("Zum Elternblatt", STR$(aktuellerBlattIndex()), "0")
+            pruefe("Blattsymbol hat den Port", STR$(LEN(hsb.sym.pins)) + " " + hsb.sym.pins[0].name, "1 VIN")
+            ' ein Draht vom Port zu einer Versorgung verbindet ueber die Grenze
+            DIM hpp AS kern.Punkt : hpp = hsb.pinPunkt(0)
+            verlaufMerken()
+            DIM hvcc AS kern.Bauteil : hvcc = kern.neuesBauteil("VCC", NEW kern.Lage(NEW kern.Punkt(hpp.x - 600, hpp.y), 0, FALSE))
+            ARRAY_PUSH(gBlatt.bauteile, hvcc)
+            DIM hdr AS kern.Draht : hdr = NEW kern.Draht()
+            ARRAY_PUSH(hdr.punkte, NEW kern.Punkt(hpp.x - 600, hpp.y))
+            ARRAY_PUSH(hdr.punkte, NEW kern.Punkt(hpp.x, hpp.y))
+            ARRAY_PUSH(gBlatt.draehte, hdr)
+            geaendert()
+            DIM hnz AS kern.Netze : hnz = kern.netzeDokument(gDok)
+            hnz.blattWaehlen(LEN(gDok.blaetter) - 1)
+            pruefe("Port-Netz im Unterblatt heisst wie die Versorgung", hnz.liste[hnz.netzAn(2000, 2000)].name, "VCC")
+            zentrieren(hpp.x, hpp.y)
+        CASE 27
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel + ".unterblatt.png") THEN PRINT "Foto Unterblatt gesichert"
+            END IF
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
+            pruefe("Rueckgaengig: Unterblatt wieder weg", STR$(LEN(gDok.blaetter)), STR$(probeZahl0))
         CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()

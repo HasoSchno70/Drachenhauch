@@ -221,7 +221,7 @@ FUNCTION platinenBauteile(dok AS Dokument) AS ARRAY OF Bauteil
     FOR bi = 0 TO LEN(dok.blaetter) - 1
         FOR ci = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
             DIM b AS Bauteil : b = dok.blaetter[bi].bauteile[ci]
-            IF NOT b.sym.einheitLeistung AND NOT b.sym.fehlt THEN ARRAY_PUSH(r, b)
+            IF NOT b.sym.einheitLeistung AND NOT b.sym.fehlt AND NOT b.sym.blattSymbol THEN ARRAY_PUSH(r, b)
         NEXT
     NEXT
     RETURN r
@@ -567,7 +567,7 @@ FUNCTION platineAbgleichen(dok AS Dokument) AS INTEGER
     FOR i = 0 TO LEN(pl.teile) - 1
         DIM b AS Bauteil
         IF bauteilMitId(dok, pl.teile[i].bauteilId, b) THEN
-            IF NOT b.sym.einheitLeistung THEN
+            IF NOT b.sym.einheitLeistung AND NOT b.sym.blattSymbol THEN
                 ARRAY_PUSH(neu, pl.teile[i])
                 CONTINUE
             END IF

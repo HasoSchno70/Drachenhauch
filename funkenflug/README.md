@@ -67,6 +67,28 @@ Netze und heißen dann `Blatt/Name`. Referenzen zählen über alle Blätter (kei
 zweites R1), Netzliste, Stückliste und ERC umfassen das ganze Dokument; eine
 ERC-Zeile springt auch aufs richtige Blatt. Die Statuszeile nennt das Blatt.
 
+**Unterblätter** („Blatt ▾" → „Unterblatt einsetzen …"): legt ein neues Blatt
+an und setzt im aktuellen ein **Blattsymbol** dafür ein – ein Rechteck mit
+doppeltem Rand und dem Namen des Unterblatts. Ein **Doppelklick** darauf öffnet
+das Unterblatt, „Zum Elternblatt" führt zurück; Reiter (`> Name`) und
+Statuszeile (`Haupt > Netzteil`) zeigen die Ebene. Im Unterblatt macht `H` ein
+gewähltes Label **hierarchisch** (Kasten mit Keil am Anker): es wird ein
+**Port** am Blattsymbol, auf der Seite, von der aus der Text des Labels
+läuft. Port und gleichnamige hierarchische Labels sind ein Netz; ein Name im
+Elternblatt (Versorgung, Label) geht vor dem Port-Namen.
+
+Das Blattsymbol wird nicht gespeichert, sondern jedes Mal aus den Labels des
+Unterblatts erzeugt – ein Label umbenennen, und der Port heißt mit; eine
+zweite Port-Liste, die auseinanderläuft, gibt es nicht. Das Blattsymbol ist
+kein Bauteil: es fehlt in Stückliste, Netzliste und auf der Platine, seine
+Ports zählen nicht als Pins. Bewusst einfach: ein Blatt steckt höchstens
+**einmal** als Unterblatt (keine Mehrfach-Instanzen mit Referenz-Pfaden). Der
+ERC meldet ein mehrfach eingesetztes Blatt, Zyklen, ein gelöschtes Unterblatt
+(das Blattsymbol bleibt rot stehen) und hierarchische Labels auf einem Blatt,
+das nirgends eingesetzt ist.
+
+![Blattsymbol mit Port](unterblatt.png)
+
 **Ausgabe** (Knopf „Ausgabe ▾" in der Kopfleiste): **PDF**, **SVG** und
 **PNG** (150 dpi), **Drucken** über den Druckdialog des Systems, dazu
 Stückliste und Netzliste. Alles läuft durch dieselbe Zeichenroutine wie der
@@ -276,6 +298,7 @@ kern/       Modell, Geometrie, Bibliothek, Netze, Datei – ohne Oberfläche,
   bibliothek.dh  10 eingebaute Symbole (R, C, Elko, L, Diode, LED, NPN, Schalter, GND, VCC)
   netze.dh       Netz-Erkennung (eine reine Funktion), benannte Netze, Auto-Knoten
   erc.dh         Elektrische Regelpruefung
+  hierarchie.dh  Unterblaetter: Blattsymbol aus den Labels, Ports, Pfad, ERC
   netzliste.dh   Export: SPICE, CSV, Text
   symbole.dh     eigene Symbole: Pinliste, IC-Generator, JSON, Register, Bibliothek
   stueckliste.dh Stückliste: Gruppen, natürliche Sortierung, CSV/Markdown/Text
@@ -299,7 +322,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (231 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (240 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
@@ -312,7 +335,8 @@ einsetzen, Brücken entlang der Luftlinien klicken, trennen, ziehen, drehen am
 Rand, Prüfliste, Art umschalten, Speichern, Verbinden, PDF/Druck der Platine
 1:1, Gruppe drehen; im Symbol-Editor Rechteck, Linie, Kreis, Bogen, Text und
 Pins mit Maus-Ereignissen zeichnen, verschieben, löschen, zurücknehmen und
-übernehmen). `pruef_kern.dh` prüft u. a. die
+übernehmen; Unterblatt über das Menü einsetzen, per Doppelklick öffnen, Port
+mit `H`, Verbindung über die Blattgrenze). `pruef_kern.dh` prüft u. a. die
 Gruppen-Lage in allen 8 Orientierungen × 3 Arten (72 Pin-Prüfungen). Der Selbsttest
 lässt die Zwischenablage des Systems in Ruhe und schreibt seine Bibliothek in
 eine Wegwerf-Datei neben dem Bild. `--nur-foto bild.png` macht nur das Bild.
@@ -342,10 +366,11 @@ SparkNode hatte mehrere Konzeptfehler, die hier von Anfang an vermieden sind:
    (welches Blatt, Annotation). Ein Schnappschuss kennt immer alles; Ziehen ist
    ein Schritt, ein bloßer Klick keiner.
 6. **Bewusst weggelassen** (in SparkNode überproportional viele Bugquellen):
-   Bus/Bus-Entry, Hierarchie-Sheets, Pin-Swap, Multi-Unit, auf der Platine
-   ein Autorouter, der alles auf einmal legt (Verbinden schlägt je Luftlinie
-   vor und prüft jeden Vorschlag), und Autoplatzierung nach Netzen. Kommt erst, wenn wirklich
-   gebraucht.
+   Bus/Bus-Entry, Mehrfach-Instanzen eines Unterblatts, Pin-Swap,
+   Multi-Unit, auf der Platine ein Autorouter, der alles auf einmal legt
+   (Verbinden schlägt je Luftlinie vor und prüft jeden Vorschlag). Kommt erst,
+   wenn wirklich gebraucht. Unterblätter gibt es – aber ohne zweite Wahrheit:
+   das Blattsymbol entsteht aus den Labels des Unterblatts.
 7. **Platine ohne zweite Wahrheit.** SparkNode hielt Footprint und Netzliste
    der Platine getrennt vom Schaltplan und brauchte einen „Transfer"; hier ist
    die Bauform das Gehäuse-Feld und die Netze kommen bei jeder Prüfung frisch
@@ -371,4 +396,5 @@ zweiten Kondensator wieder „C1".
 
 ## Noch offen (nächste Runden)
 
-Hierarchische Blätter (Blatt-Symbole mit Ports).
+Mehrfach-Instanzen eines Unterblatts (mit Referenz-Pfaden), Busse. Beides
+erst, wenn ein echter Schaltplan es braucht.
