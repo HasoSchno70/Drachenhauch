@@ -31,6 +31,7 @@ CONST K_T = &H74
 CONST K_B = &H62
 CONST K_H = &H68
 CONST K_F = &H66
+CONST K_M = &H6D
 CONST K_BILD_AUF = &HFF55              ' GDK_KEY_Page_Up
 CONST K_BILD_AB = &HFF56
 
@@ -51,7 +52,7 @@ SUB mausSetzen(px AS FLOAT, py AS FLOAT)
     gMausRX = weltX(px)
     gMausRY = weltY(py)
     gMausDrin = TRUE
-    IF gWerkzeug = WZ_DRAHT OR gWerkzeug = WZ_LABEL THEN
+    IF gWerkzeug = WZ_DRAHT OR gWerkzeug = WZ_LABEL OR gWerkzeug = WZ_MESSEN THEN
         DIM f AS kern.Punkt : f = fangPunkt(gMausRX, gMausRY)
         gMausWX = f.x
         gMausWY = f.y
@@ -249,6 +250,7 @@ SUB umbenennenAuswahl()
 END SUB
 
 SUB werkzeugWaehlen(wz AS INTEGER, ref AS STRING)
+    IF wz <> WZ_MESSEN THEN gMessAktiv = FALSE
     gWerkzeug = wz
     IF ref <> "" THEN gSymbolRef = ref
     IF wz <> WZ_DRAHT THEN
@@ -464,6 +466,69 @@ END SUB
 
 ' Doppelklick / E / Enter: das Gewaehlte bearbeiten. Label und Draht:
 ' Netz umbenennen; Bauteil: Eigenschaften.
+' --- Messen ------------------------------------------------------------------
+' Erster Klick setzt den Anfang, der zweite das Ende (beide fangen an Pins und
+' Drahtenden), ein dritter beginnt neu. Abstand in mm und mil, dazu dx/dy.
+DIM gMessAktiv AS BOOLEAN
+DIM gMessFest AS BOOLEAN
+DIM gMessAX AS INTEGER
+DIM gMessAY AS INTEGER
+DIM gMessEX AS INTEGER
+DIM gMessEY AS INTEGER
+
+SUB messenKlick(x AS INTEGER, y AS INTEGER)
+    IF NOT gMessAktiv OR gMessFest THEN
+        gMessAktiv = TRUE
+        gMessFest = FALSE
+        gMessAX = x
+        gMessAY = y
+    ELSE
+        gMessFest = TRUE
+        gMessEX = x
+        gMessEY = y
+    END IF
+    neuZeichnen()
+END SUB
+
+FUNCTION messEndeX() AS INTEGER : RETURN IIF(gMessFest, gMessEX, gMausWX) : END FUNCTION
+FUNCTION messEndeY() AS INTEGER : RETURN IIF(gMessFest, gMessEY, gMausWY) : END FUNCTION
+
+FUNCTION mmText$(u AS FLOAT) AS STRING
+    RETURN REPLACE$(STR$(ROUND(u / 10.0) / 10.0), ".", ",")
+END FUNCTION
+
+FUNCTION messText$() AS STRING
+    IF NOT gMessAktiv THEN RETURN "Messen: Anfang klicken (faengt an Pins und Drahtenden)"
+    DIM dx AS INTEGER : dx = messEndeX() - gMessAX
+    DIM dy AS INTEGER : dy = messEndeY() - gMessAY
+    DIM d AS FLOAT : d = SQR(dx * dx + dy * dy)
+    RETURN "Abstand " + mmText$(d) + " mm (" + STR$(ROUND(d / 2.54)) + " mil)   dx " + mmText$(dx) + "  dy " + mmText$(dy) + " mm" + IIF(gMessFest, "   -- Klick misst neu", "")
+END FUNCTION
+
+SUB messenZeichnen(cr AS INTEGER)
+    IF gWerkzeug <> WZ_MESSEN OR NOT gMessAktiv THEN RETURN
+    DIM ax AS FLOAT : ax = sx(gMessAX)
+    DIM ay AS FLOAT : ay = sy(gMessAY)
+    DIM ex AS FLOAT : ex = sx(messEndeX())
+    DIM ey AS FLOAT : ey = sy(messEndeY())
+    zeichenFarbe(cr, C_HOVER)
+    cairo_set_line_width(cr, 1.2)
+    cairo_move_to(cr, ax, ay)
+    cairo_line_to(cr, ex, ey)
+    cairo_move_to(cr, ax - 5, ay - 5)
+    cairo_line_to(cr, ax + 5, ay + 5)
+    cairo_move_to(cr, ax + 5, ay - 5)
+    cairo_line_to(cr, ax - 5, ay + 5)
+    cairo_move_to(cr, ex - 5, ey - 5)
+    cairo_line_to(cr, ex + 5, ey + 5)
+    cairo_move_to(cr, ex + 5, ey - 5)
+    cairo_line_to(cr, ex - 5, ey + 5)
+    cairo_stroke(cr)
+    DIM dx AS INTEGER : dx = messEndeX() - gMessAX
+    DIM dy AS INTEGER : dy = messEndeY() - gMessAY
+    lwTextAus(cr, (ax + ex) / 2.0 + 8, (ay + ey) / 2.0 - 10, mmText$(SQR(dx * dx + dy * dy)) + " mm", C_HOVER, 0, gSchrift)
+END SUB
+
 ' --- Referenz/Wert verschieben -----------------------------------------------
 DIM gTextZug AS BOOLEAN
 DIM gTextStart AS kern.Punkt
@@ -558,6 +623,8 @@ FUNCTION lwDruck(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
             bauteilPlatzieren()
         CASE WZ_LABEL
             IF NOT doppel THEN labelSetzen()
+        CASE WZ_MESSEN
+            messenKlick(gMausWX, gMausWY)
         CASE WZ_DRAHT
             IF doppel THEN
                 drahtEndePunkt()
@@ -773,7 +840,10 @@ FUNCTION lwTaste(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
             blattWechseln(aktuellerBlattIndex() - 1)
         CASE K_BILD_AB
             blattWechseln(aktuellerBlattIndex() + 1)
+        CASE K_M
+            werkzeugWaehlen(WZ_MESSEN, "")
         CASE K_ESC
+            gMessAktiv = FALSE
             gDrahtAktiv = FALSE
             gDrahtPunkte = []
             gRahmen = FALSE

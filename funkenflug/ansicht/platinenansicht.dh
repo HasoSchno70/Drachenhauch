@@ -134,6 +134,19 @@ FUNCTION lochY(z AS FLOAT) AS FLOAT : RETURN sy(z * kern.LOCHRASTER) : END FUNCT
 
 SUB ansichtWechseln(a AS INTEGER)
     IF a = gAnsicht THEN RETURN
+    ' Cross-Probing: die gewaehlten Bauteile sind auch drueben gewaehlt
+    DIM mitIds AS ARRAY OF STRING : mitIds = []
+    DIM ci AS INTEGER
+    IF a = ANS_PLATINE THEN
+        FOR ci = 0 TO LEN(gSelB) - 1
+            ARRAY_PUSH(mitIds, gSelB[ci].id)
+        NEXT
+    ELSE
+        DIM pm AS ARRAY OF INTEGER : pm = plAuswahlListe()
+        FOR ci = 0 TO LEN(pm) - 1
+            ARRAY_PUSH(mitIds, gDok.platine.teile[pm[ci]].bauteilId)
+        NEXT
+    END IF
     IF a = ANS_PLATINE THEN
         gSpX = vX : gSpY = vY : gSpZoom = vZoom
         vX = gPlX : vY = gPlY : vZoom = gPlZoom
@@ -165,9 +178,50 @@ SUB ansichtWechseln(a AS INTEGER)
     END IF
     gAnsicht = a
     platineVeraltet()
+    IF LEN(mitIds) > 0 THEN auswahlMitnehmen(mitIds)
     ansichtLeistenNachziehen()
     neuZeichnen()
     statusAktualisieren()
+END SUB
+
+' Die Bauteile mit diesen Ids in der neuen Ansicht waehlen. Auf der Platine
+' die Teile dazu; im Schaltplan das Blatt des ersten, dort alle, die darauf
+' liegen, und den Ausschnitt dorthin.
+SUB auswahlMitnehmen(ids AS ARRAY OF STRING)
+    DIM i AS INTEGER, k AS INTEGER
+    IF gAnsicht = ANS_PLATINE THEN
+        DIM m AS ARRAY OF INTEGER : m = []
+        FOR i = 0 TO LEN(ids) - 1
+            k = kern.teilIndex(gDok.platine, ids[i])
+            IF k >= 0 THEN ARRAY_PUSH(m, k)
+        NEXT
+        plMengeSetzen(m)
+        IF LEN(m) = 0 THEN gPlMeldung = "Das gewaehlte Bauteil steckt noch nicht auf der Platine (Einsetzen)"
+        RETURN
+    END IF
+    DIM erstesBlatt AS INTEGER : erstesBlatt = -1
+    DIM bi AS INTEGER
+    FOR bi = 0 TO LEN(gDok.blaetter) - 1
+        FOR k = 0 TO LEN(gDok.blaetter[bi].bauteile) - 1
+            IF gDok.blaetter[bi].bauteile[k].id = ids[0] THEN erstesBlatt = bi
+        NEXT
+    NEXT
+    IF erstesBlatt < 0 THEN RETURN
+    blattWechseln(erstesBlatt)
+    DIM erst AS BOOLEAN : erst = TRUE
+    FOR i = 0 TO LEN(ids) - 1
+        FOR k = 0 TO LEN(gBlatt.bauteile) - 1
+            IF gBlatt.bauteile[k].id = ids[i] THEN
+                IF erst THEN
+                    waehleB(gBlatt.bauteile[k])
+                    zentrieren(gBlatt.bauteile[k].lage.pos.x, gBlatt.bauteile[k].lage.pos.y)
+                    erst = FALSE
+                ELSE
+                    umschaltenB(gBlatt.bauteile[k])
+                END IF
+            END IF
+        NEXT
+    NEXT
 END SUB
 
 SUB plEinpassen(bw AS FLOAT, bh AS FLOAT)

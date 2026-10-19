@@ -730,3 +730,42 @@ SUB autoKnoten(bl AS Blatt)
     NEXT
     bl.knoten = neu
 END SUB
+
+' --- Netzklassen: Versorgung, Masse, Signal (fuer die Drahtfarbe) ------------
+' Nach dem Netznamen bzw. der Versorgung im Netz: GND, AGND, VSS, 0V ... ist
+' Masse; VCC, VDD, VBAT, +5V, 3V3, 12V ... ist Versorgung; alles andere Signal.
+CONST NK_SIGNAL = 0
+CONST NK_VERSORGUNG = 1
+CONST NK_MASSE = 2
+
+FUNCTION istMasseName(n AS STRING) AS BOOLEAN
+    DIM u AS STRING : u = UPPER$(TRIM$(n))
+    IF u = "0V" OR u = "MASSE" OR u = "VSS" OR u = "VEE" OR u = "COM" THEN RETURN TRUE
+    RETURN STARTSWITH(u, "GND") OR ENDSWITH(u, "GND")
+END FUNCTION
+
+FUNCTION istVersorgungsName(n AS STRING) AS BOOLEAN
+    DIM u AS STRING : u = UPPER$(TRIM$(n))
+    IF u = "" THEN RETURN FALSE
+    IF LEFT$(u, 1) = "+" THEN RETURN TRUE
+    IF STARTSWITH(u, "VCC") OR STARTSWITH(u, "VDD") OR STARTSWITH(u, "VBAT") OR STARTSWITH(u, "VIN") OR STARTSWITH(u, "VBUS") OR STARTSWITH(u, "V+") THEN RETURN TRUE
+    ' 5V, 3V3, 12V, 1.8V: Ziffern mit einem V darin
+    IF NOT istZiffer(LEFT$(u, 1)) OR NOT CONTAINS(u, "V") THEN RETURN FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(u) - 1
+        DIM c AS STRING : c = MID$(u, i, 1)
+        IF NOT (istZiffer(c) OR c = "V" OR c = "." OR c = ",") THEN RETURN FALSE
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION netzKlasse(nz AS Netz) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(nz.versorgungen) - 1
+        IF istMasseName(nz.versorgungen[i]) THEN RETURN NK_MASSE
+    NEXT
+    IF LEN(nz.versorgungen) > 0 THEN RETURN NK_VERSORGUNG
+    IF istMasseName(nz.name) THEN RETURN NK_MASSE
+    IF istVersorgungsName(nz.name) THEN RETURN NK_VERSORGUNG
+    RETURN NK_SIGNAL
+END FUNCTION

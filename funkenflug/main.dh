@@ -45,6 +45,7 @@ DIM gStatus AS INTEGER
 DIM gKnopfAuswahl AS INTEGER
 DIM gKnopfDraht AS INTEGER
 DIM gKnopfLabel AS INTEGER
+DIM gKnopfMessen AS INTEGER
 DIM gKnopfZurueck AS INTEGER
 DIM gKnopfVor AS INTEGER
 DIM gSymbolWahl AS INTEGER
@@ -84,6 +85,7 @@ SUB statusAktualisieren()
     IF gWerkzeug = WZ_DRAHT THEN wz = "Draht"
     IF gWerkzeug = WZ_BAUTEIL THEN wz = "Bauteil"
     IF gWerkzeug = WZ_LABEL THEN wz = "Label"
+    IF gWerkzeug = WZ_MESSEN THEN wz = messText$()
     DIM zoom AS INTEGER : zoom = ROUND(vZoom / 0.12 * 100)
     DIM pos AS STRING : pos = ""
     IF gMausDrin THEN pos = "   X " + STR$(gMausWX / 100) + " mm   Y " + STR$(gMausWY / 100) + " mm"
@@ -126,6 +128,7 @@ SUB werkzeugKnoepfeNachziehen()
     gtk_toggle_button_set_active(gKnopfAuswahl, gWerkzeug = WZ_AUSWAHL)
     gtk_toggle_button_set_active(gKnopfDraht, gWerkzeug = WZ_DRAHT)
     gtk_toggle_button_set_active(gKnopfLabel, gWerkzeug = WZ_LABEL)
+    gtk_toggle_button_set_active(gKnopfMessen, gWerkzeug = WZ_MESSEN)
     gKnoepfeSetzen = FALSE
 END SUB
 
@@ -611,6 +614,11 @@ SUB aufExport(knopf AS INTEGER, daten AS INTEGER)
 END SUB
 
 ' --- Werkzeug-Knoepfe
+SUB aufMessen(knopf AS INTEGER, daten AS INTEGER)
+    IF gKnoepfeSetzen THEN RETURN
+    werkzeugWaehlen(WZ_MESSEN, "")
+END SUB
+
 SUB aufAuswahl(knopf AS INTEGER, daten AS INTEGER)
     IF gKnoepfeSetzen THEN RETURN
     werkzeugWaehlen(WZ_AUSWAHL, "")
@@ -2005,6 +2013,96 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
                 pruefe("Speichern raeumt die Sicherung weg", STR$(FILEEXISTS(kpf + ".sicherung")), STR$(FALSE))
                 pruefe("Menue Datei hat den Eintrag", STR$(gDateiMenue <> 0 AND LEN(zuletztLesen()) = 1), STR$(TRUE))
             END IF
+        CASE 31
+            ' Drahtfarben nach Netzklasse
+            blattWechseln(0)
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            auswahlAufheben()
+            probeUndo0 = LEN(gUndo)
+            DIM fnz AS kern.Netze : fnz = aktuelleNetze()
+            DIM fv AS STRING : fv = ""
+            DIM fi AS INTEGER
+            FOR fi = 0 TO LEN(gBlatt.draehte) - 1
+                DIM fni AS INTEGER : fni = fnz.netzAn(gBlatt.draehte[fi].punkte[0].x, gBlatt.draehte[fi].punkte[0].y)
+                IF fni < 0 THEN CONTINUE
+                DIM fsoll AS INTEGER : fsoll = C_DRAHT
+                IF fnz.liste[fni].name = "VCC" THEN fsoll = C_DRAHT_VERS
+                IF fnz.liste[fni].name = "GND" THEN fsoll = C_DRAHT_MASSE
+                IF drahtFarbe(gBlatt.draehte[fi]) <> fsoll THEN fv = fv + fnz.liste[fni].name + " "
+            NEXT
+            pruefe("Drahtfarbe je Netzklasse (VCC rot, GND grau)", "[" + fv + "]", "[]")
+            ' Messen: faengt am Pin, Abstand in mm und mil
+            gtk_button_clicked(gKnopfMessen)
+            pruefe("Werkzeug Messen", STR$(gWerkzeug) + " " + STR$(gtk_toggle_button_get_active(gKnopfMessen)), STR$(WZ_MESSEN) + " " + STR$(TRUE))
+            DIM mp AS kern.Punkt : mp = gBlatt.bauteile[1].pinPunkt(0)
+            mausSetzen(sx(mp.x + 30), sy(mp.y - 20))
+            pruefe("Messen faengt am Pin", STR$(gMausWX) + "," + STR$(gMausWY), STR$(mp.x) + "," + STR$(mp.y))
+            messenKlick(0, 0)
+            messenKlick(3000, 4000)
+            pruefe("Abstand", messText$(), "Abstand 50,0 mm (1969 mil)   dx 30,0  dy 40,0 mm   -- Klick misst neu")
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            pruefe("Messen weg beim Werkzeugwechsel", STR$(gMessAktiv), STR$(FALSE))
+            ' Verteilen und Ausrichten auf einem eigenen Blatt: drei Widerstaende, Draht folgt
+            verlaufMerken()
+            DIM vbl AS kern.Blatt : vbl = NEW kern.Blatt("Ausrichten")
+            ARRAY_PUSH(gDok.blaetter, vbl)
+            DIM vxs AS ARRAY OF INTEGER : vxs = [0, 1000, 5000]
+            DIM vk AS INTEGER
+            FOR vk = 0 TO 2
+                DIM vr AS kern.Bauteil : vr = kern.neuesBauteil("R", NEW kern.Lage(NEW kern.Punkt(vxs[vk], vk * 300), 90, FALSE))
+                vr.referenz = "R" + STR$(80 + vk)
+                ARRAY_PUSH(vbl.bauteile, vr)
+            NEXT
+            DIM vw AS kern.Draht : vw = NEW kern.Draht()
+            ARRAY_PUSH(vw.punkte, vbl.bauteile[1].pinPunkt(1))
+            ARRAY_PUSH(vw.punkte, NEW kern.Punkt(1000, 2000))
+            ARRAY_PUSH(vbl.bauteile, kern.neuesBauteil("GND", NEW kern.Lage(NEW kern.Punkt(1000, 2000), 0, FALSE)))
+            ARRAY_PUSH(vbl.draehte, vw)
+            reiterAktualisieren()
+            blattWechseln(LEN(gDok.blaetter) - 1)
+            geaendert()
+            auswahlAufheben()
+            waehleB(vbl.bauteile[0])
+            umschaltenB(vbl.bauteile[1])
+            umschaltenB(vbl.bauteile[2])
+            DIM vu AS INTEGER : vu = LEN(gUndo)
+            auswahlAusrichten(AR_WAAGRECHT)
+            pruefe("Waagrecht verteilt (aeussere bleiben)", STR$(vbl.bauteile[0].lage.pos.x) + " " + STR$(vbl.bauteile[1].lage.pos.x) + " " + STR$(vbl.bauteile[2].lage.pos.x) + " " + STR$(LEN(gUndo) - vu), "0 2500 5000 1")
+            DIM vn AS kern.Netze : vn = aktuelleNetze()
+            DIM vp AS kern.Punkt : vp = vbl.bauteile[1].pinPunkt(1)
+            pruefe("Draht folgt dem verschobenen Pin", STR$(vn.gleich(vp.x, vp.y, 1000, 2000)), STR$(TRUE))
+            auswahlAusrichten(AR_OBEN)
+            DIM vy0 AS INTEGER, vy1 AS INTEGER, vy2 AS INTEGER, vdx AS INTEGER, vdy AS INTEGER
+            bauteilBox(vbl.bauteile[0], vdx, vy0, vdx, vdy)
+            bauteilBox(vbl.bauteile[1], vdx, vy1, vdx, vdy)
+            bauteilBox(vbl.bauteile[2], vdx, vy2, vdx, vdy)
+            pruefe("Oben ausgerichtet", STR$(vy0 = vy1 AND vy1 = vy2), STR$(TRUE))
+            auswahlAusrichten(AR_OBEN)
+            pruefe("Nochmal: steht schon so, kein Schritt", STR$(LEN(gUndo) - vu) + " " + STR$(CONTAINS(gtk_label_get_text(gStatus), "Steht schon so")), "2 " + STR$(TRUE))
+            auswahlAufheben()
+            waehleB(vbl.bauteile[0])
+            auswahlAusrichten(AR_LINKS)
+            pruefe("Ein Teil: Hinweis statt Ausrichten", STR$(CONTAINS(gtk_label_get_text(gStatus), "mindestens zwei")), STR$(TRUE))
+            ' Cross-Probing: Auswahl wandert zwischen Schaltplan und Platine
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
+            blattWechseln(0)
+            DIM xr7 AS kern.Bauteil : xr7 = gBlatt.bauteile[1]
+            waehleB(xr7)
+            gtk_button_clicked(gKnopfPlatine)
+            pruefe("Noch nicht auf der Platine: Hinweis", STR$(CONTAINS(gPlMeldung, "noch nicht auf der Platine")), STR$(TRUE))
+            plEinsetzen()
+            plMengeSetzen([kern.teilIndex(gDok.platine, xr7.id)])
+            gtk_button_clicked(gKnopfSchaltplan)
+            pruefe("Platine -> Schaltplan: R7 gewaehlt", STR$(gHatGewaehlt AND gGewaehlt.id = xr7.id) + " " + STR$(aktuellerBlattIndex()), STR$(TRUE) + " 0")
+            gtk_button_clicked(gKnopfPlatine)
+            pruefe("Schaltplan -> Platine: R7 gewaehlt", STR$(plIstGewaehlt(kern.teilIndex(gDok.platine, xr7.id))) + " " + STR$(LEN(plAuswahlListe())), STR$(TRUE) + " 1")
+            gtk_button_clicked(gKnopfSchaltplan)
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
+            auswahlAufheben()
         CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()
@@ -2121,6 +2219,9 @@ gtk_widget_set_tooltip_text(gKnopfLabel, "Netz-Label setzen (L)")
 gtk_box_pack_start(leiste, gKnopfAuswahl, FALSE, FALSE, 0)
 gtk_box_pack_start(leiste, gKnopfDraht, FALSE, FALSE, 0)
 gtk_box_pack_start(leiste, gKnopfLabel, FALSE, FALSE, 0)
+gKnopfMessen = leistenKnopf("Messen")
+gtk_widget_set_tooltip_text(gKnopfMessen, "Abstand messen: zwei Punkte klicken, faengt an Pins und Drahtenden (M)")
+gtk_box_pack_start(leiste, gKnopfMessen, FALSE, FALSE, 0)
 DIM etikett AS INTEGER : etikett = gtk_label_new("  Bauteil:")
 gtk_box_pack_start(leiste, etikett, FALSE, FALSE, 0)
 gSymbolWahl = gtk_combo_box_text_new()
@@ -2169,6 +2270,7 @@ gtk_container_add(gFenster, vbox)
 signal(gKnopfAuswahl, "clicked", aufAuswahl, 0, 0, 0)
 signal(gKnopfDraht, "clicked", aufDraht, 0, 0, 0)
 signal(gKnopfLabel, "clicked", aufLabel, 0, 0, 0)
+signal(gKnopfMessen, "clicked", aufMessen, 0, 0, 0)
 signal(gSymbolWahl, "changed", aufSymbol, 0, 0, 0)
 signal(knopfOeffnen, "clicked", aufOeffnen, 0, 0, 0)
 signal(knopfSpeichern, "clicked", aufSpeichern, 0, 0, 0)

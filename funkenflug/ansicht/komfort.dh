@@ -258,6 +258,12 @@ SUB aufMenueSuchen(e AS INTEGER, d AS INTEGER)
     suchenZeigen()
 END SUB
 
+DIM gMenueAusrichten AS ARRAY OF INTEGER
+
+SUB aufMenueAusrichten(e AS INTEGER, art AS INTEGER)
+    auswahlAusrichten(art)
+END SUB
+
 SUB aufMenueEigenschaften(e AS INTEGER, d AS INTEGER)
     dokumentEigenschaften()
 END SUB
@@ -271,6 +277,15 @@ SUB bearbeitenMenueBauen()
     gtk_menu_shell_append(gBearbMenue, gtk_separator_menu_item_new())
     gMenueSuchen = menueEintrag(gBearbMenue, "Suchen & Ersetzen ... (Strg+F)")
     signal(gMenueSuchen, "activate", aufMenueSuchen, 0, 0, 0)
+    gtk_menu_shell_append(gBearbMenue, gtk_separator_menu_item_new())
+    DIM namen AS ARRAY OF STRING : namen = ["Links ausrichten", "Rechts ausrichten", "Oben ausrichten", "Unten ausrichten", "Waagrecht verteilen", "Senkrecht verteilen"]
+    DIM i AS INTEGER
+    gMenueAusrichten = []
+    FOR i = 0 TO LEN(namen) - 1
+        DIM e AS INTEGER : e = menueEintrag(gBearbMenue, namen[i])
+        ARRAY_PUSH(gMenueAusrichten, e)
+        signal(e, "activate", aufMenueAusrichten, i + 1, 0, 0)
+    NEXT
     gtk_menu_shell_append(gBearbMenue, gtk_separator_menu_item_new())
     gMenueEigenschaften = menueEintrag(gBearbMenue, "Dokument-Eigenschaften ...")
     signal(gMenueEigenschaften, "activate", aufMenueEigenschaften, 0, 0, 0)

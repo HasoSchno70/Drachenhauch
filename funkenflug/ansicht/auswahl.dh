@@ -379,6 +379,133 @@ SUB gruppeTransformieren(art AS INTEGER)
     geaendert()
 END SUB
 
+' --- Ausrichten und Verteilen ----------------------------------------------
+' Teile einzeln versetzen (jedes um seinen eigenen Betrag, auf dem 1-mm-
+' Raster). Angeschlossene Drahtenden folgen mit dem sicheren Gummiband,
+' Labels an einem bewegten Pin gehen mit -- wie beim Ziehen und Drehen.
+SUB teileVersetzen(teile AS ARRAY OF kern.Bauteil, dxs AS ARRAY OF INTEGER, dys AS ARRAY OF INTEGER)
+    DIM neuX AS MAP OF INTEGER
+    DIM neuY AS MAP OF INTEGER
+    MAPCLEAR(neuX)
+    MAPCLEAR(neuY)
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(teile) - 1
+        IF dxs[i] = 0 AND dys[i] = 0 THEN CONTINUE
+        DIM b AS kern.Bauteil : b = teile[i]
+        FOR j = 0 TO LEN(b.sym.pins) - 1
+            DIM alt AS kern.Punkt : alt = b.pinPunkt(j)
+            MAPPUT(neuX, kern.netzKey(alt.x, alt.y), alt.x + dxs[i])
+            MAPPUT(neuY, kern.netzKey(alt.x, alt.y), alt.y + dys[i])
+        NEXT
+        b.lage = NEW kern.Lage(NEW kern.Punkt(b.lage.pos.x + dxs[i], b.lage.pos.y + dys[i]), b.lage.drehung, b.lage.gespiegelt)
+    NEXT
+    FOR i = 0 TO LEN(gBlatt.labels) - 1
+        DIM lu AS kern.Label : lu = gBlatt.labels[i]
+        DIM lk AS STRING : lk = kern.netzKey(lu.anker.x, lu.anker.y)
+        IF MAPHAS(neuX, lk) THEN lu.anker = NEW kern.Punkt(MAPGET(neuX, lk), MAPGET(neuY, lk))
+    NEXT
+    FOR i = 0 TO LEN(gBlatt.draehte) - 1
+        DIM w AS kern.Draht : w = gBlatt.draehte[i]
+        IF LEN(w.punkte) < 2 THEN CONTINUE
+        DIM a AS kern.Punkt : a = w.punkte[0]
+        DIM e AS kern.Punkt : e = w.punkte[LEN(w.punkte) - 1]
+        DIM ka AS STRING : ka = kern.netzKey(a.x, a.y)
+        DIM ke AS STRING : ke = kern.netzKey(e.x, e.y)
+        DIM dxA AS INTEGER : dxA = 0
+        DIM dyA AS INTEGER : dyA = 0
+        DIM dxE AS INTEGER : dxE = 0
+        DIM dyE AS INTEGER : dyE = 0
+        IF MAPHAS(neuX, ka) THEN dxA = MAPGET(neuX, ka) - a.x : dyA = MAPGET(neuY, ka) - a.y
+        IF MAPHAS(neuX, ke) THEN dxE = MAPGET(neuX, ke) - e.x : dyE = MAPGET(neuY, ke) - e.y
+        IF dxA <> 0 OR dyA <> 0 OR dxE <> 0 OR dyE <> 0 THEN w.punkte = kern.gummibandSicher(gBlatt, w, w.punkte, dxA, dyA, dxE, dyE)
+    NEXT
+    kern.autoKnoten(gBlatt)
+END SUB
+
+CONST AR_LINKS = 1
+CONST AR_RECHTS = 2
+CONST AR_OBEN = 3
+CONST AR_UNTEN = 4
+CONST AR_WAAGRECHT = 5          ' Mitten gleichmaessig verteilen
+CONST AR_SENKRECHT = 6
+
+' Gewaehlte Bauteile an der Kante der Auswahl ausrichten bzw. ihre Mitten
+' gleichmaessig verteilen (die aeusseren bleiben stehen). Ein Rueckgaengig-
+' Schritt -- nur wenn sich etwas bewegt.
+SUB auswahlAusrichten(art AS INTEGER)
+    DIM n AS INTEGER : n = LEN(gSelB)
+    IF n < 2 OR (art >= AR_WAAGRECHT AND n < 3) THEN
+        gSpMeldung = IIF(art >= AR_WAAGRECHT, "Verteilen braucht mindestens drei gewaehlte Bauteile", "Ausrichten braucht mindestens zwei gewaehlte Bauteile")
+        statusAktualisieren()
+        RETURN
+    END IF
+    DIM x0 AS ARRAY OF INTEGER : x0 = []
+    DIM y0 AS ARRAY OF INTEGER : y0 = []
+    DIM x1 AS ARRAY OF INTEGER : x1 = []
+    DIM y1 AS ARRAY OF INTEGER : y1 = []
+    DIM i AS INTEGER
+    DIM gx0 AS INTEGER : gx0 = 2000000000
+    DIM gy0 AS INTEGER : gy0 = 2000000000
+    DIM gx1 AS INTEGER : gx1 = -2000000000
+    DIM gy1 AS INTEGER : gy1 = -2000000000
+    FOR i = 0 TO n - 1
+        DIM a0 AS INTEGER, b0 AS INTEGER, a1 AS INTEGER, b1 AS INTEGER
+        bauteilBox(gSelB[i], a0, b0, a1, b1)
+        ARRAY_PUSH(x0, a0) : ARRAY_PUSH(y0, b0) : ARRAY_PUSH(x1, a1) : ARRAY_PUSH(y1, b1)
+        gx0 = MIN(gx0, a0) : gy0 = MIN(gy0, b0) : gx1 = MAX(gx1, a1) : gy1 = MAX(gy1, b1)
+    NEXT
+    DIM dxs AS ARRAY OF INTEGER : dxs = []
+    DIM dys AS ARRAY OF INTEGER : dys = []
+    FOR i = 0 TO n - 1
+        ARRAY_PUSH(dxs, 0)
+        ARRAY_PUSH(dys, 0)
+    NEXT
+    SELECT CASE art
+        CASE AR_LINKS
+            FOR i = 0 TO n - 1 : dxs[i] = kern.rastern(gx0 - x0[i], kern.RASTER) : NEXT
+        CASE AR_RECHTS
+            FOR i = 0 TO n - 1 : dxs[i] = kern.rastern(gx1 - x1[i], kern.RASTER) : NEXT
+        CASE AR_OBEN
+            FOR i = 0 TO n - 1 : dys[i] = kern.rastern(gy0 - y0[i], kern.RASTER) : NEXT
+        CASE AR_UNTEN
+            FOR i = 0 TO n - 1 : dys[i] = kern.rastern(gy1 - y1[i], kern.RASTER) : NEXT
+        CASE AR_WAAGRECHT, AR_SENKRECHT
+            ' nach der Mitte sortieren, aeussere bleiben, dazwischen gleiche Abstaende
+            DIM folge AS ARRAY OF STRING : folge = []
+            FOR i = 0 TO n - 1
+                DIM m AS INTEGER : m = IIF(art = AR_WAAGRECHT, (x0[i] + x1[i]) \ 2, (y0[i] + y1[i]) \ 2)
+                ARRAY_PUSH(folge, PADL$(STR$(m + 1000000000), 11, "0") + CHR$(1) + STR$(i))
+            NEXT
+            SORT(folge)
+            DIM erst AS INTEGER : erst = VAL(MID$(folge[0], INSTR(folge[0], CHR$(1)) + 1))
+            DIM letzt AS INTEGER : letzt = VAL(MID$(folge[n - 1], INSTR(folge[n - 1], CHR$(1)) + 1))
+            DIM m0 AS INTEGER : m0 = IIF(art = AR_WAAGRECHT, (x0[erst] + x1[erst]) \ 2, (y0[erst] + y1[erst]) \ 2)
+            DIM m1 AS INTEGER : m1 = IIF(art = AR_WAAGRECHT, (x0[letzt] + x1[letzt]) \ 2, (y0[letzt] + y1[letzt]) \ 2)
+            DIM k AS INTEGER
+            FOR k = 1 TO n - 2
+                DIM ix AS INTEGER : ix = VAL(MID$(folge[k], INSTR(folge[k], CHR$(1)) + 1))
+                DIM soll AS INTEGER : soll = m0 + (m1 - m0) * k \ (n - 1)
+                IF art = AR_WAAGRECHT THEN
+                    dxs[ix] = kern.rastern(soll - (x0[ix] + x1[ix]) \ 2, kern.RASTER)
+                ELSE
+                    dys[ix] = kern.rastern(soll - (y0[ix] + y1[ix]) \ 2, kern.RASTER)
+                END IF
+            NEXT
+    END SELECT
+    DIM bewegt AS BOOLEAN : bewegt = FALSE
+    FOR i = 0 TO n - 1
+        IF dxs[i] <> 0 OR dys[i] <> 0 THEN bewegt = TRUE
+    NEXT
+    IF NOT bewegt THEN
+        gSpMeldung = "Steht schon so"
+        statusAktualisieren()
+        RETURN
+    END IF
+    verlaufMerken()
+    teileVersetzen(gSelB, dxs, dys)
+    geaendert()
+END SUB
+
 ' --- Loeschen der ganzen Menge ---------------------------------------------
 
 SUB mengeLoeschen()

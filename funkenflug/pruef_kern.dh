@@ -724,6 +724,9 @@ adk.revision = "B"
 DIM adk2 AS kern.Dokument : adk2 = kern.dokumentAusJson(kern.dokumentNachJson(adk))
 PRINT "Schriftfeld: "; adk2.titel; "/"; adk2.autor; "/"; adk2.revision; "/'"; adk2.firma; "'  (erwartet Netzteil/Hans/B/'')"
 
+' --- Netzklassen nach Namen
+PRINT "Masse: "; kern.istMasseName("GND"); kern.istMasseName("agnd"); kern.istMasseName("0V"); kern.istMasseName("GNDA"); "  Versorgung: "; kern.istVersorgungsName("VCC"); kern.istVersorgungsName("+12V"); kern.istVersorgungsName("3V3"); kern.istVersorgungsName("5V"); kern.istVersorgungsName("VDD_IO"); "  Signal: "; kern.istVersorgungsName("CLK"); kern.istVersorgungsName("V"); kern.istVersorgungsName("2N"); kern.istMasseName("GNDX") AND FALSE; "  (erwartet Masse: TRUETRUETRUETRUE  Versorgung: TRUETRUETRUETRUETRUE  Signal: FALSEFALSEFALSEFALSE)"
+
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
 PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)

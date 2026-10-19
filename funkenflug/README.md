@@ -28,6 +28,7 @@ einem Programm, das es mitbringt (**Inkscape**, GIMP). Die Bibliotheks-Namen in
 | **Draht** (Taste `W`) | klicken setzt Eckpunkte, Doppelklick / `Enter` / rechte Maustaste schließt ab, `Esc` bricht ab. Enden fangen an Pins und Drahtenden |
 | **Label** (Taste `L`) | klicken, Netznamen eingeben. Der Anker ist der elektrische Punkt; **gleichnamige Labels sind ein Netz**. Mit dem Haken „global" wird es ein globales Label (Fahne) und verbindet über alle Blätter; `G` schaltet gewählte Labels um. `R`/`X`/`Y` legen die Richtung fest (rechts, unten, links, oben) – vorher für das nächste Label, danach für das gewählte, das um seinen Anker dreht |
 | **Bauteil** | in der Leiste aus der Liste wählen, dann auf die Fläche klicken; rechte Maustaste oder `R` dreht die Vorschau |
+| **Messen** (Taste `M`) | zwei Punkte klicken (fangen an Pins und Drahtenden): Abstand in mm und mil, dazu dx/dy; ein dritter Klick misst neu |
 
 **Aktiv-low:** `~{RESET}` in Pin-Namen und Labels wird überstrichen gezeichnet,
 ebenso die ältere Schreibweise `~CS~/WR` (die Tilde schaltet den Strich um; `~~`
@@ -195,6 +196,10 @@ ein Haken auch nur dieses eine umbenennen. Hat das Netz nur einen automatischen
 Namen, setzt Funkenflug ein Label an die angeklickte Stelle. Trägt ein anderes
 Netz den neuen Namen schon, fragt es vorher – Umbenennen würde beide verbinden.
 
+**Drahtfarben:** Versorgungsnetze rot (VCC, VDD, +5V, 3V3 …), Masse grau (GND,
+AGND, VSS, 0V …), Signale blau – nach Versorgungssymbol bzw. Netzname, im
+Druck in dunkleren Tönen.
+
 **Netze:** Fährt die Maus über einen Draht, einen Pin oder ein Label, zeigt die
 Statuszeile den Netznamen samt Pinzahl und die Drähte des Netzes leuchten auf.
 Namen: Versorgungssymbol (GND, VCC, auch ein umbenanntes wie `+5V`) vor globalem
@@ -255,6 +260,11 @@ laufend:
 - **Kurzschluss** (rot): zwei Netze auf demselben Kupferstück.
 - **Hinweise** (orange): doppelt belegtes Loch, Bein außerhalb der Platine, Bein
   in einer Trennstelle, unbekanntes Gehäuse.
+
+**Cross-Probing:** Die Auswahl wandert beim Umschalten mit – gewählte
+Bauteile im Schaltplan sind auf der Platine gewählt und umgekehrt (im
+Schaltplan samt Blattwechsel und Sprung). Steckt ein Teil noch nicht auf der
+Platine, sagt es die Statuszeile.
 
 `ERC` heißt in dieser Sicht „Platine prüfen" und listet alles; eine Zeile
 springt hin. Die Statuszeile nennt das Netz des Lochs unter der Maus.
@@ -342,6 +352,10 @@ geht so höchstens eine Minute Arbeit verloren.
   springt aufs Blatt und wählt das Element, *Alle ersetzen* ist ein
   Rückgängig-Schritt. Ein Feld ist ein Treffer, auch wenn das Muster darin
   mehrmals vorkommt.
+- *Ausrichten / Verteilen* – gewählte Bauteile links, rechts, oben oder unten
+  an der Kante der Auswahl ausrichten bzw. ihre Mitten waagrecht oder
+  senkrecht gleichmäßig verteilen (die äußeren bleiben stehen). Alles auf dem
+  1-mm-Raster, angeschlossene Drähte folgen mit dem Gummiband.
 - *Dokument-Eigenschaften* – Titel, Autor, Revision, Firma/Projekt fürs
   Schriftfeld (PDF, Druck) und den Kopf des Platinen-Ausdrucks.
 
@@ -387,7 +401,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (259 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (272 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
@@ -403,7 +417,8 @@ Pins mit Maus-Ereignissen zeichnen, verschieben, löschen, zurücknehmen und
 übernehmen; Unterblatt über das Menü einsetzen, per Doppelklick öffnen, Port
 mit `H`, Verbindung über die Blattgrenze; Annotieren über das Menü,
 Suchen & Ersetzen im Dialog, Dokument-Eigenschaften, Speichern, Autosave und
-Wiederherstellen beim Öffnen). `pruef_kern.dh` prüft u. a. die
+Wiederherstellen beim Öffnen, Drahtfarben, Messen mit Fang, Verteilen und
+Ausrichten samt Draht, Cross-Probing in beide Richtungen). `pruef_kern.dh` prüft u. a. die
 Gruppen-Lage in allen 8 Orientierungen × 3 Arten (72 Pin-Prüfungen). Der Selbsttest
 lässt die Zwischenablage des Systems in Ruhe und schreibt seine Bibliothek in
 eine Wegwerf-Datei neben dem Bild. `--nur-foto bild.png` macht nur das Bild.

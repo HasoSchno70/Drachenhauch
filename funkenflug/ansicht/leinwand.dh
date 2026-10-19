@@ -14,6 +14,7 @@ CONST WZ_AUSWAHL = 0
 CONST WZ_DRAHT = 1
 CONST WZ_BAUTEIL = 2
 CONST WZ_LABEL = 3
+CONST WZ_MESSEN = 4
 
 ' Farben (dunkles Thema)
 CONST C_HG = &H12131A
@@ -28,6 +29,8 @@ CONST C_AUSWAHL = &HFF8A3D
 CONST C_GEIST = &H556070
 CONST C_KNOTEN = &H4FA3FF
 CONST C_LABEL = &H8FE0A0
+CONST C_DRAHT_VERS = &HFF6B6B      ' Versorgung
+CONST C_DRAHT_MASSE = &HA0A8B8     ' Masse
 
 ' Fangradius in Einheiten (fuer Pin-/Drahtende-Fang)
 CONST FANG = 150
@@ -49,6 +52,8 @@ FUNCTION druckFarbe(c AS INTEGER) AS INTEGER
     SELECT CASE c
         CASE C_HG : RETURN &HFFFFFF
         CASE C_DRAHT, C_KNOTEN : RETURN &H1A4E9C
+        CASE C_DRAHT_VERS : RETURN &HB01E1E
+        CASE C_DRAHT_MASSE : RETURN &H555555
         CASE C_BAUTEIL : RETURN &H8C1D18
         CASE C_TEXT : RETURN &H333333
         CASE C_WERT : RETURN &H1F1F1F
@@ -293,6 +298,7 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     END IF
     ercMarkerZeichnen(cr)
     rahmenZeichnen(cr)
+    messenZeichnen(cr)
     RETURN TRUE
 END FUNCTION
 
@@ -320,7 +326,7 @@ SUB inhaltZeichnen(cr AS INTEGER)
         ELSEIF hell THEN
             drahtZeichnen(cr, dr, C_HOVER, 3.5)
         ELSE
-            drahtZeichnen(cr, dr, C_DRAHT, gStrich)
+            drahtZeichnen(cr, dr, drahtFarbe(dr), gStrich)
         END IF
     NEXT
     FOR i = 0 TO LEN(gBlatt.knoten) - 1
@@ -590,6 +596,19 @@ SUB gitterZeichnen(cr AS INTEGER, bw AS FLOAT, bh AS FLOAT)
         gy = gy + kern.RASTER
     WEND
 END SUB
+
+' Farbe nach Netzklasse: Versorgung rot, Masse grau, Signal blau.
+FUNCTION drahtFarbe(w AS kern.Draht) AS INTEGER
+    IF LEN(w.punkte) = 0 THEN RETURN C_DRAHT
+    DIM n AS kern.Netze : n = aktuelleNetze()
+    DIM i AS INTEGER : i = n.netzAn(w.punkte[0].x, w.punkte[0].y)
+    IF i < 0 THEN RETURN C_DRAHT
+    SELECT CASE kern.netzKlasse(n.liste[i])
+        CASE kern.NK_VERSORGUNG : RETURN C_DRAHT_VERS
+        CASE kern.NK_MASSE : RETURN C_DRAHT_MASSE
+    END SELECT
+    RETURN C_DRAHT
+END FUNCTION
 
 SUB drahtZeichnen(cr AS INTEGER, w AS kern.Draht, farbe AS INTEGER, breite AS FLOAT)
     IF LEN(w.punkte) < 2 THEN RETURN
