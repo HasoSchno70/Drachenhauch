@@ -12,6 +12,7 @@ IMPORT "stueckliste.dh" AS kern
 IMPORT "netze.dh" AS kern
 IMPORT "erc.dh" AS kern
 IMPORT "hierarchie.dh" AS kern
+IMPORT "busse.dh" AS kern
 IMPORT "netzliste.dh" AS kern
 IMPORT "ngspice.dh" AS kern
 IMPORT "simulation.dh" AS kern

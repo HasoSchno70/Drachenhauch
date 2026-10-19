@@ -29,6 +29,7 @@ IMPORT "ansicht/komfort.dh"
 IMPORT "ansicht/bericht.dh"
 IMPORT "ansicht/simulation.dh"
 IMPORT "ansicht/platine3d.dh"
+IMPORT "ansicht/busse.dh"
 
 CONST STIL = "window { background-color: #12131a; color: #e6e6f0; }" + _
     " headerbar { background-color: #1a1c26; color: #e6e6f0; }" + _
@@ -49,6 +50,7 @@ DIM gKnopfAuswahl AS INTEGER
 DIM gKnopfDraht AS INTEGER
 DIM gKnopfLabel AS INTEGER
 DIM gKnopfMessen AS INTEGER
+DIM gKnopfBus AS INTEGER
 DIM gKnopfZurueck AS INTEGER
 DIM gKnopfVor AS INTEGER
 DIM gSymbolWahl AS INTEGER
@@ -132,6 +134,7 @@ SUB werkzeugKnoepfeNachziehen()
     gtk_toggle_button_set_active(gKnopfDraht, gWerkzeug = WZ_DRAHT)
     gtk_toggle_button_set_active(gKnopfLabel, gWerkzeug = WZ_LABEL)
     gtk_toggle_button_set_active(gKnopfMessen, gWerkzeug = WZ_MESSEN)
+    gtk_toggle_button_set_active(gKnopfBus, gWerkzeug = WZ_BUS)
     gKnoepfeSetzen = FALSE
 END SUB
 
@@ -627,6 +630,11 @@ END SUB
 SUB aufAuswahl(knopf AS INTEGER, daten AS INTEGER)
     IF gKnoepfeSetzen THEN RETURN
     werkzeugWaehlen(WZ_AUSWAHL, "")
+END SUB
+
+SUB aufBus(knopf AS INTEGER, daten AS INTEGER)
+    IF gKnoepfeSetzen THEN RETURN
+    werkzeugWaehlen(WZ_BUS, "")
 END SUB
 
 SUB aufDraht(knopf AS INTEGER, daten AS INTEGER)
@@ -2355,6 +2363,62 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             pruefe("Ziehen dreht und kippt begrenzt", STR$(ROUND(g3Kamera.azimut)) + " " + STR$(ROUND(g3Kamera.hoehe)), "0 90")
             p3Zu(g3Dlg, 0, 0)
             gtk_button_clicked(gKnopfSchaltplan)
+        CASE 44
+            ' Busse: zeichnen und benennen, Abzweige mit dem naechsten freien Mitglied
+            leinwandDokument(NEW kern.Dokument())
+            verlaufRuecksetzen()
+            gtk_button_clicked(gKnopfBus)
+            pruefe("Knopf Bus", STR$(gWerkzeug) + " " + STR$(gtk_toggle_button_get_active(gKnopfBus)), STR$(WZ_BUS) + " " + STR$(TRUE))
+            gDrahtAktiv = TRUE
+            gDrahtPunkte = [NEW kern.Punkt(2000, 2000), NEW kern.Punkt(8000, 2000)]
+            probeText1 = "D[0..3]" : probeText2 = PROBE_LASSEN : probeText3 = PROBE_LASSEN : probeText4 = PROBE_LASSEN
+            g_timeout_add(150, dialogBestaetigen, 0)
+            drahtEndePunkt()
+            pruefe("Bus gezeichnet und benannt", STR$(LEN(gBlatt.busse)) + " " + gBlatt.busse[0].name + " " + STR$(LEN(gBlatt.draehte)), "1 D[0..3] 0")
+            werkzeugWaehlen(WZ_DRAHT, "")
+            DIM bpi AS INTEGER
+            FOR bpi = 0 TO 3
+                DIM bpx AS INTEGER : bpx = 3000 + bpi * 1400
+                DIM bpr AS kern.Bauteil : bpr = kern.neuesBauteil("R", NEW kern.Lage(NEW kern.Punkt(bpx, 3600), 90, FALSE))
+                bpr.referenz = "R" + STR$(bpi + 1)
+                ARRAY_PUSH(gBlatt.bauteile, bpr)
+                probeText1 = PROBE_LASSEN
+                g_timeout_add(150, dialogBestaetigen, 0)
+                gDrahtAktiv = TRUE
+                gDrahtPunkte = [NEW kern.Punkt(bpx, 2000), NEW kern.Punkt(bpx, 3400)]
+                drahtEndePunkt()
+            NEXT
+            DIM bpl AS STRING : bpl = ""
+            FOR bpi = 0 TO LEN(gBlatt.labels) - 1
+                bpl = bpl + gBlatt.labels[bpi].text + "@" + STR$(gBlatt.labels[bpi].anker.y) + " "
+            NEXT
+            pruefe("Abzweige: naechstes freies Mitglied, Label einen Schritt vom Bus", bpl, "D0@2100 D1@2100 D2@2100 D3@2100 ")
+            DIM bpe AS ARRAY OF kern.Verstoss : bpe = kern.ercPruefenDok(gDok)
+            DIM bpm AS INTEGER : bpm = 0
+            FOR bpi = 0 TO LEN(bpe) - 1
+                IF CONTAINS(bpe[bpi].text, "Bus") OR (CONTAINS(bpe[bpi].text, "Offenes Drahtende") AND bpe[bpi].y = 2000) THEN bpm = bpm + 1
+            NEXT
+            pruefe("ERC: Bus und Abzweige in Ordnung", STR$(bpm), "0")
+            pruefe("Abzweig = ein Rueckgaengig-Schritt (Draht + Label)", STR$(LEN(gUndo)), "5")
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            vZoom = 0.2
+            zentrieren(4900, 2800)
+        CASE 45
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel + ".bus.png") THEN PRINT "Foto Bus gesichert"
+            END IF
+            ' Bus anklicken und ziehen: die Abzweige folgen
+            mausSetzen(sx(7600), sy(2000))
+            klickAuswahl(sx(7600), sy(2000), FALSE)
+            pruefe("Bus angeklickt", STR$(LEN(gSelBus)) + " " + STR$(auswahlAnzahl()), "1 1")
+            gruppenZiehenUm(0, -500)
+            gruppenZugEnde()
+            gZieht = FALSE
+            pruefe("Bus gezogen, Abzweige folgen", STR$(gBlatt.busse[0].punkte[0].y) + " " + STR$(gBlatt.draehte[0].punkte[0].y) + " " + STR$(gBlatt.draehte[3].punkte[0].y), "1500 1500 1500")
+            auswahlLoeschen(FALSE)
+            pruefe("Bus geloescht, Abzweige bleiben", STR$(LEN(gBlatt.busse)) + " " + STR$(LEN(gBlatt.draehte)), "0 4")
+            verlaufZurueck()
+            pruefe("Rueckgaengig: Bus wieder da", STR$(LEN(gBlatt.busse)) + " " + gBlatt.busse[0].name, "1 D[0..3]")
         CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()
@@ -2553,6 +2617,10 @@ gtk_widget_set_tooltip_text(gKnopfLabel, "Netz-Label setzen (L)")
 gtk_box_pack_start(leiste, gKnopfAuswahl, FALSE, FALSE, 0)
 gtk_box_pack_start(leiste, gKnopfDraht, FALSE, FALSE, 0)
 gtk_box_pack_start(leiste, gKnopfLabel, FALSE, FALSE, 0)
+gKnopfBus = leistenKnopf("Bus")
+gtk_widget_set_tooltip_text(gKnopfBus, "Bus zeichnen (B): Name wie D[0..7]; ein Draht vom Bus ist ein Abzweig mit Mitglieds-Label")
+gtk_box_pack_start(leiste, gKnopfBus, FALSE, FALSE, 0)
+signal(gKnopfBus, "clicked", aufBus, 0, 0, 0)
 gKnopfMessen = leistenKnopf("Messen")
 gtk_widget_set_tooltip_text(gKnopfMessen, "Abstand messen: zwei Punkte klicken, faengt an Pins und Drahtenden (M)")
 gtk_box_pack_start(leiste, gKnopfMessen, FALSE, FALSE, 0)

@@ -1,0 +1,344 @@
+' Busse -- Namensraum "kern".
+'
+' Ein Bus ist eine dicke Linie mit einem Namen, der seine Mitglieder nennt:
+'     D[0..7]        D0 .. D7          A[15:0]   A15 .. A0
+'     D[0..3],CLK    D0 .. D3, CLK     I2C{SDA SCL}   I2C.SDA, I2C.SCL
+'
+' Ein Bus VERBINDET NICHTS. Verbunden wird wie ueberall ueber Netznamen: ein
+' Abzweig ist ein gewoehnlicher Draht, der auf dem Bus endet und ein Label
+' mit einem Mitgliedsnamen traegt; gleichnamige Labels sind ein Netz. Der Bus
+' ist die Zeichnung dazu -- und der ERC prueft, dass sie stimmt (Abzweig ohne
+' oder mit falschem Label, Pin direkt auf dem Bus, Bus ohne Namen).
+' SparkNode fuehrte den Bus als Draht-Art in derselben Verbindungsrechnung
+' und brauchte Ausnahmen, damit er nicht alle Mitglieder kurzschliesst; die
+' Netzliste kannte Busse gar nicht.
+'
+' Ueber die Blattgrenze: ein Port mit Busnamen (hierarchisches Label
+' "D[0..7]" im Unterblatt) verbindet jedes Mitglied mit dem gleichnamigen
+' Netz im Elternblatt (portsVerbinden).
+'
+' Busse, die sich beruehren, sind eine Gruppe mit einem Namen.
+
+
+FUNCTION istBusName(t AS STRING) AS BOOLEAN
+    RETURN (CONTAINS(t, "[") AND CONTAINS(t, "]")) OR (CONTAINS(t, "{") AND CONTAINS(t, "}"))
+END FUNCTION
+
+' Mitglieder aus dem Namen; fehler <> "" bei einem unlesbaren Namen.
+FUNCTION busMitglieder(name AS STRING, BYREF fehler AS STRING) AS ARRAY OF STRING
+    DIM r AS ARRAY OF STRING : r = []
+    fehler = ""
+    DIM t AS STRING : t = TRIM$(name)
+    IF t = "" THEN
+        fehler = "Bus ohne Namen"
+        RETURN r
+    END IF
+    ' in Teile zerlegen: Komma oder Leerzeichen, nicht innerhalb von {}
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM akt AS STRING : akt = ""
+    DIM tiefe AS INTEGER : tiefe = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        DIM c AS STRING : c = MID$(t, i, 1)
+        IF c = "{" THEN tiefe = tiefe + 1
+        IF c = "}" THEN tiefe = tiefe - 1
+        IF (c = "," OR c = " ") AND tiefe = 0 THEN
+            IF akt <> "" THEN ARRAY_PUSH(teile, akt)
+            akt = ""
+        ELSE
+            akt = akt + c
+        END IF
+    NEXT
+    IF akt <> "" THEN ARRAY_PUSH(teile, akt)
+    IF tiefe <> 0 THEN
+        fehler = "Klammern { } passen nicht in " + name
+        RETURN []
+    END IF
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(teile) - 1
+        DIM p AS STRING : p = teile[k]
+        DIM g AS INTEGER : g = INSTR(p, "{")
+        DIM e AS INTEGER : e = INSTR(p, "[")
+        IF g >= 0 THEN
+            ' Gruppe: Vorsatz{A B C}
+            IF NOT ENDSWITH(p, "}") THEN
+                fehler = "nach } darf nichts folgen: " + p
+                RETURN []
+            END IF
+            DIM vor AS STRING : vor = LEFT$(p, g)
+            DIM innen AS STRING : innen = MID$(p, g + 1, LEN(p) - g - 2)
+            DIM f2 AS STRING
+            DIM sub2 AS ARRAY OF STRING : sub2 = busMitglieder(innen, f2)
+            IF f2 <> "" THEN
+                fehler = f2
+                RETURN []
+            END IF
+            DIM j AS INTEGER
+            FOR j = 0 TO LEN(sub2) - 1
+                ARRAY_PUSH(r, IIF(vor = "", sub2[j], vor + "." + sub2[j]))
+            NEXT
+        ELSEIF e >= 0 THEN
+            ' Vektor: NAME[a..b] oder NAME[a:b]
+            IF NOT ENDSWITH(p, "]") OR e = 0 THEN
+                fehler = "Busname nicht lesbar: " + p + " (so: D[0..7])"
+                RETURN []
+            END IF
+            DIM basis AS STRING : basis = LEFT$(p, e)
+            DIM bereich AS STRING : bereich = MID$(p, e + 1, LEN(p) - e - 2)
+            DIM trenn AS STRING : trenn = IIF(CONTAINS(bereich, ".."), "..", ":")
+            DIM ab AS ARRAY OF STRING : ab = SPLIT$(bereich, trenn)
+            DIM von AS INTEGER, bis AS INTEGER
+            IF LEN(ab) <> 2 THEN
+                fehler = "Busname nicht lesbar: " + p + " (so: D[0..7])"
+                RETURN []
+            END IF
+            IF NOT ganzzahlLesen(ab[0], von) OR NOT ganzzahlLesen(ab[1], bis) THEN
+                fehler = "Busname nicht lesbar: " + p + " (so: D[0..7])"
+                RETURN []
+            END IF
+            IF ABS(bis - von) > 255 THEN
+                fehler = "Bus " + p + " ist breiter als 256"
+                RETURN []
+            END IF
+            DIM st AS INTEGER : st = IIF(bis >= von, 1, -1)
+            DIM z AS INTEGER : z = von
+            WHILE TRUE
+                ARRAY_PUSH(r, basis + STR$(z))
+                IF z = bis THEN BREAK
+                z = z + st
+            WEND
+        ELSE
+            ARRAY_PUSH(r, p)
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+
+' Liegt q auf der Strecke a..b (Enden eingeschlossen)?
+FUNCTION aufStrecke(ax AS INTEGER, ay AS INTEGER, bx AS INTEGER, by AS INTEGER, qx AS INTEGER, qy AS INTEGER) AS BOOLEAN
+    IF (bx - ax) * (qy - ay) - (by - ay) * (qx - ax) <> 0 THEN RETURN FALSE
+    RETURN qx >= MIN(ax, bx) AND qx <= MAX(ax, bx) AND qy >= MIN(ay, by) AND qy <= MAX(ay, by)
+END FUNCTION
+
+' Index des Busses, auf dem der Punkt liegt (-1 = keiner)
+FUNCTION busAn(bl AS Blatt, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM qx AS INTEGER : qx = rastern(x, RASTER)
+    DIM qy AS INTEGER : qy = rastern(y, RASTER)
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(bl.busse) - 1
+        DIM bu AS Bus : bu = bl.busse[i]
+        FOR j = 0 TO LEN(bu.punkte) - 2
+            IF aufStrecke(rastern(bu.punkte[j].x, RASTER), rastern(bu.punkte[j].y, RASTER), rastern(bu.punkte[j + 1].x, RASTER), rastern(bu.punkte[j + 1].y, RASTER), qx, qy) THEN RETURN i
+        NEXT
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Gruppen beruehrender Busse: je Bus der Index seiner Gruppe (= kleinster Bus)
+FUNCTION busGruppen(bl AS Blatt) AS ARRAY OF INTEGER
+    DIM g AS ARRAY OF INTEGER : g = []
+    DIM i AS INTEGER, j AS INTEGER, k AS INTEGER
+    FOR i = 0 TO LEN(bl.busse) - 1
+        ARRAY_PUSH(g, i)
+    NEXT
+    FOR i = 0 TO LEN(bl.busse) - 1
+        FOR j = 0 TO LEN(bl.busse) - 1
+            IF i = j THEN CONTINUE
+            DIM bi2 AS Bus : bi2 = bl.busse[i]
+            DIM beruehrt AS BOOLEAN : beruehrt = FALSE
+            DIM ende AS INTEGER
+            FOR ende = 0 TO 1
+                IF LEN(bi2.punkte) = 0 THEN CONTINUE
+                DIM p AS Punkt : p = IIF(ende = 0, bi2.punkte[0], bi2.punkte[LEN(bi2.punkte) - 1])
+                DIM bj AS Bus : bj = bl.busse[j]
+                FOR k = 0 TO LEN(bj.punkte) - 2
+                    IF aufStrecke(bj.punkte[k].x, bj.punkte[k].y, bj.punkte[k + 1].x, bj.punkte[k + 1].y, p.x, p.y) THEN beruehrt = TRUE
+                NEXT
+            NEXT
+            IF beruehrt THEN
+                DIM ga AS INTEGER : ga = g[i]
+                DIM gb AS INTEGER : gb = g[j]
+                IF ga <> gb THEN
+                    DIM neu AS INTEGER : neu = MIN(ga, gb)
+                    FOR k = 0 TO LEN(g) - 1
+                        IF g[k] = ga OR g[k] = gb THEN g[k] = neu
+                    NEXT
+                END IF
+            END IF
+        NEXT
+    NEXT
+    RETURN g
+END FUNCTION
+
+' Der Name einer Gruppe: der erste gesetzte (widerspruch = ein anderer)
+FUNCTION busGruppenName$(bl AS Blatt, g AS ARRAY OF INTEGER, gruppe AS INTEGER, BYREF widerspruch AS STRING) AS STRING
+    DIM n AS STRING : n = ""
+    widerspruch = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bl.busse) - 1
+        IF g[i] <> gruppe OR TRIM$(bl.busse[i].name) = "" THEN CONTINUE
+        IF n = "" THEN
+            n = TRIM$(bl.busse[i].name)
+        ELSEIF TRIM$(bl.busse[i].name) <> n THEN
+            widerspruch = TRIM$(bl.busse[i].name)
+        END IF
+    NEXT
+    RETURN n
+END FUNCTION
+
+' Naechstes freies Mitglied fuer einen neuen Abzweig (das erste, das auf
+' dem Blatt noch kein Label hat; sonst das erste)
+FUNCTION busFreiesMitglied$(bl AS Blatt, busIndex AS INTEGER) AS STRING
+    DIM g AS ARRAY OF INTEGER : g = busGruppen(bl)
+    DIM wid AS STRING, fe AS STRING
+    DIM name AS STRING : name = busGruppenName$(bl, g, g[busIndex], wid)
+    DIM m AS ARRAY OF STRING : m = busMitglieder(name, fe)
+    IF LEN(m) = 0 THEN RETURN ""
+    DIM da AS MAP OF INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bl.labels) - 1
+        MAPPUT(da, bl.labels[i].text, 1)
+    NEXT
+    FOR i = 0 TO LEN(m) - 1
+        IF NOT MAPHAS(da, m[i]) THEN RETURN m[i]
+    NEXT
+    RETURN m[0]
+END FUNCTION
+
+' Die Namen auf einem Netz (Labels, Versorgungen)
+FUNCTION netzNamenAlle(nz AS Netz) AS ARRAY OF STRING
+    DIM r AS ARRAY OF STRING : r = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(nz.labelNamen) - 1
+        ARRAY_PUSH(r, nz.labelNamen[i])
+    NEXT
+    FOR i = 0 TO LEN(nz.globaleNamen) - 1
+        ARRAY_PUSH(r, nz.globaleNamen[i])
+    NEXT
+    FOR i = 0 TO LEN(nz.hierNamen) - 1
+        ARRAY_PUSH(r, nz.hierNamen[i])
+    NEXT
+    FOR i = 0 TO LEN(nz.versorgungen) - 1
+        ARRAY_PUSH(r, nz.versorgungen[i])
+    NEXT
+    RETURN r
+END FUNCTION
+
+' ERC der Busse
+SUB ercBusse(dok AS Dokument, n AS Netze, BYREF warnungen AS ARRAY OF Verstoss)
+    DIM bi AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        IF LEN(dok.blaetter[bi].busse) > 0 THEN ercBusBlatt(dok, n, bi, warnungen)
+    NEXT
+END SUB
+
+SUB ercBusBlatt(dok AS Dokument, n AS Netze, bi AS INTEGER, BYREF warnungen AS ARRAY OF Verstoss)
+    DIM i AS INTEGER, j AS INTEGER, k AS INTEGER
+        DIM bl AS Blatt : bl = dok.blaetter[bi]
+        n.blattWaehlen(bi)
+        DIM g AS ARRAY OF INTEGER : g = busGruppen(bl)
+        ' je Gruppe: Name lesbar, eindeutig
+        DIM namen AS MAP OF STRING
+        DIM mitglied AS MAP OF STRING      ' "gruppe|mitglied" -> 1
+        FOR i = 0 TO LEN(bl.busse) - 1
+            IF g[i] <> i THEN CONTINUE
+            DIM wid AS STRING
+            DIM nm AS STRING : nm = busGruppenName$(bl, g, i, wid)
+            DIM ort AS Punkt : ort = bl.busse[i].punkte[0]
+            IF wid <> "" THEN ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Zusammenhaengende Busse heissen verschieden: " + nm + " und " + wid, bi, ort.x, ort.y))
+            DIM fe AS STRING
+            DIM m AS ARRAY OF STRING : m = busMitglieder(nm, fe)
+            IF fe <> "" THEN ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, fe, bi, ort.x, ort.y))
+            MAPPUT(namen, STR$(i), nm)
+            FOR k = 0 TO LEN(m) - 1
+                MAPPUT(mitglied, STR$(i) + "|" + m[k], "1")
+            NEXT
+        NEXT
+        ' Abzweige: Drahtenden auf einem Bus
+        FOR i = 0 TO LEN(bl.draehte) - 1
+            DIM w AS Draht : w = bl.draehte[i]
+            IF LEN(w.punkte) < 2 THEN CONTINUE
+            DIM ende AS INTEGER
+            FOR ende = 0 TO 1
+                DIM p AS Punkt : p = IIF(ende = 0, w.punkte[0], w.punkte[LEN(w.punkte) - 1])
+                DIM bx AS INTEGER : bx = busAn(bl, p.x, p.y)
+                IF bx < 0 THEN CONTINUE
+                DIM gk AS STRING : gk = STR$(g[bx])
+                DIM bname AS STRING : bname = MAPGET(namen, gk)
+                IF bname = "" THEN CONTINUE              ' schon gemeldet
+                ' ein Draht ohne Pin und Label ist noch kein Netz -- dann ohne Namen
+                DIM ni AS INTEGER : ni = n.netzAn(p.x, p.y)
+                DIM nn AS ARRAY OF STRING : nn = []
+                IF ni >= 0 THEN nn = netzNamenAlle(n.liste[ni])
+                DIM passt AS BOOLEAN : passt = FALSE
+                FOR k = 0 TO LEN(nn) - 1
+                    IF MAPHAS(mitglied, gk + "|" + nn[k]) THEN passt = TRUE
+                NEXT
+                IF passt THEN CONTINUE
+                IF LEN(nn) = 0 THEN
+                    ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Abzweig vom Bus " + bname + " ohne Label -- welches Mitglied ist es?", bi, p.x, p.y))
+                ELSE
+                    ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, JOIN$(nn, "/") + " gehoert nicht zum Bus " + bname, bi, p.x, p.y))
+                END IF
+            NEXT
+        NEXT
+        ' Pins direkt auf dem Bus
+        FOR i = 0 TO LEN(bl.bauteile) - 1
+            DIM b AS Bauteil : b = bl.bauteile[i]
+            IF b.sym.blattSymbol THEN CONTINUE
+            FOR j = 0 TO LEN(b.sym.pins) - 1
+                DIM pp AS Punkt : pp = b.pinPunkt(j)
+                IF busAn(bl, pp.x, pp.y) >= 0 THEN ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Pin " + b.referenz + "." + b.sym.pins[j].nummer + " liegt auf einem Bus -- ein Bus verbindet nichts, Draht mit Label nehmen", bi, pp.x, pp.y))
+            NEXT
+        NEXT
+END SUB
+
+' Bus-Ports: jedes Mitglied mit dem gleichnamigen Netz im Elternblatt
+SUB busPortVerbinden(dok AS Dokument, n AS Netze, eltern AS INTEGER, kind AS INTEGER, name AS STRING)
+    DIM fe AS STRING
+    DIM m AS ARRAY OF STRING : m = busMitglieder(name, fe)
+    IF fe <> "" THEN RETURN
+    DIM i AS INTEGER, k AS INTEGER
+    FOR i = 0 TO LEN(m) - 1
+        DIM erst AS INTEGER : erst = -1
+        n.blattWaehlen(eltern)
+        FOR k = 0 TO LEN(dok.blaetter[eltern].labels) - 1
+            DIM la AS Label : la = dok.blaetter[eltern].labels[k]
+            IF la.text = m[i] THEN
+                erst = n.punkt(la.anker.x, la.anker.y)
+                BREAK
+            END IF
+        NEXT
+        IF erst < 0 THEN CONTINUE
+        n.blattWaehlen(kind)
+        FOR k = 0 TO LEN(dok.blaetter[kind].labels) - 1
+            DIM lk AS Label : lk = dok.blaetter[kind].labels[k]
+            IF lk.text = m[i] AND lk.art <> LA_GLOBAL THEN n.eins(erst, n.punkt(lk.anker.x, lk.anker.y))
+        NEXT
+    NEXT
+END SUB
+
+FUNCTION busNachJson(bu AS Bus) AS JSON_HANDLE
+    DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+    JSON_SET_STRING(j, "id", bu.id)
+    JSON_SET_STRING(j, "name", bu.name)
+    JSON_SET_JSON(j, "pts", JSON_NEW_ARRAY())
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bu.punkte) - 1
+        JSON_APPEND_INT(j, "pts", bu.punkte[i].x)
+        JSON_APPEND_INT(j, "pts", bu.punkte[i].y)
+    NEXT
+    RETURN j
+END FUNCTION
+
+FUNCTION busAusJson(j AS JSON_HANDLE, p AS STRING) AS Bus
+    DIM bu AS Bus : bu = NEW Bus(IIF(JSON_HAS(j, p + ".name"), JSON_GET_STRING(j, p + ".name"), ""))
+    IF JSON_HAS(j, p + ".id") THEN bu.id = JSON_GET_STRING(j, p + ".id")
+    DIM n AS INTEGER : n = JSON_LEN(j, p + ".pts")
+    DIM k AS INTEGER : k = 0
+    WHILE k + 1 < n
+        ARRAY_PUSH(bu.punkte, NEW Punkt(JSON_GET_INT(j, p + ".pts." + STR$(k)), JSON_GET_INT(j, p + ".pts." + STR$(k + 1))))
+        k = k + 2
+    WEND
+    RETURN bu
+END FUNCTION

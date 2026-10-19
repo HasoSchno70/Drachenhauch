@@ -1047,6 +1047,108 @@ ELSE
     PRINT "Kaputtes Deck: "; kern.ngspiceRechnen(["* kaputt", "R1 a 0 1k", "Q1 a b 0 GIBTSNICHT", ".op", ".end"], bplot, bfehler); "  Meldung "; LEN(bfehler) > 10; "  danach Teiler "; kern.siText$(simV(kern.simRechnen(stDok, stE), "MITTE"), "V"); "  (erwartet FALSE  Meldung TRUE  danach Teiler 5 V)"
 END IF
 
+' --- Busse: Namen, ERC, verbindet nichts, Datei, Bus-Port, KiCad
+DIM bmF AS STRING, bmT AS STRING : bmT = ""
+DIM bmE AS ARRAY OF STRING : bmE = ["D[0..3]", "A[3:0]", "D[0..1],CLK EN", "I2C{SDA SCL}", "{X Y}", "D[0..x]", ""]
+DIM bmi AS INTEGER
+FOR bmi = 0 TO LEN(bmE) - 1
+    DIM bmM AS ARRAY OF STRING : bmM = kern.busMitglieder(bmE[bmi], bmF)
+    bmT = bmT + IIF(bmF <> "", "?", JOIN$(bmM, " ")) + " | "
+NEXT
+PRINT "Bus-Mitglieder: "; bmT; " (erwartet D0 D1 D2 D3 | A3 A2 A1 A0 | D0 D1 CLK EN | I2C.SDA I2C.SCL | X Y | ? | ? | )"
+FUNCTION busDraht(bl AS kern.Blatt, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER) AS kern.Draht
+    DIM w AS kern.Draht : w = NEW kern.Draht()
+    ARRAY_PUSH(w.punkte, NEW kern.Punkt(x1, y1))
+    ARRAY_PUSH(w.punkte, NEW kern.Punkt(x2, y2))
+    ARRAY_PUSH(bl.draehte, w)
+    RETURN w
+END FUNCTION
+FUNCTION busNeu(bl AS kern.Blatt, name AS STRING, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER) AS kern.Bus
+    DIM bu AS kern.Bus : bu = NEW kern.Bus(name)
+    ARRAY_PUSH(bu.punkte, NEW kern.Punkt(x1, y1))
+    ARRAY_PUSH(bu.punkte, NEW kern.Punkt(x2, y2))
+    ARRAY_PUSH(bl.busse, bu)
+    RETURN bu
+END FUNCTION
+DIM bdok AS kern.Dokument : bdok = NEW kern.Dokument()
+DIM bbl AS kern.Blatt : bbl = bdok.blaetter[0]
+DIM bBus AS kern.Bus : bBus = busNeu(bbl, "D[0..3]", 0, 0, 4000, 0)
+DIM bwx AS kern.Draht
+bwx = busDraht(bbl, 1000, 0, 1000, 1000)
+ARRAY_PUSH(bbl.labels, NEW kern.Label("D1", NEW kern.Punkt(1000, 1000), kern.LA_LOKAL))
+bwx = busDraht(bbl, 2000, 0, 2000, 1000)
+bwx = busDraht(bbl, 3000, 0, 3000, 1000)
+ARRAY_PUSH(bbl.labels, NEW kern.Label("X9", NEW kern.Punkt(3000, 1000), kern.LA_LOKAL))
+DIM bR AS kern.Bauteil : bR = kern.neuesBauteil("R", kern.neueLage(4200, 0))
+bR.referenz = "R1"
+ARRAY_PUSH(bbl.bauteile, bR)
+kern.autoKnoten(bbl)
+DIM bErc AS ARRAY OF kern.Verstoss : bErc = kern.ercPruefenDok(bdok)
+DIM bOhne AS INTEGER, bFremd AS INTEGER, bPin AS INTEGER, bOffen AS INTEGER, bOffenBus AS INTEGER
+FOR bmi = 0 TO LEN(bErc) - 1
+    IF CONTAINS(bErc[bmi].text, "Abzweig vom Bus D[0..3] ohne Label") THEN bOhne = bOhne + 1
+    IF CONTAINS(bErc[bmi].text, "X9 gehoert nicht zum Bus D[0..3]") THEN bFremd = bFremd + 1
+    IF CONTAINS(bErc[bmi].text, "Pin R1.1 liegt auf einem Bus") THEN bPin = bPin + 1
+    IF CONTAINS(bErc[bmi].text, "Offenes Drahtende") THEN
+        bOffen = bOffen + 1
+        IF bErc[bmi].y = 0 THEN bOffenBus = bOffenBus + 1
+    END IF
+NEXT
+PRINT "Bus-ERC: ohne Label "; bOhne; "  fremdes Label "; bFremd; "  Pin auf dem Bus "; bPin; "  offene Enden "; bOffen; " davon am Bus "; bOffenBus; "  (erwartet 1 1 1  offene Enden 1 davon am Bus 0)"
+DIM bN AS kern.Netze : bN = kern.netzeDokument(bdok)
+PRINT "Bus verbindet nichts: D1 und X9 getrennt "; NOT bN.gleich(1000, 1000, 3000, 1000); "  freies Mitglied "; kern.busFreiesMitglied$(bbl, 0); "  (erwartet TRUE  freies Mitglied D0)"
+' zwei beruehrende Busse mit verschiedenen Namen, ein Bus ohne Namen
+DIM bZusatz AS kern.Bus : bZusatz = busNeu(bbl, "A[0..1]", 4000, 0, 4000, 2000)
+bZusatz = busNeu(bbl, "", 0, 5000, 2000, 5000)
+bErc = kern.ercPruefenDok(bdok)
+DIM bZwei AS BOOLEAN, bLeer AS BOOLEAN
+FOR bmi = 0 TO LEN(bErc) - 1
+    IF CONTAINS(bErc[bmi].text, "Zusammenhaengende Busse heissen verschieden") THEN bZwei = TRUE
+    IF bErc[bmi].text = "Bus ohne Namen" THEN bLeer = TRUE
+NEXT
+PRINT "Bus-ERC Gruppen: zwei Namen "; bZwei; "  ohne Namen "; bLeer; "  Gruppen "; JOIN$(ARRAY_MAP(kern.busGruppen(bbl), FUNCTION(g) STR$(g)), ","); "  (erwartet TRUE TRUE  Gruppen 0,0,2)"
+DIM bPfad AS STRING : bPfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef_bus.fkn"
+DIM bGesp AS BOOLEAN : bGesp = kern.dokumentSpeichern(bdok, bPfad)
+DIM bdok2 AS kern.Dokument : bdok2 = kern.dokumentLaden(bPfad)
+DELETEFILE(bPfad)
+PRINT "Bus in der Datei: "; LEN(bdok2.blaetter[0].busse); " "; bdok2.blaetter[0].busse[0].name; " "; bdok2.blaetter[0].busse[0].punkte[1].x; "  (erwartet 3 D[0..3] 4000)"
+' Bus-Port: Unterblatt mit hierarchischem Label D[0..1], Mitglieder ueber Namen
+DIM hb AS kern.Dokument : hb = NEW kern.Dokument()
+hb.blaetter[0].name = "Haupt"
+DIM hbk AS kern.Blatt : hbk = NEW kern.Blatt("Daten")
+ARRAY_PUSH(hb.blaetter, hbk)
+DIM hbx AS kern.Bus : hbx = busNeu(hbk, "D[0..1]", 0, 0, 2000, 0)
+DIM hbl AS kern.Label : hbl = NEW kern.Label("D[0..1]", NEW kern.Punkt(0, 0), kern.LA_HIER)
+hbl.drehung = 180
+ARRAY_PUSH(hbk.labels, hbl)
+DIM hbR2 AS kern.Bauteil : hbR2 = kern.neuesBauteil("R", kern.neueLage(1000, 1200))
+hbR2.referenz = "R2"
+ARRAY_PUSH(hbk.bauteile, hbR2)
+ARRAY_PUSH(hbk.labels, NEW kern.Label("D0", NEW kern.Punkt(800, 1200), kern.LA_LOKAL))
+ARRAY_PUSH(hbk.labels, NEW kern.Label("D1", NEW kern.Punkt(1200, 1200), kern.LA_LOKAL))
+DIM hbR1 AS kern.Bauteil : hbR1 = kern.neuesBauteil("R", kern.neueLage(0, 3000))
+hbR1.referenz = "R1"
+ARRAY_PUSH(hb.blaetter[0].bauteile, hbR1)
+ARRAY_PUSH(hb.blaetter[0].labels, NEW kern.Label("D0", NEW kern.Punkt(-200, 3000), kern.LA_LOKAL))
+ARRAY_PUSH(hb.blaetter[0].labels, NEW kern.Label("D1", NEW kern.Punkt(200, 3000), kern.LA_LOKAL))
+DIM hbs AS kern.Bauteil : hbs = kern.neuesBauteil(kern.BLATT_VORSATZ + hbk.id, kern.neueLage(5000, 3000))
+ARRAY_PUSH(hb.blaetter[0].bauteile, hbs)
+kern.blattSymboleAktualisieren(hb)
+DIM hbn AS kern.Netze : hbn = kern.netzeDokument(hb)
+PRINT "Bus-Port: Port "; hbs.sym.pins[0].name; "  D0 oben = D0 unten "; hbn.gleichUeber(0, -200, 3000, 1, 800, 1200); "  D0 oben = D1 unten "; hbn.gleichUeber(0, -200, 3000, 1, 1200, 1200); "  kein Netz D[0..1] "; NOT CONTAINS(kern.netzlisteTextDok$(hb), "D[0..1]"); "  (erwartet D[0..1]  TRUE FALSE TRUE)"
+' KiCad: Bus mit Name aus dem Label, Eintraege als Abzweige
+DIM kbus AS kern.KicadErgebnis : kbus = kern.kicadImportieren("daten/kicad/beispiel.kicad_sch")
+DIM kbBl AS kern.Blatt : kbBl = kbus.dok.blaetter[0]
+DIM kbLabel AS BOOLEAN : kbLabel = FALSE
+FOR bmi = 0 TO LEN(kbBl.labels) - 1
+    IF kbBl.labels[bmi].text = "D[0..1]" THEN kbLabel = TRUE
+NEXT
+DIM kbErc AS ARRAY OF kern.Verstoss : kbErc = kern.ercPruefenDok(kbus.dok)
+DIM kbAbzweig AS INTEGER : kbAbzweig = 0
+FOR bmi = 0 TO LEN(kbErc) - 1
+    IF CONTAINS(kbErc[bmi].text, "Bus") THEN kbAbzweig = kbAbzweig + 1
+NEXT
+PRINT "KiCad-Bus: "; LEN(kbBl.busse); " "; kbBl.busse[0].name; "  Label weg "; NOT kbLabel; "  Bus-Meldungen "; kbAbzweig; "  Alias gemeldet "; CONTAINS(JOIN$(kbus.hinweise, "|"), "Bus-Alias"); "  (erwartet 1 D[0..1]  TRUE  0  TRUE)"
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
 PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)

@@ -127,6 +127,7 @@ FUNCTION ercPruefenDok(dok AS Dokument) AS ARRAY OF Verstoss
     NEXT
 
     ercHierarchie(dok, fehler, warnungen)
+    ercBusse(dok, n, warnungen)
 
     ' --- globale Labels, die nur einmal vorkommen, verbinden nichts
     DIM globAnzahl AS MAP OF INTEGER
@@ -187,6 +188,7 @@ FUNCTION ercPruefenDok(dok AS Dokument) AS ARRAY OF Verstoss
                 DIM e AS Punkt
                 IF ende = 0 THEN e = w.punkte[0] ELSE e = w.punkte[LEN(w.punkte) - 1]
                 IF MAPHAS(festpunkte, netzKey(e.x, e.y)) THEN CONTINUE
+                IF busAn(bl, e.x, e.y) >= 0 THEN CONTINUE          ' Abzweig: endet am Bus
                 IF endenAn(bl, e.x, e.y) >= 2 THEN CONTINUE
                 IF istTPunkt(bl, e.x, e.y) THEN CONTINUE
                 ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Offenes Drahtende", bi, e.x, e.y))

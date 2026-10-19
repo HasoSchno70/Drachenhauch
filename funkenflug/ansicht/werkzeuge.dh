@@ -52,7 +52,7 @@ SUB mausSetzen(px AS FLOAT, py AS FLOAT)
     gMausRX = weltX(px)
     gMausRY = weltY(py)
     gMausDrin = TRUE
-    IF gWerkzeug = WZ_DRAHT OR gWerkzeug = WZ_LABEL OR gWerkzeug = WZ_MESSEN THEN
+    IF gWerkzeug = WZ_DRAHT OR gWerkzeug = WZ_LABEL OR gWerkzeug = WZ_MESSEN OR gWerkzeug = WZ_BUS THEN
         DIM f AS kern.Punkt : f = fangPunkt(gMausRX, gMausRY)
         gMausWX = f.x
         gMausWY = f.y
@@ -251,9 +251,10 @@ END SUB
 
 SUB werkzeugWaehlen(wz AS INTEGER, ref AS STRING)
     IF wz <> WZ_MESSEN THEN gMessAktiv = FALSE
+    DIM vorher AS INTEGER : vorher = gWerkzeug
     gWerkzeug = wz
     IF ref <> "" THEN gSymbolRef = ref
-    IF wz <> WZ_DRAHT THEN
+    IF (wz <> WZ_DRAHT AND wz <> WZ_BUS) OR wz <> vorher THEN
         gDrahtAktiv = FALSE
         gDrahtPunkte = []
     END IF
@@ -314,6 +315,10 @@ END SUB
 ' Den gezeichneten Draht uebernehmen. Doppelte Eckpunkte (der Doppelklick
 ' setzt den letzten Punkt zweimal) fallen weg; unter zwei Punkten kein Draht.
 SUB drahtEndePunkt()
+    IF gWerkzeug = WZ_BUS THEN
+        IF gDrahtAktiv THEN busEnde()
+        RETURN
+    END IF
     IF gDrahtAktiv THEN
         DIM w AS kern.Draht : w = NEW kern.Draht()
         DIM i AS INTEGER
@@ -329,6 +334,7 @@ SUB drahtEndePunkt()
         IF LEN(w.punkte) >= 2 THEN
             verlaufMerken()
             ARRAY_PUSH(gBlatt.draehte, w)
+            abzweigFragen(w)                 ' endet er auf einem Bus: welches Mitglied?
             kern.autoKnoten(gBlatt)
             geaendert()
         END IF
@@ -342,7 +348,7 @@ END SUB
 ' bis zu zwei Teile), mit ganzerDraht der ganze Draht.
 SUB auswahlLoeschen(ganzerDraht AS BOOLEAN)
     DIM i AS INTEGER, k AS INTEGER
-    IF auswahlAnzahl() > 1 THEN
+    IF auswahlAnzahl() > 1 OR LEN(gSelBus) > 0 THEN
         mengeLoeschen()
         RETURN
     END IF
@@ -570,6 +576,10 @@ END SUB
 
 SUB auswahlBearbeiten()
     gZieht = FALSE
+    IF LEN(gSelBus) = 1 AND auswahlAnzahl() = 1 THEN
+        busUmbenennen(gSelBus[0])
+        RETURN
+    END IF
     IF LEN(gSelB) > 1 THEN
         eigenschaftenMehrere(gSelB)
     ELSEIF gHatLabel OR gHatDraht THEN
@@ -601,7 +611,7 @@ FUNCTION lwDruck(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
     END IF
     IF gAnsicht = ANS_PLATINE THEN RETURN plDruck(px, py, knopf, (evZustand(ev) BAND GDK_UMSCHALT) <> 0)
     IF knopf = 3 THEN
-        IF gWerkzeug = WZ_DRAHT AND gDrahtAktiv THEN
+        IF (gWerkzeug = WZ_DRAHT OR gWerkzeug = WZ_BUS) AND gDrahtAktiv THEN
             drahtEndePunkt()
         ELSEIF gWerkzeug = WZ_BAUTEIL THEN
             auswahlDrehen()
@@ -625,7 +635,7 @@ FUNCTION lwDruck(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
             IF NOT doppel THEN labelSetzen()
         CASE WZ_MESSEN
             messenKlick(gMausWX, gMausWY)
-        CASE WZ_DRAHT
+        CASE WZ_DRAHT, WZ_BUS
             IF doppel THEN
                 drahtEndePunkt()
             ELSE
@@ -675,7 +685,9 @@ SUB klickAuswahl(px AS FLOAT, py AS FLOAT, umsch AS BOOLEAN)
     IF li < 0 AND idx < 0 THEN
         IF NOT drahtUnter(px, py, wi, si) THEN wi = -1
     END IF
-    IF li < 0 AND idx < 0 AND wi < 0 THEN
+    DIM bui AS INTEGER : bui = -1
+    IF li < 0 AND idx < 0 AND wi < 0 THEN bui = busUnter(px, py)
+    IF li < 0 AND idx < 0 AND wi < 0 AND bui < 0 THEN
         IF NOT umsch THEN auswahlAufheben()
         gRahmen = TRUE
         gRahmenSX = px : gRahmenSY = py
@@ -686,6 +698,7 @@ SUB klickAuswahl(px AS FLOAT, py AS FLOAT, umsch AS BOOLEAN)
         IF li >= 0 THEN umschaltenL(gBlatt.labels[li])
         IF idx >= 0 THEN umschaltenB(gBlatt.bauteile[idx])
         IF wi >= 0 THEN umschaltenD(gBlatt.draehte[wi])
+        IF bui >= 0 THEN umschaltenBus(gBlatt.busse[bui])
         einzelAusMenge()
         RETURN
     END IF
@@ -693,6 +706,7 @@ SUB klickAuswahl(px AS FLOAT, py AS FLOAT, umsch AS BOOLEAN)
     IF li >= 0 THEN schonDrin = istGewaehltL(gBlatt.labels[li])
     IF idx >= 0 THEN schonDrin = istGewaehltB(gBlatt.bauteile[idx])
     IF wi >= 0 THEN schonDrin = istGewaehltD(gBlatt.draehte[wi])
+    IF bui >= 0 THEN schonDrin = istGewaehltBus(gBlatt.busse[bui])
     IF schonDrin AND auswahlAnzahl() > 1 THEN
         gZieht = TRUE
         gruppenZugBeginn()
@@ -701,6 +715,11 @@ SUB klickAuswahl(px AS FLOAT, py AS FLOAT, umsch AS BOOLEAN)
         gZieht = TRUE
         gSegmentZug = TRUE
         drahtZiehBeginn()
+    ELSEIF bui >= 0 THEN
+        ' ein Bus wandert ganz; seine Abzweige folgen
+        waehleBus(gBlatt.busse[bui])
+        gZieht = TRUE
+        gruppenZugBeginn()
     ELSE
         IF li >= 0 THEN
             waehleL(gBlatt.labels[li])
@@ -874,6 +893,8 @@ FUNCTION lwTaste(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
             auswahlSpiegeln(kern.GR_SPIEGELN_Y)
         CASE K_W
             werkzeugWaehlen(WZ_DRAHT, "")
+        CASE K_B
+            werkzeugWaehlen(WZ_BUS, "")
         CASE K_L
             werkzeugWaehlen(WZ_LABEL, "")
         CASE K_A

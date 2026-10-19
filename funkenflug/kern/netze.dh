@@ -243,6 +243,8 @@ SUB blattVerbinden(bl AS Blatt, n AS Netze, global AS MAP OF INTEGER)
     ' am VCC-Symbol desselben Blatts)
     FOR i = 0 TO LEN(bl.labels) - 1
         DIM la AS Label : la = bl.labels[i]
+        ' ein Busname (D[0..7]) benennt kein Netz -- er ist ein Bus-Port
+        IF istBusName(la.text) THEN CONTINUE
         ARRAY_PUSH(punkte, la.anker)
         DIM li AS INTEGER : li = n.punkt(la.anker.x, la.anker.y)
         IF la.art = LA_GLOBAL THEN
@@ -327,6 +329,7 @@ SUB netzeBenennen(dok AS Dokument, n AS Netze)
             NEXT
         NEXT
         FOR i = 0 TO LEN(bl.labels) - 1
+            IF istBusName(bl.labels[i].text) THEN CONTINUE
             ni = n.netzFuerWurzel(n.wurzelAn(bl.labels[i].anker.x, bl.labels[i].anker.y))
             IF n.liste[ni].blatt < 0 THEN n.liste[ni].blatt = bi
             IF bl.labels[i].art = LA_HIER THEN

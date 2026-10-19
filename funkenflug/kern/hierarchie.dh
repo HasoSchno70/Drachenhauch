@@ -124,6 +124,11 @@ SUB portsVerbinden(dok AS Dokument, n AS Netze)
             DIM ki AS INTEGER : ki = kindIndex(dok, b)
             IF ki < 0 THEN CONTINUE
             FOR j = 0 TO LEN(b.sym.pins) - 1
+                IF istBusName(b.sym.pins[j].name) THEN
+                    ' Bus-Port: jedes Mitglied ueber seinen Namen
+                    busPortVerbinden(dok, n, bi, ki, b.sym.pins[j].name)
+                    CONTINUE
+                END IF
                 DIM pp AS Punkt : pp = b.pinPunkt(j)
                 n.blattWaehlen(bi)
                 DIM pidx AS INTEGER : pidx = n.punkt(pp.x, pp.y)

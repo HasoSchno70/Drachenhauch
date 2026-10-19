@@ -83,6 +83,12 @@ FUNCTION dokumentNachJson(dok AS Dokument) AS JSON_HANDLE
             IF la.drehung <> 0 THEN JSON_SET_INT(lj, "rot", la.drehung)
             JSON_APPEND_JSON(b, "labels", lj)
         NEXT
+        IF LEN(bl.busse) > 0 THEN
+            JSON_SET_JSON(b, "busse", JSON_NEW_ARRAY())
+            FOR li = 0 TO LEN(bl.busse) - 1
+                JSON_APPEND_JSON(b, "busse", busNachJson(bl.busse[li]))
+            NEXT
+        END IF
         JSON_APPEND_JSON(j, "blaetter", b)
     NEXT
     RETURN j
@@ -155,6 +161,11 @@ FUNCTION dokumentAusJson(j AS JSON_HANDLE) AS Dokument
                 DIM la AS Label : la = NEW Label(JSON_GET_STRING(j, lp + ".txt"), NEW Punkt(JSON_GET_INT(j, lp + ".x"), JSON_GET_INT(j, lp + ".y")), JSON_GET_INT(j, lp + ".art"))
                 IF JSON_HAS(j, lp + ".rot") THEN la.drehung = JSON_GET_INT(j, lp + ".rot")
                 ARRAY_PUSH(bl.labels, la)
+            NEXT
+        END IF
+        IF JSON_HAS(j, bp + ".busse") THEN
+            FOR li = 0 TO JSON_LEN(j, bp + ".busse") - 1
+                ARRAY_PUSH(bl.busse, busAusJson(j, bp + ".busse." + STR$(li)))
             NEXT
         END IF
         autoKnoten(bl)

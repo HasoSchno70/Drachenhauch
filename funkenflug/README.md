@@ -91,6 +91,32 @@ das nirgends eingesetzt ist.
 
 ![Blattsymbol mit Port](unterblatt.png)
 
+**Busse** (Knopf „Bus", Taste `B`): gezeichnet wie ein Draht, nur dick, und
+mit einem Namen, der die Mitglieder nennt – `D[0..7]` (D0 … D7), `A[15:0]`
+(A15 … A0), Listen wie `D[0..3],CLK EN` und KiCad-Gruppen `I2C{SDA SCL}`
+(I2C.SDA, I2C.SCL). Ein Bus **verbindet nichts**: verbunden wird wie überall
+über Netznamen. Ein Draht, der auf dem Bus endet, ist ein **Abzweig** –
+Funkenflug fragt nach dem Mitglied (das nächste freie steht schon da) und
+setzt das Label einen Rasterschritt neben den Bus auf den Draht; Draht und
+Label sind ein Rückgängig-Schritt. Busse wählt, zieht, dreht, löscht und
+kopiert man wie Drähte, die Abzweige folgen beim Ziehen und Drehen; ein
+Doppelklick benennt um. Busse, die sich berühren, sind eine Gruppe mit einem
+Namen (ein neuer Bus an einem benannten fragt nicht nach).
+
+Der ERC prüft das Bild: Abzweig ohne Label („welches Mitglied?"), ein Label,
+das nicht zum Bus gehört, ein Pin direkt auf dem Bus, ein Bus ohne oder mit
+unlesbarem Namen, zusammenhängende Busse mit zwei Namen. Über die
+Blattgrenze: ein hierarchisches Label `D[0..7]` im Unterblatt gibt einen
+**Bus-Port**, der jedes Mitglied mit dem gleichnamigen Netz im Elternblatt
+verbindet.
+
+SparkNode führte den Bus als Art von Draht in derselben Verbindungsrechnung
+(und brauchte Ausnahmen, damit er nicht alle Mitglieder kurzschließt); die
+Netzliste kannte Busse gar nicht. Hier liegen Busse in einer eigenen Liste
+und kommen in der Netz-Erkennung nie vor.
+
+![Bus mit vier Abzweigen](bus.png)
+
 **Ausgabe** (Knopf „Ausgabe ▾" in der Kopfleiste): **PDF**, **SVG** und
 **PNG** (150 dpi), **Drucken** über den Druckdialog des Systems, dazu
 Stückliste und Netzliste. Alles läuft durch dieselbe Zeichenroutine wie der
@@ -473,8 +499,12 @@ rechts + 180°) prüft `pruef_kern.dh` an einer Testdatei mit allen acht Lagen:
 jeder Pin muss auf dem Drahtende liegen, das mit KiCads eigener
 Transform-Rechnung erzeugt wurde (`daten/kicad/erzeugen.py`).
 
+**Busse** kommen mit: das Label auf dem Bus wird sein Name, jeder
+Bus-Eintrag (der Schrägstrich) ein Draht, der auf dem Bus endet – also ein
+Abzweig mit dem Label seines Drahts.
+
 Was Funkenflug nicht kennt, wird **gemeldet** statt still verworfen (ein Dialog
-nach dem Öffnen): Busse, freie Texte und Zeichnungen auf dem Blatt,
+nach dem Öffnen): Bus-Aliase, freie Texte und Zeichnungen auf dem Blatt,
 Nicht-verbunden-Marker, mehrfach eingesetzte Unterblätter. **Versteckte
 Versorgungs-Pins** (VCC/GND an 74xx-Symbolen) verbinden in KiCad unsichtbar
 über ihren Namen – hier bekommen sie ein sichtbares globales Label, das Netz
@@ -546,6 +576,7 @@ kern/       Modell, Geometrie, Bibliothek, Netze, Datei – ohne Oberfläche,
   netze.dh       Netz-Erkennung (eine reine Funktion), benannte Netze, Auto-Knoten
   erc.dh         Elektrische Regelpruefung
   hierarchie.dh  Unterblaetter: Blattsymbol aus den Labels, Ports, Pfad, ERC
+  busse.dh       Busnamen und Mitglieder, Bus-Gruppen, Abzweige, Bus-Ports, ERC
   bearbeiten.dh  Annotieren, Suchen & Ersetzen
   netzliste.dh   Export: SPICE, CSV, Text
   ngspice.dh     ngspice als Bibliothek (FFI): laden, Schaltung rechnen, Vektoren lesen
@@ -568,6 +599,7 @@ ansicht/    Zeichenfläche und Werkzeuge – globaler Namensraum
   symboleditor.dh  Symbol-Editor mit Vorschau
   ausgabe.dh     PDF, SVG, PNG, Drucken, Menü „Ausgabe"
   blaetter.dh    Reiter, Menü „Blatt": neu, umbenennen, löschen
+  busse.dh       Bus zeichnen und benennen, Abzweig mit Mitglieds-Label
   komfort.dh     Datei-Menü, zuletzt geöffnet, Autosave, Bearbeiten-Menü, Suchen-Dialog
   platinenansicht.dh  Lochraster-Sicht: Zeichnen, Werkzeuge, Pruefliste
   platinendruck.dh    Platine 1:1: Bestueckung, Loetseite, Arbeitsliste (PDF, Druck)
@@ -581,7 +613,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (303 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (312 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
@@ -635,11 +667,12 @@ SparkNode hatte mehrere Konzeptfehler, die hier von Anfang an vermieden sind:
    (welches Blatt, Annotation). Ein Schnappschuss kennt immer alles; Ziehen ist
    ein Schritt, ein bloßer Klick keiner.
 6. **Bewusst weggelassen** (in SparkNode überproportional viele Bugquellen):
-   Bus/Bus-Entry, Mehrfach-Instanzen eines Unterblatts, Pin-Swap,
+   Mehrfach-Instanzen eines Unterblatts, Pin-Swap,
    Multi-Unit (der KiCad-Import macht daraus je Einheit ein Bauteil), auf der Platine ein Autorouter, der alles auf einmal legt
    (Verbinden schlägt je Luftlinie vor und prüft jeden Vorschlag). Kommt erst,
-   wenn wirklich gebraucht. Unterblätter gibt es – aber ohne zweite Wahrheit:
-   das Blattsymbol entsteht aus den Labels des Unterblatts.
+   wenn wirklich gebraucht. Unterblätter und Busse gibt es – aber ohne zweite
+   Wahrheit: das Blattsymbol entsteht aus den Labels des Unterblatts, ein Bus
+   verbindet nichts, die Labels seiner Abzweige tun es.
 7. **Platine ohne zweite Wahrheit.** SparkNode hielt Footprint und Netzliste
    der Platine getrennt vom Schaltplan und brauchte einen „Transfer"; hier ist
    die Bauform das Gehäuse-Feld und die Netze kommen bei jeder Prüfung frisch
@@ -665,5 +698,5 @@ zweiten Kondensator wieder „C1".
 
 ## Noch offen (nächste Runden)
 
-Mehrfach-Instanzen eines Unterblatts (mit Referenz-Pfaden), Busse. Beides
-erst, wenn ein echter Schaltplan es braucht.
+Mehrfach-Instanzen eines Unterblatts (mit Referenz-Pfaden) – erst, wenn ein
+echter Schaltplan es braucht.

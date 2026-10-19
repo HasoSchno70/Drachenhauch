@@ -15,6 +15,7 @@ CONST WZ_DRAHT = 1
 CONST WZ_BAUTEIL = 2
 CONST WZ_LABEL = 3
 CONST WZ_MESSEN = 4
+CONST WZ_BUS = 5
 
 ' Farben (dunkles Thema)
 CONST C_HG = &H12131A
@@ -31,6 +32,7 @@ CONST C_KNOTEN = &H4FA3FF
 CONST C_LABEL = &H8FE0A0
 CONST C_DRAHT_VERS = &HFF6B6B      ' Versorgung
 CONST C_DRAHT_MASSE = &HA0A8B8     ' Masse
+CONST C_BUS = &H8B7CF6             ' Bus
 
 ' Fangradius in Einheiten (fuer Pin-/Drahtende-Fang)
 CONST FANG = 150
@@ -54,6 +56,7 @@ FUNCTION druckFarbe(c AS INTEGER) AS INTEGER
         CASE C_DRAHT, C_KNOTEN : RETURN &H1A4E9C
         CASE C_DRAHT_VERS : RETURN &HB01E1E
         CASE C_DRAHT_MASSE : RETURN &H555555
+        CASE C_BUS : RETURN &H4A2FB0
         CASE C_BAUTEIL : RETURN &H8C1D18
         CASE C_TEXT : RETURN &H333333
         CASE C_WERT : RETURN &H1F1F1F
@@ -274,8 +277,8 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     ' --- Bildschirm-Hilfen, die nie gedruckt werden
     ' aktiver Draht (Gummiband)
     IF gDrahtAktiv AND LEN(gDrahtPunkte) > 0 THEN
-        zeichenFarbe(cr, C_DRAHT)
-        cairo_set_line_width(cr, gStrich)
+        zeichenFarbe(cr, IIF(gWerkzeug = WZ_BUS, C_BUS, C_DRAHT))
+        cairo_set_line_width(cr, IIF(gWerkzeug = WZ_BUS, gStrich * 3, gStrich))
         cairo_move_to(cr, sx(gDrahtPunkte[0].x), sy(gDrahtPunkte[0].y))
         FOR i = 1 TO LEN(gDrahtPunkte) - 1
             cairo_line_to(cr, sx(gDrahtPunkte[i].x), sy(gDrahtPunkte[i].y))
@@ -292,7 +295,7 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
         labelZeichnen(cr, sx(gMausWX), sy(gMausWY), "Label", C_GEIST, IIF(gLabelGlobal, kern.LA_GLOBAL, kern.LA_LOKAL), gLabelDreh)
     END IF
     ' Fang-Markierung
-    IF gMausDrin AND (gWerkzeug = WZ_DRAHT OR gWerkzeug = WZ_LABEL) THEN
+    IF gMausDrin AND (gWerkzeug = WZ_DRAHT OR gWerkzeug = WZ_LABEL OR gWerkzeug = WZ_BUS) THEN
         zeichenFarbe(cr, C_PIN)
         cairo_arc(cr, sx(gMausWX), sy(gMausWY), 4, 0, 2 * PI)
         cairo_stroke(cr)
@@ -312,6 +315,7 @@ SUB inhaltZeichnen(cr AS INTEGER)
     DIM i AS INTEGER
     DIM hw AS INTEGER : hw = -1
     IF NOT gDruck THEN hw = hoverWurzel()
+    busseZeichnen(cr)
     FOR i = 0 TO LEN(gBlatt.draehte) - 1
         DIM dr AS kern.Draht : dr = gBlatt.draehte[i]
         DIM hell AS BOOLEAN : hell = FALSE

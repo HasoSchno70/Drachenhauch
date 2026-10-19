@@ -226,7 +226,14 @@ haupt.draht((177.8, 93.98), (187.96, 93.98))
 haupt.label('label', 'SIG_AUS', (187.96, 93.98), 0)
 # was Funkenflug nicht kennt -> Hinweise
 haupt.rest.append('  (text "Hallo KiCad" (at 120 160 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid %s))\n' % u())
-haupt.rest.append('  (bus (pts (xy 120 170) (xy 140 170)) (stroke (width 0) (type default)) (uuid %s))\n' % u())
+# ein Bus D[0..1] mit zwei Eintraegen; die Drahtenden tragen D0 und D1
+haupt.rest.append('  (bus (pts (xy 120.65 165.1) (xy 146.05 165.1)) (stroke (width 0) (type default)) (uuid %s))\n' % u())
+haupt.label('label', 'D[0..1]', (125.73, 165.1), 0)
+for i, x in enumerate((130.81, 138.43)):
+    haupt.rest.append('  (bus_entry (at %s 165.1) (size 2.54 2.54) (stroke (width 0) (type default)) (uuid %s))\n' % (f(x), u()))
+    haupt.draht((x + 2.54, 167.64), (x + 2.54, 172.72))
+    haupt.label('label', 'D%d' % i, (x + 2.54, 172.72), 270)
+haupt.rest.append('  (bus_alias "ADR" (members "A0" "A1"))\n')
 
 unter = Blatt('unter')
 pr3 = unter.symbol('Device:R', 'R3', (101.6, 76.2), 90, None, wert='1k')

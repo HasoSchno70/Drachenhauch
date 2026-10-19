@@ -194,6 +194,18 @@ CLASS Label
     END SUB
 END CLASS
 
+' Bus: Linie mit Namen (Mitglieder), verbindet nichts -- siehe busse.dh
+CLASS Bus
+    DIM id AS STRING
+    DIM name AS STRING
+    DIM punkte AS ARRAY OF Punkt
+    SUB Init(nm AS STRING)
+        id = LEFT$(UUID4$(), 10)
+        name = nm
+        punkte = []
+    END SUB
+END CLASS
+
 CLASS Blatt
     DIM id AS STRING
     DIM name AS STRING
@@ -203,6 +215,7 @@ CLASS Blatt
     DIM draehte AS ARRAY OF Draht
     DIM knoten AS ARRAY OF Knoten
     DIM labels AS ARRAY OF Label
+    DIM busse AS ARRAY OF Bus
     SUB Init(nm AS STRING)
         id = LEFT$(UUID4$(), 10)
         name = nm
@@ -212,6 +225,7 @@ CLASS Blatt
         draehte = []
         knoten = []
         labels = []
+        busse = []
     END SUB
 END CLASS
 

@@ -614,8 +614,26 @@ FUNCTION kimBlatt(e AS KicadErgebnis, wurzel AS SAusdruck, name AS STRING, ordne
                 ARRAY_PUSH(bl.labels, la)
             CASE "sheet"
                 kimUnterblatt(e, bl, s, ordner, refs, offen, fertig)
-            CASE "bus", "bus_entry", "bus_alias"
-                kimHinweis(e, "Bus", "Busse kennt Funkenflug nicht (weggelassen)")
+            CASE "bus"
+                DIM bpts AS ARRAY OF SAusdruck : bpts = s.kind("pts").alle("xy")
+                IF LEN(bpts) >= 2 THEN
+                    DIM bu AS Bus : bu = NEW Bus("")
+                    FOR k = 0 TO LEN(bpts) - 1
+                        ARRAY_PUSH(bu.punkte, kimPunkt(bpts[k]))
+                    NEXT
+                    ARRAY_PUSH(bl.busse, bu)
+                END IF
+            CASE "bus_entry"
+                ' der Schraegstrich zwischen Bus und Draht wird ein Draht: ein
+                ' Ende liegt auf dem Bus (Abzweig), das andere am Draht
+                DIM eo AS Punkt : eo = kimPunkt(s.kind("at"))
+                DIM eg AS SAusdruck : eg = s.kind("size")
+                DIM ew AS Draht : ew = NEW Draht()
+                ARRAY_PUSH(ew.punkte, eo)
+                ARRAY_PUSH(ew.punkte, NEW Punkt(eo.x + kimMass(eg.wert$(0)), eo.y + kimMass(eg.wert$(1))))
+                ARRAY_PUSH(bl.draehte, ew)
+            CASE "bus_alias"
+                kimHinweis(e, "Bus-Alias", "Bus-Aliase kennt Funkenflug nicht (weggelassen)")
             CASE "no_connect"
                 kimHinweis(e, "Nicht verbunden", "Nicht-verbunden-Marker weggelassen (der ERC meldet diese Pins als offen)")
             CASE "text", "text_box", "polyline", "rectangle", "circle", "arc", "image"
@@ -623,9 +641,27 @@ FUNCTION kimBlatt(e AS KicadErgebnis, wurzel AS SAusdruck, name AS STRING, ordne
         END SELECT
     NEXT
     kimAnKnotenTrennen(bl, knoten)
+    kimBusLabels(bl)
     autoKnoten(bl)
     RETURN bl
 END FUNCTION
+
+' Ein Label auf einem Bus benennt in KiCad den Bus -- hier wird es zum
+' Busnamen (ein Label auf dem Bus ergaebe sonst ein leeres Netz).
+SUB kimBusLabels(bl AS Blatt)
+    DIM bleiben AS ARRAY OF Label : bleiben = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bl.labels) - 1
+        DIM la AS Label : la = bl.labels[i]
+        DIM bx AS INTEGER : bx = busAn(bl, la.anker.x, la.anker.y)
+        IF bx >= 0 AND la.art = LA_LOKAL THEN
+            IF bl.busse[bx].name = "" THEN bl.busse[bx].name = la.text
+        ELSE
+            ARRAY_PUSH(bleiben, la)
+        END IF
+    NEXT
+    bl.labels = bleiben
+END SUB
 
 ' (sheet (at x y) (size w h) (property "Sheetname" ..) (property "Sheetfile" ..) (pin "IN" input (at ..)))
 SUB kimUnterblatt(e AS KicadErgebnis, bl AS Blatt, s AS SAusdruck, ordner AS STRING, refs AS MAP OF STRING, BYREF offen AS MAP OF INTEGER, BYREF fertig AS MAP OF STRING)
