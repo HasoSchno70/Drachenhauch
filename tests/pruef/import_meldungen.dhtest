@@ -55,15 +55,18 @@ END FUNCTION
 --- fehler
 Compile-Fehler: 'doppelt' ist schon in a.dh:1 deklariert -- eines von beiden umbenennen
 
-=== warnung zeigt in die datei des nutzers
-' Der Ausgangsbefund: eine Datei mit zwei Zeilen bekam 'main.dh:6'.
+=== meldung zeigt in die datei des nutzers
+' Der Ausgangsbefund: eine Datei mit zwei Zeilen bekam 'main.dh:6'. Bis
+' 2026-10 war das eine Warnung, seitdem ist ein zweites DIM mit anderem Typ
+' ein Fehler -- die Stellen muessen trotzdem stimmen.
 IMPORT "d.dh"
 DIM zaehler AS STRING
 --- datei d.dh
 DIM zaehler AS INTEGER
 zaehler = 1
 
---- erwartet
+--- fehler
+fall.dh:5: Compile-Fehler: 'zaehler' wurde in d.dh:1 schon als INTEGER angelegt, hier als STRING
 
 === parse fehler im modul zeigt auf das modul
 PRINT "eins"
