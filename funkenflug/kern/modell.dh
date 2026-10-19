@@ -210,14 +210,69 @@ CLASS Blatt
     END SUB
 END CLASS
 
+' --- Platine: Lochraster (jedes Loch ein eigenes Loetauge) oder
+' Streifenraster (Kupferstreifen waagrecht durch jede Zeile). Gerechnet wird
+' in Loechern (Spalte s, Zeile z); ein Loch = 2.54 mm.
+CONST PL_LOCH = 0
+CONST PL_STREIFEN = 1
+CONST BA_LOET = 0                 ' Loetbahn: verbindet jedes Loch auf ihrem Weg
+CONST BA_BRUECKE = 1              ' Drahtbruecke: nur ihre beiden Enden
+
+' Ein Bauteil auf der Platine: Verweis auf das Bauteil im Schaltplan (Id),
+' Lage des Bauform-Ursprungs und Drehung. Welche Bauform, sagt das Gehaeuse-
+' Feld des Bauteils -- eine Quelle, kein zweiter Eintrag, der auseinanderlaeuft.
+CLASS PlatTeil
+    DIM bauteilId AS STRING
+    DIM s AS INTEGER
+    DIM z AS INTEGER
+    DIM drehung AS INTEGER
+    SUB Init(id AS STRING, sp AS INTEGER, ze AS INTEGER)
+        bauteilId = id
+        s = sp
+        z = ze
+        drehung = 0
+    END SUB
+END CLASS
+
+CLASS Bahn
+    DIM s1 AS INTEGER
+    DIM z1 AS INTEGER
+    DIM s2 AS INTEGER
+    DIM z2 AS INTEGER
+    DIM art AS INTEGER
+    SUB Init(a1 AS INTEGER, b1 AS INTEGER, a2 AS INTEGER, b2 AS INTEGER, ar AS INTEGER)
+        s1 = a1 : z1 = b1 : s2 = a2 : z2 = b2
+        art = ar
+    END SUB
+END CLASS
+
+CLASS Platine
+    DIM art AS INTEGER
+    DIM spalten AS INTEGER
+    DIM zeilen AS INTEGER
+    DIM teile AS ARRAY OF PlatTeil
+    DIM bahnen AS ARRAY OF Bahn
+    DIM trenn AS ARRAY OF Punkt       ' Trennstellen (Streifenraster): das Loch ist weggebohrt
+    SUB Init()
+        art = PL_STREIFEN
+        spalten = 30
+        zeilen = 20
+        teile = []
+        bahnen = []
+        trenn = []
+    END SUB
+END CLASS
+
 CLASS Dokument
     DIM id AS STRING
     DIM titel AS STRING
     DIM blaetter AS ARRAY OF Blatt
+    DIM platine AS Platine
     SUB Init()
         id = LEFT$(UUID4$(), 10)
         titel = ""
         blaetter = []
         ARRAY_PUSH(blaetter, NEW Blatt("Blatt1"))
+        platine = NEW Platine()
     END SUB
 END CLASS

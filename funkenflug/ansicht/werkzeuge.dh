@@ -28,6 +28,7 @@ CONST K_C = &H63
 CONST K_V = &H76
 CONST K_X = &H78
 CONST K_T = &H74
+CONST K_B = &H62
 CONST K_BILD_AUF = &HFF55              ' GDK_KEY_Page_Up
 CONST K_BILD_AB = &HFF56
 
@@ -510,6 +511,7 @@ FUNCTION lwDruck(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
         gPanSY = py
         RETURN TRUE
     END IF
+    IF gAnsicht = ANS_PLATINE THEN RETURN plDruck(px, py, knopf, (evZustand(ev) BAND GDK_UMSCHALT) <> 0)
     IF knopf = 3 THEN
         IF gWerkzeug = WZ_DRAHT AND gDrahtAktiv THEN
             drahtEndePunkt()
@@ -622,6 +624,10 @@ END SUB
 
 FUNCTION lwLos(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
     gPan = FALSE
+    IF gAnsicht = ANS_PLATINE THEN
+        plLos()
+        RETURN TRUE
+    END IF
     IF gRahmen THEN
         gRahmen = FALSE
         IF ABS(gRahmenEX - gRahmenSX) > 3 OR ABS(gRahmenEY - gRahmenSY) > 3 THEN
@@ -657,6 +663,10 @@ FUNCTION lwBewegung(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
         neuZeichnen()
         RETURN TRUE
     END IF
+    IF gAnsicht = ANS_PLATINE THEN
+        plBewegung(px, py)
+        RETURN TRUE
+    END IF
     mausSetzen(px, py)
     IF gRahmen THEN
         gRahmenEX = px
@@ -678,6 +688,7 @@ END FUNCTION
 
 FUNCTION lwVerlassen(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
     gMausDrin = FALSE
+    gPlMausDrin = FALSE
     gHoverAktiv = FALSE
     statusAktualisieren()
     neuZeichnen()
@@ -707,6 +718,12 @@ FUNCTION lwTaste(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM taste AS INTEGER
     IF NOT gdk_event_get_keyval(ev, taste) THEN RETURN FALSE
     DIM z AS INTEGER : z = evZustand(ev)
+    ' Platine: eigene Tasten; von Strg nur Speichern, Oeffnen, Rueckgaengig --
+    ' Ablage und "alles waehlen" meinen den Schaltplan und bleiben dort
+    IF gAnsicht = ANS_PLATINE THEN
+        IF (z BAND GDK_STRG) = 0 THEN RETURN plTaste(taste)
+        IF taste <> K_S AND taste <> K_O AND taste <> K_Z AND taste <> K_Y AND taste <> K_Z_GROSS THEN RETURN FALSE
+    END IF
     IF (z BAND GDK_STRG) <> 0 THEN
         SELECT CASE taste
             CASE K_S : dateiSpeichern()

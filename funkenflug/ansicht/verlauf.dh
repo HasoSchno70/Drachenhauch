@@ -57,6 +57,8 @@ SUB wiederherstellen(json AS STRING, idx AS INTEGER)
     netzeVeraltet()
     symbolListeAktualisieren(FALSE)
     auswahlAufheben()
+    plAuswahlAufheben()
+    IF gAnsicht = ANS_PLATINE THEN plKnoepfeNachziehen()
     gZieht = FALSE
     gDrahtAktiv = FALSE
     gDrahtPunkte = []

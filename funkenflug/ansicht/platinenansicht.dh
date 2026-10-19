@@ -1,0 +1,590 @@
+' Platinen-Ansicht: Lochraster/Streifenraster auf derselben Zeichenflaeche.
+' Globaler Namensraum.
+'
+' Umschalten (Kopfleiste "Schaltplan | Platine") tauscht Werkzeugleiste,
+' Zeichnen und Maus/Tastatur; jede Ansicht behaelt ihren eigenen Ausschnitt.
+' Gerechnet wird in Loechern, gezeichnet in Blatt-Einheiten (1 Loch = 2.54 mm),
+' damit Zoom, Verschieben und Mausrad unveraendert weiterarbeiten.
+' Welche Pins zusammengehoeren, sagt allein der Schaltplan (kern.platinePruefen).
+
+CONST ANS_SCHALTPLAN = 0
+CONST ANS_PLATINE = 1
+CONST PW_AUSWAHL = 0
+CONST PW_BAHN = 1
+CONST PW_TRENNEN = 2
+
+CONST C_PLATINE = &H2B261B
+CONST C_KUPFER = &HB87333
+CONST C_KUPFER_HELL = &HD89060
+CONST C_LOCH = &H15130F
+CONST C_LOETBAHN = &HC8CCD4
+CONST C_BRUECKE = &H4FA3FF
+CONST C_LUFT = &HFFE14D
+
+DIM gAnsicht AS INTEGER
+DIM gPlWz AS INTEGER
+DIM gPlSel AS INTEGER             ' gewaehltes Teil (Index in platine.teile), -1 = keins
+DIM gPlBahnSel AS INTEGER         ' gewaehlte Bahn, -1 = keine
+DIM gPlBericht AS kern.PlatBericht
+DIM gPlGueltig AS BOOLEAN
+DIM gPlHS AS INTEGER              ' Loch unter der Maus
+DIM gPlHZ AS INTEGER
+DIM gPlMausDrin AS BOOLEAN
+' Ziehen eines Teils
+DIM gPlZieht AS BOOLEAN
+DIM gPlGemerkt AS BOOLEAN
+DIM gPlStartS AS INTEGER
+DIM gPlStartZ AS INTEGER
+DIM gPlTeilS AS INTEGER
+DIM gPlTeilZ AS INTEGER
+' Bahn-Werkzeug
+DIM gPlBahnAktiv AS BOOLEAN
+DIM gPlBahnS AS INTEGER
+DIM gPlBahnZ AS INTEGER
+' eigener Ausschnitt je Ansicht
+DIM gSpX AS FLOAT
+DIM gSpY AS FLOAT
+DIM gSpZoom AS FLOAT
+DIM gPlX AS FLOAT
+DIM gPlY AS FLOAT
+DIM gPlZoom AS FLOAT
+DIM gPlEingepasst AS BOOLEAN
+DIM gPlMeldung AS STRING          ' kurze Rueckmeldung in der Statuszeile
+
+FUNCTION platineBericht() AS kern.PlatBericht
+    IF NOT gPlGueltig THEN
+        gPlBericht = kern.platinePruefen(gDok)
+        gPlGueltig = TRUE
+    END IF
+    RETURN gPlBericht
+END FUNCTION
+
+SUB platineVeraltet()
+    gPlGueltig = FALSE
+END SUB
+
+SUB plAuswahlAufheben()
+    gPlSel = -1
+    gPlBahnSel = -1
+    gPlBahnAktiv = FALSE
+    gPlZieht = FALSE
+END SUB
+
+FUNCTION plLochS(px AS FLOAT) AS INTEGER
+    RETURN ROUND(weltX(px) / kern.LOCHRASTER)
+END FUNCTION
+
+FUNCTION plLochZ(py AS FLOAT) AS INTEGER
+    RETURN ROUND(weltY(py) / kern.LOCHRASTER)
+END FUNCTION
+
+FUNCTION lochX(s AS FLOAT) AS FLOAT : RETURN sx(s * kern.LOCHRASTER) : END FUNCTION
+FUNCTION lochY(z AS FLOAT) AS FLOAT : RETURN sy(z * kern.LOCHRASTER) : END FUNCTION
+
+' --- Umschalten ---------------------------------------------------------------
+
+SUB ansichtWechseln(a AS INTEGER)
+    IF a = gAnsicht THEN RETURN
+    IF a = ANS_PLATINE THEN
+        gSpX = vX : gSpY = vY : gSpZoom = vZoom
+        vX = gPlX : vY = gPlY : vZoom = gPlZoom
+        auswahlAufheben()
+        gDrahtAktiv = FALSE
+        gDrahtPunkte = []
+        ' Teile, deren Bauteil im Schaltplan geloescht wurde, raeumen
+        DIM b AS kern.Bauteil
+        DIM verwaist AS INTEGER : verwaist = 0
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(gDok.platine.teile) - 1
+            IF NOT kern.bauteilMitId(gDok, gDok.platine.teile[i].bauteilId, b) THEN
+                verwaist = verwaist + 1
+            ELSEIF b.sym.einheitLeistung THEN
+                verwaist = verwaist + 1
+            END IF
+        NEXT
+        IF verwaist > 0 THEN
+            verlaufMerken()
+            DIM weg AS INTEGER : weg = kern.platineAbgleichen(gDok)
+            gPlMeldung = STR$(weg) + " Teil(e) entfernt, die es im Schaltplan nicht mehr gibt"
+            gGeaendert = TRUE
+            titelNachziehen()
+        END IF
+    ELSE
+        gPlX = vX : gPlY = vY : gPlZoom = vZoom
+        vX = gSpX : vY = gSpY : vZoom = gSpZoom
+        plAuswahlAufheben()
+    END IF
+    gAnsicht = a
+    platineVeraltet()
+    ansichtLeistenNachziehen()
+    neuZeichnen()
+    statusAktualisieren()
+END SUB
+
+SUB plEinpassen(bw AS FLOAT, bh AS FLOAT)
+    IF bw < 20 OR bh < 20 THEN RETURN
+    DIM p AS FLOAT : p = kern.LOCHRASTER
+    DIM wb AS FLOAT : wb = (gDok.platine.spalten + 1) * p
+    DIM wh AS FLOAT : wh = (gDok.platine.zeilen + 1) * p
+    vZoom = CLAMP(MIN((bw - 40) / wb, (bh - 40) / wh), 0.02, 1.2)
+    vX = (bw - (gDok.platine.spalten - 1) * p * vZoom) / 2.0
+    vY = (bh - (gDok.platine.zeilen - 1) * p * vZoom) / 2.0
+    gPlEingepasst = TRUE
+END SUB
+
+' --- Zeichnen -----------------------------------------------------------------
+
+SUB plKreis(cr AS INTEGER, x AS FLOAT, y AS FLOAT, r AS FLOAT, farbe AS INTEGER, voll AS BOOLEAN)
+    zeichenFarbe(cr, farbe)
+    cairo_new_sub_path(cr)
+    cairo_arc(cr, x, y, r, 0, 2 * PI)
+    IF voll THEN cairo_fill(cr) ELSE cairo_stroke(cr)
+END SUB
+
+SUB platineZeichnen(cr AS INTEGER, bw AS FLOAT, bh AS FLOAT)
+    IF NOT gPlEingepasst THEN plEinpassen(bw, bh)
+    zeichenFarbe(cr, C_HG)
+    cairo_rectangle(cr, 0, 0, bw, bh)
+    cairo_fill(cr)
+    DIM pl AS kern.Platine : pl = gDok.platine
+    DIM r AS kern.PlatBericht : r = platineBericht()
+    DIM p AS FLOAT : p = kern.LOCHRASTER * vZoom      ' ein Loch in Pixeln
+    DIM i AS INTEGER, s AS INTEGER, z AS INTEGER
+    ' Platine
+    zeichenFarbe(cr, C_PLATINE)
+    cairo_rectangle(cr, lochX(-0.5), lochY(-0.5), pl.spalten * p, pl.zeilen * p)
+    cairo_fill(cr)
+    ' Kupfer
+    IF pl.art = kern.PL_STREIFEN THEN
+        FOR z = 0 TO pl.zeilen - 1
+            zeichenFarbe(cr, C_KUPFER)
+            cairo_rectangle(cr, lochX(-0.45), lochY(z - 0.33), (pl.spalten - 0.1) * p, 0.66 * p)
+            cairo_fill(cr)
+        NEXT
+        ' Trennstellen: Kupfer weg, rotes Kreuz
+        cairo_set_line_width(cr, MAX(1.0, 0.08 * p))
+        FOR i = 0 TO LEN(pl.trenn) - 1
+            zeichenFarbe(cr, C_PLATINE)
+            cairo_rectangle(cr, lochX(pl.trenn[i].x - 0.42), lochY(pl.trenn[i].y - 0.36), 0.84 * p, 0.72 * p)
+            cairo_fill(cr)
+            zeichenFarbe(cr, C_ERC_FEHLER)
+            cairo_move_to(cr, lochX(pl.trenn[i].x - 0.25), lochY(pl.trenn[i].y - 0.25))
+            cairo_line_to(cr, lochX(pl.trenn[i].x + 0.25), lochY(pl.trenn[i].y + 0.25))
+            cairo_move_to(cr, lochX(pl.trenn[i].x + 0.25), lochY(pl.trenn[i].y - 0.25))
+            cairo_line_to(cr, lochX(pl.trenn[i].x - 0.25), lochY(pl.trenn[i].y + 0.25))
+            cairo_stroke(cr)
+        NEXT
+    ELSE
+        FOR z = 0 TO pl.zeilen - 1
+            FOR s = 0 TO pl.spalten - 1
+                plKreis(cr, lochX(s), lochY(z), 0.36 * p, C_KUPFER, TRUE)
+            NEXT
+        NEXT
+    END IF
+    ' Loecher (nicht in Trennstellen: dort ist ohnehin gebohrt)
+    IF p >= 4 THEN
+        FOR z = 0 TO pl.zeilen - 1
+            FOR s = 0 TO pl.spalten - 1
+                plKreis(cr, lochX(s), lochY(z), 0.13 * p, C_LOCH, TRUE)
+            NEXT
+        NEXT
+    END IF
+    ' Bahnen
+    cairo_set_line_cap(cr, 1)
+    FOR i = 0 TO LEN(pl.bahnen) - 1
+        DIM ba AS kern.Bahn : ba = pl.bahnen[i]
+        DIM bf AS INTEGER : bf = IIF(ba.art = kern.BA_LOET, C_LOETBAHN, C_BRUECKE)
+        IF i = gPlBahnSel THEN bf = C_AUSWAHL
+        zeichenFarbe(cr, bf)
+        cairo_set_line_width(cr, IIF(ba.art = kern.BA_LOET, 0.4, 0.14) * p)
+        cairo_move_to(cr, lochX(ba.s1), lochY(ba.z1))
+        cairo_line_to(cr, lochX(ba.s2), lochY(ba.z2))
+        cairo_stroke(cr)
+        IF ba.art = kern.BA_BRUECKE THEN
+            plKreis(cr, lochX(ba.s1), lochY(ba.z1), 0.2 * p, bf, TRUE)
+            plKreis(cr, lochX(ba.s2), lochY(ba.z2), 0.2 * p, bf, TRUE)
+        END IF
+    NEXT
+    ' Teile
+    DIM hinweis AS STRING
+    FOR i = 0 TO LEN(pl.teile) - 1
+        DIM b AS kern.Bauteil
+        IF NOT kern.bauteilMitId(gDok, pl.teile[i].bauteilId, b) THEN CONTINUE
+        DIM bfm AS kern.Bauform : bfm = kern.bauformFuer(b, hinweis)
+        DIM s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER
+        kern.teilFlaeche(pl.teile[i], bfm, s0, z0, s1, z1)
+        DIM farbe AS INTEGER : farbe = IIF(i = gPlSel, C_AUSWAHL, C_BAUTEIL)
+        zeichenFarbe(cr, farbe)
+        cairo_set_line_width(cr, MAX(1.0, 0.06 * p))
+        cairo_rectangle(cr, lochX(s0 - 0.45), lochY(z0 - 0.45), (s1 - s0 + 0.9) * p, (z1 - z0 + 0.9) * p)
+        cairo_stroke(cr)
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(bfm.pins) - 1
+            DIM lo AS kern.Punkt : lo = kern.lochVon(pl.teile[i], bfm.pins[k])
+            cairo_set_line_width(cr, MAX(1.0, 0.07 * p))
+            IF bfm.pins[k].schluessel = "1" THEN
+                ' Pin 1 eckig
+                zeichenFarbe(cr, C_PIN)
+                cairo_rectangle(cr, lochX(lo.x - 0.3), lochY(lo.y - 0.3), 0.6 * p, 0.6 * p)
+                cairo_stroke(cr)
+            ELSE
+                plKreis(cr, lochX(lo.x), lochY(lo.y), 0.3 * p, C_PIN, FALSE)
+            END IF
+        NEXT
+        lwTextAus(cr, lochX(s0 - 0.45), lochY(z0 - 0.45) - 9, b.referenz, farbe, 0, gSchrift)
+    NEXT
+    ' Luftlinien
+    zeichenFarbe(cr, C_LUFT)
+    cairo_set_line_width(cr, 1.5)
+    FOR i = 0 TO LEN(r.luft) - 1
+        cairo_move_to(cr, lochX(r.luft[i].s1), lochY(r.luft[i].z1))
+        cairo_line_to(cr, lochX(r.luft[i].s2), lochY(r.luft[i].z2))
+        cairo_stroke(cr)
+    NEXT
+    ' Fehler und Kurzschluesse
+    cairo_set_line_width(cr, 2.0)
+    FOR i = 0 TO LEN(r.fehler) - 1
+        plKreis(cr, lochX(r.fehler[i].s), lochY(r.fehler[i].z), MAX(8.0, 0.55 * p), IIF(r.fehler[i].kurz, C_ERC_FEHLER, C_ERC_WARNUNG), FALSE)
+    NEXT
+    ' Bahn im Entstehen, Loch unter der Maus
+    IF gPlBahnAktiv AND gPlMausDrin THEN
+        zeichenFarbe(cr, C_AUSWAHL)
+        cairo_set_line_width(cr, 0.2 * p)
+        cairo_move_to(cr, lochX(gPlBahnS), lochY(gPlBahnZ))
+        cairo_line_to(cr, lochX(gPlHS), lochY(gPlHZ))
+        cairo_stroke(cr)
+    END IF
+    IF gPlMausDrin AND kern.aufPlatine(pl, gPlHS, gPlHZ) THEN
+        cairo_set_line_width(cr, 1.5)
+        plKreis(cr, lochX(gPlHS), lochY(gPlHZ), 0.45 * p, C_HOVER, FALSE)
+    END IF
+    plPruefMarkerZeichnen(cr)
+END SUB
+
+' --- Treffer ------------------------------------------------------------------
+
+' Teil, dessen Flaeche (Loecher samt halbem Rand) das Loch enthaelt.
+FUNCTION plTeilAn(s AS INTEGER, z AS INTEGER) AS INTEGER
+    DIM pl AS kern.Platine : pl = gDok.platine
+    DIM hinweis AS STRING
+    DIM i AS INTEGER
+    FOR i = LEN(pl.teile) - 1 TO 0 STEP -1
+        DIM b AS kern.Bauteil
+        IF NOT kern.bauteilMitId(gDok, pl.teile[i].bauteilId, b) THEN CONTINUE
+        DIM s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER
+        kern.teilFlaeche(pl.teile[i], kern.bauformFuer(b, hinweis), s0, z0, s1, z1)
+        IF s >= s0 AND s <= s1 AND z >= z0 AND z <= z1 THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION plBahnUnter(px AS FLOAT, py AS FLOAT) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = LEN(gDok.platine.bahnen) - 1 TO 0 STEP -1
+        DIM ba AS kern.Bahn : ba = gDok.platine.bahnen[i]
+        IF abstandQ(px, py, lochX(ba.s1), lochY(ba.z1), lochX(ba.s2), lochY(ba.z2)) <= 6 THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' --- Maus und Tastatur ----------------------------------------------------------
+
+SUB plMaus(px AS FLOAT, py AS FLOAT)
+    gPlHS = plLochS(px)
+    gPlHZ = plLochZ(py)
+    gPlMausDrin = TRUE
+END SUB
+
+FUNCTION plDruck(px AS FLOAT, py AS FLOAT, knopf AS INTEGER, umsch AS BOOLEAN) AS BOOLEAN
+    plMaus(px, py)
+    DIM pl AS kern.Platine : pl = gDok.platine
+    gPlMeldung = ""
+    IF knopf = 3 THEN
+        gPlBahnAktiv = FALSE
+        neuZeichnen()
+        RETURN TRUE
+    END IF
+    IF knopf <> 1 THEN RETURN TRUE
+    SELECT CASE gPlWz
+        CASE PW_AUSWAHL
+            gPlBahnSel = -1
+            gPlSel = plTeilAn(gPlHS, gPlHZ)
+            IF gPlSel >= 0 THEN
+                gPlZieht = TRUE
+                gPlGemerkt = FALSE
+                gPlStartS = gPlHS
+                gPlStartZ = gPlHZ
+                gPlTeilS = pl.teile[gPlSel].s
+                gPlTeilZ = pl.teile[gPlSel].z
+            ELSE
+                gPlBahnSel = plBahnUnter(px, py)
+            END IF
+        CASE PW_BAHN
+            IF NOT kern.aufPlatine(pl, gPlHS, gPlHZ) THEN RETURN TRUE
+            IF NOT gPlBahnAktiv THEN
+                gPlBahnAktiv = TRUE
+                gPlBahnS = gPlHS
+                gPlBahnZ = gPlHZ
+            ELSEIF gPlHS <> gPlBahnS OR gPlHZ <> gPlBahnZ THEN
+                plBahnLegen(gPlBahnS, gPlBahnZ, gPlHS, gPlHZ, umsch)
+                ' weiter vom Endpunkt aus (wie beim Draht)
+                gPlBahnS = gPlHS
+                gPlBahnZ = gPlHZ
+            END IF
+        CASE PW_TRENNEN
+            plTrennen(gPlHS, gPlHZ)
+    END SELECT
+    neuZeichnen()
+    statusAktualisieren()
+    RETURN TRUE
+END FUNCTION
+
+' Eine Bahn legen: auf Lochraster eine Loetbahn, wenn sie gerade laeuft (sonst
+' und auf Streifenraster eine Drahtbruecke); Umschalt erzwingt die Bruecke.
+SUB plBahnLegen(s1 AS INTEGER, z1 AS INTEGER, s2 AS INTEGER, z2 AS INTEGER, bruecke AS BOOLEAN)
+    DIM art AS INTEGER : art = kern.BA_BRUECKE
+    IF gDok.platine.art = kern.PL_LOCH AND NOT bruecke AND (s1 = s2 OR z1 = z2) THEN art = kern.BA_LOET
+    verlaufMerken()
+    ARRAY_PUSH(gDok.platine.bahnen, NEW kern.Bahn(s1, z1, s2, z2, art))
+    gPlMeldung = IIF(art = kern.BA_LOET, "Loetbahn", "Drahtbruecke") + " gelegt"
+    geaendert()
+END SUB
+
+SUB plTrennen(s AS INTEGER, z AS INTEGER)
+    IF gDok.platine.art <> kern.PL_STREIFEN THEN
+        gPlMeldung = "Trennstellen gibt es nur auf Streifenraster"
+        RETURN
+    END IF
+    IF NOT kern.aufPlatine(gDok.platine, s, z) THEN RETURN
+    verlaufMerken()
+    DIM jetzt AS BOOLEAN : jetzt = kern.trennUmschalten(gDok.platine, s, z)
+    gPlMeldung = IIF(jetzt, "Streifen getrennt", "Trennstelle geschlossen") + " bei " + STR$(s + 1) + "/" + STR$(z + 1)
+    geaendert()
+END SUB
+
+SUB plBewegung(px AS FLOAT, py AS FLOAT)
+    plMaus(px, py)
+    IF gPlZieht AND gPlSel >= 0 AND gPlSel < LEN(gDok.platine.teile) THEN
+        DIM ds AS INTEGER : ds = gPlHS - gPlStartS
+        DIM dz AS INTEGER : dz = gPlHZ - gPlStartZ
+        DIM t AS kern.PlatTeil : t = gDok.platine.teile[gPlSel]
+        IF t.s <> gPlTeilS + ds OR t.z <> gPlTeilZ + dz THEN
+            IF NOT gPlGemerkt THEN
+                verlaufMerken()
+                gPlGemerkt = TRUE
+                t = gDok.platine.teile[gPlSel]
+            END IF
+            t.s = gPlTeilS + ds
+            t.z = gPlTeilZ + dz
+            platineVeraltet()
+        END IF
+    END IF
+    neuZeichnen()
+    statusAktualisieren()
+END SUB
+
+SUB plLos()
+    IF gPlZieht AND gPlGemerkt THEN geaendert()
+    gPlZieht = FALSE
+    gPlGemerkt = FALSE
+END SUB
+
+SUB plDrehen()
+    IF gPlSel < 0 OR gPlSel >= LEN(gDok.platine.teile) THEN RETURN
+    verlaufMerken()
+    DIM t AS kern.PlatTeil : t = gDok.platine.teile[gPlSel]
+    t.drehung = (t.drehung + 90) MOD 360
+    DIM b AS kern.Bauteil
+    DIM hinweis AS STRING
+    IF kern.bauteilMitId(gDok, t.bauteilId, b) THEN kern.teilInsFeld(gDok.platine, t, kern.bauformFuer(b, hinweis))
+    geaendert()
+END SUB
+
+SUB plLoeschen()
+    IF gPlSel >= 0 AND gPlSel < LEN(gDok.platine.teile) THEN
+        verlaufMerken()
+        ARRAY_REMOVE_AT(gDok.platine.teile, gPlSel)
+        gPlSel = -1
+        gPlMeldung = "Teil von der Platine genommen (Einsetzen setzt es wieder)"
+        geaendert()
+    ELSEIF gPlBahnSel >= 0 AND gPlBahnSel < LEN(gDok.platine.bahnen) THEN
+        verlaufMerken()
+        ARRAY_REMOVE_AT(gDok.platine.bahnen, gPlBahnSel)
+        gPlBahnSel = -1
+        geaendert()
+    END IF
+END SUB
+
+SUB plWerkzeug(w AS INTEGER)
+    gPlWz = w
+    gPlBahnAktiv = FALSE
+    plKnoepfeNachziehen()
+    neuZeichnen()
+    statusAktualisieren()
+END SUB
+
+FUNCTION plTaste(taste AS INTEGER) AS BOOLEAN
+    SELECT CASE taste
+        CASE K_ESC
+            plAuswahlAufheben()
+        CASE K_R
+            plDrehen()
+        CASE K_DELETE, K_BACKSPACE
+            plLoeschen()
+        CASE K_A
+            plWerkzeug(PW_AUSWAHL)
+        CASE K_B, K_W
+            plWerkzeug(PW_BAHN)
+        CASE K_T
+            plWerkzeug(PW_TRENNEN)
+        CASE K_PLUS, K_GLEICH
+            zoomMitte(1.2)
+        CASE K_MINUS
+            zoomMitte(1.0 / 1.2)
+        CASE K_NULL
+            gPlEingepasst = FALSE
+        CASE ELSE
+            RETURN FALSE
+    END SELECT
+    neuZeichnen()
+    statusAktualisieren()
+    RETURN TRUE
+END FUNCTION
+
+SUB plEinsetzen()
+    DIM r AS kern.PlatBericht : r = platineBericht()
+    IF LEN(r.unplatziert) = 0 THEN
+        gPlMeldung = "Alle Bauteile sind schon auf der Platine"
+        statusAktualisieren()
+        RETURN
+    END IF
+    verlaufMerken()
+    DIM n AS INTEGER : n = kern.platineEinsetzen(gDok)
+    gPlMeldung = STR$(n) + " Bauteil(e) eingesetzt" + IIF(gDok.platine.art = kern.PL_STREIFEN, " -- quer zu den Streifen, daneben getrennt", "")
+    gPlEingepasst = FALSE
+    geaendert()
+END SUB
+
+SUB plArtSetzen(art AS INTEGER)
+    IF art = gDok.platine.art THEN RETURN
+    verlaufMerken()
+    gDok.platine.art = art
+    geaendert()
+END SUB
+
+SUB plGroesseSetzen(sp AS INTEGER, ze AS INTEGER)
+    IF sp = gDok.platine.spalten AND ze = gDok.platine.zeilen THEN RETURN
+    verlaufMerken()
+    gDok.platine.spalten = sp
+    gDok.platine.zeilen = ze
+    gPlEingepasst = FALSE
+    geaendert()
+END SUB
+
+' --- Statuszeile ----------------------------------------------------------------
+
+FUNCTION plStatus$() AS STRING
+    DIM pl AS kern.Platine : pl = gDok.platine
+    DIM r AS kern.PlatBericht : r = platineBericht()
+    DIM wz AS STRING : wz = "Auswahl"
+    IF gPlWz = PW_BAHN THEN wz = IIF(pl.art = kern.PL_LOCH, "Bahn (gerade = Loetbahn, Umschalt = Bruecke)", "Drahtbruecke")
+    IF gPlWz = PW_TRENNEN THEN wz = "Trennen"
+    DIM t AS STRING : t = "Platine " + STR$(pl.spalten) + " x " + STR$(pl.zeilen) + " " + IIF(pl.art = kern.PL_STREIFEN, "Streifenraster", "Lochraster") + "   " + wz
+    t = t + "   " + STR$(LEN(pl.teile)) + " Teile"
+    IF LEN(r.unplatziert) > 0 THEN t = t + ", " + STR$(LEN(r.unplatziert)) + " fehlen (" + JOIN$(r.unplatziert, ", ") + ")"
+    t = t + "   Luftlinien " + STR$(LEN(r.luft)) + ", Kurzschluesse " + STR$(r.kurzschluesse)
+    IF LEN(r.fehler) > r.kurzschluesse THEN t = t + ", Hinweise " + STR$(LEN(r.fehler) - r.kurzschluesse)
+    IF gPlMausDrin AND kern.aufPlatine(pl, gPlHS, gPlHZ) THEN
+        t = t + "   Loch " + STR$(gPlHS + 1) + "/" + STR$(gPlHZ + 1)
+        DIM n AS STRING : n = r.lochNetz$(gPlHS, gPlHZ)
+        IF n <> "" THEN t = t + ": " + n
+    END IF
+    IF gPlMeldung <> "" THEN t = t + "   -- " + gPlMeldung
+    RETURN t
+END FUNCTION
+
+' --- Pruefliste (wie der ERC-Dialog; eine Zeile anklicken springt hin) ----------
+
+DIM gPlPruefDlg AS INTEGER
+DIM gPlPruefListe AS INTEGER
+DIM gPlPruefS AS ARRAY OF INTEGER
+DIM gPlPruefZ AS ARRAY OF INTEGER
+DIM gPlPruefGewaehlt AS INTEGER
+
+SUB plPruefZeile(box AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
+    IF zeile = 0 THEN RETURN
+    DIM i AS INTEGER : i = gtk_list_box_row_get_index(zeile)
+    IF i < 0 OR i >= LEN(gPlPruefS) THEN RETURN
+    gPlPruefGewaehlt = i
+    zentrieren(gPlPruefS[i] * kern.LOCHRASTER, gPlPruefZ[i] * kern.LOCHRASTER)
+END SUB
+
+SUB plPruefZu(dlg AS INTEGER, antwort AS INTEGER, daten AS INTEGER)
+    gPlPruefDlg = 0
+    gPlPruefListe = 0
+    gPlPruefGewaehlt = -1
+    gtk_widget_destroy(dlg)
+    neuZeichnen()
+END SUB
+
+SUB plPruefMarkerZeichnen(cr AS INTEGER)
+    IF gPlPruefDlg = 0 OR gPlPruefGewaehlt < 0 OR gPlPruefGewaehlt >= LEN(gPlPruefS) THEN RETURN
+    cairo_set_line_width(cr, 3.0)
+    plKreis(cr, lochX(gPlPruefS[gPlPruefGewaehlt]), lochY(gPlPruefZ[gPlPruefGewaehlt]), MAX(14.0, 0.9 * kern.LOCHRASTER * vZoom), C_AUSWAHL, FALSE)
+END SUB
+
+SUB plPruefungZeigen()
+    IF gPlPruefDlg <> 0 THEN gtk_widget_destroy(gPlPruefDlg)
+    platineVeraltet()
+    DIM r AS kern.PlatBericht : r = platineBericht()
+    DIM texte AS ARRAY OF STRING : texte = []
+    gPlPruefS = []
+    gPlPruefZ = []
+    gPlPruefGewaehlt = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.fehler) - 1
+        ARRAY_PUSH(texte, IIF(r.fehler[i].kurz, "<span foreground='#ff5a5a'><b>Kurzschluss</b></span>   ", "<span foreground='#ffc23d'><b>Hinweis</b></span>   ") + markupSicher$(REPLACE$(r.fehler[i].text, "Kurzschluss: ", "")))
+        ARRAY_PUSH(gPlPruefS, r.fehler[i].s)
+        ARRAY_PUSH(gPlPruefZ, r.fehler[i].z)
+    NEXT
+    FOR i = 0 TO LEN(r.luft) - 1
+        ARRAY_PUSH(texte, "<span foreground='#ffe14d'><b>Offen</b></span>   " + markupSicher$(r.luft[i].netz + ": Loch " + STR$(r.luft[i].s1 + 1) + "/" + STR$(r.luft[i].z1 + 1) + " fehlt die Verbindung zu " + STR$(r.luft[i].s2 + 1) + "/" + STR$(r.luft[i].z2 + 1)))
+        ARRAY_PUSH(gPlPruefS, r.luft[i].s1)
+        ARRAY_PUSH(gPlPruefZ, r.luft[i].z1)
+    NEXT
+    DIM kopf AS STRING
+    IF LEN(texte) = 0 AND LEN(r.unplatziert) = 0 THEN
+        kopf = "Die Platine stimmt mit dem Schaltplan ueberein."
+    ELSE
+        kopf = STR$(r.kurzschluesse) + " Kurzschluesse, " + STR$(LEN(r.luft)) + " offene Verbindungen, " + STR$(LEN(r.fehler) - r.kurzschluesse) + " Hinweise"
+        IF LEN(r.unplatziert) > 0 THEN kopf = kopf + CHR$(10) + "Noch nicht auf der Platine: " + JOIN$(r.unplatziert, ", ")
+    END IF
+    gPlPruefDlg = gtk_dialog_new_with_buttons("Platine pruefen", gFenster, 0, "Schliessen", GTK_ANTWORT_OK, NIL)
+    DIM vb AS INTEGER : vb = gtk_box_new(GTK_SENKRECHT, 8)
+    gtk_container_set_border_width(vb, 12)
+    gtk_box_pack_start(vb, etikettNeu(kopf), FALSE, FALSE, 0)
+    IF LEN(texte) > 0 THEN
+        DIM sw AS INTEGER : sw = gtk_scrolled_window_new(0, 0)
+        gtk_scrolled_window_set_policy(sw, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+        gtk_scrolled_window_set_min_content_height(sw, 220)
+        gtk_widget_set_size_request(sw, 520, -1)
+        gPlPruefListe = gtk_list_box_new()
+        gtk_list_box_set_selection_mode(gPlPruefListe, GTK_AUSWAHL_EINE)
+        FOR i = 0 TO LEN(texte) - 1
+            DIM zeile AS INTEGER : zeile = gtk_label_new("")
+            gtk_label_set_markup(zeile, texte[i])
+            gtk_label_set_xalign(zeile, 0.0)
+            gtk_widget_set_margin_start(zeile, 6)
+            gtk_widget_set_margin_top(zeile, 3)
+            gtk_widget_set_margin_bottom(zeile, 3)
+            gtk_list_box_insert(gPlPruefListe, zeile, -1)
+        NEXT
+        gtk_container_add(sw, gPlPruefListe)
+        gtk_box_pack_start(vb, sw, TRUE, TRUE, 0)
+        signalZeile(gPlPruefListe, "row-selected", plPruefZeile, 0, 0, 0)
+    END IF
+    gtk_box_pack_start(gtk_dialog_get_content_area(gPlPruefDlg), vb, TRUE, TRUE, 0)
+    signalAntwort(gPlPruefDlg, "response", plPruefZu, 0, 0, 0)
+    gtk_widget_show_all(gPlPruefDlg)
+    neuZeichnen()
+END SUB

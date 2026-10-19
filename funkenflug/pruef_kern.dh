@@ -361,6 +361,107 @@ ARRAY_PUSH(vd.blaetter[0].bauteile, vb)
 DIM vd2 AS kern.Dokument : vd2 = kern.dokumentAusJson(kern.dokumentNachJson(vd))
 PRINT "Versatz JSON: "; vd2.blaetter[0].bauteile[0].refVersatz.x; ","; vd2.blaetter[0].bauteile[0].refVersatz.y; " Wert "; vd2.blaetter[0].bauteile[0].wertVersatz.x; ","; vd2.blaetter[0].bauteile[0].wertVersatz.y; "  (erwartet 250,-150 Wert 0,0)"
 
+' --- Platine
+DIM bfa AS kern.Bauform
+PRINT "Bauformen: AX4 "; kern.bauformLesen("AX4", bfa); " "; bfa.pins[1].dx; "  DIP-8 "; kern.bauformLesen("DIP-8", bfa); " Pin "; bfa.pins[4].schluessel; " bei "; bfa.pins[4].dx; ","; bfa.pins[4].dy; "  TO92-EBC "; kern.bauformLesen("TO92-EBC", bfa); " "; bfa.pins[0].schluessel; bfa.pins[1].schluessel; bfa.pins[2].schluessel; "  0805 "; kern.bauformLesen("0805", bfa); "  DIP7 "; kern.bauformLesen("DIP7", bfa); "  (erwartet AX4 TRUE 4  DIP-8 TRUE Pin 8 bei 3,0  TO92-EBC TRUE EBC  0805 FALSE  DIP7 FALSE)"
+' LED-Schaltung: VCC - R1 - D1 - GND, dazu C1 zwischen VCC und GND
+DIM pdok AS kern.Dokument : pdok = NEW kern.Dokument()
+DIM pbl AS kern.Blatt : pbl = pdok.blaetter[0]
+DIM pR AS kern.Bauteil : pR = kern.neuesBauteil("R", kern.neueLage(0, 0))
+pR.referenz = "R1"
+DIM pD AS kern.Bauteil : pD = kern.neuesBauteil("LED", kern.neueLage(400, 0))
+pD.referenz = "D1"
+DIM pC AS kern.Bauteil : pC = kern.neuesBauteil("C", kern.neueLage(0, 600))
+pC.referenz = "C1"
+ARRAY_PUSH(pbl.bauteile, pR)
+ARRAY_PUSH(pbl.bauteile, pD)
+ARRAY_PUSH(pbl.bauteile, pC)
+ARRAY_PUSH(pbl.bauteile, kern.neuesBauteil("VCC", kern.neueLage(-200, 0)))
+ARRAY_PUSH(pbl.bauteile, kern.neuesBauteil("GND", kern.neueLage(600, 0)))
+DIM pw1 AS kern.Draht : pw1 = NEW kern.Draht()
+ARRAY_PUSH(pw1.punkte, NEW kern.Punkt(-200, 0))
+ARRAY_PUSH(pw1.punkte, NEW kern.Punkt(-200, 600))
+ARRAY_PUSH(pbl.draehte, pw1)
+DIM pw2 AS kern.Draht : pw2 = NEW kern.Draht()
+ARRAY_PUSH(pw2.punkte, NEW kern.Punkt(200, 600))
+ARRAY_PUSH(pw2.punkte, NEW kern.Punkt(600, 600))
+ARRAY_PUSH(pw2.punkte, NEW kern.Punkt(600, 0))
+ARRAY_PUSH(pbl.draehte, pw2)
+DIM phw AS STRING
+PRINT "Bauform je Symbol: "; kern.bauformFuer(pR, phw).name; " "; kern.bauformFuer(pD, phw).name; " "; kern.bauformFuer(pC, phw).name; "  (erwartet AX4 RAD1 RAD2)"
+pR.gehaeuse = "0805"
+DIM pfR AS kern.Bauform : pfR = kern.bauformFuer(pR, phw)
+PRINT "Unbekanntes Gehaeuse: "; pfR.name; " Hinweis "; CONTAINS(phw, "Gehaeuse 0805 von R1 kennt die Platine nicht"); "  (erwartet AX4 Hinweis TRUE)"
+pR.gehaeuse = ""
+DIM pr0 AS kern.PlatBericht : pr0 = kern.platinePruefen(pdok)
+PRINT "Leere Platine: unplatziert "; JOIN$(pr0.unplatziert, ","); "  (erwartet R1,D1,C1)"
+DIM pgs AS INTEGER : pgs = kern.platineEinsetzen(pdok)
+DIM pr1 AS kern.PlatBericht : pr1 = kern.platinePruefen(pdok)
+PRINT "Eingesetzt "; pgs; " (gedreht "; pdok.platine.teile[0].drehung; "), Fehler "; LEN(pr1.fehler); ", Kurzschluesse "; pr1.kurzschluesse; ", Luftlinien "; LEN(pr1.luft); ", unplatziert "; LEN(pr1.unplatziert); "  (erwartet 3 (gedreht 90), Fehler 0, Kurzschluesse 0, Luftlinien 3, unplatziert 0)"
+' Pad-Loecher holen
+DIM padS AS MAP OF INTEGER
+DIM padZ AS MAP OF INTEGER
+DIM ppi AS INTEGER
+FOR ppi = 0 TO LEN(pr1.pads) - 1
+    MAPPUT(padS, pr1.pads[ppi].text, pr1.pads[ppi].s)
+    MAPPUT(padZ, pr1.pads[ppi].text, pr1.pads[ppi].z)
+NEXT
+PRINT "Loch R1.1 gehoert zu: "; pr1.lochNetz$(MAPGET(padS, "R1.1"), MAPGET(padZ, "R1.1")); "  (erwartet VCC)"
+' Bruecken legen: VCC, Mitte, GND
+ARRAY_PUSH(pdok.platine.bahnen, NEW kern.Bahn(MAPGET(padS, "R1.1"), MAPGET(padZ, "R1.1"), MAPGET(padS, "C1.1"), MAPGET(padZ, "C1.1"), kern.BA_BRUECKE))
+ARRAY_PUSH(pdok.platine.bahnen, NEW kern.Bahn(MAPGET(padS, "R1.2"), MAPGET(padZ, "R1.2"), MAPGET(padS, "D1.1"), MAPGET(padZ, "D1.1"), kern.BA_BRUECKE))
+ARRAY_PUSH(pdok.platine.bahnen, NEW kern.Bahn(MAPGET(padS, "D1.2"), MAPGET(padZ, "D1.2"), MAPGET(padS, "C1.2"), MAPGET(padZ, "C1.2"), kern.BA_BRUECKE))
+DIM pr2 AS kern.PlatBericht : pr2 = kern.platinePruefen(pdok)
+PRINT "Mit Bruecken: Luftlinien "; LEN(pr2.luft); ", Kurzschluesse "; pr2.kurzschluesse; "  (erwartet 0, 0)"
+' eine falsche Bruecke VCC-GND
+ARRAY_PUSH(pdok.platine.bahnen, NEW kern.Bahn(MAPGET(padS, "R1.1"), MAPGET(padZ, "R1.1"), MAPGET(padS, "D1.2"), MAPGET(padZ, "D1.2"), kern.BA_BRUECKE))
+DIM pr3 AS kern.PlatBericht : pr3 = kern.platinePruefen(pdok)
+DIM pkt AS STRING : pkt = ""
+FOR ppi = 0 TO LEN(pr3.fehler) - 1
+    pkt = pkt + pr3.fehler[ppi].text + "|"
+NEXT
+PRINT "Falsche Bruecke: "; pr3.kurzschluesse; " "; CONTAINS(pkt, "Kurzschluss: VCC und GND") OR CONTAINS(pkt, "Kurzschluss: GND und VCC"); "  (erwartet 1 TRUE)"
+ARRAY_POP(pdok.platine.bahnen)
+' Loetbahn verbindet jedes Loch auf dem Weg, eine Bruecke nur die Enden
+DIM pls AS INTEGER : pls = MAPGET(padS, "R1.1")
+DIM plz AS INTEGER : plz = MAPGET(padZ, "R1.1")
+pdok.platine.art = kern.PL_LOCH
+DIM pr4 AS kern.PlatBericht : pr4 = kern.platinePruefen(pdok)
+PRINT "Lochraster (ohne Streifen): Luftlinien "; LEN(pr4.luft); ", Kurzschluesse "; pr4.kurzschluesse; "  (erwartet 0, 0)"
+ARRAY_PUSH(pdok.platine.bahnen, NEW kern.Bahn(pls, plz - 1, pls, plz + 1, kern.BA_BRUECKE))
+DIM pr5 AS kern.PlatBericht : pr5 = kern.platinePruefen(pdok)
+ARRAY_POP(pdok.platine.bahnen)
+ARRAY_PUSH(pdok.platine.bahnen, NEW kern.Bahn(pls, plz - 1, pls, plz + 4, kern.BA_LOET))
+DIM pr6 AS kern.PlatBericht : pr6 = kern.platinePruefen(pdok)
+ARRAY_POP(pdok.platine.bahnen)
+PRINT "Bruecke ueber R1.1 hinweg: "; pr5.kurzschluesse; "  Loetbahn ueber R1.1 bis R1.2: "; pr6.kurzschluesse; "  (erwartet 0  1)"
+pdok.platine.art = kern.PL_STREIFEN
+' Trennstelle im Pad-Loch, doppelte Belegung, Rand
+DIM ptr AS BOOLEAN : ptr = kern.trennUmschalten(pdok.platine, pls, plz)
+DIM pr7 AS kern.PlatBericht : pr7 = kern.platinePruefen(pdok)
+ptr = kern.trennUmschalten(pdok.platine, pls, plz)
+DIM pc1 AS kern.PlatTeil : pc1 = pdok.platine.teile[kern.teilIndex(pdok.platine, pC.id)]
+DIM pcs AS INTEGER : pcs = pc1.s
+DIM pcz AS INTEGER : pcz = pc1.z
+pc1.s = pdok.platine.teile[0].s
+pc1.z = pdok.platine.teile[0].z
+pc1.drehung = pdok.platine.teile[0].drehung
+DIM pr8 AS kern.PlatBericht : pr8 = kern.platinePruefen(pdok)
+pc1.s = pdok.platine.spalten - 1
+pc1.z = 0
+pc1.drehung = 0
+DIM pbf AS kern.Bauform : pbf = kern.bauformFuer(pC, phw)
+kern.teilInsFeld(pdok.platine, pc1, pbf)
+PRINT "Trennstelle im Pad "; CONTAINS(pr7.fehler[0].text, "R1.1 steckt in einer Trennstelle"); "  doppelt "; CONTAINS(pr8.fehler[0].text, "doppelt belegt"); "  am Rand eingerueckt "; pc1.s; "  (erwartet TRUE  TRUE  "; pdok.platine.spalten - 3; ")"
+pc1.s = pcs
+pc1.z = pcz
+pc1.drehung = 90
+' Speichern und Abgleich
+DIM pd2 AS kern.Dokument : pd2 = kern.dokumentAusJson(kern.dokumentNachJson(pdok))
+PRINT "Platine JSON: "; LEN(pd2.platine.teile); " Teile, "; LEN(pd2.platine.bahnen); " Bahnen, "; LEN(pd2.platine.trenn) = LEN(pdok.platine.trenn); " Trennstellen, Art "; pd2.platine.art; ", Pruefung "; LEN(kern.platinePruefen(pd2).luft); " "; kern.platinePruefen(pd2).kurzschluesse; "  (erwartet 3 Teile, 3 Bahnen, TRUE, Art 1, Pruefung 0 0)"
+ARRAY_REMOVE_AT(pbl.bauteile, 1)
+PRINT "Abgleich nach Loeschen von D1: "; kern.platineAbgleichen(pdok); " entfernt, "; LEN(pdok.platine.teile); " bleiben  (erwartet 1 entfernt, 2 bleiben)"
+
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
 PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)

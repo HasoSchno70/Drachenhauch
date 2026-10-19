@@ -177,6 +177,44 @@ gelten als Quelle – ein PWR_FLAG wie in KiCad braucht es nicht.
 `M` heißt in SPICE *milli*; Dioden und Transistoren bekommen `.model`-Zeilen),
 `.csv` (Semikolon) oder `.net`/`.txt` als lesbarer Text.
 
+## Platine (Lochraster / Streifenraster)
+
+„Platine" in der Kopfleiste schaltet auf die Lochraster-Sicht desselben
+Dokuments (eigener Ausschnitt, eigene Werkzeugleiste). Welche Pins
+zusammengehören, sagt **allein der Schaltplan**; die Platine sagt nur, wo die
+Teile stecken und wie das Kupfer verbunden ist. Die Prüfung vergleicht beides
+laufend:
+
+- **Luftlinien** (gelb): im Schaltplan verbunden, auf der Platine noch nicht –
+  je Netz die kürzesten Strecken zwischen den Kupfer-Inseln.
+- **Kurzschluss** (rot): zwei Netze auf demselben Kupferstück.
+- **Hinweise** (orange): doppelt belegtes Loch, Bein außerhalb der Platine, Bein
+  in einer Trennstelle, unbekanntes Gehäuse.
+
+`ERC` heißt in dieser Sicht „Platine prüfen" und listet alles; eine Zeile
+springt hin. Die Statuszeile nennt das Netz des Lochs unter der Maus.
+
+| Werkzeug | |
+|---|---|
+| **Auswahl** (`A`) | Teil ziehen (lochweise), `R` dreht – am Rand rückt es ein, statt still abgelehnt zu werden –, `Entf` nimmt es herunter; eine Bahn anklicken und `Entf` löscht sie |
+| **Bahn** (`B`) | Loch für Loch klicken, rechte Taste beendet. Auf Lochraster ist eine gerade Bahn eine **Lötbahn** (verbindet jedes Loch auf ihrem Weg), sonst – und immer auf Streifenraster – eine **Drahtbrücke** (nur ihre Enden); `Umschalt` erzwingt die Brücke |
+| **Trennen** (`T`) | Streifen an einem Loch auftrennen bzw. wieder schließen |
+
+**Einsetzen** setzt alle Teile, die noch fehlen. Auf Streifenraster stehen sie
+quer zu den Streifen (sonst lägen beide Beine eines Widerstands auf einem
+Streifen), rechts neben jedem Teil und unter einem DIP zwischen den Reihen
+wird getrennt – es entsteht nie ein Kurzschluss, was fehlt, zeigen die
+Luftlinien. Bauteile, die im Schaltplan gelöscht wurden, verschwinden beim
+Umschalten von der Platine (ein Rückgängig-Schritt).
+
+Die **Bauform** ist das Gehäuse-Feld des Bauteils: `AX4` (axial, 4 Löcher),
+`RAD2`, `RAD1`, `TO92-CBE` (Beinfolge nach Pin-Namen), `DIP8`, `SIL3`. Ohne
+Angabe gilt eine Vorgabe je Symbol (Widerstand/Diode AX4, Kondensator RAD2,
+Elko/LED RAD1, NPN TO92-CBE, eigene ICs DIP bzw. SIL). Platine, Teile, Bahnen
+und Trennstellen stecken in der `.fkn` und im Rückgängig.
+
+![Streifenraster mit Brücken](platine.png)
+
 ## Aufbau
 
 ```
@@ -191,6 +229,7 @@ kern/       Modell, Geometrie, Bibliothek, Netze, Datei – ohne Oberfläche,
   netzliste.dh   Export: SPICE, CSV, Text
   symbole.dh     eigene Symbole: Pinliste, IC-Generator, JSON, Register, Bibliothek
   stueckliste.dh Stückliste: Gruppen, natürliche Sortierung, CSV/Markdown/Text
+  platine.dh     Bauformen, Platinen-Pruefung (Inseln, Luftlinien, Kurzschluesse), Einsetzen
   datei.dh       Speichern/Laden als .fkn (JSON, Version 1)
 gtk/        Deklarationen für GTK 3, GDK, Cairo, Pango, GLib (aus Glutfaden)
 ansicht/    Zeichenfläche und Werkzeuge – globaler Namensraum
@@ -201,6 +240,7 @@ ansicht/    Zeichenfläche und Werkzeuge – globaler Namensraum
   symboleditor.dh  Symbol-Editor mit Vorschau
   ausgabe.dh     PDF, SVG, PNG, Drucken, Menü „Ausgabe"
   blaetter.dh    Reiter, Menü „Blatt": neu, umbenennen, löschen
+  platinenansicht.dh  Lochraster-Sicht: Zeichnen, Werkzeuge, Pruefliste
 main.dh     Fenster, Kopfleiste, Werkzeugleiste, Statuszeile, Dialoge
 ```
 
@@ -208,7 +248,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (174 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (195 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
@@ -216,7 +256,9 @@ Kopieren/Einfügen, Umbenennen, ERC und SPICE, mehrere Blätter mit Reitern,
 globalem Label über den Dialog-Haken, ERC-Sprung aufs Blatt und mehrseitigem
 PDF/Druck, gedrehte Labels samt Treffer-Test, Gehäuse/Bestellnummer einzeln
 und für mehrere Bauteile, Referenz ziehen/drehen/zurücksetzen, frei
-gezeichnetes Symbol platzieren und anschließen). `pruef_kern.dh` prüft u. a. die
+gezeichnetes Symbol platzieren und anschließen, Platine: umschalten,
+einsetzen, Brücken entlang der Luftlinien klicken, trennen, ziehen, drehen am
+Rand, Prüfliste, Art umschalten, Speichern). `pruef_kern.dh` prüft u. a. die
 Gruppen-Lage in allen 8 Orientierungen × 3 Arten (72 Pin-Prüfungen). Der Selbsttest
 lässt die Zwischenablage des Systems in Ruhe und schreibt seine Bibliothek in
 eine Wegwerf-Datei neben dem Bild. `--nur-foto bild.png` macht nur das Bild.
@@ -246,8 +288,13 @@ SparkNode hatte mehrere Konzeptfehler, die hier von Anfang an vermieden sind:
    (welches Blatt, Annotation). Ein Schnappschuss kennt immer alles; Ziehen ist
    ein Schritt, ein bloßer Klick keiner.
 6. **Bewusst weggelassen** (in SparkNode überproportional viele Bugquellen):
-   Bus/Bus-Entry, Hierarchie-Sheets, Pin-Swap, Multi-Unit. Kommt erst, wenn
-   wirklich gebraucht.
+   Bus/Bus-Entry, Hierarchie-Sheets, Pin-Swap, Multi-Unit, auf der Platine
+   Autorouter und Autoplatzierung nach Netzen. Kommt erst, wenn wirklich
+   gebraucht.
+7. **Platine ohne zweite Wahrheit.** SparkNode hielt Footprint und Netzliste
+   der Platine getrennt vom Schaltplan und brauchte einen „Transfer"; hier ist
+   die Bauform das Gehäuse-Feld und die Netze kommen bei jeder Prüfung frisch
+   aus dem Schaltplan. Die Platine merkt sich nur Lage, Kupfer und Trennstellen.
 
 ## Hinweis für Drachenhauch-Code
 
@@ -255,6 +302,12 @@ SparkNode hatte mehrere Konzeptfehler, die hier von Anfang an vermieden sind:
 bei zwei ganzen Zahlen; ganzzahlig teilt `\`. `rastern()` hatte das falsch und
 verschob jeden Punkt um ein halbes Raster – unbemerkt, weil `RETURN` eines
 ganzzahligen Kommawerts aus einer `AS INTEGER`-Funktion still durchgeht.
+
+Namen unterscheiden **keine Groß-/Kleinschreibung**: `pd` und `pD` sind
+dieselbe Variable. Ein Test, der ein Dokument `pd` und eine LED `pD` nannte,
+reichte die LED als Dokument weiter. Der Compiler warnt zwar („schon als A
+angelegt, hier als B"), läuft aber weiter – die Warnung ging in der langen
+Testausgabe unter, der Fehler kam erst zur Laufzeit.
 
 `MID$` zählt ab **0**, und `INSTR` liefert die 0-basierte Position oder **-1** –
 anders als QBasic/VB. `INSTR(...) > 0` übersieht deshalb einen Treffer ganz
@@ -264,4 +317,5 @@ zweiten Kondensator wieder „C1".
 ## Noch offen (nächste Runden)
 
 Hierarchische Blätter (Blatt-Symbole mit Ports), Symbol-Grafik mit der Maus
-zeichnen (bisher als Text), Platinen-Layout.
+zeichnen (bisher als Text), Platine drucken (Bestückungs- und Lötseite,
+1:1), weitere Bauformen (Trimmer, Buchsen, Stiftleisten zweireihig).

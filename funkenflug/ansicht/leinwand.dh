@@ -161,6 +161,8 @@ SUB leinwandDokument(d AS kern.Dokument)
     auswahlAufheben()
     gDrahtAktiv = FALSE
     vEingepasst = FALSE
+    gPlEingepasst = FALSE
+    plAuswahlAufheben()
     netzeVeraltet()
     reiterAktualisieren()
     neuZeichnen()
@@ -252,6 +254,10 @@ END FUNCTION
 FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM bw AS FLOAT : bw = gtk_widget_get_allocated_width(w)
     DIM bh AS FLOAT : bh = gtk_widget_get_allocated_height(w)
+    IF gAnsicht = ANS_PLATINE THEN
+        platineZeichnen(cr, bw, bh)
+        RETURN TRUE
+    END IF
     IF NOT vEingepasst THEN einpassen(bw, bh)
     zeichenFarbe(cr, C_HG)
     cairo_rectangle(cr, 0, 0, bw, bh)
@@ -411,6 +417,7 @@ END SUB
 ' --- Netze (Cache) ---------------------------------------------------------
 SUB netzeVeraltet()
     gNetzeGueltig = FALSE
+    platineVeraltet()                 ' die Pruefung haengt an den Netzen
     gErcSichtbar = FALSE              ' alte ERC-Marker passen nicht mehr
 END SUB
 

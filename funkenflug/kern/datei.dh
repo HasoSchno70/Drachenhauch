@@ -22,6 +22,7 @@ FUNCTION dokumentNachJson(dok AS Dokument) AS JSON_HANDLE
             END IF
         NEXT
     NEXT
+    JSON_SET_JSON(j, "platine", platineNachJson(dok.platine))
     JSON_SET_JSON(j, "blaetter", JSON_NEW_ARRAY())
     FOR bi = 0 TO LEN(dok.blaetter) - 1
         DIM bl AS Blatt : bl = dok.blaetter[bi]
@@ -153,6 +154,7 @@ FUNCTION dokumentAusJson(j AS JSON_HANDLE) AS Dokument
         autoKnoten(bl)
         ARRAY_PUSH(dok.blaetter, bl)
     NEXT
+    IF JSON_HAS(j, "platine") THEN dok.platine = platineAusJson(j, "platine")
     RETURN dok
 END FUNCTION
 
