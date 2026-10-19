@@ -30,6 +30,7 @@ CONST K_X = &H78
 CONST K_T = &H74
 CONST K_B = &H62
 CONST K_H = &H68
+CONST K_F = &H66
 CONST K_BILD_AUF = &HFF55              ' GDK_KEY_Page_Up
 CONST K_BILD_AB = &HFF56
 
@@ -260,6 +261,7 @@ SUB werkzeugWaehlen(wz AS INTEGER, ref AS STRING)
 END SUB
 
 SUB geaendert()
+    gAenderungen = gAenderungen + 1           ' fuer den Autosave
     kern.blattSymboleAktualisieren(gDok)   ' Ports folgen den Labels der Unterblaetter
     netzeVeraltet()
     gGeaendert = TRUE
@@ -523,6 +525,7 @@ FUNCTION lwDruck(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM px AS FLOAT, py AS FLOAT
     DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ev, px, py)
     gtk_widget_grab_focus(gFlaeche)
+    gSpMeldung = ""
     mausSetzen(px, py)
     DIM knopf AS INTEGER : knopf = evKnopf(ev)
     IF knopf = 2 THEN
@@ -758,6 +761,7 @@ FUNCTION lwTaste(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
             CASE K_X : ablageAusschneiden()
             CASE K_V : ablageEinfuegen()
             CASE K_A : alleWaehlen()
+            CASE K_F : suchenZeigen()
             CASE ELSE : RETURN FALSE
         END SELECT
         RETURN TRUE

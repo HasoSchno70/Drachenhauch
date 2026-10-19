@@ -36,7 +36,8 @@ ist eine echte Tilde). Der Netzname bleibt der geschriebene Text.
 Weiteres: `Strg+Z` / `Strg+Y` (oder `Strg+Umschalt+Z`) bzw. die Pfeile in der
 Kopfleiste machen rückgängig und wiederholen. `R` dreht die Auswahl, `Entf`
 löscht sie, Mausrad zoomt um den Zeiger, mittlere Maustaste schiebt,
-`+`/`-`/`0` zoomen, `Strg+S` speichert, `Strg+O` öffnet. Eine schon vergebene
+`+`/`-`/`0` zoomen, `Strg+S` speichert (mit Dateinamen ohne Rückfrage),
+`Strg+O` öffnet, `Strg+F` sucht. Eine schon vergebene
 Referenz lehnt der Eigenschaften-Dialog ab. Er kennt auch **Gehäuse** und
 **Bestellnummer** für die Stückliste. Sind mehrere Bauteile gewählt, bearbeitet
 `E` Wert, Gehäuse und Bestellnummer aller zugleich – ein Feld, das man nicht
@@ -318,6 +319,35 @@ Druckdialog „an Seite anpassen" ein, sieht man es dort. Passt eine große
 Platine nicht auf A4, wird verkleinert, und der Kopf sagt es rot. Der Kopf
 nennt auch den Prüfstand (offene Verbindungen, Kurzschlüsse).
 
+## Datei und Bearbeiten
+
+**Datei ▾**: „Speichern unter …" und die acht zuletzt geöffneten Dateien.
+**Autosave**: jede Minute, wenn sich etwas geändert hat, nach
+`<Datei>.sicherung` (ein Schaltplan ohne Namen nach
+`unbenannt.sicherung.fkn` im Einstellungs-Ordner). Speichern löscht die
+Sicherung. Findet Funkenflug beim Öffnen eine Sicherung, die nicht älter ist
+als die Datei, fragt es, ob sie geladen werden soll – die Datei selbst bleibt
+dabei unverändert, erst Speichern übernimmt die Sicherung. Nach einem Absturz
+geht so höchstens eine Minute Arbeit verloren.
+
+**Bearbeiten ▾**:
+
+- *Fehlende Referenzen vergeben* – jede gültige, eindeutige Referenz bleibt,
+  leere und doppelte bekommen die nächste freie Nummer, in Leserichtung.
+- *Alle neu annotieren* – Blatt für Blatt, zeilenweise von oben links (in
+  5-mm-Bändern, damit eine leicht versetzte Reihe zusammenbleibt); fragt
+  vorher, weil danach Bestückungsliste und Platine andere Namen tragen.
+- *Suchen & Ersetzen* (`Strg+F`) – in Referenzen, Werten und Labels über alle
+  Blätter, mit oder ohne Groß/Klein; die Liste folgt jeder Eingabe, eine Zeile
+  springt aufs Blatt und wählt das Element, *Alle ersetzen* ist ein
+  Rückgängig-Schritt. Ein Feld ist ein Treffer, auch wenn das Muster darin
+  mehrmals vorkommt.
+- *Dokument-Eigenschaften* – Titel, Autor, Revision, Firma/Projekt fürs
+  Schriftfeld (PDF, Druck) und den Kopf des Platinen-Ausdrucks.
+
+Alles, was hinterher erst weiß, ob es etwas geändert hat (Annotieren,
+Ersetzen, Verbinden), legt nur dann einen Rückgängig-Schritt an.
+
 ## Aufbau
 
 ```
@@ -332,6 +362,7 @@ kern/       Modell, Geometrie, Bibliothek, Netze, Datei – ohne Oberfläche,
   netze.dh       Netz-Erkennung (eine reine Funktion), benannte Netze, Auto-Knoten
   erc.dh         Elektrische Regelpruefung
   hierarchie.dh  Unterblaetter: Blattsymbol aus den Labels, Ports, Pfad, ERC
+  bearbeiten.dh  Annotieren, Suchen & Ersetzen
   netzliste.dh   Export: SPICE, CSV, Text
   symbole.dh     eigene Symbole: Pinliste, IC-Generator, JSON, Register, Bibliothek
   stueckliste.dh Stückliste: Gruppen, natürliche Sortierung, CSV/Markdown/Text
@@ -346,6 +377,7 @@ ansicht/    Zeichenfläche und Werkzeuge – globaler Namensraum
   symboleditor.dh  Symbol-Editor mit Vorschau
   ausgabe.dh     PDF, SVG, PNG, Drucken, Menü „Ausgabe"
   blaetter.dh    Reiter, Menü „Blatt": neu, umbenennen, löschen
+  komfort.dh     Datei-Menü, zuletzt geöffnet, Autosave, Bearbeiten-Menü, Suchen-Dialog
   platinenansicht.dh  Lochraster-Sicht: Zeichnen, Werkzeuge, Pruefliste
   platinendruck.dh    Platine 1:1: Bestueckung, Loetseite, Arbeitsliste (PDF, Druck)
 main.dh     Fenster, Kopfleiste, Werkzeugleiste, Statuszeile, Dialoge
@@ -355,7 +387,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (241 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (259 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
@@ -369,7 +401,9 @@ Rand, Prüfliste, Art umschalten, Speichern, Verbinden, PDF/Druck der Platine
 1:1, Gruppe drehen; im Symbol-Editor Rechteck, Linie, Kreis, Bogen, Text und
 Pins mit Maus-Ereignissen zeichnen, verschieben, löschen, zurücknehmen und
 übernehmen; Unterblatt über das Menü einsetzen, per Doppelklick öffnen, Port
-mit `H`, Verbindung über die Blattgrenze). `pruef_kern.dh` prüft u. a. die
+mit `H`, Verbindung über die Blattgrenze; Annotieren über das Menü,
+Suchen & Ersetzen im Dialog, Dokument-Eigenschaften, Speichern, Autosave und
+Wiederherstellen beim Öffnen). `pruef_kern.dh` prüft u. a. die
 Gruppen-Lage in allen 8 Orientierungen × 3 Arten (72 Pin-Prüfungen). Der Selbsttest
 lässt die Zwischenablage des Systems in Ruhe und schreibt seine Bibliothek in
 eine Wegwerf-Datei neben dem Bild. `--nur-foto bild.png` macht nur das Bild.

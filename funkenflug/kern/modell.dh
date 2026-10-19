@@ -270,11 +270,17 @@ END CLASS
 CLASS Dokument
     DIM id AS STRING
     DIM titel AS STRING
+    DIM autor AS STRING               ' Schriftfeld
+    DIM revision AS STRING
+    DIM firma AS STRING
     DIM blaetter AS ARRAY OF Blatt
     DIM platine AS Platine
     SUB Init()
         id = LEFT$(UUID4$(), 10)
         titel = ""
+        autor = ""
+        revision = ""
+        firma = ""
         blaetter = []
         ARRAY_PUSH(blaetter, NEW Blatt("Blatt1"))
         platine = NEW Platine()

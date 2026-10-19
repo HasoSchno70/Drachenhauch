@@ -77,6 +77,7 @@ SUB wiederherstellen(json AS STRING, idx AS INTEGER)
     gDrahtAktiv = FALSE
     gDrahtPunkte = []
     gGeaendert = TRUE
+    gAenderungen = gAenderungen + 1
     reiterAktualisieren()
     neuZeichnen()
     titelNachziehen()

@@ -48,7 +48,7 @@ END FUNCTION
 ' Die Seite auf einen Cairo-Kontext der Groesse breite x hoehe (in Punkt).
 SUB ausgabeZeichnen(cr AS INTEGER, breite AS FLOAT, hoehe AS FLOAT)
     DIM rand AS FLOAT : rand = 0.04 * MIN(breite, hoehe)
-    DIM sfH AS FLOAT : sfH = 46
+    DIM sfH AS FLOAT : sfH = 60
     farbeDruck(cr, &HFFFFFF)
     cairo_rectangle(cr, 0, 0, breite, hoehe)
     cairo_fill(cr)
@@ -86,24 +86,31 @@ END SUB
 
 ' Schriftfeld unten rechts: Titel, Blatt, Datum, Massstab-Hinweis.
 SUB schriftfeldZeichnen(cr AS INTEGER, rechts AS FLOAT, unten AS FLOAT, h AS FLOAT)
-    DIM b AS FLOAT : b = 250
+    DIM b AS FLOAT : b = 260
     DIM x AS FLOAT : x = rechts - b
     DIM y AS FLOAT : y = unten - h
+    DIM zh AS FLOAT : zh = h / 3.0
     farbeDruck(cr, &H333333)
     cairo_set_line_width(cr, 0.8)
     cairo_rectangle(cr, x, y, b, h)
-    cairo_stroke(cr)
-    cairo_move_to(cr, x, y + h / 2)
-    cairo_line_to(cr, x + b, y + h / 2)
-    cairo_move_to(cr, x + b * 0.62, y + h / 2)
+    cairo_move_to(cr, x, y + zh)
+    cairo_line_to(cr, x + b, y + zh)
+    cairo_move_to(cr, x, y + 2 * zh)
+    cairo_line_to(cr, x + b, y + 2 * zh)
+    cairo_move_to(cr, x + b * 0.62, y + zh)
     cairo_line_to(cr, x + b * 0.62, y + h)
     cairo_stroke(cr)
-    lwTextAus(cr, x + 6, y + h / 4, exportTitel$(), &H1F1F1F, 0, gSchrift)
+    ' Zeile 1: Titel (Firma/Projekt rechts, sonst "Funkenflug")
+    lwTextAus(cr, x + 6, y + zh / 2, exportTitel$(), &H1F1F1F, 0, gSchrift)
+    lwTextAus(cr, x + b - 6, y + zh / 2, IIF(gDok.firma <> "", gDok.firma, "Funkenflug"), &H777777, 2, gSchrift)
+    ' Zeile 2: Autor | Revision
+    lwTextAus(cr, x + 6, y + zh * 1.5, IIF(gDok.autor <> "", "Autor: " + gDok.autor, "Autor: -"), &H333333, 0, gSchrift)
+    lwTextAus(cr, x + b * 0.62 + 6, y + zh * 1.5, "Rev. " + IIF(gDok.revision <> "", gDok.revision, "-"), &H333333, 0, gSchrift)
+    ' Zeile 3: Blatt | Datum
     DIM blatt AS STRING : blatt = "Blatt: " + gBlatt.name
     IF LEN(gDok.blaetter) > 1 THEN blatt = blatt + "  (" + STR$(aktuellerBlattIndex() + 1) + " von " + STR$(LEN(gDok.blaetter)) + ")"
-    lwTextAus(cr, x + 6, y + h * 3 / 4, blatt, &H333333, 0, gSchrift)
-    lwTextAus(cr, x + b * 0.62 + 6, y + h * 3 / 4, DATE$(), &H333333, 0, gSchrift)
-    lwTextAus(cr, x + b - 6, y + h / 4, "Funkenflug", &H777777, 2, gSchrift)
+    lwTextAus(cr, x + 6, y + zh * 2.5, blatt, &H333333, 0, gSchrift)
+    lwTextAus(cr, x + b * 0.62 + 6, y + zh * 2.5, DATE$(), &H333333, 0, gSchrift)
 END SUB
 
 ' --- Dateien ------------------------------------------------------------------

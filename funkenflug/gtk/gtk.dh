@@ -249,6 +249,7 @@ DECLARE SUB gtk_widget_set_visible LIB GTK (w AS ZEIGER, an AS BOOLEAN)
 DECLARE FUNCTION gtk_widget_get_visible LIB GTK (w AS ZEIGER) AS BOOLEAN
 DECLARE FUNCTION gtk_widget_get_parent LIB GTK (w AS ZEIGER) AS ZEIGER
 DECLARE SUB gtk_widget_show LIB GTK (w AS ZEIGER)
+DECLARE SUB gtk_window_present LIB GTK (fenster AS ZEIGER)
 DECLARE SUB gtk_widget_hide LIB GTK (w AS ZEIGER)
 DECLARE SUB gtk_widget_add_events LIB GTK (w AS ZEIGER, maske AS LONG)
 DECLARE SUB gtk_widget_queue_draw LIB GTK (w AS ZEIGER)

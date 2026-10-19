@@ -80,6 +80,8 @@ SUB pdKopf(cr AS INTEGER, b AS FLOAT, titel AS STRING, seite AS INTEGER, gesamt 
     cairo_rectangle(cr, 0, 0, b, plSeiteH() + 1000)
     cairo_fill(cr)
     DIM name AS STRING : name = exportTitel$()
+    IF gDok.revision <> "" THEN name = name + "  Rev. " + gDok.revision
+    IF gDok.autor <> "" THEN name = name + "  (" + gDok.autor + ")"
     pdText(cr, PD_RAND, PD_RAND + 4, name + " -- " + titel, "Sans Bold 10", &H1F1F1F, 0)
     DIM mtext AS STRING : mtext = "Massstab 1:1"
     IF m < 0.999 THEN mtext = "VERKLEINERT auf " + STR$(ROUND(m * 100)) + " % -- nicht 1:1!"

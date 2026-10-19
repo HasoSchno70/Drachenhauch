@@ -1,0 +1,168 @@
+' Bearbeiten im Ganzen -- Namensraum "kern".
+'
+' Annotieren: Referenzen neu vergeben, Blatt fuer Blatt, auf jedem Blatt
+' zeilenweise von oben links (in Baendern von 5 mm, damit leicht versetzte
+' Teile einer Reihe nicht durcheinandergeraten). "Nur fehlende" laesst jede
+' gueltige, eindeutige Referenz stehen und vergibt den Rest ab der groessten
+' Nummer weiter -- nichts, was schon auf einer Platine oder einem Zettel steht,
+' aendert sich ungefragt.
+'
+' Suchen & Ersetzen ueber alle Blaetter: Referenzen, Werte, Labels. Ein
+' Treffer je Feld, auch wenn das Muster darin mehrmals vorkommt (SparkNode
+' meldete solche Felder mehrfach und stolperte beim Ersetzen darueber).
+
+FUNCTION istAnnotierbar(b AS Bauteil) AS BOOLEAN
+    RETURN NOT b.sym.einheitLeistung AND NOT b.sym.blattSymbol AND NOT b.sym.fehlt AND b.sym.praefix <> "" AND LEFT$(b.sym.praefix, 1) <> "#"
+END FUNCTION
+
+' Nummer einer Referenz zum Praefix (R12 -> 12), -1 wenn sie nicht passt.
+FUNCTION refNummer(ref AS STRING, praefix AS STRING) AS INTEGER
+    IF NOT STARTSWITH(UPPER$(ref), UPPER$(praefix)) THEN RETURN -1
+    DIM rest AS STRING : rest = MID$(ref, LEN(praefix))
+    IF rest = "" OR LEN(rest) > 6 THEN RETURN -1
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(rest) - 1
+        IF NOT istZiffer(MID$(rest, i, 1)) THEN RETURN -1
+    NEXT
+    DIM n AS INTEGER : n = VAL(rest)
+    IF n < 1 THEN RETURN -1
+    RETURN n
+END FUNCTION
+
+' Rueckgabe: wie viele Referenzen sich geaendert haben.
+FUNCTION annotieren(dok AS Dokument, alle AS BOOLEAN) AS INTEGER
+    DIM schl AS ARRAY OF STRING : schl = []
+    DIM teile AS ARRAY OF Bauteil : teile = []
+    DIM bi AS INTEGER, i AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        FOR i = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
+            DIM b AS Bauteil : b = dok.blaetter[bi].bauteile[i]
+            IF NOT istAnnotierbar(b) THEN CONTINUE
+            DIM reihe AS INTEGER : reihe = (b.lage.pos.y + 1000000) \ 500
+            ARRAY_PUSH(schl, PADL$(STR$(bi), 4, "0") + PADL$(STR$(reihe), 8, "0") + PADL$(STR$(b.lage.pos.x + 1000000), 9, "0") + CHR$(1) + STR$(LEN(teile)))
+            ARRAY_PUSH(teile, b)
+        NEXT
+    NEXT
+    SORT(schl)
+    DIM folge AS ARRAY OF Bauteil : folge = []
+    FOR i = 0 TO LEN(schl) - 1
+        ARRAY_PUSH(folge, teile[VAL(MID$(schl[i], INSTR(schl[i], CHR$(1)) + 1))])
+    NEXT
+    DIM zaehler AS MAP OF INTEGER           ' Praefix -> zuletzt vergebene Nummer
+    DIM vergeben AS MAP OF INTEGER          ' gueltige Referenzen, die bleiben
+    DIM geaendert AS INTEGER : geaendert = 0
+    IF NOT alle THEN
+        ' gueltige, eindeutige Referenzen bleiben; die groesste Nummer je Praefix merken
+        FOR i = 0 TO LEN(folge) - 1
+            DIM p0 AS STRING : p0 = folge[i].sym.praefix
+            DIM n0 AS INTEGER : n0 = refNummer(folge[i].referenz, p0)
+            IF n0 < 0 OR MAPHAS(vergeben, UPPER$(folge[i].referenz)) THEN CONTINUE
+            MAPPUT(vergeben, UPPER$(folge[i].referenz), i)
+            MAPPUT(zaehler, p0, MAX(MAPGETOR(zaehler, p0, 0), n0))
+        NEXT
+    END IF
+    FOR i = 0 TO LEN(folge) - 1
+        DIM b2 AS Bauteil : b2 = folge[i]
+        DIM p AS STRING : p = b2.sym.praefix
+        IF NOT alle THEN
+            ' bleibt, wenn sie gueltig ist und genau dieses Teil sie zuerst hatte
+            IF MAPHAS(vergeben, UPPER$(b2.referenz)) THEN
+                IF MAPGET(vergeben, UPPER$(b2.referenz)) = i THEN CONTINUE
+            END IF
+        END IF
+        DIM n AS INTEGER : n = MAPGETOR(zaehler, p, 0) + 1
+        MAPPUT(zaehler, p, n)
+        DIM neu AS STRING : neu = p + STR$(n)
+        IF neu <> b2.referenz THEN
+            b2.referenz = neu
+            geaendert = geaendert + 1
+        END IF
+    NEXT
+    RETURN geaendert
+END FUNCTION
+
+' --- Suchen & Ersetzen ---------------------------------------------------------
+
+CONST TR_REFERENZ = 0
+CONST TR_WERT = 1
+CONST TR_LABEL = 2
+
+CLASS Treffer
+    DIM blatt AS INTEGER
+    DIM art AS INTEGER
+    DIM index AS INTEGER              ' Bauteil- bzw. Label-Index im Blatt
+    DIM text AS STRING
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END CLASS
+
+FUNCTION enthaelt(s AS STRING, muster AS STRING, gross AS BOOLEAN) AS BOOLEAN
+    IF muster = "" THEN RETURN FALSE
+    IF gross THEN RETURN CONTAINS(s, muster)
+    RETURN CONTAINS(LOWER$(s), LOWER$(muster))
+END FUNCTION
+
+' Jedes Vorkommen ersetzen; ohne "gross" ohne Ruecksicht auf Gross/Klein.
+FUNCTION ersetzeText$(s AS STRING, muster AS STRING, ersatz AS STRING, gross AS BOOLEAN) AS STRING
+    IF muster = "" THEN RETURN s
+    IF gross THEN RETURN REPLACE$(s, muster, ersatz)
+    DIM r AS STRING : r = ""
+    DIM rest AS STRING : rest = s
+    DIM k AS INTEGER : k = INSTR(LOWER$(rest), LOWER$(muster))
+    WHILE k >= 0
+        r = r + LEFT$(rest, k) + ersatz
+        rest = MID$(rest, k + LEN(muster))
+        k = INSTR(LOWER$(rest), LOWER$(muster))
+    WEND
+    RETURN r + rest
+END FUNCTION
+
+SUB trefferDazu(BYREF l AS ARRAY OF Treffer, bi AS INTEGER, art AS INTEGER, idx AS INTEGER, text AS STRING, x AS INTEGER, y AS INTEGER)
+    DIM t AS Treffer : t = NEW Treffer()
+    t.blatt = bi
+    t.art = art
+    t.index = idx
+    t.text = text
+    t.x = x
+    t.y = y
+    ARRAY_PUSH(l, t)
+END SUB
+
+FUNCTION suchen(dok AS Dokument, muster AS STRING, mitRef AS BOOLEAN, mitWert AS BOOLEAN, mitLabel AS BOOLEAN, gross AS BOOLEAN) AS ARRAY OF Treffer
+    DIM r AS ARRAY OF Treffer : r = []
+    DIM bi AS INTEGER, i AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        DIM bl AS Blatt : bl = dok.blaetter[bi]
+        FOR i = 0 TO LEN(bl.bauteile) - 1
+            DIM b AS Bauteil : b = bl.bauteile[i]
+            IF b.sym.blattSymbol THEN CONTINUE
+            IF mitRef AND enthaelt(b.referenz, muster, gross) THEN trefferDazu(r, bi, TR_REFERENZ, i, b.referenz, b.lage.pos.x, b.lage.pos.y)
+            IF mitWert AND enthaelt(b.wert, muster, gross) THEN trefferDazu(r, bi, TR_WERT, i, b.wert, b.lage.pos.x, b.lage.pos.y)
+        NEXT
+        IF mitLabel THEN
+            FOR i = 0 TO LEN(bl.labels) - 1
+                IF enthaelt(bl.labels[i].text, muster, gross) THEN trefferDazu(r, bi, TR_LABEL, i, bl.labels[i].text, bl.labels[i].anker.x, bl.labels[i].anker.y)
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+
+' Rueckgabe: wie viele Felder sich geaendert haben.
+FUNCTION ersetzen(dok AS Dokument, muster AS STRING, ersatz AS STRING, mitRef AS BOOLEAN, mitWert AS BOOLEAN, mitLabel AS BOOLEAN, gross AS BOOLEAN) AS INTEGER
+    DIM t AS ARRAY OF Treffer : t = suchen(dok, muster, mitRef, mitWert, mitLabel, gross)
+    DIM n AS INTEGER : n = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        DIM bl AS Blatt : bl = dok.blaetter[t[i].blatt]
+        DIM neu AS STRING : neu = ersetzeText$(t[i].text, muster, ersatz, gross)
+        IF neu = t[i].text THEN CONTINUE
+        SELECT CASE t[i].art
+            CASE TR_REFERENZ : bl.bauteile[t[i].index].referenz = neu
+            CASE TR_WERT : bl.bauteile[t[i].index].wert = neu
+            CASE TR_LABEL : bl.labels[t[i].index].text = neu
+        END SELECT
+        n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION

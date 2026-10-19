@@ -25,6 +25,7 @@ IMPORT "ansicht/ausgabe.dh"
 IMPORT "ansicht/blaetter.dh"
 IMPORT "ansicht/platinenansicht.dh"
 IMPORT "ansicht/platinendruck.dh"
+IMPORT "ansicht/komfort.dh"
 
 CONST STIL = "window { background-color: #12131a; color: #e6e6f0; }" + _
     " headerbar { background-color: #1a1c26; color: #e6e6f0; }" + _
@@ -101,6 +102,7 @@ SUB statusAktualisieren()
     IF netz <> "" THEN netz = "   " + netz
     DIM blatt AS STRING : blatt = kern.blattPfad$(gDok, aktuellerBlattIndex())
     IF LEN(gDok.blaetter) > 1 THEN blatt = blatt + " (" + STR$(aktuellerBlattIndex() + 1) + "/" + STR$(LEN(gDok.blaetter)) + ")"
+    IF gSpMeldung <> "" THEN wahl = wahl + "   -- " + gSpMeldung
     gtk_label_set_text(gStatus, blatt + "   " + wz + "   Zoom " + STR$(zoom) + "%" + pos + netz + wahl + "   [" + STR$(LEN(gBlatt.bauteile)) + " Bauteile, " + STR$(LEN(gBlatt.draehte)) + " Draehte, " + STR$(LEN(gBlatt.labels)) + " Labels]")
 END SUB
 
@@ -830,37 +832,10 @@ FUNCTION dateiWahl(sichern AS BOOLEAN) AS STRING
     RETURN pfad
 END FUNCTION
 
-SUB dateiSpeichern()
-    DIM pfad AS STRING : pfad = dateiWahl(TRUE)
-    IF pfad = "" THEN RETURN
-    IF LOWER$(RIGHT$(pfad, 4)) <> ".fkn" THEN pfad = pfad + ".fkn"
-    IF kern.dokumentSpeichern(gDok, pfad) THEN
-        gPfad = pfad
-        gGeaendert = FALSE
-        titelNachziehen()
-    ELSE
-        meldung("Speichern nach " + pfad + " ist fehlgeschlagen.")
-    END IF
-END SUB
-
-SUB dateiOeffnen()
-    DIM pfad AS STRING : pfad = dateiWahl(FALSE)
-    IF pfad = "" THEN RETURN
-    DIM d AS kern.Dokument
-    TRY
-        d = kern.dokumentLaden(pfad)
-    CATCH e
-        meldung("Die Datei " + basisName$(pfad) + " liess sich nicht lesen.")
-        RETURN
-    END TRY
-    gPfad = pfad
-    gGeaendert = FALSE
-    leinwandDokument(d)
-    symbolListeAktualisieren(FALSE)
-    verlaufRuecksetzen()
-    titelNachziehen()
-    statusAktualisieren()
-END SUB
+FUNCTION startDateiLaden(daten AS INTEGER) AS BOOLEAN
+    dateiLaden(startPfad)
+    RETURN FALSE
+END FUNCTION
 
 SUB aufSpeichern(knopf AS INTEGER, daten AS INTEGER)
     dateiSpeichern()
@@ -1961,6 +1936,75 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             WHILE LEN(gUndo) > probeUndo0
                 verlaufZurueck()
             WEND
+        CASE 30
+            ' Annotieren ueber das Menue: fehlende vergeben, alle neu, je ein Schritt
+            blattWechseln(0)
+            probeUndo0 = LEN(gUndo)
+            DIM ar7 AS kern.Bauteil : ar7 = gBlatt.bauteile[1]
+            verlaufMerken()
+            ar7.referenz = ""
+            geaendert()
+            gtk_menu_item_activate(gMenueFehlende)
+            pruefe("Fehlende Referenz vergeben", ar7.referenz + " " + STR$(LEN(gUndo) - probeUndo0), "R1 2")
+            gtk_menu_item_activate(gMenueFehlende)
+            pruefe("Nochmal: nichts zu tun, kein Schritt", STR$(LEN(gUndo) - probeUndo0) + " " + STR$(CONTAINS(gtk_label_get_text(gStatus), "nichts zu tun")), "2 " + STR$(TRUE))
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
+            pruefe("Rueckgaengig: wieder R7", gBlatt.bauteile[1].referenz, "R7")
+            ' Suchen & Ersetzen im echten Dialog
+            suchenZeigen()
+            gtk_entry_set_text(gSuFeld, "4K7")
+            pruefe("Suchen findet ohne Gross/Klein", STR$(LEN(gSuTreffer)), "1")
+            gtk_toggle_button_set_active(gSuGross, TRUE)
+            pruefe("mit Gross/Klein nicht", STR$(LEN(gSuTreffer)), "0")
+            pruefe("Liste im Fenster folgt der Eingabe", STR$(gtk_bin_get_child(gSuKasten) <> 0 AND gtk_list_box_get_row_at_index(gSuListe, 0) = 0), STR$(TRUE))
+            gtk_toggle_button_set_active(gSuGross, FALSE)
+            gtk_list_box_select_row(gSuListe, gtk_list_box_get_row_at_index(gSuListe, 0))
+            pruefe("Zeile waehlt das Bauteil", STR$(gHatGewaehlt AND gGewaehlt.referenz = "R7"), STR$(TRUE))
+            gtk_entry_set_text(gSuErsatz, "4k8")
+            gtk_dialog_response(gSuDlg, SU_ERSETZEN)
+            pruefe("Alle ersetzen", gBlatt.bauteile[1].wert + " " + STR$(LEN(gUndo) - probeUndo0) + " " + STR$(LEN(gSuTreffer)), "4k8 1 0")
+            gtk_dialog_response(gSuDlg, GTK_ANTWORT_OK)
+            pruefe("Dialog zu", STR$(gSuDlg), "0")
+            verlaufZurueck()
+            pruefe("Rueckgaengig: Wert zurueck", gBlatt.bauteile[1].wert, "4k7")
+            ' Dokument-Eigenschaften -> Schriftfeld
+            probeText1 = "Testplatine" : probeText2 = "Hans" : probeText3 = "B" : probeText4 = ""
+            g_timeout_add(150, dialogBestaetigen, 0)
+            gtk_menu_item_activate(gMenueEigenschaften)
+            probeText3 = "" : probeText4 = ""
+            pruefe("Dokument-Eigenschaften", gDok.titel + "/" + gDok.autor + "/" + gDok.revision + " " + STR$(LEN(gUndo) - probeUndo0), "Testplatine/Hans/B 1")
+            IF fotoZiel <> "" THEN pruefe("Schriftfeld mit Autor/Revision als PNG", STR$(ausgabeNach(fotoZiel + ".schriftfeld.png")), STR$(TRUE))
+            ' Speichern: mit Namen direkt, Liste "zuletzt", Sicherung weg
+            IF fotoZiel <> "" THEN
+                DIM kpf AS STRING : kpf = fotoZiel + ".komfort.fkn"
+                IF FILEEXISTS(kpf) THEN DELETEFILE(kpf)
+                IF FILEEXISTS(kpf + ".sicherung") THEN DELETEFILE(kpf + ".sicherung")
+                DIM altPfad AS STRING : altPfad = gPfad
+                gPfad = kpf
+                dateiSpeichern()
+                pruefe("Speichern ohne Rueckfrage", STR$(FILEEXISTS(kpf)) + " " + STR$(gGeaendert), STR$(TRUE) + " " + STR$(FALSE))
+                pruefe("Zuletzt geoeffnet", zuletztLesen()[0], kpf)
+                ' Aenderung -> Autosave schreibt die Sicherung
+                verlaufMerken()
+                ARRAY_PUSH(gBlatt.labels, NEW kern.Label("GESICHERT", NEW kern.Punkt(6000, 3000), kern.LA_LOKAL))
+                geaendert()
+                DIM az AS BOOLEAN : az = autosaveTick(0)
+                pruefe("Autosave schreibt die Sicherung", STR$(FILEEXISTS(kpf + ".sicherung")), STR$(TRUE))
+                ' Laden: Sicherung wird angeboten und geladen
+                g_timeout_add(150, dialogBestaetigen, 0)
+                dateiLaden(kpf)
+                DIM hatLabel AS BOOLEAN : hatLabel = FALSE
+                DIM kli AS INTEGER
+                FOR kli = 0 TO LEN(gBlatt.labels) - 1
+                    IF gBlatt.labels[kli].text = "GESICHERT" THEN hatLabel = TRUE
+                NEXT
+                pruefe("Sicherung beim Oeffnen geladen", STR$(hatLabel) + " " + STR$(gGeaendert) + " " + gDok.titel, STR$(TRUE) + " " + STR$(TRUE) + " Testplatine")
+                dateiSpeichern()
+                pruefe("Speichern raeumt die Sicherung weg", STR$(FILEEXISTS(kpf + ".sicherung")), STR$(FALSE))
+                pruefe("Menue Datei hat den Eintrag", STR$(gDateiMenue <> 0 AND LEN(zuletztLesen()) = 1), STR$(TRUE))
+            END IF
         CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()
@@ -2011,12 +2055,10 @@ END IF
 ' Dokument gilt fuer dieses Dokument
 IF kern.bibliothekLaden(gBibPfad) < 0 THEN PRINT "Bibliothek "; gBibPfad; " ist nicht lesbar -- sie bleibt unangetastet."
 
-IF startPfad <> "" THEN
-    startDok = kern.dokumentLaden(startPfad)
-    gPfad = startPfad
-ELSE
-    startDok = demoDokument()
-END IF
+' eine Datei vom Aufruf kommt nach dem Fenster (dateiLaden fragt ggf. nach
+' der Sicherung); bis dahin das Beispiel
+startDok = demoDokument()
+IF fotoZiel <> "" THEN gKonfigOrdner = fotoZiel + ".konfig"
 
 DIM stilFehler AS STRING : stilFehler = gtkStil$(STIL)
 
@@ -2037,6 +2079,9 @@ gtk_widget_set_tooltip_text(gKnopfZurueck, "Rueckgaengig (Strg+Z)")
 gtk_widget_set_tooltip_text(gKnopfVor, "Wiederholen (Strg+Y)")
 gtk_header_bar_pack_start(gKopf, knopfOeffnen)
 gtk_header_bar_pack_start(gKopf, knopfSpeichern)
+gDateiKnopf = gtk_button_new_with_label("Datei ▾")
+gtk_widget_set_tooltip_text(gDateiKnopf, "Speichern unter, zuletzt geoeffnete Dateien")
+gtk_header_bar_pack_start(gKopf, gDateiKnopf)
 gtk_header_bar_pack_start(gKopf, gKnopfZurueck)
 gtk_header_bar_pack_start(gKopf, gKnopfVor)
 DIM ansichtBox AS INTEGER : ansichtBox = gtk_box_new(GTK_WAAGERECHT, 0)
@@ -2054,6 +2099,11 @@ gtk_widget_set_tooltip_text(knopfAusgabe, "PDF/SVG/PNG, Drucken, Stueckliste, Ne
 gtk_header_bar_pack_end(gKopf, knopfErc)
 gtk_header_bar_pack_end(gKopf, knopfAusgabe)
 ausgabeMenueBauen()
+DIM knopfBearb AS INTEGER : knopfBearb = gtk_button_new_with_label("Bearbeiten ▾")
+gtk_widget_set_tooltip_text(knopfBearb, "Annotieren, Suchen & Ersetzen, Dokument-Eigenschaften")
+gtk_header_bar_pack_end(gKopf, knopfBearb)
+bearbeitenMenueBauen()
+dateiMenueBauen()
 DIM knopfBlatt AS INTEGER : knopfBlatt = gtk_button_new_with_label("Blatt ▾")
 gtk_widget_set_tooltip_text(knopfBlatt, "Blaetter anlegen, umbenennen, loeschen (Bild auf/ab wechselt)")
 gtk_header_bar_pack_end(gKopf, knopfBlatt)
@@ -2127,6 +2177,8 @@ signal(gKnopfVor, "clicked", aufVor, 0, 0, 0)
 signal(knopfErc, "clicked", aufErc, 0, 0, 0)
 signal(knopfAusgabe, "clicked", aufAusgabeKnopf, 0, 0, 0)
 signal(knopfBlatt, "clicked", aufBlattKnopf, 0, 0, 0)
+signal(knopfBearb, "clicked", aufBearbKnopf, 0, 0, 0)
+signal(gDateiKnopf, "clicked", aufDateiKnopf, 0, 0, 0)
 signal(gKnopfSchaltplan, "clicked", aufSchaltplan, 0, 0, 0)
 signal(gKnopfPlatine, "clicked", aufPlatine, 0, 0, 0)
 signal(gPlKnopfAuswahl, "clicked", aufPlAuswahl, 0, 0, 0)
@@ -2149,5 +2201,15 @@ statusAktualisieren()
 
 gtk_widget_show_all(gFenster)
 ansichtLeistenNachziehen()
-IF fotoZiel <> "" THEN g_timeout_add(400, probe, 0)
+IF fotoZiel <> "" THEN
+    g_timeout_add(400, probe, 0)
+ELSE
+    ' Autosave; eine Datei vom Aufruf laedt dateiLaden (fragt nach einer Sicherung)
+    g_timeout_add(AUTOSAVE_MS, autosaveTick, 0)
+    IF startPfad <> "" THEN
+        g_timeout_add(200, startDateiLaden, 0)
+    ELSE
+        g_timeout_add(500, startSicherungAnbieten, 0)
+    END IF
+END IF
 gtk_main()

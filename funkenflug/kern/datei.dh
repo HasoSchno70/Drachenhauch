@@ -8,6 +8,9 @@ FUNCTION dokumentNachJson(dok AS Dokument) AS JSON_HANDLE
     JSON_SET_STRING(j, "version", "1")
     JSON_SET_STRING(j, "id", dok.id)
     JSON_SET_STRING(j, "titel", dok.titel)
+    IF dok.autor <> "" THEN JSON_SET_STRING(j, "autor", dok.autor)
+    IF dok.revision <> "" THEN JSON_SET_STRING(j, "revision", dok.revision)
+    IF dok.firma <> "" THEN JSON_SET_STRING(j, "firma", dok.firma)
     DIM bi AS INTEGER, ci AS INTEGER, wi AS INTEGER, li AS INTEGER, pk AS INTEGER
     ' eigene Symbole, die benutzt werden, reisen in der Datei mit (ein
     ' Platzhalter fuer ein fehlendes Symbol nicht -- er ist keine Definition)
@@ -100,6 +103,9 @@ FUNCTION dokumentAusJson(j AS JSON_HANDLE) AS Dokument
     dok.blaetter = []
     IF JSON_HAS(j, "id") THEN dok.id = JSON_GET_STRING(j, "id")
     IF JSON_HAS(j, "titel") THEN dok.titel = JSON_GET_STRING(j, "titel")
+    IF JSON_HAS(j, "autor") THEN dok.autor = JSON_GET_STRING(j, "autor")
+    IF JSON_HAS(j, "revision") THEN dok.revision = JSON_GET_STRING(j, "revision")
+    IF JSON_HAS(j, "firma") THEN dok.firma = JSON_GET_STRING(j, "firma")
     DIM bi AS INTEGER, ci AS INTEGER, wi AS INTEGER, li AS INTEGER, pk AS INTEGER
     ' zuerst die eigenen Symbole -- die Bauteile darunter zeigen auf sie
     IF JSON_HAS(j, "symbole") THEN
