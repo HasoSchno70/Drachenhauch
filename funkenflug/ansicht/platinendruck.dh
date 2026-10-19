@@ -339,6 +339,35 @@ SUB aufMenuePlatinePdf(eintrag AS INTEGER, daten AS INTEGER)
     IF NOT platinePdf(pfad) THEN meldung("Die Platine liess sich nicht nach " + pfad + " schreiben.")
 END SUB
 
+' Gerber-Datensatz als ZIP; liefert die Meldung fuer den Nutzer ("" = Fehler)
+FUNCTION gerberExport$(pfad AS STRING) AS STRING
+    DIM projekt AS STRING : projekt = exportTitel$()
+    IF ENDSWITH(LOWER$(projekt), ".fkn") THEN projekt = LEFT$(projekt, LEN(projekt) - 4)
+    DIM gs AS kern.GerberSatz
+    TRY
+        gs = kern.gerberSchreiben(gDok, projekt, pfad)
+    CATCH e
+        RETURN ""
+    END TRY
+    DIM t AS STRING : t = "Gerber-Datensatz geschrieben: " + basisName$(pfad) + CHR$(10) + CHR$(10)
+    t = t + FORMAT$(gs.breite, "%.1f") + " x " + FORMAT$(gs.hoehe, "%.1f") + " mm, " + STR$(gs.bohrungen) + " Bohrungen, " + STR$(LEN(gs.namen) - 1) + " Dateien (Kupfer, Loetstopp, Bestueckungsdruck, Umriss, Bohrungen)."
+    IF LEN(gs.hinweise) > 0 THEN t = t + CHR$(10) + CHR$(10) + "Achtung:" + CHR$(10) + "- " + JOIN$(gs.hinweise, CHR$(10) + "- ")
+    RETURN t
+END FUNCTION
+
+SUB aufMenueGerber(eintrag AS INTEGER, daten AS INTEGER)
+    IF LEN(gDok.platine.teile) = 0 THEN
+        meldung("Auf der Platine steckt noch nichts -- erst in der Platinen-Ansicht einsetzen.")
+        RETURN
+    END IF
+    DIM pfad AS STRING : pfad = dateiExportWahl("Platine als Gerber (ZIP)", "platine-gerber.zip", ["Gerber-ZIP (*.zip)"], ["*.zip"])
+    IF pfad = "" THEN RETURN
+    IF NOT ENDSWITH(LOWER$(pfad), ".zip") THEN pfad = pfad + ".zip"
+    DIM t AS STRING : t = gerberExport$(pfad)
+    IF t = "" THEN t = "Der Gerber-Datensatz liess sich nicht nach " + pfad + " schreiben."
+    meldung(t)
+END SUB
+
 SUB aufMenuePlatineDrucken(eintrag AS INTEGER, daten AS INTEGER)
     DIM f AS STRING : f = platineDrucken$("")
     IF f <> "" THEN meldung("Fehler beim Drucken:" + CHR$(10) + f)

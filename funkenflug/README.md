@@ -352,6 +352,37 @@ Druckdialog „an Seite anpassen" ein, sieht man es dort. Passt eine große
 Platine nicht auf A4, wird verkleinert, und der Kopf sagt es rot. Der Kopf
 nennt auch den Prüfstand (offene Verbindungen, Kurzschlüsse).
 
+**Gerber für den Fertiger** („Ausgabe ▾" → „Platine als Gerber (ZIP)"): aus
+dem Raster-Aufbau wird eine zweilagige Leiterplatte im 2,54-mm-Raster, die
+**genau so verbindet** wie die Lochraster-/Streifenplatine – ein ZIP mit
+Kupfer oben/unten, Lötstopp oben/unten, Bestückungsdruck, Umriss, Bohrdatei
+(Excellon) und `LIESMICH.txt`. Gerber X2: die Dateien sagen selbst, welche
+Lage sie sind, der Fertiger ordnet sie ohne Nachfragen zu.
+
+- Gebohrt wird nur, wo etwas steckt (Beine, Brückenenden); TO-220, Relais
+  und Taster bekommen größere Bohrungen.
+- Ein **Streifen** wird zur Leiterbahn zwischen seinem ersten und letzten
+  benutzten Loch, an jeder Trennstelle unterbrochen; Lötbahnen werden Bahnen
+  unten. **Drahtbrücken** bleiben Drähte (Bohrungen plus Linie im
+  Bestückungsdruck) – als Kupfer oben liefen sie über fremde Lötaugen.
+- Die Platine wird auf den **benutzten Bereich zugeschnitten** (gezahlt wird
+  die Fläche), mit 3,81 mm Rand für Referenzen und Titel.
+- Bestückungsdruck mit Umriss je Teil, Pin-1-Punkt und den **Referenzen in
+  einer eigenen Strichschrift** (SparkNode setzte nur einen Punkt an Pin 1,
+  „Text in Gerber ist aufwendig").
+- Offene Luftlinien, Kurzschlüsse und nicht gesetzte Teile stehen als
+  ACHTUNG im LIESMICH und im Dialog – exportiert wird trotzdem.
+
+![Gerber-Satz, gezeichnet von daten/gerber_pruefen.py](gerber.png)
+
+`daten/gerber_pruefen.py` prüft einen Satz **unabhängig** von Funkenflug:
+liest Gerber und Excellon, rechnet aus der Geometrie (sich berührende Augen
+und Bahnen, Durchkontaktierung, Brücken) die Kupferinseln aus und vergleicht
+sie mit den Netzen – nichts zerfällt, nichts ist kurzgeschlossen, jedes Bein
+gebohrt mit Auge oben und unten, Restring und Randabstand passen. Mit
+absichtlich beschädigten Sätzen meldet er die fehlenden Bahnen bzw. den
+Kurzschluss.
+
 ## Datei und Bearbeiten
 
 **Datei ▾**: „Speichern unter …" und die acht zuletzt geöffneten Dateien.
@@ -500,6 +531,7 @@ kern/       Modell, Geometrie, Bibliothek, Netze, Datei – ohne Oberfläche,
   kicad.dh       KiCad-Netzliste (.net) mit Footprint-Vorschlaegen und Pad-Nummern
   sausdruck.dh   S-Ausdruecke lesen (ohne Rekursion)
   kicadimport.dh KiCad-Schaltplan (.kicad_sch) einlesen: Symbole, Lagen, Unterblaetter
+  gerber.dh      Gerber X2 + Excellon aus der Platine, Zuschnitt, Strichschrift
   symbole.dh     eigene Symbole: Pinliste, IC-Generator, JSON, Register, Bibliothek
   stueckliste.dh Stückliste: Gruppen, natürliche Sortierung, CSV/Markdown/Text
   platine.dh     Bauformen, Platinen-Pruefung (Inseln, Luftlinien, Kurzschluesse), Einsetzen
@@ -525,7 +557,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (297 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (299 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
@@ -547,7 +579,9 @@ Ausrichten samt Draht, Cross-Probing in beide Richtungen, KiCad-Schaltplan
 Dialoge samt Ablesen). Für die Simulationsschritte `FUNKENFLUG_NGSPICE` auf die
 ngspice-Bibliothek setzen; fehlt sie, werden sie übersprungen. `pruef_kern.dh`
 rechnet dann Teiler, LED, NPN-Schalter, OPV ×2 und übersteuert, RC-Sprung (τ),
-RC-Tiefpass (−3 dB, −45°) und ein kaputtes Deck nach. `pruef_kern.dh` prüft u. a. die
+RC-Tiefpass (−3 dB, −45°) und ein kaputtes Deck nach. Mit
+`FUNKENFLUG_GERBER_ORDNER` schreibt `pruef_kern.dh` zwei Gerber-Sätze
+(Lochraster, Streifenraster) samt erwarteten Netzen für `gerber_pruefen.py`. `pruef_kern.dh` prüft u. a. die
 Gruppen-Lage in allen 8 Orientierungen × 3 Arten (72 Pin-Prüfungen). Der Selbsttest
 lässt die Zwischenablage des Systems in Ruhe und schreibt seine Bibliothek in
 eine Wegwerf-Datei neben dem Bild. `--nur-foto bild.png` macht nur das Bild.

@@ -1,0 +1,467 @@
+' Gerber-Export der Platine -- Namensraum "kern".
+'
+' Aus der Loch-/Streifenraster-Platine wird ein Datensatz fuer den
+' Leiterplattenfertiger: eine zweilagige Platine im 2,54-mm-Raster, die genau
+' so verbindet wie der Aufbau auf der Rasterplatine.
+'
+'   <p>-F_Cu.gbr      Kupfer oben: die Loetaugen (durchkontaktiert)
+'   <p>-B_Cu.gbr      Kupfer unten: Loetaugen, Streifen, Loetbahnen
+'   <p>-F_Mask.gbr / B_Mask.gbr   Loetstopp-Oeffnungen
+'   <p>-F_SilkS.gbr   Bestueckungsdruck: Umrisse, Referenzen, Pin 1, Drahtbruecken
+'   <p>-Edge_Cuts.gbr Umriss
+'   <p>.drl           Bohrungen (Excellon)
+'   LIESMICH.txt      was drin ist, und was die Pruefung noch meldet
+'
+' Gebohrt wird nur, wo etwas steckt (Bauteil-Beine, Bruecken-Enden). Ein
+' Streifen wird zur Leiterbahn zwischen seinem ersten und letzten benutzten
+' Loch, an Trennstellen unterbrochen -- er verbindet damit genau, was er auf
+' der Streifenplatine verbindet. Drahtbruecken bleiben Draehte (Bohrungen
+' plus Linie im Bestueckungsdruck): als Kupfer oben liefen sie ueber fremde
+' Loetaugen. Alle Lagen von oben gesehen, Ursprung unten links (Gerber hat Y
+' nach oben, die Platine nach unten).
+'
+' SparkNode setzte als Bestueckungsdruck nur einen Punkt an Pin 1 ("Text in
+' Gerber ist aufwendig"); hier schreibt eine kleine Strichschrift die
+' Referenzen.
+
+CONST GB_RASTER = 2.54
+CONST GB_RAND = 3.81               ' Kupfer bis Kante; Platz fuer Referenzen und Titel
+CONST GB_BAHN = 0.6               ' Leiterbahnbreite (mm)
+CONST GB_MASKE = 0.1              ' Loetstopp-Oeffnung groesser als das Auge
+CONST GB_DRUCK = 0.15             ' Strichbreite Bestueckungsdruck
+
+CLASS GerberSatz
+    DIM namen AS ARRAY OF STRING
+    DIM inhalte AS ARRAY OF STRING
+    DIM hinweise AS ARRAY OF STRING
+    DIM bohrungen AS INTEGER
+    DIM breite AS FLOAT               ' mm
+    DIM hoehe AS FLOAT
+    SUB Init()
+        namen = []
+        inhalte = []
+        hinweise = []
+    END SUB
+    SUB dazu(n AS STRING, t AS STRING)
+        ARRAY_PUSH(namen, n)
+        ARRAY_PUSH(inhalte, t)
+    END SUB
+    FUNCTION datei$(endung AS STRING) AS STRING
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(namen) - 1
+            IF ENDSWITH(namen[i], endung) THEN RETURN inhalte[i]
+        NEXT
+        RETURN ""
+    END FUNCTION
+END CLASS
+
+' Eine Gerber-Lage (RS-274X mit X2-Attributen, mm, 4.6)
+CLASS GerberLage
+    DIM kopf AS STRING
+    DIM blenden AS ARRAY OF FLOAT     ' Kreisdurchmesser je D-Code ab 10
+    DIM koerper AS STRING
+    DIM aktiv AS INTEGER
+    SUB Init(funktion AS STRING, polaritaet AS STRING)
+        kopf = "%TF.GenerationSoftware,Funkenflug,,1*%" + CHR$(10) + "%TF.FileFunction," + funktion + "*%" + CHR$(10) + "%TF.FilePolarity," + polaritaet + "*%" + CHR$(10) + "%FSLAX46Y46*%" + CHR$(10) + "%MOMM*%" + CHR$(10) + "%LPD*%" + CHR$(10)
+        blenden = []
+        koerper = ""
+        aktiv = -1
+    END SUB
+    FUNCTION blende(d AS FLOAT) AS INTEGER
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(blenden) - 1
+            IF ABS(blenden[i] - d) < 0.0005 THEN RETURN 10 + i
+        NEXT
+        ARRAY_PUSH(blenden, d)
+        RETURN 9 + LEN(blenden)
+    END FUNCTION
+    SUB waehlen(d AS FLOAT)
+        DIM c AS INTEGER : c = blende(d)
+        IF c <> aktiv THEN
+            koerper = koerper + "D" + STR$(c) + "*" + CHR$(10)
+            aktiv = c
+        END IF
+    END SUB
+    FUNCTION xy$(x AS FLOAT, y AS FLOAT) AS STRING
+        RETURN "X" + STR$(ROUND(x * 1000000)) + "Y" + STR$(ROUND(y * 1000000))
+    END FUNCTION
+    SUB blitz(x AS FLOAT, y AS FLOAT, d AS FLOAT)
+        waehlen(d)
+        koerper = koerper + xy$(x, y) + "D03*" + CHR$(10)
+    END SUB
+    SUB linie(x1 AS FLOAT, y1 AS FLOAT, x2 AS FLOAT, y2 AS FLOAT, d AS FLOAT)
+        waehlen(d)
+        koerper = koerper + xy$(x1, y1) + "D02*" + CHR$(10) + xy$(x2, y2) + "D01*" + CHR$(10)
+    END SUB
+    FUNCTION text$() AS STRING
+        DIM t AS STRING : t = kopf
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(blenden) - 1
+            t = t + "%ADD" + STR$(10 + i) + "C," + FORMAT$(blenden[i], "%.3f") + "*%" + CHR$(10)
+        NEXT
+        RETURN t + "G01*" + CHR$(10) + koerper + "M02*" + CHR$(10)
+    END FUNCTION
+END CLASS
+
+' Ausschnitt: die Platine wird auf die benutzten Loecher zugeschnitten
+' (gerberErzeugen setzt ihn) -- gezahlt wird beim Fertiger die Flaeche.
+DIM gGbS0 AS INTEGER
+DIM gGbZ1 AS INTEGER
+
+' Loch -> mm (Ursprung unten links, Y nach oben)
+FUNCTION gbX(pl AS Platine, s AS INTEGER) AS FLOAT
+    RETURN GB_RAND + (s - gGbS0) * GB_RASTER
+END FUNCTION
+FUNCTION gbY(pl AS Platine, z AS INTEGER) AS FLOAT
+    RETURN GB_RAND + (gGbZ1 - z) * GB_RASTER
+END FUNCTION
+
+' Bohrung und Loetauge je Bauform (mm)
+SUB gbMasse(bf AS Bauform, BYREF bohr AS FLOAT, BYREF auge AS FLOAT)
+    DIM n AS STRING : n = UPPER$(bf.name)
+    bohr = 1.0
+    IF STARTSWITH(n, "TO220") THEN bohr = 1.2
+    IF STARTSWITH(n, "RELAIS") THEN bohr = 1.3
+    IF STARTSWITH(n, "TAST") THEN bohr = 1.1
+    auge = bohr + 0.8
+END SUB
+
+' --- Strichschrift: Zeichen auf einem 4x6-Raster, Linienzuege mit ";" getrennt
+
+FUNCTION gbZeichen$(c AS STRING) AS STRING
+    SELECT CASE c
+        CASE "A" : RETURN "0,0 0,4 2,6 4,4 4,0;0,3 4,3"
+        CASE "B" : RETURN "0,0 0,6 3,6 4,5 4,4 3,3 0,3;3,3 4,2 4,1 3,0 0,0"
+        CASE "C" : RETURN "4,1 3,0 1,0 0,1 0,5 1,6 3,6 4,5"
+        CASE "D" : RETURN "0,0 0,6 3,6 4,5 4,1 3,0 0,0"
+        CASE "E" : RETURN "4,0 0,0 0,6 4,6;0,3 3,3"
+        CASE "F" : RETURN "0,0 0,6 4,6;0,3 3,3"
+        CASE "G" : RETURN "4,5 3,6 1,6 0,5 0,1 1,0 3,0 4,1 4,3 2,3"
+        CASE "H" : RETURN "0,0 0,6;4,0 4,6;0,3 4,3"
+        CASE "I" : RETURN "1,0 3,0;2,0 2,6;1,6 3,6"
+        CASE "J" : RETURN "0,1 1,0 3,0 4,1 4,6"
+        CASE "K" : RETURN "0,0 0,6;4,6 0,2;1,3 4,0"
+        CASE "L" : RETURN "0,6 0,0 4,0"
+        CASE "M" : RETURN "0,0 0,6 2,3 4,6 4,0"
+        CASE "N" : RETURN "0,0 0,6 4,0 4,6"
+        CASE "O" : RETURN "1,0 0,1 0,5 1,6 3,6 4,5 4,1 3,0 1,0"
+        CASE "P" : RETURN "0,0 0,6 3,6 4,5 4,4 3,3 0,3"
+        CASE "Q" : RETURN "1,0 0,1 0,5 1,6 3,6 4,5 4,1 3,0 1,0;2,2 4,0"
+        CASE "R" : RETURN "0,0 0,6 3,6 4,5 4,4 3,3 0,3;2,3 4,0"
+        CASE "S" : RETURN "0,1 1,0 3,0 4,1 4,2 3,3 1,3 0,4 0,5 1,6 3,6 4,5"
+        CASE "T" : RETURN "0,6 4,6;2,6 2,0"
+        CASE "U" : RETURN "0,6 0,1 1,0 3,0 4,1 4,6"
+        CASE "V" : RETURN "0,6 2,0 4,6"
+        CASE "W" : RETURN "0,6 1,0 2,3 3,0 4,6"
+        CASE "X" : RETURN "0,0 4,6;0,6 4,0"
+        CASE "Y" : RETURN "0,6 2,3 4,6;2,3 2,0"
+        CASE "Z" : RETURN "0,6 4,6 0,0 4,0"
+        CASE "0" : RETURN "1,0 0,1 0,5 1,6 3,6 4,5 4,1 3,0 1,0;0,1 4,5"
+        CASE "1" : RETURN "1,5 2,6 2,0;1,0 3,0"
+        CASE "2" : RETURN "0,5 1,6 3,6 4,5 4,4 0,0 4,0"
+        CASE "3" : RETURN "0,5 1,6 3,6 4,5 4,4 3,3 4,2 4,1 3,0 1,0 0,1;1,3 3,3"
+        CASE "4" : RETURN "3,0 3,6 0,2 4,2"
+        CASE "5" : RETURN "4,6 0,6 0,3 3,3 4,2 4,1 3,0 1,0 0,1"
+        CASE "6" : RETURN "4,5 3,6 1,6 0,5 0,1 1,0 3,0 4,1 4,2 3,3 0,3"
+        CASE "7" : RETURN "0,6 4,6 1,0"
+        CASE "8" : RETURN "1,3 0,4 0,5 1,6 3,6 4,5 4,4 3,3 1,3 0,2 0,1 1,0 3,0 4,1 4,2 3,3"
+        CASE "9" : RETURN "0,1 1,0 3,0 4,1 4,5 3,6 1,6 0,5 0,4 1,3 4,3"
+        CASE "-" : RETURN "1,3 3,3"
+        CASE "+" : RETURN "1,3 3,3;2,2 2,4"
+        CASE "." : RETURN "2,0 2,1"
+        CASE "_" : RETURN "0,0 4,0"
+        CASE "/" : RETURN "0,0 4,6"
+        CASE ":" : RETURN "2,1 2,2;2,4 2,5"
+        CASE "(" : RETURN "3,0 2,1 2,5 3,6"
+        CASE ")" : RETURN "1,0 2,1 2,5 1,6"
+        CASE "#" : RETURN "1,0 1,6;3,0 3,6;0,2 4,2;0,4 4,4"
+    END SELECT
+    RETURN ""
+END FUNCTION
+
+' Text fuer die Strichschrift: Grossbuchstaben, Umlaute ausgeschrieben
+FUNCTION gbSchrift$(t AS STRING) AS STRING
+    DIM u AS STRING : u = UPPER$(t)
+    u = REPLACE$(REPLACE$(REPLACE$(REPLACE$(u, "Ä", "AE"), "Ö", "OE"), "Ü", "UE"), "ß", "SS")
+    u = REPLACE$(REPLACE$(u, "ä", "AE"), "ö", "OE")
+    RETURN REPLACE$(REPLACE$(u, "ü", "UE"), "µ", "U")
+END FUNCTION
+
+FUNCTION gbTextBreite(t AS STRING, hoehe AS FLOAT) AS FLOAT
+    RETURN LEN(gbSchrift$(t)) * 6 * hoehe / 6.0 - hoehe / 3.0
+END FUNCTION
+
+' Text mit der unteren linken Ecke bei x,y; hoehe = Versalhoehe (mm)
+SUB gbText(g AS GerberLage, t AS STRING, x AS FLOAT, y AS FLOAT, hoehe AS FLOAT)
+    DIM e AS FLOAT : e = hoehe / 6.0
+    DIM s AS STRING : s = gbSchrift$(t)
+    DIM i AS INTEGER, j AS INTEGER, k AS INTEGER
+    FOR i = 0 TO LEN(s) - 1
+        DIM zuege AS ARRAY OF STRING : zuege = SPLIT$(gbZeichen$(MID$(s, i, 1)), ";")
+        DIM x0 AS FLOAT : x0 = x + i * 6 * e
+        FOR j = 0 TO LEN(zuege) - 1
+            IF zuege[j] = "" THEN CONTINUE
+            DIM pkt AS ARRAY OF STRING : pkt = SPLIT$(zuege[j], " ")
+            FOR k = 0 TO LEN(pkt) - 2
+                DIM a AS ARRAY OF STRING : a = SPLIT$(pkt[k], ",")
+                DIM b AS ARRAY OF STRING : b = SPLIT$(pkt[k + 1], ",")
+                g.linie(x0 + VAL(a[0]) * e, y + VAL(a[1]) * e, x0 + VAL(b[0]) * e, y + VAL(b[1]) * e, GB_DRUCK)
+            NEXT
+        NEXT
+    NEXT
+END SUB
+
+SUB gbRechteck(g AS GerberLage, x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT, d AS FLOAT)
+    g.linie(x0, y0, x1, y0, d)
+    g.linie(x1, y0, x1, y1, d)
+    g.linie(x1, y1, x0, y1, d)
+    g.linie(x0, y1, x0, y0, d)
+END SUB
+
+' Projektname fuer Dateinamen: Buchstaben, Ziffern, - und _
+FUNCTION gbDateiName$(t AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        DIM c AS STRING : c = MID$(t, i, 1)
+        IF (c >= "A" AND c <= "Z") OR (c >= "a" AND c <= "z") OR istZiffer(c) OR c = "-" OR c = "_" THEN
+            r = r + c
+        ELSEIF c = " " OR c = "." THEN
+            r = r + "_"
+        END IF
+    NEXT
+    IF r = "" THEN r = "platine"
+    RETURN r
+END FUNCTION
+
+CLASS GbLoch
+    DIM s AS INTEGER
+    DIM z AS INTEGER
+    DIM bohr AS FLOAT
+    DIM auge AS FLOAT
+    SUB Init(ps AS INTEGER, pz AS INTEGER, b AS FLOAT, a AS FLOAT)
+        s = ps
+        z = pz
+        bohr = b
+        auge = a
+    END SUB
+END CLASS
+
+FUNCTION gerberErzeugen(dok AS Dokument, projekt AS STRING) AS GerberSatz
+    DIM gs AS GerberSatz : gs = NEW GerberSatz()
+    DIM pl AS Platine : pl = dok.platine
+    DIM r AS PlatBericht : r = platinePruefen(dok)
+    DIM pre AS STRING : pre = gbDateiName$(projekt)
+    DIM i AS INTEGER, j AS INTEGER
+    ' --- Bohrungen: Beine der Bauteile, Bruecken-Enden (je Loch einmal)
+    DIM loecher AS ARRAY OF GbLoch : loecher = []
+    DIM gebohrt AS MAP OF INTEGER
+    FOR i = 0 TO LEN(r.pads) - 1
+        DIM pd AS Pad : pd = r.pads[i]
+        DIM lk AS STRING : lk = lochKey$(pd.s, pd.z)
+        IF MAPHAS(gebohrt, lk) THEN CONTINUE
+        DIM bohr AS FLOAT, auge AS FLOAT
+        bohr = 1.0
+        auge = 1.8
+        DIM b AS Bauteil
+        IF bauteilMitId(dok, pl.teile[pd.teil].bauteilId, b) THEN
+            DIM hw AS STRING
+            gbMasse(bauformFuer(b, hw), bohr, auge)
+        END IF
+        MAPPUT(gebohrt, lk, LEN(loecher))
+        ARRAY_PUSH(loecher, NEW GbLoch(pd.s, pd.z, bohr, auge))
+    NEXT
+    FOR i = 0 TO LEN(pl.bahnen) - 1
+        IF pl.bahnen[i].art <> BA_BRUECKE THEN CONTINUE
+        DIM ba AS Bahn : ba = pl.bahnen[i]
+        IF NOT aufPlatine(pl, ba.s1, ba.z1) OR NOT aufPlatine(pl, ba.s2, ba.z2) THEN CONTINUE
+        IF NOT MAPHAS(gebohrt, lochKey$(ba.s1, ba.z1)) THEN
+            MAPPUT(gebohrt, lochKey$(ba.s1, ba.z1), LEN(loecher))
+            ARRAY_PUSH(loecher, NEW GbLoch(ba.s1, ba.z1, 0.8, 1.6))
+        END IF
+        IF NOT MAPHAS(gebohrt, lochKey$(ba.s2, ba.z2)) THEN
+            MAPPUT(gebohrt, lochKey$(ba.s2, ba.z2), LEN(loecher))
+            ARRAY_PUSH(loecher, NEW GbLoch(ba.s2, ba.z2, 0.8, 1.6))
+        END IF
+    NEXT
+    gs.bohrungen = LEN(loecher)
+    ' --- Ausschnitt: alle Bohrungen und die Loecher auf geraden Loetbahnen
+    DIM s0 AS INTEGER : s0 = pl.spalten
+    DIM s1 AS INTEGER : s1 = -1
+    DIM z0 AS INTEGER : z0 = pl.zeilen
+    DIM z1 AS INTEGER : z1 = -1
+    FOR i = 0 TO LEN(loecher) - 1
+        s0 = MIN(s0, loecher[i].s)
+        s1 = MAX(s1, loecher[i].s)
+        z0 = MIN(z0, loecher[i].z)
+        z1 = MAX(z1, loecher[i].z)
+    NEXT
+    FOR i = 0 TO LEN(pl.bahnen) - 1
+        IF pl.bahnen[i].art <> BA_LOET THEN CONTINUE
+        IF NOT aufPlatine(pl, pl.bahnen[i].s1, pl.bahnen[i].z1) OR NOT aufPlatine(pl, pl.bahnen[i].s2, pl.bahnen[i].z2) THEN CONTINUE
+        s0 = MIN(s0, MIN(pl.bahnen[i].s1, pl.bahnen[i].s2))
+        s1 = MAX(s1, MAX(pl.bahnen[i].s1, pl.bahnen[i].s2))
+        z0 = MIN(z0, MIN(pl.bahnen[i].z1, pl.bahnen[i].z2))
+        z1 = MAX(z1, MAX(pl.bahnen[i].z1, pl.bahnen[i].z2))
+    NEXT
+    IF s1 < 0 THEN
+        s0 = 0 : s1 = pl.spalten - 1 : z0 = 0 : z1 = pl.zeilen - 1
+    END IF
+    gGbS0 = s0
+    gGbZ1 = z1
+    gs.breite = (s1 - s0) * GB_RASTER + 2 * GB_RAND
+    gs.hoehe = (z1 - z0) * GB_RASTER + 2 * GB_RAND
+    ' --- Kupfer
+    DIM fcu AS GerberLage : fcu = NEW GerberLage("Copper,L1,Top", "Positive")
+    DIM bcu AS GerberLage : bcu = NEW GerberLage("Copper,L2,Bot", "Positive")
+    DIM fm AS GerberLage : fm = NEW GerberLage("Soldermask,Top", "Negative")
+    DIM bm AS GerberLage : bm = NEW GerberLage("Soldermask,Bot", "Negative")
+    FOR i = 0 TO LEN(loecher) - 1
+        DIM lo AS GbLoch : lo = loecher[i]
+        fcu.blitz(gbX(pl, lo.s), gbY(pl, lo.z), lo.auge)
+        bcu.blitz(gbX(pl, lo.s), gbY(pl, lo.z), lo.auge)
+        fm.blitz(gbX(pl, lo.s), gbY(pl, lo.z), lo.auge + GB_MASKE)
+        bm.blitz(gbX(pl, lo.s), gbY(pl, lo.z), lo.auge + GB_MASKE)
+    NEXT
+    ' Loetbahnen (unten); die Loecher auf geraden Bahnen sind Kupferpunkte
+    DIM kupfer AS MAP OF INTEGER
+    FOR i = 0 TO LEN(loecher) - 1
+        MAPPUT(kupfer, lochKey$(loecher[i].s, loecher[i].z), 1)
+    NEXT
+    FOR i = 0 TO LEN(pl.bahnen) - 1
+        DIM bl AS Bahn : bl = pl.bahnen[i]
+        IF bl.art <> BA_LOET THEN CONTINUE
+        IF NOT aufPlatine(pl, bl.s1, bl.z1) OR NOT aufPlatine(pl, bl.s2, bl.z2) THEN CONTINUE
+        bcu.linie(gbX(pl, bl.s1), gbY(pl, bl.z1), gbX(pl, bl.s2), gbY(pl, bl.z2), GB_BAHN)
+        IF bl.s1 = bl.s2 OR bl.z1 = bl.z2 THEN
+            DIM ps AS INTEGER : ps = bl.s1
+            DIM pz AS INTEGER : pz = bl.z1
+            WHILE TRUE
+                MAPPUT(kupfer, lochKey$(ps, pz), 1)
+                IF ps = bl.s2 AND pz = bl.z2 THEN BREAK
+                ps = ps + SIGN(bl.s2 - bl.s1)
+                pz = pz + SIGN(bl.z2 - bl.z1)
+            WEND
+        END IF
+    NEXT
+    ' Streifen: je Zeile die Stuecke zwischen den Trennstellen, als Bahn vom
+    ' ersten bis zum letzten Kupferpunkt darauf
+    DIM streifen AS INTEGER : streifen = 0
+    IF pl.art = PL_STREIFEN THEN
+        DIM z AS INTEGER, s AS INTEGER
+        FOR z = 0 TO pl.zeilen - 1
+            DIM von AS INTEGER : von = -1
+            DIM bis AS INTEGER : bis = -1
+            FOR s = 0 TO pl.spalten
+                DIM ende AS BOOLEAN : ende = s = pl.spalten
+                IF NOT ende THEN ende = istTrennstelle(pl, s, z)
+                IF ende THEN
+                    IF von >= 0 AND bis > von THEN
+                        bcu.linie(gbX(pl, von), gbY(pl, z), gbX(pl, bis), gbY(pl, z), GB_BAHN)
+                        streifen = streifen + 1
+                    END IF
+                    von = -1
+                    bis = -1
+                ELSEIF MAPHAS(kupfer, lochKey$(s, z)) THEN
+                    IF von < 0 THEN von = s
+                    bis = s
+                END IF
+            NEXT
+        NEXT
+    END IF
+    ' --- Umriss
+    DIM ec AS GerberLage : ec = NEW GerberLage("Profile,NP", "Positive")
+    gbRechteck(ec, 0, 0, gs.breite, gs.hoehe, 0.1)
+    ' --- Bestueckungsdruck
+    DIM sk AS GerberLage : sk = NEW GerberLage("Legend,Top", "Positive")
+    FOR i = 0 TO LEN(pl.teile) - 1
+        DIM t AS PlatTeil : t = pl.teile[i]
+        DIM bt AS Bauteil
+        IF NOT bauteilMitId(dok, t.bauteilId, bt) THEN CONTINUE
+        DIM hw2 AS STRING
+        DIM bf AS Bauform : bf = bauformFuer(bt, hw2)
+        IF LEN(bf.pins) = 0 THEN CONTINUE
+        DIM ts0 AS INTEGER, tz0 AS INTEGER, ts1 AS INTEGER, tz1 AS INTEGER
+        teilFlaeche(t, bf, ts0, tz0, ts1, tz1)
+        DIM bo AS FLOAT, au AS FLOAT
+        gbMasse(bf, bo, au)
+        DIM abst AS FLOAT : abst = au / 2 + 0.35
+        DIM xa AS FLOAT : xa = gbX(pl, ts0) - abst
+        DIM xb AS FLOAT : xb = gbX(pl, ts1) + abst
+        DIM ya AS FLOAT : ya = gbY(pl, tz1) - abst
+        DIM yb AS FLOAT : yb = gbY(pl, tz0) + abst
+        gbRechteck(sk, xa, ya, xb, yb, GB_DRUCK)
+        ' Pin 1: Punkt schraeg links ueber dem ersten Bein
+        DIM p1 AS Punkt : p1 = lochVon(t, bf.pins[0])
+        IF LEN(bf.pins) > 1 THEN sk.blitz(gbX(pl, p1.x) - 1.25, gbY(pl, p1.y) + 1.25, 0.5)
+        IF bt.referenz <> "" THEN gbText(sk, bt.referenz, xa, yb + 0.3, 1.0)
+    NEXT
+    FOR i = 0 TO LEN(pl.bahnen) - 1
+        DIM bb AS Bahn : bb = pl.bahnen[i]
+        IF bb.art <> BA_BRUECKE THEN CONTINUE
+        IF NOT aufPlatine(pl, bb.s1, bb.z1) OR NOT aufPlatine(pl, bb.s2, bb.z2) THEN CONTINUE
+        sk.linie(gbX(pl, bb.s1), gbY(pl, bb.z1), gbX(pl, bb.s2), gbY(pl, bb.z2), 0.3)
+    NEXT
+    DIM titel AS STRING : titel = projekt
+    IF dok.revision <> "" THEN titel = titel + " REV " + dok.revision
+    ' der Titel unten -- nur, wenn er auf die (zugeschnittene) Platine passt
+    IF gbTextBreite(titel, 1.0) > gs.breite - 2 * GB_RAND AND dok.revision <> "" THEN titel = projekt
+    IF gbTextBreite(titel, 1.0) <= gs.breite - 2 THEN gbText(sk, titel, 1.0, 0.8, 1.0)
+    ' --- Bohrdatei (Excellon, mm, Dezimalpunkt)
+    DIM durch AS ARRAY OF FLOAT : durch = []
+    FOR i = 0 TO LEN(loecher) - 1
+        DIM da AS BOOLEAN : da = FALSE
+        FOR j = 0 TO LEN(durch) - 1
+            IF ABS(durch[j] - loecher[i].bohr) < 0.0005 THEN da = TRUE
+        NEXT
+        IF NOT da THEN ARRAY_PUSH(durch, loecher[i].bohr)
+    NEXT
+    SORT(durch)
+    DIM nl AS STRING : nl = CHR$(10)
+    DIM drl AS STRING : drl = "M48" + nl + "; Funkenflug: Bohrungen fuer " + projekt + nl + "; #@! TF.FileFunction,Plated,1,2,PTH" + nl + "FMAT,2" + nl + "METRIC" + nl
+    FOR j = 0 TO LEN(durch) - 1
+        drl = drl + "T" + STR$(j + 1) + "C" + FORMAT$(durch[j], "%.3f") + nl
+    NEXT
+    drl = drl + "%" + nl + "G90" + nl + "G05" + nl
+    FOR j = 0 TO LEN(durch) - 1
+        drl = drl + "T" + STR$(j + 1) + nl
+        FOR i = 0 TO LEN(loecher) - 1
+            IF ABS(loecher[i].bohr - durch[j]) < 0.0005 THEN drl = drl + "X" + FORMAT$(gbX(pl, loecher[i].s), "%.3f") + "Y" + FORMAT$(gbY(pl, loecher[i].z), "%.3f") + nl
+        NEXT
+    NEXT
+    drl = drl + "T0" + nl + "M30" + nl
+    ' --- was die Pruefung meldet
+    IF LEN(r.luft) > 0 THEN ARRAY_PUSH(gs.hinweise, STR$(LEN(r.luft)) + " Luftlinie(n) noch offen -- diese Verbindungen fehlen auf der Platine")
+    IF r.kurzschluesse > 0 THEN ARRAY_PUSH(gs.hinweise, STR$(r.kurzschluesse) + " Kurzschluss/Kurzschluesse auf der Platine")
+    IF LEN(r.unplatziert) > 0 THEN ARRAY_PUSH(gs.hinweise, "nicht auf der Platine: " + JOIN$(r.unplatziert, ", "))
+    IF LEN(pl.teile) = 0 THEN ARRAY_PUSH(gs.hinweise, "auf der Platine steckt noch nichts")
+    DIM lies AS STRING : lies = "Funkenflug -- Gerber-Datensatz " + projekt + nl + nl
+    lies = lies + "Platine: " + FORMAT$(gs.breite, "%.2f") + " x " + FORMAT$(gs.hoehe, "%.2f") + " mm, 2 Lagen, Raster 2.54 mm -- zugeschnitten auf Spalte " + STR$(s0 + 1) + "-" + STR$(s1 + 1) + ", Zeile " + STR$(z0 + 1) + "-" + STR$(z1 + 1) + " der " + STR$(pl.spalten) + " x " + STR$(pl.zeilen) + " Loecher" + nl
+    lies = lies + "Aufbau: " + IIF(pl.art = PL_STREIFEN, "Streifenraster (" + STR$(streifen) + " Streifenstuecke als Leiterbahnen unten)", "Lochraster (Loetbahnen als Leiterbahnen unten)") + nl
+    lies = lies + "Bohrungen: " + STR$(gs.bohrungen) + ", Leiterbahn " + FORMAT$(GB_BAHN, "%.2f") + " mm" + nl + nl
+    lies = lies + "  " + pre + "-F_Cu.gbr       Kupfer oben (Loetaugen)" + nl
+    lies = lies + "  " + pre + "-B_Cu.gbr       Kupfer unten (Loetaugen, Streifen, Loetbahnen)" + nl
+    lies = lies + "  " + pre + "-F_Mask.gbr     Loetstopp oben" + nl
+    lies = lies + "  " + pre + "-B_Mask.gbr     Loetstopp unten" + nl
+    lies = lies + "  " + pre + "-F_SilkS.gbr    Bestueckungsdruck (Umrisse, Referenzen, Pin 1, Drahtbruecken)" + nl
+    lies = lies + "  " + pre + "-Edge_Cuts.gbr  Umriss" + nl
+    lies = lies + "  " + pre + ".drl            Bohrungen (Excellon, mm, durchkontaktiert)" + nl + nl
+    lies = lies + "Drahtbruecken sind Draehte: gebohrt, im Bestueckungsdruck als Linie." + nl
+    lies = lies + "Format: Gerber X2 (RS-274X, mm, 4.6), Excellon metrisch mit Dezimalpunkt." + nl
+    IF LEN(gs.hinweise) > 0 THEN lies = lies + nl + "ACHTUNG:" + nl + "  " + JOIN$(gs.hinweise, nl + "  ") + nl
+    gs.dazu(pre + "-F_Cu.gbr", fcu.text$())
+    gs.dazu(pre + "-B_Cu.gbr", bcu.text$())
+    gs.dazu(pre + "-F_Mask.gbr", fm.text$())
+    gs.dazu(pre + "-B_Mask.gbr", bm.text$())
+    gs.dazu(pre + "-F_SilkS.gbr", sk.text$())
+    gs.dazu(pre + "-Edge_Cuts.gbr", ec.text$())
+    gs.dazu(pre + ".drl", drl)
+    gs.dazu("LIESMICH.txt", lies)
+    RETURN gs
+END FUNCTION
+
+FUNCTION gerberSchreiben(dok AS Dokument, projekt AS STRING, zipPfad AS STRING) AS GerberSatz
+    DIM gs AS GerberSatz : gs = gerberErzeugen(dok, projekt)
+    DIM n AS INTEGER : n = ZIP_WRITE(zipPfad, gs.namen, gs.inhalte)
+    RETURN gs
+END FUNCTION

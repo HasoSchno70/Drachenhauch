@@ -21,3 +21,4 @@ IMPORT "kicad.dh" AS kern
 IMPORT "datei.dh" AS kern
 IMPORT "sausdruck.dh" AS kern
 IMPORT "kicadimport.dh" AS kern
+IMPORT "gerber.dh" AS kern

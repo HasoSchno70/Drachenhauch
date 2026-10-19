@@ -508,6 +508,51 @@ DIM kdok AS kern.Dokument : kdok = kern.dokumentAusJson(kern.dokumentNachJson(ld
 kdok.platine.bahnen = []
 DIM kvn AS INTEGER : kvn = kern.platineVerbinden(kdok, vow)
 PRINT "Verbinden zweimal: "; kern.platineVerbinden(ldok, vow); " weitere  (erwartet 0 weitere)"
+' --- Gerber: Lochraster (Loetbahnen) und Streifenraster (Streifen, Trennstellen, Bruecken)
+FUNCTION gbZaehle(t AS STRING, teil AS STRING) AS INTEGER
+    RETURN (LEN(t) - LEN(REPLACE$(t, teil, ""))) \ LEN(teil)
+END FUNCTION
+' fuer die Gegenpruefung von aussen (gerber_pruefen.py): je Loch das Netz, je Bruecke die Enden
+SUB gbErwartet(dok AS kern.Dokument, pfad AS STRING)
+    DIM r AS kern.PlatBericht : r = kern.platinePruefen(dok)
+    DIM t AS STRING : t = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.pads) - 1
+        t = t + "P " + STR$(kern.gbX(dok.platine, r.pads[i].s)) + " " + STR$(kern.gbY(dok.platine, r.pads[i].z)) + " " + r.netzNamen[r.pads[i].netz] + CHR$(10)
+    NEXT
+    FOR i = 0 TO LEN(dok.platine.bahnen) - 1
+        DIM ba AS kern.Bahn : ba = dok.platine.bahnen[i]
+        IF ba.art = kern.BA_BRUECKE THEN t = t + "B " + STR$(kern.gbX(dok.platine, ba.s1)) + " " + STR$(kern.gbY(dok.platine, ba.z1)) + " " + STR$(kern.gbX(dok.platine, ba.s2)) + " " + STR$(kern.gbY(dok.platine, ba.z2)) + CHR$(10)
+    NEXT
+    WRITEALL(pfad, t)
+END SUB
+DIM gbOrdner AS STRING : gbOrdner = GETENV$("FUNKENFLUG_GERBER_ORDNER", "")
+DIM gsL AS kern.GerberSatz : gsL = kern.gerberErzeugen(ldok, "Pruef Loch")
+DIM gsLb AS STRING : gsLb = gsL.datei$("-B_Cu.gbr")
+PRINT "Gerber Loch: Dateien "; LEN(gsL.namen); "  Augen oben "; gbZaehle(gsL.datei$("-F_Cu.gbr"), "D03*"); " = Bohrungen "; gsL.bohrungen; "  Bohrdatei "; gbZaehle(gsL.datei$(".drl"), CHR$(10) + "X"); "  Bahnen unten "; gbZaehle(gsLb, "D01*") >= LEN(ldok.platine.bahnen); "  X2 "; CONTAINS(gsLb, "%TF.FileFunction,Copper,L2,Bot*%"); "  Ende "; ENDSWITH(gsLb, "M02*" + CHR$(10)); "  ohne Achtung "; NOT CONTAINS(gsL.datei$("LIESMICH.txt"), "ACHTUNG"); "  (erwartet 8  Augen = Bohrungen  Bohrdatei gleich  TRUE TRUE TRUE TRUE)"
+PRINT "Gerber Namen: "; gsL.namen[0]; " "; gsL.namen[6]; "  Druck mit R1 "; gbZaehle(gsL.datei$("-F_SilkS.gbr"), "D01*") > 40; "  Strichschrift "; kern.gbZeichen$("R") <> "" AND kern.gbZeichen$("7") <> ""; "  (erwartet Pruef_Loch-F_Cu.gbr Pruef_Loch.drl  TRUE TRUE)"
+DIM gsdok AS kern.Dokument : gsdok = kern.dokumentAusJson(kern.dokumentNachJson(pdok))
+gsdok.platine.bahnen = []
+gsdok.platine.trenn = []
+gsdok.platine.teile = []
+gsdok.platine.art = kern.PL_STREIFEN
+DIM gsn AS INTEGER : gsn = kern.platineEinsetzen(gsdok)
+gsn = kern.platineVerbinden(gsdok, vow)
+DIM gsr AS kern.PlatBericht : gsr = kern.platinePruefen(gsdok)
+DIM gsS AS kern.GerberSatz : gsS = kern.gerberErzeugen(gsdok, "Pruef Streifen")
+PRINT "Gerber Streifen: fertig verbunden "; LEN(gsr.luft) = 0 AND gsr.kurzschluesse = 0; "  Trennstellen "; LEN(gsdok.platine.trenn) > 0; "  Bruecken im Druck "; gbZaehle(gsS.datei$("-F_SilkS.gbr"), "D11*") >= 0; "  Streifenstuecke "; CONTAINS(gsS.datei$("LIESMICH.txt"), "Streifenstuecke"); "  (erwartet TRUE TRUE TRUE TRUE)"
+' eine Luftlinie offen -> Achtung im LIESMICH
+DIM gsoffen AS kern.Dokument : gsoffen = kern.dokumentAusJson(kern.dokumentNachJson(gsdok))
+gsoffen.platine.bahnen = []
+DIM gsO AS kern.GerberSatz : gsO = kern.gerberErzeugen(gsoffen, "offen")
+PRINT "Gerber unfertig: "; LEN(gsO.hinweise) > 0; " "; CONTAINS(gsO.datei$("LIESMICH.txt"), "ACHTUNG:"); " "; CONTAINS(JOIN$(gsO.hinweise, "|"), "Luftlinie"); "  (erwartet TRUE TRUE TRUE)"
+IF gbOrdner <> "" THEN
+    DIM gsSchreib AS kern.GerberSatz : gsSchreib = kern.gerberSchreiben(ldok, "Pruef Loch", PATHJOIN(gbOrdner, "loch.zip"))
+    gbErwartet(ldok, PATHJOIN(gbOrdner, "loch.erwartet"))
+    gsSchreib = kern.gerberSchreiben(gsdok, "Pruef Streifen", PATHJOIN(gbOrdner, "streifen.zip"))
+    gbErwartet(gsdok, PATHJOIN(gbOrdner, "streifen.erwartet"))
+    PRINT "Gerber geschrieben nach "; gbOrdner
+END IF
 ' Einsetzen nach Netzen: eine Kette R1-R2-...-R6, im Schaltplan durcheinander
 DIM kettenFolge AS ARRAY OF INTEGER : kettenFolge = [1, 4, 2, 6, 3, 5]
 DIM kettenLaenge AS ARRAY OF FLOAT : kettenLaenge = []

@@ -2312,6 +2312,18 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
                 IF gtkFoto(gtk_dialog_get_content_area(gSimDlg), fotoZiel + ".sim_ac.png") THEN PRINT "Foto Frequenzgang gesichert"
             END IF
             simZu(gSimDlg, 0, 0)
+        CASE 40
+            ' Gerber: Platine bestuecken, verbinden, als ZIP schreiben
+            gtk_button_clicked(gKnopfPlatine)
+            plEinsetzen()
+            plVerbinden()
+            IF fotoZiel <> "" THEN
+                DIM gbM AS STRING : gbM = gerberExport$(fotoZiel + ".gerber.zip")
+                DIM gbL AS ARRAY OF STRING : gbL = ZIP_LIST(fotoZiel + ".gerber.zip")
+                pruefe("Gerber-ZIP geschrieben", STR$(LEN(gbL)) + " " + STR$(STARTSWITH(gbM, "Gerber-Datensatz geschrieben")) + " " + STR$(CONTAINS(gbM, "Bohrungen")), "8 " + STR$(TRUE) + " " + STR$(TRUE))
+                pruefe("Gerber: Lagen im ZIP", STR$(LEN(ARRAY_FILTER(gbL, FUNCTION(n) ENDSWITH(n, ".gbr")))) + " " + STR$(LEN(ARRAY_FILTER(gbL, FUNCTION(n) ENDSWITH(n, ".drl")))), "6 1")
+            END IF
+            gtk_button_clicked(gKnopfSchaltplan)
         CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()
