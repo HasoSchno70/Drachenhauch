@@ -443,7 +443,9 @@ FUNCTION exportNach(pfad AS STRING) AS BOOLEAN
     DIM text AS STRING
     IF ENDSWITH(klein, ".csv") THEN
         text = kern.netzlisteCsvDok$(gDok)
-    ELSEIF ENDSWITH(klein, ".net") OR ENDSWITH(klein, ".txt") THEN
+    ELSEIF ENDSWITH(klein, ".net") THEN
+        text = kern.netzlisteKicadDok$(gDok, IIF(gPfad <> "", basisName$(gPfad), exportTitel$()))
+    ELSEIF ENDSWITH(klein, ".txt") THEN
         text = kern.netzlisteTextDok$(gDok)
     ELSE
         IF NOT CONTAINS(basisName$(pfad), ".") THEN pfad = pfad + ".cir"
@@ -608,7 +610,7 @@ SUB aufPlGroesse(knopf AS INTEGER, daten AS INTEGER)
 END SUB
 
 SUB aufExport(knopf AS INTEGER, daten AS INTEGER)
-    DIM pfad AS STRING : pfad = dateiExportWahl("Netzliste exportieren", "netzliste.cir", ["SPICE (*.cir, *.sp)", "CSV (*.csv)", "Text (*.net, *.txt)"], ["*.cir;*.sp", "*.csv", "*.net;*.txt"])
+    DIM pfad AS STRING : pfad = dateiExportWahl("Netzliste exportieren", "netzliste.cir", ["SPICE (*.cir, *.sp)", "KiCad (*.net)", "CSV (*.csv)", "Text (*.txt)"], ["*.cir;*.sp", "*.net", "*.csv", "*.txt"])
     IF pfad = "" THEN RETURN
     IF NOT exportNach(pfad) THEN meldung("Die Netzliste liess sich nicht nach " + pfad + " schreiben.")
 END SUB
@@ -730,12 +732,12 @@ FUNCTION stuecklisteNach(pfad AS STRING) AS BOOLEAN
     DIM klein AS STRING : klein = LOWER$(pfad)
     DIM text AS STRING
     IF ENDSWITH(klein, ".md") THEN
-        text = kern.stuecklisteMarkdown$(gDok, exportTitel$())
+        text = kern.stuecklisteMarkdownSp$(gDok, exportTitel$(), bomSpaltenAktuell())
     ELSEIF ENDSWITH(klein, ".txt") THEN
-        text = kern.stuecklisteText$(gDok)
+        text = kern.stuecklisteTextSp$(gDok, bomSpaltenAktuell())
     ELSE
         IF NOT CONTAINS(basisName$(pfad), ".") THEN pfad = pfad + ".csv"
-        text = kern.stuecklisteCsv$(gDok)
+        text = kern.stuecklisteCsvSp$(gDok, bomSpaltenAktuell())
     END IF
     TRY
         WRITEALL(pfad, text)
@@ -747,48 +749,102 @@ END FUNCTION
 
 CONST ANTWORT_EXPORT = 1
 
-SUB stuecklisteZeigen()
+' --- Stueckliste: Spalten waehlbar (Haken), Vorschau und Export folgen ihnen
+DIM gBomSpalten AS ARRAY OF INTEGER        ' leer = Vorgabe des Dokuments
+DIM gBomHaken AS ARRAY OF INTEGER
+DIM gBomKasten AS INTEGER
+DIM gBomSumme AS INTEGER
+DIM gBomSetzen AS BOOLEAN
+
+FUNCTION bomSpaltenAktuell() AS ARRAY OF INTEGER
+    IF LEN(gBomSpalten) = 0 THEN RETURN kern.bomVorgabeSpalten(gDok)
+    RETURN gBomSpalten
+END FUNCTION
+
+SUB bomTabelleBauen()
+    DIM alt AS INTEGER : alt = gtk_bin_get_child(gBomKasten)
+    IF alt <> 0 THEN gtk_widget_destroy(alt)
     DIM z AS ARRAY OF kern.BomZeile : z = kern.stuecklisteDok(gDok)
-    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Stueckliste", gFenster, GTK_DIALOG_MODAL, "Exportieren ...", ANTWORT_EXPORT, "Schliessen", GTK_ANTWORT_OK, NIL)
-    gtk_window_set_default_size(d, 620, 420)
-    DIM vb AS INTEGER : vb = gtk_box_new(GTK_SENKRECHT, 8)
-    gtk_container_set_border_width(vb, 12)
-    DIM sw AS INTEGER : sw = gtk_scrolled_window_new(0, 0)
-    gtk_scrolled_window_set_min_content_height(sw, 280)
+    DIM sp AS ARRAY OF INTEGER : sp = bomSpaltenAktuell()
+    DIM namen AS ARRAY OF STRING : namen = kern.bomSpaltenNamen()
     DIM g AS INTEGER : g = gtk_grid_new()
     gtk_grid_set_column_spacing(g, 18)
     gtk_grid_set_row_spacing(g, 4)
-    DIM geh AS BOOLEAN, best AS BOOLEAN
-    kern.bomSpalten(z, geh, best)
-    DIM kopf AS ARRAY OF STRING : kopf = ["Menge", "Referenzen", "Wert"]
-    IF geh THEN ARRAY_PUSH(kopf, "Gehaeuse")
-    IF best THEN ARRAY_PUSH(kopf, "Bestellnummer")
-    ARRAY_PUSH(kopf, "Bauteil")
-    DIM i AS INTEGER, summe AS INTEGER
-    FOR i = 0 TO LEN(kopf) - 1
-        DIM k AS INTEGER : k = gtk_label_new("")
-        gtk_label_set_markup(k, "<b>" + kopf[i] + "</b>")
-        gtk_label_set_xalign(k, 0.0)
-        gtk_grid_attach(g, k, i, 0, 1, 1)
+    DIM i AS INTEGER, k AS INTEGER
+    FOR k = 0 TO LEN(sp) - 1
+        DIM kl AS INTEGER : kl = gtk_label_new("")
+        gtk_label_set_markup(kl, "<b>" + namen[sp[k]] + "</b>")
+        gtk_label_set_xalign(kl, 0.0)
+        gtk_grid_attach(g, kl, k, 0, 1, 1)
     NEXT
-    summe = 0
+    DIM summe AS INTEGER : summe = 0
     FOR i = 0 TO LEN(z) - 1
-        gtk_grid_attach(g, etikettNeu(STR$(z[i].menge)), 0, i + 1, 1, 1)
-        DIM refs AS INTEGER : refs = etikettNeu(kern.referenzBereiche$(z[i].referenzen))
-        gtk_label_set_line_wrap(refs, TRUE)
-        gtk_label_set_max_width_chars(refs, 34)
-        gtk_grid_attach(g, refs, 1, i + 1, 1, 1)
-        gtk_grid_attach(g, etikettNeu(z[i].wert), 2, i + 1, 1, 1)
-        DIM sp AS INTEGER : sp = 3
-        IF geh THEN gtk_grid_attach(g, etikettNeu(z[i].gehaeuse), sp, i + 1, 1, 1) : sp = sp + 1
-        IF best THEN gtk_grid_attach(g, etikettNeu(z[i].bestellnr), sp, i + 1, 1, 1) : sp = sp + 1
-        gtk_grid_attach(g, etikettNeu(z[i].bauteil), sp, i + 1, 1, 1)
+        FOR k = 0 TO LEN(sp) - 1
+            DIM zl AS INTEGER : zl = etikettNeu(kern.bomZelle$(z[i], sp[k], TRUE))
+            IF sp[k] = kern.BS_REFERENZEN THEN
+                gtk_label_set_line_wrap(zl, TRUE)
+                gtk_label_set_max_width_chars(zl, 34)
+            END IF
+            gtk_grid_attach(g, zl, k, i + 1, 1, 1)
+        NEXT
         summe = summe + z[i].menge
     NEXT
-    gtk_container_add(sw, g)
-    gtk_box_pack_start(vb, sw, TRUE, TRUE, 0)
-    gtk_box_pack_start(vb, etikettNeu(STR$(summe) + " Bauteile in " + STR$(LEN(z)) + " Positionen (ohne Versorgungssymbole)"), FALSE, FALSE, 0)
+    gtk_container_add(gBomKasten, g)
+    gtk_widget_show_all(gBomKasten)
+    gtk_label_set_text(gBomSumme, STR$(summe) + " Bauteile in " + STR$(LEN(z)) + " Positionen (ohne Versorgungssymbole)")
+END SUB
+
+SUB aufBomHaken(knopf AS INTEGER, daten AS INTEGER)
+    IF gBomSetzen THEN RETURN
+    DIM neu AS ARRAY OF INTEGER : neu = []
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(gBomHaken) - 1
+        IF gtk_toggle_button_get_active(gBomHaken[k]) THEN ARRAY_PUSH(neu, k)
+    NEXT
+    IF LEN(neu) = 0 THEN
+        ' mindestens eine Spalte -- den letzten Haken zurueck
+        gBomSetzen = TRUE
+        gtk_toggle_button_set_active(knopf, TRUE)
+        gBomSetzen = FALSE
+        RETURN
+    END IF
+    gBomSpalten = neu
+    bomTabelleBauen()
+END SUB
+
+SUB stuecklisteZeigen()
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Stueckliste", gFenster, GTK_DIALOG_MODAL, "Exportieren ...", ANTWORT_EXPORT, "Schliessen", GTK_ANTWORT_OK, NIL)
+    gtk_window_set_default_size(d, 720, 440)
+    DIM vb AS INTEGER : vb = gtk_box_new(GTK_SENKRECHT, 8)
+    gtk_container_set_border_width(vb, 12)
+    ' Spalten-Haken
+    DIM hk AS INTEGER : hk = gtk_box_new(GTK_WAAGERECHT, 8)
+    gtk_box_pack_start(hk, etikettNeu("Spalten:"), FALSE, FALSE, 0)
+    DIM namen AS ARRAY OF STRING : namen = kern.bomSpaltenNamen()
+    DIM sp AS ARRAY OF INTEGER : sp = bomSpaltenAktuell()
+    gBomHaken = []
+    gBomSetzen = TRUE
+    DIM k AS INTEGER, j AS INTEGER
+    FOR k = 0 TO LEN(namen) - 1
+        DIM h AS INTEGER : h = gtk_check_button_new_with_label(namen[k])
+        DIM an AS BOOLEAN : an = FALSE
+        FOR j = 0 TO LEN(sp) - 1
+            IF sp[j] = k THEN an = TRUE
+        NEXT
+        gtk_toggle_button_set_active(h, an)
+        ARRAY_PUSH(gBomHaken, h)
+        gtk_box_pack_start(hk, h, FALSE, FALSE, 0)
+        signal(h, "toggled", aufBomHaken, 0, 0, 0)
+    NEXT
+    gBomSetzen = FALSE
+    gtk_box_pack_start(vb, hk, FALSE, FALSE, 0)
+    gBomKasten = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_min_content_height(gBomKasten, 280)
+    gtk_box_pack_start(vb, gBomKasten, TRUE, TRUE, 0)
+    gBomSumme = etikettNeu("")
+    gtk_box_pack_start(vb, gBomSumme, FALSE, FALSE, 0)
     gtk_box_pack_start(gtk_dialog_get_content_area(d), vb, TRUE, TRUE, 0)
+    bomTabelleBauen()
     gtk_widget_show_all(d)
     gDlg = d : gDlgFeld1 = 0 : gDlgFeld2 = 0
     WHILE gtk_dialog_run(d) = ANTWORT_EXPORT
@@ -798,6 +854,7 @@ SUB stuecklisteZeigen()
         END IF
     WEND
     gDlg = 0
+    gBomKasten = 0
     gtk_widget_destroy(d)
 END SUB
 
@@ -1026,6 +1083,23 @@ FUNCTION seProbe(daten AS INTEGER) AS BOOLEAN
             gtk_button_clicked(seKnoepfe[SE_VERSCHIEBEN - 1])
             gtk_dialog_response(seDlg, GTK_ANTWORT_OK)
     END SELECT
+    RETURN FALSE
+END FUNCTION
+
+' Stueckliste im Selbsttest: Haken bedienen wie mit der Maus, Tabelle pruefen.
+FUNCTION bomProbe(daten AS INTEGER) AS BOOLEAN
+    IF gBomKasten = 0 THEN RETURN TRUE
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(gBomHaken) - 1
+        gtk_toggle_button_set_active(gBomHaken[k], k = kern.BS_REFERENZEN OR k = kern.BS_BAUFORM OR k = kern.BS_MENGE)
+    NEXT
+    gtk_toggle_button_set_active(gBomHaken[kern.BS_MENGE], FALSE)
+    ' der letzte Haken laesst sich nicht wegnehmen
+    gtk_toggle_button_set_active(gBomHaken[kern.BS_REFERENZEN], FALSE)
+    gtk_toggle_button_set_active(gBomHaken[kern.BS_BAUFORM], FALSE)
+    pruefe("Letzte Spalte bleibt", STR$(LEN(gBomSpalten)) + " " + STR$(gtk_toggle_button_get_active(gBomHaken[kern.BS_BAUFORM])), "1 " + STR$(TRUE))
+    gtk_toggle_button_set_active(gBomHaken[kern.BS_REFERENZEN], TRUE)
+    gtk_dialog_response(gDlg, GTK_ANTWORT_OK)
     RETURN FALSE
 END FUNCTION
 
@@ -2103,6 +2177,19 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
                 verlaufZurueck()
             WEND
             auswahlAufheben()
+        CASE 32
+            ' Stueckliste: Spalten per Haken, Export folgt ihnen
+            blattWechseln(0)
+            gBomSpalten = []
+            g_timeout_add(250, bomProbe, 0)
+            stuecklisteZeigen()
+            pruefe("Stueckliste: Spalten gewaehlt", STR$(LEN(gBomSpalten)) + " " + STR$(gBomSpalten[0]) + " " + STR$(gBomSpalten[1]), "2 " + STR$(kern.BS_REFERENZEN) + " " + STR$(kern.BS_BAUFORM))
+            IF fotoZiel <> "" THEN
+                pruefe("Export mit den gewaehlten Spalten", STR$(stuecklisteNach(fotoZiel + ".spalten.csv")) + " " + STR$(STARTSWITH(READALL$(fotoZiel + ".spalten.csv"), "Referenzen;Bauform" + CHR$(10))), STR$(TRUE) + " " + STR$(TRUE))
+                pruefe("KiCad-Netzliste (.net)", STR$(exportNach(fotoZiel + ".kicad.net")) + " " + STR$(STARTSWITH(READALL$(fotoZiel + ".kicad.net"), "(export (version")), STR$(TRUE) + " " + STR$(TRUE))
+                pruefe("Text-Netzliste (.txt)", STR$(exportNach(fotoZiel + ".netz.txt")) + " " + STR$(STARTSWITH(READALL$(fotoZiel + ".netz.txt"), "# Funkenflug-Netzliste")), STR$(TRUE) + " " + STR$(TRUE))
+            END IF
+            gBomSpalten = []
         CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()

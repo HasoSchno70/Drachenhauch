@@ -171,8 +171,12 @@ erscheint ein roter Platzhalter, und der ERC meldet es.
 **Stückliste** (Kopfleiste): gruppiert nach Bauteil, Wert, Gehäuse und
 Bestellnummer (10k in 0805 und in 1206 sind zwei Positionen), natürlich
 sortiert (R2 vor R10), Bereiche zusammengefasst (`R1-R3, R10`), ohne
-Versorgungssymbole; Export als CSV (Semikolon, immer mit Gehäuse- und
-Bestellnummer-Spalte), Markdown oder Text (diese Spalten nur, wenn belegt).
+Versorgungssymbole; Export als CSV (Semikolon), Markdown oder Text. Welche
+**Spalten** – Menge, Referenzen, Wert, Bauteil, Gehäuse, Bestellnummer,
+Bauform, Beschreibung – setzt man per Haken über der Vorschau; Vorschau und
+Export folgen ihnen (Vorgabe: die ersten vier, Gehäuse und Bestellnummer nur,
+wenn eine Position sie hat). In CSV stehen die Referenzen einzeln, in Markdown
+und Text als Bereiche.
 
 **Ablage:** `Strg+C` kopiert, `Strg+X` schneidet aus, `Strg+V` fügt an der
 Mausposition ein, `Strg+A` wählt alles. Das läuft über die Zwischenablage des
@@ -219,7 +223,15 @@ gelten als Quelle – ein PWR_FLAG wie in KiCad braucht es nicht.
 **Netzliste** (Kopfleiste): das Format folgt der Endung – `.cir`/`.sp` SPICE
 (direkt für ngspice: GND wird Knoten `0`, `4k7` → `4.7k`, `1M` → `1Meg`, denn
 `M` heißt in SPICE *milli*; Dioden und Transistoren bekommen `.model`-Zeilen),
-`.csv` (Semikolon) oder `.net`/`.txt` als lesbarer Text.
+`.csv` (Semikolon), `.txt` als lesbarer Text oder **`.net` für KiCad**
+(S-Ausdruck, in Pcbnew per „Netzliste importieren"). Die KiCad-Netzliste
+schlägt je Bauteil einen Footprint aus der Bauform vor (AX4 →
+`R_Axial_…_P10.16mm`, RAD2 → `C_Disc_…_P5.00mm`, DIP8 → `DIP-8_W7.62mm`,
+TO92 → `TO-92_Inline`, SILn/HDR → `PinHeader_…`); was sich nicht sicher
+zuordnen lässt, bleibt leer. Jeder Knoten nennt die **Pad-Nummer der
+Bauform**, nicht die Pin-Nummer des Symbols – sonst läge beim TO-92 (C B E)
+in KiCad die Basis (Funkenflug-Pin 1) auf dem Kollektor-Pad. Titel, Revision,
+Bestellnummer reisen mit. (`.net` war früher die Text-Netzliste.)
 
 ## Bibliothek
 
@@ -378,6 +390,7 @@ kern/       Modell, Geometrie, Bibliothek, Netze, Datei – ohne Oberfläche,
   hierarchie.dh  Unterblaetter: Blattsymbol aus den Labels, Ports, Pfad, ERC
   bearbeiten.dh  Annotieren, Suchen & Ersetzen
   netzliste.dh   Export: SPICE, CSV, Text
+  kicad.dh       KiCad-Netzliste (.net) mit Footprint-Vorschlaegen und Pad-Nummern
   symbole.dh     eigene Symbole: Pinliste, IC-Generator, JSON, Register, Bibliothek
   stueckliste.dh Stückliste: Gruppen, natürliche Sortierung, CSV/Markdown/Text
   platine.dh     Bauformen, Platinen-Pruefung (Inseln, Luftlinien, Kurzschluesse), Einsetzen
@@ -401,7 +414,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (272 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (277 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,

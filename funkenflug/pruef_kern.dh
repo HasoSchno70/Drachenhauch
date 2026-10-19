@@ -727,6 +727,27 @@ PRINT "Schriftfeld: "; adk2.titel; "/"; adk2.autor; "/"; adk2.revision; "/'"; ad
 ' --- Netzklassen nach Namen
 PRINT "Masse: "; kern.istMasseName("GND"); kern.istMasseName("agnd"); kern.istMasseName("0V"); kern.istMasseName("GNDA"); "  Versorgung: "; kern.istVersorgungsName("VCC"); kern.istVersorgungsName("+12V"); kern.istVersorgungsName("3V3"); kern.istVersorgungsName("5V"); kern.istVersorgungsName("VDD_IO"); "  Signal: "; kern.istVersorgungsName("CLK"); kern.istVersorgungsName("V"); kern.istVersorgungsName("2N"); kern.istMasseName("GNDX") AND FALSE; "  (erwartet Masse: TRUETRUETRUETRUE  Versorgung: TRUETRUETRUETRUETRUE  Signal: FALSEFALSEFALSEFALSE)"
 
+' --- KiCad-Netzliste und Stuecklisten-Spalten
+DIM kicDok AS kern.Dokument : kicDok = NEW kern.Dokument()
+DIM kq AS kern.Bauteil : kq = kern.neuesBauteil("Q_NPN", kern.neueLage(0, 0))
+kq.referenz = "Q1"
+DIM kr AS kern.Bauteil : kr = kern.neuesBauteil("R", kern.neueLage(-400, 0))
+kr.referenz = "R1"
+kr.bestellnr = "MF0207-1K"
+DIM ku AS kern.Bauteil : ku = kern.neuesBauteil("NE555", kern.neueLage(4000, 0))
+ku.referenz = "U1"
+ARRAY_PUSH(kicDok.blaetter[0].bauteile, kq)
+ARRAY_PUSH(kicDok.blaetter[0].bauteile, kr)
+ARRAY_PUSH(kicDok.blaetter[0].bauteile, ku)
+DIM kn AS STRING : kn = kern.netzlisteKicadDok$(kicDok, "test.fkn")
+DIM kauf AS INTEGER : kauf = LEN(kn) - LEN(REPLACE$(kn, "(", ""))
+DIM kzu AS INTEGER : kzu = LEN(kn) - LEN(REPLACE$(kn, ")", ""))
+DIM qk AS STRING : qk = CHR$(34)
+PRINT "KiCad: Klammern "; kauf = kzu; "  Q1 TO-92 "; CONTAINS(kn, "(footprint " + qk + "Package_TO_SOT_THT:TO-92_Inline" + qk + ")"); "  R1 axial "; CONTAINS(kn, "R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"); "  U1 DIP "; CONTAINS(kn, "Package_DIP:DIP-8_W7.62mm"); "  Bestellnummer "; CONTAINS(kn, "MF0207-1K"); "  C metrisch "; kern.kicadFootprint$(kern.neuesBauteil("C", kern.neueLage(0, 0)), kern.bauformFuer(kern.neuesBauteil("C", kern.neueLage(0, 0)), phw)) = "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm"; "  (erwartet alle TRUE)"
+PRINT "KiCad-Pads: Basis auf Pad 2 "; CONTAINS(kn, "(node (ref " + qk + "Q1" + qk + ") (pin " + qk + "2" + qk + ") (pinfunction " + qk + "B" + qk + ")"); "  555 VCC auf Pad 8 "; CONTAINS(kn, "(node (ref " + qk + "U1" + qk + ") (pin " + qk + "8" + qk + ") (pinfunction " + qk + "VCC" + qk + ") (pintype " + qk + "power_in" + qk + "))"); "  R1.1 an Q1.B "; CONTAINS(kn, "(node (ref " + qk + "R1" + qk + ") (pin " + qk + "2" + qk + ")"); "  offen benannt "; CONTAINS(kn, "unconnected-(Q1-Pad1)"); "  (erwartet alle TRUE)"
+DIM ksp AS STRING : ksp = kern.stuecklisteCsvSp$(kicDok, [kern.BS_REFERENZEN, kern.BS_BAUFORM, kern.BS_BESTELLNR])
+PRINT "Spalten: "; CONTAINS(ksp, "Referenzen;Bauform;Bestellnummer" + CHR$(10)); " "; CONTAINS(ksp, "R1;AX4;MF0207-1K"); " "; CONTAINS(ksp, "Q1;TO92-CBE;"); "  Vorgabe "; LEN(kern.bomVorgabeSpalten(kicDok)); "  (erwartet TRUE TRUE TRUE  Vorgabe 5)"
+
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
 PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)
