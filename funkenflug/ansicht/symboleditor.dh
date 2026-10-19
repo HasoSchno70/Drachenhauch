@@ -71,8 +71,70 @@ SUB seGeaendert(objekt AS INTEGER, daten AS INTEGER)
     IF seVorschau <> 0 THEN gtk_widget_queue_draw(seVorschau)
 END SUB
 
-' Vorschau: das Symbol eingepasst. Die Zeichenroutine der Flaeche rechnet mit
-' vX/vY/vZoom -- die werden fuer die Dauer des Zeichnens umgestellt.
+' --- Vorschau mit Zeichenwerkzeugen ---------------------------------------------
+' Die Vorschau zeigt das Symbol, wie es im Schaltplan erscheint, und man kann
+' darin zeichnen. Der Text bleibt die einzige Quelle: jedes Werkzeug haengt
+' eine Zeile an (linie, rechteck, kreis, pin) bzw. streicht eine (Loeschen) --
+' was man zeichnet, steht danach lesbar in der Liste und laesst sich dort
+' weiter bearbeiten. Der Ausschnitt bleibt fest, solange alles hineinpasst.
+
+CONST SE_KEINS = 0
+CONST SE_LINIE = 1
+CONST SE_RECHTECK = 2
+CONST SE_KREIS = 3
+CONST SE_PIN = 4
+CONST SE_LOESCHEN = 5
+
+DIM seVX AS FLOAT
+DIM seVY AS FLOAT
+DIM seZoom AS FLOAT
+DIM seAnsichtOk AS BOOLEAN
+DIM seWz AS INTEGER
+DIM seKnoepfe AS ARRAY OF INTEGER         ' Werkzeug-Knoepfe, Index = Werkzeug - 1
+DIM seKnoepfeSetzen AS BOOLEAN
+DIM seHinweis AS INTEGER
+DIM sePunkte AS ARRAY OF kern.Punkt       ' Linie im Entstehen
+DIM seZieht AS BOOLEAN
+DIM seStartX AS INTEGER
+DIM seStartY AS INTEGER
+DIM seMausX AS INTEGER
+DIM seMausY AS INTEGER
+DIM seMausDrin AS BOOLEAN
+DIM seStapel AS ARRAY OF STRING           ' Text vor jeder Zeichen-Aenderung
+
+' Umgrenzung des Symbols samt Texten (Blatt-Einheiten), mindestens +-8 mm.
+SUB seUmgrenzung(s AS kern.Symbol, BYREF x0 AS INTEGER, BYREF y0 AS INTEGER, BYREF x1 AS INTEGER, BYREF y1 AS INTEGER)
+    DIM b AS kern.Bauteil : b = NEW kern.Bauteil(s.id, kern.neueLage(0, 0))
+    b.sym = s
+    bauteilBox(b, x0, y0, x1, y1)
+    IF x1 < x0 THEN
+        x0 = 0 : y0 = 0 : x1 = 0 : y1 = 0
+    END IF
+    y0 = MIN(y0, s.refOrt.y) - 150
+    y1 = MAX(y1, s.wertOrt.y) + 150
+    x0 = MIN(x0 - 150, -800)
+    x1 = MAX(x1 + 150, 800)
+    y0 = MIN(y0, -800)
+    y1 = MAX(y1, 800)
+END SUB
+
+SUB seEinpassen(bw AS FLOAT, bh AS FLOAT, s AS kern.Symbol)
+    DIM x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER
+    seUmgrenzung(s, x0, y0, x1, y1)
+    ' etwas Luft, damit man daneben weiterzeichnen kann
+    DIM rx AS INTEGER : rx = (x1 - x0) \ 6
+    DIM ry AS INTEGER : ry = (y1 - y0) \ 6
+    seZoom = CLAMP(MIN((bw - 20) / (x1 - x0 + 2 * rx), (bh - 20) / (y1 - y0 + 2 * ry)), 0.03, 0.5)
+    seVX = bw / 2.0 - (x0 + x1) / 2.0 * seZoom
+    seVY = bh / 2.0 - (y0 + y1) / 2.0 * seZoom
+    seAnsichtOk = TRUE
+END SUB
+
+FUNCTION seSchirmX(u AS FLOAT) AS FLOAT : RETURN seVX + u * seZoom : END FUNCTION
+FUNCTION seSchirmY(u AS FLOAT) AS FLOAT : RETURN seVY + u * seZoom : END FUNCTION
+FUNCTION seWeltX(px AS FLOAT) AS INTEGER : RETURN ROUND((px - seVX) / seZoom) : END FUNCTION
+FUNCTION seWeltY(py AS FLOAT) AS INTEGER : RETURN ROUND((py - seVY) / seZoom) : END FUNCTION
+
 FUNCTION seZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM bw AS FLOAT : bw = gtk_widget_get_allocated_width(w)
     DIM bh AS FLOAT : bh = gtk_widget_get_allocated_height(w)
@@ -80,29 +142,390 @@ FUNCTION seZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     cairo_rectangle(cr, 0, 0, bw, bh)
     cairo_fill(cr)
     DIM s AS kern.Symbol : s = seSymbol()
+    ' fester Ausschnitt -- neu einpassen nur, wenn etwas hinausragt
+    DIM x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER
+    seUmgrenzung(s, x0, y0, x1, y1)
+    IF NOT seAnsichtOk THEN
+        seEinpassen(bw, bh, s)
+    ELSEIF x0 * seZoom + seVX < 0 OR y0 * seZoom + seVY < 0 OR x1 * seZoom + seVX > bw OR y1 * seZoom + seVY > bh THEN
+        IF NOT seZieht AND LEN(sePunkte) = 0 THEN seEinpassen(bw, bh, s)
+    END IF
+    DIM altX AS FLOAT : altX = vX
+    DIM altY AS FLOAT : altY = vY
+    DIM altZ AS FLOAT : altZ = vZoom
+    vX = seVX
+    vY = seVY
+    vZoom = seZoom
+    ' 1-mm-Punkte und der Ursprung -- beim Zeichnen die Orientierung
+    IF seWz <> SE_KEINS AND kern.RASTER * vZoom >= 6 THEN
+        DIM gx AS INTEGER, gy AS INTEGER
+        cairoFarbe(cr, C_RASTER_GROB)
+        FOR gx = (ROUND(weltX(0)) \ 100 - 1) * 100 TO ROUND(weltX(bw)) STEP 100
+            FOR gy = (ROUND(weltY(0)) \ 100 - 1) * 100 TO ROUND(weltY(bh)) STEP 100
+                cairo_rectangle(cr, sx(gx) - 0.75, sy(gy) - 0.75, 1.5, 1.5)
+            NEXT
+        NEXT
+        cairo_fill(cr)
+        cairoFarbe(cr, C_GEIST)
+        cairo_set_line_width(cr, 1.0)
+        cairo_move_to(cr, sx(0) - 6, sy(0))
+        cairo_line_to(cr, sx(0) + 6, sy(0))
+        cairo_move_to(cr, sx(0), sy(0) - 6)
+        cairo_line_to(cr, sx(0), sy(0) + 6)
+        cairo_stroke(cr)
+    END IF
     DIM b AS kern.Bauteil : b = NEW kern.Bauteil(s.id, kern.neueLage(0, 0))
     b.sym = s
     b.referenz = s.praefix + "?"
     b.wert = s.wertVorgabe
-    DIM x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER
-    bauteilBox(b, x0, y0, x1, y1)
-    IF x1 < x0 THEN RETURN TRUE
-    y0 = MIN(y0, s.refOrt.y) - 150
-    y1 = MAX(y1, s.wertOrt.y) + 150
-    x0 = x0 - 150
-    x1 = x1 + 150
-    DIM altX AS FLOAT : altX = vX
-    DIM altY AS FLOAT : altY = vY
-    DIM altZ AS FLOAT : altZ = vZoom
-    vZoom = CLAMP(MIN((bw - 20) / (x1 - x0), (bh - 20) / (y1 - y0)), 0.03, 0.5)
-    vX = bw / 2.0 - (x0 + x1) / 2.0 * vZoom
-    vY = bh / 2.0 - (y0 + y1) / 2.0 * vZoom
     cairo_set_line_cap(cr, 1)
     bauteilZeichnen(cr, b, FALSE, FALSE)
+    ' was gerade entsteht
+    zeichenFarbe(cr, C_AUSWAHL)
+    cairo_set_line_width(cr, 1.5)
+    DIM i AS INTEGER
+    IF LEN(sePunkte) > 0 THEN
+        cairo_move_to(cr, sx(sePunkte[0].x), sy(sePunkte[0].y))
+        FOR i = 1 TO LEN(sePunkte) - 1
+            cairo_line_to(cr, sx(sePunkte[i].x), sy(sePunkte[i].y))
+        NEXT
+        IF seMausDrin THEN cairo_line_to(cr, sx(seMausX), sy(seMausY))
+        cairo_stroke(cr)
+    END IF
+    IF seZieht AND seWz = SE_RECHTECK THEN
+        cairo_rectangle(cr, sx(MIN(seStartX, seMausX)), sy(MIN(seStartY, seMausY)), ABS(seMausX - seStartX) * vZoom, ABS(seMausY - seStartY) * vZoom)
+        cairo_stroke(cr)
+    END IF
+    IF seZieht AND seWz = SE_KREIS THEN
+        cairo_new_sub_path(cr)
+        cairo_arc(cr, sx(seStartX), sy(seStartY), seKreisRadius() * vZoom, 0, 2 * PI)
+        cairo_stroke(cr)
+    END IF
+    IF seMausDrin AND seWz <> SE_KEINS AND seWz <> SE_LOESCHEN THEN
+        cairo_new_sub_path(cr)
+        cairo_arc(cr, sx(seMausX), sy(seMausY), 3, 0, 2 * PI)
+        cairo_stroke(cr)
+    END IF
     vX = altX
     vY = altY
     vZoom = altZ
     RETURN TRUE
+END FUNCTION
+
+' Masse fuer den Text: 150 -> "1.5", 200 -> "2".
+FUNCTION seMm$(u AS INTEGER) AS STRING
+    IF u MOD 100 = 0 THEN RETURN STR$(u \ 100)
+    RETURN STR$(u / 100.0)
+END FUNCTION
+
+FUNCTION seKreisRadius() AS INTEGER
+    RETURN kern.rastern(ROUND(SQR((seMausX - seStartX) ^ 2 + (seMausY - seStartY) ^ 2)), kern.RASTER_FEIN)
+END FUNCTION
+
+' Eine Zeile anhaengen (der alte Text kommt auf den Stapel fuer Rueckgaengig).
+SUB seZeileDazu(z AS STRING)
+    DIM t AS STRING : t = seTextLesen$()
+    ARRAY_PUSH(seStapel, t)
+    IF t <> "" AND RIGHT$(t, 1) <> CHR$(10) THEN t = t + CHR$(10)
+    seTextSetzen(t + z)
+END SUB
+
+SUB seZeileWeg(nr AS INTEGER)
+    DIM t AS STRING : t = REPLACE$(seTextLesen$(), CHR$(13), "")
+    DIM z AS ARRAY OF STRING : z = SPLIT$(t, CHR$(10))
+    IF nr < 0 OR nr >= LEN(z) THEN RETURN
+    ARRAY_PUSH(seStapel, t)
+    ARRAY_REMOVE_AT(z, nr)
+    seTextSetzen(JOIN$(z, CHR$(10)))
+END SUB
+
+SUB seRueckgaengig()
+    IF LEN(seStapel) = 0 THEN RETURN
+    seTextSetzen(ARRAY_POP(seStapel))
+END SUB
+
+' Naechste freie Pin-Nummer (groesste Zahl + 1).
+FUNCTION seNaechsterPin$(pl AS kern.Pinliste) AS STRING
+    DIM m AS INTEGER : m = 0
+    DIM i AS INTEGER, v AS INTEGER
+    FOR i = 0 TO LEN(pl.pins) - 1
+        IF kern.ganzzahlLesen(pl.pins[i].nummer, v) THEN m = MAX(m, v)
+    NEXT
+    FOR i = 0 TO LEN(pl.freiePins) - 1
+        IF kern.ganzzahlLesen(pl.freiePins[i].nummer, v) THEN m = MAX(m, v)
+    NEXT
+    RETURN STR$(m + 1)
+END FUNCTION
+
+' Einen Pin an (x, y) setzen; er steht von der Grafik weg nach aussen.
+SUB sePinSetzen(x AS INTEGER, y AS INTEGER)
+    DIM pl AS kern.Pinliste : pl = kern.pinlisteLesen(seTextLesen$())
+    DIM s AS kern.Symbol : s = seSymbol()
+    DIM gx0 AS INTEGER : gx0 = 0
+    DIM gy0 AS INTEGER : gy0 = 0
+    DIM gx1 AS INTEGER : gx1 = 0
+    DIM gy1 AS INTEGER : gy1 = 0
+    DIM erst AS BOOLEAN : erst = TRUE
+    DIM i AS INTEGER, k AS INTEGER
+    FOR i = 0 TO LEN(s.grafik) - 1
+        IF s.grafik[i].art = kern.PR_TEXT THEN CONTINUE
+        DIM r AS INTEGER : r = IIF(s.grafik[i].art = kern.PR_KREIS OR s.grafik[i].art = kern.PR_BOGEN, s.grafik[i].radius, 0)
+        FOR k = 0 TO LEN(s.grafik[i].punkte) - 1
+            DIM p AS kern.Punkt : p = s.grafik[i].punkte[k]
+            IF erst OR p.x - r < gx0 THEN gx0 = p.x - r
+            IF erst OR p.y - r < gy0 THEN gy0 = p.y - r
+            IF erst OR p.x + r > gx1 THEN gx1 = p.x + r
+            IF erst OR p.y + r > gy1 THEN gy1 = p.y + r
+            erst = FALSE
+        NEXT
+    NEXT
+    DIM seite AS STRING
+    IF x <= gx0 THEN
+        seite = "links"
+    ELSEIF x >= gx1 THEN
+        seite = "rechts"
+    ELSEIF y <= gy0 THEN
+        seite = "oben"
+    ELSEIF y >= gy1 THEN
+        seite = "unten"
+    ELSE
+        ' innen: zur naechsten Kante hinaus
+        DIM dl AS INTEGER : dl = x - gx0
+        DIM dr AS INTEGER : dr = gx1 - x
+        DIM dob AS INTEGER : dob = y - gy0
+        DIM du AS INTEGER : du = gy1 - y
+        DIM mi AS INTEGER : mi = MIN(MIN(dl, dr), MIN(dob, du))
+        IF mi = dl THEN
+            seite = "links"
+        ELSEIF mi = dr THEN
+            seite = "rechts"
+        ELSEIF mi = dob THEN
+            seite = "oben"
+        ELSE
+            seite = "unten"
+        END IF
+    END IF
+    seZeileDazu("pin " + seNaechsterPin$(pl) + " - " + seMm$(x) + " " + seMm$(y) + " " + seite)
+END SUB
+
+' Abstand Punkt -> Strecke (Blatt-Einheiten).
+FUNCTION seAbstand(qx AS FLOAT, qy AS FLOAT, ax AS FLOAT, ay AS FLOAT, bx AS FLOAT, by AS FLOAT) AS FLOAT
+    DIM dx AS FLOAT : dx = bx - ax
+    DIM dy AS FLOAT : dy = by - ay
+    DIM l AS FLOAT : l = dx * dx + dy * dy
+    DIM t AS FLOAT : t = 0
+    IF l > 0 THEN t = CLAMP(((qx - ax) * dx + (qy - ay) * dy) / l, 0, 1)
+    RETURN SQR((qx - ax - t * dx) ^ 2 + (qy - ay - t * dy) ^ 2)
+END FUNCTION
+
+' Textzeile des Elements unter (x, y), -1 = nichts. Pins zuerst, dann die
+' Grafik von oben (zuletzt gezeichnet) nach unten.
+FUNCTION seZeileUnter(x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM pl AS kern.Pinliste : pl = kern.pinlisteLesen(seTextLesen$())
+    DIM tol AS FLOAT : tol = 7.0 / seZoom
+    DIM i AS INTEGER, k AS INTEGER
+    FOR i = LEN(pl.freiePins) - 1 TO 0 STEP -1
+        DIM pn AS kern.Pin : pn = pl.freiePins[i]
+        IF seAbstand(x, y, pn.pos.x, pn.pos.y, pn.pos.x + kern.richtungDx(pn.richtung) * pn.laenge, pn.pos.y + kern.richtungDy(pn.richtung) * pn.laenge) <= tol THEN RETURN pl.pinZeilen[i]
+    NEXT
+    FOR i = LEN(pl.grafik) - 1 TO 0 STEP -1
+        DIM g AS kern.Primitiv : g = pl.grafik[i]
+        DIM treffer AS BOOLEAN : treffer = FALSE
+        SELECT CASE g.art
+            CASE kern.PR_POLYLINIE, kern.PR_LINIE
+                FOR k = 0 TO LEN(g.punkte) - 2
+                    IF seAbstand(x, y, g.punkte[k].x, g.punkte[k].y, g.punkte[k + 1].x, g.punkte[k + 1].y) <= tol THEN treffer = TRUE
+                NEXT
+            CASE kern.PR_RECHTECK
+                DIM ax AS INTEGER : ax = g.punkte[0].x
+                DIM ay AS INTEGER : ay = g.punkte[0].y
+                DIM bx AS INTEGER : bx = g.punkte[1].x
+                DIM by AS INTEGER : by = g.punkte[1].y
+                IF seAbstand(x, y, ax, ay, bx, ay) <= tol OR seAbstand(x, y, bx, ay, bx, by) <= tol OR seAbstand(x, y, bx, by, ax, by) <= tol OR seAbstand(x, y, ax, by, ax, ay) <= tol THEN treffer = TRUE
+                IF g.fuellen AND x >= ax AND x <= bx AND y >= ay AND y <= by THEN treffer = TRUE
+            CASE kern.PR_KREIS, kern.PR_BOGEN
+                DIM d AS FLOAT : d = SQR((x - g.punkte[0].x) ^ 2 + (y - g.punkte[0].y) ^ 2)
+                IF ABS(d - g.radius) <= tol OR (g.fuellen AND d <= g.radius) THEN treffer = TRUE
+            CASE kern.PR_TEXT
+                IF SQR((x - g.punkte[0].x) ^ 2 + (y - g.punkte[0].y) ^ 2) <= 3 * tol THEN treffer = TRUE
+        END SELECT
+        IF treffer THEN RETURN pl.grafikZeilen[i]
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB seLinieFertig()
+    IF LEN(sePunkte) >= 2 THEN
+        DIM z AS STRING : z = "linie"
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(sePunkte) - 1
+            z = z + " " + seMm$(sePunkte[i].x) + " " + seMm$(sePunkte[i].y)
+        NEXT
+        seZeileDazu(z)
+    END IF
+    sePunkte = []
+END SUB
+
+' Ein Mausereignis in der Vorschau (auch vom Selbsttest gerufen):
+' art 1 = Druck, 2 = Doppelklick, 3 = Bewegung, 4 = Loslassen.
+SUB seMaus(art AS INTEGER, px AS FLOAT, py AS FLOAT, knopf AS INTEGER)
+    IF NOT seAnsichtOk THEN RETURN
+    DIM fein AS INTEGER : fein = IIF(seWz = SE_PIN, kern.RASTER, kern.RASTER_FEIN)
+    seMausX = kern.rastern(seWeltX(px), fein)
+    seMausY = kern.rastern(seWeltY(py), fein)
+    seMausDrin = TRUE
+    SELECT CASE art
+        CASE 1
+            IF knopf = 3 THEN
+                seLinieFertig()
+            ELSEIF knopf = 1 THEN
+                SELECT CASE seWz
+                    CASE SE_LINIE
+                        ' derselbe Punkt zweimal (Doppelklick) zaehlt einmal
+                        DIM n AS INTEGER : n = LEN(sePunkte)
+                        IF n = 0 THEN
+                            ARRAY_PUSH(sePunkte, NEW kern.Punkt(seMausX, seMausY))
+                        ELSEIF sePunkte[n - 1].x <> seMausX OR sePunkte[n - 1].y <> seMausY THEN
+                            ARRAY_PUSH(sePunkte, NEW kern.Punkt(seMausX, seMausY))
+                        END IF
+                    CASE SE_RECHTECK, SE_KREIS
+                        seZieht = TRUE
+                        seStartX = seMausX
+                        seStartY = seMausY
+                    CASE SE_PIN
+                        sePinSetzen(seMausX, seMausY)
+                    CASE SE_LOESCHEN
+                        DIM zl AS INTEGER : zl = seZeileUnter(seWeltX(px), seWeltY(py))
+                        IF zl >= 0 THEN seZeileWeg(zl)
+                END SELECT
+            END IF
+        CASE 2
+            IF seWz = SE_LINIE THEN seLinieFertig()
+        CASE 4
+            IF seZieht THEN
+                seZieht = FALSE
+                IF seWz = SE_RECHTECK AND seMausX <> seStartX AND seMausY <> seStartY THEN
+                    seZeileDazu("rechteck " + seMm$(MIN(seStartX, seMausX)) + " " + seMm$(MIN(seStartY, seMausY)) + " " + seMm$(MAX(seStartX, seMausX)) + " " + seMm$(MAX(seStartY, seMausY)))
+                ELSEIF seWz = SE_KREIS AND seKreisRadius() > 0 THEN
+                    seZeileDazu("kreis " + seMm$(seStartX) + " " + seMm$(seStartY) + " " + seMm$(seKreisRadius()))
+                END IF
+            END IF
+    END SELECT
+    IF seVorschau <> 0 THEN gtk_widget_queue_draw(seVorschau)
+END SUB
+
+FUNCTION seDruck(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ev, px, py)
+    seMaus(IIF(gdk_event_get_event_type(ev) = GDK_DOPPELKLICK, 2, 1), px, py, evKnopf(ev))
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION seLos(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ev, px, py)
+    seMaus(4, px, py, evKnopf(ev))
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION seBewegung(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ev, px, py)
+    seMaus(3, px, py, 0)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION seVerlassen(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    seMausDrin = FALSE
+    IF seVorschau <> 0 THEN gtk_widget_queue_draw(seVorschau)
+    RETURN FALSE
+END FUNCTION
+
+CONST SE_HINWEISE = "Zeichnen: ein Werkzeug waehlen -- jeder Strich wird eine Zeile in der Liste."
+
+SUB seWerkzeug(w AS INTEGER)
+    IF seWz = SE_LINIE AND w <> SE_LINIE THEN seLinieFertig()
+    seWz = w
+    seZieht = FALSE
+    seKnoepfeSetzen = TRUE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(seKnoepfe) - 1
+        gtk_toggle_button_set_active(seKnoepfe[i], i + 1 = w)
+    NEXT
+    seKnoepfeSetzen = FALSE
+    DIM h AS STRING : h = SE_HINWEISE
+    SELECT CASE w
+        CASE SE_LINIE : h = "Linie: Punkte klicken (0,5-mm-Raster), Doppelklick oder rechte Taste beendet."
+        CASE SE_RECHTECK : h = "Rechteck: aufziehen."
+        CASE SE_KREIS : h = "Kreis: in der Mitte druecken, Radius ziehen."
+        CASE SE_PIN : h = "Pin: Anschlusspunkt klicken (1-mm-Raster); er steht von der Grafik weg nach aussen."
+        CASE SE_LOESCHEN : h = "Loeschen: Element anklicken -- seine Zeile verschwindet."
+    END SELECT
+    IF seHinweis <> 0 THEN gtk_label_set_text(seHinweis, h)
+    IF seVorschau <> 0 THEN gtk_widget_queue_draw(seVorschau)
+END SUB
+
+SUB aufSeWerkzeug(knopf AS INTEGER, daten AS INTEGER)
+    IF seKnoepfeSetzen THEN RETURN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(seKnoepfe) - 1
+        IF seKnoepfe[i] = knopf THEN
+            ' nochmal geklickt: Werkzeug aus
+            IF seWz = i + 1 THEN
+                seWerkzeug(SE_KEINS)
+            ELSE
+                seWerkzeug(i + 1)
+            END IF
+            RETURN
+        END IF
+    NEXT
+END SUB
+
+SUB aufSeRueckgaengig(knopf AS INTEGER, daten AS INTEGER)
+    seRueckgaengig()
+END SUB
+
+' Rechte Haelfte des Editors: Werkzeugleiste, Vorschau, Hinweis.
+FUNCTION seVorschauBauen() AS INTEGER
+    DIM rechts AS INTEGER : rechts = gtk_box_new(GTK_SENKRECHT, 6)
+    DIM leiste AS INTEGER : leiste = gtk_box_new(GTK_WAAGERECHT, 4)
+    gtkKlasse(leiste, "leiste")
+    seKnoepfe = []
+    DIM namen AS ARRAY OF STRING : namen = ["Linie", "Rechteck", "Kreis", "Pin", "Loeschen"]
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(namen) - 1
+        DIM k AS INTEGER : k = gtk_toggle_button_new_with_label(namen[i])
+        ARRAY_PUSH(seKnoepfe, k)
+        gtk_box_pack_start(leiste, k, FALSE, FALSE, 0)
+        signal(k, "clicked", aufSeWerkzeug, 0, 0, 0)
+    NEXT
+    DIM zur AS INTEGER : zur = gtk_button_new_with_label("Rueckgaengig")
+    gtk_widget_set_tooltip_text(zur, "Die letzte gezeichnete Aenderung zuruecknehmen")
+    gtk_box_pack_end(leiste, zur, FALSE, FALSE, 0)
+    signal(zur, "clicked", aufSeRueckgaengig, 0, 0, 0)
+    gtk_box_pack_start(rechts, leiste, FALSE, FALSE, 0)
+    seVorschau = gtk_drawing_area_new()
+    gtk_widget_set_size_request(seVorschau, 380, 380)
+    gtk_widget_set_hexpand(seVorschau, TRUE)
+    gtk_widget_set_vexpand(seVorschau, TRUE)
+    gtk_widget_add_events(seVorschau, GDK_MASKE_BEWEGUNG BOR GDK_MASKE_DRUCK BOR GDK_MASKE_LOSLASSEN BOR GDK_MASKE_VERLASSEN)
+    signalZeichnen(seVorschau, "draw", seZeichnen, 0, 0, 0)
+    signalEreignis(seVorschau, "button-press-event", seDruck, 0, 0, 0)
+    signalEreignis(seVorschau, "button-release-event", seLos, 0, 0, 0)
+    signalEreignis(seVorschau, "motion-notify-event", seBewegung, 0, 0, 0)
+    signalEreignis(seVorschau, "leave-notify-event", seVerlassen, 0, 0, 0)
+    gtk_box_pack_start(rechts, seVorschau, TRUE, TRUE, 0)
+    seHinweis = etikettNeu(SE_HINWEISE)
+    gtk_label_set_line_wrap(seHinweis, TRUE)
+    gtk_box_pack_start(rechts, seHinweis, FALSE, FALSE, 0)
+    ' Zustand fuer diesen Dialog
+    seWz = SE_KEINS
+    seAnsichtOk = FALSE
+    seZieht = FALSE
+    sePunkte = []
+    seStapel = []
+    seMausDrin = FALSE
+    RETURN rechts
 END FUNCTION
 
 ' Den Editor oeffnen. Mit vorlage wird dieses Symbol bearbeitet (alle
@@ -148,12 +571,7 @@ FUNCTION symbolEditor(vorlage AS kern.Symbol, bearbeiten AS BOOLEAN) AS STRING
     gtk_box_pack_start(links, seHaken, FALSE, FALSE, 0)
     gtk_widget_set_size_request(links, 420, -1)
     gtk_box_pack_start(hb, links, FALSE, TRUE, 0)
-    seVorschau = gtk_drawing_area_new()
-    gtk_widget_set_size_request(seVorschau, 380, 380)
-    gtk_widget_set_hexpand(seVorschau, TRUE)
-    gtk_widget_set_vexpand(seVorschau, TRUE)
-    signalZeichnen(seVorschau, "draw", seZeichnen, 0, 0, 0)
-    gtk_box_pack_start(hb, seVorschau, TRUE, TRUE, 0)
+    gtk_box_pack_start(hb, seVorschauBauen(), TRUE, TRUE, 0)
     gtk_box_pack_start(gtk_dialog_get_content_area(seDlg), hb, TRUE, TRUE, 0)
     IF bearbeiten THEN
         seId = vorlage.id
@@ -198,6 +616,8 @@ FUNCTION symbolEditor(vorlage AS kern.Symbol, bearbeiten AS BOOLEAN) AS STRING
     gtk_widget_destroy(seDlg)
     seDlg = 0
     seVorschau = 0
+    seHinweis = 0
+    seKnoepfe = []
     IF NOT fertig THEN RETURN ""
     IF bearbeiten THEN verlaufMerken()          ' Bauteile mit diesem Symbol aendern sich
     DIM reg AS kern.Symbol : reg = kern.symbolRegistrieren(s)

@@ -510,20 +510,66 @@ SUB plRahmenAnwenden(x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT, dazu AS
     plMengeSetzen(m)
 END SUB
 
-' R: jedes gewaehlte Teil um seinen Ursprung drehen (am Rand eingerueckt).
+' R: ein Teil dreht um seinen Ursprung, eine Gruppe als Ganzes um ihre Mitte
+' (jeder Ursprung wandert, jedes Teil dreht mit -- dieselbe Rechnung wie im
+' Schaltplan). Ragt danach etwas ueber den Rand, rueckt alles gemeinsam ein.
 SUB plDrehen()
     DIM m AS ARRAY OF INTEGER : m = plAuswahlListe()
     IF LEN(m) = 0 THEN RETURN
     verlaufMerken()
+    DIM pl AS kern.Platine : pl = gDok.platine
     DIM hinweis AS STRING
     DIM k AS INTEGER
-    FOR k = 0 TO LEN(m) - 1
-        DIM t AS kern.PlatTeil : t = gDok.platine.teile[m[k]]
+    IF LEN(m) = 1 THEN
+        DIM t AS kern.PlatTeil : t = pl.teile[m[0]]
         t.drehung = (t.drehung + 90) MOD 360
         DIM b AS kern.Bauteil
-        IF kern.bauteilMitId(gDok, t.bauteilId, b) THEN kern.teilInsFeld(gDok.platine, t, kern.bauformFuer(b, hinweis))
+        IF kern.bauteilMitId(gDok, t.bauteilId, b) THEN kern.teilInsFeld(pl, t, kern.bauformFuer(b, hinweis))
+        geaendert()
+        RETURN
+    END IF
+    ' Mitte der Gruppe (ganze Loecher)
+    DIM g0 AS INTEGER, h0 AS INTEGER, g1 AS INTEGER, h1 AS INTEGER
+    plGruppenFlaeche(m, g0, h0, g1, h1)
+    DIM mitte AS kern.Punkt : mitte = NEW kern.Punkt((g0 + g1) \ 2, (h0 + h1) \ 2)
+    FOR k = 0 TO LEN(m) - 1
+        DIM tg AS kern.PlatTeil : tg = pl.teile[m[k]]
+        DIM neu AS kern.Punkt : neu = kern.punktGruppe(NEW kern.Punkt(tg.s, tg.z), mitte, kern.GR_DREHEN)
+        tg.s = neu.x
+        tg.z = neu.y
+        tg.drehung = (tg.drehung + 90) MOD 360
+    NEXT
+    ' gemeinsam einruecken
+    plGruppenFlaeche(m, g0, h0, g1, h1)
+    DIM ds AS INTEGER : ds = 0
+    DIM dz AS INTEGER : dz = 0
+    IF g0 < 0 THEN ds = -g0
+    IF h0 < 0 THEN dz = -h0
+    IF g1 + ds >= pl.spalten THEN ds = pl.spalten - 1 - g1
+    IF h1 + dz >= pl.zeilen THEN dz = pl.zeilen - 1 - h1
+    FOR k = 0 TO LEN(m) - 1
+        pl.teile[m[k]].s = pl.teile[m[k]].s + ds
+        pl.teile[m[k]].z = pl.teile[m[k]].z + dz
     NEXT
     geaendert()
+END SUB
+
+' Umgrenzung (Loecher) aller Teile in m.
+SUB plGruppenFlaeche(m AS ARRAY OF INTEGER, BYREF g0 AS INTEGER, BYREF h0 AS INTEGER, BYREF g1 AS INTEGER, BYREF h1 AS INTEGER)
+    DIM hinweis AS STRING
+    DIM k AS INTEGER
+    DIM erst AS BOOLEAN : erst = TRUE
+    FOR k = 0 TO LEN(m) - 1
+        DIM b AS kern.Bauteil
+        IF NOT kern.bauteilMitId(gDok, gDok.platine.teile[m[k]].bauteilId, b) THEN CONTINUE
+        DIM s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER
+        kern.teilFlaeche(gDok.platine.teile[m[k]], kern.bauformFuer(b, hinweis), s0, z0, s1, z1)
+        IF erst OR s0 < g0 THEN g0 = s0
+        IF erst OR z0 < h0 THEN h0 = z0
+        IF erst OR s1 > g1 THEN g1 = s1
+        IF erst OR z1 > h1 THEN h1 = z1
+        erst = FALSE
+    NEXT
 END SUB
 
 SUB plLoeschen()

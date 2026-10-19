@@ -964,6 +964,51 @@ FUNCTION seProbe(daten AS INTEGER) AS BOOLEAN
         CASE 11
             seTextSetzen(seTextLesen$() + lf + "5 INB+ links ein")
             gtk_dialog_response(seDlg, GTK_ANTWORT_OK)
+        CASE 21
+            ' mit der Maus zeichnen: jede Aktion wird eine Zeile
+            seTextSetzen("")
+            gtk_entry_set_text(seName, "Gezeichnet")
+            seEinpassen(gtk_widget_get_allocated_width(seVorschau), gtk_widget_get_allocated_height(seVorschau), seSymbol())
+            gtk_button_clicked(seKnoepfe[SE_RECHTECK - 1])
+            pruefe("Editor: Werkzeug Rechteck", STR$(seWz) + " " + STR$(gtk_toggle_button_get_active(seKnoepfe[SE_RECHTECK - 1])), STR$(SE_RECHTECK) + " " + STR$(TRUE))
+            seMaus(1, seSchirmX(-400), seSchirmY(-300), 1)
+            seMaus(3, seSchirmX(400), seSchirmY(300), 0)
+            seMaus(4, seSchirmX(400), seSchirmY(300), 1)
+            pruefe("Rechteck aufgezogen = Zeile", seTextLesen$(), "rechteck -4 -3 4 3")
+            gtk_button_clicked(seKnoepfe[SE_LINIE - 1])
+            seMaus(1, seSchirmX(-200), seSchirmY(150), 1)
+            seMaus(1, seSchirmX(0), seSchirmY(-150), 1)
+            seMaus(1, seSchirmX(200), seSchirmY(150), 1)
+            seMaus(1, seSchirmX(200), seSchirmY(150), 1)
+            seMaus(2, seSchirmX(200), seSchirmY(150), 1)
+            pruefe("Linie geklickt, Doppelklick beendet", STR$(CONTAINS(seTextLesen$(), lf + "linie -2 1.5 0 -1.5 2 1.5")) + " " + STR$(LEN(sePunkte)), STR$(TRUE) + " 0")
+            gtk_button_clicked(seKnoepfe[SE_KREIS - 1])
+            seMaus(1, seSchirmX(0), seSchirmY(0), 1)
+            seMaus(3, seSchirmX(100), seSchirmY(0), 0)
+            seMaus(4, seSchirmX(100), seSchirmY(0), 1)
+            pruefe("Kreis gezogen", STR$(CONTAINS(seTextLesen$(), lf + "kreis 0 0 1")), STR$(TRUE))
+            gtk_button_clicked(seKnoepfe[SE_PIN - 1])
+            seMaus(1, seSchirmX(-720), seSchirmY(20), 1)
+            seMaus(1, seSchirmX(700), seSchirmY(0), 1)
+            pruefe("Pins nach aussen, Nummern fortlaufend", STR$(CONTAINS(seTextLesen$(), lf + "pin 1 - -7 0 links")) + " " + STR$(CONTAINS(seTextLesen$(), lf + "pin 2 - 7 0 rechts")), STR$(TRUE) + " " + STR$(TRUE))
+            gtk_button_clicked(seKnoepfe[SE_LOESCHEN - 1])
+            seMaus(1, seSchirmX(0), seSchirmY(100), 1)
+            pruefe("Loeschen nimmt den Kreis", STR$(CONTAINS(seTextLesen$(), "kreis")) + " " + STR$(CONTAINS(seTextLesen$(), "linie")), STR$(FALSE) + " " + STR$(TRUE))
+            seRueckgaengig()
+            pruefe("Rueckgaengig im Editor", STR$(CONTAINS(seTextLesen$(), "kreis 0 0 1")), STR$(TRUE))
+            seMaus(1, seSchirmX(700 - 150), seSchirmY(0), 1)
+            pruefe("Loeschen trifft den Pin-Stummel", STR$(CONTAINS(seTextLesen$(), "pin 2")), STR$(FALSE))
+            seRueckgaengig()
+            gtk_button_clicked(seKnoepfe[SE_LOESCHEN - 1])
+            pruefe("Werkzeug wieder aus", STR$(seWz), STR$(SE_KEINS))
+            pruefe("Meldung zaehlt mit", STR$(CONTAINS(gtk_label_get_text(seMeldung), "2 frei gesetzt, 3 Grafik-Elemente (ohne Rechteck)")), STR$(TRUE))
+            IF fotoZiel <> "" THEN
+                gtk_button_clicked(seKnoepfe[SE_PIN - 1])
+                seMaus(3, seSchirmX(300), seSchirmY(-500), 0)
+                IF gtkFoto(seVorschau, fotoZiel + ".editor.png") THEN PRINT "Foto Editor gesichert"
+                gtk_button_clicked(seKnoepfe[SE_PIN - 1])
+            END IF
+            gtk_dialog_response(seDlg, GTK_ANTWORT_OK)
     END SELECT
     RETURN FALSE
 END FUNCTION
@@ -1734,6 +1779,33 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             pruefe("Gruppe gezogen, ein Undo-Schritt", STR$(gDok.platine.teile[0].s - gS0) + " " + STR$(gDok.platine.teile[LEN(gDok.platine.teile) - 1].s - gS1) + " " + STR$(LEN(gUndo) - pundo), "3 3 1")
             pruefe("Gruppe nimmt die Bruecken nicht mit", STR$(LEN(platineBericht().luft) > 0), STR$(TRUE))
             verlaufZurueck()
+            ' Gruppe als Ganzes drehen: Paarabstaende der Beine bleiben, 4x R = wie vorher
+            plAlleWaehlen()
+            DIM gd0 AS kern.PlatBericht : gd0 = platineBericht()
+            DIM gdA AS STRING : gdA = gDok.platine.teile[0].bauteilId
+            DIM gdLage AS STRING : gdLage = STR$(gDok.platine.teile[0].s) + "," + STR$(gDok.platine.teile[0].z) + "," + STR$(gDok.platine.teile[0].drehung)
+            pundo = LEN(gUndo)
+            lz = plTaste(K_R)
+            DIM gd1 AS kern.PlatBericht : gd1 = platineBericht()
+            DIM gdi AS INTEGER, gdj AS INTEGER
+            DIM gdGleich AS BOOLEAN : gdGleich = LEN(gd0.pads) = LEN(gd1.pads)
+            FOR gdi = 0 TO MIN(LEN(gd0.pads), LEN(gd1.pads)) - 2
+                gdj = gdi + 1
+                IF (gd0.pads[gdi].s - gd0.pads[gdj].s) ^ 2 + (gd0.pads[gdi].z - gd0.pads[gdj].z) ^ 2 <> (gd1.pads[gdi].s - gd1.pads[gdj].s) ^ 2 + (gd1.pads[gdi].z - gd1.pads[gdj].z) ^ 2 THEN gdGleich = FALSE
+            NEXT
+            DIM gdRand AS INTEGER : gdRand = 0
+            FOR gdi = 0 TO LEN(gd1.fehler) - 1
+                IF CONTAINS(gd1.fehler[gdi].text, "ausserhalb") THEN gdRand = gdRand + 1
+            NEXT
+            pruefe("Gruppe dreht als Ganzes (Abstaende bleiben, nichts ueber dem Rand)", STR$(gdGleich) + " " + STR$(gdRand) + " " + STR$(LEN(gUndo) - pundo), STR$(TRUE) + " 0 1")
+            lz = plTaste(K_R)
+            lz = plTaste(K_R)
+            lz = plTaste(K_R)
+            pruefe("Viermal R: wieder wie vorher", STR$(gDok.platine.teile[0].s) + "," + STR$(gDok.platine.teile[0].z) + "," + STR$(gDok.platine.teile[0].drehung), gdLage)
+            verlaufZurueck()
+            verlaufZurueck()
+            verlaufZurueck()
+            verlaufZurueck()
             ' Umschalt-Klick nimmt eines heraus
             plMengeSetzen([])
             plAlleWaehlen()
@@ -1766,6 +1838,15 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
                 verlaufZurueck()
             WEND
             pruefe("Platine wieder leer", STR$(LEN(gDok.platine.teile)), "0")
+        CASE 25
+            ' Symbol-Editor: mit der Maus zeichnen und uebernehmen
+            seProbeSchritt = 20
+            g_timeout_add(300, seProbe, 0)
+            DIM zid AS STRING : zid = neuesSymbolUI()
+            pruefe("Gezeichnetes Symbol uebernommen", LEFT$(zid, 2), "E_")
+            DIM zsym AS kern.Symbol : zsym = kern.bibliothekSymbol(zid)
+            pruefe("Grafik und Pins aus der Maus", STR$(LEN(zsym.grafik)) + " " + STR$(LEN(zsym.pins)) + " " + zsym.name, "3 2 Gezeichnet")
+            werkzeugWaehlen(WZ_AUSWAHL, "")
         CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()

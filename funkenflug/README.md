@@ -120,6 +120,19 @@ für ERC und Netzliste). Text-Elemente bleiben beim Drehen aufrecht.
 
 ![Frei gezeichnetes Symbol](frei.png)
 
+**Mit der Maus zeichnen:** Über der Vorschau liegen die Werkzeuge *Linie*
+(Punkte klicken, Doppelklick oder rechte Taste beendet), *Rechteck* und
+*Kreis* (aufziehen), *Pin* (Anschlusspunkt klicken; er steht von der Grafik
+weg nach außen, die Nummer ist die nächste freie) und *Löschen* (Element
+anklicken). Alles läuft auf dem 0,5-mm-Raster, Pins auf 1 mm; beim Zeichnen
+zeigt die Vorschau Rasterpunkte und den Ursprung, der Ausschnitt bleibt
+stehen, solange alles hineinpasst. Der Text bleibt dabei die einzige Quelle:
+jeder Strich wird eine Zeile (`rechteck -4 -3 4 3`), Löschen streicht die
+Zeile des angeklickten Elements – man kann zeichnen und tippen mischen.
+*Rückgängig* nimmt die letzte gezeichnete Änderung zurück.
+
+![Mit der Maus gezeichnet](editor.png)
+
 Eigene Symbole **stecken in der `.fkn`** – eine Datei bleibt eigenständig,
 auch auf einem anderen Rechner. Mit dem Haken „auch in meiner Bibliothek
 speichern" landen sie zusätzlich in `%APPDATA%\Funkenflug\symbole.fkl`
@@ -196,7 +209,7 @@ springt hin. Die Statuszeile nennt das Netz des Lochs unter der Maus.
 
 | Werkzeug | |
 |---|---|
-| **Auswahl** (`A`) | Teil ziehen (lochweise), `R` dreht – am Rand rückt es ein, statt still abgelehnt zu werden –, `Entf` nimmt es herunter; eine Bahn anklicken und `Entf` löscht sie. Ein **Rahmen** über leerer Fläche wählt alle Teile darin, `Umschalt` nimmt einzelne dazu oder heraus, `Strg+A` alle; ein Klick in die Auswahl zieht die ganze Gruppe, `R` und `Entf` gelten für alle |
+| **Auswahl** (`A`) | Teil ziehen (lochweise), `R` dreht – am Rand rückt es ein, statt still abgelehnt zu werden –, `Entf` nimmt es herunter; eine Bahn anklicken und `Entf` löscht sie. Ein **Rahmen** über leerer Fläche wählt alle Teile darin, `Umschalt` nimmt einzelne dazu oder heraus, `Strg+A` alle; ein Klick in die Auswahl zieht die ganze Gruppe; `R` dreht eine Gruppe als Ganzes um ihre Mitte (ragt sie danach über den Rand, rückt sie gemeinsam ein), `Entf` nimmt alle herunter. Trennstellen und Brücken gehören zur Platine und drehen nicht mit – die Prüfung zeigt, was danach nicht mehr passt |
 | **Bahn** (`B`) | Loch für Loch klicken, rechte Taste beendet. Auf Lochraster ist eine gerade Bahn eine **Lötbahn** (verbindet jedes Loch auf ihrem Weg), sonst – und immer auf Streifenraster – eine **Drahtbrücke** (nur ihre Enden); `Umschalt` erzwingt die Brücke |
 | **Trennen** (`T`) | Streifen an einem Loch auftrennen bzw. wieder schließen |
 
@@ -283,7 +296,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (211 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (225 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
@@ -294,7 +307,8 @@ und für mehrere Bauteile, Referenz ziehen/drehen/zurücksetzen, frei
 gezeichnetes Symbol platzieren und anschließen, Platine: umschalten,
 einsetzen, Brücken entlang der Luftlinien klicken, trennen, ziehen, drehen am
 Rand, Prüfliste, Art umschalten, Speichern, Verbinden, PDF/Druck der Platine
-1:1). `pruef_kern.dh` prüft u. a. die
+1:1, Gruppe drehen; im Symbol-Editor Rechteck, Linie, Kreis und Pins mit
+Maus-Ereignissen zeichnen, löschen, zurücknehmen und übernehmen). `pruef_kern.dh` prüft u. a. die
 Gruppen-Lage in allen 8 Orientierungen × 3 Arten (72 Pin-Prüfungen). Der Selbsttest
 lässt die Zwischenablage des Systems in Ruhe und schreibt seine Bibliothek in
 eine Wegwerf-Datei neben dem Bild. `--nur-foto bild.png` macht nur das Bild.
@@ -353,6 +367,5 @@ zweiten Kondensator wieder „C1".
 
 ## Noch offen (nächste Runden)
 
-Hierarchische Blätter (Blatt-Symbole mit Ports), Symbol-Grafik mit der Maus
-zeichnen (bisher als Text), Platine: eine Gruppe als Ganzes drehen (bisher
-dreht jedes Teil um sich selbst).
+Hierarchische Blätter (Blatt-Symbole mit Ports), im Symbol-Editor Elemente
+verschieben (bisher löschen und neu zeichnen), Bögen und Text mit der Maus.

@@ -53,6 +53,8 @@ CLASS Pinliste
     DIM fehler AS ARRAY OF STRING
     DIM bauform AS STRING
     DIM loecher AS ARRAY OF STRING    ' "Nr:s,z"
+    DIM grafikZeilen AS ARRAY OF INTEGER   ' Textzeile (ab 0) je Grafik-Element
+    DIM pinZeilen AS ARRAY OF INTEGER      ' Textzeile je frei gesetztem Pin
     SUB Init()
         pins = []
         freiePins = []
@@ -60,6 +62,8 @@ CLASS Pinliste
         fehler = []
         bauform = ""
         loecher = []
+        grafikZeilen = []
+        pinZeilen = []
     END SUB
     FUNCTION pinAnzahl() AS INTEGER
         RETURN LEN(pins) + LEN(freiePins)
@@ -206,11 +210,13 @@ FUNCTION grafikZeile$(pl AS Pinliste, t AS ARRAY OF STRING, BYREF gesehen AS MAP
             ' Fuer ERC-Meldungen und die Netzliste bleibt er erhalten.
             fp.zeigeName = FALSE
             ARRAY_PUSH(pl.freiePins, fp)
+            ARRAY_PUSH(pl.pinZeilen, zeile - 1)
             RETURN ""
         CASE ELSE
             RETURN "?"
     END SELECT
     ARRAY_PUSH(pl.grafik, g)
+    ARRAY_PUSH(pl.grafikZeilen, zeile - 1)
     RETURN ""
 END FUNCTION
 
