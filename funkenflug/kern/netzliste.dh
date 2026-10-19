@@ -124,18 +124,34 @@ FUNCTION spiceModell$(praefix AS STRING, wert AS STRING) AS STRING
 END FUNCTION
 
 ' SPICE-Knoten je Netz: Knoten 0 ist das Netz mit einem GND-Symbol (auch
-' wenn es umbenannt wurde, etwa in AGND) oder dem Namen GND.
+' wenn es umbenannt wurde, etwa in AGND) oder einem Masse-Namen. Jedes andere
+' Netz bekommt einen EIGENEN Knoten: "+12V" und "-12V" werden beide "_12V" --
+' bis zur Simulation lagen sie so im Export still aufeinander.
 FUNCTION spiceKnotenListe(dok AS Dokument, n AS Netze) AS ARRAY OF STRING
     DIM k AS ARRAY OF STRING : k = []
+    DIM vergeben AS MAP OF INTEGER
     DIM i AS INTEGER, j AS INTEGER
     FOR i = 0 TO LEN(n.liste) - 1
-        DIM masse AS BOOLEAN : masse = UPPER$(n.liste[i].name) = "GND"
+        DIM masse AS BOOLEAN : masse = simMasse(n.liste[i].name)
         FOR j = 0 TO LEN(n.liste[i].pins) - 1
             IF n.liste[i].pins[j].versorgung THEN
                 IF dok.blaetter[n.liste[i].pins[j].blatt].bauteile[n.liste[i].pins[j].bauteil].sym.id = "GND" THEN masse = TRUE
             END IF
         NEXT
-        IF masse THEN ARRAY_PUSH(k, "0") ELSE ARRAY_PUSH(k, spiceKnoten$(n.liste[i].name))
+        IF masse THEN
+            ARRAY_PUSH(k, "0")
+        ELSE
+            DIM kn AS STRING : kn = spiceKnoten$(n.liste[i].name)
+            IF STARTSWITH(n.liste[i].name, "-") THEN kn = "M" + MID$(kn, 1)
+            DIM basis AS STRING : basis = kn
+            DIM zz AS INTEGER : zz = 2
+            WHILE MAPHAS(vergeben, LOWER$(kn))
+                kn = basis + "_" + STR$(zz)
+                zz = zz + 1
+            WEND
+            MAPPUT(vergeben, LOWER$(kn), 1)
+            ARRAY_PUSH(k, kn)
+        END IF
     NEXT
     RETURN k
 END FUNCTION
@@ -145,55 +161,23 @@ FUNCTION netzlisteSpice$(bl AS Blatt, titel AS STRING) AS STRING
 END FUNCTION
 
 FUNCTION netzlisteSpiceDok$(dok AS Dokument, titel AS STRING) AS STRING
+    ' dieselben Elemente wie die Simulation (kern/simulation.dh): Quellen fuer
+    ' die Versorgungen, Modelle nach Wert -- die Datei laeuft so in ngspice
     DIM n AS Netze : n = netzeDokument(dok)
     DIM knoten AS ARRAY OF STRING : knoten = spiceKnotenListe(dok, n)
     DIM t AS STRING : t = "* " + titel + " -- Funkenflug" + NL_ZEILE
     DIM modelle AS MAP OF STRING
-    DIM bi AS INTEGER, i AS INTEGER, j AS INTEGER
-    FOR bi = 0 TO LEN(dok.blaetter) - 1
-    n.blattWaehlen(bi)
-    FOR i = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
-        DIM b AS Bauteil : b = dok.blaetter[bi].bauteile[i]
-        IF b.sym.einheitLeistung OR b.sym.blattSymbol THEN CONTINUE
-        ' Knoten je Pin-Index
-        DIM k AS ARRAY OF STRING : k = []
-        FOR j = 0 TO LEN(b.sym.pins) - 1
-            DIM pp AS Punkt : pp = b.pinPunkt(j)
-            ARRAY_PUSH(k, knoten[n.netzAn(pp.x, pp.y)])
-        NEXT
-        SELECT CASE b.sym.id
-            CASE "R"
-                t = t + spiceName$("R", b.referenz) + " " + k[0] + " " + k[1] + " " + spiceWert$(b.wert) + NL_ZEILE
-            CASE "C", "CP"
-                t = t + spiceName$("C", b.referenz) + " " + k[0] + " " + k[1] + " " + spiceWert$(b.wert) + NL_ZEILE
-            CASE "L"
-                t = t + spiceName$("L", b.referenz) + " " + k[0] + " " + k[1] + " " + spiceWert$(b.wert) + NL_ZEILE
-            CASE "D", "LED"
-                DIM dm AS STRING : dm = spiceModell$("D", b.wert)
-                MAPPUT(modelle, dm, ".model " + dm + " D")
-                t = t + spiceName$("D", b.referenz) + " " + k[0] + " " + k[1] + " " + dm + NL_ZEILE
-            CASE "Q_NPN"
-                ' SPICE-Reihenfolge Kollektor, Basis, Emitter -- nach Pin-Namen
-                DIM kc AS STRING, kb AS STRING, ke AS STRING
-                FOR j = 0 TO LEN(b.sym.pins) - 1
-                    SELECT CASE b.sym.pins[j].name
-                        CASE "C" : kc = k[j]
-                        CASE "B" : kb = k[j]
-                        CASE "E" : ke = k[j]
-                    END SELECT
-                NEXT
-                DIM qm AS STRING : qm = spiceModell$("Q", b.wert)
-                MAPPUT(modelle, qm, ".model " + qm + " NPN")
-                t = t + spiceName$("Q", b.referenz) + " " + kc + " " + kb + " " + ke + " " + qm + NL_ZEILE
-            CASE ELSE
-                t = t + "* " + b.referenz + " (" + b.sym.name + ") hat kein SPICE-Modell" + NL_ZEILE
-        END SELECT
-    NEXT
-    NEXT
+    DIM quellen AS MAP OF STRING
+    DIM hinweise AS ARRAY OF STRING : hinweise = []
+    t = t + simElemente$(dok, n, knoten, 5, modelle, quellen, hinweise)
     DIM namen AS ARRAY OF STRING : namen = MAPKEYS(modelle)
     SORT(namen)
+    DIM i AS INTEGER
     FOR i = 0 TO LEN(namen) - 1
         t = t + MAPGET(modelle, namen[i]) + NL_ZEILE
+    NEXT
+    FOR i = 0 TO LEN(hinweise) - 1
+        t = t + "* Hinweis: " + hinweise[i] + NL_ZEILE
     NEXT
     RETURN t + ".end" + NL_ZEILE
 END FUNCTION

@@ -13,6 +13,8 @@ IMPORT "netze.dh" AS kern
 IMPORT "erc.dh" AS kern
 IMPORT "hierarchie.dh" AS kern
 IMPORT "netzliste.dh" AS kern
+IMPORT "ngspice.dh" AS kern
+IMPORT "simulation.dh" AS kern
 IMPORT "platine.dh" AS kern
 IMPORT "bearbeiten.dh" AS kern
 IMPORT "kicad.dh" AS kern

@@ -655,7 +655,7 @@ FOR bbi = 0 TO LEN(bibl) - 1
         IF LEN(kern.bauformPinsZu(bbf, bbt, bbj)) = 0 THEN bibFehler = bibFehler + bsy.id + " Pin " + bsy.pins[bbj].nummer + " ohne Bein in " + bbf.name + "; "
     NEXT
 NEXT
-PRINT "Bibliothek: "; LEN(bibl); " Symbole, Fehler: ["; bibFehler; "]  (erwartet 35 Symbole, Fehler: [])"
+PRINT "Bibliothek: "; LEN(bibl); " Symbole, Fehler: ["; bibFehler; "]  (erwartet 37 Symbole, Fehler: [])"
 ' Taster: vier Beine, je zwei ein Pin; Relais: fuenf
 DIM tdk AS kern.Dokument : tdk = NEW kern.Dokument()
 DIM tsw AS kern.Bauteil : tsw = kern.neuesBauteil("SW_PUSH", kern.neueLage(0, 0))
@@ -811,6 +811,143 @@ DIM kimDok2 AS kern.Dokument : kimDok2 = kern.dokumentLaden(kimPfad)
 DIM kimN2 AS kern.Netze : kimN2 = kern.netzeDokument(kimDok2)
 PRINT "KiCad->.fkn: gespeichert "; kimSp; "  R3.2 "; kimNetzMit$(kimN2, "R3", "2"); "  Q5.1 "; kimNetzMit$(kimN2, "Q5", "1"); "  (erwartet TRUE SIG_AUS Q5_1)"
 DELETEFILE(kimPfad)
+
+' --- Simulation: Zahlen, Deck, und (wenn ngspice da ist) echte Rechnungen
+DIM szw AS FLOAT, szt AS STRING : szt = ""
+DIM szEin AS ARRAY OF STRING : szEin = ["10m", "4k7", "1M", "1Meg", "2,2u", "10ms", "1 kHz", "3V3", "5V", "abc", "-12"]
+DIM szi AS INTEGER
+FOR szi = 0 TO LEN(szEin) - 1
+    IF kern.siZahl(szEin[szi], szw) THEN szt = szt + STR$(szw) + " " ELSE szt = szt + "? "
+NEXT
+PRINT "siZahl: "; szt; " (erwartet 0.01 4700.0 1000000.0 1000000.0 0.0000022 0.01 1000.0 3.3 5.0 ? -12.0)"
+PRINT "siText: "; kern.siText$(4.98, "V"); " | "; kern.siText$(0.0123, "A"); " | "; kern.siText$(1000, "Hz"); " | "; kern.siText$(-12, "V"); " | "; kern.siText$(0.9997, "V"); " | "; kern.siText$(0, "V"); "  (erwartet 4.98 V | 12.3 mA | 1 kHz | -12 V | 1 V | 0 V)"
+DIM vsv AS FLOAT, vst AS STRING : vst = ""
+DIM vsEin AS ARRAY OF STRING : vsEin = ["+5V", "3V3", "-12V", "VCC", "+12V", "VCC_9V"]
+FOR szi = 0 TO LEN(vsEin) - 1
+    IF kern.versorgungsSpannung(vsEin[szi], vsv) THEN vst = vst + STR$(vsv) + " " ELSE vst = vst + "- "
+NEXT
+PRINT "Versorgung aus dem Namen: "; vst; " (erwartet 5.0 3.3 -12.0 - 12.0 9.0)"
+DIM zbv AS FLOAT, zt AS STRING : zt = ""
+DIM zEin AS ARRAY OF STRING : zEin = ["ZPD5V1", "BZX55C5V1", "BZX55C12", "1N4733", "5V6"]
+FOR szi = 0 TO LEN(zEin) - 1
+    IF kern.simZener(zEin[szi], zbv) THEN zt = zt + STR$(zbv) + " " ELSE zt = zt + "- "
+NEXT
+PRINT "Z-Spannung: "; zt; " (erwartet 5.1 5.1 12.0 - 5.6)"
+DIM rgv AS FLOAT, rgt AS STRING : rgt = ""
+DIM rgEin AS ARRAY OF STRING : rgEin = ["7805", "LM7812", "78L05", "7905", "LM317"]
+FOR szi = 0 TO LEN(rgEin) - 1
+    IF kern.simRegler(rgEin[szi], rgv) THEN rgt = rgt + STR$(rgv) + " " ELSE rgt = rgt + "- "
+NEXT
+PRINT "Regler: "; rgt; " (erwartet 5.0 12.0 5.0 -5.0 -)"
+
+' kleine Schaltungen: Teile nebeneinander, Netze ueber Labels an den Pins
+FUNCTION simTeil(bl AS kern.Blatt, sym AS STRING, wert AS STRING, ref AS STRING, x AS INTEGER, netze AS ARRAY OF STRING) AS kern.Bauteil
+    DIM b AS kern.Bauteil : b = kern.neuesBauteil(sym, kern.neueLage(x, 0))
+    b.referenz = ref
+    IF wert <> "" THEN b.wert = wert
+    ARRAY_PUSH(bl.bauteile, b)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(netze) - 1
+        IF netze[i] <> "" THEN ARRAY_PUSH(bl.labels, NEW kern.Label(netze[i], b.pinPunkt(i), kern.LA_LOKAL))
+    NEXT
+    RETURN b
+END FUNCTION
+FUNCTION simV(r AS kern.SimErgebnis, netz AS STRING) AS FLOAT
+    DIM v AS FLOAT : v = -999
+    IF NOT r.spannung(netz, v) THEN RETURN -999
+    RETURN v
+END FUNCTION
+
+DIM stDok AS kern.Dokument : stDok = NEW kern.Dokument()
+DIM stb AS kern.Blatt : stb = stDok.blaetter[0]
+DIM stx AS kern.Bauteil
+stx = simTeil(stb, "VCC", "+10V", "", 0, ["+10V"])
+stx = simTeil(stb, "R", "1k", "R1", 2000, ["+10V", "MITTE"])
+stx = simTeil(stb, "R", "1k", "R2", 4000, ["MITTE", "GND"])
+stx = simTeil(stb, "GND", "", "", 6000, ["GND"])
+stx = simTeil(stb, "NE555", "NE555", "U1", 9000, [])
+DIM stE AS kern.SimEinstellung : stE = NEW kern.SimEinstellung(kern.SIM_OP)
+DIM stR0 AS kern.SimErgebnis : stR0 = NEW kern.SimErgebnis(kern.SIM_OP)
+DIM stDeck AS STRING : stDeck = JOIN$(kern.simDeck(stDok, stE, stR0), CHR$(10))
+PRINT "Deck: Quelle "; CONTAINS(stDeck, "VV__10V _10V 0 DC 10"); "  R1 "; CONTAINS(stDeck, "R1 _10V MITTE 1k"); "  .op "; CONTAINS(stDeck, CHR$(10) + ".op"); "  555 gemeldet "; CONTAINS(JOIN$(stR0.hinweise, "|"), "weggelassen: U1"); "  (erwartet alle TRUE)"
+DIM stSp AS STRING : stSp = kern.netzlisteSpiceDok$(stDok, "x")
+PRINT "SPICE-Export laeuft so in ngspice: Quelle "; CONTAINS(stSp, "VV__10V _10V 0 DC 10"); "  Hinweis "; CONTAINS(stSp, "* Hinweis: ohne Simulationsmodell"); "  (erwartet TRUE TRUE)"
+
+IF kern.ngspiceSuchen$() = "" THEN
+    PRINT "ngspice fehlt -- Rechnungen uebersprungen (FUNKENFLUG_NGSPICE setzen)"
+ELSE
+    DIM stR AS kern.SimErgebnis : stR = kern.simRechnen(stDok, stE)
+    PRINT "OP Teiler: ok "; stR.ok; " "; stR.fehler; " MITTE "; kern.siText$(simV(stR, "MITTE"), "V"); "  Strom aus +10V "; kern.siText$(stR.stroeme[0].re[0], "A"); "  (erwartet TRUE  MITTE 5 V  Strom aus +10V 5 mA)"
+    ' LED an 5 V ueber 330 Ohm
+    DIM sl AS kern.Dokument : sl = NEW kern.Dokument()
+    stx = simTeil(sl.blaetter[0], "VCC", "+5V", "", 0, ["+5V"])
+    stx = simTeil(sl.blaetter[0], "R", "330", "R1", 2000, ["+5V", "A"])
+    stx = simTeil(sl.blaetter[0], "LED", "rot", "D1", 4000, ["A", "GND"])
+    stx = simTeil(sl.blaetter[0], "GND", "", "", 6000, ["GND"])
+    DIM slR AS kern.SimErgebnis : slR = kern.simRechnen(sl, stE)
+    DIM slV AS FLOAT : slV = simV(slR, "A")
+    PRINT "OP LED rot: Flussspannung 1.8..2.1 "; slV > 1.8 AND slV < 2.1; "  Strom 8..10 mA "; slR.stroeme[0].re[0] > 0.008 AND slR.stroeme[0].re[0] < 0.010; "  (erwartet TRUE TRUE)  ["; kern.siText$(slV, "V"); "]"
+    ' NPN als Schalter
+    DIM sn AS kern.Dokument : sn = NEW kern.Dokument()
+    stx = simTeil(sn.blaetter[0], "VCC", "+5V", "", 0, ["+5V"])
+    stx = simTeil(sn.blaetter[0], "R", "10k", "RB", 2000, ["+5V", "B"])
+    stx = simTeil(sn.blaetter[0], "R", "1k", "RC", 4000, ["+5V", "C"])
+    stx = simTeil(sn.blaetter[0], "Q_NPN", "BC547", "Q1", 6000, ["B", "C", "GND"])
+    stx = simTeil(sn.blaetter[0], "GND", "", "", 8000, ["GND"])
+    DIM snR AS kern.SimErgebnis : snR = kern.simRechnen(sn, stE)
+    PRINT "OP NPN-Schalter: Basis 0.6..0.8 "; simV(snR, "B") > 0.6 AND simV(snR, "B") < 0.8; "  Kollektor < 0.3 "; simV(snR, "C") < 0.3; "  (erwartet TRUE TRUE)"
+    ' OPV nichtinvertierend, Verstaerkung 2, an +-12 V
+    DIM so AS kern.Dokument : so = NEW kern.Dokument()
+    stx = simTeil(so.blaetter[0], "VCC", "+12V", "", 0, ["+12V"])
+    stx = simTeil(so.blaetter[0], "VCC", "-12V", "", 2000, ["-12V"])
+    DIM soQ AS kern.Bauteil : soQ = simTeil(so.blaetter[0], "V", "1V", "V1", 4000, ["EIN", "GND"])
+    stx = simTeil(so.blaetter[0], "OPV", "TL071", "U1", 7000, ["MINUS", "EIN", "AUS", "+12V", "-12V"])
+    stx = simTeil(so.blaetter[0], "R", "10k", "R1", 10000, ["AUS", "MINUS"])
+    stx = simTeil(so.blaetter[0], "R", "10k", "R2", 12000, ["MINUS", "GND"])
+    stx = simTeil(so.blaetter[0], "GND", "", "", 14000, ["GND"])
+    DIM soR AS kern.SimErgebnis : soR = kern.simRechnen(so, stE)
+    PRINT "OP OPV x2: AUS "; kern.siText$(simV(soR, "AUS"), "V"); "  (erwartet 2 V)"
+    soQ.wert = "10V"
+    soR = kern.simRechnen(so, stE)
+    PRINT "OPV uebersteuert: AUS 11..12 V "; simV(soR, "AUS") > 11 AND simV(soR, "AUS") <= 12.001; "  (erwartet TRUE)"
+    ' RC-Sprung: 1k, 1u -> tau 1 ms
+    DIM srd AS kern.Dokument : srd = NEW kern.Dokument()
+    stx = simTeil(srd.blaetter[0], "V_SIG", "PULSE(0 1 0 1n 1n 1 2) AC 1", "V1", 0, ["EIN", "GND"])
+    stx = simTeil(srd.blaetter[0], "R", "1k", "R1", 2000, ["EIN", "AUS"])
+    stx = simTeil(srd.blaetter[0], "C", "1u", "C1", 4000, ["AUS", "GND"])
+    stx = simTeil(srd.blaetter[0], "GND", "", "", 6000, ["GND"])
+    DIM srE AS kern.SimEinstellung : srE = NEW kern.SimEinstellung(kern.SIM_TRAN)
+    srE.dauer = 0.005
+    srE.schritt = 0.00001
+    DIM srR AS kern.SimErgebnis : srR = kern.simRechnen(srd, srE)
+    DIM sra AS INTEGER : sra = srR.netz("AUS")
+    DIM srk AS INTEGER, srBei AS FLOAT : srBei = -1
+    FOR srk = 0 TO LEN(srR.x) - 1
+        IF srR.x[srk] >= 0.001 THEN
+            srBei = srR.netze[sra].re[srk]
+            BREAK
+        END IF
+    NEXT
+    PRINT "TRAN RC: ok "; srR.ok; " Punkte > 400 "; LEN(srR.x) > 400; "  bei tau 0.62..0.64 "; srBei > 0.62 AND srBei < 0.64; "  am Ende > 0.99 "; srR.netze[sra].re[LEN(srR.x) - 1] > 0.99; "  (erwartet TRUE TRUE TRUE TRUE)"
+    ' derselbe RC als Tiefpass: -3 dB bei 159 Hz
+    DIM saE AS kern.SimEinstellung : saE = NEW kern.SimEinstellung(kern.SIM_AC)
+    saE.fStart = 1
+    saE.fEnde = 100000
+    saE.punkte = 50
+    DIM saR AS kern.SimErgebnis : saR = kern.simRechnen(srd, saE)
+    DIM saa AS INTEGER : saa = saR.netz("AUS")
+    DIM sag AS FLOAT : sag = 0
+    FOR srk = 0 TO LEN(saR.x) - 1
+        IF saR.x[srk] >= 159.15 THEN
+            sag = saR.netze[saa].betragDb(srk)
+            BREAK
+        END IF
+    NEXT
+    PRINT "AC RC: komplex "; saR.netze[saa].komplex(); "  bei 159 Hz -3.2..-2.8 dB "; sag > -3.2 AND sag < -2.8; "  Phase dort -47..-43 "; saR.netze[saa].phase(srk) > -47 AND saR.netze[saa].phase(srk) < -43; "  bei 100 kHz < -50 dB "; saR.netze[saa].betragDb(LEN(saR.x) - 1) < -50; "  (erwartet TRUE TRUE TRUE TRUE)"
+    ' ein kaputtes Deck meldet sich, und danach geht es weiter
+    DIM bplot AS STRING, bfehler AS STRING
+    PRINT "Kaputtes Deck: "; kern.ngspiceRechnen(["* kaputt", "R1 a 0 1k", "Q1 a b 0 GIBTSNICHT", ".op", ".end"], bplot, bfehler); "  Meldung "; LEN(bfehler) > 10; "  danach Teiler "; kern.siText$(simV(kern.simRechnen(stDok, stE), "MITTE"), "V"); "  (erwartet FALSE  Meldung TRUE  danach Teiler 5 V)"
+END IF
 
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"

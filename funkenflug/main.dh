@@ -27,6 +27,7 @@ IMPORT "ansicht/platinenansicht.dh"
 IMPORT "ansicht/platinendruck.dh"
 IMPORT "ansicht/komfort.dh"
 IMPORT "ansicht/bericht.dh"
+IMPORT "ansicht/simulation.dh"
 
 CONST STIL = "window { background-color: #12131a; color: #e6e6f0; }" + _
     " headerbar { background-color: #1a1c26; color: #e6e6f0; }" + _
@@ -2250,6 +2251,67 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             IF fotoZiel <> "" THEN
                 IF gtkFoto(gFlaeche, fotoZiel + ".kicad.png") THEN PRINT "Foto KiCad gesichert"
             END IF
+        CASE 36
+            ' Simulation: Signalquelle -> RC, daneben +5V -> 330 -> rote LED
+            IF kern.ngspiceSuchen$() = "" THEN
+                PRINT "ngspice fehlt -- Simulationsschritte uebersprungen (FUNKENFLUG_NGSPICE setzen)"
+                probeSchritt = 39
+            ELSE
+                leinwandDokument(probeSimSchaltung())
+                verlaufRuecksetzen()
+                simArbeitspunkt()
+                pruefe("Arbeitspunkt gerechnet", STR$(gSimOpDa) + " " + STR$(gSimDlg <> 0) + " " + STR$(LEN(gSimMarken) >= 3), STR$(TRUE) + " " + STR$(TRUE) + " " + STR$(TRUE))
+                pruefe("LED-Spannung in der Statuszeile", LEFT$(simSpannungText$("LED_A"), 6), " = 1.9")
+                pruefe("Quelle +5V liefert ~9 mA", STR$(CONTAINS(gSpMeldung, "+5V liefert 9.")), STR$(TRUE))
+                gtk_widget_hide(gSimDlg)
+                vZoom = 0.24
+                zentrieren(4000, 2700)
+            END IF
+        CASE 37
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel + ".sim_op.png") THEN PRINT "Foto Arbeitspunkt gesichert"
+            END IF
+            ' eine Aenderung nimmt die Spannungen weg
+            geaendert()
+            pruefe("Aenderung verwirft den Arbeitspunkt", STR$(gSimOpDa) + " " + STR$(LEN(gSimMarken)) + " [" + simSpannungText$("LED_A") + "]", STR$(FALSE) + " 0 []")
+            ' Zeitverlauf ueber den echten Dialog
+            probeText1 = "12m" : probeText2 = "20u" : probeText3 = PROBE_LASSEN : probeText4 = PROBE_LASSEN
+            g_timeout_add(150, dialogBestaetigen, 0)
+            simZeitverlauf()
+            DIM stNamen AS STRING : stNamen = ""
+            DIM sti AS INTEGER
+            FOR sti = 0 TO LEN(gSimErg.netze) - 1
+                IF gSimSichtbar[sti] THEN stNamen = stNamen + gSimErg.netze[sti].name + " "
+            NEXT
+            pruefe("Zeitverlauf: Analyse, Punkte, Dauer", STR$(gSimErg.analyse) + " " + STR$(LEN(gSimErg.x) > 500) + " " + kern.siText$(gSimErg.x[LEN(gSimErg.x) - 1], "s"), STR$(kern.SIM_TRAN) + " " + STR$(TRUE) + " 12 ms")
+            pruefe("Benannte Netze vorgewaehlt", stNamen, "AUS EIN LED_A ")
+            gSimMausDrin = TRUE
+            gSimMausX = 74 + 0.42 * (gtk_widget_get_allocated_width(gSimFlaeche) - 108)
+            gtk_widget_queue_draw(gSimFlaeche)
+        CASE 38
+            pruefe("Ablesen an der Maus", STR$(STARTSWITH(gtk_label_get_text(gSimInfo), "t = 5.")) + " " + STR$(CONTAINS(gtk_label_get_text(gSimInfo), "AUS ")), STR$(TRUE) + " " + STR$(TRUE))
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gtk_dialog_get_content_area(gSimDlg), fotoZiel + ".sim_tran.png") THEN PRINT "Foto Zeitverlauf gesichert"
+            END IF
+            probeText1 = "1" : probeText2 = "100k" : probeText3 = "20" : probeText4 = PROBE_LASSEN
+            g_timeout_add(150, dialogBestaetigen, 0)
+            simFrequenzgang()
+            DIM saNamen AS STRING : saNamen = ""
+            DIM sai AS INTEGER
+            FOR sai = 0 TO LEN(gSimErg.netze) - 1
+                IF gSimSichtbar[sai] THEN saNamen = saNamen + gSimErg.netze[sai].name + " "
+            NEXT
+            pruefe("Frequenzgang: Analyse, bis", STR$(gSimErg.analyse) + " " + kern.siText$(gSimErg.x[LEN(gSimErg.x) - 1], "Hz"), STR$(kern.SIM_AC) + " 100 kHz")
+            pruefe("LED ohne Wechselanteil nicht vorgewaehlt", saNamen, "AUS EIN ")
+            gSimMausDrin = TRUE
+            gSimMausX = 74 + 0.44 * (gtk_widget_get_allocated_width(gSimFlaeche) - 108)
+            gtk_widget_queue_draw(gSimFlaeche)
+        CASE 39
+            pruefe("Ablesen in dB", STR$(STARTSWITH(gtk_label_get_text(gSimInfo), "f = ")) + " " + STR$(CONTAINS(gtk_label_get_text(gSimInfo), " dB / ")), STR$(TRUE) + " " + STR$(TRUE))
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gtk_dialog_get_content_area(gSimDlg), fotoZiel + ".sim_ac.png") THEN PRINT "Foto Frequenzgang gesichert"
+            END IF
+            simZu(gSimDlg, 0, 0)
         CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()
@@ -2257,6 +2319,61 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
     END SELECT
     RETURN TRUE
 END FUNCTION
+
+' Die Beispielschaltung der Simulation (auch fuer die Bilder im README)
+FUNCTION probeSimSchaltung() AS kern.Dokument
+    DIM d AS kern.Dokument : d = NEW kern.Dokument()
+    d.titel = "RC-Glied und LED"
+    DIM b AS kern.Blatt : b = d.blaetter[0]
+    DIM t AS kern.Bauteil
+    t = kern.neuesBauteil("V_SIG", kern.neueLage(2000, 3000))
+    t.referenz = "V1" : t.wert = "PULSE(0 5 0 1u 1u 2m 4m) AC 1"
+    ARRAY_PUSH(b.bauteile, t)
+    t = kern.neuesBauteil("R", kern.neueLage(3000, 2000))
+    t.referenz = "R1" : t.wert = "1k"
+    ARRAY_PUSH(b.bauteile, t)
+    t = kern.neuesBauteil("C", NEW kern.Lage(NEW kern.Punkt(4000, 2700), 90, FALSE))
+    t.referenz = "C1" : t.wert = "1u"
+    ARRAY_PUSH(b.bauteile, t)
+    t = kern.neuesBauteil("GND", kern.neueLage(3000, 3800))
+    ARRAY_PUSH(b.bauteile, t)
+    t = kern.neuesBauteil("VCC", kern.neueLage(6000, 1600))
+    t.wert = "+5V"
+    ARRAY_PUSH(b.bauteile, t)
+    t = kern.neuesBauteil("R", NEW kern.Lage(NEW kern.Punkt(6000, 2200), 90, FALSE))
+    t.referenz = "R2" : t.wert = "330"
+    ARRAY_PUSH(b.bauteile, t)
+    t = kern.neuesBauteil("LED", NEW kern.Lage(NEW kern.Punkt(6000, 2900), 90, FALSE))
+    t.referenz = "D1" : t.wert = "rot"
+    ARRAY_PUSH(b.bauteile, t)
+    t = kern.neuesBauteil("GND", kern.neueLage(6000, 3600))
+    ARRAY_PUSH(b.bauteile, t)
+    probeDraht(b, [2000, 2700, 2000, 2000, 2800, 2000])
+    probeDraht(b, [3200, 2000, 4000, 2000, 4000, 2500])
+    probeDraht(b, [4000, 2000, 4800, 2000])
+    probeDraht(b, [2000, 3300, 2000, 3800, 4000, 3800, 4000, 2900])
+    probeDraht(b, [6000, 1600, 6000, 2000])
+    probeDraht(b, [6000, 2400, 6000, 2700])
+    probeDraht(b, [6000, 3100, 6000, 3600])
+    DIM la AS kern.Label
+    la = NEW kern.Label("EIN", NEW kern.Punkt(2000, 2400), kern.LA_LOKAL)
+    la.drehung = 180
+    ARRAY_PUSH(b.labels, la)
+    ARRAY_PUSH(b.labels, NEW kern.Label("AUS", NEW kern.Punkt(4800, 2000), kern.LA_LOKAL))
+    ARRAY_PUSH(b.labels, NEW kern.Label("LED_A", NEW kern.Punkt(6000, 2550), kern.LA_LOKAL))
+    kern.autoKnoten(b)
+    RETURN d
+END FUNCTION
+
+SUB probeDraht(b AS kern.Blatt, xy AS ARRAY OF INTEGER)
+    DIM w AS kern.Draht : w = NEW kern.Draht()
+    DIM i AS INTEGER : i = 0
+    WHILE i + 1 < LEN(xy)
+        ARRAY_PUSH(w.punkte, NEW kern.Punkt(xy[i], xy[i + 1]))
+        i = i + 2
+    WEND
+    ARRAY_PUSH(b.draehte, w)
+END SUB
 
 FUNCTION leistenKnopf(text AS STRING) AS INTEGER
     RETURN gtk_toggle_button_new_with_label(text)
@@ -2304,6 +2421,7 @@ IF kern.bibliothekLaden(gBibPfad) < 0 THEN PRINT "Bibliothek "; gBibPfad; " ist 
 ' der Sicherung); bis dahin das Beispiel
 startDok = demoDokument()
 IF fotoZiel <> "" THEN gKonfigOrdner = fotoZiel + ".konfig"
+simKonfigLaden()
 
 DIM stilFehler AS STRING : stilFehler = gtkStil$(STIL)
 
@@ -2342,6 +2460,10 @@ DIM knopfAusgabe AS INTEGER : knopfAusgabe = gtk_button_new_with_label("Ausgabe 
 gtk_widget_set_tooltip_text(knopfErc, "Elektrische Regelpruefung")
 gtk_widget_set_tooltip_text(knopfAusgabe, "PDF/SVG/PNG, Drucken, Stueckliste, Netzliste")
 gtk_header_bar_pack_end(gKopf, knopfErc)
+DIM knopfSim AS INTEGER : knopfSim = gtk_button_new_with_label("Simulation ▾")
+gtk_widget_set_tooltip_text(knopfSim, "Mit ngspice rechnen: Arbeitspunkt, Zeitverlauf, Frequenzgang")
+gtk_header_bar_pack_end(gKopf, knopfSim)
+simMenueBauen()
 gtk_header_bar_pack_end(gKopf, knopfAusgabe)
 ausgabeMenueBauen()
 DIM knopfBearb AS INTEGER : knopfBearb = gtk_button_new_with_label("Bearbeiten ▾")
@@ -2425,6 +2547,7 @@ signal(gKnopfZurueck, "clicked", aufZurueck, 0, 0, 0)
 signal(gKnopfVor, "clicked", aufVor, 0, 0, 0)
 signal(knopfErc, "clicked", aufErc, 0, 0, 0)
 signal(knopfAusgabe, "clicked", aufAusgabeKnopf, 0, 0, 0)
+signal(knopfSim, "clicked", aufSimKnopf, 0, 0, 0)
 signal(knopfBlatt, "clicked", aufBlattKnopf, 0, 0, 0)
 signal(knopfBearb, "clicked", aufBearbKnopf, 0, 0, 0)
 signal(gDateiKnopf, "clicked", aufDateiKnopf, 0, 0, 0)

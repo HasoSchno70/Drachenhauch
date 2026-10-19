@@ -157,6 +157,31 @@ SUB bibliothekMehr()
     s.pinHinzu("2", "-", NEW Punkt(200, 0), 170, 180, PIN_PASSIV)
     ARRAY_PUSH(gBib, s)
 
+    ' --- Quellen fuer die Simulation (nicht auf Platine und Stueckliste) ----
+    ' Wert = Quelle in SPICE-Schreibweise: "5V", "SIN(0 1 1k)", "PULSE(0 5 0 1u 1u 0.5m 1m)", "AC 1"
+    s = NEW Symbol("V", "Spannungsquelle", "V")
+    s.wertVorgabe = "5V"
+    s.nurSimulation = TRUE
+    s.grafikHinzu(prKreis(0, 0, 150))
+    s.grafikHinzu(prLinie(-40, -80, 40, -80))
+    s.grafikHinzu(prLinie(0, -120, 0, -40))
+    s.grafikHinzu(prLinie(-40, 80, 40, 80))
+    s.pinHinzu("1", "+", NEW Punkt(0, -300), 150, 90, PIN_LEISTUNG_AUS)
+    s.pinHinzu("2", "-", NEW Punkt(0, 300), 150, 270, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    s = NEW Symbol("V_SIG", "Signalquelle", "V")
+    s.wertVorgabe = "SIN(0 1 1k) AC 1"
+    s.nurSimulation = TRUE
+    s.grafikHinzu(prKreis(0, 0, 150))
+    s.grafikHinzu(prBogen(-40, 0, 40, PI, 2 * PI))
+    s.grafikHinzu(prBogen(40, 0, 40, 0, PI))
+    s.grafikHinzu(prLinie(-30, -110, 30, -110))
+    s.grafikHinzu(prLinie(0, -140, 0, -80))
+    s.pinHinzu("1", "+", NEW Punkt(0, -300), 150, 90, PIN_LEISTUNG_AUS)
+    s.pinHinzu("2", "-", NEW Punkt(0, 300), 150, 270, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
     ' --- Schalter -----------------------------------------------------------
     ' Taster (Schliesser): Kontaktbruecke mit Betaetiger; Bauform 6x6-Taster
     s = NEW Symbol("SW_PUSH", "Taster", "SW")

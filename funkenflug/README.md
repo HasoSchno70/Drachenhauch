@@ -231,7 +231,8 @@ gelten als Quelle – ein PWR_FLAG wie in KiCad braucht es nicht.
 
 **Netzliste** (Kopfleiste): das Format folgt der Endung – `.cir`/`.sp` SPICE
 (direkt für ngspice: GND wird Knoten `0`, `4k7` → `4.7k`, `1M` → `1Meg`, denn
-`M` heißt in SPICE *milli*; Dioden und Transistoren bekommen `.model`-Zeilen),
+`M` heißt in SPICE *milli*; dieselben Elemente, Quellen und Modelle wie die
+[Simulation](#simulation-ngspice), Hinweise als Kommentar),
 `.csv` (Semikolon), `.txt` als lesbarer Text oder **`.net` für KiCad**
 (S-Ausdruck, in Pcbnew per „Netzliste importieren"). Die KiCad-Netzliste
 schlägt je Bauteil einen Footprint aus der Bauform vor (AX4 →
@@ -244,7 +245,7 @@ Bestellnummer reisen mit. (`.net` war früher die Text-Netzliste.)
 
 ## Bibliothek
 
-35 eingebaute Symbole, jedes mit seiner Platinen-Bauform:
+37 eingebaute Symbole, jedes mit seiner Platinen-Bauform:
 
 | Gruppe | Symbole (Vorgabe-Bauform) |
 |---|---|
@@ -256,6 +257,7 @@ Bestellnummer reisen mit. (`.net` war früher die Text-Netzliste.)
 | Schalter | Schalter (RAD2), Taster (TAST6: 6×6, je zwei Beine intern verbunden), Relais mit Wechsler (RELAIS5) |
 | Anschlüsse | Stecker 1×2, 1×3, 1×4, 1×6, 1×8 (SIL), 2×5 (HDR2X5), Batterie (RAD4) |
 | Versorgung | GND, VCC |
+| Simulation | Spannungsquelle, Signalquelle (nicht auf Platine und Stückliste) |
 
 Logik gibt es bewusst als ganze 74xx-ICs: einzelne Gatter-Symbole bräuchten
 Mehrfach-Einheiten je Gehäuse. Die Beinfolge der Transistoren hängt vom Typ
@@ -427,6 +429,56 @@ bleibt dasselbe.
 
 ![KiCad-Schaltplan in Funkenflug](kicad.png)
 
+## Simulation (ngspice)
+
+„Simulation ▾" in der Kopfleiste rechnet den Schaltplan mit **ngspice** – als
+Bibliothek per FFI geladen (`ngspice.dll` / `libngspice.so`), die Schaltung
+geht als Zeilen hinein, die Ergebnisse kommen als Zahlenfelder zurück, ohne
+Zwischendateien. Gesucht wird in `FUNKENFLUG_NGSPICE`, dann an den üblichen
+Orten (`C:\Spice64_dll\dll-vs`, `/usr/lib/…/libngspice.so.0`, Homebrew);
+fehlt sie, fragt Funkenflug einmal nach dem Pfad und merkt ihn sich. Ohne
+ngspice läuft alles andere wie bisher.
+
+- **Arbeitspunkt** – die Spannung jedes Netzes steht als gelbe Marke im
+  Schaltplan und hinter dem Netznamen in der Statuszeile (Maus über einem
+  Draht); ein Fenster listet alle Netze und was jede Quelle liefert. Jede
+  Änderung am Schaltplan nimmt die Marken weg – alte Werte stehen nie neben
+  einer geänderten Schaltung.
+- **Zeitverlauf** (Dauer, Schritt) und **Frequenzgang** (von/bis, Punkte je
+  Dekade; Betrag in dB, logarithmische Achse) – Kurven in einem eigenen
+  Fenster, ein Haken je Netz, die Maus liest Zeit/Frequenz und alle Werte ab
+  (im Frequenzgang mit Phase). Vorgewählt sind die Netze mit Label-Namen.
+
+![Arbeitspunkt im Schaltplan](sim_op.png)
+
+![Zeitverlauf: Rechteck über ein RC-Glied](sim_tran.png)
+
+![Frequenzgang: derselbe Tiefpass, −3 dB / −45° bei 158 Hz](sim_ac.png)
+
+Was ein Schaltplan nicht sagt, ergänzt Funkenflug – und **meldet es**
+(SparkNode warf Teile ohne Modell still heraus):
+
+| Im Schaltplan | in der Simulation |
+|---|---|
+| Versorgungssymbol | Spannungsquelle gegen Masse; Spannung aus dem Namen (`+5V`, `3V3`, `-12V`), ohne Zahl (`VCC`) die Einstellung im Dialog |
+| Spannungs-/Signalquelle, Batterie | Wert in SPICE-Schreibweise: `5V`, `SIN(0 1 1k) AC 1`, `PULSE(0 5 0 1u 1u 2m 4m)` |
+| Diode, LED, Z-, Schottky-Diode | Modell nach Wert (1N4148, 1N400x, 1N58xx, BAT…); LED nach Farbe im Wert (rot 1,9 V, grün 2,1 V, blau/weiß 3 V); Z-Spannung aus `ZPD5V1`, `BZX55C12` |
+| NPN, PNP, MOSFET | BC54x/BC55x, 2N3904/3906, 2N2222/2907, BC33x/32x, 2N7000/BS170, BS250, IRF/IRL; sonst ein typisches Modell |
+| OPV | ideal (Verstärkung 10⁵), Ausgang weich an seiner Versorgung begrenzt (ohne Versorgung ±15 V) |
+| Regler 78xx/79xx | idealer Regler (2 V Abfall) |
+| Poti, Sicherung, Schalter, Relais | Schleifer in der Mitte; 10 mΩ; offen (Wert `zu` schließt); unbestromt, Ruhekontakt zu |
+| 555, 74xx, Quarz | ohne Modell weggelassen |
+
+Eigene und aus KiCad importierte Symbole werden nach Vorsatz und Pin-Namen
+erkannt (R/C/L, D mit A/K, Q mit B/C/E bzw. G/D/S). „SPICE-Deck anzeigen"
+zeigt genau, was ngspice bekommt, samt Hinweisen. Gegen schwebende Knoten
+(Kondensator in Reihe, weggelassenes IC) steht `rshunt=1e12` im Deck.
+
+Gefunden beim Bau: Der SPICE-Export legte `+12V` und `-12V` auf **denselben**
+Knoten `_12V` (beide Namen werden zu Knoten bereinigt) – die beiden
+Versorgungen eines OPV waren damit kurzgeschlossen. Jedes Netz bekommt jetzt
+einen eigenen Knoten (`-12V` → `M12V`).
+
 ## Aufbau
 
 ```
@@ -443,6 +495,8 @@ kern/       Modell, Geometrie, Bibliothek, Netze, Datei – ohne Oberfläche,
   hierarchie.dh  Unterblaetter: Blattsymbol aus den Labels, Ports, Pfad, ERC
   bearbeiten.dh  Annotieren, Suchen & Ersetzen
   netzliste.dh   Export: SPICE, CSV, Text
+  ngspice.dh     ngspice als Bibliothek (FFI): laden, Schaltung rechnen, Vektoren lesen
+  simulation.dh  Deck aus dem Schaltplan, Modelle, Quellen, Ergebnisse je Netz, SI-Zahlen
   kicad.dh       KiCad-Netzliste (.net) mit Footprint-Vorschlaegen und Pad-Nummern
   sausdruck.dh   S-Ausdruecke lesen (ohne Rekursion)
   kicadimport.dh KiCad-Schaltplan (.kicad_sch) einlesen: Symbole, Lagen, Unterblaetter
@@ -463,6 +517,7 @@ ansicht/    Zeichenfläche und Werkzeuge – globaler Namensraum
   platinenansicht.dh  Lochraster-Sicht: Zeichnen, Werkzeuge, Pruefliste
   platinendruck.dh    Platine 1:1: Bestueckung, Loetseite, Arbeitsliste (PDF, Druck)
   bericht.dh     Projektbericht: Seitenplan, Deckblatt, Text-Seiten
+  simulation.dh  Simulations-Menü, Spannungsmarken, Kurvenfenster mit Ablesen
 main.dh     Fenster, Kopfleiste, Werkzeugleiste, Statuszeile, Dialoge
 ```
 
@@ -470,7 +525,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (287 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (297 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
@@ -488,7 +543,11 @@ mit `H`, Verbindung über die Blattgrenze; Annotieren über das Menü,
 Suchen & Ersetzen im Dialog, Dokument-Eigenschaften, Speichern, Autosave und
 Wiederherstellen beim Öffnen, Drahtfarben, Messen mit Fang, Verteilen und
 Ausrichten samt Draht, Cross-Probing in beide Richtungen, KiCad-Schaltplan
-öffnen). `pruef_kern.dh` prüft u. a. die
+öffnen, Simulation: Arbeitspunkt, Zeitverlauf und Frequenzgang über die echten
+Dialoge samt Ablesen). Für die Simulationsschritte `FUNKENFLUG_NGSPICE` auf die
+ngspice-Bibliothek setzen; fehlt sie, werden sie übersprungen. `pruef_kern.dh`
+rechnet dann Teiler, LED, NPN-Schalter, OPV ×2 und übersteuert, RC-Sprung (τ),
+RC-Tiefpass (−3 dB, −45°) und ein kaputtes Deck nach. `pruef_kern.dh` prüft u. a. die
 Gruppen-Lage in allen 8 Orientierungen × 3 Arten (72 Pin-Prüfungen). Der Selbsttest
 lässt die Zwischenablage des Systems in Ruhe und schreibt seine Bibliothek in
 eine Wegwerf-Datei neben dem Bild. `--nur-foto bild.png` macht nur das Bild.

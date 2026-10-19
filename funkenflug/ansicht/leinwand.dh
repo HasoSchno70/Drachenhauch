@@ -298,6 +298,7 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
         cairo_stroke(cr)
     END IF
     ercMarkerZeichnen(cr)
+    simMarkenZeichnen(cr)
     rahmenZeichnen(cr)
     messenZeichnen(cr)
     RETURN TRUE
@@ -437,6 +438,7 @@ SUB netzeVeraltet()
     gNetzeGueltig = FALSE
     platineVeraltet()                 ' die Pruefung haengt an den Netzen
     gErcSichtbar = FALSE              ' alte ERC-Marker passen nicht mehr
+    simVeraltet()                     ' Spannungen eines alten Arbeitspunkts auch nicht
 END SUB
 
 ' Die Netze des ganzen Dokuments (globale Labels verbinden ueber Blaetter),
@@ -522,7 +524,7 @@ FUNCTION hoverText$() AS STRING
     DIM i AS INTEGER : i = n.netzAn(gHoverX, gHoverY)
     IF i < 0 THEN RETURN "Netz: offen (Draht ohne Pin)"
     DIM e AS INTEGER : e = n.liste[i].echtePins()
-    RETURN "Netz: " + n.liste[i].name + " (" + STR$(e) + IIF(e = 1, " Pin)", " Pins)")
+    RETURN "Netz: " + n.liste[i].name + simSpannungText$(n.liste[i].name) + " (" + STR$(e) + IIF(e = 1, " Pin)", " Pins)")
 END FUNCTION
 
 ' Einen Blattpunkt in die Mitte der Flaeche holen.

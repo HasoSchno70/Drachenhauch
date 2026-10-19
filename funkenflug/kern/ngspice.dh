@@ -1,0 +1,191 @@
+' ngspice als gemeinsame Bibliothek (FFI) -- Namensraum "kern".
+'
+' Funkenflug ruft ngspice nicht als Programm, sondern laedt seine DLL
+' (ngspice.dll / libngspice.so) und reicht die Schaltung als Zeilen durch --
+' kein Zwischendatei-Hin-und-Her, keine Textausgabe parsen: die Ergebnisse
+' kommen als Zahlenfelder (vector_info) zurueck.
+'
+' Gefunden wird die Bibliothek ueber FUNKENFLUG_NGSPICE (Umgebung), einen
+' vom Nutzer gewaehlten Pfad (ngspicePfadSetzen) oder die ueblichen
+' Installationsorte; erst dann wird sie geladen. Laden geht nur EINMAL je
+' Programmlauf -- deshalb wird vorher geprueft, dass die Datei da ist.
+
+DECLARE FUNCTION ngSpice_Init LIB "$FUNKENFLUG_NGSPICE|ngspice|libngspice.so.0|libngspice" (druck AS FUNCTION(t AS TEXT, id AS LONG, u AS ZEIGER) AS LONG, stat AS FUNCTION(t AS TEXT, id AS LONG, u AS ZEIGER) AS LONG, ende AS FUNCTION(st AS LONG, sofort AS UBYTE, raus AS UBYTE, id AS LONG, u AS ZEIGER) AS LONG, daten AS ZEIGER, initDaten AS ZEIGER, hinterGrund AS ZEIGER, u AS ZEIGER) AS LONG
+DECLARE FUNCTION ngSpice_Circ LIB "$FUNKENFLUG_NGSPICE|ngspice|libngspice.so.0|libngspice" (zeilen AS BUFFER) AS LONG
+DECLARE FUNCTION ngSpice_Command LIB "$FUNKENFLUG_NGSPICE|ngspice|libngspice.so.0|libngspice" (befehl AS TEXT) AS LONG
+DECLARE FUNCTION ngSpice_CurPlot LIB "$FUNKENFLUG_NGSPICE|ngspice|libngspice.so.0|libngspice" () AS ZEIGER
+DECLARE FUNCTION ngSpice_AllVecs LIB "$FUNKENFLUG_NGSPICE|ngspice|libngspice.so.0|libngspice" (plot AS TEXT) AS ZEIGER
+DECLARE FUNCTION ngGet_Vec_Info LIB "$FUNKENFLUG_NGSPICE|ngspice|libngspice.so.0|libngspice" (name AS TEXT) AS ZEIGER
+
+' vector_info (x64): char* name @0, int typ @8, short flags @12,
+' double* real @16, ngcomplex_t* komplex @24, int laenge @32
+CONST NG_VEKTOR_GROESSE = 40
+CONST NG_ZEIT = 1
+CONST NG_FREQUENZ = 2
+CONST NG_SPANNUNG = 3
+CONST NG_STROM = 4
+
+DIM gNgBereit AS BOOLEAN
+DIM gNgAus AS BOOLEAN             ' ngspice hat sich beendet -- erst nach Neustart wieder
+DIM gNgSchaltung AS BOOLEAN       ' eine Schaltung ist geladen (vor der naechsten entfernen)
+DIM gNgPfad AS STRING             ' vom Nutzer gewaehlt
+DIM gNgGeladen AS STRING          ' tatsaechlich geladen
+DIM gNgLog AS ARRAY OF STRING
+
+FUNCTION ngDruck(t AS STRING, id AS INTEGER, u AS INTEGER) AS INTEGER
+    ARRAY_PUSH(gNgLog, t)
+    RETURN 0
+END FUNCTION
+
+FUNCTION ngStatus(t AS STRING, id AS INTEGER, u AS INTEGER) AS INTEGER
+    RETURN 0
+END FUNCTION
+
+FUNCTION ngEnde(st AS INTEGER, sofort AS INTEGER, raus AS INTEGER, id AS INTEGER, u AS INTEGER) AS INTEGER
+    gNgAus = TRUE
+    ARRAY_PUSH(gNgLog, "stderr ngspice hat sich beendet (Status " + STR$(st) + ")")
+    RETURN 0
+END FUNCTION
+
+SUB ngspicePfadSetzen(pfad AS STRING)
+    gNgPfad = pfad
+END SUB
+
+FUNCTION ngspiceGeladen$() AS STRING
+    RETURN gNgGeladen
+END FUNCTION
+
+' Die Orte, an denen ngspice ueblicherweise liegt (der offizielle Windows-
+' Download "ngspice-NN_dll_64" packt nach Spice64_dll\dll-vs).
+FUNCTION ngspiceOrte() AS ARRAY OF STRING
+    RETURN ["C:/Spice64_dll/dll-vs/ngspice.dll", "C:/Spice64/bin/ngspice.dll", "C:/Spice64/dll-vs/ngspice.dll", "C:/Program Files/Spice64/bin/ngspice.dll", "C:/Program Files/ngspice/bin/ngspice.dll", "/usr/lib/x86_64-linux-gnu/libngspice.so.0", "/usr/lib/aarch64-linux-gnu/libngspice.so.0", "/usr/lib64/libngspice.so.0", "/usr/lib/libngspice.so.0", "/usr/local/lib/libngspice.so.0", "/usr/local/lib/libngspice.so", "/opt/homebrew/lib/libngspice.dylib", "/usr/local/lib/libngspice.dylib"]
+END FUNCTION
+
+' Pfad der Bibliothek oder "" (dann ist sie nicht da).
+FUNCTION ngspiceSuchen$() AS STRING
+    IF gNgGeladen <> "" THEN RETURN gNgGeladen
+    DIM env AS STRING : env = GETENV$("FUNKENFLUG_NGSPICE", "")
+    IF env <> "" AND FILEEXISTS(env) THEN RETURN env
+    IF gNgPfad <> "" AND FILEEXISTS(gNgPfad) THEN RETURN gNgPfad
+    DIM orte AS ARRAY OF STRING : orte = ngspiceOrte()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(orte) - 1
+        IF FILEEXISTS(orte[i]) THEN RETURN orte[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+
+FUNCTION ngspiceBereit(BYREF fehler AS STRING) AS BOOLEAN
+    IF gNgAus THEN
+        fehler = "ngspice hat sich beendet und laesst sich in diesem Lauf nicht neu laden -- Funkenflug bitte neu starten."
+        RETURN FALSE
+    END IF
+    IF gNgBereit THEN RETURN TRUE
+    DIM pfad AS STRING : pfad = ngspiceSuchen$()
+    IF pfad = "" THEN
+        fehler = "ngspice nicht gefunden. Die Bibliothek (ngspice.dll aus 'ngspice-..._dll_64', unter Linux libngspice0) installieren oder ihren Pfad in FUNKENFLUG_NGSPICE eintragen."
+        RETURN FALSE
+    END IF
+    SETENV("FUNKENFLUG_NGSPICE", pfad)
+    gNgLog = []
+    TRY
+        DIM r AS INTEGER : r = ngSpice_Init(ngDruck, ngStatus, ngEnde, 0, 0, 0, 0)
+    CATCH e
+        fehler = "ngspice liess sich nicht laden (" + pfad + "): " + e
+        gNgAus = TRUE
+        RETURN FALSE
+    END TRY
+    gNgBereit = TRUE
+    gNgGeladen = pfad
+    RETURN TRUE
+END FUNCTION
+
+' Die Fehlerzeilen aus der Ausgabe (ohne die harmlose Init-Datei-Notiz).
+FUNCTION ngFehlerText$() AS STRING
+    DIM t AS STRING : t = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gNgLog) - 1
+        DIM z AS STRING : z = gNgLog[i]
+        IF NOT STARTSWITH(z, "stderr") THEN CONTINUE
+        IF CONTAINS(z, "init file") OR CONTAINS(z, "Note:") THEN CONTINUE
+        DIM l AS STRING : l = TRIM$(MID$(z, 6))
+        IF l = "" THEN CONTINUE
+        IF t <> "" THEN t = t + CHR$(10)
+        t = t + l
+    NEXT
+    RETURN t
+END FUNCTION
+
+' Eine Schaltung laden und rechnen. plot = Name des Ergebnis-Plots (op1, tran1 ...).
+FUNCTION ngspiceRechnen(zeilen AS ARRAY OF STRING, BYREF plot AS STRING, BYREF fehler AS STRING) AS BOOLEAN
+    plot = ""
+    IF NOT ngspiceBereit(fehler) THEN RETURN FALSE
+    gNgLog = []
+    DIM r AS INTEGER
+    r = ngSpice_Command("destroy all")
+    IF gNgSchaltung THEN r = ngSpice_Command("remcirc")
+    ' char*-Feld mit Nullzeiger am Ende; die Puffer muessen bis zum Aufruf leben
+    DIM halter AS ARRAY OF BUFFER : halter = []
+    DIM feld AS BUFFER : feld = BUFFER_NEW(8 * (LEN(zeilen) + 1))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM b AS BUFFER : b = BUFFER_CONCAT(BUFFER_FROM_STRING(zeilen[i]), BUFFER_NEW(1))
+        ARRAY_PUSH(halter, b)
+        BUFFER_SET_I64(feld, i * 8, BUFFER_ZEIGER(b))
+    NEXT
+    r = ngSpice_Circ(feld)
+    gNgSchaltung = TRUE
+    IF r <> 0 OR gNgAus THEN
+        fehler = "ngspice nimmt die Schaltung nicht an." + CHR$(10) + ngFehlerText$()
+        RETURN FALSE
+    END IF
+    r = ngSpice_Command("run")
+    plot = TEXT_AUS_ZEIGER$(ngSpice_CurPlot())
+    IF r <> 0 OR gNgAus OR plot = "" OR plot = "const" THEN
+        fehler = "ngspice hat nicht gerechnet." + CHR$(10) + ngFehlerText$()
+        RETURN FALSE
+    END IF
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION ngVektorNamen(plot AS STRING) AS ARRAY OF STRING
+    DIM r AS ARRAY OF STRING : r = []
+    DIM z AS INTEGER : z = ngSpice_AllVecs(plot)
+    IF z = 0 THEN RETURN r
+    DIM i AS INTEGER : i = 0
+    WHILE i < 100000
+        DIM p AS INTEGER : p = BUFFER_GET_I64(BUFFER_AUS_ZEIGER(z + i * 8, 8), 0)
+        IF p = 0 THEN BREAK
+        ARRAY_PUSH(r, TEXT_AUS_ZEIGER$(p))
+        i = i + 1
+    WEND
+    RETURN r
+END FUNCTION
+
+' Einen Vektor lesen: reelle Werte in re (im leer) oder komplexe in re/im.
+FUNCTION ngVektorLesen(plot AS STRING, name AS STRING, BYREF re AS ARRAY OF FLOAT, BYREF im AS ARRAY OF FLOAT, BYREF typ AS INTEGER) AS BOOLEAN
+    re = []
+    im = []
+    DIM z AS INTEGER : z = ngGet_Vec_Info(plot + "." + name)
+    IF z = 0 THEN RETURN FALSE
+    DIM vi AS BUFFER : vi = BUFFER_AUS_ZEIGER(z, NG_VEKTOR_GROESSE)
+    typ = BUFFER_GET_I32(vi, 8)
+    DIM n AS INTEGER : n = BUFFER_GET_I32(vi, 32)
+    DIM reell AS INTEGER : reell = BUFFER_GET_I64(vi, 16)
+    DIM kompl AS INTEGER : kompl = BUFFER_GET_I64(vi, 24)
+    IF n <= 0 THEN RETURN TRUE
+    DIM i AS INTEGER
+    IF reell <> 0 THEN
+        DIM d AS BUFFER : d = BUFFER_AUS_ZEIGER(reell, 8 * n)
+        FOR i = 0 TO n - 1
+            ARRAY_PUSH(re, BUFFER_GET_F64(d, i * 8))
+        NEXT
+    ELSEIF kompl <> 0 THEN
+        DIM c AS BUFFER : c = BUFFER_AUS_ZEIGER(kompl, 16 * n)
+        FOR i = 0 TO n - 1
+            ARRAY_PUSH(re, BUFFER_GET_F64(c, i * 16))
+            ARRAY_PUSH(im, BUFFER_GET_F64(c, i * 16 + 8))
+        NEXT
+    END IF
+    RETURN TRUE
+END FUNCTION

@@ -556,6 +556,7 @@ SUB symbolFelderKopieren(ziel AS Symbol, q AS Symbol)
     ziel.pins = q.pins
     ziel.grafik = q.grafik
     ziel.einheitLeistung = q.einheitLeistung
+    ziel.nurSimulation = q.nurSimulation
     ziel.eigen = q.eigen
     ziel.fehlt = q.fehlt
     ziel.pinTexte = q.pinTexte
