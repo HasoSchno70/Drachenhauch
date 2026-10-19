@@ -601,82 +601,206 @@ SUB teilInsFeld(pl AS Platine, t AS PlatTeil, bf AS Bauform)
     IF z1 >= pl.zeilen THEN t.z = t.z - (z1 - pl.zeilen + 1)
 END SUB
 
-' Alles Unplatzierte einsetzen, Zeile fuer Zeile von oben links, mit einem
-' Loch Abstand. Auf Streifenraster quer zu den Streifen (sonst laegen beide
-' Beine auf einem Streifen = Kurzschluss); rechts neben jedem Teil und unter
-' einem DIP zwischen den Reihen werden die Streifen getrennt -- so beruehrt
-' kein Teil ein anderes, was fehlt, zeigen die Luftlinien. Rueckgabe: wie
-' viele eingesetzt.
+' Alles Unplatzierte einsetzen. Reihenfolge und Lage nach den Netzen: zuerst
+' das Teil mit den meisten Verbindungen, dann immer das, das am meisten mit
+' schon Gesetztem teilt, und zwar dorthin, wo seine Beine den gesetzten
+' Beinen derselben Netze am naechsten sind (Summe der Loch-Abstaende). Ohne
+' Verbindung: Zeile fuer Zeile von oben links. nachNetzen = FALSE setzt in
+' Schaltplan-Reihenfolge von oben links (zum Vergleich).
+'
+' Auf Streifenraster stehen die Teile quer zu den Streifen (sonst laegen
+' beide Beine auf einem Streifen = Kurzschluss); rechts neben jedem Teil und
+' unter einem DIP zwischen den Reihen wird getrennt, rechts bleibt ein freies
+' Loch fuer eine Bruecke. Um jedes Teil herum bleibt Abstand -- in BEIDE
+' Richtungen geprueft, auch wenn ein neues Teil links neben ein altes kommt.
+' Auf Lochraster wird quer und laengs probiert. Rueckgabe: wie viele gesetzt.
 FUNCTION platineEinsetzen(dok AS Dokument) AS INTEGER
+    RETURN platineEinsetzenMit(dok, TRUE)
+END FUNCTION
+
+' Loecher einer Flaeche merken bzw. pruefen, ob keins davon belegt ist.
+SUB flaecheMerken(BYREF m AS MAP OF INTEGER, s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER)
+    DIM q AS INTEGER, w AS INTEGER
+    FOR q = s0 TO s1
+        FOR w = z0 TO z1
+            MAPPUT(m, lochKey$(q, w), 1)
+        NEXT
+    NEXT
+END SUB
+
+FUNCTION flaecheFrei(m AS MAP OF INTEGER, s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER) AS BOOLEAN
+    DIM q AS INTEGER, w AS INTEGER
+    FOR q = s0 TO s1
+        FOR w = z0 TO z1
+            IF MAPHAS(m, lochKey$(q, w)) THEN RETURN FALSE
+        NEXT
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION platineEinsetzenMit(dok AS Dokument, nachNetzen AS BOOLEAN) AS INTEGER
     DIM pl AS Platine : pl = dok.platine
-    DIM besetzt AS MAP OF INTEGER
-    DIM i AS INTEGER, s AS INTEGER, z AS INTEGER, q AS INTEGER, w AS INTEGER
-    ' Streifenraster: rechts getrennt, dann ein freies Loch -- so behaelt jedes
-    ' Teil auf seinem Streifenstueck ein Loch fuer eine Bruecke
+    DIM koerper AS MAP OF INTEGER                ' Loecher gesetzter Teile
+    DIM zone AS MAP OF INTEGER                   ' dieselben samt Abstand
+    DIM i AS INTEGER, j AS INTEGER, k AS INTEGER, s AS INTEGER, z AS INTEGER, w AS INTEGER
     DIM rechtsRand AS INTEGER : rechtsRand = IIF(pl.art = PL_STREIFEN, 2, 1)
     DIM hinweis AS STRING
-    ' schon belegte Flaechen (mit Rand)
+    DIM namen AS ARRAY OF STRING
+    DIM pn AS MAP OF INTEGER : pn = pinNetze(dok, namen)
+    ' gesetzte Beine je Netz (fuer die Abstaende)
+    DIM ps AS ARRAY OF INTEGER : ps = []
+    DIM pz AS ARRAY OF INTEGER : pz = []
+    DIM pnetz AS ARRAY OF INTEGER : pnetz = []
+    DIM netzDa AS MAP OF INTEGER
     FOR i = 0 TO LEN(pl.teile) - 1
         DIM b0 AS Bauteil
         IF NOT bauteilMitId(dok, pl.teile[i].bauteilId, b0) THEN CONTINUE
         DIM f0 AS Bauform : f0 = bauformFuer(b0, hinweis)
         DIM a0 AS INTEGER, c0 AS INTEGER, a1 AS INTEGER, c1 AS INTEGER
         teilFlaeche(pl.teile[i], f0, a0, c0, a1, c1)
-        FOR q = a0 - 1 TO a1 + rechtsRand
-            FOR w = c0 - 1 TO c1 + 1
-                MAPPUT(besetzt, lochKey$(q, w), 1)
-            NEXT
+        flaecheMerken(koerper, a0, c0, a1, c1)
+        flaecheMerken(zone, a0 - 1, c0 - 1, a1 + rechtsRand, c1 + 1)
+        FOR j = 0 TO LEN(b0.sym.pins) - 1
+            k = bauformPinZu(f0, b0, j)
+            IF k < 0 THEN CONTINUE
+            IF NOT MAPHAS(pn, b0.id + "|" + b0.sym.pins[j].nummer) THEN CONTINUE
+            DIM lo0 AS Punkt : lo0 = lochVon(pl.teile[i], f0.pins[k])
+            DIM n0 AS INTEGER : n0 = MAPGET(pn, b0.id + "|" + b0.sym.pins[j].nummer)
+            ARRAY_PUSH(ps, lo0.x)
+            ARRAY_PUSH(pz, lo0.y)
+            ARRAY_PUSH(pnetz, n0)
+            MAPPUT(netzDa, STR$(n0), 1)
         NEXT
     NEXT
+    ' wie viele echte Pins hat jedes Netz? (Netze mit einem Pin verbinden nichts)
+    DIM netzPins AS MAP OF INTEGER
+    DIM nk AS ARRAY OF STRING : nk = MAPKEYS(pn)
+    FOR i = 0 TO LEN(nk) - 1
+        DIM nn AS STRING : nn = STR$(MAPGET(pn, nk[i]))
+        IF MAPHAS(netzPins, nn) THEN
+            MAPPUT(netzPins, nn, MAPGET(netzPins, nn) + 1)
+        ELSE
+            MAPPUT(netzPins, nn, 1)
+        END IF
+    NEXT
+    DIM offen AS ARRAY OF Bauteil : offen = []
     DIM alle AS ARRAY OF Bauteil : alle = platinenBauteile(dok)
-    DIM gesetzt AS INTEGER : gesetzt = 0
     FOR i = 0 TO LEN(alle) - 1
-        DIM b AS Bauteil : b = alle[i]
-        IF teilIndex(pl, b.id) >= 0 THEN CONTINUE
+        IF teilIndex(pl, alle[i].id) < 0 THEN ARRAY_PUSH(offen, alle[i])
+    NEXT
+    DIM gesetzt AS INTEGER : gesetzt = 0
+    WHILE LEN(offen) > 0
+        ' naechstes Teil: teilt am meisten mit Gesetztem, dann die meisten Verbindungen
+        DIM wahl AS INTEGER : wahl = 0
+        IF nachNetzen THEN
+            DIM bestTeilt AS INTEGER : bestTeilt = -1
+            DIM bestGrad AS INTEGER : bestGrad = -1
+            FOR i = 0 TO LEN(offen) - 1
+                DIM teilt AS INTEGER : teilt = 0
+                DIM grad AS INTEGER : grad = 0
+                FOR j = 0 TO LEN(offen[i].sym.pins) - 1
+                    DIM pk AS STRING : pk = offen[i].id + "|" + offen[i].sym.pins[j].nummer
+                    IF NOT MAPHAS(pn, pk) THEN CONTINUE
+                    DIM nr AS STRING : nr = STR$(MAPGET(pn, pk))
+                    IF MAPGET(netzPins, nr) > 1 THEN grad = grad + 1
+                    IF MAPHAS(netzDa, nr) THEN teilt = teilt + 1
+                NEXT
+                IF teilt > bestTeilt OR (teilt = bestTeilt AND grad > bestGrad) THEN
+                    bestTeilt = teilt
+                    bestGrad = grad
+                    wahl = i
+                END IF
+            NEXT
+        END IF
+        DIM b AS Bauteil : b = offen[wahl]
+        ARRAY_REMOVE_AT(offen, wahl)
         DIM bf AS Bauform : bf = bauformFuer(b, hinweis)
-        DIM t AS PlatTeil : t = NEW PlatTeil(b.id, 0, 0)
         DIM dip AS BOOLEAN : dip = STARTSWITH(bf.name, "DIP")
-        IF pl.art = PL_STREIFEN AND NOT dip THEN t.drehung = 90
-        DIM ok AS BOOLEAN : ok = FALSE
+        ' Netz je Bauform-Bein
+        DIM beinNetz AS ARRAY OF INTEGER : beinNetz = []
+        FOR k = 0 TO LEN(bf.pins) - 1
+            ARRAY_PUSH(beinNetz, -1)
+        NEXT
+        FOR j = 0 TO LEN(b.sym.pins) - 1
+            k = bauformPinZu(bf, b, j)
+            IF k < 0 THEN CONTINUE
+            IF MAPHAS(pn, b.id + "|" + b.sym.pins[j].nummer) THEN beinNetz[k] = MAPGET(pn, b.id + "|" + b.sym.pins[j].nummer)
+        NEXT
+        ' Drehungen, die in Frage kommen
+        DIM drehungen AS ARRAY OF INTEGER : drehungen = []
+        IF pl.art = PL_STREIFEN THEN
+            ARRAY_PUSH(drehungen, IIF(dip, 0, 90))
+        ELSE
+            ARRAY_PUSH(drehungen, 0)
+            IF nachNetzen THEN ARRAY_PUSH(drehungen, 90)
+        END IF
+        DIM t AS PlatTeil : t = NEW PlatTeil(b.id, 0, 0)
+        DIM bestK AS FLOAT : bestK = -1
+        DIM bs AS INTEGER, bz AS INTEGER, bd AS INTEGER
         DIM versuch AS INTEGER
         FOR versuch = 0 TO 1
-            FOR z = 1 TO pl.zeilen - 1
-                FOR s = 1 TO pl.spalten - 1
-                    t.s = s
-                    t.z = z
-                    DIM s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER
-                    teilFlaeche(t, bf, s0, z0, s1, z1)
-                    IF s0 < 0 OR z0 < 0 OR s1 >= pl.spalten OR z1 >= pl.zeilen THEN CONTINUE
-                    DIM frei AS BOOLEAN : frei = TRUE
-                    FOR q = s0 TO s1
-                        FOR w = z0 TO z1
-                            IF MAPHAS(besetzt, lochKey$(q, w)) THEN frei = FALSE
-                        NEXT
+            DIM di AS INTEGER
+            FOR di = 0 TO LEN(drehungen) - 1
+                t.drehung = drehungen[di]
+                FOR z = 1 TO pl.zeilen - 1
+                    FOR s = 1 TO pl.spalten - 1
+                        IF NOT nachNetzen AND bestK >= 0 THEN CONTINUE
+                        t.s = s
+                        t.z = z
+                        DIM s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER
+                        teilFlaeche(t, bf, s0, z0, s1, z1)
+                        IF s0 < 0 OR z0 < 0 OR s1 >= pl.spalten OR z1 >= pl.zeilen THEN CONTINUE
+                        IF NOT flaecheFrei(zone, s0, z0, s1, z1) THEN CONTINUE
+                        IF NOT flaecheFrei(koerper, s0 - 1, z0 - 1, s1 + rechtsRand, z1 + 1) THEN CONTINUE
+                        ' Kosten: Abstand jedes Beins zum naechsten gesetzten Bein seines Netzes
+                        DIM kosten AS FLOAT : kosten = (z * pl.spalten + s) * 0.0001
+                        IF nachNetzen THEN
+                            FOR k = 0 TO LEN(bf.pins) - 1
+                                IF beinNetz[k] < 0 THEN CONTINUE
+                                DIM lo AS Punkt : lo = lochVon(t, bf.pins[k])
+                                DIM nah AS INTEGER : nah = -1
+                                FOR j = 0 TO LEN(pnetz) - 1
+                                    IF pnetz[j] <> beinNetz[k] THEN CONTINUE
+                                    DIM d AS INTEGER : d = ABS(ps[j] - lo.x) + ABS(pz[j] - lo.y)
+                                    IF nah < 0 OR d < nah THEN nah = d
+                                NEXT
+                                IF nah > 0 THEN kosten = kosten + nah
+                            NEXT
+                        END IF
+                        IF bestK < 0 OR kosten < bestK THEN
+                            bestK = kosten
+                            bs = s
+                            bz = z
+                            bd = t.drehung
+                        END IF
                     NEXT
-                    IF frei THEN
-                        ok = TRUE
-                        BREAK
-                    END IF
                 NEXT
-                IF ok THEN BREAK
             NEXT
-            IF ok THEN BREAK
+            IF bestK >= 0 THEN BREAK
             ' kein Platz: die Platine waechst nach unten
             DIM tt AS PlatTeil : tt = NEW PlatTeil(b.id, 0, 0)
-            tt.drehung = t.drehung
+            tt.drehung = drehungen[0]
             DIM e0 AS INTEGER, e1 AS INTEGER, e2 AS INTEGER, e3 AS INTEGER
             teilFlaeche(tt, bf, e0, e1, e2, e3)
-            pl.zeilen = pl.zeilen + (e3 - e1) + 2
+            pl.zeilen = pl.zeilen + (e3 - e1) + 3
         NEXT
-        IF NOT ok THEN CONTINUE
+        IF bestK < 0 THEN CONTINUE
+        t.s = bs
+        t.z = bz
+        t.drehung = bd
         ARRAY_PUSH(pl.teile, t)
         gesetzt = gesetzt + 1
         DIM fs0 AS INTEGER, fz0 AS INTEGER, fs1 AS INTEGER, fz1 AS INTEGER
         teilFlaeche(t, bf, fs0, fz0, fs1, fz1)
-        FOR q = fs0 - 1 TO fs1 + rechtsRand
-            FOR w = fz0 - 1 TO fz1 + 1
-                MAPPUT(besetzt, lochKey$(q, w), 1)
-            NEXT
+        flaecheMerken(koerper, fs0, fz0, fs1, fz1)
+        flaecheMerken(zone, fs0 - 1, fz0 - 1, fs1 + rechtsRand, fz1 + 1)
+        FOR k = 0 TO LEN(bf.pins) - 1
+            IF beinNetz[k] < 0 THEN CONTINUE
+            DIM lg AS Punkt : lg = lochVon(t, bf.pins[k])
+            ARRAY_PUSH(ps, lg.x)
+            ARRAY_PUSH(pz, lg.y)
+            ARRAY_PUSH(pnetz, beinNetz[k])
+            MAPPUT(netzDa, STR$(beinNetz[k]), 1)
         NEXT
         IF pl.art = PL_STREIFEN THEN
             FOR w = fz0 TO fz1
@@ -686,7 +810,7 @@ FUNCTION platineEinsetzen(dok AS Dokument) AS INTEGER
                 IF dip AND NOT istTrennstelle(pl, fs0 + 1, w) THEN ARRAY_PUSH(pl.trenn, NEW Punkt(fs0 + 1, w))
             NEXT
         END IF
-    NEXT
+    WEND
     RETURN gesetzt
 END FUNCTION
 

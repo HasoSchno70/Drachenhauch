@@ -722,6 +722,10 @@ FUNCTION lwTaste(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
     ' Ablage und "alles waehlen" meinen den Schaltplan und bleiben dort
     IF gAnsicht = ANS_PLATINE THEN
         IF (z BAND GDK_STRG) = 0 THEN RETURN plTaste(taste)
+        IF taste = K_A THEN
+            plAlleWaehlen()
+            RETURN TRUE
+        END IF
         IF taste <> K_S AND taste <> K_O AND taste <> K_Z AND taste <> K_Y AND taste <> K_Z_GROSS THEN RETURN FALSE
     END IF
     IF (z BAND GDK_STRG) <> 0 THEN

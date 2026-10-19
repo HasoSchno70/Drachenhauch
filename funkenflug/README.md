@@ -196,7 +196,7 @@ springt hin. Die Statuszeile nennt das Netz des Lochs unter der Maus.
 
 | Werkzeug | |
 |---|---|
-| **Auswahl** (`A`) | Teil ziehen (lochweise), `R` dreht – am Rand rückt es ein, statt still abgelehnt zu werden –, `Entf` nimmt es herunter; eine Bahn anklicken und `Entf` löscht sie |
+| **Auswahl** (`A`) | Teil ziehen (lochweise), `R` dreht – am Rand rückt es ein, statt still abgelehnt zu werden –, `Entf` nimmt es herunter; eine Bahn anklicken und `Entf` löscht sie. Ein **Rahmen** über leerer Fläche wählt alle Teile darin, `Umschalt` nimmt einzelne dazu oder heraus, `Strg+A` alle; ein Klick in die Auswahl zieht die ganze Gruppe, `R` und `Entf` gelten für alle |
 | **Bahn** (`B`) | Loch für Loch klicken, rechte Taste beendet. Auf Lochraster ist eine gerade Bahn eine **Lötbahn** (verbindet jedes Loch auf ihrem Weg), sonst – und immer auf Streifenraster – eine **Drahtbrücke** (nur ihre Enden); `Umschalt` erzwingt die Brücke |
 | **Trennen** (`T`) | Streifen an einem Loch auftrennen bzw. wieder schließen |
 
@@ -209,7 +209,12 @@ fliegt wieder raus; was keinen Weg findet, bleibt Luftlinie. Alles zusammen
 ist ein Rückgängig-Schritt. Kein Autorouter, der still Platz verbraucht –
 jede Brücke steht danach in der Arbeitsliste.
 
-**Einsetzen** setzt alle Teile, die noch fehlen. Auf Streifenraster stehen sie
+**Einsetzen** setzt alle Teile, die noch fehlen – **nach Netzen**: zuerst das
+Teil mit den meisten Verbindungen, dann immer das, das am meisten mit schon
+Gesetztem teilt, dorthin, wo seine Beine den gesetzten Beinen derselben Netze
+am nächsten sind (auf Lochraster quer oder längs, was kürzer ist). Eine Kette
+aus sechs Widerständen, im Schaltplan durcheinander, braucht so 19 statt 44
+Löcher Luftlinie (Lochraster: 17 statt 62). Auf Streifenraster stehen sie
 quer zu den Streifen (sonst lägen beide Beine eines Widerstands auf einem
 Streifen), rechts neben jedem Teil und unter einem DIP zwischen den Reihen
 wird getrennt, und rechts bleibt ein freies Loch, damit jedes Teil auf seinem
@@ -278,7 +283,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (204 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (211 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
@@ -349,5 +354,5 @@ zweiten Kondensator wieder „C1".
 ## Noch offen (nächste Runden)
 
 Hierarchische Blätter (Blatt-Symbole mit Ports), Symbol-Grafik mit der Maus
-zeichnen (bisher als Text), Bauteile auf der Platine nach Netzen gruppiert
-einsetzen (bisher der Reihe nach).
+zeichnen (bisher als Text), Platine: eine Gruppe als Ganzes drehen (bisher
+dreht jedes Teil um sich selbst).

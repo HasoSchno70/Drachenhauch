@@ -1715,6 +1715,35 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             verlaufZurueck()
             pruefe("Rueckgaengig: Bruecken wieder weg", STR$(LEN(gDok.platine.bahnen)), "0")
             verlaufZurueck()
+            ' Rahmen waehlt eine Gruppe; Ziehen bewegt alle; Entf nimmt alle herunter
+            gtk_button_clicked(gPlKnopfAuswahl)
+            DIM gw0 AS FLOAT : gw0 = lochX(-0.5)
+            DIM gh0 AS FLOAT : gh0 = lochY(-0.5)
+            lz = plDruck(gw0, gh0, 1, FALSE)
+            plBewegung(lochX(gDok.platine.spalten - 0.5), lochY(gDok.platine.zeilen - 0.5))
+            plLos()
+            pruefe("Rahmen waehlt alle Teile", STR$(LEN(plAuswahlListe())), STR$(LEN(gDok.platine.teile)))
+            statusAktualisieren()
+            pruefe("Statuszeile nennt die Gruppe", STR$(CONTAINS(gtk_label_get_text(gStatus), STR$(LEN(gDok.platine.teile)) + " Teile gewaehlt")), STR$(TRUE))
+            DIM gS0 AS INTEGER : gS0 = gDok.platine.teile[0].s
+            DIM gS1 AS INTEGER : gS1 = gDok.platine.teile[LEN(gDok.platine.teile) - 1].s
+            pundo = LEN(gUndo)
+            lz = plDruck(lochX(ppad.s), lochY(ppad.z), 1, FALSE)
+            plBewegung(lochX(ppad.s + 3), lochY(ppad.z + 2))
+            plLos()
+            pruefe("Gruppe gezogen, ein Undo-Schritt", STR$(gDok.platine.teile[0].s - gS0) + " " + STR$(gDok.platine.teile[LEN(gDok.platine.teile) - 1].s - gS1) + " " + STR$(LEN(gUndo) - pundo), "3 3 1")
+            pruefe("Gruppe nimmt die Bruecken nicht mit", STR$(LEN(platineBericht().luft) > 0), STR$(TRUE))
+            verlaufZurueck()
+            ' Umschalt-Klick nimmt eines heraus
+            plMengeSetzen([])
+            plAlleWaehlen()
+            lz = plDruck(lochX(ppad.s), lochY(ppad.z), 1, TRUE)
+            pruefe("Umschalt nimmt ein Teil heraus", STR$(LEN(plAuswahlListe())) + " " + STR$(plIstGewaehlt(ppad.teil)), STR$(LEN(gDok.platine.teile) - 1) + " " + STR$(FALSE))
+            lz = plTaste(K_DELETE)
+            pruefe("Entf nimmt die Gruppe herunter", STR$(LEN(gDok.platine.teile)), "1")
+            verlaufZurueck()
+            pruefe("Rueckgaengig: alle wieder da", STR$(LEN(gDok.platine.teile)), STR$(pbn))
+            plMengeSetzen([])
             ' Platine ausgeben: PDF und Druck (Bestueckung, Loetseite, Liste), 1:1
             pruefe("Massstab 1:1", STR$(plMassstab(plSeiteB(), plSeiteH()) = 1.0), STR$(TRUE))
             IF fotoZiel <> "" THEN

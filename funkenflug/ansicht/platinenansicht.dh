@@ -23,7 +23,19 @@ CONST C_LUFT = &HFFE14D
 
 DIM gAnsicht AS INTEGER
 DIM gPlWz AS INTEGER
-DIM gPlSel AS INTEGER             ' gewaehltes Teil (Index in platine.teile), -1 = keins
+DIM gPlSel AS INTEGER             ' zuletzt gewaehltes Teil (Index in platine.teile), -1 = keins
+DIM gPlMenge AS ARRAY OF INTEGER  ' gewaehlte Teile (leer: nur gPlSel)
+' Rahmen ueber leerer Flaeche
+DIM gPlRahmen AS BOOLEAN
+DIM gPlRahmenPlus AS BOOLEAN      ' mit Umschalt: zur Auswahl dazu
+DIM gPlRahmenSX AS FLOAT
+DIM gPlRahmenSY AS FLOAT
+DIM gPlRahmenEX AS FLOAT
+DIM gPlRahmenEY AS FLOAT
+' Lage der gezogenen Teile bei Zugbeginn
+DIM gPlZugIdx AS ARRAY OF INTEGER
+DIM gPlZugS AS ARRAY OF INTEGER
+DIM gPlZugZ AS ARRAY OF INTEGER
 DIM gPlBahnSel AS INTEGER         ' gewaehlte Bahn, -1 = keine
 DIM gPlBericht AS kern.PlatBericht
 DIM gPlGueltig AS BOOLEAN
@@ -35,8 +47,6 @@ DIM gPlZieht AS BOOLEAN
 DIM gPlGemerkt AS BOOLEAN
 DIM gPlStartS AS INTEGER
 DIM gPlStartZ AS INTEGER
-DIM gPlTeilS AS INTEGER
-DIM gPlTeilZ AS INTEGER
 ' Bahn-Werkzeug
 DIM gPlBahnAktiv AS BOOLEAN
 DIM gPlBahnS AS INTEGER
@@ -65,9 +75,48 @@ END SUB
 
 SUB plAuswahlAufheben()
     gPlSel = -1
+    gPlMenge = []
+    gPlRahmen = FALSE
     gPlBahnSel = -1
     gPlBahnAktiv = FALSE
     gPlZieht = FALSE
+END SUB
+
+' Die gewaehlten Teile (Menge, sonst das eine).
+FUNCTION plAuswahlListe() AS ARRAY OF INTEGER
+    DIM r AS ARRAY OF INTEGER : r = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gPlMenge) - 1
+        IF gPlMenge[i] >= 0 AND gPlMenge[i] < LEN(gDok.platine.teile) THEN ARRAY_PUSH(r, gPlMenge[i])
+    NEXT
+    IF LEN(r) = 0 AND gPlSel >= 0 AND gPlSel < LEN(gDok.platine.teile) THEN ARRAY_PUSH(r, gPlSel)
+    RETURN r
+END FUNCTION
+
+FUNCTION plIstGewaehlt(i AS INTEGER) AS BOOLEAN
+    DIM l AS ARRAY OF INTEGER : l = plAuswahlListe()
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(l) - 1
+        IF l[k] = i THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+SUB plMengeSetzen(m AS ARRAY OF INTEGER)
+    gPlMenge = m
+    gPlSel = IIF(LEN(m) > 0, m[LEN(m) - 1], -1)
+END SUB
+
+SUB plAlleWaehlen()
+    DIM m AS ARRAY OF INTEGER : m = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gDok.platine.teile) - 1
+        ARRAY_PUSH(m, i)
+    NEXT
+    plMengeSetzen(m)
+    gPlBahnSel = -1
+    neuZeichnen()
+    statusAktualisieren()
 END SUB
 
 FUNCTION plLochS(px AS FLOAT) AS INTEGER
@@ -213,7 +262,7 @@ SUB platineZeichnen(cr AS INTEGER, bw AS FLOAT, bh AS FLOAT)
         DIM bfm AS kern.Bauform : bfm = kern.bauformFuer(b, hinweis)
         DIM s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER
         kern.teilFlaeche(pl.teile[i], bfm, s0, z0, s1, z1)
-        DIM farbe AS INTEGER : farbe = IIF(i = gPlSel, C_AUSWAHL, C_BAUTEIL)
+        DIM farbe AS INTEGER : farbe = IIF(plIstGewaehlt(i), C_AUSWAHL, C_BAUTEIL)
         zeichenFarbe(cr, farbe)
         cairo_set_line_width(cr, MAX(1.0, 0.06 * p))
         cairo_rectangle(cr, lochX(s0 - 0.45), lochY(z0 - 0.45), (s1 - s0 + 0.9) * p, (z1 - z0 + 0.9) * p)
@@ -257,6 +306,12 @@ SUB platineZeichnen(cr AS INTEGER, bw AS FLOAT, bh AS FLOAT)
     IF gPlMausDrin AND kern.aufPlatine(pl, gPlHS, gPlHZ) THEN
         cairo_set_line_width(cr, 1.5)
         plKreis(cr, lochX(gPlHS), lochY(gPlHZ), 0.45 * p, C_HOVER, FALSE)
+    END IF
+    IF gPlRahmen THEN
+        zeichenFarbe(cr, C_AUSWAHL)
+        cairo_set_line_width(cr, 1.0)
+        cairo_rectangle(cr, MIN(gPlRahmenSX, gPlRahmenEX), MIN(gPlRahmenSY, gPlRahmenEY), ABS(gPlRahmenEX - gPlRahmenSX), ABS(gPlRahmenEY - gPlRahmenSY))
+        cairo_stroke(cr)
     END IF
     plPruefMarkerZeichnen(cr)
 END SUB
@@ -308,16 +363,49 @@ FUNCTION plDruck(px AS FLOAT, py AS FLOAT, knopf AS INTEGER, umsch AS BOOLEAN) A
     SELECT CASE gPlWz
         CASE PW_AUSWAHL
             gPlBahnSel = -1
-            gPlSel = plTeilAn(gPlHS, gPlHZ)
-            IF gPlSel >= 0 THEN
+            DIM ti AS INTEGER : ti = plTeilAn(gPlHS, gPlHZ)
+            DIM m AS ARRAY OF INTEGER : m = plAuswahlListe()
+            DIM k AS INTEGER
+            IF umsch AND ti >= 0 THEN
+                ' Umschalt: dieses Teil dazu bzw. heraus
+                DIM neu AS ARRAY OF INTEGER : neu = []
+                DIM war AS BOOLEAN : war = FALSE
+                FOR k = 0 TO LEN(m) - 1
+                    IF m[k] = ti THEN
+                        war = TRUE
+                    ELSE
+                        ARRAY_PUSH(neu, m[k])
+                    END IF
+                NEXT
+                IF NOT war THEN ARRAY_PUSH(neu, ti)
+                plMengeSetzen(neu)
+            ELSEIF ti >= 0 THEN
+                ' Klick in die Auswahl zieht die ganze Auswahl, sonst nur dieses Teil
+                IF NOT plIstGewaehlt(ti) THEN plMengeSetzen([ti])
+                m = plAuswahlListe()
                 gPlZieht = TRUE
                 gPlGemerkt = FALSE
                 gPlStartS = gPlHS
                 gPlStartZ = gPlHZ
-                gPlTeilS = pl.teile[gPlSel].s
-                gPlTeilZ = pl.teile[gPlSel].z
+                gPlZugIdx = []
+                gPlZugS = []
+                gPlZugZ = []
+                FOR k = 0 TO LEN(m) - 1
+                    ARRAY_PUSH(gPlZugIdx, m[k])
+                    ARRAY_PUSH(gPlZugS, pl.teile[m[k]].s)
+                    ARRAY_PUSH(gPlZugZ, pl.teile[m[k]].z)
+                NEXT
             ELSE
                 gPlBahnSel = plBahnUnter(px, py)
+                IF gPlBahnSel < 0 THEN
+                    IF NOT umsch THEN plMengeSetzen([])
+                    gPlRahmen = TRUE
+                    gPlRahmenPlus = umsch
+                    gPlRahmenSX = px : gPlRahmenSY = py
+                    gPlRahmenEX = px : gPlRahmenEY = py
+                ELSE
+                    plMengeSetzen([])
+                END IF
             END IF
         CASE PW_BAHN
             IF NOT kern.aufPlatine(pl, gPlHS, gPlHZ) THEN RETURN TRUE
@@ -364,18 +452,24 @@ END SUB
 
 SUB plBewegung(px AS FLOAT, py AS FLOAT)
     plMaus(px, py)
-    IF gPlZieht AND gPlSel >= 0 AND gPlSel < LEN(gDok.platine.teile) THEN
+    IF gPlRahmen THEN
+        gPlRahmenEX = px
+        gPlRahmenEY = py
+    ELSEIF gPlZieht AND LEN(gPlZugIdx) > 0 THEN
         DIM ds AS INTEGER : ds = gPlHS - gPlStartS
         DIM dz AS INTEGER : dz = gPlHZ - gPlStartZ
-        DIM t AS kern.PlatTeil : t = gDok.platine.teile[gPlSel]
-        IF t.s <> gPlTeilS + ds OR t.z <> gPlTeilZ + dz THEN
+        DIM t0 AS kern.PlatTeil : t0 = gDok.platine.teile[gPlZugIdx[0]]
+        IF t0.s <> gPlZugS[0] + ds OR t0.z <> gPlZugZ[0] + dz THEN
             IF NOT gPlGemerkt THEN
                 verlaufMerken()
                 gPlGemerkt = TRUE
-                t = gDok.platine.teile[gPlSel]
             END IF
-            t.s = gPlTeilS + ds
-            t.z = gPlTeilZ + dz
+            DIM k AS INTEGER
+            FOR k = 0 TO LEN(gPlZugIdx) - 1
+                DIM t AS kern.PlatTeil : t = gDok.platine.teile[gPlZugIdx[k]]
+                t.s = gPlZugS[k] + ds
+                t.z = gPlZugZ[k] + dz
+            NEXT
             platineVeraltet()
         END IF
     END IF
@@ -384,28 +478,64 @@ SUB plBewegung(px AS FLOAT, py AS FLOAT)
 END SUB
 
 SUB plLos()
+    IF gPlRahmen THEN
+        gPlRahmen = FALSE
+        IF ABS(gPlRahmenEX - gPlRahmenSX) > 3 OR ABS(gPlRahmenEY - gPlRahmenSY) > 3 THEN plRahmenAnwenden(MIN(gPlRahmenSX, gPlRahmenEX), MIN(gPlRahmenSY, gPlRahmenEY), MAX(gPlRahmenSX, gPlRahmenEX), MAX(gPlRahmenSY, gPlRahmenEY), gPlRahmenPlus)
+        neuZeichnen()
+        statusAktualisieren()
+    END IF
     IF gPlZieht AND gPlGemerkt THEN geaendert()
     gPlZieht = FALSE
     gPlGemerkt = FALSE
 END SUB
 
-SUB plDrehen()
-    IF gPlSel < 0 OR gPlSel >= LEN(gDok.platine.teile) THEN RETURN
-    verlaufMerken()
-    DIM t AS kern.PlatTeil : t = gDok.platine.teile[gPlSel]
-    t.drehung = (t.drehung + 90) MOD 360
-    DIM b AS kern.Bauteil
+' Teile ganz im Rahmen (Bildschirm-Koordinaten) waehlen.
+SUB plRahmenAnwenden(x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT, dazu AS BOOLEAN)
+    DIM p AS FLOAT : p = kern.LOCHRASTER
+    DIM sa AS FLOAT : sa = weltX(x0) / p
+    DIM se AS FLOAT : se = weltX(x1) / p
+    DIM za AS FLOAT : za = weltY(y0) / p
+    DIM ze AS FLOAT : ze = weltY(y1) / p
+    DIM m AS ARRAY OF INTEGER : m = []
+    IF dazu THEN m = plAuswahlListe()
     DIM hinweis AS STRING
-    IF kern.bauteilMitId(gDok, t.bauteilId, b) THEN kern.teilInsFeld(gDok.platine, t, kern.bauformFuer(b, hinweis))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gDok.platine.teile) - 1
+        DIM b AS kern.Bauteil
+        IF NOT kern.bauteilMitId(gDok, gDok.platine.teile[i].bauteilId, b) THEN CONTINUE
+        DIM s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER
+        kern.teilFlaeche(gDok.platine.teile[i], kern.bauformFuer(b, hinweis), s0, z0, s1, z1)
+        IF s0 >= sa AND s1 <= se AND z0 >= za AND z1 <= ze AND NOT plIstGewaehlt(i) THEN ARRAY_PUSH(m, i)
+    NEXT
+    plMengeSetzen(m)
+END SUB
+
+' R: jedes gewaehlte Teil um seinen Ursprung drehen (am Rand eingerueckt).
+SUB plDrehen()
+    DIM m AS ARRAY OF INTEGER : m = plAuswahlListe()
+    IF LEN(m) = 0 THEN RETURN
+    verlaufMerken()
+    DIM hinweis AS STRING
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(m) - 1
+        DIM t AS kern.PlatTeil : t = gDok.platine.teile[m[k]]
+        t.drehung = (t.drehung + 90) MOD 360
+        DIM b AS kern.Bauteil
+        IF kern.bauteilMitId(gDok, t.bauteilId, b) THEN kern.teilInsFeld(gDok.platine, t, kern.bauformFuer(b, hinweis))
+    NEXT
     geaendert()
 END SUB
 
 SUB plLoeschen()
-    IF gPlSel >= 0 AND gPlSel < LEN(gDok.platine.teile) THEN
+    DIM m AS ARRAY OF INTEGER : m = plAuswahlListe()
+    IF LEN(m) > 0 THEN
         verlaufMerken()
-        ARRAY_REMOVE_AT(gDok.platine.teile, gPlSel)
-        gPlSel = -1
-        gPlMeldung = "Teil von der Platine genommen (Einsetzen setzt es wieder)"
+        DIM i AS INTEGER
+        FOR i = LEN(gDok.platine.teile) - 1 TO 0 STEP -1
+            IF plIstGewaehlt(i) THEN ARRAY_REMOVE_AT(gDok.platine.teile, i)
+        NEXT
+        plMengeSetzen([])
+        gPlMeldung = STR$(LEN(m)) + " Teil(e) von der Platine genommen (Einsetzen setzt sie wieder)"
         geaendert()
     ELSEIF gPlBahnSel >= 0 AND gPlBahnSel < LEN(gDok.platine.bahnen) THEN
         verlaufMerken()
@@ -513,6 +643,8 @@ FUNCTION plStatus$() AS STRING
     IF LEN(r.unplatziert) > 0 THEN t = t + ", " + STR$(LEN(r.unplatziert)) + " fehlen (" + JOIN$(r.unplatziert, ", ") + ")"
     t = t + "   Luftlinien " + STR$(LEN(r.luft)) + ", Kurzschluesse " + STR$(r.kurzschluesse)
     IF LEN(r.fehler) > r.kurzschluesse THEN t = t + ", Hinweise " + STR$(LEN(r.fehler) - r.kurzschluesse)
+    DIM gew AS INTEGER : gew = LEN(plAuswahlListe())
+    IF gew > 1 THEN t = t + "   " + STR$(gew) + " Teile gewaehlt"
     IF gPlMausDrin AND kern.aufPlatine(pl, gPlHS, gPlHZ) THEN
         t = t + "   Loch " + STR$(gPlHS + 1) + "/" + STR$(gPlHZ + 1)
         DIM n AS STRING : n = r.lochNetz$(gPlHS, gPlHZ)

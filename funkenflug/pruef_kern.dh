@@ -508,6 +508,31 @@ DIM kdok AS kern.Dokument : kdok = kern.dokumentAusJson(kern.dokumentNachJson(ld
 kdok.platine.bahnen = []
 DIM kvn AS INTEGER : kvn = kern.platineVerbinden(kdok, vow)
 PRINT "Verbinden zweimal: "; kern.platineVerbinden(ldok, vow); " weitere  (erwartet 0 weitere)"
+' Einsetzen nach Netzen: eine Kette R1-R2-...-R6, im Schaltplan durcheinander
+DIM kettenFolge AS ARRAY OF INTEGER : kettenFolge = [1, 4, 2, 6, 3, 5]
+DIM kettenLaenge AS ARRAY OF FLOAT : kettenLaenge = []
+DIM kv AS INTEGER, kart AS INTEGER, kweise AS INTEGER
+FOR kart = 0 TO 1
+    FOR kweise = 0 TO 1
+        DIM kdk AS kern.Dokument : kdk = NEW kern.Dokument()
+        kdk.platine.art = IIF(kart = 0, kern.PL_STREIFEN, kern.PL_LOCH)
+        FOR kv = 0 TO 5
+            DIM kr AS kern.Bauteil : kr = kern.neuesBauteil("R", kern.neueLage((kettenFolge[kv] - 1) * 400, 0))
+            kr.referenz = "R" + STR$(kettenFolge[kv])
+            ARRAY_PUSH(kdk.blaetter[0].bauteile, kr)
+        NEXT
+        DIM kgs AS INTEGER : kgs = kern.platineEinsetzenMit(kdk, kweise = 1)
+        DIM kbr AS kern.PlatBericht : kbr = kern.platinePruefen(kdk)
+        DIM ksum AS FLOAT : ksum = 0
+        FOR kv = 0 TO LEN(kbr.luft) - 1
+            ksum = ksum + SQR((kbr.luft[kv].s2 - kbr.luft[kv].s1) ^ 2 + (kbr.luft[kv].z2 - kbr.luft[kv].z1) ^ 2)
+        NEXT
+        ARRAY_PUSH(kettenLaenge, ksum)
+        IF kbr.kurzschluesse > 0 OR LEN(kbr.fehler) > 0 OR LEN(kbr.luft) <> 5 THEN PRINT "  Kette: unerwartet "; kbr.kurzschluesse; " Kurzschluesse, "; LEN(kbr.fehler); " Hinweise, "; LEN(kbr.luft); " Luftlinien"
+    NEXT
+NEXT
+PRINT "Luftlinien der Kette (Reihenfolge / nach Netzen): Streifen "; ROUND(kettenLaenge[0]); " / "; ROUND(kettenLaenge[1]); "  Loch "; ROUND(kettenLaenge[2]); " / "; ROUND(kettenLaenge[3]); "  kuerzer: "; kettenLaenge[1] < kettenLaenge[0] AND kettenLaenge[3] < kettenLaenge[2]; "  (erwartet kuerzer: TRUE)"
+
 ' eigene Bauformen
 DIM eig AS kern.Symbol : eig = kern.symbolRegistrieren(kern.icErzeugen("E_RELAIS", "Relais", "K", "", "1 A links" + lf + "2 B rechts" + lf + "3 C rechts" + lf + "loch 1 0 0" + lf + "loch 2 4 -1" + lf + "loch 3 4 1"))
 DIM eigB AS kern.Bauteil : eigB = kern.neuesBauteil("E_RELAIS", kern.neueLage(0, 0))
