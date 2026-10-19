@@ -162,7 +162,7 @@ FUNCTION grafikZeile$(pl AS Pinliste, t AS ARRAY OF STRING, BYREF gesehen AS MAP
         CASE "bauform"
             IF LEN(t) <> 2 THEN RETURN "bauform braucht genau einen Namen (AX4, RAD2, DIP8 ...)"
             DIM bfp AS Bauform
-            IF NOT bauformLesen(t[1], bfp) THEN RETURN "Bauform '" + t[1] + "' gibt es nicht (AX4, RAD2, TO92-CBE, DIP8, SIL3, HDR2X5, TRIM)"
+            IF NOT bauformLesen(t[1], bfp) THEN RETURN "Bauform '" + t[1] + "' gibt es nicht (AX4, RAD2, TO92-CBE, DIP8, SIL3, HDR2X5, TRIM, TAST6, RELAIS5)"
             pl.bauform = t[1]
             RETURN ""
         CASE "loch"

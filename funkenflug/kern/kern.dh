@@ -7,6 +7,7 @@ IMPORT "text.dh" AS kern
 IMPORT "modell.dh" AS kern
 IMPORT "symbole.dh" AS kern
 IMPORT "bibliothek.dh" AS kern
+IMPORT "bibliothek_mehr.dh" AS kern
 IMPORT "stueckliste.dh" AS kern
 IMPORT "netze.dh" AS kern
 IMPORT "erc.dh" AS kern

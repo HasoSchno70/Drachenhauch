@@ -113,23 +113,23 @@ SUB bibliothekAufbauen()
     s.pinHinzu("2", "K", NEW Punkt(200, 0), 140, 180, PIN_PASSIV)
     ARRAY_PUSH(gBib, s)
 
-    ' NPN-Transistor
+    ' NPN-Transistor (Kollektor und Emitter auf dem 1-mm-Raster: x = 100)
     s = NEW Symbol("Q_NPN", "NPN-Transistor", "Q")
     s.wertVorgabe = "BC547"
-    s.grafikHinzu(prKreis(0, 0, 180))
+    s.grafikHinzu(prKreis(20, 0, 180))
     s.grafikHinzu(prLinie(-40, -80, -40, 80))          ' Basisbalken
-    s.grafikHinzu(prLinie(-40, -30, 70, -90))          ' Kollektor-Schraege
-    s.grafikHinzu(prLinie(-40, 30, 70, 90))            ' Emitter-Schraege
+    s.grafikHinzu(prLinie(-40, -30, 100, -100))        ' Kollektor-Schraege
+    s.grafikHinzu(prLinie(-40, 30, 100, 100))          ' Emitter-Schraege
     DIM pf AS Primitiv : pf = NEW Primitiv(PR_POLYLINIE)
     pf.fuellen = TRUE
-    ARRAY_PUSH(pf.punkte, NEW Punkt(70, 90))
-    ARRAY_PUSH(pf.punkte, NEW Punkt(35, 80))
-    ARRAY_PUSH(pf.punkte, NEW Punkt(52, 55))
-    ARRAY_PUSH(pf.punkte, NEW Punkt(70, 90))
+    ARRAY_PUSH(pf.punkte, NEW Punkt(86, 93))
+    ARRAY_PUSH(pf.punkte, NEW Punkt(36, 88))
+    ARRAY_PUSH(pf.punkte, NEW Punkt(52, 56))
+    ARRAY_PUSH(pf.punkte, NEW Punkt(86, 93))
     s.grafikHinzu(pf)
     s.pinHinzu("1", "B", NEW Punkt(-200, 0), 160, 0, PIN_PASSIV)
-    s.pinHinzu("2", "C", NEW Punkt(70, -200), 110, 90, PIN_PASSIV)
-    s.pinHinzu("3", "E", NEW Punkt(70, 200), 110, 270, PIN_PASSIV)
+    s.pinHinzu("2", "C", NEW Punkt(100, -200), 100, 90, PIN_PASSIV)
+    s.pinHinzu("3", "E", NEW Punkt(100, 200), 100, 270, PIN_PASSIV)
     ARRAY_PUSH(gBib, s)
 
     ' Schalter (Taster, einpolig)
@@ -159,4 +159,6 @@ SUB bibliothekAufbauen()
     s.grafikHinzu(prLinie(-60, -100, 60, -100))
     s.pinHinzu("1", "", NEW Punkt(0, 0), 0, 270, PIN_LEISTUNG_EIN)
     ARRAY_PUSH(gBib, s)
+
+    bibliothekMehr()
 END SUB

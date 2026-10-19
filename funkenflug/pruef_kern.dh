@@ -632,6 +632,56 @@ FOR hvi = 0 TO LEN(hev) - 1
 NEXT
 PRINT "Unterblatt geloescht: "; hs.sym.fehlt; " "; CONTAINS(het, "Unterblatt fehlt"); " kein 'Symbol fehlt' "; NOT CONTAINS(het, "Symbol #BLATT"); "  (erwartet TRUE TRUE kein 'Symbol fehlt' TRUE)"
 
+' --- Die ganze Bibliothek: Raster, eindeutige Nummern, Bauform passt
+DIM bibl AS ARRAY OF kern.Symbol : bibl = kern.bibliothekListe()
+DIM bibFehler AS STRING : bibFehler = ""
+DIM bbi AS INTEGER, bbj AS INTEGER
+FOR bbi = 0 TO LEN(bibl) - 1
+    DIM bsy AS kern.Symbol : bsy = bibl[bbi]
+    DIM bnr AS MAP OF INTEGER
+    MAPCLEAR(bnr)
+    FOR bbj = 0 TO LEN(bsy.pins) - 1
+        IF bsy.pins[bbj].pos.x MOD 100 <> 0 OR bsy.pins[bbj].pos.y MOD 100 <> 0 THEN bibFehler = bibFehler + bsy.id + "." + bsy.pins[bbj].nummer + " nicht auf dem Raster; "
+        IF MAPHAS(bnr, bsy.pins[bbj].nummer) THEN bibFehler = bibFehler + bsy.id + " Pin " + bsy.pins[bbj].nummer + " doppelt; "
+        MAPPUT(bnr, bsy.pins[bbj].nummer, 1)
+    NEXT
+    IF bsy.einheitLeistung THEN CONTINUE
+    DIM bbt AS kern.Bauteil : bbt = kern.neuesBauteil(bsy.id, kern.neueLage(0, 0))
+    bbt.referenz = bsy.praefix + "1"
+    DIM bhw AS STRING
+    DIM bbf AS kern.Bauform : bbf = kern.bauformFuer(bbt, bhw)
+    IF bhw <> "" THEN bibFehler = bibFehler + bsy.id + ": " + bhw + "; "
+    FOR bbj = 0 TO LEN(bsy.pins) - 1
+        IF LEN(kern.bauformPinsZu(bbf, bbt, bbj)) = 0 THEN bibFehler = bibFehler + bsy.id + " Pin " + bsy.pins[bbj].nummer + " ohne Bein in " + bbf.name + "; "
+    NEXT
+NEXT
+PRINT "Bibliothek: "; LEN(bibl); " Symbole, Fehler: ["; bibFehler; "]  (erwartet 35 Symbole, Fehler: [])"
+' Taster: vier Beine, je zwei ein Pin; Relais: fuenf
+DIM tdk AS kern.Dokument : tdk = NEW kern.Dokument()
+DIM tsw AS kern.Bauteil : tsw = kern.neuesBauteil("SW_PUSH", kern.neueLage(0, 0))
+tsw.referenz = "SW1"
+ARRAY_PUSH(tdk.blaetter[0].bauteile, tsw)
+DIM trl AS kern.Bauteil : trl = kern.neuesBauteil("K", kern.neueLage(2000, 0))
+trl.referenz = "K1"
+ARRAY_PUSH(tdk.blaetter[0].bauteile, trl)
+DIM tgs AS INTEGER : tgs = kern.platineEinsetzen(tdk)
+DIM tbr AS kern.PlatBericht : tbr = kern.platinePruefen(tdk)
+DIM tsw1 AS INTEGER : tsw1 = 0
+DIM tnetz AS INTEGER : tnetz = -1
+DIM tgleich AS BOOLEAN : tgleich = TRUE
+FOR bbj = 0 TO LEN(tbr.pads) - 1
+    IF tbr.pads[bbj].text = "SW1.1" THEN
+        tsw1 = tsw1 + 1
+        IF tnetz >= 0 AND tbr.pads[bbj].netz <> tnetz THEN tgleich = FALSE
+        tnetz = tbr.pads[bbj].netz
+    END IF
+NEXT
+PRINT "Taster/Relais auf der Platine: "; LEN(tbr.pads); " Loetaugen, SW1.1 hat "; tsw1; ", gleiches Netz "; tgleich; ", Kurzschluesse "; tbr.kurzschluesse; ", Hinweise "; LEN(tbr.fehler); "  (erwartet 9 Loetaugen, SW1.1 hat 2, gleiches Netz TRUE, Kurzschluesse 0, Hinweise 0)"
+' OPV: Beine nach TL071 im DIP8
+DIM top AS kern.Bauteil : top = kern.neuesBauteil("OPV", kern.neueLage(0, 0))
+DIM tobf AS kern.Bauform : tobf = kern.bauformFuer(top, bhw)
+PRINT "OPV im DIP8: OUT = Bein "; tobf.pins[kern.bauformPinZu(tobf, top, 2)].schluessel; ", V- = Bein "; tobf.pins[kern.bauformPinZu(tobf, top, 4)].schluessel; "  (erwartet OUT = Bein 6, V- = Bein 4)"
+
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
 PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)

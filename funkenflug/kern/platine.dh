@@ -19,6 +19,10 @@
 '   HDR2X5  Stiftleiste 2 Reihen x 5, Pin 1 und 2 nebeneinander (Flachkabel)
 '   TRIM  stehender Trimmer: 1 und 3 zwei Loecher auseinander, Schleifer 2
 '         ein Loch versetzt dazwischen
+'   TAST6 6x6-Taster, 4 Beine (je zwei intern verbunden = ein Pin)
+'   RELAIS5  Print-Relais mit Wechsler (A1 A2 COM NO NC)
+' Hat eine Bauform mehrere Beine mit demselben Schluessel, gehoeren sie zum
+' selben Pin -- jedes bekommt ein Loetauge, alle im selben Netz.
 ' Ohne (lesbares) Gehaeuse gilt eine Vorgabe je Symbol.
 
 CLASS BauformPin
@@ -100,6 +104,26 @@ FUNCTION bauformLesen(name AS STRING, BYREF bf AS Bauform) AS BOOLEAN
                 bf.pinDazu(STR$(q * reihen + i + 1), i, q)
             NEXT
         NEXT
+        RETURN TRUE
+    END IF
+    IF n = "TAST6" THEN
+        ' 6x6-Taster: je zwei Beine intern verbunden (gleicher Schluessel)
+        bf = NEW Bauform("TAST6")
+        bf.pinDazu("1", 0, 0)
+        bf.pinDazu("1", 3, 0)
+        bf.pinDazu("2", 0, 2)
+        bf.pinDazu("2", 3, 2)
+        RETURN TRUE
+    END IF
+    IF n = "RELAIS5" THEN
+        ' Print-Relais mit Wechsler, angenaehert an die verbreitete
+        ' Songle-SRD-Reihe -- Beinabstaende vor dem Bohren am Datenblatt pruefen
+        bf = NEW Bauform("RELAIS5")
+        bf.pinDazu("1", 0, 0)
+        bf.pinDazu("2", 0, 5)
+        bf.pinDazu("3", 1, 2)
+        bf.pinDazu("5", 5, 0)
+        bf.pinDazu("4", 5, 5)
         RETURN TRUE
     END IF
     IF n = "TRIM" THEN
@@ -205,6 +229,20 @@ FUNCTION bauformPinZu(bf AS Bauform, b AS Bauteil, j AS INTEGER) AS INTEGER
         IF b.sym.pins[j].name <> "" AND UPPER$(bf.pins[i].schluessel) = UPPER$(b.sym.pins[j].name) THEN RETURN i
     NEXT
     RETURN -1
+END FUNCTION
+
+' Alle Bauform-Beine zum Symbol-Pin j (ein Pin kann mehrere Beine haben).
+FUNCTION bauformPinsZu(bf AS Bauform, b AS Bauteil, j AS INTEGER) AS ARRAY OF INTEGER
+    DIM r AS ARRAY OF INTEGER : r = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bf.pins) - 1
+        IF bf.pins[i].schluessel = b.sym.pins[j].nummer THEN ARRAY_PUSH(r, i)
+    NEXT
+    IF LEN(r) > 0 THEN RETURN r
+    FOR i = 0 TO LEN(bf.pins) - 1
+        IF b.sym.pins[j].name <> "" AND UPPER$(bf.pins[i].schluessel) = UPPER$(b.sym.pins[j].name) THEN ARRAY_PUSH(r, i)
+    NEXT
+    RETURN r
 END FUNCTION
 
 ' Loch eines Bauform-Pins fuer ein platziertes Teil (gedreht um den Ursprung,
@@ -432,38 +470,44 @@ FUNCTION platinePruefen(dok AS Dokument) AS PlatBericht
         IF hinweis <> "" THEN platFehler(r, hinweis, t.s, t.z, FALSE)
         FOR j = 0 TO LEN(b.sym.pins) - 1
             DIM pt AS STRING : pt = b.referenz + "." + b.sym.pins[j].nummer
-            k = bauformPinZu(bf, b, j)
-            IF k < 0 THEN
+            DIM ks AS ARRAY OF INTEGER : ks = bauformPinsZu(bf, b, j)
+            IF LEN(ks) = 0 THEN
                 platFehler(r, "Bauform " + bf.name + " hat kein Bein fuer " + pt, t.s, t.z, FALSE)
                 CONTINUE
             END IF
-            DIM lo AS Punkt : lo = lochVon(t, bf.pins[k])
-            IF NOT aufPlatine(pl, lo.x, lo.y) THEN
-                platFehler(r, pt + " liegt ausserhalb der Platine", t.s, t.z, FALSE)
-                CONTINUE
-            END IF
-            DIM lk AS STRING : lk = lochKey$(lo.x, lo.y)
-            IF MAPHAS(belegt, lk) THEN
-                platFehler(r, "Loch " + STR$(lo.x + 1) + "/" + STR$(lo.y + 1) + " doppelt belegt: " + MAPGET(belegt, lk) + " und " + pt, lo.x, lo.y, FALSE)
-                CONTINUE
-            END IF
-            MAPPUT(belegt, lk, pt)
-            IF MAPHAS(weg, lk) THEN platFehler(r, pt + " steckt in einer Trennstelle -- dort ist kein Kupfer", lo.x, lo.y, FALSE)
-            DIM pd AS Pad : pd = NEW Pad()
-            pd.s = lo.x
-            pd.z = lo.y
-            pd.teil = i
-            pd.text = pt
-            pd.nummer = b.sym.pins[j].nummer
+            ' das Netz des Pins -- fuer alle seine Beine dasselbe
+            DIM pnz AS INTEGER
             DIM nk AS STRING : nk = b.id + "|" + b.sym.pins[j].nummer
             IF MAPHAS(pn, nk) THEN
-                pd.netz = MAPGET(pn, nk)
+                pnz = MAPGET(pn, nk)
             ELSE
                 ' im Schaltplan offen: ein eigenes Netz, das nichts beruehren darf
-                pd.netz = LEN(r.netzNamen)
+                pnz = LEN(r.netzNamen)
                 ARRAY_PUSH(r.netzNamen, pt + " (offen)")
             END IF
-            ARRAY_PUSH(r.pads, pd)
+            DIM kk AS INTEGER
+            FOR kk = 0 TO LEN(ks) - 1
+                DIM lo AS Punkt : lo = lochVon(t, bf.pins[ks[kk]])
+                IF NOT aufPlatine(pl, lo.x, lo.y) THEN
+                    platFehler(r, pt + " liegt ausserhalb der Platine", t.s, t.z, FALSE)
+                    CONTINUE
+                END IF
+                DIM lk AS STRING : lk = lochKey$(lo.x, lo.y)
+                IF MAPHAS(belegt, lk) THEN
+                    platFehler(r, "Loch " + STR$(lo.x + 1) + "/" + STR$(lo.y + 1) + " doppelt belegt: " + MAPGET(belegt, lk) + " und " + pt, lo.x, lo.y, FALSE)
+                    CONTINUE
+                END IF
+                MAPPUT(belegt, lk, pt)
+                IF MAPHAS(weg, lk) THEN platFehler(r, pt + " steckt in einer Trennstelle -- dort ist kein Kupfer", lo.x, lo.y, FALSE)
+                DIM pd AS Pad : pd = NEW Pad()
+                pd.s = lo.x
+                pd.z = lo.y
+                pd.teil = i
+                pd.text = pt
+                pd.nummer = b.sym.pins[j].nummer
+                pd.netz = pnz
+                ARRAY_PUSH(r.pads, pd)
+            NEXT
         NEXT
     NEXT
     ' was im Schaltplan steht, aber noch nicht auf der Platine
@@ -618,6 +662,41 @@ FUNCTION platineEinsetzen(dok AS Dokument) AS INTEGER
     RETURN platineEinsetzenMit(dok, TRUE)
 END FUNCTION
 
+' Trennstellen, die ein Teil auf Streifenraster braucht: in jeder Zeile
+' zwischen zwei benachbarten Beinen VERSCHIEDENER Pins eine, moeglichst in
+' der Mitte. FALSE, wenn zwei verschiedene Pins direkt nebeneinander stehen
+' (dann passt keine Trennstelle dazwischen). Das deckt DIP (zwischen den
+' Reihen), Relais, Taster und alles Eigene ab -- keine Sonderregel je Bauform.
+FUNCTION streifenSchnitte(t AS PlatTeil, bf AS Bauform, BYREF schnitte AS ARRAY OF Punkt) AS BOOLEAN
+    schnitte = []
+    DIM folge AS ARRAY OF STRING : folge = []
+    DIM bein AS MAP OF INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bf.pins) - 1
+        DIM lo AS Punkt : lo = lochVon(t, bf.pins[i])
+        ARRAY_PUSH(folge, PADL$(STR$(lo.y + 10000), 6, "0") + PADL$(STR$(lo.x + 10000), 6, "0") + CHR$(1) + STR$(i))
+        MAPPUT(bein, lochKey$(lo.x, lo.y), 1)
+    NEXT
+    SORT(folge)
+    FOR i = 1 TO LEN(folge) - 1
+        DIM a AS Punkt : a = lochVon(t, bf.pins[VAL(MID$(folge[i - 1], INSTR(folge[i - 1], CHR$(1)) + 1))])
+        DIM ia AS INTEGER : ia = VAL(MID$(folge[i - 1], INSTR(folge[i - 1], CHR$(1)) + 1))
+        DIM ib AS INTEGER : ib = VAL(MID$(folge[i], INSTR(folge[i], CHR$(1)) + 1))
+        DIM b AS Punkt : b = lochVon(t, bf.pins[ib])
+        IF a.y <> b.y OR bf.pins[ia].schluessel = bf.pins[ib].schluessel THEN CONTINUE
+        ' ein freies Loch dazwischen, der Mitte am naechsten
+        DIM best AS INTEGER : best = -1
+        DIM x AS INTEGER
+        FOR x = a.x + 1 TO b.x - 1
+            IF MAPHAS(bein, lochKey$(x, a.y)) THEN CONTINUE
+            IF best < 0 OR ABS(2 * x - a.x - b.x) < ABS(2 * best - a.x - b.x) THEN best = x
+        NEXT
+        IF best < 0 THEN RETURN FALSE
+        ARRAY_PUSH(schnitte, NEW Punkt(best, a.y))
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
 ' Loecher einer Flaeche merken bzw. pruefen, ob keins davon belegt ist.
 SUB flaecheMerken(BYREF m AS MAP OF INTEGER, s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER)
     DIM q AS INTEGER, w AS INTEGER
@@ -661,15 +740,16 @@ FUNCTION platineEinsetzenMit(dok AS Dokument, nachNetzen AS BOOLEAN) AS INTEGER
         flaecheMerken(koerper, a0, c0, a1, c1)
         flaecheMerken(zone, a0 - 1, c0 - 1, a1 + rechtsRand, c1 + 1)
         FOR j = 0 TO LEN(b0.sym.pins) - 1
-            k = bauformPinZu(f0, b0, j)
-            IF k < 0 THEN CONTINUE
             IF NOT MAPHAS(pn, b0.id + "|" + b0.sym.pins[j].nummer) THEN CONTINUE
-            DIM lo0 AS Punkt : lo0 = lochVon(pl.teile[i], f0.pins[k])
             DIM n0 AS INTEGER : n0 = MAPGET(pn, b0.id + "|" + b0.sym.pins[j].nummer)
-            ARRAY_PUSH(ps, lo0.x)
-            ARRAY_PUSH(pz, lo0.y)
-            ARRAY_PUSH(pnetz, n0)
-            MAPPUT(netzDa, STR$(n0), 1)
+            DIM ks0 AS ARRAY OF INTEGER : ks0 = bauformPinsZu(f0, b0, j)
+            FOR k = 0 TO LEN(ks0) - 1
+                DIM lo0 AS Punkt : lo0 = lochVon(pl.teile[i], f0.pins[ks0[k]])
+                ARRAY_PUSH(ps, lo0.x)
+                ARRAY_PUSH(pz, lo0.y)
+                ARRAY_PUSH(pnetz, n0)
+                MAPPUT(netzDa, STR$(n0), 1)
+            NEXT
         NEXT
     NEXT
     ' wie viele echte Pins hat jedes Netz? (Netze mit einem Pin verbinden nichts)
@@ -722,19 +802,47 @@ FUNCTION platineEinsetzenMit(dok AS Dokument, nachNetzen AS BOOLEAN) AS INTEGER
             ARRAY_PUSH(beinNetz, -1)
         NEXT
         FOR j = 0 TO LEN(b.sym.pins) - 1
-            k = bauformPinZu(bf, b, j)
-            IF k < 0 THEN CONTINUE
-            IF MAPHAS(pn, b.id + "|" + b.sym.pins[j].nummer) THEN beinNetz[k] = MAPGET(pn, b.id + "|" + b.sym.pins[j].nummer)
+            IF NOT MAPHAS(pn, b.id + "|" + b.sym.pins[j].nummer) THEN CONTINUE
+            DIM ksb AS ARRAY OF INTEGER : ksb = bauformPinsZu(bf, b, j)
+            FOR k = 0 TO LEN(ksb) - 1
+                beinNetz[ksb[k]] = MAPGET(pn, b.id + "|" + b.sym.pins[j].nummer)
+            NEXT
         NEXT
         ' Drehungen, die in Frage kommen
+        ' (Streifenraster: die mit den wenigsten noetigen Trennstellen, wer
+        ' zwei Pins direkt nebeneinander auf einen Streifen setzt, faellt raus)
         DIM drehungen AS ARRAY OF INTEGER : drehungen = []
+        DIM t AS PlatTeil : t = NEW PlatTeil(b.id, 0, 0)
+        DIM schnittZahl AS ARRAY OF INTEGER : schnittZahl = []
+        DIM sch AS ARRAY OF Punkt
         IF pl.art = PL_STREIFEN THEN
-            ARRAY_PUSH(drehungen, IIF(dip, 0, 90))
+            DIM wenigste AS INTEGER : wenigste = -1
+            DIM dr AS INTEGER
+            FOR dr = 0 TO 90 STEP 90
+                t.drehung = dr
+                IF NOT streifenSchnitte(t, bf, sch) THEN CONTINUE
+                IF NOT nachNetzen AND wenigste >= 0 AND LEN(sch) >= wenigste THEN CONTINUE
+                IF NOT nachNetzen THEN
+                    drehungen = []
+                    schnittZahl = []
+                END IF
+                ARRAY_PUSH(drehungen, dr)
+                ARRAY_PUSH(schnittZahl, LEN(sch))
+                IF wenigste < 0 OR LEN(sch) < wenigste THEN wenigste = LEN(sch)
+            NEXT
+            IF LEN(drehungen) = 0 THEN
+                ' geht in keiner Lage ohne Kurzschluss: quer setzen, die Pruefung meldet es
+                ARRAY_PUSH(drehungen, 90)
+                ARRAY_PUSH(schnittZahl, 0)
+            END IF
         ELSE
             ARRAY_PUSH(drehungen, 0)
-            IF nachNetzen THEN ARRAY_PUSH(drehungen, 90)
+            ARRAY_PUSH(schnittZahl, 0)
+            IF nachNetzen THEN
+                ARRAY_PUSH(drehungen, 90)
+                ARRAY_PUSH(schnittZahl, 0)
+            END IF
         END IF
-        DIM t AS PlatTeil : t = NEW PlatTeil(b.id, 0, 0)
         DIM bestK AS FLOAT : bestK = -1
         DIM bs AS INTEGER, bz AS INTEGER, bd AS INTEGER
         DIM versuch AS INTEGER
@@ -753,7 +861,7 @@ FUNCTION platineEinsetzenMit(dok AS Dokument, nachNetzen AS BOOLEAN) AS INTEGER
                         IF NOT flaecheFrei(zone, s0, z0, s1, z1) THEN CONTINUE
                         IF NOT flaecheFrei(koerper, s0 - 1, z0 - 1, s1 + rechtsRand, z1 + 1) THEN CONTINUE
                         ' Kosten: Abstand jedes Beins zum naechsten gesetzten Bein seines Netzes
-                        DIM kosten AS FLOAT : kosten = (z * pl.spalten + s) * 0.0001
+                        DIM kosten AS FLOAT : kosten = (z * pl.spalten + s) * 0.0001 + schnittZahl[di] * 3
                         IF nachNetzen THEN
                             FOR k = 0 TO LEN(bf.pins) - 1
                                 IF beinNetz[k] < 0 THEN CONTINUE
@@ -806,9 +914,13 @@ FUNCTION platineEinsetzenMit(dok AS Dokument, nachNetzen AS BOOLEAN) AS INTEGER
             FOR w = fz0 TO fz1
                 ' rechts daneben trennen: der Nachbar teilt sonst die Streifen
                 IF fs1 + 1 < pl.spalten AND NOT istTrennstelle(pl, fs1 + 1, w) THEN ARRAY_PUSH(pl.trenn, NEW Punkt(fs1 + 1, w))
-                ' DIP: zwischen den Reihen trennen
-                IF dip AND NOT istTrennstelle(pl, fs0 + 1, w) THEN ARRAY_PUSH(pl.trenn, NEW Punkt(fs0 + 1, w))
             NEXT
+            ' zwischen verschiedenen Pins desselben Teils (DIP-Reihen, Relais ...)
+            IF streifenSchnitte(t, bf, sch) THEN
+                FOR k = 0 TO LEN(sch) - 1
+                    IF NOT istTrennstelle(pl, sch[k].x, sch[k].y) THEN ARRAY_PUSH(pl.trenn, sch[k])
+                NEXT
+            END IF
         END IF
     WEND
     RETURN gesetzt

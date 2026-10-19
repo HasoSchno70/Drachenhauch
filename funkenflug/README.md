@@ -215,6 +215,32 @@ gelten als Quelle – ein PWR_FLAG wie in KiCad braucht es nicht.
 `M` heißt in SPICE *milli*; Dioden und Transistoren bekommen `.model`-Zeilen),
 `.csv` (Semikolon) oder `.net`/`.txt` als lesbarer Text.
 
+## Bibliothek
+
+35 eingebaute Symbole, jedes mit seiner Platinen-Bauform:
+
+| Gruppe | Symbole (Vorgabe-Bauform) |
+|---|---|
+| Passive | Widerstand (AX4), Kondensator (RAD2), Elko (RAD1), Spule (AX4), Potentiometer (TRIM), Quarz (RAD2), Sicherung (AX9, Halter 5×20) |
+| Dioden | Diode, Z-Diode, Schottky (AX4), LED (RAD1) |
+| Transistoren | NPN BC547, PNP BC557 (TO92-CBE), N-MOSFET 2N7000, P-MOSFET BS250 (TO92-SGD) |
+| Analog | Operationsverstärker (DIP8, Pins wie TL071/741), Spannungsregler 78xx (TO220: IN GND OUT), Timer 555 (DIP8) |
+| Logik | 7400, 7404, 7408, 7432, 7486 als ganze ICs (DIP14) |
+| Schalter | Schalter (RAD2), Taster (TAST6: 6×6, je zwei Beine intern verbunden), Relais mit Wechsler (RELAIS5) |
+| Anschlüsse | Stecker 1×2, 1×3, 1×4, 1×6, 1×8 (SIL), 2×5 (HDR2X5), Batterie (RAD4) |
+| Versorgung | GND, VCC |
+
+Logik gibt es bewusst als ganze 74xx-ICs: einzelne Gatter-Symbole bräuchten
+Mehrfach-Einheiten je Gehäuse. Die Beinfolge der Transistoren hängt vom Typ
+ab – passt sie nicht, das Gehäuse-Feld ändern (`TO92-EBC`, `TO92-GDS` …).
+`RELAIS5` ist der verbreiteten Songle-SRD-Reihe angenähert; vor dem Bohren
+am Datenblatt prüfen. Ein Test geht die ganze Bibliothek durch: jeder
+Anschluss auf dem 1-mm-Raster (beim alten NPN lagen Kollektor und Emitter
+0,7 mm daneben – verbunden war es nur, weil die Netz-Erkennung rundet),
+Pin-Nummern eindeutig, jedes Bein in der Bauform vorhanden.
+
+![Die Bibliothek](bibliothek.png)
+
 ## Platine (Lochraster / Streifenraster)
 
 „Platine" in der Kopfleiste schaltet auf die Lochraster-Sicht desselben
@@ -255,7 +281,9 @@ aus sechs Widerständen, im Schaltplan durcheinander, braucht so 19 statt 44
 Löcher Luftlinie (Lochraster: 17 statt 62). Auf Streifenraster stehen sie
 quer zu den Streifen (sonst lägen beide Beine eines Widerstands auf einem
 Streifen), rechts neben jedem Teil und unter einem DIP zwischen den Reihen
-wird getrennt, und rechts bleibt ein freies Loch, damit jedes Teil auf seinem
+wird getrennt (allgemein: in jeder Zeile zwischen zwei Beinen verschiedener
+Pins, die Drehung mit den wenigsten Trennstellen gewinnt – das deckt DIP,
+Relais und Taster ohne Sonderregel), und rechts bleibt ein freies Loch, damit jedes Teil auf seinem
 Streifenstück Platz für eine Brücke hat – es entsteht nie ein Kurzschluss,
 was fehlt, zeigen die Luftlinien. Bauteile, die im Schaltplan gelöscht wurden, verschwinden beim
 Umschalten von der Platine (ein Rückgängig-Schritt).
@@ -263,7 +291,10 @@ Umschalten von der Platine (ein Rückgängig-Schritt).
 Die **Bauform** ist das Gehäuse-Feld des Bauteils: `AX4` (axial, 4 Löcher),
 `RAD2`, `RAD1`, `TO92-CBE` (Beinfolge nach Pin-Namen, auch `TO92-GDS` für FETs),
 `TO220-GDS`, `TO92`/`TO220` ohne Folge (Pins 1 2 3), `DIP8`, `SIL3`, `HDR2X5`
-(Stiftleiste 2 × 5, Pin 1 und 2 nebeneinander), `TRIM` (stehender Trimmer).
+(Stiftleiste 2 × 5, Pin 1 und 2 nebeneinander), `TRIM` (stehender Trimmer),
+`TAST6` (6×6-Taster), `RELAIS5`. Mehrere Beine mit demselben Schlüssel
+gehören zum selben Pin – jedes bekommt ein Lötauge im selben Netz (so steht
+ein Tasterbein nie unbemerkt auf einem fremden Streifen).
 Eigene Symbole bringen ihre Bauform in der Pinliste mit: `bauform DIP8` als
 Vorgabe oder ganz eigen je Pin `loch Nr Spalte Zeile` (z. B. ein Relais mit
 versetzten Beinen); der Editor meldet fehlende, doppelte und unbekannte
@@ -295,7 +326,9 @@ kern/       Modell, Geometrie, Bibliothek, Netze, Datei – ohne Oberfläche,
   geometrie.dh   Punkt, Lage (Transform), Raster/Snap, Konstanten
   text.dh        Überstrich ~{RESET}: sichtbarer Text, Pango-Markup
   modell.dh      Pin, Primitiv, Symbol, Bauteil, Draht, Knoten, Label, Blatt, Dokument
-  bibliothek.dh  10 eingebaute Symbole (R, C, Elko, L, Diode, LED, NPN, Schalter, GND, VCC)
+  bibliothek.dh  Grundsymbole (R, C, Elko, L, Diode, LED, NPN, Schalter, GND, VCC)
+  bibliothek_mehr.dh  weitere 25: Dioden, PNP/MOSFET, Poti, Quarz, Sicherung, OPV,
+                 Regler, 555, 74xx, Stecker, Batterie, Taster, Relais
   netze.dh       Netz-Erkennung (eine reine Funktion), benannte Netze, Auto-Knoten
   erc.dh         Elektrische Regelpruefung
   hierarchie.dh  Unterblaetter: Blattsymbol aus den Labels, Ports, Pfad, ERC
@@ -322,7 +355,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (240 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (241 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,

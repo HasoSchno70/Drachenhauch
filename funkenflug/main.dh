@@ -1934,6 +1934,33 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
                 verlaufZurueck()
             WEND
             pruefe("Rueckgaengig: Unterblatt wieder weg", STR$(LEN(gDok.blaetter)), STR$(probeZahl0))
+        CASE 28
+            ' alle Symbole der Bibliothek auf einem eigenen Blatt (Sichtpruefung)
+            probeUndo0 = LEN(gUndo)
+            verlaufMerken()
+            DIM bbl AS kern.Blatt : bbl = NEW kern.Blatt("Bibliothek")
+            ARRAY_PUSH(gDok.blaetter, bbl)
+            DIM bli AS ARRAY OF kern.Symbol : bli = kern.bibliothekListe()
+            DIM bk AS INTEGER
+            FOR bk = 0 TO LEN(bli) - 1
+                DIM bbt AS kern.Bauteil : bbt = kern.neuesBauteil(bli[bk].id, NEW kern.Lage(NEW kern.Punkt((bk MOD 9) * 2400, (bk \ 9) * 2600), 0, FALSE))
+                bbt.referenz = bli[bk].praefix + STR$(bk + 1)
+                IF bli[bk].einheitLeistung THEN bbt.referenz = ""
+                ARRAY_PUSH(bbl.bauteile, bbt)
+            NEXT
+            reiterAktualisieren()
+            blattWechseln(LEN(gDok.blaetter) - 1)
+            geaendert()
+            vZoom = 0.042
+            zentrieren(9600, 3900)
+        CASE 29
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel + ".bibliothek.png") THEN PRINT "Foto Bibliothek gesichert"
+            END IF
+            pruefe("Bibliothek komplett gesetzt", STR$(LEN(gBlatt.bauteile)), STR$(LEN(kern.bibliothekListe())))
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
         CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()
