@@ -1,0 +1,154 @@
+' Zweites DIM desselben Namens (Gross-/Kleinschreibung zaehlt nicht) mit
+' ANDEREM Typ ist ein Uebersetzungsfehler, mit GLEICHEM Typ eine Warnung
+' (2026-10-19). Vorher war beides nur eine Warnung: im Funkenflug-Test hiessen
+' Dokument und Bauteil `pd` und `pD`, die Warnung ging in langer Ausgabe unter,
+' und der Abbruch kam erst beim Laufen ("Feld 'x' existiert nicht in b").
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== typwechsel im hauptprogramm ist ein fehler
+CLASS A
+    DIM x AS INTEGER
+END CLASS
+CLASS B
+    DIM y AS INTEGER
+END CLASS
+DIM pd AS A : pd = NEW A()
+DIM pD AS B : pD = NEW B()
+pd.x = 5
+PRINT "laeuft"
+--- fehler
+schon als A angelegt, hier als B
+Das Hauptprogramm kennt nur EINE Variable dieses Namens
+Zweiten Namen vergeben
+
+=== typwechsel in einer sub ist ein fehler
+CLASS A
+    DIM x AS INTEGER
+END CLASS
+CLASS B
+    DIM y AS INTEGER
+END CLASS
+SUB probe()
+    DIM pd AS A : pd = NEW A()
+    DIM pD AS B : pD = NEW B()
+    pd.x = 5
+END SUB
+PRINT "laeuft"
+--- fehler
+schon als A angelegt, hier als B
+Diese Funktion kennt nur EINE Variable dieses Namens
+Zweiten Namen vergeben
+
+=== typwechsel in einer methode ist ein fehler
+CLASS Ding
+    DIM n AS INTEGER
+    SUB tu()
+        DIM wert AS INTEGER : wert = 1
+        DIM Wert AS STRING : Wert = "a"
+    END SUB
+END CLASS
+PRINT "laeuft"
+--- fehler
+schon als INTEGER angelegt, hier als STRING
+Diese Funktion kennt
+
+=== typwechsel zwischen zwei zweigen ist ein fehler
+DIM a AS INTEGER : a = 1
+IF a > 0 THEN
+    DIM t AS INTEGER : t = 2
+ELSE
+    DIM t AS STRING : t = "x"
+END IF
+PRINT "laeuft"
+--- fehler
+schon als INTEGER angelegt, hier als STRING
+
+=== skalar und feld desselben namens ist ein fehler
+DIM werte AS INTEGER
+DIM werte[3] AS INTEGER
+PRINT "laeuft"
+--- fehler
+'werte' wurde in
+Zweiten Namen vergeben
+
+=== catch-variable und dim mit anderem typ ist ein fehler
+CLASS Ding
+    DIM n AS INTEGER
+END CLASS
+SUB probe()
+    TRY
+        THROW "x"
+    CATCH e
+        PRINT e
+    END TRY
+    DIM e AS Ding
+END SUB
+PRINT "laeuft"
+--- fehler
+schon als STRING angelegt, hier als DING
+
+=== gleicher typ bleibt eine warnung und laeuft
+DIM n AS INTEGER : n = 1
+IF n > 0 THEN
+    DIM N AS INTEGER : N = 2
+END IF
+PRINT n
+--- erwartet
+2
+--- stderr
+noch einmal (gleicher Typ INTEGER)
+
+=== gleicher typ in einer sub bleibt eine warnung
+SUB probe()
+    DIM q AS STRING : q = "a"
+    IF LEN(q) > 0 THEN
+        PRINT q
+    END IF
+    DIM Q AS STRING : Q = "b"
+    PRINT q
+END SUB
+probe()
+--- erwartet
+a
+b
+--- stderr
+noch einmal (gleicher Typ STRING)
+in dieser Funktion
+
+=== gleicher name in zwei funktionen mit verschiedenem typ ist erlaubt
+SUB eins()
+    DIM w AS INTEGER : w = 1
+    PRINT w
+END SUB
+SUB zwei()
+    DIM W AS STRING : W = "zwei"
+    PRINT W
+END SUB
+eins()
+zwei()
+--- erwartet
+1
+zwei
+
+=== lokale variable verdeckt globale mit anderem typ
+DIM w AS INTEGER : w = 7
+SUB probe()
+    DIM W AS STRING : W = "lokal"
+    PRINT W
+END SUB
+probe()
+PRINT w
+--- erwartet
+lokal
+7
+
+=== dim in der schleife ist eine anweisung, kein wechsel
+DIM i AS INTEGER
+FOR i = 1 TO 2
+    DIM s AS STRING
+    s = s + "*"
+    PRINT s
+NEXT
+--- erwartet
+*
+*

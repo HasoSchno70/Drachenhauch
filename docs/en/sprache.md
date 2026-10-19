@@ -101,6 +101,21 @@ NEXT
 Until 2026.27 a `DIM` inside a loop kept the value of the previous round (as
 in VB.NET) -- except for a sized array in the main program.
 
+**Names are case-insensitive.** `pd`, `pD` and `PD` are the SAME
+variable. A second `DIM` of the same name with a **different type** is
+therefore an **error** — the program does not compile:
+
+```basic
+DIM pd AS Document : pd = NEW Document()
+DIM pD AS Part                 ' error: 'pD' was already declared ... as DOCUMENT,
+                               ' here as PART ... Choose a second name.
+```
+
+Until 2026-10 this was only a warning; the program then ran until the first
+line that used the variable in the wrong sense ("field 'x' does not exist in
+part"). A second `DIM` with the **same** type stays a warning. The same holds
+for `CATCH e` (type `STRING`) and a later `DIM e AS …` with another type.
+
 > **No reserved words as variable names.** Some short names are
 > keywords and cannot serve as identifiers — besides the
 > obvious ones (`to`, `step`, `mod`, `end`, `next`, `new`, `class`, `in`)
@@ -258,6 +273,11 @@ compiled and runs. The reason is honesty: the compiler derives the type
 of an expression only where it is beyond doubt, and where it does not
 know it, it says nothing. A mistake in this derivation must not reject a
 running program.
+
+**Exception: a second `DIM` of the same name with a different type** (see
+[Variables](#variables-and-constants)) is an error. No type is derived
+here — both types are written out in the source, and one variable cannot
+have two of them.
 
 **Where it deliberately stays silent** — so that no message raises a false alarm:
 

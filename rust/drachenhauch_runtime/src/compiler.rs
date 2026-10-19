@@ -770,7 +770,7 @@ impl Compiler {
     /// Zwei Deklarationen mit VERSCHIEDENEM Typ hinterlassen bewusst einen
     /// leeren Eintrag = "weiss ich nicht": welche zur Laufzeit gewinnt, haengt
     /// am Ablauf, und darauf darf keine Meldung gestuetzt werden. Dass der
-    /// Name doppelt vergeben ist, meldet `warn_dim_typ_wechsel` ohnehin.
+    /// Name doppelt vergeben ist, meldet `pruefe_dim_typ_wechsel` ohnehin.
     fn merke_global_typ(&mut self, name: &str, type_name: &str,
                         array_dims: &Option<Vec<Node>>) {
         let mut eff = if array_dims.is_some() { format!("array:{}", type_name) }
@@ -1866,7 +1866,14 @@ impl Compiler {
         self.warn_typ_zuweisung(&ziel_typ, &name, wert);
     }
 
-    fn warn_dim_typ_wechsel(&mut self, name: &str, eff_type: &str) {
+    /// Zweites DIM desselben Namens (Gross-/Kleinschreibung zaehlt nicht).
+    /// Mit ANDEREM Typ ist es ein Fehler: es gibt nur EINE Variable, einer
+    /// der beiden Zwecke bekommt den falschen Typ und bricht erst beim
+    /// Laufen ab -- bis 2026-10 war das nur eine Warnung, und die ging in
+    /// langer Ausgabe unter (Funkenflug: `DIM pd AS Dokument` und
+    /// `DIM pD AS Bauteil`, danach "Feld 'x' existiert nicht"). Mit GLEICHEM
+    /// Typ bleibt es eine Warnung.
+    fn pruefe_dim_typ_wechsel(&mut self, name: &str, eff_type: &str) -> CR {
         let klein = name.to_lowercase();
         let zeile = self.ctx.cur_line;
         match self.ctx.dim_types.get(&klein) {
@@ -1874,11 +1881,10 @@ impl Compiler {
                 let (alt, alt_zeile) = (alt.clone(), *alt_zeile);
                 let wo = if self.ctx.is_main { "Das Hauptprogramm kennt" }
                          else { "Diese Funktion kennt" };
-                // Vor dem mutable borrow von `self.warnings` berechnen.
                 let alt_stelle = self.wo(alt_zeile);
-                self.warnings.push((zeile, format!(
+                return Err(format!(
                     "'{}' wurde in {} schon als {} angelegt, hier als {}. {} nur EINE Variable dieses Namens (Gross-/Kleinschreibung zaehlt nicht) -- einer der beiden Verwendungszwecke bekommt den falschen Typ. Zweiten Namen vergeben.",
-                    name, alt_stelle, Self::typ_klartext(&alt), Self::typ_klartext(eff_type), wo)));
+                    name, alt_stelle, Self::typ_klartext(&alt), Self::typ_klartext(eff_type), wo));
             }
             // Derselbe Typ in einer ANDEREN Zeile: zwei DIM-Anweisungen fuer
             // eine Variable. Ein DIM im Schleifenkoerper ist EINE Anweisung
@@ -1901,6 +1907,7 @@ impl Compiler {
                 self.ctx.dim_types.insert(klein, (eff_type.to_string(), zeile));
             }
         }
+        Ok(())
     }
 
     /// Die Anweisungen um das DIM, das gerade uebersetzt wird (ohne es selbst).
@@ -1957,7 +1964,7 @@ impl Compiler {
         self.warn_shadowed_const(name);
         let eff = if array_dims.is_some() { format!("array:{}", type_name) }
                   else { type_name.to_string() };
-        self.warn_dim_typ_wechsel(name, &eff);
+        self.pruefe_dim_typ_wechsel(name, &eff)?;
         // Ein Feld von Structs: EIN Puffer, die Structs liegen darin
         // hintereinander wie in C (`punkt[]`) -- so geht es als `Punkt*` an
         // eine Bibliothek. Ohne Groesse (ARRAY OF Punkt) ein leerer Puffer.
@@ -3838,7 +3845,7 @@ impl Compiler {
             if !catch_var.is_empty() {
                 // Die CATCH-Variable ist ein Text. Ein DIM desselben Namens
                 // weiter unten meint dieselbe Variable -- mit anderem Typ ist
-                // das dieselbe Warnung wie bei zwei DIM (2026-10-17, Glutfaden
+                // das derselbe Fehler wie bei zwei DIM (2026-10-17, Glutfaden
                 // Stufe 11: `DIM e AS Eintrag` nach `CATCH e` meldete nur
                 // "'e' ist als STRING angesagt", ohne zu sagen, wo).
                 let klein = catch_var.to_lowercase();
