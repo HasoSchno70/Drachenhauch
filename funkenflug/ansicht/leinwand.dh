@@ -129,6 +129,7 @@ DIM gPlatzSpiegel AS BOOLEAN
 DIM gLabelDreh AS INTEGER         ' Richtung des naechsten Labels (R/X/Y im Label-Werkzeug)
 DIM gGeaendert AS BOOLEAN
 DIM gPfad AS STRING
+DIM gNameVorschlag AS STRING          ' Speichern-unter-Name nach einem Import
 
 ' --- Welt <-> Schirm
 FUNCTION sx(wx AS FLOAT) AS FLOAT : RETURN wx * vZoom + vX : END FUNCTION
@@ -717,6 +718,7 @@ FUNCTION textOrt(b AS kern.Bauteil, welche AS INTEGER, BYREF x AS FLOAT, BYREF y
     DIM t AS STRING : t = IIF(welche = 0, b.referenz, b.wert)
     IF t = "" THEN RETURN FALSE
     DIM m AS kern.Punkt : m = b.lage.pos
+    IF welche = 0 AND b.sym.einheitLeistung THEN RETURN FALSE      ' Versorgung: nur der Name
     IF b.sym.textOrte THEN
         DIM a AS kern.Punkt : a = kern.transformPunkt(b.lage, IIF(welche = 0, b.sym.refOrt, b.sym.wertOrt))
         DIM dx AS INTEGER : dx = a.x - m.x

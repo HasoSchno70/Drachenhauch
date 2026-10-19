@@ -569,9 +569,9 @@ DIM hr2 AS kern.Bauteil : hr2 = kern.neuesBauteil("R", kern.neueLage(1000, 0))
 hr2.referenz = "R2"
 ARRAY_PUSH(hk.bauteile, hr2)
 DIM hl1 AS kern.Label : hl1 = NEW kern.Label("CLK", NEW kern.Punkt(800, 0), kern.LA_HIER)
+hl1.drehung = 180                    ' links am Rand, Text nach links: Port links
 ARRAY_PUSH(hk.labels, hl1)
 DIM hl2 AS kern.Label : hl2 = NEW kern.Label("EN", NEW kern.Punkt(1200, 0), kern.LA_HIER)
-hl2.drehung = 180
 ARRAY_PUSH(hk.labels, hl2)
 DIM hr1 AS kern.Bauteil : hr1 = kern.neuesBauteil("R", kern.neueLage(0, 0))
 hr1.referenz = "R1"
@@ -747,6 +747,70 @@ PRINT "KiCad: Klammern "; kauf = kzu; "  Q1 TO-92 "; CONTAINS(kn, "(footprint " 
 PRINT "KiCad-Pads: Basis auf Pad 2 "; CONTAINS(kn, "(node (ref " + qk + "Q1" + qk + ") (pin " + qk + "2" + qk + ") (pinfunction " + qk + "B" + qk + ")"); "  555 VCC auf Pad 8 "; CONTAINS(kn, "(node (ref " + qk + "U1" + qk + ") (pin " + qk + "8" + qk + ") (pinfunction " + qk + "VCC" + qk + ") (pintype " + qk + "power_in" + qk + "))"); "  R1.1 an Q1.B "; CONTAINS(kn, "(node (ref " + qk + "R1" + qk + ") (pin " + qk + "2" + qk + ")"); "  offen benannt "; CONTAINS(kn, "unconnected-(Q1-Pad1)"); "  (erwartet alle TRUE)"
 DIM ksp AS STRING : ksp = kern.stuecklisteCsvSp$(kicDok, [kern.BS_REFERENZEN, kern.BS_BAUFORM, kern.BS_BESTELLNR])
 PRINT "Spalten: "; CONTAINS(ksp, "Referenzen;Bauform;Bestellnummer" + CHR$(10)); " "; CONTAINS(ksp, "R1;AX4;MF0207-1K"); " "; CONTAINS(ksp, "Q1;TO92-CBE;"); "  Vorgabe "; LEN(kern.bomVorgabeSpalten(kicDok)); "  (erwartet TRUE TRUE TRUE  Vorgabe 5)"
+
+' --- KiCad-Schaltplan importieren: jede Lage, Mehrteiler, Unterblatt
+DIM kim AS kern.KicadErgebnis : kim = kern.kicadImportieren("daten/kicad/beispiel.kicad_sch")
+PRINT "KiCad-Import: ok "; kim.ok; " "; kim.fehler; "  Blaetter "; LEN(kim.dok.blaetter); "  Titel "; kim.dok.titel; " Rev "; kim.dok.revision; "  (erwartet TRUE  Blaetter 2  Titel KiCad-Beispiel Rev B)"
+DIM kimN AS kern.Netze : kimN = kern.netzeDokument(kim.dok)
+' jedes Label REF_NR muss im Netz von Pin NR des Bauteils REF haengen
+DIM kimGut AS INTEGER : kimGut = 0
+DIM kimSchlecht AS STRING : kimSchlecht = ""
+DIM kni AS INTEGER, knj AS INTEGER, knk AS INTEGER
+FOR kni = 0 TO LEN(kimN.liste) - 1
+    DIM knz AS kern.Netz : knz = kimN.liste[kni]
+    FOR knj = 0 TO LEN(knz.labelNamen) - 1
+        DIM kteile AS ARRAY OF STRING : kteile = SPLIT$(knz.labelNamen[knj], "_")
+        IF LEN(kteile) <> 2 OR kteile[0] = "SIG" OR kteile[0] = "KREUZ" OR kteile[0] = "FREI" THEN CONTINUE
+        DIM kda AS BOOLEAN : kda = FALSE
+        FOR knk = 0 TO LEN(knz.pins) - 1
+            IF knz.pins[knk].ref = kteile[0] AND knz.pins[knk].nummer = kteile[1] THEN kda = TRUE
+        NEXT
+        IF kda THEN kimGut = kimGut + 1 ELSE kimSchlecht = kimSchlecht + knz.labelNamen[knj] + " "
+    NEXT
+NEXT
+PRINT "KiCad-Lagen: Pins am richtigen Draht "; kimGut; "  falsch: "; kimSchlecht; "  (erwartet 32  falsch: )"
+DIM kimErc AS ARRAY OF kern.Verstoss : kimErc = kern.ercPruefenDok(kim.dok)
+DIM kimOffen AS INTEGER : kimOffen = 0
+FOR kni = 0 TO LEN(kimErc) - 1
+    IF CONTAINS(kimErc[kni].text, "Offenes Drahtende") THEN kimOffen = kimOffen + 1
+NEXT
+PRINT "KiCad-ERC: offene Drahtenden "; kimOffen; "  (erwartet 4 -- die freien Enden der Kreuzungsdraehte)"
+' Netze ueber Namen: R1 zwischen VCC und GND, U1A/U1B versteckte Versorgung
+FUNCTION kimNetzMit$(n AS kern.Netze, ref AS STRING, nr AS STRING) AS STRING
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(n.liste) - 1
+        FOR j = 0 TO LEN(n.liste[i].pins) - 1
+            IF n.liste[i].pins[j].ref = ref AND n.liste[i].pins[j].nummer = nr THEN RETURN n.liste[i].name
+        NEXT
+    NEXT
+    RETURN "-"
+END FUNCTION
+PRINT "KiCad-Netze: R1.1 "; kimNetzMit$(kimN, "R1", "1"); "  R1.2 "; kimNetzMit$(kimN, "R1", "2"); "  U1A.14 "; kimNetzMit$(kimN, "U1A", "14"); "  U1B.7 "; kimNetzMit$(kimN, "U1B", "7"); "  (erwartet VCC GND VCC GND)"
+PRINT "KiCad-Unterblatt: R3.1 "; kimNetzMit$(kimN, "R3", "1"); "  R3.2 "; kimNetzMit$(kimN, "R3", "2"); "  (erwartet SIG_EIN SIG_AUS)"
+DIM kimKreuz AS BOOLEAN : kimKreuz = FALSE
+DIM kimFrei AS BOOLEAN : kimFrei = FALSE
+FOR kni = 0 TO LEN(kimN.liste) - 1
+    IF CONTAINS(JOIN$(kimN.liste[kni].labelNamen, ","), "KREUZ_A") AND CONTAINS(JOIN$(kimN.liste[kni].labelNamen, ","), "KREUZ_B") THEN kimKreuz = TRUE
+    IF CONTAINS(JOIN$(kimN.liste[kni].labelNamen, ","), "FREI_C") AND CONTAINS(JOIN$(kimN.liste[kni].labelNamen, ","), "FREI_D") THEN kimFrei = TRUE
+NEXT
+PRINT "KiCad-Kreuzung: mit Punkt verbunden "; kimKreuz; "  ohne Punkt verbunden "; kimFrei; "  (erwartet TRUE FALSE)"
+DIM kimR1 AS kern.Bauteil, kimU AS kern.Bauteil, kimQ AS kern.Bauteil
+FOR kni = 0 TO LEN(kim.dok.blaetter[0].bauteile) - 1
+    IF kim.dok.blaetter[0].bauteile[kni].referenz = "R1" THEN kimR1 = kim.dok.blaetter[0].bauteile[kni]
+    IF kim.dok.blaetter[0].bauteile[kni].referenz = "U1B" THEN kimU = kim.dok.blaetter[0].bauteile[kni]
+    IF kim.dok.blaetter[0].bauteile[kni].referenz = "Q1" THEN kimQ = kim.dok.blaetter[0].bauteile[kni]
+NEXT
+PRINT "KiCad-Teile: R1 "; kimR1.wert; " Laenge "; kimR1.sym.pins[0].pos.y - kimR1.sym.pins[1].pos.y; "  U1B "; kimU.sym.id; " "; kimU.gehaeuse; " "; LEN(kimU.sym.pins); " Pins  Q1 "; kimQ.gehaeuse; "  (erwartet 10k Laenge -600  U1B kicad:Test:NAND2/2 DIP14 5 Pins  Q1 TO92)"
+PRINT "KiCad-Hinweise: "; JOIN$(kim.hinweise, " | ")
+DIM kimSchlecht2 AS kern.KicadErgebnis : kimSchlecht2 = kern.kicadAusText("(kicad_pcb (version 20221018))", "x", ".")
+PRINT "KiCad-Fremd: ok "; kimSchlecht2.ok; "  "; kimSchlecht2.fehler; "  (erwartet FALSE  ... kein KiCad-Schaltplan)"
+' ein importierter Schaltplan laesst sich speichern und wieder laden
+DIM kimPfad AS STRING : kimPfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef_kicad.fkn"
+DIM kimSp AS BOOLEAN : kimSp = kern.dokumentSpeichern(kim.dok, kimPfad)
+DIM kimDok2 AS kern.Dokument : kimDok2 = kern.dokumentLaden(kimPfad)
+DIM kimN2 AS kern.Netze : kimN2 = kern.netzeDokument(kimDok2)
+PRINT "KiCad->.fkn: gespeichert "; kimSp; "  R3.2 "; kimNetzMit$(kimN2, "R3", "2"); "  Q5.1 "; kimNetzMit$(kimN2, "Q5", "1"); "  (erwartet TRUE SIG_AUS Q5_1)"
+DELETEFILE(kimPfad)
 
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"

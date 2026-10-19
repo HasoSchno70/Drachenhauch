@@ -173,7 +173,13 @@ SUB dateiOeffnen()
 END SUB
 
 ' Eine Datei laden -- mit Rueckfrage, wenn eine neuere Sicherung da ist.
+' Ein KiCad-Schaltplan wird uebersetzt und ist danach ein neues, ungespeichertes
+' Dokument (Speichern fragt nach dem .fkn-Namen; die .kicad_sch bleibt unberuehrt).
 SUB dateiLaden(pfad AS STRING)
+    IF ENDSWITH(LOWER$(pfad), ".kicad_sch") THEN
+        kicadLaden(pfad)
+        RETURN
+    END IF
     DIM quelle AS STRING : quelle = pfad
     DIM sich AS STRING : sich = pfad + ".sicherung"
     DIM aus AS BOOLEAN : aus = FALSE
@@ -193,6 +199,7 @@ SUB dateiLaden(pfad AS STRING)
         RETURN
     END TRY
     gPfad = pfad
+    gNameVorschlag = ""
     gGeaendert = aus
     leinwandDokument(d)
     symbolListeAktualisieren(FALSE)
@@ -204,6 +211,39 @@ SUB dateiLaden(pfad AS STRING)
     zuletztMerken(pfad)
     gSpMeldung = IIF(aus, "Sicherung geladen -- Speichern uebernimmt sie in die Datei", "")
     statusAktualisieren()
+END SUB
+
+SUB kicadLaden(pfad AS STRING)
+    DIM e AS kern.KicadErgebnis
+    TRY
+        e = kern.kicadImportieren(pfad)
+    CATCH fe
+        meldung("Die Datei " + basisName$(pfad) + " liess sich nicht lesen.")
+        RETURN
+    END TRY
+    IF NOT e.ok THEN
+        meldung(e.fehler)
+        RETURN
+    END IF
+    sicherungLoeschen()
+    gPfad = ""
+    gNameVorschlag = kern.kimDateiName$(pfad) + ".fkn"
+    leinwandDokument(e.dok)
+    symbolListeAktualisieren(FALSE)
+    verlaufRuecksetzen()
+    gGeaendert = TRUE
+    gAenderungen = 1
+    gGesichertBei = -1
+    titelNachziehen()
+    zuletztMerken(pfad)
+    DIM teile AS INTEGER : teile = 0
+    DIM bi AS INTEGER
+    FOR bi = 0 TO LEN(e.dok.blaetter) - 1
+        teile = teile + LEN(e.dok.blaetter[bi].bauteile)
+    NEXT
+    gSpMeldung = "KiCad importiert: " + STR$(LEN(e.dok.blaetter)) + " Blatt/Blaetter, " + STR$(teile) + " Bauteile -- Speichern legt eine .fkn an"
+    statusAktualisieren()
+    IF LEN(e.hinweise) > 0 THEN meldung("KiCad-Import von " + basisName$(pfad) + ":" + CHR$(10) + CHR$(10) + "- " + JOIN$(e.hinweise, CHR$(10) + "- "))
 END SUB
 
 ' Beim Start ohne Datei: eine Sicherung des unbenannten Schaltplans anbieten.

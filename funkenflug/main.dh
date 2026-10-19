@@ -878,13 +878,27 @@ FUNCTION dateiWahl(sichern AS BOOLEAN) AS STRING
     DIM knopf AS STRING : knopf = "Oeffnen"
     IF sichern THEN titel = "Speichern" : aktion = GTK_DATEI_SICHERN : knopf = "Speichern"
     DIM d AS INTEGER : d = gtk_file_chooser_dialog_new(titel, gFenster, aktion, "Abbrechen", GTK_ANTWORT_ABBRECHEN, knopf, GTK_ANTWORT_ANNEHMEN, NIL)
-    DIM filter AS INTEGER : filter = gtk_file_filter_new()
+    DIM filter AS INTEGER
+    IF NOT sichern THEN
+        filter = gtk_file_filter_new()
+        gtk_file_filter_set_name(filter, "Schaltplaene (*.fkn, *.kicad_sch)")
+        gtk_file_filter_add_pattern(filter, "*.fkn")
+        gtk_file_filter_add_pattern(filter, "*.kicad_sch")
+        gtk_file_chooser_add_filter(d, filter)
+    END IF
+    filter = gtk_file_filter_new()
     gtk_file_filter_set_name(filter, "Funkenflug (*.fkn)")
     gtk_file_filter_add_pattern(filter, "*.fkn")
     gtk_file_chooser_add_filter(d, filter)
+    IF NOT sichern THEN
+        filter = gtk_file_filter_new()
+        gtk_file_filter_set_name(filter, "KiCad-Schaltplan (*.kicad_sch)")
+        gtk_file_filter_add_pattern(filter, "*.kicad_sch")
+        gtk_file_chooser_add_filter(d, filter)
+    END IF
     IF sichern THEN
         gtk_file_chooser_set_do_overwrite_confirmation(d, TRUE)
-        gtk_file_chooser_set_current_name(d, "schaltplan.fkn")
+        gtk_file_chooser_set_current_name(d, IIF(gNameVorschlag <> "", gNameVorschlag, "schaltplan.fkn"))
     END IF
     DIM pfad AS STRING : pfad = ""
     IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
@@ -2216,6 +2230,26 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             WHILE LEN(gUndo) > probeUndo0
                 verlaufZurueck()
             WEND
+        CASE 34
+            ' KiCad-Schaltplan oeffnen (der Hinweis-Dialog wird bestaetigt)
+            g_timeout_add(150, dialogBestaetigen, 0)
+            dateiLaden("daten/kicad/beispiel.kicad_sch")
+            pruefe("KiCad geoeffnet", STR$(LEN(gDok.blaetter)) + " " + gDok.titel + " " + gPfad + " " + gNameVorschlag + " " + STR$(gGeaendert), "2 KiCad-Beispiel  beispiel.fkn " + STR$(TRUE))
+            pruefe("KiCad-Teile auf dem Raster", STR$(gBlatt.bauteile[0].lage.pos.x MOD 100) + " " + STR$(gBlatt.bauteile[0].lage.pos.y MOD 100), "0 0")
+            DIM kiErc AS ARRAY OF kern.Verstoss : kiErc = kern.ercPruefenDok(gDok)
+            DIM kiOffen AS INTEGER : kiOffen = 0
+            DIM kie AS INTEGER
+            FOR kie = 0 TO LEN(kiErc) - 1
+                IF CONTAINS(kiErc[kie].text, "Offenes Drahtende") OR CONTAINS(kiErc[kie].text, "fehlt") THEN kiOffen = kiOffen + 1
+            NEXT
+            pruefe("KiCad-ERC: nur die vier freien Kreuzungsenden", STR$(kiOffen), "4")
+            pruefe("KiCad-Symbole in der Liste", STR$(kern.istEigenBekannt("kicad:Test:Q_NPN")), STR$(TRUE))
+            vZoom = vZoom * 1.8
+            zentrieren(6200, 5800)
+        CASE 35
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel + ".kicad.png") THEN PRINT "Foto KiCad gesichert"
+            END IF
         CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()

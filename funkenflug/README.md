@@ -75,8 +75,8 @@ doppeltem Rand und dem Namen des Unterblatts. Ein **Doppelklick** darauf öffnet
 das Unterblatt, „Zum Elternblatt" führt zurück; Reiter (`> Name`) und
 Statuszeile (`Haupt > Netzteil`) zeigen die Ebene. Im Unterblatt macht `H` ein
 gewähltes Label **hierarchisch** (Kasten mit Keil am Anker): es wird ein
-**Port** am Blattsymbol, auf der Seite, von der aus der Text des Labels
-läuft. Port und gleichnamige hierarchische Labels sind ein Netz; ein Name im
+**Port** am Blattsymbol, auf der Seite, zu der der Text des Labels zeigt
+(ein Eingang links im Unterblatt, Text nach links, sitzt links am Symbol). Port und gleichnamige hierarchische Labels sind ein Netz; ein Name im
 Elternblatt (Versorgung, Label) geht vor dem Port-Namen.
 
 Das Blattsymbol wird nicht gespeichert, sondern jedes Mal aus den Labels des
@@ -383,6 +383,50 @@ geht so höchstens eine Minute Arbeit verloren.
 Alles, was hinterher erst weiß, ob es etwas geändert hat (Annotieren,
 Ersetzen, Verbinden), legt nur dann einen Rückgängig-Schritt an.
 
+## KiCad-Schaltplan öffnen
+
+„Öffnen" nimmt auch **`.kicad_sch`** (KiCad 6, 7, 8). Daraus wird ein neues,
+ungespeichertes Dokument; „Speichern" schlägt `<name>.fkn` vor, die KiCad-Datei
+bleibt unberührt. Übernommen werden:
+
+- **Symbole** aus `lib_symbols` mit Grafik (Linie, Polylinie, Rechteck, Kreis,
+  Bogen, Text), Pins samt Typ, Name, Nummer und Versteck-Schaltern. Sie werden
+  eigene Symbole (`kicad:Device:R`), reisen in der `.fkn` mit und stehen in der
+  Bauteilliste. **Versorgungssymbole** (`power:GND`) werden Versorgungen.
+- **Bauteile** mit Lage (alle acht), Referenz (auch aus den Instanz-Pfaden),
+  Wert, Textpositionen, Bestellnummer (MPN, LCSC …). Der **Footprint** wird zur
+  Bauform, wo sie sich sicher ablesen lässt (`DIP-14_W7.62mm` → DIP14,
+  `TO-92_Inline` → TO92, `R_Axial…P10.16mm` → AX4, `PinHeader_1x04` → SIL4);
+  sonst steht sein Name im Gehäuse-Feld. Mehrteilige Symbole werden je Einheit
+  ein Bauteil (U1A, U1B).
+- **Drähte, Verbindungspunkte, Labels** (lokal, global, hierarchisch) und
+  **Unterblätter** – jede Unterblatt-Datei wird ein Blatt mit Blattsymbol. Weil
+  das Blattsymbol aus den Labels entsteht und seine eigene Größe hat, hängen
+  seine Ports über ein Label-Paar an den alten KiCad-Anschlüssen (keine Drähte
+  quer übers Symbol, die etwas berühren könnten).
+- **Titel, Revision, Firma** und das Papierformat.
+
+**Maßstab:** 1,27 mm (das KiCad-Raster) wird 1 mm (das Funkenflug-Raster). So
+liegt jeder Pin auf dem Raster, auf dem Netze verknüpft und Teile gezogen
+werden; ein KiCad-Widerstand wird genau so lang wie der eigene. SparkNode
+rechnete 1:1 in mm und landete mit den Pins neben dem Raster.
+
+**Lage:** KiCad-Symbole haben Y nach oben, KiCad dreht gegen den Uhrzeigersinn
+und spiegelt *nach* dem Drehen („mirror x" = oben/unten). Funkenflug dreht im
+Uhrzeigersinn und spiegelt links/rechts. Die Umrechnung (`mirror x` = links/
+rechts + 180°) prüft `pruef_kern.dh` an einer Testdatei mit allen acht Lagen:
+jeder Pin muss auf dem Drahtende liegen, das mit KiCads eigener
+Transform-Rechnung erzeugt wurde (`daten/kicad/erzeugen.py`).
+
+Was Funkenflug nicht kennt, wird **gemeldet** statt still verworfen (ein Dialog
+nach dem Öffnen): Busse, freie Texte und Zeichnungen auf dem Blatt,
+Nicht-verbunden-Marker, mehrfach eingesetzte Unterblätter. **Versteckte
+Versorgungs-Pins** (VCC/GND an 74xx-Symbolen) verbinden in KiCad unsichtbar
+über ihren Namen – hier bekommen sie ein sichtbares globales Label, das Netz
+bleibt dasselbe.
+
+![KiCad-Schaltplan in Funkenflug](kicad.png)
+
 ## Aufbau
 
 ```
@@ -400,6 +444,8 @@ kern/       Modell, Geometrie, Bibliothek, Netze, Datei – ohne Oberfläche,
   bearbeiten.dh  Annotieren, Suchen & Ersetzen
   netzliste.dh   Export: SPICE, CSV, Text
   kicad.dh       KiCad-Netzliste (.net) mit Footprint-Vorschlaegen und Pad-Nummern
+  sausdruck.dh   S-Ausdruecke lesen (ohne Rekursion)
+  kicadimport.dh KiCad-Schaltplan (.kicad_sch) einlesen: Symbole, Lagen, Unterblaetter
   symbole.dh     eigene Symbole: Pinliste, IC-Generator, JSON, Register, Bibliothek
   stueckliste.dh Stückliste: Gruppen, natürliche Sortierung, CSV/Markdown/Text
   platine.dh     Bauformen, Platinen-Pruefung (Inseln, Luftlinien, Kurzschluesse), Einsetzen
@@ -424,7 +470,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (283 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (287 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
@@ -441,7 +487,8 @@ Pins mit Maus-Ereignissen zeichnen, verschieben, löschen, zurücknehmen und
 mit `H`, Verbindung über die Blattgrenze; Annotieren über das Menü,
 Suchen & Ersetzen im Dialog, Dokument-Eigenschaften, Speichern, Autosave und
 Wiederherstellen beim Öffnen, Drahtfarben, Messen mit Fang, Verteilen und
-Ausrichten samt Draht, Cross-Probing in beide Richtungen). `pruef_kern.dh` prüft u. a. die
+Ausrichten samt Draht, Cross-Probing in beide Richtungen, KiCad-Schaltplan
+öffnen). `pruef_kern.dh` prüft u. a. die
 Gruppen-Lage in allen 8 Orientierungen × 3 Arten (72 Pin-Prüfungen). Der Selbsttest
 lässt die Zwischenablage des Systems in Ruhe und schreibt seine Bibliothek in
 eine Wegwerf-Datei neben dem Bild. `--nur-foto bild.png` macht nur das Bild.
@@ -472,7 +519,7 @@ SparkNode hatte mehrere Konzeptfehler, die hier von Anfang an vermieden sind:
    ein Schritt, ein bloßer Klick keiner.
 6. **Bewusst weggelassen** (in SparkNode überproportional viele Bugquellen):
    Bus/Bus-Entry, Mehrfach-Instanzen eines Unterblatts, Pin-Swap,
-   Multi-Unit, auf der Platine ein Autorouter, der alles auf einmal legt
+   Multi-Unit (der KiCad-Import macht daraus je Einheit ein Bauteil), auf der Platine ein Autorouter, der alles auf einmal legt
    (Verbinden schlägt je Luftlinie vor und prüft jeden Vorschlag). Kommt erst,
    wenn wirklich gebraucht. Unterblätter gibt es – aber ohne zweite Wahrheit:
    das Blattsymbol entsteht aus den Labels des Unterblatts.

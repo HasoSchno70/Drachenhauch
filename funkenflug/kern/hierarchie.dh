@@ -12,9 +12,12 @@
 ' anderen (keine Mehrfach-Instanzen mit Referenz-Pfaden); der ERC meldet
 ' Doppeltes, Zyklen und fehlende Unterblaetter.
 '
-' Seite eines Ports nach der Richtung des Labels im Unterblatt: Text nach
-' rechts (0) -> links am Symbol, nach links (180) -> rechts, nach oben (270)
-' -> unten, nach unten (90) -> oben.
+' Seite eines Ports = die Seite, zu der der Label-Text im Unterblatt zeigt:
+' ein Label links am Rand des Unterblatts (Text nach links, 180) ist ein
+' Eingang und sitzt links am Symbol, Text nach rechts (0) rechts, nach oben
+' (270) oben, nach unten (90) unten. (Bis Runde 22 war es genau verkehrt
+' herum -- aufgefallen beim KiCad-Import, wo die Ports dann gegenueber der
+' KiCad-Vorlage vertauscht lagen.)
 
 CONST BLATT_VORSATZ = "#BLATT:"
 
@@ -49,10 +52,10 @@ SUB blattPorts(kind AS Blatt, BYREF namen AS ARRAY OF STRING, BYREF seiten AS AR
         MAPPUT(da, la.text, 1)
         ARRAY_PUSH(namen, la.text)
         SELECT CASE la.drehung
-            CASE 180 : ARRAY_PUSH(seiten, "rechts")
-            CASE 270 : ARRAY_PUSH(seiten, "unten")
-            CASE 90 : ARRAY_PUSH(seiten, "oben")
-            CASE ELSE : ARRAY_PUSH(seiten, "links")
+            CASE 180 : ARRAY_PUSH(seiten, "links")
+            CASE 270 : ARRAY_PUSH(seiten, "oben")
+            CASE 90 : ARRAY_PUSH(seiten, "unten")
+            CASE ELSE : ARRAY_PUSH(seiten, "rechts")
         END SELECT
     NEXT
 END SUB
