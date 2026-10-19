@@ -1,0 +1,289 @@
+' Projektbericht: ein PDF mit allem, was zu einem Projekt gehoert.
+' Globaler Namensraum.
+'
+'   Deckblatt   Titel, Firma, Autor, Revision, Datum, Kennzahlen, ERC- und
+'               Platinen-Stand, Inhaltsverzeichnis mit Seitenzahlen
+'   Schaltplan  jedes Blatt (dieselbe Zeichnung wie PDF-Export und Druck)
+'   Stueckliste mit den gewaehlten Spalten
+'   Netzliste   Bauteile und Netze
+'   ERC         alle Verstoesse
+'   Platine     Bestueckung, Loetseite, Arbeitsliste (1:1) -- nur, wenn Teile
+'               darauf stecken
+'
+' Nichts wird doppelt gezeichnet: Schaltplan und Platine kommen aus
+' ausgabeBlattZeichnen bzw. platineSeite. Erst wird der Seitenplan gemacht
+' (so stehen im Inhaltsverzeichnis und unten auf jeder Seite die richtigen
+' Nummern), dann gezeichnet. Seiten haben verschiedene Groessen (A4 quer,
+' A4 hoch fuer eine hohe Platine) -- cairo_pdf_surface_set_size je Seite.
+
+CONST BR_ZEILE = 11.0
+CONST BR_RAND = 40.0
+
+DIM gBerichtSeiten AS INTEGER     ' gezeichnete Seiten (Selbsttest)
+
+CLASS BerichtSeite
+    DIM art AS STRING                 ' "deck", "blatt", "text", "platine"
+    DIM nr AS INTEGER                 ' Blatt-, Text- bzw. Platinen-Seite
+    DIM abschnitt AS STRING           ' Ueberschrift
+    DIM zeilen AS ARRAY OF STRING     ' bei "text": die Zeilen dieser Seite
+END CLASS
+
+FUNCTION brZeilenJeSeite() AS INTEGER
+    RETURN FLOOR((A4_H - 2 * BR_RAND - 40) / BR_ZEILE)
+END FUNCTION
+
+' Lange Zeilen umbrechen (Netze mit vielen Pins), Tabs zu Abstaenden.
+' Tabulatoren auf Tabstopps alle 14 Zeichen (die Spalten der Text-Netzliste).
+FUNCTION brTabs$(z AS STRING) AS STRING
+    IF NOT CONTAINS(z, CHR$(9)) THEN RETURN z
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        DIM c AS STRING : c = MID$(z, i, 1)
+        IF c = CHR$(9) THEN
+            r = r + " "
+            WHILE LEN(r) MOD 14 <> 0
+                r = r + " "
+            WEND
+        ELSE
+            r = r + c
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+
+FUNCTION brZeilen(text AS STRING) AS ARRAY OF STRING
+    DIM roh AS ARRAY OF STRING : roh = SPLIT$(REPLACE$(text, CHR$(13), ""), CHR$(10))
+    DIM r AS ARRAY OF STRING : r = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(roh) - 1
+        DIM z AS STRING : z = brTabs$(roh[i])
+        WHILE LEN(z) > 130
+            ARRAY_PUSH(r, LEFT$(z, 130))
+            z = "        " + MID$(z, 130)
+        WEND
+        ARRAY_PUSH(r, z)
+    NEXT
+    WHILE LEN(r) > 0 AND TRIM$(r[LEN(r) - 1]) = ""
+        DIM weg AS STRING : weg = ARRAY_POP(r)
+    WEND
+    RETURN r
+END FUNCTION
+
+SUB brTextAbschnitt(BYREF plan AS ARRAY OF BerichtSeite, abschnitt AS STRING, zeilen AS ARRAY OF STRING)
+    DIM je AS INTEGER : je = brZeilenJeSeite()
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(zeilen) OR i = 0
+        DIM s AS BerichtSeite : s = NEW BerichtSeite()
+        s.art = "text"
+        s.abschnitt = abschnitt
+        s.zeilen = []
+        DIM k AS INTEGER
+        FOR k = i TO MIN(LEN(zeilen), i + je) - 1
+            ARRAY_PUSH(s.zeilen, zeilen[k])
+        NEXT
+        ARRAY_PUSH(plan, s)
+        i = i + je
+        IF LEN(zeilen) = 0 THEN BREAK
+    WEND
+END SUB
+
+FUNCTION ercZeilen() AS ARRAY OF STRING
+    DIM v AS ARRAY OF kern.Verstoss : v = kern.ercPruefenDok(gDok)
+    DIM r AS ARRAY OF STRING : r = []
+    IF LEN(v) = 0 THEN ARRAY_PUSH(r, "Keine Verstoesse.")
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(v) - 1
+        DIM wo AS STRING : wo = ""
+        IF LEN(gDok.blaetter) > 1 AND v[i].blatt >= 0 AND v[i].blatt < LEN(gDok.blaetter) THEN wo = "[" + gDok.blaetter[v[i].blatt].name + "] "
+        ARRAY_PUSH(r, IIF(v[i].schwere = kern.ERC_FEHLER, "FEHLER   ", "Warnung  ") + wo + v[i].text)
+    NEXT
+    RETURN r
+END FUNCTION
+
+FUNCTION berichtPlan() AS ARRAY OF BerichtSeite
+    DIM plan AS ARRAY OF BerichtSeite : plan = []
+    DIM s AS BerichtSeite : s = NEW BerichtSeite()
+    s.art = "deck"
+    s.abschnitt = "Deckblatt"
+    ARRAY_PUSH(plan, s)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gDok.blaetter) - 1
+        DIM b AS BerichtSeite : b = NEW BerichtSeite()
+        b.art = "blatt"
+        b.nr = i
+        b.abschnitt = "Schaltplan"
+        ARRAY_PUSH(plan, b)
+    NEXT
+    brTextAbschnitt(plan, "Stueckliste", brZeilen(kern.stuecklisteTextSp$(gDok, bomSpaltenAktuell())))
+    brTextAbschnitt(plan, "Netzliste", brZeilen(kern.netzlisteTextDok$(gDok)))
+    brTextAbschnitt(plan, "Elektrische Regelpruefung", ercZeilen())
+    IF LEN(gDok.platine.teile) > 0 THEN
+        FOR i = 0 TO plSeitenGesamt(plSeiteH()) - 1
+            DIM p AS BerichtSeite : p = NEW BerichtSeite()
+            p.art = "platine"
+            p.nr = i
+            p.abschnitt = "Platine"
+            ARRAY_PUSH(plan, p)
+        NEXT
+    END IF
+    RETURN plan
+END FUNCTION
+
+' "Schaltplan  2-3" -- erste und letzte Seite je Abschnitt.
+FUNCTION berichtInhalt(plan AS ARRAY OF BerichtSeite) AS ARRAY OF STRING
+    DIM r AS ARRAY OF STRING : r = []
+    DIM i AS INTEGER : i = 1
+    WHILE i < LEN(plan)
+        DIM a AS STRING : a = plan[i].abschnitt
+        DIM von AS INTEGER : von = i
+        WHILE i < LEN(plan) AND plan[i].abschnitt = a
+            i = i + 1
+        WEND
+        ARRAY_PUSH(r, PADR$(a, 30) + "Seite " + STR$(von + 1) + IIF(i - 1 > von, "-" + STR$(i), ""))
+    WEND
+    RETURN r
+END FUNCTION
+
+SUB brFuss(cr AS INTEGER, b AS FLOAT, h AS FLOAT, seite AS INTEGER, gesamt AS INTEGER, abschnitt AS STRING)
+    pdText(cr, BR_RAND, h - 18, exportTitel$() + " -- " + abschnitt, "Sans 7", &H777777, 0)
+    pdText(cr, b - BR_RAND, h - 18, "Seite " + STR$(seite + 1) + " von " + STR$(gesamt), "Sans 7", &H777777, 2)
+END SUB
+
+SUB brWeiss(cr AS INTEGER, b AS FLOAT, h AS FLOAT)
+    cairoFarbe(cr, &HFFFFFF)
+    cairo_rectangle(cr, 0, 0, b, h)
+    cairo_fill(cr)
+END SUB
+
+SUB berichtDeckblatt(cr AS INTEGER, b AS FLOAT, h AS FLOAT, plan AS ARRAY OF BerichtSeite)
+    brWeiss(cr, b, h)
+    DIM x AS FLOAT : x = BR_RAND + 20
+    DIM y AS FLOAT : y = BR_RAND + 40
+    pdText(cr, x, y, exportTitel$(), "Sans Bold 26", &H1F1F1F, 0)
+    y = y + 34
+    IF gDok.firma <> "" THEN pdText(cr, x, y, gDok.firma, "Sans 13", &H555555, 0)
+    y = y + 30
+    DIM meta AS ARRAY OF STRING : meta = []
+    ARRAY_PUSH(meta, "Autor:      " + IIF(gDok.autor <> "", gDok.autor, "-"))
+    ARRAY_PUSH(meta, "Revision:   " + IIF(gDok.revision <> "", gDok.revision, "-"))
+    ARRAY_PUSH(meta, "Datum:      " + DATE$())
+    ARRAY_PUSH(meta, "Datei:      " + IIF(gPfad <> "", basisName$(gPfad), "(nicht gespeichert)"))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(meta) - 1
+        pdText(cr, x, y + i * 15, meta[i], "Monospace 10", &H333333, 0)
+    NEXT
+    y = y + LEN(meta) * 15 + 20
+    ' Kennzahlen
+    DIM teile AS INTEGER : teile = LEN(kern.platinenBauteile(gDok))
+    DIM n AS kern.Netze : n = kern.netzeDokument(gDok)
+    DIM v AS ARRAY OF kern.Verstoss : v = kern.ercPruefenDok(gDok)
+    DIM nf AS INTEGER : nf = 0
+    FOR i = 0 TO LEN(v) - 1
+        IF v[i].schwere = kern.ERC_FEHLER THEN nf = nf + 1
+    NEXT
+    pdText(cr, x, y, "Uebersicht", "Sans Bold 12", &H1F1F1F, 0)
+    y = y + 20
+    DIM zahlen AS ARRAY OF STRING : zahlen = []
+    DIM namen AS ARRAY OF STRING : namen = []
+    FOR i = 0 TO LEN(gDok.blaetter) - 1
+        ARRAY_PUSH(namen, kern.blattPfad$(gDok, i))
+    NEXT
+    ARRAY_PUSH(zahlen, STR$(LEN(gDok.blaetter)) + IIF(LEN(gDok.blaetter) = 1, " Blatt", " Blaetter") + ":  " + JOIN$(namen, ", "))
+    ARRAY_PUSH(zahlen, STR$(teile) + " Bauteile in " + STR$(LEN(kern.stuecklisteDok(gDok))) + " Positionen, " + STR$(LEN(n.liste)) + " Netze")
+    ARRAY_PUSH(zahlen, "ERC: " + IIF(LEN(v) = 0, "keine Verstoesse", STR$(nf) + " Fehler, " + STR$(LEN(v) - nf) + " Warnungen"))
+    IF LEN(gDok.platine.teile) > 0 THEN
+        DIM r AS kern.PlatBericht : r = kern.platinePruefen(gDok)
+        ARRAY_PUSH(zahlen, "Platine: " + STR$(gDok.platine.spalten) + " x " + STR$(gDok.platine.zeilen) + " " + IIF(gDok.platine.art = kern.PL_STREIFEN, "Streifenraster", "Lochraster") + ", " + IIF(LEN(r.luft) = 0 AND r.kurzschluesse = 0 AND LEN(r.unplatziert) = 0, "stimmt mit dem Schaltplan ueberein", STR$(LEN(r.luft)) + " offene Verbindungen, " + STR$(r.kurzschluesse) + " Kurzschluesse, " + STR$(LEN(r.unplatziert)) + " Teile fehlen"))
+    ELSE
+        ARRAY_PUSH(zahlen, "Platine: noch nicht angelegt")
+    END IF
+    FOR i = 0 TO LEN(zahlen) - 1
+        pdText(cr, x, y + i * 15, zahlen[i], "Sans 10", IIF(i = 2 AND nf > 0, &HC02020, &H333333), 0)
+    NEXT
+    y = y + LEN(zahlen) * 15 + 24
+    pdText(cr, x, y, "Inhalt", "Sans Bold 12", &H1F1F1F, 0)
+    y = y + 20
+    DIM inhalt AS ARRAY OF STRING : inhalt = berichtInhalt(plan)
+    FOR i = 0 TO LEN(inhalt) - 1
+        pdText(cr, x, y + i * 15, inhalt[i], "Monospace 10", &H333333, 0)
+    NEXT
+    pdText(cr, b - BR_RAND, h - BR_RAND, "Funkenflug", "Sans 9", &H999999, 2)
+END SUB
+
+SUB berichtTextSeite(cr AS INTEGER, b AS FLOAT, h AS FLOAT, s AS BerichtSeite)
+    brWeiss(cr, b, h)
+    pdText(cr, BR_RAND, BR_RAND, s.abschnitt, "Sans Bold 13", &H1F1F1F, 0)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(s.zeilen) - 1
+        DIM rot AS BOOLEAN : rot = STARTSWITH(s.zeilen[i], "FEHLER")
+        pdText(cr, BR_RAND, BR_RAND + 30 + i * BR_ZEILE, s.zeilen[i], "Monospace 8", IIF(rot, &HC02020, &H1F1F1F), 0)
+    NEXT
+END SUB
+
+' Seitengroesse: Platine wie ihr eigener Ausdruck, alles andere A4 quer.
+SUB berichtGroesse(s AS BerichtSeite, BYREF b AS FLOAT, BYREF h AS FLOAT)
+    b = A4_B
+    h = A4_H
+    IF s.art = "platine" THEN
+        b = plSeiteB()
+        h = plSeiteH()
+    END IF
+END SUB
+
+SUB berichtSeiteZeichnen(cr AS INTEGER, plan AS ARRAY OF BerichtSeite, i AS INTEGER)
+    gBerichtSeiten = gBerichtSeiten + 1
+    DIM b AS FLOAT, h AS FLOAT
+    berichtGroesse(plan[i], b, h)
+    DIM s AS BerichtSeite : s = plan[i]
+    SELECT CASE s.art
+        CASE "deck" : berichtDeckblatt(cr, b, h, plan)
+        CASE "blatt" : ausgabeBlattZeichnen(cr, b, h, s.nr)
+        CASE "text" : berichtTextSeite(cr, b, h, s)
+        CASE "platine" : platineSeite(cr, s.nr, b, h)
+    END SELECT
+    IF s.art <> "deck" THEN brFuss(cr, b, h, i, LEN(plan), s.abschnitt)
+END SUB
+
+FUNCTION projektbericht(pfad AS STRING) AS BOOLEAN
+    DIM plan AS ARRAY OF BerichtSeite : plan = berichtPlan()
+    DIM b AS FLOAT, h AS FLOAT
+    berichtGroesse(plan[0], b, h)
+    DIM fl AS INTEGER : fl = cairo_pdf_surface_create(pfad, b, h)
+    DIM cr AS INTEGER : cr = cairo_create(fl)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(plan) - 1
+        berichtGroesse(plan[i], b, h)
+        cairo_pdf_surface_set_size(fl, b, h)
+        berichtSeiteZeichnen(cr, plan, i)
+        cairo_show_page(cr)
+    NEXT
+    cairo_destroy(cr)
+    cairo_surface_finish(fl)
+    DIM ok AS BOOLEAN : ok = cairo_surface_status(fl) = 0
+    cairo_surface_destroy(fl)
+    RETURN ok AND FILEEXISTS(pfad)
+END FUNCTION
+
+' Eine Seite als PNG (Vorschau, Selbsttest).
+FUNCTION berichtPng(pfad AS STRING, seite AS INTEGER, dpi AS INTEGER) AS BOOLEAN
+    DIM plan AS ARRAY OF BerichtSeite : plan = berichtPlan()
+    DIM b AS FLOAT, h AS FLOAT
+    berichtGroesse(plan[seite], b, h)
+    DIM skala AS FLOAT : skala = dpi / 72.0
+    DIM fl AS INTEGER : fl = cairo_image_surface_create(CAIRO_ARGB32, ROUND(b * skala), ROUND(h * skala))
+    DIM cr AS INTEGER : cr = cairo_create(fl)
+    cairo_scale(cr, skala, skala)
+    berichtSeiteZeichnen(cr, plan, seite)
+    cairo_destroy(cr)
+    DIM st AS INTEGER : st = cairo_surface_write_to_png(fl, pfad)
+    cairo_surface_destroy(fl)
+    RETURN st = 0
+END FUNCTION
+
+SUB aufMenueBericht(eintrag AS INTEGER, daten AS INTEGER)
+    DIM pfad AS STRING : pfad = dateiExportWahl("Projektbericht (PDF)", "projektbericht.pdf", ["PDF (*.pdf)"], ["*.pdf"])
+    IF pfad = "" THEN RETURN
+    IF NOT ENDSWITH(LOWER$(pfad), ".pdf") THEN pfad = pfad + ".pdf"
+    IF NOT projektbericht(pfad) THEN meldung("Der Bericht liess sich nicht nach " + pfad + " schreiben.")
+END SUB

@@ -26,6 +26,7 @@ IMPORT "ansicht/blaetter.dh"
 IMPORT "ansicht/platinenansicht.dh"
 IMPORT "ansicht/platinendruck.dh"
 IMPORT "ansicht/komfort.dh"
+IMPORT "ansicht/bericht.dh"
 
 CONST STIL = "window { background-color: #12131a; color: #e6e6f0; }" + _
     " headerbar { background-color: #1a1c26; color: #e6e6f0; }" + _
@@ -2190,6 +2191,31 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
                 pruefe("Text-Netzliste (.txt)", STR$(exportNach(fotoZiel + ".netz.txt")) + " " + STR$(STARTSWITH(READALL$(fotoZiel + ".netz.txt"), "# Funkenflug-Netzliste")), STR$(TRUE) + " " + STR$(TRUE))
             END IF
             gBomSpalten = []
+        CASE 33
+            ' Projektbericht: Seitenplan, PDF, Inhaltsverzeichnis; mit Platine mehr Seiten
+            blattWechseln(0)
+            probeUndo0 = LEN(gUndo)
+            DIM bplan AS ARRAY OF BerichtSeite : bplan = berichtPlan()
+            pruefe("Bericht ohne Platine", STR$(LEN(bplan)) + " " + bplan[0].art + " " + bplan[1].art + " " + bplan[LEN(bplan) - 1].abschnitt, STR$(2 + LEN(gDok.blaetter) + 2) + " deck blatt Elektrische Regelpruefung")
+            DIM binh AS ARRAY OF STRING : binh = berichtInhalt(bplan)
+            pruefe("Inhaltsverzeichnis", binh[0], PADR$("Schaltplan", 30) + "Seite 2")
+            IF fotoZiel <> "" THEN
+                gBerichtSeiten = 0
+                pruefe("Projektbericht als PDF", STR$(projektbericht(fotoZiel + ".bericht.pdf")) + " " + STR$(gBerichtSeiten), STR$(TRUE) + " " + STR$(LEN(bplan)))
+                pruefe("Deckblatt als PNG", STR$(berichtPng(fotoZiel + ".deckblatt.png", 0, 100)), STR$(TRUE))
+            END IF
+            gtk_button_clicked(gKnopfPlatine)
+            plEinsetzen()
+            gtk_button_clicked(gKnopfSchaltplan)
+            DIM bplan2 AS ARRAY OF BerichtSeite : bplan2 = berichtPlan()
+            pruefe("Mit Platine drei Seiten mehr", STR$(LEN(bplan2) - LEN(bplan)) + " " + bplan2[LEN(bplan2) - 1].art, "3 platine")
+            IF fotoZiel <> "" THEN
+                gBerichtSeiten = 0
+                pruefe("Bericht mit Platine", STR$(projektbericht(fotoZiel + ".bericht2.pdf")) + " " + STR$(gBerichtSeiten), STR$(TRUE) + " " + STR$(LEN(bplan2)))
+            END IF
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
         CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()

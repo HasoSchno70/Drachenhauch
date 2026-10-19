@@ -350,6 +350,7 @@ CONST GTK_EINHEIT_PUNKT = 1                ' GTK_UNIT_POINTS
 DECLARE FUNCTION cairo_pdf_surface_create LIB CAIRO (pfad AS TEXT, b AS FLOAT, h AS FLOAT) AS ZEIGER
 DECLARE FUNCTION cairo_svg_surface_create LIB CAIRO (pfad AS TEXT, b AS FLOAT, h AS FLOAT) AS ZEIGER
 DECLARE SUB cairo_show_page LIB CAIRO (cr AS ZEIGER)
+DECLARE SUB cairo_pdf_surface_set_size LIB CAIRO (flaeche AS ZEIGER, b AS FLOAT, h AS FLOAT)
 DECLARE SUB cairo_surface_finish LIB CAIRO (flaeche AS ZEIGER)
 DECLARE FUNCTION cairo_surface_status LIB CAIRO (flaeche AS ZEIGER) AS LONG
 CONST GTK_DRUCK_DIALOG = 0                 ' GTK_PRINT_OPERATION_ACTION_PRINT_DIALOG

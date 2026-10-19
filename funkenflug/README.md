@@ -101,6 +101,15 @@ PNG zeigen das aktuelle Blatt.
 
 ![Ausgabe als PDF/PNG](druck.png)
 
+**Projektbericht** („Ausgabe ▾" → „Projektbericht (PDF)"): ein PDF mit
+allem – Deckblatt (Titel, Firma, Autor, Revision, Datum, Datei; Blätter mit
+Pfad, Bauteile, Netze, ERC-Stand, Platinen-Stand; Inhaltsverzeichnis mit
+Seitenzahlen), jedes Schaltplanblatt, Stückliste mit den gewählten Spalten,
+Netzliste, ERC-Liste (Fehler rot) und – wenn Teile darauf stecken – die
+Platine 1:1 (Bestückung, Lötseite, Arbeitsliste). Gezeichnet wird mit
+denselben Routinen wie Export und Druck; jede Seite trägt unten Titel,
+Abschnitt und „Seite i von n".
+
 **Eigene Bauteile und ICs** (Knopf „Symbol …" in der Leiste; ist ein eigenes
 Bauteil gewählt, bearbeitet er dessen Symbol): Name, Präfix, Wert und eine
 **Pinliste**, eine Zeile je Pin –
@@ -407,6 +416,7 @@ ansicht/    Zeichenfläche und Werkzeuge – globaler Namensraum
   komfort.dh     Datei-Menü, zuletzt geöffnet, Autosave, Bearbeiten-Menü, Suchen-Dialog
   platinenansicht.dh  Lochraster-Sicht: Zeichnen, Werkzeuge, Pruefliste
   platinendruck.dh    Platine 1:1: Bestueckung, Loetseite, Arbeitsliste (PDF, Druck)
+  bericht.dh     Projektbericht: Seitenplan, Deckblatt, Text-Seiten
 main.dh     Fenster, Kopfleiste, Werkzeugleiste, Statuszeile, Dialoge
 ```
 
@@ -414,7 +424,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (277 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (283 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
