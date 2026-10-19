@@ -3603,3 +3603,217 @@ END CLASS
 --- erwartet
 lesbar: TRUE
 intern: 0
+
+=== kommazahl hinter return an integer warnt
+' Seit `/` immer FLOAT liefert, bricht `RETURN n / 2` in einer FUNCTION ...
+' AS INTEGER bei ungeradem n ab -- und `((0 + n / 2) / 100) * 100` liefert
+' still 50.0, wo alter Code 0 meinte. Lange schwieg --check dazu.
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "anzahl [hinter RETURN steht eine Kommazahl]: "; wieviele("hinter RETURN steht eine Kommazahl")
+PRINT "eine meldung mit [hinter RETURN steht eine Kommazahl|ganzzahlige Division]: "; eine$("hinter RETURN steht eine Kommazahl|ganzzahlige Division")
+PRINT "eine meldung mit [hinter RETURN steht eine Kommazahl|INT()]: "; eine$("hinter RETURN steht eine Kommazahl|INT()")
+--- datei w.dh
+FUNCTION halb(n AS INTEGER) AS INTEGER
+    RETURN n / 2
+END FUNCTION
+FUNCTION prozent(n AS INTEGER) AS INTEGER
+    RETURN ((0 + n / 2) / 100) * 100
+END FUNCTION
+FUNCTION mal(f AS FLOAT) AS INTEGER
+    RETURN f * 2.0
+END FUNCTION
+PRINT halb(4); prozent(100); mal(1.5)
+
+--- erwartet
+anzahl [hinter RETURN steht eine Kommazahl]: 3
+eine meldung mit [hinter RETURN steht eine Kommazahl|ganzzahlige Division]: TRUE
+eine meldung mit [hinter RETURN steht eine Kommazahl|INT()]: TRUE
+
+=== ganzzahliges return bleibt still
+' Gegenprobe: `\`, INT(), ROUND() und eine FUNCTION AS FLOAT sind richtig.
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "gesamt: "; LEN(meldungen)
+--- datei w.dh
+FUNCTION halb(n AS INTEGER) AS INTEGER
+    RETURN n \ 2
+END FUNCTION
+FUNCTION ab(n AS INTEGER) AS INTEGER
+    RETURN INT(n / 2)
+END FUNCTION
+FUNCTION rund(n AS INTEGER) AS INTEGER
+    RETURN ROUND(n / 2)
+END FUNCTION
+FUNCTION komma(n AS INTEGER) AS FLOAT
+    RETURN n / 2
+END FUNCTION
+PRINT halb(5); ab(5); rund(5); komma(5)
+
+--- erwartet
+gesamt: 0
+
+=== kommazahl an integer parameter warnt
+' Dieselbe Regel beim Argument: an einen INTEGER-Parameter einer eigenen SUB
+' oder Methode wandelt die Laufzeit genauso wertabhaengig um. Das Feld
+' (`z.wert = a / 2`) warnt schon laenger; `\` und ein FLOAT-Parameter nicht.
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "anzahl [ist als INTEGER angesagt, hier steht eine Kommazahl]: "; wieviele("ist als INTEGER angesagt, hier steht eine Kommazahl")
+PRINT "eine meldung mit [zeige: Parameter 'n'|ganzzahlige Division]: "; eine$("zeige: Parameter 'n'|ganzzahlige Division")
+PRINT "eine meldung mit [Z.setze: Parameter 'n']: "; eine$("Z.setze: Parameter 'n'")
+PRINT "eine meldung mit ['z.wert' ist als INTEGER angesagt]: "; eine$("'z.wert' ist als INTEGER angesagt")
+PRINT "gesamt: "; LEN(meldungen)
+--- datei w.dh
+SUB zeige(n AS INTEGER)
+    PRINT n
+END SUB
+SUB zeigef(n AS FLOAT)
+    PRINT n
+END SUB
+CLASS Z
+    DIM wert AS INTEGER
+    SUB setze(n AS INTEGER)
+        Self.wert = n
+    END SUB
+END CLASS
+DIM z AS Z : z = NEW Z()
+DIM a AS INTEGER : a = 8
+zeige(a / 2)
+zeige(a \ 2)
+zeigef(a / 2)
+z.setze(a / 2)
+z.wert = a / 2
+
+--- erwartet
+anzahl [ist als INTEGER angesagt, hier steht eine Kommazahl]: 2
+eine meldung mit [zeige: Parameter 'n'|ganzzahlige Division]: TRUE
+eine meldung mit [Z.setze: Parameter 'n']: TRUE
+eine meldung mit ['z.wert' ist als INTEGER angesagt]: TRUE
+gesamt: 3

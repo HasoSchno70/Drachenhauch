@@ -1119,7 +1119,7 @@
   "INPUT_RESET": "clear all bindings + state",
   "INPUT_UNBIND": "delete an action",
   "INPUT_UPDATE": "frame snapshot (required every frame, also polls gamepads)",
-  "INSTR": "position of sub in s, or -1",
+  "INSTR": "position of sub in s (0-based), or -1",
   "INSTRREV": "last position of sub in s (with start: the last one beginning there or before), or -1",
   "INT": "Number to INT (floor). INT(3.7) = 3, INT(-1.5) = -2.",
   "ISBOOL": "type predicates (a bool is NOT a number)",

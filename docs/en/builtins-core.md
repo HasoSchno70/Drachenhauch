@@ -297,7 +297,7 @@ Functions with a `$` suffix also exist without it (`UPPER$` ≡ `UPPER`).
 | `UPPER$(s)`, `LOWER$(s)` | upper/lower case |
 | `LEFT$(s, n)`, `RIGHT$(s, n)` | first/last n characters |
 | `MID$(s, start[, n])` | substring from position start (0-based), n characters or to the end |
-| `INSTR(s, sub[, start])` → INTEGER | position of sub in s, or -1 |
+| `INSTR(s, sub[, start])` → INTEGER | position of sub in s (0-based), or -1 |
 | `INSTRREV(s, sub[, start])` → INTEGER | last position of sub in s (with `start`: the last one beginning there or before), or -1 |
 | `REPLACE$(s, alt, neu)` | replace all occurrences |
 | `TRIM$(s)` | remove whitespace at the front/back |
@@ -308,6 +308,13 @@ Functions with a `$` suffix also exist without it (`UPPER$` ≡ `UPPER`).
 | `SPACE$(n)` | n spaces |
 | `HEX$(n)` | INT as a hex string |
 | `FORMAT$(value, mask)` | printf style. `FORMAT$(42, "%05d")` → `"00042"`. Six specifiers: `%d`/`%i`, `%f`, `%x`, `%X`, `%s` — plus `%%` for a literal percent sign. Width, zeros and precision as usual (`%05d`, `%-6d`, `%.2f`). Anything else reports "unknown specifier", and a mask without any placeholder (such as the VB mask `"#,##0.00"`) is an error too -- dots between thousands come from `ZAHL$` |
+
+> **Unlike QBasic/VB:** `MID$` and `INSTR` count from **0**, and `INSTR`
+> returns **-1** for "not found", not 0. Patterns carried over from QBasic
+> therefore go silently wrong: `IF INSTR(s, t) > 0` misses a match at the
+> start (correct: `>= 0`, or simply `t IN s` / `STARTSWITH`), and
+> `MID$(s, LEN(prefix) + 1)` cuts off one character too many (correct:
+> `MID$(s, LEN(prefix))`).
 
 Extensions *(native runtime only)*:
 
@@ -330,9 +337,12 @@ Extensions *(native runtime only)*:
 ```basic
 PRINT UPPER$("hallo")           ' "HALLO"
 PRINT LEFT$("Drachenhauch", 4)     ' "Drac"
-PRINT MID$("Drachenhauch", 4, 5)   ' "henha" (counted from 0)
+PRINT MID$("Drachenhauch", 4, 5)   ' "henha"  (0-based: from the 5th character)
 PRINT INSTR("hello world", "world")   ' 6
+PRINT INSTR("hello", "he")           ' 0  -- a match right at the start
+PRINT INSTR("hello", "xy")           ' -1 -- not found
 PRINT INSTRREV("a/b/c", "/")          ' 3
+PRINT MID$("pre:rest", LEN("pre:"))  ' "rest" -- without + 1
 PRINT REPLACE$("a-b-c", "-", "_")     ' "a_b_c"
 
 DIM teile AS ARRAY OF STRING
