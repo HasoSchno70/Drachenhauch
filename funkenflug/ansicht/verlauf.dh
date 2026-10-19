@@ -39,6 +39,20 @@ SUB verlaufMerken()
     verlaufKnoepfeNachziehen()
 END SUB
 
+' Einen frueher genommenen Stand nachtraeglich merken -- fuer Aktionen, die
+' erst hinterher wissen, ob sie etwas geaendert haben.
+SUB verlaufMerkenStand(stand AS STRING, idx AS INTEGER)
+    ARRAY_PUSH(gUndo, stand)
+    ARRAY_PUSH(gUndoBlatt, idx)
+    IF LEN(gUndo) > VERLAUF_MAX THEN
+        ARRAY_REMOVE_AT(gUndo, 0)
+        ARRAY_REMOVE_AT(gUndoBlatt, 0)
+    END IF
+    gRedo = []
+    gRedoBlatt = []
+    verlaufKnoepfeNachziehen()
+END SUB
+
 SUB verlaufRuecksetzen()
     gUndo = []
     gUndoBlatt = []

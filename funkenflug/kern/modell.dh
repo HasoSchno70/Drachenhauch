@@ -103,6 +103,8 @@ CLASS Symbol
     DIM textOrte AS BOOLEAN           ' Referenz/Wert an refOrt/wertOrt statt um die Mitte
     DIM refOrt AS Punkt
     DIM wertOrt AS Punkt
+    DIM bauform AS STRING             ' Vorgabe fuer die Platine ("DIP8"), "" = keine
+    DIM loecher AS STRING             ' eigene Bauform "1:0,0;2:4,0", "" = keine
     SUB Init(i AS STRING, nm AS STRING, pre AS STRING)
         id = i
         name = nm

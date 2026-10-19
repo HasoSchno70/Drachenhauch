@@ -437,6 +437,8 @@ FUNCTION plTaste(taste AS INTEGER) AS BOOLEAN
             plWerkzeug(PW_BAHN)
         CASE K_T
             plWerkzeug(PW_TRENNEN)
+        CASE K_V
+            plVerbinden()
         CASE K_PLUS, K_GLEICH
             zoomMitte(1.2)
         CASE K_MINUS
@@ -462,6 +464,23 @@ SUB plEinsetzen()
     DIM n AS INTEGER : n = kern.platineEinsetzen(gDok)
     gPlMeldung = STR$(n) + " Bauteil(e) eingesetzt" + IIF(gDok.platine.art = kern.PL_STREIFEN, " -- quer zu den Streifen, daneben getrennt", "")
     gPlEingepasst = FALSE
+    geaendert()
+END SUB
+
+' Alle Luftlinien verbinden lassen (ein Rueckgaengig-Schritt). Was nicht
+' geht, bleibt Luftlinie -- dann helfen Platz, Verschieben oder eine Hand.
+SUB plVerbinden()
+    IF LEN(platineBericht().luft) = 0 THEN
+        gPlMeldung = "Nichts zu verbinden -- keine Luftlinien"
+        statusAktualisieren()
+        RETURN
+    END IF
+    DIM stand AS STRING : stand = schnappschuss$()
+    DIM idx AS INTEGER : idx = aktuellerBlattIndex()
+    DIM offen AS INTEGER
+    DIM n AS INTEGER : n = kern.platineVerbinden(gDok, offen)
+    IF n > 0 THEN verlaufMerkenStand(stand, idx)
+    gPlMeldung = STR$(n) + " Verbindung(en) gelegt" + IIF(offen > 0, ", " + STR$(offen) + " ohne Weg (Teile auseinanderziehen oder von Hand)", "")
     geaendert()
 END SUB
 

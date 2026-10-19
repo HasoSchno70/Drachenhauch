@@ -10,7 +10,8 @@ CONST SE_BEISPIEL = "# Nummer  Name  Seite  Typ" + CHR$(10) + _
     "3  OUT  rechts aus" + CHR$(10) + _
     "4  GND  unten  vin" + CHR$(10) + _
     "# Freie Grafik (mm): linie x1 y1 x2 y2 .. [voll], rechteck, kreis x y r," + CHR$(10) + _
-    "#   bogen x y r w1 w2, text x y Inhalt, pin Nr Name x y Seite [Typ] [Laenge]"
+    "#   bogen x y r w1 w2, text x y Inhalt, pin Nr Name x y Seite [Typ] [Laenge]" + CHR$(10) + _
+    "# Platine: bauform DIP8 (Vorgabe) oder je Pin: loch Nr Spalte Zeile"
 
 DIM seDlg AS INTEGER
 DIM seName AS INTEGER

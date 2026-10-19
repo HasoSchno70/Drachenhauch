@@ -497,6 +497,7 @@ DIM gPlKnopfAuswahl AS INTEGER
 DIM gPlKnopfBahn AS INTEGER
 DIM gPlKnopfTrennen AS INTEGER
 DIM gPlArtWahl AS INTEGER
+DIM gPlKnopfVerbinden AS INTEGER
 
 SUB ansichtLeistenNachziehen()
     IF gLeiste = 0 THEN RETURN
@@ -555,6 +556,10 @@ END SUB
 
 SUB aufPlEinsetzen(knopf AS INTEGER, daten AS INTEGER)
     plEinsetzen()
+END SUB
+
+SUB aufPlVerbinden(knopf AS INTEGER, daten AS INTEGER)
+    plVerbinden()
 END SUB
 
 SUB aufPlArt(wahl AS INTEGER, daten AS INTEGER)
@@ -1695,6 +1700,21 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             pruefe("Lochraster gewaehlt", STR$(gDok.platine.art), STR$(kern.PL_LOCH))
             verlaufZurueck()
             pruefe("Rueckgaengig: wieder Streifen, Liste folgt", STR$(gDok.platine.art) + " " + STR$(gtk_combo_box_get_active(gPlArtWahl)), STR$(kern.PL_STREIFEN) + " 0")
+            ' Verbinden: Bruecken weg (ein Schritt), dann automatisch verbinden
+            verlaufMerken()
+            gDok.platine.bahnen = []
+            platineVeraltet()
+            pruefe("Ohne Bruecken wieder offen", STR$(LEN(platineBericht().luft)), STR$(pluft))
+            pundo = LEN(gUndo)
+            gtk_button_clicked(gPlKnopfVerbinden)
+            pbr = platineBericht()
+            pruefe("Verbinden-Knopf: alles verbunden, kein Kurzschluss", STR$(LEN(pbr.luft)) + " " + STR$(pbr.kurzschluesse) + " " + STR$(LEN(gDok.platine.bahnen) > 0), "0 0 " + STR$(TRUE))
+            pruefe("Verbinden = ein Undo-Schritt", STR$(LEN(gUndo) - pundo), "1")
+            gtk_button_clicked(gPlKnopfVerbinden)
+            pruefe("Nochmal verbinden: nichts zu tun", STR$(LEN(gUndo) - pundo) + " " + STR$(CONTAINS(gtk_label_get_text(gStatus), "Nichts zu verbinden")), "1 " + STR$(TRUE))
+            verlaufZurueck()
+            pruefe("Rueckgaengig: Bruecken wieder weg", STR$(LEN(gDok.platine.bahnen)), "0")
+            verlaufZurueck()
             ' Platine ausgeben: PDF und Druck (Bestueckung, Loetseite, Liste), 1:1
             pruefe("Massstab 1:1", STR$(plMassstab(plSeiteB(), plSeiteH()) = 1.0), STR$(TRUE))
             IF fotoZiel <> "" THEN
@@ -1850,6 +1870,9 @@ gtk_box_pack_start(gPlLeiste, gPlKnopfTrennen, FALSE, FALSE, 0)
 DIM knopfEinsetzen AS INTEGER : knopfEinsetzen = gtk_button_new_with_label("Einsetzen")
 gtk_widget_set_tooltip_text(knopfEinsetzen, "Bauteile, die noch fehlen, auf die Platine setzen")
 gtk_box_pack_start(gPlLeiste, knopfEinsetzen, FALSE, FALSE, 0)
+gPlKnopfVerbinden = gtk_button_new_with_label("Verbinden")
+gtk_widget_set_tooltip_text(gPlKnopfVerbinden, "Luftlinien verbinden: Streifenraster mit Bruecken, Lochraster mit Loetbahnen; nichts, was einen Kurzschluss gaebe (V)")
+gtk_box_pack_start(gPlLeiste, gPlKnopfVerbinden, FALSE, FALSE, 0)
 gPlArtWahl = gtk_combo_box_text_new()
 gtk_combo_box_text_append_text(gPlArtWahl, "Streifenraster")
 gtk_combo_box_text_append_text(gPlArtWahl, "Lochraster")
@@ -1886,6 +1909,7 @@ signal(gPlKnopfAuswahl, "clicked", aufPlAuswahl, 0, 0, 0)
 signal(gPlKnopfBahn, "clicked", aufPlBahn, 0, 0, 0)
 signal(gPlKnopfTrennen, "clicked", aufPlTrennen, 0, 0, 0)
 signal(knopfEinsetzen, "clicked", aufPlEinsetzen, 0, 0, 0)
+signal(gPlKnopfVerbinden, "clicked", aufPlVerbinden, 0, 0, 0)
 signal(gPlArtWahl, "changed", aufPlArt, 0, 0, 0)
 signal(knopfGroesse, "clicked", aufPlGroesse, 0, 0, 0)
 signal(knopfSymbol, "clicked", aufSymbolEditor, 0, 0, 0)

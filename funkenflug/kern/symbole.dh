@@ -21,6 +21,8 @@
 '     bogen    x y r w1 w2                       Winkel in Grad, 0 = rechts, im Uhrzeigersinn
 '     text     x y Inhalt ...
 '     pin      Nummer Name x y Seite [Typ] [Laenge]
+'     bauform  DIP8                              Vorgabe fuer die Platine
+'     loch     Nummer Spalte Zeile               eigene Bauform (ganze Loecher)
 ' Ein freier Pin: (x, y) ist der elektrische Punkt (auf dem 1-mm-Raster),
 ' die Seite sagt, wohin er vom Koerper absteht (links = Stummel nach rechts
 ' zum Koerper), Name "-" = ohne Namen, Laenge in mm (Vorgabe 3). Seine
@@ -49,11 +51,15 @@ CLASS Pinliste
     DIM freiePins AS ARRAY OF Pin
     DIM grafik AS ARRAY OF Primitiv
     DIM fehler AS ARRAY OF STRING
+    DIM bauform AS STRING
+    DIM loecher AS ARRAY OF STRING    ' "Nr:s,z"
     SUB Init()
         pins = []
         freiePins = []
         grafik = []
         fehler = []
+        bauform = ""
+        loecher = []
     END SUB
     FUNCTION pinAnzahl() AS INTEGER
         RETURN LEN(pins) + LEN(freiePins)
@@ -149,6 +155,25 @@ FUNCTION grafikZeile$(pl AS Pinliste, t AS ARRAY OF STRING, BYREF gesehen AS MAP
                 ARRAY_PUSH(rest, t[i])
             NEXT
             g.text = JOIN$(rest, " ")
+        CASE "bauform"
+            IF LEN(t) <> 2 THEN RETURN "bauform braucht genau einen Namen (AX4, RAD2, DIP8 ...)"
+            DIM bfp AS Bauform
+            IF NOT bauformLesen(t[1], bfp) THEN RETURN "Bauform '" + t[1] + "' gibt es nicht (AX4, RAD2, TO92-CBE, DIP8, SIL3, HDR2X5, TRIM)"
+            pl.bauform = t[1]
+            RETURN ""
+        CASE "loch"
+            IF LEN(t) <> 4 THEN RETURN "loch braucht Nummer Spalte Zeile"
+            DIM ls AS INTEGER, lz AS INTEGER
+            IF NOT ganzzahlLesen(REPLACE$(t[2], "-", ""), ls) OR NOT ganzzahlLesen(REPLACE$(t[3], "-", ""), lz) THEN RETURN "loch: Spalte und Zeile sind ganze Loecher"
+            IF LEFT$(t[2], 1) = "-" THEN ls = -ls
+            IF LEFT$(t[3], 1) = "-" THEN lz = -lz
+            DIM li AS INTEGER
+            FOR li = 0 TO LEN(pl.loecher) - 1
+                IF LEFT$(pl.loecher[li], INSTR(pl.loecher[li], ":")) = t[1] THEN RETURN "loch fuer Pin " + t[1] + " gibt es schon"
+                IF MID$(pl.loecher[li], INSTR(pl.loecher[li], ":") + 1) = STR$(ls) + "," + STR$(lz) THEN RETURN "Loch " + STR$(ls) + "," + STR$(lz) + " ist schon belegt"
+            NEXT
+            ARRAY_PUSH(pl.loecher, t[1] + ":" + STR$(ls) + "," + STR$(lz))
+            RETURN ""
         CASE "pin"
             IF LEN(t) < 6 OR LEN(t) > 8 THEN RETURN "pin braucht Nummer Name x y Seite [Typ] [Laenge]"
             DIM px AS INTEGER, py AS INTEGER, laenge AS INTEGER
@@ -191,7 +216,7 @@ END FUNCTION
 
 FUNCTION istGrafikWort(w AS STRING) AS BOOLEAN
     SELECT CASE LOWER$(w)
-        CASE "linie", "rechteck", "kreis", "bogen", "text", "pin" : RETURN TRUE
+        CASE "linie", "rechteck", "kreis", "bogen", "text", "pin", "bauform", "loch" : RETURN TRUE
     END SELECT
     RETURN FALSE
 END FUNCTION
@@ -282,6 +307,20 @@ FUNCTION pinlisteLesen(text AS STRING) AS Pinliste
         MAPPUT(gesehen, p.nummer, i + 1)
         ARRAY_PUSH(pl.pins, p)
     NEXT
+    ' eigene Loecher: jeder Pin genau eins, keins fuer einen unbekannten Pin
+    IF LEN(pl.loecher) > 0 THEN
+        DIM hat AS MAP OF INTEGER
+        FOR k = 0 TO LEN(pl.loecher) - 1
+            DIM lnr AS STRING : lnr = LEFT$(pl.loecher[k], INSTR(pl.loecher[k], ":"))
+            MAPPUT(hat, lnr, 1)
+            IF NOT MAPHAS(gesehen, lnr) THEN ARRAY_PUSH(pl.fehler, "loch fuer Pin " + lnr + ": diesen Pin gibt es nicht")
+        NEXT
+        DIM alle AS ARRAY OF STRING : alle = MAPKEYS(gesehen)
+        SORT(alle)
+        FOR k = 0 TO LEN(alle) - 1
+            IF NOT MAPHAS(hat, alle[k]) THEN ARRAY_PUSH(pl.fehler, "Pin " + alle[k] + " hat kein loch (eigene Bauform: jeder Pin eins)")
+        NEXT
+    END IF
     RETURN pl
 END FUNCTION
 
@@ -348,6 +387,8 @@ END FUNCTION
 ' Freie Grafik und frei gesetzte Pins ins Symbol.
 SUB freiDazu(s AS Symbol, pl AS Pinliste)
     DIM i AS INTEGER
+    s.bauform = pl.bauform
+    s.loecher = JOIN$(pl.loecher, ";")
     FOR i = 0 TO LEN(pl.grafik) - 1
         s.grafikHinzu(pl.grafik[i])
     NEXT
@@ -400,6 +441,8 @@ FUNCTION symbolNachJson(s AS Symbol) AS JSON_HANDLE
     JSON_SET_STRING(j, "wert", s.wertVorgabe)
     JSON_SET_STRING(j, "quelle", s.quelltext)
     JSON_SET_BOOL(j, "pinTexte", s.pinTexte)
+    IF s.bauform <> "" THEN JSON_SET_STRING(j, "bauform", s.bauform)
+    IF s.loecher <> "" THEN JSON_SET_STRING(j, "loecher", s.loecher)
     IF s.textOrte THEN
         JSON_SET_JSON(j, "refOrt", JSON_NEW_ARRAY())
         JSON_APPEND_INT(j, "refOrt", s.refOrt.x)
@@ -460,6 +503,8 @@ FUNCTION symbolAusJson(j AS JSON_HANDLE, b AS STRING) AS Symbol
     s.wertVorgabe = jsonText$(j, v + "wert", "")
     s.quelltext = jsonText$(j, v + "quelle", "")
     IF JSON_HAS(j, v + "pinTexte") THEN s.pinTexte = JSON_GET_BOOL(j, v + "pinTexte")
+    s.bauform = jsonText$(j, v + "bauform", "")
+    s.loecher = jsonText$(j, v + "loecher", "")
     IF JSON_HAS(j, v + "refOrt") THEN
         s.textOrte = TRUE
         s.refOrt = NEW Punkt(JSON_GET_INT(j, v + "refOrt.0"), JSON_GET_INT(j, v + "refOrt.1"))
@@ -512,6 +557,8 @@ SUB symbolFelderKopieren(ziel AS Symbol, q AS Symbol)
     ziel.textOrte = q.textOrte
     ziel.refOrt = q.refOrt
     ziel.wertOrt = q.wertOrt
+    ziel.bauform = q.bauform
+    ziel.loecher = q.loecher
 END SUB
 
 FUNCTION eigenesSymbol(id AS STRING) AS Symbol

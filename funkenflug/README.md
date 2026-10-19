@@ -200,17 +200,31 @@ springt hin. Die Statuszeile nennt das Netz des Lochs unter der Maus.
 | **Bahn** (`B`) | Loch für Loch klicken, rechte Taste beendet. Auf Lochraster ist eine gerade Bahn eine **Lötbahn** (verbindet jedes Loch auf ihrem Weg), sonst – und immer auf Streifenraster – eine **Drahtbrücke** (nur ihre Enden); `Umschalt` erzwingt die Brücke |
 | **Trennen** (`T`) | Streifen an einem Loch auftrennen bzw. wieder schließen |
 
+**Verbinden** (`V`) legt für alle Luftlinien einen Vorschlag – auf
+Streifenraster eine Drahtbrücke zwischen freien Löchern der beiden
+Kupferstücke (gerade, wo eine gemeinsame Spalte frei ist, sonst die kürzeste),
+auf Lochraster Lötbahnen auf dem kürzesten Weg über freie Löcher. Jeder
+Vorschlag wird sofort geprüft: was einen Kurzschluss gäbe oder nichts hilft,
+fliegt wieder raus; was keinen Weg findet, bleibt Luftlinie. Alles zusammen
+ist ein Rückgängig-Schritt. Kein Autorouter, der still Platz verbraucht –
+jede Brücke steht danach in der Arbeitsliste.
+
 **Einsetzen** setzt alle Teile, die noch fehlen. Auf Streifenraster stehen sie
 quer zu den Streifen (sonst lägen beide Beine eines Widerstands auf einem
 Streifen), rechts neben jedem Teil und unter einem DIP zwischen den Reihen
-wird getrennt – es entsteht nie ein Kurzschluss, was fehlt, zeigen die
-Luftlinien. Bauteile, die im Schaltplan gelöscht wurden, verschwinden beim
+wird getrennt, und rechts bleibt ein freies Loch, damit jedes Teil auf seinem
+Streifenstück Platz für eine Brücke hat – es entsteht nie ein Kurzschluss,
+was fehlt, zeigen die Luftlinien. Bauteile, die im Schaltplan gelöscht wurden, verschwinden beim
 Umschalten von der Platine (ein Rückgängig-Schritt).
 
 Die **Bauform** ist das Gehäuse-Feld des Bauteils: `AX4` (axial, 4 Löcher),
 `RAD2`, `RAD1`, `TO92-CBE` (Beinfolge nach Pin-Namen, auch `TO92-GDS` für FETs),
 `TO220-GDS`, `TO92`/`TO220` ohne Folge (Pins 1 2 3), `DIP8`, `SIL3`, `HDR2X5`
-(Stiftleiste 2 × 5, Pin 1 und 2 nebeneinander), `TRIM` (stehender Trimmer). Ohne
+(Stiftleiste 2 × 5, Pin 1 und 2 nebeneinander), `TRIM` (stehender Trimmer).
+Eigene Symbole bringen ihre Bauform in der Pinliste mit: `bauform DIP8` als
+Vorgabe oder ganz eigen je Pin `loch Nr Spalte Zeile` (z. B. ein Relais mit
+versetzten Beinen); der Editor meldet fehlende, doppelte und unbekannte
+Löcher zeilengenau. Ein Gehäuse am Bauteil geht immer vor. Ohne
 Angabe gilt eine Vorgabe je Symbol (Widerstand/Diode AX4, Kondensator RAD2,
 Elko/LED RAD1, NPN TO92-CBE, eigene ICs DIP bzw. SIL). Platine, Teile, Bahnen
 und Trennstellen stecken in der `.fkn` und im Rückgängig.
@@ -264,7 +278,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (199 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (204 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
@@ -274,7 +288,8 @@ PDF/Druck, gedrehte Labels samt Treffer-Test, Gehäuse/Bestellnummer einzeln
 und für mehrere Bauteile, Referenz ziehen/drehen/zurücksetzen, frei
 gezeichnetes Symbol platzieren und anschließen, Platine: umschalten,
 einsetzen, Brücken entlang der Luftlinien klicken, trennen, ziehen, drehen am
-Rand, Prüfliste, Art umschalten, Speichern, PDF/Druck der Platine 1:1). `pruef_kern.dh` prüft u. a. die
+Rand, Prüfliste, Art umschalten, Speichern, Verbinden, PDF/Druck der Platine
+1:1). `pruef_kern.dh` prüft u. a. die
 Gruppen-Lage in allen 8 Orientierungen × 3 Arten (72 Pin-Prüfungen). Der Selbsttest
 lässt die Zwischenablage des Systems in Ruhe und schreibt seine Bibliothek in
 eine Wegwerf-Datei neben dem Bild. `--nur-foto bild.png` macht nur das Bild.
@@ -305,7 +320,8 @@ SparkNode hatte mehrere Konzeptfehler, die hier von Anfang an vermieden sind:
    ein Schritt, ein bloßer Klick keiner.
 6. **Bewusst weggelassen** (in SparkNode überproportional viele Bugquellen):
    Bus/Bus-Entry, Hierarchie-Sheets, Pin-Swap, Multi-Unit, auf der Platine
-   Autorouter und Autoplatzierung nach Netzen. Kommt erst, wenn wirklich
+   ein Autorouter, der alles auf einmal legt (Verbinden schlägt je Luftlinie
+   vor und prüft jeden Vorschlag), und Autoplatzierung nach Netzen. Kommt erst, wenn wirklich
    gebraucht.
 7. **Platine ohne zweite Wahrheit.** SparkNode hielt Footprint und Netzliste
    der Platine getrennt vom Schaltplan und brauchte einen „Transfer"; hier ist
@@ -333,5 +349,5 @@ zweiten Kondensator wieder „C1".
 ## Noch offen (nächste Runden)
 
 Hierarchische Blätter (Blatt-Symbole mit Ports), Symbol-Grafik mit der Maus
-zeichnen (bisher als Text), eigene Bauformen (bisher die festen Namen),
-Brücken automatisch entlang der Luftlinien vorschlagen.
+zeichnen (bisher als Text), Bauteile auf der Platine nach Netzen gruppiert
+einsetzen (bisher der Reihe nach).

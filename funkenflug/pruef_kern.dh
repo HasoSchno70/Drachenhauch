@@ -314,18 +314,18 @@ PRINT "Label-Richtung: R "; kern.richtungGruppe(0, kern.GR_DREHEN); " "; kern.ri
 
 ' --- Bauteil-Felder: Gehaeuse/Bestellnummer, Stueckliste trennt danach
 DIM fd AS kern.Dokument : fd = NEW kern.Dokument()
-DIM fi AS INTEGER
-FOR fi = 1 TO 3
-    DIM fr AS kern.Bauteil : fr = kern.neuesBauteil("R", kern.neueLage(fi * 1000, 0))
-    fr.referenz = "R" + STR$(fi)
+DIM fbi AS INTEGER
+FOR fbi = 1 TO 3
+    DIM fr AS kern.Bauteil : fr = kern.neuesBauteil("R", kern.neueLage(fbi * 1000, 0))
+    fr.referenz = "R" + STR$(fbi)
     fr.wert = "10k"
-    fr.gehaeuse = IIF(fi = 3, "1206", "0805")
-    IF fi = 1 THEN fr.bestellnr = "RC0805-10K"
+    fr.gehaeuse = IIF(fbi = 3, "1206", "0805")
+    IF fbi = 1 THEN fr.bestellnr = "RC0805-10K"
     ARRAY_PUSH(fd.blaetter[0].bauteile, fr)
 NEXT
-DIM fl AS kern.Label : fl = NEW kern.Label("~{RESET}", NEW kern.Punkt(0, 500), kern.LA_LOKAL)
-fl.drehung = 270
-ARRAY_PUSH(fd.blaetter[0].labels, fl)
+DIM flab AS kern.Label : flab = NEW kern.Label("~{RESET}", NEW kern.Punkt(0, 500), kern.LA_LOKAL)
+flab.drehung = 270
+ARRAY_PUSH(fd.blaetter[0].labels, flab)
 DIM fz AS ARRAY OF kern.BomZeile : fz = kern.stuecklisteDok(fd)
 PRINT "Stueckliste nach Gehaeuse: "; LEN(fz); " Positionen  "; JOIN$(fz[0].referenzen, ","); "/"; fz[0].gehaeuse; "/"; fz[0].bestellnr; "  "; JOIN$(fz[1].referenzen, ","); "/"; fz[1].gehaeuse; "  "; JOIN$(fz[2].referenzen, ","); "/"; fz[2].gehaeuse; "  (erwartet 3 Positionen  R1/0805/RC0805-10K  R2/0805  R3/1206)"
 PRINT "CSV-Kopf: "; STARTSWITH(kern.stuecklisteCsv$(fd), "Menge;Referenzen;Wert;Bauteil;Gehaeuse;Bestellnummer;Beschreibung"); "  Markdown-Spalten: "; CONTAINS(kern.stuecklisteMarkdown$(fd, "F"), "| Gehaeuse | Bestellnummer |"); " "; CONTAINS(kern.stuecklisteMarkdown$(fd, "F"), "| 1 | R3 | 10k | Widerstand | 1206 |  |"); "  (erwartet TRUE TRUE TRUE)"
@@ -459,6 +459,71 @@ pc1.drehung = 90
 ' Speichern und Abgleich
 DIM pd2 AS kern.Dokument : pd2 = kern.dokumentAusJson(kern.dokumentNachJson(pdok))
 PRINT "Platine JSON: "; LEN(pd2.platine.teile); " Teile, "; LEN(pd2.platine.bahnen); " Bahnen, "; LEN(pd2.platine.trenn) = LEN(pdok.platine.trenn); " Trennstellen, Art "; pd2.platine.art; ", Pruefung "; LEN(kern.platinePruefen(pd2).luft); " "; kern.platinePruefen(pd2).kurzschluesse; "  (erwartet 3 Teile, 3 Bahnen, TRUE, Art 1, Pruefung 0 0)"
+' Verbinden entlang der Luftlinien -- Streifenraster: gerade Bruecken
+DIM vdok AS kern.Dokument : vdok = kern.dokumentAusJson(kern.dokumentNachJson(pdok))
+vdok.platine.bahnen = []
+DIM vow AS INTEGER
+DIM vn AS INTEGER : vn = kern.platineVerbinden(vdok, vow)
+DIM vr AS kern.PlatBericht : vr = kern.platinePruefen(vdok)
+DIM vgerade AS BOOLEAN : vgerade = TRUE
+DIM vbr AS BOOLEAN : vbr = TRUE
+DIM vi AS INTEGER
+FOR vi = 0 TO LEN(vdok.platine.bahnen) - 1
+    IF NOT (vdok.platine.bahnen[vi].s1 = vdok.platine.bahnen[vi].s2 OR vdok.platine.bahnen[vi].z1 = vdok.platine.bahnen[vi].z2) THEN vgerade = FALSE
+    IF vdok.platine.bahnen[vi].art <> kern.BA_BRUECKE THEN vbr = FALSE
+NEXT
+PRINT "Verbinden (Streifen): "; vn; " gelegt, offen "; vow; ", Kurzschluesse "; vr.kurzschluesse; ", Hinweise "; LEN(vr.fehler); ", Bruecken "; vbr; "  (erwartet 3 gelegt, offen 0, Kurzschluesse 0, Hinweise 0, Bruecken TRUE)"
+' wo es eine gemeinsame freie Spalte gibt, wird die Bruecke gerade: R1 und C1
+' unter einander, beide quer -- ihre oberen Beine liegen auf Streifen 2 und 6
+DIM gdok AS kern.Dokument : gdok = kern.dokumentAusJson(kern.dokumentNachJson(pdok))
+gdok.platine.bahnen = []
+gdok.platine.trenn = []
+gdok.platine.teile = []
+DIM gt1 AS kern.PlatTeil : gt1 = NEW kern.PlatTeil(pR.id, 5, 1)
+gt1.drehung = 90
+DIM gt2 AS kern.PlatTeil : gt2 = NEW kern.PlatTeil(pC.id, 9, 5)
+gt2.drehung = 90
+ARRAY_PUSH(gdok.platine.teile, gt1)
+ARRAY_PUSH(gdok.platine.teile, gt2)
+DIM gr0 AS kern.PlatBericht : gr0 = kern.platinePruefen(gdok)
+DIM gvn AS INTEGER : gvn = kern.platineVerbinden(gdok, vow)
+DIM gbahn AS kern.Bahn : gbahn = gdok.platine.bahnen[0]
+PRINT "Gerade Bruecke, wenn moeglich: "; gvn; " "; gbahn.s1 = gbahn.s2; " Laenge "; ABS(gbahn.z2 - gbahn.z1); "  (erwartet 1 TRUE Laenge 4)"
+' Lochraster: Loetbahnen auf freien Loechern
+DIM ldok AS kern.Dokument : ldok = kern.dokumentAusJson(kern.dokumentNachJson(pdok))
+ldok.platine.bahnen = []
+ldok.platine.trenn = []
+ldok.platine.teile = []
+ldok.platine.art = kern.PL_LOCH
+DIM lgs AS INTEGER : lgs = kern.platineEinsetzen(ldok)
+DIM lvn AS INTEGER : lvn = kern.platineVerbinden(ldok, vow)
+DIM lvr AS kern.PlatBericht : lvr = kern.platinePruefen(ldok)
+DIM lloet AS BOOLEAN : lloet = LEN(ldok.platine.bahnen) > 0
+FOR vi = 0 TO LEN(ldok.platine.bahnen) - 1
+    IF ldok.platine.bahnen[vi].art <> kern.BA_LOET THEN lloet = FALSE
+NEXT
+PRINT "Verbinden (Loch): "; lvn; " gelegt, offen "; vow; ", Kurzschluesse "; lvr.kurzschluesse; ", Hinweise "; LEN(lvr.fehler); ", nur Loetbahnen "; lloet; "  (erwartet 3 gelegt, offen 0, Kurzschluesse 0, Hinweise 0, nur Loetbahnen TRUE)"
+' kein Weg: Platine so klein, dass die Teile eingemauert sind
+DIM kdok AS kern.Dokument : kdok = kern.dokumentAusJson(kern.dokumentNachJson(ldok))
+kdok.platine.bahnen = []
+DIM kvn AS INTEGER : kvn = kern.platineVerbinden(kdok, vow)
+PRINT "Verbinden zweimal: "; kern.platineVerbinden(ldok, vow); " weitere  (erwartet 0 weitere)"
+' eigene Bauformen
+DIM eig AS kern.Symbol : eig = kern.symbolRegistrieren(kern.icErzeugen("E_RELAIS", "Relais", "K", "", "1 A links" + lf + "2 B rechts" + lf + "3 C rechts" + lf + "loch 1 0 0" + lf + "loch 2 4 -1" + lf + "loch 3 4 1"))
+DIM eigB AS kern.Bauteil : eigB = kern.neuesBauteil("E_RELAIS", kern.neueLage(0, 0))
+eigB.referenz = "K1"
+DIM eigF AS kern.Bauform : eigF = kern.bauformFuer(eigB, phw)
+PRINT "Eigene Bauform: "; eigF.name; " "; LEN(eigF.pins); " Pin 2 bei "; eigF.pins[1].dx; ","; eigF.pins[1].dy; "  JSON "; kern.symbolAusJson(kern.symbolNachJson(eig), "").loecher = eig.loecher; "  (erwartet eigen 3 Pin 2 bei 4,-1  JSON TRUE)"
+eigB.gehaeuse = "SIL3"
+PRINT "Gehaeuse schlaegt eigene Bauform: "; kern.bauformFuer(eigB, phw).name; "  (erwartet SIL3)"
+DIM eigT AS kern.Symbol : eigT = kern.icErzeugen("E_FET", "FET", "Q", "", "1 G links" + lf + "2 D oben" + lf + "3 S unten" + lf + "bauform TO92-GDS")
+DIM eigTB AS kern.Bauteil : eigTB = kern.neuesBauteil("E_VORSCHAU_FET", kern.neueLage(0, 0))
+eigTB.sym = eigT
+PRINT "Bauform-Vorgabe im Symbol: "; kern.bauformFuer(eigTB, phw).name; "  (erwartet TO92-GDS)"
+DIM eigP AS kern.Pinliste : eigP = kern.pinlisteLesen("1 A" + lf + "2 B" + lf + "loch 1 0 0" + lf + "loch 1 1 0" + lf + "loch 3 2 0" + lf + "loch 4 0 0" + lf + "bauform XY9")
+DIM eigFt AS STRING : eigFt = JOIN$(eigP.fehler, "|")
+PRINT "Fehler eigene Bauform: "; CONTAINS(eigFt, "loch fuer Pin 1 gibt es schon"); " "; CONTAINS(eigFt, "Loch 0,0 ist schon belegt"); " "; CONTAINS(eigFt, "loch fuer Pin 3: diesen Pin gibt es nicht"); " "; CONTAINS(eigFt, "Pin 2 hat kein loch"); " "; CONTAINS(eigFt, "Bauform 'XY9' gibt es nicht"); "  (erwartet TRUE TRUE TRUE TRUE TRUE)"
+
 ' weitere Bauformen
 DIM bfb AS kern.Bauform
 PRINT "Mehr Bauformen: TO92 "; kern.bauformLesen("TO92", bfb); " "; bfb.pins[2].schluessel; "  TO220-GDS "; kern.bauformLesen("TO220-GDS", bfb); " "; bfb.name; " "; bfb.pins[0].schluessel; "  TO92-EEB "; kern.bauformLesen("TO92-EEB", bfb); "  HDR2X5 "; kern.bauformLesen("HDR2x5", bfb); " "; LEN(bfb.pins); " Pin 2 bei "; bfb.pins[1].dx; ","; bfb.pins[1].dy; " Pin 10 bei "; bfb.pins[9].dx; ","; bfb.pins[9].dy; "  TRIM "; kern.bauformLesen("trim", bfb); " Schleifer "; bfb.pins[1].dx; ","; bfb.pins[1].dy; "  (erwartet TO92 TRUE 3  TO220-GDS TRUE TO220-GDS G  TO92-EEB FALSE  HDR2X5 TRUE 10 Pin 2 bei 1,0 Pin 10 bei 1,4  TRIM TRUE Schleifer 1,1)"
