@@ -24,6 +24,7 @@ IMPORT "ansicht/symboleditor.dh"
 IMPORT "ansicht/ausgabe.dh"
 IMPORT "ansicht/blaetter.dh"
 IMPORT "ansicht/platinenansicht.dh"
+IMPORT "ansicht/platinendruck.dh"
 
 CONST STIL = "window { background-color: #12131a; color: #e6e6f0; }" + _
     " headerbar { background-color: #1a1c26; color: #e6e6f0; }" + _
@@ -1694,6 +1695,15 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             pruefe("Lochraster gewaehlt", STR$(gDok.platine.art), STR$(kern.PL_LOCH))
             verlaufZurueck()
             pruefe("Rueckgaengig: wieder Streifen, Liste folgt", STR$(gDok.platine.art) + " " + STR$(gtk_combo_box_get_active(gPlArtWahl)), STR$(kern.PL_STREIFEN) + " 0")
+            ' Platine ausgeben: PDF und Druck (Bestueckung, Loetseite, Liste), 1:1
+            pruefe("Massstab 1:1", STR$(plMassstab(plSeiteB(), plSeiteH()) = 1.0), STR$(TRUE))
+            IF fotoZiel <> "" THEN
+                gPlDruckSeiten = 0
+                pruefe("Platinen-PDF: Bestueckung, Loetseite, Liste", STR$(platinePdf(fotoZiel + ".platine.pdf")) + " " + STR$(gPlDruckSeiten), STR$(TRUE) + " 3")
+                gPlDruckSeiten = 0
+                pruefe("Platine drucken (Export-Weg)", platineDrucken$(fotoZiel + ".platine.druck.pdf") + STR$(gPlDruckSeiten), "3")
+                pruefe("Seiten als PNG", STR$(platinePng(fotoZiel + ".bestueckung.png", 0, 150)) + " " + STR$(platinePng(fotoZiel + ".loetseite.png", 1, 150)) + " " + STR$(platinePng(fotoZiel + ".liste.png", 2, 100)), STR$(TRUE) + " " + STR$(TRUE) + " " + STR$(TRUE))
+            END IF
             ' Speichern/Laden nimmt die Platine mit
             DIM pdj AS kern.Dokument : pdj = kern.dokumentAusJson(JSON_PARSE(schnappschuss$()))
             pruefe("Platine im Dokument gespeichert", STR$(LEN(pdj.platine.teile)) + " " + STR$(LEN(pdj.platine.bahnen)) + " " + STR$(LEN(kern.platinePruefen(pdj).luft)), STR$(pbn) + " " + STR$(pluft) + " 0")

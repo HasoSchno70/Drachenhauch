@@ -459,6 +459,14 @@ pc1.drehung = 90
 ' Speichern und Abgleich
 DIM pd2 AS kern.Dokument : pd2 = kern.dokumentAusJson(kern.dokumentNachJson(pdok))
 PRINT "Platine JSON: "; LEN(pd2.platine.teile); " Teile, "; LEN(pd2.platine.bahnen); " Bahnen, "; LEN(pd2.platine.trenn) = LEN(pdok.platine.trenn); " Trennstellen, Art "; pd2.platine.art; ", Pruefung "; LEN(kern.platinePruefen(pd2).luft); " "; kern.platinePruefen(pd2).kurzschluesse; "  (erwartet 3 Teile, 3 Bahnen, TRUE, Art 1, Pruefung 0 0)"
+' weitere Bauformen
+DIM bfb AS kern.Bauform
+PRINT "Mehr Bauformen: TO92 "; kern.bauformLesen("TO92", bfb); " "; bfb.pins[2].schluessel; "  TO220-GDS "; kern.bauformLesen("TO220-GDS", bfb); " "; bfb.name; " "; bfb.pins[0].schluessel; "  TO92-EEB "; kern.bauformLesen("TO92-EEB", bfb); "  HDR2X5 "; kern.bauformLesen("HDR2x5", bfb); " "; LEN(bfb.pins); " Pin 2 bei "; bfb.pins[1].dx; ","; bfb.pins[1].dy; " Pin 10 bei "; bfb.pins[9].dx; ","; bfb.pins[9].dy; "  TRIM "; kern.bauformLesen("trim", bfb); " Schleifer "; bfb.pins[1].dx; ","; bfb.pins[1].dy; "  (erwartet TO92 TRUE 3  TO220-GDS TRUE TO220-GDS G  TO92-EEB FALSE  HDR2X5 TRUE 10 Pin 2 bei 1,0 Pin 10 bei 1,4  TRIM TRUE Schleifer 1,1)"
+' Arbeitsliste
+DIM NL_PK AS STRING : NL_PK = CHR$(10)
+DIM pal AS STRING : pal = kern.platineArbeitsliste$(pdok)
+PRINT "Arbeitsliste: Trennstellen "; CONTAINS(pal, "Trennstellen (" + STR$(LEN(pdok.platine.trenn)) + "):"); "  Bruecken "; CONTAINS(pal, "Drahtbruecken (3):"); "  Bauteile "; CONTAINS(pal, "Bauteile (3):"); "  R1 vor D1 "; INSTR(pal, NL_PK + "  C1") < INSTR(pal, NL_PK + "  D1") AND INSTR(pal, NL_PK + "  D1") < INSTR(pal, NL_PK + "  R1"); "  Laenge mm "; CONTAINS(pal, " mm)"); "  kein Schluessel "; NOT CONTAINS(pal, "|"); "  (erwartet alle TRUE)"
+PRINT pal
 ARRAY_REMOVE_AT(pbl.bauteile, 1)
 PRINT "Abgleich nach Loeschen von D1: "; kern.platineAbgleichen(pdok); " entfernt, "; LEN(pdok.platine.teile); " bleiben  (erwartet 1 entfernt, 2 bleiben)"
 

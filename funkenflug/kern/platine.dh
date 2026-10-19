@@ -12,8 +12,13 @@
 '   AX4   axial, Beine 4 Loecher auseinander (Widerstand, Diode)
 '   RAD2  radial, 2 Loecher (Kondensator), RAD1 (Elko, LED)
 '   TO92-CBE  drei Beine nebeneinander, Reihenfolge nach Pin-Namen
+'             (TO92-GDS fuer FETs; TO92 bzw. TO220 ohne Folge = Pins 1 2 3)
+'   TO220-GDS dasselbe fuer Leistungsgehaeuse
 '   DIP8  zwei Reihen, 3 Loecher (7.62 mm) auseinander, Pin 1 oben links
 '   SIL3  eine Reihe
+'   HDR2X5  Stiftleiste 2 Reihen x 5, Pin 1 und 2 nebeneinander (Flachkabel)
+'   TRIM  stehender Trimmer: 1 und 3 zwei Loecher auseinander, Schleifer 2
+'         ein Loch versetzt dazwischen
 ' Ohne (lesbares) Gehaeuse gilt eine Vorgabe je Symbol.
 
 CLASS BauformPin
@@ -60,14 +65,48 @@ FUNCTION bauformLesen(name AS STRING, BYREF bf AS Bauform) AS BOOLEAN
         bf.pinDazu("2", k, 0)
         RETURN TRUE
     END IF
-    IF STARTSWITH(n, "TO92") THEN
-        DIM folge AS STRING : folge = MID$(n, 4)
+    IF STARTSWITH(n, "TO92") OR STARTSWITH(n, "TO220") THEN
+        DIM gh AS STRING : gh = IIF(STARTSWITH(n, "TO92"), "TO92", "TO220")
+        DIM folge AS STRING : folge = MID$(n, LEN(gh))
+        IF folge = "" THEN
+            bf = NEW Bauform(gh)
+            FOR i = 0 TO 2
+                bf.pinDazu(STR$(i + 1), i, 0)
+            NEXT
+            RETURN TRUE
+        END IF
+        ' drei verschiedene Buchstaben = Pin-Namen (EBC, CBE, GDS ...)
         IF LEN(folge) <> 3 THEN RETURN FALSE
-        IF NOT (CONTAINS(folge, "E") AND CONTAINS(folge, "B") AND CONTAINS(folge, "C")) THEN RETURN FALSE
-        bf = NEW Bauform("TO92-" + folge)
+        IF MID$(folge, 0, 1) = MID$(folge, 1, 1) OR MID$(folge, 0, 1) = MID$(folge, 2, 1) OR MID$(folge, 1, 1) = MID$(folge, 2, 1) THEN RETURN FALSE
+        FOR i = 0 TO 2
+            IF istZiffer(MID$(folge, i, 1)) THEN RETURN FALSE
+        NEXT
+        bf = NEW Bauform(gh + "-" + folge)
         FOR i = 0 TO 2
             bf.pinDazu(MID$(folge, i, 1), i, 0)
         NEXT
+        RETURN TRUE
+    END IF
+    IF STARTSWITH(n, "HDR") AND CONTAINS(n, "X") THEN
+        DIM teile AS ARRAY OF STRING : teile = SPLIT$(MID$(n, 3), "X")
+        DIM reihen AS INTEGER, laenge AS INTEGER
+        IF LEN(teile) <> 2 THEN RETURN FALSE
+        IF NOT ganzzahlLesen(teile[0], reihen) OR NOT ganzzahlLesen(teile[1], laenge) THEN RETURN FALSE
+        IF reihen < 1 OR reihen > 3 OR laenge < 1 OR laenge > 40 THEN RETURN FALSE
+        bf = NEW Bauform("HDR" + STR$(reihen) + "X" + STR$(laenge))
+        DIM q AS INTEGER
+        FOR q = 0 TO laenge - 1
+            FOR i = 0 TO reihen - 1
+                bf.pinDazu(STR$(q * reihen + i + 1), i, q)
+            NEXT
+        NEXT
+        RETURN TRUE
+    END IF
+    IF n = "TRIM" THEN
+        bf = NEW Bauform("TRIM")
+        bf.pinDazu("1", 0, 0)
+        bf.pinDazu("2", 1, 1)
+        bf.pinDazu("3", 2, 0)
         RETURN TRUE
     END IF
     IF STARTSWITH(n, "DIP") THEN
@@ -626,6 +665,75 @@ FUNCTION platineEinsetzen(dok AS Dokument) AS INTEGER
         END IF
     NEXT
     RETURN gesetzt
+END FUNCTION
+
+' --- Arbeitsliste ---------------------------------------------------------------
+' Was man an der Werkbank braucht: Trennstellen, Bruecken, Bahnen, Bauteile --
+' Spalte/Zeile ab 1, gezaehlt von oben links auf der Bestueckungsseite (auf
+' der Loetseite ist links und rechts vertauscht).
+
+FUNCTION lochText$(s AS INTEGER, z AS INTEGER) AS STRING
+    RETURN STR$(s + 1) + "/" + STR$(z + 1)
+END FUNCTION
+
+' Loecher nach Zeile, dann Spalte sortiert, n je Zeile.
+FUNCTION lochReihe$(p AS ARRAY OF Punkt, je AS INTEGER) AS STRING
+    DIM k AS ARRAY OF STRING : k = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(p) - 1
+        ARRAY_PUSH(k, PADL$(STR$(p[i].y), 5, "0") + PADL$(STR$(p[i].x), 5, "0") + "|" + lochText$(p[i].x, p[i].y))
+    NEXT
+    SORT(k)
+    DIM t AS STRING : t = ""
+    FOR i = 0 TO LEN(k) - 1
+        IF i MOD je = 0 THEN t = t + NL_ZEILE + "  "
+        t = t + PADR$(MID$(k[i], INSTR(k[i], "|") + 1), 8)
+    NEXT
+    RETURN t
+END FUNCTION
+
+FUNCTION platineArbeitsliste$(dok AS Dokument) AS STRING
+    DIM pl AS Platine : pl = dok.platine
+    DIM t AS STRING : t = "Platine " + STR$(pl.spalten) + " x " + STR$(pl.zeilen) + " Loecher, " + IIF(pl.art = PL_STREIFEN, "Streifenraster", "Lochraster") + " -- Spalte/Zeile ab 1, von oben links auf der Bestueckungsseite" + NL_ZEILE
+    DIM i AS INTEGER
+    IF pl.art = PL_STREIFEN THEN
+        t = t + NL_ZEILE + "Trennstellen (" + STR$(LEN(pl.trenn)) + "):" + lochReihe$(pl.trenn, 8) + NL_ZEILE
+    END IF
+    DIM nb AS INTEGER : nb = 0
+    DIM nl AS INTEGER : nl = 0
+    DIM br AS STRING : br = ""
+    DIM lb AS STRING : lb = ""
+    FOR i = 0 TO LEN(pl.bahnen) - 1
+        DIM ba AS Bahn : ba = pl.bahnen[i]
+        DIM zeile AS STRING : zeile = NL_ZEILE + "  " + PADR$(lochText$(ba.s1, ba.z1), 8) + "- " + PADR$(lochText$(ba.s2, ba.z2), 8)
+        IF ba.art = BA_BRUECKE THEN
+            ' Drahtlaenge in Loechern (gerundet), fuers Ablaengen
+            DIM l AS FLOAT : l = SQR((ba.s2 - ba.s1) * (ba.s2 - ba.s1) + (ba.z2 - ba.z1) * (ba.z2 - ba.z1))
+            br = br + zeile + "Laenge " + STR$(ROUND(l * 10) / 10.0) + " Loecher (" + STR$(ROUND(l * 25.4) / 10.0) + " mm)"
+            nb = nb + 1
+        ELSE
+            lb = lb + zeile
+            nl = nl + 1
+        END IF
+    NEXT
+    t = t + NL_ZEILE + "Drahtbruecken (" + STR$(nb) + "):" + br + NL_ZEILE
+    IF nl > 0 OR pl.art = PL_LOCH THEN t = t + NL_ZEILE + "Loetbahnen (" + STR$(nl) + "):" + lb + NL_ZEILE
+    t = t + NL_ZEILE + "Bauteile (" + STR$(LEN(pl.teile)) + "):"
+    DIM hinweis AS STRING
+    DIM k AS ARRAY OF STRING : k = []
+    FOR i = 0 TO LEN(pl.teile) - 1
+        DIM b AS Bauteil
+        IF NOT bauteilMitId(dok, pl.teile[i].bauteilId, b) THEN CONTINUE
+        DIM bf AS Bauform : bf = bauformFuer(b, hinweis)
+        ' Lage = Loch von Pin 1 (bzw. dem ersten Bein), so steckt man es
+        DIM lo AS Punkt : lo = lochVon(pl.teile[i], bf.pins[0])
+        ARRAY_PUSH(k, refSchluessel$(b.referenz) + CHR$(1) + NL_ZEILE + "  " + PADR$(b.referenz, 6) + PADR$(b.wert, 10) + PADR$(bf.name, 10) + "Bein " + bf.pins[0].schluessel + " bei " + PADR$(lochText$(lo.x, lo.y), 8) + IIF(pl.teile[i].drehung = 0, "", "gedreht " + STR$(pl.teile[i].drehung) + " Grad"))
+    NEXT
+    SORT(k)
+    FOR i = 0 TO LEN(k) - 1
+        t = t + MID$(k[i], INSTR(k[i], CHR$(1)) + 1)
+    NEXT
+    RETURN t + NL_ZEILE
 END FUNCTION
 
 ' --- JSON ---------------------------------------------------------------------

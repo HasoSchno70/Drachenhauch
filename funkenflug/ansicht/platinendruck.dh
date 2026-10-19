@@ -1,0 +1,343 @@
+' Platine drucken: Bestueckungsseite, Loetseite (gespiegelt), Arbeitsliste.
+' Globaler Namensraum.
+'
+' Gerechnet wird in Punkt (1/72 Zoll) im Massstab 1:1 -- ein Loch sind
+' 7.2 pt, so kann man den Ausdruck auf die Platine legen. Passt eine grosse
+' Platine nicht auf A4, wird verkleinert und das steht gross im Titel. Ein
+' 10-mm-Balken auf jeder Seite verraet, ob der Drucker still skaliert hat.
+' Die Loetseite ist von unten gesehen, also links/rechts gespiegelt; die
+' Spalten-Nummern am Rand bleiben die der Bestueckungsseite, damit die
+' Arbeitsliste auf beiden Seiten stimmt.
+
+CONST PT_JE_LOCH = 7.2            ' 2.54 mm in Punkt
+CONST PD_RAND = 36.0
+CONST PD_KOPF = 46.0
+CONST PD_LISTE_ZEILE = 10.5       ' Zeilenhoehe der Arbeitsliste
+
+DIM gPlDruckSeiten AS INTEGER     ' gezeichnete Seiten (Selbsttest)
+
+' A4 quer, wenn die Platine breiter als hoch ist.
+FUNCTION plDruckQuer() AS BOOLEAN
+    RETURN gDok.platine.spalten > gDok.platine.zeilen
+END FUNCTION
+
+FUNCTION plSeiteB() AS FLOAT
+    RETURN IIF(plDruckQuer(), A4_B, A4_H)
+END FUNCTION
+
+FUNCTION plSeiteH() AS FLOAT
+    RETURN IIF(plDruckQuer(), A4_H, A4_B)
+END FUNCTION
+
+' Massstab der Platinenseiten: 1.0 = 1:1, kleiner nur, wenn es sonst nicht passt.
+FUNCTION plMassstab(b AS FLOAT, h AS FLOAT) AS FLOAT
+    DIM bw AS FLOAT : bw = (gDok.platine.spalten + 2) * PT_JE_LOCH
+    DIM bh AS FLOAT : bh = (gDok.platine.zeilen + 2) * PT_JE_LOCH
+    RETURN MIN(1.0, MIN((b - 2 * PD_RAND) / bw, (h - 2 * PD_RAND - PD_KOPF) / bh))
+END FUNCTION
+
+FUNCTION plListenZeilen() AS ARRAY OF STRING
+    RETURN SPLIT$(kern.platineArbeitsliste$(gDok), CHR$(10))
+END FUNCTION
+
+FUNCTION plZeilenJeSeite(h AS FLOAT) AS INTEGER
+    RETURN MAX(10, FLOOR((h - 2 * PD_RAND - PD_KOPF) / PD_LISTE_ZEILE))
+END FUNCTION
+
+FUNCTION plSeitenGesamt(h AS FLOAT) AS INTEGER
+    DIM n AS INTEGER : n = LEN(plListenZeilen())
+    DIM je AS INTEGER : je = plZeilenJeSeite(h)
+    RETURN 2 + (n + je - 1) \ je
+END FUNCTION
+
+SUB pdText(cr AS INTEGER, x AS FLOAT, y AS FLOAT, text AS STRING, schrift AS STRING, farbe AS INTEGER, ausr AS INTEGER)
+    DIM f AS INTEGER : f = pango_font_description_from_string(schrift)
+    DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
+    pango_layout_set_font_description(layout, f)
+    pango_layout_set_text(layout, text, -1)
+    DIM tb AS INTEGER, th AS INTEGER
+    pango_layout_get_pixel_size(layout, tb, th)
+    DIM zx AS FLOAT : zx = x
+    IF ausr = 1 THEN zx = x - tb / 2.0
+    IF ausr = 2 THEN zx = x - tb
+    cairoFarbe(cr, farbe)
+    cairo_move_to(cr, zx, y - th / 2.0)
+    pango_cairo_show_layout(cr, layout)
+    g_object_unref(layout)
+    pango_font_description_free(f)
+END SUB
+
+SUB pdKreis(cr AS INTEGER, x AS FLOAT, y AS FLOAT, r AS FLOAT, farbe AS INTEGER, voll AS BOOLEAN)
+    cairoFarbe(cr, farbe)
+    cairo_new_sub_path(cr)
+    cairo_arc(cr, x, y, r, 0, 2 * PI)
+    IF voll THEN cairo_fill(cr) ELSE cairo_stroke(cr)
+END SUB
+
+' Kopf: Titel, Seite, Massstab, Pruefstand, 10-mm-Balken.
+SUB pdKopf(cr AS INTEGER, b AS FLOAT, titel AS STRING, seite AS INTEGER, gesamt AS INTEGER, m AS FLOAT)
+    cairoFarbe(cr, &HFFFFFF)
+    cairo_rectangle(cr, 0, 0, b, plSeiteH() + 1000)
+    cairo_fill(cr)
+    DIM name AS STRING : name = exportTitel$()
+    pdText(cr, PD_RAND, PD_RAND + 4, name + " -- " + titel, "Sans Bold 10", &H1F1F1F, 0)
+    DIM mtext AS STRING : mtext = "Massstab 1:1"
+    IF m < 0.999 THEN mtext = "VERKLEINERT auf " + STR$(ROUND(m * 100)) + " % -- nicht 1:1!"
+    pdText(cr, b - PD_RAND, PD_RAND + 4, "Seite " + STR$(seite + 1) + " von " + STR$(gesamt) + "   " + mtext, "Sans 8", IIF(m < 0.999, &HC02020, &H555555), 2)
+    DIM r AS kern.PlatBericht : r = platineBericht()
+    DIM stand AS STRING
+    IF LEN(r.luft) = 0 AND r.kurzschluesse = 0 AND LEN(r.unplatziert) = 0 THEN
+        stand = "Pruefung: stimmt mit dem Schaltplan ueberein"
+    ELSE
+        stand = "Pruefung: " + STR$(LEN(r.luft)) + " offene Verbindungen, " + STR$(r.kurzschluesse) + " Kurzschluesse, " + STR$(LEN(r.unplatziert)) + " Bauteile fehlen"
+    END IF
+    pdText(cr, PD_RAND, PD_RAND + 20, stand + "   (" + DATE$() + ")", "Sans 8", IIF(LEN(r.luft) + r.kurzschluesse > 0, &HC02020, &H555555), 0)
+    ' 10-mm-Balken (immer echte 10 mm, auch wenn die Platine verkleinert ist)
+    DIM bx AS FLOAT : bx = b - PD_RAND - 28.35
+    cairoFarbe(cr, &H1F1F1F)
+    cairo_set_line_width(cr, 1.0)
+    cairo_move_to(cr, bx, PD_RAND + 20)
+    cairo_line_to(cr, bx + 28.35, PD_RAND + 20)
+    cairo_move_to(cr, bx, PD_RAND + 17)
+    cairo_line_to(cr, bx, PD_RAND + 23)
+    cairo_move_to(cr, bx + 28.35, PD_RAND + 17)
+    cairo_line_to(cr, bx + 28.35, PD_RAND + 23)
+    cairo_stroke(cr)
+    pdText(cr, bx - 4, PD_RAND + 20, "10 mm", "Sans 7", &H555555, 2)
+END SUB
+
+' Eine Platinenseite: loet = TRUE zeichnet die Loetseite (gespiegelt).
+SUB pdPlatine(cr AS INTEGER, b AS FLOAT, h AS FLOAT, loet AS BOOLEAN)
+    DIM pl AS kern.Platine : pl = gDok.platine
+    DIM m AS FLOAT : m = plMassstab(b, h)
+    DIM p AS FLOAT : p = PT_JE_LOCH * m
+    DIM bw AS FLOAT : bw = pl.spalten * p
+    DIM bh AS FLOAT : bh = pl.zeilen * p
+    DIM ox AS FLOAT : ox = (b - bw) / 2.0
+    DIM oy AS FLOAT : oy = PD_RAND + PD_KOPF + (h - 2 * PD_RAND - PD_KOPF - bh) / 2.0
+    DIM i AS INTEGER, s AS INTEGER, z AS INTEGER, k AS INTEGER
+    ' Lochmitte (s, z) -> Seite
+    DIM sp AS INTEGER : sp = pl.spalten
+    ' Umriss
+    cairoFarbe(cr, &H1F1F1F)
+    cairo_set_line_width(cr, 0.8)
+    cairo_rectangle(cr, ox, oy, bw, bh)
+    cairo_stroke(cr)
+    ' Randnummern alle 5 Loecher
+    FOR s = 0 TO sp - 1
+        IF (s + 1) MOD 5 = 0 OR s = 0 THEN pdText(cr, ox + (IIF(loet, sp - 1 - s, s) + 0.5) * p, oy - 6, STR$(s + 1), "Sans 5", &H777777, 1)
+    NEXT
+    FOR z = 0 TO pl.zeilen - 1
+        IF (z + 1) MOD 5 = 0 OR z = 0 THEN pdText(cr, ox - 4, oy + (z + 0.5) * p, STR$(z + 1), "Sans 5", &H777777, 2)
+    NEXT
+    IF loet THEN
+        ' Kupfer
+        IF pl.art = kern.PL_STREIFEN THEN
+            FOR z = 0 TO pl.zeilen - 1
+                cairoFarbe(cr, &HD0D0D0)
+                cairo_rectangle(cr, ox + 0.05 * p, oy + (z + 0.18) * p, bw - 0.1 * p, 0.64 * p)
+                cairo_fill(cr)
+            NEXT
+        ELSE
+            FOR z = 0 TO pl.zeilen - 1
+                FOR s = 0 TO sp - 1
+                    pdKreis(cr, ox + (s + 0.5) * p, oy + (z + 0.5) * p, 0.36 * p, &HD0D0D0, TRUE)
+                NEXT
+            NEXT
+        END IF
+        ' Trennstellen: Kupfer weg, kraeftiges Kreuz
+        cairo_set_line_width(cr, MAX(0.6, 0.12 * p))
+        FOR i = 0 TO LEN(pl.trenn) - 1
+            DIM tx AS FLOAT : tx = ox + (sp - 1 - pl.trenn[i].x + 0.5) * p
+            DIM ty AS FLOAT : ty = oy + (pl.trenn[i].y + 0.5) * p
+            cairoFarbe(cr, &HFFFFFF)
+            cairo_rectangle(cr, tx - 0.45 * p, ty - 0.34 * p, 0.9 * p, 0.68 * p)
+            cairo_fill(cr)
+            cairoFarbe(cr, &HC02020)
+            cairo_move_to(cr, tx - 0.32 * p, ty - 0.32 * p)
+            cairo_line_to(cr, tx + 0.32 * p, ty + 0.32 * p)
+            cairo_move_to(cr, tx + 0.32 * p, ty - 0.32 * p)
+            cairo_line_to(cr, tx - 0.32 * p, ty + 0.32 * p)
+            cairo_stroke(cr)
+        NEXT
+    END IF
+    ' Loecher
+    FOR z = 0 TO pl.zeilen - 1
+        FOR s = 0 TO sp - 1
+            pdKreis(cr, ox + (s + 0.5) * p, oy + (z + 0.5) * p, 0.11 * p, IIF(loet, &H707070, &HB0B0B0), TRUE)
+        NEXT
+    NEXT
+    ' Bahnen: Loetbahnen liegen unten, Bruecken oben (ihre Enden sieht man unten)
+    cairo_set_line_cap(cr, 1)
+    FOR i = 0 TO LEN(pl.bahnen) - 1
+        DIM ba AS kern.Bahn : ba = pl.bahnen[i]
+        DIM x1 AS FLOAT : x1 = ox + (IIF(loet, sp - 1 - ba.s1, ba.s1) + 0.5) * p
+        DIM y1 AS FLOAT : y1 = oy + (ba.z1 + 0.5) * p
+        DIM x2 AS FLOAT : x2 = ox + (IIF(loet, sp - 1 - ba.s2, ba.s2) + 0.5) * p
+        DIM y2 AS FLOAT : y2 = oy + (ba.z2 + 0.5) * p
+        IF ba.art = kern.BA_LOET THEN
+            IF NOT loet THEN CONTINUE
+            cairoFarbe(cr, &H1F1F1F)
+            cairo_set_line_width(cr, 0.4 * p)
+        ELSE
+            IF loet THEN
+                pdKreis(cr, x1, y1, 0.22 * p, &H1F1F1F, TRUE)
+                pdKreis(cr, x2, y2, 0.22 * p, &H1F1F1F, TRUE)
+                CONTINUE
+            END IF
+            cairoFarbe(cr, &H1F5FBF)
+            cairo_set_line_width(cr, MAX(0.5, 0.12 * p))
+            pdKreis(cr, x1, y1, 0.2 * p, &H1F5FBF, TRUE)
+            pdKreis(cr, x2, y2, 0.2 * p, &H1F5FBF, TRUE)
+            cairoFarbe(cr, &H1F5FBF)
+        END IF
+        cairo_move_to(cr, x1, y1)
+        cairo_line_to(cr, x2, y2)
+        cairo_stroke(cr)
+    NEXT
+    ' Bauteile
+    DIM hinweis AS STRING
+    FOR i = 0 TO LEN(pl.teile) - 1
+        DIM bt AS kern.Bauteil
+        IF NOT kern.bauteilMitId(gDok, pl.teile[i].bauteilId, bt) THEN CONTINUE
+        DIM bf AS kern.Bauform : bf = kern.bauformFuer(bt, hinweis)
+        DIM s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER
+        kern.teilFlaeche(pl.teile[i], bf, s0, z0, s1, z1)
+        IF loet THEN
+            DIM m0 AS INTEGER : m0 = sp - 1 - s1
+            s1 = sp - 1 - s0
+            s0 = m0
+        END IF
+        IF NOT loet THEN
+            cairoFarbe(cr, &H1F1F1F)
+            cairo_set_line_width(cr, MAX(0.5, 0.08 * p))
+            cairo_rectangle(cr, ox + (s0 + 0.1) * p, oy + (z0 + 0.1) * p, (s1 - s0 + 0.8) * p, (z1 - z0 + 0.8) * p)
+            cairo_stroke(cr)
+            ' nur die Referenz (die Werte stehen in der Arbeitsliste): bei
+            ' hochkant stehenden Teilen gedreht im Teil, sonst darueber
+            DIM groesse AS INTEGER : groesse = MAX(4, ROUND(5 * m))
+            IF z1 - z0 > s1 - s0 THEN
+                cairo_save(cr)
+                cairo_translate(cr, ox + (s0 + s1 + 1) * p / 2.0, oy + (z0 + z1 + 1) * p / 2.0)
+                cairo_rotate(cr, -PI / 2)
+                cairoFarbe(cr, &HFFFFFF)
+                cairo_rectangle(cr, -LEN(bt.referenz) * groesse * 0.32, -groesse * 0.55, LEN(bt.referenz) * groesse * 0.64, groesse * 1.1)
+                cairo_fill(cr)
+                pdText(cr, 0, 0, bt.referenz, "Sans " + STR$(groesse), &H1F1F1F, 1)
+                cairo_restore(cr)
+            ELSE
+                pdText(cr, ox + (s0 + 0.15) * p, oy + (z0 + 0.1) * p - groesse * 0.7, bt.referenz, "Sans " + STR$(groesse), &H1F1F1F, 0)
+            END IF
+        END IF
+        FOR k = 0 TO LEN(bf.pins) - 1
+            DIM lo AS kern.Punkt : lo = kern.lochVon(pl.teile[i], bf.pins[k])
+            DIM px AS FLOAT : px = ox + (IIF(loet, sp - 1 - lo.x, lo.x) + 0.5) * p
+            DIM py AS FLOAT : py = oy + (lo.y + 0.5) * p
+            cairo_set_line_width(cr, MAX(0.4, 0.07 * p))
+            IF bf.pins[k].schluessel = "1" THEN
+                cairoFarbe(cr, &H1F1F1F)
+                cairo_rectangle(cr, px - 0.28 * p, py - 0.28 * p, 0.56 * p, 0.56 * p)
+                cairo_stroke(cr)
+            ELSE
+                pdKreis(cr, px, py, 0.28 * p, &H1F1F1F, FALSE)
+            END IF
+        NEXT
+    NEXT
+    ' Hinweis zur Blickrichtung
+    pdText(cr, ox, oy + bh + 10, IIF(loet, "von unten gesehen -- links und rechts vertauscht; rote Kreuze = Streifen trennen, Punkte = Bruecken-Enden", "von oben gesehen -- blau = Drahtbruecken, Quadrat = Pin 1"), "Sans 6", &H555555, 0)
+END SUB
+
+' Eine Seite des Platinen-Ausdrucks (0 Bestueckung, 1 Loetseite, ab 2 Liste).
+SUB platineSeite(cr AS INTEGER, seite AS INTEGER, b AS FLOAT, h AS FLOAT)
+    gPlDruckSeiten = gPlDruckSeiten + 1
+    DIM gesamt AS INTEGER : gesamt = plSeitenGesamt(h)
+    DIM m AS FLOAT : m = plMassstab(b, h)
+    IF seite = 0 THEN
+        pdKopf(cr, b, "Bestueckungsseite", seite, gesamt, m)
+        pdPlatine(cr, b, h, FALSE)
+    ELSEIF seite = 1 THEN
+        pdKopf(cr, b, "Loetseite", seite, gesamt, m)
+        pdPlatine(cr, b, h, TRUE)
+    ELSE
+        pdKopf(cr, b, "Arbeitsliste", seite, gesamt, 1.0)
+        DIM z AS ARRAY OF STRING : z = plListenZeilen()
+        DIM je AS INTEGER : je = plZeilenJeSeite(h)
+        DIM i AS INTEGER
+        FOR i = (seite - 2) * je TO MIN(LEN(z), (seite - 1) * je) - 1
+            pdText(cr, PD_RAND, PD_RAND + PD_KOPF + (i - (seite - 2) * je + 0.5) * PD_LISTE_ZEILE, z[i], "Monospace 8", &H1F1F1F, 0)
+        NEXT
+    END IF
+END SUB
+
+FUNCTION platinePdf(pfad AS STRING) AS BOOLEAN
+    DIM b AS FLOAT : b = plSeiteB()
+    DIM h AS FLOAT : h = plSeiteH()
+    DIM fl AS INTEGER : fl = cairo_pdf_surface_create(pfad, b, h)
+    DIM cr AS INTEGER : cr = cairo_create(fl)
+    DIM i AS INTEGER
+    FOR i = 0 TO plSeitenGesamt(h) - 1
+        platineSeite(cr, i, b, h)
+        cairo_show_page(cr)
+    NEXT
+    cairo_destroy(cr)
+    cairo_surface_finish(fl)
+    DIM ok AS BOOLEAN : ok = cairo_surface_status(fl) = 0
+    cairo_surface_destroy(fl)
+    RETURN ok AND FILEEXISTS(pfad)
+END FUNCTION
+
+' Eine Seite als PNG (Vorschau, Selbsttest).
+FUNCTION platinePng(pfad AS STRING, seite AS INTEGER, dpi AS INTEGER) AS BOOLEAN
+    DIM b AS FLOAT : b = plSeiteB()
+    DIM h AS FLOAT : h = plSeiteH()
+    DIM skala AS FLOAT : skala = dpi / 72.0
+    DIM fl AS INTEGER : fl = cairo_image_surface_create(CAIRO_ARGB32, ROUND(b * skala), ROUND(h * skala))
+    DIM cr AS INTEGER : cr = cairo_create(fl)
+    cairo_scale(cr, skala, skala)
+    platineSeite(cr, seite, b, h)
+    cairo_destroy(cr)
+    DIM st AS INTEGER : st = cairo_surface_write_to_png(fl, pfad)
+    cairo_surface_destroy(fl)
+    RETURN st = 0
+END FUNCTION
+
+SUB plDruckSeite(op AS INTEGER, kontext AS INTEGER, seite AS INTEGER, daten AS INTEGER)
+    platineSeite(gtk_print_context_get_cairo_context(kontext), seite, gtk_print_context_get_width(kontext), gtk_print_context_get_height(kontext))
+END SUB
+
+' Ueber GTKs Druckdialog; mit pdfPfad ohne Dialog in diese Datei. "" = gut.
+' Achtung beim Drucken: "An Seite anpassen" im Dialog zerstoert die 1:1 --
+' der 10-mm-Balken zeigt es.
+FUNCTION platineDrucken$(pdfPfad AS STRING) AS STRING
+    DIM op AS INTEGER : op = gtk_print_operation_new()
+    gtk_print_operation_set_n_pages(op, plSeitenGesamt(plSeiteH()))
+    gtk_print_operation_set_job_name(op, exportTitel$() + " -- Platine")
+    gtk_print_operation_set_unit(op, GTK_EINHEIT_PUNKT)
+    DIM seite AS INTEGER : seite = gtk_page_setup_new()
+    gtk_page_setup_set_orientation(seite, IIF(plDruckQuer(), GTK_SEITE_QUER, GTK_SEITE_HOCH))
+    gtk_print_operation_set_default_page_setup(op, seite)
+    g_object_unref(seite)
+    signalSeite(op, "draw-page", plDruckSeite, 0, 0, 0)
+    DIM aktion AS INTEGER : aktion = GTK_DRUCK_DIALOG
+    IF pdfPfad <> "" THEN
+        gtk_print_operation_set_export_filename(op, pdfPfad)
+        aktion = GTK_DRUCK_EXPORT
+    END IF
+    DIM fehler AS INTEGER
+    DIM r AS INTEGER : r = gtk_print_operation_run(op, aktion, gFenster, fehler)
+    g_object_unref(op)
+    IF r = GTK_DRUCK_FEHLER THEN RETURN gtkFehler$(fehler)
+    RETURN ""
+END FUNCTION
+
+SUB aufMenuePlatinePdf(eintrag AS INTEGER, daten AS INTEGER)
+    DIM pfad AS STRING : pfad = dateiExportWahl("Platine als PDF", "platine.pdf", ["PDF (*.pdf)"], ["*.pdf"])
+    IF pfad = "" THEN RETURN
+    IF NOT ENDSWITH(LOWER$(pfad), ".pdf") THEN pfad = pfad + ".pdf"
+    IF NOT platinePdf(pfad) THEN meldung("Die Platine liess sich nicht nach " + pfad + " schreiben.")
+END SUB
+
+SUB aufMenuePlatineDrucken(eintrag AS INTEGER, daten AS INTEGER)
+    DIM f AS STRING : f = platineDrucken$("")
+    IF f <> "" THEN meldung("Fehler beim Drucken:" + CHR$(10) + f)
+END SUB

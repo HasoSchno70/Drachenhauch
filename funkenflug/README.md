@@ -208,12 +208,27 @@ Luftlinien. Bauteile, die im Schaltplan gelöscht wurden, verschwinden beim
 Umschalten von der Platine (ein Rückgängig-Schritt).
 
 Die **Bauform** ist das Gehäuse-Feld des Bauteils: `AX4` (axial, 4 Löcher),
-`RAD2`, `RAD1`, `TO92-CBE` (Beinfolge nach Pin-Namen), `DIP8`, `SIL3`. Ohne
+`RAD2`, `RAD1`, `TO92-CBE` (Beinfolge nach Pin-Namen, auch `TO92-GDS` für FETs),
+`TO220-GDS`, `TO92`/`TO220` ohne Folge (Pins 1 2 3), `DIP8`, `SIL3`, `HDR2X5`
+(Stiftleiste 2 × 5, Pin 1 und 2 nebeneinander), `TRIM` (stehender Trimmer). Ohne
 Angabe gilt eine Vorgabe je Symbol (Widerstand/Diode AX4, Kondensator RAD2,
 Elko/LED RAD1, NPN TO92-CBE, eigene ICs DIP bzw. SIL). Platine, Teile, Bahnen
 und Trennstellen stecken in der `.fkn` und im Rückgängig.
 
 ![Streifenraster mit Brücken](platine.png)
+
+**Ausgabe** (Menü „Ausgabe ▾" → „Platine als PDF (1:1)" bzw. „Platine drucken
+(1:1)"): drei Teile – **Bestückungsseite** (von oben: Umriss und Referenz je
+Teil, Pin 1 eckig, Brücken blau), **Lötseite** (von unten, links/rechts
+gespiegelt: Streifen, rote Kreuze an den Trennstellen, Lötbahnen, Brücken-
+Enden) und die **Arbeitsliste** (Trennstellen, Brücken mit Drahtlänge in mm,
+Bauteile mit Wert, Bauform und Loch von Bein 1). Gerechnet wird 1:1 – ein Loch
+sind 2,54 mm, der Ausdruck passt auf die Platine. Die Spalten-Nummern am Rand
+sind auf beiden Seiten die der Bestückungsseite, damit die Liste überall
+stimmt. Jede Seite hat einen 10-mm-Balken zum Nachmessen; stellt der
+Druckdialog „an Seite anpassen" ein, sieht man es dort. Passt eine große
+Platine nicht auf A4, wird verkleinert, und der Kopf sagt es rot. Der Kopf
+nennt auch den Prüfstand (offene Verbindungen, Kurzschlüsse).
 
 ## Aufbau
 
@@ -241,6 +256,7 @@ ansicht/    Zeichenfläche und Werkzeuge – globaler Namensraum
   ausgabe.dh     PDF, SVG, PNG, Drucken, Menü „Ausgabe"
   blaetter.dh    Reiter, Menü „Blatt": neu, umbenennen, löschen
   platinenansicht.dh  Lochraster-Sicht: Zeichnen, Werkzeuge, Pruefliste
+  platinendruck.dh    Platine 1:1: Bestueckung, Loetseite, Arbeitsliste (PDF, Druck)
 main.dh     Fenster, Kopfleiste, Werkzeugleiste, Statuszeile, Dialoge
 ```
 
@@ -248,7 +264,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (195 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (199 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
@@ -258,7 +274,7 @@ PDF/Druck, gedrehte Labels samt Treffer-Test, Gehäuse/Bestellnummer einzeln
 und für mehrere Bauteile, Referenz ziehen/drehen/zurücksetzen, frei
 gezeichnetes Symbol platzieren und anschließen, Platine: umschalten,
 einsetzen, Brücken entlang der Luftlinien klicken, trennen, ziehen, drehen am
-Rand, Prüfliste, Art umschalten, Speichern). `pruef_kern.dh` prüft u. a. die
+Rand, Prüfliste, Art umschalten, Speichern, PDF/Druck der Platine 1:1). `pruef_kern.dh` prüft u. a. die
 Gruppen-Lage in allen 8 Orientierungen × 3 Arten (72 Pin-Prüfungen). Der Selbsttest
 lässt die Zwischenablage des Systems in Ruhe und schreibt seine Bibliothek in
 eine Wegwerf-Datei neben dem Bild. `--nur-foto bild.png` macht nur das Bild.
@@ -317,5 +333,5 @@ zweiten Kondensator wieder „C1".
 ## Noch offen (nächste Runden)
 
 Hierarchische Blätter (Blatt-Symbole mit Ports), Symbol-Grafik mit der Maus
-zeichnen (bisher als Text), Platine drucken (Bestückungs- und Lötseite,
-1:1), weitere Bauformen (Trimmer, Buchsen, Stiftleisten zweireihig).
+zeichnen (bisher als Text), eigene Bauformen (bisher die festen Namen),
+Brücken automatisch entlang der Luftlinien vorschlagen.
