@@ -22,3 +22,4 @@ IMPORT "datei.dh" AS kern
 IMPORT "sausdruck.dh" AS kern
 IMPORT "kicadimport.dh" AS kern
 IMPORT "gerber.dh" AS kern
+IMPORT "platine3d.dh" AS kern

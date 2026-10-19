@@ -352,6 +352,28 @@ Druckdialog „an Seite anpassen" ein, sieht man es dort. Passt eine große
 Platine nicht auf A4, wird verkleinert, und der Kopf sagt es rot. Der Kopf
 nennt auch den Prüfstand (offene Verbindungen, Kurzschlüsse).
 
+**3D** (Knopf „3D" in der Platinen-Leiste): die bestückte Platine in einem
+eigenen Fenster – ziehen dreht (waagrecht um die Hochachse, senkrecht kippen
+bis unter die Platte), das Mausrad zoomt, Knöpfe für *von oben*, *Lötseite*
+(von unten, links/rechts gespiegelt wie im Ausdruck) und *schräg*. Jede
+Bauform hat ihre Gestalt: Widerstände mit **Farbringen nach dem Wert**
+(4k7 = gelb-violett-rot-gold), Dioden mit Kathodenring, Elko mit Deckel,
+LED in der Farbe aus ihrem Wert, Keramik-Scheibe, Quarz, TO-92 mit flacher
+Seite, TO-220 mit Kühlfahne, DIP mit Kerbe an Pin 1, Stiftleisten,
+Trimmer, Taster, Relais; Drahtbrücken als Drähte. Unten Streifen bzw.
+Lötaugen, Trennstellen als Lücken, Lötbahnen und Lötpunkte an den benutzten
+Löchern.
+
+Gezeichnet wird mit Cairo, ohne OpenGL: Rückseiten fallen weg, Platte und
+Aufdrucke kommen als Schichten, die Körper werden **je Fläche** nach Tiefe
+sortiert (SparkNode hatte eine feste isometrische Sicht und sortierte je
+Bauteil – Nachbarn lagen dann falsch übereinander). Ein Bild braucht rund
+15 ms.
+
+![Platine in 3D](platine3d.png)
+
+![Lötseite in 3D](platine3d_unten.png)
+
 **Gerber für den Fertiger** („Ausgabe ▾" → „Platine als Gerber (ZIP)"): aus
 dem Raster-Aufbau wird eine zweilagige Leiterplatte im 2,54-mm-Raster, die
 **genau so verbindet** wie die Lochraster-/Streifenplatine – ein ZIP mit
@@ -532,6 +554,7 @@ kern/       Modell, Geometrie, Bibliothek, Netze, Datei – ohne Oberfläche,
   sausdruck.dh   S-Ausdruecke lesen (ohne Rekursion)
   kicadimport.dh KiCad-Schaltplan (.kicad_sch) einlesen: Symbole, Lagen, Unterblaetter
   gerber.dh      Gerber X2 + Excellon aus der Platine, Zuschnitt, Strichschrift
+  platine3d.dh   3D-Modell der Platine (Bauformen, Farbringe), Kamera, Zeichenfolge
   symbole.dh     eigene Symbole: Pinliste, IC-Generator, JSON, Register, Bibliothek
   stueckliste.dh Stückliste: Gruppen, natürliche Sortierung, CSV/Markdown/Text
   platine.dh     Bauformen, Platinen-Pruefung (Inseln, Luftlinien, Kurzschluesse), Einsetzen
@@ -550,6 +573,7 @@ ansicht/    Zeichenfläche und Werkzeuge – globaler Namensraum
   platinendruck.dh    Platine 1:1: Bestueckung, Loetseite, Arbeitsliste (PDF, Druck)
   bericht.dh     Projektbericht: Seitenplan, Deckblatt, Text-Seiten
   simulation.dh  Simulations-Menü, Spannungsmarken, Kurvenfenster mit Ablesen
+  platine3d.dh   3D-Fenster: drehen, zoomen, oben/Lötseite/schräg
 main.dh     Fenster, Kopfleiste, Werkzeugleiste, Statuszeile, Dialoge
 ```
 
@@ -557,7 +581,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (299 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (303 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,

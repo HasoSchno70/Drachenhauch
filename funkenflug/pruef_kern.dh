@@ -546,6 +546,59 @@ DIM gsoffen AS kern.Dokument : gsoffen = kern.dokumentAusJson(kern.dokumentNachJ
 gsoffen.platine.bahnen = []
 DIM gsO AS kern.GerberSatz : gsO = kern.gerberErzeugen(gsoffen, "offen")
 PRINT "Gerber unfertig: "; LEN(gsO.hinweise) > 0; " "; CONTAINS(gsO.datei$("LIESMICH.txt"), "ACHTUNG:"); " "; CONTAINS(JOIN$(gsO.hinweise, "|"), "Luftlinie"); "  (erwartet TRUE TRUE TRUE)"
+' --- 3D-Vorschau: Kamera, Farbringe, Modell, Zeichenfolge
+DIM k3 AS kern.Kamera3 : k3 = NEW kern.Kamera3()
+k3.mx = 100 : k3.my = 100 : k3.skala = 10
+k3.azimut = 0 : k3.hoehe = 90 : k3.stellen()
+DIM f3oben AS kern.Flaeche3 : f3oben = NEW kern.Flaeche3(0, 0)
+f3oben.nz = 1
+DIM f3unten AS kern.Flaeche3 : f3unten = NEW kern.Flaeche3(0, 0)
+f3unten.nz = -1
+PRINT "3D von oben: rechts "; ROUND(k3.bildX(1, 0, 0)); "  hinten oben "; ROUND(k3.bildY(0, 1, 0)); "  Oberseite sichtbar "; k3.sichtbar(f3oben); "  Unterseite "; k3.sichtbar(f3unten); "  (erwartet 110  90  TRUE FALSE)"
+k3.azimut = 180 : k3.hoehe = -90 : k3.stellen()
+PRINT "3D von unten: gespiegelt "; ROUND(k3.bildX(1, 0, 0)); "  hinten oben "; ROUND(k3.bildY(0, 1, 0)); "  Unterseite sichtbar "; k3.sichtbar(f3unten); "  Oberseite "; k3.sichtbar(f3oben); "  (erwartet 90  90  TRUE FALSE)"
+k3.azimut = 0 : k3.hoehe = 0 : k3.stellen()
+PRINT "3D von vorn: vorn naeher "; k3.tiefe(0, -5, 0) > k3.tiefe(0, 5, 0); "  oben ist oben "; ROUND(k3.bildY(0, 0, 1)); "  (erwartet TRUE  90)"
+DIM fra AS INTEGER, frb AS INTEGER, frm AS INTEGER, frt AS STRING : frt = ""
+DIM frW AS ARRAY OF STRING : frW = ["4k7", "100", "10k", "1M", "2R2", "330"]
+DIM fri AS INTEGER
+FOR fri = 0 TO LEN(frW) - 1
+    IF kern.farbRinge3(frW[fri], fra, frb, frm) THEN frt = frt + STR$(fra) + STR$(frb) + "x" + STR$(frm) + " " ELSE frt = frt + "? "
+NEXT
+PRINT "Farbringe: "; frt; " (erwartet 47x2 10x1 10x3 10x5 22x-1 33x1)"
+DIM m3 AS kern.Modell3 : m3 = kern.platineModell3(gsdok)
+DIM m3oben AS INTEGER, m3unten AS INTEGER, m3koerper AS INTEGER
+FOR fri = 0 TO LEN(m3.flaechen) - 1
+    IF m3.flaechen[fri].art = kern.F3_OBEN THEN m3oben = m3oben + 1
+    IF m3.flaechen[fri].art = kern.F3_UNTEN THEN m3unten = m3unten + 1
+    IF m3.flaechen[fri].art = kern.F3_KOERPER THEN m3koerper = m3koerper + 1
+NEXT
+PRINT "3D-Modell Streifen: Teile "; m3.koerper; "  Beschriftung "; LEN(m3.texte); "  Loecher oben "; m3oben; " = "; gsdok.platine.spalten * gsdok.platine.zeilen; "  Unterseite > Loecher "; m3unten > m3oben; "  Koerperflaechen > 50 "; m3koerper > 50; "  (erwartet Teile 3  Beschriftung 3  Loecher oben gleich  TRUE TRUE)"
+k3.azimut = 20 : k3.hoehe = 40 : k3.stellen()
+DIM zf AS ARRAY OF INTEGER : zf = kern.zeichenFolge3(m3, k3)
+DIM zfUnten AS BOOLEAN : zfUnten = FALSE
+DIM zfLetzte AS INTEGER : zfLetzte = m3.flaechen[zf[LEN(zf) - 1]].art
+FOR fri = 0 TO LEN(zf) - 1
+    IF m3.flaechen[zf[fri]].art = kern.F3_UNTEN THEN zfUnten = TRUE
+NEXT
+PRINT "Zeichenfolge von oben: nichts von unten "; NOT zfUnten; "  zuerst die Platte "; m3.flaechen[zf[0]].art = kern.F3_PLATTE; "  zuletzt ein Koerper "; zfLetzte = kern.F3_KOERPER; "  weniger als alle "; LEN(zf) < LEN(m3.flaechen); "  (erwartet TRUE TRUE TRUE TRUE)"
+k3.azimut = 180 : k3.hoehe = -60 : k3.stellen()
+zf = kern.zeichenFolge3(m3, k3)
+PRINT "Zeichenfolge von unten: zuletzt die Unterseite "; m3.flaechen[zf[LEN(zf) - 1]].art = kern.F3_UNTEN; "  Koerper zuerst "; m3.flaechen[zf[0]].art = kern.F3_KOERPER; "  (erwartet TRUE TRUE)"
+' jede Bauform der Bibliothek baut ein Modell
+DIM b3dok AS kern.Dokument : b3dok = NEW kern.Dokument()
+DIM b3lib AS ARRAY OF kern.Symbol : b3lib = kern.bibliothekListe()
+FOR fri = 0 TO LEN(b3lib) - 1
+    IF b3lib[fri].einheitLeistung OR b3lib[fri].nurSimulation THEN CONTINUE
+    DIM b3t AS kern.Bauteil : b3t = kern.neuesBauteil(b3lib[fri].id, kern.neueLage(fri * 2000, 0))
+    b3t.referenz = b3lib[fri].praefix + STR$(fri + 1)
+    ARRAY_PUSH(b3dok.blaetter[0].bauteile, b3t)
+NEXT
+b3dok.platine.spalten = 80
+b3dok.platine.zeilen = 50
+DIM b3n AS INTEGER : b3n = kern.platineEinsetzen(b3dok)
+DIM m3b AS kern.Modell3 : m3b = kern.platineModell3(b3dok)
+PRINT "3D-Modell Bibliothek: Teile "; m3b.koerper; " = gesteckt "; LEN(b3dok.platine.teile); "  alle gesteckt "; LEN(b3dok.platine.teile) = LEN(b3dok.blaetter[0].bauteile); "  (erwartet gleich  TRUE)"
 IF gbOrdner <> "" THEN
     DIM gsSchreib AS kern.GerberSatz : gsSchreib = kern.gerberSchreiben(ldok, "Pruef Loch", PATHJOIN(gbOrdner, "loch.zip"))
     gbErwartet(ldok, PATHJOIN(gbOrdner, "loch.erwartet"))

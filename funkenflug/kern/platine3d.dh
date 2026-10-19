@@ -1,0 +1,660 @@
+' 3D-Vorschau der Platine -- Namensraum "kern" (ohne Oberflaeche).
+'
+' Aus der Platine wird ein Flaechenmodell (mm): die Platte mit allen
+' Loechern, unten Streifen bzw. Loetaugen, Trennstellen, Loetbahnen und
+' Loetpunkte, oben die Bauteile nach ihrer Bauform (Widerstand mit
+' Farbringen nach dem Wert, Elko, LED in ihrer Farbe, TO-92, TO-220, DIP mit
+' Kerbe, Stiftleisten ...) und die Drahtbruecken. Kamera3 dreht frei
+' (Azimut/Hoehe), projiziert senkrecht und liefert die Zeichenfolge:
+'
+'   * Rueckseiten fallen weg (Normale zeigt von der Kamera weg),
+'   * Aufdrucke auf der Platte (Loecher, Kupfer) kommen direkt nach ihrer
+'     Plattenseite -- als grosse Flaeche haette die Platte sonst beim
+'     Sortieren die Haelfte der Loecher verdeckt,
+'   * die Koerper werden je FLAECHE nach Tiefe sortiert (SparkNode sortierte
+'     je Bauteil und zeichnete Nachbarn falsch uebereinander) und kommen,
+'     je nachdem ob man von oben oder unten schaut, nach oder vor der Platte.
+'
+' Koordinaten: X nach rechts (Spalten), Y nach hinten (Zeile 0 hinten),
+' Z nach oben; die Oberseite der Platte liegt bei Z = 0.
+
+CONST P3_RASTER = 2.54
+CONST P3_DICKE = 1.6
+CONST F3_PLATTE = 0
+CONST F3_OBEN = 1                  ' Aufdruck auf der Oberseite
+CONST F3_UNTEN = 2                 ' Aufdruck auf der Unterseite
+CONST F3_KOERPER = 3
+
+CLASS Flaeche3
+    DIM px AS ARRAY OF FLOAT
+    DIM py AS ARRAY OF FLOAT
+    DIM pz AS ARRAY OF FLOAT
+    DIM nx AS FLOAT
+    DIM ny AS FLOAT
+    DIM nz AS FLOAT
+    DIM farbe AS INTEGER
+    DIM art AS INTEGER
+    DIM mx AS FLOAT
+    DIM my AS FLOAT
+    DIM mz AS FLOAT
+    SUB Init(a AS INTEGER, f AS INTEGER)
+        art = a
+        farbe = f
+        px = []
+        py = []
+        pz = []
+    END SUB
+END CLASS
+
+CLASS Text3
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    DIM z AS FLOAT
+    DIM text AS STRING
+END CLASS
+
+CLASS Modell3
+    DIM flaechen AS ARRAY OF Flaeche3
+    DIM texte AS ARRAY OF Text3
+    DIM breite AS FLOAT
+    DIM tiefe AS FLOAT
+    DIM koerper AS INTEGER            ' Zahl der Bauteile
+    SUB Init()
+        flaechen = []
+        texte = []
+    END SUB
+    ' Eine Flaeche aus Punkten (x,y,z hintereinander); die Normale zeigt
+    ' von (cx,cy,cz) weg -- so ist die Umlaufrichtung egal.
+    SUB dazu(art AS INTEGER, farbe AS INTEGER, p AS ARRAY OF FLOAT, cx AS FLOAT, cy AS FLOAT, cz AS FLOAT)
+        DIM f AS Flaeche3 : f = NEW Flaeche3(art, farbe)
+        DIM n AS INTEGER : n = LEN(p) \ 3
+        DIM i AS INTEGER
+        FOR i = 0 TO n - 1
+            ARRAY_PUSH(f.px, p[3 * i])
+            ARRAY_PUSH(f.py, p[3 * i + 1])
+            ARRAY_PUSH(f.pz, p[3 * i + 2])
+            f.mx = f.mx + p[3 * i] / n
+            f.my = f.my + p[3 * i + 1] / n
+            f.mz = f.mz + p[3 * i + 2] / n
+        NEXT
+        ' Normale nach Newell
+        DIM ax AS FLOAT, ay AS FLOAT, az AS FLOAT
+        FOR i = 0 TO n - 1
+            DIM j AS INTEGER : j = (i + 1) MOD n
+            ax = ax + (f.py[i] - f.py[j]) * (f.pz[i] + f.pz[j])
+            ay = ay + (f.pz[i] - f.pz[j]) * (f.px[i] + f.px[j])
+            az = az + (f.px[i] - f.px[j]) * (f.py[i] + f.py[j])
+        NEXT
+        DIM l AS FLOAT : l = SQR(ax * ax + ay * ay + az * az)
+        IF l < 0.000000001 THEN RETURN
+        ax = ax / l : ay = ay / l : az = az / l
+        IF ax * (f.mx - cx) + ay * (f.my - cy) + az * (f.mz - cz) < 0 THEN
+            ax = -ax : ay = -ay : az = -az
+        END IF
+        f.nx = ax : f.ny = ay : f.nz = az
+        ARRAY_PUSH(flaechen, f)
+    END SUB
+    SUB text(x AS FLOAT, y AS FLOAT, z AS FLOAT, t AS STRING)
+        DIM e AS Text3 : e = NEW Text3()
+        e.x = x : e.y = y : e.z = z : e.text = t
+        ARRAY_PUSH(texte, e)
+    END SUB
+END CLASS
+
+' --- Grundkoerper ---------------------------------------------------------------
+
+SUB quader3(m AS Modell3, x0 AS FLOAT, y0 AS FLOAT, z0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT, z1 AS FLOAT, farbe AS INTEGER)
+    DIM a AS FLOAT : a = MIN(x0, x1)
+    DIM b AS FLOAT : b = MAX(x0, x1)
+    DIM c AS FLOAT : c = MIN(y0, y1)
+    DIM d AS FLOAT : d = MAX(y0, y1)
+    DIM e AS FLOAT : e = MIN(z0, z1)
+    DIM f AS FLOAT : f = MAX(z0, z1)
+    DIM mx AS FLOAT : mx = (a + b) / 2
+    DIM my AS FLOAT : my = (c + d) / 2
+    DIM mz AS FLOAT : mz = (e + f) / 2
+    m.dazu(F3_KOERPER, farbe, [a, c, f, b, c, f, b, d, f, a, d, f], mx, my, mz)
+    m.dazu(F3_KOERPER, farbe, [a, c, e, b, c, e, b, d, e, a, d, e], mx, my, mz)
+    m.dazu(F3_KOERPER, farbe, [a, c, e, b, c, e, b, c, f, a, c, f], mx, my, mz)
+    m.dazu(F3_KOERPER, farbe, [a, d, e, b, d, e, b, d, f, a, d, f], mx, my, mz)
+    m.dazu(F3_KOERPER, farbe, [a, c, e, a, d, e, a, d, f, a, c, f], mx, my, mz)
+    m.dazu(F3_KOERPER, farbe, [b, c, e, b, d, e, b, d, f, b, c, f], mx, my, mz)
+END SUB
+
+' Zylinder von a nach b (Radius r, n Seiten), mit Deckeln
+SUB zylinder3(m AS Modell3, ax AS FLOAT, ay AS FLOAT, az AS FLOAT, bx AS FLOAT, by AS FLOAT, bz AS FLOAT, r AS FLOAT, n AS INTEGER, farbe AS INTEGER, deckel AS INTEGER)
+    DIM dx AS FLOAT : dx = bx - ax
+    DIM dy AS FLOAT : dy = by - ay
+    DIM dz AS FLOAT : dz = bz - az
+    DIM l AS FLOAT : l = SQR(dx * dx + dy * dy + dz * dz)
+    IF l < 0.000001 THEN RETURN
+    dx = dx / l : dy = dy / l : dz = dz / l
+    ' zwei Senkrechte zur Achse
+    DIM ux AS FLOAT, uy AS FLOAT, uz AS FLOAT
+    IF ABS(dz) < 0.9 THEN
+        ux = -dy : uy = dx : uz = 0
+    ELSE
+        ux = 0 : uy = -dz : uz = dy
+    END IF
+    DIM ul AS FLOAT : ul = SQR(ux * ux + uy * uy + uz * uz)
+    ux = ux / ul : uy = uy / ul : uz = uz / ul
+    DIM vx AS FLOAT : vx = dy * uz - dz * uy
+    DIM vy AS FLOAT : vy = dz * ux - dx * uz
+    DIM vz AS FLOAT : vz = dx * uy - dy * ux
+    DIM mx AS FLOAT : mx = (ax + bx) / 2
+    DIM my AS FLOAT : my = (ay + by) / 2
+    DIM mz AS FLOAT : mz = (az + bz) / 2
+    DIM ra AS ARRAY OF FLOAT : ra = []
+    DIM rb AS ARRAY OF FLOAT : rb = []
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM w AS FLOAT : w = 2 * PI * i / n
+        DIM ox AS FLOAT : ox = r * (COS(w) * ux + SIN(w) * vx)
+        DIM oy AS FLOAT : oy = r * (COS(w) * uy + SIN(w) * vy)
+        DIM oz AS FLOAT : oz = r * (COS(w) * uz + SIN(w) * vz)
+        ARRAY_PUSH(ra, ax + ox) : ARRAY_PUSH(ra, ay + oy) : ARRAY_PUSH(ra, az + oz)
+        ARRAY_PUSH(rb, bx + ox) : ARRAY_PUSH(rb, by + oy) : ARRAY_PUSH(rb, bz + oz)
+    NEXT
+    FOR i = 0 TO n - 1
+        DIM j AS INTEGER : j = (i + 1) MOD n
+        m.dazu(F3_KOERPER, farbe, [ra[3 * i], ra[3 * i + 1], ra[3 * i + 2], ra[3 * j], ra[3 * j + 1], ra[3 * j + 2], rb[3 * j], rb[3 * j + 1], rb[3 * j + 2], rb[3 * i], rb[3 * i + 1], rb[3 * i + 2]], mx, my, mz)
+    NEXT
+    IF deckel >= 0 THEN
+        m.dazu(F3_KOERPER, deckel, ra, mx, my, mz)
+        m.dazu(F3_KOERPER, deckel, rb, mx, my, mz)
+    END IF
+END SUB
+
+' Senkrechtes Prisma ueber einem Grundriss (x,y paarweise) von z0 bis z1
+SUB prisma3(m AS Modell3, g AS ARRAY OF FLOAT, z0 AS FLOAT, z1 AS FLOAT, farbe AS INTEGER, deckel AS INTEGER)
+    DIM n AS INTEGER : n = LEN(g) \ 2
+    DIM mx AS FLOAT, my AS FLOAT
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        mx = mx + g[2 * i] / n
+        my = my + g[2 * i + 1] / n
+    NEXT
+    DIM mz AS FLOAT : mz = (z0 + z1) / 2
+    DIM unten AS ARRAY OF FLOAT : unten = []
+    DIM oben AS ARRAY OF FLOAT : oben = []
+    FOR i = 0 TO n - 1
+        DIM j AS INTEGER : j = (i + 1) MOD n
+        m.dazu(F3_KOERPER, farbe, [g[2 * i], g[2 * i + 1], z0, g[2 * j], g[2 * j + 1], z0, g[2 * j], g[2 * j + 1], z1, g[2 * i], g[2 * i + 1], z1], mx, my, mz)
+        ARRAY_PUSH(unten, g[2 * i]) : ARRAY_PUSH(unten, g[2 * i + 1]) : ARRAY_PUSH(unten, z0)
+        ARRAY_PUSH(oben, g[2 * i]) : ARRAY_PUSH(oben, g[2 * i + 1]) : ARRAY_PUSH(oben, z1)
+    NEXT
+    m.dazu(F3_KOERPER, deckel, oben, mx, my, mz)
+    m.dazu(F3_KOERPER, farbe, unten, mx, my, mz)
+END SUB
+
+' flaches Vieleck auf der Platte (Aufdruck): oben bei z >= 0, unten darunter
+SUB aufdruck3(m AS Modell3, oben AS BOOLEAN, g AS ARRAY OF FLOAT, farbe AS INTEGER, hoehe AS FLOAT)
+    DIM p AS ARRAY OF FLOAT : p = []
+    DIM z AS FLOAT : z = IIF(oben, hoehe, -P3_DICKE - hoehe)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(g) \ 2 - 1
+        ARRAY_PUSH(p, g[2 * i]) : ARRAY_PUSH(p, g[2 * i + 1]) : ARRAY_PUSH(p, z)
+    NEXT
+    m.dazu(IIF(oben, F3_OBEN, F3_UNTEN), farbe, p, p[0], p[1], z + IIF(oben, -1.0, 1.0))
+END SUB
+
+FUNCTION achteck3(x AS FLOAT, y AS FLOAT, r AS FLOAT) AS ARRAY OF FLOAT
+    DIM g AS ARRAY OF FLOAT : g = []
+    DIM i AS INTEGER
+    FOR i = 0 TO 7
+        ARRAY_PUSH(g, x + r * COS(PI / 8 + i * PI / 4))
+        ARRAY_PUSH(g, y + r * SIN(PI / 8 + i * PI / 4))
+    NEXT
+    RETURN g
+END FUNCTION
+
+FUNCTION rechteck3(x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT) AS ARRAY OF FLOAT
+    RETURN [x0, y0, x1, y0, x1, y1, x0, y1]
+END FUNCTION
+
+' --- Farben -------------------------------------------------------------------
+
+FUNCTION ringFarbe3(z AS INTEGER) AS INTEGER
+    DIM f AS ARRAY OF INTEGER : f = [&H151515, &H6B3A1E, &HC81E1E, &HF07820, &HF0D020, &H28A040, &H2850C8, &H8040B0, &H808080, &HF0F0F0]
+    IF z = -1 THEN RETURN &HC8A040              ' Gold (x0.1)
+    IF z = -2 THEN RETURN &HB8B8C0              ' Silber (x0.01)
+    IF z < 0 OR z > 9 THEN RETURN &H151515
+    RETURN f[z]
+END FUNCTION
+
+' Farbringe eines Widerstands: zwei Ziffern, Multiplikator; FALSE = unlesbar
+FUNCTION farbRinge3(wert AS STRING, BYREF a AS INTEGER, BYREF b AS INTEGER, BYREF mul AS INTEGER) AS BOOLEAN
+    DIM ohm AS FLOAT
+    IF NOT siZahl(REPLACE$(REPLACE$(wert, "Ohm", ""), "Ω", ""), ohm) THEN RETURN FALSE
+    IF ohm < 0.1 OR ohm >= 100000000000.0 THEN RETURN FALSE
+    mul = FLOOR(LOG10(ohm)) - 1
+    DIM zz AS INTEGER : zz = ROUND(ohm / (10 ^ mul))
+    IF zz >= 100 THEN
+        mul = mul + 1
+        zz = ROUND(ohm / (10 ^ mul))
+    END IF
+    a = zz \ 10
+    b = zz MOD 10
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION ledFarbe3(wert AS STRING) AS INTEGER
+    DIM w AS STRING : w = UPPER$(wert)
+    IF CONTAINS(w, "GRUEN") OR CONTAINS(w, "GRÜN") OR CONTAINS(w, "GREEN") THEN RETURN &H30D050
+    IF CONTAINS(w, "GELB") OR CONTAINS(w, "YELLOW") THEN RETURN &HF0D030
+    IF CONTAINS(w, "ORANGE") THEN RETURN &HF08020
+    IF CONTAINS(w, "BLAU") OR CONTAINS(w, "BLUE") THEN RETURN &H3070F0
+    IF CONTAINS(w, "WEISS") OR CONTAINS(w, "WHITE") THEN RETURN &HE8ECF0
+    RETURN &HE03030
+END FUNCTION
+
+' --- Bauteile -------------------------------------------------------------------
+
+' Loch -> mm (Mitte der Platine im Ursprung)
+FUNCTION p3X(pl AS Platine, s AS FLOAT) AS FLOAT
+    RETURN (s - (pl.spalten - 1) / 2.0) * P3_RASTER
+END FUNCTION
+FUNCTION p3Y(pl AS Platine, z AS FLOAT) AS FLOAT
+    RETURN ((pl.zeilen - 1) / 2.0 - z) * P3_RASTER
+END FUNCTION
+
+' Draht: senkrecht aus dem Loch, waagrecht, senkrecht ins andere Loch
+SUB bein3(m AS Modell3, x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT, h AS FLOAT, d AS FLOAT, farbe AS INTEGER)
+    DIM r AS FLOAT : r = d / 2
+    quader3(m, x0 - r, y0 - r, 0, x0 + r, y0 + r, h + r, farbe)
+    quader3(m, x1 - r, y1 - r, 0, x1 + r, y1 + r, h + r, farbe)
+    IF ABS(x1 - x0) > ABS(y1 - y0) THEN
+        quader3(m, x0, y0 - r, h - r, x1, y1 + r, h + r, farbe)
+    ELSE
+        quader3(m, x0 - r, y0, h - r, x1 + r, y1, h + r, farbe)
+    END IF
+END SUB
+
+SUB teil3(m AS Modell3, pl AS Platine, t AS PlatTeil, b AS Bauteil, bf AS Bauform)
+    DIM n AS INTEGER : n = LEN(bf.pins)
+    IF n = 0 THEN RETURN
+    DIM hx AS ARRAY OF FLOAT : hx = []
+    DIM hy AS ARRAY OF FLOAT : hy = []
+    DIM i AS INTEGER
+    DIM x0 AS FLOAT : x0 = 1000000.0
+    DIM x1 AS FLOAT : x1 = -1000000.0
+    DIM y0 AS FLOAT : y0 = 1000000.0
+    DIM y1 AS FLOAT : y1 = -1000000.0
+    FOR i = 0 TO n - 1
+        DIM lo AS Punkt : lo = lochVon(t, bf.pins[i])
+        ARRAY_PUSH(hx, p3X(pl, lo.x))
+        ARRAY_PUSH(hy, p3Y(pl, lo.y))
+        x0 = MIN(x0, hx[i]) : x1 = MAX(x1, hx[i])
+        y0 = MIN(y0, hy[i]) : y1 = MAX(y1, hy[i])
+    NEXT
+    DIM cx AS FLOAT : cx = (x0 + x1) / 2
+    DIM cy AS FLOAT : cy = (y0 + y1) / 2
+    ' Achse der Beinreihe: von Bein 0 zum letzten
+    DIM ax AS FLOAT : ax = hx[n - 1] - hx[0]
+    DIM ay AS FLOAT : ay = hy[n - 1] - hy[0]
+    DIM quer AS BOOLEAN : quer = ABS(ay) > ABS(ax)      ' Reihe entlang Y
+    DIM name AS STRING : name = UPPER$(bf.name)
+    DIM sid AS STRING : sid = b.sym.id
+    DIM oben AS FLOAT : oben = 3
+    DIM schwarz AS INTEGER : schwarz = &H1C1C1E
+    DIM metall AS INTEGER : metall = &HB8BCC4
+    IF STARTSWITH(name, "AX") THEN
+        ' liegend zwischen den Beinen
+        DIM laenge AS FLOAT : laenge = SQR(ax * ax + ay * ay)
+        DIM koerper AS FLOAT : koerper = 6.3
+        DIM r AS FLOAT : r = 1.25
+        DIM farbe AS INTEGER : farbe = &HD8C49A
+        IF sid = "D" OR sid = "D_Z" OR sid = "D_S" THEN
+            koerper = 4.2 : r = 1.0 : farbe = IIF(sid = "D_Z", &HC86A3A, schwarz)
+        ELSEIF sid = "F" THEN
+            koerper = MIN(20.0, laenge - 2) : r = 2.5 : farbe = &HCFE0E8
+        ELSEIF sid = "L" THEN
+            farbe = &H3A6E4A
+        END IF
+        koerper = MIN(koerper, laenge - 1.6)
+        DIM h AS FLOAT : h = r + 0.4
+        DIM ex AS FLOAT : ex = ax / laenge
+        DIM ey AS FLOAT : ey = ay / laenge
+        DIM ka AS FLOAT : ka = (laenge - koerper) / 2
+        bein3(m, hx[0], hy[0], hx[n - 1], hy[n - 1], h, 0.5, metall)
+        zylinder3(m, hx[0] + ex * ka, hy[0] + ey * ka, h, hx[0] + ex * (ka + koerper), hy[0] + ey * (ka + koerper), h, r, 12, farbe, farbe)
+        IF sid = "R" THEN
+            DIM ra AS INTEGER, rb AS INTEGER, rm AS INTEGER
+            IF farbRinge3(b.wert, ra, rb, rm) THEN
+                DIM ringe AS ARRAY OF INTEGER : ringe = [ringFarbe3(ra), ringFarbe3(rb), ringFarbe3(rm), &HC8A040]
+                DIM pos AS ARRAY OF FLOAT : pos = [0.18, 0.32, 0.46, 0.8]
+                FOR i = 0 TO 3
+                    DIM u AS FLOAT : u = ka + koerper * pos[i]
+                    zylinder3(m, hx[0] + ex * u, hy[0] + ey * u, h, hx[0] + ex * (u + 0.55), hy[0] + ey * (u + 0.55), h, r + 0.04, 12, ringe[i], ringe[i])
+                NEXT
+            END IF
+        ELSEIF STARTSWITH(sid, "D") OR sid = "F" THEN
+            ' Kathodenring (Diode) bzw. Kappen (Sicherung) an den Enden
+            DIM kr AS FLOAT : kr = koerper * 0.82
+            zylinder3(m, hx[0] + ex * (ka + kr), hy[0] + ey * (ka + kr), h, hx[0] + ex * (ka + kr + 0.6), hy[0] + ey * (ka + kr + 0.6), h, r + 0.04, 12, IIF(sid = "F", metall, &HC0C0C8), IIF(sid = "F", metall, &HC0C0C8))
+        END IF
+        oben = h + r
+    ELSEIF STARTSWITH(name, "RAD") THEN
+        DIM abst AS FLOAT : abst = SQR(ax * ax + ay * ay)
+        IF sid = "CP" THEN
+            DIM rd AS FLOAT : rd = MAX(2.5, abst / 2 + 1.5)
+            zylinder3(m, cx, cy, 0.3, cx, cy, 11, rd, 16, &H1E3C78, &HB0B0B8)
+            oben = 11
+        ELSEIF sid = "LED" THEN
+            DIM lf AS INTEGER : lf = ledFarbe3(b.wert)
+            zylinder3(m, cx, cy, 1, cx, cy, 1.6, 2.9, 16, lf, lf)
+            zylinder3(m, cx, cy, 1.6, cx, cy, 6.5, 2.5, 16, lf, lf)
+            zylinder3(m, cx, cy, 6.5, cx, cy, 7.6, 1.8, 16, lf, lf)
+            zylinder3(m, cx, cy, 7.6, cx, cy, 8.1, 0.9, 16, lf, lf)
+            quader3(m, hx[0] - 0.25, hy[0] - 0.25, 0, hx[0] + 0.25, hy[0] + 0.25, 1, metall)
+            quader3(m, hx[n - 1] - 0.25, hy[n - 1] - 0.25, 0, hx[n - 1] + 0.25, hy[n - 1] + 0.25, 1, metall)
+            oben = 8.1
+        ELSEIF sid = "C" THEN
+            ' Scheibe, steht in der Beinebene
+            DIM ux AS FLOAT : ux = IIF(quer, 1.0, 0.0)
+            DIM uy AS FLOAT : uy = IIF(quer, 0.0, 1.0)
+            zylinder3(m, cx - ux * 1.2, cy - uy * 1.2, 4.2, cx + ux * 1.2, cy + uy * 1.2, 4.2, MAX(2.5, abst / 2 + 0.6), 14, &HD9A441, &HD9A441)
+            bein3(m, hx[0], hy[0], hx[0], hy[0], 2, 0.5, metall)
+            bein3(m, hx[n - 1], hy[n - 1], hx[n - 1], hy[n - 1], 2, 0.5, metall)
+            oben = 4.2 + MAX(2.5, abst / 2 + 0.6)
+        ELSEIF sid = "Y" THEN
+            IF quer THEN quader3(m, cx - 2.3, y0 - 3.2, 0.5, cx + 2.3, y1 + 3.2, 4, metall) ELSE quader3(m, x0 - 3.2, cy - 2.3, 0.5, x1 + 3.2, cy + 2.3, 4, metall)
+            oben = 4
+        ELSE
+            IF quer THEN quader3(m, cx - 3, y0 - 2, 0.5, cx + 3, y1 + 2, 9, &H303034) ELSE quader3(m, x0 - 2, cy - 3, 0.5, x1 + 2, cy + 3, 9, &H303034)
+            oben = 9
+        END IF
+    ELSEIF STARTSWITH(name, "TO92") THEN
+        ' D-Form: flache Seite nach vorn (von der Beinreihe aus gesehen)
+        DIM g AS ARRAY OF FLOAT : g = []
+        DIM k AS INTEGER
+        FOR k = 0 TO 8
+            DIM wk AS FLOAT : wk = PI * k / 8
+            DIM lu AS FLOAT : lu = 2.4 * COS(wk)
+            DIM lv AS FLOAT : lv = 2.4 * SIN(wk) - 0.4
+            IF quer THEN
+                ARRAY_PUSH(g, cx + lv) : ARRAY_PUSH(g, cy + lu)
+            ELSE
+                ARRAY_PUSH(g, cx + lu) : ARRAY_PUSH(g, cy + lv)
+            END IF
+        NEXT
+        prisma3(m, g, 2.5, 7.3, schwarz, schwarz)
+        FOR i = 0 TO n - 1
+            quader3(m, hx[i] - 0.22, hy[i] - 0.22, 0, hx[i] + 0.22, hy[i] + 0.22, 2.5, metall)
+        NEXT
+        oben = 7.3
+    ELSEIF STARTSWITH(name, "TO220") THEN
+        ' Koerper unten, Kuehlfahne darueber und dahinter
+        IF quer THEN
+            quader3(m, cx - 0.8, y0 - 3.7, 3, cx + 3.7, y1 + 3.7, 12.2, schwarz)
+            quader3(m, cx + 2.4, y0 - 3.7, 12.2, cx + 3.7, y1 + 3.7, 18.5, metall)
+        ELSE
+            quader3(m, x0 - 3.7, cy - 0.8, 3, x1 + 3.7, cy + 3.7, 12.2, schwarz)
+            quader3(m, x0 - 3.7, cy + 2.4, 12.2, x1 + 3.7, cy + 3.7, 18.5, metall)
+        END IF
+        FOR i = 0 TO n - 1
+            quader3(m, hx[i] - 0.4, hy[i] - 0.25, 0, hx[i] + 0.4, hy[i] + 0.25, 3, metall)
+        NEXT
+        oben = 18.5
+    ELSEIF STARTSWITH(name, "DIP") THEN
+        ' zwei Reihen: Bein 0 .. n/2-1 und der Rest
+        DIM halb AS INTEGER : halb = n \ 2
+        DIM rx AS FLOAT : rx = hx[halb] - hx[0]
+        DIM ry AS FLOAT : ry = hy[halb] - hy[0]
+        DIM zeileY AS BOOLEAN : zeileY = ABS(hy[halb - 1] - hy[0]) > ABS(hx[halb - 1] - hx[0])
+        IF zeileY THEN
+            quader3(m, cx - 3.2, y0 - 1.3, 0.6, cx + 3.2, y1 + 1.3, 3.8, schwarz)
+        ELSE
+            quader3(m, x0 - 1.3, cy - 3.2, 0.6, x1 + 1.3, cy + 3.2, 3.8, schwarz)
+        END IF
+        FOR i = 0 TO n - 1
+            DIM sx AS FLOAT : sx = IIF(zeileY, SIGN(cx - hx[i]) * 0.6, 0.0)
+            DIM sy AS FLOAT : sy = IIF(zeileY, 0.0, SIGN(cy - hy[i]) * 0.6)
+            quader3(m, hx[i] - 0.3 + sx * 0.5, hy[i] - 0.3 + sy * 0.5, 0, hx[i] + 0.3 + sx * 0.5, hy[i] + 0.3 + sy * 0.5, 2.2, metall)
+        NEXT
+        ' Kerbe an der Seite von Pin 1
+        DIM kx AS FLOAT : kx = IIF(zeileY, cx, hx[0] - SIGN(hx[halb - 1] - hx[0]) * 0.9)
+        DIM ky AS FLOAT : ky = IIF(zeileY, hy[0] - SIGN(hy[halb - 1] - hy[0]) * 0.9, cy)
+        m.dazu(F3_KOERPER, &H55555A, achteck3Z(kx, ky, 0.7, 3.82), kx, ky, 0)
+        oben = 3.8
+    ELSEIF STARTSWITH(name, "SIL") OR STARTSWITH(name, "HDR") THEN
+        quader3(m, x0 - 1.27, y0 - 1.27, 0, x1 + 1.27, y1 + 1.27, 2.5, schwarz)
+        FOR i = 0 TO n - 1
+            quader3(m, hx[i] - 0.32, hy[i] - 0.32, 2.5, hx[i] + 0.32, hy[i] + 0.32, 8.5, &HD4AF37)
+        NEXT
+        oben = 8.5
+    ELSEIF name = "TRIM" THEN
+        quader3(m, cx - 3.3, cy - 3.3, 0.5, cx + 3.3, cy + 3.3, 5, &H2E58B8)
+        zylinder3(m, cx, cy, 5, cx, cy, 5.6, 2, 12, &HE8E8E8, &HE8E8E8)
+        oben = 5.6
+    ELSEIF name = "TAST6" THEN
+        quader3(m, x0 - 0.5, y0 - 0.5, 0.3, x1 + 0.5, y1 + 0.5, 3.5, &H3A3A3E)
+        zylinder3(m, cx, cy, 3.5, cx, cy, 5, 1.75, 12, schwarz, schwarz)
+        oben = 5
+    ELSEIF STARTSWITH(name, "RELAIS") THEN
+        quader3(m, x0 - 1.5, y0 - 1.5, 0.3, x1 + 1.5, y1 + 1.5, 15.3, &H2D5FB4)
+        oben = 15.3
+    ELSE
+        quader3(m, x0 - 1.2, y0 - 1.2, 0.3, x1 + 1.2, y1 + 1.2, 3, &H505058)
+        oben = 3
+    END IF
+    IF b.referenz <> "" THEN m.text(cx, cy, oben + 0.3, b.referenz)
+    m.koerper = m.koerper + 1
+END SUB
+
+' flaches Achteck auf Hoehe z als Koerperflaeche (Normale nach oben)
+FUNCTION achteck3Z(x AS FLOAT, y AS FLOAT, r AS FLOAT, z AS FLOAT) AS ARRAY OF FLOAT
+    DIM g AS ARRAY OF FLOAT : g = achteck3(x, y, r)
+    DIM p AS ARRAY OF FLOAT : p = []
+    DIM i AS INTEGER
+    FOR i = 0 TO 7
+        ARRAY_PUSH(p, g[2 * i]) : ARRAY_PUSH(p, g[2 * i + 1]) : ARRAY_PUSH(p, z)
+    NEXT
+    RETURN p
+END FUNCTION
+
+' --- die ganze Platine -----------------------------------------------------------
+
+FUNCTION platineModell3(dok AS Dokument) AS Modell3
+    DIM m AS Modell3 : m = NEW Modell3()
+    DIM pl AS Platine : pl = dok.platine
+    m.breite = pl.spalten * P3_RASTER
+    m.tiefe = pl.zeilen * P3_RASTER
+    DIM bx AS FLOAT : bx = m.breite / 2
+    DIM by AS FLOAT : by = m.tiefe / 2
+    DIM hart AS INTEGER : hart = &HB48C55          ' Hartpapier
+    DIM kante AS INTEGER : kante = &HA9844F
+    DIM kupfer AS INTEGER : kupfer = &HEE9A50
+    DIM loch AS INTEGER : loch = &H2A2016
+    DIM zinn AS INTEGER : zinn = &HC8CCD2
+    ' Platte
+    m.dazu(F3_PLATTE, hart, [-bx, -by, 0, bx, -by, 0, bx, by, 0, -bx, by, 0], 0, 0, -P3_DICKE / 2)
+    m.dazu(F3_PLATTE, hart, [-bx, -by, -P3_DICKE, bx, -by, -P3_DICKE, bx, by, -P3_DICKE, -bx, by, -P3_DICKE], 0, 0, -P3_DICKE / 2)
+    m.dazu(F3_PLATTE, kante, [-bx, -by, 0, bx, -by, 0, bx, -by, -P3_DICKE, -bx, -by, -P3_DICKE], 0, 0, -P3_DICKE / 2)
+    m.dazu(F3_PLATTE, kante, [-bx, by, 0, bx, by, 0, bx, by, -P3_DICKE, -bx, by, -P3_DICKE], 0, 0, -P3_DICKE / 2)
+    m.dazu(F3_PLATTE, kante, [-bx, -by, 0, -bx, by, 0, -bx, by, -P3_DICKE, -bx, -by, -P3_DICKE], 0, 0, -P3_DICKE / 2)
+    m.dazu(F3_PLATTE, kante, [bx, -by, 0, bx, by, 0, bx, by, -P3_DICKE, bx, -by, -P3_DICKE], 0, 0, -P3_DICKE / 2)
+    DIM s AS INTEGER, z AS INTEGER, i AS INTEGER
+    ' Unterseite: Streifen (an Trennstellen unterbrochen) bzw. Loetaugen
+    IF pl.art = PL_STREIFEN THEN
+        FOR z = 0 TO pl.zeilen - 1
+            DIM von AS INTEGER : von = -1
+            FOR s = 0 TO pl.spalten
+                DIM ende AS BOOLEAN : ende = s = pl.spalten
+                IF NOT ende THEN ende = istTrennstelle(pl, s, z)
+                IF ende THEN
+                    IF von >= 0 THEN aufdruck3(m, FALSE, rechteck3(p3X(pl, von) - 1.25, p3Y(pl, z) - 0.9, p3X(pl, s - 1) + 1.25, p3Y(pl, z) + 0.9), kupfer, 0.02)
+                    von = -1
+                ELSEIF von < 0 THEN
+                    von = s
+                END IF
+            NEXT
+        NEXT
+    ELSE
+        FOR z = 0 TO pl.zeilen - 1
+            FOR s = 0 TO pl.spalten - 1
+                aufdruck3(m, FALSE, achteck3(p3X(pl, s), p3Y(pl, z), 0.95), kupfer, 0.02)
+            NEXT
+        NEXT
+    END IF
+    ' Loetbahnen unten, Bruecken oben
+    FOR i = 0 TO LEN(pl.bahnen) - 1
+        DIM ba AS Bahn : ba = pl.bahnen[i]
+        IF NOT aufPlatine(pl, ba.s1, ba.z1) OR NOT aufPlatine(pl, ba.s2, ba.z2) THEN CONTINUE
+        DIM xa AS FLOAT : xa = p3X(pl, ba.s1)
+        DIM ya AS FLOAT : ya = p3Y(pl, ba.z1)
+        DIM xb AS FLOAT : xb = p3X(pl, ba.s2)
+        DIM yb AS FLOAT : yb = p3Y(pl, ba.z2)
+        IF ba.art = BA_LOET THEN
+            aufdruck3(m, FALSE, rechteck3(MIN(xa, xb) - 0.45, MIN(ya, yb) - 0.45, MAX(xa, xb) + 0.45, MAX(ya, yb) + 0.45), zinn, 0.05)
+        ELSE
+            bein3(m, xa, ya, xb, yb, 1.0, 0.6, &HD0D4DA)
+        END IF
+    NEXT
+    ' Loecher (oben und unten) und Loetpunkte an den benutzten
+    DIM benutzt AS MAP OF INTEGER
+    DIM r AS PlatBericht : r = platinePruefen(dok)
+    FOR i = 0 TO LEN(r.pads) - 1
+        MAPPUT(benutzt, lochKey$(r.pads[i].s, r.pads[i].z), 1)
+    NEXT
+    FOR i = 0 TO LEN(pl.bahnen) - 1
+        MAPPUT(benutzt, lochKey$(pl.bahnen[i].s1, pl.bahnen[i].z1), 1)
+        MAPPUT(benutzt, lochKey$(pl.bahnen[i].s2, pl.bahnen[i].z2), 1)
+    NEXT
+    FOR z = 0 TO pl.zeilen - 1
+        FOR s = 0 TO pl.spalten - 1
+            DIM qx AS FLOAT : qx = p3X(pl, s)
+            DIM qy AS FLOAT : qy = p3Y(pl, z)
+            aufdruck3(m, TRUE, rechteck3(qx - 0.5, qy - 0.5, qx + 0.5, qy + 0.5), loch, 0.01)
+            IF MAPHAS(benutzt, lochKey$(s, z)) THEN
+                aufdruck3(m, FALSE, achteck3(qx, qy, 0.8), zinn, 0.08)
+            ELSEIF istTrennstelle(pl, s, z) AND pl.art = PL_STREIFEN THEN
+                aufdruck3(m, FALSE, achteck3(qx, qy, 1.2), &HB08A52, 0.06)
+                aufdruck3(m, FALSE, rechteck3(qx - 0.5, qy - 0.5, qx + 0.5, qy + 0.5), loch, 0.07)
+            ELSE
+                aufdruck3(m, FALSE, rechteck3(qx - 0.5, qy - 0.5, qx + 0.5, qy + 0.5), loch, 0.05)
+            END IF
+        NEXT
+    NEXT
+    ' Bauteile
+    FOR i = 0 TO LEN(pl.teile) - 1
+        DIM b AS Bauteil
+        IF NOT bauteilMitId(dok, pl.teile[i].bauteilId, b) THEN CONTINUE
+        DIM hw AS STRING
+        teil3(m, pl, pl.teile[i], b, bauformFuer(b, hw))
+    NEXT
+    RETURN m
+END FUNCTION
+
+' --- Kamera -----------------------------------------------------------------------
+
+CLASS Kamera3
+    DIM azimut AS FLOAT               ' Grad, 0 = von vorn
+    DIM hoehe AS FLOAT                ' Grad, 90 = von oben, -90 = von unten
+    DIM skala AS FLOAT                ' Pixel je mm
+    DIM mx AS FLOAT                   ' Bildmitte
+    DIM my AS FLOAT
+    ' Basis: r (rechts), u (oben), c (zur Kamera)
+    DIM rx AS FLOAT
+    DIM ry AS FLOAT
+    DIM ux AS FLOAT
+    DIM uy AS FLOAT
+    DIM uz AS FLOAT
+    DIM cx AS FLOAT
+    DIM cy AS FLOAT
+    DIM cz AS FLOAT
+    SUB Init()
+        azimut = 20
+        hoehe = 40
+        skala = 8
+        stellen()
+    END SUB
+    SUB stellen()
+        IF hoehe > 90 THEN hoehe = 90
+        IF hoehe < -90 THEN hoehe = -90
+        DIM a AS FLOAT : a = RAD(azimut)
+        DIM e AS FLOAT : e = RAD(hoehe)
+        rx = COS(a) : ry = SIN(a)
+        cx = COS(e) * SIN(a) : cy = -COS(e) * COS(a) : cz = SIN(e)
+        ux = -SIN(e) * SIN(a) : uy = SIN(e) * COS(a) : uz = COS(e)
+    END SUB
+    FUNCTION bildX(x AS FLOAT, y AS FLOAT, z AS FLOAT) AS FLOAT
+        RETURN mx + skala * (x * rx + y * ry)
+    END FUNCTION
+    FUNCTION bildY(x AS FLOAT, y AS FLOAT, z AS FLOAT) AS FLOAT
+        RETURN my - skala * (x * ux + y * uy + z * uz)
+    END FUNCTION
+    FUNCTION tiefe(x AS FLOAT, y AS FLOAT, z AS FLOAT) AS FLOAT
+        RETURN x * cx + y * cy + z * cz
+    END FUNCTION
+    FUNCTION sichtbar(f AS Flaeche3) AS BOOLEAN
+        RETURN f.nx * cx + f.ny * cy + f.nz * cz > 0.0001
+    END FUNCTION
+    ' Helligkeit 0.45..1 (Licht von oben links hinter der Kamera)
+    FUNCTION licht(f AS Flaeche3) AS FLOAT
+        DIM lx AS FLOAT : lx = 0.75 * cx + 0.55 * ux - 0.35 * rx
+        DIM ly AS FLOAT : ly = 0.75 * cy + 0.55 * uy - 0.35 * ry
+        DIM lz AS FLOAT : lz = 0.75 * cz + 0.55 * uz
+        DIM l AS FLOAT : l = SQR(lx * lx + ly * ly + lz * lz)
+        DIM d AS FLOAT : d = (f.nx * lx + f.ny * ly + f.nz * lz) / l
+        IF d < 0 THEN d = 0
+        RETURN 0.45 + 0.55 * d
+    END FUNCTION
+END CLASS
+
+' Eine Farbe abgedunkelt
+FUNCTION farbeMal(f AS INTEGER, k AS FLOAT) AS INTEGER
+    DIM r AS INTEGER : r = MIN(255, ROUND(((f SHR 16) BAND 255) * k))
+    DIM g AS INTEGER : g = MIN(255, ROUND(((f SHR 8) BAND 255) * k))
+    DIM b AS INTEGER : b = MIN(255, ROUND((f BAND 255) * k))
+    RETURN (r SHL 16) BOR (g SHL 8) BOR b
+END FUNCTION
+
+SUB anhaengen3(BYREF r AS ARRAY OF INTEGER, a AS ARRAY OF INTEGER)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(a) - 1
+        ARRAY_PUSH(r, a[i])
+    NEXT
+END SUB
+
+' Die sichtbaren Flaechen in Zeichenreihenfolge (hinten zuerst). Platte und
+' ihre Aufdrucke als Schichten, die Koerper je Flaeche nach Tiefe sortiert --
+' von oben gesehen nach der Platte, von unten gesehen davor (die Platte
+' verdeckt sie dann).
+FUNCTION zeichenFolge3(m AS Modell3, k AS Kamera3) AS ARRAY OF INTEGER
+    DIM platte AS ARRAY OF INTEGER : platte = []
+    DIM oben AS ARRAY OF INTEGER : oben = []
+    DIM unten AS ARRAY OF INTEGER : unten = []
+    DIM schluessel AS ARRAY OF INTEGER : schluessel = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(m.flaechen) - 1
+        DIM f AS Flaeche3 : f = m.flaechen[i]
+        IF NOT k.sichtbar(f) THEN CONTINUE
+        SELECT CASE f.art
+            CASE F3_PLATTE : ARRAY_PUSH(platte, i)
+            CASE F3_OBEN : ARRAY_PUSH(oben, i)
+            CASE F3_UNTEN : ARRAY_PUSH(unten, i)
+            CASE ELSE
+                ' Tiefe in 1/1000 mm, Index in den unteren Stellen
+                ARRAY_PUSH(schluessel, (ROUND(k.tiefe(f.mx, f.my, f.mz) * 1000) + 1000000000) * 1000000 + i)
+        END SELECT
+    NEXT
+    SORT(schluessel)
+    DIM koerper AS ARRAY OF INTEGER : koerper = []
+    FOR i = 0 TO LEN(schluessel) - 1
+        ARRAY_PUSH(koerper, schluessel[i] MOD 1000000)
+    NEXT
+    DIM r AS ARRAY OF INTEGER : r = []
+    IF k.cz >= 0 THEN
+        anhaengen3(r, unten)
+        anhaengen3(r, platte)
+        anhaengen3(r, oben)
+        anhaengen3(r, koerper)
+    ELSE
+        anhaengen3(r, koerper)
+        anhaengen3(r, oben)
+        anhaengen3(r, platte)
+        anhaengen3(r, unten)
+    END IF
+    RETURN r
+END FUNCTION

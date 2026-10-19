@@ -28,6 +28,7 @@ IMPORT "ansicht/platinendruck.dh"
 IMPORT "ansicht/komfort.dh"
 IMPORT "ansicht/bericht.dh"
 IMPORT "ansicht/simulation.dh"
+IMPORT "ansicht/platine3d.dh"
 
 CONST STIL = "window { background-color: #12131a; color: #e6e6f0; }" + _
     " headerbar { background-color: #1a1c26; color: #e6e6f0; }" + _
@@ -2324,6 +2325,36 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
                 pruefe("Gerber: Lagen im ZIP", STR$(LEN(ARRAY_FILTER(gbL, FUNCTION(n) ENDSWITH(n, ".gbr")))) + " " + STR$(LEN(ARRAY_FILTER(gbL, FUNCTION(n) ENDSWITH(n, ".drl")))), "6 1")
             END IF
             gtk_button_clicked(gKnopfSchaltplan)
+        CASE 41
+            ' 3D: eine bunte Platine (die Simulationsschaltung und weitere Bauformen)
+            leinwandDokument(probe3dSchaltung())
+            verlaufRuecksetzen()
+            gtk_button_clicked(gKnopfPlatine)
+            plEinsetzen()
+            plVerbinden()
+            platine3dZeigen()
+            pruefe("3D-Fenster offen, alle Teile im Modell", STR$(g3Dlg <> 0) + " " + STR$(g3Modell.koerper) + " " + STR$(STARTSWITH(gtk_label_get_text(g3Info), STR$(LEN(gDok.platine.teile)) + " Bauteile")), STR$(TRUE) + " " + STR$(LEN(gDok.platine.teile)) + " " + STR$(TRUE))
+            p3Ansicht(25, 38)
+            g3Kamera.skala = g3Kamera.skala * 1.6
+        CASE 42
+            PRINT "3D: ein Bild in "; g3Dauer; " ms"
+            pruefe("3D gezeichnet", STR$(g3Eingepasst), STR$(TRUE))
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(g3Flaeche, fotoZiel + ".3d.png") THEN PRINT "Foto 3D gesichert"
+            END IF
+            gtk_button_clicked(g3KnopfUnten)
+            pruefe("Knopf Loetseite", STR$(ROUND(g3Kamera.azimut)) + " " + STR$(ROUND(g3Kamera.hoehe)), "180 -90")
+        CASE 43
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(g3Flaeche, fotoZiel + ".3d_unten.png") THEN PRINT "Foto 3D Loetseite gesichert"
+            END IF
+            ' Ziehen dreht, kippt aber nicht ueber senkrecht hinaus
+            p3Ansicht(20, 40)
+            p3Drehen(50, 0)
+            p3Drehen(0, 500)
+            pruefe("Ziehen dreht und kippt begrenzt", STR$(ROUND(g3Kamera.azimut)) + " " + STR$(ROUND(g3Kamera.hoehe)), "0 90")
+            p3Zu(g3Dlg, 0, 0)
+            gtk_button_clicked(gKnopfSchaltplan)
         CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()
@@ -2377,6 +2408,24 @@ FUNCTION probeSimSchaltung() AS kern.Dokument
     RETURN d
 END FUNCTION
 
+' fuer die 3D-Bilder: die Simulationsschaltung und einige weitere Bauformen
+FUNCTION probe3dSchaltung() AS kern.Dokument
+    DIM d AS kern.Dokument : d = probeSimSchaltung()
+    d.titel = "3D-Probe"
+    DIM b AS kern.Blatt : b = d.blaetter[0]
+    DIM ids AS ARRAY OF STRING : ids = ["NE555", "Q_NPN", "REG", "CP", "CONN_1X4", "RV", "D", "C"]
+    DIM refs AS ARRAY OF STRING : refs = ["U1", "Q1", "U2", "C2", "J1", "RV1", "D2", "C3"]
+    DIM werte AS ARRAY OF STRING : werte = ["NE555", "BC547", "7805", "100u", "", "10k", "1N4148", "100n"]
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(ids) - 1
+        DIM t AS kern.Bauteil : t = kern.neuesBauteil(ids[i], kern.neueLage(9000 + (i MOD 4) * 2000, 1500 + (i \ 4) * 2500))
+        t.referenz = refs[i]
+        IF werte[i] <> "" THEN t.wert = werte[i]
+        ARRAY_PUSH(b.bauteile, t)
+    NEXT
+    RETURN d
+END FUNCTION
+
 SUB probeDraht(b AS kern.Blatt, xy AS ARRAY OF INTEGER)
     DIM w AS kern.Draht : w = NEW kern.Draht()
     DIM i AS INTEGER : i = 0
@@ -2385,6 +2434,10 @@ SUB probeDraht(b AS kern.Blatt, xy AS ARRAY OF INTEGER)
         i = i + 2
     WEND
     ARRAY_PUSH(b.draehte, w)
+END SUB
+
+SUB aufPl3d(knopf AS INTEGER, daten AS INTEGER)
+    platine3dZeigen()
 END SUB
 
 FUNCTION leistenKnopf(text AS STRING) AS INTEGER
@@ -2535,6 +2588,9 @@ gtk_combo_box_text_append_text(gPlArtWahl, "Lochraster")
 gtk_box_pack_start(gPlLeiste, gPlArtWahl, FALSE, FALSE, 0)
 DIM knopfGroesse AS INTEGER : knopfGroesse = gtk_button_new_with_label("Groesse ...")
 gtk_box_pack_start(gPlLeiste, knopfGroesse, FALSE, FALSE, 0)
+DIM knopf3d AS INTEGER : knopf3d = gtk_button_new_with_label("3D")
+gtk_widget_set_tooltip_text(knopf3d, "Die Platine in 3D: ziehen dreht, Mausrad zoomt, auch die Loetseite")
+gtk_box_pack_start(gPlLeiste, knopf3d, FALSE, FALSE, 0)
 gtk_box_pack_start(vbox, gPlLeiste, FALSE, FALSE, 0)
 gtk_box_pack_start(vbox, reiterNeu(), FALSE, FALSE, 0)
 
@@ -2572,6 +2628,7 @@ signal(knopfEinsetzen, "clicked", aufPlEinsetzen, 0, 0, 0)
 signal(gPlKnopfVerbinden, "clicked", aufPlVerbinden, 0, 0, 0)
 signal(gPlArtWahl, "changed", aufPlArt, 0, 0, 0)
 signal(knopfGroesse, "clicked", aufPlGroesse, 0, 0, 0)
+signal(knopf3d, "clicked", aufPl3d, 0, 0, 0)
 signal(knopfSymbol, "clicked", aufSymbolEditor, 0, 0, 0)
 signal(gFenster, "destroy", fensterZu, 0, 0, 0)
 
