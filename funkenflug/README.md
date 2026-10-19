@@ -122,9 +122,12 @@ für ERC und Netzliste). Text-Elemente bleiben beim Drehen aufrecht.
 
 **Mit der Maus zeichnen:** Über der Vorschau liegen die Werkzeuge *Linie*
 (Punkte klicken, Doppelklick oder rechte Taste beendet), *Rechteck* und
-*Kreis* (aufziehen), *Pin* (Anschlusspunkt klicken; er steht von der Grafik
-weg nach außen, die Nummer ist die nächste freie) und *Löschen* (Element
-anklicken). Alles läuft auf dem 0,5-mm-Raster, Pins auf 1 mm; beim Zeichnen
+*Kreis* (aufziehen), *Bogen* (Mitte, Anfang, Ende klicken – im
+Uhrzeigersinn, Winkel auf 5°), *Text* (Stelle klicken, Inhalt eingeben),
+*Pin* (Anschlusspunkt klicken; er steht von der Grafik weg nach außen, die
+Nummer ist die nächste freie), *Verschieben* (Element anfassen und ziehen –
+versetzt nur die Zahlen seiner Zeile, alles andere bleibt, wie es
+geschrieben war) und *Löschen* (Element anklicken). Alles läuft auf dem 0,5-mm-Raster, Pins auf 1 mm; beim Zeichnen
 zeigt die Vorschau Rasterpunkte und den Ursprung, der Ausschnitt bleibt
 stehen, solange alles hineinpasst. Der Text bleibt dabei die einzige Quelle:
 jeder Strich wird eine Zeile (`rechteck -4 -3 4 3`), Löschen streicht die
@@ -296,7 +299,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (225 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (231 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
@@ -307,8 +310,9 @@ und für mehrere Bauteile, Referenz ziehen/drehen/zurücksetzen, frei
 gezeichnetes Symbol platzieren und anschließen, Platine: umschalten,
 einsetzen, Brücken entlang der Luftlinien klicken, trennen, ziehen, drehen am
 Rand, Prüfliste, Art umschalten, Speichern, Verbinden, PDF/Druck der Platine
-1:1, Gruppe drehen; im Symbol-Editor Rechteck, Linie, Kreis und Pins mit
-Maus-Ereignissen zeichnen, löschen, zurücknehmen und übernehmen). `pruef_kern.dh` prüft u. a. die
+1:1, Gruppe drehen; im Symbol-Editor Rechteck, Linie, Kreis, Bogen, Text und
+Pins mit Maus-Ereignissen zeichnen, verschieben, löschen, zurücknehmen und
+übernehmen). `pruef_kern.dh` prüft u. a. die
 Gruppen-Lage in allen 8 Orientierungen × 3 Arten (72 Pin-Prüfungen). Der Selbsttest
 lässt die Zwischenablage des Systems in Ruhe und schreibt seine Bibliothek in
 eine Wegwerf-Datei neben dem Bild. `--nur-foto bild.png` macht nur das Bild.
@@ -367,5 +371,4 @@ zweiten Kondensator wieder „C1".
 
 ## Noch offen (nächste Runden)
 
-Hierarchische Blätter (Blatt-Symbole mit Ports), im Symbol-Editor Elemente
-verschieben (bisher löschen und neu zeichnen), Bögen und Text mit der Maus.
+Hierarchische Blätter (Blatt-Symbole mit Ports).

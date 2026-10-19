@@ -84,6 +84,9 @@ CONST SE_RECHTECK = 2
 CONST SE_KREIS = 3
 CONST SE_PIN = 4
 CONST SE_LOESCHEN = 5
+CONST SE_BOGEN = 6
+CONST SE_TEXT = 7
+CONST SE_VERSCHIEBEN = 8
 
 DIM seVX AS FLOAT
 DIM seVY AS FLOAT
@@ -101,6 +104,8 @@ DIM seMausX AS INTEGER
 DIM seMausY AS INTEGER
 DIM seMausDrin AS BOOLEAN
 DIM seStapel AS ARRAY OF STRING           ' Text vor jeder Zeichen-Aenderung
+DIM seZugZeile AS INTEGER                 ' Verschieben: welche Zeile
+DIM seZugText AS STRING                   ' Verschieben: Text bei Zugbeginn
 
 ' Umgrenzung des Symbols samt Texten (Blatt-Einheiten), mindestens +-8 mm.
 SUB seUmgrenzung(s AS kern.Symbol, BYREF x0 AS INTEGER, BYREF y0 AS INTEGER, BYREF x1 AS INTEGER, BYREF y1 AS INTEGER)
@@ -199,6 +204,18 @@ FUNCTION seZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     IF seZieht AND seWz = SE_KREIS THEN
         cairo_new_sub_path(cr)
         cairo_arc(cr, sx(seStartX), sy(seStartY), seKreisRadius() * vZoom, 0, 2 * PI)
+        cairo_stroke(cr)
+    END IF
+    ' Bogen: nach der Mitte ein Kreis-Strich zum Zeiger, nach dem Anfang der Bogen
+    IF seWz = SE_BOGEN AND LEN(seBogen) = 1 AND seMausDrin THEN
+        cairo_move_to(cr, sx(seBogen[0].x), sy(seBogen[0].y))
+        cairo_line_to(cr, sx(seMausX), sy(seMausY))
+        cairo_stroke(cr)
+    END IF
+    IF seWz = SE_BOGEN AND LEN(seBogen) = 2 THEN
+        DIM br AS FLOAT : br = seBogenRadius()
+        cairo_new_sub_path(cr)
+        cairo_arc(cr, sx(seBogen[0].x), sy(seBogen[0].y), br * vZoom, RAD(seWinkel(seBogen[1].x, seBogen[1].y)), RAD(seWinkel(seMausX, seMausY)))
         cairo_stroke(cr)
     END IF
     IF seMausDrin AND seWz <> SE_KEINS AND seWz <> SE_LOESCHEN THEN
@@ -354,6 +371,69 @@ FUNCTION seZeileUnter(x AS INTEGER, y AS INTEGER) AS INTEGER
     RETURN -1
 END FUNCTION
 
+' --- Bogen: Mitte, Anfang, Ende (Winkel auf 5 Grad, im Uhrzeigersinn wie ueberall)
+DIM seBogen AS ARRAY OF kern.Punkt
+
+FUNCTION seWinkel(x AS INTEGER, y AS INTEGER) AS INTEGER
+    IF LEN(seBogen) = 0 THEN RETURN 0
+    DIM w AS FLOAT : w = DEG(ATAN2(y - seBogen[0].y, x - seBogen[0].x))
+    DIM g AS INTEGER : g = ROUND(w / 5) * 5
+    RETURN ((g MOD 360) + 360) MOD 360
+END FUNCTION
+
+FUNCTION seBogenRadius() AS INTEGER
+    IF LEN(seBogen) < 2 THEN RETURN 0
+    RETURN kern.rastern(ROUND(SQR((seBogen[1].x - seBogen[0].x) ^ 2 + (seBogen[1].y - seBogen[0].y) ^ 2)), kern.RASTER_FEIN)
+END FUNCTION
+
+' --- Verschieben: die Zahlen einer Zeile um (dx, dy) versetzen, alles andere
+' bleibt, wie es geschrieben war (Woerter, voll, Typ, Laenge).
+FUNCTION seZeileVersetzt$(zeile AS STRING, dx AS INTEGER, dy AS INTEGER) AS STRING
+    DIM roh AS ARRAY OF STRING : roh = SPLIT$(TRIM$(REPLACE$(zeile, CHR$(9), " ")), " ")
+    DIM t AS ARRAY OF STRING : t = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(roh) - 1
+        IF roh[i] <> "" THEN ARRAY_PUSH(t, roh[i])
+    NEXT
+    IF LEN(t) = 0 THEN RETURN zeile
+    ' welche Woerter sind x bzw. y?
+    DIM von AS INTEGER : von = 1
+    DIM bis AS INTEGER : bis = 2
+    SELECT CASE LOWER$(t[0])
+        CASE "linie"
+            bis = LEN(t) - 1
+            IF LOWER$(t[bis]) = "voll" THEN bis = bis - 1
+        CASE "rechteck" : bis = 4
+        CASE "kreis", "bogen", "text" : bis = 2
+        CASE "pin"
+            von = 3
+            bis = 4
+        CASE ELSE
+            RETURN zeile
+    END SELECT
+    FOR i = von TO MIN(bis, LEN(t) - 1)
+        DIM v AS INTEGER
+        IF NOT kern.mmLesen(t[i], v) THEN RETURN zeile
+        t[i] = seMm$(v + IIF((i - von) MOD 2 = 0, dx, dy))
+    NEXT
+    RETURN JOIN$(t, " ")
+END FUNCTION
+
+FUNCTION seTextZeilen() AS ARRAY OF STRING
+    RETURN SPLIT$(REPLACE$(seTextLesen$(), CHR$(13), ""), CHR$(10))
+END FUNCTION
+
+' Waehrend des Zugs: die Zeile aus dem Ausgangstext versetzt einsetzen.
+SUB seZugAnwenden()
+    DIM z AS ARRAY OF STRING : z = SPLIT$(seZugText, CHR$(10))
+    IF seZugZeile < 0 OR seZugZeile >= LEN(z) THEN RETURN
+    DIM fein AS INTEGER : fein = IIF(STARTSWITH(LOWER$(TRIM$(z[seZugZeile])), "pin"), kern.RASTER, kern.RASTER_FEIN)
+    DIM dx AS INTEGER : dx = kern.rastern(seMausX - seStartX, fein)
+    DIM dy AS INTEGER : dy = kern.rastern(seMausY - seStartY, fein)
+    z[seZugZeile] = seZeileVersetzt$(z[seZugZeile], dx, dy)
+    seTextSetzen(JOIN$(z, CHR$(10)))
+END SUB
+
 SUB seLinieFertig()
     IF LEN(sePunkte) >= 2 THEN
         DIM z AS STRING : z = "linie"
@@ -371,6 +451,7 @@ END SUB
 SUB seMaus(art AS INTEGER, px AS FLOAT, py AS FLOAT, knopf AS INTEGER)
     IF NOT seAnsichtOk THEN RETURN
     DIM fein AS INTEGER : fein = IIF(seWz = SE_PIN, kern.RASTER, kern.RASTER_FEIN)
+    IF seWz = SE_VERSCHIEBEN THEN fein = 1             ' gerastert wird der Versatz
     seMausX = kern.rastern(seWeltX(px), fein)
     seMausY = kern.rastern(seWeltY(py), fein)
     seMausDrin = TRUE
@@ -378,6 +459,7 @@ SUB seMaus(art AS INTEGER, px AS FLOAT, py AS FLOAT, knopf AS INTEGER)
         CASE 1
             IF knopf = 3 THEN
                 seLinieFertig()
+                seBogen = []
             ELSEIF knopf = 1 THEN
                 SELECT CASE seWz
                     CASE SE_LINIE
@@ -397,12 +479,41 @@ SUB seMaus(art AS INTEGER, px AS FLOAT, py AS FLOAT, knopf AS INTEGER)
                     CASE SE_LOESCHEN
                         DIM zl AS INTEGER : zl = seZeileUnter(seWeltX(px), seWeltY(py))
                         IF zl >= 0 THEN seZeileWeg(zl)
+                    CASE SE_BOGEN
+                        ARRAY_PUSH(seBogen, NEW kern.Punkt(seMausX, seMausY))
+                        IF LEN(seBogen) = 2 AND seBogenRadius() = 0 THEN ARRAY_POP(seBogen)
+                        IF LEN(seBogen) = 3 THEN
+                            DIM w1 AS INTEGER : w1 = seWinkel(seBogen[1].x, seBogen[1].y)
+                            DIM w2 AS INTEGER : w2 = seWinkel(seBogen[2].x, seBogen[2].y)
+                            IF w1 <> w2 THEN seZeileDazu("bogen " + seMm$(seBogen[0].x) + " " + seMm$(seBogen[0].y) + " " + seMm$(seBogenRadius()) + " " + STR$(w1) + " " + STR$(w2))
+                            seBogen = []
+                        END IF
+                    CASE SE_TEXT
+                        DIM tx AS INTEGER : tx = seMausX
+                        DIM ty AS INTEGER : ty = seMausY
+                        DIM inhalt AS STRING : inhalt = TRIM$(textAbfrage$("Text im Symbol", "Text:", ""))
+                        IF inhalt <> "" THEN seZeileDazu("text " + seMm$(tx) + " " + seMm$(ty) + " " + inhalt)
+                    CASE SE_VERSCHIEBEN
+                        seZugZeile = seZeileUnter(seWeltX(px), seWeltY(py))
+                        IF seZugZeile >= 0 THEN
+                            seZugText = REPLACE$(seTextLesen$(), CHR$(13), "")
+                            seZieht = TRUE
+                            seStartX = seMausX
+                            seStartY = seMausY
+                        END IF
                 END SELECT
             END IF
         CASE 2
             IF seWz = SE_LINIE THEN seLinieFertig()
+        CASE 3
+            IF seZieht AND seWz = SE_VERSCHIEBEN THEN seZugAnwenden()
         CASE 4
-            IF seZieht THEN
+            IF seZieht AND seWz = SE_VERSCHIEBEN THEN
+                seZieht = FALSE
+                seZugAnwenden()
+                ' ein Schritt fuer Rueckgaengig -- nur wenn sich etwas bewegt hat
+                IF REPLACE$(seTextLesen$(), CHR$(13), "") <> seZugText THEN ARRAY_PUSH(seStapel, seZugText)
+            ELSEIF seZieht THEN
                 seZieht = FALSE
                 IF seWz = SE_RECHTECK AND seMausX <> seStartX AND seMausY <> seStartY THEN
                     seZeileDazu("rechteck " + seMm$(MIN(seStartX, seMausX)) + " " + seMm$(MIN(seStartY, seMausY)) + " " + seMm$(MAX(seStartX, seMausX)) + " " + seMm$(MAX(seStartY, seMausY)))
@@ -447,6 +558,7 @@ SUB seWerkzeug(w AS INTEGER)
     IF seWz = SE_LINIE AND w <> SE_LINIE THEN seLinieFertig()
     seWz = w
     seZieht = FALSE
+    seBogen = []
     seKnoepfeSetzen = TRUE
     DIM i AS INTEGER
     FOR i = 0 TO LEN(seKnoepfe) - 1
@@ -460,6 +572,9 @@ SUB seWerkzeug(w AS INTEGER)
         CASE SE_KREIS : h = "Kreis: in der Mitte druecken, Radius ziehen."
         CASE SE_PIN : h = "Pin: Anschlusspunkt klicken (1-mm-Raster); er steht von der Grafik weg nach aussen."
         CASE SE_LOESCHEN : h = "Loeschen: Element anklicken -- seine Zeile verschwindet."
+        CASE SE_BOGEN : h = "Bogen: Mitte, dann Anfang (Radius), dann Ende klicken -- im Uhrzeigersinn, Winkel auf 5 Grad."
+        CASE SE_TEXT : h = "Text: Stelle klicken, Inhalt eingeben (~{RESET} wird ueberstrichen)."
+        CASE SE_VERSCHIEBEN : h = "Verschieben: Element anfassen und ziehen (0,5-mm-Raster, Pins 1 mm)."
     END SELECT
     IF seHinweis <> 0 THEN gtk_label_set_text(seHinweis, h)
     IF seVorschau <> 0 THEN gtk_widget_queue_draw(seVorschau)
@@ -491,7 +606,7 @@ FUNCTION seVorschauBauen() AS INTEGER
     DIM leiste AS INTEGER : leiste = gtk_box_new(GTK_WAAGERECHT, 4)
     gtkKlasse(leiste, "leiste")
     seKnoepfe = []
-    DIM namen AS ARRAY OF STRING : namen = ["Linie", "Rechteck", "Kreis", "Pin", "Loeschen"]
+    DIM namen AS ARRAY OF STRING : namen = ["Linie", "Rechteck", "Kreis", "Pin", "Loeschen", "Bogen", "Text", "Verschieben"]
     DIM i AS INTEGER
     FOR i = 0 TO LEN(namen) - 1
         DIM k AS INTEGER : k = gtk_toggle_button_new_with_label(namen[i])
@@ -523,6 +638,7 @@ FUNCTION seVorschauBauen() AS INTEGER
     seAnsichtOk = FALSE
     seZieht = FALSE
     sePunkte = []
+    seBogen = []
     seStapel = []
     seMausDrin = FALSE
     RETURN rechts

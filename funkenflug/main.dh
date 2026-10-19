@@ -1002,12 +1002,44 @@ FUNCTION seProbe(daten AS INTEGER) AS BOOLEAN
             gtk_button_clicked(seKnoepfe[SE_LOESCHEN - 1])
             pruefe("Werkzeug wieder aus", STR$(seWz), STR$(SE_KEINS))
             pruefe("Meldung zaehlt mit", STR$(CONTAINS(gtk_label_get_text(seMeldung), "2 frei gesetzt, 3 Grafik-Elemente (ohne Rechteck)")), STR$(TRUE))
+            ' Bogen: Mitte, Anfang, Ende
+            gtk_button_clicked(seKnoepfe[SE_BOGEN - 1])
+            seMaus(1, seSchirmX(0), seSchirmY(0), 1)
+            seMaus(1, seSchirmX(300), seSchirmY(0), 1)
+            seMaus(1, seSchirmX(0), seSchirmY(300), 1)
+            pruefe("Bogen mit drei Klicks", STR$(CONTAINS(seTextLesen$(), lf + "bogen 0 0 3 0 90")), STR$(TRUE))
+            ' Text: klicken, der Dialog fragt den Inhalt
+            gtk_button_clicked(seKnoepfe[SE_TEXT - 1])
+            probeText1 = "~{EN}"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            seMaus(1, seSchirmX(0), seSchirmY(-400), 1)
+            pruefe("Text an der Klickstelle", STR$(CONTAINS(seTextLesen$(), lf + "text 0 -4 ~{EN}")), STR$(TRUE))
+            ' Verschieben: das Rechteck an seiner linken Kante fassen
+            gtk_button_clicked(seKnoepfe[SE_VERSCHIEBEN - 1])
+            DIM sz0 AS INTEGER : sz0 = LEN(seStapel)
+            seMaus(1, seSchirmX(-400), seSchirmY(250), 1)
+            seMaus(3, seSchirmX(-350), seSchirmY(280), 0)
+            seMaus(3, seSchirmX(-300), seSchirmY(300), 0)
+            seMaus(4, seSchirmX(-300), seSchirmY(300), 1)
+            pruefe("Rechteck verschoben (0,5 mm), ein Schritt", STR$(CONTAINS(seTextLesen$(), "rechteck -3 -2.5 5 3.5")) + " " + STR$(CONTAINS(seTextLesen$(), "rechteck -4 -3 4 3")) + " " + STR$(LEN(seStapel) - sz0), STR$(TRUE) + " " + STR$(FALSE) + " 1")
+            seRueckgaengig()
+            pruefe("Rueckgaengig: Rechteck zurueck", STR$(CONTAINS(seTextLesen$(), "rechteck -4 -3 4 3")), STR$(TRUE))
+            ' ein Pin springt auf das 1-mm-Raster
+            seMaus(1, seSchirmX(700), seSchirmY(0), 1)
+            seMaus(3, seSchirmX(720), seSchirmY(140), 0)
+            seMaus(4, seSchirmX(720), seSchirmY(140), 1)
+            pruefe("Pin verschoben (1 mm)", STR$(CONTAINS(seTextLesen$(), "pin 2 - 7 1 rechts")), STR$(TRUE))
+            seRueckgaengig()
+            ' ein Klick ins Leere verschiebt nichts
+            DIM sz1 AS INTEGER : sz1 = LEN(seStapel)
+            seMaus(1, seSchirmX(-1000), seSchirmY(-1000), 1)
+            seMaus(4, seSchirmX(-900), seSchirmY(-900), 1)
+            pruefe("Ins Leere: nichts passiert", STR$(LEN(seStapel) - sz1), "0")
             IF fotoZiel <> "" THEN
-                gtk_button_clicked(seKnoepfe[SE_PIN - 1])
                 seMaus(3, seSchirmX(300), seSchirmY(-500), 0)
                 IF gtkFoto(seVorschau, fotoZiel + ".editor.png") THEN PRINT "Foto Editor gesichert"
-                gtk_button_clicked(seKnoepfe[SE_PIN - 1])
             END IF
+            gtk_button_clicked(seKnoepfe[SE_VERSCHIEBEN - 1])
             gtk_dialog_response(seDlg, GTK_ANTWORT_OK)
     END SELECT
     RETURN FALSE
@@ -1845,7 +1877,7 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             DIM zid AS STRING : zid = neuesSymbolUI()
             pruefe("Gezeichnetes Symbol uebernommen", LEFT$(zid, 2), "E_")
             DIM zsym AS kern.Symbol : zsym = kern.bibliothekSymbol(zid)
-            pruefe("Grafik und Pins aus der Maus", STR$(LEN(zsym.grafik)) + " " + STR$(LEN(zsym.pins)) + " " + zsym.name, "3 2 Gezeichnet")
+            pruefe("Grafik und Pins aus der Maus", STR$(LEN(zsym.grafik)) + " " + STR$(LEN(zsym.pins)) + " " + zsym.name, "5 2 Gezeichnet")
             werkzeugWaehlen(WZ_AUSWAHL, "")
         CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
