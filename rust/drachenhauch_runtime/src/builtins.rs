@@ -308,11 +308,24 @@ fn zeichen_stelle(s: &str, n: usize) -> usize {
     // Gemessen: 28000 x MID$ in einem Text aus 200000 Zeichen 700 ms -> 23 ms;
     // die Schleife je Zeichen schwankte zudem um den Faktor 1,6 mit der Lage
     // des Codes (M2, 2026-09-25).
+    // Ein grosser Text mit Index (textindex.rs) weiss die Stelle sofort.
+    if let Some(b) = crate::textindex::stelle(s, n) { return b.unwrap_or(s.len()); }
     let k = n.min(s.len());
     if s.as_bytes()[..k].is_ascii() {
         return k;
     }
     s.char_indices().nth(n).map_or(s.len(), |(b, _)| b)
+}
+
+/// Einen grossen Text fuer den Zeichenindex anmelden (MID$, INSTR, LEN ...):
+/// fragt man ihn zum zweiten Mal hintereinander, bekommt er einen.
+fn text_anmelden(v: &Value) {
+    if let Value::Str(rc) = v { crate::textindex::anmelden(rc); }
+}
+
+/// Zeichen vor der Byte-Stelle `byte` -- mit Index sofort, sonst `sonst`.
+fn zeichen_vor(s: &str, byte: usize, sonst: impl FnOnce() -> usize) -> usize {
+    crate::textindex::zeichen_vor(s, byte).unwrap_or_else(sonst)
 }
 
 /// Woerter eines Bezeichners fuer CAMEL$/SNAKE$/PASCAL$: getrennt an Leerraum,
@@ -350,11 +363,13 @@ fn zwischen(s: &str, ab: usize, links: &str, rechts: &str) -> Option<(usize, usi
 
 /// Zeichenzahl eines Textes -- bei reinem ASCII die Bytezahl, ohne Zaehlen.
 fn zeichen_zahl(s: &str) -> usize {
+    if let Some(z) = crate::textindex::zahl(s) { return z; }
     if s.is_ascii() { s.len() } else { s.chars().count() }
 }
 
 /// Byte-Stelle des n-ten Zeichens; genau am Ende die Laenge, dahinter None.
 fn zeichen_stelle_genau(s: &str, n: usize) -> Option<usize> {
+    if let Some(r) = crate::textindex::stelle(s, n) { return r; }
     if n <= s.len() && s.as_bytes()[..n].is_ascii() {
         return Some(n);
     }
@@ -1431,7 +1446,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "len" => {
             arity!(1);
             match &a[0] {
-                Value::Str(s) => Ok(Value::Int(s.chars().count() as i64)),
+                Value::Str(s) => { text_anmelden(&a[0]); Ok(Value::Int(zeichen_zahl(s) as i64)) }
                 Value::Tuple(t) => Ok(Value::Int(t.len() as i64)),
                 Value::Array(arr) => {
                     let arr = arr.borrow();
@@ -2271,6 +2286,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(2);
             let s = need_str(&a[0], "LEFT$")?;
             let n = need_int(&a[1], "LEFT$")?.max(0) as usize;
+            text_anmelden(&a[0]);
             Ok(Value::str_rc(&s[..zeichen_stelle(s, n)]))
         }
         "right$" | "right" => {
@@ -2278,7 +2294,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let s = need_str(&a[0], "RIGHT$")?;
             let n = need_int(&a[1], "RIGHT$")?;
             if n <= 0 { return Ok(Value::str_rc("")); }
-            let anzahl = s.chars().count();
+            text_anmelden(&a[0]);
+            let anzahl = zeichen_zahl(s);
             let n = (n as usize).min(anzahl);
             Ok(Value::str_rc(&s[zeichen_stelle(s, anzahl - n)..]))
         }
@@ -2286,6 +2303,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if a.len() < 2 || a.len() > 3 { return err(format!("MID$: erwartet 2..3 Argumente, erhalten {}", a.len())); }
             let s = need_str(&a[0], "MID$")?;
             let start = need_int(&a[1], "MID$")?.max(0) as usize;
+            text_anmelden(&a[0]);
             // Hinter dem Ende beginnt der leere Rest -- wie vorher, als die
             // Stelle auf die Zeichenzahl geklemmt wurde.
             let rest = &s[zeichen_stelle(s, start)..];
@@ -2304,6 +2322,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let hay = need_str(&a[0], "INSTR")?;
             let needle = need_str(&a[1], "INSTR")?;
             let start = if a.len() == 3 { need_int(&a[2], "INSTR")?.max(0) as usize } else { 0 };
+            text_anmelden(&a[0]);
             // 0-basiert in *Zeichen*. Gesucht wird auf den Bytes (ein Treffer
             // in UTF-8 ist immer einer auf Zeichengrenzen), die Stelle dann in
             // Zeichen zurueckgerechnet.
@@ -2315,7 +2334,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 None => return Ok(Value::Int(-1)),
             };
             match hay[ab..].find(needle) {
-                Some(off) => Ok(Value::Int((start + zeichen_zahl(&hay[ab..ab + off])) as i64)),
+                Some(off) => Ok(Value::Int(zeichen_vor(hay, ab + off, || start + zeichen_zahl(&hay[ab..ab + off])) as i64)),
                 None => Ok(Value::Int(-1)),
             }
         }
@@ -2328,13 +2347,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if a.len() < 2 || a.len() > 3 { return err(format!("INSTRREV: erwartet 2..3 Argumente, erhalten {}", a.len())); }
             let hay = need_str(&a[0], "INSTRREV")?;
             let needle = need_str(&a[1], "INSTRREV")?;
+            text_anmelden(&a[0]);
             let bis = if a.len() == 3 {
                 let s = need_int(&a[2], "INSTRREV")?;
                 if s < 0 { return Ok(Value::Int(-1)); }
                 zeichen_stelle(hay, s as usize)
             } else { hay.len() };
             match hay.rmatch_indices(needle).find(|(o, _)| *o <= bis) {
-                Some((o, _)) => Ok(Value::Int(zeichen_zahl(&hay[..o]) as i64)),
+                Some((o, _)) => Ok(Value::Int(zeichen_vor(hay, o, || zeichen_zahl(&hay[..o])) as i64)),
                 None => Ok(Value::Int(-1)),
             }
         }
@@ -2438,6 +2458,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let (l, r) = (need_str(&a[1], "BETWEEN$")?, need_str(&a[2], "BETWEEN$")?);
             if l.is_empty() || r.is_empty() { return Err("BETWEEN$: die Markierungen duerfen nicht leer sein".into()); }
             let ab = if a.len() == 4 { need_int(&a[3], "BETWEEN$")?.max(0) as usize } else { 0 };
+            text_anmelden(&a[0]);
             let start = zeichen_stelle(s, ab);
             Ok(Value::str_rc(match zwischen(s, start, l, r) {
                 Some((von, bis)) => &s[von..bis],
@@ -5512,6 +5533,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let t = need_str(&a[0], "REGEX_FIND_POS")?;
             let re = regex_compile(need_str(&a[1], "REGEX_FIND_POS")?)?;
             let ab = if a.len() == 3 { need_int(&a[2], "REGEX_FIND_POS")? } else { 0 };
+            text_anmelden(&a[0]);
             let keins = || -> R { Ok(Value::Tuple(Rc::new(vec![Value::Int(-1), Value::Int(0)]))) };
             if ab < 0 { return keins(); }
             let byte_ab = match zeichen_stelle_genau(t, ab as usize) {
@@ -5520,7 +5542,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             };
             match re.find_at(t, byte_ab) {
                 Some(m) => {
-                    let start = zeichen_zahl(&t[..m.start()]) as i64;
+                    let start = zeichen_vor(t, m.start(), || zeichen_zahl(&t[..m.start()])) as i64;
                     let laenge = zeichen_zahl(m.as_str()) as i64;
                     Ok(Value::Tuple(Rc::new(vec![Value::Int(start), Value::Int(laenge)])))
                 }
