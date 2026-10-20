@@ -1,0 +1,408 @@
+' KiCad-Symbolbibliotheken (.kicad_sym, KiCad 6 bis 9) -- Namensraum "kern".
+'
+' Eine Bibliothek wird beim Laden nur INDIZIERT: die Symbole auf oberster
+' Ebene ("(symbol \"R\"" eine Stufe eingerueckt, zwei Leerzeichen oder ein
+' Tab) mit Name, Beschreibung, Stichworten und Zahl der Einheiten. Geparst
+' wird erst das Symbol, das man einsetzt. Gearbeitet wird zeilenweise: in
+' einem Text von Megabytes kostet jeder Zugriff per Zeichenposition (MID$,
+' INSTR ab Stelle) Zeit proportional zur Position, eine Zeile ist kurz. Ist
+' eine Datei nicht zeilenweise gesetzt, wird sie ganz gelesen und je Symbol
+' eine Zeile neu geschrieben.
+'
+' Uebersetzt wird mit demselben Code wie beim Schaltplan-Import
+' (kimSymbolBauen): Id "kicad:<Bibliothek>:<Name>", ein eingesetztes Symbol
+' reist in der .fkn mit. "extends" (abgeleitete Symbole wie R_Small) erbt
+' Grafik und Pins vom Eltern-Symbol, die Eigenschaften gelten vom Kind.
+
+CLASS KicadBibEintrag
+    DIM name AS STRING
+    DIM beschreibung AS STRING
+    DIM stichworte AS STRING
+    DIM erbtVon AS STRING             ' "extends", "" = eigenstaendig
+    DIM einheiten AS INTEGER
+    DIM von AS INTEGER                ' Block: Zeilen von .. bis-1
+    DIM bis AS INTEGER
+END CLASS
+
+CLASS KicadBib
+    DIM pfad AS STRING
+    DIM name AS STRING                ' Dateiname ohne Endung = Bibliotheksname
+    DIM zeilen AS ARRAY OF STRING     ' leer, solange kein Symbol gebraucht wird
+    DIM eintraege AS ARRAY OF KicadBibEintrag
+    DIM fehler AS STRING
+    DIM neuGesetzt AS BOOLEAN         ' zeilen sind umformatiert, nicht die Datei
+    DIM nachName AS MAP OF INTEGER    ' Name -> Index in eintraege
+    SUB Init(p AS STRING)
+        pfad = p
+        name = ""
+        zeilen = []
+        eintraege = []
+        fehler = ""
+        neuGesetzt = FALSE
+        nachName = {}
+    END SUB
+    FUNCTION eintrag(nm AS STRING) AS INTEGER
+        RETURN MAPGETOR(nachName, nm, -1)
+    END FUNCTION
+END CLASS
+
+' Text in Anfuehrungszeichen ab Position p (p zeigt auf das erste Zeichen
+' NACH dem oeffnenden Anfuehrungszeichen); \" und \\ werden aufgeloest
+FUNCTION kbZitat$(t AS STRING, p AS INTEGER) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER : i = p
+    WHILE i < LEN(t)
+        DIM c AS STRING : c = MID$(t, i, 1)
+        IF c = CHR$(34) THEN RETURN r
+        IF c = "\" AND i + 1 < LEN(t) THEN
+            i = i + 1
+            c = MID$(t, i, 1)
+        END IF
+        r = r + c
+        i = i + 1
+    WEND
+    RETURN r
+END FUNCTION
+
+' Wert einer Eigenschaft im Block (erste Fundstelle), "" wenn keine
+FUNCTION kbEigenschaft$(blk AS STRING, name AS STRING) AS STRING
+    DIM such AS STRING : such = "(property " + CHR$(34) + name + CHR$(34) + " " + CHR$(34)
+    DIM k AS INTEGER : k = INSTR(blk, such, 0)
+    IF k < 0 THEN RETURN ""
+    RETURN kbZitat$(blk, k + LEN(such))
+END FUNCTION
+
+' Beginnt in dieser Zeile ein Symbol der obersten Ebene (eine Stufe
+' eingerueckt: ein Tab oder zwei Leerzeichen)?
+FUNCTION kbObenStart(z AS STRING) AS BOOLEAN
+    DIM such AS STRING : such = "(symbol " + CHR$(34)
+    IF STARTSWITH(z, CHR$(9) + such) THEN RETURN TRUE
+    RETURN STARTSWITH(z, "  " + such)
+END FUNCTION
+
+' Die Zeilen von .. bis-1 als ein Text
+FUNCTION kbBlock$(zeilen AS ARRAY OF STRING, von AS INTEGER, bis AS INTEGER) AS STRING
+    DIM t AS STRING : t = ""
+    DIM i AS INTEGER
+    FOR i = von TO bis - 1
+        t = t + zeilen[i] + CHR$(10)
+    NEXT
+    RETURN t
+END FUNCTION
+
+' Den Text gibt es nach dem Indizieren nicht mehr (die Bibliotheken eines
+' KiCad zusammen haben Dutzende Megabyte); gelesen wird er erst wieder, wenn
+' man ein Symbol daraus einsetzt.
+FUNCTION kicadBibLaden(pfad AS STRING) AS KicadBib
+    DIM b AS KicadBib : b = kicadBibIndex(pfad)
+    IF NOT b.neuGesetzt THEN b.zeilen = []
+    RETURN b
+END FUNCTION
+
+' Wie kicadBibLaden, aber mit einem Index-Zwischenspeicher im Ordner
+' "ordner": je Bibliothek eine Datei, gueltig solange Groesse und Zeit der
+' Bibliothek stimmen. Damit oeffnet sich der Browser beim zweiten Mal sofort
+' (alle KiCad-Bibliotheken zu indizieren dauert ein paar Sekunden).
+FUNCTION kicadBibLadenGemerkt(pfad AS STRING, ordner AS STRING) AS KicadBib
+    IF ordner = "" OR NOT FILEEXISTS(pfad) THEN RETURN kicadBibLaden(pfad)
+    DIM tab AS STRING : tab = CHR$(9)
+    DIM merk AS STRING : merk = ordner + "/" + kbDateiSchluessel$(pfad) + ".idx"
+    DIM stempel AS STRING : stempel = "FFKB1" + tab + STR$(FILESIZE(pfad)) + tab + STR$(FILETIME(pfad)) + tab + pfad
+    IF FILEEXISTS(merk) THEN
+        DIM z AS ARRAY OF STRING : z = SPLIT$(READALL$(merk), CHR$(10))
+        IF LEN(z) > 0 AND z[0] = stempel THEN
+            DIM b AS KicadBib : b = NEW KicadBib(pfad)
+            b.name = kimDateiName$(pfad)
+            IF ENDSWITH(LOWER$(b.name), ".kicad_sym") THEN b.name = LEFT$(b.name, LEN(b.name) - 10)
+            DIM i AS INTEGER
+            FOR i = 1 TO LEN(z) - 1
+                DIM f AS ARRAY OF STRING : f = SPLIT$(z[i], tab)
+                IF LEN(f) < 7 THEN CONTINUE
+                DIM e AS KicadBibEintrag : e = NEW KicadBibEintrag()
+                e.name = f[0]
+                e.beschreibung = f[1]
+                e.stichworte = f[2]
+                e.erbtVon = f[3]
+                e.einheiten = VAL(f[4])
+                e.von = VAL(f[5])
+                e.bis = VAL(f[6])
+                IF NOT MAPHAS(b.nachName, e.name) THEN MAPPUT(b.nachName, e.name, LEN(b.eintraege))
+                ARRAY_PUSH(b.eintraege, e)
+            NEXT
+            RETURN b
+        END IF
+    END IF
+    DIM nb AS KicadBib : nb = kicadBibLaden(pfad)
+    IF nb.fehler = "" AND NOT nb.neuGesetzt THEN
+        DIM t AS ARRAY OF STRING : t = [stempel]
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(nb.eintraege) - 1
+            DIM n AS KicadBibEintrag : n = nb.eintraege[k]
+            ARRAY_PUSH(t, kbFeld$(n.name) + tab + kbFeld$(n.beschreibung) + tab + kbFeld$(n.stichworte) + tab + kbFeld$(n.erbtVon) + tab + STR$(n.einheiten) + tab + STR$(n.von) + tab + STR$(n.bis))
+        NEXT
+        IF NOT DIREXISTS(ordner) THEN MKDIR(ordner)
+        TRY
+            WRITEALL(merk, JOIN$(t, CHR$(10)))
+        CATCH fe
+            ' ohne Zwischenspeicher geht es auch
+        END TRY
+    END IF
+    RETURN nb
+END FUNCTION
+
+FUNCTION kbFeld$(t AS STRING) AS STRING
+    RETURN REPLACE$(REPLACE$(REPLACE$(t, CHR$(9), " "), CHR$(10), " "), CHR$(13), "")
+END FUNCTION
+
+' Dateiname fuer den Zwischenspeicher: der Pfad ohne Sonderzeichen
+FUNCTION kbDateiSchluessel$(pfad AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(pfad) - 1
+        DIM c AS STRING : c = MID$(pfad, i, 1)
+        IF INSTR("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-", c) >= 0 THEN r = r + c ELSE r = r + "_"
+    NEXT
+    RETURN r
+END FUNCTION
+
+' Die Zeilen der Bibliothek (falls sie nach dem Indizieren freigegeben waren)
+FUNCTION kicadBibZeilen(b AS KicadBib) AS ARRAY OF STRING
+    IF LEN(b.zeilen) = 0 AND FILEEXISTS(b.pfad) THEN b.zeilen = SPLIT$(READALL$(b.pfad), CHR$(10))
+    RETURN b.zeilen
+END FUNCTION
+
+FUNCTION kicadBibIndex(pfad AS STRING) AS KicadBib
+    DIM b AS KicadBib : b = NEW KicadBib(pfad)
+    b.name = kimDateiName$(pfad)
+    IF ENDSWITH(LOWER$(b.name), ".kicad_sym") THEN b.name = LEFT$(b.name, LEN(b.name) - 10)
+    IF NOT FILEEXISTS(pfad) THEN
+        b.fehler = "Datei nicht gefunden: " + pfad
+        RETURN b
+    END IF
+    DIM text AS STRING : text = READALL$(pfad)
+    IF NOT CONTAINS(LEFT$(text, 200), "(kicad_symbol_lib") THEN
+        b.fehler = "keine KiCad-Symbolbibliothek (kicad_symbol_lib fehlt)"
+        RETURN b
+    END IF
+    b.zeilen = SPLIT$(text, CHR$(10))
+    DIM starts AS ARRAY OF INTEGER : starts = kbStarts(b.zeilen)
+    IF LEN(starts) = 0 AND CONTAINS(text, "(symbol " + CHR$(34)) THEN
+        ' nicht zeilenweise gesetzt: ganz lesen und neu schreiben
+        b.zeilen = SPLIT$(kbNeuSetzen$(sLesen(text)), CHR$(10))
+        b.neuGesetzt = TRUE
+        starts = kbStarts(b.zeilen)
+    END IF
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(starts) - 1
+        DIM e AS KicadBibEintrag : e = NEW KicadBibEintrag()
+        e.von = starts[i]
+        e.bis = LEN(b.zeilen)
+        IF i + 1 < LEN(starts) THEN e.bis = starts[i + 1]
+        kbEintragLesen(b.zeilen, e)
+        IF NOT MAPHAS(b.nachName, e.name) THEN MAPPUT(b.nachName, e.name, LEN(b.eintraege))
+        ARRAY_PUSH(b.eintraege, e)
+    NEXT
+    ' abgeleitete haben die Einheiten ihres Eltern-Symbols und, wo sie
+    ' selbst nichts sagen, dessen Beschreibung und Stichworte
+    FOR i = 0 TO LEN(b.eintraege) - 1
+        IF b.eintraege[i].erbtVon = "" THEN CONTINUE
+        DIM pe AS INTEGER : pe = b.eintrag(b.eintraege[i].erbtVon)
+        IF pe < 0 THEN CONTINUE
+        b.eintraege[i].einheiten = b.eintraege[pe].einheiten
+        IF b.eintraege[i].beschreibung = "" THEN b.eintraege[i].beschreibung = b.eintraege[pe].beschreibung
+        IF b.eintraege[i].stichworte = "" THEN b.eintraege[i].stichworte = b.eintraege[pe].stichworte
+    NEXT
+    RETURN b
+END FUNCTION
+
+' Name, Beschreibung, Stichworte, Eltern und Einheiten in einem Durchgang
+' ueber die Zeilen des Blocks (eine Zeile kann mehreres enthalten, wenn die
+' Datei neu gesetzt wurde)
+SUB kbEintragLesen(zeilen AS ARRAY OF STRING, e AS KicadBibEintrag)
+    DIM q AS STRING : q = CHR$(34)
+    DIM sy AS STRING : sy = "(symbol " + q
+    DIM pr AS STRING : pr = "(property " + q
+    DIM ki AS STRING : ki = ""
+    e.einheiten = 1
+    e.name = ""
+    DIM zi AS INTEGER
+    FOR zi = e.von TO e.bis - 1
+        DIM z AS STRING : z = zeilen[zi]
+        IF NOT CONTAINS(z, "(") THEN CONTINUE
+        DIM k AS INTEGER : k = INSTR(z, sy)
+        WHILE k >= 0
+            DIM nm AS STRING : nm = kbZitat$(z, k + LEN(sy))
+            IF e.name = "" THEN
+                e.name = nm
+            ELSE
+                DIM un AS INTEGER, ua AS INTEGER
+                kimEinheitLesen(nm, un, ua)
+                IF un > e.einheiten THEN e.einheiten = un
+            END IF
+            k = INSTR(z, sy, k + 1)
+        WEND
+        k = INSTR(z, pr)
+        WHILE k >= 0
+            DIM en AS STRING : en = kbZitat$(z, k + LEN(pr))
+            DIM ew AS INTEGER : ew = k + LEN(pr) + LEN(en) + 3
+            IF en = "Description" AND e.beschreibung = "" THEN
+                e.beschreibung = kbZitat$(z, ew)
+            ELSEIF en = "ki_description" THEN
+                ki = kbZitat$(z, ew)
+            ELSEIF en = "ki_keywords" AND e.stichworte = "" THEN
+                e.stichworte = kbZitat$(z, ew)
+            END IF
+            k = INSTR(z, pr, k + 1)
+        WEND
+        k = INSTR(z, "(extends " + q)
+        IF k >= 0 AND e.erbtVon = "" THEN e.erbtVon = kbZitat$(z, k + 10)
+    NEXT
+    IF e.beschreibung = "" THEN e.beschreibung = ki
+END SUB
+
+FUNCTION kbStarts(zeilen AS ARRAY OF STRING) AS ARRAY OF INTEGER
+    DIM r AS ARRAY OF INTEGER : r = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        IF kbObenStart(zeilen[i]) THEN ARRAY_PUSH(r, i)
+    NEXT
+    RETURN r
+END FUNCTION
+
+' Eine nicht zeilenweise gesetzte Bibliothek: jedes obere Symbol auf eine
+' eigene Zeile (mit zwei Leerzeichen), damit der Index greift
+FUNCTION kbNeuSetzen$(w AS SAusdruck) AS STRING
+    DIM t AS STRING : t = "(kicad_symbol_lib" + CHR$(10)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(w.kinder) - 1
+        IF w.kinder[i].kopf = "symbol" THEN t = t + "  " + kbSchreiben$(w.kinder[i]) + CHR$(10)
+    NEXT
+    RETURN t + ")" + CHR$(10)
+END FUNCTION
+
+FUNCTION kbSchreiben$(s AS SAusdruck) AS STRING
+    DIM t AS STRING : t = "(" + s.kopf
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(s.werte) - 1
+        t = t + " " + CHR$(34) + REPLACE$(REPLACE$(s.werte[i], "\", "\\"), CHR$(34), "\" + CHR$(34)) + CHR$(34)
+    NEXT
+    FOR i = 0 TO LEN(s.kinder) - 1
+        t = t + " " + kbSchreiben$(s.kinder[i])
+    NEXT
+    RETURN t + ")"
+END FUNCTION
+
+' Den Block eines Symbols als Baum -- bei "extends" mit Grafik und Pins des
+' Eltern-Symbols und den Eigenschaften des Kindes
+FUNCTION kicadBibBaum(b AS KicadBib, idx AS INTEGER) AS SAusdruck
+    DIM e AS KicadBibEintrag : e = b.eintraege[idx]
+    DIM s AS SAusdruck : s = sLesen(kbBlock$(kicadBibZeilen(b), e.von, e.bis))
+    IF e.erbtVon = "" THEN RETURN s
+    DIM pe AS INTEGER : pe = b.eintrag(e.erbtVon)
+    IF pe < 0 OR pe = idx THEN RETURN s
+    DIM eltern AS SAusdruck : eltern = kicadBibBaum(b, pe)
+    DIM m AS SAusdruck : m = NEW SAusdruck()
+    m.kopf = "symbol"
+    m.werte = [e.name]
+    DIM i AS INTEGER
+    ' Eigenschaften: die des Kindes, dazu die des Eltern-Symbols, die es nicht hat
+    FOR i = 0 TO LEN(s.kinder) - 1
+        IF s.kinder[i].kopf = "property" THEN ARRAY_PUSH(m.kinder, s.kinder[i])
+    NEXT
+    FOR i = 0 TO LEN(eltern.kinder) - 1
+        DIM k AS SAusdruck : k = eltern.kinder[i]
+        IF k.kopf = "property" THEN
+            IF NOT kbHatEigenschaft(s, k.wert$(0)) THEN ARRAY_PUSH(m.kinder, k)
+        ELSE
+            ARRAY_PUSH(m.kinder, k)
+        END IF
+    NEXT
+    RETURN m
+END FUNCTION
+
+FUNCTION kbHatEigenschaft(s AS SAusdruck, name AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(s.kinder) - 1
+        IF s.kinder[i].kopf = "property" AND s.kinder[i].wert$(0) = name THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Vor dem Einsetzen: steht der Eintrag noch dort, wo der Index ihn sah? Hat
+' sich die Datei inzwischen geaendert, wird neu indiziert. Ergebnis ist der
+' (neue) Index des Eintrags, -1 wenn es ihn nicht mehr gibt.
+FUNCTION kicadBibPruefen(b AS KicadBib, idx AS INTEGER) AS INTEGER
+    IF idx < 0 OR idx >= LEN(b.eintraege) THEN RETURN -1
+    DIM nm AS STRING : nm = b.eintraege[idx].name
+    DIM z AS ARRAY OF STRING : z = kicadBibZeilen(b)
+    DIM v AS INTEGER : v = b.eintraege[idx].von
+    IF v < LEN(z) THEN
+        IF kbObenStart(z[v]) AND CONTAINS(z[v], "(symbol " + CHR$(34) + nm + CHR$(34)) THEN RETURN idx
+    END IF
+    DIM neu AS KicadBib : neu = kicadBibIndex(b.pfad)
+    b.zeilen = neu.zeilen
+    b.eintraege = neu.eintraege
+    b.nachName = neu.nachName
+    b.fehler = neu.fehler
+    b.neuGesetzt = neu.neuGesetzt
+    RETURN b.eintrag(nm)
+END FUNCTION
+
+' Ein Symbol der Bibliothek (Einheit 1..n) uebersetzen und registrieren.
+' versteckt bekommt die Pins, die versteckte Versorgungs-Pins sind (VCC/GND
+' an Logik-ICs) -- beim Einsetzen brauchen sie ein globales Label.
+FUNCTION kicadBibSymbol(b AS KicadBib, idx AS INTEGER, einheit AS INTEGER, BYREF versteckt AS ARRAY OF INTEGER) AS Symbol
+    DIM e AS KicadErgebnis : e = NEW KicadErgebnis()
+    DIM ks AS KimSymbol : ks = kimSymbolBauen(e, kicadBibBaum(b, idx), b.name + ":" + b.eintraege[idx].name, einheit)
+    versteckt = ks.versteckt
+    RETURN ks.sym
+END FUNCTION
+
+' Fuer die Vorschau: dasselbe Symbol, aber nirgends registriert
+FUNCTION kicadBibVorschau(b AS KicadBib, idx AS INTEGER, einheit AS INTEGER) AS Symbol
+    DIM e AS KicadErgebnis : e = NEW KicadErgebnis()
+    RETURN kimSymbolNeu(e, kicadBibBaum(b, idx), b.name + ":" + b.eintraege[idx].name, einheit).sym
+END FUNCTION
+
+' Suche ueber mehrere Bibliotheken: jedes Wort muss im Namen, in der
+' Beschreibung oder den Stichworten vorkommen. Ergebnis je Treffer
+' "Bibliotheksindex/Eintragsindex".
+FUNCTION kicadBibSuchen(bibs AS ARRAY OF KicadBib, muster AS STRING, hoechstens AS INTEGER) AS ARRAY OF STRING
+    DIM r AS ARRAY OF STRING : r = []
+    DIM woerter AS ARRAY OF STRING : woerter = SPLIT$(LOWER$(TRIM$(muster)), " ")
+    DIM bi AS INTEGER, i AS INTEGER, w AS INTEGER
+    FOR bi = 0 TO LEN(bibs) - 1
+        FOR i = 0 TO LEN(bibs[bi].eintraege) - 1
+            DIM e AS KicadBibEintrag : e = bibs[bi].eintraege[i]
+            DIM heu AS STRING : heu = LOWER$(bibs[bi].name + ":" + e.name + " " + e.beschreibung + " " + e.stichworte)
+            DIM passt AS BOOLEAN : passt = TRUE
+            FOR w = 0 TO LEN(woerter) - 1
+                IF woerter[w] <> "" AND NOT CONTAINS(heu, woerter[w]) THEN passt = FALSE
+            NEXT
+            IF passt THEN
+                ARRAY_PUSH(r, STR$(bi) + "/" + STR$(i))
+                IF LEN(r) >= hoechstens THEN RETURN r
+            END IF
+        NEXT
+    NEXT
+    RETURN r
+END FUNCTION
+
+' Wo KiCad seine Bibliotheken ablegt (die erste vorhandene Stelle je System)
+FUNCTION kicadBibOrdner() AS ARRAY OF STRING
+    DIM r AS ARRAY OF STRING : r = []
+    DIM v AS ARRAY OF STRING : v = ["9.0", "8.0", "7.0", "6.0"]
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(v) - 1
+        DIM w AS STRING : w = "C:/Program Files/KiCad/" + v[i] + "/share/kicad/symbols"
+        IF DIREXISTS(w) THEN ARRAY_PUSH(r, w)
+    NEXT
+    DIM weitere AS ARRAY OF STRING : weitere = ["/usr/share/kicad/symbols", "/usr/local/share/kicad/symbols", "/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols"]
+    FOR i = 0 TO LEN(weitere) - 1
+        IF DIREXISTS(weitere[i]) THEN ARRAY_PUSH(r, weitere[i])
+    NEXT
+    DIM env AS STRING : env = GETENV$("KICAD_SYMBOL_DIR", "")
+    IF env = "" THEN env = GETENV$("KICAD9_SYMBOL_DIR", GETENV$("KICAD8_SYMBOL_DIR", ""))
+    IF env <> "" AND DIREXISTS(env) THEN ARRAY_PUSH(r, env)
+    RETURN r
+END FUNCTION

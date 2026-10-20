@@ -21,9 +21,8 @@
 ' Texte/Grafik, Nicht-verbunden-Marker, Bus-Aliase. Steckt eine Datei
 ' mehrmals im Schaltplan, wird sie EIN Blatt mit mehreren Instanzen; die
 ' Referenzen je Instanz kommen aus KiCads Instanz-Pfaden. Mehrteilige Symbole (U1A, U1B) werden je Einheit ein eigenes
-' Bauteil. Versteckte Versorgungs-Pins (VCC/GND an Logik-ICs) verbinden in
-' KiCad unsichtbar ueber ihren Namen -- hier bekommen sie ein sichtbares
-' globales Label, damit das Netz dasselbe bleibt.
+' Bauteil. Versteckte Versorgungs-Pins (VCC/GND an Logik-ICs) verbinden
+' wie in KiCad ueber ihren Namen (netze.dh, versteckteVersorgung).
 
 CLASS KicadErgebnis
     DIM dok AS Dokument
@@ -350,6 +349,17 @@ FUNCTION kimSymbolBauen(e AS KicadErgebnis, ls AS SAusdruck, schluessel AS STRIN
     FOR i = 0 TO LEN(gKimSymbole) - 1
         IF gKimSymbole[i].sym.id = id THEN RETURN gKimSymbole[i]
     NEXT
+    DIM ks AS KimSymbol : ks = kimSymbolNeu(e, ls, schluessel, einheit)
+    ks.sym = symbolRegistrieren(ks.sym)
+    ARRAY_PUSH(gKimSymbole, ks)
+    RETURN ks
+END FUNCTION
+
+' Uebersetzen ohne Registrieren (Vorschau im Bibliotheks-Browser)
+FUNCTION kimSymbolNeu(e AS KicadErgebnis, ls AS SAusdruck, schluessel AS STRING, einheit AS INTEGER) AS KimSymbol
+    DIM mehr AS BOOLEAN : mehr = kimEinheiten(ls) > 1
+    DIM id AS STRING : id = "kicad:" + schluessel + IIF(mehr, "/" + STR$(einheit), "")
+    DIM i AS INTEGER
     DIM kurz AS STRING : kurz = schluessel
     DIM d AS INTEGER : d = INSTR(kurz, ":")
     IF d >= 0 THEN kurz = MID$(kurz, d + 1)
@@ -401,8 +411,6 @@ FUNCTION kimSymbolBauen(e AS KicadErgebnis, ls AS SAusdruck, schluessel AS STRIN
         NEXT
     NEXT
     IF fremd > 0 THEN kimHinweis(e, "Grafik", "Grafik-Elemente in Symbolen, die Funkenflug nicht kennt (weggelassen)")
-    ks.sym = symbolRegistrieren(s)
-    ARRAY_PUSH(gKimSymbole, ks)
     RETURN ks
 END FUNCTION
 
@@ -640,14 +648,8 @@ SUB kimBauteil(e AS KicadErgebnis, bl AS Blatt, sy AS SAusdruck, libs AS SAusdru
         END IF
     END IF
     ARRAY_PUSH(bl.bauteile, b)
-    ' versteckte Versorgungs-Pins: sichtbar machen, Netz bleibt gleich
-    IF gefunden THEN
-        FOR i = 0 TO LEN(ks.versteckt) - 1
-            DIM pin AS Pin : pin = b.sym.pins[ks.versteckt[i]]
-            ARRAY_PUSH(bl.labels, NEW Label(pin.name, b.pinPunkt(ks.versteckt[i]), LA_GLOBAL))
-            kimHinweis(e, "Versteckte Versorgung", "versteckte Versorgungs-Pins (z. B. VCC/GND von Logik-ICs) als globale Labels angeschlossen")
-        NEXT
-    END IF
+    ' versteckte Versorgungs-Pins verbinden sich ueber den Namen (netze.dh)
+    IF gefunden AND LEN(ks.versteckt) > 0 THEN kimHinweis(e, "Versteckte Versorgung", "versteckte Versorgungs-Pins (z. B. VCC/GND von Logik-ICs) haengen wie in KiCad am gleichnamigen Netz")
 END SUB
 
 FUNCTION kimLabelArt(kopf AS STRING) AS INTEGER

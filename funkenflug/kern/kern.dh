@@ -22,5 +22,6 @@ IMPORT "kicad.dh" AS kern
 IMPORT "datei.dh" AS kern
 IMPORT "sausdruck.dh" AS kern
 IMPORT "kicadimport.dh" AS kern
+IMPORT "kicadbib.dh" AS kern
 IMPORT "gerber.dh" AS kern
 IMPORT "platine3d.dh" AS kern

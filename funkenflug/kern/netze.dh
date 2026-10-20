@@ -93,6 +93,27 @@ FUNCTION versorgungsName(b AS Bauteil) AS STRING
     RETURN b.sym.id
 END FUNCTION
 
+' Versteckte Versorgungs-Pins eines Symbols: Typ Versorgung, unsichtbar,
+' ohne Stummel, mit Namen, nicht an einem Versorgungssymbol. KiCad verbindet
+' sie ueber den Namen mit dem globalen Netz; Funkenflug ebenso.
+FUNCTION versteckteVersorgung(s AS Symbol) AS ARRAY OF INTEGER
+    DIM r AS ARRAY OF INTEGER : r = []
+    IF s.einheitLeistung THEN RETURN r
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(s.pins) - 1
+        IF pinVersteckteVersorgung(s, i) THEN ARRAY_PUSH(r, i)
+    NEXT
+    RETURN r
+END FUNCTION
+
+' Ein einzelner Pin (der Fang auf der Leinwand uebergeht ihn: er liegt im
+' Koerper und wird nicht angeschlossen)
+FUNCTION pinVersteckteVersorgung(s AS Symbol, i AS INTEGER) AS BOOLEAN
+    IF s.einheitLeistung THEN RETURN FALSE
+    DIM p AS Pin : p = s.pins[i]
+    RETURN p.typ = PIN_LEISTUNG_EIN AND p.laenge = 0 AND NOT p.zeigeName AND NOT p.zeigeNummer AND p.name <> ""
+END FUNCTION
+
 FUNCTION netzKey(x AS INTEGER, y AS INTEGER) AS STRING
     RETURN STR$(rastern(x, RASTER)) + ":" + STR$(rastern(y, RASTER))
 END FUNCTION
@@ -238,6 +259,13 @@ SUB blattVerbinden(bl AS Blatt, n AS Netze, global AS MAP OF INTEGER)
                 MAPPUT(versorgungHier, versorgungsName(b), 1)
             END IF
         NEXT
+        ' versteckte Versorgungs-Pins (VCC/GND eines Logik-ICs aus KiCad)
+        ' haengen wie dort am gleichnamigen globalen Netz
+        DIM vv AS ARRAY OF INTEGER : vv = versteckteVersorgung(b.sym)
+        FOR j = 0 TO LEN(vv) - 1
+            DIM vp AS Punkt : vp = b.pinPunkt(vv[j])
+            namensVerbund(n, global, b.sym.pins[vv[j]].name, n.punkt(vp.x, vp.y))
+        NEXT
     NEXT
     ' Labels: globale dokumentweit, lokale nur hier (ein lokales "VCC" haengt
     ' am VCC-Symbol desselben Blatts)
@@ -327,6 +355,13 @@ SUB netzeBenennen(dok AS Dokument, n AS Netze)
                 ARRAY_PUSH(n.liste[ni].pins, np)
                 IF n.liste[ni].blatt < 0 THEN n.liste[ni].blatt = bi
                 IF b.sym.einheitLeistung THEN n.liste[ni].versorgungDazu(versorgungsName(b))
+            NEXT
+            ' versteckter Versorgungs-Pin: benennt sein Netz wie ein globales
+            ' Label (keine Quelle -- ohne VCC-Symbol meldet der ERC ihn)
+            DIM vv AS ARRAY OF INTEGER : vv = versteckteVersorgung(b.sym)
+            FOR j = 0 TO LEN(vv) - 1
+                DIM vq AS Punkt : vq = b.pinPunkt(vv[j])
+                n.liste[n.netzFuerWurzel(n.wurzelAn(vq.x, vq.y))].labelDazu(b.sym.pins[vv[j]].name, TRUE)
             NEXT
         NEXT
         FOR i = 0 TO LEN(bl.labels) - 1

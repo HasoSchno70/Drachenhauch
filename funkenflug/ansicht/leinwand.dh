@@ -207,6 +207,7 @@ FUNCTION fangPunkt(wx AS FLOAT, wy AS FLOAT) AS kern.Punkt
     FOR i = 0 TO LEN(gBlatt.bauteile) - 1
         DIM b AS kern.Bauteil : b = gBlatt.bauteile[i]
         FOR j = 0 TO LEN(b.sym.pins) - 1
+            IF kern.pinVersteckteVersorgung(b.sym, j) THEN CONTINUE
             DIM pp AS kern.Punkt : pp = b.pinPunkt(j)
             DIM d AS FLOAT : d = (pp.x - wx) * (pp.x - wx) + (pp.y - wy) * (pp.y - wy)
             IF d < bestD THEN bestD = d : bestX = pp.x : bestY = pp.y : gefunden = TRUE
@@ -503,6 +504,7 @@ SUB hoverBestimmen(px AS FLOAT, py AS FLOAT)
     NEXT
     FOR i = 0 TO LEN(gBlatt.bauteile) - 1
         FOR j = 0 TO LEN(gBlatt.bauteile[i].sym.pins) - 1
+            IF kern.pinVersteckteVersorgung(gBlatt.bauteile[i].sym, j) THEN CONTINUE
             DIM pp AS kern.Punkt : pp = gBlatt.bauteile[i].pinPunkt(j)
             DIM ex AS FLOAT : ex = sx(pp.x) - px
             DIM ey AS FLOAT : ey = sy(pp.y) - py
@@ -647,6 +649,9 @@ SUB bauteilZeichnen(cr AS INTEGER, b AS kern.Bauteil, geist AS BOOLEAN, gewaehlt
     ' Pin-Stummel
     DIM j AS INTEGER
     FOR j = 0 TO LEN(b.sym.pins) - 1
+        ' versteckte Versorgung (VCC/GND eines Logik-ICs): nichts zu sehen,
+        ' angeschlossen wird sie ueber den Namen
+        IF kern.pinVersteckteVersorgung(b.sym, j) THEN CONTINUE
         DIM pin AS kern.Pin : pin = b.sym.pins[j]
         zeichenFarbe(cr, koerper)
         cairo_move_to(cr, pin.pos.x, pin.pos.y)
