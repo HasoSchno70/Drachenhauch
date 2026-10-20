@@ -108,10 +108,11 @@ art warning Zeile 1
 nennt das modul TRUE
 nennt den ausweg TRUE
 
-=== ein zweites dim mit anderem typ warnt und zeigt auf die erste stelle
+=== ein zweites dim mit anderem typ ist ein fehler und zeigt auf die erste stelle
 ' Ein Name, zwei Typen -- der Fehler faellt sonst weit entfernt auf
 ' ("Array-Index muss INTEGER sein, erhalten FLOAT") und ist dort nicht mehr
-' seiner Ursache zuzuordnen.
+' seiner Ursache zuzuordnen. Bis 2026-10 eine Warnung, seitdem ein Fehler
+' (tests/pruef/dim_typwechsel.dhtest).
 IMPORT "helfer.dh"
 IMPORT "json"
 FUNCTION dimWarnungen(quelle AS STRING) AS ARRAY OF STRING
@@ -120,7 +121,7 @@ FUNCTION dimWarnungen(quelle AS STRING) AS ARRAY OF STRING
     DIM i AS INTEGER
     FOR i = 0 TO JSON_LEN(d, "d") - 1
         DIM wo AS STRING : wo = "d." + STR$(i) + "."
-        IF JSON_GET_STRING(d, wo + "severity") <> "warning" THEN CONTINUE
+        IF JSON_GET_STRING(d, wo + "severity") <> "error" THEN CONTINUE
         DIM m AS STRING : m = JSON_GET_STRING(d, wo + "message")
         IF INSTR(m, "schon als") >= 0 THEN ARRAY_PUSH(raus, STR$(JSON_GET_INT(d, wo + "line")) + " " + m)
     NEXT

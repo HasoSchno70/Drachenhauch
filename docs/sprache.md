@@ -102,6 +102,22 @@ NEXT
 Bis 2026.27 behielt ein `DIM` in der Schleife den Wert der vorigen Runde (wie
 in VB.NET) -- außer bei einem Feld mit Größe im Hauptprogramm.
 
+**Groß-/Kleinschreibung zählt bei Namen nicht.** `pd`, `pD` und `PD` sind
+DIESELBE Variable. Ein zweites `DIM` desselben Namens mit **anderem Typ** ist
+deshalb ein **Fehler** — das Programm übersetzt nicht:
+
+```basic
+DIM pd AS Dokument : pd = NEW Dokument()
+DIM pD AS Bauteil              ' Fehler: 'pD' wurde in ... schon als DOKUMENT
+                               ' angelegt, hier als BAUTEIL ... Zweiten Namen vergeben.
+```
+
+Bis 2026-10 war das nur eine Warnung; das Programm lief dann bis zur ersten
+Zeile, die die Variable im falschen Sinn benutzte („Feld 'x' existiert nicht
+in bauteil"). Ein zweites `DIM` mit **gleichem** Typ bleibt eine Warnung.
+Dasselbe gilt für `CATCH e` (Typ `STRING`) und ein späteres `DIM e AS …`
+mit anderem Typ.
+
 > **Reservierte Wörter nicht als Variablennamen.** Manche kurze Namen sind
 > Schlüsselwörter und können nicht als Bezeichner dienen — neben den
 > offensichtlichen (`to`, `step`, `mod`, `end`, `next`, `new`, `class`, `in`)
@@ -259,6 +275,11 @@ schiefgehen:
 eines Ausdrucks nur her, wo er zweifelsfrei feststeht, und wo er ihn nicht
 kennt, sagt er nichts. Ein Irrtum in dieser Herleitung soll kein laufendes
 Programm abweisen.
+
+**Ausnahme: ein zweites `DIM` desselben Namens mit anderem Typ** (siehe
+[Variablen](#variablen-und-konstanten)) ist ein Fehler. Hier wird kein Typ
+hergeleitet — beide Typen stehen ausdrücklich im Text, und eine Variable kann
+nicht zwei davon haben.
 
 **Wo er bewusst schweigt** — damit keine Meldung falschen Alarm gibt:
 
