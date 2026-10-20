@@ -1,0 +1,195 @@
+' 3D-Vorschau der Platine -- globaler Namensraum.
+'
+' Ein eigenes Fenster: Ziehen dreht (links/rechts um die Hochachse, auf/ab
+' kippt bis unter die Platte), das Mausrad zoomt; Knoepfe fuer oben, unten
+' (wie die Loetseite im Ausdruck: links/rechts gespiegelt) und schraeg. Das
+' Modell wird beim Oeffnen und mit "Neu laden" aus der Platine gebaut;
+' gerechnet wird in kern/platine3d.dh.
+
+DIM g3Dlg AS INTEGER
+DIM g3Flaeche AS INTEGER
+DIM g3Modell AS kern.Modell3
+DIM g3Kamera AS kern.Kamera3
+DIM g3Zieht AS BOOLEAN
+DIM g3LetztX AS FLOAT
+DIM g3LetztY AS FLOAT
+DIM g3Eingepasst AS BOOLEAN
+DIM g3Info AS INTEGER
+DIM g3Dauer AS INTEGER                ' ms fuer das letzte Bild
+DIM g3KnopfUnten AS INTEGER
+
+SUB p3Zu(dlg AS INTEGER, antwort AS INTEGER, daten AS INTEGER)
+    gtk_widget_destroy(dlg)
+    g3Dlg = 0
+    g3Flaeche = 0
+    g3Info = 0
+END SUB
+
+SUB p3Ansicht(az AS FLOAT, ho AS FLOAT)
+    g3Kamera.azimut = az
+    g3Kamera.hoehe = ho
+    g3Kamera.stellen()
+    IF g3Flaeche <> 0 THEN gtk_widget_queue_draw(g3Flaeche)
+END SUB
+
+SUB aufP3Oben(k AS INTEGER, daten AS INTEGER)
+    p3Ansicht(0, 90)
+END SUB
+SUB aufP3Unten(k AS INTEGER, daten AS INTEGER)
+    p3Ansicht(180, -90)
+END SUB
+SUB aufP3Schraeg(k AS INTEGER, daten AS INTEGER)
+    p3Ansicht(20, 40)
+END SUB
+SUB aufP3Neu(k AS INTEGER, daten AS INTEGER)
+    p3Laden()
+END SUB
+
+SUB p3Laden()
+    g3Modell = kern.platineModell3(gDok)
+    g3Eingepasst = FALSE              ' Platine kann eine andere Groesse haben
+    IF g3Info <> 0 THEN gtk_label_set_text(g3Info, STR$(g3Modell.koerper) + " Bauteile, " + STR$(LEN(g3Modell.flaechen)) + " Flaechen -- ziehen dreht, Mausrad zoomt.")
+    IF g3Flaeche <> 0 THEN gtk_widget_queue_draw(g3Flaeche)
+END SUB
+
+SUB platine3dZeigen()
+    IF g3Dlg <> 0 THEN
+        p3Laden()
+        gtk_window_present(g3Dlg)
+        RETURN
+    END IF
+    g3Kamera = NEW kern.Kamera3()
+    g3Eingepasst = FALSE
+    g3Dlg = gtk_dialog_new_with_buttons("Platine in 3D", gFenster, 0, "Schliessen", GTK_ANTWORT_OK, NIL)
+    gtk_window_set_default_size(g3Dlg, 900, 620)
+    DIM vb AS INTEGER : vb = gtk_box_new(GTK_SENKRECHT, 6)
+    gtk_container_set_border_width(vb, 6)
+    DIM leiste AS INTEGER : leiste = gtk_box_new(GTK_WAAGERECHT, 6)
+    DIM ko AS INTEGER : ko = gtk_button_new_with_label("Von oben")
+    DIM ku AS INTEGER : ku = gtk_button_new_with_label("Loetseite")
+    DIM ks AS INTEGER : ks = gtk_button_new_with_label("Schraeg")
+    DIM kn AS INTEGER : kn = gtk_button_new_with_label("Neu laden")
+    gtk_widget_set_tooltip_text(ku, "Von unten, links/rechts gespiegelt wie die Loetseite im Ausdruck")
+    gtk_widget_set_tooltip_text(kn, "Das Modell aus der aktuellen Platine neu bauen")
+    gtk_box_pack_start(leiste, ko, FALSE, FALSE, 0)
+    gtk_box_pack_start(leiste, ku, FALSE, FALSE, 0)
+    gtk_box_pack_start(leiste, ks, FALSE, FALSE, 0)
+    gtk_box_pack_end(leiste, kn, FALSE, FALSE, 0)
+    signal(ko, "clicked", aufP3Oben, 0, 0, 0)
+    signal(ku, "clicked", aufP3Unten, 0, 0, 0)
+    g3KnopfUnten = ku
+    signal(ks, "clicked", aufP3Schraeg, 0, 0, 0)
+    signal(kn, "clicked", aufP3Neu, 0, 0, 0)
+    gtk_box_pack_start(vb, leiste, FALSE, FALSE, 0)
+    g3Flaeche = gtk_drawing_area_new()
+    gtk_widget_set_size_request(g3Flaeche, 600, 420)
+    gtk_widget_set_hexpand(g3Flaeche, TRUE)
+    gtk_widget_set_vexpand(g3Flaeche, TRUE)
+    gtk_widget_add_events(g3Flaeche, GDK_MASKE_BEWEGUNG BOR GDK_MASKE_DRUCK BOR GDK_MASKE_LOSLASSEN BOR GDK_MASKE_RAD BOR GDK_MASKE_RAD_FEIN)
+    signalZeichnen(g3Flaeche, "draw", p3Zeichnen, 0, 0, 0)
+    signalEreignis(g3Flaeche, "button-press-event", p3Druck, 0, 0, 0)
+    signalEreignis(g3Flaeche, "button-release-event", p3Los, 0, 0, 0)
+    signalEreignis(g3Flaeche, "motion-notify-event", p3Bewegung, 0, 0, 0)
+    signalEreignis(g3Flaeche, "scroll-event", p3Rad, 0, 0, 0)
+    gtk_box_pack_start(vb, g3Flaeche, TRUE, TRUE, 0)
+    g3Info = etikettNeu("")
+    gtk_box_pack_start(vb, g3Info, FALSE, FALSE, 0)
+    gtk_box_pack_start(gtk_dialog_get_content_area(g3Dlg), vb, TRUE, TRUE, 0)
+    signalAntwort(g3Dlg, "response", p3Zu, 0, 0, 0)
+    p3Laden()
+    gtk_widget_show_all(g3Dlg)
+END SUB
+
+FUNCTION p3Druck(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ev, px, py)
+    g3Zieht = TRUE
+    g3LetztX = px
+    g3LetztY = py
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION p3Los(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    g3Zieht = FALSE
+    RETURN TRUE
+END FUNCTION
+
+' Ziehen: waagrecht um die Hochachse, senkrecht kippen
+SUB p3Drehen(dx AS FLOAT, dy AS FLOAT)
+    g3Kamera.azimut = g3Kamera.azimut - dx * 0.4
+    g3Kamera.hoehe = g3Kamera.hoehe + dy * 0.4
+    g3Kamera.stellen()
+    IF g3Flaeche <> 0 THEN gtk_widget_queue_draw(g3Flaeche)
+END SUB
+
+FUNCTION p3Bewegung(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    IF NOT g3Zieht THEN RETURN FALSE
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ev, px, py)
+    p3Drehen(px - g3LetztX, py - g3LetztY)
+    g3LetztX = px
+    g3LetztY = py
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION p3Rad(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM richtung AS INTEGER
+    DIM ok AS BOOLEAN : ok = gdk_event_get_scroll_direction(ev, richtung)
+    IF richtung = GDK_RAD_HOCH THEN
+        g3Kamera.skala = g3Kamera.skala * 1.15
+    ELSEIF richtung = GDK_RAD_RUNTER THEN
+        g3Kamera.skala = g3Kamera.skala / 1.15
+    ELSE
+        DIM dx AS FLOAT, dy AS FLOAT
+        ok = gdk_event_get_scroll_deltas(ev, dx, dy)
+        IF dy <> 0 THEN g3Kamera.skala = g3Kamera.skala * (1.15 ^ (-dy))
+    END IF
+    gtk_widget_queue_draw(w)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION p3Zeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM start AS INTEGER : start = MILLIS()
+    DIM b AS FLOAT : b = gtk_widget_get_allocated_width(w)
+    DIM h AS FLOAT : h = gtk_widget_get_allocated_height(w)
+    cairoFarbe(cr, &H1B1E26)
+    cairo_paint(cr)
+    g3Kamera.mx = b / 2
+    g3Kamera.my = h / 2
+    IF NOT g3Eingepasst AND b > 20 AND h > 20 THEN
+        g3Kamera.skala = 0.8 * MIN(b / MAX(g3Modell.breite, 1.0), h / MAX(g3Modell.tiefe, 1.0))
+        g3Eingepasst = TRUE
+    END IF
+    DIM folge AS ARRAY OF INTEGER : folge = kern.zeichenFolge3(g3Modell, g3Kamera)
+    cairo_set_line_join(cr, 1)
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(folge) - 1
+        DIM f AS kern.Flaeche3 : f = g3Modell.flaechen[folge[i]]
+        DIM n AS INTEGER : n = LEN(f.px)
+        FOR j = 0 TO n - 1
+            DIM qx AS FLOAT : qx = g3Kamera.bildX(f.px[j], f.py[j], f.pz[j])
+            DIM qy AS FLOAT : qy = g3Kamera.bildY(f.px[j], f.py[j], f.pz[j])
+            IF j = 0 THEN cairo_move_to(cr, qx, qy) ELSE cairo_line_to(cr, qx, qy)
+        NEXT
+        cairo_close_path(cr)
+        DIM farbe AS INTEGER : farbe = kern.farbeMal(f.farbe, g3Kamera.licht(f))
+        cairoFarbe(cr, farbe)
+        IF f.art = kern.F3_KOERPER THEN
+            cairo_fill_preserve(cr)
+            cairoFarbe(cr, kern.farbeMal(farbe, 0.8))
+            cairo_set_line_width(cr, 0.6)
+            cairo_stroke(cr)
+        ELSE
+            cairo_fill(cr)
+        END IF
+    NEXT
+    ' Referenzen von oben lesbar
+    IF g3Kamera.cz > 0.45 THEN
+        FOR i = 0 TO LEN(g3Modell.texte) - 1
+            DIM t AS kern.Text3 : t = g3Modell.texte[i]
+            lwTextAus(cr, g3Kamera.bildX(t.x, t.y, t.z), g3Kamera.bildY(t.x, t.y, t.z), t.text, &HFFFFFF, 1, gSchrift)
+        NEXT
+    END IF
+    g3Dauer = MILLIS() - start
+    RETURN TRUE
+END FUNCTION

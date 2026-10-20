@@ -1,0 +1,317 @@
+' Datenmodell von Funkenflug -- ohne Oberflaeche, Namensraum "kern".
+'
+' Trennung wie bei SparkNode, aber ohne dessen Fallen:
+'   Symbol    = Definition (Pins + Grafik), liegt in der Bibliothek
+'   Bauteil   = platzierte Instanz (Verweis + Lage + Referenz/Wert)
+'   Draht     = Polylinie; Segmente werden abgeleitet, Netze berechnet
+'   Knoten    = echte Verbindung (Kreuzung ohne Knoten = NICHT verbunden)
+'   Label     = fester elektrischer Anker, Textversatz nur fuer die Anzeige
+'
+' Pin-Regel (eindeutig): pin.pos IST der elektrische Andockpunkt. pin.laenge
+' ist nur der gezeichnete Stummel, der von pos in Richtung pin.richtung zum
+' Koerper laeuft. Kein Vermischen von "position" und "connection point".
+
+CLASS Pin
+    DIM nummer AS STRING
+    DIM name AS STRING
+    DIM pos AS Punkt                 ' elektrischer Andockpunkt (lokal)
+    DIM laenge AS INTEGER            ' gezeichneter Stummel
+    DIM richtung AS INTEGER          ' 0/90/180/270: Stummel zeigt vom Pin zum Koerper
+    DIM typ AS INTEGER
+    DIM zeigeName AS BOOLEAN
+    DIM zeigeNummer AS BOOLEAN
+    SUB Init(nr AS STRING, nm AS STRING, p AS Punkt, laen AS INTEGER, ri AS INTEGER, ty AS INTEGER)
+        nummer = nr
+        name = nm
+        pos = p
+        laenge = laen
+        richtung = ri
+        typ = ty
+        zeigeName = nm <> ""
+        zeigeNummer = TRUE
+    END SUB
+END CLASS
+
+CLASS Primitiv
+    DIM art AS INTEGER
+    DIM punkte AS ARRAY OF Punkt
+    DIM radius AS INTEGER
+    DIM winkel1 AS FLOAT
+    DIM winkel2 AS FLOAT
+    DIM text AS STRING
+    DIM textGroesse AS INTEGER
+    DIM linienbreite AS INTEGER
+    DIM fuellen AS BOOLEAN
+    SUB Init(a AS INTEGER)
+        art = a
+        punkte = []
+        linienbreite = 6
+        textGroesse = 120
+    END SUB
+END CLASS
+
+' --- Bequeme Konstruktoren fuer die Bibliothek
+FUNCTION prLinie(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER) AS Primitiv
+    DIM p AS Primitiv : p = NEW Primitiv(PR_LINIE)
+    ARRAY_PUSH(p.punkte, NEW Punkt(x1, y1))
+    ARRAY_PUSH(p.punkte, NEW Punkt(x2, y2))
+    RETURN p
+END FUNCTION
+
+FUNCTION prRechteck(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER) AS Primitiv
+    DIM p AS Primitiv : p = NEW Primitiv(PR_RECHTECK)
+    ARRAY_PUSH(p.punkte, NEW Punkt(x1, y1))
+    ARRAY_PUSH(p.punkte, NEW Punkt(x2, y2))
+    RETURN p
+END FUNCTION
+
+FUNCTION prKreis(cx AS INTEGER, cy AS INTEGER, r AS INTEGER) AS Primitiv
+    DIM p AS Primitiv : p = NEW Primitiv(PR_KREIS)
+    ARRAY_PUSH(p.punkte, NEW Punkt(cx, cy))
+    p.radius = r
+    RETURN p
+END FUNCTION
+
+FUNCTION prBogen(cx AS INTEGER, cy AS INTEGER, r AS INTEGER, w1 AS FLOAT, w2 AS FLOAT) AS Primitiv
+    DIM p AS Primitiv : p = NEW Primitiv(PR_BOGEN)
+    ARRAY_PUSH(p.punkte, NEW Punkt(cx, cy))
+    p.radius = r
+    p.winkel1 = w1
+    p.winkel2 = w2
+    RETURN p
+END FUNCTION
+
+FUNCTION prPolylinie() AS Primitiv
+    RETURN NEW Primitiv(PR_POLYLINIE)
+END FUNCTION
+
+' --- Symbol: die Bauteil-Definition
+CLASS Symbol
+    DIM id AS STRING
+    DIM name AS STRING
+    DIM beschreibung AS STRING
+    DIM praefix AS STRING             ' Referenz-Vorsatz: R, C, D, U, ...
+    DIM wertVorgabe AS STRING
+    DIM pins AS ARRAY OF Pin
+    DIM grafik AS ARRAY OF Primitiv
+    DIM einheitLeistung AS BOOLEAN    ' Leistungssymbol (GND/VCC): kein sichtbarer Wert
+    DIM blattSymbol AS BOOLEAN        ' Blattsymbol eines Unterblatts (kein Bauteil)
+    DIM blattKind AS STRING           ' dessen Blatt-Id
+    DIM nurSimulation AS BOOLEAN      ' Quelle/Messgeraet: nicht auf Platine und Stueckliste
+    ' eigene Symbole (Symbol-Editor)
+    DIM eigen AS BOOLEAN              ' vom Nutzer, wird in der .fkn mitgespeichert
+    DIM fehlt AS BOOLEAN              ' Platzhalter: das Symbol ist nirgends zu finden
+    DIM pinTexte AS BOOLEAN           ' Pin-Nummern und -Namen zeichnen
+    DIM quelltext AS STRING           ' die Pinliste, aus der es entstand
+    DIM textOrte AS BOOLEAN           ' Referenz/Wert an refOrt/wertOrt statt um die Mitte
+    DIM refOrt AS Punkt
+    DIM wertOrt AS Punkt
+    DIM bauform AS STRING             ' Vorgabe fuer die Platine ("DIP8"), "" = keine
+    DIM loecher AS STRING             ' eigene Bauform "1:0,0;2:4,0", "" = keine
+    SUB Init(i AS STRING, nm AS STRING, pre AS STRING)
+        id = i
+        name = nm
+        praefix = pre
+        wertVorgabe = ""
+        beschreibung = ""
+        quelltext = ""
+        pins = []
+        grafik = []
+        refOrt = NEW Punkt(0, 0)
+        wertOrt = NEW Punkt(0, 0)
+    END SUB
+    FUNCTION pinHinzu(nr AS STRING, nm AS STRING, p AS Punkt, laen AS INTEGER, ri AS INTEGER, ty AS INTEGER) AS Pin
+        DIM pin AS Pin : pin = NEW Pin(nr, nm, p, laen, ri, ty)
+        ARRAY_PUSH(pins, pin)
+        RETURN pin
+    END FUNCTION
+    SUB grafikHinzu(pr AS Primitiv)
+        ARRAY_PUSH(grafik, pr)
+    END SUB
+END CLASS
+
+' --- Bauteil: die platzierte Instanz
+CLASS Bauteil
+    DIM id AS STRING
+    DIM symbolRef AS STRING           ' Symbol-Id (eine eingebaute Bibliothek)
+    DIM lage AS Lage
+    DIM referenz AS STRING            ' R1, C3, ...
+    DIM wert AS STRING
+    DIM gehaeuse AS STRING            ' z. B. 0805, DIP-8, TO-92 (Stueckliste)
+    DIM bestellnr AS STRING           ' Bestellnummer / Hersteller-Teilenummer
+    DIM refVersatz AS Punkt           ' Referenz-Text verschoben (Blatt-Einheiten), 0,0 = Vorgabe
+    DIM wertVersatz AS Punkt
+    DIM sym AS Symbol                 ' aufgeloest, nicht gespeichert
+    DIM instanzRefs AS MAP OF STRING  ' Unterblatt mehrfach eingesetzt: Instanzpfad -> Referenz
+    DIM vorlageId AS STRING           ' nur in der ausgerollten Sicht: Id des Originals
+    DIM instanz AS STRING             ' ... und der Instanzpfad
+    SUB Init(ref AS STRING, l AS Lage)
+        id = LEFT$(UUID4$(), 10)
+        symbolRef = ref
+        lage = l
+        referenz = ""
+        wert = ""
+        gehaeuse = ""
+        bestellnr = ""
+        refVersatz = NEW Punkt(0, 0)
+        wertVersatz = NEW Punkt(0, 0)
+        instanzRefs = {}
+        vorlageId = ""
+        instanz = ""
+    END SUB
+    ' Blattkoordinate des i-ten Pins (elektrisch, = gezeichnet).
+    FUNCTION pinPunkt(i AS INTEGER) AS Punkt
+        RETURN transformPunkt(lage, sym.pins[i].pos)
+    END FUNCTION
+END CLASS
+
+CLASS Draht
+    DIM id AS STRING
+    DIM punkte AS ARRAY OF Punkt
+    DIM netzname AS STRING
+    SUB Init()
+        id = LEFT$(UUID4$(), 10)
+        punkte = []
+        netzname = ""
+    END SUB
+END CLASS
+
+CLASS Knoten
+    DIM id AS STRING
+    DIM pos AS Punkt
+    SUB Init(p AS Punkt)
+        id = LEFT$(UUID4$(), 10)
+        pos = p
+    END SUB
+END CLASS
+
+CLASS Label
+    DIM id AS STRING
+    DIM text AS STRING
+    DIM anker AS Punkt                ' elektrischer Anschlusspunkt (fest)
+    DIM drehung AS INTEGER            ' Richtung des Textes vom Anker weg (0 rechts, 90 unten ...)
+    DIM art AS INTEGER
+    SUB Init(t AS STRING, p AS Punkt, a AS INTEGER)
+        id = LEFT$(UUID4$(), 10)
+        text = t
+        anker = p
+        drehung = 0
+        art = a
+    END SUB
+END CLASS
+
+' Bus: Linie mit Namen (Mitglieder), verbindet nichts -- siehe busse.dh
+CLASS Bus
+    DIM id AS STRING
+    DIM name AS STRING
+    DIM punkte AS ARRAY OF Punkt
+    SUB Init(nm AS STRING)
+        id = LEFT$(UUID4$(), 10)
+        name = nm
+        punkte = []
+    END SUB
+END CLASS
+
+CLASS Blatt
+    DIM id AS STRING
+    DIM name AS STRING
+    DIM breite AS INTEGER             ' A4 quer in Einheiten
+    DIM hoehe AS INTEGER
+    DIM bauteile AS ARRAY OF Bauteil
+    DIM draehte AS ARRAY OF Draht
+    DIM knoten AS ARRAY OF Knoten
+    DIM labels AS ARRAY OF Label
+    DIM busse AS ARRAY OF Bus
+    DIM quelle AS INTEGER             ' ausgerollte Sicht: Index des Originalblatts (-1 = selbst)
+    DIM instanz AS STRING             ' ... und der Instanzpfad ("/<Blattsymbol-Id>/...")
+    DIM erste AS STRING               ' Pfad der Instanz, die das Original stellt (gespeichert)
+    SUB Init(nm AS STRING)
+        id = LEFT$(UUID4$(), 10)
+        name = nm
+        breite = 29700
+        hoehe = 21000
+        bauteile = []
+        draehte = []
+        knoten = []
+        labels = []
+        busse = []
+        quelle = -1
+        instanz = ""
+        erste = ""
+    END SUB
+END CLASS
+
+' --- Platine: Lochraster (jedes Loch ein eigenes Loetauge) oder
+' Streifenraster (Kupferstreifen waagrecht durch jede Zeile). Gerechnet wird
+' in Loechern (Spalte s, Zeile z); ein Loch = 2.54 mm.
+CONST PL_LOCH = 0
+CONST PL_STREIFEN = 1
+CONST BA_LOET = 0                 ' Loetbahn: verbindet jedes Loch auf ihrem Weg
+CONST BA_BRUECKE = 1              ' Drahtbruecke: nur ihre beiden Enden
+
+' Ein Bauteil auf der Platine: Verweis auf das Bauteil im Schaltplan (Id),
+' Lage des Bauform-Ursprungs und Drehung. Welche Bauform, sagt das Gehaeuse-
+' Feld des Bauteils -- eine Quelle, kein zweiter Eintrag, der auseinanderlaeuft.
+CLASS PlatTeil
+    DIM bauteilId AS STRING
+    DIM s AS INTEGER
+    DIM z AS INTEGER
+    DIM drehung AS INTEGER
+    SUB Init(id AS STRING, sp AS INTEGER, ze AS INTEGER)
+        bauteilId = id
+        s = sp
+        z = ze
+        drehung = 0
+    END SUB
+END CLASS
+
+CLASS Bahn
+    DIM s1 AS INTEGER
+    DIM z1 AS INTEGER
+    DIM s2 AS INTEGER
+    DIM z2 AS INTEGER
+    DIM art AS INTEGER
+    SUB Init(a1 AS INTEGER, b1 AS INTEGER, a2 AS INTEGER, b2 AS INTEGER, ar AS INTEGER)
+        s1 = a1 : z1 = b1 : s2 = a2 : z2 = b2
+        art = ar
+    END SUB
+END CLASS
+
+CLASS Platine
+    DIM art AS INTEGER
+    DIM spalten AS INTEGER
+    DIM zeilen AS INTEGER
+    DIM teile AS ARRAY OF PlatTeil
+    DIM bahnen AS ARRAY OF Bahn
+    DIM trenn AS ARRAY OF Punkt       ' Trennstellen (Streifenraster): das Loch ist weggebohrt
+    SUB Init()
+        art = PL_STREIFEN
+        spalten = 30
+        zeilen = 20
+        teile = []
+        bahnen = []
+        trenn = []
+    END SUB
+END CLASS
+
+CLASS Dokument
+    DIM id AS STRING
+    DIM titel AS STRING
+    DIM autor AS STRING               ' Schriftfeld
+    DIM revision AS STRING
+    DIM firma AS STRING
+    DIM blaetter AS ARRAY OF Blatt
+    DIM platine AS Platine
+    DIM nummern AS MAP OF INTEGER     ' ausgerollte Sicht: Blattsymbol-Id -> Instanznummer
+    SUB Init()
+        id = LEFT$(UUID4$(), 10)
+        titel = ""
+        autor = ""
+        revision = ""
+        firma = ""
+        blaetter = []
+        ARRAY_PUSH(blaetter, NEW Blatt("Blatt1"))
+        platine = NEW Platine()
+        nummern = {}
+    END SUB
+END CLASS

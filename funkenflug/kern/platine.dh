@@ -1,0 +1,1239 @@
+' Platine (Lochraster / Streifenraster) -- Namensraum "kern".
+'
+' Die Platine ist eine zweite Sicht auf DASSELBE Dokument: welche Pins
+' zusammengehoeren, sagt allein der Schaltplan (netzeDokument). Die Platine
+' legt nur fest, wo die Bauteile stecken und wie das Kupfer verbunden ist
+' (Streifen, Trennstellen, Loetbahnen, Drahtbruecken). platinePruefen
+' vergleicht beides: was im Schaltplan verbunden ist, auf der Platine aber
+' nicht, wird Luftlinie; was auf der Platine verbunden ist, im Schaltplan aber
+' nicht, ist ein Kurzschluss.
+'
+' Bauform = Gehaeuse-Feld des Bauteils, als Name gelesen:
+'   AX4   axial, Beine 4 Loecher auseinander (Widerstand, Diode)
+'   RAD2  radial, 2 Loecher (Kondensator), RAD1 (Elko, LED)
+'   TO92-CBE  drei Beine nebeneinander, Reihenfolge nach Pin-Namen
+'             (TO92-GDS fuer FETs; TO92 bzw. TO220 ohne Folge = Pins 1 2 3)
+'   TO220-GDS dasselbe fuer Leistungsgehaeuse
+'   DIP8  zwei Reihen, 3 Loecher (7.62 mm) auseinander, Pin 1 oben links
+'   SIL3  eine Reihe
+'   HDR2X5  Stiftleiste 2 Reihen x 5, Pin 1 und 2 nebeneinander (Flachkabel)
+'   TRIM  stehender Trimmer: 1 und 3 zwei Loecher auseinander, Schleifer 2
+'         ein Loch versetzt dazwischen
+'   TAST6 6x6-Taster, 4 Beine (je zwei intern verbunden = ein Pin)
+'   RELAIS5  Print-Relais mit Wechsler (A1 A2 COM NO NC)
+' Hat eine Bauform mehrere Beine mit demselben Schluessel, gehoeren sie zum
+' selben Pin -- jedes bekommt ein Loetauge, alle im selben Netz.
+' Ohne (lesbares) Gehaeuse gilt eine Vorgabe je Symbol.
+
+CLASS BauformPin
+    DIM schluessel AS STRING          ' Pin-Nummer oder Pin-Name am Symbol
+    DIM dx AS INTEGER
+    DIM dy AS INTEGER
+END CLASS
+
+CLASS Bauform
+    DIM name AS STRING
+    DIM pins AS ARRAY OF BauformPin
+    SUB Init(n AS STRING)
+        name = n
+        pins = []
+    END SUB
+    SUB pinDazu(k AS STRING, x AS INTEGER, y AS INTEGER)
+        DIM p AS BauformPin : p = NEW BauformPin()
+        p.schluessel = k
+        p.dx = x
+        p.dy = y
+        ARRAY_PUSH(pins, p)
+    END SUB
+END CLASS
+
+FUNCTION ganzzahlLesen(t AS STRING, BYREF v AS INTEGER) AS BOOLEAN
+    IF t = "" OR LEN(t) > 3 THEN RETURN FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        IF NOT istZiffer(MID$(t, i, 1)) THEN RETURN FALSE
+    NEXT
+    v = VAL(t)
+    RETURN TRUE
+END FUNCTION
+
+' Eine Bauform aus ihrem Namen. FALSE, wenn der Name keine bekannte ist.
+FUNCTION bauformLesen(name AS STRING, BYREF bf AS Bauform) AS BOOLEAN
+    DIM n AS STRING : n = UPPER$(REPLACE$(REPLACE$(REPLACE$(TRIM$(name), " ", ""), "-", ""), "_", ""))
+    DIM k AS INTEGER, i AS INTEGER
+    IF STARTSWITH(n, "AX") OR STARTSWITH(n, "RAD") THEN
+        DIM rest AS STRING : rest = IIF(STARTSWITH(n, "AX"), MID$(n, 2), MID$(n, 3))
+        IF NOT ganzzahlLesen(rest, k) OR k < 1 OR k > 20 THEN RETURN FALSE
+        bf = NEW Bauform(IIF(STARTSWITH(n, "AX"), "AX", "RAD") + STR$(k))
+        bf.pinDazu("1", 0, 0)
+        bf.pinDazu("2", k, 0)
+        RETURN TRUE
+    END IF
+    IF STARTSWITH(n, "TO92") OR STARTSWITH(n, "TO220") THEN
+        DIM gh AS STRING : gh = IIF(STARTSWITH(n, "TO92"), "TO92", "TO220")
+        DIM folge AS STRING : folge = MID$(n, LEN(gh))
+        IF folge = "" THEN
+            bf = NEW Bauform(gh)
+            FOR i = 0 TO 2
+                bf.pinDazu(STR$(i + 1), i, 0)
+            NEXT
+            RETURN TRUE
+        END IF
+        ' drei verschiedene Buchstaben = Pin-Namen (EBC, CBE, GDS ...)
+        IF LEN(folge) <> 3 THEN RETURN FALSE
+        IF MID$(folge, 0, 1) = MID$(folge, 1, 1) OR MID$(folge, 0, 1) = MID$(folge, 2, 1) OR MID$(folge, 1, 1) = MID$(folge, 2, 1) THEN RETURN FALSE
+        FOR i = 0 TO 2
+            IF istZiffer(MID$(folge, i, 1)) THEN RETURN FALSE
+        NEXT
+        bf = NEW Bauform(gh + "-" + folge)
+        FOR i = 0 TO 2
+            bf.pinDazu(MID$(folge, i, 1), i, 0)
+        NEXT
+        RETURN TRUE
+    END IF
+    IF STARTSWITH(n, "HDR") AND CONTAINS(n, "X") THEN
+        DIM teile AS ARRAY OF STRING : teile = SPLIT$(MID$(n, 3), "X")
+        DIM reihen AS INTEGER, laenge AS INTEGER
+        IF LEN(teile) <> 2 THEN RETURN FALSE
+        IF NOT ganzzahlLesen(teile[0], reihen) OR NOT ganzzahlLesen(teile[1], laenge) THEN RETURN FALSE
+        IF reihen < 1 OR reihen > 3 OR laenge < 1 OR laenge > 40 THEN RETURN FALSE
+        bf = NEW Bauform("HDR" + STR$(reihen) + "X" + STR$(laenge))
+        DIM q AS INTEGER
+        FOR q = 0 TO laenge - 1
+            FOR i = 0 TO reihen - 1
+                bf.pinDazu(STR$(q * reihen + i + 1), i, q)
+            NEXT
+        NEXT
+        RETURN TRUE
+    END IF
+    IF n = "TAST6" THEN
+        ' 6x6-Taster: je zwei Beine intern verbunden (gleicher Schluessel)
+        bf = NEW Bauform("TAST6")
+        bf.pinDazu("1", 0, 0)
+        bf.pinDazu("1", 3, 0)
+        bf.pinDazu("2", 0, 2)
+        bf.pinDazu("2", 3, 2)
+        RETURN TRUE
+    END IF
+    IF n = "RELAIS5" THEN
+        ' Print-Relais mit Wechsler, angenaehert an die verbreitete
+        ' Songle-SRD-Reihe -- Beinabstaende vor dem Bohren am Datenblatt pruefen
+        bf = NEW Bauform("RELAIS5")
+        bf.pinDazu("1", 0, 0)
+        bf.pinDazu("2", 0, 5)
+        bf.pinDazu("3", 1, 2)
+        bf.pinDazu("5", 5, 0)
+        bf.pinDazu("4", 5, 5)
+        RETURN TRUE
+    END IF
+    IF n = "TRIM" THEN
+        bf = NEW Bauform("TRIM")
+        bf.pinDazu("1", 0, 0)
+        bf.pinDazu("2", 1, 1)
+        bf.pinDazu("3", 2, 0)
+        RETURN TRUE
+    END IF
+    IF STARTSWITH(n, "DIP") THEN
+        IF NOT ganzzahlLesen(MID$(n, 3), k) OR k < 4 OR k > 64 OR k MOD 2 <> 0 THEN RETURN FALSE
+        bf = NEW Bauform("DIP" + STR$(k))
+        DIM h AS INTEGER : h = k \ 2
+        FOR i = 0 TO h - 1
+            bf.pinDazu(STR$(i + 1), 0, i)
+        NEXT
+        FOR i = 0 TO h - 1
+            bf.pinDazu(STR$(k - i), 3, i)
+        NEXT
+        RETURN TRUE
+    END IF
+    IF STARTSWITH(n, "SIL") THEN
+        IF NOT ganzzahlLesen(MID$(n, 3), k) OR k < 1 OR k > 64 THEN RETURN FALSE
+        bf = NEW Bauform("SIL" + STR$(k))
+        FOR i = 0 TO k - 1
+            bf.pinDazu(STR$(i + 1), i, 0)
+        NEXT
+        RETURN TRUE
+    END IF
+    RETURN FALSE
+END FUNCTION
+
+' Eigene Loecher eines Symbols: "1:0,0;2:4,0" (Pin:Spalte,Zeile).
+FUNCTION bauformAusLoechern(t AS STRING) AS Bauform
+    DIM bf AS Bauform : bf = NEW Bauform("eigen")
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(t, ";")
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 1
+        DIM k AS INTEGER : k = INSTR(teile[i], ":")
+        IF k < 0 THEN CONTINUE
+        DIM xy AS ARRAY OF STRING : xy = SPLIT$(MID$(teile[i], k + 1), ",")
+        IF LEN(xy) <> 2 THEN CONTINUE
+        bf.pinDazu(LEFT$(teile[i], k), VAL(xy[0]), VAL(xy[1]))
+    NEXT
+    RETURN bf
+END FUNCTION
+
+' Vorgabe je Symbol, "" = eine Reihe in Pin-Reihenfolge.
+FUNCTION bauformVorgabe$(b AS Bauteil) AS STRING
+    SELECT CASE b.sym.id
+        CASE "R", "L", "D" : RETURN "AX4"
+        CASE "C", "SW" : RETURN "RAD2"
+        CASE "CP", "LED" : RETURN "RAD1"
+        CASE "Q_NPN" : RETURN "TO92-CBE"
+    END SELECT
+    DIM n AS INTEGER : n = LEN(b.sym.pins)
+    ' fortlaufend 1..n nummeriert? Dann DIP (gerade, ab 4) oder SIL
+    DIM i AS INTEGER
+    DIM da AS MAP OF INTEGER
+    FOR i = 0 TO n - 1
+        MAPPUT(da, b.sym.pins[i].nummer, 1)
+    NEXT
+    FOR i = 1 TO n
+        IF NOT MAPHAS(da, STR$(i)) THEN RETURN ""
+    NEXT
+    IF n >= 4 AND n MOD 2 = 0 THEN RETURN "DIP" + STR$(n)
+    RETURN "SIL" + STR$(n)
+END FUNCTION
+
+' Die Bauform eines Bauteils. hinweis: warum das Gehaeuse nicht galt ("" = galt).
+FUNCTION bauformFuer(b AS Bauteil, BYREF hinweis AS STRING) AS Bauform
+    hinweis = ""
+    DIM bf AS Bauform
+    IF b.gehaeuse <> "" THEN
+        IF bauformLesen(b.gehaeuse, bf) THEN RETURN bf
+        hinweis = "Gehaeuse " + b.gehaeuse + " von " + b.referenz + " kennt die Platine nicht (AX4, RAD2, TO92-CBE, DIP8, SIL3 ...)"
+    END IF
+    ' eigenes Symbol mit eigenen Loechern bzw. eigener Vorgabe
+    IF b.sym.loecher <> "" THEN RETURN bauformAusLoechern(b.sym.loecher)
+    IF b.sym.bauform <> "" THEN
+        IF bauformLesen(b.sym.bauform, bf) THEN RETURN bf
+    END IF
+    DIM v AS STRING : v = bauformVorgabe$(b)
+    IF v <> "" THEN
+        IF bauformLesen(v, bf) THEN RETURN bf
+    END IF
+    bf = NEW Bauform("SIL" + STR$(LEN(b.sym.pins)))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(b.sym.pins) - 1
+        bf.pinDazu(b.sym.pins[i].nummer, i, 0)
+    NEXT
+    RETURN bf
+END FUNCTION
+
+' Welcher Bauform-Pin gehoert zum Symbol-Pin j? Erst nach Nummer, dann nach
+' Name (TO92-CBE nennt die Beine C, B, E). -1 = keiner.
+FUNCTION bauformPinZu(bf AS Bauform, b AS Bauteil, j AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bf.pins) - 1
+        IF bf.pins[i].schluessel = b.sym.pins[j].nummer THEN RETURN i
+    NEXT
+    FOR i = 0 TO LEN(bf.pins) - 1
+        IF b.sym.pins[j].name <> "" AND UPPER$(bf.pins[i].schluessel) = UPPER$(b.sym.pins[j].name) THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Alle Bauform-Beine zum Symbol-Pin j (ein Pin kann mehrere Beine haben).
+FUNCTION bauformPinsZu(bf AS Bauform, b AS Bauteil, j AS INTEGER) AS ARRAY OF INTEGER
+    DIM r AS ARRAY OF INTEGER : r = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bf.pins) - 1
+        IF bf.pins[i].schluessel = b.sym.pins[j].nummer THEN ARRAY_PUSH(r, i)
+    NEXT
+    IF LEN(r) > 0 THEN RETURN r
+    FOR i = 0 TO LEN(bf.pins) - 1
+        IF b.sym.pins[j].name <> "" AND UPPER$(bf.pins[i].schluessel) = UPPER$(b.sym.pins[j].name) THEN ARRAY_PUSH(r, i)
+    NEXT
+    RETURN r
+END FUNCTION
+
+' Loch eines Bauform-Pins fuer ein platziertes Teil (gedreht um den Ursprung,
+' im Uhrzeigersinn wie ueberall).
+FUNCTION lochVon(t AS PlatTeil, bp AS BauformPin) AS Punkt
+    RETURN transformPunkt(NEW Lage(NEW Punkt(t.s, t.z), t.drehung, FALSE), NEW Punkt(bp.dx, bp.dy))
+END FUNCTION
+
+' Bauteile, die auf die Platine gehoeren (keine Versorgungssymbole, kein
+' Platzhalter) -- ueber alle Blaetter.
+FUNCTION platinenBauteile(dok AS Dokument) AS ARRAY OF Bauteil
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
+    DIM r AS ARRAY OF Bauteil : r = []
+    DIM bi AS INTEGER, ci AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        FOR ci = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
+            DIM b AS Bauteil : b = dok.blaetter[bi].bauteile[ci]
+            IF NOT b.sym.einheitLeistung AND NOT b.sym.fehlt AND NOT b.sym.blattSymbol AND NOT b.sym.nurSimulation THEN ARRAY_PUSH(r, b)
+        NEXT
+    NEXT
+    RETURN r
+END FUNCTION
+
+FUNCTION bauteilMitId(dok AS Dokument, id AS STRING, BYREF b AS Bauteil) AS BOOLEAN
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
+    DIM bi AS INTEGER, ci AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        FOR ci = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
+            IF dok.blaetter[bi].bauteile[ci].id = id THEN
+                b = dok.blaetter[bi].bauteile[ci]
+                RETURN TRUE
+            END IF
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION teilIndex(pl AS Platine, id AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(pl.teile) - 1
+        IF pl.teile[i].bauteilId = id THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION lochKey$(s AS INTEGER, z AS INTEGER) AS STRING
+    RETURN STR$(s) + ":" + STR$(z)
+END FUNCTION
+
+FUNCTION istTrennstelle(pl AS Platine, s AS INTEGER, z AS INTEGER) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(pl.trenn) - 1
+        IF pl.trenn[i].x = s AND pl.trenn[i].y = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Trennstelle setzen bzw. wieder schliessen. Rueckgabe: jetzt getrennt?
+FUNCTION trennUmschalten(pl AS Platine, s AS INTEGER, z AS INTEGER) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(pl.trenn) - 1
+        IF pl.trenn[i].x = s AND pl.trenn[i].y = z THEN
+            ARRAY_REMOVE_AT(pl.trenn, i)
+            RETURN FALSE
+        END IF
+    NEXT
+    ARRAY_PUSH(pl.trenn, NEW Punkt(s, z))
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION aufPlatine(pl AS Platine, s AS INTEGER, z AS INTEGER) AS BOOLEAN
+    RETURN s >= 0 AND z >= 0 AND s < pl.spalten AND z < pl.zeilen
+END FUNCTION
+
+' --- Pruefung -----------------------------------------------------------------
+
+CLASS Pad
+    DIM s AS INTEGER
+    DIM z AS INTEGER
+    DIM netz AS INTEGER               ' Index in PlatBericht.netzNamen
+    DIM text AS STRING                ' "R1.2"
+    DIM teil AS INTEGER               ' Index in platine.teile
+    DIM nummer AS STRING
+END CLASS
+
+CLASS Luftlinie
+    DIM s1 AS INTEGER
+    DIM z1 AS INTEGER
+    DIM s2 AS INTEGER
+    DIM z2 AS INTEGER
+    DIM netz AS STRING
+END CLASS
+
+CLASS PlatFehler
+    DIM text AS STRING
+    DIM s AS INTEGER
+    DIM z AS INTEGER
+    DIM kurz AS BOOLEAN               ' Kurzschluss (sonst Bestueckungs-/Lagefehler)
+END CLASS
+
+CLASS PlatBericht
+    DIM pads AS ARRAY OF Pad
+    DIM luft AS ARRAY OF Luftlinie
+    DIM fehler AS ARRAY OF PlatFehler
+    DIM unplatziert AS ARRAY OF STRING
+    DIM netzNamen AS ARRAY OF STRING
+    DIM kurzschluesse AS INTEGER
+    DIM spalten AS INTEGER
+    DIM wurzel AS ARRAY OF INTEGER    ' Kupfer-Insel je Loch
+    DIM inselNetze AS MAP OF STRING   ' Insel -> Netznamen darauf
+    SUB Init()
+        pads = []
+        luft = []
+        fehler = []
+        unplatziert = []
+        netzNamen = []
+        wurzel = []
+        inselNetze = {}
+    END SUB
+    ' Welche Netze haengen an diesem Loch (ueber Streifen/Bahnen)? "" = keins.
+    FUNCTION lochNetz$(s AS INTEGER, z AS INTEGER) AS STRING
+        DIM i AS INTEGER : i = z * spalten + s
+        IF s < 0 OR z < 0 OR s >= spalten OR i >= LEN(wurzel) THEN RETURN ""
+        DIM k AS STRING : k = STR$(wurzel[i])
+        IF MAPHAS(inselNetze, k) THEN RETURN MAPGET(inselNetze, k)
+        RETURN ""
+    END FUNCTION
+END CLASS
+
+FUNCTION ufFinden(BYREF e AS ARRAY OF INTEGER, i AS INTEGER) AS INTEGER
+    WHILE e[i] <> i
+        e[i] = e[e[i]]
+        i = e[i]
+    WEND
+    RETURN i
+END FUNCTION
+
+SUB ufVereinen(BYREF e AS ARRAY OF INTEGER, a AS INTEGER, b AS INTEGER)
+    DIM ra AS INTEGER : ra = ufFinden(e, a)
+    DIM rb AS INTEGER : rb = ufFinden(e, b)
+    IF ra <> rb THEN e[rb] = ra
+END SUB
+
+SUB platFehler(r AS PlatBericht, text AS STRING, s AS INTEGER, z AS INTEGER, kurz AS BOOLEAN)
+    DIM f AS PlatFehler : f = NEW PlatFehler()
+    f.text = text
+    f.s = s
+    f.z = z
+    f.kurz = kurz
+    ARRAY_PUSH(r.fehler, f)
+END SUB
+
+' Schaltplan-Netz je Pin: "Bauteil-Id|Pin-Nummer" -> Index in netzNamen.
+FUNCTION pinNetze(dok AS Dokument, BYREF namen AS ARRAY OF STRING) AS MAP OF INTEGER
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
+    DIM m AS MAP OF INTEGER
+    DIM n AS Netze : n = netzeDokument(dok)
+    namen = []
+    DIM i AS INTEGER, k AS INTEGER
+    FOR i = 0 TO LEN(n.liste) - 1
+        ARRAY_PUSH(namen, n.liste[i].name)
+        FOR k = 0 TO LEN(n.liste[i].pins) - 1
+            DIM np AS NetzPin : np = n.liste[i].pins[k]
+            IF np.versorgung THEN CONTINUE
+            DIM b AS Bauteil : b = dok.blaetter[np.blatt].bauteile[np.bauteil]
+            MAPPUT(m, b.id + "|" + np.nummer, i)
+        NEXT
+    NEXT
+    RETURN m
+END FUNCTION
+
+FUNCTION platinePruefen(dok AS Dokument) AS PlatBericht
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
+    DIM r AS PlatBericht : r = NEW PlatBericht()
+    DIM pl AS Platine : pl = dok.platine
+    r.spalten = pl.spalten
+    DIM anzahl AS INTEGER : anzahl = pl.spalten * pl.zeilen
+    DIM e AS ARRAY OF INTEGER : e = []
+    DIM i AS INTEGER, j AS INTEGER, k AS INTEGER
+    FOR i = 0 TO anzahl - 1
+        ARRAY_PUSH(e, i)
+    NEXT
+    DIM weg AS MAP OF INTEGER                     ' weggebohrte Loecher
+    FOR i = 0 TO LEN(pl.trenn) - 1
+        MAPPUT(weg, lochKey$(pl.trenn[i].x, pl.trenn[i].y), 1)
+    NEXT
+    ' Kupfer: Streifen
+    IF pl.art = PL_STREIFEN THEN
+        DIM zs AS INTEGER, ss AS INTEGER
+        FOR zs = 0 TO pl.zeilen - 1
+            FOR ss = 0 TO pl.spalten - 2
+                IF NOT MAPHAS(weg, lochKey$(ss, zs)) AND NOT MAPHAS(weg, lochKey$(ss + 1, zs)) THEN ufVereinen(e, zs * pl.spalten + ss, zs * pl.spalten + ss + 1)
+            NEXT
+        NEXT
+    END IF
+    ' Kupfer: Bahnen und Bruecken
+    FOR i = 0 TO LEN(pl.bahnen) - 1
+        DIM ba AS Bahn : ba = pl.bahnen[i]
+        IF NOT aufPlatine(pl, ba.s1, ba.z1) OR NOT aufPlatine(pl, ba.s2, ba.z2) THEN
+            platFehler(r, "Eine " + IIF(ba.art = BA_LOET, "Loetbahn", "Drahtbruecke") + " ragt ueber den Platinenrand", ba.s1, ba.z1, FALSE)
+            CONTINUE
+        END IF
+        IF ba.art = BA_LOET AND (ba.s1 = ba.s2 OR ba.z1 = ba.z2) THEN
+            ' jedes Loch auf dem Weg
+            DIM ds AS INTEGER : ds = SIGN(ba.s2 - ba.s1)
+            DIM dz AS INTEGER : dz = SIGN(ba.z2 - ba.z1)
+            DIM ps AS INTEGER : ps = ba.s1
+            DIM pz AS INTEGER : pz = ba.z1
+            WHILE ps <> ba.s2 OR pz <> ba.z2
+                ufVereinen(e, pz * pl.spalten + ps, (pz + dz) * pl.spalten + ps + ds)
+                ps = ps + ds
+                pz = pz + dz
+            WEND
+        ELSE
+            ufVereinen(e, ba.z1 * pl.spalten + ba.s1, ba.z2 * pl.spalten + ba.s2)
+        END IF
+    NEXT
+    ' Pads der platzierten Bauteile
+    DIM pn AS MAP OF INTEGER : pn = pinNetze(dok, r.netzNamen)
+    DIM belegt AS MAP OF STRING
+    DIM drauf AS MAP OF INTEGER
+    FOR i = 0 TO LEN(pl.teile) - 1
+        DIM t AS PlatTeil : t = pl.teile[i]
+        DIM b AS Bauteil
+        IF NOT bauteilMitId(dok, t.bauteilId, b) THEN CONTINUE
+        MAPPUT(drauf, b.id, 1)
+        DIM hinweis AS STRING
+        DIM bf AS Bauform : bf = bauformFuer(b, hinweis)
+        IF hinweis <> "" THEN platFehler(r, hinweis, t.s, t.z, FALSE)
+        FOR j = 0 TO LEN(b.sym.pins) - 1
+            DIM pt AS STRING : pt = b.referenz + "." + b.sym.pins[j].nummer
+            DIM ks AS ARRAY OF INTEGER : ks = bauformPinsZu(bf, b, j)
+            IF LEN(ks) = 0 THEN
+                platFehler(r, "Bauform " + bf.name + " hat kein Bein fuer " + pt, t.s, t.z, FALSE)
+                CONTINUE
+            END IF
+            ' das Netz des Pins -- fuer alle seine Beine dasselbe
+            DIM pnz AS INTEGER
+            DIM nk AS STRING : nk = b.id + "|" + b.sym.pins[j].nummer
+            IF MAPHAS(pn, nk) THEN
+                pnz = MAPGET(pn, nk)
+            ELSE
+                ' im Schaltplan offen: ein eigenes Netz, das nichts beruehren darf
+                pnz = LEN(r.netzNamen)
+                ARRAY_PUSH(r.netzNamen, pt + " (offen)")
+            END IF
+            DIM kk AS INTEGER
+            FOR kk = 0 TO LEN(ks) - 1
+                DIM lo AS Punkt : lo = lochVon(t, bf.pins[ks[kk]])
+                IF NOT aufPlatine(pl, lo.x, lo.y) THEN
+                    platFehler(r, pt + " liegt ausserhalb der Platine", t.s, t.z, FALSE)
+                    CONTINUE
+                END IF
+                DIM lk AS STRING : lk = lochKey$(lo.x, lo.y)
+                IF MAPHAS(belegt, lk) THEN
+                    platFehler(r, "Loch " + STR$(lo.x + 1) + "/" + STR$(lo.y + 1) + " doppelt belegt: " + MAPGET(belegt, lk) + " und " + pt, lo.x, lo.y, FALSE)
+                    CONTINUE
+                END IF
+                MAPPUT(belegt, lk, pt)
+                IF MAPHAS(weg, lk) THEN platFehler(r, pt + " steckt in einer Trennstelle -- dort ist kein Kupfer", lo.x, lo.y, FALSE)
+                DIM pd AS Pad : pd = NEW Pad()
+                pd.s = lo.x
+                pd.z = lo.y
+                pd.teil = i
+                pd.text = pt
+                pd.nummer = b.sym.pins[j].nummer
+                pd.netz = pnz
+                ARRAY_PUSH(r.pads, pd)
+            NEXT
+        NEXT
+    NEXT
+    ' was im Schaltplan steht, aber noch nicht auf der Platine
+    DIM alle AS ARRAY OF Bauteil : alle = platinenBauteile(dok)
+    FOR i = 0 TO LEN(alle) - 1
+        IF NOT MAPHAS(drauf, alle[i].id) THEN ARRAY_PUSH(r.unplatziert, IIF(alle[i].referenz = "", "?", alle[i].referenz))
+    NEXT
+    ' Inseln: Kurzschluesse (zwei Netze auf einem Kupferstueck)
+    DIM inselNetz AS MAP OF INTEGER
+    DIM inselPad AS MAP OF INTEGER
+    DIM gemeldet AS MAP OF INTEGER
+    FOR i = 0 TO LEN(r.pads) - 1
+        DIM w AS INTEGER : w = ufFinden(e, r.pads[i].z * pl.spalten + r.pads[i].s)
+        DIM wk AS STRING : wk = STR$(w)
+        IF NOT MAPHAS(inselNetz, wk) THEN
+            MAPPUT(inselNetz, wk, r.pads[i].netz)
+            MAPPUT(inselPad, wk, i)
+            MAPPUT(r.inselNetze, wk, r.netzNamen[r.pads[i].netz])
+        ELSEIF MAPGET(inselNetz, wk) <> r.pads[i].netz THEN
+            DIM na AS INTEGER : na = MAPGET(inselNetz, wk)
+            DIM nb AS INTEGER : nb = r.pads[i].netz
+            DIM gk AS STRING : gk = wk + "|" + STR$(MIN(na, nb)) + "|" + STR$(MAX(na, nb))
+            IF NOT MAPHAS(gemeldet, gk) THEN
+                MAPPUT(gemeldet, gk, 1)
+                DIM erster AS Pad : erster = r.pads[MAPGET(inselPad, wk)]
+                platFehler(r, "Kurzschluss: " + r.netzNamen[na] + " und " + r.netzNamen[nb] + " (" + erster.text + " - " + r.pads[i].text + ")", r.pads[i].s, r.pads[i].z, TRUE)
+                r.kurzschluesse = r.kurzschluesse + 1
+                IF NOT CONTAINS(MAPGET(r.inselNetze, wk), r.netzNamen[nb]) THEN MAPPUT(r.inselNetze, wk, MAPGET(r.inselNetze, wk) + ", " + r.netzNamen[nb])
+            END IF
+        END IF
+    NEXT
+    FOR i = 0 TO anzahl - 1
+        ARRAY_PUSH(r.wurzel, ufFinden(e, i))
+    NEXT
+    ' Luftlinien: je Netz die Inseln mit den kuerzesten Strecken verbinden (Prim)
+    DIM nachNetz AS MAP OF STRING
+    FOR i = 0 TO LEN(r.pads) - 1
+        DIM nnk AS STRING : nnk = STR$(r.pads[i].netz)
+        IF MAPHAS(nachNetz, nnk) THEN
+            MAPPUT(nachNetz, nnk, MAPGET(nachNetz, nnk) + "," + STR$(i))
+        ELSE
+            MAPPUT(nachNetz, nnk, STR$(i))
+        END IF
+    NEXT
+    DIM netzKeys AS ARRAY OF STRING : netzKeys = MAPKEYS(nachNetz)
+    FOR i = 0 TO LEN(netzKeys) - 1
+        DIM teil AS ARRAY OF STRING : teil = SPLIT$(MAPGET(nachNetz, netzKeys[i]), ",")
+        IF LEN(teil) < 2 THEN CONTINUE
+        DIM idx AS ARRAY OF INTEGER : idx = []
+        DIM ins AS ARRAY OF INTEGER : ins = []
+        FOR j = 0 TO LEN(teil) - 1
+            DIM pix AS INTEGER : pix = VAL(teil[j])
+            ARRAY_PUSH(idx, pix)
+            ARRAY_PUSH(ins, r.wurzel[r.pads[pix].z * pl.spalten + r.pads[pix].s])
+        NEXT
+        ' verbundene Inseln wachsen von der ersten aus
+        DIM drin AS MAP OF INTEGER
+        MAPPUT(drin, STR$(ins[0]), 1)
+        DIM weiter AS BOOLEAN : weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            DIM best AS INTEGER : best = -1
+            DIM ba1 AS INTEGER : ba1 = -1
+            DIM ba2 AS INTEGER : ba2 = -1
+            FOR j = 0 TO LEN(idx) - 1
+                IF NOT MAPHAS(drin, STR$(ins[j])) THEN CONTINUE
+                FOR k = 0 TO LEN(idx) - 1
+                    IF MAPHAS(drin, STR$(ins[k])) THEN CONTINUE
+                    DIM p1 AS Pad : p1 = r.pads[idx[j]]
+                    DIM p2 AS Pad : p2 = r.pads[idx[k]]
+                    DIM d AS INTEGER : d = (p1.s - p2.s) * (p1.s - p2.s) + (p1.z - p2.z) * (p1.z - p2.z)
+                    IF best < 0 OR d < best THEN
+                        best = d
+                        ba1 = idx[j]
+                        ba2 = idx[k]
+                    END IF
+                NEXT
+            NEXT
+            IF best >= 0 THEN
+                DIM ll AS Luftlinie : ll = NEW Luftlinie()
+                ll.s1 = r.pads[ba1].s : ll.z1 = r.pads[ba1].z
+                ll.s2 = r.pads[ba2].s : ll.z2 = r.pads[ba2].z
+                ll.netz = r.netzNamen[r.pads[ba1].netz]
+                ARRAY_PUSH(r.luft, ll)
+                MAPPUT(drin, STR$(r.wurzel[r.pads[ba2].z * pl.spalten + r.pads[ba2].s]), 1)
+                weiter = TRUE
+            END IF
+        WEND
+    NEXT
+    RETURN r
+END FUNCTION
+
+' --- Abgleich und automatisches Einsetzen --------------------------------------
+
+' Teile, deren Bauteil es im Schaltplan nicht mehr gibt, fliegen raus.
+FUNCTION platineAbgleichen(dok AS Dokument) AS INTEGER
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
+    DIM pl AS Platine : pl = dok.platine
+    DIM neu AS ARRAY OF PlatTeil : neu = []
+    DIM i AS INTEGER, weg AS INTEGER
+    weg = 0
+    FOR i = 0 TO LEN(pl.teile) - 1
+        DIM b AS Bauteil
+        IF bauteilMitId(dok, pl.teile[i].bauteilId, b) THEN
+            IF NOT b.sym.einheitLeistung AND NOT b.sym.blattSymbol AND NOT b.sym.nurSimulation THEN
+                ARRAY_PUSH(neu, pl.teile[i])
+                CONTINUE
+            END IF
+        END IF
+        weg = weg + 1
+    NEXT
+    pl.teile = neu
+    RETURN weg
+END FUNCTION
+
+' Loecher (mit einem Loch Abstand), die ein Teil belegt.
+SUB teilFlaeche(t AS PlatTeil, bf AS Bauform, BYREF s0 AS INTEGER, BYREF z0 AS INTEGER, BYREF s1 AS INTEGER, BYREF z1 AS INTEGER)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bf.pins) - 1
+        DIM lo AS Punkt : lo = lochVon(t, bf.pins[i])
+        IF i = 0 OR lo.x < s0 THEN s0 = lo.x
+        IF i = 0 OR lo.y < z0 THEN z0 = lo.y
+        IF i = 0 OR lo.x > s1 THEN s1 = lo.x
+        IF i = 0 OR lo.y > z1 THEN z1 = lo.y
+    NEXT
+END SUB
+
+' Ein Teil so verschieben, dass alle Beine auf der Platine liegen (statt ein
+' Drehen am Rand stumm abzulehnen, wie SparkNode es tat).
+SUB teilInsFeld(pl AS Platine, t AS PlatTeil, bf AS Bauform)
+    DIM s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER
+    teilFlaeche(t, bf, s0, z0, s1, z1)
+    IF s0 < 0 THEN t.s = t.s - s0
+    IF z0 < 0 THEN t.z = t.z - z0
+    IF s1 >= pl.spalten THEN t.s = t.s - (s1 - pl.spalten + 1)
+    IF z1 >= pl.zeilen THEN t.z = t.z - (z1 - pl.zeilen + 1)
+END SUB
+
+' Alles Unplatzierte einsetzen. Reihenfolge und Lage nach den Netzen: zuerst
+' das Teil mit den meisten Verbindungen, dann immer das, das am meisten mit
+' schon Gesetztem teilt, und zwar dorthin, wo seine Beine den gesetzten
+' Beinen derselben Netze am naechsten sind (Summe der Loch-Abstaende). Ohne
+' Verbindung: Zeile fuer Zeile von oben links. nachNetzen = FALSE setzt in
+' Schaltplan-Reihenfolge von oben links (zum Vergleich).
+'
+' Auf Streifenraster stehen die Teile quer zu den Streifen (sonst laegen
+' beide Beine auf einem Streifen = Kurzschluss); rechts neben jedem Teil und
+' unter einem DIP zwischen den Reihen wird getrennt, rechts bleibt ein freies
+' Loch fuer eine Bruecke. Um jedes Teil herum bleibt Abstand -- in BEIDE
+' Richtungen geprueft, auch wenn ein neues Teil links neben ein altes kommt.
+' Auf Lochraster wird quer und laengs probiert. Rueckgabe: wie viele gesetzt.
+FUNCTION platineEinsetzen(dok AS Dokument) AS INTEGER
+    RETURN platineEinsetzenMit(dok, TRUE)
+END FUNCTION
+
+' Trennstellen, die ein Teil auf Streifenraster braucht: in jeder Zeile
+' zwischen zwei benachbarten Beinen VERSCHIEDENER Pins eine, moeglichst in
+' der Mitte. FALSE, wenn zwei verschiedene Pins direkt nebeneinander stehen
+' (dann passt keine Trennstelle dazwischen). Das deckt DIP (zwischen den
+' Reihen), Relais, Taster und alles Eigene ab -- keine Sonderregel je Bauform.
+FUNCTION streifenSchnitte(t AS PlatTeil, bf AS Bauform, BYREF schnitte AS ARRAY OF Punkt) AS BOOLEAN
+    schnitte = []
+    DIM folge AS ARRAY OF STRING : folge = []
+    DIM bein AS MAP OF INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bf.pins) - 1
+        DIM lo AS Punkt : lo = lochVon(t, bf.pins[i])
+        ARRAY_PUSH(folge, PADL$(STR$(lo.y + 10000), 6, "0") + PADL$(STR$(lo.x + 10000), 6, "0") + CHR$(1) + STR$(i))
+        MAPPUT(bein, lochKey$(lo.x, lo.y), 1)
+    NEXT
+    SORT(folge)
+    FOR i = 1 TO LEN(folge) - 1
+        DIM a AS Punkt : a = lochVon(t, bf.pins[VAL(MID$(folge[i - 1], INSTR(folge[i - 1], CHR$(1)) + 1))])
+        DIM ia AS INTEGER : ia = VAL(MID$(folge[i - 1], INSTR(folge[i - 1], CHR$(1)) + 1))
+        DIM ib AS INTEGER : ib = VAL(MID$(folge[i], INSTR(folge[i], CHR$(1)) + 1))
+        DIM b AS Punkt : b = lochVon(t, bf.pins[ib])
+        IF a.y <> b.y OR bf.pins[ia].schluessel = bf.pins[ib].schluessel THEN CONTINUE
+        ' ein freies Loch dazwischen, der Mitte am naechsten
+        DIM best AS INTEGER : best = -1
+        DIM x AS INTEGER
+        FOR x = a.x + 1 TO b.x - 1
+            IF MAPHAS(bein, lochKey$(x, a.y)) THEN CONTINUE
+            IF best < 0 OR ABS(2 * x - a.x - b.x) < ABS(2 * best - a.x - b.x) THEN best = x
+        NEXT
+        IF best < 0 THEN RETURN FALSE
+        ARRAY_PUSH(schnitte, NEW Punkt(best, a.y))
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+' Loecher einer Flaeche merken bzw. pruefen, ob keins davon belegt ist.
+SUB flaecheMerken(BYREF m AS MAP OF INTEGER, s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER)
+    DIM q AS INTEGER, w AS INTEGER
+    FOR q = s0 TO s1
+        FOR w = z0 TO z1
+            MAPPUT(m, lochKey$(q, w), 1)
+        NEXT
+    NEXT
+END SUB
+
+FUNCTION flaecheFrei(m AS MAP OF INTEGER, s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER) AS BOOLEAN
+    DIM q AS INTEGER, w AS INTEGER
+    FOR q = s0 TO s1
+        FOR w = z0 TO z1
+            IF MAPHAS(m, lochKey$(q, w)) THEN RETURN FALSE
+        NEXT
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION platineEinsetzenMit(dok AS Dokument, nachNetzen AS BOOLEAN) AS INTEGER
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
+    DIM pl AS Platine : pl = dok.platine
+    DIM koerper AS MAP OF INTEGER                ' Loecher gesetzter Teile
+    DIM zone AS MAP OF INTEGER                   ' dieselben samt Abstand
+    DIM i AS INTEGER, j AS INTEGER, k AS INTEGER, s AS INTEGER, z AS INTEGER, w AS INTEGER
+    DIM rechtsRand AS INTEGER : rechtsRand = IIF(pl.art = PL_STREIFEN, 2, 1)
+    DIM hinweis AS STRING
+    DIM namen AS ARRAY OF STRING
+    DIM pn AS MAP OF INTEGER : pn = pinNetze(dok, namen)
+    ' gesetzte Beine je Netz (fuer die Abstaende)
+    DIM ps AS ARRAY OF INTEGER : ps = []
+    DIM pz AS ARRAY OF INTEGER : pz = []
+    DIM pnetz AS ARRAY OF INTEGER : pnetz = []
+    DIM netzDa AS MAP OF INTEGER
+    FOR i = 0 TO LEN(pl.teile) - 1
+        DIM b0 AS Bauteil
+        IF NOT bauteilMitId(dok, pl.teile[i].bauteilId, b0) THEN CONTINUE
+        DIM f0 AS Bauform : f0 = bauformFuer(b0, hinweis)
+        DIM a0 AS INTEGER, c0 AS INTEGER, a1 AS INTEGER, c1 AS INTEGER
+        teilFlaeche(pl.teile[i], f0, a0, c0, a1, c1)
+        flaecheMerken(koerper, a0, c0, a1, c1)
+        flaecheMerken(zone, a0 - 1, c0 - 1, a1 + rechtsRand, c1 + 1)
+        FOR j = 0 TO LEN(b0.sym.pins) - 1
+            IF NOT MAPHAS(pn, b0.id + "|" + b0.sym.pins[j].nummer) THEN CONTINUE
+            DIM n0 AS INTEGER : n0 = MAPGET(pn, b0.id + "|" + b0.sym.pins[j].nummer)
+            DIM ks0 AS ARRAY OF INTEGER : ks0 = bauformPinsZu(f0, b0, j)
+            FOR k = 0 TO LEN(ks0) - 1
+                DIM lo0 AS Punkt : lo0 = lochVon(pl.teile[i], f0.pins[ks0[k]])
+                ARRAY_PUSH(ps, lo0.x)
+                ARRAY_PUSH(pz, lo0.y)
+                ARRAY_PUSH(pnetz, n0)
+                MAPPUT(netzDa, STR$(n0), 1)
+            NEXT
+        NEXT
+    NEXT
+    ' wie viele echte Pins hat jedes Netz? (Netze mit einem Pin verbinden nichts)
+    DIM netzPins AS MAP OF INTEGER
+    DIM nk AS ARRAY OF STRING : nk = MAPKEYS(pn)
+    FOR i = 0 TO LEN(nk) - 1
+        DIM nn AS STRING : nn = STR$(MAPGET(pn, nk[i]))
+        IF MAPHAS(netzPins, nn) THEN
+            MAPPUT(netzPins, nn, MAPGET(netzPins, nn) + 1)
+        ELSE
+            MAPPUT(netzPins, nn, 1)
+        END IF
+    NEXT
+    DIM offen AS ARRAY OF Bauteil : offen = []
+    DIM alle AS ARRAY OF Bauteil : alle = platinenBauteile(dok)
+    FOR i = 0 TO LEN(alle) - 1
+        IF teilIndex(pl, alle[i].id) < 0 THEN ARRAY_PUSH(offen, alle[i])
+    NEXT
+    DIM gesetzt AS INTEGER : gesetzt = 0
+    WHILE LEN(offen) > 0
+        ' naechstes Teil: teilt am meisten mit Gesetztem, dann die meisten Verbindungen
+        DIM wahl AS INTEGER : wahl = 0
+        IF nachNetzen THEN
+            DIM bestTeilt AS INTEGER : bestTeilt = -1
+            DIM bestGrad AS INTEGER : bestGrad = -1
+            FOR i = 0 TO LEN(offen) - 1
+                DIM teilt AS INTEGER : teilt = 0
+                DIM grad AS INTEGER : grad = 0
+                FOR j = 0 TO LEN(offen[i].sym.pins) - 1
+                    DIM pk AS STRING : pk = offen[i].id + "|" + offen[i].sym.pins[j].nummer
+                    IF NOT MAPHAS(pn, pk) THEN CONTINUE
+                    DIM nr AS STRING : nr = STR$(MAPGET(pn, pk))
+                    IF MAPGET(netzPins, nr) > 1 THEN grad = grad + 1
+                    IF MAPHAS(netzDa, nr) THEN teilt = teilt + 1
+                NEXT
+                IF teilt > bestTeilt OR (teilt = bestTeilt AND grad > bestGrad) THEN
+                    bestTeilt = teilt
+                    bestGrad = grad
+                    wahl = i
+                END IF
+            NEXT
+        END IF
+        DIM b AS Bauteil : b = offen[wahl]
+        ARRAY_REMOVE_AT(offen, wahl)
+        DIM bf AS Bauform : bf = bauformFuer(b, hinweis)
+        DIM dip AS BOOLEAN : dip = STARTSWITH(bf.name, "DIP")
+        ' Netz je Bauform-Bein
+        DIM beinNetz AS ARRAY OF INTEGER : beinNetz = []
+        FOR k = 0 TO LEN(bf.pins) - 1
+            ARRAY_PUSH(beinNetz, -1)
+        NEXT
+        FOR j = 0 TO LEN(b.sym.pins) - 1
+            IF NOT MAPHAS(pn, b.id + "|" + b.sym.pins[j].nummer) THEN CONTINUE
+            DIM ksb AS ARRAY OF INTEGER : ksb = bauformPinsZu(bf, b, j)
+            FOR k = 0 TO LEN(ksb) - 1
+                beinNetz[ksb[k]] = MAPGET(pn, b.id + "|" + b.sym.pins[j].nummer)
+            NEXT
+        NEXT
+        ' Drehungen, die in Frage kommen
+        ' (Streifenraster: die mit den wenigsten noetigen Trennstellen, wer
+        ' zwei Pins direkt nebeneinander auf einen Streifen setzt, faellt raus)
+        DIM drehungen AS ARRAY OF INTEGER : drehungen = []
+        DIM t AS PlatTeil : t = NEW PlatTeil(b.id, 0, 0)
+        DIM schnittZahl AS ARRAY OF INTEGER : schnittZahl = []
+        DIM sch AS ARRAY OF Punkt
+        IF pl.art = PL_STREIFEN THEN
+            DIM wenigste AS INTEGER : wenigste = -1
+            DIM dr AS INTEGER
+            FOR dr = 0 TO 90 STEP 90
+                t.drehung = dr
+                IF NOT streifenSchnitte(t, bf, sch) THEN CONTINUE
+                IF NOT nachNetzen AND wenigste >= 0 AND LEN(sch) >= wenigste THEN CONTINUE
+                IF NOT nachNetzen THEN
+                    drehungen = []
+                    schnittZahl = []
+                END IF
+                ARRAY_PUSH(drehungen, dr)
+                ARRAY_PUSH(schnittZahl, LEN(sch))
+                IF wenigste < 0 OR LEN(sch) < wenigste THEN wenigste = LEN(sch)
+            NEXT
+            IF LEN(drehungen) = 0 THEN
+                ' geht in keiner Lage ohne Kurzschluss: quer setzen, die Pruefung meldet es
+                ARRAY_PUSH(drehungen, 90)
+                ARRAY_PUSH(schnittZahl, 0)
+            END IF
+        ELSE
+            ARRAY_PUSH(drehungen, 0)
+            ARRAY_PUSH(schnittZahl, 0)
+            IF nachNetzen THEN
+                ARRAY_PUSH(drehungen, 90)
+                ARRAY_PUSH(schnittZahl, 0)
+            END IF
+        END IF
+        DIM bestK AS FLOAT : bestK = -1
+        DIM bs AS INTEGER, bz AS INTEGER, bd AS INTEGER
+        DIM versuch AS INTEGER
+        FOR versuch = 0 TO 1
+            DIM di AS INTEGER
+            FOR di = 0 TO LEN(drehungen) - 1
+                t.drehung = drehungen[di]
+                FOR z = 1 TO pl.zeilen - 1
+                    FOR s = 1 TO pl.spalten - 1
+                        IF NOT nachNetzen AND bestK >= 0 THEN CONTINUE
+                        t.s = s
+                        t.z = z
+                        DIM s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER
+                        teilFlaeche(t, bf, s0, z0, s1, z1)
+                        IF s0 < 0 OR z0 < 0 OR s1 >= pl.spalten OR z1 >= pl.zeilen THEN CONTINUE
+                        IF NOT flaecheFrei(zone, s0, z0, s1, z1) THEN CONTINUE
+                        IF NOT flaecheFrei(koerper, s0 - 1, z0 - 1, s1 + rechtsRand, z1 + 1) THEN CONTINUE
+                        ' Kosten: Abstand jedes Beins zum naechsten gesetzten Bein seines Netzes
+                        DIM kosten AS FLOAT : kosten = (z * pl.spalten + s) * 0.0001 + schnittZahl[di] * 3
+                        IF nachNetzen THEN
+                            FOR k = 0 TO LEN(bf.pins) - 1
+                                IF beinNetz[k] < 0 THEN CONTINUE
+                                DIM lo AS Punkt : lo = lochVon(t, bf.pins[k])
+                                DIM nah AS INTEGER : nah = -1
+                                FOR j = 0 TO LEN(pnetz) - 1
+                                    IF pnetz[j] <> beinNetz[k] THEN CONTINUE
+                                    DIM d AS INTEGER : d = ABS(ps[j] - lo.x) + ABS(pz[j] - lo.y)
+                                    IF nah < 0 OR d < nah THEN nah = d
+                                NEXT
+                                IF nah > 0 THEN kosten = kosten + nah
+                            NEXT
+                        END IF
+                        IF bestK < 0 OR kosten < bestK THEN
+                            bestK = kosten
+                            bs = s
+                            bz = z
+                            bd = t.drehung
+                        END IF
+                    NEXT
+                NEXT
+            NEXT
+            IF bestK >= 0 THEN BREAK
+            ' kein Platz: die Platine waechst nach unten
+            DIM tt AS PlatTeil : tt = NEW PlatTeil(b.id, 0, 0)
+            tt.drehung = drehungen[0]
+            DIM e0 AS INTEGER, e1 AS INTEGER, e2 AS INTEGER, e3 AS INTEGER
+            teilFlaeche(tt, bf, e0, e1, e2, e3)
+            pl.zeilen = pl.zeilen + (e3 - e1) + 3
+        NEXT
+        IF bestK < 0 THEN CONTINUE
+        t.s = bs
+        t.z = bz
+        t.drehung = bd
+        ARRAY_PUSH(pl.teile, t)
+        gesetzt = gesetzt + 1
+        DIM fs0 AS INTEGER, fz0 AS INTEGER, fs1 AS INTEGER, fz1 AS INTEGER
+        teilFlaeche(t, bf, fs0, fz0, fs1, fz1)
+        flaecheMerken(koerper, fs0, fz0, fs1, fz1)
+        flaecheMerken(zone, fs0 - 1, fz0 - 1, fs1 + rechtsRand, fz1 + 1)
+        FOR k = 0 TO LEN(bf.pins) - 1
+            IF beinNetz[k] < 0 THEN CONTINUE
+            DIM lg AS Punkt : lg = lochVon(t, bf.pins[k])
+            ARRAY_PUSH(ps, lg.x)
+            ARRAY_PUSH(pz, lg.y)
+            ARRAY_PUSH(pnetz, beinNetz[k])
+            MAPPUT(netzDa, STR$(beinNetz[k]), 1)
+        NEXT
+        IF pl.art = PL_STREIFEN THEN
+            FOR w = fz0 TO fz1
+                ' rechts daneben trennen: der Nachbar teilt sonst die Streifen
+                IF fs1 + 1 < pl.spalten AND NOT istTrennstelle(pl, fs1 + 1, w) THEN ARRAY_PUSH(pl.trenn, NEW Punkt(fs1 + 1, w))
+            NEXT
+            ' zwischen verschiedenen Pins desselben Teils (DIP-Reihen, Relais ...)
+            IF streifenSchnitte(t, bf, sch) THEN
+                FOR k = 0 TO LEN(sch) - 1
+                    IF NOT istTrennstelle(pl, sch[k].x, sch[k].y) THEN ARRAY_PUSH(pl.trenn, sch[k])
+                NEXT
+            END IF
+        END IF
+    WEND
+    RETURN gesetzt
+END FUNCTION
+
+' --- Verbinden: Vorschlaege entlang der Luftlinien ---------------------------
+' Kein Autorouter, der still Platz verbraucht: je Luftlinie ein Vorschlag,
+' sofort geprueft -- erzeugt er einen Kurzschluss oder hilft er nicht, fliegt
+' er wieder raus. Streifenraster: eine Drahtbruecke zwischen freien Loechern
+' der beiden Kupferstuecke, am liebsten senkrecht und kurz. Lochraster:
+' Loetbahnen auf dem kuerzesten Weg ueber freie Loecher (Breitensuche).
+
+' Loecher, in die nichts mehr passt: Beine, Bruecken-Enden, Trennstellen.
+FUNCTION lochBelegung(pl As Platine, r AS PlatBericht) AS MAP OF INTEGER
+    DIM m AS MAP OF INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.pads) - 1
+        MAPPUT(m, lochKey$(r.pads[i].s, r.pads[i].z), 1)
+    NEXT
+    FOR i = 0 TO LEN(pl.bahnen) - 1
+        IF pl.bahnen[i].art = BA_BRUECKE THEN
+            MAPPUT(m, lochKey$(pl.bahnen[i].s1, pl.bahnen[i].z1), 1)
+            MAPPUT(m, lochKey$(pl.bahnen[i].s2, pl.bahnen[i].z2), 1)
+        END IF
+    NEXT
+    FOR i = 0 TO LEN(pl.trenn) - 1
+        MAPPUT(m, lochKey$(pl.trenn[i].x, pl.trenn[i].y), 1)
+    NEXT
+    RETURN m
+END FUNCTION
+
+FUNCTION brueckeVorschlagen(pl AS Platine, r AS PlatBericht, ll AS Luftlinie, belegt AS MAP OF INTEGER) AS BOOLEAN
+    DIM sp AS INTEGER : sp = pl.spalten
+    DIM w1 AS INTEGER : w1 = r.wurzel[ll.z1 * sp + ll.s1]
+    DIM w2 AS INTEGER : w2 = r.wurzel[ll.z2 * sp + ll.s2]
+    DIM a AS ARRAY OF INTEGER : a = []
+    DIM b AS ARRAY OF INTEGER : b = []
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(r.wurzel) - 1
+        IF MAPHAS(belegt, lochKey$(i MOD sp, i \ sp)) THEN CONTINUE
+        IF r.wurzel[i] = w1 THEN ARRAY_PUSH(a, i)
+        IF r.wurzel[i] = w2 THEN ARRAY_PUSH(b, i)
+    NEXT
+    DIM best AS FLOAT : best = -1
+    DIM ba AS INTEGER : ba = -1
+    DIM bb AS INTEGER : bb = -1
+    FOR i = 0 TO LEN(a) - 1
+        FOR j = 0 TO LEN(b) - 1
+            DIM ds AS INTEGER : ds = ABS(a[i] MOD sp - b[j] MOD sp)
+            DIM dz AS INTEGER : dz = ABS(a[i] \ sp - b[j] \ sp)
+            IF ds = 0 AND dz = 0 THEN CONTINUE
+            ' gerade Bruecken lassen sich sauber biegen und legen
+            DIM k AS FLOAT : k = SQR(ds * ds + dz * dz) + IIF(ds = 0 OR dz = 0, 0, 3)
+            IF best < 0 OR k < best THEN
+                best = k
+                ba = a[i]
+                bb = b[j]
+            END IF
+        NEXT
+    NEXT
+    IF ba < 0 THEN RETURN FALSE
+    ARRAY_PUSH(pl.bahnen, NEW Bahn(ba MOD sp, ba \ sp, bb MOD sp, bb \ sp, BA_BRUECKE))
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION bahnVorschlagen(pl AS Platine, r AS PlatBericht, ll AS Luftlinie, belegt AS MAP OF INTEGER) AS BOOLEAN
+    DIM sp AS INTEGER : sp = pl.spalten
+    DIM n AS INTEGER : n = LEN(r.wurzel)
+    DIM w1 AS INTEGER : w1 = r.wurzel[ll.z1 * sp + ll.s1]
+    DIM w2 AS INTEGER : w2 = r.wurzel[ll.z2 * sp + ll.s2]
+    ' wie gross ist jedes Kupferstueck? Frei ist nur ein einzelnes, leeres Loch
+    DIM groesse AS ARRAY OF INTEGER : groesse = []
+    DIM vor AS ARRAY OF INTEGER : vor = []
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        ARRAY_PUSH(groesse, 0)
+        ARRAY_PUSH(vor, -1)
+    NEXT
+    FOR i = 0 TO n - 1
+        groesse[r.wurzel[i]] = groesse[r.wurzel[i]] + 1
+    NEXT
+    DIM schlange AS ARRAY OF INTEGER : schlange = []
+    FOR i = 0 TO n - 1
+        IF r.wurzel[i] = w1 THEN
+            vor[i] = -2
+            ARRAY_PUSH(schlange, i)
+        END IF
+    NEXT
+    DIM ziel AS INTEGER : ziel = -1
+    DIM kopf AS INTEGER : kopf = 0
+    DIM ns AS ARRAY OF INTEGER : ns = [1, -1, 0, 0]
+    DIM nz AS ARRAY OF INTEGER : nz = [0, 0, 1, -1]
+    WHILE kopf < LEN(schlange) AND ziel < 0
+        DIM h AS INTEGER : h = schlange[kopf]
+        kopf = kopf + 1
+        DIM k AS INTEGER
+        FOR k = 0 TO 3
+            DIM s AS INTEGER : s = h MOD sp + ns[k]
+            DIM z AS INTEGER : z = h \ sp + nz[k]
+            IF NOT aufPlatine(pl, s, z) THEN CONTINUE
+            DIM q AS INTEGER : q = z * sp + s
+            IF vor[q] <> -1 THEN CONTINUE
+            IF r.wurzel[q] = w2 THEN
+                vor[q] = h
+                ziel = q
+                BREAK
+            END IF
+            IF groesse[r.wurzel[q]] = 1 AND NOT MAPHAS(belegt, lochKey$(s, z)) THEN
+                vor[q] = h
+                ARRAY_PUSH(schlange, q)
+            END IF
+        NEXT
+    WEND
+    IF ziel < 0 THEN RETURN FALSE
+    ' Weg vom Ziel zurueck, dann in gerade Stuecke zerlegen
+    DIM weg AS ARRAY OF INTEGER : weg = []
+    DIM p AS INTEGER : p = ziel
+    WHILE p >= 0
+        ARRAY_PUSH(weg, p)
+        p = vor[p]
+    WEND
+    DIM anfang AS INTEGER : anfang = 0
+    FOR i = 1 TO LEN(weg) - 1
+        DIM letzt AS BOOLEAN : letzt = i = LEN(weg) - 1
+        DIM knick AS BOOLEAN : knick = FALSE
+        IF NOT letzt THEN knick = (weg[i + 1] - weg[i]) <> (weg[i] - weg[i - 1])
+        IF letzt OR knick THEN
+            ARRAY_PUSH(pl.bahnen, NEW Bahn(weg[anfang] MOD sp, weg[anfang] \ sp, weg[i] MOD sp, weg[i] \ sp, BA_LOET))
+            anfang = i
+        END IF
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+' Alle Luftlinien der Reihe nach verbinden. Rueckgabe: gelegte Verbindungen;
+' ohneWeg: wie viele Luftlinien bleiben (kein Platz, kein Weg).
+FUNCTION platineVerbinden(dok AS Dokument, BYREF ohneWeg AS INTEGER) AS INTEGER
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
+    DIM pl AS Platine : pl = dok.platine
+    DIM gelegt AS INTEGER : gelegt = 0
+    DIM gescheitert AS MAP OF INTEGER
+    DIM runde AS INTEGER
+    FOR runde = 0 TO 999
+        DIM r AS PlatBericht : r = platinePruefen(dok)
+        DIM wahl AS INTEGER : wahl = -1
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(r.luft) - 1
+            IF NOT MAPHAS(gescheitert, r.luft[i].netz + "|" + lochKey$(r.luft[i].s1, r.luft[i].z1) + ">" + lochKey$(r.luft[i].s2, r.luft[i].z2)) THEN
+                wahl = i
+                BREAK
+            END IF
+        NEXT
+        IF wahl < 0 THEN BREAK
+        DIM ll AS Luftlinie : ll = r.luft[wahl]
+        DIM vorher AS INTEGER : vorher = LEN(pl.bahnen)
+        DIM belegt AS MAP OF INTEGER : belegt = lochBelegung(pl, r)
+        DIM ok AS BOOLEAN
+        IF pl.art = PL_STREIFEN THEN
+            ok = brueckeVorschlagen(pl, r, ll, belegt)
+        ELSE
+            ok = bahnVorschlagen(pl, r, ll, belegt)
+        END IF
+        IF ok THEN
+            ' nur behalten, was hilft und nichts kurzschliesst
+            DIM r2 AS PlatBericht : r2 = platinePruefen(dok)
+            IF r2.kurzschluesse > r.kurzschluesse OR LEN(r2.luft) >= LEN(r.luft) OR LEN(r2.fehler) > LEN(r.fehler) THEN ok = FALSE
+        END IF
+        IF ok THEN
+            gelegt = gelegt + 1
+        ELSE
+            WHILE LEN(pl.bahnen) > vorher
+                DIM weg AS Bahn : weg = ARRAY_POP(pl.bahnen)
+            WEND
+            MAPPUT(gescheitert, ll.netz + "|" + lochKey$(ll.s1, ll.z1) + ">" + lochKey$(ll.s2, ll.z2), 1)
+        END IF
+    NEXT
+    ohneWeg = LEN(platinePruefen(dok).luft)
+    RETURN gelegt
+END FUNCTION
+
+' --- Arbeitsliste ---------------------------------------------------------------
+' Was man an der Werkbank braucht: Trennstellen, Bruecken, Bahnen, Bauteile --
+' Spalte/Zeile ab 1, gezaehlt von oben links auf der Bestueckungsseite (auf
+' der Loetseite ist links und rechts vertauscht).
+
+FUNCTION lochText$(s AS INTEGER, z AS INTEGER) AS STRING
+    RETURN STR$(s + 1) + "/" + STR$(z + 1)
+END FUNCTION
+
+' Loecher nach Zeile, dann Spalte sortiert, n je Zeile.
+FUNCTION lochReihe$(p AS ARRAY OF Punkt, je AS INTEGER) AS STRING
+    DIM k AS ARRAY OF STRING : k = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(p) - 1
+        ARRAY_PUSH(k, PADL$(STR$(p[i].y), 5, "0") + PADL$(STR$(p[i].x), 5, "0") + "|" + lochText$(p[i].x, p[i].y))
+    NEXT
+    SORT(k)
+    DIM t AS STRING : t = ""
+    FOR i = 0 TO LEN(k) - 1
+        IF i MOD je = 0 THEN t = t + NL_ZEILE + "  "
+        t = t + PADR$(MID$(k[i], INSTR(k[i], "|") + 1), 8)
+    NEXT
+    RETURN t
+END FUNCTION
+
+FUNCTION platineArbeitsliste$(dok AS Dokument) AS STRING
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
+    DIM pl AS Platine : pl = dok.platine
+    DIM t AS STRING : t = "Platine " + STR$(pl.spalten) + " x " + STR$(pl.zeilen) + " Loecher, " + IIF(pl.art = PL_STREIFEN, "Streifenraster", "Lochraster") + " -- Spalte/Zeile ab 1, von oben links auf der Bestueckungsseite" + NL_ZEILE
+    DIM i AS INTEGER
+    IF pl.art = PL_STREIFEN THEN
+        t = t + NL_ZEILE + "Trennstellen (" + STR$(LEN(pl.trenn)) + "):" + lochReihe$(pl.trenn, 8) + NL_ZEILE
+    END IF
+    DIM nb AS INTEGER : nb = 0
+    DIM nl AS INTEGER : nl = 0
+    DIM br AS STRING : br = ""
+    DIM lb AS STRING : lb = ""
+    FOR i = 0 TO LEN(pl.bahnen) - 1
+        DIM ba AS Bahn : ba = pl.bahnen[i]
+        DIM zeile AS STRING : zeile = NL_ZEILE + "  " + PADR$(lochText$(ba.s1, ba.z1), 8) + "- " + PADR$(lochText$(ba.s2, ba.z2), 8)
+        IF ba.art = BA_BRUECKE THEN
+            ' Drahtlaenge in Loechern (gerundet), fuers Ablaengen
+            DIM l AS FLOAT : l = SQR((ba.s2 - ba.s1) * (ba.s2 - ba.s1) + (ba.z2 - ba.z1) * (ba.z2 - ba.z1))
+            br = br + zeile + "Laenge " + STR$(ROUND(l * 10) / 10.0) + " Loecher (" + STR$(ROUND(l * 25.4) / 10.0) + " mm)"
+            nb = nb + 1
+        ELSE
+            lb = lb + zeile
+            nl = nl + 1
+        END IF
+    NEXT
+    t = t + NL_ZEILE + "Drahtbruecken (" + STR$(nb) + "):" + br + NL_ZEILE
+    IF nl > 0 OR pl.art = PL_LOCH THEN t = t + NL_ZEILE + "Loetbahnen (" + STR$(nl) + "):" + lb + NL_ZEILE
+    t = t + NL_ZEILE + "Bauteile (" + STR$(LEN(pl.teile)) + "):"
+    DIM hinweis AS STRING
+    DIM k AS ARRAY OF STRING : k = []
+    FOR i = 0 TO LEN(pl.teile) - 1
+        DIM b AS Bauteil
+        IF NOT bauteilMitId(dok, pl.teile[i].bauteilId, b) THEN CONTINUE
+        DIM bf AS Bauform : bf = bauformFuer(b, hinweis)
+        ' Lage = Loch von Pin 1 (bzw. dem ersten Bein), so steckt man es
+        DIM lo AS Punkt : lo = lochVon(pl.teile[i], bf.pins[0])
+        ARRAY_PUSH(k, refSchluessel$(b.referenz) + CHR$(1) + NL_ZEILE + "  " + PADR$(b.referenz, 6) + PADR$(b.wert, 10) + PADR$(bf.name, 10) + "Bein " + bf.pins[0].schluessel + " bei " + PADR$(lochText$(lo.x, lo.y), 8) + IIF(pl.teile[i].drehung = 0, "", "gedreht " + STR$(pl.teile[i].drehung) + " Grad"))
+    NEXT
+    SORT(k)
+    FOR i = 0 TO LEN(k) - 1
+        t = t + MID$(k[i], INSTR(k[i], CHR$(1)) + 1)
+    NEXT
+    RETURN t + NL_ZEILE
+END FUNCTION
+
+' --- JSON ---------------------------------------------------------------------
+
+FUNCTION platineNachJson(pl AS Platine) AS JSON_HANDLE
+    DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+    JSON_SET_INT(j, "art", pl.art)
+    JSON_SET_INT(j, "sp", pl.spalten)
+    JSON_SET_INT(j, "ze", pl.zeilen)
+    JSON_SET_JSON(j, "teile", JSON_NEW_ARRAY())
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(pl.teile) - 1
+        DIM tj AS JSON_HANDLE : tj = JSON_NEW_OBJECT()
+        JSON_SET_STRING(tj, "id", pl.teile[i].bauteilId)
+        JSON_SET_INT(tj, "s", pl.teile[i].s)
+        JSON_SET_INT(tj, "z", pl.teile[i].z)
+        IF pl.teile[i].drehung <> 0 THEN JSON_SET_INT(tj, "rot", pl.teile[i].drehung)
+        JSON_APPEND_JSON(j, "teile", tj)
+    NEXT
+    JSON_SET_JSON(j, "bahnen", JSON_NEW_ARRAY())
+    FOR i = 0 TO LEN(pl.bahnen) - 1
+        DIM bj AS JSON_HANDLE : bj = JSON_NEW_OBJECT()
+        JSON_SET_JSON(bj, "a", JSON_NEW_ARRAY())
+        JSON_APPEND_INT(bj, "a", pl.bahnen[i].s1)
+        JSON_APPEND_INT(bj, "a", pl.bahnen[i].z1)
+        JSON_APPEND_INT(bj, "a", pl.bahnen[i].s2)
+        JSON_APPEND_INT(bj, "a", pl.bahnen[i].z2)
+        JSON_SET_INT(bj, "art", pl.bahnen[i].art)
+        JSON_APPEND_JSON(j, "bahnen", bj)
+    NEXT
+    JSON_SET_JSON(j, "trenn", JSON_NEW_ARRAY())
+    FOR i = 0 TO LEN(pl.trenn) - 1
+        JSON_APPEND_INT(j, "trenn", pl.trenn[i].x)
+        JSON_APPEND_INT(j, "trenn", pl.trenn[i].y)
+    NEXT
+    RETURN j
+END FUNCTION
+
+FUNCTION platineAusJson(j AS JSON_HANDLE, p AS STRING) AS Platine
+    DIM pl AS Platine : pl = NEW Platine()
+    IF JSON_HAS(j, p + ".art") THEN pl.art = JSON_GET_INT(j, p + ".art")
+    IF JSON_HAS(j, p + ".sp") THEN pl.spalten = JSON_GET_INT(j, p + ".sp")
+    IF JSON_HAS(j, p + ".ze") THEN pl.zeilen = JSON_GET_INT(j, p + ".ze")
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, p + ".teile") - 1
+        DIM tp AS STRING : tp = p + ".teile." + STR$(i)
+        DIM t AS PlatTeil : t = NEW PlatTeil(JSON_GET_STRING(j, tp + ".id"), JSON_GET_INT(j, tp + ".s"), JSON_GET_INT(j, tp + ".z"))
+        IF JSON_HAS(j, tp + ".rot") THEN t.drehung = JSON_GET_INT(j, tp + ".rot")
+        ARRAY_PUSH(pl.teile, t)
+    NEXT
+    FOR i = 0 TO JSON_LEN(j, p + ".bahnen") - 1
+        DIM bp AS STRING : bp = p + ".bahnen." + STR$(i)
+        ARRAY_PUSH(pl.bahnen, NEW Bahn(JSON_GET_INT(j, bp + ".a.0"), JSON_GET_INT(j, bp + ".a.1"), JSON_GET_INT(j, bp + ".a.2"), JSON_GET_INT(j, bp + ".a.3"), JSON_GET_INT(j, bp + ".art")))
+    NEXT
+    DIM n AS INTEGER : n = JSON_LEN(j, p + ".trenn")
+    i = 0
+    WHILE i + 1 < n
+        ARRAY_PUSH(pl.trenn, NEW Punkt(JSON_GET_INT(j, p + ".trenn." + STR$(i)), JSON_GET_INT(j, p + ".trenn." + STR$(i + 1))))
+        i = i + 2
+    WEND
+    RETURN pl
+END FUNCTION

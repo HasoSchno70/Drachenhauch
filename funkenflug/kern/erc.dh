@@ -1,0 +1,255 @@
+' Elektrische Regelpruefung (ERC) -- Namensraum "kern".
+' Arbeitet ausschliesslich auf netzeDokument() -- dieselbe Quelle wie
+' Netzliste und Anzeige, damit ERC und Export nie auseinanderlaufen. Geprueft
+' wird immer das ganze Dokument; jeder Verstoss weiss sein Blatt.
+'
+' Versorgungssymbole (GND, VCC ...) gelten als Quelle: anders als in KiCad
+' braucht es kein PWR_FLAG. Dafuer meldet der ERC, wenn zwei verschiedene
+' Versorgungen im selben Netz landen (Kurzschluss).
+
+CONST ERC_WARNUNG = 1
+CONST ERC_FEHLER = 2
+
+CLASS Verstoss
+    DIM schwere AS INTEGER
+    DIM text AS STRING
+    DIM blatt AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM instanz AS STRING             ' Instanzpfad, wenn das Blatt mehrfach steckt
+    SUB Init(s AS INTEGER, t AS STRING, b AS INTEGER, px AS INTEGER, py AS INTEGER)
+        schwere = s
+        text = t
+        blatt = b
+        x = px
+        y = py
+    END SUB
+END CLASS
+
+FUNCTION pinText$(p AS NetzPin) AS STRING
+    DIM t AS STRING : t = p.ref
+    IF t = "" THEN t = "?"
+    t = t + "." + p.nummer
+    IF p.pinName <> "" THEN t = t + " (" + p.pinName + ")"
+    RETURN t
+END FUNCTION
+
+' Ein einzelnes Blatt pruefen (als Dokument mit nur diesem Blatt).
+FUNCTION ercPruefen(bl AS Blatt) AS ARRAY OF Verstoss
+    RETURN ercPruefenDok(einBlattDokument(bl))
+END FUNCTION
+
+FUNCTION ercPruefenDok(dok AS Dokument) AS ARRAY OF Verstoss
+    DIM orig AS Dokument : orig = dok
+    dok = flach(dok)
+    DIM fehler AS ARRAY OF Verstoss : fehler = []
+    DIM warnungen AS ARRAY OF Verstoss : warnungen = []
+    DIM n AS Netze : n = netzeDokument(dok)
+    DIM bi AS INTEGER, i AS INTEGER, j AS INTEGER, k AS INTEGER
+    DIM bl AS Blatt
+
+    ' --- Referenzen: fehlend oder doppelt -- ueber alle Blaetter
+    DIM gesehen AS MAP OF INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        bl = dok.blaetter[bi]
+        FOR i = 0 TO LEN(bl.bauteile) - 1
+            DIM b AS Bauteil : b = bl.bauteile[i]
+            IF b.sym.fehlt AND NOT istBlattVerweis(b.symbolRef) THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Symbol " + b.symbolRef + " fehlt (" + IIF(b.referenz = "", "ohne Referenz", b.referenz) + ")", bi, b.lage.pos.x, b.lage.pos.y))
+            IF b.sym.einheitLeistung OR b.sym.blattSymbol OR istBlattVerweis(b.symbolRef) THEN CONTINUE
+            IF b.referenz = "" THEN
+                ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, b.sym.name + " ohne Referenz", bi, b.lage.pos.x, b.lage.pos.y))
+            ELSEIF MAPHAS(gesehen, b.referenz) THEN
+                ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Referenz " + b.referenz + " ist doppelt vergeben", bi, b.lage.pos.x, b.lage.pos.y))
+            ELSE
+                MAPPUT(gesehen, b.referenz, i)
+            END IF
+        NEXT
+    NEXT
+
+    ' --- je Netz
+    FOR i = 0 TO LEN(n.liste) - 1
+        DIM nz AS Netz : nz = n.liste[i]
+        DIM ob AS INTEGER : ob = MAX(nz.blatt, 0)
+        DIM ox AS INTEGER : ox = 0
+        DIM oy AS INTEGER : oy = 0
+        IF LEN(nz.pins) > 0 THEN ob = nz.pins[0].blatt : ox = nz.pins[0].x : oy = nz.pins[0].y
+
+        ' Kurzschluss zwischen Versorgungen
+        IF LEN(nz.versorgungen) > 1 THEN
+            ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Kurzschluss: " + JOIN$(nz.versorgungen, " und ") + " liegen im selben Netz", ob, ox, oy))
+        END IF
+        ' Namen, die nicht zusammenpassen
+        IF LEN(nz.labelNamen) > 1 THEN
+            ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Netz hat mehrere Labels: " + JOIN$(nz.labelNamen, ", "), ob, ox, oy))
+        END IF
+        IF LEN(nz.versorgungen) > 0 THEN
+            FOR j = 0 TO LEN(nz.labelNamen) - 1
+                DIM passt AS BOOLEAN : passt = FALSE
+                FOR k = 0 TO LEN(nz.versorgungen) - 1
+                    IF nz.versorgungen[k] = nz.labelNamen[j] THEN passt = TRUE
+                NEXT
+                IF NOT passt THEN ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Label " + nz.labelNamen[j] + " liegt auf der Versorgung " + nz.versorgungen[0], ob, ox, oy))
+            NEXT
+        END IF
+
+        ' Einzelner Pin = nicht verbunden
+        IF LEN(nz.pins) = 1 THEN
+            DIM p AS NetzPin : p = nz.pins[0]
+            IF p.versorgung THEN
+                ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Versorgungssymbol " + nz.name + " ist nirgends angeschlossen", p.blatt, p.x, p.y))
+            ELSEIF p.typ <> PIN_FREI THEN
+                ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Pin " + pinText$(p) + " ist nicht verbunden", p.blatt, p.x, p.y))
+            END IF
+        END IF
+
+        ' Pin-Typen gegeneinander
+        DIM aus AS INTEGER, lAus AS INTEGER, bidir AS INTEGER, ein AS INTEGER, lEin AS INTEGER, passiv AS INTEGER, quelle AS INTEGER
+        aus = 0 : lAus = 0 : bidir = 0 : ein = 0 : lEin = 0 : passiv = 0 : quelle = 0
+        FOR j = 0 TO LEN(nz.pins) - 1
+            DIM q AS NetzPin : q = nz.pins[j]
+            IF q.versorgung THEN
+                quelle = quelle + 1
+            ELSE
+                SELECT CASE q.typ
+                    CASE PIN_AUSGANG : aus = aus + 1
+                    CASE PIN_LEISTUNG_AUS : lAus = lAus + 1
+                    CASE PIN_BIDIR : bidir = bidir + 1
+                    CASE PIN_EINGANG : ein = ein + 1
+                    CASE PIN_LEISTUNG_EIN : lEin = lEin + 1
+                    CASE PIN_PASSIV : passiv = passiv + 1
+                    CASE PIN_FREI
+                        IF LEN(nz.pins) > 1 THEN ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Pin " + pinText$(q) + " ist als nicht anzuschliessen markiert, aber verbunden", q.blatt, q.x, q.y))
+                END SELECT
+            END IF
+        NEXT
+        IF aus >= 2 THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Netz " + nz.name + ": " + STR$(aus) + " Ausgaenge treiben gegeneinander", ob, ox, oy))
+        IF aus >= 1 AND (lAus + quelle) >= 1 THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Netz " + nz.name + ": Ausgang treibt gegen eine Versorgung", ob, ox, oy))
+        IF lAus >= 2 THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Netz " + nz.name + ": mehrere Versorgungsausgaenge", ob, ox, oy))
+        IF ein >= 1 AND aus + lAus + bidir + passiv + quelle = 0 THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Netz " + nz.name + ": Eingang ohne Treiber", ob, ox, oy))
+        IF lEin >= 1 AND lAus + quelle = 0 THEN ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Netz " + nz.name + ": Versorgungseingang ohne Versorgung", ob, ox, oy))
+    NEXT
+
+    ' (Hierarchie: am gezeichneten Original, gilt fuer jede Instanz -- unten)
+    DIM hFehler AS ARRAY OF Verstoss : hFehler = []
+    DIM hWarn AS ARRAY OF Verstoss : hWarn = []
+    ercHierarchie(orig, hFehler, hWarn)
+    IF dok = orig THEN
+        FOR i = 0 TO LEN(hFehler) - 1
+            ARRAY_PUSH(fehler, hFehler[i])
+        NEXT
+        FOR i = 0 TO LEN(hWarn) - 1
+            ARRAY_PUSH(warnungen, hWarn[i])
+        NEXT
+    END IF
+    ercBusse(dok, n, warnungen)
+
+    ' --- globale Labels, die nur einmal vorkommen, verbinden nichts
+    DIM globAnzahl AS MAP OF INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        FOR i = 0 TO LEN(dok.blaetter[bi].labels) - 1
+            DIM gl AS Label : gl = dok.blaetter[bi].labels[i]
+            IF gl.art = LA_GLOBAL THEN MAPPUT(globAnzahl, gl.text, MAPGETOR(globAnzahl, gl.text, 0) + 1)
+        NEXT
+    NEXT
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        FOR i = 0 TO LEN(dok.blaetter[bi].labels) - 1
+            DIM g2 AS Label : g2 = dok.blaetter[bi].labels[i]
+            IF g2.art = LA_GLOBAL AND MAPGETOR(globAnzahl, g2.text, 0) = 1 THEN
+                ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Globales Label " + g2.text + " gibt es nur einmal -- es verbindet nichts", bi, g2.anker.x, g2.anker.y))
+            END IF
+        NEXT
+    NEXT
+
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        bl = dok.blaetter[bi]
+        n.blattWaehlen(bi)
+        ' --- Bauteil kurzgeschlossen: zwei Pins desselben Bauteils im selben Netz
+        FOR i = 0 TO LEN(bl.bauteile) - 1
+            DIM bt AS Bauteil : bt = bl.bauteile[i]
+            IF bt.sym.einheitLeistung OR bt.sym.blattSymbol THEN CONTINUE
+            DIM nachNetz AS MAP OF INTEGER
+            MAPCLEAR(nachNetz)
+            FOR j = 0 TO LEN(bt.sym.pins) - 1
+                DIM pp AS Punkt : pp = bt.pinPunkt(j)
+                DIM nk AS STRING : nk = STR$(n.netzAn(pp.x, pp.y))
+                IF MAPHAS(nachNetz, nk) THEN
+                    DIM erster AS INTEGER : erster = MAPGET(nachNetz, nk)
+                    ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, bt.referenz + ": Pin " + bt.sym.pins[erster].nummer + " und " + bt.sym.pins[j].nummer + " sind kurzgeschlossen", bi, bt.lage.pos.x, bt.lage.pos.y))
+                ELSE
+                    MAPPUT(nachNetz, nk, j)
+                END IF
+            NEXT
+        NEXT
+
+        ' --- offene Drahtenden: endet hier nur dieser Draht, ohne Pin, Label
+        ' oder fremdes Segment, haengt das Ende in der Luft.
+        DIM festpunkte AS MAP OF INTEGER
+        MAPCLEAR(festpunkte)
+        FOR i = 0 TO LEN(bl.bauteile) - 1
+            FOR j = 0 TO LEN(bl.bauteile[i].sym.pins) - 1
+                DIM fp AS Punkt : fp = bl.bauteile[i].pinPunkt(j)
+                MAPPUT(festpunkte, netzKey(fp.x, fp.y), 1)
+            NEXT
+        NEXT
+        FOR i = 0 TO LEN(bl.labels) - 1
+            MAPPUT(festpunkte, netzKey(bl.labels[i].anker.x, bl.labels[i].anker.y), 1)
+        NEXT
+        FOR i = 0 TO LEN(bl.draehte) - 1
+            DIM w AS Draht : w = bl.draehte[i]
+            IF LEN(w.punkte) < 2 THEN CONTINUE
+            DIM ende AS INTEGER
+            FOR ende = 0 TO 1
+                DIM e AS Punkt
+                IF ende = 0 THEN e = w.punkte[0] ELSE e = w.punkte[LEN(w.punkte) - 1]
+                IF MAPHAS(festpunkte, netzKey(e.x, e.y)) THEN CONTINUE
+                IF busAn(bl, e.x, e.y) >= 0 THEN CONTINUE          ' Abzweig: endet am Bus
+                IF endenAn(bl, e.x, e.y) >= 2 THEN CONTINUE
+                IF istTPunkt(bl, e.x, e.y) THEN CONTINUE
+                ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Offenes Drahtende", bi, e.x, e.y))
+            NEXT
+        NEXT
+    NEXT
+
+    ' Fehler zuerst
+    FOR i = 0 TO LEN(warnungen) - 1
+        ARRAY_PUSH(fehler, warnungen[i])
+    NEXT
+    IF dok = orig THEN RETURN fehler
+    ' ausgerollt: zurueck auf das gezeichnete Blatt; was in jeder Instanz
+    ' gleich ist (offene Drahtenden ...), nur einmal
+    DIM r AS ARRAY OF Verstoss : r = hFehler
+    DIM schon AS MAP OF INTEGER
+    ' wie oft kommt eine Meldung vor, wie viele Instanzen hat ihr Blatt?
+    DIM wie AS MAP OF INTEGER
+    DIM inst AS MAP OF INTEGER
+    FOR i = 0 TO LEN(dok.blaetter) - 1
+        IF dok.blaetter[i].quelle >= 0 THEN MAPPUT(inst, STR$(dok.blaetter[i].quelle), MAPGETOR(inst, STR$(dok.blaetter[i].quelle), 0) + 1)
+    NEXT
+    FOR i = 0 TO LEN(fehler) - 1
+        IF fehler[i].blatt < 0 OR fehler[i].blatt >= LEN(dok.blaetter) THEN CONTINUE
+        DIM wk AS STRING : wk = STR$(dok.blaetter[fehler[i].blatt].quelle) + "|" + STR$(fehler[i].x) + "|" + STR$(fehler[i].y) + "|" + fehler[i].text
+        MAPPUT(wie, wk, MAPGETOR(wie, wk, 0) + 1)
+    NEXT
+    FOR i = 0 TO LEN(fehler) - 1
+        DIM v AS Verstoss : v = fehler[i]
+        IF v.blatt >= 0 AND v.blatt < LEN(dok.blaetter) THEN
+            DIM fb AS Blatt : fb = dok.blaetter[v.blatt]
+            IF fb.quelle >= 0 THEN
+                v.instanz = fb.instanz
+                v.blatt = fb.quelle
+                DIM schl AS STRING : schl = STR$(v.blatt) + "|" + STR$(v.x) + "|" + STR$(v.y) + "|" + v.text
+                IF MAPHAS(schon, schl) THEN CONTINUE
+                MAPPUT(schon, schl, 1)
+                ' in jeder Instanz gleich: gilt fuer das Blatt, nicht fuer eine Instanz
+                IF MAPGETOR(wie, schl, 0) >= MAPGETOR(inst, STR$(v.blatt), 1) THEN v.instanz = ""
+
+                IF fb.id <> orig.blaetter[v.blatt].id THEN v.text = v.text + " (in " + fb.name + ")"
+            END IF
+        END IF
+        ARRAY_PUSH(r, v)
+    NEXT
+    FOR i = 0 TO LEN(hWarn) - 1
+        ARRAY_PUSH(r, hWarn[i])
+    NEXT
+    RETURN r
+END FUNCTION

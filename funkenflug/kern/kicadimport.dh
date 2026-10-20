@@ -1,0 +1,912 @@
+' KiCad-Schaltplan einlesen (.kicad_sch, ab KiCad 6) -- Namensraum "kern".
+'
+' MASSSTAB: 1,27 mm (das KiCad-Raster) wird zu 100 Einheiten (dem
+' Funkenflug-Raster 1 mm). So liegen Pins, Draehte und Labels genau auf dem
+' Raster, auf dem Netze verknuepft und Teile verschoben werden; ein KiCad-
+' Widerstand (Pins +-3,81 mm) wird so lang wie der eigene (+-3 mm).
+' SparkNode rechnete 1:1 in mm und landete mit jedem Pin neben dem Raster.
+'
+' LAGE: KiCad-Bibliothekssymbole haben Y nach OBEN, der Schaltplan Y nach
+' unten. Die Symbole werden beim Einlesen einmal gespiegelt (lokal Y unten wie
+' alle Funkenflug-Symbole). KiCad dreht dann GEGEN den Uhrzeigersinn und
+' spiegelt danach ("mirror x" = oben/unten, "mirror y" = links/rechts);
+' Funkenflug dreht im Uhrzeigersinn und spiegelt links/rechts:
+'     keine Spiegelung   drehung = -a
+'     mirror y           drehung = -a,       gespiegelt
+'     mirror x           drehung = 180 - a,  gespiegelt  (oben/unten = links/rechts + 180)
+' pruef_kern rechnet fuer alle acht Lagen nach, dass die Pins auf den
+' Drahtenden landen.
+'
+' Was Funkenflug nicht kennt, wird gemeldet statt still verworfen: freie
+' Texte/Grafik, Nicht-verbunden-Marker, Bus-Aliase. Steckt eine Datei
+' mehrmals im Schaltplan, wird sie EIN Blatt mit mehreren Instanzen; die
+' Referenzen je Instanz kommen aus KiCads Instanz-Pfaden. Mehrteilige Symbole (U1A, U1B) werden je Einheit ein eigenes
+' Bauteil. Versteckte Versorgungs-Pins (VCC/GND an Logik-ICs) verbinden in
+' KiCad unsichtbar ueber ihren Namen -- hier bekommen sie ein sichtbares
+' globales Label, damit das Netz dasselbe bleibt.
+
+CLASS KicadErgebnis
+    DIM dok AS Dokument
+    DIM ok AS BOOLEAN
+    DIM fehler AS STRING
+    DIM hinweise AS ARRAY OF STRING
+    SUB Init()
+        dok = NEW Dokument()
+        dok.blaetter = []
+        ok = FALSE
+        fehler = ""
+        hinweise = []
+    END SUB
+END CLASS
+
+' ein Port eines Unterblatts im Elternblatt (wird nach dem Erzeugen der
+' Blattsymbole per Label angeschlossen)
+CLASS KimPort
+    DIM blatt AS Blatt
+    DIM teil AS Bauteil
+    DIM name AS STRING
+    DIM ort AS Punkt
+    DIM drehung AS INTEGER
+    SUB Init(bl AS Blatt, t AS Bauteil, nm AS STRING, p AS Punkt, d AS INTEGER)
+        blatt = bl
+        teil = t
+        name = nm
+        ort = p
+        drehung = d
+    END SUB
+END CLASS
+
+' ein uebersetztes Bibliothekssymbol (je Einheit) und seine versteckten
+' Versorgungs-Pins
+CLASS KimSymbol
+    DIM sym AS Symbol
+    DIM versteckt AS ARRAY OF INTEGER
+    SUB Init(s AS Symbol)
+        sym = s
+        versteckt = []
+    END SUB
+END CLASS
+
+DIM gKimPorts AS ARRAY OF KimPort
+DIM gKimBlattUuid AS MAP OF STRING     ' KiCad-Uuid eines Blattsymbols -> Funkenflug-Bauteil-Id
+DIM gKimV6 AS MAP OF STRING            ' KiCad 6: Symbol-Uuid -> "Blattpfad TAB Referenz" je Zeile
+DIM gKimTeile AS ARRAY OF Bauteil      ' Teile mit Instanz-Pfaden ...
+DIM gKimPaare AS ARRAY OF STRING       ' ... und ihre Paare "KiCad-Pfad TAB Referenz" je Zeile
+DIM gKimWurzel AS STRING               ' Uuid der Wurzel-Datei
+DIM gKimSymbole AS ARRAY OF KimSymbol
+DIM gKimZaehler AS MAP OF INTEGER
+
+' mm -> Einheiten
+FUNCTION kimMass(t AS STRING) AS INTEGER
+    RETURN ROUND(VAL(t) * 100 / 1.27)
+END FUNCTION
+
+FUNCTION kimMassF(t AS STRING) AS FLOAT
+    RETURN VAL(t) * 100 / 1.27
+END FUNCTION
+
+' Punkt im Schaltplan (Y unten) bzw. in einem Bibliothekssymbol (Y oben)
+FUNCTION kimPunkt(s AS SAusdruck) AS Punkt
+    RETURN NEW Punkt(kimMass(s.wert$(0)), kimMass(s.wert$(1)))
+END FUNCTION
+
+FUNCTION kimLibPunkt(s AS SAusdruck) AS Punkt
+    RETURN NEW Punkt(kimMass(s.wert$(0)), -kimMass(s.wert$(1)))
+END FUNCTION
+
+' Winkel gegen den Uhrzeigersinn (KiCad) -> Funkenflug (im Uhrzeigersinn)
+FUNCTION kimRichtung(t AS STRING) AS INTEGER
+    DIM a AS INTEGER : a = ROUND(VAL(t))
+    RETURN (((360 - a) MOD 360) + 360) MOD 360
+END FUNCTION
+
+' versteckt? KiCad 6: das Wort "hide"; ab KiCad 8: (hide yes)
+FUNCTION kimVersteckt(s AS SAusdruck) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(s.werte) - 1
+        IF s.werte[i] = "hide" THEN RETURN TRUE
+    NEXT
+    IF s.hat("hide") THEN RETURN s.kind("hide").wert$(0) <> "no"
+    IF s.hat("effects") THEN RETURN kimVersteckt(s.kind("effects"))
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION kimPinTyp(t AS STRING) AS INTEGER
+    SELECT CASE t
+        CASE "input" : RETURN PIN_EINGANG
+        CASE "output" : RETURN PIN_AUSGANG
+        CASE "bidirectional", "tri_state" : RETURN PIN_BIDIR
+        CASE "power_in" : RETURN PIN_LEISTUNG_EIN
+        CASE "power_out" : RETURN PIN_LEISTUNG_AUS
+        CASE "no_connect" : RETURN PIN_FREI
+    END SELECT
+    ' passive, unspecified, free, open_collector/-emitter (darf man parallel
+    ' schalten -- als Ausgang gaebe das falsche ERC-Fehler)
+    RETURN PIN_PASSIV
+END FUNCTION
+
+SUB kimHinweis(e AS KicadErgebnis, schluessel AS STRING, text AS STRING)
+    ' gleiche Hinweise nur einmal, mit Anzahl
+    IF MAPHAS(gKimZaehler, schluessel) THEN
+        MAPPUT(gKimZaehler, schluessel, MAPGET(gKimZaehler, schluessel) + 1)
+        RETURN
+    END IF
+    MAPPUT(gKimZaehler, schluessel, 1)
+    ARRAY_PUSH(e.hinweise, schluessel + CHR$(9) + text)
+END SUB
+
+' --- Bauform aus dem KiCad-Footprint (die Umkehrung von kicadFootprint$) ----
+
+' die Zahl hinter "_P" in mm, als Lochabstand in 2,54-mm-Schritten
+FUNCTION kimRaster(fp AS STRING) AS INTEGER
+    DIM i AS INTEGER : i = INSTR(fp, "_P")
+    IF i < 0 THEN RETURN 0
+    DIM t AS STRING : t = ""
+    DIM k AS INTEGER : k = i + 2
+    WHILE k < LEN(fp)
+        DIM c AS STRING : c = MID$(fp, k, 1)
+        IF NOT (istZiffer(c) OR c = ".") THEN BREAK
+        t = t + c
+        k = k + 1
+    WEND
+    IF t = "" THEN RETURN 0
+    RETURN ROUND(VAL(t) / 2.54)
+END FUNCTION
+
+FUNCTION kimZahlNach(fp AS STRING, vor AS STRING) AS INTEGER
+    DIM i AS INTEGER : i = INSTR(fp, vor)
+    IF i < 0 THEN RETURN 0
+    DIM k AS INTEGER : k = i + LEN(vor)
+    DIM t AS STRING : t = ""
+    WHILE k < LEN(fp)
+        IF NOT istZiffer(MID$(fp, k, 1)) THEN BREAK
+        t = t + MID$(fp, k, 1)
+        k = k + 1
+    WEND
+    IF t = "" THEN RETURN 0
+    RETURN ROUND(VAL(t))
+END FUNCTION
+
+' "Package_DIP:DIP-8_W7.62mm" -> "DIP8"; Unbekanntes bleibt als Name stehen
+' (fuer die Stueckliste), die Platine meldet es dann.
+FUNCTION kimGehaeuse$(footprint AS STRING) AS STRING
+    IF footprint = "" THEN RETURN ""
+    DIM fp AS STRING : fp = footprint
+    DIM d AS INTEGER : d = INSTR(fp, ":")
+    IF d >= 0 THEN fp = MID$(fp, d + 1)
+    DIM k AS INTEGER
+    IF STARTSWITH(fp, "DIP-") THEN
+        k = kimZahlNach(fp, "DIP-")
+        IF k > 0 THEN RETURN "DIP" + STR$(k)
+    END IF
+    IF STARTSWITH(fp, "TO-92") THEN RETURN "TO92"
+    IF STARTSWITH(fp, "TO-220") THEN RETURN "TO220"
+    IF STARTSWITH(fp, "PinHeader_") OR STARTSWITH(fp, "PinSocket_") THEN
+        DIM r AS INTEGER : r = kimZahlNach(fp, "_")
+        DIM c AS INTEGER : c = kimZahlNach(fp, STR$(r) + "x")
+        IF r = 1 AND c > 0 THEN RETURN "SIL" + STR$(c)
+        IF r > 1 AND c > 0 THEN RETURN "HDR" + STR$(r) + "X" + STR$(c)
+    END IF
+    IF STARTSWITH(fp, "R_Axial") OR STARTSWITH(fp, "D_DO-") OR STARTSWITH(fp, "L_Axial") THEN
+        k = kimRaster(fp)
+        IF k > 0 THEN RETURN "AX" + STR$(k)
+    END IF
+    IF STARTSWITH(fp, "C_Disc") OR STARTSWITH(fp, "C_Radial") OR STARTSWITH(fp, "CP_Radial") OR STARTSWITH(fp, "C_Rect") THEN
+        k = kimRaster(fp)
+        IF k > 0 THEN RETURN "RAD" + STR$(k)
+    END IF
+    IF STARTSWITH(fp, "LED_D3.0mm") OR STARTSWITH(fp, "LED_D5.0mm") THEN RETURN "RAD1"
+    IF STARTSWITH(fp, "Crystal_HC49") THEN RETURN "RAD2"
+    RETURN fp
+END FUNCTION
+
+' --- Bibliothekssymbole ------------------------------------------------------
+
+' "R_1_1" -> Einheit 1, Darstellung 1
+SUB kimEinheitLesen(name AS STRING, BYREF einheit AS INTEGER, BYREF art AS INTEGER)
+    DIM t AS ARRAY OF STRING : t = SPLIT$(name, "_")
+    einheit = 0
+    art = 0
+    IF LEN(t) < 3 THEN RETURN
+    einheit = ROUND(VAL(t[LEN(t) - 2]))
+    art = ROUND(VAL(t[LEN(t) - 1]))
+END SUB
+
+FUNCTION kimEinheiten(ls AS SAusdruck) AS INTEGER
+    DIM n AS INTEGER : n = 1
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(ls.kinder) - 1
+        IF ls.kinder[i].kopf <> "symbol" THEN CONTINUE
+        DIM u AS INTEGER, a AS INTEGER
+        kimEinheitLesen(ls.kinder[i].wert$(0), u, a)
+        IF u > n THEN n = u
+    NEXT
+    RETURN n
+END FUNCTION
+
+FUNCTION kimGefuellt(g AS SAusdruck) AS BOOLEAN
+    RETURN g.kind("fill").kind("type").wert$(0) = "outline"
+END FUNCTION
+
+FUNCTION kimWinkel(w AS FLOAT) AS FLOAT
+    DIM r AS FLOAT : r = w
+    WHILE r < 0
+        r = r + 2 * PI
+    WEND
+    WHILE r >= 2 * PI
+        r = r - 2 * PI
+    WEND
+    RETURN r
+END FUNCTION
+
+' Bogen durch Anfang, Mitte, Ende (Y unten) -- Mittelpunkt ueber den
+' Umkreis; cairo zeichnet mit wachsendem Winkel, also so herum, dass die Mitte
+' dazwischen liegt.
+FUNCTION kimBogen(ax AS FLOAT, ay AS FLOAT, bx AS FLOAT, by AS FLOAT, cx AS FLOAT, cy AS FLOAT) AS Primitiv
+    DIM d AS FLOAT : d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+    IF ABS(d) < 0.001 THEN RETURN prLinie(ROUND(ax), ROUND(ay), ROUND(cx), ROUND(cy))
+    DIM a2 AS FLOAT : a2 = ax * ax + ay * ay
+    DIM b2 AS FLOAT : b2 = bx * bx + by * by
+    DIM c2 AS FLOAT : c2 = cx * cx + cy * cy
+    DIM ux AS FLOAT : ux = (a2 * (by - cy) + b2 * (cy - ay) + c2 * (ay - by)) / d
+    DIM uy AS FLOAT : uy = (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d
+    DIM r AS FLOAT : r = SQR((ax - ux) * (ax - ux) + (ay - uy) * (ay - uy))
+    DIM ws AS FLOAT : ws = ATAN2(ay - uy, ax - ux)
+    DIM wm AS FLOAT : wm = ATAN2(by - uy, bx - ux)
+    DIM we AS FLOAT : we = ATAN2(cy - uy, cx - ux)
+    DIM de AS FLOAT : de = kimWinkel(we - ws)
+    DIM dm AS FLOAT : dm = kimWinkel(wm - ws)
+    IF dm <= de THEN RETURN prBogen(ROUND(ux), ROUND(uy), ROUND(r), ws, ws + de)
+    RETURN prBogen(ROUND(ux), ROUND(uy), ROUND(r), we, we + kimWinkel(ws - we))
+END FUNCTION
+
+FUNCTION kimLibX(s AS SAusdruck) AS FLOAT
+    RETURN kimMassF(s.wert$(0))
+END FUNCTION
+FUNCTION kimLibY(s AS SAusdruck) AS FLOAT
+    RETURN -kimMassF(s.wert$(1))
+END FUNCTION
+
+' Ein Grafik-Element; FALSE = nicht uebersetzbar
+FUNCTION kimGrafik(s AS Symbol, g AS SAusdruck) AS BOOLEAN
+    DIM pr AS Primitiv
+    DIM a AS Punkt, b AS Punkt
+    DIM i AS INTEGER
+    SELECT CASE g.kopf
+        CASE "rectangle"
+            a = kimLibPunkt(g.kind("start"))
+            b = kimLibPunkt(g.kind("end"))
+            pr = prRechteck(MIN(a.x, b.x), MIN(a.y, b.y), MAX(a.x, b.x), MAX(a.y, b.y))
+            pr.fuellen = kimGefuellt(g)
+        CASE "circle"
+            a = kimLibPunkt(g.kind("center"))
+            pr = prKreis(a.x, a.y, kimMass(g.kind("radius").wert$(0)))
+            pr.fuellen = kimGefuellt(g)
+        CASE "arc"
+            IF g.hat("mid") THEN
+                pr = kimBogen(kimLibX(g.kind("start")), kimLibY(g.kind("start")), kimLibX(g.kind("mid")), kimLibY(g.kind("mid")), kimLibX(g.kind("end")), kimLibY(g.kind("end")))
+            ELSEIF g.hat("radius") THEN
+                ' fruehe KiCad-6-Form: Mittelpunkt, Radius, Winkel (gegen den Uhrzeigersinn)
+                DIM rd AS SAusdruck : rd = g.kind("radius")
+                DIM mx AS FLOAT : mx = kimLibX(rd.kind("at"))
+                DIM my AS FLOAT : my = kimLibY(rd.kind("at"))
+                DIM rr AS FLOAT : rr = kimMassF(rd.kind("length").wert$(0))
+                DIM w1 AS FLOAT : w1 = RAD(VAL(rd.kind("angles").wert$(0)))
+                DIM w2 AS FLOAT : w2 = RAD(VAL(rd.kind("angles").wert$(1)))
+                ' Y gespiegelt: aus gegen den Uhrzeigersinn w1..w2 wird -w2..-w1
+                pr = prBogen(ROUND(mx), ROUND(my), ROUND(rr), -w2, -w2 + kimWinkel(w2 - w1))
+            ELSE
+                RETURN FALSE
+            END IF
+        CASE "polyline", "bezier"
+            DIM pts AS ARRAY OF SAusdruck : pts = g.kind("pts").alle("xy")
+            IF LEN(pts) < 2 THEN RETURN FALSE
+            IF LEN(pts) = 2 THEN
+                a = kimLibPunkt(pts[0])
+                b = kimLibPunkt(pts[1])
+                pr = prLinie(a.x, a.y, b.x, b.y)
+            ELSE
+                pr = prPolylinie()
+                FOR i = 0 TO LEN(pts) - 1
+                    ARRAY_PUSH(pr.punkte, kimLibPunkt(pts[i]))
+                NEXT
+                pr.fuellen = kimGefuellt(g)
+            END IF
+        CASE "text"
+            IF kimVersteckt(g) THEN RETURN TRUE
+            pr = NEW Primitiv(PR_TEXT)
+            ARRAY_PUSH(pr.punkte, kimLibPunkt(g.kind("at")))
+            pr.text = g.wert$(0)
+        CASE ELSE
+            RETURN FALSE
+    END SELECT
+    s.grafikHinzu(pr)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION kimBeschreibung$(ls AS SAusdruck) AS STRING
+    DIM t AS STRING : t = ls.eigenschaft$("Description")
+    IF t = "" THEN t = ls.eigenschaft$("ki_description")
+    RETURN t
+END FUNCTION
+
+FUNCTION kimEigenschaftOrt(ls AS SAusdruck, name AS STRING, BYREF p AS Punkt) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(ls.kinder) - 1
+        DIM k AS SAusdruck : k = ls.kinder[i]
+        IF k.kopf = "property" AND k.wert$(0) = name AND k.hat("at") THEN
+            p = kimLibPunkt(k.kind("at"))
+            RETURN TRUE
+        END IF
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Ein Bibliothekssymbol (eine Einheit) uebersetzen und registrieren.
+FUNCTION kimSymbolBauen(e AS KicadErgebnis, ls AS SAusdruck, schluessel AS STRING, einheit AS INTEGER) AS KimSymbol
+    DIM mehr AS BOOLEAN : mehr = kimEinheiten(ls) > 1
+    DIM id AS STRING : id = "kicad:" + schluessel + IIF(mehr, "/" + STR$(einheit), "")
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gKimSymbole) - 1
+        IF gKimSymbole[i].sym.id = id THEN RETURN gKimSymbole[i]
+    NEXT
+    DIM kurz AS STRING : kurz = schluessel
+    DIM d AS INTEGER : d = INSTR(kurz, ":")
+    IF d >= 0 THEN kurz = MID$(kurz, d + 1)
+    IF mehr THEN kurz = kurz + " (" + CHR$(64 + einheit) + ")"
+    DIM s AS Symbol : s = NEW Symbol(id, kurz, ls.eigenschaft$("Reference"))
+    s.eigen = TRUE
+    s.pinTexte = TRUE
+    s.wertVorgabe = ls.eigenschaft$("Value")
+    s.beschreibung = kimBeschreibung$(ls)
+    IF s.beschreibung = "" THEN s.beschreibung = "aus KiCad: " + schluessel
+    s.einheitLeistung = ls.hat("power")
+    s.bauform = kimGehaeuse$(ls.eigenschaft$("Footprint"))
+    IF NOT bauformBekannt(s.bauform) THEN s.bauform = ""
+    DIM nummernAus AS BOOLEAN : nummernAus = ls.hat("pin_numbers") AND kimVersteckt(ls.kind("pin_numbers"))
+    DIM namenAus AS BOOLEAN : namenAus = ls.hat("pin_names") AND kimVersteckt(ls.kind("pin_names"))
+    DIM ro AS Punkt, wo AS Punkt
+    IF kimEigenschaftOrt(ls, "Reference", ro) AND kimEigenschaftOrt(ls, "Value", wo) THEN
+        s.textOrte = TRUE
+        s.refOrt = ro
+        s.wertOrt = wo
+    END IF
+    DIM ks AS KimSymbol : ks = NEW KimSymbol(s)
+    DIM fremd AS INTEGER : fremd = 0
+    FOR i = 0 TO LEN(ls.kinder) - 1
+        DIM teil AS SAusdruck : teil = ls.kinder[i]
+        IF teil.kopf <> "symbol" THEN CONTINUE
+        DIM u AS INTEGER, art AS INTEGER
+        kimEinheitLesen(teil.wert$(0), u, art)
+        IF (u <> 0 AND u <> einheit) OR art > 1 THEN CONTINUE
+        DIM j AS INTEGER
+        FOR j = 0 TO LEN(teil.kinder) - 1
+            DIM g AS SAusdruck : g = teil.kinder[j]
+            IF g.kopf = "pin" THEN
+                DIM ort AS SAusdruck : ort = g.kind("at")
+                DIM nm AS STRING : nm = g.kind("name").wert$(0)
+                IF nm = "~" THEN nm = ""
+                DIM p AS Pin : p = s.pinHinzu(g.kind("number").wert$(0), nm, kimLibPunkt(ort), kimMass(g.kind("length").wert$(0)), kimRichtung(ort.wert$(2)), kimPinTyp(g.wert$(0)))
+                p.zeigeName = nm <> "" AND NOT namenAus
+                p.zeigeNummer = NOT nummernAus
+                IF kimVersteckt(g) THEN
+                    p.zeigeName = FALSE
+                    p.zeigeNummer = FALSE
+                    p.laenge = 0
+                    IF p.typ = PIN_LEISTUNG_EIN AND NOT s.einheitLeistung AND nm <> "" THEN ARRAY_PUSH(ks.versteckt, LEN(s.pins) - 1)
+                END IF
+            ELSEIF NOT kimGrafik(s, g) THEN
+                fremd = fremd + 1
+            END IF
+        NEXT
+    NEXT
+    IF fremd > 0 THEN kimHinweis(e, "Grafik", "Grafik-Elemente in Symbolen, die Funkenflug nicht kennt (weggelassen)")
+    ks.sym = symbolRegistrieren(s)
+    ARRAY_PUSH(gKimSymbole, ks)
+    RETURN ks
+END FUNCTION
+
+FUNCTION bauformBekannt(name AS STRING) AS BOOLEAN
+    IF name = "" THEN RETURN FALSE
+    DIM bf AS Bauform
+    RETURN bauformLesen(name, bf)
+END FUNCTION
+
+' --- Blaetter ----------------------------------------------------------------
+
+' Blattgroesse aus dem Papierformat (der Inhalt ist um 1,27 kleiner und passt)
+SUB kimPapier(bl AS Blatt, papier AS STRING)
+    SELECT CASE UPPER$(papier)
+        CASE "A3" : bl.breite = 42000 : bl.hoehe = 29700
+        CASE "A2" : bl.breite = 59400 : bl.hoehe = 42000
+        CASE "A1" : bl.breite = 84100 : bl.hoehe = 59400
+        CASE "A0" : bl.breite = 118900 : bl.hoehe = 84100
+        CASE ELSE : bl.breite = 29700 : bl.hoehe = 21000
+    END SELECT
+END SUB
+
+' Draehte an Verbindungspunkten (junction) auftrennen: in KiCad verbindet ein
+' Punkt auch zwei sich kreuzende Draehte, in Funkenflug treffen sich dann Enden.
+SUB kimAnKnotenTrennen(bl AS Blatt, knoten AS ARRAY OF Punkt)
+    DIM k AS INTEGER, i AS INTEGER
+    FOR k = 0 TO LEN(knoten) - 1
+        DIM q AS Punkt : q = knoten[k]
+        i = 0
+        WHILE i < LEN(bl.draehte)
+            DIM w AS Draht : w = bl.draehte[i]
+            IF LEN(w.punkte) = 2 THEN
+                IF aufSegment(w.punkte[0].x, w.punkte[0].y, w.punkte[1].x, w.punkte[1].y, q.x, q.y) THEN
+                    DIM w2 AS Draht : w2 = NEW Draht()
+                    ARRAY_PUSH(w2.punkte, NEW Punkt(q.x, q.y))
+                    ARRAY_PUSH(w2.punkte, w.punkte[1])
+                    w.punkte[1] = NEW Punkt(q.x, q.y)
+                    ARRAY_PUSH(bl.draehte, w2)
+                END IF
+            END IF
+            i = i + 1
+        WEND
+    NEXT
+END SUB
+
+' Referenzen aus den Instanz-Pfaden (KiCad 6: symbol_instances in der Wurzel,
+' Schluessel = letzte UUID des Pfads)
+SUB kimInstanzenLesen(wurzel AS SAusdruck, BYREF refs AS MAP OF STRING)
+    DIM si AS SAusdruck : si = wurzel.kind("symbol_instances")
+    DIM pfade AS ARRAY OF SAusdruck : pfade = si.alle("path")
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(pfade) - 1
+        DIM t AS ARRAY OF STRING : t = SPLIT$(pfade[i].wert$(0), "/")
+        IF LEN(t) = 0 THEN CONTINUE
+        DIM sym AS STRING : sym = t[LEN(t) - 1]
+        DIM ref AS STRING : ref = pfade[i].kind("reference").wert$(0)
+        IF NOT MAPHAS(refs, sym) THEN MAPPUT(refs, sym, ref)
+        ' der Blattpfad ohne die Symbol-Uuid, fuer die Instanzen
+        DIM bp AS STRING : bp = LEFT$(pfade[i].wert$(0), MAX(0, LEN(pfade[i].wert$(0)) - LEN(sym) - 1))
+        MAPPUT(gKimV6, sym, MAPGETOR(gKimV6, sym, "") + bp + CHR$(9) + ref + CHR$(10))
+    NEXT
+END SUB
+
+' KiCad-Blattpfad ("/wurzel/uuid1/uuid2") -> Funkenflug-Instanzpfad
+' ("/<Bauteil-Id>/<Bauteil-Id>"); "?" wenn ein Blatt unbekannt ist
+FUNCTION kimFfPfad$(kpfad AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(kpfad, "/")
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM erster AS BOOLEAN : erster = TRUE
+    FOR i = 0 TO LEN(t) - 1
+        IF t[i] = "" THEN CONTINUE
+        IF erster AND t[i] = gKimWurzel THEN
+            erster = FALSE
+            CONTINUE
+        END IF
+        erster = FALSE
+        IF NOT MAPHAS(gKimBlattUuid, t[i]) THEN RETURN "?"
+        r = r + "/" + MAPGET(gKimBlattUuid, t[i])
+    NEXT
+    RETURN r
+END FUNCTION
+
+' Nach dem Import: Referenzen je Instanz eintragen (die erste Instanz in
+' b.referenz, die weiteren in b.instanzRefs)
+SUB kimInstanzRefs(e AS KicadErgebnis)
+    IF NOT mehrfachInstanzen(e.dok) THEN RETURN
+    DIM f AS Dokument : f = flach(e.dok)
+    DIM i AS INTEGER, k AS INTEGER, bi AS INTEGER
+    FOR i = 0 TO LEN(gKimTeile) - 1
+        DIM b AS Bauteil : b = gKimTeile[i]
+        ' erster Instanzpfad des Blatts, auf dem das Teil steht
+        DIM erst AS STRING : erst = ""
+        FOR bi = 0 TO LEN(e.dok.blaetter) - 1
+            FOR k = 0 TO LEN(e.dok.blaetter[bi].bauteile) - 1
+                IF e.dok.blaetter[bi].bauteile[k] = b THEN erst = f.blaetter[bi].instanz
+            NEXT
+        NEXT
+        DIM z AS ARRAY OF STRING : z = SPLIT$(gKimPaare[i], CHR$(10))
+        FOR k = 0 TO LEN(z) - 1
+            IF z[k] = "" THEN CONTINUE
+            DIM pr AS ARRAY OF STRING : pr = SPLIT$(z[k], CHR$(9))
+            IF LEN(pr) < 2 THEN CONTINUE
+            DIM fp AS STRING : fp = kimFfPfad$(pr[0])
+            IF fp = "?" OR fp = "" THEN CONTINUE
+            IF fp = erst THEN
+                b.referenz = pr[1]
+            ELSE
+                MAPPUT(b.instanzRefs, fp, pr[1])
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+FUNCTION kimReferenz$(sy AS SAusdruck, refs AS MAP OF STRING) AS STRING
+    ' ab KiCad 7: (instances (project "x" (path "/..." (reference "R1") (unit 1))))
+    IF sy.hat("instances") THEN
+        ' der Pfad dieses Projekts (beginnt mit der Uuid der Wurzel); ein
+        ' geteiltes Blatt traegt auch Pfade fremder Projekte
+        DIM pr AS ARRAY OF SAusdruck : pr = sy.kind("instances").alle("project")
+        DIM pj AS INTEGER, pq AS INTEGER
+        FOR pj = 0 TO LEN(pr) - 1
+            DIM pfa AS ARRAY OF SAusdruck : pfa = pr[pj].alle("path")
+            FOR pq = 0 TO LEN(pfa) - 1
+                IF gKimWurzel <> "" AND STARTSWITH(pfa[pq].wert$(0), "/" + gKimWurzel) AND pfa[pq].kind("reference").wert$(0) <> "" THEN RETURN pfa[pq].kind("reference").wert$(0)
+            NEXT
+        NEXT
+        IF LEN(pr) > 0 THEN
+            DIM pf AS SAusdruck : pf = pr[0].kind("path")
+            IF pf.kind("reference").wert$(0) <> "" THEN RETURN pf.kind("reference").wert$(0)
+        END IF
+    END IF
+    DIM uid AS STRING : uid = sy.kind("uuid").wert$(0)
+    IF uid <> "" AND MAPHAS(refs, uid) THEN RETURN MAPGET(refs, uid)
+    RETURN sy.eigenschaft$("Reference")
+END FUNCTION
+
+FUNCTION kimEigenschaftAbs(sy AS SAusdruck, name AS STRING, BYREF p AS Punkt) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(sy.kinder) - 1
+        DIM k AS SAusdruck : k = sy.kinder[i]
+        IF k.kopf = "property" AND k.wert$(0) = name AND k.hat("at") THEN
+            p = kimPunkt(k.kind("at"))
+            RETURN TRUE
+        END IF
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Eine platzierte Instanz
+SUB kimBauteil(e AS KicadErgebnis, bl AS Blatt, sy AS SAusdruck, libs AS SAusdruck, refs AS MAP OF STRING)
+    DIM schluessel AS STRING : schluessel = sy.kind("lib_name").wert$(0)
+    IF schluessel = "" THEN schluessel = sy.kind("lib_id").wert$(0)
+    DIM ls AS SAusdruck : ls = NEW SAusdruck()
+    DIM i AS INTEGER, gefunden AS BOOLEAN
+    gefunden = FALSE
+    FOR i = 0 TO LEN(libs.kinder) - 1
+        IF libs.kinder[i].kopf = "symbol" AND libs.kinder[i].wert$(0) = schluessel THEN
+            ls = libs.kinder[i]
+            gefunden = TRUE
+            BREAK
+        END IF
+    NEXT
+    IF NOT gefunden THEN
+        kimHinweis(e, "Symbol fehlt " + schluessel, "steht nicht in lib_symbols -- Platzhalter")
+    END IF
+    DIM einheit AS INTEGER : einheit = 1
+    IF sy.hat("unit") THEN einheit = ROUND(VAL(sy.kind("unit").wert$(0)))
+    DIM ks AS KimSymbol
+    IF gefunden THEN ks = kimSymbolBauen(e, ls, schluessel, einheit)
+    ' Lage
+    DIM ort AS SAusdruck : ort = sy.kind("at")
+    DIM l AS Lage : l = neueLage(kimMass(ort.wert$(0)), kimMass(ort.wert$(1)))
+    DIM a AS INTEGER : a = ROUND(VAL(ort.wert$(2)))
+    DIM sp AS STRING : sp = sy.kind("mirror").wert$(0)
+    l.drehung = (((360 - a) MOD 360) + 360) MOD 360
+    IF sp = "y" THEN l.gespiegelt = TRUE
+    IF sp = "x" THEN
+        l.gespiegelt = TRUE
+        l.drehung = (l.drehung + 180) MOD 360
+    END IF
+    DIM b AS Bauteil
+    IF gefunden THEN
+        b = neuesBauteil(ks.sym.id, l)
+    ELSE
+        b = neuesBauteil("kicad:" + schluessel, l)
+    END IF
+    b.referenz = kimReferenz$(sy, refs)
+    DIM esuf AS STRING : esuf = ""
+    IF gefunden AND kimEinheiten(ls) > 1 THEN esuf = CHR$(64 + einheit)
+    b.referenz = b.referenz + esuf
+    ' alle Instanz-Pfade merken (KiCad 7: am Symbol, KiCad 6: in der Wurzel)
+    DIM paare AS STRING : paare = ""
+    IF sy.hat("instances") THEN
+        DIM prj AS ARRAY OF SAusdruck : prj = sy.kind("instances").alle("project")
+        DIM pj AS INTEGER, pq AS INTEGER
+        FOR pj = 0 TO LEN(prj) - 1
+            DIM pfs AS ARRAY OF SAusdruck : pfs = prj[pj].alle("path")
+            FOR pq = 0 TO LEN(pfs) - 1
+                paare = paare + pfs[pq].wert$(0) + CHR$(9) + pfs[pq].kind("reference").wert$(0) + esuf + CHR$(10)
+            NEXT
+        NEXT
+    END IF
+    DIM suid AS STRING : suid = sy.kind("uuid").wert$(0)
+    IF paare = "" AND suid <> "" AND MAPHAS(gKimV6, suid) THEN
+        DIM v6 AS ARRAY OF STRING : v6 = SPLIT$(MAPGET(gKimV6, suid), CHR$(10))
+        DIM v6i AS INTEGER
+        FOR v6i = 0 TO LEN(v6) - 1
+            IF v6[v6i] <> "" THEN paare = paare + v6[v6i] + esuf + CHR$(10)
+        NEXT
+    END IF
+    IF paare <> "" THEN
+        ARRAY_PUSH(gKimTeile, b)
+        ARRAY_PUSH(gKimPaare, paare)
+    END IF
+    b.wert = sy.eigenschaft$("Value")
+    b.gehaeuse = kimGehaeuse$(sy.eigenschaft$("Footprint"))
+    DIM bn AS ARRAY OF STRING : bn = ["MPN", "Bestellnummer", "Manufacturer_Part_Number", "LCSC", "Mouser", "Reichelt"]
+    FOR i = 0 TO LEN(bn) - 1
+        IF sy.eigenschaft$(bn[i]) <> "" THEN
+            b.bestellnr = sy.eigenschaft$(bn[i])
+            BREAK
+        END IF
+    NEXT
+    ' Texte dorthin, wo KiCad sie hatte
+    IF b.sym.textOrte THEN
+        DIM pa AS Punkt
+        IF kimEigenschaftAbs(sy, "Reference", pa) THEN
+            DIM ra AS Punkt : ra = transformPunkt(l, b.sym.refOrt)
+            b.refVersatz = NEW Punkt(pa.x - ra.x, pa.y - ra.y)
+        END IF
+        IF kimEigenschaftAbs(sy, "Value", pa) THEN
+            DIM wa AS Punkt : wa = transformPunkt(l, b.sym.wertOrt)
+            b.wertVersatz = NEW Punkt(pa.x - wa.x, pa.y - wa.y)
+        END IF
+    END IF
+    ARRAY_PUSH(bl.bauteile, b)
+    ' versteckte Versorgungs-Pins: sichtbar machen, Netz bleibt gleich
+    IF gefunden THEN
+        FOR i = 0 TO LEN(ks.versteckt) - 1
+            DIM pin AS Pin : pin = b.sym.pins[ks.versteckt[i]]
+            ARRAY_PUSH(bl.labels, NEW Label(pin.name, b.pinPunkt(ks.versteckt[i]), LA_GLOBAL))
+            kimHinweis(e, "Versteckte Versorgung", "versteckte Versorgungs-Pins (z. B. VCC/GND von Logik-ICs) als globale Labels angeschlossen")
+        NEXT
+    END IF
+END SUB
+
+FUNCTION kimLabelArt(kopf AS STRING) AS INTEGER
+    SELECT CASE kopf
+        CASE "global_label" : RETURN LA_GLOBAL
+        CASE "hierarchical_label" : RETURN LA_HIER
+    END SELECT
+    RETURN LA_LOKAL
+END FUNCTION
+
+FUNCTION kimDateiName$(pfad AS STRING) AS STRING
+    DIM t AS STRING : t = REPLACE$(pfad, "\", "/")
+    DIM i AS INTEGER : i = LEN(t) - 1
+    WHILE i >= 0
+        IF MID$(t, i, 1) = "/" THEN BREAK
+        i = i - 1
+    WEND
+    t = MID$(t, i + 1)
+    IF ENDSWITH(LOWER$(t), ".kicad_sch") THEN t = LEFT$(t, LEN(t) - 10)
+    RETURN t
+END FUNCTION
+
+FUNCTION kimOrdner$(pfad AS STRING) AS STRING
+    DIM t AS STRING : t = REPLACE$(pfad, "\", "/")
+    DIM i AS INTEGER : i = LEN(t) - 1
+    WHILE i >= 0
+        IF MID$(t, i, 1) = "/" THEN RETURN LEFT$(t, i)
+        i = i - 1
+    WEND
+    RETURN "."
+END FUNCTION
+
+' Ein Blatt (eine .kicad_sch) einlesen; Unterblaetter rekursiv. Liefert das Blatt.
+FUNCTION kimBlatt(e AS KicadErgebnis, wurzel AS SAusdruck, name AS STRING, ordner AS STRING, refs AS MAP OF STRING, BYREF offen AS MAP OF INTEGER, BYREF fertig AS MAP OF STRING) AS Blatt
+    DIM bl AS Blatt : bl = NEW Blatt(name)
+    ARRAY_PUSH(e.dok.blaetter, bl)
+    kimPapier(bl, wurzel.kind("paper").wert$(0))
+    DIM libs AS SAusdruck : libs = wurzel.kind("lib_symbols")
+    DIM knoten AS ARRAY OF Punkt : knoten = []
+    DIM i AS INTEGER, k AS INTEGER
+    FOR i = 0 TO LEN(wurzel.kinder) - 1
+        DIM s AS SAusdruck : s = wurzel.kinder[i]
+        SELECT CASE s.kopf
+            CASE "symbol"
+                kimBauteil(e, bl, s, libs, refs)
+            CASE "wire"
+                DIM pts AS ARRAY OF SAusdruck : pts = s.kind("pts").alle("xy")
+                IF LEN(pts) >= 2 THEN
+                    FOR k = 0 TO LEN(pts) - 2
+                        DIM w AS Draht : w = NEW Draht()
+                        ARRAY_PUSH(w.punkte, kimPunkt(pts[k]))
+                        ARRAY_PUSH(w.punkte, kimPunkt(pts[k + 1]))
+                        IF NOT punktGleich(w.punkte[0], w.punkte[1]) THEN ARRAY_PUSH(bl.draehte, w)
+                    NEXT
+                END IF
+            CASE "junction"
+                ARRAY_PUSH(knoten, kimPunkt(s.kind("at")))
+            CASE "label", "global_label", "hierarchical_label"
+                DIM la AS Label : la = NEW Label(s.wert$(0), kimPunkt(s.kind("at")), kimLabelArt(s.kopf))
+                la.drehung = kimRichtung(s.kind("at").wert$(2))
+                ARRAY_PUSH(bl.labels, la)
+            CASE "sheet"
+                kimUnterblatt(e, bl, s, ordner, refs, offen, fertig)
+            CASE "bus"
+                DIM bpts AS ARRAY OF SAusdruck : bpts = s.kind("pts").alle("xy")
+                IF LEN(bpts) >= 2 THEN
+                    DIM bu AS Bus : bu = NEW Bus("")
+                    FOR k = 0 TO LEN(bpts) - 1
+                        ARRAY_PUSH(bu.punkte, kimPunkt(bpts[k]))
+                    NEXT
+                    ARRAY_PUSH(bl.busse, bu)
+                END IF
+            CASE "bus_entry"
+                ' der Schraegstrich zwischen Bus und Draht wird ein Draht: ein
+                ' Ende liegt auf dem Bus (Abzweig), das andere am Draht
+                DIM eo AS Punkt : eo = kimPunkt(s.kind("at"))
+                DIM eg AS SAusdruck : eg = s.kind("size")
+                DIM ew AS Draht : ew = NEW Draht()
+                ARRAY_PUSH(ew.punkte, eo)
+                ARRAY_PUSH(ew.punkte, NEW Punkt(eo.x + kimMass(eg.wert$(0)), eo.y + kimMass(eg.wert$(1))))
+                ARRAY_PUSH(bl.draehte, ew)
+            CASE "bus_alias"
+                kimHinweis(e, "Bus-Alias", "Bus-Aliase kennt Funkenflug nicht (weggelassen)")
+            CASE "no_connect"
+                kimHinweis(e, "Nicht verbunden", "Nicht-verbunden-Marker weggelassen (der ERC meldet diese Pins als offen)")
+            CASE "text", "text_box", "polyline", "rectangle", "circle", "arc", "image"
+                kimHinweis(e, "Freie Grafik", "freie Texte und Zeichnungen auf dem Blatt weggelassen")
+        END SELECT
+    NEXT
+    kimAnKnotenTrennen(bl, knoten)
+    kimBusLabels(bl)
+    autoKnoten(bl)
+    RETURN bl
+END FUNCTION
+
+' Ein Label auf einem Bus benennt in KiCad den Bus -- hier wird es zum
+' Busnamen (ein Label auf dem Bus ergaebe sonst ein leeres Netz).
+SUB kimBusLabels(bl AS Blatt)
+    DIM bleiben AS ARRAY OF Label : bleiben = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bl.labels) - 1
+        DIM la AS Label : la = bl.labels[i]
+        DIM bx AS INTEGER : bx = busAn(bl, la.anker.x, la.anker.y)
+        ' auch ein hierarchisches oder globales Label benennt den Bus (in
+        ' Unterblaettern meist das einzige); diese bleiben stehen -- das
+        ' hierarchische ist der Bus-Port
+        IF bx >= 0 THEN
+            IF bl.busse[bx].name = "" THEN bl.busse[bx].name = la.text
+            IF la.art <> LA_LOKAL THEN ARRAY_PUSH(bleiben, la)
+        ELSE
+            ARRAY_PUSH(bleiben, la)
+        END IF
+    NEXT
+    bl.labels = bleiben
+END SUB
+
+' (sheet (at x y) (size w h) (property "Sheetname" ..) (property "Sheetfile" ..) (pin "IN" input (at ..)))
+SUB kimUnterblatt(e AS KicadErgebnis, bl AS Blatt, s AS SAusdruck, ordner AS STRING, refs AS MAP OF STRING, BYREF offen AS MAP OF INTEGER, BYREF fertig AS MAP OF STRING)
+    DIM nm AS STRING : nm = s.eigenschaft$("Sheetname")
+    IF nm = "" THEN nm = s.eigenschaft$("Sheet name")
+    DIM datei AS STRING : datei = s.eigenschaft$("Sheetfile")
+    IF datei = "" THEN datei = s.eigenschaft$("Sheet file")
+    DIM pfad AS STRING : pfad = PATHJOIN(ordner, datei)
+    DIM schl AS STRING : schl = LOWER$(REPLACE$(pfad, "\", "/"))
+    IF MAPHAS(offen, schl) THEN
+        kimHinweis(e, "Zyklus " + datei, "Unterblatt enthaelt sich selbst -- uebersprungen")
+        RETURN
+    END IF
+    DIM unterId AS STRING : unterId = ""
+    IF MAPHAS(fertig, schl) THEN
+        ' schon eingelesen: eine weitere Instanz desselben Blatts
+        unterId = MAPGET(fertig, schl)
+    ELSE
+        IF NOT FILEEXISTS(pfad) THEN
+            kimHinweis(e, "Datei fehlt " + datei, "Unterblatt-Datei nicht gefunden")
+            RETURN
+        END IF
+        DIM kw AS SAusdruck : kw = sLesen(READALL$(pfad))
+        IF kw.kopf <> "kicad_sch" THEN
+            kimHinweis(e, "Kein Schaltplan " + datei, "Unterblatt ist kein KiCad-Schaltplan")
+            RETURN
+        END IF
+        IF nm = "" THEN nm = kimDateiName$(datei)
+        MAPPUT(offen, schl, 1)
+        DIM unterBl AS Blatt : unterBl = kimBlatt(e, kw, nm, kimOrdner$(pfad), refs, offen, fertig)
+        MAPREMOVE(offen, schl)
+        MAPPUT(fertig, schl, unterBl.id)
+        unterId = unterBl.id
+    END IF
+    ' Blattsymbol in die Mitte des KiCad-Rahmens
+    DIM o AS Punkt : o = kimPunkt(s.kind("at"))
+    DIM gr AS SAusdruck : gr = s.kind("size")
+    DIM mx AS INTEGER : mx = rastern(o.x + kimMass(gr.wert$(0)) \ 2, RASTER)
+    DIM my AS INTEGER : my = rastern(o.y + kimMass(gr.wert$(1)) \ 2, RASTER)
+    DIM b AS Bauteil : b = neuesBauteil(BLATT_VORSATZ + unterId, neueLage(mx, my))
+    ARRAY_PUSH(bl.bauteile, b)
+    IF s.kind("uuid").wert$(0) <> "" THEN MAPPUT(gKimBlattUuid, s.kind("uuid").wert$(0), b.id)
+    DIM pins AS ARRAY OF SAusdruck : pins = s.alle("pin")
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(pins) - 1
+        DIM po AS SAusdruck : po = pins[i].kind("at")
+        ARRAY_PUSH(gKimPorts, NEW KimPort(bl, b, pins[i].wert$(0), kimPunkt(po), kimRichtung(po.wert$(2))))
+    NEXT
+END SUB
+
+' Die Ports der Blattsymbole an die Draehte des KiCad-Rahmens anschliessen:
+' das erzeugte Symbol hat seine eigene Groesse, also je Port ein Label-Paar
+' (am alten Anschlusspunkt und am Port) statt Draehten quer ueber das Symbol.
+SUB kimPortsAnschliessen(e AS KicadErgebnis)
+    DIM i AS INTEGER, j AS INTEGER, k AS INTEGER
+    FOR i = 0 TO LEN(gKimPorts) - 1
+        DIM kp AS KimPort : kp = gKimPorts[i]
+        DIM pi2 AS INTEGER : pi2 = -1
+        FOR j = 0 TO LEN(kp.teil.sym.pins) - 1
+            IF kp.teil.sym.pins[j].name = kp.name THEN
+                pi2 = j
+                BREAK
+            END IF
+        NEXT
+        IF pi2 < 0 THEN
+            kimHinweis(e, "Port fehlt " + kp.name, "Blatt-Pin ohne hierarchisches Label im Unterblatt -- nicht angeschlossen")
+            CONTINUE
+        END IF
+        DIM pp AS Punkt : pp = kp.teil.pinPunkt(pi2)
+        IF istBusName(kp.name) THEN
+            ' Bus-Port: ein Bus vom KiCad-Anschluss zum Port (ein Bus verbindet
+            ' nichts, kann also quer laufen); er gehoert zum Bus am Anschluss
+            DIM pb AS Bus : pb = NEW Bus("")
+            ARRAY_PUSH(pb.punkte, kp.ort)
+            IF kp.ort.x <> pp.x AND kp.ort.y <> pp.y THEN ARRAY_PUSH(pb.punkte, NEW Punkt(pp.x, kp.ort.y))
+            ARRAY_PUSH(pb.punkte, pp)
+            ARRAY_PUSH(kp.blatt.busse, pb)
+            CONTINUE
+        END IF
+        ' Name frei? sonst mit dem Blattnamen davor
+        DIM nm AS STRING : nm = kp.name
+        DIM belegt AS BOOLEAN : belegt = FALSE
+        FOR k = 0 TO LEN(kp.blatt.labels) - 1
+            IF kp.blatt.labels[k].text = nm THEN belegt = TRUE
+        NEXT
+        IF belegt THEN nm = kp.teil.referenz + "_" + kp.name
+        DIM la AS Label : la = NEW Label(nm, kp.ort, LA_LOKAL)
+        la.drehung = kp.drehung
+        ARRAY_PUSH(kp.blatt.labels, la)
+        DIM lb AS Label : lb = NEW Label(nm, pp, LA_LOKAL)
+        lb.drehung = (transformRichtung(kp.teil.lage, kp.teil.sym.pins[pi2].richtung) + 180) MOD 360
+        ARRAY_PUSH(kp.blatt.labels, lb)
+    NEXT
+END SUB
+
+' Einen KiCad-Schaltplan aus Text (ordner = wo die Unterblaetter liegen).
+FUNCTION kicadAusText(text AS STRING, name AS STRING, ordner AS STRING) AS KicadErgebnis
+    DIM e AS KicadErgebnis : e = NEW KicadErgebnis()
+    gKimPorts = []
+    gKimSymbole = []
+    gKimTeile = []
+    gKimPaare = []
+    gKimBlattUuid = {}
+    gKimV6 = {}
+    gKimZaehler = {}
+    DIM w AS SAusdruck : w = sLesen(text)
+    IF w.kopf <> "kicad_sch" THEN
+        e.fehler = "Das ist kein KiCad-Schaltplan (kicad_sch fehlt)."
+        RETURN e
+    END IF
+    IF VAL(w.kind("version").wert$(0)) < 20200000 THEN
+        e.fehler = "Zu alt: erst KiCad 6 schreibt Schaltplaene als .kicad_sch."
+        RETURN e
+    END IF
+    gKimWurzel = w.kind("uuid").wert$(0)
+    DIM tb AS SAusdruck : tb = w.kind("title_block")
+    e.dok.titel = tb.kind("title").wert$(0)
+    e.dok.revision = tb.kind("rev").wert$(0)
+    e.dok.firma = tb.kind("company").wert$(0)
+    DIM refs AS MAP OF STRING
+    kimInstanzenLesen(w, refs)
+    DIM offen AS MAP OF INTEGER
+    DIM fertig AS MAP OF STRING
+    DIM bl AS Blatt : bl = kimBlatt(e, w, IIF(name = "", "Blatt1", name), ordner, refs, offen, fertig)
+    blattSymboleAktualisieren(e.dok)
+    kimPortsAnschliessen(e)
+    kimInstanzRefs(e)
+    instanzenPflegen(e.dok)
+    ' Hinweise mit Anzahl
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(e.hinweise) - 1
+        DIM t AS ARRAY OF STRING : t = SPLIT$(e.hinweise[i], CHR$(9))
+        DIM n AS INTEGER : n = MAPGET(gKimZaehler, t[0])
+        e.hinweise[i] = t[0] + ": " + t[1] + IIF(n > 1, " (" + STR$(n) + "x)", "")
+    NEXT
+    e.ok = TRUE
+    RETURN e
+END FUNCTION
+
+FUNCTION kicadImportieren(pfad AS STRING) AS KicadErgebnis
+    IF NOT FILEEXISTS(pfad) THEN
+        DIM e AS KicadErgebnis : e = NEW KicadErgebnis()
+        e.fehler = "Datei nicht gefunden: " + pfad
+        RETURN e
+    END IF
+    RETURN kicadAusText(READALL$(pfad), kimDateiName$(pfad), kimOrdner$(pfad))
+END FUNCTION

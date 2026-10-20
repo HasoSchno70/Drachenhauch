@@ -1,0 +1,193 @@
+' Busse in der Oberflaeche -- globaler Namensraum.
+'
+' Werkzeug "Bus" (B) zeichnet wie der Draht; zum Schluss fragt es nach dem
+' Namen (D[0..7]), ausser der Bus beruehrt einen benannten. Ein Draht, der
+' auf einem Bus beginnt oder endet, ist ein Abzweig: Funkenflug fragt nach
+' dem Mitglied (das naechste freie steht vorne) und setzt das Label auf den
+' Draht -- verbunden wird ueber den Namen, der Bus selbst verbindet nichts.
+' Auswaehlen, Ziehen (Abzweige folgen), Drehen, Loeschen, Kopieren wie bei
+' Draehten; Doppelklick benennt um.
+
+FUNCTION istGewaehltBus(b AS kern.Bus) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gSelBus) - 1
+        IF gSelBus[i] = b THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+SUB umschaltenBus(b AS kern.Bus)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gSelBus) - 1
+        IF gSelBus[i] = b THEN
+            ARRAY_REMOVE_AT(gSelBus, i)
+            RETURN
+        END IF
+    NEXT
+    ARRAY_PUSH(gSelBus, b)
+END SUB
+
+SUB waehleBus(b AS kern.Bus)
+    auswahlAufheben()
+    ARRAY_PUSH(gSelBus, b)
+    einzelAusMenge()
+END SUB
+
+' Bus unter dem Schirmpunkt (-1 = keiner)
+FUNCTION busUnter(px AS FLOAT, py AS FLOAT) AS INTEGER
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = LEN(gBlatt.busse) - 1 TO 0 STEP -1
+        DIM bu AS kern.Bus : bu = gBlatt.busse[i]
+        FOR j = 0 TO LEN(bu.punkte) - 2
+            IF abstandQ(px, py, sx(bu.punkte[j].x), sy(bu.punkte[j].y), sx(bu.punkte[j + 1].x), sy(bu.punkte[j + 1].y)) <= 49 THEN RETURN i
+        NEXT
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Busse (unter den Draehten), ihr Name am Anfang, Marken an den Abzweigen
+SUB busseZeichnen(cr AS INTEGER)
+    IF LEN(gBlatt.busse) = 0 THEN RETURN
+    DIM i AS INTEGER, j AS INTEGER
+    DIM g AS ARRAY OF INTEGER : g = kern.busGruppen(gBlatt)
+    FOR i = 0 TO LEN(gBlatt.busse) - 1
+        DIM bu AS kern.Bus : bu = gBlatt.busse[i]
+        IF LEN(bu.punkte) < 2 THEN CONTINUE
+        DIM farbe AS INTEGER : farbe = IIF(NOT gDruck AND istGewaehltBus(bu), C_AUSWAHL, C_BUS)
+        zeichenFarbe(cr, farbe)
+        cairo_set_line_width(cr, gStrich * 3)
+        cairo_move_to(cr, sx(bu.punkte[0].x), sy(bu.punkte[0].y))
+        FOR j = 1 TO LEN(bu.punkte) - 1
+            cairo_line_to(cr, sx(bu.punkte[j].x), sy(bu.punkte[j].y))
+        NEXT
+        cairo_stroke(cr)
+        IF bu.name <> "" THEN
+            ' der Name ueber dem ersten Stueck, ein Stueck vom Anfang weg
+            DIM ax AS FLOAT : ax = sx(bu.punkte[0].x)
+            DIM ay AS FLOAT : ay = sy(bu.punkte[0].y)
+            DIM senk AS BOOLEAN : senk = bu.punkte[0].x = bu.punkte[1].x
+            IF senk THEN
+                lwTextAus(cr, ax + 8, ay + SIGN(sy(bu.punkte[1].y) - ay) * 18, bu.name, farbe, 0, gSchrift)
+            ELSE
+                lwTextAus(cr, ax + SIGN(sx(bu.punkte[1].x) - ax) * 10, ay - 12, bu.name, farbe, IIF(sx(bu.punkte[1].x) < ax, 2, 0), gSchrift)
+            END IF
+        ELSEIF NOT gDruck THEN
+            DIM wid AS STRING
+            IF kern.busGruppenName$(gBlatt, g, g[i], wid) = "" THEN lwTextAus(cr, sx(bu.punkte[0].x) + 8, sy(bu.punkte[0].y) - 12, "Bus ohne Namen", C_ERC_WARNUNG, 0, gSchrift)
+        END IF
+    NEXT
+    ' Abzweige: ein Punkt, breiter als der Bus, wo ein Draht auf ihm endet
+    FOR i = 0 TO LEN(gBlatt.draehte) - 1
+        DIM w AS kern.Draht : w = gBlatt.draehte[i]
+        IF LEN(w.punkte) < 2 THEN CONTINUE
+        DIM ende AS INTEGER
+        FOR ende = 0 TO 1
+            DIM p AS kern.Punkt : p = IIF(ende = 0, w.punkte[0], w.punkte[LEN(w.punkte) - 1])
+            IF kern.busAn(gBlatt, p.x, p.y) < 0 THEN CONTINUE
+            DIM r AS FLOAT : r = MAX(4.5, gStrich * 3.2)
+            zeichenFarbe(cr, C_BUS)
+            cairo_new_sub_path(cr)
+            cairo_arc(cr, sx(p.x), sy(p.y), r, 0, 2 * PI)
+            cairo_fill(cr)
+        NEXT
+    NEXT
+END SUB
+
+' Name abfragen und pruefen; FALSE = abgebrochen
+FUNCTION busNameAbfragen(BYREF name AS STRING, titel AS STRING) AS BOOLEAN
+    DIM t AS STRING : t = textAbfrage$(titel, "Name (z. B. D[0..7], A[15:0], I2C{SDA SCL}):", name)
+    IF t = "" THEN RETURN FALSE
+    DIM fe AS STRING
+    DIM m AS ARRAY OF STRING : m = kern.busMitglieder(t, fe)
+    IF fe <> "" THEN
+        meldung(fe)
+        RETURN FALSE
+    END IF
+    name = TRIM$(t)
+    gSpMeldung = "Bus " + name + ": " + STR$(LEN(m)) + " Mitglieder (" + m[0] + IIF(LEN(m) > 1, " .. " + m[LEN(m) - 1], "") + ")"
+    RETURN TRUE
+END FUNCTION
+
+' Der gezeichnete Bus ist fertig
+SUB busEnde()
+    DIM bu AS kern.Bus : bu = NEW kern.Bus("")
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gDrahtPunkte) - 1
+        IF LEN(bu.punkte) = 0 THEN
+            ARRAY_PUSH(bu.punkte, gDrahtPunkte[i])
+        ELSEIF NOT kern.punktGleich(bu.punkte[LEN(bu.punkte) - 1], gDrahtPunkte[i]) THEN
+            ARRAY_PUSH(bu.punkte, gDrahtPunkte[i])
+        END IF
+    NEXT
+    gDrahtAktiv = FALSE
+    gDrahtPunkte = []
+    IF LEN(bu.punkte) < 2 THEN
+        neuZeichnen()
+        RETURN
+    END IF
+    verlaufMerken()
+    ARRAY_PUSH(gBlatt.busse, bu)
+    ' beruehrt er einen benannten Bus, heisst er wie der
+    DIM g AS ARRAY OF INTEGER : g = kern.busGruppen(gBlatt)
+    DIM wid AS STRING
+    DIM schon AS STRING : schon = kern.busGruppenName$(gBlatt, g, g[LEN(gBlatt.busse) - 1], wid)
+    IF schon = "" THEN
+        DIM nm AS STRING : nm = "D[0..7]"
+        IF busNameAbfragen(nm, "Neuer Bus") THEN bu.name = nm
+    ELSE
+        gSpMeldung = "Bus haengt an " + schon
+    END IF
+    geaendert()
+END SUB
+
+SUB busUmbenennen(bu AS kern.Bus)
+    DIM nm AS STRING : nm = IIF(bu.name = "", "D[0..7]", bu.name)
+    IF NOT busNameAbfragen(nm, "Bus umbenennen") THEN RETURN
+    IF nm = bu.name THEN RETURN
+    verlaufMerken()
+    bu.name = nm
+    geaendert()
+END SUB
+
+' Ein neuer Draht endet auf einem Bus: nach dem Mitglied fragen und das
+' Label ans andere Ende des Drahts setzen.
+SUB abzweigFragen(w AS kern.Draht)
+    IF LEN(w.punkte) < 2 THEN RETURN
+    DIM ende AS INTEGER
+    FOR ende = 0 TO 1
+        DIM p AS kern.Punkt : p = IIF(ende = 0, w.punkte[0], w.punkte[LEN(w.punkte) - 1])
+        DIM nb AS kern.Punkt : nb = IIF(ende = 0, w.punkte[1], w.punkte[LEN(w.punkte) - 2])
+        DIM bx AS INTEGER : bx = kern.busAn(gBlatt, p.x, p.y)
+        IF bx < 0 THEN CONTINUE
+        ' traegt das Netz schon ein Label (das andere Ende an einem benannten Netz)?
+        DIM i AS INTEGER
+        DIM benannt AS BOOLEAN : benannt = FALSE
+        FOR i = 0 TO LEN(gBlatt.labels) - 1
+            DIM a AS kern.Punkt : a = gBlatt.labels[i].anker
+            DIM k AS INTEGER
+            FOR k = 0 TO LEN(w.punkte) - 2
+                IF kern.aufStrecke(w.punkte[k].x, w.punkte[k].y, w.punkte[k + 1].x, w.punkte[k + 1].y, a.x, a.y) THEN benannt = TRUE
+            NEXT
+        NEXT
+        IF benannt THEN RETURN
+        DIM g AS ARRAY OF INTEGER : g = kern.busGruppen(gBlatt)
+        DIM wid AS STRING
+        DIM bname AS STRING : bname = kern.busGruppenName$(gBlatt, g, g[bx], wid)
+        IF bname = "" THEN RETURN
+        DIM mitglied AS STRING : mitglied = textAbfrage$("Abzweig vom Bus " + bname, "Mitglied:", kern.busFreiesMitglied$(gBlatt, bx))
+        IF TRIM$(mitglied) = "" THEN RETURN
+        ' am fernen Ende (meist der Pin): dort bleibt es auf dem Draht, auch
+        ' wenn der Bus verschoben wird; Text laeuft am Draht entlang zum Bus
+        DIM fern AS kern.Punkt : fern = IIF(ende = 0, w.punkte[LEN(w.punkte) - 1], w.punkte[0])
+        DIM vor AS kern.Punkt : vor = IIF(ende = 0, w.punkte[LEN(w.punkte) - 2], w.punkte[1])
+        DIM la AS kern.Label : la = NEW kern.Label(TRIM$(mitglied), NEW kern.Punkt(fern.x, fern.y), kern.LA_LOKAL)
+        DIM dx AS INTEGER : dx = SIGN(vor.x - fern.x)
+        DIM dy AS INTEGER : dy = SIGN(vor.y - fern.y)
+        IF dx > 0 THEN la.drehung = 0
+        IF dx < 0 THEN la.drehung = 180
+        IF dy > 0 AND dx = 0 THEN la.drehung = 90
+        IF dy < 0 AND dx = 0 THEN la.drehung = 270
+        ARRAY_PUSH(gBlatt.labels, la)
+        RETURN
+    NEXT
+END SUB

@@ -1,0 +1,2807 @@
+' Funkenflug -- ein Schaltplan-Editor in Drachenhauch mit GTK 3.
+'
+' Eine Neufassung der Idee hinter SparkNode (Python/PySide6), bewusst ohne
+' dessen Stolperfallen: EINE Rotations-/Transform-Konvention (gezeichnete ==
+' elektrische Pins), EINE Netz-Erkennung, Pin-Punkt eindeutig als elektrischer
+' Andockpunkt, Undo ueber vollstaendige Schnappschuesse. GTK/Cairo wie in
+' Glutfaden (der GTK-Portierung von PySticky).
+'
+'   dhrt run funkenflug/main.dh                 (Demo-Schaltung)
+'   dhrt run funkenflug/main.dh -- datei.fkn    (diese Datei oeffnen)
+'   dhrt run funkenflug/main.dh -- --foto C:/.../bild.png   (Selbsttest)
+'
+' Aufbau:
+'   kern/      Modell, Geometrie, Bibliothek, Netze, Datei (Namensraum kern)
+'   gtk/       Deklarationen fuer GTK, GDK, Cairo, Pango
+'   ansicht/   Zeichenflaeche, Werkzeuge, Verlauf (globaler Namensraum)
+IMPORT "kern/kern.dh" AS kern
+IMPORT "gtk/gtk.dh"
+IMPORT "ansicht/leinwand.dh"
+IMPORT "ansicht/werkzeuge.dh"
+IMPORT "ansicht/verlauf.dh"
+IMPORT "ansicht/auswahl.dh"
+IMPORT "ansicht/symboleditor.dh"
+IMPORT "ansicht/ausgabe.dh"
+IMPORT "ansicht/blaetter.dh"
+IMPORT "ansicht/platinenansicht.dh"
+IMPORT "ansicht/platinendruck.dh"
+IMPORT "ansicht/komfort.dh"
+IMPORT "ansicht/bericht.dh"
+IMPORT "ansicht/simulation.dh"
+IMPORT "ansicht/platine3d.dh"
+IMPORT "ansicht/busse.dh"
+IMPORT "ansicht/instanzen.dh"
+
+CONST STIL = "window { background-color: #12131a; color: #e6e6f0; }" + _
+    " headerbar { background-color: #1a1c26; color: #e6e6f0; }" + _
+    " headerbar .title { font-weight: 700; }" + _
+    " .leiste { background-color: #1a1c26; border-bottom: 1px solid #2c2f3c; padding: 4px 8px; }" + _
+    " .leiste button, .leiste combobox button { background-color: #262a38; color: #e6e6f0; border: 1px solid #333848; border-radius: 6px; padding: 3px 10px; }" + _
+    " .leiste button:checked { background-color: #ff8a3d; color: #1a1a2e; }" + _
+    " .status { background-color: #1a1c26; color: #aeb4c4; padding: 3px 10px; font-size: 9pt; }" + _
+    " .pinliste { font-family: monospace; font-size: 10pt; }"
+
+CONST GTK_KNOEPFE_OK = 1              ' GTK_BUTTONS_OK
+CONST LOGO = "daten/bilder/funkenflug_256.png"
+
+DIM gFenster AS INTEGER
+DIM gKopf AS INTEGER
+DIM gStatus AS INTEGER
+DIM gKnopfAuswahl AS INTEGER
+DIM gKnopfDraht AS INTEGER
+DIM gKnopfLabel AS INTEGER
+DIM gKnopfMessen AS INTEGER
+DIM gKnopfBus AS INTEGER
+DIM gKnopfZurueck AS INTEGER
+DIM gKnopfVor AS INTEGER
+DIM gSymbolWahl AS INTEGER
+DIM gComboIds AS ARRAY OF STRING  ' Symbol-Id je Eintrag der Bauteilliste
+DIM gComboEigene AS INTEGER       ' wie viele eigene Symbole die Liste zeigt
+DIM gBibPfad AS STRING            ' persoenliche Symbol-Bibliothek
+DIM fotoZiel AS STRING
+
+' Der gerade offene Dialog und seine Eingabefelder -- damit der Selbsttest
+' ihn ausfuellen und bestaetigen kann.
+DIM gDlg AS INTEGER
+DIM gDlgFeld1 AS INTEGER
+DIM gDlgFeld2 AS INTEGER
+DIM gDlgFeld3 AS INTEGER
+DIM gDlgFeld4 AS INTEGER
+DIM gDlgHakenWert AS BOOLEAN      ' Ergebnis des Hakens im Umbenennen-Dialog
+DIM gFragen AS INTEGER            ' wie oft bestaetigen() gefragt hat (Selbsttest)
+DIM gDlgHaken AS INTEGER          ' der Haken im offenen Umbenennen-Dialog
+
+FUNCTION basisName$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = LEN(p) - 1 TO 0 STEP -1                ' MID$ zaehlt ab 0
+        DIM c AS STRING : c = MID$(p, i, 1)
+        IF c = "/" OR c = "\" THEN RETURN MID$(p, i + 1)
+    NEXT
+    RETURN p
+END FUNCTION
+
+' --- Statuszeile und Titel
+SUB statusAktualisieren()
+    IF gStatus = 0 THEN RETURN
+    IF gAnsicht = ANS_PLATINE THEN
+        gtk_label_set_text(gStatus, plStatus$())
+        RETURN
+    END IF
+    DIM wz AS STRING : wz = "Auswahl"
+    IF gWerkzeug = WZ_DRAHT THEN wz = "Draht"
+    IF gWerkzeug = WZ_BAUTEIL THEN wz = "Bauteil"
+    IF gWerkzeug = WZ_LABEL THEN wz = "Label"
+    IF gWerkzeug = WZ_MESSEN THEN wz = messText$()
+    DIM zoom AS INTEGER : zoom = ROUND(vZoom / 0.12 * 100)
+    DIM pos AS STRING : pos = ""
+    IF gMausDrin THEN pos = "   X " + STR$(gMausWX / 100) + " mm   Y " + STR$(gMausWY / 100) + " mm"
+    DIM wahl AS STRING : wahl = ""
+    IF gHatGewaehlt THEN wahl = "   Auswahl: " + gGewaehlt.referenz + " " + gGewaehlt.wert + " (" + gGewaehlt.sym.name + ")"
+    IF gHatLabel THEN wahl = "   Label: " + gLabelGewaehlt.text + " (F2 benennt um)"
+    IF gHatDraht THEN
+        IF gSegment >= 0 THEN
+            wahl = "   Draht: Segment " + STR$(gSegment + 1) + " von " + STR$(LEN(gDrahtGewaehlt.punkte) - 1) + " (Entf: Segment, Umschalt+Entf: Draht, F2: Netz umbenennen)"
+        ELSE
+            wahl = "   Draht (Entf loescht ihn, F2: Netz umbenennen)"
+        END IF
+    END IF
+    IF auswahlAnzahl() > 1 THEN wahl = "   Auswahl: " + STR$(LEN(gSelB)) + " Bauteile, " + STR$(LEN(gSelD)) + " Draehte, " + STR$(LEN(gSelL)) + " Labels (ziehen verschiebt, Strg+C kopiert, Entf loescht)"
+    DIM netz AS STRING : netz = hoverText$()
+    IF netz <> "" THEN netz = "   " + netz
+    DIM blatt AS STRING : blatt = instanzPfadText$()
+    IF LEN(gDok.blaetter) > 1 THEN blatt = blatt + " (Blatt " + STR$(aktuellerBlattIndex() + 1) + "/" + STR$(LEN(gDok.blaetter)) + ")"
+    blatt = blatt + instanzText$()
+    IF gSpMeldung <> "" THEN wahl = wahl + "   -- " + gSpMeldung
+    gtk_label_set_text(gStatus, blatt + "   " + wz + "   Zoom " + STR$(zoom) + "%" + pos + netz + wahl + "   [" + STR$(LEN(gBlatt.bauteile)) + " Bauteile, " + STR$(LEN(gBlatt.draehte)) + " Draehte, " + STR$(LEN(gBlatt.labels)) + " Labels]")
+END SUB
+
+SUB titelNachziehen()
+    IF gKopf = 0 THEN RETURN
+    DIM name AS STRING : name = "ohne Namen"
+    IF gPfad <> "" THEN name = basisName$(gPfad)
+    IF gGeaendert THEN name = name + " *"
+    gtk_header_bar_set_subtitle(gKopf, name)
+END SUB
+
+' Achtung GTK: gtk_toggle_button_set_active loest bei einer Aenderung auch
+' "clicked" aus. Ohne Sperre setzte das Ausschalten von "Auswahl" gleich
+' wieder das Auswahl-Werkzeug -- ein gewaehltes Bauteil liess sich so nie
+' platzieren, Draht/Label pendelten hin und her.
+DIM gKnoepfeSetzen AS BOOLEAN
+
+SUB werkzeugKnoepfeNachziehen()
+    IF gKnopfAuswahl = 0 THEN RETURN
+    gKnoepfeSetzen = TRUE
+    gtk_toggle_button_set_active(gKnopfAuswahl, gWerkzeug = WZ_AUSWAHL)
+    gtk_toggle_button_set_active(gKnopfDraht, gWerkzeug = WZ_DRAHT)
+    gtk_toggle_button_set_active(gKnopfLabel, gWerkzeug = WZ_LABEL)
+    gtk_toggle_button_set_active(gKnopfMessen, gWerkzeug = WZ_MESSEN)
+    gtk_toggle_button_set_active(gKnopfBus, gWerkzeug = WZ_BUS)
+    gKnoepfeSetzen = FALSE
+END SUB
+
+SUB verlaufKnoepfeNachziehen()
+    IF gKnopfZurueck = 0 THEN RETURN
+    gtk_widget_set_sensitive(gKnopfZurueck, kannZurueck())
+    gtk_widget_set_sensitive(gKnopfVor, kannVor())
+END SUB
+
+' --- Dialoge
+SUB meldung(text AS STRING)
+    DIM d AS INTEGER : d = gtk_message_dialog_new(gFenster, GTK_DIALOG_MODAL, GTK_NACHRICHT_WARNUNG, GTK_KNOEPFE_OK, "%s", text)
+    gDlg = d
+    DIM antwort AS INTEGER : antwort = gtk_dialog_run(d)
+    gDlg = 0
+    gtk_widget_destroy(d)
+END SUB
+
+FUNCTION dialogNeu(titel AS STRING) AS INTEGER
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons(titel, gFenster, GTK_DIALOG_MODAL, "Abbrechen", GTK_ANTWORT_ABBRECHEN, "OK", GTK_ANTWORT_OK, NIL)
+    gtk_dialog_set_default_response(d, GTK_ANTWORT_OK)
+    RETURN d
+END FUNCTION
+
+FUNCTION feldNeu(text AS STRING) AS INTEGER
+    DIM f AS INTEGER : f = gtk_entry_new()
+    gtk_entry_set_text(f, text)
+    gtk_entry_set_activates_default(f, TRUE)
+    gtk_entry_set_width_chars(f, 18)
+    RETURN f
+END FUNCTION
+
+FUNCTION etikettNeu(text AS STRING) AS INTEGER
+    DIM l AS INTEGER : l = gtk_label_new(text)
+    gtk_label_set_xalign(l, 0.0)
+    RETURN l
+END FUNCTION
+
+' Eine Zeile Text abfragen; "" bei Abbruch.
+FUNCTION textAbfrage$(titel AS STRING, frage AS STRING, vorgabe AS STRING) AS STRING
+    DIM d AS INTEGER : d = dialogNeu(titel)
+    DIM box AS INTEGER : box = gtk_box_new(GTK_WAAGERECHT, 8)
+    gtk_container_set_border_width(box, 12)
+    gtk_box_pack_start(box, etikettNeu(frage), FALSE, FALSE, 0)
+    DIM feld AS INTEGER : feld = feldNeu(vorgabe)
+    gtk_box_pack_start(box, feld, TRUE, TRUE, 0)
+    gtk_box_pack_start(gtk_dialog_get_content_area(d), box, TRUE, TRUE, 0)
+    gtk_widget_show_all(d)
+    gDlg = d : gDlgFeld1 = feld : gDlgFeld2 = 0
+    DIM text AS STRING : text = ""
+    IF gtk_dialog_run(d) = GTK_ANTWORT_OK THEN text = gtk_entry_get_text(feld)
+    gDlg = 0 : gDlgFeld1 = 0
+    gtk_widget_destroy(d)
+    RETURN text
+END FUNCTION
+
+' Neuen Netznamen abfragen; mit hakenText einen Haken darunter (Vorgabe: an),
+' dessen Stand danach in gDlgHakenWert steht. "" bei Abbruch.
+FUNCTION umbenennenDialog$(titel AS STRING, frage AS STRING, vorgabe AS STRING, hakenText AS STRING, hakenAn AS BOOLEAN) AS STRING
+    DIM d AS INTEGER : d = dialogNeu(titel)
+    DIM vb AS INTEGER : vb = gtk_box_new(GTK_SENKRECHT, 8)
+    gtk_container_set_border_width(vb, 12)
+    DIM zeile AS INTEGER : zeile = gtk_box_new(GTK_WAAGERECHT, 8)
+    gtk_box_pack_start(zeile, etikettNeu(frage), FALSE, FALSE, 0)
+    DIM feld AS INTEGER : feld = feldNeu(vorgabe)
+    gtk_box_pack_start(zeile, feld, TRUE, TRUE, 0)
+    gtk_box_pack_start(vb, zeile, FALSE, FALSE, 0)
+    DIM haken AS INTEGER : haken = 0
+    IF hakenText <> "" THEN
+        haken = gtk_check_button_new_with_label(hakenText)
+        gtk_toggle_button_set_active(haken, hakenAn)
+        gtk_box_pack_start(vb, haken, FALSE, FALSE, 0)
+    END IF
+    gtk_box_pack_start(gtk_dialog_get_content_area(d), vb, TRUE, TRUE, 0)
+    gtk_widget_show_all(d)
+    gDlg = d : gDlgFeld1 = feld : gDlgFeld2 = 0 : gDlgHaken = haken
+    DIM text AS STRING : text = ""
+    IF gtk_dialog_run(d) = GTK_ANTWORT_OK THEN text = gtk_entry_get_text(feld)
+    gDlgHakenWert = FALSE
+    IF haken <> 0 THEN gDlgHakenWert = gtk_toggle_button_get_active(haken)
+    gDlgHaken = 0
+    gDlg = 0 : gDlgFeld1 = 0
+    gtk_widget_destroy(d)
+    RETURN text
+END FUNCTION
+
+' Ja/Nein-Rueckfrage; TRUE, wenn der Nutzer "knopf" waehlt.
+FUNCTION bestaetigen(titel AS STRING, text AS STRING, knopf AS STRING) AS BOOLEAN
+    gFragen = gFragen + 1
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons(titel, gFenster, GTK_DIALOG_MODAL, "Abbrechen", GTK_ANTWORT_ABBRECHEN, knopf, GTK_ANTWORT_OK, NIL)
+    DIM l AS INTEGER : l = etikettNeu(text)
+    gtk_widget_set_margin_start(l, 12)
+    gtk_widget_set_margin_end(l, 12)
+    gtk_widget_set_margin_top(l, 12)
+    gtk_widget_set_margin_bottom(l, 12)
+    gtk_box_pack_start(gtk_dialog_get_content_area(d), l, TRUE, TRUE, 0)
+    gtk_widget_show_all(d)
+    gDlg = d : gDlgFeld1 = 0 : gDlgFeld2 = 0
+    DIM ja AS BOOLEAN : ja = gtk_dialog_run(d) = GTK_ANTWORT_OK
+    gDlg = 0
+    gtk_widget_destroy(d)
+    RETURN ja
+END FUNCTION
+
+' Referenz und Wert eines Bauteils aendern. Eine schon vergebene Referenz
+' wird abgelehnt (SparkNode liess doppelte Referenzen still zu).
+SUB eigenschaftenDialog(b AS kern.Bauteil)
+    DIM d AS INTEGER : d = dialogNeu("Eigenschaften")
+    DIM g AS INTEGER : g = gtk_grid_new()
+    gtk_grid_set_row_spacing(g, 6)
+    gtk_grid_set_column_spacing(g, 10)
+    gtk_container_set_border_width(g, 12)
+    DIM weitere AS BOOLEAN : weitere = weitereInstanz()
+    DIM alteRef AS STRING : alteRef = anzeigeRef$(b)
+    DIM feldRef AS INTEGER : feldRef = feldNeu(alteRef)
+    DIM feldWert AS INTEGER : feldWert = feldNeu(b.wert)
+    DIM feldGeh AS INTEGER : feldGeh = feldNeu(b.gehaeuse)
+    DIM feldBest AS INTEGER : feldBest = feldNeu(b.bestellnr)
+    gtk_entry_set_placeholder_text(feldGeh, "z. B. 0805, DIP-8, TO-92")
+    gtk_entry_set_placeholder_text(feldBest, "fuer die Stueckliste")
+    gtk_grid_attach(g, etikettNeu("Symbol:"), 0, 0, 1, 1)
+    gtk_grid_attach(g, etikettNeu(b.sym.name), 1, 0, 1, 1)
+    gtk_grid_attach(g, etikettNeu("Referenz:"), 0, 1, 1, 1)
+    gtk_grid_attach(g, feldRef, 1, 1, 1, 1)
+    gtk_grid_attach(g, etikettNeu("Wert:"), 0, 2, 1, 1)
+    gtk_grid_attach(g, feldWert, 1, 2, 1, 1)
+    gtk_grid_attach(g, etikettNeu("Gehaeuse:"), 0, 3, 1, 1)
+    gtk_grid_attach(g, feldGeh, 1, 3, 1, 1)
+    gtk_grid_attach(g, etikettNeu("Bestellnummer:"), 0, 4, 1, 1)
+    gtk_grid_attach(g, feldBest, 1, 4, 1, 1)
+    gtk_box_pack_start(gtk_dialog_get_content_area(d), g, TRUE, TRUE, 0)
+    gtk_widget_show_all(d)
+    gDlg = d : gDlgFeld1 = feldRef : gDlgFeld2 = feldWert : gDlgFeld3 = feldGeh : gDlgFeld4 = feldBest
+    DIM ok AS BOOLEAN : ok = gtk_dialog_run(d) = GTK_ANTWORT_OK
+    DIM neuRef AS STRING : neuRef = TRIM$(gtk_entry_get_text(feldRef))
+    DIM neuWert AS STRING : neuWert = TRIM$(gtk_entry_get_text(feldWert))
+    DIM neuGeh AS STRING : neuGeh = TRIM$(gtk_entry_get_text(feldGeh))
+    DIM neuBest AS STRING : neuBest = TRIM$(gtk_entry_get_text(feldBest))
+    gDlg = 0 : gDlgFeld1 = 0 : gDlgFeld2 = 0 : gDlgFeld3 = 0 : gDlgFeld4 = 0
+    gtk_widget_destroy(d)
+    IF NOT ok THEN RETURN
+    IF neuRef = alteRef AND neuWert = b.wert AND neuGeh = b.gehaeuse AND neuBest = b.bestellnr THEN RETURN
+    IF neuRef <> alteRef AND referenzVergeben(neuRef) THEN
+        meldung("Die Referenz " + neuRef + " ist schon vergeben.")
+        RETURN
+    END IF
+    verlaufMerken()
+    ' in einer weiteren Instanz gilt die Referenz nur fuer sie; Wert und
+    ' Gehaeuse sind die des gezeichneten Teils (in jeder Instanz gleich)
+    IF weitere THEN
+        MAPPUT(b.instanzRefs, gInstanzPfad, neuRef)
+    ELSE
+        b.referenz = neuRef
+    END IF
+    b.wert = neuWert
+    b.gehaeuse = neuGeh
+    b.bestellnr = neuBest
+    geaendert()
+END SUB
+
+' Gibt es die Referenz schon -- in irgendeiner Instanz?
+FUNCTION referenzVergeben(ref AS STRING) AS BOOLEAN
+    IF ref = "" THEN RETURN FALSE
+    DIM f AS kern.Dokument : f = aktuellesFlach()
+    DIM bi AS INTEGER, i AS INTEGER
+    FOR bi = 0 TO LEN(f.blaetter) - 1
+        FOR i = 0 TO LEN(f.blaetter[bi].bauteile) - 1
+            IF f.blaetter[bi].bauteile[i].referenz = ref THEN RETURN TRUE
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Gemeinsamer Wert eines Feldes ueber mehrere Bauteile, "" wenn verschieden.
+FUNCTION gemeinsam$(liste AS ARRAY OF kern.Bauteil, feld AS INTEGER, BYREF gleich AS BOOLEAN) AS STRING
+    DIM w AS STRING
+    DIM i AS INTEGER
+    gleich = TRUE
+    FOR i = 0 TO LEN(liste) - 1
+        DIM v AS STRING
+        SELECT CASE feld
+            CASE 0 : v = liste[i].wert
+            CASE 1 : v = liste[i].gehaeuse
+            CASE ELSE : v = liste[i].bestellnr
+        END SELECT
+        IF i = 0 THEN
+            w = v
+        ELSEIF v <> w THEN
+            gleich = FALSE
+            RETURN ""
+        END IF
+    NEXT
+    RETURN w
+END FUNCTION
+
+' Mehrere Bauteile auf einmal: Wert, Gehaeuse, Bestellnummer. Ein Feld, das
+' man nicht anfasst, bleibt je Bauteil, wie es war -- auch wenn die Werte
+' verschieden waren (dann steht dort "verschieden" als Platzhalter).
+SUB eigenschaftenMehrere(liste AS ARRAY OF kern.Bauteil)
+    DIM d AS INTEGER : d = dialogNeu("Eigenschaften von " + STR$(LEN(liste)) + " Bauteilen")
+    DIM g AS INTEGER : g = gtk_grid_new()
+    gtk_grid_set_row_spacing(g, 6)
+    gtk_grid_set_column_spacing(g, 10)
+    gtk_container_set_border_width(g, 12)
+    DIM namen AS ARRAY OF STRING : namen = ["Wert:", "Gehaeuse:", "Bestellnummer:"]
+    DIM felder AS ARRAY OF INTEGER : felder = []
+    DIM vorher AS ARRAY OF STRING : vorher = []
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO 2
+        DIM gleich AS BOOLEAN
+        DIM v AS STRING : v = gemeinsam$(liste, i, gleich)
+        DIM f AS INTEGER : f = feldNeu(v)
+        IF NOT gleich THEN gtk_entry_set_placeholder_text(f, "verschieden -- bleibt, wenn leer")
+        ARRAY_PUSH(felder, f)
+        ARRAY_PUSH(vorher, v)
+        gtk_grid_attach(g, etikettNeu(namen[i]), 0, i, 1, 1)
+        gtk_grid_attach(g, f, 1, i, 1, 1)
+    NEXT
+    gtk_box_pack_start(gtk_dialog_get_content_area(d), g, TRUE, TRUE, 0)
+    gtk_widget_show_all(d)
+    gDlg = d : gDlgFeld1 = felder[0] : gDlgFeld2 = felder[1] : gDlgFeld3 = felder[2]
+    DIM ok AS BOOLEAN : ok = gtk_dialog_run(d) = GTK_ANTWORT_OK
+    DIM neu AS ARRAY OF STRING : neu = []
+    FOR i = 0 TO 2
+        ARRAY_PUSH(neu, TRIM$(gtk_entry_get_text(felder[i])))
+    NEXT
+    gDlg = 0 : gDlgFeld1 = 0 : gDlgFeld2 = 0 : gDlgFeld3 = 0
+    gtk_widget_destroy(d)
+    IF NOT ok THEN RETURN
+    IF neu[0] = vorher[0] AND neu[1] = vorher[1] AND neu[2] = vorher[2] THEN RETURN
+    verlaufMerken()
+    FOR j = 0 TO LEN(liste) - 1
+        IF neu[0] <> vorher[0] THEN liste[j].wert = neu[0]
+        IF neu[1] <> vorher[1] THEN liste[j].gehaeuse = neu[1]
+        IF neu[2] <> vorher[2] THEN liste[j].bestellnr = neu[2]
+    NEXT
+    geaendert()
+END SUB
+
+' --- ERC: nicht-modaler Dialog mit der Liste der Verstoesse; eine Zeile
+' anklicken holt die Stelle in die Mitte und hebt ihren Marker hervor.
+DIM gErcDlg AS INTEGER
+DIM gErcListe AS INTEGER
+
+FUNCTION markupSicher$(s AS STRING) AS STRING
+    RETURN REPLACE$(REPLACE$(REPLACE$(s, "&", "&amp;"), "<", "&lt;"), ">", "&gt;")
+END FUNCTION
+
+SUB ercZeile(box AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
+    IF zeile = 0 THEN RETURN
+    DIM i AS INTEGER : i = gtk_list_box_row_get_index(zeile)
+    IF i < 0 OR i >= LEN(gErc) THEN RETURN
+    gErcGewaehlt = i
+    IF gErc[i].blatt >= 0 THEN blattWechseln(gErc[i].blatt)
+    IF gErc[i].instanz <> "" THEN gInstanzPfad = gErc[i].instanz
+    zentrieren(gErc[i].x, gErc[i].y)
+END SUB
+
+SUB ercZu(dlg AS INTEGER, antwort AS INTEGER, daten AS INTEGER)
+    gErcSichtbar = FALSE
+    gErcDlg = 0
+    gErcListe = 0
+    gtk_widget_destroy(dlg)
+    neuZeichnen()
+END SUB
+
+SUB ercAusfuehren()
+    IF gErcDlg <> 0 THEN
+        gtk_widget_destroy(gErcDlg)
+        gErcDlg = 0
+    END IF
+    gErc = kern.ercPruefenDok(gDok)
+    gErcSichtbar = TRUE
+    gErcGewaehlt = -1
+    DIM nf AS INTEGER : nf = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gErc) - 1
+        IF gErc[i].schwere = kern.ERC_FEHLER THEN nf = nf + 1
+    NEXT
+    DIM nw AS INTEGER : nw = LEN(gErc) - nf
+    gErcDlg = gtk_dialog_new_with_buttons("Elektrische Regelpruefung", gFenster, 0, "Schliessen", GTK_ANTWORT_OK, NIL)
+    DIM vb AS INTEGER : vb = gtk_box_new(GTK_SENKRECHT, 8)
+    gtk_container_set_border_width(vb, 12)
+    DIM kopf AS STRING
+    IF LEN(gErc) = 0 THEN
+        kopf = "Keine Verstoesse gefunden."
+    ELSE
+        kopf = STR$(nf) + " Fehler, " + STR$(nw) + " Warnungen -- eine Zeile anklicken springt hin."
+    END IF
+    gtk_box_pack_start(vb, etikettNeu(kopf), FALSE, FALSE, 0)
+    IF LEN(gErc) > 0 THEN
+        DIM sw AS INTEGER : sw = gtk_scrolled_window_new(0, 0)
+        gtk_scrolled_window_set_policy(sw, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+        gtk_scrolled_window_set_min_content_height(sw, 220)
+        gtk_widget_set_size_request(sw, 480, -1)
+        gErcListe = gtk_list_box_new()
+        gtk_list_box_set_selection_mode(gErcListe, GTK_AUSWAHL_EINE)
+        FOR i = 0 TO LEN(gErc) - 1
+            DIM zeile AS INTEGER : zeile = gtk_label_new("")
+            DIM art AS STRING
+            IF gErc[i].schwere = kern.ERC_FEHLER THEN
+                art = "<span foreground='#ff5a5a'><b>Fehler</b></span>"
+            ELSE
+                art = "<span foreground='#ffc23d'><b>Warnung</b></span>"
+            END IF
+            DIM wo AS STRING : wo = ""
+            IF LEN(gDok.blaetter) > 1 AND gErc[i].blatt >= 0 AND gErc[i].blatt < LEN(gDok.blaetter) THEN wo = "<span foreground='#8a90a2'>[" + markupSicher$(gDok.blaetter[gErc[i].blatt].name) + "]</span> "
+            gtk_label_set_markup(zeile, art + "   " + wo + markupSicher$(gErc[i].text))
+            gtk_label_set_xalign(zeile, 0.0)
+            gtk_widget_set_margin_start(zeile, 6)
+            gtk_widget_set_margin_top(zeile, 3)
+            gtk_widget_set_margin_bottom(zeile, 3)
+            gtk_list_box_insert(gErcListe, zeile, -1)
+        NEXT
+        gtk_container_add(sw, gErcListe)
+        gtk_box_pack_start(vb, sw, TRUE, TRUE, 0)
+        signalZeile(gErcListe, "row-selected", ercZeile, 0, 0, 0)
+    END IF
+    gtk_box_pack_start(gtk_dialog_get_content_area(gErcDlg), vb, TRUE, TRUE, 0)
+    signalAntwort(gErcDlg, "response", ercZu, 0, 0, 0)
+    gtk_widget_show_all(gErcDlg)
+    neuZeichnen()
+END SUB
+
+' --- Netzliste: das Format folgt der Endung (.cir/.sp SPICE, .csv, .net/.txt)
+FUNCTION exportTitel$() AS STRING
+    IF gDok.titel <> "" THEN RETURN gDok.titel
+    IF gPfad <> "" THEN RETURN basisName$(gPfad)
+    RETURN "Schaltplan"
+END FUNCTION
+
+FUNCTION exportNach(pfad AS STRING) AS BOOLEAN
+    DIM klein AS STRING : klein = LOWER$(pfad)
+    DIM text AS STRING
+    IF ENDSWITH(klein, ".csv") THEN
+        text = kern.netzlisteCsvDok$(gDok)
+    ELSEIF ENDSWITH(klein, ".net") THEN
+        text = kern.netzlisteKicadDok$(gDok, IIF(gPfad <> "", basisName$(gPfad), exportTitel$()))
+    ELSEIF ENDSWITH(klein, ".txt") THEN
+        text = kern.netzlisteTextDok$(gDok)
+    ELSE
+        IF NOT CONTAINS(basisName$(pfad), ".") THEN pfad = pfad + ".cir"
+        text = kern.netzlisteSpiceDok$(gDok, exportTitel$())
+    END IF
+    TRY
+        WRITEALL(pfad, text)
+    CATCH e
+        RETURN FALSE
+    END TRY
+    RETURN TRUE
+END FUNCTION
+
+' Datei zum Exportieren waehlen. Je Filter ein Name und seine Muster
+' (mehrere durch ; getrennt). "" bei Abbruch.
+FUNCTION dateiExportWahl(titel AS STRING, vorschlag AS STRING, namen AS ARRAY OF STRING, muster AS ARRAY OF STRING) AS STRING
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new(titel, gFenster, GTK_DATEI_SICHERN, "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Exportieren", GTK_ANTWORT_ANNEHMEN, NIL)
+    DIM i AS INTEGER, k AS INTEGER
+    FOR i = 0 TO LEN(namen) - 1
+        DIM f AS INTEGER : f = gtk_file_filter_new()
+        gtk_file_filter_set_name(f, namen[i])
+        DIM m AS ARRAY OF STRING : m = SPLIT$(muster[i], ";")
+        FOR k = 0 TO LEN(m) - 1
+            gtk_file_filter_add_pattern(f, m[k])
+        NEXT
+        gtk_file_chooser_add_filter(d, f)
+    NEXT
+    gtk_file_chooser_set_do_overwrite_confirmation(d, TRUE)
+    gtk_file_chooser_set_current_name(d, vorschlag)
+    DIM pfad AS STRING : pfad = ""
+    IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
+        DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
+        IF z <> 0 THEN
+            pfad = TEXT_AUS_ZEIGER$(z)
+            g_free(z)
+        END IF
+    END IF
+    gtk_widget_destroy(d)
+    RETURN pfad
+END FUNCTION
+
+SUB aufErc(knopf AS INTEGER, daten AS INTEGER)
+    IF gAnsicht = ANS_PLATINE THEN
+        plPruefungZeigen()
+    ELSE
+        ercAusfuehren()
+    END IF
+END SUB
+
+' --- Schaltplan | Platine ------------------------------------------------------
+DIM gKnopfSchaltplan AS INTEGER
+DIM gKnopfPlatine AS INTEGER
+DIM gLeiste AS INTEGER
+DIM gPlLeiste AS INTEGER
+DIM gPlKnopfAuswahl AS INTEGER
+DIM gPlKnopfBahn AS INTEGER
+DIM gPlKnopfTrennen AS INTEGER
+DIM gPlArtWahl AS INTEGER
+DIM gPlKnopfVerbinden AS INTEGER
+
+SUB ansichtLeistenNachziehen()
+    IF gLeiste = 0 THEN RETURN
+    gKnoepfeSetzen = TRUE
+    gtk_toggle_button_set_active(gKnopfSchaltplan, gAnsicht = ANS_SCHALTPLAN)
+    gtk_toggle_button_set_active(gKnopfPlatine, gAnsicht = ANS_PLATINE)
+    gKnoepfeSetzen = FALSE
+    IF gAnsicht = ANS_PLATINE THEN
+        gtk_widget_hide(gLeiste)
+        gtk_widget_hide(gReiter)
+        gtk_widget_show(gPlLeiste)
+        plKnoepfeNachziehen()
+    ELSE
+        gtk_widget_hide(gPlLeiste)
+        gtk_widget_show(gLeiste)
+        gtk_widget_show(gReiter)
+    END IF
+END SUB
+
+SUB plKnoepfeNachziehen()
+    IF gPlKnopfAuswahl = 0 THEN RETURN
+    gKnoepfeSetzen = TRUE
+    gtk_toggle_button_set_active(gPlKnopfAuswahl, gPlWz = PW_AUSWAHL)
+    gtk_toggle_button_set_active(gPlKnopfBahn, gPlWz = PW_BAHN)
+    gtk_toggle_button_set_active(gPlKnopfTrennen, gPlWz = PW_TRENNEN)
+    gtk_combo_box_set_active(gPlArtWahl, IIF(gDok.platine.art = kern.PL_STREIFEN, 0, 1))
+    gKnoepfeSetzen = FALSE
+END SUB
+
+SUB aufSchaltplan(knopf AS INTEGER, daten AS INTEGER)
+    IF gKnoepfeSetzen THEN RETURN
+    ansichtWechseln(ANS_SCHALTPLAN)
+    ansichtLeistenNachziehen()
+END SUB
+
+SUB aufPlatine(knopf AS INTEGER, daten AS INTEGER)
+    IF gKnoepfeSetzen THEN RETURN
+    ansichtWechseln(ANS_PLATINE)
+    ansichtLeistenNachziehen()
+END SUB
+
+SUB aufPlAuswahl(knopf AS INTEGER, daten AS INTEGER)
+    IF gKnoepfeSetzen THEN RETURN
+    plWerkzeug(PW_AUSWAHL)
+END SUB
+
+SUB aufPlBahn(knopf AS INTEGER, daten AS INTEGER)
+    IF gKnoepfeSetzen THEN RETURN
+    plWerkzeug(PW_BAHN)
+END SUB
+
+SUB aufPlTrennen(knopf AS INTEGER, daten AS INTEGER)
+    IF gKnoepfeSetzen THEN RETURN
+    plWerkzeug(PW_TRENNEN)
+END SUB
+
+SUB aufPlEinsetzen(knopf AS INTEGER, daten AS INTEGER)
+    plEinsetzen()
+END SUB
+
+SUB aufPlVerbinden(knopf AS INTEGER, daten AS INTEGER)
+    plVerbinden()
+END SUB
+
+SUB aufPlArt(wahl AS INTEGER, daten AS INTEGER)
+    IF gKnoepfeSetzen THEN RETURN
+    plArtSetzen(IIF(gtk_combo_box_get_active(wahl) = 0, kern.PL_STREIFEN, kern.PL_LOCH))
+END SUB
+
+' Groesse der Platine (Loecher). Was danach ueber den Rand ragt, meldet die
+' Pruefung -- nichts wird still verschoben.
+SUB plGroesseDialog()
+    DIM d AS INTEGER : d = dialogNeu("Platinengroesse")
+    DIM g AS INTEGER : g = gtk_grid_new()
+    gtk_grid_set_row_spacing(g, 6)
+    gtk_grid_set_column_spacing(g, 10)
+    gtk_container_set_border_width(g, 12)
+    DIM fs AS INTEGER : fs = feldNeu(STR$(gDok.platine.spalten))
+    DIM fz AS INTEGER : fz = feldNeu(STR$(gDok.platine.zeilen))
+    gtk_grid_attach(g, etikettNeu("Spalten (Loecher):"), 0, 0, 1, 1)
+    gtk_grid_attach(g, fs, 1, 0, 1, 1)
+    gtk_grid_attach(g, etikettNeu("Zeilen (Loecher):"), 0, 1, 1, 1)
+    gtk_grid_attach(g, fz, 1, 1, 1, 1)
+    gtk_box_pack_start(gtk_dialog_get_content_area(d), g, TRUE, TRUE, 0)
+    gtk_widget_show_all(d)
+    gDlg = d : gDlgFeld1 = fs : gDlgFeld2 = fz
+    DIM ok AS BOOLEAN : ok = gtk_dialog_run(d) = GTK_ANTWORT_OK
+    DIM ts AS STRING : ts = TRIM$(gtk_entry_get_text(fs))
+    DIM tz AS STRING : tz = TRIM$(gtk_entry_get_text(fz))
+    gDlg = 0 : gDlgFeld1 = 0 : gDlgFeld2 = 0
+    gtk_widget_destroy(d)
+    IF NOT ok THEN RETURN
+    DIM sp AS INTEGER, ze AS INTEGER
+    IF NOT kern.ganzzahlLesen(ts, sp) OR NOT kern.ganzzahlLesen(tz, ze) OR sp < 3 OR ze < 3 OR sp > 300 OR ze > 300 THEN
+        meldung("Spalten und Zeilen muessen ganze Zahlen zwischen 3 und 300 sein.")
+        RETURN
+    END IF
+    plGroesseSetzen(sp, ze)
+END SUB
+
+SUB aufPlGroesse(knopf AS INTEGER, daten AS INTEGER)
+    plGroesseDialog()
+END SUB
+
+SUB aufExport(knopf AS INTEGER, daten AS INTEGER)
+    DIM pfad AS STRING : pfad = dateiExportWahl("Netzliste exportieren", "netzliste.cir", ["SPICE (*.cir, *.sp)", "KiCad (*.net)", "CSV (*.csv)", "Text (*.txt)"], ["*.cir;*.sp", "*.net", "*.csv", "*.txt"])
+    IF pfad = "" THEN RETURN
+    IF NOT exportNach(pfad) THEN meldung("Die Netzliste liess sich nicht nach " + pfad + " schreiben.")
+END SUB
+
+' --- Werkzeug-Knoepfe
+SUB aufMessen(knopf AS INTEGER, daten AS INTEGER)
+    IF gKnoepfeSetzen THEN RETURN
+    werkzeugWaehlen(WZ_MESSEN, "")
+END SUB
+
+SUB aufAuswahl(knopf AS INTEGER, daten AS INTEGER)
+    IF gKnoepfeSetzen THEN RETURN
+    werkzeugWaehlen(WZ_AUSWAHL, "")
+END SUB
+
+SUB aufBus(knopf AS INTEGER, daten AS INTEGER)
+    IF gKnoepfeSetzen THEN RETURN
+    werkzeugWaehlen(WZ_BUS, "")
+END SUB
+
+SUB aufDraht(knopf AS INTEGER, daten AS INTEGER)
+    IF gKnoepfeSetzen THEN RETURN
+    werkzeugWaehlen(WZ_DRAHT, "")
+END SUB
+
+SUB aufLabel(knopf AS INTEGER, daten AS INTEGER)
+    IF gKnoepfeSetzen THEN RETURN
+    werkzeugWaehlen(WZ_LABEL, "")
+END SUB
+
+SUB aufSymbol(combo AS INTEGER, daten AS INTEGER)
+    DIM idx AS INTEGER : idx = gtk_combo_box_get_active(combo)
+    IF idx < 0 OR idx >= LEN(gComboIds) THEN RETURN
+    werkzeugWaehlen(WZ_BAUTEIL, gComboIds[idx])
+END SUB
+
+' --- Bauteilliste und eigene Symbole ----------------------------------------
+
+' Die Bauteilliste neu fuellen: eingebaute, dann eigene (ohne Platzhalter).
+' Ohne erzwingen nur, wenn neue eigene Symbole dazukamen (Laden, Einfuegen).
+SUB symbolListeAktualisieren(erzwingen AS BOOLEAN)
+    IF gSymbolWahl = 0 THEN RETURN
+    DIM eigene AS ARRAY OF kern.Symbol : eigene = kern.eigeneSymbole()
+    IF NOT erzwingen AND LEN(eigene) = gComboEigene THEN RETURN
+    gComboEigene = LEN(eigene)
+    gtk_combo_box_text_remove_all(gSymbolWahl)
+    gComboIds = []
+    DIM liste AS ARRAY OF kern.Symbol : liste = kern.bibliothekListe()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(liste) - 1
+        gtk_combo_box_text_append_text(gSymbolWahl, liste[i].name)
+        ARRAY_PUSH(gComboIds, liste[i].id)
+    NEXT
+    FOR i = 0 TO LEN(eigene) - 1
+        IF eigene[i].fehlt THEN CONTINUE
+        gtk_combo_box_text_append_text(gSymbolWahl, eigene[i].name + "  (eigen)")
+        ARRAY_PUSH(gComboIds, eigene[i].id)
+    NEXT
+END SUB
+
+FUNCTION listeHat(id AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gComboIds) - 1
+        IF gComboIds[i] = id THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Das Symbol in der Liste waehlen -- das stellt das Werkzeug aufs Platzieren.
+SUB symbolInListeWaehlen(id AS STRING)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gComboIds) - 1
+        IF gComboIds[i] = id THEN gtk_combo_box_set_active(gSymbolWahl, i)
+    NEXT
+END SUB
+
+FUNCTION bibliotheksPfad$() AS STRING
+    DIM eigen AS STRING : eigen = GETENV$("FUNKENFLUG_BIBLIOTHEK", "")
+    IF eigen <> "" THEN RETURN eigen
+    DIM a AS STRING : a = GETENV$("APPDATA", "")
+    IF a <> "" THEN RETURN PATHJOIN(PATHJOIN(a, "Funkenflug"), "symbole.fkl")
+    DIM x AS STRING : x = GETENV$("XDG_CONFIG_HOME", "")
+    IF x = "" THEN x = PATHJOIN(GETENV$("HOME", "."), ".config")
+    RETURN PATHJOIN(PATHJOIN(x, "funkenflug"), "symbole.fkl")
+END FUNCTION
+
+FUNCTION bibliothekSichern(s AS kern.Symbol) AS BOOLEAN
+    DIM ordner AS STRING : ordner = LEFT$(gBibPfad, LEN(gBibPfad) - LEN(basisName$(gBibPfad)))
+    IF ordner <> "" THEN
+        IF NOT DIREXISTS(ordner) THEN MKDIR(ordner)
+    END IF
+    RETURN kern.bibliothekAufnehmen(s, gBibPfad)
+END FUNCTION
+
+FUNCTION neuesSymbolUI() AS STRING
+    DIM id AS STRING : id = symbolEditor(NEW kern.Symbol("", "", ""), FALSE)
+    IF id = "" THEN RETURN ""
+    symbolListeAktualisieren(TRUE)
+    symbolInListeWaehlen(id)
+    RETURN id
+END FUNCTION
+
+FUNCTION symbolBearbeitenUI(s AS kern.Symbol) AS STRING
+    DIM id AS STRING : id = symbolEditor(s, TRUE)
+    IF id <> "" THEN symbolListeAktualisieren(TRUE)
+    RETURN id
+END FUNCTION
+
+' Knopf "Symbol ...": ein gewaehltes eigenes Symbol bearbeiten, sonst ein
+' neues anlegen.
+SUB aufSymbolEditor(knopf AS INTEGER, daten AS INTEGER)
+    IF gHatGewaehlt THEN
+        IF gGewaehlt.sym.eigen AND NOT gGewaehlt.sym.fehlt THEN
+            DIM r AS STRING : r = symbolBearbeitenUI(gGewaehlt.sym)
+            RETURN
+        END IF
+    END IF
+    DIM n AS STRING : n = neuesSymbolUI()
+END SUB
+
+' --- Stueckliste -------------------------------------------------------------
+
+FUNCTION stuecklisteNach(pfad AS STRING) AS BOOLEAN
+    DIM klein AS STRING : klein = LOWER$(pfad)
+    DIM text AS STRING
+    IF ENDSWITH(klein, ".md") THEN
+        text = kern.stuecklisteMarkdownSp$(gDok, exportTitel$(), bomSpaltenAktuell())
+    ELSEIF ENDSWITH(klein, ".txt") THEN
+        text = kern.stuecklisteTextSp$(gDok, bomSpaltenAktuell())
+    ELSE
+        IF NOT CONTAINS(basisName$(pfad), ".") THEN pfad = pfad + ".csv"
+        text = kern.stuecklisteCsvSp$(gDok, bomSpaltenAktuell())
+    END IF
+    TRY
+        WRITEALL(pfad, text)
+    CATCH e
+        RETURN FALSE
+    END TRY
+    RETURN TRUE
+END FUNCTION
+
+CONST ANTWORT_EXPORT = 1
+
+' --- Stueckliste: Spalten waehlbar (Haken), Vorschau und Export folgen ihnen
+DIM gBomSpalten AS ARRAY OF INTEGER        ' leer = Vorgabe des Dokuments
+DIM gBomHaken AS ARRAY OF INTEGER
+DIM gBomKasten AS INTEGER
+DIM gBomSumme AS INTEGER
+DIM gBomSetzen AS BOOLEAN
+
+FUNCTION bomSpaltenAktuell() AS ARRAY OF INTEGER
+    IF LEN(gBomSpalten) = 0 THEN RETURN kern.bomVorgabeSpalten(gDok)
+    RETURN gBomSpalten
+END FUNCTION
+
+SUB bomTabelleBauen()
+    DIM alt AS INTEGER : alt = gtk_bin_get_child(gBomKasten)
+    IF alt <> 0 THEN gtk_widget_destroy(alt)
+    DIM z AS ARRAY OF kern.BomZeile : z = kern.stuecklisteDok(gDok)
+    DIM sp AS ARRAY OF INTEGER : sp = bomSpaltenAktuell()
+    DIM namen AS ARRAY OF STRING : namen = kern.bomSpaltenNamen()
+    DIM g AS INTEGER : g = gtk_grid_new()
+    gtk_grid_set_column_spacing(g, 18)
+    gtk_grid_set_row_spacing(g, 4)
+    DIM i AS INTEGER, k AS INTEGER
+    FOR k = 0 TO LEN(sp) - 1
+        DIM kl AS INTEGER : kl = gtk_label_new("")
+        gtk_label_set_markup(kl, "<b>" + namen[sp[k]] + "</b>")
+        gtk_label_set_xalign(kl, 0.0)
+        gtk_grid_attach(g, kl, k, 0, 1, 1)
+    NEXT
+    DIM summe AS INTEGER : summe = 0
+    FOR i = 0 TO LEN(z) - 1
+        FOR k = 0 TO LEN(sp) - 1
+            DIM zl AS INTEGER : zl = etikettNeu(kern.bomZelle$(z[i], sp[k], TRUE))
+            IF sp[k] = kern.BS_REFERENZEN THEN
+                gtk_label_set_line_wrap(zl, TRUE)
+                gtk_label_set_max_width_chars(zl, 34)
+            END IF
+            gtk_grid_attach(g, zl, k, i + 1, 1, 1)
+        NEXT
+        summe = summe + z[i].menge
+    NEXT
+    gtk_container_add(gBomKasten, g)
+    gtk_widget_show_all(gBomKasten)
+    gtk_label_set_text(gBomSumme, STR$(summe) + " Bauteile in " + STR$(LEN(z)) + " Positionen (ohne Versorgungssymbole)")
+END SUB
+
+SUB aufBomHaken(knopf AS INTEGER, daten AS INTEGER)
+    IF gBomSetzen THEN RETURN
+    DIM neu AS ARRAY OF INTEGER : neu = []
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(gBomHaken) - 1
+        IF gtk_toggle_button_get_active(gBomHaken[k]) THEN ARRAY_PUSH(neu, k)
+    NEXT
+    IF LEN(neu) = 0 THEN
+        ' mindestens eine Spalte -- den letzten Haken zurueck
+        gBomSetzen = TRUE
+        gtk_toggle_button_set_active(knopf, TRUE)
+        gBomSetzen = FALSE
+        RETURN
+    END IF
+    gBomSpalten = neu
+    bomTabelleBauen()
+END SUB
+
+SUB stuecklisteZeigen()
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Stueckliste", gFenster, GTK_DIALOG_MODAL, "Exportieren ...", ANTWORT_EXPORT, "Schliessen", GTK_ANTWORT_OK, NIL)
+    gtk_window_set_default_size(d, 720, 440)
+    DIM vb AS INTEGER : vb = gtk_box_new(GTK_SENKRECHT, 8)
+    gtk_container_set_border_width(vb, 12)
+    ' Spalten-Haken
+    DIM hk AS INTEGER : hk = gtk_box_new(GTK_WAAGERECHT, 8)
+    gtk_box_pack_start(hk, etikettNeu("Spalten:"), FALSE, FALSE, 0)
+    DIM namen AS ARRAY OF STRING : namen = kern.bomSpaltenNamen()
+    DIM sp AS ARRAY OF INTEGER : sp = bomSpaltenAktuell()
+    gBomHaken = []
+    gBomSetzen = TRUE
+    DIM k AS INTEGER, j AS INTEGER
+    FOR k = 0 TO LEN(namen) - 1
+        DIM h AS INTEGER : h = gtk_check_button_new_with_label(namen[k])
+        DIM an AS BOOLEAN : an = FALSE
+        FOR j = 0 TO LEN(sp) - 1
+            IF sp[j] = k THEN an = TRUE
+        NEXT
+        gtk_toggle_button_set_active(h, an)
+        ARRAY_PUSH(gBomHaken, h)
+        gtk_box_pack_start(hk, h, FALSE, FALSE, 0)
+        signal(h, "toggled", aufBomHaken, 0, 0, 0)
+    NEXT
+    gBomSetzen = FALSE
+    gtk_box_pack_start(vb, hk, FALSE, FALSE, 0)
+    gBomKasten = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_min_content_height(gBomKasten, 280)
+    gtk_box_pack_start(vb, gBomKasten, TRUE, TRUE, 0)
+    gBomSumme = etikettNeu("")
+    gtk_box_pack_start(vb, gBomSumme, FALSE, FALSE, 0)
+    gtk_box_pack_start(gtk_dialog_get_content_area(d), vb, TRUE, TRUE, 0)
+    bomTabelleBauen()
+    gtk_widget_show_all(d)
+    gDlg = d : gDlgFeld1 = 0 : gDlgFeld2 = 0
+    WHILE gtk_dialog_run(d) = ANTWORT_EXPORT
+        DIM pfad AS STRING : pfad = dateiExportWahl("Stueckliste exportieren", "stueckliste.csv", ["CSV (*.csv)", "Markdown (*.md)", "Text (*.txt)"], ["*.csv", "*.md", "*.txt"])
+        IF pfad <> "" THEN
+            IF NOT stuecklisteNach(pfad) THEN meldung("Die Stueckliste liess sich nicht nach " + pfad + " schreiben.")
+        END IF
+    WEND
+    gDlg = 0
+    gBomKasten = 0
+    gtk_widget_destroy(d)
+END SUB
+
+SUB aufStueckliste(knopf AS INTEGER, daten AS INTEGER)
+    stuecklisteZeigen()
+END SUB
+
+SUB aufZurueck(knopf AS INTEGER, daten AS INTEGER)
+    verlaufZurueck()
+END SUB
+
+SUB aufVor(knopf AS INTEGER, daten AS INTEGER)
+    verlaufVor()
+END SUB
+
+' --- Datei
+FUNCTION dateiWahl(sichern AS BOOLEAN) AS STRING
+    DIM titel AS STRING : titel = "Oeffnen"
+    DIM aktion AS INTEGER : aktion = GTK_DATEI_OEFFNEN
+    DIM knopf AS STRING : knopf = "Oeffnen"
+    IF sichern THEN titel = "Speichern" : aktion = GTK_DATEI_SICHERN : knopf = "Speichern"
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new(titel, gFenster, aktion, "Abbrechen", GTK_ANTWORT_ABBRECHEN, knopf, GTK_ANTWORT_ANNEHMEN, NIL)
+    DIM filter AS INTEGER
+    IF NOT sichern THEN
+        filter = gtk_file_filter_new()
+        gtk_file_filter_set_name(filter, "Schaltplaene (*.fkn, *.kicad_sch)")
+        gtk_file_filter_add_pattern(filter, "*.fkn")
+        gtk_file_filter_add_pattern(filter, "*.kicad_sch")
+        gtk_file_chooser_add_filter(d, filter)
+    END IF
+    filter = gtk_file_filter_new()
+    gtk_file_filter_set_name(filter, "Funkenflug (*.fkn)")
+    gtk_file_filter_add_pattern(filter, "*.fkn")
+    gtk_file_chooser_add_filter(d, filter)
+    IF NOT sichern THEN
+        filter = gtk_file_filter_new()
+        gtk_file_filter_set_name(filter, "KiCad-Schaltplan (*.kicad_sch)")
+        gtk_file_filter_add_pattern(filter, "*.kicad_sch")
+        gtk_file_chooser_add_filter(d, filter)
+    END IF
+    IF sichern THEN
+        gtk_file_chooser_set_do_overwrite_confirmation(d, TRUE)
+        gtk_file_chooser_set_current_name(d, IIF(gNameVorschlag <> "", gNameVorschlag, "schaltplan.fkn"))
+    END IF
+    DIM pfad AS STRING : pfad = ""
+    IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
+        DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
+        IF z <> 0 THEN
+            pfad = TEXT_AUS_ZEIGER$(z)
+            g_free(z)
+        END IF
+    END IF
+    gtk_widget_destroy(d)
+    RETURN pfad
+END FUNCTION
+
+FUNCTION startDateiLaden(daten AS INTEGER) AS BOOLEAN
+    dateiLaden(startPfad)
+    RETURN FALSE
+END FUNCTION
+
+SUB aufSpeichern(knopf AS INTEGER, daten AS INTEGER)
+    dateiSpeichern()
+END SUB
+
+SUB aufOeffnen(knopf AS INTEGER, daten AS INTEGER)
+    dateiOeffnen()
+END SUB
+
+SUB fensterZu(objekt AS INTEGER, daten AS INTEGER)
+    gtk_main_quit()
+END SUB
+
+' --- Demo-Schaltung: VCC -> R -> LED -> GND
+FUNCTION demoDokument() AS kern.Dokument
+    DIM d AS kern.Dokument : d = NEW kern.Dokument()
+    DIM bl AS kern.Blatt : bl = d.blaetter[0]
+    DIM vcc AS kern.Bauteil : vcc = kern.neuesBauteil("VCC", kern.neueLage(2000, 1200))
+    ARRAY_PUSH(bl.bauteile, vcc)
+    DIM r AS kern.Bauteil : r = kern.neuesBauteil("R", kern.neueLage(2000, 2000))
+    r.lage.drehung = 90 : r.referenz = "R1" : r.wert = "330"
+    ARRAY_PUSH(bl.bauteile, r)
+    DIM led AS kern.Bauteil : led = kern.neuesBauteil("LED", kern.neueLage(2000, 3000))
+    led.lage.drehung = 90 : led.referenz = "D1"
+    ARRAY_PUSH(bl.bauteile, led)
+    DIM gnd AS kern.Bauteil : gnd = kern.neuesBauteil("GND", kern.neueLage(2000, 3600))
+    ARRAY_PUSH(bl.bauteile, gnd)
+    draht2(bl, 2000, 1200, 2000, 1800)       ' VCC -> R oben
+    draht2(bl, 2000, 2200, 2000, 2800)       ' R unten -> LED oben
+    draht2(bl, 2000, 3200, 2000, 3600)       ' LED unten -> GND
+    kern.autoKnoten(bl)
+    RETURN d
+END FUNCTION
+
+SUB draht2(bl AS kern.Blatt, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    DIM w AS kern.Draht : w = NEW kern.Draht()
+    ARRAY_PUSH(w.punkte, NEW kern.Punkt(x1, y1))
+    ARRAY_PUSH(w.punkte, NEW kern.Punkt(x2, y2))
+    ARRAY_PUSH(bl.draehte, w)
+END SUB
+
+' --- Selbsttest (--foto): spielt die Werkzeuge durch, auch die Dialoge, und
+' prueft Undo/Redo. Gibt Pruefzeilen aus, sichert ein Bild und endet.
+DIM probeSchritt AS INTEGER
+DIM probeText1 AS STRING
+DIM probeText2 AS STRING
+DIM probeText3 AS STRING
+DIM probeText4 AS STRING
+CONST PROBE_LASSEN = "<lassen>"     ' dieses Feld nicht anfassen
+DIM probeHaken AS INTEGER         ' 0: Haken lassen, 1: setzen, 2: loesen
+DIM probeUndo0 AS INTEGER
+DIM probeName0 AS STRING
+DIM probeSpZoom AS FLOAT
+DIM probeZahl0 AS INTEGER
+
+FUNCTION vorzeichen(a AS INTEGER) AS INTEGER
+    IF a > 0 THEN RETURN 1
+    IF a < 0 THEN RETURN -1
+    RETURN 0
+END FUNCTION
+DIM probeFehler AS INTEGER
+
+SUB pruefe(was AS STRING, ist AS STRING, soll AS STRING)
+    IF ist = soll THEN
+        PRINT "ok    "; was; " = "; ist
+    ELSE
+        PRINT "FEHLER "; was; " = "; ist; " (erwartet "; soll; ")"
+        probeFehler = probeFehler + 1
+    END IF
+END SUB
+
+FUNCTION ptListe$(w AS kern.Draht) AS STRING
+    DIM t AS STRING : t = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(w.punkte) - 1
+        IF i > 0 THEN t = t + " "
+        t = t + STR$(w.punkte[i].x) + "," + STR$(w.punkte[i].y)
+    NEXT
+    RETURN t
+END FUNCTION
+
+' Fuellt den Symbol-Editor aus (laeuft in dessen Schleife). Schritt 1: eine
+' Pinliste mit doppelter Nummer -- der Dialog muss offen bleiben. Schritt 2:
+' eine gute. Schritt 11: beim Bearbeiten einen Pin anhaengen.
+DIM seProbeSchritt AS INTEGER
+FUNCTION seProbe(daten AS INTEGER) AS BOOLEAN
+    IF seDlg = 0 THEN RETURN TRUE
+    DIM lf AS STRING : lf = CHR$(10)
+    seProbeSchritt = seProbeSchritt + 1
+    SELECT CASE seProbeSchritt
+        CASE 1
+            gtk_entry_set_text(seName, "LM358H")
+            gtk_entry_set_text(seWert, "LM358")
+            seTextSetzen("1 OUTA rechts aus" + lf + "2 INA- links ein" + lf + "2 INA+ links ein")
+            gtk_toggle_button_set_active(seHaken, TRUE)
+            gtk_dialog_response(seDlg, GTK_ANTWORT_OK)
+            RETURN TRUE
+        CASE 2
+            pruefe("Editor zeigt den Fehler", STR$(CONTAINS(gtk_label_get_text(seMeldung), "gibt es schon")), STR$(TRUE))
+            seTextSetzen("1 OUTA rechts aus" + lf + "2 INA- links ein" + lf + "3 INA+ links ein" + lf + "4 GND unten vin" + lf + "8 VCC oben vin")
+            gtk_dialog_response(seDlg, GTK_ANTWORT_OK)
+        CASE 11
+            seTextSetzen(seTextLesen$() + lf + "5 INB+ links ein")
+            gtk_dialog_response(seDlg, GTK_ANTWORT_OK)
+        CASE 21
+            ' mit der Maus zeichnen: jede Aktion wird eine Zeile
+            seTextSetzen("")
+            gtk_entry_set_text(seName, "Gezeichnet")
+            seEinpassen(gtk_widget_get_allocated_width(seVorschau), gtk_widget_get_allocated_height(seVorschau), seSymbol())
+            gtk_button_clicked(seKnoepfe[SE_RECHTECK - 1])
+            pruefe("Editor: Werkzeug Rechteck", STR$(seWz) + " " + STR$(gtk_toggle_button_get_active(seKnoepfe[SE_RECHTECK - 1])), STR$(SE_RECHTECK) + " " + STR$(TRUE))
+            seMaus(1, seSchirmX(-400), seSchirmY(-300), 1)
+            seMaus(3, seSchirmX(400), seSchirmY(300), 0)
+            seMaus(4, seSchirmX(400), seSchirmY(300), 1)
+            pruefe("Rechteck aufgezogen = Zeile", seTextLesen$(), "rechteck -4 -3 4 3")
+            gtk_button_clicked(seKnoepfe[SE_LINIE - 1])
+            seMaus(1, seSchirmX(-200), seSchirmY(150), 1)
+            seMaus(1, seSchirmX(0), seSchirmY(-150), 1)
+            seMaus(1, seSchirmX(200), seSchirmY(150), 1)
+            seMaus(1, seSchirmX(200), seSchirmY(150), 1)
+            seMaus(2, seSchirmX(200), seSchirmY(150), 1)
+            pruefe("Linie geklickt, Doppelklick beendet", STR$(CONTAINS(seTextLesen$(), lf + "linie -2 1.5 0 -1.5 2 1.5")) + " " + STR$(LEN(sePunkte)), STR$(TRUE) + " 0")
+            gtk_button_clicked(seKnoepfe[SE_KREIS - 1])
+            seMaus(1, seSchirmX(0), seSchirmY(0), 1)
+            seMaus(3, seSchirmX(100), seSchirmY(0), 0)
+            seMaus(4, seSchirmX(100), seSchirmY(0), 1)
+            pruefe("Kreis gezogen", STR$(CONTAINS(seTextLesen$(), lf + "kreis 0 0 1")), STR$(TRUE))
+            gtk_button_clicked(seKnoepfe[SE_PIN - 1])
+            seMaus(1, seSchirmX(-720), seSchirmY(20), 1)
+            seMaus(1, seSchirmX(700), seSchirmY(0), 1)
+            pruefe("Pins nach aussen, Nummern fortlaufend", STR$(CONTAINS(seTextLesen$(), lf + "pin 1 - -7 0 links")) + " " + STR$(CONTAINS(seTextLesen$(), lf + "pin 2 - 7 0 rechts")), STR$(TRUE) + " " + STR$(TRUE))
+            gtk_button_clicked(seKnoepfe[SE_LOESCHEN - 1])
+            seMaus(1, seSchirmX(0), seSchirmY(100), 1)
+            pruefe("Loeschen nimmt den Kreis", STR$(CONTAINS(seTextLesen$(), "kreis")) + " " + STR$(CONTAINS(seTextLesen$(), "linie")), STR$(FALSE) + " " + STR$(TRUE))
+            seRueckgaengig()
+            pruefe("Rueckgaengig im Editor", STR$(CONTAINS(seTextLesen$(), "kreis 0 0 1")), STR$(TRUE))
+            seMaus(1, seSchirmX(700 - 150), seSchirmY(0), 1)
+            pruefe("Loeschen trifft den Pin-Stummel", STR$(CONTAINS(seTextLesen$(), "pin 2")), STR$(FALSE))
+            seRueckgaengig()
+            gtk_button_clicked(seKnoepfe[SE_LOESCHEN - 1])
+            pruefe("Werkzeug wieder aus", STR$(seWz), STR$(SE_KEINS))
+            pruefe("Meldung zaehlt mit", STR$(CONTAINS(gtk_label_get_text(seMeldung), "2 frei gesetzt, 3 Grafik-Elemente (ohne Rechteck)")), STR$(TRUE))
+            ' Bogen: Mitte, Anfang, Ende
+            gtk_button_clicked(seKnoepfe[SE_BOGEN - 1])
+            seMaus(1, seSchirmX(0), seSchirmY(0), 1)
+            seMaus(1, seSchirmX(300), seSchirmY(0), 1)
+            seMaus(1, seSchirmX(0), seSchirmY(300), 1)
+            pruefe("Bogen mit drei Klicks", STR$(CONTAINS(seTextLesen$(), lf + "bogen 0 0 3 0 90")), STR$(TRUE))
+            ' Text: klicken, der Dialog fragt den Inhalt
+            gtk_button_clicked(seKnoepfe[SE_TEXT - 1])
+            probeText1 = "~{EN}"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            seMaus(1, seSchirmX(0), seSchirmY(-400), 1)
+            pruefe("Text an der Klickstelle", STR$(CONTAINS(seTextLesen$(), lf + "text 0 -4 ~{EN}")), STR$(TRUE))
+            ' Verschieben: das Rechteck an seiner linken Kante fassen
+            gtk_button_clicked(seKnoepfe[SE_VERSCHIEBEN - 1])
+            DIM sz0 AS INTEGER : sz0 = LEN(seStapel)
+            seMaus(1, seSchirmX(-400), seSchirmY(250), 1)
+            seMaus(3, seSchirmX(-350), seSchirmY(280), 0)
+            seMaus(3, seSchirmX(-300), seSchirmY(300), 0)
+            seMaus(4, seSchirmX(-300), seSchirmY(300), 1)
+            pruefe("Rechteck verschoben (0,5 mm), ein Schritt", STR$(CONTAINS(seTextLesen$(), "rechteck -3 -2.5 5 3.5")) + " " + STR$(CONTAINS(seTextLesen$(), "rechteck -4 -3 4 3")) + " " + STR$(LEN(seStapel) - sz0), STR$(TRUE) + " " + STR$(FALSE) + " 1")
+            seRueckgaengig()
+            pruefe("Rueckgaengig: Rechteck zurueck", STR$(CONTAINS(seTextLesen$(), "rechteck -4 -3 4 3")), STR$(TRUE))
+            ' ein Pin springt auf das 1-mm-Raster
+            seMaus(1, seSchirmX(700), seSchirmY(0), 1)
+            seMaus(3, seSchirmX(720), seSchirmY(140), 0)
+            seMaus(4, seSchirmX(720), seSchirmY(140), 1)
+            pruefe("Pin verschoben (1 mm)", STR$(CONTAINS(seTextLesen$(), "pin 2 - 7 1 rechts")), STR$(TRUE))
+            seRueckgaengig()
+            ' ein Klick ins Leere verschiebt nichts
+            DIM sz1 AS INTEGER : sz1 = LEN(seStapel)
+            seMaus(1, seSchirmX(-1000), seSchirmY(-1000), 1)
+            seMaus(4, seSchirmX(-900), seSchirmY(-900), 1)
+            pruefe("Ins Leere: nichts passiert", STR$(LEN(seStapel) - sz1), "0")
+            IF fotoZiel <> "" THEN
+                seMaus(3, seSchirmX(300), seSchirmY(-500), 0)
+                IF gtkFoto(seVorschau, fotoZiel + ".editor.png") THEN PRINT "Foto Editor gesichert"
+            END IF
+            gtk_button_clicked(seKnoepfe[SE_VERSCHIEBEN - 1])
+            gtk_dialog_response(seDlg, GTK_ANTWORT_OK)
+    END SELECT
+    RETURN FALSE
+END FUNCTION
+
+' Stueckliste im Selbsttest: Haken bedienen wie mit der Maus, Tabelle pruefen.
+FUNCTION bomProbe(daten AS INTEGER) AS BOOLEAN
+    IF gBomKasten = 0 THEN RETURN TRUE
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(gBomHaken) - 1
+        gtk_toggle_button_set_active(gBomHaken[k], k = kern.BS_REFERENZEN OR k = kern.BS_BAUFORM OR k = kern.BS_MENGE)
+    NEXT
+    gtk_toggle_button_set_active(gBomHaken[kern.BS_MENGE], FALSE)
+    ' der letzte Haken laesst sich nicht wegnehmen
+    gtk_toggle_button_set_active(gBomHaken[kern.BS_REFERENZEN], FALSE)
+    gtk_toggle_button_set_active(gBomHaken[kern.BS_BAUFORM], FALSE)
+    pruefe("Letzte Spalte bleibt", STR$(LEN(gBomSpalten)) + " " + STR$(gtk_toggle_button_get_active(gBomHaken[kern.BS_BAUFORM])), "1 " + STR$(TRUE))
+    gtk_toggle_button_set_active(gBomHaken[kern.BS_REFERENZEN], TRUE)
+    gtk_dialog_response(gDlg, GTK_ANTWORT_OK)
+    RETURN FALSE
+END FUNCTION
+
+' Fuellt den offenen Dialog aus und bestaetigt ihn (laeuft in dessen Schleife).
+FUNCTION dialogBestaetigen(daten AS INTEGER) AS BOOLEAN
+    IF gDlg = 0 THEN RETURN TRUE                 ' noch nicht offen: nochmal
+    IF gDlgFeld1 <> 0 AND probeText1 <> PROBE_LASSEN THEN gtk_entry_set_text(gDlgFeld1, probeText1)
+    IF gDlgFeld2 <> 0 AND probeText2 <> PROBE_LASSEN THEN gtk_entry_set_text(gDlgFeld2, probeText2)
+    IF gDlgFeld3 <> 0 AND probeText3 <> PROBE_LASSEN THEN gtk_entry_set_text(gDlgFeld3, probeText3)
+    IF gDlgFeld4 <> 0 AND probeText4 <> PROBE_LASSEN THEN gtk_entry_set_text(gDlgFeld4, probeText4)
+    IF gDlgHaken <> 0 AND probeHaken > 0 THEN gtk_toggle_button_set_active(gDlgHaken, probeHaken = 1)
+    gtk_dialog_response(gDlg, GTK_ANTWORT_OK)
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION probe(daten AS INTEGER) AS BOOLEAN
+    probeSchritt = probeSchritt + 1
+    SELECT CASE probeSchritt
+        CASE 1
+            ' die echten Knoepfe und die Bauteilliste (wie ein Mausklick)
+            gtk_button_clicked(gKnopfDraht)
+            pruefe("Knopf Draht", STR$(gWerkzeug) + " " + STR$(gtk_toggle_button_get_active(gKnopfAuswahl)) + "/" + STR$(gtk_toggle_button_get_active(gKnopfDraht)), STR$(WZ_DRAHT) + " " + STR$(FALSE) + "/" + STR$(TRUE))
+            gtk_button_clicked(gKnopfLabel)
+            pruefe("Knopf Label", STR$(gWerkzeug) + " " + STR$(gtk_toggle_button_get_active(gKnopfDraht)) + "/" + STR$(gtk_toggle_button_get_active(gKnopfLabel)), STR$(WZ_LABEL) + " " + STR$(FALSE) + "/" + STR$(TRUE))
+            gtk_combo_box_set_active(gSymbolWahl, 1)
+            pruefe("Bauteilliste waehlt Platzieren", STR$(gWerkzeug) + " " + gSymbolRef + " " + STR$(gtk_toggle_button_get_active(gKnopfLabel)), STR$(WZ_BAUTEIL) + " C " + STR$(FALSE))
+            gtk_button_clicked(gKnopfAuswahl)
+            pruefe("Knopf Auswahl", STR$(gWerkzeug) + " " + STR$(gtk_toggle_button_get_active(gKnopfAuswahl)), STR$(WZ_AUSWAHL) + " " + STR$(TRUE))
+            gtk_button_clicked(gKnopfAuswahl)
+            pruefe("Auswahl nochmal: bleibt an", STR$(gWerkzeug) + " " + STR$(gtk_toggle_button_get_active(gKnopfAuswahl)), STR$(WZ_AUSWAHL) + " " + STR$(TRUE))
+            ' ein Bauteil per Werkzeug setzen
+            werkzeugWaehlen(WZ_BAUTEIL, "C")
+            gMausWX = 3000 : gMausWY = 2000 : gMausDrin = TRUE
+            bauteilPlatzieren()
+            pruefe("C platziert, Referenz", gBlatt.bauteile[4].referenz, "C1")
+            ' zweites C: fortlaufende Referenz, dann wieder loeschen
+            gMausWX = 3000 : gMausWY = 4400
+            bauteilPlatzieren()
+            pruefe("zweites C, Referenz", gBlatt.bauteile[5].referenz, "C2")
+            auswahlLoeschen(FALSE)
+            pruefe("C2 geloescht, Bauteile", STR$(LEN(gBlatt.bauteile)), "5")
+        CASE 2
+            ' Draht mit doppeltem Endpunkt (wie beim Doppelklick)
+            werkzeugWaehlen(WZ_DRAHT, "")
+            gDrahtAktiv = TRUE
+            gDrahtPunkte = []
+            ARRAY_PUSH(gDrahtPunkte, NEW kern.Punkt(3200, 2000))
+            ARRAY_PUSH(gDrahtPunkte, NEW kern.Punkt(3600, 2000))
+            ARRAY_PUSH(gDrahtPunkte, NEW kern.Punkt(3600, 2600))
+            ARRAY_PUSH(gDrahtPunkte, NEW kern.Punkt(3600, 2600))
+            drahtEndePunkt()
+            pruefe("Drahtecken ohne Doppelpunkt", STR$(LEN(gBlatt.draehte[3].punkte)), "3")
+        CASE 3
+            ' Label per Dialog auf den VCC-Draht setzen
+            werkzeugWaehlen(WZ_LABEL, "")
+            gMausWX = 2000 : gMausWY = 1500
+            probeText1 = "VCC5"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            labelSetzen()
+            pruefe("Labels", STR$(LEN(gBlatt.labels)), "1")
+            pruefe("Labeltext", gBlatt.labels[0].text, "VCC5")
+            ' zweites gleichnamiges Label am offenen Draht des C -> selbes Netz
+            gMausWX = 3600 : gMausWY = 2600
+            g_timeout_add(150, dialogBestaetigen, 0)
+            labelSetzen()
+            pruefe("Label 1 am Klickpunkt", STR$(gBlatt.labels[0].anker.x) + "," + STR$(gBlatt.labels[0].anker.y), "2000,1500")
+            pruefe("Label 2 am Klickpunkt", STR$(gBlatt.labels[1].anker.x) + "," + STR$(gBlatt.labels[1].anker.y), "3600,2600")
+            DIM n AS kern.Netze : n = kern.netzeBerechnen(gBlatt)
+            pruefe("Label verbindet VCC-Pin mit C-Draht", STR$(n.gleich(2000, 1200, 3200, 2000)), STR$(TRUE))
+        CASE 4
+            ' Eigenschaften per Dialog
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            probeText1 = "R7"
+            probeText2 = "4k7"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            eigenschaftenDialog(gBlatt.bauteile[1])
+            pruefe("Referenz nach Dialog", gBlatt.bauteile[1].referenz, "R7")
+            pruefe("Wert nach Dialog", gBlatt.bauteile[1].wert, "4k7")
+            ' doppelte Referenz wird abgelehnt (die Warnung bestaetigt der Timer)
+            probeText1 = "D1"
+            probeText2 = "4k7"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            g_timeout_add(400, dialogBestaetigen, 0)
+            eigenschaftenDialog(gBlatt.bauteile[1])
+            pruefe("Doppelte Referenz abgelehnt", gBlatt.bauteile[1].referenz, "R7")
+        CASE 5
+            ' Undo / Redo
+            verlaufZurueck()
+            pruefe("Undo: Referenz zurueck", gBlatt.bauteile[1].referenz, "R1")
+            pruefe("Undo: Wert zurueck", gBlatt.bauteile[1].wert, "330")
+            verlaufZurueck()
+            pruefe("Undo: zweites Label weg", STR$(LEN(gBlatt.labels)), "1")
+            verlaufVor()
+            verlaufVor()
+            pruefe("Redo: Referenz wieder", gBlatt.bauteile[1].referenz, "R7")
+            pruefe("Redo: Labels wieder", STR$(LEN(gBlatt.labels)), "2")
+            ' Verschieben = EIN Undo-Schritt, auch ueber viele Bewegungen
+            DIM vorher AS INTEGER : vorher = LEN(gUndo)
+            waehleB(gBlatt.bauteile[4])
+            gMausWX = 3000 : gMausWY = 2000
+            gruppenZugBeginn()
+            gruppenZiehenUm(0, 0)                  ' keine Bewegung: kein Schritt
+            gruppenZiehenUm(100, 0)
+            gruppenZiehenUm(200, 100)
+            gruppenZugEnde()
+            pruefe("Ziehen = ein Undo-Schritt", STR$(LEN(gUndo) - vorher), "1")
+            verlaufZurueck()
+            pruefe("Undo Ziehen: x zurueck", STR$(gBlatt.bauteile[4].lage.pos.x), "3000")
+            ' fuers Bild: R7 gewaehlt
+            waehleB(gBlatt.bauteile[1])
+            statusAktualisieren()
+        CASE 6
+            ' Draehte: treffen, Segment ziehen (Verbindung bleibt), Segment und
+            ' ganzen Draht loeschen -- jeweils per Undo zurueck
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            DIM wi AS INTEGER, si AS INTEGER
+            DIM getroffen AS BOOLEAN : getroffen = drahtUnter(sx(3600), sy(2300), wi, si)
+            pruefe("Draht getroffen (Draht/Segment)", STR$(wi) + "/" + STR$(si), "3/1")
+            gMausRX = 3600 : gMausRY = 2300 : gMausWX = 3600 : gMausWY = 2300
+            drahtWaehlen(wi, si)
+            drahtZiehBeginn()
+            drahtZiehenUm(400, 300)                ' senkrechtes Segment: nur waagrecht
+            drahtZiehEnde()
+            pruefe("Segment gezogen, Ende bleibt am Label", ptListe$(gBlatt.draehte[3]), "3200,2000 4000,2000 4000,2600 3600,2600")
+            pruefe("Verbindung C1 ~ Label bleibt", STR$(aktuelleNetze().gleich(3200, 2000, 3600, 2600)), STR$(TRUE))
+            verlaufZurueck()
+            pruefe("Undo Ziehen", ptListe$(gBlatt.draehte[3]), "3200,2000 3600,2000 3600,2600")
+            getroffen = drahtUnter(sx(3400), sy(2000), wi, si)
+            gMausRX = 3400 : gMausRY = 2000
+            drahtWaehlen(wi, si)
+            auswahlLoeschen(FALSE)
+            pruefe("Segment geloescht, Draehte", STR$(LEN(gBlatt.draehte)), "4")
+            pruefe("C1 vom Label getrennt", STR$(aktuelleNetze().gleich(3200, 2000, 3600, 2600)), STR$(FALSE))
+            verlaufZurueck()
+            drahtWaehlen(3, 0)
+            auswahlLoeschen(TRUE)
+            pruefe("ganzer Draht geloescht, Draehte", STR$(LEN(gBlatt.draehte)), "3")
+            verlaufZurueck()
+            pruefe("Undo: Draehte wieder", STR$(LEN(gBlatt.draehte)), "4")
+        CASE 7
+            ' Umbenennen: Label an allen Stellen, Versorgung ueber den Draht,
+            ' automatisches Netz bekommt ein Label, Zusammenfuehren fragt nach
+            DIM fragenVorher AS INTEGER : fragenVorher = gFragen
+            auswahlAufheben()
+            waehleL(gBlatt.labels[0])
+            probeText1 = "SIG"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            umbenennenAuswahl()
+            pruefe("Label an allen Stellen", gBlatt.labels[0].text + "/" + gBlatt.labels[1].text, "SIG/SIG")
+            ' GND ueber seinen Draht umbenennen
+            gMausRX = 2000 : gMausRY = 3400
+            drahtWaehlen(2, 0)
+            probeText1 = "AGND"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            umbenennenAuswahl()
+            pruefe("Versorgung umbenannt", gBlatt.bauteile[3].wert, "AGND")
+            pruefe("Netzname am Draht", aktuelleNetze().liste[aktuelleNetze().netzAn(2000, 3200)].name, "AGND")
+            pruefe("AGND bleibt SPICE-Masse", STR$(CONTAINS(kern.netzlisteSpiceDok$(gDok, "P"), " 0 D_LED")), STR$(TRUE))
+            ' automatisches Netz R7-D1: ein Label entsteht am Klickpunkt
+            gMausRX = 2000 : gMausRY = 2500
+            drahtWaehlen(1, 0)
+            probeText1 = "LED_A"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            umbenennenAuswahl()
+            pruefe("neues Label", STR$(LEN(gBlatt.labels)) + " " + gBlatt.labels[2].text + " @" + STR$(gBlatt.labels[2].anker.x) + "," + STR$(gBlatt.labels[2].anker.y), "3 LED_A @2000,2500")
+            pruefe("ohne Rueckfrage bisher", STR$(gFragen - fragenVorher), "0")
+            ' LED_A -> SIG: SIG liegt auf dem VCC-Netz -> Rueckfrage, dann verbunden
+            auswahlAufheben()
+            waehleL(gBlatt.labels[2])
+            probeText1 = "SIG"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            g_timeout_add(400, dialogBestaetigen, 0)
+            umbenennenAuswahl()
+            pruefe("Zusammenfuehren fragt nach", STR$(gFragen - fragenVorher), "1")
+            pruefe("Netze verbunden", STR$(aktuelleNetze().gleich(2000, 2200, 2000, 1200)), STR$(TRUE))
+            ' alles zurueck
+            verlaufZurueck()
+            verlaufZurueck()
+            verlaufZurueck()
+            verlaufZurueck()
+            pruefe("Undo: Namen zurueck", gBlatt.labels[0].text + " " + gBlatt.bauteile[3].wert + "|" + STR$(LEN(gBlatt.labels)), "VCC5 |2")
+        CASE 8
+            ' Gummiband: R7 nach rechts ziehen, beide Draehte folgen mit Knick
+            waehleB(gBlatt.bauteile[1])
+            gMausWX = 2000 : gMausWY = 2000
+            gruppenZugBeginn()
+            gruppenZiehenUm(300, 0)
+            gruppenZiehenUm(500, 0)
+            gruppenZugEnde()
+            pruefe("R7 verschoben", STR$(gBlatt.bauteile[1].lage.pos.x) + "," + STR$(gBlatt.bauteile[1].lage.pos.y), "2500,2000")
+            pruefe("Draht oben folgt", ptListe$(gBlatt.draehte[0]), "2000,1200 2000,1800 2500,1800")
+            pruefe("Draht unten folgt", ptListe$(gBlatt.draehte[1]), "2500,2200 2000,2200 2000,2800")
+            pruefe("R7 bleibt an VCC", STR$(aktuelleNetze().gleich(2500, 1800, 2000, 1200)), STR$(TRUE))
+            pruefe("R7 bleibt an D1", STR$(aktuelleNetze().gleich(2500, 2200, 2000, 2800)), STR$(TRUE))
+            verlaufZurueck()
+            pruefe("Undo Gummiband", ptListe$(gBlatt.draehte[0]) + " | " + STR$(gBlatt.bauteile[1].lage.pos.x), "2000,1200 2000,1800 | 2000")
+        CASE 9
+            ' Rahmen waehlt alles ganz Umschlossene
+            auswahlAufheben()
+            rahmenAnwendenWelt(1500, 1000, 2600, 3000)
+            pruefe("Rahmen", STR$(LEN(gSelB)) + " Bauteile, " + STR$(LEN(gSelD)) + " Draehte, " + STR$(LEN(gSelL)) + " Labels", "2 Bauteile, 2 Draehte, 1 Labels")
+            umschaltenB(gBlatt.bauteile[2])
+            pruefe("Umschalten dazu", STR$(LEN(gSelB)), "3")
+            umschaltenB(gBlatt.bauteile[2])
+            pruefe("Umschalten weg", STR$(LEN(gSelB)), "2")
+            ' kopieren und an der Maus einfuegen
+            ablageKopieren()
+            gMausDrin = TRUE : gMausWX = 5000 : gMausWY = 1000
+            ablageEinfuegen()
+            pruefe("eingefuegt (Bauteile/Draehte/Labels)", STR$(LEN(gBlatt.bauteile)) + "/" + STR$(LEN(gBlatt.draehte)) + "/" + STR$(LEN(gBlatt.labels)), "7/6/3")
+            pruefe("neue Referenz", gBlatt.bauteile[6].referenz, "R8")
+            pruefe("Kopie an der Maus", STR$(gBlatt.bauteile[5].lage.pos.x) + "," + STR$(gBlatt.bauteile[5].lage.pos.y), "5000,1000")
+            pruefe("Kopie haengt am VCC-Netz", STR$(aktuelleNetze().gleich(5000, 1600, 2000, 1200)), STR$(TRUE))
+            pruefe("Eingefuegtes ist gewaehlt", STR$(auswahlAnzahl()), "5")
+            ' die Kopie als Gruppe ziehen, dann loeschen
+            gMausWX = 5000 : gMausWY = 1800
+            gruppenZugBeginn()
+            gruppenZiehenUm(0, 200)
+            gruppenZugEnde()
+            pruefe("Gruppe gezogen", STR$(gBlatt.bauteile[6].lage.pos.y) + " " + ptListe$(gBlatt.draehte[4]), "2000 5000,1200 5000,1800")
+            auswahlLoeschen(FALSE)
+            pruefe("Gruppe geloescht", STR$(LEN(gBlatt.bauteile)) + "/" + STR$(LEN(gBlatt.draehte)) + "/" + STR$(LEN(gBlatt.labels)), "5/4/2")
+            verlaufZurueck()
+            verlaufZurueck()
+            verlaufZurueck()
+            pruefe("Undo bis vor das Einfuegen", STR$(LEN(gBlatt.bauteile)) + "/" + STR$(LEN(gBlatt.draehte)), "5/4")
+            ' ausschneiden und wieder einfuegen: R7 behaelt seine Referenz
+            waehleB(gBlatt.bauteile[1])
+            ablageAusschneiden()
+            pruefe("ausgeschnitten", STR$(LEN(gBlatt.bauteile)), "4")
+            gMausWX = 2000 : gMausWY = 2000
+            ablageEinfuegen()
+            pruefe("wieder eingefuegt, Referenz", gBlatt.bauteile[4].referenz, "R7")
+            verlaufZurueck()
+            verlaufZurueck()
+            pruefe("Undo Ausschneiden", gBlatt.bauteile[1].referenz + "/" + STR$(LEN(gBlatt.bauteile)), "R7/5")
+            ' der Weg ueber den Klick-Handler: Klick ins Leere zieht einen
+            ' Rahmen, Loslassen waehlt; Umschalt-Klick nimmt D1 dazu; Klick auf
+            ' ein gewaehltes Element zieht die ganze Gruppe
+            gMausRX = 1500 : gMausRY = 1000
+            klickAuswahl(sx(1500), sy(1000), FALSE)
+            pruefe("Klick ins Leere startet Rahmen", STR$(gRahmen), STR$(TRUE))
+            gRahmenEX = sx(2600) : gRahmenEY = sy(3000)
+            DIM los AS BOOLEAN : los = lwLos(0, 0, 0)
+            pruefe("Rahmen per Maus", STR$(auswahlAnzahl()), "5")
+            gMausRX = 2000 : gMausRY = 3000
+            klickAuswahl(sx(2000), sy(3000), TRUE)
+            pruefe("Umschalt-Klick nimmt D1 dazu", STR$(LEN(gSelB)), "3")
+            gMausWX = 2000 : gMausWY = 3000
+            klickAuswahl(sx(2000), sy(3000), FALSE)
+            gruppenZiehenUm(1000, 0)
+            los = lwLos(0, 0, 0)
+            pruefe("Gruppe per Klick gezogen", STR$(gBlatt.bauteile[1].lage.pos.x) + "/" + STR$(gBlatt.bauteile[2].lage.pos.x) + "/" + STR$(gBlatt.bauteile[3].lage.pos.x), "3000/3000/2000")
+            pruefe("GND bleibt per Gummiband dran", STR$(aktuelleNetze().gleich(3000, 3200, 2000, 3600)), STR$(TRUE))
+            verlaufZurueck()
+            alleWaehlen()
+            pruefe("Strg+A", STR$(auswahlAnzahl()), "11")
+            auswahlAufheben()
+        CASE 10
+            ' Symbol-Editor: erst eine fehlerhafte Pinliste (Dialog bleibt
+            ' offen, Fehler steht da), dann eine gute
+            seProbeSchritt = 0
+            g_timeout_add(200, seProbe, 0)
+            DIM neueId AS STRING : neueId = neuesSymbolUI()
+            pruefe("Editor: Fehler hielt den Dialog offen", STR$(seProbeSchritt), "2")
+            pruefe("Editor: neue Id", LEFT$(neueId, 2), "E_")
+            DIM es AS kern.Symbol : es = kern.bibliothekSymbol(neueId)
+            pruefe("Symbol: Name/Pins", es.name + "/" + STR$(LEN(es.pins)), "LM358H/5")
+            pruefe("in der Bauteilliste", STR$(listeHat(neueId)), STR$(TRUE))
+            pruefe("in der Bibliothek gesichert", STR$(FILEEXISTS(gBibPfad) AND kern.inBibliothek(neueId)), STR$(TRUE))
+            pruefe("Werkzeug steht aufs Platzieren", STR$(gWerkzeug = WZ_BAUTEIL AND gSymbolRef = neueId), STR$(TRUE))
+            gMausWX = 5000 : gMausWY = 2000 : gMausDrin = TRUE
+            bauteilPlatzieren()
+            pruefe("Referenz", gBlatt.bauteile[5].referenz, "U1")
+            ' die Pin-Typen kommen beim ERC an
+            DIM ercU AS ARRAY OF kern.Verstoss : ercU = kern.ercPruefenDok(gDok)
+            DIM ercT AS STRING : ercT = ""
+            DIM eu AS INTEGER
+            FOR eu = 0 TO LEN(ercU) - 1
+                ercT = ercT + ercU[eu].text + "|"
+            NEXT
+            pruefe("ERC kennt den Eingang", STR$(CONTAINS(ercT, "Eingang ohne Treiber")), STR$(TRUE))
+            pruefe("ERC nennt den Pin", STR$(CONTAINS(ercT, "Pin U1.1 (OUTA) ist nicht verbunden")), STR$(TRUE))
+            pruefe("Symbol reist in der Datei mit", STR$(CONTAINS(JSON_STRINGIFY(kern.dokumentNachJson(gDok)), neueId)), STR$(TRUE))
+            ' bearbeiten: ein Pin mehr -> das Bauteil aendert sich mit, ein Undo-Schritt
+            waehleB(gBlatt.bauteile[5])
+            seProbeSchritt = 10
+            g_timeout_add(200, seProbe, 0)
+            DIM eid AS STRING : eid = symbolBearbeitenUI(gGewaehlt.sym)
+            pruefe("Bearbeiten: gleiche Id", STR$(eid = neueId), STR$(TRUE))
+            pruefe("Bearbeiten: Bauteil hat jetzt 6 Pins", STR$(LEN(gBlatt.bauteile[5].sym.pins)), "6")
+            verlaufZurueck()
+            pruefe("Undo Bearbeiten: wieder 5 Pins", STR$(LEN(gBlatt.bauteile[5].sym.pins)), "5")
+            verlaufZurueck()
+            pruefe("Undo Platzieren", STR$(LEN(gBlatt.bauteile)), "5")
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+        CASE 11
+            ' Stueckliste: Dialog oeffnen und schliessen, Inhalt, Export
+            g_timeout_add(200, dialogBestaetigen, 0)
+            stuecklisteZeigen()
+            pruefe("Stueckliste-Dialog wieder zu", STR$(gDlg), "0")
+            DIM bz AS ARRAY OF kern.BomZeile : bz = kern.stuecklisteDok(gDok)
+            pruefe("Stueckliste: Positionen", STR$(LEN(bz)), "3")
+            pruefe("Stueckliste: Reihenfolge", bz[0].referenzen[0] + " " + bz[1].referenzen[0] + " " + bz[2].referenzen[0], "C1 D1 R7")
+            IF fotoZiel <> "" THEN pruefe("Stueckliste als Markdown", STR$(stuecklisteNach(fotoZiel + ".md")), STR$(TRUE))
+            pruefe("Markdown-Tabelle", STR$(CONTAINS(kern.stuecklisteMarkdown$(gDok, "P"), "| 1 | R7 | 4k7 | Widerstand |")), STR$(TRUE))
+        CASE 12
+            ' Drehen: R7 einzeln um 90 Grad -- beide Draehte folgen, ohne Kurzschluss
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            waehleB(gBlatt.bauteile[1])
+            DIM vorD AS INTEGER : vorD = LEN(gUndo)
+            auswahlDrehen()
+            DIM nd AS kern.Netze : nd = aktuelleNetze()
+            pruefe("R7 gedreht", STR$(gBlatt.bauteile[1].lage.drehung), "180")
+            pruefe("Drehen = ein Undo-Schritt", STR$(LEN(gUndo) - vorD), "1")
+            DIM p0 AS kern.Punkt : p0 = gBlatt.bauteile[1].pinPunkt(0)
+            DIM p1 AS kern.Punkt : p1 = gBlatt.bauteile[1].pinPunkt(1)
+            pruefe("R7 Pin 1 bleibt an VCC", STR$(nd.gleich(p0.x, p0.y, 2000, 1200)), STR$(TRUE))
+            pruefe("R7 Pin 2 bleibt an D1", STR$(nd.gleich(p1.x, p1.y, 2000, 2800)), STR$(TRUE))
+            pruefe("kein Kurzschluss VCC-D1", STR$(nd.gleich(2000, 1200, 2000, 2800)), STR$(FALSE))
+            verlaufZurueck()
+            ' Spiegeln: C1 oben/unten -- Lage und Anschluss stimmen
+            waehleB(gBlatt.bauteile[4])
+            auswahlSpiegeln(kern.GR_SPIEGELN_Y)
+            pruefe("C1 gespiegelt (Y)", STR$(gBlatt.bauteile[4].lage.gespiegelt) + " " + STR$(gBlatt.bauteile[4].lage.drehung), STR$(TRUE) + " 180")
+            pruefe("C1 Pin 2 noch am Draht", STR$(aktuelleNetze().gleich(3200, 2000, 3600, 2600)), STR$(TRUE))
+            verlaufZurueck()
+            ' Gruppe: R7, D1 und der Draht dazwischen um ihre Mitte drehen
+            auswahlAufheben()
+            rahmenAnwendenWelt(1500, 1700, 2600, 3300)
+            pruefe("Gruppe gewaehlt", STR$(LEN(gSelB)) + "/" + STR$(LEN(gSelD)), "2/1")
+            gruppeTransformieren(kern.GR_DREHEN)
+            DIM ng AS kern.Netze : ng = aktuelleNetze()
+            DIM r0 AS kern.Punkt : r0 = gBlatt.bauteile[1].pinPunkt(0)
+            DIM d1 AS kern.Punkt : d1 = gBlatt.bauteile[2].pinPunkt(1)
+            pruefe("Gruppe: R7 haengt an VCC", STR$(ng.gleich(r0.x, r0.y, 2000, 1200)), STR$(TRUE))
+            pruefe("Gruppe: D1 haengt an GND", STR$(ng.gleich(d1.x, d1.y, 2000, 3600)), STR$(TRUE))
+            pruefe("Gruppe: R7-D1 verbunden", STR$(ng.gleich(gBlatt.bauteile[1].pinPunkt(1).x, gBlatt.bauteile[1].pinPunkt(1).y, gBlatt.bauteile[2].pinPunkt(0).x, gBlatt.bauteile[2].pinPunkt(0).y)), STR$(TRUE))
+            pruefe("Gruppe: kein Kurzschluss VCC-GND", STR$(ng.gleich(2000, 1200, 2000, 3600)), STR$(FALSE))
+            verlaufZurueck()
+            ' Beim Platzieren drehen R und X die Vorschau, nicht das eben Gesetzte
+            werkzeugWaehlen(WZ_BAUTEIL, "R")
+            waehleB(gBlatt.bauteile[1])
+            auswahlDrehen()
+            auswahlSpiegeln(kern.GR_SPIEGELN_X)
+            pruefe("Vorschau statt Auswahl", STR$(gBlatt.bauteile[1].lage.drehung) + " " + STR$(gPlatzDreh) + " " + STR$(gPlatzSpiegel), "90 90 " + STR$(TRUE))
+            gPlatzDreh = 0
+            gPlatzSpiegel = FALSE
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            auswahlAufheben()
+        CASE 13
+            ' Ausgabe: PDF, SVG, PNG und Drucken (ueber GTKs Export, ohne Drucker)
+            DIM zoomVor AS FLOAT : zoomVor = vZoom
+            IF fotoZiel <> "" THEN
+                pruefe("PDF geschrieben", STR$(ausgabeNach(fotoZiel + ".pdf")), STR$(TRUE))
+                pruefe("SVG geschrieben", STR$(ausgabeNach(fotoZiel + ".svg")), STR$(TRUE))
+                pruefe("PNG geschrieben", STR$(ausgabeNach(fotoZiel + ".ausgabe.png")), STR$(TRUE))
+                pruefe("Drucken (Export-Weg)", drucken$(fotoZiel + ".druck.pdf"), "")
+                pruefe("Druck-PDF da", STR$(FILEEXISTS(fotoZiel + ".druck.pdf")), STR$(TRUE))
+            END IF
+            pruefe("Bildschirm danach unveraendert", STR$(vZoom = zoomVor AND NOT gDruck), STR$(TRUE))
+            pruefe("Menue Ausgabe gebaut", STR$(gAusgabeMenue <> 0), STR$(TRUE))
+        CASE 14
+            ' Netz unter der Maus: VCC-Draht, GND-Draht, Statuszeile
+            gMausDrin = TRUE
+            hoverBestimmen(sx(2000), sy(1650))
+            pruefe("Netz unter der Maus (VCC-Draht)", hoverText$(), "Netz: VCC (2 Pins)")
+            hoverBestimmen(sx(2000), sy(3400))
+            pruefe("Netz unter der Maus (GND-Draht)", hoverText$(), "Netz: GND (1 Pin)")
+            hoverBestimmen(sx(2000), sy(1650))
+            statusAktualisieren()
+            pruefe("Statuszeile nennt das Netz", STR$(CONTAINS(gtk_label_get_text(gStatus), "Netz: VCC")), STR$(TRUE))
+        CASE 15
+            ' ERC: genau zwei Warnungen; Zeile 2 anklicken springt zu C1.1
+            ercAusfuehren()
+            pruefe("ERC-Verstoesse", STR$(LEN(gErc)), "2")
+            DIM texte AS STRING : texte = ""
+            DIM ei AS INTEGER
+            FOR ei = 0 TO LEN(gErc) - 1
+                texte = texte + gErc[ei].text + "|"
+            NEXT
+            pruefe("ERC: Label auf Versorgung", STR$(CONTAINS(texte, "Label VCC5 liegt auf der Versorgung VCC")), STR$(TRUE))
+            pruefe("ERC: offener Pin", STR$(CONTAINS(texte, "Pin C1.1 ist nicht verbunden")), STR$(TRUE))
+            DIM zielZeile AS INTEGER : zielZeile = -1
+            FOR ei = 0 TO LEN(gErc) - 1
+                IF CONTAINS(gErc[ei].text, "C1.1") THEN zielZeile = ei
+            NEXT
+            gtk_list_box_select_row(gErcListe, gtk_list_box_get_row_at_index(gErcListe, zielZeile))
+            pruefe("Zeilenklick waehlt Verstoss", STR$(gErcGewaehlt), STR$(zielZeile))
+            pruefe("Zeilenklick zentriert", STR$(ROUND(weltX(gtk_widget_get_allocated_width(gFlaeche) / 2.0))), "2800")
+            ' Netzliste als SPICE
+            IF fotoZiel <> "" THEN
+                pruefe("SPICE-Export geschrieben", STR$(exportNach(fotoZiel + ".cir")), STR$(TRUE))
+            END IF
+            DIM sp AS STRING : sp = kern.netzlisteSpiceDok$(gDok, "Probe")
+            pruefe("SPICE: R7 an VCC", STR$(CONTAINS(sp, "R7 VCC ")), STR$(TRUE))
+            pruefe("SPICE: D1 an Masse", STR$(CONTAINS(sp, " 0 D_LED")), STR$(TRUE))
+        CASE 16
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel) THEN
+                    PRINT "Foto gesichert: "; fotoZiel
+                ELSE
+                    PRINT "Foto fehlgeschlagen"
+                END IF
+            END IF
+            ' ERC-Dialog schliessen: Marker verschwinden
+            IF gErcDlg <> 0 THEN gtk_dialog_response(gErcDlg, GTK_ANTWORT_OK)
+            pruefe("ERC-Dialog zu, Marker weg", STR$(gErcSichtbar), STR$(FALSE))
+        CASE 17
+            ' Mehrere Blaetter: neues Blatt ueber das Menue, Reiter wechseln
+            probeUndo0 = LEN(gUndo)
+            probeName0 = gDok.blaetter[0].name
+            gtk_menu_item_activate(gBlattMenueNeu)
+            pruefe("Neues Blatt", STR$(LEN(gDok.blaetter)) + " " + STR$(aktuellerBlattIndex()) + " " + gBlatt.name, "2 1 Blatt2")
+            pruefe("Neues Blatt = ein Undo-Schritt", STR$(LEN(gUndo) - probeUndo0), "1")
+            pruefe("Reiter", STR$(gtk_notebook_get_n_pages(gReiter)) + " " + STR$(gtk_notebook_get_current_page(gReiter)), "2 1")
+            pruefe("Neues Blatt leer", STR$(LEN(gBlatt.bauteile)) + " " + STR$(auswahlAnzahl()), "0 0")
+            statusAktualisieren()
+            pruefe("Statuszeile nennt das Blatt", STR$(STARTSWITH(gtk_label_get_text(gStatus), "Blatt2 (Blatt 2/2)")), STR$(TRUE))
+            gtk_notebook_set_current_page(gReiter, 0)
+            pruefe("Reiter 1 -> Blatt 1", STR$(aktuellerBlattIndex()), "0")
+            ' Blatt 1: globales Label BUS auf den Knoten R7-D1 (Haken im Dialog)
+            gMausWX = 2000 : gMausWY = 2800
+            probeText1 = "BUS" : probeHaken = 1
+            g_timeout_add(150, dialogBestaetigen, 0)
+            labelSetzen()
+            DIM lb AS kern.Label : lb = gBlatt.labels[LEN(gBlatt.labels) - 1]
+            pruefe("Haken macht das Label global", STR$(lb.art = kern.LA_GLOBAL) + " " + lb.text, STR$(TRUE) + " BUS")
+            gtk_notebook_set_current_page(gReiter, 1)
+            pruefe("Reiter 2 -> Blatt 2", STR$(aktuellerBlattIndex()), "1")
+            ' Blatt 2: R mit Draht nach aussen, dort wieder BUS; dazu ein offenes R
+            verlaufMerken()
+            DIM r2 AS kern.Bauteil : r2 = kern.neuesBauteil("R", NEW kern.Lage(NEW kern.Punkt(2000, 2000), 0, FALSE))
+            r2.referenz = naechsteReferenz("R")
+            ARRAY_PUSH(gBlatt.bauteile, r2)
+            DIM r3 AS kern.Bauteil : r3 = kern.neuesBauteil("R", NEW kern.Lage(NEW kern.Punkt(5000, 2000), 0, FALSE))
+            r3.referenz = naechsteReferenz("R")
+            ARRAY_PUSH(gBlatt.bauteile, r3)
+            DIM q0 AS kern.Punkt : q0 = r2.pinPunkt(0)
+            DIM q1 AS kern.Punkt : q1 = r2.pinPunkt(1)
+            DIM ende AS kern.Punkt : ende = NEW kern.Punkt(q1.x + 400 * vorzeichen(q1.x - q0.x), q1.y + 400 * vorzeichen(q1.y - q0.y))
+            DIM w2 AS kern.Draht : w2 = NEW kern.Draht()
+            ARRAY_PUSH(w2.punkte, NEW kern.Punkt(q1.x, q1.y))
+            ARRAY_PUSH(w2.punkte, ende)
+            ARRAY_PUSH(gBlatt.draehte, w2)
+            geaendert()
+            pruefe("Referenzen zaehlen ueber alle Blaetter", r2.referenz + " " + r3.referenz, "R8 R9")
+            gMausWX = ende.x : gMausWY = ende.y
+            probeText1 = "BUS" : probeHaken = 0          ' Haken unberuehrt: Vorgabe vom letzten Label
+            g_timeout_add(150, dialogBestaetigen, 0)
+            labelSetzen()
+            pruefe("Haken merkt sich global", STR$(gBlatt.labels[0].art = kern.LA_GLOBAL), STR$(TRUE))
+            DIM nb AS kern.Netze : nb = kern.netzeDokument(gDok)
+            pruefe("BUS verbindet Blatt 1 und 2", STR$(nb.gleichUeber(0, 2000, 2800, 1, q1.x, q1.y)), STR$(TRUE))
+            gMausDrin = TRUE
+            hoverBestimmen(sx((q1.x + ende.x) / 2.0), sy((q1.y + ende.y) / 2.0))
+            pruefe("Netz unter der Maus auf Blatt 2", LEFT$(hoverText$(), 11), "Netz: BUS (")
+            ' ein lokales Label gleichen Namens wie auf Blatt 1 verbindet NICHT
+            DIM lokal AS STRING : lokal = ""
+            DIM lx AS INTEGER, ly AS INTEGER, li AS INTEGER
+            FOR li = 0 TO LEN(gDok.blaetter[0].labels) - 1
+                IF gDok.blaetter[0].labels[li].art = kern.LA_LOKAL AND lokal = "" THEN
+                    lokal = gDok.blaetter[0].labels[li].text
+                    lx = gDok.blaetter[0].labels[li].anker.x : ly = gDok.blaetter[0].labels[li].anker.y
+                END IF
+            NEXT
+            gMausWX = q0.x : gMausWY = q0.y
+            probeText1 = lokal : probeHaken = 2
+            g_timeout_add(150, dialogBestaetigen, 0)
+            labelSetzen()
+            probeHaken = 0
+            nb = kern.netzeDokument(gDok)
+            pruefe("Lokales " + lokal + " bleibt auf seinem Blatt", STR$(lokal <> "" AND NOT nb.gleichUeber(0, lx, ly, 1, q0.x, q0.y)), STR$(TRUE))
+            ' ERC von Blatt 1 aus: eine Zeile von Blatt 2 anklicken wechselt dorthin
+            gtk_notebook_set_current_page(gReiter, 0)
+            ercAusfuehren()
+            DIM ziel2 AS INTEGER : ziel2 = -1
+            FOR li = 0 TO LEN(gErc) - 1
+                IF gErc[li].blatt = 1 AND ziel2 < 0 THEN ziel2 = li
+            NEXT
+            pruefe("ERC meldet auch Blatt 2", STR$(ziel2 >= 0), STR$(TRUE))
+            IF ziel2 >= 0 THEN
+                gtk_list_box_select_row(gErcListe, gtk_list_box_get_row_at_index(gErcListe, ziel2))
+                pruefe("ERC-Zeile wechselt aufs Blatt", STR$(aktuellerBlattIndex()), "1")
+            END IF
+            gtk_dialog_response(gErcDlg, GTK_ANTWORT_OK)
+            ' Ausgabe: PDF und Druck mit je einer Seite pro Blatt
+            IF fotoZiel <> "" THEN
+                gAusgabeSeiten = 0
+                pruefe("PDF mit allen Blaettern", STR$(ausgabeNach(fotoZiel + ".blaetter.pdf")) + " " + STR$(gAusgabeSeiten), STR$(TRUE) + " 2")
+                gAusgabeSeiten = 0
+                pruefe("Druck: je Blatt eine Seite", drucken$(fotoZiel + ".blaetter.druck.pdf") + STR$(gAusgabeSeiten), "2")
+            END IF
+            pruefe("Ausgabe laesst das Blatt stehen", STR$(aktuellerBlattIndex()), "1")
+            zentrieren(3500, 2000)
+        CASE 18
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel + ".blatt2.png") THEN PRINT "Foto Blatt 2 gesichert"
+            END IF
+            ' Umbenennen: doppelter Name wird abgelehnt, dann "Takt"
+            probeText1 = probeName0
+            g_timeout_add(150, dialogBestaetigen, 0)
+            g_timeout_add(400, dialogBestaetigen, 0)     ' die Meldung
+            blattUmbenennen()
+            pruefe("Doppelter Blattname abgelehnt", gBlatt.name, "Blatt2")
+            probeText1 = "Takt"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            blattUmbenennen()
+            pruefe("Blatt umbenannt", gBlatt.name + " " + STR$(gtk_notebook_get_current_page(gReiter)), "Takt 1")
+            ' Loeschen: volles Blatt fragt nach, Rueckgaengig holt es zurueck
+            DIM fr AS INTEGER : fr = gFragen
+            g_timeout_add(150, dialogBestaetigen, 0)
+            blattLoeschen()
+            pruefe("Loeschen fragt bei vollem Blatt", STR$(gFragen - fr), "1")
+            pruefe("Blatt geloescht", STR$(LEN(gDok.blaetter)) + " " + STR$(gtk_notebook_get_n_pages(gReiter)) + " " + STR$(aktuellerBlattIndex()), "1 1 0")
+            verlaufZurueck()
+            pruefe("Rueckgaengig holt das Blatt zurueck", STR$(LEN(gDok.blaetter)) + " " + gBlatt.name + " " + STR$(gtk_notebook_get_n_pages(gReiter)) + " " + STR$(gtk_notebook_get_current_page(gReiter)), "2 Takt 2 1")
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
+            pruefe("Rueckgaengig bis vor das neue Blatt", STR$(LEN(gDok.blaetter)) + " " + STR$(gtk_notebook_get_n_pages(gReiter)) + " " + STR$(aktuellerBlattIndex()), "1 1 0")
+            g_timeout_add(150, dialogBestaetigen, 0)
+            blattLoeschen()
+            pruefe("Letztes Blatt bleibt", STR$(LEN(gDok.blaetter)), "1")
+        CASE 19
+            ' Label-Werkzeug: R/Y drehen die Vorschau, das Label kommt so gedreht
+            werkzeugWaehlen(WZ_LABEL, "")
+            gLabelDreh = 0
+            auswahlDrehen()
+            DIM lr1 AS INTEGER : lr1 = gLabelDreh
+            auswahlSpiegeln(kern.GR_SPIEGELN_Y)
+            pruefe("Label-Vorschau R, dann Y", STR$(lr1) + " " + STR$(gLabelDreh), "90 270")
+            probeUndo0 = LEN(gUndo)
+            gMausWX = 5000 : gMausWY = 1000
+            probeText1 = "~{RESET}" : probeHaken = 2
+            g_timeout_add(150, dialogBestaetigen, 0)
+            labelSetzen()
+            probeHaken = 0
+            DIM lrs AS kern.Label : lrs = gBlatt.labels[LEN(gBlatt.labels) - 1]
+            pruefe("Label senkrecht gesetzt", lrs.text + " " + STR$(lrs.drehung), "~{RESET} 270")
+            DIM lax AS FLOAT : lax = sx(5000)
+            DIM lay AS FLOAT : lay = sy(1000)
+            pruefe("Treffer ueber dem Anker", STR$(labelIndexUnter(lax - 8, lay - 30) = LEN(gBlatt.labels) - 1), STR$(TRUE))
+            pruefe("kein Treffer rechts daneben", STR$(labelIndexUnter(lax + 40, lay - 9) = LEN(gBlatt.labels) - 1), STR$(FALSE))
+            ' ein gewaehltes Label dreht um seinen Anker, nur die Richtung aendert sich
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            waehleL(lrs)
+            auswahlDrehen()
+            pruefe("Label dreht um den Anker", STR$(lrs.anker.x) + "," + STR$(lrs.anker.y) + " " + STR$(lrs.drehung), "5000,1000 0")
+            auswahlSpiegeln(kern.GR_SPIEGELN_X)
+            pruefe("Label gespiegelt (X)", STR$(lrs.drehung), "180")
+            pruefe("Label: drei Undo-Schritte", STR$(LEN(gUndo) - probeUndo0), "3")
+            ' Eigenschaften: Gehaeuse und Bestellnummer
+            DIM r7 AS kern.Bauteil : r7 = gBlatt.bauteile[1]
+            probeText1 = "R7" : probeText2 = "4k7" : probeText3 = "0805" : probeText4 = "RC0805-4K7"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            eigenschaftenDialog(r7)
+            probeText3 = "" : probeText4 = ""
+            pruefe("Gehaeuse/Bestellnummer gesetzt", r7.gehaeuse + " " + r7.bestellnr + " " + r7.wert, "0805 RC0805-4K7 4k7")
+            ' mehrere Bauteile: nur das Gehaeuse aendern, Wert und Bestellnummer bleiben je Bauteil
+            DIM c1 AS kern.Bauteil : c1 = gBlatt.bauteile[4]
+            DIM c1wert AS STRING : c1wert = c1.wert
+            auswahlAufheben()
+            waehleB(r7)
+            umschaltenB(c1)
+            pruefe("Zwei Bauteile gewaehlt", STR$(LEN(gSelB)), "2")
+            probeText1 = PROBE_LASSEN : probeText2 = "SMD" : probeText3 = PROBE_LASSEN
+            g_timeout_add(150, dialogBestaetigen, 0)
+            auswahlBearbeiten()
+            probeText1 = "" : probeText2 = "" : probeText3 = ""
+            pruefe("Gemeinsames Gehaeuse", r7.gehaeuse + " " + c1.gehaeuse, "SMD SMD")
+            pruefe("Werte und Bestellnummer unberuehrt", r7.wert + " " + c1.wert + " " + r7.bestellnr, "4k7 " + c1wert + " RC0805-4K7")
+            pruefe("Markdown mit Gehaeuse-Spalte", STR$(CONTAINS(kern.stuecklisteMarkdown$(gDok, "P"), "| 1 | R7 | 4k7 | Widerstand | SMD | RC0805-4K7 |")), STR$(TRUE))
+            ' Rueckgaengig: Mehrfach-Aenderung und Eigenschaften in je einem Schritt
+            verlaufZurueck()
+            pruefe("Rueckgaengig Mehrfach", gBlatt.bauteile[1].gehaeuse + "/" + gBlatt.bauteile[4].gehaeuse, "0805/")
+            verlaufZurueck()
+            pruefe("Rueckgaengig Eigenschaften", "[" + gBlatt.bauteile[1].gehaeuse + gBlatt.bauteile[1].bestellnr + "]", "[]")
+            auswahlAufheben()
+            zentrieren(4000, 1800)
+        CASE 20
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel + ".label.png") THEN PRINT "Foto Label gesichert"
+            END IF
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
+            pruefe("Label wieder weg", STR$(LEN(gBlatt.labels) > 0 AND gBlatt.labels[LEN(gBlatt.labels) - 1].text = "~{RESET}"), STR$(FALSE))
+        CASE 21
+            ' Referenz anfassen und ziehen: nur der Text wandert, ein Undo-Schritt
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            auswahlAufheben()
+            DIM tr7 AS kern.Bauteil : tr7 = gBlatt.bauteile[1]
+            DIM tlage AS STRING : tlage = STR$(tr7.lage.pos.x) + "," + STR$(tr7.lage.pos.y)
+            DIM ttx AS FLOAT, tty AS FLOAT, tta AS INTEGER
+            pruefe("R7 zeigt seine Referenz", STR$(textOrt(tr7, 0, ttx, tty, tta)), STR$(TRUE))
+            DIM twelche AS INTEGER
+            pruefe("Treffer auf dem Referenz-Text", STR$(textIndexUnter(ttx, tty, twelche)) + " " + STR$(twelche), "1 0")
+            probeUndo0 = LEN(gUndo)
+            mausSetzen(ttx, tty)
+            klickAuswahl(ttx, tty, FALSE)
+            pruefe("Text-Zug beginnt, R7 gewaehlt", STR$(gTextZug) + " " + STR$(gHatGewaehlt AND gGewaehlt = tr7), STR$(TRUE) + " " + STR$(TRUE))
+            mausSetzen(ttx + 210 * vZoom, tty + 95 * vZoom)
+            textZiehenUm(gMausRX - gTextMausX, gMausRY - gTextMausY)
+            DIM lz AS BOOLEAN : lz = lwLos(0, 0, 0)
+            pruefe("Referenz verschoben (0,5-mm-Raster)", STR$(tr7.refVersatz.x) + "," + STR$(tr7.refVersatz.y) + " Wert " + STR$(tr7.wertVersatz.x) + "," + STR$(tr7.wertVersatz.y), "200,100 Wert 0,0")
+            pruefe("Bauteil bleibt stehen", STR$(tr7.lage.pos.x) + "," + STR$(tr7.lage.pos.y), tlage)
+            pruefe("Text ziehen = ein Undo-Schritt", STR$(LEN(gUndo) - probeUndo0), "1")
+            DIM ttx2 AS FLOAT, tty2 AS FLOAT
+            lz = textOrt(tr7, 0, ttx2, tty2, tta)
+            pruefe("Text steht an der neuen Stelle", STR$(ROUND(ttx2 - ttx)) + "," + STR$(ROUND(tty2 - tty)), STR$(ROUND(200 * vZoom)) + "," + STR$(ROUND(100 * vZoom)))
+            pruefe("Treffer an der neuen Stelle", STR$(textIndexUnter(ttx2, tty2, twelche)), "1")
+            ' Drehen nimmt den Versatz mit
+            waehleB(tr7)
+            auswahlDrehen()
+            pruefe("Versatz dreht mit", STR$(gBlatt.bauteile[1].refVersatz.x) + "," + STR$(gBlatt.bauteile[1].refVersatz.y), "-100,200")
+            verlaufZurueck()
+            ' T setzt zurueck, Rueckgaengig holt den Versatz wieder (er steckt im Schnappschuss)
+            tr7 = gBlatt.bauteile[1]
+            waehleB(tr7)
+            texteZuruecksetzen()
+            pruefe("T setzt die Texte zurueck", STR$(tr7.refVersatz.x) + "," + STR$(tr7.refVersatz.y), "0,0")
+            verlaufZurueck()
+            pruefe("Rueckgaengig: Versatz wieder da", STR$(gBlatt.bauteile[1].refVersatz.x) + "," + STR$(gBlatt.bauteile[1].refVersatz.y), "200,100")
+            ' frei gezeichnetes Symbol: platzieren, anschliessen, zeigen
+            DIM lff AS STRING : lff = CHR$(10)
+            DIM fsym AS kern.Symbol : fsym = kern.icErzeugen("E_PROBE_OPV", "OPV frei", "U", "LM358", "linie -2 -3 3 0 -2 3 -2 -3" + lff + "text 0 -4 ~{EN}" + lff + "kreis 3,5 0 0,5" + lff + "pin 1 IN- -5 -1 links ein" + lff + "pin 2 IN+ -5 1 links ein" + lff + "pin 3 OUT 6 0 rechts aus 2" + lff + "pin 4 V+ 0 -5 oben vin 2,5")
+            fsym = kern.symbolRegistrieren(fsym)
+            verlaufMerken()
+            DIM fb AS kern.Bauteil : fb = kern.neuesBauteil("E_PROBE_OPV", NEW kern.Lage(NEW kern.Punkt(5000, 2400), 0, FALSE))
+            fb.referenz = naechsteReferenz("U")
+            ARRAY_PUSH(gBlatt.bauteile, fb)
+            DIM fw AS kern.Draht : fw = NEW kern.Draht()
+            ARRAY_PUSH(fw.punkte, fb.pinPunkt(2))
+            ARRAY_PUSH(fw.punkte, NEW kern.Punkt(fb.pinPunkt(2).x + 600, fb.pinPunkt(2).y))
+            ARRAY_PUSH(gBlatt.draehte, fw)
+            geaendert()
+            pruefe("Freies Symbol platziert", fb.sym.name + " " + fb.referenz + " " + STR$(LEN(fb.sym.pins)), "OPV frei U1 4")
+            pruefe("OUT-Pin bei", STR$(fb.pinPunkt(2).x) + "," + STR$(fb.pinPunkt(2).y), "5600,2400")
+            DIM fn AS kern.Netze : fn = aktuelleNetze()
+            pruefe("Draht haengt am OUT-Pin", STR$(fn.liste[fn.netzAn(5600, 2400)].echtePins()), "1")
+            zentrieren(4200, 2200)
+        CASE 22
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel + ".frei.png") THEN PRINT "Foto freies Symbol gesichert"
+            END IF
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
+            DIM nOpv AS INTEGER : nOpv = 0
+            DIM ko AS INTEGER
+            FOR ko = 0 TO LEN(gBlatt.bauteile) - 1
+                IF gBlatt.bauteile[ko].symbolRef = "E_PROBE_OPV" THEN nOpv = nOpv + 1
+            NEXT
+            pruefe("Alles zurueck (Versatz, freies Symbol)", STR$(gBlatt.bauteile[1].refVersatz.x) + " " + STR$(nOpv), "0 0")
+        CASE 23
+            ' Platine: umschalten ueber den echten Knopf
+            probeUndo0 = LEN(gUndo)
+            probeSpZoom = vZoom
+            gtk_button_clicked(gKnopfPlatine)
+            pruefe("Ansicht Platine", STR$(gAnsicht) + " " + STR$(gtk_toggle_button_get_active(gKnopfPlatine)) + " " + STR$(gtk_toggle_button_get_active(gKnopfSchaltplan)), STR$(ANS_PLATINE) + " " + STR$(TRUE) + " " + STR$(FALSE))
+            DIM pbr AS kern.PlatBericht : pbr = platineBericht()
+            DIM pbn AS INTEGER : pbn = LEN(kern.platinenBauteile(gDok))
+            pruefe("Leere Platine: alle Bauteile fehlen", STR$(LEN(pbr.unplatziert)), STR$(pbn))
+            plEinsetzen()
+            plEinpassen(gtk_widget_get_allocated_width(gFlaeche), gtk_widget_get_allocated_height(gFlaeche))
+            pbr = platineBericht()
+            pruefe("Eingesetzt, kein Kurzschluss", STR$(LEN(gDok.platine.teile)) + " " + STR$(pbr.kurzschluesse) + " " + STR$(LEN(pbr.unplatziert)), STR$(pbn) + " 0 0")
+            DIM pluft AS INTEGER : pluft = LEN(pbr.luft)
+            pruefe("Luftlinien zeigen, was fehlt", STR$(pluft > 0), STR$(TRUE))
+            ' Bruecken entlang der Luftlinien, mit dem Werkzeug geklickt
+            gtk_button_clicked(gPlKnopfBahn)
+            pruefe("Werkzeug Bahn", STR$(gPlWz), STR$(PW_BAHN))
+            DIM pundo AS INTEGER : pundo = LEN(gUndo)
+            DIM pli AS INTEGER
+            DIM plLinien AS ARRAY OF kern.Luftlinie : plLinien = pbr.luft
+            FOR pli = 0 TO LEN(plLinien) - 1
+                lz = plDruck(lochX(plLinien[pli].s1), lochY(plLinien[pli].z1), 1, FALSE)
+                lz = plDruck(lochX(plLinien[pli].s2), lochY(plLinien[pli].z2), 1, FALSE)
+                lz = plDruck(lochX(plLinien[pli].s2), lochY(plLinien[pli].z2), 3, FALSE)
+            NEXT
+            pbr = platineBericht()
+            pruefe("Bruecken gelegt: alles verbunden", STR$(LEN(gDok.platine.bahnen)) + " " + STR$(LEN(pbr.luft)) + " " + STR$(pbr.kurzschluesse), STR$(pluft) + " 0 0")
+            pruefe("je Bruecke ein Undo-Schritt", STR$(LEN(gUndo) - pundo), STR$(pluft))
+            pruefe("Bruecken (Streifenraster)", STR$(gDok.platine.bahnen[0].art), STR$(kern.BA_BRUECKE))
+            statusAktualisieren()
+            pruefe("Statuszeile der Platine", STR$(CONTAINS(gtk_label_get_text(gStatus), "Luftlinien 0, Kurzschluesse 0")), STR$(TRUE))
+            ' Loch unter der Maus nennt das Netz
+            DIM ppad AS kern.Pad : ppad = pbr.pads[0]
+            lz = plDruck(lochX(ppad.s), lochY(ppad.z), 3, FALSE)
+            plBewegung(lochX(ppad.s), lochY(ppad.z))
+            pruefe("Loch zeigt sein Netz", STR$(CONTAINS(gtk_label_get_text(gStatus), ": " + pbr.netzNamen[ppad.netz])), STR$(TRUE))
+            ' Trennen im Pad-Loch gibt einen Hinweis
+            gtk_button_clicked(gPlKnopfTrennen)
+            lz = plDruck(lochX(ppad.s), lochY(ppad.z), 1, FALSE)
+            pbr = platineBericht()
+            pruefe("Trennstelle im Pad wird gemeldet", STR$(LEN(pbr.fehler) > 0 AND CONTAINS(pbr.fehler[0].text, "steckt in einer Trennstelle")), STR$(TRUE))
+            verlaufZurueck()
+            ' Ziehen: Teil wandert lochweise, ein Undo-Schritt, Bruecken passen nicht mehr
+            gtk_button_clicked(gPlKnopfAuswahl)
+            DIM pt0 AS kern.PlatTeil : pt0 = gDok.platine.teile[ppad.teil]
+            DIM pts AS INTEGER : pts = pt0.s
+            pundo = LEN(gUndo)
+            lz = plDruck(lochX(ppad.s), lochY(ppad.z), 1, FALSE)
+            pruefe("Teil gewaehlt", STR$(gPlSel), STR$(ppad.teil))
+            plBewegung(lochX(ppad.s + 2), lochY(ppad.z))
+            plLos()
+            pruefe("Teil um 2 Loecher gezogen", STR$(gDok.platine.teile[ppad.teil].s - pts) + " " + STR$(LEN(gUndo) - pundo), "2 1")
+            pruefe("Pruefung merkt es", STR$(LEN(platineBericht().luft) > 0), STR$(TRUE))
+            verlaufZurueck()
+            ' Drehen am Rand: wird eingerueckt statt abgelehnt
+            gPlSel = ppad.teil
+            verlaufMerken()
+            gDok.platine.teile[gPlSel].s = gDok.platine.spalten - 1
+            lz = plTaste(K_R)
+            DIM pbf AS kern.Bauform
+            DIM phin AS STRING
+            DIM pbt AS kern.Bauteil
+            lz = kern.bauteilMitId(aktuellesFlach(), gDok.platine.teile[gPlSel].bauteilId, pbt)
+            pbf = kern.bauformFuer(pbt, phin)
+            DIM ps0 AS INTEGER, pz0 AS INTEGER, ps1 AS INTEGER, pz1 AS INTEGER
+            kern.teilFlaeche(gDok.platine.teile[gPlSel], pbf, ps0, pz0, ps1, pz1)
+            pruefe("Drehen am Rand bleibt auf der Platine", STR$(ps1 < gDok.platine.spalten AND ps0 >= 0), STR$(TRUE))
+            verlaufZurueck()
+            verlaufZurueck()
+            ' Pruefliste
+            gtk_button_clicked(gPlKnopfAuswahl)
+            plPruefungZeigen()
+            pruefe("Pruefliste offen", STR$(gPlPruefDlg <> 0), STR$(TRUE))
+            gtk_dialog_response(gPlPruefDlg, GTK_ANTWORT_OK)
+            ' Lochraster: Art umschalten ueber die Auswahlliste
+            gtk_combo_box_set_active(gPlArtWahl, 1)
+            pruefe("Lochraster gewaehlt", STR$(gDok.platine.art), STR$(kern.PL_LOCH))
+            verlaufZurueck()
+            pruefe("Rueckgaengig: wieder Streifen, Liste folgt", STR$(gDok.platine.art) + " " + STR$(gtk_combo_box_get_active(gPlArtWahl)), STR$(kern.PL_STREIFEN) + " 0")
+            ' Verbinden: Bruecken weg (ein Schritt), dann automatisch verbinden
+            verlaufMerken()
+            gDok.platine.bahnen = []
+            platineVeraltet()
+            pruefe("Ohne Bruecken wieder offen", STR$(LEN(platineBericht().luft)), STR$(pluft))
+            pundo = LEN(gUndo)
+            gtk_button_clicked(gPlKnopfVerbinden)
+            pbr = platineBericht()
+            pruefe("Verbinden-Knopf: alles verbunden, kein Kurzschluss", STR$(LEN(pbr.luft)) + " " + STR$(pbr.kurzschluesse) + " " + STR$(LEN(gDok.platine.bahnen) > 0), "0 0 " + STR$(TRUE))
+            pruefe("Verbinden = ein Undo-Schritt", STR$(LEN(gUndo) - pundo), "1")
+            gtk_button_clicked(gPlKnopfVerbinden)
+            pruefe("Nochmal verbinden: nichts zu tun", STR$(LEN(gUndo) - pundo) + " " + STR$(CONTAINS(gtk_label_get_text(gStatus), "Nichts zu verbinden")), "1 " + STR$(TRUE))
+            verlaufZurueck()
+            pruefe("Rueckgaengig: Bruecken wieder weg", STR$(LEN(gDok.platine.bahnen)), "0")
+            verlaufZurueck()
+            ' Rahmen waehlt eine Gruppe; Ziehen bewegt alle; Entf nimmt alle herunter
+            gtk_button_clicked(gPlKnopfAuswahl)
+            DIM gw0 AS FLOAT : gw0 = lochX(-0.5)
+            DIM gh0 AS FLOAT : gh0 = lochY(-0.5)
+            lz = plDruck(gw0, gh0, 1, FALSE)
+            plBewegung(lochX(gDok.platine.spalten - 0.5), lochY(gDok.platine.zeilen - 0.5))
+            plLos()
+            pruefe("Rahmen waehlt alle Teile", STR$(LEN(plAuswahlListe())), STR$(LEN(gDok.platine.teile)))
+            statusAktualisieren()
+            pruefe("Statuszeile nennt die Gruppe", STR$(CONTAINS(gtk_label_get_text(gStatus), STR$(LEN(gDok.platine.teile)) + " Teile gewaehlt")), STR$(TRUE))
+            DIM gS0 AS INTEGER : gS0 = gDok.platine.teile[0].s
+            DIM gS1 AS INTEGER : gS1 = gDok.platine.teile[LEN(gDok.platine.teile) - 1].s
+            pundo = LEN(gUndo)
+            lz = plDruck(lochX(ppad.s), lochY(ppad.z), 1, FALSE)
+            plBewegung(lochX(ppad.s + 3), lochY(ppad.z + 2))
+            plLos()
+            pruefe("Gruppe gezogen, ein Undo-Schritt", STR$(gDok.platine.teile[0].s - gS0) + " " + STR$(gDok.platine.teile[LEN(gDok.platine.teile) - 1].s - gS1) + " " + STR$(LEN(gUndo) - pundo), "3 3 1")
+            pruefe("Gruppe nimmt die Bruecken nicht mit", STR$(LEN(platineBericht().luft) > 0), STR$(TRUE))
+            verlaufZurueck()
+            ' Gruppe als Ganzes drehen: Paarabstaende der Beine bleiben, 4x R = wie vorher
+            plAlleWaehlen()
+            DIM gd0 AS kern.PlatBericht : gd0 = platineBericht()
+            DIM gdA AS STRING : gdA = gDok.platine.teile[0].bauteilId
+            DIM gdLage AS STRING : gdLage = STR$(gDok.platine.teile[0].s) + "," + STR$(gDok.platine.teile[0].z) + "," + STR$(gDok.platine.teile[0].drehung)
+            pundo = LEN(gUndo)
+            lz = plTaste(K_R)
+            DIM gd1 AS kern.PlatBericht : gd1 = platineBericht()
+            DIM gdi AS INTEGER, gdj AS INTEGER
+            DIM gdGleich AS BOOLEAN : gdGleich = LEN(gd0.pads) = LEN(gd1.pads)
+            FOR gdi = 0 TO MIN(LEN(gd0.pads), LEN(gd1.pads)) - 2
+                gdj = gdi + 1
+                IF (gd0.pads[gdi].s - gd0.pads[gdj].s) ^ 2 + (gd0.pads[gdi].z - gd0.pads[gdj].z) ^ 2 <> (gd1.pads[gdi].s - gd1.pads[gdj].s) ^ 2 + (gd1.pads[gdi].z - gd1.pads[gdj].z) ^ 2 THEN gdGleich = FALSE
+            NEXT
+            DIM gdRand AS INTEGER : gdRand = 0
+            FOR gdi = 0 TO LEN(gd1.fehler) - 1
+                IF CONTAINS(gd1.fehler[gdi].text, "ausserhalb") THEN gdRand = gdRand + 1
+            NEXT
+            pruefe("Gruppe dreht als Ganzes (Abstaende bleiben, nichts ueber dem Rand)", STR$(gdGleich) + " " + STR$(gdRand) + " " + STR$(LEN(gUndo) - pundo), STR$(TRUE) + " 0 1")
+            lz = plTaste(K_R)
+            lz = plTaste(K_R)
+            lz = plTaste(K_R)
+            pruefe("Viermal R: wieder wie vorher", STR$(gDok.platine.teile[0].s) + "," + STR$(gDok.platine.teile[0].z) + "," + STR$(gDok.platine.teile[0].drehung), gdLage)
+            verlaufZurueck()
+            verlaufZurueck()
+            verlaufZurueck()
+            verlaufZurueck()
+            ' Umschalt-Klick nimmt eines heraus
+            plMengeSetzen([])
+            plAlleWaehlen()
+            lz = plDruck(lochX(ppad.s), lochY(ppad.z), 1, TRUE)
+            pruefe("Umschalt nimmt ein Teil heraus", STR$(LEN(plAuswahlListe())) + " " + STR$(plIstGewaehlt(ppad.teil)), STR$(LEN(gDok.platine.teile) - 1) + " " + STR$(FALSE))
+            lz = plTaste(K_DELETE)
+            pruefe("Entf nimmt die Gruppe herunter", STR$(LEN(gDok.platine.teile)), "1")
+            verlaufZurueck()
+            pruefe("Rueckgaengig: alle wieder da", STR$(LEN(gDok.platine.teile)), STR$(pbn))
+            plMengeSetzen([])
+            ' Platine ausgeben: PDF und Druck (Bestueckung, Loetseite, Liste), 1:1
+            pruefe("Massstab 1:1", STR$(plMassstab(plSeiteB(), plSeiteH()) = 1.0), STR$(TRUE))
+            IF fotoZiel <> "" THEN
+                gPlDruckSeiten = 0
+                pruefe("Platinen-PDF: Bestueckung, Loetseite, Liste", STR$(platinePdf(fotoZiel + ".platine.pdf")) + " " + STR$(gPlDruckSeiten), STR$(TRUE) + " 3")
+                gPlDruckSeiten = 0
+                pruefe("Platine drucken (Export-Weg)", platineDrucken$(fotoZiel + ".platine.druck.pdf") + STR$(gPlDruckSeiten), "3")
+                pruefe("Seiten als PNG", STR$(platinePng(fotoZiel + ".bestueckung.png", 0, 150)) + " " + STR$(platinePng(fotoZiel + ".loetseite.png", 1, 150)) + " " + STR$(platinePng(fotoZiel + ".liste.png", 2, 100)), STR$(TRUE) + " " + STR$(TRUE) + " " + STR$(TRUE))
+            END IF
+            ' Speichern/Laden nimmt die Platine mit
+            DIM pdj AS kern.Dokument : pdj = kern.dokumentAusJson(JSON_PARSE(schnappschuss$()))
+            pruefe("Platine im Dokument gespeichert", STR$(LEN(pdj.platine.teile)) + " " + STR$(LEN(pdj.platine.bahnen)) + " " + STR$(LEN(kern.platinePruefen(pdj).luft)), STR$(pbn) + " " + STR$(pluft) + " 0")
+        CASE 24
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel + ".platine.png") THEN PRINT "Foto Platine gesichert"
+            END IF
+            gtk_button_clicked(gKnopfSchaltplan)
+            pruefe("Zurueck im Schaltplan, Ausschnitt wie vorher", STR$(gAnsicht) + " " + STR$(vZoom = probeSpZoom), STR$(ANS_SCHALTPLAN) + " " + STR$(TRUE))
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
+            pruefe("Platine wieder leer", STR$(LEN(gDok.platine.teile)), "0")
+        CASE 25
+            ' Symbol-Editor: mit der Maus zeichnen und uebernehmen
+            seProbeSchritt = 20
+            g_timeout_add(300, seProbe, 0)
+            DIM zid AS STRING : zid = neuesSymbolUI()
+            pruefe("Gezeichnetes Symbol uebernommen", LEFT$(zid, 2), "E_")
+            DIM zsym AS kern.Symbol : zsym = kern.bibliothekSymbol(zid)
+            pruefe("Grafik und Pins aus der Maus", STR$(LEN(zsym.grafik)) + " " + STR$(LEN(zsym.pins)) + " " + zsym.name, "5 2 Gezeichnet")
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+        CASE 26
+            ' Unterblatt ueber das Menue einsetzen, hineinspringen, Port anlegen
+            probeUndo0 = LEN(gUndo)
+            blattWechseln(0)
+            DIM hb0 AS INTEGER : hb0 = LEN(gDok.blaetter)
+            probeZahl0 = hb0
+            DIM hbt0 AS INTEGER : hbt0 = LEN(gBlatt.bauteile)
+            probeText1 = "Netzteil"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            gtk_menu_item_activate(gBlattMenueUnter)
+            DIM hsb AS kern.Bauteil : hsb = gBlatt.bauteile[LEN(gBlatt.bauteile) - 1]
+            pruefe("Unterblatt eingesetzt", STR$(LEN(gDok.blaetter) - hb0) + " " + STR$(LEN(gBlatt.bauteile) - hbt0) + " " + STR$(hsb.sym.blattSymbol) + " " + hsb.referenz + " " + STR$(aktuellerBlattIndex()), "1 1 " + STR$(TRUE) + " Netzteil 0")
+            pruefe("Einsetzen = ein Undo-Schritt", STR$(LEN(gUndo) - probeUndo0), "1")
+            waehleB(hsb)
+            auswahlBearbeiten()
+            pruefe("Doppelklick oeffnet das Unterblatt", gBlatt.name, "Netzteil")
+            statusAktualisieren()
+            pruefe("Statuszeile zeigt den Pfad", STR$(STARTSWITH(gtk_label_get_text(gStatus), gDok.blaetter[0].name + " > Netzteil")), STR$(TRUE))
+            ' Label setzen und mit H zum Port machen
+            werkzeugWaehlen(WZ_LABEL, "")
+            gMausWX = 2000 : gMausWY = 2000
+            probeText1 = "VIN" : probeHaken = 2
+            g_timeout_add(150, dialogBestaetigen, 0)
+            labelSetzen()
+            probeHaken = 0
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            waehleL(gBlatt.labels[0])
+            labelsHierUmschalten()
+            pruefe("H macht das Label hierarchisch", STR$(gBlatt.labels[0].art), STR$(kern.LA_HIER))
+            gtk_menu_item_activate(gBlattMenueEltern)
+            pruefe("Zum Elternblatt", STR$(aktuellerBlattIndex()), "0")
+            pruefe("Blattsymbol hat den Port", STR$(LEN(hsb.sym.pins)) + " " + hsb.sym.pins[0].name, "1 VIN")
+            ' ein Draht vom Port zu einer Versorgung verbindet ueber die Grenze
+            DIM hpp AS kern.Punkt : hpp = hsb.pinPunkt(0)
+            verlaufMerken()
+            DIM hvcc AS kern.Bauteil : hvcc = kern.neuesBauteil("VCC", NEW kern.Lage(NEW kern.Punkt(hpp.x - 600, hpp.y), 0, FALSE))
+            ARRAY_PUSH(gBlatt.bauteile, hvcc)
+            DIM hdr AS kern.Draht : hdr = NEW kern.Draht()
+            ARRAY_PUSH(hdr.punkte, NEW kern.Punkt(hpp.x - 600, hpp.y))
+            ARRAY_PUSH(hdr.punkte, NEW kern.Punkt(hpp.x, hpp.y))
+            ARRAY_PUSH(gBlatt.draehte, hdr)
+            geaendert()
+            DIM hnz AS kern.Netze : hnz = kern.netzeDokument(gDok)
+            hnz.blattWaehlen(LEN(gDok.blaetter) - 1)
+            pruefe("Port-Netz im Unterblatt heisst wie die Versorgung", hnz.liste[hnz.netzAn(2000, 2000)].name, "VCC")
+            zentrieren(hpp.x, hpp.y)
+        CASE 27
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel + ".unterblatt.png") THEN PRINT "Foto Unterblatt gesichert"
+            END IF
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
+            pruefe("Rueckgaengig: Unterblatt wieder weg", STR$(LEN(gDok.blaetter)), STR$(probeZahl0))
+        CASE 28
+            ' alle Symbole der Bibliothek auf einem eigenen Blatt (Sichtpruefung)
+            probeUndo0 = LEN(gUndo)
+            verlaufMerken()
+            DIM bbl AS kern.Blatt : bbl = NEW kern.Blatt("Bibliothek")
+            ARRAY_PUSH(gDok.blaetter, bbl)
+            DIM bli AS ARRAY OF kern.Symbol : bli = kern.bibliothekListe()
+            DIM bk AS INTEGER
+            FOR bk = 0 TO LEN(bli) - 1
+                DIM bbt AS kern.Bauteil : bbt = kern.neuesBauteil(bli[bk].id, NEW kern.Lage(NEW kern.Punkt((bk MOD 9) * 2400, (bk \ 9) * 2600), 0, FALSE))
+                bbt.referenz = bli[bk].praefix + STR$(bk + 1)
+                IF bli[bk].einheitLeistung THEN bbt.referenz = ""
+                ARRAY_PUSH(bbl.bauteile, bbt)
+            NEXT
+            reiterAktualisieren()
+            blattWechseln(LEN(gDok.blaetter) - 1)
+            geaendert()
+            vZoom = 0.042
+            zentrieren(9600, 3900)
+        CASE 29
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel + ".bibliothek.png") THEN PRINT "Foto Bibliothek gesichert"
+            END IF
+            pruefe("Bibliothek komplett gesetzt", STR$(LEN(gBlatt.bauteile)), STR$(LEN(kern.bibliothekListe())))
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
+        CASE 30
+            ' Annotieren ueber das Menue: fehlende vergeben, alle neu, je ein Schritt
+            blattWechseln(0)
+            probeUndo0 = LEN(gUndo)
+            DIM ar7 AS kern.Bauteil : ar7 = gBlatt.bauteile[1]
+            verlaufMerken()
+            ar7.referenz = ""
+            geaendert()
+            gtk_menu_item_activate(gMenueFehlende)
+            pruefe("Fehlende Referenz vergeben", ar7.referenz + " " + STR$(LEN(gUndo) - probeUndo0), "R1 2")
+            gtk_menu_item_activate(gMenueFehlende)
+            pruefe("Nochmal: nichts zu tun, kein Schritt", STR$(LEN(gUndo) - probeUndo0) + " " + STR$(CONTAINS(gtk_label_get_text(gStatus), "nichts zu tun")), "2 " + STR$(TRUE))
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
+            pruefe("Rueckgaengig: wieder R7", gBlatt.bauteile[1].referenz, "R7")
+            ' Suchen & Ersetzen im echten Dialog
+            suchenZeigen()
+            gtk_entry_set_text(gSuFeld, "4K7")
+            pruefe("Suchen findet ohne Gross/Klein", STR$(LEN(gSuTreffer)), "1")
+            gtk_toggle_button_set_active(gSuGross, TRUE)
+            pruefe("mit Gross/Klein nicht", STR$(LEN(gSuTreffer)), "0")
+            pruefe("Liste im Fenster folgt der Eingabe", STR$(gtk_bin_get_child(gSuKasten) <> 0 AND gtk_list_box_get_row_at_index(gSuListe, 0) = 0), STR$(TRUE))
+            gtk_toggle_button_set_active(gSuGross, FALSE)
+            gtk_list_box_select_row(gSuListe, gtk_list_box_get_row_at_index(gSuListe, 0))
+            pruefe("Zeile waehlt das Bauteil", STR$(gHatGewaehlt AND gGewaehlt.referenz = "R7"), STR$(TRUE))
+            gtk_entry_set_text(gSuErsatz, "4k8")
+            gtk_dialog_response(gSuDlg, SU_ERSETZEN)
+            pruefe("Alle ersetzen", gBlatt.bauteile[1].wert + " " + STR$(LEN(gUndo) - probeUndo0) + " " + STR$(LEN(gSuTreffer)), "4k8 1 0")
+            gtk_dialog_response(gSuDlg, GTK_ANTWORT_OK)
+            pruefe("Dialog zu", STR$(gSuDlg), "0")
+            verlaufZurueck()
+            pruefe("Rueckgaengig: Wert zurueck", gBlatt.bauteile[1].wert, "4k7")
+            ' Dokument-Eigenschaften -> Schriftfeld
+            probeText1 = "Testplatine" : probeText2 = "Hans" : probeText3 = "B" : probeText4 = ""
+            g_timeout_add(150, dialogBestaetigen, 0)
+            gtk_menu_item_activate(gMenueEigenschaften)
+            probeText3 = "" : probeText4 = ""
+            pruefe("Dokument-Eigenschaften", gDok.titel + "/" + gDok.autor + "/" + gDok.revision + " " + STR$(LEN(gUndo) - probeUndo0), "Testplatine/Hans/B 1")
+            IF fotoZiel <> "" THEN pruefe("Schriftfeld mit Autor/Revision als PNG", STR$(ausgabeNach(fotoZiel + ".schriftfeld.png")), STR$(TRUE))
+            ' Speichern: mit Namen direkt, Liste "zuletzt", Sicherung weg
+            IF fotoZiel <> "" THEN
+                DIM kpf AS STRING : kpf = fotoZiel + ".komfort.fkn"
+                IF FILEEXISTS(kpf) THEN DELETEFILE(kpf)
+                IF FILEEXISTS(kpf + ".sicherung") THEN DELETEFILE(kpf + ".sicherung")
+                DIM altPfad AS STRING : altPfad = gPfad
+                gPfad = kpf
+                dateiSpeichern()
+                pruefe("Speichern ohne Rueckfrage", STR$(FILEEXISTS(kpf)) + " " + STR$(gGeaendert), STR$(TRUE) + " " + STR$(FALSE))
+                pruefe("Zuletzt geoeffnet", zuletztLesen()[0], kpf)
+                ' Aenderung -> Autosave schreibt die Sicherung
+                verlaufMerken()
+                ARRAY_PUSH(gBlatt.labels, NEW kern.Label("GESICHERT", NEW kern.Punkt(6000, 3000), kern.LA_LOKAL))
+                geaendert()
+                DIM az AS BOOLEAN : az = autosaveTick(0)
+                pruefe("Autosave schreibt die Sicherung", STR$(FILEEXISTS(kpf + ".sicherung")), STR$(TRUE))
+                ' Laden: Sicherung wird angeboten und geladen
+                g_timeout_add(150, dialogBestaetigen, 0)
+                dateiLaden(kpf)
+                DIM hatLabel AS BOOLEAN : hatLabel = FALSE
+                DIM kli AS INTEGER
+                FOR kli = 0 TO LEN(gBlatt.labels) - 1
+                    IF gBlatt.labels[kli].text = "GESICHERT" THEN hatLabel = TRUE
+                NEXT
+                pruefe("Sicherung beim Oeffnen geladen", STR$(hatLabel) + " " + STR$(gGeaendert) + " " + gDok.titel, STR$(TRUE) + " " + STR$(TRUE) + " Testplatine")
+                dateiSpeichern()
+                pruefe("Speichern raeumt die Sicherung weg", STR$(FILEEXISTS(kpf + ".sicherung")), STR$(FALSE))
+                pruefe("Menue Datei hat den Eintrag", STR$(gDateiMenue <> 0 AND LEN(zuletztLesen()) = 1), STR$(TRUE))
+            END IF
+        CASE 31
+            ' Drahtfarben nach Netzklasse
+            blattWechseln(0)
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            auswahlAufheben()
+            probeUndo0 = LEN(gUndo)
+            DIM fnz AS kern.Netze : fnz = aktuelleNetze()
+            DIM fv AS STRING : fv = ""
+            DIM fi AS INTEGER
+            FOR fi = 0 TO LEN(gBlatt.draehte) - 1
+                DIM fni AS INTEGER : fni = fnz.netzAn(gBlatt.draehte[fi].punkte[0].x, gBlatt.draehte[fi].punkte[0].y)
+                IF fni < 0 THEN CONTINUE
+                DIM fsoll AS INTEGER : fsoll = C_DRAHT
+                IF fnz.liste[fni].name = "VCC" THEN fsoll = C_DRAHT_VERS
+                IF fnz.liste[fni].name = "GND" THEN fsoll = C_DRAHT_MASSE
+                IF drahtFarbe(gBlatt.draehte[fi]) <> fsoll THEN fv = fv + fnz.liste[fni].name + " "
+            NEXT
+            pruefe("Drahtfarbe je Netzklasse (VCC rot, GND grau)", "[" + fv + "]", "[]")
+            ' Messen: faengt am Pin, Abstand in mm und mil
+            gtk_button_clicked(gKnopfMessen)
+            pruefe("Werkzeug Messen", STR$(gWerkzeug) + " " + STR$(gtk_toggle_button_get_active(gKnopfMessen)), STR$(WZ_MESSEN) + " " + STR$(TRUE))
+            DIM mp AS kern.Punkt : mp = gBlatt.bauteile[1].pinPunkt(0)
+            mausSetzen(sx(mp.x + 30), sy(mp.y - 20))
+            pruefe("Messen faengt am Pin", STR$(gMausWX) + "," + STR$(gMausWY), STR$(mp.x) + "," + STR$(mp.y))
+            messenKlick(0, 0)
+            messenKlick(3000, 4000)
+            pruefe("Abstand", messText$(), "Abstand 50,0 mm (1969 mil)   dx 30,0  dy 40,0 mm   -- Klick misst neu")
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            pruefe("Messen weg beim Werkzeugwechsel", STR$(gMessAktiv), STR$(FALSE))
+            ' Verteilen und Ausrichten auf einem eigenen Blatt: drei Widerstaende, Draht folgt
+            verlaufMerken()
+            DIM vbl AS kern.Blatt : vbl = NEW kern.Blatt("Ausrichten")
+            ARRAY_PUSH(gDok.blaetter, vbl)
+            DIM vxs AS ARRAY OF INTEGER : vxs = [0, 1000, 5000]
+            DIM vk AS INTEGER
+            FOR vk = 0 TO 2
+                DIM vr AS kern.Bauteil : vr = kern.neuesBauteil("R", NEW kern.Lage(NEW kern.Punkt(vxs[vk], vk * 300), 90, FALSE))
+                vr.referenz = "R" + STR$(80 + vk)
+                ARRAY_PUSH(vbl.bauteile, vr)
+            NEXT
+            DIM vw AS kern.Draht : vw = NEW kern.Draht()
+            ARRAY_PUSH(vw.punkte, vbl.bauteile[1].pinPunkt(1))
+            ARRAY_PUSH(vw.punkte, NEW kern.Punkt(1000, 2000))
+            ARRAY_PUSH(vbl.bauteile, kern.neuesBauteil("GND", NEW kern.Lage(NEW kern.Punkt(1000, 2000), 0, FALSE)))
+            ARRAY_PUSH(vbl.draehte, vw)
+            reiterAktualisieren()
+            blattWechseln(LEN(gDok.blaetter) - 1)
+            geaendert()
+            auswahlAufheben()
+            waehleB(vbl.bauteile[0])
+            umschaltenB(vbl.bauteile[1])
+            umschaltenB(vbl.bauteile[2])
+            DIM vu AS INTEGER : vu = LEN(gUndo)
+            auswahlAusrichten(AR_WAAGRECHT)
+            pruefe("Waagrecht verteilt (aeussere bleiben)", STR$(vbl.bauteile[0].lage.pos.x) + " " + STR$(vbl.bauteile[1].lage.pos.x) + " " + STR$(vbl.bauteile[2].lage.pos.x) + " " + STR$(LEN(gUndo) - vu), "0 2500 5000 1")
+            DIM vn AS kern.Netze : vn = aktuelleNetze()
+            DIM vp AS kern.Punkt : vp = vbl.bauteile[1].pinPunkt(1)
+            pruefe("Draht folgt dem verschobenen Pin", STR$(vn.gleich(vp.x, vp.y, 1000, 2000)), STR$(TRUE))
+            auswahlAusrichten(AR_OBEN)
+            DIM vy0 AS INTEGER, vy1 AS INTEGER, vy2 AS INTEGER, vdx AS INTEGER, vdy AS INTEGER
+            bauteilBox(vbl.bauteile[0], vdx, vy0, vdx, vdy)
+            bauteilBox(vbl.bauteile[1], vdx, vy1, vdx, vdy)
+            bauteilBox(vbl.bauteile[2], vdx, vy2, vdx, vdy)
+            pruefe("Oben ausgerichtet", STR$(vy0 = vy1 AND vy1 = vy2), STR$(TRUE))
+            auswahlAusrichten(AR_OBEN)
+            pruefe("Nochmal: steht schon so, kein Schritt", STR$(LEN(gUndo) - vu) + " " + STR$(CONTAINS(gtk_label_get_text(gStatus), "Steht schon so")), "2 " + STR$(TRUE))
+            auswahlAufheben()
+            waehleB(vbl.bauteile[0])
+            auswahlAusrichten(AR_LINKS)
+            pruefe("Ein Teil: Hinweis statt Ausrichten", STR$(CONTAINS(gtk_label_get_text(gStatus), "mindestens zwei")), STR$(TRUE))
+            ' Cross-Probing: Auswahl wandert zwischen Schaltplan und Platine
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
+            blattWechseln(0)
+            DIM xr7 AS kern.Bauteil : xr7 = gBlatt.bauteile[1]
+            waehleB(xr7)
+            gtk_button_clicked(gKnopfPlatine)
+            pruefe("Noch nicht auf der Platine: Hinweis", STR$(CONTAINS(gPlMeldung, "noch nicht auf der Platine")), STR$(TRUE))
+            plEinsetzen()
+            plMengeSetzen([kern.teilIndex(gDok.platine, xr7.id)])
+            gtk_button_clicked(gKnopfSchaltplan)
+            pruefe("Platine -> Schaltplan: R7 gewaehlt", STR$(gHatGewaehlt AND gGewaehlt.id = xr7.id) + " " + STR$(aktuellerBlattIndex()), STR$(TRUE) + " 0")
+            gtk_button_clicked(gKnopfPlatine)
+            pruefe("Schaltplan -> Platine: R7 gewaehlt", STR$(plIstGewaehlt(kern.teilIndex(gDok.platine, xr7.id))) + " " + STR$(LEN(plAuswahlListe())), STR$(TRUE) + " 1")
+            gtk_button_clicked(gKnopfSchaltplan)
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
+            auswahlAufheben()
+        CASE 32
+            ' Stueckliste: Spalten per Haken, Export folgt ihnen
+            blattWechseln(0)
+            gBomSpalten = []
+            g_timeout_add(250, bomProbe, 0)
+            stuecklisteZeigen()
+            pruefe("Stueckliste: Spalten gewaehlt", STR$(LEN(gBomSpalten)) + " " + STR$(gBomSpalten[0]) + " " + STR$(gBomSpalten[1]), "2 " + STR$(kern.BS_REFERENZEN) + " " + STR$(kern.BS_BAUFORM))
+            IF fotoZiel <> "" THEN
+                pruefe("Export mit den gewaehlten Spalten", STR$(stuecklisteNach(fotoZiel + ".spalten.csv")) + " " + STR$(STARTSWITH(READALL$(fotoZiel + ".spalten.csv"), "Referenzen;Bauform" + CHR$(10))), STR$(TRUE) + " " + STR$(TRUE))
+                pruefe("KiCad-Netzliste (.net)", STR$(exportNach(fotoZiel + ".kicad.net")) + " " + STR$(STARTSWITH(READALL$(fotoZiel + ".kicad.net"), "(export (version")), STR$(TRUE) + " " + STR$(TRUE))
+                pruefe("Text-Netzliste (.txt)", STR$(exportNach(fotoZiel + ".netz.txt")) + " " + STR$(STARTSWITH(READALL$(fotoZiel + ".netz.txt"), "# Funkenflug-Netzliste")), STR$(TRUE) + " " + STR$(TRUE))
+            END IF
+            gBomSpalten = []
+        CASE 33
+            ' Projektbericht: Seitenplan, PDF, Inhaltsverzeichnis; mit Platine mehr Seiten
+            blattWechseln(0)
+            probeUndo0 = LEN(gUndo)
+            DIM bplan AS ARRAY OF BerichtSeite : bplan = berichtPlan()
+            pruefe("Bericht ohne Platine", STR$(LEN(bplan)) + " " + bplan[0].art + " " + bplan[1].art + " " + bplan[LEN(bplan) - 1].abschnitt, STR$(2 + LEN(gDok.blaetter) + 2) + " deck blatt Elektrische Regelpruefung")
+            DIM binh AS ARRAY OF STRING : binh = berichtInhalt(bplan)
+            pruefe("Inhaltsverzeichnis", binh[0], PADR$("Schaltplan", 30) + "Seite 2")
+            IF fotoZiel <> "" THEN
+                gBerichtSeiten = 0
+                pruefe("Projektbericht als PDF", STR$(projektbericht(fotoZiel + ".bericht.pdf")) + " " + STR$(gBerichtSeiten), STR$(TRUE) + " " + STR$(LEN(bplan)))
+                pruefe("Deckblatt als PNG", STR$(berichtPng(fotoZiel + ".deckblatt.png", 0, 100)), STR$(TRUE))
+            END IF
+            gtk_button_clicked(gKnopfPlatine)
+            plEinsetzen()
+            gtk_button_clicked(gKnopfSchaltplan)
+            DIM bplan2 AS ARRAY OF BerichtSeite : bplan2 = berichtPlan()
+            pruefe("Mit Platine drei Seiten mehr", STR$(LEN(bplan2) - LEN(bplan)) + " " + bplan2[LEN(bplan2) - 1].art, "3 platine")
+            IF fotoZiel <> "" THEN
+                gBerichtSeiten = 0
+                pruefe("Bericht mit Platine", STR$(projektbericht(fotoZiel + ".bericht2.pdf")) + " " + STR$(gBerichtSeiten), STR$(TRUE) + " " + STR$(LEN(bplan2)))
+            END IF
+            WHILE LEN(gUndo) > probeUndo0
+                verlaufZurueck()
+            WEND
+        CASE 34
+            ' KiCad-Schaltplan oeffnen (der Hinweis-Dialog wird bestaetigt)
+            g_timeout_add(150, dialogBestaetigen, 0)
+            dateiLaden("daten/kicad/beispiel.kicad_sch")
+            pruefe("KiCad geoeffnet", STR$(LEN(gDok.blaetter)) + " " + gDok.titel + " " + gPfad + " " + gNameVorschlag + " " + STR$(gGeaendert), "2 KiCad-Beispiel  beispiel.fkn " + STR$(TRUE))
+            pruefe("KiCad-Teile auf dem Raster", STR$(gBlatt.bauteile[0].lage.pos.x MOD 100) + " " + STR$(gBlatt.bauteile[0].lage.pos.y MOD 100), "0 0")
+            DIM kiErc AS ARRAY OF kern.Verstoss : kiErc = kern.ercPruefenDok(gDok)
+            DIM kiOffen AS INTEGER : kiOffen = 0
+            DIM kie AS INTEGER
+            FOR kie = 0 TO LEN(kiErc) - 1
+                IF CONTAINS(kiErc[kie].text, "Offenes Drahtende") OR CONTAINS(kiErc[kie].text, "fehlt") THEN kiOffen = kiOffen + 1
+            NEXT
+            pruefe("KiCad-ERC: nur die vier freien Kreuzungsenden", STR$(kiOffen), "4")
+            pruefe("KiCad-Symbole in der Liste", STR$(kern.istEigenBekannt("kicad:Test:Q_NPN")), STR$(TRUE))
+            vZoom = vZoom * 1.8
+            zentrieren(6200, 5800)
+        CASE 35
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel + ".kicad.png") THEN PRINT "Foto KiCad gesichert"
+            END IF
+        CASE 36
+            ' Simulation: Signalquelle -> RC, daneben +5V -> 330 -> rote LED
+            IF kern.ngspiceSuchen$() = "" THEN
+                PRINT "ngspice fehlt -- Simulationsschritte uebersprungen (FUNKENFLUG_NGSPICE setzen)"
+                probeSchritt = 39
+            ELSE
+                leinwandDokument(probeSimSchaltung())
+                verlaufRuecksetzen()
+                simArbeitspunkt()
+                pruefe("Arbeitspunkt gerechnet", STR$(gSimOpDa) + " " + STR$(gSimDlg <> 0) + " " + STR$(LEN(gSimMarken) >= 3), STR$(TRUE) + " " + STR$(TRUE) + " " + STR$(TRUE))
+                pruefe("LED-Spannung in der Statuszeile", LEFT$(simSpannungText$("LED_A"), 6), " = 1.9")
+                pruefe("Quelle +5V liefert ~9 mA", STR$(CONTAINS(gSpMeldung, "+5V liefert 9.")), STR$(TRUE))
+                gtk_widget_hide(gSimDlg)
+                vZoom = 0.24
+                zentrieren(4000, 2700)
+            END IF
+        CASE 37
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel + ".sim_op.png") THEN PRINT "Foto Arbeitspunkt gesichert"
+            END IF
+            ' eine Aenderung nimmt die Spannungen weg
+            geaendert()
+            pruefe("Aenderung verwirft den Arbeitspunkt", STR$(gSimOpDa) + " " + STR$(LEN(gSimMarken)) + " [" + simSpannungText$("LED_A") + "]", STR$(FALSE) + " 0 []")
+            ' Zeitverlauf ueber den echten Dialog
+            probeText1 = "12m" : probeText2 = "20u" : probeText3 = PROBE_LASSEN : probeText4 = PROBE_LASSEN
+            g_timeout_add(150, dialogBestaetigen, 0)
+            simZeitverlauf()
+            DIM stNamen AS STRING : stNamen = ""
+            DIM sti AS INTEGER
+            FOR sti = 0 TO LEN(gSimErg.netze) - 1
+                IF gSimSichtbar[sti] THEN stNamen = stNamen + gSimErg.netze[sti].name + " "
+            NEXT
+            pruefe("Zeitverlauf: Analyse, Punkte, Dauer", STR$(gSimErg.analyse) + " " + STR$(LEN(gSimErg.x) > 500) + " " + kern.siText$(gSimErg.x[LEN(gSimErg.x) - 1], "s"), STR$(kern.SIM_TRAN) + " " + STR$(TRUE) + " 12 ms")
+            pruefe("Benannte Netze vorgewaehlt", stNamen, "AUS EIN LED_A ")
+            gSimMausDrin = TRUE
+            gSimMausX = 74 + 0.42 * (gtk_widget_get_allocated_width(gSimFlaeche) - 108)
+            gtk_widget_queue_draw(gSimFlaeche)
+        CASE 38
+            pruefe("Ablesen an der Maus", STR$(STARTSWITH(gtk_label_get_text(gSimInfo), "t = 5.")) + " " + STR$(CONTAINS(gtk_label_get_text(gSimInfo), "AUS ")), STR$(TRUE) + " " + STR$(TRUE))
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gtk_dialog_get_content_area(gSimDlg), fotoZiel + ".sim_tran.png") THEN PRINT "Foto Zeitverlauf gesichert"
+            END IF
+            probeText1 = "1" : probeText2 = "100k" : probeText3 = "20" : probeText4 = PROBE_LASSEN
+            g_timeout_add(150, dialogBestaetigen, 0)
+            simFrequenzgang()
+            DIM saNamen AS STRING : saNamen = ""
+            DIM sai AS INTEGER
+            FOR sai = 0 TO LEN(gSimErg.netze) - 1
+                IF gSimSichtbar[sai] THEN saNamen = saNamen + gSimErg.netze[sai].name + " "
+            NEXT
+            pruefe("Frequenzgang: Analyse, bis", STR$(gSimErg.analyse) + " " + kern.siText$(gSimErg.x[LEN(gSimErg.x) - 1], "Hz"), STR$(kern.SIM_AC) + " 100 kHz")
+            pruefe("LED ohne Wechselanteil nicht vorgewaehlt", saNamen, "AUS EIN ")
+            gSimMausDrin = TRUE
+            gSimMausX = 74 + 0.44 * (gtk_widget_get_allocated_width(gSimFlaeche) - 108)
+            gtk_widget_queue_draw(gSimFlaeche)
+        CASE 39
+            pruefe("Ablesen in dB", STR$(STARTSWITH(gtk_label_get_text(gSimInfo), "f = ")) + " " + STR$(CONTAINS(gtk_label_get_text(gSimInfo), " dB / ")), STR$(TRUE) + " " + STR$(TRUE))
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gtk_dialog_get_content_area(gSimDlg), fotoZiel + ".sim_ac.png") THEN PRINT "Foto Frequenzgang gesichert"
+            END IF
+            simZu(gSimDlg, 0, 0)
+        CASE 40
+            ' Gerber: Platine bestuecken, verbinden, als ZIP schreiben
+            gtk_button_clicked(gKnopfPlatine)
+            plEinsetzen()
+            plVerbinden()
+            IF fotoZiel <> "" THEN
+                DIM gbM AS STRING : gbM = gerberExport$(fotoZiel + ".gerber.zip")
+                DIM gbL AS ARRAY OF STRING : gbL = ZIP_LIST(fotoZiel + ".gerber.zip")
+                pruefe("Gerber-ZIP geschrieben", STR$(LEN(gbL)) + " " + STR$(STARTSWITH(gbM, "Gerber-Datensatz geschrieben")) + " " + STR$(CONTAINS(gbM, "Bohrungen")), "8 " + STR$(TRUE) + " " + STR$(TRUE))
+                pruefe("Gerber: Lagen im ZIP", STR$(LEN(ARRAY_FILTER(gbL, FUNCTION(n) ENDSWITH(n, ".gbr")))) + " " + STR$(LEN(ARRAY_FILTER(gbL, FUNCTION(n) ENDSWITH(n, ".drl")))), "6 1")
+            END IF
+            gtk_button_clicked(gKnopfSchaltplan)
+        CASE 41
+            ' 3D: eine bunte Platine (die Simulationsschaltung und weitere Bauformen)
+            leinwandDokument(probe3dSchaltung())
+            verlaufRuecksetzen()
+            gtk_button_clicked(gKnopfPlatine)
+            plEinsetzen()
+            plVerbinden()
+            platine3dZeigen()
+            pruefe("3D-Fenster offen, alle Teile im Modell", STR$(g3Dlg <> 0) + " " + STR$(g3Modell.koerper) + " " + STR$(STARTSWITH(gtk_label_get_text(g3Info), STR$(LEN(gDok.platine.teile)) + " Bauteile")), STR$(TRUE) + " " + STR$(LEN(gDok.platine.teile)) + " " + STR$(TRUE))
+            p3Ansicht(25, 38)
+            g3Kamera.skala = g3Kamera.skala * 1.6
+        CASE 42
+            PRINT "3D: ein Bild in "; g3Dauer; " ms"
+            pruefe("3D gezeichnet", STR$(g3Eingepasst), STR$(TRUE))
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(g3Flaeche, fotoZiel + ".3d.png") THEN PRINT "Foto 3D gesichert"
+            END IF
+            gtk_button_clicked(g3KnopfUnten)
+            pruefe("Knopf Loetseite", STR$(ROUND(g3Kamera.azimut)) + " " + STR$(ROUND(g3Kamera.hoehe)), "180 -90")
+        CASE 43
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(g3Flaeche, fotoZiel + ".3d_unten.png") THEN PRINT "Foto 3D Loetseite gesichert"
+            END IF
+            ' Ziehen dreht, kippt aber nicht ueber senkrecht hinaus
+            p3Ansicht(20, 40)
+            p3Drehen(50, 0)
+            p3Drehen(0, 500)
+            pruefe("Ziehen dreht und kippt begrenzt", STR$(ROUND(g3Kamera.azimut)) + " " + STR$(ROUND(g3Kamera.hoehe)), "0 90")
+            p3Zu(g3Dlg, 0, 0)
+            gtk_button_clicked(gKnopfSchaltplan)
+        CASE 44
+            ' Busse: zeichnen und benennen, Abzweige mit dem naechsten freien Mitglied
+            leinwandDokument(NEW kern.Dokument())
+            verlaufRuecksetzen()
+            gtk_button_clicked(gKnopfBus)
+            pruefe("Knopf Bus", STR$(gWerkzeug) + " " + STR$(gtk_toggle_button_get_active(gKnopfBus)), STR$(WZ_BUS) + " " + STR$(TRUE))
+            gDrahtAktiv = TRUE
+            gDrahtPunkte = [NEW kern.Punkt(2000, 2000), NEW kern.Punkt(8000, 2000)]
+            probeText1 = "D[0..3]" : probeText2 = PROBE_LASSEN : probeText3 = PROBE_LASSEN : probeText4 = PROBE_LASSEN
+            g_timeout_add(150, dialogBestaetigen, 0)
+            drahtEndePunkt()
+            pruefe("Bus gezeichnet und benannt", STR$(LEN(gBlatt.busse)) + " " + gBlatt.busse[0].name + " " + STR$(LEN(gBlatt.draehte)), "1 D[0..3] 0")
+            werkzeugWaehlen(WZ_DRAHT, "")
+            DIM bpi AS INTEGER
+            FOR bpi = 0 TO 3
+                DIM bpx AS INTEGER : bpx = 3000 + bpi * 1400
+                DIM bpr AS kern.Bauteil : bpr = kern.neuesBauteil("R", NEW kern.Lage(NEW kern.Punkt(bpx, 3600), 90, FALSE))
+                bpr.referenz = "R" + STR$(bpi + 1)
+                ARRAY_PUSH(gBlatt.bauteile, bpr)
+                probeText1 = PROBE_LASSEN
+                g_timeout_add(150, dialogBestaetigen, 0)
+                gDrahtAktiv = TRUE
+                gDrahtPunkte = [NEW kern.Punkt(bpx, 2000), NEW kern.Punkt(bpx, 3400)]
+                drahtEndePunkt()
+            NEXT
+            DIM bpl AS STRING : bpl = ""
+            FOR bpi = 0 TO LEN(gBlatt.labels) - 1
+                bpl = bpl + gBlatt.labels[bpi].text + "@" + STR$(gBlatt.labels[bpi].anker.y) + " "
+            NEXT
+            pruefe("Abzweige: naechstes freies Mitglied, Label am Pin-Ende", bpl, "D0@3400 D1@3400 D2@3400 D3@3400 ")
+            DIM bpe AS ARRAY OF kern.Verstoss : bpe = kern.ercPruefenDok(gDok)
+            DIM bpm AS INTEGER : bpm = 0
+            FOR bpi = 0 TO LEN(bpe) - 1
+                IF CONTAINS(bpe[bpi].text, "Bus") OR (CONTAINS(bpe[bpi].text, "Offenes Drahtende") AND bpe[bpi].y = 2000) THEN bpm = bpm + 1
+            NEXT
+            pruefe("ERC: Bus und Abzweige in Ordnung", STR$(bpm), "0")
+            pruefe("Abzweig = ein Rueckgaengig-Schritt (Draht + Label)", STR$(LEN(gUndo)), "5")
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            vZoom = 0.2
+            zentrieren(4900, 2800)
+        CASE 45
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFlaeche, fotoZiel + ".bus.png") THEN PRINT "Foto Bus gesichert"
+            END IF
+            ' Bus anklicken und ziehen: die Abzweige folgen
+            mausSetzen(sx(7600), sy(2000))
+            klickAuswahl(sx(7600), sy(2000), FALSE)
+            pruefe("Bus angeklickt", STR$(LEN(gSelBus)) + " " + STR$(auswahlAnzahl()), "1 1")
+            gruppenZiehenUm(0, -500)
+            gruppenZugEnde()
+            gZieht = FALSE
+            pruefe("Bus gezogen, Abzweige folgen", STR$(gBlatt.busse[0].punkte[0].y) + " " + STR$(gBlatt.draehte[0].punkte[0].y) + " " + STR$(gBlatt.draehte[3].punkte[0].y), "1500 1500 1500")
+            auswahlLoeschen(FALSE)
+            pruefe("Bus geloescht, Abzweige bleiben", STR$(LEN(gBlatt.busse)) + " " + STR$(LEN(gBlatt.draehte)), "0 4")
+            verlaufZurueck()
+            pruefe("Rueckgaengig: Bus wieder da", STR$(LEN(gBlatt.busse)) + " " + gBlatt.busse[0].name, "1 D[0..3]")
+        CASE 46
+            ' Mehrfach-Instanzen: Unterblatt einsetzen, dasselbe noch einmal
+            leinwandDokument(NEW kern.Dokument())
+            verlaufRuecksetzen()
+            gDok.blaetter[0].name = "Haupt"
+            vZoom = 0.2
+            zentrieren(3000, 2000)
+            probeText1 = "Kanal" : probeText2 = PROBE_LASSEN : probeText3 = PROBE_LASSEN : probeText4 = PROBE_LASSEN
+            g_timeout_add(150, dialogBestaetigen, 0)
+            blattUnterEinsetzen()
+            DIM ikind AS kern.Blatt : ikind = gDok.blaetter[1]
+            DIM ir AS kern.Bauteil : ir = kern.neuesBauteil("R", kern.neueLage(3000, 2000))
+            ir.referenz = "R1"
+            ir.wert = "10k"
+            ARRAY_PUSH(ikind.bauteile, ir)
+            DIM ie AS kern.Label : ie = NEW kern.Label("EIN", NEW kern.Punkt(2800, 2000), kern.LA_HIER)
+            ie.drehung = 180
+            ARRAY_PUSH(ikind.labels, ie)
+            ARRAY_PUSH(ikind.labels, NEW kern.Label("AUS", NEW kern.Punkt(3200, 2000), kern.LA_HIER))
+            geaendert()
+            DIM iA AS kern.Bauteil : iA = gDok.blaetter[0].bauteile[0]
+            probeText1 = "Kanal"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            blattErneutEinsetzen()
+            DIM iB AS kern.Bauteil : iB = gDok.blaetter[0].bauteile[1]
+            iB.lage = NEW kern.Lage(NEW kern.Punkt(iA.lage.pos.x, iA.lage.pos.y + 2500), 0, FALSE)
+            geaendert()
+            pruefe("Zweite Instanz eingesetzt", STR$(LEN(gDok.blaetter)) + " " + iA.referenz + " / " + iB.referenz, "2 Kanal / Kanal (2)")
+            DIM ierc AS ARRAY OF kern.Verstoss : ierc = kern.ercPruefenDok(gDok)
+            DIM iet AS STRING : iet = ""
+            DIM iei AS INTEGER
+            FOR iei = 0 TO LEN(ierc) - 1
+                iet = iet + ierc[iei].text + "|"
+            NEXT
+            pruefe("ERC: kein Mehrfach-Fehler, Referenzen eindeutig", STR$(CONTAINS(iet, "mehrfach")) + " " + STR$(CONTAINS(iet, "doppelt")), STR$(FALSE) + " " + STR$(FALSE))
+            ' per Doppelklick-Weg in die zweite Instanz
+            instanzBetreten(iB)
+            pruefe("In Instanz 2", gBlatt.name + instanzText$() + " " + anzeigeRef$(ir), "Kanal  Instanz 2/2 R1_2")
+            probeText1 = "R7"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            eigenschaftenDialog(ir)
+            pruefe("Referenz nur fuer diese Instanz", anzeigeRef$(ir) + " " + ir.referenz + " " + ir.wert, "R7 R1 10k")
+            pruefe("Statuszeile nennt die Instanz", STR$(STARTSWITH(gtk_label_get_text(gStatus), "Haupt > Kanal (2) (Blatt 2/2)  Instanz 2/2")), STR$(TRUE))
+            vZoom = 0.35
+            zentrieren(3000, 2000)
+        CASE 47
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFenster, fotoZiel + ".instanz.png") THEN PRINT "Foto Instanz gesichert"
+            END IF
+            instanzWechseln()
+            pruefe("Naechste Instanz (I)", instanzText$() + " " + anzeigeRef$(gBlatt.bauteile[0]), "  Instanz 1/2 R1")
+            instanzWechseln()
+            pruefe("Und wieder die zweite", instanzText$(), "  Instanz 2/2")
+            instanzZumEltern()
+            pruefe("Zum Elternblatt", gBlatt.name + "[" + instanzText$() + "]", "Haupt[]")
+            DIM ibom AS ARRAY OF kern.BomZeile : ibom = kern.stuecklisteDok(gDok)
+            pruefe("Stueckliste: beide Instanzen", STR$(ibom[0].menge) + " " + JOIN$(ibom[0].referenzen, ","), "2 R1,R7")
+            verlaufZurueck()
+            pruefe("Rueckgaengig nimmt die Instanz-Referenz", MAPGETOR(gDok.blaetter[1].bauteile[0].instanzRefs, "/" + gDok.blaetter[0].bauteile[1].id, "-"), "-")
+        CASE ELSE
+            PRINT "Pruefungen mit Fehler: "; probeFehler
+            gtk_main_quit()
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' Die Beispielschaltung der Simulation (auch fuer die Bilder im README)
+FUNCTION probeSimSchaltung() AS kern.Dokument
+    DIM d AS kern.Dokument : d = NEW kern.Dokument()
+    d.titel = "RC-Glied und LED"
+    DIM b AS kern.Blatt : b = d.blaetter[0]
+    DIM t AS kern.Bauteil
+    t = kern.neuesBauteil("V_SIG", kern.neueLage(2000, 3000))
+    t.referenz = "V1" : t.wert = "PULSE(0 5 0 1u 1u 2m 4m) AC 1"
+    ARRAY_PUSH(b.bauteile, t)
+    t = kern.neuesBauteil("R", kern.neueLage(3000, 2000))
+    t.referenz = "R1" : t.wert = "1k"
+    ARRAY_PUSH(b.bauteile, t)
+    t = kern.neuesBauteil("C", NEW kern.Lage(NEW kern.Punkt(4000, 2700), 90, FALSE))
+    t.referenz = "C1" : t.wert = "1u"
+    ARRAY_PUSH(b.bauteile, t)
+    t = kern.neuesBauteil("GND", kern.neueLage(3000, 3800))
+    ARRAY_PUSH(b.bauteile, t)
+    t = kern.neuesBauteil("VCC", kern.neueLage(6000, 1600))
+    t.wert = "+5V"
+    ARRAY_PUSH(b.bauteile, t)
+    t = kern.neuesBauteil("R", NEW kern.Lage(NEW kern.Punkt(6000, 2200), 90, FALSE))
+    t.referenz = "R2" : t.wert = "330"
+    ARRAY_PUSH(b.bauteile, t)
+    t = kern.neuesBauteil("LED", NEW kern.Lage(NEW kern.Punkt(6000, 2900), 90, FALSE))
+    t.referenz = "D1" : t.wert = "rot"
+    ARRAY_PUSH(b.bauteile, t)
+    t = kern.neuesBauteil("GND", kern.neueLage(6000, 3600))
+    ARRAY_PUSH(b.bauteile, t)
+    probeDraht(b, [2000, 2700, 2000, 2000, 2800, 2000])
+    probeDraht(b, [3200, 2000, 4000, 2000, 4000, 2500])
+    probeDraht(b, [4000, 2000, 4800, 2000])
+    probeDraht(b, [2000, 3300, 2000, 3800, 4000, 3800, 4000, 2900])
+    probeDraht(b, [6000, 1600, 6000, 2000])
+    probeDraht(b, [6000, 2400, 6000, 2700])
+    probeDraht(b, [6000, 3100, 6000, 3600])
+    DIM la AS kern.Label
+    la = NEW kern.Label("EIN", NEW kern.Punkt(2000, 2400), kern.LA_LOKAL)
+    la.drehung = 180
+    ARRAY_PUSH(b.labels, la)
+    ARRAY_PUSH(b.labels, NEW kern.Label("AUS", NEW kern.Punkt(4800, 2000), kern.LA_LOKAL))
+    ARRAY_PUSH(b.labels, NEW kern.Label("LED_A", NEW kern.Punkt(6000, 2550), kern.LA_LOKAL))
+    kern.autoKnoten(b)
+    RETURN d
+END FUNCTION
+
+' fuer die 3D-Bilder: die Simulationsschaltung und einige weitere Bauformen
+FUNCTION probe3dSchaltung() AS kern.Dokument
+    DIM d AS kern.Dokument : d = probeSimSchaltung()
+    d.titel = "3D-Probe"
+    DIM b AS kern.Blatt : b = d.blaetter[0]
+    DIM ids AS ARRAY OF STRING : ids = ["NE555", "Q_NPN", "REG", "CP", "CONN_1X4", "RV", "D", "C"]
+    DIM refs AS ARRAY OF STRING : refs = ["U1", "Q1", "U2", "C2", "J1", "RV1", "D2", "C3"]
+    DIM werte AS ARRAY OF STRING : werte = ["NE555", "BC547", "7805", "100u", "", "10k", "1N4148", "100n"]
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(ids) - 1
+        DIM t AS kern.Bauteil : t = kern.neuesBauteil(ids[i], kern.neueLage(9000 + (i MOD 4) * 2000, 1500 + (i \ 4) * 2500))
+        t.referenz = refs[i]
+        IF werte[i] <> "" THEN t.wert = werte[i]
+        ARRAY_PUSH(b.bauteile, t)
+    NEXT
+    RETURN d
+END FUNCTION
+
+SUB probeDraht(b AS kern.Blatt, xy AS ARRAY OF INTEGER)
+    DIM w AS kern.Draht : w = NEW kern.Draht()
+    DIM i AS INTEGER : i = 0
+    WHILE i + 1 < LEN(xy)
+        ARRAY_PUSH(w.punkte, NEW kern.Punkt(xy[i], xy[i + 1]))
+        i = i + 2
+    WEND
+    ARRAY_PUSH(b.draehte, w)
+END SUB
+
+SUB aufPl3d(knopf AS INTEGER, daten AS INTEGER)
+    platine3dZeigen()
+END SUB
+
+FUNCTION leistenKnopf(text AS STRING) AS INTEGER
+    RETURN gtk_toggle_button_new_with_label(text)
+END FUNCTION
+
+DIM bereit AS BOOLEAN
+TRY
+    bereit = gtk_init_check(0, 0)
+CATCH e
+    PRINT "GTK nicht gefunden -- unter Windows GTK aus MSYS2 im PATH oder aus Inkscape."
+    END
+END TRY
+IF NOT bereit THEN
+    PRINT "GTK ist da, findet aber keinen Bildschirm."
+    END
+END IF
+
+kern.bibliothekAufbauen()
+
+DIM i AS INTEGER
+DIM startDok AS kern.Dokument
+DIM startPfad AS STRING : startPfad = ""
+FOR i = 0 TO ARGC() - 1
+    IF ARG$(i) = "--nur-foto" THEN probeSchritt = 100      ' nur das Bild, keine Pruefungen
+    IF (ARG$(i) = "--foto" OR ARG$(i) = "--nur-foto") AND i + 1 < ARGC() THEN
+        fotoZiel = ARG$(i + 1)
+    ELSEIF RIGHT$(LOWER$(ARG$(i)), 4) = ".fkn" THEN
+        startPfad = ARG$(i)
+    END IF
+NEXT
+
+' Der Selbsttest laesst die Zwischenablage des Systems in Ruhe und benutzt
+' eine eigene Wegwerf-Bibliothek statt der persoenlichen.
+gAblageSystem = fotoZiel = ""
+IF fotoZiel <> "" THEN
+    gBibPfad = fotoZiel + ".fkl"
+ELSE
+    gBibPfad = bibliotheksPfad$()
+END IF
+' erst die Bibliothek, dann das Dokument: gleiche Ids -> die Fassung im
+' Dokument gilt fuer dieses Dokument
+IF kern.bibliothekLaden(gBibPfad) < 0 THEN PRINT "Bibliothek "; gBibPfad; " ist nicht lesbar -- sie bleibt unangetastet."
+
+' eine Datei vom Aufruf kommt nach dem Fenster (dateiLaden fragt ggf. nach
+' der Sicherung); bis dahin das Beispiel
+startDok = demoDokument()
+IF fotoZiel <> "" THEN gKonfigOrdner = fotoZiel + ".konfig"
+simKonfigLaden()
+
+DIM stilFehler AS STRING : stilFehler = gtkStil$(STIL)
+
+gFenster = gtk_window_new(0)
+gtk_window_set_default_size(gFenster, 1000, 700)
+' Fenster-Symbol (dhrt startet im Ordner des Skripts -- CWD$() ist funkenflug/)
+DIM symbolFehler AS INTEGER
+IF NOT gtk_window_set_icon_from_file(gFenster, PATHJOIN(CWD$(), LOGO), symbolFehler) THEN PRINT "Fenster-Symbol: "; gtkFehler$(symbolFehler)
+gKopf = gtk_header_bar_new()
+gtk_header_bar_set_show_close_button(gKopf, TRUE)
+gtk_header_bar_set_title(gKopf, "Funkenflug")
+gtk_window_set_titlebar(gFenster, gKopf)
+DIM knopfOeffnen AS INTEGER : knopfOeffnen = gtk_button_new_with_label("Oeffnen")
+DIM knopfSpeichern AS INTEGER : knopfSpeichern = gtk_button_new_with_label("Speichern")
+gKnopfZurueck = gtk_button_new_with_label("↶")
+gKnopfVor = gtk_button_new_with_label("↷")
+gtk_widget_set_tooltip_text(gKnopfZurueck, "Rueckgaengig (Strg+Z)")
+gtk_widget_set_tooltip_text(gKnopfVor, "Wiederholen (Strg+Y)")
+gtk_header_bar_pack_start(gKopf, knopfOeffnen)
+gtk_header_bar_pack_start(gKopf, knopfSpeichern)
+gDateiKnopf = gtk_button_new_with_label("Datei ▾")
+gtk_widget_set_tooltip_text(gDateiKnopf, "Speichern unter, zuletzt geoeffnete Dateien")
+gtk_header_bar_pack_start(gKopf, gDateiKnopf)
+gtk_header_bar_pack_start(gKopf, gKnopfZurueck)
+gtk_header_bar_pack_start(gKopf, gKnopfVor)
+DIM ansichtBox AS INTEGER : ansichtBox = gtk_box_new(GTK_WAAGERECHT, 0)
+gtkKlasse(ansichtBox, "linked")
+gKnopfSchaltplan = gtk_toggle_button_new_with_label("Schaltplan")
+gKnopfPlatine = gtk_toggle_button_new_with_label("Platine")
+gtk_widget_set_tooltip_text(gKnopfPlatine, "Lochraster/Streifenraster: Bauteile stecken, Bahnen, Trennstellen")
+gtk_box_pack_start(ansichtBox, gKnopfSchaltplan, FALSE, FALSE, 0)
+gtk_box_pack_start(ansichtBox, gKnopfPlatine, FALSE, FALSE, 0)
+gtk_header_bar_pack_start(gKopf, ansichtBox)
+DIM knopfErc AS INTEGER : knopfErc = gtk_button_new_with_label("ERC")
+DIM knopfAusgabe AS INTEGER : knopfAusgabe = gtk_button_new_with_label("Ausgabe ▾")
+gtk_widget_set_tooltip_text(knopfErc, "Elektrische Regelpruefung")
+gtk_widget_set_tooltip_text(knopfAusgabe, "PDF/SVG/PNG, Drucken, Stueckliste, Netzliste")
+gtk_header_bar_pack_end(gKopf, knopfErc)
+DIM knopfSim AS INTEGER : knopfSim = gtk_button_new_with_label("Simulation ▾")
+gtk_widget_set_tooltip_text(knopfSim, "Mit ngspice rechnen: Arbeitspunkt, Zeitverlauf, Frequenzgang")
+gtk_header_bar_pack_end(gKopf, knopfSim)
+simMenueBauen()
+gtk_header_bar_pack_end(gKopf, knopfAusgabe)
+ausgabeMenueBauen()
+DIM knopfBearb AS INTEGER : knopfBearb = gtk_button_new_with_label("Bearbeiten ▾")
+gtk_widget_set_tooltip_text(knopfBearb, "Annotieren, Suchen & Ersetzen, Dokument-Eigenschaften")
+gtk_header_bar_pack_end(gKopf, knopfBearb)
+bearbeitenMenueBauen()
+dateiMenueBauen()
+DIM knopfBlatt AS INTEGER : knopfBlatt = gtk_button_new_with_label("Blatt ▾")
+gtk_widget_set_tooltip_text(knopfBlatt, "Blaetter anlegen, umbenennen, loeschen (Bild auf/ab wechselt)")
+gtk_header_bar_pack_end(gKopf, knopfBlatt)
+blattMenueBauen()
+
+DIM vbox AS INTEGER : vbox = gtk_box_new(GTK_SENKRECHT, 0)
+DIM leiste AS INTEGER : leiste = gtk_box_new(GTK_WAAGERECHT, 6)
+gtkKlasse(leiste, "leiste")
+gKnopfAuswahl = leistenKnopf("Auswahl")
+gKnopfDraht = leistenKnopf("Draht")
+gKnopfLabel = leistenKnopf("Label")
+gtk_widget_set_tooltip_text(gKnopfAuswahl, "Auswaehlen, ziehen; Doppelklick bearbeitet (A)")
+gtk_widget_set_tooltip_text(gKnopfDraht, "Draht zeichnen (W)")
+gtk_widget_set_tooltip_text(gKnopfLabel, "Netz-Label setzen (L)")
+gtk_box_pack_start(leiste, gKnopfAuswahl, FALSE, FALSE, 0)
+gtk_box_pack_start(leiste, gKnopfDraht, FALSE, FALSE, 0)
+gtk_box_pack_start(leiste, gKnopfLabel, FALSE, FALSE, 0)
+gKnopfBus = leistenKnopf("Bus")
+gtk_widget_set_tooltip_text(gKnopfBus, "Bus zeichnen (B): Name wie D[0..7]; ein Draht vom Bus ist ein Abzweig mit Mitglieds-Label")
+gtk_box_pack_start(leiste, gKnopfBus, FALSE, FALSE, 0)
+signal(gKnopfBus, "clicked", aufBus, 0, 0, 0)
+gKnopfMessen = leistenKnopf("Messen")
+gtk_widget_set_tooltip_text(gKnopfMessen, "Abstand messen: zwei Punkte klicken, faengt an Pins und Drahtenden (M)")
+gtk_box_pack_start(leiste, gKnopfMessen, FALSE, FALSE, 0)
+DIM etikett AS INTEGER : etikett = gtk_label_new("  Bauteil:")
+gtk_box_pack_start(leiste, etikett, FALSE, FALSE, 0)
+gSymbolWahl = gtk_combo_box_text_new()
+gtk_box_pack_start(leiste, gSymbolWahl, FALSE, FALSE, 0)
+DIM knopfSymbol AS INTEGER : knopfSymbol = gtk_button_new_with_label("Symbol ...")
+gtk_widget_set_tooltip_text(knopfSymbol, "Eigenes Bauteil/IC anlegen; ist ein eigenes gewaehlt, es bearbeiten")
+gtk_box_pack_start(leiste, knopfSymbol, FALSE, FALSE, 0)
+gtk_box_pack_start(vbox, leiste, FALSE, FALSE, 0)
+gLeiste = leiste
+gPlLeiste = gtk_box_new(GTK_WAAGERECHT, 6)
+gtkKlasse(gPlLeiste, "leiste")
+gPlKnopfAuswahl = leistenKnopf("Auswahl")
+gPlKnopfBahn = leistenKnopf("Bahn")
+gPlKnopfTrennen = leistenKnopf("Trennen")
+gtk_widget_set_tooltip_text(gPlKnopfAuswahl, "Teil ziehen, R dreht, Entf nimmt es herunter; Bahn anklicken + Entf loescht sie (A)")
+gtk_widget_set_tooltip_text(gPlKnopfBahn, "Loch fuer Loch: auf Lochraster gerade = Loetbahn, sonst Drahtbruecke; Umschalt = Bruecke, rechte Taste beendet (B)")
+gtk_widget_set_tooltip_text(gPlKnopfTrennen, "Streifen an einem Loch trennen bzw. wieder schliessen (T)")
+gtk_box_pack_start(gPlLeiste, gPlKnopfAuswahl, FALSE, FALSE, 0)
+gtk_box_pack_start(gPlLeiste, gPlKnopfBahn, FALSE, FALSE, 0)
+gtk_box_pack_start(gPlLeiste, gPlKnopfTrennen, FALSE, FALSE, 0)
+DIM knopfEinsetzen AS INTEGER : knopfEinsetzen = gtk_button_new_with_label("Einsetzen")
+gtk_widget_set_tooltip_text(knopfEinsetzen, "Bauteile, die noch fehlen, auf die Platine setzen")
+gtk_box_pack_start(gPlLeiste, knopfEinsetzen, FALSE, FALSE, 0)
+gPlKnopfVerbinden = gtk_button_new_with_label("Verbinden")
+gtk_widget_set_tooltip_text(gPlKnopfVerbinden, "Luftlinien verbinden: Streifenraster mit Bruecken, Lochraster mit Loetbahnen; nichts, was einen Kurzschluss gaebe (V)")
+gtk_box_pack_start(gPlLeiste, gPlKnopfVerbinden, FALSE, FALSE, 0)
+gPlArtWahl = gtk_combo_box_text_new()
+gtk_combo_box_text_append_text(gPlArtWahl, "Streifenraster")
+gtk_combo_box_text_append_text(gPlArtWahl, "Lochraster")
+gtk_box_pack_start(gPlLeiste, gPlArtWahl, FALSE, FALSE, 0)
+DIM knopfGroesse AS INTEGER : knopfGroesse = gtk_button_new_with_label("Groesse ...")
+gtk_box_pack_start(gPlLeiste, knopfGroesse, FALSE, FALSE, 0)
+DIM knopf3d AS INTEGER : knopf3d = gtk_button_new_with_label("3D")
+gtk_widget_set_tooltip_text(knopf3d, "Die Platine in 3D: ziehen dreht, Mausrad zoomt, auch die Loetseite")
+gtk_box_pack_start(gPlLeiste, knopf3d, FALSE, FALSE, 0)
+gtk_box_pack_start(vbox, gPlLeiste, FALSE, FALSE, 0)
+gtk_box_pack_start(vbox, reiterNeu(), FALSE, FALSE, 0)
+
+DIM flaeche AS INTEGER : flaeche = leinwandNeu()
+gtk_box_pack_start(vbox, flaeche, TRUE, TRUE, 0)
+
+gStatus = gtk_label_new("")
+gtk_label_set_xalign(gStatus, 0.0)
+gtkKlasse(gStatus, "status")
+gtk_box_pack_start(vbox, gStatus, FALSE, FALSE, 0)
+
+gtk_container_add(gFenster, vbox)
+
+signal(gKnopfAuswahl, "clicked", aufAuswahl, 0, 0, 0)
+signal(gKnopfDraht, "clicked", aufDraht, 0, 0, 0)
+signal(gKnopfLabel, "clicked", aufLabel, 0, 0, 0)
+signal(gKnopfMessen, "clicked", aufMessen, 0, 0, 0)
+signal(gSymbolWahl, "changed", aufSymbol, 0, 0, 0)
+signal(knopfOeffnen, "clicked", aufOeffnen, 0, 0, 0)
+signal(knopfSpeichern, "clicked", aufSpeichern, 0, 0, 0)
+signal(gKnopfZurueck, "clicked", aufZurueck, 0, 0, 0)
+signal(gKnopfVor, "clicked", aufVor, 0, 0, 0)
+signal(knopfErc, "clicked", aufErc, 0, 0, 0)
+signal(knopfAusgabe, "clicked", aufAusgabeKnopf, 0, 0, 0)
+signal(knopfSim, "clicked", aufSimKnopf, 0, 0, 0)
+signal(knopfBlatt, "clicked", aufBlattKnopf, 0, 0, 0)
+signal(knopfBearb, "clicked", aufBearbKnopf, 0, 0, 0)
+signal(gDateiKnopf, "clicked", aufDateiKnopf, 0, 0, 0)
+signal(gKnopfSchaltplan, "clicked", aufSchaltplan, 0, 0, 0)
+signal(gKnopfPlatine, "clicked", aufPlatine, 0, 0, 0)
+signal(gPlKnopfAuswahl, "clicked", aufPlAuswahl, 0, 0, 0)
+signal(gPlKnopfBahn, "clicked", aufPlBahn, 0, 0, 0)
+signal(gPlKnopfTrennen, "clicked", aufPlTrennen, 0, 0, 0)
+signal(knopfEinsetzen, "clicked", aufPlEinsetzen, 0, 0, 0)
+signal(gPlKnopfVerbinden, "clicked", aufPlVerbinden, 0, 0, 0)
+signal(gPlArtWahl, "changed", aufPlArt, 0, 0, 0)
+signal(knopfGroesse, "clicked", aufPlGroesse, 0, 0, 0)
+signal(knopf3d, "clicked", aufPl3d, 0, 0, 0)
+signal(knopfSymbol, "clicked", aufSymbolEditor, 0, 0, 0)
+signal(gFenster, "destroy", fensterZu, 0, 0, 0)
+
+symbolListeAktualisieren(TRUE)
+leinwandDokument(startDok)
+verlaufRuecksetzen()
+gWerkzeug = WZ_AUSWAHL
+werkzeugKnoepfeNachziehen()
+titelNachziehen()
+statusAktualisieren()
+
+gtk_widget_show_all(gFenster)
+ansichtLeistenNachziehen()
+IF fotoZiel <> "" THEN
+    g_timeout_add(400, probe, 0)
+ELSE
+    ' Autosave; eine Datei vom Aufruf laedt dateiLaden (fragt nach einer Sicherung)
+    g_timeout_add(AUTOSAVE_MS, autosaveTick, 0)
+    IF startPfad <> "" THEN
+        g_timeout_add(200, startDateiLaden, 0)
+    ELSE
+        g_timeout_add(500, startSicherungAnbieten, 0)
+    END IF
+END IF
+gtk_main()

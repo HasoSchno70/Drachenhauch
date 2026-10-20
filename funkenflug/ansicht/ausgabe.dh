@@ -1,0 +1,261 @@
+' Ausgabe: PDF, SVG, PNG und Drucken. Globaler Namensraum.
+'
+' Alles zeichnet inhaltZeichnen() -- dieselbe Routine wie der Bildschirm --,
+' im Druckmodus (gDruck: Farben fuer Weiss, ohne Raster, Auswahl, Pin-Punkte),
+' auf eine A4-Seite quer eingepasst, mit Schriftfeld. Gerechnet wird immer in
+' Punkt (1/72 Zoll): PDF und SVG sind ohnehin in Punkt, PNG skaliert vorher
+' auf die gewuenschte Aufloesung, und der Druck stellt GTK auf Punkt um. So
+' sind Schrift und Linien ueberall gleich gross.
+
+CONST A4_B = 841.89
+CONST A4_H = 595.28
+CONST PT_JE_EINHEIT = 0.0283465   ' 0.01 mm in Punkt
+CONST AUSGABE_MAX = 3.0           ' kleine Schaltungen hoechstens 3:1 vergroessern
+
+' Umgrenzung der Schaltung samt Platz fuer Beschriftungen. FALSE = leer.
+FUNCTION blattUmgrenzung(BYREF x0 AS INTEGER, BYREF y0 AS INTEGER, BYREF x1 AS INTEGER, BYREF y1 AS INTEGER) AS BOOLEAN
+    x0 = 2000000000 : y0 = 2000000000 : x1 = -2000000000 : y1 = -2000000000
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(gBlatt.bauteile) - 1
+        DIM bx0 AS INTEGER, by0 AS INTEGER, bx1 AS INTEGER, by1 AS INTEGER
+        bauteilBox(gBlatt.bauteile[i], bx0, by0, bx1, by1)
+        ' Referenz und Wert stehen um das Bauteil herum
+        x0 = MIN(x0, bx0 - 300) : y0 = MIN(y0, by0 - 400) : x1 = MAX(x1, bx1 + 500) : y1 = MAX(y1, by1 + 400)
+    NEXT
+    FOR i = 0 TO LEN(gBlatt.draehte) - 1
+        FOR j = 0 TO LEN(gBlatt.draehte[i].punkte) - 1
+            x0 = MIN(x0, gBlatt.draehte[i].punkte[j].x) : y0 = MIN(y0, gBlatt.draehte[i].punkte[j].y)
+            x1 = MAX(x1, gBlatt.draehte[i].punkte[j].x) : y1 = MAX(y1, gBlatt.draehte[i].punkte[j].y)
+        NEXT
+    NEXT
+    FOR i = 0 TO LEN(gBlatt.labels) - 1
+        DIM la AS kern.Label : la = gBlatt.labels[i]
+        DIM ll AS INTEGER : ll = 100 + LEN(kern.sichtbarerText$(la.text)) * 90 + IIF(la.art = kern.LA_GLOBAL, 150, 0)
+        DIM lx0 AS INTEGER : lx0 = la.anker.x
+        DIM ly0 AS INTEGER : ly0 = la.anker.y - 300
+        DIM lx1 AS INTEGER : lx1 = la.anker.x + ll
+        DIM ly1 AS INTEGER : ly1 = la.anker.y
+        SELECT CASE la.drehung
+            CASE 180 : lx0 = la.anker.x - ll : lx1 = la.anker.x
+            CASE 270 : lx0 = la.anker.x - 300 : lx1 = la.anker.x : ly0 = la.anker.y - ll : ly1 = la.anker.y
+            CASE 90 : lx0 = la.anker.x - 300 : lx1 = la.anker.x : ly0 = la.anker.y : ly1 = la.anker.y + ll
+        END SELECT
+        x0 = MIN(x0, lx0) : y0 = MIN(y0, ly0) : x1 = MAX(x1, lx1) : y1 = MAX(y1, ly1)
+    NEXT
+    RETURN x1 > x0
+END FUNCTION
+
+' Die Seite auf einen Cairo-Kontext der Groesse breite x hoehe (in Punkt).
+SUB ausgabeZeichnen(cr AS INTEGER, breite AS FLOAT, hoehe AS FLOAT)
+    DIM rand AS FLOAT : rand = 0.04 * MIN(breite, hoehe)
+    DIM sfH AS FLOAT : sfH = 60
+    farbeDruck(cr, &HFFFFFF)
+    cairo_rectangle(cr, 0, 0, breite, hoehe)
+    cairo_fill(cr)
+    ' alten Bildschirm-Zustand sichern
+    DIM altX AS FLOAT : altX = vX
+    DIM altY AS FLOAT : altY = vY
+    DIM altZ AS FLOAT : altZ = vZoom
+    DIM altStrich AS FLOAT : altStrich = gStrich
+    DIM altSchrift AS INTEGER : altSchrift = gSchrift
+    gDruck = TRUE
+    gStrich = 0.8
+    gSchrift = pango_font_description_from_string("Sans 7")
+    DIM x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER
+    IF blattUmgrenzung(x0, y0, x1, y1) THEN
+        DIM vb AS FLOAT : vb = breite - 2 * rand
+        DIM vh AS FLOAT : vh = hoehe - 2 * rand - sfH - rand / 2
+        vZoom = MIN(MIN(vb / (x1 - x0), vh / (y1 - y0)), AUSGABE_MAX * PT_JE_EINHEIT)
+        vX = rand + (vb - (x1 - x0) * vZoom) / 2.0 - x0 * vZoom
+        vY = rand + (vh - (y1 - y0) * vZoom) / 2.0 - y0 * vZoom
+        inhaltZeichnen(cr)
+    END IF
+    schriftfeldZeichnen(cr, breite - rand, hoehe - rand, sfH)
+    pango_font_description_free(gSchrift)
+    gSchrift = altSchrift
+    gStrich = altStrich
+    gDruck = FALSE
+    vX = altX
+    vY = altY
+    vZoom = altZ
+END SUB
+
+SUB farbeDruck(cr AS INTEGER, c AS INTEGER)
+    cairoFarbe(cr, c)
+END SUB
+
+' Schriftfeld unten rechts: Titel, Blatt, Datum, Massstab-Hinweis.
+SUB schriftfeldZeichnen(cr AS INTEGER, rechts AS FLOAT, unten AS FLOAT, h AS FLOAT)
+    DIM b AS FLOAT : b = 260
+    DIM x AS FLOAT : x = rechts - b
+    DIM y AS FLOAT : y = unten - h
+    DIM zh AS FLOAT : zh = h / 3.0
+    farbeDruck(cr, &H333333)
+    cairo_set_line_width(cr, 0.8)
+    cairo_rectangle(cr, x, y, b, h)
+    cairo_move_to(cr, x, y + zh)
+    cairo_line_to(cr, x + b, y + zh)
+    cairo_move_to(cr, x, y + 2 * zh)
+    cairo_line_to(cr, x + b, y + 2 * zh)
+    cairo_move_to(cr, x + b * 0.62, y + zh)
+    cairo_line_to(cr, x + b * 0.62, y + h)
+    cairo_stroke(cr)
+    ' Zeile 1: Titel (Firma/Projekt rechts, sonst "Funkenflug")
+    lwTextAus(cr, x + 6, y + zh / 2, exportTitel$(), &H1F1F1F, 0, gSchrift)
+    lwTextAus(cr, x + b - 6, y + zh / 2, IIF(gDok.firma <> "", gDok.firma, "Funkenflug"), &H777777, 2, gSchrift)
+    ' Zeile 2: Autor | Revision
+    lwTextAus(cr, x + 6, y + zh * 1.5, IIF(gDok.autor <> "", "Autor: " + gDok.autor, "Autor: -"), &H333333, 0, gSchrift)
+    lwTextAus(cr, x + b * 0.62 + 6, y + zh * 1.5, "Rev. " + IIF(gDok.revision <> "", gDok.revision, "-"), &H333333, 0, gSchrift)
+    ' Zeile 3: Blatt | Datum
+    DIM blatt AS STRING : blatt = "Blatt: " + gBlatt.name
+    IF LEN(gDok.blaetter) > 1 THEN blatt = blatt + "  (" + STR$(aktuellerBlattIndex() + 1) + " von " + STR$(LEN(gDok.blaetter)) + ")"
+    lwTextAus(cr, x + 6, y + zh * 2.5, blatt, &H333333, 0, gSchrift)
+    lwTextAus(cr, x + b * 0.62 + 6, y + zh * 2.5, DATE$(), &H333333, 0, gSchrift)
+END SUB
+
+' --- Dateien ------------------------------------------------------------------
+
+' Ein bestimmtes Blatt ausgeben: gBlatt kurz umstellen, damit Zeichnen,
+' Netze und Schriftfeld dieses Blatt meinen; danach zurueck.
+DIM gAusgabeSeiten AS INTEGER     ' ausgegebene Seiten (Selbsttest)
+
+SUB ausgabeBlattZeichnen(cr AS INTEGER, breite AS FLOAT, hoehe AS FLOAT, i AS INTEGER)
+    gAusgabeSeiten = gAusgabeSeiten + 1
+    DIM alt AS kern.Blatt : alt = gBlatt
+    IF i >= 0 AND i < LEN(gDok.blaetter) THEN gBlatt = gDok.blaetter[i]
+    ausgabeZeichnen(cr, breite, hoehe)
+    gBlatt = alt
+END SUB
+
+' PDF: jedes Blatt eine Seite. SVG und PNG kennen nur eine Seite -- dort
+' das aktuelle Blatt.
+FUNCTION ausgabePdf(pfad AS STRING) AS BOOLEAN
+    DIM fl AS INTEGER : fl = cairo_pdf_surface_create(pfad, A4_B, A4_H)
+    DIM cr AS INTEGER : cr = cairo_create(fl)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gDok.blaetter) - 1
+        ausgabeBlattZeichnen(cr, A4_B, A4_H, i)
+        cairo_show_page(cr)
+    NEXT
+    cairo_destroy(cr)
+    cairo_surface_finish(fl)
+    DIM ok AS BOOLEAN : ok = cairo_surface_status(fl) = 0
+    cairo_surface_destroy(fl)
+    RETURN ok AND FILEEXISTS(pfad)
+END FUNCTION
+
+FUNCTION ausgabeSvg(pfad AS STRING) AS BOOLEAN
+    DIM fl AS INTEGER : fl = cairo_svg_surface_create(pfad, A4_B, A4_H)
+    DIM cr AS INTEGER : cr = cairo_create(fl)
+    ausgabeZeichnen(cr, A4_B, A4_H)
+    cairo_show_page(cr)
+    cairo_destroy(cr)
+    cairo_surface_finish(fl)
+    DIM ok AS BOOLEAN : ok = cairo_surface_status(fl) = 0
+    cairo_surface_destroy(fl)
+    RETURN ok AND FILEEXISTS(pfad)
+END FUNCTION
+
+FUNCTION ausgabePng(pfad AS STRING, dpi AS INTEGER) AS BOOLEAN
+    DIM skala AS FLOAT : skala = dpi / 72.0
+    DIM fl AS INTEGER : fl = cairo_image_surface_create(CAIRO_ARGB32, ROUND(A4_B * skala), ROUND(A4_H * skala))
+    DIM cr AS INTEGER : cr = cairo_create(fl)
+    cairo_scale(cr, skala, skala)
+    ausgabeZeichnen(cr, A4_B, A4_H)
+    cairo_destroy(cr)
+    DIM st AS INTEGER : st = cairo_surface_write_to_png(fl, pfad)
+    cairo_surface_destroy(fl)
+    RETURN st = 0
+END FUNCTION
+
+' Nach der Endung: .pdf, .svg, .png (150 dpi); ohne Endung PDF.
+FUNCTION ausgabeNach(pfad AS STRING) AS BOOLEAN
+    DIM klein AS STRING : klein = LOWER$(pfad)
+    IF ENDSWITH(klein, ".svg") THEN RETURN ausgabeSvg(pfad)
+    IF ENDSWITH(klein, ".png") THEN RETURN ausgabePng(pfad, 150)
+    IF NOT ENDSWITH(klein, ".pdf") THEN pfad = pfad + ".pdf"
+    RETURN ausgabePdf(pfad)
+END FUNCTION
+
+SUB ausgabeExportieren()
+    DIM pfad AS STRING : pfad = dateiExportWahl("Schaltplan exportieren", "schaltplan.pdf", ["PDF (*.pdf)", "SVG (*.svg)", "PNG, 150 dpi (*.png)"], ["*.pdf", "*.svg", "*.png"])
+    IF pfad = "" THEN RETURN
+    IF NOT ausgabeNach(pfad) THEN meldung("Der Schaltplan liess sich nicht nach " + pfad + " schreiben.")
+END SUB
+
+' --- Drucken ------------------------------------------------------------------
+
+SUB druckSeite(op AS INTEGER, kontext AS INTEGER, seite AS INTEGER, daten AS INTEGER)
+    ausgabeBlattZeichnen(gtk_print_context_get_cairo_context(kontext), gtk_print_context_get_width(kontext), gtk_print_context_get_height(kontext), seite)
+END SUB
+
+' Ueber GTKs Druckdialog drucken. Mit pdfPfad statt Dialog in diese PDF --
+' derselbe Weg ohne Drucker (fuer den Selbsttest). Rueckgabe: "" oder Fehler.
+FUNCTION drucken$(pdfPfad AS STRING) AS STRING
+    DIM op AS INTEGER : op = gtk_print_operation_new()
+    gtk_print_operation_set_n_pages(op, LEN(gDok.blaetter))    ' je Blatt eine Seite
+    gtk_print_operation_set_job_name(op, exportTitel$())
+    gtk_print_operation_set_unit(op, GTK_EINHEIT_PUNKT)
+    DIM seite AS INTEGER : seite = gtk_page_setup_new()
+    gtk_page_setup_set_orientation(seite, GTK_SEITE_QUER)
+    gtk_print_operation_set_default_page_setup(op, seite)
+    g_object_unref(seite)
+    signalSeite(op, "draw-page", druckSeite, 0, 0, 0)
+    DIM aktion AS INTEGER : aktion = GTK_DRUCK_DIALOG
+    IF pdfPfad <> "" THEN
+        gtk_print_operation_set_export_filename(op, pdfPfad)
+        aktion = GTK_DRUCK_EXPORT
+    END IF
+    DIM fehler AS INTEGER
+    DIM r AS INTEGER : r = gtk_print_operation_run(op, aktion, gFenster, fehler)
+    g_object_unref(op)
+    IF r = GTK_DRUCK_FEHLER THEN RETURN gtkFehler$(fehler)
+    RETURN ""
+END FUNCTION
+
+' --- Menue "Ausgabe" in der Kopfleiste ----------------------------------------
+
+DIM gAusgabeMenue AS INTEGER
+
+SUB aufMenueExport(eintrag AS INTEGER, daten AS INTEGER)
+    ausgabeExportieren()
+END SUB
+
+SUB aufMenueDrucken(eintrag AS INTEGER, daten AS INTEGER)
+    DIM f AS STRING : f = drucken$("")
+    IF f <> "" THEN meldung("Fehler beim Drucken:" + CHR$(10) + f)
+END SUB
+
+SUB aufMenueStueckliste(eintrag AS INTEGER, daten AS INTEGER)
+    stuecklisteZeigen()
+END SUB
+
+SUB aufMenueNetzliste(eintrag AS INTEGER, daten AS INTEGER)
+    aufExport(0, 0)
+END SUB
+
+FUNCTION menueEintrag(menue AS INTEGER, text AS STRING) AS INTEGER
+    DIM e AS INTEGER : e = gtk_menu_item_new_with_label(text)
+    gtk_menu_shell_append(menue, e)
+    RETURN e
+END FUNCTION
+
+SUB ausgabeMenueBauen()
+    gAusgabeMenue = gtk_menu_new()
+    signal(menueEintrag(gAusgabeMenue, "Als PDF, SVG oder PNG exportieren ..."), "activate", aufMenueExport, 0, 0, 0)
+    signal(menueEintrag(gAusgabeMenue, "Drucken ..."), "activate", aufMenueDrucken, 0, 0, 0)
+    gtk_menu_shell_append(gAusgabeMenue, gtk_separator_menu_item_new())
+    signal(menueEintrag(gAusgabeMenue, "Platine als PDF (1:1) ..."), "activate", aufMenuePlatinePdf, 0, 0, 0)
+    signal(menueEintrag(gAusgabeMenue, "Platine drucken (1:1) ..."), "activate", aufMenuePlatineDrucken, 0, 0, 0)
+    signal(menueEintrag(gAusgabeMenue, "Platine als Gerber (ZIP) fuer den Fertiger ..."), "activate", aufMenueGerber, 0, 0, 0)
+    gtk_menu_shell_append(gAusgabeMenue, gtk_separator_menu_item_new())
+    signal(menueEintrag(gAusgabeMenue, "Projektbericht (PDF) ..."), "activate", aufMenueBericht, 0, 0, 0)
+    gtk_menu_shell_append(gAusgabeMenue, gtk_separator_menu_item_new())
+    signal(menueEintrag(gAusgabeMenue, "Stueckliste ..."), "activate", aufMenueStueckliste, 0, 0, 0)
+    signal(menueEintrag(gAusgabeMenue, "Netzliste exportieren ..."), "activate", aufMenueNetzliste, 0, 0, 0)
+    gtk_widget_show_all(gAusgabeMenue)
+END SUB
+
+SUB aufAusgabeKnopf(knopf AS INTEGER, daten AS INTEGER)
+    gtk_menu_popup_at_widget(gAusgabeMenue, knopf, GDK_SCHWERE_UNTEN_LINKS, GDK_SCHWERE_OBEN_LINKS, 0)
+END SUB

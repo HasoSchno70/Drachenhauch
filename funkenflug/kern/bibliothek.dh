@@ -1,0 +1,164 @@
+' Eingebaute Bauteil-Bibliothek -- Namensraum "kern".
+' Symbole sind in lokalen Koordinaten um den Ursprung zentriert; 100 = 1 mm.
+' Pins: pos = elektrischer Andockpunkt, richtung zeigt vom Pin zum Koerper,
+' laenge = gezeichneter Stummel (der Renderer zieht ihn selbst).
+
+DIM gBib AS ARRAY OF Symbol
+
+' Ein Symbol nach Id: eigene (Dokument, persoenliche Bibliothek), dann die
+' eingebauten. Unbekannt -> ein sichtbarer Platzhalter, NIE still ein anderes
+' Symbol (bis hierher wurde aus einem unbekannten Symbol ein Widerstand).
+FUNCTION bibliothekSymbol(id AS STRING) AS Symbol
+    IF istEigenBekannt(id) THEN RETURN eigenesSymbol(id)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gBib) - 1
+        IF gBib[i].id = id THEN RETURN gBib[i]
+    NEXT
+    RETURN symbolPlatzhalter(id)
+END FUNCTION
+
+FUNCTION bibliothekListe() AS ARRAY OF Symbol
+    RETURN gBib
+END FUNCTION
+
+' Ein neues Bauteil aus einem Symbol-Verweis -- loest das Symbol auf und
+' uebernimmt den Vorgabewert.
+FUNCTION neuesBauteil(ref AS STRING, l AS Lage) AS Bauteil
+    DIM b AS Bauteil : b = NEW Bauteil(ref, l)
+    b.sym = bibliothekSymbol(ref)
+    b.wert = b.sym.wertVorgabe
+    RETURN b
+END FUNCTION
+
+SUB bibliothekAufbauen()
+    IF LEN(gBib) > 0 THEN RETURN
+    gBib = []
+    DIM s AS Symbol
+
+    ' Widerstand (IEC-Rechteck)
+    s = NEW Symbol("R", "Widerstand", "R")
+    s.wertVorgabe = "1k"
+    s.grafikHinzu(prRechteck(-100, -40, 100, 40))
+    s.pinHinzu("1", "", NEW Punkt(-200, 0), 100, 0, PIN_PASSIV)
+    s.pinHinzu("2", "", NEW Punkt(200, 0), 100, 180, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    ' Kondensator (unpolarisiert)
+    s = NEW Symbol("C", "Kondensator", "C")
+    s.wertVorgabe = "100n"
+    s.grafikHinzu(prLinie(-30, -80, -30, 80))
+    s.grafikHinzu(prLinie(30, -80, 30, 80))
+    s.pinHinzu("1", "", NEW Punkt(-200, 0), 170, 0, PIN_PASSIV)
+    s.pinHinzu("2", "", NEW Punkt(200, 0), 170, 180, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    ' Elko (polarisiert): eine gerade, eine gebogene Platte, + Zeichen
+    s = NEW Symbol("CP", "Elko", "C")
+    s.wertVorgabe = "10u"
+    s.grafikHinzu(prLinie(-30, -80, -30, 80))
+    s.grafikHinzu(prBogen(130, 0, 160, 2.42, 3.86))
+    DIM plus AS Primitiv : plus = NEW Primitiv(PR_TEXT)
+    plus.text = "+"
+    plus.textGroesse = 110
+    ARRAY_PUSH(plus.punkte, NEW Punkt(-90, -70))
+    s.grafikHinzu(plus)
+    s.pinHinzu("1", "", NEW Punkt(-200, 0), 170, 0, PIN_PASSIV)
+    s.pinHinzu("2", "", NEW Punkt(200, 0), 100, 180, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    ' Induktivitaet (vier Boegen)
+    s = NEW Symbol("L", "Spule", "L")
+    s.wertVorgabe = "10u"
+    DIM i AS INTEGER
+    FOR i = 0 TO 3
+        s.grafikHinzu(prBogen(-150 + i * 100, 0, 50, 3.1416, 6.2832))
+    NEXT
+    s.pinHinzu("1", "", NEW Punkt(-200, 0), 0, 0, PIN_PASSIV)
+    s.pinHinzu("2", "", NEW Punkt(200, 0), 0, 180, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    ' Diode: Dreieck zur Kathoden-Balken
+    s = NEW Symbol("D", "Diode", "D")
+    s.wertVorgabe = "1N4148"
+    DIM dr AS Primitiv : dr = NEW Primitiv(PR_POLYLINIE)
+    dr.fuellen = TRUE
+    ARRAY_PUSH(dr.punkte, NEW Punkt(-60, -70))
+    ARRAY_PUSH(dr.punkte, NEW Punkt(60, 0))
+    ARRAY_PUSH(dr.punkte, NEW Punkt(-60, 70))
+    ARRAY_PUSH(dr.punkte, NEW Punkt(-60, -70))
+    s.grafikHinzu(dr)
+    s.grafikHinzu(prLinie(60, -70, 60, 70))
+    s.pinHinzu("1", "A", NEW Punkt(-200, 0), 140, 0, PIN_PASSIV)
+    s.pinHinzu("2", "K", NEW Punkt(200, 0), 140, 180, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    ' LED: Diode + zwei Pfeile
+    s = NEW Symbol("LED", "LED", "D")
+    s.wertVorgabe = "LED"
+    DIM dl AS Primitiv : dl = NEW Primitiv(PR_POLYLINIE)
+    dl.fuellen = TRUE
+    ARRAY_PUSH(dl.punkte, NEW Punkt(-60, -70))
+    ARRAY_PUSH(dl.punkte, NEW Punkt(60, 0))
+    ARRAY_PUSH(dl.punkte, NEW Punkt(-60, 70))
+    ARRAY_PUSH(dl.punkte, NEW Punkt(-60, -70))
+    s.grafikHinzu(dl)
+    s.grafikHinzu(prLinie(60, -70, 60, 70))
+    s.grafikHinzu(prLinie(20, -90, 70, -140))
+    s.grafikHinzu(prLinie(70, -140, 55, -115))
+    s.grafikHinzu(prLinie(70, -140, 45, -125))
+    s.grafikHinzu(prLinie(70, -60, 120, -110))
+    s.grafikHinzu(prLinie(120, -110, 105, -85))
+    s.grafikHinzu(prLinie(120, -110, 95, -95))
+    s.pinHinzu("1", "A", NEW Punkt(-200, 0), 140, 0, PIN_PASSIV)
+    s.pinHinzu("2", "K", NEW Punkt(200, 0), 140, 180, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    ' NPN-Transistor (Kollektor und Emitter auf dem 1-mm-Raster: x = 100)
+    s = NEW Symbol("Q_NPN", "NPN-Transistor", "Q")
+    s.wertVorgabe = "BC547"
+    s.grafikHinzu(prKreis(20, 0, 180))
+    s.grafikHinzu(prLinie(-40, -80, -40, 80))          ' Basisbalken
+    s.grafikHinzu(prLinie(-40, -30, 100, -100))        ' Kollektor-Schraege
+    s.grafikHinzu(prLinie(-40, 30, 100, 100))          ' Emitter-Schraege
+    DIM pf AS Primitiv : pf = NEW Primitiv(PR_POLYLINIE)
+    pf.fuellen = TRUE
+    ARRAY_PUSH(pf.punkte, NEW Punkt(86, 93))
+    ARRAY_PUSH(pf.punkte, NEW Punkt(36, 88))
+    ARRAY_PUSH(pf.punkte, NEW Punkt(52, 56))
+    ARRAY_PUSH(pf.punkte, NEW Punkt(86, 93))
+    s.grafikHinzu(pf)
+    s.pinHinzu("1", "B", NEW Punkt(-200, 0), 160, 0, PIN_PASSIV)
+    s.pinHinzu("2", "C", NEW Punkt(100, -200), 100, 90, PIN_PASSIV)
+    s.pinHinzu("3", "E", NEW Punkt(100, 200), 100, 270, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    ' Schalter (Taster, einpolig)
+    s = NEW Symbol("SW", "Schalter", "SW")
+    s.grafikHinzu(prLinie(-60, 0, 60, -60))
+    s.grafikHinzu(prKreis(-60, 0, 12))
+    s.grafikHinzu(prKreis(60, 0, 12))
+    s.pinHinzu("1", "", NEW Punkt(-200, 0), 140, 0, PIN_PASSIV)
+    s.pinHinzu("2", "", NEW Punkt(200, 0), 140, 180, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    ' Masse (GND)
+    s = NEW Symbol("GND", "Masse", "#PWR")
+    s.einheitLeistung = TRUE
+    s.grafikHinzu(prLinie(0, 0, 0, 100))
+    s.grafikHinzu(prLinie(-80, 100, 80, 100))
+    s.grafikHinzu(prLinie(-50, 140, 50, 140))
+    s.grafikHinzu(prLinie(-20, 180, 20, 180))
+    s.pinHinzu("1", "", NEW Punkt(0, 0), 0, 90, PIN_LEISTUNG_EIN)
+    ARRAY_PUSH(gBib, s)
+
+    ' Versorgung (VCC)
+    s = NEW Symbol("VCC", "Versorgung", "#PWR")
+    s.einheitLeistung = TRUE
+    s.wertVorgabe = "VCC"
+    s.grafikHinzu(prLinie(0, 0, 0, -100))
+    s.grafikHinzu(prLinie(-60, -100, 60, -100))
+    s.pinHinzu("1", "", NEW Punkt(0, 0), 0, 270, PIN_LEISTUNG_EIN)
+    ARRAY_PUSH(gBib, s)
+
+    bibliothekMehr()
+END SUB
