@@ -1,0 +1,522 @@
+' Komfort: Datei-Menue (Speichern unter, zuletzt geoeffnet), Autosave mit
+' Wiederherstellen, Menue "Bearbeiten" (Annotieren, Suchen & Ersetzen,
+' Dokument-Eigenschaften). Globaler Namensraum.
+'
+' Autosave: alle 60 s, wenn sich seit der letzten Sicherung etwas geaendert
+' hat, nach "<Datei>.sicherung" (ohne Namen: "unbenannt.sicherung.fkn" im
+' Einstellungs-Ordner). Speichern loescht die Sicherung. Gibt es beim Oeffnen
+' eine Sicherung, die nicht aelter ist als die Datei, fragt Funkenflug, ob sie
+' geladen werden soll -- sie ist nie still die Datei.
+
+CONST ZULETZT_MAX = 8
+CONST AUTOSAVE_MS = 60000
+
+DIM gKonfigOrdner AS STRING       ' "" = der uebliche (APPDATA bzw. ~/.config)
+DIM gAenderungen AS INTEGER       ' zaehlt jede Aenderung (geaendert, Rueckgaengig)
+DIM gGesichertBei AS INTEGER      ' Stand der letzten Sicherung
+DIM gDateiMenue AS INTEGER
+DIM gDateiKnopf AS INTEGER
+DIM gBearbMenue AS INTEGER
+DIM gMenueAnnotieren AS INTEGER
+DIM gMenueFehlende AS INTEGER
+DIM gMenueSuchen AS INTEGER
+DIM gMenueEigenschaften AS INTEGER
+DIM gSpMeldung AS STRING          ' kurze Rueckmeldung in der Statuszeile
+
+FUNCTION konfigOrdner$() AS STRING
+    IF gKonfigOrdner <> "" THEN RETURN gKonfigOrdner
+    DIM a AS STRING : a = GETENV$("APPDATA", "")
+    IF a <> "" THEN RETURN PATHJOIN(a, "Funkenflug")
+    DIM x AS STRING : x = GETENV$("XDG_CONFIG_HOME", "")
+    IF x = "" THEN x = PATHJOIN(GETENV$("HOME", "."), ".config")
+    RETURN PATHJOIN(x, "funkenflug")
+END FUNCTION
+
+SUB konfigOrdnerAnlegen()
+    IF NOT DIREXISTS(konfigOrdner$()) THEN MKDIR(konfigOrdner$())
+END SUB
+
+' --- zuletzt geoeffnet -------------------------------------------------------
+
+FUNCTION zuletztDatei$() AS STRING
+    RETURN PATHJOIN(konfigOrdner$(), "zuletzt.txt")
+END FUNCTION
+
+FUNCTION zuletztLesen() AS ARRAY OF STRING
+    DIM r AS ARRAY OF STRING : r = []
+    IF NOT FILEEXISTS(zuletztDatei$()) THEN RETURN r
+    DIM z AS ARRAY OF STRING
+    TRY
+        z = SPLIT$(REPLACE$(READALL$(zuletztDatei$()), CHR$(13), ""), CHR$(10))
+    CATCH e
+        RETURN r
+    END TRY
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        IF TRIM$(z[i]) <> "" AND LEN(r) < ZULETZT_MAX THEN ARRAY_PUSH(r, TRIM$(z[i]))
+    NEXT
+    RETURN r
+END FUNCTION
+
+' Eine Datei nach vorn (doppelte fallen weg).
+SUB zuletztMerken(pfad AS STRING)
+    DIM alt AS ARRAY OF STRING : alt = zuletztLesen()
+    DIM neu AS ARRAY OF STRING : neu = [pfad]
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(alt) - 1
+        IF LOWER$(alt[i]) <> LOWER$(pfad) AND LEN(neu) < ZULETZT_MAX THEN ARRAY_PUSH(neu, alt[i])
+    NEXT
+    TRY
+        konfigOrdnerAnlegen()
+        WRITEALL(zuletztDatei$(), JOIN$(neu, CHR$(10)))
+    CATCH e
+        ' ohne Liste geht es auch
+    END TRY
+    dateiMenueBauen()
+END SUB
+
+SUB aufZuletzt(eintrag AS INTEGER, nr AS INTEGER)
+    DIM z AS ARRAY OF STRING : z = zuletztLesen()
+    IF nr < 0 OR nr >= LEN(z) THEN RETURN
+    IF NOT FILEEXISTS(z[nr]) THEN
+        meldung("Die Datei " + z[nr] + " gibt es nicht mehr.")
+        RETURN
+    END IF
+    dateiLaden(z[nr])
+END SUB
+
+SUB aufSpeichernUnter(eintrag AS INTEGER, daten AS INTEGER)
+    dateiSpeichernUnter()
+END SUB
+
+SUB dateiMenueBauen()
+    IF gDateiMenue <> 0 THEN gtk_widget_destroy(gDateiMenue)
+    gDateiMenue = gtk_menu_new()
+    signal(menueEintrag(gDateiMenue, "Speichern unter ..."), "activate", aufSpeichernUnter, 0, 0, 0)
+    DIM z AS ARRAY OF STRING : z = zuletztLesen()
+    IF LEN(z) > 0 THEN gtk_menu_shell_append(gDateiMenue, gtk_separator_menu_item_new())
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        DIM e AS INTEGER : e = menueEintrag(gDateiMenue, STR$(i + 1) + "  " + basisName$(z[i]))
+        gtk_widget_set_tooltip_text(e, z[i])
+        signal(e, "activate", aufZuletzt, i, 0, 0)
+    NEXT
+    gtk_widget_show_all(gDateiMenue)
+END SUB
+
+SUB aufDateiKnopf(knopf AS INTEGER, daten AS INTEGER)
+    gtk_menu_popup_at_widget(gDateiMenue, knopf, GDK_SCHWERE_UNTEN_LINKS, GDK_SCHWERE_OBEN_LINKS, 0)
+END SUB
+
+' --- Laden und Speichern ----------------------------------------------------
+
+FUNCTION sicherungsPfad$() AS STRING
+    IF gPfad <> "" THEN RETURN gPfad + ".sicherung"
+    RETURN PATHJOIN(konfigOrdner$(), "unbenannt.sicherung.fkn")
+END FUNCTION
+
+SUB sicherungLoeschen()
+    TRY
+        IF FILEEXISTS(sicherungsPfad$()) THEN DELETEFILE(sicherungsPfad$())
+    CATCH e
+    END TRY
+END SUB
+
+' Alle 60 s (g_timeout_add): sichern, wenn sich seit der letzten Sicherung
+' etwas geaendert hat. Liefert TRUE -- der Zeitgeber laeuft weiter.
+FUNCTION autosaveTick(daten AS INTEGER) AS BOOLEAN
+    IF NOT gGeaendert OR gAenderungen = gGesichertBei THEN RETURN TRUE
+    TRY
+        IF gPfad = "" THEN konfigOrdnerAnlegen()
+        IF kern.dokumentSpeichern(gDok, sicherungsPfad$()) THEN gGesichertBei = gAenderungen
+    CATCH e
+    END TRY
+    RETURN TRUE
+END FUNCTION
+
+' Speichern: hat die Datei schon einen Namen, ohne Rueckfrage dorthin.
+SUB dateiSpeichern()
+    IF gPfad = "" THEN
+        dateiSpeichernUnter()
+        RETURN
+    END IF
+    dateiSchreiben(gPfad)
+END SUB
+
+SUB dateiSpeichernUnter()
+    DIM pfad AS STRING : pfad = dateiWahl(TRUE)
+    IF pfad = "" THEN RETURN
+    IF LOWER$(RIGHT$(pfad, 4)) <> ".fkn" THEN pfad = pfad + ".fkn"
+    dateiSchreiben(pfad)
+END SUB
+
+SUB dateiSchreiben(pfad AS STRING)
+    IF kern.dokumentSpeichern(gDok, pfad) THEN
+        sicherungLoeschen()                 ' die alte (evtl. "unbenannt")
+        gPfad = pfad
+        sicherungLoeschen()                 ' und die zur neuen Datei
+        gGeaendert = FALSE
+        gGesichertBei = gAenderungen
+        titelNachziehen()
+        zuletztMerken(pfad)
+        gSpMeldung = "Gespeichert: " + basisName$(pfad)
+        statusAktualisieren()
+    ELSE
+        meldung("Speichern nach " + pfad + " ist fehlgeschlagen.")
+    END IF
+END SUB
+
+SUB dateiOeffnen()
+    DIM pfad AS STRING : pfad = dateiWahl(FALSE)
+    IF pfad = "" THEN RETURN
+    dateiLaden(pfad)
+END SUB
+
+' Eine Datei laden -- mit Rueckfrage, wenn eine neuere Sicherung da ist.
+' Ein KiCad-Schaltplan wird uebersetzt und ist danach ein neues, ungespeichertes
+' Dokument (Speichern fragt nach dem .fkn-Namen; die .kicad_sch bleibt unberuehrt).
+SUB dateiLaden(pfad AS STRING)
+    IF ENDSWITH(LOWER$(pfad), ".kicad_sch") THEN
+        kicadLaden(pfad)
+        RETURN
+    END IF
+    DIM quelle AS STRING : quelle = pfad
+    DIM sich AS STRING : sich = pfad + ".sicherung"
+    DIM aus AS BOOLEAN : aus = FALSE
+    IF FILEEXISTS(sich) THEN
+        IF FILETIME(sich) >= FILETIME(pfad) THEN
+            IF bestaetigen("Sicherung gefunden", "Zu " + basisName$(pfad) + " gibt es eine automatische Sicherung" + CHR$(10) + "mit Aenderungen, die nicht gespeichert wurden." + CHR$(10) + CHR$(10) + "Die Sicherung laden? (Die Datei selbst bleibt unveraendert.)", "Sicherung laden") THEN
+                quelle = sich
+                aus = TRUE
+            END IF
+        END IF
+    END IF
+    DIM d AS kern.Dokument
+    TRY
+        d = kern.dokumentLaden(quelle)
+    CATCH e
+        meldung("Die Datei " + basisName$(quelle) + " liess sich nicht lesen.")
+        RETURN
+    END TRY
+    gPfad = pfad
+    gNameVorschlag = ""
+    gGeaendert = aus
+    leinwandDokument(d)
+    symbolListeAktualisieren(FALSE)
+    verlaufRuecksetzen()
+    gAenderungen = 0
+    gGesichertBei = IIF(aus, -1, 0)
+    IF aus THEN gAenderungen = 1
+    titelNachziehen()
+    zuletztMerken(pfad)
+    gSpMeldung = IIF(aus, "Sicherung geladen -- Speichern uebernimmt sie in die Datei", "")
+    statusAktualisieren()
+END SUB
+
+SUB kicadLaden(pfad AS STRING)
+    DIM e AS kern.KicadErgebnis
+    TRY
+        e = kern.kicadImportieren(pfad)
+    CATCH fe
+        meldung("Die Datei " + basisName$(pfad) + " liess sich nicht lesen.")
+        RETURN
+    END TRY
+    IF NOT e.ok THEN
+        meldung(e.fehler)
+        RETURN
+    END IF
+    sicherungLoeschen()
+    gPfad = ""
+    gNameVorschlag = kern.kimDateiName$(pfad) + ".fkn"
+    leinwandDokument(e.dok)
+    symbolListeAktualisieren(FALSE)
+    verlaufRuecksetzen()
+    gGeaendert = TRUE
+    gAenderungen = 1
+    gGesichertBei = -1
+    titelNachziehen()
+    zuletztMerken(pfad)
+    DIM teile AS INTEGER : teile = 0
+    DIM bi AS INTEGER
+    FOR bi = 0 TO LEN(e.dok.blaetter) - 1
+        teile = teile + LEN(e.dok.blaetter[bi].bauteile)
+    NEXT
+    gSpMeldung = "KiCad importiert: " + STR$(LEN(e.dok.blaetter)) + " Blatt/Blaetter, " + STR$(teile) + " Bauteile -- Speichern legt eine .fkn an"
+    statusAktualisieren()
+    IF LEN(e.hinweise) > 0 THEN meldung("KiCad-Import von " + basisName$(pfad) + ":" + CHR$(10) + CHR$(10) + "- " + JOIN$(e.hinweise, CHR$(10) + "- "))
+END SUB
+
+' Beim Start ohne Datei: eine Sicherung des unbenannten Schaltplans anbieten.
+FUNCTION startSicherungAnbieten(daten AS INTEGER) AS BOOLEAN
+    DIM sich AS STRING : sich = PATHJOIN(konfigOrdner$(), "unbenannt.sicherung.fkn")
+    IF gPfad <> "" OR NOT FILEEXISTS(sich) THEN RETURN FALSE
+    IF bestaetigen("Sicherung gefunden", "Es gibt eine automatische Sicherung eines Schaltplans," + CHR$(10) + "der nie gespeichert wurde. Laden?", "Laden") THEN
+        DIM d AS kern.Dokument
+        TRY
+            d = kern.dokumentLaden(sich)
+        CATCH e
+            meldung("Die Sicherung liess sich nicht lesen.")
+            RETURN FALSE
+        END TRY
+        leinwandDokument(d)
+        symbolListeAktualisieren(FALSE)
+        verlaufRuecksetzen()
+        gGeaendert = TRUE
+        gAenderungen = 1
+        gGesichertBei = -1
+        titelNachziehen()
+        statusAktualisieren()
+    END IF
+    RETURN FALSE
+END FUNCTION
+
+' --- Bearbeiten -------------------------------------------------------------
+
+' Eine Aktion, die erst hinterher weiss, ob sie etwas geaendert hat:
+' Schnappschuss davor, nur bei einer Aenderung in den Verlauf.
+SUB annotierenUI(alle AS BOOLEAN)
+    DIM stand AS STRING : stand = schnappschuss$()
+    DIM idx AS INTEGER : idx = aktuellerBlattIndex()
+    DIM n AS INTEGER : n = kern.annotieren(gDok, alle)
+    IF n > 0 THEN
+        verlaufMerkenStand(stand, idx)
+        geaendert()
+    END IF
+    gSpMeldung = IIF(n = 0, "Referenzen: nichts zu tun", STR$(n) + " Referenz(en) " + IIF(alle, "neu vergeben", "ergaenzt"))
+    statusAktualisieren()
+END SUB
+
+SUB aufMenueAnnotieren(e AS INTEGER, d AS INTEGER)
+    IF bestaetigen("Neu annotieren", "Alle Referenzen neu vergeben -- Blatt fuer Blatt, zeilenweise von oben links?" + CHR$(10) + "Was schon auf einer Platine oder Liste steht, passt danach nicht mehr." + CHR$(10) + "(Laesst sich mit Rueckgaengig zuruecknehmen.)", "Neu vergeben") THEN annotierenUI(TRUE)
+END SUB
+
+SUB aufMenueFehlende(e AS INTEGER, d AS INTEGER)
+    annotierenUI(FALSE)
+END SUB
+
+SUB aufMenueSuchen(e AS INTEGER, d AS INTEGER)
+    suchenZeigen()
+END SUB
+
+DIM gMenueAusrichten AS ARRAY OF INTEGER
+
+SUB aufMenueAusrichten(e AS INTEGER, art AS INTEGER)
+    auswahlAusrichten(art)
+END SUB
+
+SUB aufMenueEigenschaften(e AS INTEGER, d AS INTEGER)
+    dokumentEigenschaften()
+END SUB
+
+SUB bearbeitenMenueBauen()
+    gBearbMenue = gtk_menu_new()
+    gMenueFehlende = menueEintrag(gBearbMenue, "Fehlende Referenzen vergeben")
+    signal(gMenueFehlende, "activate", aufMenueFehlende, 0, 0, 0)
+    gMenueAnnotieren = menueEintrag(gBearbMenue, "Alle neu annotieren ...")
+    signal(gMenueAnnotieren, "activate", aufMenueAnnotieren, 0, 0, 0)
+    gtk_menu_shell_append(gBearbMenue, gtk_separator_menu_item_new())
+    gMenueSuchen = menueEintrag(gBearbMenue, "Suchen & Ersetzen ... (Strg+F)")
+    signal(gMenueSuchen, "activate", aufMenueSuchen, 0, 0, 0)
+    gtk_menu_shell_append(gBearbMenue, gtk_separator_menu_item_new())
+    DIM namen AS ARRAY OF STRING : namen = ["Links ausrichten", "Rechts ausrichten", "Oben ausrichten", "Unten ausrichten", "Waagrecht verteilen", "Senkrecht verteilen"]
+    DIM i AS INTEGER
+    gMenueAusrichten = []
+    FOR i = 0 TO LEN(namen) - 1
+        DIM e AS INTEGER : e = menueEintrag(gBearbMenue, namen[i])
+        ARRAY_PUSH(gMenueAusrichten, e)
+        signal(e, "activate", aufMenueAusrichten, i + 1, 0, 0)
+    NEXT
+    gtk_menu_shell_append(gBearbMenue, gtk_separator_menu_item_new())
+    gMenueEigenschaften = menueEintrag(gBearbMenue, "Dokument-Eigenschaften ...")
+    signal(gMenueEigenschaften, "activate", aufMenueEigenschaften, 0, 0, 0)
+    gtk_widget_show_all(gBearbMenue)
+END SUB
+
+SUB aufBearbKnopf(knopf AS INTEGER, daten AS INTEGER)
+    gtk_menu_popup_at_widget(gBearbMenue, knopf, GDK_SCHWERE_UNTEN_LINKS, GDK_SCHWERE_OBEN_LINKS, 0)
+END SUB
+
+' Titel, Autor, Revision, Firma -- fuers Schriftfeld (ein Rueckgaengig-Schritt).
+SUB dokumentEigenschaften()
+    DIM d AS INTEGER : d = dialogNeu("Dokument-Eigenschaften")
+    DIM g AS INTEGER : g = gtk_grid_new()
+    gtk_grid_set_row_spacing(g, 6)
+    gtk_grid_set_column_spacing(g, 10)
+    gtk_container_set_border_width(g, 12)
+    DIM fT AS INTEGER : fT = feldNeu(gDok.titel)
+    DIM fA AS INTEGER : fA = feldNeu(gDok.autor)
+    DIM fR AS INTEGER : fR = feldNeu(gDok.revision)
+    DIM fF AS INTEGER : fF = feldNeu(gDok.firma)
+    gtk_entry_set_placeholder_text(fT, "sonst der Dateiname")
+    gtk_grid_attach(g, etikettNeu("Titel:"), 0, 0, 1, 1)
+    gtk_grid_attach(g, fT, 1, 0, 1, 1)
+    gtk_grid_attach(g, etikettNeu("Autor:"), 0, 1, 1, 1)
+    gtk_grid_attach(g, fA, 1, 1, 1, 1)
+    gtk_grid_attach(g, etikettNeu("Revision:"), 0, 2, 1, 1)
+    gtk_grid_attach(g, fR, 1, 2, 1, 1)
+    gtk_grid_attach(g, etikettNeu("Firma/Projekt:"), 0, 3, 1, 1)
+    gtk_grid_attach(g, fF, 1, 3, 1, 1)
+    gtk_box_pack_start(gtk_dialog_get_content_area(d), g, TRUE, TRUE, 0)
+    gtk_widget_show_all(d)
+    gDlg = d : gDlgFeld1 = fT : gDlgFeld2 = fA : gDlgFeld3 = fR : gDlgFeld4 = fF
+    DIM ok AS BOOLEAN : ok = gtk_dialog_run(d) = GTK_ANTWORT_OK
+    DIM t AS STRING : t = TRIM$(gtk_entry_get_text(fT))
+    DIM a AS STRING : a = TRIM$(gtk_entry_get_text(fA))
+    DIM r AS STRING : r = TRIM$(gtk_entry_get_text(fR))
+    DIM f AS STRING : f = TRIM$(gtk_entry_get_text(fF))
+    gDlg = 0 : gDlgFeld1 = 0 : gDlgFeld2 = 0 : gDlgFeld3 = 0 : gDlgFeld4 = 0
+    gtk_widget_destroy(d)
+    IF NOT ok THEN RETURN
+    IF t = gDok.titel AND a = gDok.autor AND r = gDok.revision AND f = gDok.firma THEN RETURN
+    verlaufMerken()
+    gDok.titel = t
+    gDok.autor = a
+    gDok.revision = r
+    gDok.firma = f
+    geaendert()
+END SUB
+
+' --- Suchen & Ersetzen (nicht modal, eine Zeile anklicken springt hin) -------
+
+DIM gSuDlg AS INTEGER
+DIM gSuFeld AS INTEGER
+DIM gSuErsatz AS INTEGER
+DIM gSuRef AS INTEGER
+DIM gSuWert AS INTEGER
+DIM gSuLabel AS INTEGER
+DIM gSuGross AS INTEGER
+DIM gSuListe AS INTEGER
+DIM gSuKasten AS INTEGER
+DIM gSuInfo AS INTEGER
+DIM gSuTreffer AS ARRAY OF kern.Treffer
+CONST SU_ERSETZEN = 1
+
+FUNCTION suHaken(w AS INTEGER) AS BOOLEAN
+    RETURN gtk_toggle_button_get_active(w)
+END FUNCTION
+
+' Die Trefferliste neu fuellen (bei jeder Eingabe).
+SUB suchenAktualisieren()
+    IF gSuDlg = 0 THEN RETURN
+    ' das Scroll-Fenster huellt die Liste in einen Viewport -- beide weg, sonst
+    ' nimmt es die neue Liste nicht an (GTK: "child_widget == NULL")
+    IF gSuListe <> 0 THEN
+        DIM alt AS INTEGER : alt = gtk_bin_get_child(gSuKasten)
+        IF alt <> 0 THEN gtk_widget_destroy(alt)
+    END IF
+    gSuListe = gtk_list_box_new()
+    gtk_list_box_set_selection_mode(gSuListe, GTK_AUSWAHL_EINE)
+    DIM muster AS STRING : muster = gtk_entry_get_text(gSuFeld)
+    gSuTreffer = kern.suchen(gDok, muster, suHaken(gSuRef), suHaken(gSuWert), suHaken(gSuLabel), suHaken(gSuGross))
+    DIM arten AS ARRAY OF STRING : arten = ["Referenz", "Wert", "Label"]
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gSuTreffer) - 1
+        DIM t AS kern.Treffer : t = gSuTreffer[i]
+        DIM z AS INTEGER : z = gtk_label_new("")
+        gtk_label_set_markup(z, "<span foreground='#8a90a2'>[" + markupSicher$(gDok.blaetter[t.blatt].name) + "]</span>  " + arten[t.art] + ":  <b>" + markupSicher$(t.text) + "</b>")
+        gtk_label_set_xalign(z, 0.0)
+        gtk_widget_set_margin_start(z, 6)
+        gtk_list_box_insert(gSuListe, z, -1)
+    NEXT
+    gtk_container_add(gSuKasten, gSuListe)
+    signalZeile(gSuListe, "row-selected", suchenZeile, 0, 0, 0)
+    gtk_widget_show_all(gSuListe)
+    gtk_label_set_text(gSuInfo, IIF(muster = "", "Suchbegriff eingeben", STR$(LEN(gSuTreffer)) + " Treffer -- eine Zeile anklicken springt hin"))
+END SUB
+
+SUB suchenGeaendert(objekt AS INTEGER, daten AS INTEGER)
+    suchenAktualisieren()
+END SUB
+
+SUB suchenZeile(box AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
+    IF zeile = 0 THEN RETURN
+    DIM i AS INTEGER : i = gtk_list_box_row_get_index(zeile)
+    IF i < 0 OR i >= LEN(gSuTreffer) THEN RETURN
+    DIM t AS kern.Treffer : t = gSuTreffer[i]
+    blattWechseln(t.blatt)
+    IF t.art = kern.TR_LABEL THEN
+        IF t.index < LEN(gBlatt.labels) THEN waehleL(gBlatt.labels[t.index])
+    ELSE
+        IF t.index < LEN(gBlatt.bauteile) THEN waehleB(gBlatt.bauteile[t.index])
+    END IF
+    zentrieren(t.x, t.y)
+    statusAktualisieren()
+END SUB
+
+SUB suchenAntwort(dlg AS INTEGER, antwort AS INTEGER, daten AS INTEGER)
+    IF antwort = SU_ERSETZEN THEN
+        suchenErsetzen()
+        RETURN
+    END IF
+    gSuDlg = 0
+    gSuListe = 0
+    gtk_widget_destroy(dlg)
+END SUB
+
+' Alle Treffer ersetzen -- ein Rueckgaengig-Schritt, nur wenn sich etwas tut.
+SUB suchenErsetzen()
+    DIM muster AS STRING : muster = gtk_entry_get_text(gSuFeld)
+    IF muster = "" THEN RETURN
+    DIM stand AS STRING : stand = schnappschuss$()
+    DIM idx AS INTEGER : idx = aktuellerBlattIndex()
+    DIM n AS INTEGER : n = kern.ersetzen(gDok, muster, gtk_entry_get_text(gSuErsatz), suHaken(gSuRef), suHaken(gSuWert), suHaken(gSuLabel), suHaken(gSuGross))
+    IF n > 0 THEN
+        verlaufMerkenStand(stand, idx)
+        auswahlAufheben()
+        geaendert()
+    END IF
+    gSpMeldung = STR$(n) + " Feld(er) ersetzt" + IIF(n > 0 AND suHaken(gSuRef), " -- doppelte Referenzen zeigt der ERC", "")
+    statusAktualisieren()
+    suchenAktualisieren()
+END SUB
+
+SUB suchenZeigen()
+    IF gSuDlg <> 0 THEN
+        gtk_window_present(gSuDlg)
+        RETURN
+    END IF
+    gSuDlg = gtk_dialog_new_with_buttons("Suchen & Ersetzen", gFenster, 0, "Alle ersetzen", SU_ERSETZEN, "Schliessen", GTK_ANTWORT_OK, NIL)
+    DIM vb AS INTEGER : vb = gtk_box_new(GTK_SENKRECHT, 8)
+    gtk_container_set_border_width(vb, 12)
+    DIM g AS INTEGER : g = gtk_grid_new()
+    gtk_grid_set_row_spacing(g, 6)
+    gtk_grid_set_column_spacing(g, 10)
+    gSuFeld = feldNeu("")
+    gSuErsatz = feldNeu("")
+    gtk_entry_set_activates_default(gSuFeld, FALSE)
+    gtk_grid_attach(g, etikettNeu("Suchen:"), 0, 0, 1, 1)
+    gtk_grid_attach(g, gSuFeld, 1, 0, 1, 1)
+    gtk_grid_attach(g, etikettNeu("Ersetzen durch:"), 0, 1, 1, 1)
+    gtk_grid_attach(g, gSuErsatz, 1, 1, 1, 1)
+    gtk_box_pack_start(vb, g, FALSE, FALSE, 0)
+    DIM hk AS INTEGER : hk = gtk_box_new(GTK_WAAGERECHT, 10)
+    gSuRef = gtk_check_button_new_with_label("Referenzen")
+    gSuWert = gtk_check_button_new_with_label("Werte")
+    gSuLabel = gtk_check_button_new_with_label("Labels")
+    gSuGross = gtk_check_button_new_with_label("Gross/klein beachten")
+    gtk_toggle_button_set_active(gSuRef, TRUE)
+    gtk_toggle_button_set_active(gSuWert, TRUE)
+    gtk_toggle_button_set_active(gSuLabel, TRUE)
+    gtk_box_pack_start(hk, gSuRef, FALSE, FALSE, 0)
+    gtk_box_pack_start(hk, gSuWert, FALSE, FALSE, 0)
+    gtk_box_pack_start(hk, gSuLabel, FALSE, FALSE, 0)
+    gtk_box_pack_start(hk, gSuGross, FALSE, FALSE, 0)
+    gtk_box_pack_start(vb, hk, FALSE, FALSE, 0)
+    gSuInfo = etikettNeu("Suchbegriff eingeben")
+    gtk_box_pack_start(vb, gSuInfo, FALSE, FALSE, 0)
+    gSuKasten = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_policy(gSuKasten, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+    gtk_scrolled_window_set_min_content_height(gSuKasten, 200)
+    gtk_widget_set_size_request(gSuKasten, 420, -1)
+    gtk_box_pack_start(vb, gSuKasten, TRUE, TRUE, 0)
+    gtk_box_pack_start(gtk_dialog_get_content_area(gSuDlg), vb, TRUE, TRUE, 0)
+    gSuListe = 0
+    signal(gSuFeld, "changed", suchenGeaendert, 0, 0, 0)
+    signal(gSuRef, "toggled", suchenGeaendert, 0, 0, 0)
+    signal(gSuWert, "toggled", suchenGeaendert, 0, 0, 0)
+    signal(gSuLabel, "toggled", suchenGeaendert, 0, 0, 0)
+    signal(gSuGross, "toggled", suchenGeaendert, 0, 0, 0)
+    signalAntwort(gSuDlg, "response", suchenAntwort, 0, 0, 0)
+    gtk_widget_show_all(gSuDlg)
+    suchenAktualisieren()
+END SUB

@@ -620,6 +620,8 @@ extern "C" fn w_op(k: *mut Kontext, o: u64, a_i: u64, b_i: u64, ziel: u64, lokal
     // Anhaengen an Ort und Stelle: `a` ist ein Text, den sonst niemand haelt.
     if o == op::ADD {
         if let Value::Str(mut links) = a {
+            // ein Zeichenindex (textindex.rs) haelt ein Weak -- erst loslassen
+            crate::textindex::loslassen(&links);
             if let Some(t) = Rc::get_mut(&mut links) {
                 match &b { Value::Str(r) => t.push_str(r), _ => t.push_str(&b.fmt()) }
                 *w_platz(k, ziel) = Value::Str(links);

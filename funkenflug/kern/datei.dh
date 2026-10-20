@@ -1,0 +1,201 @@
+' Speichern und Laden -- Namensraum "kern". Format .fkn = JSON (Version 1).
+' Sparsam: Drehung nur wenn <>0, Spiegelung nur wenn gesetzt, Wert nur bei
+' Abweichung vom Symbol-Vorgabewert. Knoten werden beim Laden neu berechnet.
+
+' Ein Dokument in einen JSON-Baum bauen (auch fuer Undo-Schnappschuesse).
+FUNCTION dokumentNachJson(dok AS Dokument) AS JSON_HANDLE
+    DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+    JSON_SET_STRING(j, "version", "1")
+    JSON_SET_STRING(j, "id", dok.id)
+    JSON_SET_STRING(j, "titel", dok.titel)
+    IF dok.autor <> "" THEN JSON_SET_STRING(j, "autor", dok.autor)
+    IF dok.revision <> "" THEN JSON_SET_STRING(j, "revision", dok.revision)
+    IF dok.firma <> "" THEN JSON_SET_STRING(j, "firma", dok.firma)
+    DIM bi AS INTEGER, ci AS INTEGER, wi AS INTEGER, li AS INTEGER, pk AS INTEGER
+    ' eigene Symbole, die benutzt werden, reisen in der Datei mit (ein
+    ' Platzhalter fuer ein fehlendes Symbol nicht -- er ist keine Definition)
+    JSON_SET_JSON(j, "symbole", JSON_NEW_ARRAY())
+    DIM drin AS MAP OF INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        FOR ci = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
+            DIM sy AS Symbol : sy = dok.blaetter[bi].bauteile[ci].sym
+            IF sy.eigen AND NOT sy.fehlt AND NOT MAPHAS(drin, sy.id) THEN
+                MAPPUT(drin, sy.id, 1)
+                JSON_APPEND_JSON(j, "symbole", symbolNachJson(sy))
+            END IF
+        NEXT
+    NEXT
+    JSON_SET_JSON(j, "platine", platineNachJson(dok.platine))
+    JSON_SET_JSON(j, "blaetter", JSON_NEW_ARRAY())
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        DIM bl AS Blatt : bl = dok.blaetter[bi]
+        DIM b AS JSON_HANDLE : b = JSON_NEW_OBJECT()
+        JSON_SET_STRING(b, "id", bl.id)
+        JSON_SET_STRING(b, "name", bl.name)
+        JSON_SET_INT(b, "breite", bl.breite)
+        JSON_SET_INT(b, "hoehe", bl.hoehe)
+        IF bl.erste <> "" THEN JSON_SET_STRING(b, "erste", bl.erste)
+        JSON_SET_JSON(b, "bauteile", JSON_NEW_ARRAY())
+        FOR ci = 0 TO LEN(bl.bauteile) - 1
+            DIM bt AS Bauteil : bt = bl.bauteile[ci]
+            DIM c AS JSON_HANDLE : c = JSON_NEW_OBJECT()
+            JSON_SET_STRING(c, "id", bt.id)
+            JSON_SET_STRING(c, "sym", bt.symbolRef)
+            JSON_SET_STRING(c, "ref", bt.referenz)
+            JSON_SET_INT(c, "x", bt.lage.pos.x)
+            JSON_SET_INT(c, "y", bt.lage.pos.y)
+            IF bt.lage.drehung <> 0 THEN JSON_SET_INT(c, "rot", bt.lage.drehung)
+            IF bt.lage.gespiegelt THEN JSON_SET_BOOL(c, "sp", TRUE)
+            IF bt.wert <> bt.sym.wertVorgabe THEN JSON_SET_STRING(c, "wert", bt.wert)
+            IF bt.gehaeuse <> "" THEN JSON_SET_STRING(c, "geh", bt.gehaeuse)
+            DIM ipf AS ARRAY OF STRING : ipf = MAPKEYS(bt.instanzRefs)
+            IF LEN(ipf) > 0 THEN
+                SORT(ipf)
+                JSON_SET_JSON(c, "iref", JSON_NEW_ARRAY())
+                FOR pk = 0 TO LEN(ipf) - 1
+                    JSON_APPEND_STRING(c, "iref", ipf[pk])
+                    JSON_APPEND_STRING(c, "iref", MAPGET(bt.instanzRefs, ipf[pk]))
+                NEXT
+            END IF
+            IF bt.bestellnr <> "" THEN JSON_SET_STRING(c, "best", bt.bestellnr)
+            IF bt.refVersatz.x <> 0 OR bt.refVersatz.y <> 0 THEN
+                JSON_SET_JSON(c, "refV", JSON_NEW_ARRAY())
+                JSON_APPEND_INT(c, "refV", bt.refVersatz.x)
+                JSON_APPEND_INT(c, "refV", bt.refVersatz.y)
+            END IF
+            IF bt.wertVersatz.x <> 0 OR bt.wertVersatz.y <> 0 THEN
+                JSON_SET_JSON(c, "wertV", JSON_NEW_ARRAY())
+                JSON_APPEND_INT(c, "wertV", bt.wertVersatz.x)
+                JSON_APPEND_INT(c, "wertV", bt.wertVersatz.y)
+            END IF
+            JSON_APPEND_JSON(b, "bauteile", c)
+        NEXT
+        JSON_SET_JSON(b, "draehte", JSON_NEW_ARRAY())
+        FOR wi = 0 TO LEN(bl.draehte) - 1
+            DIM w AS Draht : w = bl.draehte[wi]
+            DIM wj AS JSON_HANDLE : wj = JSON_NEW_OBJECT()
+            JSON_SET_STRING(wj, "id", w.id)
+            JSON_SET_JSON(wj, "pts", JSON_NEW_ARRAY())
+            FOR pk = 0 TO LEN(w.punkte) - 1
+                JSON_APPEND_INT(wj, "pts", w.punkte[pk].x)
+                JSON_APPEND_INT(wj, "pts", w.punkte[pk].y)
+            NEXT
+            JSON_APPEND_JSON(b, "draehte", wj)
+        NEXT
+        JSON_SET_JSON(b, "labels", JSON_NEW_ARRAY())
+        FOR li = 0 TO LEN(bl.labels) - 1
+            DIM la AS Label : la = bl.labels[li]
+            DIM lj AS JSON_HANDLE : lj = JSON_NEW_OBJECT()
+            JSON_SET_STRING(lj, "txt", la.text)
+            JSON_SET_INT(lj, "x", la.anker.x)
+            JSON_SET_INT(lj, "y", la.anker.y)
+            JSON_SET_INT(lj, "art", la.art)
+            IF la.drehung <> 0 THEN JSON_SET_INT(lj, "rot", la.drehung)
+            JSON_APPEND_JSON(b, "labels", lj)
+        NEXT
+        IF LEN(bl.busse) > 0 THEN
+            JSON_SET_JSON(b, "busse", JSON_NEW_ARRAY())
+            FOR li = 0 TO LEN(bl.busse) - 1
+                JSON_APPEND_JSON(b, "busse", busNachJson(bl.busse[li]))
+            NEXT
+        END IF
+        JSON_APPEND_JSON(j, "blaetter", b)
+    NEXT
+    RETURN j
+END FUNCTION
+
+FUNCTION dokumentSpeichern(dok AS Dokument, pfad AS STRING) AS BOOLEAN
+    TRY
+        WRITEALL(pfad, JSON_STRINGIFY(dokumentNachJson(dok)))
+    CATCH e
+        RETURN FALSE
+    END TRY
+    RETURN TRUE
+END FUNCTION
+
+' Einen JSON-Baum zurueck in ein Dokument (auch fuer Undo).
+FUNCTION dokumentAusJson(j AS JSON_HANDLE) AS Dokument
+    DIM dok AS Dokument : dok = NEW Dokument()
+    dok.blaetter = []
+    IF JSON_HAS(j, "id") THEN dok.id = JSON_GET_STRING(j, "id")
+    IF JSON_HAS(j, "titel") THEN dok.titel = JSON_GET_STRING(j, "titel")
+    IF JSON_HAS(j, "autor") THEN dok.autor = JSON_GET_STRING(j, "autor")
+    IF JSON_HAS(j, "revision") THEN dok.revision = JSON_GET_STRING(j, "revision")
+    IF JSON_HAS(j, "firma") THEN dok.firma = JSON_GET_STRING(j, "firma")
+    DIM bi AS INTEGER, ci AS INTEGER, wi AS INTEGER, li AS INTEGER, pk AS INTEGER
+    ' zuerst die eigenen Symbole -- die Bauteile darunter zeigen auf sie
+    IF JSON_HAS(j, "symbole") THEN
+        FOR bi = 0 TO JSON_LEN(j, "symbole") - 1
+            DIM sy AS Symbol : sy = symbolRegistrieren(symbolAusJson(j, "symbole." + STR$(bi)))
+        NEXT
+    END IF
+    FOR bi = 0 TO JSON_LEN(j, "blaetter") - 1
+        DIM bp AS STRING : bp = "blaetter." + STR$(bi)
+        DIM bl AS Blatt : bl = NEW Blatt(JSON_GET_STRING(j, bp + ".name"))
+        IF JSON_HAS(j, bp + ".id") THEN bl.id = JSON_GET_STRING(j, bp + ".id")
+        IF JSON_HAS(j, bp + ".breite") THEN bl.breite = JSON_GET_INT(j, bp + ".breite")
+        IF JSON_HAS(j, bp + ".hoehe") THEN bl.hoehe = JSON_GET_INT(j, bp + ".hoehe")
+        IF JSON_HAS(j, bp + ".erste") THEN bl.erste = JSON_GET_STRING(j, bp + ".erste")
+        ' Bauteile
+        FOR ci = 0 TO JSON_LEN(j, bp + ".bauteile") - 1
+            DIM cp AS STRING : cp = bp + ".bauteile." + STR$(ci)
+            DIM l AS Lage : l = neueLage(JSON_GET_INT(j, cp + ".x"), JSON_GET_INT(j, cp + ".y"))
+            IF JSON_HAS(j, cp + ".rot") THEN l.drehung = JSON_GET_INT(j, cp + ".rot")
+            IF JSON_HAS(j, cp + ".sp") THEN l.gespiegelt = JSON_GET_BOOL(j, cp + ".sp")
+            DIM bt AS Bauteil : bt = neuesBauteil(JSON_GET_STRING(j, cp + ".sym"), l)
+            IF JSON_HAS(j, cp + ".id") THEN bt.id = JSON_GET_STRING(j, cp + ".id")
+            IF JSON_HAS(j, cp + ".ref") THEN bt.referenz = JSON_GET_STRING(j, cp + ".ref")
+            IF JSON_HAS(j, cp + ".wert") THEN bt.wert = JSON_GET_STRING(j, cp + ".wert")
+            IF JSON_HAS(j, cp + ".geh") THEN bt.gehaeuse = JSON_GET_STRING(j, cp + ".geh")
+            IF JSON_HAS(j, cp + ".iref") THEN
+                pk = 0
+                WHILE pk + 1 < JSON_LEN(j, cp + ".iref")
+                    MAPPUT(bt.instanzRefs, JSON_GET_STRING(j, cp + ".iref." + STR$(pk)), JSON_GET_STRING(j, cp + ".iref." + STR$(pk + 1)))
+                    pk = pk + 2
+                WEND
+            END IF
+            IF JSON_HAS(j, cp + ".best") THEN bt.bestellnr = JSON_GET_STRING(j, cp + ".best")
+            IF JSON_HAS(j, cp + ".refV") THEN bt.refVersatz = NEW Punkt(JSON_GET_INT(j, cp + ".refV.0"), JSON_GET_INT(j, cp + ".refV.1"))
+            IF JSON_HAS(j, cp + ".wertV") THEN bt.wertVersatz = NEW Punkt(JSON_GET_INT(j, cp + ".wertV.0"), JSON_GET_INT(j, cp + ".wertV.1"))
+            ARRAY_PUSH(bl.bauteile, bt)
+        NEXT
+        ' Draehte
+        FOR wi = 0 TO JSON_LEN(j, bp + ".draehte") - 1
+            DIM wp AS STRING : wp = bp + ".draehte." + STR$(wi)
+            DIM w AS Draht : w = NEW Draht()
+            IF JSON_HAS(j, wp + ".id") THEN w.id = JSON_GET_STRING(j, wp + ".id")
+            DIM anz AS INTEGER : anz = JSON_LEN(j, wp + ".pts")
+            pk = 0
+            WHILE pk + 1 < anz
+                ARRAY_PUSH(w.punkte, NEW Punkt(JSON_GET_INT(j, wp + ".pts." + STR$(pk)), JSON_GET_INT(j, wp + ".pts." + STR$(pk + 1))))
+                pk = pk + 2
+            WEND
+            ARRAY_PUSH(bl.draehte, w)
+        NEXT
+        ' Labels
+        IF JSON_HAS(j, bp + ".labels") THEN
+            FOR li = 0 TO JSON_LEN(j, bp + ".labels") - 1
+                DIM lp AS STRING : lp = bp + ".labels." + STR$(li)
+                DIM la AS Label : la = NEW Label(JSON_GET_STRING(j, lp + ".txt"), NEW Punkt(JSON_GET_INT(j, lp + ".x"), JSON_GET_INT(j, lp + ".y")), JSON_GET_INT(j, lp + ".art"))
+                IF JSON_HAS(j, lp + ".rot") THEN la.drehung = JSON_GET_INT(j, lp + ".rot")
+                ARRAY_PUSH(bl.labels, la)
+            NEXT
+        END IF
+        IF JSON_HAS(j, bp + ".busse") THEN
+            FOR li = 0 TO JSON_LEN(j, bp + ".busse") - 1
+                DIM bj AS Bus : bj = busAusJson(j, bp + ".busse." + STR$(li))
+                IF LEN(bj.punkte) >= 2 THEN ARRAY_PUSH(bl.busse, bj)
+            NEXT
+        END IF
+        autoKnoten(bl)
+        ARRAY_PUSH(dok.blaetter, bl)
+    NEXT
+    IF JSON_HAS(j, "platine") THEN dok.platine = platineAusJson(j, "platine")
+    blattSymboleAktualisieren(dok)
+    instanzenPflegen(dok)
+    RETURN dok
+END FUNCTION
+
+FUNCTION dokumentLaden(pfad AS STRING) AS Dokument
+    RETURN dokumentAusJson(JSON_LOAD(pfad))
+END FUNCTION

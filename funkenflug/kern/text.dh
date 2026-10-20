@@ -1,0 +1,87 @@
+' Text-Hilfen -- Namensraum "kern".
+'
+' Ueberstrich fuer aktiv-low-Signale, zwei Schreibweisen:
+'   ~{RESET}    ueberstreicht genau den Inhalt der Klammern (wie KiCad 6+)
+'   ~RESET      ohne Klammer schaltet ~ den Strich um (wie KiCad 5):
+'               ~CS~/WR -> CS ueberstrichen, /WR nicht
+'   ~~          ein woertliches ~
+' Der Netzname bleibt der geschriebene Text ("~RESET"); nur die Anzeige
+' streicht ueber.
+
+' Fuer Pango-Markup: & < > maskieren.
+FUNCTION xmlSicher$(s AS STRING) AS STRING
+    RETURN REPLACE$(REPLACE$(REPLACE$(s, "&", "&amp;"), "<", "&lt;"), ">", "&gt;")
+END FUNCTION
+
+FUNCTION hatUeberstrich(t AS STRING) AS BOOLEAN
+    RETURN CONTAINS(t, "~")
+END FUNCTION
+
+' Zerlegt t in Stuecke abwechselnd ohne/mit Strich. teile[i] gehoert zu
+' strich[i]. Leere Stuecke fallen weg.
+SUB ueberstrichTeile(t AS STRING, BYREF teile AS ARRAY OF STRING, BYREF strich AS ARRAY OF BOOLEAN)
+    teile = []
+    strich = []
+    DIM an AS BOOLEAN : an = FALSE           ' Umschalt-Strich (~ ohne Klammer)
+    DIM klammer AS BOOLEAN : klammer = FALSE ' innerhalb ~{ ... }
+    DIM stueck AS STRING : stueck = ""
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(t)
+        DIM c AS STRING : c = MID$(t, i, 1)
+        DIM naechstes AS STRING : naechstes = ""
+        IF i + 1 < LEN(t) THEN naechstes = MID$(t, i + 1, 1)
+        IF c = "~" AND naechstes = "~" THEN
+            stueck = stueck + "~"
+            i = i + 2
+            CONTINUE
+        END IF
+        IF c = "~" AND naechstes = "{" AND NOT klammer THEN
+            IF stueck <> "" THEN ARRAY_PUSH(teile, stueck) : ARRAY_PUSH(strich, an)
+            stueck = ""
+            klammer = TRUE
+            i = i + 2
+            CONTINUE
+        END IF
+        IF c = "}" AND klammer THEN
+            IF stueck <> "" THEN ARRAY_PUSH(teile, stueck) : ARRAY_PUSH(strich, TRUE)
+            stueck = ""
+            klammer = FALSE
+            i = i + 1
+            CONTINUE
+        END IF
+        IF c = "~" AND NOT klammer THEN
+            IF stueck <> "" THEN ARRAY_PUSH(teile, stueck) : ARRAY_PUSH(strich, an)
+            stueck = ""
+            an = NOT an
+            i = i + 1
+            CONTINUE
+        END IF
+        stueck = stueck + c
+        i = i + 1
+    WEND
+    IF stueck <> "" THEN ARRAY_PUSH(teile, stueck) : ARRAY_PUSH(strich, an OR klammer)
+END SUB
+
+' Der Text, wie er erscheint (ohne ~ und Klammern) -- fuer Breiten.
+FUNCTION sichtbarerText$(t AS STRING) AS STRING
+    IF NOT hatUeberstrich(t) THEN RETURN t
+    DIM teile AS ARRAY OF STRING, strich AS ARRAY OF BOOLEAN
+    ueberstrichTeile(t, teile, strich)
+    RETURN JOIN$(teile, "")
+END FUNCTION
+
+' Pango-Markup mit overline="single" fuer die ueberstrichenen Stuecke.
+FUNCTION ueberstrichMarkup$(t AS STRING) AS STRING
+    DIM teile AS ARRAY OF STRING, strich AS ARRAY OF BOOLEAN
+    ueberstrichTeile(t, teile, strich)
+    DIM m AS STRING : m = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 1
+        IF strich[i] THEN
+            m = m + "<span overline=" + CHR$(34) + "single" + CHR$(34) + ">" + xmlSicher$(teile[i]) + "</span>"
+        ELSE
+            m = m + xmlSicher$(teile[i])
+        END IF
+    NEXT
+    RETURN m
+END FUNCTION

@@ -1,0 +1,152 @@
+' KiCad-Netzliste (.net, S-Ausdruck, Version "E") -- Namensraum "kern".
+'
+' Damit eine Schaltung aus Funkenflug in KiCads Platinen-Editor weiterleben
+' kann (Pcbnew: "Netzliste importieren"). Die Footprints sind VORSCHLAEGE aus
+' der Bauform (AX4 -> R_Axial ... P10.16mm, DIP8 -> DIP-8_W7.62mm ...);
+' was sich nicht sicher zuordnen laesst, bleibt leer und wird in KiCad
+' zugewiesen.
+'
+' Wichtig: jeder Knoten nennt die PAD-Nummer der Bauform, nicht die Pin-
+' Nummer des Symbols. Funkenflugs NPN hat Pin 1 = Basis, KiCads TO-92 zaehlt
+' die Pads aber von links (C B E bei TO92-CBE) -- mit der Symbol-Nummer laege
+' in KiCad die Basis auf dem Kollektor-Pad.
+
+FUNCTION kicadText$(s AS STRING) AS STRING
+    RETURN CHR$(34) + REPLACE$(REPLACE$(s, "\", "\\"), CHR$(34), "\" + CHR$(34)) + CHR$(34)
+END FUNCTION
+
+FUNCTION kicadMm$(loecher AS INTEGER) AS STRING
+    ' 4 Loecher -> "10.16"
+    DIM h AS INTEGER : h = loecher * 254
+    DIM t AS STRING : t = STR$(h \ 100) + "." + PADL$(STR$(h MOD 100), 2, "0")
+    RETURN t
+END FUNCTION
+
+' Footprint-Vorschlag aus Symbol und Bauform, "" = keiner.
+FUNCTION kicadFootprint$(b AS Bauteil, bf AS Bauform) AS STRING
+    DIM n AS STRING : n = UPPER$(bf.name)
+    DIM id AS STRING : id = b.sym.id
+    DIM k AS INTEGER
+    IF STARTSWITH(n, "AX") THEN
+        IF NOT ganzzahlLesen(MID$(n, 2), k) THEN RETURN ""
+        SELECT CASE id
+            CASE "R" : RETURN "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P" + kicadMm$(k) + "mm_Horizontal"
+            CASE "D", "D_Z" : RETURN "Diode_THT:D_DO-35_SOD27_P" + kicadMm$(k) + "mm_Horizontal"
+            CASE "D_S" : RETURN "Diode_THT:D_DO-41_SOD81_P" + kicadMm$(k) + "mm_Horizontal"
+        END SELECT
+        RETURN ""
+    END IF
+    IF STARTSWITH(n, "RAD") THEN
+        IF NOT ganzzahlLesen(MID$(n, 3), k) THEN RETURN ""
+        SELECT CASE id
+            ' KiCad nennt radiale Bauteile nach metrischem Raster (2,50 / 5,00 mm)
+            CASE "C"
+                IF k = 1 THEN RETURN "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm"
+                IF k = 2 THEN RETURN "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm"
+            CASE "CP"
+                IF k = 1 THEN RETURN "Capacitor_THT:CP_Radial_D5.0mm_P2.50mm"
+                IF k = 2 THEN RETURN "Capacitor_THT:CP_Radial_D8.0mm_P5.00mm"
+            CASE "LED" : IF k = 1 THEN RETURN "LED_THT:LED_D5.0mm"
+            CASE "Y" : IF k = 2 THEN RETURN "Crystal:Crystal_HC49-U_Vertical"
+        END SELECT
+        RETURN ""
+    END IF
+    IF STARTSWITH(n, "TO92") THEN RETURN "Package_TO_SOT_THT:TO-92_Inline"
+    IF STARTSWITH(n, "TO220") THEN RETURN "Package_TO_SOT_THT:TO-220-3_Vertical"
+    IF STARTSWITH(n, "DIP") THEN RETURN "Package_DIP:DIP-" + MID$(n, 3) + "_W7.62mm"
+    IF STARTSWITH(n, "SIL") THEN
+        IF NOT ganzzahlLesen(MID$(n, 3), k) THEN RETURN ""
+        RETURN "Connector_PinHeader_2.54mm:PinHeader_1x" + PADL$(STR$(k), 2, "0") + "_P2.54mm_Vertical"
+    END IF
+    IF STARTSWITH(n, "HDR") THEN
+        DIM t AS ARRAY OF STRING : t = SPLIT$(MID$(n, 3), "X")
+        DIM r AS INTEGER, c AS INTEGER
+        IF LEN(t) <> 2 THEN RETURN ""
+        IF NOT ganzzahlLesen(t[0], r) OR NOT ganzzahlLesen(t[1], c) THEN RETURN ""
+        RETURN "Connector_PinHeader_2.54mm:PinHeader_" + STR$(r) + "x" + PADL$(STR$(c), 2, "0") + "_P2.54mm_Vertical"
+    END IF
+    IF n = "TAST6" THEN RETURN "Button_Switch_THT:SW_PUSH_6mm"
+    IF n = "RELAIS5" THEN RETURN "Relay_THT:Relay_SPDT_SANYOU_SRD_Series_Form_C"
+    RETURN ""
+END FUNCTION
+
+FUNCTION kicadPinTyp$(t AS INTEGER) AS STRING
+    SELECT CASE t
+        CASE PIN_EINGANG : RETURN "input"
+        CASE PIN_AUSGANG : RETURN "output"
+        CASE PIN_BIDIR : RETURN "bidirectional"
+        CASE PIN_LEISTUNG_EIN : RETURN "power_in"
+        CASE PIN_LEISTUNG_AUS : RETURN "power_out"
+        CASE PIN_FREI : RETURN "no_connect"
+    END SELECT
+    RETURN "passive"
+END FUNCTION
+
+' Pad-Nummer eines Symbol-Pins in der Bauform: ein Zahlen-Schluessel ist die
+' Pad-Nummer (DIP, SIL, R ...), ein Namens-Schluessel (TO92-CBE) zaehlt nach
+' der Lage in der Reihe.
+FUNCTION kicadPad$(b AS Bauteil, bf AS Bauform, j AS INTEGER) AS STRING
+    DIM ks AS ARRAY OF INTEGER : ks = bauformPinsZu(bf, b, j)
+    IF LEN(ks) = 0 THEN RETURN b.sym.pins[j].nummer
+    DIM sl AS STRING : sl = bf.pins[ks[0]].schluessel
+    DIM v AS INTEGER
+    IF ganzzahlLesen(sl, v) THEN RETURN sl
+    RETURN STR$(ks[0] + 1)
+END FUNCTION
+
+FUNCTION netzlisteKicadDok$(dok AS Dokument, quelle AS STRING) AS STRING
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
+    DIM nl AS STRING : nl = CHR$(10)
+    DIM t AS STRING : t = "(export (version " + CHR$(34) + "E" + CHR$(34) + ")" + nl
+    t = t + "  (design" + nl
+    t = t + "    (source " + kicadText$(quelle) + ")" + nl
+    t = t + "    (date " + kicadText$(DATE$()) + ")" + nl
+    t = t + "    (tool " + kicadText$("Funkenflug") + ")" + nl
+    IF dok.titel <> "" OR dok.revision <> "" THEN t = t + "    (sheet (number " + kicadText$("1") + ") (name " + kicadText$("/") + ") (tstamps " + kicadText$("/") + ") (title_block (title " + kicadText$(dok.titel) + ") (company " + kicadText$(dok.firma) + ") (rev " + kicadText$(dok.revision) + ") (date " + kicadText$(DATE$()) + ")))" + nl
+    t = t + "  )" + nl
+    ' Bauteile
+    DIM hinweis AS STRING
+    t = t + "  (components" + nl
+    DIM bi AS INTEGER, i AS INTEGER, j AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        FOR i = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
+            DIM b AS Bauteil : b = dok.blaetter[bi].bauteile[i]
+            IF b.sym.einheitLeistung OR b.sym.blattSymbol OR b.sym.fehlt OR b.sym.nurSimulation THEN CONTINUE
+            DIM bf AS Bauform : bf = bauformFuer(b, hinweis)
+            t = t + "    (comp (ref " + kicadText$(b.referenz) + ")" + nl
+            t = t + "      (value " + kicadText$(IIF(b.wert = "", b.sym.name, b.wert)) + ")" + nl
+            t = t + "      (footprint " + kicadText$(kicadFootprint$(b, bf)) + ")" + nl
+            IF b.bestellnr <> "" THEN t = t + "      (fields (field (name " + kicadText$("Bestellnummer") + ") " + kicadText$(b.bestellnr) + "))" + nl
+            t = t + "      (libsource (lib " + kicadText$("funkenflug") + ") (part " + kicadText$(b.sym.id) + ") (description " + kicadText$(b.sym.name) + "))" + nl
+            t = t + "      (sheetpath (names " + kicadText$("/" + IIF(bi = 0, "", dok.blaetter[bi].name + "/")) + ") (tstamps " + kicadText$("/") + "))" + nl
+            t = t + "      (tstamps " + kicadText$(b.id) + "))" + nl
+        NEXT
+    NEXT
+    t = t + "  )" + nl
+    ' Netze: jedes mit wenigstens einem echten Pin; ein einzelner Pin ist in
+    ' KiCad "unconnected-(R1-Pad2)"
+    DIM n AS Netze : n = netzeDokument(dok)
+    t = t + "  (nets" + nl
+    DIM code AS INTEGER : code = 0
+    FOR i = 0 TO LEN(n.liste) - 1
+        DIM nz AS Netz : nz = n.liste[i]
+        IF nz.echtePins() = 0 THEN CONTINUE
+        code = code + 1
+        DIM knoten AS STRING : knoten = ""
+        DIM name AS STRING : name = nz.name
+        FOR j = 0 TO LEN(nz.pins) - 1
+            DIM np AS NetzPin : np = nz.pins[j]
+            IF np.versorgung THEN CONTINUE
+            DIM pb AS Bauteil : pb = dok.blaetter[np.blatt].bauteile[np.bauteil]
+            DIM pbf AS Bauform : pbf = bauformFuer(pb, hinweis)
+            DIM pad AS STRING : pad = kicadPad$(pb, pbf, np.pin)
+            knoten = knoten + "      (node (ref " + kicadText$(np.ref) + ") (pin " + kicadText$(pad) + ")"
+            IF np.pinName <> "" THEN knoten = knoten + " (pinfunction " + kicadText$(np.pinName) + ")"
+            knoten = knoten + " (pintype " + kicadText$(kicadPinTyp$(np.typ)) + "))" + nl
+            IF nz.echtePins() = 1 AND nz.automatisch THEN name = "unconnected-(" + np.ref + "-Pad" + pad + ")"
+        NEXT
+        t = t + "    (net (code " + kicadText$(STR$(code)) + ") (name " + kicadText$(name) + ")" + nl + knoten + "    )" + nl
+    NEXT
+    t = t + "  )" + nl + ")" + nl
+    RETURN t
+END FUNCTION

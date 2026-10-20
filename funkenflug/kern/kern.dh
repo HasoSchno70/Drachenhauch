@@ -1,0 +1,27 @@
+' Der Kern von Funkenflug -- ohne Oberflaeche. Eingebunden als
+'     IMPORT "kern/kern.dh" AS kern
+' Alle Teile teilen den Namensraum "kern" und sehen einander ohne Vorsatz.
+IMPORT "json"
+IMPORT "geometrie.dh" AS kern
+IMPORT "text.dh" AS kern
+IMPORT "modell.dh" AS kern
+IMPORT "symbole.dh" AS kern
+IMPORT "bibliothek.dh" AS kern
+IMPORT "bibliothek_mehr.dh" AS kern
+IMPORT "stueckliste.dh" AS kern
+IMPORT "netze.dh" AS kern
+IMPORT "erc.dh" AS kern
+IMPORT "hierarchie.dh" AS kern
+IMPORT "busse.dh" AS kern
+IMPORT "netzliste.dh" AS kern
+IMPORT "ngspice.dh" AS kern
+IMPORT "simulation.dh" AS kern
+IMPORT "platine.dh" AS kern
+IMPORT "bearbeiten.dh" AS kern
+IMPORT "kicad.dh" AS kern
+IMPORT "datei.dh" AS kern
+IMPORT "sausdruck.dh" AS kern
+IMPORT "kicadimport.dh" AS kern
+IMPORT "kicadbib.dh" AS kern
+IMPORT "gerber.dh" AS kern
+IMPORT "platine3d.dh" AS kern

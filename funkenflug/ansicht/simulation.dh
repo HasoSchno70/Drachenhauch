@@ -1,0 +1,740 @@
+' Simulation in der Oberflaeche -- globaler Namensraum.
+'
+' Menue "Simulation ▾": Arbeitspunkt (Spannungen stehen dann an den Netzen im
+' Schaltplan und in der Statuszeile), Zeitverlauf und Frequenzgang (Kurven in
+' einem eigenen Fenster, ein Haken je Netz, Ablesen mit der Maus). Jede
+' Aenderung am Schaltplan nimmt die Spannungen wieder weg -- veraltete Werte
+' stehen nie neben einer geaenderten Schaltung.
+
+CONST C_SIM = &HFFD866
+CONST C_SIM_GRUND = &H2A2614
+
+CLASS SimMarke
+    DIM blatt AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM text AS STRING
+    DIM instanz AS STRING             ' Instanzpfad (mehrfach eingesetztes Blatt), "" = alle
+    SUB Init(b AS INTEGER, px AS INTEGER, py AS INTEGER, t AS STRING)
+        blatt = b
+        x = px
+        y = py
+        text = t
+    END SUB
+END CLASS
+
+DIM gSimMenue AS INTEGER
+DIM gSimOpDa AS BOOLEAN
+DIM gSimOp AS kern.SimErgebnis
+DIM gSimMarken AS ARRAY OF SimMarke
+DIM gSimVcc AS STRING
+DIM gSimDauer AS STRING
+DIM gSimSchritt AS STRING
+DIM gSimFStart AS STRING
+DIM gSimFEnde AS STRING
+DIM gSimPunkte AS STRING
+' Ergebnisfenster
+DIM gSimDlg AS INTEGER
+DIM gSimFlaeche AS INTEGER
+DIM gSimInfo AS INTEGER
+DIM gSimErg AS kern.SimErgebnis
+DIM gSimSichtbar AS ARRAY OF BOOLEAN
+DIM gSimMausDrin AS BOOLEAN
+DIM gSimMausX AS FLOAT
+DIM gSimPlotL AS FLOAT
+DIM gSimPlotB AS FLOAT
+DIM gSimHinweisText AS STRING
+DIM gSimMarkeInstanz AS STRING
+
+SUB simVorgaben()
+    IF gSimVcc <> "" THEN RETURN
+    gSimVcc = "5"
+    gSimDauer = "10m"
+    gSimSchritt = "10u"
+    gSimFStart = "10"
+    gSimFEnde = "1M"
+    gSimPunkte = "20"
+END SUB
+
+FUNCTION simFarbe(i AS INTEGER) AS INTEGER
+    DIM p AS ARRAY OF INTEGER : p = [&H4FA3FF, &HFF8A3D, &H8FE0A0, &HFFD866, &HE07BE0, &H6BE0E0, &HFF6B6B, &HC8C8D0]
+    RETURN p[i MOD LEN(p)]
+END FUNCTION
+
+' --- ngspice finden ------------------------------------------------------------
+
+FUNCTION simKonfigDatei$() AS STRING
+    RETURN PATHJOIN(konfigOrdner$(), "ngspice.txt")
+END FUNCTION
+
+SUB simKonfigLaden()
+    simVorgaben()
+    IF FILEEXISTS(simKonfigDatei$()) THEN kern.ngspicePfadSetzen(TRIM$(READALL$(simKonfigDatei$())))
+END SUB
+
+' Ist ngspice da? Sonst fragen, wo die Bibliothek liegt (und es merken).
+FUNCTION ngspiceSicherstellen() AS BOOLEAN
+    IF kern.ngspiceSuchen$() <> "" THEN RETURN TRUE
+    IF NOT bestaetigen("ngspice fehlt", "Fuer die Simulation braucht Funkenflug die ngspice-Bibliothek" + CHR$(10) + "(Windows: ngspice.dll aus dem Paket 'ngspice-NN_dll_64'," + CHR$(10) + "Linux: Paket libngspice0, macOS: brew install libngspice)." + CHR$(10) + CHR$(10) + "Liegt sie schon irgendwo? Dann jetzt auswaehlen.", "Bibliothek waehlen ...") THEN RETURN FALSE
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("ngspice-Bibliothek waehlen", gFenster, GTK_DATEI_OEFFNEN, "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Waehlen", GTK_ANTWORT_ANNEHMEN, NIL)
+    DIM filter AS INTEGER : filter = gtk_file_filter_new()
+    gtk_file_filter_set_name(filter, "ngspice (ngspice.dll, libngspice.so, libngspice.dylib)")
+    gtk_file_filter_add_pattern(filter, "*ngspice*.dll")
+    gtk_file_filter_add_pattern(filter, "libngspice*")
+    gtk_file_chooser_add_filter(d, filter)
+    DIM pfad AS STRING : pfad = ""
+    IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
+        DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
+        IF z <> 0 THEN
+            pfad = TEXT_AUS_ZEIGER$(z)
+            g_free(z)
+        END IF
+    END IF
+    gtk_widget_destroy(d)
+    IF pfad = "" THEN RETURN FALSE
+    kern.ngspicePfadSetzen(pfad)
+    TRY
+        konfigOrdnerAnlegen()
+        WRITEALL(simKonfigDatei$(), pfad)
+    CATCH e
+    END TRY
+    RETURN kern.ngspiceSuchen$() <> ""
+END FUNCTION
+
+' --- Menue ---------------------------------------------------------------------
+
+SUB aufSimOp(eintrag AS INTEGER, daten AS INTEGER)
+    simArbeitspunkt()
+END SUB
+SUB aufSimTran(eintrag AS INTEGER, daten AS INTEGER)
+    simZeitverlauf()
+END SUB
+SUB aufSimAc(eintrag AS INTEGER, daten AS INTEGER)
+    simFrequenzgang()
+END SUB
+SUB aufSimAus(eintrag AS INTEGER, daten AS INTEGER)
+    simVeraltet()
+    gSpMeldung = ""
+    statusAktualisieren()
+END SUB
+SUB aufSimDeck(eintrag AS INTEGER, daten AS INTEGER)
+    simDeckZeigen()
+END SUB
+
+SUB simMenueBauen()
+    simVorgaben()
+    gSimMenue = gtk_menu_new()
+    signal(menueEintrag(gSimMenue, "Arbeitspunkt (Spannungen im Schaltplan)"), "activate", aufSimOp, 0, 0, 0)
+    signal(menueEintrag(gSimMenue, "Zeitverlauf ..."), "activate", aufSimTran, 0, 0, 0)
+    signal(menueEintrag(gSimMenue, "Frequenzgang ..."), "activate", aufSimAc, 0, 0, 0)
+    gtk_menu_shell_append(gSimMenue, gtk_separator_menu_item_new())
+    signal(menueEintrag(gSimMenue, "Spannungen ausblenden"), "activate", aufSimAus, 0, 0, 0)
+    signal(menueEintrag(gSimMenue, "SPICE-Deck anzeigen ..."), "activate", aufSimDeck, 0, 0, 0)
+    gtk_widget_show_all(gSimMenue)
+END SUB
+
+SUB aufSimKnopf(knopf AS INTEGER, daten AS INTEGER)
+    gtk_menu_popup_at_widget(gSimMenue, knopf, GDK_SCHWERE_UNTEN_LINKS, GDK_SCHWERE_OBEN_LINKS, 0)
+END SUB
+
+' --- Rechnen -------------------------------------------------------------------
+
+FUNCTION simEinstellung(analyse AS INTEGER) AS kern.SimEinstellung
+    DIM e AS kern.SimEinstellung : e = NEW kern.SimEinstellung(analyse)
+    DIM v AS FLOAT
+    IF kern.siZahl(gSimVcc, v) THEN e.vcc = v
+    IF kern.siZahl(gSimDauer, v) THEN e.dauer = v
+    IF kern.siZahl(gSimSchritt, v) THEN e.schritt = v
+    IF kern.siZahl(gSimFStart, v) THEN e.fStart = v
+    IF kern.siZahl(gSimFEnde, v) THEN e.fEnde = v
+    IF kern.siZahl(gSimPunkte, v) THEN e.punkte = MAX(1, ROUND(v))
+    RETURN e
+END FUNCTION
+
+' Rechnen mit Rueckmeldung; FALSE bei einem Fehler (schon gemeldet).
+FUNCTION simAusfuehren(e AS kern.SimEinstellung, BYREF r AS kern.SimErgebnis) AS BOOLEAN
+    IF NOT ngspiceSicherstellen() THEN RETURN FALSE
+    gSpMeldung = "Simulation laeuft ..."
+    statusAktualisieren()
+    TRY
+        r = kern.simRechnen(gDok, e)
+    CATCH fe
+        gSpMeldung = ""
+        statusAktualisieren()
+        meldung("Die Simulation ist abgebrochen: " + fe)
+        RETURN FALSE
+    END TRY
+    IF NOT r.ok THEN
+        gSpMeldung = ""
+        statusAktualisieren()
+        meldung("Die Simulation hat nicht geklappt." + CHR$(10) + CHR$(10) + r.fehler + CHR$(10) + CHR$(10) + "(Simulation ▾ > SPICE-Deck anzeigen zeigt, was ngspice bekam.)")
+        RETURN FALSE
+    END IF
+    RETURN TRUE
+END FUNCTION
+
+SUB simArbeitspunkt()
+    DIM r AS kern.SimErgebnis
+    IF NOT simAusfuehren(simEinstellung(kern.SIM_OP), r) THEN RETURN
+    gSimOp = r
+    gSimOpDa = TRUE
+    simMarkenBauen(r)
+    ' Statuszeile: was die Versorgungen liefern
+    DIM t AS STRING : t = "Arbeitspunkt: " + STR$(LEN(r.netze)) + " Netze"
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.stroeme) - 1
+        IF LEN(r.stroeme[i].re) > 0 THEN t = t + IIF(i = 0, " -- ", ", ") + r.stroeme[i].name + " liefert " + kern.siText$(r.stroeme[i].re[0], "A")
+    NEXT
+    gSpMeldung = t
+    statusAktualisieren()
+    neuZeichnen()
+    simFensterZeigen(r)
+END SUB
+
+' Ein kleiner Dialog mit bis zu vier Feldern; werte kommen geaendert zurueck.
+FUNCTION simDialog(titel AS STRING, namen AS ARRAY OF STRING, BYREF werte AS ARRAY OF STRING, hilfe AS STRING) AS BOOLEAN
+    DIM d AS INTEGER : d = dialogNeu(titel)
+    DIM g AS INTEGER : g = gtk_grid_new()
+    gtk_grid_set_row_spacing(g, 6)
+    gtk_grid_set_column_spacing(g, 10)
+    gtk_container_set_border_width(g, 12)
+    DIM felder AS ARRAY OF INTEGER : felder = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(namen) - 1
+        DIM f AS INTEGER : f = feldNeu(werte[i])
+        ARRAY_PUSH(felder, f)
+        gtk_grid_attach(g, etikettNeu(namen[i]), 0, i, 1, 1)
+        gtk_grid_attach(g, f, 1, i, 1, 1)
+    NEXT
+    DIM h AS INTEGER : h = etikettNeu(hilfe)
+    gtk_label_set_line_wrap(h, TRUE)
+    gtk_grid_attach(g, h, 0, LEN(namen), 2, 1)
+    gtk_box_pack_start(gtk_dialog_get_content_area(d), g, TRUE, TRUE, 0)
+    gtk_widget_show_all(d)
+    gDlg = d
+    gDlgFeld1 = 0 : gDlgFeld2 = 0 : gDlgFeld3 = 0 : gDlgFeld4 = 0
+    IF LEN(felder) > 0 THEN gDlgFeld1 = felder[0]
+    IF LEN(felder) > 1 THEN gDlgFeld2 = felder[1]
+    IF LEN(felder) > 2 THEN gDlgFeld3 = felder[2]
+    IF LEN(felder) > 3 THEN gDlgFeld4 = felder[3]
+    DIM ok AS BOOLEAN : ok = gtk_dialog_run(d) = GTK_ANTWORT_OK
+    FOR i = 0 TO LEN(felder) - 1
+        werte[i] = TRIM$(gtk_entry_get_text(felder[i]))
+    NEXT
+    gDlg = 0 : gDlgFeld1 = 0 : gDlgFeld2 = 0 : gDlgFeld3 = 0 : gDlgFeld4 = 0
+    gtk_widget_destroy(d)
+    RETURN ok
+END FUNCTION
+
+' Felder pruefen: jedes eine Zahl > 0 (Vcc darf jede Zahl sein)
+FUNCTION simFelderOk(namen AS ARRAY OF STRING, werte AS ARRAY OF STRING, letzteBeliebig AS BOOLEAN) AS BOOLEAN
+    DIM i AS INTEGER
+    DIM v AS FLOAT
+    FOR i = 0 TO LEN(werte) - 1
+        IF NOT kern.siZahl(werte[i], v) THEN
+            meldung(namen[i] + " '" + werte[i] + "' ist keine Zahl (Beispiele: 10m, 4k7, 1M, 2.2u).")
+            RETURN FALSE
+        END IF
+        IF v <= 0 AND NOT (letzteBeliebig AND i = LEN(werte) - 1) THEN
+            meldung(namen[i] + " muss groesser als null sein.")
+            RETURN FALSE
+        END IF
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+SUB simZeitverlauf()
+    simVorgaben()
+    DIM namen AS ARRAY OF STRING : namen = ["Dauer (s):", "Schritt (s):", "VCC/VDD (V):"]
+    DIM werte AS ARRAY OF STRING : werte = [gSimDauer, gSimSchritt, gSimVcc]
+    IF NOT simDialog("Zeitverlauf", namen, werte, "Mit Vorsatz: 10m = 10 ms, 10u = 10 µs. VCC gilt fuer Versorgungen ohne Zahl im Namen; +5V oder 3V3 rechnen mit ihrer Spannung.") THEN RETURN
+    IF NOT simFelderOk(namen, werte, TRUE) THEN RETURN
+    DIM d AS FLOAT, s AS FLOAT
+    DIM ok AS BOOLEAN : ok = kern.siZahl(werte[0], d) AND kern.siZahl(werte[1], s)
+    IF d / s > 1000000 THEN
+        meldung("Dauer/Schritt ergibt mehr als eine Million Punkte -- den Schritt groesser waehlen.")
+        RETURN
+    END IF
+    gSimDauer = werte[0]
+    gSimSchritt = werte[1]
+    gSimVcc = werte[2]
+    DIM r AS kern.SimErgebnis
+    IF NOT simAusfuehren(simEinstellung(kern.SIM_TRAN), r) THEN RETURN
+    gSpMeldung = "Zeitverlauf: " + STR$(LEN(r.x)) + " Zeitpunkte bis " + kern.siText$(d, "s")
+    statusAktualisieren()
+    simFensterZeigen(r)
+END SUB
+
+SUB simFrequenzgang()
+    simVorgaben()
+    DIM namen AS ARRAY OF STRING : namen = ["von (Hz):", "bis (Hz):", "Punkte je Dekade:", "VCC/VDD (V):"]
+    DIM werte AS ARRAY OF STRING : werte = [gSimFStart, gSimFEnde, gSimPunkte, gSimVcc]
+    IF NOT simDialog("Frequenzgang", namen, werte, "Angeregt wird mit dem AC-Anteil der Quellen (Wert z. B. 'AC 1' oder 'SIN(0 1 1k) AC 1'). 1M = 1 MHz.") THEN RETURN
+    IF NOT simFelderOk(namen, werte, TRUE) THEN RETURN
+    DIM a AS FLOAT, b AS FLOAT
+    DIM ok AS BOOLEAN : ok = kern.siZahl(werte[0], a) AND kern.siZahl(werte[1], b)
+    IF b <= a THEN
+        meldung("'bis' muss ueber 'von' liegen.")
+        RETURN
+    END IF
+    gSimFStart = werte[0]
+    gSimFEnde = werte[1]
+    gSimPunkte = werte[2]
+    gSimVcc = werte[3]
+    DIM r AS kern.SimErgebnis
+    IF NOT simAusfuehren(simEinstellung(kern.SIM_AC), r) THEN RETURN
+    gSpMeldung = "Frequenzgang: " + kern.siText$(a, "Hz") + " bis " + kern.siText$(b, "Hz")
+    statusAktualisieren()
+    simFensterZeigen(r)
+END SUB
+
+SUB simDeckZeigen()
+    DIM r AS kern.SimErgebnis : r = NEW kern.SimErgebnis(kern.SIM_OP)
+    DIM z AS ARRAY OF STRING : z = kern.simDeck(gDok, simEinstellung(kern.SIM_OP), r)
+    DIM t AS STRING : t = JOIN$(z, CHR$(10))
+    IF LEN(r.hinweise) > 0 THEN t = t + CHR$(10) + CHR$(10) + "* Hinweise:" + CHR$(10) + "* " + JOIN$(r.hinweise, CHR$(10) + "* ")
+    DIM ng AS STRING : ng = kern.ngspiceSuchen$()
+    t = t + CHR$(10) + CHR$(10) + "* ngspice: " + IIF(ng = "", "nicht gefunden", ng)
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("SPICE-Deck (Arbeitspunkt)", gFenster, 0, "Schliessen", GTK_ANTWORT_OK, NIL)
+    DIM sw AS INTEGER : sw = gtk_scrolled_window_new(0, 0)
+    gtk_widget_set_size_request(sw, 640, 420)
+    DIM tv AS INTEGER : tv = gtk_text_view_new()
+    gtk_text_view_set_editable(tv, FALSE)
+    gtkKlasse(tv, "mono")
+    gtk_text_buffer_set_text(gtk_text_view_get_buffer(tv), t, -1)
+    gtk_container_add(sw, tv)
+    gtk_box_pack_start(gtk_dialog_get_content_area(d), sw, TRUE, TRUE, 0)
+    signalAntwort(d, "response", simDeckZu, 0, 0, 0)
+    gtk_widget_show_all(d)
+END SUB
+
+SUB simDeckZu(dlg AS INTEGER, antwort AS INTEGER, daten AS INTEGER)
+    gtk_widget_destroy(dlg)
+END SUB
+
+' --- Spannungen im Schaltplan ------------------------------------------------
+
+' Je Netz und Blatt eine Marke: am ersten Label, sonst in der Mitte des
+' laengsten Drahtstuecks, sonst am ersten Pin. Masse und Versorgungen nicht
+' (deren Spannung steht schon da).
+SUB simMarkenBauen(r AS kern.SimErgebnis)
+    gSimMarken = []
+    ' je Instanz eigene Spannungen: ueber die ausgerollte Sicht
+    DIM f AS kern.Dokument : f = aktuellesFlach()
+    DIM n AS kern.Netze : n = kern.netzeDokument(f)
+    DIM fi AS INTEGER, i AS INTEGER, j AS INTEGER
+    FOR fi = 0 TO LEN(f.blaetter) - 1
+        n.blattWaehlen(fi)
+        DIM bl AS kern.Blatt : bl = f.blaetter[fi]
+        DIM bi AS INTEGER : bi = IIF(bl.quelle >= 0, bl.quelle, fi)
+        gSimMarkeInstanz = bl.instanz
+        DIM da AS MAP OF INTEGER
+        da = {}                           ' je Blatt frisch (DIM in der Schleife tut es nicht)
+        FOR i = 0 TO LEN(bl.labels) - 1
+            simMarkeDazu(r, n, bi, bl.labels[i].anker.x, bl.labels[i].anker.y, da)
+        NEXT
+        FOR i = 0 TO LEN(bl.draehte) - 1
+            DIM w AS kern.Draht : w = bl.draehte[i]
+            IF LEN(w.punkte) < 2 THEN CONTINUE
+            DIM best AS INTEGER : best = 0
+            DIM bestL AS INTEGER : bestL = -1
+            FOR j = 0 TO LEN(w.punkte) - 2
+                DIM l AS INTEGER : l = ABS(w.punkte[j + 1].x - w.punkte[j].x) + ABS(w.punkte[j + 1].y - w.punkte[j].y)
+                IF l > bestL THEN
+                    bestL = l
+                    best = j
+                END IF
+            NEXT
+            DIM mx AS INTEGER : mx = (w.punkte[best].x + w.punkte[best + 1].x) \ 2
+            DIM my AS INTEGER : my = (w.punkte[best].y + w.punkte[best + 1].y) \ 2
+            ' das Netz am Drahtende (die Mitte liegt evtl. neben dem Raster)
+            DIM ni AS INTEGER : ni = n.netzAn(w.punkte[0].x, w.punkte[0].y)
+            simMarkeNetz(r, n, ni, bi, mx, my, da)
+        NEXT
+        FOR i = 0 TO LEN(bl.bauteile) - 1
+            DIM b AS kern.Bauteil : b = bl.bauteile[i]
+            IF b.sym.einheitLeistung OR b.sym.blattSymbol THEN CONTINUE
+            FOR j = 0 TO LEN(b.sym.pins) - 1
+                DIM pp AS kern.Punkt : pp = b.pinPunkt(j)
+                simMarkeDazu(r, n, bi, pp.x, pp.y, da)
+            NEXT
+        NEXT
+    NEXT
+END SUB
+
+SUB simMarkeDazu(r AS kern.SimErgebnis, n AS kern.Netze, bi AS INTEGER, x AS INTEGER, y AS INTEGER, BYREF da AS MAP OF INTEGER)
+    simMarkeNetz(r, n, n.netzAn(x, y), bi, x, y, da)
+END SUB
+
+SUB simMarkeNetz(r AS kern.SimErgebnis, n AS kern.Netze, ni AS INTEGER, bi AS INTEGER, x AS INTEGER, y AS INTEGER, BYREF da AS MAP OF INTEGER)
+    IF ni < 0 THEN RETURN
+    DIM nz AS kern.Netz : nz = n.liste[ni]
+    IF MAPHAS(da, nz.name) OR LEN(nz.versorgungen) > 0 THEN RETURN
+    DIM v AS FLOAT
+    IF NOT r.spannung(nz.name, v) THEN RETURN
+    MAPPUT(da, nz.name, 1)
+    DIM mk AS SimMarke : mk = NEW SimMarke(bi, x, y, kern.siText$(v, "V"))
+    mk.instanz = gSimMarkeInstanz
+    ARRAY_PUSH(gSimMarken, mk)
+END SUB
+
+SUB simVeraltet()
+    ' ein offenes Ergebnisfenster zeigt den alten Stand -- das sagt es dann
+    IF gSimDlg <> 0 AND gSimInfo <> 0 AND NOT CONTAINS(gSimHinweisText, "VERALTET") THEN
+        gSimHinweisText = "VERALTET: der Schaltplan wurde geaendert -- neu rechnen. " + gSimHinweisText
+        simInfoSetzen("")
+    END IF
+    IF NOT gSimOpDa AND LEN(gSimMarken) = 0 THEN RETURN
+    gSimOpDa = FALSE
+    gSimMarken = []
+END SUB
+
+SUB simMarkenZeichnen(cr AS INTEGER)
+    IF gDruck OR LEN(gSimMarken) = 0 THEN RETURN
+    DIM hier AS INTEGER : hier = aktuellerBlattIndex()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gSimMarken) - 1
+        DIM m AS SimMarke : m = gSimMarken[i]
+        IF m.blatt <> hier THEN CONTINUE
+        IF m.instanz <> "" AND m.instanz <> aktuellerPfad$() THEN CONTINUE
+        DIM x AS FLOAT : x = sx(m.x) + 6
+        DIM y AS FLOAT : y = sy(m.y) + 14          ' unter dem Draht, der Label-Text steht darueber
+        DIM b AS FLOAT : b = LEN(m.text) * 6.6 + 8
+        cairoFarbe(cr, C_SIM_GRUND)
+        cairo_rectangle(cr, x, y - 8, b, 16)
+        cairo_fill(cr)
+        cairoFarbe(cr, C_SIM)
+        cairo_set_line_width(cr, 1.0)
+        cairo_rectangle(cr, x, y - 8, b, 16)
+        cairo_stroke(cr)
+        lwTextAus(cr, x + 4, y, m.text, C_SIM, 0, gSchrift)
+    NEXT
+END SUB
+
+' Fuer die Statuszeile: " = 4.98 V", wenn ein Arbeitspunkt da ist
+FUNCTION simSpannungText$(netz AS STRING) AS STRING
+    IF NOT gSimOpDa THEN RETURN ""
+    DIM v AS FLOAT
+    IF NOT gSimOp.spannung(netz, v) THEN RETURN ""
+    RETURN " = " + kern.siText$(v, "V")
+END FUNCTION
+
+' --- Ergebnisfenster -----------------------------------------------------------
+
+SUB simZu(dlg AS INTEGER, antwort AS INTEGER, daten AS INTEGER)
+    gtk_widget_destroy(dlg)
+    gSimDlg = 0
+    gSimFlaeche = 0
+    gSimInfo = 0
+END SUB
+
+SUB aufSimHaken(knopf AS INTEGER, daten AS INTEGER)
+    IF daten < 0 OR daten >= LEN(gSimSichtbar) THEN RETURN
+    gSimSichtbar[daten] = gtk_toggle_button_get_active(knopf)
+    IF gSimFlaeche <> 0 THEN gtk_widget_queue_draw(gSimFlaeche)
+END SUB
+
+FUNCTION simBewegung(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ev, px, py)
+    gSimMausDrin = TRUE
+    gSimMausX = px
+    gtk_widget_queue_draw(w)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION simVerlassen(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    gSimMausDrin = FALSE
+    gtk_widget_queue_draw(w)
+    simInfoSetzen("")
+    RETURN FALSE
+END FUNCTION
+
+SUB simInfoSetzen(cursor AS STRING)
+    IF gSimInfo = 0 THEN RETURN
+    DIM t AS STRING : t = cursor
+    IF gSimHinweisText <> "" THEN t = IIF(t = "", "", t + CHR$(10)) + gSimHinweisText
+    gtk_label_set_text(gSimInfo, t)
+END SUB
+
+' Welche Netze anfangs gezeigt werden: die mit Label-Namen (keine
+' Versorgung, kein N1 ...); gibt es keine, die ersten sechs.
+FUNCTION simVorauswahl(r AS kern.SimErgebnis) AS ARRAY OF BOOLEAN
+    DIM s AS ARRAY OF BOOLEAN : s = []
+    DIM n AS kern.Netze : n = kern.netzeDokument(gDok)
+    DIM benannt AS MAP OF INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(n.liste) - 1
+        IF NOT n.liste[i].automatisch AND LEN(n.liste[i].versorgungen) = 0 THEN MAPPUT(benannt, n.liste[i].name, 1)
+    NEXT
+    DIM irgendeins AS BOOLEAN : irgendeins = FALSE
+    FOR i = 0 TO LEN(r.netze) - 1
+        DIM an AS BOOLEAN : an = MAPHAS(benannt, r.netze[i].name)
+        ' im Frequenzgang: ein Netz ohne Wechselanteil waere eine -240-dB-Linie
+        IF an AND r.analyse = kern.SIM_AC THEN an = simHatWechsel(r.netze[i])
+        ARRAY_PUSH(s, an)
+        IF s[i] THEN irgendeins = TRUE
+    NEXT
+    IF NOT irgendeins THEN
+        FOR i = 0 TO MIN(LEN(s), 6) - 1
+            s[i] = TRUE
+        NEXT
+    END IF
+    RETURN s
+END FUNCTION
+
+FUNCTION simHatWechsel(k AS kern.SimKurve) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(k.re) - 1
+        IF k.betragDb(i) > -200 THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+SUB simFensterZeigen(r AS kern.SimErgebnis)
+    IF gSimDlg <> 0 THEN
+        gtk_widget_destroy(gSimDlg)
+        gSimDlg = 0
+    END IF
+    gSimErg = r
+    gSimSichtbar = simVorauswahl(r)
+    gSimMausDrin = FALSE
+    gSimHinweisText = ""
+    IF LEN(r.hinweise) > 0 THEN gSimHinweisText = "Hinweise: " + JOIN$(r.hinweise, " -- ")
+    DIM titel AS STRING : titel = "Simulation: Arbeitspunkt"
+    IF r.analyse = kern.SIM_TRAN THEN titel = "Simulation: Zeitverlauf"
+    IF r.analyse = kern.SIM_AC THEN titel = "Simulation: Frequenzgang"
+    gSimDlg = gtk_dialog_new_with_buttons(titel, gFenster, 0, "Schliessen", GTK_ANTWORT_OK, NIL)
+    gtk_window_set_default_size(gSimDlg, 900, 540)
+    DIM vb AS INTEGER : vb = gtk_box_new(GTK_SENKRECHT, 6)
+    gtk_container_set_border_width(vb, 8)
+    DIM hb AS INTEGER : hb = gtk_box_new(GTK_WAAGERECHT, 8)
+    gSimFlaeche = gtk_drawing_area_new()
+    gtk_widget_set_size_request(gSimFlaeche, 560, 360)
+    gtk_widget_set_hexpand(gSimFlaeche, TRUE)
+    gtk_widget_set_vexpand(gSimFlaeche, TRUE)
+    gtk_widget_add_events(gSimFlaeche, GDK_MASKE_BEWEGUNG BOR GDK_MASKE_VERLASSEN)
+    signalZeichnen(gSimFlaeche, "draw", simZeichnen, 0, 0, 0)
+    signalEreignis(gSimFlaeche, "motion-notify-event", simBewegung, 0, 0, 0)
+    signalEreignis(gSimFlaeche, "leave-notify-event", simVerlassen, 0, 0, 0)
+    gtk_box_pack_start(hb, gSimFlaeche, TRUE, TRUE, 0)
+    IF r.analyse <> kern.SIM_OP THEN
+        ' Haken je Netz
+        DIM rechts AS INTEGER : rechts = gtk_box_new(GTK_SENKRECHT, 2)
+        gtk_box_pack_start(rechts, etikettNeu("Netze"), FALSE, FALSE, 0)
+        DIM sw AS INTEGER : sw = gtk_scrolled_window_new(0, 0)
+        gtk_widget_set_size_request(sw, 170, 200)
+        gtk_widget_set_vexpand(sw, TRUE)
+        DIM liste AS INTEGER : liste = gtk_box_new(GTK_SENKRECHT, 0)
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(r.netze) - 1
+            DIM k AS INTEGER : k = gtk_check_button_new_with_label(r.netze[i].name)
+            gtk_toggle_button_set_active(k, gSimSichtbar[i])
+            signal(k, "toggled", aufSimHaken, i, 0, 0)
+            gtk_box_pack_start(liste, k, FALSE, FALSE, 0)
+        NEXT
+        gtk_container_add(sw, liste)
+        gtk_box_pack_start(rechts, sw, TRUE, TRUE, 0)
+        gtk_box_pack_start(hb, rechts, FALSE, FALSE, 0)
+    END IF
+    gtk_box_pack_start(vb, hb, TRUE, TRUE, 0)
+    gSimInfo = etikettNeu("")
+    gtk_label_set_line_wrap(gSimInfo, TRUE)
+    gtk_box_pack_start(vb, gSimInfo, FALSE, FALSE, 0)
+    gtk_box_pack_start(gtk_dialog_get_content_area(gSimDlg), vb, TRUE, TRUE, 0)
+    signalAntwort(gSimDlg, "response", simZu, 0, 0, 0)
+    gtk_widget_show_all(gSimDlg)
+    simInfoSetzen(IIF(r.analyse = kern.SIM_OP, "", "Maus ueber die Kurven: Werte ablesen."))
+END SUB
+
+FUNCTION simZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM b AS FLOAT : b = gtk_widget_get_allocated_width(w)
+    DIM h AS FLOAT : h = gtk_widget_get_allocated_height(w)
+    cairoFarbe(cr, C_HG)
+    cairo_paint(cr)
+    IF gSimErg.analyse = kern.SIM_OP THEN
+        simTabelleZeichnen(cr, b, h)
+    ELSE
+        simPlotZeichnen(cr, b, h)
+    END IF
+    RETURN TRUE
+END FUNCTION
+
+SUB simTabelleZeichnen(cr AS INTEGER, b AS FLOAT, h AS FLOAT)
+    DIM y AS FLOAT : y = 22
+    DIM i AS INTEGER
+    lwTextAus(cr, 16, y, "Netz", C_TEXT, 0, gSchrift)
+    lwTextAus(cr, 260, y, "Spannung", C_TEXT, 2, gSchrift)
+    y = y + 22
+    FOR i = 0 TO LEN(gSimErg.netze) - 1
+        IF y > h - 10 THEN BREAK
+        lwTextAus(cr, 16, y, gSimErg.netze[i].name, C_WERT, 0, gSchrift)
+        IF LEN(gSimErg.netze[i].re) > 0 THEN lwTextAus(cr, 260, y, kern.siText$(gSimErg.netze[i].re[0], "V"), C_SIM, 2, gSchrift)
+        y = y + 18
+    NEXT
+    y = 22
+    lwTextAus(cr, 320, y, "Quelle", C_TEXT, 0, gSchrift)
+    lwTextAus(cr, 560, y, "liefert", C_TEXT, 2, gSchrift)
+    y = y + 22
+    FOR i = 0 TO LEN(gSimErg.stroeme) - 1
+        IF y > h - 10 THEN BREAK
+        lwTextAus(cr, 320, y, gSimErg.stroeme[i].name, C_WERT, 0, gSchrift)
+        IF LEN(gSimErg.stroeme[i].re) > 0 THEN lwTextAus(cr, 560, y, kern.siText$(gSimErg.stroeme[i].re[0], "A"), C_SIM, 2, gSchrift)
+        y = y + 18
+    NEXT
+END SUB
+
+' 1-2-5-Schritt fuer etwa so viele Teile
+FUNCTION simSchritt(spanne AS FLOAT, teile AS INTEGER) AS FLOAT
+    DIM roh AS FLOAT : roh = spanne / teile
+    IF roh <= 0 THEN RETURN 1
+    DIM p AS FLOAT : p = 10 ^ FLOOR(LOG10(roh))
+    DIM m AS FLOAT : m = roh / p
+    IF m <= 1 THEN RETURN p
+    IF m <= 2 THEN RETURN 2 * p
+    IF m <= 5 THEN RETURN 5 * p
+    RETURN 10 * p
+END FUNCTION
+
+' y-Wert einer Kurve: Spannung bzw. Betrag in dB
+FUNCTION simWert(k AS kern.SimKurve, i AS INTEGER) AS FLOAT
+    IF gSimErg.analyse = kern.SIM_AC THEN RETURN k.betragDb(i)
+    RETURN k.re[i]
+END FUNCTION
+
+SUB simPlotZeichnen(cr AS INTEGER, b AS FLOAT, h AS FLOAT)
+    DIM r AS kern.SimErgebnis : r = gSimErg
+    DIM ac AS BOOLEAN : ac = r.analyse = kern.SIM_AC
+    DIM links AS FLOAT : links = 74
+    DIM oben AS FLOAT : oben = 14
+    DIM pw AS FLOAT : pw = b - links - 34
+    DIM ph AS FLOAT : ph = h - oben - 36
+    gSimPlotL = links
+    gSimPlotB = pw
+    DIM n AS INTEGER : n = LEN(r.x)
+    IF n < 2 OR pw < 50 OR ph < 50 THEN RETURN
+    ' x-Bereich
+    DIM x0 AS FLOAT : x0 = r.x[0]
+    DIM x1 AS FLOAT : x1 = r.x[n - 1]
+    IF ac THEN
+        x0 = LOG10(MAX(x0, 0.000000001))
+        x1 = LOG10(MAX(x1, 0.000000001))
+    END IF
+    IF x1 <= x0 THEN x1 = x0 + 1
+    ' y-Bereich ueber die gezeigten Kurven
+    DIM y0 AS FLOAT : y0 = 1000000000000000.0
+    DIM y1 AS FLOAT : y1 = -1000000000000000.0
+    DIM i AS INTEGER, k AS INTEGER
+    DIM gezeigt AS INTEGER : gezeigt = 0
+    FOR k = 0 TO LEN(r.netze) - 1
+        IF NOT gSimSichtbar[k] THEN CONTINUE
+        gezeigt = gezeigt + 1
+        FOR i = 0 TO MIN(n, LEN(r.netze[k].re)) - 1
+            DIM v AS FLOAT : v = simWert(r.netze[k], i)
+            IF v < y0 THEN y0 = v
+            IF v > y1 THEN y1 = v
+        NEXT
+    NEXT
+    IF gezeigt = 0 THEN
+        lwTextAus(cr, b / 2, h / 2, "Rechts ein Netz anhaken.", C_TEXT, 1, gSchrift)
+        RETURN
+    END IF
+    IF y1 - y0 < 0.000001 THEN
+        y0 = y0 - 1
+        y1 = y1 + 1
+    END IF
+    DIM ys AS FLOAT : ys = simSchritt(y1 - y0, 6)
+    y0 = FLOOR(y0 / ys) * ys
+    y1 = CEIL(y1 / ys) * ys
+    ' Gitter und Beschriftung
+    cairo_set_line_width(cr, 1.0)
+    DIM yv AS FLOAT : yv = y0
+    WHILE yv <= y1 + ys * 0.001
+        DIM py AS FLOAT : py = oben + ph - (yv - y0) / (y1 - y0) * ph
+        cairoFarbe(cr, C_RASTER_GROB)
+        cairo_move_to(cr, links, py)
+        cairo_line_to(cr, links + pw, py)
+        cairo_stroke(cr)
+        DIM yt AS STRING
+        IF ac THEN yt = FORMAT$(yv, "%.0f") + " dB" ELSE yt = kern.siText$(yv, "V")
+        lwTextAus(cr, links - 6, py, yt, C_TEXT, 2, gSchrift)
+        yv = yv + ys
+    WEND
+    IF ac THEN
+        DIM dek AS INTEGER
+        FOR dek = FLOOR(x0) TO CEIL(x1)
+            DIM m AS INTEGER
+            FOR m = 1 TO 9
+                DIM lx AS FLOAT : lx = dek + LOG10(m)
+                IF lx < x0 - 0.0001 OR lx > x1 + 0.0001 THEN CONTINUE
+                DIM pxl AS FLOAT : pxl = links + (lx - x0) / (x1 - x0) * pw
+                cairoFarbe(cr, IIF(m = 1, C_RASTER_GROB, C_RASTER))
+                cairo_move_to(cr, pxl, oben)
+                cairo_line_to(cr, pxl, oben + ph)
+                cairo_stroke(cr)
+                IF m = 1 THEN lwTextAus(cr, pxl, oben + ph + 14, kern.siText$(10 ^ dek, "Hz"), C_TEXT, 1, gSchrift)
+            NEXT
+        NEXT
+    ELSE
+        DIM xs AS FLOAT : xs = simSchritt(x1 - x0, 8)
+        DIM xv AS FLOAT : xv = CEIL(x0 / xs) * xs
+        WHILE xv <= x1 + xs * 0.001
+            DIM pxt AS FLOAT : pxt = links + (xv - x0) / (x1 - x0) * pw
+            cairoFarbe(cr, C_RASTER_GROB)
+            cairo_move_to(cr, pxt, oben)
+            cairo_line_to(cr, pxt, oben + ph)
+            cairo_stroke(cr)
+            lwTextAus(cr, pxt, oben + ph + 14, kern.siText$(xv, "s"), C_TEXT, 1, gSchrift)
+            xv = xv + xs
+        WEND
+    END IF
+    cairoFarbe(cr, C_TEXT)
+    cairo_rectangle(cr, links, oben, pw, ph)
+    cairo_stroke(cr)
+    ' Kurven
+    cairo_set_line_width(cr, 1.6)
+    DIM farbe AS INTEGER : farbe = 0
+    DIM legY AS FLOAT : legY = oben + 12
+    FOR k = 0 TO LEN(r.netze) - 1
+        IF NOT gSimSichtbar[k] THEN CONTINUE
+        cairoFarbe(cr, simFarbe(k))
+        FOR i = 0 TO MIN(n, LEN(r.netze[k].re)) - 1
+            DIM xx AS FLOAT : xx = r.x[i]
+            IF ac THEN xx = LOG10(MAX(xx, 0.000000001))
+            DIM qx AS FLOAT : qx = links + (xx - x0) / (x1 - x0) * pw
+            DIM qy AS FLOAT : qy = oben + ph - (simWert(r.netze[k], i) - y0) / (y1 - y0) * ph
+            IF i = 0 THEN cairo_move_to(cr, qx, qy) ELSE cairo_line_to(cr, qx, qy)
+        NEXT
+        cairo_stroke(cr)
+        ' Legende
+        cairo_move_to(cr, links + 10, legY)
+        cairo_line_to(cr, links + 30, legY)
+        cairo_stroke(cr)
+        lwTextAus(cr, links + 36, legY, r.netze[k].name, simFarbe(k), 0, gSchrift)
+        legY = legY + 16
+    NEXT
+    ' Ablesen an der Maus
+    IF gSimMausDrin AND gSimMausX >= links AND gSimMausX <= links + pw THEN
+        DIM xm AS FLOAT : xm = x0 + (gSimMausX - links) / pw * (x1 - x0)
+        IF ac THEN xm = 10 ^ xm
+        DIM ix AS INTEGER : ix = 0
+        FOR i = 1 TO n - 1
+            IF ABS(r.x[i] - xm) < ABS(r.x[ix] - xm) THEN ix = i
+        NEXT
+        cairoFarbe(cr, C_HOVER)
+        cairo_set_line_width(cr, 1.0)
+        cairo_move_to(cr, gSimMausX, oben)
+        cairo_line_to(cr, gSimMausX, oben + ph)
+        cairo_stroke(cr)
+        DIM t AS STRING : t = IIF(ac, "f = " + kern.siText$(r.x[ix], "Hz"), "t = " + kern.siText$(r.x[ix], "s"))
+        FOR k = 0 TO LEN(r.netze) - 1
+            IF NOT gSimSichtbar[k] OR ix >= LEN(r.netze[k].re) THEN CONTINUE
+            IF ac THEN
+                t = t + "    " + r.netze[k].name + " " + FORMAT$(r.netze[k].betragDb(ix), "%.1f") + " dB / " + FORMAT$(r.netze[k].phase(ix), "%.0f") + "°"
+            ELSE
+                t = t + "    " + r.netze[k].name + " " + kern.siText$(r.netze[k].re[ix], "V")
+            END IF
+        NEXT
+        simInfoSetzen(t)
+    END IF
+END SUB

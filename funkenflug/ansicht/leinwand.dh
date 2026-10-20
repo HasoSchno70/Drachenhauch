@@ -1,0 +1,860 @@
+' Zeichenflaeche von Funkenflug. Globaler Namensraum (ohne AS eingebunden),
+' teilt Zustand und SUBs mit main.dh und werkzeuge.dh.
+'
+' Welt: Modell-Einheiten (0.01 mm). Schirm: Pixel. vZoom Pixel je Einheit,
+' (vX, vY) Verschiebung.  screen = welt * vZoom + v   /   welt = (screen - v) / vZoom
+'
+' Bauteile werden ueber EINE Cairo-Matrix gezeichnet, die kern.transformPunkt
+' exakt nachbildet (translate -> scale -> [spiegeln] -> drehen). Dadurch liegen
+' gezeichnete und elektrische Pins per Konstruktion uebereinander.
+
+CONST PI = 3.141592653589793
+
+CONST WZ_AUSWAHL = 0
+CONST WZ_DRAHT = 1
+CONST WZ_BAUTEIL = 2
+CONST WZ_LABEL = 3
+CONST WZ_MESSEN = 4
+CONST WZ_BUS = 5
+
+' Farben (dunkles Thema)
+CONST C_HG = &H12131A
+CONST C_RASTER = &H21232D
+CONST C_RASTER_GROB = &H2C2F3C
+CONST C_DRAHT = &H4FA3FF
+CONST C_BAUTEIL = &HD7DCE8
+CONST C_PIN = &HFF8A3D
+CONST C_TEXT = &HAEB4C4
+CONST C_WERT = &HE6E6F0
+CONST C_AUSWAHL = &HFF8A3D
+CONST C_GEIST = &H556070
+CONST C_KNOTEN = &H4FA3FF
+CONST C_LABEL = &H8FE0A0
+CONST C_DRAHT_VERS = &HFF6B6B      ' Versorgung
+CONST C_DRAHT_MASSE = &HA0A8B8     ' Masse
+CONST C_BUS = &H8B7CF6             ' Bus
+
+' Fangradius in Einheiten (fuer Pin-/Drahtende-Fang)
+CONST FANG = 150
+
+DIM gDok AS kern.Dokument
+DIM gBlatt AS kern.Blatt
+DIM gWerkzeug AS INTEGER
+DIM gSymbolRef AS STRING
+DIM gFlaeche AS INTEGER
+DIM gSchrift AS INTEGER
+DIM gSchriftPin AS INTEGER       ' Pin-Texte, Groesse folgt dem Zoom
+
+' Druckmodus: dieselbe Zeichenroutine, andere Farben (fuer Weiss), duennere
+' Linien, ohne Raster, Pin-Punkte, Auswahl und Hervorhebung.
+DIM gDruck AS BOOLEAN
+DIM gStrich AS FLOAT              ' Grund-Linienstaerke in Geraete-Einheiten
+
+FUNCTION druckFarbe(c AS INTEGER) AS INTEGER
+    SELECT CASE c
+        CASE C_HG : RETURN &HFFFFFF
+        CASE C_DRAHT, C_KNOTEN : RETURN &H1A4E9C
+        CASE C_DRAHT_VERS : RETURN &HB01E1E
+        CASE C_DRAHT_MASSE : RETURN &H555555
+        CASE C_BUS : RETURN &H4A2FB0
+        CASE C_BAUTEIL : RETURN &H8C1D18
+        CASE C_TEXT : RETURN &H333333
+        CASE C_WERT : RETURN &H1F1F1F
+        CASE C_LABEL : RETURN &H1F6B33
+        CASE C_ERC_FEHLER : RETURN &HC00000
+    END SELECT
+    RETURN &H000000
+END FUNCTION
+
+SUB zeichenFarbe(cr AS INTEGER, c AS INTEGER)
+    IF gDruck THEN
+        cairoFarbe(cr, druckFarbe(c))
+    ELSE
+        cairoFarbe(cr, c)
+    END IF
+END SUB
+
+DIM vX AS FLOAT
+DIM vY AS FLOAT
+DIM vZoom AS FLOAT
+DIM vEingepasst AS BOOLEAN
+
+DIM gMausDrin AS BOOLEAN
+DIM gMausWX AS INTEGER          ' gefangene Welt-Mausposition
+DIM gMausWY AS INTEGER
+DIM gMausRX AS FLOAT            ' rohe Welt-Mausposition
+DIM gMausRY AS FLOAT
+
+DIM gGewaehlt AS kern.Bauteil
+DIM gHatGewaehlt AS BOOLEAN
+DIM gZieht AS BOOLEAN
+DIM gZiehDX AS INTEGER
+DIM gZiehDY AS INTEGER
+DIM gZiehGemerkt AS BOOLEAN      ' Undo-Schnappschuss fuer diesen Zug schon genommen?
+
+DIM gLabelGewaehlt AS kern.Label ' Auswahl ist entweder ein Bauteil, ein Label ODER ein Draht
+DIM gHatLabel AS BOOLEAN
+DIM gDrahtGewaehlt AS kern.Draht
+DIM gHatDraht AS BOOLEAN
+DIM gSegment AS INTEGER          ' gewaehltes Segment (Ecke gSegment .. gSegment+1)
+DIM gDrahtKlickX AS INTEGER      ' Rasterpunkt auf dem Segment, wo geklickt wurde
+DIM gDrahtKlickY AS INTEGER
+DIM gDrahtOrig AS ARRAY OF kern.Punkt   ' Ecken bei Zugbeginn
+DIM gZiehStartX AS INTEGER
+DIM gZiehStartY AS INTEGER
+
+' Netze: einmal je Aenderung berechnet (netzeVeraltet() macht sie ungueltig)
+DIM gNetze AS kern.Netze
+DIM gNetzeGueltig AS BOOLEAN
+' Netz unter der Maus: ein Blattpunkt des Netzes, -1 = keins
+DIM gHoverX AS INTEGER
+DIM gHoverY AS INTEGER
+DIM gHoverAktiv AS BOOLEAN
+
+' ERC-Ergebnis, solange der ERC-Dialog offen ist
+DIM gErc AS ARRAY OF kern.Verstoss
+DIM gErcSichtbar AS BOOLEAN
+DIM gErcGewaehlt AS INTEGER
+
+CONST C_HOVER = &H9CD2FF
+CONST C_ERC_FEHLER = &HFF5A5A
+CONST C_ERC_WARNUNG = &HFFC23D
+
+DIM gPan AS BOOLEAN
+DIM gPanSX AS FLOAT
+DIM gPanSY AS FLOAT
+
+DIM gDrahtAktiv AS BOOLEAN
+DIM gDrahtPunkte AS ARRAY OF kern.Punkt
+
+DIM gPlatzDreh AS INTEGER
+DIM gPlatzSpiegel AS BOOLEAN
+DIM gLabelDreh AS INTEGER         ' Richtung des naechsten Labels (R/X/Y im Label-Werkzeug)
+DIM gGeaendert AS BOOLEAN
+DIM gPfad AS STRING
+DIM gNameVorschlag AS STRING          ' Speichern-unter-Name nach einem Import
+
+' --- Welt <-> Schirm
+FUNCTION sx(wx AS FLOAT) AS FLOAT : RETURN wx * vZoom + vX : END FUNCTION
+FUNCTION sy(wy AS FLOAT) AS FLOAT : RETURN wy * vZoom + vY : END FUNCTION
+FUNCTION weltX(px AS FLOAT) AS FLOAT : RETURN (px - vX) / vZoom : END FUNCTION
+FUNCTION weltY(px AS FLOAT) AS FLOAT : RETURN (px - vY) / vZoom : END FUNCTION
+
+FUNCTION leinwandNeu() AS INTEGER
+    gFlaeche = gtk_drawing_area_new()
+    gtk_widget_set_hexpand(gFlaeche, TRUE)
+    gtk_widget_set_vexpand(gFlaeche, TRUE)
+    gtk_widget_set_can_focus(gFlaeche, TRUE)
+    gtk_widget_add_events(gFlaeche, GDK_MASKE_BEWEGUNG BOR GDK_MASKE_DRUCK BOR GDK_MASKE_LOSLASSEN BOR GDK_MASKE_RAD BOR GDK_MASKE_RAD_FEIN BOR GDK_MASKE_VERLASSEN)
+    signalZeichnen(gFlaeche, "draw", lwZeichnen, 0, 0, 0)
+    signalEreignis(gFlaeche, "scroll-event", lwRad, 0, 0, 0)
+    signalEreignis(gFlaeche, "button-press-event", lwDruck, 0, 0, 0)
+    signalEreignis(gFlaeche, "button-release-event", lwLos, 0, 0, 0)
+    signalEreignis(gFlaeche, "motion-notify-event", lwBewegung, 0, 0, 0)
+    signalEreignis(gFlaeche, "leave-notify-event", lwVerlassen, 0, 0, 0)
+    signalEreignis(gFlaeche, "key-press-event", lwTaste, 0, 0, 0)
+    gSchrift = pango_font_description_from_string("Sans 9")
+    gSchriftPin = pango_font_description_from_string("Sans")
+    gStrich = 2.0
+    vZoom = 0.12
+    vX = 60
+    vY = 60
+    gPlatzDreh = 0
+    gDrahtPunkte = []
+    RETURN gFlaeche
+END FUNCTION
+
+SUB leinwandDokument(d AS kern.Dokument)
+    gDok = d
+    gBlatt = d.blaetter[0]
+    gInstanzPfad = ""
+    auswahlAufheben()
+    gDrahtAktiv = FALSE
+    vEingepasst = FALSE
+    gPlEingepasst = FALSE
+    plAuswahlAufheben()
+    netzeVeraltet()
+    reiterAktualisieren()
+    neuZeichnen()
+END SUB
+
+SUB neuZeichnen()
+    IF gFlaeche <> 0 THEN gtk_widget_queue_draw(gFlaeche)
+END SUB
+
+' --- Zoom um den Zeiger
+SUB zoomUm(neu AS FLOAT, px AS FLOAT, py AS FLOAT)
+    neu = CLAMP(neu, 0.02, 1.2)
+    DIM wx AS FLOAT : wx = (px - vX) / vZoom
+    DIM wy AS FLOAT : wy = (py - vY) / vZoom
+    vZoom = neu
+    vX = px - wx * neu
+    vY = py - wy * neu
+    neuZeichnen()
+    statusAktualisieren()
+END SUB
+
+SUB zoomMitte(faktor AS FLOAT)
+    zoomUm(vZoom * faktor, gtk_widget_get_allocated_width(gFlaeche) / 2.0, gtk_widget_get_allocated_height(gFlaeche) / 2.0)
+END SUB
+
+' --- Fang: naechster Pin, sonst naechstes Drahtende, sonst Raster
+FUNCTION fangPunkt(wx AS FLOAT, wy AS FLOAT) AS kern.Punkt
+    DIM bestX AS INTEGER, bestY AS INTEGER
+    DIM bestD AS FLOAT : bestD = FANG * FANG + 1
+    DIM gefunden AS BOOLEAN : gefunden = FALSE
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(gBlatt.bauteile) - 1
+        DIM b AS kern.Bauteil : b = gBlatt.bauteile[i]
+        FOR j = 0 TO LEN(b.sym.pins) - 1
+            IF kern.pinVersteckteVersorgung(b.sym, j) THEN CONTINUE
+            DIM pp AS kern.Punkt : pp = b.pinPunkt(j)
+            DIM d AS FLOAT : d = (pp.x - wx) * (pp.x - wx) + (pp.y - wy) * (pp.y - wy)
+            IF d < bestD THEN bestD = d : bestX = pp.x : bestY = pp.y : gefunden = TRUE
+        NEXT
+    NEXT
+    FOR i = 0 TO LEN(gBlatt.draehte) - 1
+        DIM w AS kern.Draht : w = gBlatt.draehte[i]
+        FOR j = 0 TO LEN(w.punkte) - 1
+            DIM q AS kern.Punkt : q = w.punkte[j]
+            DIM d2 AS FLOAT : d2 = (q.x - wx) * (q.x - wx) + (q.y - wy) * (q.y - wy)
+            IF d2 < bestD THEN bestD = d2 : bestX = q.x : bestY = q.y : gefunden = TRUE
+        NEXT
+    NEXT
+    IF gefunden AND bestD <= FANG * FANG THEN RETURN NEW kern.Punkt(bestX, bestY)
+    RETURN NEW kern.Punkt(kern.rastern(ROUND(wx), kern.RASTER), kern.rastern(ROUND(wy), kern.RASTER))
+END FUNCTION
+
+' --- Umgrenzung eines Bauteils in Weltkoordinaten (fuer Treffer)
+SUB bauteilBox(b AS kern.Bauteil, BYREF x0 AS INTEGER, BYREF y0 AS INTEGER, BYREF x1 AS INTEGER, BYREF y1 AS INTEGER)
+    x0 = 2000000000 : y0 = 2000000000 : x1 = -2000000000 : y1 = -2000000000
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(b.sym.pins) - 1
+        DIM pp AS kern.Punkt : pp = b.pinPunkt(j)
+        IF pp.x < x0 THEN x0 = pp.x
+        IF pp.y < y0 THEN y0 = pp.y
+        IF pp.x > x1 THEN x1 = pp.x
+        IF pp.y > y1 THEN y1 = pp.y
+    NEXT
+    FOR j = 0 TO LEN(b.sym.grafik) - 1
+        DIM pr AS kern.Primitiv : pr = b.sym.grafik[j]
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(pr.punkte) - 1
+            DIM w AS kern.Punkt : w = kern.transformPunkt(b.lage, pr.punkte[k])
+            DIM rr AS INTEGER : rr = 0
+            IF pr.art = kern.PR_KREIS OR pr.art = kern.PR_BOGEN THEN rr = pr.radius
+            IF w.x - rr < x0 THEN x0 = w.x - rr
+            IF w.y - rr < y0 THEN y0 = w.y - rr
+            IF w.x + rr > x1 THEN x1 = w.x + rr
+            IF w.y + rr > y1 THEN y1 = w.y + rr
+        NEXT
+    NEXT
+END SUB
+
+FUNCTION bauteilIndexUnter(wx AS FLOAT, wy AS FLOAT) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = LEN(gBlatt.bauteile) - 1 TO 0 STEP -1
+        DIM x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER
+        bauteilBox(gBlatt.bauteile[i], x0, y0, x1, y1)
+        IF wx >= x0 - 40 AND wx <= x1 + 40 AND wy >= y0 - 40 AND wy <= y1 + 40 THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' --- Zeichnen -------------------------------------------------------------
+FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM bw AS FLOAT : bw = gtk_widget_get_allocated_width(w)
+    DIM bh AS FLOAT : bh = gtk_widget_get_allocated_height(w)
+    IF gAnsicht = ANS_PLATINE THEN
+        platineZeichnen(cr, bw, bh)
+        RETURN TRUE
+    END IF
+    IF NOT vEingepasst THEN einpassen(bw, bh)
+    zeichenFarbe(cr, C_HG)
+    cairo_rectangle(cr, 0, 0, bw, bh)
+    cairo_fill(cr)
+    gitterZeichnen(cr, bw, bh)
+    inhaltZeichnen(cr)
+    DIM i AS INTEGER
+    ' --- Bildschirm-Hilfen, die nie gedruckt werden
+    ' aktiver Draht (Gummiband)
+    IF gDrahtAktiv AND LEN(gDrahtPunkte) > 0 THEN
+        zeichenFarbe(cr, IIF(gWerkzeug = WZ_BUS, C_BUS, C_DRAHT))
+        cairo_set_line_width(cr, IIF(gWerkzeug = WZ_BUS, gStrich * 3, gStrich))
+        cairo_move_to(cr, sx(gDrahtPunkte[0].x), sy(gDrahtPunkte[0].y))
+        FOR i = 1 TO LEN(gDrahtPunkte) - 1
+            cairo_line_to(cr, sx(gDrahtPunkte[i].x), sy(gDrahtPunkte[i].y))
+        NEXT
+        cairo_line_to(cr, sx(gMausWX), sy(gMausWY))
+        cairo_stroke(cr)
+    END IF
+    ' Geist bei Platzierung
+    IF gWerkzeug = WZ_BAUTEIL AND gMausDrin AND gSymbolRef <> "" THEN
+        DIM geist AS kern.Bauteil : geist = kern.neuesBauteil(gSymbolRef, NEW kern.Lage(NEW kern.Punkt(gMausWX, gMausWY), gPlatzDreh, gPlatzSpiegel))
+        bauteilZeichnen(cr, geist, TRUE, FALSE)
+    END IF
+    IF gWerkzeug = WZ_LABEL AND gMausDrin THEN
+        labelZeichnen(cr, sx(gMausWX), sy(gMausWY), "Label", C_GEIST, IIF(gLabelGlobal, kern.LA_GLOBAL, kern.LA_LOKAL), gLabelDreh)
+    END IF
+    ' Fang-Markierung
+    IF gMausDrin AND (gWerkzeug = WZ_DRAHT OR gWerkzeug = WZ_LABEL OR gWerkzeug = WZ_BUS) THEN
+        zeichenFarbe(cr, C_PIN)
+        cairo_arc(cr, sx(gMausWX), sy(gMausWY), 4, 0, 2 * PI)
+        cairo_stroke(cr)
+    END IF
+    ercMarkerZeichnen(cr)
+    simMarkenZeichnen(cr)
+    rahmenZeichnen(cr)
+    messenZeichnen(cr)
+    RETURN TRUE
+END FUNCTION
+
+' Die Schaltung selbst: Draehte, Knoten, Bauteile, Labels. Dieselbe Routine
+' fuer Bildschirm und Druck (gDruck): im Druck ohne Auswahl und Hervorhebung.
+SUB inhaltZeichnen(cr AS INTEGER)
+    cairo_set_line_cap(cr, 1)
+    cairo_set_line_join(cr, 1)
+    DIM i AS INTEGER
+    DIM hw AS INTEGER : hw = -1
+    IF NOT gDruck THEN hw = hoverWurzel()
+    busseZeichnen(cr)
+    FOR i = 0 TO LEN(gBlatt.draehte) - 1
+        DIM dr AS kern.Draht : dr = gBlatt.draehte[i]
+        DIM hell AS BOOLEAN : hell = FALSE
+        IF hw >= 0 AND LEN(dr.punkte) > 0 THEN hell = aktuelleNetze().wurzelAn(dr.punkte[0].x, dr.punkte[0].y) = hw
+        IF NOT gDruck AND istGewaehltD(dr) THEN
+            drahtZeichnen(cr, dr, C_AUSWAHL, 2.5)
+            ' das gegriffene Segment kraeftiger
+            IF gHatDraht AND dr = gDrahtGewaehlt AND gSegment >= 0 AND gSegment < LEN(dr.punkte) - 1 THEN
+                cairo_set_line_width(cr, 5.0)
+                cairo_move_to(cr, sx(dr.punkte[gSegment].x), sy(dr.punkte[gSegment].y))
+                cairo_line_to(cr, sx(dr.punkte[gSegment + 1].x), sy(dr.punkte[gSegment + 1].y))
+                cairo_stroke(cr)
+            END IF
+        ELSEIF hell THEN
+            drahtZeichnen(cr, dr, C_HOVER, 3.5)
+        ELSE
+            drahtZeichnen(cr, dr, drahtFarbe(dr), gStrich)
+        END IF
+    NEXT
+    FOR i = 0 TO LEN(gBlatt.knoten) - 1
+        zeichenFarbe(cr, C_KNOTEN)
+        cairo_arc(cr, sx(gBlatt.knoten[i].pos.x), sy(gBlatt.knoten[i].pos.y), 2.0 * gStrich, 0, 2 * PI)
+        cairo_fill(cr)
+    NEXT
+    FOR i = 0 TO LEN(gBlatt.bauteile) - 1
+        bauteilZeichnen(cr, gBlatt.bauteile[i], FALSE, NOT gDruck AND istGewaehltB(gBlatt.bauteile[i]))
+    NEXT
+    FOR i = 0 TO LEN(gBlatt.labels) - 1
+        DIM lgew AS BOOLEAN : lgew = NOT gDruck AND istGewaehltL(gBlatt.labels[i])
+        labelZeichnen(cr, sx(gBlatt.labels[i].anker.x), sy(gBlatt.labels[i].anker.y), gBlatt.labels[i].text, IIF(lgew, C_AUSWAHL, C_LABEL), gBlatt.labels[i].art, gBlatt.labels[i].drehung)
+    NEXT
+END SUB
+
+' Ein Netz-Label: Punkt am elektrischen Anker, Text in Richtung dreh davon
+' weg (0 rechts, 90 unten, 180 links, 270 oben), lokal mit Unterstrich,
+' global als Faehnchen. Der Text verschiebt den Anker nie (SparkNode-Lehre).
+' Senkrechte Labels liest man von unten nach oben wie in jedem Schaltplan;
+' links/unten laeuft der Text auf den Anker zu statt auf dem Kopf zu stehen.
+CONST LABEL_DX = 6
+CONST LABEL_DY = 9
+CONST LABEL_ZEICHEN = 7              ' ungefaehre Breite je Zeichen (Treffer-Test)
+
+' Gemessene Breite eines Textes in Pixeln (Pango), mit Ueberstrich-Markup.
+FUNCTION textBreite(cr AS INTEGER, text AS STRING, schrift AS INTEGER, ueber AS BOOLEAN) AS FLOAT
+    DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
+    pango_layout_set_font_description(layout, schrift)
+    IF ueber AND kern.hatUeberstrich(text) THEN
+        pango_layout_set_markup(layout, kern.ueberstrichMarkup$(text), -1)
+    ELSE
+        pango_layout_set_text(layout, text, -1)
+    END IF
+    DIM tb AS INTEGER, th AS INTEGER
+    pango_layout_get_pixel_size(layout, tb, th)
+    g_object_unref(layout)
+    RETURN tb
+END FUNCTION
+
+' Geschaetzte Laenge (ohne Kairo-Kontext) -- fuer Treffer-Test und Rahmen.
+FUNCTION labelLaenge(text AS STRING, global AS BOOLEAN) AS FLOAT
+    RETURN LABEL_DX + LEN(kern.sichtbarerText$(text)) * LABEL_ZEICHEN + IIF(global, 10, 0)
+END FUNCTION
+
+SUB labelZeichnen(cr AS INTEGER, ax AS FLOAT, ay AS FLOAT, text AS STRING, farbe AS INTEGER, art AS INTEGER, dreh AS INTEGER)
+    zeichenFarbe(cr, farbe)
+    ' der Anker-Punkt nur am Bildschirm: auf Papier hiesse ein Punkt "Knoten"
+    IF NOT gDruck THEN
+        cairo_arc(cr, ax, ay, 3.5, 0, 2 * PI)
+        cairo_fill(cr)
+    END IF
+    ' im lokalen Rahmen laeuft das Label immer an der x-Achse entlang, s = Seite
+    DIM s AS FLOAT : s = 1.0
+    IF dreh = 180 OR dreh = 90 THEN s = -1.0
+    cairo_save(cr)
+    cairo_translate(cr, ax, ay)
+    IF dreh = 90 OR dreh = 270 THEN cairo_rotate(cr, -PI / 2)    ' lokal +x = oben
+    cairo_set_line_width(cr, 1.2)
+    DIM breite AS FLOAT : breite = LABEL_DX + textBreite(cr, text, gSchrift, TRUE)
+    DIM ausr AS INTEGER : ausr = IIF(s > 0, 0, 2)
+    IF art = kern.LA_HIER THEN
+        ' hierarchisch (Port zum Elternblatt): Kasten, mit einem Keil am Anker
+        DIM ho AS FLOAT : ho = -2 * LABEL_DY - 2
+        cairo_rectangle(cr, IIF(s > 0, 6, -(breite + 8)), ho, breite + 2, -ho)
+        cairo_stroke(cr)
+        cairo_move_to(cr, 0, 0)
+        cairo_line_to(cr, s * 6, 0)
+        cairo_line_to(cr, s * 6, ho)
+        cairo_close_path(cr)
+        cairo_fill(cr)
+        lwTextAusU(cr, s * (LABEL_DX + 4), -LABEL_DY, text, farbe, ausr, gSchrift, TRUE)
+    ELSEIF art = kern.LA_GLOBAL THEN
+        DIM oben AS FLOAT : oben = -2 * LABEL_DY - 2
+        cairo_move_to(cr, 0, 0)
+        cairo_line_to(cr, s * 8, oben)
+        cairo_line_to(cr, s * (breite + 6), oben)
+        cairo_line_to(cr, s * (breite + 6), 0)
+        cairo_close_path(cr)
+        cairo_stroke(cr)
+        lwTextAusU(cr, s * (LABEL_DX + 4), -LABEL_DY, text, farbe, ausr, gSchrift, TRUE)
+    ELSE
+        cairo_move_to(cr, 0, 0)
+        cairo_line_to(cr, s * breite, 0)
+        cairo_stroke(cr)
+        lwTextAusU(cr, s * LABEL_DX, -LABEL_DY, text, farbe, ausr, gSchrift, TRUE)
+    END IF
+    cairo_restore(cr)
+END SUB
+
+' Bildschirm-Rechteck eines Labels (Treffer-Test), passend zu labelZeichnen.
+SUB labelRechteck(la AS kern.Label, BYREF x0 AS FLOAT, BYREF y0 AS FLOAT, BYREF x1 AS FLOAT, BYREF y1 AS FLOAT)
+    DIM ax AS FLOAT : ax = sx(la.anker.x)
+    DIM ay AS FLOAT : ay = sy(la.anker.y)
+    DIM l AS FLOAT : l = labelLaenge(la.text, la.art <> kern.LA_LOKAL) + 6
+    DIM t AS FLOAT : t = 2 * LABEL_DY + 4
+    SELECT CASE la.drehung
+        CASE 180 : x0 = ax - l : x1 = ax + 6 : y0 = ay - t : y1 = ay + 6
+        CASE 270 : x0 = ax - t : x1 = ax + 6 : y0 = ay - l : y1 = ay + 6
+        CASE 90 : x0 = ax - t : x1 = ax + 6 : y0 = ay - 6 : y1 = ay + l
+        CASE ELSE : x0 = ax - 6 : x1 = ax + l : y0 = ay - t : y1 = ay + 6
+    END SELECT
+END SUB
+
+' --- Netze (Cache) ---------------------------------------------------------
+SUB netzeVeraltet()
+    gNetzeGueltig = FALSE
+    platineVeraltet()                 ' die Pruefung haengt an den Netzen
+    gErcSichtbar = FALSE              ' alte ERC-Marker passen nicht mehr
+    flachVeraltet()                   ' die ausgerollte Sicht (Instanzen) auch nicht
+    simVeraltet()                     ' Spannungen eines alten Arbeitspunkts auch nicht
+END SUB
+
+' Die Netze des ganzen Dokuments (globale Labels verbinden ueber Blaetter),
+' Abfragen bezogen auf das aktuelle Blatt.
+FUNCTION aktuelleNetze() AS kern.Netze
+    IF NOT gNetzeGueltig THEN
+        gNetze = kern.netzeDokument(gDok)
+        gNetzeGueltig = TRUE
+    END IF
+    gNetze.blattWaehlen(aktuellerFlachIndex())     ' die gezeigte Instanz
+    RETURN gNetze
+END FUNCTION
+
+' Abstand im Quadrat von (px,py) zur Strecke a..b (alles Bildschirm).
+FUNCTION abstandQ(px AS FLOAT, py AS FLOAT, ax AS FLOAT, ay AS FLOAT, bx AS FLOAT, by AS FLOAT) AS FLOAT
+    DIM dx AS FLOAT : dx = bx - ax
+    DIM dy AS FLOAT : dy = by - ay
+    DIM l2 AS FLOAT : l2 = dx * dx + dy * dy
+    DIM t AS FLOAT : t = 0
+    IF l2 > 0 THEN t = CLAMP(((px - ax) * dx + (py - ay) * dy) / l2, 0.0, 1.0)
+    DIM qx AS FLOAT : qx = ax + t * dx - px
+    DIM qy AS FLOAT : qy = ay + t * dy - py
+    RETURN qx * qx + qy * qy
+END FUNCTION
+
+' Draht und Segment unter dem Bildschirmpunkt (6 Pixel Naehe)?
+FUNCTION drahtUnter(px AS FLOAT, py AS FLOAT, BYREF wi AS INTEGER, BYREF si AS INTEGER) AS BOOLEAN
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = LEN(gBlatt.draehte) - 1 TO 0 STEP -1
+        DIM w AS kern.Draht : w = gBlatt.draehte[i]
+        FOR j = 0 TO LEN(w.punkte) - 2
+            IF abstandQ(px, py, sx(w.punkte[j].x), sy(w.punkte[j].y), sx(w.punkte[j + 1].x), sy(w.punkte[j + 1].y)) <= 36.0 THEN
+                wi = i
+                si = j
+                RETURN TRUE
+            END IF
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Welches Netz liegt unter dem Bildschirmpunkt? Draht, Pin oder Label in
+' 6 Pixel Naehe; merkt sich einen Blattpunkt dieses Netzes.
+SUB hoverBestimmen(px AS FLOAT, py AS FLOAT)
+    gHoverAktiv = FALSE
+    DIM grenze AS FLOAT : grenze = 36.0
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(gBlatt.draehte) - 1
+        DIM w AS kern.Draht : w = gBlatt.draehte[i]
+        FOR j = 0 TO LEN(w.punkte) - 2
+            IF abstandQ(px, py, sx(w.punkte[j].x), sy(w.punkte[j].y), sx(w.punkte[j + 1].x), sy(w.punkte[j + 1].y)) <= grenze THEN
+                gHoverX = w.punkte[j].x : gHoverY = w.punkte[j].y : gHoverAktiv = TRUE
+                RETURN
+            END IF
+        NEXT
+    NEXT
+    FOR i = 0 TO LEN(gBlatt.bauteile) - 1
+        FOR j = 0 TO LEN(gBlatt.bauteile[i].sym.pins) - 1
+            IF kern.pinVersteckteVersorgung(gBlatt.bauteile[i].sym, j) THEN CONTINUE
+            DIM pp AS kern.Punkt : pp = gBlatt.bauteile[i].pinPunkt(j)
+            DIM ex AS FLOAT : ex = sx(pp.x) - px
+            DIM ey AS FLOAT : ey = sy(pp.y) - py
+            IF ex * ex + ey * ey <= grenze THEN
+                gHoverX = pp.x : gHoverY = pp.y : gHoverAktiv = TRUE
+                RETURN
+            END IF
+        NEXT
+    NEXT
+    DIM li AS INTEGER : li = labelIndexUnter(px, py)
+    IF li >= 0 THEN
+        gHoverX = gBlatt.labels[li].anker.x : gHoverY = gBlatt.labels[li].anker.y : gHoverAktiv = TRUE
+    END IF
+END SUB
+
+FUNCTION hoverWurzel() AS INTEGER
+    IF NOT gHoverAktiv THEN RETURN -1
+    RETURN aktuelleNetze().wurzelAn(gHoverX, gHoverY)
+END FUNCTION
+
+' "Netz: VCC (3 Pins)" fuer die Statuszeile, "" ohne Netz unter der Maus.
+FUNCTION hoverText$() AS STRING
+    IF NOT gHoverAktiv THEN RETURN ""
+    DIM n AS kern.Netze : n = aktuelleNetze()
+    DIM i AS INTEGER : i = n.netzAn(gHoverX, gHoverY)
+    IF i < 0 THEN RETURN "Netz: offen (Draht ohne Pin)"
+    DIM e AS INTEGER : e = n.liste[i].echtePins()
+    RETURN "Netz: " + n.liste[i].name + simSpannungText$(n.liste[i].name) + " (" + STR$(e) + IIF(e = 1, " Pin)", " Pins)")
+END FUNCTION
+
+' Einen Blattpunkt in die Mitte der Flaeche holen.
+SUB zentrieren(x AS INTEGER, y AS INTEGER)
+    vX = gtk_widget_get_allocated_width(gFlaeche) / 2.0 - x * vZoom
+    vY = gtk_widget_get_allocated_height(gFlaeche) / 2.0 - y * vZoom
+    neuZeichnen()
+END SUB
+
+SUB ercMarkerZeichnen(cr AS INTEGER)
+    IF NOT gErcSichtbar THEN RETURN
+    DIM i AS INTEGER
+    DIM hier AS INTEGER : hier = aktuellerBlattIndex()
+    FOR i = 0 TO LEN(gErc) - 1
+        DIM v AS kern.Verstoss : v = gErc[i]
+        IF v.blatt <> hier THEN CONTINUE              ' Marker nur auf ihrem Blatt
+        IF v.instanz <> "" AND v.instanz <> aktuellerPfad$() THEN CONTINUE   ' ... und ihrer Instanz
+        DIM r AS FLOAT : r = 9
+        IF i = gErcGewaehlt THEN r = 14
+        zeichenFarbe(cr, IIF(v.schwere = kern.ERC_FEHLER, C_ERC_FEHLER, C_ERC_WARNUNG))
+        cairo_set_line_width(cr, IIF(i = gErcGewaehlt, 3.0, 2.0))
+        cairo_new_sub_path(cr)
+        cairo_arc(cr, sx(v.x), sy(v.y), r, 0, 2 * PI)
+        cairo_stroke(cr)
+        lwText(cr, sx(v.x), sy(v.y), "!", IIF(v.schwere = kern.ERC_FEHLER, C_ERC_FEHLER, C_ERC_WARNUNG), TRUE)
+    NEXT
+END SUB
+
+' Index des Labels unter dem Bildschirmpunkt (px, py), sonst -1.
+FUNCTION labelIndexUnter(px AS FLOAT, py AS FLOAT) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = LEN(gBlatt.labels) - 1 TO 0 STEP -1
+        DIM la AS kern.Label : la = gBlatt.labels[i]
+        DIM x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT
+        labelRechteck(la, x0, y0, x1, y1)
+        IF px >= x0 AND px <= x1 AND py >= y0 AND py <= y1 THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB einpassen(bw AS FLOAT, bh AS FLOAT)
+    IF bw < 20 OR bh < 20 THEN RETURN
+    vEingepasst = TRUE
+END SUB
+
+SUB gitterZeichnen(cr AS INTEGER, bw AS FLOAT, bh AS FLOAT)
+    IF gDruck THEN RETURN
+    DIM schritt AS FLOAT : schritt = kern.RASTER * vZoom
+    IF schritt < 5 THEN RETURN
+    DIM wx0 AS FLOAT : wx0 = weltX(0)
+    DIM wy0 AS FLOAT : wy0 = weltY(0)
+    DIM startX AS INTEGER : startX = kern.rastern(FLOOR(wx0), kern.RASTER)
+    DIM startY AS INTEGER : startY = kern.rastern(FLOOR(wy0), kern.RASTER)
+    cairo_set_line_width(cr, 1.0)
+    DIM gx AS INTEGER : gx = startX
+    WHILE sx(gx) < bw
+        IF sx(gx) >= 0 THEN
+            IF (gx \ kern.RASTER) MOD 10 = 0 THEN zeichenFarbe(cr, C_RASTER_GROB) ELSE zeichenFarbe(cr, C_RASTER)
+            cairo_move_to(cr, sx(gx), 0)
+            cairo_line_to(cr, sx(gx), bh)
+            cairo_stroke(cr)
+        END IF
+        gx = gx + kern.RASTER
+    WEND
+    DIM gy AS INTEGER : gy = startY
+    WHILE sy(gy) < bh
+        IF sy(gy) >= 0 THEN
+            IF (gy \ kern.RASTER) MOD 10 = 0 THEN zeichenFarbe(cr, C_RASTER_GROB) ELSE zeichenFarbe(cr, C_RASTER)
+            cairo_move_to(cr, 0, sy(gy))
+            cairo_line_to(cr, bw, sy(gy))
+            cairo_stroke(cr)
+        END IF
+        gy = gy + kern.RASTER
+    WEND
+END SUB
+
+' Farbe nach Netzklasse: Versorgung rot, Masse grau, Signal blau.
+FUNCTION drahtFarbe(w AS kern.Draht) AS INTEGER
+    IF LEN(w.punkte) = 0 THEN RETURN C_DRAHT
+    DIM n AS kern.Netze : n = aktuelleNetze()
+    DIM i AS INTEGER : i = n.netzAn(w.punkte[0].x, w.punkte[0].y)
+    IF i < 0 THEN RETURN C_DRAHT
+    SELECT CASE kern.netzKlasse(n.liste[i])
+        CASE kern.NK_VERSORGUNG : RETURN C_DRAHT_VERS
+        CASE kern.NK_MASSE : RETURN C_DRAHT_MASSE
+    END SELECT
+    RETURN C_DRAHT
+END FUNCTION
+
+SUB drahtZeichnen(cr AS INTEGER, w AS kern.Draht, farbe AS INTEGER, breite AS FLOAT)
+    IF LEN(w.punkte) < 2 THEN RETURN
+    zeichenFarbe(cr, farbe)
+    cairo_set_line_width(cr, breite)
+    cairo_move_to(cr, sx(w.punkte[0].x), sy(w.punkte[0].y))
+    DIM i AS INTEGER
+    FOR i = 1 TO LEN(w.punkte) - 1
+        cairo_line_to(cr, sx(w.punkte[i].x), sy(w.punkte[i].y))
+    NEXT
+    cairo_stroke(cr)
+END SUB
+
+SUB bauteilZeichnen(cr AS INTEGER, b AS kern.Bauteil, geist AS BOOLEAN, gewaehlt AS BOOLEAN)
+    DIM koerper AS INTEGER : koerper = C_BAUTEIL
+    IF b.sym.fehlt THEN koerper = C_ERC_FEHLER      ' Platzhalter: nicht zu uebersehen
+    IF geist THEN koerper = C_GEIST
+    IF gewaehlt THEN koerper = C_AUSWAHL
+    cairo_save(cr)
+    cairo_translate(cr, sx(b.lage.pos.x), sy(b.lage.pos.y))
+    cairo_scale(cr, vZoom, vZoom)
+    IF b.lage.gespiegelt THEN cairo_scale(cr, -1, 1)
+    cairo_rotate(cr, b.lage.drehung * PI / 180.0)
+    DIM lw AS FLOAT : lw = gStrich / vZoom
+    cairo_set_line_width(cr, lw)
+    ' Pin-Stummel
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(b.sym.pins) - 1
+        ' versteckte Versorgung (VCC/GND eines Logik-ICs): nichts zu sehen,
+        ' angeschlossen wird sie ueber den Namen
+        IF kern.pinVersteckteVersorgung(b.sym, j) THEN CONTINUE
+        DIM pin AS kern.Pin : pin = b.sym.pins[j]
+        zeichenFarbe(cr, koerper)
+        cairo_move_to(cr, pin.pos.x, pin.pos.y)
+        cairo_line_to(cr, pin.pos.x + kern.richtungDx(pin.richtung) * pin.laenge, pin.pos.y + kern.richtungDy(pin.richtung) * pin.laenge)
+        cairo_stroke(cr)
+        IF NOT gDruck THEN
+            zeichenFarbe(cr, C_PIN)
+            cairo_arc(cr, pin.pos.x, pin.pos.y, 3.0 / vZoom, 0, 2 * PI)
+            cairo_fill(cr)
+        END IF
+    NEXT
+    ' Grafik
+    zeichenFarbe(cr, koerper)
+    FOR j = 0 TO LEN(b.sym.grafik) - 1
+        DIM pr AS kern.Primitiv : pr = b.sym.grafik[j]
+        SELECT CASE pr.art
+            CASE kern.PR_LINIE
+                cairo_move_to(cr, pr.punkte[0].x, pr.punkte[0].y)
+                cairo_line_to(cr, pr.punkte[1].x, pr.punkte[1].y)
+                cairo_stroke(cr)
+            CASE kern.PR_RECHTECK
+                cairo_rectangle(cr, pr.punkte[0].x, pr.punkte[0].y, pr.punkte[1].x - pr.punkte[0].x, pr.punkte[1].y - pr.punkte[0].y)
+                IF pr.fuellen THEN cairo_fill(cr) ELSE cairo_stroke(cr)
+            CASE kern.PR_KREIS
+                cairo_new_sub_path(cr)
+                cairo_arc(cr, pr.punkte[0].x, pr.punkte[0].y, pr.radius, 0, 2 * PI)
+                IF pr.fuellen THEN cairo_fill(cr) ELSE cairo_stroke(cr)
+            CASE kern.PR_BOGEN
+                cairo_new_sub_path(cr)
+                cairo_arc(cr, pr.punkte[0].x, pr.punkte[0].y, pr.radius, pr.winkel1, pr.winkel2)
+                cairo_stroke(cr)
+            CASE kern.PR_POLYLINIE
+                cairo_move_to(cr, pr.punkte[0].x, pr.punkte[0].y)
+                DIM k AS INTEGER
+                FOR k = 1 TO LEN(pr.punkte) - 1
+                    cairo_line_to(cr, pr.punkte[k].x, pr.punkte[k].y)
+                NEXT
+                IF pr.fuellen THEN
+                    cairo_close_path(cr)
+                    cairo_fill(cr)
+                ELSE
+                    cairo_stroke(cr)
+                END IF
+        END SELECT
+    NEXT
+    cairo_restore(cr)
+    IF b.sym.pinTexte THEN pinTexteZeichnen(cr, b, geist)
+    ' Text-Primitive aufrecht, auch im gedrehten Bauteil
+    FOR j = 0 TO LEN(b.sym.grafik) - 1
+        IF b.sym.grafik[j].art = kern.PR_TEXT AND LEN(b.sym.grafik[j].punkte) > 0 THEN
+            DIM tp AS kern.Punkt : tp = kern.transformPunkt(b.lage, b.sym.grafik[j].punkte[0])
+            lwTextAusU(cr, sx(tp.x), sy(tp.y), b.sym.grafik[j].text, koerper, 1, gSchrift, TRUE)
+        END IF
+    NEXT
+    ' Text (Referenz/Wert) in Schirmkoordinaten
+    IF NOT geist THEN
+        DIM mitte AS kern.Punkt : mitte = b.lage.pos
+        DIM tf AS INTEGER : tf = C_TEXT
+        IF gewaehlt THEN tf = C_AUSWAHL
+        IF b.sym.fehlt THEN
+            lwText(cr, sx(mitte.x), sy(mitte.y), "?", C_ERC_FEHLER, TRUE)
+            lwText(cr, sx(mitte.x), sy(mitte.y) - 200 * vZoom - 12, b.sym.name, C_ERC_FEHLER, TRUE)
+        END IF
+        DIM tx AS FLOAT, ty AS FLOAT, ta AS INTEGER
+        IF textOrt(b, 0, tx, ty, ta) THEN lwTextAus(cr, tx, ty, anzeigeRef$(b), IIF(gTextZug AND gTextZugTeil = b AND gTextZugWelche = 0, C_AUSWAHL, tf), ta, gSchrift)
+        IF textOrt(b, 1, tx, ty, ta) THEN lwTextAus(cr, tx, ty, b.wert, IIF(gTextZug AND gTextZugTeil = b AND gTextZugWelche = 1, C_AUSWAHL, IIF(b.sym.einheitLeistung, tf, C_WERT)), ta, gSchrift)
+    END IF
+END SUB
+
+' Wo Referenz (welche = 0) bzw. Wert (1) eines Bauteils steht -- am Schirm,
+' samt Ausrichtung (0 links buendig, 1 mittig, 2 rechts buendig) und dem
+' vom Nutzer gezogenen Versatz. FALSE = dieser Text wird nicht gezeigt.
+' Zeichnen und Treffer-Test rechnen beide hiermit.
+DIM gTextZugTeil AS kern.Bauteil     ' gerade gezogener Text (Hervorhebung)
+DIM gTextZugWelche AS INTEGER
+
+FUNCTION textOrt(b AS kern.Bauteil, welche AS INTEGER, BYREF x AS FLOAT, BYREF y AS FLOAT, BYREF ausr AS INTEGER) AS BOOLEAN
+    DIM t AS STRING : t = IIF(welche = 0, anzeigeRef$(b), b.wert)
+    IF t = "" THEN RETURN FALSE
+    DIM m AS kern.Punkt : m = b.lage.pos
+    IF welche = 0 AND b.sym.einheitLeistung THEN RETURN FALSE      ' Versorgung: nur der Name
+    IF b.sym.textOrte THEN
+        DIM a AS kern.Punkt : a = kern.transformPunkt(b.lage, IIF(welche = 0, b.sym.refOrt, b.sym.wertOrt))
+        DIM dx AS INTEGER : dx = a.x - m.x
+        DIM dy AS INTEGER : dy = a.y - m.y
+        ' ueber oder unter dem Koerper beginnt der Text am Anker; links daneben
+        ' endet er dort -- so landet er nie im Koerper
+        ausr = IIF(ABS(dx) > ABS(dy) AND dx < 0, 2, 0)
+        x = sx(a.x)
+        y = sy(a.y)
+    ELSEIF NOT b.sym.einheitLeistung THEN
+        IF b.lage.drehung = 90 OR b.lage.drehung = 270 THEN
+            ' senkrecht: Text daneben, sonst laege er auf den Pin-Stummeln
+            ausr = 0
+            x = sx(m.x) + 16
+            y = sy(m.y) + IIF(welche = 0, -8, 8)
+        ELSE
+            ausr = 1
+            x = sx(m.x)
+            y = sy(m.y) + IIF(welche = 0, -34, 20)
+        END IF
+    ELSE
+        IF welche = 0 THEN RETURN FALSE                 ' Versorgung: nur der Name
+        ausr = 0
+        x = sx(m.x) + 14
+        y = sy(m.y) - 10
+    END IF
+    DIM v AS kern.Punkt : v = IIF(welche = 0, b.refVersatz, b.wertVersatz)
+    x = x + v.x * vZoom
+    y = y + v.y * vZoom
+    RETURN TRUE
+END FUNCTION
+
+' Referenz- oder Wert-Text unter dem Schirmpunkt: Index des Bauteils (welche
+' sagt, welcher Text), sonst -1. Breite geschaetzt wie beim Label.
+FUNCTION textIndexUnter(px AS FLOAT, py AS FLOAT, BYREF welche AS INTEGER) AS INTEGER
+    DIM i AS INTEGER, k AS INTEGER
+    FOR i = LEN(gBlatt.bauteile) - 1 TO 0 STEP -1
+        DIM b AS kern.Bauteil : b = gBlatt.bauteile[i]
+        FOR k = 0 TO 1
+            DIM x AS FLOAT, y AS FLOAT, ausr AS INTEGER
+            IF NOT textOrt(b, k, x, y, ausr) THEN CONTINUE
+            DIM br AS FLOAT : br = LEN(IIF(k = 0, b.referenz, b.wert)) * LABEL_ZEICHEN + 4
+            DIM x0 AS FLOAT : x0 = x
+            IF ausr = 1 THEN x0 = x - br / 2.0
+            IF ausr = 2 THEN x0 = x - br
+            IF px >= x0 - 2 AND px <= x0 + br + 2 AND py >= y - 8 AND py <= y + 8 THEN
+                welche = k
+                RETURN i
+            END IF
+        NEXT
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB lwText(cr AS INTEGER, x AS FLOAT, y AS FLOAT, text AS STRING, farbe AS INTEGER, mitte AS BOOLEAN)
+    lwTextAus(cr, x, y, text, farbe, IIF(mitte, 1, 0), gSchrift)
+END SUB
+
+' Text, senkrecht mittig um y; ausr 0 = links buendig an x, 1 = mittig,
+' 2 = rechts buendig (endet bei x).
+SUB lwTextAus(cr AS INTEGER, x AS FLOAT, y AS FLOAT, text AS STRING, farbe AS INTEGER, ausr AS INTEGER, schrift AS INTEGER)
+    lwTextAusU(cr, x, y, text, farbe, ausr, schrift, FALSE)
+END SUB
+
+' Wie lwTextAus; mit ueber = TRUE wird ~{RESET} / ~RESET ueberstrichen
+' (Pin-Namen, Labels). Titel, Werte und Referenzen bleiben woertlich.
+SUB lwTextAusU(cr AS INTEGER, x AS FLOAT, y AS FLOAT, text AS STRING, farbe AS INTEGER, ausr AS INTEGER, schrift AS INTEGER, ueber AS BOOLEAN)
+    DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
+    pango_layout_set_font_description(layout, schrift)
+    IF ueber AND kern.hatUeberstrich(text) THEN
+        pango_layout_set_markup(layout, kern.ueberstrichMarkup$(text), -1)
+    ELSE
+        pango_layout_set_text(layout, text, -1)
+    END IF
+    DIM tb AS INTEGER, th AS INTEGER
+    pango_layout_get_pixel_size(layout, tb, th)
+    DIM zx AS FLOAT : zx = x
+    IF ausr = 1 THEN zx = x - tb / 2.0
+    IF ausr = 2 THEN zx = x - tb
+    zeichenFarbe(cr, farbe)
+    cairo_move_to(cr, zx, y - th / 2.0)
+    pango_cairo_show_layout(cr, layout)
+    g_object_unref(layout)
+END SUB
+
+' Pin-Nummern (am Stummel) und -Namen (innen am Koerper). Die Schrift waechst
+' mit dem Zoom wie das Symbol; zu klein wird sie weggelassen.
+CONST PIN_SCHRIFT = 110               ' Schrifthoehe in Einheiten (1.1 mm)
+
+SUB pinTexteZeichnen(cr AS INTEGER, b AS kern.Bauteil, geist AS BOOLEAN)
+    DIM px AS FLOAT : px = PIN_SCHRIFT * vZoom
+    IF px < 6 THEN RETURN
+    pango_font_description_set_absolute_size(gSchriftPin, px * PANGO_SCALE)
+    DIM fName AS INTEGER : fName = IIF(geist, C_GEIST, C_WERT)
+    DIM fNr AS INTEGER : fNr = IIF(geist, C_GEIST, C_TEXT)
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(b.sym.pins) - 1
+        DIM pin AS kern.Pin : pin = b.sym.pins[j]
+        DIM p AS kern.Punkt : p = kern.transformPunkt(b.lage, pin.pos)
+        DIM r AS INTEGER : r = kern.transformRichtung(b.lage, pin.richtung)
+        DIM dx AS INTEGER : dx = kern.richtungDx(r)
+        DIM dy AS INTEGER : dy = kern.richtungDy(r)
+        ' Nummer an der Mitte des Stummels
+        DIM mx AS FLOAT : mx = sx(p.x + dx * pin.laenge / 2.0)
+        DIM my AS FLOAT : my = sy(p.y + dy * pin.laenge / 2.0)
+        IF NOT pin.zeigeNummer THEN
+            ' (Ports eines Blattsymbols: die Nummer ist der Name)
+        ELSEIF dy = 0 THEN
+            lwTextAus(cr, mx, my - px * 0.6, pin.nummer, fNr, 1, gSchriftPin)
+        ELSE
+            lwTextAus(cr, mx + 3, my, pin.nummer, fNr, 0, gSchriftPin)
+        END IF
+        ' Name innen am Koerper
+        IF pin.name <> "" AND pin.zeigeName THEN
+            DIM qx AS FLOAT : qx = sx(p.x + dx * (pin.laenge + 60))
+            DIM qy AS FLOAT : qy = sy(p.y + dy * (pin.laenge + 60))
+            SELECT CASE r
+                CASE 0 : lwTextAusU(cr, qx, qy, pin.name, fName, 0, gSchriftPin, TRUE)
+                CASE 180 : lwTextAusU(cr, qx, qy, pin.name, fName, 2, gSchriftPin, TRUE)
+                CASE 90 : lwTextAusU(cr, qx, qy + px * 0.4, pin.name, fName, 1, gSchriftPin, TRUE)
+                CASE 270 : lwTextAusU(cr, qx, qy - px * 0.4, pin.name, fName, 1, gSchriftPin, TRUE)
+            END SELECT
+        END IF
+    NEXT
+END SUB

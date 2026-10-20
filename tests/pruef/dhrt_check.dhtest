@@ -315,6 +315,9 @@ FOR i = 0 TO LEN(roh) - 1
     ' Warnung dort richtig, keine Falschmeldung -- bis Stufe 18 fiel das nur
     ' nicht auf, weil jede Datei vorher an einem unbekannten kern.-Typ scheiterte.
     IF INSTR(REPLACE$(roh[i], CHR$(92), "/"), "examples/glutfaden/ansicht/") >= 0 THEN CONTINUE
+    ' Funkenflug (Schaltplan-Editor) ist genauso gebaut: ansicht/*.dh sind
+    ' Teile von funkenflug/main.dh (gDok, gBlatt ... legt main.dh an).
+    IF INSTR(REPLACE$(roh[i], CHR$(92), "/"), "funkenflug/ansicht/") >= 0 THEN CONTINUE
     ARRAY_PUSH(dateien, wurzel + "/" + roh[i])
 NEXT
 PRINT "genug dateien "; (LEN(dateien) > 300)

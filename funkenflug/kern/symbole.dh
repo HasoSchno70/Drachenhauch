@@ -1,0 +1,657 @@
+' Eigene Symbole -- Namensraum "kern".
+'
+' Ein eigenes Symbol entsteht aus einer Pinliste (IC-Generator), wird mit
+' seiner vollen Geometrie gespeichert (nicht nur die Pinliste: aendert sich
+' der Generator spaeter, bleiben alte Schaltplaene unberuehrt) und steckt in
+' jeder .fkn, die es benutzt. SparkNode verwies nur auf Bibliotheks-Ids und
+' riet bei fehlenden per Referenz-Praefix -- hier ist die Datei eigenstaendig,
+' und ein wirklich fehlendes Symbol wird ein sichtbarer Platzhalter.
+'
+' Pinliste: eine Zeile je Pin, durch Leerraum getrennt:
+'     Nummer  [Name  [Seite  [Typ]]]
+' Seite: links rechts oben unten (auch l r o u)        -- Vorgabe links
+' Typ:   passiv ein aus bidir vin vout nc (und Langformen) -- Vorgabe passiv
+' Leere Zeilen und Zeilen mit # oder ' sind Kommentare.
+'
+' Freie Grafik und frei gesetzte Pins (Masse in mm, Komma oder Punkt,
+' y nach unten, Nullpunkt = Bauteil-Ursprung):
+'     linie    x1 y1 x2 y2 [x3 y3 ...] [voll]   Polylinie, "voll" = gefuellt
+'     rechteck x1 y1 x2 y2 [voll]
+'     kreis    x y r [voll]
+'     bogen    x y r w1 w2                       Winkel in Grad, 0 = rechts, im Uhrzeigersinn
+'     text     x y Inhalt ...
+'     pin      Nummer Name x y Seite [Typ] [Laenge]
+'     bauform  DIP8                              Vorgabe fuer die Platine
+'     loch     Nummer Spalte Zeile               eigene Bauform (ganze Loecher)
+' Ein freier Pin: (x, y) ist der elektrische Punkt (auf dem 1-mm-Raster),
+' die Seite sagt, wohin er vom Koerper absteht (links = Stummel nach rechts
+' zum Koerper), Name "-" = ohne Namen, Laenge in mm (Vorgabe 3). Seine
+' Nummer wird gezeichnet, der Name nicht (er gilt fuer ERC und Netzliste).
+' Gibt es Seiten-Pins, baut der Generator sein Rechteck und die Grafik kommt
+' dazu; ohne Seiten-Pins ist das Symbol ganz frei (kein Rechteck).
+
+CONST SEITE_LINKS = 0
+CONST SEITE_RECHTS = 1
+CONST SEITE_OBEN = 2
+CONST SEITE_UNTEN = 3
+
+CONST IC_ABSTAND = 200            ' Pin-Abstand (2 Raster)
+CONST IC_PINLAENGE = 300
+CONST IC_ZEICHEN = 70             ' geschaetzte Breite je Zeichen der Pin-Namen
+
+CLASS PinAngabe
+    DIM nummer AS STRING
+    DIM name AS STRING
+    DIM seite AS INTEGER
+    DIM typ AS INTEGER
+END CLASS
+
+CLASS Pinliste
+    DIM pins AS ARRAY OF PinAngabe
+    DIM freiePins AS ARRAY OF Pin
+    DIM grafik AS ARRAY OF Primitiv
+    DIM fehler AS ARRAY OF STRING
+    DIM bauform AS STRING
+    DIM loecher AS ARRAY OF STRING    ' "Nr:s,z"
+    DIM grafikZeilen AS ARRAY OF INTEGER   ' Textzeile (ab 0) je Grafik-Element
+    DIM pinZeilen AS ARRAY OF INTEGER      ' Textzeile je frei gesetztem Pin
+    SUB Init()
+        pins = []
+        freiePins = []
+        grafik = []
+        fehler = []
+        bauform = ""
+        loecher = []
+        grafikZeilen = []
+        pinZeilen = []
+    END SUB
+    FUNCTION pinAnzahl() AS INTEGER
+        RETURN LEN(pins) + LEN(freiePins)
+    END FUNCTION
+END CLASS
+
+' Ein Mass in mm ("1.5", "-2", "0,5") in Einheiten (0.01 mm). FALSE, wenn
+' es keine Zahl ist.
+FUNCTION mmLesen(w AS STRING, BYREF wert AS INTEGER) AS BOOLEAN
+    DIM s AS STRING : s = REPLACE$(w, ",", ".")
+    DIM punkte AS INTEGER : punkte = 0
+    DIM ziffern AS INTEGER : ziffern = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(s) - 1
+        DIM c AS STRING : c = MID$(s, i, 1)
+        IF c = "-" AND i = 0 THEN CONTINUE
+        IF c = "." THEN
+            punkte = punkte + 1
+        ELSEIF istZiffer(c) THEN
+            ziffern = ziffern + 1
+        ELSE
+            RETURN FALSE
+        END IF
+    NEXT
+    IF punkte > 1 OR ziffern = 0 THEN RETURN FALSE
+    wert = ROUND(VAL(s) * 100)
+    RETURN TRUE
+END FUNCTION
+
+' Liest die Zahlen t[ab..] (ohne ein abschliessendes "voll") als Masse.
+FUNCTION masseLesen(t AS ARRAY OF STRING, ab AS INTEGER, BYREF werte AS ARRAY OF INTEGER, BYREF voll AS BOOLEAN, BYREF falsch AS STRING) AS BOOLEAN
+    werte = []
+    voll = FALSE
+    DIM bis AS INTEGER : bis = LEN(t) - 1
+    IF bis >= ab AND LOWER$(t[bis]) = "voll" THEN
+        voll = TRUE
+        bis = bis - 1
+    END IF
+    DIM i AS INTEGER
+    FOR i = ab TO bis
+        DIM v AS INTEGER
+        IF NOT mmLesen(t[i], v) THEN
+            falsch = t[i]
+            RETURN FALSE
+        END IF
+        ARRAY_PUSH(werte, v)
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+' Eine Grafik- oder freie Pin-Zeile. "" = in Ordnung, sonst der Fehler.
+FUNCTION grafikZeile$(pl AS Pinliste, t AS ARRAY OF STRING, BYREF gesehen AS MAP OF INTEGER, zeile AS INTEGER) AS STRING
+    DIM wort AS STRING : wort = LOWER$(t[0])
+    DIM w AS ARRAY OF INTEGER
+    DIM voll AS BOOLEAN
+    DIM falsch AS STRING
+    DIM g AS Primitiv
+    DIM i AS INTEGER
+    SELECT CASE wort
+        CASE "linie"
+            IF NOT masseLesen(t, 1, w, voll, falsch) THEN RETURN "'" + falsch + "' ist keine Zahl (mm)"
+            IF LEN(w) < 4 OR LEN(w) MOD 2 <> 0 THEN RETURN "linie braucht Punktpaare: x1 y1 x2 y2 [...]"
+            g = NEW Primitiv(PR_POLYLINIE)
+            i = 0
+            WHILE i < LEN(w)
+                ARRAY_PUSH(g.punkte, NEW Punkt(w[i], w[i + 1]))
+                i = i + 2
+            WEND
+            g.fuellen = voll
+        CASE "rechteck"
+            IF NOT masseLesen(t, 1, w, voll, falsch) THEN RETURN "'" + falsch + "' ist keine Zahl (mm)"
+            IF LEN(w) <> 4 THEN RETURN "rechteck braucht x1 y1 x2 y2"
+            g = prRechteck(MIN(w[0], w[2]), MIN(w[1], w[3]), MAX(w[0], w[2]), MAX(w[1], w[3]))
+            g.fuellen = voll
+        CASE "kreis"
+            IF NOT masseLesen(t, 1, w, voll, falsch) THEN RETURN "'" + falsch + "' ist keine Zahl (mm)"
+            IF LEN(w) <> 3 OR w[2] <= 0 THEN RETURN "kreis braucht x y r (r > 0)"
+            g = prKreis(w[0], w[1], w[2])
+            g.fuellen = voll
+        CASE "bogen"
+            IF NOT masseLesen(t, 1, w, voll, falsch) THEN RETURN "'" + falsch + "' ist keine Zahl"
+            IF LEN(w) <> 5 OR w[2] <= 0 OR voll THEN RETURN "bogen braucht x y r w1 w2 (Winkel in Grad)"
+            ' masseLesen rechnet mm*100 -- Winkel zurueck in Grad, dann Bogenmass
+            g = prBogen(w[0], w[1], w[2], w[3] / 100.0 * PI / 180.0, w[4] / 100.0 * PI / 180.0)
+        CASE "text"
+            IF LEN(t) < 4 THEN RETURN "text braucht x y und den Inhalt"
+            DIM tx AS INTEGER, ty AS INTEGER
+            IF NOT mmLesen(t[1], tx) OR NOT mmLesen(t[2], ty) THEN RETURN "text: x und y muessen Zahlen sein (mm)"
+            g = NEW Primitiv(PR_TEXT)
+            ARRAY_PUSH(g.punkte, NEW Punkt(tx, ty))
+            DIM rest AS ARRAY OF STRING : rest = []
+            FOR i = 3 TO LEN(t) - 1
+                ARRAY_PUSH(rest, t[i])
+            NEXT
+            g.text = JOIN$(rest, " ")
+        CASE "bauform"
+            IF LEN(t) <> 2 THEN RETURN "bauform braucht genau einen Namen (AX4, RAD2, DIP8 ...)"
+            DIM bfp AS Bauform
+            IF NOT bauformLesen(t[1], bfp) THEN RETURN "Bauform '" + t[1] + "' gibt es nicht (AX4, RAD2, TO92-CBE, DIP8, SIL3, HDR2X5, TRIM, TAST6, RELAIS5)"
+            pl.bauform = t[1]
+            RETURN ""
+        CASE "loch"
+            IF LEN(t) <> 4 THEN RETURN "loch braucht Nummer Spalte Zeile"
+            DIM ls AS INTEGER, lz AS INTEGER
+            IF NOT ganzzahlLesen(REPLACE$(t[2], "-", ""), ls) OR NOT ganzzahlLesen(REPLACE$(t[3], "-", ""), lz) THEN RETURN "loch: Spalte und Zeile sind ganze Loecher"
+            IF LEFT$(t[2], 1) = "-" THEN ls = -ls
+            IF LEFT$(t[3], 1) = "-" THEN lz = -lz
+            DIM li AS INTEGER
+            FOR li = 0 TO LEN(pl.loecher) - 1
+                IF LEFT$(pl.loecher[li], INSTR(pl.loecher[li], ":")) = t[1] THEN RETURN "loch fuer Pin " + t[1] + " gibt es schon"
+                IF MID$(pl.loecher[li], INSTR(pl.loecher[li], ":") + 1) = STR$(ls) + "," + STR$(lz) THEN RETURN "Loch " + STR$(ls) + "," + STR$(lz) + " ist schon belegt"
+            NEXT
+            ARRAY_PUSH(pl.loecher, t[1] + ":" + STR$(ls) + "," + STR$(lz))
+            RETURN ""
+        CASE "pin"
+            IF LEN(t) < 6 OR LEN(t) > 8 THEN RETURN "pin braucht Nummer Name x y Seite [Typ] [Laenge]"
+            DIM px AS INTEGER, py AS INTEGER, laenge AS INTEGER
+            IF NOT mmLesen(t[3], px) OR NOT mmLesen(t[4], py) THEN RETURN "pin: x und y muessen Zahlen sein (mm)"
+            IF px MOD RASTER <> 0 OR py MOD RASTER <> 0 THEN RETURN "pin " + t[1] + ": der Punkt liegt nicht auf dem 1-mm-Raster -- so liesse er sich nicht anschliessen"
+            DIM se AS INTEGER : se = seiteAusWort(t[5])
+            IF se < 0 THEN RETURN "unbekannte Seite '" + t[5] + "' (links, rechts, oben, unten)"
+            DIM typ AS INTEGER : typ = PIN_PASSIV
+            IF LEN(t) >= 7 THEN
+                typ = pinTypAusWort(t[6])
+                IF typ < 0 THEN RETURN "unbekannter Typ '" + t[6] + "' (passiv, ein, aus, bidir, vin, vout, nc)"
+            END IF
+            laenge = IC_PINLAENGE
+            IF LEN(t) = 8 THEN
+                IF NOT mmLesen(t[7], laenge) OR laenge < 0 THEN RETURN "pin: Laenge '" + t[7] + "' ist keine Zahl (mm)"
+            END IF
+            IF MAPHAS(gesehen, t[1]) THEN RETURN "Pin-Nummer " + t[1] + " gibt es schon (Zeile " + STR$(MAPGET(gesehen, t[1])) + ")"
+            MAPPUT(gesehen, t[1], zeile)
+            ' Stummel zeigt vom Pin zum Koerper: ein links abstehender Pin zeigt nach rechts
+            DIM ri AS INTEGER
+            SELECT CASE se
+                CASE SEITE_LINKS : ri = 0
+                CASE SEITE_RECHTS : ri = 180
+                CASE SEITE_OBEN : ri = 90
+                CASE ELSE : ri = 270
+            END SELECT
+            DIM fp AS Pin : fp = NEW Pin(t[1], IIF(t[2] = "-", "", t[2]), NEW Punkt(px, py), laenge, ri, typ)
+            ' Namen frei gesetzter Pins stehen nicht im Bild -- die Grafik sagt,
+            ' was der Pin ist; ohne Rechteck gibt es kein "innen" fuer den Namen.
+            ' Fuer ERC-Meldungen und die Netzliste bleibt er erhalten.
+            fp.zeigeName = FALSE
+            ARRAY_PUSH(pl.freiePins, fp)
+            ARRAY_PUSH(pl.pinZeilen, zeile - 1)
+            RETURN ""
+        CASE ELSE
+            RETURN "?"
+    END SELECT
+    ARRAY_PUSH(pl.grafik, g)
+    ARRAY_PUSH(pl.grafikZeilen, zeile - 1)
+    RETURN ""
+END FUNCTION
+
+FUNCTION istGrafikWort(w AS STRING) AS BOOLEAN
+    SELECT CASE LOWER$(w)
+        CASE "linie", "rechteck", "kreis", "bogen", "text", "pin", "bauform", "loch" : RETURN TRUE
+    END SELECT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION pinTypAusWort(w AS STRING) AS INTEGER
+    SELECT CASE LOWER$(w)
+        CASE "passiv", "pas", "p", "passive" : RETURN PIN_PASSIV
+        CASE "ein", "eingang", "in", "i", "input" : RETURN PIN_EINGANG
+        CASE "aus", "ausgang", "out", "o", "output" : RETURN PIN_AUSGANG
+        CASE "bidir", "bi", "io", "b", "bidirektional" : RETURN PIN_BIDIR
+        CASE "vin", "versorgung", "pwr", "power", "pwr_in", "v" : RETURN PIN_LEISTUNG_EIN
+        CASE "vout", "pwr_out", "quelle", "regler" : RETURN PIN_LEISTUNG_AUS
+        CASE "nc", "frei", "n" : RETURN PIN_FREI
+    END SELECT
+    RETURN -1
+END FUNCTION
+
+FUNCTION pinTypName$(t AS INTEGER) AS STRING
+    SELECT CASE t
+        CASE PIN_EINGANG : RETURN "ein"
+        CASE PIN_AUSGANG : RETURN "aus"
+        CASE PIN_BIDIR : RETURN "bidir"
+        CASE PIN_LEISTUNG_EIN : RETURN "vin"
+        CASE PIN_LEISTUNG_AUS : RETURN "vout"
+        CASE PIN_FREI : RETURN "nc"
+    END SELECT
+    RETURN "passiv"
+END FUNCTION
+
+FUNCTION seiteAusWort(w AS STRING) AS INTEGER
+    SELECT CASE LOWER$(w)
+        CASE "l", "links", "left", "w" : RETURN SEITE_LINKS
+        CASE "r", "rechts", "right", "e" : RETURN SEITE_RECHTS
+        CASE "o", "oben", "top", "t", "n" : RETURN SEITE_OBEN
+        CASE "u", "unten", "bottom", "s" : RETURN SEITE_UNTEN
+    END SELECT
+    RETURN -1
+END FUNCTION
+
+FUNCTION pinlisteLesen(text AS STRING) AS Pinliste
+    DIM pl AS Pinliste : pl = NEW Pinliste()
+    DIM gesehen AS MAP OF INTEGER
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(REPLACE$(text, CHR$(13), ""), CHR$(10))
+    DIM i AS INTEGER, k AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM z AS STRING : z = TRIM$(REPLACE$(zeilen[i], CHR$(9), " "))
+        IF z = "" THEN CONTINUE
+        IF LEFT$(z, 1) = "#" OR LEFT$(z, 1) = "'" THEN CONTINUE
+        DIM roh AS ARRAY OF STRING : roh = SPLIT$(z, " ")
+        DIM t AS ARRAY OF STRING : t = []
+        FOR k = 0 TO LEN(roh) - 1
+            IF roh[k] <> "" THEN ARRAY_PUSH(t, roh[k])
+        NEXT
+        DIM nr AS STRING : nr = "Zeile " + STR$(i + 1) + ": "
+        IF istGrafikWort(t[0]) THEN
+            DIM gf AS STRING : gf = grafikZeile$(pl, t, gesehen, i + 1)
+            IF gf <> "" THEN ARRAY_PUSH(pl.fehler, nr + gf)
+            CONTINUE
+        END IF
+        IF LEN(t) > 4 THEN
+            ARRAY_PUSH(pl.fehler, nr + "zu viele Angaben (Nummer Name Seite Typ)")
+            CONTINUE
+        END IF
+        DIM p AS PinAngabe : p = NEW PinAngabe()
+        p.nummer = t[0]
+        p.name = ""
+        p.seite = SEITE_LINKS
+        p.typ = PIN_PASSIV
+        IF LEN(t) >= 2 THEN p.name = t[1]
+        IF LEN(t) >= 3 THEN
+            p.seite = seiteAusWort(t[2])
+            IF p.seite < 0 THEN
+                ARRAY_PUSH(pl.fehler, nr + "unbekannte Seite '" + t[2] + "' (links, rechts, oben, unten)")
+                CONTINUE
+            END IF
+        END IF
+        IF LEN(t) = 4 THEN
+            p.typ = pinTypAusWort(t[3])
+            IF p.typ < 0 THEN
+                ARRAY_PUSH(pl.fehler, nr + "unbekannter Typ '" + t[3] + "' (passiv, ein, aus, bidir, vin, vout, nc)")
+                CONTINUE
+            END IF
+        END IF
+        IF MAPHAS(gesehen, p.nummer) THEN
+            ARRAY_PUSH(pl.fehler, nr + "Pin-Nummer " + p.nummer + " gibt es schon (Zeile " + STR$(MAPGET(gesehen, p.nummer)) + ")")
+            CONTINUE
+        END IF
+        MAPPUT(gesehen, p.nummer, i + 1)
+        ARRAY_PUSH(pl.pins, p)
+    NEXT
+    ' eigene Loecher: jeder Pin genau eins, keins fuer einen unbekannten Pin
+    IF LEN(pl.loecher) > 0 THEN
+        DIM hat AS MAP OF INTEGER
+        FOR k = 0 TO LEN(pl.loecher) - 1
+            DIM lnr AS STRING : lnr = LEFT$(pl.loecher[k], INSTR(pl.loecher[k], ":"))
+            MAPPUT(hat, lnr, 1)
+            IF NOT MAPHAS(gesehen, lnr) THEN ARRAY_PUSH(pl.fehler, "loch fuer Pin " + lnr + ": diesen Pin gibt es nicht")
+        NEXT
+        DIM alle AS ARRAY OF STRING : alle = MAPKEYS(gesehen)
+        SORT(alle)
+        FOR k = 0 TO LEN(alle) - 1
+            IF NOT MAPHAS(hat, alle[k]) THEN ARRAY_PUSH(pl.fehler, "Pin " + alle[k] + " hat kein loch (eigene Bauform: jeder Pin eins)")
+        NEXT
+    END IF
+    RETURN pl
+END FUNCTION
+
+FUNCTION aufRunden(wert AS INTEGER, schritt AS INTEGER) AS INTEGER
+    RETURN ((wert + schritt - 1) \ schritt) * schritt
+END FUNCTION
+
+' Ein IC-Symbol aus der Pinliste bauen: Rechteck, Pins je Seite von oben
+' bzw. links her im Abstand 2 Raster. Breite und Hoehe sind Vielfache von
+' 2 Raster -- so liegen alle Pin-Spitzen auf dem Raster.
+FUNCTION icErzeugen(id AS STRING, name AS STRING, praefix AS STRING, wert AS STRING, text AS STRING) AS Symbol
+    DIM pl AS Pinliste : pl = pinlisteLesen(text)
+    DIM s AS Symbol : s = NEW Symbol(id, name, praefix)
+    s.wertVorgabe = wert
+    s.eigen = TRUE
+    s.pinTexte = TRUE
+    s.textOrte = TRUE
+    s.quelltext = text
+    DIM anz[4] AS INTEGER
+    DIM lang[4] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(pl.pins) - 1
+        DIM se AS INTEGER : se = pl.pins[i].seite
+        anz[se] = anz[se] + 1
+        IF LEN(sichtbarerText$(pl.pins[i].name)) > lang[se] THEN lang[se] = LEN(sichtbarerText$(pl.pins[i].name))
+    NEXT
+    ' ganz frei gezeichnet: keine Seiten-Pins -> kein Rechteck
+    IF LEN(pl.pins) = 0 THEN
+        freiDazu(s, pl)
+        freieTextOrte(s)
+        RETURN s
+    END IF
+    DIM oben AS INTEGER : oben = IIF(anz[SEITE_OBEN] > 0, IC_ABSTAND, 0)
+    DIM unten AS INTEGER : unten = IIF(anz[SEITE_UNTEN] > 0, IC_ABSTAND, 0)
+    DIM w AS INTEGER : w = MAX((MAX(anz[SEITE_OBEN], anz[SEITE_UNTEN]) + 1) * IC_ABSTAND, (lang[SEITE_LINKS] + lang[SEITE_RECHTS]) * IC_ZEICHEN + 400)
+    w = aufRunden(MAX(w, 600), IC_ABSTAND)          ' Vielfaches von 200: w/2 liegt auf dem Raster
+    DIM h AS INTEGER : h = (MAX(anz[SEITE_LINKS], anz[SEITE_RECHTS]) + 1) * IC_ABSTAND + oben + unten
+    h = MAX(h, 400)
+    DIM hw AS INTEGER : hw = w \ 2
+    DIM hh AS INTEGER : hh = h \ 2
+    s.grafikHinzu(prRechteck(-hw, -hh, hw, hh))
+    DIM nr[4] AS INTEGER
+    FOR i = 0 TO LEN(pl.pins) - 1
+        DIM p AS PinAngabe : p = pl.pins[i]
+        DIM k AS INTEGER : k = nr[p.seite]
+        nr[p.seite] = k + 1
+        SELECT CASE p.seite
+            CASE SEITE_LINKS
+                s.pinHinzu(p.nummer, p.name, NEW Punkt(-hw - IC_PINLAENGE, -hh + oben + IC_ABSTAND * (k + 1)), IC_PINLAENGE, 0, p.typ)
+            CASE SEITE_RECHTS
+                s.pinHinzu(p.nummer, p.name, NEW Punkt(hw + IC_PINLAENGE, -hh + oben + IC_ABSTAND * (k + 1)), IC_PINLAENGE, 180, p.typ)
+            CASE SEITE_OBEN
+                s.pinHinzu(p.nummer, p.name, NEW Punkt(-hw + IC_ABSTAND * (k + 1), -hh - IC_PINLAENGE), IC_PINLAENGE, 90, p.typ)
+            CASE SEITE_UNTEN
+                s.pinHinzu(p.nummer, p.name, NEW Punkt(-hw + IC_ABSTAND * (k + 1), hh + IC_PINLAENGE), IC_PINLAENGE, 270, p.typ)
+        END SELECT
+    NEXT
+    s.refOrt = NEW Punkt(-hw, -hh - 80 - IIF(anz[SEITE_OBEN] > 0, IC_PINLAENGE, 0))
+    s.wertOrt = NEW Punkt(-hw, hh + 80 + IIF(anz[SEITE_UNTEN] > 0, IC_PINLAENGE, 0))
+    freiDazu(s, pl)
+    RETURN s
+END FUNCTION
+
+' Freie Grafik und frei gesetzte Pins ins Symbol.
+SUB freiDazu(s AS Symbol, pl AS Pinliste)
+    DIM i AS INTEGER
+    s.bauform = pl.bauform
+    s.loecher = JOIN$(pl.loecher, ";")
+    FOR i = 0 TO LEN(pl.grafik) - 1
+        s.grafikHinzu(pl.grafik[i])
+    NEXT
+    FOR i = 0 TO LEN(pl.freiePins) - 1
+        ARRAY_PUSH(s.pins, pl.freiePins[i])
+    NEXT
+END SUB
+
+' Referenz ueber, Wert unter die Umgrenzung von Grafik und Pins.
+SUB freieTextOrte(s AS Symbol)
+    DIM x0 AS INTEGER : x0 = 0
+    DIM y0 AS INTEGER : y0 = 0
+    DIM y1 AS INTEGER : y1 = 0
+    DIM erst AS BOOLEAN : erst = TRUE
+    DIM i AS INTEGER, k AS INTEGER
+    FOR i = 0 TO LEN(s.grafik) - 1
+        DIM r AS INTEGER : r = 0
+        IF s.grafik[i].art = PR_KREIS OR s.grafik[i].art = PR_BOGEN THEN r = s.grafik[i].radius
+        FOR k = 0 TO LEN(s.grafik[i].punkte) - 1
+            DIM p AS Punkt : p = s.grafik[i].punkte[k]
+            IF erst OR p.x - r < x0 THEN x0 = p.x - r
+            IF erst OR p.y - r < y0 THEN y0 = p.y - r
+            IF erst OR p.y + r > y1 THEN y1 = p.y + r
+            erst = FALSE
+        NEXT
+    NEXT
+    FOR i = 0 TO LEN(s.pins) - 1
+        IF erst OR s.pins[i].pos.x < x0 THEN x0 = s.pins[i].pos.x
+        IF erst OR s.pins[i].pos.y < y0 THEN y0 = s.pins[i].pos.y
+        IF erst OR s.pins[i].pos.y > y1 THEN y1 = s.pins[i].pos.y
+        erst = FALSE
+    NEXT
+    s.refOrt = NEW Punkt(x0, y0 - 80)
+    s.wertOrt = NEW Punkt(x0, y1 + 80)
+END SUB
+
+' Eine neue, praktisch kollisionsfreie Id fuer ein eigenes Symbol.
+FUNCTION neueSymbolId$() AS STRING
+    RETURN "E_" + LEFT$(UUID4$(), 8)
+END FUNCTION
+
+' --- JSON -------------------------------------------------------------------
+
+FUNCTION symbolNachJson(s AS Symbol) AS JSON_HANDLE
+    DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+    JSON_SET_STRING(j, "id", s.id)
+    JSON_SET_STRING(j, "name", s.name)
+    JSON_SET_STRING(j, "beschreibung", s.beschreibung)
+    JSON_SET_STRING(j, "praefix", s.praefix)
+    JSON_SET_STRING(j, "wert", s.wertVorgabe)
+    JSON_SET_STRING(j, "quelle", s.quelltext)
+    JSON_SET_BOOL(j, "pinTexte", s.pinTexte)
+    IF s.bauform <> "" THEN JSON_SET_STRING(j, "bauform", s.bauform)
+    IF s.loecher <> "" THEN JSON_SET_STRING(j, "loecher", s.loecher)
+    IF s.textOrte THEN
+        JSON_SET_JSON(j, "refOrt", JSON_NEW_ARRAY())
+        JSON_APPEND_INT(j, "refOrt", s.refOrt.x)
+        JSON_APPEND_INT(j, "refOrt", s.refOrt.y)
+        JSON_SET_JSON(j, "wertOrt", JSON_NEW_ARRAY())
+        JSON_APPEND_INT(j, "wertOrt", s.wertOrt.x)
+        JSON_APPEND_INT(j, "wertOrt", s.wertOrt.y)
+    END IF
+    JSON_SET_JSON(j, "pins", JSON_NEW_ARRAY())
+    DIM i AS INTEGER, k AS INTEGER
+    FOR i = 0 TO LEN(s.pins) - 1
+        DIM p AS Pin : p = s.pins[i]
+        DIM pj AS JSON_HANDLE : pj = JSON_NEW_OBJECT()
+        JSON_SET_STRING(pj, "nr", p.nummer)
+        JSON_SET_STRING(pj, "name", p.name)
+        JSON_SET_INT(pj, "x", p.pos.x)
+        JSON_SET_INT(pj, "y", p.pos.y)
+        JSON_SET_INT(pj, "len", p.laenge)
+        JSON_SET_INT(pj, "ri", p.richtung)
+        JSON_SET_INT(pj, "typ", p.typ)
+        IF NOT p.zeigeName AND p.name <> "" THEN JSON_SET_BOOL(pj, "zn", FALSE)
+        JSON_APPEND_JSON(j, "pins", pj)
+    NEXT
+    JSON_SET_JSON(j, "grafik", JSON_NEW_ARRAY())
+    FOR i = 0 TO LEN(s.grafik) - 1
+        DIM g AS Primitiv : g = s.grafik[i]
+        DIM gj AS JSON_HANDLE : gj = JSON_NEW_OBJECT()
+        JSON_SET_INT(gj, "art", g.art)
+        JSON_SET_JSON(gj, "pts", JSON_NEW_ARRAY())
+        FOR k = 0 TO LEN(g.punkte) - 1
+            JSON_APPEND_INT(gj, "pts", g.punkte[k].x)
+            JSON_APPEND_INT(gj, "pts", g.punkte[k].y)
+        NEXT
+        IF g.radius <> 0 THEN JSON_SET_INT(gj, "r", g.radius)
+        IF g.winkel1 <> 0 OR g.winkel2 <> 0 THEN
+            JSON_SET_FLOAT(gj, "w1", g.winkel1)
+            JSON_SET_FLOAT(gj, "w2", g.winkel2)
+        END IF
+        IF g.text <> "" THEN JSON_SET_STRING(gj, "text", g.text)
+        IF g.fuellen THEN JSON_SET_BOOL(gj, "fuellen", TRUE)
+        JSON_APPEND_JSON(j, "grafik", gj)
+    NEXT
+    RETURN j
+END FUNCTION
+
+FUNCTION jsonText$(j AS JSON_HANDLE, pfad AS STRING, vorgabe AS STRING) AS STRING
+    IF JSON_HAS(j, pfad) THEN RETURN JSON_GET_STRING(j, pfad)
+    RETURN vorgabe
+END FUNCTION
+
+' Ein Symbol aus dem JSON-Baum am Pfad b ("" = Wurzel, sonst "symbole.3").
+FUNCTION symbolAusJson(j AS JSON_HANDLE, b AS STRING) AS Symbol
+    DIM v AS STRING : v = b
+    IF v <> "" THEN v = v + "."
+    DIM s AS Symbol : s = NEW Symbol(JSON_GET_STRING(j, v + "id"), jsonText$(j, v + "name", "?"), jsonText$(j, v + "praefix", "U"))
+    s.eigen = TRUE
+    s.beschreibung = jsonText$(j, v + "beschreibung", "")
+    s.wertVorgabe = jsonText$(j, v + "wert", "")
+    s.quelltext = jsonText$(j, v + "quelle", "")
+    IF JSON_HAS(j, v + "pinTexte") THEN s.pinTexte = JSON_GET_BOOL(j, v + "pinTexte")
+    s.bauform = jsonText$(j, v + "bauform", "")
+    s.loecher = jsonText$(j, v + "loecher", "")
+    IF JSON_HAS(j, v + "refOrt") THEN
+        s.textOrte = TRUE
+        s.refOrt = NEW Punkt(JSON_GET_INT(j, v + "refOrt.0"), JSON_GET_INT(j, v + "refOrt.1"))
+        s.wertOrt = NEW Punkt(JSON_GET_INT(j, v + "wertOrt.0"), JSON_GET_INT(j, v + "wertOrt.1"))
+    END IF
+    DIM i AS INTEGER, k AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, v + "pins") - 1
+        DIM pv AS STRING : pv = v + "pins." + STR$(i) + "."
+        DIM jp AS Pin : jp = s.pinHinzu(JSON_GET_STRING(j, pv + "nr"), jsonText$(j, pv + "name", ""), NEW Punkt(JSON_GET_INT(j, pv + "x"), JSON_GET_INT(j, pv + "y")), JSON_GET_INT(j, pv + "len"), JSON_GET_INT(j, pv + "ri"), JSON_GET_INT(j, pv + "typ"))
+        IF JSON_HAS(j, pv + "zn") THEN jp.zeigeName = JSON_GET_BOOL(j, pv + "zn")
+    NEXT
+    FOR i = 0 TO JSON_LEN(j, v + "grafik") - 1
+        DIM gv AS STRING : gv = v + "grafik." + STR$(i) + "."
+        DIM g AS Primitiv : g = NEW Primitiv(JSON_GET_INT(j, gv + "art"))
+        DIM n AS INTEGER : n = JSON_LEN(j, gv + "pts")
+        k = 0
+        WHILE k + 1 < n
+            ARRAY_PUSH(g.punkte, NEW Punkt(JSON_GET_INT(j, gv + "pts." + STR$(k)), JSON_GET_INT(j, gv + "pts." + STR$(k + 1))))
+            k = k + 2
+        WEND
+        IF JSON_HAS(j, gv + "r") THEN g.radius = JSON_GET_INT(j, gv + "r")
+        IF JSON_HAS(j, gv + "w1") THEN g.winkel1 = JSON_GET_FLOAT(j, gv + "w1")
+        IF JSON_HAS(j, gv + "w2") THEN g.winkel2 = JSON_GET_FLOAT(j, gv + "w2")
+        g.text = jsonText$(j, gv + "text", "")
+        IF JSON_HAS(j, gv + "fuellen") THEN g.fuellen = JSON_GET_BOOL(j, gv + "fuellen")
+        s.grafikHinzu(g)
+    NEXT
+    RETURN s
+END FUNCTION
+
+' --- Register: alle eigenen Symbole, die das Programm gerade kennt ----------
+' (persoenliche Bibliothek + aus geladenen Dokumenten). Ein schon bekanntes
+' Symbol wird an Ort und Stelle ueberschrieben -- alle Bauteile, die darauf
+' zeigen, sehen die neue Fassung sofort (auch beim Rueckgaengig).
+
+DIM gEigene AS ARRAY OF Symbol
+
+SUB symbolFelderKopieren(ziel AS Symbol, q AS Symbol)
+    ziel.name = q.name
+    ziel.beschreibung = q.beschreibung
+    ziel.praefix = q.praefix
+    ziel.wertVorgabe = q.wertVorgabe
+    ziel.pins = q.pins
+    ziel.grafik = q.grafik
+    ziel.einheitLeistung = q.einheitLeistung
+    ziel.nurSimulation = q.nurSimulation
+    ziel.eigen = q.eigen
+    ziel.fehlt = q.fehlt
+    ziel.pinTexte = q.pinTexte
+    ziel.quelltext = q.quelltext
+    ziel.textOrte = q.textOrte
+    ziel.refOrt = q.refOrt
+    ziel.wertOrt = q.wertOrt
+    ziel.bauform = q.bauform
+    ziel.loecher = q.loecher
+END SUB
+
+FUNCTION eigenesSymbol(id AS STRING) AS Symbol
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gEigene) - 1
+        IF gEigene[i].id = id THEN RETURN gEigene[i]
+    NEXT
+    RETURN NEW Symbol("", "", "")
+END FUNCTION
+
+FUNCTION istEigenBekannt(id AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gEigene) - 1
+        IF gEigene[i].id = id THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION symbolRegistrieren(s AS Symbol) AS Symbol
+    IF istEigenBekannt(s.id) THEN
+        DIM alt AS Symbol : alt = eigenesSymbol(s.id)
+        symbolFelderKopieren(alt, s)
+        RETURN alt
+    END IF
+    ARRAY_PUSH(gEigene, s)
+    RETURN s
+END FUNCTION
+
+FUNCTION eigeneSymbole() AS ARRAY OF Symbol
+    RETURN gEigene
+END FUNCTION
+
+' Ein sichtbarer Ersatz fuer ein unbekanntes Symbol (statt still ein anderes
+' Bauteil). Taucht das echte Symbol spaeter auf (Einfuegen, Laden), wird der
+' Platzhalter an Ort und Stelle ersetzt.
+FUNCTION symbolPlatzhalter(id AS STRING) AS Symbol
+    DIM s AS Symbol : s = NEW Symbol(id, "Fehlt: " + id, "?")
+    s.fehlt = TRUE
+    s.eigen = TRUE
+    s.grafikHinzu(prRechteck(-300, -200, 300, 200))
+    s.grafikHinzu(prLinie(-300, -200, 300, 200))
+    s.grafikHinzu(prLinie(-300, 200, 300, -200))
+    RETURN symbolRegistrieren(s)
+END FUNCTION
+
+' --- Persoenliche Bibliothek (eine JSON-Datei) ------------------------------
+
+DIM gBibDatei AS ARRAY OF Symbol
+
+FUNCTION bibliothekLaden(pfad AS STRING) AS INTEGER
+    gBibDatei = []
+    IF NOT FILEEXISTS(pfad) THEN RETURN 0
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_LOAD(pfad)
+    CATCH e
+        RETURN -1
+    END TRY
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "symbole") - 1
+        ARRAY_PUSH(gBibDatei, symbolRegistrieren(symbolAusJson(j, "symbole." + STR$(i))))
+    NEXT
+    RETURN LEN(gBibDatei)
+END FUNCTION
+
+FUNCTION inBibliothek(id AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gBibDatei) - 1
+        IF gBibDatei[i].id = id THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION bibliothekAufnehmen(s AS Symbol, pfad AS STRING) AS BOOLEAN
+    IF NOT inBibliothek(s.id) THEN ARRAY_PUSH(gBibDatei, s)
+    DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+    JSON_SET_INT(j, "funkenflugBibliothek", 1)
+    JSON_SET_JSON(j, "symbole", JSON_NEW_ARRAY())
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gBibDatei) - 1
+        JSON_APPEND_JSON(j, "symbole", symbolNachJson(gBibDatei[i]))
+    NEXT
+    TRY
+        WRITEALL(pfad, JSON_PRETTY(j))
+    CATCH e
+        RETURN FALSE
+    END TRY
+    RETURN TRUE
+END FUNCTION

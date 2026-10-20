@@ -1,0 +1,274 @@
+' Weitere eingebaute Symbole -- Namensraum "kern".
+'
+' Jedes Symbol bringt seine Platinen-Bauform mit (s.bauform), die Pin-
+' Nummern folgen dem ueblichen Gehaeuse (OPV wie TL071/741, Regler wie 78xx,
+' 555 und 74xx wie im Datenblatt) -- so passt das Bein auf der Platine.
+' Logik gibt es als ganze 74xx-ICs: einzelne Gatter-Symbole braeuchten
+' Mehrfach-Einheiten je Gehaeuse, die bewusst fehlen.
+' Alle Anschlusspunkte liegen auf dem 1-mm-Raster.
+
+FUNCTION prDreieck(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, x3 AS INTEGER, y3 AS INTEGER, voll AS BOOLEAN) AS Primitiv
+    DIM p AS Primitiv : p = NEW Primitiv(PR_POLYLINIE)
+    ARRAY_PUSH(p.punkte, NEW Punkt(x1, y1))
+    ARRAY_PUSH(p.punkte, NEW Punkt(x2, y2))
+    ARRAY_PUSH(p.punkte, NEW Punkt(x3, y3))
+    ARRAY_PUSH(p.punkte, NEW Punkt(x1, y1))
+    p.fuellen = voll
+    RETURN p
+END FUNCTION
+
+FUNCTION prText(x AS INTEGER, y AS INTEGER, t AS STRING) AS Primitiv
+    DIM p AS Primitiv : p = NEW Primitiv(PR_TEXT)
+    p.text = t
+    p.textGroesse = 110
+    ARRAY_PUSH(p.punkte, NEW Punkt(x, y))
+    RETURN p
+END FUNCTION
+
+' Ein IC aus einer Pinliste als eingebautes Symbol (nicht "eigen").
+FUNCTION icEingebaut(id AS STRING, name AS STRING, praefix AS STRING, wert AS STRING, bauform AS STRING, liste AS STRING) AS Symbol
+    DIM s AS Symbol : s = icErzeugen(id, name, praefix, wert, liste)
+    s.eigen = FALSE
+    s.quelltext = ""
+    s.bauform = bauform
+    RETURN s
+END FUNCTION
+
+' Diodenkoerper (Dreieck zum Kathodenbalken bei x = 60), ohne den Balken.
+SUB diodenDreieck(s AS Symbol)
+    s.grafikHinzu(prDreieck(-60, -70, 60, 0, -60, 70, TRUE))
+END SUB
+
+SUB bibliothekMehr()
+    DIM s AS Symbol
+    DIM lf AS STRING : lf = CHR$(10)
+    DIM i AS INTEGER
+
+    ' --- Dioden -------------------------------------------------------------
+    s = NEW Symbol("D_Z", "Z-Diode", "D")
+    s.wertVorgabe = "ZPD5V1"
+    s.bauform = "AX4"
+    diodenDreieck(s)
+    s.grafikHinzu(prLinie(60, -70, 60, 70))
+    s.grafikHinzu(prLinie(60, -70, 35, -95))
+    s.grafikHinzu(prLinie(60, 70, 85, 95))
+    s.pinHinzu("1", "A", NEW Punkt(-200, 0), 140, 0, PIN_PASSIV)
+    s.pinHinzu("2", "K", NEW Punkt(200, 0), 140, 180, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    s = NEW Symbol("D_S", "Schottky-Diode", "D")
+    s.wertVorgabe = "1N5819"
+    s.bauform = "AX4"
+    diodenDreieck(s)
+    s.grafikHinzu(prLinie(60, -70, 60, 70))
+    s.grafikHinzu(prLinie(60, -70, 90, -70))
+    s.grafikHinzu(prLinie(90, -70, 90, -45))
+    s.grafikHinzu(prLinie(60, 70, 30, 70))
+    s.grafikHinzu(prLinie(30, 70, 30, 45))
+    s.pinHinzu("1", "A", NEW Punkt(-200, 0), 140, 0, PIN_PASSIV)
+    s.pinHinzu("2", "K", NEW Punkt(200, 0), 140, 180, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    ' --- Transistoren --------------------------------------------------------
+    ' PNP: wie NPN, der Pfeil am Emitter zeigt zur Basis
+    s = NEW Symbol("Q_PNP", "PNP-Transistor", "Q")
+    s.wertVorgabe = "BC557"
+    s.bauform = "TO92-CBE"
+    s.grafikHinzu(prKreis(20, 0, 180))
+    s.grafikHinzu(prLinie(-40, -80, -40, 80))
+    s.grafikHinzu(prLinie(-40, -30, 100, -100))
+    s.grafikHinzu(prLinie(-40, 30, 100, 100))
+    s.grafikHinzu(prDreieck(9, 55, 43, 91, 59, 59, TRUE))
+    s.pinHinzu("1", "B", NEW Punkt(-200, 0), 160, 0, PIN_PASSIV)
+    s.pinHinzu("2", "C", NEW Punkt(100, -200), 100, 90, PIN_PASSIV)
+    s.pinHinzu("3", "E", NEW Punkt(100, 200), 100, 270, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    ' MOSFETs (Anreicherung): Gate links, drei Kanalstriche, Pfeil am Substrat
+    FOR i = 0 TO 1
+        IF i = 0 THEN
+            s = NEW Symbol("Q_NMOS", "N-MOSFET", "Q")
+            s.wertVorgabe = "2N7000"
+        ELSE
+            s = NEW Symbol("Q_PMOS", "P-MOSFET", "Q")
+            s.wertVorgabe = "BS250"
+        END IF
+        s.bauform = "TO92-SGD"
+        s.grafikHinzu(prKreis(20, 0, 180))
+        s.grafikHinzu(prLinie(-80, -80, -80, 80))
+        s.grafikHinzu(prLinie(-40, -90, -40, -50))
+        s.grafikHinzu(prLinie(-40, -20, -40, 20))
+        s.grafikHinzu(prLinie(-40, 50, -40, 90))
+        s.grafikHinzu(prLinie(-40, -70, 100, -70))
+        s.grafikHinzu(prLinie(-40, 70, 100, 70))
+        s.grafikHinzu(prLinie(-40, 0, 100, 0))
+        s.grafikHinzu(prLinie(100, 0, 100, 70))
+        IF i = 0 THEN
+            s.grafikHinzu(prDreieck(-35, 0, 5, -20, 5, 20, TRUE))
+        ELSE
+            s.grafikHinzu(prDreieck(25, 0, -15, -20, -15, 20, TRUE))
+        END IF
+        s.pinHinzu("1", "G", NEW Punkt(-200, 0), 120, 0, PIN_EINGANG)
+        s.pinHinzu("2", "D", NEW Punkt(100, -200), 130, 90, PIN_PASSIV)
+        s.pinHinzu("3", "S", NEW Punkt(100, 200), 130, 270, PIN_PASSIV)
+        ARRAY_PUSH(gBib, s)
+    NEXT
+
+    ' --- Passive ------------------------------------------------------------
+    s = NEW Symbol("RV", "Potentiometer", "RV")
+    s.wertVorgabe = "10k"
+    s.bauform = "TRIM"
+    s.grafikHinzu(prRechteck(-100, -40, 100, 40))
+    s.grafikHinzu(prDreieck(0, -40, -25, -80, 25, -80, TRUE))
+    s.pinHinzu("1", "", NEW Punkt(-200, 0), 100, 0, PIN_PASSIV)
+    s.pinHinzu("2", "S", NEW Punkt(0, -200), 120, 90, PIN_PASSIV)
+    s.pinHinzu("3", "", NEW Punkt(200, 0), 100, 180, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    s = NEW Symbol("Y", "Quarz", "Y")
+    s.wertVorgabe = "16MHz"
+    s.bauform = "RAD2"
+    s.grafikHinzu(prRechteck(-30, -80, 30, 80))
+    s.grafikHinzu(prLinie(-70, -100, -70, 100))
+    s.grafikHinzu(prLinie(70, -100, 70, 100))
+    s.pinHinzu("1", "", NEW Punkt(-200, 0), 130, 0, PIN_PASSIV)
+    s.pinHinzu("2", "", NEW Punkt(200, 0), 130, 180, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    ' Sicherung: Rechteck mit durchgehendem Draht; Bauform Halter 5x20 (22,6 mm)
+    s = NEW Symbol("F", "Sicherung", "F")
+    s.wertVorgabe = "500mA"
+    s.bauform = "AX9"
+    s.grafikHinzu(prRechteck(-120, -40, 120, 40))
+    s.grafikHinzu(prLinie(-120, 0, 120, 0))
+    s.pinHinzu("1", "", NEW Punkt(-200, 0), 80, 0, PIN_PASSIV)
+    s.pinHinzu("2", "", NEW Punkt(200, 0), 80, 180, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    ' Batterie: lange Platte = Plus
+    s = NEW Symbol("BT", "Batterie", "BT")
+    s.wertVorgabe = "9V"
+    s.bauform = "RAD4"
+    s.grafikHinzu(prLinie(-30, -100, -30, 100))
+    s.grafikHinzu(prLinie(30, -50, 30, 50))
+    s.grafikHinzu(prLinie(31, -50, 31, 50))
+    s.grafikHinzu(prText(-90, -100, "+"))
+    s.pinHinzu("1", "+", NEW Punkt(-200, 0), 170, 0, PIN_LEISTUNG_AUS)
+    s.pinHinzu("2", "-", NEW Punkt(200, 0), 170, 180, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    ' --- Quellen fuer die Simulation (nicht auf Platine und Stueckliste) ----
+    ' Wert = Quelle in SPICE-Schreibweise: "5V", "SIN(0 1 1k)", "PULSE(0 5 0 1u 1u 0.5m 1m)", "AC 1"
+    s = NEW Symbol("V", "Spannungsquelle", "V")
+    s.wertVorgabe = "5V"
+    s.nurSimulation = TRUE
+    s.grafikHinzu(prKreis(0, 0, 150))
+    s.grafikHinzu(prLinie(-40, -80, 40, -80))
+    s.grafikHinzu(prLinie(0, -120, 0, -40))
+    s.grafikHinzu(prLinie(-40, 80, 40, 80))
+    s.pinHinzu("1", "+", NEW Punkt(0, -300), 150, 90, PIN_LEISTUNG_AUS)
+    s.pinHinzu("2", "-", NEW Punkt(0, 300), 150, 270, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    s = NEW Symbol("V_SIG", "Signalquelle", "V")
+    s.wertVorgabe = "SIN(0 1 1k) AC 1"
+    s.nurSimulation = TRUE
+    s.grafikHinzu(prKreis(0, 0, 150))
+    s.grafikHinzu(prBogen(-40, 0, 40, PI, 2 * PI))
+    s.grafikHinzu(prBogen(40, 0, 40, 0, PI))
+    s.grafikHinzu(prLinie(-30, -110, 30, -110))
+    s.grafikHinzu(prLinie(0, -140, 0, -80))
+    s.pinHinzu("1", "+", NEW Punkt(0, -300), 150, 90, PIN_LEISTUNG_AUS)
+    s.pinHinzu("2", "-", NEW Punkt(0, 300), 150, 270, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    ' --- Schalter -----------------------------------------------------------
+    ' Taster (Schliesser): Kontaktbruecke mit Betaetiger; Bauform 6x6-Taster
+    s = NEW Symbol("SW_PUSH", "Taster", "SW")
+    s.bauform = "TAST6"
+    s.grafikHinzu(prKreis(-60, 0, 12))
+    s.grafikHinzu(prKreis(60, 0, 12))
+    s.grafikHinzu(prLinie(-80, -50, 80, -50))
+    s.grafikHinzu(prLinie(0, -50, 0, -110))
+    s.grafikHinzu(prLinie(-30, -110, 30, -110))
+    s.pinHinzu("1", "", NEW Punkt(-200, 0), 140, 0, PIN_PASSIV)
+    s.pinHinzu("2", "", NEW Punkt(200, 0), 140, 180, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    ' Relais (Wechsler): Spule links, Kontakt rechts (Ruhelage an NC)
+    s = NEW Symbol("K", "Relais", "K")
+    s.wertVorgabe = "5V"
+    s.bauform = "RELAIS5"
+    s.grafikHinzu(prRechteck(-400, -100, -200, 100))
+    s.grafikHinzu(prLinie(-400, 100, -200, -100))
+    s.grafikHinzu(prLinie(100, 100, 20, -90))
+    s.grafikHinzu(prKreis(100, 100, 12))
+    s.grafikHinzu(prLinie(-200, 0, 55, 0))
+    s.pinHinzu("1", "A1", NEW Punkt(-300, -300), 200, 90, PIN_PASSIV)
+    s.pinHinzu("2", "A2", NEW Punkt(-300, 300), 200, 270, PIN_PASSIV)
+    s.pinHinzu("3", "COM", NEW Punkt(100, 300), 200, 270, PIN_PASSIV)
+    s.pinHinzu("4", "NO", NEW Punkt(200, -300), 200, 90, PIN_PASSIV)
+    s.pinHinzu("5", "NC", NEW Punkt(0, -300), 200, 90, PIN_PASSIV)
+    ARRAY_PUSH(gBib, s)
+
+    ' --- Analog-ICs ---------------------------------------------------------
+    ' Operationsverstaerker, Pins wie TL071/741 (DIP8: 1, 5, 8 frei)
+    s = NEW Symbol("OPV", "Operationsverstaerker", "U")
+    s.wertVorgabe = "TL071"
+    s.bauform = "DIP8"
+    s.grafikHinzu(prDreieck(-200, -200, 200, 0, -200, 200, FALSE))
+    s.grafikHinzu(prText(-150, -100, "-"))
+    s.grafikHinzu(prText(-150, 100, "+"))
+    s.pinHinzu("2", "IN-", NEW Punkt(-400, -100), 200, 0, PIN_EINGANG)
+    s.pinHinzu("3", "IN+", NEW Punkt(-400, 100), 200, 0, PIN_EINGANG)
+    s.pinHinzu("6", "OUT", NEW Punkt(400, 0), 200, 180, PIN_AUSGANG)
+    s.pinHinzu("7", "V+", NEW Punkt(0, -300), 200, 90, PIN_LEISTUNG_EIN)
+    s.pinHinzu("4", "V-", NEW Punkt(0, 300), 200, 270, PIN_LEISTUNG_EIN)
+    ARRAY_PUSH(gBib, s)
+
+    ' Festspannungsregler 78xx: IN 1, GND 2, OUT 3 (TO-220)
+    s = NEW Symbol("REG", "Spannungsregler", "U")
+    s.wertVorgabe = "7805"
+    s.bauform = "TO220"
+    s.pinTexte = TRUE
+    s.grafikHinzu(prRechteck(-400, -200, 400, 200))
+    s.pinHinzu("1", "IN", NEW Punkt(-600, 0), 200, 0, PIN_LEISTUNG_EIN)
+    s.pinHinzu("3", "OUT", NEW Punkt(600, 0), 200, 180, PIN_LEISTUNG_AUS)
+    s.pinHinzu("2", "GND", NEW Punkt(0, 400), 200, 270, PIN_LEISTUNG_EIN)
+    ARRAY_PUSH(gBib, s)
+
+    ARRAY_PUSH(gBib, icEingebaut("NE555", "Timer 555", "U", "NE555", "DIP8", "1 GND unten vin" + lf + "2 TRIG links ein" + lf + "3 OUT rechts aus" + lf + "4 ~{RESET} links ein" + lf + "5 CV links passiv" + lf + "6 THR links ein" + lf + "7 DIS rechts passiv" + lf + "8 VCC oben vin"))
+
+    ' --- Logik (74xx, ganze ICs) ----------------------------------------------
+    DIM vier AS STRING
+    vier = "1 1A links ein" + lf + "2 1B links ein" + lf + "3 1Y rechts aus" + lf + "4 2A links ein" + lf + "5 2B links ein" + lf + "6 2Y rechts aus" + lf + "7 GND unten vin" + lf + "8 3Y rechts aus" + lf + "9 3A links ein" + lf + "10 3B links ein" + lf + "11 4Y rechts aus" + lf + "12 4A links ein" + lf + "13 4B links ein" + lf + "14 VCC oben vin"
+    ARRAY_PUSH(gBib, icEingebaut("7400", "4x NAND (7400)", "U", "74HC00", "DIP14", vier))
+    ARRAY_PUSH(gBib, icEingebaut("7408", "4x AND (7408)", "U", "74HC08", "DIP14", vier))
+    ARRAY_PUSH(gBib, icEingebaut("7432", "4x OR (7432)", "U", "74HC32", "DIP14", vier))
+    ARRAY_PUSH(gBib, icEingebaut("7486", "4x XOR (7486)", "U", "74HC86", "DIP14", vier))
+    ARRAY_PUSH(gBib, icEingebaut("7404", "6x NOT (7404)", "U", "74HC04", "DIP14", "1 1A links ein" + lf + "2 1Y rechts aus" + lf + "3 2A links ein" + lf + "4 2Y rechts aus" + lf + "5 3A links ein" + lf + "6 3Y rechts aus" + lf + "7 GND unten vin" + lf + "8 4Y rechts aus" + lf + "9 4A links ein" + lf + "10 5Y rechts aus" + lf + "11 5A links ein" + lf + "12 6Y rechts aus" + lf + "13 6A links ein" + lf + "14 VCC oben vin"))
+
+    ' --- Steckverbinder ---------------------------------------------------
+    DIM groessen AS ARRAY OF INTEGER : groessen = [2, 3, 4, 6, 8]
+    DIM k AS INTEGER
+    FOR i = 0 TO LEN(groessen) - 1
+        DIM t AS STRING : t = ""
+        FOR k = 1 TO groessen[i]
+            t = t + STR$(k) + " - links" + lf
+        NEXT
+        DIM c AS Symbol : c = icEingebaut("CONN_1X" + STR$(groessen[i]), "Stecker 1x" + STR$(groessen[i]), "J", "", "SIL" + STR$(groessen[i]), t)
+        FOR k = 0 TO LEN(c.pins) - 1
+            c.pins[k].name = ""
+        NEXT
+        ARRAY_PUSH(gBib, c)
+    NEXT
+    DIM t2 AS STRING : t2 = ""
+    FOR k = 1 TO 10
+        t2 = t2 + STR$(k) + " - " + IIF(k MOD 2 = 1, "links", "rechts") + lf
+    NEXT
+    DIM c2 AS Symbol : c2 = icEingebaut("CONN_2X5", "Stecker 2x5", "J", "", "HDR2X5", t2)
+    FOR k = 0 TO LEN(c2.pins) - 1
+        c2.pins[k].name = ""
+    NEXT
+    ARRAY_PUSH(gBib, c2)
+END SUB

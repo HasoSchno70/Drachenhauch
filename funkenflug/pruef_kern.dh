@@ -1,0 +1,1445 @@
+' Kern-Pruefung ohne Oberflaeche: Transform, Save/Load, Netze.
+IMPORT "kern/kern.dh" AS kern
+
+kern.bibliothekAufbauen()
+PRINT "Symbole: "; LEN(kern.bibliothekListe())
+
+DIM dok AS kern.Dokument : dok = NEW kern.Dokument()
+DIM bl AS kern.Blatt : bl = dok.blaetter[0]
+
+DIM r AS kern.Bauteil : r = kern.neuesBauteil("R", kern.neueLage(1000, 1000))
+r.referenz = "R1"
+ARRAY_PUSH(bl.bauteile, r)
+
+DIM w AS kern.Draht : w = NEW kern.Draht()
+ARRAY_PUSH(w.punkte, NEW kern.Punkt(1200, 1000))
+ARRAY_PUSH(w.punkte, NEW kern.Punkt(2000, 1000))
+ARRAY_PUSH(bl.draehte, w)
+kern.autoKnoten(bl)
+
+' Transform: Pin 0 (lokal -200,0) bei pos 1000,1000
+PRINT "Pin0 rot0:  "; r.pinPunkt(0).x; ","; r.pinPunkt(0).y; "  (erwartet 800,1000)"
+r.lage.drehung = 90
+PRINT "Pin0 rot90: "; r.pinPunkt(0).x; ","; r.pinPunkt(0).y; "  (erwartet 1000,800)"
+r.lage.drehung = 0
+
+' Netz: Pin 1 des R bei (1200,1000) == Drahtende (2000,1000)?
+DIM n AS kern.Netze : n = kern.netzeBerechnen(bl)
+PRINT "Pin1(1200,1000) ~ Drahtende(2000,1000)? "; n.gleich(1200, 1000, 2000, 1000); " (erwartet TRUE)"
+PRINT "Pin0(800,1000)  ~ Drahtende(2000,1000)? "; n.gleich(800, 1000, 2000, 1000); " (erwartet FALSE)"
+
+' Raster: "\" statt "/" (in Drachenhauch ist "/" immer Kommazahl)
+PRINT "rastern 0/49/50/149/-49/-50: "; kern.rastern(0, 100); " "; kern.rastern(49, 100); " "; kern.rastern(50, 100); " "; kern.rastern(149, 100); " "; kern.rastern(-49, 100); " "; kern.rastern(-50, 100); "  (erwartet 0 0 100 100 0 -100)"
+
+' Labels: Label A innen auf dem Draht (T), Label B frei bei (5000,5000),
+' beide "NETZ" -> Draht und B im selben Netz.
+DIM lb AS kern.Blatt : lb = NEW kern.Blatt("L")
+DIM w2 AS kern.Draht : w2 = NEW kern.Draht()
+ARRAY_PUSH(w2.punkte, NEW kern.Punkt(0, 0))
+ARRAY_PUSH(w2.punkte, NEW kern.Punkt(0, 1000))
+ARRAY_PUSH(lb.draehte, w2)
+ARRAY_PUSH(lb.labels, NEW kern.Label("NETZ", NEW kern.Punkt(0, 500), kern.LA_LOKAL))
+ARRAY_PUSH(lb.labels, NEW kern.Label("NETZ", NEW kern.Punkt(5000, 5000), kern.LA_LOKAL))
+DIM nl AS kern.Netze : nl = kern.netzeBerechnen(lb)
+PRINT "Label A ~ Drahtende (T)?   "; nl.gleich(0, 500, 0, 0); " (erwartet TRUE)"
+PRINT "Label A ~ Label B (Name)?  "; nl.gleich(0, 500, 5000, 5000); " (erwartet TRUE)"
+PRINT "Drahtende ~ Label B?       "; nl.gleich(0, 0, 5000, 5000); " (erwartet TRUE)"
+
+' Benannte Netze: zwei GND-Symbole ohne Draht sind EIN Netz "GND";
+' R1 Pin 1 haengt per Draht an GND, Pin 2 ist frei (automatisch N1).
+DIM nb AS kern.Blatt : nb = NEW kern.Blatt("N")
+ARRAY_PUSH(nb.bauteile, kern.neuesBauteil("GND", kern.neueLage(0, 0)))
+ARRAY_PUSH(nb.bauteile, kern.neuesBauteil("GND", kern.neueLage(5000, 0)))
+DIM rn AS kern.Bauteil : rn = kern.neuesBauteil("R", kern.neueLage(200, -1000))
+rn.referenz = "R1"
+ARRAY_PUSH(nb.bauteile, rn)
+DIM wn AS kern.Draht : wn = NEW kern.Draht()
+ARRAY_PUSH(wn.punkte, NEW kern.Punkt(0, -1000))
+ARRAY_PUSH(wn.punkte, NEW kern.Punkt(0, 0))
+ARRAY_PUSH(nb.draehte, wn)
+DIM nn AS kern.Netze : nn = kern.netzeBerechnen(nb)
+PRINT "Netze: "; LEN(nn.liste); "  (erwartet 2)"
+PRINT "Netz an R1.1 / GND rechts / R1.2: "; nn.liste[nn.netzAn(0, -1000)].name; " / "; nn.liste[nn.netzAn(5000, 0)].name; " / "; nn.liste[nn.netzAn(400, -1000)].name; "  (erwartet GND / GND / N1)"
+PRINT "echte Pins in GND: "; nn.liste[nn.netzAn(0, 0)].echtePins(); "  (erwartet 1)"
+
+' ERC am Blatt oben: genau ein Verstoss (R1 Pin 2 offen)
+DIM ev AS ARRAY OF kern.Verstoss : ev = kern.ercPruefen(nb)
+PRINT "ERC-Verstoesse: "; LEN(ev); "  (erwartet 1)"
+IF LEN(ev) > 0 THEN PRINT "  -> "; ev[0].text
+' Kurzschluss: VCC per Draht an GND
+DIM kb AS kern.Blatt : kb = NEW kern.Blatt("K")
+ARRAY_PUSH(kb.bauteile, kern.neuesBauteil("VCC", kern.neueLage(0, 0)))
+ARRAY_PUSH(kb.bauteile, kern.neuesBauteil("GND", kern.neueLage(0, 1000)))
+DIM wk AS kern.Draht : wk = NEW kern.Draht()
+ARRAY_PUSH(wk.punkte, NEW kern.Punkt(0, 0))
+ARRAY_PUSH(wk.punkte, NEW kern.Punkt(0, 1000))
+ARRAY_PUSH(kb.draehte, wk)
+DIM ek AS ARRAY OF kern.Verstoss : ek = kern.ercPruefen(kb)
+PRINT "Kurzschluss erkannt: "; LEN(ek) > 0 AND ek[0].schwere = kern.ERC_FEHLER; "  (erwartet TRUE)"
+IF LEN(ek) > 0 THEN PRINT "  -> "; ek[0].text
+
+' SPICE-Werte
+PRINT "spiceWert: "; kern.spiceWert$("4k7"); " "; kern.spiceWert$("2R2"); " "; kern.spiceWert$("1M"); " "; kern.spiceWert$("100n"); " "; kern.spiceWert$("10R"); " "; kern.spiceWert$("330"); " "; kern.spiceWert$("4.7µ")
+PRINT "           (erwartet 4.7k 2.2 1Meg 100n 10 330 4.7u)"
+
+' SPICE einer kleinen Schaltung: VCC - R1 4k7 - D1 LED - GND
+DIM sb AS kern.Blatt : sb = NEW kern.Blatt("S")
+ARRAY_PUSH(sb.bauteile, kern.neuesBauteil("VCC", kern.neueLage(2000, 1200)))
+DIM sr AS kern.Bauteil : sr = kern.neuesBauteil("R", kern.neueLage(2000, 2000))
+sr.lage.drehung = 90 : sr.referenz = "R1" : sr.wert = "4k7"
+ARRAY_PUSH(sb.bauteile, sr)
+DIM sd AS kern.Bauteil : sd = kern.neuesBauteil("LED", kern.neueLage(2000, 3000))
+sd.lage.drehung = 90 : sd.referenz = "D1"
+ARRAY_PUSH(sb.bauteile, sd)
+ARRAY_PUSH(sb.bauteile, kern.neuesBauteil("GND", kern.neueLage(2000, 3600)))
+DIM sw AS kern.Draht
+sw = NEW kern.Draht() : ARRAY_PUSH(sw.punkte, NEW kern.Punkt(2000, 1200)) : ARRAY_PUSH(sw.punkte, NEW kern.Punkt(2000, 1800)) : ARRAY_PUSH(sb.draehte, sw)
+sw = NEW kern.Draht() : ARRAY_PUSH(sw.punkte, NEW kern.Punkt(2000, 2200)) : ARRAY_PUSH(sw.punkte, NEW kern.Punkt(2000, 2800)) : ARRAY_PUSH(sb.draehte, sw)
+sw = NEW kern.Draht() : ARRAY_PUSH(sw.punkte, NEW kern.Punkt(2000, 3200)) : ARRAY_PUSH(sw.punkte, NEW kern.Punkt(2000, 3600)) : ARRAY_PUSH(sb.draehte, sw)
+DIM sp AS STRING : sp = kern.netzlisteSpice$(sb, "Pruefung")
+PRINT "--- SPICE ---"
+PRINT sp;
+PRINT "SPICE enthaelt R1 VCC N1 4.7k: "; CONTAINS(sp, "R1 VCC N1 4.7k"); "  (erwartet TRUE)"
+PRINT "SPICE enthaelt D1 N1 0 D_LED:  "; CONTAINS(sp, "D1 N1 0 D_LED"); "  (erwartet TRUE)"
+PRINT "ERC der LED-Schaltung: "; LEN(kern.ercPruefen(sb)); " Verstoesse  (erwartet 0)"
+PRINT "--- CSV ---"
+PRINT kern.netzlisteCsv$(sb);
+
+' Umbenennen: GND -> AGND bleibt SPICE-Masse, VCC -> +5V wird Knoten _5V
+PRINT "Stellen GND: "; kern.namensStellen(sb, "GND"); "  (erwartet 1)"
+PRINT "umbenannt GND->AGND: "; kern.namenUmbenennen(sb, "GND", "AGND"); "  (erwartet 1)"
+PRINT "umbenannt VCC->+5V:  "; kern.namenUmbenennen(sb, "VCC", "+5V"); "  (erwartet 1)"
+DIM sp2 AS STRING : sp2 = kern.netzlisteSpice$(sb, "Pruefung")
+PRINT "SPICE AGND bleibt Masse: "; CONTAINS(sp2, "D1 N1 0 D_LED"); "  (erwartet TRUE)"
+PRINT "SPICE +5V als _5V:       "; CONTAINS(sp2, "R1 _5V N1 4.7k"); "  (erwartet TRUE)"
+
+' Draht aufraeumen: Doppelte und Ecken auf der Geraden weg, Spitze bleibt
+DIM wa AS kern.Draht : wa = NEW kern.Draht()
+ARRAY_PUSH(wa.punkte, NEW kern.Punkt(0, 0)) : ARRAY_PUSH(wa.punkte, NEW kern.Punkt(0, 0))
+ARRAY_PUSH(wa.punkte, NEW kern.Punkt(0, 500)) : ARRAY_PUSH(wa.punkte, NEW kern.Punkt(0, 1000))
+ARRAY_PUSH(wa.punkte, NEW kern.Punkt(500, 1000)) : ARRAY_PUSH(wa.punkte, NEW kern.Punkt(500, 1000))
+kern.drahtAufraeumen(wa)
+PRINT "aufgeraeumt: "; LEN(wa.punkte); " Ecken  (erwartet 3)"
+DIM wsp AS kern.Draht : wsp = NEW kern.Draht()
+ARRAY_PUSH(wsp.punkte, NEW kern.Punkt(0, 0)) : ARRAY_PUSH(wsp.punkte, NEW kern.Punkt(0, 1000)) : ARRAY_PUSH(wsp.punkte, NEW kern.Punkt(0, 500))
+kern.drahtAufraeumen(wsp)
+PRINT "Spitze bleibt: "; LEN(wsp.punkte); " Ecken  (erwartet 3)"
+PRINT "Pin angeschlossen: "; kern.punktAngeschlossen(sb, 2000, 1800, wa); "  frei: "; kern.punktAngeschlossen(sb, 9000, 9000, wa); "  (erwartet TRUE FALSE)"
+
+' Gummiband
+FUNCTION pl$(p AS ARRAY OF kern.Punkt) AS STRING
+    DIM t AS STRING : t = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(p) - 1
+        IF i > 0 THEN t = t + " "
+        t = t + STR$(p[i].x) + "," + STR$(p[i].y)
+    NEXT
+    RETURN t
+END FUNCTION
+DIM g1 AS ARRAY OF kern.Punkt : g1 = []
+ARRAY_PUSH(g1, NEW kern.Punkt(2000, 1200)) : ARRAY_PUSH(g1, NEW kern.Punkt(2000, 1800))
+PRINT "Gummiband Ende  : "; pl$(kern.gummiband(g1, 2, 500, 0)); "  (erwartet 2000,1200 2000,1800 2500,1800)"
+DIM g2 AS ARRAY OF kern.Punkt : g2 = []
+ARRAY_PUSH(g2, NEW kern.Punkt(2000, 2200)) : ARRAY_PUSH(g2, NEW kern.Punkt(2000, 2800))
+PRINT "Gummiband Anfang: "; pl$(kern.gummiband(g2, 1, 500, 0)); "  (erwartet 2500,2200 2000,2200 2000,2800)"
+DIM g3 AS ARRAY OF kern.Punkt : g3 = []
+ARRAY_PUSH(g3, NEW kern.Punkt(0, 0)) : ARRAY_PUSH(g3, NEW kern.Punkt(0, 1000)) : ARRAY_PUSH(g3, NEW kern.Punkt(1000, 1000))
+PRINT "Nachbar rueckt  : "; pl$(kern.gummiband(g3, 2, 0, 300)); "  (erwartet 0,0 0,1300 1000,1300)"
+PRINT "Gleiten         : "; pl$(kern.gummiband(g3, 2, 200, 0)); "  (erwartet 0,0 0,1000 1200,1000)"
+PRINT "Original bleibt : "; pl$(g3); "  (erwartet 0,0 0,1000 1000,1000)"
+
+' --- Eigene Symbole
+DIM fl AS kern.Pinliste : fl = kern.pinlisteLesen("# Kommentar" + CHR$(10) + "1 A links ein" + CHR$(10) + "2 B seitwaerts" + CHR$(10) + "3 C r quatsch" + CHR$(10) + "1 D" + CHR$(10) + "4 E r aus zuviel" + CHR$(10) + CHR$(10) + "5 F")
+PRINT "Pinliste: "; LEN(fl.pins); " Pins, "; LEN(fl.fehler); " Fehler  (erwartet 2 Pins, 4 Fehler)"
+DIM fi AS INTEGER
+FOR fi = 0 TO LEN(fl.fehler) - 1
+    PRINT "  "; fl.fehler[fi]
+NEXT
+DIM nePins AS STRING : nePins = "1 GND unten vin" + CHR$(10) + "2 TRIG links ein" + CHR$(10) + "3 OUT rechts aus" + CHR$(10) + "4 RESET links ein" + CHR$(10) + "5 CTRL links ein" + CHR$(10) + "6 THR links ein" + CHR$(10) + "7 DIS rechts aus" + CHR$(10) + "8 VCC oben vin"
+DIM ne AS kern.Symbol : ne = kern.icErzeugen("E_TEST555", "NE555", "U", "NE555", nePins)
+DIM aufRaster AS BOOLEAN : aufRaster = TRUE
+DIM pi2 AS INTEGER
+FOR pi2 = 0 TO LEN(ne.pins) - 1
+    IF ne.pins[pi2].pos.x MOD 100 <> 0 OR ne.pins[pi2].pos.y MOD 100 <> 0 THEN aufRaster = FALSE
+NEXT
+PRINT "NE555: "; LEN(ne.pins); " Pins, alle auf dem Raster: "; aufRaster; "  (erwartet 8 TRUE)"
+PRINT "  Pin 3 OUT: "; ne.pins[2].pos.x; ","; ne.pins[2].pos.y; " Typ "; kern.pinTypName$(ne.pins[2].typ); " Richtung "; ne.pins[2].richtung
+DIM nj AS kern.Symbol : nj = kern.symbolAusJson(kern.symbolNachJson(ne), "")
+PRINT "JSON hin und zurueck: "; LEN(nj.pins); " Pins, Pin 8 bei "; nj.pins[7].pos.x; ","; nj.pins[7].pos.y; ", Quelle gleich: "; nj.quelltext = nePins; "  (erwartet 8, wie oben, TRUE)"
+' fehlendes Symbol -> Platzhalter; taucht es auf, heilt das Bauteil
+DIM eb AS kern.Blatt : eb = NEW kern.Blatt("E")
+DIM ub AS kern.Bauteil : ub = kern.neuesBauteil("E_TEST555", kern.neueLage(0, 0))
+ub.referenz = "U1"
+ARRAY_PUSH(eb.bauteile, ub)
+PRINT "unbekannt -> Platzhalter: "; ub.sym.fehlt; "  ERC: "; kern.ercPruefen(eb)[0].text
+DIM reg AS kern.Symbol : reg = kern.symbolRegistrieren(ne)
+PRINT "nach Registrieren geheilt: "; NOT ub.sym.fehlt; ", "; LEN(ub.sym.pins); " Pins  (erwartet TRUE, 8)"
+' eingebettet in die Datei
+DIM ed AS kern.Dokument : ed = NEW kern.Dokument()
+ARRAY_PUSH(ed.blaetter[0].bauteile, ub)
+DIM ejs AS STRING : ejs = JSON_STRINGIFY(kern.dokumentNachJson(ed))
+PRINT "Symbol steckt in der Datei: "; CONTAINS(ejs, "E_TEST555") AND CONTAINS(ejs, "TRIG"); "  (erwartet TRUE)"
+
+' --- Stueckliste
+DIM bb AS kern.Blatt : bb = NEW kern.Blatt("B")
+DIM bomRefs AS ARRAY OF STRING : bomRefs = ["R10", "R2", "R1", "R3", "R4", "C1"]
+DIM bomWerte AS ARRAY OF STRING : bomWerte = ["4k7", "4k7", "4k7", "4k7", "1k", "100n"]
+DIM bi2 AS INTEGER
+FOR bi2 = 0 TO LEN(bomRefs) - 1
+    DIM bt2 AS kern.Bauteil : bt2 = kern.neuesBauteil(IIF(LEFT$(bomRefs[bi2], 1) = "C", "C", "R"), kern.neueLage(bi2 * 1000, 0))
+    bt2.referenz = bomRefs[bi2]
+    bt2.wert = bomWerte[bi2]
+    ARRAY_PUSH(bb.bauteile, bt2)
+NEXT
+ARRAY_PUSH(bb.bauteile, kern.neuesBauteil("GND", kern.neueLage(0, 2000)))
+PRINT "--- Stueckliste ---"
+PRINT kern.stuecklisteText$(kern.einBlattDokument(bb));
+DIM bz AS ARRAY OF kern.BomZeile : bz = kern.stueckliste(bb)
+PRINT "Zeilen: "; LEN(bz); "  erste: "; bz[0].referenzen[0]; "  4k7: "; kern.referenzBereiche$(bz[1].referenzen); " x"; bz[1].menge; "  (erwartet 3, C1, R1-R3, R10 x4)"
+
+' Gruppen drehen/spiegeln: in allen 8 Lagen x 3 Arten muss jeder Pin (und
+' seine Stummel-Richtung) genau dort landen, wo punktGruppe ihn hinbringt.
+DIM gq AS kern.Symbol : gq = kern.bibliothekSymbol("Q_NPN")
+DIM piv AS kern.Punkt : piv = NEW kern.Punkt(1000, 200)
+DIM fehlerG AS INTEGER : fehlerG = 0
+DIM pruefG AS INTEGER : pruefG = 0
+DIM gsp AS INTEGER, gdr AS INTEGER, gart AS INTEGER, gpn AS INTEGER
+FOR gsp = 0 TO 1
+    FOR gdr = 0 TO 270 STEP 90
+        FOR gart = 1 TO 3
+            DIM gl AS kern.Lage : gl = NEW kern.Lage(NEW kern.Punkt(300, -500), gdr, gsp = 1)
+            DIM gn AS kern.Lage : gn = kern.lageGruppe(gl, piv, gart)
+            FOR gpn = 0 TO LEN(gq.pins) - 1
+                DIM pv AS kern.Pin : pv = gq.pins[gpn]
+                DIM soll AS kern.Punkt : soll = kern.punktGruppe(kern.transformPunkt(gl, pv.pos), piv, gart)
+                DIM ist AS kern.Punkt : ist = kern.transformPunkt(gn, pv.pos)
+                ' Richtung: wohin zeigt der Stummel nach der Gruppenbewegung?
+                DIM rv AS INTEGER : rv = kern.transformRichtung(gl, pv.richtung)
+                DIM spitze2 AS kern.Punkt : spitze2 = kern.punktGruppe(NEW kern.Punkt(kern.transformPunkt(gl, pv.pos).x + kern.richtungDx(rv) * 100, kern.transformPunkt(gl, pv.pos).y + kern.richtungDy(rv) * 100), piv, gart)
+                DIM rnn AS INTEGER : rnn = kern.transformRichtung(gn, pv.richtung)
+                pruefG = pruefG + 1
+                IF NOT kern.punktGleich(soll, ist) OR kern.richtungDx(rnn) * 100 <> spitze2.x - soll.x OR kern.richtungDy(rnn) * 100 <> spitze2.y - soll.y THEN
+                    fehlerG = fehlerG + 1
+                    PRINT "  FEHLER sp="; gsp; " d="; gdr; " art="; gart; " pin "; pv.nummer; ": soll "; soll.x; ","; soll.y; " ist "; ist.x; ","; ist.y
+                END IF
+            NEXT
+        NEXT
+    NEXT
+NEXT
+PRINT "Gruppen-Lage: "; pruefG; " Pin-Pruefungen, Fehler: "; fehlerG; "  (erwartet 72, 0)"
+DIM gb AS ARRAY OF kern.Punkt : gb = []
+ARRAY_PUSH(gb, NEW kern.Punkt(0, 0)) : ARRAY_PUSH(gb, NEW kern.Punkt(1000, 0))
+PRINT "Gummiband beide Enden gleich: "; pl$(kern.gummibandEnden(gb, 100, 200, 100, 200)); "  (erwartet 100,200 1100,200)"
+PRINT "Gummiband beide verschieden : "; pl$(kern.gummibandEnden(gb, 0, 200, 0, -200)); "  (erwartet 0,200 0,-200 1000,-200: Enden am Ziel, rechtwinklig)"
+
+' Gummiband darf keinen Kurzschluss erfinden: senkrechter R mit Draehten
+' oben und unten, um 90 Grad gedreht -- beide Leitungen wuerden sonst zum
+' selben Mittelpunkt knicken.
+DIM kz AS kern.Blatt : kz = NEW kern.Blatt("KZ")
+DIM rk AS kern.Bauteil : rk = kern.neuesBauteil("R", kern.neueLage(2000, 2000))
+rk.lage.drehung = 90
+ARRAY_PUSH(kz.bauteile, rk)
+DIM wo AS kern.Draht : wo = NEW kern.Draht()
+ARRAY_PUSH(wo.punkte, NEW kern.Punkt(2000, 1200)) : ARRAY_PUSH(wo.punkte, NEW kern.Punkt(2000, 1800))
+DIM wu AS kern.Draht : wu = NEW kern.Draht()
+ARRAY_PUSH(wu.punkte, NEW kern.Punkt(2000, 2200)) : ARRAY_PUSH(wu.punkte, NEW kern.Punkt(2000, 2800))
+ARRAY_PUSH(kz.draehte, wo) : ARRAY_PUSH(kz.draehte, wu)
+' ein Label, das schon vorher auf dem oberen Draht sitzt, ist KEINE neue
+' Beruehrung -- es darf den gewohnten Knick nicht verhindern
+ARRAY_PUSH(kz.labels, NEW kern.Label("OBEN", NEW kern.Punkt(2000, 1500), kern.LA_LOKAL))
+DIM altO AS kern.Punkt : altO = rk.pinPunkt(0)
+DIM altU AS kern.Punkt : altU = rk.pinPunkt(1)
+rk.lage = kern.lageGruppe(rk.lage, rk.lage.pos, kern.GR_DREHEN)
+DIM neuO AS kern.Punkt : neuO = rk.pinPunkt(0)
+DIM neuU AS kern.Punkt : neuU = rk.pinPunkt(1)
+wo.punkte = kern.gummibandSicher(kz, wo, wo.punkte, 0, 0, neuO.x - altO.x, neuO.y - altO.y)
+wu.punkte = kern.gummibandSicher(kz, wu, wu.punkte, neuU.x - altU.x, neuU.y - altU.y, 0, 0)
+DIM nkz AS kern.Netze : nkz = kern.netzeBerechnen(kz)
+PRINT "Drehen: oben "; pl$(wo.punkte); " | unten "; pl$(wu.punkte)
+PRINT "  Enden an den neuen Pins: "; kern.punktGleich(wo.punkte[LEN(wo.punkte) - 1], neuO) AND kern.punktGleich(wu.punkte[0], neuU); "  kein Kurzschluss: "; NOT nkz.gleich(2000, 1200, 2000, 2800); "  (erwartet TRUE TRUE)"
+
+' --- Mehrere Blaetter: global/lokal, Namen, ERC, Netzliste, Stueckliste
+DIM md AS kern.Dokument : md = NEW kern.Dokument()
+md.blaetter[0].name = "Haupt"
+DIM mb2 AS kern.Blatt : mb2 = NEW kern.Blatt("Takt")
+ARRAY_PUSH(md.blaetter, mb2)
+DIM mbi AS INTEGER
+FOR mbi = 0 TO 1
+    DIM mr AS kern.Bauteil : mr = kern.neuesBauteil("R", kern.neueLage(0, 0))
+    mr.referenz = "R" + STR$(mbi + 1)
+    ARRAY_PUSH(md.blaetter[mbi].bauteile, mr)
+    ARRAY_PUSH(md.blaetter[mbi].bauteile, kern.neuesBauteil("VCC", kern.neueLage(1000, 0)))
+    ARRAY_PUSH(md.blaetter[mbi].labels, NEW kern.Label("SIG", NEW kern.Punkt(200, 0), kern.LA_GLOBAL))
+    ARRAY_PUSH(md.blaetter[mbi].labels, NEW kern.Label("L", NEW kern.Punkt(-200, 0), kern.LA_LOKAL))
+NEXT
+DIM mn AS kern.Netze : mn = kern.netzeDokument(md)
+PRINT "Blaetter: SIG verbunden "; mn.gleichUeber(0, 200, 0, 1, 200, 0); ", lokales L getrennt "; NOT mn.gleichUeber(0, -200, 0, 1, -200, 0); ", VCC verbunden "; mn.gleichUeber(0, 1000, 0, 1, 1000, 0); "  (erwartet TRUE TRUE TRUE)"
+mn.blattWaehlen(0)
+DIM nameH AS STRING : nameH = mn.liste[mn.netzAn(-200, 0)].name
+mn.blattWaehlen(1)
+DIM nameT AS STRING : nameT = mn.liste[mn.netzAn(-200, 0)].name
+PRINT "Namen der lokalen L: "; nameH; " / "; nameT; "  (erwartet Haupt/L / Takt/L)"
+DIM msp AS STRING : msp = kern.netzlisteSpiceDok$(md, "Mehr")
+PRINT "SPICE ueber Blaetter: "; CONTAINS(msp, "R1 Haupt_L SIG 1k") AND CONTAINS(msp, "R2 Takt_L SIG 1k"); "  (erwartet TRUE)"
+DIM mbz AS ARRAY OF kern.BomZeile : mbz = kern.stuecklisteDok(md)
+PRINT "Stueckliste ueber Blaetter: "; kern.referenzBereiche$(mbz[0].referenzen); " x"; mbz[0].menge; "  (erwartet R1, R2 x2)"
+' lokale L verbinden NICHT ueber Blaetter -> R1.1 und R2.1 sind wirklich offen
+DIM mev0 AS ARRAY OF kern.Verstoss : mev0 = kern.ercPruefenDok(md)
+DIM mtx0 AS STRING : mtx0 = ""
+DIM mv0 AS INTEGER
+FOR mv0 = 0 TO LEN(mev0) - 1
+    mtx0 = mtx0 + mev0[mv0].text + "|"
+NEXT
+PRINT "ERC: "; LEN(mev0); " Verstoesse, R1.1 offen "; CONTAINS(mtx0, "Pin R1.1 ist nicht verbunden"); ", R2.1 offen "; CONTAINS(mtx0, "Pin R2.1 ist nicht verbunden"); "  (erwartet 2, TRUE, TRUE)"
+md.blaetter[1].bauteile[0].referenz = "R1"
+ARRAY_PUSH(md.blaetter[1].labels, NEW kern.Label("EINZELN", NEW kern.Punkt(3000, 3000), kern.LA_GLOBAL))
+DIM mev AS ARRAY OF kern.Verstoss : mev = kern.ercPruefenDok(md)
+DIM mtx AS STRING : mtx = ""
+DIM mvi AS INTEGER
+FOR mvi = 0 TO LEN(mev) - 1
+    mtx = mtx + mev[mvi].text + " [Blatt " + STR$(mev[mvi].blatt) + "]|"
+NEXT
+PRINT "ERC doppelte Ref ueber Blaetter: "; CONTAINS(mtx, "Referenz R1 ist doppelt vergeben [Blatt 1]"); "  einzelnes globales Label: "; CONTAINS(mtx, "Globales Label EINZELN gibt es nur einmal"); "  (erwartet TRUE TRUE)"
+
+' --- Ueberstrich (aktiv-low)
+PRINT "Ueberstrich sichtbar: "; kern.sichtbarerText$("~{RESET}"); " "; kern.sichtbarerText$("~CS~/WR"); " "; kern.sichtbarerText$("A~~B"); " "; kern.sichtbarerText$("~{WR}/RD"); "  (erwartet RESET CS/WR A~B WR/RD)"
+DIM ue1 AS STRING : ue1 = kern.ueberstrichMarkup$("~{RESET}")
+DIM ue2 AS STRING : ue2 = kern.ueberstrichMarkup$("~CS~/WR")
+DIM ue3 AS STRING : ue3 = kern.ueberstrichMarkup$("R&D<1>")
+PRINT "Markup: "; ue1 = "<span overline=" + CHR$(34) + "single" + CHR$(34) + ">RESET</span>"; " "; ue2 = "<span overline=" + CHR$(34) + "single" + CHR$(34) + ">CS</span>/WR"; " "; ue3; "  (erwartet TRUE TRUE R&amp;D&lt;1&gt;)"
+PRINT "Ohne Tilde unveraendert: "; kern.sichtbarerText$("VCC"); " "; kern.hatUeberstrich("VCC"); "  (erwartet VCC FALSE)"
+
+' --- Label-Richtungen folgen der Gruppe wie Pins
+PRINT "Label-Richtung: R "; kern.richtungGruppe(0, kern.GR_DREHEN); " "; kern.richtungGruppe(270, kern.GR_DREHEN); "  X "; kern.richtungGruppe(0, kern.GR_SPIEGELN_X); " "; kern.richtungGruppe(90, kern.GR_SPIEGELN_X); "  Y "; kern.richtungGruppe(90, kern.GR_SPIEGELN_Y); " "; kern.richtungGruppe(180, kern.GR_SPIEGELN_Y); "  (erwartet R 90 0  X 180 90  Y 270 180)"
+
+' --- Bauteil-Felder: Gehaeuse/Bestellnummer, Stueckliste trennt danach
+DIM fd AS kern.Dokument : fd = NEW kern.Dokument()
+DIM fbi AS INTEGER
+FOR fbi = 1 TO 3
+    DIM fr AS kern.Bauteil : fr = kern.neuesBauteil("R", kern.neueLage(fbi * 1000, 0))
+    fr.referenz = "R" + STR$(fbi)
+    fr.wert = "10k"
+    fr.gehaeuse = IIF(fbi = 3, "1206", "0805")
+    IF fbi = 1 THEN fr.bestellnr = "RC0805-10K"
+    ARRAY_PUSH(fd.blaetter[0].bauteile, fr)
+NEXT
+DIM flab AS kern.Label : flab = NEW kern.Label("~{RESET}", NEW kern.Punkt(0, 500), kern.LA_LOKAL)
+flab.drehung = 270
+ARRAY_PUSH(fd.blaetter[0].labels, flab)
+DIM fz AS ARRAY OF kern.BomZeile : fz = kern.stuecklisteDok(fd)
+PRINT "Stueckliste nach Gehaeuse: "; LEN(fz); " Positionen  "; JOIN$(fz[0].referenzen, ","); "/"; fz[0].gehaeuse; "/"; fz[0].bestellnr; "  "; JOIN$(fz[1].referenzen, ","); "/"; fz[1].gehaeuse; "  "; JOIN$(fz[2].referenzen, ","); "/"; fz[2].gehaeuse; "  (erwartet 3 Positionen  R1/0805/RC0805-10K  R2/0805  R3/1206)"
+PRINT "CSV-Kopf: "; STARTSWITH(kern.stuecklisteCsv$(fd), "Menge;Referenzen;Wert;Bauteil;Gehaeuse;Bestellnummer;Beschreibung"); "  Markdown-Spalten: "; CONTAINS(kern.stuecklisteMarkdown$(fd, "F"), "| Gehaeuse | Bestellnummer |"); " "; CONTAINS(kern.stuecklisteMarkdown$(fd, "F"), "| 1 | R3 | 10k | Widerstand | 1206 |  |"); "  (erwartet TRUE TRUE TRUE)"
+DIM fd2 AS kern.Dokument : fd2 = kern.dokumentAusJson(kern.dokumentNachJson(fd))
+PRINT "JSON: "; fd2.blaetter[0].bauteile[0].gehaeuse; " "; fd2.blaetter[0].bauteile[0].bestellnr; " "; fd2.blaetter[0].bauteile[1].bestellnr = ""; " "; fd2.blaetter[0].labels[0].text; " "; fd2.blaetter[0].labels[0].drehung; "  (erwartet 0805 RC0805-10K TRUE ~{RESET} 270)"
+ARRAY_PUSH(fd.blaetter[0].labels, NEW kern.Label("~{RESET}", fd.blaetter[0].bauteile[0].pinPunkt(0), kern.LA_LOKAL))
+DIM fn AS kern.Netze : fn = kern.netzeBerechnen(fd.blaetter[0])
+PRINT "Netzname bleibt der geschriebene Text: "; fn.liste[fn.netzAn(fd.blaetter[0].bauteile[0].pinPunkt(0).x, fd.blaetter[0].bauteile[0].pinPunkt(0).y)].name; "  (erwartet ~{RESET})"
+
+' --- Freie Symbolgrafik und frei gesetzte Pins
+DIM lf AS STRING : lf = CHR$(10)
+DIM opvText AS STRING : opvText = "# Operationsverstaerker, frei gezeichnet" + lf + "linie -2 -3 3 0 -2 3 -2 -3" + lf + "kreis 0 0 0,5 voll" + lf + "bogen 0 0 4 0 90" + lf + "text 0 -4 OPV" + lf + "pin 1 IN- -5 -1 links ein" + lf + "pin 2 IN+ -5 1 links ein" + lf + "pin 3 OUT 5 0 rechts aus 2"
+DIM opv AS kern.Symbol : opv = kern.icErzeugen("E_OPV", "OPV", "U", "", opvText)
+DIM opvPl AS kern.Pinliste : opvPl = kern.pinlisteLesen(opvText)
+PRINT "Frei: Fehler "; LEN(opvPl.fehler); ", Grafik "; LEN(opv.grafik); ", Pins "; LEN(opv.pins); ", kein Rechteck "; opv.grafik[0].art = kern.PR_POLYLINIE; "  (erwartet 0, 4, 3, TRUE)"
+PRINT "Frei: Polylinie "; LEN(opv.grafik[0].punkte); " Punkte, Kreis voll "; opv.grafik[1].fuellen; " r "; opv.grafik[1].radius; ", Bogen bis "; ROUND(opv.grafik[2].winkel2 * 180 / PI); " Grad, Text "; opv.grafik[3].text; "  (erwartet 4 Punkte, TRUE r 50, 90 Grad, OPV)"
+PRINT "Frei: Pin 3 bei "; opv.pins[2].pos.x; ","; opv.pins[2].pos.y; " Laenge "; opv.pins[2].laenge; " Richtung "; opv.pins[2].richtung; " Typ aus "; opv.pins[2].typ = kern.PIN_AUSGANG; ", Pin 1 Richtung "; opv.pins[0].richtung; "  (erwartet 500,0 Laenge 200 Richtung 180 Typ aus TRUE, Pin 1 Richtung 0)"
+PRINT "Frei: Texte ueber/unter der Grafik "; opv.refOrt.y < -300; " "; opv.wertOrt.y > 300; "  (erwartet TRUE TRUE)"
+DIM opvJ AS kern.Symbol : opvJ = kern.symbolAusJson(kern.symbolNachJson(opv), "")
+PRINT "Frei JSON: "; LEN(opvJ.grafik); " "; opvJ.grafik[1].fuellen; " "; opvJ.grafik[3].text; " "; LEN(opvJ.pins); " Name "; opvJ.pins[0].name; " versteckt "; NOT opvJ.pins[0].zeigeName; "  (erwartet 4 TRUE OPV 3 Name IN- versteckt TRUE)"
+DIM fpl AS kern.Pinliste : fpl = kern.pinlisteLesen("1 A links" + lf + "pin 1 B 0 0 links" + lf + "pin 2 C 1,5 0 links" + lf + "kreis 0 0" + lf + "linie 0 0 x 1" + lf + "bogen 0 0 1 0 90 voll")
+DIM fft AS STRING : fft = JOIN$(fpl.fehler, "|")
+PRINT "Frei Fehler: "; LEN(fpl.fehler); " doppelt "; CONTAINS(fft, "Zeile 2: Pin-Nummer 1 gibt es schon"); " Raster "; CONTAINS(fft, "Zeile 3: pin 2: der Punkt liegt nicht auf dem 1-mm-Raster"); " Kreis "; CONTAINS(fft, "Zeile 4: kreis braucht"); " Zahl "; CONTAINS(fft, "Zeile 5: 'x' ist keine Zahl"); " Bogen "; CONTAINS(fft, "Zeile 6: bogen braucht"); "  (erwartet 5 TRUE TRUE TRUE TRUE TRUE)"
+DIM gem AS kern.Symbol : gem = kern.icErzeugen("E_GEM", "Logo-IC", "U", "", "1 A links" + lf + "2 B rechts" + lf + "text 0 0 LOGO")
+PRINT "Gemischt: "; LEN(gem.grafik); " Grafik (Rechteck + Text), erstes Rechteck "; gem.grafik[0].art = kern.PR_RECHTECK; "  (erwartet 2, TRUE)"
+
+' --- Referenz/Wert-Versatz wird gespeichert
+DIM vd AS kern.Dokument : vd = NEW kern.Dokument()
+DIM vb AS kern.Bauteil : vb = kern.neuesBauteil("R", kern.neueLage(0, 0))
+vb.referenz = "R1"
+vb.refVersatz = NEW kern.Punkt(250, -150)
+ARRAY_PUSH(vd.blaetter[0].bauteile, vb)
+DIM vd2 AS kern.Dokument : vd2 = kern.dokumentAusJson(kern.dokumentNachJson(vd))
+PRINT "Versatz JSON: "; vd2.blaetter[0].bauteile[0].refVersatz.x; ","; vd2.blaetter[0].bauteile[0].refVersatz.y; " Wert "; vd2.blaetter[0].bauteile[0].wertVersatz.x; ","; vd2.blaetter[0].bauteile[0].wertVersatz.y; "  (erwartet 250,-150 Wert 0,0)"
+
+' --- Platine
+DIM bfa AS kern.Bauform
+PRINT "Bauformen: AX4 "; kern.bauformLesen("AX4", bfa); " "; bfa.pins[1].dx; "  DIP-8 "; kern.bauformLesen("DIP-8", bfa); " Pin "; bfa.pins[4].schluessel; " bei "; bfa.pins[4].dx; ","; bfa.pins[4].dy; "  TO92-EBC "; kern.bauformLesen("TO92-EBC", bfa); " "; bfa.pins[0].schluessel; bfa.pins[1].schluessel; bfa.pins[2].schluessel; "  0805 "; kern.bauformLesen("0805", bfa); "  DIP7 "; kern.bauformLesen("DIP7", bfa); "  (erwartet AX4 TRUE 4  DIP-8 TRUE Pin 8 bei 3,0  TO92-EBC TRUE EBC  0805 FALSE  DIP7 FALSE)"
+' LED-Schaltung: VCC - R1 - D1 - GND, dazu C1 zwischen VCC und GND
+DIM pdok AS kern.Dokument : pdok = NEW kern.Dokument()
+DIM pbl AS kern.Blatt : pbl = pdok.blaetter[0]
+DIM pR AS kern.Bauteil : pR = kern.neuesBauteil("R", kern.neueLage(0, 0))
+pR.referenz = "R1"
+DIM pD AS kern.Bauteil : pD = kern.neuesBauteil("LED", kern.neueLage(400, 0))
+pD.referenz = "D1"
+DIM pC AS kern.Bauteil : pC = kern.neuesBauteil("C", kern.neueLage(0, 600))
+pC.referenz = "C1"
+ARRAY_PUSH(pbl.bauteile, pR)
+ARRAY_PUSH(pbl.bauteile, pD)
+ARRAY_PUSH(pbl.bauteile, pC)
+ARRAY_PUSH(pbl.bauteile, kern.neuesBauteil("VCC", kern.neueLage(-200, 0)))
+ARRAY_PUSH(pbl.bauteile, kern.neuesBauteil("GND", kern.neueLage(600, 0)))
+DIM pw1 AS kern.Draht : pw1 = NEW kern.Draht()
+ARRAY_PUSH(pw1.punkte, NEW kern.Punkt(-200, 0))
+ARRAY_PUSH(pw1.punkte, NEW kern.Punkt(-200, 600))
+ARRAY_PUSH(pbl.draehte, pw1)
+DIM pw2 AS kern.Draht : pw2 = NEW kern.Draht()
+ARRAY_PUSH(pw2.punkte, NEW kern.Punkt(200, 600))
+ARRAY_PUSH(pw2.punkte, NEW kern.Punkt(600, 600))
+ARRAY_PUSH(pw2.punkte, NEW kern.Punkt(600, 0))
+ARRAY_PUSH(pbl.draehte, pw2)
+DIM phw AS STRING
+PRINT "Bauform je Symbol: "; kern.bauformFuer(pR, phw).name; " "; kern.bauformFuer(pD, phw).name; " "; kern.bauformFuer(pC, phw).name; "  (erwartet AX4 RAD1 RAD2)"
+pR.gehaeuse = "0805"
+DIM pfR AS kern.Bauform : pfR = kern.bauformFuer(pR, phw)
+PRINT "Unbekanntes Gehaeuse: "; pfR.name; " Hinweis "; CONTAINS(phw, "Gehaeuse 0805 von R1 kennt die Platine nicht"); "  (erwartet AX4 Hinweis TRUE)"
+pR.gehaeuse = ""
+DIM pr0 AS kern.PlatBericht : pr0 = kern.platinePruefen(pdok)
+PRINT "Leere Platine: unplatziert "; JOIN$(pr0.unplatziert, ","); "  (erwartet R1,D1,C1)"
+DIM pgs AS INTEGER : pgs = kern.platineEinsetzen(pdok)
+DIM pr1 AS kern.PlatBericht : pr1 = kern.platinePruefen(pdok)
+PRINT "Eingesetzt "; pgs; " (gedreht "; pdok.platine.teile[0].drehung; "), Fehler "; LEN(pr1.fehler); ", Kurzschluesse "; pr1.kurzschluesse; ", Luftlinien "; LEN(pr1.luft); ", unplatziert "; LEN(pr1.unplatziert); "  (erwartet 3 (gedreht 90), Fehler 0, Kurzschluesse 0, Luftlinien 3, unplatziert 0)"
+' Pad-Loecher holen
+DIM padS AS MAP OF INTEGER
+DIM padZ AS MAP OF INTEGER
+DIM ppi AS INTEGER
+FOR ppi = 0 TO LEN(pr1.pads) - 1
+    MAPPUT(padS, pr1.pads[ppi].text, pr1.pads[ppi].s)
+    MAPPUT(padZ, pr1.pads[ppi].text, pr1.pads[ppi].z)
+NEXT
+PRINT "Loch R1.1 gehoert zu: "; pr1.lochNetz$(MAPGET(padS, "R1.1"), MAPGET(padZ, "R1.1")); "  (erwartet VCC)"
+' Bruecken legen: VCC, Mitte, GND
+ARRAY_PUSH(pdok.platine.bahnen, NEW kern.Bahn(MAPGET(padS, "R1.1"), MAPGET(padZ, "R1.1"), MAPGET(padS, "C1.1"), MAPGET(padZ, "C1.1"), kern.BA_BRUECKE))
+ARRAY_PUSH(pdok.platine.bahnen, NEW kern.Bahn(MAPGET(padS, "R1.2"), MAPGET(padZ, "R1.2"), MAPGET(padS, "D1.1"), MAPGET(padZ, "D1.1"), kern.BA_BRUECKE))
+ARRAY_PUSH(pdok.platine.bahnen, NEW kern.Bahn(MAPGET(padS, "D1.2"), MAPGET(padZ, "D1.2"), MAPGET(padS, "C1.2"), MAPGET(padZ, "C1.2"), kern.BA_BRUECKE))
+DIM pr2 AS kern.PlatBericht : pr2 = kern.platinePruefen(pdok)
+PRINT "Mit Bruecken: Luftlinien "; LEN(pr2.luft); ", Kurzschluesse "; pr2.kurzschluesse; "  (erwartet 0, 0)"
+' eine falsche Bruecke VCC-GND
+ARRAY_PUSH(pdok.platine.bahnen, NEW kern.Bahn(MAPGET(padS, "R1.1"), MAPGET(padZ, "R1.1"), MAPGET(padS, "D1.2"), MAPGET(padZ, "D1.2"), kern.BA_BRUECKE))
+DIM pr3 AS kern.PlatBericht : pr3 = kern.platinePruefen(pdok)
+DIM pkt AS STRING : pkt = ""
+FOR ppi = 0 TO LEN(pr3.fehler) - 1
+    pkt = pkt + pr3.fehler[ppi].text + "|"
+NEXT
+PRINT "Falsche Bruecke: "; pr3.kurzschluesse; " "; CONTAINS(pkt, "Kurzschluss: VCC und GND") OR CONTAINS(pkt, "Kurzschluss: GND und VCC"); "  (erwartet 1 TRUE)"
+ARRAY_POP(pdok.platine.bahnen)
+' Loetbahn verbindet jedes Loch auf dem Weg, eine Bruecke nur die Enden
+DIM pls AS INTEGER : pls = MAPGET(padS, "R1.1")
+DIM plz AS INTEGER : plz = MAPGET(padZ, "R1.1")
+pdok.platine.art = kern.PL_LOCH
+DIM pr4 AS kern.PlatBericht : pr4 = kern.platinePruefen(pdok)
+PRINT "Lochraster (ohne Streifen): Luftlinien "; LEN(pr4.luft); ", Kurzschluesse "; pr4.kurzschluesse; "  (erwartet 0, 0)"
+ARRAY_PUSH(pdok.platine.bahnen, NEW kern.Bahn(pls, plz - 1, pls, plz + 1, kern.BA_BRUECKE))
+DIM pr5 AS kern.PlatBericht : pr5 = kern.platinePruefen(pdok)
+ARRAY_POP(pdok.platine.bahnen)
+ARRAY_PUSH(pdok.platine.bahnen, NEW kern.Bahn(pls, plz - 1, pls, plz + 4, kern.BA_LOET))
+DIM pr6 AS kern.PlatBericht : pr6 = kern.platinePruefen(pdok)
+ARRAY_POP(pdok.platine.bahnen)
+PRINT "Bruecke ueber R1.1 hinweg: "; pr5.kurzschluesse; "  Loetbahn ueber R1.1 bis R1.2: "; pr6.kurzschluesse; "  (erwartet 0  1)"
+pdok.platine.art = kern.PL_STREIFEN
+' Trennstelle im Pad-Loch, doppelte Belegung, Rand
+DIM ptr AS BOOLEAN : ptr = kern.trennUmschalten(pdok.platine, pls, plz)
+DIM pr7 AS kern.PlatBericht : pr7 = kern.platinePruefen(pdok)
+ptr = kern.trennUmschalten(pdok.platine, pls, plz)
+DIM pc1 AS kern.PlatTeil : pc1 = pdok.platine.teile[kern.teilIndex(pdok.platine, pC.id)]
+DIM pcs AS INTEGER : pcs = pc1.s
+DIM pcz AS INTEGER : pcz = pc1.z
+pc1.s = pdok.platine.teile[0].s
+pc1.z = pdok.platine.teile[0].z
+pc1.drehung = pdok.platine.teile[0].drehung
+DIM pr8 AS kern.PlatBericht : pr8 = kern.platinePruefen(pdok)
+pc1.s = pdok.platine.spalten - 1
+pc1.z = 0
+pc1.drehung = 0
+DIM pbf AS kern.Bauform : pbf = kern.bauformFuer(pC, phw)
+kern.teilInsFeld(pdok.platine, pc1, pbf)
+PRINT "Trennstelle im Pad "; CONTAINS(pr7.fehler[0].text, "R1.1 steckt in einer Trennstelle"); "  doppelt "; CONTAINS(pr8.fehler[0].text, "doppelt belegt"); "  am Rand eingerueckt "; pc1.s; "  (erwartet TRUE  TRUE  "; pdok.platine.spalten - 3; ")"
+pc1.s = pcs
+pc1.z = pcz
+pc1.drehung = 90
+' Speichern und Abgleich
+DIM pd2 AS kern.Dokument : pd2 = kern.dokumentAusJson(kern.dokumentNachJson(pdok))
+PRINT "Platine JSON: "; LEN(pd2.platine.teile); " Teile, "; LEN(pd2.platine.bahnen); " Bahnen, "; LEN(pd2.platine.trenn) = LEN(pdok.platine.trenn); " Trennstellen, Art "; pd2.platine.art; ", Pruefung "; LEN(kern.platinePruefen(pd2).luft); " "; kern.platinePruefen(pd2).kurzschluesse; "  (erwartet 3 Teile, 3 Bahnen, TRUE, Art 1, Pruefung 0 0)"
+' Verbinden entlang der Luftlinien -- Streifenraster: gerade Bruecken
+DIM vdok AS kern.Dokument : vdok = kern.dokumentAusJson(kern.dokumentNachJson(pdok))
+vdok.platine.bahnen = []
+DIM vow AS INTEGER
+DIM vn AS INTEGER : vn = kern.platineVerbinden(vdok, vow)
+DIM vr AS kern.PlatBericht : vr = kern.platinePruefen(vdok)
+DIM vgerade AS BOOLEAN : vgerade = TRUE
+DIM vbr AS BOOLEAN : vbr = TRUE
+DIM vi AS INTEGER
+FOR vi = 0 TO LEN(vdok.platine.bahnen) - 1
+    IF NOT (vdok.platine.bahnen[vi].s1 = vdok.platine.bahnen[vi].s2 OR vdok.platine.bahnen[vi].z1 = vdok.platine.bahnen[vi].z2) THEN vgerade = FALSE
+    IF vdok.platine.bahnen[vi].art <> kern.BA_BRUECKE THEN vbr = FALSE
+NEXT
+PRINT "Verbinden (Streifen): "; vn; " gelegt, offen "; vow; ", Kurzschluesse "; vr.kurzschluesse; ", Hinweise "; LEN(vr.fehler); ", Bruecken "; vbr; "  (erwartet 3 gelegt, offen 0, Kurzschluesse 0, Hinweise 0, Bruecken TRUE)"
+' wo es eine gemeinsame freie Spalte gibt, wird die Bruecke gerade: R1 und C1
+' unter einander, beide quer -- ihre oberen Beine liegen auf Streifen 2 und 6
+DIM gdok AS kern.Dokument : gdok = kern.dokumentAusJson(kern.dokumentNachJson(pdok))
+gdok.platine.bahnen = []
+gdok.platine.trenn = []
+gdok.platine.teile = []
+DIM gt1 AS kern.PlatTeil : gt1 = NEW kern.PlatTeil(pR.id, 5, 1)
+gt1.drehung = 90
+DIM gt2 AS kern.PlatTeil : gt2 = NEW kern.PlatTeil(pC.id, 9, 5)
+gt2.drehung = 90
+ARRAY_PUSH(gdok.platine.teile, gt1)
+ARRAY_PUSH(gdok.platine.teile, gt2)
+DIM gr0 AS kern.PlatBericht : gr0 = kern.platinePruefen(gdok)
+DIM gvn AS INTEGER : gvn = kern.platineVerbinden(gdok, vow)
+DIM gbahn AS kern.Bahn : gbahn = gdok.platine.bahnen[0]
+PRINT "Gerade Bruecke, wenn moeglich: "; gvn; " "; gbahn.s1 = gbahn.s2; " Laenge "; ABS(gbahn.z2 - gbahn.z1); "  (erwartet 1 TRUE Laenge 4)"
+' Lochraster: Loetbahnen auf freien Loechern
+DIM ldok AS kern.Dokument : ldok = kern.dokumentAusJson(kern.dokumentNachJson(pdok))
+ldok.platine.bahnen = []
+ldok.platine.trenn = []
+ldok.platine.teile = []
+ldok.platine.art = kern.PL_LOCH
+DIM lgs AS INTEGER : lgs = kern.platineEinsetzen(ldok)
+DIM lvn AS INTEGER : lvn = kern.platineVerbinden(ldok, vow)
+DIM lvr AS kern.PlatBericht : lvr = kern.platinePruefen(ldok)
+DIM lloet AS BOOLEAN : lloet = LEN(ldok.platine.bahnen) > 0
+FOR vi = 0 TO LEN(ldok.platine.bahnen) - 1
+    IF ldok.platine.bahnen[vi].art <> kern.BA_LOET THEN lloet = FALSE
+NEXT
+PRINT "Verbinden (Loch): "; lvn; " gelegt, offen "; vow; ", Kurzschluesse "; lvr.kurzschluesse; ", Hinweise "; LEN(lvr.fehler); ", nur Loetbahnen "; lloet; "  (erwartet 3 gelegt, offen 0, Kurzschluesse 0, Hinweise 0, nur Loetbahnen TRUE)"
+' kein Weg: Platine so klein, dass die Teile eingemauert sind
+DIM kdok AS kern.Dokument : kdok = kern.dokumentAusJson(kern.dokumentNachJson(ldok))
+kdok.platine.bahnen = []
+DIM kvn AS INTEGER : kvn = kern.platineVerbinden(kdok, vow)
+PRINT "Verbinden zweimal: "; kern.platineVerbinden(ldok, vow); " weitere  (erwartet 0 weitere)"
+' --- Gerber: Lochraster (Loetbahnen) und Streifenraster (Streifen, Trennstellen, Bruecken)
+FUNCTION gbZaehle(t AS STRING, teil AS STRING) AS INTEGER
+    RETURN (LEN(t) - LEN(REPLACE$(t, teil, ""))) \ LEN(teil)
+END FUNCTION
+' fuer die Gegenpruefung von aussen (gerber_pruefen.py): je Loch das Netz, je Bruecke die Enden
+SUB gbErwartet(dok AS kern.Dokument, pfad AS STRING)
+    DIM r AS kern.PlatBericht : r = kern.platinePruefen(dok)
+    DIM t AS STRING : t = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.pads) - 1
+        t = t + "P " + STR$(kern.gbX(dok.platine, r.pads[i].s)) + " " + STR$(kern.gbY(dok.platine, r.pads[i].z)) + " " + r.netzNamen[r.pads[i].netz] + CHR$(10)
+    NEXT
+    FOR i = 0 TO LEN(dok.platine.bahnen) - 1
+        DIM ba AS kern.Bahn : ba = dok.platine.bahnen[i]
+        IF ba.art = kern.BA_BRUECKE THEN t = t + "B " + STR$(kern.gbX(dok.platine, ba.s1)) + " " + STR$(kern.gbY(dok.platine, ba.z1)) + " " + STR$(kern.gbX(dok.platine, ba.s2)) + " " + STR$(kern.gbY(dok.platine, ba.z2)) + CHR$(10)
+    NEXT
+    WRITEALL(pfad, t)
+END SUB
+DIM gbOrdner AS STRING : gbOrdner = GETENV$("FUNKENFLUG_GERBER_ORDNER", "")
+DIM gsL AS kern.GerberSatz : gsL = kern.gerberErzeugen(ldok, "Pruef Loch")
+DIM gsLb AS STRING : gsLb = gsL.datei$("-B_Cu.gbr")
+PRINT "Gerber Loch: Dateien "; LEN(gsL.namen); "  Augen oben "; gbZaehle(gsL.datei$("-F_Cu.gbr"), "D03*"); " = Bohrungen "; gsL.bohrungen; "  Bohrdatei "; gbZaehle(gsL.datei$(".drl"), CHR$(10) + "X"); "  Bahnen unten "; gbZaehle(gsLb, "D01*") >= LEN(ldok.platine.bahnen); "  X2 "; CONTAINS(gsLb, "%TF.FileFunction,Copper,L2,Bot*%"); "  Ende "; ENDSWITH(gsLb, "M02*" + CHR$(10)); "  ohne Achtung "; NOT CONTAINS(gsL.datei$("LIESMICH.txt"), "ACHTUNG"); "  (erwartet 8  Augen = Bohrungen  Bohrdatei gleich  TRUE TRUE TRUE TRUE)"
+PRINT "Gerber Namen: "; gsL.namen[0]; " "; gsL.namen[6]; "  Druck mit R1 "; gbZaehle(gsL.datei$("-F_SilkS.gbr"), "D01*") > 40; "  Strichschrift "; kern.gbZeichen$("R") <> "" AND kern.gbZeichen$("7") <> ""; "  (erwartet Pruef_Loch-F_Cu.gbr Pruef_Loch.drl  TRUE TRUE)"
+DIM gsdok AS kern.Dokument : gsdok = kern.dokumentAusJson(kern.dokumentNachJson(pdok))
+gsdok.platine.bahnen = []
+gsdok.platine.trenn = []
+gsdok.platine.teile = []
+gsdok.platine.art = kern.PL_STREIFEN
+DIM gsn AS INTEGER : gsn = kern.platineEinsetzen(gsdok)
+gsn = kern.platineVerbinden(gsdok, vow)
+DIM gsr AS kern.PlatBericht : gsr = kern.platinePruefen(gsdok)
+DIM gsS AS kern.GerberSatz : gsS = kern.gerberErzeugen(gsdok, "Pruef Streifen")
+PRINT "Gerber Streifen: fertig verbunden "; LEN(gsr.luft) = 0 AND gsr.kurzschluesse = 0; "  Trennstellen "; LEN(gsdok.platine.trenn) > 0; "  Bruecken im Druck "; gbZaehle(gsS.datei$("-F_SilkS.gbr"), "D11*") >= 0; "  Streifenstuecke "; CONTAINS(gsS.datei$("LIESMICH.txt"), "Streifenstuecke"); "  (erwartet TRUE TRUE TRUE TRUE)"
+' eine Luftlinie offen -> Achtung im LIESMICH
+DIM gsoffen AS kern.Dokument : gsoffen = kern.dokumentAusJson(kern.dokumentNachJson(gsdok))
+gsoffen.platine.bahnen = []
+DIM gsO AS kern.GerberSatz : gsO = kern.gerberErzeugen(gsoffen, "offen")
+PRINT "Gerber unfertig: "; LEN(gsO.hinweise) > 0; " "; CONTAINS(gsO.datei$("LIESMICH.txt"), "ACHTUNG:"); " "; CONTAINS(JOIN$(gsO.hinweise, "|"), "Luftlinie"); "  (erwartet TRUE TRUE TRUE)"
+' --- 3D-Vorschau: Kamera, Farbringe, Modell, Zeichenfolge
+DIM k3 AS kern.Kamera3 : k3 = NEW kern.Kamera3()
+k3.mx = 100 : k3.my = 100 : k3.skala = 10
+k3.azimut = 0 : k3.hoehe = 90 : k3.stellen()
+DIM f3oben AS kern.Flaeche3 : f3oben = NEW kern.Flaeche3(0, 0)
+f3oben.nz = 1
+DIM f3unten AS kern.Flaeche3 : f3unten = NEW kern.Flaeche3(0, 0)
+f3unten.nz = -1
+PRINT "3D von oben: rechts "; ROUND(k3.bildX(1, 0, 0)); "  hinten oben "; ROUND(k3.bildY(0, 1, 0)); "  Oberseite sichtbar "; k3.sichtbar(f3oben); "  Unterseite "; k3.sichtbar(f3unten); "  (erwartet 110  90  TRUE FALSE)"
+k3.azimut = 180 : k3.hoehe = -90 : k3.stellen()
+PRINT "3D von unten: gespiegelt "; ROUND(k3.bildX(1, 0, 0)); "  hinten oben "; ROUND(k3.bildY(0, 1, 0)); "  Unterseite sichtbar "; k3.sichtbar(f3unten); "  Oberseite "; k3.sichtbar(f3oben); "  (erwartet 90  90  TRUE FALSE)"
+k3.azimut = 0 : k3.hoehe = 0 : k3.stellen()
+PRINT "3D von vorn: vorn naeher "; k3.tiefe(0, -5, 0) > k3.tiefe(0, 5, 0); "  oben ist oben "; ROUND(k3.bildY(0, 0, 1)); "  (erwartet TRUE  90)"
+DIM fra AS INTEGER, frb AS INTEGER, frm AS INTEGER, frt AS STRING : frt = ""
+DIM frW AS ARRAY OF STRING : frW = ["4k7", "100", "10k", "1M", "2R2", "330"]
+DIM fri AS INTEGER
+FOR fri = 0 TO LEN(frW) - 1
+    IF kern.farbRinge3(frW[fri], fra, frb, frm) THEN frt = frt + STR$(fra) + STR$(frb) + "x" + STR$(frm) + " " ELSE frt = frt + "? "
+NEXT
+PRINT "Farbringe: "; frt; " (erwartet 47x2 10x1 10x3 10x5 22x-1 33x1)"
+DIM m3 AS kern.Modell3 : m3 = kern.platineModell3(gsdok)
+DIM m3oben AS INTEGER, m3unten AS INTEGER, m3koerper AS INTEGER
+FOR fri = 0 TO LEN(m3.flaechen) - 1
+    IF m3.flaechen[fri].art = kern.F3_OBEN THEN m3oben = m3oben + 1
+    IF m3.flaechen[fri].art = kern.F3_UNTEN THEN m3unten = m3unten + 1
+    IF m3.flaechen[fri].art = kern.F3_KOERPER THEN m3koerper = m3koerper + 1
+NEXT
+PRINT "3D-Modell Streifen: Teile "; m3.koerper; "  Beschriftung "; LEN(m3.texte); "  Loecher oben "; m3oben; " = "; gsdok.platine.spalten * gsdok.platine.zeilen; "  Unterseite > Loecher "; m3unten > m3oben; "  Koerperflaechen > 50 "; m3koerper > 50; "  (erwartet Teile 3  Beschriftung 3  Loecher oben gleich  TRUE TRUE)"
+k3.azimut = 20 : k3.hoehe = 40 : k3.stellen()
+DIM zf AS ARRAY OF INTEGER : zf = kern.zeichenFolge3(m3, k3)
+DIM zfUnten AS BOOLEAN : zfUnten = FALSE
+DIM zfLetzte AS INTEGER : zfLetzte = m3.flaechen[zf[LEN(zf) - 1]].art
+FOR fri = 0 TO LEN(zf) - 1
+    IF m3.flaechen[zf[fri]].art = kern.F3_UNTEN THEN zfUnten = TRUE
+NEXT
+PRINT "Zeichenfolge von oben: nichts von unten "; NOT zfUnten; "  zuerst die Platte "; m3.flaechen[zf[0]].art = kern.F3_PLATTE; "  zuletzt ein Koerper "; zfLetzte = kern.F3_KOERPER; "  weniger als alle "; LEN(zf) < LEN(m3.flaechen); "  (erwartet TRUE TRUE TRUE TRUE)"
+k3.azimut = 180 : k3.hoehe = -60 : k3.stellen()
+zf = kern.zeichenFolge3(m3, k3)
+PRINT "Zeichenfolge von unten: zuletzt die Unterseite "; m3.flaechen[zf[LEN(zf) - 1]].art = kern.F3_UNTEN; "  Koerper zuerst "; m3.flaechen[zf[0]].art = kern.F3_KOERPER; "  (erwartet TRUE TRUE)"
+' jede Bauform der Bibliothek baut ein Modell
+DIM b3dok AS kern.Dokument : b3dok = NEW kern.Dokument()
+DIM b3lib AS ARRAY OF kern.Symbol : b3lib = kern.bibliothekListe()
+FOR fri = 0 TO LEN(b3lib) - 1
+    IF b3lib[fri].einheitLeistung OR b3lib[fri].nurSimulation THEN CONTINUE
+    DIM b3t AS kern.Bauteil : b3t = kern.neuesBauteil(b3lib[fri].id, kern.neueLage(fri * 2000, 0))
+    b3t.referenz = b3lib[fri].praefix + STR$(fri + 1)
+    ARRAY_PUSH(b3dok.blaetter[0].bauteile, b3t)
+NEXT
+b3dok.platine.spalten = 80
+b3dok.platine.zeilen = 50
+DIM b3n AS INTEGER : b3n = kern.platineEinsetzen(b3dok)
+DIM m3b AS kern.Modell3 : m3b = kern.platineModell3(b3dok)
+PRINT "3D-Modell Bibliothek: Teile "; m3b.koerper; " = gesteckt "; LEN(b3dok.platine.teile); "  alle gesteckt "; LEN(b3dok.platine.teile) = LEN(b3dok.blaetter[0].bauteile); "  (erwartet gleich  TRUE)"
+' Review: jedes Bein gebohrt, schraege Loetbahn als Draht, Referenz im Rand
+DIM rvd AS kern.Dokument : rvd = NEW kern.Dokument()
+DIM rvo AS kern.Bauteil : rvo = kern.neuesBauteil("OPV", kern.neueLage(0, 0))
+rvo.referenz = "U_LANGER_NAME"
+ARRAY_PUSH(rvd.blaetter[0].bauteile, rvo)
+rvd.platine.art = kern.PL_LOCH
+DIM rvt AS kern.PlatTeil : rvt = NEW kern.PlatTeil(rvo.id, 5, 5)
+ARRAY_PUSH(rvd.platine.teile, rvt)
+ARRAY_PUSH(rvd.platine.bahnen, NEW kern.Bahn(10, 10, 12, 11, kern.BA_LOET))
+DIM rvg AS kern.GerberSatz : rvg = kern.gerberErzeugen(rvd, "x")
+DIM rvb AS STRING : rvb = rvg.datei$("-B_Cu.gbr")
+' groesste X-Koordinate im Bestueckungsdruck
+DIM rvs AS STRING : rvs = rvg.datei$("-F_SilkS.gbr")
+DIM rvz AS ARRAY OF STRING : rvz = SPLIT$(rvs, CHR$(10))
+DIM rvmax AS FLOAT : rvmax = 0
+FOR bmi = 0 TO LEN(rvz) - 1
+    IF STARTSWITH(rvz[bmi], "X") THEN rvmax = MAX(rvmax, VAL(MID$(rvz[bmi], 1, INSTR(rvz[bmi], "Y") - 1)) / 1000000.0)
+NEXT
+PRINT "Gerber-Review: OPV-Bohrungen "; rvg.bohrungen; "  schraege Loetbahn kein Kupfer "; gbZaehle(rvb, "D01*"); "  Druck im Rand "; rvmax <= rvg.breite; "  (erwartet 10  0  TRUE)"
+DIM rvm AS kern.Modell3 : rvm = kern.platineModell3(rvd)
+DIM rvk AS INTEGER : rvk = 0
+FOR bmi = 0 TO LEN(rvm.flaechen) - 1
+    IF rvm.flaechen[bmi].art = kern.F3_UNTEN AND LEN(rvm.flaechen[bmi].px) = 4 THEN
+        DIM rvf AS kern.Flaeche3 : rvf = rvm.flaechen[bmi]
+        ' eine Platte ueber das ganze Rechteck haette 2 x 1 Loecher Flaeche
+        IF ABS(rvf.px[0] - rvf.px[2]) > 4 AND ABS(rvf.py[0] - rvf.py[2]) > 2 AND ABS(rvf.px[0] - rvf.px[3]) < 0.001 AND ABS(rvf.py[0] - rvf.py[1]) < 0.001 THEN rvk = rvk + 1
+    END IF
+NEXT
+PRINT "3D-Review: schraege Loetbahn ohne Platte "; rvk = 0; "  (erwartet TRUE)"
+IF gbOrdner <> "" THEN
+    DIM gsSchreib AS kern.GerberSatz : gsSchreib = kern.gerberSchreiben(ldok, "Pruef Loch", PATHJOIN(gbOrdner, "loch.zip"))
+    gbErwartet(ldok, PATHJOIN(gbOrdner, "loch.erwartet"))
+    gsSchreib = kern.gerberSchreiben(gsdok, "Pruef Streifen", PATHJOIN(gbOrdner, "streifen.zip"))
+    gbErwartet(gsdok, PATHJOIN(gbOrdner, "streifen.erwartet"))
+    PRINT "Gerber geschrieben nach "; gbOrdner
+END IF
+' Einsetzen nach Netzen: eine Kette R1-R2-...-R6, im Schaltplan durcheinander
+DIM kettenFolge AS ARRAY OF INTEGER : kettenFolge = [1, 4, 2, 6, 3, 5]
+DIM kettenLaenge AS ARRAY OF FLOAT : kettenLaenge = []
+DIM kv AS INTEGER, kart AS INTEGER, kweise AS INTEGER
+FOR kart = 0 TO 1
+    FOR kweise = 0 TO 1
+        DIM kdk AS kern.Dokument : kdk = NEW kern.Dokument()
+        kdk.platine.art = IIF(kart = 0, kern.PL_STREIFEN, kern.PL_LOCH)
+        FOR kv = 0 TO 5
+            DIM kr AS kern.Bauteil : kr = kern.neuesBauteil("R", kern.neueLage((kettenFolge[kv] - 1) * 400, 0))
+            kr.referenz = "R" + STR$(kettenFolge[kv])
+            ARRAY_PUSH(kdk.blaetter[0].bauteile, kr)
+        NEXT
+        DIM kgs AS INTEGER : kgs = kern.platineEinsetzenMit(kdk, kweise = 1)
+        DIM kbr AS kern.PlatBericht : kbr = kern.platinePruefen(kdk)
+        DIM ksum AS FLOAT : ksum = 0
+        FOR kv = 0 TO LEN(kbr.luft) - 1
+            ksum = ksum + SQR((kbr.luft[kv].s2 - kbr.luft[kv].s1) ^ 2 + (kbr.luft[kv].z2 - kbr.luft[kv].z1) ^ 2)
+        NEXT
+        ARRAY_PUSH(kettenLaenge, ksum)
+        IF kbr.kurzschluesse > 0 OR LEN(kbr.fehler) > 0 OR LEN(kbr.luft) <> 5 THEN PRINT "  Kette: unerwartet "; kbr.kurzschluesse; " Kurzschluesse, "; LEN(kbr.fehler); " Hinweise, "; LEN(kbr.luft); " Luftlinien"
+    NEXT
+NEXT
+PRINT "Luftlinien der Kette (Reihenfolge / nach Netzen): Streifen "; ROUND(kettenLaenge[0]); " / "; ROUND(kettenLaenge[1]); "  Loch "; ROUND(kettenLaenge[2]); " / "; ROUND(kettenLaenge[3]); "  kuerzer: "; kettenLaenge[1] < kettenLaenge[0] AND kettenLaenge[3] < kettenLaenge[2]; "  (erwartet kuerzer: TRUE)"
+
+' eigene Bauformen
+DIM eig AS kern.Symbol : eig = kern.symbolRegistrieren(kern.icErzeugen("E_RELAIS", "Relais", "K", "", "1 A links" + lf + "2 B rechts" + lf + "3 C rechts" + lf + "loch 1 0 0" + lf + "loch 2 4 -1" + lf + "loch 3 4 1"))
+DIM eigB AS kern.Bauteil : eigB = kern.neuesBauteil("E_RELAIS", kern.neueLage(0, 0))
+eigB.referenz = "K1"
+DIM eigF AS kern.Bauform : eigF = kern.bauformFuer(eigB, phw)
+PRINT "Eigene Bauform: "; eigF.name; " "; LEN(eigF.pins); " Pin 2 bei "; eigF.pins[1].dx; ","; eigF.pins[1].dy; "  JSON "; kern.symbolAusJson(kern.symbolNachJson(eig), "").loecher = eig.loecher; "  (erwartet eigen 3 Pin 2 bei 4,-1  JSON TRUE)"
+eigB.gehaeuse = "SIL3"
+PRINT "Gehaeuse schlaegt eigene Bauform: "; kern.bauformFuer(eigB, phw).name; "  (erwartet SIL3)"
+DIM eigT AS kern.Symbol : eigT = kern.icErzeugen("E_FET", "FET", "Q", "", "1 G links" + lf + "2 D oben" + lf + "3 S unten" + lf + "bauform TO92-GDS")
+DIM eigTB AS kern.Bauteil : eigTB = kern.neuesBauteil("E_VORSCHAU_FET", kern.neueLage(0, 0))
+eigTB.sym = eigT
+PRINT "Bauform-Vorgabe im Symbol: "; kern.bauformFuer(eigTB, phw).name; "  (erwartet TO92-GDS)"
+DIM eigP AS kern.Pinliste : eigP = kern.pinlisteLesen("1 A" + lf + "2 B" + lf + "loch 1 0 0" + lf + "loch 1 1 0" + lf + "loch 3 2 0" + lf + "loch 4 0 0" + lf + "bauform XY9")
+DIM eigFt AS STRING : eigFt = JOIN$(eigP.fehler, "|")
+PRINT "Fehler eigene Bauform: "; CONTAINS(eigFt, "loch fuer Pin 1 gibt es schon"); " "; CONTAINS(eigFt, "Loch 0,0 ist schon belegt"); " "; CONTAINS(eigFt, "loch fuer Pin 3: diesen Pin gibt es nicht"); " "; CONTAINS(eigFt, "Pin 2 hat kein loch"); " "; CONTAINS(eigFt, "Bauform 'XY9' gibt es nicht"); "  (erwartet TRUE TRUE TRUE TRUE TRUE)"
+
+' weitere Bauformen
+DIM bfb AS kern.Bauform
+PRINT "Mehr Bauformen: TO92 "; kern.bauformLesen("TO92", bfb); " "; bfb.pins[2].schluessel; "  TO220-GDS "; kern.bauformLesen("TO220-GDS", bfb); " "; bfb.name; " "; bfb.pins[0].schluessel; "  TO92-EEB "; kern.bauformLesen("TO92-EEB", bfb); "  HDR2X5 "; kern.bauformLesen("HDR2x5", bfb); " "; LEN(bfb.pins); " Pin 2 bei "; bfb.pins[1].dx; ","; bfb.pins[1].dy; " Pin 10 bei "; bfb.pins[9].dx; ","; bfb.pins[9].dy; "  TRIM "; kern.bauformLesen("trim", bfb); " Schleifer "; bfb.pins[1].dx; ","; bfb.pins[1].dy; "  (erwartet TO92 TRUE 3  TO220-GDS TRUE TO220-GDS G  TO92-EEB FALSE  HDR2X5 TRUE 10 Pin 2 bei 1,0 Pin 10 bei 1,4  TRIM TRUE Schleifer 1,1)"
+' Arbeitsliste
+DIM NL_PK AS STRING : NL_PK = CHR$(10)
+DIM pal AS STRING : pal = kern.platineArbeitsliste$(pdok)
+PRINT "Arbeitsliste: Trennstellen "; CONTAINS(pal, "Trennstellen (" + STR$(LEN(pdok.platine.trenn)) + "):"); "  Bruecken "; CONTAINS(pal, "Drahtbruecken (3):"); "  Bauteile "; CONTAINS(pal, "Bauteile (3):"); "  R1 vor D1 "; INSTR(pal, NL_PK + "  C1") < INSTR(pal, NL_PK + "  D1") AND INSTR(pal, NL_PK + "  D1") < INSTR(pal, NL_PK + "  R1"); "  Laenge mm "; CONTAINS(pal, " mm)"); "  kein Schluessel "; NOT CONTAINS(pal, "|"); "  (erwartet alle TRUE)"
+PRINT pal
+ARRAY_REMOVE_AT(pbl.bauteile, 1)
+PRINT "Abgleich nach Loeschen von D1: "; kern.platineAbgleichen(pdok); " entfernt, "; LEN(pdok.platine.teile); " bleiben  (erwartet 1 entfernt, 2 bleiben)"
+
+' --- Hierarchische Blaetter
+DIM hd AS kern.Dokument : hd = NEW kern.Dokument()
+hd.blaetter[0].name = "Haupt"
+DIM hk AS kern.Blatt : hk = NEW kern.Blatt("Takt")
+ARRAY_PUSH(hd.blaetter, hk)
+DIM hr2 AS kern.Bauteil : hr2 = kern.neuesBauteil("R", kern.neueLage(1000, 0))
+hr2.referenz = "R2"
+ARRAY_PUSH(hk.bauteile, hr2)
+DIM hl1 AS kern.Label : hl1 = NEW kern.Label("CLK", NEW kern.Punkt(800, 0), kern.LA_HIER)
+hl1.drehung = 180                    ' links am Rand, Text nach links: Port links
+ARRAY_PUSH(hk.labels, hl1)
+DIM hl2 AS kern.Label : hl2 = NEW kern.Label("EN", NEW kern.Punkt(1200, 0), kern.LA_HIER)
+ARRAY_PUSH(hk.labels, hl2)
+DIM hr1 AS kern.Bauteil : hr1 = kern.neuesBauteil("R", kern.neueLage(0, 0))
+hr1.referenz = "R1"
+ARRAY_PUSH(hd.blaetter[0].bauteile, hr1)
+DIM hs AS kern.Bauteil : hs = kern.neuesBauteil(kern.BLATT_VORSATZ + hk.id, kern.neueLage(2000, 0))
+ARRAY_PUSH(hd.blaetter[0].bauteile, hs)
+kern.blattSymboleAktualisieren(hd)
+PRINT "Blattsymbol: "; hs.sym.blattSymbol; " Ref "; hs.referenz; " Ports "; LEN(hs.sym.pins); " "; hs.sym.pins[0].name; " Richtung "; hs.sym.pins[0].richtung; " "; hs.sym.pins[1].name; " Richtung "; hs.sym.pins[1].richtung; "  (erwartet TRUE Ref Takt Ports 2 CLK Richtung 0 EN Richtung 180)"
+DIM hp AS kern.Punkt : hp = hs.pinPunkt(0)
+DIM hw AS kern.Draht : hw = NEW kern.Draht()
+ARRAY_PUSH(hw.punkte, NEW kern.Punkt(200, 0))
+ARRAY_PUSH(hw.punkte, NEW kern.Punkt(200, hp.y))
+ARRAY_PUSH(hw.punkte, NEW kern.Punkt(hp.x, hp.y))
+ARRAY_PUSH(hd.blaetter[0].draehte, hw)
+DIM hn AS kern.Netze : hn = kern.netzeDokument(hd)
+hn.blattWaehlen(1)
+PRINT "Port verbindet ueber die Blattgrenze: "; hn.gleichUeber(0, 200, 0, 1, 800, 0); "  Name "; hn.liste[hn.netzAn(800, 0)].name; "  echte Pins "; hn.liste[hn.netzAn(800, 0)].echtePins(); "  (erwartet TRUE  Name CLK  echte Pins 2)"
+ARRAY_PUSH(hd.blaetter[0].labels, NEW kern.Label("TAKT", NEW kern.Punkt(200, 0), kern.LA_LOKAL))
+hn = kern.netzeDokument(hd)
+hn.blattWaehlen(1)
+PRINT "Label im Elternblatt geht vor: "; hn.liste[hn.netzAn(800, 0)].name; "  (erwartet TAKT)"
+DIM hsp AS STRING : hsp = kern.netzlisteSpiceDok$(hd, "H")
+PRINT "SPICE: R2 an TAKT "; CONTAINS(hsp, "R2 TAKT EN 1k"); "  kein Blattsymbol als Bauteil "; NOT CONTAINS(hsp, CHR$(10) + "Takt"); "  Stueckliste "; kern.stuecklisteDok(hd)[0].menge; " Positionen "; LEN(kern.stuecklisteDok(hd)); "  Platine "; LEN(kern.platinenBauteile(hd)); "  (erwartet TRUE  TRUE  Stueckliste 2 Positionen 1  Platine 2)"
+DIM hev AS ARRAY OF kern.Verstoss : hev = kern.ercPruefenDok(hd)
+DIM hfz AS INTEGER : hfz = 0
+DIM hvi AS INTEGER
+FOR hvi = 0 TO LEN(hev) - 1
+    IF hev[hvi].schwere = kern.ERC_FEHLER THEN hfz = hfz + 1
+NEXT
+PRINT "ERC sauber: "; hfz; " Fehler  Pfad "; kern.blattPfad$(hd, 1); "  (erwartet 0 Fehler  Pfad Haupt > Takt)"
+' zweimal eingesetzt, hierarchisches Label auf dem Wurzelblatt
+DIM hs2 AS kern.Bauteil : hs2 = kern.neuesBauteil(kern.BLATT_VORSATZ + hk.id, kern.neueLage(5000, 0))
+ARRAY_PUSH(hd.blaetter[0].bauteile, hs2)
+ARRAY_PUSH(hd.blaetter[0].labels, NEW kern.Label("WURZEL", NEW kern.Punkt(9000, 9000), kern.LA_HIER))
+DIM het AS STRING : het = ""
+hev = kern.ercPruefenDok(hd)
+FOR hvi = 0 TO LEN(hev) - 1
+    het = het + hev[hvi].text + "|"
+NEXT
+PRINT "ERC Hierarchie: zweimal eingesetzt ist erlaubt "; NOT CONTAINS(het, "mehrfach"); "  Wurzel-Label "; CONTAINS(het, "Hierarchisches Label WURZEL: das Blatt Haupt ist nirgends"); "  (erwartet TRUE TRUE)"
+ARRAY_POP(hd.blaetter[0].labels)
+ARRAY_POP(hd.blaetter[0].bauteile)
+' Speichern/Laden: das Blattsymbol wird aus dem Unterblatt neu erzeugt
+DIM hd2 AS kern.Dokument : hd2 = kern.dokumentAusJson(kern.dokumentNachJson(hd))
+DIM hs3 AS kern.Bauteil : hs3 = hd2.blaetter[0].bauteile[1]
+DIM hn2 AS kern.Netze : hn2 = kern.netzeDokument(hd2)
+PRINT "JSON: "; hs3.sym.blattSymbol; " "; hs3.referenz; " "; LEN(hs3.sym.pins); " verbunden "; hn2.gleichUeber(0, 200, 0, 1, 800, 0); "  (erwartet TRUE Takt 2 verbunden TRUE)"
+' Label im Unterblatt umbenennen -> Port heisst mit; Unterblatt loeschen -> ERC
+hl2.text = "ENA"
+kern.blattSymboleAktualisieren(hd)
+PRINT "Port folgt dem Label: "; hs.sym.pins[1].name; "  (erwartet ENA)"
+ARRAY_REMOVE_AT(hd.blaetter, 1)
+kern.blattSymboleAktualisieren(hd)
+het = ""
+hev = kern.ercPruefenDok(hd)
+FOR hvi = 0 TO LEN(hev) - 1
+    het = het + hev[hvi].text + "|"
+NEXT
+PRINT "Unterblatt geloescht: "; hs.sym.fehlt; " "; CONTAINS(het, "Unterblatt fehlt"); " kein 'Symbol fehlt' "; NOT CONTAINS(het, "Symbol #BLATT"); "  (erwartet TRUE TRUE kein 'Symbol fehlt' TRUE)"
+
+' --- Die ganze Bibliothek: Raster, eindeutige Nummern, Bauform passt
+DIM bibl AS ARRAY OF kern.Symbol : bibl = kern.bibliothekListe()
+DIM bibFehler AS STRING : bibFehler = ""
+DIM bbi AS INTEGER, bbj AS INTEGER
+FOR bbi = 0 TO LEN(bibl) - 1
+    DIM bsy AS kern.Symbol : bsy = bibl[bbi]
+    DIM bnr AS MAP OF INTEGER
+    MAPCLEAR(bnr)
+    FOR bbj = 0 TO LEN(bsy.pins) - 1
+        IF bsy.pins[bbj].pos.x MOD 100 <> 0 OR bsy.pins[bbj].pos.y MOD 100 <> 0 THEN bibFehler = bibFehler + bsy.id + "." + bsy.pins[bbj].nummer + " nicht auf dem Raster; "
+        IF MAPHAS(bnr, bsy.pins[bbj].nummer) THEN bibFehler = bibFehler + bsy.id + " Pin " + bsy.pins[bbj].nummer + " doppelt; "
+        MAPPUT(bnr, bsy.pins[bbj].nummer, 1)
+    NEXT
+    IF bsy.einheitLeistung THEN CONTINUE
+    DIM bbt AS kern.Bauteil : bbt = kern.neuesBauteil(bsy.id, kern.neueLage(0, 0))
+    bbt.referenz = bsy.praefix + "1"
+    DIM bhw AS STRING
+    DIM bbf AS kern.Bauform : bbf = kern.bauformFuer(bbt, bhw)
+    IF bhw <> "" THEN bibFehler = bibFehler + bsy.id + ": " + bhw + "; "
+    FOR bbj = 0 TO LEN(bsy.pins) - 1
+        IF LEN(kern.bauformPinsZu(bbf, bbt, bbj)) = 0 THEN bibFehler = bibFehler + bsy.id + " Pin " + bsy.pins[bbj].nummer + " ohne Bein in " + bbf.name + "; "
+    NEXT
+NEXT
+PRINT "Bibliothek: "; LEN(bibl); " Symbole, Fehler: ["; bibFehler; "]  (erwartet 37 Symbole, Fehler: [])"
+' Taster: vier Beine, je zwei ein Pin; Relais: fuenf
+DIM tdk AS kern.Dokument : tdk = NEW kern.Dokument()
+DIM tsw AS kern.Bauteil : tsw = kern.neuesBauteil("SW_PUSH", kern.neueLage(0, 0))
+tsw.referenz = "SW1"
+ARRAY_PUSH(tdk.blaetter[0].bauteile, tsw)
+DIM trl AS kern.Bauteil : trl = kern.neuesBauteil("K", kern.neueLage(2000, 0))
+trl.referenz = "K1"
+ARRAY_PUSH(tdk.blaetter[0].bauteile, trl)
+DIM tgs AS INTEGER : tgs = kern.platineEinsetzen(tdk)
+DIM tbr AS kern.PlatBericht : tbr = kern.platinePruefen(tdk)
+DIM tsw1 AS INTEGER : tsw1 = 0
+DIM tnetz AS INTEGER : tnetz = -1
+DIM tgleich AS BOOLEAN : tgleich = TRUE
+FOR bbj = 0 TO LEN(tbr.pads) - 1
+    IF tbr.pads[bbj].text = "SW1.1" THEN
+        tsw1 = tsw1 + 1
+        IF tnetz >= 0 AND tbr.pads[bbj].netz <> tnetz THEN tgleich = FALSE
+        tnetz = tbr.pads[bbj].netz
+    END IF
+NEXT
+PRINT "Taster/Relais auf der Platine: "; LEN(tbr.pads); " Loetaugen, SW1.1 hat "; tsw1; ", gleiches Netz "; tgleich; ", Kurzschluesse "; tbr.kurzschluesse; ", Hinweise "; LEN(tbr.fehler); "  (erwartet 9 Loetaugen, SW1.1 hat 2, gleiches Netz TRUE, Kurzschluesse 0, Hinweise 0)"
+' OPV: Beine nach TL071 im DIP8
+DIM top AS kern.Bauteil : top = kern.neuesBauteil("OPV", kern.neueLage(0, 0))
+DIM tobf AS kern.Bauform : tobf = kern.bauformFuer(top, bhw)
+PRINT "OPV im DIP8: OUT = Bein "; tobf.pins[kern.bauformPinZu(tobf, top, 2)].schluessel; ", V- = Bein "; tobf.pins[kern.bauformPinZu(tobf, top, 4)].schluessel; "  (erwartet OUT = Bein 6, V- = Bein 4)"
+
+' --- Annotieren
+DIM adk AS kern.Dokument : adk = NEW kern.Dokument()
+ARRAY_PUSH(adk.blaetter, NEW kern.Blatt("Zwei"))
+DIM anpos AS ARRAY OF INTEGER : anpos = [3000, 1000, 2000]
+DIM ani AS INTEGER
+FOR ani = 0 TO 2
+    DIM anr AS kern.Bauteil : anr = kern.neuesBauteil("R", kern.neueLage(anpos[ani], 0))
+    anr.referenz = IIF(ani = 0, "R7", IIF(ani = 1, "R7", ""))
+    ARRAY_PUSH(adk.blaetter[0].bauteile, anr)
+NEXT
+DIM anc AS kern.Bauteil : anc = kern.neuesBauteil("C", kern.neueLage(0, 2000))
+ARRAY_PUSH(adk.blaetter[0].bauteile, anc)
+DIM anr2 AS kern.Bauteil : anr2 = kern.neuesBauteil("R", kern.neueLage(0, 0))
+anr2.referenz = "R2"
+ARRAY_PUSH(adk.blaetter[1].bauteile, anr2)
+ARRAY_PUSH(adk.blaetter[0].bauteile, kern.neuesBauteil("GND", kern.neueLage(5000, 0)))
+DIM ang AS INTEGER : ang = kern.annotieren(adk, FALSE)
+DIM anb AS ARRAY OF kern.Bauteil : anb = adk.blaetter[0].bauteile
+PRINT "Nur fehlende: "; ang; " geaendert -> "; anb[0].referenz; " "; anb[1].referenz; " "; anb[2].referenz; " "; anb[3].referenz; " "; adk.blaetter[1].bauteile[0].referenz; " GND '"; anb[4].referenz; "'  (erwartet 3 geaendert -> R9 R7 R8 C1 R2 GND '')"
+ang = kern.annotieren(adk, TRUE)
+PRINT "Alle neu (zeilenweise, Blatt fuer Blatt): "; anb[1].referenz; " "; anb[2].referenz; " "; anb[0].referenz; " "; anb[3].referenz; " "; adk.blaetter[1].bauteile[0].referenz; "  (erwartet R1 R2 R3 C1 R4)"
+PRINT "Nochmal alle: "; kern.annotieren(adk, TRUE); " geaendert  (erwartet 0 geaendert)"
+
+' --- Suchen & Ersetzen
+anb[0].wert = "10k"
+anb[1].wert = "10K"
+anb[2].wert = "4k7"
+ARRAY_PUSH(adk.blaetter[1].labels, NEW kern.Label("CLK10K", NEW kern.Punkt(0, 0), kern.LA_LOKAL))
+DIM sut AS ARRAY OF kern.Treffer : sut = kern.suchen(adk, "10k", TRUE, TRUE, TRUE, FALSE)
+DIM sut2 AS ARRAY OF kern.Treffer : sut2 = kern.suchen(adk, "10k", TRUE, TRUE, TRUE, TRUE)
+PRINT "Suchen 10k: "; LEN(sut); " ohne, "; LEN(sut2); " mit Gross/Klein; Label auf Blatt "; sut[LEN(sut) - 1].blatt; "  (erwartet 3 ohne, 1 mit Gross/Klein; Label auf Blatt 1)"
+DIM sue AS INTEGER : sue = kern.ersetzen(adk, "10k", "22k", FALSE, TRUE, FALSE, FALSE)
+PRINT "Ersetzen nur Werte: "; sue; " -> "; anb[0].wert; " "; anb[1].wert; " "; anb[2].wert; "  Label bleibt "; adk.blaetter[1].labels[0].text; "  (erwartet 2 -> 22k 22k 4k7  Label bleibt CLK10K)"
+PRINT "Mehrfach im Feld: "; LEN(kern.suchen(adk, "k", FALSE, FALSE, TRUE, FALSE)); " Treffer, ersetzt "; kern.ersetzeText$("CLK10K", "k", "_", FALSE); "  (erwartet 1 Treffer, ersetzt CL_10_)"
+
+' --- Schriftfeld-Felder reisen in der Datei mit
+adk.titel = "Netzteil"
+adk.autor = "Hans"
+adk.revision = "B"
+DIM adk2 AS kern.Dokument : adk2 = kern.dokumentAusJson(kern.dokumentNachJson(adk))
+PRINT "Schriftfeld: "; adk2.titel; "/"; adk2.autor; "/"; adk2.revision; "/'"; adk2.firma; "'  (erwartet Netzteil/Hans/B/'')"
+
+' --- Netzklassen nach Namen
+PRINT "Masse: "; kern.istMasseName("GND"); kern.istMasseName("agnd"); kern.istMasseName("0V"); kern.istMasseName("GNDA"); "  Versorgung: "; kern.istVersorgungsName("VCC"); kern.istVersorgungsName("+12V"); kern.istVersorgungsName("3V3"); kern.istVersorgungsName("5V"); kern.istVersorgungsName("VDD_IO"); "  Signal: "; kern.istVersorgungsName("CLK"); kern.istVersorgungsName("V"); kern.istVersorgungsName("2N"); kern.istMasseName("GNDX") AND FALSE; "  (erwartet Masse: TRUETRUETRUETRUE  Versorgung: TRUETRUETRUETRUETRUE  Signal: FALSEFALSEFALSEFALSE)"
+
+' --- KiCad-Netzliste und Stuecklisten-Spalten
+DIM kicDok AS kern.Dokument : kicDok = NEW kern.Dokument()
+DIM kq AS kern.Bauteil : kq = kern.neuesBauteil("Q_NPN", kern.neueLage(0, 0))
+kq.referenz = "Q1"
+DIM kr AS kern.Bauteil : kr = kern.neuesBauteil("R", kern.neueLage(-400, 0))
+kr.referenz = "R1"
+kr.bestellnr = "MF0207-1K"
+DIM ku AS kern.Bauteil : ku = kern.neuesBauteil("NE555", kern.neueLage(4000, 0))
+ku.referenz = "U1"
+ARRAY_PUSH(kicDok.blaetter[0].bauteile, kq)
+ARRAY_PUSH(kicDok.blaetter[0].bauteile, kr)
+ARRAY_PUSH(kicDok.blaetter[0].bauteile, ku)
+DIM kn AS STRING : kn = kern.netzlisteKicadDok$(kicDok, "test.fkn")
+DIM kauf AS INTEGER : kauf = LEN(kn) - LEN(REPLACE$(kn, "(", ""))
+DIM kzu AS INTEGER : kzu = LEN(kn) - LEN(REPLACE$(kn, ")", ""))
+DIM qk AS STRING : qk = CHR$(34)
+PRINT "KiCad: Klammern "; kauf = kzu; "  Q1 TO-92 "; CONTAINS(kn, "(footprint " + qk + "Package_TO_SOT_THT:TO-92_Inline" + qk + ")"); "  R1 axial "; CONTAINS(kn, "R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"); "  U1 DIP "; CONTAINS(kn, "Package_DIP:DIP-8_W7.62mm"); "  Bestellnummer "; CONTAINS(kn, "MF0207-1K"); "  C metrisch "; kern.kicadFootprint$(kern.neuesBauteil("C", kern.neueLage(0, 0)), kern.bauformFuer(kern.neuesBauteil("C", kern.neueLage(0, 0)), phw)) = "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm"; "  (erwartet alle TRUE)"
+PRINT "KiCad-Pads: Basis auf Pad 2 "; CONTAINS(kn, "(node (ref " + qk + "Q1" + qk + ") (pin " + qk + "2" + qk + ") (pinfunction " + qk + "B" + qk + ")"); "  555 VCC auf Pad 8 "; CONTAINS(kn, "(node (ref " + qk + "U1" + qk + ") (pin " + qk + "8" + qk + ") (pinfunction " + qk + "VCC" + qk + ") (pintype " + qk + "power_in" + qk + "))"); "  R1.1 an Q1.B "; CONTAINS(kn, "(node (ref " + qk + "R1" + qk + ") (pin " + qk + "2" + qk + ")"); "  offen benannt "; CONTAINS(kn, "unconnected-(Q1-Pad1)"); "  (erwartet alle TRUE)"
+DIM ksp AS STRING : ksp = kern.stuecklisteCsvSp$(kicDok, [kern.BS_REFERENZEN, kern.BS_BAUFORM, kern.BS_BESTELLNR])
+PRINT "Spalten: "; CONTAINS(ksp, "Referenzen;Bauform;Bestellnummer" + CHR$(10)); " "; CONTAINS(ksp, "R1;AX4;MF0207-1K"); " "; CONTAINS(ksp, "Q1;TO92-CBE;"); "  Vorgabe "; LEN(kern.bomVorgabeSpalten(kicDok)); "  (erwartet TRUE TRUE TRUE  Vorgabe 5)"
+
+' --- KiCad-Schaltplan importieren: jede Lage, Mehrteiler, Unterblatt
+DIM kim AS kern.KicadErgebnis : kim = kern.kicadImportieren("daten/kicad/beispiel.kicad_sch")
+PRINT "KiCad-Import: ok "; kim.ok; " "; kim.fehler; "  Blaetter "; LEN(kim.dok.blaetter); "  Titel "; kim.dok.titel; " Rev "; kim.dok.revision; "  (erwartet TRUE  Blaetter 2  Titel KiCad-Beispiel Rev B)"
+DIM kimN AS kern.Netze : kimN = kern.netzeDokument(kim.dok)
+' jedes Label REF_NR muss im Netz von Pin NR des Bauteils REF haengen
+DIM kimGut AS INTEGER : kimGut = 0
+DIM kimSchlecht AS STRING : kimSchlecht = ""
+DIM kni AS INTEGER, knj AS INTEGER, knk AS INTEGER
+FOR kni = 0 TO LEN(kimN.liste) - 1
+    DIM knz AS kern.Netz : knz = kimN.liste[kni]
+    FOR knj = 0 TO LEN(knz.labelNamen) - 1
+        DIM kteile AS ARRAY OF STRING : kteile = SPLIT$(knz.labelNamen[knj], "_")
+        IF LEN(kteile) <> 2 OR STARTSWITH(kteile[0], "SIG") OR kteile[0] = "KREUZ" OR kteile[0] = "FREI" OR CONTAINS(kteile[0], "(") THEN CONTINUE
+        DIM kda AS BOOLEAN : kda = FALSE
+        FOR knk = 0 TO LEN(knz.pins) - 1
+            IF knz.pins[knk].ref = kteile[0] AND knz.pins[knk].nummer = kteile[1] THEN kda = TRUE
+        NEXT
+        IF kda THEN kimGut = kimGut + 1 ELSE kimSchlecht = kimSchlecht + knz.labelNamen[knj] + " "
+    NEXT
+NEXT
+PRINT "KiCad-Lagen: Pins am richtigen Draht "; kimGut; "  falsch: "; kimSchlecht; "  (erwartet 32  falsch: )"
+DIM kimErc AS ARRAY OF kern.Verstoss : kimErc = kern.ercPruefenDok(kim.dok)
+DIM kimOffen AS INTEGER : kimOffen = 0
+FOR kni = 0 TO LEN(kimErc) - 1
+    IF CONTAINS(kimErc[kni].text, "Offenes Drahtende") THEN kimOffen = kimOffen + 1
+NEXT
+PRINT "KiCad-ERC: offene Drahtenden "; kimOffen; "  (erwartet 4 -- die freien Enden der Kreuzungsdraehte)"
+' Netze ueber Namen: R1 zwischen VCC und GND, U1A/U1B versteckte Versorgung
+FUNCTION kimNetzMit$(n AS kern.Netze, ref AS STRING, nr AS STRING) AS STRING
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(n.liste) - 1
+        FOR j = 0 TO LEN(n.liste[i].pins) - 1
+            IF n.liste[i].pins[j].ref = ref AND n.liste[i].pins[j].nummer = nr THEN RETURN n.liste[i].name
+        NEXT
+    NEXT
+    RETURN "-"
+END FUNCTION
+PRINT "KiCad-Netze: R1.1 "; kimNetzMit$(kimN, "R1", "1"); "  R1.2 "; kimNetzMit$(kimN, "R1", "2"); "  U1A.14 "; kimNetzMit$(kimN, "U1A", "14"); "  U1B.7 "; kimNetzMit$(kimN, "U1B", "7"); "  (erwartet VCC GND VCC GND)"
+PRINT "KiCad-Unterblatt: R3.1 "; kimNetzMit$(kimN, "R3", "1"); "  R3.2 "; kimNetzMit$(kimN, "R3", "2"); "  (erwartet SIG_EIN SIG_AUS)"
+PRINT "KiCad-Instanzen: R4.1 "; kimNetzMit$(kimN, "R4", "1"); "  R4.2 "; kimNetzMit$(kimN, "R4", "2"); "  Blattsymbole "; LEN(kim.dok.blaetter[0].bauteile) - LEN(ARRAY_FILTER(kim.dok.blaetter[0].bauteile, FUNCTION(b) NOT kern.istBlattVerweis(b.symbolRef))); "  kein Mehrfach-Hinweis "; NOT CONTAINS(JOIN$(kim.hinweise, "|"), "Mehrfach"); "  (erwartet SIG2_EIN SIG2_AUS  Blattsymbole 2  TRUE)"
+DIM kimKreuz AS BOOLEAN : kimKreuz = FALSE
+DIM kimFrei AS BOOLEAN : kimFrei = FALSE
+FOR kni = 0 TO LEN(kimN.liste) - 1
+    IF CONTAINS(JOIN$(kimN.liste[kni].labelNamen, ","), "KREUZ_A") AND CONTAINS(JOIN$(kimN.liste[kni].labelNamen, ","), "KREUZ_B") THEN kimKreuz = TRUE
+    IF CONTAINS(JOIN$(kimN.liste[kni].labelNamen, ","), "FREI_C") AND CONTAINS(JOIN$(kimN.liste[kni].labelNamen, ","), "FREI_D") THEN kimFrei = TRUE
+NEXT
+PRINT "KiCad-Kreuzung: mit Punkt verbunden "; kimKreuz; "  ohne Punkt verbunden "; kimFrei; "  (erwartet TRUE FALSE)"
+DIM kimR1 AS kern.Bauteil, kimU AS kern.Bauteil, kimQ AS kern.Bauteil
+FOR kni = 0 TO LEN(kim.dok.blaetter[0].bauteile) - 1
+    IF kim.dok.blaetter[0].bauteile[kni].referenz = "R1" THEN kimR1 = kim.dok.blaetter[0].bauteile[kni]
+    IF kim.dok.blaetter[0].bauteile[kni].referenz = "U1B" THEN kimU = kim.dok.blaetter[0].bauteile[kni]
+    IF kim.dok.blaetter[0].bauteile[kni].referenz = "Q1" THEN kimQ = kim.dok.blaetter[0].bauteile[kni]
+NEXT
+PRINT "KiCad-Teile: R1 "; kimR1.wert; " Laenge "; kimR1.sym.pins[0].pos.y - kimR1.sym.pins[1].pos.y; "  U1B "; kimU.sym.id; " "; kimU.gehaeuse; " "; LEN(kimU.sym.pins); " Pins  Q1 "; kimQ.gehaeuse; "  (erwartet 10k Laenge -600  U1B kicad:Test:NAND2/2 DIP14 5 Pins  Q1 TO92)"
+PRINT "KiCad-Hinweise: "; JOIN$(kim.hinweise, " | ")
+DIM kimSchlecht2 AS kern.KicadErgebnis : kimSchlecht2 = kern.kicadAusText("(kicad_pcb (version 20221018))", "x", ".")
+PRINT "KiCad-Fremd: ok "; kimSchlecht2.ok; "  "; kimSchlecht2.fehler; "  (erwartet FALSE  ... kein KiCad-Schaltplan)"
+' ein importierter Schaltplan laesst sich speichern und wieder laden
+DIM kimPfad AS STRING : kimPfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef_kicad.fkn"
+DIM kimSp AS BOOLEAN : kimSp = kern.dokumentSpeichern(kim.dok, kimPfad)
+DIM kimDok2 AS kern.Dokument : kimDok2 = kern.dokumentLaden(kimPfad)
+DIM kimN2 AS kern.Netze : kimN2 = kern.netzeDokument(kimDok2)
+PRINT "KiCad->.fkn: gespeichert "; kimSp; "  R3.2 "; kimNetzMit$(kimN2, "R3", "2"); "  Q5.1 "; kimNetzMit$(kimN2, "Q5", "1"); "  (erwartet TRUE SIG_AUS Q5_1)"
+DELETEFILE(kimPfad)
+
+' --- Simulation: Zahlen, Deck, und (wenn ngspice da ist) echte Rechnungen
+DIM szw AS FLOAT, szt AS STRING : szt = ""
+DIM szEin AS ARRAY OF STRING : szEin = ["10m", "4k7", "1M", "1Meg", "2,2u", "10ms", "1 kHz", "3V3", "5V", "abc", "-12"]
+DIM szi AS INTEGER
+FOR szi = 0 TO LEN(szEin) - 1
+    IF kern.siZahl(szEin[szi], szw) THEN szt = szt + STR$(szw) + " " ELSE szt = szt + "? "
+NEXT
+PRINT "siZahl: "; szt; " (erwartet 0.01 4700.0 1000000.0 1000000.0 0.0000022 0.01 1000.0 3.3 5.0 ? -12.0)"
+PRINT "siText: "; kern.siText$(4.98, "V"); " | "; kern.siText$(0.0123, "A"); " | "; kern.siText$(1000, "Hz"); " | "; kern.siText$(-12, "V"); " | "; kern.siText$(0.9997, "V"); " | "; kern.siText$(0, "V"); "  (erwartet 4.98 V | 12.3 mA | 1 kHz | -12 V | 1 V | 0 V)"
+DIM vsv AS FLOAT, vst AS STRING : vst = ""
+DIM vsEin AS ARRAY OF STRING : vsEin = ["+5V", "3V3", "-12V", "VCC", "+12V", "VCC_9V"]
+FOR szi = 0 TO LEN(vsEin) - 1
+    IF kern.versorgungsSpannung(vsEin[szi], vsv) THEN vst = vst + STR$(vsv) + " " ELSE vst = vst + "- "
+NEXT
+PRINT "Versorgung aus dem Namen: "; vst; " (erwartet 5.0 3.3 -12.0 - 12.0 9.0)"
+DIM zbv AS FLOAT, zt AS STRING : zt = ""
+DIM zEin AS ARRAY OF STRING : zEin = ["ZPD5V1", "BZX55C5V1", "BZX55C12", "1N4733", "5V6"]
+FOR szi = 0 TO LEN(zEin) - 1
+    IF kern.simZener(zEin[szi], zbv) THEN zt = zt + STR$(zbv) + " " ELSE zt = zt + "- "
+NEXT
+PRINT "Z-Spannung: "; zt; " (erwartet 5.1 5.1 12.0 - 5.6)"
+DIM rgv AS FLOAT, rgt AS STRING : rgt = ""
+DIM rgEin AS ARRAY OF STRING : rgEin = ["7805", "LM7812", "78L05", "7905", "LM317"]
+FOR szi = 0 TO LEN(rgEin) - 1
+    IF kern.simRegler(rgEin[szi], rgv) THEN rgt = rgt + STR$(rgv) + " " ELSE rgt = rgt + "- "
+NEXT
+PRINT "Regler: "; rgt; " (erwartet 5.0 12.0 5.0 -5.0 -)"
+
+' kleine Schaltungen: Teile nebeneinander, Netze ueber Labels an den Pins
+FUNCTION simTeil(bl AS kern.Blatt, sym AS STRING, wert AS STRING, ref AS STRING, x AS INTEGER, netze AS ARRAY OF STRING) AS kern.Bauteil
+    DIM b AS kern.Bauteil : b = kern.neuesBauteil(sym, kern.neueLage(x, 0))
+    b.referenz = ref
+    IF wert <> "" THEN b.wert = wert
+    ARRAY_PUSH(bl.bauteile, b)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(netze) - 1
+        IF netze[i] <> "" THEN ARRAY_PUSH(bl.labels, NEW kern.Label(netze[i], b.pinPunkt(i), kern.LA_LOKAL))
+    NEXT
+    RETURN b
+END FUNCTION
+FUNCTION simV(r AS kern.SimErgebnis, netz AS STRING) AS FLOAT
+    DIM v AS FLOAT : v = -999
+    IF NOT r.spannung(netz, v) THEN RETURN -999
+    RETURN v
+END FUNCTION
+
+DIM stDok AS kern.Dokument : stDok = NEW kern.Dokument()
+DIM stb AS kern.Blatt : stb = stDok.blaetter[0]
+DIM stx AS kern.Bauteil
+stx = simTeil(stb, "VCC", "+10V", "", 0, ["+10V"])
+stx = simTeil(stb, "R", "1k", "R1", 2000, ["+10V", "MITTE"])
+stx = simTeil(stb, "R", "1k", "R2", 4000, ["MITTE", "GND"])
+stx = simTeil(stb, "GND", "", "", 6000, ["GND"])
+stx = simTeil(stb, "NE555", "NE555", "U1", 9000, [])
+DIM stE AS kern.SimEinstellung : stE = NEW kern.SimEinstellung(kern.SIM_OP)
+DIM stR0 AS kern.SimErgebnis : stR0 = NEW kern.SimErgebnis(kern.SIM_OP)
+DIM stDeck AS STRING : stDeck = JOIN$(kern.simDeck(stDok, stE, stR0), CHR$(10))
+PRINT "Deck: Quelle "; CONTAINS(stDeck, "VV__10V _10V 0 DC 10"); "  R1 "; CONTAINS(stDeck, "R1 _10V MITTE 1k"); "  .op "; CONTAINS(stDeck, CHR$(10) + ".op"); "  555 gemeldet "; CONTAINS(JOIN$(stR0.hinweise, "|"), "weggelassen: U1"); "  (erwartet alle TRUE)"
+DIM stSp AS STRING : stSp = kern.netzlisteSpiceDok$(stDok, "x")
+PRINT "SPICE-Export laeuft so in ngspice: Quelle "; CONTAINS(stSp, "VV__10V _10V 0 DC 10"); "  Hinweis "; CONTAINS(stSp, "* Hinweis: ohne Simulationsmodell"); "  (erwartet TRUE TRUE)"
+
+IF kern.ngspiceSuchen$() = "" THEN
+    PRINT "ngspice fehlt -- Rechnungen uebersprungen (FUNKENFLUG_NGSPICE setzen)"
+ELSE
+    DIM stR AS kern.SimErgebnis : stR = kern.simRechnen(stDok, stE)
+    PRINT "OP Teiler: ok "; stR.ok; " "; stR.fehler; " MITTE "; kern.siText$(simV(stR, "MITTE"), "V"); "  Strom aus +10V "; kern.siText$(stR.stroeme[0].re[0], "A"); "  (erwartet TRUE  MITTE 5 V  Strom aus +10V 5 mA)"
+    ' LED an 5 V ueber 330 Ohm
+    DIM sl AS kern.Dokument : sl = NEW kern.Dokument()
+    stx = simTeil(sl.blaetter[0], "VCC", "+5V", "", 0, ["+5V"])
+    stx = simTeil(sl.blaetter[0], "R", "330", "R1", 2000, ["+5V", "A"])
+    stx = simTeil(sl.blaetter[0], "LED", "rot", "D1", 4000, ["A", "GND"])
+    stx = simTeil(sl.blaetter[0], "GND", "", "", 6000, ["GND"])
+    DIM slR AS kern.SimErgebnis : slR = kern.simRechnen(sl, stE)
+    DIM slV AS FLOAT : slV = simV(slR, "A")
+    PRINT "OP LED rot: Flussspannung 1.8..2.1 "; slV > 1.8 AND slV < 2.1; "  Strom 8..10 mA "; slR.stroeme[0].re[0] > 0.008 AND slR.stroeme[0].re[0] < 0.010; "  (erwartet TRUE TRUE)  ["; kern.siText$(slV, "V"); "]"
+    ' NPN als Schalter
+    DIM sn AS kern.Dokument : sn = NEW kern.Dokument()
+    stx = simTeil(sn.blaetter[0], "VCC", "+5V", "", 0, ["+5V"])
+    stx = simTeil(sn.blaetter[0], "R", "10k", "RB", 2000, ["+5V", "B"])
+    stx = simTeil(sn.blaetter[0], "R", "1k", "RC", 4000, ["+5V", "C"])
+    stx = simTeil(sn.blaetter[0], "Q_NPN", "BC547", "Q1", 6000, ["B", "C", "GND"])
+    stx = simTeil(sn.blaetter[0], "GND", "", "", 8000, ["GND"])
+    DIM snR AS kern.SimErgebnis : snR = kern.simRechnen(sn, stE)
+    PRINT "OP NPN-Schalter: Basis 0.6..0.8 "; simV(snR, "B") > 0.6 AND simV(snR, "B") < 0.8; "  Kollektor < 0.3 "; simV(snR, "C") < 0.3; "  (erwartet TRUE TRUE)"
+    ' OPV nichtinvertierend, Verstaerkung 2, an +-12 V
+    DIM so AS kern.Dokument : so = NEW kern.Dokument()
+    stx = simTeil(so.blaetter[0], "VCC", "+12V", "", 0, ["+12V"])
+    stx = simTeil(so.blaetter[0], "VCC", "-12V", "", 2000, ["-12V"])
+    DIM soQ AS kern.Bauteil : soQ = simTeil(so.blaetter[0], "V", "1V", "V1", 4000, ["EIN", "GND"])
+    stx = simTeil(so.blaetter[0], "OPV", "TL071", "U1", 7000, ["MINUS", "EIN", "AUS", "+12V", "-12V"])
+    stx = simTeil(so.blaetter[0], "R", "10k", "R1", 10000, ["AUS", "MINUS"])
+    stx = simTeil(so.blaetter[0], "R", "10k", "R2", 12000, ["MINUS", "GND"])
+    stx = simTeil(so.blaetter[0], "GND", "", "", 14000, ["GND"])
+    DIM soR AS kern.SimErgebnis : soR = kern.simRechnen(so, stE)
+    PRINT "OP OPV x2: AUS "; kern.siText$(simV(soR, "AUS"), "V"); "  (erwartet 2 V)"
+    soQ.wert = "10V"
+    soR = kern.simRechnen(so, stE)
+    PRINT "OPV uebersteuert: AUS 11..12 V "; simV(soR, "AUS") > 11 AND simV(soR, "AUS") <= 12.001; "  (erwartet TRUE)"
+    ' RC-Sprung: 1k, 1u -> tau 1 ms
+    DIM srd AS kern.Dokument : srd = NEW kern.Dokument()
+    stx = simTeil(srd.blaetter[0], "V_SIG", "PULSE(0 1 0 1n 1n 1 2) AC 1", "V1", 0, ["EIN", "GND"])
+    stx = simTeil(srd.blaetter[0], "R", "1k", "R1", 2000, ["EIN", "AUS"])
+    stx = simTeil(srd.blaetter[0], "C", "1u", "C1", 4000, ["AUS", "GND"])
+    stx = simTeil(srd.blaetter[0], "GND", "", "", 6000, ["GND"])
+    DIM srE AS kern.SimEinstellung : srE = NEW kern.SimEinstellung(kern.SIM_TRAN)
+    srE.dauer = 0.005
+    srE.schritt = 0.00001
+    DIM srR AS kern.SimErgebnis : srR = kern.simRechnen(srd, srE)
+    DIM sra AS INTEGER : sra = srR.netz("AUS")
+    DIM srk AS INTEGER, srBei AS FLOAT : srBei = -1
+    FOR srk = 0 TO LEN(srR.x) - 1
+        IF srR.x[srk] >= 0.001 THEN
+            srBei = srR.netze[sra].re[srk]
+            BREAK
+        END IF
+    NEXT
+    PRINT "TRAN RC: ok "; srR.ok; " Punkte > 400 "; LEN(srR.x) > 400; "  bei tau 0.62..0.64 "; srBei > 0.62 AND srBei < 0.64; "  am Ende > 0.99 "; srR.netze[sra].re[LEN(srR.x) - 1] > 0.99; "  (erwartet TRUE TRUE TRUE TRUE)"
+    ' derselbe RC als Tiefpass: -3 dB bei 159 Hz
+    DIM saE AS kern.SimEinstellung : saE = NEW kern.SimEinstellung(kern.SIM_AC)
+    saE.fStart = 1
+    saE.fEnde = 100000
+    saE.punkte = 50
+    DIM saR AS kern.SimErgebnis : saR = kern.simRechnen(srd, saE)
+    DIM saa AS INTEGER : saa = saR.netz("AUS")
+    DIM sag AS FLOAT : sag = 0
+    FOR srk = 0 TO LEN(saR.x) - 1
+        IF saR.x[srk] >= 159.15 THEN
+            sag = saR.netze[saa].betragDb(srk)
+            BREAK
+        END IF
+    NEXT
+    PRINT "AC RC: komplex "; saR.netze[saa].komplex(); "  bei 159 Hz -3.2..-2.8 dB "; sag > -3.2 AND sag < -2.8; "  Phase dort -47..-43 "; saR.netze[saa].phase(srk) > -47 AND saR.netze[saa].phase(srk) < -43; "  bei 100 kHz < -50 dB "; saR.netze[saa].betragDb(LEN(saR.x) - 1) < -50; "  (erwartet TRUE TRUE TRUE TRUE)"
+    ' ein kaputtes Deck meldet sich, und danach geht es weiter
+    DIM bplot AS STRING, bfehler AS STRING
+    PRINT "Kaputtes Deck: "; kern.ngspiceRechnen(["* kaputt", "R1 a 0 1k", "Q1 a b 0 GIBTSNICHT", ".op", ".end"], bplot, bfehler); "  Meldung "; LEN(bfehler) > 10; "  danach Teiler "; kern.siText$(simV(kern.simRechnen(stDok, stE), "MITTE"), "V"); "  (erwartet FALSE  Meldung TRUE  danach Teiler 5 V)"
+END IF
+
+' Review: Spannungsnamen, Masse, Werte, Quellen, Modellnamen
+DIM rvv AS FLOAT, rvtx AS STRING : rvtx = ""
+DIM rvE AS ARRAY OF STRING : rvE = ["VCC2", "V1", "+12", "VCC2_5V", "VDD_1"]
+FOR szi = 0 TO LEN(rvE) - 1
+    IF kern.versorgungsSpannung(rvE[szi], rvv) THEN rvtx = rvtx + STR$(rvv) + " " ELSE rvtx = rvtx + "- "
+NEXT
+PRINT "Spannungsnamen streng: "; rvtx; " (erwartet - - 12.0 5.0 -)"
+PRINT "Vorzeichen und Masse: -VCC "; kern.negativeVersorgung("-VCC"); "  VEE "; kern.negativeVersorgung("VEE"); "  VSS Masse "; kern.simMasse("VSS"); "  VEE keine Masse "; NOT kern.istMasseName("VEE"); "  (erwartet TRUE TRUE TRUE TRUE)"
+DIM rvq AS STRING
+PRINT "Werte: "; kern.spiceWert$("4,7k"); " "; kern.spiceWert$("100 nF"); " "; kern.spiceWert$("10kOhm"); "  4K7 "; kern.siZahl("4K7", rvv); " "; STR$(rvv); "  Quelle '9V Block' "; kern.simQuelle$("9V Block", rvq); " ["; rvq; "]  (erwartet 4.7k 100nF 10k  4K7 TRUE 4700.0  Quelle DC 9.0 [Wert als 9.0 V gelesen])"
+DIM rvmd AS kern.Dokument : rvmd = NEW kern.Dokument()
+stx = simTeil(rvmd.blaetter[0], "D", "LED", "D1", 0, ["A", "GND"])
+stx = simTeil(rvmd.blaetter[0], "LED", "LED", "D2", 2000, ["A", "GND"])
+DIM rvmS AS STRING : rvmS = kern.netzlisteSpiceDok$(rvmd, "x")
+PRINT "Modellnamen: D_LED "; CONTAINS(rvmS, ".model D_LED D("); "  zweites eigenes "; CONTAINS(rvmS, ".model D_LED_LED D("); "  (erwartet TRUE TRUE)"
+' Regler am Netz mit +5V-Symbol: keine zweite Quelle
+DIM rg AS kern.Dokument : rg = NEW kern.Dokument()
+stx = simTeil(rg.blaetter[0], "VCC", "+12V", "", 0, ["+12V"])
+stx = simTeil(rg.blaetter[0], "REG", "7805", "U1", 3000, ["+12V", "+5V", "GND"])
+stx = simTeil(rg.blaetter[0], "VCC", "+5V", "", 6000, ["+5V"])
+stx = simTeil(rg.blaetter[0], "R", "1k", "R1", 8000, ["+5V", "GND"])
+stx = simTeil(rg.blaetter[0], "GND", "", "", 10000, ["GND"])
+DIM rgR0 AS kern.SimErgebnis : rgR0 = NEW kern.SimErgebnis(kern.SIM_OP)
+DIM rgDeck AS STRING : rgDeck = JOIN$(kern.simDeck(rg, stE, rgR0), CHR$(10))
+PRINT "Regler am +5V-Netz: keine zweite Quelle "; NOT CONTAINS(rgDeck, "VV__5V"); "  Hinweis "; CONTAINS(JOIN$(rgR0.hinweise, "|"), "kommt aus der Schaltung"); "  (erwartet TRUE TRUE)"
+IF kern.ngspiceSuchen$() <> "" THEN
+    DIM rgR AS kern.SimErgebnis : rgR = kern.simRechnen(rg, stE)
+    PRINT "Regler gerechnet: ok "; rgR.ok; " "; rgR.fehler; " +5V = "; kern.siText$(simV(rgR, "+5V"), "V"); "  (erwartet TRUE  +5V = 5 V)"
+    ' OPV an +VCC/-VCC (ohne Zahl): Grenzen +-5 V
+    DIM ro AS kern.Dokument : ro = NEW kern.Dokument()
+    stx = simTeil(ro.blaetter[0], "VCC", "+VCC", "", 0, ["+VCC"])
+    stx = simTeil(ro.blaetter[0], "VCC", "-VCC", "", 2000, ["-VCC"])
+    stx = simTeil(ro.blaetter[0], "V", "-1V", "V1", 4000, ["EIN", "GND"])
+    stx = simTeil(ro.blaetter[0], "OPV", "TL071", "U1", 7000, ["GND", "EIN", "AUS", "+VCC", "-VCC"])
+    stx = simTeil(ro.blaetter[0], "GND", "", "", 10000, ["GND"])
+    DIM roR AS kern.SimErgebnis : roR = kern.simRechnen(ro, stE)
+    PRINT "OPV an -VCC: ok "; roR.ok; "  AUS -5..-4.9 "; simV(roR, "AUS") < -4.9 AND simV(roR, "AUS") >= -5.001; "  (erwartet TRUE TRUE)"
+END IF
+' --- Busse: Namen, ERC, verbindet nichts, Datei, Bus-Port, KiCad
+DIM bmF AS STRING, bmT AS STRING : bmT = ""
+DIM bmE AS ARRAY OF STRING : bmE = ["D[0..3]", "A[3:0]", "D[0..1],CLK EN", "I2C{SDA SCL}", "{X Y}", "D[0..x]", ""]
+DIM bmi AS INTEGER
+FOR bmi = 0 TO LEN(bmE) - 1
+    DIM bmM AS ARRAY OF STRING : bmM = kern.busMitglieder(bmE[bmi], bmF)
+    bmT = bmT + IIF(bmF <> "", "?", JOIN$(bmM, " ")) + " | "
+NEXT
+PRINT "Bus-Mitglieder: "; bmT; " (erwartet D0 D1 D2 D3 | A3 A2 A1 A0 | D0 D1 CLK EN | I2C.SDA I2C.SCL | X Y | ? | ? | )"
+FUNCTION busDraht(bl AS kern.Blatt, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER) AS kern.Draht
+    DIM w AS kern.Draht : w = NEW kern.Draht()
+    ARRAY_PUSH(w.punkte, NEW kern.Punkt(x1, y1))
+    ARRAY_PUSH(w.punkte, NEW kern.Punkt(x2, y2))
+    ARRAY_PUSH(bl.draehte, w)
+    RETURN w
+END FUNCTION
+FUNCTION busNeu(bl AS kern.Blatt, name AS STRING, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER) AS kern.Bus
+    DIM bu AS kern.Bus : bu = NEW kern.Bus(name)
+    ARRAY_PUSH(bu.punkte, NEW kern.Punkt(x1, y1))
+    ARRAY_PUSH(bu.punkte, NEW kern.Punkt(x2, y2))
+    ARRAY_PUSH(bl.busse, bu)
+    RETURN bu
+END FUNCTION
+DIM bdok AS kern.Dokument : bdok = NEW kern.Dokument()
+DIM bbl AS kern.Blatt : bbl = bdok.blaetter[0]
+DIM bBus AS kern.Bus : bBus = busNeu(bbl, "D[0..3]", 0, 0, 4000, 0)
+DIM bwx AS kern.Draht
+bwx = busDraht(bbl, 1000, 0, 1000, 1000)
+ARRAY_PUSH(bbl.labels, NEW kern.Label("D1", NEW kern.Punkt(1000, 1000), kern.LA_LOKAL))
+bwx = busDraht(bbl, 2000, 0, 2000, 1000)
+bwx = busDraht(bbl, 3000, 0, 3000, 1000)
+ARRAY_PUSH(bbl.labels, NEW kern.Label("X9", NEW kern.Punkt(3000, 1000), kern.LA_LOKAL))
+DIM bR AS kern.Bauteil : bR = kern.neuesBauteil("R", kern.neueLage(4200, 0))
+bR.referenz = "R1"
+ARRAY_PUSH(bbl.bauteile, bR)
+kern.autoKnoten(bbl)
+DIM bErc AS ARRAY OF kern.Verstoss : bErc = kern.ercPruefenDok(bdok)
+DIM bOhne AS INTEGER, bFremd AS INTEGER, bPin AS INTEGER, bOffen AS INTEGER, bOffenBus AS INTEGER
+FOR bmi = 0 TO LEN(bErc) - 1
+    IF CONTAINS(bErc[bmi].text, "Abzweig vom Bus D[0..3] ohne Label") THEN bOhne = bOhne + 1
+    IF CONTAINS(bErc[bmi].text, "X9 gehoert nicht zum Bus D[0..3]") THEN bFremd = bFremd + 1
+    IF CONTAINS(bErc[bmi].text, "Pin R1.1 liegt auf einem Bus") THEN bPin = bPin + 1
+    IF CONTAINS(bErc[bmi].text, "Offenes Drahtende") THEN
+        bOffen = bOffen + 1
+        IF bErc[bmi].y = 0 THEN bOffenBus = bOffenBus + 1
+    END IF
+NEXT
+PRINT "Bus-ERC: ohne Label "; bOhne; "  fremdes Label "; bFremd; "  Pin auf dem Bus "; bPin; "  offene Enden "; bOffen; " davon am Bus "; bOffenBus; "  (erwartet 1 1 1  offene Enden 1 davon am Bus 0)"
+DIM bN AS kern.Netze : bN = kern.netzeDokument(bdok)
+PRINT "Bus verbindet nichts: D1 und X9 getrennt "; NOT bN.gleich(1000, 1000, 3000, 1000); "  freies Mitglied "; kern.busFreiesMitglied$(bbl, 0); "  (erwartet TRUE  freies Mitglied D0)"
+' zwei beruehrende Busse mit verschiedenen Namen, ein Bus ohne Namen
+DIM bZusatz AS kern.Bus : bZusatz = busNeu(bbl, "A[0..1]", 4000, 0, 4000, 2000)
+bZusatz = busNeu(bbl, "", 0, 5000, 2000, 5000)
+bErc = kern.ercPruefenDok(bdok)
+DIM bZwei AS BOOLEAN, bLeer AS BOOLEAN
+FOR bmi = 0 TO LEN(bErc) - 1
+    IF CONTAINS(bErc[bmi].text, "Zusammenhaengende Busse heissen verschieden") THEN bZwei = TRUE
+    IF bErc[bmi].text = "Bus ohne Namen" THEN bLeer = TRUE
+NEXT
+PRINT "Bus-ERC Gruppen: zwei Namen "; bZwei; "  ohne Namen "; bLeer; "  Gruppen "; JOIN$(ARRAY_MAP(kern.busGruppen(bbl), FUNCTION(g) STR$(g)), ","); "  (erwartet TRUE TRUE  Gruppen 0,0,2)"
+DIM bPfad AS STRING : bPfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef_bus.fkn"
+DIM bGesp AS BOOLEAN : bGesp = kern.dokumentSpeichern(bdok, bPfad)
+DIM bdok2 AS kern.Dokument : bdok2 = kern.dokumentLaden(bPfad)
+DELETEFILE(bPfad)
+PRINT "Bus in der Datei: "; LEN(bdok2.blaetter[0].busse); " "; bdok2.blaetter[0].busse[0].name; " "; bdok2.blaetter[0].busse[0].punkte[1].x; "  (erwartet 3 D[0..3] 4000)"
+' Bus-Port: Unterblatt mit hierarchischem Label D[0..1], Mitglieder ueber Namen
+DIM hb AS kern.Dokument : hb = NEW kern.Dokument()
+hb.blaetter[0].name = "Haupt"
+DIM hbk AS kern.Blatt : hbk = NEW kern.Blatt("Daten")
+ARRAY_PUSH(hb.blaetter, hbk)
+DIM hbx AS kern.Bus : hbx = busNeu(hbk, "D[0..1]", 0, 0, 2000, 0)
+DIM hbl AS kern.Label : hbl = NEW kern.Label("D[0..1]", NEW kern.Punkt(0, 0), kern.LA_HIER)
+hbl.drehung = 180
+ARRAY_PUSH(hbk.labels, hbl)
+DIM hbR2 AS kern.Bauteil : hbR2 = kern.neuesBauteil("R", kern.neueLage(1000, 1200))
+hbR2.referenz = "R2"
+ARRAY_PUSH(hbk.bauteile, hbR2)
+ARRAY_PUSH(hbk.labels, NEW kern.Label("D0", NEW kern.Punkt(800, 1200), kern.LA_LOKAL))
+ARRAY_PUSH(hbk.labels, NEW kern.Label("D1", NEW kern.Punkt(1200, 1200), kern.LA_LOKAL))
+DIM hbR1 AS kern.Bauteil : hbR1 = kern.neuesBauteil("R", kern.neueLage(0, 3000))
+hbR1.referenz = "R1"
+ARRAY_PUSH(hb.blaetter[0].bauteile, hbR1)
+ARRAY_PUSH(hb.blaetter[0].labels, NEW kern.Label("D0", NEW kern.Punkt(-200, 3000), kern.LA_LOKAL))
+ARRAY_PUSH(hb.blaetter[0].labels, NEW kern.Label("D1", NEW kern.Punkt(200, 3000), kern.LA_LOKAL))
+DIM hbs AS kern.Bauteil : hbs = kern.neuesBauteil(kern.BLATT_VORSATZ + hbk.id, kern.neueLage(5000, 3000))
+ARRAY_PUSH(hb.blaetter[0].bauteile, hbs)
+kern.blattSymboleAktualisieren(hb)
+DIM hbn AS kern.Netze : hbn = kern.netzeDokument(hb)
+PRINT "Bus-Port: Port "; hbs.sym.pins[0].name; "  D0 oben = D0 unten "; hbn.gleichUeber(0, -200, 3000, 1, 800, 1200); "  D0 oben = D1 unten "; hbn.gleichUeber(0, -200, 3000, 1, 1200, 1200); "  kein Netz D[0..1] "; NOT CONTAINS(kern.netzlisteTextDok$(hb), "D[0..1]"); "  (erwartet D[0..1]  TRUE FALSE TRUE)"
+' Review: Ueberstrich und IO[3] sind keine Busnamen; ~{CS} verbindet
+PRINT "Busname?: "; kern.istBusName("~{RESET}"); " "; kern.istBusName("IO[3]"); " "; kern.istBusName("{slash}"); " "; kern.istBusName("D[0..7]"); " "; kern.istBusName("I2C{SDA SCL}"); " "; kern.istBusName("A[15:0] CLK"); "  (erwartet FALSE FALSE FALSE TRUE TRUE TRUE)"
+DIM ueb AS kern.Dokument : ueb = NEW kern.Dokument()
+DIM ubR1 AS kern.Bauteil : ubR1 = kern.neuesBauteil("R", kern.neueLage(0, 0))
+ubR1.referenz = "R1"
+DIM ubR2 AS kern.Bauteil : ubR2 = kern.neuesBauteil("R", kern.neueLage(3000, 0))
+ubR2.referenz = "R2"
+ARRAY_PUSH(ueb.blaetter[0].bauteile, ubR1)
+ARRAY_PUSH(ueb.blaetter[0].bauteile, ubR2)
+ARRAY_PUSH(ueb.blaetter[0].labels, NEW kern.Label("~{CS}", NEW kern.Punkt(200, 0), kern.LA_LOKAL))
+ARRAY_PUSH(ueb.blaetter[0].labels, NEW kern.Label("~{CS}", NEW kern.Punkt(2800, 0), kern.LA_LOKAL))
+DIM ubN AS kern.Netze : ubN = kern.netzeDokument(ueb)
+PRINT "Ueberstrich-Label verbindet: "; ubN.gleich(200, 0, 2800, 0); "  (erwartet TRUE)"
+' Bus-Port nach Index: Elternbus DATA[0..1] am Port D[0..1]
+DIM ix AS kern.Dokument : ix = NEW kern.Dokument()
+DIM ixK AS kern.Blatt : ixK = NEW kern.Blatt("Daten")
+ARRAY_PUSH(ix.blaetter, ixK)
+DIM ixB AS kern.Bus : ixB = busNeu(ixK, "D[0..1]", 0, 0, 2000, 0)
+DIM ixH AS kern.Label : ixH = NEW kern.Label("D[0..1]", NEW kern.Punkt(0, 0), kern.LA_HIER)
+ixH.drehung = 180
+ARRAY_PUSH(ixK.labels, ixH)
+DIM ixR AS kern.Bauteil : ixR = kern.neuesBauteil("R", kern.neueLage(1000, 1200))
+ixR.referenz = "R2"
+ARRAY_PUSH(ixK.bauteile, ixR)
+ARRAY_PUSH(ixK.labels, NEW kern.Label("D0", NEW kern.Punkt(800, 1200), kern.LA_LOKAL))
+ARRAY_PUSH(ixK.labels, NEW kern.Label("D1", NEW kern.Punkt(1200, 1200), kern.LA_LOKAL))
+DIM ixS AS kern.Bauteil : ixS = kern.neuesBauteil(kern.BLATT_VORSATZ + ixK.id, kern.neueLage(5000, 3000))
+ARRAY_PUSH(ix.blaetter[0].bauteile, ixS)
+kern.blattSymboleAktualisieren(ix)
+DIM ixP AS kern.Punkt : ixP = ixS.pinPunkt(0)
+DIM ixEB AS kern.Bus : ixEB = busNeu(ix.blaetter[0], "DATA[0..1]", ixP.x - 3000, ixP.y, ixP.x, ixP.y)
+DIM ixR1 AS kern.Bauteil : ixR1 = kern.neuesBauteil("R", kern.neueLage(0, 6000))
+ixR1.referenz = "R1"
+ARRAY_PUSH(ix.blaetter[0].bauteile, ixR1)
+ARRAY_PUSH(ix.blaetter[0].labels, NEW kern.Label("DATA0", NEW kern.Punkt(-200, 6000), kern.LA_LOKAL))
+ARRAY_PUSH(ix.blaetter[0].labels, NEW kern.Label("DATA1", NEW kern.Punkt(200, 6000), kern.LA_LOKAL))
+DIM ixN AS kern.Netze : ixN = kern.netzeDokument(ix)
+PRINT "Bus-Port nach Index: DATA0 = D0 "; ixN.gleichUeber(0, -200, 6000, 1, 800, 1200); "  DATA1 = D1 "; ixN.gleichUeber(0, 200, 6000, 1, 1200, 1200); "  DATA0 = D1 "; ixN.gleichUeber(0, -200, 6000, 1, 1200, 1200); "  (erwartet TRUE TRUE FALSE)"
+' KiCad: Bus mit Name aus dem Label, Eintraege als Abzweige
+DIM kbus AS kern.KicadErgebnis : kbus = kern.kicadImportieren("daten/kicad/beispiel.kicad_sch")
+DIM kbBl AS kern.Blatt : kbBl = kbus.dok.blaetter[0]
+DIM kbLabel AS BOOLEAN : kbLabel = FALSE
+FOR bmi = 0 TO LEN(kbBl.labels) - 1
+    IF kbBl.labels[bmi].text = "D[0..1]" THEN kbLabel = TRUE
+NEXT
+DIM kbErc AS ARRAY OF kern.Verstoss : kbErc = kern.ercPruefenDok(kbus.dok)
+DIM kbAbzweig AS INTEGER : kbAbzweig = 0
+FOR bmi = 0 TO LEN(kbErc) - 1
+    IF CONTAINS(kbErc[bmi].text, "Bus") THEN kbAbzweig = kbAbzweig + 1
+NEXT
+PRINT "KiCad-Bus: "; LEN(kbBl.busse); " "; kbBl.busse[0].name; "  Label weg "; NOT kbLabel; "  Bus-Meldungen "; kbAbzweig; "  Alias gemeldet "; CONTAINS(JOIN$(kbus.hinweise, "|"), "Bus-Alias"); "  (erwartet 1 D[0..1]  TRUE  0  TRUE)"
+' --- Mehrfach-Instanzen: zwei gleiche Kanaele aus einem Blatt
+DIM mi AS kern.Dokument : mi = NEW kern.Dokument()
+mi.blaetter[0].name = "Haupt"
+DIM miK AS kern.Blatt : miK = NEW kern.Blatt("Kanal")
+ARRAY_PUSH(mi.blaetter, miK)
+DIM miR AS kern.Bauteil : miR = kern.neuesBauteil("R", kern.neueLage(1000, 0))
+miR.referenz = "R1"
+ARRAY_PUSH(miK.bauteile, miR)
+DIM miE AS kern.Label : miE = NEW kern.Label("EIN", NEW kern.Punkt(800, 0), kern.LA_HIER)
+miE.drehung = 180
+ARRAY_PUSH(miK.labels, miE)
+ARRAY_PUSH(miK.labels, NEW kern.Label("AUS", NEW kern.Punkt(1200, 0), kern.LA_HIER))
+DIM miA AS kern.Bauteil : miA = kern.neuesBauteil(kern.BLATT_VORSATZ + miK.id, kern.neueLage(3000, 0))
+DIM miB AS kern.Bauteil : miB = kern.neuesBauteil(kern.BLATT_VORSATZ + miK.id, kern.neueLage(3000, 3000))
+ARRAY_PUSH(mi.blaetter[0].bauteile, miA)
+ARRAY_PUSH(mi.blaetter[0].bauteile, miB)
+kern.blattSymboleAktualisieren(mi)
+' im Elternblatt je Port ein Label
+FUNCTION miPort(d AS kern.Dokument, b AS kern.Bauteil, port AS STRING, name AS STRING) AS kern.Punkt
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(b.sym.pins) - 1
+        IF b.sym.pins[i].name = port THEN
+            DIM p AS kern.Punkt : p = b.pinPunkt(i)
+            ARRAY_PUSH(d.blaetter[0].labels, NEW kern.Label(name, p, kern.LA_LOKAL))
+            RETURN p
+        END IF
+    NEXT
+    RETURN NEW kern.Punkt(0, 0)
+END FUNCTION
+DIM miPA AS kern.Punkt : miPA = miPort(mi, miA, "EIN", "A_EIN")
+DIM miPB AS kern.Punkt : miPB = miPort(mi, miB, "EIN", "B_EIN")
+DIM miPA2 AS kern.Punkt : miPA2 = miPort(mi, miA, "AUS", "A_AUS")
+DIM miPB2 AS kern.Punkt : miPB2 = miPort(mi, miB, "AUS", "B_AUS")
+DIM miF AS kern.Dokument : miF = kern.flach(mi)
+PRINT "Instanzen: Blaetter "; LEN(miF.blaetter); "  Kopie "; miF.blaetter[2].name; " aus "; miF.blaetter[2].quelle; "  Pfade "; miF.blaetter[1].instanz = "/" + miA.id; " "; miF.blaetter[2].instanz = "/" + miB.id; "  Blattsymbole "; miA.referenz; " / "; miB.referenz; "  Original bleibt "; LEN(mi.blaetter); " "; mi.blaetter[0].bauteile[1] = miB; "  (erwartet 3  Kanal (2) aus 1  TRUE TRUE  Kanal / Kanal (2)  2 TRUE)"
+PRINT "Instanzen: ohne Mehrfach dasselbe Dokument "; kern.flach(hd) = hd OR LEN(kern.flach(hd).blaetter) = LEN(hd.blaetter); "  flach von flach "; kern.flach(miF) = miF; "  Liste "; LEN(kern.instanzenVon(miF, 1)); "  (erwartet TRUE TRUE 2)"
+FUNCTION miNetzRefs$(n AS kern.Netze, bi AS INTEGER, p AS kern.Punkt) AS STRING
+    n.blattWaehlen(bi)
+    DIM i AS INTEGER : i = n.netzAn(p.x, p.y)
+    IF i < 0 THEN RETURN "-"
+    DIM t AS STRING : t = ""
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(n.liste[i].pins) - 1
+        t = t + n.liste[i].pins[j].ref + "." + n.liste[i].pins[j].nummer + " "
+    NEXT
+    RETURN n.liste[i].name + ": " + t
+END FUNCTION
+DIM miNetz AS kern.Netze : miNetz = kern.netzeDokument(mi)
+PRINT "Instanz-Netze: "; miNetzRefs$(miNetz, 0, miPA); "| "; miNetzRefs$(miNetz, 0, miPB); "| "; miNetzRefs$(miNetz, 0, miPB2); " (erwartet A_EIN: R1.1 | B_EIN: R1_2.1 | B_AUS: R1_2.2 )"
+DIM miBom AS ARRAY OF kern.BomZeile : miBom = kern.stuecklisteDok(mi)
+DIM miErc AS ARRAY OF kern.Verstoss : miErc = kern.ercPruefenDok(mi)
+DIM miEt AS STRING : miEt = ""
+FOR bmi = 0 TO LEN(miErc) - 1
+    miEt = miEt + miErc[bmi].text + "|"
+NEXT
+PRINT "Instanz-Stueckliste: "; miBom[0].menge; " "; JOIN$(miBom[0].referenzen, ","); "  ERC ohne Mehrfach-Fehler "; NOT CONTAINS(miEt, "mehrfach"); "  doppelt "; CONTAINS(miEt, "doppelt"); "  (erwartet 2 R1,R1_2  TRUE FALSE)"
+DIM miAn AS INTEGER : miAn = kern.annotieren(mi, FALSE)
+miF = kern.flach(mi)
+PRINT "Instanz annotieren: geaendert "; miAn; "  Kopie "; miF.blaetter[2].bauteile[0].referenz; "  im Original "; MAPGETOR(miR.instanzRefs, "/" + miB.id, "-"); "  erste bleibt "; miR.referenz; "  (erwartet 1  R2  R2  R1)"
+DIM miPfad AS STRING : miPfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef_inst.fkn"
+DIM miSp AS BOOLEAN : miSp = kern.dokumentSpeichern(mi, miPfad)
+DIM mi2 AS kern.Dokument : mi2 = kern.dokumentLaden(miPfad)
+DELETEFILE(miPfad)
+PRINT "Instanz in der Datei: "; kern.flach(mi2).blaetter[2].bauteile[0].referenz; "  Blattsymbol "; mi2.blaetter[0].bauteile[1].referenz; "  (erwartet R2  Kanal (2))"
+DIM miEin AS INTEGER : miEin = kern.platineEinsetzen(mi)
+DIM miPr AS kern.PlatBericht : miPr = kern.platinePruefen(mi)
+PRINT "Instanz auf der Platine: gesetzt "; miEin; " Teile "; LEN(mi.platine.teile); "  zweite Id "; ENDSWITH(mi.platine.teile[1].bauteilId, "@/" + miB.id) OR ENDSWITH(mi.platine.teile[0].bauteilId, "@/" + miB.id); "  SPICE "; CONTAINS(kern.netzlisteSpiceDok$(mi, "x"), "R2 B_EIN B_AUS 1k"); "  (erwartet gesetzt 2 Teile 2  TRUE  TRUE)"
+' Review: erste Instanz faellt weg -> die zweite rueckt mit ihrer Referenz und ihrem Platz nach
+DIM miPlatz AS INTEGER : miPlatz = -1
+DIM mlk AS INTEGER
+FOR mlk = 0 TO LEN(mi.platine.teile) - 1
+    IF ENDSWITH(mi.platine.teile[mlk].bauteilId, "@/" + miB.id) THEN miPlatz = mi.platine.teile[mlk].s * 1000 + mi.platine.teile[mlk].z
+NEXT
+kern.instanzenPflegen(mi)              ' wie nach jeder Aenderung in der Oberflaeche
+ARRAY_REMOVE_AT(mi.blaetter[0].bauteile, 0)
+kern.instanzenPflegen(mi)
+DIM miRest AS STRING : miRest = ""
+FOR mlk = 0 TO LEN(mi.platine.teile) - 1
+    miRest = miRest + mi.platine.teile[mlk].bauteilId + "@" + STR$(mi.platine.teile[mlk].s * 1000 + mi.platine.teile[mlk].z) + " "
+NEXT
+PRINT "Erste Instanz weg: Referenz "; miR.referenz; "  Platz "; miRest = miR.id + "@" + STR$(miPlatz) + " "; "  alte Instanz-Refs weg "; LEN(MAPKEYS(miR.instanzRefs)); "  erste "; mi.blaetter[1].erste = "/" + miB.id; "  (erwartet R2  TRUE  0  TRUE)"
+' Review: ein Kreis ueber zwei Eltern wird erkannt und nicht ausgerollt
+DIM zk AS kern.Dokument : zk = NEW kern.Dokument()
+DIM zkP AS kern.Blatt : zkP = NEW kern.Blatt("P")
+DIM zkK AS kern.Blatt : zkK = NEW kern.Blatt("K")
+ARRAY_PUSH(zk.blaetter, zkP)
+ARRAY_PUSH(zk.blaetter, zkK)
+ARRAY_PUSH(zk.blaetter[0].bauteile, kern.neuesBauteil(kern.BLATT_VORSATZ + zkP.id, kern.neueLage(0, 0)))
+ARRAY_PUSH(zk.blaetter[0].bauteile, kern.neuesBauteil(kern.BLATT_VORSATZ + zkK.id, kern.neueLage(5000, 0)))
+ARRAY_PUSH(zkP.bauteile, kern.neuesBauteil(kern.BLATT_VORSATZ + zkK.id, kern.neueLage(0, 0)))
+PRINT "Kreis-Pruefung vorher: K enthaelt P "; kern.blattEnthaelt(zk, 2, 1); "  (erwartet FALSE)"
+ARRAY_PUSH(zkK.bauteile, kern.neuesBauteil(kern.BLATT_VORSATZ + zkP.id, kern.neueLage(0, 0)))
+DIM zkE AS ARRAY OF kern.Verstoss : zkE = kern.ercPruefenDok(zk)
+DIM zkT AS STRING : zkT = ""
+FOR mlk = 0 TO LEN(zkE) - 1
+    zkT = zkT + zkE[mlk].text + "|"
+NEXT
+PRINT "Kreis ueber zwei Eltern: erkannt "; CONTAINS(zkT, "ein Kreis"); "  ausgerollt endlich "; LEN(kern.flach(zk).blaetter) < 8; "  (erwartet TRUE TRUE)"
+' --- KiCad-Symbolbibliotheken (.kicad_sym)
+DIM klPfade AS ARRAY OF STRING : klPfade = ["daten/kicad/testbib.kicad_sym", "daten/kicad/testbib9.kicad_sym", "daten/kicad/testbib_zeile.kicad_sym"]
+DIM klT AS STRING : klT = ""
+DIM kli AS INTEGER, klj AS INTEGER
+FOR kli = 0 TO LEN(klPfade) - 1
+    DIM klB AS kern.KicadBib : klB = kern.kicadBibLaden(klPfade[kli])
+    klT = klT + klB.name + "[" + klB.fehler + "]:"
+    FOR klj = 0 TO LEN(klB.eintraege) - 1
+        klT = klT + klB.eintraege[klj].name + "/" + STR$(klB.eintraege[klj].einheiten) + "/" + klB.eintraege[klj].erbtVon + " "
+    NEXT
+    klT = klT + "| "
+NEXT
+PRINT "KiCad-Bib Index: "; klT; " (erwartet je R/1/ R_Small/1/R NAND2/2/ GND/1/, ohne Fehler)"
+DIM klb AS kern.KicadBib : klb = kern.kicadBibLaden("daten/kicad/testbib9.kicad_sym")
+DIM klV AS ARRAY OF INTEGER
+DIM klR AS kern.Symbol : klR = kern.kicadBibSymbol(klb, klb.eintrag("R"), 1, klV)
+DIM klS AS kern.Symbol : klS = kern.kicadBibSymbol(klb, klb.eintrag("R_Small"), 1, klV)
+PRINT "KiCad-Bib R: "; klR.id; " "; LEN(klR.pins); " Pins "; klR.beschreibung; "  R_Small: "; klS.id; " "; LEN(klS.pins); " Pins Wert "; klS.wertVorgabe; " "; klS.beschreibung; " Ref "; klS.praefix; "  (erwartet kicad:testbib9:R 2 Pins Widerstand  R_Small: kicad:testbib9:R_Small 2 Pins Wert R_Small Widerstand, klein Ref R)"
+DIM klN AS kern.Symbol : klN = kern.kicadBibSymbol(klb, klb.eintrag("NAND2"), 2, klV)
+DIM klVt AS STRING : klVt = ""
+FOR klj = 0 TO LEN(klV) - 1
+    klVt = klVt + klN.pins[klV[klj]].name + " "
+NEXT
+PRINT "KiCad-Bib NAND2 B: "; klN.id; " "; LEN(klN.pins); " Pins  versteckt "; klVt; " gleich "; JOIN$(ARRAY_MAP(kern.versteckteVersorgung(klN), FUNCTION(x) STR$(x)), ",") = JOIN$(ARRAY_MAP(klV, FUNCTION(x) STR$(x)), ","); "  registriert "; kern.istEigenBekannt(klN.id); "  (erwartet kicad:testbib9:NAND2/2 5 Pins  versteckt VCC GND  gleich TRUE  registriert TRUE)"
+DIM klG AS kern.Symbol : klG = kern.kicadBibSymbol(klb, klb.eintrag("GND"), 1, klV)
+' versteckte Versorgung verbindet ueber den Namen -- ohne Label, auch nach dem Verschieben
+DIM klD AS kern.Dokument : klD = NEW kern.Dokument()
+DIM klU1 AS kern.Bauteil : klU1 = kern.neuesBauteil(klN.id, kern.neueLage(3000, 3000))
+klU1.referenz = "U1"
+DIM klNa AS kern.Symbol : klNa = kern.kicadBibSymbol(klb, klb.eintrag("NAND2"), 1, klV)
+DIM klU2 AS kern.Bauteil : klU2 = kern.neuesBauteil(klNa.id, kern.neueLage(8000, 3000))
+klU2.referenz = "U2"
+ARRAY_PUSH(klD.blaetter[0].bauteile, klU1)
+ARRAY_PUSH(klD.blaetter[0].bauteile, klU2)
+DIM klE0 AS ARRAY OF kern.Verstoss : klE0 = kern.ercPruefenDok(klD)
+DIM klE0t AS STRING : klE0t = JOIN$(ARRAY_MAP(klE0, FUNCTION(v) v.text), "|")
+ARRAY_PUSH(klD.blaetter[0].bauteile, kern.neuesBauteil(klG.id, kern.neueLage(20000, 20000)))
+klU2.lage.pos = NEW kern.Punkt(12000, 9000)
+DIM klDn AS kern.Netze : klDn = kern.netzeDokument(klD)
+DIM klE1 AS ARRAY OF kern.Verstoss : klE1 = kern.ercPruefenDok(klD)
+PRINT "KiCad-Bib versteckte Versorgung: U1.14 "; kimNetzMit$(klDn, "U1", "14"); "  U2.14 "; kimNetzMit$(klDn, "U2", "14"); "  U1.7 "; kimNetzMit$(klDn, "U1", "7"); "  U2.7 "; kimNetzMit$(klDn, "U2", "7"); "  Labels "; LEN(klD.blaetter[0].labels); "  ERC ohne Quelle "; CONTAINS(klE0t, "VCC: Versorgungseingang ohne Versorgung"); "  mit GND-Symbol GND versorgt "; NOT CONTAINS(JOIN$(ARRAY_MAP(klE1, FUNCTION(v) v.text), "|"), "GND: Versorgungseingang"); "  (erwartet VCC VCC GND GND  Labels 0  TRUE  TRUE)"
+PRINT "KiCad-Bib GND: Leistung "; klG.einheitLeistung; "  keine versteckte Versorgung "; LEN(kern.versteckteVersorgung(klG)) = 0; "  R ohne "; LEN(kern.versteckteVersorgung(klR)) = 0; "  (erwartet TRUE TRUE TRUE)"
+DIM klBibs AS ARRAY OF kern.KicadBib : klBibs = [klb, kern.kicadBibLaden("daten/kicad/testbib.kicad_sym")]
+PRINT "KiCad-Bib Suche: widerstand "; JOIN$(kern.kicadBibSuchen(klBibs, "Widerstand", 50), " "); "  'res klein' "; JOIN$(kern.kicadBibSuchen(klBibs, "res klein", 50), " "); "  testbib9:nand "; JOIN$(kern.kicadBibSuchen(klBibs, "testbib9:nand", 50), " "); "  hoechstens 1 "; LEN(kern.kicadBibSuchen(klBibs, "", 1)); "  (erwartet 0/0 0/1 1/0 1/1  0/1 1/1  0/2  1)"
+DIM klVs AS kern.Symbol : klVs = kern.kicadBibVorschau(klBibs[1], klBibs[1].eintrag("R_Small"), 1)
+PRINT "KiCad-Bib Vorschau: "; klVs.id; " "; LEN(klVs.pins); " Pins  nicht registriert "; NOT kern.istEigenBekannt(klVs.id); "  (erwartet kicad:testbib:R_Small 2 Pins  nicht registriert TRUE)"
+DIM klF AS kern.KicadBib : klF = kern.kicadBibLaden("daten/kicad/beispiel.kicad_sch")
+DIM klF2 AS kern.KicadBib : klF2 = kern.kicadBibLaden("daten/kicad/gibtsnicht.kicad_sym")
+' geaenderte Datei: der Index wird beim Einsetzen erneuert
+DIM klAend AS STRING : klAend = "C:/Programmieren/Python/GameBasic/funkenflug/pruef_bib.kicad_sym"
+DIM klTx AS STRING : klTx = READALL$("daten/kicad/testbib.kicad_sym")
+WRITEALL(klAend, klTx)
+DIM klA AS kern.KicadBib : klA = kern.kicadBibLaden(klAend)
+PRINT "KiCad-Bib Text frei: "; LEN(klA.zeilen) = 0; "  einzeilig behalten "; LEN(kern.kicadBibLaden("daten/kicad/testbib_zeile.kicad_sym").zeilen) > 0; "  (erwartet TRUE TRUE)"
+DIM klAi AS INTEGER : klAi = klA.eintrag("GND")
+WRITEALL(klAend, REPLACE$(klTx, "(symbol " + CHR$(34) + "R_Small" + CHR$(34), "(symbol " + CHR$(34) + "R_Kleiner_Name" + CHR$(34)))
+DIM klAj AS INTEGER : klAj = kern.kicadBibPruefen(klA, klAi)
+PRINT "KiCad-Bib geaendert: GND "; klAi; " -> "; klAj; " "; klA.eintraege[klAj].name; "  R_Small weg "; kern.kicadBibPruefen(klA, klA.eintrag("R_Small")); "  unveraendert "; kern.kicadBibPruefen(klA, klAj) = klAj; "  (erwartet GND 3 -> 3 GND  R_Small weg -1  unveraendert TRUE)"
+DELETEFILE(klAend)
+' Index-Zwischenspeicher: zweites Laden aus der .idx, nach Aenderung neu
+DIM klC AS STRING : klC = "C:/Programmieren/Python/GameBasic/funkenflug/pruef_bibcache"
+WRITEALL(klAend, klTx)
+DIM klC1 AS kern.KicadBib : klC1 = kern.kicadBibLadenGemerkt(klAend, klC)
+DIM klIdx AS ARRAY OF STRING : klIdx = DIRLIST(klC)
+WRITEALL(klC + "/" + klIdx[0], REPLACE$(READALL$(klC + "/" + klIdx[0]), "res resistor", "aus dem Speicher"))
+DIM klC2 AS kern.KicadBib : klC2 = kern.kicadBibLadenGemerkt(klAend, klC)
+DIM klCt AS STRING : klCt = ""
+FOR klj = 0 TO LEN(klC2.eintraege) - 1
+    klCt = klCt + klC2.eintraege[klj].name + "/" + STR$(klC2.eintraege[klj].einheiten) + "/" + klC2.eintraege[klj].erbtVon + "/" + klC2.eintraege[klj].stichworte + " "
+NEXT
+DIM klCs AS kern.Symbol : klCs = kern.kicadBibSymbol(klC2, kern.kicadBibPruefen(klC2, klC2.eintrag("NAND2")), 1, klV)
+WRITEALL(klAend, REPLACE$(klTx, "Widerstand, klein", "Widerstand, winzig"))
+DIM klC3 AS kern.KicadBib : klC3 = kern.kicadBibLadenGemerkt(klAend, klC)
+PRINT "KiCad-Bib Zwischenspeicher: Dateien "; LEN(klIdx); "  aus dem Speicher "; klCt; " NAND2 "; LEN(klCs.pins); " Pins  nach Aenderung "; klC3.eintraege[1].beschreibung; "  (erwartet Dateien 1 ... R/1//R aus dem Speicher R_Small/1/R/R aus dem Speicher NAND2/2// GND/1//  NAND2 5 Pins  nach Aenderung Widerstand, winzig)"
+DIM klCd AS ARRAY OF STRING : klCd = DIRLIST(klC)
+FOR klj = 0 TO LEN(klCd) - 1
+    DELETEFILE(klC + "/" + klCd[klj])
+NEXT
+RMDIR(klC)
+DELETEFILE(klAend)
+PRINT "KiCad-Bib fremd: "; klF.fehler; " "; LEN(klF.eintraege); "  fehlt "; LEFT$(klF2.fehler, 20); "  (erwartet keine KiCad-Symbolbibliothek ... 0  fehlt Datei nicht gefunden)"
+' Save / Load
+DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
+PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)
+DIM dok2 AS kern.Dokument : dok2 = kern.dokumentLaden(pfad)
+PRINT "Geladen Bauteile: "; LEN(dok2.blaetter[0].bauteile)
+PRINT "Geladen Ref:      "; dok2.blaetter[0].bauteile[0].referenz
+PRINT "Geladen Wert:     "; dok2.blaetter[0].bauteile[0].wert
+PRINT "Geladen Draehte:  "; LEN(dok2.blaetter[0].draehte)
+PRINT "fertig"

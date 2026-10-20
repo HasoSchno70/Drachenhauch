@@ -1,0 +1,4 @@
+pruef.fkn
+*.bak
+# Wegwerf-Ausgaben des Selbsttests (neben dem --foto-Bild)
+*.png.*

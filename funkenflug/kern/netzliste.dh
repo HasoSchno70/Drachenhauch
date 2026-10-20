@@ -1,0 +1,188 @@
+' Netzlisten-Export -- Namensraum "kern". Alle Formate lesen netzeDokument(),
+' dieselbe Quelle wie ERC und Anzeige, und umfassen alle Blaetter.
+' Versorgungssymbole sind keine Bauteile; sie geben nur dem Netz seinen Namen.
+' Die ...(bl AS Blatt)-Fassungen sind Huellen fuer ein einzelnes Blatt.
+
+CONST NL_ZEILE = CHR$(10)
+
+' Netze nach Namen sortiert, nur solche mit echten Pins.
+FUNCTION nlNetze(n AS Netze) AS ARRAY OF Netz
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM nachName AS MAP OF INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(n.liste) - 1
+        IF n.liste[i].echtePins() > 0 THEN
+            ARRAY_PUSH(namen, n.liste[i].name)
+            MAPPUT(nachName, n.liste[i].name, i)
+        END IF
+    NEXT
+    SORT(namen)
+    DIM r AS ARRAY OF Netz : r = []
+    FOR i = 0 TO LEN(namen) - 1
+        ARRAY_PUSH(r, n.liste[MAPGET(nachName, namen[i])])
+    NEXT
+    RETURN r
+END FUNCTION
+
+' --- Lesbarer Text
+FUNCTION netzlisteText$(bl AS Blatt) AS STRING
+    RETURN netzlisteTextDok$(einBlattDokument(bl))
+END FUNCTION
+
+FUNCTION netzlisteTextDok$(dok AS Dokument) AS STRING
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
+    DIM n AS Netze : n = netzeDokument(dok)
+    DIM t AS STRING : t = "# Funkenflug-Netzliste, " + STR$(LEN(dok.blaetter)) + IIF(LEN(dok.blaetter) = 1, " Blatt", " Blaetter") + NL_ZEILE + NL_ZEILE + "# Bauteile" + NL_ZEILE
+    DIM bi AS INTEGER, i AS INTEGER, j AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        FOR i = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
+            DIM b AS Bauteil : b = dok.blaetter[bi].bauteile[i]
+            IF NOT b.sym.einheitLeistung AND NOT b.sym.blattSymbol THEN t = t + b.referenz + CHR$(9) + b.wert + CHR$(9) + b.sym.name + CHR$(9) + dok.blaetter[bi].name + NL_ZEILE
+        NEXT
+    NEXT
+    t = t + NL_ZEILE + "# Netze" + NL_ZEILE
+    DIM netze AS ARRAY OF Netz : netze = nlNetze(n)
+    FOR i = 0 TO LEN(netze) - 1
+        t = t + netze[i].name + ":"
+        FOR j = 0 TO LEN(netze[i].pins) - 1
+            IF NOT netze[i].pins[j].versorgung THEN t = t + " " + netze[i].pins[j].ref + "." + netze[i].pins[j].nummer
+        NEXT
+        t = t + NL_ZEILE
+    NEXT
+    RETURN t
+END FUNCTION
+
+' --- CSV (Semikolon, wie es eine deutsche Tabellenkalkulation erwartet)
+FUNCTION csvFeld$(s AS STRING) AS STRING
+    IF CONTAINS(s, ";") OR CONTAINS(s, CHR$(34)) THEN RETURN CHR$(34) + REPLACE$(s, CHR$(34), CHR$(34) + CHR$(34)) + CHR$(34)
+    RETURN s
+END FUNCTION
+
+FUNCTION netzlisteCsv$(bl AS Blatt) AS STRING
+    RETURN netzlisteCsvDok$(einBlattDokument(bl))
+END FUNCTION
+
+FUNCTION netzlisteCsvDok$(dok AS Dokument) AS STRING
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
+    DIM n AS Netze : n = netzeDokument(dok)
+    DIM t AS STRING : t = "Netz;Referenz;Pin;Pinname;Wert" + NL_ZEILE
+    DIM netze AS ARRAY OF Netz : netze = nlNetze(n)
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(netze) - 1
+        FOR j = 0 TO LEN(netze[i].pins) - 1
+            DIM p AS NetzPin : p = netze[i].pins[j]
+            IF NOT p.versorgung THEN t = t + csvFeld$(netze[i].name) + ";" + csvFeld$(p.ref) + ";" + csvFeld$(p.nummer) + ";" + csvFeld$(p.pinName) + ";" + csvFeld$(dok.blaetter[p.blatt].bauteile[p.bauteil].wert) + NL_ZEILE
+        NEXT
+    NEXT
+    RETURN t
+END FUNCTION
+
+' --- SPICE
+' Knotenname: nur Buchstaben, Ziffern und _ (Masse regelt spiceKnotenListe).
+FUNCTION spiceKnoten$(name AS STRING) AS STRING
+    IF name = "0" THEN RETURN "0"
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(name) - 1                     ' MID$ zaehlt ab 0
+        DIM c AS STRING : c = MID$(name, i, 1)
+        IF (c >= "A" AND c <= "Z") OR (c >= "a" AND c <= "z") OR (c >= "0" AND c <= "9") THEN r = r + c ELSE r = r + "_"
+    NEXT
+    RETURN r
+END FUNCTION
+
+FUNCTION istZiffer(c AS STRING) AS BOOLEAN
+    RETURN c >= "0" AND c <= "9"
+END FUNCTION
+
+' Wert in SPICE-Schreibweise: RKM-Notation (4k7 -> 4.7k, 2R2 -> 2.2),
+' Einheiten-R weg, "M" (Mega) -> "Meg" (in SPICE heisst M milli!), u statt µ.
+FUNCTION spiceWert$(w AS STRING) AS STRING
+    ' 4,7k -> 4.7k, "100 nF" -> 100nF: Komma und Leerzeichen trennt ngspice
+    DIM s AS STRING : s = REPLACE$(REPLACE$(REPLACE$(REPLACE$(TRIM$(w), "µ", "u"), "Ω", ""), ",", "."), " ", "")
+    IF ENDSWITH(LOWER$(s), "ohm") THEN s = LEFT$(s, LEN(s) - 3)
+    IF s = "" THEN RETURN "0"
+    ' RKM: Ziffer, Buchstabe, Ziffer (MID$ zaehlt ab 0)
+    DIM i AS INTEGER
+    FOR i = 1 TO LEN(s) - 2
+        DIM c AS STRING : c = MID$(s, i, 1)
+        IF istZiffer(MID$(s, i - 1, 1)) AND istZiffer(MID$(s, i + 1, 1)) AND CONTAINS("RrkKMmunpG", c) THEN
+            DIM einheit AS STRING : einheit = c
+            IF UPPER$(c) = "R" THEN einheit = ""
+            s = LEFT$(s, i) + "." + MID$(s, i + 1) + einheit
+            BREAK
+        END IF
+    NEXT
+    IF UPPER$(RIGHT$(s, 1)) = "R" AND LEN(s) > 1 THEN s = LEFT$(s, LEN(s) - 1)
+    IF RIGHT$(s, 1) = "M" THEN s = LEFT$(s, LEN(s) - 1) + "Meg"
+    RETURN s
+END FUNCTION
+
+' Instanzname muss mit dem Elementbuchstaben beginnen.
+FUNCTION spiceName$(buchstabe AS STRING, ref AS STRING) AS STRING
+    IF UPPER$(LEFT$(ref, 1)) = buchstabe THEN RETURN ref
+    RETURN buchstabe + ref
+END FUNCTION
+
+FUNCTION spiceModell$(praefix AS STRING, wert AS STRING) AS STRING
+    RETURN praefix + "_" + spiceKnoten$(wert)
+END FUNCTION
+
+' SPICE-Knoten je Netz: Knoten 0 ist das Netz mit einem GND-Symbol (auch
+' wenn es umbenannt wurde, etwa in AGND) oder einem Masse-Namen. Jedes andere
+' Netz bekommt einen EIGENEN Knoten: "+12V" und "-12V" werden beide "_12V" --
+' bis zur Simulation lagen sie so im Export still aufeinander.
+FUNCTION spiceKnotenListe(dok AS Dokument, n AS Netze) AS ARRAY OF STRING
+    DIM k AS ARRAY OF STRING : k = []
+    DIM vergeben AS MAP OF INTEGER
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(n.liste) - 1
+        DIM masse AS BOOLEAN : masse = simMasse(n.liste[i].name)
+        FOR j = 0 TO LEN(n.liste[i].pins) - 1
+            IF n.liste[i].pins[j].versorgung THEN
+                IF dok.blaetter[n.liste[i].pins[j].blatt].bauteile[n.liste[i].pins[j].bauteil].sym.id = "GND" THEN masse = TRUE
+            END IF
+        NEXT
+        IF masse THEN
+            ARRAY_PUSH(k, "0")
+        ELSE
+            DIM kn AS STRING : kn = spiceKnoten$(n.liste[i].name)
+            IF STARTSWITH(n.liste[i].name, "-") THEN kn = "M" + MID$(kn, 1)
+            DIM basis AS STRING : basis = kn
+            DIM zz AS INTEGER : zz = 2
+            WHILE MAPHAS(vergeben, LOWER$(kn))
+                kn = basis + "_" + STR$(zz)
+                zz = zz + 1
+            WEND
+            MAPPUT(vergeben, LOWER$(kn), 1)
+            ARRAY_PUSH(k, kn)
+        END IF
+    NEXT
+    RETURN k
+END FUNCTION
+
+FUNCTION netzlisteSpice$(bl AS Blatt, titel AS STRING) AS STRING
+    RETURN netzlisteSpiceDok$(einBlattDokument(bl), titel)
+END FUNCTION
+
+FUNCTION netzlisteSpiceDok$(dok AS Dokument, titel AS STRING) AS STRING
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
+    ' dieselben Elemente wie die Simulation (kern/simulation.dh): Quellen fuer
+    ' die Versorgungen, Modelle nach Wert -- die Datei laeuft so in ngspice
+    DIM n AS Netze : n = netzeDokument(dok)
+    DIM knoten AS ARRAY OF STRING : knoten = spiceKnotenListe(dok, n)
+    DIM t AS STRING : t = "* " + titel + " -- Funkenflug" + NL_ZEILE
+    DIM modelle AS MAP OF STRING
+    DIM quellen AS MAP OF STRING
+    DIM hinweise AS ARRAY OF STRING : hinweise = []
+    t = t + simElemente$(dok, n, knoten, 5, modelle, quellen, hinweise)
+    DIM namen AS ARRAY OF STRING : namen = MAPKEYS(modelle)
+    SORT(namen)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(namen) - 1
+        t = t + MAPGET(modelle, namen[i]) + NL_ZEILE
+    NEXT
+    FOR i = 0 TO LEN(hinweise) - 1
+        t = t + "* Hinweis: " + hinweise[i] + NL_ZEILE
+    NEXT
+    RETURN t + ".end" + NL_ZEILE
+END FUNCTION
