@@ -709,7 +709,7 @@ hev = kern.ercPruefenDok(hd)
 FOR hvi = 0 TO LEN(hev) - 1
     het = het + hev[hvi].text + "|"
 NEXT
-PRINT "ERC Hierarchie: mehrfach "; CONTAINS(het, "Blatt Takt ist mehrfach als Unterblatt eingesetzt"); "  Wurzel-Label "; CONTAINS(het, "Hierarchisches Label WURZEL: das Blatt Haupt ist nirgends"); "  (erwartet TRUE TRUE)"
+PRINT "ERC Hierarchie: zweimal eingesetzt ist erlaubt "; NOT CONTAINS(het, "mehrfach"); "  Wurzel-Label "; CONTAINS(het, "Hierarchisches Label WURZEL: das Blatt Haupt ist nirgends"); "  (erwartet TRUE TRUE)"
 ARRAY_POP(hd.blaetter[0].labels)
 ARRAY_POP(hd.blaetter[0].bauteile)
 ' Speichern/Laden: das Blattsymbol wird aus dem Unterblatt neu erzeugt
@@ -858,7 +858,7 @@ FOR kni = 0 TO LEN(kimN.liste) - 1
     DIM knz AS kern.Netz : knz = kimN.liste[kni]
     FOR knj = 0 TO LEN(knz.labelNamen) - 1
         DIM kteile AS ARRAY OF STRING : kteile = SPLIT$(knz.labelNamen[knj], "_")
-        IF LEN(kteile) <> 2 OR kteile[0] = "SIG" OR kteile[0] = "KREUZ" OR kteile[0] = "FREI" THEN CONTINUE
+        IF LEN(kteile) <> 2 OR STARTSWITH(kteile[0], "SIG") OR kteile[0] = "KREUZ" OR kteile[0] = "FREI" OR CONTAINS(kteile[0], "(") THEN CONTINUE
         DIM kda AS BOOLEAN : kda = FALSE
         FOR knk = 0 TO LEN(knz.pins) - 1
             IF knz.pins[knk].ref = kteile[0] AND knz.pins[knk].nummer = kteile[1] THEN kda = TRUE
@@ -885,6 +885,7 @@ FUNCTION kimNetzMit$(n AS kern.Netze, ref AS STRING, nr AS STRING) AS STRING
 END FUNCTION
 PRINT "KiCad-Netze: R1.1 "; kimNetzMit$(kimN, "R1", "1"); "  R1.2 "; kimNetzMit$(kimN, "R1", "2"); "  U1A.14 "; kimNetzMit$(kimN, "U1A", "14"); "  U1B.7 "; kimNetzMit$(kimN, "U1B", "7"); "  (erwartet VCC GND VCC GND)"
 PRINT "KiCad-Unterblatt: R3.1 "; kimNetzMit$(kimN, "R3", "1"); "  R3.2 "; kimNetzMit$(kimN, "R3", "2"); "  (erwartet SIG_EIN SIG_AUS)"
+PRINT "KiCad-Instanzen: R4.1 "; kimNetzMit$(kimN, "R4", "1"); "  R4.2 "; kimNetzMit$(kimN, "R4", "2"); "  Blattsymbole "; LEN(kim.dok.blaetter[0].bauteile) - LEN(ARRAY_FILTER(kim.dok.blaetter[0].bauteile, FUNCTION(b) NOT kern.istBlattVerweis(b.symbolRef))); "  kein Mehrfach-Hinweis "; NOT CONTAINS(JOIN$(kim.hinweise, "|"), "Mehrfach"); "  (erwartet SIG2_EIN SIG2_AUS  Blattsymbole 2  TRUE)"
 DIM kimKreuz AS BOOLEAN : kimKreuz = FALSE
 DIM kimFrei AS BOOLEAN : kimFrei = FALSE
 FOR kni = 0 TO LEN(kimN.liste) - 1
@@ -1149,6 +1150,73 @@ FOR bmi = 0 TO LEN(kbErc) - 1
     IF CONTAINS(kbErc[bmi].text, "Bus") THEN kbAbzweig = kbAbzweig + 1
 NEXT
 PRINT "KiCad-Bus: "; LEN(kbBl.busse); " "; kbBl.busse[0].name; "  Label weg "; NOT kbLabel; "  Bus-Meldungen "; kbAbzweig; "  Alias gemeldet "; CONTAINS(JOIN$(kbus.hinweise, "|"), "Bus-Alias"); "  (erwartet 1 D[0..1]  TRUE  0  TRUE)"
+' --- Mehrfach-Instanzen: zwei gleiche Kanaele aus einem Blatt
+DIM mi AS kern.Dokument : mi = NEW kern.Dokument()
+mi.blaetter[0].name = "Haupt"
+DIM miK AS kern.Blatt : miK = NEW kern.Blatt("Kanal")
+ARRAY_PUSH(mi.blaetter, miK)
+DIM miR AS kern.Bauteil : miR = kern.neuesBauteil("R", kern.neueLage(1000, 0))
+miR.referenz = "R1"
+ARRAY_PUSH(miK.bauteile, miR)
+DIM miE AS kern.Label : miE = NEW kern.Label("EIN", NEW kern.Punkt(800, 0), kern.LA_HIER)
+miE.drehung = 180
+ARRAY_PUSH(miK.labels, miE)
+ARRAY_PUSH(miK.labels, NEW kern.Label("AUS", NEW kern.Punkt(1200, 0), kern.LA_HIER))
+DIM miA AS kern.Bauteil : miA = kern.neuesBauteil(kern.BLATT_VORSATZ + miK.id, kern.neueLage(3000, 0))
+DIM miB AS kern.Bauteil : miB = kern.neuesBauteil(kern.BLATT_VORSATZ + miK.id, kern.neueLage(3000, 3000))
+ARRAY_PUSH(mi.blaetter[0].bauteile, miA)
+ARRAY_PUSH(mi.blaetter[0].bauteile, miB)
+kern.blattSymboleAktualisieren(mi)
+' im Elternblatt je Port ein Label
+FUNCTION miPort(d AS kern.Dokument, b AS kern.Bauteil, port AS STRING, name AS STRING) AS kern.Punkt
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(b.sym.pins) - 1
+        IF b.sym.pins[i].name = port THEN
+            DIM p AS kern.Punkt : p = b.pinPunkt(i)
+            ARRAY_PUSH(d.blaetter[0].labels, NEW kern.Label(name, p, kern.LA_LOKAL))
+            RETURN p
+        END IF
+    NEXT
+    RETURN NEW kern.Punkt(0, 0)
+END FUNCTION
+DIM miPA AS kern.Punkt : miPA = miPort(mi, miA, "EIN", "A_EIN")
+DIM miPB AS kern.Punkt : miPB = miPort(mi, miB, "EIN", "B_EIN")
+DIM miPA2 AS kern.Punkt : miPA2 = miPort(mi, miA, "AUS", "A_AUS")
+DIM miPB2 AS kern.Punkt : miPB2 = miPort(mi, miB, "AUS", "B_AUS")
+DIM miF AS kern.Dokument : miF = kern.flach(mi)
+PRINT "Instanzen: Blaetter "; LEN(miF.blaetter); "  Kopie "; miF.blaetter[2].name; " aus "; miF.blaetter[2].quelle; "  Pfade "; miF.blaetter[1].instanz = "/" + miA.id; " "; miF.blaetter[2].instanz = "/" + miB.id; "  Blattsymbole "; miA.referenz; " / "; miB.referenz; "  Original bleibt "; LEN(mi.blaetter); " "; mi.blaetter[0].bauteile[1] = miB; "  (erwartet 3  Kanal (2) aus 1  TRUE TRUE  Kanal / Kanal (2)  2 TRUE)"
+PRINT "Instanzen: ohne Mehrfach dasselbe Dokument "; kern.flach(hd) = hd OR LEN(kern.flach(hd).blaetter) = LEN(hd.blaetter); "  flach von flach "; kern.flach(miF) = miF; "  Liste "; LEN(kern.instanzenVon(miF, 1)); "  (erwartet TRUE TRUE 2)"
+FUNCTION miNetzRefs$(n AS kern.Netze, bi AS INTEGER, p AS kern.Punkt) AS STRING
+    n.blattWaehlen(bi)
+    DIM i AS INTEGER : i = n.netzAn(p.x, p.y)
+    IF i < 0 THEN RETURN "-"
+    DIM t AS STRING : t = ""
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(n.liste[i].pins) - 1
+        t = t + n.liste[i].pins[j].ref + "." + n.liste[i].pins[j].nummer + " "
+    NEXT
+    RETURN n.liste[i].name + ": " + t
+END FUNCTION
+DIM miNetz AS kern.Netze : miNetz = kern.netzeDokument(mi)
+PRINT "Instanz-Netze: "; miNetzRefs$(miNetz, 0, miPA); "| "; miNetzRefs$(miNetz, 0, miPB); "| "; miNetzRefs$(miNetz, 0, miPB2); " (erwartet A_EIN: R1.1 | B_EIN: R1_2.1 | B_AUS: R1_2.2 )"
+DIM miBom AS ARRAY OF kern.BomZeile : miBom = kern.stuecklisteDok(mi)
+DIM miErc AS ARRAY OF kern.Verstoss : miErc = kern.ercPruefenDok(mi)
+DIM miEt AS STRING : miEt = ""
+FOR bmi = 0 TO LEN(miErc) - 1
+    miEt = miEt + miErc[bmi].text + "|"
+NEXT
+PRINT "Instanz-Stueckliste: "; miBom[0].menge; " "; JOIN$(miBom[0].referenzen, ","); "  ERC ohne Mehrfach-Fehler "; NOT CONTAINS(miEt, "mehrfach"); "  doppelt "; CONTAINS(miEt, "doppelt"); "  (erwartet 2 R1,R1_2  TRUE FALSE)"
+DIM miAn AS INTEGER : miAn = kern.annotieren(mi, FALSE)
+miF = kern.flach(mi)
+PRINT "Instanz annotieren: geaendert "; miAn; "  Kopie "; miF.blaetter[2].bauteile[0].referenz; "  im Original "; MAPGETOR(miR.instanzRefs, "/" + miB.id, "-"); "  erste bleibt "; miR.referenz; "  (erwartet 1  R2  R2  R1)"
+DIM miPfad AS STRING : miPfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef_inst.fkn"
+DIM miSp AS BOOLEAN : miSp = kern.dokumentSpeichern(mi, miPfad)
+DIM mi2 AS kern.Dokument : mi2 = kern.dokumentLaden(miPfad)
+DELETEFILE(miPfad)
+PRINT "Instanz in der Datei: "; kern.flach(mi2).blaetter[2].bauteile[0].referenz; "  Blattsymbol "; mi2.blaetter[0].bauteile[1].referenz; "  (erwartet R2  Kanal (2))"
+DIM miEin AS INTEGER : miEin = kern.platineEinsetzen(mi)
+DIM miPr AS kern.PlatBericht : miPr = kern.platinePruefen(mi)
+PRINT "Instanz auf der Platine: gesetzt "; miEin; " Teile "; LEN(mi.platine.teile); "  zweite Id "; ENDSWITH(mi.platine.teile[1].bauteilId, "@/" + miB.id) OR ENDSWITH(mi.platine.teile[0].bauteilId, "@/" + miB.id); "  SPICE "; CONTAINS(kern.netzlisteSpiceDok$(mi, "x"), "R2 B_EIN B_AUS 1k"); "  (erwartet gesetzt 2 Teile 2  TRUE  TRUE)"
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
 PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)

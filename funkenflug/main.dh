@@ -30,6 +30,7 @@ IMPORT "ansicht/bericht.dh"
 IMPORT "ansicht/simulation.dh"
 IMPORT "ansicht/platine3d.dh"
 IMPORT "ansicht/busse.dh"
+IMPORT "ansicht/instanzen.dh"
 
 CONST STIL = "window { background-color: #12131a; color: #e6e6f0; }" + _
     " headerbar { background-color: #1a1c26; color: #e6e6f0; }" + _
@@ -107,8 +108,9 @@ SUB statusAktualisieren()
     IF auswahlAnzahl() > 1 THEN wahl = "   Auswahl: " + STR$(LEN(gSelB)) + " Bauteile, " + STR$(LEN(gSelD)) + " Draehte, " + STR$(LEN(gSelL)) + " Labels (ziehen verschiebt, Strg+C kopiert, Entf loescht)"
     DIM netz AS STRING : netz = hoverText$()
     IF netz <> "" THEN netz = "   " + netz
-    DIM blatt AS STRING : blatt = kern.blattPfad$(gDok, aktuellerBlattIndex())
-    IF LEN(gDok.blaetter) > 1 THEN blatt = blatt + " (" + STR$(aktuellerBlattIndex() + 1) + "/" + STR$(LEN(gDok.blaetter)) + ")"
+    DIM blatt AS STRING : blatt = instanzPfadText$()
+    IF LEN(gDok.blaetter) > 1 THEN blatt = blatt + " (Blatt " + STR$(aktuellerBlattIndex() + 1) + "/" + STR$(LEN(gDok.blaetter)) + ")"
+    blatt = blatt + instanzText$()
     IF gSpMeldung <> "" THEN wahl = wahl + "   -- " + gSpMeldung
     gtk_label_set_text(gStatus, blatt + "   " + wz + "   Zoom " + STR$(zoom) + "%" + pos + netz + wahl + "   [" + STR$(LEN(gBlatt.bauteile)) + " Bauteile, " + STR$(LEN(gBlatt.draehte)) + " Draehte, " + STR$(LEN(gBlatt.labels)) + " Labels]")
 END SUB
@@ -247,7 +249,9 @@ SUB eigenschaftenDialog(b AS kern.Bauteil)
     gtk_grid_set_row_spacing(g, 6)
     gtk_grid_set_column_spacing(g, 10)
     gtk_container_set_border_width(g, 12)
-    DIM feldRef AS INTEGER : feldRef = feldNeu(b.referenz)
+    DIM weitere AS BOOLEAN : weitere = weitereInstanz()
+    DIM alteRef AS STRING : alteRef = anzeigeRef$(b)
+    DIM feldRef AS INTEGER : feldRef = feldNeu(alteRef)
     DIM feldWert AS INTEGER : feldWert = feldNeu(b.wert)
     DIM feldGeh AS INTEGER : feldGeh = feldNeu(b.gehaeuse)
     DIM feldBest AS INTEGER : feldBest = feldNeu(b.bestellnr)
@@ -274,18 +278,37 @@ SUB eigenschaftenDialog(b AS kern.Bauteil)
     gDlg = 0 : gDlgFeld1 = 0 : gDlgFeld2 = 0 : gDlgFeld3 = 0 : gDlgFeld4 = 0
     gtk_widget_destroy(d)
     IF NOT ok THEN RETURN
-    IF neuRef = b.referenz AND neuWert = b.wert AND neuGeh = b.gehaeuse AND neuBest = b.bestellnr THEN RETURN
-    IF referenzBelegt(neuRef, b) THEN
+    IF neuRef = alteRef AND neuWert = b.wert AND neuGeh = b.gehaeuse AND neuBest = b.bestellnr THEN RETURN
+    IF neuRef <> alteRef AND referenzVergeben(neuRef) THEN
         meldung("Die Referenz " + neuRef + " ist schon vergeben.")
         RETURN
     END IF
     verlaufMerken()
-    b.referenz = neuRef
+    ' in einer weiteren Instanz gilt die Referenz nur fuer sie; Wert und
+    ' Gehaeuse sind die des gezeichneten Teils (in jeder Instanz gleich)
+    IF weitere THEN
+        MAPPUT(b.instanzRefs, gInstanzPfad, neuRef)
+    ELSE
+        b.referenz = neuRef
+    END IF
     b.wert = neuWert
     b.gehaeuse = neuGeh
     b.bestellnr = neuBest
     geaendert()
 END SUB
+
+' Gibt es die Referenz schon -- in irgendeiner Instanz?
+FUNCTION referenzVergeben(ref AS STRING) AS BOOLEAN
+    IF ref = "" THEN RETURN FALSE
+    DIM f AS kern.Dokument : f = aktuellesFlach()
+    DIM bi AS INTEGER, i AS INTEGER
+    FOR bi = 0 TO LEN(f.blaetter) - 1
+        FOR i = 0 TO LEN(f.blaetter[bi].bauteile) - 1
+            IF f.blaetter[bi].bauteile[i].referenz = ref THEN RETURN TRUE
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
 
 ' Gemeinsamer Wert eines Feldes ueber mehrere Bauteile, "" wenn verschieden.
 FUNCTION gemeinsam$(liste AS ARRAY OF kern.Bauteil, feld AS INTEGER, BYREF gleich AS BOOLEAN) AS STRING
@@ -368,6 +391,7 @@ SUB ercZeile(box AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
     IF i < 0 OR i >= LEN(gErc) THEN RETURN
     gErcGewaehlt = i
     IF gErc[i].blatt >= 0 THEN blattWechseln(gErc[i].blatt)
+    IF gErc[i].instanz <> "" THEN gInstanzPfad = gErc[i].instanz
     zentrieren(gErc[i].x, gErc[i].y)
 END SUB
 
@@ -1543,7 +1567,7 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             pruefe("Reiter", STR$(gtk_notebook_get_n_pages(gReiter)) + " " + STR$(gtk_notebook_get_current_page(gReiter)), "2 1")
             pruefe("Neues Blatt leer", STR$(LEN(gBlatt.bauteile)) + " " + STR$(auswahlAnzahl()), "0 0")
             statusAktualisieren()
-            pruefe("Statuszeile nennt das Blatt", STR$(STARTSWITH(gtk_label_get_text(gStatus), "Blatt2 (2/2)")), STR$(TRUE))
+            pruefe("Statuszeile nennt das Blatt", STR$(STARTSWITH(gtk_label_get_text(gStatus), "Blatt2 (Blatt 2/2)")), STR$(TRUE))
             gtk_notebook_set_current_page(gReiter, 0)
             pruefe("Reiter 1 -> Blatt 1", STR$(aktuellerBlattIndex()), "0")
             ' Blatt 1: globales Label BUS auf den Knoten R7-D1 (Haken im Dialog)
@@ -2419,6 +2443,65 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             pruefe("Bus geloescht, Abzweige bleiben", STR$(LEN(gBlatt.busse)) + " " + STR$(LEN(gBlatt.draehte)), "0 4")
             verlaufZurueck()
             pruefe("Rueckgaengig: Bus wieder da", STR$(LEN(gBlatt.busse)) + " " + gBlatt.busse[0].name, "1 D[0..3]")
+        CASE 46
+            ' Mehrfach-Instanzen: Unterblatt einsetzen, dasselbe noch einmal
+            leinwandDokument(NEW kern.Dokument())
+            verlaufRuecksetzen()
+            gDok.blaetter[0].name = "Haupt"
+            vZoom = 0.2
+            zentrieren(3000, 2000)
+            probeText1 = "Kanal" : probeText2 = PROBE_LASSEN : probeText3 = PROBE_LASSEN : probeText4 = PROBE_LASSEN
+            g_timeout_add(150, dialogBestaetigen, 0)
+            blattUnterEinsetzen()
+            DIM ikind AS kern.Blatt : ikind = gDok.blaetter[1]
+            DIM ir AS kern.Bauteil : ir = kern.neuesBauteil("R", kern.neueLage(3000, 2000))
+            ir.referenz = "R1"
+            ir.wert = "10k"
+            ARRAY_PUSH(ikind.bauteile, ir)
+            DIM ie AS kern.Label : ie = NEW kern.Label("EIN", NEW kern.Punkt(2800, 2000), kern.LA_HIER)
+            ie.drehung = 180
+            ARRAY_PUSH(ikind.labels, ie)
+            ARRAY_PUSH(ikind.labels, NEW kern.Label("AUS", NEW kern.Punkt(3200, 2000), kern.LA_HIER))
+            geaendert()
+            DIM iA AS kern.Bauteil : iA = gDok.blaetter[0].bauteile[0]
+            probeText1 = "Kanal"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            blattErneutEinsetzen()
+            DIM iB AS kern.Bauteil : iB = gDok.blaetter[0].bauteile[1]
+            iB.lage = NEW kern.Lage(NEW kern.Punkt(iA.lage.pos.x, iA.lage.pos.y + 2500), 0, FALSE)
+            geaendert()
+            pruefe("Zweite Instanz eingesetzt", STR$(LEN(gDok.blaetter)) + " " + iA.referenz + " / " + iB.referenz, "2 Kanal / Kanal (2)")
+            DIM ierc AS ARRAY OF kern.Verstoss : ierc = kern.ercPruefenDok(gDok)
+            DIM iet AS STRING : iet = ""
+            DIM iei AS INTEGER
+            FOR iei = 0 TO LEN(ierc) - 1
+                iet = iet + ierc[iei].text + "|"
+            NEXT
+            pruefe("ERC: kein Mehrfach-Fehler, Referenzen eindeutig", STR$(CONTAINS(iet, "mehrfach")) + " " + STR$(CONTAINS(iet, "doppelt")), STR$(FALSE) + " " + STR$(FALSE))
+            ' per Doppelklick-Weg in die zweite Instanz
+            instanzBetreten(iB)
+            pruefe("In Instanz 2", gBlatt.name + instanzText$() + " " + anzeigeRef$(ir), "Kanal  Instanz 2/2 R1_2")
+            probeText1 = "R7"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            eigenschaftenDialog(ir)
+            pruefe("Referenz nur fuer diese Instanz", anzeigeRef$(ir) + " " + ir.referenz + " " + ir.wert, "R7 R1 10k")
+            pruefe("Statuszeile nennt die Instanz", STR$(STARTSWITH(gtk_label_get_text(gStatus), "Haupt > Kanal (2) (Blatt 2/2)  Instanz 2/2")), STR$(TRUE))
+            vZoom = 0.35
+            zentrieren(3000, 2000)
+        CASE 47
+            IF fotoZiel <> "" THEN
+                IF gtkFoto(gFenster, fotoZiel + ".instanz.png") THEN PRINT "Foto Instanz gesichert"
+            END IF
+            instanzWechseln()
+            pruefe("Naechste Instanz (I)", instanzText$() + " " + anzeigeRef$(gBlatt.bauteile[0]), "  Instanz 1/2 R1")
+            instanzWechseln()
+            pruefe("Und wieder die zweite", instanzText$(), "  Instanz 2/2")
+            instanzZumEltern()
+            pruefe("Zum Elternblatt", gBlatt.name + "[" + instanzText$() + "]", "Haupt[]")
+            DIM ibom AS ARRAY OF kern.BomZeile : ibom = kern.stuecklisteDok(gDok)
+            pruefe("Stueckliste: beide Instanzen", STR$(ibom[0].menge) + " " + JOIN$(ibom[0].referenzen, ","), "2 R1,R7")
+            verlaufZurueck()
+            pruefe("Rueckgaengig nimmt die Instanz-Referenz", MAPGETOR(gDok.blaetter[1].bauteile[0].instanzRefs, "/" + gDok.blaetter[0].bauteile[1].id, "-"), "-")
         CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()

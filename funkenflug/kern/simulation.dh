@@ -597,6 +597,7 @@ END FUNCTION
 
 ' Das Deck als Zeilen (fuer ngspice) -- r bekommt Hinweise und Zuordnungen.
 FUNCTION simDeck(dok AS Dokument, e AS SimEinstellung, r AS SimErgebnis) AS ARRAY OF STRING
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
     DIM n AS Netze : n = netzeDokument(dok)
     DIM knoten AS ARRAY OF STRING : knoten = spiceKnotenListe(dok, n)
     DIM i AS INTEGER

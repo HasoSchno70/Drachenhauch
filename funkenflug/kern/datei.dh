@@ -47,6 +47,15 @@ FUNCTION dokumentNachJson(dok AS Dokument) AS JSON_HANDLE
             IF bt.lage.gespiegelt THEN JSON_SET_BOOL(c, "sp", TRUE)
             IF bt.wert <> bt.sym.wertVorgabe THEN JSON_SET_STRING(c, "wert", bt.wert)
             IF bt.gehaeuse <> "" THEN JSON_SET_STRING(c, "geh", bt.gehaeuse)
+            DIM ipf AS ARRAY OF STRING : ipf = MAPKEYS(bt.instanzRefs)
+            IF LEN(ipf) > 0 THEN
+                SORT(ipf)
+                JSON_SET_JSON(c, "iref", JSON_NEW_ARRAY())
+                FOR pk = 0 TO LEN(ipf) - 1
+                    JSON_APPEND_STRING(c, "iref", ipf[pk])
+                    JSON_APPEND_STRING(c, "iref", MAPGET(bt.instanzRefs, ipf[pk]))
+                NEXT
+            END IF
             IF bt.bestellnr <> "" THEN JSON_SET_STRING(c, "best", bt.bestellnr)
             IF bt.refVersatz.x <> 0 OR bt.refVersatz.y <> 0 THEN
                 JSON_SET_JSON(c, "refV", JSON_NEW_ARRAY())
@@ -136,6 +145,13 @@ FUNCTION dokumentAusJson(j AS JSON_HANDLE) AS Dokument
             IF JSON_HAS(j, cp + ".ref") THEN bt.referenz = JSON_GET_STRING(j, cp + ".ref")
             IF JSON_HAS(j, cp + ".wert") THEN bt.wert = JSON_GET_STRING(j, cp + ".wert")
             IF JSON_HAS(j, cp + ".geh") THEN bt.gehaeuse = JSON_GET_STRING(j, cp + ".geh")
+            IF JSON_HAS(j, cp + ".iref") THEN
+                pk = 0
+                WHILE pk + 1 < JSON_LEN(j, cp + ".iref")
+                    MAPPUT(bt.instanzRefs, JSON_GET_STRING(j, cp + ".iref." + STR$(pk)), JSON_GET_STRING(j, cp + ".iref." + STR$(pk + 1)))
+                    pk = pk + 2
+                WEND
+            END IF
             IF JSON_HAS(j, cp + ".best") THEN bt.bestellnr = JSON_GET_STRING(j, cp + ".best")
             IF JSON_HAS(j, cp + ".refV") THEN bt.refVersatz = NEW Punkt(JSON_GET_INT(j, cp + ".refV.0"), JSON_GET_INT(j, cp + ".refV.1"))
             IF JSON_HAS(j, cp + ".wertV") THEN bt.wertVersatz = NEW Punkt(JSON_GET_INT(j, cp + ".wertV.0"), JSON_GET_INT(j, cp + ".wertV.1"))

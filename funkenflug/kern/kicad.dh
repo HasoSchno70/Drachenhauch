@@ -95,6 +95,7 @@ FUNCTION kicadPad$(b AS Bauteil, bf AS Bauform, j AS INTEGER) AS STRING
 END FUNCTION
 
 FUNCTION netzlisteKicadDok$(dok AS Dokument, quelle AS STRING) AS STRING
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
     DIM nl AS STRING : nl = CHR$(10)
     DIM t AS STRING : t = "(export (version " + CHR$(34) + "E" + CHR$(34) + ")" + nl
     t = t + "  (design" + nl

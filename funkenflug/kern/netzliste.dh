@@ -30,6 +30,7 @@ FUNCTION netzlisteText$(bl AS Blatt) AS STRING
 END FUNCTION
 
 FUNCTION netzlisteTextDok$(dok AS Dokument) AS STRING
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
     DIM n AS Netze : n = netzeDokument(dok)
     DIM t AS STRING : t = "# Funkenflug-Netzliste, " + STR$(LEN(dok.blaetter)) + IIF(LEN(dok.blaetter) = 1, " Blatt", " Blaetter") + NL_ZEILE + NL_ZEILE + "# Bauteile" + NL_ZEILE
     DIM bi AS INTEGER, i AS INTEGER, j AS INTEGER
@@ -62,6 +63,7 @@ FUNCTION netzlisteCsv$(bl AS Blatt) AS STRING
 END FUNCTION
 
 FUNCTION netzlisteCsvDok$(dok AS Dokument) AS STRING
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
     DIM n AS Netze : n = netzeDokument(dok)
     DIM t AS STRING : t = "Netz;Referenz;Pin;Pinname;Wert" + NL_ZEILE
     DIM netze AS ARRAY OF Netz : netze = nlNetze(n)
@@ -161,6 +163,7 @@ FUNCTION netzlisteSpice$(bl AS Blatt, titel AS STRING) AS STRING
 END FUNCTION
 
 FUNCTION netzlisteSpiceDok$(dok AS Dokument, titel AS STRING) AS STRING
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
     ' dieselben Elemente wie die Simulation (kern/simulation.dh): Quellen fuer
     ' die Versorgungen, Modelle nach Wert -- die Datei laeuft so in ngspice
     DIM n AS Netze : n = netzeDokument(dok)

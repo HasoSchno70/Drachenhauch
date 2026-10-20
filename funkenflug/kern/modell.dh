@@ -142,6 +142,9 @@ CLASS Bauteil
     DIM refVersatz AS Punkt           ' Referenz-Text verschoben (Blatt-Einheiten), 0,0 = Vorgabe
     DIM wertVersatz AS Punkt
     DIM sym AS Symbol                 ' aufgeloest, nicht gespeichert
+    DIM instanzRefs AS MAP OF STRING  ' Unterblatt mehrfach eingesetzt: Instanzpfad -> Referenz
+    DIM vorlageId AS STRING           ' nur in der ausgerollten Sicht: Id des Originals
+    DIM instanz AS STRING             ' ... und der Instanzpfad
     SUB Init(ref AS STRING, l AS Lage)
         id = LEFT$(UUID4$(), 10)
         symbolRef = ref
@@ -152,6 +155,9 @@ CLASS Bauteil
         bestellnr = ""
         refVersatz = NEW Punkt(0, 0)
         wertVersatz = NEW Punkt(0, 0)
+        instanzRefs = {}
+        vorlageId = ""
+        instanz = ""
     END SUB
     ' Blattkoordinate des i-ten Pins (elektrisch, = gezeichnet).
     FUNCTION pinPunkt(i AS INTEGER) AS Punkt
@@ -216,6 +222,8 @@ CLASS Blatt
     DIM knoten AS ARRAY OF Knoten
     DIM labels AS ARRAY OF Label
     DIM busse AS ARRAY OF Bus
+    DIM quelle AS INTEGER             ' ausgerollte Sicht: Index des Originalblatts (-1 = selbst)
+    DIM instanz AS STRING             ' ... und der Instanzpfad ("/<Blattsymbol-Id>/...")
     SUB Init(nm AS STRING)
         id = LEFT$(UUID4$(), 10)
         name = nm
@@ -226,6 +234,8 @@ CLASS Blatt
         knoten = []
         labels = []
         busse = []
+        quelle = -1
+        instanz = ""
     END SUB
 END CLASS
 
@@ -290,6 +300,7 @@ CLASS Dokument
     DIM firma AS STRING
     DIM blaetter AS ARRAY OF Blatt
     DIM platine AS Platine
+    DIM nummern AS MAP OF INTEGER     ' ausgerollte Sicht: Blattsymbol-Id -> Instanznummer
     SUB Init()
         id = LEFT$(UUID4$(), 10)
         titel = ""
@@ -299,5 +310,6 @@ CLASS Dokument
         blaetter = []
         ARRAY_PUSH(blaetter, NEW Blatt("Blatt1"))
         platine = NEW Platine()
+        nummern = {}
     END SUB
 END CLASS

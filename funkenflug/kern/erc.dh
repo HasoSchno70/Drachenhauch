@@ -16,6 +16,7 @@ CLASS Verstoss
     DIM blatt AS INTEGER
     DIM x AS INTEGER
     DIM y AS INTEGER
+    DIM instanz AS STRING             ' Instanzpfad, wenn das Blatt mehrfach steckt
     SUB Init(s AS INTEGER, t AS STRING, b AS INTEGER, px AS INTEGER, py AS INTEGER)
         schwere = s
         text = t
@@ -39,6 +40,8 @@ FUNCTION ercPruefen(bl AS Blatt) AS ARRAY OF Verstoss
 END FUNCTION
 
 FUNCTION ercPruefenDok(dok AS Dokument) AS ARRAY OF Verstoss
+    DIM orig AS Dokument : orig = dok
+    dok = flach(dok)
     DIM fehler AS ARRAY OF Verstoss : fehler = []
     DIM warnungen AS ARRAY OF Verstoss : warnungen = []
     DIM n AS Netze : n = netzeDokument(dok)
@@ -126,7 +129,7 @@ FUNCTION ercPruefenDok(dok AS Dokument) AS ARRAY OF Verstoss
         IF lEin >= 1 AND lAus + quelle = 0 THEN ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Netz " + nz.name + ": Versorgungseingang ohne Versorgung", ob, ox, oy))
     NEXT
 
-    ercHierarchie(dok, fehler, warnungen)
+    ercHierarchie(orig, fehler, warnungen)
     ercBusse(dok, n, warnungen)
 
     ' --- globale Labels, die nur einmal vorkommen, verbinden nichts
@@ -200,5 +203,25 @@ FUNCTION ercPruefenDok(dok AS Dokument) AS ARRAY OF Verstoss
     FOR i = 0 TO LEN(warnungen) - 1
         ARRAY_PUSH(fehler, warnungen[i])
     NEXT
-    RETURN fehler
+    IF dok = orig THEN RETURN fehler
+    ' ausgerollt: zurueck auf das gezeichnete Blatt; was in jeder Instanz
+    ' gleich ist (offene Drahtenden ...), nur einmal
+    DIM r AS ARRAY OF Verstoss : r = []
+    DIM schon AS MAP OF INTEGER
+    FOR i = 0 TO LEN(fehler) - 1
+        DIM v AS Verstoss : v = fehler[i]
+        IF v.blatt >= 0 AND v.blatt < LEN(dok.blaetter) THEN
+            DIM fb AS Blatt : fb = dok.blaetter[v.blatt]
+            IF fb.quelle >= 0 THEN
+                v.instanz = fb.instanz
+                v.blatt = fb.quelle
+                DIM schl AS STRING : schl = STR$(v.blatt) + "|" + STR$(v.x) + "|" + STR$(v.y) + "|" + v.text
+                IF MAPHAS(schon, schl) THEN CONTINUE
+                MAPPUT(schon, schl, 1)
+                IF fb.id <> orig.blaetter[v.blatt].id THEN v.text = v.text + " (in " + fb.name + ")"
+            END IF
+        END IF
+        ARRAY_PUSH(r, v)
+    NEXT
+    RETURN r
 END FUNCTION

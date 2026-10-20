@@ -456,6 +456,7 @@ END FUNCTION
 ' --- die ganze Platine -----------------------------------------------------------
 
 FUNCTION platineModell3(dok AS Dokument) AS Modell3
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
     DIM m AS Modell3 : m = NEW Modell3()
     DIM pl AS Platine : pl = dok.platine
     m.breite = pl.spalten * P3_RASTER

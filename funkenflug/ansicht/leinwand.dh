@@ -167,6 +167,7 @@ END FUNCTION
 SUB leinwandDokument(d AS kern.Dokument)
     gDok = d
     gBlatt = d.blaetter[0]
+    gInstanzPfad = ""
     auswahlAufheben()
     gDrahtAktiv = FALSE
     vEingepasst = FALSE
@@ -442,6 +443,7 @@ SUB netzeVeraltet()
     gNetzeGueltig = FALSE
     platineVeraltet()                 ' die Pruefung haengt an den Netzen
     gErcSichtbar = FALSE              ' alte ERC-Marker passen nicht mehr
+    flachVeraltet()                   ' die ausgerollte Sicht (Instanzen) auch nicht
     simVeraltet()                     ' Spannungen eines alten Arbeitspunkts auch nicht
 END SUB
 
@@ -452,7 +454,7 @@ FUNCTION aktuelleNetze() AS kern.Netze
         gNetze = kern.netzeDokument(gDok)
         gNetzeGueltig = TRUE
     END IF
-    gNetze.blattWaehlen(aktuellerBlattIndex())
+    gNetze.blattWaehlen(aktuellerFlachIndex())     ' die gezeigte Instanz
     RETURN gNetze
 END FUNCTION
 
@@ -545,6 +547,7 @@ SUB ercMarkerZeichnen(cr AS INTEGER)
     FOR i = 0 TO LEN(gErc) - 1
         DIM v AS kern.Verstoss : v = gErc[i]
         IF v.blatt <> hier THEN CONTINUE              ' Marker nur auf ihrem Blatt
+        IF v.instanz <> "" AND v.instanz <> aktuellerPfad$() THEN CONTINUE   ' ... und ihrer Instanz
         DIM r AS FLOAT : r = 9
         IF i = gErcGewaehlt THEN r = 14
         zeichenFarbe(cr, IIF(v.schwere = kern.ERC_FEHLER, C_ERC_FEHLER, C_ERC_WARNUNG))
@@ -708,7 +711,7 @@ SUB bauteilZeichnen(cr AS INTEGER, b AS kern.Bauteil, geist AS BOOLEAN, gewaehlt
             lwText(cr, sx(mitte.x), sy(mitte.y) - 200 * vZoom - 12, b.sym.name, C_ERC_FEHLER, TRUE)
         END IF
         DIM tx AS FLOAT, ty AS FLOAT, ta AS INTEGER
-        IF textOrt(b, 0, tx, ty, ta) THEN lwTextAus(cr, tx, ty, b.referenz, IIF(gTextZug AND gTextZugTeil = b AND gTextZugWelche = 0, C_AUSWAHL, tf), ta, gSchrift)
+        IF textOrt(b, 0, tx, ty, ta) THEN lwTextAus(cr, tx, ty, anzeigeRef$(b), IIF(gTextZug AND gTextZugTeil = b AND gTextZugWelche = 0, C_AUSWAHL, tf), ta, gSchrift)
         IF textOrt(b, 1, tx, ty, ta) THEN lwTextAus(cr, tx, ty, b.wert, IIF(gTextZug AND gTextZugTeil = b AND gTextZugWelche = 1, C_AUSWAHL, IIF(b.sym.einheitLeistung, tf, C_WERT)), ta, gSchrift)
     END IF
 END SUB
@@ -721,7 +724,7 @@ DIM gTextZugTeil AS kern.Bauteil     ' gerade gezogener Text (Hervorhebung)
 DIM gTextZugWelche AS INTEGER
 
 FUNCTION textOrt(b AS kern.Bauteil, welche AS INTEGER, BYREF x AS FLOAT, BYREF y AS FLOAT, BYREF ausr AS INTEGER) AS BOOLEAN
-    DIM t AS STRING : t = IIF(welche = 0, b.referenz, b.wert)
+    DIM t AS STRING : t = IIF(welche = 0, anzeigeRef$(b), b.wert)
     IF t = "" THEN RETURN FALSE
     DIM m AS kern.Punkt : m = b.lage.pos
     IF welche = 0 AND b.sym.einheitLeistung THEN RETURN FALSE      ' Versorgung: nur der Name

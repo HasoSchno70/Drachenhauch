@@ -31,6 +31,10 @@ END FUNCTION
 
 ' Rueckgabe: wie viele Referenzen sich geaendert haben.
 FUNCTION annotieren(dok AS Dokument, alle AS BOOLEAN) AS INTEGER
+    ' ueber alle Instanzen: weitere Instanzen bekommen eigene Nummern, die im
+    ' Original je Instanzpfad stehen
+    DIM orig AS Dokument : orig = dok
+    dok = flach(dok)
     DIM schl AS ARRAY OF STRING : schl = []
     DIM teile AS ARRAY OF Bauteil : teile = []
     DIM bi AS INTEGER, i AS INTEGER
@@ -78,6 +82,19 @@ FUNCTION annotieren(dok AS Dokument, alle AS BOOLEAN) AS INTEGER
             geaendert = geaendert + 1
         END IF
     NEXT
+    IF dok <> orig THEN
+        ' Referenzen der Kopien ins Original zurueck
+        DIM bi2 AS INTEGER, k AS INTEGER
+        FOR i = 0 TO LEN(folge) - 1
+            DIM kl AS Bauteil : kl = folge[i]
+            IF kl.vorlageId = "" THEN CONTINUE
+            FOR bi2 = 0 TO LEN(orig.blaetter) - 1
+                FOR k = 0 TO LEN(orig.blaetter[bi2].bauteile) - 1
+                    IF orig.blaetter[bi2].bauteile[k].id = kl.vorlageId THEN MAPPUT(orig.blaetter[bi2].bauteile[k].instanzRefs, kl.instanz, kl.referenz)
+                NEXT
+            NEXT
+        NEXT
+    END IF
     RETURN geaendert
 END FUNCTION
 

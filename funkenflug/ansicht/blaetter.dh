@@ -50,6 +50,7 @@ SUB blattWechseln(i AS INTEGER)
     IF i < 0 OR i >= LEN(gDok.blaetter) THEN RETURN
     IF gDok.blaetter[i] = gBlatt THEN RETURN
     gBlatt = gDok.blaetter[i]
+    gInstanzPfad = ""                 ' die erste Instanz, bis man eine waehlt
     auswahlAufheben()
     gDrahtAktiv = FALSE
     gDrahtPunkte = []
@@ -153,8 +154,7 @@ END SUB
 
 ' Zurueck ins Blatt, in dem das aktuelle als Unterblatt steckt.
 SUB blattZumEltern()
-    DIM e AS INTEGER : e = kern.elternVon(gDok, aktuellerBlattIndex())
-    IF e >= 0 THEN blattWechseln(e)
+    instanzZumEltern()                ' in das Blatt der gezeigten Instanz
 END SUB
 
 SUB aufMenueBlattUnter(e AS INTEGER, d AS INTEGER)
@@ -183,8 +183,10 @@ SUB blattMenueBauen()
     signal(gBlattMenueNeu, "activate", aufMenueBlattNeu, 0, 0, 0)
     gBlattMenueUnter = menueEintrag(gBlattMenue, "Unterblatt einsetzen ...")
     signal(gBlattMenueUnter, "activate", aufMenueBlattUnter, 0, 0, 0)
+    signal(menueEintrag(gBlattMenue, "Vorhandenes Blatt erneut einsetzen ..."), "activate", aufMenueErneut, 0, 0, 0)
     gBlattMenueEltern = menueEintrag(gBlattMenue, "Zum Elternblatt")
     signal(gBlattMenueEltern, "activate", aufMenueBlattEltern, 0, 0, 0)
+    signal(menueEintrag(gBlattMenue, "Naechste Instanz (I)"), "activate", aufMenueInstanz, 0, 0, 0)
     signal(menueEintrag(gBlattMenue, "Blatt umbenennen ..."), "activate", aufMenueBlattUmbenennen, 0, 0, 0)
     gtk_menu_shell_append(gBlattMenue, gtk_separator_menu_item_new())
     signal(menueEintrag(gBlattMenue, "Blatt loeschen ..."), "activate", aufMenueBlattLoeschen, 0, 0, 0)

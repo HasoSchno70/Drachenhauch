@@ -117,7 +117,7 @@ class Blatt:
         self.teile = []
         self.rest = []
 
-    def symbol(self, lib, ref, pos, winkel=0, spiegel=None, einheit=1, wert=None, stummel=True, extra=''):
+    def symbol(self, lib, ref, pos, winkel=0, spiegel=None, einheit=1, wert=None, stummel=True, extra='', pfade=None):
         d = LIB[lib]
         self.libs.add(lib)
         sp = ' (mirror %s)' % spiegel if spiegel else ''
@@ -127,10 +127,11 @@ class Blatt:
     (property "Reference" "%s" (at %s %s 0) %s)
     (property "Value" "%s" (at %s %s 0) %s)
     (property "Footprint" "%s" (at 0 0 0) %s)%s
-    (instances (project "beispiel" (path "/%s" (reference "%s") (unit %d))))
+    (instances (project "beispiel" %s))
   )
 ''' % (lib, f(pos[0]), f(pos[1]), winkel, sp, einheit, u(), ref_txt, f(pos[0] + 3.81), f(pos[1] - 2.54), FX,
-       wert or d['wert'], f(pos[0] + 3.81), f(pos[1] + 2.54), FX, d.get('fp', ''), FXH, extra, ROOT_UUID, ref_txt, einheit))
+       wert or d['wert'], f(pos[0] + 3.81), f(pos[1] + 2.54), FX, d.get('fp', ''), FXH, extra,
+       ' '.join('(path "%s" (reference "%s") (unit %d))' % (pf, rf, einheit) for pf, rf in (pfade or [('/' + ROOT_UUID, ref_txt)]))))
         punkte = {}
         for nr, lp in d['pins'].items():
             punkte[nr] = pinAbs(pos, winkel, spiegel, lp)
@@ -209,21 +210,23 @@ haupt.draht((66.04, 139.7), (96.52, 139.7))
 haupt.draht((81.28, 127), (81.28, 152.4))
 haupt.label('label', 'FREI_C', (66.04, 139.7), 180)
 haupt.label('label', 'FREI_D', (81.28, 127), 90)
-# Unterblatt mit zwei Ports
-haupt.rest.append('''  (sheet (at 152.4 88.9) (size 25.4 20.32) (fields_autoplaced)
+# dasselbe Unterblatt zweimal (Filter, Filter2), je mit zwei Ports
+BLATT1, BLATT2 = u(), u()
+for uid, name, y, vor, seite in ((BLATT1, 'Filter', 88.9, 'SIG', 2), (BLATT2, 'Filter2', 119.38, 'SIG2', 3)):
+    haupt.rest.append('''  (sheet (at 152.4 %s) (size 25.4 20.32) (fields_autoplaced)
     (stroke (width 0.1524) (type solid)) (fill (color 0 0 0 0.0000))
     (uuid %s)
-    (property "Sheetname" "Filter" (at 152.4 88.1884 0) (effects (font (size 1.27 1.27)) (justify left bottom)))
-    (property "Sheetfile" "unterblatt.kicad_sch" (at 152.4 109.8046 0) (effects (font (size 1.27 1.27)) (justify left top)))
-    (pin "EIN" input (at 152.4 93.98 180) (effects (font (size 1.27 1.27)) (justify left)) (uuid %s))
-    (pin "AUS" output (at 177.8 93.98 0) (effects (font (size 1.27 1.27)) (justify right)) (uuid %s))
-    (instances (project "beispiel" (path "/%s" (page "2"))))
+    (property "Sheetname" "%s" (at 152.4 %s 0) (effects (font (size 1.27 1.27)) (justify left bottom)))
+    (property "Sheetfile" "unterblatt.kicad_sch" (at 152.4 %s 0) (effects (font (size 1.27 1.27)) (justify left top)))
+    (pin "EIN" input (at 152.4 %s 180) (effects (font (size 1.27 1.27)) (justify left)) (uuid %s))
+    (pin "AUS" output (at 177.8 %s 0) (effects (font (size 1.27 1.27)) (justify right)) (uuid %s))
+    (instances (project "beispiel" (path "/%s" (page "%d"))))
   )
-''' % (u(), u(), u(), ROOT_UUID))
-haupt.draht((142.24, 93.98), (152.4, 93.98))
-haupt.label('label', 'SIG_EIN', (142.24, 93.98), 180)
-haupt.draht((177.8, 93.98), (187.96, 93.98))
-haupt.label('label', 'SIG_AUS', (187.96, 93.98), 0)
+''' % (f(y), uid, name, f(y - 0.7116), f(y + 20.9046), f(y + 5.08), u(), f(y + 5.08), u(), ROOT_UUID, seite))
+    haupt.draht((142.24, y + 5.08), (152.4, y + 5.08))
+    haupt.label('label', vor + '_EIN', (142.24, y + 5.08), 180)
+    haupt.draht((177.8, y + 5.08), (187.96, y + 5.08))
+    haupt.label('label', vor + '_AUS', (187.96, y + 5.08), 0)
 # was Funkenflug nicht kennt -> Hinweise
 haupt.rest.append('  (text "Hallo KiCad" (at 120 160 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid %s))\n' % u())
 # ein Bus D[0..1] mit zwei Eintraegen; die Drahtenden tragen D0 und D1
@@ -236,7 +239,8 @@ for i, x in enumerate((130.81, 138.43)):
 haupt.rest.append('  (bus_alias "ADR" (members "A0" "A1"))\n')
 
 unter = Blatt('unter')
-pr3 = unter.symbol('Device:R', 'R3', (101.6, 76.2), 90, None, wert='1k')
+pr3 = unter.symbol('Device:R', 'R3', (101.6, 76.2), 90, None, wert='1k',
+                   pfade=[('/%s/%s' % (ROOT_UUID, BLATT1), 'R3'), ('/%s/%s' % (ROOT_UUID, BLATT2), 'R4')])
 unter.draht((88.9, 76.2), pr3['1'])
 unter.draht(pr3['2'], (114.3, 76.2))
 unter.label('hierarchical_label', 'EIN', (88.9, 76.2), 180, ' (shape input)')

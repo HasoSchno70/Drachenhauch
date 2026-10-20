@@ -83,11 +83,32 @@ Das Blattsymbol wird nicht gespeichert, sondern jedes Mal aus den Labels des
 Unterblatts erzeugt – ein Label umbenennen, und der Port heißt mit; eine
 zweite Port-Liste, die auseinanderläuft, gibt es nicht. Das Blattsymbol ist
 kein Bauteil: es fehlt in Stückliste, Netzliste und auf der Platine, seine
-Ports zählen nicht als Pins. Bewusst einfach: ein Blatt steckt höchstens
-**einmal** als Unterblatt (keine Mehrfach-Instanzen mit Referenz-Pfaden). Der
-ERC meldet ein mehrfach eingesetztes Blatt, Zyklen, ein gelöschtes Unterblatt
+Ports zählen nicht als Pins. Der ERC meldet Zyklen, ein gelöschtes Unterblatt
 (das Blattsymbol bleibt rot stehen) und hierarchische Labels auf einem Blatt,
 das nirgends eingesetzt ist.
+
+**Mehrfach-Instanzen** („Blatt ▾" → „Vorhandenes Blatt erneut einsetzen …"):
+ein Blatt darf mehrmals eingesetzt sein – zwei gleiche Kanäle, gezeichnet
+einmal. Elektrisch ist jede Instanz eine eigene Schaltung mit eigenen Netzen
+und eigenen Referenzen; das zweite Blattsymbol heißt „Kanal (2)". Ein
+Doppelklick aufs Blattsymbol öffnet genau diese Instanz, `I` (bzw. „Nächste
+Instanz") wechselt; Referenzen, Netznamen, ERC-Marker und die Statuszeile
+(„Haupt > Kanal (2) … Instanz 2/2") zeigen die gewählte. Eine Referenz, die
+man in einer weiteren Instanz ändert, gilt nur dort (gespeichert je
+Instanzpfad); bis dahin heißt das Teil „R1_2", *Fehlende Referenzen vergeben*
+macht daraus eine richtige Nummer. Wert und Gehäuse sind in jeder Instanz
+gleich – es ist dieselbe Zeichnung.
+
+Gerechnet wird auf einer **ausgerollten Sicht** (`kern.flach`): jede weitere
+Instanz wird eine Kopie des Blatts, deren Teile Ids und Referenzen ihres
+Instanzpfads tragen (Pfad = Kette der Blattsymbol-Ids von der Wurzel, stabil
+beim Speichern). Netze, ERC, Stückliste, Netzlisten, Platine, Gerber, 3D und
+Simulation rechnen nur darauf und kennen Instanzen gar nicht – jede zählt
+ihre Teile, die Platine setzt sie einzeln. Die erste Instanz bleibt das
+Original, damit eine vorhandene Platine gültig bleibt, wenn eine zweite
+dazukommt. Ohne Mehrfach-Instanz ist die Sicht das Dokument selbst.
+
+![Zweite Instanz eines Kanals](instanz.png)
 
 ![Blattsymbol mit Port](unterblatt.png)
 
@@ -505,7 +526,10 @@ Abzweig mit dem Label seines Drahts.
 
 Was Funkenflug nicht kennt, wird **gemeldet** statt still verworfen (ein Dialog
 nach dem Öffnen): Bus-Aliase, freie Texte und Zeichnungen auf dem Blatt,
-Nicht-verbunden-Marker, mehrfach eingesetzte Unterblätter. **Versteckte
+Nicht-verbunden-Marker. Steckt eine Datei **mehrmals** im Schaltplan, wird
+sie ein Blatt mit mehreren Instanzen; die Referenzen je Instanz kommen aus
+KiCads Instanz-Pfaden (KiCad 6: `symbol_instances`, ab 7: `instances` am
+Symbol). **Versteckte
 Versorgungs-Pins** (VCC/GND an 74xx-Symbolen) verbinden in KiCad unsichtbar
 über ihren Namen – hier bekommen sie ein sichtbares globales Label, das Netz
 bleibt dasselbe.
@@ -575,7 +599,8 @@ kern/       Modell, Geometrie, Bibliothek, Netze, Datei – ohne Oberfläche,
                  Regler, 555, 74xx, Stecker, Batterie, Taster, Relais
   netze.dh       Netz-Erkennung (eine reine Funktion), benannte Netze, Auto-Knoten
   erc.dh         Elektrische Regelpruefung
-  hierarchie.dh  Unterblaetter: Blattsymbol aus den Labels, Ports, Pfad, ERC
+  hierarchie.dh  Unterblaetter: Blattsymbol aus den Labels, Ports, Pfad, ERC,
+                 Mehrfach-Instanzen (flach: die ausgerollte Sicht)
   busse.dh       Busnamen und Mitglieder, Bus-Gruppen, Abzweige, Bus-Ports, ERC
   bearbeiten.dh  Annotieren, Suchen & Ersetzen
   netzliste.dh   Export: SPICE, CSV, Text
@@ -600,6 +625,7 @@ ansicht/    Zeichenfläche und Werkzeuge – globaler Namensraum
   ausgabe.dh     PDF, SVG, PNG, Drucken, Menü „Ausgabe"
   blaetter.dh    Reiter, Menü „Blatt": neu, umbenennen, löschen
   busse.dh       Bus zeichnen und benennen, Abzweig mit Mitglieds-Label
+  instanzen.dh   gezeigte Instanz, betreten/wechseln, erneut einsetzen
   komfort.dh     Datei-Menü, zuletzt geöffnet, Autosave, Bearbeiten-Menü, Suchen-Dialog
   platinenansicht.dh  Lochraster-Sicht: Zeichnen, Werkzeuge, Pruefliste
   platinendruck.dh    Platine 1:1: Bestueckung, Loetseite, Arbeitsliste (PDF, Druck)
@@ -613,7 +639,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (312 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (322 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
@@ -667,7 +693,7 @@ SparkNode hatte mehrere Konzeptfehler, die hier von Anfang an vermieden sind:
    (welches Blatt, Annotation). Ein Schnappschuss kennt immer alles; Ziehen ist
    ein Schritt, ein bloßer Klick keiner.
 6. **Bewusst weggelassen** (in SparkNode überproportional viele Bugquellen):
-   Mehrfach-Instanzen eines Unterblatts, Pin-Swap,
+   Pin-Swap,
    Multi-Unit (der KiCad-Import macht daraus je Einheit ein Bauteil), auf der Platine ein Autorouter, der alles auf einmal legt
    (Verbinden schlägt je Luftlinie vor und prüft jeden Vorschlag). Kommt erst,
    wenn wirklich gebraucht. Unterblätter und Busse gibt es – aber ohne zweite
@@ -698,5 +724,5 @@ zweiten Kondensator wieder „C1".
 
 ## Noch offen (nächste Runden)
 
-Mehrfach-Instanzen eines Unterblatts (mit Referenz-Pfaden) – erst, wenn ein
-echter Schaltplan es braucht.
+Was SparkNode konnte, kann Funkenflug jetzt auch. Offen sind eigene Ideen:
+Pin-Swap, ein Autorouter, der mehr als je Luftlinie vorschlägt.

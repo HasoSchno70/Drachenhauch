@@ -17,9 +17,10 @@
 ' pruef_kern rechnet fuer alle acht Lagen nach, dass die Pins auf den
 ' Drahtenden landen.
 '
-' Was Funkenflug nicht kennt, wird gemeldet statt still verworfen: Busse,
-' freie Texte/Grafik, Nicht-verbunden-Marker, Mehrfach-Instanzen eines
-' Unterblatts. Mehrteilige Symbole (U1A, U1B) werden je Einheit ein eigenes
+' Was Funkenflug nicht kennt, wird gemeldet statt still verworfen: freie
+' Texte/Grafik, Nicht-verbunden-Marker, Bus-Aliase. Steckt eine Datei
+' mehrmals im Schaltplan, wird sie EIN Blatt mit mehreren Instanzen; die
+' Referenzen je Instanz kommen aus KiCads Instanz-Pfaden. Mehrteilige Symbole (U1A, U1B) werden je Einheit ein eigenes
 ' Bauteil. Versteckte Versorgungs-Pins (VCC/GND an Logik-ICs) verbinden in
 ' KiCad unsichtbar ueber ihren Namen -- hier bekommen sie ein sichtbares
 ' globales Label, damit das Netz dasselbe bleibt.
@@ -67,6 +68,11 @@ CLASS KimSymbol
 END CLASS
 
 DIM gKimPorts AS ARRAY OF KimPort
+DIM gKimBlattUuid AS MAP OF STRING     ' KiCad-Uuid eines Blattsymbols -> Funkenflug-Bauteil-Id
+DIM gKimV6 AS MAP OF STRING            ' KiCad 6: Symbol-Uuid -> "Blattpfad TAB Referenz" je Zeile
+DIM gKimTeile AS ARRAY OF Bauteil      ' Teile mit Instanz-Pfaden ...
+DIM gKimPaare AS ARRAY OF STRING       ' ... und ihre Paare "KiCad-Pfad TAB Referenz" je Zeile
+DIM gKimWurzel AS STRING               ' Uuid der Wurzel-Datei
 DIM gKimSymbole AS ARRAY OF KimSymbol
 DIM gKimZaehler AS MAP OF INTEGER
 
@@ -451,7 +457,63 @@ SUB kimInstanzenLesen(wurzel AS SAusdruck, BYREF refs AS MAP OF STRING)
     FOR i = 0 TO LEN(pfade) - 1
         DIM t AS ARRAY OF STRING : t = SPLIT$(pfade[i].wert$(0), "/")
         IF LEN(t) = 0 THEN CONTINUE
-        MAPPUT(refs, t[LEN(t) - 1], pfade[i].kind("reference").wert$(0))
+        DIM sym AS STRING : sym = t[LEN(t) - 1]
+        DIM ref AS STRING : ref = pfade[i].kind("reference").wert$(0)
+        IF NOT MAPHAS(refs, sym) THEN MAPPUT(refs, sym, ref)
+        ' der Blattpfad ohne die Symbol-Uuid, fuer die Instanzen
+        DIM bp AS STRING : bp = LEFT$(pfade[i].wert$(0), MAX(0, LEN(pfade[i].wert$(0)) - LEN(sym) - 1))
+        MAPPUT(gKimV6, sym, MAPGETOR(gKimV6, sym, "") + bp + CHR$(9) + ref + CHR$(10))
+    NEXT
+END SUB
+
+' KiCad-Blattpfad ("/wurzel/uuid1/uuid2") -> Funkenflug-Instanzpfad
+' ("/<Bauteil-Id>/<Bauteil-Id>"); "?" wenn ein Blatt unbekannt ist
+FUNCTION kimFfPfad$(kpfad AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(kpfad, "/")
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM erster AS BOOLEAN : erster = TRUE
+    FOR i = 0 TO LEN(t) - 1
+        IF t[i] = "" THEN CONTINUE
+        IF erster AND t[i] = gKimWurzel THEN
+            erster = FALSE
+            CONTINUE
+        END IF
+        erster = FALSE
+        IF NOT MAPHAS(gKimBlattUuid, t[i]) THEN RETURN "?"
+        r = r + "/" + MAPGET(gKimBlattUuid, t[i])
+    NEXT
+    RETURN r
+END FUNCTION
+
+' Nach dem Import: Referenzen je Instanz eintragen (die erste Instanz in
+' b.referenz, die weiteren in b.instanzRefs)
+SUB kimInstanzRefs(e AS KicadErgebnis)
+    IF NOT mehrfachInstanzen(e.dok) THEN RETURN
+    DIM f AS Dokument : f = flach(e.dok)
+    DIM i AS INTEGER, k AS INTEGER, bi AS INTEGER
+    FOR i = 0 TO LEN(gKimTeile) - 1
+        DIM b AS Bauteil : b = gKimTeile[i]
+        ' erster Instanzpfad des Blatts, auf dem das Teil steht
+        DIM erst AS STRING : erst = ""
+        FOR bi = 0 TO LEN(e.dok.blaetter) - 1
+            FOR k = 0 TO LEN(e.dok.blaetter[bi].bauteile) - 1
+                IF e.dok.blaetter[bi].bauteile[k] = b THEN erst = f.blaetter[bi].instanz
+            NEXT
+        NEXT
+        DIM z AS ARRAY OF STRING : z = SPLIT$(gKimPaare[i], CHR$(10))
+        FOR k = 0 TO LEN(z) - 1
+            IF z[k] = "" THEN CONTINUE
+            DIM pr AS ARRAY OF STRING : pr = SPLIT$(z[k], CHR$(9))
+            IF LEN(pr) < 2 THEN CONTINUE
+            DIM fp AS STRING : fp = kimFfPfad$(pr[0])
+            IF fp = "?" OR fp = "" THEN CONTINUE
+            IF fp = erst THEN
+                b.referenz = pr[1]
+            ELSE
+                MAPPUT(b.instanzRefs, fp, pr[1])
+            END IF
+        NEXT
     NEXT
 END SUB
 
@@ -520,7 +582,33 @@ SUB kimBauteil(e AS KicadErgebnis, bl AS Blatt, sy AS SAusdruck, libs AS SAusdru
         b = neuesBauteil("kicad:" + schluessel, l)
     END IF
     b.referenz = kimReferenz$(sy, refs)
-    IF gefunden AND kimEinheiten(ls) > 1 THEN b.referenz = b.referenz + CHR$(64 + einheit)
+    DIM esuf AS STRING : esuf = ""
+    IF gefunden AND kimEinheiten(ls) > 1 THEN esuf = CHR$(64 + einheit)
+    b.referenz = b.referenz + esuf
+    ' alle Instanz-Pfade merken (KiCad 7: am Symbol, KiCad 6: in der Wurzel)
+    DIM paare AS STRING : paare = ""
+    IF sy.hat("instances") THEN
+        DIM prj AS ARRAY OF SAusdruck : prj = sy.kind("instances").alle("project")
+        DIM pj AS INTEGER, pq AS INTEGER
+        FOR pj = 0 TO LEN(prj) - 1
+            DIM pfs AS ARRAY OF SAusdruck : pfs = prj[pj].alle("path")
+            FOR pq = 0 TO LEN(pfs) - 1
+                paare = paare + pfs[pq].wert$(0) + CHR$(9) + pfs[pq].kind("reference").wert$(0) + esuf + CHR$(10)
+            NEXT
+        NEXT
+    END IF
+    DIM suid AS STRING : suid = sy.kind("uuid").wert$(0)
+    IF paare = "" AND suid <> "" AND MAPHAS(gKimV6, suid) THEN
+        DIM v6 AS ARRAY OF STRING : v6 = SPLIT$(MAPGET(gKimV6, suid), CHR$(10))
+        DIM v6i AS INTEGER
+        FOR v6i = 0 TO LEN(v6) - 1
+            IF v6[v6i] <> "" THEN paare = paare + v6[v6i] + esuf + CHR$(10)
+        NEXT
+    END IF
+    IF paare <> "" THEN
+        ARRAY_PUSH(gKimTeile, b)
+        ARRAY_PUSH(gKimPaare, paare)
+    END IF
     b.wert = sy.eigenschaft$("Value")
     b.gehaeuse = kimGehaeuse$(sy.eigenschaft$("Footprint"))
     DIM bn AS ARRAY OF STRING : bn = ["MPN", "Bestellnummer", "Manufacturer_Part_Number", "LCSC", "Mouser", "Reichelt"]
@@ -675,31 +763,35 @@ SUB kimUnterblatt(e AS KicadErgebnis, bl AS Blatt, s AS SAusdruck, ordner AS STR
         kimHinweis(e, "Zyklus " + datei, "Unterblatt enthaelt sich selbst -- uebersprungen")
         RETURN
     END IF
+    DIM unterId AS STRING : unterId = ""
     IF MAPHAS(fertig, schl) THEN
-        kimHinweis(e, "Mehrfach " + datei, "steckt mehrfach im Schaltplan; Funkenflug kennt nur eine Instanz -- nur die erste uebernommen")
-        RETURN
+        ' schon eingelesen: eine weitere Instanz desselben Blatts
+        unterId = MAPGET(fertig, schl)
+    ELSE
+        IF NOT FILEEXISTS(pfad) THEN
+            kimHinweis(e, "Datei fehlt " + datei, "Unterblatt-Datei nicht gefunden")
+            RETURN
+        END IF
+        DIM kw AS SAusdruck : kw = sLesen(READALL$(pfad))
+        IF kw.kopf <> "kicad_sch" THEN
+            kimHinweis(e, "Kein Schaltplan " + datei, "Unterblatt ist kein KiCad-Schaltplan")
+            RETURN
+        END IF
+        IF nm = "" THEN nm = kimDateiName$(datei)
+        MAPPUT(offen, schl, 1)
+        DIM unterBl AS Blatt : unterBl = kimBlatt(e, kw, nm, kimOrdner$(pfad), refs, offen, fertig)
+        MAPREMOVE(offen, schl)
+        MAPPUT(fertig, schl, unterBl.id)
+        unterId = unterBl.id
     END IF
-    IF NOT FILEEXISTS(pfad) THEN
-        kimHinweis(e, "Datei fehlt " + datei, "Unterblatt-Datei nicht gefunden")
-        RETURN
-    END IF
-    DIM kw AS SAusdruck : kw = sLesen(READALL$(pfad))
-    IF kw.kopf <> "kicad_sch" THEN
-        kimHinweis(e, "Kein Schaltplan " + datei, "Unterblatt ist kein KiCad-Schaltplan")
-        RETURN
-    END IF
-    IF nm = "" THEN nm = kimDateiName$(datei)
-    MAPPUT(offen, schl, 1)
-    DIM unterBl AS Blatt : unterBl = kimBlatt(e, kw, nm, kimOrdner$(pfad), refs, offen, fertig)
-    MAPREMOVE(offen, schl)
-    MAPPUT(fertig, schl, unterBl.id)
     ' Blattsymbol in die Mitte des KiCad-Rahmens
     DIM o AS Punkt : o = kimPunkt(s.kind("at"))
     DIM gr AS SAusdruck : gr = s.kind("size")
     DIM mx AS INTEGER : mx = rastern(o.x + kimMass(gr.wert$(0)) \ 2, RASTER)
     DIM my AS INTEGER : my = rastern(o.y + kimMass(gr.wert$(1)) \ 2, RASTER)
-    DIM b AS Bauteil : b = neuesBauteil(BLATT_VORSATZ + unterBl.id, neueLage(mx, my))
+    DIM b AS Bauteil : b = neuesBauteil(BLATT_VORSATZ + unterId, neueLage(mx, my))
     ARRAY_PUSH(bl.bauteile, b)
+    IF s.kind("uuid").wert$(0) <> "" THEN MAPPUT(gKimBlattUuid, s.kind("uuid").wert$(0), b.id)
     DIM pins AS ARRAY OF SAusdruck : pins = s.alle("pin")
     DIM i AS INTEGER
     FOR i = 0 TO LEN(pins) - 1
@@ -748,6 +840,11 @@ FUNCTION kicadAusText(text AS STRING, name AS STRING, ordner AS STRING) AS Kicad
     DIM e AS KicadErgebnis : e = NEW KicadErgebnis()
     gKimPorts = []
     gKimSymbole = []
+    gKimTeile = []
+    gKimPaare = []
+    DIM leerS AS MAP OF STRING
+    gKimBlattUuid = leerS
+    gKimV6 = leerS
     DIM leer AS MAP OF INTEGER
     gKimZaehler = leer
     DIM w AS SAusdruck : w = sLesen(text)
@@ -759,6 +856,7 @@ FUNCTION kicadAusText(text AS STRING, name AS STRING, ordner AS STRING) AS Kicad
         e.fehler = "Zu alt: erst KiCad 6 schreibt Schaltplaene als .kicad_sch."
         RETURN e
     END IF
+    gKimWurzel = w.kind("uuid").wert$(0)
     DIM tb AS SAusdruck : tb = w.kind("title_block")
     e.dok.titel = tb.kind("title").wert$(0)
     e.dok.revision = tb.kind("rev").wert$(0)
@@ -770,6 +868,7 @@ FUNCTION kicadAusText(text AS STRING, name AS STRING, ordner AS STRING) AS Kicad
     DIM bl AS Blatt : bl = kimBlatt(e, w, IIF(name = "", "Blatt1", name), ordner, refs, offen, fertig)
     blattSymboleAktualisieren(e.dok)
     kimPortsAnschliessen(e)
+    kimInstanzRefs(e)
     ' Hinweise mit Anzahl
     DIM i AS INTEGER
     FOR i = 0 TO LEN(e.hinweise) - 1

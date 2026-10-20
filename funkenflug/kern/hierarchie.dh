@@ -8,9 +8,18 @@
 '
 ' Verbunden wird ueber den Namen: der Port im Elternblatt und alle
 ' hierarchischen Labels gleichen Namens im Unterblatt sind ein Netz.
-' Bewusst einfach: ein Blatt steckt hoechstens EINMAL als Unterblatt in einem
-' anderen (keine Mehrfach-Instanzen mit Referenz-Pfaden); der ERC meldet
-' Doppeltes, Zyklen und fehlende Unterblaetter.
+'
+' MEHRFACH-INSTANZEN: ein Blatt darf mehrmals eingesetzt sein (zwei gleiche
+' Kanaele). Gezeichnet wird es einmal; elektrisch ist jede Instanz eine
+' eigene Schaltung. flach() rollt das Dokument dafuer aus: jede weitere
+' Instanz wird eine Kopie des Blatts, deren Bauteile Ids und Referenzen ihres
+' Instanzpfads tragen (Pfad = Kette der Blattsymbol-Ids von der Wurzel).
+' Netze, ERC, Stueckliste, Netzlisten, Platine, Gerber, 3D und Simulation
+' rechnen auf dieser Sicht -- nichts davon kennt Instanzen. Die ERSTE Instanz
+' bleibt das Original (Ids, Referenzen), damit vorhandene Platinen beim
+' Hinzufuegen einer zweiten Instanz gueltig bleiben. Referenzen der weiteren
+' Instanzen stehen im Bauteil (instanzRefs je Pfad); bis zum Annotieren gilt
+' "R1_2". Der ERC meldet Zyklen und fehlende Unterblaetter.
 '
 ' Seite eines Ports = die Seite, zu der der Label-Text im Unterblatt zeigt:
 ' ein Label links am Rand des Unterblatts (Text nach links, 180) ist ein
@@ -91,9 +100,13 @@ FUNCTION blattSymbolErzeugen(kind AS Blatt) AS Symbol
 END FUNCTION
 
 ' Symbole und Referenzen aller Blattsymbole neu erzeugen (nach Laden und
-' jeder Aenderung): Referenz = Name des Unterblatts.
+' jeder Aenderung): Referenz = Name des Unterblatts, ab der zweiten Instanz
+' mit Nummer ("Kanal (2)").
 SUB blattSymboleAktualisieren(dok AS Dokument)
     DIM bi AS INTEGER, i AS INTEGER
+    DIM mehr AS BOOLEAN : mehr = mehrfachInstanzen(dok)
+    DIM f AS Dokument : f = dok
+    IF mehr THEN f = flach(dok)
     FOR bi = 0 TO LEN(dok.blaetter) - 1
         FOR i = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
             DIM b AS Bauteil : b = dok.blaetter[bi].bauteile[i]
@@ -108,11 +121,165 @@ SUB blattSymboleAktualisieren(dok AS Dokument)
             ELSE
                 b.sym = blattSymbolErzeugen(dok.blaetter[ki])
                 b.referenz = dok.blaetter[ki].name
+                IF mehr THEN
+                    DIM nr AS INTEGER : nr = MAPGETOR(f.nummern, b.id, 1)
+                    IF nr > 1 THEN b.referenz = b.referenz + " (" + STR$(nr) + ")"
+                END IF
                 b.wert = ""
             END IF
         NEXT
     NEXT
 END SUB
+
+' --- Mehrfach-Instanzen ----------------------------------------------------------
+
+' Steckt irgendein Blatt mehr als einmal als Unterblatt?
+FUNCTION mehrfachInstanzen(dok AS Dokument) AS BOOLEAN
+    DIM gesehen AS MAP OF INTEGER
+    DIM bi AS INTEGER, i AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        FOR i = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
+            DIM r AS STRING : r = dok.blaetter[bi].bauteile[i].symbolRef
+            IF NOT istBlattVerweis(r) THEN CONTINUE
+            IF MAPHAS(gesehen, r) THEN RETURN TRUE
+            MAPPUT(gesehen, r, 1)
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION bauteilKlon(b AS Bauteil) AS Bauteil
+    DIM c AS Bauteil : c = NEW Bauteil(b.symbolRef, b.lage)
+    c.id = b.id
+    c.sym = b.sym
+    c.referenz = b.referenz
+    c.wert = b.wert
+    c.gehaeuse = b.gehaeuse
+    c.bestellnr = b.bestellnr
+    c.refVersatz = b.refVersatz
+    c.wertVersatz = b.wertVersatz
+    c.instanzRefs = b.instanzRefs
+    RETURN c
+END FUNCTION
+
+' Huelle eines Blatts: eigene Bauteil-Liste, Draehte/Labels/Busse geteilt
+FUNCTION blattHuelle(bl AS Blatt, quelle AS INTEGER) AS Blatt
+    DIM h AS Blatt : h = NEW Blatt(bl.name)
+    h.id = bl.id
+    h.breite = bl.breite
+    h.hoehe = bl.hoehe
+    h.bauteile = ARRAY_COPY(bl.bauteile)
+    h.draehte = bl.draehte
+    h.knoten = bl.knoten
+    h.labels = bl.labels
+    h.busse = bl.busse
+    h.quelle = quelle
+    RETURN h
+END FUNCTION
+
+' Referenz eines Bauteils in einer weiteren Instanz (Nummer n)
+FUNCTION instanzReferenz$(b AS Bauteil, pfad AS STRING, n AS INTEGER) AS STRING
+    IF MAPHAS(b.instanzRefs, pfad) THEN RETURN MAPGET(b.instanzRefs, pfad)
+    IF b.referenz = "" THEN RETURN ""
+    RETURN b.referenz + "_" + STR$(n)
+END FUNCTION
+
+FUNCTION instanzKopie(orig AS Blatt, quelle AS INTEGER, pfad AS STRING, n AS INTEGER) AS Blatt
+    DIM k AS Blatt : k = blattHuelle(orig, quelle)
+    k.id = orig.id + "@" + pfad
+    k.name = orig.name + " (" + STR$(n) + ")"
+    k.instanz = pfad
+    k.bauteile = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(orig.bauteile) - 1
+        DIM b AS Bauteil : b = orig.bauteile[i]
+        DIM c AS Bauteil : c = bauteilKlon(b)
+        c.id = b.id + "@" + pfad
+        c.vorlageId = b.id
+        c.instanz = pfad
+        IF NOT istBlattVerweis(b.symbolRef) THEN c.referenz = instanzReferenz$(b, pfad, n)
+        ARRAY_PUSH(k.bauteile, c)
+    NEXT
+    RETURN k
+END FUNCTION
+
+SUB flachAbsteigen(dok AS Dokument, f AS Dokument, fi AS INTEGER, pfad AS STRING, BYREF zaehler AS MAP OF INTEGER, tiefe AS INTEGER)
+    IF tiefe > LEN(dok.blaetter) THEN RETURN          ' Zyklus: meldet der ERC
+    DIM bl AS Blatt : bl = f.blaetter[fi]
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(bl.bauteile) - 1
+        DIM b AS Bauteil : b = bl.bauteile[j]
+        IF NOT istBlattVerweis(b.symbolRef) THEN CONTINUE
+        DIM ki AS INTEGER : ki = blattIndexMitId(dok, MID$(b.symbolRef, LEN(BLATT_VORSATZ)))
+        IF ki < 0 THEN CONTINUE
+        DIM vid AS STRING : vid = IIF(b.vorlageId <> "", b.vorlageId, b.id)
+        DIM kp AS STRING : kp = pfad + "/" + vid
+        DIM n AS INTEGER : n = MAPGETOR(zaehler, STR$(ki), 0) + 1
+        MAPPUT(zaehler, STR$(ki), n)
+        IF NOT MAPHAS(f.nummern, vid) THEN MAPPUT(f.nummern, vid, n)
+        IF n = 1 THEN
+            f.blaetter[ki].instanz = kp
+            flachAbsteigen(dok, f, ki, kp, zaehler, tiefe + 1)
+        ELSE
+            DIM kopie AS Blatt : kopie = instanzKopie(dok.blaetter[ki], ki, kp, n)
+            ARRAY_PUSH(f.blaetter, kopie)
+            DIM bs AS Bauteil : bs = bauteilKlon(b)
+            bs.symbolRef = BLATT_VORSATZ + kopie.id
+            bs.vorlageId = vid
+            bl.bauteile[j] = bs
+            flachAbsteigen(dok, f, LEN(f.blaetter) - 1, kp, zaehler, tiefe + 1)
+        END IF
+    NEXT
+END SUB
+
+' Die ausgerollte Sicht (siehe oben). Ohne Mehrfach-Instanz: das Dokument selbst.
+' Reihenfolge: zuerst die Originalblaetter (= erste Instanzen) an ihren
+' Indizes, danach die weiteren Instanzen -- ein Blattindex des Originals
+' gilt so auch in der ausgerollten Sicht.
+FUNCTION flach(dok AS Dokument) AS Dokument
+    IF NOT mehrfachInstanzen(dok) THEN RETURN dok
+    DIM f AS Dokument : f = NEW Dokument()
+    f.id = dok.id
+    f.titel = dok.titel
+    f.autor = dok.autor
+    f.revision = dok.revision
+    f.firma = dok.firma
+    f.platine = dok.platine
+    f.blaetter = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(dok.blaetter) - 1
+        ARRAY_PUSH(f.blaetter, blattHuelle(dok.blaetter[i], i))
+    NEXT
+    DIM zaehler AS MAP OF INTEGER
+    FOR i = 0 TO LEN(dok.blaetter) - 1
+        IF elternVon(dok, i) < 0 THEN flachAbsteigen(dok, f, i, "", zaehler, 0)
+    NEXT
+    RETURN f
+END FUNCTION
+
+' Index des Blatts einer Instanz in der ausgerollten Sicht (sonst das Original)
+FUNCTION flachIndex(f AS Dokument, bi AS INTEGER, pfad AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    IF pfad <> "" THEN
+        FOR i = 0 TO LEN(f.blaetter) - 1
+            IF f.blaetter[i].instanz = pfad AND (f.blaetter[i].quelle = bi OR i = bi) THEN RETURN i
+        NEXT
+    END IF
+    RETURN bi
+END FUNCTION
+
+' Alle Instanzpfade eines Blatts in ihrer Reihenfolge (leer: nicht mehrfach)
+FUNCTION instanzenVon(f AS Dokument, bi AS INTEGER) AS ARRAY OF STRING
+    DIM r AS ARRAY OF STRING : r = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(f.blaetter) - 1
+        IF (i = bi OR f.blaetter[i].quelle = bi) AND f.blaetter[i].instanz <> "" THEN
+            IF i = bi OR i >= 0 THEN ARRAY_PUSH(r, f.blaetter[i].instanz)
+        END IF
+    NEXT
+    IF LEN(r) < 2 THEN RETURN []
+    RETURN r
+END FUNCTION
 
 ' Ports mit den hierarchischen Labels der Unterblaetter verbinden.
 SUB portsVerbinden(dok AS Dokument, n AS Netze)
@@ -183,7 +350,6 @@ SUB ercHierarchie(dok AS Dokument, BYREF fehler AS ARRAY OF Verstoss, BYREF warn
             END IF
             DIM k AS STRING : k = STR$(ki)
             MAPPUT(wie, k, MAPGETOR(wie, k, 0) + 1)
-            IF MAPGET(wie, k) = 2 THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Blatt " + dok.blaetter[ki].name + " ist mehrfach als Unterblatt eingesetzt -- Mehrfach-Instanzen gibt es nicht", bi, b.lage.pos.x, b.lage.pos.y))
             IF ki = bi THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Blatt " + dok.blaetter[bi].name + " enthaelt sich selbst als Unterblatt", bi, b.lage.pos.x, b.lage.pos.y))
         NEXT
     NEXT

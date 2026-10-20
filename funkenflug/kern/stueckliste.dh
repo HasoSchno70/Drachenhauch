@@ -96,6 +96,7 @@ END FUNCTION
 
 ' Ueber alle Blaetter des Dokuments.
 FUNCTION stuecklisteDok(dok AS Dokument) AS ARRAY OF BomZeile
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
     DIM zeilen AS ARRAY OF BomZeile : zeilen = []
     DIM nachSchluessel AS MAP OF INTEGER
     DIM bi AS INTEGER, i AS INTEGER
@@ -175,6 +176,7 @@ END FUNCTION
 ' Die Vorgabe: Menge, Referenzen, Wert, Bauteil -- Gehaeuse und Bestellnummer
 ' nur, wenn eine Position sie hat.
 FUNCTION bomVorgabeSpalten(dok AS Dokument) AS ARRAY OF INTEGER
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
     DIM geh AS BOOLEAN, best AS BOOLEAN
     bomSpalten(stuecklisteDok(dok), geh, best)
     DIM r AS ARRAY OF INTEGER : r = [BS_MENGE, BS_REFERENZEN, BS_WERT, BS_BAUTEIL]

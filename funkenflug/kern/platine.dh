@@ -254,6 +254,7 @@ END FUNCTION
 ' Bauteile, die auf die Platine gehoeren (keine Versorgungssymbole, kein
 ' Platzhalter) -- ueber alle Blaetter.
 FUNCTION platinenBauteile(dok AS Dokument) AS ARRAY OF Bauteil
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
     DIM r AS ARRAY OF Bauteil : r = []
     DIM bi AS INTEGER, ci AS INTEGER
     FOR bi = 0 TO LEN(dok.blaetter) - 1
@@ -266,6 +267,7 @@ FUNCTION platinenBauteile(dok AS Dokument) AS ARRAY OF Bauteil
 END FUNCTION
 
 FUNCTION bauteilMitId(dok AS Dokument, id AS STRING, BYREF b AS Bauteil) AS BOOLEAN
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
     DIM bi AS INTEGER, ci AS INTEGER
     FOR bi = 0 TO LEN(dok.blaetter) - 1
         FOR ci = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
@@ -395,6 +397,7 @@ END SUB
 
 ' Schaltplan-Netz je Pin: "Bauteil-Id|Pin-Nummer" -> Index in netzNamen.
 FUNCTION pinNetze(dok AS Dokument, BYREF namen AS ARRAY OF STRING) AS MAP OF INTEGER
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
     DIM m AS MAP OF INTEGER
     DIM n AS Netze : n = netzeDokument(dok)
     namen = []
@@ -412,6 +415,7 @@ FUNCTION pinNetze(dok AS Dokument, BYREF namen AS ARRAY OF STRING) AS MAP OF INT
 END FUNCTION
 
 FUNCTION platinePruefen(dok AS Dokument) AS PlatBericht
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
     DIM r AS PlatBericht : r = NEW PlatBericht()
     DIM pl AS Platine : pl = dok.platine
     r.spalten = pl.spalten
@@ -604,6 +608,7 @@ END FUNCTION
 
 ' Teile, deren Bauteil es im Schaltplan nicht mehr gibt, fliegen raus.
 FUNCTION platineAbgleichen(dok AS Dokument) AS INTEGER
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
     DIM pl AS Platine : pl = dok.platine
     DIM neu AS ARRAY OF PlatTeil : neu = []
     DIM i AS INTEGER, weg AS INTEGER
@@ -718,6 +723,7 @@ FUNCTION flaecheFrei(m AS MAP OF INTEGER, s0 AS INTEGER, z0 AS INTEGER, s1 AS IN
 END FUNCTION
 
 FUNCTION platineEinsetzenMit(dok AS Dokument, nachNetzen AS BOOLEAN) AS INTEGER
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
     DIM pl AS Platine : pl = dok.platine
     DIM koerper AS MAP OF INTEGER                ' Loecher gesetzter Teile
     DIM zone AS MAP OF INTEGER                   ' dieselben samt Abstand
@@ -1058,6 +1064,7 @@ END FUNCTION
 ' Alle Luftlinien der Reihe nach verbinden. Rueckgabe: gelegte Verbindungen;
 ' ohneWeg: wie viele Luftlinien bleiben (kein Platz, kein Weg).
 FUNCTION platineVerbinden(dok AS Dokument, BYREF ohneWeg AS INTEGER) AS INTEGER
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
     DIM pl AS Platine : pl = dok.platine
     DIM gelegt AS INTEGER : gelegt = 0
     DIM gescheitert AS MAP OF INTEGER
@@ -1126,6 +1133,7 @@ FUNCTION lochReihe$(p AS ARRAY OF Punkt, je AS INTEGER) AS STRING
 END FUNCTION
 
 FUNCTION platineArbeitsliste$(dok AS Dokument) AS STRING
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
     DIM pl AS Platine : pl = dok.platine
     DIM t AS STRING : t = "Platine " + STR$(pl.spalten) + " x " + STR$(pl.zeilen) + " Loecher, " + IIF(pl.art = PL_STREIFEN, "Streifenraster", "Lochraster") + " -- Spalte/Zeile ab 1, von oben links auf der Bestueckungsseite" + NL_ZEILE
     DIM i AS INTEGER

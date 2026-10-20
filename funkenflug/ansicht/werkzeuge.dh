@@ -32,6 +32,7 @@ CONST K_B = &H62
 CONST K_H = &H68
 CONST K_F = &H66
 CONST K_M = &H6D
+CONST K_I = &H69
 CONST K_BILD_AUF = &HFF55              ' GDK_KEY_Page_Up
 CONST K_BILD_AB = &HFF56
 
@@ -587,8 +588,7 @@ SUB auswahlBearbeiten()
     ELSEIF gHatGewaehlt THEN
         ' ein Blattsymbol oeffnet sein Unterblatt
         IF gGewaehlt.sym.blattSymbol THEN
-            DIM ki AS INTEGER : ki = kern.kindIndex(gDok, gGewaehlt)
-            IF ki >= 0 THEN blattWechseln(ki)
+            instanzBetreten(gGewaehlt)       ' genau diese Instanz
             RETURN
         END IF
         eigenschaftenDialog(gGewaehlt)
@@ -895,6 +895,8 @@ FUNCTION lwTaste(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
             werkzeugWaehlen(WZ_DRAHT, "")
         CASE K_B
             werkzeugWaehlen(WZ_BUS, "")
+        CASE K_I
+            instanzWechseln()
         CASE K_L
             werkzeugWaehlen(WZ_LABEL, "")
         CASE K_A

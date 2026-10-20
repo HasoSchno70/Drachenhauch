@@ -273,6 +273,7 @@ END SUB
 
 ' Alle Blaetter des Dokuments verknuepfen und benennen.
 FUNCTION netzeDokument(dok AS Dokument) AS Netze
+    dok = flach(dok)                  ' jede Instanz eines Unterblatts eigene Netze
     DIM n AS Netze : n = NEW Netze()
     DIM global AS MAP OF INTEGER
     DIM bi AS INTEGER

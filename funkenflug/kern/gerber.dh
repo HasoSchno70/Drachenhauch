@@ -248,6 +248,7 @@ CLASS GbLoch
 END CLASS
 
 FUNCTION gerberErzeugen(dok AS Dokument, projekt AS STRING) AS GerberSatz
+    dok = flach(dok)                  ' Mehrfach-Instanzen ausgerollt
     DIM gs AS GerberSatz : gs = NEW GerberSatz()
     DIM pl AS Platine : pl = dok.platine
     DIM r AS PlatBericht : r = platinePruefen(dok)
