@@ -1353,6 +1353,87 @@ FOR mlk = 0 TO LEN(zkE) - 1
     zkT = zkT + zkE[mlk].text + "|"
 NEXT
 PRINT "Kreis ueber zwei Eltern: erkannt "; CONTAINS(zkT, "ein Kreis"); "  ausgerollt endlich "; LEN(kern.flach(zk).blaetter) < 8; "  (erwartet TRUE TRUE)"
+' --- KiCad-Symbolbibliotheken (.kicad_sym)
+DIM klPfade AS ARRAY OF STRING : klPfade = ["daten/kicad/testbib.kicad_sym", "daten/kicad/testbib9.kicad_sym", "daten/kicad/testbib_zeile.kicad_sym"]
+DIM klT AS STRING : klT = ""
+DIM kli AS INTEGER, klj AS INTEGER
+FOR kli = 0 TO LEN(klPfade) - 1
+    DIM klB AS kern.KicadBib : klB = kern.kicadBibLaden(klPfade[kli])
+    klT = klT + klB.name + "[" + klB.fehler + "]:"
+    FOR klj = 0 TO LEN(klB.eintraege) - 1
+        klT = klT + klB.eintraege[klj].name + "/" + STR$(klB.eintraege[klj].einheiten) + "/" + klB.eintraege[klj].erbtVon + " "
+    NEXT
+    klT = klT + "| "
+NEXT
+PRINT "KiCad-Bib Index: "; klT; " (erwartet je R/1/ R_Small/1/R NAND2/2/ GND/1/, ohne Fehler)"
+DIM klb AS kern.KicadBib : klb = kern.kicadBibLaden("daten/kicad/testbib9.kicad_sym")
+DIM klV AS ARRAY OF INTEGER
+DIM klR AS kern.Symbol : klR = kern.kicadBibSymbol(klb, klb.eintrag("R"), 1, klV)
+DIM klS AS kern.Symbol : klS = kern.kicadBibSymbol(klb, klb.eintrag("R_Small"), 1, klV)
+PRINT "KiCad-Bib R: "; klR.id; " "; LEN(klR.pins); " Pins "; klR.beschreibung; "  R_Small: "; klS.id; " "; LEN(klS.pins); " Pins Wert "; klS.wertVorgabe; " "; klS.beschreibung; " Ref "; klS.praefix; "  (erwartet kicad:testbib9:R 2 Pins Widerstand  R_Small: kicad:testbib9:R_Small 2 Pins Wert R_Small Widerstand, klein Ref R)"
+DIM klN AS kern.Symbol : klN = kern.kicadBibSymbol(klb, klb.eintrag("NAND2"), 2, klV)
+DIM klVt AS STRING : klVt = ""
+FOR klj = 0 TO LEN(klV) - 1
+    klVt = klVt + klN.pins[klV[klj]].name + " "
+NEXT
+PRINT "KiCad-Bib NAND2 B: "; klN.id; " "; LEN(klN.pins); " Pins  versteckt "; klVt; " gleich "; JOIN$(ARRAY_MAP(kern.versteckteVersorgung(klN), FUNCTION(x) STR$(x)), ",") = JOIN$(ARRAY_MAP(klV, FUNCTION(x) STR$(x)), ","); "  registriert "; kern.istEigenBekannt(klN.id); "  (erwartet kicad:testbib9:NAND2/2 5 Pins  versteckt VCC GND  gleich TRUE  registriert TRUE)"
+DIM klG AS kern.Symbol : klG = kern.kicadBibSymbol(klb, klb.eintrag("GND"), 1, klV)
+' versteckte Versorgung verbindet ueber den Namen -- ohne Label, auch nach dem Verschieben
+DIM klD AS kern.Dokument : klD = NEW kern.Dokument()
+DIM klU1 AS kern.Bauteil : klU1 = kern.neuesBauteil(klN.id, kern.neueLage(3000, 3000))
+klU1.referenz = "U1"
+DIM klNa AS kern.Symbol : klNa = kern.kicadBibSymbol(klb, klb.eintrag("NAND2"), 1, klV)
+DIM klU2 AS kern.Bauteil : klU2 = kern.neuesBauteil(klNa.id, kern.neueLage(8000, 3000))
+klU2.referenz = "U2"
+ARRAY_PUSH(klD.blaetter[0].bauteile, klU1)
+ARRAY_PUSH(klD.blaetter[0].bauteile, klU2)
+DIM klE0 AS ARRAY OF kern.Verstoss : klE0 = kern.ercPruefenDok(klD)
+DIM klE0t AS STRING : klE0t = JOIN$(ARRAY_MAP(klE0, FUNCTION(v) v.text), "|")
+ARRAY_PUSH(klD.blaetter[0].bauteile, kern.neuesBauteil(klG.id, kern.neueLage(20000, 20000)))
+klU2.lage.pos = NEW kern.Punkt(12000, 9000)
+DIM klDn AS kern.Netze : klDn = kern.netzeDokument(klD)
+DIM klE1 AS ARRAY OF kern.Verstoss : klE1 = kern.ercPruefenDok(klD)
+PRINT "KiCad-Bib versteckte Versorgung: U1.14 "; kimNetzMit$(klDn, "U1", "14"); "  U2.14 "; kimNetzMit$(klDn, "U2", "14"); "  U1.7 "; kimNetzMit$(klDn, "U1", "7"); "  U2.7 "; kimNetzMit$(klDn, "U2", "7"); "  Labels "; LEN(klD.blaetter[0].labels); "  ERC ohne Quelle "; CONTAINS(klE0t, "VCC: Versorgungseingang ohne Versorgung"); "  mit GND-Symbol GND versorgt "; NOT CONTAINS(JOIN$(ARRAY_MAP(klE1, FUNCTION(v) v.text), "|"), "GND: Versorgungseingang"); "  (erwartet VCC VCC GND GND  Labels 0  TRUE  TRUE)"
+PRINT "KiCad-Bib GND: Leistung "; klG.einheitLeistung; "  keine versteckte Versorgung "; LEN(kern.versteckteVersorgung(klG)) = 0; "  R ohne "; LEN(kern.versteckteVersorgung(klR)) = 0; "  (erwartet TRUE TRUE TRUE)"
+DIM klBibs AS ARRAY OF kern.KicadBib : klBibs = [klb, kern.kicadBibLaden("daten/kicad/testbib.kicad_sym")]
+PRINT "KiCad-Bib Suche: widerstand "; JOIN$(kern.kicadBibSuchen(klBibs, "Widerstand", 50), " "); "  'res klein' "; JOIN$(kern.kicadBibSuchen(klBibs, "res klein", 50), " "); "  testbib9:nand "; JOIN$(kern.kicadBibSuchen(klBibs, "testbib9:nand", 50), " "); "  hoechstens 1 "; LEN(kern.kicadBibSuchen(klBibs, "", 1)); "  (erwartet 0/0 0/1 1/0 1/1  0/1 1/1  0/2  1)"
+DIM klVs AS kern.Symbol : klVs = kern.kicadBibVorschau(klBibs[1], klBibs[1].eintrag("R_Small"), 1)
+PRINT "KiCad-Bib Vorschau: "; klVs.id; " "; LEN(klVs.pins); " Pins  nicht registriert "; NOT kern.istEigenBekannt(klVs.id); "  (erwartet kicad:testbib:R_Small 2 Pins  nicht registriert TRUE)"
+DIM klF AS kern.KicadBib : klF = kern.kicadBibLaden("daten/kicad/beispiel.kicad_sch")
+DIM klF2 AS kern.KicadBib : klF2 = kern.kicadBibLaden("daten/kicad/gibtsnicht.kicad_sym")
+' geaenderte Datei: der Index wird beim Einsetzen erneuert
+DIM klAend AS STRING : klAend = "C:/Programmieren/Python/GameBasic/funkenflug/pruef_bib.kicad_sym"
+DIM klTx AS STRING : klTx = READALL$("daten/kicad/testbib.kicad_sym")
+WRITEALL(klAend, klTx)
+DIM klA AS kern.KicadBib : klA = kern.kicadBibLaden(klAend)
+PRINT "KiCad-Bib Text frei: "; LEN(klA.zeilen) = 0; "  einzeilig behalten "; LEN(kern.kicadBibLaden("daten/kicad/testbib_zeile.kicad_sym").zeilen) > 0; "  (erwartet TRUE TRUE)"
+DIM klAi AS INTEGER : klAi = klA.eintrag("GND")
+WRITEALL(klAend, REPLACE$(klTx, "(symbol " + CHR$(34) + "R_Small" + CHR$(34), "(symbol " + CHR$(34) + "R_Kleiner_Name" + CHR$(34)))
+DIM klAj AS INTEGER : klAj = kern.kicadBibPruefen(klA, klAi)
+PRINT "KiCad-Bib geaendert: GND "; klAi; " -> "; klAj; " "; klA.eintraege[klAj].name; "  R_Small weg "; kern.kicadBibPruefen(klA, klA.eintrag("R_Small")); "  unveraendert "; kern.kicadBibPruefen(klA, klAj) = klAj; "  (erwartet GND 3 -> 3 GND  R_Small weg -1  unveraendert TRUE)"
+DELETEFILE(klAend)
+' Index-Zwischenspeicher: zweites Laden aus der .idx, nach Aenderung neu
+DIM klC AS STRING : klC = "C:/Programmieren/Python/GameBasic/funkenflug/pruef_bibcache"
+WRITEALL(klAend, klTx)
+DIM klC1 AS kern.KicadBib : klC1 = kern.kicadBibLadenGemerkt(klAend, klC)
+DIM klIdx AS ARRAY OF STRING : klIdx = DIRLIST(klC)
+WRITEALL(klC + "/" + klIdx[0], REPLACE$(READALL$(klC + "/" + klIdx[0]), "res resistor", "aus dem Speicher"))
+DIM klC2 AS kern.KicadBib : klC2 = kern.kicadBibLadenGemerkt(klAend, klC)
+DIM klCt AS STRING : klCt = ""
+FOR klj = 0 TO LEN(klC2.eintraege) - 1
+    klCt = klCt + klC2.eintraege[klj].name + "/" + STR$(klC2.eintraege[klj].einheiten) + "/" + klC2.eintraege[klj].erbtVon + "/" + klC2.eintraege[klj].stichworte + " "
+NEXT
+DIM klCs AS kern.Symbol : klCs = kern.kicadBibSymbol(klC2, kern.kicadBibPruefen(klC2, klC2.eintrag("NAND2")), 1, klV)
+WRITEALL(klAend, REPLACE$(klTx, "Widerstand, klein", "Widerstand, winzig"))
+DIM klC3 AS kern.KicadBib : klC3 = kern.kicadBibLadenGemerkt(klAend, klC)
+PRINT "KiCad-Bib Zwischenspeicher: Dateien "; LEN(klIdx); "  aus dem Speicher "; klCt; " NAND2 "; LEN(klCs.pins); " Pins  nach Aenderung "; klC3.eintraege[1].beschreibung; "  (erwartet Dateien 1 ... R/1//R aus dem Speicher R_Small/1/R/R aus dem Speicher NAND2/2// GND/1//  NAND2 5 Pins  nach Aenderung Widerstand, winzig)"
+DIM klCd AS ARRAY OF STRING : klCd = DIRLIST(klC)
+FOR klj = 0 TO LEN(klCd) - 1
+    DELETEFILE(klC + "/" + klCd[klj])
+NEXT
+RMDIR(klC)
+DELETEFILE(klAend)
+PRINT "KiCad-Bib fremd: "; klF.fehler; " "; LEN(klF.eintraege); "  fehlt "; LEFT$(klF2.fehler, 20); "  (erwartet keine KiCad-Symbolbibliothek ... 0  fehlt Datei nicht gefunden)"
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
 PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)

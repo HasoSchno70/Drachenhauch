@@ -1,0 +1,350 @@
+' KiCad-Symbolbibliotheken als Symbolquelle: Suchen, Vorschau, Einsetzen.
+'
+' Bibliotheken kommen aus der KiCad-Installation (kern.kicadBibOrdner) und
+' aus der Liste kicadbib.txt im Konfigurationsordner (eine Datei oder ein
+' Ordner je Zeile, "Bibliothek hinzufuegen ..." traegt dort ein). Indiziert
+' wird beim ersten Oeffnen; der Index liegt danach je Bibliothek im
+' Konfigurationsordner und gilt, bis sich die Datei aendert.
+
+DIM gKbBibs AS ARRAY OF kern.KicadBib
+DIM gKbGeladen AS BOOLEAN
+DIM gKbDlg AS INTEGER
+DIM gKbFeld AS INTEGER
+DIM gKbKasten AS INTEGER
+DIM gKbListe AS INTEGER
+DIM gKbInfo AS INTEGER
+DIM gKbText AS INTEGER
+DIM gKbVorschau AS INTEGER
+DIM gKbTreffer AS ARRAY OF STRING      ' "bib/eintrag/einheit"
+DIM gKbWahl AS INTEGER                 ' gewaehlte Zeile, -1 = keine
+DIM gKbSym AS kern.Symbol
+DIM gKbHatSym AS BOOLEAN
+CONST KB_HOECHSTENS = 200              ' mehr Zeilen macht die Liste traege
+
+FUNCTION kbListenDatei$() AS STRING
+    RETURN PATHJOIN(konfigOrdner$(), "kicadbib.txt")
+END FUNCTION
+
+' Die Dateien und Ordner aus kicadbib.txt (Kommentare mit #)
+FUNCTION kbEigeneQuellen() AS ARRAY OF STRING
+    DIM r AS ARRAY OF STRING : r = []
+    IF NOT FILEEXISTS(kbListenDatei$()) THEN RETURN r
+    DIM z AS ARRAY OF STRING : z = SPLIT$(READALL$(kbListenDatei$()), CHR$(10))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        DIM t AS STRING : t = TRIM$(REPLACE$(z[i], CHR$(13), ""))
+        IF t <> "" AND LEFT$(t, 1) <> "#" THEN ARRAY_PUSH(r, t)
+    NEXT
+    RETURN r
+END FUNCTION
+
+' Alle .kicad_sym-Dateien: KiCad-Ordner, dann die eigenen Eintraege
+FUNCTION kbDateien() AS ARRAY OF STRING
+    DIM quellen AS ARRAY OF STRING : quellen = kern.kicadBibOrdner()
+    DIM eigene AS ARRAY OF STRING : eigene = kbEigeneQuellen()
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(eigene) - 1
+        ARRAY_PUSH(quellen, eigene[i])
+    NEXT
+    DIM r AS ARRAY OF STRING : r = []
+    DIM da AS MAP OF INTEGER : da = {}
+    FOR i = 0 TO LEN(quellen) - 1
+        DIM q AS STRING : q = quellen[i]
+        IF DIREXISTS(q) THEN
+            DIM namen AS ARRAY OF STRING : namen = DIRLIST(q)
+            SORT(namen)
+            FOR j = 0 TO LEN(namen) - 1
+                IF ENDSWITH(LOWER$(namen[j]), ".kicad_sym") THEN kbDazu(r, da, PATHJOIN(q, namen[j]))
+            NEXT
+        ELSEIF FILEEXISTS(q) THEN
+            kbDazu(r, da, q)
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+
+SUB kbDazu(r AS ARRAY OF STRING, da AS MAP OF INTEGER, pfad AS STRING)
+    DIM k AS STRING : k = LOWER$(REPLACE$(pfad, "\", "/"))
+    IF MAPHAS(da, k) THEN RETURN
+    MAPPUT(da, k, 1)
+    ARRAY_PUSH(r, pfad)
+END SUB
+
+' Alle Bibliotheken indizieren (mit Zwischenspeicher); waehrend es dauert,
+' steht in der Statuszeile, welche gerade dran ist
+SUB kbBibsLaden()
+    gKbBibs = []
+    DIM dateien AS ARRAY OF STRING : dateien = kbDateien()
+    DIM ordner AS STRING : ordner = PATHJOIN(konfigOrdner$(), "kicadbib_index")
+    IF LEN(dateien) > 0 THEN konfigOrdnerAnlegen()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(dateien) - 1
+        IF i MOD 10 = 0 AND gStatus <> 0 THEN
+            gtk_label_set_text(gStatus, "KiCad-Bibliotheken lesen ... " + STR$(i + 1) + "/" + STR$(LEN(dateien)))
+            gtkAbarbeiten()
+        END IF
+        DIM b AS kern.KicadBib : b = kern.kicadBibLadenGemerkt(dateien[i], ordner)
+        IF b.fehler = "" THEN ARRAY_PUSH(gKbBibs, b)
+    NEXT
+    gKbGeladen = TRUE
+    statusAktualisieren()
+END SUB
+
+FUNCTION kbSymbolZahl() AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gKbBibs) - 1
+        n = n + LEN(gKbBibs[i].eintraege)
+    NEXT
+    RETURN n
+END FUNCTION
+
+' Trefferliste neu fuellen; mehrteilige Symbole je Einheit eine Zeile
+SUB kbAktualisieren()
+    IF gKbDlg = 0 THEN RETURN
+    IF gKbListe <> 0 THEN
+        DIM alt AS INTEGER : alt = gtk_bin_get_child(gKbKasten)
+        IF alt <> 0 THEN gtk_widget_destroy(alt)
+    END IF
+    gKbListe = gtk_list_box_new()
+    gtk_list_box_set_selection_mode(gKbListe, GTK_AUSWAHL_EINE)
+    gKbTreffer = []
+    gKbWahl = -1
+    gKbHatSym = FALSE
+    DIM muster AS STRING : muster = gtk_entry_get_text(gKbFeld)
+    DIM roh AS ARRAY OF STRING : roh = kern.kicadBibSuchen(gKbBibs, muster, KB_HOECHSTENS + 1)
+    DIM mehr AS BOOLEAN : mehr = LEN(roh) > KB_HOECHSTENS
+    DIM i AS INTEGER, u AS INTEGER
+    FOR i = 0 TO MIN(LEN(roh), KB_HOECHSTENS) - 1
+        DIM t AS ARRAY OF STRING : t = SPLIT$(roh[i], "/")
+        DIM b AS kern.KicadBib : b = gKbBibs[VAL(t[0])]
+        DIM e AS kern.KicadBibEintrag : e = b.eintraege[VAL(t[1])]
+        FOR u = 1 TO e.einheiten
+            IF LEN(gKbTreffer) >= KB_HOECHSTENS THEN
+                mehr = TRUE
+                BREAK
+            END IF
+            ARRAY_PUSH(gKbTreffer, roh[i] + "/" + STR$(u))
+            DIM nm AS STRING : nm = b.name + ":" + e.name
+            IF e.einheiten > 1 THEN nm = nm + " (" + CHR$(64 + u) + ")"
+            DIM z AS INTEGER : z = gtk_label_new("")
+            DIM bes AS STRING : bes = e.beschreibung
+            IF LEN(bes) > 70 THEN bes = LEFT$(bes, 67) + "..."
+            gtk_label_set_markup(z, "<b>" + markupSicher$(nm) + "</b>  <span foreground='#8a90a2'>" + markupSicher$(bes) + "</span>")
+            gtk_label_set_xalign(z, 0.0)
+            gtk_widget_set_margin_start(z, 6)
+            gtk_list_box_insert(gKbListe, z, -1)
+        NEXT
+    NEXT
+    gtk_container_add(gKbKasten, gKbListe)
+    signalZeile(gKbListe, "row-selected", kbZeile, 0, 0, 0)
+    gtk_widget_show_all(gKbListe)
+    DIM info AS STRING
+    IF LEN(gKbBibs) = 0 THEN
+        info = "Keine KiCad-Bibliothek gefunden -- KiCad installieren oder mit " + CHR$(34) + "Bibliothek hinzufuegen ..." + CHR$(34) + " eine .kicad_sym-Datei waehlen"
+    ELSE
+        info = STR$(LEN(gKbBibs)) + IIF(LEN(gKbBibs) = 1, " Bibliothek, ", " Bibliotheken, ") + STR$(kbSymbolZahl()) + " Symbole -- " + STR$(LEN(gKbTreffer)) + IIF(mehr, "+", "") + " Treffer"
+        IF mehr THEN info = info + " (die ersten " + STR$(KB_HOECHSTENS) + ", genauer suchen)"
+    END IF
+    gtk_label_set_text(gKbInfo, info)
+    gtk_label_set_text(gKbText, "")
+    IF gKbVorschau <> 0 THEN gtk_widget_queue_draw(gKbVorschau)
+END SUB
+
+SUB kbGeaendert(objekt AS INTEGER, daten AS INTEGER)
+    kbAktualisieren()
+END SUB
+
+' Bibliothek, Eintrag und Einheit einer Trefferzeile
+SUB kbTeile(zeile AS INTEGER, BYREF bi AS INTEGER, BYREF ei AS INTEGER, BYREF einheit AS INTEGER)
+    DIM t AS ARRAY OF STRING : t = SPLIT$(gKbTreffer[zeile], "/")
+    bi = VAL(t[0])
+    ei = VAL(t[1])
+    einheit = VAL(t[2])
+END SUB
+
+SUB kbZeile(box AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
+    IF zeile = 0 THEN RETURN
+    DIM i AS INTEGER : i = gtk_list_box_row_get_index(zeile)
+    IF i < 0 OR i >= LEN(gKbTreffer) THEN RETURN
+    kbWaehlen(i)
+END SUB
+
+' Eine Zeile waehlen: Vorschau bauen (ohne das Symbol zu registrieren)
+SUB kbWaehlen(i AS INTEGER)
+    gKbWahl = i
+    gKbHatSym = FALSE
+    DIM bi AS INTEGER, ei AS INTEGER, einheit AS INTEGER
+    kbTeile(i, bi, ei, einheit)
+    DIM b AS kern.KicadBib : b = gKbBibs[bi]
+    DIM nm AS STRING : nm = b.eintraege[ei].name
+    DIM neu AS INTEGER : neu = kern.kicadBibPruefen(b, ei)
+    IF neu < 0 THEN
+        gtk_label_set_text(gKbText, nm + " steht nicht mehr in " + b.name + ".kicad_sym (Datei geaendert?)")
+        gtk_widget_queue_draw(gKbVorschau)
+        RETURN
+    END IF
+    IF neu <> ei THEN
+        ' die Datei hat sich geaendert: die Zeile zeigt auf den neuen Index
+        gKbTreffer[i] = STR$(bi) + "/" + STR$(neu) + "/" + STR$(einheit)
+    END IF
+    gKbSym = kern.kicadBibVorschau(b, neu, einheit)
+    gKbHatSym = TRUE
+    DIM e AS kern.KicadBibEintrag : e = b.eintraege[neu]
+    DIM t AS STRING : t = e.beschreibung
+    IF e.erbtVon <> "" THEN t = t + IIF(t = "", "", CHR$(10)) + "abgeleitet von " + e.erbtVon
+    DIM vv AS ARRAY OF INTEGER : vv = kern.versteckteVersorgung(gKbSym)
+    IF LEN(vv) > 0 THEN
+        DIM vn AS STRING : vn = ""
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(vv) - 1
+            vn = vn + IIF(k > 0, ", ", "") + gKbSym.pins[vv[k]].name
+        NEXT
+        t = t + IIF(t = "", "", CHR$(10)) + "versteckte Versorgung " + vn + " -- verbindet ueber den Namen"
+    END IF
+    t = t + IIF(t = "", "", CHR$(10)) + STR$(LEN(gKbSym.pins)) + " Pins" + IIF(gKbSym.bauform <> "", ", Bauform " + gKbSym.bauform, "")
+    gtk_label_set_text(gKbText, t)
+    gtk_widget_queue_draw(gKbVorschau)
+END SUB
+
+FUNCTION kbZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM bw AS FLOAT : bw = gtk_widget_get_allocated_width(w)
+    DIM bh AS FLOAT : bh = gtk_widget_get_allocated_height(w)
+    cairoFarbe(cr, C_HG)
+    cairo_rectangle(cr, 0, 0, bw, bh)
+    cairo_fill(cr)
+    IF NOT gKbHatSym THEN RETURN TRUE
+    DIM x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER
+    seUmgrenzung(gKbSym, x0, y0, x1, y1)
+    DIM altX AS FLOAT : altX = vX
+    DIM altY AS FLOAT : altY = vY
+    DIM altZ AS FLOAT : altZ = vZoom
+    vZoom = CLAMP(MIN((bw - 24) / (x1 - x0), (bh - 24) / (y1 - y0)), 0.02, 0.4)
+    vX = bw / 2.0 - (x0 + x1) / 2.0 * vZoom
+    vY = bh / 2.0 - (y0 + y1) / 2.0 * vZoom
+    DIM b AS kern.Bauteil : b = NEW kern.Bauteil(gKbSym.id, kern.neueLage(0, 0))
+    b.sym = gKbSym
+    b.referenz = gKbSym.praefix + "?"
+    b.wert = gKbSym.wertVorgabe
+    cairo_set_line_cap(cr, 1)
+    bauteilZeichnen(cr, b, FALSE, FALSE)
+    vX = altX
+    vY = altY
+    vZoom = altZ
+    RETURN TRUE
+END FUNCTION
+
+' "Bibliothek hinzufuegen ...": eine .kicad_sym-Datei in kicadbib.txt eintragen
+SUB kbHinzufuegen(knopf AS INTEGER, daten AS INTEGER)
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("KiCad-Symbolbibliothek waehlen", gKbDlg, GTK_DATEI_OEFFNEN, "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Hinzufuegen", GTK_ANTWORT_ANNEHMEN, NIL)
+    DIM filter AS INTEGER : filter = gtk_file_filter_new()
+    gtk_file_filter_set_name(filter, "KiCad-Symbolbibliothek (*.kicad_sym)")
+    gtk_file_filter_add_pattern(filter, "*.kicad_sym")
+    gtk_file_chooser_add_filter(d, filter)
+    DIM pfad AS STRING : pfad = ""
+    IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
+        DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
+        IF z <> 0 THEN
+            pfad = TEXT_AUS_ZEIGER$(z)
+            g_free(z)
+        END IF
+    END IF
+    gtk_widget_destroy(d)
+    IF pfad = "" THEN RETURN
+    DIM meldung AS STRING : meldung = kbQuelleEintragen$(pfad)
+    kbAktualisieren()
+    gtk_label_set_text(gKbText, meldung)
+END SUB
+
+' Eine Datei in die Liste aufnehmen und indizieren; Rueckgabe: was geschah
+FUNCTION kbQuelleEintragen$(pfad AS STRING) AS STRING
+    DIM b AS kern.KicadBib : b = kern.kicadBibLadenGemerkt(pfad, PATHJOIN(konfigOrdner$(), "kicadbib_index"))
+    IF b.fehler <> "" THEN RETURN "Nicht aufgenommen: " + b.fehler
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(gKbBibs) - 1
+        IF LOWER$(REPLACE$(gKbBibs[i].pfad, "\", "/")) = LOWER$(REPLACE$(pfad, "\", "/")) THEN RETURN b.name + " ist schon dabei"
+    NEXT
+    konfigOrdnerAnlegen()
+    DIM alt AS STRING : alt = ""
+    IF FILEEXISTS(kbListenDatei$()) THEN alt = READALL$(kbListenDatei$())
+    IF alt <> "" AND RIGHT$(alt, 1) <> CHR$(10) THEN alt = alt + CHR$(10)
+    WRITEALL(kbListenDatei$(), alt + pfad + CHR$(10))
+    ARRAY_PUSH(gKbBibs, b)
+    RETURN b.name + " aufgenommen: " + STR$(LEN(b.eintraege)) + " Symbole"
+END FUNCTION
+
+' Der Dialog. Einsetzen nimmt die gewaehlte Zeile, sonst den ersten Treffer;
+' danach haengt das Symbol an der Maus wie eines aus der Bauteilliste.
+SUB kicadSymbolWaehlen()
+    IF NOT gKbGeladen THEN kbBibsLaden()
+    gKbDlg = gtk_dialog_new_with_buttons("KiCad-Symbole", gFenster, GTK_DIALOG_MODAL, "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Einsetzen", GTK_ANTWORT_OK, NIL)
+    gtk_window_set_default_size(gKbDlg, 860, 540)
+    gtk_dialog_set_default_response(gKbDlg, GTK_ANTWORT_OK)
+    DIM vb AS INTEGER : vb = gtk_box_new(GTK_SENKRECHT, 8)
+    gtk_container_set_border_width(vb, 12)
+    DIM oben AS INTEGER : oben = gtk_box_new(GTK_WAAGERECHT, 8)
+    gKbFeld = feldNeu("")
+    gtk_entry_set_placeholder_text(gKbFeld, "Suchen: Name, Beschreibung, Stichworte (74hc00, regler 5v, Device:R ...)")
+    gtk_box_pack_start(oben, gKbFeld, TRUE, TRUE, 0)
+    DIM dazu AS INTEGER : dazu = gtk_button_new_with_label("Bibliothek hinzufuegen ...")
+    gtk_widget_set_tooltip_text(dazu, "Eine .kicad_sym-Datei aufnehmen (steht danach in kicadbib.txt im Konfigurationsordner)")
+    gtk_box_pack_start(oben, dazu, FALSE, FALSE, 0)
+    signal(dazu, "clicked", kbHinzufuegen, 0, 0, 0)
+    gtk_box_pack_start(vb, oben, FALSE, FALSE, 0)
+    DIM mitte AS INTEGER : mitte = gtk_box_new(GTK_WAAGERECHT, 12)
+    gKbKasten = gtk_scrolled_window_new(0, 0)
+    gtk_widget_set_size_request(gKbKasten, 440, 380)
+    gtk_box_pack_start(mitte, gKbKasten, TRUE, TRUE, 0)
+    DIM rechts AS INTEGER : rechts = gtk_box_new(GTK_SENKRECHT, 6)
+    gKbVorschau = gtk_drawing_area_new()
+    gtk_widget_set_size_request(gKbVorschau, 340, 320)
+    signalZeichnen(gKbVorschau, "draw", kbZeichnen, 0, 0, 0)
+    gtk_box_pack_start(rechts, gKbVorschau, TRUE, TRUE, 0)
+    gKbText = etikettNeu("")
+    gtk_label_set_line_wrap(gKbText, TRUE)
+    gtk_label_set_xalign(gKbText, 0.0)
+    gtk_widget_set_size_request(gKbText, 340, -1)
+    gtk_box_pack_start(rechts, gKbText, FALSE, FALSE, 0)
+    gtk_box_pack_start(mitte, rechts, FALSE, FALSE, 0)
+    gtk_box_pack_start(vb, mitte, TRUE, TRUE, 0)
+    gKbInfo = etikettNeu("")
+    gtk_label_set_xalign(gKbInfo, 0.0)
+    gtk_box_pack_start(vb, gKbInfo, FALSE, FALSE, 0)
+    gtk_box_pack_start(gtk_dialog_get_content_area(gKbDlg), vb, TRUE, TRUE, 0)
+    gKbListe = 0
+    kbAktualisieren()
+    signal(gKbFeld, "changed", kbGeaendert, 0, 0, 0)
+    gtk_widget_show_all(gKbDlg)
+    gDlg = gKbDlg : gDlgFeld1 = gKbFeld : gDlgFeld2 = 0
+    DIM ok AS BOOLEAN : ok = gtk_dialog_run(gKbDlg) = GTK_ANTWORT_OK
+    gDlg = 0 : gDlgFeld1 = 0
+    DIM wahl AS INTEGER : wahl = gKbWahl
+    IF ok AND wahl < 0 AND LEN(gKbTreffer) > 0 THEN wahl = 0
+    DIM id AS STRING : id = ""
+    IF ok AND wahl >= 0 THEN id = kbEinsetzen$(wahl)
+    gtk_widget_destroy(gKbDlg)
+    gKbDlg = 0
+    gKbListe = 0
+    gKbVorschau = 0
+    IF id <> "" THEN
+        symbolListeAktualisieren(TRUE)
+        symbolInListeWaehlen(id)
+        werkzeugWaehlen(WZ_BAUTEIL, id)
+    END IF
+END SUB
+
+' Das Symbol uebersetzen und registrieren; "" wenn es nicht (mehr) geht
+FUNCTION kbEinsetzen$(zeile AS INTEGER) AS STRING
+    DIM bi AS INTEGER, ei AS INTEGER, einheit AS INTEGER
+    kbTeile(zeile, bi, ei, einheit)
+    DIM b AS kern.KicadBib : b = gKbBibs[bi]
+    DIM neu AS INTEGER : neu = kern.kicadBibPruefen(b, ei)
+    IF neu < 0 THEN RETURN ""
+    DIM vv AS ARRAY OF INTEGER
+    DIM s AS kern.Symbol : s = kern.kicadBibSymbol(b, neu, einheit, vv)
+    RETURN s.id
+END FUNCTION
+
+SUB aufKicadSymbol(knopf AS INTEGER, daten AS INTEGER)
+    kicadSymbolWaehlen()
+END SUB

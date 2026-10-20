@@ -249,3 +249,41 @@ unter.label('hierarchical_label', 'AUS', (114.3, 76.2), 0, ' (shape output)')
 open(os.path.join(ZIEL, 'beispiel.kicad_sch'), 'w', encoding='utf-8', newline='\n').write(haupt.text())
 open(os.path.join(ZIEL, 'unterblatt.kicad_sch'), 'w', encoding='utf-8', newline='\n').write(unter.text())
 print('R1', pr1, 'R2', pr2, 'R3', pr3)
+
+
+# --- Symbolbibliotheken (.kicad_sym) fuer den Bibliotheks-Browser ---------------
+def bib_symbol(lib_id, text):
+    # im Schaltplan heissen Symbole "Bibliothek:Name", in der Bibliothek nur "Name"
+    kurz = lib_id.split(':', 1)[1]
+    t = text.replace('"%s"' % lib_id, '"%s"' % kurz)
+    # in lib_symbols eine Stufe tiefer als in einer Bibliothek
+    return '\n'.join(z[2:] if z.startswith('  ') else z for z in t.split('\n'))
+
+
+def bibliothek(einrueckung, eine_zeile=False):
+    teile = [bib_symbol('Device:R', LIB['Device:R']['text']).replace(
+                '(property "Value" "R"', '(property "Description" "Widerstand" (at 0 0 0) %s)\n      (property "ki_keywords" "R res resistor" (at 0 0 0) %s)\n      (property "Value" "R"' % (FXH, FXH)),
+             '''  (symbol "R_Small" (extends "R")
+    (property "Reference" "R" (at 0 0 0) %s)
+    (property "Value" "R_Small" (at 0 0 0) %s)
+    (property "Description" "Widerstand, klein" (at 0 0 0) %s)
+  )
+''' % (FX, FX, FXH),
+             bib_symbol('Test:NAND2', LIB['Test:NAND2']['text']),
+             bib_symbol('power:GND', LIB['power:GND']['text'])]
+    t = '(kicad_symbol_lib (version 20231120) (generator kicad_symbol_editor)\n' + ''.join(teile) + ')\n'
+    if einrueckung == '\t':
+        # KiCad 9: Tabs statt je zwei Leerzeichen
+        zeilen = []
+        for z in t.split('\n'):
+            n = len(z) - len(z.lstrip(' '))
+            zeilen.append('\t' * (n // 2) + z.lstrip(' '))
+        t = '\n'.join(zeilen)
+    if eine_zeile:
+        t = ' '.join(z.strip() for z in t.split('\n'))
+    return t
+
+
+open(os.path.join(ZIEL, 'testbib.kicad_sym'), 'w', encoding='utf-8', newline='\n').write(bibliothek('  '))
+open(os.path.join(ZIEL, 'testbib9.kicad_sym'), 'w', encoding='utf-8', newline='\n').write(bibliothek('\t'))
+open(os.path.join(ZIEL, 'testbib_zeile.kicad_sym'), 'w', encoding='utf-8', newline='\n').write(bibliothek('  ', True))

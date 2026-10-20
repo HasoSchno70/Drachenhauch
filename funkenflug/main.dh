@@ -31,6 +31,7 @@ IMPORT "ansicht/simulation.dh"
 IMPORT "ansicht/platine3d.dh"
 IMPORT "ansicht/busse.dh"
 IMPORT "ansicht/instanzen.dh"
+IMPORT "ansicht/kicadbib.dh"
 
 CONST STIL = "window { background-color: #12131a; color: #e6e6f0; }" + _
     " headerbar { background-color: #1a1c26; color: #e6e6f0; }" + _
@@ -1153,6 +1154,23 @@ FUNCTION bomProbe(daten AS INTEGER) AS BOOLEAN
 END FUNCTION
 
 ' Fuellt den offenen Dialog aus und bestaetigt ihn (laeuft in dessen Schleife).
+DIM probeKbZeile AS INTEGER
+
+' KiCad-Dialog: suchen, eine Zeile waehlen, Foto, Einsetzen
+FUNCTION kbProbe(daten AS INTEGER) AS BOOLEAN
+    IF gKbDlg = 0 THEN RETURN TRUE
+    gtk_entry_set_text(gKbFeld, probeText1)
+    pruefe("KiCad-Dialog: Treffer", STR$(LEN(gKbTreffer)), "2")
+    gtk_list_box_select_row(gKbListe, gtk_list_box_get_row_at_index(gKbListe, probeKbZeile))
+    pruefe("KiCad-Dialog: Vorschau", STR$(gKbHatSym) + " " + gKbSym.id, STR$(TRUE) + " kicad:testbib:NAND2/2")
+    pruefe("KiCad-Dialog: Text nennt versteckte Versorgung", STR$(CONTAINS(gtk_label_get_text(gKbText), "versteckte Versorgung VCC, GND")), STR$(TRUE))
+    IF fotoZiel <> "" THEN
+        IF gtkFoto(gKbDlg, fotoZiel + ".kicadbib.png") THEN PRINT "Foto KiCad-Bibliothek gesichert"
+    END IF
+    gtk_dialog_response(gKbDlg, GTK_ANTWORT_OK)
+    RETURN FALSE
+END FUNCTION
+
 FUNCTION dialogBestaetigen(daten AS INTEGER) AS BOOLEAN
     IF gDlg = 0 THEN RETURN TRUE                 ' noch nicht offen: nochmal
     IF gDlgFeld1 <> 0 AND probeText1 <> PROBE_LASSEN THEN gtk_entry_set_text(gDlgFeld1, probeText1)
@@ -2502,6 +2520,53 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             pruefe("Stueckliste: beide Instanzen", STR$(ibom[0].menge) + " " + JOIN$(ibom[0].referenzen, ","), "2 R1,R7")
             verlaufZurueck()
             pruefe("Rueckgaengig nimmt die Instanz-Referenz", MAPGETOR(gDok.blaetter[1].bauteile[0].instanzRefs, "/" + gDok.blaetter[0].bauteile[1].id, "-"), "-")
+        CASE 48
+            ' KiCad-Bibliothek: aus der Liste im (Pruef-)Konfigurationsordner
+            leinwandDokument(NEW kern.Dokument())
+            verlaufRuecksetzen()
+            konfigOrdnerAnlegen()
+            WRITEALL(kbListenDatei$(), "# Pruefung" + CHR$(10) + "daten/kicad/testbib.kicad_sym" + CHR$(10))
+            gKbGeladen = FALSE
+            probeText1 = "testbib:nand2"
+            probeKbZeile = 1
+            g_timeout_add(200, kbProbe, 0)
+            kicadSymbolWaehlen()
+            pruefe("KiCad: Bibliothek gelesen", STR$(LEN(gKbBibs)) + " " + STR$(kbSymbolZahl()), "1 4")
+            pruefe("KiCad: Einheit B gewaehlt", STR$(gWerkzeug) + " " + gSymbolRef + " " + STR$(listeHat(gSymbolRef)), STR$(WZ_BAUTEIL) + " kicad:testbib:NAND2/2 " + STR$(TRUE))
+            pruefe("KiCad: Vorschau registriert nichts", STR$(kern.istEigenBekannt("kicad:testbib:NAND2/1")), STR$(FALSE))
+            gMausWX = 3000 : gMausWY = 2000 : gMausDrin = TRUE
+            bauteilPlatzieren()
+            gMausWX = 6000
+            bauteilPlatzieren()
+            DIM kbU AS kern.Bauteil : kbU = gBlatt.bauteile[0]
+            pruefe("KiCad: eingesetzt", kbU.referenz + " " + gBlatt.bauteile[1].referenz + " " + kbU.sym.name + " " + STR$(LEN(gBlatt.labels)), "U1 U2 NAND2 (B) 0")
+            ' Fang uebergeht die versteckten Pins im Koerper
+            DIM kbVp AS kern.Punkt : kbVp = kbU.pinPunkt(kern.versteckteVersorgung(kbU.sym)[0])
+            gWerkzeug = WZ_DRAHT
+            vZoom = 0.5
+            zentrieren(kbVp.x, kbVp.y)
+            hoverBestimmen(sx(kbVp.x), sy(kbVp.y))
+            pruefe("KiCad: kein Andocken am versteckten Pin", STR$(gHoverAktiv), STR$(FALSE))
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            ' Verschieben aendert die Netze nicht: VCC haengt am Namen
+            kbU.lage = NEW kern.Lage(NEW kern.Punkt(3000, 5000), 90, FALSE)
+            geaendert()
+            DIM kbN AS kern.Netze : kbN = kern.netzeDokument(gDok)
+            DIM kbVcc AS INTEGER : kbVcc = 0
+            DIM kbi AS INTEGER, kbj AS INTEGER
+            FOR kbi = 0 TO LEN(kbN.liste) - 1
+                IF kbN.liste[kbi].name = "VCC" THEN kbVcc = LEN(kbN.liste[kbi].pins)
+            NEXT
+            pruefe("KiCad: VCC beider ICs ein Netz", STR$(kbVcc), "2")
+            ' Bibliothek hinzufuegen (ohne Dateiwahl)
+            pruefe("KiCad: hinzufuegen", kbQuelleEintragen$("daten/kicad/testbib9.kicad_sym"), "testbib9 aufgenommen: 4 Symbole")
+            pruefe("KiCad: doppelt", kbQuelleEintragen$("daten/kicad/testbib9.kicad_sym"), "testbib9 ist schon dabei")
+            pruefe("KiCad: fremde Datei", LEFT$(kbQuelleEintragen$("daten/kicad/beispiel.kicad_sch"), 17), "Nicht aufgenommen")
+            pruefe("KiCad: Liste gemerkt", STR$(LEN(kbEigeneQuellen())), "2")
+            pruefe("KiCad: Index zwischengespeichert", STR$(LEN(DIRLIST(PATHJOIN(konfigOrdner$(), "kicadbib_index")))), "2")
+            ' Rueckgaengig nimmt das zweite IC
+            verlaufZurueck()
+            pruefe("KiCad: Rueckgaengig", STR$(LEN(gBlatt.bauteile)), "1")
         CASE ELSE
             PRINT "Pruefungen mit Fehler: "; probeFehler
             gtk_main_quit()
@@ -2714,6 +2779,10 @@ gtk_box_pack_start(leiste, gSymbolWahl, FALSE, FALSE, 0)
 DIM knopfSymbol AS INTEGER : knopfSymbol = gtk_button_new_with_label("Symbol ...")
 gtk_widget_set_tooltip_text(knopfSymbol, "Eigenes Bauteil/IC anlegen; ist ein eigenes gewaehlt, es bearbeiten")
 gtk_box_pack_start(leiste, knopfSymbol, FALSE, FALSE, 0)
+DIM knopfKicad AS INTEGER : knopfKicad = gtk_button_new_with_label("KiCad ...")
+gtk_widget_set_tooltip_text(knopfKicad, "Ein Symbol aus den KiCad-Bibliotheken (.kicad_sym) suchen und einsetzen")
+gtk_box_pack_start(leiste, knopfKicad, FALSE, FALSE, 0)
+signal(knopfKicad, "clicked", aufKicadSymbol, 0, 0, 0)
 gtk_box_pack_start(vbox, leiste, FALSE, FALSE, 0)
 gLeiste = leiste
 gPlLeiste = gtk_box_new(GTK_WAAGERECHT, 6)

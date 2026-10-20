@@ -327,6 +327,50 @@ Pin-Nummern eindeutig, jedes Bein in der Bauform vorhanden.
 
 ![Die Bibliothek](bibliothek.png)
 
+### KiCad-Bibliotheken
+
+Knopf **„KiCad …"** in der Leiste: Suchen in allen KiCad-Symbolbibliotheken
+(`.kicad_sym`, KiCad 6 bis 9), Vorschau, **Einsetzen** – danach hängt das
+Symbol an der Maus wie eines aus der Bauteilliste. Gesucht wird in Name,
+Beschreibung und Stichworten, jedes Wort muss passen (`74hc 4x nand`,
+`regler 5v`, `Device:R`); Enter nimmt den ersten Treffer. Mehrteilige
+Symbole stehen je Einheit in der Liste (`74HC00 (A)` … `(E)`).
+
+Die Bibliotheken findet Funkenflug in der KiCad-Installation
+(`C:/Program Files/KiCad/<Version>/share/kicad/symbols`,
+`/usr/share/kicad/symbols`, macOS-App, `KICAD_SYMBOL_DIR`); weitere nimmt
+**„Bibliothek hinzufügen …"** auf – sie stehen dann in `kicadbib.txt` im
+Konfigurationsordner (eine Datei oder ein Ordner je Zeile, von Hand
+änderbar).
+
+- **Schnell trotz Größe:** beim Öffnen wird jede Bibliothek nur indiziert
+  (Name, Beschreibung, Stichworte, Einheiten, Lage im Text), Zeile für
+  Zeile – ein Zugriff per Zeichenposition kostet in einem Text von
+  Megabytes Zeit proportional zur Position. 5000 Symbole brauchen so
+  0,3 s statt 2,5 s. Der Index liegt danach im Konfigurationsordner
+  (`kicadbib_index/`) und gilt, bis sich Größe oder Zeit der Datei ändern;
+  beim zweiten Öffnen ist der Browser sofort da. Den Text selbst liest
+  Funkenflug erst wieder, wenn man ein Symbol einsetzt – und prüft dabei,
+  ob der Eintrag noch dort steht (sonst wird neu indiziert).
+- **Abgeleitete Symbole** (`extends`, z. B. `R_Small` aus `R`) bekommen
+  Grafik und Pins vom Eltern-Symbol, Eigenschaften vom Kind; Beschreibung
+  und Stichworte erben sie, wo sie selbst keine haben.
+- Übersetzt wird mit demselben Code wie beim Schaltplan-Import: Id
+  `kicad:<Bibliothek>:<Name>`, Bauform aus dem Footprint (DIP14, TO92 …),
+  das eingesetzte Symbol reist in der `.fkn` mit. Die Vorschau registriert
+  nichts – in der Bauteilliste erscheint nur, was man eingesetzt hat.
+- **Versteckte Versorgungs-Pins** (VCC und GND eines 74xx) verbinden wie
+  in KiCad über ihren Namen mit dem gleichnamigen globalen Netz – ohne
+  Label, auch nachdem man das IC verschoben hat. Sie sind unsichtbar,
+  Drähte docken dort nicht an, und sie sind keine Quelle: ohne
+  VCC-Symbol meldet der ERC „Versorgungseingang ohne Versorgung". Auf der
+  Platine gehören die Beine 7 und 14 damit zu VCC und GND.
+- Dateien, die nicht zeilenweise gesetzt sind (alles in einer Zeile),
+  werden ganz gelesen und je Symbol neu gesetzt; KiCad 9 (Tabs) und ältere
+  (zwei Leerzeichen) gehen gleich.
+
+![KiCad-Symbole suchen und einsetzen](kicadbib.png)
+
 ## Platine (Lochraster / Streifenraster)
 
 „Platine" in der Kopfleiste schaltet auf die Lochraster-Sicht desselben
@@ -543,9 +587,8 @@ Nicht-verbunden-Marker. Steckt eine Datei **mehrmals** im Schaltplan, wird
 sie ein Blatt mit mehreren Instanzen; die Referenzen je Instanz kommen aus
 KiCads Instanz-Pfaden (KiCad 6: `symbol_instances`, ab 7: `instances` am
 Symbol). **Versteckte
-Versorgungs-Pins** (VCC/GND an 74xx-Symbolen) verbinden in KiCad unsichtbar
-über ihren Namen – hier bekommen sie ein sichtbares globales Label, das Netz
-bleibt dasselbe.
+Versorgungs-Pins** (VCC/GND an 74xx-Symbolen) verbinden wie in KiCad
+unsichtbar über ihren Namen mit dem gleichnamigen Netz (siehe unten).
 
 ![KiCad-Schaltplan in Funkenflug](kicad.png)
 
@@ -622,6 +665,7 @@ kern/       Modell, Geometrie, Bibliothek, Netze, Datei – ohne Oberfläche,
   kicad.dh       KiCad-Netzliste (.net) mit Footprint-Vorschlaegen und Pad-Nummern
   sausdruck.dh   S-Ausdruecke lesen (ohne Rekursion)
   kicadimport.dh KiCad-Schaltplan (.kicad_sch) einlesen: Symbole, Lagen, Unterblaetter
+  kicadbib.dh    KiCad-Symbolbibliotheken: Index (zeilenweise, Zwischenspeicher), extends, Suche
   gerber.dh      Gerber X2 + Excellon aus der Platine, Zuschnitt, Strichschrift
   platine3d.dh   3D-Modell der Platine (Bauformen, Farbringe), Kamera, Zeichenfolge
   symbole.dh     eigene Symbole: Pinliste, IC-Generator, JSON, Register, Bibliothek
@@ -639,6 +683,7 @@ ansicht/    Zeichenfläche und Werkzeuge – globaler Namensraum
   blaetter.dh    Reiter, Menü „Blatt": neu, umbenennen, löschen
   busse.dh       Bus zeichnen und benennen, Abzweig mit Mitglieds-Label
   instanzen.dh   gezeigte Instanz, betreten/wechseln, erneut einsetzen
+  kicadbib.dh    KiCad-Bibliotheks-Browser: Suche, Vorschau, Bibliothek hinzufügen
   komfort.dh     Datei-Menü, zuletzt geöffnet, Autosave, Bearbeiten-Menü, Suchen-Dialog
   platinenansicht.dh  Lochraster-Sicht: Zeichnen, Werkzeuge, Pruefliste
   platinendruck.dh    Platine 1:1: Bestueckung, Loetseite, Arbeitsliste (PDF, Druck)
@@ -652,7 +697,7 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (322 Prüfungen,
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (337 Prüfungen,
 darunter Drehen/Spiegeln einzeln und als Gruppe ohne Kurzschluss, PDF/SVG/PNG
 und Drucken über GTKs Export-Weg, die echten Werkzeug-Knöpfe, Symbol-Editor,
 Stückliste, Gummiband, Rahmen und Gruppen-Zug über den Klick-Handler,
