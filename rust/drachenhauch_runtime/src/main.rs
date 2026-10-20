@@ -60,6 +60,7 @@ mod httpd;
 mod smtp;
 mod zipdatei;
 mod builtins;
+mod textindex;
 mod compiler;
 mod typen;
 mod parser;

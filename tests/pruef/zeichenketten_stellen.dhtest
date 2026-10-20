@@ -164,3 +164,56 @@ PRINT INSTRREV("abc", "c", 99)
 2
 -1
 2
+
+=== grosser Text mit Zeichenindex
+' Ab 16 KB bekommt ein Text, der zweimal hintereinander nach Zeichen gefragt
+' wird, einen Index (textindex.rs): MID$/INSTR/LEN kosten dann O(1) statt
+' O(Stelle). Erwartung mit Python gerechnet (str zaehlt Zeichen).
+DIM teil AS STRING : teil = "aä€😀bcd"
+DIM t AS STRING : t = ""
+DIM i AS INTEGER
+FOR i = 1 TO 5000
+    t = t + teil
+NEXT
+PRINT LEN(t)
+PRINT LEN(t)
+PRINT MID$(t, 7 * 4000 + 3, 4)
+PRINT MID$(t, 34998, 5)
+PRINT INSTR(t, "da", 30000)
+PRINT INSTR(t, "😀b", 34990)
+PRINT INSTRREV(t, "€")
+PRINT LEFT$(RIGHT$(t, 9), 3)
+PRINT INSTR(t, "Z")
+' anhaengen: der Index darf nicht veralten
+t = t + "Z"
+PRINT LEN(t)
+PRINT RIGHT$(t, 2)
+PRINT INSTR(t, "Z")
+PRINT MID$(t, 34990, 3)
+' abwechselnd in zwei grossen Texten
+DIM u AS STRING : u = ""
+FOR i = 1 TO 6000
+    u = u + "xyz€"
+NEXT
+PRINT INSTR(u, "€x", 20000)
+PRINT MID$(t, 30001, 2)
+PRINT INSTR(u, "€x", 20001)
+PRINT LEN(u)
+--- erwartet
+35000
+35000
+😀bcd
+cd
+30001
+34996
+34995
+cda
+-1
+35001
+dZ
+35000
+bcd
+20003
+da
+20003
+24000

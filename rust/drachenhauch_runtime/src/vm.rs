@@ -1828,6 +1828,8 @@ impl<'p> Vm<'p> {
         if let Some(r) = module_op('+', &a, &b) { return r; }
         if let Some(r) = self.user_op("__op_add__", &a, &b, true)? { return Ok(r); }
         if let Value::Str(mut links) = a {
+            // ein Zeichenindex (textindex.rs) haelt ein Weak -- erst loslassen
+            crate::textindex::loslassen(&links);
             match Rc::get_mut(&mut links) {
                 Some(s) => {
                     match &b { Value::Str(r) => s.push_str(r), _ => s.push_str(&b.fmt()) }
