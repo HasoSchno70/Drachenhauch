@@ -1756,6 +1756,109 @@ impl<'p> Vm<'p> {
         }
     }
 
+    /// `a + b` wie ADD (Zahlen direkt, sonst `addieren`).
+    #[inline]
+    pub(crate) fn plus(&mut self, a: Value, b: Value) -> R<Value> {
+        match zahlen_addieren(&a, &b) {
+            Some(r) => r,
+            None => self.addieren(a, b),
+        }
+    }
+
+    /// ADD_STORE_MEMBER: `obj.name = a + b`. Kennt der Merkplatz des Befehls
+    /// das Feld schon (ein Feld, nie eine PROPERTY -- die kommt nicht in den
+    /// Merkplatz) und haelt es noch den Text `a`, wird dort angehaengt. Sonst
+    /// genau ADD + STORE_MEMBER; das erste Mal fuellt `member_setzen` den
+    /// Merkplatz.
+    #[inline(never)]
+    pub(crate) fn mitglied_addieren(&mut self, instr: &crate::model::Instr, name_wert: &Value, obj: Value,
+                                    a: Value, b: Value) -> R<()> {
+        let a = match &obj {
+            Value::Instance(rc) => {
+                let mut ib = rc.borrow_mut();
+                let ib = &mut *ib;
+                let (lage, platz) = instr.merk.get();
+                if std::ptr::eq(Rc::as_ptr(&ib.layout), lage) && text_platz_typ(&ib.layout.typen[platz]) {
+                    match an_ort_anhaengen(&mut ib.fields[platz], a, &b) {
+                        Ok(()) => return Ok(()),
+                        Err(a) => a,
+                    }
+                } else { a }
+            }
+            _ => a,
+        };
+        let v = self.plus(a, b)?;
+        self.member_setzen(instr, name_wert, obj, v)
+    }
+
+    /// ADD_STORE_FIELD: `text = a + b` in einer Methode (Feld von Self).
+    /// Wie `mitglied_addieren`, sonst ADD + STORE_FIELD.
+    #[inline(never)]
+    fn feld_addieren(&mut self, instr: &crate::model::Instr, name_wert: &Value, self_obj: Option<&Value>,
+                     a: Value, b: Value) -> R<()> {
+        let name_owned;
+        let name: &str = match name_wert {
+            Value::Str(s) => s,
+            v => { name_owned = v.fmt(); &name_owned }
+        };
+        let a = match self_obj {
+            Some(Value::Instance(rc)) => {
+                let mut ib = rc.borrow_mut();
+                let ib = &mut *ib;
+                match feld_platz(instr, ib, name) {
+                    Some(i) if text_platz_typ(&ib.layout.typen[i]) => match an_ort_anhaengen(&mut ib.fields[i], a, &b) {
+                        Ok(()) => return Ok(()),
+                        Err(a) => a,
+                    },
+                    _ => a,
+                }
+            }
+            _ => a,
+        };
+        let v = self.plus(a, b)?;
+        // Ab hier wie STORE_FIELD.
+        let s = self_obj.ok_or_else(|| format!("STORE_FIELD '{}' ausserhalb Methodenkontext", name))?;
+        let Value::Instance(rc) = s else { return Err("STORE_FIELD: self ist keine Instanz".into()) };
+        let langsam_ty = {
+            let mut rcb = rc.borrow_mut();
+            let i = feld_platz(instr, &rcb, name)
+                .ok_or_else(|| format!("Feld '{}' existiert nicht", name))?;
+            let lage = rcb.layout.clone();
+            let ty = lage.typen[i].as_str();
+            match (&v, ty) {
+                (Value::Int(_), "integer") | (Value::Float(_), "float")
+                | (Value::Str(_), "string") | (Value::Bool(_), "boolean")
+                | (_, "any") | (_, "") => { rcb.fields[i] = v; None }
+                (Value::Int(n), "float") => { rcb.fields[i] = Value::Float(*n as f64); None }
+                _ => Some((i, ty.to_string(), v)),
+            }
+        };
+        if let Some((i, ty, v)) = langsam_ty {
+            let cv = coerce(v, &ty, &format!("Zuweisung an Feld {}", name))?;
+            rc.borrow_mut().fields[i] = cv;
+        }
+        Ok(())
+    }
+
+    /// ADD_STORE_INDEX: Stapel `[.., c, i1..in, a, b]` -- `c[i..] = a + b`,
+    /// an Ort und Stelle, wenn das Element bzw. der MAP-Eintrag den Text `a`
+    /// noch haelt (`index_anhaengen`), sonst ADD + STORE_INDEX.
+    #[inline(never)]
+    fn index_addieren(&mut self, stack: &mut Vec<Value>, n: usize) -> R<()> {
+        let b = vm_pop(stack)?;
+        let a = vm_pop(stack)?;
+        let split = stack.len().checked_sub(n).filter(|&s| s >= 1)
+            .ok_or("Interner VM-Fehler: Stack-Underflow")?;
+        let a = match index_anhaengen(&stack[split - 1], &stack[split..], a, &b) {
+            Ok(()) => { stack.truncate(split - 1); return Ok(()); }
+            Err(a) => a,
+        };
+        let v = self.plus(a, b)?;
+        let idx = stack.split_off(split);
+        let c = vm_pop(stack)?;
+        store_index(&c, &idx, v)
+    }
+
     #[inline(never)]
     fn allocate_instance(&self, class_name: &str) -> Value {
         let layout = match self.prog.classes.get(class_name) {
@@ -3816,6 +3919,20 @@ impl<'p> Vm<'p> {
                     let obj = vm_pop(stack)?;
                     self.member_setzen(instr, &constants[arg.as_usize()], obj, v)?;
                 }
+                // `ziel = ziel + e` fuer Feld, Mitglied und Element: wie ADD +
+                // STORE_*, aber an Ort und Stelle angehaengt, wenn der Platz den
+                // geladenen Text noch haelt (`an_ort_anhaengen`). Die Arbeit
+                // liegt in eigenen Funktionen -- `dispatch` bleibt schlank.
+                op::ADD_STORE_FIELD => {
+                    let b = vm_pop(stack)?; let a = vm_pop(stack)?;
+                    self.feld_addieren(instr, &constants[arg.as_usize()], self_obj, a, b)?;
+                }
+                op::ADD_STORE_MEMBER => {
+                    let b = vm_pop(stack)?; let a = vm_pop(stack)?;
+                    let obj = vm_pop(stack)?;
+                    self.mitglied_addieren(instr, &constants[arg.as_usize()], obj, a, b)?;
+                }
+                op::ADD_STORE_INDEX => self.index_addieren(stack, arg.as_usize())?,
                 // --- Arrays ---
                 op::LOAD_INDEX => {
                     let num_dims = arg.as_usize();
@@ -3925,6 +4042,25 @@ impl<'p> Vm<'p> {
         let arg = &instr.arg;
         let constants = &fn_.constants;
         match instr.op {
+                // BYREF-Argument aus einer Variablen, die waehrend des Aufrufs
+                // niemand sieht (der Compiler prueft das, `byref_leihen`): der
+                // Wert wandert hinueber, damit der Aufgerufene der einzige
+                // Halter ist und an einen Text anhaengen kann. Das Zurueck-
+                // schreiben fuellt den Platz wieder. Unter dem Debugger bleibt
+                // es eine Kopie -- der zeigt die Variablen des Aufrufers.
+                op::LEIHE_LOCAL => {
+                    let s = arg.as_usize();
+                    let v = if self.dbg.is_some() { locals[s].clone() } else { std::mem::replace(&mut locals[s], Value::Nil) };
+                    stack.push(v);
+                }
+                op::LEIHE_GLOBAL_SLOT => {
+                    let idx = arg.as_usize();
+                    let s = match self.global_slots[idx].as_ref() { Some(s) => s, None => return Err(self.global_ungesetzt(idx)) };
+                    let mut sb = s.borrow_mut();
+                    let v = if self.dbg.is_some() || sb.is_const { sb.value.clone() } else { std::mem::replace(&mut sb.value, Value::Nil) };
+                    drop(sb);
+                    stack.push(v);
+                }
                 op::DECLARE_LOCAL => {
                     let l = arg.list();
                     let slot = l[0].as_usize();
@@ -12469,6 +12605,77 @@ fn ist_schlicht(b: &Value) -> bool {
     matches!(b, Value::Str(_) | Value::Int(_) | Value::Float(_) | Value::Bool(_) | Value::Nil)
 }
 
+/// Nimmt ein Platz dieses Typs einen Text ohne Umwandlung auf? Haelt er schon
+/// einen, ist das zwar immer so -- die Pruefung macht es nur sichtbar.
+fn text_platz_typ(t: &str) -> bool { matches!(t, "string" | "any" | "") }
+
+/// `platz = a + b` an Ort und Stelle (ADD_STORE_FIELD/_MEMBER/_INDEX, auch im
+/// Maschinencode): haelt der Platz noch genau den Text `a` (derselbe Verweis)
+/// und ist `b` schlicht, geht `a` -- nur ein zweiter Verweis -- zuerst weg;
+/// haelt dann sonst niemand den Text, haengt `push_str` an, statt ihn zu
+/// kopieren. Das Ergebnis ist dasselbe wie ADD + STORE: `Text + schlicht`
+/// ruft keinen Code (kein OPERATOR) und kann nicht scheitern, und ein Text in
+/// einem Platz, der schon einen hielt, braucht keine Umwandlung. Weil der
+/// Platz nie geleert wird, bleibt bei keinem Fehler ein Loch zurueck.
+/// Passt etwas nicht, kommt `a` unveraendert zurueck.
+pub(crate) fn an_ort_anhaengen(platz: &mut Value, a: Value, b: &Value) -> Result<(), Value> {
+    match (&a, &*platz) {
+        (Value::Str(ra), Value::Str(rp)) if Rc::ptr_eq(ra, rp) && ist_schlicht(b) => {}
+        _ => return Err(a),
+    }
+    drop(a);
+    let Value::Str(links) = platz else { unreachable!() };
+    // ein Zeichenindex (textindex.rs) haelt ein Weak -- erst loslassen
+    crate::textindex::loslassen(links);
+    match Rc::get_mut(links) {
+        Some(s) => match b { Value::Str(r) => s.push_str(r), _ => s.push_str(&b.fmt()) },
+        None => {
+            let rechts: std::borrow::Cow<str> = match b {
+                Value::Str(r) => std::borrow::Cow::Borrowed(r.as_str()),
+                _ => std::borrow::Cow::Owned(b.fmt()),
+            };
+            let mut s = String::with_capacity(links.len() + rechts.len());
+            s.push_str(links);
+            s.push_str(&rechts);
+            *links = Rc::new(s);
+        }
+    }
+    Ok(())
+}
+
+/// Der Platz `c[idx]` fuer `an_ort_anhaengen`: ein Element eines Feldes, das
+/// Texte aufnimmt, bzw. ein vorhandener Eintrag einer solchen MAP. Alles
+/// andere (falscher Index, neuer Schluessel, Zahlenfeld ...) gibt `a` zurueck
+/// -- dann rechnet der Aufrufer ADD + STORE_INDEX mit dessen Meldungen.
+pub(crate) fn index_anhaengen(c: &Value, idx: &[Value], a: Value, b: &Value) -> Result<(), Value> {
+    if !matches!(a, Value::Str(_)) || !ist_schlicht(b) { return Err(a); }
+    match c {
+        Value::Array(arr) => {
+            let mut ab = arr.borrow_mut();
+            if !text_platz_typ(&ab.element_type) || idx.len() > 8 { return Err(a); }
+            let mut ints = [0i64; 8];
+            for (z, ix) in ints.iter_mut().zip(idx) {
+                match ix { Value::Int(i) => *z = *i, _ => return Err(a) }
+            }
+            let Ok(flat) = ab.flat_index(&ints[..idx.len()]) else { return Err(a) };
+            match &mut ab.cells {
+                Cells::Val(v) if flat < v.len() => an_ort_anhaengen(&mut v[flat], a, b),
+                _ => Err(a),
+            }
+        }
+        Value::Map(m) => {
+            let [Value::Str(k)] = idx else { return Err(a) };
+            let mut mb = m.borrow_mut();
+            if matches!(mb.value_type.as_str(), "integer" | "float" | "boolean") { return Err(a); }
+            match mb.get_mut(k) {
+                Some(platz) => an_ort_anhaengen(platz, a, b),
+                None => Err(a),
+            }
+        }
+        _ => Err(a),
+    }
+}
+
 fn require_number(a: &Value, b: &Value, op: &str) -> R<()> {
     // Eine FUNCTION ohne Klammern ist nur ihr Name (`zwei + 1` statt
     // `zwei() + 1`) -- in anderen BASICs ruft der Name allein sie auf.
@@ -13076,4 +13283,100 @@ fn byref_ohne_typ(m: &Func, method: &str, cn: &str, argc: usize) -> Result<(), S
              Variablen mit Typ halten (DIM x AS {}) und darueber aufrufen.", k, method, k));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod anhaengen_tests {
+    use super::*;
+
+    fn text(s: &str) -> Value { Value::Str(Rc::new(s.to_string())) }
+    fn str_von(v: &Value) -> &Rc<String> { match v { Value::Str(r) => r, _ => panic!("kein Text") } }
+
+    #[test]
+    fn haengt_an_ort_und_stelle_an() {
+        let mut platz = Value::Str(Rc::new(String::with_capacity(64)));
+        let vorher = Rc::as_ptr(str_von(&platz));
+        for b in [text("ab"), Value::Int(7), Value::Float(0.5), Value::Bool(true), Value::Nil] {
+            let a = platz.clone();
+            assert!(an_ort_anhaengen(&mut platz, a, &b).is_ok());
+        }
+        assert_eq!(str_von(&platz).as_str(), format!("ab70.5TRUE{}", Value::Nil.fmt()));
+        // Kein neuer Text: derselbe Speicher, nur laenger.
+        assert_eq!(Rc::as_ptr(str_von(&platz)), vorher);
+    }
+
+    #[test]
+    fn ein_zweiter_halter_behaelt_seinen_text() {
+        let mut platz = text("abc");
+        let kopie = platz.clone();
+        let a = platz.clone();
+        assert!(an_ort_anhaengen(&mut platz, a, &text("d")).is_ok());
+        assert_eq!(str_von(&platz).as_str(), "abcd");
+        assert_eq!(str_von(&kopie).as_str(), "abc");
+    }
+
+    #[test]
+    fn rechts_derselbe_text() {
+        let mut platz = text("ab");
+        let (a, b) = (platz.clone(), platz.clone());
+        assert!(an_ort_anhaengen(&mut platz, a, &b).is_ok());
+        assert_eq!(str_von(&platz).as_str(), "abab");
+    }
+
+    #[test]
+    fn passt_nicht_gibt_links_zurueck_und_laesst_den_platz() {
+        // Der Platz haelt einen anderen Text (der Ausdruck hat ihn ersetzt).
+        let mut platz = text("neu");
+        let a = text("alt");
+        let zurueck = an_ort_anhaengen(&mut platz, a, &text("!")).unwrap_err();
+        assert_eq!(str_von(&zurueck).as_str(), "alt");
+        assert_eq!(str_von(&platz).as_str(), "neu");
+        // Rechts ein Wert, dessen `+` Code laufen lassen koennte.
+        let mut platz = text("x");
+        let a = platz.clone();
+        let feld = Value::Array(Rc::new(RefCell::new(DhArray::new("any".into(), vec![1], || Value::Nil))));
+        assert!(an_ort_anhaengen(&mut platz, a, &feld).is_err());
+        assert_eq!(str_von(&platz).as_str(), "x");
+        // Zahlen sind kein Fall fuer diesen Weg.
+        let mut platz = Value::Int(1);
+        assert!(an_ort_anhaengen(&mut platz, Value::Int(1), &Value::Int(2)).is_err());
+    }
+
+    #[test]
+    fn zeichenindex_haelt_nicht_auf() {
+        // Ein grosser Text mit Zeichenindex (Weak darauf) haengt trotzdem an.
+        let mut platz = Value::Str(Rc::new("ä".repeat(200_000)));
+        crate::textindex::anmelden(str_von(&platz));
+        crate::textindex::anmelden(str_von(&platz));
+        let vorher = Rc::as_ptr(str_von(&platz));
+        let a = platz.clone();
+        assert!(an_ort_anhaengen(&mut platz, a, &text("z")).is_ok());
+        assert_eq!(Rc::as_ptr(str_von(&platz)), vorher, "hat kopiert statt angehaengt");
+        assert!(str_von(&platz).ends_with("äz"));
+    }
+
+    #[test]
+    fn element_und_map_eintrag() {
+        let arr = DhArray::new("string".into(), vec![2, 2], || Value::Str(Rc::new(String::new())));
+        let c = Value::Array(Rc::new(RefCell::new(arr)));
+        store_index(&c, &[Value::Int(1), Value::Int(0)], text("a")).unwrap();
+        let a = load_index(&c, &[Value::Int(1), Value::Int(0)]).unwrap();
+        assert!(index_anhaengen(&c, &[Value::Int(1), Value::Int(0)], a, &text("b")).is_ok());
+        assert_eq!(str_von(&load_index(&c, &[Value::Int(1), Value::Int(0)]).unwrap()).as_str(), "ab");
+        // Falscher Index: zurueck, ADD + STORE_INDEX meldet es.
+        assert!(index_anhaengen(&c, &[Value::Int(5), Value::Int(0)], text("ab"), &text("b")).is_err());
+        assert!(index_anhaengen(&c, &[Value::Int(1)], text("ab"), &text("b")).is_err());
+
+        let m = Value::Map(Rc::new(RefCell::new(DhMap::new("string".into()))));
+        store_index(&m, &[text("k")], text("m")).unwrap();
+        let a = load_index(&m, &[text("k")]).unwrap();
+        assert!(index_anhaengen(&m, &[text("k")], a, &text("n")).is_ok());
+        assert_eq!(str_von(&load_index(&m, &[text("k")]).unwrap()).as_str(), "mn");
+        // Ein neuer Schluessel wird hier nicht angelegt.
+        assert!(index_anhaengen(&m, &[text("neu")], text("x"), &text("y")).is_err());
+        assert!(load_index(&m, &[text("neu")]).is_err());
+        // Ein Zahlenfeld ist kein Platz fuer Text.
+        let z = Value::Array(Rc::new(RefCell::new(DhArray::new("integer".into(), vec![1], || Value::Int(0)))));
+        assert!(index_anhaengen(&z, &[Value::Int(0)], text("1"), &text("x")).is_err());
+    }
 }

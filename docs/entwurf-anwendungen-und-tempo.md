@@ -67,10 +67,34 @@ ebenfalls an, statt jedes Mal neu zu kopieren. Die Speicherprüfung von
 `STORE_LOCAL`/`STORE_GLOBAL_SLOT` ist ein Makro (`passend!`); als Funktion
 wurde sie nicht eingebettet und kostete gemessen 25 %.
 
-**Nicht erfasst** (bleiben beim Kopieren): Felder (`Self.text = Self.text +
-z`) und Feldelemente (`a[i] = a[i] + z`). Prüfstein:
-`tests/pruef/zeichenketten_anhaengen.dhtest` -- auf der alten Laufzeit
-fallen genau die zwei Tempo-Fälle.
+Prüfstein: `tests/pruef/zeichenketten_anhaengen.dhtest` -- auf der alten
+Laufzeit fallen genau die Tempo-Fälle.
+
+**Felder, Elemente, MAP-Werte und BYREF (2026-10-20).** Was oben noch
+kopierte, hängt jetzt auch an: `k.text = k.text + z`, `text = text + z` bzw.
+`Self.text = Self.text + z` in einer Methode, `a[i] = a[i] + z`,
+`m["k"] = m["k"] + z` (Befehle `ADD_STORE_MEMBER`, `ADD_STORE_FIELD`,
+`ADD_STORE_INDEX`) und `SUB anh(BYREF t AS STRING) : t = t + z`. Die drei
+Befehle hängen direkt im Platz an, wenn er noch denselben Text hält und `z`
+schlicht ist -- der Platz wird dabei nie geleert, ein Fehler kann also kein
+Loch hinterlassen; sonst rechnen sie genau wie ADD + STORE. Verschmolzen wird
+nur, wenn Text im Spiel ist und das Ziel keinen Aufruf enthält. Ein
+BYREF-Argument war Copy-In/Copy-Out: Aufrufer und Parameter teilten den Text,
+und das erste Anhängen im Aufgerufenen kopierte ihn -- bei jedem Aufruf. Jetzt
+wandert der Wert hinüber (`LEIHE_LOCAL`/`LEIHE_GLOBAL_SLOT`), wo die
+vorübergehend leere Variable niemand sehen kann: kein TRY um den Aufruf, die
+Variable in keinem anderen Argument, eine Globale nur im Hauptprogramm und nur,
+wenn der Aufgerufene sie nicht nennt und keinen fremden Code erreicht.
+
+| N = 200 000 (Zeit bei N / 2N) | 2026.32 | jetzt |
+|---|---|---|
+| `k.text = k.text + "x"` | 199 / 671 ms | 8 / 13 ms |
+| `text = text + s` (Methode) | 203 / 1 499 ms | 5 / 9 ms |
+| `Self.text = Self.text + s` | 203 / 1 584 ms | 8 / 19 ms |
+| `a[0] = a[0] + "x"` | 215 / 1 192 ms | 13 / 22 ms |
+| `m["a"] = m["a"] + "x"` | 246 / 1 247 ms | 14 / 27 ms |
+| BYREF lokal | 239 / 1 352 ms | 25 / 50 ms |
+| BYREF global | 250 / 1 233 ms | 25 / 51 ms |
 
 ### 1b. Builtins werden je Aufruf am NAMEN gesucht
 

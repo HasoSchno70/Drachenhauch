@@ -118,6 +118,20 @@ mod oc {
     /// Angabe). Der Wert bleibt liegen.
     pub const TYP_PRUEFEN: i64 = 123;
     pub const CALL_METHOD_BYREF: i64 = 124;
+    /// `x = x + e` fuer ein Feld (`text` bzw. `Self.text` in einer Methode,
+    /// `obj.text`) und ein Element (`a[i]`, `m["k"]`): wie ADD + STORE_*, haengt
+    /// aber an Ort und Stelle an, wenn der Platz den geladenen Text noch haelt
+    /// (siehe `vm::an_ort_anhaengen`). Stapel wie bei ADD + STORE_*: ...,
+    /// [Objekt bzw. Behaelter, Indizes,] links, rechts.
+    pub const ADD_STORE_FIELD: i64 = 125;
+    pub const ADD_STORE_MEMBER: i64 = 126;
+    pub const ADD_STORE_INDEX: i64 = 127;
+    /// BYREF-Argument aus einer Variablen, die waehrend des Aufrufs niemand
+    /// sieht: der Wert wandert in den Aufgerufenen, statt geteilt zu werden
+    /// (sonst kopiert sein erstes Anhaengen den ganzen Text). Das Zurueck-
+    /// schreiben danach fuellt den Platz wieder. Siehe `byref_leihen`.
+    pub const LEIHE_LOCAL: i64 = 128;
+    pub const LEIHE_GLOBAL_SLOT: i64 = 129;
     pub const HALT: i64 = 99;
 }
 
@@ -193,6 +207,11 @@ struct Ctx {
     continue_patches: Vec<(Vec<usize>, usize)>,
     /// Die gerade offenen TRY-Bloecke, von aussen nach innen (WP F).
     try_stack: Vec<TryRahmen>,
+    /// Wie viele TRY-Anweisungen die Stelle umschliessen -- samt CATCH- und
+    /// FINALLY-Zweig, anders als `try_stack` (nur der geschuetzte Teil). Ein
+    /// Fehler kann dort in dieser Funktion aufgefangen werden; `byref_leihen`
+    /// leiht dann nicht.
+    try_gesamt: usize,
     local_slots: HashMap<String, usize>,
     local_types: Vec<String>,
     local_defaults: Vec<CVal>,
@@ -223,6 +242,7 @@ impl Ctx {
         Ctx { code: vec![], lines: vec![], cur_line: 0,
               consts: vec![], const_index: HashMap::new(), break_patches: vec![], continue_patches: vec![],
               try_stack: vec![],
+              try_gesamt: 0,
               local_slots: HashMap::new(), local_types: vec![], local_defaults: vec![],
               dim_types: HashMap::new(), dim_pfade: HashMap::new(), stmt_pfad: vec![],
               is_main: true, is_sub: true, current_class: None,
@@ -417,6 +437,11 @@ pub struct Compiler {
     /// Wo eine freie SUB/FUNCTION deklariert wurde (gemergte Zeile) -- damit
     /// eine Kollision BEIDE Stellen nennen kann (WP I.4).
     fn_lines: HashMap<String, u32>,
+    /// Je SUB/FUNCTION (Schluessel wie `fn_sigs`) die Spur fuer
+    /// `byref_leihen`: alle Namen und Texte darin (klein, ohne die Parameter)
+    /// und die Befehle, die sie ruft -- `None`, wenn sie anderen Code
+    /// erreichen kann (Objekte, Lambdas, Aufrufe ueber Werte). Siehe `leih_spur`.
+    leih_spuren: HashMap<String, Option<(std::collections::HashSet<String>, Vec<String>)>>,
     /// `DECLARE ... LIB` (klein geschriebener Name): Funktionen aus fremden
     /// Bibliotheken, docs/entwurf-ffi.md.
     ffi_decls: HashMap<String, FfiDecl>,
@@ -735,7 +760,7 @@ impl Compiler {
                    global_slots: HashMap::new(),
                    global_consts: std::collections::HashSet::new(),
                    global_vars: std::collections::HashSet::new(),
-                   fn_sigs: HashMap::new(), fn_lines: HashMap::new(), ffi_decls: HashMap::new(), lagen: HashMap::new(),
+                   fn_sigs: HashMap::new(), fn_lines: HashMap::new(), leih_spuren: HashMap::new(), ffi_decls: HashMap::new(), lagen: HashMap::new(),
                    class_lines: HashMap::new(),
                    herkunft: vec![], haupt: String::new(),
                    compiled_fns: vec![],
@@ -1079,6 +1104,14 @@ impl Compiler {
                             return Ok(());
                         }
                     }
+                    // `text = text + e` in einer Methode: ein Feld von Self.
+                    if l == name && !self.ctx.local_slots.contains_key(name.as_str()) && self.is_field(name)
+                        && self.anhaengen_lohnt(links, &glieder) {
+                        self.anhaengen_rechnen(links, &glieder)?;
+                        let idx = self.ctx.add_const(json!(name));
+                        self.ctx.emit(oc::ADD_STORE_FIELD, json!(idx));
+                        return Ok(());
+                    }
                 }
                 self.expr(value)?;
                 self.store_var(name);
@@ -1172,6 +1205,20 @@ impl Compiler {
                 self.index_pruefen(indices);
                 self.expr(target)?;
                 for ix in indices { self.expr(ix)?; }
+                // `c[i] = c[i] + e`: derselbe Code wie unten, nur ADD +
+                // STORE_INDEX als ein Befehl (Anhaengen an Ort und Stelle).
+                let mut glieder: Vec<&Node> = Vec::new();
+                let links = plus_kette(value, &mut glieder);
+                if let Node::IndexAccess { target: t2, indices: i2 } = links {
+                    if !glieder.is_empty() && gleicher_ort(t2, target) && ort_rein(target)
+                        && i2.len() == indices.len()
+                        && i2.iter().zip(indices).all(|(a, b)| gleicher_ort(a, b) && ort_rein(b))
+                        && self.anhaengen_lohnt(links, &glieder) {
+                        self.anhaengen_rechnen(links, &glieder)?;
+                        self.ctx.emit(oc::ADD_STORE_INDEX, json!(indices.len()));
+                        return Ok(());
+                    }
+                }
                 self.expr(value)?;
                 self.ctx.emit(oc::STORE_INDEX, json!(indices.len()));
                 Ok(())
@@ -1184,6 +1231,18 @@ impl Compiler {
                 }
                 self.pruefe_feld_zuweisung(target, name, value);
                 self.expr(target)?;
+                // `obj.x = obj.x + e`: wie bei IndexAssign.
+                let mut glieder: Vec<&Node> = Vec::new();
+                let links = plus_kette(value, &mut glieder);
+                if let Node::MemberAccess { target: t2, name: n2 } = links {
+                    if !glieder.is_empty() && n2 == name && gleicher_ort(t2, target) && ort_rein(target)
+                        && self.anhaengen_lohnt(links, &glieder) {
+                        self.anhaengen_rechnen(links, &glieder)?;
+                        let idx = self.ctx.add_const(json!(name));
+                        self.ctx.emit(oc::ADD_STORE_MEMBER, json!(idx));
+                        return Ok(());
+                    }
+                }
                 self.expr(value)?;
                 let idx = self.ctx.add_const(json!(name));
                 self.ctx.emit(oc::STORE_MEMBER, json!(idx));
@@ -2610,6 +2669,80 @@ impl Compiler {
             .then_some((oc::ADD_STORE_GLOBAL_SLOT, slot))
     }
 
+    /// Lohnt der verschmolzene Befehl fuer ein Feld, Mitglied oder Element
+    /// (`ziel = links + glieder...`)? Nur wenn Text im Spiel ist: bei Zahlen
+    /// gewinnt er nichts, und der Maschinencode rechnet `k.n = k.n + 1` auf
+    /// einem Zahlenfeld weiter selbst (ADD_STORE_* nimmt er nur im
+    /// Wertemodus). Eine Kette formt `anhaengen_rechnen` um wie bei
+    /// `add_store_ziel` -- das verlangt sicher Text links.
+    fn anhaengen_lohnt(&self, links: &Node, glieder: &[&Node]) -> bool {
+        let links_text = self.ist_text(links) || self.element_typ(links).as_deref() == Some("string");
+        match glieder {
+            [] => false,
+            [g] => links_text || self.ist_text(g),
+            [g, rest @ ..] => links_text && self.ist_text(g) && rest.iter().all(|r| self.ist_schlicht_statisch(r)),
+        }
+    }
+
+    /// `links`, dann `glieder[0]`, und die weiteren Glieder schon hier
+    /// angehaengt: `x + (t1 + t2 + ...)` statt `((x + t1) + t2) + ...`.
+    fn anhaengen_rechnen(&mut self, links: &Node, glieder: &[&Node]) -> CR {
+        self.expr(links)?;
+        self.expr(glieder[0])?;
+        for g in &glieder[1..] {
+            self.expr(g)?;
+            self.ctx.emit(oc::ADD, Value::Null);
+        }
+        Ok(())
+    }
+
+    /// Typ der Elemente bei `c[i]`, wenn `c` ein Feld oder eine MAP mit
+    /// angesagtem Typ ist.
+    fn element_typ(&self, n: &Node) -> Option<String> {
+        let Node::IndexAccess { target, .. } = n else { return None };
+        let t = self.statischer_typ(target)?;
+        let e = t.strip_prefix("array:").or_else(|| t.strip_prefix("map:"))?;
+        Some(self.typ_norm(e))
+    }
+
+    /// BYREF-Argument `name` an `callee`: darf der Wert hinueberwandern
+    /// (LEIHE_LOCAL/LEIHE_GLOBAL_SLOT), statt geteilt zu werden? Geteilt
+    /// kopiert das erste Anhaengen im Aufgerufenen den ganzen Text -- in einer
+    /// Schleife, die immer wieder `anhaengen(puffer)` ruft, quadratisch.
+    ///
+    /// Waehrend des Aufrufs ist die Variable leer. Das darf niemand sehen:
+    /// - kein TRY um die Stelle in dieser Funktion (sonst saehe ein CATCH
+    ///   oder FINALLY nach einem Fehler im Aufgerufenen das Loch statt des
+    ///   alten Werts -- ohne TRY endet mit dem Fehler auch der Rahmen),
+    /// - die Variable steht in keinem anderen Argument (`f(s, LEN(s))`),
+    /// - ein Local sieht sonst niemand; eine Globale nur im Hauptprogramm
+    ///   (darueber gibt es keinen Rahmen, der einen Fehler faengt), und nur,
+    ///   wenn der Aufgerufene sie nicht nennt und keinen anderen Code
+    ///   erreicht (`leih_spur`; dazu kein OPERATOR einer Klasse).
+    /// Nur fuer angesagte Texte -- bei allem anderen gewinnt es nichts.
+    fn byref_leihen(&self, callee: &str, args: &[Node], arg: &Node) -> Option<(i64, usize)> {
+        let Node::Identifier(name) = arg else { return None };
+        if self.ctx.try_gesamt > 0 || self.angesagter_typ(name).as_deref() != Some("string") { return None; }
+        let sig = self.fn_sigs.get(callee)?;
+        if sig.is_coroutine { return None; }
+        let klein = name.to_lowercase();
+        fn innen(a: &Node) -> &Node { match a { Node::NamedArg { value, .. } => value, _ => a } }
+        if args.iter().filter(|a| !std::ptr::eq(innen(a), arg)).any(|a| erwaehnt(a, &klein)) { return None; }
+        if let Some(&slot) = self.ctx.local_slots.get(name.as_str()) {
+            return Some((oc::LEIHE_LOCAL, slot));
+        }
+        if !self.ctx.is_main || self.is_field(name) || self.global_consts.contains(&klein) { return None; }
+        let slot = *self.global_slots.get(name.as_str())?;
+        let (namen, rufe) = self.leih_spuren.get(callee)?.as_ref()?;
+        if namen.contains(&klein) { return None; }
+        if !rufe.iter().all(|r| REINE_TEXTBEFEHLE.contains(&r.as_str()) && !self.fn_sigs.contains_key(r.as_str())
+                                 && !self.fn_sigs.keys().any(|k| k.eq_ignore_ascii_case(r))) {
+            return None;
+        }
+        if self.classes.values().any(|c| c.method_sigs.keys().any(|m| m.starts_with("__op_"))) { return None; }
+        Some((oc::LEIHE_GLOBAL_SLOT, slot))
+    }
+
     /// Liefert dieser Ausdruck sicher Text? Ueber `statischer_typ` hinaus:
     /// ein Befehl mit `$` am Ende (`STR$`, `CHR$`, `FORMAT$` ...) und eine
     /// eigene FUNCTION mit `AS STRING` -- genau die stehen in Textketten.
@@ -3207,7 +3340,8 @@ impl Compiler {
                 let mut caps: Vec<ByrefCap> = Vec::new();
                 for (i, a) in args.iter().enumerate() {
                     if byref.get(i).copied().unwrap_or(false) {
-                        caps.push(self.emit_byref_capture_and_load(a)?);
+                        let leihe = self.byref_leihen(&name, args, a);
+                        caps.push(self.emit_byref_capture_and_load(a, leihe)?);
                     } else {
                         self.expr(a)?;
                     }
@@ -3222,7 +3356,10 @@ impl Compiler {
             for (i, act) in actions.into_iter().enumerate() {
                 if byref.get(i).copied().unwrap_or(false) {
                     match act {
-                        RArg::Expr(e) => caps.push(self.emit_byref_capture_and_load(e)?),
+                        RArg::Expr(e) => {
+                            let leihe = self.byref_leihen(&name, args, e);
+                            caps.push(self.emit_byref_capture_and_load(e, leihe)?);
+                        }
                         RArg::Default(_) => return Err(format!(
                             "{}: BYREF-Parameter '{}' braucht ein zuweisbares Argument",
                             name, self.fn_sigs[&name].param_names.get(i)
@@ -3355,7 +3492,7 @@ impl Compiler {
         let mut caps: Vec<ByrefCap> = Vec::new();
         for (i, a) in args.iter().enumerate() {
             if stellen.contains(&i) {
-                caps.push(self.emit_byref_capture_and_load(a).map_err(|e| format!("{}: {}", name, e))?);
+                caps.push(self.emit_byref_capture_and_load(a, None).map_err(|e| format!("{}: {}", name, e))?);
             } else {
                 self.expr(a)?;
             }
@@ -3375,10 +3512,13 @@ impl Compiler {
     /// UND laedt den aktuellen Wert als Argument auf den Stack. Liefert die
     /// Capture-Info fuer das spaetere Write-Back. Fehler, wenn das Argument
     /// keine zuweisbare Form (Identifier/Index/Member) ist.
-    fn emit_byref_capture_and_load(&mut self, arg: &Node) -> Result<ByrefCap, String> {
+    fn emit_byref_capture_and_load(&mut self, arg: &Node, leihe: Option<(i64, usize)>) -> Result<ByrefCap, String> {
         match arg {
             Node::Identifier(n) => {
-                self.load_var(n);
+                match leihe {
+                    Some((code, slot)) => { self.ctx.emit(code, json!(slot)); }
+                    None => self.load_var(n),
+                }
                 Ok(ByrefCap::Var(n.clone()))
             }
             Node::IndexAccess { target, indices } => {
@@ -3819,6 +3959,14 @@ impl Compiler {
     /// anderer.
     fn stmt_try(&mut self, body: &[Node], catch_var: &str, catch_block: &[Node],
                 has_catch: bool, finally_block: &[Node]) -> CR {
+        self.ctx.try_gesamt += 1;
+        let r = self.stmt_try_teile(body, catch_var, catch_block, has_catch, finally_block);
+        self.ctx.try_gesamt -= 1;
+        r
+    }
+
+    fn stmt_try_teile(&mut self, body: &[Node], catch_var: &str, catch_block: &[Node],
+                      has_catch: bool, finally_block: &[Node]) -> CR {
         let try_zeile = self.ctx.cur_line;
         let hat_finally = !finally_block.is_empty();
         let fin_jmp = if hat_finally { Some(self.ctx.emit(oc::TRY_BEGIN, Value::Null)) } else { None };
@@ -4175,6 +4323,7 @@ impl Compiler {
         let sig = make_sig(decl)?;
         self.fn_sigs.insert(name.to_string(), sig);
         self.fn_lines.insert(name.to_string(), zeile);
+        self.leih_spuren.insert(name.to_string(), leih_spur(decl));
         Ok(())
     }
 
@@ -4643,7 +4792,7 @@ impl Compiler {
         for (i, a) in args.iter().enumerate() {
             let br = i < fest && d.byref[i];
             if br {
-                caps.push(self.emit_byref_capture_and_load(a).map_err(|_| format!(
+                caps.push(self.emit_byref_capture_and_load(a, None).map_err(|_| format!(
                     "{}: ein BYREF-Parameter braucht eine Variable (oder ein Feld-/Objektelement), in die das Ergebnis zurueckgeschrieben wird", name))?);
             } else if !self.struct_zeiger(a, i < fest && d.arten[i] == 'p')? {
                 self.expr(a)?;
@@ -5202,6 +5351,100 @@ fn eval_literal_default(e: &Node) -> Result<CVal, String> {
 /// Zerlegt eine linksgeschachtelte `+`-Kette `((a + b) + c) + d` in ihr
 /// linkestes Glied (`a`, Rueckgabe) und die uebrigen in Reihenfolge
 /// (`[b, c, d]`). Ohne `+` ist der Ausdruck selbst das linkeste Glied.
+/// Zwei Orte (`ziel` einer Zuweisung und `links` ihres Werts) gleich gebaut?
+/// Nur fuer die Formen, die `ort_rein` zulaesst.
+fn gleicher_ort(a: &Node, b: &Node) -> bool {
+    match (a, b) {
+        (Node::Identifier(x), Node::Identifier(y)) => x == y,
+        (Node::StringLit(x), Node::StringLit(y)) => x == y,
+        (Node::BoolLit(x), Node::BoolLit(y)) => x == y,
+        (Node::NumberLit(NumV::Int(x)), Node::NumberLit(NumV::Int(y))) => x == y,
+        (Node::MemberAccess { target: t1, name: n1 }, Node::MemberAccess { target: t2, name: n2 }) =>
+            n1 == n2 && gleicher_ort(t1, t2),
+        (Node::IndexAccess { target: t1, indices: i1 }, Node::IndexAccess { target: t2, indices: i2 }) =>
+            gleicher_ort(t1, t2) && i1.len() == i2.len() && i1.iter().zip(i2).all(|(x, y)| gleicher_ort(x, y)),
+        (Node::BinaryOp { op: o1, left: l1, right: r1 }, Node::BinaryOp { op: o2, left: l2, right: r2 }) =>
+            o1 == o2 && gleicher_ort(l1, l2) && gleicher_ort(r1, r2),
+        (Node::UnaryOp { op: o1, operand: x }, Node::UnaryOp { op: o2, operand: y }) => o1 == o2 && gleicher_ort(x, y),
+        _ => false,
+    }
+}
+
+/// Ein Ziel ohne Aufruf (Variable, Feld, Element, Literal, Rechnung daraus):
+/// nur dann wird `ziel = ziel + e` verschmolzen.
+fn ort_rein(n: &Node) -> bool {
+    match n {
+        Node::Identifier(_) | Node::StringLit(_) | Node::BoolLit(_) | Node::NumberLit(NumV::Int(_)) => true,
+        Node::MemberAccess { target, .. } => ort_rein(target),
+        Node::IndexAccess { target, indices } => ort_rein(target) && indices.iter().all(ort_rein),
+        Node::BinaryOp { left, right, .. } => ort_rein(left) && ort_rein(right),
+        Node::UnaryOp { operand, .. } => ort_rein(operand),
+        _ => false,
+    }
+}
+
+/// Befehle, die eine SUB/FUNCTION rufen darf, ohne dass `byref_leihen` eine
+/// Globale ablehnt: sie rechnen nur mit Texten und Zahlen und erreichen
+/// keinen Drachenhauch-Code.
+const REINE_TEXTBEFEHLE: &[&str] = &[
+    "len", "instr", "asc", "val", "abs", "int", "min", "max",
+    "str$", "chr$", "left$", "right$", "mid$", "ucase$", "lcase$", "trim$", "ltrim$", "rtrim$",
+    "space$", "string$", "replace$", "hex$", "bin$",
+    "str", "chr", "left", "right", "mid", "ucase", "lcase", "trim", "ltrim", "rtrim", "space", "hex", "bin",
+];
+
+/// Die Spur einer SUB/FUNCTION fuer `byref_leihen`: alle Namen und Texte in
+/// ihrem Rumpf (klein, ohne ihre Parameter -- die verdecken eine Globale
+/// gleichen Namens) und die Namen der Befehle, die sie ruft. `None`, wenn
+/// sie ueber Objekte, Lambdas oder einen Aufruf ueber einen Wert anderen Code
+/// erreichen kann. Grob, aber auf der sicheren Seite: ein Text, der zufaellig
+/// wie die Globale heisst, verhindert nur das Leihen.
+fn leih_spur(decl: &Node) -> Option<(std::collections::HashSet<String>, Vec<String>)> {
+    use serde_json::Value as J;
+    fn gehe(j: &J, namen: &mut std::collections::HashSet<String>, rufe: &mut Vec<String>) -> bool {
+        match j {
+            J::String(s) => { namen.insert(s.to_lowercase()); true }
+            J::Array(a) => a.iter().all(|x| gehe(x, namen, rufe)),
+            J::Object(m) => {
+                match m.get("_").and_then(|t| t.as_str()) {
+                    Some("Call") => match m.get("callee") {
+                        Some(J::Object(c)) if c.get("_").and_then(|t| t.as_str()) == Some("Identifier") => {
+                            if let Some(n) = c.get("name").and_then(|n| n.as_str()) { rufe.push(n.to_lowercase()); }
+                        }
+                        _ => return false,
+                    },
+                    Some("New" | "MemberAccess" | "MemberAssign" | "Lambda" | "With" | "Yield") => return false,
+                    _ => {}
+                }
+                m.iter().filter(|(k, _)| k.as_str() != "_").all(|(_, x)| gehe(x, namen, rufe))
+            }
+            _ => true,
+        }
+    }
+    let (_, params, body, _, _) = fn_parts(decl);
+    let mut namen = std::collections::HashSet::new();
+    let mut rufe = Vec::new();
+    for st in body {
+        if !gehe(&st.to_json(), &mut namen, &mut rufe) { return None; }
+    }
+    for p in params { namen.remove(&p.name.to_lowercase()); }
+    Some((namen, rufe))
+}
+
+/// Kommt `name` (klein) irgendwo in diesem Ausdruck vor?
+fn erwaehnt(n: &Node, name: &str) -> bool {
+    use serde_json::Value as J;
+    fn gehe(j: &J, name: &str) -> bool {
+        match j {
+            J::String(s) => s.eq_ignore_ascii_case(name),
+            J::Array(a) => a.iter().any(|x| gehe(x, name)),
+            J::Object(m) => m.values().any(|x| gehe(x, name)),
+            _ => false,
+        }
+    }
+    gehe(&n.to_json(), name)
+}
+
 fn plus_kette<'a>(n: &'a Node, glieder: &mut Vec<&'a Node>) -> &'a Node {
     match n {
         Node::BinaryOp { op, left, right } if op == "+" => {

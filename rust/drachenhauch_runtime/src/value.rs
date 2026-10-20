@@ -600,6 +600,10 @@ impl DhMap {
 
     pub fn get(&self, k: &str) -> Option<&Value> { self.eintraege.get(k) }
 
+    /// Der Platz eines vorhandenen Eintrags (Anhaengen an Ort und Stelle,
+    /// `vm::index_anhaengen`). Die Reihenfolge bleibt.
+    pub fn get_mut(&mut self, k: &str) -> Option<&mut Value> { self.eintraege.get_mut(k) }
+
     /// Ein vorhandener Schluessel behaelt seinen Platz in der Reihenfolge.
     pub fn put(&mut self, k: String, v: Value) { self.eintraege.insert(k, v); }
 

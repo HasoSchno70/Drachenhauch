@@ -2723,6 +2723,105 @@ fn run_program(prog: model::Program, source_label: &str) -> ExitCode {
 mod tests {
     use super::{embedded_gbc_in, ist_quelldatei, PAYLOAD_MAGIC};
 
+    // --- ziel = ziel + e: verschmolzene Befehle und BYREF-Leihe ------------
+
+    /// Alle Befehle des Programms (Hauptprogramm, Funktionen, Methoden).
+    fn befehle(quelle: &str) -> Vec<(String, u16)> {
+        let prog = super::compile_source_programm(quelle, std::path::Path::new("."), "t.dh")
+            .unwrap_or_else(|_| panic!("uebersetzt nicht"));
+        let mut v: Vec<(String, u16)> = prog.main.code.iter().map(|i| ("main".to_string(), i.op)).collect();
+        for f in &prog.functions { v.extend(f.code.iter().map(|i| (f.name.clone(), i.op))); }
+        for c in prog.classes.values() {
+            for (n, m) in &c.methods { v.extend(m.code.iter().map(|i| (n.clone(), i.op))); }
+        }
+        v
+    }
+    fn hat(b: &[(String, u16)], wo: &str, o: u16) -> bool { b.iter().any(|(n, x)| n.eq_ignore_ascii_case(wo) && *x == o) }
+
+    #[test]
+    fn anhaengen_an_feld_element_und_map_ist_ein_befehl() {
+        use super::model::op;
+        let b = befehle(r#"
+CLASS K
+    DIM text AS STRING
+    DIM n AS INTEGER
+    SUB m(z AS STRING)
+        text = text + z
+        n = n + 1
+    END SUB
+END CLASS
+DIM k AS K
+k = NEW K()
+DIM a[2] AS STRING
+DIM m AS MAP OF STRING
+k.text = k.text + "x"
+a[0] = a[0] + "x"
+m["a"] = m["a"] + "x"
+"#);
+        assert!(hat(&b, "main", op::ADD_STORE_MEMBER));
+        assert!(hat(&b, "main", op::ADD_STORE_INDEX));
+        assert!(hat(&b, "m", op::ADD_STORE_FIELD));
+        // Genau einmal: `n = n + 1` bleibt ADD + STORE_FIELD (der
+        // Maschinencode rechnet Zahlenfelder selbst).
+        assert_eq!(b.iter().filter(|(_, o)| *o == op::ADD_STORE_FIELD).count(), 1);
+    }
+
+    #[test]
+    fn zahlen_und_ziele_mit_aufruf_bleiben_beim_alten_weg() {
+        use super::model::op;
+        let b = befehle(r#"
+CLASS K
+    DIM n AS INTEGER
+END CLASS
+DIM k AS K
+k = NEW K()
+DIM z[2] AS INTEGER
+DIM a[2] AS STRING
+FUNCTION i() AS INTEGER
+    RETURN 0
+END FUNCTION
+k.n = k.n + 1
+z[0] = z[0] + 1
+a[i()] = a[i()] + "x"
+"#);
+        assert!(!hat(&b, "main", op::ADD_STORE_MEMBER));
+        assert!(!hat(&b, "main", op::ADD_STORE_INDEX));
+    }
+
+    #[test]
+    fn byref_leiht_nur_wo_es_niemand_sieht() {
+        use super::model::op;
+        let b = befehle(r#"
+DIM g AS STRING
+DIM h AS STRING
+SUB anh(BYREF t AS STRING)
+    t = t + "x" + STR$(LEN(t))
+END SUB
+SUB liest(BYREF t AS STRING)
+    t = t + h
+END SUB
+SUB lokal()
+    DIM s AS STRING
+    anh(s)
+    TRY
+        anh(s)
+    CATCH e
+    END TRY
+END SUB
+SUB global_in_sub()
+    anh(g)
+END SUB
+anh(g)
+liest(h)
+"#);
+        assert!(hat(&b, "main", op::LEIHE_GLOBAL_SLOT));
+        assert_eq!(b.iter().filter(|(n, o)| n.eq_ignore_ascii_case("main") && *o == op::LEIHE_GLOBAL_SLOT).count(), 1,
+                   "liest(h) nennt h selbst -- keine Leihe");
+        assert_eq!(b.iter().filter(|(n, o)| n.eq_ignore_ascii_case("lokal") && *o == op::LEIHE_LOCAL).count(), 1,
+                   "im TRY keine Leihe");
+        assert!(!hat(&b, "global_in_sub", op::LEIHE_GLOBAL_SLOT), "eine Globale nur im Hauptprogramm");
+    }
+
     #[test]
     fn quelldatei_erkennt_beide_endungen_und_ignoriert_gross_klein() {
         let alt = super::ALTE_QUELL_ENDUNG;                     // ".gb"

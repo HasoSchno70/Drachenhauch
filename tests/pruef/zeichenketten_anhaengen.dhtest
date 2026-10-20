@@ -179,3 +179,325 @@ bau()
 --- erwartet
 400000
 TRUE
+
+=== alle ziele liefern dasselbe wie eine variable
+' Feld, Mitglied, Element, MAP-Wert, BYREF (2026-10-20): `k.text = k.text +
+' e`, `text = text + e` in einer Methode, `a[i] = a[i] + e` und `m["k"] =
+' m["k"] + e` sind eigene Befehle (ADD_STORE_MEMBER/_FIELD/_INDEX); ein
+' BYREF-Argument wandert, wo es niemand sieht, in den Aufgerufenen
+' (LEIHE_LOCAL/_GLOBAL_SLOT). Vorher kopierte jedes Anhaengen den ganzen
+' Text: 200 000 Mal ~1,3 s statt ~10 ms.
+CLASS K
+    DIM text AS STRING
+    SUB impl(z AS STRING)
+        text = text + z + "|"
+    END SUB
+    SUB selbst(z AS STRING)
+        Self.text = Self.text + z
+        Self.text += "/"
+    END SUB
+END CLASS
+SUB anh(BYREF t AS STRING, z AS STRING)
+    t = t + z
+END SUB
+SUB lokal()
+    DIM s AS STRING
+    anh(s, "p") : anh(s, "q")
+    PRINT s
+END SUB
+DIM k AS K
+k = NEW K()
+DIM a[3] AS STRING
+DIM m AS MAP OF STRING
+m["x"] = "m"
+DIM g AS STRING
+DIM ref AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    ref = ref + STR$(i) + "," + 0.5 + TRUE
+    k.text = k.text + STR$(i) + "," + 0.5 + TRUE
+    a[1] = a[1] + STR$(i) + "," + 0.5 + TRUE
+    m["x"] = m["x"] + STR$(i) + "," + 0.5 + TRUE
+    k.impl(STR$(i))
+    k.selbst("s")
+    anh(g, STR$(i))
+NEXT
+PRINT ref
+PRINT k.text
+PRINT a[1]; " ["; a[0]; "]"
+PRINT m["x"]
+PRINT g
+lokal()
+DIM z[2, 2] AS STRING
+z[1, 0] = "z"
+z[1, 0] = z[1, 0] + "w"
+z[1, 0] += "v"
+PRINT z[1, 0]
+--- erwartet
+1,0.5TRUE2,0.5TRUE3,0.5TRUE
+1,0.5TRUE1|s/2,0.5TRUE2|s/3,0.5TRUE3|s/
+1,0.5TRUE2,0.5TRUE3,0.5TRUE []
+m1,0.5TRUE2,0.5TRUE3,0.5TRUE
+123
+pq
+zwv
+
+=== ein zweiter halter behaelt seinen text auch bei feld element und map
+CLASS K
+    DIM text AS STRING
+END CLASS
+DIM k AS K
+k = NEW K()
+k.text = "abc"
+DIM kopie AS STRING
+kopie = k.text
+k.text = k.text + "d"
+DIM a[2] AS STRING
+a[0] = "x"
+a[1] = a[0]
+a[0] = a[0] + "y"
+DIM m AS MAP OF STRING
+m["a"] = "m"
+DIM mk AS STRING
+mk = m["a"]
+m["a"] = m["a"] + "n"
+PRINT k.text; " "; kopie; " "; a[0]; " "; a[1]; " "; m["a"]; " "; mk
+--- erwartet
+abcd abc xy x mn m
+
+=== der ausdruck darf den platz aendern und der alte text wird angehaengt
+CLASS K
+    DIM text AS STRING
+END CLASS
+DIM k AS K
+k = NEW K()
+DIM a[1] AS STRING
+DIM m AS MAP OF STRING
+FUNCTION stoer$(n AS INTEGER) AS STRING
+    IF n = 1 THEN k.text = "WEG"
+    IF n = 2 THEN a[0] = "WEG"
+    IF n = 3 THEN m["a"] = "WEG"
+    RETURN "!"
+END FUNCTION
+k.text = "alt" : a[0] = "alt" : m["a"] = "alt"
+k.text = k.text + stoer$(1)
+a[0] = a[0] + stoer$(2)
+m["a"] = m["a"] + stoer$(3)
+PRINT k.text; " "; a[0]; " "; m["a"]
+--- erwartet
+alt! alt! alt!
+
+=== scheitert der operator bleibt der alte text in feld element und map
+CLASS Boese
+    OPERATOR + (other AS STRING) AS STRING
+        THROW "nein"
+    END OPERATOR
+END CLASS
+CLASS K
+    DIM text AS STRING
+    SUB impl(b AS Boese)
+        text = text + b
+    END SUB
+END CLASS
+DIM b AS Boese
+b = NEW Boese()
+DIM k AS K
+k = NEW K()
+k.text = "f"
+DIM a[1] AS STRING
+a[0] = "e"
+DIM m AS MAP OF STRING
+m["a"] = "m"
+TRY
+    k.text = k.text + b
+CATCH e
+    PRINT "1 "; e
+END TRY
+TRY
+    k.impl(b)
+CATCH e
+    PRINT "2 "; e
+END TRY
+TRY
+    a[0] = a[0] + b
+CATCH e
+    PRINT "3 "; e
+END TRY
+TRY
+    m["a"] = m["a"] + b
+CATCH e
+    PRINT "4 "; e
+END TRY
+PRINT k.text; " "; a[0]; " "; m["a"]
+--- erwartet
+1 nein
+2 nein
+3 nein
+4 nein
+f e m
+
+=== property und zahlen bleiben wie vorher
+CLASS P
+    DIM _t AS STRING
+    DIM n AS INTEGER
+    PROPERTY GET t() AS STRING
+        RETURN Self._t
+    END PROPERTY
+    PROPERTY SET t(v AS STRING)
+        Self._t = "<" + v + ">"
+    END PROPERTY
+END CLASS
+DIM p AS P
+p = NEW P()
+p.t = "a"
+p.t = p.t + "b"
+p.t = p.t + "c"
+p.n = p.n + 2
+p.n += 3
+DIM zahlen[2] AS INTEGER
+zahlen[1] = zahlen[1] + 7
+DIM fm AS MAP OF FLOAT
+fm["x"] = 1.5
+fm["x"] = fm["x"] + 1
+PRINT p.t; " "; p.n; " "; zahlen[1]; " "; fm["x"]
+--- erwartet
+<<<a>b>c> 5 7 2.5
+
+=== ein text in einem zahlenfeld bleibt ein fehler
+DIM zahlen[2] AS INTEGER
+zahlen[0] = zahlen[0] + "x"
+--- fehler
+INTEGER
+
+=== ein neuer map schluessel bleibt ein fehler
+DIM m AS MAP OF STRING
+m["neu"] = m["neu"] + "x"
+--- fehler
+nicht in der MAP
+
+=== byref sieht den alten wert wo der aufgerufene die variable liest
+DIM g AS STRING
+FUNCTION lies$() AS STRING
+    RETURN "(" + g + ")"
+END FUNCTION
+SUB zeig(BYREF t AS STRING)
+    PRINT "g="; g
+    t = t + "x"
+END SUB
+SUB ueber(BYREF t AS STRING)
+    t = t + lies$()
+END SUB
+SUB zwei(BYREF t AS STRING, n AS INTEGER)
+    t = t + STR$(n)
+END SUB
+SUB beide(BYREF t AS STRING, BYREF u AS STRING)
+    t = t + "1"
+    u = u + "2"
+END SUB
+g = "a"
+zeig(g)
+PRINT g
+ueber(g)
+PRINT g
+zwei(g, LEN(g))
+PRINT g
+beide(g, g)
+PRINT g
+--- erwartet
+g=a
+ax
+ax(ax)
+ax(ax)6
+ax(ax)61
+
+=== byref nach einem fehler im aufgerufenen bleibt der alte wert
+SUB kaputt(BYREF t AS STRING)
+    t = t + "x"
+    THROW "weg"
+END SUB
+SUB lokal()
+    DIM s AS STRING
+    s = "lokal"
+    TRY
+        kaputt(s)
+    CATCH e
+        PRINT e
+    END TRY
+    PRINT s
+END SUB
+SUB ohne_try()
+    DIM s AS STRING
+    s = "innen"
+    kaputt(s)
+    PRINT "nie"
+END SUB
+DIM g AS STRING
+g = "global"
+TRY
+    kaputt(g)
+CATCH e
+    PRINT e
+FINALLY
+    PRINT g
+END TRY
+lokal()
+TRY
+    ohne_try()
+CATCH e
+    PRINT "aussen "; e
+END TRY
+PRINT g
+--- erwartet
+weg
+global
+weg
+lokal
+aussen weg
+global
+
+=== 600000 mal an feld element map und byref anhaengen ist linear
+' Vorher ~18 s auf dem Entwicklungsrechner, jetzt ~0,2 s. Die Grenze laesst
+' langsamen CI-Rechnern viel Luft und faellt beim quadratischen Weg trotzdem.
+CLASS K
+    DIM text AS STRING
+    SUB impl(n AS INTEGER)
+        DIM i AS INTEGER
+        FOR i = 1 TO n
+            text = text + "x"
+        NEXT
+    END SUB
+END CLASS
+SUB anh(BYREF t AS STRING)
+    t = t + "x"
+END SUB
+SUB lokal_byref(n AS INTEGER)
+    DIM s AS STRING
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        anh(s)
+    NEXT
+    PRINT LEN(s)
+END SUB
+CONST N = 600000
+DIM k AS K
+k = NEW K()
+DIM a[1] AS STRING
+DIM m AS MAP OF STRING
+m["a"] = ""
+DIM g AS STRING
+DIM i AS INTEGER
+DIM t AS INTEGER : t = MILLIS()
+FOR i = 1 TO N
+    k.text = k.text + "x"
+    a[0] = a[0] + "x"
+    m["a"] = m["a"] + "x"
+    anh(g)
+NEXT
+k.impl(N)
+lokal_byref(N)
+PRINT LEN(k.text); " "; LEN(a[0]); " "; LEN(m["a"]); " "; LEN(g)
+PRINT MILLIS() - t < 4000
+--- erwartet
+600000
+1200000 600000 600000 600000
+TRUE

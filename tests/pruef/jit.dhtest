@@ -6583,10 +6583,10 @@ DHRT_JIT_BILANZ=1
 6.0:000 7.5:111 9.0:222 10.5:333 12.0:444 
 --- stderr
 jit: Schleife an Stelle 15 in __main__ bleibt in der VM: Objekt; mit Werten: Objekt
-jit: Schleife an Stelle 38 in __main__ bleibt in der VM: mit Werten: Mitglieder in der inneren Schleife 48..69
+jit: Schleife an Stelle 38 in __main__ bleibt in der VM: mit Werten: Mitglieder in der inneren Schleife 48..68
 jit: 0 Funktionen, 2 Schleifen, 4 Schleifenlaeufe
 jit: 3 Runden in der VM -- Stelle 15 in __main__: Objekt; mit Werten: Objekt
-jit: 1 Runden in der VM -- Stelle 38 in __main__: mit Werten: Mitglieder in der inneren Schleife 48..69
+jit: 1 Runden in der VM -- Stelle 38 in __main__: mit Werten: Mitglieder in der inneren Schleife 48..68
 
 === property als wert in der schleife
 DIM zugriffe AS INTEGER
