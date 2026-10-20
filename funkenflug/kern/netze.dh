@@ -744,7 +744,8 @@ CONST NK_MASSE = 2
 
 FUNCTION istMasseName(n AS STRING) AS BOOLEAN
     DIM u AS STRING : u = UPPER$(TRIM$(n))
-    IF u = "0V" OR u = "MASSE" OR u = "VSS" OR u = "VEE" OR u = "COM" THEN RETURN TRUE
+    ' VEE ist die NEGATIVE Versorgung (OPV, ECL), keine Masse
+    IF u = "0V" OR u = "MASSE" OR u = "VSS" OR u = "COM" THEN RETURN TRUE
     RETURN STARTSWITH(u, "GND") OR ENDSWITH(u, "GND")
 END FUNCTION
 

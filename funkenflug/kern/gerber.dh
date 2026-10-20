@@ -234,6 +234,12 @@ FUNCTION gbDateiName$(t AS STRING) AS STRING
     RETURN r
 END FUNCTION
 
+' Bruecke oder schraege Loetbahn: ein Draht, der nur seine Enden verbindet
+FUNCTION bahnIstDraht(ba AS Bahn) AS BOOLEAN
+    IF ba.art = BA_BRUECKE THEN RETURN TRUE
+    RETURN ba.s1 <> ba.s2 AND ba.z1 <> ba.z2
+END FUNCTION
+
 CLASS GbLoch
     DIM s AS INTEGER
     DIM z AS INTEGER
@@ -254,26 +260,31 @@ FUNCTION gerberErzeugen(dok AS Dokument, projekt AS STRING) AS GerberSatz
     DIM r AS PlatBericht : r = platinePruefen(dok)
     DIM pre AS STRING : pre = gbDateiName$(projekt)
     DIM i AS INTEGER, j AS INTEGER
-    ' --- Bohrungen: Beine der Bauteile, Bruecken-Enden (je Loch einmal)
+    ' --- Bohrungen: JEDES Bein der Bauform (auch ohne Pin im Symbol -- beim
+    ' OPV im DIP8 sind 1, 5, 8 frei, das Gehaeuse braucht trotzdem acht
+    ' Loecher), Bruecken-Enden; je Loch einmal
     DIM loecher AS ARRAY OF GbLoch : loecher = []
     DIM gebohrt AS MAP OF INTEGER
-    FOR i = 0 TO LEN(r.pads) - 1
-        DIM pd AS Pad : pd = r.pads[i]
-        DIM lk AS STRING : lk = lochKey$(pd.s, pd.z)
-        IF MAPHAS(gebohrt, lk) THEN CONTINUE
-        DIM bohr AS FLOAT, auge AS FLOAT
-        bohr = 1.0
-        auge = 1.8
+    FOR i = 0 TO LEN(pl.teile) - 1
         DIM b AS Bauteil
-        IF bauteilMitId(dok, pl.teile[pd.teil].bauteilId, b) THEN
-            DIM hw AS STRING
-            gbMasse(bauformFuer(b, hw), bohr, auge)
-        END IF
-        MAPPUT(gebohrt, lk, LEN(loecher))
-        ARRAY_PUSH(loecher, NEW GbLoch(pd.s, pd.z, bohr, auge))
+        IF NOT bauteilMitId(dok, pl.teile[i].bauteilId, b) THEN CONTINUE
+        DIM hw AS STRING
+        DIM bfb AS Bauform : bfb = bauformFuer(b, hw)
+        DIM bohr AS FLOAT, auge AS FLOAT
+        gbMasse(bfb, bohr, auge)
+        FOR j = 0 TO LEN(bfb.pins) - 1
+            DIM lo0 AS Punkt : lo0 = lochVon(pl.teile[i], bfb.pins[j])
+            IF NOT aufPlatine(pl, lo0.x, lo0.y) THEN CONTINUE
+            DIM lk AS STRING : lk = lochKey$(lo0.x, lo0.y)
+            IF MAPHAS(gebohrt, lk) THEN CONTINUE
+            MAPPUT(gebohrt, lk, LEN(loecher))
+            ARRAY_PUSH(loecher, NEW GbLoch(lo0.x, lo0.y, bohr, auge))
+        NEXT
     NEXT
+    ' Bruecken und schraege Loetbahnen sind Draehte: nur ihre Enden verbinden
+    ' (so rechnet platinePruefen) -- als Kupfer liefe die schraege ueber Augen
     FOR i = 0 TO LEN(pl.bahnen) - 1
-        IF pl.bahnen[i].art <> BA_BRUECKE THEN CONTINUE
+        IF NOT bahnIstDraht(pl.bahnen[i]) THEN CONTINUE
         DIM ba AS Bahn : ba = pl.bahnen[i]
         IF NOT aufPlatine(pl, ba.s1, ba.z1) OR NOT aufPlatine(pl, ba.s2, ba.z2) THEN CONTINUE
         IF NOT MAPHAS(gebohrt, lochKey$(ba.s1, ba.z1)) THEN
@@ -298,7 +309,7 @@ FUNCTION gerberErzeugen(dok AS Dokument, projekt AS STRING) AS GerberSatz
         z1 = MAX(z1, loecher[i].z)
     NEXT
     FOR i = 0 TO LEN(pl.bahnen) - 1
-        IF pl.bahnen[i].art <> BA_LOET THEN CONTINUE
+        IF bahnIstDraht(pl.bahnen[i]) THEN CONTINUE
         IF NOT aufPlatine(pl, pl.bahnen[i].s1, pl.bahnen[i].z1) OR NOT aufPlatine(pl, pl.bahnen[i].s2, pl.bahnen[i].z2) THEN CONTINUE
         s0 = MIN(s0, MIN(pl.bahnen[i].s1, pl.bahnen[i].s2))
         s1 = MAX(s1, MAX(pl.bahnen[i].s1, pl.bahnen[i].s2))
@@ -331,7 +342,7 @@ FUNCTION gerberErzeugen(dok AS Dokument, projekt AS STRING) AS GerberSatz
     NEXT
     FOR i = 0 TO LEN(pl.bahnen) - 1
         DIM bl AS Bahn : bl = pl.bahnen[i]
-        IF bl.art <> BA_LOET THEN CONTINUE
+        IF bahnIstDraht(bl) THEN CONTINUE
         IF NOT aufPlatine(pl, bl.s1, bl.z1) OR NOT aufPlatine(pl, bl.s2, bl.z2) THEN CONTINUE
         bcu.linie(gbX(pl, bl.s1), gbY(pl, bl.z1), gbX(pl, bl.s2), gbY(pl, bl.z2), GB_BAHN)
         IF bl.s1 = bl.s2 OR bl.z1 = bl.z2 THEN
@@ -395,18 +406,22 @@ FUNCTION gerberErzeugen(dok AS Dokument, projekt AS STRING) AS GerberSatz
         ' Pin 1: Punkt schraeg links ueber dem ersten Bein
         DIM p1 AS Punkt : p1 = lochVon(t, bf.pins[0])
         IF LEN(bf.pins) > 1 THEN sk.blitz(gbX(pl, p1.x) - 1.25, gbY(pl, p1.y) + 1.25, 0.5)
-        IF bt.referenz <> "" THEN gbText(sk, bt.referenz, xa, yb + 0.3, 1.0)
+        ' Referenz ueber dem Umriss, nie ueber den Platinenrand hinaus
+        IF bt.referenz <> "" THEN
+            DIM tx AS FLOAT : tx = MIN(xa, gs.breite - 0.4 - gbTextBreite(bt.referenz, 1.0))
+            gbText(sk, bt.referenz, MAX(0.4, tx), yb + 0.3, 1.0)
+        END IF
     NEXT
     FOR i = 0 TO LEN(pl.bahnen) - 1
         DIM bb AS Bahn : bb = pl.bahnen[i]
-        IF bb.art <> BA_BRUECKE THEN CONTINUE
+        IF NOT bahnIstDraht(bb) THEN CONTINUE
         IF NOT aufPlatine(pl, bb.s1, bb.z1) OR NOT aufPlatine(pl, bb.s2, bb.z2) THEN CONTINUE
         sk.linie(gbX(pl, bb.s1), gbY(pl, bb.z1), gbX(pl, bb.s2), gbY(pl, bb.z2), 0.3)
     NEXT
     DIM titel AS STRING : titel = projekt
     IF dok.revision <> "" THEN titel = titel + " REV " + dok.revision
     ' der Titel unten -- nur, wenn er auf die (zugeschnittene) Platine passt
-    IF gbTextBreite(titel, 1.0) > gs.breite - 2 * GB_RAND AND dok.revision <> "" THEN titel = projekt
+    IF gbTextBreite(titel, 1.0) > gs.breite - 2 AND dok.revision <> "" THEN titel = projekt
     IF gbTextBreite(titel, 1.0) <= gs.breite - 2 THEN gbText(sk, titel, 1.0, 0.8, 1.0)
     ' --- Bohrdatei (Excellon, mm, Dezimalpunkt)
     DIM durch AS ARRAY OF FLOAT : durch = []
@@ -447,7 +462,7 @@ FUNCTION gerberErzeugen(dok AS Dokument, projekt AS STRING) AS GerberSatz
     lies = lies + "  " + pre + "-F_SilkS.gbr    Bestueckungsdruck (Umrisse, Referenzen, Pin 1, Drahtbruecken)" + nl
     lies = lies + "  " + pre + "-Edge_Cuts.gbr  Umriss" + nl
     lies = lies + "  " + pre + ".drl            Bohrungen (Excellon, mm, durchkontaktiert)" + nl + nl
-    lies = lies + "Drahtbruecken sind Draehte: gebohrt, im Bestueckungsdruck als Linie." + nl
+    lies = lies + "Drahtbruecken (und schraege Loetbahnen) sind Draehte: gebohrt, im Bestueckungsdruck als Linie." + nl
     lies = lies + "Format: Gerber X2 (RS-274X, mm, 4.6), Excellon metrisch mit Dezimalpunkt." + nl
     IF LEN(gs.hinweise) > 0 THEN lies = lies + nl + "ACHTUNG:" + nl + "  " + JOIN$(gs.hinweise, nl + "  ") + nl
     gs.dazu(pre + "-F_Cu.gbr", fcu.text$())

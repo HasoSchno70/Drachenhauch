@@ -201,7 +201,7 @@ SUB pdPlatine(cr AS INTEGER, b AS FLOAT, h AS FLOAT, loet AS BOOLEAN)
     DIM hinweis AS STRING
     FOR i = 0 TO LEN(pl.teile) - 1
         DIM bt AS kern.Bauteil
-        IF NOT kern.bauteilMitId(gDok, pl.teile[i].bauteilId, bt) THEN CONTINUE
+        IF NOT kern.bauteilMitId(aktuellesFlach(), pl.teile[i].bauteilId, bt) THEN CONTINUE
         DIM bf AS kern.Bauform : bf = kern.bauformFuer(bt, hinweis)
         DIM s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER
         kern.teilFlaeche(pl.teile[i], bf, s0, z0, s1, z1)

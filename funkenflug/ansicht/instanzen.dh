@@ -15,6 +15,8 @@ DIM gFlach AS kern.Dokument
 FUNCTION aktuellesFlach() AS kern.Dokument
     IF NOT gFlachGueltig THEN
         gFlach = kern.flach(gDok)
+        ' Blattsymbole der Kopien heissen wie ihre Instanz ("C (4)")
+        IF gFlach <> gDok THEN kern.blattSymboleAktualisieren(gFlach)
         gFlachGueltig = TRUE
     END IF
     RETURN gFlach
@@ -81,18 +83,26 @@ END FUNCTION
 FUNCTION instanzPfadText$() AS STRING
     DIM p AS STRING : p = aktuellerPfad$()
     IF p = "" OR LEN(aktuelleInstanzen()) < 2 THEN RETURN kern.blattPfad$(gDok, aktuellerBlattIndex())
+    ' je Abschnitt der Name der Instanz in der ausgerollten Sicht
+    DIM f AS kern.Dokument : f = aktuellesFlach()
     DIM teile AS ARRAY OF STRING : teile = SPLIT$(p, "/")
     DIM t AS STRING : t = ""
-    DIM i AS INTEGER, bi AS INTEGER, k AS INTEGER
+    DIM vor AS STRING : vor = ""
+    DIM i AS INTEGER, k AS INTEGER
     FOR i = 0 TO LEN(teile) - 1
         IF teile[i] = "" THEN CONTINUE
-        FOR bi = 0 TO LEN(gDok.blaetter) - 1
-            FOR k = 0 TO LEN(gDok.blaetter[bi].bauteile) - 1
-                IF gDok.blaetter[bi].bauteile[k].id = teile[i] THEN
-                    IF t = "" THEN t = gDok.blaetter[bi].name
-                    t = t + " > " + gDok.blaetter[bi].bauteile[k].referenz
-                END IF
+        IF t = "" THEN
+            ' das Wurzelblatt: wo das erste Blattsymbol steht
+            FOR k = 0 TO LEN(gDok.blaetter) - 1
+                DIM j AS INTEGER
+                FOR j = 0 TO LEN(gDok.blaetter[k].bauteile) - 1
+                    IF gDok.blaetter[k].bauteile[j].id = teile[i] THEN t = gDok.blaetter[k].name
+                NEXT
             NEXT
+        END IF
+        vor = vor + "/" + teile[i]
+        FOR k = 0 TO LEN(f.blaetter) - 1
+            IF f.blaetter[k].instanz = vor THEN t = t + " > " + f.blaetter[k].name
         NEXT
     NEXT
     IF t = "" THEN RETURN kern.blattPfad$(gDok, aktuellerBlattIndex())
@@ -184,17 +194,11 @@ SUB blattErneutEinsetzen()
         meldung("Ein Blatt namens " + name + " gibt es nicht.")
         RETURN
     END IF
-    ' kein Zyklus: das Ziel darf das aktuelle Blatt nicht (ueber Ecken) enthalten
-    DIM e AS INTEGER : e = aktuellerBlattIndex()
-    DIM schritte AS INTEGER : schritte = 0
-    WHILE e >= 0 AND schritte <= LEN(gDok.blaetter)
-        IF e = ki THEN
-            meldung("Das Blatt " + name + " enthaelt das aktuelle -- eingesetzt ergaebe es einen Kreis.")
-            RETURN
-        END IF
-        e = kern.elternVon(gDok, e)
-        schritte = schritte + 1
-    WEND
+    ' kein Kreis: das Ziel darf das aktuelle Blatt nicht (ueber Ecken) enthalten
+    IF ki = aktuellerBlattIndex() OR kern.blattEnthaelt(gDok, ki, aktuellerBlattIndex()) THEN
+        meldung("Das Blatt " + name + " enthaelt das aktuelle -- eingesetzt ergaebe es einen Kreis.")
+        RETURN
+    END IF
     verlaufMerken()
     DIM mx AS INTEGER : mx = kern.rastern(ROUND(weltX(gtk_widget_get_allocated_width(gFlaeche) / 2.0)), kern.RASTER)
     DIM my AS INTEGER : my = kern.rastern(ROUND(weltY(gtk_widget_get_allocated_height(gFlaeche) / 2.0)), kern.RASTER)

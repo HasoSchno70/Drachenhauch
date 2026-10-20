@@ -695,6 +695,7 @@ SUB ablageEinfuegen()
     FOR i = 0 TO LEN(q.bauteile) - 1
         DIM b AS kern.Bauteil : b = q.bauteile[i]
         b.id = LEFT$(UUID4$(), 10)
+        b.instanzRefs = {}                    ' Referenzen anderer Instanzen gehoeren nicht mit
         b.lage.pos = NEW kern.Punkt(b.lage.pos.x + dx, b.lage.pos.y + dy)
         IF NOT b.sym.einheitLeistung THEN
             IF b.referenz = "" OR referenzBelegt(b.referenz, b) THEN b.referenz = naechsteReferenz(b.sym.praefix)

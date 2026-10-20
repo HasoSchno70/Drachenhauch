@@ -224,6 +224,7 @@ CLASS Blatt
     DIM busse AS ARRAY OF Bus
     DIM quelle AS INTEGER             ' ausgerollte Sicht: Index des Originalblatts (-1 = selbst)
     DIM instanz AS STRING             ' ... und der Instanzpfad ("/<Blattsymbol-Id>/...")
+    DIM erste AS STRING               ' Pfad der Instanz, die das Original stellt (gespeichert)
     SUB Init(nm AS STRING)
         id = LEFT$(UUID4$(), 10)
         name = nm
@@ -236,6 +237,7 @@ CLASS Blatt
         busse = []
         quelle = -1
         instanz = ""
+        erste = ""
     END SUB
 END CLASS
 

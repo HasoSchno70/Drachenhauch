@@ -150,7 +150,7 @@ SUB busUmbenennen(bu AS kern.Bus)
 END SUB
 
 ' Ein neuer Draht endet auf einem Bus: nach dem Mitglied fragen und das
-' Label auf den Draht setzen (ein Rasterschritt vom Bus weg, Text vom Bus weg).
+' Label ans andere Ende des Drahts setzen.
 SUB abzweigFragen(w AS kern.Draht)
     IF LEN(w.punkte) < 2 THEN RETURN
     DIM ende AS INTEGER
@@ -176,15 +176,17 @@ SUB abzweigFragen(w AS kern.Draht)
         IF bname = "" THEN RETURN
         DIM mitglied AS STRING : mitglied = textAbfrage$("Abzweig vom Bus " + bname, "Mitglied:", kern.busFreiesMitglied$(gBlatt, bx))
         IF TRIM$(mitglied) = "" THEN RETURN
-        DIM dx AS INTEGER : dx = SIGN(nb.x - p.x)
-        DIM dy AS INTEGER : dy = SIGN(nb.y - p.y)
-        DIM laenge AS INTEGER : laenge = ABS(nb.x - p.x) + ABS(nb.y - p.y)
-        DIM schritt AS INTEGER : schritt = IIF(laenge >= 2 * kern.RASTER, kern.RASTER, laenge)
-        DIM la AS kern.Label : la = NEW kern.Label(TRIM$(mitglied), NEW kern.Punkt(p.x + dx * schritt, p.y + dy * schritt), kern.LA_LOKAL)
+        ' am fernen Ende (meist der Pin): dort bleibt es auf dem Draht, auch
+        ' wenn der Bus verschoben wird; Text laeuft am Draht entlang zum Bus
+        DIM fern AS kern.Punkt : fern = IIF(ende = 0, w.punkte[LEN(w.punkte) - 1], w.punkte[0])
+        DIM vor AS kern.Punkt : vor = IIF(ende = 0, w.punkte[LEN(w.punkte) - 2], w.punkte[1])
+        DIM la AS kern.Label : la = NEW kern.Label(TRIM$(mitglied), NEW kern.Punkt(fern.x, fern.y), kern.LA_LOKAL)
+        DIM dx AS INTEGER : dx = SIGN(vor.x - fern.x)
+        DIM dy AS INTEGER : dy = SIGN(vor.y - fern.y)
         IF dx > 0 THEN la.drehung = 0
         IF dx < 0 THEN la.drehung = 180
-        IF dy > 0 THEN la.drehung = 90
-        IF dy < 0 THEN la.drehung = 270
+        IF dy > 0 AND dx = 0 THEN la.drehung = 90
+        IF dy < 0 AND dx = 0 THEN la.drehung = 270
         ARRAY_PUSH(gBlatt.labels, la)
         RETURN
     NEXT

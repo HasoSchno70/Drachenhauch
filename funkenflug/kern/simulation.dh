@@ -55,7 +55,9 @@ CLASS SimKurve
     END FUNCTION
     ' Betrag in dB (Frequenzgang) bzw. der Wert selbst
     FUNCTION betragDb(i AS INTEGER) AS FLOAT
-        DIM b AS FLOAT : b = SQR(re[i] * re[i] + IIF(LEN(im) > i, im[i] * im[i], 0.0))
+        DIM q AS FLOAT : q = re[i] * re[i]
+        IF LEN(im) > i THEN q = q + im[i] * im[i]
+        DIM b AS FLOAT : b = SQR(q)
         IF b < 0.000000000001 THEN b = 0.000000000001
         RETURN 20 * LOG10(b)
     END FUNCTION
@@ -112,6 +114,8 @@ END CLASS
 ' so schreibt man es im Dialog.
 FUNCTION siZahl(text AS STRING, BYREF wert AS FLOAT) AS BOOLEAN
     DIM s AS STRING : s = REPLACE$(REPLACE$(REPLACE$(TRIM$(text), " ", ""), ",", "."), "µ", "u")
+    s = REPLACE$(s, "Ω", "")
+    IF ENDSWITH(LOWER$(s), "ohm") THEN s = LEFT$(s, LEN(s) - 3)
     IF s = "" THEN RETURN FALSE
     IF ENDSWITH(LOWER$(s), "hz") THEN s = LEFT$(s, LEN(s) - 2)
     IF ENDSWITH(LOWER$(s), "meg") THEN
@@ -121,7 +125,7 @@ FUNCTION siZahl(text AS STRING, BYREF wert AS FLOAT) AS BOOLEAN
     DIM i AS INTEGER
     FOR i = 1 TO LEN(s) - 2
         DIM c AS STRING : c = MID$(s, i, 1)
-        IF istZiffer(MID$(s, i - 1, 1)) AND istZiffer(MID$(s, i + 1, 1)) AND CONTAINS("VRfpnumkMGT", c) THEN
+        IF istZiffer(MID$(s, i - 1, 1)) AND istZiffer(MID$(s, i + 1, 1)) AND CONTAINS("VRfpnumkKMGT", c) THEN
             s = LEFT$(s, i) + "." + MID$(s, i + 1) + IIF(c = "V" OR c = "R", "", c)
             BREAK
         END IF
@@ -194,31 +198,51 @@ END FUNCTION
 ' Spannung aus einem Versorgungsnamen: +5V -> 5, 3V3 -> 3.3, -12V -> -12,
 ' VCC -> keine Zahl (FALSE).
 FUNCTION versorgungsSpannung(name AS STRING, BYREF v AS FLOAT) AS BOOLEAN
+    ' Eine Zahl gilt nur als Spannung, wenn ein V folgt (+5V, 12V, VCC_9V,
+    ' 3V3) oder der ganze Name die Zahl ist (+12) -- VCC2, VDD_1, V1 sind
+    ' Namen, keine Spannungen
     DIM u AS STRING : u = UPPER$(TRIM$(name))
     DIM i AS INTEGER : i = 0
     WHILE i < LEN(u)
-        IF istZiffer(MID$(u, i, 1)) THEN BREAK
-        i = i + 1
-    WEND
-    IF i >= LEN(u) THEN RETURN FALSE
-    DIM t AS STRING : t = ""
-    DIM punkt AS BOOLEAN : punkt = FALSE
-    WHILE i < LEN(u)
-        DIM c AS STRING : c = MID$(u, i, 1)
-        IF istZiffer(c) THEN
-            t = t + c
-        ELSEIF (c = "." OR c = "V") AND NOT punkt AND i + 1 < LEN(u) THEN
-            IF NOT istZiffer(MID$(u, i + 1, 1)) THEN BREAK
-            t = t + "."
-            punkt = TRUE
-        ELSE
-            BREAK
+        IF NOT istZiffer(MID$(u, i, 1)) THEN
+            i = i + 1
+            CONTINUE
         END IF
-        i = i + 1
+        DIM a0 AS INTEGER : a0 = i
+        DIM t AS STRING : t = ""
+        DIM punkt AS BOOLEAN : punkt = FALSE
+        DIM mitV AS BOOLEAN : mitV = FALSE
+        WHILE i < LEN(u)
+            DIM c AS STRING : c = MID$(u, i, 1)
+            IF istZiffer(c) THEN
+                t = t + c
+            ELSEIF (c = "." OR c = "V") AND NOT punkt AND i + 1 < LEN(u) AND istZiffer(MID$(u, i + 1, 1)) THEN
+                t = t + "."
+                punkt = TRUE
+                IF c = "V" THEN mitV = TRUE
+            ELSE
+                BREAK
+            END IF
+            i = i + 1
+        WEND
+        IF i < LEN(u) THEN
+            IF MID$(u, i, 1) = "V" THEN mitV = TRUE
+        END IF
+        DIM vorn AS STRING : vorn = LEFT$(u, a0)
+        DIM nurZahl AS BOOLEAN : nurZahl = i >= LEN(u) AND (vorn = "" OR vorn = "+" OR vorn = "-")
+        IF mitV OR nurZahl THEN
+            v = VAL(t)
+            IF STARTSWITH(u, "-") OR STARTSWITH(u, "NEG") THEN v = -v
+            RETURN TRUE
+        END IF
     WEND
-    v = VAL(t)
-    IF STARTSWITH(u, "-") OR STARTSWITH(u, "NEG") THEN v = -v
-    RETURN TRUE
+    RETURN FALSE
+END FUNCTION
+
+' Eine negative Versorgung ohne Zahl im Namen: -VCC, V-, VEE, VNEG ...
+FUNCTION negativeVersorgung(name AS STRING) AS BOOLEAN
+    DIM u AS STRING : u = UPPER$(TRIM$(name))
+    RETURN STARTSWITH(u, "-") OR ENDSWITH(u, "-") OR u = "VEE" OR CONTAINS(u, "NEG")
 END FUNCTION
 
 ' Z-Spannung aus dem Wert: 5V1, ZPD5V1, BZX55C5V1 (Ziffer V Ziffer), sonst die
@@ -253,9 +277,9 @@ FUNCTION simZener(w AS STRING, BYREF bv AS FLOAT) AS BOOLEAN
     RETURN bv > 0 AND bv < 200
 END FUNCTION
 
+' Masse wie beim ERC und bei den Drahtfarben (istMasseName), dazu "0"
 FUNCTION simMasse(name AS STRING) AS BOOLEAN
-    DIM u AS STRING : u = UPPER$(TRIM$(name))
-    RETURN u = "GND" OR u = "0" OR u = "0V" OR u = "MASSE" OR STARTSWITH(u, "GND") OR ENDSWITH(u, "GND")
+    RETURN TRIM$(name) = "0" OR istMasseName(name)
 END FUNCTION
 
 ' --- Welches Bauteil ist was ------------------------------------------------
@@ -385,14 +409,25 @@ END FUNCTION
 
 ' Wert einer Quelle: "5V", "3V3" -> 5, 3.3; alles mit Klammer oder
 ' Schluesselwort (SIN, PULSE, AC, DC, PWL) geht so an ngspice.
-FUNCTION simQuelle$(wert AS STRING) AS STRING
+FUNCTION simQuelle$(wert AS STRING, BYREF hinweis AS STRING) AS STRING
+    hinweis = ""
     DIM w AS STRING : w = TRIM$(wert)
-    IF w = "" THEN RETURN "DC 0"
-    DIM v AS FLOAT
-    IF NOT CONTAINS(w, "(") AND NOT CONTAINS(w, " ") THEN
-        IF siZahl(w, v) THEN RETURN "DC " + STR$(v)
+    IF w = "" THEN
+        hinweis = "ohne Wert, 0 V"
+        RETURN "DC 0"
     END IF
-    RETURN w
+    DIM v AS FLOAT
+    IF siZahl(w, v) THEN RETURN "DC " + STR$(v)
+    ' SPICE-Schreibweise: Klammer oder Schluesselwort vorn
+    DIM erstes AS STRING : erstes = UPPER$(SPLIT$(w, " ")[0])
+    IF CONTAINS(w, "(") OR CONTAINS(",DC,AC,SIN,PULSE,PWL,EXP,SFFM,AM,DISTOF1,DISTOF2,", "," + erstes + ",") THEN RETURN w
+    ' "9V Block", "LiPo 3.7V": die Spannung aus dem Text
+    IF versorgungsSpannung(w, v) THEN
+        hinweis = "Wert als " + STR$(v) + " V gelesen"
+        RETURN "DC " + STR$(v)
+    END IF
+    hinweis = "Wert nicht lesbar, 0 V"
+    RETURN "DC 0"
 END FUNCTION
 
 ' Regler 78xx/79xx: Ausgangsspannung (negativ fuer 79xx), FALSE = unbekannt
@@ -418,6 +453,17 @@ FUNCTION simRegler(wert AS STRING, BYREF v AS FLOAT) AS BOOLEAN
 END FUNCTION
 
 ' --- Deck --------------------------------------------------------------------
+
+' Modellname aus Wert (gross geschrieben -- ngspice kennt keine Gross/Klein-
+' Unterschiede); zwei verschiedene Modelle gleichen Namens bekommen die Art dazu
+FUNCTION simModellName$(praefix AS STRING, art AS STRING, wert AS STRING, text AS STRING, BYREF modelle AS MAP OF STRING) AS STRING
+    DIM mn AS STRING : mn = spiceModell$(praefix, UPPER$(IIF(wert = "", art, wert)))
+    IF MAPHAS(modelle, mn) THEN
+        IF MAPGET(modelle, mn) <> ".model " + mn + " " + text THEN mn = mn + "_" + art
+    END IF
+    MAPPUT(modelle, mn, ".model " + mn + " " + text)
+    RETURN mn
+END FUNCTION
 
 ' Hinweise sammeln: je Art eine Zeile mit allen Referenzen
 SUB simHinweis(BYREF arten AS ARRAY OF STRING, BYREF refs AS MAP OF STRING, art AS STRING, ref AS STRING)
@@ -452,20 +498,7 @@ FUNCTION simElemente$(dok AS Dokument, n AS Netze, knoten AS ARRAY OF STRING, vc
     DIM arten AS ARRAY OF STRING : arten = []
     DIM refs AS MAP OF STRING
     DIM bi AS INTEGER, i AS INTEGER, j AS INTEGER
-    ' Versorgungen: je Netz mit Versorgungssymbol eine Quelle gegen Masse
-    DIM da AS MAP OF INTEGER
-    FOR i = 0 TO LEN(n.liste) - 1
-        IF LEN(n.liste[i].versorgungen) = 0 OR knoten[i] = "0" OR MAPHAS(da, knoten[i]) THEN CONTINUE
-        MAPPUT(da, knoten[i], 1)
-        DIM v AS FLOAT
-        IF NOT versorgungsSpannung(n.liste[i].name, v) THEN
-            v = vcc
-            simHinweis(arten, refs, "Versorgung ohne Spannung im Namen, gerechnet mit " + siText$(vcc, "V"), n.liste[i].name)
-        END IF
-        DIM qn AS STRING : qn = "VV_" + knoten[i]
-        MAPPUT(quellen, LOWER$(qn), n.liste[i].name)
-        t = t + qn + " " + knoten[i] + " 0 DC " + STR$(v) + nl
-    NEXT
+    DIM getrieben AS MAP OF STRING       ' Knoten, den schon eine Quelle/ein Regler/ein OPV haelt
     FOR bi = 0 TO LEN(dok.blaetter) - 1
         n.blattWaehlen(bi)
         FOR i = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
@@ -492,29 +525,35 @@ FUNCTION simElemente$(dok AS Dokument, n AS Netze, knoten AS ARRAY OF STRING, vc
                 CASE "L"
                     t = t + spiceName$("L", ref) + " " + k[0] + " " + k[1] + " " + spiceWert$(b.wert) + nl
                 CASE "D", "LED", "DZ", "DS"
-                    mn = spiceModell$("D", IIF(b.wert = "", art, b.wert))
-                    MAPPUT(modelle, mn, ".model " + mn + " " + simModell$(art, b.wert, ges))
+                    mn = simModellName$("D", art, b.wert, simModell$(art, b.wert, ges), modelle)
                     IF ges THEN simHinweis(arten, refs, "Modell geschaetzt (Wert unbekannt)", ref)
                     t = t + spiceName$("D", ref) + " " + simKnotenAn$(b, k, "A") + " " + simKnotenAn$(b, k, "K") + " " + mn + nl
                 CASE "NPN", "PNP"
-                    mn = spiceModell$("Q", IIF(b.wert = "", art, b.wert))
-                    MAPPUT(modelle, mn, ".model " + mn + " " + simModell$(art, b.wert, ges))
+                    mn = simModellName$("Q", art, b.wert, simModell$(art, b.wert, ges), modelle)
                     IF ges THEN simHinweis(arten, refs, "Modell geschaetzt (Wert unbekannt)", ref)
                     t = t + spiceName$("Q", ref) + " " + simKnotenAn$(b, k, "C") + " " + simKnotenAn$(b, k, "B") + " " + simKnotenAn$(b, k, "E") + " " + mn + nl
                 CASE "NMOS", "PMOS"
-                    mn = spiceModell$("M", IIF(b.wert = "", art, b.wert))
-                    MAPPUT(modelle, mn, ".model " + mn + " " + simModell$(art, b.wert, ges))
+                    mn = simModellName$("M", art, b.wert, simModell$(art, b.wert, ges), modelle)
                     IF ges THEN simHinweis(arten, refs, "Modell geschaetzt (Wert unbekannt)", ref)
                     DIM ks AS STRING : ks = simKnotenAn$(b, k, "S")
                     t = t + spiceName$("M", ref) + " " + simKnotenAn$(b, k, "D") + " " + simKnotenAn$(b, k, "G") + " " + ks + " " + ks + " " + mn + nl
                 CASE "V"
                     DIM vn AS STRING : vn = spiceName$("V", ref)
                     MAPPUT(quellen, LOWER$(vn), ref)
-                    t = t + vn + " " + simKnotenAn$(b, k, "+") + " " + simKnotenAn$(b, k, "-") + " " + simQuelle$(b.wert) + nl
+                    DIM kp AS STRING : kp = simKnotenAn$(b, k, "+")
+                    DIM km AS STRING : km = simKnotenAn$(b, k, "-")
+                    IF km = "0" THEN MAPPUT(getrieben, kp, ref)
+                    IF kp = "0" THEN MAPPUT(getrieben, km, ref)
+                    DIM qh AS STRING
+                    t = t + vn + " " + kp + " " + km + " " + simQuelle$(b.wert, qh) + nl
+                    IF qh <> "" THEN simHinweis(arten, refs, "Quelle: " + qh, ref)
                 CASE "RV"
                     ' Schleifer in der Mitte: zwei halbe Widerstaende
                     DIM rv AS FLOAT
-                    IF NOT siZahl(b.wert, rv) THEN rv = 10000
+                    IF NOT siZahl(SPLIT$(TRIM$(b.wert) + " ", " ")[0], rv) THEN
+                        rv = 10000
+                        simHinweis(arten, refs, "Poti-Wert nicht lesbar, 10 kOhm", ref)
+                    END IF
                     t = t + spiceName$("R", ref) + "_A " + k[0] + " " + k[1] + " " + STR$(rv / 2) + nl
                     t = t + spiceName$("R", ref) + "_B " + k[1] + " " + k[2] + " " + STR$(rv / 2) + nl
                     simHinweis(arten, refs, "Poti mit dem Schleifer in der Mitte", ref)
@@ -550,6 +589,7 @@ FUNCTION simElemente$(dok AS Dokument, n AS Netze, knoten AS ARRAY OF STRING, vc
                         END IF
                     END IF
                     IF NOT versorgt THEN simHinweis(arten, refs, "OPV ohne Versorgung, Grenzen +-15 V", ref)
+                    MAPPUT(getrieben, simKnotenAn$(b, k, "OUT"), ref)
                     DIM mitte AS STRING : mitte = "((" + vp + ")+(" + vm + "))/2"
                     DIM halb AS STRING : halb = "max(((" + vp + ")-(" + vm + "))/2,1m)"
                     t = t + spiceName$("B", ref) + " " + simKnotenAn$(b, k, "OUT") + " 0 V=" + mitte + "+" + halb + "*tanh(1e5*(" + simV$(simKnotenAn$(b, k, "IN+")) + "-" + simV$(simKnotenAn$(b, k, "IN-")) + ")/" + halb + ")" + nl
@@ -558,6 +598,7 @@ FUNCTION simElemente$(dok AS Dokument, n AS Netze, knoten AS ARRAY OF STRING, vc
                     DIM vr AS FLOAT
                     IF simRegler(b.wert, vr) THEN
                         DIM kg AS STRING : kg = simKnotenAn$(b, k, "GND")
+                        IF kg = "0" THEN MAPPUT(getrieben, simKnotenAn$(b, k, "OUT"), ref)
                         DIM ein AS STRING : ein = "(" + simV$(simKnotenAn$(b, k, "IN")) + "-" + simV$(kg) + ")"
                         IF vr > 0 THEN
                             t = t + spiceName$("B", ref) + " " + simKnotenAn$(b, k, "OUT") + " " + kg + " V=min(max(" + ein + "-2,0)," + STR$(vr) + ")" + nl
@@ -579,6 +620,38 @@ FUNCTION simElemente$(dok AS Dokument, n AS Netze, knoten AS ARRAY OF STRING, vc
             END SELECT
         NEXT
     NEXT
+    ' Versorgungen: je Netz mit Versorgungssymbol eine Quelle gegen Masse --
+    ' ausser ein Teil treibt es schon (Regler-Ausgang, Batterie, OPV): zwei
+    ' ideale Quellen parallel waeren eine singulaere Matrix
+    DIM vers AS STRING : vers = ""
+    DIM da AS MAP OF INTEGER
+    FOR i = 0 TO LEN(n.liste) - 1
+        IF LEN(n.liste[i].versorgungen) = 0 OR knoten[i] = "0" OR MAPHAS(da, knoten[i]) THEN CONTINUE
+        MAPPUT(da, knoten[i], 1)
+        IF MAPHAS(getrieben, knoten[i]) THEN
+            simHinweis(arten, refs, "Versorgung kommt aus der Schaltung (keine eigene Quelle)", n.liste[i].name + " von " + MAPGET(getrieben, knoten[i]))
+            CONTINUE
+        END IF
+        DIM v AS FLOAT
+        IF NOT versorgungsSpannung(n.liste[i].name, v) THEN
+            IF negativeVersorgung(n.liste[i].name) THEN
+                v = -vcc
+                simHinweis(arten, refs, "negative Versorgung ohne Spannung im Namen, gerechnet mit " + siText$(-vcc, "V"), n.liste[i].name)
+            ELSE
+                v = vcc
+                simHinweis(arten, refs, "Versorgung ohne Spannung im Namen, gerechnet mit " + siText$(vcc, "V"), n.liste[i].name)
+            END IF
+        END IF
+        DIM qn AS STRING : qn = "VV_" + knoten[i]
+        MAPPUT(quellen, LOWER$(qn), n.liste[i].name)
+        vers = vers + qn + " " + knoten[i] + " 0 DC " + STR$(v) + nl
+    NEXT
+    DIM hatMasse AS BOOLEAN : hatMasse = FALSE
+    FOR i = 0 TO LEN(knoten) - 1
+        IF knoten[i] = "0" THEN hatMasse = TRUE
+    NEXT
+    IF NOT hatMasse AND LEN(n.liste) > 0 THEN simHinweis(arten, refs, "kein Masse-Netz (GND) -- die Spannungen haben keinen Bezug", "Schaltung")
+    t = vers + t
     FOR i = 0 TO LEN(arten) - 1
         ARRAY_PUSH(hinweise, arten[i] + ": " + MAPGET(refs, arten[i]))
     NEXT
@@ -639,7 +712,7 @@ FUNCTION simRechnen(dok AS Dokument, e AS SimEinstellung) AS SimErgebnis
         DIM re AS ARRAY OF FLOAT, im AS ARRAY OF FLOAT, typ AS INTEGER
         IF NOT ngVektorLesen(plot, namen[i], re, im, typ) THEN CONTINUE
         DIM nm AS STRING : nm = LOWER$(namen[i])
-        IF typ = NG_ZEIT OR typ = NG_FREQUENZ OR nm = "time" OR nm = "frequency" THEN
+        IF typ = NG_ZEIT OR typ = NG_FREQUENZ THEN
             r.x = re
         ELSEIF ENDSWITH(nm, "#branch") THEN
             DIM q AS STRING : q = LEFT$(nm, LEN(nm) - 7)
@@ -672,6 +745,19 @@ FUNCTION simRechnen(dok AS Dokument, e AS SimEinstellung) AS SimErgebnis
         ARRAY_PUSH(sortiert, r.netze[r.netz(nam[i])])
     NEXT
     r.netze = sortiert
+    ' ngspice liefert auch nach "timestep too small" einen Plot -- leer bzw.
+    ' abgeschnitten; das ist kein Ergebnis
+    DIM logText AS STRING : logText = LOWER$(ngFehlerText$())
+    IF CONTAINS(logText, "abort") OR CONTAINS(logText, "singular") OR CONTAINS(logText, "too small") OR CONTAINS(logText, "not converge") OR CONTAINS(logText, "failed") THEN
+        r.fehler = "ngspice ist nicht zu Ende gekommen." + CHR$(10) + ngFehlerText$()
+        RETURN r
+    END IF
+    FOR i = 0 TO LEN(r.netze) - 1
+        IF LEN(r.netze[i].re) = 0 THEN
+            r.fehler = "ngspice hat keine Werte geliefert." + CHR$(10) + ngFehlerText$()
+            RETURN r
+        END IF
+    NEXT
     r.ok = TRUE
     RETURN r
 END FUNCTION

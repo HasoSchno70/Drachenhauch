@@ -47,6 +47,7 @@ END SUB
 
 SUB p3Laden()
     g3Modell = kern.platineModell3(gDok)
+    g3Eingepasst = FALSE              ' Platine kann eine andere Groesse haben
     IF g3Info <> 0 THEN gtk_label_set_text(g3Info, STR$(g3Modell.koerper) + " Bauteile, " + STR$(LEN(g3Modell.flaechen)) + " Flaechen -- ziehen dreht, Mausrad zoomt.")
     IF g3Flaeche <> 0 THEN gtk_widget_queue_draw(g3Flaeche)
 END SUB
@@ -155,7 +156,7 @@ FUNCTION p3Zeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     cairo_paint(cr)
     g3Kamera.mx = b / 2
     g3Kamera.my = h / 2
-    IF NOT g3Eingepasst THEN
+    IF NOT g3Eingepasst AND b > 20 AND h > 20 THEN
         g3Kamera.skala = 0.8 * MIN(b / MAX(g3Modell.breite, 1.0), h / MAX(g3Modell.tiefe, 1.0))
         g3Eingepasst = TRUE
     END IF

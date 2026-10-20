@@ -14,6 +14,7 @@ CLASS SimMarke
     DIM x AS INTEGER
     DIM y AS INTEGER
     DIM text AS STRING
+    DIM instanz AS STRING             ' Instanzpfad (mehrfach eingesetztes Blatt), "" = alle
     SUB Init(b AS INTEGER, px AS INTEGER, py AS INTEGER, t AS STRING)
         blatt = b
         x = px
@@ -43,6 +44,7 @@ DIM gSimMausX AS FLOAT
 DIM gSimPlotL AS FLOAT
 DIM gSimPlotB AS FLOAT
 DIM gSimHinweisText AS STRING
+DIM gSimMarkeInstanz AS STRING
 
 SUB simVorgaben()
     IF gSimVcc <> "" THEN RETURN
@@ -157,6 +159,8 @@ FUNCTION simAusfuehren(e AS kern.SimEinstellung, BYREF r AS kern.SimErgebnis) AS
     TRY
         r = kern.simRechnen(gDok, e)
     CATCH fe
+        gSpMeldung = ""
+        statusAktualisieren()
         meldung("Die Simulation ist abgebrochen: " + fe)
         RETURN FALSE
     END TRY
@@ -315,14 +319,17 @@ END SUB
 ' (deren Spannung steht schon da).
 SUB simMarkenBauen(r AS kern.SimErgebnis)
     gSimMarken = []
-    DIM n AS kern.Netze : n = kern.netzeDokument(gDok)
-    DIM bi AS INTEGER, i AS INTEGER, j AS INTEGER
-    FOR bi = 0 TO LEN(gDok.blaetter) - 1
-        n.blattWaehlen(bi)
-        DIM bl AS kern.Blatt : bl = gDok.blaetter[bi]
+    ' je Instanz eigene Spannungen: ueber die ausgerollte Sicht
+    DIM f AS kern.Dokument : f = aktuellesFlach()
+    DIM n AS kern.Netze : n = kern.netzeDokument(f)
+    DIM fi AS INTEGER, i AS INTEGER, j AS INTEGER
+    FOR fi = 0 TO LEN(f.blaetter) - 1
+        n.blattWaehlen(fi)
+        DIM bl AS kern.Blatt : bl = f.blaetter[fi]
+        DIM bi AS INTEGER : bi = IIF(bl.quelle >= 0, bl.quelle, fi)
+        gSimMarkeInstanz = bl.instanz
         DIM da AS MAP OF INTEGER
-        DIM leer AS MAP OF INTEGER
-        da = leer
+        da = {}                           ' je Blatt frisch (DIM in der Schleife tut es nicht)
         FOR i = 0 TO LEN(bl.labels) - 1
             simMarkeDazu(r, n, bi, bl.labels[i].anker.x, bl.labels[i].anker.y, da)
         NEXT
@@ -366,10 +373,17 @@ SUB simMarkeNetz(r AS kern.SimErgebnis, n AS kern.Netze, ni AS INTEGER, bi AS IN
     DIM v AS FLOAT
     IF NOT r.spannung(nz.name, v) THEN RETURN
     MAPPUT(da, nz.name, 1)
-    ARRAY_PUSH(gSimMarken, NEW SimMarke(bi, x, y, kern.siText$(v, "V")))
+    DIM mk AS SimMarke : mk = NEW SimMarke(bi, x, y, kern.siText$(v, "V"))
+    mk.instanz = gSimMarkeInstanz
+    ARRAY_PUSH(gSimMarken, mk)
 END SUB
 
 SUB simVeraltet()
+    ' ein offenes Ergebnisfenster zeigt den alten Stand -- das sagt es dann
+    IF gSimDlg <> 0 AND gSimInfo <> 0 AND NOT CONTAINS(gSimHinweisText, "VERALTET") THEN
+        gSimHinweisText = "VERALTET: der Schaltplan wurde geaendert -- neu rechnen. " + gSimHinweisText
+        simInfoSetzen("")
+    END IF
     IF NOT gSimOpDa AND LEN(gSimMarken) = 0 THEN RETURN
     gSimOpDa = FALSE
     gSimMarken = []
@@ -382,6 +396,7 @@ SUB simMarkenZeichnen(cr AS INTEGER)
     FOR i = 0 TO LEN(gSimMarken) - 1
         DIM m AS SimMarke : m = gSimMarken[i]
         IF m.blatt <> hier THEN CONTINUE
+        IF m.instanz <> "" AND m.instanz <> aktuellerPfad$() THEN CONTINUE
         DIM x AS FLOAT : x = sx(m.x) + 6
         DIM y AS FLOAT : y = sy(m.y) + 14          ' unter dem Draht, der Label-Text steht darueber
         DIM b AS FLOAT : b = LEN(m.text) * 6.6 + 8
@@ -554,7 +569,7 @@ SUB simTabelleZeichnen(cr AS INTEGER, b AS FLOAT, h AS FLOAT)
     FOR i = 0 TO LEN(gSimErg.netze) - 1
         IF y > h - 10 THEN BREAK
         lwTextAus(cr, 16, y, gSimErg.netze[i].name, C_WERT, 0, gSchrift)
-        lwTextAus(cr, 260, y, kern.siText$(gSimErg.netze[i].re[0], "V"), C_SIM, 2, gSchrift)
+        IF LEN(gSimErg.netze[i].re) > 0 THEN lwTextAus(cr, 260, y, kern.siText$(gSimErg.netze[i].re[0], "V"), C_SIM, 2, gSchrift)
         y = y + 18
     NEXT
     y = 22
@@ -564,7 +579,7 @@ SUB simTabelleZeichnen(cr AS INTEGER, b AS FLOAT, h AS FLOAT)
     FOR i = 0 TO LEN(gSimErg.stroeme) - 1
         IF y > h - 10 THEN BREAK
         lwTextAus(cr, 320, y, gSimErg.stroeme[i].name, C_WERT, 0, gSchrift)
-        lwTextAus(cr, 560, y, kern.siText$(gSimErg.stroeme[i].re[0], "A"), C_SIM, 2, gSchrift)
+        IF LEN(gSimErg.stroeme[i].re) > 0 THEN lwTextAus(cr, 560, y, kern.siText$(gSimErg.stroeme[i].re[0], "A"), C_SIM, 2, gSchrift)
         y = y + 18
     NEXT
 END SUB

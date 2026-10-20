@@ -129,7 +129,18 @@ FUNCTION ercPruefenDok(dok AS Dokument) AS ARRAY OF Verstoss
         IF lEin >= 1 AND lAus + quelle = 0 THEN ARRAY_PUSH(warnungen, NEW Verstoss(ERC_WARNUNG, "Netz " + nz.name + ": Versorgungseingang ohne Versorgung", ob, ox, oy))
     NEXT
 
-    ercHierarchie(orig, fehler, warnungen)
+    ' (Hierarchie: am gezeichneten Original, gilt fuer jede Instanz -- unten)
+    DIM hFehler AS ARRAY OF Verstoss : hFehler = []
+    DIM hWarn AS ARRAY OF Verstoss : hWarn = []
+    ercHierarchie(orig, hFehler, hWarn)
+    IF dok = orig THEN
+        FOR i = 0 TO LEN(hFehler) - 1
+            ARRAY_PUSH(fehler, hFehler[i])
+        NEXT
+        FOR i = 0 TO LEN(hWarn) - 1
+            ARRAY_PUSH(warnungen, hWarn[i])
+        NEXT
+    END IF
     ercBusse(dok, n, warnungen)
 
     ' --- globale Labels, die nur einmal vorkommen, verbinden nichts
@@ -206,8 +217,19 @@ FUNCTION ercPruefenDok(dok AS Dokument) AS ARRAY OF Verstoss
     IF dok = orig THEN RETURN fehler
     ' ausgerollt: zurueck auf das gezeichnete Blatt; was in jeder Instanz
     ' gleich ist (offene Drahtenden ...), nur einmal
-    DIM r AS ARRAY OF Verstoss : r = []
+    DIM r AS ARRAY OF Verstoss : r = hFehler
     DIM schon AS MAP OF INTEGER
+    ' wie oft kommt eine Meldung vor, wie viele Instanzen hat ihr Blatt?
+    DIM wie AS MAP OF INTEGER
+    DIM inst AS MAP OF INTEGER
+    FOR i = 0 TO LEN(dok.blaetter) - 1
+        IF dok.blaetter[i].quelle >= 0 THEN MAPPUT(inst, STR$(dok.blaetter[i].quelle), MAPGETOR(inst, STR$(dok.blaetter[i].quelle), 0) + 1)
+    NEXT
+    FOR i = 0 TO LEN(fehler) - 1
+        IF fehler[i].blatt < 0 OR fehler[i].blatt >= LEN(dok.blaetter) THEN CONTINUE
+        DIM wk AS STRING : wk = STR$(dok.blaetter[fehler[i].blatt].quelle) + "|" + STR$(fehler[i].x) + "|" + STR$(fehler[i].y) + "|" + fehler[i].text
+        MAPPUT(wie, wk, MAPGETOR(wie, wk, 0) + 1)
+    NEXT
     FOR i = 0 TO LEN(fehler) - 1
         DIM v AS Verstoss : v = fehler[i]
         IF v.blatt >= 0 AND v.blatt < LEN(dok.blaetter) THEN
@@ -218,10 +240,16 @@ FUNCTION ercPruefenDok(dok AS Dokument) AS ARRAY OF Verstoss
                 DIM schl AS STRING : schl = STR$(v.blatt) + "|" + STR$(v.x) + "|" + STR$(v.y) + "|" + v.text
                 IF MAPHAS(schon, schl) THEN CONTINUE
                 MAPPUT(schon, schl, 1)
+                ' in jeder Instanz gleich: gilt fuer das Blatt, nicht fuer eine Instanz
+                IF MAPGETOR(wie, schl, 0) >= MAPGETOR(inst, STR$(v.blatt), 1) THEN v.instanz = ""
+
                 IF fb.id <> orig.blaetter[v.blatt].id THEN v.text = v.text + " (in " + fb.name + ")"
             END IF
         END IF
         ARRAY_PUSH(r, v)
+    NEXT
+    FOR i = 0 TO LEN(hWarn) - 1
+        ARRAY_PUSH(r, hWarn[i])
     NEXT
     RETURN r
 END FUNCTION

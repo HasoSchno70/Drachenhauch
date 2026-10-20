@@ -1867,7 +1867,7 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             DIM pbf AS kern.Bauform
             DIM phin AS STRING
             DIM pbt AS kern.Bauteil
-            lz = kern.bauteilMitId(gDok, gDok.platine.teile[gPlSel].bauteilId, pbt)
+            lz = kern.bauteilMitId(aktuellesFlach(), gDok.platine.teile[gPlSel].bauteilId, pbt)
             pbf = kern.bauformFuer(pbt, phin)
             DIM ps0 AS INTEGER, pz0 AS INTEGER, ps1 AS INTEGER, pz1 AS INTEGER
             kern.teilFlaeche(gDok.platine.teile[gPlSel], pbf, ps0, pz0, ps1, pz1)
@@ -2416,7 +2416,7 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             FOR bpi = 0 TO LEN(gBlatt.labels) - 1
                 bpl = bpl + gBlatt.labels[bpi].text + "@" + STR$(gBlatt.labels[bpi].anker.y) + " "
             NEXT
-            pruefe("Abzweige: naechstes freies Mitglied, Label einen Schritt vom Bus", bpl, "D0@2100 D1@2100 D2@2100 D3@2100 ")
+            pruefe("Abzweige: naechstes freies Mitglied, Label am Pin-Ende", bpl, "D0@3400 D1@3400 D2@3400 D3@3400 ")
             DIM bpe AS ARRAY OF kern.Verstoss : bpe = kern.ercPruefenDok(gDok)
             DIM bpm AS INTEGER : bpm = 0
             FOR bpi = 0 TO LEN(bpe) - 1

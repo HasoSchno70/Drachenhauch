@@ -520,7 +520,16 @@ END SUB
 FUNCTION kimReferenz$(sy AS SAusdruck, refs AS MAP OF STRING) AS STRING
     ' ab KiCad 7: (instances (project "x" (path "/..." (reference "R1") (unit 1))))
     IF sy.hat("instances") THEN
+        ' der Pfad dieses Projekts (beginnt mit der Uuid der Wurzel); ein
+        ' geteiltes Blatt traegt auch Pfade fremder Projekte
         DIM pr AS ARRAY OF SAusdruck : pr = sy.kind("instances").alle("project")
+        DIM pj AS INTEGER, pq AS INTEGER
+        FOR pj = 0 TO LEN(pr) - 1
+            DIM pfa AS ARRAY OF SAusdruck : pfa = pr[pj].alle("path")
+            FOR pq = 0 TO LEN(pfa) - 1
+                IF gKimWurzel <> "" AND STARTSWITH(pfa[pq].wert$(0), "/" + gKimWurzel) AND pfa[pq].kind("reference").wert$(0) <> "" THEN RETURN pfa[pq].kind("reference").wert$(0)
+            NEXT
+        NEXT
         IF LEN(pr) > 0 THEN
             DIM pf AS SAusdruck : pf = pr[0].kind("path")
             IF pf.kind("reference").wert$(0) <> "" THEN RETURN pf.kind("reference").wert$(0)
@@ -742,8 +751,12 @@ SUB kimBusLabels(bl AS Blatt)
     FOR i = 0 TO LEN(bl.labels) - 1
         DIM la AS Label : la = bl.labels[i]
         DIM bx AS INTEGER : bx = busAn(bl, la.anker.x, la.anker.y)
-        IF bx >= 0 AND la.art = LA_LOKAL THEN
+        ' auch ein hierarchisches oder globales Label benennt den Bus (in
+        ' Unterblaettern meist das einzige); diese bleiben stehen -- das
+        ' hierarchische ist der Bus-Port
+        IF bx >= 0 THEN
             IF bl.busse[bx].name = "" THEN bl.busse[bx].name = la.text
+            IF la.art <> LA_LOKAL THEN ARRAY_PUSH(bleiben, la)
         ELSE
             ARRAY_PUSH(bleiben, la)
         END IF
@@ -818,6 +831,17 @@ SUB kimPortsAnschliessen(e AS KicadErgebnis)
             kimHinweis(e, "Port fehlt " + kp.name, "Blatt-Pin ohne hierarchisches Label im Unterblatt -- nicht angeschlossen")
             CONTINUE
         END IF
+        DIM pp AS Punkt : pp = kp.teil.pinPunkt(pi2)
+        IF istBusName(kp.name) THEN
+            ' Bus-Port: ein Bus vom KiCad-Anschluss zum Port (ein Bus verbindet
+            ' nichts, kann also quer laufen); er gehoert zum Bus am Anschluss
+            DIM pb AS Bus : pb = NEW Bus("")
+            ARRAY_PUSH(pb.punkte, kp.ort)
+            IF kp.ort.x <> pp.x AND kp.ort.y <> pp.y THEN ARRAY_PUSH(pb.punkte, NEW Punkt(pp.x, kp.ort.y))
+            ARRAY_PUSH(pb.punkte, pp)
+            ARRAY_PUSH(kp.blatt.busse, pb)
+            CONTINUE
+        END IF
         ' Name frei? sonst mit dem Blattnamen davor
         DIM nm AS STRING : nm = kp.name
         DIM belegt AS BOOLEAN : belegt = FALSE
@@ -828,7 +852,6 @@ SUB kimPortsAnschliessen(e AS KicadErgebnis)
         DIM la AS Label : la = NEW Label(nm, kp.ort, LA_LOKAL)
         la.drehung = kp.drehung
         ARRAY_PUSH(kp.blatt.labels, la)
-        DIM pp AS Punkt : pp = kp.teil.pinPunkt(pi2)
         DIM lb AS Label : lb = NEW Label(nm, pp, LA_LOKAL)
         lb.drehung = (transformRichtung(kp.teil.lage, kp.teil.sym.pins[pi2].richtung) + 180) MOD 360
         ARRAY_PUSH(kp.blatt.labels, lb)
@@ -842,11 +865,9 @@ FUNCTION kicadAusText(text AS STRING, name AS STRING, ordner AS STRING) AS Kicad
     gKimSymbole = []
     gKimTeile = []
     gKimPaare = []
-    DIM leerS AS MAP OF STRING
-    gKimBlattUuid = leerS
-    gKimV6 = leerS
-    DIM leer AS MAP OF INTEGER
-    gKimZaehler = leer
+    gKimBlattUuid = {}
+    gKimV6 = {}
+    gKimZaehler = {}
     DIM w AS SAusdruck : w = sLesen(text)
     IF w.kopf <> "kicad_sch" THEN
         e.fehler = "Das ist kein KiCad-Schaltplan (kicad_sch fehlt)."
@@ -869,6 +890,7 @@ FUNCTION kicadAusText(text AS STRING, name AS STRING, ordner AS STRING) AS Kicad
     blattSymboleAktualisieren(e.dok)
     kimPortsAnschliessen(e)
     kimInstanzRefs(e)
+    instanzenPflegen(e.dok)
     ' Hinweise mit Anzahl
     DIM i AS INTEGER
     FOR i = 0 TO LEN(e.hinweise) - 1

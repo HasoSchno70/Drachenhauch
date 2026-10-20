@@ -63,7 +63,7 @@ DIM gPlMeldung AS STRING          ' kurze Rueckmeldung in der Statuszeile
 
 FUNCTION platineBericht() AS kern.PlatBericht
     IF NOT gPlGueltig THEN
-        gPlBericht = kern.platinePruefen(gDok)
+        gPlBericht = kern.platinePruefen(aktuellesFlach())
         gPlGueltig = TRUE
     END IF
     RETURN gPlBericht
@@ -158,7 +158,7 @@ SUB ansichtWechseln(a AS INTEGER)
         DIM verwaist AS INTEGER : verwaist = 0
         DIM i AS INTEGER
         FOR i = 0 TO LEN(gDok.platine.teile) - 1
-            IF NOT kern.bauteilMitId(gDok, gDok.platine.teile[i].bauteilId, b) THEN
+            IF NOT kern.bauteilMitId(aktuellesFlach(), gDok.platine.teile[i].bauteilId, b) THEN
                 verwaist = verwaist + 1
             ELSEIF b.sym.einheitLeistung THEN
                 verwaist = verwaist + 1
@@ -312,7 +312,7 @@ SUB platineZeichnen(cr AS INTEGER, bw AS FLOAT, bh AS FLOAT)
     DIM hinweis AS STRING
     FOR i = 0 TO LEN(pl.teile) - 1
         DIM b AS kern.Bauteil
-        IF NOT kern.bauteilMitId(gDok, pl.teile[i].bauteilId, b) THEN CONTINUE
+        IF NOT kern.bauteilMitId(aktuellesFlach(), pl.teile[i].bauteilId, b) THEN CONTINUE
         DIM bfm AS kern.Bauform : bfm = kern.bauformFuer(b, hinweis)
         DIM s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER
         kern.teilFlaeche(pl.teile[i], bfm, s0, z0, s1, z1)
@@ -379,7 +379,7 @@ FUNCTION plTeilAn(s AS INTEGER, z AS INTEGER) AS INTEGER
     DIM i AS INTEGER
     FOR i = LEN(pl.teile) - 1 TO 0 STEP -1
         DIM b AS kern.Bauteil
-        IF NOT kern.bauteilMitId(gDok, pl.teile[i].bauteilId, b) THEN CONTINUE
+        IF NOT kern.bauteilMitId(aktuellesFlach(), pl.teile[i].bauteilId, b) THEN CONTINUE
         DIM s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER
         kern.teilFlaeche(pl.teile[i], kern.bauformFuer(b, hinweis), s0, z0, s1, z1)
         IF s >= s0 AND s <= s1 AND z >= z0 AND z <= z1 THEN RETURN i
@@ -556,7 +556,7 @@ SUB plRahmenAnwenden(x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT, dazu AS
     DIM i AS INTEGER
     FOR i = 0 TO LEN(gDok.platine.teile) - 1
         DIM b AS kern.Bauteil
-        IF NOT kern.bauteilMitId(gDok, gDok.platine.teile[i].bauteilId, b) THEN CONTINUE
+        IF NOT kern.bauteilMitId(aktuellesFlach(), gDok.platine.teile[i].bauteilId, b) THEN CONTINUE
         DIM s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER
         kern.teilFlaeche(gDok.platine.teile[i], kern.bauformFuer(b, hinweis), s0, z0, s1, z1)
         IF s0 >= sa AND s1 <= se AND z0 >= za AND z1 <= ze AND NOT plIstGewaehlt(i) THEN ARRAY_PUSH(m, i)
@@ -578,7 +578,7 @@ SUB plDrehen()
         DIM t AS kern.PlatTeil : t = pl.teile[m[0]]
         t.drehung = (t.drehung + 90) MOD 360
         DIM b AS kern.Bauteil
-        IF kern.bauteilMitId(gDok, t.bauteilId, b) THEN kern.teilInsFeld(pl, t, kern.bauformFuer(b, hinweis))
+        IF kern.bauteilMitId(aktuellesFlach(), t.bauteilId, b) THEN kern.teilInsFeld(pl, t, kern.bauformFuer(b, hinweis))
         geaendert()
         RETURN
     END IF
@@ -615,7 +615,7 @@ SUB plGruppenFlaeche(m AS ARRAY OF INTEGER, BYREF g0 AS INTEGER, BYREF h0 AS INT
     DIM erst AS BOOLEAN : erst = TRUE
     FOR k = 0 TO LEN(m) - 1
         DIM b AS kern.Bauteil
-        IF NOT kern.bauteilMitId(gDok, gDok.platine.teile[m[k]].bauteilId, b) THEN CONTINUE
+        IF NOT kern.bauteilMitId(aktuellesFlach(), gDok.platine.teile[m[k]].bauteilId, b) THEN CONTINUE
         DIM s0 AS INTEGER, z0 AS INTEGER, s1 AS INTEGER, z1 AS INTEGER
         kern.teilFlaeche(gDok.platine.teile[m[k]], kern.bauformFuer(b, hinweis), s0, z0, s1, z1)
         IF erst OR s0 < g0 THEN g0 = s0

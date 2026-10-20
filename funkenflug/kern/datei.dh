@@ -34,6 +34,7 @@ FUNCTION dokumentNachJson(dok AS Dokument) AS JSON_HANDLE
         JSON_SET_STRING(b, "name", bl.name)
         JSON_SET_INT(b, "breite", bl.breite)
         JSON_SET_INT(b, "hoehe", bl.hoehe)
+        IF bl.erste <> "" THEN JSON_SET_STRING(b, "erste", bl.erste)
         JSON_SET_JSON(b, "bauteile", JSON_NEW_ARRAY())
         FOR ci = 0 TO LEN(bl.bauteile) - 1
             DIM bt AS Bauteil : bt = bl.bauteile[ci]
@@ -134,6 +135,7 @@ FUNCTION dokumentAusJson(j AS JSON_HANDLE) AS Dokument
         IF JSON_HAS(j, bp + ".id") THEN bl.id = JSON_GET_STRING(j, bp + ".id")
         IF JSON_HAS(j, bp + ".breite") THEN bl.breite = JSON_GET_INT(j, bp + ".breite")
         IF JSON_HAS(j, bp + ".hoehe") THEN bl.hoehe = JSON_GET_INT(j, bp + ".hoehe")
+        IF JSON_HAS(j, bp + ".erste") THEN bl.erste = JSON_GET_STRING(j, bp + ".erste")
         ' Bauteile
         FOR ci = 0 TO JSON_LEN(j, bp + ".bauteile") - 1
             DIM cp AS STRING : cp = bp + ".bauteile." + STR$(ci)
@@ -181,7 +183,8 @@ FUNCTION dokumentAusJson(j AS JSON_HANDLE) AS Dokument
         END IF
         IF JSON_HAS(j, bp + ".busse") THEN
             FOR li = 0 TO JSON_LEN(j, bp + ".busse") - 1
-                ARRAY_PUSH(bl.busse, busAusJson(j, bp + ".busse." + STR$(li)))
+                DIM bj AS Bus : bj = busAusJson(j, bp + ".busse." + STR$(li))
+                IF LEN(bj.punkte) >= 2 THEN ARRAY_PUSH(bl.busse, bj)
             NEXT
         END IF
         autoKnoten(bl)
@@ -189,6 +192,7 @@ FUNCTION dokumentAusJson(j AS JSON_HANDLE) AS Dokument
     NEXT
     IF JSON_HAS(j, "platine") THEN dok.platine = platineAusJson(j, "platine")
     blattSymboleAktualisieren(dok)
+    instanzenPflegen(dok)
     RETURN dok
 END FUNCTION
 

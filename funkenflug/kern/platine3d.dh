@@ -208,6 +208,17 @@ FUNCTION achteck3(x AS FLOAT, y AS FLOAT, r AS FLOAT) AS ARRAY OF FLOAT
     RETURN g
 END FUNCTION
 
+' Ein Streifen der halben Breite h von a nach b (beliebige Richtung)
+FUNCTION band3(xa AS FLOAT, ya AS FLOAT, xb AS FLOAT, yb AS FLOAT, h AS FLOAT) AS ARRAY OF FLOAT
+    DIM dx AS FLOAT : dx = xb - xa
+    DIM dy AS FLOAT : dy = yb - ya
+    DIM l AS FLOAT : l = SQR(dx * dx + dy * dy)
+    IF l < 0.000001 THEN RETURN rechteck3(xa - h, ya - h, xa + h, ya + h)
+    DIM nx AS FLOAT : nx = -dy / l * h
+    DIM ny AS FLOAT : ny = dx / l * h
+    RETURN [xa + nx, ya + ny, xb + nx, yb + ny, xb - nx, yb - ny, xa - nx, ya - ny]
+END FUNCTION
+
 FUNCTION rechteck3(x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT) AS ARRAY OF FLOAT
     RETURN [x0, y0, x1, y0, x1, y1, x0, y1]
 END FUNCTION
@@ -262,11 +273,15 @@ END FUNCTION
 SUB bein3(m AS Modell3, x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT, h AS FLOAT, d AS FLOAT, farbe AS INTEGER)
     DIM r AS FLOAT : r = d / 2
     quader3(m, x0 - r, y0 - r, 0, x0 + r, y0 + r, h + r, farbe)
+    IF ABS(x1 - x0) < 0.001 AND ABS(y1 - y0) < 0.001 THEN RETURN      ' ein einzelnes Bein
     quader3(m, x1 - r, y1 - r, 0, x1 + r, y1 + r, h + r, farbe)
-    IF ABS(x1 - x0) > ABS(y1 - y0) THEN
+    IF ABS(x1 - x0) < 0.001 THEN
+        quader3(m, x0 - r, y0, h - r, x1 + r, y1, h + r, farbe)
+    ELSEIF ABS(y1 - y0) < 0.001 THEN
         quader3(m, x0, y0 - r, h - r, x1, y1 + r, h + r, farbe)
     ELSE
-        quader3(m, x0 - r, y0, h - r, x1 + r, y1, h + r, farbe)
+        ' schraeg: ein duenner Zylinder, keine Platte ueber das ganze Rechteck
+        zylinder3(m, x0, y0, h, x1, y1, h, r, 6, farbe, farbe)
     END IF
 END SUB
 
@@ -506,17 +521,40 @@ FUNCTION platineModell3(dok AS Dokument) AS Modell3
         DIM ya AS FLOAT : ya = p3Y(pl, ba.z1)
         DIM xb AS FLOAT : xb = p3X(pl, ba.s2)
         DIM yb AS FLOAT : yb = p3Y(pl, ba.z2)
-        IF ba.art = BA_LOET THEN
-            aufdruck3(m, FALSE, rechteck3(MIN(xa, xb) - 0.45, MIN(ya, yb) - 0.45, MAX(xa, xb) + 0.45, MAX(ya, yb) + 0.45), zinn, 0.05)
+        IF ba.art = BA_LOET AND (ba.s1 = ba.s2 OR ba.z1 = ba.z2) THEN
+            aufdruck3(m, FALSE, rechteck3(MIN(xa, xb) - 0.45, MIN(ya, yb) - 0.45, MAX(xa, xb) + 0.45, MAX(ya, yb) + 0.45), zinn, 0.09)
+        ELSEIF ba.art = BA_LOET THEN
+            ' schraeg: verbindet nur die Enden -- ein Draht unten
+            aufdruck3(m, FALSE, band3(xa, ya, xb, yb, 0.3), zinn, 0.09)
         ELSE
             bein3(m, xa, ya, xb, yb, 1.0, 0.6, &HD0D4DA)
         END IF
     NEXT
     ' Loecher (oben und unten) und Loetpunkte an den benutzten
     DIM benutzt AS MAP OF INTEGER
-    DIM r AS PlatBericht : r = platinePruefen(dok)
-    FOR i = 0 TO LEN(r.pads) - 1
-        MAPPUT(benutzt, lochKey$(r.pads[i].s, r.pads[i].z), 1)
+    DIM ti AS INTEGER, tj AS INTEGER
+    FOR ti = 0 TO LEN(pl.teile) - 1
+        DIM tb AS Bauteil
+        IF NOT bauteilMitId(dok, pl.teile[ti].bauteilId, tb) THEN CONTINUE
+        DIM thw AS STRING
+        DIM tbf AS Bauform : tbf = bauformFuer(tb, thw)
+        FOR tj = 0 TO LEN(tbf.pins) - 1
+            DIM tlo AS Punkt : tlo = lochVon(pl.teile[ti], tbf.pins[tj])
+            MAPPUT(benutzt, lochKey$(tlo.x, tlo.y), 1)
+        NEXT
+    NEXT
+    ' unter einer geraden Loetbahn ist jedes Loch zugeloetet
+    FOR i = 0 TO LEN(pl.bahnen) - 1
+        DIM bz AS Bahn : bz = pl.bahnen[i]
+        IF bz.art <> BA_LOET OR (bz.s1 <> bz.s2 AND bz.z1 <> bz.z2) THEN CONTINUE
+        DIM ps AS INTEGER : ps = bz.s1
+        DIM pz AS INTEGER : pz = bz.z1
+        WHILE TRUE
+            MAPPUT(benutzt, lochKey$(ps, pz), 1)
+            IF ps = bz.s2 AND pz = bz.z2 THEN BREAK
+            ps = ps + SIGN(bz.s2 - bz.s1)
+            pz = pz + SIGN(bz.z2 - bz.z1)
+        WEND
     NEXT
     FOR i = 0 TO LEN(pl.bahnen) - 1
         MAPPUT(benutzt, lochKey$(pl.bahnen[i].s1, pl.bahnen[i].z1), 1)

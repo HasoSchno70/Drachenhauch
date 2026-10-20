@@ -20,8 +20,60 @@
 ' Busse, die sich beruehren, sind eine Gruppe mit einem Namen.
 
 
+' Teile eines Busnamens: Komma oder Leerzeichen trennen, nicht innerhalb {}
+FUNCTION busTeile(t AS STRING) AS ARRAY OF STRING
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM akt AS STRING : akt = ""
+    DIM tiefe AS INTEGER : tiefe = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        DIM c AS STRING : c = MID$(t, i, 1)
+        IF c = "{" THEN tiefe = tiefe + 1
+        IF c = "}" THEN tiefe = tiefe - 1
+        IF (c = "," OR c = " ") AND tiefe = 0 THEN
+            IF akt <> "" THEN ARRAY_PUSH(teile, akt)
+            akt = ""
+        ELSE
+            akt = akt + c
+        END IF
+    NEXT
+    IF akt <> "" THEN ARRAY_PUSH(teile, akt)
+    RETURN teile
+END FUNCTION
+
+' NAME[a..b] bzw. NAME[a:b] mit Zahlen (IO[3] ist ein gewoehnlicher Name)
+FUNCTION istBusVektor(p AS STRING) AS BOOLEAN
+    DIM e AS INTEGER : e = INSTR(p, "[")
+    IF e <= 0 OR NOT ENDSWITH(p, "]") THEN RETURN FALSE
+    DIM innen AS STRING : innen = MID$(p, e + 1, LEN(p) - e - 2)
+    DIM ab AS ARRAY OF STRING : ab = SPLIT$(innen, IIF(CONTAINS(innen, ".."), "..", ":"))
+    DIM v AS INTEGER
+    IF LEN(ab) <> 2 THEN RETURN FALSE
+    RETURN ganzzahlLesen(ab[0], v) AND ganzzahlLesen(ab[1], v)
+END FUNCTION
+
+' Vorsatz{A B} -- aber nicht ~{RESET} (Ueberstrich), ^{..}, _{..} und
+' KiCads Ersatzzeichen wie {slash}: eine Gruppe nennt mehrere Mitglieder
+FUNCTION istBusGruppe(p AS STRING) AS BOOLEAN
+    DIM g AS INTEGER : g = INSTR(p, "{")
+    IF g < 0 OR NOT ENDSWITH(p, "}") THEN RETURN FALSE
+    IF g > 0 THEN
+        IF CONTAINS("~^_", MID$(p, g - 1, 1)) THEN RETURN FALSE
+    END IF
+    DIM innen AS STRING : innen = MID$(p, g + 1, LEN(p) - g - 2)
+    RETURN CONTAINS(innen, " ") OR CONTAINS(innen, ",")
+END FUNCTION
+
+' Ein Busname nennt mindestens einen Vektor oder eine Gruppe. Ein Netzname
+' mit Ueberstrich (~{RESET}) oder eckigen Klammern (IO[3]) ist keiner.
 FUNCTION istBusName(t AS STRING) AS BOOLEAN
-    RETURN (CONTAINS(t, "[") AND CONTAINS(t, "]")) OR (CONTAINS(t, "{") AND CONTAINS(t, "}"))
+    IF NOT (CONTAINS(t, "[") OR CONTAINS(t, "{")) THEN RETURN FALSE
+    DIM teile AS ARRAY OF STRING : teile = busTeile(TRIM$(t))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 1
+        IF istBusVektor(teile[i]) OR istBusGruppe(teile[i]) THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
 END FUNCTION
 
 ' Mitglieder aus dem Namen; fehler <> "" bei einem unlesbaren Namen.
@@ -241,7 +293,7 @@ SUB ercBusBlatt(dok AS Dokument, n AS Netze, bi AS INTEGER, BYREF warnungen AS A
         DIM namen AS MAP OF STRING
         DIM mitglied AS MAP OF STRING      ' "gruppe|mitglied" -> 1
         FOR i = 0 TO LEN(bl.busse) - 1
-            IF g[i] <> i THEN CONTINUE
+            IF g[i] <> i OR LEN(bl.busse[i].punkte) = 0 THEN CONTINUE
             DIM wid AS STRING
             DIM nm AS STRING : nm = busGruppenName$(bl, g, i, wid)
             DIM ort AS Punkt : ort = bl.busse[i].punkte[0]
@@ -294,17 +346,29 @@ SUB ercBusBlatt(dok AS Dokument, n AS Netze, bi AS INTEGER, BYREF warnungen AS A
 END SUB
 
 ' Bus-Ports: jedes Mitglied mit dem gleichnamigen Netz im Elternblatt
-SUB busPortVerbinden(dok AS Dokument, n AS Netze, eltern AS INTEGER, kind AS INTEGER, name AS STRING)
+' Haengt am Port ein Bus des Elternblatts mit gleich vielen Mitgliedern
+' (DATA[0..7] am Port D[0..7]), gilt die Stelle: DATA0 <-> D0 wie in KiCad.
+' Sonst verbinden gleiche Namen.
+SUB busPortVerbinden(dok AS Dokument, n AS Netze, eltern AS INTEGER, kind AS INTEGER, name AS STRING, px AS INTEGER, py AS INTEGER)
     DIM fe AS STRING
     DIM m AS ARRAY OF STRING : m = busMitglieder(name, fe)
     IF fe <> "" THEN RETURN
+    DIM oben AS ARRAY OF STRING : oben = m
+    DIM ebl AS Blatt : ebl = dok.blaetter[eltern]
+    DIM bx AS INTEGER : bx = busAn(ebl, px, py)
+    IF bx >= 0 THEN
+        DIM g AS ARRAY OF INTEGER : g = busGruppen(ebl)
+        DIM wid AS STRING, fe2 AS STRING
+        DIM pm AS ARRAY OF STRING : pm = busMitglieder(busGruppenName$(ebl, g, g[bx], wid), fe2)
+        IF fe2 = "" AND LEN(pm) = LEN(m) THEN oben = pm
+    END IF
     DIM i AS INTEGER, k AS INTEGER
     FOR i = 0 TO LEN(m) - 1
         DIM erst AS INTEGER : erst = -1
         n.blattWaehlen(eltern)
         FOR k = 0 TO LEN(dok.blaetter[eltern].labels) - 1
             DIM la AS Label : la = dok.blaetter[eltern].labels[k]
-            IF la.text = m[i] THEN
+            IF la.text = oben[i] THEN
                 erst = n.punkt(la.anker.x, la.anker.y)
                 BREAK
             END IF

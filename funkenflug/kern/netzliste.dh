@@ -97,7 +97,9 @@ END FUNCTION
 ' Wert in SPICE-Schreibweise: RKM-Notation (4k7 -> 4.7k, 2R2 -> 2.2),
 ' Einheiten-R weg, "M" (Mega) -> "Meg" (in SPICE heisst M milli!), u statt µ.
 FUNCTION spiceWert$(w AS STRING) AS STRING
-    DIM s AS STRING : s = REPLACE$(REPLACE$(TRIM$(w), "µ", "u"), "Ω", "")
+    ' 4,7k -> 4.7k, "100 nF" -> 100nF: Komma und Leerzeichen trennt ngspice
+    DIM s AS STRING : s = REPLACE$(REPLACE$(REPLACE$(REPLACE$(TRIM$(w), "µ", "u"), "Ω", ""), ",", "."), " ", "")
+    IF ENDSWITH(LOWER$(s), "ohm") THEN s = LEFT$(s, LEN(s) - 3)
     IF s = "" THEN RETURN "0"
     ' RKM: Ziffer, Buchstabe, Ziffer (MID$ zaehlt ab 0)
     DIM i AS INTEGER

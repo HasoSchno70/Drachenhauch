@@ -267,6 +267,7 @@ END SUB
 SUB geaendert()
     gAenderungen = gAenderungen + 1           ' fuer den Autosave
     kern.blattSymboleAktualisieren(gDok)   ' Ports folgen den Labels der Unterblaetter
+    kern.instanzenPflegen(gDok)             ' neue erste Instanz uebernimmt ihre Referenzen
     netzeVeraltet()
     gGeaendert = TRUE
     titelNachziehen()
@@ -278,9 +279,10 @@ FUNCTION naechsteReferenz(praefix AS STRING) AS STRING
     IF LEFT$(praefix, 1) = "#" THEN RETURN ""        ' Leistungssymbole ohne Referenz
     DIM groesste AS INTEGER : groesste = 0
     DIM bi AS INTEGER, i AS INTEGER
-    FOR bi = 0 TO LEN(gDok.blaetter) - 1                 ' ueber alle Blaetter
-        FOR i = 0 TO LEN(gDok.blaetter[bi].bauteile) - 1
-            DIM r AS STRING : r = gDok.blaetter[bi].bauteile[i].referenz
+    DIM f AS kern.Dokument : f = aktuellesFlach()      ' alle Blaetter und Instanzen
+    FOR bi = 0 TO LEN(f.blaetter) - 1
+        FOR i = 0 TO LEN(f.blaetter[bi].bauteile) - 1
+            DIM r AS STRING : r = f.blaetter[bi].bauteile[i].referenz
             IF LEN(r) > LEN(praefix) AND LEFT$(r, LEN(praefix)) = praefix THEN
                 DIM n AS INTEGER : n = VAL(MID$(r, LEN(praefix)))     ' MID$ zaehlt ab 0
                 IF n > groesste THEN groesste = n
@@ -294,9 +296,10 @@ END FUNCTION
 FUNCTION referenzBelegt(ref AS STRING, ausser AS kern.Bauteil) AS BOOLEAN
     IF ref = "" THEN RETURN FALSE
     DIM bi AS INTEGER, i AS INTEGER
-    FOR bi = 0 TO LEN(gDok.blaetter) - 1                 ' ueber alle Blaetter
-        FOR i = 0 TO LEN(gDok.blaetter[bi].bauteile) - 1
-            DIM b AS kern.Bauteil : b = gDok.blaetter[bi].bauteile[i]
+    DIM f AS kern.Dokument : f = aktuellesFlach()      ' alle Blaetter und Instanzen
+    FOR bi = 0 TO LEN(f.blaetter) - 1
+        FOR i = 0 TO LEN(f.blaetter[bi].bauteile) - 1
+            DIM b AS kern.Bauteil : b = f.blaetter[bi].bauteile[i]
             IF b <> ausser AND b.referenz = ref THEN RETURN TRUE
         NEXT
     NEXT

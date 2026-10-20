@@ -133,6 +133,27 @@ END SUB
 
 ' --- Mehrfach-Instanzen ----------------------------------------------------------
 
+' Steckt Blatt "ziel" (ueber beliebig viele Ebenen) in Blatt "von"? Ein Blatt
+' kann jetzt mehrere Eltern haben -- die erste Eltern-Kette (elternVon) reicht
+' fuer Zyklen nicht mehr.
+FUNCTION blattEnthaelt(dok AS Dokument, von AS INTEGER, ziel AS INTEGER) AS BOOLEAN
+    DIM besucht AS MAP OF INTEGER
+    DIM stapel AS ARRAY OF INTEGER : stapel = [von]
+    WHILE LEN(stapel) > 0
+        DIM bi AS INTEGER : bi = ARRAY_POP(stapel)
+        IF MAPHAS(besucht, STR$(bi)) THEN CONTINUE
+        MAPPUT(besucht, STR$(bi), 1)
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
+            DIM ki AS INTEGER : ki = kindIndex(dok, dok.blaetter[bi].bauteile[i])
+            IF ki < 0 THEN CONTINUE
+            IF ki = ziel THEN RETURN TRUE
+            ARRAY_PUSH(stapel, ki)
+        NEXT
+    WEND
+    RETURN FALSE
+END FUNCTION
+
 ' Steckt irgendein Blatt mehr als einmal als Unterblatt?
 FUNCTION mehrfachInstanzen(dok AS Dokument) AS BOOLEAN
     DIM gesehen AS MAP OF INTEGER
@@ -174,6 +195,7 @@ FUNCTION blattHuelle(bl AS Blatt, quelle AS INTEGER) AS Blatt
     h.labels = bl.labels
     h.busse = bl.busse
     h.quelle = quelle
+    h.erste = bl.erste
     RETURN h
 END FUNCTION
 
@@ -203,7 +225,7 @@ FUNCTION instanzKopie(orig AS Blatt, quelle AS INTEGER, pfad AS STRING, n AS INT
     RETURN k
 END FUNCTION
 
-SUB flachAbsteigen(dok AS Dokument, f AS Dokument, fi AS INTEGER, pfad AS STRING, BYREF zaehler AS MAP OF INTEGER, tiefe AS INTEGER)
+SUB flachAbsteigen(dok AS Dokument, f AS Dokument, fi AS INTEGER, pfad AS STRING, BYREF zaehler AS MAP OF INTEGER, tiefe AS INTEGER, kette AS STRING)
     IF tiefe > LEN(dok.blaetter) THEN RETURN          ' Zyklus: meldet der ERC
     DIM bl AS Blatt : bl = f.blaetter[fi]
     DIM j AS INTEGER
@@ -212,6 +234,8 @@ SUB flachAbsteigen(dok AS Dokument, f AS Dokument, fi AS INTEGER, pfad AS STRING
         IF NOT istBlattVerweis(b.symbolRef) THEN CONTINUE
         DIM ki AS INTEGER : ki = blattIndexMitId(dok, MID$(b.symbolRef, LEN(BLATT_VORSATZ)))
         IF ki < 0 THEN CONTINUE
+        ' ein Kreis (das Blatt liegt schon auf dem Weg): nicht ausrollen, der ERC meldet ihn
+        IF CONTAINS(kette, "," + STR$(ki) + ",") THEN CONTINUE
         DIM vid AS STRING : vid = IIF(b.vorlageId <> "", b.vorlageId, b.id)
         DIM kp AS STRING : kp = pfad + "/" + vid
         DIM n AS INTEGER : n = MAPGETOR(zaehler, STR$(ki), 0) + 1
@@ -219,7 +243,7 @@ SUB flachAbsteigen(dok AS Dokument, f AS Dokument, fi AS INTEGER, pfad AS STRING
         IF NOT MAPHAS(f.nummern, vid) THEN MAPPUT(f.nummern, vid, n)
         IF n = 1 THEN
             f.blaetter[ki].instanz = kp
-            flachAbsteigen(dok, f, ki, kp, zaehler, tiefe + 1)
+            flachAbsteigen(dok, f, ki, kp, zaehler, tiefe + 1, kette + STR$(ki) + ",")
         ELSE
             DIM kopie AS Blatt : kopie = instanzKopie(dok.blaetter[ki], ki, kp, n)
             ARRAY_PUSH(f.blaetter, kopie)
@@ -227,7 +251,7 @@ SUB flachAbsteigen(dok AS Dokument, f AS Dokument, fi AS INTEGER, pfad AS STRING
             bs.symbolRef = BLATT_VORSATZ + kopie.id
             bs.vorlageId = vid
             bl.bauteile[j] = bs
-            flachAbsteigen(dok, f, LEN(f.blaetter) - 1, kp, zaehler, tiefe + 1)
+            flachAbsteigen(dok, f, LEN(f.blaetter) - 1, kp, zaehler, tiefe + 1, kette + STR$(ki) + ",")
         END IF
     NEXT
 END SUB
@@ -252,10 +276,105 @@ FUNCTION flach(dok AS Dokument) AS Dokument
     NEXT
     DIM zaehler AS MAP OF INTEGER
     FOR i = 0 TO LEN(dok.blaetter) - 1
-        IF elternVon(dok, i) < 0 THEN flachAbsteigen(dok, f, i, "", zaehler, 0)
+        IF elternVon(dok, i) < 0 THEN flachAbsteigen(dok, f, i, "", zaehler, 0, "," + STR$(i) + ",")
     NEXT
     RETURN f
 END FUNCTION
+
+' Alle Instanzpfade je Blatt-Id, in der Reihenfolge von flach (die erste = die,
+' die das Original stellt). Auch fuer Blaetter, die nur einmal stecken.
+SUB pfadeSammeln(dok AS Dokument, bi AS INTEGER, pfad AS STRING, kette AS STRING, BYREF pfade AS MAP OF STRING, tiefe AS INTEGER)
+    IF tiefe > LEN(dok.blaetter) THEN RETURN
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(dok.blaetter[bi].bauteile) - 1
+        DIM b AS Bauteil : b = dok.blaetter[bi].bauteile[j]
+        DIM ki AS INTEGER : ki = kindIndex(dok, b)
+        IF ki < 0 THEN CONTINUE
+        IF CONTAINS(kette, "," + STR$(ki) + ",") THEN CONTINUE
+        DIM kp AS STRING : kp = pfad + "/" + b.id
+        DIM schl AS STRING : schl = dok.blaetter[ki].id
+        MAPPUT(pfade, schl, MAPGETOR(pfade, schl, "") + kp + CHR$(10))
+        pfadeSammeln(dok, ki, kp, kette + STR$(ki) + ",", pfade, tiefe + 1)
+    NEXT
+END SUB
+
+FUNCTION instanzPfade(dok AS Dokument) AS MAP OF STRING
+    DIM pfade AS MAP OF STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(dok.blaetter) - 1
+        IF elternVon(dok, i) < 0 THEN pfadeSammeln(dok, i, "", "," + STR$(i) + ",", pfade, 0)
+    NEXT
+    RETURN pfade
+END FUNCTION
+
+' Die erste Instanz stellt das Original (Ids, Referenzen). Faellt sie weg
+' (Blattsymbol geloescht, ausgeschnitten und eingefuegt) oder rueckt eine
+' andere nach vorn, uebernimmt die neue erste ihre EIGENEN Referenzen und
+' Platinen-Plaetze -- sonst stuende sie mit denen der alten da. Nach jeder
+' Aenderung aufrufen (die Oberflaeche tut es in geaendert(), Laden auch).
+SUB instanzenPflegen(dok AS Dokument)
+    DIM pfade AS MAP OF STRING : pfade = instanzPfade(dok)
+    DIM bi AS INTEGER, i AS INTEGER, k AS INTEGER
+    FOR bi = 0 TO LEN(dok.blaetter) - 1
+        DIM bl AS Blatt : bl = dok.blaetter[bi]
+        DIM liste AS ARRAY OF STRING : liste = []
+        DIM roh AS ARRAY OF STRING : roh = SPLIT$(MAPGETOR(pfade, bl.id, ""), CHR$(10))
+        FOR i = 0 TO LEN(roh) - 1
+            IF roh[i] <> "" THEN ARRAY_PUSH(liste, roh[i])
+        NEXT
+        IF LEN(liste) = 0 THEN
+            bl.erste = ""
+            CONTINUE
+        END IF
+        DIM neu AS STRING : neu = liste[0]
+        DIM gilt AS MAP OF INTEGER
+        gilt = {}                         ' je Blatt frisch (DIM in der Schleife tut es nicht)
+        FOR i = 0 TO LEN(liste) - 1
+            MAPPUT(gilt, liste[i], 1)
+        NEXT
+        IF bl.erste <> "" AND bl.erste <> neu THEN
+            DIM altDa AS BOOLEAN : altDa = MAPHAS(gilt, bl.erste)
+            FOR i = 0 TO LEN(bl.bauteile) - 1
+                DIM b AS Bauteil : b = bl.bauteile[i]
+                IF istBlattVerweis(b.symbolRef) THEN CONTINUE
+                ' hat die neue erste eigene Platinen-Plaetze?
+                DIM eigene AS BOOLEAN : eigene = FALSE
+                FOR k = 0 TO LEN(dok.platine.teile) - 1
+                    IF dok.platine.teile[k].bauteilId = b.id + "@" + neu THEN eigene = TRUE
+                NEXT
+                DIM neueTeile AS ARRAY OF PlatTeil : neueTeile = []
+                FOR k = 0 TO LEN(dok.platine.teile) - 1
+                    DIM t AS PlatTeil : t = dok.platine.teile[k]
+                    IF t.bauteilId = b.id AND eigene THEN
+                        ' der Platz der alten ersten: bleibt bei ihr oder geht mit ihr
+                        IF NOT altDa THEN CONTINUE
+                        t.bauteilId = b.id + "@" + bl.erste
+                    ELSEIF t.bauteilId = b.id + "@" + neu THEN
+                        t.bauteilId = b.id
+                    END IF
+                    ARRAY_PUSH(neueTeile, t)
+                NEXT
+                dok.platine.teile = neueTeile
+                ' Referenzen tauschen
+                IF MAPHAS(b.instanzRefs, neu) THEN
+                    IF altDa THEN MAPPUT(b.instanzRefs, bl.erste, b.referenz)
+                    b.referenz = MAPGET(b.instanzRefs, neu)
+                    MAPREMOVE(b.instanzRefs, neu)
+                ELSEIF altDa THEN
+                    MAPPUT(b.instanzRefs, bl.erste, b.referenz)
+                END IF
+            NEXT
+        END IF
+        bl.erste = neu
+        ' Referenzen weggefallener Instanzen vergessen
+        FOR i = 0 TO LEN(bl.bauteile) - 1
+            DIM schl AS ARRAY OF STRING : schl = MAPKEYS(bl.bauteile[i].instanzRefs)
+            FOR k = 0 TO LEN(schl) - 1
+                IF NOT MAPHAS(gilt, schl[k]) OR schl[k] = neu THEN MAPREMOVE(bl.bauteile[i].instanzRefs, schl[k])
+            NEXT
+        NEXT
+    NEXT
+END SUB
 
 ' Index des Blatts einer Instanz in der ausgerollten Sicht (sonst das Original)
 FUNCTION flachIndex(f AS Dokument, bi AS INTEGER, pfad AS STRING) AS INTEGER
@@ -293,7 +412,8 @@ SUB portsVerbinden(dok AS Dokument, n AS Netze)
             FOR j = 0 TO LEN(b.sym.pins) - 1
                 IF istBusName(b.sym.pins[j].name) THEN
                     ' Bus-Port: jedes Mitglied ueber seinen Namen
-                    busPortVerbinden(dok, n, bi, ki, b.sym.pins[j].name)
+                    DIM bpp AS Punkt : bpp = b.pinPunkt(j)
+                    busPortVerbinden(dok, n, bi, ki, b.sym.pins[j].name, bpp.x, bpp.y)
                     CONTINUE
                 END IF
                 DIM pp AS Punkt : pp = b.pinPunkt(j)
@@ -351,17 +471,8 @@ SUB ercHierarchie(dok AS Dokument, BYREF fehler AS ARRAY OF Verstoss, BYREF warn
             DIM k AS STRING : k = STR$(ki)
             MAPPUT(wie, k, MAPGETOR(wie, k, 0) + 1)
             IF ki = bi THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Blatt " + dok.blaetter[bi].name + " enthaelt sich selbst als Unterblatt", bi, b.lage.pos.x, b.lage.pos.y))
+            IF ki <> bi AND blattEnthaelt(dok, ki, bi) THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Blatt " + dok.blaetter[ki].name + " enthaelt (ueber Ecken) " + dok.blaetter[bi].name + ", in dem es selbst steckt -- ein Kreis", bi, b.lage.pos.x, b.lage.pos.y))
         NEXT
-    NEXT
-    ' Zyklen ueber mehrere Ebenen
-    FOR bi = 0 TO LEN(dok.blaetter) - 1
-        DIM e AS INTEGER : e = elternVon(dok, bi)
-        DIM schritte AS INTEGER : schritte = 0
-        WHILE e >= 0 AND e <> bi AND schritte <= LEN(dok.blaetter)
-            e = elternVon(dok, e)
-            schritte = schritte + 1
-        WEND
-        IF e = bi AND elternVon(dok, bi) <> bi THEN ARRAY_PUSH(fehler, NEW Verstoss(ERC_FEHLER, "Blatt " + dok.blaetter[bi].name + " steckt ueber mehrere Ebenen in sich selbst", bi, 0, 0))
     NEXT
     ' hierarchische Labels auf einem Wurzelblatt verbinden nichts
     FOR bi = 0 TO LEN(dok.blaetter) - 1

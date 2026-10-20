@@ -106,7 +106,12 @@ beim Speichern). Netze, ERC, Stückliste, Netzlisten, Platine, Gerber, 3D und
 Simulation rechnen nur darauf und kennen Instanzen gar nicht – jede zählt
 ihre Teile, die Platine setzt sie einzeln. Die erste Instanz bleibt das
 Original, damit eine vorhandene Platine gültig bleibt, wenn eine zweite
-dazukommt. Ohne Mehrfach-Instanz ist die Sicht das Dokument selbst.
+dazukommt; welche das ist, steht im Blatt. Fällt sie weg (Blattsymbol
+gelöscht oder ausgeschnitten), rückt die nächste mit ihren **eigenen**
+Referenzen und Platinen-Plätzen nach. Ohne Mehrfach-Instanz ist die Sicht
+das Dokument selbst. Ein Kreis (ein Blatt, das über Ecken sich selbst
+enthält) lässt sich nicht einsetzen; der ERC findet ihn auch über mehrere
+Eltern.
 
 ![Zweite Instanz eines Kanals](instanz.png)
 
@@ -118,8 +123,11 @@ mit einem Namen, der die Mitglieder nennt – `D[0..7]` (D0 … D7), `A[15:0]`
 (I2C.SDA, I2C.SCL). Ein Bus **verbindet nichts**: verbunden wird wie überall
 über Netznamen. Ein Draht, der auf dem Bus endet, ist ein **Abzweig** –
 Funkenflug fragt nach dem Mitglied (das nächste freie steht schon da) und
-setzt das Label einen Rasterschritt neben den Bus auf den Draht; Draht und
-Label sind ein Rückgängig-Schritt. Busse wählt, zieht, dreht, löscht und
+setzt das Label ans andere Ende des Drahts (meist der Pin) – dort bleibt es
+auf dem Draht, auch wenn man den Bus verschiebt; Draht und Label sind ein
+Rückgängig-Schritt. Als Busname gilt nur, was einen Vektor (`D[0..7]`) oder
+eine Gruppe mit mehreren Mitgliedern nennt – `~{RESET}` (Überstrich) und
+`IO[3]` bleiben gewöhnliche Netznamen. Busse wählt, zieht, dreht, löscht und
 kopiert man wie Drähte, die Abzweige folgen beim Ziehen und Drehen; ein
 Doppelklick benennt um. Busse, die sich berühren, sind eine Gruppe mit einem
 Namen (ein neuer Bus an einem benannten fragt nicht nach).
@@ -129,7 +137,9 @@ das nicht zum Bus gehört, ein Pin direkt auf dem Bus, ein Bus ohne oder mit
 unlesbarem Namen, zusammenhängende Busse mit zwei Namen. Über die
 Blattgrenze: ein hierarchisches Label `D[0..7]` im Unterblatt gibt einen
 **Bus-Port**, der jedes Mitglied mit dem gleichnamigen Netz im Elternblatt
-verbindet.
+verbindet – hängt am Port ein Bus des Elternblatts mit gleich vielen
+Mitgliedern, nach der Stelle (`DATA[0..7]` am Port `D[0..7]`: DATA0 ↔ D0,
+wie in KiCad).
 
 SparkNode führte den Bus als Art von Draht in derselben Verbindungsrechnung
 (und brauchte Ausnahmen, damit er nicht alle Mitglieder kurzschließt); die
@@ -428,12 +438,15 @@ Kupfer oben/unten, Lötstopp oben/unten, Bestückungsdruck, Umriss, Bohrdatei
 (Excellon) und `LIESMICH.txt`. Gerber X2: die Dateien sagen selbst, welche
 Lage sie sind, der Fertiger ordnet sie ohne Nachfragen zu.
 
-- Gebohrt wird nur, wo etwas steckt (Beine, Brückenenden); TO-220, Relais
-  und Taster bekommen größere Bohrungen.
+- Gebohrt wird nur, wo etwas steckt – aber **jedes Bein** der Bauform, auch
+  ohne Pin im Symbol (der OPV im DIP8 braucht acht Löcher), dazu
+  Brückenenden; TO-220, Relais und Taster bekommen größere Bohrungen.
 - Ein **Streifen** wird zur Leiterbahn zwischen seinem ersten und letzten
   benutzten Loch, an jeder Trennstelle unterbrochen; Lötbahnen werden Bahnen
   unten. **Drahtbrücken** bleiben Drähte (Bohrungen plus Linie im
-  Bestückungsdruck) – als Kupfer oben liefen sie über fremde Lötaugen.
+  Bestückungsdruck) – als Kupfer oben liefen sie über fremde Lötaugen. Eine
+  schräge Lötbahn verbindet (wie in der Platinen-Prüfung) nur ihre Enden und
+  wird darum ebenfalls ein Draht.
 - Die Platine wird auf den **benutzten Bereich zugeschnitten** (gezahlt wird
   die Fläche), mit 3,81 mm Rand für Referenzen und Titel.
 - Bestückungsdruck mit Umriss je Teil, Pin-1-Punkt und den **Referenzen in
@@ -567,7 +580,7 @@ Was ein Schaltplan nicht sagt, ergänzt Funkenflug – und **meldet es**
 
 | Im Schaltplan | in der Simulation |
 |---|---|
-| Versorgungssymbol | Spannungsquelle gegen Masse; Spannung aus dem Namen (`+5V`, `3V3`, `-12V`), ohne Zahl (`VCC`) die Einstellung im Dialog |
+| Versorgungssymbol | Spannungsquelle gegen Masse; Spannung aus dem Namen (`+5V`, `3V3`, `-12V`; `VCC2` ist ein Name, keine 2 V), ohne Zahl die Einstellung im Dialog (`-VCC`, `VEE` negativ; `VSS`, `COM` sind Masse). Treibt ein Regler, eine Batterie oder ein OPV das Netz schon, kommt keine zweite Quelle dazu |
 | Spannungs-/Signalquelle, Batterie | Wert in SPICE-Schreibweise: `5V`, `SIN(0 1 1k) AC 1`, `PULSE(0 5 0 1u 1u 2m 4m)` |
 | Diode, LED, Z-, Schottky-Diode | Modell nach Wert (1N4148, 1N400x, 1N58xx, BAT…); LED nach Farbe im Wert (rot 1,9 V, grün 2,1 V, blau/weiß 3 V); Z-Spannung aus `ZPD5V1`, `BZX55C12` |
 | NPN, PNP, MOSFET | BC54x/BC55x, 2N3904/3906, 2N2222/2907, BC33x/32x, 2N7000/BS170, BS250, IRF/IRL; sonst ein typisches Modell |
