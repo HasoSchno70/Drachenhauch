@@ -854,7 +854,7 @@ extern "C" fn w_drucken(k: *mut Kontext, ins: u64, basis: u64, n: u64) {
 /// Plaetze, die ein Befehl anfasst; Namen (LOAD_NAME ...) ueber `global_names`.
 fn globale_plaetze(prog: &Program, g: &Func, ins: &crate::model::Instr) -> Vec<usize> {
     match ins.op {
-        op::LOAD_GLOBAL_SLOT | op::STORE_GLOBAL_SLOT | op::ADD_STORE_GLOBAL_SLOT => vec![ins.arg.as_usize()],
+        op::LOAD_GLOBAL_SLOT | op::STORE_GLOBAL_SLOT | op::ADD_STORE_GLOBAL_SLOT | op::LEIHE_GLOBAL_SLOT => vec![ins.arg.as_usize()],
         op::FOR_NEXT => match for_teile(&ins.arg) { Some(t) if t[0] == 1 => vec![t[1] as usize], _ => vec![] },
         op::LOAD_NAME | op::STORE_NAME | op::INPUT_NAME => match g.constants.get(ins.arg.as_usize()) {
             Some(Value::Str(n)) => prog.global_names.iter()
@@ -989,6 +989,54 @@ extern "C" fn w_setzen(k: *mut Kontext, basis: u64, n: u64) {
     }
 }
 
+/// Rechnet `w_add_setzen`/`w_add_mitglied_setzen` selbst? Nur mit Werten,
+/// bei denen `+` keinen Drachenhauch-Code ruft (wie `w_op`).
+fn w_schlicht(v: &Value) -> bool { matches!(v, Value::Int(_) | Value::Float(_) | Value::Str(_) | Value::Bool(_)) }
+
+/// ADD_STORE_INDEX (`c[i] = c[i] + e`): Behaelter in `basis`, die Indizes,
+/// dann links und rechts. Haelt das Element den Text links noch, wird dort
+/// angehaengt (`vm::index_anhaengen`), sonst wie W_OP(+) + W_SETZEN. Ist
+/// einer der beiden kein schlichter Wert, steigt der Bereich aus (nichts
+/// veraendert), und die VM fuehrt den Befehl aus; ein Fehler beim Rechnen
+/// oder Speichern geht als Meldung an diese Stelle.
+extern "C" fn w_add_setzen(k: *mut Kontext, basis: u64, n: u64) {
+    let (ia, ib) = (basis + n + 1, basis + n + 2);
+    if !w_schlicht(w_platz(k, ia)) || !w_schlicht(w_platz(k, ib)) { w_fehler(k); return; }
+    let a = w_nehmen(k, ia);
+    let b = w_nehmen(k, ib);
+    let (c, idx): (&Value, &[Value]) = unsafe {
+        (&*(*k).werte.add(basis as usize), std::slice::from_raw_parts((*k).werte.add(basis as usize + 1), n as usize))
+    };
+    let r = match crate::vm::index_anhaengen(c, idx, a, &b) {
+        Ok(()) => Ok(()),
+        Err(a) => {
+            let vm = unsafe { &mut *(*k).vm };
+            vm.plus(a, b).and_then(|v| crate::vm::store_index(c, idx, v))
+        }
+    };
+    match r {
+        Ok(()) => { for j in 0..=n { drop(w_nehmen(k, basis + j)); } }
+        Err(e) => { unsafe { (*k).meldung = Some(e); } w_fehler(k); }
+    }
+}
+
+/// ADD_STORE_MEMBER (`obj.x = obj.x + e`) im Wertemodus: Objekt in `basis`,
+/// links und rechts dahinter. Derselbe Weg wie in der VM
+/// (`Vm::mitglied_addieren`); sonst wie `w_add_setzen`.
+extern "C" fn w_add_mitglied_setzen(k: *mut Kontext, ins: u64, name: u64, basis: u64) {
+    if !w_schlicht(w_platz(k, basis + 1)) || !w_schlicht(w_platz(k, basis + 2)) { w_fehler(k); return; }
+    let ins: &'static crate::model::Instr = unsafe { &*(ins as *const crate::model::Instr) };
+    let name: &Value = unsafe { &*(name as *const Value) };
+    let obj = w_nehmen(k, basis);
+    let a = w_nehmen(k, basis + 1);
+    let b = w_nehmen(k, basis + 2);
+    let vm = unsafe { &mut *(*k).vm };
+    if let Err(e) = vm.mitglied_addieren(ins, name, obj, a, b) {
+        unsafe { (*k).meldung = Some(e); }
+        w_fehler(k);
+    }
+}
+
 /// Die Helfer, die der Maschinencode ruft (Kennungen im Modul).
 #[derive(Clone, Copy)]
 struct Hilfe {
@@ -1004,7 +1052,7 @@ struct Hilfe {
     mathe1: FuncId,
     mathe2: FuncId,
     ffi: FuncId,
-    w: [FuncId; 21],
+    w: [FuncId; 23],
 }
 
 /// Plaetze in `Hilfe::w`.
@@ -1029,6 +1077,8 @@ const W_AUSPACKEN: usize = 17;
 const W_TUPEL: usize = 18;
 const W_MLESEN: usize = 19;
 const W_MSETZEN: usize = 20;
+const W_ADD_SETZEN: usize = 21;
+const W_ADD_MSETZEN: usize = 22;
 
 type Einstieg = unsafe extern "C" fn(*mut Kontext, *const u64, *mut u64);
 
@@ -1535,6 +1585,25 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 if !w_mitglieder.contains(&ip) { w_mitglieder.push(ip); }
                 schreibt_felder = true;
             }
+            // `obj.x = obj.x + e` / `c[i] = c[i] + e` (ADD_STORE_MEMBER/_INDEX):
+            // wie ADD + STORE_MEMBER/_INDEX im Wertemodus, die Helfer haengen
+            // an Ort und Stelle an. ADD_STORE_FIELD (ein Text-Feld von Self)
+            // bleibt in der VM -- STORE_FIELD nimmt hier nur Zahlen.
+            op::ADD_STORE_MEMBER if modus_w && z.stapel.len() >= 3 && z.stapel[z.stapel.len() - 3] == Art::W => {
+                let name = match f.constants.get(ins.arg.as_usize()) { Some(Value::Str(n)) => n.to_string(), _ => return Err("Feldname".into()) };
+                mitglied_harmlos(prog, f, bereich.ok_or("Mitglied ausserhalb eines Bereichs")?, &name, true)?;
+                for _ in 0..2 { if !w_oder_skalar(pop!()) { return Err("NIL in ein Feld".into()); } }
+                pop!();
+                if !w_mitglieder.contains(&ip) { w_mitglieder.push(ip); }
+                schreibt_felder = true;
+            }
+            op::ADD_STORE_INDEX if modus_w => {
+                let n = ins.arg.as_usize();
+                for _ in 0..2 { if !w_oder_skalar(pop!()) { return Err("Feld bekommt NIL".into()); } }
+                for _ in 0..n { if !w_oder_skalar(pop!()) { return Err("Index, der kein Wert ist".into()); } }
+                if pop!() != Art::W { return Err("Index auf etwas, das kein Wert ist".into()); }
+                schreibt_felder = true;
+            }
             op::LOAD_FIELD | op::LOAD_MEMBER | op::STORE_FIELD | op::STORE_MEMBER if bereich.is_some() || selbst.is_some() => {
                 let name = match f.constants.get(ins.arg.as_usize()) { Some(Value::Str(n)) => n.to_string(), _ => return Err("Feldname".into()) };
                 let wert = if matches!(o, op::STORE_FIELD | op::STORE_MEMBER) { Some(pop!()) } else { None };
@@ -1985,8 +2054,9 @@ fn befehl_name(o: u16) -> String {
         | op::LOAD_NAME | op::STORE_NAME => "globale Variable".into(),
         op::CALL_BUILTIN => "eingebauter Befehl".into(),
         op::CALL_METHOD | op::CALL_METHOD_BYREF | op::LOAD_MEMBER | op::STORE_MEMBER | op::LOAD_FIELD
-        | op::STORE_FIELD | op::NEW_INSTANCE | op::LOAD_SELF => "Objekt".into(),
-        op::LOAD_INDEX | op::STORE_INDEX | op::DECLARE_ARRAY_LOCAL => "Feld".into(),
+        | op::STORE_FIELD | op::ADD_STORE_FIELD | op::ADD_STORE_MEMBER | op::NEW_INSTANCE | op::LOAD_SELF => "Objekt".into(),
+        op::LOAD_INDEX | op::STORE_INDEX | op::ADD_STORE_INDEX | op::DECLARE_ARRAY_LOCAL => "Feld".into(),
+        op::LEIHE_LOCAL | op::LEIHE_GLOBAL_SLOT => "BYREF-Argument".into(),
         op::CALL_VALUE | op::LOAD_FUNCREF => "FUNCREF".into(),
         op::TRY_BEGIN | op::TRY_END | op::THROW => "TRY/THROW".into(),
         op::POW => "^".into(),
@@ -2709,6 +2779,25 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         bau.fehler_pruefen();
                         if o == op::LOAD_MEMBER { let z = bau.iconst(0); st.push((z, Art::W)); }
                     }
+                    op::ADD_STORE_MEMBER if an.w_mitglieder.contains(&ip) => {
+                        let d = st.len() - 3;
+                        bau.w_boxen(&st, d);
+                        st.truncate(d);
+                        let ip_c = bau.iconst(ins as *const crate::model::Instr as i64);
+                        let pz = bau.iconst(&f.constants[ins.arg.as_usize()] as *const Value as i64);
+                        let basis = bau.iconst(bau.w_slot(d));
+                        bau.w_ruf(W_ADD_MSETZEN, &[ip_c, pz, basis]);
+                        bau.fehler_pruefen();
+                    }
+                    op::ADD_STORE_INDEX if an.modus_w => {
+                        let n = ins.arg.as_usize();
+                        let d = st.len() - n - 3;
+                        bau.w_boxen(&st, d);
+                        st.truncate(d);
+                        let (basis, nz) = (bau.iconst(bau.w_slot(d)), bau.iconst(n as i64));
+                        bau.w_ruf(W_ADD_SETZEN, &[basis, nz]);
+                        bau.fehler_pruefen();
+                    }
                     op::UNPACK_TUPLE if an.modus_w => {
                         let n = ins.arg.as_usize();
                         let d = st.len() - 1;
@@ -3430,7 +3519,7 @@ impl Jit {
         builder.symbol("dh_mathe1", mathe1 as *const u8);
         builder.symbol("dh_mathe2", mathe2 as *const u8);
         builder.symbol("dh_ffi_zahlen", ffi_zahlen as *const u8);
-        let w_namen: [(&str, *const u8); 21] = [
+        let w_namen: [(&str, *const u8); 23] = [
             ("dh_w_konst", w_konst as *const u8), ("dh_w_kopie", w_kopie as *const u8),
             ("dh_w_frei", w_frei as *const u8), ("dh_w_ablegen_i", w_ablegen_i as *const u8),
             ("dh_w_ablegen_f", w_ablegen_f as *const u8), ("dh_w_zahl_i", w_zahl_i as *const u8),
@@ -3442,6 +3531,7 @@ impl Jit {
             ("dh_w_funktion", w_funktion as *const u8),
             ("dh_w_auspacken", w_auspacken as *const u8), ("dh_w_tupel", w_tupel as *const u8),
             ("dh_w_mlesen", w_mitglied_lesen as *const u8), ("dh_w_msetzen", w_mitglied_setzen as *const u8),
+            ("dh_w_add_setzen", w_add_setzen as *const u8), ("dh_w_add_msetzen", w_add_mitglied_setzen as *const u8),
         ];
         for (n, f) in w_namen { builder.symbol(n, f); }
         let mut modul = JITModule::new(builder);
@@ -3495,10 +3585,12 @@ impl Jit {
             ("dh_w_tupel", vec![ptr, i, i], None),
             ("dh_w_mlesen", vec![ptr, i, i, i], None),
             ("dh_w_msetzen", vec![ptr, i, i, i], None),
+            ("dh_w_add_setzen", vec![ptr, i, i], None),
+            ("dh_w_add_msetzen", vec![ptr, i, i, i], None),
         ].into_iter().map(|(n, pa, r): (&str, Vec<Type>, Option<Type>)| (n, sig_h(&pa, r))).collect();
         let mut dekl = |name: &str, sg: &cranelift_codegen::ir::Signature| modul.declare_function(name, Linkage::Import, sg)
             .map_err(|e| format!("{:?}", e));
-        let mut w_ids = [holen_id; 21];
+        let mut w_ids = [holen_id; 23];
         for (j, (n, sg)) in w_sigs.iter().enumerate() { w_ids[j] = dekl(n, sg)?; }
         let hilfe = Hilfe {
             holen: holen_id,

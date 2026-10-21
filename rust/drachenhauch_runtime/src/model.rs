@@ -102,6 +102,11 @@ pub mod op {
     pub const BIND_GLOBAL_SLOT: u16 = 122;      // globalen Eintrag (Feld/Map/Struktur) in seinen Platz haengen
     pub const TYP_PRUEFEN: u16 = 123;
     pub const CALL_METHOD_BYREF: u16 = 124;     // Methode mit BYREF-Parametern: [name, argc, [byref-Stellen]]           // nur DHRT_TYPEN_PRUEFEN: Typ des Stapelwerts gegen den Compiler pruefen
+    pub const ADD_STORE_FIELD: u16 = 125;       // text = text + e in einer Methode (Feld von Self)
+    pub const ADD_STORE_MEMBER: u16 = 126;      // obj.x = obj.x + e: [obj, a, b]
+    pub const ADD_STORE_INDEX: u16 = 127;       // c[i] = c[i] + e: [c, i.., a, b] (Feld oder MAP)
+    pub const LEIHE_LOCAL: u16 = 128;           // BYREF-Argument: Wert aus dem lokalen Platz nehmen statt kopieren
+    pub const LEIHE_GLOBAL_SLOT: u16 = 129;     // dasselbe fuer einen globalen Platz
 
     // OOP / Member
     pub const NEW_INSTANCE: u16 = 80;

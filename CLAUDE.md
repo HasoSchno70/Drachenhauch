@@ -3074,9 +3074,29 @@ und der Rest schlicht (`plus_kette`, `add_store_ziel`). `Value::str_rc` nimmt
 `impl Into<String>` -- ein fertiger `String` geht ohne Kopie hinein. **Falle:**
 die Typpruefung beim Speichern (`passend!`) MUSS ein Makro bleiben; als
 Funktion wurde sie nicht eingebettet und `z = z + i` war 25 % langsamer.
-Nicht erfasst: Felder und Feldelemente. Tests
-`tests/pruef/zeichenketten_anhaengen.dhtest`, Doku
+Tests `tests/pruef/zeichenketten_anhaengen.dhtest`, Doku
 `docs/entwurf-anwendungen-und-tempo.md` (1a).
+
+**Felder, Elemente, MAP-Werte, BYREF (2026-10-20):** `k.text = k.text + e`,
+`text = text + e` (Feld von Self), `a[i] = a[i] + e`, `m["k"] = m["k"] + e`
+werden `ADD_STORE_MEMBER`/`ADD_STORE_FIELD`/`ADD_STORE_INDEX` (126/125/127),
+wenn Text im Spiel ist (`anhaengen_lohnt` -- `k.n = k.n + 1` bleibt ADD +
+STORE, sonst verloere der Maschinencode Zahlenfelder) und das Ziel keinen
+Aufruf hat (`ort_rein`, `gleicher_ort`). Anders als ADD_STORE_LOCAL wird der
+Platz NIE geleert: `vm::an_ort_anhaengen` haengt direkt im Platz an, wenn er
+noch denselben Text haelt (`Rc::ptr_eq`) und `e` schlicht ist -- Text +
+schlicht ruft keinen Code, kann nicht scheitern, und der Platz nimmt Text ohne
+Umwandlung (`text_platz_typ`). Mitglied nur ueber den Merkplatz des Befehls
+(nie PROPERTY). JIT: `_MEMBER`/`_INDEX` im Wertemodus ueber `w_add_*`,
+`_FIELD` bleibt in der VM (String-Felder von Self konnte er nie). BYREF ist
+Copy-In/Copy-Out -- Caller-Platz und Parameter teilten den Text, also kopierte
+jeder Aufruf: `LEIHE_LOCAL`/`LEIHE_GLOBAL_SLOT` (128/129) NEHMEN den Wert
+(Platz = NIL bis zum Zurueckschreiben). Nur wo das niemand sieht
+(`byref_leihen`): angesagter STRING, kein TRY um die Stelle (`try_gesamt`,
+auch CATCH/FINALLY), Variable in keinem anderen Argument; Local immer, Globale
+nur im Hauptprogramm und nur, wenn der Aufgerufene sie nicht nennt und nur
+`REINE_TEXTBEFEHLE` ruft (`leih_spur`) und keine Klasse einen OPERATOR hat.
+Unter dem Debugger kopiert LEIHE.
 
 ## Builtin-Aufruf mit Merkplatz (2026-09-24)
 
