@@ -74,7 +74,7 @@ Details in the [manual](docs/en/README.md); how it got there is in the
 
 ## Download
 
-**[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 56 MB, currently version 2026.32.
+**[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 56 MB, currently version 2026.33.
 
 You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 225 examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
 
@@ -278,6 +278,7 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 | `154_chart.dh` | **charts**: all six kinds, themes, mouse interaction |
 | `156_gui_alle_widgets.dh` | **all 22 GUI widgets** in one fullscreen application, each with a real job |
 | `glutfaden/main.dh` | **Glutfaden** — the cross-stitch editor PySticky in Drachenhauch, with GTK 3 through foreign libraries: part and back stitches, layers, image import, PDF/HTML/OXS export, PCStitch and Pattern Maker, printing, light and dark theme |
+| `../funkenflug/main.dh` | **Funkenflug** — a schematic editor with GTK 3: hierarchy and buses, ERC, netlist/SPICE, simulation with ngspice, perfboard layout with Gerber and 3D preview, KiCad import (in the top-level folder, not in the installer) |
 | `texteditor/main.dh` | **text editor** — tabs, find and replace, encoding and line endings kept on save |
 | `fotos/main.dh` | **photo viewer with GTK 3** — overview, single view, rotation from camera data, slideshow |
 | `157_gui_tabelle.dh`, `158_gui_tabelle_sqlite.dh` | **professional table** — sort, filter, edit cells; the second one against a real SQLite database |
