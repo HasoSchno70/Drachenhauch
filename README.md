@@ -75,7 +75,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 ## Herunterladen
 
-**[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 56 MB, aktuell Fassung 2026.32.
+**[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 56 MB, aktuell Fassung 2026.33.
 
 Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 225 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
 
@@ -277,6 +277,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `154_chart.dh` | **Diagramme**: alle sechs Arten, Themen, Maus-Interaktion |
 | `156_gui_alle_widgets.dh` | **alle 22 GUI-Widgets** in einer Vollbild-Anwendung, jedes mit echter Aufgabe |
 | `glutfaden/main.dh` | **Glutfaden** — der Kreuzstich-Editor PySticky in Drachenhauch, mit GTK 3 über fremde Bibliotheken: Teil- und Rückstiche, Ebenen, Bildimport, PDF/HTML/OXS-Export, PCStitch und Pattern Maker, Drucken, helles und dunkles Thema |
+| `../funkenflug/main.dh` | **Funkenflug** — ein Schaltplan-Editor mit GTK 3: Hierarchie und Busse, ERC, Netzliste/SPICE, Simulation mit ngspice, Lochraster-Platine mit Gerber und 3D-Vorschau, KiCad-Import (liegt im Hauptordner, nicht im Installer) |
 | `texteditor/main.dh` | **Texteditor** — Reiter, Suchen und Ersetzen, Kodierung und Zeilenenden bleiben beim Speichern |
 | `fotos/main.dh` | **Fotobetrachter mit GTK 3** — Übersicht, Einzelansicht, Drehen nach den Kameradaten, Diaschau |
 | `200_gui_akkordeon_assistent.dh` | **Akkordeon, Assistent, Baumtabelle** — eine kleine Projektablage: Einstellungen in aufklappbaren Abschnitten, Ordner und Dateien als Baum mit Spalten, neue Einträge über einen Assistenten mit Pflichtfeldern |
