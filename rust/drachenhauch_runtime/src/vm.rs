@@ -1470,7 +1470,7 @@ impl<'p> Vm<'p> {
         // neue Struct-Instanz, neutrales Element, NIL fuer Klassen. Ein DIM in
         // einer Schleife faengt seit 2026.28 jede Runde frisch an.
         if name == "__frisch" {
-            let ty = match a.first() { Some(Value::Str(t)) => t.to_string(), _ => String::new() };
+            let ty: &str = match a.first() { Some(Value::Str(t)) => t, _ => "" };
             return Ok(Some(if let Some(vt) = ty.strip_prefix("map:") {
                 Value::Map(Rc::new(RefCell::new(DhMap::new(vt.to_string()))))
             } else if ty.starts_with("array:") {
@@ -1861,42 +1861,95 @@ impl<'p> Vm<'p> {
 
     #[inline(never)]
     fn allocate_instance(&self, class_name: &str) -> Value {
-        let layout = match self.prog.classes.get(class_name) {
-            Some(ci) => ci.layout.clone(),
+        match self.prog.classes.get(class_name) {
+            Some(ci) => self.objekt_aus(self.vorlage(class_name, ci)),
             // Eine Klasse, die es nicht gibt, hat keine Felder. EINE geteilte
             // leere Lage: eine je Instanz wuerde freigegeben, und ihre Adresse
             // koennte eine spaetere erben -- ein Merkplatz traefe dann falsch.
-            None => LEERE_LAGE.with(|l| l.clone()),
-        };
-        let mut fields: Vec<Value> = vec![Value::Nil; layout.typen.len()];
-        // Kette parent-first sammeln (ein Feld, das eine Unterklasse noch
-        // einmal deklariert, ueberschreibt den Wert auf demselben Platz).
-        let mut chain: Vec<&ClassInfo> = Vec::new();
-        let mut cur = self.prog.classes.get(class_name);
-        while let Some(ci) = cur {
-            chain.push(ci);
-            cur = if ci.parent_name.is_empty() { None } else { self.prog.classes.get(&ci.parent_name) };
+            None => Value::Instance(Rc::new(RefCell::new(Instance {
+                class_name: Rc::from(class_name),
+                layout: LEERE_LAGE.with(|l| l.clone()),
+                fields: Vec::new(),
+            }))),
         }
-        for ci in chain.iter().rev() {
-            for fd in &ci.fields {
-                let value = if fd.struct_bytes > 0 {
+    }
+
+    /// Die Vorlage der Klasse `ci` (Schluessel `class_name`), beim ersten
+    /// Mal gerechnet. `set` statt `get_or_init`: ein Feld mit Elementen eines
+    /// STRUCT baut beim Rechnen die Vorlage einer ANDEREN Klasse, und eine
+    /// Kette, die zurueckfuehrt, darf nicht in einer Panik enden.
+    fn vorlage(&self, class_name: &str, ci: &'p ClassInfo) -> &'p ObjektVorlage {
+        if let Some(v) = ci.vorlage.get() { return v; }
+        let v = self.vorlage_bauen(class_name, ci);
+        let _ = ci.vorlage.set(v);
+        ci.vorlage.get().expect("Vorlage eben gesetzt")
+    }
+
+    /// Wie NEW frueher je Objekt: die Kette parent-first, ein Feld, das eine
+    /// Unterklasse noch einmal deklariert, ueberschreibt den Wert auf
+    /// demselben Platz.
+    #[inline(never)]
+    fn vorlage_bauen(&self, class_name: &str, ci: &'p ClassInfo) -> ObjektVorlage {
+        let layout = ci.layout.clone();
+        let mut werte: Vec<Value> = vec![Value::Nil; layout.typen.len()];
+        let mut frisch: Vec<Option<Frisch>> = (0..layout.typen.len()).map(|_| None).collect();
+        let mut chain: Vec<&ClassInfo> = Vec::new();
+        let mut cur = Some(ci);
+        while let Some(c) = cur {
+            chain.push(c);
+            cur = if c.parent_name.is_empty() { None } else { self.prog.classes.get(&c.parent_name) };
+        }
+        for c in chain.iter().rev() {
+            for fd in &c.fields {
+                let Some(&i) = layout.index.get(&fd.name) else { continue };
+                let i = i as usize;
+                frisch[i] = if fd.struct_bytes > 0 {
                     // Ein STRUCT ... LAYOUT C: je Objekt ein eigener Puffer.
-                    crate::builtins::neuer_buffer(vec![0u8; fd.struct_bytes])
+                    Some(Frisch::Puffer(fd.struct_bytes))
                 } else if !fd.array_dims.is_empty() {
                     let et = fd.type_name.clone();
                     let arr = DhArray::new(et.clone(), fd.array_dims.clone(), || self.element_default(&et));
-                    Value::Array(Rc::new(RefCell::new(arr)))
+                    if arr.cells.iter().all(|v| teilbar(&v)) { Some(Frisch::FeldKopie(arr)) }
+                    else { Some(Frisch::Feld(et, fd.array_dims.clone())) }
                 } else if self.prog.classes.get(&fd.type_name).map(|c| c.is_struct).unwrap_or(false) {
-                    self.allocate_instance(&fd.type_name)
+                    Some(Frisch::Struktur(fd.type_name.clone()))
                 } else {
-                    self.element_default(&fd.type_name)
+                    let v = self.element_default(&fd.type_name);
+                    if teilbar(&v) { werte[i] = v; None } else { Some(Frisch::Wert(fd.type_name.clone())) }
                 };
-                if let Some(&i) = layout.index.get(&fd.name) { fields[i as usize] = value; }
             }
         }
-        Value::Instance(Rc::new(RefCell::new(Instance {
-            class_name: Rc::from(class_name),
+        ObjektVorlage {
+            klasse: Rc::from(class_name),
             layout,
+            werte,
+            frisch: frisch.into_iter().enumerate().filter_map(|(i, f)| f.map(|f| (i, f))).collect(),
+            init: self.resolve_method(class_name, "init").map(|f| f as *const Func),
+        }
+    }
+
+    /// Ein neues Objekt nach der Vorlage: die teilbaren Werte geklont, Felder,
+    /// Puffer und Strukturen je Objekt neu.
+    fn objekt_aus(&self, v: &ObjektVorlage) -> Value {
+        let mut fields = v.werte.clone();
+        for (i, f) in &v.frisch {
+            fields[*i] = match f {
+                Frisch::Puffer(n) => crate::builtins::neuer_buffer(vec![0u8; *n]),
+                Frisch::FeldKopie(a) => Value::Array(Rc::new(RefCell::new(DhArray {
+                    element_type: a.element_type.clone(),
+                    dims: a.dims.clone(),
+                    strides: a.strides.clone(),
+                    cells: a.cells.clone(),
+                }))),
+                Frisch::Feld(et, dims) => Value::Array(Rc::new(RefCell::new(
+                    DhArray::new(et.clone(), dims.clone(), || self.element_default(et))))),
+                Frisch::Struktur(k) => self.allocate_instance(k),
+                Frisch::Wert(t) => self.element_default(t),
+            };
+        }
+        Value::Instance(Rc::new(RefCell::new(Instance {
+            class_name: v.klasse.clone(),
+            layout: v.layout.clone(),
             fields,
         })))
     }
@@ -4390,17 +4443,27 @@ impl<'p> Vm<'p> {
                     let class_name = l[0].str();
                     let argc = l[1].as_usize();
                     let has_init_args = arg_truthy(&l[2]);
-                    if !self.prog.classes.contains_key(class_name) {
-                        return Err(format!("Klasse '{}' nicht gefunden", class_name));
-                    }
-                    let inst = self.allocate_instance(class_name);
+                    // Merkplatz: die Klasse (der Name im Befehl steht fest).
+                    let (_, ci_p) = instr.merk.get();
+                    let ci: &'p ClassInfo = if ci_p != 0 {
+                        unsafe { &*(ci_p as *const ClassInfo) }
+                    } else {
+                        let ci = self.prog.classes.get(class_name)
+                            .ok_or_else(|| format!("Klasse '{}' nicht gefunden", class_name))?;
+                        instr.merk.set((Rc::as_ptr(&ci.layout), ci as *const ClassInfo as usize));
+                        ci
+                    };
+                    let vorlage = self.vorlage(class_name, ci);
+                    let inst = self.objekt_aus(vorlage);
                     if has_init_args {
                         let split = stack.len() - argc;
-                        let init_args = stack.split_off(split);
-                        if let Some(init) = self.resolve_method(class_name, "init") {
-                            self.exec(init, init_args, Some(inst.clone()))?;
-                        } else if !init_args.is_empty() {
+                        if let Some(init) = vorlage.init {
+                            let init: &'p Func = unsafe { &*init };
+                            self.exec(init, stack.drain(split..), Some(inst.clone()))?;
+                        } else if argc != 0 {
                             return Err(format!("Klasse {} hat keine SUB Init - Argumente bei NEW nicht moeglich", class_name));
+                        } else {
+                            stack.truncate(split);
                         }
                     }
                     stack.push(inst);
@@ -12948,6 +13011,44 @@ fn round_audio(f: f64) -> f64 { (f * 1_000_000.0).round() / 1_000_000.0 }
 /// gemischt -> any (generisches Value-Backing).
 /// Ein leeres, eindimensionales Feld zum Typ `array:T` -- der Startwert von
 /// `DIM a AS ARRAY OF T` ohne Groesse.
+/// Was NEW fuer ein Objekt einer Klasse braucht (`ClassInfo::vorlage`,
+/// `Vm::vorlage_bauen`): der Klassenname EINMAL als `Rc<str>` (vorher je
+/// Objekt neu), die Lage, je Platz der Anfangswert und die SUB Init.
+pub(crate) struct ObjektVorlage {
+    klasse: Rc<str>,
+    layout: Rc<crate::value::Layout>,
+    /// Anfangswerte; auf den Plaetzen in `frisch` nur Platzhalter.
+    werte: Vec<Value>,
+    /// Plaetze, deren Wert jedes Objekt fuer sich braucht.
+    frisch: Vec<(usize, Frisch)>,
+    /// `resolve_method(klasse, "init")` -- die Klasse oder eine Vorfahrin.
+    /// Ein Zeiger wie in `Instr::merk`: das Programm aendert sich nach dem
+    /// Laden nicht mehr.
+    init: Option<*const Func>,
+}
+
+/// Ein Anfangswert, der je Objekt neu entsteht.
+enum Frisch {
+    /// STRUCT ... LAYOUT C: Puffer mit so vielen Bytes.
+    Puffer(usize),
+    /// Feld mit Groesse, dessen Elemente teilbar sind: die Vorlage kopieren.
+    FeldKopie(DhArray),
+    /// Feld mit Groesse, dessen Elemente selbst je Objekt neu entstehen.
+    Feld(String, Vec<i64>),
+    /// Ein STRUCT als Feld.
+    Struktur(String),
+    /// Ein Anfangswert mit eigenem Speicher (MAT4, Tupel, leeres Feld ...).
+    Wert(String),
+}
+
+/// Darf ein Anfangswert zwischen Objekten geteilt werden? Werte ohne Speicher
+/// und Text (der wird nur an Ort und Stelle veraendert, wenn niemand sonst
+/// ihn haelt -- `Rc::get_mut`).
+fn teilbar(v: &Value) -> bool {
+    matches!(v, Value::Nil | Value::Bool(_) | Value::Int(_) | Value::Float(_) | Value::Str(_)
+        | Value::Vec2(..) | Value::Geld(_) | Value::Vec3(..) | Value::Vec4(..) | Value::Quat(..))
+}
+
 fn leeres_feld(ty: &str) -> Value {
     let elem = ty.strip_prefix("array:").unwrap_or("any").to_string();
     Value::Array(Rc::new(RefCell::new(DhArray::new(elem, vec![0], || Value::Nil))))

@@ -326,6 +326,10 @@ pub struct ClassInfo {
     pub props_alle: rustc_hash::FxHashSet<String>,
     /// Feste Lage der Felder samt Vorfahren (`programm_bauen`).
     pub layout: std::rc::Rc<crate::value::Layout>,
+    /// Was NEW fuer ein Objekt dieser Klasse braucht, beim ersten NEW
+    /// gerechnet (`Vm::vorlage`). Vorher suchte jedes NEW die Vorfahren und
+    /// je Feld Typ und Platz per Namen.
+    pub vorlage: std::cell::OnceCell<crate::vm::ObjektVorlage>,
 }
 
 pub struct Program {
@@ -657,6 +661,7 @@ fn decode_class(j: &J) -> ClassInfo {
         prop_set: Default::default(),
         props_alle: Default::default(),
         layout: Default::default(),
+        vorlage: Default::default(),
     }
 }
 
