@@ -185,3 +185,80 @@ f()
 PRINT s.punkte
 --- erwartet
 2
+
+=== jedes objekt hat eigene felder puffer und strukturen (vorlage je klasse)
+STRUCT Pos
+    DIM x AS INTEGER
+END STRUCT
+STRUCT CPunkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+CLASS Basis
+    DIM name AS STRING
+    DIM wert AS INTEGER
+    DIM liste[3] AS INTEGER
+END CLASS
+CLASS Kind EXTENDS Basis
+    DIM wert AS FLOAT
+    DIM texte[2] AS STRING
+    DIM orte[2] AS Pos
+    DIM pos AS Pos
+    DIM c AS CPunkt
+    DIM m AS MAT4
+    DIM v AS VEC2
+    DIM leer AS ARRAY OF INTEGER
+    DIM tab AS MAP OF INTEGER
+END CLASS
+DIM a AS Kind : a = NEW Kind()
+DIM b AS Kind : b = NEW Kind()
+a.name = a.name + "x"
+a.wert = 2.5
+a.liste[1] = 7
+a.texte[0] = a.texte[0] + "t"
+a.orte[1].x = 3
+a.pos.x = 4
+a.c.x = 5
+ARRAY_PUSH(a.leer, 9)
+PRINT "["; a.name; "] ["; b.name; "] "; a.wert; " "; b.wert; " "; TYPEOF(b.wert)
+PRINT a.liste[1]; " "; b.liste[1]; " ["; a.texte[0]; "] ["; b.texte[0]; "]"
+PRINT a.orte[1].x; " "; b.orte[1].x; " "; a.pos.x; " "; b.pos.x; " "; a.c.x; " "; b.c.x
+PRINT LEN(a.leer); " "; LEN(b.leer); " "; TYPEOF(b.tab); " "; TYPEOF(b.m); " "; b.v
+DIM c AS Kind : c = NEW Kind()
+PRINT LEN(c.leer); " "; c.liste[1]; " ["; c.texte[0]; "] "; c.orte[1].x; " "; c.pos.x; " "; c.c.x; " "; c.wert
+--- erwartet
+[x] [] 2.5 0.0 FLOAT
+7 0 [t] []
+3 0 4 0 5 0
+1 0 NIL MAT4 Vec2(0.0, 0.0)
+0 0 [] 0 0 0 0.0
+
+=== new mit init der vorfahrin und ohne init
+CLASS A
+    DIM n AS INTEGER
+    SUB Init(x AS INTEGER)
+        n = x
+    END SUB
+END CLASS
+CLASS B EXTENDS A
+    DIM s AS STRING
+END CLASS
+CLASS C
+    DIM k AS INTEGER
+END CLASS
+DIM b AS B : b = NEW B(5)
+PRINT b.n; " ["; b.s; "]"
+DIM c AS C : c = NEW C()
+PRINT c.k
+FOR i = 1 TO 3
+    DIM x AS B : x = NEW B(i)
+    PRINT x.n;
+NEXT
+PRINT
+DIM d AS C : d = NEW C(1)
+--- fehler
+Klasse c hat keine SUB Init - Argumente bei NEW nicht moeglich
+--- erwartet
+5 []
+0
+123

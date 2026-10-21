@@ -493,6 +493,17 @@ fn numeric_1d_array<'a>(v: &'a Value, fn_: &str) -> Result<std::cell::Ref<'a, Dh
     Ok(arr)
 }
 
+/// Nach Wachsen/Schrumpfen eines 1D-Feldes: dims = [Laenge], strides = [1].
+/// An Ort und Stelle -- vorher legte jeder ARRAY_PUSH/POP zwei neue Vecs an.
+fn laenge_setzen(b: &mut DhArray) -> i64 {
+    let n = b.cells.len() as i64;
+    b.dims.clear();
+    b.dims.push(n);
+    b.strides.clear();
+    b.strides.push(1);
+    n
+}
+
 fn type_default(t: &str) -> Value {
     match t {
         "integer" => Value::Int(0),
@@ -2203,14 +2214,13 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "array_push" => {
             arity!(2);
             if let Value::Array(arr) = &a[0] {
-                let et = { let b = arr.borrow(); if b.dims.len() != 1 { return err("ARRAY_PUSH: nur 1D-Arrays".to_string()); } b.element_type.clone() };
-                let v = coerce_elem(a[1].clone(), &et, "ARRAY_PUSH")?;
+                // Alles unter EINER Leihe: coerce_elem ruft keinen fremden
+                // Code, also braucht der Elementtyp keine Kopie.
                 let mut b = arr.borrow_mut();
+                if b.dims.len() != 1 { return err("ARRAY_PUSH: nur 1D-Arrays".to_string()); }
+                let v = coerce_elem(a[1].clone(), &b.element_type, "ARRAY_PUSH")?;
                 b.cells.push(v);
-                let n = b.cells.len() as i64;
-                b.dims = vec![n];
-                b.strides = vec![1];
-                Ok(Value::Int(n))
+                Ok(Value::Int(laenge_setzen(&mut b)))
             } else { err("ARRAY_PUSH erwartet ARRAY".to_string()) }
         }
         "array_pop" => {
@@ -2219,7 +2229,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let mut b = arr.borrow_mut();
                 if b.dims.len() != 1 { return err("ARRAY_POP: nur 1D-Arrays".to_string()); }
                 match b.cells.pop() {
-                    Some(v) => { let n = b.cells.len() as i64; b.dims = vec![n]; b.strides = vec![1]; Ok(v) }
+                    Some(v) => { laenge_setzen(&mut b); Ok(v) }
                     None => err("ARRAY_POP: Array ist leer".to_string()),
                 }
             } else { err("ARRAY_POP erwartet ARRAY".to_string()) }
@@ -2227,17 +2237,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "array_insert" => {
             arity!(3);
             if let Value::Array(arr) = &a[0] {
-                let et = { let b = arr.borrow(); if b.dims.len() != 1 { return err("ARRAY_INSERT: nur 1D-Arrays".to_string()); } b.element_type.clone() };
-                let idx = need_int(&a[1], "ARRAY_INSERT")?;
-                let v = coerce_elem(a[2].clone(), &et, "ARRAY_INSERT")?;
                 let mut b = arr.borrow_mut();
+                if b.dims.len() != 1 { return err("ARRAY_INSERT: nur 1D-Arrays".to_string()); }
+                let idx = need_int(&a[1], "ARRAY_INSERT")?;
+                let v = coerce_elem(a[2].clone(), &b.element_type, "ARRAY_INSERT")?;
                 let n = b.cells.len() as i64;
                 if idx < 0 || idx > n { return err(format!("ARRAY_INSERT: Index {} ausserhalb [0..{}]", idx, n)); }
                 b.cells.insert(idx as usize, v);
-                let nn = b.cells.len() as i64;
-                b.dims = vec![nn];
-                b.strides = vec![1];
-                Ok(Value::Int(nn))
+                Ok(Value::Int(laenge_setzen(&mut b)))
             } else { err("ARRAY_INSERT erwartet ARRAY".to_string()) }
         }
         "array_remove_at" => {
@@ -2249,9 +2256,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let n = b.cells.len() as i64;
                 if idx < 0 || idx >= n { return err(format!("ARRAY_REMOVE_AT: Index {} ausserhalb [0..{}]", idx, n - 1)); }
                 let v = b.cells.remove(idx as usize);
-                let nn = b.cells.len() as i64;
-                b.dims = vec![nn];
-                b.strides = vec![1];
+                laenge_setzen(&mut b);
                 Ok(v)
             } else { err("ARRAY_REMOVE_AT erwartet ARRAY".to_string()) }
         }
@@ -2270,8 +2275,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 } else {
                     for _ in cur..new_len { b.cells.push(type_default(&et)); }
                 }
-                b.dims = vec![new_len];
-                b.strides = vec![1];
+                laenge_setzen(&mut b);
                 Ok(Value::Nil)
             } else { err("REDIM erwartet ARRAY".to_string()) }
         }

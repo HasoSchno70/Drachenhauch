@@ -59,6 +59,56 @@ PRINT ARRAY_POP(a), LEN(a)
 4 40 4
 40 3
 
+=== array push pop insert remove coerce und laenge (dims an ort und stelle)
+DIM a AS ARRAY OF INTEGER
+PRINT ARRAY_PUSH(a, 2.0), a[0], TYPEOF(a[0])
+DIM f AS ARRAY OF FLOAT
+ARRAY_PUSH(f, 3)
+PRINT f[0], TYPEOF(f[0])
+PRINT ARRAY_INSERT(f, 0, 1), f[0], f[1]
+DIM s AS ARRAY OF STRING
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    ARRAY_PUSH(s, STR$(i))
+NEXT
+PRINT ARRAY_REMOVE_AT(s, 0), ARRAY_POP(s), LEN(s), s[0], s[2]
+DIM w AS ARRAY OF ANY
+ARRAY_PUSH(w, w)
+PRINT LEN(w), LEN(w[0])
+PRINT ARRAY_PUSH(a, 2.5)
+--- fehler
+ARRAY_PUSH: FLOAT 2.5 kann nicht ohne Verlust nach INTEGER (nutze INT())
+--- erwartet
+1 2 INTEGER
+3.0 FLOAT
+2 1.0 3.0
+1 5 3 2 4
+1 1
+
+=== array nach pop leer hat keinen index 0
+DIM s AS ARRAY OF STRING
+ARRAY_PUSH(s, "a")
+ARRAY_POP(s)
+PRINT LEN(s)
+PRINT s[0]
+--- fehler
+Index 0 ausserhalb [0..-1] in Dimension 0
+--- erwartet
+0
+
+=== array push auf 2d bleibt fehler
+DIM m[2, 2] AS INTEGER
+ARRAY_PUSH(m, 1)
+--- fehler
+ARRAY_PUSH: nur 1D-Arrays
+
+=== array insert prueft elementtyp
+DIM a AS ARRAY OF BOOLEAN
+ARRAY_PUSH(a, TRUE)
+ARRAY_INSERT(a, 0, 1)
+--- fehler
+ARRAY_INSERT: Erwartet BOOLEAN, erhalten INTEGER
+
 === array insert remove at
 DIM a[3] AS INTEGER
 a[0]=10 : a[1]=20 : a[2]=30
