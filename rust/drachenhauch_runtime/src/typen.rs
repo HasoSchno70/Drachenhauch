@@ -127,7 +127,11 @@ pub fn builtin_typ(name: &str) -> Option<Typ> {
         | "mid$" | "mid" | "upper$" | "upper" | "lower$" | "lower" | "trim$" | "trim" | "ltrim$" | "rtrim$"
         | "replace$" | "replace" | "format$" | "hex$" | "bin$" | "oct$" | "space$"
         | "repeat$" | "join$" | "padl$" | "padr$" => Typ::Str,
-        "len" | "int" | "millis" => Typ::Int,
+        // Liefern immer INTEGER (builtins.rs) -- der Maschinencode rechnet mit
+        // dem Ergebnis dann als Zahl weiter statt im Wertemodus (ASC in einer
+        // Schleife: 42 -> ~15 ns).
+        "len" | "int" | "millis" | "asc" | "instr" | "instrrev" | "mapsize" | "count"
+        | "array_push" => Typ::Int,
         "sqr" | "sin" | "cos" | "timer" => Typ::Float,
         "abs" => Typ::Zahl,
         _ => return None,

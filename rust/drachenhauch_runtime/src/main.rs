@@ -59,6 +59,11 @@ mod httpd;
 #[cfg(feature = "smtp")]
 mod smtp;
 mod zipdatei;
+// Siehe Cargo.toml: mimalloc statt des System-Verwalters (nicht im Web).
+#[cfg(not(target_os = "emscripten"))]
+#[global_allocator]
+static SPEICHER: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 mod builtins;
 mod textindex;
 mod compiler;

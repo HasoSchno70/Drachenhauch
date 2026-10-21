@@ -1491,7 +1491,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(1);
             let n = need_int(&a[0], "CHR$")?;
             let c = char::from_u32(n as u32).ok_or_else(|| format!("CHR$: ungueltiger Codepoint {}", n))?;
-            Ok(Value::str_rc(&c.to_string()))
+            let mut puffer = [0u8; 4];
+            Ok(Value::str_stueck(c.encode_utf8(&mut puffer)))
         }
         "asc" => {
             arity!(1);
@@ -2291,7 +2292,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let s = need_str(&a[0], "LEFT$")?;
             let n = need_int(&a[1], "LEFT$")?.max(0) as usize;
             text_anmelden(&a[0]);
-            Ok(Value::str_rc(&s[..zeichen_stelle(s, n)]))
+            Ok(Value::str_stueck(&s[..zeichen_stelle(s, n)]))
         }
         "right$" | "right" => {
             arity!(2);
@@ -2301,7 +2302,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             text_anmelden(&a[0]);
             let anzahl = zeichen_zahl(s);
             let n = (n as usize).min(anzahl);
-            Ok(Value::str_rc(&s[zeichen_stelle(s, anzahl - n)..]))
+            Ok(Value::str_stueck(&s[zeichen_stelle(s, anzahl - n)..]))
         }
         "mid$" | "mid" => {
             if a.len() < 2 || a.len() > 3 { return err(format!("MID$: erwartet 2..3 Argumente, erhalten {}", a.len())); }
@@ -2313,7 +2314,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let rest = &s[zeichen_stelle(s, start)..];
             if a.len() == 3 {
                 let cnt = need_int(&a[2], "MID$")?.max(0) as usize;
-                Ok(Value::str_rc(&rest[..zeichen_stelle(rest, cnt)]))
+                Ok(Value::str_stueck(&rest[..zeichen_stelle(rest, cnt)]))
             } else {
                 Ok(Value::str_rc(rest))
             }

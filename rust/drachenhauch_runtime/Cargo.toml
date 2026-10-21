@@ -215,6 +215,13 @@ libloading = { version = "0.8", optional = true }
 # einen WAV-Strom, den Kira wie jeden anderen Klang spielt.
 # Das Crate liegt ueber andere Abhaengigkeiten ohnehin im Baum; hier nur die
 # Features, die die Druckseite braucht. Unter macOS/Linux druckt CUPS (`lp`).
+# Schneller Speicher-Verwalter fuer den Desktop: jeder Text ist zwei
+# Heap-Bloecke (Rc + String), jedes Objekt, Feld und jede MAP mindestens
+# einer -- der Standard von Windows (HeapAlloc) kostete je Block ~20 ns.
+# Nicht im Web-Build (emscripten bringt seinen eigenen mit).
+[target.'cfg(not(target_os = "emscripten"))'.dependencies]
+mimalloc = { version = "0.1", default-features = false }
+
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing", "Win32_Storage_Xps", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_Ime", "Win32_UI_Input_KeyboardAndMouse", "Win32_System_WinRT", "Win32_System_Console", "Foundation", "Foundation_Collections", "Media_Core", "Media_SpeechSynthesis", "Storage_Streams"] }
 # UIA-Adapter von AccessKit: haengt sich per Subclassing an raylibs GLFW-Fenster.
