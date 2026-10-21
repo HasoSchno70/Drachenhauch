@@ -868,6 +868,27 @@ impl Value {
     pub fn str_rc(s: impl Into<String>) -> Value {
         Value::Str(Rc::new(s.into()))
     }
+
+    /// Ein Text aus einem Stueck eines anderen (MID$, LEFT$, RIGHT$, CHR$):
+    /// ein einzelnes ASCII-Zeichen und der leere Text kommen aus einer
+    /// Tafel je Faden, statt jedes Mal zwei Bloecke anzulegen -- eine
+    /// Schleife `MID$(t, i, 1)` legte sonst je Zeichen Rc und String an.
+    /// Geteilt ist harmlos: an Ort und Stelle angehaengt wird nur, wer den
+    /// Text allein haelt (`Rc::get_mut`); die Tafel haelt immer mit.
+    pub fn str_stueck(s: &str) -> Value {
+        match s.as_bytes() {
+            [] => KURZTEXTE.with(|t| Value::Str(t[128].clone())),
+            [b] if *b < 128 => KURZTEXTE.with(|t| Value::Str(t[*b as usize].clone())),
+            _ => Value::Str(Rc::new(s.to_string())),
+        }
+    }
+}
+
+thread_local! {
+    /// Die 128 ASCII-Zeichen als Text, dahinter der leere (`str_stueck`).
+    static KURZTEXTE: [Rc<String>; 129] = std::array::from_fn(|i| {
+        Rc::new(if i < 128 { (i as u8 as char).to_string() } else { String::new() })
+    });
 }
 
 pub fn is_num(v: &Value) -> bool {

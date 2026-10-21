@@ -13338,6 +13338,15 @@ fn coerce_array(value: Value, elem: &str, ctx: &str) -> R<Value> {
         let mut a = arr.borrow_mut();
         if a.element_type == "any" && a.cells.len() == 0 {
             a.element_type = elem.to_string();
+            // Auch der Speicher wie bei `DIM a[n] AS INTEGER`: sonst landet
+            // jedes ARRAY_PUSH in Werten (Cells::Val), und der Maschinencode
+            // darf so ein Feld nur lesen -- jede Schleife, die hineinschreibt,
+            // lief im Wertemodus (gemessen 39 statt 1 ns je `a[i] = x`).
+            match elem {
+                "integer" => a.cells = Cells::Int(Vec::new()),
+                "float" => a.cells = Cells::Float(Vec::new()),
+                _ => {}
+            }
         // Ein frisches `[1, 2, 3]` an einem FLOAT-Ziel: die Zellen umbauen,
         // statt die Zuweisung abzulehnen. Nur wenn dieses Array sonst
         // niemandem gehoert (strong_count == 1, also ein Literal von eben) --

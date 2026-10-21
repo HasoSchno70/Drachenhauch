@@ -198,3 +198,59 @@ PRINT LEN(namen())
 --- fehler
 RETURN: Erwartet ARRAY OF STRING
 
+
+=== leeres literal an getyptem feld bekommt getypten speicher
+' `a = []` an ARRAY OF INTEGER/FLOAT: seit 2026-10-21 Cells::Int/Float wie
+' DIM a[n] -- vorher Werte (Cells::Val), und der Maschinencode lief jede
+' Schleife, die hineinschreibt, im Wertemodus (39 statt 1 ns je a[i] = x).
+' Dazu MID$/LEFT$/RIGHT$/CHR$ mit geteilten Kurztexten (str_stueck):
+' Anhaengen an so einen Text darf die Tafel nicht veraendern.
+FUNCTION zaehlen() AS INTEGER
+    DIM a AS ARRAY OF INTEGER : a = []
+    DIM i AS INTEGER
+    FOR i = 0 TO 9
+        ARRAY_PUSH(a, i)
+    NEXT
+    FOR i = 1 TO 5000
+        a[i MOD 10] = a[i MOD 10] + i
+    NEXT
+    DIM s AS INTEGER : s = 0
+    FOR i = 0 TO 9
+        s = s + a[i]
+    NEXT
+    RETURN s
+END FUNCTION
+PRINT zaehlen()
+DIM f AS ARRAY OF FLOAT : f = []
+ARRAY_PUSH(f, 1)
+ARRAY_PUSH(f, 2.5)
+PRINT f[0]; " "; f[1]; " "; LEN(f)
+DIM g AS ARRAY OF INTEGER : g = []
+ARRAY_PUSH(g, 2.0)
+PRINT g[0]
+TRY
+    ARRAY_PUSH(g, 2.5)
+CATCH e
+    PRINT "Fehler: "; e
+END TRY
+TRY
+    ARRAY_PUSH(g, "x")
+CATCH e2
+    PRINT "Fehler: "; e2
+END TRY
+DIM h AS ARRAY OF STRING : h = []
+ARRAY_PUSH(h, "a")
+PRINT JOIN$(h, ",")
+PRINT MID$("hallo", 1, 1); LEFT$("xy", 0); "|"; RIGHT$("abc", 1); CHR$(65); CHR$(228); MID$("ä€x", 1, 1)
+DIM t AS STRING : t = MID$("abc", 0, 1)
+t = t + "z"
+PRINT t; " "; MID$("abc", 0, 1); " "; ASC("A") + INSTR("abc", "c") + COUNT("aXa", "a")
+--- erwartet
+12502545
+1.0 2.5 2
+2
+Fehler: ARRAY_PUSH: FLOAT 2.5 kann nicht ohne Verlust nach INTEGER (nutze INT())
+Fehler: ARRAY_PUSH: Erwartet INTEGER, erhalten STRING
+a
+a|cAä€
+az a 69

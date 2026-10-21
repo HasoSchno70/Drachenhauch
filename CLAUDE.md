@@ -3114,6 +3114,28 @@ neue Nummer in `familie_rufen` UND `BUILTIN_FAMILIEN` anpassen. Eine Nummer
 je Befehl lohnt nicht: gemessen kostet Arm 494 des grossen `match` so viel wie
 Arm 10. Tests `tests/pruef/builtin_familien.dhtest`.
 
+## Speicher und kleine Wege (2026-10-21)
+
+Gemessen je Grundoperation (ns je Schleifendurchlauf): der Maschinencode
+rechnet Zahlen in 0,5-5 ns, aber alles, was Speicher anlegt, lag bei
+40-140 ns. Vier Stellen: (1) **mimalloc** als globaler Speicher-Verwalter
+(`main.rs`, nicht fuer emscripten) -- jeder Text ist zwei Bloecke (Rc +
+String), HeapAlloc kostete je Block ~20 ns; tools/tempo text 19,6 -> 9,0 ms,
+maps 79,9 -> 50,5, ffi 77,3 -> 43,4. (2) **`a = []` an ARRAY OF
+INTEGER/FLOAT** bekommt in `coerce_array` auch den getypten Speicher
+(Cells::Int/Float) wie `DIM a[n]` -- vorher Cells::Val, und der
+Maschinencode darf ein Feld von Werten nur lesen: jede Schleife, die
+hineinschrieb, lief im Wertemodus (39 -> 1 ns je `a[i] = x`). (3)
+`typen::builtin_typ` kennt ASC, INSTR, INSTRREV, MAPSIZE, COUNT, ARRAY_PUSH
+als INTEGER -- dann rechnet der Maschinencode mit dem Ergebnis als Zahl
+weiter (ASC in der Schleife 42 -> 19 ns). Nur eintragen, was in builtins.rs
+auf JEDEM Weg diesen Typ liefert (die Tafel speist auch die Typpruefung des
+Compilers; Wahrheitswerte wie CONTAINS bewusst nicht). (4)
+`Value::str_stueck`: MID$/LEFT$/RIGHT$/CHR$ liefern ein einzelnes
+ASCII-Zeichen und "" aus einer Tafel je Faden statt neu angelegt. Teilen ist
+harmlos, angehaengt wird an Ort und Stelle nur ohne zweiten Halter. Tests
+`tests/pruef/array_literal.dhtest` (letzter Fall).
+
 ## Globale Felder ueber Plaetze (2026-09-24)
 
 Bis dahin bekamen nur skalare Globals einen Platz; Felder, Maps und
