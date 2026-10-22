@@ -156,6 +156,34 @@ fn familie_nr(prog: &Program, klassen: &mut Vec<Klasse>, mitglieder: &[(*const c
     Some((klassen.len() - 1) as u16)
 }
 
+/// Die Art eines Platzes vom Typ der Klasse `typ`: die Klasse selbst mit
+/// allen Unterklassen als Familie (hoechstens FAMILIE_MAX), sonst genau die
+/// Klasse. Sicher seit 2026-10-22, weil die Laufzeit in einen solchen Platz
+/// nur noch NIL und Instanzen von `typ` oder einer Unterklasse laesst
+/// (`value::klasse_pruefen`) -- vorher konnte dort alles liegen. None: keine
+/// Klasse (oder ein STRUCT, der als Wert kopiert wird).
+fn familie_des_typs(prog: &Program, klassen: &mut Vec<Klasse>, typ: &str) -> Option<u16> {
+    let ci = prog.classes.get(typ)?;
+    if ci.is_struct { return None; }
+    let stammt = |n: &str| -> bool {
+        let mut cur = Some(n.to_string());
+        let mut tiefe = 0;
+        while let Some(c) = cur {
+            if c == typ { return true; }
+            tiefe += 1;
+            if tiefe > 64 { return false; }
+            cur = prog.classes.get(&c).filter(|x| !x.parent_name.is_empty()).map(|x| x.parent_name.clone());
+        }
+        false
+    };
+    let mut mitglieder: Vec<(*const crate::value::Layout, String)> = prog.classes.iter()
+        .filter(|(n, c)| !c.is_struct && stammt(n))
+        .map(|(n, c)| (Rc::as_ptr(&c.layout), n.clone())).collect();
+    mitglieder.sort_by_key(|(l, _)| *l as usize);
+    if mitglieder.len() <= 1 { return Some(klasse_nr(klassen, Rc::as_ptr(&ci.layout), typ)); }
+    familie_nr(prog, klassen, &mitglieder).or_else(|| Some(klasse_nr(klassen, Rc::as_ptr(&ci.layout), typ)))
+}
+
 /// Die Art der Elemente eines Feldes von Werten: die des ersten, oder --
 /// stecken Objekte mehrerer Unterklassen darin -- ihre Familie.
 fn elemente_art(prog: &Program, w: &[Value], klassen: &mut Vec<Klasse>) -> Option<Art> {
@@ -218,7 +246,8 @@ fn feld_von(prog: &Program, klassen: &mut Vec<Klasse>, k: usize, name: &str, mit
     let a = match art_von_typ(typ) {
         Some(a) => a,
         None => match prog.classes.get(typ) {
-            Some(ci) if !typ.is_empty() => Art::Obj(klasse_nr(klassen, Rc::as_ptr(&ci.layout), typ)),
+            Some(ci) if !typ.is_empty() => Art::Obj(familie_des_typs(prog, klassen, typ)
+                .unwrap_or_else(|| klasse_nr(klassen, Rc::as_ptr(&ci.layout), typ))),
             _ => return Err(format!("Feld {} vom Typ '{}'", name, typ)),
         },
     };
@@ -553,25 +582,50 @@ fn objekt<'a>(obj: u64) -> &'a RefCell<crate::value::Instance> {
 
 extern "C" fn feld_lesen_i(k: *mut Kontext, obj: u64, platz: u64, art: u64, lage: u64) -> i64 {
     match objekt(obj).try_borrow() {
-        Ok(b) => wert_bits(k, b.fields.get(platz as usize), art, lage),
+        Ok(b) => {
+            let v = b.fields.get(platz as usize);
+            // Der haeufigste Fall direkt: ein INTEGER-Feld.
+            if art == 1 { if let Some(Value::Int(x)) = v { return *x; } }
+            wert_bits(k, v, art, lage)
+        }
         Err(_) => { unsafe { (*k).fehler = 1; } 0 }
     }
 }
 
+// Lesen und Schreiben von Kommazahl-Feldern laufen in einer Teilchen-Schleife
+// millionenfach: ohne Klon des Werts und, wenn kein Journal mitschreibt,
+// ohne `mem::replace` samt Abraeumen. Vorher hing ihr Tempo an der
+// Codelage -- je nachdem, was LTO wegoptimierte, schwankte
+// tools/tempo/teilchen.dh um bis zu 9 %, auch bei Aenderungen in vm.rs.
 extern "C" fn feld_lesen_f(k: *mut Kontext, obj: u64, platz: u64) -> f64 {
-    match objekt(obj).try_borrow().ok().as_deref().and_then(|b| b.fields.get(platz as usize).cloned()) {
-        Some(Value::Float(x)) => x,
-        _ => { unsafe { (*k).fehler = 1; } 0.0 }
+    if let Ok(b) = objekt(obj).try_borrow() {
+        if let Some(Value::Float(x)) = b.fields.get(platz as usize) { return *x; }
     }
+    unsafe { (*k).fehler = 1; }
+    0.0
 }
 
 /// Ein Zahlenfeld schreiben; den Wert hat der Maschinencode schon in die Art
 /// des Feldes gewandelt (`art` 1 INTEGER, 3 BOOLEAN).
 extern "C" fn feld_setzen_i(k: *mut Kontext, obj: u64, platz: u64, art: u64, w: i64) {
+    if unsafe { (*k).journal }.is_null() {
+        if let Ok(mut b) = objekt(obj).try_borrow_mut() {
+            match (b.fields.get_mut(platz as usize), art) {
+                (Some(Value::Int(x)), 1) => { *x = w; return; }
+                (Some(Value::Bool(x)), 3) => { *x = w != 0; return; }
+                _ => {}
+            }
+        }
+    }
     feld_setzen(k, obj, platz, if art == 3 { Value::Bool(w != 0) } else { Value::Int(w) });
 }
 
 extern "C" fn feld_setzen_f(k: *mut Kontext, obj: u64, platz: u64, w: f64) {
+    if unsafe { (*k).journal }.is_null() {
+        if let Ok(mut b) = objekt(obj).try_borrow_mut() {
+            if let Some(Value::Float(x)) = b.fields.get_mut(platz as usize) { *x = w; return; }
+        }
+    }
     feld_setzen(k, obj, platz, Value::Float(w));
 }
 
@@ -1984,12 +2038,18 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                     continue;
                 }
                 if let Art::Obj(k) = a {
-                    // In einen Platz ohne Typ oder vom Typ genau dieser Klasse.
+                    // In einen Platz ohne Typ (die Art bleibt), oder in einen
+                    // vom Typ einer Klasse: dann hat der Platz die Familie
+                    // dieser Klasse, und das Objekt muss dazugehoeren.
                     let t = typen[s].to_lowercase();
-                    if !(matches!(t.as_str(), "any" | "") || t == klassen[k as usize].name.to_lowercase()) {
-                        return Err(format!("Objekt {} in Platz vom Typ '{}'", klassen[k as usize].name, typen[s]));
-                    }
-                    z.lokal[s] = Some(a);
+                    let nach = if matches!(t.as_str(), "any" | "") { a } else {
+                        let fam = familie_des_typs(prog, &mut klassen, &t)
+                            .ok_or_else(|| format!("Objekt {} in Platz vom Typ '{}'", klassen[k as usize].name, typen[s]))?;
+                        let alle = klassen[k as usize].lagen().iter().all(|l| klassen[fam as usize].passt(*l));
+                        if !alle { return Err(format!("Objekt {} in Platz vom Typ '{}'", klassen[k as usize].name, typen[s])); }
+                        Art::Obj(fam)
+                    };
+                    z.lokal[s] = Some(nach);
                     melden(&mut vor, &mut offen, ip + 1, &z)?;
                     continue;
                 }
@@ -3184,7 +3244,16 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                             let (x, xa) = st.pop().unwrap();
                             (w, a) = rechnen(&mut bau, op::ADD, x, xa, w, a);
                         }
-                        let nach = if matches!(a, Art::Feld(_) | Art::Obj(_)) { a } else { art_von_typ(&an.typen[s]).unwrap_or(a) };
+                        let nach = match a {
+                            Art::Feld(_) => a,
+                            // Wie in der Analyse: ein Platz vom Typ einer
+                            // Klasse hat die Familie dieser Klasse.
+                            Art::Obj(_) => match an.typen[s].to_lowercase().as_str() {
+                                "any" | "" => a,
+                                t => familie_des_typs(prog, &mut klassen, t).map(Art::Obj).unwrap_or(a),
+                            },
+                            _ => art_von_typ(&an.typen[s]).unwrap_or(a),
+                        };
                         let w = bau.wandeln(w, a, nach);
                         let v = bau.var(1, s, nach);
                         bau.b.def_var(v, w);
@@ -4178,6 +4247,18 @@ impl Jit {
             }
             _ => None,
         };
+        // Ein Local vom Typ einer Klasse hat deren Familie, wie nach jedem
+        // Speichern (STORE_LOCAL) -- sonst passten die Arten am Schleifenkopf
+        // nicht zusammen, sobald die Schleife ein Objekt hineinlegt.
+        for (i, a) in lokal.iter_mut().enumerate() {
+            let Some(Art::Obj(k)) = *a else { continue };
+            let t = lok_typen.get(i).map(|t| t.to_lowercase()).unwrap_or_default();
+            if matches!(t.as_str(), "" | "any") { continue; }
+            if let Some(fam) = familie_des_typs(prog, &mut klassen, &t) {
+                let l = klassen[k as usize].lage;
+                if klassen[fam as usize].passt(l) { *a = Some(Art::Obj(fam)); }
+            }
+        }
         let start = Zustand { stapel: Vec::new(), lokal };
         let bereich = Bereich { von: kopf, bis, start, globale_da, felder, glob_felder,
                                 klassen, selbst: selbst_k, dyn_glob, lok_typen, modus_w: false, vm_fns: Vec::new(), any_w: false };
