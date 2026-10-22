@@ -1,0 +1,78 @@
+' Das Mausrad in Glutfaden (examples/glutfaden): radSchritt in gtk/gtk.dh.
+' Mit GDK_SMOOTH_SCROLL_MASK kommt das Rad als "feines" Ereignis
+' (GDK_SCROLL_SMOOTH) mit Deltas; gdk_event_get_scroll_direction liefert
+' dann FALSE und laesst die Richtung, wie sie war -- 0, also "hoch". Die
+' Leinwand, der Stickpfad- und der Vorschau-Dialog fragten die Richtung
+' zuerst und uebergingen das FALSE: jede Drehung zoomte hinein.
+' Der erste Fall baut echte GdkEventScroll-Ereignisse (gdk_event_new) und
+' schreibt Richtung und Delta selbst hinein; ohne GTK ueberspringt er sich.
+
+=== radschritt liest feine und grobe radereignisse
+IMPORT "helfer.dh"
+' GdkEventScroll unter x86-64 und arm64 (int 4, Zeiger 8, double 8, unter
+' Windows, Linux und macOS gleich): direction bei 44, delta_y bei 80.
+DECLARE FUNCTION memcpy LIB "c" (ziel AS ZEIGER, quelle AS ZEIGER, n AS ZEIGER) AS ZEIGER
+CONST GDK_SCROLL = 31
+
+FUNCTION radEreignis(richtung AS INTEGER, dy AS FLOAT) AS INTEGER
+    DIM ev AS INTEGER : ev = gdk_event_new(GDK_SCROLL)
+    DIM b AS BUFFER : b = BUFFER_NEW(8)
+    BUFFER_SET_I32(b, 0, richtung)
+    DIM z AS INTEGER : z = memcpy(ev + 44, BUFFER_ZEIGER(b), 4)
+    BUFFER_SET_F64(b, 0, dy)
+    z = memcpy(ev + 80, BUFFER_ZEIGER(b), 8)
+    RETURN ev
+END FUNCTION
+
+DIM bereit AS BOOLEAN : bereit = FALSE
+TRY
+    bereit = gtk_init_check(0, 0)
+CATCH e
+    bereit = FALSE
+END TRY
+IF NOT bereit THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    DIM namen AS ARRAY OF STRING : namen = ["fein runter", "fein hoch", "fein seitwaerts", "grob hoch", "grob runter", "grob links"]
+    DIM arten AS ARRAY OF INTEGER : arten = [GDK_RAD_FEIN, GDK_RAD_FEIN, GDK_RAD_FEIN, GDK_RAD_HOCH, GDK_RAD_RUNTER, 2]
+    DIM deltas AS ARRAY OF FLOAT : deltas = [1.0, -1.0, 0.0, 0.0, 0.0, 0.0]
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(namen) - 1
+        DIM ev AS INTEGER : ev = radEreignis(arten[i], deltas[i])
+        DIM r AS INTEGER
+        DIM gibtRichtung AS BOOLEAN : gibtRichtung = gdk_event_get_scroll_direction(ev, r)
+        PRINT namen[i]; ": schritt "; radSchritt(ev); " | richtung gemeldet "; gibtRichtung
+        gdk_event_free(ev)
+    NEXT
+END IF
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/gtk/gtk.dh"
+--- erwartet
+fein runter: schritt 1.0 | richtung gemeldet FALSE
+fein hoch: schritt -1.0 | richtung gemeldet FALSE
+fein seitwaerts: schritt 0.0 | richtung gemeldet FALSE
+grob hoch: schritt -1.0 | richtung gemeldet TRUE
+grob runter: schritt 1.0 | richtung gemeldet TRUE
+grob links: schritt 0.0 | richtung gemeldet TRUE
+
+=== niemand liest die radrichtung ungeprueft
+' gdk_event_get_scroll_direction darf nur in einer IF-Bedingung stehen: was
+' es bei FALSE in die Richtung schreibt, ist nichts.
+DIM gefunden AS INTEGER : gefunden = 0
+DIM d AS STRING
+FOR EACH d IN DIRLIST_REC(GETENV$("GLUT"), "*.dh")
+    DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(PATHJOIN(GETENV$("GLUT"), d))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM t AS STRING : t = TRIM$(zeilen[i])
+        IF LEFT$(t, 1) = "'" OR LEFT$(t, 8) = "DECLARE " THEN CONTINUE
+        IF INSTR(t, "gdk_event_get_scroll_direction(") < 0 THEN CONTINUE
+        gefunden = gefunden + 1
+        IF NOT (LEFT$(t, 3) = "IF " OR LEFT$(t, 7) = "ELSEIF ") THEN PRINT "ungeprueft: "; d; ":"; i + 1; ": "; t
+    NEXT
+NEXT
+PRINT "aufrufe gesehen: "; gefunden > 0
+--- umgebung
+GLUT={sammlung}/../../examples/glutfaden
+--- erwartet
+aufrufe gesehen: TRUE

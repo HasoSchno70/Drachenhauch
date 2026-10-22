@@ -170,21 +170,12 @@ END SUB
 FUNCTION vdlRad(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM mx AS FLOAT, my AS FLOAT
     DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, mx, my)
-    DIM richtung AS INTEGER
-    ok = gdk_event_get_scroll_direction(ereignis, richtung)
     DIM zustand AS INTEGER
     ok = gdk_event_get_state(ereignis, zustand)
     DIM fein AS BOOLEAN : fein = (zustand BAND GDK_STRG) <> 0
-    IF richtung = GDK_RAD_HOCH THEN
-        vdlRadZoom(TRUE, fein, mx, my)
-    ELSEIF richtung = GDK_RAD_RUNTER THEN
-        vdlRadZoom(FALSE, fein, mx, my)
-    ELSE
-        DIM dx AS FLOAT, dy AS FLOAT
-        ok = gdk_event_get_scroll_deltas(ereignis, dx, dy)
-        IF dy < 0 THEN vdlRadZoom(TRUE, fein, mx, my)
-        IF dy > 0 THEN vdlRadZoom(FALSE, fein, mx, my)
-    END IF
+    DIM schritt AS FLOAT : schritt = radSchritt(ereignis)
+    IF schritt < 0 THEN vdlRadZoom(TRUE, fein, mx, my)
+    IF schritt > 0 THEN vdlRadZoom(FALSE, fein, mx, my)
     RETURN TRUE
 END FUNCTION
 

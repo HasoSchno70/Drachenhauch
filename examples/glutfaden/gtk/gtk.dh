@@ -591,6 +591,25 @@ FUNCTION gtkStil$(css AS STRING) AS STRING
     RETURN ""
 END FUNCTION
 
+' Wohin das Rad gedreht wurde: negativ = hoch (vom Nutzer weg), positiv =
+' runter, 0 = nur seitwaerts. Mit GDK_MASKE_RAD_FEIN kommt das Rad als
+' "feines" Ereignis (GDK_SCROLL_SMOOTH) mit Deltas, und dann liefert
+' gdk_event_get_scroll_direction FALSE und laesst die Richtung, wie sie war:
+' 0, also GDK_RAD_HOCH. Wer die Richtung zuerst fragt und das FALSE
+' uebergeht, liest darum jede Drehung als "hoch" -- das Zoomen ging nur noch
+' hinein. Erst die Deltas, dann die Richtung, und jede Antwort nur, wenn GDK
+' sie auch gegeben hat.
+FUNCTION radSchritt(ereignis AS INTEGER) AS FLOAT
+    DIM dx AS FLOAT, dy AS FLOAT
+    IF gdk_event_get_scroll_deltas(ereignis, dx, dy) THEN RETURN dy
+    DIM richtung AS INTEGER
+    IF gdk_event_get_scroll_direction(ereignis, richtung) THEN
+        IF richtung = GDK_RAD_HOCH THEN RETURN -1
+        IF richtung = GDK_RAD_RUNTER THEN RETURN 1
+    END IF
+    RETURN 0
+END FUNCTION
+
 ' Anstehende Ereignisse abarbeiten -- damit ein Balken waehrend einer langen
 ' Rechnung weiterzeichnet.
 SUB gtkAbarbeiten()
