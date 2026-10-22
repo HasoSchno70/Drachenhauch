@@ -106,7 +106,7 @@ SUB statusAktualisieren()
             wahl = "   Draht (Entf loescht ihn, F2: Netz umbenennen)"
         END IF
     END IF
-    IF auswahlAnzahl() > 1 THEN wahl = "   Auswahl: " + STR$(LEN(gSelB)) + " Bauteile, " + STR$(LEN(gSelD)) + " Draehte, " + STR$(LEN(gSelL)) + " Labels (ziehen verschiebt, Strg+C kopiert, Entf loescht)"
+    IF auswahlAnzahl() > 1 THEN wahl = "   Auswahl: " + STR$(LEN(selB())) + " Bauteile, " + STR$(LEN(selD())) + " Draehte, " + STR$(LEN(selL())) + " Labels (ziehen verschiebt, Strg+C kopiert, Entf loescht)"
     DIM netz AS STRING : netz = hoverText$()
     IF netz <> "" THEN netz = "   " + netz
     DIM blatt AS STRING : blatt = instanzPfadText$()
@@ -1367,11 +1367,11 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             ' Rahmen waehlt alles ganz Umschlossene
             auswahlAufheben()
             rahmenAnwendenWelt(1500, 1000, 2600, 3000)
-            pruefe("Rahmen", STR$(LEN(gSelB)) + " Bauteile, " + STR$(LEN(gSelD)) + " Draehte, " + STR$(LEN(gSelL)) + " Labels", "2 Bauteile, 2 Draehte, 1 Labels")
-            umschaltenB(gBlatt.bauteile[2])
-            pruefe("Umschalten dazu", STR$(LEN(gSelB)), "3")
-            umschaltenB(gBlatt.bauteile[2])
-            pruefe("Umschalten weg", STR$(LEN(gSelB)), "2")
+            pruefe("Rahmen", STR$(LEN(selB())) + " Bauteile, " + STR$(LEN(selD())) + " Draehte, " + STR$(LEN(selL())) + " Labels", "2 Bauteile, 2 Draehte, 1 Labels")
+            umschalten(gBlatt.bauteile[2])
+            pruefe("Umschalten dazu", STR$(LEN(selB())), "3")
+            umschalten(gBlatt.bauteile[2])
+            pruefe("Umschalten weg", STR$(LEN(selB())), "2")
             ' kopieren und an der Maus einfuegen
             ablageKopieren()
             gMausDrin = TRUE : gMausWX = 5000 : gMausWY = 1000
@@ -1414,7 +1414,7 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             pruefe("Rahmen per Maus", STR$(auswahlAnzahl()), "5")
             gMausRX = 2000 : gMausRY = 3000
             klickAuswahl(sx(2000), sy(3000), TRUE)
-            pruefe("Umschalt-Klick nimmt D1 dazu", STR$(LEN(gSelB)), "3")
+            pruefe("Umschalt-Klick nimmt D1 dazu", STR$(LEN(selB())), "3")
             gMausWX = 2000 : gMausWY = 3000
             klickAuswahl(sx(2000), sy(3000), FALSE)
             gruppenZiehenUm(1000, 0)
@@ -1497,7 +1497,7 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             ' Gruppe: R7, D1 und der Draht dazwischen um ihre Mitte drehen
             auswahlAufheben()
             rahmenAnwendenWelt(1500, 1700, 2600, 3300)
-            pruefe("Gruppe gewaehlt", STR$(LEN(gSelB)) + "/" + STR$(LEN(gSelD)), "2/1")
+            pruefe("Gruppe gewaehlt", STR$(LEN(selB())) + "/" + STR$(LEN(selD())), "2/1")
             gruppeTransformieren(kern.GR_DREHEN)
             DIM ng AS kern.Netze : ng = aktuelleNetze()
             DIM r0 AS kern.Punkt : r0 = gBlatt.bauteile[1].pinPunkt(0)
@@ -1731,8 +1731,8 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             DIM c1wert AS STRING : c1wert = c1.wert
             auswahlAufheben()
             waehleB(r7)
-            umschaltenB(c1)
-            pruefe("Zwei Bauteile gewaehlt", STR$(LEN(gSelB)), "2")
+            umschalten(c1)
+            pruefe("Zwei Bauteile gewaehlt", STR$(LEN(selB())), "2")
             probeText1 = PROBE_LASSEN : probeText2 = "SMD" : probeText3 = PROBE_LASSEN
             g_timeout_add(150, dialogBestaetigen, 0)
             auswahlBearbeiten()
@@ -2204,8 +2204,8 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             geaendert()
             auswahlAufheben()
             waehleB(vbl.bauteile[0])
-            umschaltenB(vbl.bauteile[1])
-            umschaltenB(vbl.bauteile[2])
+            umschalten(vbl.bauteile[1])
+            umschalten(vbl.bauteile[2])
             DIM vu AS INTEGER : vu = LEN(gUndo)
             auswahlAusrichten(AR_WAAGRECHT)
             pruefe("Waagrecht verteilt (aeussere bleiben)", STR$(vbl.bauteile[0].lage.pos.x) + " " + STR$(vbl.bauteile[1].lage.pos.x) + " " + STR$(vbl.bauteile[2].lage.pos.x) + " " + STR$(LEN(gUndo) - vu), "0 2500 5000 1")
@@ -2452,7 +2452,7 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             ' Bus anklicken und ziehen: die Abzweige folgen
             mausSetzen(sx(7600), sy(2000))
             klickAuswahl(sx(7600), sy(2000), FALSE)
-            pruefe("Bus angeklickt", STR$(LEN(gSelBus)) + " " + STR$(auswahlAnzahl()), "1 1")
+            pruefe("Bus angeklickt", STR$(LEN(selBus())) + " " + STR$(auswahlAnzahl()), "1 1")
             gruppenZiehenUm(0, -500)
             gruppenZugEnde()
             gZieht = FALSE

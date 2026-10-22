@@ -131,8 +131,16 @@ CLASS Symbol
 END CLASS
 
 ' --- Bauteil: die platzierte Instanz
-CLASS Bauteil
+' Element: was auf einem Blatt liegt und sich auswaehlen laesst -- Bauteil,
+' Label, Draht, Bus. Die Auswahl der Oberflaeche ist EINE Menge daraus
+' (ansicht/auswahl.dh); was je Art anders ist, sagt die Unterklasse.
+CLASS Element
     DIM id AS STRING
+    ' Um (dx, dy) Blatt-Einheiten verschieben (Einfuegen aus der Ablage).
+    ABSTRACT SUB verschieben(dx AS INTEGER, dy AS INTEGER)
+END CLASS
+
+CLASS Bauteil EXTENDS Element
     DIM symbolRef AS STRING           ' Symbol-Id (eine eingebaute Bibliothek)
     DIM lage AS Lage
     DIM referenz AS STRING            ' R1, C3, ...
@@ -159,20 +167,25 @@ CLASS Bauteil
         vorlageId = ""
         instanz = ""
     END SUB
+    SUB verschieben(dx AS INTEGER, dy AS INTEGER)
+        lage.pos = NEW Punkt(lage.pos.x + dx, lage.pos.y + dy)
+    END SUB
     ' Blattkoordinate des i-ten Pins (elektrisch, = gezeichnet).
     FUNCTION pinPunkt(i AS INTEGER) AS Punkt
         RETURN transformPunkt(lage, sym.pins[i].pos)
     END FUNCTION
 END CLASS
 
-CLASS Draht
-    DIM id AS STRING
+CLASS Draht EXTENDS Element
     DIM punkte AS ARRAY OF Punkt
     DIM netzname AS STRING
     SUB Init()
         id = LEFT$(UUID4$(), 10)
         punkte = []
         netzname = ""
+    END SUB
+    SUB verschieben(dx AS INTEGER, dy AS INTEGER)
+        punkte = punkteVerschoben(punkte, dx, dy)
     END SUB
 END CLASS
 
@@ -185,8 +198,7 @@ CLASS Knoten
     END SUB
 END CLASS
 
-CLASS Label
-    DIM id AS STRING
+CLASS Label EXTENDS Element
     DIM text AS STRING
     DIM anker AS Punkt                ' elektrischer Anschlusspunkt (fest)
     DIM drehung AS INTEGER            ' Richtung des Textes vom Anker weg (0 rechts, 90 unten ...)
@@ -198,17 +210,22 @@ CLASS Label
         drehung = 0
         art = a
     END SUB
+    SUB verschieben(dx AS INTEGER, dy AS INTEGER)
+        anker = NEW Punkt(anker.x + dx, anker.y + dy)
+    END SUB
 END CLASS
 
 ' Bus: Linie mit Namen (Mitglieder), verbindet nichts -- siehe busse.dh
-CLASS Bus
-    DIM id AS STRING
+CLASS Bus EXTENDS Element
     DIM name AS STRING
     DIM punkte AS ARRAY OF Punkt
     SUB Init(nm AS STRING)
         id = LEFT$(UUID4$(), 10)
         name = nm
         punkte = []
+    END SUB
+    SUB verschieben(dx AS INTEGER, dy AS INTEGER)
+        punkte = punkteVerschoben(punkte, dx, dy)
     END SUB
 END CLASS
 
