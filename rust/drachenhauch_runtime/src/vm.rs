@@ -1054,6 +1054,7 @@ impl<'p> Vm<'p> {
     }
 
     pub fn new(prog: &'p Program) -> Self {
+        crate::value::klassen_setzen(prog.classes.keys());
         let mut global_slots = Vec::with_capacity(prog.n_globals);
         for _ in 0..prog.n_globals {
             global_slots.push(None);
@@ -1649,6 +1650,14 @@ impl<'p> Vm<'p> {
             // ARRAY_PUSH "erwartet ARRAY", und man musste wissen, dass erst
             // `a = []` kommen muss.
             other if other.starts_with("array:") => leeres_feld(other),
+            // Ebenso `DIM tab AS MAP OF INTEGER`: eine LEERE MAP. Global,
+            // lokal und in einer Schleife war das laengst so (DECLARE_*,
+            // `__frisch`); nur ein Klassen- oder STRUCT-Feld kam hier vorbei
+            // und blieb NIL, bis das erste `tab["k"] = 1` mit "Index-Zuweisung
+            // an NIL" abbrach. Die Vorlage legt sie je Objekt neu an
+            // (`teilbar` verneint MAPs).
+            other if other.starts_with("map:") =>
+                Value::Map(Rc::new(RefCell::new(DhMap::new(other["map:".len()..].to_string())))),
             other => crate::model::neutrales_element(other).unwrap_or(Value::Nil),
         }
     }
@@ -1747,7 +1756,15 @@ impl<'p> Vm<'p> {
                     | (Value::Str(_), "string") | (Value::Bool(_), "boolean")
                     | (_, "any") | (_, "") => v,
                     (Value::Int(n), "float") => Value::Float(*n as f64),
-                    (_, ty) => coerce(v, ty, &format!("Zuweisung an {}.{}", cn, name))?,
+                    (_, ty) => {
+                        // Die Sperre VOR coerce abgeben: bei `k.naechster = k`
+                        // ist der Wert dasselbe Objekt, und die Pruefung der
+                        // Klasse (value::klasse_pruefen) liest es.
+                        drop(rcb);
+                        let cv = coerce(v, ty, &format!("Zuweisung an {}.{}", cn, name))?;
+                        rc.borrow_mut().fields[i] = cv;
+                        return Ok(());
+                    }
                 };
                 rcb.fields[i] = cv;
                 Ok(())
@@ -13286,10 +13303,14 @@ pub(crate) fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
                 ctx, v.type_name(), v.fmt())),
             v => Err(format!("{}: Erwartet GELD, erhalten {}", ctx, v.type_name())),
         },
-        // map:/Klassen/sonstige -> Durchreichen (Referenz-Typen).
+        // map:/Modul-Typen -> Durchreichen (Referenz-Typen); eine Klasse
+        // nimmt nur NIL und Instanzen ihrer selbst oder einer Unterklasse.
         _ => match target.strip_prefix("array:") {
             Some(elem) => coerce_array(value, elem, ctx),
-            None => Ok(value),
+            None => {
+                crate::value::klasse_pruefen(&value, target, ctx)?;
+                Ok(value)
+            }
         },
     }
 }

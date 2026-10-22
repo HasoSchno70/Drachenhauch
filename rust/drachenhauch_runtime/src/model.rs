@@ -770,6 +770,10 @@ pub(crate) fn programm_bauen(n_globals: usize, global_names: Vec<String>, main: 
             cur = classes.get(ci.parent_name.as_str());
         }
         let mut lage = crate::value::Layout::default();
+        lage.vorfahren.push(k.clone());
+        for ci in &kette {
+            if !ci.parent_name.is_empty() { lage.vorfahren.push(ci.parent_name.clone()); }
+        }
         for ci in kette.iter().rev() {
             for fd in &ci.fields {
                 let ty = if fd.array_dims.is_empty() { fd.type_name.clone() } else { format!("array:{}", fd.type_name) };

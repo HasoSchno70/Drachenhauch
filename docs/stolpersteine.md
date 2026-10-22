@@ -357,6 +357,10 @@ Reflexionen/Mirror-Effekte.
 >   sind, und nennt `BAND`/`BOR`.
 > - **`DIM a AS ARRAY OF T` ohne Größe war NIL** — das erste `ARRAY_PUSH`
 >   meldete „erwartet ARRAY". Jetzt ein leeres Feld (global, lokal, Klassenfeld).
+> - **`DIM m AS MAP OF T` als Feld einer Klasse oder eines STRUCT war NIL**
+>   (global und lokal war es längst eine leere Map) — das erste `m["k"] = 1`
+>   brach mit „Index-Zuweisung an NIL" ab. Seit 2026-10-22 eine leere Map, je
+>   Objekt eine eigene.
 > - **`VAL` las nur Texte, die GANZ eine Zahl sind**: `VAL("3 Äpfel")`,
 >   `VAL("1e3")` und `VAL("&HFF")` waren 0 (die PDF-Leser mussten deshalb
 >   „3 0 R" selbst zerlegen). Jetzt die Zahl am Anfang, mit `&H`/`&O`/`&B`,

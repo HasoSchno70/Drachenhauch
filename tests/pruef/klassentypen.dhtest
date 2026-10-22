@@ -1,0 +1,377 @@
+' Klassentypen werden geprueft (docs/entwurf-schnittstellen.md, Weg B).
+' Ein Platz vom Typ einer Klasse -- Variable, Parameter, Feld, Feldelement,
+' MAP-Wert, Rueckgabe -- nimmt NIL und Instanzen der Klasse oder einer
+' Unterklasse (`value::klasse_pruefen`). Bis 2026-10-22 reichte die Laufzeit
+' Klassen ungeprueft durch: eine Variable AS Tier nahm ein Auto, ein Parameter
+' AS Datei die Zahl 5, und der Fehler kam erst beim naechsten Methodenaufruf.
+' `--check` warnt, wo es sicher nicht passt (fremde Klasse, Zahl, Text).
+
+=== erlaubt bleiben unterklasse nil und polymorphie
+CLASS Tier
+    FUNCTION laut() AS STRING
+        RETURN "?"
+    END FUNCTION
+END CLASS
+CLASS Hund EXTENDS Tier
+    FUNCTION laut() AS STRING
+        RETURN "wuff"
+    END FUNCTION
+END CLASS
+CLASS Dackel EXTENDS Hund
+END CLASS
+DIM t AS Tier
+t = NEW Dackel()
+PRINT t.laut()
+t = NIL
+PRINT t IS NIL
+DIM tiere AS ARRAY OF Tier : tiere = []
+ARRAY_PUSH(tiere, NEW Tier())
+ARRAY_PUSH(tiere, NEW Hund())
+DIM x AS Tier
+FOR EACH x IN tiere
+    PRINT x.laut()
+NEXT
+' Herunter geht, wenn es wirklich einer ist
+DIM h AS Hund
+t = NEW Hund()
+h = t
+PRINT h.laut()
+--- erwartet
+wuff
+TRUE
+?
+wuff
+wuff
+
+=== fremde klasse an eine variable
+CLASS Tier
+END CLASS
+CLASS Auto
+END CLASS
+DIM t AS Tier
+t = NEW Auto()
+PRINT "nicht erreicht"
+--- fehler
+Erwartet TIER (oder eine Unterklasse), erhalten AUTO
+
+=== herunter in die falsche unterklasse
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+CLASS Katze EXTENDS Tier
+END CLASS
+DIM t AS Tier : t = NEW Katze()
+DIM h AS Hund
+h = t
+--- fehler
+Erwartet HUND (oder eine Unterklasse), erhalten KATZE
+
+=== zahl an einen klassenparameter
+CLASS Datei
+    FUNCTION name() AS STRING
+        RETURN "d"
+    END FUNCTION
+END CLASS
+SUB zeige(d AS Datei)
+    PRINT d.name()
+END SUB
+zeige(NEW Datei())
+zeige(5)
+--- fehler
+Erwartet DATEI (oder eine Unterklasse), erhalten INTEGER
+
+=== lokale variable in einer sub
+CLASS A
+END CLASS
+CLASS B
+END CLASS
+SUB probe()
+    DIM a AS A
+    a = NEW B()
+END SUB
+probe()
+--- fehler
+Erwartet A (oder eine Unterklasse), erhalten B
+
+=== feld eines objekts
+CLASS Person
+END CLASS
+CLASS Auto
+    DIM besitzer AS Person
+END CLASS
+DIM w AS Auto : w = NEW Auto()
+w.besitzer = NEW Person()
+PRINT "person ok"
+w.besitzer = NEW Auto()
+--- fehler
+Erwartet PERSON (oder eine Unterklasse), erhalten AUTO
+
+=== feld im eigenen objekt ohne self
+CLASS Person
+END CLASS
+CLASS Auto
+    DIM besitzer AS Person
+    SUB falsch()
+        besitzer = NEW Auto()
+    END SUB
+END CLASS
+DIM w AS Auto : w = NEW Auto()
+w.falsch()
+--- fehler
+Erwartet PERSON (oder eine Unterklasse), erhalten AUTO
+
+=== feldelement per array_push und per index
+CLASS Form
+END CLASS
+CLASS Kreis EXTENDS Form
+END CLASS
+CLASS Auto
+END CLASS
+DIM formen AS ARRAY OF Form : formen = []
+ARRAY_PUSH(formen, NEW Kreis())
+PRINT LEN(formen)
+TRY
+    ARRAY_PUSH(formen, NEW Auto())
+CATCH e
+    PRINT "push: "; INSTR(e, "Erwartet FORM (oder eine Unterklasse), erhalten AUTO") >= 0
+END TRY
+TRY
+    formen[0] = NEW Auto()
+CATCH e
+    PRINT "index: "; INSTR(e, "Erwartet FORM (oder eine Unterklasse), erhalten AUTO") >= 0
+END TRY
+DIM feste[2] AS Form
+TRY
+    feste[1] = "text"
+CATCH e
+    PRINT "fest: "; INSTR(e, "Erwartet FORM (oder eine Unterklasse), erhalten STRING") >= 0
+END TRY
+PRINT LEN(formen); " "; TYPEOF(formen[0])
+--- erwartet
+1
+push: TRUE
+index: TRUE
+fest: TRUE
+1 KREIS
+
+=== map-wert
+CLASS Form
+END CLASS
+CLASS Auto
+END CLASS
+DIM m AS MAP OF Form
+m["a"] = NEW Form()
+PRINT MAPSIZE(m)
+TRY
+    m["b"] = NEW Auto()
+CATCH e
+    PRINT "index: "; INSTR(e, "Erwartet FORM (oder eine Unterklasse), erhalten AUTO") >= 0
+END TRY
+TRY
+    MAPPUT(m, "c", 7)
+CATCH e
+    PRINT "mapput: "; INSTR(e, "Erwartet FORM (oder eine Unterklasse), erhalten INTEGER") >= 0
+END TRY
+PRINT MAPSIZE(m)
+--- erwartet
+1
+index: TRUE
+mapput: TRUE
+1
+
+=== rueckgabe einer funktion
+CLASS Tier
+END CLASS
+CLASS Auto
+END CLASS
+FUNCTION gib() AS Tier
+    RETURN NEW Auto()
+END FUNCTION
+DIM t AS Tier : t = gib()
+--- fehler
+Erwartet TIER (oder eine Unterklasse), erhalten AUTO
+
+=== struct an struct
+STRUCT PosA
+    DIM x AS INTEGER
+END STRUCT
+STRUCT PosB
+    DIM x AS INTEGER
+END STRUCT
+DIM a AS PosA
+DIM b AS PosB
+b.x = 3
+a = b
+--- fehler
+Erwartet POSA (oder eine Unterklasse), erhalten POSB
+
+=== klasse aus einem namensraum
+IMPORT "kern.dh" AS kern
+CLASS Fremd
+END CLASS
+DIM k AS kern.Knoten
+k = NEW kern.Knoten()
+PRINT TYPEOF(k)
+k = NEW Fremd()
+--- datei kern.dh
+CLASS Knoten
+END CLASS
+--- fehler
+Erwartet KERN.KNOTEN (oder eine Unterklasse), erhalten FREMD
+
+=== der fehler laesst sich fangen
+CLASS Tier
+END CLASS
+CLASS Auto
+END CLASS
+DIM t AS Tier
+TRY
+    t = NEW Auto()
+CATCH e
+    PRINT "gefangen"
+END TRY
+PRINT t IS NIL
+--- erwartet
+gefangen
+TRUE
+
+=== im maschinencode wie in der vm
+' Eine Schleife, die ein Objekt in einen Platz vom Typ einer Klasse legt,
+' laeuft im Maschinencode (Wertemodus). Beim falschen Objekt steigt er aus,
+' und die VM meldet denselben Fehler.
+CLASS Form
+    DIM n AS INTEGER
+END CLASS
+CLASS Auto
+END CLASS
+DIM teile AS ARRAY OF Form : teile = []
+DIM i AS INTEGER
+FOR i = 1 TO 50
+    DIM f AS Form : f = NEW Form() : f.n = i
+    ARRAY_PUSH(teile, f)
+NEXT
+FUNCTION summe(xs AS ARRAY OF Form) AS INTEGER
+    DIM s AS INTEGER : s = 0
+    DIM g AS Form
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(xs) - 1
+        g = xs[j]
+        s = s + g.n
+    NEXT
+    RETURN s
+END FUNCTION
+PRINT summe(teile)
+DIM falsch AS Form
+DIM k AS INTEGER
+FOR k = 1 TO 100
+    IF k = 60 THEN
+        falsch = NEW Auto()
+    ELSE
+        falsch = NEW Form()
+    END IF
+NEXT
+--- fehler
+Erwartet FORM (oder eine Unterklasse), erhalten AUTO
+
+=== im maschinencode wie in der vm ohne maschinencode
+CLASS Form
+    DIM n AS INTEGER
+END CLASS
+CLASS Auto
+END CLASS
+DIM falsch AS Form
+DIM k AS INTEGER
+FOR k = 1 TO 100
+    IF k = 60 THEN
+        falsch = NEW Auto()
+    ELSE
+        falsch = NEW Form()
+    END IF
+NEXT
+--- umgebung
+DHRT_JIT=aus
+--- fehler
+Erwartet FORM (oder eine Unterklasse), erhalten AUTO
+
+=== check warnt bei sicher falschen klassen
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    PRINT JSON_GET_INT(h, "b." + STR$(i) + ".line"); ": "; JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+NEXT
+--- datei w.dh
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+CLASS Auto
+    DIM besitzer AS Tier
+END CLASS
+SUB zeige(t AS Tier)
+END SUB
+FUNCTION gib() AS Tier
+    RETURN NEW Auto()
+END FUNCTION
+DIM t AS Tier
+t = NEW Auto()
+zeige(5)
+DIM w AS Auto : w = NEW Auto()
+w.besitzer = "Rex"
+--- erwartet
+11: Diese Funktion ist als TIER angesagt, hier steht AUTO hinter RETURN. Das bricht beim Laufen ab ('Erwartet TIER (oder eine Unterklasse), erhalten AUTO').
+14: 't' ist als TIER angesagt, rechts steht AUTO. Das bricht beim Laufen ab ('Erwartet TIER (oder eine Unterklasse), erhalten AUTO').
+15: zeige: Parameter 't' ist als TIER angesagt, hier steht INTEGER. Das bricht beim Laufen ab ('Erwartet TIER (oder eine Unterklasse), erhalten INTEGER').
+17: 'w.besitzer' ist als TIER angesagt, rechts steht STRING. Das bricht beim Laufen ab ('Erwartet TIER (oder eine Unterklasse), erhalten STRING').
+
+=== check schweigt bei verwandten klassen und nil
+IMPORT "json"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+PRINT "befund "; TRIM$(lesen$(pc))
+--- datei w.dh
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+FUNCTION finde() AS Tier
+    RETURN NEW Hund()
+END FUNCTION
+SUB zeige(t AS Tier)
+END SUB
+DIM t AS Tier
+t = NEW Hund()
+t = NIL
+DIM h AS Hund
+h = finde()
+h = t
+zeige(h)
+zeige(NIL)
+--- erwartet
+befund []

@@ -1705,17 +1705,39 @@ impl Compiler {
     ///   * INTEGER/FLOAT nehmen nur Zahlen (FLOAT->INTEGER ist WERTabhaengig
     ///     und laeuft ueber `warn_komma_an_ganzzahl`, nicht hier).
     ///   * STRING/BOOLEAN/TUPLE/FUNCREF nehmen ausschliesslich ihresgleichen.
-    ///   * Alles Uebrige (Klassen, MAP, ARRAY, Modul-Typen) reicht die Laufzeit
+    ///   * Eine Klasse nimmt NIL und Instanzen ihrer selbst oder einer
+    ///     Unterklasse (`value::klasse_pruefen`, seit 2026-10-22). Sicher nie
+    ///     passt eine Zahl, ein Text oder ein Wahrheitswert -- und eine Klasse,
+    ///     die mit dem Ziel gar nicht verwandt ist. Steht die Quelle ueber dem
+    ///     Ziel (`h = tierVariable` bei `DIM h AS Hund`), kann es ein Hund
+    ///     sein; das entscheidet erst die Laufzeit.
+    ///   * Alles Uebrige (MAP, ARRAY, Modul-Typen) reicht die Laufzeit
     ///     durch -- dort waere eine Meldung "bricht ab" schlicht unwahr.
     ///     ARRAY hat zwar eine eigene Pruefung (`coerce_array`), die aber ein
     ///     frisches Zahlen-Literal an ein FLOAT-Ziel noch umbaut; das ist
     ///     statisch nicht sauber zu trennen und bleibt darum aussen vor.
-    fn passt_nie(quelle: &str, ziel: &str) -> bool {
+    fn passt_nie(&self, quelle: &str, ziel: &str) -> bool {
         let zahl = |t: &str| t == "integer" || t == "float";
         match ziel {
             "integer" | "float" => !zahl(quelle),
             "string" | "boolean" | "tuple" | "funcref" => quelle != ziel,
+            z if self.classes.contains_key(z) => match quelle {
+                "integer" | "float" | "string" | "boolean" => true,
+                q if self.classes.contains_key(q) =>
+                    !self.stammt_ab(q, z) && !self.stammt_ab(z, q),
+                _ => false,
+            },
             _ => false,
+        }
+    }
+
+    /// Was die Laufzeit in ihrer Meldung als erwartet nennt -- bei einer
+    /// Klasse mit dem Zusatz, den `value::klasse_pruefen` schreibt.
+    fn erwartet_text(&self, ziel: &str) -> String {
+        if self.classes.contains_key(ziel) {
+            format!("{} (oder eine Unterklasse)", crate::namensraum::lesbar_text(&ziel.to_uppercase()))
+        } else {
+            ziel.to_uppercase()
         }
     }
 
@@ -1745,12 +1767,13 @@ impl Compiler {
     /// machen, das sich nicht mehr uebersetzen laesst.
     fn warn_typ_zuweisung(&mut self, ziel_typ: &str, ziel: &str, wert: &Node) {
         let Some(quelle) = self.statischer_typ(wert) else { return };
-        if !Self::passt_nie(&quelle, ziel_typ) { return; }
+        if !self.passt_nie(&quelle, ziel_typ) { return; }
         let zeile = self.ctx.cur_line;
+        let erwartet = self.erwartet_text(ziel_typ);
         self.warnings.push((zeile, format!(
             "'{}' ist als {} angesagt, rechts steht {}. Das bricht beim Laufen ab ('Erwartet {}, erhalten {}').{}",
             ziel, Self::typ_klartext(ziel_typ), Self::typ_klartext(&quelle),
-            ziel_typ.to_uppercase(), quelle.to_uppercase(),
+            erwartet, quelle.to_uppercase(),
             Self::typ_hinweis(&quelle, ziel_typ))));
     }
 
@@ -1815,12 +1838,13 @@ impl Compiler {
             return;
         }
         let Some(quelle) = self.statischer_typ(wert) else { return };
-        if !Self::passt_nie(&quelle, &ziel) { return; }
+        if !self.passt_nie(&quelle, &ziel) { return; }
         let zeile = self.ctx.cur_line;
+        let erwartet = self.erwartet_text(&ziel);
         self.warnings.push((zeile, format!(
             "Diese Funktion ist als {} angesagt, hier steht {} hinter RETURN. Das bricht beim Laufen ab ('Erwartet {}, erhalten {}').{}",
             Self::typ_klartext(&ziel), Self::typ_klartext(&quelle),
-            ziel.to_uppercase(), quelle.to_uppercase(),
+            erwartet, quelle.to_uppercase(),
             Self::typ_hinweis(&quelle, &ziel))));
     }
 
@@ -1892,11 +1916,11 @@ impl Compiler {
                 continue;
             }
             let Some(quelle) = self.statischer_typ(wert) else { continue };
-            if !Self::passt_nie(&quelle, ziel_typ) { continue; }
+            if !self.passt_nie(&quelle, ziel_typ) { continue; }
             raus.push((self.ctx.cur_line, format!(
                 "{}: Parameter '{}' ist als {} angesagt, hier steht {}. Das bricht beim Laufen ab ('Erwartet {}, erhalten {}').{}",
                 wo, pname, Self::typ_klartext(ziel_typ), Self::typ_klartext(&quelle),
-                ziel_typ.to_uppercase(), quelle.to_uppercase(),
+                self.erwartet_text(ziel_typ), quelle.to_uppercase(),
                 Self::typ_hinweis(&quelle, ziel_typ))));
         }
         raus

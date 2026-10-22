@@ -115,6 +115,7 @@ Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie e
 - **Doku-Prüfer** — `dhrt pruef` schickt jeden `basic`-Block durch die Front-End-Kette (`bloecke`), prüft Befehlsnamen in Tabellen/Fließtext (`namen`), die Zählungen im README (`zaehlungen`), Tasten-Konstanten (`konstanten`) und Pfade/Links (`pfade`). Hängt an der Testsuite; bis September 2026 zwei Python-Skripte in `tools/`
 - **[Rust-Front-End-Portierung](rust-frontend-port.md)** und **[Runtime-Migration](rust-runtime.md)** — wie `dhrt` entstand
 - **[Entwurf: Namensräume](entwurf-namensraeume.md)** — WP I der Allzweck-Roadmap. Alle vier Stufen sind inzwischen gebaut; das Dokument bleibt als Protokoll der Entscheidungen
+- **[Entwurf: Schnittstellen](entwurf-schnittstellen.md)** — `INTERFACE`/`IMPLEMENTS` neu abgewogen: Klassentypen werden heute gar nicht geprüft, die großen Programme nutzen keine Vererbung; Empfehlung: erst Klassentypen prüfen, dann Schnittstellen nach einer Probe in Funkenflug (noch nicht gebaut)
 - **[Entwurf: Python-Parser entfernen](entwurf-python-parser-entfernen.md)** — gemessen, was noch am zweiten Parser hängt, und was ein Schnitt kostet
 - **[Entwurf: Mengen](entwurf-set-builtins.md)** — der letzte offene WP-J-Punkt, nach dem Nachmessen neu zugeschnitten
 - **[Entwurf: TASK_START](entwurf-task-start.md)** — DH-Code im Hintergrund; drei Wege, und der dritte umgeht das Send-Problem ganz

@@ -81,17 +81,100 @@ enum Elem { I, F, Wert(Art) }
 /// Zeiger auf `RefCell<Instance>`; ihre Felder liest und schreibt er ueber
 /// die Helfer `feld_lesen_*`/`feld_setzen_*`, weil die Lage eines `Value`
 /// im Speicher nicht festgelegt ist.
+///
+/// Eine **Familie** (Weg F aus docs/entwurf-schnittstellen.md): Objekte
+/// mehrerer Unterklassen einer gemeinsamen Vorfahrin, etwa Kreise und
+/// Quadrate in einem `ARRAY OF Form`. Dann ist `lage`/`name` die der
+/// Vorfahrin (ihre Felder liegen bei allen auf demselben Platz, Vorfahren
+/// zuerst), `familie` die Lagen der Mitglieder. Bis 2026-10-22 kannte der
+/// Maschinencode nur genau eine Lage je Art: in einem gemischten Feld stieg
+/// er bei jedem Element der zweiten Klasse aus (b_poly: 500 000 Mal).
 #[derive(Clone, Debug)]
 struct Klasse {
     lage: *const crate::value::Layout,
     name: String,
+    /// Leer: genau diese Klasse. Sonst die Lagen der Mitglieder.
+    familie: Vec<*const crate::value::Layout>,
+    /// Fuer `wert_bits`: [Zahl, Lage 1, Lage 2 ...], fuer die Dauer des
+    /// Programms (der Maschinencode traegt den Zeiger als Konstante).
+    pruef: u64,
+}
+
+/// Hoechstens so viele Klassen in einer Familie -- mehr Vergleiche vor jedem
+/// Aufruf lohnen nicht, dann bleibt es beim Wertemodus der VM.
+const FAMILIE_MAX: usize = 4;
+
+impl Klasse {
+    /// Gehoert ein Objekt mit dieser Lage dazu?
+    fn passt(&self, l: *const crate::value::Layout) -> bool {
+        if self.familie.is_empty() { std::ptr::eq(self.lage, l) } else { self.familie.iter().any(|m| std::ptr::eq(*m, l)) }
+    }
+    /// (Art-Code, Lage) fuer `wert_bits`: 4 = genau diese Lage, 5 = eine der Familie.
+    fn code(&self) -> (i64, i64) {
+        if self.familie.is_empty() { (4, self.lage as i64) } else { (5, self.pruef as i64) }
+    }
+    /// Die Lagen, die ein Aufruf unterscheiden muss.
+    fn lagen(&self) -> Vec<*const crate::value::Layout> {
+        if self.familie.is_empty() { vec![self.lage] } else { self.familie.clone() }
+    }
 }
 
 fn klasse_nr(klassen: &mut Vec<Klasse>, lage: *const crate::value::Layout, name: &str) -> u16 {
-    match klassen.iter().position(|k| std::ptr::eq(k.lage, lage)) {
+    match klassen.iter().position(|k| std::ptr::eq(k.lage, lage) && k.familie.is_empty()) {
         Some(i) => i as u16,
-        None => { klassen.push(Klasse { lage, name: name.to_string() }); (klassen.len() - 1) as u16 }
+        None => { klassen.push(Klasse { lage, name: name.to_string(), familie: Vec::new(), pruef: 0 }); (klassen.len() - 1) as u16 }
     }
+}
+
+/// Die Familie der Klassen `namen` (mit ihren Lagen): die naechste
+/// gemeinsame Vorfahrin, oder None, wenn es keine gibt oder es zu viele sind.
+fn familie_nr(prog: &Program, klassen: &mut Vec<Klasse>, mitglieder: &[(*const crate::value::Layout, String)]) -> Option<u16> {
+    if mitglieder.len() < 2 || mitglieder.len() > FAMILIE_MAX { return None; }
+    let kette = |n: &str| -> Vec<String> {
+        let mut k = Vec::new();
+        let mut cur = Some(n.to_string());
+        while let Some(c) = cur {
+            if k.len() > 64 { break; }
+            cur = prog.classes.get(&c).filter(|ci| !ci.parent_name.is_empty()).map(|ci| ci.parent_name.clone());
+            k.push(c);
+        }
+        k
+    };
+    let erste = kette(&mitglieder[0].1);
+    let ahnin = erste.iter().find(|a| mitglieder[1..].iter().all(|(_, n)| kette(n).contains(a)))?.clone();
+    let ci = prog.classes.get(&ahnin)?;
+    let lage = Rc::as_ptr(&ci.layout);
+    let mut lagen: Vec<*const crate::value::Layout> = mitglieder.iter().map(|(l, _)| *l).collect();
+    lagen.sort_by_key(|l| *l as usize);
+    if let Some(i) = klassen.iter().position(|k| std::ptr::eq(k.lage, lage) && k.familie == lagen) {
+        return Some(i as u16);
+    }
+    let mut tafel: Vec<u64> = vec![lagen.len() as u64];
+    tafel.extend(lagen.iter().map(|l| *l as u64));
+    let pruef = Box::leak(tafel.into_boxed_slice()).as_ptr() as u64;
+    klassen.push(Klasse { lage, name: ahnin, familie: lagen, pruef });
+    Some((klassen.len() - 1) as u16)
+}
+
+/// Die Art der Elemente eines Feldes von Werten: die des ersten, oder --
+/// stecken Objekte mehrerer Unterklassen darin -- ihre Familie.
+fn elemente_art(prog: &Program, w: &[Value], klassen: &mut Vec<Klasse>) -> Option<Art> {
+    let erste = wert_art(w.first()?, klassen)?;
+    if !matches!(erste, Art::Obj(_)) { return Some(erste); }
+    let mut mitglieder: Vec<(*const crate::value::Layout, String)> = Vec::new();
+    // Ein langes Feld nur am Anfang ansehen -- spaetere Fremde lassen
+    // aussteigen wie bisher.
+    for v in w.iter().take(4096) {
+        let Value::Instance(rc) = v else { return Some(erste) };
+        let Ok(b) = rc.try_borrow() else { return Some(erste) };
+        let l = Rc::as_ptr(&b.layout);
+        if !mitglieder.iter().any(|(m, _)| std::ptr::eq(*m, l)) {
+            mitglieder.push((l, b.class_name.to_string()));
+            if mitglieder.len() > FAMILIE_MAX { return Some(erste); }
+        }
+    }
+    if mitglieder.len() < 2 { return Some(erste); }
+    Some(familie_nr(prog, klassen, &mitglieder).map(Art::Obj).unwrap_or(erste))
 }
 
 /// Art eines einzelnen Wertes, Objekte eingeschlossen.
@@ -119,6 +202,19 @@ fn feld_von(prog: &Program, klassen: &mut Vec<Klasse>, k: usize, name: &str, mit
     }
     let platz = *lage.index.get(name).ok_or_else(|| format!("{} hat kein Feld {}", kl.name, name))? as usize;
     let typ = lage.typen[platz].as_str();
+    // Eine Familie: jedes Mitglied muss das Feld auf demselben Platz mit
+    // demselben Typ haben (eine Unterklasse darf es neu deklarieren) und darf
+    // keine PROPERTY dieses Namens haben.
+    for m in &kl.familie {
+        let ml = unsafe { &**m };
+        if ml.index.get(name).map(|&p| p as usize) != Some(platz) || ml.typen[platz] != typ {
+            return Err(format!("Feld {} liegt in den Klassen der Familie {} verschieden", name, kl.name));
+        }
+        if mit_props && prog.classes.values().any(|ci| std::ptr::eq(Rc::as_ptr(&ci.layout), *m)
+            && ci.props_alle.contains(&name.to_lowercase())) {
+            return Err(format!("PROPERTY {} in einer Unterklasse von {}", name, kl.name));
+        }
+    }
     let a = match art_von_typ(typ) {
         Some(a) => a,
         None => match prog.classes.get(typ) {
@@ -158,7 +254,7 @@ impl FeldInfo {
 /// Ein Feld von Zahlen (INTEGER/FLOAT), ein Feld von Werten oder ein Tupel,
 /// dessen erstes Element eine Zahl, ein Wahrheitswert oder ein Objekt ist:
 /// (Element, Dimensionen, Tupel?). Alles andere bleibt der VM.
-fn feld_beschreiben(v: &Value, klassen: &mut Vec<Klasse>) -> Option<(Elem, u8, bool)> {
+fn feld_beschreiben(prog: &Program, v: &Value, klassen: &mut Vec<Klasse>) -> Option<(Elem, u8, bool)> {
     match v {
         Value::Array(a) => {
             let a = a.borrow();
@@ -167,10 +263,10 @@ fn feld_beschreiben(v: &Value, klassen: &mut Vec<Klasse>) -> Option<(Elem, u8, b
             match &a.cells {
                 crate::value::Cells::Int(_) => Some((Elem::I, d, false)),
                 crate::value::Cells::Float(_) => Some((Elem::F, d, false)),
-                crate::value::Cells::Val(w) => Some((Elem::Wert(wert_art(w.first()?, klassen)?), d, false)),
+                crate::value::Cells::Val(w) => Some((Elem::Wert(elemente_art(prog, w, klassen)?), d, false)),
             }
         }
-        Value::Tuple(t) => Some((Elem::Wert(wert_art(t.first()?, klassen)?), 1, true)),
+        Value::Tuple(t) => Some((Elem::Wert(elemente_art(prog, t, klassen)?), 1, true)),
         _ => None,
     }
 }
@@ -414,14 +510,40 @@ extern "C" fn global_holen(k: *mut Kontext, idx: u64) {
 }
 
 /// Einen Wert als Bits fuer den Maschinencode: `art` 1 INTEGER, 3 BOOLEAN,
-/// 4 Objekt der Lage `lage` (dann der Zeiger). Passt er nicht, steigt der
-/// Maschinencode aus (`fehler`).
+/// 4 Objekt der Lage `lage` (dann der Zeiger), 5 Objekt einer Familie
+/// (`familie_bits`). Passt er nicht, steigt der Maschinencode aus (`fehler`).
 fn wert_bits(k: *mut Kontext, v: Option<&Value>, art: u64, lage: u64) -> i64 {
     match (art, v) {
         (1, Some(Value::Int(x))) => *x,
         (3, Some(Value::Bool(b))) => *b as i64,
         (4, Some(Value::Instance(rc))) if Rc::as_ptr(&rc.borrow().layout) as u64 == lage => Rc::as_ptr(rc) as i64,
+        // Eine Familie: `lage` zeigt auf [Zahl, Lage 1, Lage 2 ...] (`Klasse::pruef`).
+        // Eigene Funktion: als Arm hier machte er gemessen jedes Lesen eines
+        // Objekts 5 % langsamer, auch ohne Familie.
+        (5, Some(Value::Instance(rc))) => familie_bits(k, rc, lage),
         _ => { unsafe { (*k).fehler = 1; } 0 }
+    }
+}
+
+/// `wert_bits` fuer eine Familie (Art 5): passt die Lage des Objekts zu
+/// einer der Lagen in `lage` = [Zahl, Lage 1, Lage 2 ...]?
+#[cold]
+#[inline(never)]
+fn familie_bits(k: *mut Kontext, rc: &Rc<RefCell<crate::value::Instance>>, lage: u64) -> i64 {
+    let l = Rc::as_ptr(&rc.borrow().layout) as u64;
+    let t = lage as *const u64;
+    let n = unsafe { *t } as usize;
+    if (1..=n).any(|i| unsafe { *t.add(i) } == l) { Rc::as_ptr(rc) as i64 }
+    else { unsafe { (*k).fehler = 1; } 0 }
+}
+
+/// Die Lage eines Objekts -- fuer den Verteiler eines Methodenaufrufs auf
+/// einer Familie (0, wenn es gerade gesperrt ist: dann passt keine, und der
+/// Code steigt aus).
+extern "C" fn obj_lage(obj: u64) -> i64 {
+    match objekt(obj).try_borrow() {
+        Ok(b) => Rc::as_ptr(&b.layout) as i64,
+        Err(_) => 0,
     }
 }
 
@@ -1052,6 +1174,7 @@ struct Hilfe {
     mathe1: FuncId,
     mathe2: FuncId,
     ffi: FuncId,
+    lage: FuncId,
     w: [FuncId; 23],
 }
 
@@ -1480,7 +1603,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
     // Eine Methode, als Funktion uebersetzt: `Self` ist ein Objekt genau
     // dieser Klasse (der Einstieg prueft die Lage).
     if let (None, Some(ci)) = (bereich, klasse) {
-        klassen.push(Klasse { lage: Rc::as_ptr(&ci.layout), name: ci.name.clone() });
+        klassen.push(Klasse { lage: Rc::as_ptr(&ci.layout), name: ci.name.clone(), familie: Vec::new(), pruef: 0 });
         selbst = Some(0);
     }
     let dyn_glob: Vec<usize> = bereich.map_or(Vec::new(), |b| b.dyn_glob.clone());
@@ -1663,18 +1786,40 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 for _ in 0..argc { args.push(pop!()); }
                 args.reverse();
                 let k = match pop!() { Art::Obj(k) => k as usize, _ => return Err(format!("Methode {} auf etwas, das kein Objekt ist", name)) };
-                let lage = klassen[k].lage;
-                let j = glob.tafel.iter().position(|e| std::ptr::eq(e.lage, lage) && e.name.eq_ignore_ascii_case(&name))
-                    .ok_or_else(|| format!("Methode {} (nicht in der Tafel)", name))?;
-                let g: &Func = unsafe { &*glob.tafel[j].func };
-                if g.is_coroutine { return Err(format!("Methode {} ist eine Coroutine", name)); }
-                if argc != g.n_params { return Err(format!("Methode {} mit {} statt {} Argumenten", name, argc, g.n_params)); }
-                for (i, a) in args.iter().enumerate() {
-                    let p = art_von_typ(&g.local_types[i]).ok_or_else(|| format!("{} hat einen Parameter vom Typ '{}'", name, g.local_types[i]))?;
-                    if !passt(*a, p) { return Err(format!("Argument {} an {} passt nicht", i + 1, name)); }
+                // Je Lage (eine Klasse, oder jedes Mitglied einer Familie) die
+                // Methode aus der Tafel; alle muessen dieselbe Form haben,
+                // sonst liesse sich das Ergebnis nicht zusammenfuehren.
+                let mut erg_art: Option<Art> = None;
+                for lage in klassen[k].lagen() {
+                    let j = glob.tafel.iter().position(|e| std::ptr::eq(e.lage, lage) && e.name.eq_ignore_ascii_case(&name))
+                        .ok_or_else(|| format!("Methode {} (nicht in der Tafel)", name))?;
+                    let g: &Func = unsafe { &*glob.tafel[j].func };
+                    if g.is_coroutine { return Err(format!("Methode {} ist eine Coroutine", name)); }
+                    if argc != g.n_params { return Err(format!("Methode {} mit {} statt {} Argumenten", name, argc, g.n_params)); }
+                    for (i, a) in args.iter().enumerate() {
+                        let p = art_von_typ(&g.local_types[i]).ok_or_else(|| format!("{} hat einen Parameter vom Typ '{}'", name, g.local_types[i]))?;
+                        if !passt(*a, p) { return Err(format!("Argument {} an {} passt nicht", i + 1, name)); }
+                    }
+                    let a = if g.is_sub { Art::N } else { art_von_typ(&g.return_type).ok_or_else(|| format!("{} liefert '{}'", name, g.return_type))? };
+                    if erg_art.map_or(false, |e| e != a) { return Err(format!("Methode {} liefert in der Familie {} Verschiedenes", name, klassen[k].name)); }
+                    erg_art = Some(a);
+                    gerufen.push(prog.functions.len() + j);
                 }
-                gerufen.push(prog.functions.len() + j);
-                z.stapel.push(if g.is_sub { Art::N } else { art_von_typ(&g.return_type).ok_or_else(|| format!("{} liefert '{}'", name, g.return_type))? });
+                if klassen[k].familie.len() > 1 {
+                    // Die Parameter muessen bei allen dieselbe Art haben --
+                    // gewandelt wird einmal, vor der Verzweigung.
+                    let erste: Vec<String> = { let l = klassen[k].lagen()[0];
+                        let j = glob.tafel.iter().position(|e| std::ptr::eq(e.lage, l) && e.name.eq_ignore_ascii_case(&name)).unwrap();
+                        unsafe { (&*glob.tafel[j].func).local_types[..argc].to_vec() } };
+                    for lage in klassen[k].lagen() {
+                        let j = glob.tafel.iter().position(|e| std::ptr::eq(e.lage, lage) && e.name.eq_ignore_ascii_case(&name)).unwrap();
+                        let g: &Func = unsafe { &*glob.tafel[j].func };
+                        if (0..argc).any(|i| art_von_typ(&g.local_types[i]) != art_von_typ(&erste[i])) {
+                            return Err(format!("Methode {}: Parameter verschieden in der Familie {}", name, klassen[k].name));
+                        }
+                    }
+                }
+                z.stapel.push(erg_art.unwrap());
                 // Die Methode kann Felder schreiben -- auch die, die dieser Code liest.
                 schreibt_felder = true;
             }
@@ -2149,6 +2294,7 @@ struct Bauer<'a, 'b> {
     h_mathe1: cranelift_codegen::ir::FuncRef,
     h_mathe2: cranelift_codegen::ir::FuncRef,
     h_ffi: cranelift_codegen::ir::FuncRef,
+    h_lage: cranelift_codegen::ir::FuncRef,
     /// Wertemodus: die Helfer `w_*` und der erste Platz des Stapels unter den
     /// Werteplaetzen (= Zahl aller Locals samt `dyn_glob`).
     hw: Vec<cranelift_codegen::ir::FuncRef>,
@@ -2276,9 +2422,9 @@ impl<'a, 'b> Bauer<'a, 'b> {
         let fl = self.b.ins().load(types::I64, MemFlagsData::trusted(), self.ctx, 0);
         self.aussteigen_wenn(fl);
     }
-    /// Feld `platz` eines Objekts lesen (Art `a`; ein Objekt der Klasse mit
-    /// Lage `lage`).
-    fn feld_lesen(&mut self, obj: CWert, platz: usize, a: Art, lage: u64) -> CWert {
+    /// Feld `platz` eines Objekts lesen (Art `a`; bei einem Objekt
+    /// `lage` = (Art-Code, Lage) aus `Klasse::code`).
+    fn feld_lesen(&mut self, obj: CWert, platz: usize, a: Art, lage: (i64, i64)) -> CWert {
         let pl = self.b.ins().iconst(types::I64, platz as i64);
         if a == Art::F {
             let r = self.b.ins().call(self.h_lesen_f, &[self.ctx, obj, pl]);
@@ -2286,9 +2432,9 @@ impl<'a, 'b> Bauer<'a, 'b> {
             self.fehler_pruefen();
             return w;
         }
-        let code = match a { Art::B => 3, Art::Obj(_) => 4, _ => 1 };
+        let code = match a { Art::B => 3, Art::Obj(_) => lage.0, _ => 1 };
         let c = self.b.ins().iconst(types::I64, code);
-        let l = self.b.ins().iconst(types::I64, lage as i64);
+        let l = self.b.ins().iconst(types::I64, lage.1);
         let r = self.b.ins().call(self.h_lesen_i, &[self.ctx, obj, pl, c, l]);
         let w = self.b.inst_results(r)[0];
         self.fehler_pruefen();
@@ -2459,11 +2605,12 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
         let h_mathe1 = modul.declare_func_in_func(hilfe.mathe1, fb.func);
         let h_mathe2 = modul.declare_func_in_func(hilfe.mathe2, fb.func);
         let h_ffi = modul.declare_func_in_func(hilfe.ffi, fb.func);
+        let h_lage = modul.declare_func_in_func(hilfe.lage, fb.func);
         let selbst = if an.selbst.is_some() { Some(fb.ins().load(types::I64, MemFlagsData::trusted(), ctxp, K_SELBST)) } else { None };
         let mut bau = Bauer { b: &mut fb, ctx: ctxp, fehler, vars: HashMap::new(), schatten, marken, holen,
                               befoerdert: HashMap::new(), felder: Vec::new(), mitten, punkt: None,
                               aussteige: Vec::new(), lok_zeiger, zu_tief: false, selbst,
-                              h_lesen_i, h_lesen_f, h_setzen_i, h_setzen_f, h_element_i, h_element_f, h_gfeld, h_journal, h_mathe1, h_mathe2, h_ffi,
+                              h_lesen_i, h_lesen_f, h_setzen_i, h_setzen_f, h_element_i, h_element_f, h_gfeld, h_journal, h_mathe1, h_mathe2, h_ffi, h_lage,
                               hw: Vec::new(), w_basis: an.typen.len() as i64 };
         if an.modus_w {
             for id in hilfe.w { let r = modul.declare_func_in_func(id, bau.b.func); bau.hw.push(r); }
@@ -2732,32 +2879,74 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         let (name, argc) = match &ins.arg { Arg::Call(n, c, _) => (n.clone(), *c as usize), _ => unreachable!() };
                         let teil = st.split_off(st.len() - argc);
                         let Some((obj, Art::Obj(k))) = st.pop() else { unreachable!() };
-                        let lage = klassen[k as usize].lage;
-                        let j = glob.tafel.iter().position(|e| std::ptr::eq(e.lage, lage) && e.name.eq_ignore_ascii_case(&name)).unwrap();
-                        let g: &Func = unsafe { &*glob.tafel[j].func };
-                        let idx = prog.functions.len() + j;
+                        // Je Lage das Ziel (eine Klasse: eins; eine Familie: je
+                        // Mitglied eins -- die Analyse hat gesichert, dass alle
+                        // dieselbe Form haben).
+                        let ziele: Vec<(i64, usize)> = klassen[k as usize].lagen().iter().map(|l| {
+                            let j = glob.tafel.iter().position(|e| std::ptr::eq(e.lage, *l) && e.name.eq_ignore_ascii_case(&name)).unwrap();
+                            (*l as i64, j)
+                        }).collect();
+                        let g: &Func = unsafe { &*glob.tafel[ziele[0].1].func };
                         let mut args = Vec::with_capacity(argc + 1);
                         args.push(bau.ctx);
                         for (i, (w, a)) in teil.into_iter().enumerate() {
                             let p = art_von_typ(&g.local_types[i]).unwrap();
                             args.push(bau.wandeln(w, a, p));
                         }
+                        let erg_art = if g.is_sub { None } else { Some(art_von_typ(&g.return_type).unwrap()) };
                         // `Self` des Gerufenen; der Rufer hat sein eigenes beim
-                        // Eintritt gelesen und braucht es nicht zurueck.
-                        bau.b.ins().store(MemFlagsData::trusted(), obj, bau.ctx, K_SELBST);
-                        if bereich.is_some() {
-                            let jb = bau.b.ins().load(types::I64, MemFlagsData::trusted(), bau.ctx, K_JOURNAL_BEREICH);
-                            bau.b.ins().store(MemFlagsData::trusted(), jb, bau.ctx, K_JOURNAL);
-                        }
-                        let fref = modul.declare_func_in_func(ids[idx].unwrap(), bau.b.func);
-                        let ruf = bau.b.ins().call(fref, &args);
-                        let erg = bau.b.inst_results(ruf).first().copied();
+                        // Eintritt gelesen und braucht es nicht zurueck. Bei
+                        // einer Familie erst im getroffenen Zweig -- passt keine
+                        // Lage, steigt der Code vorher aus und hat nichts
+                        // veraendert.
+                        let mut rufen = |bau: &mut Bauer, j: usize| -> Option<CWert> {
+                            bau.b.ins().store(MemFlagsData::trusted(), obj, bau.ctx, K_SELBST);
+                            if bereich.is_some() {
+                                let jb = bau.b.ins().load(types::I64, MemFlagsData::trusted(), bau.ctx, K_JOURNAL_BEREICH);
+                                bau.b.ins().store(MemFlagsData::trusted(), jb, bau.ctx, K_JOURNAL);
+                            }
+                            let fref = modul.declare_func_in_func(ids[prog.functions.len() + j].unwrap(), bau.b.func);
+                            let ruf = bau.b.ins().call(fref, &args);
+                            bau.b.inst_results(ruf).first().copied()
+                        };
+                        let erg = if ziele.len() == 1 {
+                            rufen(&mut bau, ziele[0].1)
+                        } else {
+                            // Der Verteiler: die Lage des Objekts mit jedem
+                            // Mitglied vergleichen und dessen Methode rufen.
+                            let r = bau.b.ins().call(bau.h_lage, &[obj]);
+                            let lg = bau.b.inst_results(r)[0];
+                            let ende = bau.b.create_block();
+                            let ergebnis = erg_art.map(|a| bau.b.declare_var(cl_typ(a)));
+                            for &(lage, j) in &ziele {
+                                let treffer = bau.b.create_block();
+                                let weiter = bau.b.create_block();
+                                let c = bau.b.ins().icmp_imm(IntCC::Equal, lg, lage);
+                                bau.b.ins().brif(c, treffer, &[], weiter, &[]);
+                                bau.b.switch_to_block(treffer);
+                                let w = rufen(&mut bau, j);
+                                if let (Some(v), Some(w)) = (ergebnis, w) { bau.b.def_var(v, w); }
+                                bau.b.ins().jump(ende, &[]);
+                                bau.b.switch_to_block(weiter);
+                            }
+                            // Keine Lage passt (ein Objekt einer Klasse, die
+                            // beim Bauen nicht im Feld stand): aussteigen.
+                            let eins = bau.b.ins().iconst(types::I64, 1);
+                            bau.aussteigen_wenn(eins);
+                            if let (Some(v), Some(a)) = (ergebnis, erg_art) {
+                                let null = if a == Art::F { bau.b.ins().f64const(0.0) } else { bau.b.ins().iconst(types::I64, 0) };
+                                bau.b.def_var(v, null);
+                            }
+                            bau.b.ins().jump(ende, &[]);
+                            bau.b.switch_to_block(ende);
+                            ergebnis.map(|v| bau.b.use_var(v))
+                        };
                         if bereich.is_some() { bau.b.ins().call(bau.h_journal, &[bau.ctx]); }
                         let fl = bau.b.ins().load(types::I64, MemFlagsData::trusted(), bau.ctx, 0);
                         bau.aussteigen_wenn(fl);
-                        match erg {
-                            Some(w) => st.push((w, art_von_typ(&g.return_type).unwrap())),
-                            None => { let n = bau.b.ins().iconst(types::I64, 0); st.push((n, Art::N)); }
+                        match (erg, erg_art) {
+                            (Some(w), Some(a)) => st.push((w, a)),
+                            _ => { let n = bau.b.ins().iconst(types::I64, 0); st.push((n, Art::N)); }
                         }
                     }
                     op::PRINT => {
@@ -2888,7 +3077,7 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                             }
                             Elem::Wert(a) => {
                                 let (code, lage) = match a {
-                                    Art::B => (3, 0), Art::Obj(k) => (4, klassen[k as usize].lage as i64), _ => (1, 0),
+                                    Art::B => (3, 0), Art::Obj(k) => klassen[k as usize].code(), _ => (1, 0),
                                 };
                                 let c = bau.b.ins().iconst(types::I64, code);
                                 let l = bau.b.ins().iconst(types::I64, lage);
@@ -2935,7 +3124,7 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         let (platz, a) = feld_von(prog, &mut klassen, k as usize, &name, mit_props)?;
                         match wert {
                             None => {
-                                let lage = match a { Art::Obj(k2) => klassen[k2 as usize].lage as u64, _ => 0 };
+                                let lage = match a { Art::Obj(k2) => klassen[k2 as usize].code(), _ => (1, 0) };
                                 let w = bau.feld_lesen(obj, platz, a, lage);
                                 st.push((w, a));
                             }
@@ -3519,6 +3708,7 @@ impl Jit {
         builder.symbol("dh_mathe1", mathe1 as *const u8);
         builder.symbol("dh_mathe2", mathe2 as *const u8);
         builder.symbol("dh_ffi_zahlen", ffi_zahlen as *const u8);
+        builder.symbol("dh_obj_lage", obj_lage as *const u8);
         let w_namen: [(&str, *const u8); 23] = [
             ("dh_w_konst", w_konst as *const u8), ("dh_w_kopie", w_kopie as *const u8),
             ("dh_w_frei", w_frei as *const u8), ("dh_w_ablegen_i", w_ablegen_i as *const u8),
@@ -3562,6 +3752,7 @@ impl Jit {
         let s_mathe1 = sig_h(&[i, types::F64], Some(types::F64));
         let s_mathe2 = sig_h(&[i, types::F64, types::F64], Some(types::F64));
         let s_ffi = sig_h(&[i, ptr, i, ptr], Some(i));
+        let s_lage = sig_h(&[i], Some(i));
         let f64t = types::F64;
         let w_sigs: Vec<(&str, cranelift_codegen::ir::Signature)> = [
             ("dh_w_konst", vec![ptr, i, i], None),
@@ -3605,6 +3796,7 @@ impl Jit {
             mathe1: dekl("dh_mathe1", &s_mathe1)?,
             mathe2: dekl("dh_mathe2", &s_mathe2)?,
             ffi: dekl("dh_ffi_zahlen", &s_ffi)?,
+            lage: dekl("dh_obj_lage", &s_lage)?,
             w: w_ids,
         };
         // Beruehrte Plaetze je Funktion samt allen, die sie ruft.
@@ -3758,7 +3950,7 @@ impl Jit {
                 (Art::F, Value::Float(x)) => x.to_bits(),
                 (Art::B, Value::Bool(b)) => *b as u64,
                 (Art::Feld(_), _) => 0,   // geprueft mit den Feldern unten
-                (Art::Obj(k), Value::Instance(rc)) if std::ptr::eq(Rc::as_ptr(&rc.borrow().layout), s.klassen[*k as usize].lage)
+                (Art::Obj(k), Value::Instance(rc)) if s.klassen[*k as usize].passt(Rc::as_ptr(&rc.borrow().layout))
                     => Rc::as_ptr(rc) as u64,
                 // Ein Local ohne Typ fuehrt der Wertemodus auch mit einer Zahl
                 // als Wert (siehe `wertebereich`).
@@ -3772,7 +3964,7 @@ impl Jit {
         let selbst_zeiger = match s.selbst {
             None => 0,
             Some(k) => match selbst {
-                Some(Value::Instance(rc)) if std::ptr::eq(Rc::as_ptr(&rc.borrow().layout), s.klassen[k as usize].lage) => Rc::as_ptr(rc) as u64,
+                Some(Value::Instance(rc)) if s.klassen[k as usize].passt(Rc::as_ptr(&rc.borrow().layout)) => Rc::as_ptr(rc) as u64,
                 _ => return None,
             },
         };
@@ -3944,7 +4136,7 @@ impl Jit {
         let mut klassen: Vec<Klasse> = Vec::new();
         let mut lokal: Vec<Option<Art>> = Vec::with_capacity(locals.len());
         for (i, v) in locals.iter().enumerate() {
-            lokal.push(match feld_beschreiben(v, &mut klassen) {
+            lokal.push(match feld_beschreiben(prog, v, &mut klassen) {
                 Some((elem, dims, tupel)) => {
                     felder.push(FeldInfo { quelle: Quelle::Lokal(i), elem, dims, tupel });
                     Some(Art::Feld((felder.len() - 1) as u16))
@@ -3954,7 +4146,7 @@ impl Jit {
         }
         let globale_da = slots.iter().map(|x| x.is_some()).collect();
         let glob_felder: Vec<Option<(Elem, u8, bool)>> = slots.iter()
-            .map(|x| x.as_ref().and_then(|sl| feld_beschreiben(&sl.borrow().value, &mut klassen))).collect();
+            .map(|x| x.as_ref().and_then(|sl| feld_beschreiben(prog, &sl.borrow().value, &mut klassen))).collect();
         // Globale Plaetze ohne festen Zahlentyp (ein Objekt, eine Zahl in
         // einer Variable ohne Typ wie der Laufvariable von FOR EACH, oder noch
         // NIL) fuehrt der Bereich wie Locals: ihre Art folgt dem, was

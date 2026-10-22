@@ -1931,8 +1931,10 @@ p.hp = 5
 eine meldung mit [bricht beim Laufen ab]: FALSE
 
 === referenztypen bleiben still
-' Klassen/MAP reicht die Laufzeit durch -- eine Meldung 'bricht ab' waere
-' schlicht unwahr, egal wie sinnvoll die Zuweisung ist.
+' MAP reicht die Laufzeit durch -- eine Meldung 'bricht ab' waere schlicht
+' unwahr, egal wie sinnvoll die Zuweisung ist. Klassen prueft die Laufzeit
+' seit 2026-10-22; dort warnt --check, wo es sicher nie passt
+' (klassentypen.dhtest). Eine Unterklasse an die Elternklasse bleibt still.
 ' (Bis Stufe 47 in test_compiler_warnungen.py.)
 IMPORT "json"
 ' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
@@ -1983,11 +1985,14 @@ PRINT "eine meldung mit [bricht beim Laufen ab]: "; eine$("bricht beim Laufen ab
 CLASS A
     DIM x AS INTEGER
 END CLASS
-CLASS B
+CLASS B EXTENDS A
     DIM y AS INTEGER
 END CLASS
 DIM a AS A
 a = NEW B()
+DIM m AS MAP OF INTEGER
+DIM n AS MAP OF STRING
+m = n
 
 --- erwartet
 eine meldung mit [bricht beim Laufen ab]: FALSE

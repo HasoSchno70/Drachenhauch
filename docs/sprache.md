@@ -284,8 +284,11 @@ nicht zwei davon haben.
 **Wo er bewusst schweigt** — damit keine Meldung falschen Alarm gibt:
 
 * **Rückgabewerte von Built-ins** werden nicht hergeleitet.
-* **Klassen, MAP und ARRAY** reicht die Laufzeit bei einer Zuweisung durch;
-  eine Meldung „bricht ab" wäre dort schlicht unwahr.
+* **MAP und ARRAY** reicht die Laufzeit bei einer Zuweisung durch;
+  eine Meldung „bricht ab" wäre dort schlicht unwahr. Bei **Klassen** meldet
+  er nur, was sicher nie passt: eine Zahl, einen Text, einen Wahrheitswert
+  oder eine Klasse, die mit dem Ziel nicht verwandt ist. Ein Wert vom Typ der
+  Elternklasse kann eine Unterklasse sein — das prüft erst die Laufzeit.
 * **`PROPERTY`** — dort entscheidet der Setter, nicht das Feld dahinter.
 * **Ein Mitglied, das eine ABGELEITETE Klasse hat.** `DIM t AS Tier : t = NEW
   Hund() : t.belle()` ist gültig und bleibt still.
@@ -1332,6 +1335,20 @@ ihr noch gar nicht gibt — `Zeige()` oben ruft `Flaeche()`, und zur Laufzeit
 landet das bei der Unterklasse, die sie ausgefüllt hat.
 
 `ABSTRACT` ist ebenfalls kein reserviertes Wort.
+
+**Der Typ einer Klasse gilt.** Eine Variable, ein Parameter, ein Feld, ein
+Feldelement (`ARRAY OF Tier`), ein MAP-Wert oder eine Rückgabe vom Typ
+`Tier` nimmt `NIL` und Instanzen von `Tier` oder einer Unterklasse — sonst
+nichts. Ein `Auto` oder die Zahl 5 an dieser Stelle bricht dort ab, wo sie
+hineinkommen soll, nicht erst beim nächsten Methodenaufruf:
+
+```
+Laufzeitfehler in spiel.dh:12: Zuweisung an global: Erwartet TIER (oder eine Unterklasse), erhalten AUTO
+```
+
+Herunter (`DIM h AS Hund : h = einTier`) geht, wenn in `einTier` wirklich
+ein Hund steckt; das entscheidet die Laufzeit. Bis Fassung 2026.33 reichte
+die Laufzeit Klassen ungeprüft durch.
 
 **STRUCT** ist ein leichtgewichtiges Daten-Klassen-Substitut, das automatisch instanziert wird (kein `NEW` nötig):
 

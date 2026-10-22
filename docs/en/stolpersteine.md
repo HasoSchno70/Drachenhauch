@@ -357,6 +357,10 @@ reflections/mirror effects become possible.
 >   and names `BAND`/`BOR`.
 > - **`DIM a AS ARRAY OF T` without a size was NIL** — the first `ARRAY_PUSH`
 >   reported “expected ARRAY”. Now an empty array (global, local, class field).
+> - **`DIM m AS MAP OF T` as a field of a class or STRUCT was NIL**
+>   (global and local it had long been an empty map) — the first `m["k"] = 1`
+>   stopped with “Index-Zuweisung an NIL”. Since 2026-10-22 an empty map, a
+>   separate one for each object.
 > - **`VAL` only read texts that are ENTIRELY a number**: `VAL("3 Äpfel")`,
 >   `VAL("1e3")` and `VAL("&HFF")` were 0 (the PDF readers therefore had to
 >   take “3 0 R” apart themselves). Now the number at the start, with `&H`/`&O`/`&B`,

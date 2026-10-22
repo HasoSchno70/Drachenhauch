@@ -2728,6 +2728,8 @@ DHRT_JIT=aus
 66 8 10
 
 === unterklasse an der stelle der oberklasse (maschinencode)
+' Tier und Hund im selben Tupel: seit 2026-10-22 eine Familie (Weg F) --
+' vorher stieg der Code bei jedem zweiten Element aus (6 Mal, 0 Laeufe).
 CLASS Tier
     DIM beine AS INTEGER
 END CLASS
@@ -2752,8 +2754,7 @@ DHRT_JIT_BILANZ=1
 66 8 10
 --- stderr
 jit: Schleife an Stelle 24 in __main__ bleibt in der VM: mit Werten: Mitglieder in der inneren Schleife 40..62
-jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
-jit: 6 mal mitten in einer Schleife ausgestiegen
+jit: 0 Funktionen, 1 Schleifen, 3 Schleifenlaeufe
 jit: 1 Runden in der VM -- Stelle 24 in __main__: mit Werten: Mitglieder in der inneren Schleife 40..62
 
 === text anhaengen in einer schleife
@@ -7481,3 +7482,437 @@ gefangen: SHL: Schiebeweite muss 0..63 sein, erhalten 64 zeile 24
 gefangen: BAND erwartet INTEGER, erhalten INTEGER / STRING
 --- stderr
 jit: 3 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== objekte verschiedener unterklassen in einem feld
+' Weg F (docs/entwurf-schnittstellen.md): Kreis, Rechteck und Quadrat (zwei
+' Stufen) in einem ARRAY OF Form. Der Maschinencode fasst sie als Familie
+' und verteilt den Aufruf ueber die Lage; das Basisfeld n liegt bei allen
+' auf demselben Platz. Bis 2026-10-22 stieg er bei jedem Element einer
+' zweiten Klasse aus (hier 1000 Mal, 0 Laeufe).
+CLASS Form
+    DIM n AS INTEGER
+    ABSTRACT FUNCTION flaeche() AS FLOAT
+END CLASS
+CLASS Kreis EXTENDS Form
+    DIM r AS FLOAT
+    FUNCTION flaeche() AS FLOAT
+        RETURN 3.0 * r * r
+    END FUNCTION
+END CLASS
+CLASS Rechteck EXTENDS Form
+    DIM a AS FLOAT
+    DIM b AS FLOAT
+    FUNCTION flaeche() AS FLOAT
+        RETURN a * b
+    END FUNCTION
+END CLASS
+CLASS Quadrat EXTENDS Rechteck
+    FUNCTION flaeche() AS FLOAT
+        RETURN a * a
+    END FUNCTION
+END CLASS
+DIM formen AS ARRAY OF Form : formen = []
+DIM i AS INTEGER
+FOR i = 0 TO 29
+    SELECT CASE i MOD 3
+        CASE 0
+            DIM k AS Kreis : k = NEW Kreis() : k.r = i : k.n = 1
+            ARRAY_PUSH(formen, k)
+        CASE 1
+            DIM e AS Rechteck : e = NEW Rechteck() : e.a = i : e.b = 2 : e.n = 2
+            ARRAY_PUSH(formen, e)
+        CASE ELSE
+            DIM q AS Quadrat : q = NEW Quadrat() : q.a = i : q.n = 3
+            ARRAY_PUSH(formen, q)
+    END SELECT
+NEXT
+DIM summe AS FLOAT : summe = 0
+DIM zahl AS INTEGER : zahl = 0
+DIM runde AS INTEGER
+FOR runde = 1 TO 50
+    FOR i = 0 TO LEN(formen) - 1
+        summe = summe + formen[i].flaeche()
+        zahl = zahl + formen[i].n
+    NEXT
+NEXT
+PRINT summe; " "; zahl
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+556500.0 3000
+
+=== objekte verschiedener unterklassen in einem feld (maschinencode)
+CLASS Form
+    DIM n AS INTEGER
+    ABSTRACT FUNCTION flaeche() AS FLOAT
+END CLASS
+CLASS Kreis EXTENDS Form
+    DIM r AS FLOAT
+    FUNCTION flaeche() AS FLOAT
+        RETURN 3.0 * r * r
+    END FUNCTION
+END CLASS
+CLASS Rechteck EXTENDS Form
+    DIM a AS FLOAT
+    DIM b AS FLOAT
+    FUNCTION flaeche() AS FLOAT
+        RETURN a * b
+    END FUNCTION
+END CLASS
+CLASS Quadrat EXTENDS Rechteck
+    FUNCTION flaeche() AS FLOAT
+        RETURN a * a
+    END FUNCTION
+END CLASS
+DIM formen AS ARRAY OF Form : formen = []
+DIM i AS INTEGER
+FOR i = 0 TO 29
+    SELECT CASE i MOD 3
+        CASE 0
+            DIM k AS Kreis : k = NEW Kreis() : k.r = i : k.n = 1
+            ARRAY_PUSH(formen, k)
+        CASE 1
+            DIM e AS Rechteck : e = NEW Rechteck() : e.a = i : e.b = 2 : e.n = 2
+            ARRAY_PUSH(formen, e)
+        CASE ELSE
+            DIM q AS Quadrat : q = NEW Quadrat() : q.a = i : q.n = 3
+            ARRAY_PUSH(formen, q)
+    END SELECT
+NEXT
+DIM summe AS FLOAT : summe = 0
+DIM zahl AS INTEGER : zahl = 0
+DIM runde AS INTEGER
+FOR runde = 1 TO 50
+    FOR i = 0 TO LEN(formen) - 1
+        summe = summe + formen[i].flaeche()
+        zahl = zahl + formen[i].n
+    NEXT
+NEXT
+PRINT summe; " "; zahl
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+556500.0 3000
+--- stderr
+jit: 4 Funktionen, 1 Schleifen, 50 Schleifenlaeufe
+
+=== eine klasse kommt nach dem bauen dazu
+' Die Familie entsteht beim Bauen aus dem, was im Feld steht. Kommt danach
+' ein Objekt einer weiteren Klasse dazu, passt keine Lage: der Code steigt
+' aus, und die naechste Schleife baut die Familie mit drei Klassen.
+CLASS Form
+    ABSTRACT FUNCTION ecken() AS INTEGER
+END CLASS
+CLASS Kreis EXTENDS Form
+    FUNCTION ecken() AS INTEGER
+        RETURN 0
+    END FUNCTION
+END CLASS
+CLASS Quadrat EXTENDS Form
+    FUNCTION ecken() AS INTEGER
+        RETURN 4
+    END FUNCTION
+END CLASS
+CLASS Dreieck EXTENDS Form
+    FUNCTION ecken() AS INTEGER
+        RETURN 3
+    END FUNCTION
+END CLASS
+FUNCTION zaehle(xs AS ARRAY OF Form) AS INTEGER
+    DIM s AS INTEGER : s = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(xs) - 1
+        s = s + xs[i].ecken()
+    NEXT
+    RETURN s
+END FUNCTION
+DIM formen AS ARRAY OF Form : formen = []
+DIM i AS INTEGER
+FOR i = 1 TO 40
+    IF i MOD 2 = 0 THEN ARRAY_PUSH(formen, NEW Kreis()) ELSE ARRAY_PUSH(formen, NEW Quadrat())
+NEXT
+DIM runde AS INTEGER
+DIM ges AS INTEGER : ges = 0
+FOR runde = 1 TO 20
+    ges = ges + zaehle(formen)
+NEXT
+PRINT ges
+' Jetzt kommt eine Klasse dazu, die beim Bauen nicht im Feld stand.
+ARRAY_PUSH(formen, NEW Dreieck())
+ges = 0
+FOR runde = 1 TO 20
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(formen) - 1
+        ges = ges + formen[j].ecken()
+    NEXT
+NEXT
+PRINT ges
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1600
+1660
+
+=== eine klasse kommt nach dem bauen dazu (maschinencode)
+CLASS Form
+    ABSTRACT FUNCTION ecken() AS INTEGER
+END CLASS
+CLASS Kreis EXTENDS Form
+    FUNCTION ecken() AS INTEGER
+        RETURN 0
+    END FUNCTION
+END CLASS
+CLASS Quadrat EXTENDS Form
+    FUNCTION ecken() AS INTEGER
+        RETURN 4
+    END FUNCTION
+END CLASS
+CLASS Dreieck EXTENDS Form
+    FUNCTION ecken() AS INTEGER
+        RETURN 3
+    END FUNCTION
+END CLASS
+FUNCTION zaehle(xs AS ARRAY OF Form) AS INTEGER
+    DIM s AS INTEGER : s = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(xs) - 1
+        s = s + xs[i].ecken()
+    NEXT
+    RETURN s
+END FUNCTION
+DIM formen AS ARRAY OF Form : formen = []
+DIM i AS INTEGER
+FOR i = 1 TO 40
+    IF i MOD 2 = 0 THEN ARRAY_PUSH(formen, NEW Kreis()) ELSE ARRAY_PUSH(formen, NEW Quadrat())
+NEXT
+DIM runde AS INTEGER
+DIM ges AS INTEGER : ges = 0
+FOR runde = 1 TO 20
+    ges = ges + zaehle(formen)
+NEXT
+PRINT ges
+' Jetzt kommt eine Klasse dazu, die beim Bauen nicht im Feld stand.
+ARRAY_PUSH(formen, NEW Dreieck())
+ges = 0
+FOR runde = 1 TO 20
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(formen) - 1
+        ges = ges + formen[j].ecken()
+    NEXT
+NEXT
+PRINT ges
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1600
+1660
+--- stderr
+jit: 4 Funktionen, 4 Schleifen, 23 Schleifenlaeufe
+
+=== familie mit verschiedener rueckgabe feld oder property
+' Liefert dieselbe Methode in den Klassen Verschiedenes (INTEGER/FLOAT),
+' deklariert eine Unterklasse ein Feld mit anderem Typ neu oder hat sie eine
+' PROPERTY gleichen Namens, gibt es keine Familie -- der Bereich laeuft im
+' Wertemodus, das Ergebnis ist das der VM.
+CLASS Basis
+    DIM n AS INTEGER
+    DIM w AS INTEGER
+    FUNCTION wert() AS INTEGER
+        RETURN n
+    END FUNCTION
+END CLASS
+CLASS A EXTENDS Basis
+    FUNCTION wert() AS INTEGER
+        RETURN n * 2
+    END FUNCTION
+END CLASS
+CLASS B EXTENDS Basis
+    DIM w AS FLOAT
+    PROPERTY GET n() AS INTEGER
+        RETURN 100
+    END PROPERTY
+    FUNCTION wert() AS FLOAT
+        RETURN 0.5
+    END FUNCTION
+END CLASS
+DIM xs AS ARRAY OF Basis : xs = []
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    DIM a AS A : a = NEW A() : a.n = i : a.w = i
+    ARRAY_PUSH(xs, a)
+    DIM b AS B : b = NEW B() : b.w = 1.5
+    ARRAY_PUSH(xs, b)
+NEXT
+DIM s AS FLOAT : s = 0
+DIM t AS FLOAT : t = 0
+DIM u AS INTEGER : u = 0
+DIM r AS INTEGER
+FOR r = 1 TO 5
+    FOR i = 0 TO LEN(xs) - 1
+        s = s + xs[i].wert()
+        t = t + xs[i].w
+        u = u + xs[i].n
+    NEXT
+NEXT
+PRINT s; " "; t; " "; u
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+575.0 350.0 5275
+
+=== familie mit verschiedener rueckgabe feld oder property (maschinencode)
+CLASS Basis
+    DIM n AS INTEGER
+    DIM w AS INTEGER
+    FUNCTION wert() AS INTEGER
+        RETURN n
+    END FUNCTION
+END CLASS
+CLASS A EXTENDS Basis
+    FUNCTION wert() AS INTEGER
+        RETURN n * 2
+    END FUNCTION
+END CLASS
+CLASS B EXTENDS Basis
+    DIM w AS FLOAT
+    PROPERTY GET n() AS INTEGER
+        RETURN 100
+    END PROPERTY
+    FUNCTION wert() AS FLOAT
+        RETURN 0.5
+    END FUNCTION
+END CLASS
+DIM xs AS ARRAY OF Basis : xs = []
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    DIM a AS A : a = NEW A() : a.n = i : a.w = i
+    ARRAY_PUSH(xs, a)
+    DIM b AS B : b = NEW B() : b.w = 1.5
+    ARRAY_PUSH(xs, b)
+NEXT
+DIM s AS FLOAT : s = 0
+DIM t AS FLOAT : t = 0
+DIM u AS INTEGER : u = 0
+DIM r AS INTEGER
+FOR r = 1 TO 5
+    FOR i = 0 TO LEN(xs) - 1
+        s = s + xs[i].wert()
+        t = t + xs[i].w
+        u = u + xs[i].n
+    NEXT
+NEXT
+PRINT s; " "; t; " "; u
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+575.0 350.0 5275
+--- stderr
+jit: 4 Funktionen, 1 Schleifen, 5 Schleifenlaeufe
+
+=== mehr als vier klassen bilden keine familie
+' Eine Familie hat hoechstens vier Klassen (FAMILIE_MAX); bei fuenf bleibt
+' es beim alten Weg: aussteigen, die VM rechnet.
+CLASS F
+    FUNCTION z() AS INTEGER
+        RETURN 0
+    END FUNCTION
+END CLASS
+CLASS F1 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+CLASS F2 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 2
+    END FUNCTION
+END CLASS
+CLASS F3 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 3
+    END FUNCTION
+END CLASS
+CLASS F4 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 4
+    END FUNCTION
+END CLASS
+DIM xs AS ARRAY OF F : xs = []
+DIM i AS INTEGER
+FOR i = 0 TO 49
+    SELECT CASE i MOD 5
+        CASE 0 : ARRAY_PUSH(xs, NEW F())
+        CASE 1 : ARRAY_PUSH(xs, NEW F1())
+        CASE 2 : ARRAY_PUSH(xs, NEW F2())
+        CASE 3 : ARRAY_PUSH(xs, NEW F3())
+        CASE ELSE : ARRAY_PUSH(xs, NEW F4())
+    END SELECT
+NEXT
+DIM s AS INTEGER : s = 0
+DIM r AS INTEGER
+FOR r = 1 TO 10
+    FOR i = 0 TO 49
+        s = s + xs[i].z()
+    NEXT
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1000
+
+=== mehr als vier klassen bilden keine familie (maschinencode)
+CLASS F
+    FUNCTION z() AS INTEGER
+        RETURN 0
+    END FUNCTION
+END CLASS
+CLASS F1 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+CLASS F2 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 2
+    END FUNCTION
+END CLASS
+CLASS F3 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 3
+    END FUNCTION
+END CLASS
+CLASS F4 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 4
+    END FUNCTION
+END CLASS
+DIM xs AS ARRAY OF F : xs = []
+DIM i AS INTEGER
+FOR i = 0 TO 49
+    SELECT CASE i MOD 5
+        CASE 0 : ARRAY_PUSH(xs, NEW F())
+        CASE 1 : ARRAY_PUSH(xs, NEW F1())
+        CASE 2 : ARRAY_PUSH(xs, NEW F2())
+        CASE 3 : ARRAY_PUSH(xs, NEW F3())
+        CASE ELSE : ARRAY_PUSH(xs, NEW F4())
+    END SELECT
+NEXT
+DIM s AS INTEGER : s = 0
+DIM r AS INTEGER
+FOR r = 1 TO 10
+    FOR i = 0 TO 49
+        s = s + xs[i].z()
+    NEXT
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1000
+--- stderr
+jit: 400 mal mitten in einer Schleife ausgestiegen
