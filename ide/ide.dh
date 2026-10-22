@@ -3748,6 +3748,13 @@ SUB tabSchliessen(i AS INTEGER)
     layout()
     GUI_LISTBOX_CLEAR(lstProbleme)
     protokoll("geschlossen " + STR$(i))
+    ' Der letzte Reiter ist zu: gefuellt wird die Gliederung nur beim
+    ' Pruefen eines Reiters, ohne Reiter bliebe sie stehen und zeigte die
+    ' Unterprogramme einer Datei, die nicht mehr offen ist.
+    IF tabAnzahl = 0 THEN
+        GUI_SET_TEXT(lblProbleme, tr$("Probleme"))
+        gliederungLeeren()
+    END IF
 END SUB
 
 ' --- Projektbaum -------------------------------------------------------
@@ -4227,13 +4234,17 @@ DIM problemHinweis AS ARRAY OF BOOLEAN : problemHinweis = []
 SUB pruefen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF problemModus = 0 THEN GUI_LISTBOX_CLEAR(lstProbleme)
-    IF ta < 0 THEN RETURN
+    IF ta < 0 THEN
+        gliederungLeeren()
+        RETURN
+    END IF
     ' Nur Drachenhauch pruefen: eine .json oder .md durch den Uebersetzer
     ' zu schicken fuellt die Liste mit Meldungen ueber etwas, das gar kein
     ' Programm ist.
     IF tabPfade[aktiverTab] <> "" AND LOWER$(RIGHT$(tabPfade[aktiverTab], 3)) <> ".dh" THEN
         GUI_SET_TEXT(lblProbleme, tr$("Probleme: -- (") + BASENAME(tabPfade[aktiverTab]) + _
                      " ist kein Drachenhauch)")
+        gliederungLeeren()
         RETURN
     END IF
     DIM basis AS STRING : basis = projektOrdner
@@ -4549,6 +4560,16 @@ SUB gliederungFuellen(quelle AS STRING)
         END IF
     NEXT
     protokoll("gliederung " + STR$(n))
+END SUB
+
+' Keine Drachenhauch-Datei vorn (alle Reiter zu, oder eine .json/.md):
+' die Gliederung der vorigen Datei darf nicht stehen bleiben.
+SUB gliederungLeeren()
+    IF gliederungSchluessel = "" AND GUI_LISTBOX_COUNT(lstGliederung) = 0 THEN RETURN
+    gliederungSchluessel = ""
+    gliederungZeilen = []
+    GUI_LISTBOX_CLEAR(lstGliederung)
+    protokoll("gliederung leer")
 END SUB
 
 ' --- Verzeichnis der eigenen Symbole ueber ALLE Dateien des Projekts ---
