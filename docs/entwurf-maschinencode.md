@@ -1111,6 +1111,27 @@ in `jit.dhtest` ("bit-operatoren in funktion und schleife"), je mit und ohne;
 gegen den Bau davor faellt der Maschinencode-Fall an der Bilanz (0 statt 3
 Funktionen, 0 statt 2 Schleifen).
 
+**Schritt 25 (2026-10-22): mehrere Klassen an einer Stelle.** Eine
+Objektart kannte genau EINE Lage, und die Art der Elemente eines Feldes
+legte das erste Element fest. In einem gemischten `ARRAY OF Form` stieg der
+Code darum bei jedem Element einer zweiten Klasse aus (Weg F aus
+[entwurf-schnittstellen.md](entwurf-schnittstellen.md)). Jetzt kann eine Art
+eine **Familie** sein: bis zu vier Lagen mit einer gemeinsamen Vorfahrin
+(`Klasse::familie`, `familie_nr`). `elemente_art` sieht beim Bauen bis zu
+4096 Elemente an. Felder der Vorfahrin liegen bei allen Mitgliedern auf
+demselben Platz und werden direkt gelesen; ist ein Platz oder Typ
+verschieden oder hat ein Mitglied eine PROPERTY gleichen Namens, bleibt der
+Zugriff in der VM. Ein Methodenaufruf holt die Lage des Objekts (`obj_lage`)
+und verzweigt zur uebersetzten Methode des Mitglieds; alle muessen dieselbe
+Form haben. Passt keine Lage, steigt er aus, bevor `Self` gesetzt ist.
+Gemessen, eine Million Aufrufe: `b_poly` (Kreis/Quadrat) 72 -> 12 ms, so
+schnell wie eine einzige Klasse (10 ms); `tools/tempo` unveraendert (A/B
+0,97..1,02). Der Arm fuer Art 5 sitzt in `familie_bits`, nicht in
+`wert_bits`: dort kostete er gemessen 5 % bei jedem Objekt-Lesen, auch ohne
+Familie. Faelle in `jit.dhtest` (vier Paare, dazu ein alter Fall, dessen
+Bilanz jetzt 3 Laeufe statt 6 Ausstiegen zeigt); gegen den Bau davor fallen
+die drei Faelle mit Familie an der Bilanz.
+
 ## 5. Was bewusst nicht kommt
 
 - Kein eigener Registerzuteiler, keine eigenen Optimierungen jenseits dessen,

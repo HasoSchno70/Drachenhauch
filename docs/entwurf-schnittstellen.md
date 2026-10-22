@@ -1,7 +1,8 @@
 # Entwurf: Schnittstellen (INTERFACE / IMPLEMENTS)
 
-> **Stand 22.10.2026: Weg B ist gebaut** (Klassentypen werden geprüft,
-> Abschnitt 4), Weg C bis F nicht. Die Laufzeit nimmt in einem Platz vom Typ
+> **Stand 22.10.2026: Weg B und Weg F sind gebaut** (Klassentypen werden
+> geprüft; der Maschinencode kennt mehrere Klassen an einer Stelle,
+> Abschnitt 4), Weg C bis E nicht. Die Laufzeit nimmt in einem Platz vom Typ
 > einer Klasse nur noch NIL und Instanzen der Klasse oder einer Unterklasse,
 > `--check` warnt, wo es sicher nie passt; Prüfsammlung
 > `tests/pruef/klassentypen.dhtest`. Im Bestand hat das nichts gebrochen
@@ -358,6 +359,10 @@ JavaScript-Maschinen) liefe das Beispiel aus (b) ohne Aussteigen.
 Gewinnen würde jedes polymorphe Programm, schon heute mit `ABSTRACT`. Die
 Zahl dazu würde erst gemessen; aus (b) ist nur bekannt, dass es zwischen
 10 und 73 ms liegen muss.
+
+*Gebaut am 22.10.2026* (Schritt 25 in
+[entwurf-maschinencode.md](entwurf-maschinencode.md)): das Beispiel aus (b)
+braucht 12 statt 72 ms, also so viel wie eine einzige Klasse.
 
 ## 5. Empfehlung
 
