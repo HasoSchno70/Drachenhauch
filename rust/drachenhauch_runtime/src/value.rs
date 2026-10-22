@@ -650,6 +650,9 @@ pub struct Instance {
 pub struct Layout {
     pub index: FxHashMap<String, u32>,
     pub typen: Vec<String>,
+    /// Die Klasse selbst und ihre Vorfahren, innen zuerst -- fuer die
+    /// Pruefung einer Zuweisung an eine Variable vom Typ einer Klasse.
+    pub vorfahren: Vec<String>,
 }
 
 impl Instance {
@@ -657,6 +660,56 @@ impl Instance {
     pub fn platz(&self, name: &str) -> Option<usize> {
         self.layout.index.get(name).map(|&i| i as usize)
     }
+}
+
+thread_local! {
+    /// Die Klassen (und STRUCTs) des laufenden Programms, gesetzt in
+    /// `Vm::new`. `coerce` ist eine freie Funktion und kennt das Programm
+    /// nicht; ohne das Verzeichnis liesse sich ein Typname wie `tier` nicht
+    /// von einem Modul-Typ wie `image` unterscheiden.
+    static KLASSEN: std::cell::RefCell<rustc_hash::FxHashSet<String>> =
+        std::cell::RefCell::new(Default::default());
+}
+
+pub(crate) fn klassen_setzen<'a, I: IntoIterator<Item = &'a String>>(namen: I) {
+    KLASSEN.with(|k| {
+        let mut k = k.borrow_mut();
+        k.clear();
+        k.extend(namen.into_iter().cloned());
+    });
+}
+
+pub(crate) fn ist_klasse(name: &str) -> bool {
+    KLASSEN.with(|k| k.borrow().contains(name))
+}
+
+/// Darf `value` in einen Platz vom Typ `target`? Fuer alles, was keine Klasse
+/// ist, sagt diese Pruefung nichts (Ok). Eine Klasse nimmt NIL und Instanzen
+/// ihrer selbst oder einer Unterklasse.
+///
+/// Bis 2026-10-22 reichte `coerce` Klassen ungeprueft durch: eine Variable
+/// `AS Tier` nahm ein `Auto` und eine Parameter `AS Datei` die Zahl 5, und
+/// der Fehler kam erst beim ersten Methodenaufruf, weit weg von der Stelle
+/// (docs/entwurf-schnittstellen.md, Weg B).
+pub(crate) fn klasse_pruefen(value: &Value, target: &str, ctx: &str) -> Result<(), String> {
+    let ist = match value {
+        Value::Nil => return Ok(()),
+        Value::Instance(rc) => {
+            // Haelt jemand das Objekt gerade zum Schreiben (ein Feld bekommt
+            // sein eigenes Objekt, `k.naechster = k`), laesst sich die Klasse
+            // nicht lesen -- dann lieber ungeprueft als ein Absturz. Die
+            // Stellen in vm.rs geben die Sperre vor `coerce` ab.
+            let Ok(i) = rc.try_borrow() else { return Ok(()) };
+            if i.class_name.as_ref() == target || i.layout.vorfahren.iter().any(|v| v == target) {
+                return Ok(());
+            }
+            crate::namensraum::lesbar_text(&i.class_name.to_uppercase())
+        }
+        v => v.type_name().to_string(),
+    };
+    if !ist_klasse(target) { return Ok(()); }
+    Err(format!("{}: Erwartet {} (oder eine Unterklasse), erhalten {}",
+        ctx, crate::namensraum::lesbar_text(&target.to_uppercase()), ist))
 }
 
 /// Ein gespeicherter Rueckruf, wie ihn `gui` und `timer` fuehren.

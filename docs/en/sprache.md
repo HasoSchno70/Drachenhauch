@@ -282,8 +282,11 @@ have two of them.
 **Where it deliberately stays silent** — so that no message raises a false alarm:
 
 * **Return values of built-ins** are not derived.
-* **Classes, MAP and ARRAY** are passed through by the runtime on assignment;
-  a message saying it "aborts" would simply be untrue there.
+* **MAP and ARRAY** are passed through by the runtime on assignment;
+  a message saying it "aborts" would simply be untrue there. For **classes**
+  it reports only what never fits: a number, a text, a boolean, or a class
+  that is not related to the target. A value of the parent class's type may
+  be a subclass — only the runtime checks that.
 * **`PROPERTY`** — there the setter decides, not the field behind it.
 * **A member that a DERIVED class has.** `DIM t AS Tier : t = NEW
   Hund() : t.belle()` is valid and stays silent.
@@ -1329,6 +1332,20 @@ exist in it yet — `Zeige()` above calls `Flaeche()`, and at run time
 that ends up in the subclass that filled it in.
 
 `ABSTRACT` is not a reserved word either.
+
+**The type of a class counts.** A variable, parameter, field, array element
+(`ARRAY OF Tier`), MAP value or return value of type `Tier` takes `NIL` and
+instances of `Tier` or one of its subclasses — nothing else. An `Auto` or the
+number 5 in that place stops the program where it is put in, not only at the
+next method call:
+
+```
+Laufzeitfehler in spiel.dh:12: Zuweisung an global: Erwartet TIER (oder eine Unterklasse), erhalten AUTO
+```
+
+Going down (`DIM h AS Hund : h = someAnimal`) works if `someAnimal` really
+holds a dog; the runtime decides that. Up to version 2026.33 the runtime
+passed classes through unchecked.
 
 **STRUCT** is a lightweight data-class substitute that is instantiated automatically (no `NEW` needed):
 

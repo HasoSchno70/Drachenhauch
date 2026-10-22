@@ -554,7 +554,10 @@ fn coerce_elem(value: Value, target: &str, ctx: &str) -> R {
             Value::Bool(_) => Ok(value),
             _ => Err(format!("{}: Erwartet BOOLEAN, erhalten {}", ctx, value.type_name())),
         },
-        _ => Ok(value),
+        _ => {
+            crate::value::klasse_pruefen(&value, target, ctx)?;
+            Ok(value)
+        }
     }
 }
 
@@ -6827,7 +6830,10 @@ pub(crate) fn coerce_map_value(v: &Value, vt: &str) -> R {
         "float" => match v { Value::Float(_) => Ok(v.clone()), Value::Int(i) => Ok(Value::Float(*i as f64)), _ => err("Map-Wert: Erwartet FLOAT".to_string()) },
         "string" => match v { Value::Str(_) => Ok(v.clone()), _ => err("Map-Wert: Erwartet STRING".to_string()) },
         "boolean" => match v { Value::Bool(_) => Ok(v.clone()), _ => err("Map-Wert: Erwartet BOOLEAN".to_string()) },
-        _ => Ok(v.clone()),
+        _ => {
+            crate::value::klasse_pruefen(v, vt, "Map-Wert")?;
+            Ok(v.clone())
+        }
     }
 }
 

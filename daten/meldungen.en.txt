@@ -382,6 +382,7 @@ eine Farbe aus Hex-Text kommt aus COLOR_FROM_HEX("{}"); im Quelltext geht auch &
 ein ganzes Thema setzt GUI_THEME_PRESET("{}"); GUI_THEME nimmt nur die Akzentfarbe	a whole theme is set by GUI_THEME_PRESET("{}"); GUI_THEME only takes the accent colour
 
 # ---------------------------------------------------------------- Laufzeit: Typen und Werte
+{} (oder eine Unterklasse)	{} (or a subclass)
 {}: Erwartet {}, erhalten {}	{}: expected {}, got {}
 {}: Erwartet {}, erhalten ARRAY OF {}	{}: expected {}, got ARRAY OF {}
 {}: FLOAT {} passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden	{}: FLOAT {} does not fit into INTEGER without loss -- use \ instead of / for integer division, otherwise round with INT()/ROUND()
