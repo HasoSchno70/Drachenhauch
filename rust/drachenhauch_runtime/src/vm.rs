@@ -1650,6 +1650,14 @@ impl<'p> Vm<'p> {
             // ARRAY_PUSH "erwartet ARRAY", und man musste wissen, dass erst
             // `a = []` kommen muss.
             other if other.starts_with("array:") => leeres_feld(other),
+            // Ebenso `DIM tab AS MAP OF INTEGER`: eine LEERE MAP. Global,
+            // lokal und in einer Schleife war das laengst so (DECLARE_*,
+            // `__frisch`); nur ein Klassen- oder STRUCT-Feld kam hier vorbei
+            // und blieb NIL, bis das erste `tab["k"] = 1` mit "Index-Zuweisung
+            // an NIL" abbrach. Die Vorlage legt sie je Objekt neu an
+            // (`teilbar` verneint MAPs).
+            other if other.starts_with("map:") =>
+                Value::Map(Rc::new(RefCell::new(DhMap::new(other["map:".len()..].to_string())))),
             other => crate::model::neutrales_element(other).unwrap_or(Value::Nil),
         }
     }

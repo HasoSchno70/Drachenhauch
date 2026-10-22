@@ -156,7 +156,8 @@ Anhaltspunkt, kein Beweis: Die Probe sieht nur Ausdrücke, deren Typ der
 `DIM tab AS MAP OF INTEGER` ist NIL, eine gleich angelegte Variable im
 Hauptprogramm eine leere MAP. Der Übersetzer nimmt `MAP OF INTEGER` an, und
 die Sammlung hält das NIL als Erwartung fest. Das gehört nicht hierher, ist
-aber ein eigener Punkt wert.
+aber ein eigener Punkt wert. *(Behoben am selben Tag: ein solches Feld ist
+jetzt eine leere MAP, je Objekt eine eigene.)*
 
 ### (e) Was die Begründung von damals übersieht
 

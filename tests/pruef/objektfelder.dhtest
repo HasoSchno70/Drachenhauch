@@ -230,7 +230,7 @@ PRINT LEN(c.leer); " "; c.liste[1]; " ["; c.texte[0]; "] "; c.orte[1].x; " "; c.
 [x] [] 2.5 0.0 FLOAT
 7 0 [t] []
 3 0 4 0 5 0
-1 0 NIL MAT4 Vec2(0.0, 0.0)
+1 0 MAP MAT4 Vec2(0.0, 0.0)
 0 0 [] 0 0 0 0.0
 
 === new mit init der vorfahrin und ohne init
@@ -262,3 +262,50 @@ Klasse c hat keine SUB Init - Argumente bei NEW nicht moeglich
 5 []
 0
 123
+
+=== ein map-feld ist eine leere map und je objekt eine eigene
+' Bis 2026-10-22 war ein Feld `DIM tab AS MAP OF INTEGER` in einer Klasse
+' oder einem STRUCT NIL -- global, lokal und in einer Schleife war es laengst
+' eine leere MAP. Das erste `tab["k"] = 1` brach mit "Index-Zuweisung an
+' NIL" ab.
+CLASS Basis
+    DIM namen AS MAP OF STRING
+END CLASS
+CLASS Kind EXTENDS Basis
+    DIM zahl AS MAP OF INTEGER
+    SUB merke(k AS STRING, n AS INTEGER)
+        zahl[k] = n
+    END SUB
+END CLASS
+STRUCT Eintrag
+    DIM tags AS MAP OF BOOLEAN
+END STRUCT
+DIM a AS Kind : a = NEW Kind()
+DIM b AS Kind : b = NEW Kind()
+a.merke("x", 1)
+a.namen["n"] = "eins"
+MAPPUT(a.zahl, "y", 2)
+PRINT MAPSIZE(a.zahl); " "; MAPSIZE(b.zahl); " "; MAPSIZE(a.namen); " "; MAPSIZE(b.namen)
+PRINT a.zahl["y"]; " "; MAPHAS(b.zahl, "x"); " "; TYPEOF(b.namen)
+DIM e AS Eintrag
+e.tags["rot"] = TRUE
+DIM f AS Eintrag
+PRINT MAPSIZE(e.tags); " "; MAPSIZE(f.tags)
+TRY
+    a.zahl["z"] = "text"
+CATCH err
+    PRINT "typ geprueft"
+END TRY
+DIM i AS INTEGER
+DIM c AS Kind
+FOR i = 1 TO 3
+    c = NEW Kind()
+    c.merke("k" + STR$(i), i)
+NEXT
+PRINT MAPSIZE(c.zahl); " "; c.zahl["k3"]
+--- erwartet
+2 0 1 0
+2 FALSE MAP
+1 0
+typ geprueft
+1 3
