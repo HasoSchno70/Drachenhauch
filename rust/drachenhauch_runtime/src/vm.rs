@@ -22,22 +22,6 @@ macro_rules! passend {
             _ => coerce(v, ty, $wo)?,
         }
     }};
-    // Mit dem Namen fuer die Meldung: `$name` wird erst im Fehlerfall
-    // ausgewertet (`mit_namen`), der Normalfall bleibt so schnell wie oben.
-    ($v:expr, $ty:expr, $wo:expr, $name:expr) => {{
-        let v = $v;
-        let ty: &str = $ty;
-        match (&v, ty) {
-            (Value::Int(_), "integer") | (Value::Float(_), "float")
-            | (Value::Str(_), "string") | (Value::Bool(_), "boolean")
-            | (_, "any") | (_, "") => v,
-            (Value::Int(n), "float") => Value::Float(*n as f64),
-            _ => match coerce(v, ty, $wo) {
-                Ok(x) => x,
-                Err(e) => return Err(mit_namen(e, $wo, &$name).into()),
-            },
-        }
-    }};
 }
 
 /// Den Anfang einer Meldung von `coerce` (`wo`, etwa "Lokale Variable")
@@ -51,6 +35,7 @@ fn mit_namen(e: String, wo: &str, neu: &str) -> String {
     }
 }
 
+#[cold]
 fn zuweisung_an(name: Option<&String>) -> String {
     match name {
         Some(n) if !n.is_empty() => format!("Zuweisung an '{}'", crate::namensraum::lesbar_text(n)),
@@ -58,11 +43,20 @@ fn zuweisung_an(name: Option<&String>) -> String {
     }
 }
 
-fn param_name(fn_: &Func, i: usize) -> String {
-    match fn_.local_names.get(i) {
-        Some(n) if !n.is_empty() => format!("Parameter '{}' von {}", n, crate::namensraum::lesbar_text(&fn_.name)),
-        _ => format!("Parameter {} von {}", i + 1, crate::namensraum::lesbar_text(&fn_.name)),
-    }
+/// Kennung eines Parameters fuer `coerce` in `bind_params`: ein fester Text,
+/// den `Vm::fehler_benennen` spaeter durch den Namen ersetzt. Ein `format!`
+/// in `bind_params` machte gemessen tools/tempo/teilchen.dh 9 % langsamer --
+/// die Funktion wird in `dispatch` eingebettet, und die Codelage verschob sich.
+const PARAM_KENNUNG: [&str; 16] = [
+    "Parameter #0", "Parameter #1", "Parameter #2", "Parameter #3",
+    "Parameter #4", "Parameter #5", "Parameter #6", "Parameter #7",
+    "Parameter #8", "Parameter #9", "Parameter #10", "Parameter #11",
+    "Parameter #12", "Parameter #13", "Parameter #14", "Parameter #15",
+];
+
+#[inline]
+fn param_kennung(i: usize) -> &'static str {
+    match PARAM_KENNUNG.get(i) { Some(k) => k, None => "Parameter" }
 }
 
 use std::cell::RefCell;
@@ -212,7 +206,7 @@ fn bind_params<I: ExactSizeIterator<Item = Value>>(fn_: &Func, args: I, mut loca
     if !fn_.is_variadic && args.len() == fn_.n_params
         && !fn_.param_default_is_expr.iter().any(|&b| b) {
         for (i, v) in args.enumerate() {
-            locals.push(passend!(v, fn_.local_types[i].as_str(), "Parameter", param_name(fn_, i)));
+            locals.push(passend!(v, fn_.local_types[i].as_str(), param_kennung(i)));
         }
         let np = fn_.n_params;
         if fn_.local_defaults.len() > np {
@@ -238,7 +232,7 @@ fn bind_params<I: ExactSizeIterator<Item = Value>>(fn_: &Func, args: I, mut loca
         let mut it = args.into_iter();
         for i in 0..normal_n {
             let v = it.next().unwrap();
-            locals[i] = passend!(v, fn_.local_types[i].as_str(), "Parameter", param_name(fn_, i));
+            locals[i] = passend!(v, fn_.local_types[i].as_str(), param_kennung(i));
         }
         let rest: Vec<Value> = it.collect();
         locals[fn_.n_params - 1] = Value::Tuple(Rc::new(rest));
@@ -273,7 +267,7 @@ fn bind_params<I: ExactSizeIterator<Item = Value>>(fn_: &Func, args: I, mut loca
             } else {
                 // Schneller Typvergleich wie beim Speichern; `coerce` nur, wenn
                 // der Wert nicht schon passt.
-                locals[i] = passend!(v, fn_.local_types[i].as_str(), "Parameter", param_name(fn_, i));
+                locals[i] = passend!(v, fn_.local_types[i].as_str(), param_kennung(i));
             }
         }
         for i in argn..fn_.n_params {
@@ -2962,6 +2956,7 @@ impl<'p> Vm<'p> {
                     return Err(e);
                 }
                 Err(e) => {
+                    let mut e = e;
                     // Die Funktion, in der der Fehler FIEL -- nicht die, mit
                     // der dispatch betreten wurde; es kann Rahmen gewechselt
                     // haben.
@@ -2981,6 +2976,12 @@ impl<'p> Vm<'p> {
                             if ln != 0 { self.cur_line = ln; }
                         }
                         self.err_line_set = true;
+                        // Den Namen der Variable bzw. Funktion in die Meldung
+                        // ("Zuweisung an 'rex'" statt "Zuweisung an global").
+                        // Hier und nicht an den Speicherstellen in dispatch:
+                        // dort machte der Fehlerzweig gemessen
+                        // tools/tempo/teilchen.dh 9 % langsamer (Codelage).
+                        e = self.fehler_benennen(e, fn_, ip.saturating_sub(1));
                         // WP F: Hier -- und nur hier -- sieht die VM einen
                         // FRISCHEN Fehler. Also der richtige Ort, um Fundstelle
                         // und Code fuer ERROR_LINE()/ERROR_CODE$() festzuhalten.
@@ -3022,6 +3023,47 @@ impl<'p> Vm<'p> {
                     }
                 }
             }
+        }
+    }
+
+    /// Eine Meldung von `coerce` um den Namen ergaenzen, den der fehlgeschlagene
+    /// Befehl kennt (lokaler/globaler Platz, Funktion bei RETURN). Nur fuer
+    /// einen frischen Fehler (`run_frame`).
+    #[cold]
+    #[inline(never)]
+    fn fehler_benennen(&self, e: String, fn_: &Func, i: usize) -> String {
+        let Some(ins) = fn_.code.get(i) else { return e };
+        // "Parameter #n: ..." aus bind_params: der aufrufende Befehl nennt die
+        // Funktion oder Methode, deren n-ter Parameter gemeint ist.
+        if let Some(rest) = e.strip_prefix("Parameter #") {
+            let (zahl, rest) = rest.split_at(rest.find(':').unwrap_or(rest.len()));
+            let Ok(n) = zahl.parse::<usize>() else { return e };
+            let wer = match &ins.arg { Arg::Call(name, _, _) => Some(name.to_string()), _ => None };
+            let pname = wer.as_ref().and_then(|w| {
+                if let Some(&fi) = self.prog.fn_index.get(w) {
+                    return self.prog.functions.get(fi).and_then(|f| f.local_names.get(n).cloned());
+                }
+                // Eine Methode: alle Klassen, die sie haben, muessen den
+                // Parameter gleich nennen -- sonst bleibt es bei der Nummer.
+                let mut namen = self.prog.classes.values()
+                    .filter_map(|c| c.methods.get(w.as_str()))
+                    .filter_map(|m| m.local_names.get(n).cloned());
+                let erster = namen.next()?;
+                if namen.all(|x| x == erster) { Some(erster) } else { None }
+            });
+            return match (pname, wer) {
+                (Some(p), Some(w)) => format!("Parameter '{}' von {}{}", p, crate::namensraum::lesbar_text(&w), rest),
+                _ => format!("Parameter {}{}", n + 1, rest),
+            };
+        }
+        match ins.op {
+            op::STORE_LOCAL | op::ADD_STORE_LOCAL =>
+                mit_namen(e, "Lokale Variable", &zuweisung_an(fn_.local_names.get(ins.arg.as_usize()))),
+            op::STORE_GLOBAL_SLOT | op::ADD_STORE_GLOBAL_SLOT =>
+                mit_namen(e, "Zuweisung an global", &zuweisung_an(self.prog.global_names.get(ins.arg.as_usize()))),
+            op::RETURN =>
+                mit_namen(e, "RETURN", &format!("RETURN von {}", crate::namensraum::lesbar_text(&fn_.name))),
+            _ => e,
         }
     }
 
@@ -3496,7 +3538,7 @@ impl<'p> Vm<'p> {
                 op::STORE_LOCAL => {
                     let slot = arg.as_usize();
                     let v = vm_pop(stack)?;
-                    locals[slot] = passend!(v, fn_.local_types[slot].as_str(), "Lokale Variable", zuweisung_an(fn_.local_names.get(slot)));
+                    locals[slot] = passend!(v, fn_.local_types[slot].as_str(), "Lokale Variable");
                 }
                 op::FOR_NEXT => {
                     // Fusioniertes FOR-Ende: var += step, Weiter-Test, Sprung
@@ -3600,7 +3642,7 @@ impl<'p> Vm<'p> {
                     if sb.is_const {
                         return Err("CONST kann nicht ueberschrieben werden".into());
                     }
-                    let neu = passend!(v, sb.ty.as_str(), "Zuweisung an global", zuweisung_an(self.prog.global_names.get(idx)));
+                    let neu = passend!(v, sb.ty.as_str(), "Zuweisung an global");
                     sb.value = neu;
                 }
                 // --- Arithmetik (generisch, mit User-Operator-Overloading) ---
@@ -3631,7 +3673,7 @@ impl<'p> Vm<'p> {
                             self.addieren(a, b)?
                         }
                     };
-                    locals[slot] = passend!(v, fn_.local_types[slot].as_str(), "Lokale Variable", zuweisung_an(fn_.local_names.get(slot)));
+                    locals[slot] = passend!(v, fn_.local_types[slot].as_str(), "Lokale Variable");
                 }
                 op::ADD_STORE_GLOBAL_SLOT => {
                     let idx = arg.as_usize();
@@ -3658,7 +3700,7 @@ impl<'p> Vm<'p> {
                     if sb.is_const {
                         return Err("CONST kann nicht ueberschrieben werden".into());
                     }
-                    let neu = passend!(v, sb.ty.as_str(), "Zuweisung an global", zuweisung_an(self.prog.global_names.get(idx)));
+                    let neu = passend!(v, sb.ty.as_str(), "Zuweisung an global");
                     sb.value = neu;
                 }
                 op::SUB => {
@@ -4112,8 +4154,7 @@ impl<'p> Vm<'p> {
                 // --- Rueckgabe ---
                 op::RETURN => {
                     let v = vm_pop(stack)?;
-                    let v = coerce(v, &fn_.return_type, "RETURN")
-                        .map_err(|e| mit_namen(e, "RETURN", &format!("RETURN von {}", fn_.name)))?;
+                    let v = coerce(v, &fn_.return_type, "RETURN")?;
                     if self.rahmen.len() > basis { zurueck!(v); }
                     return Ok(Step::Return(v));
                 }

@@ -1,0 +1,104 @@
+' Typ-Meldungen nennen, WAS gemeint ist: Variable, Parameter samt
+' Funktion, Rueckgabe. Der Name entsteht erst im Fehlerfall
+' (vm.rs fehler_benennen) -- jeder Fall gilt mit und ohne Maschinencode.
+
+=== lokale variable
+SUB g()
+    DIM n AS INTEGER
+    n = "x"
+END SUB
+g()
+--- fehler
+Zuweisung an 'n': Erwartet INTEGER, erhalten STRING
+
+=== globale variable
+DIM zahl AS INTEGER
+zahl = "x"
+--- fehler
+Zuweisung an 'zahl': Erwartet INTEGER, erhalten STRING
+
+=== anhaengen an einen text mit falschem typ
+DIM s AS INTEGER
+s = 1
+s += "x"
+--- fehler
+Zuweisung an 's': Erwartet INTEGER, erhalten STRING
+
+=== parameter einer funktion
+SUB f(a AS INTEGER, t AS STRING)
+END SUB
+DIM x AS INTEGER
+x = 3
+f(1, x)
+--- fehler
+Parameter 't' von f: Erwartet STRING, erhalten INTEGER
+
+=== parameter einer methode
+CLASS Tier
+END CLASS
+CLASS Halter
+    SUB nimm(t AS Tier)
+    END SUB
+END CLASS
+CLASS Auto
+END CLASS
+DIM h AS Halter
+h = NEW Halter()
+DIM a AS Auto
+a = NEW Auto()
+h.nimm(a)
+--- fehler
+Parameter 't' von nimm: Erwartet TIER (oder eine Unterklasse), erhalten AUTO
+
+=== parameter ueber funcref
+' Ueber eine FUNCREF ist an der Stelle nicht bekannt, welche Funktion
+' gerufen wird -- dann bleibt es bei der Nummer.
+SUB f(t AS STRING)
+END SUB
+DIM r AS FUNCREF
+r = f
+DIM x AS INTEGER
+x = 1
+r(x)
+--- fehler
+Parameter 1: Erwartet STRING, erhalten INTEGER
+
+=== rueckgabe einer funktion
+FUNCTION finde() AS INTEGER
+    DIM s AS STRING
+    s = "x"
+    RETURN s
+END FUNCTION
+PRINT finde()
+--- fehler
+RETURN von finde: Erwartet INTEGER, erhalten STRING
+
+=== der siebzehnte parameter
+' Benannt werden die ersten sechzehn Parameter (feste Kennungen, damit
+' der Normalfall nichts kostet); dahinter bleibt es beim Wort.
+SUB viele(a1 AS INTEGER, a2 AS INTEGER, a3 AS INTEGER, a4 AS INTEGER, a5 AS INTEGER, a6 AS INTEGER, a7 AS INTEGER, a8 AS INTEGER, a9 AS INTEGER, a10 AS INTEGER, a11 AS INTEGER, a12 AS INTEGER, a13 AS INTEGER, a14 AS INTEGER, a15 AS INTEGER, a16 AS INTEGER, a17 AS STRING)
+END SUB
+DIM x AS INTEGER
+viele(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, x)
+--- fehler
+Parameter: Erwartet STRING, erhalten INTEGER
+
+=== auf englisch
+SUB f(t AS STRING)
+END SUB
+DIM x AS INTEGER
+f(x)
+--- umgebung
+DHRT_LANG=en
+--- fehler
+parameter 't' of f
+
+=== ohne maschinencode genauso
+SUB f(t AS STRING)
+END SUB
+DIM x AS INTEGER
+f(x)
+--- umgebung
+DHRT_JIT=aus
+--- fehler
+Parameter 't' von f: Erwartet STRING, erhalten INTEGER
