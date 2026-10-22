@@ -3258,3 +3258,78 @@ pr z9 0
 pr ae 20001 Ärger.dh abschnitt_teil9/modul_datei_nummer_m999.dh
 pr xq 0
 pr flott TRUE
+
+=== die gliederung leert sich, wenn der letzte reiter zugeht
+' Gefuellt wurde die Gliederung nur beim Pruefen eines Reiters -- ohne Reiter
+' blieben die Unterprogramme der geschlossenen Datei stehen.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 80 THEN
+    protokoll("pr vorher " + STR$(GUI_LISTBOX_COUNT(lstGliederung)))
+    tabSchliessen(aktiverTab)
+    protokoll("pr reiter " + STR$(tabAnzahl))
+END IF
+IF prBild = 120 THEN protokoll("pr nachher " + STR$(GUI_LISTBOX_COUNT(lstGliederung)))
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=130
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+SUB foo()
+END SUB
+FUNCTION bar() AS INTEGER
+    RETURN 1
+END FUNCTION
+foo()
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM z AS STRING
+FOR EACH z IN L
+    IF LEFT$(z, 3) = "pr " OR LEFT$(z, 11) = "gliederung " THEN PRINT z
+NEXT
+--- erwartet
+gliederung 2
+pr vorher 2
+gliederung leer
+pr reiter 0
+pr nachher 0
+
+=== die gliederung leert sich, wenn eine json-datei vorn steht
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 80 THEN
+    protokoll("pr vorher " + STR$(GUI_LISTBOX_COUNT(lstGliederung)))
+    dateiOeffnen(PATHJOIN(projektOrdner, "daten.json"))
+END IF
+IF prBild = 120 THEN protokoll("pr nachher " + STR$(GUI_LISTBOX_COUNT(lstGliederung)))
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=130
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+SUB foo()
+END SUB
+foo()
+--- datei daten.json
+{"a": 1}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM z AS STRING
+FOR EACH z IN L
+    IF LEFT$(z, 3) = "pr " OR LEFT$(z, 11) = "gliederung " THEN PRINT z
+NEXT
+--- erwartet
+gliederung 1
+pr vorher 1
+gliederung leer
+pr nachher 0

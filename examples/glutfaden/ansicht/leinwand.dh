@@ -766,18 +766,7 @@ FUNCTION lwRad(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
     IF lwOhneMaus THEN RETURN TRUE
     DIM px AS FLOAT, py AS FLOAT
     DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
-    DIM richtung AS INTEGER
-    ok = gdk_event_get_scroll_direction(ereignis, richtung)
-    DIM schritt AS FLOAT
-    IF richtung = GDK_RAD_HOCH THEN
-        schritt = -1
-    ELSEIF richtung = GDK_RAD_RUNTER THEN
-        schritt = 1
-    ELSE
-        DIM dx AS FLOAT, dy AS FLOAT
-        ok = gdk_event_get_scroll_deltas(ereignis, dx, dy)
-        schritt = dy
-    END IF
+    DIM schritt AS FLOAT : schritt = radSchritt(ereignis)
     IF schritt = 0 THEN RETURN TRUE
     leinwandZoom(lwZelle * kern.zoomFaktor(einst) ^ (-schritt), px, py)
     RETURN TRUE

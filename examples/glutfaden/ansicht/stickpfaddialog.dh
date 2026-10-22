@@ -370,18 +370,7 @@ END FUNCTION
 FUNCTION sdRad(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM x AS FLOAT, y AS FLOAT
     DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, x, y)
-    DIM richtung AS INTEGER
-    ok = gdk_event_get_scroll_direction(ereignis, richtung)
-    DIM schritt AS FLOAT
-    IF richtung = GDK_RAD_HOCH THEN
-        schritt = -1
-    ELSEIF richtung = GDK_RAD_RUNTER THEN
-        schritt = 1
-    ELSE
-        DIM dx AS FLOAT, dy AS FLOAT
-        ok = gdk_event_get_scroll_deltas(ereignis, dx, dy)
-        schritt = dy
-    END IF
+    DIM schritt AS FLOAT : schritt = radSchritt(ereignis)
     IF schritt = 0 THEN RETURN TRUE
     sdZoomUm(sdZoom * IIF(schritt < 0, 1.15, 1 / 1.15), x, y)
     RETURN TRUE
