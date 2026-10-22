@@ -394,6 +394,10 @@ bewusst treffen und aufschreiben sollte.
   Drachenhauch Mehrfachvererbung oder ein zweites Typsystem daneben. Das ist
   keine Bequemlichkeit mehr, sondern eine Grundsatzentscheidung, und für einen
   BASIC-Dialekt die falsche.
+  **Neu abgewogen am 2026-10-22** in [Entwurf: Schnittstellen](entwurf-schnittstellen.md):
+  die Laufzeit findet Methoden über ihren Namen, eine Schnittstelle braucht
+  darum weder Mehrfachvererbung noch ein zweites Typsystem. Dabei fiel auf,
+  dass Klassentypen bei der Zuweisung gar nicht geprüft werden.
 - **Keine anonymen Funktionen, keine Closures, keine verschachtelten
   Funktionen.** `FUNCREF` verlangt eine benannte Funktion, und ihr Rumpf sieht
   nur Parameter und Globals. Das passt zu BASIC und bleibt so.

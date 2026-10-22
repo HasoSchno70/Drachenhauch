@@ -116,6 +116,7 @@ Working notes, not user documentation — they explain why something is the way 
 - **Doc checker** — `dhrt pruef` sends every `basic` block through the front-end chain (`bloecke`), checks command names in tables and prose (`namen`), the counts in the README (`zaehlungen`), key constants (`konstanten`) and paths/links (`pfade`). Hooked into the test suite; until September 2026 it was two Python scripts in `tools/`
 - **[Rust front-end port](../rust-frontend-port.md)** (German) and **[runtime migration](rust-runtime.md)** — how `dhrt` came about
 - **[Design: namespaces](../entwurf-namensraeume.md)** (German) — WP I of the general-purpose roadmap. All four stages have been built by now; the document remains as a record of the decisions
+- **[Design: interfaces](../entwurf-schnittstellen.md)** (German) — `INTERFACE`/`IMPLEMENTS` weighed again: class types are not checked at all today, and the large programs use no inheritance; recommendation: check class types first, then interfaces after a trial in Funkenflug (not built yet)
 - **[Design: removing the Python parser](../entwurf-python-parser-entfernen.md)** (German) — measured what still depends on the second parser, and what a cut would cost
 - **[Design: sets](../entwurf-set-builtins.md)** (German) — the last open WP-J point, re-scoped after measuring again
 - **[Design: TASK_START](../entwurf-task-start.md)** (German) — DH code in the background; three ways, and the third avoids the Send problem entirely
