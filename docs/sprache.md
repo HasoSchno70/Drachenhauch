@@ -1343,7 +1343,7 @@ nichts. Ein `Auto` oder die Zahl 5 an dieser Stelle bricht dort ab, wo sie
 hineinkommen soll, nicht erst beim nächsten Methodenaufruf:
 
 ```
-Laufzeitfehler in spiel.dh:12: Zuweisung an global: Erwartet TIER (oder eine Unterklasse), erhalten AUTO
+Laufzeitfehler in spiel.dh:12: Zuweisung an 't': Erwartet TIER (oder eine Unterklasse), erhalten AUTO
 ```
 
 Herunter (`DIM h AS Hund : h = einTier`) geht, wenn in `einTier` wirklich

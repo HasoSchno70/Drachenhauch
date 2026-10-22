@@ -226,7 +226,7 @@ IMPORT "geld"
 DIM x AS GELD
 x = 5
 --- fehler
-Zuweisung an global: Erwartet GELD, erhalten INTEGER -- mit GELD_NEU(5) einen Betrag daraus machen
+Zuweisung an 'x': Erwartet GELD, erhalten INTEGER -- mit GELD_NEU(5) einen Betrag daraus machen
 
 === builtin will wirklich geld
 IMPORT "geld"

@@ -374,8 +374,8 @@ END TRY
 DHRT_JIT=aus
 --- erwartet
 4 3 0
-Lokale Variable: FLOAT 3.5 passt nicht verlus
-RETURN: Ganzzahl-Ueberlauf bei 'Zuweisung' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+Zuweisung an 'h': FLOAT 3.5 passt nicht verlu
+RETURN von rueck: Ganzzahl-Ueberlauf bei 'Zuweisung' (INTEGER ist 64-bit; Wertebereich ueberschritten)
 
 === kommazahl in eine ganze zahl (maschinencode)
 FUNCTION halb(a AS INTEGER) AS INTEGER
@@ -402,8 +402,8 @@ DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
 4 3 0
-Lokale Variable: FLOAT 3.5 passt nicht verlus
-RETURN: Ganzzahl-Ueberlauf bei 'Zuweisung' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+Zuweisung an 'h': FLOAT 3.5 passt nicht verlu
+RETURN von rueck: Ganzzahl-Ueberlauf bei 'Zuweisung' (INTEGER ist 64-bit; Wertebereich ueberschritten)
 --- stderr
 jit: 2 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
 
@@ -658,7 +658,7 @@ END TRY
 DHRT_JIT=aus
 --- erwartet
 6.0 6.5 5.5 20.5 9
-Parameter: FLOAT 2.5 passt nicht verlust
+Parameter 'n' von f: FLOAT 2.5 passt nic
 
 === argumente werden wie in der vm gewandelt (maschinencode)
 FUNCTION f(x AS FLOAT, n AS INTEGER, b AS BOOLEAN) AS FLOAT
@@ -687,7 +687,7 @@ DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
 6.0 6.5 5.5 20.5 9
-Parameter: FLOAT 2.5 passt nicht verlust
+Parameter 'n' von f: FLOAT 2.5 passt nic
 --- stderr
 jit: 4 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
 
@@ -898,7 +898,7 @@ PRINT gf; " "; gi
 DHRT_JIT=aus
 --- erwartet
 3.0 FLOAT 4 INTEGER
-Zuweisung an global: FLOAT 2.5 pass
+Zuweisung an 'gi': FLOAT 2.5 passt 
 5.0 4
 
 === umwandeln beim schreiben in globale (maschinencode)
@@ -921,7 +921,7 @@ DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
 3.0 FLOAT 4 INTEGER
-Zuweisung an global: FLOAT 2.5 pass
+Zuweisung an 'gi': FLOAT 2.5 passt 
 5.0 4
 --- stderr
 jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
@@ -3036,7 +3036,7 @@ PRINT t
 DHRT_JIT=aus
 --- erwartet
 --- fehler
-Zuweisung an global: Erwartet STRING, erhalten INTEGER
+Zuweisung an 't': Erwartet STRING, erhalten INTEGER
 
 === eine zahl in eine textvariable ist ein fehler (maschinencode)
 DIM w AS TUPLE
@@ -3053,7 +3053,7 @@ DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
 --- fehler
-Zuweisung an global: Erwartet STRING, erhalten INTEGER
+Zuweisung an 't': Erwartet STRING, erhalten INTEGER
 
 === zahlen aus text in getypte variablen
 DIM f AS FLOAT
@@ -6495,7 +6495,7 @@ PRINT i; " "; t
 --- umgebung
 DHRT_JIT=aus
 --- erwartet
-gefangen: Zuweisung an global: FLOAT 1.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+gefangen: Zuweisung an 'a': FLOAT 1.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
 4 112233
 
 === tupel mit falschem typ fuer ein ziel (maschinencode)
@@ -6520,7 +6520,7 @@ PRINT i; " "; t
 DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
-gefangen: Zuweisung an global: FLOAT 1.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+gefangen: Zuweisung an 'a': FLOAT 1.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
 4 112233
 --- stderr
 jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
@@ -7075,7 +7075,7 @@ END TRY
 DHRT_JIT=aus
 --- erwartet
 12345 15
-gefangen: Lokale Variable: FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+gefangen: Zuweisung an 'n': FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
 
 === wert in ein getyptes local einer sub (maschinencode)
 SUB rechne(t AS TUPLE)
@@ -7101,7 +7101,7 @@ DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
 12345 15
-gefangen: Lokale Variable: FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+gefangen: Zuweisung an 'n': FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
 --- stderr
 jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 jit: 1 mal mitten in einer Schleife ausgestiegen
@@ -7127,7 +7127,7 @@ END TRY
 DHRT_JIT=aus
 --- erwartet
 a,b,c,d,
-gefangen: Lokale Variable: Erwartet STRING, erhalten INTEGER
+gefangen: Zuweisung an 'w': Erwartet STRING, erhalten INTEGER
 
 === zahl in ein text-local einer sub (maschinencode)
 SUB rechne(t AS TUPLE)
@@ -7151,7 +7151,7 @@ DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
 a,b,c,d,
-gefangen: Lokale Variable: Erwartet STRING, erhalten INTEGER
+gefangen: Zuweisung an 'w': Erwartet STRING, erhalten INTEGER
 --- stderr
 jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 jit: 1 mal mitten in einer Schleife ausgestiegen

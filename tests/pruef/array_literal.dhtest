@@ -130,7 +130,7 @@ DIM zahlen AS ARRAY OF INTEGER
 zahlen = [1, 2]
 zeige(zahlen)
 --- fehler
-Parameter: Erwartet ARRAY OF STRING
+Parameter 'liste' von zeige: Erwartet ARRAY OF STRING
 
 === einfacher wert an array ziel
 DIM a AS ARRAY OF INTEGER
@@ -196,7 +196,7 @@ FUNCTION namen() AS ARRAY OF STRING
 END FUNCTION
 PRINT LEN(namen())
 --- fehler
-RETURN: Erwartet ARRAY OF STRING
+RETURN von namen: Erwartet ARRAY OF STRING
 
 
 === leeres literal an getyptem feld bekommt getypten speicher

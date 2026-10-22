@@ -22,6 +22,47 @@ macro_rules! passend {
             _ => coerce(v, ty, $wo)?,
         }
     }};
+    // Mit dem Namen fuer die Meldung: `$name` wird erst im Fehlerfall
+    // ausgewertet (`mit_namen`), der Normalfall bleibt so schnell wie oben.
+    ($v:expr, $ty:expr, $wo:expr, $name:expr) => {{
+        let v = $v;
+        let ty: &str = $ty;
+        match (&v, ty) {
+            (Value::Int(_), "integer") | (Value::Float(_), "float")
+            | (Value::Str(_), "string") | (Value::Bool(_), "boolean")
+            | (_, "any") | (_, "") => v,
+            (Value::Int(n), "float") => Value::Float(*n as f64),
+            _ => match coerce(v, ty, $wo) {
+                Ok(x) => x,
+                Err(e) => return Err(mit_namen(e, $wo, &$name).into()),
+            },
+        }
+    }};
+}
+
+/// Den Anfang einer Meldung von `coerce` (`wo`, etwa "Lokale Variable")
+/// durch einen mit Namen ersetzen ("Zuweisung an 'zaehler'"). Nur im
+/// Fehlerfall -- vorher sagte die Meldung "Zuweisung an global: Erwartet
+/// TIER ...", und welche Variable gemeint war, stand nirgends.
+fn mit_namen(e: String, wo: &str, neu: &str) -> String {
+    match e.strip_prefix(wo) {
+        Some(rest) => format!("{}{}", neu, rest),
+        None => e,
+    }
+}
+
+fn zuweisung_an(name: Option<&String>) -> String {
+    match name {
+        Some(n) if !n.is_empty() => format!("Zuweisung an '{}'", crate::namensraum::lesbar_text(n)),
+        _ => "Zuweisung".to_string(),
+    }
+}
+
+fn param_name(fn_: &Func, i: usize) -> String {
+    match fn_.local_names.get(i) {
+        Some(n) if !n.is_empty() => format!("Parameter '{}' von {}", n, crate::namensraum::lesbar_text(&fn_.name)),
+        _ => format!("Parameter {} von {}", i + 1, crate::namensraum::lesbar_text(&fn_.name)),
+    }
 }
 
 use std::cell::RefCell;
@@ -171,7 +212,7 @@ fn bind_params<I: ExactSizeIterator<Item = Value>>(fn_: &Func, args: I, mut loca
     if !fn_.is_variadic && args.len() == fn_.n_params
         && !fn_.param_default_is_expr.iter().any(|&b| b) {
         for (i, v) in args.enumerate() {
-            locals.push(passend!(v, fn_.local_types[i].as_str(), "Parameter"));
+            locals.push(passend!(v, fn_.local_types[i].as_str(), "Parameter", param_name(fn_, i)));
         }
         let np = fn_.n_params;
         if fn_.local_defaults.len() > np {
@@ -197,7 +238,7 @@ fn bind_params<I: ExactSizeIterator<Item = Value>>(fn_: &Func, args: I, mut loca
         let mut it = args.into_iter();
         for i in 0..normal_n {
             let v = it.next().unwrap();
-            locals[i] = passend!(v, fn_.local_types[i].as_str(), "Parameter");
+            locals[i] = passend!(v, fn_.local_types[i].as_str(), "Parameter", param_name(fn_, i));
         }
         let rest: Vec<Value> = it.collect();
         locals[fn_.n_params - 1] = Value::Tuple(Rc::new(rest));
@@ -232,7 +273,7 @@ fn bind_params<I: ExactSizeIterator<Item = Value>>(fn_: &Func, args: I, mut loca
             } else {
                 // Schneller Typvergleich wie beim Speichern; `coerce` nur, wenn
                 // der Wert nicht schon passt.
-                locals[i] = passend!(v, fn_.local_types[i].as_str(), "Parameter");
+                locals[i] = passend!(v, fn_.local_types[i].as_str(), "Parameter", param_name(fn_, i));
             }
         }
         for i in argn..fn_.n_params {
@@ -3455,7 +3496,7 @@ impl<'p> Vm<'p> {
                 op::STORE_LOCAL => {
                     let slot = arg.as_usize();
                     let v = vm_pop(stack)?;
-                    locals[slot] = passend!(v, fn_.local_types[slot].as_str(), "Lokale Variable");
+                    locals[slot] = passend!(v, fn_.local_types[slot].as_str(), "Lokale Variable", zuweisung_an(fn_.local_names.get(slot)));
                 }
                 op::FOR_NEXT => {
                     // Fusioniertes FOR-Ende: var += step, Weiter-Test, Sprung
@@ -3559,7 +3600,7 @@ impl<'p> Vm<'p> {
                     if sb.is_const {
                         return Err("CONST kann nicht ueberschrieben werden".into());
                     }
-                    let neu = passend!(v, sb.ty.as_str(), "Zuweisung an global");
+                    let neu = passend!(v, sb.ty.as_str(), "Zuweisung an global", zuweisung_an(self.prog.global_names.get(idx)));
                     sb.value = neu;
                 }
                 // --- Arithmetik (generisch, mit User-Operator-Overloading) ---
@@ -3590,7 +3631,7 @@ impl<'p> Vm<'p> {
                             self.addieren(a, b)?
                         }
                     };
-                    locals[slot] = passend!(v, fn_.local_types[slot].as_str(), "Lokale Variable");
+                    locals[slot] = passend!(v, fn_.local_types[slot].as_str(), "Lokale Variable", zuweisung_an(fn_.local_names.get(slot)));
                 }
                 op::ADD_STORE_GLOBAL_SLOT => {
                     let idx = arg.as_usize();
@@ -3617,7 +3658,7 @@ impl<'p> Vm<'p> {
                     if sb.is_const {
                         return Err("CONST kann nicht ueberschrieben werden".into());
                     }
-                    let neu = passend!(v, sb.ty.as_str(), "Zuweisung an global");
+                    let neu = passend!(v, sb.ty.as_str(), "Zuweisung an global", zuweisung_an(self.prog.global_names.get(idx)));
                     sb.value = neu;
                 }
                 op::SUB => {
@@ -4071,7 +4112,8 @@ impl<'p> Vm<'p> {
                 // --- Rueckgabe ---
                 op::RETURN => {
                     let v = vm_pop(stack)?;
-                    let v = coerce(v, &fn_.return_type, "RETURN")?;
+                    let v = coerce(v, &fn_.return_type, "RETURN")
+                        .map_err(|e| mit_namen(e, "RETURN", &format!("RETURN von {}", fn_.name)))?;
                     if self.rahmen.len() > basis { zurueck!(v); }
                     return Ok(Step::Return(v));
                 }
