@@ -1387,6 +1387,17 @@ enthält, und prüft jeden Schreibzugriff selbst. Daraus folgt:
 `--check` warnt, wo ein Feld nie passen kann, etwa ein `ARRAY OF Hund` an
 ein `ARRAY OF Katze` oder ein `ARRAY OF STRING` an ein `ARRAY OF INTEGER`.
 
+Für eine **MAP** gilt dasselbe mit ihren Werten: Eine `MAP OF STRING` passt
+nicht an eine `MAP OF INTEGER`, ein Literal mit Objekten wird Wert für Wert
+geprüft, und eine MAP einer Unterklasse passt an eine MAP der Vorfahrin. Ein
+Literal hat nur dann einen Werttyp, wenn alle Werte dieselbe Art haben
+(`{"a": 1, "b": "x"}` hat keinen). Bis Fassung 2026.34 prüfte die Laufzeit
+die Zuweisung einer ganzen MAP gar nicht.
+
+`--check` kennt dabei auch die Rückgaben eigener Funktionen und Methoden:
+`k = hunde()` an ein `ARRAY OF Katze` warnt, wenn `hunde` als
+`FUNCTION … AS ARRAY OF Hund` angesagt ist.
+
 **STRUCT** ist ein leichtgewichtiges Daten-Klassen-Substitut, das automatisch instanziert wird (kein `NEW` nötig):
 
 ```basic

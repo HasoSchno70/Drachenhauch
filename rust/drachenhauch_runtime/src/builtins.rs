@@ -1434,15 +1434,18 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "__dict_from_pairs" => {
             arity!(1);
             if let Value::Tuple(t) = &a[0] {
-                let mut vt = "any".to_string();
-                if let Some(Value::Tuple(p0)) = t.first() {
-                    if p0.len() == 2 {
-                        vt = match &p0[1] {
-                            Value::Bool(_) => "boolean", Value::Int(_) => "integer",
-                            Value::Float(_) => "float", Value::Str(_) => "string", _ => "any",
-                        }.to_string();
-                    }
-                }
+                // Der Werttyp nur, wenn ALLE Werte dieselbe Art haben -- bis
+                // 2026.34 gab ihn der erste Wert vor, und `{"a": 1, "b": "x"}`
+                // galt als MAP OF INTEGER mit einem Text darin.
+                let art = |p: &Value| match p {
+                    Value::Tuple(kv) if kv.len() == 2 => match &kv[1] {
+                        Value::Bool(_) => "boolean", Value::Int(_) => "integer",
+                        Value::Float(_) => "float", Value::Str(_) => "string", _ => "any",
+                    },
+                    _ => "any",
+                };
+                let erste = t.first().map(art).unwrap_or("any");
+                let vt = if t.iter().all(|p| art(p) == erste) { erste } else { "any" }.to_string();
                 let mut m = DhMap::new(vt);
                 for p in t.iter() {
                     if let Value::Tuple(kv) = p {

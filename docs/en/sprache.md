@@ -1385,6 +1385,17 @@ holds and checks every write itself. It follows that:
 Hund` into an `ARRAY OF Katze` or an `ARRAY OF STRING` into an `ARRAY OF
 INTEGER`.
 
+The same holds for a **MAP** and its values: a `MAP OF STRING` does not fit
+a `MAP OF INTEGER`, a literal with objects is checked value by value, and a
+MAP of a subclass fits a MAP of its ancestor. A literal has a value type only
+if all values are of the same kind (`{"a": 1, "b": "x"}` has none). Up to
+version 2026.34 the runtime did not check the assignment of a whole MAP at
+all.
+
+`--check` also knows the return types of your own functions and methods:
+`k = hunde()` into an `ARRAY OF Katze` warns when `hunde` is declared as
+`FUNCTION … AS ARRAY OF Hund`.
+
 **STRUCT** is a lightweight data-class substitute that is instantiated automatically (no `NEW` needed):
 
 ```basic

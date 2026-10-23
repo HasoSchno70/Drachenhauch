@@ -1,5 +1,6 @@
-' Felder mit Elementtyp: was an ein ARRAY OF X darf (vm.rs coerce_array,
-' any_feld_annehmen) und wo --check warnt (compiler.rs feld_passt_nie).
+' Felder und MAPs mit Elementtyp: was an ein ARRAY OF X bzw. eine MAP OF X
+' darf (vm.rs coerce_array, any_feld_annehmen, coerce_map) und wo --check
+' warnt (compiler.rs feld_passt_nie).
 ' Ein Feld behaelt zur Laufzeit seinen Elementtyp und prueft jeden
 ' Schreibzugriff selbst.
 
@@ -165,3 +166,123 @@ q = q + "DIM f AS ARRAY OF FLOAT" + nl + "f = [1, 2]" + nl
 PRINT CODE_CHECK$(q)
 --- erwartet
 []
+
+=== eine map mit objekten wird geprueft
+CLASS Hund
+END CLASS
+CLASS Katze
+END CLASS
+DIM h AS MAP OF Hund
+h = {"rex": NEW Hund()}
+PRINT LEN(h)
+h = {"mia": NEW Katze()}
+--- fehler
+Zuweisung an 'h': Wert 'mia': Erwartet HUND (oder eine Unterklasse), erhalten KATZE
+
+=== eine map nimmt den werttyp an
+CLASS Hund
+END CLASS
+CLASS Katze
+END CLASS
+DIM h AS MAP OF Hund
+h = {"rex": NEW Hund()}
+h["mia"] = NEW Katze()
+--- fehler
+Map-Wert: Erwartet HUND (oder eine Unterklasse), erhalten KATZE
+
+=== maps verschiedener werttypen
+DIM s AS MAP OF STRING
+s = {"a": "x"}
+DIM n AS MAP OF INTEGER
+n = s
+--- fehler
+Zuweisung an 'n': Erwartet MAP OF INTEGER, erhalten MAP OF STRING
+
+=== ein gemischtes map-literal hat keinen werttyp
+' Bis 2026.34 gab der erste Wert den Typ vor: {"a": 1, "b": "x"} galt als
+' MAP OF INTEGER mit einem Text darin und ging ungeprueft durch.
+DIM n AS MAP OF INTEGER
+n = {"a": 1, "b": "x"}
+--- fehler
+Zuweisung an 'n': Wert 'b': Erwartet INTEGER, erhalten STRING
+
+=== leere und ganzzahlige literale an eine map
+DIM f AS MAP OF FLOAT
+f = {"a": 1, "b": 2}
+PRINT f["a"] + f["b"]
+DIM leer AS MAP OF INTEGER
+leer = {}
+leer["x"] = 3
+PRINT leer["x"]
+--- erwartet
+3.0
+3
+
+=== eine map einer unterklasse an eine map der vorfahrin
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+CLASS Katze EXTENDS Tier
+END CLASS
+DIM h AS MAP OF Hund
+h["rex"] = NEW Hund()
+DIM t AS MAP OF Tier
+t = h
+PRINT LEN(t)
+t["mia"] = NEW Katze()
+--- fehler
+Map-Wert: Erwartet HUND (oder eine Unterklasse), erhalten KATZE
+
+=== keine map an eine map
+DIM n AS MAP OF INTEGER
+DIM a AS ARRAY OF INTEGER
+a = [1]
+TRY
+    n = a
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+Zuweisung an 'n': Erwartet MAP OF INTEGER, erhalten ARRAY
+
+=== check warnt bei maps die nie passen
+DIM q AS STRING
+DIM nl AS STRING : nl = CHR$(10)
+q = "DIM s AS MAP OF STRING" + nl + "DIM n AS MAP OF INTEGER" + nl + "n = s" + nl
+q = q + "DIM i AS MAP OF INTEGER" + nl + "DIM f AS MAP OF FLOAT" + nl + "f = i" + nl
+q = q + "f = {" + CHR$(34) + "a" + CHR$(34) + ": 1}" + nl
+q = q + "DIM z AS MAP OF ANY" + nl + "n = z" + nl
+DIM r AS STRING
+r = CODE_CHECK$(q)
+PRINT INSTR(r, "'Erwartet MAP OF INTEGER, erhalten MAP OF STRING'") >= 0
+PRINT INSTR(r, "'Erwartet MAP OF FLOAT, erhalten MAP OF INTEGER'") >= 0
+PRINT INSTR(r, CHR$(34) + "zeile" + CHR$(34) + ":7") >= 0
+PRINT INSTR(r, CHR$(34) + "zeile" + CHR$(34) + ":9") >= 0
+--- erwartet
+TRUE
+TRUE
+FALSE
+FALSE
+
+=== check kennt die rueckgabe eigener funktionen
+' Die Laufzeit wandelt jedes RETURN auf den angesagten Typ -- darum gilt er
+' fuer das Ergebnis (compiler.rs aufruf_rueckgabe_text).
+DIM q AS STRING
+DIM nl AS STRING : nl = CHR$(10)
+q = "CLASS Tier" + nl + "END CLASS" + nl + "CLASS Hund EXTENDS Tier" + nl + "END CLASS" + nl
+q = q + "CLASS Katze EXTENDS Tier" + nl + "END CLASS" + nl
+q = q + "FUNCTION hunde() AS ARRAY OF Hund" + nl + "DIM r AS ARRAY OF Hund" + nl + "RETURN r" + nl + "END FUNCTION" + nl
+q = q + "CLASS Zoo" + nl + "FUNCTION name$() AS STRING" + nl + "RETURN " + CHR$(34) + "z" + CHR$(34) + nl + "END FUNCTION" + nl + "END CLASS" + nl
+q = q + "DIM k AS ARRAY OF Katze" + nl + "k = hunde()" + nl
+q = q + "DIM t AS ARRAY OF Tier" + nl + "t = hunde()" + nl
+q = q + "DIM zoo AS Zoo" + nl + "zoo = NEW Zoo()" + nl + "DIM n AS INTEGER" + nl + "n = zoo.name$()" + nl
+DIM r AS STRING
+r = CODE_CHECK$(q)
+PRINT INSTR(r, "'Erwartet ARRAY OF KATZE, erhalten ARRAY OF HUND'") >= 0
+PRINT INSTR(r, "'Erwartet INTEGER, erhalten STRING'") >= 0
+PRINT INSTR(r, "ARRAY OF TIER") >= 0
+--- erwartet
+TRUE
+TRUE
+FALSE

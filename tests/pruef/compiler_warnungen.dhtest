@@ -1931,10 +1931,11 @@ p.hp = 5
 eine meldung mit [bricht beim Laufen ab]: FALSE
 
 === referenztypen bleiben still
-' MAP reicht die Laufzeit durch -- eine Meldung 'bricht ab' waere schlicht
-' unwahr, egal wie sinnvoll die Zuweisung ist. Klassen prueft die Laufzeit
-' seit 2026-10-22; dort warnt --check, wo es sicher nie passt
-' (klassentypen.dhtest). Eine Unterklasse an die Elternklasse bleibt still.
+' Eine Unterklasse an die Elternklasse bleibt still, ebenso eine MAP OF ANY
+' an eine MAP OF INTEGER (die Werte prueft erst die Laufzeit). MAPs
+' verschiedener Werttypen prueft die Laufzeit seit 2026.35 (feldtypen.dhtest),
+' Klassen seit 2026-10-22 (klassentypen.dhtest); dort warnt --check, wo es
+' sicher nie passt.
 ' (Bis Stufe 47 in test_compiler_warnungen.py.)
 IMPORT "json"
 ' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
@@ -1991,7 +1992,7 @@ END CLASS
 DIM a AS A
 a = NEW B()
 DIM m AS MAP OF INTEGER
-DIM n AS MAP OF STRING
+DIM n AS MAP OF ANY
 m = n
 
 --- erwartet
