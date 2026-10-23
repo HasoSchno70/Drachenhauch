@@ -9,7 +9,6 @@
 '     wird gewaehlt, ohne die Datei ein zweites Mal zu oeffnen.
 ' Getippte Buchstaben waehlen im offenen Menue den Eintrag, der so anfaengt
 ' (eindeutig = gleich ausloesen).
---- seriell
 --- langsam
 
 === rechtsklick ins code-feld setzt einen haltepunkt an der stelle

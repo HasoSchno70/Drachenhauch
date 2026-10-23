@@ -11,7 +11,6 @@
 ' nacheinander. Gelesen wird danach mit `--- nachher`: das Protokoll
 ' zeilenweise (genau, nicht als Teiltext), gesicherte Dateien als |Zeile|.
 ' In der Aufnahme: 2 Taste runter, 1 hoch.
---- seriell
 
 --- langsam
 === ide uebersetzt ohne befund

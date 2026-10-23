@@ -3,7 +3,6 @@
 ' wer eine Zeile geschrieben hat (am Zeilenende der Marke), und ein
 ' Konflikt unter der Marke: meine, ihre oder beide Fassungen.
 ' Das Repository legt ein `--- vorher` an (Zweig "haupt").
---- seriell
 
 === zweige und beiseitelegen, blame an der zeile
 DIM prBild AS INTEGER : prBild = 0

@@ -1131,8 +1131,8 @@ Gebraucht werden Rust (`cargo`) und ein beliebiges Python 3 für das Bauskript
 (nur Standardbibliothek, kein venv):
 ```
 python rust\build_runtime.py            # dhrt bauen (--hardware: serial/usb/bt/wifi/midi)
-rust\drachenhauch_runtime\target\release\dhrt test tests\pruef    # alle Pruefsammlungen (~50 min)
-rust\drachenhauch_runtime\target\release\dhrt test tests\pruef --schnell   # ohne `--- langsam` (~12 min)
+rust\drachenhauch_runtime\target\release\dhrt test tests\pruef    # alle Pruefsammlungen (~15 min)
+rust\drachenhauch_runtime\target\release\dhrt test tests\pruef --schnell   # ohne `--- langsam` (~6 min)
 rust\drachenhauch_runtime\target\release\dhrt test tests\pruef\json.dhtest --filter Text
 ```
 **`--schnell` (2026-09-24)** laesst die 32 Sammlungen mit `--- langsam` im
@@ -1141,9 +1141,18 @@ nennt sie in der Bilanz. Fuer die Arbeit an der Laufzeit reicht das; wer an
 einem Werkzeug oder der IDE aendert, laeuft dessen Sammlung einzeln, die CI
 laeuft immer alles. Eine neue Sammlung, die Minuten braucht, bekommt die
 Zeile ebenfalls.
-`dhrt test` laeuft die Faelle einer Datei parallel (bis 8 Faeden), Dateien mit
-`--- seriell` nacheinander; ohne Fenster oder Ton ueberspringt sich, was sie
-braucht. Die CI fuehrt dasselbe auf Windows (mit Grafik), Linux und macOS
+`dhrt test` laeuft die Dateien nebeneinander mit gemeinsam bis zu 8 Plaetzen
+(`platz_nehmen` in main.rs); Dateien mit `--- seriell` danach, allein und
+Fall fuer Fall. Jedes Programm, das `dhrt test` startet, bekommt
+`DHRT_ZWISCHENABLAGE=privat` (eine Zwischenablage je Prozess, graphics.rs
+`private_ablage`) -- darum duerfen die IDE- und Werkzeug-Sammlungen, die
+ueber Strg+V tippen, parallel laufen; wer die echte Ablage prueft, setzt
+`DHRT_ZWISCHENABLAGE=system` in `--- umgebung`. **`--- seriell` nur noch fuer
+echte Einzelstuecke:** fester Port, Soundkarte/Audiouhr, Drucker,
+Vordergrundfenster, echte Zwischenablage, Fensternachrichten mit festen
+Abstaenden, Video in Echtzeit (werkzeug_ide_vorspann hing parallel). Bis
+2026.34 lief eine Datei nach der anderen: voller Lauf 2314 s, seither ~850 s.
+Ohne Fenster oder Ton ueberspringt sich, was sie braucht. Die CI fuehrt dasselbe auf Windows (mit Grafik), Linux und macOS
 (ohne Grafik, `DHRT_OHNE_GRAFIK=1`) aus, dazu `cargo check`/`cargo test` je
 System. `DH_OHNE_AUDIO=1` setzen, wenn der Rechner keine Soundkarte hat.
 **Die Laufzeit baut NUR `rust/build_runtime.py` verlaesslich** (CFLAGS fuer die

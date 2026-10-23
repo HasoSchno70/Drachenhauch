@@ -3,7 +3,6 @@
 ' die naechste Pruefung findet nichts mehr. Getippt wird mit echten
 ' Tastenereignissen; die Aufnahme schreibt der Einschub erst, wenn die
 ' Pruefung gelaufen ist.
---- seriell
 
 === tippfehler ersetzen
 DIM prBild AS INTEGER : prBild = 0

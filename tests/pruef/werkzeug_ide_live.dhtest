@@ -2,7 +2,6 @@
 ' Programm im Reiter 30 Bilder lang ueber `dhrt bild`, das Bild steht im
 ' Fenster. Die Kopie neben der Datei (.dh_live_vorschau.dh) ist danach
 ' wieder weg. Ein Programm ohne Fenster meldet sich als Fehler.
---- seriell
 
 === ein bild nach der pause, ein fehler ohne fenster
 DIM prBild AS INTEGER : prBild = 0

@@ -2,7 +2,6 @@
 ' gemessenen Zeile ein Farbband (GUI_TEXTAREA_LINE_COLORS), die teuersten
 ' tragen ihre Zahlen am Zeilenende. Die Baender wandern beim Tippen mit;
 ' abgeschaltet und entfernt sind sie weg.
---- seriell
 --- langsam
 
 === messung faerbt die zeilen, sie wandern mit, aus ist aus

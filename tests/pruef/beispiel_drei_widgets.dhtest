@@ -2,7 +2,6 @@
 ' legt einen Eintrag in den gewaehlten Ordner, der Filter zeigt den Weg zum
 ' Treffer, ein Klick auf einen Akkordeon-Kopf klappt um. Der Einschub steht
 ' hinter GUI_UPDATE in der Bildschleife. Format: docs/werkzeuge.md.
---- seriell
 
 === der assistent legt einen eintrag in den gewaehlten ordner
 IF prBild = 1 THEN

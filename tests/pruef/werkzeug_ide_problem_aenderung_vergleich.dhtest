@@ -6,7 +6,6 @@
 '     Strg+Alt+Links fuehrt zurueck.
 ' (3) Mit gesicherter Fassung vergleichen: Unterschied Reiter gegen Platte
 '     als diff, von dort sichern oder verwerfen.
---- seriell
 --- langsam
 
 === naechstes und voriges problem, auch per alt f8

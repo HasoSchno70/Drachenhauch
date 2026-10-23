@@ -2,7 +2,6 @@
 ' GUI_TEXTAREA_INDENT_WORDS). Getippt wird ueber die Zwischenablage
 ' (Strg+V): raylibs Wiedergabe legt Tasten in die Tastenwarteschlange, aber
 ' keine ZEICHEN in die Zeichenwarteschlange. Format: docs/werkzeuge.md.
---- seriell
 
 --- langsam
 === ohne den schalter bleibt alles wie zuvor

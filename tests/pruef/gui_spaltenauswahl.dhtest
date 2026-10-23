@@ -1,7 +1,6 @@
 ' Spaltenauswahl im Textbereich: ein RECHTECK statt eines Laufs. Jede Zeile
 ' bekommt ihre eigene Marke samt Auswahl -- getippt wird in allen zugleich.
 ' Alt+Zug macht dasselbe mit der Maus. Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 === jede zeile des blocks bekommt eine marke
 IMPORT "gui"

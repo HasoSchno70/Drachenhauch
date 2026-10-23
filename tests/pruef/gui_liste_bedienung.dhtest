@@ -6,7 +6,6 @@
 ' Liste bei (10, 10, 280, 200), Zeilen 22 hoch: Zeile r liegt bei
 ' y 10 + 22 r .. + 21. Tasten: F2 291, Enter 257, ESC 256, Strg 341, V 86.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 --- langsam
 === f2 benennt um, enter uebernimmt

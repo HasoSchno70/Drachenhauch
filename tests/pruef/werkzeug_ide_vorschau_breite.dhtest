@@ -4,7 +4,6 @@
 ' gross. Jetzt ist sie so breit wie der Schirm es zulaesst, und Liste,
 ' Unterschied und Knoepfe haengen an ihren Kanten.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 --- langsam
 === die vorschau ist breit und waechst mit dem fenster

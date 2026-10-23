@@ -1,7 +1,6 @@
 ' Die Haltepunkt-Liste (Strg+Umschalt+F9) und Werte beim Ueberfahren
 ' (ide/ide.dh, 2026-09-27). Getrieben ueber die Unterprogramme der IDE.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 --- langsam
 === ein abgeschalteter haltepunkt haelt nicht und bleibt gemerkt

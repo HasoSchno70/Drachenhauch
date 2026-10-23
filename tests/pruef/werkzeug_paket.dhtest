@@ -11,7 +11,6 @@
 ' ueberspringen sich die Faelle; der Start der IDE braucht zusaetzlich eine
 ' Laufzeit mit Grafik.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 --- langsam
 === linux: der ordner traegt alles, was starter und installer brauchen

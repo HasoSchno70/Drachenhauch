@@ -1,7 +1,6 @@
 ' Die Variablenliste des Debuggers als Baum und der Halt am Fehler
 ' (ide/ide.dh, 2026-09-27). Getrieben ueber die Unterprogramme der IDE.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 --- langsam
 === felder und objekte klappen auf und bleiben offen

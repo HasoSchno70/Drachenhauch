@@ -2,7 +2,6 @@
 ' Unterprogramms bis zur Haltezeile die Variablen, die darin vorkommen, mit
 ' ihrem Wert (GUI_TEXTAREA_HINTS). Beim Weiterlaufen verschwinden sie. Das
 ' Protokoll nennt jede Zeile ("codewert N: ...").
---- seriell
 
 --- langsam
 === im halt stehen die werte hinter den zeilen

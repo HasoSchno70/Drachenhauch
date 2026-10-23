@@ -12,7 +12,6 @@
 '
 ' Lagen: Palette-Zeile 0 bei y = 26 + 56 + 2 + 11 = 95, die Form ab (270, 60).
 ' In der Aufnahme: 7 Mauslage, 6 Taste runter, 5 hoch, 2 Taste runter, 1 hoch.
---- seriell
 
 --- langsam
 === ablegen und sichern

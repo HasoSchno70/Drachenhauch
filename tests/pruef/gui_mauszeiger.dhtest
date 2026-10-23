@@ -2,7 +2,6 @@
 ' Bild einen Wunsch, gesetzt wird beim FLIP; MOUSE_CURSOR_GET$ liefert, was
 ' gilt. Die Maus faehrt per Aufnahme ueber die Flaeche, ausgegeben wird jeder
 ' WECHSEL mit der Stelle -- so haengt der Fall nicht an einzelnen Pixeln.
---- seriell
 
 === zeiger nach widget und stelle
 IMPORT "gui"

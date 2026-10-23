@@ -14,7 +14,6 @@
 ' links, 93 "]", 61 "=", 334 Ziffernblock +, 47 "/", 45 "-", 333
 ' Ziffernblock -, 48 "0". Die Wiedergabe setzt beim ersten Ereignis an.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 === das rad rollt den textbereich und die marke holt ihn nicht zurueck
 IMPORT "gui"

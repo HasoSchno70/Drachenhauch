@@ -7,7 +7,6 @@
 ' oeffnen sehen die Pakete weiter. Die Quelle ist ein lokaler Ordner, damit
 ' der Fall ohne Netz laeuft -- unter `_quelle/`, das die IDE auslaesst; sonst
 ' faende das Symbolverzeichnis die Funktion auch ohne das Paket.
---- seriell
 --- langsam
 
 === holen, liste, pruefung, entfernen

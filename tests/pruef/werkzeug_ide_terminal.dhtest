@@ -3,7 +3,6 @@
 ' Skript am Ende schreibt. Die Befehle gibt ein Einschub nacheinander ein
 ' und wartet, bis der vorige fertig ist; gelesen wird das Protokoll.
 ' Die Befehle sind die von cmd -- darum nur unter Windows.
---- seriell
 --- langsam
 
 === befehle, cd, fehlercode, umlaute und eingabe

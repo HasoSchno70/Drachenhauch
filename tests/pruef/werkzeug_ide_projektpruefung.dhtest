@@ -4,7 +4,6 @@
 ' nicht noch einmal bei jeder Datei, die sie importiert. Hinweise (eine
 ' unbenutzte Variable) zaehlen nicht. Ein Klick auf einen Eintrag oeffnet
 ' die Datei an der Zeile.
---- seriell
 
 === alle dateien, import-fehler einmal, klick oeffnet
 DIM prBild AS INTEGER : prBild = 0

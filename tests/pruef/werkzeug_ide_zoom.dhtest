@@ -7,7 +7,6 @@
 ' links, 93 "]" (das deutsche "+"), 334 Ziffernblock +, 47 "/" (das deutsche
 ' "-"), 48 "0". Die Wiedergabe setzt beim ersten Ereignis an.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 === plus minus rad und null
 AUTOMATION_PLAY("ev.txt")

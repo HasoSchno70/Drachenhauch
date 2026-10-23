@@ -4,7 +4,6 @@
 ' der neue Ordner das Projekt und main.dh offen. Ein unbrauchbarer Name und
 ' ein belegter Ordner werden abgelehnt. Das `--- nachher` uebersetzt jedes
 ' main.dh, laeuft die Pruefsammlung und das Konsolenprogramm mit Eingabe.
---- seriell
 
 === vier vorlagen, zwei ablehnungen
 DIM prBild AS INTEGER : prBild = 0

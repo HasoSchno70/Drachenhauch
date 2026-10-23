@@ -1,6 +1,5 @@
 ' Aus test_gui_text_formular.py uebertragen (24 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
 ' Die Faelle laufen nacheinander: tippt ueber die Zwischenablage -- die gibt es nur einmal.
---- seriell
 
 --- langsam
 === umbruch laesst die hoehe wachsen

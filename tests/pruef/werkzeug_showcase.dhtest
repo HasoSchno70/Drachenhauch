@@ -1,7 +1,6 @@
 ' Der Showcase: tools/showcase_bilder.dh erzeugt die Vorschaubilder aus
 ' examples/showcase.json (bis 2026-09-15 gen_showcase_thumbs.py), und die IDE
 ' in Drachenhauch zeigt dieselbe Liste als Kacheln auf der Willkommensseite.
---- seriell
 
 --- langsam
 === der erzeuger schreibt 480 punkte breit ohne alphakanal

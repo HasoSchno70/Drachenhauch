@@ -15,7 +15,6 @@
 ' und beginnt mit einem Ereignis in Bild 0. `prProbe(k)` schreibt ab k >= Ende - 2
 ' den Endstand nach _programm/probe.txt.
 ' In der Aufnahme: 7 Mauslage, 6 Taste runter, 5 hoch, 2 Taste runter, 1 hoch.
---- seriell
 
 --- langsam
 === zauberstab waehlt die ganze leere ebene

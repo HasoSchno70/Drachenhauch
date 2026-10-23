@@ -9,7 +9,6 @@
 ' Aufnahme. Aufnahme: 7 Maus, 6/5 Maustaste runter/hoch (0 links,
 ' 1 rechts), 2/1 Taste runter/hoch; 296 F7, 297 F8, 341 Strg, 86 V, 257 Enter.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 --- langsam
 === links setzt den haltepunkt, der debugger haelt dort

@@ -6,7 +6,6 @@
 ' und `befehl` rufbar), gelesen wird mit `--- nachher` aus Protokoll und
 ' ide.json. Das Tippen selbst prueft tests/pruef/gui_klammern.dhtest an der
 ' Laufzeit -- hier geht es um die Einstellung.
---- seriell
 
 --- langsam
 === klammern schliessen ist an und laesst sich abschalten

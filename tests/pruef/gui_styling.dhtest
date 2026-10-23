@@ -4,7 +4,6 @@
 ' echten des Systems, nicht einen je Prozess): parallel zog der eine ihn dem
 ' anderen unter dem Knopf weg, und `rein` feuerte ein drittes Mal. Der
 ' Fehlschlag kam nur im vollen Lauf und nur manchmal.
---- seriell
 
 === enabled toggle
 IMPORT "gui"

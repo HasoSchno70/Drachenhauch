@@ -13,7 +13,6 @@
 ' geschrieben haette. Aufnahme: 2 Taste runter, 1 hoch; 257 Enter, 258 Tab,
 ' 256 ESC. Der Dialog nimmt Enter fuer den ersten Knopf, ESC fuer den letzten.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 --- langsam
 === ein verwaister stand wird angeboten und wiederhergestellt

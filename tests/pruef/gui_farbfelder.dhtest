@@ -1,6 +1,5 @@
 ' Farbfelder im Textbereich (GUI_TEXTAREA_SWATCHES + SWATCH_CLICKED).
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 === ein farbfeld steht hinter seinem stueck (Bild)
 ' Der Beleg, dass wirklich gezeichnet wird: das Quadrat liegt am ENDE der

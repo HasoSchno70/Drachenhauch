@@ -2,7 +2,6 @@
 ' Kaestchen (vorgemerkt = im Index), Uebergeben mit Nachricht, Verwerfen
 ' einer Aenderung. Das Repository legt ein `--- vorher` an; `_programm/`
 ' (die IDE-Kopie) steht in der .gitignore.
---- seriell
 
 === vormerken, uebergeben, verwerfen
 DIM prBild AS INTEGER : prBild = 0

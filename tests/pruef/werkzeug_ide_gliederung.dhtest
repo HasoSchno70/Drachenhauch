@@ -6,7 +6,6 @@
 ' Enter springt. Die Lage des ersten Eintrags sucht der Einschub mit
 ' GUI_HIT_TEST; geklickt wird ueber eine Aufnahme, die er selbst schreibt.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 --- langsam
 === ein klick springt ohne zu markieren

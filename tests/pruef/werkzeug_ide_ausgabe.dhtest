@@ -10,7 +10,6 @@
 ' das Protokoll (`ausgabe sprung DATEI ZEILE`) und die Marke im Reiter.
 ' In der Aufnahme: 2 Taste runter, 1 hoch; 294 F5, 257 Enter.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 === ein laufzeitfehler fuehrt an seine zeile
 ' Die Marke steht nach dem Start in Zeile 1; der Sprung setzt sie auf 3.

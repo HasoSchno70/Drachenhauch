@@ -4,7 +4,6 @@
 ' (2) Klammerpaare farbig: jede Tiefe eine eigene Farbe, am Bild geprueft.
 ' (3) Suchtreffer einzeln ersetzen: die Treffer der Projektsuche tragen
 '     Haken, ersetzt wird nur in den angehakten Zeilen.
---- seriell
 --- langsam
 
 === gross klein und anfangsbuchstaben auf auswahl und wort
