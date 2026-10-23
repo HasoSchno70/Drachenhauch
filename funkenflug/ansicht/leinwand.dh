@@ -322,7 +322,7 @@ SUB inhaltZeichnen(cr AS INTEGER)
         DIM dr AS kern.Draht : dr = gBlatt.draehte[i]
         DIM hell AS BOOLEAN : hell = FALSE
         IF hw >= 0 AND LEN(dr.punkte) > 0 THEN hell = aktuelleNetze().wurzelAn(dr.punkte[0].x, dr.punkte[0].y) = hw
-        IF NOT gDruck AND istGewaehltD(dr) THEN
+        IF NOT gDruck AND istGewaehlt(dr) THEN
             drahtZeichnen(cr, dr, C_AUSWAHL, 2.5)
             ' das gegriffene Segment kraeftiger
             IF gHatDraht AND dr = gDrahtGewaehlt AND gSegment >= 0 AND gSegment < LEN(dr.punkte) - 1 THEN
@@ -343,10 +343,10 @@ SUB inhaltZeichnen(cr AS INTEGER)
         cairo_fill(cr)
     NEXT
     FOR i = 0 TO LEN(gBlatt.bauteile) - 1
-        bauteilZeichnen(cr, gBlatt.bauteile[i], FALSE, NOT gDruck AND istGewaehltB(gBlatt.bauteile[i]))
+        bauteilZeichnen(cr, gBlatt.bauteile[i], FALSE, NOT gDruck AND istGewaehlt(gBlatt.bauteile[i]))
     NEXT
     FOR i = 0 TO LEN(gBlatt.labels) - 1
-        DIM lgew AS BOOLEAN : lgew = NOT gDruck AND istGewaehltL(gBlatt.labels[i])
+        DIM lgew AS BOOLEAN : lgew = NOT gDruck AND istGewaehlt(gBlatt.labels[i])
         labelZeichnen(cr, sx(gBlatt.labels[i].anker.x), sy(gBlatt.labels[i].anker.y), gBlatt.labels[i].text, IIF(lgew, C_AUSWAHL, C_LABEL), gBlatt.labels[i].art, gBlatt.labels[i].drehung)
     NEXT
 END SUB

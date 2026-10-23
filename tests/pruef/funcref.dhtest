@@ -180,13 +180,13 @@ PRINT apply(mul2, add1, 5)
 DIM f AS FUNCREF
 f = 42
 --- fehler
-Zuweisung an global: Erwartet FUNCREF, erhalten INTEGER
+Zuweisung an 'f': Erwartet FUNCREF, erhalten INTEGER
 
 === funcref rejects non funcref (2)
 DIM f AS FUNCREF
 f = 42
 --- fehler
-Zuweisung an global: Erwartet FUNCREF, erhalten INTEGER
+Zuweisung an 'f': Erwartet FUNCREF, erhalten INTEGER
 
 === calling non callable throws (1)
 ' `x()` mit x = 42 wirft.

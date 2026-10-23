@@ -186,13 +186,13 @@ PRINT rx, ry
 DIM t AS TUPLE
 t = 42
 --- fehler
-Zuweisung an global: Erwartet TUPLE, erhalten INTEGER
+Zuweisung an 't': Erwartet TUPLE, erhalten INTEGER
 
 === tuple var rejects non tuple (2)
 DIM t AS TUPLE
 t = 42
 --- fehler
-Zuweisung an global: Erwartet TUPLE, erhalten INTEGER
+Zuweisung an 't': Erwartet TUPLE, erhalten INTEGER
 
 === print paren expr not tuple (1)
 ' `PRINT (1 + 2)` soll 3 ausgeben, kein Tupel.

@@ -138,8 +138,9 @@ SUB ansichtWechseln(a AS INTEGER)
     DIM mitIds AS ARRAY OF STRING : mitIds = []
     DIM ci AS INTEGER
     IF a = ANS_PLATINE THEN
-        FOR ci = 0 TO LEN(gSelB) - 1
-            ARRAY_PUSH(mitIds, gSelB[ci].id)
+        DIM sB AS ARRAY OF kern.Bauteil : sB = selB()
+        FOR ci = 0 TO LEN(sB) - 1
+            ARRAY_PUSH(mitIds, sB[ci].id)
         NEXT
     ELSE
         DIM pm AS ARRAY OF INTEGER : pm = plAuswahlListe()
@@ -217,7 +218,7 @@ SUB auswahlMitnehmen(ids AS ARRAY OF STRING)
                     zentrieren(gBlatt.bauteile[k].lage.pos.x, gBlatt.bauteile[k].lage.pos.y)
                     erst = FALSE
                 ELSE
-                    umschaltenB(gBlatt.bauteile[k])
+                    umschalten(gBlatt.bauteile[k])
                 END IF
             END IF
         NEXT

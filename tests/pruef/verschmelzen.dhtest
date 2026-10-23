@@ -150,7 +150,7 @@ END TRY
 --- erwartet
 10.0 FLOAT
 3 INTEGER
-halb: Zuweisung an global: FLOAT 1.5 passt nic
+halb: Zuweisung an 'gi': FLOAT 1.5 passt nicht
 null: Division durch 0
 
 === umwandeln beim speichern und division durch null (ohne verschmelzen)
@@ -178,7 +178,7 @@ DHRT_OHNE_VERSCHMELZEN=1
 --- erwartet
 10.0 FLOAT
 3 INTEGER
-halb: Zuweisung an global: FLOAT 1.5 passt nic
+halb: Zuweisung an 'gi': FLOAT 1.5 passt nicht
 null: Division durch 0
 
 === welche folgen markiert werden

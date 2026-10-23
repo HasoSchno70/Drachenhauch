@@ -225,7 +225,7 @@ module.exports = (H) => [
 
   H.table([
     [{ text: "Variable 'mmx' nicht deklariert (DIM fehlt?)", mono: true }, "Tippfehler, oder die DIM-Zeile fehlt. Die Meldung nennt den Namen — such genau den, Buchstabe für Buchstabe."],
-    [{ text: "Zuweisung an global: Erwartet INTEGER, erhalten STRING", mono: true }, "Du legst Text in einen Zahlenkarton. Meist ist ein Anführungszeichen verrutscht."],
+    [{ text: "Zuweisung an 'punkte': Erwartet INTEGER, erhalten STRING", mono: true }, "Du legst Text in einen Zahlenkarton — die Meldung nennt den Karton. Meist ist ein Anführungszeichen verrutscht."],
     [{ text: "'a' wurde in Zeile 1 schon als INTEGER angelegt", mono: true }, "Zwei DIM-Zeilen, derselbe Name, verschiedene Sorten. Zweiten Namen vergeben."],
     ["Das Bild sieht falsch aus, aber es läuft", "Rechenfehler in einer Zeile. Setz TEXT ein und lass dir den Wert anzeigen — das ist die häufigste Suchmethode überhaupt."],
   ], { headers: ["Was du siehst", "Was meistens dahintersteckt"], widths: [4000, 5026] }),

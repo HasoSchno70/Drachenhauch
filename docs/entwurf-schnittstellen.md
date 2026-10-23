@@ -2,7 +2,9 @@
 
 > **Stand 22.10.2026: Weg B und Weg F sind gebaut** (Klassentypen werden
 > geprüft; der Maschinencode kennt mehrere Klassen an einer Stelle,
-> Abschnitt 4), Weg C bis E nicht. Die Laufzeit nimmt in einem Platz vom Typ
+> Abschnitt 4), Weg C bis E nicht. **Die Probe für Weg C ist gemacht**
+> (Abschnitt 5a): Die Funkenflug-Auswahl kam mit einer abstrakten
+> Basisklasse aus, `INTERFACE` wird vorerst nicht gebaut. Die Laufzeit nimmt in einem Platz vom Typ
 > einer Klasse nur noch NIL und Instanzen der Klasse oder einer Unterklasse,
 > `--check` warnt, wo es sicher nie passt; Prüfsammlung
 > `tests/pruef/klassentypen.dhtest`. Im Bestand hat das nichts gebrochen
@@ -382,6 +384,52 @@ braucht 12 statt 72 ms, also so viel wie eine einzige Klasse.
 
 Unabhängig vom Ausgang gehört die Zeile im Allzweck-Audit berichtigt: Die
 Begründung „zweites Typsystem“ trifft auf diese Laufzeit nicht zu, siehe 2 (e).
+
+## 5a. Ergebnis der Probe (22.10.2026)
+
+Die Auswahl in Funkenflug ist auf eine abstrakte Basisklasse umgebaut:
+
+* `kern.Element` (`kern/modell.dh`) trägt `id` und kündigt
+  `verschieben(dx, dy)` an. `Bauteil`, `Label`, `Draht` und `Bus` erben
+  davon und füllen es aus.
+* Die Auswahl ist **eine** Menge `gSel AS ARRAY OF kern.Element` statt vier
+  Feldern. `istGewaehlt`, `umschalten`, `dazu` und `mengeLeeren` gibt es je
+  einmal statt viermal. `einzelAusMenge` fragt `e IS kern.Bauteil` statt vier
+  Längen, und das Einfügen aus der Ablage ruft `verschieben`.
+* Was nur eine Art betrifft (Ausrichten, Drehpunkt, Ablage), holt sich seine
+  Teilmenge über `selB()`, `selL()`, `selD()` und `selBus()`.
+
+Geprüft: Funkenflugs Selbsttest (`main.dh -- --foto`) besteht vor und nach
+dem Umbau dieselben 327 Prüfungen ohne Fehler, der Kerntest ebenso.
+`auswahl.dh` hat 740 statt 731 Zeilen; die vier Paare `istGewaehltB/L/D/Bus`
+und `umschaltenB/L/D/Bus` sind weg, 116 Stellen in sechs Dateien nennen
+jetzt die eine Menge.
+
+**Was die Probe zeigt:**
+
+1. **Eine Basisklasse reichte.** Keine der vier Klassen hatte schon eine
+   Vorfahrin, und die Auswahl braucht nur einen Vertrag. Den Fall aus
+   Abschnitt 5, Punkt 2 (zwei Verträge, verschieden geerbt) gibt es hier
+   nicht. Das Speichern ist ein zweiter Vertrag nur dem Namen nach: Es sind
+   freie Funktionen in `kern/datei.dh`, und an ihnen hängt nichts, das ein
+   gemeinsamer Typ verbessern würde.
+2. **Weg B war die Voraussetzung.** Erst seit Klassentypen geprüft werden,
+   sagt `ARRAY OF kern.Element` etwas. Vorher hätte die Menge alles
+   angenommen.
+3. **Wiederholt bleibt, was eine Schnittstelle auch nicht beseitigt:** die
+   vier Teilmengen `selB()` … `selBus()`. Sie unterscheiden sich nur im Typ.
+   Dafür fehlt ein Filter nach Typ (ein Befehl, der die Elemente einer
+   Klasse heraussucht, oder Generika), keine Schnittstelle.
+4. **Nicht in die Basisklasse ging der Rahmen-Test.** `bauteilBox` liegt in
+   der Ansicht, weil die Größe eines Bauteils an seiner gezeichneten Grafik
+   hängt. Eine Methode `imRahmen` am Element müsste die Ansicht kennen. Das
+   ist eine Frage der Schichten, nicht der Sprache.
+
+**Entscheidung daraus:** Weg C wird vorerst nicht gebaut; es bleibt bei
+Weg A, also Basisklassen mit `ABSTRACT`. Neu aufgenommen wird die Frage,
+wenn ein Programm wirklich zwei Verträge für dieselbe Klasse braucht. Ein
+Kandidat sind die drei Einleser in Glutfaden, falls sie einmal eine echte
+Vorfahrin bekommen. Ein Filter nach Typ ist ein eigener, kleiner Punkt.
 
 ## 6. Offene Fragen an die Entscheidung
 

@@ -22,7 +22,7 @@ PRINT "davor"
 DIM s AS STRING
 s = 5
 --- fehler
-Zuweisung an global: Erwartet STRING, erhalten INTEGER
+Zuweisung an 's': Erwartet STRING, erhalten INTEGER
 
 === zu viele argumente werden gemeldet
 ' (Bis Stufe 47 in test_compiler_warnungen.py.)

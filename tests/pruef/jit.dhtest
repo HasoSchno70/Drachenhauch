@@ -374,8 +374,8 @@ END TRY
 DHRT_JIT=aus
 --- erwartet
 4 3 0
-Lokale Variable: FLOAT 3.5 passt nicht verlus
-RETURN: Ganzzahl-Ueberlauf bei 'Zuweisung' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+Zuweisung an 'h': FLOAT 3.5 passt nicht verlu
+RETURN von rueck: Ganzzahl-Ueberlauf bei 'Zuweisung' (INTEGER ist 64-bit; Wertebereich ueberschritten)
 
 === kommazahl in eine ganze zahl (maschinencode)
 FUNCTION halb(a AS INTEGER) AS INTEGER
@@ -402,8 +402,8 @@ DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
 4 3 0
-Lokale Variable: FLOAT 3.5 passt nicht verlus
-RETURN: Ganzzahl-Ueberlauf bei 'Zuweisung' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+Zuweisung an 'h': FLOAT 3.5 passt nicht verlu
+RETURN von rueck: Ganzzahl-Ueberlauf bei 'Zuweisung' (INTEGER ist 64-bit; Wertebereich ueberschritten)
 --- stderr
 jit: 2 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
 
@@ -658,7 +658,7 @@ END TRY
 DHRT_JIT=aus
 --- erwartet
 6.0 6.5 5.5 20.5 9
-Parameter: FLOAT 2.5 passt nicht verlust
+Parameter 'n' von f: FLOAT 2.5 passt nic
 
 === argumente werden wie in der vm gewandelt (maschinencode)
 FUNCTION f(x AS FLOAT, n AS INTEGER, b AS BOOLEAN) AS FLOAT
@@ -687,7 +687,7 @@ DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
 6.0 6.5 5.5 20.5 9
-Parameter: FLOAT 2.5 passt nicht verlust
+Parameter 'n' von f: FLOAT 2.5 passt nic
 --- stderr
 jit: 4 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
 
@@ -898,7 +898,7 @@ PRINT gf; " "; gi
 DHRT_JIT=aus
 --- erwartet
 3.0 FLOAT 4 INTEGER
-Zuweisung an global: FLOAT 2.5 pass
+Zuweisung an 'gi': FLOAT 2.5 passt 
 5.0 4
 
 === umwandeln beim schreiben in globale (maschinencode)
@@ -921,7 +921,7 @@ DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
 3.0 FLOAT 4 INTEGER
-Zuweisung an global: FLOAT 2.5 pass
+Zuweisung an 'gi': FLOAT 2.5 passt 
 5.0 4
 --- stderr
 jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
@@ -3036,7 +3036,7 @@ PRINT t
 DHRT_JIT=aus
 --- erwartet
 --- fehler
-Zuweisung an global: Erwartet STRING, erhalten INTEGER
+Zuweisung an 't': Erwartet STRING, erhalten INTEGER
 
 === eine zahl in eine textvariable ist ein fehler (maschinencode)
 DIM w AS TUPLE
@@ -3053,7 +3053,7 @@ DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
 --- fehler
-Zuweisung an global: Erwartet STRING, erhalten INTEGER
+Zuweisung an 't': Erwartet STRING, erhalten INTEGER
 
 === zahlen aus text in getypte variablen
 DIM f AS FLOAT
@@ -6495,7 +6495,7 @@ PRINT i; " "; t
 --- umgebung
 DHRT_JIT=aus
 --- erwartet
-gefangen: Zuweisung an global: FLOAT 1.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+gefangen: Zuweisung an 'a': FLOAT 1.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
 4 112233
 
 === tupel mit falschem typ fuer ein ziel (maschinencode)
@@ -6520,7 +6520,7 @@ PRINT i; " "; t
 DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
-gefangen: Zuweisung an global: FLOAT 1.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+gefangen: Zuweisung an 'a': FLOAT 1.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
 4 112233
 --- stderr
 jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
@@ -7075,7 +7075,7 @@ END TRY
 DHRT_JIT=aus
 --- erwartet
 12345 15
-gefangen: Lokale Variable: FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+gefangen: Zuweisung an 'n': FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
 
 === wert in ein getyptes local einer sub (maschinencode)
 SUB rechne(t AS TUPLE)
@@ -7101,7 +7101,7 @@ DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
 12345 15
-gefangen: Lokale Variable: FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+gefangen: Zuweisung an 'n': FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
 --- stderr
 jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 jit: 1 mal mitten in einer Schleife ausgestiegen
@@ -7127,7 +7127,7 @@ END TRY
 DHRT_JIT=aus
 --- erwartet
 a,b,c,d,
-gefangen: Lokale Variable: Erwartet STRING, erhalten INTEGER
+gefangen: Zuweisung an 'w': Erwartet STRING, erhalten INTEGER
 
 === zahl in ein text-local einer sub (maschinencode)
 SUB rechne(t AS TUPLE)
@@ -7151,7 +7151,7 @@ DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
 a,b,c,d,
-gefangen: Lokale Variable: Erwartet STRING, erhalten INTEGER
+gefangen: Zuweisung an 'w': Erwartet STRING, erhalten INTEGER
 --- stderr
 jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 jit: 1 mal mitten in einer Schleife ausgestiegen
@@ -7916,3 +7916,340 @@ DHRT_JIT_BILANZ=1
 1000
 --- stderr
 jit: 400 mal mitten in einer Schleife ausgestiegen
+
+=== variable und feld vom typ der oberklasse
+' Eine lokale Variable `AS Form` und ein Feld `form AS Form` halten Kreise
+' und Quadrate. Seit Weg B laesst die Laufzeit dort nur Form und Unterklassen
+' zu; darum hat ein solcher Platz im Maschinencode die Familie der Klasse
+' (familie_des_typs). Vorher stieg der Code bei jedem Objekt einer anderen
+' Klasse als der deklarierten aus (hier 780 Mal). Ein NIL im Feld laesst
+' aussteigen, die VM rechnet weiter.
+CLASS Form
+    DIM n AS INTEGER
+    ABSTRACT FUNCTION flaeche() AS FLOAT
+END CLASS
+CLASS Kreis EXTENDS Form
+    DIM r AS FLOAT
+    FUNCTION flaeche() AS FLOAT
+        RETURN 3.0 * r * r
+    END FUNCTION
+END CLASS
+CLASS Quadrat EXTENDS Form
+    DIM a AS FLOAT
+    FUNCTION flaeche() AS FLOAT
+        RETURN a * a
+    END FUNCTION
+END CLASS
+CLASS Teil
+    DIM form AS Form
+END CLASS
+DIM formen AS ARRAY OF Form : formen = []
+DIM teile AS ARRAY OF Teil : teile = []
+DIM i AS INTEGER
+FOR i = 0 TO 39
+    DIM t AS Teil : t = NEW Teil()
+    IF i MOD 2 = 0 THEN
+        DIM k AS Kreis : k = NEW Kreis() : k.r = i : k.n = 1
+        ARRAY_PUSH(formen, k) : t.form = k
+    ELSE
+        DIM q AS Quadrat : q = NEW Quadrat() : q.a = i : q.n = 2
+        ARRAY_PUSH(formen, q) : t.form = q
+    END IF
+    ARRAY_PUSH(teile, t)
+NEXT
+SUB ueber_variable()
+    DIM f AS Form
+    DIM s AS FLOAT : s = 0
+    DIM z AS INTEGER : z = 0
+    DIM r AS INTEGER
+    DIM j AS INTEGER
+    FOR r = 1 TO 20
+        FOR j = 0 TO LEN(formen) - 1
+            f = formen[j]
+            s = s + f.flaeche()
+            z = z + f.n
+        NEXT
+    NEXT
+    PRINT "variable: "; s; " "; z
+END SUB
+ueber_variable()
+DIM s2 AS FLOAT : s2 = 0
+DIM r2 AS INTEGER
+FOR r2 = 1 TO 20
+    FOR i = 0 TO LEN(teile) - 1
+        s2 = s2 + teile[i].form.flaeche()
+    NEXT
+NEXT
+PRINT "feld: "; s2
+' Ein NIL mitten im Feld: der Code steigt aus, die VM rechnet weiter.
+teile[7].form = NIL
+DIM nil_seen AS INTEGER : nil_seen = 0
+FOR i = 0 TO LEN(teile) - 1
+    IF teile[i].form IS NIL THEN
+        nil_seen = nil_seen + 1
+    ELSE
+        s2 = s2 + teile[i].form.flaeche()
+    END IF
+NEXT
+PRINT "mit nil: "; s2; " "; nil_seen
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+variable: 806000.0 1200
+feld: 806000.0
+mit nil: 846251.0 1
+
+=== variable und feld vom typ der oberklasse (maschinencode)
+CLASS Form
+    DIM n AS INTEGER
+    ABSTRACT FUNCTION flaeche() AS FLOAT
+END CLASS
+CLASS Kreis EXTENDS Form
+    DIM r AS FLOAT
+    FUNCTION flaeche() AS FLOAT
+        RETURN 3.0 * r * r
+    END FUNCTION
+END CLASS
+CLASS Quadrat EXTENDS Form
+    DIM a AS FLOAT
+    FUNCTION flaeche() AS FLOAT
+        RETURN a * a
+    END FUNCTION
+END CLASS
+CLASS Teil
+    DIM form AS Form
+END CLASS
+DIM formen AS ARRAY OF Form : formen = []
+DIM teile AS ARRAY OF Teil : teile = []
+DIM i AS INTEGER
+FOR i = 0 TO 39
+    DIM t AS Teil : t = NEW Teil()
+    IF i MOD 2 = 0 THEN
+        DIM k AS Kreis : k = NEW Kreis() : k.r = i : k.n = 1
+        ARRAY_PUSH(formen, k) : t.form = k
+    ELSE
+        DIM q AS Quadrat : q = NEW Quadrat() : q.a = i : q.n = 2
+        ARRAY_PUSH(formen, q) : t.form = q
+    END IF
+    ARRAY_PUSH(teile, t)
+NEXT
+SUB ueber_variable()
+    DIM f AS Form
+    DIM s AS FLOAT : s = 0
+    DIM z AS INTEGER : z = 0
+    DIM r AS INTEGER
+    DIM j AS INTEGER
+    FOR r = 1 TO 20
+        FOR j = 0 TO LEN(formen) - 1
+            f = formen[j]
+            s = s + f.flaeche()
+            z = z + f.n
+        NEXT
+    NEXT
+    PRINT "variable: "; s; " "; z
+END SUB
+ueber_variable()
+DIM s2 AS FLOAT : s2 = 0
+DIM r2 AS INTEGER
+FOR r2 = 1 TO 20
+    FOR i = 0 TO LEN(teile) - 1
+        s2 = s2 + teile[i].form.flaeche()
+    NEXT
+NEXT
+PRINT "feld: "; s2
+' Ein NIL mitten im Feld: der Code steigt aus, die VM rechnet weiter.
+teile[7].form = NIL
+DIM nil_seen AS INTEGER : nil_seen = 0
+FOR i = 0 TO LEN(teile) - 1
+    IF teile[i].form IS NIL THEN
+        nil_seen = nil_seen + 1
+    ELSE
+        s2 = s2 + teile[i].form.flaeche()
+    END IF
+NEXT
+PRINT "mit nil: "; s2; " "; nil_seen
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+variable: 806000.0 1200
+feld: 806000.0
+mit nil: 846251.0 1
+--- stderr
+jit: 3 Funktionen, 3 Schleifen, 41 Schleifenlaeufe
+
+=== fremde klasse in einer variable der oberklasse
+' Weg B gilt auch im Maschinencode: das Auto in einer Variable AS Form ist
+' derselbe Fehler mit derselben Meldung.
+CLASS Form
+    ABSTRACT FUNCTION n() AS INTEGER
+END CLASS
+CLASS Kreis EXTENDS Form
+    FUNCTION n() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+CLASS Auto
+END CLASS
+DIM f AS Form
+DIM s AS INTEGER : s = 0
+DIM i AS INTEGER
+FOR i = 1 TO 100
+    IF i = 70 THEN
+        f = NEW Auto()
+    ELSE
+        f = NEW Kreis()
+    END IF
+    s = s + f.n()
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- fehler
+Zuweisung an 'f': Erwartet FORM (oder eine Unterklasse), erhalten AUTO
+
+=== fremde klasse in einer variable der oberklasse (maschinencode)
+CLASS Form
+    ABSTRACT FUNCTION n() AS INTEGER
+END CLASS
+CLASS Kreis EXTENDS Form
+    FUNCTION n() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+CLASS Auto
+END CLASS
+DIM f AS Form
+DIM s AS INTEGER : s = 0
+DIM i AS INTEGER
+FOR i = 1 TO 100
+    IF i = 70 THEN
+        f = NEW Auto()
+    ELSE
+        f = NEW Kreis()
+    END IF
+    s = s + f.n()
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- fehler
+Zuweisung an 'f': Erwartet FORM (oder eine Unterklasse), erhalten AUTO
+
+=== variable mit fuenf moeglichen klassen
+' Mehr als vier Klassen (FAMILIE_MAX): der Platz bekommt keine Familie, der
+' Code steigt aus wie bisher, das Ergebnis ist das der VM.
+CLASS F
+    FUNCTION z() AS INTEGER
+        RETURN 0
+    END FUNCTION
+END CLASS
+CLASS F1 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+CLASS F2 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 2
+    END FUNCTION
+END CLASS
+CLASS F3 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 3
+    END FUNCTION
+END CLASS
+CLASS F4 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 4
+    END FUNCTION
+END CLASS
+DIM xs AS ARRAY OF F : xs = []
+DIM i AS INTEGER
+FOR i = 0 TO 99
+    SELECT CASE i MOD 5
+        CASE 0 : ARRAY_PUSH(xs, NEW F())
+        CASE 1 : ARRAY_PUSH(xs, NEW F1())
+        CASE 2 : ARRAY_PUSH(xs, NEW F2())
+        CASE 3 : ARRAY_PUSH(xs, NEW F3())
+        CASE ELSE : ARRAY_PUSH(xs, NEW F4())
+    END SELECT
+NEXT
+SUB lauf()
+    DIM x AS F
+    DIM s AS INTEGER : s = 0
+    DIM r AS INTEGER
+    DIM j AS INTEGER
+    FOR r = 1 TO 10
+        FOR j = 0 TO LEN(xs) - 1
+            x = xs[j]
+            s = s + x.z()
+        NEXT
+    NEXT
+    PRINT s
+END SUB
+lauf()
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+2000
+
+=== variable mit fuenf moeglichen klassen (maschinencode)
+CLASS F
+    FUNCTION z() AS INTEGER
+        RETURN 0
+    END FUNCTION
+END CLASS
+CLASS F1 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+CLASS F2 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 2
+    END FUNCTION
+END CLASS
+CLASS F3 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 3
+    END FUNCTION
+END CLASS
+CLASS F4 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 4
+    END FUNCTION
+END CLASS
+DIM xs AS ARRAY OF F : xs = []
+DIM i AS INTEGER
+FOR i = 0 TO 99
+    SELECT CASE i MOD 5
+        CASE 0 : ARRAY_PUSH(xs, NEW F())
+        CASE 1 : ARRAY_PUSH(xs, NEW F1())
+        CASE 2 : ARRAY_PUSH(xs, NEW F2())
+        CASE 3 : ARRAY_PUSH(xs, NEW F3())
+        CASE ELSE : ARRAY_PUSH(xs, NEW F4())
+    END SELECT
+NEXT
+SUB lauf()
+    DIM x AS F
+    DIM s AS INTEGER : s = 0
+    DIM r AS INTEGER
+    DIM j AS INTEGER
+    FOR r = 1 TO 10
+        FOR j = 0 TO LEN(xs) - 1
+            x = xs[j]
+            s = s + x.z()
+        NEXT
+    NEXT
+    PRINT s
+END SUB
+lauf()
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+2000
+--- stderr
+jit: 20 mal mitten in einer Schleife ausgestiegen

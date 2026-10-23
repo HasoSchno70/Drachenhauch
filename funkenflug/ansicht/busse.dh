@@ -8,28 +8,9 @@
 ' Auswaehlen, Ziehen (Abzweige folgen), Drehen, Loeschen, Kopieren wie bei
 ' Draehten; Doppelklick benennt um.
 
-FUNCTION istGewaehltBus(b AS kern.Bus) AS BOOLEAN
-    DIM i AS INTEGER
-    FOR i = 0 TO LEN(gSelBus) - 1
-        IF gSelBus[i] = b THEN RETURN TRUE
-    NEXT
-    RETURN FALSE
-END FUNCTION
-
-SUB umschaltenBus(b AS kern.Bus)
-    DIM i AS INTEGER
-    FOR i = 0 TO LEN(gSelBus) - 1
-        IF gSelBus[i] = b THEN
-            ARRAY_REMOVE_AT(gSelBus, i)
-            RETURN
-        END IF
-    NEXT
-    ARRAY_PUSH(gSelBus, b)
-END SUB
-
 SUB waehleBus(b AS kern.Bus)
     auswahlAufheben()
-    ARRAY_PUSH(gSelBus, b)
+    dazu(b)
     einzelAusMenge()
 END SUB
 
@@ -53,7 +34,7 @@ SUB busseZeichnen(cr AS INTEGER)
     FOR i = 0 TO LEN(gBlatt.busse) - 1
         DIM bu AS kern.Bus : bu = gBlatt.busse[i]
         IF LEN(bu.punkte) < 2 THEN CONTINUE
-        DIM farbe AS INTEGER : farbe = IIF(NOT gDruck AND istGewaehltBus(bu), C_AUSWAHL, C_BUS)
+        DIM farbe AS INTEGER : farbe = IIF(NOT gDruck AND istGewaehlt(bu), C_AUSWAHL, C_BUS)
         zeichenFarbe(cr, farbe)
         cairo_set_line_width(cr, gStrich * 3)
         cairo_move_to(cr, sx(bu.punkte[0].x), sy(bu.punkte[0].y))

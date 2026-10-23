@@ -375,3 +375,53 @@ zeige(h)
 zeige(NIL)
 --- erwartet
 befund []
+
+=== die meldung nennt variable parameter und funktion
+' Bis 2026-10-22 hiess es "Zuweisung an global", "Lokale Variable",
+' "Parameter" und "RETURN" -- welche Variable gemeint war, stand nicht da.
+CLASS Tier
+END CLASS
+CLASS Auto
+END CLASS
+DIM rex AS Tier
+SUB futter(t AS Tier)
+END SUB
+SUB lokal()
+    DIM mein AS Tier
+    mein = NEW Auto()
+END SUB
+FUNCTION finde() AS Tier
+    RETURN NEW Auto()
+END FUNCTION
+TRY
+    rex = NEW Auto()
+CATCH e
+    PRINT e
+END TRY
+TRY
+    lokal()
+CATCH e
+    PRINT e
+END TRY
+TRY
+    futter(NEW Auto())
+CATCH e
+    PRINT e
+END TRY
+TRY
+    rex = finde()
+CATCH e
+    PRINT e
+END TRY
+DIM zahl AS INTEGER
+TRY
+    zahl = "drei"
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+Zuweisung an 'rex': Erwartet TIER (oder eine Unterklasse), erhalten AUTO
+Zuweisung an 'mein': Erwartet TIER (oder eine Unterklasse), erhalten AUTO
+Parameter 't' von futter: Erwartet TIER (oder eine Unterklasse), erhalten AUTO
+RETURN von finde: Erwartet TIER (oder eine Unterklasse), erhalten AUTO
+Zuweisung an 'zahl': Erwartet INTEGER, erhalten STRING

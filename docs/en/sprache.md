@@ -1340,7 +1340,7 @@ number 5 in that place stops the program where it is put in, not only at the
 next method call:
 
 ```
-Laufzeitfehler in spiel.dh:12: Zuweisung an global: Erwartet TIER (oder eine Unterklasse), erhalten AUTO
+Laufzeitfehler in spiel.dh:12: Zuweisung an 't': Erwartet TIER (oder eine Unterklasse), erhalten AUTO
 ```
 
 Going down (`DIM h AS Hund : h = someAnimal`) works if `someAnimal` really

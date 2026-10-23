@@ -76,7 +76,7 @@ DIM gSegmentZug AS BOOLEAN        ' laeuft gerade ein Segment-Zug (statt Gruppen
 
 SUB drahtWaehlen(wi AS INTEGER, si AS INTEGER)
     auswahlAufheben()
-    ARRAY_PUSH(gSelD, gBlatt.draehte[wi])
+    dazu(gBlatt.draehte[wi])
     gDrahtGewaehlt = gBlatt.draehte[wi]
     gHatDraht = TRUE
     gSegment = si
@@ -352,7 +352,7 @@ END SUB
 ' bis zu zwei Teile), mit ganzerDraht der ganze Draht.
 SUB auswahlLoeschen(ganzerDraht AS BOOLEAN)
     DIM i AS INTEGER, k AS INTEGER
-    IF auswahlAnzahl() > 1 OR LEN(gSelBus) > 0 THEN
+    IF auswahlAnzahl() > 1 OR LEN(selBus()) > 0 THEN
         mengeLoeschen()
         RETURN
     END IF
@@ -438,11 +438,12 @@ DIM gLabelGlobal AS BOOLEAN       ' Vorgabe des Hakens beim naechsten Label
 
 ' G: die gewaehlten Labels zwischen lokal und global umschalten.
 SUB labelsGlobalUmschalten()
-    IF LEN(gSelL) = 0 THEN RETURN
+    DIM sL AS ARRAY OF kern.Label : sL = selL()
+    IF LEN(sL) = 0 THEN RETURN
     verlaufMerken()
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(gSelL) - 1
-        gSelL[i].art = IIF(gSelL[i].art = kern.LA_GLOBAL, kern.LA_LOKAL, kern.LA_GLOBAL)
+    FOR i = 0 TO LEN(sL) - 1
+        sL[i].art = IIF(sL[i].art = kern.LA_GLOBAL, kern.LA_LOKAL, kern.LA_GLOBAL)
     NEXT
     geaendert()
 END SUB
@@ -450,11 +451,12 @@ END SUB
 ' H: die gewaehlten Labels zwischen lokal und hierarchisch umschalten. Ein
 ' hierarchisches Label ist ein Port: im Elternblatt erscheint es am Blattsymbol.
 SUB labelsHierUmschalten()
-    IF LEN(gSelL) = 0 THEN RETURN
+    DIM sL AS ARRAY OF kern.Label : sL = selL()
+    IF LEN(sL) = 0 THEN RETURN
     verlaufMerken()
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(gSelL) - 1
-        gSelL[i].art = IIF(gSelL[i].art = kern.LA_HIER, kern.LA_LOKAL, kern.LA_HIER)
+    FOR i = 0 TO LEN(sL) - 1
+        sL[i].art = IIF(sL[i].art = kern.LA_HIER, kern.LA_LOKAL, kern.LA_HIER)
     NEXT
     geaendert()
 END SUB
@@ -564,28 +566,31 @@ END SUB
 
 ' T: Referenz und Wert der gewaehlten Bauteile zurueck an ihre Vorgabe.
 SUB texteZuruecksetzen()
+    DIM sB AS ARRAY OF kern.Bauteil : sB = selB()
     DIM i AS INTEGER, n AS INTEGER
     n = 0
-    FOR i = 0 TO LEN(gSelB) - 1
-        IF gSelB[i].refVersatz.x <> 0 OR gSelB[i].refVersatz.y <> 0 OR gSelB[i].wertVersatz.x <> 0 OR gSelB[i].wertVersatz.y <> 0 THEN n = n + 1
+    FOR i = 0 TO LEN(sB) - 1
+        IF sB[i].refVersatz.x <> 0 OR sB[i].refVersatz.y <> 0 OR sB[i].wertVersatz.x <> 0 OR sB[i].wertVersatz.y <> 0 THEN n = n + 1
     NEXT
     IF n = 0 THEN RETURN
     verlaufMerken()
-    FOR i = 0 TO LEN(gSelB) - 1
-        gSelB[i].refVersatz = NEW kern.Punkt(0, 0)
-        gSelB[i].wertVersatz = NEW kern.Punkt(0, 0)
+    FOR i = 0 TO LEN(sB) - 1
+        sB[i].refVersatz = NEW kern.Punkt(0, 0)
+        sB[i].wertVersatz = NEW kern.Punkt(0, 0)
     NEXT
     geaendert()
 END SUB
 
 SUB auswahlBearbeiten()
+    DIM sB AS ARRAY OF kern.Bauteil : sB = selB()
+    DIM sBus AS ARRAY OF kern.Bus : sBus = selBus()
     gZieht = FALSE
-    IF LEN(gSelBus) = 1 AND auswahlAnzahl() = 1 THEN
-        busUmbenennen(gSelBus[0])
+    IF LEN(sBus) = 1 AND auswahlAnzahl() = 1 THEN
+        busUmbenennen(sBus[0])
         RETURN
     END IF
-    IF LEN(gSelB) > 1 THEN
-        eigenschaftenMehrere(gSelB)
+    IF LEN(sB) > 1 THEN
+        eigenschaftenMehrere(sB)
     ELSEIF gHatLabel OR gHatDraht THEN
         umbenennenAuswahl()
     ELSEIF gHatGewaehlt THEN
@@ -698,18 +703,18 @@ SUB klickAuswahl(px AS FLOAT, py AS FLOAT, umsch AS BOOLEAN)
         RETURN
     END IF
     IF umsch THEN
-        IF li >= 0 THEN umschaltenL(gBlatt.labels[li])
-        IF idx >= 0 THEN umschaltenB(gBlatt.bauteile[idx])
-        IF wi >= 0 THEN umschaltenD(gBlatt.draehte[wi])
-        IF bui >= 0 THEN umschaltenBus(gBlatt.busse[bui])
+        IF li >= 0 THEN umschalten(gBlatt.labels[li])
+        IF idx >= 0 THEN umschalten(gBlatt.bauteile[idx])
+        IF wi >= 0 THEN umschalten(gBlatt.draehte[wi])
+        IF bui >= 0 THEN umschalten(gBlatt.busse[bui])
         einzelAusMenge()
         RETURN
     END IF
     DIM schonDrin AS BOOLEAN : schonDrin = FALSE
-    IF li >= 0 THEN schonDrin = istGewaehltL(gBlatt.labels[li])
-    IF idx >= 0 THEN schonDrin = istGewaehltB(gBlatt.bauteile[idx])
-    IF wi >= 0 THEN schonDrin = istGewaehltD(gBlatt.draehte[wi])
-    IF bui >= 0 THEN schonDrin = istGewaehltBus(gBlatt.busse[bui])
+    IF li >= 0 THEN schonDrin = istGewaehlt(gBlatt.labels[li])
+    IF idx >= 0 THEN schonDrin = istGewaehlt(gBlatt.bauteile[idx])
+    IF wi >= 0 THEN schonDrin = istGewaehlt(gBlatt.draehte[wi])
+    IF bui >= 0 THEN schonDrin = istGewaehlt(gBlatt.busse[bui])
     IF schonDrin AND auswahlAnzahl() > 1 THEN
         gZieht = TRUE
         gruppenZugBeginn()
