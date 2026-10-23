@@ -13436,10 +13436,12 @@ pub(crate) fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
                 ctx, v.type_name(), v.fmt())),
             v => Err(format!("{}: Erwartet GELD, erhalten {}", ctx, v.type_name())),
         },
-        // map:/Modul-Typen -> Durchreichen (Referenz-Typen); eine Klasse
+        // Modul-Typen -> Durchreichen (Referenz-Typen); eine MAP prueft
+        // coerce_map wie ein Feld coerce_array; eine Klasse
         // nimmt nur NIL und Instanzen ihrer selbst oder einer Unterklasse.
         _ => match target.strip_prefix("array:") {
             Some(elem) => coerce_array(value, elem, ctx),
+            None if target.starts_with("map:") => coerce_map(value, &target[4..], ctx),
             None => {
                 crate::value::klasse_pruefen(&value, target, ctx)?;
                 Ok(value)
@@ -13452,10 +13454,52 @@ pub(crate) fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
 /// (`array:integer` -> `ARRAY OF INTEGER`). Gegenstueck zu
 /// `Compiler::typ_klartext` -- die interne Schreibweise sagt einem Nutzer nichts.
 fn typ_lesbar(t: &str) -> String {
-    match t.strip_prefix("array:") {
-        Some(e) => format!("ARRAY OF {}", typ_lesbar(e)),
-        None => t.to_uppercase(),
+    if let Some(e) = t.strip_prefix("array:") { return format!("ARRAY OF {}", typ_lesbar(e)); }
+    if let Some(e) = t.strip_prefix("map:") { return format!("MAP OF {}", typ_lesbar(e)); }
+    t.to_uppercase()
+}
+
+/// Zuweisung an ein MAP-Ziel (`DIM m AS MAP OF Hund : m = ...`), nach
+/// denselben Regeln wie `coerce_array`. Bis 2026.34 reichte `coerce` jede
+/// MAP durch: eine MAP OF STRING ging an eine MAP OF INTEGER, und ein
+/// Literal mit einer Katze an eine MAP OF Hund.
+///
+/// * Gleicher Werttyp oder der einer Unterklasse: passt (die MAP behaelt
+///   ihren Werttyp, jeder Schreibzugriff prueft ihn).
+/// * Eine MAP ohne Werttyp (ein Literal mit Objekten oder gemischten
+///   Werten, `{}`): jeder Wert wird geprueft. Gehoert sie sonst niemandem,
+///   nimmt sie den Werttyp an. Eine frische MAP von Ganzzahlen wird so auch
+///   zu einer von Kommazahlen.
+/// * Sonst: Fehler.
+#[inline(never)]
+fn coerce_map(value: Value, vt: &str, ctx: &str) -> R<Value> {
+    if matches!(value, Value::Nil) { return Ok(value); }
+    let ziel = format!("MAP OF {}", typ_lesbar(vt));
+    let m = match &value {
+        Value::Map(m) => m,
+        _ => return Err(format!("{}: Erwartet {}, erhalten {}", ctx, ziel, value.type_name())),
+    };
+    if vt.is_empty() || vt == "any" { return Ok(value); }
+    let ist = m.borrow().value_type.clone();
+    if ist == vt || crate::value::klasse_erbt(&ist, vt) { return Ok(value); }
+    let frisch = Rc::strong_count(m) == 1;
+    if ist == "any" || (frisch && ist == "integer" && vt == "float") {
+        let schluessel: Vec<String> = m.borrow().entries().keys().cloned().collect();
+        let mut gepasst = Vec::with_capacity(schluessel.len());
+        for k in &schluessel {
+            let v = m.borrow().get(k).cloned().unwrap_or(Value::Nil);
+            gepasst.push(coerce(v, vt, &format!("{}: Wert '{}'", ctx, k))?);
+        }
+        if frisch {
+            let mut mb = m.borrow_mut();
+            mb.value_type = vt.to_string();
+            for (k, v) in schluessel.iter().zip(gepasst) {
+                if let Some(platz) = mb.get_mut(k) { *platz = v; }
+            }
+        }
+        return Ok(value);
     }
+    Err(format!("{}: Erwartet {}, erhalten MAP OF {}", ctx, ziel, typ_lesbar(&ist)))
 }
 
 /// Zuweisung an ein ARRAY-Ziel pruefen (`DIM a AS ARRAY OF STRING : a = ...`).
