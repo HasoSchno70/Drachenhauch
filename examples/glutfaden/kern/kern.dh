@@ -19,6 +19,7 @@ IMPORT "bearbeiten.dh" AS kern
 IMPORT "auswahl.dh" AS kern
 IMPORT "bildimport.dh" AS kern
 IMPORT "export.dh" AS kern
+IMPORT "einleser.dh" AS kern
 IMPORT "oxs.dh" AS kern
 IMPORT "pat.dh" AS kern
 IMPORT "xsdhersteller.dh" AS kern

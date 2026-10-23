@@ -25,45 +25,12 @@
 ' werden Viertelstiche, Spannstiche Rueckstiche; Sonderstiche und Kurven
 ' kennt Glutfaden nicht (gezaehlt und gemeldet).
 
-CLASS XsdImport
-    DIM muster AS Muster
-    DIM warnungen AS ARRAY OF STRING
-    DIM fassung AS STRING
-END CLASS
 
-CLASS XsdLeser
-    DIM daten AS BUFFER
-    DIM p AS INTEGER
-
-    SUB Init(b AS BUFFER)
-        daten = b
-    END SUB
-
-    SUB brauche(n AS INTEGER)
-        IF n < 0 OR p + n > BUFFER_LEN(daten) THEN THROW trf$("XSD: Datei endet vorzeitig (bei Byte {0})", [STR$(p)])
-    END SUB
-
-    FUNCTION u8() AS INTEGER
-        brauche(1)
-        p = p + 1
-        RETURN BUFFER_GET(daten, p - 1)
-    END FUNCTION
-
-    FUNCTION u16() AS INTEGER
-        brauche(2)
-        p = p + 2
-        RETURN BUFFER_GET_U16(daten, p - 2)
-    END FUNCTION
-
-    FUNCTION u32() AS INTEGER
-        brauche(4)
-        p = p + 4
-        RETURN BUFFER_GET_U32(daten, p - 4)
-    END FUNCTION
-
-    SUB ueber(n AS INTEGER)
-        brauche(n)
-        p = p + n
+' Die Leseposition in der Datei (BinLeser, einleser.dh); dazu die Meldung am
+' Dateiende, Texte fester Laenge und Farben.
+CLASS XsdLeser EXTENDS BinLeser
+    SUB zuKurz()
+        THROW trf$("XSD: Datei endet vorzeitig (bei Byte {0})", [STR$(p)])
     END SUB
 
     ' Text fester Laenge: n Bytes und ein Platz fuer die Null
@@ -197,8 +164,8 @@ FUNCTION xsdGarn(hst AS STRING, nummer AS STRING, name AS STRING, farbe AS INTEG
     RETURN neuesGarn(IIF(name <> "", name, TRIM$(hst + " " + nummer)), farbe, hst, nummer)
 END FUNCTION
 
-FUNCTION xsdLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY OF STRING) AS XsdImport
-    DIM erg AS XsdImport : erg = NEW XsdImport()
+FUNCTION xsdLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY OF STRING) AS MusterImport
+    DIM erg AS MusterImport : erg = NEW MusterImport()
     erg.warnungen = []
     DIM roh AS BUFFER
     TRY

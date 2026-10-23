@@ -348,7 +348,7 @@ SUB themaAnwenden()
 END SUB
 
 ' Die Statuszeile nach einem fremden Format
-FUNCTION fremdHinweis$(fi AS kern.FremdImport) AS STRING
+FUNCTION fremdHinweis$(fi AS kern.MusterImport) AS STRING
     DIM kurz AS STRING : kurz = "OXS"
     IF LEFT$(fi.format, 8) = "PCStitch" THEN kurz = tr$("PCStitch")
     IF LEFT$(fi.format, 7) = "Pattern" THEN kurz = tr$("Pattern Maker")
@@ -365,7 +365,7 @@ FUNCTION musterOeffnen(pfad AS STRING) AS BOOLEAN
     TRY
         ' ein fremdes Format: eingelesen, gesichert wird als .pxs
         IF fremd THEN
-            DIM fi AS kern.FremdImport : fi = kern.fremdLaden(pfad, slPaletten, slSymbole)
+            DIM fi AS kern.MusterImport : fi = kern.fremdLaden(pfad, slPaletten, slSymbole)
             m = fi.muster
             fremdHinweis = fremdHinweis$(fi)
         ELSE

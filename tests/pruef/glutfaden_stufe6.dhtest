@@ -124,7 +124,7 @@ fa = fa + phFarbe$("DMC", "5200", "snow white", &HE6E6E6, ASC("X"))
 SUB versuch(name AS STRING, b AS BUFFER)
     WRITEALL_BYTES("x.pat", b)
     TRY
-        DIM imp AS kern.PatImport : imp = kern.patLaden("x.pat", pal, sym)
+        DIM imp AS kern.MusterImport : imp = kern.patLaden("x.pat", pal, sym)
         PRINT name; ": gelesen"
     CATCH e
         PRINT name; ": "; e
@@ -248,7 +248,7 @@ jo = jo + ph16$(2) + "0000" + ph16$(0) + ph16$(0) + ph16$(2) + ph16$(0) + "09" +
 SUB versuch(name AS STRING, b AS BUFFER)
     WRITEALL_BYTES("x.xsd", b)
     TRY
-        DIM imp AS kern.XsdImport : imp = kern.xsdLaden("x.xsd", pal, sym)
+        DIM imp AS kern.MusterImport : imp = kern.xsdLaden("x.xsd", pal, sym)
         PRINT name; ": gelesen, "; LEN(imp.muster.rueckstiche); " rueckstiche"
     CATCH e
         PRINT name; ": "; e

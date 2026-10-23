@@ -24,7 +24,7 @@ WRITEALL("kaputt.pat", "PCStitch? nein")
 DIM pfad AS STRING
 FOR EACH pfad IN ["probe.oxs", "farbe.oxs", "demo.oxs", "kaputt.oxs", "kaputt.pat"]
     TRY
-        DIM f AS kern.FremdImport : f = kern.fremdLaden(pfad, pal, sym)
+        DIM f AS kern.MusterImport : f = kern.fremdLaden(pfad, pal, sym)
         DIM m AS kern.Muster : m = f.muster
         PRINT pfad; ": "; m.name; " | "; m.breite; "x"; m.hoehe; " | farben "; m.farbanzahl(); " | stiche "; kern.statistikVon(m).sticheGesamt; " | "; f.format; " | "; FORMAT$(m.breiteCm(), "%.1f"); " x "; FORMAT$(m.hoeheCm(), "%.1f"); " cm"
     CATCH e
@@ -109,7 +109,7 @@ FOR EACH d IN ["a.xsd", "B.PAT", "c.oxs", "d.pxs", "ohne", "e.tar.oxs"]
 NEXT
 PRINT
 TRY
-    DIM f AS kern.FremdImport : f = kern.fremdLaden("notiz.txt", pal, sym)
+    DIM f AS kern.MusterImport : f = kern.fremdLaden("notiz.txt", pal, sym)
 CATCH e
     PRINT "notiz.txt: "; e
 END TRY
