@@ -248,6 +248,10 @@ ELSE
     IF dlErr <> "" THEN PRINT "stderr: "; dlErr
     PRINT "hauptfenster "; FILEEXISTS("d_hauptfenster.png")
     PRINT "datei unveraendert: "; READLINES("alle.pxs")[0] = READLINES("vorher.pxs")[0]
+    ' Die Ausgaben der Probe gehoeren in den Fallordner, nicht neben
+    ' Glutfaden (bis 2026.34 lagen sprache.pdf/.html/_de/_en.oxs dort).
+    PRINT "glutfaden-ordner sauber: "; NOT FILEEXISTS(GLUTORDNER + "/sprache.pdf") AND NOT FILEEXISTS(GLUTORDNER + "/sprache.html") AND NOT FILEEXISTS(GLUTORDNER + "/sprache_en.oxs") AND NOT FILEEXISTS(GLUTORDNER + "/sprache_de.oxs")
+    PRINT "im fallordner: "; FILEEXISTS("sprache.pdf") AND FILEEXISTS("sprache.html") AND FILEEXISTS("sprache_en.oxs")
 END IF
 --- argumente
 {sammlung}/../../examples/glutfaden
@@ -308,3 +312,5 @@ oxs: <?xml version='1.0' encoding='utf-8'?> | in beiden sprachen gleich TRUE | w
 csv: ﻿Symbol,Name,Manufacturer,Catalog number,Stitches,Percent,Skeins,Cost,Do not stitch
 hauptfenster TRUE
 datei unveraendert: TRUE
+glutfaden-ordner sauber: TRUE
+im fallordner: TRUE
