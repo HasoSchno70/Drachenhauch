@@ -1383,6 +1383,11 @@ enthält, und prüft jeden Schreibzugriff selbst. Daraus folgt:
   Zuweisen Element für Element geprüft und nimmt dann den Elementtyp des
   Ziels an. Bis Fassung 2026.33 ging `h = [NEW Katze()]` an ein
   `ARRAY OF Hund` ungeprüft durch.
+* Hängt dasselbe Feld außerdem unter einem Namen `AS ARRAY OF ANY`, bleibt
+  es ein Feld ohne Typ: Die Elemente werden beim Zuweisen an das
+  `ARRAY OF Hund` geprüft, über den ANY-Namen kommt danach aber weiter
+  alles hinein. Wer ein Feld von Hunden will, legt es gleich so an oder holt
+  die Hunde mit `ARRAY_OF_TYPE` heraus.
 
 `--check` warnt, wo ein Feld nie passen kann, etwa ein `ARRAY OF Hund` an
 ein `ARRAY OF Katze` oder ein `ARRAY OF STRING` an ein `ARRAY OF INTEGER`.

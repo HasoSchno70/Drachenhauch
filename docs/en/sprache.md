@@ -1380,6 +1380,11 @@ holds and checks every write itself. It follows that:
   element on assignment and then takes on the element type of the target.
   Up to version 2026.33, `h = [NEW Katze()]` went into an `ARRAY OF Hund`
   unchecked.
+* If the same array is also held under a name `AS ARRAY OF ANY`, it stays
+  an array without a type: its elements are checked when it is assigned to
+  the `ARRAY OF Hund`, but afterwards anything still gets in through the ANY
+  name. If you want an array of dogs, create it that way or take the dogs
+  out with `ARRAY_OF_TYPE`.
 
 `--check` warns where an array can never fit, for example an `ARRAY OF
 Hund` into an `ARRAY OF Katze` or an `ARRAY OF STRING` into an `ARRAY OF
