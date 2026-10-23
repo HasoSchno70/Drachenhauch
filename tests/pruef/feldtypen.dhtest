@@ -133,15 +133,35 @@ TRUE
 TRUE
 TRUE
 
+=== ein feld von ganzzahlen hinter einem namen an float
+' Umgebaut wird nur ein frisches Feld; eines, das einer Variable gehoert,
+' bricht ab -- und --check sagt es vorher.
+DIM q AS STRING
+DIM nl AS STRING : nl = CHR$(10)
+q = "DIM z AS ARRAY OF INTEGER" + nl + "z = [1, 2]" + nl + "DIM f AS ARRAY OF FLOAT" + nl + "f = z" + nl
+q = q + "f = [1, 2]" + nl
+DIM r AS STRING
+r = CODE_CHECK$(q)
+PRINT INSTR(r, "'Erwartet ARRAY OF FLOAT, erhalten ARRAY OF INTEGER'") >= 0
+PRINT INSTR(r, "FLT(x)") >= 0
+PRINT INSTR(r, CHR$(34) + "zeile" + CHR$(34) + ":4") >= 0
+PRINT INSTR(r, CHR$(34) + "zeile" + CHR$(34) + ":5") >= 0
+DIM z AS ARRAY OF INTEGER
+z = [1, 2]
+DIM f AS ARRAY OF FLOAT
+f = z
+--- fehler
+Zuweisung an 'f': Erwartet ARRAY OF FLOAT, erhalten ARRAY OF INTEGER
+
 === check bleibt still wo es passen kann
-' Herauf, herunter (haengt am Inhalt), ANY, INTEGER an FLOAT (ein frisches
-' Feld wird umgebaut).
+' Herauf, herunter (haengt am Inhalt), ANY und ein frisches Feld von
+' Ganzzahlen an FLOAT (es wird umgebaut).
 DIM q AS STRING
 DIM nl AS STRING : nl = CHR$(10)
 q = "CLASS Tier" + nl + "END CLASS" + nl + "CLASS Hund EXTENDS Tier" + nl + "END CLASS" + nl
 q = q + "DIM h AS ARRAY OF Hund" + nl + "DIM t AS ARRAY OF Tier" + nl + "t = h" + nl + "h = t" + nl
 q = q + "DIM a AS ARRAY OF ANY" + nl + "h = a" + nl + "a = h" + nl
-q = q + "DIM z AS ARRAY OF INTEGER" + nl + "DIM f AS ARRAY OF FLOAT" + nl + "f = z" + nl
+q = q + "DIM f AS ARRAY OF FLOAT" + nl + "f = [1, 2]" + nl
 PRINT CODE_CHECK$(q)
 --- erwartet
 []

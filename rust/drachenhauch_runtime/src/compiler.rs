@@ -1753,6 +1753,15 @@ impl Compiler {
         }
     }
 
+    /// Ein Feld von Ganzzahlen, das schon einem NAMEN gehoert, an ein ARRAY OF
+    /// FLOAT: die Laufzeit baut nur ein frisches Feld um (ein Literal, ein
+    /// Ergebnis), eines hinter einer Variable bricht ab. Darum nur bei einem
+    /// Namen oder Feld eines Objekts -- `f = [1, 2]` bleibt still.
+    fn ganzzahlfeld_an_float(quelle: &str, ziel: &str, wert: &Node) -> bool {
+        quelle == "array:integer" && ziel == "array:float"
+            && matches!(wert, Node::Identifier(_) | Node::MemberAccess { .. })
+    }
+
     /// Ein Wert vom Typ `quelle` an ein `ARRAY OF e` (coerce_array in vm.rs).
     /// Ein Feld behaelt zur Laufzeit seinen Elementtyp; eine Variable `AS
     /// ARRAY OF Hund` kann ein Feld von Hunden halten, eines einer
@@ -1801,6 +1810,8 @@ impl Compiler {
                 " Ein Vergleich wie `x > 0` liefert einen BOOLEAN.",
             ("boolean", z) if z == "integer" || z == "float" =>
                 " BOOLEAN ist in Drachenhauch keine Zahl -- mit IIF(b, 1, 0) umwandeln.",
+            ("array:integer", "array:float") =>
+                " Umgebaut wird nur ein frisches Feld; sonst ARRAY_MAP(feld, FUNCTION(x) FLT(x)) oder gleich ein ARRAY OF FLOAT.",
             (q, z) if q.starts_with("array:") && z.starts_with("array:") =>
                 " Ein Feld nimmt nur Felder seines Elementtyps oder einer Unterklasse davon; ARRAY_OF_TYPE holt die passenden Elemente heraus.",
             _ => "",
@@ -1817,7 +1828,7 @@ impl Compiler {
     /// machen, das sich nicht mehr uebersetzen laesst.
     fn warn_typ_zuweisung(&mut self, ziel_typ: &str, ziel: &str, wert: &Node) {
         let Some(quelle) = self.statischer_typ(wert) else { return };
-        if !self.passt_nie(&quelle, ziel_typ) { return; }
+        if !self.passt_nie(&quelle, ziel_typ) && !Self::ganzzahlfeld_an_float(&quelle, ziel_typ, wert) { return; }
         let zeile = self.ctx.cur_line;
         let erwartet = self.erwartet_text(ziel_typ);
         self.warnings.push((zeile, format!(
@@ -1888,7 +1899,7 @@ impl Compiler {
             return;
         }
         let Some(quelle) = self.statischer_typ(wert) else { return };
-        if !self.passt_nie(&quelle, &ziel) { return; }
+        if !self.passt_nie(&quelle, &ziel) && !Self::ganzzahlfeld_an_float(&quelle, &ziel, wert) { return; }
         let zeile = self.ctx.cur_line;
         let erwartet = self.erwartet_text(&ziel);
         self.warnings.push((zeile, format!(
@@ -1966,7 +1977,7 @@ impl Compiler {
                 continue;
             }
             let Some(quelle) = self.statischer_typ(wert) else { continue };
-            if !self.passt_nie(&quelle, ziel_typ) { continue; }
+            if !self.passt_nie(&quelle, ziel_typ) && !Self::ganzzahlfeld_an_float(&quelle, ziel_typ, wert) { continue; }
             raus.push((self.ctx.cur_line, format!(
                 "{}: Parameter '{}' ist als {} angesagt, hier steht {}. Das bricht beim Laufen ab ('Erwartet {}, erhalten {}').{}",
                 wo, pname, Self::typ_klartext(ziel_typ), Self::typ_klartext(&quelle),
