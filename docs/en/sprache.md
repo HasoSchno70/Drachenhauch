@@ -1347,6 +1347,28 @@ Going down (`DIM h AS Hund : h = someAnimal`) works if `someAnimal` really
 holds a dog; the runtime decides that. Up to version 2026.33 the runtime
 passed classes through unchecked.
 
+`ARRAY_OF_TYPE(feld, Typ)` takes all elements of a subclass out of an array.
+The right-hand side is a type name as with `IS`, and the result is an
+`ARRAY OF Typ` -- so it fits even where the array itself is only
+`ARRAY OF Tier`:
+
+```basic
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+CLASS Katze EXTENDS Tier
+END CLASS
+
+DIM alle AS ARRAY OF Tier
+alle = [NEW Hund(), NEW Katze(), NEW Hund()]
+DIM hunde AS ARRAY OF Hund
+hunde = ARRAY_OF_TYPE(alle, Hund)
+PRINT LEN(hunde)
+```
+
+The result is 2.
+
 **STRUCT** is a lightweight data-class substitute that is instantiated automatically (no `NEW` needed):
 
 ```basic

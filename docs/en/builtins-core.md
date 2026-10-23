@@ -405,6 +405,7 @@ See also [Language reference → Arrays](sprache.md#arrays).
 | `ARRAY_INDEXOF(arr, v)` → INTEGER | first index of v, otherwise -1 |
 | `ARRAY_MAP(arr, funktion)` → ARRAY | new array with `funktion(x)` for each element, e.g. `ARRAY_MAP(a, FUNCTION(x) x * 2)` |
 | `ARRAY_FILTER(arr, funktion)` → ARRAY | new array with the elements for which `funktion(x)` returns TRUE (same element type) |
+| `ARRAY_OF_TYPE(arr, Typ)` → ARRAY OF Typ | new array with the elements that are `IS Typ`, in their order. `Typ` is a type name as on the right of `IS` (a class including its subclasses, or a value type such as `INTEGER`); the result fits an `ARRAY OF Typ` |
 | `ARRAY_REDUCE(arr, funktion, start)` | folds the array: `funktion(bisher, x)` for each element, starting with `start` |
 | `ARRAY_FIND(arr, funktion)` → INTEGER | index of the first element for which `funktion(x)` returns TRUE, otherwise -1 |
 

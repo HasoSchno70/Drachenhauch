@@ -1350,6 +1350,28 @@ Herunter (`DIM h AS Hund : h = einTier`) geht, wenn in `einTier` wirklich
 ein Hund steckt; das entscheidet die Laufzeit. Bis Fassung 2026.33 reichte
 die Laufzeit Klassen ungeprüft durch.
 
+Alle Elemente einer Unterklasse aus einem Feld holt `ARRAY_OF_TYPE(feld,
+Typ)`. Rechts steht ein Typname wie bei `IS`, und das Ergebnis ist ein
+`ARRAY OF Typ` -- es passt also auch dort, wo das Feld selbst nur
+`ARRAY OF Tier` ist:
+
+```basic
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+CLASS Katze EXTENDS Tier
+END CLASS
+
+DIM alle AS ARRAY OF Tier
+alle = [NEW Hund(), NEW Katze(), NEW Hund()]
+DIM hunde AS ARRAY OF Hund
+hunde = ARRAY_OF_TYPE(alle, Hund)
+PRINT LEN(hunde)
+```
+
+Das Ergebnis ist 2.
+
 **STRUCT** ist ein leichtgewichtiges Daten-Klassen-Substitut, das automatisch instanziert wird (kein `NEW` nötig):
 
 ```basic

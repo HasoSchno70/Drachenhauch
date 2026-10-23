@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2099,
+ "count": 2100,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -33,6 +33,7 @@
   "ARRAY_MAP": "new array with funktion(x) for each element, e.g. ARRAY_MAP(a, FUNCTION(x) x * 2)",
   "ARRAY_MAX": "smallest / largest element",
   "ARRAY_MIN": "smallest / largest element",
+  "ARRAY_OF_TYPE": "new array with the elements that are IS Typ, in their order. Typ is a type name as on the right of IS (a class including its subclasses, or a value type such as INTEGER); the result fits an ARRAY OF Typ",
   "ARRAY_POP": "remove and return the last element (not empty)",
   "ARRAY_PUSH": "append an element at the end; returns the new length",
   "ARRAY_REDUCE": "folds the array: funktion(bisher, x) for each element, starting with start",

@@ -1515,34 +1515,67 @@ impl<'p> Vm<'p> {
                 self.element_default(&ty)
             }));
         }
+        if name == "__array_of_type" { return self.array_of_type(a).map(Some); }
         if name != "__is_typ" { return Ok(None); }
         let gesucht = match a.get(1) {
             Some(Value::Str(s)) => s.to_string(),
             _ => return Err("IS: interner Fehler -- Typname fehlt".into()),
         };
         let wert = a.first().unwrap_or(&Value::Nil);
-        // Eine Klasse schlaegt den Werttyp-Vergleich: `x IS Gegner` fragt nach
-        // der Vererbungskette, nicht nach dem pauschalen "OBJECT".
-        if self.prog.classes.contains_key(&gesucht) {
-            let treffer = match wert {
+        Ok(Some(Value::Bool(self.ist_vom_typ(wert, &gesucht))))
+    }
+
+    /// `wert IS gesucht`: eine Klasse schlaegt den Werttyp-Vergleich -- `x IS
+    /// Gegner` fragt nach der Vererbungskette, nicht nach dem pauschalen
+    /// "OBJECT". Sonst der Werttyp (`x IS INTEGER`, `x IS NIL`, `x IS VEC2`).
+    fn ist_vom_typ(&self, wert: &Value, gesucht: &str) -> bool {
+        if self.prog.classes.contains_key(gesucht) {
+            return match wert {
                 Value::Instance(rc) => {
                     let mut cur: Option<String> = Some(rc.borrow().class_name.to_string());
-                    let mut ja = false;
                     while let Some(c) = cur {
-                        if c == gesucht { ja = true; break; }
+                        if c == gesucht { return true; }
                         cur = match self.prog.classes.get(c.as_str()) {
                             Some(ci) if !ci.parent_name.is_empty() => Some(ci.parent_name.to_string()),
                             _ => None,
                         };
                     }
-                    ja
+                    false
                 }
                 _ => false,
             };
-            return Ok(Some(Value::Bool(treffer)));
         }
-        // Sonst der Werttyp -- deckt `x IS INTEGER`, `x IS NIL`, `x IS VEC2` ab.
-        Ok(Some(Value::Bool(wert.type_name().eq_ignore_ascii_case(&gesucht))))
+        wert.type_name().eq_ignore_ascii_case(gesucht)
+    }
+
+    /// `ARRAY_OF_TYPE(feld, Typ)` (der Compiler emittiert
+    /// `__array_of_type(feld, "typ")`): ein NEUES Feld mit den Elementen, die
+    /// `IS Typ` sind, in ihrer Reihenfolge. Der Elementtyp des Ergebnisses ist
+    /// `Typ` -- es passt also an ein `ARRAY OF Typ`, auch wenn das Feld selbst
+    /// eine Vorfahrin als Elementtyp hat.
+    fn array_of_type(&self, a: &[Value]) -> R<Value> {
+        let gesucht = match a.get(1) {
+            Some(Value::Str(s)) => s.to_string(),
+            _ => return Err("ARRAY_OF_TYPE: interner Fehler -- Typname fehlt".into()),
+        };
+        let werte: Vec<Value> = match a.first() {
+            Some(Value::Array(x)) => {
+                let arr = x.borrow();
+                if arr.dims.len() != 1 {
+                    return Err("ARRAY_OF_TYPE: nur eindimensionale Felder".into());
+                }
+                arr.cells.to_values()
+            }
+            Some(Value::Tuple(t)) => t.to_vec(),
+            Some(andere) => return Err(format!(
+                "ARRAY_OF_TYPE: erwartet ein Feld oder TUPLE, erhalten {} -- Aufruf: ARRAY_OF_TYPE(feld, Typ)",
+                andere.type_name())),
+            None => return Err("ARRAY_OF_TYPE: erwartet ein Feld".into()),
+        };
+        let aus: Vec<Value> = werte.into_iter().filter(|v| self.ist_vom_typ(v, &gesucht)).collect();
+        let mut neu = DhArray::new(gesucht, vec![aus.len() as i64], || Value::Nil);
+        for (i, v) in aus.into_iter().enumerate() { neu.cells.set(i, v); }
+        Ok(Value::Array(Rc::new(RefCell::new(neu))))
     }
 
     // ------------------------------------------------------- Rueckrufe

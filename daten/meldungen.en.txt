@@ -320,9 +320,14 @@ BYREF-Parameter werden bei Coroutinen (Funktionen/Subs mit YIELD) nicht unterstu
 Default-Parameter muessen Literale sein (VM-Pfad)	Default parameters must be literals (VM path)
 DATA: '-' nur auf Zahlen	DATA: '-' only on numbers
 DATA: ungueltiges Literal	DATA: invalid literal
-IS: unbekannter Typ '{}' (keine Klasse, kein Werttyp)	IS: unknown type '{}' (not a class, not a value type)
+{}: unbekannter Typ '{}' (keine Klasse, kein Werttyp)	{}: unknown type '{}' (not a class, not a value type)
 IS: '{}' ist eine Variable, kein Typ -- IS prueft den Typ (x IS Klasse); ob zwei Variablen dasselbe Objekt meinen, sagt =	IS: '{}' is a variable, not a type -- IS checks the type (x IS Class); whether two variables refer to the same object is answered by =
-IS: unbekannter Typ '{}' -- fehlt ein IMPORT? (z.B. {})	IS: unknown type '{}' -- is an IMPORT missing? (e.g. {})
+{}: unbekannter Typ '{}' -- fehlt ein IMPORT? (z.B. {})	{}: unknown type '{}' -- is an IMPORT missing? (e.g. {})
+ARRAY_OF_TYPE: {} geht nicht -- gemeint ist der Typ der Elemente, eine Klasse oder ein Werttyp wie INTEGER	ARRAY_OF_TYPE: {} does not work -- what is meant is the type of the elements, a class or a value type such as INTEGER
+ARRAY_OF_TYPE: erwartet ein Feld oder TUPLE, erhalten {}	ARRAY_OF_TYPE: expected an array or TUPLE, got {}
+ARRAY_OF_TYPE: erwartet ein Feld	ARRAY_OF_TYPE: expected an array
+ARRAY_OF_TYPE: Erwartet ','	ARRAY_OF_TYPE: expected ','
+ARRAY_OF_TYPE: Erwartet ')'	ARRAY_OF_TYPE: expected ')'
 Unbekannter Typ '{}' (keine Klasse, kein Werttyp, kein importiertes Modul)	Unknown type '{}' (not a class, not a value type, not an imported module)
 Unbekannter Typ '{}' -- fehlt IMPORT "{}"?	Unknown type '{}' -- is IMPORT "{}" missing?
 Unbekannter Typ '{}' -- fehlt ein IMPORT? (z.B. {})	Unknown type '{}' -- is an IMPORT missing? (e.g. {})

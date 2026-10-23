@@ -2369,6 +2369,19 @@ impl Parser {
                     return Ok(Node::TernaryExpr { cond: Box::new(cond),
                         then_expr: Box::new(then_e), else_expr: Box::new(else_e) });
                 }
+                // `ARRAY_OF_TYPE(feld, Typ)`: das zweite Argument ist ein
+                // TYPNAME wie rechts von IS, kein Ausdruck. Es reist als
+                // `IsTyp` mit -- so schreibt namensraum.rs einen qualifizierten
+                // Namen (`kern.Bauteil`) um wie bei jedem IS.
+                if sval(&tok) == "array_of_type" && self.tt(1) == Tt::Lparen {
+                    self.pos += 2;
+                    let feld = self.expression()?;
+                    self.expect(Tt::Comma, "ARRAY_OF_TYPE: Erwartet ',' -- Aufruf: ARRAY_OF_TYPE(feld, Typ)")?;
+                    let typ = self.is_typname()?;
+                    self.expect(Tt::Rparen, "ARRAY_OF_TYPE: Erwartet ')' -- Aufruf: ARRAY_OF_TYPE(feld, Typ)")?;
+                    return Ok(Node::Call { callee: Box::new(Node::Identifier("array_of_type".into())),
+                        args: vec![feld, Node::IsTyp { wert: Box::new(Node::NilLit), typ }] });
+                }
                 self.pos += 1;
                 Ok(Node::Identifier(sval(&tok)))
             }
