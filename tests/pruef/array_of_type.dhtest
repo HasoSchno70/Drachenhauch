@@ -1,0 +1,221 @@
+' ARRAY_OF_TYPE(feld, Typ): die Elemente eines Typs als neues Feld, das an
+' ein ARRAY OF Typ passt (vm.rs array_of_type). Der Typname steht wie
+' rechts von IS; der Parser reicht ihn als IsTyp durch.
+
+=== unterklassen aus einem feld der vorfahrin
+CLASS Tier
+    DIM name AS STRING
+    SUB Init(n AS STRING)
+        name = n
+    END SUB
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+CLASS Katze EXTENDS Tier
+END CLASS
+CLASS Dackel EXTENDS Hund
+END CLASS
+DIM alle AS ARRAY OF Tier
+alle = [NEW Hund("rex"), NEW Katze("mia"), NEW Dackel("waldi"), NEW Hund("bello")]
+DIM hunde AS ARRAY OF Hund
+hunde = ARRAY_OF_TYPE(alle, Hund)
+FOR EACH h IN hunde
+    PRINT h.name
+NEXT
+PRINT LEN(ARRAY_OF_TYPE(alle, Katze)); " "; LEN(ARRAY_OF_TYPE(alle, Dackel)); " "; LEN(ARRAY_OF_TYPE(alle, Tier))
+--- erwartet
+rex
+waldi
+bello
+1 1 4
+
+=== das ergebnis ist ein neues feld
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+DIM alle AS ARRAY OF Tier
+alle = [NEW Hund()]
+DIM hunde AS ARRAY OF Hund
+hunde = ARRAY_OF_TYPE(alle, Hund)
+ARRAY_PUSH(hunde, NEW Hund())
+PRINT LEN(alle); " "; LEN(hunde)
+--- erwartet
+1 2
+
+=== nichts passt ergibt ein leeres feld des typs
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+DIM alle AS ARRAY OF Tier
+alle = [NEW Tier()]
+DIM hunde AS ARRAY OF Hund
+hunde = ARRAY_OF_TYPE(alle, Hund)
+PRINT LEN(hunde)
+ARRAY_PUSH(hunde, NEW Hund())
+PRINT LEN(hunde)
+--- erwartet
+0
+1
+
+=== das ergebnis traegt den typ und lehnt eine fremde klasse ab
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+CLASS Katze EXTENDS Tier
+END CLASS
+DIM alle AS ARRAY OF Tier
+alle = [NEW Hund(), NEW Katze()]
+DIM katzen AS ARRAY OF Katze
+katzen = ARRAY_OF_TYPE(alle, Hund)
+--- fehler
+Zuweisung an 'katzen': Erwartet ARRAY OF KATZE, erhalten ARRAY OF HUND
+
+=== werttypen aus einem gemischten feld
+DIM gemischt AS ARRAY OF ANY
+gemischt = [1, "zwei", 3, 4.5, TRUE]
+DIM z AS ARRAY OF INTEGER
+z = ARRAY_OF_TYPE(gemischt, INTEGER)
+PRINT LEN(z); " "; z[0] + z[1]
+DIM t AS ARRAY OF STRING
+t = ARRAY_OF_TYPE(gemischt, STRING)
+PRINT t[0]
+PRINT LEN(ARRAY_OF_TYPE(gemischt, FLOAT)); " "; LEN(ARRAY_OF_TYPE(gemischt, BOOLEAN))
+--- erwartet
+2 4
+zwei
+1 1
+
+=== auch aus einem tupel
+PRINT LEN(ARRAY_OF_TYPE((1, "a", "b", 2), STRING))
+--- erwartet
+2
+
+=== mit namensraum
+IMPORT "tiere.dh" AS zoo
+DIM alle AS ARRAY OF zoo.Tier
+DIM h AS zoo.Hund
+h = NEW zoo.Hund()
+h.name = "rex"
+alle = [NEW zoo.Tier(), h]
+DIM hunde AS ARRAY OF zoo.Hund
+hunde = ARRAY_OF_TYPE(alle, zoo.Hund)
+PRINT LEN(hunde); " "; hunde[0].name
+--- datei tiere.dh
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+    DIM name AS STRING
+END CLASS
+--- erwartet
+1 rex
+
+=== in einer schleife mit maschinencode
+CLASS Tier
+    DIM n AS INTEGER
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+DIM alle AS ARRAY OF Tier
+DIM i AS INTEGER
+FOR i = 1 TO 50
+    IF i MOD 2 = 0 THEN
+        ARRAY_PUSH(alle, NEW Hund())
+    ELSE
+        ARRAY_PUSH(alle, NEW Tier())
+    END IF
+NEXT
+DIM summe AS INTEGER
+FOR i = 1 TO 200
+    summe = summe + LEN(ARRAY_OF_TYPE(alle, Hund))
+NEXT
+PRINT summe
+--- erwartet
+5000
+
+=== ohne maschinencode genauso
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+DIM alle AS ARRAY OF Tier
+alle = [NEW Hund(), NEW Tier(), NEW Hund()]
+PRINT LEN(ARRAY_OF_TYPE(alle, Hund))
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+2
+
+=== unbekannter typ ist ein uebersetzungsfehler
+DIM a AS ARRAY OF INTEGER
+PRINT LEN(ARRAY_OF_TYPE(a, Gibtsnicht))
+--- fehler
+ARRAY_OF_TYPE: unbekannter Typ 'gibtsnicht' (keine Klasse, kein Werttyp)
+
+=== nil array und map sind keine elementtypen
+DIM a AS ARRAY OF INTEGER
+PRINT LEN(ARRAY_OF_TYPE(a, NIL))
+--- fehler
+ARRAY_OF_TYPE: NIL geht nicht
+
+=== kein feld ist ein laufzeitfehler
+DIM s AS STRING
+s = "abc"
+PRINT LEN(ARRAY_OF_TYPE(s, STRING))
+--- fehler
+ARRAY_OF_TYPE: erwartet ein Feld oder TUPLE, erhalten STRING
+
+=== zwei dimensionen gehen nicht
+DIM g[2, 2] AS INTEGER
+PRINT LEN(ARRAY_OF_TYPE(g, INTEGER))
+--- fehler
+ARRAY_OF_TYPE: nur eindimensionale Felder
+
+=== fehlender typ ist ein parse-fehler
+DIM a AS ARRAY OF INTEGER
+PRINT LEN(ARRAY_OF_TYPE(a))
+--- fehler
+ARRAY_OF_TYPE: Erwartet ','
+
+=== eine eigene funktion dieses namens bleibt moeglich
+FUNCTION array_of_type_x(n AS INTEGER) AS INTEGER
+    RETURN n * 2
+END FUNCTION
+PRINT array_of_type_x(4)
+--- erwartet
+8
+
+=== an eine zahl zugewiesen bricht ab
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+DIM alle AS ARRAY OF Tier
+alle = [NEW Hund()]
+DIM n AS INTEGER
+n = ARRAY_OF_TYPE(alle, Hund)
+--- fehler
+Erwartet INTEGER, erhalten ARRAY
+
+=== auf englisch
+DIM s AS STRING
+PRINT LEN(ARRAY_OF_TYPE(s, STRING))
+--- umgebung
+DHRT_LANG=en
+--- fehler
+ARRAY_OF_TYPE: expected an array or TUPLE, got STRING -- usage: ARRAY_OF_TYPE(feld, Typ)
+
+=== --check kennt den typ des ergebnisses
+' Die Warnung zitiert die Laufzeitmeldung -- dort heisst ein Feld ARRAY.
+DIM q AS STRING
+q = "CLASS Tier" + CHR$(10) + "END CLASS" + CHR$(10) + "CLASS Hund EXTENDS Tier" + CHR$(10) + "END CLASS" + CHR$(10)
+q = q + "DIM alle AS ARRAY OF Tier" + CHR$(10) + "DIM n AS INTEGER" + CHR$(10) + "n = ARRAY_OF_TYPE(alle, Hund)" + CHR$(10)
+DIM r AS STRING
+r = CODE_CHECK$(q)
+PRINT INSTR(r, "rechts steht ARRAY OF HUND") >= 0
+PRINT INSTR(r, "'Erwartet INTEGER, erhalten ARRAY'") >= 0
+--- erwartet
+TRUE
+TRUE

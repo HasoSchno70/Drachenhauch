@@ -76,7 +76,7 @@ FUNCTION phDatei(fassung AS STRING, b AS INTEGER, h AS INTEGER, stoff AS INTEGER
 END FUNCTION
 
 ' Alles, was der Leser aus einer Datei macht, als Text.
-SUB phZeigen(imp AS kern.PatImport)
+SUB phZeigen(imp AS kern.MusterImport)
     PRINT "fassung "; imp.fassung
     phMuster(imp.muster, imp.warnungen)
 END SUB

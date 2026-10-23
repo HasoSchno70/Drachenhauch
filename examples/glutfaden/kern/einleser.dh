@@ -1,0 +1,62 @@
+' Was die Einleser fremder Formate (OXS, PAT, XSD) gemeinsam haben: das
+' Ergebnis und, fuer die beiden binaeren Formate, das Lesen der Bytes.
+
+' Das Ergebnis eines Einlesens: das Muster, die Warnungen (krumme Eintraege
+' werden uebergangen und hier genannt, nicht als Fehler gemeldet -- wie im
+' Original), die Fassung, die die Datei nennt ("" bei OXS), und der
+' Formatname fuer die Anzeige (setzt fremdLaden).
+CLASS MusterImport
+    DIM muster AS Muster
+    DIM warnungen AS ARRAY OF STRING
+    DIM fassung AS STRING
+    DIM format AS STRING
+END CLASS
+
+' Die Leseposition in einer binaeren Datei; jeder Zugriff prueft das Ende.
+' Was je Format anders ist -- die Meldung am Dateiende, Texte, Farben --
+' steht in PatLeser (pat.dh) und XsdLeser (xsd.dh).
+CLASS BinLeser
+    DIM daten AS BUFFER
+    DIM p AS INTEGER
+
+    SUB Init(b AS BUFFER)
+        daten = b
+    END SUB
+
+    ' Die Datei endet vor dem naechsten Wert: mit der Meldung des Formats
+    ' abbrechen (THROW).
+    ABSTRACT SUB zuKurz()
+
+    SUB brauche(n AS INTEGER)
+        IF n < 0 OR p + n > BUFFER_LEN(daten) THEN zuKurz()
+    END SUB
+
+    FUNCTION u8() AS INTEGER
+        brauche(1)
+        p = p + 1
+        RETURN BUFFER_GET(daten, p - 1)
+    END FUNCTION
+
+    FUNCTION u16() AS INTEGER
+        brauche(2)
+        p = p + 2
+        RETURN BUFFER_GET_U16(daten, p - 2)
+    END FUNCTION
+
+    FUNCTION u32() AS INTEGER
+        brauche(4)
+        p = p + 4
+        RETURN BUFFER_GET_U32(daten, p - 4)
+    END FUNCTION
+
+    FUNCTION i32() AS INTEGER
+        brauche(4)
+        p = p + 4
+        RETURN BUFFER_GET_I32(daten, p - 4)
+    END FUNCTION
+
+    SUB ueber(n AS INTEGER)
+        brauche(n)
+        p = p + n
+    END SUB
+END CLASS

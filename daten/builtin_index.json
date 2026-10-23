@@ -153,6 +153,12 @@
    "module": "core"
   },
   {
+   "name": "ARRAY_OF_TYPE",
+   "kind": "core",
+   "signature": "ARRAY_OF_TYPE(arr, Typ) AS ARRAY",
+   "module": "core"
+  },
+  {
    "name": "ARRAY_FIND",
    "kind": "core",
    "signature": "ARRAY_FIND(arr: ?, funktion: FUNCREF) AS INTEGER",

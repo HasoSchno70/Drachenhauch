@@ -667,20 +667,28 @@ thread_local! {
     /// `Vm::new`. `coerce` ist eine freie Funktion und kennt das Programm
     /// nicht; ohne das Verzeichnis liesse sich ein Typname wie `tier` nicht
     /// von einem Modul-Typ wie `image` unterscheiden.
-    static KLASSEN: std::cell::RefCell<rustc_hash::FxHashSet<String>> =
+    ///
+    /// Je Klasse ihre Vorfahren (innen zuerst, ohne sie selbst) -- fuer ein
+    /// Feld, das an ein Feld der Vorfahrin geht (`coerce_array`).
+    static KLASSEN: std::cell::RefCell<rustc_hash::FxHashMap<String, Vec<String>>> =
         std::cell::RefCell::new(Default::default());
 }
 
-pub(crate) fn klassen_setzen<'a, I: IntoIterator<Item = &'a String>>(namen: I) {
+pub(crate) fn klassen_setzen<'a, I: IntoIterator<Item = (&'a String, &'a [String])>>(klassen: I) {
     KLASSEN.with(|k| {
         let mut k = k.borrow_mut();
         k.clear();
-        k.extend(namen.into_iter().cloned());
+        k.extend(klassen.into_iter().map(|(n, v)| (n.clone(), v.iter().filter(|x| *x != n).cloned().collect())));
     });
 }
 
 pub(crate) fn ist_klasse(name: &str) -> bool {
-    KLASSEN.with(|k| k.borrow().contains(name))
+    KLASSEN.with(|k| k.borrow().contains_key(name))
+}
+
+/// Stammt die Klasse `kind` von `basis` ab (und ist nicht dieselbe)?
+pub(crate) fn klasse_erbt(kind: &str, basis: &str) -> bool {
+    KLASSEN.with(|k| k.borrow().get(kind).is_some_and(|v| v.iter().any(|x| x == basis)))
 }
 
 /// Darf `value` in einen Platz vom Typ `target`? Fuer alles, was keine Klasse

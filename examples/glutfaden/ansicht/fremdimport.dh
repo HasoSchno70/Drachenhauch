@@ -10,7 +10,7 @@ DIM fiFlaeche AS INTEGER              ' Vorschau
 DIM fiWerte AS ARRAY OF INTEGER       ' Name, Groesse, Farben, Stiche, Format
 DIM fiRolle AS INTEGER                ' Meldungen (nur, wenn es welche gibt)
 DIM fiMeldungen AS INTEGER
-DIM fiErgebnis AS kern.FremdImport
+DIM fiErgebnis AS kern.MusterImport
 DIM fiPfad AS STRING
 DIM fiBild AS INTEGER                 ' cairo_surface_t der Vorschau, 0 = keins
 DIM fiPuffer AS BUFFER
@@ -86,7 +86,7 @@ SUB fremdImportDialog(pfad AS STRING)
     gtk_widget_hide(fiRolle)
     IF pfad <> "" THEN fiLaden(pfad)
     DIM a AS INTEGER : a = gtk_dialog_run(d)
-    DIM fi AS kern.FremdImport : fi = fiErgebnis
+    DIM fi AS kern.MusterImport : fi = fiErgebnis
     fiDialog = 0
     gtk_widget_destroy(d)
     IF fiBild <> 0 THEN cairo_surface_destroy(fiBild) : fiBild = 0

@@ -2,9 +2,11 @@
 
 > **Stand 22.10.2026: Weg B und Weg F sind gebaut** (Klassentypen werden
 > geprüft; der Maschinencode kennt mehrere Klassen an einer Stelle,
-> Abschnitt 4), Weg C bis E nicht. **Die Probe für Weg C ist gemacht**
-> (Abschnitt 5a): Die Funkenflug-Auswahl kam mit einer abstrakten
-> Basisklasse aus, `INTERFACE` wird vorerst nicht gebaut. Die Laufzeit nimmt in einem Platz vom Typ
+> Abschnitt 4), Weg C bis E nicht. **Die Proben für Weg C sind gemacht**
+> (Abschnitt 5a und 5b): Die Funkenflug-Auswahl und die Glutfaden-Einleser
+> kamen mit einer abstrakten Basisklasse aus, `INTERFACE` wird vorerst
+> nicht gebaut. Der Filter nach Typ aus der ersten Probe ist gebaut
+> (`ARRAY_OF_TYPE`). Die Laufzeit nimmt in einem Platz vom Typ
 > einer Klasse nur noch NIL und Instanzen der Klasse oder einer Unterklasse,
 > `--check` warnt, wo es sicher nie passt; Prüfsammlung
 > `tests/pruef/klassentypen.dhtest`. Im Bestand hat das nichts gebrochen
@@ -418,8 +420,9 @@ jetzt die eine Menge.
    angenommen.
 3. **Wiederholt bleibt, was eine Schnittstelle auch nicht beseitigt:** die
    vier Teilmengen `selB()` … `selBus()`. Sie unterscheiden sich nur im Typ.
-   Dafür fehlt ein Filter nach Typ (ein Befehl, der die Elemente einer
-   Klasse heraussucht, oder Generika), keine Schnittstelle.
+   Dafür fehlte ein Filter nach Typ, keine Schnittstelle. Er ist seither
+   gebaut: `ARRAY_OF_TYPE(gSel, kern.Bauteil)` liefert ein `ARRAY OF
+   kern.Bauteil`, die vier Funktionen haben je eine Zeile statt sieben.
 4. **Nicht in die Basisklasse ging der Rahmen-Test.** `bauteilBox` liegt in
    der Ansicht, weil die Größe eines Bauteils an seiner gezeichneten Grafik
    hängt. Eine Methode `imRahmen` am Element müsste die Ansicht kennen. Das
@@ -430,6 +433,35 @@ Weg A, also Basisklassen mit `ABSTRACT`. Neu aufgenommen wird die Frage,
 wenn ein Programm wirklich zwei Verträge für dieselbe Klasse braucht. Ein
 Kandidat sind die drei Einleser in Glutfaden, falls sie einmal eine echte
 Vorfahrin bekommen. Ein Filter nach Typ ist ein eigener, kleiner Punkt.
+
+## 5b. Zweite Probe: die Einleser in Glutfaden (23.10.2026)
+
+Zwei Doppelungen, beide ohne gemeinsamen Typ:
+
+* **Die Ergebnisse.** `OxsImport`, `PatImport`, `XsdImport` und
+  `FremdImport` trugen dieselben Felder (`muster`, `warnungen`, bei PAT und
+  XSD `fassung`, bei FremdImport `format`). `fremdLaden` kopierte sie
+  dreimal von Hand um.
+* **Die Byte-Leser.** `PatLeser` und `XsdLeser` führten dieselbe
+  Leseposition (`daten`, `p`, `brauche`, `u16`, `u32`, `ueber`). Nur die
+  Meldung am Dateiende, die Texte und die Farben unterscheiden sich.
+
+Umgebaut (`kern/einleser.dh`):
+
+* Ein Ergebnis `MusterImport` für alle drei Formate und für `fremdLaden`.
+  Es braucht keine Unterklassen, weil kein Format ein eigenes Feld hat;
+  `fremdLaden` setzt nur noch `format`.
+* `BinLeser` als Basisklasse mit `ABSTRACT SUB zuKurz()`. `PatLeser` und
+  `XsdLeser` erben davon und schreiben nur noch, was sie unterscheidet.
+  Die Meldung am Dateiende bleibt je Format eine eigene Methode, damit die
+  übersetzten Texte (`daten/sprache/en.txt`) unverändert gelten.
+
+Ergebnis: 114 Zeilen weniger, dazu die 62 von `einleser.dh`. Alle
+Glutfaden-Sammlungen bestehen wie vorher.
+
+**Auch hier kein zweiter Vertrag.** Ein Leser ist nur ein Leser, und ein
+Ergebnis nur ein Ergebnis. Was `INTERFACE` lösen würde, kam in beiden
+Proben nicht vor. Die Entscheidung aus 5a bleibt.
 
 ## 6. Offene Fragen an die Entscheidung
 

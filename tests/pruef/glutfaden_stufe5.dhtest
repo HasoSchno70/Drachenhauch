@@ -699,7 +699,7 @@ DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/pa
 DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
 ' Die eine bewusste Abweichung: ein Garn ohne Palette behaelt seinen Namen ohne
 ' "DMC TW1 - " davor (PySticky laesst ihn bei jedem Rundweg wachsen).
-DIM g AS kern.OxsImport : g = kern.oxsLaden("probe_pysticky.oxs", pal, sym)
+DIM g AS kern.MusterImport : g = kern.oxsLaden("probe_pysticky.oxs", pal, sym)
 PRINT "probe: "; geVergleich$(geMuster$(g.muster), geLies$("gelesen.txt")); " warnungen "; LEN(g.warnungen)
 ' bekannte Garne kommen aus der Palette (DMC 310 hat dort eine andere Farbe)
 PRINT "aus der palette: "; kern.farbeAlsHex$(g.muster.farben[0].garn.farbe); " blend "; g.muster.farben[3].garn.istBlend()
@@ -838,7 +838,7 @@ DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/pa
 DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
 ' Kommazahl-Koordinaten, unbekannter und doppelter palindex, kaputte Farbe und
 ' Index, Ornamente unter dem kurzen Namen, Rueckstich ausserhalb, fehlender Titel
-DIM g AS kern.OxsImport : g = kern.oxsLaden("krumm.oxs", pal, sym)
+DIM g AS kern.MusterImport : g = kern.oxsLaden("krumm.oxs", pal, sym)
 DIM t AS STRING : t = geMuster$(g.muster)
 DIM w AS STRING
 FOR EACH w IN g.warnungen
@@ -929,15 +929,15 @@ DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.t
 ' Palette (bei PySticky genauso). Ab dem ersten Lesen bleibt alles stehen.
 DIM m AS kern.Muster : m = kern.pxsLaden("probe.pxs")
 kern.oxsSpeichern(m, "eins.oxs")
-DIM g1 AS kern.OxsImport : g1 = kern.oxsLaden("eins.oxs", pal, sym)
+DIM g1 AS kern.MusterImport : g1 = kern.oxsLaden("eins.oxs", pal, sym)
 kern.oxsSpeichern(g1.muster, "zwei.oxs")
-DIM g2 AS kern.OxsImport : g2 = kern.oxsLaden("zwei.oxs", pal, sym)
+DIM g2 AS kern.MusterImport : g2 = kern.oxsLaden("zwei.oxs", pal, sym)
 PRINT "muster: "; geVergleich$(geMuster$(g1.muster), geMuster$(g2.muster))
 kern.oxsSpeichern(g2.muster, "drei.oxs")
 PRINT "datei: "; geVergleich$(geLies$("zwei.oxs"), geLies$("drei.oxs"))
 ' der Name eines Garns ohne Palette waechst nicht (bei PySticky schon)
 PRINT "name: "; g2.muster.farben[3].garn.name
-DIM g AS kern.OxsImport
+DIM g AS kern.MusterImport
 TRY
     g = kern.oxsLaden("probe.pxs", pal, sym)
 CATCH e

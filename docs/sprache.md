@@ -1350,6 +1350,43 @@ Herunter (`DIM h AS Hund : h = einTier`) geht, wenn in `einTier` wirklich
 ein Hund steckt; das entscheidet die Laufzeit. Bis Fassung 2026.33 reichte
 die Laufzeit Klassen ungeprüft durch.
 
+Alle Elemente einer Unterklasse aus einem Feld holt `ARRAY_OF_TYPE(feld,
+Typ)`. Rechts steht ein Typname wie bei `IS`, und das Ergebnis ist ein
+`ARRAY OF Typ` -- es passt also auch dort, wo das Feld selbst nur
+`ARRAY OF Tier` ist:
+
+```basic
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+CLASS Katze EXTENDS Tier
+END CLASS
+
+DIM alle AS ARRAY OF Tier
+alle = [NEW Hund(), NEW Katze(), NEW Hund()]
+DIM hunde AS ARRAY OF Hund
+hunde = ARRAY_OF_TYPE(alle, Hund)
+PRINT LEN(hunde)
+```
+
+Das Ergebnis ist 2.
+
+**Felder behalten ihren Elementtyp.** Ein Feld weiß zur Laufzeit, was es
+enthält, und prüft jeden Schreibzugriff selbst. Daraus folgt:
+
+* Ein Feld von Hunden passt an ein `ARRAY OF Tier`. Über den neuen Namen
+  kommt trotzdem keine Katze hinein, das Feld bleibt eines von Hunden.
+* Ein Feld von Tieren an ein `ARRAY OF Hund` geht nur, wenn wirklich
+  Hunde darin stehen.
+* Ein Literal mit Objekten (`[NEW Hund(), NEW Hund()]`) wird beim
+  Zuweisen Element für Element geprüft und nimmt dann den Elementtyp des
+  Ziels an. Bis Fassung 2026.33 ging `h = [NEW Katze()]` an ein
+  `ARRAY OF Hund` ungeprüft durch.
+
+`--check` warnt, wo ein Feld nie passen kann, etwa ein `ARRAY OF Hund` an
+ein `ARRAY OF Katze` oder ein `ARRAY OF STRING` an ein `ARRAY OF INTEGER`.
+
 **STRUCT** ist ein leichtgewichtiges Daten-Klassen-Substitut, das automatisch instanziert wird (kein `NEW` nötig):
 
 ```basic

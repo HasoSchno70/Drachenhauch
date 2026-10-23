@@ -404,6 +404,7 @@ Siehe auch [Sprachreferenz → Arrays](sprache.md#arrays).
 | `ARRAY_INDEXOF(arr, v)` → INTEGER | erster Index von v, sonst -1 |
 | `ARRAY_MAP(arr, funktion)` → ARRAY | neues Feld mit `funktion(x)` je Element, z.B. `ARRAY_MAP(a, FUNCTION(x) x * 2)` |
 | `ARRAY_FILTER(arr, funktion)` → ARRAY | neues Feld mit den Elementen, für die `funktion(x)` TRUE liefert (gleicher Elementtyp) |
+| `ARRAY_OF_TYPE(arr, Typ)` → ARRAY OF Typ | neues Feld mit den Elementen, die `IS Typ` sind, in ihrer Reihenfolge. `Typ` ist ein Typname wie rechts von `IS` (Klasse samt Unterklassen, oder ein Werttyp wie `INTEGER`); das Ergebnis passt an ein `ARRAY OF Typ` |
 | `ARRAY_REDUCE(arr, funktion, start)` | faltet das Feld: `funktion(bisher, x)` je Element, beginnend mit `start` |
 | `ARRAY_FIND(arr, funktion)` → INTEGER | Index des ersten Elements, für das `funktion(x)` TRUE liefert, sonst -1 |
 

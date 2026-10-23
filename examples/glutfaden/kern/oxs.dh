@@ -164,12 +164,7 @@ END SUB
 
 ' --- Lesen ---------------------------------------------------------------------------
 
-' Das Ergebnis eines Imports: das Muster und die Warnungen (krumme Eintraege
-' werden uebergangen, nicht gemeldet als Fehler -- wie im Original).
-CLASS OxsImport
-    DIM muster AS Muster
-    DIM warnungen AS ARRAY OF STRING
-END CLASS
+' Das Ergebnis ist ein MusterImport (einleser.dh).
 
 FUNCTION oxsWert$(k AS XML_HANDLE, tag AS STRING) AS STRING
     IF NOT XML_HAS(k, tag) THEN RETURN ""
@@ -237,8 +232,8 @@ FUNCTION oxsSymbol$(m AS Muster, symbole AS ARRAY OF STRING) AS STRING
     RETURN "#" + STR$(n)
 END FUNCTION
 
-FUNCTION oxsLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY OF STRING) AS OxsImport
-    DIM erg AS OxsImport : erg = NEW OxsImport()
+FUNCTION oxsLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY OF STRING) AS MusterImport
+    DIM erg AS MusterImport : erg = NEW MusterImport()
     erg.warnungen = []
     DIM x AS XML_HANDLE
     TRY
@@ -438,7 +433,7 @@ FUNCTION oxsLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
 END FUNCTION
 
 ' palindex -> Farbnummer; -1 = ueberspringen (Stoff still, Unbekanntes mit Warnung).
-FUNCTION oxsFarbe(pidx AS INTEGER, erg AS OxsImport, zuordnung AS MAP OF INTEGER, gesehen AS MAP OF BOOLEAN, gemeldet AS MAP OF BOOLEAN) AS INTEGER
+FUNCTION oxsFarbe(pidx AS INTEGER, erg AS MusterImport, zuordnung AS MAP OF INTEGER, gesehen AS MAP OF BOOLEAN, gemeldet AS MAP OF BOOLEAN) AS INTEGER
     IF MAPHAS(zuordnung, STR$(pidx)) THEN RETURN MAPGET(zuordnung, STR$(pidx))
     IF NOT MAPHAS(gesehen, STR$(pidx)) AND NOT MAPHAS(gemeldet, STR$(pidx)) THEN
         MAPPUT(gemeldet, STR$(pidx), TRUE)
@@ -463,7 +458,7 @@ SUB oxsSetzen(m AS Muster, eb AS Ebene, x AS INTEGER, y AS INTEGER, farbe AS INT
 END SUB
 
 ' Ein Abschnitt mit Zellstichen: welche = 0 voll, 1 halb, 2 viertel, 3 dreiviertel.
-SUB oxsStiche(x AS XML_HANDLE, abschnitt AS STRING, tag AS STRING, erg AS OxsImport, eb AS Ebene, zuordnung AS MAP OF INTEGER, gesehen AS MAP OF BOOLEAN, gemeldet AS MAP OF BOOLEAN, welche AS INTEGER)
+SUB oxsStiche(x AS XML_HANDLE, abschnitt AS STRING, tag AS STRING, erg AS MusterImport, eb AS Ebene, zuordnung AS MAP OF INTEGER, gesehen AS MAP OF BOOLEAN, gemeldet AS MAP OF BOOLEAN, welche AS INTEGER)
     IF NOT XML_HAS(x, abschnitt) THEN RETURN
     DIM s AS XML_HANDLE : s = XML_FIND(x, abschnitt)
     DIM i AS INTEGER

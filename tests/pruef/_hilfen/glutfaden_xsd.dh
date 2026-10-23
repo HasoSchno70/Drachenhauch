@@ -64,7 +64,7 @@ FUNCTION xhDatei(b AS INTEGER, h AS INTEGER, stoff AS INTEGER, titel AS STRING, 
     RETURN BUFFER_FROM_HEX(x)
 END FUNCTION
 
-SUB xhZeigen(imp AS kern.XsdImport)
+SUB xhZeigen(imp AS kern.MusterImport)
     PRINT "fassung "; imp.fassung
     phMuster(imp.muster, imp.warnungen)
 END SUB

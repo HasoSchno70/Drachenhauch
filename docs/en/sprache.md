@@ -1347,6 +1347,44 @@ Going down (`DIM h AS Hund : h = someAnimal`) works if `someAnimal` really
 holds a dog; the runtime decides that. Up to version 2026.33 the runtime
 passed classes through unchecked.
 
+`ARRAY_OF_TYPE(feld, Typ)` takes all elements of a subclass out of an array.
+The right-hand side is a type name as with `IS`, and the result is an
+`ARRAY OF Typ` -- so it fits even where the array itself is only
+`ARRAY OF Tier`:
+
+```basic
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+CLASS Katze EXTENDS Tier
+END CLASS
+
+DIM alle AS ARRAY OF Tier
+alle = [NEW Hund(), NEW Katze(), NEW Hund()]
+DIM hunde AS ARRAY OF Hund
+hunde = ARRAY_OF_TYPE(alle, Hund)
+PRINT LEN(hunde)
+```
+
+The result is 2.
+
+**Arrays keep their element type.** At runtime an array knows what it
+holds and checks every write itself. It follows that:
+
+* An array of dogs fits an `ARRAY OF Tier`. Even so, no cat gets in through
+  the new name; the array stays one of dogs.
+* An array of animals goes into an `ARRAY OF Hund` only if it really holds
+  dogs.
+* A literal with objects (`[NEW Hund(), NEW Hund()]`) is checked element by
+  element on assignment and then takes on the element type of the target.
+  Up to version 2026.33, `h = [NEW Katze()]` went into an `ARRAY OF Hund`
+  unchecked.
+
+`--check` warns where an array can never fit, for example an `ARRAY OF
+Hund` into an `ARRAY OF Katze` or an `ARRAY OF STRING` into an `ARRAY OF
+INTEGER`.
+
 **STRUCT** is a lightweight data-class substitute that is instantiated automatically (no `NEW` needed):
 
 ```basic

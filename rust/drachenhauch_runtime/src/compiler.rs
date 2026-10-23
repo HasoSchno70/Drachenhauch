@@ -1323,6 +1323,17 @@ impl Compiler {
 
     /// Typ so schreiben, wie er im Quelltext steht (`array:INTEGER` ->
     /// `ARRAY OF INTEGER`) -- die interne Schreibweise sagt einem Nutzer nichts.
+    /// Wie die LAUFZEIT den Typ eines Wertes nennt ("erhalten ..."): ein Feld
+    /// heisst dort ARRAY, eine MAP MAP -- ohne Elementtyp, anders als im
+    /// Quelltext. Die Warnungen zitieren die Laufzeitmeldung woertlich.
+    fn laufzeit_erhalten(t: &str, ziel: &str) -> String {
+        // An ein Feld nennt die Laufzeit den Elementtyp mit (coerce_array).
+        if t.starts_with("array:") && ziel.starts_with("array:") { return Self::typ_klartext(t); }
+        if t.starts_with("array:") { return "ARRAY".into(); }
+        if t.starts_with("map:") { return "MAP".into(); }
+        t.to_uppercase()
+    }
+
     fn typ_klartext(t: &str) -> String {
         // Gross geschrieben, weil der Compiler Typnamen klein ablegt, sie im
         // Quelltext aber ueberall gross stehen (DIM x AS INTEGER).
@@ -1383,6 +1394,10 @@ impl Compiler {
                 _ => return None,
             },
             Node::IsTyp { .. } => "boolean".to_string(),
+            Node::Call { callee, args } => match array_of_type_typ(callee, args) {
+                Some(typ) => format!("array:{}", typ.to_lowercase()),
+                None => return None,
+            },
             Node::BinaryOp { op, left, right } => match op.as_str() {
                 "=" | "<>" | "<" | ">" | "<=" | ">=" | "and" | "or" | "in" =>
                     "boolean".to_string(),
@@ -1495,6 +1510,10 @@ impl Compiler {
                 }
                 _ => Typ::Unbekannt,
             },
+            Node::Call { callee, args } if array_of_type_typ(callee, args).is_some() => {
+                let typ = array_of_type_typ(callee, args).unwrap_or_default().to_lowercase();
+                Typ::Feld(Box::new(angabe(&typ)))
+            }
             Node::Call { callee, args } => match &**callee {
                 Node::MemberAccess { target, name } => match self.typ_von(target) {
                     Typ::Klasse(k) => self.methode_rueckgabe(&k, name),
@@ -1727,13 +1746,42 @@ impl Compiler {
                     !self.stammt_ab(q, z) && !self.stammt_ab(z, q),
                 _ => false,
             },
-            _ => false,
+            z => match z.strip_prefix("array:") {
+                Some(e) => self.feld_passt_nie(quelle, e),
+                None => false,
+            },
+        }
+    }
+
+    /// Ein Wert vom Typ `quelle` an ein `ARRAY OF e` (coerce_array in vm.rs).
+    /// Ein Feld behaelt zur Laufzeit seinen Elementtyp; eine Variable `AS
+    /// ARRAY OF Hund` kann ein Feld von Hunden halten, eines einer
+    /// Unterklasse, oder ein ungetyptes, dessen Elemente beim Zuweisen
+    /// geprueft wurden. Gewarnt wird nur, wo keiner dieser Faelle passt.
+    fn feld_passt_nie(&self, quelle: &str, e: &str) -> bool {
+        let wert = |t: &str| matches!(t, "integer" | "float" | "string" | "boolean");
+        let bekannt = |t: &str| wert(t) || self.classes.contains_key(t);
+        if !bekannt(e) { return false; }
+        match quelle.strip_prefix("array:") {
+            Some(q) => {
+                if !bekannt(q) || q == e { return false; }
+                // Ein frisches Feld von Ganzzahlen wird an FLOAT umgebaut.
+                if q == "integer" && e == "float" { return false; }
+                // Herauf geht immer, herunter haengt am Inhalt.
+                if self.classes.contains_key(q) && self.classes.contains_key(e) {
+                    return !self.stammt_ab(q, e) && !self.stammt_ab(e, q);
+                }
+                true
+            }
+            // Kein Feld: eine Zahl, ein Text, ein Objekt passen nie.
+            None => bekannt(quelle) || quelle == "tuple" || quelle.starts_with("map:"),
         }
     }
 
     /// Was die Laufzeit in ihrer Meldung als erwartet nennt -- bei einer
     /// Klasse mit dem Zusatz, den `value::klasse_pruefen` schreibt.
     fn erwartet_text(&self, ziel: &str) -> String {
+        if ziel.starts_with("array:") { return Self::typ_klartext(ziel); }
         if self.classes.contains_key(ziel) {
             format!("{} (oder eine Unterklasse)", crate::namensraum::lesbar_text(&ziel.to_uppercase()))
         } else {
@@ -1753,6 +1801,8 @@ impl Compiler {
                 " Ein Vergleich wie `x > 0` liefert einen BOOLEAN.",
             ("boolean", z) if z == "integer" || z == "float" =>
                 " BOOLEAN ist in Drachenhauch keine Zahl -- mit IIF(b, 1, 0) umwandeln.",
+            (q, z) if q.starts_with("array:") && z.starts_with("array:") =>
+                " Ein Feld nimmt nur Felder seines Elementtyps oder einer Unterklasse davon; ARRAY_OF_TYPE holt die passenden Elemente heraus.",
             _ => "",
         }
     }
@@ -1773,7 +1823,7 @@ impl Compiler {
         self.warnings.push((zeile, format!(
             "'{}' ist als {} angesagt, rechts steht {}. Das bricht beim Laufen ab ('Erwartet {}, erhalten {}').{}",
             ziel, Self::typ_klartext(ziel_typ), Self::typ_klartext(&quelle),
-            erwartet, quelle.to_uppercase(),
+            erwartet, Self::laufzeit_erhalten(&quelle, ziel_typ),
             Self::typ_hinweis(&quelle, ziel_typ))));
     }
 
@@ -1844,7 +1894,7 @@ impl Compiler {
         self.warnings.push((zeile, format!(
             "Diese Funktion ist als {} angesagt, hier steht {} hinter RETURN. Das bricht beim Laufen ab ('Erwartet {}, erhalten {}').{}",
             Self::typ_klartext(&ziel), Self::typ_klartext(&quelle),
-            erwartet, quelle.to_uppercase(),
+            erwartet, Self::laufzeit_erhalten(&quelle, &ziel),
             Self::typ_hinweis(&quelle, &ziel))));
     }
 
@@ -1920,7 +1970,7 @@ impl Compiler {
             raus.push((self.ctx.cur_line, format!(
                 "{}: Parameter '{}' ist als {} angesagt, hier steht {}. Das bricht beim Laufen ab ('Erwartet {}, erhalten {}').{}",
                 wo, pname, Self::typ_klartext(ziel_typ), Self::typ_klartext(&quelle),
-                self.erwartet_text(ziel_typ), quelle.to_uppercase(),
+                self.erwartet_text(ziel_typ), Self::laufzeit_erhalten(&quelle, ziel_typ),
                 Self::typ_hinweis(&quelle, ziel_typ))));
         }
         raus
@@ -3062,7 +3112,7 @@ impl Compiler {
                     if self.ctx.local_slots.contains_key(t.as_str()) || self.global_slots.contains_key(t.as_str()) || self.is_field(&t) {
                         return Err(format!("IS: '{}' ist eine Variable, kein Typ -- IS prueft den Typ (x IS Klasse); ob zwei Variablen dasselbe Objekt meinen, sagt =", typ));
                     }
-                    return Err(unbekannter_is_typ_msg(typ));
+                    return Err(unbekannter_typ_msg("IS", typ));
                 }
                 self.expr(wert)?;
                 let c = self.ctx.add_const(json!(t));
@@ -3222,6 +3272,20 @@ impl Compiler {
     }
 
     fn expr_call(&mut self, callee: &Node, args: &[Node]) -> CR {
+        if let Some(typ) = array_of_type_typ(callee, args) {
+            let t = typ.to_lowercase();
+            if matches!(t.as_str(), "nil" | "array" | "map") {
+                return Err(format!("ARRAY_OF_TYPE: {} geht nicht -- gemeint ist der Typ der Elemente, eine Klasse oder ein Werttyp wie INTEGER", typ.to_uppercase()));
+            }
+            if !self.is_typname_bekannt(&t) {
+                return Err(unbekannter_typ_msg("ARRAY_OF_TYPE", typ));
+            }
+            self.expr(&args[0])?;
+            let c = self.ctx.add_const(json!(t));
+            self.ctx.emit(oc::LOAD_CONST, json!(c));
+            self.ctx.emit(oc::CALL_BUILTIN, json!(["__array_of_type", 2]));
+            return Ok(());
+        }
         // SIZEOF(typ) / OFFSETOF(struct, feld): feste Zahlen beim Uebersetzen.
         if let Node::Identifier(f) = callee {
             if (f == "sizeof" || f == "offsetof") && !self.ctx.local_slots.contains_key(f.as_str())
@@ -5731,13 +5795,24 @@ fn data_literal(lit: &Node) -> Result<CVal, String> {
 ///
 /// Ohne diese Pruefung waere ein Tippfehler (`x IS Gegnr`) still fuer immer
 /// FALSE -- ein Test, der nie zuschlaegt, faellt niemandem auf.
-fn unbekannter_is_typ_msg(typ: &str) -> String {
+/// `ARRAY_OF_TYPE(feld, Typ)` erkennen: der Parser legt den Typnamen als
+/// `IsTyp` mit leerem Wert ins zweite Argument (siehe parser.rs).
+fn array_of_type_typ<'a>(callee: &Node, args: &'a [Node]) -> Option<&'a str> {
+    match (callee, args) {
+        (Node::Identifier(f), [_, Node::IsTyp { wert, typ }])
+            if f == "array_of_type" && matches!(**wert, Node::NilLit) => Some(typ.as_str()),
+        _ => None,
+    }
+}
+
+/// `wer` ist IS oder ARRAY_OF_TYPE -- beide nehmen einen Typnamen.
+fn unbekannter_typ_msg(wer: &str, typ: &str) -> String {
     let mods = crate::preprocess::modules_for_type(&typ.to_lowercase());
     if mods.is_empty() {
-        format!("IS: unbekannter Typ '{}' (keine Klasse, kein Werttyp)", typ)
+        format!("{}: unbekannter Typ '{}' (keine Klasse, kein Werttyp)", wer, typ)
     } else {
         let list = mods.iter().map(|m| format!("\"{}\"", m)).collect::<Vec<_>>().join(", ");
-        format!("IS: unbekannter Typ '{}' -- fehlt ein IMPORT? (z.B. {})", typ, list)
+        format!("{}: unbekannter Typ '{}' -- fehlt ein IMPORT? (z.B. {})", wer, typ, list)
     }
 }
 
