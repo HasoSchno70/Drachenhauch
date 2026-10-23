@@ -1619,10 +1619,10 @@ impl<'p> Vm<'p> {
     /// Lambda kommen seine kopierten Locals VOR die Argumente.
     fn rueckruf_exec(&mut self, cb: &crate::value::Rueckruf, f: &'p Func, empf: &Option<Value>,
                      args: Vec<Value>) -> R<Value> {
-        if cb.vorab.is_empty() { return self.exec(f, args, empf.clone()); }
+        if cb.vorab.is_empty() { return self.exec(f, args, empf.clone()).map_err(|e| Self::param_von(e, f)); }
         let mut alle = cb.vorab.clone();
         alle.extend(args);
-        self.exec(f, alle, empf.clone())
+        self.exec(f, alle, empf.clone()).map_err(|e| Self::param_von(e, f))
     }
 
     /// Fuer Rueckrufe aus einer fremden Bibliothek (ffi.rs): einen
@@ -3064,6 +3064,23 @@ impl<'p> Vm<'p> {
     /// einen frischen Fehler (`run_frame`).
     #[cold]
     #[inline(never)]
+    /// Ein Aufruf ueber einen WERT (FUNCREF, gebundene Methode, Lambda): an
+    /// der Aufrufstelle steht kein Name, den `fehler_benennen` lesen koennte --
+    /// darum benennt CALL_VALUE den Parameter selbst, solange es die gerufene
+    /// Funktion noch kennt. Nur im Fehlerfall.
+    #[cold]
+    #[inline(never)]
+    fn param_von(e: String, tgt: &Func) -> String {
+        let Some(rest) = e.strip_prefix("Parameter #") else { return e };
+        let (zahl, rest) = rest.split_at(rest.find(':').unwrap_or(rest.len()));
+        let Ok(n) = zahl.parse::<usize>() else { return e };
+        let Some(p) = tgt.local_names.get(n) else { return e };
+        if tgt.name.starts_with("__lambda") {
+            return format!("Parameter '{}' einer Lambda-Funktion{}", p, rest);
+        }
+        format!("Parameter '{}' von {}{}", p, crate::namensraum::lesbar_text(&tgt.name), rest)
+    }
+
     fn fehler_benennen(&self, e: String, fn_: &Func, i: usize) -> String {
         let Some(ins) = fn_.code.get(i) else { return e };
         // "Parameter #n: ..." aus bind_params: der aufrufende Befehl nennt die
@@ -4455,7 +4472,7 @@ impl<'p> Vm<'p> {
                             if tgt.is_coroutine {
                                 stack.push(make_coro(tgt, call_args, None));
                             } else {
-                                let ret = self.exec(tgt, call_args, None)?;
+                                let ret = self.exec(tgt, call_args, None).map_err(|e| Self::param_von(e, tgt))?;
                                 if !tgt.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
                             }
                         }
@@ -4478,7 +4495,7 @@ impl<'p> Vm<'p> {
                             if tgt.is_coroutine {
                                 stack.push(make_coro(tgt, call_args, Some(recv)));
                             } else {
-                                let ret = self.exec(tgt, call_args, Some(recv))?;
+                                let ret = self.exec(tgt, call_args, Some(recv)).map_err(|e| Self::param_von(e, tgt))?;
                                 if !tgt.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
                             }
                         }
@@ -4488,7 +4505,7 @@ impl<'p> Vm<'p> {
                                 .ok_or_else(|| format!("FUNCREF: Funktion '{}' existiert nicht (mehr)", c.0))?;
                             let mut alle = c.1.clone();
                             alle.extend(call_args);
-                            let ret = self.exec(tgt, alle, None)?;
+                            let ret = self.exec(tgt, alle, None).map_err(|e| Self::param_von(e, tgt))?;
                             if !tgt.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
                         }
                         other => return Err(format!(

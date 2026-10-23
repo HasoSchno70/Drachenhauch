@@ -51,8 +51,8 @@ h.nimm(a)
 Parameter 't' von nimm: Erwartet TIER (oder eine Unterklasse), erhalten AUTO
 
 === parameter ueber funcref
-' Ueber eine FUNCREF ist an der Stelle nicht bekannt, welche Funktion
-' gerufen wird -- dann bleibt es bei der Nummer.
+' Ueber eine FUNCREF steht an der Aufrufstelle kein Name -- CALL_VALUE
+' benennt den Parameter selbst (vm.rs param_von).
 SUB f(t AS STRING)
 END SUB
 DIM r AS FUNCREF
@@ -61,7 +61,38 @@ DIM x AS INTEGER
 x = 1
 r(x)
 --- fehler
-Parameter 1: Erwartet STRING, erhalten INTEGER
+Parameter 't' von f: Erwartet STRING, erhalten INTEGER
+
+=== parameter ueber eine gebundene methode
+CLASS Hund
+    SUB bellen(laut AS INTEGER)
+    END SUB
+END CLASS
+DIM h AS Hund
+h = NEW Hund()
+DIM r AS FUNCREF
+r = h.bellen
+r("sehr")
+--- fehler
+Parameter 'laut' von bellen: Erwartet INTEGER, erhalten STRING
+
+=== parameter einer lambda-funktion
+DIM r AS FUNCREF
+r = FUNCTION(n AS INTEGER) n * 2
+PRINT r("drei")
+--- fehler
+Parameter 'n' einer Lambda-Funktion: Erwartet INTEGER, erhalten STRING
+
+=== parameter in einem rueckruf
+FUNCTION doppelt(n AS INTEGER) AS INTEGER
+    RETURN n * 2
+END FUNCTION
+DIM a AS ARRAY OF ANY
+a = [1, "zwei"]
+DIM b AS ARRAY OF ANY
+b = ARRAY_MAP(a, doppelt)
+--- fehler
+Parameter 'n' von doppelt: Erwartet INTEGER, erhalten STRING
 
 === rueckgabe einer funktion
 FUNCTION finde() AS INTEGER

@@ -393,6 +393,7 @@ ein ganzes Thema setzt GUI_THEME_PRESET("{}"); GUI_THEME nimmt nur die Akzentfar
 {}: FLOAT {} passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden	{}: FLOAT {} does not fit into INTEGER without loss -- use \ instead of / for integer division, otherwise round with INT()/ROUND()
 Parameter {}	parameter {}
 Parameter '{}' von {}	parameter '{}' of {}
+Parameter '{}' einer Lambda-Funktion	parameter '{}' of a lambda function
 RETURN von {}	RETURN of {}
 Zuweisung an '{}'	assignment to '{}'
 Zuweisung an {}.{}	assignment to {}.{}
