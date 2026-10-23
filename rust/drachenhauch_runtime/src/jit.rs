@@ -606,24 +606,33 @@ extern "C" fn feld_lesen_f(k: *mut Kontext, obj: u64, platz: u64) -> f64 {
 }
 
 /// Ein Zahlenfeld schreiben; den Wert hat der Maschinencode schon in die Art
-/// des Feldes gewandelt (`art` 1 INTEGER, 3 BOOLEAN).
+/// des Feldes gewandelt (`art` 1 INTEGER, 3 BOOLEAN). Hat das Feld schon die
+/// Art, wird es an seinem Platz ueberschrieben; im Journal (Methode, siehe
+/// `Kontext::journal`) steht dann der alte Wert als Zahl, ohne Austausch.
 extern "C" fn feld_setzen_i(k: *mut Kontext, obj: u64, platz: u64, art: u64, w: i64) {
-    if unsafe { (*k).journal }.is_null() {
-        if let Ok(mut b) = objekt(obj).try_borrow_mut() {
-            match (b.fields.get_mut(platz as usize), art) {
-                (Some(Value::Int(x)), 1) => { *x = w; return; }
-                (Some(Value::Bool(x)), 3) => { *x = w != 0; return; }
-                _ => {}
-            }
+    if let Ok(mut b) = objekt(obj).try_borrow_mut() {
+        let alt = match (b.fields.get_mut(platz as usize), art) {
+            (Some(Value::Int(x)), 1) => { let a = Value::Int(*x); *x = w; Some(a) }
+            (Some(Value::Bool(x)), 3) => { let a = Value::Bool(*x); *x = w != 0; Some(a) }
+            _ => None,
+        };
+        if let Some(alt) = alt {
+            let j = unsafe { (*k).journal };
+            if !j.is_null() { unsafe { (*j).push((obj, platz, alt)); } }
+            return;
         }
     }
     feld_setzen(k, obj, platz, if art == 3 { Value::Bool(w != 0) } else { Value::Int(w) });
 }
 
 extern "C" fn feld_setzen_f(k: *mut Kontext, obj: u64, platz: u64, w: f64) {
-    if unsafe { (*k).journal }.is_null() {
-        if let Ok(mut b) = objekt(obj).try_borrow_mut() {
-            if let Some(Value::Float(x)) = b.fields.get_mut(platz as usize) { *x = w; return; }
+    if let Ok(mut b) = objekt(obj).try_borrow_mut() {
+        if let Some(Value::Float(x)) = b.fields.get_mut(platz as usize) {
+            let alt = *x;
+            *x = w;
+            let j = unsafe { (*k).journal };
+            if !j.is_null() { unsafe { (*j).push((obj, platz, Value::Float(alt))); } }
+            return;
         }
     }
     feld_setzen(k, obj, platz, Value::Float(w));
