@@ -1328,7 +1328,10 @@ impl Compiler {
     /// Quelltext. Die Warnungen zitieren die Laufzeitmeldung woertlich.
     fn laufzeit_erhalten(t: &str, ziel: &str) -> String {
         // An ein Feld nennt die Laufzeit den Elementtyp mit (coerce_array).
-        if t.starts_with("array:") && ziel.starts_with("array:") { return Self::typ_klartext(t); }
+        if (t.starts_with("array:") && ziel.starts_with("array:")) || (t.starts_with("map:") && ziel.starts_with("map:")) {
+            return Self::typ_klartext(t);
+        }
+        if t.starts_with("map:") { return "MAP".into(); }
         if t.starts_with("array:") { return "ARRAY".into(); }
         if t.starts_with("map:") { return "MAP".into(); }
         t.to_uppercase()
@@ -1396,7 +1399,7 @@ impl Compiler {
             Node::IsTyp { .. } => "boolean".to_string(),
             Node::Call { callee, args } => match array_of_type_typ(callee, args) {
                 Some(typ) => format!("array:{}", typ.to_lowercase()),
-                None => return None,
+                None => self.aufruf_rueckgabe_text(callee)?,
             },
             Node::BinaryOp { op, left, right } => match op.as_str() {
                 "=" | "<>" | "<" | ">" | "<=" | ">=" | "and" | "or" | "in" =>
@@ -1576,6 +1579,16 @@ impl Compiler {
     /// gerufen wird. Eine Abkoemmlingin kann sie ueberschreiben -- steht dort
     /// ein anderer Typ, weiss man es erst zur Laufzeit.
     fn methode_rueckgabe(&self, klasse: &str, m: &str) -> Typ {
+        match self.methode_rueckgabe_text(klasse, m) {
+            Some(t) => Typ::aus_angabe(&t, &|k| self.classes.contains_key(k)),
+            None => Typ::Unbekannt,
+        }
+    }
+
+    /// Der angesagte Rueckgabetyp einer Methode, wie ihn `klasse` sieht --
+    /// nur, wenn jede Ueberschreibung darunter dasselbe verspricht (sonst
+    /// None). Keine Coroutine, kein SUB.
+    fn methode_rueckgabe_text(&self, klasse: &str, m: &str) -> Option<String> {
         let low = m.to_lowercase();
         let sig_in = |ci: &ClassInfo| ci.method_sigs.get(m).or_else(|| ci.method_sigs.get(&low))
             .map(|s| (s.is_coroutine, s.return_type.clone()));
@@ -1587,17 +1600,53 @@ impl Compiler {
             if let Some(s) = sig_in(ci) { eigene = Some(s); break; }
             cur = if ci.parent_name.is_empty() { None } else { Some(ci.parent_name.clone()) };
         }
-        let Some(eigene) = eigene else { return Typ::Unbekannt };
+        let eigene = eigene?;
         // ... und jede Ueberschreibung darunter muss dasselbe versprechen.
         for (name, ci) in &self.classes {
             if name != klasse && self.stammt_ab(name, klasse) {
                 if let Some(s) = sig_in(ci) {
-                    if s.0 != eigene.0 || !s.1.eq_ignore_ascii_case(&eigene.1) { return Typ::Unbekannt; }
+                    if s.0 != eigene.0 || !s.1.eq_ignore_ascii_case(&eigene.1) { return None; }
                 }
             }
         }
-        if eigene.0 || eigene.1.is_empty() { return Typ::Unbekannt; }
-        Typ::aus_angabe(&eigene.1, &|k| self.classes.contains_key(k))
+        if eigene.0 || eigene.1.is_empty() || eigene.1 == "any" { return None; }
+        Some(eigene.1)
+    }
+
+    /// Der angesagte Rueckgabetyp eines Aufrufs einer EIGENEN Funktion oder
+    /// Methode (fuer `statischer_typ`, also die Warnungen). Die Laufzeit
+    /// wandelt jedes RETURN auf diesen Typ, darum gilt er fuer das Ergebnis.
+    /// Befehle und FUNCREF-Variablen: None.
+    fn aufruf_rueckgabe_text(&self, callee: &Node) -> Option<String> {
+        let t = match callee {
+            Node::Identifier(f) => {
+                if self.ctx.local_slots.contains_key(f.as_str())
+                    || self.global_slots.contains_key(f.as_str()) || self.is_field(f) {
+                    return None;
+                }
+                let low = f.to_lowercase();
+                if let Some(k) = self.ctx.current_class.as_deref() {
+                    if self.resolve_method(k, f) || self.resolve_method(k, &low) {
+                        return self.methode_rueckgabe_text(k, f).map(|t| self.typ_norm(&t));
+                    }
+                }
+                if let Some(d) = self.ffi_decls.get(&low) {
+                    if d.rueck.is_empty() { return None; }
+                    d.rueck.clone()
+                } else {
+                    let sig = self.fn_sigs.get(f.as_str()).or_else(|| self.fn_sigs.get(&low))?;
+                    if sig.is_coroutine || sig.return_type.is_empty() { return None; }
+                    sig.return_type.clone()
+                }
+            }
+            Node::MemberAccess { target, name } => {
+                let k = self.statischer_typ(target)?;
+                if !self.classes.contains_key(&k) { return None; }
+                self.methode_rueckgabe_text(&k, name)?
+            }
+            _ => return None,
+        };
+        if t.is_empty() || t == "any" { None } else { Some(self.typ_norm(&t)) }
     }
 
     /// Stammt `kind` von `basis` ab (oder ist es dieselbe Klasse)?
@@ -1746,9 +1795,10 @@ impl Compiler {
                     !self.stammt_ab(q, z) && !self.stammt_ab(z, q),
                 _ => false,
             },
-            z => match z.strip_prefix("array:") {
-                Some(e) => self.feld_passt_nie(quelle, e),
-                None => false,
+            z => match (z.strip_prefix("array:"), z.strip_prefix("map:")) {
+                (Some(e), _) => self.feld_passt_nie(quelle, e, "array:"),
+                (_, Some(e)) => self.feld_passt_nie(quelle, e, "map:"),
+                _ => false,
             },
         }
     }
@@ -1758,20 +1808,22 @@ impl Compiler {
     /// Ergebnis), eines hinter einer Variable bricht ab. Darum nur bei einem
     /// Namen oder Feld eines Objekts -- `f = [1, 2]` bleibt still.
     fn ganzzahlfeld_an_float(quelle: &str, ziel: &str, wert: &Node) -> bool {
-        quelle == "array:integer" && ziel == "array:float"
+        ((quelle == "array:integer" && ziel == "array:float") || (quelle == "map:integer" && ziel == "map:float"))
             && matches!(wert, Node::Identifier(_) | Node::MemberAccess { .. })
     }
 
-    /// Ein Wert vom Typ `quelle` an ein `ARRAY OF e` (coerce_array in vm.rs).
-    /// Ein Feld behaelt zur Laufzeit seinen Elementtyp; eine Variable `AS
-    /// ARRAY OF Hund` kann ein Feld von Hunden halten, eines einer
-    /// Unterklasse, oder ein ungetyptes, dessen Elemente beim Zuweisen
-    /// geprueft wurden. Gewarnt wird nur, wo keiner dieser Faelle passt.
-    fn feld_passt_nie(&self, quelle: &str, e: &str) -> bool {
+    /// Ein Wert vom Typ `quelle` an ein `ARRAY OF e` bzw. eine `MAP OF e`
+    /// (`art` "array:" oder "map:"; coerce_array/coerce_map in vm.rs). Ein
+    /// Feld behaelt zur Laufzeit seinen Elementtyp; eine Variable `AS ARRAY
+    /// OF Hund` kann ein Feld von Hunden halten, eines einer Unterklasse,
+    /// oder ein ungetyptes, dessen Elemente beim Zuweisen geprueft wurden.
+    /// Gewarnt wird nur, wo keiner dieser Faelle passt. Fuer eine MAP gilt
+    /// dasselbe mit ihren Werten.
+    fn feld_passt_nie(&self, quelle: &str, e: &str, art: &str) -> bool {
         let wert = |t: &str| matches!(t, "integer" | "float" | "string" | "boolean");
         let bekannt = |t: &str| wert(t) || self.classes.contains_key(t);
         if !bekannt(e) { return false; }
-        match quelle.strip_prefix("array:") {
+        match quelle.strip_prefix(art) {
             Some(q) => {
                 if !bekannt(q) || q == e { return false; }
                 // Ein frisches Feld von Ganzzahlen wird an FLOAT umgebaut.
@@ -1782,15 +1834,17 @@ impl Compiler {
                 }
                 true
             }
-            // Kein Feld: eine Zahl, ein Text, ein Objekt passen nie.
-            None => bekannt(quelle) || quelle == "tuple" || quelle.starts_with("map:"),
+            // Nicht dieselbe Art: eine Zahl, ein Text, ein Objekt, ein Tupel,
+            // ein Feld an eine MAP oder eine MAP an ein Feld passen nie.
+            None => bekannt(quelle) || quelle == "tuple"
+                || quelle.starts_with("map:") || quelle.starts_with("array:"),
         }
     }
 
     /// Was die Laufzeit in ihrer Meldung als erwartet nennt -- bei einer
     /// Klasse mit dem Zusatz, den `value::klasse_pruefen` schreibt.
     fn erwartet_text(&self, ziel: &str) -> String {
-        if ziel.starts_with("array:") { return Self::typ_klartext(ziel); }
+        if ziel.starts_with("array:") || ziel.starts_with("map:") { return Self::typ_klartext(ziel); }
         if self.classes.contains_key(ziel) {
             format!("{} (oder eine Unterklasse)", crate::namensraum::lesbar_text(&ziel.to_uppercase()))
         } else {
@@ -1812,6 +1866,10 @@ impl Compiler {
                 " BOOLEAN ist in Drachenhauch keine Zahl -- mit IIF(b, 1, 0) umwandeln.",
             ("array:integer", "array:float") =>
                 " Umgebaut wird nur ein frisches Feld; sonst ARRAY_MAP(feld, FUNCTION(x) FLT(x)) oder gleich ein ARRAY OF FLOAT.",
+            ("map:integer", "map:float") =>
+                " Umgebaut wird nur eine frische MAP; sonst gleich eine MAP OF FLOAT anlegen.",
+            (q, z) if q.starts_with("map:") && z.starts_with("map:") =>
+                " Eine MAP nimmt nur MAPs ihres Werttyps oder einer Unterklasse davon.",
             (q, z) if q.starts_with("array:") && z.starts_with("array:") =>
                 " Ein Feld nimmt nur Felder seines Elementtyps oder einer Unterklasse davon; ARRAY_OF_TYPE holt die passenden Elemente heraus.",
             _ => "",
