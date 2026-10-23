@@ -52,37 +52,10 @@ SUB umschalten(e AS kern.Element)
 END SUB
 
 ' Die Teilmengen einer Art, in der Reihenfolge des Waehlens.
-FUNCTION selB() AS ARRAY OF kern.Bauteil
-    DIM r AS ARRAY OF kern.Bauteil
-    FOR EACH e IN gSel
-        IF e IS kern.Bauteil THEN ARRAY_PUSH(r, e)
-    NEXT
-    RETURN r
-END FUNCTION
-
-FUNCTION selL() AS ARRAY OF kern.Label
-    DIM r AS ARRAY OF kern.Label
-    FOR EACH e IN gSel
-        IF e IS kern.Label THEN ARRAY_PUSH(r, e)
-    NEXT
-    RETURN r
-END FUNCTION
-
-FUNCTION selD() AS ARRAY OF kern.Draht
-    DIM r AS ARRAY OF kern.Draht
-    FOR EACH e IN gSel
-        IF e IS kern.Draht THEN ARRAY_PUSH(r, e)
-    NEXT
-    RETURN r
-END FUNCTION
-
-FUNCTION selBus() AS ARRAY OF kern.Bus
-    DIM r AS ARRAY OF kern.Bus
-    FOR EACH e IN gSel
-        IF e IS kern.Bus THEN ARRAY_PUSH(r, e)
-    NEXT
-    RETURN r
-END FUNCTION
+FUNCTION selB() AS ARRAY OF kern.Bauteil : RETURN ARRAY_OF_TYPE(gSel, kern.Bauteil) : END FUNCTION
+FUNCTION selL() AS ARRAY OF kern.Label : RETURN ARRAY_OF_TYPE(gSel, kern.Label) : END FUNCTION
+FUNCTION selD() AS ARRAY OF kern.Draht : RETURN ARRAY_OF_TYPE(gSel, kern.Draht) : END FUNCTION
+FUNCTION selBus() AS ARRAY OF kern.Bus : RETURN ARRAY_OF_TYPE(gSel, kern.Bus) : END FUNCTION
 
 ' Die Einzel-Auswahl aus der Menge ableiten (nur bei genau einem Element).
 ' Ein Draht aus Rahmen oder Umschalt-Klick hat kein Segment (-1 = ganz).
