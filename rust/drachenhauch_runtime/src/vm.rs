@@ -3059,11 +3059,6 @@ impl<'p> Vm<'p> {
         }
     }
 
-    /// Eine Meldung von `coerce` um den Namen ergaenzen, den der fehlgeschlagene
-    /// Befehl kennt (lokaler/globaler Platz, Funktion bei RETURN). Nur fuer
-    /// einen frischen Fehler (`run_frame`).
-    #[cold]
-    #[inline(never)]
     /// Ein Aufruf ueber einen WERT (FUNCREF, gebundene Methode, Lambda): an
     /// der Aufrufstelle steht kein Name, den `fehler_benennen` lesen koennte --
     /// darum benennt CALL_VALUE den Parameter selbst, solange es die gerufene
@@ -3081,6 +3076,11 @@ impl<'p> Vm<'p> {
         format!("Parameter '{}' von {}{}", p, crate::namensraum::lesbar_text(&tgt.name), rest)
     }
 
+    /// Eine Meldung von `coerce` um den Namen ergaenzen, den der fehlgeschlagene
+    /// Befehl kennt (lokaler/globaler Platz, Funktion bei RETURN). Nur fuer
+    /// einen frischen Fehler (`run_frame`).
+    #[cold]
+    #[inline(never)]
     fn fehler_benennen(&self, e: String, fn_: &Func, i: usize) -> String {
         let Some(ins) = fn_.code.get(i) else { return e };
         // "Parameter #n: ..." aus bind_params: der aufrufende Befehl nennt die
