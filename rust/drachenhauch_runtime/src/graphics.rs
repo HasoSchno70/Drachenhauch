@@ -285,6 +285,23 @@ const MAX_LIGHTS: usize = 4;
 ///
 /// Diese 711 ms sind die Obergrenze, und sie faellt nur dort an, wo es ohne
 /// die Schleife STILL schiefgegangen waere.
+/// Eine Zwischenablage nur fuer diesen Prozess (`DHRT_ZWISCHENABLAGE=privat`).
+///
+/// `dhrt test` setzt das fuer jedes Programm, das es startet: die Pruefungen
+/// der IDE und der Werkzeuge "tippen" ueber CLIPBOARD_SET und Strg+V, weil
+/// eine Aufnahme keine Zeichen einspeist -- und die Zwischenablage des
+/// Systems gibt es nur einmal. Zwei Faelle zugleich fuegten den Text des
+/// anderen ein; darum liefen diese Sammlungen nacheinander (`--- seriell`),
+/// 84 % der Zeit eines vollen Laufs. Mit einer eigenen Ablage je Prozess
+/// duerfen sie parallel laufen. Wer die echte Ablage prueft, setzt in
+/// `--- umgebung` `DHRT_ZWISCHENABLAGE=system`.
+fn private_ablage() -> Option<&'static std::sync::Mutex<String>> {
+    static ABLAGE: std::sync::OnceLock<Option<std::sync::Mutex<String>>> = std::sync::OnceLock::new();
+    ABLAGE.get_or_init(|| {
+        (std::env::var("DHRT_ZWISCHENABLAGE").as_deref() == Ok("privat")).then(|| std::sync::Mutex::new(String::new()))
+    }).as_ref()
+}
+
 const CLIP_VERSUCHE: u32 = 4;
 const CLIP_WARTE_MS: u64 = 150;
 
@@ -3910,7 +3927,10 @@ impl Graphics {
             .to_str().ok().map(|s| s.to_owned())
     }
 
-    pub fn clipboard_get(&self) -> String { Self::clipboard_text_roh().unwrap_or_default() }
+    pub fn clipboard_get(&self) -> String {
+        if let Some(p) = private_ablage() { return p.lock().map(|t| t.clone()).unwrap_or_default(); }
+        Self::clipboard_text_roh().unwrap_or_default()
+    }
 
     /// Text in die Systemzwischenablage legen -- mit Zuruecklesen und
     /// Wiederholen; liefert FALSE, wenn er danach nicht darin steht.
@@ -3928,6 +3948,11 @@ impl Graphics {
     /// Markierung als seriell reicht dagegen nicht: getroffen wurde auch eine
     /// Sammlung, die bereits `--- seriell` trug.
     pub fn clipboard_set(&mut self, s: &str) -> bool {
+        if let Some(p) = private_ablage() {
+            if s.contains('\0') { return false; }
+            if let Ok(mut t) = p.lock() { *t = s.to_string(); }
+            return true;
+        }
         for versuch in 0..CLIP_VERSUCHE {
             // Ein Nullbyte im Text ist kein Wettlauf, sondern ein Inhalt, den
             // die Zwischenablage nie annehmen wird -- da hilft Wiederholen

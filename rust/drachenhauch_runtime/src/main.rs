@@ -1161,6 +1161,60 @@ fn zeitgrenze_meldung(sek: u64, was: &str, lauf: &TestLauf) -> String {
     m
 }
 
+/// Wie viele Faelle zugleich laufen, ueber alle Sammlungen zusammen.
+fn test_plaetze() -> usize {
+    std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(1, 8)
+}
+
+/// Der gemeinsame Vorrat an Plaetzen (`platz_nehmen`). Seit 2026.35 laufen
+/// die Sammlungen ohne `--- seriell` nebeneinander; jede startet weiter bis zu
+/// acht Faelle, aber erst ein freier Platz laesst einen Fall wirklich laufen.
+struct Plaetze { frei: std::sync::Mutex<usize>, cv: std::sync::Condvar }
+
+struct Platz;
+
+impl Drop for Platz {
+    fn drop(&mut self) {
+        let p = plaetze();
+        *p.frei.lock().unwrap() += 1;
+        p.cv.notify_one();
+    }
+}
+
+fn plaetze() -> &'static Plaetze {
+    static P: std::sync::OnceLock<Plaetze> = std::sync::OnceLock::new();
+    P.get_or_init(|| Plaetze { frei: std::sync::Mutex::new(test_plaetze()), cv: std::sync::Condvar::new() })
+}
+
+fn platz_nehmen() -> Platz {
+    let p = plaetze();
+    let mut frei = p.frei.lock().unwrap();
+    while *frei == 0 { frei = p.cv.wait(frei).unwrap(); }
+    *frei -= 1;
+    Platz
+}
+
+/// Bilanz einer Sammlung: die Zeilen fuer die Ausgabe und (ok, fehl, ueber,
+/// Fehler-Datei?). Als ein Block, damit Sammlungen, die nebeneinander laufen,
+/// ihre Zeilen nicht ineinander schieben.
+fn sammlung_bericht(name: &str, r: Result<(usize, usize, usize, Vec<String>), String>, dauer: f64)
+    -> (String, usize, usize, usize, bool)
+{
+    match r {
+        Ok((ok, fehl, ueber, meldungen)) => {
+            let zusatz = if ueber > 0 { format!(", {} uebersprungen", ueber) } else { String::new() };
+            let mut s = if fehl > 0 {
+                format!("  FEHLER  {}  ({} von {} Faellen{}, {:.2}s)\n", name, fehl, ok + fehl + ueber, zusatz, dauer)
+            } else {
+                format!("  ok      {}  ({} Faelle{}, {:.2}s)\n", name, ok + ueber, zusatz, dauer)
+            };
+            for m in meldungen { s.push_str(&format!("          {}\n", m)); }
+            (s, ok, fehl, ueber, fehl > 0)
+        }
+        Err(e) => (format!("  FEHLER  {}  ({})\n", name, e), 0, 0, 0, true),
+    }
+}
+
 fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option<&str>, genau: bool,
                    grenze_vorgabe: Option<u64>)
     -> Result<(usize, usize, usize, Vec<String>), String>
@@ -1193,9 +1247,7 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
         Arc::new(Mutex::new(vec![None; faelle.len()]));
     // `--- seriell` im Kopf: die Faelle teilen sich etwas, das es nur einmal
     // gibt (Zwischenablage, fester Port, Soundkarte) -- dann einer nach dem anderen.
-    let faeden = if seriell { 1 } else {
-        std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(1, 8).min(faelle.len())
-    };
+    let faeden = if seriell { 1 } else { test_plaetze().min(faelle.len()) };
     let mut griffe = Vec::new();
     for _ in 0..faeden {
         let (faelle, naechster, ergebnisse) = (faelle.clone(), naechster.clone(), ergebnisse.clone());
@@ -1210,6 +1262,9 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
             let frist = grenze.map(|s| std::time::Instant::now() + std::time::Duration::from_secs(s));
             let dir = wurzel.join(format!("fall_{}", i));
             let _ = std::fs::create_dir_all(&dir);
+            // Ein Platz aus dem gemeinsamen Vorrat (`test_plaetze`): Sammlungen
+            // laufen nebeneinander, zusammen aber nie mehr Faelle als Plaetze.
+            let _platz = platz_nehmen();
             let erg = (|| {
                 if let Some(systeme) = &f.system {
                     if !pruefsammlung::system_passt(systeme) {
@@ -1294,7 +1349,11 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         .env_remove("DHRT_LANG")
                         // Fenster ohne echte Tastatur/Maus (stillfenster.rs): wer
                         // waehrend des Laufs tippt, schreibt sonst in einen Fall.
-                        .env("DHRT_OHNE_EINGABE", "1");
+                        .env("DHRT_OHNE_EINGABE", "1")
+                        // Eine Zwischenablage je Prozess (graphics.rs
+                        // private_ablage): Faelle, die ueber Strg+V tippen,
+                        // laufen sonst nur nacheinander.
+                        .env("DHRT_ZWISCHENABLAGE", "privat");
                     if let Some(b) = &f.bild {
                         if b.datei.is_none() {
                             cmd.env("DHRT_SCREENSHOT", dir.join("bild.png"));
@@ -1314,7 +1373,8 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         .current_dir(&dir)
                         .stdin(std::process::Stdio::null())
                         .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
-                        .env_remove("DHRT_LANG").env("DHRT_OHNE_EINGABE", "1");
+                        .env_remove("DHRT_LANG").env("DHRT_OHNE_EINGABE", "1")
+                        .env("DHRT_ZWISCHENABLAGE", "privat");
                     let l = test_lauf(cmd, None, frist).map_err(|e| format!("{}: {}", name, e))?;
                     if l.abgelaufen {
                         return Err(zeitgrenze_meldung(grenze.unwrap_or(0), &format!("--- {}", name.trim_end_matches(".dh")), &l));
@@ -1523,40 +1583,63 @@ fn test_main(args: &[String]) -> ExitCode {
     let mut fehler = 0usize;
     let mut ausgelassen: Vec<String> = Vec::new();
     let (mut faelle_ok, mut faelle_fehl, mut faelle_ueber) = (0usize, 0usize, 0usize);
+    // Sammlungen ohne `--- seriell` laufen nebeneinander und teilen sich die
+    // Plaetze (`platz_nehmen`); wer seriell ist, teilt sich etwas, das es nur
+    // einmal gibt (Port, Fenster im Vordergrund, echte Zwischenablage), und
+    // laeuft danach allein. Bis 2026.34 lief eine Sammlung nach der anderen --
+    // die 100 seriellen hielten den vollen Lauf auf ueber 38 Minuten.
+    let mut parallel: Vec<std::path::PathBuf> = Vec::new();
+    let mut danach: Vec<std::path::PathBuf> = Vec::new();
     for d in &dateien {
+        let name = d.display().to_string();
+        if !name.ends_with(SAMMLUNG_ENDUNG) { danach.push(d.clone()); continue; }
+        let kopf = std::fs::read_to_string(d).ok().and_then(|t| pruefsammlung::sammlung_parsen(&t).ok());
+        if schnell && kopf.as_ref().map_or(false, |s| s.langsam) {
+            ausgelassen.push(name);
+            continue;
+        }
+        if kopf.as_ref().map_or(false, |s| s.seriell) { danach.push(d.clone()); } else { parallel.push(d.clone()); }
+    }
+    {
+        use std::sync::{Mutex, atomic::{AtomicUsize, Ordering}};
+        let naechste = AtomicUsize::new(0);
+        let stand = Mutex::new((0usize, 0usize, 0usize, 0usize));
+        let (exe, filter, parallel) = (&exe, &filter, &parallel);
+        std::thread::scope(|s| {
+            for _ in 0..test_plaetze().min(parallel.len()) {
+                s.spawn(|| loop {
+                    let i = naechste.fetch_add(1, Ordering::SeqCst);
+                    let Some(d) = parallel.get(i) else { break };
+                    let t0 = std::time::Instant::now();
+                    let r = sammlung_laufen(exe, d, filter.as_deref(), genau, grenze);
+                    let (text, ok, fehl, ueber, f) = sammlung_bericht(&d.display().to_string(), r, t0.elapsed().as_secs_f64());
+                    let mut st = stand.lock().unwrap();
+                    print!("{}", text);
+                    let _ = std::io::stdout().flush();
+                    st.0 += ok; st.1 += fehl; st.2 += ueber; if f { st.3 += 1; }
+                });
+            }
+        });
+        let st = stand.into_inner().unwrap();
+        faelle_ok += st.0; faelle_fehl += st.1; faelle_ueber += st.2; fehler += st.3;
+    }
+    for d in &danach {
         let t0 = std::time::Instant::now();
         let name = d.display().to_string();
         if name.ends_with(SAMMLUNG_ENDUNG) {
-            if schnell && std::fs::read_to_string(d).ok()
-                .and_then(|t| pruefsammlung::sammlung_parsen(&t).ok())
-                .map_or(false, |s| s.langsam) {
-                ausgelassen.push(name);
-                continue;
-            }
-            match sammlung_laufen(&exe, d, filter.as_deref(), genau, grenze) {
-                Ok((ok, fehl, ueber, meldungen)) => {
-                    let dauer = t0.elapsed().as_secs_f64();
-                    faelle_ok += ok; faelle_fehl += fehl; faelle_ueber += ueber;
-                    let zusatz = if ueber > 0 { format!(", {} uebersprungen", ueber) } else { String::new() };
-                    if fehl > 0 {
-                        fehler += 1;
-                        println!("  FEHLER  {}  ({} von {} Faellen{}, {:.2}s)", name, fehl, ok + fehl + ueber, zusatz, dauer);
-                    } else {
-                        println!("  ok      {}  ({} Faelle{}, {:.2}s)", name, ok + ueber, zusatz, dauer);
-                    }
-                    for m in meldungen { println!("          {}", m); }
-                }
-                Err(e) => {
-                    fehler += 1;
-                    println!("  FEHLER  {}  ({})", name, e);
-                }
-            }
+            let r = sammlung_laufen(&exe, d, filter.as_deref(), genau, grenze);
+            let (text, ok, fehl, ueber, f) = sammlung_bericht(&name, r, t0.elapsed().as_secs_f64());
+            print!("{}", text);
+            let _ = std::io::stdout().flush();
+            faelle_ok += ok; faelle_fehl += fehl; faelle_ueber += ueber;
+            if f { fehler += 1; }
             continue;
         }
         let mut cmd = std::process::Command::new(&exe);
         cmd.arg("run").arg(d)
             .stdin(std::process::Stdio::null())
-            .env_remove("DHRT_LANG").env("DHRT_OHNE_EINGABE", "1");
+            .env_remove("DHRT_LANG").env("DHRT_OHNE_EINGABE", "1")
+            .env("DHRT_ZWISCHENABLAGE", "privat");
         let r = test_lauf(cmd, None, grenze.map(|s| t0 + std::time::Duration::from_secs(s)));
         let dauer = t0.elapsed().as_secs_f64();
         let name = d.display().to_string();
