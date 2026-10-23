@@ -1369,6 +1369,22 @@ PRINT LEN(hunde)
 
 The result is 2.
 
+**Arrays keep their element type.** At runtime an array knows what it
+holds and checks every write itself. It follows that:
+
+* An array of dogs fits an `ARRAY OF Tier`. Even so, no cat gets in through
+  the new name; the array stays one of dogs.
+* An array of animals goes into an `ARRAY OF Hund` only if it really holds
+  dogs.
+* A literal with objects (`[NEW Hund(), NEW Hund()]`) is checked element by
+  element on assignment and then takes on the element type of the target.
+  Up to version 2026.33, `h = [NEW Katze()]` went into an `ARRAY OF Hund`
+  unchecked.
+
+`--check` warns where an array can never fit, for example an `ARRAY OF
+Hund` into an `ARRAY OF Katze` or an `ARRAY OF STRING` into an `ARRAY OF
+INTEGER`.
+
 **STRUCT** is a lightweight data-class substitute that is instantiated automatically (no `NEW` needed):
 
 ```basic

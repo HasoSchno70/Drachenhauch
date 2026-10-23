@@ -1326,7 +1326,9 @@ impl Compiler {
     /// Wie die LAUFZEIT den Typ eines Wertes nennt ("erhalten ..."): ein Feld
     /// heisst dort ARRAY, eine MAP MAP -- ohne Elementtyp, anders als im
     /// Quelltext. Die Warnungen zitieren die Laufzeitmeldung woertlich.
-    fn laufzeit_erhalten(t: &str) -> String {
+    fn laufzeit_erhalten(t: &str, ziel: &str) -> String {
+        // An ein Feld nennt die Laufzeit den Elementtyp mit (coerce_array).
+        if t.starts_with("array:") && ziel.starts_with("array:") { return Self::typ_klartext(t); }
         if t.starts_with("array:") { return "ARRAY".into(); }
         if t.starts_with("map:") { return "MAP".into(); }
         t.to_uppercase()
@@ -1744,13 +1746,42 @@ impl Compiler {
                     !self.stammt_ab(q, z) && !self.stammt_ab(z, q),
                 _ => false,
             },
-            _ => false,
+            z => match z.strip_prefix("array:") {
+                Some(e) => self.feld_passt_nie(quelle, e),
+                None => false,
+            },
+        }
+    }
+
+    /// Ein Wert vom Typ `quelle` an ein `ARRAY OF e` (coerce_array in vm.rs).
+    /// Ein Feld behaelt zur Laufzeit seinen Elementtyp; eine Variable `AS
+    /// ARRAY OF Hund` kann ein Feld von Hunden halten, eines einer
+    /// Unterklasse, oder ein ungetyptes, dessen Elemente beim Zuweisen
+    /// geprueft wurden. Gewarnt wird nur, wo keiner dieser Faelle passt.
+    fn feld_passt_nie(&self, quelle: &str, e: &str) -> bool {
+        let wert = |t: &str| matches!(t, "integer" | "float" | "string" | "boolean");
+        let bekannt = |t: &str| wert(t) || self.classes.contains_key(t);
+        if !bekannt(e) { return false; }
+        match quelle.strip_prefix("array:") {
+            Some(q) => {
+                if !bekannt(q) || q == e { return false; }
+                // Ein frisches Feld von Ganzzahlen wird an FLOAT umgebaut.
+                if q == "integer" && e == "float" { return false; }
+                // Herauf geht immer, herunter haengt am Inhalt.
+                if self.classes.contains_key(q) && self.classes.contains_key(e) {
+                    return !self.stammt_ab(q, e) && !self.stammt_ab(e, q);
+                }
+                true
+            }
+            // Kein Feld: eine Zahl, ein Text, ein Objekt passen nie.
+            None => bekannt(quelle) || quelle == "tuple" || quelle.starts_with("map:"),
         }
     }
 
     /// Was die Laufzeit in ihrer Meldung als erwartet nennt -- bei einer
     /// Klasse mit dem Zusatz, den `value::klasse_pruefen` schreibt.
     fn erwartet_text(&self, ziel: &str) -> String {
+        if ziel.starts_with("array:") { return Self::typ_klartext(ziel); }
         if self.classes.contains_key(ziel) {
             format!("{} (oder eine Unterklasse)", crate::namensraum::lesbar_text(&ziel.to_uppercase()))
         } else {
@@ -1770,6 +1801,8 @@ impl Compiler {
                 " Ein Vergleich wie `x > 0` liefert einen BOOLEAN.",
             ("boolean", z) if z == "integer" || z == "float" =>
                 " BOOLEAN ist in Drachenhauch keine Zahl -- mit IIF(b, 1, 0) umwandeln.",
+            (q, z) if q.starts_with("array:") && z.starts_with("array:") =>
+                " Ein Feld nimmt nur Felder seines Elementtyps oder einer Unterklasse davon; ARRAY_OF_TYPE holt die passenden Elemente heraus.",
             _ => "",
         }
     }
@@ -1790,7 +1823,7 @@ impl Compiler {
         self.warnings.push((zeile, format!(
             "'{}' ist als {} angesagt, rechts steht {}. Das bricht beim Laufen ab ('Erwartet {}, erhalten {}').{}",
             ziel, Self::typ_klartext(ziel_typ), Self::typ_klartext(&quelle),
-            erwartet, Self::laufzeit_erhalten(&quelle),
+            erwartet, Self::laufzeit_erhalten(&quelle, ziel_typ),
             Self::typ_hinweis(&quelle, ziel_typ))));
     }
 
@@ -1861,7 +1894,7 @@ impl Compiler {
         self.warnings.push((zeile, format!(
             "Diese Funktion ist als {} angesagt, hier steht {} hinter RETURN. Das bricht beim Laufen ab ('Erwartet {}, erhalten {}').{}",
             Self::typ_klartext(&ziel), Self::typ_klartext(&quelle),
-            erwartet, Self::laufzeit_erhalten(&quelle),
+            erwartet, Self::laufzeit_erhalten(&quelle, &ziel),
             Self::typ_hinweis(&quelle, &ziel))));
     }
 
@@ -1937,7 +1970,7 @@ impl Compiler {
             raus.push((self.ctx.cur_line, format!(
                 "{}: Parameter '{}' ist als {} angesagt, hier steht {}. Das bricht beim Laufen ab ('Erwartet {}, erhalten {}').{}",
                 wo, pname, Self::typ_klartext(ziel_typ), Self::typ_klartext(&quelle),
-                self.erwartet_text(ziel_typ), Self::laufzeit_erhalten(&quelle),
+                self.erwartet_text(ziel_typ), Self::laufzeit_erhalten(&quelle, ziel_typ),
                 Self::typ_hinweis(&quelle, ziel_typ))));
         }
         raus

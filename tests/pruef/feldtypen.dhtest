@@ -1,0 +1,147 @@
+' Felder mit Elementtyp: was an ein ARRAY OF X darf (vm.rs coerce_array,
+' any_feld_annehmen) und wo --check warnt (compiler.rs feld_passt_nie).
+' Ein Feld behaelt zur Laufzeit seinen Elementtyp und prueft jeden
+' Schreibzugriff selbst.
+
+=== ein literal mit objekten wird geprueft
+CLASS Hund
+END CLASS
+CLASS Katze
+END CLASS
+DIM h AS ARRAY OF Hund
+h = [NEW Katze()]
+--- fehler
+Zuweisung an 'h': Element 0: Erwartet HUND (oder eine Unterklasse), erhalten KATZE
+
+=== ein passendes literal nimmt den elementtyp an
+CLASS Hund
+END CLASS
+CLASS Katze
+END CLASS
+DIM h AS ARRAY OF Hund
+h = [NEW Hund(), NEW Hund()]
+PRINT LEN(h)
+ARRAY_PUSH(h, NEW Katze())
+--- fehler
+ARRAY_PUSH: Erwartet HUND (oder eine Unterklasse), erhalten KATZE
+
+=== ein gemischtes literal an zahlen
+DIM n AS ARRAY OF INTEGER
+n = [1, "zwei"]
+--- fehler
+Zuweisung an 'n': Element 1: Erwartet INTEGER, erhalten STRING
+
+=== ganzzahlen und kommazahlen an float
+DIM f AS ARRAY OF FLOAT
+f = [1, 2.5]
+PRINT f[0] + f[1]
+--- erwartet
+3.5
+
+=== feld einer unterklasse an ein feld der vorfahrin
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+CLASS Katze EXTENDS Tier
+END CLASS
+DIM h AS ARRAY OF Hund
+ARRAY_PUSH(h, NEW Hund())
+DIM t AS ARRAY OF Tier
+t = h
+PRINT LEN(t)
+' Das Feld bleibt eines von Hunden -- ueber t kommt keine Katze hinein.
+ARRAY_PUSH(t, NEW Katze())
+--- fehler
+ARRAY_PUSH: Erwartet HUND (oder eine Unterklasse), erhalten KATZE
+
+=== herunter haengt am inhalt
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+DIM h AS ARRAY OF Hund
+ARRAY_PUSH(h, NEW Hund())
+DIM t AS ARRAY OF Tier
+t = h
+DIM h2 AS ARRAY OF Hund
+h2 = t
+PRINT LEN(h2)
+DIM t2 AS ARRAY OF Tier
+ARRAY_PUSH(t2, NEW Tier())
+h2 = t2
+--- fehler
+Zuweisung an 'h2': Erwartet ARRAY OF HUND, erhalten ARRAY OF TIER
+
+=== geteiltes feld ohne typ bleibt offen
+CLASS Hund
+END CLASS
+DIM roh AS ARRAY OF ANY
+roh = [NEW Hund()]
+DIM h AS ARRAY OF Hund
+h = roh
+' roh ist weiter ARRAY OF ANY: dort darf alles hinein.
+ARRAY_PUSH(roh, 5)
+PRINT LEN(h)
+--- erwartet
+2
+
+=== ohne maschinencode genauso
+CLASS Hund
+END CLASS
+CLASS Katze
+END CLASS
+DIM h AS ARRAY OF Hund
+h = [NEW Katze()]
+--- umgebung
+DHRT_JIT=aus
+--- fehler
+Zuweisung an 'h': Element 0: Erwartet HUND (oder eine Unterklasse), erhalten KATZE
+
+=== als parameter
+CLASS Hund
+END CLASS
+CLASS Katze
+END CLASS
+SUB zeige(h AS ARRAY OF Hund)
+    PRINT LEN(h)
+END SUB
+zeige([NEW Hund()])
+zeige([NEW Katze()])
+--- fehler
+Parameter 'h' von zeige: Element 0: Erwartet HUND (oder eine Unterklasse), erhalten KATZE
+
+=== check warnt bei feldern die nie passen
+' Hund und Katze sind nicht verwandt, STRING ist keine Zahl, eine Zahl
+' ist kein Feld; die Warnung zitiert die Meldung der Laufzeit.
+DIM q AS STRING
+DIM nl AS STRING : nl = CHR$(10)
+q = "CLASS Tier" + nl + "END CLASS" + nl + "CLASS Hund EXTENDS Tier" + nl + "END CLASS" + nl
+q = q + "CLASS Katze EXTENDS Tier" + nl + "END CLASS" + nl
+q = q + "DIM h AS ARRAY OF Hund" + nl + "DIM k AS ARRAY OF Katze" + nl + "k = h" + nl
+q = q + "DIM s AS ARRAY OF STRING" + nl + "DIM z AS ARRAY OF INTEGER" + nl + "z = s" + nl
+q = q + "s = 5" + nl
+DIM r AS STRING
+r = CODE_CHECK$(q)
+PRINT INSTR(r, "'Erwartet ARRAY OF KATZE, erhalten ARRAY OF HUND'") >= 0
+PRINT INSTR(r, "'Erwartet ARRAY OF INTEGER, erhalten ARRAY OF STRING'") >= 0
+PRINT INSTR(r, "'Erwartet ARRAY OF STRING, erhalten INTEGER'") >= 0
+PRINT INSTR(r, "ARRAY_OF_TYPE holt die passenden Elemente heraus") >= 0
+--- erwartet
+TRUE
+TRUE
+TRUE
+TRUE
+
+=== check bleibt still wo es passen kann
+' Herauf, herunter (haengt am Inhalt), ANY, INTEGER an FLOAT (ein frisches
+' Feld wird umgebaut).
+DIM q AS STRING
+DIM nl AS STRING : nl = CHR$(10)
+q = "CLASS Tier" + nl + "END CLASS" + nl + "CLASS Hund EXTENDS Tier" + nl + "END CLASS" + nl
+q = q + "DIM h AS ARRAY OF Hund" + nl + "DIM t AS ARRAY OF Tier" + nl + "t = h" + nl + "h = t" + nl
+q = q + "DIM a AS ARRAY OF ANY" + nl + "h = a" + nl + "a = h" + nl
+q = q + "DIM z AS ARRAY OF INTEGER" + nl + "DIM f AS ARRAY OF FLOAT" + nl + "f = z" + nl
+PRINT CODE_CHECK$(q)
+--- erwartet
+[]

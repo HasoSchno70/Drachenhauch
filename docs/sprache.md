@@ -1372,6 +1372,21 @@ PRINT LEN(hunde)
 
 Das Ergebnis ist 2.
 
+**Felder behalten ihren Elementtyp.** Ein Feld weiß zur Laufzeit, was es
+enthält, und prüft jeden Schreibzugriff selbst. Daraus folgt:
+
+* Ein Feld von Hunden passt an ein `ARRAY OF Tier`. Über den neuen Namen
+  kommt trotzdem keine Katze hinein, das Feld bleibt eines von Hunden.
+* Ein Feld von Tieren an ein `ARRAY OF Hund` geht nur, wenn wirklich
+  Hunde darin stehen.
+* Ein Literal mit Objekten (`[NEW Hund(), NEW Hund()]`) wird beim
+  Zuweisen Element für Element geprüft und nimmt dann den Elementtyp des
+  Ziels an. Bis Fassung 2026.33 ging `h = [NEW Katze()]` an ein
+  `ARRAY OF Hund` ungeprüft durch.
+
+`--check` warnt, wo ein Feld nie passen kann, etwa ein `ARRAY OF Hund` an
+ein `ARRAY OF Katze` oder ein `ARRAY OF STRING` an ein `ARRAY OF INTEGER`.
+
 **STRUCT** ist ein leichtgewichtiges Daten-Klassen-Substitut, das automatisch instanziert wird (kein `NEW` nötig):
 
 ```basic
