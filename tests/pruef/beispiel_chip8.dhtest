@@ -316,7 +316,20 @@ vorbei: leben 0 wartet TRUE fehler []
 ' das Innere der Null ist dunkel.
 DIM p AS INTEGER
 p = PROCESS_START("dhrt", "bild", ARG$(0), CWD$() + "/chip8.png", "30")
-WHILE PROCESS_RUNNING(p) : SLEEP(20) : WEND
+DIM aus AS STRING : aus = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+    aus = aus + teil
+    IF teil = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+    SLEEP(20)
+WEND
+' Ohne Fenster (Bau ohne Grafik, kein Bildschirm) steht die Meldung in
+' der Ausgabe, und der Laeufer ueberspringt den Fall.
+IF NOT FILEEXISTS("chip8.png") THEN
+    PRINT aus
+    EXIT(1)
+END IF
 PRINT "rueckgabe "; PROCESS_CODE(p)
 --- argumente
 {sammlung}/../../examples/chip8/main.dh
@@ -338,7 +351,20 @@ FOR k = 0 TO 11 : BUFFER_SET(b, k, bytes[k]) : NEXT
 WRITEALL_BYTES(CWD$() + "/acht.ch8", b)
 DIM p AS INTEGER
 p = PROCESS_START("dhrt", "bild", ARG$(0), CWD$() + "/acht.png", "20", "--", CWD$() + "/acht.ch8")
-WHILE PROCESS_RUNNING(p) : SLEEP(20) : WEND
+DIM aus AS STRING : aus = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+    aus = aus + teil
+    IF teil = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+    SLEEP(20)
+WEND
+' Ohne Fenster (Bau ohne Grafik, kein Bildschirm) steht die Meldung in
+' der Ausgabe, und der Laeufer ueberspringt den Fall.
+IF NOT FILEEXISTS("acht.png") THEN
+    PRINT aus
+    EXIT(1)
+END IF
 PRINT "rueckgabe "; PROCESS_CODE(p)
 --- argumente
 {sammlung}/../../examples/chip8/main.dh
