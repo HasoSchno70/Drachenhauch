@@ -97,6 +97,7 @@ designed, recommended; none of it is decided.
 - **[Packages](pakete.md)** — `dhrt paket hole github:nutzer/repo@stand`: fetch libraries, pin them and share them
 - **[The tools around the language](werkzeuge.md)** — `dhrt --version`, `dhrt test` (run test programs), `dhrt fmt` (uniform formatting), `dhrt --check`, `dhrt doku referenz` (reference generated from the source)
 - **[IDE](ide.md)** — the development environment, written in Drachenhauch: tabs, project tree, debugger, profiler, project-wide search, refactorings
+- **[Plugins of the IDE](ide-plugins.md)** — own commands, panels, events and code helpers as a program of their own
 - **[Sprite editor](sprite-editor.md)** (`examples/189_sprite_editor.dh`) — pixel art with frames, layers, selection mask, GIF, atlas export
 - **[Tilemap editor](tilemap-editor.md)** (`examples/187_tilemap_editor.dh`) — build levels, read and write Tiled JSON
 - **[Form designer](form-designer.md)** (`examples/197_form_designer.dh`) — click user interfaces together, Xojo style, F5 runs them

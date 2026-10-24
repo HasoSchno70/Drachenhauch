@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2154,
+ "count": 2181,
  "builtins": [
   {
    "name": "ABS",
@@ -3384,6 +3384,168 @@
    "name": "GUI_DATE_RANGE",
    "kind": "core",
    "signature": "GUI_DATE_RANGE(picker, von$, bis$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK",
+   "kind": "core",
+   "signature": "GUI_DOCK(win, x, y, w, h)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_SET",
+   "kind": "core",
+   "signature": "GUI_DOCK_SET(win, schluessel$, n)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_PANEL",
+   "kind": "core",
+   "signature": "GUI_DOCK_PANEL(win, name$, titel$, bereich$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_TAB",
+   "kind": "core",
+   "signature": "GUI_DOCK_TAB(win, name$, titel$, neben$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_ADD",
+   "kind": "core",
+   "signature": "GUI_DOCK_ADD(win, name$, wdg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_WINDOW",
+   "kind": "core",
+   "signature": "GUI_DOCK_WINDOW(win, name$, fenster)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_RECT",
+   "kind": "core",
+   "signature": "GUI_DOCK_RECT(win, name$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_TAB_RECT",
+   "kind": "core",
+   "signature": "GUI_DOCK_TAB_RECT(win, name$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_HEAD_RECT",
+   "kind": "core",
+   "signature": "GUI_DOCK_HEAD_RECT(win, name$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_CENTER",
+   "kind": "core",
+   "signature": "GUI_DOCK_CENTER(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_SHOWN",
+   "kind": "core",
+   "signature": "GUI_DOCK_SHOWN(win, name$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_WHERE$",
+   "kind": "core",
+   "signature": "GUI_DOCK_WHERE$(win, name$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_SHOW",
+   "kind": "core",
+   "signature": "GUI_DOCK_SHOW(win, name$, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_ACTIVATE",
+   "kind": "core",
+   "signature": "GUI_DOCK_ACTIVATE(win, name$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_TITLE",
+   "kind": "core",
+   "signature": "GUI_DOCK_TITLE(win, name$, titel$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_CLOSABLE",
+   "kind": "core",
+   "signature": "GUI_DOCK_CLOSABLE(win, name$, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_CLOSED$",
+   "kind": "core",
+   "signature": "GUI_DOCK_CLOSED$(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_CHANGED",
+   "kind": "core",
+   "signature": "GUI_DOCK_CHANGED(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_AREA",
+   "kind": "core",
+   "signature": "GUI_DOCK_AREA(win, bereich$, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_AREA_SHOWN",
+   "kind": "core",
+   "signature": "GUI_DOCK_AREA_SHOWN(win, bereich$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_SIZE",
+   "kind": "core",
+   "signature": "GUI_DOCK_SIZE(win, bereich$, px)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_SHARE",
+   "kind": "core",
+   "signature": "GUI_DOCK_SHARE(win, name$, anteil)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_GET_SIZE",
+   "kind": "core",
+   "signature": "GUI_DOCK_GET_SIZE(win, bereich$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_FLOAT",
+   "kind": "core",
+   "signature": "GUI_DOCK_FLOAT(win, name$, x, y, w, h)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_MOVE",
+   "kind": "core",
+   "signature": "GUI_DOCK_MOVE(win, name$, bereich$ [, neben$])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_STATE$",
+   "kind": "core",
+   "signature": "GUI_DOCK_STATE$(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_SET_STATE",
+   "kind": "core",
+   "signature": "GUI_DOCK_SET_STATE(win, stand$)",
    "module": "gui"
   },
   {

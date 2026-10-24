@@ -558,6 +558,31 @@ DIM konfigUebergangen AS STRING : konfigUebergangen = ""
 SUB konfigFalsch(pfad AS STRING)
     konfigUebergangen = konfigUebergangen + IIF(konfigUebergangen = "", "", ", ") + pfad
 END SUB
+
+' --- Plugins: der Stand (die Unterprogramme stehen bei der Befehlspalette) --
+' Je Plugin: Ordnername, Pfad zur plugin.dh, Handle der Leitung (WINDOW_OPEN,
+' -1 = laeuft nicht), Zustand und die Ereignisse, die es hoeren will.
+DIM plugNamen AS ARRAY OF STRING : plugNamen = []
+DIM plugPfade AS ARRAY OF STRING : plugPfade = []
+DIM plugLeitung AS ARRAY OF INTEGER : plugLeitung = []
+DIM plugZustand AS ARRAY OF STRING : plugZustand = []
+DIM plugHoert AS ARRAY OF STRING : plugHoert = []
+' Befehle der Plugins: Kennung "plugin:<plugin>:<id>", Menuepunkt, Plugin.
+DIM plugBefKennung AS ARRAY OF STRING : plugBefKennung = []
+DIM plugBefItem AS ARRAY OF INTEGER : plugBefItem = []
+' Leisten der Plugins: Name im Dock "plugin.<plugin>.<id>", Fenster.
+DIM plugLeisteName AS ARRAY OF STRING : plugLeisteName = []
+DIM plugLeisteFenster AS ARRAY OF INTEGER : plugLeisteFenster = []
+' Befunde je "<plugin>|<datei>" als JSON-Text (PLUGIN_BEFUNDE_SENDEN).
+DIM plugBefunde AS MAP OF STRING : plugBefunde = {}
+' Schnipsel und Faerbungen der Plugins.
+DIM plugSchnName AS ARRAY OF STRING : plugSchnName = []
+DIM plugSchnAbk AS ARRAY OF STRING : plugSchnAbk = []
+DIM plugSchnText AS ARRAY OF STRING : plugSchnText = []
+DIM plugSchnHerkunft AS ARRAY OF STRING : plugSchnHerkunft = []
+DIM plugFaerbEndung AS ARRAY OF STRING : plugFaerbEndung = []
+DIM plugFaerbMuster AS ARRAY OF STRING : plugFaerbMuster = []
+DIM plugFaerbFarbe AS ARRAY OF INTEGER : plugFaerbFarbe = []
 FUNCTION kBool(pfad AS STRING, vorgabe AS BOOLEAN) AS BOOLEAN
     IF NOT JSON_HAS(konfig, pfad) THEN RETURN vorgabe
     SELECT CASE JSON_TYPE(konfig, pfad)
@@ -910,6 +935,33 @@ win = GUI_WINDOW(tr$("Drachenhauch"), 0, 0, SCREENWIDTH(), SCREENHEIGHT())
 GUI_TABS_CLOSABLE(win, TRUE)
 GUI_WINDOW_CHROME(win, FALSE)
 GUI_WINDOW_MOVABLE(win, FALSE)
+' Die Leisten stehen in einem Dock (seit 2026-10-24): links Projekt und
+' Gliederung, unten Ausgabe|Terminal und Probleme|Debugger als Reiter. Am
+' Reiter laesst sich jede Leiste in einen anderen Bereich ziehen oder
+' abtrennen; die Anordnung steht in der ide.json (`dock`). Das Rechteck
+' setzt layout(), die Inhalte verteilt layoutLeisten -- die Widgets kommen
+' weiter unten dazu (GUI_DOCK_ADD), wenn es sie gibt.
+GUI_DOCK(win, 0, 0, SCREENWIDTH(), SCREENHEIGHT())
+GUI_DOCK_PANEL(win, "projekt", tr$("Projekt"), "links")
+GUI_DOCK_PANEL(win, "gliederung", tr$("Gliederung"), "links")
+GUI_DOCK_PANEL(win, "ausgabe", tr$("Ausgabe"), "unten")
+GUI_DOCK_TAB(win, "terminal", tr$("Terminal"), "ausgabe")
+GUI_DOCK_PANEL(win, "probleme", tr$("Probleme"), "unten")
+GUI_DOCK_TAB(win, "debugger", tr$("Debugger"), "probleme")
+GUI_DOCK_SHOW(win, "debugger", FALSE)
+GUI_DOCK_SIZE(win, "links", 220)
+GUI_DOCK_SIZE(win, "unten", 202)
+GUI_DOCK_SHARE(win, "projekt", 3)
+GUI_DOCK_SHARE(win, "gliederung", 2)
+' Die Vorgabe, fuer "Leisten zuruecksetzen".
+DIM dockVorgabe AS STRING : dockVorgabe = GUI_DOCK_STATE$(win)
+IF JSON_HAS(konfig, "dock") THEN
+    TRY
+        GUI_DOCK_SET_STATE(win, JSON_STRINGIFY(JSON_GET_JSON(konfig, "dock")))
+    CATCH dockFehler
+        konfigFalsch("dock")
+    END TRY
+END IF
 
 ' Menue
 DIM mDatei AS INTEGER : mDatei = GUI_MENU(win, tr$("Datei"))
@@ -1130,6 +1182,8 @@ DIM miFaltenAuf AS INTEGER : miFaltenAuf = GUI_MENU_ITEM(mAnsicht, tr$("Alles au
 DIM miGroesser AS INTEGER : miGroesser = GUI_MENU_ITEM(mAnsicht, tr$("Schrift größer"), kz$("Strg+Plus"))
 DIM miKleiner AS INTEGER : miKleiner = GUI_MENU_ITEM(mAnsicht, tr$("Schrift kleiner"), kz$("Strg+Minus"))
 DIM miNormal AS INTEGER : miNormal = GUI_MENU_ITEM(mAnsicht, tr$("Schrift normal"), kz$("Strg+0"))
+GUI_MENU_SEPARATOR(mAnsicht)
+DIM miLeistenZurueck AS INTEGER : miLeistenZurueck = GUI_MENU_ITEM(mAnsicht, tr$("Leisten zurücksetzen"))
 
 DIM mHilfe AS INTEGER : mHilfe = GUI_MENU(win, tr$("Hilfe"))
 DIM miHandbuch AS INTEGER : miHandbuch = GUI_MENU_ITEM(mHilfe, tr$("Handbuch (Wort unter der Marke)"), kz$("F1"))
@@ -1138,6 +1192,15 @@ DIM miTasten AS INTEGER : miTasten = GUI_MENU_ITEM(mHilfe, tr$("Tastenkürzel ä
 DIM miTastenZurueck AS INTEGER : miTastenZurueck = GUI_MENU_ITEM(mHilfe, tr$("Tastenkürzel zurücksetzen"))
 DIM miBefehle AS INTEGER : miBefehle = GUI_MENU_ITEM(mHilfe, tr$("Eingebaute Befehle nachschlagen ..."), kz$("Strg+F3"))
 DIM miUeber AS INTEGER : miUeber = GUI_MENU_ITEM(mHilfe, tr$("Über ..."))
+
+' Plugins (seit 2026-10-24, docs/ide-plugins.md): eigene Programme in
+' plugins/<name>/plugin.dh neben der ide.json. Ihre Befehle stehen hier
+' unter dem Strich, ihre Leisten im Dock.
+DIM mPlugins AS INTEGER : mPlugins = GUI_MENU(win, tr$("Plugins"))
+DIM miPlugVerwalten AS INTEGER : miPlugVerwalten = GUI_MENU_ITEM(mPlugins, tr$("Plugins verwalten ..."))
+DIM miPlugNeu AS INTEGER : miPlugNeu = GUI_MENU_ITEM(mPlugins, tr$("Plugins neu laden"))
+DIM miPlugOrdner AS INTEGER : miPlugOrdner = GUI_MENU_ITEM(mPlugins, tr$("Plugin-Ordner öffnen"))
+GUI_MENU_SEPARATOR(mPlugins)
 
 ' --- Werkzeugleiste ---------------------------------------------------
 ' Was man am haeufigsten braucht, als Sinnbild unter dem Menue. Seit Stand
@@ -1370,10 +1433,6 @@ GUI_CONTEXT_WIDGET(ctxAusgabe, lstAusgabe)
 ' darueber schalten um. Die Eingabezeile unten gehoert dann dem Terminal.
 DIM lstTerminal AS GUI_WIDGET : lstTerminal = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 GUI_LISTBOX_PLACEHOLDER(lstTerminal, tr$("Befehl unten eingeben, Enter führt ihn aus -- cd, dir/ls, git, dhrt ..."))
-GUI_SET_VISIBLE(lstTerminal, FALSE)
-DIM btnReiterAusgabe AS GUI_WIDGET : btnReiterAusgabe = GUI_BUTTON(win, tr$("Ausgabe"), 0, 0, 90, 20)
-DIM btnReiterTerminal AS GUI_WIDGET : btnReiterTerminal = GUI_BUTTON(win, tr$("Terminal"), 0, 0, 90, 20)
-GUI_TOOLTIP(btnReiterTerminal, tr$("Terminal (Alt+3)"))
 DIM btnTermStopp AS GUI_WIDGET : btnTermStopp = GUI_BUTTON(win, tr$("Abbrechen"), 0, 0, 90, 20)
 GUI_BUTTON_VARIANT(btnTermStopp, "gefahr")
 GUI_SET_VISIBLE(btnTermStopp, FALSE)
@@ -1495,6 +1554,27 @@ DIM setzenName AS STRING : setzenName = ""
 ' ersten Halt dorthin.
 DIM debugBis AS INTEGER : debugBis = 0
 DIM debugSichtbar AS BOOLEAN : debugSichtbar = FALSE
+
+' Die Widgets der Leisten -- was zu sehen ist, entscheidet das Dock
+' (vorderer Reiter, Bereich an); verteilt werden sie in layoutLeisten.
+GUI_DOCK_ADD(win, "projekt", baum) : GUI_DOCK_ADD(win, "projekt", tfBaumFilter)
+GUI_DOCK_ADD(win, "projekt", lblProjekt)
+GUI_DOCK_ADD(win, "gliederung", lstGliederung) : GUI_DOCK_ADD(win, "gliederung", lblGliederung)
+GUI_DOCK_ADD(win, "ausgabe", lstAusgabe) : GUI_DOCK_ADD(win, "ausgabe", lblAusgabe)
+GUI_DOCK_ADD(win, "ausgabe", tfAusgabeFilter)
+GUI_DOCK_ADD(win, "terminal", lstTerminal) : GUI_DOCK_ADD(win, "terminal", btnTermStopp)
+GUI_DOCK_ADD(win, "probleme", lstProbleme) : GUI_DOCK_ADD(win, "probleme", lblProbleme)
+GUI_DOCK_ADD(win, "probleme", lblHilfeKopf) : GUI_DOCK_ADD(win, "probleme", lblHilfe)
+GUI_DOCK_ADD(win, "debugger", lblDebug) : GUI_DOCK_ADD(win, "debugger", tblVars)
+GUI_DOCK_ADD(win, "debugger", btnWeiter) : GUI_DOCK_ADD(win, "debugger", btnDrueber)
+GUI_DOCK_ADD(win, "debugger", btnHinein) : GUI_DOCK_ADD(win, "debugger", btnHeraus)
+GUI_DOCK_ADD(win, "debugger", btnStoppD) : GUI_DOCK_ADD(win, "debugger", btnBisMarke)
+GUI_DOCK_ADD(win, "debugger", tblStapel) : GUI_DOCK_ADD(win, "debugger", tblWatch)
+GUI_DOCK_ADD(win, "debugger", tfWatch) : GUI_DOCK_ADD(win, "debugger", btnWatchWeg)
+' Der Reiter sagt den Namen -- die Beschriftungen von frueher bleiben (ihr
+' Text ist der Titel), werden aber nicht mehr gezeigt.
+GUI_SET_VISIBLE(lblProjekt, FALSE)
+GUI_SET_VISIBLE(lblGliederung, FALSE)
 
 ' Profil: die Zeilen nach Zeit, ein Klick springt hin.
 DIM winProfil AS GUI_WINDOW : winProfil = GUI_WINDOW(tr$("Profil"), 600, 60, 640, 460)
@@ -2160,6 +2240,11 @@ END SUB
 
 ' --- Einstellungen, Sitzung, zuletzt geoeffnet -----------------------
 SUB konfigSichern()
+    ' Die Anordnung der Leisten (wo, wie gross, welcher Reiter vorn).
+    TRY
+        JSON_SET_JSON(konfig, "dock", JSON_PARSE(GUI_DOCK_STATE$(win)))
+    CATCH dockFehler
+    END TRY
     JSON_SET_BOOL(konfig, "hell", hell)
     JSON_SET_INT(konfig, "schrift", codeGroesse)
     JSON_SET_INT(konfig, "listen_schrift", listenGroesse)
@@ -2361,16 +2446,84 @@ END SUB
 
 SUB debugPanelZeigen(an AS BOOLEAN)
     debugSichtbar = an
-    ' Bei ausgeblendeter unterer Leiste ist keins von beiden zu sehen --
-    ' `debugSichtbar` merkt sich trotzdem, welches dran waere.
-    DIM p AS BOOLEAN : p = (NOT an) AND untenAn
-    DIM d AS BOOLEAN : d = an AND untenAn
-    GUI_SET_VISIBLE(lblProbleme, p) : GUI_SET_VISIBLE(lstProbleme, p) : GUI_SET_VISIBLE(lblHilfe, p) : GUI_SET_VISIBLE(lblHilfeKopf, p)
-    GUI_SET_VISIBLE(lblDebug, d) : GUI_SET_VISIBLE(tblVars, d)
-    GUI_SET_VISIBLE(btnWeiter, d) : GUI_SET_VISIBLE(btnDrueber, d) : GUI_SET_VISIBLE(btnHinein, d)
-    GUI_SET_VISIBLE(btnHeraus, d) : GUI_SET_VISIBLE(btnStoppD, d)
-    GUI_SET_VISIBLE(btnBisMarke, d) : GUI_SET_VISIBLE(tblStapel, d) : GUI_SET_VISIBLE(tblWatch, d)
-    GUI_SET_VISIBLE(tfWatch, d) : GUI_SET_VISIBLE(btnWatchWeg, d)
+    ' Der Reiter "Debugger" steht neben "Probleme" und ist nur da, solange
+    ' der Debugger laeuft; er kommt dabei nach vorn. Bei ausgeblendeter
+    ' unterer Leiste bleibt sie aus.
+    GUI_DOCK_SHOW(win, "debugger", an)
+    IF NOT an THEN GUI_DOCK_ACTIVATE(win, "probleme")
+    GUI_DOCK_AREA(win, "unten", untenAn)
+END SUB
+
+' Die Inhalte der Leisten in ihre Rechtecke (GUI_DOCK_RECT). Eine Leiste,
+' die gerade nicht zu sehen ist, hat ein leeres Rechteck -- ihre Widgets
+' blendet das Dock ohnehin aus. Was im Kopf neben den Reitern steht (Filter,
+' Zaehler, Abbrechen), kommt in dessen freien Teil (GUI_DOCK_HEAD_RECT).
+SUB layoutLeisten()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM b AS INTEGER
+    DIM h AS INTEGER
+    DIM kx AS INTEGER
+    DIM ky AS INTEGER
+    DIM kb AS INTEGER
+    DIM kh AS INTEGER
+    GUI_DOCK_TITLE(win, "projekt", GUI_TEXT(lblProjekt))
+    GUI_DOCK_TITLE(win, "gliederung", GUI_TEXT(lblGliederung))
+    (x, y, b, h) = GUI_DOCK_RECT(win, "projekt")
+    IF b > 0 THEN
+        GUI_SET_BOUNDS(baum, x, y, b, h)
+        (kx, ky, kb, kh) = GUI_DOCK_HEAD_RECT(win, "projekt")
+        GUI_SET_VISIBLE(tfBaumFilter, kb >= 60)
+        GUI_SET_BOUNDS(tfBaumFilter, kx + 4, ky, MAX(40, kb - 4), kh)
+    END IF
+    (x, y, b, h) = GUI_DOCK_RECT(win, "gliederung")
+    IF b > 0 THEN GUI_SET_BOUNDS(lstGliederung, x, y, b, h)
+    (x, y, b, h) = GUI_DOCK_RECT(win, "ausgabe")
+    IF b > 0 THEN
+        GUI_SET_BOUNDS(lstAusgabe, x, y, b, h)
+        (kx, ky, kb, kh) = GUI_DOCK_HEAD_RECT(win, "ausgabe")
+        GUI_SET_BOUNDS(lblAusgabe, kx + 8, ky + 2, MAX(40, kb - 196), 18)
+        GUI_SET_BOUNDS(tfAusgabeFilter, kx + kb - 180, ky, 180, kh)
+        GUI_SET_VISIBLE(tfAusgabeFilter, kb >= 220)
+    END IF
+    (x, y, b, h) = GUI_DOCK_RECT(win, "terminal")
+    IF b > 0 THEN
+        GUI_SET_BOUNDS(lstTerminal, x, y, b, h)
+        (kx, ky, kb, kh) = GUI_DOCK_HEAD_RECT(win, "terminal")
+        GUI_SET_BOUNDS(btnTermStopp, kx + kb - 90, ky + 1, 90, kh - 2)
+    END IF
+    GUI_SET_VISIBLE(btnTermStopp, termProz >= 0)
+    (x, y, b, h) = GUI_DOCK_RECT(win, "probleme")
+    IF b > 0 THEN
+        GUI_SET_BOUNDS(lstProbleme, x, y, b, h \ 2 - 4)
+        GUI_SET_BOUNDS(lblHilfeKopf, x, y + h \ 2, b, 18)
+        GUI_SET_BOUNDS(lblHilfe, x + 8, y + h \ 2 + 22, b - 8, h \ 2 - 22)
+        GUI_SET_WRAP(lblHilfe, MAX(40, b - 16))
+        (kx, ky, kb, kh) = GUI_DOCK_HEAD_RECT(win, "probleme")
+        GUI_SET_BOUNDS(lblProbleme, kx + 8, ky + 2, MAX(40, kb - 8), 18)
+    END IF
+    (x, y, b, h) = GUI_DOCK_RECT(win, "debugger")
+    IF b > 0 THEN
+        (kx, ky, kb, kh) = GUI_DOCK_HEAD_RECT(win, "debugger")
+        GUI_SET_BOUNDS(lblDebug, kx + 8, ky + 2, MAX(40, kb - 8), 18)
+        GUI_SET_BOUNDS(btnWeiter, x, y, 100, 26)
+        GUI_SET_BOUNDS(btnDrueber, x + 106, y, 108, 26)
+        GUI_SET_BOUNDS(btnHinein, x + 220, y, 104, 26)
+        GUI_SET_BOUNDS(btnHeraus, x + 330, y, 70, 26)
+        GUI_SET_BOUNDS(btnStoppD, x + 406, y, 60, 26)
+        GUI_SET_BOUNDS(btnBisMarke, x + 472, y, 84, 26)
+        ' Variablen links, Stapel und Ueberwachen rechts uebereinander.
+        DIM vw AS INTEGER : vw = (b * 55) \ 100
+        DIM hh AS INTEGER : hh = MAX(60, h - 32)
+        GUI_SET_BOUNDS(tblVars, x, y + 32, vw, hh)
+        DIM rx AS INTEGER : rx = x + vw + 6
+        DIM rw AS INTEGER : rw = MAX(60, b - vw - 6)
+        DIM sh AS INTEGER : sh = MAX(30, (hh - 32) \ 2)
+        GUI_SET_BOUNDS(tblStapel, rx, y + 32, rw, sh)
+        GUI_SET_BOUNDS(tblWatch, rx, y + 36 + sh, rw, MAX(30, hh - sh - 36))
+        GUI_SET_BOUNDS(tfWatch, rx, y + 32 + hh - 26, MAX(30, rw - 86), 26)
+        GUI_SET_BOUNDS(btnWatchWeg, rx + rw - 80, y + 32 + hh - 26, 80, 26)
+    END IF
 END SUB
 
 SUB leistenSetzen(seiten AS BOOLEAN, unten AS BOOLEAN)
@@ -2407,26 +2560,26 @@ SUB layout()
     IF leisteAn THEN GUI_SET_BOUNDS(leiste, 0, oben - 4, w, 36)
     DIM statusH AS INTEGER : statusH = 24
     DIM eingabeH AS INTEGER : eingabeH = 30
-    DIM untenH AS INTEGER : untenH = IIF(untenAn, hoeheUnten, -4)
-    DIM mitteH AS INTEGER : mitteH = hi - oben - untenH - statusH - eingabeH - 12 - leisteH
     oben = oben + leisteH
-    ' links: Projektbaum oben, Gliederung darunter
-    DIM baumH AS INTEGER : baumH = (mitteH - 22) * 3 \ 5
-    GUI_SET_VISIBLE(lblProjekt, seitenAn) : GUI_SET_VISIBLE(baum, seitenAn)
-    GUI_SET_VISIBLE(tfBaumFilter, seitenAn)
-    GUI_SET_VISIBLE(lblGliederung, seitenAn) : GUI_SET_VISIBLE(lstGliederung, seitenAn)
-    ' Der Projektname nimmt sich, was er braucht (hoechstens die Haelfte),
-    ' das Filterfeld den Rest -- mit fester Haelfte war es bei der groesseren
-    ' Schrift so schmal, dass "Filter ..." nicht mehr hineinpasste.
-    DIM projB AS INTEGER : projB = MIN((breiteLinks - 16) \ 2 - 4, TEXT_WIDTH(GUI_TEXT(lblProjekt)) + 8)
-    GUI_SET_BOUNDS(lblProjekt, 8, oben, projB, 18)
-    GUI_SET_BOUNDS(tfBaumFilter, 12 + projB, oben - 2, breiteLinks - 20 - projB, 24)
-    GUI_SET_BOUNDS(baum, 8, oben + 22, breiteLinks - 16, baumH)
-    GUI_SET_BOUNDS(lblGliederung, 8, oben + 30 + baumH, breiteLinks - 16, 18)
-    GUI_SET_BOUNDS(lstGliederung, 8, oben + 52 + baumH, breiteLinks - 16, mitteH - baumH - 52)
-    DIM links AS INTEGER : links = IIF(seitenAn, breiteLinks, 8)
-    DIM ex AS INTEGER : ex = links
-    DIM ew AS INTEGER : ew = w - links - 8
+    ' Das Dock nimmt alles zwischen Werkzeugleiste und Eingabezeile: links
+    ' und rechts die Seitenleisten, unten Ausgabe und Probleme, die Mitte
+    ' bleibt dem Code. Wo eine Leiste steht, weiss das Dock (der Nutzer kann
+    ' sie verschieben); was in ihr steht, verteilt layoutLeisten.
+    DIM ey AS INTEGER : ey = hi - statusH - eingabeH - 4
+    GUI_DOCK(win, 0, oben, w, MAX(80, ey - 4 - oben))
+    GUI_DOCK_AREA(win, "links", seitenAn)
+    GUI_DOCK_AREA(win, "rechts", seitenAn)
+    GUI_DOCK_AREA(win, "unten", untenAn)
+    layoutLeisten()
+    DIM cx AS INTEGER
+    DIM cy AS INTEGER
+    DIM cw AS INTEGER
+    DIM mitteH AS INTEGER
+    (cx, cy, cw, mitteH) = GUI_DOCK_CENTER(win)
+    ' Ohne Leiste links bzw. rechts bekommt der Code 8 Punkte Rand -- mit
+    ' Leiste liegt der Rand schon in deren Bereich.
+    DIM ex AS INTEGER : ex = IIF(GUI_DOCK_AREA_SHOWN(win, "links"), cx, cx + 8)
+    DIM ew AS INTEGER : ew = IIF(GUI_DOCK_AREA_SHOWN(win, "rechts"), cx + cw, cx + cw - 8) - ex
     ' Die Spur steht ueber dem Code und nimmt sich 20 Punkte von seiner Hoehe.
     DIM spurH AS INTEGER : spurH = 20
     GUI_SET_BOUNDS(lblSpur, ex, oben - 1, ew, 20)
@@ -2516,46 +2669,6 @@ SUB layout()
     GUI_SET_BOUNDS(lblWkKuerzel, wx, nachKacheln + 34 + zlH, MIN(ew - 80, 620), 18)
     GUI_SET_WRAP(lblWkKuerzel, MIN(ew - 80, 620))
     willkommenZeigen(tabAnzahl = 0)
-    DIM uy AS INTEGER : uy = oben + mitteH + 4
-    DIM halb AS INTEGER : halb = (w - 24) \ 2
-    GUI_SET_VISIBLE(lblAusgabe, untenAn) : GUI_SET_VISIBLE(lstAusgabe, untenAn AND NOT terminalAn)
-    GUI_SET_VISIBLE(lstTerminal, untenAn AND terminalAn)
-    GUI_SET_VISIBLE(btnReiterAusgabe, untenAn) : GUI_SET_VISIBLE(btnReiterTerminal, untenAn)
-    GUI_SET_VISIBLE(btnTermStopp, untenAn AND terminalAn AND termProz >= 0)
-    GUI_SET_BOUNDS(btnReiterAusgabe, 8, uy - 1, 90, 20)
-    GUI_SET_BOUNDS(btnReiterTerminal, 102, uy - 1, 90, 20)
-    GUI_SET_BOUNDS(lblAusgabe, 200, uy, MAX(40, halb - 390), 18)
-    GUI_SET_VISIBLE(tfAusgabeFilter, untenAn AND NOT terminalAn)
-    GUI_SET_BOUNDS(tfAusgabeFilter, 8 + halb - 180, uy - 1, 180, 20)
-    GUI_SET_BOUNDS(btnTermStopp, 8 + halb - 90, uy - 1, 90, 20)
-    GUI_SET_BOUNDS(lstAusgabe, 8, uy + 20, halb, hoeheUnten - 20)
-    GUI_SET_BOUNDS(lstTerminal, 8, uy + 20, halb, hoeheUnten - 20)
-    GUI_SET_BOUNDS(lblProbleme, 16 + halb, uy, halb, 18)
-    GUI_SET_BOUNDS(lstProbleme, 16 + halb, uy + 20, halb, (hoeheUnten - 20) \ 2 - 4)
-    GUI_SET_BOUNDS(lblHilfeKopf, 16 + halb, uy + 20 + (hoeheUnten - 20) \ 2, halb, 18)
-    GUI_SET_BOUNDS(lblHilfe, 24 + halb, uy + 42 + (hoeheUnten - 20) \ 2, halb - 8, (hoeheUnten - 20) \ 2 - 22)
-    GUI_SET_WRAP(lblHilfe, halb - 16)
-    ' Debugger-Panel auf derselben Flaeche
-    GUI_SET_BOUNDS(lblDebug, 16 + halb, uy, halb, 18)
-    GUI_SET_BOUNDS(btnWeiter, 16 + halb, uy + 20, 100, 26)
-    GUI_SET_BOUNDS(btnDrueber, 122 + halb, uy + 20, 108, 26)
-    GUI_SET_BOUNDS(btnHinein, 236 + halb, uy + 20, 104, 26)
-    GUI_SET_BOUNDS(btnHeraus, 346 + halb, uy + 20, 70, 26)
-    GUI_SET_BOUNDS(btnStoppD, 422 + halb, uy + 20, 60, 26)
-    GUI_SET_BOUNDS(btnBisMarke, 488 + halb, uy + 20, 84, 26)
-    ' Variablen links, Stapel und Ueberwachen rechts uebereinander.
-    DIM vw AS INTEGER : vw = (halb * 55) \ 100
-    DIM hh AS INTEGER : hh = MAX(60, hoeheUnten - 52)
-    GUI_SET_BOUNDS(tblVars, 16 + halb, uy + 52, vw, hh)
-    DIM rx AS INTEGER : rx = 16 + halb + vw + 6
-    DIM rw AS INTEGER : rw = MAX(60, halb - vw - 6)
-    DIM sh AS INTEGER : sh = MAX(30, (hh - 32) \ 2)
-    GUI_SET_BOUNDS(tblStapel, rx, uy + 52, rw, sh)
-    GUI_SET_BOUNDS(tblWatch, rx, uy + 56 + sh, rw, MAX(30, hh - sh - 36))
-    GUI_SET_BOUNDS(tfWatch, rx, uy + 52 + hh - 26, MAX(30, rw - 86), 26)
-    GUI_SET_BOUNDS(btnWatchWeg, rx + rw - 80, uy + 52 + hh - 26, 80, 26)
-    debugPanelZeigen(debugSichtbar)
-    DIM ey AS INTEGER : ey = hi - statusH - eingabeH - 4
     GUI_SET_BOUNDS(tfEingabe, 8, ey, w - 108, 26)
     GUI_SET_BOUNDS(btnEingabe, w - 92, ey, 84, 26)
     GUI_SET_BOUNDS(lblStatus, 0, hi - statusH, w, statusH)
@@ -3505,6 +3618,7 @@ SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
     pruefungFaellig = GET_TIME()
     protokoll("geoeffnet " + pfad)
     IF waermeDaten THEN waermeFeld(tabAnzahl - 1)
+    IF pfad <> "" THEN pluginEreignis("geoeffnet", pfad)
 END SUB
 
 ' Eine .dhform oeffnet seit Stand 31 den Form-Designer in Drachenhauch
@@ -3664,6 +3778,7 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
         protokoll("neustart beim sichern")
         stoppen()
     END IF
+    pluginEreignis("gesichert", pfad)
     ' Eigene Schnipsel und Tastenbelegung gelten, sobald sie gesichert sind --
     ' und sie liegen neben der ide.json, nicht im Projekt: der Projektordner
     ' bleibt, wo er war.
@@ -4132,6 +4247,9 @@ SUB faerben(ta AS GUI_WIDGET)
         IIF(sucheOffen, suchMuster$(suchtext), "") + ":" + IIF(klammerFarbenAn, "k", "") + ":" + stueck
     IF schl = faerbSchluessel THEN RETURN
     faerbSchluessel = schl
+    ' Eine Dateiart, fuer die ein Plugin eine Faerbung angemeldet hat
+    ' (PLUGIN_FAERBUNG), faerbt dessen Regeln statt Drachenhauch.
+    IF pluginFaerben(ta, stueck, von) THEN RETURN
     DIM starts AS ARRAY OF INTEGER
     DIM laengen AS ARRAY OF INTEGER
     DIM arten AS ARRAY OF STRING
@@ -4280,8 +4398,32 @@ SUB pruefen()
             END IF
         END IF
     NEXT
-    problemZeilen = zeilen
-    wellenSetzen(ta, j, n)
+    ' Befunde der Plugins fuer diese Datei hinten an (PLUGIN_BEFUND).
+    DIM pbZ AS ARRAY OF INTEGER : pbZ = []
+    DIM pbT AS ARRAY OF STRING : pbT = []
+    DIM pbS AS ARRAY OF STRING : pbS = []
+    pluginBefundeFuer(tabPfade[aktiverTab], pbZ, pbT, pbS)
+    IF LEN(pbZ) > 0 THEN
+        DIM alleZ AS ARRAY OF INTEGER : alleZ = []
+        FOR i = 0 TO n - 1
+            ARRAY_PUSH(alleZ, zeilen[i])
+        NEXT
+        FOR i = 0 TO LEN(pbZ) - 1
+            ARRAY_PUSH(alleZ, pbZ[i])
+            ARRAY_PUSH(problemHinweis, pbS[i] = "hinweis")
+            IF pbS[i] = "fehler" THEN fehler = fehler + 1
+            IF pbS[i] = "hinweis" THEN hinweise = hinweise + 1
+            IF problemModus = 0 THEN
+                DIM pz AS INTEGER : pz = GUI_LISTBOX_ADD(lstProbleme, "Zeile " + STR$(pbZ[i]) + ": " + pbT[i])
+                GUI_LISTBOX_COLOR(lstProbleme, pz, IIF(pbS[i] = "fehler", &HE06060, IIF(pbS[i] = "hinweis", &H909CA8, &HE0C060)))
+            END IF
+        NEXT
+        problemZeilen = alleZ
+        n = n + LEN(pbZ)
+    ELSE
+        problemZeilen = zeilen
+    END IF
+    wellenSetzen(ta, j, n - LEN(pbZ))
     typenSammeln(ta, basis)
     parameterSammeln(ta)
     DIM altF AS GUI_WIDGET : altF = fehlerFeld
@@ -4303,6 +4445,7 @@ SUB pruefen()
     IF hinweise > 0 THEN protokoll("hinweise " + STR$(hinweise))
     gliederungFuellen(GUI_TEXT(ta))
     zaehlerSetzen_(ta)
+    pluginEreignis("geprueft", tabPfade[aktiverTab])
 END SUB
 
 ' Fehler und Warnungen DORT unterstreichen, wo sie stehen (rot bzw. gelb),
@@ -8317,6 +8460,17 @@ END SUB
 ' Ein Lichtstreif ueber das Hauptfenster, wenn er eingeschaltet ist.
 ' Ein Testlauf (DHRT_FRAMES) bekommt ihn nur mit DH_IDE_GLANZ=1 -- sonst
 ' laege er ueber den Bildproben der ersten Sekunden.
+' Der Streif beim Start zieht erst ab dem vierten Bild (`glanzStartIn`,
+' gesetzt am Ende des Starts): die ersten Bilder brauchen je 50 ms
+' (Einfaerben, Schriften), und ein Streif, der dabei schon laeuft, ruckelt
+' gleich am Anfang.
+DIM glanzStartIn AS INTEGER : glanzStartIn = 0
+SUB glanzStartNachziehen()
+    IF glanzStartIn <= 0 THEN RETURN
+    glanzStartIn = glanzStartIn - 1
+    IF glanzStartIn = 0 THEN lichtstreif(2200)
+END SUB
+
 SUB lichtstreif(dauer AS INTEGER)
     IF NOT glanzAn THEN RETURN
     IF GETENV$("DHRT_FRAMES") <> "" AND GETENV$("DH_IDE_GLANZ") <> "1" THEN RETURN
@@ -8969,6 +9123,13 @@ FUNCTION signaturArgs(quelle AS STRING, z AS INTEGER, s AS INTEGER, mitOptionale
         sig = TRIM$(zl)
         BREAK
     NEXT
+    RETURN signaturNamen(sig, mitOptionalen)
+END FUNCTION
+
+' Die Parameternamen aus einer Signaturzeile (`NAME(a, b [, c])` aus dem
+' Hover, oder die Kopfzeile einer SUB/FUNCTION aus dem Quelltext).
+FUNCTION signaturNamen(sig AS STRING, mitOptionalen AS BOOLEAN) AS ARRAY OF STRING
+    DIM leer AS ARRAY OF STRING : leer = []
     DIM auf AS INTEGER : auf = INSTR(sig, "(")
     DIM zu AS INTEGER : zu = INSTR(sig, ")")
     IF auf < 0 OR zu < auf THEN RETURN leer
@@ -12766,6 +12927,7 @@ FUNCTION prozessStartenDatei(art AS STRING, datei AS STRING) AS BOOLEAN
         protokoll("start mit " + STR$(LEN(sa)) + " argumenten " + STR$(LEN(MAPKEYS(su))) + " umgebung")
     END IF
     lichtstreif(1500)
+    pluginEreignis("gestartet", prozessDatei)
     GUI_SET_TEXT(lblAusgabe, tr$("Ausgabe: ") + BASENAME(prozessDatei) + tr$(" läuft ..."))
     GUI_SET_TEXT(lblStatus, tr$("Gestartet: ") + prozessDatei)
     RETURN TRUE
@@ -12892,6 +13054,30 @@ FUNCTION festesArgument(a AS STRING) AS BOOLEAN
     RETURN t <> "" AND REGEX_TEST(t, "^[0-9]+(\.[0-9]+)?$")
 END FUNCTION
 
+' Die Kopfzeilen der SUBs und FUNCTIONs einer Datei: Name (klein) ->
+' Kopfzeile, in einem Durchgang. Steht ein Name mehrfach da (eine Methode
+' gleichen Namens in zwei Klassen), ist der Eintrag leer -- dann entscheidet
+' der Hover an der Stelle des Aufrufs, welche gemeint ist.
+SUB kopfZeilenSammeln(zeilen AS ARRAY OF STRING, BYREF kopf AS MAP OF STRING)
+    DIM zl AS STRING
+    FOR EACH zl IN zeilen
+        DIM t AS STRING : t = LTRIM$(zl)
+        DIM w AS INTEGER
+        IF UPPER$(LEFT$(t, 4)) = "SUB " THEN
+            w = 4
+        ELSEIF UPPER$(LEFT$(t, 9)) = "FUNCTION " THEN
+            w = 9
+        ELSE
+            CONTINUE
+        END IF
+        DIM rest AS STRING : rest = LTRIM$(MID$(t, w))
+        DIM k AS INTEGER : k = INSTR(rest, "(")
+        IF k <= 0 THEN CONTINUE
+        DIM n AS STRING : n = LOWER$(RTRIM$(LEFT$(rest, k)))
+        IF MAPHAS(kopf, n) THEN MAPPUT(kopf, n, "") ELSE MAPPUT(kopf, n, t)
+    NEXT
+END SUB
+
 SUB parameterSammeln(ta AS GUI_WIDGET)
     paramFeld = ta : paramZeilen = [] : paramTexte = []
     IF NOT paramNamenAn THEN RETURN
@@ -12909,6 +13095,10 @@ SUB parameterSammeln(ta AS GUI_WIDGET)
     DIM arten AS ARRAY OF STRING
     (starts, laengen, arten) = SYNTAX_SPANS(quelle)
     DIM li AS INTEGER : li = 0
+    ' Kopfzeilen der eigenen SUBs/FUNCTIONs, erst gelesen, wenn ein Name
+    ' gebraucht wird (`kopfZeilenSammeln`).
+    DIM kopfGelesen AS BOOLEAN : kopfGelesen = FALSE
+    DIM kopfZeile AS MAP OF STRING : kopfZeile = {}
     DIM erledigt AS INTEGER : erledigt = -1       ' Zeile mit Hinweis
     DIM gefragt AS INTEGER : gefragt = 0
     DIM i AS INTEGER
@@ -12953,9 +13143,37 @@ SUB parameterSammeln(ta AS GUI_WIDGET)
             ' Hoechstens 60 neue Namen je Pruefung -- jede Frage uebersetzt
             ' die Datei; der Rest kommt bei der naechsten Pruefung.
             IF gefragt >= 60 THEN CONTINUE
-            gefragt = gefragt + 1
             DIM namen AS ARRAY OF STRING
-            namen = signaturArgs(quelle, li + 1, starts[i] - anf[li] + 1, TRUE)
+            ' Ein eingebauter Befehl braucht die Datei nicht: der Name allein
+            ' genuegt CODE_HOVER$ (wie im Befehlsverzeichnis). Ueber die ganze
+            ' Datei kostete jede Frage bei 18000 Zeilen 5 ms, 60 Fragen das
+            ' halbe Pruefen. Nur was hier oder in einem Import steht, geht
+            ' weiter ueber den ganzen Text und zaehlt gegen die 60.
+            ' Eine eigene Funktion, die genau EINMAL in der Datei steht, nennt
+            ' ihre Parameter in ihrer Kopfzeile -- die liest man direkt (bei
+            ' 18000 Zeilen kostete die Frage ueber den Hover 20 ms je Name).
+            ' Ein eingebauter Befehl braucht die Datei gar nicht: der Name
+            ' allein genuegt CODE_HOVER$ (wie im Befehlsverzeichnis). Nur was
+            ' mehrfach oder in einem Import steht, geht ueber den ganzen Text.
+            namen = []
+            IF NOT kopfGelesen THEN
+                kopfGelesen = TRUE
+                kopfZeilenSammeln(zeilen, kopfZeile)
+            END IF
+            DIM kn AS STRING : kn = LOWER$(name)
+            IF NOT MAPHAS(kopfZeile, kn) THEN
+                namen = signaturArgs(name, 1, 1, TRUE)
+            ELSEIF MAPGET(kopfZeile, kn) <> "" THEN
+                namen = signaturNamen(MAPGET(kopfZeile, kn), TRUE)
+                IF LEN(namen) = 0 THEN
+                    MAPPUT(paramCache, kn, "")
+                    CONTINUE
+                END IF
+            END IF
+            IF LEN(namen) = 0 THEN
+                gefragt = gefragt + 1
+                namen = signaturArgs(quelle, li + 1, starts[i] - anf[li] + 1, TRUE)
+            END IF
             sig = JOIN$(namen, ",")
             MAPPUT(paramCache, LOWER$(name), sig)
         END IF
@@ -14940,6 +15158,7 @@ SUB prozessNachsehen()
         fertigNachStopp = FALSE
         stoppFrist = 0
         prozessArt = ""
+        pluginEreignis("beendet", prozessDatei)
         IF neustartArt <> "" THEN neustartAusfuehren()
     END IF
 END SUB
@@ -16302,6 +16521,14 @@ SUB schnipselLaden()
         ARRAY_PUSH(schnipselText, schnipselEingebautText[i])
         ARRAY_PUSH(schnipselHerkunft, "")
     NEXT
+    ' Schnipsel der Plugins (PLUGIN_SCHNIPSEL) vor den eigenen -- ein eigener
+    ' mit demselben Kuerzel ersetzt sie wie die eingebauten.
+    FOR i = 0 TO LEN(plugSchnName) - 1
+        ARRAY_PUSH(schnipselNamen, plugSchnName[i])
+        ARRAY_PUSH(schnipselAbk, plugSchnAbk[i])
+        ARRAY_PUSH(schnipselText, plugSchnText[i])
+        ARRAY_PUSH(schnipselHerkunft, plugSchnHerkunft[i])
+    NEXT
     DIM eigene AS INTEGER : eigene = 0
     DIM fehler AS INTEGER : fehler = 0
     IF FILEEXISTS(schnipselPfad$()) THEN
@@ -16434,8 +16661,7 @@ DIM termVerlaufPos AS INTEGER : termVerlaufPos = 0
 SUB terminalZeigen(an AS BOOLEAN)
     terminalAn = an
     IF an AND NOT untenAn THEN leistenSetzen(seitenAn, TRUE)
-    GUI_BUTTON_VARIANT(btnReiterAusgabe, IIF(an, "flach", "primaer"))
-    GUI_BUTTON_VARIANT(btnReiterTerminal, IIF(an, "primaer", "flach"))
+    GUI_DOCK_ACTIVATE(win, IIF(an, "terminal", "ausgabe"))
     GUI_MENU_CHECK(miTerminal, an)
     layout()
     IF an THEN
@@ -16761,6 +16987,568 @@ END SUB
 
 ' --- Befehlspalette und Datei-Waehler ------------------------------------
 ' EINE Liste aller Befehle mit Kuerzel: Palette, Tastenkuerzel-Uebersicht.
+' --- Plugins (seit 2026-10-24, docs/ide-plugins.md) -----------------------
+' Ein Plugin ist ein eigenes Programm (plugins/<name>/plugin.dh neben der
+' ide.json); die IDE startet es mit WINDOW_OPEN und spricht ueber dessen
+' Leitung mit ihm -- eine JSON-Zeile je Nachricht, die Seite des Plugins
+' steht in ide/dh_plugin.dh. Ein Plugin, das abstuerzt oder haengt, reisst
+' die IDE nicht mit: sein Zustand wird "abgestuerzt", seine Leisten gehen zu,
+' seine Befehle werden gesperrt.
+FUNCTION pluginOrdner$() AS STRING
+    RETURN PATHJOIN(konfigOrdner$(), "plugins")
+END FUNCTION
+
+' Abgeschaltet ist, was in der ide.json unter "plugins_aus" steht.
+FUNCTION pluginAus(name AS STRING) AS BOOLEAN
+    IF NOT JSON_HAS(konfig, "plugins_aus") THEN RETURN FALSE
+    IF JSON_TYPE(konfig, "plugins_aus") <> "array" THEN RETURN FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(konfig, "plugins_aus") - 1
+        DIM p AS STRING : p = "plugins_aus." + STR$(i)
+        IF JSON_TYPE(konfig, p) = "string" THEN
+            IF LOWER$(JSON_GET_STRING(konfig, p)) = LOWER$(name) THEN RETURN TRUE
+        END IF
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+SUB pluginAusSetzen(name AS STRING, aus AS BOOLEAN)
+    DIM liste AS JSON_HANDLE : liste = JSON_PARSE("[]")
+    IF JSON_HAS(konfig, "plugins_aus") THEN
+        IF JSON_TYPE(konfig, "plugins_aus") = "array" THEN
+            DIM i AS INTEGER
+            FOR i = 0 TO JSON_LEN(konfig, "plugins_aus") - 1
+                DIM p AS STRING : p = "plugins_aus." + STR$(i)
+                IF JSON_TYPE(konfig, p) = "string" THEN
+                    IF LOWER$(JSON_GET_STRING(konfig, p)) <> LOWER$(name) THEN JSON_APPEND_STRING(liste, "", JSON_GET_STRING(konfig, p))
+                END IF
+            NEXT
+        END IF
+    END IF
+    IF aus THEN JSON_APPEND_STRING(liste, "", name)
+    JSON_SET_JSON(konfig, "plugins_aus", liste)
+    konfigSichern()
+END SUB
+
+' Die Bibliothek dh_plugin.dh liegt neben der IDE; DH_PATH zeigt dorthin,
+' damit ein Plugin schlicht IMPORT "dh_plugin.dh" schreibt. Ein Kind erbt
+' die Umgebung beim Start.
+SUB pluginPfadSetzen()
+    DIM bib AS STRING : bib = CWD$()
+    IF NOT FILEEXISTS(PATHJOIN(bib, "dh_plugin.dh")) THEN bib = PATHJOIN(wurzel, "ide")
+    DIM trenner AS STRING : trenner = IIF(MID$(bib, 1, 1) = ":", ";", ":")
+    DIM alt AS STRING : alt = GETENV$("DH_PATH")
+    IF INSTR(alt, bib) >= 0 THEN RETURN
+    SETENV("DH_PATH", IIF(alt = "", bib, bib + trenner + alt))
+END SUB
+
+SUB pluginsStarten()
+    pluginPfadSetzen()
+    DIM ordner AS STRING : ordner = pluginOrdner$()
+    IF NOT DIREXISTS(ordner) THEN RETURN
+    DIM namen AS ARRAY OF STRING : namen = DIRLIST(ordner)
+    SORT(namen)
+    DIM n AS STRING
+    FOR EACH n IN namen
+        DIM pfad AS STRING : pfad = PATHJOIN(PATHJOIN(ordner, n), "plugin.dh")
+        IF LEFT$(n, 1) = "." OR NOT FILEEXISTS(pfad) THEN CONTINUE
+        IF ARRAY_INDEXOF(plugNamen, n) >= 0 THEN CONTINUE
+        ARRAY_PUSH(plugNamen, n)
+        ARRAY_PUSH(plugPfade, pfad)
+        ARRAY_PUSH(plugLeitung, -1)
+        ARRAY_PUSH(plugZustand, "aus")
+        ARRAY_PUSH(plugHoert, ";")
+        IF NOT pluginAus(n) THEN pluginStarten(LEN(plugNamen) - 1)
+    NEXT
+    protokoll("plugins " + STR$(LEN(plugNamen)))
+END SUB
+
+SUB pluginStarten(k AS INTEGER)
+    IF plugLeitung[k] >= 0 THEN RETURN
+    TRY
+        plugLeitung[k] = WINDOW_OPEN(plugPfade[k])
+        plugZustand[k] = "läuft"
+        plugHoert[k] = ";"
+        protokoll("plugin " + plugNamen[k] + " gestartet")
+    CATCH e
+        plugZustand[k] = "Fehler: " + e
+        protokoll("plugin " + plugNamen[k] + " fehler " + e)
+    END TRY
+END SUB
+
+' Beenden: "ende" schicken, dann die Leitung zu. Leisten gehen zu, Befehle
+' werden gesperrt -- ein neuer Start meldet sie wieder an.
+SUB pluginStoppen(k AS INTEGER, zustand AS STRING)
+    IF plugLeitung[k] >= 0 THEN
+        TRY
+            WINDOW_SEND(plugLeitung[k], "{" + CHR$(34) + "art" + CHR$(34) + ":" + CHR$(34) + "ende" + CHR$(34) + "}")
+            WINDOW_CLOSE(plugLeitung[k])
+        CATCH e
+        END TRY
+    END IF
+    plugLeitung[k] = -1
+    plugZustand[k] = zustand
+    DIM vor AS STRING : vor = "plugin:" + plugNamen[k] + ":"
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(plugBefKennung) - 1
+        IF LEFT$(plugBefKennung[i], LEN(vor)) = vor THEN GUI_MENU_ENABLE(plugBefItem[i], FALSE)
+    NEXT
+    DIM lv AS STRING : lv = "plugin." + plugNamen[k] + "."
+    FOR i = 0 TO LEN(plugLeisteName) - 1
+        IF LEFT$(plugLeisteName[i], LEN(lv)) = lv THEN GUI_DOCK_SHOW(win, plugLeisteName[i], FALSE)
+    NEXT
+    ' Befunde, Schnipsel und Faerbungen des Plugins gelten nicht mehr.
+    DIM bk AS STRING
+    FOR EACH bk IN MAPKEYS(plugBefunde)
+        IF LEFT$(bk, LEN(plugNamen[k]) + 1) = plugNamen[k] + "|" THEN MAPREMOVE(plugBefunde, bk)
+    NEXT
+    pluginSchnipselWeg(plugNamen[k])
+    pluginFaerbungWeg(plugNamen[k])
+    protokoll("plugin " + plugNamen[k] + " " + zustand)
+END SUB
+
+SUB pluginsBeenden()
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(plugNamen) - 1
+        IF plugLeitung[k] >= 0 THEN pluginStoppen(k, "aus")
+    NEXT
+END SUB
+
+SUB pluginsNeuLaden()
+    pluginsBeenden()
+    plugNamen = [] : plugPfade = [] : plugLeitung = [] : plugZustand = [] : plugHoert = []
+    pluginsStarten()
+    GUI_SET_TEXT(lblStatus, tr$("Plugins neu geladen: ") + STR$(LEN(plugNamen)))
+    IF GUI_WINDOW_SHOWN(winPlug) THEN pluginListeFuellen()
+END SUB
+
+FUNCTION pluginNr(name AS STRING) AS INTEGER
+    RETURN ARRAY_INDEXOF(plugNamen, name)
+END FUNCTION
+
+SUB pluginSenden(k AS INTEGER, j AS JSON_HANDLE)
+    IF k < 0 OR plugLeitung[k] < 0 THEN RETURN
+    TRY
+        WINDOW_SEND(plugLeitung[k], JSON_STRINGIFY(j))
+    CATCH e
+    END TRY
+END SUB
+
+' Ein Ereignis an alle, die es hoeren wollen (PLUGIN_HOERE).
+SUB pluginEreignis(name AS STRING, datei AS STRING)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(plugNamen) - 1
+        IF plugLeitung[k] < 0 THEN CONTINUE
+        IF INSTR(plugHoert[k], ";" + name + ";") < 0 THEN CONTINUE
+        DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+        JSON_SET_STRING(j, "art", "ereignis")
+        JSON_SET_STRING(j, "name", name)
+        JSON_SET_STRING(j, "datei", datei)
+        pluginSenden(k, j)
+    NEXT
+END SUB
+
+' "plugin:<plugin>:<id>" -- ausgeloest ueber Menue, Kuerzel oder Palette.
+SUB pluginBefehl(kennung AS STRING)
+    DIM rest AS STRING : rest = MID$(kennung, 7)
+    DIM t AS INTEGER : t = INSTR(rest, ":")
+    IF t < 0 THEN RETURN
+    DIM k AS INTEGER : k = pluginNr(LEFT$(rest, t))
+    IF k < 0 THEN RETURN
+    IF plugLeitung[k] < 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Das Plugin läuft nicht: ") + plugNamen[k])
+        RETURN
+    END IF
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    JSON_SET_STRING(j, "art", "befehl")
+    JSON_SET_STRING(j, "id", MID$(rest, t + 1))
+    pluginSenden(k, j)
+    protokoll("plugin befehl " + kennung)
+END SUB
+
+' Je Bild: Nachrichten der Plugins lesen (hoechstens 50 je Plugin, sonst
+' haelt ein geschwaetziges Plugin die IDE an), Abstuerze erkennen, Klicks
+' und Aenderungen in ihren Leisten weitergeben.
+SUB pluginsNachziehen()
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(plugNamen) - 1
+        IF plugLeitung[k] < 0 THEN CONTINUE
+        DIM zaehl AS INTEGER : zaehl = 0
+        WHILE zaehl < 50
+            DIM z AS STRING : z = ""
+            TRY
+                z = WINDOW_RECV$(plugLeitung[k])
+            CATCH e
+                z = ""
+            END TRY
+            IF z = "" THEN BREAK
+            pluginNachricht(k, z)
+            zaehl = zaehl + 1
+            IF plugLeitung[k] < 0 THEN BREAK
+        WEND
+        IF plugLeitung[k] >= 0 THEN
+            IF NOT WINDOW_ALIVE(plugLeitung[k]) THEN pluginStoppen(k, "abgestürzt")
+        END IF
+    NEXT
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(plugLeisteName) - 1
+        IF NOT GUI_DOCK_SHOWN(win, plugLeisteName[i]) THEN CONTINUE
+        DIM pw AS INTEGER : pw = plugLeisteFenster[i]
+        DIM teile AS ARRAY OF STRING : teile = SPLIT$(plugLeisteName[i], ".")
+        IF LEN(teile) < 3 THEN CONTINUE
+        DIM pk AS INTEGER : pk = pluginNr(teile[1])
+        IF pk < 0 THEN CONTINUE
+        DIM leisteId AS STRING : leisteId = MID$(plugLeisteName[i], LEN(teile[0]) + LEN(teile[1]) + 2)
+        DIM wi AS INTEGER
+        FOR wi = 0 TO GUI_WINDOW_WIDGET_COUNT(pw) - 1
+            DIM h AS GUI_WIDGET : h = GUI_WINDOW_WIDGET(pw, wi)
+            IF GUI_CLICKED(h) THEN pluginWidgetEreignis(pk, "klick", leisteId, wi, "")
+            IF GUI_CHANGED(h) THEN pluginWidgetEreignis(pk, "geaendert", leisteId, wi, pluginWert$(h))
+        NEXT
+    NEXT
+END SUB
+
+FUNCTION pluginWert$(h AS GUI_WIDGET) AS STRING
+    SELECT CASE LOWER$(GUI_KIND(h))
+        CASE "checkbox", "toggle", "radio" : RETURN IIF(GUI_CHECKED(h), "TRUE", "FALSE")
+        CASE "slider", "spinner", "knob", "progress" : RETURN STR$(GUI_VALUE(h))
+        CASE "listbox" : RETURN STR$(GUI_LISTBOX_SELECTED(h))
+        CASE "dropdown" : RETURN STR$(GUI_DROPDOWN_SELECTED(h))
+    END SELECT
+    RETURN GUI_TEXT(h)
+END FUNCTION
+
+SUB pluginWidgetEreignis(k AS INTEGER, art AS STRING, leiste AS STRING, widget AS INTEGER, wert AS STRING)
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    JSON_SET_STRING(j, "art", art)
+    JSON_SET_STRING(j, "leiste", leiste)
+    JSON_SET_INT(j, "widget", widget)
+    JSON_SET_STRING(j, "wert", wert)
+    pluginSenden(k, j)
+END SUB
+
+FUNCTION plugText$(j AS JSON_HANDLE, k AS STRING) AS STRING
+    IF NOT JSON_HAS(j, k) THEN RETURN ""
+    IF JSON_TYPE(j, k) = "string" THEN RETURN JSON_GET_STRING(j, k)
+    IF JSON_TYPE(j, k) = "number" THEN RETURN STR$(JSON_GET_INT(j, k))
+    RETURN ""
+END FUNCTION
+
+FUNCTION plugZahl(j AS JSON_HANDLE, k AS STRING) AS INTEGER
+    IF NOT JSON_HAS(j, k) THEN RETURN 0
+    IF JSON_TYPE(j, k) <> "number" THEN RETURN 0
+    RETURN JSON_GET_INT(j, k)
+END FUNCTION
+
+' Eine Nachricht eines Plugins. Was nicht stimmt, steht im Protokoll und in
+' der Ausgabe -- ein Fehler im Plugin ist nicht der Fehler der IDE.
+SUB pluginNachricht(k AS INTEGER, zeile AS STRING)
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_PARSE(zeile)
+    CATCH e
+        protokoll("plugin " + plugNamen[k] + " unlesbar")
+        RETURN
+    END TRY
+    DIM art AS STRING : art = plugText$(j, "art")
+    TRY
+        SELECT CASE art
+            CASE "befehl" : pluginBefehlAnmelden(k, j)
+            CASE "leiste" : pluginLeisteAnmelden(k, j)
+            CASE "hoere"
+                DIM ev AS STRING : ev = plugText$(j, "ereignis")
+                IF INSTR(plugHoert[k], ";" + ev + ";") < 0 THEN plugHoert[k] = plugHoert[k] + ev + ";"
+            CASE "setze" : pluginSetze(k, j)
+            CASE "liste" : pluginListe(k, j)
+            CASE "frage" : pluginAntwort(k, j)
+            CASE "tue" : pluginTue(k, j)
+            CASE "befunde"
+                MAPPUT(plugBefunde, plugNamen[k] + "|" + wegGleich$(plugText$(j, "datei")), JSON_STRINGIFY(JSON_GET_JSON(j, "liste")))
+                pruefungFaellig = GET_TIME()
+            CASE "schnipsel"
+                ARRAY_PUSH(plugSchnName, plugText$(j, "name"))
+                ARRAY_PUSH(plugSchnAbk, plugText$(j, "kuerzel"))
+                ARRAY_PUSH(plugSchnText, plugText$(j, "text"))
+                ARRAY_PUSH(plugSchnHerkunft, "Plugin " + plugNamen[k])
+                schnipselLaden()
+            CASE "faerbung"
+                ARRAY_PUSH(plugFaerbEndung, plugNamen[k] + "|" + LOWER$(plugText$(j, "endung")))
+                ARRAY_PUSH(plugFaerbMuster, plugText$(j, "muster"))
+                ARRAY_PUSH(plugFaerbFarbe, plugZahl(j, "farbe"))
+                faerbSchluessel = ""
+            CASE ELSE
+                protokoll("plugin " + plugNamen[k] + " unbekannt " + art)
+        END SELECT
+    CATCH e
+        protokoll("plugin " + plugNamen[k] + " fehler " + e)
+        ausgabe("[" + plugNamen[k] + "] " + e)
+    END TRY
+END SUB
+
+SUB pluginBefehlAnmelden(k AS INTEGER, j AS JSON_HANDLE)
+    DIM kennung AS STRING : kennung = "plugin:" + plugNamen[k] + ":" + plugText$(j, "id")
+    DIM titel AS STRING : titel = plugText$(j, "titel")
+    DIM kuerzel AS STRING : kuerzel = plugText$(j, "kuerzel")
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(plugBefKennung, kennung)
+    IF i >= 0 THEN
+        ' Neu gestartet: derselbe Menuepunkt, wieder bedienbar.
+        GUI_MENU_ENABLE(plugBefItem[i], TRUE)
+        GUI_MENU_TEXT(plugBefItem[i], titel)
+        RETURN
+    END IF
+    DIM item AS INTEGER
+    IF kuerzel = "" THEN
+        item = GUI_MENU_ITEM(mPlugins, titel)
+    ELSE
+        item = GUI_MENU_ITEM(mPlugins, titel, kz$(kuerzel))
+    END IF
+    ARRAY_PUSH(plugBefKennung, kennung)
+    ARRAY_PUSH(plugBefItem, item)
+    menueBefehl(item, kennung, kuerzel)
+    paletteEintrag(titel, kennung, kuerzel)
+    protokoll("plugin befehl angemeldet " + kennung)
+END SUB
+
+SUB pluginLeisteAnmelden(k AS INTEGER, j AS JSON_HANDLE)
+    DIM name AS STRING : name = "plugin." + plugNamen[k] + "." + plugText$(j, "id")
+    DIM bereich AS STRING : bereich = plugText$(j, "bereich")
+    IF bereich = "" THEN bereich = "rechts"
+    DIM pw AS INTEGER : pw = GUI_FROM_JSON(JSON_STRINGIFY(JSON_GET_JSON(j, "form")))
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(plugLeisteName, name)
+    IF i >= 0 THEN
+        ' Neu gestartet: das alte Fenster weg, das neue an seinen Platz.
+        GUI_WINDOW_DESTROY(plugLeisteFenster[i])
+        plugLeisteFenster[i] = pw
+        GUI_DOCK_TITLE(win, name, plugText$(j, "titel"))
+        GUI_DOCK_SHOW(win, name, TRUE)
+    ELSE
+        GUI_DOCK_PANEL(win, name, plugText$(j, "titel"), bereich)
+        ARRAY_PUSH(plugLeisteName, name)
+        ARRAY_PUSH(plugLeisteFenster, pw)
+    END IF
+    GUI_DOCK_WINDOW(win, name, pw)
+    layout()
+    protokoll("plugin leiste " + name + " " + GUI_DOCK_WHERE$(win, name))
+END SUB
+
+FUNCTION pluginLeisteFenster(k AS INTEGER, j AS JSON_HANDLE) AS INTEGER
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(plugLeisteName, "plugin." + plugNamen[k] + "." + plugText$(j, "leiste"))
+    IF i < 0 THEN RETURN -1
+    RETURN plugLeisteFenster[i]
+END FUNCTION
+
+SUB pluginSetze(k AS INTEGER, j AS JSON_HANDLE)
+    DIM pw AS INTEGER : pw = pluginLeisteFenster(k, j)
+    IF pw < 0 THEN RETURN
+    DIM nr AS INTEGER : nr = plugZahl(j, "widget")
+    IF nr < 0 OR nr >= GUI_WINDOW_WIDGET_COUNT(pw) THEN RETURN
+    DIM h AS GUI_WIDGET : h = GUI_WINDOW_WIDGET(pw, nr)
+    DIM wert AS STRING : wert = plugText$(j, "wert")
+    DIM wahr AS BOOLEAN : wahr = UPPER$(wert) = "TRUE" OR wert = "1"
+    SELECT CASE plugText$(j, "was")
+        CASE "text" : GUI_SET_TEXT(h, wert)
+        CASE "checked" : GUI_SET_CHECKED(h, wahr)
+        CASE "value" : GUI_SET_VALUE(h, VAL(wert))
+        CASE "enabled" : GUI_SET_ENABLED(h, wahr)
+        CASE "visible" : GUI_SET_VISIBLE(h, wahr)
+        CASE "selected"
+            IF LOWER$(GUI_KIND(h)) = "dropdown" THEN GUI_DROPDOWN_SET_SELECTED(h, VAL(wert)) ELSE GUI_LISTBOX_SET_SELECTED(h, VAL(wert))
+    END SELECT
+END SUB
+
+SUB pluginListe(k AS INTEGER, j AS JSON_HANDLE)
+    DIM pw AS INTEGER : pw = pluginLeisteFenster(k, j)
+    IF pw < 0 THEN RETURN
+    DIM nr AS INTEGER : nr = plugZahl(j, "widget")
+    IF nr < 0 OR nr >= GUI_WINDOW_WIDGET_COUNT(pw) THEN RETURN
+    DIM h AS GUI_WIDGET : h = GUI_WINDOW_WIDGET(pw, nr)
+    DIM eintraege AS ARRAY OF STRING : eintraege = []
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "eintraege") - 1
+        ARRAY_PUSH(eintraege, JSON_GET_STRING(j, "eintraege." + STR$(i)))
+    NEXT
+    IF LOWER$(GUI_KIND(h)) = "dropdown" THEN GUI_SET_DROPDOWN(h, eintraege) ELSE GUI_SET_LISTBOX(h, eintraege)
+END SUB
+
+SUB pluginAntwort(k AS INTEGER, j AS JSON_HANDLE)
+    DIM a AS JSON_HANDLE : a = JSON_PARSE("{}")
+    JSON_SET_STRING(a, "art", "antwort")
+    JSON_SET_INT(a, "nr", plugZahl(j, "nr"))
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    DIM wert AS STRING : wert = ""
+    SELECT CASE plugText$(j, "was")
+        CASE "text" : IF ta >= 0 THEN wert = GUI_TEXT(ta)
+        CASE "datei" : IF aktiverTab >= 0 THEN wert = tabPfade[aktiverTab]
+        CASE "auswahl" : IF ta >= 0 THEN wert = GUI_TEXTAREA_SELECTION$(ta)
+        CASE "projekt" : wert = projektOrdner
+        CASE "marke"
+            IF ta >= 0 THEN
+                DIM mz AS INTEGER
+                DIM ms AS INTEGER
+                (mz, ms) = GUI_TEXTAREA_CURSOR(ta)
+                wert = STR$(mz) + "," + STR$(ms)
+            END IF
+    END SELECT
+    JSON_SET_STRING(a, "wert", wert)
+    pluginSenden(k, a)
+END SUB
+
+SUB pluginTue(k AS INTEGER, j AS JSON_HANDLE)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    SELECT CASE plugText$(j, "was")
+        CASE "einfuegen" : IF ta >= 0 THEN GUI_TEXTAREA_INSERT(ta, plugText$(j, "text"))
+        CASE "meldung" : GUI_SET_TEXT(lblStatus, plugText$(j, "text"))
+        CASE "ausgabe" : ausgabe(plugText$(j, "text"))
+        CASE "oeffnen"
+            dateiOeffnen(plugText$(j, "datei"))
+            DIM zl AS INTEGER : zl = plugZahl(j, "zeile")
+            ta = aktivesFeld()
+            IF ta >= 0 AND zl > 0 THEN GUI_TEXTAREA_GOTO(ta, zl, 1)
+    END SELECT
+END SUB
+
+' Die Befunde aller Plugins fuer eine Datei (Zeile, Meldung, Schwere).
+SUB pluginBefundeFuer(datei AS STRING, BYREF zeilen AS ARRAY OF INTEGER, BYREF texte AS ARRAY OF STRING, BYREF schweren AS ARRAY OF STRING)
+    IF datei = "" OR LEN(MAPKEYS(plugBefunde)) = 0 THEN RETURN
+    DIM d AS STRING : d = wegGleich$(datei)
+    DIM bk AS STRING
+    FOR EACH bk IN MAPKEYS(plugBefunde)
+        DIM t AS INTEGER : t = INSTR(bk, "|")
+        IF MID$(bk, t + 1) <> d THEN CONTINUE
+        DIM liste AS JSON_HANDLE : liste = JSON_PARSE(MAPGET(plugBefunde, bk))
+        DIM i AS INTEGER
+        FOR i = 0 TO JSON_LEN(liste, "") - 1
+            DIM p AS STRING : p = STR$(i)
+            ARRAY_PUSH(zeilen, plugZahl(liste, p + ".zeile"))
+            ARRAY_PUSH(texte, "[" + LEFT$(bk, t) + "] " + plugText$(liste, p + ".meldung"))
+            DIM s AS STRING : s = LOWER$(plugText$(liste, p + ".schwere"))
+            ARRAY_PUSH(schweren, IIF(s = "fehler" OR s = "hinweis", s, "warnung"))
+        NEXT
+    NEXT
+END SUB
+
+SUB pluginSchnipselWeg(name AS STRING)
+    DIM i AS INTEGER : i = LEN(plugSchnName) - 1
+    DIM weg AS BOOLEAN : weg = FALSE
+    WHILE i >= 0
+        IF plugSchnHerkunft[i] = "Plugin " + name THEN
+            ARRAY_REMOVE_AT(plugSchnName, i) : ARRAY_REMOVE_AT(plugSchnAbk, i)
+            ARRAY_REMOVE_AT(plugSchnText, i) : ARRAY_REMOVE_AT(plugSchnHerkunft, i)
+            weg = TRUE
+        END IF
+        i = i - 1
+    WEND
+    IF weg THEN schnipselLaden()
+END SUB
+
+SUB pluginFaerbungWeg(name AS STRING)
+    DIM i AS INTEGER : i = LEN(plugFaerbEndung) - 1
+    WHILE i >= 0
+        IF LEFT$(plugFaerbEndung[i], LEN(name) + 1) = name + "|" THEN
+            ARRAY_REMOVE_AT(plugFaerbEndung, i) : ARRAY_REMOVE_AT(plugFaerbMuster, i) : ARRAY_REMOVE_AT(plugFaerbFarbe, i)
+        END IF
+        i = i - 1
+    WEND
+    faerbSchluessel = ""
+END SUB
+
+' Ein Feld einer Dateiart, fuer die ein Plugin Regeln angemeldet hat: deren
+' Treffer im Ausschnitt faerben, zeilenweise wie die Suche. FALSE heisst:
+' keine Regel, die Faerbung fuer Drachenhauch gilt.
+FUNCTION pluginFaerben(ta AS GUI_WIDGET, stueck AS STRING, von AS INTEGER) AS BOOLEAN
+    IF LEN(plugFaerbEndung) = 0 THEN RETURN FALSE
+    DIM pfad AS STRING : pfad = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        IF tabFelder[i] = ta THEN pfad = tabPfade[i]
+    NEXT
+    DIM pkt AS INTEGER : pkt = INSTRREV(pfad, ".")
+    IF pkt < 0 THEN RETURN FALSE
+    DIM endung AS STRING : endung = LOWER$(MID$(pfad, pkt))
+    DIM s2 AS ARRAY OF INTEGER : s2 = []
+    DIM l2 AS ARRAY OF INTEGER : l2 = []
+    DIM f2 AS ARRAY OF INTEGER : f2 = []
+    DIM treffer AS BOOLEAN : treffer = FALSE
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(stueck, NL)
+    FOR i = 0 TO LEN(plugFaerbEndung) - 1
+        DIM e AS STRING : e = plugFaerbEndung[i]
+        IF MID$(e, INSTR(e, "|") + 1) <> endung THEN CONTINUE
+        treffer = TRUE
+        DIM off AS INTEGER : off = 0
+        DIM zi AS INTEGER
+        FOR zi = 0 TO LEN(zeilen) - 1
+            DIM ab AS INTEGER : ab = 0
+            DIM wie AS INTEGER : wie = 0
+            WHILE ab <= LEN(zeilen[zi]) AND wie < 200
+                DIM sp AS INTEGER
+                DIM sl AS INTEGER
+                TRY
+                    (sp, sl) = REGEX_FIND_POS(zeilen[zi], plugFaerbMuster[i], ab)
+                CATCH fe
+                    sp = -1
+                END TRY
+                IF sp < 0 THEN BREAK
+                IF sl > 0 THEN
+                    ARRAY_PUSH(s2, von + off + sp) : ARRAY_PUSH(l2, sl) : ARRAY_PUSH(f2, plugFaerbFarbe[i])
+                END IF
+                ab = sp + MAX(sl, 1)
+                wie = wie + 1
+            WEND
+            off = off + LEN(zeilen[zi]) + 1
+        NEXT
+    NEXT
+    IF NOT treffer THEN RETURN FALSE
+    GUI_TEXTAREA_SPANS(ta, s2, l2, f2)
+    RETURN TRUE
+END FUNCTION
+
+' --- Plugins verwalten (Plugins -> Plugins verwalten ...) -------------------
+DIM winPlug AS GUI_WINDOW : winPlug = GUI_WINDOW(tr$("Plugins"), 260, 120, 560, 380)
+GUI_WINDOW_CLOSABLE(winPlug, TRUE)
+DIM lblPlugInfo AS GUI_WIDGET : lblPlugInfo = GUI_LABEL(winPlug, tr$("Haken = beim Start laden. Ein Plugin liegt in plugins/<name>/plugin.dh."), 12, 10)
+DIM lstPlug AS GUI_WIDGET : lstPlug = GUI_LISTBOX(winPlug, 12, 34, 536, 250, [])
+GUI_LISTBOX_SET(lstPlug, "kaestchen", 1)
+GUI_LISTBOX_PLACEHOLDER(lstPlug, tr$("Keine Plugins -- „Plugin-Ordner öffnen“ legt den Ordner an."))
+DIM btnPlugNeu AS GUI_WIDGET : btnPlugNeu = GUI_BUTTON(winPlug, tr$("Neu laden"), 12, 296, 120, 30)
+DIM btnPlugOrdner AS GUI_WIDGET : btnPlugOrdner = GUI_BUTTON(winPlug, tr$("Ordner öffnen"), 142, 296, 140, 30)
+DIM btnPlugZu AS GUI_WIDGET : btnPlugZu = GUI_BUTTON(winPlug, tr$("Schließen"), 428, 296, 120, 30)
+GUI_WINDOW_CANCEL(winPlug, btnPlugZu)
+GUI_WINDOW_VISIBLE(winPlug, FALSE)
+
+SUB pluginListeFuellen()
+    GUI_LISTBOX_CLEAR(lstPlug)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(plugNamen) - 1
+        DIM z AS INTEGER : z = GUI_LISTBOX_ADD(lstPlug, plugNamen[k])
+        GUI_LISTBOX_DETAIL(lstPlug, z, plugZustand[k])
+        GUI_LISTBOX_SET_CHECKED(lstPlug, z, NOT pluginAus(plugNamen[k]))
+    NEXT
+END SUB
+
+SUB pluginsVerwalten()
+    IF LEN(plugNamen) = 0 THEN pluginsStarten()
+    pluginListeFuellen()
+    GUI_WINDOW_VISIBLE(winPlug, TRUE)
+    GUI_FOCUS(lstPlug)
+END SUB
+
+' Je Bild, solange das Fenster offen ist.
+SUB pluginsVerwaltenNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winPlug) THEN RETURN
+    IF GUI_CLICKED(btnPlugZu) THEN GUI_WINDOW_VISIBLE(winPlug, FALSE) : RETURN
+    IF GUI_CLICKED(btnPlugNeu) THEN pluginsNeuLaden()
+    IF GUI_CLICKED(btnPlugOrdner) THEN befehl("plugins_ordner")
+    DIM k AS INTEGER
+    FOR k = 0 TO MIN(LEN(plugNamen), GUI_LISTBOX_COUNT(lstPlug)) - 1
+        DIM an AS BOOLEAN : an = GUI_LISTBOX_CHECKED(lstPlug, k)
+        IF an = pluginAus(plugNamen[k]) THEN
+            pluginAusSetzen(plugNamen[k], NOT an)
+            IF an THEN pluginStarten(k) ELSE pluginStoppen(k, "aus")
+            GUI_LISTBOX_DETAIL(lstPlug, k, plugZustand[k])
+        END IF
+    NEXT
+END SUB
+
 SUB paletteEintrag(name AS STRING, kennung AS STRING, kuerzel AS STRING)
     ARRAY_PUSH(befehlNamen, tr$(name))
     ARRAY_PUSH(befehlKennungen, kennung)
@@ -16808,6 +17596,10 @@ paletteEintrag("Geänderte Zeilen am Rand", "git_rand", "")
 paletteEintrag("Schnipsel einfügen ...", "schnipsel", "Strg+J")
 paletteEintrag("Einstellungen ...", "einstellungen", "Strg+U")
 paletteEintrag("Eingebaute Befehle nachschlagen ...", "befehle", "Strg+F3")
+' Plugins und das Dock -- hinten, damit "oeffnen" in der Palette zuerst
+' das Oeffnen einer Datei findet.
+paletteEintrag("Plugins verwalten ...", "plugins_verwalten", "") : paletteEintrag("Plugins neu laden", "plugins_neu", "")
+paletteEintrag("Plugin-Ordner öffnen", "plugins_ordner", "") : paletteEintrag("Leisten zurücksetzen", "leisten_zurueck", "")
 paletteEintrag("Definition hier zeigen", "peek", "Alt+F12")
 paletteEintrag("Symbol im Projekt suchen ...", "symbole", "Strg+Umschalt+S")
 paletteEintrag("Im ganzen Projekt ersetzen ...", "ersetzen_projekt", "Strg+Umschalt+H")
@@ -17580,6 +18372,18 @@ SUB befehl(k AS STRING)
         CASE "beispiele_themen" : themenZeigen()
         CASE "ausdruck"
             IF prozessArt = "debug" AND debugPause THEN GUI_FOCUS(tfEingabe) ELSE GUI_SET_TEXT(lblStatus, tr$("Der Debugger steht gerade nicht -- erst F7 und ein Halt."))
+        CASE "leisten_zurueck"
+            GUI_DOCK_SET_STATE(win, dockVorgabe)
+            layout()
+            konfigSichern()
+            protokoll("leisten zurueckgesetzt")
+        CASE "plugins_verwalten" : pluginsVerwalten()
+        CASE "plugins_neu" : pluginsNeuLaden()
+        CASE "plugins_ordner"
+            IF NOT DIREXISTS(pluginOrdner$()) THEN MKDIR(pluginOrdner$())
+            OPENDOC(pluginOrdner$())
+        CASE ELSE
+            IF LEFT$(k, 7) = "plugin:" THEN pluginBefehl(k)
     END SELECT
 END SUB
 
@@ -17649,6 +18453,8 @@ menueBefehl(miBNeuDatei, "baum_neue_datei", "") : menueBefehl(miBNeuOrdner, "bau
 menueBefehl(miBLoeschen, "baum_loeschen", "") : menueBefehl(miBPfad, "baum_pfad", "")
 menueBefehl(miAZeile, "ausgabe_zeile_kopieren", "") : menueBefehl(miAKopieren, "ausgabe_kopieren", "") : menueBefehl(miASichern, "ausgabe_sichern", "") : menueBefehl(miALeeren, "ausgabe_leeren", "")
 menueBefehl(miDefinition, "definition", "F12") : menueBefehl(miUmbenennen, "umbenennen", "Umschalt+F6") : menueBefehl(miKorrektur, "korrektur", "Strg+.")
+menueBefehl(miPlugVerwalten, "plugins_verwalten", "") : menueBefehl(miPlugNeu, "plugins_neu", "")
+menueBefehl(miPlugOrdner, "plugins_ordner", "") : menueBefehl(miLeistenZurueck, "leisten_zurueck", "")
 menueBefehl(miSchnipsel, "schnipsel", "Strg+J") : menueBefehl(miEinstellungen, "einstellungen", "Strg+U") : menueBefehl(miBefehle, "befehle", "Strg+F3")
 menueBefehl(miPeek, "peek", "Alt+F12") : menueBefehl(miSymbole, "symbole", "Strg+Umschalt+S") : menueBefehl(miErsProjekt, "ersetzen_projekt", "Strg+Umschalt+H")
 menueBefehl(miAusgabeSuche, "ausgabe_suchen", "Strg+Umschalt+A") : menueBefehl(miMarkeNaechste, "marke_naechste", "Strg+Umschalt+N") : menueBefehl(miMarkeEnden, "marken_enden", "Strg+Umschalt+I")
@@ -17771,8 +18577,9 @@ handbuchSchrift(handbuchGroesse)
 IF codeFont >= 0 THEN GUI_RICHTEXT_SET(rtHandbuch, "codeschrift", codeFont)
 hbFarben()
 protokoll("projekt " + projektOrdner)
-lichtstreif(2200)
+glanzStartIn = 4                ' der Streif zieht ab dem vierten Bild
 IF konfigUebergangen <> "" THEN protokoll("konfig uebergangen " + konfigUebergangen)
+pluginsStarten()
 protokoll("bereit")
 
 DIM warBreite AS INTEGER : warBreite = SCREENWIDTH()
@@ -17818,8 +18625,15 @@ WHILE NOT beenden
 
     ' --- Menue (Klick oder Kuerzel) ---
     menueKlicks()
-    IF GUI_CLICKED(btnReiterAusgabe) THEN terminalZeigen(FALSE)
-    IF GUI_CLICKED(btnReiterTerminal) THEN terminalZeigen(TRUE)
+    ' Ein Klick auf den Reiter "Terminal" bzw. "Ausgabe" schaltet um wie
+    ' Alt+3 -- die Eingabezeile gehoert dann dem, was vorn ist.
+    IF GUI_DOCK_CHANGED(win) THEN
+        layout()
+        DIM tsVorn AS BOOLEAN : tsVorn = GUI_DOCK_SHOWN(win, "terminal")
+        DIM asVorn AS BOOLEAN : asVorn = GUI_DOCK_SHOWN(win, "ausgabe")
+        IF tsVorn AND NOT asVorn AND NOT terminalAn THEN terminalZeigen(TRUE)
+        IF asVorn AND NOT tsVorn AND terminalAn THEN terminalZeigen(FALSE)
+    END IF
     IF GUI_CLICKED(btnTermStopp) THEN befehl("terminal_stopp")
     terminalNachziehen()
     terminalVerlaufTasten()
@@ -18306,13 +19120,23 @@ WHILE NOT beenden
         spurNachziehen()
         mausNachziehen(tf)
         randKlicksNachziehen()
-        IF pruefungFaellig >= 0.0 AND GET_TIME() >= pruefungFaellig THEN
+        ' Nicht, solange der Lichtstreif zieht: bei einer grossen Datei haelt
+        ' das Pruefen ein Bild eine halbe Sekunde fest, und genau das passiert
+        ' kurz nach dem Start mit einem Reiter aus der Sitzung -- der Streif
+        ' stockte mitten im Weg. Die Liste fuellt sich dann eben danach.
+        IF pruefungFaellig >= 0.0 AND GET_TIME() >= pruefungFaellig AND NOT GUI_WINDOW_GLOWING(win) THEN
             pruefungFaellig = -1.0
             pruefen()
         END IF
     END IF
 
     abgelegteNachziehen()
+    pluginsNachziehen()
+    pluginsVerwaltenNachziehen()
+    IF aktiverTab <> letzterTab THEN
+        letzterTab = aktiverTab
+        IF aktiverTab >= 0 THEN pluginEreignis("reiter", tabPfade[aktiverTab])
+    END IF
     IF suchLauf THEN
         IF KEYHIT(KEY_ESCAPE) THEN suchAbbrechen() ELSE suchSchritt()
     END IF
@@ -18359,7 +19183,9 @@ WHILE NOT beenden
         IF GUI_WINDOW_AT(GUI_WINDOW_GET_X(winLive) + 10, GUI_WINDOW_GET_Y(winLive) + 10) = winLive THEN GUI_DRAW_WINDOW(winLive)
     END IF
     FLIP()
+    glanzStartNachziehen()
 WEND
+pluginsBeenden()
 
 ' Sauber beendet heisst: ueber die Rueckfrage (alles gesichert oder
 ' ausdruecklich verworfen) oder ohne ungesicherte Reiter -- dann ist der

@@ -15,7 +15,9 @@ prBild = prBild + 1
 IF prBild = 20 THEN
     prBefehle = ["echo hallo", "cd unter", "cd", "echo Größe", "dir /b", "exit /b 3", "type gibtsnicht.txt"]
     befehl("terminal")
-    protokoll("pr ausgabe sichtbar " + STR$(GUI_VISIBLE(lstAusgabe)) + " terminal " + STR$(GUI_VISIBLE(lstTerminal)))
+    ' Ausgabe und Terminal sind zwei Reiter derselben Leiste im Dock (seit
+    ' 2026-10-24) -- gezeigt wird, was vorn ist.
+    protokoll("pr ausgabe sichtbar " + STR$(GUI_DOCK_SHOWN(win, "ausgabe")) + " terminal " + STR$(GUI_DOCK_SHOWN(win, "terminal")))
 END IF
 IF prBild > 20 AND termProz < 0 THEN
     IF prSchritt < LEN(prBefehle) THEN
