@@ -4,7 +4,6 @@
 ' sonst Zeile 30 steht, der Kopf -- GUI_TEXTAREA_POS_AT trifft dort keinen
 ' Text. Ausgeschaltet (Befehl "blockkopf") trifft derselbe Punkt Zeile 30,
 ' und die ide.json merkt es sich.
---- seriell
 
 === der kopf verdeckt die erste zeile, ausgeschaltet nicht
 DIM prBild AS INTEGER : prBild = 0

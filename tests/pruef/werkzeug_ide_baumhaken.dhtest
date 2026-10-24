@@ -4,7 +4,6 @@
 ' einer DATEI -- ein angehakter Ordner machte das Projekt leer, und es sah
 ' aus, als taete der Haken nichts.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 --- langsam
 === ein angehakter ordner nimmt seine dateien mit

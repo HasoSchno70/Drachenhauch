@@ -4,7 +4,6 @@
 ' oeffnet eine Vorschau in der IDE statt des Systemprogramms. Der Klang
 ' hier ist absichtlich kein lesbares WAV -- die Vorschau sagt es, statt
 ' abzubrechen (eine Tonausgabe gibt es auf den Pruefrechnern ohnehin nicht).
---- seriell
 
 === bild beim ueberfahren, vorschau fuer bild und klang
 DIM prBild AS INTEGER : prBild = 0

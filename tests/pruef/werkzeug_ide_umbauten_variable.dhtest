@@ -3,7 +3,6 @@
 ' Vorschau (ide.json umbau_vorschau: false) landet der Umbau gleich im
 ' Reiter; geprueft wird der Text und dass er laeuft. Jeder Umbau hat eine
 ' Ablehnung, wo er die Bedeutung aendern wuerde.
---- seriell
 
 === auswahl als variable einfuehren
 DIM prBild AS INTEGER : prBild = 0

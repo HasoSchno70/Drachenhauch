@@ -3,7 +3,6 @@
 ' FUNCREF, aber nicht im Kommentar, nicht in einer Zeichenkette und nicht
 ' in der Kopfzeile selbst. Ein Klick auf den Zaehler zeigt die Aufrufer.
 ' Ausgeschaltet verschwinden die Zaehler.
---- seriell
 
 === zaehlt ueber das projekt, klick zeigt die aufrufer
 DIM prBild AS INTEGER : prBild = 0

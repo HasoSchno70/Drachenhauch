@@ -3,7 +3,6 @@
 ' ausfuehren" laeuft den Projektordner, "Fehlgeschlagene" nur die roten
 ' Faelle (je einer mit --fall), danach stimmt der Stand wieder.
 ' Die Sammlungen schreibt das `--- vorher` -- ihre Zeilen beginnen mit ===.
---- seriell
 
 === alle, dann nur die fehlgeschlagenen
 DIM prBild AS INTEGER : prBild = 0

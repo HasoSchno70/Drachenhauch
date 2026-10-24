@@ -4,7 +4,6 @@
 ' Nacheinander: das Warten auf Eingabe wacht bei JEDEM Ereignis auf, und
 ' parallel erscheinende Fenster der anderen Faelle sind welche.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 === grundkoerper und labyrinth an ihren huellquadern
 ' Der Kegel steht auf dem Boden (y 0..h), die Halbkugel ist die obere

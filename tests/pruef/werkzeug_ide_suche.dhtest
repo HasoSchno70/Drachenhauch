@@ -10,7 +10,6 @@
 ' Die Datei: `hp` steht als ganzes Wort in Zeile 1 und 3, als `HP` in
 ' Zeile 4 und als Teil von `hpmax` in Zeile 2 und 4.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 --- langsam
 === tippen springt, enter geht weiter und zurueck

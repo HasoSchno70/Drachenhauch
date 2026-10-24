@@ -2,7 +2,6 @@
 ' .dhtest im Reiter laufen, jeder fehlgeschlagene Fall steht mit Zeile in
 ' der Liste unten rechts, ein Klick springt hin. Strg+Alt+Umschalt+F5 nimmt
 ' nur den Fall unter der Marke (--filter).
---- seriell
 
 === ganze sammlung, dann nur der fall unter der marke
 DIM prBild AS INTEGER : prBild = 0

@@ -1,7 +1,6 @@
 ' Reiter mit Kreuz (GUI_TABS_CLOSABLE / GUI_TAB_CLOSED). Die Laufzeit
 ' schliesst NICHTS -- sie meldet nur, welches Kreuz getroffen wurde.
 ' Format: docs/werkzeuge.md.
---- seriell
 
 === ohne den schalter meldet nichts
 ' Die Gegenprobe: derselbe Klick an derselben Stelle meldet NICHTS.

@@ -5,7 +5,6 @@
 ' - ein Ordner als Startargument hiess "Gibt es nicht".
 ' Getrieben ueber die Unterprogramme der IDE (Einschub in der Bildschleife).
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 --- langsam
 === das profil zeigt zeilen der importierten datei und springt dorthin

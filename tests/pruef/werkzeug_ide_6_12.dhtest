@@ -9,7 +9,6 @@
 ' als Beilage _programm/ide.json. Mausklicks treffen feste Lagen: Projektbaum
 ' ab y = 128 je 22 Punkte, Werkzeugleiste bei y = 74.
 ' In der Aufnahme: 7 Mauslage, 6 Taste runter, 5 hoch, 2 Taste runter, 1 hoch.
---- seriell
 
 --- langsam
 === neue zeile uebernimmt die einrueckung und rueckt aus

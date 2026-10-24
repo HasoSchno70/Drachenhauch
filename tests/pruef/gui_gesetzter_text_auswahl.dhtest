@@ -6,7 +6,6 @@
 '
 ' Die Faelle mit Tasten laufen nacheinander: Strg+C schreibt in DIE
 ' Zwischenablage, und die gibt es nur einmal.
---- seriell
 
 === weiter und zurueck mit umlauf
 IMPORT "gui"

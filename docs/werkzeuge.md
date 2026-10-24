@@ -178,6 +178,15 @@ Fall zu tippen. Vorher stand dann „BSCREEN“ statt „SCREEN“ in der IDE ei
 Falls, und eine Maus über dem Fenster nahm einem Fall seinen Tooltip.
 `DHRT_OHNE_EINGABE=0` in `--- umgebung` schaltet es für einen Fall ab.
 
+**Eine Zwischenablage je Prozess:** dieselben Programme bekommen
+`DHRT_ZWISCHENABLAGE=privat`. `CLIPBOARD_SET`, `CLIPBOARD_GET` und Kopieren
+und Einfügen in der gui benutzen dann eine Ablage nur dieses Prozesses statt
+der des Systems. Die Prüfungen der IDE und der Werkzeuge „tippen“ über
+`CLIPBOARD_SET` und Strg+V (eine Aufnahme speist keine Zeichen ein), und die
+Zwischenablage des Systems gibt es nur einmal -- zwei Fälle zugleich fügten
+den Text des anderen ein. Wer die echte Ablage prüft, setzt
+`DHRT_ZWISCHENABLAGE=system` in `--- umgebung` (so `zwischenablage.dhtest`).
+
 **Werkzeuge ohne Python prüfen** (seit Stufe 32): so laufen die Tests des
 Form-Designers in `tests/pruef/werkzeug_formdesigner.dhtest`. Zwei Wege
 nebeneinander — echte Klicks über eine Aufnahme (Einschub
@@ -267,10 +276,16 @@ WEND
 ```
 
 Ohne Erwartung gilt ein Fall als bestanden, wenn er mit 0 endet. **Jeder
-Fall läuft als eigener Prozess in einem eigenen Verzeichnis**, die Fälle
-einer Datei parallel — außer die Datei trägt vor dem ersten Fall die Zeile
-`--- seriell`, dann laufen sie nacheinander (für Fälle, die sich die
-Zwischenablage, einen festen Port oder die Soundkarte teilen); `dhrt test datei.dhtest --filter Text` lässt nur die
+Fall läuft als eigener Prozess in einem eigenen Verzeichnis.** Die Dateien
+laufen nebeneinander und teilen sich bis zu acht Plätze (so viele Fälle
+laufen zugleich, über alle Dateien zusammen). Trägt eine Datei vor dem
+ersten Fall die Zeile `--- seriell`, laufen ihre Fälle nacheinander und die
+Datei allein, nach allen anderen -- für Fälle, die sich etwas teilen, das es
+nur einmal gibt: einen festen Port, die Soundkarte, den Drucker, das Fenster
+im Vordergrund, die echte Zwischenablage oder Fensternachrichten mit festen
+Abständen. Bis 2026.34 lief eine Datei nach der anderen, und gut hundert
+Dateien trugen `--- seriell` nur wegen der Zwischenablage; ein voller Lauf
+brauchte 38 Minuten, seither etwa 14 (mit `--schnell` etwa 6). `dhrt test datei.dhtest --filter Text` lässt nur die
 Fälle laufen, deren Name den Text enthält, `--fall Name` genau den einen dieses Namens. Eine Datei mit der Zeile
 `--- langsam` vor dem ersten Fall lässt `dhrt test --schnell` aus (die
 Werkzeuge, die IDE und alles, was echte Fenster in Echtzeit bedient) — die

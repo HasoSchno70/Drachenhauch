@@ -8,7 +8,6 @@
 '     nur fuer das gestartete Programm.
 ' (3) Beim Sichern neu starten: laeuft ein Programm (F5), startet Strg+S es
 '     neu -- ausgeschaltet nicht.
---- seriell
 --- langsam
 
 === eine warnung steht gelb hinter ihrer zeile und laesst sich abschalten

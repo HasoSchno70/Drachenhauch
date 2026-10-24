@@ -5,7 +5,6 @@
 ' (2) Zurueck zur vorigen Stelle / Vorwaerts (Strg+Alt+Links/Rechts): jeder
 '     Sprung in eine andere Datei oder um mindestens acht Zeilen wird gemerkt.
 ' (3) Ausgabe filtern und sichern.
---- seriell
 --- langsam
 
 === rechtsklick im baum waehlt ohne zu oeffnen und legt eine datei an

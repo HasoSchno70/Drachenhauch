@@ -8,7 +8,6 @@
 ' SET_MARKDOWN, Verlauf und .dhform. Getippt wird ueber die Zwischenablage
 ' (Strg+V) -- die Wiedergabe fuellt keine Zeichenwarteschlange.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 --- langsam
 === textfeld: doppelklick waehlt das wort

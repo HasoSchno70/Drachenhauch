@@ -4,7 +4,6 @@
 ' (2) Eigene Farben: farben.json neben der ide.json ueberschreibt Code-
 '     Farben, Bereichstoene und Theme-Schluessel, je Thema; gilt nach dem
 '     Sichern sofort.
---- seriell
 --- langsam
 
 === typ hinweise stehen hinter der zeile und lassen sich abschalten

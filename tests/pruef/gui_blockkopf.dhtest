@@ -6,7 +6,6 @@
 ' dort stuende. Die Beilage baut das Feld: SUB (1..29) mit FOR (2..21),
 ' dahinter Zeilen ohne Block.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 === die koepfe verdecken die zeilen darunter, aussen zuerst
 IMPORT "bk.dh"

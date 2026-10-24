@@ -2,7 +2,6 @@
 ' GUI_TEXTAREA_SET(ta, "tab_meldet", 1) rueckt das Feld nicht mehr ein und
 ' sieht nicht nach Abkuerzungen, sondern MELDET ihn nur
 ' (GUI_TEXTAREA_TAB_HIT). Format: docs/werkzeuge.md.
---- seriell
 
 === ohne den schalter rueckt der tabulator ein
 ' Die Gegenprobe zuerst.

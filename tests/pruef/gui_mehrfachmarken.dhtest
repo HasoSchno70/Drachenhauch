@@ -2,7 +2,6 @@
 ' CLEAR_CARETS). Getippt wird ueber die Zwischenablage (Strg+V): raylibs
 ' Wiedergabe legt Tasten in die Tastenwarteschlange, aber keine ZEICHEN in
 ' die Zeichenwarteschlange. Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 === eine marke ist der stand von vorher
 IMPORT "gui"

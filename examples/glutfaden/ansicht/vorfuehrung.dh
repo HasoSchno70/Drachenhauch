@@ -3095,7 +3095,7 @@ FUNCTION vorfuehrenSprache(daten AS INTEGER) AS BOOLEAN
         CASE 5
             ' Ausgaben auf Englisch: Schluessel (Stilnamen, OXS-Elemente)
             ' duerfen nicht mituebersetzt sein -- auf Deutsch fiele das nie auf
-            DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(lwMuster, "sprache.pdf", NEW kern.PdfOptionen())
+            DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(lwMuster, v19Ort$("sprache.pdf"), NEW kern.PdfOptionen())
             DIM stile AS ARRAY OF STRING : stile = []
             DIM zl AS STRING
             DIM titelZeile AS STRING : titelZeile = ""
@@ -3107,9 +3107,9 @@ FUNCTION vorfuehrenSprache(daten AS INTEGER) AS BOOLEAN
                 END IF
             NEXT
             SORT(stile)
-            PRINT "pdf: stile "; JOIN$(stile, " "); " | erster titel '"; titelZeile; "' | datei "; FILEEXISTS("sprache.pdf")
-            kern.htmlExportieren(lwMuster, "sprache.html", NEW kern.HtmlOptionen())
-            DIM hz AS ARRAY OF STRING : hz = READLINES("sprache.html")
+            PRINT "pdf: stile "; JOIN$(stile, " "); " | erster titel '"; titelZeile; "' | datei "; FILEEXISTS(v19Ort$("sprache.pdf"))
+            kern.htmlExportieren(lwMuster, v19Ort$("sprache.html"), NEW kern.HtmlOptionen())
+            DIM hz AS ARRAY OF STRING : hz = READLINES(v19Ort$("sprache.html"))
             DIM hd AS ARRAY OF STRING : hd = []
             DIM sprachZeile AS STRING : sprachZeile = ""
             FOR EACH zl IN hz
@@ -3121,12 +3121,12 @@ FUNCTION vorfuehrenSprache(daten AS INTEGER) AS BOOLEAN
                 PRINT "  "; zl
             NEXT
             ' Eine OXS-Datei ist ein Austauschformat: in beiden Sprachen dieselbe
-            kern.oxsSpeichern(lwMuster, "sprache_en.oxs")
+            kern.oxsSpeichern(lwMuster, v19Ort$("sprache_en.oxs"))
             ok = kern.spracheLaden("de", "")
-            kern.oxsSpeichern(lwMuster, "sprache_de.oxs")
+            kern.oxsSpeichern(lwMuster, v19Ort$("sprache_de.oxs"))
             ok = kern.spracheLaden("en", PATHJOIN(CWD$(), "daten/sprache/en.txt"))
-            DIM ox AS STRING : ox = JOIN$(READLINES("sprache_en.oxs"), CHR$(10))
-            PRINT "oxs: "; LEFT$(ox, 38); " | in beiden sprachen gleich "; ox = JOIN$(READLINES("sprache_de.oxs"), CHR$(10)); " | wieder "; kern.spracheJetzt$()
+            DIM ox AS STRING : ox = JOIN$(READLINES(v19Ort$("sprache_en.oxs")), CHR$(10))
+            PRINT "oxs: "; LEFT$(ox, 38); " | in beiden sprachen gleich "; ox = JOIN$(READLINES(v19Ort$("sprache_de.oxs")), CHR$(10)); " | wieder "; kern.spracheJetzt$()
             DIM csv AS STRING : csv = kern.statistikCsv$(lwMuster, 14, 10.0, 0.0)
             PRINT "csv: "; LEFT$(csv, INSTR(csv, CHR$(10)))
         CASE ELSE

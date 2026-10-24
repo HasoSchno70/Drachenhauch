@@ -5,7 +5,6 @@
 ' Format: docs/werkzeuge.md, dhrt test.
 '
 ' Nacheinander: die Faelle mit Tasten teilen sich die Zwischenablage.
---- seriell
 
 === einfuegen mit spaltenarten und anhaengen
 IMPORT "gui"

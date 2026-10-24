@@ -182,6 +182,15 @@ appeared instead of "SCREEN" in a case's IDE, and a mouse over the window
 took a case's tooltip away. `DHRT_OHNE_EINGABE=0` in `--- umgebung` switches
 it off for one case.
 
+**One clipboard per process:** the same programs get
+`DHRT_ZWISCHENABLAGE=privat`. `CLIPBOARD_SET`, `CLIPBOARD_GET` and copy and
+paste in the gui then use a clipboard of this process only instead of the
+system's. The tests of the IDE and the tools "type" through `CLIPBOARD_SET`
+and Ctrl+V (a recording feeds no characters), and the system clipboard
+exists only once -- two cases at the same time pasted each other's text.
+Whoever tests the real clipboard sets `DHRT_ZWISCHENABLAGE=system` in
+`--- umgebung` (as `zwischenablage.dhtest` does).
+
 **Testing tools without Python** (since stage 32): this is how the form
 designer's tests run in `tests/pruef/werkzeug_formdesigner.dhtest`. Two ways
 side by side — real clicks through a recording (insertion
@@ -272,10 +281,16 @@ WEND
 ```
 
 Without an expectation a case counts as passed if it ends with 0. **Every
-case runs as its own process in its own directory**, the cases of one file in
-parallel — unless the file carries the line `--- seriell` before the first
-case, then they run one after another (for cases that share the clipboard, a
-fixed port or the sound card); `dhrt test datei.dhtest --filter Text` runs
+case runs as its own process in its own directory.** The files run side by
+side and share up to eight slots (that many cases run at once, over all files
+together). If a file carries the line `--- seriell` before the first case,
+its cases run one after another and the file runs alone, after all others --
+for cases that share something that exists only once: a fixed port, the
+sound card, the printer, the window in the foreground, the real clipboard or
+window messages with fixed delays. Up to 2026.34 one file ran after the
+other, and about a hundred files carried `--- seriell` only because of the
+clipboard; a full run took 38 minutes, since then about 14 (with `--schnell` about 6).
+`dhrt test datei.dhtest --filter Text` runs
 only the cases whose name contains the text, `--fall Name` exactly the one
 with this name. A file with the line `--- langsam` before the first case is
 left out by `dhrt test --schnell` (the tools, the IDE and everything that

@@ -9,7 +9,6 @@
 ' die Probe. Aufnahme: 7 Maus (x y), 2 Taste/Knopf runter, 1 hoch, 6/5
 ' Maustaste runter/hoch; 341 Strg links.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 --- langsam
 === verweilen zeigt die hilfe zum eigenen unterprogramm

@@ -6,7 +6,6 @@
 ' dritten Bild selbst. Die Marke steht nach GUI_SET_TEXT am Ende (Zeile 4)
 ' -- nicht auf der angeklickten Zeile, sonst bewiese "bleibt" nichts.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 === links und rechts melden die zeile, die marke bleibt
 IMPORT "gui"

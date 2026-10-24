@@ -9,7 +9,6 @@
 ' - Die Hilfe zum Wort blieb nach einem Reiterwechsel beim vorigen Wort,
 '   wenn die Marke in beiden Reitern an derselben Stelle stand.
 ' Format: docs/werkzeuge.md, dhrt test.
---- seriell
 
 --- langsam
 === gliederung, statusleiste und hilfe zum wort

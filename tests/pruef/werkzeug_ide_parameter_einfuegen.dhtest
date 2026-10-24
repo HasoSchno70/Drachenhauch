@@ -8,7 +8,6 @@
 ' (2) Beim Einfuegen einruecken: ein mehrzeiliger Block bekommt die
 '     Einrueckung der Stelle, an der er landet; Strg+Z nimmt erst das
 '     Einruecken zurueck; abschaltbar.
---- seriell
 --- langsam
 
 === parameternamen an aufrufen mit festen argumenten

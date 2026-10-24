@@ -2,7 +2,6 @@
 ' liegen neben der ide.json: schnipsel.txt (=== Name | kuerzel, dann der
 ' Text) und tasten.json ({"kennung": "Kuerzel"}). Gesichert gelten sie
 ' sofort. Gelesen wird ueber das Protokoll (DH_IDE_LOG).
---- seriell
 --- langsam
 
 === eigene schnipsel kommen dazu und ersetzen eingebaute
