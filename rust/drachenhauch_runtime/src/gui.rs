@@ -3011,6 +3011,10 @@ pub struct Window {
     glanz: Glanz,
 }
 
+/// Groesster Zeitschritt des Lichtstreifs je Bild (Sekunden), siehe
+/// `Glanz::weiter`.
+const GLANZ_SCHRITT_MAX: f32 = 0.05;
+
 /// Ein Lichtstreif, der ueber ein Fenster zieht: ein weicher Schein, ein
 /// hellerer Kern und eine heisse Linie, additiv gemischt, dazu ein Aufleuchten
 /// des Rahmens, wo der Streif gerade ist. Die Zeit laeuft mit `g.delta()`
@@ -3042,7 +3046,25 @@ struct Glanz {
     t: f32,
 }
 
+
 impl Glanz {
+    /// Ein Bild weiter. Hoechstens `GLANZ_SCHRITT_MAX` je Bild: haengt ein
+    /// Bild (das Programm prueft gerade eine grosse Datei), bleibt der Streif
+    /// kurz stehen und zieht dann weiter -- mit der vollen Zeit sprang er um
+    /// ein Viertel seines Wegs, und das sah aus wie ein Stottern (IDE-Start
+    /// mit offener Datei, 614 ms in einem Bild).
+    fn weiter(&mut self, dt: f32) {
+        if self.t < 0.0 { return; }
+        self.t += dt.clamp(0.0, GLANZ_SCHRITT_MAX);
+        if self.t > self.dauer {
+            if self.pause > 0.0 {
+                if self.t > self.dauer + self.pause { self.t = 0.0; }
+            } else {
+                self.t = -1.0;
+            }
+        }
+    }
+
     fn neu() -> Glanz {
         Glanz { farbe: 0xFFB050, dauer: 1.2, pause: 0.0, richtung: 0,
                 breite: 0.35, staerke: 0.55, rand: true, art: 0, t: -1.0 }
@@ -12418,18 +12440,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         let dt = g.delta();
         // Lichtstreifen der Fenster weiterschieben.
-        for win in self.windows.iter_mut() {
-            let gl = &mut win.glanz;
-            if gl.t < 0.0 { continue; }
-            gl.t += dt as f32;
-            if gl.t > gl.dauer {
-                if gl.pause > 0.0 {
-                    if gl.t > gl.dauer + gl.pause { gl.t = 0.0; }
-                } else {
-                    gl.t = -1.0;
-                }
-            }
-        }
+        for win in self.windows.iter_mut() { win.glanz.weiter(dt as f32); }
         let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
         let dauer = self.m("uebergang").max(0) as f32;
         let schritt = if dauer > 0.0 { (dt as f32 * 1000.0 / dauer).clamp(0.0, 1.0) } else { 1.0 };
@@ -22592,5 +22603,32 @@ mod marken_tests {
         let alt = "a\nx1\nweg\nx2\nz";
         let neu = "a\ny1\ny2\nneu\nmehr\nz";
         assert_eq!(nach(alt, neu, &[2]), vec![1]);
+    }
+}
+
+#[cfg(test)]
+mod glanz_tests {
+    use super::*;
+
+    #[test]
+    fn ein_haengendes_bild_laesst_den_streif_nicht_springen() {
+        let mut g = Glanz::neu();
+        g.dauer = 2.2;
+        g.t = 0.0;
+        // gleichmaessig: 1/60 s je Bild
+        g.weiter(1.0 / 60.0);
+        assert!((g.t - 1.0 / 60.0).abs() < 1e-6);
+        // ein Bild haengt 614 ms -- der Streif geht nur 50 ms weiter
+        g.weiter(0.614);
+        assert!((g.t - (1.0 / 60.0 + GLANZ_SCHRITT_MAX)).abs() < 1e-6);
+        // Gegenprobe: ohne Grenze waere er um mehr als ein Viertel gesprungen
+        assert!(0.614 / g.dauer > 0.25);
+        // eine negative Zeit schiebt nicht zurueck
+        let vorher = g.t;
+        g.weiter(-1.0);
+        assert_eq!(g.t, vorher);
+        // am Ende ist er vorbei
+        for _ in 0..200 { g.weiter(1.0 / 60.0); }
+        assert!(g.t < 0.0);
     }
 }

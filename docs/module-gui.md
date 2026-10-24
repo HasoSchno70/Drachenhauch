@@ -3639,6 +3639,8 @@ Stufen.
 Farbe `-1` ist die Akzentfarbe des Themas. `breite` ist ein Anteil der
 Fensterbreite (bzw. -höhe bei `oben`/`unten`, Vorgabe 0,35), `staerke`
 0..1 (Vorgabe 0,55). Die Zeit läuft mit `DELTA()` -- ohne echte Uhr fest
-1/60 s --, ein Bild zeigt also immer dieselbe Stelle. Ein zweiter Aufruf
+1/60 s --, ein Bild zeigt also immer dieselbe Stelle. Je Bild geht er
+höchstens 50 ms weiter: hängt ein Bild, bleibt der Streif kurz stehen und
+zieht dann weiter, statt ein Stück zu überspringen. Ein zweiter Aufruf
 von `GUI_WINDOW_GLOW` beginnt von vorn. Die IDE zeigt ihn beim Start und
 wenn ein Programm losgeht.

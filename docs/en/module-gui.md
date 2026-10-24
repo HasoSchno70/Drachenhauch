@@ -3628,6 +3628,8 @@ visible steps.
 Colour `-1` is the theme's accent colour. `breite` (width) is a fraction of
 the window width (or height for `oben`/`unten`, default 0.35), `staerke`
 (strength) 0..1 (default 0.55). Time runs with `DELTA()` -- without a real
-clock a fixed 1/60 s --, so a frame always shows the same spot. A second call
+clock a fixed 1/60 s --, so a frame always shows the same spot. Per frame it
+advances by at most 50 ms: if a frame hangs, the sweep stays put for a moment
+and then moves on instead of skipping a piece. A second call
 of `GUI_WINDOW_GLOW` starts from the beginning. The IDE shows it at startup
 and when a program starts.

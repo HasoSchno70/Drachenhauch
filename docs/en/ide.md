@@ -574,7 +574,10 @@ accordingly. It compares paths with `SAMEFILE` -- `helfer.dh` can arrive as
 starts, a warm light sweeps diagonally from right to left across the
 window, and the frames flash where it crosses them (kind `rahmen`).
 Can be switched off in the settings (second column, `glanz` in the ide.json);
-a test run with `DHRT_FRAMES` only shows it with `DH_IDE_GLANZ=1`. The profiler
+a test run with `DHRT_FRAMES` only shows it with `DH_IDE_GLANZ=1`. At startup
+it begins only from the fourth frame, and an open file is only checked once
+it is through -- with a large file the check holds one frame for half a
+second, and the sweep used to stall halfway. The profiler
 (`dhrt profile`) delivers at the end a JSON line with `total_time`, `lines`
 (line, `file`, count, time), the program output and, on an error,
 `error`, `error_line` and `error_file`. As with the debugger these are lines of the

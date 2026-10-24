@@ -8317,6 +8317,17 @@ END SUB
 ' Ein Lichtstreif ueber das Hauptfenster, wenn er eingeschaltet ist.
 ' Ein Testlauf (DHRT_FRAMES) bekommt ihn nur mit DH_IDE_GLANZ=1 -- sonst
 ' laege er ueber den Bildproben der ersten Sekunden.
+' Der Streif beim Start zieht erst ab dem vierten Bild (`glanzStartIn`,
+' gesetzt am Ende des Starts): die ersten Bilder brauchen je 50 ms
+' (Einfaerben, Schriften), und ein Streif, der dabei schon laeuft, ruckelt
+' gleich am Anfang.
+DIM glanzStartIn AS INTEGER : glanzStartIn = 0
+SUB glanzStartNachziehen()
+    IF glanzStartIn <= 0 THEN RETURN
+    glanzStartIn = glanzStartIn - 1
+    IF glanzStartIn = 0 THEN lichtstreif(2200)
+END SUB
+
 SUB lichtstreif(dauer AS INTEGER)
     IF NOT glanzAn THEN RETURN
     IF GETENV$("DHRT_FRAMES") <> "" AND GETENV$("DH_IDE_GLANZ") <> "1" THEN RETURN
@@ -8969,6 +8980,13 @@ FUNCTION signaturArgs(quelle AS STRING, z AS INTEGER, s AS INTEGER, mitOptionale
         sig = TRIM$(zl)
         BREAK
     NEXT
+    RETURN signaturNamen(sig, mitOptionalen)
+END FUNCTION
+
+' Die Parameternamen aus einer Signaturzeile (`NAME(a, b [, c])` aus dem
+' Hover, oder die Kopfzeile einer SUB/FUNCTION aus dem Quelltext).
+FUNCTION signaturNamen(sig AS STRING, mitOptionalen AS BOOLEAN) AS ARRAY OF STRING
+    DIM leer AS ARRAY OF STRING : leer = []
     DIM auf AS INTEGER : auf = INSTR(sig, "(")
     DIM zu AS INTEGER : zu = INSTR(sig, ")")
     IF auf < 0 OR zu < auf THEN RETURN leer
@@ -12892,6 +12910,30 @@ FUNCTION festesArgument(a AS STRING) AS BOOLEAN
     RETURN t <> "" AND REGEX_TEST(t, "^[0-9]+(\.[0-9]+)?$")
 END FUNCTION
 
+' Die Kopfzeilen der SUBs und FUNCTIONs einer Datei: Name (klein) ->
+' Kopfzeile, in einem Durchgang. Steht ein Name mehrfach da (eine Methode
+' gleichen Namens in zwei Klassen), ist der Eintrag leer -- dann entscheidet
+' der Hover an der Stelle des Aufrufs, welche gemeint ist.
+SUB kopfZeilenSammeln(zeilen AS ARRAY OF STRING, BYREF kopf AS MAP OF STRING)
+    DIM zl AS STRING
+    FOR EACH zl IN zeilen
+        DIM t AS STRING : t = LTRIM$(zl)
+        DIM w AS INTEGER
+        IF UPPER$(LEFT$(t, 4)) = "SUB " THEN
+            w = 4
+        ELSEIF UPPER$(LEFT$(t, 9)) = "FUNCTION " THEN
+            w = 9
+        ELSE
+            CONTINUE
+        END IF
+        DIM rest AS STRING : rest = LTRIM$(MID$(t, w))
+        DIM k AS INTEGER : k = INSTR(rest, "(")
+        IF k <= 0 THEN CONTINUE
+        DIM n AS STRING : n = LOWER$(RTRIM$(LEFT$(rest, k)))
+        IF MAPHAS(kopf, n) THEN MAPPUT(kopf, n, "") ELSE MAPPUT(kopf, n, t)
+    NEXT
+END SUB
+
 SUB parameterSammeln(ta AS GUI_WIDGET)
     paramFeld = ta : paramZeilen = [] : paramTexte = []
     IF NOT paramNamenAn THEN RETURN
@@ -12909,6 +12951,10 @@ SUB parameterSammeln(ta AS GUI_WIDGET)
     DIM arten AS ARRAY OF STRING
     (starts, laengen, arten) = SYNTAX_SPANS(quelle)
     DIM li AS INTEGER : li = 0
+    ' Kopfzeilen der eigenen SUBs/FUNCTIONs, erst gelesen, wenn ein Name
+    ' gebraucht wird (`kopfZeilenSammeln`).
+    DIM kopfGelesen AS BOOLEAN : kopfGelesen = FALSE
+    DIM kopfZeile AS MAP OF STRING : kopfZeile = {}
     DIM erledigt AS INTEGER : erledigt = -1       ' Zeile mit Hinweis
     DIM gefragt AS INTEGER : gefragt = 0
     DIM i AS INTEGER
@@ -12953,9 +12999,37 @@ SUB parameterSammeln(ta AS GUI_WIDGET)
             ' Hoechstens 60 neue Namen je Pruefung -- jede Frage uebersetzt
             ' die Datei; der Rest kommt bei der naechsten Pruefung.
             IF gefragt >= 60 THEN CONTINUE
-            gefragt = gefragt + 1
             DIM namen AS ARRAY OF STRING
-            namen = signaturArgs(quelle, li + 1, starts[i] - anf[li] + 1, TRUE)
+            ' Ein eingebauter Befehl braucht die Datei nicht: der Name allein
+            ' genuegt CODE_HOVER$ (wie im Befehlsverzeichnis). Ueber die ganze
+            ' Datei kostete jede Frage bei 18000 Zeilen 5 ms, 60 Fragen das
+            ' halbe Pruefen. Nur was hier oder in einem Import steht, geht
+            ' weiter ueber den ganzen Text und zaehlt gegen die 60.
+            ' Eine eigene Funktion, die genau EINMAL in der Datei steht, nennt
+            ' ihre Parameter in ihrer Kopfzeile -- die liest man direkt (bei
+            ' 18000 Zeilen kostete die Frage ueber den Hover 20 ms je Name).
+            ' Ein eingebauter Befehl braucht die Datei gar nicht: der Name
+            ' allein genuegt CODE_HOVER$ (wie im Befehlsverzeichnis). Nur was
+            ' mehrfach oder in einem Import steht, geht ueber den ganzen Text.
+            namen = []
+            IF NOT kopfGelesen THEN
+                kopfGelesen = TRUE
+                kopfZeilenSammeln(zeilen, kopfZeile)
+            END IF
+            DIM kn AS STRING : kn = LOWER$(name)
+            IF NOT MAPHAS(kopfZeile, kn) THEN
+                namen = signaturArgs(name, 1, 1, TRUE)
+            ELSEIF MAPGET(kopfZeile, kn) <> "" THEN
+                namen = signaturNamen(MAPGET(kopfZeile, kn), TRUE)
+                IF LEN(namen) = 0 THEN
+                    MAPPUT(paramCache, kn, "")
+                    CONTINUE
+                END IF
+            END IF
+            IF LEN(namen) = 0 THEN
+                gefragt = gefragt + 1
+                namen = signaturArgs(quelle, li + 1, starts[i] - anf[li] + 1, TRUE)
+            END IF
             sig = JOIN$(namen, ",")
             MAPPUT(paramCache, LOWER$(name), sig)
         END IF
@@ -17771,7 +17845,7 @@ handbuchSchrift(handbuchGroesse)
 IF codeFont >= 0 THEN GUI_RICHTEXT_SET(rtHandbuch, "codeschrift", codeFont)
 hbFarben()
 protokoll("projekt " + projektOrdner)
-lichtstreif(2200)
+glanzStartIn = 4                ' der Streif zieht ab dem vierten Bild
 IF konfigUebergangen <> "" THEN protokoll("konfig uebergangen " + konfigUebergangen)
 protokoll("bereit")
 
@@ -18306,7 +18380,11 @@ WHILE NOT beenden
         spurNachziehen()
         mausNachziehen(tf)
         randKlicksNachziehen()
-        IF pruefungFaellig >= 0.0 AND GET_TIME() >= pruefungFaellig THEN
+        ' Nicht, solange der Lichtstreif zieht: bei einer grossen Datei haelt
+        ' das Pruefen ein Bild eine halbe Sekunde fest, und genau das passiert
+        ' kurz nach dem Start mit einem Reiter aus der Sitzung -- der Streif
+        ' stockte mitten im Weg. Die Liste fuellt sich dann eben danach.
+        IF pruefungFaellig >= 0.0 AND GET_TIME() >= pruefungFaellig AND NOT GUI_WINDOW_GLOWING(win) THEN
             pruefungFaellig = -1.0
             pruefen()
         END IF
@@ -18359,6 +18437,7 @@ WHILE NOT beenden
         IF GUI_WINDOW_AT(GUI_WINDOW_GET_X(winLive) + 10, GUI_WINDOW_GET_Y(winLive) + 10) = winLive THEN GUI_DRAW_WINDOW(winLive)
     END IF
     FLIP()
+    glanzStartNachziehen()
 WEND
 
 ' Sauber beendet heisst: ueber die Rueckfrage (alles gesichert oder

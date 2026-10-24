@@ -1,0 +1,117 @@
+' Der Lichtstreif der IDE beim Start (lichtstreif, ide/ide.dh, 2026-10-24).
+' Mit einer offenen Datei (aus der Sitzung oder als Argument) prueft die IDE
+' sie gut eine halbe Sekunde nach dem Start -- bei 18000 Zeilen hielt das
+' EIN Bild 614 ms fest, und der Streif sprang mitten im Weg. Jetzt wartet die
+' Pruefung, bis der Streif durch ist, und der Streif beginnt erst ab dem
+' vierten Bild (die ersten brauchen je 50 ms). Unter DHRT_FRAMES zieht er nur
+' mit DH_IDE_GLANZ=1.
+'
+' Ein Einschub am Ende der Bildschleife schreibt je Bild "bild N"
+' und, solange der Streif zieht, "streif"; das Protokoll sagt dann, in
+' welchem Bild "geprueft" kam.
+
+=== mit dem streif kommt die erste pruefung danach
+DIM prB AS INTEGER
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+protokoll("bild " + STR$(prB))
+IF GUI_WINDOW_GLOWING(win) THEN protokoll("streif")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=220
+DH_IDE_LOG=ide.log
+DH_IDE_GLANZ=1
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+DIM x AS INTEGER
+x = 1
+PRINT x
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+DIM bild AS INTEGER : bild = 0
+DIM ersterStreif AS INTEGER : ersterStreif = -1
+DIM letzterStreif AS INTEGER : letzterStreif = -1
+DIM geprueft AS INTEGER : geprueft = -1
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 5) = "bild " THEN bild = VAL(MID$(L[i], 5))
+    IF L[i] = "streif" THEN
+        IF ersterStreif < 0 THEN ersterStreif = bild
+        letzterStreif = bild
+    END IF
+    ' "geprueft" steht vor der "bild"-Zeile SEINES Bildes
+    IF LEFT$(L[i], 9) = "geprueft " AND geprueft < 0 THEN geprueft = bild + 1
+NEXT
+PRINT "streif gezogen "; (letzterStreif - ersterStreif > 100)
+PRINT "geprueft "; (geprueft >= 0)
+PRINT "erst danach "; (geprueft > letzterStreif)
+--- erwartet
+streif gezogen TRUE
+geprueft TRUE
+erst danach TRUE
+
+=== der streif beginnt erst ab dem vierten bild
+DIM prB AS INTEGER
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prB <= 6 THEN protokoll("pr bild " + STR$(prB) + " " + STR$(GUI_WINDOW_GLOWING(win)))
+--- umgebung
+DHRT_FRAMES=30
+DH_IDE_LOG=ide.log
+DH_IDE_GLANZ=1
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR L[i] = "glanz 2200" THEN PRINT L[i]
+NEXT
+--- erwartet
+pr bild 1 FALSE
+pr bild 2 FALSE
+pr bild 3 FALSE
+glanz 2200
+pr bild 4 TRUE
+pr bild 5 TRUE
+pr bild 6 TRUE
+
+=== ohne streif wird gleich geprueft
+' Die Gegenprobe zum ersten Fall: ohne DH_IDE_GLANZ zieht kein Streif, und
+' die Pruefung kommt nach gut einer halben Sekunde -- weit vor dem Bild, in
+' dem ein Streif von 2,2 s fertig waere.
+DIM prB AS INTEGER
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+protokoll("bild " + STR$(prB))
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=220
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+DIM x AS INTEGER
+x = 1
+PRINT x
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+DIM bild AS INTEGER : bild = 0
+DIM geprueft AS INTEGER : geprueft = -1
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 5) = "bild " THEN bild = VAL(MID$(L[i], 5))
+    ' "geprueft" steht vor der "bild"-Zeile SEINES Bildes
+    IF LEFT$(L[i], 9) = "geprueft " AND geprueft < 0 THEN geprueft = bild + 1
+NEXT
+PRINT "geprueft "; (geprueft >= 0)
+PRINT "vor dem ende eines streifs "; (geprueft < 132)
+--- erwartet
+geprueft TRUE
+vor dem ende eines streifs TRUE

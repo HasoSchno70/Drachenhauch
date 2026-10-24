@@ -574,7 +574,10 @@ danach nach. Pfade vergleicht sie mit `SAMEFILE` -- `helfer.dh` kann als
 losgeht, streift ein warmes Licht schräg von rechts nach links über das
 Fenster, und die Rahmen blitzen auf, wo es sie kreuzt (Art `rahmen`).
 Abschaltbar in den Einstellungen (zweite Spalte, `glanz` in der ide.json);
-ein Testlauf mit `DHRT_FRAMES` zeigt ihn nur mit `DH_IDE_GLANZ=1`. Der Profiler
+ein Testlauf mit `DHRT_FRAMES` zeigt ihn nur mit `DH_IDE_GLANZ=1`. Beim Start
+beginnt er erst ab dem vierten Bild, und eine offene Datei wird erst geprüft,
+wenn er durch ist -- bei einer großen Datei hält das Prüfen ein Bild eine
+halbe Sekunde fest, und der Streif stockte sonst mitten im Weg. Der Profiler
 (`dhrt profile`) liefert am Ende eine JSON-Zeile mit `total_time`, `lines`
 (Zeile, `file`, Anzahl, Zeit), der Programmausgabe und bei einem Fehler
 `error`, `error_line` und `error_file`. Wie beim Debugger sind es Zeilen der

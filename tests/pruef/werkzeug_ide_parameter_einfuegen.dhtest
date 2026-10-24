@@ -227,3 +227,60 @@ FOR i = 0 TO LEN(L) - 1
 NEXT
 --- erwartet
 pr spalte0 |SUB s()/    IF a THEN/        b = 1/    ELSE/        b = 2/    END IF/END SUB|
+
+=== parameternamen aus der kopfzeile und bei doppelten namen
+' Seit 2026-10-24 liest das Sammeln die Parameter einer eigenen Funktion aus
+' ihrer Kopfzeile (`kopfZeilenSammeln`), statt die ganze Datei per Hover zu
+' fragen, und fragt eingebaute Befehle nur mit ihrem Namen. Steht ein Name
+' zweimal da (Methoden zweier Klassen), entscheidet weiter der Hover an der
+' Stelle des Aufrufs. Die Erwartung ist die Ausgabe des Baus davor.
+' (Ein `ob.setz(3, 4)` bekaeme dort die Namen von Aa -- der Hover kennt den
+' Typ von `ob` nicht; das war schon vorher so und steht darum nicht hier.)
+pruefen()
+DIM prI AS INTEGER
+FOR prI = 0 TO LEN(paramZeilen) - 1
+    protokoll("pr param " + STR$(paramZeilen[prI]) + " " + paramTexte[prI])
+NEXT
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+CLASS Aa
+    SUB setz(a AS INTEGER, b AS INTEGER)
+        PRINT a
+    END SUB
+END CLASS
+CLASS Bb
+    SUB setz(p AS INTEGER, q AS INTEGER)
+        PRINT p
+    END SUB
+END CLASS
+FUNCTION fmt$(text AS STRING, breite AS INTEGER = 8) AS STRING
+    RETURN text
+END FUNCTION
+SUB leer()
+    PRINT 1
+END SUB
+DIM oa AS Aa : oa = NEW Aa()
+DIM ob AS Bb : ob = NEW Bb()
+oa.setz(1, 2)
+PRINT fmt$("x", 3)
+PRINT LEFT$("abc", 2)
+leer()
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 9) = "pr param " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr param 19 a, b
+pr param 20 text, breite
+pr param 21 s, n
