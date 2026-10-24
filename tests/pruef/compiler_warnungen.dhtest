@@ -3823,3 +3823,58 @@ eine meldung mit [zeige: Parameter 'n'|ganzzahlige Division]: TRUE
 eine meldung mit [Z.setze: Parameter 'n']: TRUE
 eine meldung mit ['z.wert' ist als INTEGER angesagt]: TRUE
 gesamt: 3
+
+=== unbekanntes feld hinter einem feldelement warnt
+' Ein Element traegt den Typ seines Feldes bzw. seiner MAP. Vorher ging er
+' hinter `m.farben[0]` verloren: `g.rgb` warnte, `m.farben[0].garn.rgb`
+' nicht (gefunden im Glutfaden-Plugin). Die richtigen Zugriffe bleiben still.
+IMPORT "json"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    PRINT JSON_GET_INT(h, "b." + STR$(i) + ".line"); ": "; JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+NEXT
+PRINT "gesamt: "; JSON_LEN(h, "b")
+--- datei w.dh
+CLASS Garn
+    DIM farbe AS INTEGER
+END CLASS
+CLASS Eintrag
+    DIM garn AS Garn
+END CLASS
+CLASS Muster
+    DIM farben AS ARRAY OF Eintrag
+END CLASS
+DIM m AS Muster : m = NEW Muster()
+DIM nach AS MAP OF Garn
+DIM gitter AS ARRAY OF ARRAY OF Garn
+DIM zahlen AS ARRAY OF INTEGER
+PRINT m.farben[0].garn.farbe
+PRINT m.farben[0].garn.rgb
+PRINT nach["rot"].farbe
+PRINT nach["rot"].rbg
+PRINT gitter[0][1].farbe
+PRINT gitter[0][1].farb
+DIM s AS STRING : s = zahlen[0]
+DIM n AS INTEGER : n = zahlen[0]
+
+--- erwartet
+15: GARN hat kein Mitglied 'rgb' -- weder GARN selbst noch eine ihrer Eltern- oder Kindklassen. Dieses Feld gibt es nicht, der Zugriff bricht beim Laufen ab.
+17: GARN hat kein Mitglied 'rbg' -- weder GARN selbst noch eine ihrer Eltern- oder Kindklassen. Dieses Feld gibt es nicht, der Zugriff bricht beim Laufen ab.
+19: GARN hat kein Mitglied 'farb' -- weder GARN selbst noch eine ihrer Eltern- oder Kindklassen. Dieses Feld gibt es nicht, der Zugriff bricht beim Laufen ab. Meintest du 'farbe'?
+20: 's' ist als STRING angesagt, rechts steht INTEGER. Das bricht beim Laufen ab ('Erwartet STRING, erhalten INTEGER'). Mit STR$() in Text umwandeln.
+gesamt: 4
