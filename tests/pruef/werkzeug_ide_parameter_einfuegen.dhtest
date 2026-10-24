@@ -234,8 +234,8 @@ pr spalte0 |SUB s()/    IF a THEN/        b = 1/    ELSE/        b = 2/    END I
 ' fragen, und fragt eingebaute Befehle nur mit ihrem Namen. Steht ein Name
 ' zweimal da (Methoden zweier Klassen), entscheidet weiter der Hover an der
 ' Stelle des Aufrufs. Die Erwartung ist die Ausgabe des Baus davor.
-' (Ein `ob.setz(3, 4)` bekaeme dort die Namen von Aa -- der Hover kennt den
-' Typ von `ob` nicht; das war schon vorher so und steht darum nicht hier.)
+' (Methodenaufrufe wie `ob.setz(3, 4)` nehmen seit 2026-10-24 die Namen
+' ihrer Klasse -- der Fall danach.)
 pruefen()
 DIM prI AS INTEGER
 FOR prI = 0 TO LEN(paramZeilen) - 1
@@ -284,3 +284,100 @@ NEXT
 pr param 19 a, b
 pr param 20 text, breite
 pr param 21 s, n
+
+=== methodenaufrufe nehmen die parameter ihrer klasse
+' Zwei Klassen mit einer Methode `setz`, eine dritte erbt sie von Bb. Ueber
+' den Namen allein bekaeme jeder Aufruf die Namen von Aa (die erste `setz`
+' im Text). Jetzt kommen alle Methodenaufrufe aus EINEM Uebersetzungslauf
+' (CODE_METHOD_CALLS$), je aus der Klasse des Objekts.
+pruefen()
+DIM prI AS INTEGER
+FOR prI = 0 TO LEN(paramZeilen) - 1
+    protokoll("pr param " + STR$(paramZeilen[prI]) + " " + paramTexte[prI])
+NEXT
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+CLASS Aa
+    SUB setz(a AS INTEGER, b AS INTEGER)
+        PRINT a
+    END SUB
+END CLASS
+CLASS Bb
+    SUB setz(pWert AS INTEGER, qWert AS INTEGER)
+        PRINT pWert
+    END SUB
+END CLASS
+CLASS Cc EXTENDS Bb
+END CLASS
+DIM oa AS Aa : oa = NEW Aa()
+DIM ob AS Bb : ob = NEW Bb()
+DIM oc AS Cc : oc = NEW Cc()
+oa.setz(1, 2)
+ob.setz(3, 4)
+oc.setz(5, 6)
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 9) = "pr param " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr param 16 a, b
+pr param 17 pWert, qWert
+pr param 18 pWert, qWert
+
+=== vervollstaendigen hinter dem punkt setzt die platzhalter der klasse
+' `ob.se` vervollstaendigt zu `setz` und bekommt die Argumente als
+' Platzhalter -- die von Bb, nicht die der ersten `setz` im Text (Aa).
+GUI_FOCUS(tabFelder[0])
+GUI_TEXTAREA_GOTO(tabFelder[0], 12, 1)
+GUI_TEXTAREA_INSERT(tabFelder[0], "ob.se")
+vervollstaendigen(TRUE)
+DIM prK AS INTEGER
+FOR prK = 0 TO GUI_LISTBOX_COUNT(lstVervoll) - 1
+    IF GUI_LISTBOX_ITEM(lstVervoll, prK) = "setz" THEN GUI_LISTBOX_SET_SELECTED(lstVervoll, prK)
+NEXT
+vervollUebernehmen()
+DIM prZeilen AS ARRAY OF STRING : prZeilen = SPLIT$(GUI_TEXT(tabFelder[0]), NL)
+protokoll("pr zeile " + prZeilen[11])
+protokoll("pr markiert " + GUI_TEXTAREA_SELECTION$(tabFelder[0]))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+CLASS Aa
+    SUB setz(a AS INTEGER, b AS INTEGER)
+        PRINT a
+    END SUB
+END CLASS
+CLASS Bb
+    SUB setz(pWert AS INTEGER, qWert AS INTEGER)
+        PRINT pWert
+    END SUB
+END CLASS
+DIM ob AS Bb : ob = NEW Bb()
+' Ende
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr zeile ob.setz(pWert, qWert)' Ende
+pr markiert pWert

@@ -7073,6 +7073,14 @@ impl<'p> Vm<'p> {
                 let neu = bi_str(a, 3, "CODE_RENAME$")?;
                 Value::str_rc(crate::lsp::umbenennen(text, z, s, neu).unwrap_or_default())
             }
+            "code_method_calls$" | "code_method_calls" => {
+                let text = bi_str(a, 0, "CODE_METHOD_CALLS$")?.to_string();
+                let basis = code_basis(a, 1, "CODE_METHOD_CALLS$")?
+                    .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
+                let liste: Vec<serde_json::Value> = crate::lsp::methoden_aufrufe(&text, &basis).into_iter()
+                    .map(|(z, n, k, sig)| serde_json::json!({"zeile": z, "name": n, "klasse": k, "signatur": sig})).collect();
+                Value::str_rc(serde_json::Value::Array(liste).to_string())
+            }
             "code_types$" | "code_types" => {
                 let text = bi_str(a, 0, "CODE_TYPES$")?.to_string();
                 let basis = if a.len() > 1 { std::path::PathBuf::from(bi_str(a, 1, "CODE_TYPES$")?) }

@@ -368,3 +368,57 @@ in der klasse TRUE
 mitglieder name,hp,heilen
 mit anfang hp,heilen
 ohne basis viele TRUE
+
+=== namensraum und methodenaufrufe
+' Hinter `kern.` (IMPORT ... AS kern) die obersten Definitionen der Datei
+' ohne PRIVATE -- ohne Uebersetzen, also auch bei einem Fehler im Text.
+' Der Hover nimmt den Kommentar ueber der Definition, nicht die Marke, die
+' der Vorverarbeiter vor die Datei setzt. CODE_METHOD_CALLS$ nennt jeden
+' Methodenaufruf mit der Klasse, in der die Methode steht.
+DIM q AS STRING : q = JOIN$(READLINES("haupt.dh"), CHR$(10))
+PRINT "kern. "; JOIN$(CODE_COMPLETE(q, 12, 12, CWD$()), ",")
+PRINT "kern.su "; JOIN$(CODE_COMPLETE(q, 12, 14, CWD$()), ",")
+DIM h AS STRING : h = CODE_HOVER$(q, 12, 14, CWD$())
+PRINT "hover "; INSTR(h, "FUNCTION summe(links AS INTEGER, rechts AS INTEGER)") >= 0; " "; INSTR(h, "Rechnet die Summe.") >= 0; " "; INSTR(h, "IMPORT") < 0
+DIM q2 AS STRING : q2 = q + CHR$(10) + "PRINT kern.geheim()"
+PRINT "privat "; CODE_HOVER$(q2, 13, 13, CWD$())
+PRINT CODE_METHOD_CALLS$(q, CWD$())
+DIM kaputt AS STRING : kaputt = q + CHR$(10) + "DIM x AS"
+PRINT "kaputt kern. "; JOIN$(CODE_COMPLETE(kaputt, 12, 12, CWD$()), ",")
+PRINT "kaputt aufrufe "; CODE_METHOD_CALLS$(kaputt, CWD$())
+--- datei lib/kern.dh
+' Rechnet die Summe.
+FUNCTION summe(links AS INTEGER, rechts AS INTEGER) AS INTEGER
+    RETURN links + rechts
+END FUNCTION
+PRIVATE FUNCTION geheim() AS INTEGER
+    RETURN 1
+END FUNCTION
+CONST GRENZE = 10
+CLASS Garn
+    DIM farbe AS INTEGER
+    SUB setz(rot AS INTEGER, gruen AS INTEGER)
+        DIM innen AS INTEGER
+    END SUB
+END CLASS
+--- datei haupt.dh
+IMPORT "lib/kern.dh" AS kern
+CLASS Tier
+    SUB setz(alter AS INTEGER, groesse AS INTEGER)
+    END SUB
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+DIM g AS kern.Garn : g = NEW kern.Garn()
+DIM h AS Hund : h = NEW Hund()
+g.setz(1, 2)
+h.setz(3, 4)
+PRINT kern.summe(1, 2)
+--- erwartet
+kern. summe,GRENZE,Garn
+kern.su summe
+hover TRUE TRUE TRUE
+privat Der Namensraum kern hat nichts namens 'geheim'.
+[{"zeile":10,"name":"setz","klasse":"KERN.GARN","signatur":"SUB setz(rot AS INTEGER, gruen AS INTEGER)"},{"zeile":11,"name":"setz","klasse":"TIER","signatur":"SUB setz(alter AS INTEGER, groesse AS INTEGER)"}]
+kaputt kern. summe,GRENZE,Garn
+kaputt aufrufe []

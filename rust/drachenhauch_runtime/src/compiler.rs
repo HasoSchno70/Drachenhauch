@@ -1974,6 +1974,22 @@ impl Compiler {
             }
             return;
         }
+        // Alle Methodenaufrufe einer Pruefung auf einmal (CODE_METHOD_CALLS$):
+        // die Parameternamen der IDE kaemen sonst je Aufruf aus einem
+        // eigenen Uebersetzungslauf.
+        if ist_aufruf && METHODEN_AUFRUFE.with(|a| a.borrow().is_some()) {
+            // Die Klasse, in der die Methode STEHT (bei geerbten die Vorfahrin).
+            let mut von = Some(klasse.clone());
+            while let Some(k) = von.clone() {
+                let Some(ci) = self.classes.get(&k) else { von = None; break };
+                if ci.method_sigs.contains_key(name) { break; }
+                von = if ci.parent_name.is_empty() { None } else { Some(ci.parent_name.clone()) };
+            }
+            if let (Some(von), Some(sig)) = (von, self.find_method_sig(&klasse, name)) {
+                let eintrag = (self.ctx.cur_line, name.to_string(), von, sig.param_names.clone());
+                METHODEN_AUFRUFE.with(|a| if let Some(l) = a.borrow_mut().as_mut() { l.push(eintrag); });
+            }
+        }
         if self.mitglied_moeglich(&klasse, name) { return; }
         let was = if ist_aufruf { "Diese Methode" } else { "Dieses Feld" };
         let hinweis = match Self::naechster_name(name, &self.bekannte_mitglieder(&klasse)) {
@@ -6036,6 +6052,22 @@ thread_local! {
     /// noch nicht gesehen ist; danach `Some(Some(fund))`.
     static MITGLIED_FUND: std::cell::RefCell<Option<Option<MitgliedFund>>> =
         const { std::cell::RefCell::new(None) };
+}
+
+thread_local! {
+    /// Je Methodenaufruf mit bekannter Klasse: (Zeile der gemergten Quelle,
+    /// Methode, Klasse, in der sie steht, Parameternamen) -- solange
+    /// `methoden_aufrufe_sammeln` laeuft.
+    static METHODEN_AUFRUFE: std::cell::RefCell<Option<Vec<(u32, String, String, Vec<String>)>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Den Compiler `f` laufen lassen und alle Methodenaufrufe einsammeln, deren
+/// Klasse er kennt.
+pub(crate) fn methoden_aufrufe_sammeln(f: impl FnOnce()) -> Vec<(u32, String, String, Vec<String>)> {
+    METHODEN_AUFRUFE.with(|a| *a.borrow_mut() = Some(Vec::new()));
+    f();
+    METHODEN_AUFRUFE.with(|a| a.borrow_mut().take()).unwrap_or_default()
 }
 
 /// Den Compiler `f` laufen lassen und festhalten, welche Klasse vor
