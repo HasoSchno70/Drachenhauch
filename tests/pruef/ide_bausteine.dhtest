@@ -316,3 +316,55 @@ PRINT CODE_TYPES$("DIM a AS ARRAY OF INTEGER : a = [1]" + CHR$(10) + "for each e
 []
 flott TRUE
 [{"zeile":2,"name":"e","typ":"INTEGER"}]
+
+=== code hover und complete hinter einem punkt
+' Mit basis$ uebersetzt CODE_HOVER$/CODE_COMPLETE den Text und kennt hinter
+' `objekt.` die Klasse des Objekts -- auch ueber einen Index und geerbt.
+' Ohne basis$ bleibt es beim Text: die erste Definition des Namens (hier
+' die von TIER). In der Klasse selbst gilt ihr Mitglied, nicht die lokale
+' DIM der Methode.
+DIM q AS STRING : q = JOIN$(READLINES("q.dh"), CHR$(10))
+FUNCTION hat(t AS STRING, teil AS STRING) AS BOOLEAN
+    RETURN INSTR(t, teil) >= 0
+END FUNCTION
+DIM a AS STRING : a = CODE_HOVER$(q, 19, 17, CWD$())
+PRINT "index "; hat(a, "Feld von SPIELER"); " "; hat(a, "Bestenliste.")
+a = CODE_HOVER$(q, 20, 9, CWD$())
+PRINT "geerbt "; hat(a, "Feld von HELD, geerbt von SPIELER"); " "; hat(a, "Lebenspunkte.")
+PRINT "unbekannt "; CODE_HOVER$(q, 21, 9, CWD$())
+PRINT "ohne basis "; hat(CODE_HOVER$(q, 19, 17), "Rufname.")
+PRINT "in der klasse "; hat(CODE_HOVER$(q, 7, 10), "Bestenliste.")
+PRINT "mitglieder "; JOIN$(CODE_COMPLETE(q, 20, 9, CWD$()), ",")
+PRINT "mit anfang "; JOIN$(CODE_COMPLETE(q, 20, 10, CWD$()), ",")
+PRINT "ohne basis viele "; LEN(CODE_COMPLETE(q, 20, 9)) > 100
+--- datei q.dh
+CLASS Tier
+    ' Rufname.
+    DIM name AS STRING
+END CLASS
+CLASS Spieler
+    ' Bestenliste.
+    DIM name AS STRING
+    ' Lebenspunkte.
+    DIM hp AS INTEGER
+    SUB heilen(n AS INTEGER)
+        DIM name AS INTEGER
+        hp = hp + n
+    END SUB
+END CLASS
+CLASS Held EXTENDS Spieler
+END CLASS
+DIM leute AS ARRAY OF Spieler
+DIM h AS Held : h = NEW Held()
+PRINT leute[0].name
+PRINT h.hp
+PRINT h.hq
+--- erwartet
+index TRUE TRUE
+geerbt TRUE TRUE
+unbekannt HELD hat kein Mitglied 'hq'.
+ohne basis TRUE
+in der klasse TRUE
+mitglieder name,hp,heilen
+mit anfang hp,heilen
+ohne basis viele TRUE

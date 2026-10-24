@@ -2605,6 +2605,36 @@ Quelltext-Fall prueft zusaetzlich jede Kern-Liste gegen die Tafel. Auf
 Deutsch blieben alle 25 Glutfaden-Sammlungen unveraendert gruen; 20 von 20
 Verfaelschungen fallen.
 
+## Hover und Vervollstaendigung hinter `objekt.` (2026-10-24)
+
+Der Hover nahm zu `spieler.name` die ERSTE Definition `name` im Text (oft
+die einer anderen Klasse), die Vervollstaendigung nach `s.` bot alle 2000
+Befehle an. Jetzt (`lsp.rs`): `mitglied_stelle` erkennt das Wort hinter
+einem Punkt (davor Name, `)` oder `]`, keine Zahl), `mitglied_fund` setzt
+`compiler::MITGLIED_MARKE` an seine Stelle und uebersetzt -- in
+`warn_unbekanntes_mitglied` haelt der Compiler (Thread-Speicher
+`MITGLIED_FUND`) die Klasse samt `mitglied_fund` fest (Felder, PROPERTYs,
+Methoden mit Parametern, eigene vor geerbten). So stimmt es auch ueber
+Indizes, Aufrufe, `Self` und Importe mit Namensraum (`KERN.GARN`); Signatur
+und Kommentar kommen aus dem Quelltext samt Importen
+(`mitglied_definitionen` ueber `symbole::bereiche`: lokale DIMs in Methoden
+sind keine Mitglieder). Das letzte Ergebnis wird gemerkt
+(`LETZTER_FUND`). Ohne Uebersetzung (Fehler anderswo im Text) bleibt es
+beim alten Weg. **Nur mit Ordner:** `hover`/`vervollstaendigung` nehmen
+`basis: Option<&Path>`, `CODE_HOVER$`/`CODE_COMPLETE` ein viertes
+Argument `basis$` -- ohne bleibt es beim Text, weil die Parameternamen der
+IDE bis zu 60 Stellen je Pruefung fragen (je 0,2 s Uebersetzen). Dazu
+`klassen_hover`: in einer Klasse gilt ihr Mitglied (lokale DIM/Parameter
+der Methode verdecken es). Die IDE gibt `codeBasis$()` mit, oeffnet die
+Liste hinter `objekt.` ohne drei Zeichen (`nachPunkt`, `vorschlagWort$`),
+aber von selbst nur bei hoechstens 100 Eintraegen -- ohne bekannte Klasse
+kommt die ganze Liste, und die soll nicht hinter jedem Satzpunkt aufgehen.
+**Falle beim Testen:** die leere letzte Zeile einer Beilage faellt weg,
+`GUI_TEXTAREA_GOTO` auf sie landet in der Zeile davor. Tests:
+Rust-Test `mitglieder_hinter_dem_punkt`, je ein Fall in `ide_bausteine`
+und `dhrt_lsp`, zwei in `werkzeug_ide_vorschlag` (drei Verfaelschungen der
+IDE fallen je in ihrem Fall; gegen 2026.35 fallen beide Laufzeit-Faelle).
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als
@@ -3995,8 +4025,10 @@ GUI_WINDOW_GLOWING(win)`, der Streif beim Start beginnt erst im vierten Bild
 (`glanzStartNachziehen`). Die Parameternamen fragen eingebaute Befehle nur
 mit dem Namen (`CODE_HOVER$(name, 1, 1)`, 0,05 ms) und lesen eigene
 Funktionen aus ihrer Kopfzeile (`kopfZeilenSammeln`); doppelte Namen gehen
-weiter ueber den Hover an der Stelle -- der kennt den Typ eines Objekts
-nicht (`ob.setz(` bekommt die Namen der ersten Klasse, schon vorher so).
+weiter ueber den Hover an der Stelle, OHNE `basis$` -- mit ihm
+uebersetzte er fuer jeden Methodenaufruf (`ob.setz(` bekommt darum weiter
+die Namen der ersten Klasse; der Hover der IDE selbst kennt die Klasse,
+siehe "Hover und Vervollstaendigung hinter `objekt.`").
 **Unter `DHRT_FRAMES` ist `DELTA()` fest 1/60** -- eine Bildzeit misst man
 mit `GET_TIME()`. Tests `werkzeug_ide_lichtstreif.dhtest` (3, je eine
 Gegenprobe faellt), Rust-Test `glanz_tests`.
@@ -4016,9 +4048,14 @@ Gast, `bring_to_front` eines Kindes holt den Gast). `dock_pass` laeuft in
 `update` NACH `update_innen` (ein Reiterklick steht so schon in
 GUI_DOCK_CHANGED desselben Bildes); Ereignis = Aenderung der `unterschrift`.
 Stand als JSON in logischen Punkten; `vorgemerkt` setzt spaeter angemeldete
-Leisten (Plugins) an ihren alten Platz. Bekannt offen: schwebende
-Widget-Leiste unter einem angedockten FENSTER. 30 Befehle `GUI_DOCK*`,
-Tests `tests/pruef/gui_dock.dhtest` (15, Aufbau in `_hilfen/dockaufbau.dh`,
+Leisten (Plugins) an ihren alten Platz. **Schwebende Leisten ueber
+angedockten Fenstern** (2026-10-24): die stehen in `z_order` hinter dem
+Gast und kamen beim Zeichnen danach -- jetzt holt `draw` die obere Schicht
+(`dock_oben_nachholen`) nach dem letzten angedockten Gast nach, sobald
+`dock_hat_angedockte` (nicht bei Zoom), auch GUI_DRAW_WINDOW; `topmost_at`,
+`window_at`, `hit_test` ueberspringen einen Gast, den eine schwebende
+Leiste verdeckt (`dock_gast_verdeckt`). 27 Befehle `GUI_DOCK*`,
+Tests `tests/pruef/gui_dock.dhtest` (17, Aufbau in `_hilfen/dockaufbau.dh`,
 Mauswege `_hilfen/dockmaus.dh`; vier Verfaelschungen fallen je in ihrem
 Fall -- die erste Fassung des Ausblende-Falls war wertlos, weil die hintere
 Liste ohne Rechteck gar nicht unter der vorderen lag), 4 Rust-Tests.

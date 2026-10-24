@@ -10310,6 +10310,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         for &wi in self.z_order.iter().rev() {
             let win = &self.windows[wi];
             if !win.alive || !win.visible { continue; }
+            if self.dock_gast_verdeckt(wi, mx, my) { continue; }
             if Self::in_rect(mx, my, self.sicht_rect(wi)) { return wi as i64; }
         }
         -1
@@ -10320,6 +10321,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let win = &self.windows[wi];
             if !win.alive || !win.visible { continue; }
             if !Self::in_rect(mx, my, self.sicht_rect(wi)) { continue; }
+            if self.dock_gast_verdeckt(wi, mx, my) { continue; }
             let (mx, my) = self.ins_fenster(wi, mx, my);
             // innerhalb des Fensters: spaeter gezeichnete Widgets liegen oben.
             // Review-Fund: pruefte bisher nur alive+visible, nicht die
@@ -12114,7 +12116,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     fn topmost_at(&self, mx: i32, my: i32) -> Option<usize> {
         for &wi in self.z_order.iter().rev() {
             let w = &self.windows[wi];
-            if w.alive && w.visible && Self::in_rect(mx, my, self.sicht_rect(wi)) { return Some(wi); }
+            // Ein angedocktes Fenster unter einer schwebenden Leiste seines
+            // Gastfensters: der Punkt gehoert der Leiste.
+            if w.alive && w.visible && Self::in_rect(mx, my, self.sicht_rect(wi))
+                && !self.dock_gast_verdeckt(wi, mx, my) { return Some(wi); }
         }
         None
     }
@@ -16736,9 +16741,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// nicht zugedeckt hat. Genau an einer Kante also, an der ein Tooltip oft
     /// liegt, weil er der Maus folgt.
     pub fn draw(&self, g: &mut Graphics, obenauf: bool) {
-        for &wi in &self.z_order {
+        for (k, &wi) in self.z_order.iter().enumerate() {
             if self.modal == Some(wi) { self.schleier(g); }
             if self.windows[wi].alive && self.windows[wi].visible { self.draw_window_sicht(g, wi); }
+            // Schwebende Leisten eines Gastfensters liegen ueber seinen
+            // angedockten Fenstern: gezeichnet nach dem letzten davon.
+            if let Some(h) = self.dock_angedockter_gast(wi) {
+                let naechster = self.z_order.get(k + 1).and_then(|&n| self.dock_angedockter_gast(n));
+                if naechster != Some(h) { self.dock_oben_nachholen(g, h); }
+            }
         }
         if obenauf { self.draw_top(g); }
     }
@@ -17641,6 +17652,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if !w.visible { return Ok(()); }
         if self.modal == Some(wi) { self.schleier(g); }
         self.draw_window_sicht(g, wi);
+        if self.dock_hat_angedockte(wi) { self.dock_oben_nachholen(g, wi); }
         self.bring_to_front(wi);
         Ok(())
     }
@@ -19010,7 +19022,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 self.draw_widget(g, wi, i, wdg);
             }
         }
-        self.dock_zeichnen_oben(g, wi);
+        // Mit angedockten Fenstern kommt die obere Schicht des Docks erst
+        // nach ihnen (`draw`), sonst laege eine schwebende Leiste darunter.
+        if !self.dock_hat_angedockte(wi) { self.dock_zeichnen_oben(g, wi); }
         g.pop_clip();
         // Inhalts-Scrollbalken (rechts), wenn der Inhalt hoeher als das Fenster ist.
         if let Some((tx, ty, bw, th, thy, thh)) = self.winscroll_geom(wi) {

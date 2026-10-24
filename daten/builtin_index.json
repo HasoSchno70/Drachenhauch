@@ -1883,7 +1883,7 @@
   {
    "name": "CODE_COMPLETE",
    "kind": "core",
-   "signature": "CODE_COMPLETE(quelltext$, zeile, spalte) AS ARRAY OF STRING",
+   "signature": "CODE_COMPLETE(quelltext$, zeile, spalte [, basis$]) AS ARRAY OF STRING",
    "module": "dhrt"
   },
   {
@@ -1901,7 +1901,7 @@
   {
    "name": "CODE_HOVER$",
    "kind": "core",
-   "signature": "CODE_HOVER$(quelltext$, zeile, spalte) AS STRING",
+   "signature": "CODE_HOVER$(quelltext$, zeile, spalte [, basis$]) AS STRING",
    "module": "dhrt"
   },
   {

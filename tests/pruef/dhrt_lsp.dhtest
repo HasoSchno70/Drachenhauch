@@ -356,3 +356,51 @@ IMPORT "{sammlung}/_hilfen/lspklient.dh"
 faehig TRUE
 Ersetzen durch zaehler / quickfix
 DIM zaehlr AS INTEGER anlegen / quickfix
+
+=== hover und vervollstaendigung kennen die klasse vor dem punkt
+' Der Server gibt den Ordner der Datei mit: hinter `leute[0].` das Feld von
+' SPIELER (nicht das erste `name` im Text), nach `h.` nur die Mitglieder.
+IMPORT "helfer.dh"
+lsStart()
+DIM i AS INTEGER : i = lsFragen("initialize", "{}")
+DIM u AS STRING : u = "file:///tmp/klassen.dh"
+lsOeffnen(u, JOIN$(READLINES("q.dh"), CHR$(10)))
+DIM a AS INTEGER : a = lsFragen("textDocument/hover", lsStelle$(u, 18, 16))
+DIM b AS INTEGER : b = lsFragen("textDocument/completion", lsStelle$(u, 19, 8))
+lsEnde()
+DIM t AS STRING : t = JSON_GET_STRING(lsAntwort(a), "result.contents.value")
+PRINT "feld von spieler "; INSTR(t, "Feld von SPIELER") >= 0; " "; INSTR(t, "Bestenliste.") >= 0
+DIM h AS JSON_HANDLE : h = lsAntwort(b)
+DIM k AS INTEGER
+DIM namen AS STRING : namen = ""
+FOR k = 0 TO JSON_LEN(h, "result") - 1
+    namen = namen + IIF(k > 0, ",", "") + JSON_GET_STRING(h, "result." + STR$(k) + ".label") + ":" + STR$(JSON_GET_INT(h, "result." + STR$(k) + ".kind"))
+NEXT
+PRINT "mitglieder "; namen
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/lspklient.dh"
+--- datei q.dh
+CLASS Tier
+    ' Rufname.
+    DIM name AS STRING
+END CLASS
+CLASS Spieler
+    ' Bestenliste.
+    DIM name AS STRING
+    ' Lebenspunkte.
+    DIM hp AS INTEGER
+    SUB heilen(n AS INTEGER)
+        DIM name AS INTEGER
+        hp = hp + n
+    END SUB
+END CLASS
+CLASS Held EXTENDS Spieler
+END CLASS
+DIM leute AS ARRAY OF Spieler
+DIM h AS Held : h = NEW Held()
+PRINT leute[0].name
+PRINT h.hp
+PRINT h.hq
+--- erwartet
+feld von spieler TRUE TRUE
+mitglieder name:5,hp:5,heilen:2

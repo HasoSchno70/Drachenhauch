@@ -50,7 +50,7 @@ fn re(quelle: &'static str, zelle: &'static OnceLock<Regex>) -> &'static Regex {
     zelle.get_or_init(|| Regex::new(quelle).expect("Regex im Quelltext"))
 }
 
-fn ist_ident(c: char) -> bool { c.is_ascii_alphanumeric() || c == '_' }
+pub(crate) fn ist_ident(c: char) -> bool { c.is_ascii_alphanumeric() || c == '_' }
 
 /// Zeichenketten und Kommentare durch Leerzeichen gleicher Laenge ersetzen --
 /// die Spalten bleiben, der Inhalt liefert keine Treffer mehr. Erkannt:
@@ -339,6 +339,13 @@ pub fn bereiche(quelle: &str) -> Vec<Bereich> {
 /// ueber Zeilen) und der Kommentarblock DIREKT darueber.
 pub fn nutzer_doku(quelle: &str, name: &str) -> Option<(String, String)> {
     let d = definition(quelle, name)?;
+    doku_der_definition(quelle, &d)
+}
+
+/// `(Signatur, Kommentar darueber)` einer schon gefundenen Definition --
+/// die Kopfzeile, bei einer Parameterliste ueber mehrere Zeilen bis zur
+/// schliessenden Klammer.
+pub fn doku_der_definition(quelle: &str, d: &Definition) -> Option<(String, String)> {
     let zeilen: Vec<&str> = quelle.split('\n').collect();
     if d.zeile == 0 || d.zeile > zeilen.len() { return None; }
     let idx = d.zeile - 1;
