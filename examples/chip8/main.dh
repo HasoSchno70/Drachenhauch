@@ -1,0 +1,151 @@
+' chip8 -- ein CHIP-8-Emulator in Drachenhauch.
+'
+' Startet ein CHIP-8-Programm: eine .ch8-Datei (fertige Bytes) oder eine
+' .c8s-Datei (Quelltext fuer den Assembler in asm.dh). Ohne Angabe laeuft
+' das mitgelieferte Spiel faenger.c8s. Eine Datei laesst sich auch auf das
+' Fenster ziehen.
+'
+'     dhrt run examples/chip8/main.dh -- spiel.ch8
+'
+' Tasten: das CHIP-8-Tastenfeld liegt auf  1 2 3 4 / Q W E R / A S D F /
+' Z X C V  (auf einer deutschen Tastatur Y statt Z -- gezaehlt wird die
+' Lage, nicht die Beschriftung). F5 startet neu, P haelt an, Bild auf/ab
+' (oder + und - im Ziffernblock) aendern das Tempo, F2 schaltet die
+' Eigenheiten des COSMAC VIP um, ESC beendet.
+IMPORT "audio"
+IMPORT "cpu.dh"
+IMPORT "asm.dh"
+
+CONST GROESSE = 12                  ' Bildschirmpunkte je CHIP-8-Punkt
+CONST LEISTE = 28
+CONST BREITE = C8_B * GROESSE
+CONST HOEHE = C8_H * GROESSE + LEISTE
+
+' Das Tastenfeld des CHIP-8 (Zeile fuer Zeile) und die Tasten dafuer.
+DIM tastenfeld AS ARRAY OF INTEGER : tastenfeld = [1, 2, 3, &HC, 4, 5, 6, &HD, 7, 8, 9, &HE, &HA, 0, &HB, &HF]
+DIM tastatur AS ARRAY OF INTEGER
+tastatur = [KEY_1, KEY_2, KEY_3, KEY_4, KEY_Q, KEY_W, KEY_E, KEY_R, _
+            KEY_A, KEY_S, KEY_D, KEY_F, KEY_Z, KEY_X, KEY_C, KEY_V]
+
+DIM tempo AS INTEGER : tempo = 15   ' Befehle je Bild (15 x 60 = 900 je Sekunde)
+DIM pause AS BOOLEAN : pause = FALSE
+DIM name AS STRING : name = ""
+DIM meldung AS STRING : meldung = ""
+DIM programm AS BUFFER
+
+' Nachleuchten: je Punkt die Helligkeit 0..1 -- ein Punkt, der ausgeht,
+' verblasst ueber ein paar Bilder.
+DIM hell[2048] AS FLOAT
+DIM xs1[2048] AS INTEGER
+DIM ys1[2048] AS INTEGER
+DIM xs2[2048] AS INTEGER
+DIM ys2[2048] AS INTEGER
+DIM farben[2048] AS INTEGER
+
+' Ein Programm laden: .c8s wird assembliert, alles andere sind Bytes.
+FUNCTION ladeDatei(pfad AS STRING) AS BOOLEAN
+    IF NOT FILEEXISTS(pfad) THEN
+        meldung = "Datei fehlt: " + pfad
+        RETURN FALSE
+    END IF
+    DIM bytes AS BUFFER
+    IF LOWER$(RIGHT$(pfad, 4)) = ".c8s" THEN
+        DIM f AS STRING : f = asmUebersetzen$(JOIN$(READLINES(pfad), CHR$(10)))
+        IF f <> "" THEN
+            meldung = BASENAME(pfad) + ": " + f
+            RETURN FALSE
+        END IF
+        bytes = asmCode
+    ELSE
+        bytes = READALL_BYTES(pfad)
+    END IF
+    IF NOT c8Laden(bytes) THEN
+        meldung = BASENAME(pfad) + " ist zu gross fuer CHIP-8"
+        RETURN FALSE
+    END IF
+    programm = bytes
+    name = BASENAME(pfad)
+    meldung = ""
+    DIM k AS INTEGER
+    FOR k = 0 TO 2047 : hell[k] = 0.0 : NEXT
+    RETURN TRUE
+END FUNCTION
+
+SCREEN(BREITE, HOEHE, "CHIP-8", 1)
+SETFPS(60)
+RANDOMIZE()
+
+DIM piep AS SOUND : piep = AUDIO_TONE(440, 1000, "square", 0.25)
+DIM piepKanal AS AUDIO_CHANNEL
+DIM piept AS BOOLEAN : piept = FALSE
+
+DIM start AS STRING : start = ARGPATH$(0)
+IF start = "" THEN start = "faenger.c8s"
+ladeDatei(start)
+
+WHILE NOT QUITREQUESTED()
+    ' --- Eingabe ----------------------------------------------------------
+    DIM k AS INTEGER
+    FOR k = 0 TO 15
+        c8Taste[tastenfeld[k]] = IIF(KEYPRESSED(tastatur[k]), 1, 0)
+    NEXT
+    IF FILES_DROPPED() > 0 THEN ladeDatei(FILE_DROPPED(0))
+    IF KEYHIT(KEY_F5) AND BUFFER_LEN(programm) > 0 THEN c8Laden(programm)
+    IF KEYHIT(KEY_P) THEN pause = NOT pause
+    IF KEYHIT(KEY_F2) THEN
+        c8SchiebeVY = NOT c8SchiebeVY
+        c8LadenErhoehtI = c8SchiebeVY
+        c8LogikVF = c8SchiebeVY
+        meldung = IIF(c8SchiebeVY, "Eigenheiten: COSMAC VIP", "Eigenheiten: CHIP-48")
+    END IF
+    IF KEYHIT(KEY_PAGEUP) OR KEYHIT(KEY_KP_PLUS) THEN tempo = MIN(tempo + 2, 99)
+    IF KEYHIT(KEY_PAGEDOWN) OR KEYHIT(KEY_KP_MINUS) THEN tempo = MAX(tempo - 2, 1)
+
+    ' --- Rechnen ----------------------------------------------------------
+    IF NOT pause THEN
+        c8Bild60()
+        FOR k = 1 TO tempo : c8Schritt() : NEXT
+    END IF
+    IF c8Fehler <> "" THEN meldung = "Angehalten: " + c8Fehler
+
+    ' --- Ton --------------------------------------------------------------
+    IF c8Ton > 0 AND NOT pause AND NOT piept THEN
+        piepKanal = AUDIO_PLAY(piep, -1)
+        piept = TRUE
+    ELSEIF (c8Ton = 0 OR pause) AND piept THEN
+        AUDIO_STOP(piepKanal)
+        piept = FALSE
+    END IF
+
+    ' --- Bild -------------------------------------------------------------
+    CLS(RGB(12, 18, 14))
+    DIM n AS INTEGER : n = 0
+    FOR k = 0 TO 2047
+        IF c8Punkte[k] = 1 THEN
+            hell[k] = 1.0
+        ELSE
+            hell[k] = hell[k] * 0.55
+        END IF
+        IF hell[k] > 0.04 THEN
+            DIM px AS INTEGER : px = (k MOD C8_B) * GROESSE
+            DIM py AS INTEGER : py = (k \ C8_B) * GROESSE
+            xs1[n] = px + 1 : ys1[n] = py + 1
+            xs2[n] = px + GROESSE - 2 : ys2[n] = py + GROESSE - 2
+            DIM h AS FLOAT : h = hell[k]
+            farben[n] = RGB(INT(40 + 140 * h), INT(60 + 195 * h), INT(40 + 100 * h))
+            n = n + 1
+        END IF
+    NEXT
+    IF n > 0 THEN BOXES(xs1, ys1, xs2, ys2, farben, n)
+
+    BOX(0, C8_H * GROESSE, BREITE - 1, HOEHE - 1, RGB(28, 36, 30))
+    DIM zeile AS STRING
+    IF meldung <> "" THEN
+        zeile = meldung
+    ELSE
+        zeile = name + "   " + STR$(tempo * 60) + " Befehle/s" + IIF(pause, "   PAUSE", "") + _
+                "   F5 neu  P Pause  Bild auf/ab Tempo  F2 Eigenheiten"
+    END IF
+    TEXT(8, C8_H * GROESSE + 7, zeile, RGB(170, 210, 170))
+    FLIP()
+WEND

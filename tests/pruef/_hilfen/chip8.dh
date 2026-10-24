@@ -1,0 +1,11 @@
+' Fuer beispiel_chip8.dhtest: Kern und Assembler aus examples/chip8, dazu
+' `op` -- einen Befehl an die aktuelle Adresse schreiben und einen Schritt
+' ausfuehren.
+IMPORT "../../../examples/chip8/cpu.dh"
+IMPORT "../../../examples/chip8/asm.dh"
+
+SUB op(code AS INTEGER)
+    c8Mem[c8PC] = code SHR 8
+    c8Mem[c8PC + 1] = code BAND &HFF
+    c8Schritt()
+END SUB

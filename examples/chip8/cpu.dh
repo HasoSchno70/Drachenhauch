@@ -1,0 +1,298 @@
+' chip8/cpu.dh -- der Rechenkern eines CHIP-8, ohne Fenster.
+'
+' CHIP-8 ist eine kleine virtuelle Maschine aus dem Jahr 1977: 4096 Bytes
+' Speicher, 16 Register V0..VF, ein Adressregister I, ein Stapel mit 16
+' Plaetzen, zwei Zeitgeber mit 60 Hz und ein Bild aus 64 x 32 Punkten.
+' Programme beginnen bei Adresse &H200, die Schrift fuer die Ziffern 0..F
+' liegt bei &H050.
+'
+' Das Hauptprogramm (main.dh) gibt dem Kern die Tasten und ruft je Bild
+' c8Bild60() einmal und c8Schritt() so oft, wie Befehle in ein Bild passen.
+' Die Pruefsammlung ruft ihn ohne Fenster auf.
+
+CONST C8_B = 64
+CONST C8_H = 32
+CONST C8_START = &H200
+CONST C8_SCHRIFT = &H50
+
+DIM c8Mem[4096] AS INTEGER
+DIM c8V[16] AS INTEGER
+DIM c8I AS INTEGER
+DIM c8PC AS INTEGER
+DIM c8Stapel[16] AS INTEGER
+DIM c8SP AS INTEGER
+DIM c8Verz AS INTEGER          ' Verzoegerungs-Zeitgeber (DT)
+DIM c8Ton AS INTEGER           ' Ton-Zeitgeber (ST), > 0 = es piept
+DIM c8Punkte[2048] AS INTEGER  ' 64 x 32, 1 = an
+DIM c8Taste[16] AS INTEGER     ' 1 = gedrueckt (vom Hauptprogramm gesetzt)
+DIM c8Wartet AS INTEGER        ' FX0A: Register, das auf eine Taste wartet, sonst -1
+DIM c8WarteTaste AS INTEGER    ' FX0A: die gedrueckte Taste, gesetzt beim Loslassen
+DIM c8Neu AS BOOLEAN           ' das Bild hat sich geaendert
+DIM c8Fehler AS STRING         ' unbekannter Befehl, Stapel voll/leer -- dann steht er
+DIM c8Befehle AS INTEGER       ' ausgefuehrte Befehle seit dem Laden
+
+' Eigenheiten -- die Varianten von CHIP-8 widersprechen sich hier, und Spiele
+' haengen davon ab. Vorgabe ist das Verhalten, das die meisten Spiele seit
+' CHIP-48 erwarten.
+DIM c8SchiebeVY AS BOOLEAN     ' 8XY6/8XYE schieben VY nach VX (COSMAC VIP)
+DIM c8LadenErhoehtI AS BOOLEAN ' FX55/FX65 zaehlen I weiter (COSMAC VIP)
+DIM c8SprungVX AS BOOLEAN      ' BXNN springt nach XNN + VX (CHIP-48)
+DIM c8LogikVF AS BOOLEAN       ' 8XY1/2/3 setzen VF auf 0 (COSMAC VIP)
+DIM c8Umbruch AS BOOLEAN       ' Sprites laufen am Rand um, statt abgeschnitten zu werden
+
+' Die Ziffern 0..F, je 5 Zeilen zu 4 Punkten (die oberen 4 Bits).
+DIM c8Schrift AS ARRAY OF INTEGER
+c8Schrift = [&HF0, &H90, &H90, &H90, &HF0, &H20, &H60, &H20, &H20, &H70, _
+             &HF0, &H10, &HF0, &H80, &HF0, &HF0, &H10, &HF0, &H10, &HF0, _
+             &H90, &H90, &HF0, &H10, &H10, &HF0, &H80, &HF0, &H10, &HF0, _
+             &HF0, &H80, &HF0, &H90, &HF0, &HF0, &H10, &H20, &H40, &H40, _
+             &HF0, &H90, &HF0, &H90, &HF0, &HF0, &H90, &HF0, &H10, &HF0, _
+             &HF0, &H90, &HF0, &H90, &H90, &HE0, &H90, &HE0, &H90, &HE0, _
+             &HF0, &H80, &H80, &H80, &HF0, &HE0, &H90, &H90, &H90, &HE0, _
+             &HF0, &H80, &HF0, &H80, &HF0, &HF0, &H80, &HF0, &H80, &H80]
+
+' Alles auf Anfang; das Programm bleibt im Speicher, wenn `behalten`.
+SUB c8Neustart(behalten AS BOOLEAN)
+    DIM k AS INTEGER
+    IF NOT behalten THEN
+        FOR k = 0 TO 4095 : c8Mem[k] = 0 : NEXT
+    END IF
+    FOR k = 0 TO LEN(c8Schrift) - 1 : c8Mem[C8_SCHRIFT + k] = c8Schrift[k] : NEXT
+    FOR k = 0 TO 15
+        c8V[k] = 0
+        c8Stapel[k] = 0
+        c8Taste[k] = 0
+    NEXT
+    FOR k = 0 TO 2047 : c8Punkte[k] = 0 : NEXT
+    c8I = 0 : c8PC = C8_START : c8SP = 0
+    c8Verz = 0 : c8Ton = 0
+    c8Wartet = -1 : c8WarteTaste = -1
+    c8Neu = TRUE : c8Fehler = "" : c8Befehle = 0
+END SUB
+
+' Ein Programm ab &H200 laden. FALSE, wenn es nicht hineinpasst.
+FUNCTION c8Laden(bytes AS BUFFER) AS BOOLEAN
+    DIM n AS INTEGER : n = BUFFER_LEN(bytes)
+    IF n > 4096 - C8_START THEN RETURN FALSE
+    c8Neustart(FALSE)
+    DIM k AS INTEGER
+    FOR k = 0 TO n - 1 : c8Mem[C8_START + k] = BUFFER_GET(bytes, k) : NEXT
+    RETURN TRUE
+END FUNCTION
+
+' Die Zeitgeber laufen mit 60 Hz -- einmal je Bild.
+SUB c8Bild60()
+    IF c8Verz > 0 THEN c8Verz = c8Verz - 1
+    IF c8Ton > 0 THEN c8Ton = c8Ton - 1
+END SUB
+
+' Ein Sprite an (x, y) mit n Zeilen ab I zeichnen (XOR); VF = 1 bei Kollision.
+SUB c8Zeichnen(vx AS INTEGER, vy AS INTEGER, n AS INTEGER)
+    DIM x0 AS INTEGER : x0 = vx MOD C8_B
+    DIM y0 AS INTEGER : y0 = vy MOD C8_H
+    c8V[15] = 0
+    DIM r AS INTEGER
+    DIM b AS INTEGER
+    FOR r = 0 TO n - 1
+        DIM y AS INTEGER : y = y0 + r
+        IF y >= C8_H THEN
+            IF NOT c8Umbruch THEN BREAK
+            y = y MOD C8_H
+        END IF
+        DIM zeile AS INTEGER : zeile = c8Mem[(c8I + r) BAND &HFFF]
+        FOR b = 0 TO 7
+            IF (zeile BAND (&H80 SHR b)) = 0 THEN CONTINUE
+            DIM x AS INTEGER : x = x0 + b
+            IF x >= C8_B THEN
+                IF NOT c8Umbruch THEN BREAK
+                x = x MOD C8_B
+            END IF
+            DIM p AS INTEGER : p = y * C8_B + x
+            IF c8Punkte[p] = 1 THEN
+                c8V[15] = 1
+                c8Punkte[p] = 0
+            ELSE
+                c8Punkte[p] = 1
+            END IF
+        NEXT
+    NEXT
+    c8Neu = TRUE
+END SUB
+
+' Einen Befehl ausfuehren. Steht der Kern (Fehler oder Warten auf eine
+' Taste), tut er nichts.
+SUB c8Schritt()
+    IF c8Fehler <> "" THEN RETURN
+    IF c8Wartet >= 0 THEN
+        ' FX0A: wie auf dem COSMAC VIP erst beim LOSLASSEN weiter.
+        DIM t AS INTEGER
+        IF c8WarteTaste < 0 THEN
+            FOR t = 0 TO 15
+                IF c8Taste[t] = 1 THEN c8WarteTaste = t
+            NEXT
+        ELSEIF c8Taste[c8WarteTaste] = 0 THEN
+            c8V[c8Wartet] = c8WarteTaste
+            c8Wartet = -1
+            c8WarteTaste = -1
+        END IF
+        RETURN
+    END IF
+    DIM op AS INTEGER : op = c8Mem[c8PC] * 256 + c8Mem[(c8PC + 1) BAND &HFFF]
+    c8PC = (c8PC + 2) BAND &HFFF
+    c8Befehle = c8Befehle + 1
+    DIM x AS INTEGER : x = (op SHR 8) BAND &HF
+    DIM y AS INTEGER : y = (op SHR 4) BAND &HF
+    DIM n AS INTEGER : n = op BAND &HF
+    DIM nn AS INTEGER : nn = op BAND &HFF
+    DIM nnn AS INTEGER : nnn = op BAND &HFFF
+    DIM w AS INTEGER
+    DIM k AS INTEGER
+    SELECT CASE op SHR 12
+        CASE 0
+            IF op = &H00E0 THEN
+                FOR k = 0 TO 2047 : c8Punkte[k] = 0 : NEXT
+                c8Neu = TRUE
+            ELSEIF op = &H00EE THEN
+                IF c8SP = 0 THEN
+                    c8Fehler = "RET ohne CALL"
+                ELSE
+                    c8SP = c8SP - 1
+                    c8PC = c8Stapel[c8SP]
+                END IF
+            ELSE
+                ' 0NNN ruft Maschinencode des COSMAC -- kann kein Emulator.
+                c8Fehler = "Maschinencode-Aufruf"
+            END IF
+        CASE 1
+            c8PC = nnn
+        CASE 2
+            IF c8SP = 16 THEN
+                c8Fehler = "Stapel voll"
+            ELSE
+                c8Stapel[c8SP] = c8PC
+                c8SP = c8SP + 1
+                c8PC = nnn
+            END IF
+        CASE 3
+            IF c8V[x] = nn THEN c8PC = (c8PC + 2) BAND &HFFF
+        CASE 4
+            IF c8V[x] <> nn THEN c8PC = (c8PC + 2) BAND &HFFF
+        CASE 5
+            IF n <> 0 THEN
+                c8Fehler = "unbekannter Befehl"
+            ELSEIF c8V[x] = c8V[y] THEN
+                c8PC = (c8PC + 2) BAND &HFFF
+            END IF
+        CASE 6
+            c8V[x] = nn
+        CASE 7
+            c8V[x] = (c8V[x] + nn) BAND &HFF
+        CASE 8
+            SELECT CASE n
+                CASE 0
+                    c8V[x] = c8V[y]
+                CASE 1
+                    c8V[x] = c8V[x] BOR c8V[y]
+                    IF c8LogikVF THEN c8V[15] = 0
+                CASE 2
+                    c8V[x] = c8V[x] BAND c8V[y]
+                    IF c8LogikVF THEN c8V[15] = 0
+                CASE 3
+                    c8V[x] = c8V[x] BXOR c8V[y]
+                    IF c8LogikVF THEN c8V[15] = 0
+                CASE 4
+                    ' VF zuletzt: ist X = F, gewinnt der Uebertrag.
+                    w = c8V[x] + c8V[y]
+                    c8V[x] = w BAND &HFF
+                    c8V[15] = IIF(w > 255, 1, 0)
+                CASE 5
+                    w = c8V[x] - c8V[y]
+                    c8V[x] = w BAND &HFF
+                    c8V[15] = IIF(w >= 0, 1, 0)
+                CASE 6
+                    IF c8SchiebeVY THEN c8V[x] = c8V[y]
+                    w = c8V[x] BAND 1
+                    c8V[x] = c8V[x] SHR 1
+                    c8V[15] = w
+                CASE 7
+                    w = c8V[y] - c8V[x]
+                    c8V[x] = w BAND &HFF
+                    c8V[15] = IIF(w >= 0, 1, 0)
+                CASE &HE
+                    IF c8SchiebeVY THEN c8V[x] = c8V[y]
+                    w = (c8V[x] SHR 7) BAND 1
+                    c8V[x] = (c8V[x] SHL 1) BAND &HFF
+                    c8V[15] = w
+                CASE ELSE
+                    c8Fehler = "unbekannter Befehl"
+            END SELECT
+        CASE 9
+            IF n <> 0 THEN
+                c8Fehler = "unbekannter Befehl"
+            ELSEIF c8V[x] <> c8V[y] THEN
+                c8PC = (c8PC + 2) BAND &HFFF
+            END IF
+        CASE &HA
+            c8I = nnn
+        CASE &HB
+            IF c8SprungVX THEN
+                c8PC = (nnn + c8V[x]) BAND &HFFF
+            ELSE
+                c8PC = (nnn + c8V[0]) BAND &HFFF
+            END IF
+        CASE &HC
+            c8V[x] = INT(RND() * 256) BAND nn
+        CASE &HD
+            c8Zeichnen(c8V[x], c8V[y], n)
+        CASE &HE
+            IF nn = &H9E THEN
+                IF c8Taste[c8V[x] BAND &HF] = 1 THEN c8PC = (c8PC + 2) BAND &HFFF
+            ELSEIF nn = &HA1 THEN
+                IF c8Taste[c8V[x] BAND &HF] = 0 THEN c8PC = (c8PC + 2) BAND &HFFF
+            ELSE
+                c8Fehler = "unbekannter Befehl"
+            END IF
+        CASE &HF
+            SELECT CASE nn
+                CASE &H07
+                    c8V[x] = c8Verz
+                CASE &H0A
+                    c8Wartet = x
+                    c8WarteTaste = -1
+                CASE &H15
+                    c8Verz = c8V[x]
+                CASE &H18
+                    c8Ton = c8V[x]
+                CASE &H1E
+                    c8I = (c8I + c8V[x]) BAND &HFFF
+                CASE &H29
+                    c8I = C8_SCHRIFT + (c8V[x] BAND &HF) * 5
+                CASE &H33
+                    c8Mem[c8I BAND &HFFF] = c8V[x] \ 100
+                    c8Mem[(c8I + 1) BAND &HFFF] = (c8V[x] \ 10) MOD 10
+                    c8Mem[(c8I + 2) BAND &HFFF] = c8V[x] MOD 10
+                CASE &H55
+                    FOR k = 0 TO x : c8Mem[(c8I + k) BAND &HFFF] = c8V[k] : NEXT
+                    IF c8LadenErhoehtI THEN c8I = (c8I + x + 1) BAND &HFFF
+                CASE &H65
+                    FOR k = 0 TO x : c8V[k] = c8Mem[(c8I + k) BAND &HFFF] : NEXT
+                    IF c8LadenErhoehtI THEN c8I = (c8I + x + 1) BAND &HFFF
+                CASE ELSE
+                    c8Fehler = "unbekannter Befehl"
+            END SELECT
+    END SELECT
+    IF c8Fehler <> "" THEN
+        ' Der Fehler meint den Befehl, der eben gelesen wurde.
+        c8PC = (c8PC - 2) BAND &HFFF
+        c8Fehler = c8Fehler + " " + c8Hex$(op, 4) + " bei " + c8Hex$(c8PC, 3)
+    END IF
+END SUB
+
+' Eine Zahl als Hex mit fester Stellenzahl.
+FUNCTION c8Hex$(wert AS INTEGER, stellen AS INTEGER) AS STRING
+    DIM t AS STRING : t = HEX$(wert)
+    WHILE LEN(t) < stellen : t = "0" + t : WEND
+    RETURN t
+END FUNCTION
+
+c8Neustart(FALSE)

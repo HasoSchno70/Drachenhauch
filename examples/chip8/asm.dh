@@ -1,0 +1,245 @@
+' chip8/asm.dh -- ein kleiner Assembler fuer CHIP-8.
+'
+' Die Schreibweise ist die verbreitete aus "Cowgod's Chip-8 Technical
+' Reference": ein Befehl je Zeile, Marken mit Doppelpunkt, Kommentare ab `;`.
+'
+'     start:  LD V0, 10        ; dezimal
+'             LD I, figur      ; eine Marke als Adresse
+'             DRW V0, V1, 3
+'             JP start
+'     figur:  DB %01100000, #F0, $90   ; binaer, hex (# oder $ oder 0x)
+'
+' Gross/klein ist egal. Gelesen wird in zwei Durchgaengen: der erste zaehlt
+' Adressen und sammelt die Marken, der zweite setzt die Befehle zusammen --
+' so darf eine Marke auch weiter unten stehen.
+'
+' asmUebersetzen$(text) liefert "" und fuellt asmCode, oder die erste
+' Fehlermeldung mit Zeilennummer.
+
+IMPORT "regex"
+
+CONST ASM_START = &H200
+
+DIM asmCode AS BUFFER
+DIM asmMarken AS MAP OF INTEGER
+DIM asmZeile AS INTEGER
+DIM asmFehler AS STRING
+
+' Ein Operand als Zahl: dezimal, #hex, $hex, 0x..., %binaer oder eine Marke.
+FUNCTION asmZahl(t AS STRING) AS INTEGER
+    DIM s AS STRING : s = UPPER$(TRIM$(t))
+    IF s = "" THEN
+        asmFehler = "Zahl fehlt"
+        RETURN 0
+    END IF
+    DIM ziffern AS STRING : ziffern = ""
+    DIM basis AS INTEGER : basis = 10
+    IF LEFT$(s, 1) = "#" OR LEFT$(s, 1) = "$" THEN
+        basis = 16 : ziffern = MID$(s, 1, LEN(s) - 1)
+    ELSEIF LEFT$(s, 2) = "0X" THEN
+        basis = 16 : ziffern = MID$(s, 2, LEN(s) - 2)
+    ELSEIF LEFT$(s, 1) = "%" THEN
+        basis = 2 : ziffern = MID$(s, 1, LEN(s) - 1)
+    ELSEIF REGEX_TEST(s, "^[0-9]+$") THEN
+        ziffern = s
+    ELSE
+        IF MAPHAS(asmMarken, LOWER$(TRIM$(t))) THEN RETURN MAPGET(asmMarken, LOWER$(TRIM$(t)))
+        asmFehler = "unbekannte Marke '" + TRIM$(t) + "'"
+        RETURN 0
+    END IF
+    DIM w AS INTEGER : w = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(ziffern) - 1
+        DIM d AS INTEGER : d = INSTR("0123456789ABCDEF", MID$(ziffern, k, 1))
+        IF d < 0 OR d >= basis THEN
+            asmFehler = "keine Zahl: '" + TRIM$(t) + "'"
+            RETURN 0
+        END IF
+        w = w * basis + d
+    NEXT
+    RETURN w
+END FUNCTION
+
+' Ein Register V0..VF -- oder -1.
+FUNCTION asmRegister(t AS STRING) AS INTEGER
+    DIM s AS STRING : s = UPPER$(TRIM$(t))
+    IF LEN(s) <> 2 OR LEFT$(s, 1) <> "V" THEN RETURN -1
+    RETURN INSTR("0123456789ABCDEF", RIGHT$(s, 1))
+END FUNCTION
+
+' Wie asmRegister, aber ein fehlendes Register ist ein Fehler.
+FUNCTION asmV(t AS STRING) AS INTEGER
+    DIM r AS INTEGER : r = asmRegister(t)
+    IF r < 0 THEN
+        asmFehler = "Register erwartet, nicht '" + TRIM$(t) + "'"
+        RETURN 0
+    END IF
+    RETURN r
+END FUNCTION
+
+' Ein Wert, der in `bits` Bits passen muss.
+FUNCTION asmWert(t AS STRING, bits AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = asmZahl(t)
+    IF asmFehler = "" AND (w < 0 OR w >= (1 SHL bits)) THEN
+        asmFehler = "'" + TRIM$(t) + "' passt nicht in " + STR$(bits) + " Bit"
+    END IF
+    RETURN w BAND ((1 SHL bits) - 1)
+END FUNCTION
+
+' Die Zeile ohne Kommentar, Marke abgetrennt.
+SUB asmZerlegen(zeile AS STRING, BYREF marke AS STRING, BYREF befehl AS STRING, BYREF ops AS ARRAY OF STRING)
+    DIM s AS STRING : s = zeile
+    DIM k AS INTEGER : k = INSTR(s, ";")
+    IF k >= 0 THEN s = LEFT$(s, k)
+    s = TRIM$(s)
+    marke = ""
+    k = INSTR(s, ":")
+    IF k > 0 AND REGEX_TEST(LEFT$(s, k), "^[A-Za-z_][A-Za-z0-9_]*$") THEN
+        marke = LOWER$(LEFT$(s, k))
+        s = TRIM$(MID$(s, k + 1, LEN(s) - k - 1))
+    END IF
+    ops = []
+    befehl = ""
+    IF s = "" THEN RETURN
+    k = INSTR(s, " ")
+    IF k < 0 THEN
+        befehl = UPPER$(s)
+        RETURN
+    END IF
+    befehl = UPPER$(LEFT$(s, k))
+    DIM teil AS STRING
+    FOR EACH teil IN SPLIT$(MID$(s, k + 1, LEN(s) - k - 1), ",")
+        ARRAY_PUSH(ops, TRIM$(teil))
+    NEXT
+END SUB
+
+' Wie viele Bytes eine Zeile belegt (fuer den ersten Durchgang).
+FUNCTION asmGroesse(befehl AS STRING, ops AS ARRAY OF STRING) AS INTEGER
+    IF befehl = "" THEN RETURN 0
+    IF befehl = "DB" THEN RETURN LEN(ops)
+    IF befehl = "DW" THEN RETURN 2 * LEN(ops)
+    RETURN 2
+END FUNCTION
+
+' Den Befehlscode einer Zeile -- -1 bei DB/DW (die schreiben selbst).
+FUNCTION asmBefehl(befehl AS STRING, ops AS ARRAY OF STRING) AS INTEGER
+    DIM n AS INTEGER : n = LEN(ops)
+    DIM a AS STRING : a = ""
+    DIM b AS STRING : b = ""
+    IF n > 0 THEN a = UPPER$(ops[0])
+    IF n > 1 THEN b = UPPER$(ops[1])
+    SELECT CASE befehl
+        CASE "CLS"
+            RETURN &H00E0
+        CASE "RET"
+            RETURN &H00EE
+        CASE "SYS"
+            RETURN asmWert(ops[0], 12)
+        CASE "JP"
+            IF n = 2 THEN RETURN &HB000 BOR asmWert(ops[1], 12)
+            RETURN &H1000 BOR asmWert(ops[0], 12)
+        CASE "CALL"
+            RETURN &H2000 BOR asmWert(ops[0], 12)
+        CASE "SE", "SNE"
+            DIM gross AS INTEGER : gross = IIF(befehl = "SE", &H3000, &H4000)
+            DIM klein AS INTEGER : klein = IIF(befehl = "SE", &H5000, &H9000)
+            IF asmRegister(b) >= 0 THEN RETURN klein BOR (asmV(a) SHL 8) BOR (asmV(b) SHL 4)
+            RETURN gross BOR (asmV(a) SHL 8) BOR asmWert(ops[1], 8)
+        CASE "LD"
+            IF a = "I" THEN RETURN &HA000 BOR asmWert(ops[1], 12)
+            IF a = "DT" THEN RETURN &HF015 BOR (asmV(b) SHL 8)
+            IF a = "ST" THEN RETURN &HF018 BOR (asmV(b) SHL 8)
+            IF a = "F" THEN RETURN &HF029 BOR (asmV(b) SHL 8)
+            IF a = "B" THEN RETURN &HF033 BOR (asmV(b) SHL 8)
+            IF a = "[I]" THEN RETURN &HF055 BOR (asmV(b) SHL 8)
+            IF b = "[I]" THEN RETURN &HF065 BOR (asmV(a) SHL 8)
+            IF b = "DT" THEN RETURN &HF007 BOR (asmV(a) SHL 8)
+            IF b = "K" THEN RETURN &HF00A BOR (asmV(a) SHL 8)
+            IF asmRegister(b) >= 0 THEN RETURN &H8000 BOR (asmV(a) SHL 8) BOR (asmV(b) SHL 4)
+            RETURN &H6000 BOR (asmV(a) SHL 8) BOR asmWert(ops[1], 8)
+        CASE "ADD"
+            IF a = "I" THEN RETURN &HF01E BOR (asmV(b) SHL 8)
+            IF asmRegister(b) >= 0 THEN RETURN &H8004 BOR (asmV(a) SHL 8) BOR (asmV(b) SHL 4)
+            RETURN &H7000 BOR (asmV(a) SHL 8) BOR asmWert(ops[1], 8)
+        CASE "OR", "AND", "XOR", "SUB", "SUBN"
+            ' Die letzte Ziffer: OR 1, AND 2, XOR 3, SUB 5, SUBN 7.
+            DIM art AS INTEGER : art = MAPGET({"OR": 1, "AND": 2, "XOR": 3, "SUB": 5, "SUBN": 7}, befehl)
+            RETURN &H8000 BOR (asmV(a) SHL 8) BOR (asmV(b) SHL 4) BOR art
+        CASE "SHR", "SHL"
+            DIM yy AS INTEGER : yy = 0
+            IF n > 1 THEN yy = asmV(b)
+            RETURN &H8000 BOR (asmV(a) SHL 8) BOR (yy SHL 4) BOR IIF(befehl = "SHR", 6, &HE)
+        CASE "RND"
+            RETURN &HC000 BOR (asmV(a) SHL 8) BOR asmWert(ops[1], 8)
+        CASE "DRW"
+            RETURN &HD000 BOR (asmV(a) SHL 8) BOR (asmV(b) SHL 4) BOR asmWert(ops[2], 4)
+        CASE "SKP"
+            RETURN &HE09E BOR (asmV(a) SHL 8)
+        CASE "SKNP"
+            RETURN &HE0A1 BOR (asmV(a) SHL 8)
+    END SELECT
+    asmFehler = "unbekannter Befehl '" + befehl + "'"
+    RETURN 0
+END FUNCTION
+
+' Die Zahl der Operanden, die ein Befehl verlangt (Bereich von..bis).
+FUNCTION asmOperandenOk(befehl AS STRING, n AS INTEGER) AS BOOLEAN
+    IF befehl = "CLS" OR befehl = "RET" THEN RETURN n = 0
+    IF befehl = "SYS" OR befehl = "CALL" OR befehl = "SKP" OR befehl = "SKNP" THEN RETURN n = 1
+    IF befehl = "JP" OR befehl = "SHR" OR befehl = "SHL" THEN RETURN n = 1 OR n = 2
+    IF befehl = "DRW" THEN RETURN n = 3
+    IF befehl = "DB" OR befehl = "DW" THEN RETURN n >= 1
+    RETURN n = 2
+END FUNCTION
+
+FUNCTION asmUebersetzen$(text AS STRING) AS STRING
+    asmMarken = {}
+    asmFehler = ""
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(REPLACE$(text, CHR$(13), ""), CHR$(10))
+    DIM marke AS STRING
+    DIM befehl AS STRING
+    DIM ops AS ARRAY OF STRING
+    ' 1. Durchgang: Adressen und Marken.
+    DIM adr AS INTEGER : adr = ASM_START
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(zeilen) - 1
+        asmZeile = k + 1
+        asmZerlegen(zeilen[k], marke, befehl, ops)
+        IF marke <> "" THEN
+            IF MAPHAS(asmMarken, marke) THEN RETURN "Zeile " + STR$(asmZeile) + ": Marke '" + marke + "' gibt es schon"
+            MAPPUT(asmMarken, marke, adr)
+        END IF
+        adr = adr + asmGroesse(befehl, ops)
+    NEXT
+    IF adr > 4096 THEN RETURN "Programm zu gross: " + STR$(adr - ASM_START) + " Bytes"
+    ' 2. Durchgang: Befehle zusammensetzen.
+    asmCode = BUFFER_NEW(adr - ASM_START)
+    DIM p AS INTEGER : p = 0
+    DIM t AS STRING
+    FOR k = 0 TO LEN(zeilen) - 1
+        asmZeile = k + 1
+        asmZerlegen(zeilen[k], marke, befehl, ops)
+        IF befehl = "" THEN CONTINUE
+        IF NOT asmOperandenOk(befehl, LEN(ops)) THEN RETURN "Zeile " + STR$(asmZeile) + ": falsche Zahl von Operanden fuer " + befehl
+        IF befehl = "DB" THEN
+            FOR EACH t IN ops
+                BUFFER_SET(asmCode, p, asmWert(t, 8))
+                p = p + 1
+            NEXT
+        ELSEIF befehl = "DW" THEN
+            FOR EACH t IN ops
+                DIM wort AS INTEGER : wort = asmWert(t, 16)
+                BUFFER_SET(asmCode, p, wort SHR 8)
+                BUFFER_SET(asmCode, p + 1, wort BAND &HFF)
+                p = p + 2
+            NEXT
+        ELSE
+            DIM code AS INTEGER : code = asmBefehl(befehl, ops)
+            BUFFER_SET(asmCode, p, code SHR 8)
+            BUFFER_SET(asmCode, p + 1, code BAND &HFF)
+            p = p + 2
+        END IF
+        IF asmFehler <> "" THEN RETURN "Zeile " + STR$(asmZeile) + ": " + asmFehler
+    NEXT
+    RETURN ""
+END FUNCTION
