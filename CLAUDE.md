@@ -2656,6 +2656,39 @@ drei, Hover leer) und zwei in `werkzeug_ide_parameter_einfuegen`
 (Methoden zweier Klassen samt geerbter, Platzhalter nach `ob.se`),
 Rust-Test `import_marke_gehoert_nicht_zur_doku`.
 
+## Dogfooding 14: IDE-Plugin "Klassen" (2026-10-24)
+
+`examples/plugins/klassen/` (plugin.dh + leiste.dhform): alle Klassen und
+Structs des Projekts als Baum in einer Leiste rechts, darunter Felder,
+Konstanten, Eigenschaften und Methoden mit Typ, Filterfeld, "Nur die Datei
+vorn", ein Klick springt hin; neu gelesen nach dem Sichern (beim
+Reiterwechsel nur im Modus "Nur die Datei vorn" -- sonst klappte der Baum
+bei jedem Sprung nach oben). Drei Luecken der Plugin-Schnittstelle:
+(1) **Kein Befehl lieferte die Klassenstruktur** -- `CODE_SYMBOLS$` kennt
+weder Felder noch Typen noch die Vorfahrin. Neu **`CODE_CLASSES$(text$)`**
+(`lsp::klassen_struktur`, textbasiert ueber `symbole::bereiche`/
+`definitionen`, also auch fuer eine Datei mit Fehler): je Klasse name, art,
+basis (EXTENDS), zeile, bis, kommentar, mitglieder; je Mitglied name, art
+(feld/konstante/sub/function/property), typ, kopf, zeile, kommentar. Lokale
+Variablen der Methoden sind keine Felder, GET und SET einer PROPERTY EIN
+Mitglied, `DIM a, b AS INTEGER` gibt beiden den Typ. Dabei:
+`doku_der_definition` nahm bei einer Kopfzeile ueber mehrere Zeilen den
+Fortsetzungsstrich ` _` mit in die Signatur (auch im Hover). (2) **Ein
+Plugin konnte keinen Baum fuellen** -- neu `PLUGIN_BAUM(leiste, widget,
+ebenen, texte [, auf])`, Nachricht `baum` (`pluginBaum` in ide.dh; ein
+Eintrag haengt am letzten davor mit kleinerer Ebene, die Knotennummer ist
+die Stelle in der Liste), `PLUGIN_SETZE ... "selected"` waehlt auch im
+Baum. (3) **`GUI_CHANGED` auf einem Baum war stumm**, wenn ein Knoten
+gewaehlt wurde -- der Abdruck (`Gui::abdruck`) kannte die Auswahl des
+Baums nicht (sie liegt in `TreeState`); `pluginWert$` liefert fuer einen
+Baum den gewaehlten Knoten. `PLUGIN_OEFFNEN` ohne Pfad springt im Reiter
+vorn (ungesicherter Text). Tests `tests/pruef/werkzeug_ide_plugin_klassen.dhtest`
+(2: das Plugin aus examples/ in der echten IDE mit echtem Klick, Filter,
+Kopfzeile; allein gestartet endet es gleich), Rust-Test
+`klassen_mit_mitgliedern_ohne_uebersetzen`; Gegenproben (ohne Baum in
+`pluginWert$`, `_`-Ordner mitgezaehlt, Baumauswahl nicht im Abdruck) fallen
+je in ihrem Fall.
+
 ## Dogfooding 13: CHIP-8-Emulator (2026-10-24)
 
 `examples/chip8/`: `cpu.dh` (Rechenkern ohne Fenster, alle 35 Befehle,
