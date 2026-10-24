@@ -251,6 +251,9 @@ FOR i = 0 TO LEN(roh) - 1
 NEXT
 PRINT "genug dateien "; (LEN(dateien) > 150)
 PRINT "teile von programmen uebergangen "; (teile > 0)
+' Plugins der IDE (examples/plugins/) importieren dh_plugin.dh -- das findet
+' ein Plugin ueber DH_PATH, das die IDE beim Start auf ihren Ordner setzt.
+SETENV("DH_PATH", ordner + "/../ide")
 DIM zeilen AS ARRAY OF STRING : zeilen = dlCheckViele(dateien)
 PRINT "je datei eine zeile "; (LEN(zeilen) = LEN(dateien))
 DIM fehler AS INTEGER : fehler = 0

@@ -96,6 +96,7 @@ entworfen, empfohlen; entschieden ist nichts davon.
 - **[Pakete](pakete.md)** — `dhrt paket hole github:nutzer/repo@stand`: Bibliotheken holen, festhalten und teilen
 - **[Die Werkzeuge um die Sprache](werkzeuge.md)** — `dhrt --version`, `dhrt test` (Prüfprogramme laufen lassen), `dhrt fmt` (einheitlich schreiben), `dhrt --check`, `dhrt doku referenz` (Referenz aus dem Quelltext)
 - **[IDE](ide.md)** — die Entwicklungsumgebung, geschrieben in Drachenhauch: Reiter, Projektbaum, Debugger, Profil, Suche im Projekt, Umbauten
+- **[Plugins der IDE](ide-plugins.md)** — eigene Befehle, Leisten, Ereignisse und Code-Hilfen als eigenes Programm
 - **[Sprite-Editor](sprite-editor.md)** (`examples/189_sprite_editor.dh`) — Pixel-Art mit Einzelbildern, Ebenen, Auswahlmaske, GIF, Atlas-Export
 - **[Tilemap-Editor](tilemap-editor.md)** (`examples/187_tilemap_editor.dh`) — Level bauen, Tiled-JSON lesen und schreiben
 - **[Form-Designer](form-designer.md)** (`examples/197_form_designer.dh`) — Oberflächen zusammenklicken, Xojo-Stil, F5 startet sie

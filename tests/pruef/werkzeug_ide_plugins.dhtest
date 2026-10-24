@@ -1,0 +1,225 @@
+' Plugins der IDE (docs/ide-plugins.md): ein eigenes Programm in
+' plugins/<name>/plugin.dh neben der ide.json, gestartet mit WINDOW_OPEN,
+' die Seite des Plugins in ide/dh_plugin.dh.
+'
+' Das Test-Plugin liegt als Beilage unter _programm/plugins/test/ -- die
+' ide.json der Pruefung liegt in _programm, und die IDE sucht ihre Plugins
+' daneben. Ein Einschub am Ende der Bildschleife wartet, bis das Plugin
+' angemeldet ist (es ist ein eigener Prozess, das dauert ein paar Bilder),
+' und fragt dann den Stand der IDE ab. Die Lage des Knopfs in der Leiste
+' kommt zur Laufzeit aus dem Fenster der Leiste.
+--- langsam
+
+=== befehl leiste ereignis und code-hilfen eines plugins
+DIM prB AS INTEGER
+DIM prSchritt AS INTEGER
+DIM prSeit AS INTEGER
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prSchritt = 0 AND LEN(plugBefKennung) > 0 AND LEN(plugLeisteName) > 0 AND LEN(plugSchnName) > 0 AND LEN(plugFaerbEndung) > 0 THEN
+    protokoll("pr angemeldet " + plugBefKennung[0] + " " + plugLeisteName[0] + " " + GUI_DOCK_WHERE$(win, plugLeisteName[0]))
+    protokoll("pr schnipsel " + STR$(ARRAY_INDEXOF(schnipselNamen, "Hallo-Schnipsel") >= 0))
+    protokoll("pr faerbung " + STR$(pluginFaerben(aktivesFeld(), "[x] fertig", 0)))
+    ' Das Fenster der Leiste liegt auf ihrem Rechteck im Dock.
+    DIM prX AS INTEGER
+    DIM prY AS INTEGER
+    DIM prBr AS INTEGER
+    DIM prH AS INTEGER
+    (prX, prY, prBr, prH) = GUI_DOCK_RECT(win, plugLeisteName[0])
+    protokoll("pr leiste auf dem rechteck " + STR$(GUI_WINDOW_GET_W(plugLeisteFenster[0]) = prBr AND prBr > 0))
+    befehl(plugBefKennung[0])
+    prSchritt = 1 : prSeit = prB
+END IF
+IF prSchritt = 1 AND INSTR(GUI_TEXT(aktivesFeld()), "eingefuegt") >= 0 THEN
+    protokoll("pr eingefuegt nach dem befehl")
+    sichern(aktiverTab, FALSE)
+    prSchritt = 2 : prSeit = prB
+END IF
+IF prSchritt = 2 AND GUI_LISTBOX_COUNT(lstAusgabe) > 0 THEN
+    DIM prA AS STRING : prA = GUI_LISTBOX_ITEM(lstAusgabe, GUI_LISTBOX_COUNT(lstAusgabe) - 1)
+    IF INSTR(prA, "gesichert:") >= 0 THEN
+        protokoll("pr ausgabe " + prA)
+        pruefen()
+        DIM prI AS INTEGER
+        FOR prI = 0 TO GUI_LISTBOX_COUNT(lstProbleme) - 1
+            IF INSTR(GUI_LISTBOX_ITEM(lstProbleme, prI), "[test]") >= 0 THEN protokoll("pr befund " + GUI_LISTBOX_ITEM(lstProbleme, prI))
+        NEXT
+        prSchritt = 3 : prSeit = prB
+    END IF
+END IF
+IF prB > 600 THEN protokoll("pr zeit um bei schritt " + STR$(prSchritt)) : EXIT(0)
+IF prSchritt = 3 THEN EXIT(0)
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=900
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT 1
+PRINT 2
+
+--- datei _programm/plugins/test/plugin.dh
+IMPORT "dh_plugin.dh"
+PLUGIN_BEFEHL("hallo", "Hallo einfuegen", "Strg+Alt+Umschalt+H")
+PLUGIN_LEISTE("leiste", "Test", "leiste.dhform", "rechts")
+PLUGIN_HOERE("gesichert")
+PLUGIN_SCHNIPSEL("Hallo-Schnipsel", "hallo", "PRINT |")
+PLUGIN_FAERBUNG(".dh", "^\[x\].*", &H70A070)
+WHILE PLUGIN_LAEUFT()
+    SELECT CASE PLUGIN_EREIGNIS$()
+        CASE "befehl"
+            IF PLUGIN_ID$() = "hallo" THEN PLUGIN_EINFUEGEN("' eingefuegt" + CHR$(10))
+        CASE "ereignis"
+            IF PLUGIN_ID$() = "gesichert" THEN
+                PLUGIN_AUSGABE("gesichert: " + BASENAME(PLUGIN_DATEI$()))
+                PLUGIN_BEFUND(PLUGIN_DATEI$(), 2, "zweite Zeile", "warnung")
+                PLUGIN_BEFUNDE_SENDEN(PLUGIN_DATEI$())
+            END IF
+        CASE "ende"
+            EXIT(0)
+    END SELECT
+WEND
+
+--- datei _programm/plugins/test/leiste.dhform
+{"title": "Test", "w": 200, "h": 120, "chrome": false, "widgets": [{"kind": "button", "name": "knopf", "text": "Knopf", "x": 4, "y": 4, "w": 100, "h": 28}]}
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 8) = "plugins " THEN PRINT L[i]
+NEXT
+--- erwartet
+plugins 1
+pr angemeldet plugin:test:hallo plugin.test.leiste rechts
+pr schnipsel TRUE
+pr faerbung TRUE
+pr leiste auf dem rechteck TRUE
+pr eingefuegt nach dem befehl
+pr ausgabe gesichert: haupt.dh
+pr befund Zeile 2: [test] zweite Zeile
+
+=== ein klick in die leiste kommt beim plugin an
+DIM prB AS INTEGER
+DIM prSchritt AS INTEGER
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prSchritt = 0 AND LEN(plugLeisteName) > 0 THEN
+    IF GUI_WINDOW_SHOWN(plugLeisteFenster[0]) THEN
+        DIM prKx AS INTEGER : prKx = GUI_WINDOW_GET_X(plugLeisteFenster[0]) + 20
+        DIM prKy AS INTEGER : prKy = GUI_WINDOW_GET_Y(plugLeisteFenster[0]) + 16
+        WRITEALL("ev.txt", "c 4" + CHR$(10) + "e 0 7 " + STR$(prKx) + " " + STR$(prKy) + " 0 0" + CHR$(10) + "e 1 7 " + STR$(prKx) + " " + STR$(prKy) + " 0 0" + CHR$(10) + "e 2 6 0 0 0 0" + CHR$(10) + "e 4 5 0 0 0 0" + CHR$(10))
+        AUTOMATION_PLAY("ev.txt")
+        prSchritt = 1
+    END IF
+END IF
+IF prSchritt = 1 AND INSTR(GUI_TEXT(lblStatus), "geklickt") >= 0 THEN
+    protokoll("pr status " + GUI_TEXT(lblStatus))
+    EXIT(0)
+END IF
+IF prB > 600 THEN protokoll("pr zeit um bei schritt " + STR$(prSchritt)) : EXIT(0)
+--- umgebung
+DHRT_FRAMES=900
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei _programm/plugins/test/plugin.dh
+IMPORT "dh_plugin.dh"
+PLUGIN_LEISTE("leiste", "Test", "leiste.dhform", "rechts")
+WHILE PLUGIN_LAEUFT()
+    IF PLUGIN_EREIGNIS$() = "klick" THEN PLUGIN_MELDUNG("geklickt " + PLUGIN_LEISTE$() + "/" + PLUGIN_WIDGET$())
+WEND
+
+--- datei _programm/plugins/test/leiste.dhform
+{"title": "Test", "w": 200, "h": 120, "chrome": false, "widgets": [{"kind": "button", "name": "knopf", "text": "Knopf", "x": 4, "y": 4, "w": 100, "h": 28}]}
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr status geklickt leiste/knopf
+
+=== ein abgestuerztes plugin reisst die ide nicht mit
+' Das Plugin meldet einen Befehl an und bricht beim Ausloesen mit einem
+' Laufzeitfehler ab. Die IDE laeuft weiter, der Befehl ist gesperrt, und
+' die Leiste ist zu.
+DIM prB AS INTEGER
+DIM prSchritt AS INTEGER
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prSchritt = 0 AND LEN(plugBefKennung) > 0 AND LEN(plugLeisteName) > 0 THEN
+    befehl(plugBefKennung[0])
+    prSchritt = 1
+END IF
+IF prSchritt = 1 AND plugZustand[0] <> "läuft" THEN
+    protokoll("pr zustand " + plugZustand[0])
+    protokoll("pr leiste zu " + STR$(NOT GUI_DOCK_SHOWN(win, plugLeisteName[0])))
+    protokoll("pr ide laeuft weiter " + STR$(prB > 0))
+    EXIT(0)
+END IF
+IF prB > 600 THEN protokoll("pr zeit um bei schritt " + STR$(prSchritt)) : EXIT(0)
+--- umgebung
+DHRT_FRAMES=900
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei _programm/plugins/test/plugin.dh
+IMPORT "dh_plugin.dh"
+PLUGIN_BEFEHL("kaputt", "Kaputt", "")
+PLUGIN_LEISTE("leiste", "Test", "leiste.dhform", "unten")
+DIM leer AS ARRAY OF INTEGER : leer = []
+WHILE PLUGIN_LAEUFT()
+    IF PLUGIN_EREIGNIS$() = "befehl" THEN PRINT leer[5]
+WEND
+
+--- datei _programm/plugins/test/leiste.dhform
+{"title": "Test", "w": 200, "h": 120, "chrome": false, "widgets": [{"kind": "label", "text": "x", "x": 4, "y": 4}]}
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr zustand abgestürzt
+pr leiste zu TRUE
+pr ide laeuft weiter TRUE
+
+=== ein abgeschaltetes plugin startet nicht
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+protokoll("pr zustand " + plugZustand[0] + " leitung " + STR$(plugLeitung[0]))
+EXIT(0)
+--- umgebung
+DHRT_FRAMES=60
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei _programm/ide.json
+{"plugins_aus": ["test"]}
+--- datei _programm/plugins/test/plugin.dh
+IMPORT "dh_plugin.dh"
+PLUGIN_BEFEHL("x", "X", "")
+DIM ev AS STRING
+WHILE PLUGIN_LAEUFT()
+    ev = PLUGIN_EREIGNIS$()
+WEND
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 8) = "plugins " THEN PRINT L[i]
+NEXT
+--- erwartet
+plugins 1
+pr zustand aus leitung -1

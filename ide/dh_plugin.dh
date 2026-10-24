@@ -1,0 +1,303 @@
+' dh_plugin.dh -- die Seite des PLUGINS. Ein Plugin der IDE ist ein eigenes
+' Drachenhauch-Programm (plugins/<name>/plugin.dh im Konfigurationsordner der
+' IDE); die IDE startet es mit WINDOW_OPEN und spricht ueber dessen Leitung
+' mit ihm (PARENT_SEND / PARENT_RECV$), eine JSON-Zeile je Nachricht. Ein
+' Plugin, das abstuerzt oder haengt, reisst die IDE nicht mit.
+'
+'     IMPORT "dh_plugin.dh"            ' die IDE legt ihren Ordner in DH_PATH
+'     PLUGIN_BEFEHL("todo.neu", "Todo anlegen", "Strg+Alt+T")
+'     PLUGIN_LEISTE("todo", "Todos", "leiste.dhform", "rechts")
+'     PLUGIN_HOERE("gesichert")
+'     WHILE PLUGIN_LAEUFT()
+'         SELECT CASE PLUGIN_EREIGNIS$()
+'             CASE "befehl" : ...         ' PLUGIN_ID$() = "todo.neu"
+'             CASE "klick" : ...          ' PLUGIN_LEISTE$(), PLUGIN_WIDGET$()
+'             CASE "geaendert" : ...      ' dazu PLUGIN_WERT$()
+'             CASE "ereignis" : ...       ' PLUGIN_ID$() = "gesichert", PLUGIN_DATEI$()
+'         END SELECT
+'     WEND
+'
+' Das ganze Protokoll steht in docs/ide-plugins.md. Die Namen hier beginnen
+' mit plg bzw. PLUGIN_, damit sie die eines Plugins nicht verdecken.
+IMPORT "json"
+
+DIM plgEv AS JSON_HANDLE : plgEv = JSON_PARSE("{}")
+' Nachrichten, die ankamen, waehrend eine Frage auf ihre Antwort wartete.
+DIM plgWarte AS ARRAY OF STRING : plgWarte = []
+DIM plgNr AS INTEGER : plgNr = 0
+' Name eines Widgets -> Nummer in seiner Leiste ("leiste/name"), und zurueck.
+DIM plgNummer AS MAP OF INTEGER : plgNummer = {}
+DIM plgNamen AS MAP OF STRING : plgNamen = {}
+' Gesammelte Befunde (PLUGIN_BEFUND), je Datei verschickt.
+DIM plgBefunde AS JSON_HANDLE : plgBefunde = JSON_PARSE("[]")
+DIM plgBefundDatei AS STRING : plgBefundDatei = ""
+
+SUB plgSenden(j AS JSON_HANDLE)
+    IF PARENT_ALIVE() THEN PARENT_SEND(JSON_STRINGIFY(j))
+END SUB
+
+FUNCTION plgNachricht(art AS STRING) AS JSON_HANDLE
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    JSON_SET_STRING(j, "art", art)
+    RETURN j
+END FUNCTION
+
+' Laeuft die IDE noch? Ohne IDE (das Plugin allein gestartet) FALSE.
+FUNCTION PLUGIN_LAEUFT() AS BOOLEAN
+    RETURN PARENT_ALIVE()
+END FUNCTION
+
+' Das naechste Ereignis -- wartet bis zu 50 ms und liefert "" ohne eins.
+' Die Art ist "befehl", "klick", "geaendert", "ereignis" oder "ende".
+FUNCTION PLUGIN_EREIGNIS$() AS STRING
+    DIM zeile AS STRING : zeile = ""
+    DIM bis AS FLOAT : bis = GET_TIME() + 0.05
+    WHILE zeile = ""
+        IF LEN(plgWarte) > 0 THEN
+            zeile = plgWarte[0]
+            plgWarte = plgWarte[1:]
+        ELSE
+            zeile = PARENT_RECV$()
+        END IF
+        IF zeile = "" THEN
+            IF GET_TIME() >= bis OR NOT PARENT_ALIVE() THEN RETURN ""
+            SLEEP(5)
+        END IF
+    WEND
+    TRY
+        plgEv = JSON_PARSE(zeile)
+    CATCH e
+        RETURN ""
+    END TRY
+    RETURN plgFeld$("art")
+END FUNCTION
+
+FUNCTION plgFeld$(k AS STRING) AS STRING
+    IF NOT JSON_HAS(plgEv, k) THEN RETURN ""
+    SELECT CASE JSON_TYPE(plgEv, k)
+        CASE "string" : RETURN JSON_GET_STRING(plgEv, k)
+        CASE "number" : RETURN STR$(JSON_GET_INT(plgEv, k))
+        CASE "boolean" : RETURN IIF(JSON_GET_BOOL(plgEv, k), "TRUE", "FALSE")
+    END SELECT
+    RETURN JSON_STRINGIFY(JSON_GET_JSON(plgEv, k))
+END FUNCTION
+
+' Zum Ereignis: der Befehl bzw. der Name des Ereignisses.
+FUNCTION PLUGIN_ID$() AS STRING
+    IF plgFeld$("art") = "ereignis" THEN RETURN plgFeld$("name")
+    RETURN plgFeld$("id")
+END FUNCTION
+FUNCTION PLUGIN_LEISTE$() AS STRING
+    RETURN plgFeld$("leiste")
+END FUNCTION
+' Der Name des Widgets (aus der .dhform), sonst seine Nummer.
+FUNCTION PLUGIN_WIDGET$() AS STRING
+    DIM k AS STRING : k = plgFeld$("leiste") + "/" + plgFeld$("widget")
+    IF MAPHAS(plgNamen, k) THEN RETURN MAPGET(plgNamen, k)
+    RETURN plgFeld$("widget")
+END FUNCTION
+FUNCTION PLUGIN_WERT$() AS STRING
+    RETURN plgFeld$("wert")
+END FUNCTION
+FUNCTION PLUGIN_DATEI$() AS STRING
+    RETURN plgFeld$("datei")
+END FUNCTION
+
+' Einen Befehl anmelden: er steht im Menue "Plugins", in der Befehlspalette
+' und (wenn angegeben) auf dem Kuerzel. Ausgeloest kommt "befehl".
+SUB PLUGIN_BEFEHL(id AS STRING, titel AS STRING, kuerzel AS STRING = "")
+    DIM j AS JSON_HANDLE : j = plgNachricht("befehl")
+    JSON_SET_STRING(j, "id", id)
+    JSON_SET_STRING(j, "titel", titel)
+    JSON_SET_STRING(j, "kuerzel", kuerzel)
+    plgSenden(j)
+END SUB
+
+' Eine eigene Leiste: eine .dhform (etwa aus dem Form-Designer), die die IDE
+' als Fenster in ihr Dock legt -- links, rechts, unten oder schwebend. Die
+' Widgets heissen wie in der Form (Feld "name"); Klicks und Aenderungen
+' kommen als "klick" bzw. "geaendert".
+SUB PLUGIN_LEISTE(id AS STRING, titel AS STRING, formdatei AS STRING, bereich AS STRING = "rechts")
+    DIM form AS JSON_HANDLE : form = JSON_LOAD(formdatei)
+    DIM n AS INTEGER : n = 0
+    IF JSON_HAS(form, "widgets") THEN n = JSON_LEN(form, "widgets")
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM p AS STRING : p = "widgets." + STR$(i) + ".name"
+        IF JSON_HAS(form, p) THEN
+            DIM name AS STRING : name = JSON_GET_STRING(form, p)
+            IF name <> "" THEN
+                MAPPUT(plgNummer, id + "/" + name, i)
+                MAPPUT(plgNamen, id + "/" + STR$(i), name)
+            END IF
+        END IF
+    NEXT
+    DIM j AS JSON_HANDLE : j = plgNachricht("leiste")
+    JSON_SET_STRING(j, "id", id)
+    JSON_SET_STRING(j, "titel", titel)
+    JSON_SET_STRING(j, "bereich", bereich)
+    JSON_SET_JSON(j, "form", form)
+    plgSenden(j)
+END SUB
+
+' Ein Ereignis der IDE hoeren: "gesichert", "geoeffnet", "reiter",
+' "gestartet", "beendet", "geprueft" (je mit PLUGIN_DATEI$).
+SUB PLUGIN_HOERE(ereignis AS STRING)
+    DIM j AS JSON_HANDLE : j = plgNachricht("hoere")
+    JSON_SET_STRING(j, "ereignis", ereignis)
+    plgSenden(j)
+END SUB
+
+FUNCTION plgWidgetNr(leiste AS STRING, widget AS STRING) AS INTEGER
+    DIM k AS STRING : k = leiste + "/" + widget
+    IF MAPHAS(plgNummer, k) THEN RETURN MAPGET(plgNummer, k)
+    RETURN VAL(widget)
+END FUNCTION
+
+' Ein Widget der eigenen Leiste aendern: was$ = text, checked, value,
+' enabled, visible oder selected; der Wert als Text ("TRUE"/"FALSE", Zahl).
+SUB PLUGIN_SETZE(leiste AS STRING, widget AS STRING, was AS STRING, wert AS STRING)
+    DIM j AS JSON_HANDLE : j = plgNachricht("setze")
+    JSON_SET_STRING(j, "leiste", leiste)
+    JSON_SET_INT(j, "widget", plgWidgetNr(leiste, widget))
+    JSON_SET_STRING(j, "was", was)
+    JSON_SET_STRING(j, "wert", wert)
+    plgSenden(j)
+END SUB
+
+' Die Eintraege einer Liste (oder Klappliste) der eigenen Leiste.
+SUB PLUGIN_LISTE(leiste AS STRING, widget AS STRING, eintraege AS ARRAY OF STRING)
+    DIM j AS JSON_HANDLE : j = plgNachricht("liste")
+    JSON_SET_STRING(j, "leiste", leiste)
+    JSON_SET_INT(j, "widget", plgWidgetNr(leiste, widget))
+    JSON_SET_JSON(j, "eintraege", JSON_PARSE("[]"))
+    DIM e AS STRING
+    FOR EACH e IN eintraege
+        JSON_APPEND_STRING(j, "eintraege", e)
+    NEXT
+    plgSenden(j)
+END SUB
+
+SUB plgTue(was AS STRING, text AS STRING, datei AS STRING, zeile AS INTEGER)
+    DIM j AS JSON_HANDLE : j = plgNachricht("tue")
+    JSON_SET_STRING(j, "was", was)
+    JSON_SET_STRING(j, "text", text)
+    JSON_SET_STRING(j, "datei", datei)
+    JSON_SET_INT(j, "zeile", zeile)
+    plgSenden(j)
+END SUB
+' Text an der Schreibmarke einfuegen (eine Auswahl ersetzt er).
+SUB PLUGIN_EINFUEGEN(text AS STRING)
+    plgTue("einfuegen", text, "", 0)
+END SUB
+' Eine Meldung in die Statusleiste.
+SUB PLUGIN_MELDUNG(text AS STRING)
+    plgTue("meldung", text, "", 0)
+END SUB
+' Eine Zeile in die Ausgabe.
+SUB PLUGIN_AUSGABE(text AS STRING)
+    plgTue("ausgabe", text, "", 0)
+END SUB
+' Eine Datei oeffnen, auf Wunsch in einer Zeile.
+SUB PLUGIN_OEFFNEN(pfad AS STRING, zeile AS INTEGER = 0)
+    plgTue("oeffnen", "", pfad, zeile)
+END SUB
+
+' Eine Frage an die IDE: wartet bis zu zwei Sekunden auf die Antwort; was
+' dazwischen ankommt, bekommt PLUGIN_EREIGNIS$ danach.
+FUNCTION plgFrage$(was AS STRING) AS STRING
+    plgNr = plgNr + 1
+    DIM j AS JSON_HANDLE : j = plgNachricht("frage")
+    JSON_SET_INT(j, "nr", plgNr)
+    JSON_SET_STRING(j, "was", was)
+    plgSenden(j)
+    DIM bis AS FLOAT : bis = GET_TIME() + 2.0
+    WHILE GET_TIME() < bis AND PARENT_ALIVE()
+        DIM z AS STRING : z = PARENT_RECV$()
+        IF z = "" THEN
+            SLEEP(2)
+        ELSE
+            DIM a AS JSON_HANDLE
+            DIM ok AS BOOLEAN : ok = TRUE
+            TRY
+                a = JSON_PARSE(z)
+            CATCH e
+                ok = FALSE
+            END TRY
+            IF ok AND JSON_HAS(a, "art") AND JSON_HAS(a, "nr") THEN
+                IF JSON_GET_STRING(a, "art") = "antwort" AND JSON_GET_INT(a, "nr") = plgNr THEN
+                    IF JSON_HAS(a, "wert") THEN RETURN JSON_GET_STRING(a, "wert")
+                    RETURN ""
+                END IF
+            END IF
+            ARRAY_PUSH(plgWarte, z)
+        END IF
+    WEND
+    RETURN ""
+END FUNCTION
+' Der Text im vorderen Reiter.
+FUNCTION PLUGIN_TEXT$() AS STRING
+    RETURN plgFrage$("text")
+END FUNCTION
+' Der Pfad der Datei im vorderen Reiter ("" = noch ungesichert).
+FUNCTION PLUGIN_DATEINAME$() AS STRING
+    RETURN plgFrage$("datei")
+END FUNCTION
+' Der markierte Text.
+FUNCTION PLUGIN_AUSWAHL$() AS STRING
+    RETURN plgFrage$("auswahl")
+END FUNCTION
+' Der Projektordner.
+FUNCTION PLUGIN_PROJEKT$() AS STRING
+    RETURN plgFrage$("projekt")
+END FUNCTION
+' Zeile und Spalte der Schreibmarke als "zeile,spalte".
+FUNCTION PLUGIN_MARKE$() AS STRING
+    RETURN plgFrage$("marke")
+END FUNCTION
+
+' Eigene Pruefungen: Befunde sammeln und je Datei verschicken -- die IDE
+' zeigt sie in der Liste der Probleme, solange die Datei vorn ist. Ein
+' neues PLUGIN_BEFUNDE_SENDEN fuer dieselbe Datei ersetzt die alten;
+' leer gesendet nimmt es sie weg. Schwere: "fehler", "warnung", "hinweis".
+SUB PLUGIN_BEFUND(datei AS STRING, zeile AS INTEGER, meldung AS STRING, schwere AS STRING = "warnung")
+    IF datei <> plgBefundDatei THEN
+        plgBefunde = JSON_PARSE("[]")
+        plgBefundDatei = datei
+    END IF
+    DIM b AS JSON_HANDLE : b = JSON_PARSE("{}")
+    JSON_SET_INT(b, "zeile", zeile)
+    JSON_SET_STRING(b, "meldung", meldung)
+    JSON_SET_STRING(b, "schwere", schwere)
+    JSON_APPEND_JSON(plgBefunde, "", b)
+END SUB
+SUB PLUGIN_BEFUNDE_SENDEN(datei AS STRING)
+    IF datei <> plgBefundDatei THEN plgBefunde = JSON_PARSE("[]")
+    DIM j AS JSON_HANDLE : j = plgNachricht("befunde")
+    JSON_SET_STRING(j, "datei", datei)
+    JSON_SET_JSON(j, "liste", plgBefunde)
+    plgSenden(j)
+    plgBefunde = JSON_PARSE("[]")
+    plgBefundDatei = ""
+END SUB
+
+' Ein Schnipsel (Strg+J, oder das Kuerzel + Tabulator). `|` markiert, wo die
+' Schreibmarke danach steht.
+SUB PLUGIN_SCHNIPSEL(name AS STRING, kuerzel AS STRING, text AS STRING)
+    DIM j AS JSON_HANDLE : j = plgNachricht("schnipsel")
+    JSON_SET_STRING(j, "name", name)
+    JSON_SET_STRING(j, "kuerzel", kuerzel)
+    JSON_SET_STRING(j, "text", text)
+    plgSenden(j)
+END SUB
+
+' Faerbung fuer eine weitere Dateiart (Endung mit Punkt, etwa ".md"): jede
+' Regel ist ein regulaerer Ausdruck und eine Farbe. Die IDE faerbt solche
+' Dateien dann damit statt mit der Faerbung fuer Drachenhauch.
+SUB PLUGIN_FAERBUNG(endung AS STRING, muster AS STRING, farbe AS INTEGER)
+    DIM j AS JSON_HANDLE : j = plgNachricht("faerbung")
+    JSON_SET_STRING(j, "endung", LOWER$(endung))
+    JSON_SET_STRING(j, "muster", muster)
+    JSON_SET_INT(j, "farbe", farbe)
+    plgSenden(j)
+END SUB

@@ -1,0 +1,11 @@
+{
+ "title": "Todos",
+ "w": 240,
+ "h": 320,
+ "chrome": false,
+ "widgets": [
+  {"kind": "label", "name": "kopf", "text": "TODO und FIXME in dieser Datei", "x": 6, "y": 6, "w": 228, "h": 18, "anchor": "lrt"},
+  {"kind": "listbox", "name": "liste", "x": 4, "y": 28, "w": 232, "h": 252, "anchor": "lrtb", "items": []},
+  {"kind": "button", "name": "auffrischen", "text": "Auffrischen", "x": 4, "y": 286, "w": 120, "h": 28, "anchor": "lb"}
+ ]
+}
