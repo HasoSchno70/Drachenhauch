@@ -45,11 +45,27 @@ FOR i = 0 TO LEN(namen) - 1
         PRINT namen[i]; " endet NICHT -- Schleifenkopf auf QUITREQUESTED umstellen"
         CONTINUE
     END IF
-    fehler = fehler + PROCESS_ERR$(p)
+    ' Das Kind kann beendet sein, bevor sein Lesefaden die letzte Zeile
+    ' abgelegt hat: bis zu fuenf leere Abfragen abwarten (wie die anderen
+    ' Leseschleifen). Sonst stand unter Linux ohne Grafik manchmal nur
+    ' "UEBERSPRINGEN: " ohne Grund da, und das galt nicht als Ueberspringen.
+    DIM stille AS INTEGER : stille = 0
+    WHILE stille < 5
+        DIM rest AS STRING : rest = PROCESS_ERR$(p)
+        IF rest = "" THEN
+            stille = stille + 1
+            SLEEP(30)
+        ELSE
+            fehler = fehler + rest
+            stille = 0
+        END IF
+    WEND
     IF PROCESS_CODE(p) <> 0 THEN
         ' Ohne Bildschirm (oder im Bau ohne raylib) kommt gar kein Fenster
         ' zustande -- dann ist hier nichts zu pruefen.
-        PRINT "UEBERSPRINGEN: " + REPLACE$(TRIM$(SPLIT$(fehler, CHR$(10))[0]), CHR$(13), "")
+        DIM grund AS STRING : grund = REPLACE$(TRIM$(SPLIT$(fehler, CHR$(10))[0]), CHR$(13), "")
+        IF grund = "" THEN grund = namen[i] + " endete mit " + STR$(PROCESS_CODE(p))
+        PRINT "UEBERSPRINGEN: " + grund
         EXIT(0)
     END IF
     PRINT namen[i]; " endet"
