@@ -1382,8 +1382,8 @@ Lines and columns count from 1, in characters.
 | Function | Returns | Effect |
 |---|---|---|
 | `CODE_CHECK$(quelltext$[, basis$])` | STRING (JSON) | the front-end chain like `dhrt --check`: a list of `{zeile, spalte, laenge, schwere, meldung}` with `schwere` = `fehler`/`warnung`; `spalte` (from 1) and `laenge` say where in the line the message belongs -- the location of a syntax error, otherwise a name mentioned in the message, otherwise the line without indentation; `basis$` = folder for `IMPORT "x.dh"` (default: the working directory). Lines are those of the buffer, even with imports |
-| `CODE_HOVER$(quelltext$, zeile, spalte)` | STRING | signature and description of the word at that position as Markdown; empty if there is no word there |
-| `CODE_COMPLETE(quelltext$, zeile, spalte)` | ARRAY OF STRING | suggestions for the word beginning to the left of the position: own symbols, commands, keywords, constants |
+| `CODE_HOVER$(quelltext$, zeile, spalte [, basis$])` | STRING | signature and description of the word at that position as Markdown; empty if there is no word there. With `basis$` (folder for IMPORTs, empty = working folder) it describes the member of the object's class after `object.`; for that the text is compiled |
+| `CODE_COMPLETE(quelltext$, zeile, spalte [, basis$])` | ARRAY OF STRING | suggestions for the word beginning to the left of the position: own symbols, commands, keywords, constants; with `basis$`, after `object.` only the fields, PROPERTYs and methods of its class |
 | `CODE_DEFINITION(quelltext$, zeile, spalte)` | TUPLE (zeile, spalte) | where the word is defined; `(-1, -1)` if there is no definition in this text |
 | `CODE_REFERENCES(quelltext$, zeile, spalte)` | ARRAY OF INTEGER | the lines of all occurrences |
 | `CODE_TYPES$(quelltext$[, basis$])` | STRING (JSON) | type hints for an editor: for each place without a written type -- today the variables of `FOR EACH` -- `{"zeile", "name", "typ"}` (line from 1; `MAP` yields keys as STRING, in the pair form plus the value); what the compiler does not know is left out |

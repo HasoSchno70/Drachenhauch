@@ -1514,6 +1514,43 @@ FUNCTION wortAnfang$() AS STRING
     RETURN MID$(zeile, a, s - 1 - a)
 END FUNCTION
 
+' Steht der Wortanfang hinter `objekt.` (vor dem Punkt ein Name, `)` oder
+' `]`, keine Zahl wie in `1.5`)? Dann zeigt die Vorschlagsliste die
+' Mitglieder seiner Klasse, auch ohne drei getippte Zeichen.
+FUNCTION nachPunkt() AS BOOLEAN
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN FALSE
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM zeile AS STRING : zeile = zeileVon$(ta, z)
+    DIM a AS INTEGER : a = s - 1
+    WHILE a > 0 AND istWortzeichen(MID$(zeile, a - 1, 1)) : a = a - 1 : WEND
+    IF a < 2 THEN RETURN FALSE
+    IF MID$(zeile, a - 1, 1) <> "." THEN RETURN FALSE
+    DIM c AS STRING : c = MID$(zeile, a - 2, 1)
+    IF c = ")" OR c = "]" THEN RETURN TRUE
+    IF NOT istWortzeichen(c) THEN RETURN FALSE
+    DIM k AS INTEGER : k = a - 1
+    WHILE k > 0 AND istWortzeichen(MID$(zeile, k - 1, 1)) : k = k - 1 : WEND
+    RETURN NOT REGEX_TEST(MID$(zeile, k, a - 1 - k), "^[0-9]+$")
+END FUNCTION
+
+' Was die Vorschlagsliste sich merkt: der Wortanfang, hinter einem Punkt
+' mit dem Punkt davor -- sonst gliche `s.` dem leeren Wortanfang.
+FUNCTION vorschlagWort$() AS STRING
+    RETURN IIF(nachPunkt(), ".", "") + wortAnfang$()
+END FUNCTION
+
+' Von wo aus IMPORTs gelten, wenn die IDE den Uebersetzer fragt: der Ordner
+' der Datei im Reiter, sonst der Projektordner.
+FUNCTION codeBasis$() AS STRING
+    IF aktiverTab >= 0 THEN
+        IF tabPfade[aktiverTab] <> "" THEN RETURN DIRNAME(tabPfade[aktiverTab])
+    END IF
+    RETURN projektOrdner
+END FUNCTION
+
 ' Debugger: Variablen und die Schritt-Knoepfe rechts unten IM Hauptfenster,
 ' anstelle der Problemliste, solange der Debugger laeuft. Ein eigenes Fenster
 ' laege hinter dem bildschirmfuellenden Hauptfenster, und Kuerzel gelten nur
@@ -8644,7 +8681,7 @@ FUNCTION signaturHilfe$(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER) AS STRING
     DIM arg AS INTEGER
     (name, spalte, arg) = aufrufUmDieMarke(zeileVon$(ta, z), s)
     IF name = "" THEN RETURN ""
-    DIM md AS STRING : md = CODE_HOVER$(GUI_TEXT(ta), z, spalte)
+    DIM md AS STRING : md = CODE_HOVER$(GUI_TEXT(ta), z, spalte, codeBasis$())
     IF md = "" THEN RETURN ""
     ' Die erste Zeile im Codeblock ist die Signatur.
     md = REPLACE$(md, "```drachenhauch" + NL, "")
@@ -8707,7 +8744,7 @@ SUB hilfeNachziehen()
         protokoll("signatur " + sig)
         RETURN
     END IF
-    DIM md AS STRING : md = CODE_HOVER$(GUI_TEXT(ta), z, s)
+    DIM md AS STRING : md = CODE_HOVER$(GUI_TEXT(ta), z, s, codeBasis$())
     ' Die Markdown-Zaeune weglassen -- die Beschriftung zeigt Text.
     md = REPLACE$(md, "```drachenhauch" + NL, "")
     md = REPLACE$(md, NL + "```", "")
@@ -8906,7 +8943,7 @@ SUB mausNachziehen(ta AS GUI_WIDGET)
     IF stelle = "" OR tippGefragt OR tippRuhe < TIPP_RUHE THEN RETURN
     tippGefragt = TRUE
     DIM text AS STRING : text = ""
-    IF wort <> "" THEN text = tippText$(CODE_HOVER$(GUI_TEXT(ta), z, anfang))
+    IF wort <> "" THEN text = tippText$(CODE_HOVER$(GUI_TEXT(ta), z, anfang, codeBasis$()))
     IF meldung <> "" THEN
         text = tippText$(meldung) + IIF(text <> "", NL + NL + text, "")
         protokoll("tooltip meldung " + LEFT$(meldung, 30))
@@ -8985,7 +9022,7 @@ SUB vervollstaendigen(fokus AS BOOLEAN)
     (z, s) = GUI_TEXTAREA_CURSOR(ta)
     DIM q AS STRING : q = GUI_TEXT(ta)
     DIM namen AS ARRAY OF STRING
-    namen = CODE_COMPLETE(q, z, s)
+    namen = CODE_COMPLETE(q, z, s, codeBasis$())
     ' Laenge des Praefixes links der Marke -- so viel wird beim Uebernehmen ersetzt.
     DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(q, NL)
     DIM zeile AS STRING : zeile = zeilen[z - 1]
@@ -8999,6 +9036,10 @@ SUB vervollstaendigen(fokus AS BOOLEAN)
     WEND
     GUI_LISTBOX_CLEAR(lstVervoll)
     DIM i AS INTEGER
+    ' Von selbst hinter einem Punkt nur, wenn Mitglieder kamen: weiss der
+    ' Uebersetzer die Klasse nicht, kommt die ganze Liste -- die soll nicht
+    ' hinter jedem Satzpunkt in einem Kommentar aufgehen.
+    IF NOT fokus AND nachPunkt() AND LEN(namen) > 100 THEN RETURN
     FOR i = 0 TO MIN(LEN(namen), 200) - 1
         GUI_LISTBOX_ADD(lstVervoll, namen[i])
     NEXT
@@ -9025,7 +9066,7 @@ SUB vervollstaendigen(fokus AS BOOLEAN)
     GUI_WINDOW_FRONT(winVervoll)
     protokoll("vorschlag offen " + STR$(vx) + " " + STR$(vy))
     vervollOffen = TRUE
-    vervollWort = wortAnfang$()
+    vervollWort = vorschlagWort$()
     IF fokus THEN GUI_FOCUS(lstVervoll)
 END SUB
 
@@ -9045,7 +9086,7 @@ SUB vervollNachziehen()
     DIM getippt AS BOOLEAN : getippt = vervollGetippt
     vervollGetippt = FALSE
     IF NOT vorschlagAn OR aktiverTab < 0 OR paletteOffen THEN RETURN
-    DIM wort AS STRING : wort = wortAnfang$()
+    DIM wort AS STRING : wort = vorschlagWort$()
     ' Grosse Datei: die Liste kommt erst, wenn das Wort kurz ruht --
     ' CODE_COMPLETE liest den ganzen Text, bei 20000 Zeilen gut 10 ms je
     ' getipptem Zeichen (Stresstest 2026-10-02). Weitergetippt = neu warten,
@@ -9070,7 +9111,7 @@ SUB vervollNachziehen()
     END IF
     IF wort = vervollAus THEN RETURN
     vervollAus = "-"
-    IF LEN(wort) < 3 THEN
+    IF LEN(wort) < 3 AND LEFT$(wort, 1) <> "." THEN
         vervollSchliessen()
         RETURN
     END IF
@@ -19044,7 +19085,7 @@ WHILE NOT beenden
     ' --- Vervollstaendigung: Enter/Doppelklick uebernimmt, ESC schliesst ---
     IF vervollOffen THEN
         IF GUI_DOUBLE_CLICKED(lstVervoll) OR (KEYHIT(KEY_RETURN) AND GUI_FOCUSED() = lstVervoll) THEN vervollUebernehmen()
-        IF KEYHIT(KEY_ESCAPE) THEN vervollAus = wortAnfang$() : vervollSchliessen() : GUI_FOCUS(aktivesFeld())
+        IF KEYHIT(KEY_ESCAPE) THEN vervollAus = vorschlagWort$() : vervollSchliessen() : GUI_FOCUS(aktivesFeld())
     END IF
 
     ' --- Der Tabulator: drei Bedeutungen, eine Reihenfolge ---

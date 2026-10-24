@@ -22,8 +22,8 @@ entfallen.
 | LSP-Methode | Funktion |
 |---|---|
 | `publishDiagnostics` | Fehler, Warnungen und Hinweise (unbenutzte Variablen in Unterprogrammen, Schwere 4, `unnecessary`) der ganzen Kette (Preprocess → Lex → Parse → Namensraum → Compile), dieselben wie `dhrt --check`, auf die Zeilen des Puffers zurückgerechnet — ein Fehler in einer importierten Datei steht in Zeile 1 mit Herkunft |
-| `completion` | Befehle aus dem Index, Schlüsselwörter, Konstanten (Farben, Tasten, `PI`, `TAU`) und die im Dokument definierten Symbole, nach dem Präfix links von der Marke gefiltert |
-| `hover` | Signatur und Beschreibung für Befehle (handgepflegte Texte vor den aus `docs/` erzeugten, sonst die Signatur aus dem Index) und für eigene `SUB`/`FUNCTION`/`CLASS`/… (der Kommentarblock über der Definition) |
+| `completion` | Befehle aus dem Index, Schlüsselwörter, Konstanten (Farben, Tasten, `PI`, `TAU`) und die im Dokument definierten Symbole, nach dem Präfix links von der Marke gefiltert; hinter `objekt.` nur die Felder, PROPERTYs und Methoden seiner Klasse samt geerbten |
+| `hover` | Signatur und Beschreibung für Befehle (handgepflegte Texte vor den aus `docs/` erzeugten, sonst die Signatur aus dem Index) und für eigene `SUB`/`FUNCTION`/`CLASS`/… (der Kommentarblock über der Definition); hinter `objekt.` das Mitglied der Klasse des Objekts, mit der Klasse, der es gehört -- auch über Indizes, Aufrufe, `Self` und importierte Klassen, weil der Server dafür den Text übersetzt |
 | `definition` | zur Definition springen |
 | `references` | alle Vorkommen eines Symbols |
 | `documentSymbol` | Gliederung — Klassen mit Methoden und Properties verschachtelt, dazu ENUMs |

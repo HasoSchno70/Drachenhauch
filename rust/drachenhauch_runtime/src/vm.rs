@@ -344,6 +344,14 @@ fn bi_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
         None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
     }
 }
+/// Der Ordner, von dem aus ein CODE_*-Befehl IMPORTs aufloest: das Argument
+/// an Stelle `i` -- ohne es None (der Befehl bleibt dann beim Text).
+fn code_basis(a: &[Value], i: usize, fn_: &str) -> R<Option<std::path::PathBuf>> {
+    if a.len() <= i { return Ok(None); }
+    let b = bi_str(a, i, fn_)?;
+    Ok(Some(if b.is_empty() { std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")) }
+            else { std::path::PathBuf::from(b) }))
+}
 #[allow(dead_code)]
 fn bi_num(a: &[Value], i: usize, fn_: &str) -> R<f64> {
     match a.get(i) {
@@ -7005,7 +7013,8 @@ impl<'p> Vm<'p> {
                 let text = bi_str(a, 0, "CODE_HOVER$")?;
                 let z = bi_int(a, 1, "CODE_HOVER$")?.max(1) as usize - 1;
                 let s = bi_int(a, 2, "CODE_HOVER$")?.max(1) as usize - 1;
-                let md = crate::lsp::hover(text, z, s)
+                let basis = code_basis(a, 3, "CODE_HOVER$")?;
+                let md = crate::lsp::hover(text, basis.as_deref(), z, s)
                     .and_then(|h| h["contents"]["value"].as_str().map(str::to_string)).unwrap_or_default();
                 Value::str_rc(&md)
             }
@@ -7013,7 +7022,8 @@ impl<'p> Vm<'p> {
                 let text = bi_str(a, 0, "CODE_COMPLETE")?;
                 let z = bi_int(a, 1, "CODE_COMPLETE")?.max(1) as usize - 1;
                 let s = bi_int(a, 2, "CODE_COMPLETE")?.max(1) as usize - 1;
-                let namen: Vec<String> = crate::lsp::vervollstaendigung(text, z, s).into_iter()
+                let basis = code_basis(a, 3, "CODE_COMPLETE")?;
+                let namen: Vec<String> = crate::lsp::vervollstaendigung(text, basis.as_deref(), z, s).into_iter()
                     .filter_map(|e| e["label"].as_str().map(str::to_string)).collect();
                 let n = namen.len() as i64;
                 let mut arr = DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));

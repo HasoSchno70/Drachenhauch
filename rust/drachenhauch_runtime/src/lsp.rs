@@ -33,6 +33,9 @@ const NAME: &str = "drachenhauch-lsp";
 // LSP CompletionItemKind / SymbolKind (Teilmenge).
 const CK_FUNCTION: i64 = 3;
 const CK_VARIABLE: i64 = 6;
+const CK_METHOD: i64 = 2;
+const CK_FIELD: i64 = 5;
+const CK_PROPERTY: i64 = 10;
 const CK_KEYWORD: i64 = 14;
 const CK_CONSTANT: i64 = 21;
 const SK_CLASS: i64 = 5;
@@ -684,7 +687,24 @@ pub fn builtin_doku(name: &str) -> Option<(String, String)> {
 
 // ---------------------------------------------------------------- Features
 
-pub fn vervollstaendigung(text: &str, z0: usize, c0: usize) -> Vec<Value> {
+pub fn vervollstaendigung(text: &str, basis: Option<&Path>, z0: usize, c0: usize) -> Vec<Value> {
+    // Hinter `objekt.` nur, was das Objekt hat -- sofern der Uebersetzer die
+    // Klasse kennt; sonst wie ueberall. Nur mit `basis`: dafuer wird der
+    // ganze Text uebersetzt (CODE_COMPLETE ohne basis$ bleibt beim Text).
+    if let (Some(basis), Some((a, e))) = (basis, mitglied_stelle(text, z0, c0, false)) {
+        if let Some(fund) = mitglied_fund(text, basis, z0, a, e) {
+            let z: Vec<char> = text.split('\n').nth(z0).unwrap_or("").chars().collect();
+            let pl: String = z[a..c0.min(z.len())].iter().collect::<String>().to_lowercase();
+            let namen = quell_namen(text, basis, &fund);
+            return fund.mitglieder.iter()
+                .filter(|m| m.name.to_lowercase().starts_with(&pl))
+                .map(|m| {
+                    let art = match m.art { "feld" => CK_FIELD, "property" => CK_PROPERTY, _ => CK_METHOD };
+                    let name = namen.get(&m.name.to_lowercase()).cloned().unwrap_or_else(|| m.name.clone());
+                    json!({"label": name, "kind": art, "detail": mitglied_kopf(m, &name)})
+                }).collect();
+        }
+    }
     let (praefix, _) = symbole::praefix_bei(text, z0, c0);
     let pl = praefix.to_lowercase();
     let mut gesehen: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -711,13 +731,174 @@ pub fn vervollstaendigung(text: &str, z0: usize, c0: usize) -> Vec<Value> {
     out
 }
 
-pub fn hover(text: &str, z0: usize, c0: usize) -> Option<Value> {
+pub fn hover(text: &str, basis: Option<&Path>, z0: usize, c0: usize) -> Option<Value> {
     let (wort, _, _) = symbole::wort_bei(text, z0, c0);
     if wort.is_empty() { return None; }
-    let (sig, doc) = builtin_doku(&wort).or_else(|| symbole::nutzer_doku(text, &wort))?;
+    // Hinter `objekt.` das Mitglied SEINER Klasse -- nur mit `basis`, weil
+    // dafuer der ganze Text uebersetzt wird (die Parameternamen der IDE
+    // fragen viele Stellen auf einmal und kommen ohne aus).
+    if let Some(md) = basis.and_then(|b| mitglied_hover(text, b, z0, c0, &wort)) {
+        return Some(json!({"contents": {"kind": "markdown", "value": md}}));
+    }
+    let (sig, doc) = klassen_hover(text, z0, &wort)
+        .or_else(|| builtin_doku(&wort))
+        .or_else(|| symbole::nutzer_doku(text, &wort))?;
     let mut md = format!("```drachenhauch\n{}\n```", sig);
     if !doc.is_empty() { md.push_str("\n\n"); md.push_str(&doc); }
     Some(json!({"contents": {"kind": "markdown", "value": md}}))
+}
+
+// ------------------------------------------- Mitglieder hinter einem Punkt
+
+/// Steht an (z0, c0) ein Mitglied hinter einem Punkt (`objekt.na|me`, auch
+/// leer direkt hinter dem Punkt): Anfang und Ende des Worts in Zeichen.
+/// `ganz` = das ganze Wort (Hover), sonst nur bis zur Marke (Vervollstaendigung).
+/// Vor dem Punkt muss ein Name, `)` oder `]` stehen -- `1.5` ist keins.
+fn mitglied_stelle(text: &str, z0: usize, c0: usize, ganz: bool) -> Option<(usize, usize)> {
+    let z: Vec<char> = text.split('\n').nth(z0)?.chars().collect();
+    // Ersetzt wird immer das ganze Wort, auch rechts der Marke -- sonst
+    // haengte die Marke vor dem Rest und hiesse anders.
+    let (_, wa, e) = symbole::wort_bei(text, z0, c0);
+    let a = if ganz { wa } else { symbole::praefix_bei(text, z0, c0).1 };
+    let e = e.max(a);
+    if a < 2 || z[a - 1] != '.' { return None; }
+    let davor = z[a - 2];
+    if !(symbole::ist_ident(davor) || davor == ')' || davor == ']') { return None; }
+    // `1.5`: eine Zahl vor dem Punkt ist kein Objekt.
+    let mut k = a - 1;
+    while k > 0 && symbole::ist_ident(z[k - 1]) { k -= 1; }
+    if k < a - 1 && z[k..a - 1].iter().all(|c| c.is_ascii_digit()) { return None; }
+    Some((a, e))
+}
+
+thread_local! {
+    /// Das letzte Ergebnis -- die Statuszeile der IDE fragt bei jeder
+    /// Bewegung der Marke, und an derselben Stelle steht dasselbe Mitglied.
+    static LETZTER_FUND: std::cell::RefCell<Option<(String, PathBuf, Option<crate::compiler::MitgliedFund>)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Die Klasse vor dem Punkt samt Mitgliedern: das Wort zwischen `a` und `e`
+/// wird durch eine Marke ersetzt und der Text uebersetzt -- der Uebersetzer
+/// kennt Felder, Indizes, Aufrufe, `Self` und importierte Klassen. None, wenn
+/// er die Klasse nicht weiss (auch, wenn der Text anderswo nicht uebersetzt).
+fn mitglied_fund(text: &str, basis: &Path, z0: usize, a: usize, e: usize) -> Option<crate::compiler::MitgliedFund> {
+    let mut zeilen: Vec<String> = text.split('\n').map(str::to_string).collect();
+    let z: Vec<char> = zeilen.get(z0)?.chars().collect();
+    let mut neu: String = z[..a].iter().collect();
+    neu.push_str(crate::compiler::MITGLIED_MARKE);
+    neu.extend(&z[e.min(z.len())..]);
+    zeilen[z0] = neu;
+    let neu_text = zeilen.join("\n");
+    if let Some(f) = LETZTER_FUND.with(|l| l.borrow().as_ref()
+            .filter(|(t, b, _)| *t == neu_text && b == basis).map(|(_, _, f)| f.clone())) {
+        return f;
+    }
+    let fund = crate::compiler::mitglied_fund_sammeln(|| { let _ = crate::check_source(&neu_text, basis, "<editor>"); });
+    LETZTER_FUND.with(|l| *l.borrow_mut() = Some((neu_text, basis.to_path_buf(), fund.clone())));
+    fund
+}
+
+/// Der Name einer Klasse ohne Namensraum (`kern@spieler` -> `spieler`).
+fn schlichter_name(klasse: &str) -> &str {
+    klasse.rsplit('@').next().unwrap_or(klasse)
+}
+
+/// Die Mitglieder einer Klasse (Bereich `k`): Felder auf Klassenebene --
+/// nicht die lokalen Variablen ihrer Methoden -- und die Methoden selbst.
+fn klassen_mitglieder(quelle: &str, k: &symbole::Bereich, bereiche: &[symbole::Bereich]) -> Vec<symbole::Definition> {
+    let methoden: Vec<&symbole::Bereich> = bereiche.iter()
+        .filter(|x| matches!(x.art, "sub" | "function" | "property") && x.zeile > k.zeile && x.ende <= k.ende).collect();
+    symbole::definitionen(quelle).into_iter().filter(|d| d.zeile > k.zeile && d.zeile < k.ende && match d.art {
+        "sub" | "function" | "property" => true,
+        "dim" => !methoden.iter().any(|m| m.zeile <= d.zeile && d.zeile <= m.ende),
+        _ => false,
+    }).collect()
+}
+
+/// Die Mitglieder der Klasse `klasse` im Quelltext samt Importen.
+fn mitglied_definitionen(quelle: &str, klasse: &str) -> Vec<symbole::Definition> {
+    let bereiche = symbole::bereiche(quelle);
+    let name = schlichter_name(klasse);
+    match bereiche.iter().find(|x| matches!(x.art, "class" | "struct") && x.name.eq_ignore_ascii_case(name)) {
+        Some(k) => klassen_mitglieder(quelle, k, &bereiche),
+        None => Vec::new(),
+    }
+}
+
+/// Hover auf einen Namen INNERHALB einer Klasse (`DIM name`, `hp` in einer
+/// Methode): das Mitglied DIESER Klasse, nicht die erste gleichnamige
+/// Definition im Text. Ein Parameter oder eine lokale Variable der Methode
+/// gleichen Namens verdeckt das Feld -- dann gilt der gewoehnliche Weg.
+fn klassen_hover(text: &str, z0: usize, wort: &str) -> Option<(String, String)> {
+    let zeile = z0 + 1;
+    let bereiche = symbole::bereiche(text);
+    let k = bereiche.iter().filter(|x| matches!(x.art, "class" | "struct") && x.zeile <= zeile && zeile <= x.ende).last()?;
+    if let Some(mt) = bereiche.iter().find(|x| matches!(x.art, "sub" | "function" | "property")
+            && x.zeile > k.zeile && x.zeile <= zeile && zeile <= x.ende) {
+        let lokal = symbole::definitionen(text).iter().any(|d| d.zeile >= mt.zeile && d.zeile <= mt.ende
+            && d.name.eq_ignore_ascii_case(wort) && matches!(d.art, "dim" | "param"));
+        if lokal { return None; }
+    }
+    let m = klassen_mitglieder(text, k, &bereiche).into_iter().find(|d| d.name.eq_ignore_ascii_case(wort))?;
+    symbole::doku_der_definition(text, &m)
+}
+
+/// Der Quelltext, in dem die Klassen stehen: der Puffer samt Importen.
+fn quelle_mit_importen(text: &str, basis: &Path) -> String {
+    crate::preprocess::process(text, basis).map(|r| r.0).unwrap_or_else(|_| text.to_string())
+}
+
+/// Die Schreibweise der Mitglieder im Quelltext (der Uebersetzer kennt sie
+/// klein): klein -> wie geschrieben.
+fn quell_namen(text: &str, basis: &Path, fund: &crate::compiler::MitgliedFund) -> HashMap<String, String> {
+    let quelle = quelle_mit_importen(text, basis);
+    let mut klassen: Vec<&str> = fund.mitglieder.iter().map(|m| m.von.as_str()).collect();
+    klassen.dedup();
+    let mut namen = HashMap::new();
+    for k in klassen {
+        for d in mitglied_definitionen(&quelle, k) {
+            namen.entry(d.name.to_lowercase()).or_insert(d.name);
+        }
+    }
+    namen
+}
+
+/// Eine Zeile, wie das Mitglied aussieht, wenn der Quelltext es nicht zeigt.
+fn mitglied_kopf(m: &crate::compiler::Mitglied, name: &str) -> String {
+    let typ = |t: &str| if t.is_empty() { String::new() } else { format!(" AS {}", t) };
+    match m.art {
+        "feld" => format!("{}{}", name, typ(&m.typ)),
+        "property" => format!("PROPERTY {}{}", name, typ(&m.typ)),
+        art => {
+            let p: Vec<String> = m.parameter.iter().map(|(n, t)| format!("{}{}", n, typ(t))).collect();
+            format!("{} {}({}){}", if art == "function" { "FUNCTION" } else { "SUB" }, name, p.join(", "), typ(&m.typ))
+        }
+    }
+}
+
+/// Hover auf `objekt.mitglied`: die Zeile des Mitglieds in SEINER Klasse
+/// (nicht die erste gleichnamige im Text), wem es gehoert, und der
+/// Kommentar darueber. None, wo kein Punkt davor steht oder die Klasse
+/// nicht feststeht -- dann gilt der gewoehnliche Hover.
+fn mitglied_hover(text: &str, basis: &Path, z0: usize, c0: usize, wort: &str) -> Option<String> {
+    let (a, e) = mitglied_stelle(text, z0, c0, true)?;
+    let fund = mitglied_fund(text, basis, z0, a, e)?;
+    let klasse = crate::namensraum::lesbar_text(&fund.klasse.to_uppercase());
+    let Some(m) = fund.mitglieder.iter().find(|m| m.name.eq_ignore_ascii_case(wort)) else {
+        return Some(crate::meldung::t(&format!("{} hat kein Mitglied '{}'.", klasse, wort)));
+    };
+    let quelle = quelle_mit_importen(text, basis);
+    let def = mitglied_definitionen(&quelle, &m.von).into_iter().find(|d| d.name.eq_ignore_ascii_case(wort));
+    let (sig, doc) = def.as_ref().and_then(|d| symbole::doku_der_definition(&quelle, d))
+        .unwrap_or_else(|| (mitglied_kopf(m, wort), String::new()));
+    let von = crate::namensraum::lesbar_text(&m.von.to_uppercase());
+    let was = match m.art { "feld" => "Feld", "property" => "PROPERTY", _ => "Methode" };
+    let mut wem = format!("{} von {}", was, klasse);
+    if !m.von.eq_ignore_ascii_case(&fund.klasse) { wem.push_str(&format!(", geerbt von {}", von)); }
+    let mut md = format!("```drachenhauch\n{}\n```\n\n{}", sig, crate::meldung::t(&wem));
+    if !doc.is_empty() { md.push_str("\n\n"); md.push_str(&doc); }
+    Some(md)
 }
 
 fn ort(uri: &str, zeile: usize, spalte: usize, spalte_ende: usize) -> Value {
@@ -933,8 +1114,8 @@ impl Server {
                 let z0 = params["position"]["line"].as_u64().unwrap_or(0) as usize;
                 let c0 = params["position"]["character"].as_u64().unwrap_or(0) as usize;
                 match methode {
-                    "textDocument/completion" => Value::Array(vervollstaendigung(&text, z0, c0)),
-                    "textDocument/hover" => hover(&text, z0, c0).unwrap_or(Value::Null),
+                    "textDocument/completion" => Value::Array(vervollstaendigung(&text, Some(&basis_von(&uri)), z0, c0)),
+                    "textDocument/hover" => hover(&text, Some(&basis_von(&uri)), z0, c0).unwrap_or(Value::Null),
                     "textDocument/definition" => definition(&text, &uri, z0, c0),
                     _ => fundstellen(&text, &uri, z0, c0),
                 }
@@ -1154,29 +1335,53 @@ WEND";
 
     #[test]
     fn hover_kennt_builtins_und_eigene() {
-        let h = hover("DIM x AS INTEGER\nx = ABS(-5)\n", 1, 5).unwrap();
+        let h = hover("DIM x AS INTEGER\nx = ABS(-5)\n", None, 1, 5).unwrap();
         assert!(h["contents"]["value"].as_str().unwrap().to_uppercase().contains("ABS"));
-        let h = hover("DIM s AS STRING\ns = STR$(5)\n", 1, 6).unwrap();
+        let h = hover("DIM s AS STRING\ns = STR$(5)\n", None, 1, 6).unwrap();
         assert!(h["contents"]["value"].as_str().unwrap().contains("STR$"));
         // Nur im Index, keine Handdoku: wenigstens die Signatur.
-        let h = hover("x = MODEL_TEXTURE(1, 2)\n", 0, 6).unwrap();
+        let h = hover("x = MODEL_TEXTURE(1, 2)\n", None, 0, 6).unwrap();
         assert!(h["contents"]["value"].as_str().unwrap().contains("MODEL_TEXTURE"));
         let src = "' Addiert.\nFUNCTION add(a AS INTEGER) AS INTEGER\nEND FUNCTION\nr = add(1)\n";
-        let h = hover(src, 3, 5).unwrap();
+        let h = hover(src, None, 3, 5).unwrap();
         assert!(h["contents"]["value"].as_str().unwrap().contains("Addiert."));
-        assert!(hover("   \n", 0, 1).is_none());
+        assert!(hover("   \n", None, 0, 1).is_none());
     }
 
     #[test]
     fn vervollstaendigung_filtert_und_kennt_eigene() {
-        let items = vervollstaendigung("PRI", 0, 3);
+        let items = vervollstaendigung("PRI", None, 0, 3);
         assert!(items.iter().all(|i| i["label"].as_str().unwrap().to_lowercase().starts_with("pri")));
         assert!(items.iter().any(|i| i["label"] == "PRINT"));
-        let items = vervollstaendigung("CLASS Player\nEND CLASS\nPl", 2, 2);
+        let items = vervollstaendigung("CLASS Player\nEND CLASS\nPl", None, 2, 2);
         assert!(items.iter().any(|i| i["label"] == "Player"));
-        let alle = vervollstaendigung("", 0, 0);
+        let alle = vervollstaendigung("", None, 0, 0);
         assert!(alle.iter().any(|i| i["label"] == "KEY_SPACE"));
         assert!(alle.iter().any(|i| i["label"] == "WHILE"));
+    }
+
+    #[test]
+    fn mitglieder_hinter_dem_punkt() {
+        let src = "CLASS Tier\n    ' Rufname.\n    DIM name AS STRING\nEND CLASS\n\
+                   CLASS Spieler\n    ' Bestenliste.\n    DIM name AS STRING\n    DIM hp AS INTEGER\n\
+                   \x20   SUB heilen(n AS INTEGER)\n        DIM name AS INTEGER\n    END SUB\nEND CLASS\n\
+                   DIM leute AS ARRAY OF Spieler\nPRINT leute[0].name\nPRINT 1.5\n";
+        let b = Some(Path::new("."));
+        let md = |h: Option<Value>| h.map(|h| h["contents"]["value"].as_str().unwrap().to_string()).unwrap_or_default();
+        // Hinter dem Punkt: das Feld von SPIELER, nicht das erste `name` im Text.
+        let h = md(hover(src, b, 13, 16));
+        assert!(h.contains("Feld von SPIELER") && h.contains("Bestenliste."), "{}", h);
+        // Ohne basis bleibt es beim Text (die erste Definition).
+        assert!(md(hover(src, None, 13, 16)).contains("Rufname."));
+        // In der Klasse selbst gilt ihr Mitglied; die lokale DIM der Methode
+        // zaehlt nicht als Feld.
+        assert!(md(hover(src, None, 6, 9)).contains("Bestenliste."));
+        // Direkt hinter dem Punkt, das Wort dahinter steht noch da.
+        let namen: Vec<String> = vervollstaendigung(src, b, 13, 15).iter()
+            .map(|i| i["label"].as_str().unwrap().to_string()).collect();
+        assert_eq!(namen, vec!["name", "hp", "heilen"]);
+        // Eine Zahl vor dem Punkt ist kein Objekt.
+        assert!(mitglied_stelle(src, 14, 8, false).is_none());
     }
 
     #[test]

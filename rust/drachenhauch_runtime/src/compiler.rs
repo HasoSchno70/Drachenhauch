@@ -1721,6 +1721,44 @@ impl Compiler {
         raus
     }
 
+    /// Was ein Objekt der Klasse `klasse` hat: Felder, PROPERTYs und
+    /// Methoden, die eigenen zuerst, dann die geerbten (eine Ueberschreibung
+    /// verdeckt die Fassung weiter oben). Fuer Hover und Vervollstaendigung.
+    fn mitglied_fund(&self, klasse: &str) -> MitgliedFund {
+        let mut mitglieder: Vec<Mitglied> = Vec::new();
+        let mut gesehen: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut cur = Some(klasse.to_string());
+        while let Some(cn) = cur {
+            let Some(ci) = self.classes.get(&cn) else { break };
+            for f in &ci.fields {
+                if !gesehen.insert(f.name.to_lowercase()) { continue; }
+                let typ = if f.array_dims.is_empty() { f.type_name.clone() } else { format!("array:{}", f.type_name) };
+                mitglieder.push(Mitglied { name: f.name.clone(), art: "feld", typ: Self::typ_klartext(&typ),
+                                           parameter: Vec::new(), von: ci.name.clone() });
+            }
+            for p in &ci.property_set {
+                if !gesehen.insert(p.clone()) { continue; }
+                let typ = self.methode_rueckgabe_text(&cn, &format!("__get_{}", p)).unwrap_or_default();
+                mitglieder.push(Mitglied { name: p.clone(), art: "property", typ: Self::typ_klartext(&typ),
+                                           parameter: Vec::new(), von: ci.name.clone() });
+            }
+            let mut methoden: Vec<(&String, &FnSig)> = ci.method_sigs.iter()
+                .filter(|(n, _)| !n.starts_with("__")).collect();
+            methoden.sort_by(|a, b| a.0.cmp(b.0));
+            for (n, sig) in methoden {
+                if !gesehen.insert(n.to_lowercase()) { continue; }
+                let rueck = if sig.return_type.is_empty() { String::new() } else { Self::typ_klartext(&sig.return_type) };
+                let parameter = sig.param_names.iter().zip(sig.param_types.iter())
+                    .map(|(pn, pt)| (pn.clone(), if pt.is_empty() || pt == "any" { String::new() } else { Self::typ_klartext(pt) }))
+                    .collect();
+                mitglieder.push(Mitglied { name: n.clone(), art: if rueck.is_empty() { "sub" } else { "function" },
+                                           typ: rueck, parameter, von: ci.name.clone() });
+            }
+            cur = if ci.parent_name.is_empty() { None } else { Some(ci.parent_name.clone()) };
+        }
+        MitgliedFund { klasse: klasse.to_string(), mitglieder }
+    }
+
     /// Ist `name` bei `class_name` (oder weiter oben) eine PROPERTY?
     fn ist_property(&self, class_name: &str, name: &str) -> bool {
         let klein = name.to_lowercase();
@@ -1927,6 +1965,15 @@ impl Compiler {
         // Nur echte Klassen/Structs -- STRING/ARRAY/MAP haben ihre eigene
         // Methoden-Tabelle, Modul-Typen ihre eigenen Builtins.
         if !self.classes.contains_key(&klasse) { return; }
+        // Der Editor fragt, was hinter `objekt.` steht (Hover,
+        // Vervollstaendigung): an der Marke die Klasse samt Mitgliedern.
+        if name == MITGLIED_MARKE {
+            if MITGLIED_FUND.with(|f| matches!(*f.borrow(), Some(None))) {
+                let fund = self.mitglied_fund(&klasse);
+                MITGLIED_FUND.with(|f| *f.borrow_mut() = Some(Some(fund)));
+            }
+            return;
+        }
         if self.mitglied_moeglich(&klasse, name) { return; }
         let was = if ist_aufruf { "Diese Methode" } else { "Dieses Feld" };
         let hinweis = match Self::naechster_name(name, &self.bekannte_mitglieder(&klasse)) {
@@ -5957,6 +6004,46 @@ thread_local! {
     /// geht, das keine Einstellungen durchreicht.
     static TYP_HINWEISE: std::cell::RefCell<Option<Vec<(u32, String, String)>>> =
         const { std::cell::RefCell::new(None) };
+}
+
+/// Der Name, den der Editor an die Stelle eines Mitglieds setzt, nach dem er
+/// fragt (`objekt.<marke>`). Klein, weil der Lexer Namen klein schreibt.
+pub(crate) const MITGLIED_MARKE: &str = "dh_mitglied_marke";
+
+/// Ein Mitglied einer Klasse, wie es der Editor anzeigt.
+#[derive(Debug, Clone)]
+pub(crate) struct Mitglied {
+    pub name: String,
+    /// "feld", "property", "sub" oder "function".
+    pub art: &'static str,
+    /// Typ des Feldes bzw. der PROPERTY, Rueckgabe einer FUNCTION -- in
+    /// Klartext (`ARRAY OF SPIELER`); leer, wo keiner angesagt ist.
+    pub typ: String,
+    /// Bei Methoden: Name und Typ je Parameter.
+    pub parameter: Vec<(String, String)>,
+    /// Die Klasse, in der das Mitglied steht (bei geerbten die Vorfahrin).
+    pub von: String,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct MitgliedFund {
+    pub klasse: String,
+    pub mitglieder: Vec<Mitglied>,
+}
+
+thread_local! {
+    /// `Some(None)`, solange `mitglied_fund_sammeln` laeuft und die Marke
+    /// noch nicht gesehen ist; danach `Some(Some(fund))`.
+    static MITGLIED_FUND: std::cell::RefCell<Option<Option<MitgliedFund>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Den Compiler `f` laufen lassen und festhalten, welche Klasse vor
+/// `.MITGLIED_MARKE` steht -- `None`, wenn er es nicht weiss.
+pub(crate) fn mitglied_fund_sammeln(f: impl FnOnce()) -> Option<MitgliedFund> {
+    MITGLIED_FUND.with(|h| *h.borrow_mut() = Some(None));
+    f();
+    MITGLIED_FUND.with(|h| h.borrow_mut().take()).flatten()
 }
 
 /// Den Compiler `f` laufen lassen und die Typ-Hinweise einsammeln, die dabei
