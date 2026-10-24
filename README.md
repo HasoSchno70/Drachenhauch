@@ -66,6 +66,7 @@ schreibt man damit auch Anwendungen mit Fenstern, Formularen und Tabellen
 | **Objekte als Rückrufe** | `obj.methode` ist eine `FUNCREF`, die ihre Instanz mitträgt — `GUI_ON_CLICK(knopf, spieler.klick)`, `TIMER_EVERY(500, gegner.zucken)`, `SORT(zahlen, regel.cmp)` |
 | **Fremde Bibliotheken** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — Windows-API, C-Bibliothek, Gerätetreiber direkt aufrufen, mit Zeigern, Structs und Rückrufen; sogar Python samt numpy einbetten ([mehr](docs/ffi.md)) |
 | **Nebenher** | HTTP, Datenbank, fremde Programme und **eigene Funktionen** im Hintergrund (`TASK_START`) — die Hauptschleife läuft weiter |
+| **Leisten und Plugins** | `GUI_DOCK` verteilt Leisten links, rechts und unten, als Reiter oder schwebend; die IDE und Glutfaden laden eigene Drachenhauch-Programme als Plugins ([mehr](docs/ide-plugins.md)) |
 
 Nichts davon braucht ein Fenster. Ein Drachenhauch-Programm kann eine
 Konsolenanwendung sein, ein Cron-Job oder ein Spiel — dieselbe Sprache.
@@ -75,7 +76,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 ## Herunterladen
 
-**[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 56 MB, aktuell Fassung 2026.34.
+**[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 56 MB, aktuell Fassung 2026.35.
 
 Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 225 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
 
