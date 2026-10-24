@@ -1,0 +1,375 @@
+' Das Beispiel examples/chip8 (2026-10-24, Dogfooding): ein CHIP-8-Emulator
+' mit Assembler und eigenem Spiel. Der Kern (cpu.dh) und der Assembler
+' (asm.dh) laufen ohne Fenster -- die Faelle setzen Register, schreiben EINEN
+' Befehl an die aktuelle Adresse und fuehren genau einen Schritt aus (`op`
+' in _hilfen/chip8.dh). Das Fenster pruefen die letzten Faelle ueber
+' `dhrt bild`, mit dem eigenen Spiel und mit einer .ch8-Datei als Argument.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== rechnen mit uebertrag und borgen
+IMPORT "hilfe.dh"
+c8V[0] = 200 : c8V[1] = 100
+op(&H8014)
+PRINT "8XY4 "; c8V[0]; " vf "; c8V[15]
+c8V[0] = 10 : c8V[1] = 20
+op(&H8015)
+PRINT "8XY5 "; c8V[0]; " vf "; c8V[15]
+c8V[0] = 10 : c8V[1] = 20
+op(&H8017)
+PRINT "8XY7 "; c8V[0]; " vf "; c8V[15]
+c8V[0] = 20 : c8V[1] = 20
+op(&H8015)
+PRINT "gleich "; c8V[0]; " vf "; c8V[15]
+' Ist X selbst VF, gewinnt der Uebertrag ueber das Ergebnis.
+c8V[15] = 200 : c8V[1] = 100
+op(&H8F14)
+PRINT "vf als ziel "; c8V[15]
+c8V[2] = 250
+op(&H7210)
+PRINT "7XNN "; c8V[2]; " vf bleibt "; c8V[15]
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/chip8.dh"
+--- erwartet
+8XY4 44 vf 1
+8XY5 246 vf 0
+8XY7 10 vf 1
+gleich 0 vf 1
+vf als ziel 1
+7XNN 10 vf bleibt 1
+
+=== schieben und logik nach beiden eigenheiten
+IMPORT "hilfe.dh"
+c8V[0] = &H81 : c8V[1] = 2
+op(&H8016)
+PRINT "chip-48 shr "; c8V[0]; " vf "; c8V[15]
+c8V[0] = &H81
+op(&H801E)
+PRINT "chip-48 shl "; c8V[0]; " vf "; c8V[15]
+c8V[15] = 7 : c8V[0] = 12 : c8V[1] = 10
+op(&H8011)
+PRINT "chip-48 or "; c8V[0]; " vf "; c8V[15]
+c8SchiebeVY = TRUE : c8LogikVF = TRUE
+c8V[0] = &H81 : c8V[1] = 2
+op(&H8016)
+PRINT "cosmac shr "; c8V[0]; " vf "; c8V[15]
+c8V[0] = 0 : c8V[1] = &H81
+op(&H801E)
+PRINT "cosmac shl "; c8V[0]; " vf "; c8V[15]
+c8V[15] = 7 : c8V[0] = 12 : c8V[1] = 10
+op(&H8012)
+PRINT "cosmac and "; c8V[0]; " vf "; c8V[15]
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/chip8.dh"
+--- erwartet
+chip-48 shr 64 vf 1
+chip-48 shl 2 vf 1
+chip-48 or 14 vf 7
+cosmac shr 1 vf 0
+cosmac shl 2 vf 1
+cosmac and 8 vf 0
+
+=== speicher, bcd, schrift und zeitgeber
+IMPORT "hilfe.dh"
+c8V[0] = 234 : c8I = &H300
+op(&HF033)
+PRINT "bcd "; c8Mem[&H300]; c8Mem[&H301]; c8Mem[&H302]
+c8V[0] = 7 : c8V[1] = 8 : c8V[2] = 9 : c8I = &H310
+op(&HF255)
+PRINT "fx55 "; c8Mem[&H310]; c8Mem[&H311]; c8Mem[&H312]; " i "; c8Hex$(c8I, 3)
+c8LadenErhoehtI = TRUE
+c8I = &H310
+op(&HF255)
+PRINT "fx55 cosmac i "; c8Hex$(c8I, 3)
+c8LadenErhoehtI = FALSE
+c8I = &H300
+op(&HF265)
+PRINT "fx65 "; c8V[0]; c8V[1]; c8V[2]
+c8I = &HFFF : c8V[0] = 2
+op(&HF01E)
+PRINT "fx1e laeuft um "; c8I
+c8V[0] = &HA
+op(&HF029)
+PRINT "fx29 "; c8Hex$(c8I, 3)
+c8V[0] = 10
+op(&HF015)
+c8Bild60() : c8Bild60() : c8Bild60()
+op(&HF107)
+PRINT "zeitgeber "; c8V[1]
+c8V[2] = 5
+op(&HF218)
+PRINT "ton "; c8Ton
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/chip8.dh"
+--- erwartet
+bcd 234
+fx55 789 i 310
+fx55 cosmac i 313
+fx65 234
+fx1e laeuft um 1
+fx29 082
+zeitgeber 7
+ton 5
+
+=== spruenge, unterprogramme und uebersprungene befehle
+IMPORT "hilfe.dh"
+op(&H1456)
+PRINT "1NNN "; c8Hex$(c8PC, 3)
+c8PC = &H200
+op(&H2400)
+PRINT "call "; c8Hex$(c8PC, 3); " sp "; c8SP; " zurueck "; c8Hex$(c8Stapel[0], 3)
+op(&H00EE)
+PRINT "ret "; c8Hex$(c8PC, 3); " sp "; c8SP
+c8V[0] = 4 : c8V[3] = 5
+op(&HB300)
+PRINT "bnnn mit v0 "; c8Hex$(c8PC, 3)
+c8SprungVX = TRUE
+op(&HB300)
+PRINT "bxnn mit v3 "; c8Hex$(c8PC, 3)
+c8PC = &H200 : c8V[0] = 5 : c8V[1] = 5
+op(&H3005)
+PRINT "3XNN gleich "; c8Hex$(c8PC, 3)
+op(&H4005)
+PRINT "4XNN gleich "; c8Hex$(c8PC, 3)
+op(&H5010)
+PRINT "5XY0 gleich "; c8Hex$(c8PC, 3)
+op(&H9010)
+PRINT "9XY0 gleich "; c8Hex$(c8PC, 3)
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/chip8.dh"
+--- erwartet
+1NNN 456
+call 400 sp 1 zurueck 202
+ret 202 sp 0
+bnnn mit v0 304
+bxnn mit v3 305
+3XNN gleich 204
+4XNN gleich 206
+5XY0 gleich 20A
+9XY0 gleich 20C
+
+=== zeichnen mit kollision und abschneiden
+IMPORT "hilfe.dh"
+FUNCTION zeile$(y AS INTEGER) AS STRING
+    DIM t AS STRING : t = ""
+    DIM x AS INTEGER
+    FOR x = 0 TO 7 : t = t + STR$(c8Punkte[y * 64 + x]) : NEXT
+    t = t + " .. "
+    FOR x = 60 TO 63 : t = t + STR$(c8Punkte[y * 64 + x]) : NEXT
+    RETURN t
+END FUNCTION
+' Die Ziffer 0 (F0 90 90 90 F0) bei (0, 0).
+c8I = C8_SCHRIFT
+op(&HD015)
+PRINT "0 oben "; zeile$(0); " mitte "; zeile$(1); " vf "; c8V[15]
+op(&HD015)
+PRINT "nochmal geloescht "; zeile$(0); " vf "; c8V[15]
+' Bei x = 62 abgeschnitten: nur zwei Punkte, nichts links.
+c8V[2] = 62 : c8V[3] = 0
+op(&HD235)
+PRINT "abgeschnitten "; zeile$(0)
+op(&HD235)
+c8Umbruch = TRUE
+op(&HD235)
+PRINT "umgebrochen "; zeile$(0)
+' x = 66 ist 66 MOD 64 = 2: die Lage laeuft immer um, nur der Rand nicht.
+op(&H00E0)
+c8Umbruch = FALSE
+c8V[2] = 66
+op(&HD231)
+PRINT "lage laeuft um "; zeile$(0)
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/chip8.dh"
+--- erwartet
+0 oben 11110000 .. 0000 mitte 10010000 .. 0000 vf 0
+nochmal geloescht 00000000 .. 0000 vf 1
+abgeschnitten 00000000 .. 0011
+umgebrochen 11000000 .. 0011
+lage laeuft um 00111100 .. 0000
+
+=== warten auf eine taste bis zum loslassen
+IMPORT "hilfe.dh"
+op(&HF30A)
+PRINT "wartet "; c8Wartet; " pc "; c8Hex$(c8PC, 3)
+c8Schritt()
+PRINT "ohne taste "; c8Wartet
+c8Taste[7] = 1
+c8Schritt() : c8Schritt()
+PRINT "gedrueckt "; c8Wartet; " v3 "; c8V[3]
+c8Taste[7] = 0
+c8Schritt()
+PRINT "losgelassen "; c8Wartet; " v3 "; c8V[3]
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/chip8.dh"
+--- erwartet
+wartet 3 pc 202
+ohne taste 3
+gedrueckt 3 v3 0
+losgelassen -1 v3 7
+
+=== fehler halten den kern an
+IMPORT "hilfe.dh"
+op(&H00EE)
+PRINT c8Fehler
+DIM vorher AS INTEGER : vorher = c8Befehle
+c8Schritt()
+PRINT "steht "; c8Befehle = vorher; " pc "; c8Hex$(c8PC, 3)
+c8Neustart(FALSE)
+op(&H5011)
+PRINT c8Fehler
+c8Neustart(FALSE)
+c8Mem[&H200] = &H22 : c8Mem[&H201] = &H00
+DIM k AS INTEGER
+FOR k = 1 TO 17 : c8Schritt() : NEXT
+PRINT c8Fehler; " sp "; c8SP
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/chip8.dh"
+--- erwartet
+RET ohne CALL 00EE bei 200
+steht TRUE pc 200
+unbekannter Befehl 5011 bei 200
+Stapel voll 2200 bei 200 sp 16
+
+=== der assembler schreibt die bytes
+IMPORT "hilfe.dh"
+DIM q AS STRING
+q = "; ein Kommentar" + CHR$(10) + _
+    "start:  CLS" + CHR$(10) + _
+    "        ld v0, 10        ; dezimal" + CHR$(10) + _
+    "        LD VA, #2a" + CHR$(10) + _
+    "        LD I, daten" + CHR$(10) + _
+    "        DRW V0, VA, 2" + CHR$(10) + _
+    "        SE V0, V1" + CHR$(10) + _
+    "        LD [I], V3" + CHR$(10) + _
+    "        LD V3, [I]" + CHR$(10) + _
+    "        SHR V4" + CHR$(10) + _
+    "        JP V0, $300" + CHR$(10) + _
+    "        CALL start" + CHR$(10) + _
+    "daten:  DB %10100000, 0xFF" + CHR$(10) + _
+    "        DW #1234"
+PRINT "["; asmUebersetzen$(q); "] "; BUFFER_LEN(asmCode)
+DIM t AS STRING : t = ""
+DIM k AS INTEGER
+FOR k = 0 TO BUFFER_LEN(asmCode) - 1 : t = t + c8Hex$(BUFFER_GET(asmCode, k), 2) : NEXT
+PRINT t
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/chip8.dh"
+--- erwartet
+[] 26
+00E0600A6A2AA216D0A25010F355F3658406B3002200A0FF1234
+
+=== der assembler meldet fehler mit zeile
+IMPORT "hilfe.dh"
+PRINT asmUebersetzen$("LD V0, 1" + CHR$(10) + "MOVE V1, 2")
+PRINT asmUebersetzen$("JP nirgends")
+PRINT asmUebersetzen$("LD V0, 300")
+PRINT asmUebersetzen$("a: CLS" + CHR$(10) + "a: CLS")
+PRINT asmUebersetzen$("DRW V0, V1")
+PRINT asmUebersetzen$("LD VG, 1")
+PRINT asmUebersetzen$("DB #1G")
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/chip8.dh"
+--- erwartet
+Zeile 2: unbekannter Befehl 'MOVE'
+Zeile 1: unbekannte Marke 'nirgends'
+Zeile 1: '300' passt nicht in 8 Bit
+Zeile 2: Marke 'a' gibt es schon
+Zeile 1: falsche Zahl von Operanden fuer DRW
+Zeile 1: Register erwartet, nicht 'VG'
+Zeile 1: keine Zahl: '#1G'
+
+=== das eigene spiel: schlaeger und verlorene baelle
+' faenger.c8s ohne Fenster: mit gehaltener Taste 6 laeuft der Schlaeger an
+' den rechten Rand, mit 4 an den linken; ohne Fang ist das Spiel nach drei
+' Baellen vorbei und wartet auf eine Taste.
+IMPORT "hilfe.dh"
+SUB bilder(n AS INTEGER)
+    DIM b AS INTEGER
+    DIM k AS INTEGER
+    FOR b = 1 TO n
+        c8Bild60()
+        FOR k = 1 TO 15 : c8Schritt() : NEXT
+    NEXT
+END SUB
+RANDOMIZE(3)
+PRINT "["; asmUebersetzen$(JOIN$(READLINES(ARG$(0)), CHR$(10))); "] "; c8Laden(asmCode)
+c8Taste[6] = 1
+bilder(40)
+PRINT "rechts "; c8V[14]
+c8Taste[6] = 0 : c8Taste[4] = 1
+bilder(80)
+PRINT "links "; c8V[14]
+c8Taste[4] = 0
+bilder(2000)
+PRINT "vorbei: leben "; c8V[6]; " wartet "; c8Wartet >= 0; " fehler ["; c8Fehler; "]"
+--- argumente
+{sammlung}/../../examples/chip8/faenger.c8s
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/chip8.dh"
+--- erwartet
+[] TRUE
+rechts 56
+links 0
+vorbei: leben 0 wartet TRUE fehler []
+
+=== das fenster zeigt das spiel
+' Nach 30 Bildern: die Punkte 00 links oben, die Leben 3 rechts oben, und
+' das Innere der Null ist dunkel.
+DIM p AS INTEGER
+p = PROCESS_START("dhrt", "bild", ARG$(0), CWD$() + "/chip8.png", "30")
+DIM aus AS STRING : aus = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+    aus = aus + teil
+    IF teil = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+    SLEEP(20)
+WEND
+' Ohne Fenster (Bau ohne Grafik, kein Bildschirm) steht die Meldung in
+' der Ausgabe, und der Laeufer ueberspringt den Fall.
+IF NOT FILEEXISTS("chip8.png") THEN
+    PRINT aus
+    EXIT(1)
+END IF
+PRINT "rueckgabe "; PROCESS_CODE(p)
+--- argumente
+{sammlung}/../../examples/chip8/main.dh
+--- bild chip8.png
+groesse 768 412
+18 6 #B4FF8C +-40
+30 18 #0C120E +-20
+714 6 #B4FF8C +-40
+--- erwartet
+rueckgabe 0
+
+=== eine ch8-datei als argument
+' Ein Programm aus sechs Befehlen zeichnet die Ziffer 8 bei (10, 10) und
+' steht dann: Punkt (10, 10) leuchtet, (11, 11) im Loch der 8 nicht.
+DIM b AS BUFFER : b = BUFFER_NEW(12)
+DIM bytes AS ARRAY OF INTEGER : bytes = [&H60, &H0A, &H61, &H0A, &H62, &H08, &HF2, &H29, &HD0, &H15, &H12, &H0A]
+DIM k AS INTEGER
+FOR k = 0 TO 11 : BUFFER_SET(b, k, bytes[k]) : NEXT
+WRITEALL_BYTES(CWD$() + "/acht.ch8", b)
+DIM p AS INTEGER
+p = PROCESS_START("dhrt", "bild", ARG$(0), CWD$() + "/acht.png", "20", "--", CWD$() + "/acht.ch8")
+DIM aus AS STRING : aus = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+    aus = aus + teil
+    IF teil = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+    SLEEP(20)
+WEND
+' Ohne Fenster (Bau ohne Grafik, kein Bildschirm) steht die Meldung in
+' der Ausgabe, und der Laeufer ueberspringt den Fall.
+IF NOT FILEEXISTS("acht.png") THEN
+    PRINT aus
+    EXIT(1)
+END IF
+PRINT "rueckgabe "; PROCESS_CODE(p)
+--- argumente
+{sammlung}/../../examples/chip8/main.dh
+--- bild acht.png
+126 126 #B4FF8C +-40
+138 138 #0C120E +-20
+--- erwartet
+rueckgabe 0

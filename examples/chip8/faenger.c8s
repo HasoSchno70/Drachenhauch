@@ -1,0 +1,116 @@
+; faenger.c8s -- ein kleines Spiel fuer CHIP-8, geschrieben fuer den
+; Assembler in asm.dh. Ein Ball springt im Feld, unten faengt ihn der
+; Schlaeger. Jeder Fang gibt einen Punkt, jeder verlorene Ball kostet ein
+; Leben; nach dem dritten zeigt das Spiel die Punkte und wartet auf eine
+; Taste.
+;
+; Tasten (CHIP-8-Tastenfeld): 4 links, 6 rechts -- auf der Tastatur Q und E.
+;
+; Register: VA/VB Ball x/y, VC/VD Richtung x/y (1 oder #FF = -1),
+;           VE Schlaeger x, V5 Punkte, V6 Leben, V0..V4 und V7..V9 frei.
+;
+; Gezeichnet wird mit XOR: ein zweites Zeichnen loescht. Ball und Schlaeger
+; werden je Schritt geloescht und neu gezeichnet, die Anzeige nur, wenn sich
+; Punkte oder Leben aendern -- sie kostet mehr Befehle als alles andere.
+
+start:      CLS
+            LD V5, 0
+            LD V6, 3
+            LD VE, 28
+            CALL anzeige
+
+runde:      RND VA, #1F         ; Ball x 16..47
+            ADD VA, 16
+            LD VB, 8
+            LD VC, 1
+            LD VD, 1
+            CALL figuren
+
+schleife:   LD V7, 2            ; ein Schritt dauert zwei Zeitgeber-Takte:
+            LD DT, V7           ; erst rechnen, dann den Rest warten
+            CALL figuren        ; loeschen
+
+            LD V7, 4            ; Schlaeger
+            SKNP V7
+            CALL links
+            LD V7, 6
+            SKNP V7
+            CALL rechts
+
+            ADD VA, VC          ; Ball
+            ADD VB, VD
+            SNE VA, 0
+            LD VC, 1
+            SNE VA, 63
+            LD VC, #FF
+            SNE VB, 6           ; unter der Anzeige kehrt er um
+            LD VD, 1
+
+            SE VB, 29           ; ueber dem Schlaeger?
+            JP unten
+            LD V7, VA           ; VE <= VA ?
+            SUB V7, VE
+            SE VF, 1
+            JP unten
+            LD V8, V7           ; VA - VE <= 7 ?
+            LD V9, 7
+            SUBN V8, V9
+            SE VF, 1
+            JP unten
+            LD VD, #FF          ; gefangen
+            CALL anzeige
+            ADD V5, 1
+            CALL anzeige
+            LD V7, 2
+            LD ST, V7
+
+unten:      SE VB, 31           ; ganz unten: verloren
+            JP weiter
+            ADD V6, #FF
+            LD V7, 20
+            LD ST, V7
+            CLS
+            CALL anzeige
+            SE V6, 0
+            JP runde
+            LD V7, K            ; vorbei: auf eine Taste warten
+            JP start
+
+weiter:     CALL figuren
+warte:      LD V7, DT
+            SE V7, 0
+            JP warte
+            JP schleife
+
+links:      SE VE, 0
+            ADD VE, #FE
+            RET
+rechts:     SE VE, 56
+            ADD VE, 2
+            RET
+
+figuren:    LD I, ball
+            DRW VA, VB, 1
+            LD I, schlaeger
+            LD V7, 30
+            DRW VE, V7, 1
+            RET
+
+anzeige:    LD I, ziffern       ; Punkte als zwei Ziffern links oben
+            LD B, V5
+            LD V2, [I]
+            LD V3, 1
+            LD V4, 0
+            LD F, V1
+            DRW V3, V4, 5
+            LD V3, 6
+            LD F, V2
+            DRW V3, V4, 5
+            LD V3, 59           ; Leben rechts oben
+            LD F, V6
+            DRW V3, V4, 5
+            RET
+
+ball:       DB %10000000
+schlaeger:  DB #FF
+ziffern:    DB 0, 0, 0

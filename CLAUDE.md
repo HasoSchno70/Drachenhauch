@@ -2656,6 +2656,27 @@ drei, Hover leer) und zwei in `werkzeug_ide_parameter_einfuegen`
 (Methoden zweier Klassen samt geerbter, Platzhalter nach `ob.se`),
 Rust-Test `import_marke_gehoert_nicht_zur_doku`.
 
+## Dogfooding 13: CHIP-8-Emulator (2026-10-24)
+
+`examples/chip8/`: `cpu.dh` (Rechenkern ohne Fenster, alle 35 Befehle,
+Eigenheiten als Merker c8SchiebeVY/c8LadenErhoehtI/c8SprungVX/c8LogikVF/
+c8Umbruch), `asm.dh` (Assembler in Cowgod-Schreibweise, zwei Durchgaenge,
+Fehler mit Zeile), `faenger.c8s` (eigenes Spiel), `main.dh` (Fenster,
+Tastenfeld nach LAGE ueber KEY_1..KEY_V, Ton, Nachleuchten gegen das
+XOR-Flackern, Laden per Argument oder Ablegen). **Keine Funde in der
+Laufzeit** -- der Uebersetzer fing `RND` ohne Klammern ab, Maschinencode
+und VM rechneten mit festem Zufall Befehl fuer Befehl gleich; der Kern
+schafft ~1,2 Mio. Befehle/s (VM 0,7), obwohl `c8Schritt` (liest die
+Text-Globale c8Fehler) und `c8Zeichnen` (schreibt ein globales Feld) in der
+VM bleiben. Die Funde lagen im Beispiel selbst: `RETURN` vor dem Anhaengen
+der Fehlerstelle, und das Spiel wartete ZUERST auf den Zeitgeber und
+rechnete dann (ein Schritt kostete 4 statt 2 Bilder). **Falle:**
+`dhrt bild` wechselt in den Ordner des Programms -- ein relatives Ziel
+landet dort, im Repository; immer `CWD$() + "/..."`. Argumente hinter `--`
+reicht `dhrt bild` an das Programm weiter. Tests
+`tests/pruef/beispiel_chip8.dhtest` (12; drei Verfaelschungen des Kerns
+fallen je in ihrem Fall), Helfer `_hilfen/chip8.dh`.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als
