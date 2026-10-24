@@ -3,6 +3,11 @@
 # darunter der Text; Leerzeilen trennen Absätze. Zeilen mit # sind Kommentar.
 # Die neueste Stufe steht oben.
 
+## 🧩 Stufe 26: Leisten und Plugins
+Übersicht, Muster, Info und Fortschritt sind Leisten: am Reiter gezogen wandern sie nach links, rechts, unten oder in ein eigenes Fenster, und Glutfaden merkt sich die Anordnung. „Leisten zurücksetzen“ im Logo-Menü stellt die alte her.
+
+Plugins sind eigene Drachenhauch-Programme im Ordner „plugins“ der Einstellungen (Logo-Menü → Plugins → Plugin-Ordner öffnen). Sie bekommen Befehle mit Kürzel, eine eigene Leiste, hören auf Sichern und Öffnen, lesen das Muster und setzen Stiche – ein Schritt für Rückgängig. Ein Plugin, das abstürzt, reißt Glutfaden nicht mit.
+
 ## 🌍 Stufe 25: Englisch in jedem Dialog
 Jetzt sprechen auch alle Dialoge Englisch, dazu die Ausgaben: PDF- und HTML-Anleitung, Statistik als CSV, Stickplan und Paket. Meldungen beim Lesen fremder Muster und der Verlauf (Rückgängig: …) folgen der Sprache ebenso.
 

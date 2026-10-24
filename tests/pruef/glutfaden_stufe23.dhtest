@@ -166,7 +166,7 @@ vorgaben: FALSE 5 TRUE 5 FALSE
 "touch/gestures_enabled": true,
 gelesen: TRUE 7 FALSE 12 TRUE
 krumm: schritt 1 | pinsel 20 | gesten FALSE
-befehl einrasten: TRUE | tafel 77
+befehl einrasten: TRUE | tafel 80
 
 === probe: einrasten, druck, pinch, dialog
 IMPORT "helfer.dh"

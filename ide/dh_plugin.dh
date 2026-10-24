@@ -301,3 +301,31 @@ SUB PLUGIN_FAERBUNG(endung AS STRING, muster AS STRING, farbe AS INTEGER)
     JSON_SET_INT(j, "farbe", farbe)
     plgSenden(j)
 END SUB
+
+' --- Fuer Glutfaden (examples/glutfaden) ---------------------------------------
+' Glutfaden spricht dasselbe Protokoll; dazu kommen das Muster und Stiche.
+
+' Das Muster als JSON: name, breite, hoehe, stiche, farbe (die gewaehlte) und
+' farben (je name, nummer, rgb, stiche). "" ohne Muster.
+FUNCTION PLUGIN_MUSTER$() AS STRING
+    RETURN plgFrage$("muster")
+END FUNCTION
+
+' Stiche auf die aktive Ebene: punkte = x, y, x, y, ...; farben = je Punkt
+' die Nummer der Farbe im Muster (-1 = leeren). Ein Schritt fuer
+' Rueckgaengig, beschriftet mit `text` (sonst dem Namen des Plugins).
+SUB PLUGIN_STICHE(punkte AS ARRAY OF INTEGER, farben AS ARRAY OF INTEGER, text AS STRING = "")
+    DIM j AS JSON_HANDLE : j = plgNachricht("tue")
+    JSON_SET_STRING(j, "was", "stiche")
+    JSON_SET_STRING(j, "text", text)
+    JSON_SET_JSON(j, "punkte", JSON_PARSE("[]"))
+    JSON_SET_JSON(j, "farben", JSON_PARSE("[]"))
+    DIM z AS INTEGER
+    FOR EACH z IN punkte
+        JSON_APPEND_INT(j, "punkte", z)
+    NEXT
+    FOR EACH z IN farben
+        JSON_APPEND_INT(j, "farben", z)
+    NEXT
+    plgSenden(j)
+END SUB

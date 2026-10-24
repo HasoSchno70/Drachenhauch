@@ -346,8 +346,12 @@ SUB minikarteAuffrischen()
     END IF
 END SUB
 
+' Seit Stufe 26 ist die Uebersicht eine Leiste: aus heisst die ganze Leiste
+' samt Reiter (ein leerer Platz verschwindet dann ganz).
 SUB minikarteZeigen(an AS BOOLEAN)
-    IF mkBox <> 0 THEN gtk_widget_set_visible(mkBox, an)
+    IF mkBox = 0 THEN RETURN
+    gtk_widget_set_visible(mkBox, an)
+    leisteAusblenden("uebersicht", NOT an)
 END SUB
 
 SUB mkBauen(bw AS INTEGER, bh AS INTEGER)

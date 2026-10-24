@@ -1804,9 +1804,9 @@ FUNCTION vorfuehrenStufe17(daten AS INTEGER) AS BOOLEAN
     SELECT CASE schritt
         CASE 1
             v17Vorher = v17Stand$()
-            PRINT "reiter: "; gtk_stack_get_visible_child_name(slStapel)
+            PRINT "reiter: "; leisteVornNeben$("muster")
             seitenleisteReiter("info")
-            PRINT "info: "; gtk_stack_get_visible_child_name(slStapel)
+            PRINT "info: "; leisteVornNeben$("muster")
             PRINT "karten: "; v17Karten$()
             PRINT "wie der kern: "; v17Karten$() = JOIN$(kern.infoKarten(lwMuster, lwMuster.modus), " | ")
             PRINT "stoffe: "; LEN(ilStoffe); " | gewaehlt "; gtk_combo_box_get_active(ilStoff); " = "; ilStoffe[gtk_combo_box_get_active(ilStoff)]
@@ -3129,6 +3129,134 @@ FUNCTION vorfuehrenSprache(daten AS INTEGER) AS BOOLEAN
             PRINT "oxs: "; LEFT$(ox, 38); " | in beiden sprachen gleich "; ox = JOIN$(READLINES(v19Ort$("sprache_de.oxs")), CHR$(10)); " | wieder "; kern.spracheJetzt$()
             DIM csv AS STRING : csv = kern.statistikCsv$(lwMuster, 14, 10.0, 0.0)
             PRINT "csv: "; LEFT$(csv, INSTR(csv, CHR$(10)))
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' --- Stufe 26: andockbare Leisten und Plugins ------------------------------------
+' Die Pruefsammlung legt ein Plugin "probe" in den Einstellungsordner
+' (Befehle zaehlen/sticken/absturz, eine Leiste unten, hoert "gesichert").
+DIM v26Warten AS INTEGER
+DIM v26Stand AS STRING
+DIM v26Stiche AS INTEGER
+
+FUNCTION v26Orte$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM n AS STRING
+    FOR EACH n IN ["uebersicht", "muster", "info", "fortschritt"]
+        ARRAY_PUSH(t, n + " " + leisteOrt$(n))
+    NEXT
+    RETURN JOIN$(t, ", ")
+END FUNCTION
+
+FUNCTION v26Sichtbar$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM o AS INTEGER
+    FOR o = 0 TO 3
+        ARRAY_PUSH(t, lsOrte[o] + " " + IIF(gtk_widget_get_visible(lsBuch[o]), "an", "aus"))
+    NEXT
+    RETURN JOIN$(t, ", ")
+END FUNCTION
+
+' Das GTK-Widget Nummer `nr` der Probe-Leiste.
+FUNCTION v26W(nr AS INTEGER) AS INTEGER
+    DIM li AS INTEGER : li = ARRAY_INDEXOF(pgLeisteName, "plugin.probe.leiste")
+    DIM w AS INTEGER
+    FOR w = 0 TO LEN(pgWLeiste) - 1
+        IF pgWLeiste[w] = li AND pgWNr[w] = nr THEN RETURN pgWGtk[w]
+    NEXT
+    RETURN 0
+END FUNCTION
+
+' Auf etwas warten, das ueber die Leitung kommt: den Schritt wiederholen,
+' hoechstens 40 Mal (12 s).
+FUNCTION v26Warte(bereit AS BOOLEAN, was AS STRING) AS BOOLEAN
+    IF bereit THEN
+        v26Warten = 0
+        RETURN FALSE
+    END IF
+    v26Warten = v26Warten + 1
+    IF v26Warten > 40 THEN
+        PRINT "zeit abgelaufen: "; was
+        v26Warten = 0
+        RETURN FALSE
+    END IF
+    schritt = schritt - 1
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION vorfuehrenStufe26(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(pgNamen, "probe")
+    SELECT CASE schritt
+        CASE 1
+            IF v26Warte(k >= 0 AND LEN(pgBefKennung) >= 3 AND ARRAY_INDEXOF(pgLeisteName, "plugin.probe.leiste") >= 0, "plugin bereit") THEN RETURN TRUE
+            PRINT "plugin: "; pgNamen[k]; " "; pgZustand[k]; " | befehle "; JOIN$(pgBefKennung, ", ")
+            PRINT "  kuerzel "; JOIN$(pgBefKuerzel, ","); " | titel "; JOIN$(pgBefTitel, ", ")
+            PRINT "  leiste "; leisteOrt$("plugin.probe.leiste"); " | text "; gtk_label_get_text(v26W(0)); " | knopf "; TEXT_AUS_ZEIGER$(gtk_button_get_label(v26W(1)))
+            PRINT "orte: "; v26Orte$()
+            PRINT "sichtbar: "; v26Sichtbar$()
+            ' Info nach links, Fortschritt in ein eigenes Fenster
+            lsNach(lsNr("info"), lsBuch[0])
+            leisteAbtrennen("fortschritt")
+            PRINT "verschoben: "; v26Orte$(); " | fenster "; LEN(lsSchwebFenster)
+            PRINT "  sichtbar: "; v26Sichtbar$()
+            v26Stand = leistenStand$()
+            DIM j AS JSON_HANDLE : j = JSON_PARSE(v26Stand)
+            PRINT "stand: links "; JSON_GET_STRING(j, "orte.links.leisten.0"); " | schwebend "; JSON_GET_STRING(j, "schwebend.0.leisten.0"); " | unten "; JSON_GET_STRING(j, "orte.unten.leisten.0")
+            leistenZuruecksetzen()
+            PRINT "zurueck: "; v26Orte$(); " | fenster "; LEN(lsSchwebFenster); " | vorn "; leisteVornNeben$("muster")
+            leistenStandSetzen(v26Stand)
+            PRINT "wieder: "; v26Orte$(); " | fenster "; LEN(lsSchwebFenster)
+            leistenZuruecksetzen()
+            ok = vfFoto(fenster, "leisten")
+            ' ein Befehl ueber sein Kuerzel (die Teile in anderer Reihenfolge)
+            PRINT "kuerzel trifft: "; pluginKuerzel("Alt+Strg+K"); " | fremdes "; pluginKuerzel("Strg+Alt+Q")
+        CASE 2
+            IF v26Warte(LEFT$(gtk_label_get_text(v26W(0)), 6) = "farben", "zaehlen") THEN RETURN TRUE
+            PRINT "zaehlen: "; gtk_label_get_text(v26W(0))
+            gtk_button_clicked(v26W(1))
+            v26Stiche = lwMuster.sticheGesamt()
+            befehlAusfuehren("plugin:probe:sticken")
+        CASE 3
+            IF v26Warte(LEFT$(gtk_label_get_text(v26W(0)), 8) = "geklickt" AND lwMuster.sticheGesamt() <> v26Stiche, "klick und stiche") THEN RETURN TRUE
+            PRINT "klick: "; gtk_label_get_text(v26W(0))
+            PRINT "stiche: "; lwMuster.sticheGesamt() - v26Stiche; " | schritt '"; wzVerlauf.textZurueck$(); "' | geaendert "; istGeaendert()
+            werkzeugZurueck()
+            PRINT "  zurueck: "; lwMuster.sticheGesamt() = v26Stiche
+            gtk_entry_set_text(v26W(2), "hallo")
+        CASE 4
+            IF v26Warte(LEFT$(gtk_label_get_text(v26W(0)), 4) = "wert", "eingabe") THEN RETURN TRUE
+            PRINT "eingabe: "; gtk_label_get_text(v26W(0))
+            ok = musterSichern(PATHJOIN(GETENV$("DHRT_START_DIR", CWD$()), "kopie.pxs"))
+        CASE 5
+            IF v26Warte(LEFT$(meldung, 7) = "gehoert", "gesichert") THEN RETURN TRUE
+            PRINT "ereignis: "; meldung
+            ' das Menue baut sich mit den Befehlen der Plugins
+            DIM m AS INTEGER : m = gtk_menu_new()
+            pluginMenue(m)
+            gtk_widget_destroy(m)
+            befehlAusfuehren("plugin:probe:absturz")
+        CASE 6
+            IF v26Warte(pgLeitung[k] < 0, "absturz") THEN RETURN TRUE
+            PRINT "absturz: "; pgZustand[k]; " | leiste "; leisteOrt$("plugin.probe.leiste"); " sichtbar "; gtk_widget_get_visible(lsKind[lsNr("plugin.probe.leiste")]); " | unten "; gtk_widget_get_visible(lsBuch[3])
+            befehlAusfuehren("plugin:probe:zaehlen")
+            PRINT "  befehl ohne plugin: "; meldung
+            pluginStarten(k)
+        CASE 7
+            IF v26Warte(gtk_widget_get_visible(lsKind[lsNr("plugin.probe.leiste")]), "neustart") THEN RETURN TRUE
+            PRINT "neu: "; pgZustand[k]; " | befehle "; LEN(pgBefKennung); " | leisten "; LEN(pgLeisteName); " | text "; gtk_label_get_text(v26W(0))
+            ' verwalten: ausgeschaltet startet es nicht
+            einst.pluginsAus = "probe"
+            pluginsNeuLaden()
+            k = ARRAY_INDEXOF(pgNamen, "probe")
+            PRINT "aus: "; pgZustand[k]; " | leitung "; pgLeitung[k] < 0; " | leiste sichtbar "; gtk_widget_get_visible(lsKind[lsNr("plugin.probe.leiste")]); " | "; meldung
+            einst.pluginsAus = ""
         CASE ELSE
             schliessenErlaubt = TRUE
             gtk_widget_destroy(fenster)

@@ -30,6 +30,10 @@ CLASS Einstellungen
     DIM ueberschreibenFragen AS BOOLEAN  ' confirm_overwrite
     DIM meldungSekunden AS INTEGER       ' status_timeout 1..30
     DIM autor AS STRING                  ' default_author
+    ' Stufe 26: Anordnung der Leisten (JSON, ansicht/leisten.dh) und die
+    ' abgeschalteten Plugins (Namen, durch Komma getrennt)
+    DIM leistenStand AS STRING           ' panel_layout
+    DIM pluginsAus AS STRING             ' plugins_disabled
     DIM copyright AS STRING              ' default_copyright
     ' Zeichenflaeche
     DIM raster AS BOOLEAN                ' show_grid
@@ -113,6 +117,8 @@ SUB einstellungenVorgabe(e AS Einstellungen)
     e.ueberschreibenFragen = TRUE
     e.meldungSekunden = 3
     e.autor = ""
+    e.leistenStand = ""
+    e.pluginsAus = ""
     e.copyright = ""
     e.raster = TRUE
     e.lineale = TRUE
@@ -294,6 +300,8 @@ FUNCTION einstellungenLaden(pfad AS STRING) AS Einstellungen
     IF esBool(j, "confirm_overwrite", b) THEN e.ueberschreibenFragen = b
     IF jsonGanz(j, "status_timeout", z) THEN e.meldungSekunden = z
     IF esText(j, "default_author", t) THEN e.autor = TRIM$(t)
+    IF esText(j, "panel_layout", t) THEN e.leistenStand = t
+    IF esText(j, "plugins_disabled", t) THEN e.pluginsAus = t
     IF esText(j, "default_copyright", t) THEN e.copyright = TRIM$(t)
     IF esBool(j, "show_grid", b) THEN e.raster = b
     IF esBool(j, "show_rulers", b) THEN e.lineale = b
@@ -461,6 +469,8 @@ FUNCTION einstellungenJson$(e AS Einstellungen) AS STRING
         JSON_SET_STRING(ks, JSON_KEY$(k), e.kuerzel[k])
     NEXT
     JSON_SET_JSON(j, "shortcuts", ks)
+    JSON_SET_STRING(j, "panel_layout", e.leistenStand)
+    JSON_SET_STRING(j, "plugins_disabled", e.pluginsAus)
     RETURN JSON_PRETTY(j)
 END FUNCTION
 
@@ -615,6 +625,9 @@ FUNCTION kuerzelAktionen() AS ARRAY OF Kuerzelaktion
         ka("mittelkreuz", "Zentrierhilfe", ""), _
         ka("einrasten", "Magnetisches Raster", ""), _
         ka("tastenkuerzel", "Tastenkürzel anzeigen", "F1"), _
+        ka("leisten_zurueck", "Leisten zurücksetzen", ""), _
+        ka("plugins_neu", "Plugins neu laden", ""), _
+        ka("plugins_ordner", "Plugin-Ordner öffnen", ""), _
         ka("drucken", "Drucken", "Strg+P"), _
         ka("bildschirm_pipette", "Farbe vom Bildschirm picken", ""), _
         ka("palette_export", "Palette exportieren", ""), _

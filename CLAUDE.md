@@ -4051,6 +4051,49 @@ beendet, geprueft), Fragen/Antworten, Befunde in `pruefen`, Schnipsel in
 (`ide/dh_plugin.dh`). Beispiel `examples/plugins/todo/`, Tests
 `tests/pruef/werkzeug_ide_plugins.dhtest` (4; drei Verfaelschungen fallen).
 
+**Glutfaden Stufe 26 (selber Tag): Leisten und Plugins.** `ansicht/leisten.dh`:
+vier GtkNotebooks einer Gruppe (`gtk_notebook_set_group_name`, Reiter
+detachable/reorderable) -- links, rechts_oben, rechts, unten; `create-window`
+(Rueckruf mit ZEIGER-Rueckgabe) gibt einem ausserhalb losgelassenen Reiter
+ein Werkzeugfenster, dessen Kreuz die Leisten heimschickt. Ein Platz ohne
+SICHTBARE Seite ist aus (`lsSichtbareSeiten` -- ein ausgeblendeter Reiter
+eines Plugins zaehlt nicht), waehrend eines Zugs alle an. Verschoben wird per
+`g_object_ref` + remove + append, das Widget bleibt dasselbe. Anordnung in
+den Einstellungen (`panel_layout`, am ENDE der Datei geschrieben, sonst
+verschob sich jede bestehende Einstellungsdatei), "Leisten zuruecksetzen" im
+Logo-Menue. **Drei Fallen:** (1) beim Ende raeumt GTK die Notizbuecher
+nacheinander ab und jedes meldet page-removed -- `leistenEnde()` in
+`fensterZu` stellt die Handler ab, sonst Gtk-CRITICAL in stderr (jede Probe
+rot); (2) `switch-page` kommt BEVOR die neue Seite vorn ist -- nachgezogen
+wird im Takt danach, `seitenleisteReiter` zieht selbst nach; (3) eine Leiste
+mit fester Hoehe (Uebersicht, Plugin-Form) gehoert NICHT in einen
+Rollbereich: dessen Mindesthoehe ist 0, und die Teilung drueckte sie zum
+Streifen (gesehen nur im Bild). `ansicht/plugins.dh`: dieselbe Leitung und
+Bibliothek wie die IDE (`DH_PATH` auf `../../ide`, Installation `ide/` neben
+der Laufzeit), Takt `g_timeout_add(50)`, die `.dhform` als GtkFixed
+nachgebaut (label/button/textinput/checkbox/toggle/slider/listbox/dropdown),
+Befehle im Logo-Menue unter Plugins und im Tastenweg nach den eigenen
+Kuerzeln, Ereignisse gesichert/geoeffnet/geaendert, neu in `dh_plugin.dh`
+`PLUGIN_MUSTER$` und `PLUGIN_STICHE` (ein Schritt ueber
+`kern.zellenSetzenJe`), ausgeschaltet ueber `plugins_disabled`. Eine Frage
+wird auch bei einem Fehler beantwortet. Tests
+`tests/pruef/glutfaden_stufe26.dhtest` (2; echtes Plugin; sechs
+Verfaelschungen fallen); die Befehlstafel hat 80 Eintraege.
+
+**Fund in der Laufzeit dabei (Maschinencode + FFI-Rueckrufe):** ein
+Schleifenbereich im Wertemodus haelt Globale in seinen Plaetzen; rief er eine
+VM-Funktion, die eine Bibliothek aufruft, und die Bibliothek rief einen
+Rueckruf (GTK page-removed bei `gtk_notebook_remove_page`, qsort mit
+Vergleich), sah der Rueckruf diese Globalen als NIL ("Index-Zugriff auf
+NIL"). `gerufenes_harmlos` lehnt jetzt Gerufenes ab, das einen Rueckruf
+VERGIBT (eine Konstante mit Rueckruf-Signatur, `ffi::signatur_mit_rueckruf`)
+oder `__ffi` ruft, sobald Rueckrufe vergeben sind; und ein Bereich, der vorher
+gebaut wurde und `__ffi` erreicht (`erreicht_ffi`, `Schleife::ffi_gerufen`),
+wird beim naechsten Eintritt verworfen. Faelle in `tests/pruef/ffi.dhtest`
+("ein bereich ruft eine funktion, die einen rueckruf vergibt", "... gebaut
+bevor ein rueckruf vergeben war" -- `signal`/`raise` der C-Bibliothek, die
+sich einen Rueckruf merkt); gegen den Bau davor fallen beide.
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.
