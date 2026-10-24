@@ -1136,7 +1136,7 @@ Glutfaden beenden?	Quit Glutfaden?
 Über Glutfaden …	About Glutfaden …
 Neu in Glutfaden …	New in Glutfaden …
 Tastenkürzel ({0}) …	Keyboard shortcuts ({0}) …
-Stufe 25	Stage 25
+Stufe 26	Stage 26
 Kreuzstich-Muster ansehen und bearbeiten -- eine Portierung von PySticky nach Drachenhauch und GTK 3.	View and edit cross-stitch patterns -- a port of PySticky to Drachenhauch and GTK 3.
 PySticky (das Original)	PySticky (the original)
 Erst ein Muster öffnen oder anlegen.	Open or create a pattern first.
@@ -1639,3 +1639,12 @@ Nikolausstiefel	Christmas stocking
 Stiefelform	Boot shape
 Adventskalender	Advent calendar
 24 Felder	24 fields
+Plugins	Plugins
+Plugins neu laden	Reload plugins
+Plugin-Ordner öffnen	Open the plugin folder
+Leisten zurücksetzen	Reset panels
+läuft	running
+Fehler: 	Error: 
+abgestürzt	crashed
+Plugins neu geladen: {0}	Plugins reloaded: {0}
+Das Plugin läuft nicht: {0}	The plugin is not running: {0}

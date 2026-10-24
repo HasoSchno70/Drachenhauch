@@ -1,0 +1,444 @@
+' Andockbare Leisten (Stufe 26). PySticky hatte QDockWidgets; hier sind es
+' vier GTK-Notizbuecher einer Gruppe -- links, rechts oben, rechts und unten
+' --, die ihre Reiter per Ziehen untereinander tauschen. Ein Reiter, der
+' ausserhalb fallen gelassen wird, bekommt ein eigenes Fenster (GTK fragt mit
+' create-window nach einem Notizbuch darin); das Kreuz dieses Fensters legt
+' seine Leisten an ihren Platz zurueck, statt sie wegzuwerfen.
+'
+' Ein leeres Notizbuch ist ausgeblendet -- solange ein Reiter gezogen wird,
+' zeigen sich alle als Ablageziel. Die Anordnung steht in den Einstellungen
+' (panel_layout); "Leisten zurücksetzen" stellt die Vorgabe her: rechts oben
+' die Übersicht, rechts Muster, Info und Fortschritt.
+CONST LS_GRUPPE = "glutfaden-leisten"
+
+DIM lsNamen AS ARRAY OF STRING : lsNamen = []
+DIM lsTitel AS ARRAY OF STRING : lsTitel = []
+DIM lsKind AS ARRAY OF INTEGER : lsKind = []
+DIM lsHeim AS ARRAY OF STRING : lsHeim = []
+' Die vier Plaetze; ihre Notizbuecher in derselben Reihenfolge.
+DIM lsOrte AS ARRAY OF STRING : lsOrte = ["links", "rechts_oben", "rechts", "unten"]
+DIM lsBuch[4] AS INTEGER
+' Schwebende Leisten: je ein Fenster mit einem Notizbuch.
+DIM lsSchwebBuch AS ARRAY OF INTEGER : lsSchwebBuch = []
+DIM lsSchwebFenster AS ARRAY OF INTEGER : lsSchwebFenster = []
+DIM lsZiehen AS BOOLEAN : lsZiehen = FALSE
+' Die Teilungen: links | (Mitte | rechts), rechts oben / rechts, oben / unten
+DIM lsTeilLinks AS INTEGER
+DIM lsTeilRechts AS INTEGER
+DIM lsTeilUnten AS INTEGER
+DIM lsAufraeumen AS INTEGER : lsAufraeumen = 0
+' Beim Ende raeumt GTK die Notizbuecher eins nach dem anderen ab, und jedes
+' meldet dabei page-removed -- dann fragte lsSichtbarkeit schon zerstoerte.
+DIM lsEnde AS BOOLEAN : lsEnde = FALSE
+DIM lsNachWechsel AS INTEGER : lsNachWechsel = 0
+
+SUB leistenEnde()
+    lsEnde = TRUE
+END SUB
+
+FUNCTION lsBuchNeu() AS INTEGER
+    DIM nb AS INTEGER : nb = gtk_notebook_new()
+    gtk_notebook_set_group_name(nb, LS_GRUPPE)
+    gtk_notebook_set_scrollable(nb, TRUE)
+    gtkKlasse(nb, "seitenleiste")
+    signalSeite(nb, "page-added", lsSeitenGeaendert, 0, 0, 0)
+    signalSeite(nb, "page-removed", lsSeitenGeaendert, 0, 0, 0)
+    signalSeite(nb, "switch-page", lsReiterGewechselt, 0, 0, 0)
+    signalNeuesFenster(nb, "create-window", lsFensterNeu, 0, 0, 0)
+    signalZeile(nb, "drag-begin", lsZugAnfang, 0, 0, 0)
+    signalZeile(nb, "drag-end", lsZugEnde, 0, 0, 0)
+    RETURN nb
+END FUNCTION
+
+' Der Rahmen um die Mitte: links | (mitte | rechts oben/rechts), darunter
+' unten. `mitte` ist die Teilung Mitte | rechts, die main.dh baut.
+FUNCTION leistenRechts() AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO 3
+        lsBuch[i] = lsBuchNeu()
+    NEXT
+    lsTeilRechts = gtk_paned_new(GTK_SENKRECHT)
+    gtk_paned_pack1(lsTeilRechts, lsBuch[1], FALSE, FALSE)
+    gtk_paned_pack2(lsTeilRechts, lsBuch[2], TRUE, FALSE)
+    gtk_widget_set_size_request(lsTeilRechts, 300, -1)
+    RETURN lsTeilRechts
+END FUNCTION
+
+FUNCTION leistenRahmen(mitte AS INTEGER) AS INTEGER
+    lsTeilLinks = gtk_paned_new(GTK_WAAGERECHT)
+    gtk_paned_pack1(lsTeilLinks, lsBuch[0], FALSE, FALSE)
+    gtk_paned_pack2(lsTeilLinks, mitte, TRUE, FALSE)
+    lsTeilUnten = gtk_paned_new(GTK_SENKRECHT)
+    gtk_paned_pack1(lsTeilUnten, lsTeilLinks, TRUE, FALSE)
+    gtk_paned_pack2(lsTeilUnten, lsBuch[3], FALSE, FALSE)
+    RETURN lsTeilUnten
+END FUNCTION
+
+FUNCTION lsOrtNr(ort AS STRING) AS INTEGER
+    RETURN ARRAY_INDEXOF(lsOrte, ort)
+END FUNCTION
+
+FUNCTION lsNr(name AS STRING) AS INTEGER
+    RETURN ARRAY_INDEXOF(lsNamen, name)
+END FUNCTION
+
+' Eine Leiste anmelden: ihr Widget kommt in das Notizbuch ihres Platzes.
+SUB leisteAnmelden(name AS STRING, titel AS STRING, kind AS INTEGER, heim AS STRING)
+    ARRAY_PUSH(lsNamen, name)
+    ARRAY_PUSH(lsTitel, titel)
+    ARRAY_PUSH(lsKind, kind)
+    ARRAY_PUSH(lsHeim, heim)
+    DIM o AS INTEGER : o = lsOrtNr(heim)
+    IF o < 0 THEN o = 2
+    lsAnhaengen(lsBuch[o], LEN(lsNamen) - 1)
+END SUB
+
+SUB lsAnhaengen(nb AS INTEGER, i AS INTEGER)
+    DIM n AS INTEGER : n = gtk_notebook_append_page(nb, lsKind[i], gtk_label_new(lsTitel[i]))
+    gtk_notebook_set_tab_detachable(nb, lsKind[i], TRUE)
+    gtk_notebook_set_tab_reorderable(nb, lsKind[i], TRUE)
+    gtk_widget_show_all(lsKind[i])
+END SUB
+
+' In welchem Notizbuch steckt die Leiste? (0 = keinem)
+FUNCTION lsBuchVon(i AS INTEGER) AS INTEGER
+    RETURN gtk_widget_get_parent(lsKind[i])
+END FUNCTION
+
+' Wo steht sie: links, rechts_oben, rechts, unten oder schwebend.
+FUNCTION leisteOrt$(name AS STRING) AS STRING
+    DIM i AS INTEGER : i = lsNr(name)
+    IF i < 0 THEN RETURN ""
+    DIM nb AS INTEGER : nb = lsBuchVon(i)
+    DIM o AS INTEGER
+    FOR o = 0 TO 3
+        IF lsBuch[o] = nb THEN RETURN lsOrte[o]
+    NEXT
+    IF ARRAY_INDEXOF(lsSchwebBuch, nb) >= 0 THEN RETURN "schwebend"
+    RETURN ""
+END FUNCTION
+
+' Eine Leiste in ein anderes Notizbuch -- das Widget bleibt dasselbe (sonst
+' gingen sein Inhalt und seine Signale verloren).
+SUB lsNach(i AS INTEGER, nb AS INTEGER)
+    DIM alt AS INTEGER : alt = lsBuchVon(i)
+    IF alt = nb THEN RETURN
+    DIM k AS INTEGER : k = g_object_ref(lsKind[i])
+    DIM sicht AS BOOLEAN : sicht = gtk_widget_get_visible(lsKind[i])
+    IF alt <> 0 THEN gtk_notebook_remove_page(alt, gtk_notebook_page_num(alt, lsKind[i]))
+    lsAnhaengen(nb, i)
+    IF NOT sicht AND alt <> 0 THEN gtk_widget_set_visible(lsKind[i], FALSE)
+    g_object_unref(lsKind[i])
+END SUB
+
+' Eine Leiste nach vorn holen (auch eine schwebende: ihr Fenster nach vorn).
+SUB leisteZeigen(name AS STRING)
+    DIM i AS INTEGER : i = lsNr(name)
+    IF i < 0 THEN RETURN
+    DIM nb AS INTEGER : nb = lsBuchVon(i)
+    IF nb = 0 THEN RETURN
+    gtk_notebook_set_current_page(nb, gtk_notebook_page_num(nb, lsKind[i]))
+    DIM s AS INTEGER : s = ARRAY_INDEXOF(lsSchwebBuch, nb)
+    IF s >= 0 THEN gtk_window_present(lsSchwebFenster[s])
+END SUB
+
+' Ist die Leiste vorn in ihrem Notizbuch?
+FUNCTION leisteVorn(name AS STRING) AS BOOLEAN
+    DIM i AS INTEGER : i = lsNr(name)
+    IF i < 0 THEN RETURN FALSE
+    DIM nb AS INTEGER : nb = lsBuchVon(i)
+    IF nb = 0 THEN RETURN FALSE
+    RETURN gtk_notebook_get_current_page(nb) = gtk_notebook_page_num(nb, lsKind[i])
+END FUNCTION
+
+' Welche Leiste steht vorn in dem Notizbuch, in dem `name` steckt?
+FUNCTION leisteVornNeben$(name AS STRING) AS STRING
+    DIM i AS INTEGER : i = lsNr(name)
+    IF i < 0 THEN RETURN ""
+    DIM nb AS INTEGER : nb = lsBuchVon(i)
+    IF nb = 0 THEN RETURN ""
+    DIM kind AS INTEGER : kind = gtk_notebook_get_nth_page(nb, gtk_notebook_get_current_page(nb))
+    RETURN lsNamen[ARRAY_INDEXOF(lsKind, kind)]
+END FUNCTION
+
+' Leere Notizbuecher aus -- waehrend eines Zugs alle an, als Ablageziel.
+SUB lsSichtbarkeit()
+    IF lsEnde THEN RETURN
+    DIM o AS INTEGER
+    FOR o = 0 TO 3
+        IF lsBuch[o] = 0 THEN CONTINUE
+        DIM leer AS BOOLEAN : leer = lsSichtbareSeiten(lsBuch[o]) = 0
+        gtk_widget_set_visible(lsBuch[o], NOT leer OR lsZiehen)
+        IF leer AND lsZiehen THEN
+            gtk_widget_set_size_request(lsBuch[o], IIF(o = 3, -1, 160), IIF(o = 3, 90, 120))
+        ELSE
+            gtk_widget_set_size_request(lsBuch[o], -1, -1)
+        END IF
+    NEXT
+    IF lsTeilRechts <> 0 THEN
+        gtk_widget_set_visible(lsTeilRechts, gtk_widget_get_visible(lsBuch[1]) OR gtk_widget_get_visible(lsBuch[2]))
+    END IF
+END SUB
+
+' Ausgeblendete Leisten (ein Plugin, das nicht laeuft) zaehlen nicht.
+FUNCTION lsSichtbareSeiten(nb AS INTEGER) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO gtk_notebook_get_n_pages(nb) - 1
+        IF gtk_widget_get_visible(gtk_notebook_get_nth_page(nb, k)) THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+
+' Eine Leiste aus- oder einblenden; ihr Reiter geht mit, ihr Platz bleibt.
+SUB leisteAusblenden(name AS STRING, aus AS BOOLEAN)
+    DIM i AS INTEGER : i = lsNr(name)
+    IF i < 0 THEN RETURN
+    gtk_widget_set_visible(lsKind[i], NOT aus)
+    lsSichtbarkeit()
+END SUB
+
+' Den Inhalt einer Leiste tauschen (ein neu gestartetes Plugin baut seine
+' Leiste neu) -- an derselben Stelle desselben Notizbuchs.
+SUB leisteErsetzen(name AS STRING, titel AS STRING, kind AS INTEGER)
+    DIM i AS INTEGER : i = lsNr(name)
+    IF i < 0 THEN RETURN
+    DIM nb AS INTEGER : nb = lsBuchVon(i)
+    DIM stelle AS INTEGER : stelle = -1
+    IF nb <> 0 THEN
+        stelle = gtk_notebook_page_num(nb, lsKind[i])
+        gtk_notebook_remove_page(nb, stelle)
+    ELSE
+        nb = lsBuch[MAX(0, lsOrtNr(lsHeim[i]))]
+    END IF
+    lsKind[i] = kind
+    lsTitel[i] = titel
+    lsAnhaengen(nb, i)
+    IF stelle >= 0 THEN gtk_notebook_reorder_child(nb, kind, stelle)
+END SUB
+
+' Eine Leiste in ein eigenes Fenster.
+SUB leisteAbtrennen(name AS STRING)
+    DIM i AS INTEGER : i = lsNr(name)
+    IF i < 0 THEN RETURN
+    lsNach(i, lsSchwebend(240, 160, 320, 420))
+END SUB
+
+SUB lsSeitenGeaendert(nb AS INTEGER, kind AS INTEGER, nr AS INTEGER, daten AS INTEGER)
+    IF lsEnde THEN RETURN
+    lsSichtbarkeit()
+    ' Ein schwebendes Fenster ohne Reiter geht weg -- nicht hier mitten im
+    ' Signal seines Notizbuchs, sondern gleich danach.
+    IF ARRAY_INDEXOF(lsSchwebBuch, nb) >= 0 AND lsSichtbareSeiten(nb) = 0 AND lsAufraeumen = 0 THEN
+        lsAufraeumen = g_timeout_add(1, lsLeereFensterWeg, 0)
+    END IF
+END SUB
+
+FUNCTION lsLeereFensterWeg(daten AS INTEGER) AS BOOLEAN
+    lsAufraeumen = 0
+    DIM s AS INTEGER : s = LEN(lsSchwebBuch) - 1
+    WHILE s >= 0
+        IF lsSichtbareSeiten(lsSchwebBuch[s]) = 0 THEN
+            DIM k AS INTEGER
+            FOR k = 0 TO LEN(lsNamen) - 1
+                IF lsBuchVon(k) = lsSchwebBuch[s] THEN lsNach(k, lsBuch[MAX(0, lsOrtNr(lsHeim[k]))])
+            NEXT
+            gtk_widget_destroy(lsSchwebFenster[s])
+            ARRAY_REMOVE_AT(lsSchwebBuch, s)
+            ARRAY_REMOVE_AT(lsSchwebFenster, s)
+        END IF
+        s = s - 1
+    WEND
+    RETURN FALSE
+END FUNCTION
+
+' switch-page kommt, BEVOR die neue Seite vorn ist -- wer jetzt
+' leisteVorn fragt, bekaeme die alte. Darum gleich danach.
+SUB lsReiterGewechselt(nb AS INTEGER, kind AS INTEGER, nr AS INTEGER, daten AS INTEGER)
+    IF lsEnde THEN RETURN
+    IF lsNachWechsel = 0 THEN lsNachWechsel = g_timeout_add(1, lsNachDemWechsel, 0)
+END SUB
+
+FUNCTION lsNachDemWechsel(daten AS INTEGER) AS BOOLEAN
+    lsNachWechsel = 0
+    IF NOT lsEnde THEN ilNachziehen()
+    RETURN FALSE
+END FUNCTION
+
+SUB lsZugAnfang(nb AS INTEGER, kontext AS INTEGER, daten AS INTEGER)
+    lsZiehen = TRUE
+    lsSichtbarkeit()
+END SUB
+
+SUB lsZugEnde(nb AS INTEGER, kontext AS INTEGER, daten AS INTEGER)
+    lsZiehen = FALSE
+    lsSichtbarkeit()
+END SUB
+
+' Ein Reiter fiel ausserhalb: ein eigenes Fenster, das ihn aufnimmt.
+FUNCTION lsFensterNeu(nb AS INTEGER, seite AS INTEGER, x AS INTEGER, y AS INTEGER, daten AS INTEGER) AS INTEGER
+    RETURN lsSchwebend(x, y, 320, 420)
+END FUNCTION
+
+FUNCTION lsSchwebend(x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = gtk_window_new(0)
+    gtk_window_set_transient_for(w, fenster)
+    gtk_window_set_type_hint(w, GDK_FENSTER_WERKZEUG)
+    gtk_window_set_title(w, tr$("Glutfaden"))
+    gtk_window_set_default_size(w, b, h)
+    gtk_window_move(w, x, y)
+    DIM nb2 AS INTEGER : nb2 = lsBuchNeu()
+    gtk_container_add(w, nb2)
+    ARRAY_PUSH(lsSchwebBuch, nb2)
+    ARRAY_PUSH(lsSchwebFenster, w)
+    signalEreignis(w, "delete-event", lsSchwebZu, 0, 0, 0)
+    signalEreignis(w, "key-press-event", taste, 0, 0, 0)
+    gtk_widget_show_all(w)
+    RETURN nb2
+END FUNCTION
+
+' Das Kreuz eines schwebenden Fensters: seine Leisten zurueck an ihren Platz.
+FUNCTION lsSchwebZu(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM s AS INTEGER : s = ARRAY_INDEXOF(lsSchwebFenster, w)
+    IF s < 0 THEN RETURN FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(lsNamen) - 1
+        IF lsBuchVon(i) = lsSchwebBuch[s] THEN lsNach(i, lsBuch[MAX(0, lsOrtNr(lsHeim[i]))])
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+' --- Stand ----------------------------------------------------------------------
+
+' Die Anordnung als JSON: je Platz die Leisten (der Reihe nach) und die
+' vordere, die schwebenden mit Lage und Groesse, die Teilungen.
+FUNCTION leistenStand$() AS STRING
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "orte" + CHR$(34) + ":{}," + CHR$(34) + "schwebend" + CHR$(34) + ":[]}")
+    DIM o AS INTEGER
+    FOR o = 0 TO 3
+        JSON_SET_JSON(j, "orte." + lsOrte[o], lsBuchStand(lsBuch[o]))
+    NEXT
+    DIM s AS INTEGER
+    FOR s = 0 TO LEN(lsSchwebBuch) - 1
+        DIM e AS JSON_HANDLE : e = lsBuchStand(lsSchwebBuch[s])
+        DIM x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER
+        gtk_window_get_position(lsSchwebFenster[s], x, y)
+        gtk_window_get_size(lsSchwebFenster[s], b, h)
+        JSON_SET_INT(e, "x", x) : JSON_SET_INT(e, "y", y)
+        JSON_SET_INT(e, "w", b) : JSON_SET_INT(e, "h", h)
+        JSON_APPEND_JSON(j, "schwebend", e)
+    NEXT
+    IF lsTeilLinks <> 0 THEN
+        JSON_SET_INT(j, "teilung_links", gtk_paned_get_position(lsTeilLinks))
+        JSON_SET_INT(j, "teilung_rechts", gtk_paned_get_position(lsTeilRechts))
+        JSON_SET_INT(j, "teilung_unten", gtk_paned_get_position(lsTeilUnten))
+    END IF
+    RETURN JSON_STRINGIFY(j)
+END FUNCTION
+
+FUNCTION lsBuchStand(nb AS INTEGER) AS JSON_HANDLE
+    DIM e AS JSON_HANDLE : e = JSON_PARSE("{" + CHR$(34) + "leisten" + CHR$(34) + ":[]}")
+    DIM k AS INTEGER
+    FOR k = 0 TO gtk_notebook_get_n_pages(nb) - 1
+        DIM i AS INTEGER : i = ARRAY_INDEXOF(lsKind, gtk_notebook_get_nth_page(nb, k))
+        IF i >= 0 THEN JSON_APPEND_STRING(e, "leisten", lsNamen[i])
+    NEXT
+    DIM c AS INTEGER : c = gtk_notebook_get_current_page(nb)
+    IF c >= 0 THEN
+        DIM v AS INTEGER : v = ARRAY_INDEXOF(lsKind, gtk_notebook_get_nth_page(nb, c))
+        IF v >= 0 THEN JSON_SET_STRING(e, "vorn", lsNamen[v])
+    END IF
+    RETURN e
+END FUNCTION
+
+' Einen Stand uebernehmen. Leisten, die er nicht nennt, bleiben, wo sie sind;
+' Namen, die es (noch) nicht gibt, werden uebergangen -- eine spaeter
+' angemeldete Leiste (ein Plugin) fragt mit leisteNachStand selbst nach.
+SUB leistenStandSetzen(stand AS STRING)
+    IF TRIM$(stand) = "" THEN RETURN
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_PARSE(stand)
+    CATCH fe
+        RETURN
+    END TRY
+    DIM o AS INTEGER
+    FOR o = 0 TO 3
+        DIM p AS STRING : p = "orte." + lsOrte[o]
+        IF JSON_HAS(j, p) THEN lsBuchSetzen(lsBuch[o], JSON_GET_JSON(j, p))
+    NEXT
+    IF JSON_HAS(j, "schwebend") THEN
+        DIM s AS INTEGER
+        FOR s = 0 TO JSON_LEN(j, "schwebend") - 1
+            DIM e AS JSON_HANDLE : e = JSON_GET_JSON(j, "schwebend." + STR$(s))
+            DIM nb AS INTEGER : nb = lsSchwebend(lsZahl(e, "x", 80), lsZahl(e, "y", 80), MAX(160, lsZahl(e, "w", 320)), MAX(120, lsZahl(e, "h", 420)))
+            lsBuchSetzen(nb, e)
+        NEXT
+    END IF
+    IF JSON_HAS(j, "teilung_links") THEN gtk_paned_set_position(lsTeilLinks, lsZahl(j, "teilung_links", 200))
+    IF JSON_HAS(j, "teilung_rechts") THEN gtk_paned_set_position(lsTeilRechts, lsZahl(j, "teilung_rechts", 200))
+    IF JSON_HAS(j, "teilung_unten") THEN gtk_paned_set_position(lsTeilUnten, lsZahl(j, "teilung_unten", 400))
+    lsSichtbarkeit()
+    ' Ein schwebendes Fenster, das nichts Bekanntes aufnahm, gleich wieder weg.
+    DIM leer AS BOOLEAN : leer = lsLeereFensterWeg(0)
+END SUB
+
+FUNCTION lsZahl(j AS JSON_HANDLE, k AS STRING, vorgabe AS INTEGER) AS INTEGER
+    IF NOT JSON_HAS(j, k) THEN RETURN vorgabe
+    IF JSON_TYPE(j, k) <> "number" THEN RETURN vorgabe
+    RETURN JSON_GET_INT(j, k)
+END FUNCTION
+
+SUB lsBuchSetzen(nb AS INTEGER, e AS JSON_HANDLE)
+    IF NOT JSON_HAS(e, "leisten") THEN RETURN
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(e, "leisten") - 1
+        DIM i AS INTEGER : i = lsNr(JSON_GET_STRING(e, "leisten." + STR$(k)))
+        IF i >= 0 THEN
+            lsNach(i, nb)
+            ' in der Reihenfolge des Stands
+            gtk_notebook_reorder_child(nb, lsKind[i], k)
+        END IF
+    NEXT
+    IF JSON_HAS(e, "vorn") THEN
+        DIM v AS INTEGER : v = lsNr(JSON_GET_STRING(e, "vorn"))
+        IF v >= 0 THEN
+            IF lsBuchVon(v) = nb THEN gtk_notebook_set_current_page(nb, gtk_notebook_page_num(nb, lsKind[v]))
+        END IF
+    END IF
+END SUB
+
+' Eine spaet angemeldete Leiste (ein Plugin): an den Platz, den der
+' gesicherte Stand fuer sie nennt, sonst bleibt sie, wo sie ist.
+SUB leisteNachStand(name AS STRING, stand AS STRING)
+    IF TRIM$(stand) = "" THEN RETURN
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_PARSE(stand)
+    CATCH fe
+        RETURN
+    END TRY
+    DIM i AS INTEGER : i = lsNr(name)
+    IF i < 0 THEN RETURN
+    DIM o AS INTEGER
+    FOR o = 0 TO 3
+        DIM p AS STRING : p = "orte." + lsOrte[o] + ".leisten"
+        IF JSON_HAS(j, p) THEN
+            DIM k AS INTEGER
+            FOR k = 0 TO JSON_LEN(j, p) - 1
+                IF JSON_GET_STRING(j, p + "." + STR$(k)) = name THEN lsNach(i, lsBuch[o]) : RETURN
+            NEXT
+        END IF
+    NEXT
+END SUB
+
+' Alles an seinen Platz, schwebende Fenster weg, Teilungen wie beim Start.
+SUB leistenZuruecksetzen()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(lsNamen) - 1
+        lsNach(i, lsBuch[MAX(0, lsOrtNr(lsHeim[i]))])
+    NEXT
+    DIM leer AS BOOLEAN : leer = lsLeereFensterWeg(0)
+    leisteZeigen("muster")
+    lsSichtbarkeit()
+END SUB

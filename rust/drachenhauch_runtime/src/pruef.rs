@@ -121,6 +121,12 @@ pub const GEDULDET: &[(&str, &str)] = &[
     ("DECLARE_GLOBAL_CONST_SLOT", "CLAUDE.md: Bytecode-Opcode, kein Builtin"),
 ];
 
+/// Bibliotheken in Drachenhauch, deren SUBs und FUNCTIONs das Handbuch wie
+/// Befehle beschreibt -- ihre Namen gelten in der Namenspruefung als bekannt.
+/// Ein Tippfehler faellt so weiter auf, und die Liste waechst nicht mit
+/// jedem Befehl der Bibliothek.
+const BIBLIOTHEKEN: &[&str] = &["ide/dh_plugin.dh"];
+
 fn bekannte_builtins(wurzel: &Path) -> HashSet<String> {
     let raw = lesen(&wurzel.join("daten/builtin_index.json"));
     let mut namen: HashSet<String> = HashSet::new();
@@ -130,6 +136,14 @@ fn bekannte_builtins(wurzel: &Path) -> HashSet<String> {
                 namen.insert(n.to_uppercase());
                 namen.insert(n.trim_end_matches('$').to_uppercase());
             }
+        }
+    }
+    static DEF: OnceLock<Regex> = OnceLock::new();
+    let def = re(r"(?im)^\s*(?:SUB|FUNCTION)\s+([A-Za-z_][A-Za-z0-9_]*\$?)", &DEF);
+    for b in BIBLIOTHEKEN {
+        for c in def.captures_iter(&lesen(&wurzel.join(b))) {
+            namen.insert(c[1].to_uppercase());
+            namen.insert(c[1].trim_end_matches('$').to_uppercase());
         }
     }
     namen

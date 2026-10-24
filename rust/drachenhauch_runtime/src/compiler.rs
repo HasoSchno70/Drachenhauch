@@ -5950,9 +5950,6 @@ fn stmt_line(n: &Node) -> u32 {
     if let Node::Stmt { line, .. } = n { *line } else { 0 }
 }
 
-/// `dhrt --typen`: je Zeile die uebersetzten Ausdruecke mit ihrem Typ, nach
-/// Zeilen geordnet (uebersetzt wird Klassen, Funktionen, Hauptprogramm --
-/// nicht in Quelltext-Reihenfolge). `?` heisst: der Compiler weiss es nicht.
 thread_local! {
     /// Sammelt Typ-Hinweise (Zeile der gemergten Quelle, Name, Typ), solange
     /// `typ_hinweise_sammeln` laeuft -- fuer CODE_TYPES$. Ein Thread-Speicher
@@ -5970,6 +5967,9 @@ pub(crate) fn typ_hinweise_sammeln(f: impl FnOnce()) -> Vec<(u32, String, String
     TYP_HINWEISE.with(|h| h.borrow_mut().take()).unwrap_or_default()
 }
 
+/// `dhrt --typen`: je Zeile die uebersetzten Ausdruecke mit ihrem Typ, nach
+/// Zeilen geordnet (uebersetzt wird Klassen, Funktionen, Hauptprogramm --
+/// nicht in Quelltext-Reihenfolge). `?` heisst: der Compiler weiss es nicht.
 fn typen_ausgeben(mut liste: Vec<(u32, String, String)>, herkunft: &[crate::preprocess::Herkunft],
                   haupt: &str) {
     liste.sort_by_key(|e| e.0);

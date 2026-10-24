@@ -1,0 +1,72 @@
+' Beispiel-Plugin der IDE: TODO und FIXME in der Datei vorn.
+'
+' Zum Ausprobieren den Ordner todo/ nach plugins/ neben die ide.json kopieren
+' (Plugins -> Plugin-Ordner oeffnen legt ihn an) und Plugins -> Plugins neu
+' laden. Es zeigt alle vier Faehigkeiten eines Plugins (docs/ide-plugins.md):
+'
+' * ein Befehl mit Kuerzel (Plugins -> TODO und FIXME sammeln),
+' * eine eigene Leiste im Dock (rechts, aus leiste.dhform) -- ein Klick auf
+'   eine Zeile springt dorthin,
+' * Ereignisse: nach dem Sichern und beim Reiterwechsel sammelt es neu,
+' * Code-Hilfen: jedes FIXME steht als Warnung in der Liste der Probleme, das
+'   Kuerzel `todo` + Tabulator schreibt einen TODO-Kommentar, und Dateien mit
+'   der Endung .todo werden eingefaerbt.
+IMPORT "dh_plugin.dh"
+
+DIM zeilen AS ARRAY OF INTEGER : zeilen = []
+DIM datei AS STRING : datei = ""
+
+SUB sammeln()
+    datei = PLUGIN_DATEINAME$()
+    DIM text AS STRING : text = PLUGIN_TEXT$()
+    DIM eintraege AS ARRAY OF STRING : eintraege = []
+    zeilen = []
+    DIM z AS ARRAY OF STRING : z = SPLIT$(text, CHR$(10))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        DIM t AS STRING : t = TRIM$(REPLACE$(z[i], CHR$(13), ""))
+        DIM gross AS STRING : gross = UPPER$(t)
+        IF INSTR(gross, "TODO") >= 0 OR INSTR(gross, "FIXME") >= 0 THEN
+            ARRAY_PUSH(zeilen, i + 1)
+            ARRAY_PUSH(eintraege, STR$(i + 1) + ": " + t)
+            IF INSTR(gross, "FIXME") >= 0 AND datei <> "" THEN PLUGIN_BEFUND(datei, i + 1, "FIXME: noch zu erledigen", "warnung")
+        END IF
+    NEXT
+    PLUGIN_LISTE("todo", "liste", eintraege)
+    DIM wo AS STRING : wo = "(ungesichert)"
+    IF datei <> "" THEN wo = BASENAME(datei)
+    PLUGIN_SETZE("todo", "kopf", "text", STR$(LEN(zeilen)) + " Stellen in " + wo)
+    IF datei <> "" THEN PLUGIN_BEFUNDE_SENDEN(datei)
+END SUB
+
+PLUGIN_BEFEHL("sammeln", "TODO und FIXME sammeln", "Strg+Alt+Umschalt+T")
+PLUGIN_LEISTE("todo", "Todos", "leiste.dhform", "rechts")
+PLUGIN_HOERE("gesichert")
+PLUGIN_HOERE("reiter")
+PLUGIN_SCHNIPSEL("TODO-Kommentar", "todo", "' TODO: |")
+' Eine kleine Aufgabenliste als .todo-Datei: erledigt gruen, offen gelb,
+' Stichworte (#wort) blau.
+PLUGIN_FAERBUNG(".todo", "^\s*\[x\].*", &H70A070)
+PLUGIN_FAERBUNG(".todo", "^\s*\[ \].*", &HE0C060)
+PLUGIN_FAERBUNG(".todo", "#\w+", &H6FA8DC)
+
+WHILE PLUGIN_LAEUFT()
+    SELECT CASE PLUGIN_EREIGNIS$()
+        CASE "befehl"
+            IF PLUGIN_ID$() = "sammeln" THEN
+                sammeln()
+                PLUGIN_MELDUNG(STR$(LEN(zeilen)) + " TODO/FIXME gefunden")
+            END IF
+        CASE "ereignis"
+            sammeln()
+        CASE "klick"
+            IF PLUGIN_WIDGET$() = "auffrischen" THEN sammeln()
+        CASE "geaendert"
+            IF PLUGIN_WIDGET$() = "liste" THEN
+                DIM nr AS INTEGER : nr = VAL(PLUGIN_WERT$())
+                IF nr >= 0 AND nr < LEN(zeilen) AND datei <> "" THEN PLUGIN_OEFFNEN(datei, zeilen[nr])
+            END IF
+        CASE "ende"
+            EXIT(0)
+    END SELECT
+WEND

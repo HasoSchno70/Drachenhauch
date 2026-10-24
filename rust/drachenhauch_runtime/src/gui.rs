@@ -17,6 +17,9 @@ use std::collections::HashMap;
 use crate::graphics::Graphics;
 use crate::value::{Rueckruf, Value};
 
+#[path = "gui_dock.rs"]
+mod dock;
+
 const KEY_BACKSPACE: i64 = 8;
 const KEY_TAB: i64 = 9;
 // Tastencodes (pygame/SDL) fuer die TextInput-Editierung.
@@ -2636,6 +2639,8 @@ pub struct Widget {
     tabctl: Option<Box<TabCtlState>>,
     tc_von: i32,
     tc_seite: i32,
+    /// Leiste eines Docks, zu der das Widget gehoert (GUI_DOCK_ADD), -1 = keine.
+    dock_von: i32,
     /// Nur Kind::Accordion bzw. Kind::Wizard.
     akk: Option<Box<AkkState>>,
     wz: Option<Box<WzState>>,
@@ -3009,7 +3014,16 @@ pub struct Window {
     /// Lichtstreif ueber das Fenster (GUI_WINDOW_GLOW) -- "ein neuer
     /// Drachenhauch zieht durch".
     glanz: Glanz,
+    /// Dock dieses Fensters (GUI_DOCK, gui_dock.rs).
+    dock: Option<Box<dock::DockState>>,
+    /// Steckt das Fenster selbst in einem Dock (GUI_DOCK_WINDOW): das
+    /// Gastfenster, sonst -1.
+    dock_host: i32,
 }
+
+/// Groesster Zeitschritt des Lichtstreifs je Bild (Sekunden), siehe
+/// `Glanz::weiter`.
+const GLANZ_SCHRITT_MAX: f32 = 0.05;
 
 /// Ein Lichtstreif, der ueber ein Fenster zieht: ein weicher Schein, ein
 /// hellerer Kern und eine heisse Linie, additiv gemischt, dazu ein Aufleuchten
@@ -3042,7 +3056,25 @@ struct Glanz {
     t: f32,
 }
 
+
 impl Glanz {
+    /// Ein Bild weiter. Hoechstens `GLANZ_SCHRITT_MAX` je Bild: haengt ein
+    /// Bild (das Programm prueft gerade eine grosse Datei), bleibt der Streif
+    /// kurz stehen und zieht dann weiter -- mit der vollen Zeit sprang er um
+    /// ein Viertel seines Wegs, und das sah aus wie ein Stottern (IDE-Start
+    /// mit offener Datei, 614 ms in einem Bild).
+    fn weiter(&mut self, dt: f32) {
+        if self.t < 0.0 { return; }
+        self.t += dt.clamp(0.0, GLANZ_SCHRITT_MAX);
+        if self.t > self.dauer {
+            if self.pause > 0.0 {
+                if self.t > self.dauer + self.pause { self.t = 0.0; }
+            } else {
+                self.t = -1.0;
+            }
+        }
+    }
+
     fn neu() -> Glanz {
         Glanz { farbe: 0xFFB050, dauer: 1.2, pause: 0.0, richtung: 0,
                 breite: 0.35, staerke: 0.55, rand: true, art: 0, t: -1.0 }
@@ -3543,6 +3575,7 @@ impl Gui {
             tabs: Vec::new(), active_tab: 0, tabs_closable: false, tab_zu: -1, tab_kontext: -1,
             default_btn: -1, cancel_btn: -1,
             glanz: Glanz::neu(),
+            dock: None, dock_host: -1,
         });
         self.z_order.push(idx);
         self.focus_window = Some(idx);
@@ -4431,7 +4464,7 @@ impl Gui {
             placeholder: String::new(), clicked: false, hovered: false,
             on_click: None, on_change: None, beobachtet: false, stand_vorher: String::new(), geaendert: false, ov: HashMap::new(), tbl: None, tree: None, list: None,
             layout: None, auto_w: false, auto_h: false,
-            panel: None, panel_von: -1, tabctl: None, tc_von: -1, tc_seite: -1, akk: None, wz: None,
+            panel: None, panel_von: -1, tabctl: None, tc_von: -1, tc_seite: -1, dock_von: -1, akk: None, wz: None,
             leiste: None, status: None, pfad: None, sinnbild: String::new(),
             rich: None, vert: false, unbestimmt: false, bildmodus: 0,
             ziehbar: false, ablage: false, abgelegt: false,
@@ -11878,6 +11911,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// von dessen Flaeche -- was herausgerollt ist, ist weder zu sehen noch
     /// zu treffen.
     fn im_panel_sichtbar(&self, win: usize, w: &Widget, mx: i32, my: i32) -> bool {
+        // Liegt eine schwebende Leiste darueber, gehoert der Punkt ihr.
+        if !self.dock_frei(win, w, mx, my) { return false; }
         if w.panel_von < 0 { return true; }
         match self.windows[win].widgets.get(w.panel_von as usize) {
             Some(p) => Self::in_rect(mx, my, self.abs_rect(win, p)),
@@ -11901,6 +11936,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     fn widget_shown(&self, win: usize, w: &Widget) -> bool {
         if !(w.alive && w.visible) { return false; }
         if w.tab_page >= 0 && w.tab_page != self.windows[win].active_tab { return false; }
+        // Leiste eines Docks: nur, wenn ihr Inhalt zu sehen ist (vorderer
+        // Reiter, Bereich an, nicht ausgeblendet).
+        if w.dock_von >= 0 {
+            if let Some(d) = self.windows[win].dock.as_ref() {
+                if !d.leisten.get(w.dock_von as usize).map(|l| l.sichtbar).unwrap_or(true) { return false; }
+            }
+        }
         // Reiter IM Fenster: nur die vordere Seite ist da -- fuer das
         // Zeichnen wie fuer jeden Treffertest, die beide hier fragen.
         if w.tc_von >= 0 {
@@ -12077,9 +12119,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         None
     }
     fn bring_to_front(&mut self, wi: usize) {
-        if self.z_order.last() == Some(&wi) { return; }
+        // Ein angedocktes Fenster bringt sein Gastfenster nach vorn -- es
+        // selbst steht immer direkt darueber (dock_ordnen).
+        let h = self.windows[wi].dock_host;
+        let wi = if h >= 0 && self.windows.get(h as usize).map(|w| w.alive).unwrap_or(false) { h as usize } else { wi };
+        if self.z_order.last() == Some(&wi) && !self.windows.iter().any(|w| w.dock_host == wi as i32) { return; }
         self.z_order.retain(|&i| i != wi);
         self.z_order.push(wi);
+        self.dock_ordnen();
     }
 
     fn wcol(&self, w: &Widget, role: &str, theme_key: &str) -> i64 {
@@ -12418,18 +12465,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         let dt = g.delta();
         // Lichtstreifen der Fenster weiterschieben.
-        for win in self.windows.iter_mut() {
-            let gl = &mut win.glanz;
-            if gl.t < 0.0 { continue; }
-            gl.t += dt as f32;
-            if gl.t > gl.dauer {
-                if gl.pause > 0.0 {
-                    if gl.t > gl.dauer + gl.pause { gl.t = 0.0; }
-                } else {
-                    gl.t = -1.0;
-                }
-            }
-        }
+        for win in self.windows.iter_mut() { win.glanz.weiter(dt as f32); }
         let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
         let dauer = self.m("uebergang").max(0) as f32;
         let schritt = if dauer > 0.0 { (dt as f32 * 1000.0 / dauer).clamp(0.0, 1.0) } else { 1.0 };
@@ -12559,6 +12595,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
         }
         self.update_innen(g);
+        // Das Dock rechnet NACH der Bedienung: ein Klick auf einen Reiter
+        // oder ein Zug an der Trennlinie steht so schon in GUI_DOCK_RECT und
+        // GUI_DOCK_CHANGED, wenn das Programm nach GUI_UPDATE fragt.
+        self.dock_pass(g);
         for wi in 0..self.windows.len() {
             for i in 0..self.windows[wi].widgets.len() {
                 if self.windows[wi].widgets[i].beobachtet {
@@ -12587,6 +12627,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         for win in self.windows.iter_mut() {
             win.answer = 0;
             win.tab_zu = -1;
+            if let Some(d) = win.dock.as_deref_mut() { d.geaendert = false; d.geschlossen.clear(); }
             for wdg in win.widgets.iter_mut() {
                 wdg.clicked = false; wdg.hovered = false; wdg.entered = false; wdg.abgelegt = false;
                 if let Some(l) = wdg.leiste.as_mut() { l.hover = -1; l.geklickt = -1; }
@@ -12988,6 +13029,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
         }
         self.uebergaenge(g);
+        self.dock_zug_pass(is_down, mx, my);
         // Rollbalken einer Liste ziehen -- auch wenn die Maus die Rinne
         // verlaesst, wie bei jedem Rollbalken.
         if let Some((wi, i, griff)) = self.listbar_zug {
@@ -16366,6 +16408,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
             return;
         }
+        // Das Dock (Reiter, Kreuz, Trennlinie, schwebender Kopf und Griff)
+        // vor allem, was im Fenster liegt -- eine schwebende Leiste liegt
+        // obenauf, und ihr Kopf darf nicht an den Editor darunter gehen.
+        if self.dock_druck(win, mx, my) { return; }
         // Ein Klick neben das Umbenennen-Feld einer Liste uebernimmt es --
         // wie bei der Tabellenzelle. Ein Klick hinein laesst es offen.
         let n = self.windows[win].widgets.len();
@@ -16378,7 +16424,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // der Griff unter die Maus (und laesst sich gleich weiterziehen).
         for i in 0..n {
             if let Some((tx, ty, bw, th, thy, thh)) = self.list_bar_geom(win, i) {
-                if Self::in_rect(mx, my, (tx, ty, bw, th)) {
+                if Self::in_rect(mx, my, (tx, ty, bw, th)) && self.dock_frei(win, &self.windows[win].widgets[i], mx, my) {
                     let griff = if my >= thy && my < thy + thh { my - thy } else {
                         let max = self.list_max_scroll(win, i);
                         let rel = ((my - ty - thh / 2) as f64 / (th - thh).max(1) as f64).clamp(0.0, 1.0);
@@ -16395,7 +16441,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Rollbalken eines Panels: ein Klick springt an die Stelle.
         for i in 0..n {
             if let Some((tx, ty, bw, th, _thy, thh)) = self.panel_bar_geom(win, i) {
-                if Self::in_rect(mx, my, (tx, ty, bw, th)) {
+                if Self::in_rect(mx, my, (tx, ty, bw, th)) && self.dock_frei(win, &self.windows[win].widgets[i], mx, my) {
                     let rel = ((my - ty - thh / 2) as f32 / (th - thh).max(1) as f32).clamp(0.0, 1.0);
                     let max = self.panel_max_scroll(win, i);
                     if let Some(p) = self.windows[win].widgets[i].panel.as_mut() { p.scroll = (rel * max as f32) as i32; }
@@ -17167,6 +17213,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             return Some(if ueber_quelle || self.ablage_unter(mx, my).is_some() { "hand" } else { "not_allowed" });
         }
         if self.resize_window.is_some() { return Some("resize_nwse"); }
+        if let Some(f) = self.dock_zeiger(mx, my) { return Some(f); }
         if let Some((sw, si)) = self.active_split {
             return Some(if self.windows[sw].widgets[si].group == "v" { "resize_ew" } else { "resize_ns" });
         }
@@ -18934,7 +18981,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Widgets auf den Fenster-Innenbereich begrenzen: wird das Fenster kleiner
         // gezogen, ragt nichts ueber den Rand/die Titelleiste/Menueleiste hinaus.
         g.push_clip(x + 1, y + coff, (w - 2).max(0), (h - coff - 1).max(0));
+        self.dock_zeichnen_unten(g, wi);
         for (i, wdg) in win.widgets.iter().enumerate() {
+            // Widgets einer schwebenden Leiste kommen spaeter, obenauf.
+            if wdg.dock_von >= 0 && win.dock.as_ref().and_then(|d| d.leisten.get(wdg.dock_von as usize)).map(|l| l.schwebt >= 0).unwrap_or(false) { continue; }
             // Kind eines Akkordeons, dessen Abschnitt gerade auf- oder
             // zugeht: auf den sichtbaren Teil beschnitten gezeichnet, damit
             // es hineingleitet statt aufzutauchen. Bedienbar (widget_shown)
@@ -18960,6 +19010,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 self.draw_widget(g, wi, i, wdg);
             }
         }
+        self.dock_zeichnen_oben(g, wi);
         g.pop_clip();
         // Inhalts-Scrollbalken (rechts), wenn der Inhalt hoeher als das Fenster ist.
         if let Some((tx, ty, bw, th, thy, thh)) = self.winscroll_geom(wi) {
@@ -22592,5 +22643,32 @@ mod marken_tests {
         let alt = "a\nx1\nweg\nx2\nz";
         let neu = "a\ny1\ny2\nneu\nmehr\nz";
         assert_eq!(nach(alt, neu, &[2]), vec![1]);
+    }
+}
+
+#[cfg(test)]
+mod glanz_tests {
+    use super::*;
+
+    #[test]
+    fn ein_haengendes_bild_laesst_den_streif_nicht_springen() {
+        let mut g = Glanz::neu();
+        g.dauer = 2.2;
+        g.t = 0.0;
+        // gleichmaessig: 1/60 s je Bild
+        g.weiter(1.0 / 60.0);
+        assert!((g.t - 1.0 / 60.0).abs() < 1e-6);
+        // ein Bild haengt 614 ms -- der Streif geht nur 50 ms weiter
+        g.weiter(0.614);
+        assert!((g.t - (1.0 / 60.0 + GLANZ_SCHRITT_MAX)).abs() < 1e-6);
+        // Gegenprobe: ohne Grenze waere er um mehr als ein Viertel gesprungen
+        assert!(0.614 / g.dauer > 0.25);
+        // eine negative Zeit schiebt nicht zurueck
+        let vorher = g.t;
+        g.weiter(-1.0);
+        assert_eq!(g.t, vorher);
+        // am Ende ist er vorbei
+        for _ in 0..200 { g.weiter(1.0 / 60.0); }
+        assert!(g.t < 0.0);
     }
 }

@@ -1,0 +1,59 @@
+' Mauswege fuer die Dock-Pruefungen (gui_dock.dhtest): sammelt Ereignisse
+' in raylibs Aufnahmeformat und spielt sie ab. Die Lagen kommen zur Laufzeit
+' aus GUI_DOCK_TAB_RECT / GUI_DOCK_RECT -- feste Pixel hingen an der Schrift.
+'
+' Format: "e BILD ART P0 P1 0 0", ART 7 = Maus hin (x, y), 6 = Taste runter,
+' 5 = Taste hoch. Die Wiedergabe setzt beim ERSTEN Ereignis an, darum zaehlt
+' dmBild ab 0.
+DIM dmZeilen AS ARRAY OF STRING : dmZeilen = []
+DIM dmBild AS INTEGER : dmBild = 0
+
+SUB dmHin(x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(dmZeilen, "e " + STR$(dmBild) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    dmBild = dmBild + 1
+END SUB
+
+SUB dmRunter()
+    ARRAY_PUSH(dmZeilen, "e " + STR$(dmBild) + " 6 0 0 0 0")
+    dmBild = dmBild + 2
+END SUB
+
+SUB dmHoch()
+    ARRAY_PUSH(dmZeilen, "e " + STR$(dmBild) + " 5 0 0 0 0")
+    dmBild = dmBild + 2
+END SUB
+
+SUB dmKlick(x AS INTEGER, y AS INTEGER)
+    dmHin(x, y)
+    dmHin(x, y)
+    dmRunter()
+    dmHoch()
+END SUB
+
+' Zwei Klicks kurz hintereinander an derselben Stelle.
+SUB dmDoppel(x AS INTEGER, y AS INTEGER)
+    dmHin(x, y)
+    ARRAY_PUSH(dmZeilen, "e " + STR$(dmBild) + " 6 0 0 0 0")
+    ARRAY_PUSH(dmZeilen, "e " + STR$(dmBild + 1) + " 5 0 0 0 0")
+    ARRAY_PUSH(dmZeilen, "e " + STR$(dmBild + 3) + " 6 0 0 0 0")
+    ARRAY_PUSH(dmZeilen, "e " + STR$(dmBild + 4) + " 5 0 0 0 0")
+    dmBild = dmBild + 6
+END SUB
+
+' Druecken, in `schritte` Bildern ziehen, loslassen.
+SUB dmZug(x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, schritte AS INTEGER)
+    dmHin(x0, y0)
+    dmHin(x0, y0)
+    dmRunter()
+    DIM k AS INTEGER
+    FOR k = 1 TO schritte
+        dmHin(x0 + (x1 - x0) * k \ schritte, y0 + (y1 - y0) * k \ schritte)
+    NEXT
+    dmHin(x1, y1)
+    dmHoch()
+END SUB
+
+SUB dmSpielen()
+    WRITEALL("ev.txt", "c " + STR$(LEN(dmZeilen)) + CHR$(10) + JOIN$(dmZeilen, CHR$(10)) + CHR$(10))
+    AUTOMATION_PLAY("ev.txt")
+END SUB

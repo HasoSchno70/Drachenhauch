@@ -931,3 +931,15 @@ Quelle (github:nutzer/repo@stand, https-Adresse oder Ordner), dahinter wahlweise
 dhrt paket 	dhrt paket 
 dhrt paket ist nicht zu starten: 	dhrt paket cannot be started: 
 dhrt paket läuft noch.	dhrt paket is still running.
+Debugger	Debugger
+Leisten zurücksetzen	Reset panels
+Plugins	Plugins
+Plugins verwalten ...	Manage plugins ...
+Plugins neu laden	Reload plugins
+Plugin-Ordner öffnen	Open plugin folder
+Plugins neu geladen: 	Plugins reloaded: 
+Das Plugin läuft nicht: 	The plugin is not running: 
+Haken = beim Start laden. Ein Plugin liegt in plugins/<name>/plugin.dh.	Tick = load at startup. A plugin lives in plugins/<name>/plugin.dh.
+Keine Plugins -- „Plugin-Ordner öffnen“ legt den Ordner an.	No plugins -- “Open plugin folder” creates the folder.
+Neu laden	Reload
+Ordner öffnen	Open folder

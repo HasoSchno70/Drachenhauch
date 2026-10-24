@@ -1,0 +1,616 @@
+' Plugins (Stufe 26) -- dieselbe Leitung und dieselbe Bibliothek wie die IDE
+' (ide/dh_plugin.dh, docs/ide-plugins.md): ein Plugin ist ein eigenes
+' Programm in plugins/<name>/plugin.dh im Einstellungsordner von Glutfaden,
+' gestartet mit WINDOW_OPEN; ein Takt von 50 ms liest seine Nachrichten.
+' Ein Plugin, das abstuerzt, reisst Glutfaden nicht mit.
+'
+' Was in Glutfaden geht: Befehle mit Kuerzel (im Logo-Menue unter
+' "Plugins"), eigene Leisten (die .dhform nachgebaut aus GTK-Widgets in
+' einem GtkFixed -- Lage und Groesse wie in der Form), Ereignisse
+' (gesichert, geoeffnet, geaendert), das Muster lesen (PLUGIN_MUSTER$) und
+' Stiche setzen (PLUGIN_STICHE, ein Schritt fuer Rueckgaengig). Was zu
+' einem Code-Editor gehoert (Befunde, Schnipsel, Faerbung), uebergeht es.
+
+DIM pgNamen AS ARRAY OF STRING : pgNamen = []
+DIM pgPfade AS ARRAY OF STRING : pgPfade = []
+DIM pgLeitung AS ARRAY OF INTEGER : pgLeitung = []
+DIM pgZustand AS ARRAY OF STRING : pgZustand = []
+DIM pgHoert AS ARRAY OF STRING : pgHoert = []
+' Befehle: Kennung "plugin:<plugin>:<id>", Titel, Kuerzel
+DIM pgBefKennung AS ARRAY OF STRING : pgBefKennung = []
+DIM pgBefTitel AS ARRAY OF STRING : pgBefTitel = []
+DIM pgBefKuerzel AS ARRAY OF STRING : pgBefKuerzel = []
+' Leisten: Name im Dock "plugin.<plugin>.<id>"
+DIM pgLeisteName AS ARRAY OF STRING : pgLeisteName = []
+' Die Widgets aller Plugin-Leisten: Leiste, Nummer in der Form, GTK-Widget, Art
+DIM pgWLeiste AS ARRAY OF INTEGER : pgWLeiste = []
+DIM pgWNr AS ARRAY OF INTEGER : pgWNr = []
+DIM pgWGtk AS ARRAY OF INTEGER : pgWGtk = []
+DIM pgWArt AS ARRAY OF STRING : pgWArt = []
+DIM pgSperre AS BOOLEAN : pgSperre = FALSE
+DIM pgTaktNr AS INTEGER : pgTaktNr = 0
+DIM pgProtokoll AS ARRAY OF STRING : pgProtokoll = []
+
+FUNCTION pluginOrdner$() AS STRING
+    RETURN kern.einstellungsDatei$("plugins")
+END FUNCTION
+
+SUB pgMerken(text AS STRING)
+    ARRAY_PUSH(pgProtokoll, text)
+    IF LEN(pgProtokoll) > 200 THEN pgProtokoll = pgProtokoll[100:]
+END SUB
+
+FUNCTION pgAus(name AS STRING) AS BOOLEAN
+    DIM n AS STRING
+    FOR EACH n IN SPLIT$(einst.pluginsAus, ",")
+        IF LOWER$(TRIM$(n)) = LOWER$(name) THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Die Bibliothek dh_plugin.dh liegt neben der IDE: im Repository zwei
+' Ordner hoeher, in einer Installation neben der Laufzeit (unter macOS in
+' Resources). DH_PATH zeigt dorthin; ein Kind erbt die Umgebung.
+SUB pgPfadSetzen()
+    DIM exe AS STRING : exe = DIRNAME(EXEPATH$())
+    DIM orte AS ARRAY OF STRING : orte = [PATHJOIN(CWD$(), "../../ide"), PATHJOIN(exe, "ide"), PATHJOIN(exe, "../Resources/ide")]
+    DIM o AS STRING
+    FOR EACH o IN orte
+        IF FILEEXISTS(PATHJOIN(o, "dh_plugin.dh")) THEN
+            DIM trenner AS STRING : trenner = IIF(MID$(o, 1, 1) = ":", ";", ":")
+            DIM alt AS STRING : alt = GETENV$("DH_PATH")
+            IF INSTR(alt, o) < 0 THEN SETENV("DH_PATH", IIF(alt = "", o, o + trenner + alt))
+            RETURN
+        END IF
+    NEXT
+END SUB
+
+SUB pluginsStarten()
+    pgPfadSetzen()
+    DIM ordner AS STRING : ordner = pluginOrdner$()
+    IF DIREXISTS(ordner) THEN
+        DIM namen AS ARRAY OF STRING : namen = DIRLIST(ordner)
+        SORT(namen)
+        DIM n AS STRING
+        FOR EACH n IN namen
+            DIM pfad AS STRING : pfad = PATHJOIN(PATHJOIN(ordner, n), "plugin.dh")
+            IF LEFT$(n, 1) = "." OR NOT FILEEXISTS(pfad) THEN CONTINUE
+            IF ARRAY_INDEXOF(pgNamen, n) >= 0 THEN CONTINUE
+            ARRAY_PUSH(pgNamen, n) : ARRAY_PUSH(pgPfade, pfad) : ARRAY_PUSH(pgLeitung, -1)
+            ARRAY_PUSH(pgZustand, tr$("aus")) : ARRAY_PUSH(pgHoert, ";")
+            IF NOT pgAus(n) THEN pluginStarten(LEN(pgNamen) - 1)
+        NEXT
+    END IF
+    IF pgTaktNr = 0 THEN pgTaktNr = g_timeout_add(50, pgTakt, 0)
+END SUB
+
+SUB pluginStarten(k AS INTEGER)
+    IF pgLeitung[k] >= 0 THEN RETURN
+    TRY
+        pgLeitung[k] = WINDOW_OPEN(pgPfade[k])
+        pgZustand[k] = tr$("läuft")
+        pgHoert[k] = ";"
+        pgMerken("plugin " + pgNamen[k] + " gestartet")
+    CATCH e
+        pgZustand[k] = tr$("Fehler: ") + e
+    END TRY
+END SUB
+
+SUB pluginStoppen(k AS INTEGER, zustand AS STRING)
+    IF pgLeitung[k] >= 0 THEN
+        TRY
+            WINDOW_SEND(pgLeitung[k], "{" + CHR$(34) + "art" + CHR$(34) + ":" + CHR$(34) + "ende" + CHR$(34) + "}")
+            WINDOW_CLOSE(pgLeitung[k])
+        CATCH e
+        END TRY
+    END IF
+    pgLeitung[k] = -1
+    pgZustand[k] = zustand
+    ' Seine Leisten aus (ihr Platz bleibt: ein neuer Start legt sie dorthin)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(pgLeisteName) - 1
+        IF LEFT$(pgLeisteName[i], LEN(pgNamen[k]) + 8) = "plugin." + pgNamen[k] + "." THEN leisteAusblenden(pgLeisteName[i], TRUE)
+    NEXT
+    pgMerken("plugin " + pgNamen[k] + " " + zustand)
+END SUB
+
+SUB pluginsBeenden()
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(pgNamen) - 1
+        IF pgLeitung[k] >= 0 THEN pluginStoppen(k, tr$("aus"))
+    NEXT
+END SUB
+
+SUB pluginsNeuLaden()
+    pluginsBeenden()
+    pgNamen = [] : pgPfade = [] : pgLeitung = [] : pgZustand = [] : pgHoert = []
+    pluginsStarten()
+    statusMeldung(trf$("Plugins neu geladen: {0}", [STR$(LEN(pgNamen))]))
+END SUB
+
+SUB pgSenden(k AS INTEGER, j AS JSON_HANDLE)
+    IF k < 0 OR pgLeitung[k] < 0 THEN RETURN
+    TRY
+        WINDOW_SEND(pgLeitung[k], JSON_STRINGIFY(j))
+    CATCH e
+    END TRY
+END SUB
+
+' Ein Ereignis an alle, die es hoeren: gesichert, geoeffnet, geaendert.
+SUB pluginEreignis(name AS STRING, datei AS STRING)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(pgNamen) - 1
+        IF pgLeitung[k] < 0 OR INSTR(pgHoert[k], ";" + name + ";") < 0 THEN CONTINUE
+        DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+        JSON_SET_STRING(j, "art", "ereignis")
+        JSON_SET_STRING(j, "name", name)
+        JSON_SET_STRING(j, "datei", datei)
+        pgSenden(k, j)
+    NEXT
+END SUB
+
+' "plugin:<plugin>:<id>" -- aus dem Menue oder per Kuerzel.
+SUB pluginBefehl(kennung AS STRING)
+    DIM rest AS STRING : rest = MID$(kennung, 7)
+    DIM t AS INTEGER : t = INSTR(rest, ":")
+    IF t < 0 THEN RETURN
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(pgNamen, LEFT$(rest, t))
+    IF k < 0 THEN RETURN
+    IF pgLeitung[k] < 0 THEN
+        statusMeldung(trf$("Das Plugin läuft nicht: {0}", [pgNamen[k]]))
+        RETURN
+    END IF
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    JSON_SET_STRING(j, "art", "befehl")
+    JSON_SET_STRING(j, "id", MID$(rest, t + 1))
+    pgSenden(k, j)
+    pgMerken("befehl " + kennung)
+END SUB
+
+' Ein Kuerzel der Plugins? Verglichen wird die MENGE der Teile -- "Strg+Alt+T"
+' und "Alt+Strg+T" sind dasselbe.
+FUNCTION pgKuerzelForm$(k AS STRING) AS STRING
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM s AS STRING
+    FOR EACH s IN SPLIT$(LOWER$(k), "+")
+        s = TRIM$(s)
+        IF s = "ctrl" THEN s = "strg"
+        IF s = "shift" THEN s = "umschalt"
+        IF s <> "" THEN ARRAY_PUSH(teile, s)
+    NEXT
+    SORT(teile)
+    RETURN JOIN$(teile, "+")
+END FUNCTION
+
+FUNCTION pluginKuerzel(k AS STRING) AS BOOLEAN
+    IF LEN(pgBefKuerzel) = 0 OR k = "" THEN RETURN FALSE
+    DIM f AS STRING : f = pgKuerzelForm$(k)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(pgBefKuerzel) - 1
+        IF pgBefKuerzel[i] <> "" AND pgKuerzelForm$(pgBefKuerzel[i]) = f THEN
+            pluginBefehl(pgBefKennung[i])
+            RETURN TRUE
+        END IF
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Der Takt: Nachrichten lesen (hoechstens 50 je Plugin), Abstuerze erkennen.
+FUNCTION pgTakt(daten AS INTEGER) AS BOOLEAN
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(pgNamen) - 1
+        IF pgLeitung[k] < 0 THEN CONTINUE
+        DIM zaehl AS INTEGER : zaehl = 0
+        WHILE zaehl < 50
+            DIM z AS STRING : z = ""
+            TRY
+                z = WINDOW_RECV$(pgLeitung[k])
+            CATCH e
+                z = ""
+            END TRY
+            IF z = "" THEN BREAK
+            pgNachricht(k, z)
+            zaehl = zaehl + 1
+            IF pgLeitung[k] < 0 THEN BREAK
+        WEND
+        IF pgLeitung[k] >= 0 THEN
+            IF NOT WINDOW_ALIVE(pgLeitung[k]) THEN pluginStoppen(k, tr$("abgestürzt"))
+        END IF
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION pgText$(j AS JSON_HANDLE, k AS STRING) AS STRING
+    IF NOT JSON_HAS(j, k) THEN RETURN ""
+    IF JSON_TYPE(j, k) = "string" THEN RETURN JSON_GET_STRING(j, k)
+    IF JSON_TYPE(j, k) = "number" THEN RETURN STR$(JSON_GET_INT(j, k))
+    RETURN ""
+END FUNCTION
+
+FUNCTION pgZahl(j AS JSON_HANDLE, k AS STRING, vorgabe AS INTEGER) AS INTEGER
+    IF NOT JSON_HAS(j, k) THEN RETURN vorgabe
+    IF JSON_TYPE(j, k) <> "number" THEN RETURN vorgabe
+    RETURN JSON_GET_INT(j, k)
+END FUNCTION
+
+SUB pgNachricht(k AS INTEGER, zeile AS STRING)
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_PARSE(zeile)
+    CATCH e
+        RETURN
+    END TRY
+    TRY
+        SELECT CASE pgText$(j, "art")
+            CASE "befehl"
+                DIM kennung AS STRING : kennung = "plugin:" + pgNamen[k] + ":" + pgText$(j, "id")
+                DIM bi AS INTEGER : bi = ARRAY_INDEXOF(pgBefKennung, kennung)
+                IF bi < 0 THEN
+                    ARRAY_PUSH(pgBefKennung, kennung) : ARRAY_PUSH(pgBefTitel, pgText$(j, "titel"))
+                    ARRAY_PUSH(pgBefKuerzel, pgText$(j, "kuerzel"))
+                ELSE
+                    pgBefTitel[bi] = pgText$(j, "titel") : pgBefKuerzel[bi] = pgText$(j, "kuerzel")
+                END IF
+                pgMerken("befehl angemeldet " + kennung)
+            CASE "leiste" : pgLeisteBauen(k, j)
+            CASE "hoere"
+                DIM ev AS STRING : ev = pgText$(j, "ereignis")
+                IF INSTR(pgHoert[k], ";" + ev + ";") < 0 THEN pgHoert[k] = pgHoert[k] + ev + ";"
+            CASE "setze" : pgSetze(k, j)
+            CASE "liste" : pgListe(k, j)
+            CASE "frage" : pgAntwort(k, j)
+            CASE "tue" : pgTue(k, j)
+        END SELECT
+    CATCH e
+        pgMerken("plugin " + pgNamen[k] + " fehler " + e)
+        statusMeldung("[" + pgNamen[k] + "] " + e)
+    END TRY
+END SUB
+
+' --- Leisten aus einer .dhform ---------------------------------------------------
+
+SUB pgLeisteBauen(k AS INTEGER, j AS JSON_HANDLE)
+    DIM name AS STRING : name = "plugin." + pgNamen[k] + "." + pgText$(j, "id")
+    DIM li AS INTEGER : li = ARRAY_INDEXOF(pgLeisteName, name)
+    IF li < 0 THEN
+        ARRAY_PUSH(pgLeisteName, name)
+        li = LEN(pgLeisteName) - 1
+    ELSE
+        ' neu gestartet: die alten Widgets dieser Leiste vergessen
+        DIM w AS INTEGER : w = LEN(pgWLeiste) - 1
+        WHILE w >= 0
+            IF pgWLeiste[w] = li THEN
+                ARRAY_REMOVE_AT(pgWLeiste, w) : ARRAY_REMOVE_AT(pgWNr, w)
+                ARRAY_REMOVE_AT(pgWGtk, w) : ARRAY_REMOVE_AT(pgWArt, w)
+            END IF
+            w = w - 1
+        WEND
+    END IF
+    DIM form AS JSON_HANDLE : form = JSON_GET_JSON(j, "form")
+    DIM fest AS INTEGER : fest = gtk_fixed_new()
+    gtk_widget_set_size_request(fest, pgZahl(form, "w", 240), pgZahl(form, "h", 200))
+    DIM n AS INTEGER : n = 0
+    IF JSON_HAS(form, "widgets") THEN n = JSON_LEN(form, "widgets")
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM wj AS JSON_HANDLE : wj = JSON_GET_JSON(form, "widgets." + STR$(i))
+        DIM g AS INTEGER : g = pgWidgetBauen(li, i, wj)
+        IF g <> 0 THEN gtk_fixed_put(fest, g, pgZahl(wj, "x", 0), pgZahl(wj, "y", 0))
+    NEXT
+    DIM bereich AS STRING : bereich = pgText$(j, "bereich")
+    DIM ort AS STRING : ort = IIF(ARRAY_INDEXOF(lsOrte, bereich) >= 0, bereich, "rechts")
+    IF lsNr(name) >= 0 THEN
+        leisteErsetzen(name, pgText$(j, "titel"), fest)
+    ELSE
+        leisteAnmelden(name, pgText$(j, "titel"), fest, ort)
+        IF bereich = "schwebend" THEN leisteAbtrennen(name)
+        leisteNachStand(name, einst.leistenStand)
+    END IF
+    leisteAusblenden(name, FALSE)
+    pgMerken("leiste " + name + " " + leisteOrt$(name))
+END SUB
+
+FUNCTION pgWidgetBauen(li AS INTEGER, nr AS INTEGER, wj AS JSON_HANDLE) AS INTEGER
+    DIM art AS STRING : art = LOWER$(pgText$(wj, "kind"))
+    DIM text AS STRING : text = pgText$(wj, "text")
+    DIM b AS INTEGER : b = pgZahl(wj, "w", 0)
+    DIM h AS INTEGER : h = pgZahl(wj, "h", 0)
+    DIM g AS INTEGER : g = 0
+    DIM nutz AS INTEGER : nutz = 0              ' das Widget, das bedient wird
+    DIM flach AS INTEGER : flach = LEN(pgWLeiste)
+    SELECT CASE art
+        CASE "label"
+            g = gtk_label_new(text)
+            gtk_label_set_xalign(g, 0.0)
+            nutz = g
+        CASE "button"
+            g = gtk_button_new_with_label(text)
+            signal(g, "clicked", pgGeklickt, flach, 0, 0)
+            nutz = g
+        CASE "textinput"
+            g = gtk_entry_new()
+            gtk_entry_set_text(g, text)
+            signal(g, "changed", pgGeaendert, flach, 0, 0)
+            nutz = g
+        CASE "checkbox", "toggle"
+            g = gtk_check_button_new_with_label(text)
+            IF JSON_HAS(wj, "checked") THEN
+                IF JSON_TYPE(wj, "checked") = "boolean" THEN gtk_toggle_button_set_active(g, JSON_GET_BOOL(wj, "checked"))
+            END IF
+            signal(g, "toggled", pgGeaendert, flach, 0, 0)
+            nutz = g
+        CASE "slider"
+            DIM mn AS FLOAT : mn = 0.0
+            DIM mx AS FLOAT : mx = 1.0
+            IF JSON_HAS(wj, "min") THEN mn = JSON_GET_FLOAT(wj, "min")
+            IF JSON_HAS(wj, "max") THEN mx = JSON_GET_FLOAT(wj, "max")
+            g = gtk_scale_new_with_range(GTK_WAAGERECHT, mn, MAX(mx, mn + 0.001), (mx - mn) / 100.0)
+            IF JSON_HAS(wj, "value") THEN gtk_range_set_value(g, JSON_GET_FLOAT(wj, "value"))
+            signal(g, "value-changed", pgGeaendert, flach, 0, 0)
+            nutz = g
+        CASE "listbox"
+            nutz = gtk_list_box_new()
+            gtk_list_box_set_selection_mode(nutz, GTK_AUSWAHL_EINE)
+            pgListeFuellen(nutz, wj)
+            signalZeile(nutz, "row-selected", pgZeileGewaehlt, flach, 0, 0)
+            g = gtk_scrolled_window_new(0, 0)
+            gtk_scrolled_window_set_policy(g, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+            gtk_container_add(g, nutz)
+        CASE "dropdown"
+            g = gtk_combo_box_text_new()
+            IF JSON_HAS(wj, "items") THEN
+                DIM e AS INTEGER
+                FOR e = 0 TO JSON_LEN(wj, "items") - 1
+                    gtk_combo_box_text_append_text(g, JSON_GET_STRING(wj, "items." + STR$(e)))
+                NEXT
+            END IF
+            signal(g, "changed", pgGeaendert, flach, 0, 0)
+            nutz = g
+        CASE ELSE
+            ' was Glutfaden nicht nachbaut, steht als Hinweis da
+            g = gtk_label_new("(" + art + ")")
+            nutz = g
+    END SELECT
+    IF b > 0 OR h > 0 THEN gtk_widget_set_size_request(g, IIF(b > 0, b, -1), IIF(h > 0, h, -1))
+    ARRAY_PUSH(pgWLeiste, li) : ARRAY_PUSH(pgWNr, nr) : ARRAY_PUSH(pgWGtk, nutz) : ARRAY_PUSH(pgWArt, art)
+    RETURN g
+END FUNCTION
+
+SUB pgListeFuellen(lb AS INTEGER, wj AS JSON_HANDLE)
+    IF NOT JSON_HAS(wj, "items") THEN RETURN
+    DIM e AS INTEGER
+    FOR e = 0 TO JSON_LEN(wj, "items") - 1
+        pgZeileDazu(lb, JSON_GET_STRING(wj, "items." + STR$(e)))
+    NEXT
+END SUB
+
+SUB pgZeileDazu(lb AS INTEGER, text AS STRING)
+    DIM l AS INTEGER : l = gtk_label_new(text)
+    gtk_label_set_xalign(l, 0.0)
+    gtk_label_set_ellipsize(l, GTK_ELLIPSE_ENDE)
+    gtk_list_box_insert(lb, l, -1)
+    gtk_widget_show_all(lb)
+END SUB
+
+' Zu einem flachen Widget-Index: welches Plugin, welche Leiste.
+SUB pgWidgetMelden(flach AS INTEGER, art AS STRING, wert AS STRING)
+    IF pgSperre OR flach >= LEN(pgWLeiste) THEN RETURN
+    DIM name AS STRING : name = pgLeisteName[pgWLeiste[flach]]
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(name, ".")
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(pgNamen, teile[1])
+    IF k < 0 THEN RETURN
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    JSON_SET_STRING(j, "art", art)
+    JSON_SET_STRING(j, "leiste", MID$(name, LEN(teile[0]) + LEN(teile[1]) + 2))
+    JSON_SET_INT(j, "widget", pgWNr[flach])
+    JSON_SET_STRING(j, "wert", wert)
+    pgSenden(k, j)
+END SUB
+
+SUB pgGeklickt(w AS INTEGER, flach AS INTEGER)
+    pgWidgetMelden(flach, "klick", "")
+END SUB
+
+SUB pgGeaendert(w AS INTEGER, flach AS INTEGER)
+    pgWidgetMelden(flach, "geaendert", pgWert$(flach))
+END SUB
+
+SUB pgZeileGewaehlt(lb AS INTEGER, zeile AS INTEGER, flach AS INTEGER)
+    pgWidgetMelden(flach, "geaendert", pgWert$(flach))
+END SUB
+
+FUNCTION pgWert$(flach AS INTEGER) AS STRING
+    DIM g AS INTEGER : g = pgWGtk[flach]
+    SELECT CASE pgWArt[flach]
+        CASE "textinput" : RETURN gtk_entry_get_text(g)
+        CASE "checkbox", "toggle" : RETURN IIF(gtk_toggle_button_get_active(g), "TRUE", "FALSE")
+        CASE "slider" : RETURN STR$(gtk_range_get_value(g))
+        CASE "dropdown" : RETURN STR$(gtk_combo_box_get_active(g))
+        CASE "listbox"
+            DIM z AS INTEGER : z = gtk_list_box_get_selected_row(g)
+            IF z = 0 THEN RETURN "-1"
+            RETURN STR$(gtk_list_box_row_get_index(z))
+    END SELECT
+    RETURN ""
+END FUNCTION
+
+FUNCTION pgWidget(k AS INTEGER, j AS JSON_HANDLE) AS INTEGER
+    DIM li AS INTEGER : li = ARRAY_INDEXOF(pgLeisteName, "plugin." + pgNamen[k] + "." + pgText$(j, "leiste"))
+    IF li < 0 THEN RETURN -1
+    DIM nr AS INTEGER : nr = pgZahl(j, "widget", -1)
+    DIM w AS INTEGER
+    FOR w = 0 TO LEN(pgWLeiste) - 1
+        IF pgWLeiste[w] = li AND pgWNr[w] = nr THEN RETURN w
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB pgSetze(k AS INTEGER, j AS JSON_HANDLE)
+    DIM w AS INTEGER : w = pgWidget(k, j)
+    IF w < 0 THEN RETURN
+    DIM g AS INTEGER : g = pgWGtk[w]
+    DIM wert AS STRING : wert = pgText$(j, "wert")
+    DIM wahr AS BOOLEAN : wahr = UPPER$(wert) = "TRUE" OR wert = "1"
+    pgSperre = TRUE
+    SELECT CASE pgText$(j, "was")
+        CASE "text"
+            SELECT CASE pgWArt[w]
+                CASE "label" : gtk_label_set_text(g, wert)
+                CASE "button", "checkbox", "toggle" : gtk_button_set_label(g, wert)
+                CASE "textinput" : gtk_entry_set_text(g, wert)
+            END SELECT
+        CASE "checked" : IF pgWArt[w] = "checkbox" OR pgWArt[w] = "toggle" THEN gtk_toggle_button_set_active(g, wahr)
+        CASE "value" : IF pgWArt[w] = "slider" THEN gtk_range_set_value(g, VAL(wert))
+        CASE "enabled" : gtk_widget_set_sensitive(g, wahr)
+        CASE "visible" : gtk_widget_set_visible(g, wahr)
+        CASE "selected"
+            IF pgWArt[w] = "dropdown" THEN gtk_combo_box_set_active(g, VAL(wert))
+            IF pgWArt[w] = "listbox" THEN
+                DIM z AS INTEGER : z = gtk_list_box_get_row_at_index(g, VAL(wert))
+                IF z <> 0 THEN gtk_list_box_select_row(g, z)
+            END IF
+    END SELECT
+    pgSperre = FALSE
+END SUB
+
+SUB pgListe(k AS INTEGER, j AS JSON_HANDLE)
+    DIM w AS INTEGER : w = pgWidget(k, j)
+    IF w < 0 THEN RETURN
+    DIM g AS INTEGER : g = pgWGtk[w]
+    pgSperre = TRUE
+    DIM e AS INTEGER
+    IF pgWArt[w] = "listbox" THEN
+        DIM z AS INTEGER : z = gtk_list_box_get_row_at_index(g, 0)
+        WHILE z <> 0
+            gtk_widget_destroy(z)
+            z = gtk_list_box_get_row_at_index(g, 0)
+        WEND
+        FOR e = 0 TO JSON_LEN(j, "eintraege") - 1
+            pgZeileDazu(g, JSON_GET_STRING(j, "eintraege." + STR$(e)))
+        NEXT
+    ELSEIF pgWArt[w] = "dropdown" THEN
+        gtk_combo_box_text_remove_all(g)
+        FOR e = 0 TO JSON_LEN(j, "eintraege") - 1
+            gtk_combo_box_text_append_text(g, JSON_GET_STRING(j, "eintraege." + STR$(e)))
+        NEXT
+    END IF
+    pgSperre = FALSE
+END SUB
+
+' Die Fragen: datei, muster (als JSON), auswahl (x,y,b,h), projekt.
+SUB pgAntwort(k AS INTEGER, j AS JSON_HANDLE)
+    DIM a AS JSON_HANDLE : a = JSON_PARSE("{}")
+    JSON_SET_STRING(a, "art", "antwort")
+    JSON_SET_INT(a, "nr", pgZahl(j, "nr", 0))
+    DIM wert AS STRING : wert = ""
+    ' auch bei einem Fehler eine Antwort -- sonst wartete das Plugin zwei Sekunden
+    TRY
+        SELECT CASE pgText$(j, "was")
+            CASE "datei" : wert = musterPfad
+            CASE "muster", "text" : IF lwHat THEN wert = pgMusterJson$()
+            CASE "projekt" : wert = einstOrdner$()
+        END SELECT
+    CATCH e
+        pgMerken("plugin " + pgNamen[k] + " frage " + e)
+        wert = ""
+    END TRY
+    JSON_SET_STRING(a, "wert", wert)
+    pgSenden(k, a)
+END SUB
+
+' Das Muster fuer ein Plugin: Name, Masse, Farben (Name, Farbe, Stiche),
+' die aktive Ebene und die gewaehlte Farbe. Die Stiche selbst bleiben in
+' der Datei (PLUGIN_DATEINAME$) -- ein grosses Muster waeren Megabyte je Frage.
+FUNCTION pgMusterJson$() AS STRING
+    DIM m AS JSON_HANDLE : m = JSON_PARSE("{" + CHR$(34) + "farben" + CHR$(34) + ":[]}")
+    JSON_SET_STRING(m, "name", lwMuster.name)
+    JSON_SET_INT(m, "breite", lwMuster.breite)
+    JSON_SET_INT(m, "hoehe", lwMuster.hoehe)
+    JSON_SET_INT(m, "stiche", lwMuster.sticheGesamt())
+    JSON_SET_INT(m, "farbe", wzFarbe)
+    DIM i AS INTEGER
+    FOR i = 0 TO lwMuster.farbanzahl() - 1
+        DIM f AS JSON_HANDLE : f = JSON_PARSE("{}")
+        JSON_SET_STRING(f, "name", lwMuster.farben[i].garn.name)
+        JSON_SET_STRING(f, "nummer", lwMuster.farben[i].garn.nummer)
+        JSON_SET_STRING(f, "hersteller", lwMuster.farben[i].garn.hersteller)
+        JSON_SET_INT(f, "rgb", lwMuster.farben[i].garn.farbe)
+        JSON_SET_INT(f, "stiche", lwMuster.farben[i].stichzahl)
+        JSON_APPEND_JSON(m, "farben", f)
+    NEXT
+    RETURN JSON_STRINGIFY(m)
+END FUNCTION
+
+SUB pgTue(k AS INTEGER, j AS JSON_HANDLE)
+    SELECT CASE pgText$(j, "was")
+        CASE "meldung", "ausgabe" : statusMeldung(pgText$(j, "text"))
+        CASE "oeffnen"
+            IF ungesichertFragen("Öffnen") THEN
+                DIM ok AS BOOLEAN : ok = musterOeffnen(pgText$(j, "datei"))
+            END IF
+        CASE "stiche" : pgStiche(k, j)
+    END SELECT
+END SUB
+
+' Stiche setzen: Punkte (x, y, ...) mit je einer Farbe (Nummer im Muster,
+' -1 = leeren) auf der aktiven Ebene -- EIN Schritt fuer Rueckgaengig.
+SUB pgStiche(k AS INTEGER, j AS JSON_HANDLE)
+    IF NOT lwHat THEN RETURN
+    IF lwMuster.ebenen.aktiveEbene().gesperrt THEN
+        statusMeldung(trf$("Die Ebene „{0}“ ist gesperrt.", [lwMuster.ebenen.aktiveEbene().name]))
+        RETURN
+    END IF
+    DIM pp AS ARRAY OF INTEGER : pp = []
+    DIM ff AS ARRAY OF INTEGER : ff = []
+    DIM aa AS ARRAY OF INTEGER : aa = []
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = JSON_LEN(j, "farben")
+    FOR i = 0 TO n - 1
+        DIM x AS INTEGER : x = JSON_GET_INT(j, "punkte." + STR$(2 * i))
+        DIM y AS INTEGER : y = JSON_GET_INT(j, "punkte." + STR$(2 * i + 1))
+        DIM f AS INTEGER : f = JSON_GET_INT(j, "farben." + STR$(i))
+        IF x < 0 OR y < 0 OR x >= lwMuster.breite OR y >= lwMuster.hoehe THEN CONTINUE
+        IF f >= lwMuster.farbanzahl() THEN CONTINUE
+        ARRAY_PUSH(pp, x) : ARRAY_PUSH(pp, y) : ARRAY_PUSH(ff, f) : ARRAY_PUSH(aa, wzStichart)
+    NEXT
+    DIM text AS STRING : text = pgText$(j, "text")
+    IF text = "" THEN text = pgNamen[k]
+    DIM gesetzt AS INTEGER : gesetzt = kern.zellenSetzenJe(lwMuster, wzVerlauf, pp, ff, aa, text)
+    IF gesetzt > 0 THEN leinwandZellen(pp)
+    nachAenderung()
+    pgMerken("stiche " + STR$(gesetzt))
+END SUB
+
+' --- Im Logo-Menue -------------------------------------------------------------
+
+SUB pluginMenue(m AS INTEGER)
+    DIM eintrag AS INTEGER : eintrag = gtk_menu_item_new_with_label(tr$("Plugins"))
+    DIM unter AS INTEGER : unter = gtk_menu_new()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(pgBefKennung) - 1
+        DIM t AS STRING : t = pgBefTitel[i]
+        IF pgBefKuerzel[i] <> "" THEN t = t + "  (" + pgBefKuerzel[i] + ")"
+        DIM e AS INTEGER : e = gtk_menu_item_new_with_label(t)
+        signal(e, "activate", pgMenueGewaehlt, i, 0, 0)
+        gtk_menu_shell_append(unter, e)
+    NEXT
+    IF LEN(pgBefKennung) > 0 THEN gtk_menu_shell_append(unter, gtk_separator_menu_item_new())
+    pgMenuePunkt(unter, tr$("Plugins neu laden"), -1)
+    pgMenuePunkt(unter, tr$("Plugin-Ordner öffnen"), -2)
+    gtk_menu_item_set_submenu(eintrag, unter)
+    gtk_menu_shell_append(m, eintrag)
+END SUB
+
+SUB pgMenuePunkt(m AS INTEGER, text AS STRING, was AS INTEGER)
+    DIM e AS INTEGER : e = gtk_menu_item_new_with_label(text)
+    signal(e, "activate", pgMenueGewaehlt, was, 0, 0)
+    gtk_menu_shell_append(m, e)
+END SUB
+
+SUB pgMenueGewaehlt(w AS INTEGER, was AS INTEGER)
+    SELECT CASE was
+        CASE -1 : befehlAusfuehren("plugins_neu")
+        CASE -2 : befehlAusfuehren("plugins_ordner")
+        CASE ELSE : IF was >= 0 AND was < LEN(pgBefKennung) THEN pluginBefehl(pgBefKennung[was])
+    END SELECT
+END SUB

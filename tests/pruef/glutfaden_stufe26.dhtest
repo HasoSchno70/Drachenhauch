@@ -1,0 +1,124 @@
+' Glutfaden Stufe 26: andockbare Leisten (ansicht/leisten.dh -- vier
+' GTK-Notizbuecher einer Gruppe, Reiter ziehbar, ausserhalb losgelassen ein
+' eigenes Fenster) und Plugins (ansicht/plugins.dh -- dieselbe Leitung und
+' Bibliothek wie die IDE, ide/dh_plugin.dh, docs/ide-plugins.md).
+'
+' Das Ziehen selbst laesst sich ohne Maus nicht ausloesen; die Probe ruft
+' dieselben Wege (lsNach, leisteAbtrennen) und prueft Ort, Sichtbarkeit und
+' Stand. Das Plugin ist echt: ein zweiter Prozess, der ueber die Leitung
+' Befehle anmeldet, eine Leiste aus einer .dhform baut, das Muster liest,
+' Stiche setzt und am Ende absichtlich abstuerzt.
+
+=== einstellungen: anordnung der leisten und ausgeschaltete plugins
+IMPORT "helfer.dh"
+MKDIR("app")
+DIM e AS kern.Einstellungen : e = kern.einstellungenLaden(CWD$() + "/gibt-es-nicht.json")
+PRINT "vorgabe: '"; e.leistenStand; "' | '"; e.pluginsAus; "'"
+e = kern.einstellungenLaden(CWD$() + "/mit.json")
+PRINT "gelesen: "; e.leistenStand; " | "; e.pluginsAus
+DIM j AS JSON_HANDLE : j = JSON_PARSE(kern.einstellungenJson$(e))
+PRINT "geschrieben: "; JSON_GET_STRING(j, "panel_layout"); " | "; JSON_GET_STRING(j, "plugins_disabled")
+e = kern.einstellungenLaden(CWD$() + "/krumm.json")
+PRINT "krumm: '"; e.leistenStand; "' | '"; e.pluginsAus; "'"
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+--- datei mit.json
+{"panel_layout": "{\"orte\":{}}", "plugins_disabled": "todo,probe"}
+--- datei krumm.json
+{"panel_layout": 5, "plugins_disabled": ["a"]}
+--- erwartet
+vorgabe: '' | ''
+gelesen: {"orte":{}} | todo,probe
+geschrieben: {"orte":{}} | todo,probe
+krumm: '' | ''
+
+=== probe: leisten verschieben, abtrennen, zuruecksetzen und ein plugin
+IMPORT "helfer.dh"
+' --probe-stufe26 mit alle.pxs und dem Plugin "probe" im Einstellungsordner
+' (APPDATA/Glutfaden/plugins/probe): Leisten an andere Plaetze, Stand als
+' JSON und zurueck; das Plugin meldet drei Befehle und eine Leiste unten an,
+' der Kuerzel trifft (Teile in anderer Reihenfolge), Klick und Eingabe in
+' seiner Leiste kommen an, Stiche sind ein Schritt fuer Rueckgaengig, es
+' hoert "gesichert", ein Absturz blendet seine Leiste aus, ein Neustart
+' bringt sie wieder, ausgeschaltet startet es nicht.
+SETENV("APPDATA", CWD$() + "/app")
+SETENV("HOME", CWD$() + "/app")
+dlStarten(["run", BEISPIEL, "--", "--probe-stufe26", "--foto", "d", "alle.pxs"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT REPLACE$(dlAus, CHR$(13), "");
+    IF dlErr <> "" THEN PRINT "stderr: "; REPLACE$(dlErr, CHR$(13), "");
+    PRINT "leisten "; FILEEXISTS("d_leisten.png")
+    PRINT "datei unveraendert: "; READLINES("alle.pxs")[0] = READLINES("vorher.pxs")[0]
+    PRINT "kopie gesichert: "; FILEEXISTS("kopie.pxs")
+END IF
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- datei app/Glutfaden/plugins/probe/plugin.dh
+IMPORT "dh_plugin.dh"
+PLUGIN_BEFEHL("zaehlen", "Farben zählen", "Strg+Alt+K")
+PLUGIN_BEFEHL("sticken", "Ecke sticken")
+PLUGIN_BEFEHL("absturz", "Abstürzen")
+PLUGIN_LEISTE("leiste", "Probe", "leiste.dhform", "unten")
+PLUGIN_HOERE("gesichert")
+WHILE PLUGIN_LAEUFT()
+    SELECT CASE PLUGIN_EREIGNIS$()
+        CASE "befehl"
+            SELECT CASE PLUGIN_ID$()
+                CASE "zaehlen"
+                    DIM m AS JSON_HANDLE : m = JSON_PARSE(PLUGIN_MUSTER$())
+                    PLUGIN_SETZE("leiste", "info", "text", "farben " + STR$(JSON_LEN(m, "farben")) + " | " + STR$(JSON_GET_INT(m, "breite")) + "x" + STR$(JSON_GET_INT(m, "hoehe")) + " | " + JSON_GET_STRING(m, "name"))
+                CASE "sticken" : PLUGIN_STICHE([0, 0, 1, 0, 2, 0], [1, 1, 1], "Ecke")
+                CASE "absturz" : THROW "absichtlich"
+            END SELECT
+        CASE "klick" : PLUGIN_SETZE("leiste", "info", "text", "geklickt " + PLUGIN_WIDGET$())
+        CASE "geaendert" : PLUGIN_SETZE("leiste", "info", "text", "wert " + PLUGIN_WIDGET$() + " " + PLUGIN_WERT$())
+        CASE "ereignis" : PLUGIN_MELDUNG("gehoert " + PLUGIN_ID$() + " " + BASENAME(PLUGIN_DATEI$()))
+    END SELECT
+WEND
+--- datei app/Glutfaden/plugins/probe/leiste.dhform
+{"title": "Probe", "w": 260, "h": 120, "widgets": [
+ {"kind": "label", "name": "info", "text": "bereit", "x": 6, "y": 6, "w": 250, "h": 20},
+ {"kind": "button", "name": "knopf", "text": "Drücken", "x": 6, "y": 30, "w": 100, "h": 28},
+ {"kind": "textinput", "name": "feld", "text": "", "x": 112, "y": 30, "w": 140, "h": 28},
+ {"kind": "listbox", "name": "liste", "x": 6, "y": 62, "w": 250, "h": 52, "items": ["a", "b"]}
+]}
+--- datei alle.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- datei vorher.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T15:01:34.959073","pattern":{"name":"Vorschauprobe","width":14,"height":8,"fabric_count":14,"metadata":{},"colors":[{"name":"F0","color":"#C72B3B","manufacturer":"DMC","catalog_number":"100","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"f4062f9b"},{"name":"F1","color":"#5AA0D2","manufacturer":"DMC","catalog_number":"101","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"2cdb7352"},{"name":"F2","color":"#141414","manufacturer":"DMC","catalog_number":"102","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"40f34af3"},{"name":"F3","color":"#F0EADA","manufacturer":"DMC","catalog_number":"103","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"66fd920f"},{"name":"F4","color":"#3CAA50","manufacturer":"DMC","catalog_number":"104","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b9e37166"},{"name":"F5","color":"#FAC81E","manufacturer":"DMC","catalog_number":"105","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"4afc79a0"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,0],[8,0,2],[9,0,3],[10,0,4],[11,0,5],[12,0,0],[13,0,1],[0,1,1],[1,1,2],[3,1,4],[4,1,5],[5,1,0],[6,1,1],[7,1,2],[8,1,3],[10,1,5],[11,1,0],[12,1,1],[13,1,2],[0,2,2],[1,2,3],[2,2,4],[3,2,5],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,2,5],[10,2,0],[12,2,2],[13,2,3],[0,3,3],[1,3,4],[2,3,5],[3,3,0],[4,3,1],[5,3,2],[7,3,4],[8,3,5],[9,3,0],[10,3,1],[11,3,2],[12,3,3],[0,4,4],[2,4,0],[3,4,1],[4,4,2],[5,4,3],[6,4,4],[7,4,5],[9,4,1],[10,4,2],[11,4,3],[12,4,4],[13,4,5],[0,5,5],[1,5,0],[2,5,1],[4,5,3],[5,5,4],[6,5,5],[7,5,0],[8,5,1],[9,5,2],[11,5,4],[12,5,5],[13,5,0],[0,6,0],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,0],[7,6,1],[8,6,2],[9,6,3],[10,6,4],[11,6,5],[13,6,1],[1,7,2],[2,7,3],[3,7,4],[4,7,5],[5,7,0],[6,7,1],[8,7,3],[9,7,4],[10,7,5],[11,7,0],[12,7,1],[13,7,2]],"completed_stitches":[[5,0],[10,0],[3,1],[8,1],[13,1],[1,2],[6,2],[4,3],[9,3],[2,4],[7,4],[12,4],[0,5],[5,5],[3,6],[8,6],[13,6],[1,7],[6,7],[11,7]],"stitch_types":[[1,0,1],[2,0,2],[3,0,3],[4,0,4],[5,0,5],[6,0,6],[8,0,8],[9,0,9],[10,0,10],[11,0,11],[13,0,1],[0,1,2],[1,1,3],[3,1,5],[4,1,6],[5,1,7],[6,1,8],[7,1,9],[8,1,10],[11,1,1],[12,1,2],[13,1,3],[0,2,4],[1,2,5],[2,2,6],[3,2,7],[5,2,9],[6,2,10],[7,2,11],[9,2,1],[10,2,2],[12,2,4],[13,2,5],[0,3,6],[1,3,7],[2,3,8],[3,3,9],[4,3,10],[5,3,11],[7,3,1],[8,3,2],[9,3,3],[10,3,4],[11,3,5],[12,3,6],[0,4,8],[2,4,10],[3,4,11],[5,4,1],[6,4,2],[7,4,3],[9,4,5],[10,4,6],[11,4,7],[12,4,8],[13,4,9],[0,5,10],[1,5,11],[4,5,2],[5,5,3],[6,5,4],[7,5,5],[8,5,6],[9,5,7],[11,5,9],[12,5,10],[13,5,11],[1,6,1],[2,6,2],[3,6,3],[4,6,4],[6,6,6],[7,6,7],[8,6,8],[9,6,9],[10,6,10],[11,6,11],[13,6,1],[1,7,3],[2,7,4],[3,7,5],[4,7,6],[5,7,7],[6,7,8],[8,7,10],[9,7,11],[11,7,1],[12,7,2],[13,7,3]]},{"name":"Oben","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,1,4],[2,1,4],[6,3,4],[12,6,4],[13,7,4]],"completed_stitches":[[1,1]],"stitch_types":[[2,1,2],[12,6,9],[13,7,10]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,7,5],[1,7,5],[2,7,5],[3,7,5],[4,7,5],[5,7,5],[6,7,5],[7,7,5],[8,7,5],[9,7,5],[10,7,5],[11,7,5],[12,7,5],[13,7,5]],"completed_stitches":[[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[13,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":4,"y2":4,"color_index":1},{"x1":2,"y1":6,"x2":10,"y2":6,"color_index":3},{"x1":5,"y1":1,"x2":5,"y2":9,"color_index":9},{"x1":27,"y1":15,"x2":20,"y2":2,"color_index":0}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- erwartet
+rueckgabe 0
+plugin: probe läuft | befehle plugin:probe:zaehlen, plugin:probe:sticken, plugin:probe:absturz
+  kuerzel Strg+Alt+K,, | titel Farben zählen, Ecke sticken, Abstürzen
+  leiste unten | text bereit | knopf Drücken
+orte: uebersicht rechts_oben, muster rechts, info rechts, fortschritt rechts
+sichtbar: links aus, rechts_oben an, rechts an, unten an
+verschoben: uebersicht rechts_oben, muster rechts, info links, fortschritt schwebend | fenster 1
+  sichtbar: links an, rechts_oben an, rechts an, unten an
+stand: links info | schwebend fortschritt | unten plugin.probe.leiste
+zurueck: uebersicht rechts_oben, muster rechts, info rechts, fortschritt rechts | fenster 0 | vorn muster
+wieder: uebersicht rechts_oben, muster rechts, info links, fortschritt schwebend | fenster 1
+kuerzel trifft: TRUE | fremdes FALSE
+zaehlen: farben 6 | 14x8 | Vorschauprobe
+klick: geklickt knopf
+stiche: 3 | schritt 'Ecke' | geaendert TRUE
+  zurueck: TRUE
+eingabe: wert feld hallo
+ereignis: gehoert gesichert kopie.pxs
+absturz: abgestürzt | leiste unten sichtbar FALSE | unten FALSE
+  befehl ohne plugin: Das Plugin läuft nicht: probe
+neu: läuft | befehle 3 | leisten 1 | text bereit
+aus: aus | leitung TRUE | leiste sichtbar FALSE | Plugins neu geladen: 1
+stderr: Laufzeitfehler in plugin.dh:15: absichtlich
+leisten TRUE
+datei unveraendert: TRUE
+kopie gesichert: TRUE

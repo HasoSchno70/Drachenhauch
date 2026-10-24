@@ -1,0 +1,404 @@
+' Dock (GUI_DOCK, gui_dock.rs): Leisten links, rechts und unten, mehrere
+' als Reiter in einer Gruppe, Trennlinien, Ziehen an einen anderen Ort,
+' Abtrennen als schwebende Leiste, ein Fenster als Inhalt, Stand speichern.
+'
+' Der Aufbau steht in _hilfen/dockaufbau.dh (800x600, links Projekt und
+' Gliederung, unten Ausgabe|Terminal und Probleme, Rand 8, Kopf 22), die
+' Mauswege in _hilfen/dockmaus.dh -- die Lagen der Reiter kommen zur
+' Laufzeit aus GUI_DOCK_TAB_RECT, weil ihre Breite an der Schrift haengt.
+
+=== die vorgabe teilt die flaeche
+IMPORT "hilfe.dh"
+DIM n AS STRING
+FOR EACH n IN daNamen
+    PRINT n; ": "; daRect$(n); " "; GUI_DOCK_SHOWN(w, n); " "; GUI_DOCK_WHERE$(w, n)
+NEXT
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM b AS INTEGER
+DIM h AS INTEGER
+(x, y, b, h) = GUI_DOCK_CENTER(w)
+PRINT "mitte: "; x; " "; y; " "; b; " "; h
+PRINT "groessen "; GUI_DOCK_GET_SIZE(w, "links"); " "; GUI_DOCK_GET_SIZE(w, "unten")
+' Die Liste des hinteren Reiters liegt auf derselben Stelle -- getroffen
+' wird trotzdem die der vorderen, die hintere blendet das Dock aus.
+GUI_SET_BOUNDS(daListe[3], 10, 424, 384, 174)
+PRINT "getroffen wird die vordere liste "; GUI_HIT_TEST(100, 480) = daListe[2]
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+projekt: 8 22 224 173 TRUE links
+gliederung: 8 225 224 173 TRUE links
+ausgabe: 8 422 388 178 TRUE unten
+terminal: 0 0 0 0 FALSE unten
+probleme: 404 422 388 178 TRUE unten
+mitte: 240 0 560 398
+groessen 240 200
+getroffen wird die vordere liste TRUE
+
+=== ein klick auf einen reiter holt ihn nach vorn
+IMPORT "hilfe.dh"
+DIM bild AS INTEGER
+DIM geaendert AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DOCK_CHANGED(w) THEN
+        geaendert = geaendert + 1
+        daVerteilen()
+    END IF
+    bild = bild + 1
+    IF bild = 3 THEN
+        geaendert = 0
+        dmKlick(daReiterX("terminal"), daReiterY("terminal"))
+        dmSpielen()
+    END IF
+    IF bild = 30 THEN
+        PRINT "terminal "; daRect$("terminal"); " "; GUI_DOCK_SHOWN(w, "terminal")
+        PRINT "ausgabe "; GUI_DOCK_SHOWN(w, "ausgabe")
+        PRINT "gemeldet "; geaendert
+        PRINT "die liste darunter ist die des terminals "; GUI_HIT_TEST(100, 480) = daListe[3]
+        EXIT(0)
+    END IF
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+terminal 8 422 388 178 TRUE
+ausgabe FALSE
+gemeldet 1
+die liste darunter ist die des terminals TRUE
+
+=== ein reiter an den rechten rand gezogen bekommt den bereich dort
+IMPORT "hilfe.dh"
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DOCK_CHANGED(w) THEN daVerteilen()
+    bild = bild + 1
+    IF bild = 3 THEN
+        dmZug(daReiterX("probleme"), daReiterY("probleme"), 790, 200, 8)
+        dmSpielen()
+    END IF
+    IF bild = 40 THEN
+        PRINT "probleme "; GUI_DOCK_WHERE$(w, "probleme"); " "; daRect$("probleme")
+        PRINT "ausgabe "; daRect$("ausgabe")
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        DIM b AS INTEGER
+        DIM h AS INTEGER
+        (x, y, b, h) = GUI_DOCK_CENTER(w)
+        PRINT "mitte "; x; " "; y; " "; b; " "; h
+        EXIT(0)
+    END IF
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+probleme rechts 568 22 224 376
+ausgabe 8 422 784 178
+mitte 240 0 320 398
+
+=== ein reiter in die mitte gezogen schwebt und liegt obenauf
+IMPORT "hilfe.dh"
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DOCK_CHANGED(w) THEN daVerteilen()
+    bild = bild + 1
+    IF bild = 3 THEN
+        dmZug(daReiterX("ausgabe"), daReiterY("ausgabe"), 500, 200, 8)
+        dmSpielen()
+    END IF
+    IF bild = 40 THEN
+        PRINT "ausgabe "; GUI_DOCK_WHERE$(w, "ausgabe"); " "; daRect$("ausgabe")
+        PRINT "terminal kommt nach vorn "; GUI_DOCK_SHOWN(w, "terminal")
+        PRINT "in der schwebenden leiste "; GUI_HIT_TEST(600, 300) = daListe[2]
+        PRINT "daneben die mitte "; GUI_HIT_TEST(300, 100) = daMitte
+        EXIT(0)
+    END IF
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+ausgabe schwebend 471 211 306 197
+terminal kommt nach vorn TRUE
+in der schwebenden leiste TRUE
+daneben die mitte TRUE
+
+=== ein doppelklick auf den schwebenden kopf dockt wieder an
+IMPORT "hilfe.dh"
+GUI_DOCK_FLOAT(w, "ausgabe", 300, 100, 300, 200)
+daVerteilen()
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DOCK_CHANGED(w) THEN daVerteilen()
+    bild = bild + 1
+    IF bild = 3 THEN
+        PRINT "vorher "; GUI_DOCK_WHERE$(w, "ausgabe")
+        dmDoppel(300 + 300 - 30, 100 + 11)
+        dmSpielen()
+    END IF
+    IF bild = 30 THEN
+        PRINT "nachher "; GUI_DOCK_WHERE$(w, "ausgabe")
+        EXIT(0)
+    END IF
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+vorher schwebend
+nachher unten
+
+=== die trennlinie zieht den bereich breiter
+IMPORT "hilfe.dh"
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DOCK_CHANGED(w) THEN daVerteilen()
+    bild = bild + 1
+    IF bild = 3 THEN
+        dmZug(236, 300, 336, 300, 6)
+        dmSpielen()
+    END IF
+    IF bild = 30 THEN
+        PRINT "links "; GUI_DOCK_GET_SIZE(w, "links"); " "; daRect$("projekt")
+        EXIT(0)
+    END IF
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+links 340 8 22 324 173
+
+=== das kreuz blendet die leiste aus und meldet sie
+IMPORT "hilfe.dh"
+GUI_DOCK_CLOSABLE(w, "probleme", TRUE)
+DIM bild AS INTEGER
+DIM zu AS STRING
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DOCK_CHANGED(w) THEN daVerteilen()
+    IF GUI_DOCK_CLOSED$(w) <> "" THEN zu = zu + GUI_DOCK_CLOSED$(w) + ";"
+    bild = bild + 1
+    IF bild = 3 THEN
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        DIM b AS INTEGER
+        DIM h AS INTEGER
+        (x, y, b, h) = GUI_DOCK_TAB_RECT(w, "probleme")
+        dmKlick(x + b - 10, y + h \ 2)
+        dmSpielen()
+    END IF
+    IF bild = 30 THEN
+        PRINT "gemeldet "; zu
+        PRINT "jetzt "; GUI_DOCK_WHERE$(w, "probleme"); " "; GUI_DOCK_SHOWN(w, "probleme")
+        PRINT "ausgabe nimmt den platz "; daRect$("ausgabe")
+        GUI_DOCK_SHOW(w, "probleme", TRUE)
+        PRINT "wieder "; GUI_DOCK_WHERE$(w, "probleme"); " "; daRect$("probleme")
+        EXIT(0)
+    END IF
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+gemeldet probleme;
+jetzt zu FALSE
+ausgabe nimmt den platz 8 422 784 178
+wieder unten 404 422 388 178
+
+=== der stand geht hin und zurueck
+IMPORT "hilfe.dh"
+GUI_DOCK_MOVE(w, "probleme", "rechts")
+GUI_DOCK_FLOAT(w, "gliederung", 300, 120, 260, 180)
+GUI_DOCK_MOVE(w, "terminal", "links", "projekt")
+GUI_DOCK_SIZE(w, "rechts", 200)
+GUI_DOCK_SHOW(w, "terminal", FALSE)
+DIM stand AS STRING : stand = GUI_DOCK_STATE$(w)
+DIM vorher AS STRING
+DIM n AS STRING
+FOR EACH n IN daNamen
+    vorher = vorher + n + "=" + GUI_DOCK_WHERE$(w, n) + ":" + daRect$(n) + " "
+NEXT
+' alles zurueck in die Vorgabe ...
+GUI_DOCK_MOVE(w, "probleme", "unten")
+GUI_DOCK_MOVE(w, "gliederung", "links")
+GUI_DOCK_MOVE(w, "terminal", "unten", "ausgabe")
+' ... und den Stand wieder setzen
+GUI_DOCK_SET_STATE(w, stand)
+DIM nachher AS STRING
+FOR EACH n IN daNamen
+    nachher = nachher + n + "=" + GUI_DOCK_WHERE$(w, n) + ":" + daRect$(n) + " "
+NEXT
+PRINT "gleich "; vorher = nachher
+PRINT RTRIM$(vorher)
+' Ein zweites Dock, das die Leisten noch nicht kennt: eine spaeter
+' angemeldete findet den Platz, den der Stand ihr gab.
+DIM w2 AS GUI_WINDOW : w2 = GUI_WINDOW("zwei", 0, 0, 800, 600)
+GUI_DOCK(w2, 0, 0, 800, 600)
+GUI_DOCK_SET_STATE(w2, stand)
+GUI_DOCK_PANEL(w2, "probleme", "Probleme", "links")
+PRINT "spaeter angemeldet "; GUI_DOCK_WHERE$(w2, "probleme")
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+gleich TRUE
+projekt=links:8 22 224 376 gliederung=schwebend:301 142 258 157 ausgabe=unten:8 422 784 178 terminal=zu:0 0 0 0 probleme=rechts:608 22 184 376
+spaeter angemeldet rechts
+
+=== ein fenster als leiste liegt auf ihr und ueber dem gastfenster
+IMPORT "hilfe.dh"
+DIM w2 AS GUI_WINDOW : w2 = GUI_WINDOW("plugin", 0, 0, 200, 100)
+DIM knopf AS GUI_WIDGET : knopf = GUI_BUTTON(w2, "im plugin", 5, 5, 100, 30)
+GUI_DOCK_PANEL(w, "plugin", "Plugin", "rechts")
+GUI_DOCK_WINDOW(w, "plugin", w2)
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DOCK_CHANGED(w) THEN daVerteilen()
+    bild = bild + 1
+    IF bild = 3 THEN
+        PRINT "lage "; GUI_WINDOW_GET_X(w2); " "; GUI_WINDOW_GET_Y(w2); " "; GUI_WINDOW_GET_W(w2); " "; GUI_WINDOW_GET_H(w2); " "; daRect$("plugin")
+        PRINT "knopf getroffen "; GUI_HIT_TEST(575, 32) = knopf
+        ' ein Klick ins Gastfenster holt es nach vorn -- die Leiste bleibt darueber
+        dmKlick(400, 200)
+        dmSpielen()
+    END IF
+    IF bild = 20 THEN
+        PRINT "nach dem klick oben "; GUI_WINDOW_AT(600, 100) = w2
+        GUI_DOCK_TAB(w, "zweit", "Zweit", "plugin")
+        GUI_DOCK_ACTIVATE(w, "zweit")
+    END IF
+    IF bild = 22 THEN
+        PRINT "hinterer reiter "; GUI_WINDOW_SHOWN(w2)
+        EXIT(0)
+    END IF
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+lage 568 22 224 376 568 22 224 376
+knopf getroffen TRUE
+nach dem klick oben TRUE
+hinterer reiter FALSE
+
+=== eine schwebende leiste deckt die mitte zu
+IMPORT "hilfe.dh"
+GUI_DOCK_FLOAT(w, "ausgabe", 250, 250, 300, 120)
+daVerteilen()
+GUI_UPDATE()
+CLS(&H101820)
+GUI_DRAW()
+FLIP()
+GUI_UPDATE()
+CLS(&H101820)
+GUI_DRAW()
+FLIP()
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+--- bild
+300 330 nicht #C03030 +-60
+300 100 #C03030 +-60
+
+=== ohne die schwebende leiste ist dort die mitte
+' Die Gegenprobe zum Fall davor: dieselbe Stelle zeigt den roten Knopf.
+IMPORT "hilfe.dh"
+GUI_UPDATE()
+CLS(&H101820)
+GUI_DRAW()
+FLIP()
+GUI_UPDATE()
+CLS(&H101820)
+GUI_DRAW()
+FLIP()
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+--- bild
+300 330 #C03030 +-60
+
+=== ein unbekannter bereich ist ein fehler
+IMPORT "gui"
+SCREEN(200, 200, "T", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 200, 200)
+GUI_DOCK(w, 0, 0, 200, 200)
+GUI_DOCK_PANEL(w, "x", "X", "oben")
+--- fehler
+unbekannter Bereich 'oben'
+
+=== ein name gibt es nur einmal
+IMPORT "gui"
+SCREEN(200, 200, "T", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 200, 200)
+GUI_DOCK(w, 0, 0, 200, 200)
+GUI_DOCK_PANEL(w, "x", "X", "links")
+GUI_DOCK_PANEL(w, "X", "Noch eins", "unten")
+--- fehler
+eine Leiste 'X' gibt es schon
+
+=== ohne dock sagt die meldung, was fehlt
+IMPORT "gui"
+SCREEN(200, 200, "T", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 200, 200)
+GUI_DOCK_PANEL(w, "x", "X", "links")
+--- fehler
+das Fenster hat kein Dock -- erst GUI_DOCK(win, x, y, w, h)
+
+=== eine leiste, die es nicht gibt, nennt die vorhandenen
+IMPORT "gui"
+SCREEN(200, 200, "T", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 200, 200)
+GUI_DOCK(w, 0, 0, 200, 200)
+GUI_DOCK_PANEL(w, "eins", "Eins", "links")
+PRINT GUI_DOCK_SHOWN(w, "zwei")
+--- fehler
+keine Leiste 'zwei' im Dock (da sind: eins)

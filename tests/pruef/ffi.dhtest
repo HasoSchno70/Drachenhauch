@@ -1530,3 +1530,75 @@ PRINT strlen2("Drache")
 --- erwartet
 strlen: Bibliothek "$DH_PRUEF_FEHLT": die Umgebungsvariable DH_PRUEF_FEHLT ist nicht gesetzt -- vor dem ersten Aufruf mit SETENV den Pfad der Bibliothek eintragen
 6
+
+=== ein bereich ruft eine funktion, die einen rueckruf vergibt
+' Die Schleife in lauf haelt `gewicht` als Maschinencode-Bereich; sortiert$
+' bleibt in der VM und gibt vergleich an qsort -- der Rueckruf liest
+' `gewicht` mitten im Bereich. Der erste Rueckruf wird erst in der dritten
+' Runde vergeben, also NACHDEM der Bereich gebaut ist. Bis 2026.35 sah er
+' `gewicht` als NIL ("Index-Zugriff auf NIL"); jetzt lehnt schon der Bau
+' eine Funktion ab, die einen Rueckruf vergibt.
+DECLARE SUB qsort LIB "c" (feld AS BUFFER, n AS ZEIGER, groesse AS ZEIGER, _
+                           vergleich AS FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG)
+DIM gewicht[8] AS INTEGER
+DIM runden AS INTEGER
+FUNCTION vergleich(a AS INTEGER, b AS INTEGER) AS INTEGER
+    ' liest eine Globale, die die Schleife unten auch beruehrt
+    RETURN SGN(gewicht[BUFFER_GET_I32(BUFFER_AUS_ZEIGER(a, 4), 0)] - gewicht[BUFFER_GET_I32(BUFFER_AUS_ZEIGER(b, 4), 0)])
+END FUNCTION
+FUNCTION sortiert$() AS STRING
+    DIM b AS BUFFER : b = BUFFER_NEW(32)
+    DIM i AS INTEGER
+    FOR i = 0 TO 7
+        BUFFER_SET_I32(b, i * 4, i)
+    NEXT
+    qsort(b, 8, 4, vergleich)
+    DIM t AS STRING
+    FOR i = 0 TO 7
+        t = t + STR$(BUFFER_GET_I32(b, i * 4))
+    NEXT
+    RETURN t
+END FUNCTION
+SUB lauf()
+    DIM i AS INTEGER
+    DIM t AS STRING
+    FOR i = 1 TO 20
+        gewicht[i MOD 8] = 100 - i
+        runden = runden + 1
+        IF i > 2 THEN t = sortiert$()
+    NEXT
+    PRINT runden; " "; t
+END SUB
+lauf()
+--- erwartet
+20 43210765
+
+=== ein bereich, gebaut bevor ein rueckruf vergeben war
+' lauf wird zuerst ohne Rueckruf als Bereich gebaut; danach merkt sich die
+' C-Bibliothek einen (signal), und raise ruft ihn aus einer Funktion, die der
+' Bereich ueber die VM erreicht. Der Bereich wird beim naechsten Eintritt
+' verworfen, statt den Rueckruf auf leere Globale treffen zu lassen.
+DECLARE FUNCTION signal LIB "c" (nr AS LONG, f AS SUB(nr AS LONG)) AS ZEIGER
+DECLARE FUNCTION raise LIB "c" (nr AS LONG) AS LONG
+DIM zaehler[2] AS INTEGER
+SUB beimSignal(nr AS INTEGER)
+    PRINT "im rueckruf: "; zaehler[1]
+END SUB
+SUB ausloesen()
+    DIM r AS INTEGER : r = raise(2)
+END SUB
+SUB lauf(n AS INTEGER, mit AS BOOLEAN)
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        zaehler[1] = zaehler[1] + 1
+        IF mit AND i = n THEN ausloesen()
+    NEXT
+END SUB
+' gebaut, bevor ein Rueckruf vergeben ist
+lauf(10, FALSE)
+DIM alt AS INTEGER : alt = signal(2, beimSignal)
+lauf(10, TRUE)
+PRINT "danach: "; zaehler[1]
+--- erwartet
+im rueckruf: 20
+danach: 20

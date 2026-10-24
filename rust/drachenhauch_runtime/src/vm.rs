@@ -8654,6 +8654,55 @@ impl<'p> Vm<'p> {
             "gui_accordion_toggled" => Value::Int(self.gui.accordion_toggled(gi(a,0,"GUI_ACCORDION_TOGGLED")?)?),
             "gui_accordion_set" => { self.gui.accordion_set(gi(a,0,"GUI_ACCORDION_SET")?, &gs(a,1,"GUI_ACCORDION_SET")?, gi(a,2,"GUI_ACCORDION_SET")?)?; Value::Nil }
             "gui_accordion_set_height" => { self.gui.accordion_set_height(gi(a,0,"GUI_ACCORDION_SET_HEIGHT")?, gi(a,1,"GUI_ACCORDION_SET_HEIGHT")?, gi(a,2,"GUI_ACCORDION_SET_HEIGHT")?)?; Value::Nil }
+            // --- Dock (gui_dock.rs) ---
+            "gui_dock" => { self.gui.dock(gi(a,0,"GUI_DOCK")?, gi(a,1,"GUI_DOCK")? as i32, gi(a,2,"GUI_DOCK")? as i32,
+                gi(a,3,"GUI_DOCK")? as i32, gi(a,4,"GUI_DOCK")? as i32)?; Value::Nil }
+            "gui_dock_set" => { self.gui.dock_set(gi(a,0,"GUI_DOCK_SET")?, &gs(a,1,"GUI_DOCK_SET")?, gi(a,2,"GUI_DOCK_SET")? as i32)?; Value::Nil }
+            "gui_dock_panel" => { self.gui.dock_panel(gi(a,0,"GUI_DOCK_PANEL")?, &gs(a,1,"GUI_DOCK_PANEL")?, &gs(a,2,"GUI_DOCK_PANEL")?, &gs(a,3,"GUI_DOCK_PANEL")?)?; Value::Nil }
+            "gui_dock_tab" => { self.gui.dock_tab(gi(a,0,"GUI_DOCK_TAB")?, &gs(a,1,"GUI_DOCK_TAB")?, &gs(a,2,"GUI_DOCK_TAB")?, &gs(a,3,"GUI_DOCK_TAB")?)?; Value::Nil }
+            "gui_dock_add" => { self.gui.dock_add(gi(a,0,"GUI_DOCK_ADD")?, &gs(a,1,"GUI_DOCK_ADD")?, gi(a,2,"GUI_DOCK_ADD")?)?; Value::Nil }
+            "gui_dock_window" => { self.gui.dock_window(gi(a,0,"GUI_DOCK_WINDOW")?, &gs(a,1,"GUI_DOCK_WINDOW")?, gi(a,2,"GUI_DOCK_WINDOW")?)?; Value::Nil }
+            "gui_dock_rect" => {
+                let (x, y, w, h) = self.gui.dock_rect(gi(a,0,"GUI_DOCK_RECT")?, &gs(a,1,"GUI_DOCK_RECT")?)?;
+                Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
+            }
+            "gui_dock_tab_rect" => {
+                let (x, y, w, h) = self.gui.dock_tab_rect(gi(a,0,"GUI_DOCK_TAB_RECT")?, &gs(a,1,"GUI_DOCK_TAB_RECT")?)?;
+                Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
+            }
+            "gui_dock_head_rect" => {
+                let (x, y, w, h) = self.gui.dock_head_rect(gi(a,0,"GUI_DOCK_HEAD_RECT")?, &gs(a,1,"GUI_DOCK_HEAD_RECT")?)?;
+                Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
+            }
+            "gui_dock_share" => {
+                let f = match a.get(2) { Some(Value::Int(i)) => *i as f64, Some(Value::Float(f)) => *f,
+                    _ => return Err("GUI_DOCK_SHARE: erwartet (win, name$, anteil)".into()) };
+                self.gui.dock_share(gi(a,0,"GUI_DOCK_SHARE")?, &gs(a,1,"GUI_DOCK_SHARE")?, f)?; Value::Nil
+            }
+            "gui_dock_center" => {
+                let (x, y, w, h) = self.gui.dock_center(gi(a,0,"GUI_DOCK_CENTER")?)?;
+                Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
+            }
+            "gui_dock_shown" => Value::Bool(self.gui.dock_shown(gi(a,0,"GUI_DOCK_SHOWN")?, &gs(a,1,"GUI_DOCK_SHOWN")?)?),
+            "gui_dock_where$" | "gui_dock_where" => Value::str_rc(self.gui.dock_where(gi(a,0,"GUI_DOCK_WHERE$")?, &gs(a,1,"GUI_DOCK_WHERE$")?)?),
+            "gui_dock_show" => { self.gui.dock_show(gi(a,0,"GUI_DOCK_SHOW")?, &gs(a,1,"GUI_DOCK_SHOW")?, gbool(a,2,"GUI_DOCK_SHOW")?)?; Value::Nil }
+            "gui_dock_activate" => { self.gui.dock_activate(gi(a,0,"GUI_DOCK_ACTIVATE")?, &gs(a,1,"GUI_DOCK_ACTIVATE")?)?; Value::Nil }
+            "gui_dock_title" => { self.gui.dock_title(gi(a,0,"GUI_DOCK_TITLE")?, &gs(a,1,"GUI_DOCK_TITLE")?, &gs(a,2,"GUI_DOCK_TITLE")?)?; Value::Nil }
+            "gui_dock_closable" => { self.gui.dock_closable(gi(a,0,"GUI_DOCK_CLOSABLE")?, &gs(a,1,"GUI_DOCK_CLOSABLE")?, gbool(a,2,"GUI_DOCK_CLOSABLE")?)?; Value::Nil }
+            "gui_dock_closed$" | "gui_dock_closed" => Value::str_rc(self.gui.dock_closed(gi(a,0,"GUI_DOCK_CLOSED$")?)?),
+            "gui_dock_changed" => Value::Bool(self.gui.dock_changed(gi(a,0,"GUI_DOCK_CHANGED")?)?),
+            "gui_dock_area" => { self.gui.dock_area(gi(a,0,"GUI_DOCK_AREA")?, &gs(a,1,"GUI_DOCK_AREA")?, gbool(a,2,"GUI_DOCK_AREA")?)?; Value::Nil }
+            "gui_dock_area_shown" => Value::Bool(self.gui.dock_area_shown(gi(a,0,"GUI_DOCK_AREA_SHOWN")?, &gs(a,1,"GUI_DOCK_AREA_SHOWN")?)?),
+            "gui_dock_size" => { self.gui.dock_size(gi(a,0,"GUI_DOCK_SIZE")?, &gs(a,1,"GUI_DOCK_SIZE")?, gi(a,2,"GUI_DOCK_SIZE")? as i32)?; Value::Nil }
+            "gui_dock_get_size" => Value::Int(self.gui.dock_get_size(gi(a,0,"GUI_DOCK_GET_SIZE")?, &gs(a,1,"GUI_DOCK_GET_SIZE")?)? as i64),
+            "gui_dock_float" => { self.gui.dock_float(gi(a,0,"GUI_DOCK_FLOAT")?, &gs(a,1,"GUI_DOCK_FLOAT")?, gi(a,2,"GUI_DOCK_FLOAT")? as i32,
+                gi(a,3,"GUI_DOCK_FLOAT")? as i32, gi(a,4,"GUI_DOCK_FLOAT")? as i32, gi(a,5,"GUI_DOCK_FLOAT")? as i32)?; Value::Nil }
+            "gui_dock_move" => {
+                let neben = if a.len() > 3 { gs(a,3,"GUI_DOCK_MOVE")? } else { String::new() };
+                self.gui.dock_move(gi(a,0,"GUI_DOCK_MOVE")?, &gs(a,1,"GUI_DOCK_MOVE")?, &gs(a,2,"GUI_DOCK_MOVE")?, &neben)?; Value::Nil
+            }
+            "gui_dock_state$" | "gui_dock_state" => Value::str_rc(self.gui.dock_state(gi(a,0,"GUI_DOCK_STATE$")?)?),
+            "gui_dock_set_state" => { self.gui.dock_set_state(gi(a,0,"GUI_DOCK_SET_STATE")?, &gs(a,1,"GUI_DOCK_SET_STATE")?)?; Value::Nil }
             // --- Assistent ---
             "gui_wizard" => Value::Int(self.gui.wizard(gi(a,0,"GUI_WIZARD")?, gi(a,1,"GUI_WIZARD")? as i32,
                 gi(a,2,"GUI_WIZARD")? as i32, gi(a,3,"GUI_WIZARD")? as i32, gi(a,4,"GUI_WIZARD")? as i32)?),

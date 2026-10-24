@@ -3984,6 +3984,116 @@ dasselbe Fenster ohne Licht; der Rahmen-Fall sucht die hellste Stelle je
 Kante statt fester Pixel -- die Lage haengt an der Bildzeit); Gegenproben
 ohne Lampen- bzw. Rahmen-Zweig fallen.
 
+## Dock, Plugins und der Lichtstreif der IDE (2026-10-24)
+
+**Lichtstreif ohne Stottern:** mit einer offenen Datei (Sitzung oder
+Argument) pruefte die IDE sie gut eine halbe Sekunde nach dem Start -- bei
+18000 Zeilen hielt das EIN Bild 614 ms fest, der Streif sprang um ein
+Viertel. `Glanz::weiter` (gui.rs) geht hoechstens 50 ms je Bild weiter
+(`GLANZ_SCHRITT_MAX`), die faellige Pruefung wartet `NOT
+GUI_WINDOW_GLOWING(win)`, der Streif beim Start beginnt erst im vierten Bild
+(`glanzStartNachziehen`). Die Parameternamen fragen eingebaute Befehle nur
+mit dem Namen (`CODE_HOVER$(name, 1, 1)`, 0,05 ms) und lesen eigene
+Funktionen aus ihrer Kopfzeile (`kopfZeilenSammeln`); doppelte Namen gehen
+weiter ueber den Hover an der Stelle -- der kennt den Typ eines Objekts
+nicht (`ob.setz(` bekommt die Namen der ersten Klasse, schon vorher so).
+**Unter `DHRT_FRAMES` ist `DELTA()` fest 1/60** -- eine Bildzeit misst man
+mit `GET_TIME()`. Tests `werkzeug_ide_lichtstreif.dhtest` (3, je eine
+Gegenprobe faellt), Rust-Test `glanz_tests`.
+
+**Dock (`gui_dock.rs`, Untermodul der gui per `#[path]`, sieht ihre privaten
+Felder):** gehoert dem FENSTER (`Window::dock`), keine Widget-Art -- sonst
+muesste es in die Palette des Form-Designers. Bereiche links/rechts/unten,
+Gruppen mit Reitern, Trennlinien, schwebende Gruppen; alles aus EINER
+Rechnung `DockState::rechnen` (Zeichnen, Treffer, Zug, GUI_DOCK_RECT).
+Inhalt auf zwei Wegen: Widgets des Fensters (`GUI_DOCK_ADD`, `Widget::dock_von`;
+`widget_shown` blendet aus, `im_panel_sichtbar` -> `dock_frei` sperrt, was
+unter einer schwebenden Leiste liegt, `draw_window` zeichnet ihre Widgets
+in `dock_zeichnen_oben`) -- VERTEILEN tut sie das Programm in GUI_DOCK_RECT
+nach GUI_DOCK_CHANGED; oder ein ganzes Fenster (`GUI_DOCK_WINDOW`,
+`Window::dock_host`, `dock_ordnen` haelt es in `z_order` direkt hinter dem
+Gast, `bring_to_front` eines Kindes holt den Gast). `dock_pass` laeuft in
+`update` NACH `update_innen` (ein Reiterklick steht so schon in
+GUI_DOCK_CHANGED desselben Bildes); Ereignis = Aenderung der `unterschrift`.
+Stand als JSON in logischen Punkten; `vorgemerkt` setzt spaeter angemeldete
+Leisten (Plugins) an ihren alten Platz. Bekannt offen: schwebende
+Widget-Leiste unter einem angedockten FENSTER. 30 Befehle `GUI_DOCK*`,
+Tests `tests/pruef/gui_dock.dhtest` (15, Aufbau in `_hilfen/dockaufbau.dh`,
+Mauswege `_hilfen/dockmaus.dh`; vier Verfaelschungen fallen je in ihrem
+Fall -- die erste Fassung des Ausblende-Falls war wertlos, weil die hintere
+Liste ohne Rechteck gar nicht unter der vorderen lag), 4 Rust-Tests.
+
+**Die IDE im Dock:** links Projekt + Gliederung, unten Ausgabe/Terminal und
+Probleme/Debugger als Reiter (die Knoepfe "Ausgabe"/"Terminal" sind weg,
+der Debugger-Reiter ist nur beim Debuggen da). `layout()` setzt das
+Rechteck, `layoutLeisten` verteilt in GUI_DOCK_RECT, Kopf-Widgets (Filter,
+Zaehler, Abbrechen) in GUI_DOCK_HEAD_RECT; die Mitte kommt aus
+GUI_DOCK_CENTER. Vorgabe = alte Maße (links 220, unten 202, Rand 8, Kopf 22)
+-- 378 von 382 IDE-Faellen liefen unveraendert. Anordnung in ide.json
+`dock`, **Ansicht -> Leisten zuruecksetzen** (`dockVorgabe`). Falle: eine
+`CATCH e` auf oberster Ebene kollidiert mit globalem `e` weiter unten.
+
+**Plugins (docs/ide-plugins.md):** eigene Programme `plugins/<name>/plugin.dh`
+neben der ide.json, gestartet mit `WINDOW_OPEN` (TCP-Leitung, JSON-Zeilen),
+die Seite des Plugins ist `ide/dh_plugin.dh` (NICHT `plugin.dh` -- sonst
+importierte der Einstieg sich selbst), gefunden ueber `DH_PATH`, das die IDE
+setzt (`pluginPfadSetzen`; in Pruefungen liegt die IDE-Kopie in
+`_programm/`, darum ersatzweise `wurzel/ide`). Befehle (`plugin:<p>:<id>`
+ueber `menueBefehl`/`paletteEintrag`, Menue **Plugins** am Ende der Leiste),
+Leisten (`GUI_FROM_JSON` + `GUI_DOCK_WINDOW`, Widgets ueber ihre NUMMER in
+der Form -- die Laufzeit liest `name` nicht, die Bibliothek bildet ihn ab),
+Ereignisse (`pluginEreignis`: gesichert, geoeffnet, reiter, gestartet,
+beendet, geprueft), Fragen/Antworten, Befunde in `pruefen`, Schnipsel in
+`schnipselLaden`, Faerbung in `faerben` (`pluginFaerben`). Absturz =
+`WINDOW_ALIVE` FALSE -> `pluginStoppen`. Die Plugin-Variablen stehen OBEN
+(hinter `konfigFalsch`), weil Sitzung/Schnipsel sie beim Start lesen.
+`dhrt pruef namen` kennt die SUBs/FUNCTIONs aus `pruef::BIBLIOTHEKEN`
+(`ide/dh_plugin.dh`). Beispiel `examples/plugins/todo/`, Tests
+`tests/pruef/werkzeug_ide_plugins.dhtest` (4; drei Verfaelschungen fallen).
+
+**Glutfaden Stufe 26 (selber Tag): Leisten und Plugins.** `ansicht/leisten.dh`:
+vier GtkNotebooks einer Gruppe (`gtk_notebook_set_group_name`, Reiter
+detachable/reorderable) -- links, rechts_oben, rechts, unten; `create-window`
+(Rueckruf mit ZEIGER-Rueckgabe) gibt einem ausserhalb losgelassenen Reiter
+ein Werkzeugfenster, dessen Kreuz die Leisten heimschickt. Ein Platz ohne
+SICHTBARE Seite ist aus (`lsSichtbareSeiten` -- ein ausgeblendeter Reiter
+eines Plugins zaehlt nicht), waehrend eines Zugs alle an. Verschoben wird per
+`g_object_ref` + remove + append, das Widget bleibt dasselbe. Anordnung in
+den Einstellungen (`panel_layout`, am ENDE der Datei geschrieben, sonst
+verschob sich jede bestehende Einstellungsdatei), "Leisten zuruecksetzen" im
+Logo-Menue. **Drei Fallen:** (1) beim Ende raeumt GTK die Notizbuecher
+nacheinander ab und jedes meldet page-removed -- `leistenEnde()` in
+`fensterZu` stellt die Handler ab, sonst Gtk-CRITICAL in stderr (jede Probe
+rot); (2) `switch-page` kommt BEVOR die neue Seite vorn ist -- nachgezogen
+wird im Takt danach, `seitenleisteReiter` zieht selbst nach; (3) eine Leiste
+mit fester Hoehe (Uebersicht, Plugin-Form) gehoert NICHT in einen
+Rollbereich: dessen Mindesthoehe ist 0, und die Teilung drueckte sie zum
+Streifen (gesehen nur im Bild). `ansicht/plugins.dh`: dieselbe Leitung und
+Bibliothek wie die IDE (`DH_PATH` auf `../../ide`, Installation `ide/` neben
+der Laufzeit), Takt `g_timeout_add(50)`, die `.dhform` als GtkFixed
+nachgebaut (label/button/textinput/checkbox/toggle/slider/listbox/dropdown),
+Befehle im Logo-Menue unter Plugins und im Tastenweg nach den eigenen
+Kuerzeln, Ereignisse gesichert/geoeffnet/geaendert, neu in `dh_plugin.dh`
+`PLUGIN_MUSTER$` und `PLUGIN_STICHE` (ein Schritt ueber
+`kern.zellenSetzenJe`), ausgeschaltet ueber `plugins_disabled`. Eine Frage
+wird auch bei einem Fehler beantwortet. Tests
+`tests/pruef/glutfaden_stufe26.dhtest` (2; echtes Plugin; sechs
+Verfaelschungen fallen); die Befehlstafel hat 80 Eintraege.
+
+**Fund in der Laufzeit dabei (Maschinencode + FFI-Rueckrufe):** ein
+Schleifenbereich im Wertemodus haelt Globale in seinen Plaetzen; rief er eine
+VM-Funktion, die eine Bibliothek aufruft, und die Bibliothek rief einen
+Rueckruf (GTK page-removed bei `gtk_notebook_remove_page`, qsort mit
+Vergleich), sah der Rueckruf diese Globalen als NIL ("Index-Zugriff auf
+NIL"). `gerufenes_harmlos` lehnt jetzt Gerufenes ab, das einen Rueckruf
+VERGIBT (eine Konstante mit Rueckruf-Signatur, `ffi::signatur_mit_rueckruf`)
+oder `__ffi` ruft, sobald Rueckrufe vergeben sind; und ein Bereich, der vorher
+gebaut wurde und `__ffi` erreicht (`erreicht_ffi`, `Schleife::ffi_gerufen`),
+wird beim naechsten Eintritt verworfen. Faelle in `tests/pruef/ffi.dhtest`
+("ein bereich ruft eine funktion, die einen rueckruf vergibt", "... gebaut
+bevor ein rueckruf vergeben war" -- `signal`/`raise` der C-Bibliothek, die
+sich einen Rueckruf merkt); gegen den Bau davor fallen beide.
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.

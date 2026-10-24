@@ -157,7 +157,7 @@ CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 CONST GLUTORDNER = "{sammlung}/../../examples/glutfaden"
 --- erwartet
 tafel ueber 1500: TRUE | doppelt 0 | leer 0
-dateien ueber 20: TRUE | texte ueber 1500: TRUE | kuerzel-namen 77 | aus kern-listen ueber 100: TRUE
+dateien ueber 20: TRUE | texte ueber 1500: TRUE | kuerzel-namen 80 | aus kern-listen ueber 100: TRUE
 fehlen in der tafel: 0
 andere platzhalter: 0
 falsch eingepackt: 0
@@ -272,7 +272,7 @@ kuerzel: Ctrl+Shift+S | Ctrl+Z | Ctrl+Shift+Del, Alt+PgUp, Space
 zahlen: 1,234,567.89 | 2.5 | 400,000
 tooltip mit kuerzel: Save (Ctrl+S) -- Save as: Ctrl+Shift+S
 hauptfenster: 631 texte, deutsch aussehend 0
-f1: 143 texte, deutsch aussehend 0
+f1: 146 texte, deutsch aussehend 0
   f1-zeile: Save as -> Ctrl+Shift+S
   f1-zeile: Undo -> Ctrl+Z
 einstellungen: sprache 0 'Automatic (system language)'
@@ -284,8 +284,8 @@ dialoge:
   versionen: 9 texte, deutsch aussehend 0
   vorlage sichern: 9 texte, deutsch aussehend 0
   vorlagen: 4 texte, deutsch aussehend 0
-  neuigkeiten: 18 texte, deutsch aussehend 0
-  einstellungen: 284 texte, deutsch aussehend 0
+  neuigkeiten: 20 texte, deutsch aussehend 0
+  einstellungen: 287 texte, deutsch aussehend 0
   raster: 18 texte, deutsch aussehend 0
   statistik: 118 texte, deutsch aussehend 0
   heatmap: 8 texte, deutsch aussehend 0

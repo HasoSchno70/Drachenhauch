@@ -85,6 +85,8 @@ IMPORT "ansicht/farbdialog.dh"
 IMPORT "ansicht/einstellungsdialog.dh"
 IMPORT "ansicht/leinwand.dh"
 IMPORT "ansicht/seitenleiste.dh"
+IMPORT "ansicht/leisten.dh"
+IMPORT "ansicht/plugins.dh"
 IMPORT "ansicht/flaechenteile.dh"
 IMPORT "ansicht/farbleiste.dh"
 IMPORT "ansicht/willkommen.dh"
@@ -274,6 +276,7 @@ SUB nachAenderung()
     seitenleisteZahlen()
     zustandNachziehen()
     statusNachziehen()
+    pluginEreignis("geaendert", musterPfad)
 END SUB
 
 ' Nach Rueckgaengig und Umbauten: Bild und Seitenleiste ganz neu.
@@ -380,6 +383,7 @@ FUNCTION musterOeffnen(pfad AS STRING) AS BOOLEAN
     zuletztMerken(pfad)
     ' liegt ein neuerer automatisch gesicherter Stand daneben?
     IF NOT fremd THEN asNebenDatei(pfad)
+    pluginEreignis("geoeffnet", pfad)
     RETURN TRUE
 END FUNCTION
 
@@ -405,6 +409,7 @@ FUNCTION musterSichern(pfad AS STRING) AS BOOLEAN
     IF schonDa THEN vwSchnappschussWennFaellig()
     autosicherungWeg(pfad)
     zuletztMerken(pfad)
+    pluginEreignis("gesichert", pfad)
     RETURN TRUE
 END FUNCTION
 
@@ -547,6 +552,8 @@ SUB einpassenGeklickt(knopf AS INTEGER, daten AS INTEGER) : leinwandEinpassen() 
 ' Sicherung wegraeumen (wer ohne Sichern schliesst, hat sich entschieden).
 SUB fensterZu(objekt AS INTEGER, daten AS INTEGER)
     einstellungenBeimEnde()
+    pluginsBeenden()
+    leistenEnde()
     autosichernEnde()
     gtk_main_quit()
 END SUB
@@ -570,6 +577,9 @@ SUB ueberGeklickt(knopf AS INTEGER, daten AS INTEGER)
     ueberPunkt(m, tr$("Über Glutfaden …"), 0)
     ueberPunkt(m, tr$("Neu in Glutfaden …"), 1)
     ueberPunkt(m, trf$("Tastenkürzel ({0}) …", [kz$("tastenkuerzel")]), 2)
+    gtk_menu_shell_append(m, gtk_separator_menu_item_new())
+    ueberPunkt(m, tr$("Leisten zurücksetzen"), 3)
+    pluginMenue(m)
     gtk_widget_show_all(m)
     gtk_menu_popup_at_widget(m, knopf, GDK_SCHWERE_UNTEN_LINKS, GDK_SCHWERE_OBEN_LINKS, 0)
 END SUB
@@ -585,6 +595,7 @@ SUB ueberGewaehlt(w AS INTEGER, was AS INTEGER)
         CASE 0 : ueberZeigen()
         CASE 1 : neuigkeitenDialog()
         CASE 2 : befehlAusfuehren("tastenkuerzel")
+        CASE 3 : befehlAusfuehren("leisten_zurueck")
     END SELECT
 END SUB
 
@@ -592,7 +603,7 @@ SUB ueberZeigen()
     DIM f AS INTEGER
     DIM bild AS INTEGER : bild = gdk_pixbuf_new_from_file_at_size(PATHJOIN(CWD$(), LOGO), 128, 128, f)
     IF bild = 0 THEN g_error_free(f)
-    gtk_show_about_dialog(fenster, "program-name", tr$("Glutfaden"), "logo", bild, "version", tr$("Stufe 25"), _
+    gtk_show_about_dialog(fenster, "program-name", tr$("Glutfaden"), "logo", bild, "version", tr$("Stufe 26"), _
         "comments", tr$("Kreuzstich-Muster ansehen und bearbeiten -- eine Portierung von PySticky nach Drachenhauch und GTK 3."), _
         "website", "https://github.com/HasoSchno70/Pysticky", "website-label", tr$("PySticky (das Original)"), 0)
 END SUB
@@ -693,10 +704,18 @@ SUB befehlAusfuehren(kennung AS STRING)
             einst.lineale = NOT einst.lineale
             flLinealeZeigen(einst.lineale)
             einstellungenMerken()
+        CASE "leisten_zurueck" : leistenZuruecksetzen()
+        CASE "plugins_neu" : pluginsNeuLaden()
+        CASE "plugins_ordner"
+            DIM po AS STRING : po = pluginOrdner$()
+            IF NOT DIREXISTS(po) THEN MKDIR(po)
+            OPENDOC(po)
         CASE "uebersicht"
             einst.uebersicht = NOT einst.uebersicht
             minikarteZeigen(einst.uebersicht)
             einstellungenMerken()
+        CASE ELSE
+            IF LEFT$(kennung, 7) = "plugin:" THEN pluginBefehl(kennung)
     END SELECT
 END SUB
 
@@ -724,6 +743,7 @@ FUNCTION taste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
         befehlAusfuehren(einstTafel[k])
         RETURN TRUE
     END IF
+    IF pluginKuerzel(k) THEN RETURN TRUE
     IF NOT strg AND NOT alt AND NOT umschalt THEN
         IF leinwandPfeil(t) THEN RETURN TRUE
     END IF
@@ -871,6 +891,8 @@ gtk_paned_pack1(teilung, willkommenStapel(linksBox), TRUE, FALSE)
 gtk_paned_pack2(teilung, seitenleisteNeu(), FALSE, FALSE)
 ' Die Seitenleiste behaelt ihre Breite, der Rest gehoert der Zeichenflaeche
 gtk_paned_set_position(teilung, MAX(600, fensterBreite - 400))
+' Rundherum die Plaetze links und unten (Stufe 26, ansicht/leisten.dh)
+DIM aussen AS INTEGER : aussen = leistenRahmen(teilung)
 status = gtk_label_new("")
 gtk_label_set_xalign(status, 0.0)
 gtk_label_set_ellipsize(status, GTK_ELLIPSE_ENDE)
@@ -892,7 +914,7 @@ gtk_box_pack_start(statuszeile, status, TRUE, TRUE, 0)
 gtk_box_pack_start(statuszeile, zoomRegler, FALSE, FALSE, 0)
 gtk_box_pack_start(statuszeile, zoomProzent, FALSE, FALSE, 0)
 gtk_box_pack_start(spalte, werkzeugzeile, FALSE, FALSE, 0)
-gtk_box_pack_start(spalte, teilung, TRUE, TRUE, 0)
+gtk_box_pack_start(spalte, aussen, TRUE, TRUE, 0)
 gtk_box_pack_start(spalte, statuszeile, FALSE, FALSE, 0)
 gtk_container_add(fenster, spalte)
 
@@ -914,6 +936,9 @@ ablageEinrichten(fenster)
 signalEreignis(fenster, "delete-event", schliessenAngefragt, 0, 0, 0)
 signal(fenster, "destroy", fensterZu, 0, 0, 0)
 gtk_widget_show_all(fenster)
+' Die gemerkte Anordnung der Leisten; leere Plaetze aus
+leistenStandSetzen(einst.leistenStand)
+lsSichtbarkeit()
 flLinealeZeigen(einst.lineale)
 minikarteZeigen(einst.uebersicht)
 farbleisteZeigen(einst.farbleiste)
@@ -973,6 +998,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe22"
     ELSEIF ARG$(a) = "--probe-stufe23" THEN
         probe = "stufe23"
+    ELSEIF ARG$(a) = "--probe-stufe26" THEN
+        probe = "stufe26"
     ELSEIF ARG$(a) = "--probe-sprache" THEN
         probe = "sprache"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
@@ -1010,6 +1037,8 @@ ELSE
 END IF
 ' Werkzeug beim Start (Einstellungen -> Werkzeuge)
 werkzeugWaehlen(IIF(einst.werkzeugMerken, einst.letztesWerkzeug, einst.startWerkzeug), FALSE)
+' Plugins aus dem Einstellungsordner (plugins/<name>/plugin.dh)
+pluginsStarten()
 
 IMPORT "ansicht/vorfuehrung.dh"
 ' Die Fotoproben vor Stufe 16 zaehlen Farben im Bereich der Zeichenflaeche --
@@ -1043,6 +1072,7 @@ IF probe = "stufe20" THEN g_timeout_add(300, vorfuehrenStufe20, 0)
 IF probe = "stufe21" THEN g_timeout_add(300, vorfuehrenStufe21, 0)
 IF probe = "stufe22" THEN g_timeout_add(300, vorfuehrenStufe22, 0)
 IF probe = "stufe23" THEN g_timeout_add(300, vorfuehrenStufe23, 0)
+IF probe = "stufe26" THEN g_timeout_add(300, vorfuehrenStufe26, 0)
 IF probe = "sprache" THEN g_timeout_add(300, vorfuehrenSprache, 0)
 ' Alle fuenf Minuten ein Schnappschuss, wenn etwas ungesichert ist
 DIM takt AS INTEGER : takt = g_timeout_add(300000, vwTakt, 0)
