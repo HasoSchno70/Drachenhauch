@@ -272,7 +272,7 @@ CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 rueckgabe 0
 start: lineale TRUE/TRUE uebersicht TRUE verlaufsleiste FALSE | werkzeuge 15 | GRADIENT D
 uebersicht: 14 × 8 Stiche
-minikarte: bild 234x134 bei 82,8 | ausschnitt 82,8 233x133
+minikarte: bild 234x134 bei 80,8 | ausschnitt 80,8 233x133
 lineal: spalte 10 in der mitte TRUE | zeile 3 TRUE
 minikarte: ecke in der mitte TRUE
 zentriert: TRUE zelle 30.0

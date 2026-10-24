@@ -734,6 +734,7 @@ END SUB
 ' Beim Ende: was sich gemerkt wird
 SUB einstellungenBeimEnde()
     einst.letztesWerkzeug = wzAktiv
+    einst.leistenStand = leistenStand$()
     einstellungenMerken()
 END SUB
 

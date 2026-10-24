@@ -1040,12 +1040,19 @@ static FREMDER_FADEN: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(N
 /// Ohne das Feature ruft der Aufruf ohnehin nichts.
 pub fn ohne_drachenhauch_code(a: &[Value]) -> bool {
     let Some(Value::Str(text)) = a.first() else { return false };
-    let params = text.rsplit(TRENNER).next().unwrap_or("");
-    if params.split(',').any(|p| p.starts_with('r')) { return false; }
+    if signatur_mit_rueckruf(text) { return false; }
     #[cfg(feature = "ffi")]
     { ZUSTAND.with(|z| z.borrow().rueckrufe.is_empty()) }
     #[cfg(not(feature = "ffi"))]
     true
+}
+
+/// Nimmt die Signatur (der Text, den der Compiler als erstes Argument von
+/// `__ffi` ablegt) einen Rueckruf? Dann vergibt der Aufruf womoeglich einen.
+pub fn signatur_mit_rueckruf(text: &str) -> bool {
+    if !text.contains(TRENNER) { return false; }
+    let params = text.rsplit(TRENNER).next().unwrap_or("");
+    params.split(',').any(|p| p.starts_with('r'))
 }
 
 /// Hat das Programm schon einen Rueckruf vergeben? Dann baut der

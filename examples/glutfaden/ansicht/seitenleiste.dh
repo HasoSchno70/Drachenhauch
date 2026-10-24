@@ -42,34 +42,37 @@ DIM slKnoepfe AS ARRAY OF INTEGER         ' neu, loeschen, duplizieren, hoch, ru
 DIM slNurAktiv AS INTEGER                 ' Kaestchen "Nur aktive"
 DIM slAbdunkeln AS INTEGER                ' Kaestchen "Andere abdunkeln"
 
+' Die Seitenleiste ist seit Stufe 26 kein fester Block mehr, sondern vier
+' andockbare Leisten (ansicht/leisten.dh): Uebersicht, Muster, Info und
+' Fortschritt. Jede steht in einem rollbaren Bereich, damit sie auch links,
+' unten oder schwebend passt. Zurueck kommt der rechte Rand (oben die
+' Uebersicht, darunter die drei Reiter).
 FUNCTION seitenleisteNeu() AS INTEGER
-    DIM rolle AS INTEGER : rolle = gtk_scrolled_window_new(0, 0)
-    gtk_scrolled_window_set_policy(rolle, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
-    gtk_widget_set_size_request(rolle, 300, -1)
-    gtkKlasse(rolle, "seitenleiste")
-    slBox = gtk_box_new(GTK_SENKRECHT, 0)
-    gtk_container_add(rolle, slBox)
-    gtk_box_pack_start(slBox, minikarteNeu(), FALSE, FALSE, 0)
-    ' Drei Reiter; jeder so hoch wie er selbst (nicht wie der hoechste)
-    slStapel = gtk_stack_new()
-    gtk_stack_set_vhomogeneous(slStapel, FALSE)
+    DIM rand AS INTEGER : rand = leistenRechts()
+    slBox = 0
+    slStapel = 0
     slMusterSeite = gtk_box_new(GTK_SENKRECHT, 0)
-    gtk_stack_add_titled(slStapel, slMusterSeite, "muster", tr$("Muster"))
-    gtk_stack_add_titled(slStapel, infoleisteNeu(), "info", tr$("Info"))
-    gtk_stack_add_titled(slStapel, fortschrittleisteNeu(), "fortschritt", tr$("Fortschritt"))
-    DIM umschalter AS INTEGER : umschalter = gtk_stack_switcher_new()
-    gtk_stack_switcher_set_stack(umschalter, slStapel)
-    gtk_widget_set_halign(umschalter, GTK_AUSRICHTEN_MITTE)
-    gtkKlasse(umschalter, "reiter")
-    gtk_box_pack_start(slBox, umschalter, FALSE, FALSE, 6)
-    gtk_box_pack_start(slBox, slStapel, FALSE, FALSE, 0)
-    signalZeile(slStapel, "notify::visible-child-name", slReiterGewechselt, 0, 0, 0)
+    ' die Uebersicht ohne Rollbereich: ihre feste Hoehe ist die Mindesthoehe
+    ' des Platzes, sonst druckte die Teilung sie zu einem Streifen zusammen
+    leisteAnmelden("uebersicht", tr$("Übersicht"), minikarteNeu(), "rechts_oben")
+    leisteAnmelden("muster", tr$("Muster"), slRolle(slMusterSeite), "rechts")
+    leisteAnmelden("info", tr$("Info"), slRolle(infoleisteNeu()), "rechts")
+    leisteAnmelden("fortschritt", tr$("Fortschritt"), slRolle(fortschrittleisteNeu()), "rechts")
+    leisteZeigen("muster")
     slEbenenKnoepfe = []
     slSchrift = pango_font_description_from_string("DejaVu Sans Bold 11")
     slPaletten = kern.palettenLaden(PATHJOIN(CWD$(), "daten/paletten"))
     slSymbole = kern.symboleLaden(PATHJOIN(CWD$(), "daten/symbole.txt"))
     slKatZeilen = []
     slKatGarne = []
+    RETURN rand
+END FUNCTION
+
+' Eine Leiste in einem senkrecht rollbaren Bereich.
+FUNCTION slRolle(inhalt AS INTEGER) AS INTEGER
+    DIM rolle AS INTEGER : rolle = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_policy(rolle, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+    gtk_container_add(rolle, inhalt)
     RETURN rolle
 END FUNCTION
 
@@ -336,22 +339,19 @@ SUB seitenleisteMuster(m AS kern.Muster)
     ilNachziehen()
 END SUB
 
-SUB slReiterGewechselt(stapel AS INTEGER, pspec AS INTEGER, daten AS INTEGER)
+' Eine Leiste nach vorn holen: "muster", "info", "fortschritt", "uebersicht"
+SUB seitenleisteReiter(name AS STRING)
+    leisteZeigen(name)
     ilNachziehen()
 END SUB
 
-' Einen Reiter zeigen: "muster", "info" oder "fortschritt"
-SUB seitenleisteReiter(name AS STRING)
-    IF slStapel <> 0 THEN gtk_stack_set_visible_child_name(slStapel, name)
-END SUB
-
-' Info und Fortschritt: nur der sichtbare Reiter wird nachgezogen
+' Info und Fortschritt: nur, was vorn in seinem Notizbuch steht, wird
+' nachgezogen -- seit Stufe 26 koennen beide zugleich zu sehen sein.
 SUB ilNachziehen()
     fortschrittModusNachziehen()
-    IF slStapel = 0 OR NOT lwHat THEN RETURN
-    DIM s AS STRING : s = gtk_stack_get_visible_child_name(slStapel)
-    IF s = "info" THEN infoleisteNachziehen()
-    IF s = "fortschritt" THEN fortschrittleisteNachziehen()
+    IF NOT lwHat THEN RETURN
+    IF leisteVorn("info") THEN infoleisteNachziehen()
+    IF leisteVorn("fortschritt") THEN fortschrittleisteNachziehen()
 END SUB
 
 ' Die Palette zum Muster: der Hersteller der ersten Farbe, sonst die aus den

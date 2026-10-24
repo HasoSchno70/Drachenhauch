@@ -3,6 +3,11 @@
 # below, blank lines separate paragraphs, lines starting with # are comments.
 # The newest stage is at the top.
 
+## 🧩 Stage 26: Panels and plugins
+Overview, Pattern, Info and Progress are panels: dragged by their tab they move to the left, right, bottom or into a window of their own, and Glutfaden remembers the arrangement. "Reset panels" in the logo menu brings back the old one.
+
+Plugins are Drachenhauch programs of their own in the "plugins" folder of the settings (logo menu → Plugins → Open the plugin folder). They get commands with shortcuts, a panel of their own, hear saving and opening, read the pattern and set stitches – one step for undo. A plugin that crashes does not take Glutfaden down with it.
+
 ## 🌍 Stage 25: English in every dialog
 All dialogs now speak English too, and so do the outputs: PDF and HTML instructions, statistics as CSV, stitch plan and package. Messages while reading other pattern formats and the history (Undo: …) follow the language as well.
 

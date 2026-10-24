@@ -495,6 +495,29 @@ DECLARE FUNCTION signalZeile LIB GOBJECT ALIAS "g_signal_connect_data" _
     (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, zeile AS ZEIGER, daten AS ZEIGER), _
      daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
 DECLARE SUB g_object_unref LIB GOBJECT (objekt AS ZEIGER)
+DECLARE FUNCTION g_object_ref LIB GOBJECT (objekt AS ZEIGER) AS ZEIGER
+' --- Andockbare Leisten (Stufe 26, ansicht/leisten.dh): Notizbuecher einer
+' Gruppe tauschen ihre Reiter per Ziehen; fallen gelassen ausserhalb fragt
+' GTK mit create-window nach einem Notizbuch in einem neuen Fenster.
+DECLARE SUB gtk_notebook_set_group_name LIB GTK (nb AS ZEIGER, name AS TEXT)
+DECLARE SUB gtk_notebook_set_tab_detachable LIB GTK (nb AS ZEIGER, kind AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_notebook_set_tab_reorderable LIB GTK (nb AS ZEIGER, kind AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_notebook_set_scrollable LIB GTK (nb AS ZEIGER, an AS BOOLEAN)
+DECLARE FUNCTION gtk_notebook_page_num LIB GTK (nb AS ZEIGER, kind AS ZEIGER) AS LONG
+DECLARE FUNCTION gtk_notebook_get_current_page LIB GTK (nb AS ZEIGER) AS LONG
+DECLARE SUB gtk_notebook_remove_page LIB GTK (nb AS ZEIGER, seite AS LONG)
+DECLARE SUB gtk_notebook_reorder_child LIB GTK (nb AS ZEIGER, kind AS ZEIGER, stelle AS LONG)
+DECLARE SUB gtk_window_set_transient_for LIB GTK (fenster AS ZEIGER, eltern AS ZEIGER)
+DECLARE SUB gtk_window_set_type_hint LIB GTK (fenster AS ZEIGER, art AS LONG)
+DECLARE SUB gtk_window_get_position LIB GTK (fenster AS ZEIGER, BYREF x AS LONG, BYREF y AS LONG)
+DECLARE SUB gtk_window_present LIB GTK (fenster AS ZEIGER)
+DECLARE FUNCTION gtk_paned_get_position LIB GTK (p AS ZEIGER) AS LONG
+DECLARE FUNCTION gtk_fixed_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_fixed_put LIB GTK (f AS ZEIGER, kind AS ZEIGER, x AS LONG, y AS LONG)
+CONST GDK_FENSTER_WERKZEUG = 5        ' GDK_WINDOW_TYPE_HINT_UTILITY
+DECLARE FUNCTION signalNeuesFenster LIB GOBJECT ALIAS "g_signal_connect_data" _
+    (objekt AS ZEIGER, name AS TEXT, rueckruf AS FUNCTION(nb AS ZEIGER, seite AS ZEIGER, x AS LONG, y AS LONG, daten AS ZEIGER) AS ZEIGER, _
+     daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
 DECLARE FUNCTION g_timeout_add LIB GLIB (ms AS ULONG, rueckruf AS FUNCTION(daten AS ZEIGER) AS BOOLEAN, daten AS ZEIGER) AS ULONG
 DECLARE SUB g_free LIB GLIB (z AS ZEIGER)
 DECLARE FUNCTION g_source_remove LIB GLIB (kennung AS ULONG) AS BOOLEAN

@@ -1117,6 +1117,12 @@ fn gerufenes_harmlos<'a>(prog: &'a Program, f: &'a Func, b: &Bereich, start: Vec
     while let Some(g) = offen.pop() {
         if gesehen.contains(&(g as *const Func)) { continue; }
         gesehen.push(g);
+        // Vergibt sie einen Rueckruf (eine Bibliothek mit FUNCTION-Parameter),
+        // ruft die Bibliothek ihn womoeglich gleich -- waehrend der Bereich
+        // die Globalen haelt.
+        if g.constants.iter().any(|c| matches!(c, Value::Str(t) if crate::ffi::signatur_mit_rueckruf(t))) {
+            return Err(format!("{}: {} vergibt einen Rueckruf an eine Bibliothek", name, g.name));
+        }
         for ins in &g.code {
             for p in globale_plaetze(prog, g, ins) {
                 if bereich.contains(&p) {
@@ -1135,8 +1141,13 @@ fn gerufenes_harmlos<'a>(prog: &'a Program, f: &'a Func, b: &Bereich, start: Vec
                     return Err(format!("{}: {} ruft {}", name, g.name, befehl_name(ins.op))),
                 op::CALL_BUILTIN => if let Arg::Call(n, _, _) = &ins.arg {
                     let n: &str = n;
+                    // Eine Funktion einer Bibliothek kann einen vergebenen
+                    // Rueckruf rufen (GTK bei gtk_notebook_remove_page das
+                    // Signal page-removed) -- und der saehe die Globalen, die
+                    // der Bereich gerade haelt, als NIL.
                     if n == "sort" || n == "__comp_iter" || n.starts_with("coro_") || n.starts_with("task_")
-                        || n == "gui_update" || n == "timer_update" || n == "exit" || n == "end" {
+                        || n == "gui_update" || n == "timer_update" || n == "exit" || n == "end"
+                        || (n == "__ffi" && crate::ffi::rueckrufe_vergeben()) {
                         return Err(format!("{}: {} ruft {}", name, g.name, n.to_uppercase()));
                     }
                 },
@@ -1145,6 +1156,33 @@ fn gerufenes_harmlos<'a>(prog: &'a Program, f: &'a Func, b: &Bereich, start: Vec
         }
     }
     Ok(())
+}
+
+/// Ruft der Code `von..=bis` von `f` (ueber Funktionen und Methoden, die er
+/// erreicht) eine Funktion einer Bibliothek?
+fn erreicht_ffi(prog: &Program, f: &Func, von: usize, bis: usize) -> bool {
+    let methoden = |n: &str| -> Vec<&Func> {
+        prog.classes.values().flat_map(|c| c.methods.iter())
+            .filter(|(m, _)| m.eq_ignore_ascii_case(n)).map(|(_, g)| g).collect()
+    };
+    let mut offen: Vec<(&Func, usize, usize)> = vec![(f, von, bis.min(f.code.len().saturating_sub(1)))];
+    let mut gesehen: Vec<*const Func> = Vec::new();
+    while let Some((g, a, b)) = offen.pop() {
+        if a > b || b >= g.code.len() { continue; }
+        for ins in &g.code[a..=b] {
+            match (&ins.arg, ins.op) {
+                (Arg::Call(n, _, _), op::CALL_BUILTIN) if &n[..] == "__ffi" => return true,
+                (Arg::Call(_, _, i), op::CALL_USER) => if let Some(h) = prog.functions.get(*i as usize) {
+                    if !gesehen.contains(&(h as *const Func)) { gesehen.push(h); offen.push((h, 0, h.code.len().saturating_sub(1))); }
+                },
+                (Arg::Call(n, _, _), op::CALL_METHOD) => for h in methoden(n) {
+                    if !gesehen.contains(&(h as *const Func)) { gesehen.push(h); offen.push((h, 0, h.code.len().saturating_sub(1))); }
+                },
+                _ => {}
+            }
+        }
+    }
+    false
 }
 
 /// `c[i...]` lesen: Behaelter in `basis`, die Indizes dahinter; das Ergebnis
@@ -1349,6 +1387,11 @@ struct Schleife {
     typen: Vec<String>,
     /// Locals ohne Typ als Wert gebaut (M4 Schritt 18/19).
     any_w: bool,
+    /// Erreicht der Bereich ueber das, was er ruft, eine Funktion einer
+    /// Bibliothek? Gebaut wurde er, als noch kein Rueckruf vergeben war; ist
+    /// seither einer vergeben, koennte die Bibliothek ihn rufen, waehrend der
+    /// Bereich Globale haelt -- dann wird neu gebaut (und abgelehnt).
+    ffi_gerufen: bool,
 }
 
 /// Was der Maschinencode ueber die globalen Plaetze wissen muss: ihre Art
@@ -4006,6 +4049,13 @@ impl Jit {
         let nr = (nr - 2) as usize;
         let s: Rc<Schleife> = match self.schleifen.borrow().get(nr) { Some(s) => s.clone(), None => return None };
         if s.kopf != kopf || s.fehlschlaege.get() >= MAX_FEHLSCHLAEGE { return None; }
+        // Erreicht er eine Bibliothek und sind inzwischen Rueckrufe vergeben,
+        // bleibt die Schleife fortan in der VM (neu bauen hiesse hier: bei
+        // jedem Ruecksprung neu uebersetzen, falls der Bau es nicht ablehnt).
+        if s.ffi_gerufen && crate::ffi::rueckrufe_vergeben() {
+            marke.set(1);
+            return None;
+        }
         // Hat eine der Globalen, die beim Bauen fehlten, jetzt einen Platz, wird
         // beim naechsten Ruecksprung neu gebaut -- dann ohne den festen Ausgang.
         if s.fehlende.iter().any(|&g| slots.get(g).map_or(false, |x| x.is_some())) {
@@ -4354,6 +4404,7 @@ impl Jit {
             modus_w: an.modus_w,
             any_w: an.any_w,
             typen: an.typen,
+            ffi_gerufen: erreicht_ffi(prog, f, kopf, bis),
         }));
         self.zahl_schleifen.set(self.zahl_schleifen.get() + 1);
         Ok(nr)

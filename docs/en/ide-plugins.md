@@ -114,3 +114,28 @@ Per frame the IDE reads at most 50 messages of a plugin -- a chatty plugin
 cannot stall it that way. An unreadable line goes into the log, an error
 while carrying it out (an unknown shortcut, say) also into the output with
 the plugin's name in front.
+
+## Plugins in Glutfaden
+
+Glutfaden (`examples/glutfaden`, from stage 26 on) loads plugins the same
+way: a folder `plugins/<name>/plugin.dh` in Glutfaden's settings folder
+(logo menu → Plugins → Open the plugin folder), started with
+`WINDOW_OPEN`, the same line and the same library `dh_plugin.dh`. The
+commands are in the logo menu under **Plugins**, their shortcuts work
+anywhere in the window. Glutfaden rebuilds the panel from GTK widgets
+(position and size as in the form): label, button, text field, check box,
+slider, list and drop-down list; anything else shows as a note. It sits
+among the dockable panels and can be dragged like Overview or Pattern.
+The events are `gesichert`, `geoeffnet` and `geaendert` (after every change
+to the pattern).
+
+| Command | What it does |
+|---|---|
+| `PLUGIN_MUSTER$()` | the pattern as JSON: `name`, `breite`, `hoehe`, `stiche`, `farbe` (the selected one) and `farben` (each `name`, `nummer`, `hersteller`, `rgb`, `stiche`); "" without a pattern |
+| `PLUGIN_STICHE(punkte, farben [, text$])` | stitches on the active layer: `punkte` = x, y, x, y ..., `farben` = for each point the number of the color in the pattern (-1 clears). One step for undo, labelled with `text$` (otherwise the plugin's name) |
+
+`PLUGIN_DATEINAME$()` is the path of the pattern, `PLUGIN_PROJEKT$()` the
+folder used last, `PLUGIN_TEXT$()` the same as `PLUGIN_MUSTER$()`. Whatever
+belongs to a code editor (findings, snippets, highlighting, inserting) is
+skipped by Glutfaden. On the line, `PLUGIN_STICHE` is a `tue` with `was` =
+`stiche` and the fields `punkte` and `farben`.

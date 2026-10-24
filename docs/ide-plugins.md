@@ -115,3 +115,28 @@ Je Bild liest die IDE höchstens 50 Nachrichten eines Plugins -- ein
 geschwätziges Plugin hält sie so nicht an. Eine unlesbare Zeile steht im
 Protokoll, ein Fehler beim Ausführen (etwa ein unbekanntes Kürzel) dazu in
 der Ausgabe mit dem Namen des Plugins davor.
+
+## Plugins in Glutfaden
+
+Glutfaden (`examples/glutfaden`, ab Stufe 26) lädt Plugins auf dieselbe
+Weise: ein Ordner `plugins/<name>/plugin.dh` im Einstellungsordner von
+Glutfaden (Logo-Menü → Plugins → Plugin-Ordner öffnen), gestartet mit
+`WINDOW_OPEN`, dieselbe Leitung und dieselbe Bibliothek `dh_plugin.dh`.
+Die Befehle stehen im Logo-Menü unter **Plugins**, ihre Kürzel gelten
+überall im Fenster. Die Leiste baut Glutfaden aus GTK-Widgets nach (Lage
+und Größe wie in der Form): Beschriftung, Knopf, Textfeld, Kästchen,
+Regler, Liste und Klappliste; anderes steht als Hinweis da. Sie liegt in
+den andockbaren Leisten und lässt sich ziehen wie Übersicht oder Muster.
+Ereignisse sind `gesichert`, `geoeffnet` und `geaendert` (nach jeder
+Änderung am Muster).
+
+| Befehl | Was es tut |
+|---|---|
+| `PLUGIN_MUSTER$()` | das Muster als JSON: `name`, `breite`, `hoehe`, `stiche`, `farbe` (die gewählte) und `farben` (je `name`, `nummer`, `hersteller`, `rgb`, `stiche`); "" ohne Muster |
+| `PLUGIN_STICHE(punkte, farben [, text$])` | Stiche auf die aktive Ebene: `punkte` = x, y, x, y ..., `farben` = je Punkt die Nummer der Farbe im Muster (-1 leert). Ein Schritt für Rückgängig, beschriftet mit `text$` (sonst dem Namen des Plugins) |
+
+`PLUGIN_DATEINAME$()` ist der Pfad des Musters, `PLUGIN_PROJEKT$()` der
+zuletzt benutzte Ordner, `PLUGIN_TEXT$()` dasselbe wie `PLUGIN_MUSTER$()`.
+Was zu einem Code-Editor gehört (Befunde, Schnipsel, Färbung, Einfügen),
+übergeht Glutfaden. Auf der Leitung ist `PLUGIN_STICHE` ein `tue` mit
+`was` = `stiche` und den Feldern `punkte` und `farben`.
