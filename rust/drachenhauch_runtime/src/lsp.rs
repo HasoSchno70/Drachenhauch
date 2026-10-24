@@ -908,6 +908,73 @@ fn klassen_mitglieder(quelle: &str, k: &symbole::Bereich, bereiche: &[symbole::B
     }).collect()
 }
 
+/// Der Typ hinter `AS` in einem Stueck Quelltext, bis zum Ende, einem `=`
+/// oder einem Komma auf oberster Ebene; leer, wenn keiner dasteht.
+fn typ_hinter_as(stueck: &str) -> String {
+    let g = stueck.to_ascii_uppercase();
+    let Some(p) = g.find(" AS ").map(|p| p + 4) else { return String::new() };
+    let mut tiefe = 0i32;
+    let mut ende = stueck.len();
+    for (i, c) in stueck[p..].char_indices() {
+        match c {
+            '(' | '[' => tiefe += 1,
+            ')' | ']' => tiefe -= 1,
+            '=' | ',' | ':' if tiefe <= 0 => { ende = p + i; break; }
+            _ => {}
+        }
+    }
+    stueck[p..ende].trim().to_string()
+}
+
+/// Die Klassen und Structs eines Quelltexts mit ihren Mitgliedern, ohne zu
+/// uebersetzen -- ein halb getippter Text liefert, was zu lesen ist. Je
+/// Klasse: Name, Art, Vorfahrin (EXTENDS), Zeilen, Kommentar darueber; je
+/// Mitglied: Name, Art (feld/konstante/sub/function/property), Typ, Kopfzeile,
+/// Zeile, Kommentar. GET und SET einer PROPERTY sind EIN Mitglied.
+pub fn klassen_struktur(quelle: &str) -> Value {
+    static BASIS: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let basis_re = BASIS.get_or_init(|| regex::Regex::new(r"(?i)\bEXTENDS\s+([A-Za-z_][A-Za-z0-9_.]*)").expect("Regex"));
+    let zeilen: Vec<&str> = quelle.split('\n').collect();
+    let bereiche = symbole::bereiche(quelle);
+    let alle = symbole::definitionen(quelle);
+    let mut aus = Vec::new();
+    for k in bereiche.iter().filter(|x| matches!(x.art, "class" | "struct")) {
+        let kopf = zeilen.get(k.zeile - 1).map(|z| symbole::ohne_kommentare_und_texte(z)).unwrap_or_default();
+        let vorfahrin = basis_re.captures(&kopf).map(|c| c[1].to_string()).unwrap_or_default();
+        let methoden: Vec<&symbole::Bereich> = bereiche.iter()
+            .filter(|x| matches!(x.art, "sub" | "function" | "property") && x.zeile > k.zeile && x.ende <= k.ende).collect();
+        let mut mitglieder = Vec::new();
+        let mut gesehen = std::collections::HashSet::new();
+        for d in alle.iter().filter(|d| d.zeile > k.zeile && d.zeile < k.ende) {
+            let in_methode = methoden.iter().any(|m| m.zeile <= d.zeile && d.zeile <= m.ende);
+            let art = match d.art {
+                "sub" | "function" | "property" => d.art,
+                "dim" if !in_methode => "feld",
+                "const" if !in_methode => "konstante",
+                _ => continue,
+            };
+            if !gesehen.insert((art, d.name.to_lowercase())) { continue; }
+            let (sig, doku) = symbole::doku_der_definition(quelle, d).unwrap_or_default();
+            let typ = match art {
+                "feld" | "konstante" => {
+                    let roh = symbole::ohne_kommentare_und_texte(zeilen[d.zeile - 1]);
+                    // Ab dem Namen: `DIM a AS INTEGER, s AS STRING` gibt jedem seinen.
+                    let ab: usize = roh.char_indices().nth(d.spalte - 1).map(|(b, _)| b).unwrap_or(0);
+                    typ_hinter_as(&format!(" {}", &roh[ab..]))
+                }
+                "sub" => String::new(),
+                _ => match sig.rfind(')') { Some(p) => typ_hinter_as(&sig[p..]), None => typ_hinter_as(&sig) },
+            };
+            mitglieder.push(json!({"name": d.name, "art": art, "typ": typ, "kopf": sig,
+                                   "zeile": d.zeile, "kommentar": doku}));
+        }
+        aus.push(json!({"name": k.name, "art": k.art, "basis": vorfahrin, "zeile": k.zeile, "bis": k.ende,
+                        "kommentar": symbole::kommentar_darueber(&zeilen, k.zeile - 1),
+                        "mitglieder": mitglieder}));
+    }
+    Value::Array(aus)
+}
+
 /// Die Mitglieder der Klasse `klasse` im Quelltext samt Importen.
 fn mitglied_definitionen(quelle: &str, klasse: &str) -> Vec<symbole::Definition> {
     let bereiche = symbole::bereiche(quelle);
@@ -1273,6 +1340,29 @@ pub fn serve() -> std::process::ExitCode {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn klassen_mit_mitgliedern_ohne_uebersetzen() {
+        // Ein Fehler im Text (das IF ohne END) haelt nichts auf.
+        let text = "' Ein Tier\nCLASS Tier\n    DIM hp, mp AS INTEGER\n    STATIC CONST MAXHP AS INTEGER = 9\n\
+            \x20   PROPERTY GET titel() AS STRING\n        IF x THEN\n    END PROPERTY\n\
+            \x20   PROPERTY SET titel(v AS STRING)\n    END PROPERTY\n\
+            \x20   SUB laut(x AS INTEGER)\n        DIM lokal AS INTEGER\n    END SUB\nEND CLASS\n\
+            CLASS Hund EXTENDS Tier\n    FUNCTION alter(a AS INTEGER, _\n                   b AS FLOAT) AS INTEGER\n    END FUNCTION\nEND CLASS\n";
+        let v = super::klassen_struktur(text);
+        let k = v.as_array().unwrap();
+        assert_eq!(k.len(), 2);
+        assert_eq!(k[0]["name"], "Tier");
+        assert_eq!(k[0]["kommentar"], "Ein Tier");
+        assert_eq!(k[1]["basis"], "Tier");
+        let m: Vec<String> = k[0]["mitglieder"].as_array().unwrap().iter()
+            .map(|m| format!("{}:{}:{}", m["name"].as_str().unwrap(), m["art"].as_str().unwrap(), m["typ"].as_str().unwrap())).collect();
+        // Die lokale Variable der Methode ist kein Feld, GET und SET sind EIN Mitglied.
+        assert_eq!(m, ["hp:feld:INTEGER", "mp:feld:INTEGER", "MAXHP:konstante:INTEGER", "titel:property:STRING", "laut:sub:"]);
+        let f = &k[1]["mitglieder"][0];
+        assert_eq!(f["typ"], "INTEGER");
+        assert_eq!(f["kopf"], "FUNCTION alter(a AS INTEGER, b AS FLOAT) AS INTEGER");
+    }
+
     #[test]
     fn korrekturen_aus_der_meldung() {
         let text = "DIM zaehler AS INTEGER

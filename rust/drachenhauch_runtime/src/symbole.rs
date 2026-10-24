@@ -353,7 +353,9 @@ pub fn doku_der_definition(quelle: &str, d: &Definition) -> Option<(String, Stri
     if matches!(d.art, "sub" | "function" | "property") && sig.contains('(') && !sig.contains(')') {
         let mut i = idx + 1;
         while i < zeilen.len() && !sig.contains(')') {
-            sig = format!("{} {}", sig, ohne_inline_kommentar(zeilen[i].trim_end()).trim_start());
+            // Der Fortsetzungsstrich ` _` am Zeilenende gehoert nicht in die Signatur.
+            let vorn = sig.trim_end().strip_suffix('_').map(|v| v.trim_end().to_string()).unwrap_or(sig);
+            sig = format!("{} {}", vorn, ohne_inline_kommentar(zeilen[i].trim_end()).trim_start());
             i += 1;
         }
     }

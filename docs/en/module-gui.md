@@ -265,7 +265,7 @@ IMPORT "gui"
 | `GUI_DRAW_TOP()` | — | only what lies above all windows: open context menu and tooltip |
 | `GUI_DRAW_WINDOW(win)` | — | draw ONE window again, above everything added since `GUI_DRAW` |
 | `GUI_CLICKED(widget)` | BOOLEAN | clicked in this frame? Applies to button, menu entry, **checkbox, toggle and radio** and to a click on a list entry -- also the one already selected |
-| `GUI_CHANGED(widget)` | BOOLEAN | did the **user** change the widget in the last `GUI_UPDATE` (selection, value, text, tick)? What the program sets itself does not count. The first call starts watching and returns FALSE |
+| `GUI_CHANGED(widget)` | BOOLEAN | did the **user** change the widget in the last `GUI_UPDATE` (selection -- the node of a tree too --, value, text, tick)? What the program sets itself does not count. The first call starts watching and returns FALSE |
 | `GUI_CHECKED(widget)` | BOOLEAN | checkbox state |
 | `GUI_VALUE(widget)` | FLOAT | slider value |
 | `GUI_TEXT(widget)` | STRING | text (label/button/TextInput) |
