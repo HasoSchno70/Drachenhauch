@@ -17298,6 +17298,7 @@ FUNCTION pluginWert$(h AS GUI_WIDGET) AS STRING
         CASE "slider", "spinner", "knob", "progress" : RETURN STR$(GUI_VALUE(h))
         CASE "listbox" : RETURN STR$(GUI_LISTBOX_SELECTED(h))
         CASE "dropdown" : RETURN STR$(GUI_DROPDOWN_SELECTED(h))
+        CASE "tree" : RETURN STR$(GUI_TREE_SELECTED(h))
     END SELECT
     RETURN GUI_TEXT(h)
 END FUNCTION
@@ -17344,6 +17345,7 @@ SUB pluginNachricht(k AS INTEGER, zeile AS STRING)
                 IF INSTR(plugHoert[k], ";" + ev + ";") < 0 THEN plugHoert[k] = plugHoert[k] + ev + ";"
             CASE "setze" : pluginSetze(k, j)
             CASE "liste" : pluginListe(k, j)
+            CASE "baum" : pluginBaum(k, j)
             CASE "frage" : pluginAntwort(k, j)
             CASE "tue" : pluginTue(k, j)
             CASE "befunde"
@@ -17436,7 +17438,11 @@ SUB pluginSetze(k AS INTEGER, j AS JSON_HANDLE)
         CASE "enabled" : GUI_SET_ENABLED(h, wahr)
         CASE "visible" : GUI_SET_VISIBLE(h, wahr)
         CASE "selected"
-            IF LOWER$(GUI_KIND(h)) = "dropdown" THEN GUI_DROPDOWN_SET_SELECTED(h, VAL(wert)) ELSE GUI_LISTBOX_SET_SELECTED(h, VAL(wert))
+            SELECT CASE LOWER$(GUI_KIND(h))
+                CASE "dropdown" : GUI_DROPDOWN_SET_SELECTED(h, VAL(wert))
+                CASE "tree" : GUI_TREE_SET_SELECTED(h, VAL(wert))
+                CASE ELSE : GUI_LISTBOX_SET_SELECTED(h, VAL(wert))
+            END SELECT
     END SELECT
 END SUB
 
@@ -17452,6 +17458,34 @@ SUB pluginListe(k AS INTEGER, j AS JSON_HANDLE)
         ARRAY_PUSH(eintraege, JSON_GET_STRING(j, "eintraege." + STR$(i)))
     NEXT
     IF LOWER$(GUI_KIND(h)) = "dropdown" THEN GUI_SET_DROPDOWN(h, eintraege) ELSE GUI_SET_LISTBOX(h, eintraege)
+END SUB
+
+' Einen Baum der Leiste fuellen: je Eintrag eine Ebene (0 = oben) und ein
+' Text, in der Reihenfolge, in der sie unter einander stehen. Ein Knoten
+' haengt am letzten davor mit kleinerer Ebene; seine Nummer ist die Stelle
+' in der Liste, und dieselbe Nummer kommt bei "geaendert" als Wert zurueck.
+SUB pluginBaum(k AS INTEGER, j AS JSON_HANDLE)
+    DIM pw AS INTEGER : pw = pluginLeisteFenster(k, j)
+    IF pw < 0 THEN RETURN
+    DIM nr AS INTEGER : nr = plugZahl(j, "widget")
+    IF nr < 0 OR nr >= GUI_WINDOW_WIDGET_COUNT(pw) THEN RETURN
+    DIM h AS GUI_WIDGET : h = GUI_WINDOW_WIDGET(pw, nr)
+    IF LOWER$(GUI_KIND(h)) <> "tree" THEN RETURN
+    GUI_TREE_CLEAR(h)
+    DIM eltern AS ARRAY OF INTEGER : eltern = []
+    DIM auf AS BOOLEAN : auf = TRUE
+    IF JSON_HAS(j, "auf") THEN auf = JSON_GET_BOOL(j, "auf")
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "texte") - 1
+        DIM ebene AS INTEGER : ebene = MAX(0, JSON_GET_INT(j, "ebenen." + STR$(i)))
+        ' Ein Sprung um mehrere Ebenen haengt am tiefsten vorhandenen.
+        WHILE LEN(eltern) > ebene : ARRAY_POP(eltern) : WEND
+        DIM oben AS INTEGER : oben = -1
+        IF LEN(eltern) > 0 THEN oben = eltern[LEN(eltern) - 1]
+        DIM knoten AS INTEGER : knoten = GUI_TREE_ADD(h, oben, JSON_GET_STRING(j, "texte." + STR$(i)))
+        IF oben >= 0 THEN GUI_TREE_EXPAND(h, oben, auf)
+        ARRAY_PUSH(eltern, knoten)
+    NEXT
 END SUB
 
 SUB pluginAntwort(k AS INTEGER, j AS JSON_HANDLE)
@@ -17484,7 +17518,8 @@ SUB pluginTue(k AS INTEGER, j AS JSON_HANDLE)
         CASE "meldung" : GUI_SET_TEXT(lblStatus, plugText$(j, "text"))
         CASE "ausgabe" : ausgabe(plugText$(j, "text"))
         CASE "oeffnen"
-            dateiOeffnen(plugText$(j, "datei"))
+            ' Ohne Datei: die Zeile im Reiter vorn (ein ungesicherter Text).
+            IF plugText$(j, "datei") <> "" THEN dateiOeffnen(plugText$(j, "datei"))
             DIM zl AS INTEGER : zl = plugZahl(j, "zeile")
             ta = aktivesFeld()
             IF ta >= 0 AND zl > 0 THEN GUI_TEXTAREA_GOTO(ta, zl, 1)

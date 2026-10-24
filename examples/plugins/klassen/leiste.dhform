@@ -1,0 +1,13 @@
+{
+ "title": "Klassen",
+ "w": 260,
+ "h": 360,
+ "chrome": false,
+ "widgets": [
+  {"kind": "label", "name": "kopf", "text": "Klassen des Projekts", "x": 6, "y": 6, "w": 248, "h": 18, "anchor": "lrt"},
+  {"kind": "textinput", "name": "filter", "text": "", "placeholder": "Filter (Klasse oder Mitglied)", "x": 4, "y": 28, "w": 252, "h": 26, "anchor": "lrt"},
+  {"kind": "checkbox", "name": "nurdatei", "text": "Nur die Datei vorn", "x": 6, "y": 60, "w": 200, "h": 20, "anchor": "lt"},
+  {"kind": "tree", "name": "baum", "x": 4, "y": 84, "w": 252, "h": 238, "anchor": "lrtb"},
+  {"kind": "button", "name": "auffrischen", "text": "Auffrischen", "x": 4, "y": 328, "w": 120, "h": 28, "anchor": "lb"}
+ ]
+}

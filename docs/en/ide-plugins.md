@@ -24,6 +24,13 @@ front as a panel on the right, a command with a shortcut, a warning per
 FIXME, a snippet and a colouring for `.todo` files. To try it, copy the
 folder `todo` into the plugin folder and reload.
 
+A second one in `examples/plugins/klassen/`: all classes and structs of the
+project as a tree (from `CODE_CLASSES$`, without compiling), below them
+fields, constants, properties and methods with their type; a filter field,
+"only the file in front", and a click jumps to the place. It reads again
+after saving and leaves out folders starting with `.` or `_`, as well as
+`pakete/` and `target/`.
+
 ## Writing a plugin
 
 The library `dh_plugin.dh` lives next to the IDE; the IDE puts its folder
@@ -60,8 +67,9 @@ its own) `PLUGIN_LAEUFT()` is FALSE and the program ends right away.
 | `PLUGIN_BEFEHL(id$, titel$ [, kuerzel$])` | register a command: it appears in the **Plugins** menu, in the command palette and on the shortcut. When triggered, the event `befehl` arrives with `PLUGIN_ID$()` |
 | `PLUGIN_LEISTE(id$, titel$, formdatei$ [, bereich$])` | a panel of its own in the dock: a `.dhform` (from the form designer, say) as a window on the left, right (default), bottom or floating. The user can move it like any panel of the IDE |
 | `PLUGIN_HOERE(ereignis$)` | listen to an event: `gesichert` (saved), `geoeffnet` (opened), `reiter` (another tab in front), `gestartet` (started), `beendet` (a program has run), `geprueft` (checked) -- each with `PLUGIN_DATEI$()` |
-| `PLUGIN_SETZE(leiste$, widget$, was$, wert$)` | change a widget of the own panel: `text`, `checked`, `value`, `enabled`, `visible` or `selected` |
+| `PLUGIN_SETZE(leiste$, widget$, was$, wert$)` | change a widget of the own panel: `text`, `checked`, `value`, `enabled`, `visible` or `selected` (row of a list, entry of a dropdown, node of a tree) |
 | `PLUGIN_LISTE(leiste$, widget$, eintraege)` | the entries of a list or dropdown of the panel |
+| `PLUGIN_BAUM(leiste$, widget$, ebenen, texte [, auf])` | fill a tree of the panel: per entry a level (0 = top) and a text, in order from top to bottom; an entry hangs on the last one before it with a smaller level. The number of a node is its place in the list -- the same number arrives as the value of `geaendert`. `auf` (default TRUE) expands the branches |
 | `PLUGIN_TEXT$()` | the text in the tab in front |
 | `PLUGIN_DATEINAME$()` | its path ("" = not saved yet) |
 | `PLUGIN_AUSWAHL$()` | the selected text |
@@ -80,7 +88,8 @@ Belonging to the event are `PLUGIN_ID$()` (the command or the name of the
 event), `PLUGIN_LEISTE$()` and `PLUGIN_WIDGET$()` (for `klick` and
 `geaendert` -- the widget's name from the `.dhform`, field `name`),
 `PLUGIN_WERT$()` (for `geaendert`: the text, a tick as `TRUE`/`FALSE`, the
-value of a slider, the number of the selected row) and `PLUGIN_DATEI$()`
+value of a slider, the number of the selected row or tree node) and
+`PLUGIN_DATEI$()`
 (for `ereignis`). The questions (`PLUGIN_TEXT$` and the others) wait up to
 two seconds for the answer; whatever arrives in between is delivered by the
 next `PLUGIN_EREIGNIS$`.
@@ -100,6 +109,7 @@ From the plugin to the IDE:
 | `hoere` | `ereignis` |
 | `setze` | `leiste`, `widget` (number in the form), `was`, `wert` |
 | `liste` | `leiste`, `widget`, `eintraege` (array) |
+| `baum` | `leiste`, `widget`, `ebenen` and `texte` (arrays of the same length), `auf` |
 | `frage` | `nr`, `was` (`text`, `datei`, `auswahl`, `marke`, `projekt`) |
 | `tue` | `was` (`einfuegen`, `meldung`, `ausgabe`, `oeffnen`), `text`, `datei`, `zeile` |
 | `befunde` | `datei`, `liste` (objects with `zeile`, `meldung`, `schwere`) |

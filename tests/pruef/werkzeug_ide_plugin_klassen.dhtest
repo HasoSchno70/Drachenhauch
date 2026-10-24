@@ -1,0 +1,122 @@
+' Das Beispiel-Plugin examples/plugins/klassen in der echten IDE: ein Baum
+' aller Klassen des Projekts aus CODE_CLASSES$, gefuellt ueber PLUGIN_BAUM,
+' Filter, und ein Klick auf ein Mitglied oeffnet die Datei an seiner Zeile
+' (GUI_CHANGED meldet seit 2026-10-24 auch die Auswahl eines Baums).
+'
+' Das Plugin selbst ist die Datei aus examples/ -- die Beilage plugin.dh
+' wechselt nur in ihren Ordner (dort liegt leiste.dhform) und bindet sie
+' ein. Das Projekt ist der Fallordner: a.dh und b.dh; _programm/ zaehlt
+' nicht mit, weil der Ordner mit "_" beginnt.
+--- langsam
+
+=== der baum zeigt die klassen und ein klick springt hin
+DIM prB AS INTEGER
+DIM prSchritt AS INTEGER
+DIM prSeit AS INTEGER
+DIM prBaum AS GUI_WIDGET
+FUNCTION prBaumText$() AS STRING
+    DIM t AS STRING : t = ""
+    DIM n AS INTEGER : n = 0
+    WHILE n < 40
+        DIM l AS STRING : l = ""
+        TRY
+            l = GUI_TREE_LABEL(prBaum, n)
+        CATCH e
+            RETURN t
+        END TRY
+        t = t + "|" + l
+        n = n + 1
+    WEND
+    RETURN t
+END FUNCTION
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prSchritt = 0 AND LEN(plugLeisteName) > 0 THEN
+    IF GUI_WINDOW_SHOWN(plugLeisteFenster[0]) THEN
+        prBaum = GUI_WINDOW_WIDGET(plugLeisteFenster[0], 3)
+        IF INSTR(prBaumText$(), "bellen") >= 0 THEN
+            protokoll("pr baum " + prBaumText$())
+            protokoll("pr kopf " + GUI_TEXT(GUI_WINDOW_WIDGET(plugLeisteFenster[0], 0)))
+            ' Ein echter Klick auf den sechsten Knoten (bellen in b.dh).
+            DIM prKx AS INTEGER : prKx = GUI_WINDOW_GET_X(plugLeisteFenster[0]) + GUI_GET_X(prBaum) + 70
+            DIM prKy AS INTEGER : prKy = GUI_WINDOW_GET_Y(plugLeisteFenster[0]) + GUI_GET_Y(prBaum) + 1 + 5 * 22 + 11
+            WRITEALL("ev.txt", "c 4" + CHR$(10) + "e 0 7 " + STR$(prKx) + " " + STR$(prKy) + " 0 0" + CHR$(10) + "e 1 7 " + STR$(prKx) + " " + STR$(prKy) + " 0 0" + CHR$(10) + "e 2 6 0 0 0 0" + CHR$(10) + "e 4 5 0 0 0 0" + CHR$(10))
+            AUTOMATION_PLAY("ev.txt")
+            prSchritt = 1 : prSeit = prB
+        END IF
+    END IF
+END IF
+IF prSchritt = 1 AND aktiverTab >= 0 THEN
+    IF BASENAME(tabPfade[aktiverTab]) = "b.dh" THEN
+        DIM prZ AS INTEGER
+        DIM prS AS INTEGER
+        (prZ, prS) = GUI_TEXTAREA_CURSOR(aktivesFeld())
+        protokoll("pr geoeffnet " + BASENAME(tabPfade[aktiverTab]) + " zeile " + STR$(prZ))
+        ' Der Filter: nur noch, was "rasse" heisst -- samt seiner Klasse.
+        GUI_SET_TEXT(GUI_WINDOW_WIDGET(plugLeisteFenster[0], 1), "")
+        pluginWidgetEreignis(0, "geaendert", "klassen", 1, "rasse")
+        prSchritt = 2 : prSeit = prB
+    END IF
+END IF
+IF prSchritt = 2 AND prB - prSeit > 5 AND INSTR(prBaumText$(), "bellen") < 0 AND INSTR(prBaumText$(), "rasse") >= 0 THEN
+    protokoll("pr gefiltert " + prBaumText$())
+    EXIT(0)
+END IF
+IF prB > 700 THEN protokoll("pr zeit um bei schritt " + STR$(prSchritt) + " " + prBaumText$()) : EXIT(0)
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=1000
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei a.dh
+' Ein Tier
+CLASS Tier
+    DIM name AS STRING
+    SUB laut()
+        PRINT name
+    END SUB
+END CLASS
+
+--- datei b.dh
+IMPORT "a.dh"
+CLASS Hund EXTENDS Tier
+    DIM rasse AS STRING
+    ' bellt
+    SUB bellen()
+        PRINT "wuff"
+    END SUB
+END CLASS
+
+--- datei _programm/plugins/klassen/plugin.dh
+CHDIR("{sammlung}/../../examples/plugins/klassen")
+IMPORT "{sammlung}/../../examples/plugins/klassen/plugin.dh"
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 8) = "plugins " THEN PRINT L[i]
+NEXT
+--- erwartet
+plugins 1
+pr baum |Tier   (a.dh)|name AS STRING|laut()|Hund : Tier   (b.dh)|rasse AS STRING|bellen()
+pr kopf 2 Klassen in 2 Dateien
+pr geoeffnet b.dh zeile 5
+pr gefiltert |Hund : Tier   (b.dh)|rasse AS STRING
+
+=== ohne die ide endet das plugin gleich
+' Allein gestartet ist PLUGIN_LAEUFT() FALSE -- das Plugin fragt dann
+' nichts (jede Frage wartete zwei Sekunden auf eine Antwort) und endet.
+SETENV("DH_PATH", ARG$(1))
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0))
+WHILE PROCESS_RUNNING(p) AND MILLIS() - t0 < 20000 : SLEEP(20) : WEND
+PRINT "rueckgabe "; PROCESS_CODE(p); " schnell "; MILLIS() - t0 < 1500
+--- argumente
+{sammlung}/../../examples/plugins/klassen/plugin.dh
+{sammlung}/../../ide
+--- erwartet
+rueckgabe 0 schnell TRUE
