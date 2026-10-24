@@ -1387,6 +1387,18 @@ impl Compiler {
                 if self.ist_property(&ziel, name) { return None; }
                 self.feld_typ(&ziel, name)?
             }
+            // Ein Element traegt den Typ seines Feldes bzw. seiner MAP --
+            // ohne das ging der Typ hinter `m.farben[i]` verloren, und ein
+            // Tippfehler im Feld danach blieb ungemeldet.
+            Node::IndexAccess { target, indices } => {
+                let ziel = self.statischer_typ(target)?;
+                if let Some(e) = ziel.strip_prefix("array:") { e.to_string() }
+                else if let Some(e) = ziel.strip_prefix("map:") {
+                    if indices.len() != 1 { return None; }
+                    e.to_string()
+                } else if ziel == "string" && indices.len() == 1 { ziel }
+                else { return None; }
+            }
             Node::UnaryOp { op, operand } => match op.as_str() {
                 "not" => "boolean".to_string(),
                 "bnot" => "integer".to_string(),
