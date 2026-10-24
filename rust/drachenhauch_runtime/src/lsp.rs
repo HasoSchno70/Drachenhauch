@@ -36,6 +36,8 @@ const CK_VARIABLE: i64 = 6;
 const CK_METHOD: i64 = 2;
 const CK_FIELD: i64 = 5;
 const CK_PROPERTY: i64 = 10;
+const CK_CLASS: i64 = 7;
+const CK_ENUM: i64 = 13;
 const CK_KEYWORD: i64 = 14;
 const CK_CONSTANT: i64 = 21;
 const SK_CLASS: i64 = 5;
@@ -692,6 +694,15 @@ pub fn vervollstaendigung(text: &str, basis: Option<&Path>, z0: usize, c0: usize
     // Klasse kennt; sonst wie ueberall. Nur mit `basis`: dafuer wird der
     // ganze Text uebersetzt (CODE_COMPLETE ohne basis$ bleibt beim Text).
     if let (Some(basis), Some((a, e))) = (basis, mitglied_stelle(text, z0, c0, false)) {
+        let z: Vec<char> = text.split('\n').nth(z0).unwrap_or("").chars().collect();
+        let pl: String = z[a..c0.min(z.len())].iter().collect::<String>().to_lowercase();
+        if let Some((_, defs)) = namensraum_mitglieder(text, basis, &wort_vor_punkt(&z, a)) {
+            return defs.iter().filter(|d| d.name.to_lowercase().starts_with(&pl)).map(|d| {
+                let art = match d.art { "sub" | "function" => CK_FUNCTION, "class" | "struct" => CK_CLASS,
+                                        "enum" => CK_ENUM, "const" => CK_CONSTANT, _ => CK_VARIABLE };
+                json!({"label": d.name, "kind": art, "detail": d.art})
+            }).collect();
+        }
         if let Some(fund) = mitglied_fund(text, basis, z0, a, e) {
             let z: Vec<char> = text.split('\n').nth(z0).unwrap_or("").chars().collect();
             let pl: String = z[a..c0.min(z.len())].iter().collect::<String>().to_lowercase();
@@ -737,7 +748,8 @@ pub fn hover(text: &str, basis: Option<&Path>, z0: usize, c0: usize) -> Option<V
     // Hinter `objekt.` das Mitglied SEINER Klasse -- nur mit `basis`, weil
     // dafuer der ganze Text uebersetzt wird (die Parameternamen der IDE
     // fragen viele Stellen auf einmal und kommen ohne aus).
-    if let Some(md) = basis.and_then(|b| mitglied_hover(text, b, z0, c0, &wort)) {
+    if let Some(md) = basis.and_then(|b| namensraum_hover(text, b, z0, c0, &wort)
+            .or_else(|| mitglied_hover(text, b, z0, c0, &wort))) {
         return Some(json!({"contents": {"kind": "markdown", "value": md}}));
     }
     let (sig, doc) = klassen_hover(text, z0, &wort)
@@ -797,6 +809,86 @@ fn mitglied_fund(text: &str, basis: &Path, z0: usize, a: usize, e: usize) -> Opt
     let fund = crate::compiler::mitglied_fund_sammeln(|| { let _ = crate::check_source(&neu_text, basis, "<editor>"); });
     LETZTER_FUND.with(|l| *l.borrow_mut() = Some((neu_text, basis.to_path_buf(), fund.clone())));
     fund
+}
+
+/// Das Wort direkt vor dem Punkt, der an Stelle `a - 1` steht.
+fn wort_vor_punkt(z: &[char], a: usize) -> String {
+    let ende = a.saturating_sub(1);
+    let mut k = ende;
+    while k > 0 && symbole::ist_ident(z[k - 1]) { k -= 1; }
+    z[k..ende].iter().collect()
+}
+
+/// Ist `alias` ein Namensraum (`IMPORT "x.dh" AS alias`)? Dann der Text samt
+/// Importen und die obersten Definitionen seiner Dateien -- SUB, FUNCTION,
+/// CLASS, STRUCT, ENUM, CONST und globale DIMs, ohne PRIVATE. Ohne
+/// Uebersetzen, also auch, wenn der Text gerade nicht uebersetzt.
+fn namensraum_mitglieder(text: &str, basis: &Path, alias: &str) -> Option<(String, Vec<symbole::Definition>)> {
+    if alias.is_empty() { return None; }
+    let (quelle, _, herkunft, raeume) = crate::preprocess::process(text, basis).ok()?;
+    let dateien: std::collections::HashSet<String> = raeume.iter()
+        .filter(|(_, a)| a.eq_ignore_ascii_case(alias)).map(|(d, _)| d.clone()).collect();
+    if dateien.is_empty() { return None; }
+    let bereiche = symbole::bereiche(&quelle);
+    let zeilen: Vec<&str> = quelle.split('\n').collect();
+    let mut gesehen = std::collections::HashSet::new();
+    let defs = symbole::definitionen(&quelle).into_iter().filter(|d| {
+        let aus_raum = herkunft.get(d.zeile.saturating_sub(1)).map(|h| dateien.contains(&h.datei)).unwrap_or(false);
+        // Oberste Ebene: in keinem Block (die Kopfzeile eines Blocks zaehlt).
+        let oben = !bereiche.iter().any(|b| d.zeile > b.zeile && d.zeile <= b.ende);
+        let privat = zeilen.get(d.zeile.saturating_sub(1))
+            .map(|z| z.trim_start().to_ascii_uppercase().starts_with("PRIVATE ")).unwrap_or(false);
+        aus_raum && oben && !privat && d.art != "param"
+    }).filter(|d| gesehen.insert(d.name.to_lowercase())).collect();
+    Some((quelle, defs))
+}
+
+/// Hover auf `kern.Name`: die Definition im Namensraum.
+fn namensraum_hover(text: &str, basis: &Path, z0: usize, c0: usize, wort: &str) -> Option<String> {
+    let (a, _) = mitglied_stelle(text, z0, c0, true)?;
+    let z: Vec<char> = text.split('\n').nth(z0)?.chars().collect();
+    let alias = wort_vor_punkt(&z, a);
+    let (quelle, defs) = namensraum_mitglieder(text, basis, &alias)?;
+    let Some(d) = defs.iter().find(|d| d.name.eq_ignore_ascii_case(wort)) else {
+        return Some(crate::meldung::t(&format!("Der Namensraum {} hat nichts namens '{}'.", alias, wort)));
+    };
+    let (sig, doc) = symbole::doku_der_definition(&quelle, d)?;
+    let wem = crate::meldung::t(&format!("aus dem Namensraum {}", alias));
+    let mut md = format!("```drachenhauch\n{}\n```\n\n{}", sig, wem);
+    if !doc.is_empty() { md.push_str("\n\n"); md.push_str(&doc); }
+    Some(md)
+}
+
+/// Alle Methodenaufrufe des Textes, deren Klasse der Uebersetzer kennt, in
+/// EINEM Lauf: (Zeile im Puffer, Methode, Klasse, Kopfzeile der Methode) --
+/// fuer die Parameternamen an Aufrufen. Die Kopfzeile kommt aus der Klasse,
+/// in der die Methode steht, in der Schreibweise des Quelltexts; fehlt sie
+/// dort, baut der Server sie aus den Angaben des Uebersetzers.
+pub fn methoden_aufrufe(text: &str, basis: &Path) -> Vec<(u32, String, String, String)> {
+    let roh = crate::compiler::methoden_aufrufe_sammeln(|| { let _ = crate::check_source(text, basis, "<editor>"); });
+    if roh.is_empty() { return Vec::new(); }
+    let quelle = quelle_mit_importen(text, basis);
+    let herkunft = crate::preprocess::process(text, basis).ok().map(|r| r.2);
+    let mut kopf: HashMap<(String, String), String> = HashMap::new();
+    let mut aus = Vec::new();
+    let mut gesehen = std::collections::HashSet::new();
+    for (z, name, von, param) in roh {
+        let zeile = match herkunft.as_ref().and_then(|h| h.get((z as usize).saturating_sub(1))) {
+            Some(h) if h.datei.is_empty() => h.zeile,
+            Some(_) => continue,
+            None => z,
+        };
+        if !gesehen.insert((zeile, name.clone())) { continue; }
+        let sig = kopf.entry((von.clone(), name.clone())).or_insert_with(|| {
+            mitglied_definitionen(&quelle, &von).into_iter()
+                .find(|d| d.name.eq_ignore_ascii_case(&name) && matches!(d.art, "sub" | "function"))
+                .and_then(|d| symbole::doku_der_definition(&quelle, &d)).map(|(s, _)| s)
+                .unwrap_or_else(|| format!("SUB {}({})", name, param.join(", ")))
+        }).clone();
+        aus.push((zeile, name, crate::namensraum::lesbar_text(&von.to_uppercase()), sig));
+    }
+    aus.sort_by_key(|e| e.0);
+    aus
 }
 
 /// Der Name einer Klasse ohne Namensraum (`kern@spieler` -> `spieler`).

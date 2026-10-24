@@ -369,6 +369,10 @@ pub fn kommentar_darueber(zeilen: &[&str], idx: usize) -> String {
         let s = zeilen[i].trim();
         if s.is_empty() { break; }
         match kommentar_text(s) {
+            // Die Marke, die der Vorverarbeiter vor eine eingebundene Datei
+            // setzt (`' === IMPORT lib/x.dh ===`), gehoert nicht zur Doku
+            // ihrer ersten Definition.
+            Some(t) if t.starts_with("=== IMPORT ") && t.ends_with("===") => break,
             Some(t) => out.push(t.to_string()),
             None => break,
         }
@@ -438,6 +442,14 @@ mod tests {
     use super::*;
 
     const SRC: &str = "' Spieler-Klasse\nCLASS Player\n    DIM hp AS INTEGER\n    SUB Init()\n        Self.hp = 100\n    END SUB\nEND CLASS\nFUNCTION add(a AS INTEGER, b AS INTEGER) AS INTEGER\n    RETURN a + b\nEND FUNCTION\nDIM result AS INTEGER\nresult = add(1, 2)\n";
+
+    #[test]
+    fn import_marke_gehoert_nicht_zur_doku() {
+        let q = "' === IMPORT lib/kern.dh ===\n' Rechnet.\nFUNCTION summe() AS INTEGER\nEND FUNCTION\n";
+        assert_eq!(nutzer_doku(q, "summe").unwrap().1, "Rechnet.");
+        let q = "' === IMPORT lib/kern.dh ===\nFUNCTION summe() AS INTEGER\nEND FUNCTION\n";
+        assert_eq!(nutzer_doku(q, "summe").unwrap().1, "");
+    }
 
     #[test]
     fn wort_bei_findet_und_laesst_leer() {

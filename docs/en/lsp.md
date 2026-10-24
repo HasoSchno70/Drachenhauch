@@ -21,8 +21,8 @@ already knew when compiling — it was dropped with path A from
 | LSP method | Function |
 |---|---|
 | `publishDiagnostics` | errors, warnings and hints (unused variables in subroutines, severity 4, `unnecessary`) from the whole chain (preprocess → lex → parse → namespace → compile), the same as `dhrt --check`, mapped back onto the lines of the buffer — an error in an imported file appears on line 1 with its origin |
-| `completion` | commands from the index, keywords, constants (colours, keys, `PI`, `TAU`) and the symbols defined in the document, filtered by the prefix left of the cursor; after `object.` only the fields, PROPERTYs and methods of its class, inherited ones included |
-| `hover` | signature and description for commands (hand-written texts before the ones generated from `docs/`, otherwise the signature from the index) and for your own `SUB`/`FUNCTION`/`CLASS`/… (the comment block above the definition); after `object.` the member of the object's class, with the class it belongs to -- also through indices, calls, `Self` and imported classes, because the server compiles the text for it |
+| `completion` | commands from the index, keywords, constants (colours, keys, `PI`, `TAU`) and the symbols defined in the document, filtered by the prefix left of the cursor; after `object.` only the fields, PROPERTYs and methods of its class, inherited ones included, after a namespace (`kern.`) the top-level definitions of its files without `PRIVATE` |
+| `hover` | signature and description for commands (hand-written texts before the ones generated from `docs/`, otherwise the signature from the index) and for your own `SUB`/`FUNCTION`/`CLASS`/… (the comment block above the definition); after `object.` the member of the object's class, with the class it belongs to -- also through indices, calls, `Self` and imported classes, because the server compiles the text for it; after a namespace the definition there |
 | `definition` | jump to definition |
 | `references` | all occurrences of a symbol |
 | `documentSymbol` | outline — classes with methods and properties nested, plus ENUMs |

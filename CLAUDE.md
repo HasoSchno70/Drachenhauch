@@ -2635,6 +2635,27 @@ Rust-Test `mitglieder_hinter_dem_punkt`, je ein Fall in `ide_bausteine`
 und `dhrt_lsp`, zwei in `werkzeug_ide_vorschlag` (drei Verfaelschungen der
 IDE fallen je in ihrem Fall; gegen 2026.35 fallen beide Laufzeit-Faelle).
 
+**Namensraeume und Methodenaufrufe (selber Tag, danach):** hinter `kern.`
+(IMPORT ... AS kern) bietet die Vervollstaendigung die obersten
+Definitionen der Dateien dieses Alias ohne `PRIVATE` an, der Hover zeigt
+die Definition dort (`namensraum_mitglieder`/`namensraum_hover` in lsp.rs,
+aus `preprocess::process` samt Herkunft und Namensraeumen -- OHNE
+Uebersetzen, also auch bei einem Fehler im Text). `kommentar_darueber`
+endet an der Marke `' === IMPORT ... ===`, sonst stand sie in der Doku der
+ersten Definition einer eingebundenen Datei. Neu `CODE_METHOD_CALLS$(quelltext$
+[, basis$])`: alle Methodenaufrufe mit bekannter Klasse in EINEM Lauf
+(`compiler::methoden_aufrufe_sammeln`, Thread-Speicher `METHODEN_AUFRUFE`,
+gefuellt in `warn_unbekanntes_mitglied` bei `ist_aufruf`; die Klasse ist
+die, in der die Methode STEHT, die Signatur ihre Kopfzeile aus dem
+Quelltext). `parameterSammeln` der IDE holt die Liste einmal je Pruefung
+(`methodenAufrufeLesen`, Schluessel `Zeile:methode`) und nimmt sie fuer
+Namen hinter einem Punkt; `signaturArgs` hat ein freiwilliges `basis`
+(nur die Platzhalter hinter einem Punkt geben es mit -- EINE Stelle).
+Tests: je ein Fall in `ide_bausteine` (gegen 2026.35: 2384 Eintraege statt
+drei, Hover leer) und zwei in `werkzeug_ide_parameter_einfuegen`
+(Methoden zweier Klassen samt geerbter, Platzhalter nach `ob.se`),
+Rust-Test `import_marke_gehoert_nicht_zur_doku`.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

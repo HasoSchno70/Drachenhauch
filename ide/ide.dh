@@ -9146,11 +9146,13 @@ DIM platzhalterAn AS BOOLEAN : platzhalterAn = FALSE
 ' Die Argumentnamen einer Signatur, oder ein leeres Feld.
 ' Optionales (alles ab `[`) faellt weg -- ein Platzhalter, den man meist
 ' wieder loescht, ist keiner.
-FUNCTION signaturArgs(quelle AS STRING, z AS INTEGER, s AS INTEGER, mitOptionalen AS BOOLEAN = FALSE) AS ARRAY OF STRING
+FUNCTION signaturArgs(quelle AS STRING, z AS INTEGER, s AS INTEGER, mitOptionalen AS BOOLEAN = FALSE, basis AS STRING = "") AS ARRAY OF STRING
     DIM leer AS ARRAY OF STRING : leer = []
     DIM md AS STRING : md = ""
     TRY
-        md = CODE_HOVER$(quelle, z, s)
+        ' Mit Ordner kennt der Hover hinter `objekt.` die Klasse -- dafuer
+        ' uebersetzt er den Text, also nur, wo es um EINE Stelle geht.
+        IF basis <> "" THEN md = CODE_HOVER$(quelle, z, s, basis) ELSE md = CODE_HOVER$(quelle, z, s)
     CATCH e
         RETURN leer
     END TRY
@@ -9318,7 +9320,7 @@ SUB vervollUebernehmen()
         DIM ns AS INTEGER
         (nz, ns) = GUI_TEXTAREA_CURSOR(ta)
         DIM args AS ARRAY OF STRING : args = []
-        IF NOT ohneGeruest THEN args = signaturArgs(GUI_TEXT(ta), nz, MAX(1, ns - 1))
+        IF NOT ohneGeruest THEN args = signaturArgs(GUI_TEXT(ta), nz, MAX(1, ns - 1), FALSE, IIF(RIGHT$(vor, 1) = ".", codeBasis$(), ""))
         IF LEN(args) > 0 THEN
             GUI_TEXTAREA_INSERT(ta, "(" + JOIN$(args, ", ") + ")")
             GUI_TEXTAREA_SELECT(ta, nz, ns + 1, nz, ns + 1 + LEN(args[0]))
@@ -13142,6 +13144,12 @@ SUB parameterSammeln(ta AS GUI_WIDGET)
     DIM kopfZeile AS MAP OF STRING : kopfZeile = {}
     DIM erledigt AS INTEGER : erledigt = -1       ' Zeile mit Hinweis
     DIM gefragt AS INTEGER : gefragt = 0
+    ' Methodenaufrufe (`ob.setz(`): ihre Parameter kommen aus der Klasse des
+    ' Objekts, alle aus EINEM Uebersetzungslauf, erst geholt, wenn einer
+    ' gebraucht wird. Ueber den Namen allein gaebe es die erste Methode
+    ' dieses Namens im Text, auch die einer anderen Klasse.
+    DIM aufrufeGelesen AS BOOLEAN : aufrufeGelesen = FALSE
+    DIM aufrufe AS MAP OF STRING : aufrufe = {}
     DIM i AS INTEGER
     FOR i = 0 TO LEN(starts) - 2
         IF arten[i] <> "name" AND arten[i] <> "schluessel" THEN CONTINUE
@@ -13178,7 +13186,23 @@ SUB parameterSammeln(ta AS GUI_WIDGET)
         NEXT
         IF NOT fest THEN CONTINUE
         DIM sig AS STRING
-        IF MAPHAS(paramCache, LOWER$(name)) THEN
+        DIM nachPkt AS BOOLEAN : nachPkt = FALSE
+        IF starts[i] - anf[li] > 0 THEN nachPkt = MID$(zl, starts[i] - anf[li] - 1, 1) = "."
+        DIM ausAufruf AS BOOLEAN : ausAufruf = FALSE
+        IF nachPkt THEN
+            IF NOT aufrufeGelesen THEN
+                aufrufeGelesen = TRUE
+                methodenAufrufeLesen(quelle, aufrufe)
+            END IF
+            DIM schl AS STRING : schl = STR$(li + 1) + ":" + LOWER$(name)
+            IF MAPHAS(aufrufe, schl) THEN
+                sig = MAPGET(aufrufe, schl)
+                ausAufruf = TRUE
+            END IF
+        END IF
+        IF ausAufruf THEN
+            ' schon da
+        ELSEIF MAPHAS(paramCache, LOWER$(name)) THEN
             sig = MAPGET(paramCache, LOWER$(name))
         ELSE
             ' Hoechstens 60 neue Namen je Pruefung -- jede Frage uebersetzt
@@ -13231,6 +13255,25 @@ SUB parameterSammeln(ta AS GUI_WIDGET)
         erledigt = li
     NEXT
     IF LEN(paramZeilen) > 0 THEN protokoll("parameternamen " + STR$(LEN(paramZeilen)))
+END SUB
+
+' Alle Methodenaufrufe des Textes mit ihren Parameternamen (CODE_METHOD_CALLS$):
+' "Zeile:methode" -> "a,b". Uebersetzt der Text nicht, bleibt die Tafel leer,
+' und die Aufrufe gehen den alten Weg.
+SUB methodenAufrufeLesen(quelle AS STRING, BYREF aufrufe AS MAP OF STRING)
+    DIM roh AS STRING : roh = "[]"
+    TRY
+        roh = CODE_METHOD_CALLS$(quelle, codeBasis$())
+    CATCH e
+        RETURN
+    END TRY
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(roh)
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(j, "") - 1
+        DIM pre AS STRING : pre = STR$(k) + "."
+        DIM schl AS STRING : schl = STR$(JSON_GET_INT(j, pre + "zeile")) + ":" + LOWER$(JSON_GET_STRING(j, pre + "name"))
+        MAPPUT(aufrufe, schl, JOIN$(signaturNamen(JSON_GET_STRING(j, pre + "signatur"), TRUE), ","))
+    NEXT
 END SUB
 
 ' --- Beim Einfuegen einruecken --------------------------------------------

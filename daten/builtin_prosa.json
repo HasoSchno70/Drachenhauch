@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2132,
+ "count": 2133,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -319,10 +319,11 @@
   "CLOUD_SAVE": "Speichert data$ komplett (überschreibt einen vorherigen Stand)",
   "CLS": "Buffer mit color füllen (Default: schwarz)",
   "CODE_CHECK$": "STRING (JSON) die Front-End-Kette wie dhrt --check: eine Liste von {zeile, spalte, laenge, schwere, meldung} mit schwere = fehler/warnung; spalte (ab 1) und laenge sagen, wo in der Zeile die Meldung hingehört -- die Stelle eines Syntaxfehlers, sonst ein in der Meldung genannter Name, sonst die Zeile ohne Einrückung; basis$ = Ordner für IMPORT \"x.dh\" (Vorgabe: das Arbeitsverzeichnis). Zeilen sind …",
-  "CODE_COMPLETE": "ARRAY OF STRING Vorschläge zum Wortanfang links der Stelle: eigene Symbole, Befehle, Schlüsselwörter, Konstanten; mit basis$ hinter objekt. nur die Felder, PROPERTYs und Methoden seiner Klasse",
+  "CODE_COMPLETE": "ARRAY OF STRING Vorschläge zum Wortanfang links der Stelle: eigene Symbole, Befehle, Schlüsselwörter, Konstanten; mit basis$ hinter objekt. nur die Felder, PROPERTYs und Methoden seiner Klasse, hinter einem Namensraum (kern.) dessen oberste Definitionen ohne PRIVATE",
   "CODE_DEFINITION": "TUPLE (zeile, spalte) wo das Wort definiert ist; (-1, -1) ohne Definition in diesem Text",
   "CODE_FORMAT$": "STRING — der Quelltext formatiert wie durch dhrt fmt: Schlüsselwörter groß, Leerraum am Zeilenende weg, mit einruecken (Vorgabe TRUE) die Blöcke neu eingerückt; leer, wenn sich die Quelle nicht lesen lässt (Syntaxfehler)",
   "CODE_HOVER$": "STRING — Signatur und Beschreibung zum Wort an der Stelle als Markdown; leer, wenn dort kein Wort steht. Mit basis$ (Ordner für IMPORTs, leer = Arbeitsordner) gilt hinter objekt. das Mitglied der Klasse des Objekts; dafür wird der Text übersetzt",
+  "CODE_METHOD_CALLS$": "STRING (JSON) alle Methodenaufrufe, deren Klasse der Übersetzer kennt, in einem Lauf: {\"zeile\", \"name\", \"klasse\", \"signatur\"} (Zeile ab 1; klasse ist die Klasse, in der die Methode steht, signatur ihre Kopfzeile aus dem Quelltext) -- für Parameternamen an Aufrufen; ohne Übersetzung []",
   "CODE_NAMES": "MAP OF INTEGER wie oft jeder Name benutzt wird (klein, samt $): ohne Kommentare und Zeichenketten und ohne die Stelle, an der eine SUB/FUNCTION ihn definiert -- Aufrufe, FUNCREFs und Methoden hinter einem Punkt zählen",
   "CODE_REFERENCES": "ARRAY OF INTEGER die Zeilen aller Vorkommen",
   "CODE_RENAME$": "STRING — der Quelltext mit dem Namen an dieser Stelle überall in neu$ umbenannt — ganze Wörter, ohne Kommentare und Zeichenketten. Leer, wenn dort kein Name steht, es ein Schlüsselwort ist oder neu$ keiner ist",
