@@ -12576,7 +12576,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Auswahl, Zahl und Haken (eine Liste, eine Tabelle haben keinen Text).
     fn abdruck(&self, w: &Widget) -> String {
         let tab = w.tbl.as_ref().map(|t| t.selected).unwrap_or(-1);
-        format!("{}|{}|{}|{}|{}", self.wert_text(w), w.sel, w.value, w.checked, tab)
+        // Der Baum haelt seine Auswahl im eigenen Zustand -- ohne sie hier
+        // meldete GUI_CHANGED bei einem Baum nie, dass ein Knoten gewaehlt wurde.
+        let baum = w.tree.as_ref().map(|t| t.selected).unwrap_or(-1);
+        format!("{}|{}|{}|{}|{}|{}", self.wert_text(w), w.sel, w.value, w.checked, tab, baum)
     }
 
     /// GUI_CHANGED(wdg): hat die Bedienung das Widget im letzten GUI_UPDATE
