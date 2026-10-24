@@ -1213,6 +1213,53 @@ impl Gui {
         }
     }
 
+    /// Ist `wi` ein ANGEDOCKTES Fenster (nicht schwebend, sichtbar)? Dann
+    /// das Gastfenster, sonst None.
+    pub(super) fn dock_angedockter_gast(&self, wi: usize) -> Option<usize> {
+        let w = self.windows.get(wi)?;
+        if w.dock_host < 0 || !w.alive || !w.visible { return None; }
+        let h = w.dock_host as usize;
+        let d = self.windows.get(h).filter(|g| g.alive)?.dock.as_ref()?;
+        let l = d.leisten.iter().find(|l| l.fenster == wi as i64)?;
+        if l.schwebt >= 0 { None } else { Some(h) }
+    }
+
+    /// Hat das Gastfenster `h` angedockte Fenster (und schwebende Leisten)?
+    /// Dann zeichnet es seine obere Schicht erst nach ihnen. Vergroessert
+    /// (Zoom) bleibt es dabei, sie mit dem Fenster zu zeichnen -- die
+    /// nachgeholte Schicht kennt den Faktor nicht.
+    pub(super) fn dock_hat_angedockte(&self, h: usize) -> bool {
+        if self.zoom_von(h) != 1.0 { return false; }
+        match self.windows.get(h).and_then(|w| w.dock.as_ref()) {
+            Some(d) if !d.schweben.is_empty() => {}
+            _ => return false,
+        }
+        (0..self.windows.len()).any(|k| self.dock_angedockter_gast(k) == Some(h))
+    }
+
+    /// Die obere Schicht des Docks von `h` nachholen, beschnitten auf seinen
+    /// Inhaltsbereich wie in `draw_window`.
+    pub(super) fn dock_oben_nachholen(&self, g: &mut Graphics, h: usize) {
+        if !self.dock_hat_angedockte(h) { return; }
+        let w = &self.windows[h];
+        if !w.alive || !w.visible { return; }
+        let ct = self.content_top(h);
+        g.push_clip(w.x + 1, w.y + ct, (w.w - 2).max(0), (w.h - ct - 1).max(0));
+        self.dock_zeichnen_oben(g, h);
+        g.pop_clip();
+    }
+
+    /// Liegt an (mx, my) eine schwebende Leiste des Gastfensters ueber dem
+    /// angedockten Fenster `wi`? Dann gehoert der Punkt dem Gastfenster --
+    /// Treffertests ueberspringen `wi`.
+    pub(super) fn dock_gast_verdeckt(&self, wi: usize, mx: i32, my: i32) -> bool {
+        let Some(h) = self.dock_angedockter_gast(wi) else { return false };
+        let Some(d) = self.windows[h].dock.as_ref() else { return false };
+        if d.schweben.is_empty() { return false; }
+        let (cx, cy) = (mx - self.windows[h].x, my - self.windows[h].y - self.content_top(h));
+        d.schwebe_unter(cx, cy).is_some()
+    }
+
     /// Schwebende Gruppen samt ihrer Widgets, dann der Hinweis eines Zugs --
     /// nach allen anderen Widgets, also obenauf.
     pub(super) fn dock_zeichnen_oben(&self, g: &mut Graphics, wi: usize) {

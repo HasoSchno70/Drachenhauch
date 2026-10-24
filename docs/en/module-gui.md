@@ -3733,7 +3733,8 @@ place. A floating panel lying outside (say because the window is smaller than
 when it was saved) is brought into the dock.
 
 Defaults: header 22, margin 8, gap 8, seam 2 (`GUI_DOCK_SET`). An area and a
-group do not get narrower than 60 points. **Known open:** a floating panel
-made of widgets lies below a docked *window* (a panel from
-`GUI_DOCK_WINDOW`) when dragged over it -- the window is in the window order,
-the panel is drawn with the host window.
+group do not get narrower than 60 points. A floating panel also lies above
+docked *windows* (panels from `GUI_DOCK_WINDOW`): they sit in the window
+order directly above the host window, so the dock draws its floating panels
+after them, and clicks, `GUI_HIT_TEST` and `GUI_WINDOW_AT` go to the panel
+there.

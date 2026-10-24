@@ -3745,8 +3745,8 @@ an ihren alten Platz. Eine schwebende Leiste, die außerhalb liegt (etwa weil
 das Fenster kleiner ist als beim Sichern), wird ins Dock geholt.
 
 Vorgaben: Kopf 22, Rand 8, Abstand 8, Fuge 2 (`GUI_DOCK_SET`). Ein Bereich
-und eine Gruppe werden nicht schmaler als 60 Punkte. **Bekannt offen:** eine
-schwebende Leiste aus Widgets liegt unter einem angedockten *Fenster* (eine
-Leiste aus `GUI_DOCK_WINDOW`), wenn man sie darüber zieht -- das Fenster
-steht in der Reihenfolge der Fenster, die Leiste wird mit dem Gastfenster
-gezeichnet.
+und eine Gruppe werden nicht schmaler als 60 Punkte. Eine schwebende Leiste
+liegt auch über angedockten *Fenstern* (Leisten aus `GUI_DOCK_WINDOW`): die
+stehen in der Reihenfolge der Fenster direkt über dem Gastfenster, darum
+zeichnet das Dock seine schwebenden Leisten erst nach ihnen, und Klicks,
+`GUI_HIT_TEST` und `GUI_WINDOW_AT` gehen dort an die Leiste.

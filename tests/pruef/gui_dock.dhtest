@@ -330,6 +330,79 @@ knopf getroffen TRUE
 nach dem klick oben TRUE
 hinterer reiter FALSE
 
+=== eine schwebende leiste liegt ueber einem angedockten fenster
+' Die Leiste gehoert dem Gastfenster, das angedockte Fenster steht in der
+' Reihenfolge darueber: bis 2026.35 zeichnete es sich ueber die schwebende
+' Leiste und nahm ihr die Klicks. Jetzt kommt die obere Schicht des Docks
+' nach den angedockten Fenstern, und die Treffertests ueberspringen sie dort.
+IMPORT "hilfe.dh"
+DIM w2 AS GUI_WINDOW : w2 = GUI_WINDOW("plugin", 0, 0, 200, 100)
+DIM gruen AS GUI_WIDGET : gruen = GUI_BUTTON(w2, "", 0, 0, 224, 376)
+GUI_SET_COLOR(gruen, "bg", &H30C030)
+GUI_DOCK_PANEL(w, "plugin", "Plugin", "rechts")
+GUI_DOCK_WINDOW(w, "plugin", w2)
+GUI_DOCK_FLOAT(w, "ausgabe", 540, 100, 200, 140)
+daVerteilen()
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DOCK_CHANGED(w) THEN daVerteilen()
+    bild = bild + 1
+    IF bild = 3 THEN
+        PRINT "unter der leiste "; GUI_HIT_TEST(640, 180) = daListe[2]
+        PRINT "fenster dort "; GUI_WINDOW_AT(640, 180) = w
+        PRINT "daneben das plugin "; GUI_HIT_TEST(640, 300) = gruen
+    END IF
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+--- umgebung
+DHRT_FRAMES=4
+--- erwartet
+unter der leiste TRUE
+fenster dort TRUE
+daneben das plugin TRUE
+--- bild
+640 180 nicht #30C030 +-60
+640 300 #30C030 +-60
+
+=== ohne schwebende leiste zeigt dieselbe stelle das angedockte fenster
+' Gegenprobe zum Fall davor: ohne GUI_DOCK_FLOAT ist die Stelle gruen und
+' gehoert dem Plugin.
+IMPORT "hilfe.dh"
+DIM w2 AS GUI_WINDOW : w2 = GUI_WINDOW("plugin", 0, 0, 200, 100)
+DIM gruen AS GUI_WIDGET : gruen = GUI_BUTTON(w2, "", 0, 0, 224, 376)
+GUI_SET_COLOR(gruen, "bg", &H30C030)
+GUI_DOCK_PANEL(w, "plugin", "Plugin", "rechts")
+GUI_DOCK_WINDOW(w, "plugin", w2)
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DOCK_CHANGED(w) THEN daVerteilen()
+    bild = bild + 1
+    IF bild = 3 THEN
+        PRINT "dort das plugin "; GUI_HIT_TEST(640, 180) = gruen
+        PRINT "fenster dort "; GUI_WINDOW_AT(640, 180) = w2
+    END IF
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+--- umgebung
+DHRT_FRAMES=4
+--- erwartet
+dort das plugin TRUE
+fenster dort TRUE
+--- bild
+640 180 #30C030 +-60
+
 === eine schwebende leiste deckt die mitte zu
 IMPORT "hilfe.dh"
 GUI_DOCK_FLOAT(w, "ausgabe", 250, 250, 300, 120)
