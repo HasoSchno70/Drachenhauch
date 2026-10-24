@@ -28,6 +28,33 @@ IMPORT "gui"
 | `GUI_WINDOW_GLOW_SET(win, schluessel$, wert)` | — | configure the streak of light: `farbe` (colour), `dauer` (duration), `pause` (ms until it returns, 0 = once), `richtung` (direction: rechts/links/unten/oben), `breite` (width), `staerke` (strength, 0..1), `rand` (edge), `art` (kind: `streif`, `lampe` or `rahmen`) |
 | `GUI_WINDOW_GLOW_STOP(win)` | — | stop the streak of light |
 | `GUI_WINDOW_GLOWING(win)` | BOOLEAN | is a streak of light running (also during the pause between two)? |
+| `GUI_DOCK(win, x, y, w, h)` | — | set up a dock on the window or set its rectangle -- panels on the left, right and bottom, the centre stays with the program (see [Dock](#dock-dockable-panels)) |
+| `GUI_DOCK_SET(win, schluessel$, n)` | — | dimensions of the dock: `kopf` (height of the tab row, 22), `rand` (margin, 8), `abstand` (between groups, 8), `fuge` (above the bottom area, 2) |
+| `GUI_DOCK_PANEL(win, name$, titel$, bereich$)` | — | a panel as a new group at the end of `links` (left), `rechts` (right), `unten` (bottom) or `schwebend` (floating) |
+| `GUI_DOCK_TAB(win, name$, titel$, neben$)` | — | a panel as a tab in the group of another one |
+| `GUI_DOCK_ADD(win, name$, wdg)` | — | a widget belongs to the panel: visible only when the panel is, on top when it floats |
+| `GUI_DOCK_WINDOW(win, name$, fenster)` | — | a whole window (for instance from `GUI_FROM_JSON`) as the content of the panel -- borderless, above the host window |
+| `GUI_DOCK_RECT(win, name$)` | TUPLE | the content rectangle of the panel (x, y, w, h); (0, 0, 0, 0) when it is not shown |
+| `GUI_DOCK_TAB_RECT(win, name$)` | TUPLE | where the tab of the panel is (x, y, w, h) |
+| `GUI_DOCK_HEAD_RECT(win, name$)` | TUPLE | the free part of the header right of the tabs -- room for the panel's filter, counters, buttons |
+| `GUI_DOCK_CENTER(win)` | TUPLE | the rectangle of the centre (x, y, w, h) |
+| `GUI_DOCK_SHOWN(win, name$)` | BOOLEAN | is the content of the panel shown (front tab, area on, not hidden)? |
+| `GUI_DOCK_WHERE$(win, name$)` | STRING | `links`, `rechts`, `unten`, `schwebend` or `zu` (hidden) |
+| `GUI_DOCK_SHOW(win, name$, an)` | — | hide a panel or show it again (then in front) |
+| `GUI_DOCK_ACTIVATE(win, name$)` | — | bring the panel's tab to the front |
+| `GUI_DOCK_TITLE(win, name$, titel$)` | — | relabel the tab |
+| `GUI_DOCK_CLOSABLE(win, name$, an)` | — | a cross on the tab: a click hides the panel and reports it |
+| `GUI_DOCK_CLOSED$(win)` | STRING | the panel whose cross was clicked in this frame ("" = none) |
+| `GUI_DOCK_CHANGED(win)` | BOOLEAN | did a rectangle change in this frame (dragged, switched, detached)? Then lay out the contents again |
+| `GUI_DOCK_AREA(win, bereich$, an)` | — | show or hide an area |
+| `GUI_DOCK_AREA_SHOWN(win, bereich$)` | BOOLEAN | does the area show anything? |
+| `GUI_DOCK_SIZE(win, bereich$, px)` | — | width (left/right) or height (bottom) of an area |
+| `GUI_DOCK_SHARE(win, name$, anteil)` | — | the share of the panel's group in its area, compared with the other groups there |
+| `GUI_DOCK_GET_SIZE(win, bereich$)` | INTEGER | width or height of an area |
+| `GUI_DOCK_FLOAT(win, name$, x, y, w, h)` | — | detach a panel (floating at this place) |
+| `GUI_DOCK_MOVE(win, name$, bereich$ [, neben$])` | — | dock a panel: as a new group in the area or as a tab next to `neben$` |
+| `GUI_DOCK_STATE$(win)` | STRING | the arrangement as JSON (areas, groups, front tabs, sizes, floating, hidden) |
+| `GUI_DOCK_SET_STATE(win, stand$)` | — | take over an arrangement; panels that do not exist yet get their place as soon as they are registered |
 | `GUI_WINDOW_CLOSABLE(win, an)` | — | show a close button (default: off) |
 | `GUI_WINDOW_VISIBLE(win, an)` | — | set visibility |
 | `GUI_WINDOW_FRONT(win)` | — | bring the window to the front without giving it focus -- for a suggestion list or a tooltip that should lie over the text while typing. Shown via `GUI_WINDOW_VISIBLE`, a window otherwise lies behind the one clicked last |
@@ -3633,3 +3660,80 @@ advances by at most 50 ms: if a frame hangs, the sweep stays put for a moment
 and then moves on instead of skipping a piece. A second call
 of `GUI_WINDOW_GLOW` starts from the beginning. The IDE shows it at startup
 and when a program starts.
+
+## Dock: dockable panels
+
+A **dock** arranges a window like a development environment: panels on the
+left, right and bottom, several in one group as tabs, draggable dividers
+between the areas and between the groups. The centre stays with the program
+(the editor goes there, for instance). Dragging a tab moves the panel
+elsewhere: onto the header of another group (then as a tab), into a group
+(then it splits the group), to the edge of the centre (then it gets the area
+there) or anywhere else (then it **floats** on top; a double click on its
+header docks it again). While dragging, a hint shows where it will land.
+
+```basic
+IMPORT "gui"
+SCREEN(1000, 700, "Dock", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Dock", 0, 0, 1000, 700)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_DOCK(w, 0, 0, 1000, 700)
+GUI_DOCK_PANEL(w, "dateien", "Dateien", "links")
+GUI_DOCK_PANEL(w, "ausgabe", "Ausgabe", "unten")
+GUI_DOCK_TAB(w, "log", "Log", "ausgabe")
+DIM baum AS GUI_WIDGET : baum = GUI_LISTBOX(w, 0, 0, 10, 10, ["a.dh", "b.dh"])
+DIM liste AS GUI_WIDGET : liste = GUI_LISTBOX(w, 0, 0, 10, 10, [])
+DIM log AS GUI_WIDGET : log = GUI_LISTBOX(w, 0, 0, 10, 10, [])
+DIM editor AS GUI_WIDGET : editor = GUI_TEXTAREA(w, 0, 0, 10, 10)
+GUI_DOCK_ADD(w, "dateien", baum)
+GUI_DOCK_ADD(w, "ausgabe", liste)
+GUI_DOCK_ADD(w, "log", log)
+
+SUB verteilen()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM b AS INTEGER
+    DIM h AS INTEGER
+    (x, y, b, h) = GUI_DOCK_RECT(w, "dateien") : IF b > 0 THEN GUI_SET_BOUNDS(baum, x, y, b, h)
+    (x, y, b, h) = GUI_DOCK_RECT(w, "ausgabe") : IF b > 0 THEN GUI_SET_BOUNDS(liste, x, y, b, h)
+    (x, y, b, h) = GUI_DOCK_RECT(w, "log") : IF b > 0 THEN GUI_SET_BOUNDS(log, x, y, b, h)
+    (x, y, b, h) = GUI_DOCK_CENTER(w) : GUI_SET_BOUNDS(editor, x, y, b, h)
+END SUB
+verteilen()
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DOCK_CHANGED(w) THEN verteilen()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+```
+
+**Who lays out what?** The dock knows *where* a panel is, the program knows
+*what* is in it. The dock shows and hides the widgets of a panel (back tab,
+area off, hidden) and draws them on top when their panel floats -- a click
+there goes to the panel, not to the editor underneath. The program lays them
+out itself, in `GUI_DOCK_RECT`, as soon as `GUI_DOCK_CHANGED` says so. A dock
+that arranged the widgets itself would have rebuilt every panel that had
+grown over time. What belongs into the header next to the tabs (filter field,
+counter, a button) goes into `GUI_DOCK_HEAD_RECT`.
+
+**A whole window as a panel** (`GUI_DOCK_WINDOW`): the dock puts it on the
+panel without a border, switches it on and off with the panel and keeps it
+in the window order directly above the host window -- also after someone
+clicked into the host window. That is how a `.dhform` comes in as a panel,
+for instance one of an IDE plugin: its widgets refer to each other by number,
+and inserted into a foreign window those would shift.
+
+**Remembering the arrangement:** `GUI_DOCK_STATE$` returns it as JSON (sizes
+in logical points, so independent of `GUI_SCALE`), `GUI_DOCK_SET_STATE` takes
+it over. Panels the state names but that do not exist yet are remembered by
+the dock -- when such a panel is registered later, it comes back to its old
+place. A floating panel lying outside (say because the window is smaller than
+when it was saved) is brought into the dock.
+
+Defaults: header 22, margin 8, gap 8, seam 2 (`GUI_DOCK_SET`). An area and a
+group do not get narrower than 60 points. **Known open:** a floating panel
+made of widgets lies below a docked *window* (a panel from
+`GUI_DOCK_WINDOW`) when dragged over it -- the window is in the window order,
+the panel is drawn with the host window.

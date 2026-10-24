@@ -28,6 +28,33 @@ IMPORT "gui"
 | `GUI_WINDOW_GLOW_SET(win, schluessel$, wert)` | — | Lichtstreif einstellen: `farbe`, `dauer`, `pause` (ms bis zur Wiederkehr, 0 = einmal), `richtung` (rechts/links/unten/oben), `breite`, `staerke` (0..1), `rand`, `art` (`streif`, `lampe` oder `rahmen`) |
 | `GUI_WINDOW_GLOW_STOP(win)` | — | den Lichtstreif anhalten |
 | `GUI_WINDOW_GLOWING(win)` | BOOLEAN | läuft ein Lichtstreif (auch in der Pause zwischen zwei)? |
+| `GUI_DOCK(win, x, y, w, h)` | — | ein Dock auf dem Fenster einrichten bzw. sein Rechteck setzen -- Leisten links, rechts und unten, die Mitte bleibt dem Programm (siehe [Dock](#dock-andockbare-leisten)) |
+| `GUI_DOCK_SET(win, schluessel$, n)` | — | Maße des Docks: `kopf` (Höhe der Reiterzeile, 22), `rand` (8), `abstand` (zwischen Gruppen, 8), `fuge` (über dem unteren Bereich, 2) |
+| `GUI_DOCK_PANEL(win, name$, titel$, bereich$)` | — | eine Leiste als neue Gruppe am Ende von `links`, `rechts`, `unten` oder `schwebend` |
+| `GUI_DOCK_TAB(win, name$, titel$, neben$)` | — | eine Leiste als Reiter in die Gruppe einer anderen |
+| `GUI_DOCK_ADD(win, name$, wdg)` | — | ein Widget gehört zur Leiste: zu sehen nur, wenn sie es ist, obenauf, wenn sie schwebt |
+| `GUI_DOCK_WINDOW(win, name$, fenster)` | — | ein ganzes Fenster (etwa aus `GUI_FROM_JSON`) als Inhalt der Leiste -- randlos, über dem Gastfenster |
+| `GUI_DOCK_RECT(win, name$)` | TUPLE | das Inhaltsrechteck der Leiste (x, y, b, h); (0, 0, 0, 0), wenn sie nicht zu sehen ist |
+| `GUI_DOCK_TAB_RECT(win, name$)` | TUPLE | wo der Reiter der Leiste steht (x, y, b, h) |
+| `GUI_DOCK_HEAD_RECT(win, name$)` | TUPLE | der freie Teil des Kopfs rechts neben den Reitern -- Platz für Filter, Zähler, Knöpfe der Leiste |
+| `GUI_DOCK_CENTER(win)` | TUPLE | das Rechteck der Mitte (x, y, b, h) |
+| `GUI_DOCK_SHOWN(win, name$)` | BOOLEAN | ist der Inhalt der Leiste zu sehen (vorderer Reiter, Bereich an, nicht ausgeblendet)? |
+| `GUI_DOCK_WHERE$(win, name$)` | STRING | `links`, `rechts`, `unten`, `schwebend` oder `zu` |
+| `GUI_DOCK_SHOW(win, name$, an)` | — | eine Leiste ausblenden bzw. wieder zeigen (dann vorn) |
+| `GUI_DOCK_ACTIVATE(win, name$)` | — | den Reiter der Leiste nach vorn holen |
+| `GUI_DOCK_TITLE(win, name$, titel$)` | — | den Reiter neu beschriften |
+| `GUI_DOCK_CLOSABLE(win, name$, an)` | — | ein Kreuz am Reiter: ein Klick blendet die Leiste aus und meldet sie |
+| `GUI_DOCK_CLOSED$(win)` | STRING | die Leiste, deren Kreuz in diesem Bild geklickt wurde ("" = keine) |
+| `GUI_DOCK_CHANGED(win)` | BOOLEAN | hat sich in diesem Bild ein Rechteck geändert (gezogen, umgeschaltet, abgetrennt)? Dann die Inhalte neu verteilen |
+| `GUI_DOCK_AREA(win, bereich$, an)` | — | einen Bereich ein- oder ausblenden |
+| `GUI_DOCK_AREA_SHOWN(win, bereich$)` | BOOLEAN | zeigt der Bereich etwas? |
+| `GUI_DOCK_SIZE(win, bereich$, px)` | — | Breite (links/rechts) bzw. Höhe (unten) eines Bereichs |
+| `GUI_DOCK_SHARE(win, name$, anteil)` | — | der Anteil der Gruppe der Leiste an ihrem Bereich, verglichen mit den anderen Gruppen dort |
+| `GUI_DOCK_GET_SIZE(win, bereich$)` | INTEGER | Breite bzw. Höhe eines Bereichs |
+| `GUI_DOCK_FLOAT(win, name$, x, y, w, h)` | — | eine Leiste abtrennen (schwebend an dieser Stelle) |
+| `GUI_DOCK_MOVE(win, name$, bereich$ [, neben$])` | — | eine Leiste andocken: als neue Gruppe im Bereich oder als Reiter neben `neben$` |
+| `GUI_DOCK_STATE$(win)` | STRING | die Anordnung als JSON (Bereiche, Gruppen, Reiter vorn, Größen, schwebende, ausgeblendete) |
+| `GUI_DOCK_SET_STATE(win, stand$)` | — | eine Anordnung übernehmen; Leisten, die es noch nicht gibt, bekommen ihren Platz, sobald sie angemeldet werden |
 | `GUI_WINDOW_CLOSABLE(win, an)` | — | Schließen-Button anzeigen (Default: aus) |
 | `GUI_WINDOW_VISIBLE(win, an)` | — | Sichtbarkeit setzen |
 | `GUI_WINDOW_FRONT(win)` | — | Fenster nach vorn holen, ohne ihm den Fokus zu geben -- fuer eine Vorschlagsliste oder einen Tooltip, der beim Tippen ueber dem Text liegen soll. Per `GUI_WINDOW_VISIBLE` eingeblendet liegt ein Fenster sonst hinter dem zuletzt angeklickten |
@@ -3644,3 +3671,82 @@ höchstens 50 ms weiter: hängt ein Bild, bleibt der Streif kurz stehen und
 zieht dann weiter, statt ein Stück zu überspringen. Ein zweiter Aufruf
 von `GUI_WINDOW_GLOW` beginnt von vorn. Die IDE zeigt ihn beim Start und
 wenn ein Programm losgeht.
+
+## Dock: andockbare Leisten
+
+Ein **Dock** ordnet ein Fenster wie eine Entwicklungsumgebung: Leisten links,
+rechts und unten, mehrere in einer Gruppe als Reiter, ziehbare Trennlinien
+zwischen den Bereichen und zwischen den Gruppen. Die Mitte bleibt dem
+Programm (dort steht etwa der Editor). Wer einen Reiter zieht, legt die
+Leiste woandershin: auf den Kopf einer anderen Gruppe (dann als Reiter), in
+eine Gruppe hinein (dann teilt sie die Gruppe), an den Rand der Mitte (dann
+bekommt sie den Bereich dort) oder irgendwohin sonst (dann **schwebt** sie
+obenauf; ein Doppelklick auf ihren Kopf dockt sie wieder an). Ein Hinweis
+zeigt beim Ziehen, wo sie landet.
+
+```basic
+IMPORT "gui"
+SCREEN(1000, 700, "Dock", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Dock", 0, 0, 1000, 700)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_DOCK(w, 0, 0, 1000, 700)
+GUI_DOCK_PANEL(w, "dateien", "Dateien", "links")
+GUI_DOCK_PANEL(w, "ausgabe", "Ausgabe", "unten")
+GUI_DOCK_TAB(w, "log", "Log", "ausgabe")
+DIM baum AS GUI_WIDGET : baum = GUI_LISTBOX(w, 0, 0, 10, 10, ["a.dh", "b.dh"])
+DIM liste AS GUI_WIDGET : liste = GUI_LISTBOX(w, 0, 0, 10, 10, [])
+DIM log AS GUI_WIDGET : log = GUI_LISTBOX(w, 0, 0, 10, 10, [])
+DIM editor AS GUI_WIDGET : editor = GUI_TEXTAREA(w, 0, 0, 10, 10)
+GUI_DOCK_ADD(w, "dateien", baum)
+GUI_DOCK_ADD(w, "ausgabe", liste)
+GUI_DOCK_ADD(w, "log", log)
+
+SUB verteilen()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM b AS INTEGER
+    DIM h AS INTEGER
+    (x, y, b, h) = GUI_DOCK_RECT(w, "dateien") : IF b > 0 THEN GUI_SET_BOUNDS(baum, x, y, b, h)
+    (x, y, b, h) = GUI_DOCK_RECT(w, "ausgabe") : IF b > 0 THEN GUI_SET_BOUNDS(liste, x, y, b, h)
+    (x, y, b, h) = GUI_DOCK_RECT(w, "log") : IF b > 0 THEN GUI_SET_BOUNDS(log, x, y, b, h)
+    (x, y, b, h) = GUI_DOCK_CENTER(w) : GUI_SET_BOUNDS(editor, x, y, b, h)
+END SUB
+verteilen()
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DOCK_CHANGED(w) THEN verteilen()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+```
+
+**Wer verteilt was?** Das Dock weiß, *wo* eine Leiste steht, das Programm
+weiß, *was* in ihr steht. Das Dock blendet die Widgets einer Leiste ein und
+aus (hinterer Reiter, Bereich aus, ausgeblendet) und zeichnet sie obenauf,
+wenn ihre Leiste schwebt -- ein Klick dort geht an die Leiste, nicht an den
+Editor darunter. Verteilen tut sie das Programm selbst, in `GUI_DOCK_RECT`,
+sobald `GUI_DOCK_CHANGED` es sagt. Ein Dock, das die Widgets selbst
+anordnet, hätte jede gewachsene Leiste umgebaut. Was neben die Reiter in den
+Kopf gehört (Filterfeld, Zähler, ein Knopf), kommt in `GUI_DOCK_HEAD_RECT`.
+
+**Ein ganzes Fenster als Leiste** (`GUI_DOCK_WINDOW`): das Dock setzt es
+randlos auf die Leiste, schaltet es mit ihr ein und aus und hält es in der
+Reihenfolge der Fenster direkt über dem Gastfenster -- auch nachdem jemand
+ins Gastfenster geklickt hat. So kommt eine `.dhform` als Leiste herein,
+etwa die eines Plugins der IDE: ihre Widgets verweisen über Nummern
+aufeinander, und in ein fremdes Fenster eingesetzt verrutschten die.
+
+**Die Anordnung merken:** `GUI_DOCK_STATE$` liefert sie als JSON (Größen in
+logischen Punkten, also unabhängig von `GUI_SCALE`), `GUI_DOCK_SET_STATE`
+übernimmt sie. Leisten, die der Stand nennt, die es aber noch nicht gibt,
+merkt sich das Dock -- wird eine solche Leiste später angemeldet, kommt sie
+an ihren alten Platz. Eine schwebende Leiste, die außerhalb liegt (etwa weil
+das Fenster kleiner ist als beim Sichern), wird ins Dock geholt.
+
+Vorgaben: Kopf 22, Rand 8, Abstand 8, Fuge 2 (`GUI_DOCK_SET`). Ein Bereich
+und eine Gruppe werden nicht schmaler als 60 Punkte. **Bekannt offen:** eine
+schwebende Leiste aus Widgets liegt unter einem angedockten *Fenster* (eine
+Leiste aus `GUI_DOCK_WINDOW`), wenn man sie darüber zieht -- das Fenster
+steht in der Reihenfolge der Fenster, die Leiste wird mit dem Gastfenster
+gezeichnet.

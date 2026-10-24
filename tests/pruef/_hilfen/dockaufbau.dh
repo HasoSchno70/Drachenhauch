@@ -1,0 +1,69 @@
+' Ein Fenster mit Dock fuer gui_dock.dhtest: links Projekt und Gliederung,
+' unten Ausgabe|Terminal und Probleme, in jeder Leiste eine Liste, in der
+' Mitte ein roter Knopf. Das Fenster ist randlos, Inhaltskoordinaten sind
+' also Bildschirmkoordinaten.
+IMPORT "gui"
+SCREEN(800, 600, "Dock", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Dock", 0, 0, 800, 600)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_DOCK(w, 0, 0, 800, 600)
+GUI_DOCK_PANEL(w, "projekt", "Projekt", "links")
+GUI_DOCK_PANEL(w, "gliederung", "Gliederung", "links")
+GUI_DOCK_PANEL(w, "ausgabe", "Ausgabe", "unten")
+GUI_DOCK_TAB(w, "terminal", "Terminal", "ausgabe")
+GUI_DOCK_PANEL(w, "probleme", "Probleme", "unten")
+GUI_DOCK_SIZE(w, "links", 240)
+GUI_DOCK_SIZE(w, "unten", 200)
+DIM daNamen AS ARRAY OF STRING : daNamen = ["projekt", "gliederung", "ausgabe", "terminal", "probleme"]
+DIM daListe[5] AS GUI_WIDGET
+DIM daI AS INTEGER
+FOR daI = 0 TO 4
+    daListe[daI] = GUI_LISTBOX(w, 0, 0, 10, 10, [daNamen[daI] + " 1", daNamen[daI] + " 2"])
+    GUI_DOCK_ADD(w, daNamen[daI], daListe[daI])
+NEXT
+DIM daMitte AS GUI_WIDGET : daMitte = GUI_BUTTON(w, "mitte", 0, 0, 10, 10)
+GUI_SET_COLOR(daMitte, "bg", &HC03030)
+
+' Den Inhalt auf die Rechtecke des Docks verteilen -- das Programm tut es,
+' sobald GUI_DOCK_CHANGED es sagt.
+SUB daVerteilen()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM b AS INTEGER
+    DIM h AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO 4
+        (x, y, b, h) = GUI_DOCK_RECT(w, daNamen[i])
+        IF b > 0 THEN GUI_SET_BOUNDS(daListe[i], x + 2, y + 2, b - 4, h - 4)
+    NEXT
+    (x, y, b, h) = GUI_DOCK_CENTER(w)
+    GUI_SET_BOUNDS(daMitte, x, y, b, h)
+END SUB
+daVerteilen()
+
+' Die Mitte eines Reiters bzw. einer Leiste.
+FUNCTION daReiterX(name AS STRING) AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM b AS INTEGER
+    DIM h AS INTEGER
+    (x, y, b, h) = GUI_DOCK_TAB_RECT(w, name)
+    RETURN x + b \ 2
+END FUNCTION
+FUNCTION daReiterY(name AS STRING) AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM b AS INTEGER
+    DIM h AS INTEGER
+    (x, y, b, h) = GUI_DOCK_TAB_RECT(w, name)
+    RETURN y + h \ 2
+END FUNCTION
+
+FUNCTION daRect$(name AS STRING) AS STRING
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM b AS INTEGER
+    DIM h AS INTEGER
+    (x, y, b, h) = GUI_DOCK_RECT(w, name)
+    RETURN STR$(x) + " " + STR$(y) + " " + STR$(b) + " " + STR$(h)
+END FUNCTION
