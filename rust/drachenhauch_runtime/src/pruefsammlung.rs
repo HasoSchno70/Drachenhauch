@@ -851,6 +851,12 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
             };
             continue;
         }
+        // Hinter einem Kopf ohne Inhalt (`--- programm`, `--- verzeichnis`,
+        // `--- streichen` ...) wurde Text bisher stillschweigend uebergangen --
+        // der Quelltext eines Falls hinter `--- programm` lief so nie.
+        if matches!(abschnitt, Abschnitt::Verzeichnis) && !zeile.trim().is_empty() && !zeile.trim_start().starts_with('\'') {
+            return Err(format!("Zeile {}: hier gilt kein Inhalt, die Zeile wuerde uebergangen -- der Quelltext eines Falls steht VOR '--- programm'", nr + 1));
+        }
         puffer.push(zeile.to_string());
     }
     if let Some(f) = faelle.last_mut() { abschliessen(f, abschnitt, &mut puffer, &datei_name, datei_b64)?; }
@@ -1093,6 +1099,16 @@ PRINT 1
         let p = "SETFPS(60)\r\nWINDOW_MAXIMIZE()\r\nPRINT 1\r\n";
         assert_eq!(streichen_zeile(p, "WINDOW_MAXIMIZE()").unwrap(), "SETFPS(60)\r\nPRINT 1\r\n");
         assert!(streichen_zeile(p, "GIBTS()").unwrap_err().contains("GIBTS()"));
+    }
+
+    #[test]
+    fn text_hinter_programm_ist_ein_fehler() {
+        // Der Quelltext gehoert VOR `--- programm`; dahinter lief er nie.
+        let e = parsen("=== f\n--- programm werkzeug.dh nach X()\nPRINT 1\n").unwrap_err();
+        assert!(e.contains("Zeile 3") && e.contains("VOR '--- programm'"), "{}", e);
+        // Leerzeilen und Kommentare sind dort harmlos.
+        assert!(parsen("=== f\nPRINT 1\n--- programm werkzeug.dh\n' nur das Werkzeug\n\n").is_ok());
+        assert!(parsen("=== f\nPRINT 1\n--- zeitgrenze 5\nPRINT 2\n").is_err());
     }
 
     #[test]

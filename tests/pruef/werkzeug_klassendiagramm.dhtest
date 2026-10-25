@@ -1,0 +1,178 @@
+' Das Klassendiagramm (examples/210_klassendiagramm.dh) und sein Weg zurueck
+' in die IDE: das Werkzeug schreibt "DH_IDE_OEFFNEN|pfad|zeile", die IDE
+' liest die Ausgabe ihrer Werkzeuge und oeffnet die Datei dort.
+--- langsam
+
+=== klassen ebenen lagen und der sprungwunsch
+' Ohne Fenster-Bedienung: ein Einschub hinter dem Einlesen fragt den Stand
+' ab und ruft die Unterprogramme des Werkzeugs selbst.
+DIM prI AS INTEGER
+FOR prI = 0 TO LEN(kName) - 1
+    PRINT kName[prI]; " "; kArt[prI]; " ebene "; tiefe(prI); " mitglieder "; kAnz[prI]
+NEXT
+' Kinder stehen unter ihrer Vorfahrin, Geschwister nebeneinander.
+' _alt/ zaehlt nicht mit (Ordner mit "_"), mehr/ schon.
+PRINT "klassen "; LEN(kName)
+PRINT "hund unter tier "; kY[klasseNr("Hund")] > kY[klasseNr("Tier")] + kH[klasseNr("Tier")]
+PRINT "katze neben hund "; kY[klasseNr("Katze")] = kY[klasseNr("Hund")] AND kX[klasseNr("Katze")] > kX[klasseNr("Hund")]
+PRINT "nutzt "; typKlasse$("ARRAY OF Katze"); " "; typKlasse$("Katze")
+' Doppelklick auf die zweite Zeile im Kasten Hund (die Methode alter).
+DIM prH AS INTEGER : prH = klasseNr("Hund")
+inDerIdeOeffnen(prH, zeileBei(prH, kY[prH] + oy + KOPF_H + 4 + ZEILE_H + 2))
+' Gemerkte Lage: verschieben, sichern, neu anordnen, laden.
+kX[prH] = 640 : kY[prH] = 320
+lagenSichern()
+anordnen()
+lagenLaden()
+PRINT "lage gemerkt "; kX[prH]; " "; kY[prH]
+EXIT(0)
+--- programm ../../examples/210_klassendiagramm.dh nach lagenLaden()
+--- argumente
+.
+--- umgebung
+DHRT_FRAMES=5
+--- datei tiere.dh
+' Ein Tier
+CLASS Tier
+    DIM name AS STRING
+    SUB laut()
+    END SUB
+END CLASS
+CLASS Hund EXTENDS Tier
+    DIM freunde AS ARRAY OF Katze
+    FUNCTION alter() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+CLASS Katze EXTENDS Tier
+END CLASS
+
+--- datei mehr/punkt.dh
+STRUCT Punkt
+    DIM x AS FLOAT
+END STRUCT
+
+--- datei _alt/weg.dh
+CLASS Uebergangen
+END CLASS
+
+--- enthaelt
+klassen 4
+Hund class ebene 1 mitglieder 2
+Katze class ebene 1 mitglieder 0
+Tier class ebene 0 mitglieder 2
+Punkt struct ebene 0 mitglieder 1
+hund unter tier TRUE
+katze neben hund TRUE
+nutzt Katze Katze
+lage gemerkt 640 320
+
+=== der sprungwunsch nennt datei und zeile
+' Doppelklick auf eine Methode meint ihre Zeile, auf den Kopf die der Klasse.
+DIM prH AS INTEGER : prH = klasseNr("Hund")
+inDerIdeOeffnen(prH, zeileBei(prH, kY[prH] + oy + KOPF_H + 4 + ZEILE_H + 2))
+inDerIdeOeffnen(prH, zeileBei(prH, kY[prH] + oy + 5))
+EXIT(0)
+--- programm ../../examples/210_klassendiagramm.dh nach lagenLaden()
+--- argumente
+tiere.dh
+--- umgebung
+DHRT_FRAMES=5
+--- datei tiere.dh
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+    DIM name AS STRING
+    FUNCTION alter() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+
+--- enthaelt
+tiere.dh|5
+tiere.dh|3
+
+=== das diagramm im bild
+' Kopfzeilen in ihren Farben (Klasse blau, Struct gruen), darunter die
+' Kinder; die Kaesten stehen an der Lage der Anordnung (40, 40).
+--- programm ../../examples/210_klassendiagramm.dh
+' nur das Werkzeug
+--- argumente
+.
+--- datei tiere.dh
+CLASS Tier
+    DIM name AS STRING
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+STRUCT Punkt
+    DIM x AS FLOAT
+END STRUCT
+
+--- bild
+50 45 #34557E +-12
+50 80 #2A313C +-12
+50 175 #34557E +-12
+230 45 #2F6B66 +-12
+
+=== die ide oeffnet, was ein werkzeug ihr sagt
+' Ein Werkzeug schreibt "DH_IDE_OEFFNEN|pfad|zeile" -- hier ein kleines
+' Programm statt des Diagramms, gestartet wie jedes Werkzeug; die IDE liest
+' seine Ausgabe und oeffnet b.dh in Zeile 3 (eine Datei, die es nicht gibt,
+' laesst die Marke stehen). Dazu startet der Menuepunkt
+' das echte Klassendiagramm mit dem Projektordner.
+DIM prB AS INTEGER
+DIM prSchritt AS INTEGER
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prSchritt = 0 AND prB > 5 THEN
+    ARRAY_PUSH(werkzeuge, PROCESS_START("dhrt", "run", PATHJOIN(projektOrdner, "sag.dh")))
+    befehl("wz_klassen")
+    ' Zwei Werkzeuge laufen: das kleine und das Diagramm (mit dem Projekt).
+    protokoll("pr werkzeuge " + STR$(LEN(werkzeuge)))
+    prSchritt = 1
+END IF
+IF prSchritt = 1 AND aktiverTab >= 0 THEN
+    IF BASENAME(tabPfade[aktiverTab]) = "b.dh" THEN
+        DIM prZ AS INTEGER
+        DIM prS AS INTEGER
+        (prZ, prS) = GUI_TEXTAREA_CURSOR(aktivesFeld())
+        protokoll("pr vorn " + BASENAME(tabPfade[aktiverTab]) + " zeile " + STR$(prZ))
+        EXIT(0)
+    END IF
+END IF
+IF prB > 600 THEN protokoll("pr zeit um " + STR$(aktiverTab) + " " + IIF(aktiverTab >= 0, tabPfade[MAX(0, aktiverTab)], "-")) : EXIT(0)
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=700
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei a.dh
+PRINT 1
+
+--- datei b.dh
+CLASS Tier
+    DIM name AS STRING
+    SUB laut()
+    END SUB
+END CLASS
+
+--- datei sag.dh
+PRINT "etwas anderes"
+PRINT "DH_IDE_OEFFNEN|" + PATHJOIN(CWD$(), "fehlt.dh") + "|2"
+PRINT "DH_IDE_OEFFNEN|" + PATHJOIN(CWD$(), "b.dh") + "|3"
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 16) = "werkzeug oeffnet" THEN PRINT L[i]
+NEXT
+--- erwartet
+pr werkzeuge 2
+werkzeug oeffnet fehlt fehlt.dh
+werkzeug oeffnet b.dh 3
+pr vorn b.dh zeile 3

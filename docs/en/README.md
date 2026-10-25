@@ -104,6 +104,7 @@ designed, recommended; none of it is decided.
 - **[Particle editor](particle-editor.md)** (`examples/185_partikel_editor.dh`) — tune effects live
 - **[Animation editor](anim-editor.md)** (`examples/198_anim_fsm_editor.dh`) — state machine for sprite animations
 - **[Score editor](score-editor.md)** (`examples/199_notenblatt.dh`) — set notes instead of filling tracker rows
+- **[Class diagram](klassendiagramm.md)** (`examples/210_klassendiagramm.dh`) — the classes of a project as boxes and arrows, a double-click jumps to the code
 - **[Tracker](tracker.md)** (`examples/190_tracker.dh`) and **[SFX generator](sfx-generator.md)** (`examples/183_sfx_generator.dh`) — music and sound effects
 - **[Language server + VS Code](lsp.md)** — `dhrt lsp`: the same diagnostics in other editors, without Python
 - **[Recording input](automation.md)** — demo mode, replayable bug reports, automated game tests

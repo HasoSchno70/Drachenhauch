@@ -77,7 +77,7 @@ Details in the [manual](docs/en/README.md); how it got there is in the
 
 **[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 56 MB, currently version 2026.35.
 
-You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 225 examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
+You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 226 examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
 
 ## Working from source
 
@@ -130,6 +130,7 @@ Full documentation lives in [docs/en/](docs/en/README.md) — the English transl
   - **[Tilemap/level editor](docs/en/tilemap-editor.md)** (`187_tilemap_editor.dh`) — layers, object layers, multiple tilesets, tile properties, Tiled JSON (`TILED_LOAD`), DH code renderer
   - **[Form designer](docs/en/form-designer.md)** (`197_form_designer.dh`) — GUI forms in Xojo style, `.dhform` for `GUI_LOAD`, F5 launches, DH code
   - **[Animation FSM editor](docs/en/anim-editor.md)** (`198_anim_fsm_editor.dh`) — states, transitions and conditions as a graph, `.dhanim` for `ANIM_FSM_LOAD` ([module `animfsm`](docs/en/module-animfsm.md)), preview with F5
+  - **[Class diagram](docs/en/klassendiagramm.md)** (`210_klassendiagramm.dh`) — all classes of the project with fields and methods, inheritance and use as arrows; a double-click jumps to the place in the IDE, P saves an image
 - **[Language server + VSCode extension](docs/en/lsp.md)** — Drachenhauch in any LSP editor: syntax highlighting, diagnostics, completion, hover, goto-definition, references, outline. The server is the runtime itself (`dhrt lsp`), no Python (`vscode-drachenhauch/`)
 - **[Web playground](docs/en/web-playground.md)** — `dhrt` as WebAssembly in the browser, [table below](#web-playground)
 - **[`cloud` module](docs/en/module-cloud.md)** — cloud save + leaderboard against the bundled, self-hostable reference server [`cloudserver/`](cloudserver/README.md) (a Drachenhauch program + SQLite, shared API-key secret): `CLOUD_CONFIGURE`/`CLOUD_SAVE`/`CLOUD_LOAD`, `LEADERBOARD_SUBMIT`/`LEADERBOARD_FETCH`. Plus **`NUMFMT$`** (core built-in) for idle-/incremental-game-style big-number formatting (`1234567` → `"1.23M"`, K/M/B/T/Qa/Qi/Sx/Sp/Oc/No/Dc, falling back to scientific notation beyond that). Demo [examples/146_cloud_idle.dh](examples/146_cloud_idle.dh)

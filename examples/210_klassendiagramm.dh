@@ -1,0 +1,479 @@
+' Klassendiagramm: alle Klassen und Structs eines Projekts als Kaesten mit
+' Feldern und Methoden, Vererbung als Pfeil mit offenem Dreieck (UML), ein
+' Feld vom Typ einer anderen Klasse als gestrichelte Linie.
+'
+'     dhrt run examples/210_klassendiagramm.dh -- <projektordner oder datei>
+'
+' In der IDE: Werkzeuge -> Klassendiagramm (nimmt den Projektordner).
+' Ziehen verschiebt einen Kasten (die Lage wird gemerkt, in
+' .klassendiagramm.json im Projektordner), Ziehen auf freier Flaeche oder
+' das Mausrad verschiebt die Ansicht. Doppelklick springt in der IDE an die
+' Stelle -- das Werkzeug schreibt dafuer eine Zeile "DH_IDE_OEFFNEN|pfad|
+' zeile", die die IDE liest. F5 liest neu ein, L ordnet neu an, P sichert das
+' ganze Diagramm als klassendiagramm.png in den Projektordner.
+'
+' Gelesen wird mit CODE_CLASSES$, ohne zu uebersetzen -- auch eine Datei mit
+' Fehler kommt ins Bild. Ordner, die mit "." oder "_" beginnen, sowie
+' pakete/ und target/ bleiben draussen, wie bei den Umbauten der IDE.
+IMPORT "json"
+IMPORT "imgfx"
+
+CONST RAND = 10          ' Innenabstand im Kasten
+CONST ZEILE_H = 18       ' Hoehe einer Zeile im Kasten
+CONST KOPF_H = 26        ' Hoehe der Kopfzeile
+CONST ABST_X = 40        ' waagerechter Abstand beim Anordnen
+CONST ABST_Y = 70        ' senkrechter Abstand zwischen den Ebenen
+CONST RASTER = 8
+
+CONST F_GRUND = &H1C2128
+CONST F_KASTEN = &H2A313C
+CONST F_KOPF_KLASSE = &H34557E
+CONST F_KOPF_STRUCT = &H2F6B66
+CONST F_RAHMEN = &H5A6676
+CONST F_WAHL = &HF0B040
+CONST F_TEXT = &HE6EAF0
+CONST F_FELD = &HC8D0DA
+CONST F_METHODE = &H8CC0F0
+CONST F_PROPERTY = &HE8D08C
+CONST F_KONST = &HF0A070
+CONST F_ERBT = &HB8C4D4
+CONST F_NUTZT = &H7A8898
+CONST F_LEISE = &H8894A0
+
+' --- Daten -------------------------------------------------------------------
+' Je Klasse: Name, Art, Vorfahrin, Datei, Zeile, Lage und Groesse, dazu der
+' Bereich ihrer Mitglieder in den m-Feldern.
+DIM kName AS ARRAY OF STRING : kName = []
+DIM kArt AS ARRAY OF STRING : kArt = []
+DIM kBasis AS ARRAY OF STRING : kBasis = []
+DIM kDatei AS ARRAY OF STRING : kDatei = []
+DIM kZeile AS ARRAY OF INTEGER : kZeile = []
+DIM kX AS ARRAY OF INTEGER : kX = []
+DIM kY AS ARRAY OF INTEGER : kY = []
+DIM kB AS ARRAY OF INTEGER : kB = []
+DIM kH AS ARRAY OF INTEGER : kH = []
+DIM kErst AS ARRAY OF INTEGER : kErst = []
+DIM kAnz AS ARRAY OF INTEGER : kAnz = []
+' Je Mitglied: Text im Kasten, Art, Typ, Zeile.
+DIM mText AS ARRAY OF STRING : mText = []
+DIM mArt AS ARRAY OF STRING : mArt = []
+DIM mTyp AS ARRAY OF STRING : mTyp = []
+DIM mZeile AS ARRAY OF INTEGER : mZeile = []
+
+DIM ziel AS STRING : ziel = ARGPATH$(0)
+IF ziel = "" THEN ziel = STARTDIR$()
+DIM projekt AS STRING : projekt = ziel
+IF NOT DIREXISTS(ziel) THEN projekt = DIRNAME(ziel)
+DIM lagenDatei AS STRING : lagenDatei = PATHJOIN(projekt, ".klassendiagramm.json")
+DIM dateienZahl AS INTEGER : dateienZahl = 0
+
+FUNCTION mitgezaehlt(weg AS STRING) AS BOOLEAN
+    DIM t AS STRING
+    FOR EACH t IN SPLIT$(REPLACE$(weg, "\", "/"), "/")
+        IF LEFT$(t, 1) = "." OR LEFT$(t, 1) = "_" THEN RETURN FALSE
+        IF LOWER$(t) = "pakete" OR LOWER$(t) = "target" THEN RETURN FALSE
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION klasseNr(name AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(kName) - 1
+        IF LOWER$(kName[i]) = LOWER$(name) THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION mitgliedText$(art AS STRING, name AS STRING, typ AS STRING) AS STRING
+    DIM t AS STRING : t = name
+    SELECT CASE art
+        CASE "sub", "function" : t = name + "()"
+        CASE "property" : t = "PROPERTY " + name
+        CASE "konstante" : t = "CONST " + name
+    END SELECT
+    IF typ <> "" THEN t = t + " AS " + typ
+    RETURN t
+END FUNCTION
+
+' Den Klassennamen hinter einem Typ: "Tier", "ARRAY OF Tier", "MAP OF Tier".
+FUNCTION typKlasse$(typ AS STRING) AS STRING
+    DIM t AS STRING : t = TRIM$(typ)
+    DIM g AS STRING : g = UPPER$(t)
+    IF LEFT$(g, 9) = "ARRAY OF " THEN t = TRIM$(MID$(t, 9))
+    IF LEFT$(UPPER$(t), 7) = "MAP OF " THEN t = TRIM$(MID$(t, 7))
+    RETURN t
+END FUNCTION
+
+SUB einlesen()
+    kName = [] : kArt = [] : kBasis = [] : kDatei = [] : kZeile = []
+    kX = [] : kY = [] : kB = [] : kH = [] : kErst = [] : kAnz = []
+    mText = [] : mArt = [] : mTyp = [] : mZeile = []
+    DIM dateien AS ARRAY OF STRING : dateien = []
+    IF NOT DIREXISTS(ziel) THEN
+        ARRAY_PUSH(dateien, ziel)
+    ELSE
+        DIM d AS STRING
+        FOR EACH d IN DIRLIST_REC(projekt, "*.dh")
+            IF mitgezaehlt(d) THEN ARRAY_PUSH(dateien, PATHJOIN(projekt, d))
+        NEXT
+        SORT(dateien)
+    END IF
+    dateienZahl = LEN(dateien)
+    DIM datei AS STRING
+    FOR EACH datei IN dateien
+        DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "k" + CHR$(34) + ": " + CODE_CLASSES$(JOIN$(READLINES(datei), CHR$(10))) + "}")
+        DIM k AS INTEGER
+        FOR k = 0 TO JSON_LEN(j, "k") - 1
+            DIM p AS STRING : p = "k." + STR$(k)
+            ' Derselbe Name in zwei Dateien: der erste gewinnt.
+            IF klasseNr(JSON_GET_STRING(j, p + ".name")) >= 0 THEN CONTINUE
+            ARRAY_PUSH(kName, JSON_GET_STRING(j, p + ".name"))
+            ARRAY_PUSH(kArt, JSON_GET_STRING(j, p + ".art"))
+            ARRAY_PUSH(kBasis, JSON_GET_STRING(j, p + ".basis"))
+            ARRAY_PUSH(kDatei, datei)
+            ARRAY_PUSH(kZeile, JSON_GET_INT(j, p + ".zeile"))
+            ARRAY_PUSH(kX, 0) : ARRAY_PUSH(kY, 0) : ARRAY_PUSH(kB, 0) : ARRAY_PUSH(kH, 0)
+            ARRAY_PUSH(kErst, LEN(mText))
+            DIM m AS INTEGER
+            FOR m = 0 TO JSON_LEN(j, p + ".mitglieder") - 1
+                DIM q AS STRING : q = p + ".mitglieder." + STR$(m)
+                DIM art AS STRING : art = JSON_GET_STRING(j, q + ".art")
+                ARRAY_PUSH(mArt, art)
+                ARRAY_PUSH(mTyp, JSON_GET_STRING(j, q + ".typ"))
+                ARRAY_PUSH(mText, mitgliedText$(art, JSON_GET_STRING(j, q + ".name"), JSON_GET_STRING(j, q + ".typ")))
+                ARRAY_PUSH(mZeile, JSON_GET_INT(j, q + ".zeile"))
+            NEXT
+            ARRAY_PUSH(kAnz, LEN(mText) - kErst[LEN(kErst) - 1])
+        NEXT
+    NEXT
+    groessenRechnen()
+END SUB
+
+' Breite und Hoehe jedes Kastens aus seinem Text.
+FUNCTION kopfText$(i AS INTEGER) AS STRING
+    IF kArt[i] = "struct" THEN RETURN "STRUCT " + kName[i]
+    RETURN kName[i]
+END FUNCTION
+
+SUB groessenRechnen()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(kName) - 1
+        DIM b AS INTEGER : b = TEXT_WIDTH(kopfText$(i)) + 8
+        DIM m AS INTEGER
+        FOR m = kErst[i] TO kErst[i] + kAnz[i] - 1
+            b = MAX(b, TEXT_WIDTH(mText[m]))
+        NEXT
+        kB[i] = MAX(120, b + 2 * RAND)
+        kH[i] = KOPF_H + MAX(1, kAnz[i]) * ZEILE_H + RAND
+    NEXT
+END SUB
+
+' --- Anordnen ----------------------------------------------------------------
+' Ebenen nach der Vererbung: Wurzeln oben, Kinder darunter. Innerhalb einer
+' Ebene stehen Geschwister nebeneinander, in der Reihenfolge ihrer Eltern.
+FUNCTION tiefe(i AS INTEGER) AS INTEGER
+    DIM t AS INTEGER : t = 0
+    DIM k AS INTEGER : k = i
+    WHILE t < 20
+        IF kBasis[k] = "" THEN RETURN t
+        DIM e AS INTEGER : e = klasseNr(kBasis[k])
+        IF e < 0 THEN RETURN t
+        k = e : t = t + 1
+    WEND
+    RETURN t
+END FUNCTION
+
+SUB anordnen()
+    DIM maxT AS INTEGER : maxT = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(kName) - 1
+        maxT = MAX(maxT, tiefe(i))
+    NEXT
+    DIM y AS INTEGER : y = 40
+    DIM t AS INTEGER
+    DIM reihe AS ARRAY OF INTEGER : reihe = []
+    FOR t = 0 TO maxT
+        DIM vorige AS ARRAY OF INTEGER : vorige = reihe
+        reihe = []
+        ' Erst die Kinder der vorigen Ebene in deren Reihenfolge, dann der Rest.
+        DIM v AS INTEGER
+        FOR EACH v IN vorige
+            FOR i = 0 TO LEN(kName) - 1
+                IF tiefe(i) = t AND klasseNr(kBasis[i]) = v THEN ARRAY_PUSH(reihe, i)
+            NEXT
+        NEXT
+        FOR i = 0 TO LEN(kName) - 1
+            IF tiefe(i) = t AND ARRAY_INDEXOF(reihe, i) < 0 THEN ARRAY_PUSH(reihe, i)
+        NEXT
+        DIM x AS INTEGER : x = 40
+        DIM hoch AS INTEGER : hoch = 0
+        FOR EACH v IN reihe
+            ' Zu breit fuer eine Zeile: umbrechen, die Ebene wird hoeher.
+            IF x > 40 AND x + kB[v] > 1800 THEN
+                x = 40 : y = y + hoch + ABST_X : hoch = 0
+            END IF
+            kX[v] = x : kY[v] = y
+            x = x + kB[v] + ABST_X
+            hoch = MAX(hoch, kH[v])
+        NEXT
+        y = y + hoch + ABST_Y
+    NEXT
+END SUB
+
+' Gemerkte Lagen ueber die Anordnung legen (Schluessel = Klassenname klein).
+SUB lagenLaden()
+    IF NOT FILEEXISTS(lagenDatei) THEN RETURN
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_LOAD(lagenDatei)
+    CATCH e
+        RETURN
+    END TRY
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(kName) - 1
+        DIM s AS STRING : s = JSON_KEY$(LOWER$(kName[i]))
+        IF JSON_HAS(j, s + ".x") THEN
+            kX[i] = JSON_GET_INT(j, s + ".x")
+            kY[i] = JSON_GET_INT(j, s + ".y")
+        END IF
+    NEXT
+END SUB
+
+SUB lagenSichern()
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(kName) - 1
+        DIM s AS STRING : s = JSON_KEY$(LOWER$(kName[i]))
+        JSON_SET_INT(j, s + ".x", kX[i])
+        JSON_SET_INT(j, s + ".y", kY[i])
+    NEXT
+    TRY
+        WRITEALL(lagenDatei, JSON_STRINGIFY(j))
+    CATCH e
+        meldung = "Lagen nicht gesichert: " + e
+    END TRY
+END SUB
+
+' --- Zeichnen ----------------------------------------------------------------
+DIM ox AS INTEGER : ox = 0       ' Verschiebung der Ansicht
+DIM oy AS INTEGER : oy = 0
+DIM gewaehlt AS INTEGER : gewaehlt = -1
+DIM meldung AS STRING : meldung = ""
+
+' Eine gestrichelte Linie (fuer "nutzt").
+SUB strichlinie(x1 AS FLOAT, y1 AS FLOAT, x2 AS FLOAT, y2 AS FLOAT, farbe AS INTEGER)
+    DIM dx AS FLOAT : dx = x2 - x1
+    DIM dy AS FLOAT : dy = y2 - y1
+    DIM l AS FLOAT : l = SQR(dx * dx + dy * dy)
+    IF l < 1.0 THEN RETURN
+    DIM s AS FLOAT : s = 0.0
+    WHILE s < l
+        DIM e AS FLOAT : e = MIN(l, s + 7.0)
+        LINE(x1 + dx * s / l, y1 + dy * s / l, x1 + dx * e / l, y1 + dy * e / l, farbe)
+        s = s + 12.0
+    WEND
+END SUB
+
+' Der Punkt auf dem Rand eines Kastens Richtung (zx, zy).
+FUNCTION randPunkt(i AS INTEGER, zx AS FLOAT, zy AS FLOAT, dx0 AS INTEGER, dy0 AS INTEGER) AS TUPLE
+    DIM cx AS FLOAT : cx = kX[i] + dx0 + kB[i] / 2.0
+    DIM cy AS FLOAT : cy = kY[i] + dy0 + kH[i] / 2.0
+    DIM dx AS FLOAT : dx = zx - cx
+    DIM dy AS FLOAT : dy = zy - cy
+    IF dx = 0.0 AND dy = 0.0 THEN RETURN (cx, cy)
+    DIM s AS FLOAT : s = 1000000000.0
+    IF dx <> 0.0 THEN s = (kB[i] / 2.0) / ABS(dx)
+    IF dy <> 0.0 THEN s = MIN(s, (kH[i] / 2.0) / ABS(dy))
+    RETURN (cx + dx * s, cy + dy * s)
+END FUNCTION
+
+' Pfeil von a nach b; `dreieck` = offenes Dreieck (Vererbung), sonst eine
+' offene Spitze (nutzt).
+SUB pfeil(a AS INTEGER, b AS INTEGER, dreieck AS BOOLEAN, dx0 AS INTEGER, dy0 AS INTEGER)
+    DIM x1 AS FLOAT : DIM y1 AS FLOAT : DIM x2 AS FLOAT : DIM y2 AS FLOAT
+    (x1, y1) = randPunkt(a, kX[b] + dx0 + kB[b] / 2.0, kY[b] + dy0 + kH[b] / 2.0, dx0, dy0)
+    (x2, y2) = randPunkt(b, kX[a] + dx0 + kB[a] / 2.0, kY[a] + dy0 + kH[a] / 2.0, dx0, dy0)
+    DIM dx AS FLOAT : dx = x2 - x1
+    DIM dy AS FLOAT : dy = y2 - y1
+    DIM l AS FLOAT : l = MAX(1.0, SQR(dx * dx + dy * dy))
+    DIM ux AS FLOAT : ux = dx / l
+    DIM uy AS FLOAT : uy = dy / l
+    DIM gr AS FLOAT : gr = IIF(dreieck, 14.0, 10.0)
+    DIM bx AS FLOAT : bx = x2 - ux * gr
+    DIM bby AS FLOAT : bby = y2 - uy * gr
+    DIM lx AS FLOAT : lx = bx - uy * gr * 0.55
+    DIM ly AS FLOAT : ly = bby + ux * gr * 0.55
+    DIM rx AS FLOAT : rx = bx + uy * gr * 0.55
+    DIM ry AS FLOAT : ry = bby - ux * gr * 0.55
+    IF dreieck THEN
+        LINEW(x1, y1, bx, bby, 2, F_ERBT)
+        TRIANGLE(x2, y2, lx, ly, rx, ry, F_GRUND)
+        LINEW(x2, y2, lx, ly, 2, F_ERBT) : LINEW(lx, ly, rx, ry, 2, F_ERBT) : LINEW(rx, ry, x2, y2, 2, F_ERBT)
+    ELSE
+        strichlinie(x1, y1, x2, y2, F_NUTZT)
+        LINE(x2, y2, lx, ly, F_NUTZT) : LINE(x2, y2, rx, ry, F_NUTZT)
+    END IF
+END SUB
+
+FUNCTION mitgliedFarbe(art AS STRING) AS INTEGER
+    SELECT CASE art
+        CASE "sub", "function" : RETURN F_METHODE
+        CASE "property" : RETURN F_PROPERTY
+        CASE "konstante" : RETURN F_KONST
+    END SELECT
+    RETURN F_FELD
+END FUNCTION
+
+' Alles, um (dx0, dy0) verschoben -- auf den Schirm und ins Bild fuer P.
+SUB diagrammZeichnen(dx0 AS INTEGER, dy0 AS INTEGER)
+    DIM i AS INTEGER
+    DIM m AS INTEGER
+    ' Erst die Linien, damit die Kaesten darueber liegen.
+    FOR i = 0 TO LEN(kName) - 1
+        FOR m = kErst[i] TO kErst[i] + kAnz[i] - 1
+            IF mArt[m] <> "feld" THEN CONTINUE
+            DIM z AS INTEGER : z = klasseNr(typKlasse$(mTyp[m]))
+            IF z >= 0 AND z <> i THEN pfeil(i, z, FALSE, dx0, dy0)
+        NEXT
+    NEXT
+    FOR i = 0 TO LEN(kName) - 1
+        DIM e AS INTEGER : e = klasseNr(kBasis[i])
+        IF e >= 0 THEN pfeil(i, e, TRUE, dx0, dy0)
+    NEXT
+    FOR i = 0 TO LEN(kName) - 1
+        DIM x AS INTEGER : x = kX[i] + dx0
+        DIM y AS INTEGER : y = kY[i] + dy0
+        BOXROUND(x, y, x + kB[i], y + kH[i], 6, F_KASTEN)
+        BOXROUND(x, y, x + kB[i], y + KOPF_H, 6, IIF(kArt[i] = "struct", F_KOPF_STRUCT, F_KOPF_KLASSE))
+        BOX(x, y + KOPF_H - 6, x + kB[i], y + KOPF_H, IIF(kArt[i] = "struct", F_KOPF_STRUCT, F_KOPF_KLASSE))
+        RECTROUND(x, y, x + kB[i], y + kH[i], 6, IIF(i = gewaehlt, F_WAHL, F_RAHMEN))
+        TEXT_BOLD(TRUE)
+        TEXT(x + (kB[i] - TEXT_WIDTH(kopfText$(i))) \ 2, y + 5, kopfText$(i), F_TEXT)
+        TEXT_BOLD(FALSE)
+        IF kAnz[i] = 0 THEN TEXT(x + RAND, y + KOPF_H + 4, "(leer)", F_LEISE)
+        DIM r AS INTEGER : r = 0
+        FOR m = kErst[i] TO kErst[i] + kAnz[i] - 1
+            TEXT(x + RAND, y + KOPF_H + 4 + r * ZEILE_H, mText[m], mitgliedFarbe(mArt[m]))
+            r = r + 1
+        NEXT
+        ' Eine Vorfahrin, die das Projekt nicht kennt, steht klein darueber.
+        IF kBasis[i] <> "" AND klasseNr(kBasis[i]) < 0 THEN TEXT(x, y - 16, "EXTENDS " + kBasis[i], F_LEISE)
+    NEXT
+END SUB
+
+' --- Treffer -------------------------------------------------------------------
+FUNCTION kastenBei(mx AS INTEGER, my AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    ' Von hinten: der zuletzt gezeichnete liegt oben.
+    FOR i = LEN(kName) - 1 TO 0 STEP -1
+        IF mx >= kX[i] + ox AND mx <= kX[i] + ox + kB[i] AND my >= kY[i] + oy AND my <= kY[i] + oy + kH[i] THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Die Zeile im Quelltext unter der Maus: ein Mitglied oder der Kopf.
+FUNCTION zeileBei(i AS INTEGER, my AS INTEGER) AS INTEGER
+    DIM r AS INTEGER : r = (my - (kY[i] + oy + KOPF_H + 4)) \ ZEILE_H
+    IF my >= kY[i] + oy + KOPF_H AND r >= 0 AND r < kAnz[i] THEN RETURN mZeile[kErst[i] + r]
+    RETURN kZeile[i]
+END FUNCTION
+
+' Die IDE liest diese Zeile aus der Ausgabe ihrer Werkzeuge und oeffnet die
+' Datei an der Stelle; allein gestartet steht sie nur in der Konsole.
+SUB inDerIdeOeffnen(i AS INTEGER, zeile AS INTEGER)
+    PRINT "DH_IDE_OEFFNEN|" + kDatei[i] + "|" + STR$(zeile)
+    meldung = BASENAME(kDatei[i]) + ":" + STR$(zeile)
+END SUB
+
+' Das ganze Diagramm als PNG (ein Rendertarget in voller Groesse).
+SUB bildSichern()
+    IF LEN(kName) = 0 THEN RETURN
+    DIM x0 AS INTEGER : x0 = 1000000
+    DIM y0 AS INTEGER : y0 = 1000000
+    DIM x1 AS INTEGER : x1 = -1000000
+    DIM y1 AS INTEGER : y1 = -1000000
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(kName) - 1
+        x0 = MIN(x0, kX[i]) : y0 = MIN(y0, kY[i] - 20)
+        x1 = MAX(x1, kX[i] + kB[i]) : y1 = MAX(y1, kY[i] + kH[i])
+    NEXT
+    DIM b AS INTEGER : b = MIN(8000, x1 - x0 + 40)
+    DIM h AS INTEGER : h = MIN(8000, y1 - y0 + 40)
+    DIM rt AS INTEGER : rt = RENDERTARGET_NEW(b, h)
+    RENDERTARGET_BEGIN(rt)
+    BOX(0, 0, b, h, F_GRUND)
+    diagrammZeichnen(20 - x0, 20 - y0)
+    RENDERTARGET_END()
+    DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+    DIM pfad AS STRING : pfad = PATHJOIN(projekt, "klassendiagramm.png")
+    IMAGE_SAVE(bild, pfad, FALSE)
+    IMAGE_FREE(bild)
+    meldung = "Gesichert: " + pfad
+END SUB
+
+' --- Hauptprogramm -----------------------------------------------------------
+SCREEN(1280, 800, "Klassendiagramm -- " + BASENAME(ziel), 1)
+WINDOW_RESIZABLE(TRUE)
+SETFPS(60)
+DIM schrift AS INTEGER : schrift = LOADFONT("sans", 30)
+SETFONT(schrift, 15)
+einlesen()
+anordnen()
+lagenLaden()
+
+DIM zug AS INTEGER : zug = -1      ' -1 nichts, sonst Kasten; -2 Ansicht
+DIM zugMx AS INTEGER : DIM zugMy AS INTEGER
+DIM zugX AS INTEGER : DIM zugY AS INTEGER
+DIM bewegt AS BOOLEAN : bewegt = FALSE
+DIM letzterKlick AS INTEGER : letzterKlick = -100000
+DIM letzteNr AS INTEGER : letzteNr = -1
+
+WHILE NOT QUITREQUESTED()
+    DIM mx AS INTEGER : mx = MOUSEX()
+    DIM my AS INTEGER : my = MOUSEY()
+    IF MOUSE_HIT(0) THEN
+        DIM n AS INTEGER : n = kastenBei(mx, my)
+        IF n >= 0 AND n = letzteNr AND MILLIS() - letzterKlick < 400 THEN
+            inDerIdeOeffnen(n, zeileBei(n, my))
+            letzterKlick = -100000
+        ELSE
+            letzterKlick = MILLIS() : letzteNr = n
+            gewaehlt = n
+            zugMx = mx : zugMy = my : bewegt = FALSE
+            IF n >= 0 THEN
+                zug = n : zugX = kX[n] : zugY = kY[n]
+            ELSE
+                zug = -2 : zugX = ox : zugY = oy
+            END IF
+        END IF
+    END IF
+    IF MOUSEBUTTON(0) AND zug <> -1 THEN
+        IF ABS(mx - zugMx) + ABS(my - zugMy) > 3 THEN bewegt = TRUE
+        IF zug >= 0 THEN
+            kX[zug] = ((zugX + mx - zugMx) \ RASTER) * RASTER
+            kY[zug] = ((zugY + my - zugMy) \ RASTER) * RASTER
+        ELSE
+            ox = zugX + mx - zugMx : oy = zugY + my - zugMy
+        END IF
+    END IF
+    IF MOUSE_RELEASED(0) THEN
+        IF zug >= 0 AND bewegt THEN lagenSichern()
+        zug = -1
+    END IF
+    oy = oy + INT(MOUSEWHEEL_Y() * 40)
+    ox = ox + INT(MOUSEWHEEL_X() * 40)
+    IF KEYHIT(KEY_F5) THEN einlesen() : anordnen() : lagenLaden() : meldung = "Neu eingelesen"
+    IF KEYHIT("l") THEN anordnen() : lagenSichern() : meldung = "Neu angeordnet"
+    IF KEYHIT("p") THEN bildSichern()
+
+    CLS(F_GRUND)
+    diagrammZeichnen(ox, oy)
+    DIM sh AS INTEGER : sh = SCREENHEIGHT()
+    BOX(0, sh - 26, SCREENWIDTH(), sh, &H151A20)
+    DIM unten AS STRING : unten = STR$(LEN(kName)) + " Klassen in " + STR$(dateienZahl) + IIF(dateienZahl = 1, " Datei", " Dateien")
+    unten = unten + "   --   Ziehen verschiebt, Doppelklick springt in die IDE, F5 neu einlesen, L neu anordnen, P als Bild"
+    IF meldung <> "" THEN unten = meldung + "   --   " + unten
+    TEXT(10, sh - 21, unten, F_LEISE)
+    IF LEN(kName) = 0 THEN TEXT(40, 40, "Keine Klassen gefunden in " + ziel, F_TEXT)
+    FLIP()
+WEND

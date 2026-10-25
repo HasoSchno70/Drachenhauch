@@ -2689,6 +2689,27 @@ Kopfzeile; allein gestartet endet es gleich), Rust-Test
 `pluginWert$`, `_`-Ordner mitgezaehlt, Baumauswahl nicht im Abdruck) fallen
 je in ihrem Fall.
 
+## Klassendiagramm (2026-10-25)
+
+`examples/210_klassendiagramm.dh`: die Klassen eines Projekts als Kaesten
+(Felder, Konstanten, Eigenschaften, Methoden mit Typ) aus `CODE_CLASSES$`,
+Vererbung mit offenem Dreieck, ein Feld vom Typ einer anderen Klasse
+gestrichelt; Ebenen nach der Vererbung, Kaesten ziehbar (Lagen in
+`.klassendiagramm.json` im Projekt), F5/L/P, das ganze Diagramm als PNG
+ueber ein Rendertarget. **Doppelklick springt in die IDE:** das Werkzeug
+schreibt `DH_IDE_OEFFNEN|pfad|zeile`, und die IDE liest jetzt die Ausgabe
+ihrer Werkzeuge (`werkzeugeAufraeumen` -> `werkzeugZeile`; vorher las sie
+niemand, die Leitung haette sich gefuellt). Eine Datei, die es nicht gibt,
+laesst die Marke stehen (sonst sprang der Reiter vorn auf die Zeile).
+Werkzeuge -> Klassendiagramm nimmt den Projektordner. **Fund im
+Pruefformat:** Text hinter `--- programm` (und den anderen Koepfen ohne
+Inhalt) wurde stillschweigend uebergangen -- der Quelltext eines neuen
+Falls lief so nie, und der Fall schwieg; jetzt ein Fehler, Leerzeilen und
+Kommentare bleiben erlaubt (alle 444 Sammlungen lesen sich weiter ein).
+Tests `tests/pruef/werkzeug_klassendiagramm.dhtest` (4: Ebenen, Lagen,
+Sprungwunsch, Bild, die IDE ueber einen echten Werkzeug-Prozess), Rust-Test
+`text_hinter_programm_ist_ein_fehler`; sechs Verfaelschungen fallen.
+
 ## Plugin-Schnittstelle: Code-Hilfen (2026-10-25)
 
 Drei Wege, auf denen ein Plugin im Code-Feld mitredet, als Probe das
@@ -5617,6 +5638,7 @@ Ihre Nachfolger sind Drachenhauch-Programme, in der IDE unter *Werkzeuge*:
 | Form-Designer | `examples/197_form_designer.dh` | `docs/form-designer.md` | `tests/pruef/werkzeug_formdesigner.dhtest` |
 | Anim-FSM-Editor | `examples/198_anim_fsm_editor.dh` | `docs/anim-editor.md` | `tests/pruef/werkzeug_animfsm.dhtest` |
 | Notenblatt | `examples/199_notenblatt.dh` | `docs/score-editor.md` | `tests/pruef/werkzeug_notenblatt.dhtest` |
+| Klassendiagramm | `examples/210_klassendiagramm.dh` | `docs/klassendiagramm.md` | `tests/pruef/werkzeug_klassendiagramm.dhtest` |
 
 Jedes Handbuch nennt am Ende, was die Qt-Fassung zusaetzlich konnte. [Neu] und [Oeffnen] im Notenblatt fragen
 seit 2026-09-21 bei ungesicherten Aenderungen nach (PR #211; hier stand bis

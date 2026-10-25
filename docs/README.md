@@ -103,6 +103,7 @@ entworfen, empfohlen; entschieden ist nichts davon.
 - **[Partikel-Editor](particle-editor.md)** (`examples/185_partikel_editor.dh`) — Effekte live einstellen
 - **[Animations-Editor](anim-editor.md)** (`examples/198_anim_fsm_editor.dh`) — Zustandsautomat für Sprite-Animationen
 - **[Notenblatt](score-editor.md)** (`examples/199_notenblatt.dh`) — Noten setzen statt Tracker-Zeilen füllen
+- **[Klassendiagramm](klassendiagramm.md)** (`examples/210_klassendiagramm.dh`) — die Klassen eines Projekts als Kästen und Pfeile, Doppelklick springt in den Code
 - **[Tracker](tracker.md)** (`examples/190_tracker.dh`) und **[SFX-Generator](sfx-generator.md)** (`examples/183_sfx_generator.dh`) — Musik und Geräusche
 - **[Sprachserver + VS Code](lsp.md)** — `dhrt lsp`: dieselbe Diagnose in fremden Editoren, ohne Python
 - **[Eingabe aufzeichnen](automation.md)** — Demo-Modus, nachspielbare Fehlerberichte, automatische Spieltests
