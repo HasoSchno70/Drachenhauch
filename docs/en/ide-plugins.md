@@ -11,31 +11,55 @@ run in a process of their own.
 
 ## Where plugins live
 
-Each plugin is a folder under `plugins/` next to the `ide.json`
-(Windows: `%APPDATA%\Drachenhauch\plugins\<name>\`) with a `plugin.dh`
-in it. **Plugins → Open plugin folder** creates the folder and opens it.
-**Plugins → Manage plugins …** shows all of them with their state; the tick
-says whether it is loaded at startup (`plugins_aus` in the `ide.json`).
-**Plugins → Reload plugins** stops all of them and starts them again --
-after changing a plugin that is enough, the IDE does not have to restart.
+Each plugin is a folder with a `plugin.dh` in it, in one of two places:
 
-An example lives in `examples/plugins/todo/`: TODO and FIXME of the file in
-front as a panel on the right, a command with a shortcut, a warning per
-FIXME, a snippet and a colouring for `.todo` files. To try it, copy the
-folder `todo` into the plugin folder and reload.
+* **Your own plugins** under `plugins/` next to the `ide.json` (Windows:
+  `%APPDATA%\Drachenhauch\plugins\<name>\`). They run until you switch
+  them off (`plugins_aus` in the `ide.json`).
+* **Bundled plugins** in `examples/plugins/`, shipped with the installer.
+  They are off until you tick them (`plugins_an`). A plugin of your own
+  with the same name hides the bundled one.
 
-A third one in `examples/plugins/schreibweise/` shows the code helps in the
-code field: typical German misspellings in comments ("Standart",
-"seperat") are underlined, Ctrl+. replaces them, the tooltip names the
-right spelling, and the context menu has "Schreibweise: Wort erlauben"
-(allow word) for words meant that way (`erlaubt.txt` next to the plugin).
+**Plugins → New plugin …** creates one of your own from the template (a
+command, an entry in the context menu, a panel), opens its `plugin.dh` and
+starts it. **Plugins → Manage plugins …** shows all of them with title,
+version and state; the tooltip gives description, author and path; the tick
+says whether it is loaded at startup. **Plugins → Reload plugins** stops all
+of them and starts them again -- after changing a plugin that is enough, the
+IDE does not have to restart. **Plugins → Open plugin folder** opens the
+folder of your own plugins.
 
-A second one in `examples/plugins/klassen/`: all classes and structs of the
-project as a tree (from `CODE_CLASSES$`, without compiling), below them
-fields, constants, properties and methods with their type; a filter field,
-"only the file in front", and a click jumps to the place. It reads again
-after saving and leaves out folders starting with `.` or `_`, as well as
-`pakete/` and `target/`.
+Three are bundled:
+
+* `todo`: TODO and FIXME of the file in front as a panel on the right, a
+  command with a shortcut, a warning per FIXME, a snippet and a colouring
+  for `.todo` files.
+* `klassen`: all classes and structs of the project as a tree (from
+  `CODE_CLASSES$`, without compiling), below them fields, constants,
+  properties and methods with their type; a filter field, "only the file in
+  front", and a click jumps to the place. It reads again after saving and
+  leaves out folders starting with `.` or `_`, as well as `pakete/` and
+  `target/`.
+* `schreibweise`: typical German misspellings in comments ("Standart",
+  "seperat") are underlined, Ctrl+. replaces them, the tooltip names the
+  right spelling, and the context menu has "Schreibweise: Wort erlauben"
+  (allow word) for words meant that way (`erlaubt.txt` in the data folder).
+
+### The profile
+
+Next to the `plugin.dh` there may be a `plugin.json`:
+
+```json
+{"name": "Mein Plugin", "fassung": "1.0", "beschreibung": "Was es tut.", "autor": "Ich", "ide": "2026.36"}
+```
+
+The manager shows name and version instead of the folder name. `ide` is the
+smallest IDE version the plugin needs -- with an older one it does not
+start, and its state says so. Without a profile the folder name counts.
+
+Each plugin has a **data folder** next to the `ide.json`
+(`plugin-daten/<name>/`, `PLUGIN_DATENORDNER$()`). Its settings and lists
+go there -- a bundled plugin may live in a folder it must not write to.
 
 ## Writing a plugin
 
@@ -83,6 +107,9 @@ its own) `PLUGIN_LAEUFT()` is FALSE and the program ends right away.
 | `PLUGIN_PROJEKT$()` | the project folder |
 | `PLUGIN_WORT$()` | the word at the cursor |
 | `PLUGIN_EINFUEGEN(text$)` | insert text at the cursor (it replaces a selection) |
+| `PLUGIN_ERSETZEN(zeile, spalte, bis_zeile, bis_spalte, text$ [, datei$])` | replace a range (lines and columns from 1, `bis_spalte` exclusive) -- in the tab in front or in `datei$`, which the IDE opens for it. One step for Ctrl+Z |
+| `PLUGIN_AUSWAHL_SETZEN(zeile, spalte [, bis_zeile, bis_spalte [, datei$]])` | set the cursor, with an end a selection |
+| `PLUGIN_DATENORDNER$()` | the folder the plugin may write to |
 | `PLUGIN_MELDUNG(text$)` | a message in the status bar |
 | `PLUGIN_AUSGABE(text$)` | a line in the output |
 | `PLUGIN_OEFFNEN(pfad$ [, zeile])` | open a file, on request at a line |
@@ -122,7 +149,7 @@ From the plugin to the IDE:
 | `liste` | `leiste`, `widget`, `eintraege` (array) |
 | `baum` | `leiste`, `widget`, `ebenen` and `texte` (arrays of the same length), `auf` |
 | `frage` | `nr`, `was` (`text`, `datei`, `auswahl`, `marke`, `wort`, `projekt`) |
-| `tue` | `was` (`einfuegen`, `meldung`, `ausgabe`, `oeffnen`), `text`, `datei`, `zeile` |
+| `tue` | `was` (`einfuegen`, `meldung`, `ausgabe`, `oeffnen`, `ersetzen`, `waehlen`), `text`, `datei`, `zeile`, plus `spalte`, `bis_zeile`, `bis_spalte` |
 | `befunde` | `datei`, `liste` (objects with `zeile`, `meldung`, `schwere`, optionally `spalte`, `laenge` and `korrekturen` -- each with `titel` and `aenderungen` holding `zeile`, `spalte`, `bis_zeile`, `bis_spalte`, `text`, as in `CODE_CHECK$`) |
 | `hover` | `nr` (from the event), `text` |
 | `schnipsel` | `name`, `kuerzel`, `text` |

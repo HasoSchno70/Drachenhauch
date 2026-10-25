@@ -2689,6 +2689,32 @@ Kopfzeile; allein gestartet endet es gleich), Rust-Test
 `pluginWert$`, `_`-Ordner mitgezaehlt, Baumauswahl nicht im Abdruck) fallen
 je in ihrem Fall.
 
+## Plugin-Oekosystem: Steckbrief, mitgelieferte, Vorlage, Text aendern (2026-10-25)
+
+Plugins an ZWEI Stellen (`pluginsAusOrdner`): eigene unter `plugins/`
+neben der ide.json (laufen, ausser `plugins_aus`) und **mitgelieferte** in
+`examples/plugins/` (`pluginMitOrdner$` ueber `beispielOrdner`; aus, bis
+`plugins_an` sie nennt -- `pluginGewollt`/`pluginGewolltSetzen`). Eigene
+zuerst, ein gleicher Name verdeckt das mitgelieferte. Das Protokoll zaehlt
+`plugins N` weiter nur die eigenen (alte Tests), dazu `mitgeliefert N`.
+**Steckbrief** `plugin.json` (name, fassung, beschreibung, autor, ide):
+Verwaltung zeigt "Titel Fassung (mitgeliefert)", Tooltip Beschreibung/Autor/
+Pfad; `ide` neuer als `VERSION$()` (`fassungVergleich`) -> startet nicht,
+Zustand "braucht IDE x". **Datenordner** je Plugin `plugin-daten/<name>/`
+neben der ide.json, ueber `DH_PLUGIN_DATEN` (per SETENV vor WINDOW_OPEN,
+**als REALPATH$** -- bei einer ide.json ohne Ordner ist der Konfig-Ordner
+".", und das Plugin laeuft in seinem eigenen Ordner) -> `PLUGIN_DATENORDNER$`;
+Schreibweise schreibt seine erlaubt.txt dorthin (vorher in seinen eigenen
+Ordner, also bei einem mitgelieferten ins Repository/Beispielordner).
+**Vorlage** Plugins -> Neues Plugin ... (`pluginAnlegen`: Name
+`[A-Za-z0-9_-]+`, plugin.dh + plugin.json + leiste.dhform, sofort
+angemeldet und geoeffnet; das Muster zaehlt das Wort an der Marke).
+**Text aendern:** `PLUGIN_ERSETZEN(z, s, bz, bs, text$ [, datei$])` und
+`PLUGIN_AUSWAHL_SETZEN` (Nachricht `tue` mit `ersetzen`/`waehlen`, SELECT +
+INSERT = ein Undo-Schritt, mit Datei wird sie erst geoeffnet). Tests
+`tests/pruef/werkzeug_ide_plugin_oekosystem.dhtest` (4); sieben
+Verfaelschungen fallen.
+
 ## Klassendiagramm (2026-10-25)
 
 `examples/210_klassendiagramm.dh`: die Klassen eines Projekts als Kaesten

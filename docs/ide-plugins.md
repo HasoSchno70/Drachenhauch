@@ -11,32 +11,57 @@ Wie bei VS Code laufen die Erweiterungen in einem eigenen Prozess.
 
 ## Wo Plugins liegen
 
-Jedes Plugin ist ein Ordner unter `plugins/` neben der `ide.json`
-(Windows: `%APPDATA%\Drachenhauch\plugins\<name>\`) mit einer `plugin.dh`
-darin. **Plugins → Plugin-Ordner öffnen** legt den Ordner an und öffnet ihn.
-**Plugins → Plugins verwalten …** zeigt alle mit ihrem Zustand; der Haken
-sagt, ob es beim Start geladen wird (`plugins_aus` in der `ide.json`).
-**Plugins → Plugins neu laden** beendet alle und startet sie wieder -- nach
-einer Änderung an einem Plugin genügt das, die IDE muss nicht neu starten.
+Jedes Plugin ist ein Ordner mit einer `plugin.dh` darin, an einer von zwei
+Stellen:
 
-Ein Beispiel liegt in `examples/plugins/todo/`: TODO und FIXME der Datei
-vorn als Leiste rechts, ein Befehl mit Kürzel, eine Warnung je FIXME, ein
-Schnipsel und eine Färbung für `.todo`-Dateien. Zum Ausprobieren den Ordner
-`todo` in den Plugin-Ordner kopieren und neu laden.
+* **Eigene Plugins** unter `plugins/` neben der `ide.json` (Windows:
+  `%APPDATA%\Drachenhauch\plugins\<name>\`). Sie laufen, bis man sie
+  abschaltet (`plugins_aus` in der `ide.json`).
+* **Mitgelieferte Plugins** in `examples/plugins/`, sie kommen mit dem
+  Installer. Sie sind aus, bis man sie anhakt (`plugins_an`). Ein eigenes
+  Plugin gleichen Namens verdeckt das mitgelieferte.
 
-Ein drittes in `examples/plugins/schreibweise/` zeigt die Code-Hilfen im
-Code-Feld: typische Schreibfehler in Kommentaren („Standart“, „seperat“)
-sind unterstrichen, Strg+. ersetzt sie, der Tooltip nennt die
-richtige Schreibweise, und das Kontextmenü hat „Schreibweise: Wort
-erlauben“ für Wörter, die so gemeint sind (`erlaubt.txt` neben dem
-Plugin).
+**Plugins → Neues Plugin …** legt ein eigenes aus der Vorlage an (ein
+Befehl, ein Eintrag im Kontextmenü, eine Leiste), öffnet seine `plugin.dh`
+und startet es. **Plugins → Plugins verwalten …** zeigt alle mit Titel,
+Fassung und Zustand, der Tooltip nennt Beschreibung, Autor und Pfad; der
+Haken sagt, ob es beim Start geladen wird. **Plugins → Plugins neu laden**
+beendet alle und startet sie wieder -- nach einer Änderung an einem Plugin
+genügt das, die IDE muss nicht neu starten. **Plugins → Plugin-Ordner
+öffnen** öffnet den Ordner der eigenen.
 
-Ein zweites in `examples/plugins/klassen/`: alle Klassen und Structs des
-Projekts als Baum (aus `CODE_CLASSES$`, ohne zu übersetzen), darunter Felder,
-Konstanten, Eigenschaften und Methoden mit Typ; ein Filterfeld, „Nur die
-Datei vorn“, und ein Klick springt an die Stelle. Es liest nach dem Sichern
-neu und lässt Ordner aus, die mit `.` oder `_` beginnen, dazu `pakete/` und
-`target/`.
+Mitgeliefert sind drei:
+
+* `todo`: TODO und FIXME der Datei vorn als Leiste rechts, ein Befehl mit
+  Kürzel, eine Warnung je FIXME, ein Schnipsel und eine Färbung für
+  `.todo`-Dateien.
+* `klassen`: alle Klassen und Structs des Projekts als Baum (aus
+  `CODE_CLASSES$`, ohne zu übersetzen), darunter Felder, Konstanten,
+  Eigenschaften und Methoden mit Typ; ein Filterfeld, „Nur die Datei vorn“,
+  und ein Klick springt an die Stelle. Es liest nach dem Sichern neu und
+  lässt Ordner aus, die mit `.` oder `_` beginnen, dazu `pakete/` und
+  `target/`.
+* `schreibweise`: typische Schreibfehler in Kommentaren („Standart“,
+  „seperat“) sind unterstrichen, Strg+. ersetzt sie, der Tooltip nennt die
+  richtige Schreibweise, und das Kontextmenü hat „Schreibweise: Wort
+  erlauben“ für Wörter, die so gemeint sind (`erlaubt.txt` im Datenordner).
+
+### Der Steckbrief
+
+Neben der `plugin.dh` darf eine `plugin.json` liegen:
+
+```json
+{"name": "Mein Plugin", "fassung": "1.0", "beschreibung": "Was es tut.", "autor": "Ich", "ide": "2026.36"}
+```
+
+Die Verwaltung zeigt Name und Fassung statt des Ordnernamens. `ide` ist die
+kleinste Fassung der IDE, die das Plugin braucht -- mit einer älteren startet
+es nicht, und sein Zustand sagt das. Ohne Steckbrief gilt der Ordnername.
+
+Jedes Plugin hat einen **Datenordner** neben der `ide.json`
+(`plugin-daten/<name>/`, `PLUGIN_DATENORDNER$()`). Dorthin gehören seine
+Einstellungen und Listen -- ein mitgeliefertes Plugin liegt womöglich in
+einem Ordner, in den es nicht schreiben darf.
 
 ## Ein Plugin schreiben
 
@@ -85,6 +110,9 @@ gestartet) ist `PLUGIN_LAEUFT()` FALSE und das Programm endet gleich.
 | `PLUGIN_PROJEKT$()` | der Projektordner |
 | `PLUGIN_WORT$()` | das Wort an der Schreibmarke |
 | `PLUGIN_EINFUEGEN(text$)` | Text an der Schreibmarke einfügen (eine Auswahl ersetzt er) |
+| `PLUGIN_ERSETZEN(zeile, spalte, bis_zeile, bis_spalte, text$ [, datei$])` | einen Bereich ersetzen (Zeilen und Spalten ab 1, `bis_spalte` ausschließlich) -- im Reiter vorn oder in `datei$`, die die IDE dafür öffnet. Für Strg+Z ein Schritt |
+| `PLUGIN_AUSWAHL_SETZEN(zeile, spalte [, bis_zeile, bis_spalte [, datei$]])` | die Schreibmarke setzen, mit Ende eine Auswahl |
+| `PLUGIN_DATENORDNER$()` | der Ordner, in den das Plugin schreiben darf |
 | `PLUGIN_MELDUNG(text$)` | eine Meldung in die Statusleiste |
 | `PLUGIN_AUSGABE(text$)` | eine Zeile in die Ausgabe |
 | `PLUGIN_OEFFNEN(pfad$ [, zeile])` | eine Datei öffnen, auf Wunsch in einer Zeile |
@@ -124,7 +152,7 @@ Vom Plugin an die IDE:
 | `liste` | `leiste`, `widget`, `eintraege` (Feld) |
 | `baum` | `leiste`, `widget`, `ebenen` und `texte` (Felder gleicher Länge), `auf` |
 | `frage` | `nr`, `was` (`text`, `datei`, `auswahl`, `marke`, `wort`, `projekt`) |
-| `tue` | `was` (`einfuegen`, `meldung`, `ausgabe`, `oeffnen`), `text`, `datei`, `zeile` |
+| `tue` | `was` (`einfuegen`, `meldung`, `ausgabe`, `oeffnen`, `ersetzen`, `waehlen`), `text`, `datei`, `zeile`, dazu `spalte`, `bis_zeile`, `bis_spalte` |
 | `befunde` | `datei`, `liste` (Objekte mit `zeile`, `meldung`, `schwere`, auf Wunsch `spalte`, `laenge` und `korrekturen` -- je `titel` und `aenderungen` mit `zeile`, `spalte`, `bis_zeile`, `bis_spalte`, `text`, wie bei `CODE_CHECK$`) |
 | `hover` | `nr` (aus dem Ereignis), `text` |
 | `schnipsel` | `name`, `kuerzel`, `text` |

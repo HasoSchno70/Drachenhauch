@@ -11,7 +11,7 @@
 ' * ein Beitrag zum Tooltip beim Ueberfahren des Worts,
 ' * ein Eintrag im Kontextmenue des Code-Felds: "Schreibweise: Wort
 '   erlauben" nimmt das Wort unter der Marke in die eigene Liste
-'   (erlaubt.txt neben diesem Programm).
+'   (erlaubt.txt im Datenordner des Plugins, PLUGIN_DATENORDNER$).
 '
 ' Geprueft wird nur, was hinter einem ' steht (ausserhalb einer
 ' Zeichenkette), nach dem Sichern, beim Oeffnen und beim Reiterwechsel.
@@ -22,7 +22,8 @@ DIM richtig AS ARRAY OF STRING
 falsch = ["standart", "seperat", "wiederrum", "vorraus", "addresse", "rythmus", "agressiv", "orginal", "warscheinlich", "entgültig", "nähmlich", "tolerannt", "vieleicht", "endgueltig", "zuende"]
 richtig = ["Standard", "separat", "wiederum", "voraus", "Adresse", "Rhythmus", "aggressiv", "Original", "wahrscheinlich", "endgültig", "nämlich", "tolerant", "vielleicht", "endgültig", "zu Ende"]
 DIM erlaubt AS ARRAY OF STRING : erlaubt = []
-IF FILEEXISTS("erlaubt.txt") THEN erlaubt = READLINES("erlaubt.txt")
+DIM erlaubtDatei AS STRING : erlaubtDatei = PATHJOIN(PLUGIN_DATENORDNER$(), "erlaubt.txt")
+IF FILEEXISTS(erlaubtDatei) THEN erlaubt = READLINES(erlaubtDatei)
 
 FUNCTION istBuchstabe(c AS STRING) AS BOOLEAN
     IF c = "" THEN RETURN FALSE
@@ -142,7 +143,7 @@ WHILE PLUGIN_LAEUFT()
                     PLUGIN_MELDUNG("Schreibweise: an der Marke steht kein Wort")
                 ELSEIF ARRAY_INDEXOF(erlaubt, LOWER$(w2)) < 0 THEN
                     ARRAY_PUSH(erlaubt, LOWER$(w2))
-                    WRITEALL("erlaubt.txt", JOIN$(erlaubt, CHR$(10)) + CHR$(10))
+                    WRITEALL(erlaubtDatei, JOIN$(erlaubt, CHR$(10)) + CHR$(10))
                     PLUGIN_MELDUNG("Schreibweise: " + CHR$(34) + w2 + CHR$(34) + " ist jetzt erlaubt")
                     pruefen()
                 END IF
