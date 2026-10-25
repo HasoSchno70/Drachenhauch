@@ -575,6 +575,13 @@ DIM plugLeisteName AS ARRAY OF STRING : plugLeisteName = []
 DIM plugLeisteFenster AS ARRAY OF INTEGER : plugLeisteFenster = []
 ' Befunde je "<plugin>|<datei>" als JSON-Text (PLUGIN_BEFUNDE_SENDEN).
 DIM plugBefunde AS MAP OF STRING : plugBefunde = {}
+' Hover-Beitraege: eine Frage je Stelle (Nummer), die Antworten kommen
+' spaeter und haengen sich an den Tooltip, solange die Maus dort steht.
+DIM plugHoverNr AS INTEGER : plugHoverNr = 0
+DIM plugHoverStelle AS STRING : plugHoverStelle = ""
+DIM plugHoverFeld AS GUI_WIDGET : plugHoverFeld = -1
+DIM plugHoverText AS STRING : plugHoverText = ""
+DIM plugKontextTrenner AS BOOLEAN : plugKontextTrenner = FALSE
 ' Schnipsel und Faerbungen der Plugins.
 DIM plugSchnName AS ARRAY OF STRING : plugSchnName = []
 DIM plugSchnAbk AS ARRAY OF STRING : plugSchnAbk = []
@@ -4406,6 +4413,9 @@ SUB pruefen()
     IF tabPfade[aktiverTab] <> "" THEN basis = DIRNAME(tabPfade[aktiverTab])
     DIM j AS JSON_HANDLE
     j = JSON_PARSE(CODE_CHECK$(GUI_TEXT(ta), basis))
+    ' Befunde der Plugins fuer diese Datei hinten an (PLUGIN_BEFUND) -- in
+    ' derselben Form, also mit Wellenlinie, Tooltip und Schnellkorrektur.
+    pluginBefundeAnhaengen(tabPfade[aktiverTab], j, GUI_TEXT(ta))
     DIM n AS INTEGER : n = JSON_LEN(j, "")
     DIM zeilen[MAX(n, 1)] AS INTEGER
     DIM i AS INTEGER
@@ -4435,32 +4445,8 @@ SUB pruefen()
             END IF
         END IF
     NEXT
-    ' Befunde der Plugins fuer diese Datei hinten an (PLUGIN_BEFUND).
-    DIM pbZ AS ARRAY OF INTEGER : pbZ = []
-    DIM pbT AS ARRAY OF STRING : pbT = []
-    DIM pbS AS ARRAY OF STRING : pbS = []
-    pluginBefundeFuer(tabPfade[aktiverTab], pbZ, pbT, pbS)
-    IF LEN(pbZ) > 0 THEN
-        DIM alleZ AS ARRAY OF INTEGER : alleZ = []
-        FOR i = 0 TO n - 1
-            ARRAY_PUSH(alleZ, zeilen[i])
-        NEXT
-        FOR i = 0 TO LEN(pbZ) - 1
-            ARRAY_PUSH(alleZ, pbZ[i])
-            ARRAY_PUSH(problemHinweis, pbS[i] = "hinweis")
-            IF pbS[i] = "fehler" THEN fehler = fehler + 1
-            IF pbS[i] = "hinweis" THEN hinweise = hinweise + 1
-            IF problemModus = 0 THEN
-                DIM pz AS INTEGER : pz = GUI_LISTBOX_ADD(lstProbleme, "Zeile " + STR$(pbZ[i]) + ": " + pbT[i])
-                GUI_LISTBOX_COLOR(lstProbleme, pz, IIF(pbS[i] = "fehler", &HE06060, IIF(pbS[i] = "hinweis", &H909CA8, &HE0C060)))
-            END IF
-        NEXT
-        problemZeilen = alleZ
-        n = n + LEN(pbZ)
-    ELSE
-        problemZeilen = zeilen
-    END IF
-    wellenSetzen(ta, j, n - LEN(pbZ))
+    problemZeilen = zeilen
+    wellenSetzen(ta, j, n)
     typenSammeln(ta, basis)
     parameterSammeln(ta)
     DIM altF AS GUI_WIDGET : altF = fehlerFeld
@@ -8952,6 +8938,7 @@ SUB mausNachziehen(ta AS GUI_WIDGET)
         DIM wz AS ARRAY OF STRING : wz = SPLIT$(GUI_TEXT(ta), NL)
         debugWertFragen(ta, ausdruckBeiWort$(wz[z - 1], wort, anfang), text)
     END IF
+    pluginHoverFragen(ta, z, anfang, wort, text)
     IF text = "" THEN RETURN
     GUI_TOOLTIP(ta, text)
     tippFeld = ta
@@ -17177,6 +17164,11 @@ SUB pluginStoppen(k AS INTEGER, zustand AS STRING)
     FOR i = 0 TO LEN(plugBefKennung) - 1
         IF LEFT$(plugBefKennung[i], LEN(vor)) = vor THEN GUI_MENU_ENABLE(plugBefItem[i], FALSE)
     NEXT
+    ' Ein Menue wird Eintraege nicht wieder los -- gesperrt, und ein Neustart
+    ' gibt sie frei (pluginKontextAnmelden).
+    FOR i = 0 TO LEN(ctxKennung) - 1
+        IF LEFT$(ctxKennung[i], LEN(vor)) = vor THEN GUI_MENU_ENABLE(ctxItems[i], FALSE)
+    NEXT
     DIM lv AS STRING : lv = "plugin." + plugNamen[k] + "."
     FOR i = 0 TO LEN(plugLeisteName) - 1
         IF LEFT$(plugLeisteName[i], LEN(lv)) = lv THEN GUI_DOCK_SHOW(win, plugLeisteName[i], FALSE)
@@ -17246,6 +17238,9 @@ SUB pluginBefehl(kennung AS STRING)
     DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
     JSON_SET_STRING(j, "art", "befehl")
     JSON_SET_STRING(j, "id", MID$(rest, t + 1))
+    ' Aus dem Kontextmenue meint ein Befehl meist das Wort, auf das geklickt
+    ' wurde -- der Rechtsklick hat die Marke dorthin gesetzt.
+    JSON_SET_STRING(j, "wert", wortAnDerMarke$())
     pluginSenden(k, j)
     protokoll("plugin befehl " + kennung)
 END SUB
@@ -17339,6 +17334,8 @@ SUB pluginNachricht(k AS INTEGER, zeile AS STRING)
     TRY
         SELECT CASE art
             CASE "befehl" : pluginBefehlAnmelden(k, j)
+            CASE "kontext" : pluginKontextAnmelden(k, j)
+            CASE "hover" : pluginHoverAntwort(k, j)
             CASE "leiste" : pluginLeisteAnmelden(k, j)
             CASE "hoere"
                 DIM ev AS STRING : ev = plugText$(j, "ereignis")
@@ -17488,6 +17485,85 @@ SUB pluginBaum(k AS INTEGER, j AS JSON_HANDLE)
     NEXT
 END SUB
 
+' Das Wort an der Schreibmarke des Feldes vorn ("" = keins).
+FUNCTION wortAnDerMarke$() AS STRING
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN ""
+    DIM mz AS INTEGER
+    DIM ms AS INTEGER
+    (mz, ms) = GUI_TEXTAREA_CURSOR(ta)
+    DIM zl AS ARRAY OF STRING : zl = SPLIT$(GUI_TEXT(ta), NL)
+    IF mz < 1 OR mz > LEN(zl) THEN RETURN ""
+    DIM w AS STRING
+    DIM a AS INTEGER
+    (w, a) = wortBeiZeichen(zl[mz - 1], ms)
+    ' Hinter dem Wort (die Marke steht oft direkt dahinter) zaehlt es auch.
+    IF w = "" AND ms > 1 THEN (w, a) = wortBeiZeichen(zl[mz - 1], ms - 1)
+    RETURN w
+END FUNCTION
+
+' Ein Eintrag im Kontextmenue des Code-Felds (PLUGIN_KONTEXT). Er loest
+' denselben Weg aus wie ein Befehl ("plugin:<name>:<id>"); bei einem
+' Neustart des Plugins wird der alte Eintrag wieder bedienbar.
+SUB pluginKontextAnmelden(k AS INTEGER, j AS JSON_HANDLE)
+    DIM kennung AS STRING : kennung = "plugin:" + plugNamen[k] + ":" + plugText$(j, "id")
+    DIM titel AS STRING : titel = plugText$(j, "titel")
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(ctxKennung, kennung)
+    IF i >= 0 THEN
+        GUI_MENU_ENABLE(ctxItems[i], TRUE)
+        GUI_MENU_TEXT(ctxItems[i], titel)
+        RETURN
+    END IF
+    IF NOT plugKontextTrenner THEN
+        GUI_MENU_SEPARATOR(ctxCode)
+        plugKontextTrenner = TRUE
+    END IF
+    ctxEintrag(ctxCode, titel, kennung)
+    protokoll("plugin kontext angemeldet " + kennung)
+END SUB
+
+' Beim Ueberfahren: alle Plugins, die "hover" hoeren, bekommen Wort und
+' Stelle. Die Antwort kommt Bilder spaeter (pluginHoverAntwort) und haengt
+' sich an den Tooltip, wenn die Maus noch dort steht -- ein Plugin, das
+' nicht antwortet, haelt so nichts auf.
+SUB pluginHoverFragen(ta AS GUI_WIDGET, z AS INTEGER, sp AS INTEGER, wort AS STRING, text AS STRING)
+    plugHoverStelle = ""
+    IF wort = "" THEN RETURN
+    DIM k AS INTEGER
+    DIM gefragt AS BOOLEAN : gefragt = FALSE
+    FOR k = 0 TO LEN(plugNamen) - 1
+        IF plugLeitung[k] < 0 THEN CONTINUE
+        IF INSTR(plugHoert[k], ";hover;") < 0 THEN CONTINUE
+        IF NOT gefragt THEN plugHoverNr = plugHoverNr + 1
+        gefragt = TRUE
+        DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+        JSON_SET_STRING(j, "art", "hover")
+        JSON_SET_INT(j, "nr", plugHoverNr)
+        JSON_SET_STRING(j, "wert", wort)
+        JSON_SET_INT(j, "zeile", z)
+        JSON_SET_INT(j, "spalte", sp)
+        DIM d AS STRING : d = ""
+        IF aktiverTab >= 0 THEN d = tabPfade[aktiverTab]
+        JSON_SET_STRING(j, "datei", d)
+        pluginSenden(k, j)
+    NEXT
+    IF NOT gefragt THEN RETURN
+    plugHoverStelle = tippStelle
+    plugHoverFeld = ta
+    plugHoverText = text
+END SUB
+
+SUB pluginHoverAntwort(k AS INTEGER, j AS JSON_HANDLE)
+    DIM t AS STRING : t = TRIM$(plugText$(j, "text"))
+    IF t = "" OR plugZahl(j, "nr") <> plugHoverNr THEN RETURN
+    IF plugHoverStelle = "" OR plugHoverStelle <> tippStelle THEN RETURN
+    DIM teil AS STRING : teil = tippText$(t)
+    IF plugHoverText = "" THEN plugHoverText = teil ELSE plugHoverText = plugHoverText + NL + NL + teil
+    GUI_TOOLTIP(plugHoverFeld, plugHoverText)
+    tippFeld = plugHoverFeld
+    protokoll("plugin hover " + plugNamen[k] + " " + LEFT$(t, 40))
+END SUB
+
 SUB pluginAntwort(k AS INTEGER, j AS JSON_HANDLE)
     DIM a AS JSON_HANDLE : a = JSON_PARSE("{}")
     JSON_SET_STRING(a, "art", "antwort")
@@ -17499,6 +17575,7 @@ SUB pluginAntwort(k AS INTEGER, j AS JSON_HANDLE)
         CASE "datei" : IF aktiverTab >= 0 THEN wert = tabPfade[aktiverTab]
         CASE "auswahl" : IF ta >= 0 THEN wert = GUI_TEXTAREA_SELECTION$(ta)
         CASE "projekt" : wert = projektOrdner
+        CASE "wort" : wert = wortAnDerMarke$()
         CASE "marke"
             IF ta >= 0 THEN
                 DIM mz AS INTEGER
@@ -17526,22 +17603,41 @@ SUB pluginTue(k AS INTEGER, j AS JSON_HANDLE)
     END SELECT
 END SUB
 
-' Die Befunde aller Plugins fuer eine Datei (Zeile, Meldung, Schwere).
-SUB pluginBefundeFuer(datei AS STRING, BYREF zeilen AS ARRAY OF INTEGER, BYREF texte AS ARRAY OF STRING, BYREF schweren AS ARRAY OF STRING)
+' Die Befunde aller Plugins fuer eine Datei hinten an die Meldungen von
+' CODE_CHECK$ (`liste`, ein JSON-Feld), in derselben Form: Zeile, Spalte,
+' Laenge, Meldung mit dem Namen des Plugins davor, Schwere, Korrekturen.
+' Ohne Spalte gilt die Zeile ohne Einrueckung, wie bei der Laufzeit.
+SUB pluginBefundeAnhaengen(datei AS STRING, liste AS JSON_HANDLE, text AS STRING)
     IF datei = "" OR LEN(MAPKEYS(plugBefunde)) = 0 THEN RETURN
     DIM d AS STRING : d = wegGleich$(datei)
+    DIM tz AS ARRAY OF STRING : tz = SPLIT$(text, NL)
     DIM bk AS STRING
     FOR EACH bk IN MAPKEYS(plugBefunde)
         DIM t AS INTEGER : t = INSTR(bk, "|")
         IF MID$(bk, t + 1) <> d THEN CONTINUE
-        DIM liste AS JSON_HANDLE : liste = JSON_PARSE(MAPGET(plugBefunde, bk))
+        DIM bl AS JSON_HANDLE : bl = JSON_PARSE(MAPGET(plugBefunde, bk))
         DIM i AS INTEGER
-        FOR i = 0 TO JSON_LEN(liste, "") - 1
+        FOR i = 0 TO JSON_LEN(bl, "") - 1
             DIM p AS STRING : p = STR$(i)
-            ARRAY_PUSH(zeilen, plugZahl(liste, p + ".zeile"))
-            ARRAY_PUSH(texte, "[" + LEFT$(bk, t) + "] " + plugText$(liste, p + ".meldung"))
-            DIM s AS STRING : s = LOWER$(plugText$(liste, p + ".schwere"))
-            ARRAY_PUSH(schweren, IIF(s = "fehler" OR s = "hinweis", s, "warnung"))
+            DIM z AS INTEGER : z = plugZahl(bl, p + ".zeile")
+            DIM sp AS INTEGER : sp = plugZahl(bl, p + ".spalte")
+            DIM ln AS INTEGER : ln = plugZahl(bl, p + ".laenge")
+            IF sp < 1 AND z >= 1 AND z <= LEN(tz) THEN
+                DIM zt AS STRING : zt = RTRIM$(REPLACE$(tz[z - 1], CHR$(13), ""))
+                sp = LEN(zt) - LEN(LTRIM$(zt)) + 1
+                ln = MAX(1, LEN(LTRIM$(zt)))
+            END IF
+            IF sp < 1 THEN sp = 1
+            IF ln < 1 THEN ln = 1
+            DIM b AS JSON_HANDLE : b = JSON_PARSE("{}")
+            JSON_SET_INT(b, "zeile", z)
+            JSON_SET_INT(b, "spalte", sp)
+            JSON_SET_INT(b, "laenge", ln)
+            JSON_SET_STRING(b, "meldung", "[" + LEFT$(bk, t) + "] " + plugText$(bl, p + ".meldung"))
+            DIM sw AS STRING : sw = LOWER$(plugText$(bl, p + ".schwere"))
+            JSON_SET_STRING(b, "schwere", IIF(sw = "fehler" OR sw = "hinweis", sw, "warnung"))
+            IF JSON_HAS(bl, p + ".korrekturen") THEN JSON_SET_JSON(b, "korrekturen", JSON_GET_JSON(bl, p + ".korrekturen"))
+            JSON_APPEND_JSON(liste, "", b)
         NEXT
     NEXT
 END SUB

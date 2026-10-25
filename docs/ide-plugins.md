@@ -24,6 +24,13 @@ vorn als Leiste rechts, ein Befehl mit Kürzel, eine Warnung je FIXME, ein
 Schnipsel und eine Färbung für `.todo`-Dateien. Zum Ausprobieren den Ordner
 `todo` in den Plugin-Ordner kopieren und neu laden.
 
+Ein drittes in `examples/plugins/schreibweise/` zeigt die Code-Hilfen im
+Code-Feld: typische Schreibfehler in Kommentaren („Standart“, „seperat“)
+sind unterstrichen, Strg+. ersetzt sie, der Tooltip nennt die
+richtige Schreibweise, und das Kontextmenü hat „Schreibweise: Wort
+erlauben“ für Wörter, die so gemeint sind (`erlaubt.txt` neben dem
+Plugin).
+
 Ein zweites in `examples/plugins/klassen/`: alle Klassen und Structs des
 Projekts als Baum (aus `CODE_CLASSES$`, ohne zu übersetzen), darunter Felder,
 Konstanten, Eigenschaften und Methoden mit Typ; ein Filterfeld, „Nur die
@@ -67,7 +74,7 @@ gestartet) ist `PLUGIN_LAEUFT()` FALSE und das Programm endet gleich.
 |---|---|
 | `PLUGIN_BEFEHL(id$, titel$ [, kuerzel$])` | einen Befehl anmelden: er steht im Menü **Plugins**, in der Befehlspalette und auf dem Kürzel. Ausgelöst kommt das Ereignis `befehl` mit `PLUGIN_ID$()` |
 | `PLUGIN_LEISTE(id$, titel$, formdatei$ [, bereich$])` | eine eigene Leiste im Dock: eine `.dhform` (etwa aus dem Form-Designer) als Fenster links, rechts (Vorgabe), unten oder schwebend. Der Nutzer kann sie verschieben wie jede Leiste der IDE |
-| `PLUGIN_HOERE(ereignis$)` | ein Ereignis hören: `gesichert`, `geoeffnet`, `reiter` (ein anderer Reiter vorn), `gestartet`, `beendet` (ein Programm lief), `geprueft` -- jeweils mit `PLUGIN_DATEI$()` |
+| `PLUGIN_HOERE(ereignis$)` | ein Ereignis hören: `gesichert`, `geoeffnet`, `reiter` (ein anderer Reiter vorn), `gestartet`, `beendet` (ein Programm lief), `geprueft` -- jeweils mit `PLUGIN_DATEI$()`. Dazu `hover`: beim Verweilen der Maus auf einem Wort, als eigenes Ereignis (siehe `PLUGIN_HOVER_ANTWORT`) |
 | `PLUGIN_SETZE(leiste$, widget$, was$, wert$)` | ein Widget der eigenen Leiste ändern: `text`, `checked`, `value`, `enabled`, `visible` oder `selected` (Zeile einer Liste, Eintrag einer Klappliste, Knoten eines Baums) |
 | `PLUGIN_LISTE(leiste$, widget$, eintraege)` | die Einträge einer Liste oder Klappliste der Leiste |
 | `PLUGIN_BAUM(leiste$, widget$, ebenen, texte [, auf])` | einen Baum der Leiste füllen: je Eintrag eine Ebene (0 = oben) und ein Text, in der Reihenfolge von oben nach unten; ein Eintrag hängt am letzten davor mit kleinerer Ebene. Die Nummer eines Knotens ist seine Stelle in der Liste -- dieselbe Zahl kommt bei `geaendert` als Wert. `auf` (Vorgabe TRUE) klappt die Äste auf |
@@ -76,13 +83,17 @@ gestartet) ist `PLUGIN_LAEUFT()` FALSE und das Programm endet gleich.
 | `PLUGIN_AUSWAHL$()` | der markierte Text |
 | `PLUGIN_MARKE$()` | Zeile und Spalte der Schreibmarke als `zeile,spalte` |
 | `PLUGIN_PROJEKT$()` | der Projektordner |
+| `PLUGIN_WORT$()` | das Wort an der Schreibmarke |
 | `PLUGIN_EINFUEGEN(text$)` | Text an der Schreibmarke einfügen (eine Auswahl ersetzt er) |
 | `PLUGIN_MELDUNG(text$)` | eine Meldung in die Statusleiste |
 | `PLUGIN_AUSGABE(text$)` | eine Zeile in die Ausgabe |
 | `PLUGIN_OEFFNEN(pfad$ [, zeile])` | eine Datei öffnen, auf Wunsch in einer Zeile |
-| `PLUGIN_BEFUND(datei$, zeile, meldung$ [, schwere$])` | einen Befund sammeln (`fehler`, `warnung` oder `hinweis`) |
+| `PLUGIN_BEFUND(datei$, zeile, meldung$ [, schwere$ [, spalte, laenge]])` | einen Befund sammeln (`fehler`, `warnung` oder `hinweis`). Er ist im Code unterstrichen wie eine Meldung der Laufzeit, mit Spalte (ab 1) und Länge genau diese Stelle, sonst die Zeile ohne Einrückung, und steht als Text am Zeilenende und im Tooltip |
+| `PLUGIN_KORREKTUR(titel$, text$ [, zeile, spalte, bis_zeile, bis_spalte])` | eine Schnellkorrektur (Strg+.) zum zuletzt gesammelten Befund: `text$` ersetzt die Stelle des Befunds, mit eigener Angabe eine andere (Spalten ab 1, `bis_spalte` ausschließlich). Mehrere Aufrufe = mehrere Angebote |
 | `PLUGIN_BEFUNDE_SENDEN(datei$)` | die gesammelten Befunde der Datei verschicken -- sie stehen in der Liste der Probleme, solange die Datei vorn ist, mit dem Namen des Plugins davor; ein neues Senden ersetzt die alten, leer gesendet nimmt es sie weg |
 | `PLUGIN_SCHNIPSEL(name$, kuerzel$, text$)` | ein Schnipsel (Strg+J, oder das Kürzel + Tabulator); `\|` ist die Stelle der Schreibmarke |
+| `PLUGIN_KONTEXT(id$, titel$)` | ein Eintrag im Kontextmenü des Code-Felds. Angeklickt kommt `befehl` mit dieser `id`, `PLUGIN_WERT$()` ist das Wort, auf das geklickt wurde (der Rechtsklick setzt die Schreibmarke dorthin) |
+| `PLUGIN_HOVER_ANTWORT(text$)` | Antwort auf `hover` (nach `PLUGIN_HOERE("hover")`): der Text hängt sich an den Tooltip, solange die Maus noch an der Stelle steht; leer = nichts beizutragen. Zum Ereignis gehören `PLUGIN_WERT$()` (das Wort), `PLUGIN_ZEILE()`, `PLUGIN_SPALTE()` (ab 1) und `PLUGIN_DATEI$()`. Die IDE wartet nicht -- ein Plugin, das nicht antwortet, hält den Tooltip nicht auf |
 | `PLUGIN_FAERBUNG(endung$, muster$, farbe)` | Färbung für eine weitere Dateiart (`".md"`): jede Regel ein regulärer Ausdruck und eine Farbe; solche Dateien färbt die IDE dann damit statt mit der Färbung für Drachenhauch |
 
 Zum Ereignis gehören `PLUGIN_ID$()` (der Befehl bzw. der Name des
@@ -90,8 +101,8 @@ Ereignisses), `PLUGIN_LEISTE$()` und `PLUGIN_WIDGET$()` (bei `klick` und
 `geaendert` -- der Name des Widgets aus der `.dhform`, Feld `name`),
 `PLUGIN_WERT$()` (bei `geaendert`: der Text, der Haken als `TRUE`/`FALSE`,
 der Wert eines Reglers, die Nummer der gewählten Zeile oder des gewählten
-Baumknotens) und
-`PLUGIN_DATEI$()` (bei `ereignis`). Die Fragen (`PLUGIN_TEXT$` und die
+Baumknotens; bei `befehl` das Wort an der Schreibmarke) und
+`PLUGIN_DATEI$()` (bei `ereignis` und `hover`). Die Fragen (`PLUGIN_TEXT$` und die
 anderen) warten bis zu zwei Sekunden auf die Antwort; was dazwischen
 ankommt, bekommt das nächste `PLUGIN_EREIGNIS$`.
 
@@ -106,19 +117,22 @@ Vom Plugin an die IDE:
 | `art` | Felder |
 |---|---|
 | `befehl` | `id`, `titel`, `kuerzel` |
+| `kontext` | `id`, `titel` |
 | `leiste` | `id`, `titel`, `bereich`, `form` (die `.dhform` als Objekt) |
 | `hoere` | `ereignis` |
 | `setze` | `leiste`, `widget` (Nummer in der Form), `was`, `wert` |
 | `liste` | `leiste`, `widget`, `eintraege` (Feld) |
 | `baum` | `leiste`, `widget`, `ebenen` und `texte` (Felder gleicher Länge), `auf` |
-| `frage` | `nr`, `was` (`text`, `datei`, `auswahl`, `marke`, `projekt`) |
+| `frage` | `nr`, `was` (`text`, `datei`, `auswahl`, `marke`, `wort`, `projekt`) |
 | `tue` | `was` (`einfuegen`, `meldung`, `ausgabe`, `oeffnen`), `text`, `datei`, `zeile` |
-| `befunde` | `datei`, `liste` (Objekte mit `zeile`, `meldung`, `schwere`) |
+| `befunde` | `datei`, `liste` (Objekte mit `zeile`, `meldung`, `schwere`, auf Wunsch `spalte`, `laenge` und `korrekturen` -- je `titel` und `aenderungen` mit `zeile`, `spalte`, `bis_zeile`, `bis_spalte`, `text`, wie bei `CODE_CHECK$`) |
+| `hover` | `nr` (aus dem Ereignis), `text` |
 | `schnipsel` | `name`, `kuerzel`, `text` |
 | `faerbung` | `endung`, `muster`, `farbe` |
 
-Von der IDE an das Plugin: `befehl` (`id`), `klick` und `geaendert`
-(`leiste`, `widget`, `wert`), `ereignis` (`name`, `datei`), `antwort`
+Von der IDE an das Plugin: `befehl` (`id`, `wert`), `klick` und `geaendert`
+(`leiste`, `widget`, `wert`), `ereignis` (`name`, `datei`), `hover` (`nr`,
+`wert`, `zeile`, `spalte`, `datei`), `antwort`
 (`nr`, `wert`) und `ende`, kurz bevor die IDE die Leitung schließt.
 
 Je Bild liest die IDE höchstens 50 Nachrichten eines Plugins -- ein

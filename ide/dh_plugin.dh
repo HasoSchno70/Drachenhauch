@@ -48,7 +48,7 @@ FUNCTION PLUGIN_LAEUFT() AS BOOLEAN
 END FUNCTION
 
 ' Das naechste Ereignis -- wartet bis zu 50 ms und liefert "" ohne eins.
-' Die Art ist "befehl", "klick", "geaendert", "ereignis" oder "ende".
+' Die Art ist "befehl", "klick", "geaendert", "ereignis", "hover" oder "ende".
 FUNCTION PLUGIN_EREIGNIS$() AS STRING
     DIM zeile AS STRING : zeile = ""
     DIM bis AS FLOAT : bis = GET_TIME() + 0.05
@@ -98,6 +98,13 @@ FUNCTION PLUGIN_WIDGET$() AS STRING
 END FUNCTION
 FUNCTION PLUGIN_WERT$() AS STRING
     RETURN plgFeld$("wert")
+END FUNCTION
+' Zum Ereignis "hover": Zeile und Spalte (ab 1) des Worts.
+FUNCTION PLUGIN_ZEILE() AS INTEGER
+    RETURN VAL(plgFeld$("zeile"))
+END FUNCTION
+FUNCTION PLUGIN_SPALTE() AS INTEGER
+    RETURN VAL(plgFeld$("spalte"))
 END FUNCTION
 FUNCTION PLUGIN_DATEI$() AS STRING
     RETURN plgFeld$("datei")
@@ -199,6 +206,26 @@ SUB PLUGIN_BAUM(leiste AS STRING, widget AS STRING, ebenen AS ARRAY OF INTEGER, 
     plgSenden(j)
 END SUB
 
+' Ein Eintrag im Kontextmenue des Code-Felds. Angeklickt kommt das Ereignis
+' "befehl" mit dieser `id`, wie bei PLUGIN_BEFEHL; PLUGIN_WERT$() ist dann
+' das Wort an der Schreibmarke (der Rechtsklick hat sie dorthin gesetzt).
+SUB PLUGIN_KONTEXT(id AS STRING, titel AS STRING)
+    DIM j AS JSON_HANDLE : j = plgNachricht("kontext")
+    JSON_SET_STRING(j, "id", id)
+    JSON_SET_STRING(j, "titel", titel)
+    plgSenden(j)
+END SUB
+
+' Antwort auf das Ereignis "hover" (PLUGIN_HOERE("hover")): der Text haengt
+' sich an den Tooltip, solange die Maus noch an der Stelle steht. Leer =
+' nichts beizutragen. Gilt dem zuletzt geholten Ereignis.
+SUB PLUGIN_HOVER_ANTWORT(text AS STRING)
+    DIM j AS JSON_HANDLE : j = plgNachricht("hover")
+    JSON_SET_INT(j, "nr", VAL(plgFeld$("nr")))
+    JSON_SET_STRING(j, "text", text)
+    plgSenden(j)
+END SUB
+
 SUB plgTue(was AS STRING, text AS STRING, datei AS STRING, zeile AS INTEGER)
     DIM j AS JSON_HANDLE : j = plgNachricht("tue")
     JSON_SET_STRING(j, "was", was)
@@ -269,6 +296,10 @@ FUNCTION PLUGIN_AUSWAHL$() AS STRING
     RETURN plgFrage$("auswahl")
 END FUNCTION
 ' Der Projektordner.
+' Das Wort an der Schreibmarke ("" = keins).
+FUNCTION PLUGIN_WORT$() AS STRING
+    RETURN plgFrage$("wort")
+END FUNCTION
 FUNCTION PLUGIN_PROJEKT$() AS STRING
     RETURN plgFrage$("projekt")
 END FUNCTION
@@ -281,7 +312,9 @@ END FUNCTION
 ' zeigt sie in der Liste der Probleme, solange die Datei vorn ist. Ein
 ' neues PLUGIN_BEFUNDE_SENDEN fuer dieselbe Datei ersetzt die alten;
 ' leer gesendet nimmt es sie weg. Schwere: "fehler", "warnung", "hinweis".
-SUB PLUGIN_BEFUND(datei AS STRING, zeile AS INTEGER, meldung AS STRING, schwere AS STRING = "warnung")
+' Mit Spalte (ab 1) und Laenge unterstreicht die IDE genau diese Stelle,
+' ohne die Zeile ohne Einrueckung.
+SUB PLUGIN_BEFUND(datei AS STRING, zeile AS INTEGER, meldung AS STRING, schwere AS STRING = "warnung", spalte AS INTEGER = 0, laenge AS INTEGER = 0)
     IF datei <> plgBefundDatei THEN
         plgBefunde = JSON_PARSE("[]")
         plgBefundDatei = datei
@@ -290,7 +323,46 @@ SUB PLUGIN_BEFUND(datei AS STRING, zeile AS INTEGER, meldung AS STRING, schwere 
     JSON_SET_INT(b, "zeile", zeile)
     JSON_SET_STRING(b, "meldung", meldung)
     JSON_SET_STRING(b, "schwere", schwere)
+    IF spalte > 0 THEN
+        JSON_SET_INT(b, "spalte", spalte)
+        JSON_SET_INT(b, "laenge", MAX(1, laenge))
+    END IF
     JSON_APPEND_JSON(plgBefunde, "", b)
+END SUB
+
+' Eine Schnellkorrektur (Strg+.) zum zuletzt gesammelten Befund: `titel`
+' steht in der Auswahl, `text` ersetzt die Stelle. Ohne eigene Stelle
+' gilt die des Befunds (Spalte und Laenge) -- hat der keine, die ganze
+' Zeile. Mehrere Aufrufe = mehrere Angebote.
+SUB PLUGIN_KORREKTUR(titel AS STRING, text AS STRING, zeile AS INTEGER = 0, spalte AS INTEGER = 0, bis_zeile AS INTEGER = 0, bis_spalte AS INTEGER = 0)
+    DIM n AS INTEGER : n = JSON_LEN(plgBefunde, "")
+    IF n = 0 THEN RETURN
+    DIM p AS STRING : p = STR$(n - 1)
+    IF zeile < 1 THEN
+        zeile = JSON_GET_INT(plgBefunde, p + ".zeile")
+        bis_zeile = zeile
+        IF JSON_HAS(plgBefunde, p + ".spalte") THEN
+            spalte = JSON_GET_INT(plgBefunde, p + ".spalte")
+            bis_spalte = spalte + JSON_GET_INT(plgBefunde, p + ".laenge")
+        ELSE
+            spalte = 1
+            bis_spalte = 1000000
+        END IF
+    END IF
+    IF bis_zeile < 1 THEN bis_zeile = zeile
+    IF bis_spalte < 1 THEN bis_spalte = spalte
+    IF NOT JSON_HAS(plgBefunde, p + ".korrekturen") THEN JSON_SET_JSON(plgBefunde, p + ".korrekturen", JSON_PARSE("[]"))
+    DIM k AS JSON_HANDLE : k = JSON_PARSE("{}")
+    JSON_SET_STRING(k, "titel", titel)
+    DIM a AS JSON_HANDLE : a = JSON_PARSE("{}")
+    JSON_SET_INT(a, "zeile", zeile)
+    JSON_SET_INT(a, "spalte", spalte)
+    JSON_SET_INT(a, "bis_zeile", bis_zeile)
+    JSON_SET_INT(a, "bis_spalte", bis_spalte)
+    JSON_SET_STRING(a, "text", text)
+    JSON_SET_JSON(k, "aenderungen", JSON_PARSE("[]"))
+    JSON_APPEND_JSON(k, "aenderungen", a)
+    JSON_APPEND_JSON(plgBefunde, p + ".korrekturen", k)
 END SUB
 SUB PLUGIN_BEFUNDE_SENDEN(datei AS STRING)
     IF datei <> plgBefundDatei THEN plgBefunde = JSON_PARSE("[]")

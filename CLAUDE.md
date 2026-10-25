@@ -2689,6 +2689,35 @@ Kopfzeile; allein gestartet endet es gleich), Rust-Test
 `pluginWert$`, `_`-Ordner mitgezaehlt, Baumauswahl nicht im Abdruck) fallen
 je in ihrem Fall.
 
+## Plugin-Schnittstelle: Code-Hilfen (2026-10-25)
+
+Drei Wege, auf denen ein Plugin im Code-Feld mitredet, als Probe das
+Beispiel `examples/plugins/schreibweise/` (Schreibfehler in Kommentaren).
+(1) **Befunde mit Stelle und Schnellkorrektur:** `PLUGIN_BEFUND(...,
+spalte, laenge)` und `PLUGIN_KORREKTUR(titel, text [, Bereich])` (haengt am
+zuletzt gesammelten Befund; ohne Bereich gilt dessen Stelle, ohne Stelle die
+ganze Zeile). Die IDE haengt Plugin-Befunde jetzt in DEN JSON von
+`CODE_CHECK$` (`pluginBefundeAnhaengen`, vorher eine eigene Liste neben der
+Problemliste) -- damit bekommen sie Wellenlinie, Tooltip, Text am
+Zeilenende und Strg+. ohne eigenen Weg; ohne Spalte unterstreicht sie die
+Zeile ohne Einrueckung wie die Laufzeit. (2) **Kontextmenue:**
+`PLUGIN_KONTEXT(id, titel)` -> Eintrag in `ctxCode` hinter einem Trenner,
+loest denselben Weg wie ein Befehl aus (`plugin:<name>:<id>`); jedes
+`befehl`-Ereignis traegt jetzt das Wort an der Marke als `wert`
+(`wortAnDerMarke$`, auch als Frage `PLUGIN_WORT$`). Beim Stoppen gesperrt,
+beim Neustart wieder frei (ein Menue wird Eintraege nicht los).
+(3) **Hover:** `PLUGIN_HOERE("hover")` -> beim Verweilen schickt
+`mausNachziehen` ueber `pluginHoverFragen` (Nummer je Stelle) Wort, Zeile,
+Spalte, Datei; `PLUGIN_HOVER_ANTWORT(text)` haengt sich an den Tooltip, nur
+wenn Nummer UND Stelle noch stimmen (`pluginHoverAntwort`) -- die IDE wartet
+nicht. **Falle beim Testen:** steht die Maus auf einem Befund, enthaelt der
+Tooltip schon dessen Meldung und "Strg+. schlaegt eine Korrektur vor." --
+ein Warten auf ein Wort aus der Meldung kam zu frueh. Tests
+`tests/pruef/werkzeug_ide_plugin_codehilfen.dhtest` (echte Maus ueber
+`_hilfen/idemaus.dh`; Gegenprobe Zeichenkette ohne Hover); vier
+Verfaelschungen fallen, die Pruefung der Stelle bei der Antwort ist
+ungedeckt (der Test bewegt die Maus nicht vor der Antwort weg).
+
 ## Dogfooding 13: CHIP-8-Emulator (2026-10-24)
 
 `examples/chip8/`: `cpu.dh` (Rechenkern ohne Fenster, alle 35 Befehle,

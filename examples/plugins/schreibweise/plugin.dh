@@ -1,0 +1,153 @@
+' Beispiel-Plugin der IDE: typische Schreibfehler in Kommentaren.
+'
+' Zum Ausprobieren den Ordner schreibweise/ nach plugins/ neben die ide.json
+' kopieren (Plugins -> Plugin-Ordner oeffnen legt ihn an) und Plugins ->
+' Plugins neu laden. Es zeigt die drei Code-Hilfen, die ein Plugin neben
+' Befehl und Leiste hat (docs/ide-plugins.md):
+'
+' * ein Befund mit genauer Stelle -- das falsche Wort ist unterstrichen und
+'   steht als Hinweis in der Liste der Probleme,
+' * eine Schnellkorrektur dazu -- Strg+. auf dem Wort ersetzt es,
+' * ein Beitrag zum Tooltip beim Ueberfahren des Worts,
+' * ein Eintrag im Kontextmenue des Code-Felds: "Schreibweise: Wort
+'   erlauben" nimmt das Wort unter der Marke in die eigene Liste
+'   (erlaubt.txt neben diesem Programm).
+'
+' Geprueft wird nur, was hinter einem ' steht (ausserhalb einer
+' Zeichenkette), nach dem Sichern, beim Oeffnen und beim Reiterwechsel.
+IMPORT "dh_plugin.dh"
+
+DIM falsch AS ARRAY OF STRING
+DIM richtig AS ARRAY OF STRING
+falsch = ["standart", "seperat", "wiederrum", "vorraus", "addresse", "rythmus", "agressiv", "orginal", "warscheinlich", "entgültig", "nähmlich", "tolerannt", "vieleicht", "endgueltig", "zuende"]
+richtig = ["Standard", "separat", "wiederum", "voraus", "Adresse", "Rhythmus", "aggressiv", "Original", "wahrscheinlich", "endgültig", "nämlich", "tolerant", "vielleicht", "endgültig", "zu Ende"]
+DIM erlaubt AS ARRAY OF STRING : erlaubt = []
+IF FILEEXISTS("erlaubt.txt") THEN erlaubt = READLINES("erlaubt.txt")
+
+FUNCTION istBuchstabe(c AS STRING) AS BOOLEAN
+    IF c = "" THEN RETURN FALSE
+    RETURN (c >= "a" AND c <= "z") OR (c >= "A" AND c <= "Z") OR INSTR("äöüÄÖÜß", c) >= 0
+END FUNCTION
+
+' Wo der Kommentar einer Zeile beginnt (ab 0), -1 = keiner. Ein ' in einer
+' Zeichenkette zaehlt nicht.
+FUNCTION kommentarAb(zeile AS STRING) AS INTEGER
+    DIM inText AS BOOLEAN : inText = FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeile) - 1
+        DIM c AS STRING : c = MID$(zeile, i, 1)
+        IF c = CHR$(34) THEN inText = NOT inText
+        IF c = "'" AND NOT inText THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Die Verbesserung zu einem Wort, "" = keine. Die Schreibweise des ersten
+' Buchstabens bleibt: aus "Standart" wird "Standard", aus "standart" auch.
+FUNCTION verbessert$(wort AS STRING) AS STRING
+    DIM w AS STRING : w = LOWER$(wort)
+    IF ARRAY_INDEXOF(erlaubt, w) >= 0 THEN RETURN ""
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(falsch, w)
+    IF k < 0 THEN RETURN ""
+    DIM r AS STRING : r = richtig[k]
+    IF LEFT$(wort, 1) = UPPER$(LEFT$(wort, 1)) THEN RETURN UPPER$(LEFT$(r, 1)) + MID$(r, 1)
+    RETURN LOWER$(LEFT$(r, 1)) + MID$(r, 1)
+END FUNCTION
+
+' Das Wort um eine Spalte (ab 1) einer Zeile: (Wort, Anfang ab 1).
+FUNCTION wortUm(zeile AS STRING, spalte AS INTEGER) AS TUPLE
+    DIM i AS INTEGER : i = spalte - 1
+    IF i < 0 OR i >= LEN(zeile) THEN RETURN ("", 0)
+    IF NOT istBuchstabe(MID$(zeile, i, 1)) THEN
+        IF i > 0 AND istBuchstabe(MID$(zeile, i - 1, 1)) THEN i = i - 1 ELSE RETURN ("", 0)
+    END IF
+    DIM a AS INTEGER : a = i
+    WHILE a > 0 AND istBuchstabe(MID$(zeile, a - 1, 1)) : a = a - 1 : WEND
+    DIM e AS INTEGER : e = i
+    WHILE e < LEN(zeile) AND istBuchstabe(MID$(zeile, e, 1)) : e = e + 1 : WEND
+    RETURN (MID$(zeile, a, e - a), a + 1)
+END FUNCTION
+
+FUNCTION zeileVon$(text AS STRING, z AS INTEGER) AS STRING
+    DIM zl AS ARRAY OF STRING : zl = SPLIT$(text, CHR$(10))
+    IF z < 1 OR z > LEN(zl) THEN RETURN ""
+    RETURN REPLACE$(zl[z - 1], CHR$(13), "")
+END FUNCTION
+
+SUB pruefen()
+    DIM datei AS STRING : datei = PLUGIN_DATEINAME$()
+    IF datei = "" THEN RETURN
+    DIM zl AS ARRAY OF STRING : zl = SPLIT$(PLUGIN_TEXT$(), CHR$(10))
+    DIM gefunden AS INTEGER : gefunden = 0
+    DIM z AS INTEGER
+    FOR z = 1 TO LEN(zl)
+        DIM zeile AS STRING : zeile = REPLACE$(zl[z - 1], CHR$(13), "")
+        DIM ab AS INTEGER : ab = kommentarAb(zeile)
+        IF ab < 0 THEN CONTINUE
+        DIM i AS INTEGER : i = ab + 1
+        WHILE i < LEN(zeile)
+            IF istBuchstabe(MID$(zeile, i, 1)) THEN
+                DIM a AS INTEGER : a = i
+                WHILE i < LEN(zeile) AND istBuchstabe(MID$(zeile, i, 1)) : i = i + 1 : WEND
+                DIM w AS STRING : w = MID$(zeile, a, i - a)
+                DIM r AS STRING : r = verbessert$(w)
+                IF r <> "" THEN
+                    PLUGIN_BEFUND(datei, z, "Schreibweise: " + CHR$(34) + w + CHR$(34) + " -- gemeint ist wohl " + CHR$(34) + r + CHR$(34), "hinweis", a + 1, LEN(w))
+                    PLUGIN_KORREKTUR(CHR$(34) + w + CHR$(34) + " durch " + CHR$(34) + r + CHR$(34) + " ersetzen", r)
+                    gefunden = gefunden + 1
+                END IF
+            ELSE
+                i = i + 1
+            END IF
+        WEND
+    NEXT
+    ' Auch ohne Fund senden -- so verschwinden alte Befunde.
+    PLUGIN_BEFUNDE_SENDEN(datei)
+END SUB
+
+PLUGIN_HOERE("gesichert")
+PLUGIN_HOERE("geoeffnet")
+PLUGIN_HOERE("reiter")
+PLUGIN_HOERE("hover")
+PLUGIN_KONTEXT("erlauben", "Schreibweise: Wort erlauben")
+IF PLUGIN_LAEUFT() THEN pruefen()
+
+WHILE PLUGIN_LAEUFT()
+    SELECT CASE PLUGIN_EREIGNIS$()
+        CASE "ereignis"
+            pruefen()
+        CASE "hover"
+            ' Nur in einem Kommentar -- im Code ist "seperat" ein Name.
+            DIM antwort AS STRING : antwort = ""
+            DIM zeile AS STRING : zeile = zeileVon$(PLUGIN_TEXT$(), PLUGIN_ZEILE())
+            DIM ab AS INTEGER : ab = kommentarAb(zeile)
+            IF ab >= 0 AND PLUGIN_SPALTE() > ab THEN
+                DIM w AS STRING
+                DIM a AS INTEGER
+                (w, a) = wortUm(zeile, PLUGIN_SPALTE())
+                DIM r AS STRING : r = verbessert$(w)
+                IF r <> "" THEN antwort = "Schreibweise: gemeint ist wohl " + CHR$(34) + r + CHR$(34) + " (Strg+. ersetzt es)"
+            END IF
+            PLUGIN_HOVER_ANTWORT(antwort)
+        CASE "befehl"
+            IF PLUGIN_ID$() = "erlauben" THEN
+                ' "zeile,spalte" -- VAL liest die Zahl am Anfang.
+                DIM marke AS STRING : marke = PLUGIN_MARKE$()
+                DIM mz AS INTEGER : mz = VAL(marke)
+                DIM ms AS INTEGER : ms = VAL(MID$(marke, INSTR(marke, ",") + 1))
+                DIM w2 AS STRING
+                DIM a2 AS INTEGER
+                (w2, a2) = wortUm(zeileVon$(PLUGIN_TEXT$(), mz), ms)
+                IF w2 = "" THEN
+                    PLUGIN_MELDUNG("Schreibweise: an der Marke steht kein Wort")
+                ELSEIF ARRAY_INDEXOF(erlaubt, LOWER$(w2)) < 0 THEN
+                    ARRAY_PUSH(erlaubt, LOWER$(w2))
+                    WRITEALL("erlaubt.txt", JOIN$(erlaubt, CHR$(10)) + CHR$(10))
+                    PLUGIN_MELDUNG("Schreibweise: " + CHR$(34) + w2 + CHR$(34) + " ist jetzt erlaubt")
+                    pruefen()
+                END IF
+            END IF
+        CASE "ende"
+            EXIT(0)
+    END SELECT
+WEND
