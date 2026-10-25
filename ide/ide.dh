@@ -17177,9 +17177,14 @@ END SUB
 ' Die Bibliothek dh_plugin.dh liegt neben der IDE; DH_PATH zeigt dorthin,
 ' damit ein Plugin schlicht IMPORT "dh_plugin.dh" schreibt. Ein Kind erbt
 ' die Umgebung beim Start.
-SUB pluginPfadSetzen()
+FUNCTION pluginBibOrdner$() AS STRING
     DIM bib AS STRING : bib = CWD$()
     IF NOT FILEEXISTS(PATHJOIN(bib, "dh_plugin.dh")) THEN bib = PATHJOIN(wurzel, "ide")
+    RETURN bib
+END FUNCTION
+
+SUB pluginPfadSetzen()
+    DIM bib AS STRING : bib = pluginBibOrdner$()
     DIM trenner AS STRING : trenner = IIF(MID$(bib, 1, 1) = ":", ";", ":")
     DIM alt AS STRING : alt = GETENV$("DH_PATH")
     IF INSTR(alt, bib) >= 0 THEN RETURN
@@ -18011,6 +18016,8 @@ DIM btnPlugHolen AS GUI_WIDGET : btnPlugHolen = GUI_BUTTON(winPlug, tr$("Holen .
 GUI_TOOLTIP(btnPlugHolen, tr$("Ein Plugin aus github:nutzer/repo@stand, einer https-Adresse oder einem Ordner holen (dhrt paket)"))
 DIM btnPlugEntfernen AS GUI_WIDGET : btnPlugEntfernen = GUI_BUTTON(winPlug, tr$("Entfernen"), 142, 336, 140, 30)
 GUI_TOOLTIP(btnPlugEntfernen, tr$("Das gewählte geholte Plugin entfernen"))
+DIM btnPlugAktuell AS GUI_WIDGET : btnPlugAktuell = GUI_BUTTON(winPlug, tr$("Aktualisieren"), 292, 336, 126, 30)
+GUI_TOOLTIP(btnPlugAktuell, tr$("Alle geholten Plugins neu holen und einen neuen Stand annehmen (dhrt paket hole --erneuern)"))
 DIM btnPlugZu AS GUI_WIDGET : btnPlugZu = GUI_BUTTON(winPlug, tr$("Schließen"), 428, 296, 120, 30)
 GUI_WINDOW_CANCEL(winPlug, btnPlugZu)
 GUI_WINDOW_VISIBLE(winPlug, FALSE)
@@ -18049,7 +18056,7 @@ SUB pluginAnlegenNachziehen()
     IF a = 1 THEN pluginAnlegen(name)
 END SUB
 
-' Legt plugins/<name>/ mit plugin.dh, plugin.json und leiste.dhform an,
+' Legt plugins/<name>/ mit plugin.dh, plugin.json, leiste.dhform und test.dhtest an,
 ' oeffnet plugin.dh und startet das Plugin. FALSE, wenn der Name krumm ist
 ' oder den Ordner gibt.
 FUNCTION pluginAnlegen(name AS STRING) AS BOOLEAN
@@ -18106,6 +18113,25 @@ FUNCTION pluginAnlegen(name AS STRING) AS BOOLEAN
     c = c + "    END SELECT" + NL
     c = c + "WEND" + NL
     WRITEALL(PATHJOIN(ordner, "plugin.dh"), c)
+    ' Eine Pruefung mit der Schein-IDE (ide/dh_plugin_probe.dh): sie laeuft
+    ' ohne Fenster und ohne IDE, mit dhrt test oder Strg+Alt+F5. DH_PATH
+    ' zeigt auf den Ordner dieser IDE, dort liegen dh_plugin.dh und die Probe.
+    DIM t AS STRING : t = "' Pruefung des Plugins " + q + name + q + " mit der Schein-IDE (dh_plugin_probe.dh)." + NL
+    t = t + "' Laufen lassen: dhrt test <dieser Ordner>, in der IDE Strg+Alt+F5." + NL
+    t = t + "' Handbuch: docs/ide-plugins.md, Abschnitt " + q + "Ein Plugin pruefen" + q + "." + NL + NL
+    t = t + "=== das wort an der marke wird gezaehlt" + NL
+    t = t + "IMPORT " + q + "dh_plugin_probe.dh" + q + NL
+    t = t + "PROBE_SETZE_TEXT(" + q + "a = 1" + q + " + CHR$(10) + " + q + "PRINT a + a" + q + " + CHR$(10), CWD$() + " + q + "/haupt.dh" + q + ", 2, 7)" + NL
+    t = t + "PRINT PROBE_START(ARG$(0) + " + q + "/plugin.dh" + q + ")" + NL
+    t = t + "PRINT PROBE_WARTEN(" + q + "leiste" + q + ")" + NL
+    t = t + "PROBE_BEFEHL(" + q + "zaehlen" + q + ")" + NL
+    t = t + "PRINT PROBE_WARTEN(" + q + "setze" + q + ")" + NL
+    t = t + "PRINT PROBE_WIDGET$(" + q + "leiste" + q + ", " + q + "kopf" + q + ", " + q + "text" + q + ")" + NL
+    t = t + "PROBE_ENDE()" + NL
+    t = t + "--- argumente" + NL + "{sammlung}" + NL
+    t = t + "--- umgebung" + NL + "DH_PATH=" + REALPATH$(pluginBibOrdner$()) + NL
+    t = t + "--- erwartet" + NL + "TRUE" + NL + "TRUE" + NL + "TRUE" + NL + "a: 3 mal" + NL
+    WRITEALL(PATHJOIN(ordner, "test.dhtest"), t)
     protokoll("plugin angelegt " + name)
     ' Anmelden und starten wie beim Start der IDE, dann zum Bearbeiten oeffnen.
     pluginsAusOrdner(pluginOrdner$(), FALSE)
@@ -18139,6 +18165,14 @@ SUB pluginHolenStarten(mehr AS ARRAY OF STRING)
         RETURN
     END IF
     IF NOT DIREXISTS(pluginOrdner$()) THEN MKDIR(pluginOrdner$())
+    ' Ein laufendes geholtes Plugin hat seinen Ordner als Arbeitsordner, und
+    ' Windows ersetzt keinen Ordner, der in Gebrauch ist -- Aktualisieren
+    ' und Entfernen scheiterten sonst. Danach startet pluginHolenNachziehen
+    ' alle neu, auch nach einem Fehler (dann laeuft das alte weiter).
+    DIM gk AS INTEGER
+    FOR gk = 0 TO LEN(plugNamen) - 1
+        IF plugGeholt[gk] AND plugLeitung[gk] >= 0 THEN pluginStoppen(gk, "aus")
+    NEXT
     DIM a AS ARRAY OF STRING : a = ["paket", "-C", pluginOrdner$()]
     DIM m AS STRING
     FOR EACH m IN mehr
@@ -18148,6 +18182,17 @@ SUB pluginHolenStarten(mehr AS ARRAY OF STRING)
     plugHolProz = PROCESS_START("dhrt", a)
     PROCESS_CLOSE_INPUT(plugHolProz)
     protokoll("plugin holen start " + JOIN$(mehr, " "))
+END SUB
+
+' Alle geholten Plugins neu holen. Ohne --erneuern ist ein geaenderter
+' Inhalt ein Fehler (die Pruefsumme passt nicht) -- hier ist er gewollt: ein
+' Plugin von einem Zweig (github:nutzer/repo@main) bekommt so den neuen Stand.
+SUB pluginsAktualisieren()
+    IF NOT FILEEXISTS(PATHJOIN(pluginOrdner$(), "paket.json")) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Es gibt keine geholten Plugins."))
+        RETURN
+    END IF
+    pluginHolenStarten(["hole", "--erneuern"])
 END SUB
 
 SUB pluginHolenNachziehen()
@@ -18190,9 +18235,8 @@ SUB pluginHolenNachziehen()
     PROCESS_CLOSE(plugHolProz)
     plugHolProz = -1
     protokoll("plugin holen " + STR$(code))
+    pluginsNeuLaden()
     GUI_SET_TEXT(lblStatus, IIF(code = 0, tr$("Plugins: fertig -- neu geladen."), tr$("Plugins holen fehlgeschlagen -- siehe Ausgabe.")))
-    IF code = 0 THEN pluginsNeuLaden()
-    IF GUI_WINDOW_SHOWN(winPlug) THEN pluginListeFuellen()
 END SUB
 
 SUB pluginsVerwaltenNachziehen()
@@ -18204,11 +18248,11 @@ SUB pluginsVerwaltenNachziehen()
     IF GUI_CLICKED(btnPlugOrdner) THEN befehl("plugins_ordner")
     IF GUI_CLICKED(btnPlugAnlegen) THEN befehl("plugin_anlegen")
     IF GUI_CLICKED(btnPlugHolen) THEN pluginHolenFragen()
+    IF GUI_CLICKED(btnPlugAktuell) THEN pluginsAktualisieren()
     IF GUI_CLICKED(btnPlugEntfernen) THEN
         DIM wk AS INTEGER : wk = GUI_LISTBOX_SELECTED(lstPlug)
         IF wk >= 0 AND wk < LEN(plugNamen) THEN
             IF plugGeholt[wk] THEN
-                pluginStoppen(wk, "aus")
                 pluginHolenStarten(["entferne", plugNamen[wk]])
             ELSE
                 GUI_SET_TEXT(lblStatus, tr$("Entfernen geht nur bei geholten Plugins -- eigene liegen im Plugin-Ordner."))

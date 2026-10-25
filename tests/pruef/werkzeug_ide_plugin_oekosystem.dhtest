@@ -124,7 +124,7 @@ IF prSchritt = 0 AND prB > 10 THEN
     protokoll("pr krumm " + STR$(pluginAnlegen("a b")))
     protokoll("pr angelegt " + STR$(pluginAnlegen("probe")))
     protokoll("pr nochmal " + STR$(pluginAnlegen("probe")))
-    protokoll("pr dateien " + STR$(FILEEXISTS("plugins/probe/plugin.dh")) + " " + STR$(FILEEXISTS("plugins/probe/plugin.json")) + " " + STR$(FILEEXISTS("plugins/probe/leiste.dhform")))
+    protokoll("pr dateien " + STR$(FILEEXISTS("plugins/probe/plugin.dh")) + " " + STR$(FILEEXISTS("plugins/probe/plugin.json")) + " " + STR$(FILEEXISTS("plugins/probe/leiste.dhform")) + " " + STR$(FILEEXISTS("plugins/probe/test.dhtest")))
     protokoll("pr vorn " + BASENAME(tabPfade[aktiverTab]))
     prSchritt = 1
 END IF
@@ -151,6 +151,30 @@ DIM i AS INTEGER
 FOR i = 0 TO LEN(L) - 1
     IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 15) = "plugin anlegen " OR LEFT$(L[i], 16) = "plugin angelegt " THEN PRINT L[i]
 NEXT
+' Die angelegte Pruefung laeuft durch -- und faellt, wenn das Plugin etwas
+' anderes in seine Leiste schreibt (sonst pruefte sie nichts).
+FUNCTION pruefung$() AS STRING
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "test", "_programm/plugins/probe/test.dhtest")
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM z AS STRING : z = PROCESS_READ$(p)
+        IF z = "" THEN
+            IF NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+            SLEEP(30)
+        ELSE
+            aus = aus + z
+            leer = 0
+        END IF
+    WEND
+    DIM r AS STRING : r = STR$(PROCESS_CODE(p))
+    IF INSTR(aus, "1 Faelle, 1 ok") >= 0 THEN r = r + " ok" ELSE r = r + " fehl"
+    RETURN r
+END FUNCTION
+PRINT "pruefung "; pruefung$()
+DIM c AS STRING : c = JOIN$(READLINES("_programm/plugins/probe/plugin.dh"), CHR$(10))
+WRITEALL("_programm/plugins/probe/plugin.dh", REPLACE$(c, CHR$(34) + " mal" + CHR$(34), CHR$(34) + " Stellen" + CHR$(34)))
+PRINT "verdorben "; pruefung$()
 --- erwartet
 plugin anlegen krumm a b
 pr krumm FALSE
@@ -158,9 +182,11 @@ plugin angelegt probe
 pr angelegt TRUE
 plugin anlegen gibt es probe
 pr nochmal FALSE
-pr dateien TRUE TRUE TRUE
+pr dateien TRUE TRUE TRUE TRUE
 pr vorn plugin.dh
 pr leiste zaehlen: 6 mal
+pruefung 0 ok
+verdorben 1 fehl
 
 === ein plugin ersetzt einen bereich und setzt die auswahl
 DIM prB AS INTEGER
@@ -300,7 +326,6 @@ IF prSchritt = 1 AND ARRAY_INDEXOF(plugNamen, "geholt") >= 0 THEN
     DIM prK AS INTEGER : prK = ARRAY_INDEXOF(plugNamen, "geholt")
     IF plugZustand[prK] = "läuft" THEN
         protokoll("pr geholt " + plugTitel[prK] + " geholt " + STR$(plugGeholt[prK]) + " " + STR$(FILEEXISTS("plugins/pakete/geholt/plugin.dh")) + " " + STR$(FILEEXISTS("plugins/paket.lock.json")))
-        pluginStoppen(prK, "aus")
         pluginHolenStarten(["entferne", "geholt"])
         prSchritt = 2
     END IF
@@ -335,3 +360,70 @@ plugin holen 0
 pr geholt Geholtes Plugin geholt TRUE TRUE TRUE
 plugin holen 0
 pr entfernt FALSE
+
+=== ein plugin ueber http holen und aktualisieren
+' Ein ZIP wie von GitHub (mit Oberordner geholt-1.0/) ueber HTTP vom
+' Gegenserver: Holen, ein geaenderter Inhalt ist ohne --erneuern ein Fehler
+' und das alte bleibt, Aktualisieren nimmt den neuen Stand an.
+DIM prB AS INTEGER
+DIM prSchritt AS INTEGER
+DIM prSrv AS INTEGER
+DIM prBasis AS STRING
+DIM prHolen AS INTEGER
+SUB prZip(fassung AS STRING)
+    IF NOT DIREXISTS("srv") THEN MKDIR("srv")
+    DIM q AS STRING : q = CHR$(34)
+    DIM code AS STRING : code = "IMPORT " + q + "dh_plugin.dh" + q + NL + "WHILE PLUGIN_LAEUFT()" + NL + "    IF PLUGIN_EREIGNIS$() = " + q + "ende" + q + " THEN EXIT(0)" + NL + "WEND" + NL
+    ZIP_WRITE("srv/geholt.zip", ["geholt-1.0/plugin.dh", "geholt-1.0/plugin.json"], [code, "{" + q + "name" + q + ": " + q + "Netz" + q + ", " + q + "fassung" + q + ": " + q + fassung + q + "}"])
+END SUB
+FUNCTION prFassung$() AS STRING
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(plugNamen, "geholt")
+    IF k < 0 THEN RETURN "-"
+    RETURN plugFassung[k] + " " + plugZustand[k]
+END FUNCTION
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prSchritt = 0 AND prB > 10 THEN
+    prZip("1.0")
+    prSrv = PROCESS_START("dhrt", "run", GETENV$("DH_IDE_WURZEL") + "/tests/pruef/_hilfen/gegenserver.dh", "--", "dateien", "0", "-", CWD$() + "/port.txt")
+    prSchritt = 1
+ELSEIF prSchritt = 1 AND FILEEXISTS("port.txt") THEN
+    prBasis = "http://127.0.0.1:" + TRIM$(READLINES("port.txt")[0])
+    pluginHolenStarten(["hole", prBasis + "/srv/geholt.zip"])
+    prSchritt = 2
+ELSEIF prSchritt = 2 AND plugHolProz < 0 AND prFassung$() = "1.0 läuft" THEN
+    protokoll("pr geholt " + prFassung$() + " lock " + STR$(INSTR(JOIN$(READLINES("plugins/paket.lock.json"), " "), "sha256") >= 0) + " oberordner " + STR$(DIREXISTS("plugins/pakete/geholt/geholt-1.0")))
+    prZip("1.1")
+    pluginHolenStarten(["hole"])
+    prSchritt = 3
+ELSEIF prSchritt = 3 AND plugHolProz < 0 THEN
+    protokoll("pr ohne erneuern " + prFassung$())
+    pluginsAktualisieren()
+    prSchritt = 4
+ELSEIF prSchritt = 4 AND plugHolProz < 0 AND prFassung$() = "1.1 läuft" THEN
+    protokoll("pr aktualisiert " + prFassung$())
+    PROCESS_KILL(prSrv)
+    EXIT(0)
+END IF
+IF prB > 1500 THEN protokoll("pr zeit um " + STR$(prSchritt) + " " + prFassung$()) : PROCESS_KILL(prSrv) : EXIT(0)
+--- umgebung
+DHRT_FRAMES=1600
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 13) = "plugin holen " THEN
+        IF LEFT$(L[i], 19) <> "plugin holen start " THEN PRINT L[i]
+    END IF
+NEXT
+--- erwartet
+plugin holen 0
+pr geholt 1.0 läuft lock TRUE oberordner FALSE
+plugin holen 1
+pr ohne erneuern 1.0 läuft
+plugin holen 0
+pr aktualisiert 1.1 läuft

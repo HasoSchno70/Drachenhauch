@@ -26,11 +26,17 @@ Stellen:
   oder ein ZIP auf der Platte) und holt das Plugin über
   `dhrt paket -C <plugin-ordner> hole`; die Prüfsumme steht in der
   paket.lock.json des Plugin-Ordners, ein zweites Holen bekommt also genau
-  denselben Inhalt. **Entfernen** nimmt ein geholtes wieder weg. Sie laufen wie eigene; in der Verwaltung steht
-  „(geholt)“ hinter dem Namen. Ein eigenes Plugin gleichen Namens geht vor.
+  denselben Inhalt -- hat sich der Stand an der Quelle geändert, ist das ein
+  Fehler, und das alte bleibt. **Aktualisieren** holt alle geholten neu und
+  nimmt einen neuen Stand an (`hole --erneuern`; für ein Plugin von einem
+  Zweig wie `@main`), **Entfernen** nimmt eins wieder weg. Laufende geholte
+  Plugins hält die IDE dafür kurz an und startet sie danach wieder. Sie
+  laufen wie eigene; in der Verwaltung steht „(geholt)“ hinter dem Namen.
+  Ein eigenes Plugin gleichen Namens geht vor.
 
 **Plugins → Neues Plugin …** legt ein eigenes aus der Vorlage an (ein
-Befehl, ein Eintrag im Kontextmenü, eine Leiste), öffnet seine `plugin.dh`
+Befehl, ein Eintrag im Kontextmenü, eine Leiste, dazu eine `test.dhtest`
+mit der Schein-IDE, siehe „Ein Plugin prüfen“), öffnet seine `plugin.dh`
 und startet es. **Plugins → Plugins verwalten …** zeigt alle mit Titel,
 Fassung und Zustand, der Tooltip nennt Beschreibung, Autor und Pfad; der
 Haken sagt, ob es beim Start geladen wird. **Plugins → Plugins neu laden**
@@ -178,6 +184,10 @@ PROBE_ENDE()
 | `PROBE_ENDE()`, `PROBE_LAEUFT()` | `ende` schicken und warten, bis das Plugin sich beendet |
 
 Die mitgelieferten Plugins sind so geprüft (`tests/pruef/plugin_probe.dhtest`).
+Ein Plugin aus der Vorlage bringt seine Prüfung schon mit: `test.dhtest`
+neben der `plugin.dh`, mit `DH_PATH` auf den Ordner der IDE (dort liegen
+`dh_plugin.dh` und die Probe). Laufen lässt man sie mit Strg+Alt+F5, wenn
+sie vorn ist, oder mit `dhrt test <plugin-ordner>`.
 
 ## Die Leitung
 
