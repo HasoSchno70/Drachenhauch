@@ -24,6 +24,13 @@ vorn als Leiste rechts, ein Befehl mit Kürzel, eine Warnung je FIXME, ein
 Schnipsel und eine Färbung für `.todo`-Dateien. Zum Ausprobieren den Ordner
 `todo` in den Plugin-Ordner kopieren und neu laden.
 
+Ein zweites in `examples/plugins/klassen/`: alle Klassen und Structs des
+Projekts als Baum (aus `CODE_CLASSES$`, ohne zu übersetzen), darunter Felder,
+Konstanten, Eigenschaften und Methoden mit Typ; ein Filterfeld, „Nur die
+Datei vorn“, und ein Klick springt an die Stelle. Es liest nach dem Sichern
+neu und lässt Ordner aus, die mit `.` oder `_` beginnen, dazu `pakete/` und
+`target/`.
+
 ## Ein Plugin schreiben
 
 Die Bibliothek `dh_plugin.dh` liegt neben der IDE; die IDE legt ihren
@@ -61,8 +68,9 @@ gestartet) ist `PLUGIN_LAEUFT()` FALSE und das Programm endet gleich.
 | `PLUGIN_BEFEHL(id$, titel$ [, kuerzel$])` | einen Befehl anmelden: er steht im Menü **Plugins**, in der Befehlspalette und auf dem Kürzel. Ausgelöst kommt das Ereignis `befehl` mit `PLUGIN_ID$()` |
 | `PLUGIN_LEISTE(id$, titel$, formdatei$ [, bereich$])` | eine eigene Leiste im Dock: eine `.dhform` (etwa aus dem Form-Designer) als Fenster links, rechts (Vorgabe), unten oder schwebend. Der Nutzer kann sie verschieben wie jede Leiste der IDE |
 | `PLUGIN_HOERE(ereignis$)` | ein Ereignis hören: `gesichert`, `geoeffnet`, `reiter` (ein anderer Reiter vorn), `gestartet`, `beendet` (ein Programm lief), `geprueft` -- jeweils mit `PLUGIN_DATEI$()` |
-| `PLUGIN_SETZE(leiste$, widget$, was$, wert$)` | ein Widget der eigenen Leiste ändern: `text`, `checked`, `value`, `enabled`, `visible` oder `selected` |
+| `PLUGIN_SETZE(leiste$, widget$, was$, wert$)` | ein Widget der eigenen Leiste ändern: `text`, `checked`, `value`, `enabled`, `visible` oder `selected` (Zeile einer Liste, Eintrag einer Klappliste, Knoten eines Baums) |
 | `PLUGIN_LISTE(leiste$, widget$, eintraege)` | die Einträge einer Liste oder Klappliste der Leiste |
+| `PLUGIN_BAUM(leiste$, widget$, ebenen, texte [, auf])` | einen Baum der Leiste füllen: je Eintrag eine Ebene (0 = oben) und ein Text, in der Reihenfolge von oben nach unten; ein Eintrag hängt am letzten davor mit kleinerer Ebene. Die Nummer eines Knotens ist seine Stelle in der Liste -- dieselbe Zahl kommt bei `geaendert` als Wert. `auf` (Vorgabe TRUE) klappt die Äste auf |
 | `PLUGIN_TEXT$()` | der Text im vorderen Reiter |
 | `PLUGIN_DATEINAME$()` | sein Pfad ("" = ungesichert) |
 | `PLUGIN_AUSWAHL$()` | der markierte Text |
@@ -81,7 +89,8 @@ Zum Ereignis gehören `PLUGIN_ID$()` (der Befehl bzw. der Name des
 Ereignisses), `PLUGIN_LEISTE$()` und `PLUGIN_WIDGET$()` (bei `klick` und
 `geaendert` -- der Name des Widgets aus der `.dhform`, Feld `name`),
 `PLUGIN_WERT$()` (bei `geaendert`: der Text, der Haken als `TRUE`/`FALSE`,
-der Wert eines Reglers, die Nummer der gewählten Zeile) und
+der Wert eines Reglers, die Nummer der gewählten Zeile oder des gewählten
+Baumknotens) und
 `PLUGIN_DATEI$()` (bei `ereignis`). Die Fragen (`PLUGIN_TEXT$` und die
 anderen) warten bis zu zwei Sekunden auf die Antwort; was dazwischen
 ankommt, bekommt das nächste `PLUGIN_EREIGNIS$`.
@@ -101,6 +110,7 @@ Vom Plugin an die IDE:
 | `hoere` | `ereignis` |
 | `setze` | `leiste`, `widget` (Nummer in der Form), `was`, `wert` |
 | `liste` | `leiste`, `widget`, `eintraege` (Feld) |
+| `baum` | `leiste`, `widget`, `ebenen` und `texte` (Felder gleicher Länge), `auf` |
 | `frage` | `nr`, `was` (`text`, `datei`, `auswahl`, `marke`, `projekt`) |
 | `tue` | `was` (`einfuegen`, `meldung`, `ausgabe`, `oeffnen`), `text`, `datei`, `zeile` |
 | `befunde` | `datei`, `liste` (Objekte mit `zeile`, `meldung`, `schwere`) |

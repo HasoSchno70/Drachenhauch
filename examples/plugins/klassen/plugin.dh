@@ -1,0 +1,150 @@
+' Beispiel-Plugin der IDE: die Klassen des Projekts als Baum.
+'
+' Zum Ausprobieren den Ordner klassen/ nach plugins/ neben die ide.json
+' kopieren (Plugins -> Plugin-Ordner oeffnen legt ihn an) und Plugins ->
+' Plugins neu laden. Rechts erscheint eine Leiste mit jeder Klasse und jedem
+' Struct des Projekts, darunter Felder, Konstanten, Eigenschaften und
+' Methoden mit ihrem Typ; ein Klick springt an die Stelle. Das Filterfeld
+' sucht in Klassen- und Mitgliedsnamen, "Nur die Datei vorn" beschraenkt auf
+' den Reiter vorn. Nach dem Sichern und beim Reiterwechsel liest es neu.
+'
+' Die Klassen liest CODE_CLASSES$ -- ohne zu uebersetzen, also auch in einer
+' Datei, die gerade einen Fehler hat. Ein Ordner, der mit "." oder "_"
+' beginnt, und die Ordner pakete/ und target/ bleiben draussen, wie bei den
+' Umbauten der IDE.
+IMPORT "dh_plugin.dh"
+IMPORT "json"
+
+' Je Knoten des Baums: Datei und Zeile, in der Reihenfolge der Knoten.
+DIM knDatei AS ARRAY OF STRING : knDatei = []
+DIM knZeile AS ARRAY OF INTEGER : knZeile = []
+DIM filterText AS STRING : filterText = ""
+DIM nurDatei AS BOOLEAN : nurDatei = FALSE
+
+FUNCTION mitgezaehlt(weg AS STRING) AS BOOLEAN
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(REPLACE$(weg, "\", "/"), "/")
+    DIM t AS STRING
+    FOR EACH t IN teile
+        IF LEFT$(t, 1) = "." OR LEFT$(t, 1) = "_" THEN RETURN FALSE
+        IF LOWER$(t) = "pakete" OR LOWER$(t) = "target" THEN RETURN FALSE
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+' Die Zeile im Baum fuer ein Mitglied: `hp AS INTEGER`, `bellen()`,
+' `alter() AS INTEGER`, `PROPERTY name AS STRING`.
+FUNCTION mitgliedText$(art AS STRING, name AS STRING, typ AS STRING) AS STRING
+    DIM t AS STRING : t = name
+    SELECT CASE art
+        CASE "sub", "function" : t = name + "()"
+        CASE "property" : t = "PROPERTY " + name
+        CASE "konstante" : t = "CONST " + name
+    END SELECT
+    IF typ <> "" THEN t = t + " AS " + typ
+    RETURN t
+END FUNCTION
+
+FUNCTION passt(t AS STRING) AS BOOLEAN
+    RETURN filterText = "" OR INSTR(LOWER$(t), LOWER$(filterText)) >= 0
+END FUNCTION
+
+SUB sammeln()
+    knDatei = []
+    knZeile = []
+    DIM ebenen AS ARRAY OF INTEGER : ebenen = []
+    DIM texte AS ARRAY OF STRING : texte = []
+    DIM vorn AS STRING : vorn = PLUGIN_DATEINAME$()
+    DIM vornText AS STRING : vornText = PLUGIN_TEXT$()
+    DIM dateien AS ARRAY OF STRING : dateien = []
+    DIM projekt AS STRING : projekt = PLUGIN_PROJEKT$()
+    IF nurDatei OR projekt = "" THEN
+        ARRAY_PUSH(dateien, vorn)
+    ELSE
+        DIM d AS STRING
+        FOR EACH d IN DIRLIST_REC(projekt, "*.dh")
+            IF mitgezaehlt(d) THEN ARRAY_PUSH(dateien, PATHJOIN(projekt, d))
+        NEXT
+        SORT(dateien)
+    END IF
+    DIM klassen AS INTEGER : klassen = 0
+    DIM datei AS STRING
+    FOR EACH datei IN dateien
+        DIM text AS STRING : text = ""
+        ' Der Reiter vorn zaehlt mit dem Stand im Editor, nicht dem auf der Platte.
+        IF datei = "" OR SAMEFILE(datei, vorn) THEN
+            text = vornText
+        ELSEIF FILEEXISTS(datei) THEN
+            text = JOIN$(READLINES(datei), CHR$(10))
+        END IF
+        DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "k" + CHR$(34) + ": " + CODE_CLASSES$(text) + "}")
+        DIM k AS INTEGER
+        FOR k = 0 TO JSON_LEN(j, "k") - 1
+            DIM p AS STRING : p = "k." + STR$(k)
+            DIM kname AS STRING : kname = JSON_GET_STRING(j, p + ".name")
+            DIM kopf AS STRING : kopf = kname
+            DIM basis AS STRING : basis = JSON_GET_STRING(j, p + ".basis")
+            IF basis <> "" THEN kopf = kopf + " : " + basis
+            IF JSON_GET_STRING(j, p + ".art") = "struct" THEN kopf = "STRUCT " + kopf
+            IF datei <> "" AND NOT nurDatei THEN kopf = kopf + "   (" + BASENAME(datei) + ")"
+            ' Passt der Klassenname, kommen alle Mitglieder; sonst nur die passenden.
+            DIM ganz AS BOOLEAN : ganz = passt(kname)
+            DIM zeigen AS ARRAY OF INTEGER : zeigen = []
+            DIM m AS INTEGER
+            FOR m = 0 TO JSON_LEN(j, p + ".mitglieder") - 1
+                IF ganz OR passt(JSON_GET_STRING(j, p + ".mitglieder." + STR$(m) + ".name")) THEN ARRAY_PUSH(zeigen, m)
+            NEXT
+            IF ganz OR LEN(zeigen) > 0 THEN
+                klassen = klassen + 1
+                ARRAY_PUSH(ebenen, 0) : ARRAY_PUSH(texte, kopf)
+                ARRAY_PUSH(knDatei, datei) : ARRAY_PUSH(knZeile, JSON_GET_INT(j, p + ".zeile"))
+                FOR EACH m IN zeigen
+                    DIM q AS STRING : q = p + ".mitglieder." + STR$(m)
+                    ARRAY_PUSH(ebenen, 1)
+                    ARRAY_PUSH(texte, mitgliedText$(JSON_GET_STRING(j, q + ".art"), JSON_GET_STRING(j, q + ".name"), JSON_GET_STRING(j, q + ".typ")))
+                    ARRAY_PUSH(knDatei, datei) : ARRAY_PUSH(knZeile, JSON_GET_INT(j, q + ".zeile"))
+                NEXT
+            END IF
+        NEXT
+    NEXT
+    PLUGIN_BAUM("klassen", "baum", ebenen, texte)
+    DIM wo AS STRING : wo = STR$(LEN(dateien)) + " Dateien"
+    IF nurDatei THEN wo = IIF(vorn = "", "(ungesichert)", BASENAME(vorn))
+    PLUGIN_SETZE("klassen", "kopf", "text", STR$(klassen) + " Klassen in " + wo)
+END SUB
+
+PLUGIN_BEFEHL("zeigen", "Klassen des Projekts", "Strg+Alt+Umschalt+K")
+PLUGIN_LEISTE("klassen", "Klassen", "leiste.dhform", "rechts")
+PLUGIN_HOERE("gesichert")
+PLUGIN_HOERE("reiter")
+IF PLUGIN_LAEUFT() THEN sammeln()
+
+WHILE PLUGIN_LAEUFT()
+    SELECT CASE PLUGIN_EREIGNIS$()
+        CASE "befehl"
+            IF PLUGIN_ID$() = "zeigen" THEN
+                sammeln()
+                PLUGIN_MELDUNG("Klassen neu gelesen")
+            END IF
+        CASE "ereignis"
+            ' Ueber das ganze Projekt aendert ein anderer Reiter vorn nichts --
+            ' neu gebaut, klappte der Baum bei jedem Sprung zurueck nach oben.
+            IF PLUGIN_ID$() = "gesichert" OR nurDatei THEN sammeln()
+        CASE "klick"
+            IF PLUGIN_WIDGET$() = "auffrischen" THEN sammeln()
+        CASE "geaendert"
+            SELECT CASE PLUGIN_WIDGET$()
+                CASE "filter"
+                    filterText = TRIM$(PLUGIN_WERT$())
+                    sammeln()
+                CASE "nurdatei"
+                    nurDatei = PLUGIN_WERT$() = "TRUE"
+                    sammeln()
+                CASE "baum"
+                    DIM nr AS INTEGER : nr = VAL(PLUGIN_WERT$())
+                    ' Ohne Datei (ungesichert vorn) springt die IDE im Reiter vorn.
+                    IF nr >= 0 AND nr < LEN(knZeile) THEN PLUGIN_OEFFNEN(knDatei[nr], knZeile[nr])
+            END SELECT
+        CASE "ende"
+            EXIT(0)
+    END SELECT
+WEND

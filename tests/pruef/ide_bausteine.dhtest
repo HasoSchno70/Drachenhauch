@@ -20,7 +20,14 @@ WHILE PROCESS_RUNNING(p) AND runden < 400
     IF t <> "" THEN teile = teile + 1 : alles = alles + t
     SLEEP(20) : runden = runden + 1
 WEND
-alles = alles + PROCESS_READ$(p)
+' Ist das Kind beendet, kann sein Lesefaden die letzte Zeile noch nicht
+' abgelegt haben (macOS-Laeufer, 2026-10-24): bis zu fuenf leere Abfragen.
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM rest AS STRING : rest = PROCESS_READ$(p)
+    IF rest = "" THEN leer = leer + 1 ELSE alles = alles + rest
+    SLEEP(30)
+WEND
 PRINT teile >= 2
 PRINT TRIM$(REPLACE$(alles, CHR$(13), ""))
 PRINT PROCESS_CODE(p)

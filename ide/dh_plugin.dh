@@ -178,6 +178,27 @@ SUB PLUGIN_LISTE(leiste AS STRING, widget AS STRING, eintraege AS ARRAY OF STRIN
     plgSenden(j)
 END SUB
 
+' Einen Baum der Leiste fuellen. `ebenen[i]` ist die Tiefe des Eintrags
+' (0 = oben), `texte[i]` seine Beschriftung; ein Eintrag haengt am letzten
+' davor mit kleinerer Ebene. Gewaehlt wird mit derselben Nummer, die ein
+' "geaendert"-Ereignis als Wert bringt. `auf` = Aeste aufgeklappt.
+SUB PLUGIN_BAUM(leiste AS STRING, widget AS STRING, ebenen AS ARRAY OF INTEGER, texte AS ARRAY OF STRING, auf AS BOOLEAN = TRUE)
+    DIM j AS JSON_HANDLE : j = plgNachricht("baum")
+    JSON_SET_STRING(j, "leiste", leiste)
+    JSON_SET_INT(j, "widget", plgWidgetNr(leiste, widget))
+    JSON_SET_BOOL(j, "auf", auf)
+    JSON_SET_JSON(j, "ebenen", JSON_PARSE("[]"))
+    JSON_SET_JSON(j, "texte", JSON_PARSE("[]"))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(texte) - 1
+        DIM e AS INTEGER : e = 0
+        IF i < LEN(ebenen) THEN e = ebenen[i]
+        JSON_APPEND_INT(j, "ebenen", e)
+        JSON_APPEND_STRING(j, "texte", texte[i])
+    NEXT
+    plgSenden(j)
+END SUB
+
 SUB plgTue(was AS STRING, text AS STRING, datei AS STRING, zeile AS INTEGER)
     DIM j AS JSON_HANDLE : j = plgNachricht("tue")
     JSON_SET_STRING(j, "was", was)

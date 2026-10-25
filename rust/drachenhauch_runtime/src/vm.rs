@@ -7081,6 +7081,12 @@ impl<'p> Vm<'p> {
                     .map(|(z, n, k, sig)| serde_json::json!({"zeile": z, "name": n, "klasse": k, "signatur": sig})).collect();
                 Value::str_rc(serde_json::Value::Array(liste).to_string())
             }
+            // CODE_CLASSES$: Klassen und Structs des Textes mit ihren
+            // Mitgliedern als JSON, ohne zu uebersetzen (lsp::klassen_struktur).
+            "code_classes$" | "code_classes" => {
+                let text = bi_str(a, 0, "CODE_CLASSES$")?;
+                Value::str_rc(crate::lsp::klassen_struktur(text).to_string())
+            }
             "code_types$" | "code_types" => {
                 let text = bi_str(a, 0, "CODE_TYPES$")?.to_string();
                 let basis = if a.len() > 1 { std::path::PathBuf::from(bi_str(a, 1, "CODE_TYPES$")?) }

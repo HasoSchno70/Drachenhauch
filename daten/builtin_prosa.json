@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2133,
+ "count": 2134,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -319,6 +319,7 @@
   "CLOUD_SAVE": "Speichert data$ komplett (überschreibt einen vorherigen Stand)",
   "CLS": "Buffer mit color füllen (Default: schwarz)",
   "CODE_CHECK$": "STRING (JSON) die Front-End-Kette wie dhrt --check: eine Liste von {zeile, spalte, laenge, schwere, meldung} mit schwere = fehler/warnung; spalte (ab 1) und laenge sagen, wo in der Zeile die Meldung hingehört -- die Stelle eines Syntaxfehlers, sonst ein in der Meldung genannter Name, sonst die Zeile ohne Einrückung; basis$ = Ordner für IMPORT \"x.dh\" (Vorgabe: das Arbeitsverzeichnis). Zeilen sind …",
+  "CODE_CLASSES$": "STRING (JSON) die Klassen und Structs des Textes mit ihren Mitgliedern, ohne zu übersetzen: je Klasse {\"name\", \"art\", \"basis\", \"zeile\", \"bis\", \"kommentar\", \"mitglieder\"} (basis = die Klasse hinter EXTENDS), je Mitglied {\"name\", \"art\", \"typ\", \"kopf\", \"zeile\", \"kommentar\"} mit art = feld/konstante/sub/function/property -- GET und SET einer PROPERTY sind ein Mitglied; ein halb getippter Text …",
   "CODE_COMPLETE": "ARRAY OF STRING Vorschläge zum Wortanfang links der Stelle: eigene Symbole, Befehle, Schlüsselwörter, Konstanten; mit basis$ hinter objekt. nur die Felder, PROPERTYs und Methoden seiner Klasse, hinter einem Namensraum (kern.) dessen oberste Definitionen ohne PRIVATE",
   "CODE_DEFINITION": "TUPLE (zeile, spalte) wo das Wort definiert ist; (-1, -1) ohne Definition in diesem Text",
   "CODE_FORMAT$": "STRING — der Quelltext formatiert wie durch dhrt fmt: Schlüsselwörter groß, Leerraum am Zeilenende weg, mit einruecken (Vorgabe TRUE) die Blöcke neu eingerückt; leer, wenn sich die Quelle nicht lesen lässt (Syntaxfehler)",
@@ -546,7 +547,7 @@
   "GUI_CARD": "GUI_WIDGET — Kachel: Bild oben, Titel, Beschreibung -- das Ganze ist ein Knopf (GUI_CLICKED, Enter/Leertaste); bild -1 = ohne",
   "GUI_CARD_SET_TEXT": "Beschreibung einer Kachel setzen (den Titel setzt GUI_SET_TEXT)",
   "GUI_CARD_TEXT$": "STRING — Beschreibung einer Kachel",
-  "GUI_CHANGED": "BOOLEAN — hat die Bedienung das Widget im letzten GUI_UPDATE geändert (Auswahl, Wert, Text, Haken)? Was das Programm selbst setzt, zählt nicht. Der erste Aufruf beginnt zu beobachten und liefert FALSE",
+  "GUI_CHANGED": "BOOLEAN — hat die Bedienung das Widget im letzten GUI_UPDATE geändert (Auswahl -- auch der Knoten eines Baums --, Wert, Text, Haken)? Was das Programm selbst setzt, zählt nicht. Der erste Aufruf beginnt zu beobachten und liefert FALSE",
   "GUI_CHECKBOX": "GUI_WIDGET — Toggle",
   "GUI_CHECKED": "BOOLEAN — Checkbox-Zustand",
   "GUI_CLEAR_ERRORS": "STRING / — / — Meldung lesen, von außen setzen (z. B. aus der Datenbank), alle löschen",

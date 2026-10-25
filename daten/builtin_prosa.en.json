@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2128,
+ "count": 2129,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -319,6 +319,7 @@
   "CLOUD_SAVE": "stores data$ in full (overwrites a previous state)",
   "CLS": "fill the buffer with color (default: black)",
   "CODE_CHECK$": "STRING (JSON) the front-end chain like dhrt --check: a list of {zeile, spalte, laenge, schwere, meldung} with schwere = fehler/warnung; spalte (from 1) and laenge say where in the line the message belongs -- the location of a syntax error, otherwise a name mentioned in the message, otherwise the line without indentation; basis$ = folder for IMPORT \"x.dh\" (default: the working directory). Lines …",
+  "CODE_CLASSES$": "STRING (JSON) the classes and structs of the text with their members, without compiling: per class {\"name\", \"art\", \"basis\", \"zeile\", \"bis\", \"kommentar\", \"mitglieder\"} (basis = the class after EXTENDS), per member {\"name\", \"art\", \"typ\", \"kopf\", \"zeile\", \"kommentar\"} with art = feld/konstante/sub/function/property -- GET and SET of a PROPERTY are one member; a half-typed text yields what can be read",
   "CODE_COMPLETE": "ARRAY OF STRING suggestions for the word beginning to the left of the position: own symbols, commands, keywords, constants; with basis$, after object. only the fields, PROPERTYs and methods of its class, after a namespace (kern.) its top-level definitions without PRIVATE",
   "CODE_DEFINITION": "TUPLE (zeile, spalte) where the word is defined; (-1, -1) if there is no definition in this text",
   "CODE_FORMAT$": "STRING — the source formatted as by dhrt fmt: keywords in upper case, trailing whitespace removed, with einruecken (default TRUE) the blocks re-indented; empty if the source cannot be read (syntax error)",
@@ -546,7 +547,7 @@
   "GUI_CARD": "GUI_WIDGET — card: image at the top, title, description -- the whole thing is a button (GUI_CLICKED, Enter/Space); bild -1 = without",
   "GUI_CARD_SET_TEXT": "set the description of a card (the title is set by GUI_SET_TEXT)",
   "GUI_CARD_TEXT$": "STRING — description of a card",
-  "GUI_CHANGED": "BOOLEAN — did the user change the widget in the last GUI_UPDATE (selection, value, text, tick)? What the program sets itself does not count. The first call starts watching and returns FALSE",
+  "GUI_CHANGED": "BOOLEAN — did the user change the widget in the last GUI_UPDATE (selection -- the node of a tree too --, value, text, tick)? What the program sets itself does not count. The first call starts watching and returns FALSE",
   "GUI_CHECKBOX": "GUI_WIDGET — toggle",
   "GUI_CHECKED": "BOOLEAN — checkbox state",
   "GUI_CLEAR_ERRORS": "STRING / — / — read the message, set it from outside (e.g. from the database), clear all",
