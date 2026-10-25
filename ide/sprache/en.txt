@@ -943,3 +943,7 @@ Haken = beim Start laden. Ein Plugin liegt in plugins/<name>/plugin.dh.	Tick = l
 Keine Plugins -- „Plugin-Ordner öffnen“ legt den Ordner an.	No plugins -- “Open plugin folder” creates the folder.
 Neu laden	Reload
 Ordner öffnen	Open folder
+Klassendiagramm	Class diagram
+Werkzeug: Klassendiagramm	Tool: class diagram
+Erst ein Projekt oder eine Datei öffnen.	Open a project or a file first.
+Klassendiagramm gestartet -- Doppelklick auf einen Kasten springt hierher.	Class diagram started -- double-click a box to jump here.

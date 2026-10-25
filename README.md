@@ -78,7 +78,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 **[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 56 MB, aktuell Fassung 2026.35.
 
-Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 225 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
+Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 226 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
 
 ## Aus dem Quelltext arbeiten
 
@@ -129,6 +129,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
   - **[Tilemap-/Level-Editor](docs/tilemap-editor.md)** (`187_tilemap_editor.dh`) — Ebenen, Objekt-Ebenen, mehrere Tilesets, Kachel-Eigenschaften, Tiled-JSON (`TILED_LOAD`), DH-Code-Renderer
   - **[Form-Designer](docs/form-designer.md)** (`197_form_designer.dh`) — GUI-Formulare im Xojo-Stil, `.dhform` für `GUI_LOAD`, F5 startet, DH-Code
   - **[Animations-FSM-Editor](docs/anim-editor.md)** (`198_anim_fsm_editor.dh`) — Zustände, Übergänge und Bedingungen als Graph, `.dhanim` für `ANIM_FSM_LOAD` ([Modul `animfsm`](docs/module-animfsm.md)), Vorschau mit F5
+  - **[Klassendiagramm](docs/klassendiagramm.md)** (`210_klassendiagramm.dh`) — alle Klassen des Projekts mit Feldern und Methoden, Vererbung und Verwendung als Pfeile; Doppelklick springt in der IDE an die Stelle, P sichert ein Bild
 - **[Sprachserver + VS Code](docs/lsp.md)** — Drachenhauch in jedem LSP-Editor: Syntax-Highlighting, Diagnostics, Completion, Hover, Goto-Definition, References, Outline. Der Server ist die Runtime selbst (`dhrt lsp`), ohne Python (`vscode-drachenhauch/`)
 - **[Web-Playground](docs/web-playground.md)** — `dhrt` als WebAssembly im Browser, [Tabelle unten](#web-playground)
 - **[`cloud`-Modul](docs/module-cloud.md)** — Cloud-Save + Leaderboard gegen den mitgelieferten, selbst hostbaren Referenz-Server [`cloudserver/`](cloudserver/README.md) (ein Drachenhauch-Programm + SQLite, geteiltes API-Key-Secret): `CLOUD_CONFIGURE`/`CLOUD_SAVE`/`CLOUD_LOAD`, `LEADERBOARD_SUBMIT`/`LEADERBOARD_FETCH`. Plus **`NUMFMT$`** (core-Builtin) für Idle-/Incremental-Game-taugliche Big-Number-Formatierung (`1234567` → `"1.23M"`, K/M/B/T/Qa/Qi/Sx/Sp/Oc/No/Dc, danach wissenschaftliche Notation). Demo [examples/146_cloud_idle.dh](examples/146_cloud_idle.dh)

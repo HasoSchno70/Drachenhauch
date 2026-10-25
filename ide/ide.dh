@@ -1133,6 +1133,7 @@ DIM miWzTracker AS INTEGER : miWzTracker = GUI_MENU_ITEM(mWerkzeuge, tr$("Tracke
 DIM miWzForm AS INTEGER : miWzForm = GUI_MENU_ITEM(mWerkzeuge, tr$("Form-Designer"))
 DIM miWzAnim AS INTEGER : miWzAnim = GUI_MENU_ITEM(mWerkzeuge, tr$("Anim-FSM-Editor"))
 DIM miWzNoten AS INTEGER : miWzNoten = GUI_MENU_ITEM(mWerkzeuge, tr$("Notenblatt"))
+DIM miWzKlassen AS INTEGER : miWzKlassen = GUI_MENU_ITEM(mWerkzeuge, tr$("Klassendiagramm"))
 GUI_MENU_SEPARATOR(mWerkzeuge)
 DIM miBeispiele AS INTEGER : miBeispiele = GUI_MENU_ITEM(mWerkzeuge, tr$("Beispiele als Projekt öffnen"))
 DIM miThemen AS INTEGER : miThemen = GUI_MENU_ITEM(mWerkzeuge, tr$("Beispiele nach Themen ..."))
@@ -16100,9 +16101,53 @@ SUB formularAlsText()
     formAlsText = FALSE
 END SUB
 
+' Das Klassendiagramm des Projekts (examples/210_klassendiagramm.dh); ohne
+' Projektordner das der Datei vorn.
+SUB klassendiagrammStarten()
+    DIM ziel AS STRING : ziel = projektOrdner
+    IF ziel = "" AND aktiverTab >= 0 THEN ziel = tabPfade[aktiverTab]
+    IF ziel = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Erst ein Projekt oder eine Datei öffnen."))
+        RETURN
+    END IF
+    werkzeugMit("210_klassendiagramm.dh", ziel)
+    GUI_SET_TEXT(lblStatus, tr$("Klassendiagramm gestartet -- Doppelklick auf einen Kasten springt hierher."))
+END SUB
+
+' Eine Zeile aus der Ausgabe eines Werkzeugs. "DH_IDE_OEFFNEN|pfad|zeile"
+' oeffnet die Datei an der Stelle (so springt das Klassendiagramm in den
+' Code); alles andere wird uebergangen -- frueher las niemand die Ausgabe.
+SUB werkzeugZeile(z AS STRING)
+    z = TRIM$(REPLACE$(z, CHR$(13), ""))
+    IF LEFT$(z, 15) <> "DH_IDE_OEFFNEN|" THEN RETURN
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(MID$(z, 15), "|")
+    IF LEN(teile) < 2 THEN RETURN
+    ' Gibt es die Datei nicht, darf die Marke im Reiter vorn nicht wandern.
+    IF NOT FILEEXISTS(teile[0]) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Gibt es nicht: ") + teile[0])
+        protokoll("werkzeug oeffnet fehlt " + BASENAME(teile[0]))
+        RETURN
+    END IF
+    dateiOeffnen(teile[0])
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    DIM zl AS INTEGER : zl = VAL(teile[1])
+    IF ta >= 0 AND zl > 0 THEN GUI_TEXTAREA_GOTO(ta, zl, 1)
+    WINDOW_FOCUS()
+    protokoll("werkzeug oeffnet " + BASENAME(teile[0]) + " " + STR$(zl))
+END SUB
+
 SUB werkzeugeAufraeumen()
     DIM i AS INTEGER : i = 0
     WHILE i < LEN(werkzeuge)
+        ' Was ein Werkzeug schreibt, abholen -- sonst fuellt sich die
+        ' Leitung, und ein Sprungwunsch kaeme nie an.
+        DIM roh AS STRING : roh = PROCESS_READ$(werkzeuge[i])
+        IF roh <> "" THEN
+            DIM wz AS STRING
+            FOR EACH wz IN SPLIT$(roh, NL)
+                werkzeugZeile(wz)
+            NEXT
+        END IF
         IF PROCESS_RUNNING(werkzeuge[i]) THEN
             i = i + 1
         ELSE
@@ -17913,7 +17958,7 @@ paletteEintrag("Listing drucken ...", "drucken", "Strg+P")
 paletteEintrag("Listing als PDF neben die Quelle", "pdf", "")
 paletteEintrag("Werkzeug: SFX-Generator", "wz_sfx", "") : paletteEintrag("Werkzeug: Partikel-Editor", "wz_partikel", "")
 paletteEintrag("Werkzeug: Tilemap-Editor", "wz_tilemap", "") : paletteEintrag("Werkzeug: Sprite-Editor", "wz_sprite", "")
-paletteEintrag("Werkzeug: Tracker", "wz_tracker", "") : paletteEintrag("Werkzeug: Form-Designer", "wz_form", "") : paletteEintrag("Werkzeug: Anim-FSM-Editor", "wz_anim", "") : paletteEintrag("Werkzeug: Notenblatt", "wz_noten", "") : paletteEintrag("Beispiele als Projekt öffnen", "beispiele", "") : paletteEintrag("Beispiele nach Themen ...", "beispiele_themen", "")
+paletteEintrag("Werkzeug: Tracker", "wz_tracker", "") : paletteEintrag("Werkzeug: Form-Designer", "wz_form", "") : paletteEintrag("Werkzeug: Anim-FSM-Editor", "wz_anim", "") : paletteEintrag("Werkzeug: Notenblatt", "wz_noten", "") : paletteEintrag("Werkzeug: Klassendiagramm", "wz_klassen", "") : paletteEintrag("Beispiele als Projekt öffnen", "beispiele", "") : paletteEintrag("Beispiele nach Themen ...", "beispiele_themen", "")
 paletteEintrag("Ausdruck im Debugger auswerten", "ausdruck", "Strg+E")
 paletteEintrag("Eigene Schnipsel bearbeiten", "schnipsel_eigen", "") : paletteEintrag("Auswahl als Schnipsel sichern ...", "schnipsel_auswahl", "")
 paletteEintrag("Tastenkürzel ändern ...", "tasten", "") : paletteEintrag("Tastenkürzel zurücksetzen", "tasten_zurueck", "")
@@ -18583,6 +18628,7 @@ SUB befehl(k AS STRING)
         CASE "form_text" : formularAlsText()
         CASE "wz_anim" : werkzeugStarten("198_anim_fsm_editor.dh")
         CASE "wz_noten" : werkzeugStarten("199_notenblatt.dh")
+        CASE "wz_klassen" : klassendiagrammStarten()
         CASE "beispiele" : beispieleOeffnen()
         CASE "beispiele_themen" : themenZeigen()
         CASE "ausdruck"
@@ -18621,7 +18667,7 @@ symbol(miDebug, "debug") : symbol(miHaltepunkt, "haltepunkt") : symbol(miBedingu
 symbol(miExport, "export")
 symbol(miWzSfx, "werkzeug") : symbol(miWzPartikel, "werkzeug") : symbol(miWzTilemap, "werkzeug")
 symbol(miWzSprite, "werkzeug") : symbol(miWzTracker, "werkzeug") : symbol(miWzForm, "werkzeug")
-symbol(miWzAnim, "werkzeug") : symbol(miWzNoten, "werkzeug")
+symbol(miWzAnim, "werkzeug") : symbol(miWzNoten, "werkzeug") : symbol(miWzKlassen, "werkzeug")
 symbol(miHandbuch, "handbuch") : symbol(miKuerzel, "handbuch")
 symbol(miUmbruch, "umbruch") : symbol(miLeiste, "menue")
 
@@ -18702,7 +18748,7 @@ menueBefehl(miFaltenAuf, "falten_auf", "Umschalt+F4") : menueBefehl(miUeber, "ue
 menueBefehl(miDrucken, "drucken", "Strg+P") : menueBefehl(miPdf, "pdf", "") : menueBefehl(miWzSfx, "wz_sfx", "")
 menueBefehl(miWzPartikel, "wz_partikel", "") : menueBefehl(miWzTilemap, "wz_tilemap", "") : menueBefehl(miWzSprite, "wz_sprite", "")
 menueBefehl(miWzTracker, "wz_tracker", "") : menueBefehl(miWzForm, "wz_form", "") : menueBefehl(miWzAnim, "wz_anim", "")
-menueBefehl(miWzNoten, "wz_noten", "") : menueBefehl(miBeispiele, "beispiele", "") : menueBefehl(miThemen, "beispiele_themen", "")
+menueBefehl(miWzNoten, "wz_noten", "") : menueBefehl(miWzKlassen, "wz_klassen", "") : menueBefehl(miBeispiele, "beispiele", "") : menueBefehl(miThemen, "beispiele_themen", "")
 menueBefehl(miAusdruck, "ausdruck", "Strg+E") : menueBefehl(miSchnell, "schnell", "Strg+Umschalt+O") : menueBefehl(miTodo, "todo", "Strg+Umschalt+M")
 menueBefehl(miBlame, "blame", "Strg+Umschalt+B") : menueBefehl(miDiff, "diff", "Strg+Umschalt+D") : menueBefehl(miVerlauf, "verlauf", "")
 menueBefehl(miGitRand, "git_rand", "") : menueBefehl(miKommentar, "kommentar", "Strg+K") : menueBefehl(miDuplizieren, "duplizieren", "Strg+D")
