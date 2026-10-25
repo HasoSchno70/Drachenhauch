@@ -31,6 +31,9 @@ DIM plgNamen AS MAP OF STRING : plgNamen = {}
 ' Gesammelte Befunde (PLUGIN_BEFUND), je Datei verschickt.
 DIM plgBefunde AS JSON_HANDLE : plgBefunde = JSON_PARSE("[]")
 DIM plgBefundDatei AS STRING : plgBefundDatei = ""
+' Aus der Begruessung der IDE ("hallo"): Fassung des Protokolls und der IDE.
+DIM plgProtokoll AS INTEGER : plgProtokoll = 0
+DIM plgIde AS STRING : plgIde = ""
 
 SUB plgSenden(j AS JSON_HANDLE)
     IF PARENT_ALIVE() THEN PARENT_SEND(JSON_STRINGIFY(j))
@@ -48,7 +51,8 @@ FUNCTION PLUGIN_LAEUFT() AS BOOLEAN
 END FUNCTION
 
 ' Das naechste Ereignis -- wartet bis zu 50 ms und liefert "" ohne eins.
-' Die Art ist "befehl", "klick", "geaendert", "ereignis", "hover" oder "ende".
+' Die Art ist "befehl", "klick", "geaendert", "ereignis", "hover",
+' "vervollstaendigen" oder "ende".
 FUNCTION PLUGIN_EREIGNIS$() AS STRING
     DIM zeile AS STRING : zeile = ""
     DIM bis AS FLOAT : bis = GET_TIME() + 0.05
@@ -69,7 +73,53 @@ FUNCTION PLUGIN_EREIGNIS$() AS STRING
     CATCH e
         RETURN ""
     END TRY
+    ' Die Begruessung gehoert der Bibliothek, nicht dem Plugin.
+    IF plgFeld$("art") = "hallo" THEN
+        plgProtokoll = VAL(plgFeld$("protokoll"))
+        plgIde = plgFeld$("ide")
+        RETURN ""
+    END IF
     RETURN plgFeld$("art")
+END FUNCTION
+
+' Die Begruessung abwarten (hoechstens eine Sekunde), ohne andere
+' Nachrichten zu verlieren -- sie kommen danach ueber PLUGIN_EREIGNIS$.
+SUB plgHalloAbwarten()
+    IF plgIde <> "" OR NOT PARENT_ALIVE() THEN RETURN
+    DIM bis AS FLOAT : bis = GET_TIME() + 1.0
+    WHILE plgIde = "" AND GET_TIME() < bis
+        DIM z AS STRING : z = PARENT_RECV$()
+        IF z = "" THEN
+            SLEEP(5)
+        ELSE
+            DIM j AS JSON_HANDLE
+            TRY
+                j = JSON_PARSE(z)
+                IF JSON_HAS(j, "art") AND JSON_GET_STRING(j, "art") = "hallo" THEN
+                    plgProtokoll = JSON_GET_INT(j, "protokoll")
+                    plgIde = JSON_GET_STRING(j, "ide")
+                ELSE
+                    ARRAY_PUSH(plgWarte, z)
+                END IF
+            CATCH e
+            END TRY
+        END IF
+    WEND
+END SUB
+
+' Die Fassung der IDE ("2026.36") und die des Protokolls (eine Zahl; 1 =
+' 2026.35, 2 = 2026.36, 3 = mit Ersetzen und Vervollstaendigen). Eine IDE
+' vor der Begruessung meldet "" bzw. 1. So kann ein Plugin auf eine neuere
+' Faehigkeit verzichten, statt eine Nachricht zu schicken, die die IDE nicht
+' kennt (sie steht dann nur im Protokoll der IDE).
+FUNCTION PLUGIN_IDE_FASSUNG$() AS STRING
+    plgHalloAbwarten()
+    RETURN plgIde
+END FUNCTION
+FUNCTION PLUGIN_PROTOKOLL() AS INTEGER
+    plgHalloAbwarten()
+    IF plgProtokoll = 0 THEN RETURN 1
+    RETURN plgProtokoll
 END FUNCTION
 
 FUNCTION plgFeld$(k AS STRING) AS STRING
@@ -219,6 +269,22 @@ END SUB
 ' Antwort auf das Ereignis "hover" (PLUGIN_HOERE("hover")): der Text haengt
 ' sich an den Tooltip, solange die Maus noch an der Stelle steht. Leer =
 ' nichts beizutragen. Gilt dem zuletzt geholten Ereignis.
+' Antwort auf das Ereignis "vervollstaendigen" (PLUGIN_HOERE(
+' "vervollstaendigen")): Woerter, die die IDE an die Liste der
+' Vervollstaendigung haengt. PLUGIN_WERT$() ist der Wortanfang an der Marke,
+' PLUGIN_ZEILE()/PLUGIN_SPALTE() die Stelle; leer = nichts beizutragen.
+' Gilt dem zuletzt geholten Ereignis.
+SUB PLUGIN_VORSCHLAEGE(eintraege AS ARRAY OF STRING)
+    DIM j AS JSON_HANDLE : j = plgNachricht("vorschlaege")
+    JSON_SET_INT(j, "nr", VAL(plgFeld$("nr")))
+    JSON_SET_JSON(j, "eintraege", JSON_PARSE("[]"))
+    DIM e AS STRING
+    FOR EACH e IN eintraege
+        JSON_APPEND_STRING(j, "eintraege", e)
+    NEXT
+    plgSenden(j)
+END SUB
+
 SUB PLUGIN_HOVER_ANTWORT(text AS STRING)
     DIM j AS JSON_HANDLE : j = plgNachricht("hover")
     JSON_SET_INT(j, "nr", VAL(plgFeld$("nr")))

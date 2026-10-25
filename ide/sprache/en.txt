@@ -959,3 +959,13 @@ Ein Plugin-Name besteht aus Buchstaben, Ziffern, _ und -.	A plugin name consists
 Das Plugin gibt es schon: 	The plugin already exists: 
 Was das Plugin tut.	What the plugin does.
 Plugin angelegt: 	Plugin created: 
+ (geholt)	 (fetched)
+Holen ...	Fetch ...
+Ein Plugin aus github:nutzer/repo@stand, einer https-Adresse oder einem Ordner holen (dhrt paket)	Fetch a plugin from github:user/repo@ref, an https address or a folder (dhrt paket)
+Entfernen	Remove
+Das gewählte geholte Plugin entfernen	Remove the selected fetched plugin
+Entfernen geht nur bei geholten Plugins -- eigene liegen im Plugin-Ordner.	Only fetched plugins can be removed -- your own live in the plugin folder.
+Plugin holen	Fetch plugin
+Quelle (github:nutzer/repo@stand, https-Adresse oder Ordner), dahinter wahlweise --als name:	Source (github:user/repo@ref, https address or folder), optionally followed by --als name:
+Plugins: fertig -- neu geladen.	Plugins: done -- reloaded.
+Plugins holen fehlgeschlagen -- siehe Ausgabe.	Fetching plugins failed -- see the output.

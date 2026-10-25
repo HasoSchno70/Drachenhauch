@@ -1,0 +1,144 @@
+' Die Testhilfe ide/dh_plugin_probe.dh -- eine Schein-IDE -- an den
+' mitgelieferten Plugins aus examples/plugins/ und an kleinen eigenen. Kein
+' Fenster, keine IDE: das Plugin laeuft als eigener Prozess wie in der IDE,
+' die Probe beantwortet seine Fragen und merkt sich, was es schickt.
+'
+' ARG$(0) ist der Ordner mit dh_plugin.dh, ARG$(1) der Plugin-Ordner der
+' Beispiele.
+
+=== todo sammelt und meldet ein fixme
+IMPORT "probe.dh"
+PRINT PROBE_START(ARG$(1) + "/todo/plugin.dh", ARG$(0))
+PRINT PROBE_WARTEN("leiste")
+PROBE_SETZE_TEXT("PRINT 1" + CHR$(10) + "' TODO: mehr" + CHR$(10) + "' FIXME kaputt" + CHR$(10), CWD$() + "/haupt.dh")
+PROBE_EREIGNIS("gesichert", CWD$() + "/haupt.dh")
+PRINT PROBE_WARTEN("befunde")
+PRINT "befehle "; PROBE_BEFEHLE$(); " hoert "; PROBE_HOERT$()
+PRINT "liste "; PROBE_WIDGET$("todo", "liste", "eintraege")
+PRINT "kopf "; PROBE_WIDGET$("todo", "kopf", "text")
+PRINT "befund "; INSTR(PROBE_BEFUNDE$(CWD$() + "/haupt.dh"), "FIXME") >= 0
+PROBE_ENDE()
+PRINT "laeuft "; PROBE_LAEUFT()
+--- datei probe.dh
+IMPORT "{sammlung}/../../ide/dh_plugin_probe.dh"
+
+--- argumente
+{sammlung}/../../ide
+{sammlung}/../../examples/plugins
+--- erwartet
+TRUE
+TRUE
+TRUE
+befehle sammeln hoert gesichert,reiter
+liste ["2: ' TODO: mehr","3: ' FIXME kaputt"]
+kopf 2 Stellen in haupt.dh
+befund TRUE
+laeuft FALSE
+
+=== schreibweise unterstreicht korrigiert und erlaubt
+IMPORT "probe.dh"
+DIM d AS STRING : d = CWD$() + "/haupt.dh"
+PROBE_SETZE_TEXT("' Das ist der Standart" + CHR$(10) + "PRINT 1" + CHR$(10), d, 1, 17)
+PRINT PROBE_START(ARG$(1) + "/schreibweise/plugin.dh", ARG$(0))
+PRINT PROBE_WARTEN("befunde")
+DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + PROBE_BEFUNDE$(d) + "}")
+PRINT "stelle "; JSON_GET_INT(j, "b.0.zeile"); " "; JSON_GET_INT(j, "b.0.spalte"); " "; JSON_GET_INT(j, "b.0.laenge")
+PRINT "korrektur "; JSON_GET_STRING(j, "b.0.korrekturen.0.aenderungen.0.text")
+PRINT "hover "; PROBE_HOVER$("Standart", 1, 17)
+PRINT "kontext "; PROBE_KONTEXT$()
+PROBE_BEFEHL("erlauben")
+PRINT PROBE_WARTEN("befunde")
+PRINT "danach "; PROBE_BEFUNDE$(d)
+PRINT "erlaubt "; TRIM$(READLINES("probe-daten/erlaubt.txt")[0])
+PROBE_ENDE()
+--- datei probe.dh
+IMPORT "{sammlung}/../../ide/dh_plugin_probe.dh"
+
+--- argumente
+{sammlung}/../../ide
+{sammlung}/../../examples/plugins
+--- erwartet
+TRUE
+TRUE
+stelle 1 15 8
+korrektur Standard
+hover Schreibweise: gemeint ist wohl "Standard" (Strg+. ersetzt es)
+kontext erlauben
+TRUE
+danach []
+erlaubt standart
+
+=== klassen liest das projekt in einen baum
+IMPORT "probe.dh"
+MKDIR("projekt")
+WRITEALL("projekt/tiere.dh", "CLASS Tier" + CHR$(10) + "    DIM name AS STRING" + CHR$(10) + "END CLASS" + CHR$(10))
+PROBE_SETZE_PROJEKT(CWD$() + "/projekt")
+PRINT PROBE_START(ARG$(1) + "/klassen/plugin.dh", ARG$(0))
+PRINT PROBE_WARTEN("baum")
+PRINT "baum "; PROBE_WIDGET$("klassen", "baum", "texte")
+PRINT "kopf "; PROBE_WIDGET$("klassen", "kopf", "text")
+PROBE_ENDE()
+--- datei probe.dh
+IMPORT "{sammlung}/../../ide/dh_plugin_probe.dh"
+
+--- argumente
+{sammlung}/../../ide
+{sammlung}/../../examples/plugins
+--- erwartet
+TRUE
+TRUE
+baum ["Tier   (tiere.dh)","name AS STRING"]
+kopf 1 Klassen in 1 Dateien
+
+=== vervollstaendigen ersetzen und die fassung der ide
+' Ein kleines Plugin: schlaegt Farbnamen vor, ersetzt beim Befehl das Wort
+' an der Marke und meldet, welche IDE es begruesst hat.
+IMPORT "probe.dh"
+PROBE_SETZE_TEXT("PRINT rot" + CHR$(10), CWD$() + "/haupt.dh", 1, 8)
+PRINT PROBE_START("mein.dh", ARG$(0))
+PRINT PROBE_WARTEN("befehl")
+PRINT "vorschlaege "; JOIN$(PROBE_VORSCHLAEGE("ro", 1, 7), ",")
+PRINT "keine "; LEN(PROBE_VORSCHLAEGE("xy", 1, 7))
+PROBE_BEFEHL("gross")
+PRINT PROBE_WARTEN("tue")
+PROBE_LAUFEN(100)
+PRINT "text "; TRIM$(PROBE_TEXT$())
+DIM soll AS STRING : soll = "ide " + VERSION$() + " protokoll 3"
+PRINT "meldung "; (PROBE_MELDUNG$() = soll)
+PROBE_ENDE()
+--- datei probe.dh
+IMPORT "{sammlung}/../../ide/dh_plugin_probe.dh"
+
+--- datei mein.dh
+IMPORT "dh_plugin.dh"
+PLUGIN_BEFEHL("gross", "Gross schreiben")
+PLUGIN_HOERE("vervollstaendigen")
+DIM farben AS ARRAY OF STRING : farben = ["rot", "rosa", "gruen"]
+WHILE PLUGIN_LAEUFT()
+    SELECT CASE PLUGIN_EREIGNIS$()
+        CASE "vervollstaendigen"
+            DIM aus AS ARRAY OF STRING : aus = []
+            DIM f AS STRING
+            FOR EACH f IN farben
+                IF LEFT$(f, LEN(PLUGIN_WERT$())) = PLUGIN_WERT$() THEN ARRAY_PUSH(aus, f)
+            NEXT
+            PLUGIN_VORSCHLAEGE(aus)
+        CASE "befehl"
+            DIM w AS STRING : w = PLUGIN_WERT$()
+            PLUGIN_ERSETZEN(1, 7, 1, 7 + LEN(w), UPPER$(w))
+            PLUGIN_MELDUNG("ide " + PLUGIN_IDE_FASSUNG$() + " protokoll " + STR$(PLUGIN_PROTOKOLL()))
+        CASE "ende"
+            EXIT(0)
+    END SELECT
+WEND
+
+--- argumente
+{sammlung}/../../ide
+--- erwartet
+TRUE
+TRUE
+vorschlaege rot,rosa
+keine 0
+TRUE
+text PRINT ROT
+meldung TRUE

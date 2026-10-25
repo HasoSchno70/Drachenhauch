@@ -1,0 +1,413 @@
+' dh_plugin_probe.dh -- eine Schein-IDE, um ein Plugin ohne die IDE zu
+' pruefen. Sie startet das Plugin wie die IDE (WINDOW_OPEN, Begruessung,
+' Datenordner), beantwortet seine Fragen aus einem Stand, den der Test
+' setzt, wendet Textaenderungen darauf an und merkt sich alles, was das
+' Plugin schickt.
+'
+'     IMPORT "dh_plugin_probe.dh"
+'     PROBE_START("plugins/mein/plugin.dh")
+'     PROBE_SETZE_TEXT("PRINT 1" + CHR$(10), "haupt.dh", 1, 3)
+'     PROBE_BEFEHL("zaehlen")
+'     PROBE_LAUFEN(300)
+'     PRINT PROBE_WIDGET$("leiste", "kopf", "text")
+'     PROBE_ENDE()
+'
+' Die Namen beginnen mit PROBE_ bzw. prb, damit sie die eines Tests nicht
+' verdecken. Das Protokoll steht in docs/ide-plugins.md.
+IMPORT "json"
+
+DIM prbLeitung AS INTEGER : prbLeitung = -1
+' Der Stand, aus dem die Fragen beantwortet werden.
+DIM prbText AS STRING : prbText = ""
+DIM prbDatei AS STRING : prbDatei = ""
+DIM prbProjekt AS STRING : prbProjekt = ""
+DIM prbZeile AS INTEGER : prbZeile = 1
+DIM prbSpalte AS INTEGER : prbSpalte = 1
+DIM prbAuswahl AS STRING : prbAuswahl = ""
+' Was das Plugin schickte: alle Zeilen, und je Art die letzte.
+DIM prbAlle AS ARRAY OF STRING : prbAlle = []
+DIM prbLetzte AS MAP OF STRING : prbLetzte = {}
+DIM prbBefehle AS ARRAY OF STRING : prbBefehle = []
+DIM prbKontext AS ARRAY OF STRING : prbKontext = []
+DIM prbLeisten AS ARRAY OF STRING : prbLeisten = []
+DIM prbHoert AS ARRAY OF STRING : prbHoert = []
+DIM prbMeldung AS STRING : prbMeldung = ""
+DIM prbAusgabe AS ARRAY OF STRING : prbAusgabe = []
+DIM prbGeoeffnet AS STRING : prbGeoeffnet = ""
+' "leiste/name" <-> Nummer, und die gesetzten Werte "leiste/name/was".
+DIM prbNummer AS MAP OF INTEGER : prbNummer = {}
+DIM prbName AS MAP OF STRING : prbName = {}
+DIM prbWerte AS MAP OF STRING : prbWerte = {}
+DIM prbBefunde AS MAP OF STRING : prbBefunde = {}
+DIM prbNr AS INTEGER : prbNr = 0
+DIM prbHoverText AS STRING : prbHoverText = ""
+DIM prbHoverDa AS BOOLEAN : prbHoverDa = FALSE
+DIM prbVorschlaege AS ARRAY OF STRING : prbVorschlaege = []
+DIM prbVorschlaegeDa AS BOOLEAN : prbVorschlaegeDa = FALSE
+
+FUNCTION prbFeld$(j AS JSON_HANDLE, k AS STRING) AS STRING
+    IF NOT JSON_HAS(j, k) THEN RETURN ""
+    SELECT CASE JSON_TYPE(j, k)
+        CASE "string" : RETURN JSON_GET_STRING(j, k)
+        CASE "number" : RETURN STR$(JSON_GET_INT(j, k))
+        CASE "boolean" : RETURN IIF(JSON_GET_BOOL(j, k), "TRUE", "FALSE")
+    END SELECT
+    RETURN JSON_STRINGIFY(JSON_GET_JSON(j, k))
+END FUNCTION
+
+SUB prbSenden(j AS JSON_HANDLE)
+    IF prbLeitung < 0 THEN RETURN
+    TRY
+        WINDOW_SEND(prbLeitung, JSON_STRINGIFY(j))
+    CATCH e
+    END TRY
+END SUB
+
+' Das Plugin starten. `ide_ordner$` ist der Ordner mit dh_plugin.dh; leer:
+' aus DH_PATH oder neben der Laufzeit (ide/). Der Datenordner des Plugins
+' liegt in probe-daten/ im Arbeitsordner.
+FUNCTION PROBE_START(plugin AS STRING, ide_ordner AS STRING = "") AS BOOLEAN
+    DIM ordner AS STRING : ordner = ide_ordner
+    IF ordner = "" AND GETENV$("DH_PATH") = "" THEN
+        DIM neben AS STRING : neben = PATHJOIN(DIRNAME(EXEPATH$()), "ide")
+        IF FILEEXISTS(PATHJOIN(neben, "dh_plugin.dh")) THEN ordner = neben
+    END IF
+    IF ordner <> "" THEN
+        DIM alt AS STRING : alt = GETENV$("DH_PATH")
+        DIM trenner AS STRING : trenner = IIF(MID$(ordner, 1, 1) = ":", ";", ":")
+        SETENV("DH_PATH", IIF(alt = "", ordner, ordner + trenner + alt))
+    END IF
+    DIM daten AS STRING : daten = PATHJOIN(CWD$(), "probe-daten")
+    IF NOT DIREXISTS(daten) THEN MKDIR(daten)
+    SETENV("DH_PLUGIN_DATEN", daten)
+    IF prbProjekt = "" THEN prbProjekt = CWD$()
+    TRY
+        prbLeitung = WINDOW_OPEN(plugin)
+    CATCH e
+        prbLeitung = -1
+        RETURN FALSE
+    END TRY
+    DIM hallo AS JSON_HANDLE : hallo = JSON_PARSE("{}")
+    JSON_SET_STRING(hallo, "art", "hallo")
+    JSON_SET_INT(hallo, "protokoll", 3)
+    JSON_SET_STRING(hallo, "ide", VERSION$())
+    prbSenden(hallo)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION PROBE_LAEUFT() AS BOOLEAN
+    IF prbLeitung < 0 THEN RETURN FALSE
+    RETURN WINDOW_ALIVE(prbLeitung)
+END FUNCTION
+
+' Der Stand der "IDE": Text im Reiter vorn, sein Pfad, die Marke.
+SUB PROBE_SETZE_TEXT(text AS STRING, datei AS STRING = "", zeile AS INTEGER = 1, spalte AS INTEGER = 1)
+    prbText = text : prbDatei = datei : prbZeile = zeile : prbSpalte = spalte : prbAuswahl = ""
+END SUB
+SUB PROBE_SETZE_AUSWAHL(text AS STRING)
+    prbAuswahl = text
+END SUB
+SUB PROBE_SETZE_PROJEKT(ordner AS STRING)
+    prbProjekt = ordner
+END SUB
+
+FUNCTION prbIstWortzeichen(c AS STRING) AS BOOLEAN
+    RETURN c = "_" OR (c >= "a" AND c <= "z") OR (c >= "A" AND c <= "Z") OR (c >= "0" AND c <= "9")
+END FUNCTION
+
+FUNCTION prbWort$() AS STRING
+    DIM zl AS ARRAY OF STRING : zl = SPLIT$(prbText, CHR$(10))
+    IF prbZeile < 1 OR prbZeile > LEN(zl) THEN RETURN ""
+    DIM z AS STRING : z = zl[prbZeile - 1]
+    DIM i AS INTEGER : i = prbSpalte - 1
+    IF i >= LEN(z) OR NOT prbIstWortzeichen(MID$(z, i, 1)) THEN i = i - 1
+    IF i < 0 OR i >= LEN(z) THEN RETURN ""
+    IF NOT prbIstWortzeichen(MID$(z, i, 1)) THEN RETURN ""
+    DIM a AS INTEGER : a = i
+    WHILE a > 0 AND prbIstWortzeichen(MID$(z, a - 1, 1)) : a = a - 1 : WEND
+    DIM e AS INTEGER : e = i
+    WHILE e < LEN(z) AND prbIstWortzeichen(MID$(z, e, 1)) : e = e + 1 : WEND
+    RETURN MID$(z, a, e - a)
+END FUNCTION
+
+' Die Stelle (Zeile, Spalte ab 1) als Zeichenposition im Text (ab 0).
+FUNCTION prbStelle(zeile AS INTEGER, spalte AS INTEGER) AS INTEGER
+    DIM zl AS ARRAY OF STRING : zl = SPLIT$(prbText, CHR$(10))
+    DIM pos AS INTEGER : pos = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO MIN(zeile - 1, LEN(zl)) - 1
+        pos = pos + LEN(zl[i]) + 1
+    NEXT
+    DIM zlen AS INTEGER : zlen = 0
+    IF zeile >= 1 AND zeile <= LEN(zl) THEN zlen = LEN(zl[zeile - 1])
+    RETURN pos + MIN(MAX(spalte - 1, 0), zlen)
+END FUNCTION
+
+SUB prbAntworten(j AS JSON_HANDLE)
+    DIM a AS JSON_HANDLE : a = JSON_PARSE("{}")
+    JSON_SET_STRING(a, "art", "antwort")
+    JSON_SET_INT(a, "nr", JSON_GET_INT(j, "nr"))
+    DIM wert AS STRING : wert = ""
+    SELECT CASE prbFeld$(j, "was")
+        CASE "text" : wert = prbText
+        CASE "datei" : wert = prbDatei
+        CASE "auswahl" : wert = prbAuswahl
+        CASE "projekt" : wert = prbProjekt
+        CASE "marke" : wert = STR$(prbZeile) + "," + STR$(prbSpalte)
+        CASE "wort" : wert = prbWort$()
+    END SELECT
+    JSON_SET_STRING(a, "wert", wert)
+    prbSenden(a)
+END SUB
+
+SUB prbTue(j AS JSON_HANDLE)
+    SELECT CASE prbFeld$(j, "was")
+        CASE "meldung" : prbMeldung = prbFeld$(j, "text")
+        CASE "ausgabe" : ARRAY_PUSH(prbAusgabe, prbFeld$(j, "text"))
+        CASE "oeffnen" : prbGeoeffnet = prbFeld$(j, "datei") + ":" + prbFeld$(j, "zeile")
+        CASE "einfuegen"
+            DIM p AS INTEGER : p = prbStelle(prbZeile, prbSpalte)
+            prbText = LEFT$(prbText, p) + prbFeld$(j, "text") + MID$(prbText, p)
+        CASE "ersetzen", "waehlen"
+            ' Eine andere Datei kennt die Schein-IDE nicht: nur merken.
+            IF prbFeld$(j, "datei") <> "" AND prbFeld$(j, "datei") <> prbDatei THEN
+                prbGeoeffnet = prbFeld$(j, "datei")
+                RETURN
+            END IF
+            DIM z1 AS INTEGER : z1 = MAX(1, JSON_GET_INT(j, "zeile"))
+            DIM s1 AS INTEGER : s1 = MAX(1, JSON_GET_INT(j, "spalte"))
+            DIM z2 AS INTEGER : z2 = JSON_GET_INT(j, "bis_zeile")
+            DIM s2 AS INTEGER : s2 = JSON_GET_INT(j, "bis_spalte")
+            IF z2 < 1 THEN z2 = z1
+            IF s2 < 1 THEN s2 = s1
+            DIM a AS INTEGER : a = prbStelle(z1, s1)
+            DIM e AS INTEGER : e = prbStelle(z2, s2)
+            IF prbFeld$(j, "was") = "ersetzen" THEN
+                prbText = LEFT$(prbText, a) + prbFeld$(j, "text") + MID$(prbText, e)
+                prbAuswahl = ""
+            ELSE
+                prbAuswahl = MID$(prbText, a, e - a)
+            END IF
+            prbZeile = z1 : prbSpalte = s1
+    END SELECT
+END SUB
+
+SUB prbNachricht(zeile AS STRING)
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_PARSE(zeile)
+    CATCH e
+        RETURN
+    END TRY
+    DIM art AS STRING : art = prbFeld$(j, "art")
+    ARRAY_PUSH(prbAlle, zeile)
+    MAPPUT(prbLetzte, art, zeile)
+    SELECT CASE art
+        CASE "befehl" : ARRAY_PUSH(prbBefehle, prbFeld$(j, "id"))
+        CASE "kontext" : ARRAY_PUSH(prbKontext, prbFeld$(j, "id"))
+        CASE "hoere" : ARRAY_PUSH(prbHoert, prbFeld$(j, "ereignis"))
+        CASE "leiste"
+            DIM id AS STRING : id = prbFeld$(j, "id")
+            ARRAY_PUSH(prbLeisten, id)
+            DIM i AS INTEGER
+            FOR i = 0 TO JSON_LEN(j, "form.widgets") - 1
+                DIM np AS STRING : np = "form.widgets." + STR$(i) + ".name"
+                IF JSON_HAS(j, np) THEN
+                    MAPPUT(prbNummer, id + "/" + JSON_GET_STRING(j, np), i)
+                    MAPPUT(prbName, id + "/" + STR$(i), JSON_GET_STRING(j, np))
+                END IF
+            NEXT
+        CASE "setze"
+            MAPPUT(prbWerte, prbWidgetName$(j) + "/" + prbFeld$(j, "was"), prbFeld$(j, "wert"))
+        CASE "liste"
+            MAPPUT(prbWerte, prbWidgetName$(j) + "/eintraege", prbFeld$(j, "eintraege"))
+        CASE "baum"
+            MAPPUT(prbWerte, prbWidgetName$(j) + "/texte", prbFeld$(j, "texte"))
+        CASE "frage" : prbAntworten(j)
+        CASE "tue" : prbTue(j)
+        CASE "befunde" : MAPPUT(prbBefunde, prbFeld$(j, "datei"), prbFeld$(j, "liste"))
+        CASE "hover"
+            IF JSON_GET_INT(j, "nr") = prbNr THEN prbHoverText = prbFeld$(j, "text") : prbHoverDa = TRUE
+        CASE "vorschlaege"
+            IF JSON_GET_INT(j, "nr") = prbNr THEN
+                prbVorschlaege = []
+                DIM k AS INTEGER
+                FOR k = 0 TO JSON_LEN(j, "eintraege") - 1
+                    ARRAY_PUSH(prbVorschlaege, JSON_GET_STRING(j, "eintraege." + STR$(k)))
+                NEXT
+                prbVorschlaegeDa = TRUE
+            END IF
+    END SELECT
+END SUB
+
+FUNCTION prbWidgetName$(j AS JSON_HANDLE) AS STRING
+    DIM k AS STRING : k = prbFeld$(j, "leiste") + "/" + prbFeld$(j, "widget")
+    IF MAPHAS(prbName, k) THEN RETURN prbFeld$(j, "leiste") + "/" + MAPGET(prbName, k)
+    RETURN k
+END FUNCTION
+
+' Nachrichten des Plugins abholen und verarbeiten, `ms` Millisekunden lang.
+SUB PROBE_LAUFEN(ms AS INTEGER)
+    DIM bis AS FLOAT : bis = GET_TIME() + ms / 1000.0
+    WHILE GET_TIME() < bis
+        IF prbLeitung < 0 THEN RETURN
+        DIM z AS STRING : z = WINDOW_RECV$(prbLeitung)
+        IF z = "" THEN
+            SLEEP(5)
+        ELSE
+            prbNachricht(z)
+        END IF
+    WEND
+END SUB
+
+' So lange laufen, bis das Plugin eine Nachricht dieser Art geschickt hat
+' (hoechstens `ms`). TRUE, wenn sie kam.
+FUNCTION PROBE_WARTEN(art AS STRING, ms AS INTEGER = 3000) AS BOOLEAN
+    DIM vorher AS INTEGER : vorher = LEN(prbAlle)
+    DIM bis AS FLOAT : bis = GET_TIME() + ms / 1000.0
+    WHILE GET_TIME() < bis
+        PROBE_LAUFEN(20)
+        DIM i AS INTEGER
+        FOR i = vorher TO LEN(prbAlle) - 1
+            IF INSTR(prbAlle[i], CHR$(34) + "art" + CHR$(34) + ":" + CHR$(34) + art + CHR$(34)) >= 0 THEN RETURN TRUE
+        NEXT
+    WEND
+    RETURN FALSE
+END FUNCTION
+
+' --- Ereignisse an das Plugin ------------------------------------------------
+SUB PROBE_BEFEHL(id AS STRING)
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    JSON_SET_STRING(j, "art", "befehl")
+    JSON_SET_STRING(j, "id", id)
+    JSON_SET_STRING(j, "wert", prbWort$())
+    prbSenden(j)
+END SUB
+SUB PROBE_EREIGNIS(name AS STRING, datei AS STRING = "")
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    JSON_SET_STRING(j, "art", "ereignis")
+    JSON_SET_STRING(j, "name", name)
+    JSON_SET_STRING(j, "datei", datei)
+    prbSenden(j)
+END SUB
+SUB prbWidgetEreignis(art AS STRING, leiste AS STRING, widget AS STRING, wert AS STRING)
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    JSON_SET_STRING(j, "art", art)
+    JSON_SET_STRING(j, "leiste", leiste)
+    DIM nr AS INTEGER : nr = -1
+    IF MAPHAS(prbNummer, leiste + "/" + widget) THEN nr = MAPGET(prbNummer, leiste + "/" + widget)
+    JSON_SET_INT(j, "widget", nr)
+    JSON_SET_STRING(j, "wert", wert)
+    prbSenden(j)
+END SUB
+SUB PROBE_KLICK(leiste AS STRING, widget AS STRING)
+    prbWidgetEreignis("klick", leiste, widget, "")
+END SUB
+SUB PROBE_GEAENDERT(leiste AS STRING, widget AS STRING, wert AS STRING)
+    prbWidgetEreignis("geaendert", leiste, widget, wert)
+END SUB
+
+' Hover an einer Stelle: wartet bis `ms` auf die Antwort, "" = keine.
+FUNCTION PROBE_HOVER$(wort AS STRING, zeile AS INTEGER, spalte AS INTEGER, ms AS INTEGER = 2000) AS STRING
+    prbNr = prbNr + 1
+    prbHoverDa = FALSE : prbHoverText = ""
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    JSON_SET_STRING(j, "art", "hover")
+    JSON_SET_INT(j, "nr", prbNr)
+    JSON_SET_STRING(j, "wert", wort)
+    JSON_SET_INT(j, "zeile", zeile)
+    JSON_SET_INT(j, "spalte", spalte)
+    JSON_SET_STRING(j, "datei", prbDatei)
+    prbSenden(j)
+    DIM bis AS FLOAT : bis = GET_TIME() + ms / 1000.0
+    WHILE NOT prbHoverDa AND GET_TIME() < bis
+        PROBE_LAUFEN(20)
+    WEND
+    RETURN prbHoverText
+END FUNCTION
+
+' Vervollstaendigen am Wortanfang: die Vorschlaege des Plugins.
+FUNCTION PROBE_VORSCHLAEGE(wort AS STRING, zeile AS INTEGER, spalte AS INTEGER, ms AS INTEGER = 2000) AS ARRAY OF STRING
+    prbNr = prbNr + 1
+    prbVorschlaegeDa = FALSE : prbVorschlaege = []
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    JSON_SET_STRING(j, "art", "vervollstaendigen")
+    JSON_SET_INT(j, "nr", prbNr)
+    JSON_SET_STRING(j, "wert", wort)
+    JSON_SET_INT(j, "zeile", zeile)
+    JSON_SET_INT(j, "spalte", spalte)
+    JSON_SET_STRING(j, "datei", prbDatei)
+    prbSenden(j)
+    DIM bis AS FLOAT : bis = GET_TIME() + ms / 1000.0
+    WHILE NOT prbVorschlaegeDa AND GET_TIME() < bis
+        PROBE_LAUFEN(20)
+    WEND
+    RETURN prbVorschlaege
+END FUNCTION
+
+' "ende" schicken und warten, bis das Plugin sich beendet (hoechstens 3 s).
+SUB PROBE_ENDE()
+    IF prbLeitung < 0 THEN RETURN
+    prbSenden(JSON_PARSE("{" + CHR$(34) + "art" + CHR$(34) + ":" + CHR$(34) + "ende" + CHR$(34) + "}"))
+    DIM bis AS FLOAT : bis = GET_TIME() + 3.0
+    WHILE WINDOW_ALIVE(prbLeitung) AND GET_TIME() < bis
+        PROBE_LAUFEN(20)
+    WEND
+    TRY
+        WINDOW_CLOSE(prbLeitung)
+    CATCH e
+    END TRY
+    prbLeitung = -1
+END SUB
+
+' --- Abfragen ------------------------------------------------------------------
+FUNCTION PROBE_TEXT$() AS STRING
+    RETURN prbText
+END FUNCTION
+FUNCTION PROBE_AUSWAHL$() AS STRING
+    RETURN prbAuswahl
+END FUNCTION
+FUNCTION PROBE_MELDUNG$() AS STRING
+    RETURN prbMeldung
+END FUNCTION
+FUNCTION PROBE_AUSGABE$() AS STRING
+    RETURN JOIN$(prbAusgabe, CHR$(10))
+END FUNCTION
+FUNCTION PROBE_GEOEFFNET$() AS STRING
+    RETURN prbGeoeffnet
+END FUNCTION
+' Die angemeldeten Befehle, Kontexteintraege, Leisten und gehoerten
+' Ereignisse, je mit Komma.
+FUNCTION PROBE_BEFEHLE$() AS STRING
+    RETURN JOIN$(prbBefehle, ",")
+END FUNCTION
+FUNCTION PROBE_KONTEXT$() AS STRING
+    RETURN JOIN$(prbKontext, ",")
+END FUNCTION
+FUNCTION PROBE_LEISTEN$() AS STRING
+    RETURN JOIN$(prbLeisten, ",")
+END FUNCTION
+FUNCTION PROBE_HOERT$() AS STRING
+    RETURN JOIN$(prbHoert, ",")
+END FUNCTION
+' Was das Plugin einem Widget seiner Leiste gesetzt hat: `was` wie bei
+' PLUGIN_SETZE ("text", "checked" ...), "eintraege" (PLUGIN_LISTE) oder
+' "texte" (PLUGIN_BAUM) -- Listen als JSON-Text.
+FUNCTION PROBE_WIDGET$(leiste AS STRING, widget AS STRING, was AS STRING) AS STRING
+    DIM k AS STRING : k = leiste + "/" + widget + "/" + was
+    IF MAPHAS(prbWerte, k) THEN RETURN MAPGET(prbWerte, k)
+    RETURN ""
+END FUNCTION
+' Die zuletzt geschickten Befunde einer Datei als JSON ("" = keine).
+FUNCTION PROBE_BEFUNDE$(datei AS STRING) AS STRING
+    IF MAPHAS(prbBefunde, datei) THEN RETURN MAPGET(prbBefunde, datei)
+    RETURN ""
+END FUNCTION
+' Die letzte Nachricht einer Art als JSON-Text, und wie viele kamen.
+FUNCTION PROBE_LETZTE$(art AS STRING) AS STRING
+    IF MAPHAS(prbLetzte, art) THEN RETURN MAPGET(prbLetzte, art)
+    RETURN ""
+END FUNCTION
+FUNCTION PROBE_ANZAHL() AS INTEGER
+    RETURN LEN(prbAlle)
+END FUNCTION
