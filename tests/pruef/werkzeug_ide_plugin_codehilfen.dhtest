@@ -1,0 +1,112 @@
+' Code-Hilfen aus Plugins in der echten IDE, am Beispiel-Plugin
+' examples/plugins/schreibweise (Schreibfehler in Kommentaren): ein Befund
+' mit genauer Stelle (PLUGIN_BEFUND mit Spalte und Laenge), eine
+' Schnellkorrektur dazu (PLUGIN_KORREKTUR, angewendet ueber Strg+.), ein
+' Beitrag zum Tooltip beim Ueberfahren (PLUGIN_HOERE("hover") +
+' PLUGIN_HOVER_ANTWORT) und ein Eintrag im Kontextmenue (PLUGIN_KONTEXT).
+'
+' Die Beilage plugin.dh bindet das Plugin aus examples/ ein; es laeuft im
+' Fallordner unter _programm/plugins/schreibweise und schreibt seine
+' erlaubt.txt dorthin, nicht ins Repository. Die Maus kommt aus einer
+' Aufnahme (Helfer _hilfen/idemaus.dh), alles andere ruft der Einschub.
+--- langsam
+
+=== befund korrektur hover und kontextmenue eines plugins
+DIM prB AS INTEGER
+DIM prSchritt AS INTEGER
+DIM prSeit AS INTEGER
+FUNCTION prProbleme$() AS STRING
+    DIM t AS STRING : t = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO GUI_LISTBOX_COUNT(lstProbleme) - 1
+        IF INSTR(GUI_LISTBOX_ITEM(lstProbleme, i), "[schreibweise]") >= 0 THEN t = t + "|" + GUI_LISTBOX_ITEM(lstProbleme, i)
+    NEXT
+    RETURN t
+END FUNCTION
+FUNCTION prZeile$(z AS INTEGER) AS STRING
+    RETURN SPLIT$(GUI_TEXT(aktivesFeld()), NL)[z - 1]
+END FUNCTION
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach protokoll("bereit")
+IMPORT "hilfe.dh"
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prSchritt = 0 AND prProbleme$() <> "" AND ARRAY_INDEXOF(ctxKennung, "plugin:schreibweise:erlauben") >= 0 THEN
+    protokoll("pr probleme " + prProbleme$())
+    ' Die Stellen der Wellenlinien: Zeile, Spalte, Laenge.
+    DIM prI AS INTEGER
+    FOR prI = 0 TO LEN(probZeile) - 1
+        IF LEFT$(probMeldung[prI], 14) = "[schreibweise]" THEN protokoll("pr stelle " + STR$(probZeile[prI]) + " " + STR$(probSpalte[prI]) + " " + STR$(probLaenge[prI]))
+    NEXT
+    ' Gegenprobe zuerst: "seperat" in einer Zeichenkette (Zeile 2).
+    prZiel(2, 10, FALSE, FALSE)
+    prSchritt = 1 : prSeit = prB
+END IF
+IF prSchritt = 1 AND prB - prSeit > 60 THEN
+    protokoll("pr hover in der zeichenkette " + STR$(INSTR(plugHoverText, "ersetzt es") >= 0))
+    prZiel(1, 17, FALSE, FALSE)
+    prSchritt = 2 : prSeit = prB
+END IF
+IF prSchritt = 2 AND INSTR(plugHoverText, "ersetzt es") >= 0 THEN
+    ' Erst die Meldung des Befunds (die Maus steht auf der Wellenlinie),
+    ' dann der Beitrag des Plugins.
+    protokoll("pr hover " + REPLACE$(plugHoverText, NL, " / "))
+    ' Strg+. auf Zeile 3 ("seperat" im Kommentar) und das erste Angebot.
+    GUI_TEXTAREA_GOTO(aktivesFeld(), 3, 5)
+    korrekturZeigen()
+    korrekturAnwenden("0")
+    paletteSchliessen()
+    protokoll("pr zeile 3 " + prZeile$(3))
+    prSchritt = 3 : prSeit = prB
+END IF
+IF prSchritt = 3 AND prB - prSeit > 5 THEN
+    ' Rechtsklick-Menue: "Wort erlauben" auf "Standart" in Zeile 1.
+    GUI_TEXTAREA_GOTO(aktivesFeld(), 1, 17)
+    befehl(ctxKennung[ARRAY_INDEXOF(ctxKennung, "plugin:schreibweise:erlauben")])
+    prSchritt = 4 : prSeit = prB
+END IF
+IF prSchritt = 4 AND FILEEXISTS("plugins/schreibweise/erlaubt.txt") THEN
+    ' Nach dem Erlauben sendet das Plugin neu -- Zeile 1 ist kein Befund mehr.
+    sichern(aktiverTab, FALSE)
+    prSchritt = 5 : prSeit = prB
+END IF
+IF prSchritt = 5 AND prB - prSeit > 20 AND prProbleme$() = "" THEN
+    protokoll("pr erlaubt " + TRIM$(READLINES("plugins/schreibweise/erlaubt.txt")[0]) + " probleme leer")
+    EXIT(0)
+END IF
+IF prB > 900 THEN protokoll("pr zeit um bei schritt " + STR$(prSchritt) + " " + prProbleme$()) : EXIT(0)
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=1000
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+' Das ist der Standart
+PRINT "seperat"
+' seperat geht es weiter
+PRINT 1
+
+--- datei _programm/hilfe.dh
+IMPORT "{sammlung}/_hilfen/idemaus.dh"
+--- datei _programm/plugins/schreibweise/plugin.dh
+IMPORT "{sammlung}/../../examples/plugins/schreibweise/plugin.dh"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 8) = "plugins " OR LEFT$(L[i], 25) = "plugin kontext angemeldet" OR LEFT$(L[i], 10) = "korrektur " THEN PRINT L[i]
+NEXT
+--- erwartet
+plugins 1
+plugin kontext angemeldet plugin:schreibweise:erlauben
+pr probleme |Zeile 1: [schreibweise] Schreibweise: "Standart" -- gemeint ist wohl "Standard"|Zeile 3: [schreibweise] Schreibweise: "seperat" -- gemeint ist wohl "separat"
+pr stelle 1 15 8
+pr stelle 3 3 7
+pr hover in der zeichenkette FALSE
+pr hover [schreibweise] Schreibweise: "Standart" -- gemeint ist wohl "Standard" / Strg+. schlägt eine Korrektur vor. /  / Schreibweise: gemeint ist wohl "Standard" (Strg+. ersetzt es)
+korrektur angebot "seperat" durch "separat" ersetzen
+korrektur "seperat" durch "separat" ersetzen
+pr zeile 3 ' separat geht es weiter
+pr erlaubt standart probleme leer
