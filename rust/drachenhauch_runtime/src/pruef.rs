@@ -125,7 +125,7 @@ pub const GEDULDET: &[(&str, &str)] = &[
 /// Befehle beschreibt -- ihre Namen gelten in der Namenspruefung als bekannt.
 /// Ein Tippfehler faellt so weiter auf, und die Liste waechst nicht mit
 /// jedem Befehl der Bibliothek.
-const BIBLIOTHEKEN: &[&str] = &["ide/dh_plugin.dh"];
+const BIBLIOTHEKEN: &[&str] = &["ide/dh_plugin.dh", "ide/dh_plugin_probe.dh"];
 
 fn bekannte_builtins(wurzel: &Path) -> HashSet<String> {
     let raw = lesen(&wurzel.join("daten/builtin_index.json"));

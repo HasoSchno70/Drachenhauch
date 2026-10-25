@@ -11,7 +11,7 @@ Wie bei VS Code laufen die Erweiterungen in einem eigenen Prozess.
 
 ## Wo Plugins liegen
 
-Jedes Plugin ist ein Ordner mit einer `plugin.dh` darin, an einer von zwei
+Jedes Plugin ist ein Ordner mit einer `plugin.dh` darin, an einer von drei
 Stellen:
 
 * **Eigene Plugins** unter `plugins/` neben der `ide.json` (Windows:
@@ -20,6 +20,14 @@ Stellen:
 * **Mitgelieferte Plugins** in `examples/plugins/`, sie kommen mit dem
   Installer. Sie sind aus, bis man sie anhakt (`plugins_an`). Ein eigenes
   Plugin gleichen Namens verdeckt das mitgelieferte.
+* **Geholte Plugins** unter `plugins/pakete/<name>/` -- **Holen …** in der
+  Verwaltung nimmt eine Quelle wie bei `dhrt paket`
+  (`github:nutzer/repo@stand`, eine https-Adresse auf ein ZIP, ein Ordner
+  oder ein ZIP auf der Platte) und holt das Plugin über
+  `dhrt paket -C <plugin-ordner> hole`; die Prüfsumme steht in der
+  paket.lock.json des Plugin-Ordners, ein zweites Holen bekommt also genau
+  denselben Inhalt. **Entfernen** nimmt ein geholtes wieder weg. Sie laufen wie eigene; in der Verwaltung steht
+  „(geholt)“ hinter dem Namen. Ein eigenes Plugin gleichen Namens geht vor.
 
 **Plugins → Neues Plugin …** legt ein eigenes aus der Vorlage an (ein
 Befehl, ein Eintrag im Kontextmenü, eine Leiste), öffnet seine `plugin.dh`
@@ -99,7 +107,7 @@ gestartet) ist `PLUGIN_LAEUFT()` FALSE und das Programm endet gleich.
 |---|---|
 | `PLUGIN_BEFEHL(id$, titel$ [, kuerzel$])` | einen Befehl anmelden: er steht im Menü **Plugins**, in der Befehlspalette und auf dem Kürzel. Ausgelöst kommt das Ereignis `befehl` mit `PLUGIN_ID$()` |
 | `PLUGIN_LEISTE(id$, titel$, formdatei$ [, bereich$])` | eine eigene Leiste im Dock: eine `.dhform` (etwa aus dem Form-Designer) als Fenster links, rechts (Vorgabe), unten oder schwebend. Der Nutzer kann sie verschieben wie jede Leiste der IDE |
-| `PLUGIN_HOERE(ereignis$)` | ein Ereignis hören: `gesichert`, `geoeffnet`, `reiter` (ein anderer Reiter vorn), `gestartet`, `beendet` (ein Programm lief), `geprueft` -- jeweils mit `PLUGIN_DATEI$()`. Dazu `hover`: beim Verweilen der Maus auf einem Wort, als eigenes Ereignis (siehe `PLUGIN_HOVER_ANTWORT`) |
+| `PLUGIN_HOERE(ereignis$)` | ein Ereignis hören: `gesichert`, `geoeffnet`, `reiter` (ein anderer Reiter vorn), `gestartet`, `beendet` (ein Programm lief), `geprueft` -- jeweils mit `PLUGIN_DATEI$()`. Dazu `hover`: beim Verweilen der Maus auf einem Wort, als eigenes Ereignis (siehe `PLUGIN_HOVER_ANTWORT`), und `vervollstaendigen`: wenn die Liste der Vervollständigung aufgeht (siehe `PLUGIN_VORSCHLAEGE`) |
 | `PLUGIN_SETZE(leiste$, widget$, was$, wert$)` | ein Widget der eigenen Leiste ändern: `text`, `checked`, `value`, `enabled`, `visible` oder `selected` (Zeile einer Liste, Eintrag einer Klappliste, Knoten eines Baums) |
 | `PLUGIN_LISTE(leiste$, widget$, eintraege)` | die Einträge einer Liste oder Klappliste der Leiste |
 | `PLUGIN_BAUM(leiste$, widget$, ebenen, texte [, auf])` | einen Baum der Leiste füllen: je Eintrag eine Ebene (0 = oben) und ein Text, in der Reihenfolge von oben nach unten; ein Eintrag hängt am letzten davor mit kleinerer Ebene. Die Nummer eines Knotens ist seine Stelle in der Liste -- dieselbe Zahl kommt bei `geaendert` als Wert. `auf` (Vorgabe TRUE) klappt die Äste auf |
@@ -122,6 +130,9 @@ gestartet) ist `PLUGIN_LAEUFT()` FALSE und das Programm endet gleich.
 | `PLUGIN_SCHNIPSEL(name$, kuerzel$, text$)` | ein Schnipsel (Strg+J, oder das Kürzel + Tabulator); `\|` ist die Stelle der Schreibmarke |
 | `PLUGIN_KONTEXT(id$, titel$)` | ein Eintrag im Kontextmenü des Code-Felds. Angeklickt kommt `befehl` mit dieser `id`, `PLUGIN_WERT$()` ist das Wort, auf das geklickt wurde (der Rechtsklick setzt die Schreibmarke dorthin) |
 | `PLUGIN_HOVER_ANTWORT(text$)` | Antwort auf `hover` (nach `PLUGIN_HOERE("hover")`): der Text hängt sich an den Tooltip, solange die Maus noch an der Stelle steht; leer = nichts beizutragen. Zum Ereignis gehören `PLUGIN_WERT$()` (das Wort), `PLUGIN_ZEILE()`, `PLUGIN_SPALTE()` (ab 1) und `PLUGIN_DATEI$()`. Die IDE wartet nicht -- ein Plugin, das nicht antwortet, hält den Tooltip nicht auf |
+| `PLUGIN_VORSCHLAEGE(eintraege)` | Antwort auf `vervollstaendigen` (nach `PLUGIN_HOERE("vervollstaendigen")`): die Wörter (`ARRAY OF STRING`) kommen an die Liste der Vervollständigung, hinter die der IDE; kennt die IDE selbst nichts, öffnet die Antwort die Liste. `PLUGIN_WERT$()` ist der Wortanfang an der Marke, dazu `PLUGIN_ZEILE()`, `PLUGIN_SPALTE()`, `PLUGIN_DATEI$()`. Eine Antwort, die erst ankommt, wenn weitergetippt wurde, verwirft die IDE |
+| `PLUGIN_IDE_FASSUNG$()` | die Fassung der IDE, die das Plugin gestartet hat (`"2026.36"`), aus ihrer Begrüßung; eine ältere IDE ohne Begrüßung liefert `""` |
+| `PLUGIN_PROTOKOLL()` | die Fassung der Leitung: 1 = 2026.35, 2 = 2026.36, 3 = mit `PLUGIN_ERSETZEN`, `PLUGIN_AUSWAHL_SETZEN` und `PLUGIN_VORSCHLAEGE`. So verzichtet ein Plugin auf eine neuere Nachricht, statt eine zu schicken, die die IDE nur ins Protokoll schreibt |
 | `PLUGIN_FAERBUNG(endung$, muster$, farbe)` | Färbung für eine weitere Dateiart (`".md"`): jede Regel ein regulärer Ausdruck und eine Farbe; solche Dateien färbt die IDE dann damit statt mit der Färbung für Drachenhauch |
 
 Zum Ereignis gehören `PLUGIN_ID$()` (der Befehl bzw. der Name des
@@ -133,6 +144,40 @@ Baumknotens; bei `befehl` das Wort an der Schreibmarke) und
 `PLUGIN_DATEI$()` (bei `ereignis` und `hover`). Die Fragen (`PLUGIN_TEXT$` und die
 anderen) warten bis zu zwei Sekunden auf die Antwort; was dazwischen
 ankommt, bekommt das nächste `PLUGIN_EREIGNIS$`.
+
+## Ein Plugin prüfen
+
+`ide/dh_plugin_probe.dh` ist eine Schein-IDE: sie startet das Plugin wie die
+IDE (eigener Prozess, Begrüßung, Datenordner `probe-daten/` im
+Arbeitsordner), beantwortet seine Fragen aus einem Stand, den der Test
+setzt, wendet Ersetzen und Einfügen darauf an und merkt sich alles, was das
+Plugin schickt. Eine Prüfsammlung (`dhrt test`) braucht so kein Fenster und
+keine IDE:
+
+```basic
+IMPORT "dh_plugin_probe.dh"
+PRINT PROBE_START("plugins/mein/plugin.dh")
+PROBE_SETZE_TEXT("PRINT 1" + CHR$(10), CWD$() + "/haupt.dh", 1, 3)
+PROBE_BEFEHL("zaehlen")
+PRINT PROBE_WARTEN("setze")
+PRINT PROBE_WIDGET$("leiste", "kopf", "text")
+PROBE_ENDE()
+```
+
+| Befehl | Was er tut |
+|---|---|
+| `PROBE_START(plugin$ [, ide_ordner$])` | das Plugin starten (`ide_ordner$` = der Ordner mit `dh_plugin.dh`, sonst `ide/` neben der Laufzeit); TRUE, wenn es läuft |
+| `PROBE_SETZE_TEXT(text$ [, datei$, zeile, spalte])`, `PROBE_SETZE_AUSWAHL(text$)`, `PROBE_SETZE_PROJEKT(ordner$)` | der Stand, aus dem die Fragen beantwortet werden |
+| `PROBE_BEFEHL(id$)`, `PROBE_EREIGNIS(name$ [, datei$])`, `PROBE_KLICK(leiste$, widget$)`, `PROBE_GEAENDERT(leiste$, widget$, wert$)` | ein Ereignis an das Plugin schicken |
+| `PROBE_HOVER$(wort$, zeile, spalte)`, `PROBE_VORSCHLAEGE(wort$, zeile, spalte)` | `hover` bzw. `vervollstaendigen` schicken und auf die Antwort warten (höchstens 2 s) |
+| `PROBE_LAUFEN(ms)`, `PROBE_WARTEN(art$ [, ms])` | Nachrichten verarbeiten -- eine Weile bzw. bis eine Nachricht dieser Art kam (TRUE) |
+| `PROBE_TEXT$()`, `PROBE_AUSWAHL$()`, `PROBE_MELDUNG$()`, `PROBE_AUSGABE$()`, `PROBE_GEOEFFNET$()` | der Stand danach |
+| `PROBE_BEFEHLE$()`, `PROBE_KONTEXT$()`, `PROBE_LEISTEN$()`, `PROBE_HOERT$()` | was das Plugin angemeldet hat, mit Komma |
+| `PROBE_WIDGET$(leiste$, widget$, was$)` | was es einem Widget seiner Leiste gesetzt hat (`text`, `checked` …, `eintraege`, `texte` als JSON) |
+| `PROBE_BEFUNDE$(datei$)`, `PROBE_LETZTE$(art$)`, `PROBE_ANZAHL()` | Befunde einer Datei, die letzte Nachricht einer Art, alle Nachrichten |
+| `PROBE_ENDE()`, `PROBE_LAEUFT()` | `ende` schicken und warten, bis das Plugin sich beendet |
+
+Die mitgelieferten Plugins sind so geprüft (`tests/pruef/plugin_probe.dhtest`).
 
 ## Die Leitung
 
@@ -155,12 +200,14 @@ Vom Plugin an die IDE:
 | `tue` | `was` (`einfuegen`, `meldung`, `ausgabe`, `oeffnen`, `ersetzen`, `waehlen`), `text`, `datei`, `zeile`, dazu `spalte`, `bis_zeile`, `bis_spalte` |
 | `befunde` | `datei`, `liste` (Objekte mit `zeile`, `meldung`, `schwere`, auf Wunsch `spalte`, `laenge` und `korrekturen` -- je `titel` und `aenderungen` mit `zeile`, `spalte`, `bis_zeile`, `bis_spalte`, `text`, wie bei `CODE_CHECK$`) |
 | `hover` | `nr` (aus dem Ereignis), `text` |
+| `vorschlaege` | `nr` (aus dem Ereignis), `eintraege` (Feld) |
 | `schnipsel` | `name`, `kuerzel`, `text` |
 | `faerbung` | `endung`, `muster`, `farbe` |
 
-Von der IDE an das Plugin: `befehl` (`id`, `wert`), `klick` und `geaendert`
-(`leiste`, `widget`, `wert`), `ereignis` (`name`, `datei`), `hover` (`nr`,
-`wert`, `zeile`, `spalte`, `datei`), `antwort`
+Von der IDE an das Plugin: zuerst `hallo` (`protokoll` -- heute 3 --,
+`ide` = die Fassung), dann `befehl` (`id`, `wert`), `klick` und `geaendert`
+(`leiste`, `widget`, `wert`), `ereignis` (`name`, `datei`), `hover` und
+`vervollstaendigen` (je `nr`, `wert`, `zeile`, `spalte`, `datei`), `antwort`
 (`nr`, `wert`) und `ende`, kurz bevor die IDE die Leitung schließt.
 
 Je Bild liest die IDE höchstens 50 Nachrichten eines Plugins -- ein

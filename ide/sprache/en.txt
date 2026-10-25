@@ -962,7 +962,6 @@ Plugin angelegt: 	Plugin created:
  (geholt)	 (fetched)
 Holen ...	Fetch ...
 Ein Plugin aus github:nutzer/repo@stand, einer https-Adresse oder einem Ordner holen (dhrt paket)	Fetch a plugin from github:user/repo@ref, an https address or a folder (dhrt paket)
-Entfernen	Remove
 Das gewählte geholte Plugin entfernen	Remove the selected fetched plugin
 Entfernen geht nur bei geholten Plugins -- eigene liegen im Plugin-Ordner.	Only fetched plugins can be removed -- your own live in the plugin folder.
 Plugin holen	Fetch plugin
