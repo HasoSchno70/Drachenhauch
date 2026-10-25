@@ -2765,6 +2765,36 @@ ein Warten auf ein Wort aus der Meldung kam zu frueh. Tests
 Verfaelschungen fallen, die Pruefung der Stelle bei der Antwort ist
 ungedeckt (der Test bewegt die Maus nicht vor der Antwort weg).
 
+## Plugins: Testhilfe, Begruessung, Vervollstaendigung, Holen (2026-10-25)
+
+**Schein-IDE** `ide/dh_plugin_probe.dh`: startet ein Plugin wie die IDE
+(WINDOW_OPEN, Begruessung, `DH_PLUGIN_DATEN` = `probe-daten/` im
+Arbeitsordner), beantwortet `frage` aus einem gesetzten Stand
+(`PROBE_SETZE_TEXT/AUSWAHL/PROJEKT`), wendet `tue` (ersetzen, einfuegen,
+waehlen ...) auf den Text an und merkt sich alles (`PROBE_WIDGET$`,
+`PROBE_BEFUNDE$`, `PROBE_LETZTE$`); Ereignisse `PROBE_BEFEHL/EREIGNIS/
+KLICK/GEAENDERT`, `PROBE_HOVER$`/`PROBE_VORSCHLAEGE` warten auf die
+Antwort. `dhrt pruef` kennt ihre Namen (`BIBLIOTHEKEN` in pruef.rs).
+**Begruessung:** die IDE schickt nach WINDOW_OPEN `{"art":"hallo",
+"protokoll":3,"ide":VERSION$()}` (`PLUGIN_PROTOKOLL_FASSUNG`); die
+Bibliothek verarbeitet sie selbst in `PLUGIN_EREIGNIS$` (liefert dann ""),
+`PLUGIN_IDE_FASSUNG$`/`PLUGIN_PROTOKOLL` warten hoechstens 1 s darauf
+(`plgHalloAbwarten`, andere Nachrichten gehen in `plgWarte`); ohne
+Begruessung "" bzw. 1. **Vervollstaendigung:**
+`PLUGIN_HOERE("vervollstaendigen")` -> `vervollstaendigen` fragt ueber
+`pluginVervollFragen` (Nummer je Frage) VOR dem Abbruch bei leerer eigener
+Liste; `PLUGIN_VORSCHLAEGE(feld)` -> `pluginVervollAntwort` haengt an, wenn
+Nummer und Wortanfang noch stimmen, und oeffnet die Liste selbst, wenn die
+IDE nichts kannte (`vervollFensterZeigen` herausgeloest). **Holen:**
+dritter Ort `plugins/pakete/<name>/` (`plugGeholt`), Knoepfe Holen/Entfernen
+in der Verwaltung -> `dhrt paket -C <pluginOrdner> hole <quelle>` bzw.
+`entferne` als Prozess `plugHolProz`, danach `pluginsNeuLaden`. Tests
+`tests/pruef/plugin_probe.dhtest` (4: die drei mitgelieferten Plugins und
+ein eigenes, ohne IDE) und zwei Faelle mehr in
+`werkzeug_ide_plugin_oekosystem.dhtest`; fuenf Verfaelschungen (ohne
+Begruessung, ohne Frage, ohne `pakete`, Probe ohne Antworten, Bibliothek
+ohne hallo) fallen je in ihrem Fall.
+
 ## Dogfooding 13: CHIP-8-Emulator (2026-10-24)
 
 `examples/chip8/`: `cpu.dh` (Rechenkern ohne Fenster, alle 35 Befehle,

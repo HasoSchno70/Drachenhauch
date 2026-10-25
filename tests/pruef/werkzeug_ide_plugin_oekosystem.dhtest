@@ -224,3 +224,114 @@ NEXT
 pr b ' NEU / PRINT 3
 pr a HALLO 1 / PRINT 2
 pr auswahl PRINT
+
+=== vorschlaege eines plugins und die begruessung
+' Die Laufzeit kennt "rotk" nicht -- die Liste oeffnet die Antwort des
+' Plugins. Sein Befehl meldet, welche IDE es begruesst hat.
+DIM prB AS INTEGER
+DIM prSchritt AS INTEGER
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prSchritt = 0 AND ARRAY_INDEXOF(plugBefKennung, "plugin:farben:fassung") >= 0 THEN
+    befehl("plugin:farben:fassung")
+    GUI_TEXTAREA_GOTO(aktivesFeld(), 1, 11)
+    vervollstaendigen(FALSE)
+    prSchritt = 1
+END IF
+IF prSchritt = 1 AND vervollHat("rotkehlchen") THEN
+    protokoll("pr liste offen " + STR$(vervollOffen) + " " + GUI_LISTBOX_ITEM(lstVervoll, 0))
+    prSchritt = 2
+END IF
+IF prSchritt = 2 AND LEFT$(GUI_TEXT(lblStatus), 4) = "ide " THEN
+    protokoll("pr status " + STR$(GUI_TEXT(lblStatus) = "ide " + VERSION$() + " 3"))
+    EXIT(0)
+END IF
+IF prB > 600 THEN protokoll("pr zeit um " + STR$(prSchritt)) : EXIT(0)
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=700
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei a.dh
+PRINT rotk
+
+--- datei _programm/plugins/farben/plugin.dh
+IMPORT "dh_plugin.dh"
+PLUGIN_BEFEHL("fassung", "Fassung")
+PLUGIN_HOERE("vervollstaendigen")
+WHILE PLUGIN_LAEUFT()
+    SELECT CASE PLUGIN_EREIGNIS$()
+        CASE "vervollstaendigen"
+            IF PLUGIN_WERT$() = "rotk" THEN PLUGIN_VORSCHLAEGE(["rotkehlchen"]) ELSE PLUGIN_VORSCHLAEGE([])
+        CASE "befehl"
+            PLUGIN_MELDUNG("ide " + PLUGIN_IDE_FASSUNG$() + " " + STR$(PLUGIN_PROTOKOLL()))
+        CASE "ende"
+            EXIT(0)
+    END SELECT
+WEND
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 19) = "plugin vorschlaege " THEN PRINT L[i]
+NEXT
+--- erwartet
+plugin vorschlaege farben 1
+pr liste offen TRUE rotkehlchen
+pr status TRUE
+
+=== ein plugin holen und wieder entfernen
+' Geholt wird aus einem Ordner im Fallordner (dhrt paket): das Plugin landet
+' in plugins/pakete/geholt/ und laeuft als eigenes; Entfernen nimmt es weg.
+DIM prB AS INTEGER
+DIM prSchritt AS INTEGER
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prSchritt = 0 AND prB > 10 THEN
+    pluginHolenStarten(["hole", PATHJOIN(projektOrdner, "quelle/geholt")])
+    prSchritt = 1
+END IF
+IF prSchritt = 1 AND ARRAY_INDEXOF(plugNamen, "geholt") >= 0 THEN
+    DIM prK AS INTEGER : prK = ARRAY_INDEXOF(plugNamen, "geholt")
+    IF plugZustand[prK] = "läuft" THEN
+        protokoll("pr geholt " + plugTitel[prK] + " geholt " + STR$(plugGeholt[prK]) + " " + STR$(FILEEXISTS("plugins/pakete/geholt/plugin.dh")) + " " + STR$(FILEEXISTS("plugins/paket.lock.json")))
+        pluginStoppen(prK, "aus")
+        pluginHolenStarten(["entferne", "geholt"])
+        prSchritt = 2
+    END IF
+END IF
+IF prSchritt = 2 AND plugHolProz < 0 AND ARRAY_INDEXOF(plugNamen, "geholt") < 0 THEN
+    protokoll("pr entfernt " + STR$(DIREXISTS("plugins/pakete/geholt")))
+    EXIT(0)
+END IF
+IF prB > 900 THEN protokoll("pr zeit um " + STR$(prSchritt)) : EXIT(0)
+--- umgebung
+DHRT_FRAMES=1000
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei quelle/geholt/plugin.dh
+IMPORT "dh_plugin.dh"
+WHILE PLUGIN_LAEUFT()
+    IF PLUGIN_EREIGNIS$() = "ende" THEN EXIT(0)
+WEND
+
+--- datei quelle/geholt/plugin.json
+{"name": "Geholtes Plugin", "fassung": "0.3"}
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 14) = "plugin holen 0" THEN PRINT L[i]
+NEXT
+--- erwartet
+plugin holen 0
+pr geholt Geholtes Plugin geholt TRUE TRUE TRUE
+plugin holen 0
+pr entfernt FALSE

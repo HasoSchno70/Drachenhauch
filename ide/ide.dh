@@ -576,6 +576,16 @@ DIM plugInfo AS ARRAY OF STRING : plugInfo = []
 DIM plugAutor AS ARRAY OF STRING : plugAutor = []
 DIM plugIdeMin AS ARRAY OF STRING : plugIdeMin = []
 DIM plugMit AS ARRAY OF BOOLEAN : plugMit = []
+' Geholt = mit `dhrt paket` nach plugins/pakete/<name>/ geholt.
+DIM plugGeholt AS ARRAY OF BOOLEAN : plugGeholt = []
+' Die Fassung des Protokolls zwischen IDE und Plugin: 1 = 2026.35, 2 = 2026.36
+' (Code-Hilfen, Baum), 3 = Ersetzen, Vervollstaendigen, Begruessung.
+CONST PLUGIN_PROTOKOLL_FASSUNG = 3
+' Vervollstaendigen: eine Frage je Aufruf (Nummer), die Antworten haengen
+' sich an die offene Liste.
+DIM plugVervollNr AS INTEGER : plugVervollNr = 0
+DIM plugVervollWort AS STRING : plugVervollWort = ""
+DIM plugHolProz AS INTEGER : plugHolProz = -1
 ' Befehle der Plugins: Kennung "plugin:<plugin>:<id>", Menuepunkt, Plugin.
 DIM plugBefKennung AS ARRAY OF STRING : plugBefKennung = []
 DIM plugBefItem AS ARRAY OF INTEGER : plugBefItem = []
@@ -9041,10 +9051,18 @@ SUB vervollstaendigen(fokus AS BOOLEAN)
     FOR i = 0 TO MIN(LEN(namen), 200) - 1
         GUI_LISTBOX_ADD(lstVervoll, namen[i])
     NEXT
+    ' Plugins tragen spaeter bei (pluginVervollAntwort).
+    pluginVervollFragen(z, s, vorschlagWort$())
     IF LEN(namen) = 0 THEN RETURN
     GUI_LISTBOX_SET_SELECTED(lstVervoll, 0)
-    ' An der Schreibmarke statt fest oben links: darunter, und wenn dort
-    ' kein Platz ist, darueber.
+    vervollFensterZeigen(fokus)
+END SUB
+
+' Die Liste an der Schreibmarke zeigen: darunter, und wenn dort kein Platz
+' ist, darueber.
+SUB vervollFensterZeigen(fokus AS BOOLEAN)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
     DIM vx AS INTEGER : vx = breiteLinks + 40
     DIM vy AS INTEGER : vy = 120
     DIM mx AS INTEGER
@@ -17261,7 +17279,7 @@ END SUB
 
 ' Alle Plugins eines Ordners anmelden; ein Name, den es schon gibt, zaehlt
 ' nicht -- ein eigenes Plugin verdeckt so ein mitgeliefertes gleichen Namens.
-SUB pluginsAusOrdner(ordner AS STRING, mit AS BOOLEAN)
+SUB pluginsAusOrdner(ordner AS STRING, mit AS BOOLEAN, geholt AS BOOLEAN = FALSE)
     IF ordner = "" THEN RETURN
     IF NOT DIREXISTS(ordner) THEN RETURN
     DIM namen AS ARRAY OF STRING : namen = DIRLIST(ordner)
@@ -17277,6 +17295,7 @@ SUB pluginsAusOrdner(ordner AS STRING, mit AS BOOLEAN)
         ARRAY_PUSH(plugZustand, "aus")
         ARRAY_PUSH(plugHoert, ";")
         ARRAY_PUSH(plugMit, mit)
+        ARRAY_PUSH(plugGeholt, geholt)
         pluginSteckbrief(LEN(plugNamen) - 1, PATHJOIN(ordner, n))
         IF pluginGewollt(LEN(plugNamen) - 1) THEN pluginStarten(LEN(plugNamen) - 1)
     NEXT
@@ -17285,6 +17304,8 @@ END SUB
 SUB pluginsStarten()
     pluginPfadSetzen()
     pluginsAusOrdner(pluginOrdner$(), FALSE)
+    ' Geholte (dhrt paket) zaehlen zu den eigenen.
+    pluginsAusOrdner(PATHJOIN(pluginOrdner$(), "pakete"), FALSE, TRUE)
     ' Gezaehlt werden die eigenen; die mitgelieferten in einer eigenen Zeile.
     protokoll("plugins " + STR$(LEN(plugNamen)))
     DIM eigene AS INTEGER : eigene = LEN(plugNamen)
@@ -17317,6 +17338,13 @@ SUB pluginStarten(k AS INTEGER)
         ' Konfig-Ordner ist bei einer ide.json ohne Ordner nur ".".
         SETENV("DH_PLUGIN_DATEN", REALPATH$(daten))
         plugLeitung[k] = WINDOW_OPEN(plugPfade[k])
+        ' Die erste Nachricht: Fassung des Protokolls und der IDE. Vor der
+        ' Verbindung Gesendetes merkt sich die Leitung vor.
+        DIM hallo AS JSON_HANDLE : hallo = JSON_PARSE("{}")
+        JSON_SET_STRING(hallo, "art", "hallo")
+        JSON_SET_INT(hallo, "protokoll", PLUGIN_PROTOKOLL_FASSUNG)
+        JSON_SET_STRING(hallo, "ide", VERSION$())
+        WINDOW_SEND(plugLeitung[k], JSON_STRINGIFY(hallo))
         plugZustand[k] = "läuft"
         plugHoert[k] = ";"
         protokoll("plugin " + plugNamen[k] + " gestartet")
@@ -17372,7 +17400,7 @@ END SUB
 SUB pluginsNeuLaden()
     pluginsBeenden()
     plugNamen = [] : plugPfade = [] : plugLeitung = [] : plugZustand = [] : plugHoert = []
-    plugTitel = [] : plugFassung = [] : plugInfo = [] : plugAutor = [] : plugIdeMin = [] : plugMit = []
+    plugTitel = [] : plugFassung = [] : plugInfo = [] : plugAutor = [] : plugIdeMin = [] : plugMit = [] : plugGeholt = []
     pluginsStarten()
     GUI_SET_TEXT(lblStatus, tr$("Plugins neu geladen: ") + STR$(LEN(plugNamen)))
     IF GUI_WINDOW_SHOWN(winPlug) THEN pluginListeFuellen()
@@ -17516,6 +17544,7 @@ SUB pluginNachricht(k AS INTEGER, zeile AS STRING)
             CASE "befehl" : pluginBefehlAnmelden(k, j)
             CASE "kontext" : pluginKontextAnmelden(k, j)
             CASE "hover" : pluginHoverAntwort(k, j)
+            CASE "vorschlaege" : pluginVervollAntwort(k, j)
             CASE "leiste" : pluginLeisteAnmelden(k, j)
             CASE "hoere"
                 DIM ev AS STRING : ev = plugText$(j, "ereignis")
@@ -17733,6 +17762,62 @@ SUB pluginHoverFragen(ta AS GUI_WIDGET, z AS INTEGER, sp AS INTEGER, wort AS STR
     plugHoverText = text
 END SUB
 
+' Beim Vervollstaendigen: alle Plugins, die "vervollstaendigen" hoeren,
+' bekommen den Wortanfang und die Stelle. Gefragt wird auch, wenn die Laufzeit
+' nichts weiss -- die erste Antwort oeffnet die Liste dann selbst.
+SUB pluginVervollFragen(z AS INTEGER, sp AS INTEGER, wort AS STRING)
+    plugVervollWort = ""
+    DIM k AS INTEGER
+    DIM gefragt AS BOOLEAN : gefragt = FALSE
+    FOR k = 0 TO LEN(plugNamen) - 1
+        IF plugLeitung[k] < 0 THEN CONTINUE
+        IF INSTR(plugHoert[k], ";vervollstaendigen;") < 0 THEN CONTINUE
+        IF NOT gefragt THEN plugVervollNr = plugVervollNr + 1
+        gefragt = TRUE
+        DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+        JSON_SET_STRING(j, "art", "vervollstaendigen")
+        JSON_SET_INT(j, "nr", plugVervollNr)
+        JSON_SET_STRING(j, "wert", wort)
+        JSON_SET_INT(j, "zeile", z)
+        JSON_SET_INT(j, "spalte", sp)
+        DIM d AS STRING : d = ""
+        IF aktiverTab >= 0 THEN d = tabPfade[aktiverTab]
+        JSON_SET_STRING(j, "datei", d)
+        pluginSenden(k, j)
+    NEXT
+    IF gefragt THEN plugVervollWort = wort
+END SUB
+
+FUNCTION vervollHat(e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO GUI_LISTBOX_COUNT(lstVervoll) - 1
+        IF GUI_LISTBOX_ITEM(lstVervoll, i) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Die Vorschlaege eines Plugins: nur zur letzten Frage und nur, wenn an der
+' Marke noch derselbe Wortanfang steht. Doppelte fallen weg.
+SUB pluginVervollAntwort(k AS INTEGER, j AS JSON_HANDLE)
+    IF plugZahl(j, "nr") <> plugVervollNr OR plugVervollWort = "" THEN RETURN
+    IF vorschlagWort$() <> plugVervollWort THEN RETURN
+    IF NOT JSON_HAS(j, "eintraege") THEN RETURN
+    DIM neu AS INTEGER : neu = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "eintraege") - 1
+        DIM e AS STRING : e = JSON_GET_STRING(j, "eintraege." + STR$(i))
+        IF e = "" OR vervollHat(e) THEN CONTINUE
+        GUI_LISTBOX_ADD(lstVervoll, e)
+        neu = neu + 1
+    NEXT
+    IF neu = 0 THEN RETURN
+    IF NOT vervollOffen THEN
+        GUI_LISTBOX_SET_SELECTED(lstVervoll, 0)
+        vervollFensterZeigen(FALSE)
+    END IF
+    protokoll("plugin vorschlaege " + plugNamen[k] + " " + STR$(neu))
+END SUB
+
 SUB pluginHoverAntwort(k AS INTEGER, j AS JSON_HANDLE)
     DIM t AS STRING : t = TRIM$(plugText$(j, "text"))
     IF t = "" OR plugZahl(j, "nr") <> plugHoverNr THEN RETURN
@@ -17913,7 +17998,7 @@ FUNCTION pluginFaerben(ta AS GUI_WIDGET, stueck AS STRING, von AS INTEGER) AS BO
 END FUNCTION
 
 ' --- Plugins verwalten (Plugins -> Plugins verwalten ...) -------------------
-DIM winPlug AS GUI_WINDOW : winPlug = GUI_WINDOW(tr$("Plugins"), 260, 120, 560, 380)
+DIM winPlug AS GUI_WINDOW : winPlug = GUI_WINDOW(tr$("Plugins"), 260, 120, 560, 420)
 GUI_WINDOW_CLOSABLE(winPlug, TRUE)
 DIM lblPlugInfo AS GUI_WIDGET : lblPlugInfo = GUI_LABEL(winPlug, tr$("Haken = beim Start laden. Mitgelieferte sind aus, bis man sie anhakt."), 12, 10)
 DIM lstPlug AS GUI_WIDGET : lstPlug = GUI_LISTBOX(winPlug, 12, 34, 536, 250, [])
@@ -17922,6 +18007,10 @@ GUI_LISTBOX_PLACEHOLDER(lstPlug, tr$("Keine Plugins -- „Neues Plugin ...“ le
 DIM btnPlugNeu AS GUI_WIDGET : btnPlugNeu = GUI_BUTTON(winPlug, tr$("Neu laden"), 12, 296, 120, 30)
 DIM btnPlugOrdner AS GUI_WIDGET : btnPlugOrdner = GUI_BUTTON(winPlug, tr$("Ordner öffnen"), 142, 296, 140, 30)
 DIM btnPlugAnlegen AS GUI_WIDGET : btnPlugAnlegen = GUI_BUTTON(winPlug, tr$("Neues Plugin ..."), 292, 296, 126, 30)
+DIM btnPlugHolen AS GUI_WIDGET : btnPlugHolen = GUI_BUTTON(winPlug, tr$("Holen ..."), 12, 336, 120, 30)
+GUI_TOOLTIP(btnPlugHolen, tr$("Ein Plugin aus github:nutzer/repo@stand, einer https-Adresse oder einem Ordner holen (dhrt paket)"))
+DIM btnPlugEntfernen AS GUI_WIDGET : btnPlugEntfernen = GUI_BUTTON(winPlug, tr$("Entfernen"), 142, 336, 140, 30)
+GUI_TOOLTIP(btnPlugEntfernen, tr$("Das gewählte geholte Plugin entfernen"))
 DIM btnPlugZu AS GUI_WIDGET : btnPlugZu = GUI_BUTTON(winPlug, tr$("Schließen"), 428, 296, 120, 30)
 GUI_WINDOW_CANCEL(winPlug, btnPlugZu)
 GUI_WINDOW_VISIBLE(winPlug, FALSE)
@@ -17933,6 +18022,7 @@ SUB pluginListeFuellen()
         DIM zeile AS STRING : zeile = plugTitel[k]
         IF plugFassung[k] <> "" THEN zeile = zeile + " " + plugFassung[k]
         IF plugMit[k] THEN zeile = zeile + tr$(" (mitgeliefert)")
+        IF plugGeholt[k] THEN zeile = zeile + tr$(" (geholt)")
         DIM z AS INTEGER : z = GUI_LISTBOX_ADD(lstPlug, zeile)
         GUI_LISTBOX_DETAIL(lstPlug, z, plugZustand[k])
         GUI_LISTBOX_SET_CHECKED(lstPlug, z, pluginGewollt(k))
@@ -18033,13 +18123,98 @@ SUB pluginsVerwalten()
 END SUB
 
 ' Je Bild, solange das Fenster offen ist.
+' --- Plugins holen (dhrt paket in den Plugin-Ordner) -------------------------
+DIM dlgPlugQuelle AS GUI_WINDOW : dlgPlugQuelle = 0
+
+SUB pluginHolenFragen()
+    dlgPlugQuelle = GUI_PROMPT(tr$("Plugin holen"), tr$("Quelle (github:nutzer/repo@stand, https-Adresse oder Ordner), dahinter wahlweise --als name:"), "github:")
+END SUB
+
+' `dhrt paket -C <plugin-ordner> ...` als Prozess -- das Plugin landet in
+' plugins/pakete/<name>/, Quelle und Pruefsumme in paket.json und
+' paket.lock.json daneben.
+SUB pluginHolenStarten(mehr AS ARRAY OF STRING)
+    IF plugHolProz >= 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("dhrt paket läuft noch."))
+        RETURN
+    END IF
+    IF NOT DIREXISTS(pluginOrdner$()) THEN MKDIR(pluginOrdner$())
+    DIM a AS ARRAY OF STRING : a = ["paket", "-C", pluginOrdner$()]
+    DIM m AS STRING
+    FOR EACH m IN mehr
+        ARRAY_PUSH(a, m)
+    NEXT
+    ausgabe("dhrt " + JOIN$(a, " "))
+    plugHolProz = PROCESS_START("dhrt", a)
+    PROCESS_CLOSE_INPUT(plugHolProz)
+    protokoll("plugin holen start " + JOIN$(mehr, " "))
+END SUB
+
+SUB pluginHolenNachziehen()
+    IF dlgPlugQuelle <> 0 THEN
+        DIM aq AS INTEGER : aq = GUI_ANSWER(dlgPlugQuelle)
+        IF aq <> 0 THEN
+            DIM q AS STRING : q = TRIM$(GUI_DIALOG_TEXT(dlgPlugQuelle))
+            dlgPlugQuelle = 0
+            IF aq = 1 AND q <> "" THEN
+                DIM teile AS ARRAY OF STRING : teile = ["hole"]
+                DIM w AS STRING
+                FOR EACH w IN SPLIT$(q, " ")
+                    IF w <> "" THEN ARRAY_PUSH(teile, w)
+                NEXT
+                pluginHolenStarten(teile)
+            END IF
+        END IF
+    END IF
+    IF plugHolProz < 0 THEN RETURN
+    DIM aus AS STRING : aus = PROCESS_READ$(plugHolProz) + PROCESS_ERR$(plugHolProz)
+    IF aus <> "" THEN
+        DIM zl AS STRING
+        FOR EACH zl IN SPLIT$(aus, NL)
+            IF TRIM$(zl) <> "" THEN ausgabe(TRIM$(REPLACE$(zl, CHR$(13), "")))
+        NEXT
+    END IF
+    IF PROCESS_RUNNING(plugHolProz) THEN RETURN
+    ' Bis zu fuenf leere Abfragen: die letzte Zeile kommt womoeglich nach.
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM rest AS STRING : rest = PROCESS_READ$(plugHolProz) + PROCESS_ERR$(plugHolProz)
+        IF rest = "" THEN
+            leer = leer + 1
+        ELSE
+            ausgabe(TRIM$(REPLACE$(rest, CHR$(13), "")))
+        END IF
+        SLEEP(20)
+    WEND
+    DIM code AS INTEGER : code = PROCESS_CODE(plugHolProz)
+    PROCESS_CLOSE(plugHolProz)
+    plugHolProz = -1
+    protokoll("plugin holen " + STR$(code))
+    GUI_SET_TEXT(lblStatus, IIF(code = 0, tr$("Plugins: fertig -- neu geladen."), tr$("Plugins holen fehlgeschlagen -- siehe Ausgabe.")))
+    IF code = 0 THEN pluginsNeuLaden()
+    IF GUI_WINDOW_SHOWN(winPlug) THEN pluginListeFuellen()
+END SUB
+
 SUB pluginsVerwaltenNachziehen()
     pluginAnlegenNachziehen()
+    pluginHolenNachziehen()
     IF NOT GUI_WINDOW_SHOWN(winPlug) THEN RETURN
     IF GUI_CLICKED(btnPlugZu) THEN GUI_WINDOW_VISIBLE(winPlug, FALSE) : RETURN
     IF GUI_CLICKED(btnPlugNeu) THEN pluginsNeuLaden()
     IF GUI_CLICKED(btnPlugOrdner) THEN befehl("plugins_ordner")
     IF GUI_CLICKED(btnPlugAnlegen) THEN befehl("plugin_anlegen")
+    IF GUI_CLICKED(btnPlugHolen) THEN pluginHolenFragen()
+    IF GUI_CLICKED(btnPlugEntfernen) THEN
+        DIM wk AS INTEGER : wk = GUI_LISTBOX_SELECTED(lstPlug)
+        IF wk >= 0 AND wk < LEN(plugNamen) THEN
+            IF plugGeholt[wk] THEN
+                pluginStoppen(wk, "aus")
+                pluginHolenStarten(["entferne", plugNamen[wk]])
+            ELSE
+                GUI_SET_TEXT(lblStatus, tr$("Entfernen geht nur bei geholten Plugins -- eigene liegen im Plugin-Ordner."))
+            END IF
+        END IF
+    END IF
     DIM k AS INTEGER
     FOR k = 0 TO MIN(LEN(plugNamen), GUI_LISTBOX_COUNT(lstPlug)) - 1
         DIM an AS BOOLEAN : an = GUI_LISTBOX_CHECKED(lstPlug, k)
