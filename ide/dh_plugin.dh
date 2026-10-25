@@ -234,6 +234,36 @@ SUB plgTue(was AS STRING, text AS STRING, datei AS STRING, zeile AS INTEGER)
     JSON_SET_INT(j, "zeile", zeile)
     plgSenden(j)
 END SUB
+' Einen Bereich ersetzen: Zeilen und Spalten ab 1, `bis_spalte` ausschliesslich
+' (bis_zeile 0 = dieselbe Zeile). Ohne `datei` im Reiter vorn, sonst in
+' dieser Datei (die IDE oeffnet sie). Fuer Strg+Z ist es ein Schritt.
+SUB PLUGIN_ERSETZEN(zeile AS INTEGER, spalte AS INTEGER, bis_zeile AS INTEGER, bis_spalte AS INTEGER, text AS STRING, datei AS STRING = "")
+    plgBereich("ersetzen", zeile, spalte, bis_zeile, bis_spalte, text, datei)
+END SUB
+' Die Schreibmarke setzen, mit `bis_zeile`/`bis_spalte` eine Auswahl.
+SUB PLUGIN_AUSWAHL_SETZEN(zeile AS INTEGER, spalte AS INTEGER, bis_zeile AS INTEGER = 0, bis_spalte AS INTEGER = 0, datei AS STRING = "")
+    plgBereich("waehlen", zeile, spalte, bis_zeile, bis_spalte, "", datei)
+END SUB
+SUB plgBereich(was AS STRING, zeile AS INTEGER, spalte AS INTEGER, bis_zeile AS INTEGER, bis_spalte AS INTEGER, text AS STRING, datei AS STRING)
+    DIM j AS JSON_HANDLE : j = plgNachricht("tue")
+    JSON_SET_STRING(j, "was", was)
+    JSON_SET_INT(j, "zeile", zeile)
+    JSON_SET_INT(j, "spalte", spalte)
+    JSON_SET_INT(j, "bis_zeile", bis_zeile)
+    JSON_SET_INT(j, "bis_spalte", bis_spalte)
+    JSON_SET_STRING(j, "text", text)
+    JSON_SET_STRING(j, "datei", datei)
+    plgSenden(j)
+END SUB
+' Der Ordner, in den das Plugin schreiben darf (Einstellungen, eigene
+' Listen) -- neben der ide.json, je Plugin einer. Sein eigener Ordner kann
+' schreibgeschuetzt sein. Ohne IDE der Ordner des Programms.
+FUNCTION PLUGIN_DATENORDNER$() AS STRING
+    DIM d AS STRING : d = GETENV$("DH_PLUGIN_DATEN")
+    IF d = "" THEN d = CWD$()
+    RETURN d
+END FUNCTION
+
 ' Text an der Schreibmarke einfuegen (eine Auswahl ersetzt er).
 SUB PLUGIN_EINFUEGEN(text AS STRING)
     plgTue("einfuegen", text, "", 0)

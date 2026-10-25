@@ -947,3 +947,15 @@ Klassendiagramm	Class diagram
 Werkzeug: Klassendiagramm	Tool: class diagram
 Erst ein Projekt oder eine Datei öffnen.	Open a project or a file first.
 Klassendiagramm gestartet -- Doppelklick auf einen Kasten springt hierher.	Class diagram started -- double-click a box to jump here.
+braucht IDE 	requires IDE 
+ (mitgeliefert)	 (bundled)
+Von: 	By: 
+Neues Plugin ...	New plugin ...
+Keine Plugins -- „Neues Plugin ...“ legt eins an.	No plugins -- "New plugin ..." creates one.
+Haken = beim Start laden. Mitgelieferte sind aus, bis man sie anhakt.	Tick = load at start. Bundled ones are off until ticked.
+Neues Plugin	New plugin
+Name des Plugins (Buchstaben, Ziffern, _ und -):	Name of the plugin (letters, digits, _ and -):
+Ein Plugin-Name besteht aus Buchstaben, Ziffern, _ und -.	A plugin name consists of letters, digits, _ and -.
+Das Plugin gibt es schon: 	The plugin already exists: 
+Was das Plugin tut.	What the plugin does.
+Plugin angelegt: 	Plugin created: 

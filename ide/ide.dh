@@ -567,6 +567,15 @@ DIM plugPfade AS ARRAY OF STRING : plugPfade = []
 DIM plugLeitung AS ARRAY OF INTEGER : plugLeitung = []
 DIM plugZustand AS ARRAY OF STRING : plugZustand = []
 DIM plugHoert AS ARRAY OF STRING : plugHoert = []
+' Aus dem Steckbrief (plugin.json): Titel, Fassung, Beschreibung, Autor,
+' kleinste IDE-Fassung. Mitgeliefert = aus examples/plugins/; die sind aus,
+' bis man sie anhakt ("plugins_an" in der ide.json).
+DIM plugTitel AS ARRAY OF STRING : plugTitel = []
+DIM plugFassung AS ARRAY OF STRING : plugFassung = []
+DIM plugInfo AS ARRAY OF STRING : plugInfo = []
+DIM plugAutor AS ARRAY OF STRING : plugAutor = []
+DIM plugIdeMin AS ARRAY OF STRING : plugIdeMin = []
+DIM plugMit AS ARRAY OF BOOLEAN : plugMit = []
 ' Befehle der Plugins: Kennung "plugin:<plugin>:<id>", Menuepunkt, Plugin.
 DIM plugBefKennung AS ARRAY OF STRING : plugBefKennung = []
 DIM plugBefItem AS ARRAY OF INTEGER : plugBefItem = []
@@ -1206,6 +1215,7 @@ DIM miUeber AS INTEGER : miUeber = GUI_MENU_ITEM(mHilfe, tr$("Über ..."))
 ' unter dem Strich, ihre Leisten im Dock.
 DIM mPlugins AS INTEGER : mPlugins = GUI_MENU(win, tr$("Plugins"))
 DIM miPlugVerwalten AS INTEGER : miPlugVerwalten = GUI_MENU_ITEM(mPlugins, tr$("Plugins verwalten ..."))
+DIM miPlugAnlegen AS INTEGER : miPlugAnlegen = GUI_MENU_ITEM(mPlugins, tr$("Neues Plugin ..."))
 DIM miPlugNeu AS INTEGER : miPlugNeu = GUI_MENU_ITEM(mPlugins, tr$("Plugins neu laden"))
 DIM miPlugOrdner AS INTEGER : miPlugOrdner = GUI_MENU_ITEM(mPlugins, tr$("Plugin-Ordner öffnen"))
 GUI_MENU_SEPARATOR(mPlugins)
@@ -17158,9 +17168,101 @@ SUB pluginPfadSetzen()
     SETENV("DH_PATH", IIF(alt = "", bib, bib + trenner + alt))
 END SUB
 
-SUB pluginsStarten()
-    pluginPfadSetzen()
-    DIM ordner AS STRING : ordner = pluginOrdner$()
+' Die mitgelieferten Plugins: examples/plugins/ (kommen mit dem Installer).
+FUNCTION pluginMitOrdner$() AS STRING
+    IF beispielOrdner = "" THEN RETURN ""
+    RETURN PATHJOIN(beispielOrdner, "plugins")
+END FUNCTION
+
+' Ein mitgeliefertes Plugin laeuft nur, wenn es in "plugins_an" steht.
+FUNCTION pluginAn(name AS STRING) AS BOOLEAN
+    IF NOT JSON_HAS(konfig, "plugins_an") THEN RETURN FALSE
+    IF JSON_TYPE(konfig, "plugins_an") <> "array" THEN RETURN FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(konfig, "plugins_an") - 1
+        DIM p AS STRING : p = "plugins_an." + STR$(i)
+        IF JSON_TYPE(konfig, p) = "string" THEN
+            IF LOWER$(JSON_GET_STRING(konfig, p)) = LOWER$(name) THEN RETURN TRUE
+        END IF
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+SUB pluginAnSetzen(name AS STRING, an AS BOOLEAN)
+    DIM liste AS JSON_HANDLE : liste = JSON_PARSE("[]")
+    IF JSON_HAS(konfig, "plugins_an") THEN
+        IF JSON_TYPE(konfig, "plugins_an") = "array" THEN
+            DIM i AS INTEGER
+            FOR i = 0 TO JSON_LEN(konfig, "plugins_an") - 1
+                DIM p AS STRING : p = "plugins_an." + STR$(i)
+                IF JSON_TYPE(konfig, p) = "string" THEN
+                    IF LOWER$(JSON_GET_STRING(konfig, p)) <> LOWER$(name) THEN JSON_APPEND_STRING(liste, "", JSON_GET_STRING(konfig, p))
+                END IF
+            NEXT
+        END IF
+    END IF
+    IF an THEN JSON_APPEND_STRING(liste, "", name)
+    JSON_SET_JSON(konfig, "plugins_an", liste)
+    konfigSichern()
+END SUB
+
+' Soll das Plugin laufen? Eigene: ja, ausser abgeschaltet; mitgelieferte:
+' nur angehakt.
+FUNCTION pluginGewollt(k AS INTEGER) AS BOOLEAN
+    IF plugMit[k] THEN RETURN pluginAn(plugNamen[k])
+    RETURN NOT pluginAus(plugNamen[k])
+END FUNCTION
+
+SUB pluginGewolltSetzen(k AS INTEGER, an AS BOOLEAN)
+    IF plugMit[k] THEN pluginAnSetzen(plugNamen[k], an) ELSE pluginAusSetzen(plugNamen[k], NOT an)
+END SUB
+
+' Fassungen wie "2026.36" der Reihe nach vergleichen: -1, 0, 1.
+FUNCTION fassungVergleich(a AS STRING, b AS STRING) AS INTEGER
+    DIM ta AS ARRAY OF STRING : ta = SPLIT$(a, ".")
+    DIM tb AS ARRAY OF STRING : tb = SPLIT$(b, ".")
+    DIM i AS INTEGER
+    FOR i = 0 TO MAX(LEN(ta), LEN(tb)) - 1
+        DIM x AS INTEGER : x = 0
+        DIM y AS INTEGER : y = 0
+        IF i < LEN(ta) THEN x = VAL(ta[i])
+        IF i < LEN(tb) THEN y = VAL(tb[i])
+        IF x < y THEN RETURN -1
+        IF x > y THEN RETURN 1
+    NEXT
+    RETURN 0
+END FUNCTION
+
+' Den Steckbrief lesen: plugin.json neben plugin.dh. Fehlt er oder ist er
+' krumm, gelten der Ordnername und leere Angaben -- ein Plugin laeuft auch
+' ohne.
+SUB pluginSteckbrief(k AS INTEGER, ordner AS STRING)
+    DIM titel AS STRING : titel = plugNamen[k]
+    DIM fassung AS STRING : fassung = ""
+    DIM info AS STRING : info = ""
+    DIM autor AS STRING : autor = ""
+    DIM ide AS STRING : ide = ""
+    DIM sb AS STRING : sb = PATHJOIN(ordner, "plugin.json")
+    IF FILEEXISTS(sb) THEN
+        TRY
+            DIM j AS JSON_HANDLE : j = JSON_LOAD(sb)
+            IF JSON_HAS(j, "name") THEN titel = JSON_GET_STRING(j, "name")
+            IF JSON_HAS(j, "fassung") THEN fassung = JSON_GET_STRING(j, "fassung")
+            IF JSON_HAS(j, "beschreibung") THEN info = JSON_GET_STRING(j, "beschreibung")
+            IF JSON_HAS(j, "autor") THEN autor = JSON_GET_STRING(j, "autor")
+            IF JSON_HAS(j, "ide") THEN ide = JSON_GET_STRING(j, "ide")
+        CATCH e
+            protokoll("plugin " + plugNamen[k] + " steckbrief unlesbar")
+        END TRY
+    END IF
+    ARRAY_PUSH(plugTitel, titel) : ARRAY_PUSH(plugFassung, fassung)
+    ARRAY_PUSH(plugInfo, info) : ARRAY_PUSH(plugAutor, autor) : ARRAY_PUSH(plugIdeMin, ide)
+END SUB
+
+' Alle Plugins eines Ordners anmelden; ein Name, den es schon gibt, zaehlt
+' nicht -- ein eigenes Plugin verdeckt so ein mitgeliefertes gleichen Namens.
+SUB pluginsAusOrdner(ordner AS STRING, mit AS BOOLEAN)
+    IF ordner = "" THEN RETURN
     IF NOT DIREXISTS(ordner) THEN RETURN
     DIM namen AS ARRAY OF STRING : namen = DIRLIST(ordner)
     SORT(namen)
@@ -17174,14 +17276,46 @@ SUB pluginsStarten()
         ARRAY_PUSH(plugLeitung, -1)
         ARRAY_PUSH(plugZustand, "aus")
         ARRAY_PUSH(plugHoert, ";")
-        IF NOT pluginAus(n) THEN pluginStarten(LEN(plugNamen) - 1)
+        ARRAY_PUSH(plugMit, mit)
+        pluginSteckbrief(LEN(plugNamen) - 1, PATHJOIN(ordner, n))
+        IF pluginGewollt(LEN(plugNamen) - 1) THEN pluginStarten(LEN(plugNamen) - 1)
     NEXT
-    protokoll("plugins " + STR$(LEN(plugNamen)))
 END SUB
+
+SUB pluginsStarten()
+    pluginPfadSetzen()
+    pluginsAusOrdner(pluginOrdner$(), FALSE)
+    ' Gezaehlt werden die eigenen; die mitgelieferten in einer eigenen Zeile.
+    protokoll("plugins " + STR$(LEN(plugNamen)))
+    DIM eigene AS INTEGER : eigene = LEN(plugNamen)
+    pluginsAusOrdner(pluginMitOrdner$(), TRUE)
+    protokoll("mitgeliefert " + STR$(LEN(plugNamen) - eigene))
+END SUB
+
+' Der Ordner, in den ein Plugin schreiben darf (Einstellungen, Listen): neben
+' der ide.json, je Plugin einer. Sein eigener Ordner kann schreibgeschuetzt
+' sein -- ein mitgeliefertes liegt im Beispiel-Ordner.
+FUNCTION pluginDaten$(name AS STRING) AS STRING
+    RETURN PATHJOIN(PATHJOIN(konfigOrdner$(), "plugin-daten"), name)
+END FUNCTION
 
 SUB pluginStarten(k AS INTEGER)
     IF plugLeitung[k] >= 0 THEN RETURN
+    ' Braucht es eine neuere IDE, startet es nicht -- es liefe womoeglich
+    ' gegen Nachrichten, die diese IDE nicht kennt.
+    IF plugIdeMin[k] <> "" AND fassungVergleich(plugIdeMin[k], VERSION$()) > 0 THEN
+        plugZustand[k] = tr$("braucht IDE ") + plugIdeMin[k]
+        protokoll("plugin " + plugNamen[k] + " braucht " + plugIdeMin[k])
+        RETURN
+    END IF
     TRY
+        DIM daten AS STRING : daten = pluginDaten$(plugNamen[k])
+        IF NOT DIREXISTS(PATHJOIN(konfigOrdner$(), "plugin-daten")) THEN MKDIR(PATHJOIN(konfigOrdner$(), "plugin-daten"))
+        IF NOT DIREXISTS(daten) THEN MKDIR(daten)
+        ' Das Kind erbt die Umgebung beim Start (PLUGIN_DATENORDNER$) -- als
+        ' voller Pfad, denn es laeuft in seinem eigenen Ordner, und der
+        ' Konfig-Ordner ist bei einer ide.json ohne Ordner nur ".".
+        SETENV("DH_PLUGIN_DATEN", REALPATH$(daten))
         plugLeitung[k] = WINDOW_OPEN(plugPfade[k])
         plugZustand[k] = "läuft"
         plugHoert[k] = ";"
@@ -17238,6 +17372,7 @@ END SUB
 SUB pluginsNeuLaden()
     pluginsBeenden()
     plugNamen = [] : plugPfade = [] : plugLeitung = [] : plugZustand = [] : plugHoert = []
+    plugTitel = [] : plugFassung = [] : plugInfo = [] : plugAutor = [] : plugIdeMin = [] : plugMit = []
     pluginsStarten()
     GUI_SET_TEXT(lblStatus, tr$("Plugins neu geladen: ") + STR$(LEN(plugNamen)))
     IF GUI_WINDOW_SHOWN(winPlug) THEN pluginListeFuellen()
@@ -17639,6 +17774,21 @@ SUB pluginTue(k AS INTEGER, j AS JSON_HANDLE)
         CASE "einfuegen" : IF ta >= 0 THEN GUI_TEXTAREA_INSERT(ta, plugText$(j, "text"))
         CASE "meldung" : GUI_SET_TEXT(lblStatus, plugText$(j, "text"))
         CASE "ausgabe" : ausgabe(plugText$(j, "text"))
+        CASE "ersetzen", "waehlen"
+            ' Mit Datei erst dorthin (oeffnet sie, wenn noetig), ohne der Reiter vorn.
+            IF plugText$(j, "datei") <> "" THEN dateiOeffnen(plugText$(j, "datei"))
+            ta = aktivesFeld()
+            IF ta < 0 THEN RETURN
+            DIM z1 AS INTEGER : z1 = MAX(1, plugZahl(j, "zeile"))
+            DIM s1 AS INTEGER : s1 = MAX(1, plugZahl(j, "spalte"))
+            DIM z2 AS INTEGER : z2 = plugZahl(j, "bis_zeile")
+            DIM s2 AS INTEGER : s2 = plugZahl(j, "bis_spalte")
+            IF z2 < 1 THEN z2 = z1
+            IF s2 < 1 THEN s2 = s1
+            GUI_TEXTAREA_SELECT(ta, z1, s1, z2, s2)
+            ' Auswahl + INSERT: ein Schritt fuer Strg+Z.
+            IF plugText$(j, "was") = "ersetzen" THEN GUI_TEXTAREA_INSERT(ta, plugText$(j, "text"))
+            GUI_FOCUS(ta)
         CASE "oeffnen"
             ' Ohne Datei: die Zeile im Reiter vorn (ein ungesicherter Text).
             IF plugText$(j, "datei") <> "" THEN dateiOeffnen(plugText$(j, "datei"))
@@ -17765,12 +17915,13 @@ END FUNCTION
 ' --- Plugins verwalten (Plugins -> Plugins verwalten ...) -------------------
 DIM winPlug AS GUI_WINDOW : winPlug = GUI_WINDOW(tr$("Plugins"), 260, 120, 560, 380)
 GUI_WINDOW_CLOSABLE(winPlug, TRUE)
-DIM lblPlugInfo AS GUI_WIDGET : lblPlugInfo = GUI_LABEL(winPlug, tr$("Haken = beim Start laden. Ein Plugin liegt in plugins/<name>/plugin.dh."), 12, 10)
+DIM lblPlugInfo AS GUI_WIDGET : lblPlugInfo = GUI_LABEL(winPlug, tr$("Haken = beim Start laden. Mitgelieferte sind aus, bis man sie anhakt."), 12, 10)
 DIM lstPlug AS GUI_WIDGET : lstPlug = GUI_LISTBOX(winPlug, 12, 34, 536, 250, [])
 GUI_LISTBOX_SET(lstPlug, "kaestchen", 1)
-GUI_LISTBOX_PLACEHOLDER(lstPlug, tr$("Keine Plugins -- „Plugin-Ordner öffnen“ legt den Ordner an."))
+GUI_LISTBOX_PLACEHOLDER(lstPlug, tr$("Keine Plugins -- „Neues Plugin ...“ legt eins an."))
 DIM btnPlugNeu AS GUI_WIDGET : btnPlugNeu = GUI_BUTTON(winPlug, tr$("Neu laden"), 12, 296, 120, 30)
 DIM btnPlugOrdner AS GUI_WIDGET : btnPlugOrdner = GUI_BUTTON(winPlug, tr$("Ordner öffnen"), 142, 296, 140, 30)
+DIM btnPlugAnlegen AS GUI_WIDGET : btnPlugAnlegen = GUI_BUTTON(winPlug, tr$("Neues Plugin ..."), 292, 296, 126, 30)
 DIM btnPlugZu AS GUI_WIDGET : btnPlugZu = GUI_BUTTON(winPlug, tr$("Schließen"), 428, 296, 120, 30)
 GUI_WINDOW_CANCEL(winPlug, btnPlugZu)
 GUI_WINDOW_VISIBLE(winPlug, FALSE)
@@ -17779,11 +17930,100 @@ SUB pluginListeFuellen()
     GUI_LISTBOX_CLEAR(lstPlug)
     DIM k AS INTEGER
     FOR k = 0 TO LEN(plugNamen) - 1
-        DIM z AS INTEGER : z = GUI_LISTBOX_ADD(lstPlug, plugNamen[k])
+        DIM zeile AS STRING : zeile = plugTitel[k]
+        IF plugFassung[k] <> "" THEN zeile = zeile + " " + plugFassung[k]
+        IF plugMit[k] THEN zeile = zeile + tr$(" (mitgeliefert)")
+        DIM z AS INTEGER : z = GUI_LISTBOX_ADD(lstPlug, zeile)
         GUI_LISTBOX_DETAIL(lstPlug, z, plugZustand[k])
-        GUI_LISTBOX_SET_CHECKED(lstPlug, z, NOT pluginAus(plugNamen[k]))
+        GUI_LISTBOX_SET_CHECKED(lstPlug, z, pluginGewollt(k))
+        DIM tipp AS STRING : tipp = plugInfo[k]
+        IF plugAutor[k] <> "" THEN tipp = tipp + IIF(tipp = "", "", NL) + tr$("Von: ") + plugAutor[k]
+        tipp = tipp + IIF(tipp = "", "", NL) + plugPfade[k]
+        GUI_LISTBOX_TIP(lstPlug, z, tipp)
     NEXT
 END SUB
+
+' --- Neues Plugin aus der Vorlage -------------------------------------------
+DIM dlgPlugName AS GUI_WINDOW : dlgPlugName = 0
+
+SUB pluginAnlegenFragen()
+    dlgPlugName = GUI_PROMPT(tr$("Neues Plugin"), tr$("Name des Plugins (Buchstaben, Ziffern, _ und -):"), "mein_plugin")
+END SUB
+
+SUB pluginAnlegenNachziehen()
+    IF dlgPlugName = 0 THEN RETURN
+    DIM a AS INTEGER : a = GUI_ANSWER(dlgPlugName)
+    IF a = 0 THEN RETURN
+    DIM name AS STRING : name = TRIM$(GUI_DIALOG_TEXT(dlgPlugName))
+    dlgPlugName = 0
+    IF a = 1 THEN pluginAnlegen(name)
+END SUB
+
+' Legt plugins/<name>/ mit plugin.dh, plugin.json und leiste.dhform an,
+' oeffnet plugin.dh und startet das Plugin. FALSE, wenn der Name krumm ist
+' oder den Ordner gibt.
+FUNCTION pluginAnlegen(name AS STRING) AS BOOLEAN
+    IF name = "" OR NOT REGEX_TEST(name, "^[A-Za-z0-9_-]+$") THEN
+        GUI_SET_TEXT(lblStatus, tr$("Ein Plugin-Name besteht aus Buchstaben, Ziffern, _ und -."))
+        protokoll("plugin anlegen krumm " + name)
+        RETURN FALSE
+    END IF
+    DIM ordner AS STRING : ordner = PATHJOIN(pluginOrdner$(), name)
+    IF DIREXISTS(ordner) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Das Plugin gibt es schon: ") + ordner)
+        protokoll("plugin anlegen gibt es " + name)
+        RETURN FALSE
+    END IF
+    IF NOT DIREXISTS(pluginOrdner$()) THEN MKDIR(pluginOrdner$())
+    MKDIR(ordner)
+    DIM q AS STRING : q = CHR$(34)
+    DIM sb AS JSON_HANDLE : sb = JSON_PARSE("{}")
+    JSON_SET_STRING(sb, "name", name)
+    JSON_SET_STRING(sb, "fassung", "0.1")
+    JSON_SET_STRING(sb, "beschreibung", tr$("Was das Plugin tut."))
+    JSON_SET_STRING(sb, "autor", "")
+    JSON_SET_STRING(sb, "ide", VERSION$())
+    WRITEALL(PATHJOIN(ordner, "plugin.json"), JSON_STRINGIFY(sb) + NL)
+    DIM form AS STRING : form = "{" + q + "title" + q + ": " + q + name + q + ", " + q + "w" + q + ": 240, " + q + "h" + q + ": 160, " + q + "chrome" + q + ": false, " + q + "widgets" + q + ": [" + NL
+    form = form + "  {" + q + "kind" + q + ": " + q + "label" + q + ", " + q + "name" + q + ": " + q + "kopf" + q + ", " + q + "text" + q + ": " + q + name + q + ", " + q + "x" + q + ": 6, " + q + "y" + q + ": 6, " + q + "w" + q + ": 228, " + q + "h" + q + ": 18, " + q + "anchor" + q + ": " + q + "lrt" + q + "}," + NL
+    form = form + "  {" + q + "kind" + q + ": " + q + "button" + q + ", " + q + "name" + q + ": " + q + "knopf" + q + ", " + q + "text" + q + ": " + q + "Wort zählen" + q + ", " + q + "x" + q + ": 6, " + q + "y" + q + ": 30, " + q + "w" + q + ": 140, " + q + "h" + q + ": 28}" + NL
+    form = form + "]}" + NL
+    WRITEALL(PATHJOIN(ordner, "leiste.dhform"), form)
+    DIM c AS STRING : c = "' Plugin " + q + name + q + " -- angelegt aus der Vorlage der IDE." + NL
+    c = c + "' Handbuch: docs/ide-plugins.md. Nach einer Aenderung: Plugins -> Plugins neu laden." + NL
+    c = c + "IMPORT " + q + "dh_plugin.dh" + q + NL + NL
+    c = c + "SUB zaehlen()" + NL
+    c = c + "    DIM text AS STRING : text = PLUGIN_TEXT$()" + NL
+    c = c + "    DIM wort AS STRING : wort = PLUGIN_WORT$()" + NL
+    c = c + "    IF wort = " + q + q + " THEN" + NL
+    c = c + "        PLUGIN_MELDUNG(" + q + "An der Schreibmarke steht kein Wort." + q + ")" + NL
+    c = c + "        RETURN" + NL
+    c = c + "    END IF" + NL
+    c = c + "    DIM n AS INTEGER : n = LEN(REGEX_FIND_ALL(text, " + q + "\b" + q + " + wort + " + q + "\b" + q + "))" + NL
+    c = c + "    PLUGIN_SETZE(" + q + "leiste" + q + ", " + q + "kopf" + q + ", " + q + "text" + q + ", wort + " + q + ": " + q + " + STR$(n) + " + q + " mal" + q + ")" + NL
+    c = c + "END SUB" + NL + NL
+    c = c + "PLUGIN_BEFEHL(" + q + "zaehlen" + q + ", " + q + "Wort an der Marke zählen" + q + ")" + NL
+    c = c + "PLUGIN_KONTEXT(" + q + "zaehlen" + q + ", " + q + "Wie oft steht das Wort hier?" + q + ")" + NL
+    c = c + "PLUGIN_LEISTE(" + q + "leiste" + q + ", " + q + name + q + ", " + q + "leiste.dhform" + q + ", " + q + "rechts" + q + ")" + NL + NL
+    c = c + "WHILE PLUGIN_LAEUFT()" + NL
+    c = c + "    SELECT CASE PLUGIN_EREIGNIS$()" + NL
+    c = c + "        CASE " + q + "befehl" + q + NL
+    c = c + "            IF PLUGIN_ID$() = " + q + "zaehlen" + q + " THEN zaehlen()" + NL
+    c = c + "        CASE " + q + "klick" + q + NL
+    c = c + "            IF PLUGIN_WIDGET$() = " + q + "knopf" + q + " THEN zaehlen()" + NL
+    c = c + "        CASE " + q + "ende" + q + NL
+    c = c + "            EXIT(0)" + NL
+    c = c + "    END SELECT" + NL
+    c = c + "WEND" + NL
+    WRITEALL(PATHJOIN(ordner, "plugin.dh"), c)
+    protokoll("plugin angelegt " + name)
+    ' Anmelden und starten wie beim Start der IDE, dann zum Bearbeiten oeffnen.
+    pluginsAusOrdner(pluginOrdner$(), FALSE)
+    IF GUI_WINDOW_SHOWN(winPlug) THEN pluginListeFuellen()
+    dateiOeffnen(PATHJOIN(ordner, "plugin.dh"))
+    GUI_SET_TEXT(lblStatus, tr$("Plugin angelegt: ") + ordner)
+    RETURN TRUE
+END FUNCTION
 
 SUB pluginsVerwalten()
     IF LEN(plugNamen) = 0 THEN pluginsStarten()
@@ -17794,15 +18034,17 @@ END SUB
 
 ' Je Bild, solange das Fenster offen ist.
 SUB pluginsVerwaltenNachziehen()
+    pluginAnlegenNachziehen()
     IF NOT GUI_WINDOW_SHOWN(winPlug) THEN RETURN
     IF GUI_CLICKED(btnPlugZu) THEN GUI_WINDOW_VISIBLE(winPlug, FALSE) : RETURN
     IF GUI_CLICKED(btnPlugNeu) THEN pluginsNeuLaden()
     IF GUI_CLICKED(btnPlugOrdner) THEN befehl("plugins_ordner")
+    IF GUI_CLICKED(btnPlugAnlegen) THEN befehl("plugin_anlegen")
     DIM k AS INTEGER
     FOR k = 0 TO MIN(LEN(plugNamen), GUI_LISTBOX_COUNT(lstPlug)) - 1
         DIM an AS BOOLEAN : an = GUI_LISTBOX_CHECKED(lstPlug, k)
-        IF an = pluginAus(plugNamen[k]) THEN
-            pluginAusSetzen(plugNamen[k], NOT an)
+        IF an <> pluginGewollt(k) THEN
+            pluginGewolltSetzen(k, an)
             IF an THEN pluginStarten(k) ELSE pluginStoppen(k, "aus")
             GUI_LISTBOX_DETAIL(lstPlug, k, plugZustand[k])
         END IF
@@ -17859,7 +18101,7 @@ paletteEintrag("Eingebaute Befehle nachschlagen ...", "befehle", "Strg+F3")
 ' Plugins und das Dock -- hinten, damit "oeffnen" in der Palette zuerst
 ' das Oeffnen einer Datei findet.
 paletteEintrag("Plugins verwalten ...", "plugins_verwalten", "") : paletteEintrag("Plugins neu laden", "plugins_neu", "")
-paletteEintrag("Plugin-Ordner öffnen", "plugins_ordner", "") : paletteEintrag("Leisten zurücksetzen", "leisten_zurueck", "")
+paletteEintrag("Plugin-Ordner öffnen", "plugins_ordner", "") : paletteEintrag("Neues Plugin ...", "plugin_anlegen", "") : paletteEintrag("Leisten zurücksetzen", "leisten_zurueck", "")
 paletteEintrag("Definition hier zeigen", "peek", "Alt+F12")
 paletteEintrag("Symbol im Projekt suchen ...", "symbole", "Strg+Umschalt+S")
 paletteEintrag("Im ganzen Projekt ersetzen ...", "ersetzen_projekt", "Strg+Umschalt+H")
@@ -18640,6 +18882,7 @@ SUB befehl(k AS STRING)
             protokoll("leisten zurueckgesetzt")
         CASE "plugins_verwalten" : pluginsVerwalten()
         CASE "plugins_neu" : pluginsNeuLaden()
+        CASE "plugin_anlegen" : pluginAnlegenFragen()
         CASE "plugins_ordner"
             IF NOT DIREXISTS(pluginOrdner$()) THEN MKDIR(pluginOrdner$())
             OPENDOC(pluginOrdner$())
@@ -18715,7 +18958,7 @@ menueBefehl(miBLoeschen, "baum_loeschen", "") : menueBefehl(miBPfad, "baum_pfad"
 menueBefehl(miAZeile, "ausgabe_zeile_kopieren", "") : menueBefehl(miAKopieren, "ausgabe_kopieren", "") : menueBefehl(miASichern, "ausgabe_sichern", "") : menueBefehl(miALeeren, "ausgabe_leeren", "")
 menueBefehl(miDefinition, "definition", "F12") : menueBefehl(miUmbenennen, "umbenennen", "Umschalt+F6") : menueBefehl(miKorrektur, "korrektur", "Strg+.")
 menueBefehl(miPlugVerwalten, "plugins_verwalten", "") : menueBefehl(miPlugNeu, "plugins_neu", "")
-menueBefehl(miPlugOrdner, "plugins_ordner", "") : menueBefehl(miLeistenZurueck, "leisten_zurueck", "")
+menueBefehl(miPlugOrdner, "plugins_ordner", "") : menueBefehl(miPlugAnlegen, "plugin_anlegen", "") : menueBefehl(miLeistenZurueck, "leisten_zurueck", "")
 menueBefehl(miSchnipsel, "schnipsel", "Strg+J") : menueBefehl(miEinstellungen, "einstellungen", "Strg+U") : menueBefehl(miBefehle, "befehle", "Strg+F3")
 menueBefehl(miPeek, "peek", "Alt+F12") : menueBefehl(miSymbole, "symbole", "Strg+Umschalt+S") : menueBefehl(miErsProjekt, "ersetzen_projekt", "Strg+Umschalt+H")
 menueBefehl(miAusgabeSuche, "ausgabe_suchen", "Strg+Umschalt+A") : menueBefehl(miMarkeNaechste, "marke_naechste", "Strg+Umschalt+N") : menueBefehl(miMarkeEnden, "marken_enden", "Strg+Umschalt+I")

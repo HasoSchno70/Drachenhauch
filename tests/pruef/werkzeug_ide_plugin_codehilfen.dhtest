@@ -7,8 +7,9 @@
 '
 ' Die Beilage plugin.dh bindet das Plugin aus examples/ ein; es laeuft im
 ' Fallordner unter _programm/plugins/schreibweise und schreibt seine
-' erlaubt.txt dorthin, nicht ins Repository. Die Maus kommt aus einer
-' Aufnahme (Helfer _hilfen/idemaus.dh), alles andere ruft der Einschub.
+' erlaubt.txt in seinen Datenordner _programm/plugin-daten/schreibweise.
+' Die Maus kommt aus einer Aufnahme (Helfer _hilfen/idemaus.dh), alles
+' andere ruft der Einschub.
 --- langsam
 
 === befund korrektur hover und kontextmenue eines plugins
@@ -65,13 +66,13 @@ IF prSchritt = 3 AND prB - prSeit > 5 THEN
     befehl(ctxKennung[ARRAY_INDEXOF(ctxKennung, "plugin:schreibweise:erlauben")])
     prSchritt = 4 : prSeit = prB
 END IF
-IF prSchritt = 4 AND FILEEXISTS("plugins/schreibweise/erlaubt.txt") THEN
+IF prSchritt = 4 AND FILEEXISTS("plugin-daten/schreibweise/erlaubt.txt") THEN
     ' Nach dem Erlauben sendet das Plugin neu -- Zeile 1 ist kein Befund mehr.
     sichern(aktiverTab, FALSE)
     prSchritt = 5 : prSeit = prB
 END IF
 IF prSchritt = 5 AND prB - prSeit > 20 AND prProbleme$() = "" THEN
-    protokoll("pr erlaubt " + TRIM$(READLINES("plugins/schreibweise/erlaubt.txt")[0]) + " probleme leer")
+    protokoll("pr erlaubt " + TRIM$(READLINES("plugin-daten/schreibweise/erlaubt.txt")[0]) + " probleme leer")
     EXIT(0)
 END IF
 IF prB > 900 THEN protokoll("pr zeit um bei schritt " + STR$(prSchritt) + " " + prProbleme$()) : EXIT(0)
