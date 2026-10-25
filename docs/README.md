@@ -131,6 +131,7 @@ Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie e
 - **[Entwurf: Eingabemethoden (IME)](entwurf-eingabemethoden.md)** — gemessen: der Speicher ist Unicode, die Anzeige Latin-1 (das Euro-Zeichen ist ein Fragezeichen); Wege Zeichenvorrat, Umwandlungsfenster, Preedit, SDL; Empfehlung: erst sehen, dann tippen
 - **[Entwurf: Barrierefreiheit](entwurf-barrierefreiheit.md)** — der UIA-Baum eines dhrt-Fensters ist leer, gemessen; AccessKit, Sprachausgabe und Handwerk als Wege; Empfehlung: Handwerk sofort, dann AccessKit mit Windows zuerst
 - **[Entwurf: Drucken](entwurf-drucken.md)** — kein raylib fuers Papier: geprüfte Bausteine, vier Wege; Empfehlung: die Seite selbst zeichnen (GDI/CUPS als Ziele des pdf-Moduls), dazu ein Befehl, der eine Datei öffnet
+- **[Release 2026.36](release-2026.36.md)** — was in dieser Fassung neu ist
 - **[Release 2026.35](release-2026.35.md)** — was in dieser Fassung neu ist
 - **[Release 2026.34](release-2026.34.md)** — was in dieser Fassung neu ist
 - **[Release 2026.33](release-2026.33.md)** — die Fassung davor
