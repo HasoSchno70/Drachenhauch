@@ -65,7 +65,7 @@ happen *next to* a game — tools, reports, small services:
 | **Larger programs** | namespaces (`IMPORT "math.dh" AS math`), `PRIVATE`, `TRY`/`CATCH`/`FINALLY` with error codes, inheritance with `SUPER` and `ABSTRACT`, `ASSERT_EQ` |
 | **Foreign libraries** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — call the Windows API, the C library or device drivers directly, with pointers, structs and callbacks; even embed Python with numpy ([more, in German](docs/en/ffi.md)) |
 | **In the background** | HTTP, database, external programs and **your own functions** (`TASK_START`) — the main loop keeps running |
-| **Panels and plugins** | `GUI_DOCK` arranges panels on the left, right and bottom, as tabs or floating; the IDE and Glutfaden load your own Drachenhauch programs as plugins ([more](docs/en/ide-plugins.md)) |
+| **Panels and plugins** | `GUI_DOCK` arranges panels on the left, right and bottom, as tabs or floating; the IDE and Glutfaden load your own Drachenhauch programs as plugins; the IDE also fetches them from GitHub or a ZIP, ships three and tests them without a window ([more](docs/en/ide-plugins.md)) |
 
 None of it needs a window. A Drachenhauch program can be a console
 application, a cron job or a game — same language.
@@ -75,7 +75,7 @@ Details in the [manual](docs/en/README.md); how it got there is in the
 
 ## Download
 
-**[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 56 MB, currently version 2026.36.
+**[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 56 MB, currently version 2026.37.
 
 You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 226 examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
 
