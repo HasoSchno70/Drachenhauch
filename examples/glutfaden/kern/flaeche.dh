@@ -165,10 +165,17 @@ FUNCTION gedimmt(farbe AS INTEGER, stoff AS INTEGER, a AS INTEGER) AS INTEGER
     DIM r AS INTEGER : r = (stoff SHR 16) BAND 255
     DIM g AS INTEGER : g = (stoff SHR 8) BAND 255
     DIM b AS INTEGER : b = stoff BAND 255
-    r = r + (((farbe SHR 16) BAND 255) - r) * d \ 255
-    g = g + (((farbe SHR 8) BAND 255) - g) * d \ 255
-    b = b + ((farbe BAND 255) - b) * d \ 255
+    r = r + richtungNull(((farbe SHR 16) BAND 255) - r, d)
+    g = g + richtungNull(((farbe SHR 8) BAND 255) - g, d)
+    b = b + richtungNull((farbe BAND 255) - b, d)
     RETURN (r SHL 16) BOR (g SHL 8) BOR b
+END FUNCTION
+
+' (unterschied * d) / 255, Richtung null abgeschnitten -- `\` rundet nach
+' unten, ein dunklerer Ton wuerde damit um eins dunkler als bisher.
+FUNCTION richtungNull(unterschied AS INTEGER, d AS INTEGER) AS INTEGER
+    IF unterschied < 0 THEN RETURN -((-unterschied * d) \ 255)
+    RETURN unterschied * d \ 255
 END FUNCTION
 
 ' --- Kachel-Vorschau ------------------------------------------------------------------

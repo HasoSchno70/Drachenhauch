@@ -31,9 +31,10 @@ PRINT 7 \ 2
 3
 
 === arithmetic (7)
+' `\` rundet nach unten wie FLOOR (seit 2026.38, vorher -3)
 PRINT -7 \ 2
 --- erwartet
--3
+-4
 
 === arithmetic type errors (1)
 DIM t AS BOOLEAN
