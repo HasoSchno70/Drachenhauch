@@ -191,7 +191,7 @@ Fuer prozedurale Sounds ohne Audio-Files. Liefert ein `SOUND`-Objekt, das du wie
 |---|---|
 | `AUDIO_TONE(freq_hz, dauer_ms[, waveform$[, vol]])` | Sine/Square/Saw/Triangle-Ton |
 | `AUDIO_NOISE(dauer_ms[, vol])` | Weisses Rauschen |
-| `AUDIO_NOTE(wf$, freq, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, vib_depth, vib_speed, detune_cents, slide_halbtoene])` | eine gehaltene Note mit echter ADSR-Hüllkurve, Vibrato, Detune-Schicht und Portamento — das Instrument für Tracker und Musik |
+| `AUDIO_NOTE(wf$, freq, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, vib_depth, vib_speed, detune_cents, slide_halbtoene])` | eine gehaltene Note mit echter ADSR-Hüllkurve, Vibrato, Detune-Schicht und Portamento — das Instrument für Tracker und Musik; `vib_depth` ist ein Anteil der Frequenz (0.005 = ±0,5 %), keine Halbtöne |
 
 **Waveforms** (case-insensitive): `"sine"`, `"square"`, `"saw"`, `"triangle"`, `"noise"`.
 
@@ -228,6 +228,7 @@ AUDIO_SFX(waveform$, freq, slide, attack_ms, sustain_ms, decay_ms,
 
 | Argument | Wirkung |
 |---|---|
+| `vib_depth` / `vib_speed` | Vibrato: die Frequenz schwankt `vib_speed`-mal je Sekunde um den **Faktor** `1 ± vib_depth`. `vib_depth` ist also ein Anteil der Frequenz, keine Halbtöne: 0.003..0.006 klingt wie ein natürliches Vibrato (±5..10 Cent), 0.06 sind schon ±1 Halbton, 0.12 rund ±2 Halbtöne (das leiert). 0 = aus. |
 | `duty` | Pulsbreite der `square`-Welle (0.05..0.95; **0.5 = symmetrisch = wie bisher**). Schmaler = duenner/naeselnder SID-Puls. |
 | `pwm_depth` / `pwm_speed` | Pulsbreiten-**Modulation** (PWM): die Pulsbreite pendelt mit `pwm_speed` Hz um `duty` — der typische SID-Schimmer. |
 | `flt_cutoff` | Grenzfrequenz des resonanten Tiefpasses in Hz (**0 = aus**). |
@@ -260,7 +261,7 @@ AUDIO_NOTE(waveform$, freq, dauer_ms, attack_ms, decay_ms, sustain, release_ms, 
 | `attack_ms` / `decay_ms` | Anstieg auf voll, dann Abfall auf den Sustain-Pegel |
 | `sustain` | der Pegel 0..1, der danach **bleibt** — bei `0.0` verstummt die Note nach dem Decay, egal wie lange sie gehalten wird (Klavier); bei `1.0` bleibt sie voll (Orgel) |
 | `release_ms` | das Ausklingen — es hängt **hinten an**, der Klang ist also `dauer_ms + release_ms` lang und überlappt die nächste Note wie bei einem echten Synthesizer |
-| `vib_depth` / `vib_speed` | Vibrato wie bei `AUDIO_SFX` |
+| `vib_depth` / `vib_speed` | Vibrato wie bei `AUDIO_SFX`: `vib_depth` ist der **Faktor** der Frequenz (0.005 = ±0,5 % ≈ ±9 Cent, fein; 0.06 = ±1 Halbton), `vib_speed` in Hz |
 | `detune_cents` | eine zweite, um so viele Cent verstimmte Schicht darunter (Chorus) — aus einer nackten Wellenform wird ein Instrument |
 | `slide_halbtoene` | Portamento: die Tonhöhe gleitet über die gehaltene Zeit zum Ziel, in Halbtönen und exponentiell (musikalisch gleichmäßig), nicht in Hz/s wie bei `AUDIO_SFX` |
 
@@ -270,7 +271,7 @@ DIM piano AS SOUND
 piano = AUDIO_NOTE("triangle", 261.6, 500, 2, 700, 0.0, 200, 0.8, 0, 0, 6)
 ' Eine Orgel: bleibt, solange gehalten
 DIM orgel AS SOUND
-orgel = AUDIO_NOTE("square", 261.6, 500, 6, 0, 1.0, 70, 0.6, 0.06, 6, 5)
+orgel = AUDIO_NOTE("square", 261.6, 500, 6, 0, 1.0, 70, 0.6, 0.005, 6, 5)
 ```
 
 Der Tracker in Drachenhauch (`examples/190_tracker.dh`) baut jede Note so.

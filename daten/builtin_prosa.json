@@ -117,7 +117,7 @@
   "AUDIO_MUSIC_SET_VOLUME": "AUDIO_MUSIC_VOLUME(v)",
   "AUDIO_MUSIC_STOP": "stoppen, optional ausfaden (nicht-blockierend)",
   "AUDIO_NOISE": "Weisses Rauschen",
-  "AUDIO_NOTE": "eine gehaltene Note mit echter ADSR-Hüllkurve, Vibrato, Detune-Schicht und Portamento — das Instrument für Tracker und Musik",
+  "AUDIO_NOTE": "eine gehaltene Note mit echter ADSR-Hüllkurve, Vibrato, Detune-Schicht und Portamento — das Instrument für Tracker und Musik; vib_depth ist ein Anteil der Frequenz (0.005 = ±0,5 %), keine Halbtöne",
   "AUDIO_NUM_CHANNELS": "aktuelle Channel-Anzahl",
   "AUDIO_PAN": "Stereo-Pan (beide 0..1)",
   "AUDIO_PAN_POS": "Position direkt setzen (beendet eine laufende Animation)",

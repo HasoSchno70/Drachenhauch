@@ -118,7 +118,7 @@
   "AUDIO_MUSIC_SET_VOLUME": "AUDIO_MUSIC_VOLUME(v)",
   "AUDIO_MUSIC_STOP": "stop, optionally fade out (non-blocking)",
   "AUDIO_NOISE": "white noise",
-  "AUDIO_NOTE": "a held note with a real ADSR envelope, vibrato, detune layer and portamento — the instrument for trackers and music",
+  "AUDIO_NOTE": "a held note with a real ADSR envelope, vibrato, detune layer and portamento — the instrument for trackers and music; vib_depth is a fraction of the frequency (0.005 = ±0.5 %), not semitones",
   "AUDIO_NUM_CHANNELS": "current channel count",
   "AUDIO_PAN": "stereo pan (both 0..1)",
   "AUDIO_PAN_POS": "set the position directly (ends a running animation)",
