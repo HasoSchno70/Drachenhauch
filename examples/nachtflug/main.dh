@@ -2,15 +2,18 @@
 '
 ' Die Musik (musik.dh) ist ganz synthetisiert -- Trance in A-Moll, 128 Schlaege
 ' je Minute, in Stereo, knapp drei Minuten. Die Bilder folgen ihr: jede
-' Szene gehoert zu einem Abschnitt des Stuecks, und alles, was pulsiert,
-' pulsiert mit der Bassdrum. Gezeichnet wird in 1280x720; die Szenen 1 bis 4
-' rechnet je ein Fragment-Shader (Raymarching), die fuenfte ist eine echte
-' 3D-Szene der Laufzeit.
+' Szene gehoert zu einem Abschnitt des Stuecks, was pulsiert, pulsiert mit
+' der Bassdrum, was aufblitzt, blitzt mit der Melodie, und die Farbe geht
+' mit dem Akkord. Die Szenen gehen durch Licht ineinander ueber. Gezeichnet
+' wird in 1280x720; die Szenen 1 bis 4 rechnet je ein Fragment-Shader
+' (Raymarching, assets/shader), die fuenfte ist eine echte 3D-Szene.
 '
 '     dhrt run main.dh                    ' im Vollbild, von vorn
 '     dhrt run main.dh -- --fenster       ' im Fenster
 '     dhrt run main.dh -- --ab 32         ' ab Takt 32
-'     dhrt run main.dh -- --wav datei.wav ' nur die Musik als WAV schreiben
+'     dhrt run main.dh -- --wav datei.wav ' nur die Musik als WAV schreiben (trocken)
+'     dhrt run main.dh -- --mitschnitt datei.wav  ' abspielen und mitschneiden,
+'                                         ' so wie man es hoert (mit Hall)
 '
 ' ESC beendet, F11 schaltet das Vollbild.
 IMPORT "g3d"
@@ -25,6 +28,7 @@ DIM abTakt AS INTEGER
 DIM imFenster AS BOOLEAN
 DIM wavZiel AS STRING
 DIM messen AS BOOLEAN
+DIM mitschnitt AS STRING
 DIM ai AS INTEGER
 WHILE ai < ARGC()
     SELECT CASE ARG$(ai)
@@ -36,6 +40,8 @@ WHILE ai < ARGC()
             messen = TRUE
         CASE "--wav"
             ai = ai + 1 : wavZiel = ARGPATH$(ai)
+        CASE "--mitschnitt"
+            ai = ai + 1 : mitschnitt = ARGPATH$(ai)
     END SELECT
     ai = ai + 1
 WEND
@@ -55,7 +61,7 @@ DIM schrift AS INTEGER : schrift = LOADFONT("sans", 32)
 
 ' --- Shader ------------------------------------------------------------------
 FUNCTION shader(name AS STRING) AS INTEGER
-    DIM h AS INTEGER : h = SHADER_LOAD("shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
     IF h < 0 THEN THROW "Shader " + name + " liess sich nicht laden"
     SHADER_SET2(h, "resolution", BREITE, HOEHE)
     RETURN h
@@ -130,7 +136,7 @@ FUNCTION umlauf(r AS FLOAT) AS FLOAT
     RETURN 0.9 / (r + 2.0)
 END FUNCTION
 
-SUB galaxieZeichnen(zeit AS FLOAT, kick AS FLOAT, fort AS FLOAT, takt AS FLOAT)
+SUB galaxieZeichnen(zeit AS FLOAT, kick AS FLOAT, fort AS FLOAT, takt AS FLOAT, ton AS FLOAT)
     ' Kamera: von hoch oben ueber der Scheibe in einem Bogen hinab, bis knapp
     ' ueber die Arme
     DIM kw AS FLOAT : kw = 0.6 + zeit * 0.05
@@ -143,12 +149,17 @@ SUB galaxieZeichnen(zeit AS FLOAT, kick AS FLOAT, fort AS FLOAT, takt AS FLOAT)
     LIGHT_AMBIENT(RGB(255, 255, 255), 1.0)
     ' die Welle: auf jeden Schlag ein Ring, der in einer Viertel nach aussen laeuft
     DIM welle AS FLOAT : welle = (takt * 4.0 - FLOOR(takt * 4.0)) * 36.0
+    ' die Melodie: jeder Ton laesst einen Ring aufleuchten -- je hoeher der
+    ' Ton, desto weiter aussen
+    DIM melRing AS FLOAT : melRing = 4.0 + tonHoehe * 24.0
     DIM i AS INTEGER
     FOR i = 0 TO STERNE - 1
         DIM r AS FLOAT : r = gR[i]
         DIM w AS FLOAT : w = gW[i] - zeit * umlauf(r)
         DIM abst AS FLOAT : abst = r - welle
         DIM hub AS FLOAT : hub = EXP(-abst * abst * 0.08) * (0.25 + 0.75 * kick)
+        DIM mabst AS FLOAT : mabst = r - melRing
+        hub = hub + EXP(-mabst * mabst * 0.12) * ton * 0.9
         ' die Spur: so lang, wie der Stern in einer Drittelsekunde wandert
         DIM lang AS FLOAT : lang = 0.25 + umlauf(r) * r * 2.6 * (1.0 + 0.6 * hub)
         DIM d AS FLOAT : d = gD[i] * (1.0 + hub)
@@ -205,17 +216,43 @@ SUB beschriftung(takt AS FLOAT)
 END SUB
 
 ' --- Ablauf ---------------------------------------------------------------------
-' Helligkeit einer Szene: blendet ueber einen halben Takt aus und ueber einen
-' Takt ein. Vor einem Hoehepunkt: weisser Blitz statt Schwarz (siehe glanz).
-FUNCTION blende(takt AS FLOAT, von AS FLOAT, bis AS FLOAT) AS FLOAT
-    RETURN CLAMP(MIN(takt - von, (bis - takt) * 2.0), 0.0, 1.0)
+' Szenenwechsel durch Licht: am Ende einer Szene waechst aus der Mitte ein
+' Lichtkreis, bis er das Bild fuellt; die naechste Szene erscheint aus der
+' Mitte, waehrend das Licht nach aussen weicht. Je ueber einen Takt.
+FUNCTION vorEnde(takt AS FLOAT, ende AS FLOAT) AS FLOAT
+    DIM f AS FLOAT : f = CLAMP(takt - (ende - 1.0), 0.0, 1.0)
+    RETURN f * f * (3.0 - 2.0 * f)
 END FUNCTION
+FUNCTION nachBeginn(takt AS FLOAT, beginn AS FLOAT) AS FLOAT
+    DIM f AS FLOAT : f = CLAMP(takt - beginn, 0.0, 1.0)
+    RETURN f * f * (3.0 - 2.0 * f)
+END FUNCTION
+SUB uebergang(sh AS INTEGER, aus AS FLOAT, ein AS FLOAT, r AS FLOAT, g AS FLOAT, b AS FLOAT)
+    SHADER_SET(sh, "aus", aus)
+    SHADER_SET(sh, "ein", ein)
+    SHADER_SET3(sh, "uebLicht", r, g, b)
+END SUB
+
+' Die Farbe jedes Akkords: a-Moll violett, F tuerkis, C gold, G rosa, F
+' gruenblau, G pink, e-Moll tiefblau, a-Moll hellviolett. Die Bilder ziehen
+' ihr weich nach.
+DIM akkR AS ARRAY OF FLOAT : akkR = [0.55, 0.15, 1.0, 1.0, 0.2, 1.0, 0.3, 0.75]
+DIM akkG AS ARRAY OF FLOAT : akkG = [0.3, 0.85, 0.72, 0.35, 1.0, 0.45, 0.45, 0.55]
+DIM akkB AS ARRAY OF FLOAT : akkB = [1.0, 1.0, 0.3, 0.65, 0.75, 0.8, 1.0, 1.0]
+DIM farbeR AS FLOAT : farbeR = akkR[0]
+DIM farbeG AS FLOAT : farbeG = akkG[0]
+DIM farbeB AS FLOAT : farbeB = akkB[0]
 
 musikStarten(abTakt)
+' der Mitschnitt: der fertige Mix hinter allen Effekten, so wie man ihn hoert
+IF mitschnitt <> "" THEN
+    IF mitTon THEN AUDIO_RECORD_START(400) ELSE PRINT "kein Ton -- kein Mitschnitt"
+END IF
 DIM start AS FLOAT : start = GET_TIME()
 DIM beenden AS BOOLEAN
 DIM bilder AS INTEGER
 DIM spitze AS FLOAT
+DIM letztesBild AS FLOAT : letztesBild = GET_TIME()
 
 WHILE NOT beenden
     IF QUITREQUESTED() OR KEYHIT(KEY_ESCAPE) THEN beenden = TRUE
@@ -226,42 +263,61 @@ WHILE NOT beenden
     DIM kick AS FLOAT : kick = musikKick()
     IF musikZuEnde() THEN beenden = TRUE
 
+    ' Melodie und Akkord
+    DIM melTon AS FLOAT : melTon = musikTon()
+    DIM nr AS INTEGER : nr = musikAkkord()
+    DIM jetzt AS FLOAT : jetzt = GET_TIME()
+    DIM zieh AS FLOAT : zieh = 1.0 - EXP(-(jetzt - letztesBild) * 2.5)
+    letztesBild = jetzt
+    farbeR = farbeR + (akkR[nr] - farbeR) * zieh
+    farbeG = farbeG + (akkG[nr] - farbeG) * zieh
+    farbeB = farbeB + (akkB[nr] - farbeB) * zieh
+
     CLS(BLACK)
     DIM sh AS INTEGER
     IF takt < AB_AUFBAU THEN
         sh = shOzean
-        SHADER_SET(sh, "hell", blende(takt, -1.0, AB_AUFBAU) * MIN(1.0, takt / 2.0 + 0.05))
+        SHADER_SET(sh, "hell", MIN(1.0, takt / 2.0 + 0.05))
         SHADER_SET(sh, "licht", CLAMP(takt / AB_AUFBAU, 0.0, 1.0))
         SHADER_SET(sh, "morgen", 0.0)
+        uebergang(sh, vorEnde(takt, AB_AUFBAU), 1.0, 0.55, 1.0, 0.8)
     ELSEIF takt < AB_HOCH1 THEN
         sh = shFlug
-        SHADER_SET(sh, "hell", blende(takt, AB_AUFBAU, AB_HOCH1))
+        SHADER_SET(sh, "hell", 1.0)
         SHADER_SET(sh, "fort", (takt - AB_AUFBAU) / 16.0)
+        uebergang(sh, vorEnde(takt, AB_HOCH1), nachBeginn(takt, AB_AUFBAU), IIF(takt < AB_AUFBAU + 1, 0.55, 0.5), IIF(takt < AB_AUFBAU + 1, 1.0, 0.95), IIF(takt < AB_AUFBAU + 1, 0.8, 1.0))
     ELSEIF takt < AB_PAUSE THEN
         sh = shTunnel
-        SHADER_SET(sh, "hell", blende(takt, AB_HOCH1 - 0.5, AB_PAUSE))
-        SHADER_SET(sh, "akkord", (takt / 2.0) MOD 4.0)
+        SHADER_SET(sh, "hell", 1.0)
+        uebergang(sh, vorEnde(takt, AB_PAUSE), nachBeginn(takt, AB_HOCH1), IIF(takt < AB_HOCH1 + 1, 0.5, 0.92), IIF(takt < AB_HOCH1 + 1, 0.95, 0.88), 1.0)
     ELSEIF takt < AB_HOCH2 THEN
         sh = shNebel
-        SHADER_SET(sh, "hell", blende(takt, AB_PAUSE, AB_HOCH2 + 0.3))
+        ' das Ende ist schon hell (der Nebel endet im Weiss des Hoehepunkts)
+        SHADER_SET(sh, "hell", 1.0)
         SHADER_SET(sh, "fort", (takt - AB_PAUSE) / 16.0)
+        uebergang(sh, 0.0, nachBeginn(takt, AB_PAUSE), 0.92, 0.88, 1.0)
     ELSEIF takt < AB_AUS THEN
         sh = shGlanz
-        galaxieZeichnen(zeit, kick, (takt - AB_HOCH2) / 16.0, takt)
+        galaxieZeichnen(zeit, kick, (takt - AB_HOCH2) / 16.0, takt, melTon)
         SHADER_SET3(sh, "kamera", kamX, kamY, kamZ)
         SHADER_SET(sh, "fort", (takt - AB_HOCH2) / 16.0)
-        SHADER_SET(sh, "hell", blende(takt, AB_HOCH2 - 0.5, AB_AUS))
+        SHADER_SET(sh, "hell", 1.0)
         ' der weisse Blitz auf der Eins des Hoehepunkts
         SHADER_SET(sh, "blitz", MAX(0.0, 1.0 - (takt - AB_HOCH2) * 1.5))
+        uebergang(sh, vorEnde(takt, AB_AUS), 1.0, 1.0, 0.82, 0.6)
     ELSE
         sh = shOzean
-        SHADER_SET(sh, "hell", blende(takt, AB_AUS, TAKTE + 1.5))
+        SHADER_SET(sh, "hell", CLAMP((TAKTE + 1.5 - takt) * 2.0, 0.0, 1.0))
         SHADER_SET(sh, "licht", 0.6)
         SHADER_SET(sh, "morgen", CLAMP((takt - AB_AUS) / 12.0, 0.0, 1.0))
+        uebergang(sh, 0.0, nachBeginn(takt, AB_AUS), 1.0, 0.82, 0.6)
     END IF
     SHADER_SET(sh, "time", zeit)
     SHADER_SET(sh, "kick", kick)
     SHADER_SET(sh, "takt", takt)
+    SHADER_SET(sh, "ton", melTon)
+    SHADER_SET(sh, "hoehe", tonHoehe)
+    SHADER_SET3(sh, "farbe", farbeR, farbeG, farbeB)
     beschriftung(takt)
     POSTFX(sh)
     FLIP()
@@ -271,5 +327,9 @@ WEND
 IF messen THEN
     PRINT "Bilder je Sekunde: "; FORMAT$(bilder / MAX(0.001, GET_TIME() - start), "%.1f")
     IF mitTon THEN PRINT "Spitze im Mischer: "; FORMAT$(spitze, "%.2f")
+END IF
+IF mitschnitt <> "" AND mitTon THEN
+    AUDIO_SAVE_WAV(AUDIO_RECORD_STOP(), mitschnitt)
+    PRINT "Mitschnitt: "; mitschnitt
 END IF
 musikStoppen()

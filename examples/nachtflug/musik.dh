@@ -357,6 +357,44 @@ FUNCTION lead(midi AS INTEGER, achtel AS INTEGER) AS SOUND
     RETURN merken(k, mitEcho(t, dauer + 600, -0.4, 0.32, 3))
 END FUNCTION
 
+' --- Stimme --------------------------------------------------------------------
+' Zwei Saetze, gesprochen von der Sprachausgabe des Systems (SPEAK_SOUND) und
+' hier zur Trance-Stimme gemacht: langsamer, dreifach geschichtet (die beiden
+' Seiten einen Hauch hoeher und tiefer und etwas spaeter -- ein Chor aus
+' einer Stimme) und mit langem Ping-Pong-Echo. Ohne Sprachausgabe (unter
+' Linux ohne espeak-ng) bleibt der Breakdown ohne Stimme.
+DIM saetze AS ARRAY OF STRING : saetze = ["Schließ die Augen", "Flieg mit mir durch die Nacht"]
+DIM stimmeFehlt AS BOOLEAN
+
+FUNCTION stimmeBauen(nr AS INTEGER) AS BOOLEAN
+    IF stimmeFehlt THEN RETURN FALSE
+    IF gemerkt("stimme" + STR$(nr)) >= 0 THEN RETURN TRUE
+    TRY
+        ' eine weibliche Stimme, wenn es sie gibt
+        DIM namen AS ARRAY OF STRING : namen = SPEAK_VOICES()
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(namen) - 1
+            IF INSTR(namen[i], "Katja") >= 0 THEN SPEAK_VOICE(namen[i])
+        NEXT
+        SPEAK_RATE(0.8)
+        DIM roh AS SOUND : roh = SPEAK_SOUND(saetze[nr])
+        ' ueber eine WAV zum Sample -- dann laesst sie sich verstimmen
+        DIM pfad AS STRING : pfad = TEMPFILE$("nachtflug", ".wav")
+        AUDIO_SAVE_WAV(roh, pfad)
+        DIM sm AS SAMPLE : sm = SAMPLE_LOAD(pfad)
+        DELETEFILE(pfad)
+        DIM lang AS INTEGER : lang = INT(SAMPLE_LEN(sm) * 1000)
+        DIM t AS SOUND : t = AUDIO_SOUND_NEW(lang + 300)
+        AUDIO_SOUND_MIX(t, SAMPLE_NOTE(sm, 0, lang, 60, 0, 1.0, 150, 0.8), 0, 1.0)
+        AUDIO_SOUND_MIX(t, SAMPLE_NOTE(sm, 0.12, lang, 60, 0, 1.0, 150, 0.4), 18, 1.0, -0.7)
+        AUDIO_SOUND_MIX(t, SAMPLE_NOTE(sm, -0.12, lang, 60, 0, 1.0, 150, 0.4), 31, 1.0, 0.7)
+        merken("stimme" + STR$(nr), mitEcho(t, lang + 300, -0.35, 0.42, 6))
+    CATCH fehler
+        stimmeFehlt = TRUE
+    END TRY
+    RETURN NOT stimmeFehlt
+END FUNCTION
+
 ' --- Ablauf --------------------------------------------------------------------
 DIM uhr AS AUDIO_CLOCK
 DIM mitTon AS BOOLEAN
@@ -502,6 +540,12 @@ SUB schrittPlanen(n AS INTEGER)
     ' Ausklang: das Klavier noch einmal, allein
     IF takt >= AB_AUS + 2 AND takt < AB_AUS + 10 THEN melodieSpielen(n, 1, 0.6 * laut + 0.2, 0)
 
+    ' --- Stimme --- im Breakdown zwei Saetze, im Ausklang noch einmal der zweite
+    IF s = 0 AND (takt = AB_PAUSE + 1 OR takt = AB_PAUSE + 9 OR takt = AB_AUS + 5) THEN
+        DIM sn AS INTEGER : sn = IIF(takt = AB_PAUSE + 1, 0, 1)
+        IF stimmeBauen(sn) THEN spielen(klaenge[gemerkt("stimme" + STR$(sn))], n, IIF(takt >= AB_AUS, 0.55, 0.85))
+    END IF
+
     ' --- Funken --- Glocken auf festen Stellen, die nach Zufall aussehen
     IF (takt < AB_AUFBAU OR takt >= AB_AUS) AND (n * 7919 + 13) MOD 23 = 0 THEN
         spielen(glocke(akkord[nr * 4 + (n MOD 4)] + 24), n, 0.45 * laut + 0.1)
@@ -573,6 +617,10 @@ FUNCTION vorbauen() AS BOOLEAN
         chor(i) : RETURN TRUE
     END IF
     i = i - 8
+    IF i < 2 THEN
+        stimmeBauen(i) : RETURN TRUE
+    END IF
+    i = i - 2
     IF i < 8 * 6 THEN
         DIM nr AS INTEGER : nr = i \ 6
         SELECT CASE i MOD 6
@@ -662,6 +710,41 @@ END FUNCTION
 
 FUNCTION musikZuEnde() AS BOOLEAN
     RETURN musikSchritt() >= schritteGesamt() + 24
+END FUNCTION
+
+' --- Fuer die Bilder ---------------------------------------------------------
+' Wo die Melodie klingt: dieselben Abschnitte wie in schrittPlanen
+FUNCTION melodieAktiv(takt AS INTEGER) AS BOOLEAN
+    RETURN (takt >= 8 AND takt < AB_AUFBAU) OR (takt >= AB_HOCH1 AND takt < AB_AUS) OR (takt >= AB_AUS + 2 AND takt < AB_AUS + 10)
+END FUNCTION
+
+' Huellkurve des Melodietons: 1 auf dem Anschlag, klingt ab, bleibt bei 0.3,
+' solange der Ton gehalten wird. Dabei merkt sich tonHoehe, wie hoch er
+' liegt (0 = das A unten, 1 = das hohe B).
+DIM tonHoehe AS FLOAT
+FUNCTION musikTon() AS FLOAT
+    RETURN tonBei(musikSchritt())
+END FUNCTION
+
+' dasselbe fuer einen beliebigen Schritt n (mit Bruchteil)
+FUNCTION tonBei(n AS FLOAT) AS FLOAT
+    DIM ganz AS INTEGER : ganz = INT(n)
+    IF NOT melodieAktiv(ganz \ SCHRITTE_JE_TAKT) THEN RETURN 0.0
+    DIM kreis AS INTEGER : kreis = 16 * SCHRITTE_JE_TAKT
+    DIM e AS INTEGER : e = (ganz MOD kreis) \ 2
+    WHILE e > 0 AND melodie[e] = -1
+        e = e - 1
+    WEND
+    IF melodie[e] <= 0 THEN RETURN 0.0
+    tonHoehe = CLAMP((melodie[e] - 69) / 14.0, 0.0, 1.0)
+    DIM seit AS FLOAT : seit = n - (ganz - ganz MOD kreis + e * 2)
+    IF seit >= melodieLaenge(e) * 2 THEN RETURN 0.0
+    RETURN MAX(EXP(-seit * 0.45), 0.3)
+END FUNCTION
+
+' Der Akkord, der gerade klingt (0..7)
+FUNCTION musikAkkord() AS INTEGER
+    RETURN akkordNr(INT(musikTakt()))
 END FUNCTION
 
 ' Huellkurve der Bassdrum fuer die Bilder: 1 auf dem Schlag, faellt dann.

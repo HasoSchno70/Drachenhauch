@@ -16,6 +16,12 @@ uniform float blitz;
 uniform float takt;
 uniform float fort;      // 0..1 durch den Abschnitt
 uniform vec3 kamera;     // dieselbe Kamera wie CAMERA3D in main.dh
+uniform float ton;       // Melodie: 1 auf dem Anschlag, klingt ab
+uniform float hoehe;     // wie hoch der Melodieton liegt, 0..1
+uniform vec3 farbe;      // Farbe des Akkords
+uniform float aus;       // Szenenwechsel: Licht waechst aus der Mitte (0..1)
+uniform float ein;       // ... und weicht nach aussen (0 = nur Licht, 1 = Szene)
+uniform vec3 uebLicht;   // Farbe des Lichts beim Wechsel
 out vec4 finalColor;
 
 const float FOV = 52.0;
@@ -50,12 +56,13 @@ void scheibe(vec3 p, out vec3 licht, out float staub) {
     float klumpen = fbm(q);
     float scheibeHell = exp(-r / 10.0) * (0.05 + 1.5 * arm * (0.3 + 1.1 * klumpen)) * smoothstep(40.0, 26.0, r);
     vec3 farbeArm = mix(vec3(0.45, 0.6, 1.0), vec3(0.4, 0.9, 1.0), smoothstep(0.4, 0.8, rausch(q * 0.7 + 3.0)));
-    vec3 farbe = mix(vec3(1.0, 0.78, 0.5), farbeArm, smoothstep(1.5, 9.0, r));
-    licht = farbe * scheibeHell * senk;
+    farbeArm = mix(farbeArm, farbe, 0.3);
+    vec3 fScheibe = mix(vec3(1.0, 0.78, 0.5), farbeArm, smoothstep(1.5, 9.0, r));
+    licht = fScheibe * scheibeHell * senk;
     // rosa Knoten, wo Sterne entstehen: nur auf den Armen, nur wo das Rauschen hoch ist
     licht += vec3(1.0, 0.35, 0.7) * pow(max(klumpen - 0.5, 0.0) * 2.5, 2.0) * arm * senk * smoothstep(5.0, 12.0, r) * smoothstep(32.0, 20.0, r) * 1.6;
     // Kern
-    licht += vec3(1.0, 0.85, 0.62) * exp(-r * r / 2.5) * exp(-p.y * p.y / 0.8) * (1.3 + 1.0 * kick) * (1.0 - 0.45 * fort);
+    licht += vec3(1.0, 0.85, 0.62) * exp(-r * r / 2.5) * exp(-p.y * p.y / 0.8) * (1.3 + 1.0 * kick + 0.8 * ton) * (1.0 - 0.45 * fort);
     // der Ring des Schlags
     float welle = fract(takt * 4.0) * 36.0;
     licht += vec3(0.55, 0.8, 1.0) * exp(-(r - welle) * (r - welle) * 0.12) * senk * (0.08 + 0.35 * kick) * smoothstep(36.0, 20.0, welle);
@@ -74,6 +81,34 @@ vec3 sterne(vec3 d) {
 vec3 probe(vec2 uv) {
     vec2 px = 0.5 / resolution;
     return texture(texture0, clamp(uv, px, 1.0 - px)).rgb;
+}
+
+// Szenenwechsel durch Licht (uv: zentriert, durch die Hoehe geteilt): ein
+// Kreis aus Licht -- innen weiss, am Rand in der Farbe des Wechsels -- waechst
+// aus der Mitte bzw. weicht nach aussen, dazu Strahlen wie bei einem Sprung.
+float uebHash(float x) { return fract(sin(x * 91.7) * 43758.5453); }
+vec3 uebergang(vec3 c, vec2 uv) {
+    float r = length(uv);
+    float maske;
+    float k;
+    if (aus > 0.0) {
+        float R = aus * 1.7;
+        maske = 1.0 - smoothstep(R - 0.6, R, r);
+        k = aus;
+    } else if (ein < 1.0) {
+        float R = ein * 1.7;
+        maske = smoothstep(R - 0.6, R, r);
+        k = 1.0 - ein;
+    } else {
+        return c;
+    }
+    vec3 l = mix(uebLicht, vec3(1.0), exp(-r * 2.2)) * 1.05;
+    c = mix(c, l, maske * 0.9);
+    float a = atan(uv.y, uv.x);
+    float id = floor(a * 60.0);
+    float strahl = pow(uebHash(id), 5.0) * (0.6 + 0.4 * sin(time * 2.5 + id * 1.7));
+    c += mix(uebLicht, vec3(1.0), 0.5) * strahl * k * smoothstep(0.08, 0.7, r) * 0.5;
+    return c;
 }
 
 void main() {
@@ -146,5 +181,6 @@ void main() {
     c = c / (1.0 + 0.4 * c);
     c = pow(c, vec3(0.95));
     c = mix(c, vec3(1.0, 0.97, 0.92), clamp(blitz, 0.0, 1.0) * 0.85);
+    c = uebergang(c, m * vec2(resolution.x / resolution.y, 1.0));
     finalColor = vec4(c * hell, 1.0);
 }

@@ -5,7 +5,9 @@
 ' Stereo, Laenge, Spitze, laut im Hoehepunkt, still am Ende. Die Bilder:
 ' jede Szene einmal ab ihrem Takt, das Bildschirmfoto darf weder schwarz
 ' noch weiss sein -- ein Shader, der nicht uebersetzt, liefert Schwarz (und
-' main.dh bricht ab), eine verdrehte Blende Weiss.
+' main.dh bricht ab), eine verdrehte Blende Weiss. Dazu: der Szenenwechsel
+' durch Licht, die Huellkurve der Melodie fuer die Bilder und der
+' Mitschnitt (nur mit Soundkarte).
 --- langsam
 
 === die musik ist stereo und hat ihre form
@@ -31,8 +33,8 @@ pegel 175600 176400 < 0.005
 --- programm ../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
 IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
---- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/shader/" + name + ".fs")
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -65,8 +67,8 @@ nicht schwarz TRUE, nicht weiss TRUE
 --- programm ../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
 IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
---- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/shader/" + name + ".fs")
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -98,8 +100,8 @@ nicht schwarz TRUE, nicht weiss TRUE
 --- programm ../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
 IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
---- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/shader/" + name + ".fs")
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -131,8 +133,8 @@ nicht schwarz TRUE, nicht weiss TRUE
 --- programm ../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
 IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
---- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/shader/" + name + ".fs")
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -164,8 +166,8 @@ nicht schwarz TRUE, nicht weiss TRUE
 --- programm ../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
 IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
---- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/shader/" + name + ".fs")
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -197,8 +199,8 @@ nicht schwarz TRUE, nicht weiss TRUE
 --- programm ../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
 IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
---- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/shader/" + name + ".fs")
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -225,3 +227,84 @@ PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
 IMPORT "pruefen.dh"
 --- erwartet
 nicht schwarz TRUE, nicht weiss TRUE
+
+=== der szenenwechsel geht durch licht
+' kurz vor Takt 16 fuellt das Licht des Wechsels das Bild -- ohne den
+' Uebergang waere es dort so dunkel wie der Ozean (Mittel um 30)
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+15
+--- umgebung
+DHRT_FRAMES=80
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- nachher
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+PRINT "hell "; s / (32 * 18 * 3) > 120
+--- erwartet
+hell TRUE
+
+=== die bilder folgen der melodie
+' die Huellkurve des Melodietons: 1 auf dem Anschlag (Takt 32, das E),
+' dann abklingend, 0.3 solange gehalten, 0 in einer Pause und in Takten
+' ohne Melodie; tonHoehe sagt, wie hoch der Ton liegt
+IMPORT "musik_hier.dh"
+PRINT FORMAT$(tonBei(512), "%.2f"); " "; FORMAT$(tonHoehe, "%.2f")
+PRINT FORMAT$(tonBei(514), "%.2f")
+PRINT FORMAT$(tonBei(517.5), "%.2f")
+PRINT FORMAT$(tonBei(518), "%.2f"); " "; FORMAT$(tonHoehe, "%.2f")
+PRINT FORMAT$(tonBei(320), "%.2f")
+PRINT FORMAT$(tonBei(32 * 16 + 15 * 16 + 12), "%.2f")
+PRINT melodieAktiv(10); " "; melodieAktiv(20); " "; melodieAktiv(50); " "; melodieAktiv(81)
+--- datei musik_hier.dh
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- erwartet
+1.00 0.50
+0.41
+0.30
+1.00 0.36
+0.00
+0.00
+TRUE FALSE TRUE FALSE
+
+=== der mitschnitt ist stereo
+' nur mit Soundkarte: der Mitschnitt nimmt den Mischer auf
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+90
+--mitschnitt
+{fall}/mit.wav
+--- nachher
+IF NOT FILEEXISTS("mit.wav") THEN
+    PRINT "UEBERSPRINGEN: kein Ton, kein Mitschnitt"
+    END
+END IF
+DIM w AS BUFFER : w = READALL_BYTES("mit.wav")
+PRINT "RIFF "; BUFFER_GET(w, 0) = 82 AND BUFFER_GET(w, 8) = 87
+PRINT "kanaele "; BUFFER_GET_U16(w, 22)
+PRINT "laenger als 4 s "; BUFFER_LEN(w) > BUFFER_GET_U32(w, 28) * 4
+--- erwartet
+RIFF TRUE
+kanaele 2
+laenger als 4 s TRUE

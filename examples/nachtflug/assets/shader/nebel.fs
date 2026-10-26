@@ -11,6 +11,12 @@ uniform float hell;
 uniform float kick;
 uniform float takt;
 uniform float fort;      // 0..1 durch den Abschnitt
+uniform float ton;       // Melodie: 1 auf dem Anschlag, klingt ab
+uniform float hoehe;     // wie hoch der Melodieton liegt, 0..1
+uniform vec3 farbe;      // Farbe des Akkords
+uniform float aus;       // Szenenwechsel: Licht waechst aus der Mitte (0..1)
+uniform float ein;       // ... und weicht nach aussen (0 = nur Licht, 1 = Szene)
+uniform vec3 uebLicht;   // Farbe des Lichts beim Wechsel
 out vec4 finalColor;
 
 float hash(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
@@ -43,6 +49,34 @@ vec3 sterne(vec2 uv) {
     return vec3(0.8, 0.85, 1.0) * st * (0.6 + 0.4 * sin(time * 2.0 + h * 50.0));
 }
 
+// Szenenwechsel durch Licht (uv: zentriert, durch die Hoehe geteilt): ein
+// Kreis aus Licht -- innen weiss, am Rand in der Farbe des Wechsels -- waechst
+// aus der Mitte bzw. weicht nach aussen, dazu Strahlen wie bei einem Sprung.
+float uebHash(float x) { return fract(sin(x * 91.7) * 43758.5453); }
+vec3 uebergang(vec3 c, vec2 uv) {
+    float r = length(uv);
+    float maske;
+    float k;
+    if (aus > 0.0) {
+        float R = aus * 1.7;
+        maske = 1.0 - smoothstep(R - 0.6, R, r);
+        k = aus;
+    } else if (ein < 1.0) {
+        float R = ein * 1.7;
+        maske = smoothstep(R - 0.6, R, r);
+        k = 1.0 - ein;
+    } else {
+        return c;
+    }
+    vec3 l = mix(uebLicht, vec3(1.0), exp(-r * 2.2)) * 1.05;
+    c = mix(c, l, maske * 0.9);
+    float a = atan(uv.y, uv.x);
+    float id = floor(a * 60.0);
+    float strahl = pow(uebHash(id), 5.0) * (0.6 + 0.4 * sin(time * 2.5 + id * 1.7));
+    c += mix(uebLicht, vec3(1.0), 0.5) * strahl * k * smoothstep(0.08, 0.7, r) * 0.5;
+    return c;
+}
+
 void main() {
     vec2 uv = (fragTexCoord * resolution - 0.5 * resolution) / resolution.y;
     float schub = pow(max(fort - 0.5, 0.0) * 2.0, 3.0);
@@ -63,10 +97,10 @@ void main() {
         float dunkel = smoothstep(0.4, 0.75, staub(p * 0.35 + 11.0));
         // Farbe aus einem zweiten Feld: Magenta <-> Tuerkis, Gold in den hellsten Faeden
         float mischung = rausch(q * 0.7 + 21.0);
-        vec3 farbe = mix(vec3(1.0, 0.15, 0.6), vec3(0.1, 0.8, 1.0), smoothstep(0.3, 0.7, mischung));
-        farbe = mix(farbe, vec3(1.0, 0.75, 0.35), smoothstep(0.85, 1.1, f));
+        vec3 fGas = mix(vec3(1.0, 0.15, 0.6), vec3(0.1, 0.8, 1.0), smoothstep(0.3, 0.7, mischung));
+        fGas = mix(fGas, vec3(1.0, 0.75, 0.35), smoothstep(0.85, 1.1, f));
         float naehe = exp(-t * 0.05);
-        sammel += farbe * leucht * durch * 0.7 * (0.6 + 0.4 * naehe) * (1.0 + 0.4 * kick);
+        sammel += mix(fGas, farbe, 0.3) * leucht * durch * 0.7 * (0.6 + 0.4 * naehe) * (1.0 + 0.4 * kick + 0.7 * ton);
         durch *= 1.0 - dunkel * 0.16 - leucht * 0.04;
         if (durch < 0.02) break;
         t += 0.22 + t * 0.035;
@@ -75,7 +109,7 @@ void main() {
     // Kern: waechst im Aufstieg, pulsiert leise
     float kern = smoothstep(0.35, 1.0, fort);
     float r = length(uv);
-    c += vec3(1.0, 0.85, 0.65) * exp(-r * (18.0 - 12.0 * kern)) * (0.15 + 1.6 * kern);
+    c += vec3(1.0, 0.85, 0.65) * exp(-r * (18.0 - 12.0 * kern)) * (0.15 + 1.6 * kern + 0.5 * ton);
     float w = atan(uv.y, uv.x);
     float strahl = pow(0.5 + 0.5 * sin(w * 19.0 + time * 0.15) * sin(w * 11.0 - time * 0.1), 8.0);
     c += vec3(1.0, 0.8, 0.6) * strahl * exp(-r * 2.8) * kern * 0.5;
@@ -83,6 +117,7 @@ void main() {
     c += (hash2(fragTexCoord * resolution + time) - 0.5) * 0.012;
     c = c / (1.0 + c);
     c = pow(c, vec3(1.1));
+    c = uebergang(c, uv);
     // ganz am Ende: hell werden, hinein in den weissen Blitz des Hoehepunkts
     c = mix(c, vec3(1.0, 0.97, 0.92), smoothstep(0.94, 1.0, fort));
     vec3 oberlage = texture(texture0, fragTexCoord).rgb;
