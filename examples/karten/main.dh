@@ -1,0 +1,749 @@
+' karten -- eine Landkarte aus OpenStreetMap-Kacheln.
+'
+' Ziehen verschiebt, das Mausrad zoomt um den Punkt unter dem Zeiger, ein
+' Doppelklick zoomt hinein, ein Rechtsklick setzt einen Marker. Rechts: Orte
+' suchen (Nominatim), eine GPX-Spur mit Laenge, Auf- und Abstieg und
+' Hoehenprofil, die Marker. Die Ansicht laesst sich als Bild oder PDF sichern
+' und drucken.
+'
+'     dhrt run main.dh -- [spur.gpx] [--ort breite,laenge,zoom]
+'                         [--kacheln URL] [--suche URL] [--daten ORDNER]
+'
+' Kacheln liegen im Zwischenspeicher unter <daten>/kacheln -- was einmal
+' geladen war, ist auch ohne Netz zu sehen. Die Server von OpenStreetMap sind
+' fuer massvollen Gebrauch da: dieses Programm holt hoechstens vier Kacheln
+' zugleich, nennt sich mit eigenem Namen und holt keine Kachel zweimal.
+IMPORT "gui"
+IMPORT "chart"
+IMPORT "pdf"
+IMPORT "imgfx"
+IMPORT "json"
+IMPORT "html"
+IMPORT "kern.dh"
+IMPORT "kacheln.dh"
+
+CONST BREITE = 1200
+CONST HOEHE = 800
+CONST SEITE = 310                ' Breite der rechten Spalte
+CONST ZOOM_MIN = 2
+CONST ZOOM_MAX = 19
+CONST KENNUNG = "Drachenhauch-Karten/1.0 (Beispielprogramm; https://github.com/HasoSchno70/Drachenhauch)"
+CONST ZUSCHREIBUNG = "© OpenStreetMap-Mitwirkende"
+CONST FARBE_SPUR = &HD02870
+CONST FARBE_MARKER = &HE03020
+
+' --- Argumente ------------------------------------------------------------
+DIM gpxStart AS STRING
+DIM kachelUrl AS STRING
+DIM sucheUrl AS STRING : sucheUrl = "https://nominatim.openstreetmap.org/search?format=json&limit=8&q={q}"
+DIM datenOrdner AS STRING
+DIM ortVorgabe AS STRING
+DIM ai AS INTEGER
+WHILE ai < ARGC()
+    SELECT CASE ARG$(ai)
+        CASE "--kacheln"
+            ai = ai + 1 : kachelUrl = ARG$(ai)
+        CASE "--suche"
+            ai = ai + 1 : sucheUrl = ARG$(ai)
+        CASE "--daten"
+            ai = ai + 1 : datenOrdner = ARGPATH$(ai)
+        CASE "--ort"
+            ai = ai + 1 : ortVorgabe = ARG$(ai)
+        CASE ELSE
+            gpxStart = ARGPATH$(ai)
+    END SELECT
+    ai = ai + 1
+WEND
+IF datenOrdner = "" THEN
+    DIM basis AS STRING : basis = GETENV$("LOCALAPPDATA")
+    IF basis = "" THEN basis = PATHJOIN(GETENV$("HOME"), ".cache")
+    datenOrdner = PATHJOIN(PATHJOIN(basis, "Drachenhauch"), "karten")
+END IF
+IF NOT DIREXISTS(datenOrdner) THEN MKDIR(datenOrdner)
+kachelnEinrichten(kachelUrl, PATHJOIN(datenOrdner, "kacheln"), KENNUNG)
+
+SCREEN(BREITE, HOEHE, "Karten", 1)
+SETFPS(60)
+WINDOW_RESIZABLE(TRUE)
+WINDOW_MIN_SIZE(800, 520)
+DIM schrift AS INTEGER : schrift = LOADFONT("sans", 32)
+SETFONT(schrift, 16)
+
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("Karten", 0, 0, BREITE, HOEHE)
+GUI_WINDOW_CHROME(win, FALSE)
+
+DIM mDatei AS INTEGER : mDatei = GUI_MENU(win, "Datei")
+DIM miGpx AS INTEGER : miGpx = GUI_MENU_ITEM(mDatei, "GPX-Spur öffnen ...", "Strg+O")
+DIM miMarkerGpx AS INTEGER : miMarkerGpx = GUI_MENU_ITEM(mDatei, "Marker als GPX sichern ...", "Strg+S")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miBild AS INTEGER : miBild = GUI_MENU_ITEM(mDatei, "Ansicht als Bild sichern ...", "Strg+B")
+DIM miPdf AS INTEGER : miPdf = GUI_MENU_ITEM(mDatei, "Als PDF sichern ...", "Strg+E")
+DIM miDruck AS INTEGER : miDruck = GUI_MENU_ITEM(mDatei, "Drucken ...", "Strg+P")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miEnde AS INTEGER : miEnde = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
+DIM mAnsicht AS INTEGER : mAnsicht = GUI_MENU(win, "Ansicht")
+DIM miRein AS INTEGER : miRein = GUI_MENU_ITEM(mAnsicht, "Vergrößern", "Strg+Plus")
+DIM miRaus AS INTEGER : miRaus = GUI_MENU_ITEM(mAnsicht, "Verkleinern", "Strg+Minus")
+DIM miSpurZeigen AS INTEGER : miSpurZeigen = GUI_MENU_ITEM(mAnsicht, "Ganze Spur zeigen", "Strg+0")
+GUI_MENU_SEPARATOR(mAnsicht)
+DIM miLeeren AS INTEGER : miLeeren = GUI_MENU_ITEM(mAnsicht, "Zwischenspeicher leeren")
+DIM mMarker AS INTEGER : mMarker = GUI_MENU(win, "Marker")
+DIM miMarkerWeg AS INTEGER : miMarkerWeg = GUI_MENU_ITEM(mMarker, "Gewählten Marker entfernen")
+DIM miMarkerAlle AS INTEGER : miMarkerAlle = GUI_MENU_ITEM(mMarker, "Alle Marker entfernen")
+
+DIM innenH AS INTEGER : innenH = GUI_WINDOW_CONTENT_H(win)
+DIM rechts AS INTEGER : rechts = BREITE - SEITE + 8
+DIM cvKarte AS GUI_WIDGET : cvKarte = GUI_CANVAS(win, 0, 0, BREITE - SEITE, innenH - 26)
+DIM tfSuche AS GUI_WIDGET : tfSuche = GUI_TEXTINPUT(win, rechts, 8, SEITE - 16, 28, "Ort suchen ...")
+GUI_TOOLTIP(tfSuche, "Enter sucht bei Nominatim (OpenStreetMap)")
+DIM lstTreffer AS GUI_WIDGET : lstTreffer = GUI_LISTBOX(win, rechts, 42, SEITE - 16, 112, [])
+GUI_LISTBOX_PLACEHOLDER(lstTreffer, "Suchergebnisse stehen hier.")
+DIM lbSpur AS GUI_WIDGET : lbSpur = GUI_LABEL(win, "Keine Spur -- Datei → GPX-Spur öffnen.", rechts, 164)
+GUI_SET_WRAP(lbSpur, SEITE - 16)
+DIM lbMarker AS GUI_WIDGET : lbMarker = GUI_LABEL(win, "Marker (Rechtsklick in die Karte setzt einen)", rechts, 250)
+DIM lstMarker AS GUI_WIDGET : lstMarker = GUI_LISTBOX(win, rechts, 272, SEITE - 16, 170, [])
+GUI_LISTBOX_PLACEHOLDER(lstMarker, "Noch keine Marker.")
+DIM cvProfil AS GUI_WIDGET : cvProfil = GUI_CANVAS(win, rechts, 452, SEITE - 16, innenH - 26 - 460)
+DIM sb AS GUI_WIDGET : sb = GUI_STATUSBAR(win, 0, innenH - 26, BREITE, 26, "Bereit.")
+GUI_STATUSBAR_ADD(sb, "", 200, "mitte")
+GUI_STATUSBAR_ADD(sb, "", 80, "mitte")
+GUI_STATUSBAR_ADD(sb, "", 120, "rechts")
+GUI_SET_ANCHOR(cvKarte, "ltrb")
+GUI_SET_ANCHOR(tfSuche, "rt")
+GUI_SET_ANCHOR(lstTreffer, "rt")
+GUI_SET_ANCHOR(lbSpur, "rt")
+GUI_SET_ANCHOR(lbMarker, "rt")
+GUI_SET_ANCHOR(lstMarker, "rt")
+GUI_SET_ANCHOR(cvProfil, "rtb")
+GUI_SET_ANCHOR(sb, "lrb")
+
+DIM profil AS CHART : profil = CHART_NEW("flaeche", 0, 0, 100, 100)
+CHART_THEME(profil, "hell")
+CHART_SET_NUM(profil, "schrift", schrift)
+CHART_SET_FLAG(profil, "komma", TRUE)
+CHART_SET(profil, "titel", "Höhenprofil")
+CHART_SET(profil, "einheit", " m")
+DIM rHoehe AS INTEGER : rHoehe = CHART_SERIES(profil, "Höhe", FARBE_SPUR)
+
+' --- Zustand der Ansicht ----------------------------------------------------
+' Die Mitte in Weltpunkten bei der Zoomstufe `zoom`.
+DIM zoom AS INTEGER : zoom = 6
+DIM mitteX AS FLOAT
+DIM mitteY AS FLOAT
+DIM spur AS Spur : spur = NEW Spur()
+DIM spurDatei AS STRING
+DIM beenden AS BOOLEAN
+DIM ziehen AS BOOLEAN
+DIM zugX AS INTEGER
+DIM zugY AS INTEGER
+DIM klickZeit AS INTEGER : klickZeit = -1000
+DIM klickX AS INTEGER
+DIM klickY AS INTEGER
+DIM dlgMarker AS GUI_WINDOW : dlgMarker = 0
+DIM dlgDruck AS GUI_WINDOW : dlgDruck = 0
+DIM neuLat AS FLOAT
+DIM neuLon AS FLOAT
+DIM sucheAbruf AS INTEGER : sucheAbruf = -1
+DIM trLat AS ARRAY OF FLOAT : trLat = []
+DIM trLon AS ARRAY OF FLOAT : trLon = []
+DIM trZoom AS ARRAY OF INTEGER : trZoom = []
+DIM rtExport AS INTEGER : rtExport = -1
+DIM rtB AS INTEGER
+DIM rtH AS INTEGER
+
+SUB status(t AS STRING)
+    GUI_STATUSBAR_SET(sb, 0, t)
+END SUB
+
+SUB ansichtSetzen(lat AS FLOAT, lon AS FLOAT, z AS INTEGER)
+    zoom = CLAMP(z, ZOOM_MIN, ZOOM_MAX)
+    mitteX = weltX(lon, zoom)
+    mitteY = weltY(lat, zoom)
+END SUB
+
+FUNCTION mitteLat() AS FLOAT
+    RETURN latAus(mitteY, zoom)
+END FUNCTION
+FUNCTION mitteLon() AS FLOAT
+    RETURN lonAus(mitteX, zoom)
+END FUNCTION
+
+' Waagerecht rund, senkrecht nicht ueber den Rand der Welt hinaus.
+SUB ansichtBegrenzen()
+    DIM w AS FLOAT : w = weltGroesse(zoom)
+    WHILE mitteX < 0 : mitteX = mitteX + w : WEND
+    WHILE mitteX >= w : mitteX = mitteX - w : WEND
+    mitteY = CLAMP(mitteY, 0.0, w)
+END SUB
+
+' Zoomen um einen Punkt: (dx, dy) ist sein Abstand zur Bildmitte -- der
+' Weltpunkt dort bleibt unter dem Zeiger stehen.
+SUB zoomUm(neuZ AS INTEGER, dx AS FLOAT, dy AS FLOAT)
+    DIM z AS INTEGER : z = CLAMP(neuZ, ZOOM_MIN, ZOOM_MAX)
+    IF z = zoom THEN RETURN
+    DIM f AS FLOAT : f = 2.0 ^ (z - zoom)
+    mitteX = (mitteX + dx) * f - dx
+    mitteY = (mitteY + dy) * f - dy
+    zoom = z
+    ansichtBegrenzen()
+END SUB
+
+FUNCTION karteB() AS INTEGER
+    RETURN GUI_CANVAS_W(cvKarte)
+END FUNCTION
+FUNCTION karteH() AS INTEGER
+    RETURN GUI_CANVAS_H(cvKarte)
+END FUNCTION
+
+' --- Zeichnen ---------------------------------------------------------------
+' Die Karte in das Rechteck (ox, oy, b, h) -- im Fenster und fuer die Ausfuhr.
+SUB karteZeichnen(ox AS INTEGER, oy AS INTEGER, b AS INTEGER, h AS INTEGER, hervor AS INTEGER)
+    DIM links AS FLOAT : links = mitteX - b / 2
+    DIM oben AS FLOAT : oben = mitteY - h / 2
+    DIM n AS INTEGER : n = 1 SHL zoom
+    BOX(ox, oy, ox + b, oy + h, RGB(226, 222, 214))
+    DIM tx AS INTEGER
+    DIM ty AS INTEGER
+    FOR ty = MAX(0, kachelNr(oben)) TO MIN(n - 1, kachelNr(oben + h))
+        FOR tx = kachelNr(links) TO kachelNr(links + b)
+            DIM sx AS INTEGER : sx = ox + INT(FLOOR(tx * KACHEL - links))
+            DIM sy AS INTEGER : sy = oy + INT(FLOOR(ty * KACHEL - oben))
+            DIM kx AS INTEGER : kx = kachelX(tx, zoom)
+            DIM vorrang AS FLOAT : vorrang = ABS(sx + KACHEL / 2 - ox - b / 2) + ABS(sy + KACHEL / 2 - oy - h / 2)
+            DIM bild AS INTEGER : bild = kachelBild(zoom, kx, ty, vorrang)
+            IF bild >= 0 THEN
+                DRAWIMAGE(bild, sx, sy)
+            ELSE
+                ' solange sie laedt: der passende Teil einer groeberen Kachel
+                DIM d AS INTEGER
+                DIM ersatz AS BOOLEAN : ersatz = FALSE
+                FOR d = 1 TO MIN(6, zoom)
+                    DIM g AS INTEGER : g = kachelDa(zoom - d, kx SHR d, ty SHR d)
+                    IF g >= 0 THEN
+                        DIM teil AS INTEGER : teil = KACHEL SHR d
+                        DRAWIMAGEPARTEX(g, (kx - ((kx SHR d) SHL d)) * teil, (ty - ((ty SHR d) SHL d)) * teil, teil, teil, sx, sy, KACHEL, KACHEL)
+                        ersatz = TRUE
+                        BREAK
+                    END IF
+                NEXT
+                IF NOT ersatz THEN RECT(sx, sy, sx + KACHEL - 1, sy + KACHEL - 1, RGB(210, 205, 196))
+            END IF
+        NEXT
+    NEXT
+    spurZeichnen(ox - links, oy - oben, hervor)
+    markerZeichnen(ox - links, oy - oben)
+    massstabZeichnen(ox + 12, oy + h - 14)
+    ' Die Zuschreibung gehoert auf jede Karte aus OpenStreetMap-Daten.
+    DIM zb AS INTEGER : zb = TEXT_WIDTH(ZUSCHREIBUNG)
+    BOX(ox + b - zb - 12, oy + h - 22, ox + b, oy + h, RGBA(255, 255, 255, 200))
+    TEXT(ox + b - zb - 6, oy + h - 20, ZUSCHREIBUNG, RGB(40, 40, 40))
+END SUB
+
+' Die Spur, um (vx, vy) verschoben (Weltpunkte -> Bild). Punkte naeher als
+' zwei Bildpunkte am vorigen werden uebergangen -- eine Spur mit 20000
+' Punkten waere sonst bei kleinem Zoom 20000 Striche je Bild.
+SUB spurZeichnen(vx AS FLOAT, vy AS FLOAT, hervor AS INTEGER)
+    DIM n AS INTEGER : n = spur.anzahl()
+    IF n = 0 THEN RETURN
+    DIM px AS ARRAY OF FLOAT : px = []
+    DIM py AS ARRAY OF FLOAT : py = []
+    DIM pn AS ARRAY OF BOOLEAN : pn = []
+    DIM i AS INTEGER
+    DIM lx AS FLOAT : lx = -1E9
+    DIM ly AS FLOAT : ly = -1E9
+    FOR i = 0 TO n - 1
+        DIM x AS FLOAT : x = weltX(spur.lon[i], zoom) + vx
+        DIM y AS FLOAT : y = weltY(spur.lat[i], zoom) + vy
+        IF spur.neu[i] OR i = n - 1 OR ABS(x - lx) + ABS(y - ly) >= 2 THEN
+            ARRAY_PUSH(px, x) : ARRAY_PUSH(py, y) : ARRAY_PUSH(pn, spur.neu[i])
+            lx = x : ly = y
+        END IF
+    NEXT
+    DIM lauf AS INTEGER
+    FOR lauf = 0 TO 1
+        FOR i = 1 TO LEN(px) - 1
+            IF NOT pn[i] THEN
+                IF lauf = 0 THEN
+                    LINEW(px[i - 1], py[i - 1], px[i], py[i], 7, RGBA(255, 255, 255, 190))
+                ELSE
+                    LINEW(px[i - 1], py[i - 1], px[i], py[i], 4, FARBE_SPUR)
+                END IF
+            END IF
+        NEXT
+    NEXT
+    ' Anfang gruen, Ende schwarzweiss
+    CIRCLE(px[0], py[0], 7, RGB(255, 255, 255)) : CIRCLE(px[0], py[0], 5, RGB(40, 160, 60))
+    DIM e AS INTEGER : e = LEN(px) - 1
+    CIRCLE(px[e], py[e], 7, RGB(255, 255, 255)) : CIRCLE(px[e], py[e], 5, RGB(30, 30, 30))
+    IF hervor >= 0 AND hervor < n THEN
+        DIM hx AS FLOAT : hx = weltX(spur.lon[hervor], zoom) + vx
+        DIM hy AS FLOAT : hy = weltY(spur.lat[hervor], zoom) + vy
+        CIRCLE(hx, hy, 9, RGB(255, 255, 255)) : CIRCLE(hx, hy, 6, RGB(30, 90, 200))
+    END IF
+END SUB
+
+SUB markerZeichnen(vx AS FLOAT, vy AS FLOAT)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(mkName) - 1
+        DIM x AS FLOAT : x = weltX(mkLon[i], zoom) + vx
+        DIM y AS FLOAT : y = weltY(mkLat[i], zoom) + vy
+        ' eine Nadel: Spitze auf dem Punkt
+        TRIANGLE(x - 6, y - 12, x + 6, y - 12, x, y, FARBE_MARKER)
+        CIRCLE(x, y - 16, 8, FARBE_MARKER)
+        CIRCLE(x, y - 16, 3, RGB(255, 255, 255))
+        DIM tb AS INTEGER : tb = TEXT_WIDTH(mkName[i])
+        BOX(x + 10, y - 26, x + 18 + tb, y - 8, RGBA(255, 255, 255, 215))
+        TEXT(x + 14, y - 25, mkName[i], RGB(30, 30, 30))
+    NEXT
+END SUB
+
+SUB massstabZeichnen(x AS INTEGER, y AS INTEGER)
+    DIM m AS FLOAT : m = massstabMeter(mitteLat(), zoom, 140)
+    DIM l AS INTEGER : l = INT(m / meterJePunkt(mitteLat(), zoom))
+    DIM t AS STRING : t = streckeText$(m)
+    BOX(x - 6, y - 24, x + MAX(l, TEXT_WIDTH(t)) + 8, y + 6, RGBA(255, 255, 255, 200))
+    LINEW(x, y, x + l, y, 3, RGB(30, 30, 30))
+    LINEW(x, y - 6, x, y, 2, RGB(30, 30, 30))
+    LINEW(x + l, y - 6, x + l, y, 2, RGB(30, 30, 30))
+    TEXT(x, y - 22, t, RGB(30, 30, 30))
+END SUB
+
+' --- Spur ------------------------------------------------------------------
+SUB spurInfo()
+    IF spur.anzahl() = 0 THEN
+        GUI_SET_TEXT(lbSpur, "Keine Spur -- Datei → GPX-Spur öffnen.")
+        RETURN
+    END IF
+    DIM t AS STRING : t = IIF(spur.name = "", BASENAME(spurDatei), spur.name) + CHR$(10)
+    t = t + "Länge " + streckeText$(spur.laenge) + ", " + ZAHL$(spur.anzahl()) + " Punkte"
+    IF spur.mitHoehe THEN t = t + CHR$(10) + "Aufstieg " + ZAHL$(spur.auf, 0) + " m, Abstieg " + ZAHL$(spur.ab, 0) + " m"
+    GUI_SET_TEXT(lbSpur, t)
+END SUB
+
+SUB spurEinpassen()
+    IF spur.anzahl() = 0 THEN RETURN
+    DIM s AS FLOAT : DIM w AS FLOAT : DIM n AS FLOAT : DIM o AS FLOAT
+    (s, w, n, o) = spurRahmen(spur)
+    DIM z AS INTEGER : z = zoomFuer(s, w, n, o, karteB() - 60, karteH() - 60)
+    zoom = CLAMP(z, ZOOM_MIN, ZOOM_MAX)
+    mitteX = (weltX(w, zoom) + weltX(o, zoom)) / 2
+    mitteY = (weltY(n, zoom) + weltY(s, zoom)) / 2
+END SUB
+
+FUNCTION spurLaden(pfad AS STRING) AS BOOLEAN
+    TRY
+        DIM neu AS Spur : neu = gpxLesen(READALL$(pfad))
+        IF neu.anzahl() = 0 THEN
+            status(BASENAME(pfad) + ": keine Spur und keine Route darin.")
+            markerListe()
+            RETURN FALSE
+        END IF
+        spur = neu
+        spurDatei = pfad
+    CATCH e
+        status(BASENAME(pfad) + ": " + e)
+        RETURN FALSE
+    END TRY
+    DIM km AS ARRAY OF FLOAT : km = []
+    DIM i AS INTEGER
+    FOR i = 0 TO spur.anzahl() - 1
+        ARRAY_PUSH(km, spur.weg[i] / 1000.0)
+    NEXT
+    CHART_DATA(profil, rHoehe, spur.ele)
+    CHART_X(profil, km)
+    ' Beschriftet wird der erste Punkt hinter jedem vollen Schritt (1, 2, 5,
+    ' 10 ... km, so dass es etwa sechs Marken werden)
+    DIM schritt AS FLOAT : schritt = 1
+    WHILE spur.laenge / 1000.0 / schritt > 7
+        IF schritt = 1 OR schritt = 10 OR schritt = 100 THEN
+            schritt = schritt * 2
+        ELSEIF schritt = 2 OR schritt = 20 OR schritt = 200 THEN
+            schritt = schritt * 2.5
+        ELSE
+            schritt = schritt * 2
+        END IF
+    WEND
+    DIM marke AS FLOAT : marke = 0
+    FOR i = 0 TO spur.anzahl() - 1
+        IF km[i] >= marke THEN
+            CHART_LABEL(profil, i, ZAHL$(marke, IIF(schritt < 1, 1, 0)) + " km")
+            marke = marke + schritt
+        ELSE
+            CHART_LABEL(profil, i, "")
+        END IF
+    NEXT
+    spurInfo()
+    markerListe()
+    spurEinpassen()
+    status("Spur geladen: " + BASENAME(pfad))
+    RETURN TRUE
+END FUNCTION
+
+' --- Marker ------------------------------------------------------------------
+SUB markerListe()
+    GUI_LISTBOX_CLEAR(lstMarker)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(mkName) - 1
+        DIM z AS INTEGER : z = GUI_LISTBOX_ADD(lstMarker, mkName[i])
+        GUI_LISTBOX_DETAIL(lstMarker, z, FORMAT$(mkLat[i], "%.4f") + ", " + FORMAT$(mkLon[i], "%.4f"))
+    NEXT
+END SUB
+
+SUB markerSichern()
+    TRY
+        WRITEALL(PATHJOIN(datenOrdner, "marker.json"), markerJson$())
+    CATCH e
+        status("Marker nicht gesichert: " + e)
+    END TRY
+END SUB
+
+' --- Suche (Nominatim) -------------------------------------------------------
+SUB sucheStarten(q AS STRING)
+    IF TRIM$(q) = "" THEN RETURN
+    IF sucheAbruf >= 0 THEN HTTP_CANCEL(sucheAbruf)
+    sucheAbruf = HTTP_GET_START(REPLACE$(sucheUrl, "{q}", URL_ENCODE(TRIM$(q))))
+    status("Suche nach " + TRIM$(q) + " ...")
+END SUB
+
+' Zahl aus einem JSON-Feld -- Nominatim schreibt sie als Zeichenkette.
+FUNCTION jsonZahl(j AS JSON_HANDLE, pfad AS STRING) AS FLOAT
+    IF JSON_TYPE(j, pfad) = "number" THEN RETURN JSON_GET_FLOAT(j, pfad)
+    RETURN VAL(JSON_GET_STRING(j, pfad))
+END FUNCTION
+
+SUB sucheAbholen()
+    IF sucheAbruf < 0 THEN RETURN
+    IF NOT HTTP_READY(sucheAbruf) THEN RETURN
+    DIM antwort AS STRING
+    TRY
+        antwort = HTTP_RESULT(sucheAbruf)
+    CATCH e
+        sucheAbruf = -1
+        status("Suche fehlgeschlagen: " + e)
+        RETURN
+    END TRY
+    sucheAbruf = -1
+    GUI_LISTBOX_CLEAR(lstTreffer)
+    trLat = [] : trLon = [] : trZoom = []
+    TRY
+        DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "r" + CHR$(34) + ":" + antwort + "}")
+        DIM i AS INTEGER
+        FOR i = 0 TO JSON_LEN(j, "r") - 1
+            DIM p AS STRING : p = "r." + STR$(i)
+            ARRAY_PUSH(trLat, jsonZahl(j, p + ".lat"))
+            ARRAY_PUSH(trLon, jsonZahl(j, p + ".lon"))
+            DIM z AS INTEGER : z = 14
+            ' ein einzelnes Haus hat einen winzigen Rahmen -- naeher als 17
+            ' hilft beim Finden nicht
+            IF JSON_HAS(j, p + ".boundingbox") THEN
+                z = zoomFuer(jsonZahl(j, p + ".boundingbox.0"), jsonZahl(j, p + ".boundingbox.2"), jsonZahl(j, p + ".boundingbox.1"), jsonZahl(j, p + ".boundingbox.3"), karteB() - 40, karteH() - 40)
+            END IF
+            ARRAY_PUSH(trZoom, MIN(z, 17))
+            DIM name AS STRING : name = "?"
+            IF JSON_HAS(j, p + ".display_name") THEN name = JSON_GET_STRING(j, p + ".display_name")
+            GUI_LISTBOX_ADD(lstTreffer, name)
+        NEXT
+        status(STR$(LEN(trLat)) + " Treffer")
+        IF LEN(trLat) > 0 THEN
+            GUI_LISTBOX_SET_SELECTED(lstTreffer, 0)
+            ansichtSetzen(trLat[0], trLon[0], trZoom[0])
+        END IF
+    CATCH e
+        status("Antwort der Suche nicht lesbar: " + e)
+    END TRY
+END SUB
+
+' --- Ausfuhr: Bild, PDF, Drucken ---------------------------------------------
+FUNCTION ansichtBild() AS IMAGE
+    DIM b AS INTEGER : b = karteB()
+    DIM h AS INTEGER : h = karteH()
+    IF rtExport < 0 OR rtB <> b OR rtH <> h THEN
+        rtExport = RENDERTARGET_NEW(b, h)
+        rtB = b : rtH = h
+    END IF
+    RENDERTARGET_BEGIN(rtExport)
+    karteZeichnen(0, 0, b, h, -1)
+    RENDERTARGET_END()
+    RETURN RENDERTARGET_IMAGE(rtExport)
+END FUNCTION
+
+SUB bildSichern(pfad AS STRING)
+    DIM bild AS IMAGE : bild = ansichtBild()
+    IMAGE_SAVE(bild, pfad)
+    IMAGE_FREE(bild)
+    status("Bild gesichert: " + pfad)
+END SUB
+
+FUNCTION profilBild() AS IMAGE
+    DIM rt AS INTEGER : rt = RENDERTARGET_NEW(1600, 500)
+    RENDERTARGET_BEGIN(rt)
+    BOX(0, 0, 1600, 500, WHITE)
+    CHART_BOUNDS(profil, 0, 0, 1600, 500)
+    CHART_SET_NUM(profil, "text_groesse", 30) : CHART_SET_NUM(profil, "titel_groesse", 38)
+    CHART_SET_NUM(profil, "linien_dicke", 4)
+    CHART_DRAW(profil)
+    RENDERTARGET_END()
+    CHART_SET_NUM(profil, "text_groesse", 13) : CHART_SET_NUM(profil, "titel_groesse", 16)
+    CHART_SET_NUM(profil, "linien_dicke", 2)
+    RETURN RENDERTARGET_IMAGE(rt)
+END FUNCTION
+
+FUNCTION karteAlsPdf() AS PDF
+    DIM p AS PDF : p = PDF_NEW("a4", "quer")
+    DIM titel AS STRING : titel = "Karte"
+    IF spur.anzahl() > 0 THEN titel = IIF(spur.name = "", BASENAME(spurDatei), spur.name)
+    PDF_FONT(p, "sans-fett", 16)
+    PDF_TEXT(p, 15, 12, titel)
+    PDF_FONT(p, "sans", 9)
+    PDF_TEXT(p, 15, 20, FORMAT$(mitteLat(), "%.5f") + ", " + FORMAT$(mitteLon(), "%.5f") + ", Zoom " + STR$(zoom) + ", Maßstab " + streckeText$(massstabMeter(mitteLat(), zoom, 140)) + " je " + STR$(INT(massstabMeter(mitteLat(), zoom, 140) / meterJePunkt(mitteLat(), zoom))) + " Punkte")
+    DIM bild AS IMAGE : bild = ansichtBild()
+    ' 267 mm breit, hoechstens 150 hoch, Seitenverhaeltnis bleibt
+    DIM bw AS FLOAT : bw = 267
+    DIM bh AS FLOAT : bh = bw * karteH() / karteB()
+    IF bh > 150 THEN
+        bw = bw * 150 / bh : bh = 150
+    END IF
+    PDF_IMAGE(p, bild, 15, 26, bw, bh)
+    IMAGE_FREE(bild)
+    DIM y AS FLOAT : y = 26 + bh + 7
+    IF spur.anzahl() > 0 THEN
+        PDF_TEXT(p, 15, y, "Länge " + streckeText$(spur.laenge) + IIF(spur.mitHoehe, ", Aufstieg " + ZAHL$(spur.auf, 0) + " m, Abstieg " + ZAHL$(spur.ab, 0) + " m", ""))
+        y = y + 6
+    END IF
+    PDF_TEXT(p, 15, 200, "Kartendaten " + ZUSCHREIBUNG + " (openstreetmap.org/copyright)")
+    IF spur.anzahl() > 0 AND spur.mitHoehe THEN
+        PDF_PAGE(p)
+        PDF_FONT(p, "sans-fett", 14)
+        PDF_TEXT(p, 15, 12, "Höhenprofil: " + titel)
+        DIM pb AS IMAGE : pb = profilBild()
+        PDF_IMAGE(p, pb, 15, 22, 267, 267 * 500 / 1600)
+        IMAGE_FREE(pb)
+    END IF
+    IF LEN(mkName) > 0 THEN
+        PDF_PAGE(p)
+        PDF_FONT(p, "sans-fett", 14)
+        PDF_TEXT(p, 15, 12, "Marker")
+        PDF_FONT(p, "sans", 10)
+        DIM i AS INTEGER
+        FOR i = 0 TO MIN(LEN(mkName), 28) - 1
+            PDF_TEXT(p, 15, 22 + i * 6.2, mkName[i])
+            PDF_TEXT(p, 150, 22 + i * 6.2, FORMAT$(mkLat[i], "%.5f") + ", " + FORMAT$(mkLon[i], "%.5f"))
+        NEXT
+    END IF
+    RETURN p
+END FUNCTION
+
+' --- Einstellungen -------------------------------------------------------------
+SUB einstellungenSichern()
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    JSON_SET_FLOAT(j, "lat", mitteLat())
+    JSON_SET_FLOAT(j, "lon", mitteLon())
+    JSON_SET_INT(j, "zoom", zoom)
+    TRY
+        WRITEALL(PATHJOIN(datenOrdner, "einstellungen.json"), JSON_STRINGIFY(j))
+    CATCH e
+    END TRY
+    markerSichern()
+END SUB
+
+SUB einstellungenLaden()
+    ansichtSetzen(51.1657, 10.4515, 6)     ' Deutschland
+    DIM d AS STRING : d = PATHJOIN(datenOrdner, "einstellungen.json")
+    IF FILEEXISTS(d) THEN
+        TRY
+            DIM j AS JSON_HANDLE : j = JSON_PARSE(READALL$(d))
+            ansichtSetzen(JSON_GET_FLOAT(j, "lat"), JSON_GET_FLOAT(j, "lon"), JSON_GET_INT(j, "zoom"))
+        CATCH e
+        END TRY
+    END IF
+    DIM m AS STRING : m = PATHJOIN(datenOrdner, "marker.json")
+    IF FILEEXISTS(m) THEN
+        TRY
+            markerAusJson(READALL$(m))
+        CATCH e
+            status("marker.json nicht lesbar: " + e)
+        END TRY
+    END IF
+    IF ortVorgabe <> "" THEN
+        DIM t AS ARRAY OF STRING : t = SPLIT$(ortVorgabe, ",")
+        IF LEN(t) >= 2 THEN ansichtSetzen(VAL(t[0]), VAL(t[1]), IIF(LEN(t) >= 3, VAL(t[2]), zoom))
+    END IF
+END SUB
+
+einstellungenLaden()
+markerListe()
+IF gpxStart <> "" THEN spurLaden(gpxStart)
+
+' --- Eingabe in der Karte --------------------------------------------------------
+SUB karteBedienen()
+    DIM mx AS INTEGER : mx = MOUSEX()
+    DIM my AS INTEGER : my = MOUSEY()
+    DIM ox AS INTEGER : ox = GUI_CANVAS_X(cvKarte)
+    DIM oy AS INTEGER : oy = GUI_CANVAS_Y(cvKarte)
+    DIM ueber AS BOOLEAN : ueber = GUI_HIT_TEST(mx, my) = cvKarte AND NOT GUI_MODAL()
+    DIM dx AS FLOAT : dx = mx - ox - karteB() / 2
+    DIM dy AS FLOAT : dy = my - oy - karteH() / 2
+    IF ziehen THEN
+        IF MOUSEBUTTON(0) THEN
+            mitteX = mitteX - (mx - zugX)
+            mitteY = mitteY - (my - zugY)
+            zugX = mx : zugY = my
+            ansichtBegrenzen()
+        ELSE
+            ziehen = FALSE
+            MOUSE_CURSOR("auto")
+        END IF
+    END IF
+    IF NOT ueber THEN RETURN
+    GUI_STATUSBAR_SET(sb, 1, FORMAT$(latAus(mitteY + dy, zoom), "%.5f") + ", " + FORMAT$(lonAus(mitteX + dx, zoom), "%.5f"))
+    DIM rad AS FLOAT : rad = MOUSEWHEEL_Y()
+    IF rad > 0 THEN zoomUm(zoom + 1, dx, dy)
+    IF rad < 0 THEN zoomUm(zoom - 1, dx, dy)
+    IF MOUSE_HIT(0) THEN
+        IF MILLIS() - klickZeit < 400 AND ABS(mx - klickX) + ABS(my - klickY) < 6 THEN
+            zoomUm(zoom + 1, dx, dy)
+            klickZeit = -1000
+        ELSE
+            klickZeit = MILLIS() : klickX = mx : klickY = my
+            ziehen = TRUE : zugX = mx : zugY = my
+            MOUSE_CURSOR("resize_all")
+        END IF
+    END IF
+    IF MOUSE_HIT(1) AND dlgMarker = 0 THEN
+        neuLat = latAus(mitteY + dy, zoom)
+        neuLon = lonAus(mitteX + dx, zoom)
+        dlgMarker = GUI_PROMPT("Marker setzen", "Name des Markers:", "Marker " + STR$(LEN(mkName) + 1))
+    END IF
+END SUB
+
+SUB tastenBedienen()
+    ' Pfeile verschieben, + und - zoomen -- nur, wenn kein Textfeld den Fokus hat
+    IF GUI_FOCUSED() = tfSuche OR GUI_MODAL() THEN RETURN
+    DIM s AS INTEGER : s = 80
+    IF KEYPRESSED(KEY_LEFT) THEN mitteX = mitteX - s / 8
+    IF KEYPRESSED(KEY_RIGHT) THEN mitteX = mitteX + s / 8
+    IF KEYPRESSED(KEY_UP) THEN mitteY = mitteY - s / 8
+    IF KEYPRESSED(KEY_DOWN) THEN mitteY = mitteY + s / 8
+    ansichtBegrenzen()
+END SUB
+
+' --- Bildschleife -------------------------------------------------------------
+WHILE NOT beenden
+    GUI_UPDATE()
+    IF WINDOW_CLOSE_REQUESTED() THEN
+        beenden = TRUE
+    ELSEIF QUITREQUESTED() THEN
+        BREAK
+    END IF
+    IF WINDOW_RESIZED() THEN GUI_WINDOW_SET_BOUNDS(win, 0, 0, SCREENWIDTH(), SCREENHEIGHT())
+
+    IF GUI_CLICKED(miGpx) THEN
+        DIM g AS STRING : g = FILE_OPEN_DIALOG("GPX-Spur öffnen", "gpx")
+        IF g <> "" THEN spurLaden(g)
+    END IF
+    IF GUI_CLICKED(miMarkerGpx) THEN
+        DIM mg AS STRING : mg = FILE_SAVE_DIALOG("Marker als GPX sichern", "marker.gpx", "gpx")
+        IF mg <> "" THEN
+            WRITEALL(mg, markerGpx$())
+            status(STR$(LEN(mkName)) + " Marker gesichert: " + mg)
+        END IF
+    END IF
+    IF GUI_CLICKED(miBild) THEN
+        DIM bp AS STRING : bp = FILE_SAVE_DIALOG("Ansicht als Bild sichern", "karte.png", "png")
+        IF bp <> "" THEN bildSichern(bp)
+    END IF
+    IF GUI_CLICKED(miPdf) THEN
+        DIM pp AS STRING : pp = FILE_SAVE_DIALOG("Als PDF sichern", "karte.pdf", "pdf")
+        IF pp <> "" THEN
+            PDF_SAVE(karteAlsPdf(), pp)
+            status("PDF gesichert: " + pp)
+        END IF
+    END IF
+    IF GUI_CLICKED(miDruck) AND dlgDruck = 0 THEN
+        dlgDruck = GUI_DIALOG("Drucken", "Die Karte auf dem Standarddrucker drucken?", "Drucken|Abbrechen")
+    END IF
+    IF GUI_CLICKED(miEnde) THEN beenden = TRUE
+    IF GUI_CLICKED(miRein) THEN zoomUm(zoom + 1, 0, 0)
+    IF GUI_CLICKED(miRaus) THEN zoomUm(zoom - 1, 0, 0)
+    IF GUI_CLICKED(miSpurZeigen) THEN spurEinpassen()
+    IF GUI_CLICKED(miLeeren) THEN
+        kachelnLeeren(TRUE)
+        status("Zwischenspeicher geleert.")
+    END IF
+    IF GUI_CLICKED(miMarkerWeg) THEN
+        markerEntfernen(GUI_LISTBOX_SELECTED(lstMarker))
+        markerListe()
+        markerSichern()
+    END IF
+    IF GUI_CLICKED(miMarkerAlle) THEN
+        mkLat = [] : mkLon = [] : mkName = []
+        markerListe()
+        markerSichern()
+    END IF
+
+    IF dlgMarker <> 0 THEN
+        DIM am AS INTEGER : am = GUI_ANSWER(dlgMarker)
+        IF am > 0 THEN
+            DIM mn AS STRING : mn = TRIM$(GUI_DIALOG_TEXT(dlgMarker))
+            IF am = 1 AND mn <> "" THEN
+                markerSetzen(neuLat, neuLon, mn)
+                markerListe()
+                markerSichern()
+            END IF
+            dlgMarker = 0
+        END IF
+    END IF
+    IF dlgDruck <> 0 THEN
+        DIM ad AS INTEGER : ad = GUI_ANSWER(dlgDruck)
+        IF ad > 0 THEN
+            dlgDruck = 0
+            IF ad = 1 THEN
+                TRY
+                    PDF_PRINT(karteAlsPdf())
+                    status("Gedruckt.")
+                CATCH e
+                    status("Drucken fehlgeschlagen: " + e)
+                END TRY
+            END IF
+        END IF
+    END IF
+
+    IF GUI_ENTERED(tfSuche) THEN sucheStarten(GUI_TEXT(tfSuche))
+    sucheAbholen()
+    IF GUI_CLICKED(lstTreffer) THEN
+        DIM tw AS INTEGER : tw = GUI_LISTBOX_SELECTED(lstTreffer)
+        IF tw >= 0 AND tw < LEN(trLat) THEN ansichtSetzen(trLat[tw], trLon[tw], trZoom[tw])
+    END IF
+    IF GUI_DOUBLE_CLICKED(lstMarker) THEN
+        DIM mw AS INTEGER : mw = GUI_LISTBOX_SELECTED(lstMarker)
+        IF mw >= 0 AND mw < LEN(mkName) THEN ansichtSetzen(mkLat[mw], mkLon[mw], MAX(zoom, 14))
+    END IF
+
+    karteBedienen()
+    tastenBedienen()
+
+    GUI_STATUSBAR_SET(sb, 2, "Zoom " + STR$(zoom))
+    DIM laeuft AS INTEGER : laeuft = kachelnLaufend()
+    GUI_STATUSBAR_SET(sb, 3, IIF(laeuft > 0, "lädt " + STR$(laeuft) + " Kacheln", ""))
+    CHART_BOUNDS(profil, GUI_CANVAS_X(cvProfil), GUI_CANVAS_Y(cvProfil), GUI_CANVAS_W(cvProfil), GUI_CANVAS_H(cvProfil))
+
+    CLS(RGB(240, 240, 240))
+    GUI_DRAW(FALSE)
+    DIM hervor AS INTEGER : hervor = -1
+    IF spur.mitHoehe THEN
+        CHART_DRAW(profil)
+        hervor = CHART_HOVER(profil)
+    ELSE
+        TEXT(GUI_CANVAS_X(cvProfil) + 12, GUI_CANVAS_Y(cvProfil) + 12, "Das Höhenprofil erscheint mit", RGB(150, 160, 175))
+        TEXT(GUI_CANVAS_X(cvProfil) + 12, GUI_CANVAS_Y(cvProfil) + 32, "einer GPX-Spur, die Höhen hat.", RGB(150, 160, 175))
+    END IF
+    SCISSOR(GUI_CANVAS_X(cvKarte), GUI_CANVAS_Y(cvKarte), karteB(), karteH())
+    karteZeichnen(GUI_CANVAS_X(cvKarte), GUI_CANVAS_Y(cvKarte), karteB(), karteH(), hervor)
+    SCISSOR_END()
+    IF dlgMarker <> 0 THEN GUI_DRAW_WINDOW(dlgMarker)
+    IF dlgDruck <> 0 THEN GUI_DRAW_WINDOW(dlgDruck)
+    GUI_DRAW_TOP()
+    FLIP()
+    kachelnPumpen()
+WEND
+einstellungenSichern()

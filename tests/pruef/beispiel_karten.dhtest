@@ -1,0 +1,391 @@
+' Das Beispiel examples/karten (Dogfooding-Runde 15): eine Landkarte aus
+' OpenStreetMap-Kacheln mit GPX-Spur, Markern, Ortssuche und Ausfuhr.
+'
+' Der Kern (Projektion, Entfernungen, GPX) wird gegen eine Rechnung in
+' JavaScript geprueft, die von dhrt nichts weiss. Die Kacheln kommen von einem
+' Gegenserver auf 127.0.0.1 (tests/pruef/_hilfen/gegenserver.dh, Modus
+' dateien), der die Kacheln ausliefert, die der Fall vorher selbst gemalt
+' hat -- jede in einer Farbe, die sich aus z/x/y rechnen laesst. So laesst
+' sich am gezeichneten Bild pruefen, ob die richtige Kachel an der richtigen
+' Stelle liegt. Kein Fall fragt die echten Server von OpenStreetMap.
+--- seriell
+--- langsam
+
+=== kern rechnet wie eine fremde rechnung
+' Die Erwartungen stammen aus einer Rechnung in JavaScript (Haversine und
+' Web-Mercator nach der Formel von OpenStreetMap); Kachel 550/335 bei Zoom 10
+' ist die des Brandenburger Tors.
+IMPORT "kern.dh"
+PRINT kachelNr(weltX(13.3777, 10)); " "; kachelNr(weltY(52.5163, 10))
+PRINT FORMAT$(lonAus(weltX(13.3777, 15), 15), "%.6f"); " "; FORMAT$(latAus(weltY(52.5163, 15), 15), "%.6f")
+PRINT FORMAT$(abstandM(52.5163, 13.3777, 48.1374, 11.5755) / 1000, "%.3f")
+PRINT FORMAT$(meterJePunkt(52.5163, 15), "%.4f"); " "; massstabMeter(52.5163, 15, 120); " "; streckeText$(1234.5)
+PRINT kachelX(-1, 3); " "; kachelX(9, 3)
+' Zwei Abschnitte, eine Route ohne Hoehen, ein Wegpunkt: zwischen den Teilen
+' wird nicht gezaehlt, Hoehen mit 3 m Totband
+DIM sp AS Spur : sp = gpxLesen(READALL$("probe.gpx"))
+PRINT sp.name; " "; sp.anzahl(); " "; FORMAT$(sp.laenge, "%.3f"); " "; sp.auf; " "; sp.ab
+PRINT LEN(mkName); " "; mkName[0]
+DIM s AS FLOAT : DIM w AS FLOAT : DIM n AS FLOAT : DIM o AS FLOAT
+(s, w, n, o) = spurRahmen(sp)
+PRINT s; " "; w; " "; n; " "; o; " zoom "; zoomFuer(s, w, n, o, 800, 600)
+' Marker hin und zurueck: als JSON und als GPX (dort kommen sie als Wegpunkte
+' wieder herein -- und nicht doppelt, wenn sie schon da sind)
+markerSetzen(52.5, 13.4, "Zweiter")
+DIM j AS STRING : j = markerJson$()
+mkLat = [] : mkLon = [] : mkName = []
+markerAusJson(j)
+PRINT LEN(mkName); " "; mkName[1]; " "; mkLat[1]
+DIM g AS STRING : g = markerGpx$()
+DIM sp2 AS Spur : sp2 = gpxLesen(g)
+PRINT LEN(mkName); " "; sp2.anzahl()
+mkLat = [] : mkLon = [] : mkName = []
+sp2 = gpxLesen(g)
+PRINT LEN(mkName); " "; mkName[0]
+--- datei kern.dh
+IMPORT "{sammlung}/../../examples/karten/kern.dh"
+
+--- datei probe.gpx
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Probe" xmlns="http://www.topografix.com/GPX/1/1">
+  <wpt lat="50.005" lon="8.005"><name>Mitte &amp; Co</name></wpt>
+  <trk><name>Probe</name>
+    <trkseg>
+      <trkpt lat="50.0" lon="8.0"><ele>100</ele></trkpt>
+      <trkpt lat="50.0" lon="8.01"><ele>110</ele></trkpt>
+      <trkpt lat="50.01" lon="8.01"><ele>104</ele></trkpt>
+    </trkseg>
+    <trkseg>
+      <trkpt lat="50.02" lon="8.02"><ele>104</ele></trkpt>
+      <trkpt lat="50.02" lon="8.03"><ele>120</ele></trkpt>
+    </trkseg>
+  </trk>
+  <rte><rtept lat="50.1" lon="8.1"/><rtept lat="50.1" lon="8.11"/></rte>
+</gpx>
+
+--- erwartet
+550 335
+13.377700 52.516300
+503.396
+2.9039 200.0 1,23 km
+7 1
+Probe 7 3254.410 26.0 6.0
+1 Mitte & Co
+50.0 8.0 50.1 8.11 zoom 12
+2 Zweiter 52.5
+2 0
+2 Mitte & Co
+
+=== kacheln kommen vom server liegen richtig und gehen in den zwischenspeicher
+' Die Kacheln malt der Fall selbst (Farbe aus z/x/y), ein Gegenserver liefert
+' sie. Geprueft wird am Bild, das die Ausfuhr zeichnet: in der Mitte liegt die
+' Kachel, in der die Mitte liegt. Danach geht der Server weg, der Speicher
+' wird geleert -- die Kacheln kommen von der Platte. Zuletzt wird die Grenze
+' fuer Kacheln im Speicher klein gestellt und herausgezoomt: die nicht mehr
+' gebrauchten werden vergessen.
+FUNCTION prFarbe(z AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    RETURN RGB(60 + (x * 37 + z * 13) MOD 180, 60 + (y * 53 + z * 29) MOD 180, 60 + (x * 11 + y * 7) MOD 180)
+END FUNCTION
+SUB prMalen(z AS INTEGER, x0 AS INTEGER, x1 AS INTEGER, y0 AS INTEGER, y1 AS INTEGER)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR x = x0 TO x1
+        FOR y = y0 TO y1
+            DIM b AS INTEGER : b = IMAGE_NEW(256, 256, prFarbe(z, x, y))
+            MKDIR("srv/" + STR$(z) + "/" + STR$(x))
+            IMAGE_SAVE(b, "srv/" + STR$(z) + "/" + STR$(x) + "/" + STR$(y) + ".png")
+            IMAGE_FREE(b)
+        NEXT
+    NEXT
+END SUB
+prMalen(10, 546, 554, 332, 338)
+prMalen(9, 272, 278, 165, 170)
+DIM prSrv AS INTEGER : prSrv = PROCESS_START("dhrt", "run", GETENV$("KARTEN_SERVER"), "--", "dateien", "0", "-", CWD$() + "/port.txt")
+DIM prT0 AS INTEGER : prT0 = MILLIS()
+WHILE NOT FILEEXISTS("port.txt") AND MILLIS() - prT0 < 15000
+    SLEEP(20)
+WEND
+SLEEP(50)
+kUrl = "http://127.0.0.1:" + TRIM$(READLINES("port.txt")[0]) + "/srv/{z}/{x}/{y}.png"
+DIM prPhase AS INTEGER
+DIM prB AS INTEGER
+DIM prNetz AS INTEGER
+DIM prWarte AS INTEGER
+' Die Mitte der Karte im Bild der Ausfuhr: welche Kachel liegt dort, und hat
+' der Punkt ihre Farbe?
+FUNCTION prMitteStimmt() AS BOOLEAN
+    DIM bild AS IMAGE : bild = ansichtBild()
+    DIM px AS INTEGER : px = karteB() \ 2
+    DIM py AS INTEGER : py = karteH() \ 2
+    DIM ok AS BOOLEAN : ok = GETPIXEL(bild, px, py) = prFarbe(zoom, kachelNr(mitteX), kachelNr(mitteY))
+    ' und eine Kachel weiter rechts die rechte Nachbarin
+    DIM rx AS INTEGER : rx = px + KACHEL
+    IF rx < karteB() THEN ok = ok AND GETPIXEL(bild, rx, py) = prFarbe(zoom, kachelNr(mitteX) + 1, kachelNr(mitteY))
+    IMAGE_FREE(bild)
+    RETURN ok
+END FUNCTION
+SUB prProbe()
+    prB = prB + 1
+    IF prB > 900 THEN
+        PRINT "zeit um in phase "; prPhase; " "; kLetzterFehler
+        PROCESS_KILL(prSrv)
+        EXIT(0)
+    END IF
+    IF prB < 3 OR kachelnLaufend() > 0 THEN RETURN
+    SELECT CASE prPhase
+        CASE 0
+            IF kAusNetz < 12 THEN RETURN
+            PRINT "netz: mitte stimmt "; prMitteStimmt(); ", von der platte "; kAusPlatte; ", fehler "; kFehler
+            PRINT "zwischenspeicher hat 10/550/335: "; FILEEXISTS(PATHJOIN(kCache, "10/550/335.png"))
+            prNetz = kAusNetz
+            zoomUm(9, 0, 0)
+            prPhase = 1
+        CASE 1
+            IF kAusNetz = prNetz THEN RETURN
+            PRINT "zoom 9 aus dem netz: mitte stimmt "; prMitteStimmt()
+            prNetz = kAusNetz
+            PROCESS_KILL(prSrv)
+            kachelnLeeren(FALSE)
+            zoomUm(10, 0, 0)
+            prPhase = 2
+        CASE 2
+            IF kAusPlatte < 12 THEN RETURN
+            PRINT "ohne server: mitte stimmt "; prMitteStimmt(); ", neu aus dem netz "; kAusNetz - prNetz
+            kMaxSpeicher = 8
+            zoomUm(9, 0, 0)
+            prPhase = 3
+        CASE 3
+            ' das Probebild eben hat die Kacheln von Zoom 10 fuer dieses Bild als
+            ' gebraucht markiert -- vergessen werden sie erst danach
+            prWarte = prWarte + 1
+            IF prWarte < 3 THEN RETURN
+            PRINT "zoom 9 von der platte: mitte stimmt "; prMitteStimmt(); ", vergessen "; kVergessenZahl > 0; ", im speicher hoechstens 8 neben den sichtbaren "; kachelnImSpeicher() <= 8 + 20
+            EXIT(0)
+    END SELECT
+END SUB
+--- programm ../../examples/karten/main.dh nach SETFONT(schrift, 16)
+--- ersetzen IMPORT "kern.dh"
+IMPORT "{sammlung}/../../examples/karten/kern.dh"
+--- ersetzen IMPORT "kacheln.dh"
+IMPORT "{sammlung}/../../examples/karten/kacheln.dh"
+--- einschub nach     kachelnPumpen()
+    prProbe()
+--- argumente
+--daten
+{fall}/daten
+--ort
+52.5163,13.3777,10
+--- umgebung
+KARTEN_SERVER={sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+netz: mitte stimmt TRUE, von der platte 0, fehler 0
+zwischenspeicher hat 10/550/335: TRUE
+zoom 9 aus dem netz: mitte stimmt TRUE
+ohne server: mitte stimmt TRUE, neu aus dem netz 0
+zoom 9 von der platte: mitte stimmt TRUE, vergessen TRUE, im speicher hoechstens 8 neben den sichtbaren TRUE
+
+=== abrufe fuer kacheln ausser sicht werden abgebrochen
+' Der Gegenserver antwortet erst nach 1,5 s. Nach ein paar Bildern springt die
+' Ansicht nach Muenchen: die Abrufe fuer Berlin werden abgebrochen, keine
+' Berliner Kachel kommt mehr an, nie laufen mehr als vier Abrufe zugleich, und
+' HTTP_PENDING zaehlt nur noch die Muenchner. Muenchen gibt es auf dem Server
+' nicht -- das sind Fehler, kein Absturz.
+DIM prSrv AS INTEGER : prSrv = PROCESS_START("dhrt", "run", GETENV$("KARTEN_SERVER"), "--", "dateien", "1500", "-", CWD$() + "/port.txt")
+DIM prT0 AS INTEGER : prT0 = MILLIS()
+WHILE NOT FILEEXISTS("port.txt") AND MILLIS() - prT0 < 15000
+    SLEEP(20)
+WEND
+SLEEP(50)
+kUrl = "http://127.0.0.1:" + TRIM$(READLINES("port.txt")[0]) + "/srv/{z}/{x}/{y}.png"
+DIM prB AS INTEGER
+DIM prMax AS INTEGER
+DIM prOffenGleich AS BOOLEAN : prOffenGleich = TRUE
+SUB prProbe()
+    prB = prB + 1
+    prMax = MAX(prMax, kachelnLaufend())
+    IF prB = 5 THEN
+        PRINT "berlin laeuft: "; kachelnLaufend()
+        ansichtSetzen(48.1374, 11.5755, 10)
+    END IF
+    IF prB > 6 AND HTTP_PENDING() <> kachelnLaufend() THEN prOffenGleich = FALSE
+    IF prB > 6 AND kFehler >= 4 THEN
+        PRINT "abgebrochen "; kAbgebrochen; ", aus dem netz "; kAusNetz; ", hoechstens zugleich "; prMax; ", offen = laufend "; prOffenGleich
+        PRINT "fehler sagt 404: "; INSTR(kLetzterFehler, "404") >= 0
+        PROCESS_KILL(prSrv)
+        EXIT(0)
+    END IF
+    IF prB > 900 THEN
+        PRINT "zeit um "; kFehler; " "; kLetzterFehler
+        EXIT(0)
+    END IF
+END SUB
+--- programm ../../examples/karten/main.dh nach SETFONT(schrift, 16)
+--- ersetzen IMPORT "kern.dh"
+IMPORT "{sammlung}/../../examples/karten/kern.dh"
+--- ersetzen IMPORT "kacheln.dh"
+IMPORT "{sammlung}/../../examples/karten/kacheln.dh"
+--- einschub nach     kachelnPumpen()
+    prProbe()
+--- argumente
+--daten
+{fall}/daten
+--ort
+52.5163,13.3777,10
+--- umgebung
+KARTEN_SERVER={sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+berlin laeuft: 4
+abgebrochen 4, aus dem netz 0, hoechstens zugleich 4, offen = laufend TRUE
+fehler sagt 404: TRUE
+
+=== spur marker bild und pdf
+' Die Beispielspur des Beispiels. Kacheln gibt es keine (die Adresse fuehrt
+' ins Leere) -- geprueft werden Spur, Marker und die Ausfuhr.
+kUrl = "http://127.0.0.1:1/{z}/{x}/{y}.png"
+DIM prB AS INTEGER
+DIM prAus AS ARRAY OF STRING : prAus = []
+SUB prZeile(t AS STRING)
+    ARRAY_PUSH(prAus, t)
+END SUB
+SUB prProbe()
+    prB = prB + 1
+    IF prB < 5 THEN RETURN
+    prZeile(REPLACE$(GUI_TEXT(lbSpur), CHR$(10), " | "))
+    prZeile("marker " + STR$(GUI_LISTBOX_COUNT(lstMarker)) + " " + GUI_LISTBOX_ITEM(lstMarker, 0))
+    ' dieselbe Datei noch einmal: die Wegpunkte kommen nicht doppelt
+    spurLaden(spurDatei)
+    prZeile("nochmal geladen, marker " + STR$(GUI_LISTBOX_COUNT(lstMarker)))
+    ' Punkt 40 der Spur liegt im Bild auf der Linie in Spurfarbe
+    DIM bild AS IMAGE : bild = ansichtBild()
+    DIM sx AS INTEGER : sx = INT(weltX(spur.lon[40], zoom) - (mitteX - karteB() / 2))
+    DIM sy AS INTEGER : sy = INT(weltY(spur.lat[40], zoom) - (mitteY - karteH() / 2))
+    DIM treffer AS BOOLEAN
+    DIM ix AS INTEGER
+    DIM iy AS INTEGER
+    FOR ix = -1 TO 1
+        FOR iy = -1 TO 1
+            IF GETPIXEL(bild, sx + ix, sy + iy) = FARBE_SPUR THEN treffer = TRUE
+        NEXT
+    NEXT
+    prZeile("spur im bild " + STR$(treffer) + ", ganze spur im bild " + STR$(sx > 0 AND sx < karteB()))
+    IMAGE_FREE(bild)
+    bildSichern("karte.png")
+    DIM gb AS IMAGE : gb = LOADIMAGE("karte.png")
+    prZeile("bild " + STR$(IMAGE_WIDTH(gb) = karteB()) + " " + STR$(IMAGE_HEIGHT(gb) = karteH()))
+    PDF_SAVE(karteAlsPdf(), "karte.pdf")
+    einstellungenSichern()
+    WRITEALL("probe.txt", JOIN$(prAus, CHR$(10)) + CHR$(10))
+    EXIT(0)
+END SUB
+--- programm ../../examples/karten/main.dh nach SETFONT(schrift, 16)
+--- ersetzen IMPORT "kern.dh"
+IMPORT "{sammlung}/../../examples/karten/kern.dh"
+--- ersetzen IMPORT "kacheln.dh"
+IMPORT "{sammlung}/../../examples/karten/kacheln.dh"
+--- einschub nach     kachelnPumpen()
+    prProbe()
+--- argumente
+{sammlung}/../../examples/karten/teufelsberg.gpx
+--daten
+{fall}/daten
+--- datei leser.dh
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+--- nachher
+IMPORT "leser.dh"
+IMPORT "json"
+DIM z AS STRING
+FOR EACH z IN READLINES("_programm/probe.txt")
+    PRINT z
+NEXT
+DIM s AS ARRAY OF STRING
+s = pdfSeiten("_programm/karte.pdf")
+PRINT "seiten "; LEN(s)
+PRINT "titel "; INSTR(s[0], "Zum Teufelsberg (erfunden)") >= 0; ", laenge "; INSTR(s[0], "Länge 9,88 km") >= 0; ", zuschreibung "; INSTR(s[0], "OpenStreetMap") >= 0
+PRINT "profil "; INSTR(s[1], "Höhenprofil") >= 0; ", marker "; INSTR(s[2], "Siegessäule") >= 0
+DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "m" + CHR$(34) + ":" + READALL$("daten/marker.json") + "}")
+PRINT "marker.json "; JSON_LEN(j, "m"); " "; JSON_GET_STRING(j, "m.1.name")
+--- erwartet
+Zum Teufelsberg (erfunden) | Länge 9,88 km, 85 Punkte | Aufstieg 80 m, Abstieg 0 m
+marker 2 Siegessäule
+nochmal geladen, marker 2
+spur im bild TRUE, ganze spur im bild TRUE
+bild TRUE TRUE
+seiten 3
+titel TRUE, laenge TRUE, zuschreibung TRUE
+profil TRUE, marker TRUE
+marker.json 2 Teufelsberg
+
+=== die maus zoomt um den zeiger zieht und setzt marker
+' Echte Mausereignisse aus einer Aufnahme: das Rad ueber der Karte zoomt, und
+' der Ort unter dem Zeiger bleibt derselbe; Ziehen verschiebt die Karte genau
+' um den Weg der Maus; ein Rechtsklick fragt nach dem Namen eines Markers an
+' der Stelle des Klicks.
+kUrl = "http://127.0.0.1:1/{z}/{x}/{y}.png"
+AUTOMATION_PLAY("ev.txt")
+DIM prB AS INTEGER
+DIM prZoom AS INTEGER : prZoom = -1
+DIM prLat AS FLOAT
+DIM prLon AS FLOAT
+DIM prZieht AS BOOLEAN
+DIM prX0 AS FLOAT
+DIM prY0 AS FLOAT
+FUNCTION prUnter(mx AS INTEGER, my AS INTEGER, lat AS BOOLEAN) AS FLOAT
+    DIM dx AS FLOAT : dx = mx - GUI_CANVAS_X(cvKarte) - karteB() / 2
+    DIM dy AS FLOAT : dy = my - GUI_CANVAS_Y(cvKarte) - karteH() / 2
+    IF lat THEN RETURN latAus(mitteY + dy, zoom)
+    RETURN lonAus(mitteX + dx, zoom)
+END FUNCTION
+SUB prProbe()
+    prB = prB + 1
+    IF prZoom >= 0 AND zoom <> prZoom THEN
+        PRINT "rad: zoom "; prZoom; " -> "; zoom; ", ort unter dem zeiger bleibt "; ABS(prUnter(300, 300, TRUE) - prLat) < 0.000001 AND ABS(prUnter(300, 300, FALSE) - prLon) < 0.000001
+    END IF
+    prZoom = zoom
+    prLat = prUnter(300, 300, TRUE)
+    prLon = prUnter(300, 300, FALSE)
+    IF ziehen AND NOT prZieht THEN
+        prX0 = mitteX : prY0 = mitteY
+    ELSEIF prZieht AND NOT ziehen THEN
+        PRINT "gezogen um "; prX0 - mitteX; " "; prY0 - mitteY
+    END IF
+    prZieht = ziehen
+    IF dlgMarker <> 0 THEN
+        PRINT "rechtsklick: dialog offen, stelle stimmt "; ABS(neuLat - prUnter(500, 400, TRUE)) < 0.000001 AND ABS(neuLon - prUnter(500, 400, FALSE)) < 0.000001
+        EXIT(0)
+    END IF
+    IF prB > 300 THEN
+        PRINT "zeit um"
+        EXIT(0)
+    END IF
+END SUB
+--- programm ../../examples/karten/main.dh nach SETFONT(schrift, 16)
+--- ersetzen IMPORT "kern.dh"
+IMPORT "{sammlung}/../../examples/karten/kern.dh"
+--- ersetzen IMPORT "kacheln.dh"
+IMPORT "{sammlung}/../../examples/karten/kacheln.dh"
+--- einschub nach     kachelnPumpen()
+    prProbe()
+--- argumente
+--daten
+{fall}/daten
+--ort
+52.5163,13.3777,12
+--- datei _programm/ev.txt
+# Rad, Ziehen, Rechtsklick
+c 11
+e 0 7 300 300 0 0 // Event: test
+e 20 7 300 300 0 0 // Event: test
+e 21 8 0 1 0 0 // Event: test
+e 40 7 300 300 0 0 // Event: test
+e 41 6 0 0 0 0 // Event: test
+e 42 7 350 330 0 0 // Event: test
+e 43 7 400 360 0 0 // Event: test
+e 44 5 0 0 0 0 // Event: test
+e 60 7 500 400 0 0 // Event: test
+e 61 6 1 0 0 0 // Event: test
+e 62 5 1 0 0 0 // Event: test
+
+--- erwartet
+rad: zoom 12 -> 13, ort unter dem zeiger bleibt TRUE
+gezogen um 100.0 60.0
+rechtsklick: dialog offen, stelle stimmt TRUE

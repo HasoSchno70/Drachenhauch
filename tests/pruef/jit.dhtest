@@ -252,7 +252,7 @@ DHRT_JIT=aus
 --- erwartet
 3 -3 -2 2 0
 0.5 -0.5 -1.5
--3 -3 3
+-4 -4 3
 
 === mod folgt dem vorzeichen des teilers (maschinencode)
 FUNCTION r(a AS INTEGER, b AS INTEGER) AS INTEGER
@@ -273,7 +273,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 3 -3 -2 2 0
 0.5 -0.5 -1.5
--3 -3 3
+-4 -4 3
 --- stderr
 jit: 3 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
 

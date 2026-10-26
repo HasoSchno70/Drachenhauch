@@ -455,7 +455,15 @@ Plain strings (`"..."`) are **not** interpolated — `{name}` stays literal. Onl
   out even -- `((0 + 100 / 2) / 100) * 100` gives `50.0` and slips through
   silently where old code meant `/` as integer division and `0`.
   `RETURN n \ 2`, `INT(n / 2)` and `ROUND(n / 2)` stay quiet.
-- `\` is integer division (returns INTEGER, INTEGER even with FLOAT input).
+- `\` is integer division: integers only (a fractional number is a run-time
+  error; use `INT(x) \ n` or `FLOOR(x / n)`), result INTEGER, **rounded down
+  like `FLOOR`**: `7 \ 2` is 3, `-7 \ 2` is -4 (up to 2026.37: -3, towards
+  zero as in QBasic).
+- `MOD` is the remainder that goes with it, with the **sign of the divisor**:
+  `-7 MOD 2` is 1, `7 MOD -2` is -1. So `(a \ b) * b + a MOD b = a` always
+  holds, and `x MOD n` with a positive `n` always lies between 0 and `n - 1`
+  -- handy for wrapping around an edge (playing field, tiles). `MOD` works the
+  same with fractional numbers: `-7.5 MOD 2` is 0.5.
 - `^` is exponentiation: `2 ^ 8 = 256`.
 
 **Comparison:** `= <> < > <= >=`

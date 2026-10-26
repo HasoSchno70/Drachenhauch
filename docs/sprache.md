@@ -457,7 +457,15 @@ Plain-Strings (`"..."`) werden **nicht** interpoliert — `{name}` bleibt buchst
   wenn die Division nicht aufgeht -- `((0 + 100 / 2) / 100) * 100` ergibt `50.0`
   und rutscht still durch, wo alter Code mit `/` als Ganzzahl-Division `0`
   meinte. `RETURN n \ 2`, `INT(n / 2)` und `ROUND(n / 2)` bleiben still.
-- `\` ist ganzzahlige Division (gibt INTEGER, INTEGER auch bei FLOAT-Eingabe).
+- `\` ist ganzzahlige Division: nur fuer ganze Zahlen (eine Kommazahl ist ein
+  Laufzeitfehler, `INT(x) \ n` oder `FLOOR(x / n)` nehmen), Ergebnis INTEGER,
+  **abgerundet wie `FLOOR`**: `7 \ 2` ist 3, `-7 \ 2` ist -4 (bis 2026.37:
+  -3, Richtung null wie in QBasic).
+- `MOD` ist der Rest dazu, mit dem **Vorzeichen des Teilers**: `-7 MOD 2` ist
+  1, `7 MOD -2` ist -1. Damit gilt immer `(a \ b) * b + a MOD b = a`, und
+  `x MOD n` mit positivem `n` liegt immer zwischen 0 und `n - 1` -- praktisch,
+  um ueber einen Rand hinaus wieder von vorn zu zaehlen (Spielfeld, Kacheln).
+  Mit Kommazahlen rechnet `MOD` ebenso: `-7.5 MOD 2` ist 0.5.
 - `^` ist Potenz: `2 ^ 8 = 256`.
 
 **Vergleich:** `= <> < > <= >=`

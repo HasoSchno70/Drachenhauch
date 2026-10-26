@@ -146,6 +146,8 @@ them:
 - **Arrays start at 0.** `DIM a[3] AS INTEGER` has `a[0]` to `a[2]`.
 - **`/` can return a fractional number.** `7 / 2` is `3.5`; for integer
   division there is `\` (`7 \ 2` is `3`).
+- **`\` and `MOD` round down for negative numbers**, not towards zero as
+  in QBasic: `-7 \ 2` is `-4`, `-7 MOD 2` is `1`.
 - **`=` on arrays and MAPs asks for THE SAME container**, not for equal
   contents: two arrays with the same numbers are `<>`. Contents are compared
   element by element.

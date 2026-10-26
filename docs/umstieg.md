@@ -144,6 +144,8 @@ Sie sind Absicht und laufen darum ohne Warnung — man muss sie kennen:
 - **Felder beginnen bei 0.** `DIM a[3] AS INTEGER` hat `a[0]` bis `a[2]`.
 - **`/` kann eine Kommazahl liefern.** `7 / 2` ist `3.5`; für die
   ganzzahlige Division gibt es `\` (`7 \ 2` ist `3`).
+- **`\` und `MOD` runden bei negativen Zahlen nach unten**, nicht Richtung
+  null wie in QBasic: `-7 \ 2` ist `-4`, `-7 MOD 2` ist `1`.
 - **`=` auf Feldern und MAPs fragt nach DEMSELBEN Behälter**, nicht nach
   gleichem Inhalt: zwei Felder mit denselben Zahlen sind `<>`. Inhalte
   vergleicht man Platz für Platz.

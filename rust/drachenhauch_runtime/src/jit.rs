@@ -3702,7 +3702,17 @@ fn rechnen(bau: &mut Bauer, o: u16, x: CWert, xa: Art, y: CWert, ya: Art) -> (CW
                 let beide = bau.b.ins().band(a, b);
                 bau.aussteigen_wenn(beide);
                 if o == op::INT_DIV {
-                    bau.b.ins().sdiv(x, y)
+                    // abgerundet wie int_div in vm.rs: bleibt ein Rest und
+                    // haben Geteiltes und Teiler verschiedene Vorzeichen, eins weniger
+                    let q = bau.b.ins().sdiv(x, y);
+                    let m = bau.b.ins().srem(x, y);
+                    let nz = bau.b.ins().icmp_imm_s(IntCC::NotEqual, m, 0);
+                    let xn = bau.b.ins().icmp_imm_s(IntCC::SignedLessThan, x, 0);
+                    let yn = bau.b.ins().icmp_imm_s(IntCC::SignedLessThan, y, 0);
+                    let versch = bau.b.ins().bxor(xn, yn);
+                    let korr = bau.b.ins().band(nz, versch);
+                    let q1 = bau.b.ins().iadd_imm(q, -1);
+                    bau.b.ins().select(korr, q1, q)
                 } else {
                     // Vorzeichen folgt dem Teiler (wie Python): -17 MOD 5 = 3.
                     let m = bau.b.ins().srem(x, y);
