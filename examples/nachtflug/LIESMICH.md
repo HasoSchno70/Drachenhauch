@@ -7,8 +7,16 @@ Musik und Bild aus einem Programm, ohne eine einzige Klang- oder Bilddatei.
 dhrt run main.dh                     # im Vollbild, von vorn
 dhrt run main.dh -- --fenster        # im Fenster
 dhrt run main.dh -- --ab 48          # ab Takt 48 (der Breakdown)
-dhrt run main.dh -- --wav nacht.wav  # nur die Musik als WAV schreiben
+dhrt run main.dh -- --wav nacht.wav  # nur die Musik als WAV schreiben (trocken, ohne Hall)
+dhrt run main.dh -- --mitschnitt nacht.wav  # abspielen und mitschneiden, wie man es hört
 dhrt run main.dh -- --messen         # am Ende Bildrate und Spitze im Mischer
+```
+
+Zum Weitergeben als eigenständiges Programm (der Ordner `assets/shader`
+kommt mit):
+
+```
+dhrt --export main.dh Nachtflug/Nachtflug.exe
 ```
 
 ESC beendet, F11 schaltet das Vollbild.
@@ -29,6 +37,10 @@ entsteht im Programm (`musik.dh`):
   im zweiten Höhepunkt.
 * **Flächen**, die unter der Bassdrum **pumpen**, und ein **Trance-Gate**,
   das den Akkord in Sechzehntel zerhackt.
+* **Stimme** im Breakdown und im Ausklang: „Schließ die Augen“ und „Flieg
+  mit mir durch die Nacht“, gesprochen von der Sprachausgabe des Systems
+  (`SPEAK_SOUND`, unter Windows die Stimme Katja), langsamer, dreifach
+  geschichtet und mit langem Echo. Ohne Sprachausgabe bleibt sie weg.
 * **Bassdrum** aus einem fallenden Sinus, **Offbeat-Bass**, **Klatschen**,
   **Becken**, **Shaker**, eine **Füllung** am Ende jeder Phrase,
   **Glocken** als Funken im Intro und im Ausklang, **Aufstieg** und
@@ -51,12 +63,20 @@ Bus.
 
 | Takte | Szene | Wie |
 |---|---|---|
-| 0–16 | Ozean bei Nacht, Polarlicht, Mondglitzern | Fragment-Shader `ozean.fs` |
+| 0–16 | Ozean bei Nacht, Polarlicht, Mondglitzern | Fragment-Shader `assets/shader/ozean.fs` |
 | 16–32 | Tiefflug durch ein Tal, ein Fluss aus Licht, Wellen im Takt | Raymarching über ein Höhenfeld, `flug.fs` |
 | 32–48 | Lichttunnel, die Farbe folgt dem Akkord | `tunnel.fs` |
 | 48–64 | Sternennebel, zum Aufstieg hin schneller und heller | Volumen-Raymarching, `nebel.fs` |
 | 64–80 | Galaxie aus 2.600 Lichtspuren, auf jeden Schlag läuft eine Welle nach außen | echte 3D-Szene (`MODEL_INSTANCED`), die leuchtende Scheibe mit Spiralarmen und Staub rechnet `glanz.fs` mit derselben Kamera |
 | 80–92 | Ozean in der Morgendämmerung, Abspann | wieder `ozean.fs` |
+
+Was pulsiert, pulsiert mit der Bassdrum; was aufblitzt, blitzt mit der
+**Melodie** (Polarlicht und Mondglitzern, ein Funkenlauf auf dem Fluss, ein
+Rahmen im Tunnel, der Nebel, in der Galaxie ein Ring, der umso weiter außen
+liegt, je höher der Ton ist), und die **Farbe** geht mit dem Akkord. Die
+Szenen gehen **durch Licht** ineinander über: ein Lichtkreis mit Strahlen
+wächst aus der Mitte, die nächste Szene erscheint, während er nach außen
+weicht.
 
 Die Beschriftungen stehen deutsch und darunter englisch.
 

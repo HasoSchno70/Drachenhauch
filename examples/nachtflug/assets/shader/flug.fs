@@ -10,6 +10,12 @@ uniform float hell;
 uniform float kick;
 uniform float takt;
 uniform float fort;      // 0..1 durch den Abschnitt
+uniform float ton;       // Melodie: 1 auf dem Anschlag, klingt ab
+uniform float hoehe;     // wie hoch der Melodieton liegt, 0..1
+uniform vec3 farbe;      // Farbe des Akkords
+uniform float aus;       // Szenenwechsel: Licht waechst aus der Mitte (0..1)
+uniform float ein;       // ... und weicht nach aussen (0 = nur Licht, 1 = Szene)
+uniform vec3 uebLicht;   // Farbe des Lichts beim Wechsel
 out vec4 finalColor;
 
 const vec3 MOND = vec3(-0.4924, 0.4924, 0.7176);
@@ -79,6 +85,34 @@ vec3 himmel(vec3 d) {
     return c;
 }
 
+// Szenenwechsel durch Licht (uv: zentriert, durch die Hoehe geteilt): ein
+// Kreis aus Licht -- innen weiss, am Rand in der Farbe des Wechsels -- waechst
+// aus der Mitte bzw. weicht nach aussen, dazu Strahlen wie bei einem Sprung.
+float uebHash(float x) { return fract(sin(x * 91.7) * 43758.5453); }
+vec3 uebergang(vec3 c, vec2 uv) {
+    float r = length(uv);
+    float maske;
+    float k;
+    if (aus > 0.0) {
+        float R = aus * 1.7;
+        maske = 1.0 - smoothstep(R - 0.6, R, r);
+        k = aus;
+    } else if (ein < 1.0) {
+        float R = ein * 1.7;
+        maske = smoothstep(R - 0.6, R, r);
+        k = 1.0 - ein;
+    } else {
+        return c;
+    }
+    vec3 l = mix(uebLicht, vec3(1.0), exp(-r * 2.2)) * 1.05;
+    c = mix(c, l, maske * 0.9);
+    float a = atan(uv.y, uv.x);
+    float id = floor(a * 60.0);
+    float strahl = pow(uebHash(id), 5.0) * (0.6 + 0.4 * sin(time * 2.5 + id * 1.7));
+    c += mix(uebLicht, vec3(1.0), 0.5) * strahl * k * smoothstep(0.08, 0.7, r) * 0.5;
+    return c;
+}
+
 void main() {
     vec2 uv = (fragTexCoord * resolution - 0.5 * resolution) / resolution.y;
     float z = time * 7.0;
@@ -112,7 +146,7 @@ void main() {
             if (p.y - gelaende(p.xz) < 0.0) t = m; else tAlt = m;
         }
     }
-    vec3 c = himmel(d) + polarlicht(ro, d) * (0.6 + 0.6 * fort);
+    vec3 c = himmel(d) + polarlicht(ro, d) * (0.6 + 0.6 * fort) * (1.0 + 0.7 * ton);
     if (treffer) {
         vec3 p = ro + d * t;
         vec3 n = normale(p.xz, t);
@@ -130,7 +164,10 @@ void main() {
         float vor = p.z - ro.z;
         float welle = exp(-pow((vor - 6.0 - viertel * 70.0) * 0.35, 2.0));
         vec3 glut = mix(vec3(0.1, 0.85, 1.0), vec3(0.4, 1.0, 0.7), 0.5 + 0.5 * sin(p.z * 0.02));
-        float staerke = 1.4 + 1.0 * fort + welle * (4.0 + 5.0 * kick);
+        glut = mix(glut, farbe, 0.45);
+        // die Melodie: ein Funkenlauf, der mit jedem Ton aus der Ferne heranrollt
+        float lauf = exp(-pow((vor - 4.0 - (1.0 - ton) * 60.0) * 0.25, 2.0)) * ton;
+        float staerke = 1.4 + 1.0 * fort + welle * (4.0 + 5.0 * kick) + lauf * 7.0;
         c += glut * fluss * staerke;
         // das Licht faellt auf die Ufer
         c += glut * ufer * 0.08 * staerke * max(n.y, 0.0);
@@ -146,6 +183,7 @@ void main() {
     c += (hash(fragTexCoord * resolution + time) - 0.5) * 0.012;
     c = c / (1.0 + c);
     c = pow(c, vec3(0.9));
+    c = uebergang(c, uv);
     vec3 oberlage = texture(texture0, fragTexCoord).rgb;
     finalColor = vec4(c * hell + oberlage, 1.0);
 }

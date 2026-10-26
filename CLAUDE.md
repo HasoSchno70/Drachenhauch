@@ -2829,13 +2829,24 @@ Sechzehntel = ein Tick, je Bild einen halben Takt voraus), dieselbe Routine
 `schrittPlanen` schreibt ueber `spielen` auch die WAV (`--wav`). `--ab TAKT`
 startet mitten im Stueck, `--messen` meldet Bildrate und Spitze am Mischer
 (0.88). `main.dh`: fuenf Szenen, vier als Fragment-Shader ueber POSTFX
-(`shader/*.fs`, Raymarching; der Text liegt in texture0 und wird obenauf
-gelegt), die fuenfte eine Galaxie aus 2600 Lichtspuren (duenne, lange
+(`assets/shader/*.fs` -- unter assets, damit `dhrt --export` sie
+mitnimmt; Raymarching; der Text liegt in texture0 und wird obenauf gelegt), die fuenfte eine Galaxie aus 2600 Lichtspuren (duenne, lange
 Quader entlang der Umlaufbahn, MODEL_INSTANCED) ueber einer Scheibe, die
 `glanz.fs` mit DERSELBEN Kamera und Drehung rechnet (Kamera als Uniform).
 **MODEL_INSTANCED zeichnet je verschiedener Farbe einmal** -- die Farben
 stufen darum in eine Tafel aus 24. Beschriftung deutsch mit englischer
-Zeile darunter (`zweisprachig`). **Falle:** `fragTexCoord.y` zaehlt hier
+Zeile darunter (`zweisprachig`).
+**Dritte Runde (selber Tag, alle vier Wuensche des Nutzers):** die Bilder
+folgen der Melodie (`tonBei(n)`: Huellkurve 1 auf dem Anschlag, 0.3
+solange gehalten, `tonHoehe`; Uniforms `ton`/`hoehe`/`farbe` in jedem
+Shader, die Akkordfarbe zieht in main weich nach), Szenenwechsel durch
+Licht (`uebergang` in jedem Shader: Lichtkreis mit Strahlen, `aus`/`ein`
+je einen Takt; Vorsicht: ein Shader ohne gesetztes `ein` zeigt nur Licht,
+main setzt es darum in jedem Bild), eine Stimme im Breakdown
+(`SPEAK_SOUND` -> WAV -> `SAMPLE_LOAD` -> drei `SAMPLE_NOTE` um +-0.12
+Halbtoene versetzt; hier gibt es nur deutsche Stimmen, darum deutsche
+Saetze), `--mitschnitt` (AUDIO_RECORD_*, der Mix mit Hall wie gehoert) und
+die Exe (`dhrt --export`, 40 MB). **Falle:** `fragTexCoord.y` zaehlt hier
 nach oben -- kein `uv.y = -uv.y`. Etwa 60 Bilder je Sekunde in 1280x720.
 Tests `tests/pruef/beispiel_nachtflug.dhtest` (7: die WAV mit `--- ton`,
 jede Szene am Bildschirmfoto); ein kaputter Shader und eine Fassung ohne
