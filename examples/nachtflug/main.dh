@@ -1,0 +1,275 @@
+' Nachtflug -- eine Demo in Drachenhauch: Musik und Bild aus einem Programm.
+'
+' Die Musik (musik.dh) ist ganz synthetisiert -- Trance in A-Moll, 128 Schlaege
+' je Minute, in Stereo, knapp drei Minuten. Die Bilder folgen ihr: jede
+' Szene gehoert zu einem Abschnitt des Stuecks, und alles, was pulsiert,
+' pulsiert mit der Bassdrum. Gezeichnet wird in 1280x720; die Szenen 1 bis 4
+' rechnet je ein Fragment-Shader (Raymarching), die fuenfte ist eine echte
+' 3D-Szene der Laufzeit.
+'
+'     dhrt run main.dh                    ' im Vollbild, von vorn
+'     dhrt run main.dh -- --fenster       ' im Fenster
+'     dhrt run main.dh -- --ab 32         ' ab Takt 32
+'     dhrt run main.dh -- --wav datei.wav ' nur die Musik als WAV schreiben
+'
+' ESC beendet, F11 schaltet das Vollbild.
+IMPORT "g3d"
+IMPORT "m3d"
+IMPORT "musik.dh"
+
+CONST BREITE = 1280
+CONST HOEHE = 720
+
+' --- Argumente ------------------------------------------------------------
+DIM abTakt AS INTEGER
+DIM imFenster AS BOOLEAN
+DIM wavZiel AS STRING
+DIM messen AS BOOLEAN
+DIM ai AS INTEGER
+WHILE ai < ARGC()
+    SELECT CASE ARG$(ai)
+        CASE "--ab"
+            ai = ai + 1 : abTakt = CLAMP(VAL(ARG$(ai)), 0, TAKTE - 1)
+        CASE "--fenster"
+            imFenster = TRUE
+        CASE "--messen"
+            messen = TRUE
+        CASE "--wav"
+            ai = ai + 1 : wavZiel = ARGPATH$(ai)
+    END SELECT
+    ai = ai + 1
+WEND
+IF wavZiel <> "" THEN
+    musikAusschreiben(wavZiel)
+    PRINT "geschrieben: "; wavZiel
+    END
+END IF
+
+SCREEN(BREITE, HOEHE, "Nachtflug -- eine Demo in Drachenhauch", 1)
+SETFPS(60)
+WINDOW_ESC_QUIT(FALSE)
+IF NOT imFenster THEN SET_FULLSCREEN(TRUE)
+
+DIM schriftGross AS INTEGER : schriftGross = LOADFONT("serif", 72)
+DIM schrift AS INTEGER : schrift = LOADFONT("sans", 32)
+
+' --- Shader ------------------------------------------------------------------
+FUNCTION shader(name AS STRING) AS INTEGER
+    DIM h AS INTEGER : h = SHADER_LOAD("shader/" + name + ".fs")
+    IF h < 0 THEN THROW "Shader " + name + " liess sich nicht laden"
+    SHADER_SET2(h, "resolution", BREITE, HOEHE)
+    RETURN h
+END FUNCTION
+DIM shOzean AS INTEGER : shOzean = shader("ozean")
+DIM shFlug AS INTEGER : shFlug = shader("flug")
+DIM shTunnel AS INTEGER : shTunnel = shader("tunnel")
+DIM shNebel AS INTEGER : shNebel = shader("nebel")
+DIM shGlanz AS INTEGER : shGlanz = shader("glanz")
+
+' --- Galaxie (Szene 5): Lichtspuren auf Umlaufbahnen ---------------------------
+' Jeder Stern ist ein langgezogener, duenner Quader entlang seiner Bahn --
+' mit dem Glanz-Shader darueber wird daraus eine Lichtspur wie auf einer
+' Langzeitbelichtung. Alle in EINEM Aufruf (MODEL_INSTANCED); die Laufzeit
+' zeichnet je verschiedener Farbe einmal, darum stufen die Farben in eine
+' kleine Tafel (6 Toene x 4 Helligkeiten). Dahinter rechnet der Shader die
+' leuchtende Scheibe mit Spiralarmen und Staubbahnen (glanz.fs) -- mit
+' derselben Kamera und derselben Drehung, damit beides deckungsgleich ist.
+' Auf jeden Schlag laeuft eine Welle von innen nach aussen: die Spuren, die
+' sie erreicht, heben sich und leuchten auf.
+CONST STERNE = 2600
+DIM spur AS INTEGER : spur = MESH_CUBE(1.0, 1.0, 1.0)
+DIM gR[STERNE] AS FLOAT       ' Abstand zur Mitte
+DIM gW[STERNE] AS FLOAT       ' Winkel
+DIM gH[STERNE] AS FLOAT       ' Hoehe ueber der Scheibe
+DIM gD[STERNE] AS FLOAT       ' Dicke
+DIM gTon[STERNE] AS INTEGER   ' Farbton 0..5
+DIM gMat[STERNE] AS MAT4
+DIM gFarbe[STERNE] AS INTEGER
+DIM tafel[24] AS INTEGER
+' Farbtoene: Kern warm, Arme blau, tuerkis, violett, rosa (Sternentstehung)
+DIM tonR AS ARRAY OF INTEGER : tonR = [255, 255, 120, 110, 190, 255]
+DIM tonG AS ARRAY OF INTEGER : tonG = [225, 190, 165, 245, 130, 140]
+DIM tonB AS ARRAY OF INTEGER : tonB = [170, 120, 255, 235, 255, 210]
+DIM gi AS INTEGER
+FOR gi = 0 TO 23
+    DIM st AS FLOAT : st = 0.55 + 0.3 * (gi MOD 4)
+    tafel[gi] = RGB(MIN(255, INT(tonR[gi \ 4] * st)), MIN(255, INT(tonG[gi \ 4] * st)), MIN(255, INT(tonB[gi \ 4] * st)))
+NEXT
+RANDOMIZE(7)
+FOR gi = 0 TO STERNE - 1
+    DIM arm AS INTEGER : arm = gi MOD 2
+    DIM r AS FLOAT
+    IF gi < STERNE \ 8 THEN
+        r = 0.4 + RND() ^ 1.6 * 6.0
+    ELSE
+        r = 3.0 + RND() ^ 0.9 * 32.0
+    END IF
+    gR[gi] = r
+    ' um den Arm gestreut, aussen weiter
+    gW[gi] = arm * PI + r * 0.22 + (RND() - 0.5) * (0.35 + 4.0 / (r + 2.0)) + (RND() - 0.5) * 0.25
+    gH[gi] = (RND() - 0.5) * 2.0 * (0.25 + 1.6 * EXP(-r * 0.25))
+    gD[gi] = 0.022 + RND() ^ 4 * 0.07
+    DIM ton AS INTEGER
+    IF r < 6 THEN
+        ton = IIF(RND() < 0.7, 0, 1)
+    ELSE
+        ton = 2 + INT(RND() * 3)
+        IF RND() < 0.12 THEN ton = 5
+    END IF
+    gTon[gi] = ton
+NEXT
+
+' Die Kamera der Galaxie -- main und Shader brauchen dieselbe
+DIM kamX AS FLOAT
+DIM kamY AS FLOAT
+DIM kamZ AS FLOAT
+CONST KAM_FOV = 52.0
+
+' wie schnell eine Bahn im Abstand r umlaeuft (Bogenmass je Sekunde)
+FUNCTION umlauf(r AS FLOAT) AS FLOAT
+    RETURN 0.9 / (r + 2.0)
+END FUNCTION
+
+SUB galaxieZeichnen(zeit AS FLOAT, kick AS FLOAT, fort AS FLOAT, takt AS FLOAT)
+    ' Kamera: von hoch oben ueber der Scheibe in einem Bogen hinab, bis knapp
+    ' ueber die Arme
+    DIM kw AS FLOAT : kw = 0.6 + zeit * 0.05
+    DIM kr AS FLOAT : kr = 46.0 - 20.0 * fort
+    kamX = COS(kw) * kr
+    kamZ = SIN(kw) * kr
+    kamY = 4.0 + 30.0 * (1.0 - fort) ^ 2
+    CAMERA3D(kamX, kamY, kamZ, 0, -0.5 * fort, 0, KAM_FOV)
+    LIGHT_ENABLE()
+    LIGHT_AMBIENT(RGB(255, 255, 255), 1.0)
+    ' die Welle: auf jeden Schlag ein Ring, der in einer Viertel nach aussen laeuft
+    DIM welle AS FLOAT : welle = (takt * 4.0 - FLOOR(takt * 4.0)) * 36.0
+    DIM i AS INTEGER
+    FOR i = 0 TO STERNE - 1
+        DIM r AS FLOAT : r = gR[i]
+        DIM w AS FLOAT : w = gW[i] - zeit * umlauf(r)
+        DIM abst AS FLOAT : abst = r - welle
+        DIM hub AS FLOAT : hub = EXP(-abst * abst * 0.08) * (0.25 + 0.75 * kick)
+        ' die Spur: so lang, wie der Stern in einer Drittelsekunde wandert
+        DIM lang AS FLOAT : lang = 0.25 + umlauf(r) * r * 2.6 * (1.0 + 0.6 * hub)
+        DIM d AS FLOAT : d = gD[i] * (1.0 + hub)
+        gMat[i] = MAT4_MUL(MAT4_TRANSLATE(COS(w) * r, gH[i] + hub * 1.2, SIN(w) * r), MAT4_MUL(MAT4_ROTATE_Y(-w), MAT4_SCALE(d, d, lang)))
+        ' der Kern ist dicht, dort reicht die dunkelste Stufe -- sonst nur ein weisser Fleck
+        gFarbe[i] = tafel[gTon[i] * 4 + MIN(3, INT(IIF(r < 6.0, 0.0, 1.0) + hub * 3.0))]
+    NEXT
+    MODEL_INSTANCED(spur, gMat, gFarbe)
+END SUB
+
+' --- Text auf dem Bild ----------------------------------------------------------
+' Weiss mit Deckkraft; der Shader legt das Bild obenauf.
+SUB mittig(t AS STRING, y AS INTEGER, groesse AS INTEGER, deck AS FLOAT, gross AS BOOLEAN)
+    IF deck <= 0.01 THEN RETURN
+    SETFONT(IIF(gross, schriftGross, schrift), groesse)
+    DIM a AS INTEGER : a = INT(CLAMP(deck, 0.0, 1.0) * 235)
+    TEXT((BREITE - TEXT_WIDTH(t)) / 2, y, t, RGBA(225, 232, 255, MAX(1, a)))
+END SUB
+
+' Ein- und Ausblenden zwischen zwei Taktzeiten (mit weichen Raendern).
+FUNCTION zeigen(takt AS FLOAT, von AS FLOAT, bis AS FLOAT) AS FLOAT
+    RETURN CLAMP(MIN((takt - von) / 1.5, (bis - takt) / 1.5), 0.0, 1.0)
+END FUNCTION
+
+' Eine Zeile deutsch, darunter englisch, kleiner und etwas zurueckhaltender.
+SUB zweisprachig(de AS STRING, en AS STRING, y AS INTEGER, groesse AS INTEGER, deck AS FLOAT, gross AS BOOLEAN)
+    mittig(de, y, groesse, deck, gross)
+    mittig(en, y + INT(groesse * 1.3), INT(groesse * 0.8), deck * 0.7, FALSE)
+END SUB
+
+SUB beschriftung(takt AS FLOAT)
+    mittig("N A C H T F L U G", 250, 64, zeigen(takt, 3, 11), TRUE)
+    zweisprachig("eine Demo in Drachenhauch", "a demo in Drachenhauch", 352, 24, zeigen(takt, 5, 11), FALSE)
+    zweisprachig("von Hans Schnorrenberger", "by Hans Schnorrenberger", 432, 22, zeigen(takt, 6, 11), FALSE)
+    zweisprachig("Musik und Bild aus einem Programm -- ohne eine einzige Klang- oder Bilddatei", _
+        "Music and pictures from one program -- without a single sound or image file", 636, 18, zeigen(takt, 7, 14), FALSE)
+    ' kleine Hinweise, was gerade zu sehen ist
+    zweisprachig("Tiefflug: Gelände aus Rauschen, im Fragment-Shader berechnet", _
+        "Low flight: terrain made of noise, computed in a fragment shader", 646, 18, zeigen(takt, 17, 22), FALSE)
+    zweisprachig("Lichttunnel: die Wellen laufen auf der Audio-Uhr", _
+        "Light tunnel: the waves run on the audio clock", 646, 18, zeigen(takt, 33, 38), FALSE)
+    zweisprachig("Sternennebel: Volumen-Raymarching", _
+        "Star nebula: volume raymarching", 646, 18, zeigen(takt, 49, 54), FALSE)
+    zweisprachig(ZAHL$(STERNE) + " Lichtspuren in einem Zeichenaufruf, die Scheibe im Shader", _
+        REPLACE$(ZAHL$(STERNE), ".", ",") + " light trails in one draw call, the disc in a shader", 646, 18, zeigen(takt, 65, 70), FALSE)
+    ' Abspann
+    mittig("Nachtflug", 200, 56, zeigen(takt, 83, 93), TRUE)
+    zweisprachig("von Hans Schnorrenberger", "by Hans Schnorrenberger", 290, 26, zeigen(takt, 83.5, 93), FALSE)
+    zweisprachig("Musik: Uplifting Trance, 128 BPM, a-Moll -- synthetisiert mit AUDIO_NOTE und einer Audio-Uhr", _
+        "Music: uplifting trance, 128 BPM, A minor -- synthesised with AUDIO_NOTE and an audio clock", 380, 19, zeigen(takt, 84, 93), FALSE)
+    zweisprachig("Bild: GLSL-Raymarching und 3D-Instancing in dhrt", _
+        "Pictures: GLSL raymarching and 3D instancing in dhrt", 440, 19, zeigen(takt, 85, 93), FALSE)
+    mittig("Drachenhauch", 520, 30, zeigen(takt, 87, 95), TRUE)
+END SUB
+
+' --- Ablauf ---------------------------------------------------------------------
+' Helligkeit einer Szene: blendet ueber einen halben Takt aus und ueber einen
+' Takt ein. Vor einem Hoehepunkt: weisser Blitz statt Schwarz (siehe glanz).
+FUNCTION blende(takt AS FLOAT, von AS FLOAT, bis AS FLOAT) AS FLOAT
+    RETURN CLAMP(MIN(takt - von, (bis - takt) * 2.0), 0.0, 1.0)
+END FUNCTION
+
+musikStarten(abTakt)
+DIM start AS FLOAT : start = GET_TIME()
+DIM beenden AS BOOLEAN
+DIM bilder AS INTEGER
+DIM spitze AS FLOAT
+
+WHILE NOT beenden
+    IF QUITREQUESTED() OR KEYHIT(KEY_ESCAPE) THEN beenden = TRUE
+    IF KEYHIT(KEY_F11) THEN SET_FULLSCREEN(NOT WINDOW_IS_FULLSCREEN())
+    musikPlanen()
+    DIM takt AS FLOAT : takt = musikTakt()
+    DIM zeit AS FLOAT : zeit = GET_TIME() - start + abTakt * 1.875
+    DIM kick AS FLOAT : kick = musikKick()
+    IF musikZuEnde() THEN beenden = TRUE
+
+    CLS(BLACK)
+    DIM sh AS INTEGER
+    IF takt < AB_AUFBAU THEN
+        sh = shOzean
+        SHADER_SET(sh, "hell", blende(takt, -1.0, AB_AUFBAU) * MIN(1.0, takt / 2.0 + 0.05))
+        SHADER_SET(sh, "licht", CLAMP(takt / AB_AUFBAU, 0.0, 1.0))
+        SHADER_SET(sh, "morgen", 0.0)
+    ELSEIF takt < AB_HOCH1 THEN
+        sh = shFlug
+        SHADER_SET(sh, "hell", blende(takt, AB_AUFBAU, AB_HOCH1))
+        SHADER_SET(sh, "fort", (takt - AB_AUFBAU) / 16.0)
+    ELSEIF takt < AB_PAUSE THEN
+        sh = shTunnel
+        SHADER_SET(sh, "hell", blende(takt, AB_HOCH1 - 0.5, AB_PAUSE))
+        SHADER_SET(sh, "akkord", (takt / 2.0) MOD 4.0)
+    ELSEIF takt < AB_HOCH2 THEN
+        sh = shNebel
+        SHADER_SET(sh, "hell", blende(takt, AB_PAUSE, AB_HOCH2 + 0.3))
+        SHADER_SET(sh, "fort", (takt - AB_PAUSE) / 16.0)
+    ELSEIF takt < AB_AUS THEN
+        sh = shGlanz
+        galaxieZeichnen(zeit, kick, (takt - AB_HOCH2) / 16.0, takt)
+        SHADER_SET3(sh, "kamera", kamX, kamY, kamZ)
+        SHADER_SET(sh, "fort", (takt - AB_HOCH2) / 16.0)
+        SHADER_SET(sh, "hell", blende(takt, AB_HOCH2 - 0.5, AB_AUS))
+        ' der weisse Blitz auf der Eins des Hoehepunkts
+        SHADER_SET(sh, "blitz", MAX(0.0, 1.0 - (takt - AB_HOCH2) * 1.5))
+    ELSE
+        sh = shOzean
+        SHADER_SET(sh, "hell", blende(takt, AB_AUS, TAKTE + 1.5))
+        SHADER_SET(sh, "licht", 0.6)
+        SHADER_SET(sh, "morgen", CLAMP((takt - AB_AUS) / 12.0, 0.0, 1.0))
+    END IF
+    SHADER_SET(sh, "time", zeit)
+    SHADER_SET(sh, "kick", kick)
+    SHADER_SET(sh, "takt", takt)
+    beschriftung(takt)
+    POSTFX(sh)
+    FLIP()
+    bilder = bilder + 1
+    IF messen AND mitTon THEN spitze = MAX(spitze, AUDIO_PEAK())
+WEND
+IF messen THEN
+    PRINT "Bilder je Sekunde: "; FORMAT$(bilder / MAX(0.001, GET_TIME() - start), "%.1f")
+    IF mitTon THEN PRINT "Spitze im Mischer: "; FORMAT$(spitze, "%.2f")
+END IF
+musikStoppen()

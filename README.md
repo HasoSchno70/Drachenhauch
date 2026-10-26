@@ -280,6 +280,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `156_gui_alle_widgets.dh` | **alle 22 GUI-Widgets** in einer Vollbild-Anwendung, jedes mit echter Aufgabe |
 | `glutfaden/main.dh` | **Glutfaden** — der Kreuzstich-Editor PySticky in Drachenhauch, mit GTK 3 über fremde Bibliotheken: Teil- und Rückstiche, Ebenen, Bildimport, PDF/HTML/OXS-Export, PCStitch und Pattern Maker, Drucken, helles und dunkles Thema |
 | `../funkenflug/main.dh` | **Funkenflug** — ein Schaltplan-Editor mit GTK 3: Hierarchie und Busse, ERC, Netzliste/SPICE, Simulation mit ngspice, Lochraster-Platine mit Gerber und 3D-Vorschau, KiCad-Import (liegt im Hauptordner, nicht im Installer) |
+| `nachtflug/main.dh` | **Nachtflug** — eine Demo: drei Minuten Uplifting Trance in Stereo (Supersaw, Klavier, Chor aus Formanten, Trance-Gate), ganz synthetisiert, auf einer Audio-Uhr; dazu Ozean mit Polarlicht, Tiefflug, Lichttunnel und Sternennebel aus Fragment-Shadern und eine Galaxie aus 2.600 Lichtspuren |
 | `chip8/main.dh` | **CHIP-8-Emulator** — alle 35 Befehle, Assembler und ein eigenes Spiel, Tastenfeld nach Lage, Nachleuchten gegen das Flackern |
 | `karten/main.dh` | **Landkarte** — OpenStreetMap-Kacheln im Hintergrund geladen und auf der Platte gemerkt, Ortssuche, GPX-Spur mit Höhenprofil, Marker, als Bild oder PDF sichern, drucken |
 | `texteditor/main.dh` | **Texteditor** — Reiter, Suchen und Ersetzen, Kodierung und Zeilenenden bleiben beim Speichern |

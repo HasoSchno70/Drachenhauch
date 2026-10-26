@@ -1,0 +1,227 @@
+' Die Demo examples/nachtflug: Trance-Musik, ganz synthetisiert, und Bilder
+' aus Fragment-Shadern und 3D-Instancing.
+'
+' Die Musik wird offline ausgeschrieben (--wav) und an der Datei geprueft:
+' Stereo, Laenge, Spitze, laut im Hoehepunkt, still am Ende. Die Bilder:
+' jede Szene einmal ab ihrem Takt, das Bildschirmfoto darf weder schwarz
+' noch weiss sein -- ein Shader, der nicht uebersetzt, liefert Schwarz (und
+' main.dh bricht ab), eine verdrehte Blende Weiss.
+--- langsam
+
+=== die musik ist stereo und hat ihre form
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- argumente
+--wav
+{fall}/nachtflug.wav
+--- enthaelt
+geschrieben: 
+--- ton nachtflug.wav
+kanaele 2
+kanaele verschieden
+dauer 176.5 +-0.05
+spitze 0.9 +-0.01
+pegel 0 30000 < 0.5
+pegel 70000 71000 > 0.05
+pegel 95000 96000 > 0.02
+pegel 175600 176400 < 0.005
+
+=== intro ozean mit polarlicht
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+12
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+' Mittlere Helligkeit ueber ein Raster von 32 x 18 Punkten
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== tiefflug
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+24
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== lichttunnel
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+40
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== sternennebel
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+54
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== galaxie aus wuerfeln
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+70
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== ausklang in der daemmerung
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+86
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
