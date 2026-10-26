@@ -368,6 +368,7 @@ Drum-Sample wird so ein ganzes Instrument.
 |---|---|
 | `SAMPLE_LOAD(pfad$)` → SAMPLE | WAV/OGG/QOA laden, auf Mono normalisiert |
 | `SAMPLE_FROM_BUFFER(puffer, abtastrate)` → SAMPLE | Sample aus rohem 16-Bit-PCM (little endian, vorzeichenbehaftet, mono) |
+| `SAMPLE_FROM_SOUND(sound)` → SAMPLE | ein SOUND (aus `SPEAK_SOUND`, `AUDIO_NOTE`, `LOADSOUND` ...) als Sample, Kanäle auf Mono gemittelt, Abtastrate übernommen |
 | `SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms])` → AUDIO_CHANNEL | bei relativer Tonhoehe abspielen |
 | `SAMPLE_NOTE(sample, halbtoene, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_halbtoene])` → SOUND | eine Note als Klang bauen (nicht abspielen), Huellkurve wie `AUDIO_NOTE` |
 | `SAMPLE_SET_LOOP(sample, start, end[, art$])` | Loop-Region in Frames (fuer gehaltene Noten), `art$` = `vorwaerts` (Vorgabe) oder `pingpong` |
@@ -412,6 +413,11 @@ die Abtastrate des Samples ist in der Tonhoehe schon verrechnet.
 `SAMPLE_FROM_BUFFER` nimmt Samples, die nicht als Datei vorliegen — etwa
 Base64 in einer JSON (`BUFFER_FROM_BASE64` davor). Ein Wert −32768..32767
 wird durch 32768 geteilt; eine ungerade Laenge ist ein Fehler.
+`SAMPLE_FROM_SOUND` macht aus einem fertigen Klang ein Sample, ohne Umweg
+ueber `AUDIO_SAVE_WAV` und `SAMPLE_LOAD` — etwa eine Stimme aus `SPEAK_SOUND`,
+die danach mit `SAMPLE_NOTE` verstimmt oder gedoppelt wird. Die Kanaele
+werden wie bei `SAMPLE_LOAD` gemittelt, die Werte bleiben Kommazahlen (keine
+16-Bit-Rundung wie ueber die Datei).
 **Pingpong** laeuft die Loop-Region am Ende rueckwaerts wieder hinunter
 statt an ihren Anfang zu springen — ein Sample, dessen Enden nicht
 zusammenpassen, knackt so nicht.

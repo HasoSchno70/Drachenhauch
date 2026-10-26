@@ -248,3 +248,146 @@ IMPORT "audio"
 DIM k AS SOUND : k = SAMPLE_NOTE(99, 0, 100, 0, 0, 1.0, 0, 1.0)
 --- fehler
 SAMPLE_NOTE: ungueltiges SAMPLE-Handle 99
+
+=== ein klang wird zum sample
+' SAMPLE_FROM_SOUND nimmt einen SOUND (hier AUDIO_NOTE, sonst etwa
+' SPEAK_SOUND) ohne Umweg ueber eine Datei. Der Sinus mit 441 Hz klingt als
+' Sample in Originalhoehe weiter mit 441 Hz und eine Oktave hoeher mit 882.
+IMPORT "audio"
+DIM k AS SOUND : k = AUDIO_NOTE("sine", 441, 500, 0, 0, 1.0, 0, 0.8)
+DIM s AS SAMPLE : s = SAMPLE_FROM_SOUND(k)
+WRITEALL("laenge.txt", "laenge " + STR$(ROUND(SAMPLE_LEN(s) * 10) / 10))
+AUDIO_SAVE_WAV(SAMPLE_NOTE(s, 0, 450, 0, 0, 1.0, 0, 1.0), "grund.wav")
+AUDIO_SAVE_WAV(SAMPLE_NOTE(s, 12, 450, 0, 0, 1.0, 0, 1.0), "oktave.wav")
+--- nachher
+FUNCTION hz(datei AS STRING, von AS INTEGER, bis AS INTEGER) AS FLOAT
+    DIM w AS BUFFER : w = READALL_BYTES(datei)
+    DIM f AS INTEGER : f = BUFFER_INDEXOF(w, BUFFER_FROM_STRING("fmt "))
+    DIM kan AS INTEGER : kan = BUFFER_GET_U16(w, f + 10)
+    DIM sr AS INTEGER : sr = BUFFER_GET_U32(w, f + 12)
+    DIM d AS INTEGER : d = BUFFER_INDEXOF(w, BUFFER_FROM_STRING("data")) + 8
+    DIM a AS INTEGER : a = sr * von \ 1000
+    DIM e AS INTEGER : e = sr * bis \ 1000
+    DIM kreuz AS INTEGER : kreuz = 0
+    DIM vorher AS BOOLEAN : vorher = BUFFER_GET_I16(w, d + a * 2 * kan) < 0
+    DIM i AS INTEGER
+    FOR i = a + 1 TO e - 1
+        DIM neg AS BOOLEAN : neg = BUFFER_GET_I16(w, d + i * 2 * kan) < 0
+        IF neg <> vorher THEN kreuz = kreuz + 1
+        vorher = neg
+    NEXT
+    RETURN kreuz / 2.0 / ((bis - von) / 1000.0)
+END FUNCTION
+PRINT READLINES("laenge.txt")[0]
+DIM g AS FLOAT : g = hz("grund.wav", 50, 200)
+DIM o AS FLOAT : o = hz("oktave.wav", 50, 200)
+PRINT "grund um 441 hz "; g > 430 AND g < 452
+PRINT "oktave um 882 hz "; o > 860 AND o < 904
+--- erwartet
+laenge 0.5
+grund um 441 hz TRUE
+oktave um 882 hz TRUE
+
+=== die abtastrate des klangs wird uebernommen
+' Eine WAV mit 22050 Hz (441 Hz Sinus, eine Sekunde) ueber LOADSOUND: als
+' Sample ist sie eine Sekunde lang und klingt mit 441 Hz. Rechnete
+' SAMPLE_FROM_SOUND mit 44100, waere sie eine halbe Sekunde und 882 Hz.
+IMPORT "audio"
+DIM n AS INTEGER : n = 22050
+DIM w AS BUFFER : w = BUFFER_NEW(44 + n * 2)
+BUFFER_SET(w, 0, ASC("R")) : BUFFER_SET(w, 1, ASC("I"))
+BUFFER_SET(w, 2, ASC("F")) : BUFFER_SET(w, 3, ASC("F"))
+BUFFER_SET_U32(w, 4, 36 + n * 2)
+BUFFER_SET(w, 8, ASC("W")) : BUFFER_SET(w, 9, ASC("A"))
+BUFFER_SET(w, 10, ASC("V")) : BUFFER_SET(w, 11, ASC("E"))
+BUFFER_SET(w, 12, ASC("f")) : BUFFER_SET(w, 13, ASC("m"))
+BUFFER_SET(w, 14, ASC("t")) : BUFFER_SET(w, 15, ASC(" "))
+BUFFER_SET_U32(w, 16, 16)
+BUFFER_SET_U16(w, 20, 1)
+BUFFER_SET_U16(w, 22, 1)
+BUFFER_SET_U32(w, 24, 22050)
+BUFFER_SET_U32(w, 28, 44100)
+BUFFER_SET_U16(w, 32, 2)
+BUFFER_SET_U16(w, 34, 16)
+BUFFER_SET(w, 36, ASC("d")) : BUFFER_SET(w, 37, ASC("a"))
+BUFFER_SET(w, 38, ASC("t")) : BUFFER_SET(w, 39, ASC("a"))
+BUFFER_SET_U32(w, 40, n * 2)
+DIM i AS INTEGER
+FOR i = 0 TO n - 1
+    BUFFER_SET_I16(w, 44 + i * 2, INT(SIN(2.0 * PI * 441.0 * i / 22050.0) * 20000.0))
+NEXT
+WRITEALL_BYTES("sinus22.wav", w)
+DIM s AS SAMPLE : s = SAMPLE_FROM_SOUND(LOADSOUND("sinus22.wav"))
+WRITEALL("laenge.txt", "laenge " + STR$(ROUND(SAMPLE_LEN(s) * 10) / 10))
+AUDIO_SAVE_WAV(SAMPLE_NOTE(s, 0, 450, 0, 0, 1.0, 0, 1.0), "grund.wav")
+--- nachher
+FUNCTION hz(datei AS STRING, von AS INTEGER, bis AS INTEGER) AS FLOAT
+    DIM w AS BUFFER : w = READALL_BYTES(datei)
+    DIM f AS INTEGER : f = BUFFER_INDEXOF(w, BUFFER_FROM_STRING("fmt "))
+    DIM kan AS INTEGER : kan = BUFFER_GET_U16(w, f + 10)
+    DIM sr AS INTEGER : sr = BUFFER_GET_U32(w, f + 12)
+    DIM d AS INTEGER : d = BUFFER_INDEXOF(w, BUFFER_FROM_STRING("data")) + 8
+    DIM a AS INTEGER : a = sr * von \ 1000
+    DIM e AS INTEGER : e = sr * bis \ 1000
+    DIM kreuz AS INTEGER : kreuz = 0
+    DIM vorher AS BOOLEAN : vorher = BUFFER_GET_I16(w, d + a * 2 * kan) < 0
+    DIM i AS INTEGER
+    FOR i = a + 1 TO e - 1
+        DIM neg AS BOOLEAN : neg = BUFFER_GET_I16(w, d + i * 2 * kan) < 0
+        IF neg <> vorher THEN kreuz = kreuz + 1
+        vorher = neg
+    NEXT
+    RETURN kreuz / 2.0 / ((bis - von) / 1000.0)
+END FUNCTION
+PRINT READLINES("laenge.txt")[0]
+DIM g AS FLOAT : g = hz("grund.wav", 50, 400)
+PRINT "um 441 hz "; g > 430 AND g < 452
+--- erwartet
+laenge 1.0
+um 441 hz TRUE
+
+=== die kanaele werden gemittelt
+' Ein Klang nur im linken Kanal (Pan ganz links) wird als Sample halb so
+' laut wie derselbe Klang in der Mitte -- wie bei SAMPLE_LOAD.
+IMPORT "audio"
+DIM k AS SOUND : k = AUDIO_NOTE("sine", 441, 400, 0, 0, 1.0, 0, 0.8)
+DIM links AS SOUND : links = AUDIO_SOUND_NEW(400)
+AUDIO_SOUND_MIX(links, k, 0, 1.0, -1.0)
+AUDIO_SAVE_WAV(SAMPLE_NOTE(SAMPLE_FROM_SOUND(k), 0, 350, 0, 0, 1.0, 0, 1.0), "mitte.wav")
+AUDIO_SAVE_WAV(SAMPLE_NOTE(SAMPLE_FROM_SOUND(links), 0, 350, 0, 0, 1.0, 0, 1.0), "links.wav")
+--- nachher
+FUNCTION spitze(datei AS STRING) AS FLOAT
+    DIM w AS BUFFER : w = READALL_BYTES(datei)
+    DIM f AS INTEGER : f = BUFFER_INDEXOF(w, BUFFER_FROM_STRING("fmt "))
+    DIM kan AS INTEGER : kan = BUFFER_GET_U16(w, f + 10)
+    DIM d AS INTEGER : d = BUFFER_INDEXOF(w, BUFFER_FROM_STRING("data")) + 8
+    DIM n AS INTEGER : n = BUFFER_GET_U32(w, d - 4) \ 2
+    DIM best AS INTEGER : best = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM v AS INTEGER : v = ABS(BUFFER_GET_I16(w, d + i * 2))
+        IF v > best THEN best = v
+    NEXT
+    RETURN best / 32767.0
+END FUNCTION
+DIM m AS FLOAT : m = spitze("mitte.wav")
+DIM l AS FLOAT : l = spitze("links.wav")
+PRINT "mitte laut "; m > 0.7
+PRINT "links halb so laut "; l / m > 0.45 AND l / m < 0.55
+--- erwartet
+mitte laut TRUE
+links halb so laut TRUE
+
+=== ein freigegebener klang ist ein fehler
+IMPORT "audio"
+DIM k AS SOUND : k = AUDIO_TONE(440, 100)
+UNLOADSOUND(k)
+DIM s AS SAMPLE : s = SAMPLE_FROM_SOUND(k)
+--- fehler
+SAMPLE_FROM_SOUND: dieser Klang wurde bereits mit UNLOADSOUND freigegeben
+
+=== ein ungueltiges handle ist ein fehler
+IMPORT "audio"
+DIM s AS SAMPLE : s = SAMPLE_FROM_SOUND(99)
+--- fehler
+SAMPLE_FROM_SOUND: ungueltiges SOUND-Handle 99

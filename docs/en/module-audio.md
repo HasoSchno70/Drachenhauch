@@ -366,6 +366,7 @@ instrument.
 |---|---|
 | `SAMPLE_LOAD(pfad$)` → SAMPLE | load WAV/OGG/QOA, normalized to mono |
 | `SAMPLE_FROM_BUFFER(puffer, abtastrate)` → SAMPLE | sample from raw 16-bit PCM (little endian, signed, mono) |
+| `SAMPLE_FROM_SOUND(sound)` → SAMPLE | a SOUND (from `SPEAK_SOUND`, `AUDIO_NOTE`, `LOADSOUND` ...) as a sample, channels averaged to mono, sample rate kept |
 | `SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms])` → AUDIO_CHANNEL | play at a relative pitch |
 | `SAMPLE_NOTE(sample, halbtoene, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_halbtoene])` → SOUND | build a note as a sound (not play it), envelope like `AUDIO_NOTE` |
 | `SAMPLE_SET_LOOP(sample, start, end[, art$])` | loop region in frames (for held notes), `art$` = `vorwaerts` (forwards, default) or `pingpong` |
@@ -410,6 +411,11 @@ sample rate is already accounted for in the pitch.
 `SAMPLE_FROM_BUFFER` takes samples that do not exist as a file — such as
 Base64 in a JSON (`BUFFER_FROM_BASE64` before it). A value −32768..32767 is
 divided by 32768; an odd length is an error.
+`SAMPLE_FROM_SOUND` turns a finished sound into a sample without the detour
+via `AUDIO_SAVE_WAV` and `SAMPLE_LOAD` — such as a voice from `SPEAK_SOUND`
+that is then detuned or doubled with `SAMPLE_NOTE`. The channels are averaged
+as with `SAMPLE_LOAD`, the values stay floating point (no 16-bit rounding as
+via the file).
 **Ping-pong** runs the loop region backwards down again at its end instead of
 jumping to its start — a sample whose ends do not match up does not click
 that way.

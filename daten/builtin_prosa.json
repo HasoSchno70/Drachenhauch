@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2134,
+ "count": 2135,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1634,6 +1634,7 @@
   "RTRIM$": "Whitespace nur links / nur rechts entfernen",
   "SAMEFILE": "meinen beide Pfade dieselbe Datei? Ein Textvergleich irrt bei / gegen \\, bei einem .. im Pfad, bei kurzen 8.3-Namen und (unter Windows) bei Groß/klein",
   "SAMPLE_FROM_BUFFER": "Sample aus rohem 16-Bit-PCM (little endian, vorzeichenbehaftet, mono)",
+  "SAMPLE_FROM_SOUND": "ein SOUND (aus SPEAK_SOUND, AUDIO_NOTE, LOADSOUND ...) als Sample, Kanäle auf Mono gemittelt, Abtastrate übernommen",
   "SAMPLE_LEN": "Laenge in Sekunden bei Originaltonhoehe",
   "SAMPLE_LOAD": "WAV/OGG/QOA laden, auf Mono normalisiert",
   "SAMPLE_NOTE": "eine Note als Klang bauen (nicht abspielen), Huellkurve wie AUDIO_NOTE",
