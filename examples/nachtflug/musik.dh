@@ -543,7 +543,7 @@ SUB schrittPlanen(n AS INTEGER)
     ' --- Stimme --- im Breakdown zwei Saetze, im Ausklang noch einmal der zweite
     IF s = 0 AND (takt = AB_PAUSE + 1 OR takt = AB_PAUSE + 9 OR takt = AB_AUS + 5) THEN
         DIM sn AS INTEGER : sn = IIF(takt = AB_PAUSE + 1, 0, 1)
-        IF stimmeBauen(sn) THEN spielen(klaenge[gemerkt("stimme" + STR$(sn))], n, IIF(takt >= AB_AUS, 0.55, 0.85))
+        IF stimmeBauen(sn) THEN spielen(klaenge[gemerkt("stimme" + STR$(sn))], n, IIF(takt >= AB_AUS, 0.9, 1.4))
     END IF
 
     ' --- Funken --- Glocken auf festen Stellen, die nach Zufall aussehen
