@@ -66,57 +66,97 @@ DIM shTunnel AS INTEGER : shTunnel = shader("tunnel")
 DIM shNebel AS INTEGER : shNebel = shader("nebel")
 DIM shGlanz AS INTEGER : shGlanz = shader("glanz")
 
-' --- Galaxie (Szene 5): tausende Wuerfel, ein Zeichenaufruf -------------------
-CONST STERNE = 1800
-DIM wuerfel AS INTEGER : wuerfel = MESH_CUBE(1.0, 1.0, 1.0)
+' --- Galaxie (Szene 5): Lichtspuren auf Umlaufbahnen ---------------------------
+' Jeder Stern ist ein langgezogener, duenner Quader entlang seiner Bahn --
+' mit dem Glanz-Shader darueber wird daraus eine Lichtspur wie auf einer
+' Langzeitbelichtung. Alle in EINEM Aufruf (MODEL_INSTANCED); die Laufzeit
+' zeichnet je verschiedener Farbe einmal, darum stufen die Farben in eine
+' kleine Tafel (6 Toene x 4 Helligkeiten). Dahinter rechnet der Shader die
+' leuchtende Scheibe mit Spiralarmen und Staubbahnen (glanz.fs) -- mit
+' derselben Kamera und derselben Drehung, damit beides deckungsgleich ist.
+' Auf jeden Schlag laeuft eine Welle von innen nach aussen: die Spuren, die
+' sie erreicht, heben sich und leuchten auf.
+CONST STERNE = 2600
+DIM spur AS INTEGER : spur = MESH_CUBE(1.0, 1.0, 1.0)
 DIM gR[STERNE] AS FLOAT       ' Abstand zur Mitte
 DIM gW[STERNE] AS FLOAT       ' Winkel
 DIM gH[STERNE] AS FLOAT       ' Hoehe ueber der Scheibe
-DIM gS[STERNE] AS FLOAT       ' Groesse
-DIM gFarbe[STERNE] AS INTEGER
+DIM gD[STERNE] AS FLOAT       ' Dicke
+DIM gTon[STERNE] AS INTEGER   ' Farbton 0..5
 DIM gMat[STERNE] AS MAT4
+DIM gFarbe[STERNE] AS INTEGER
+DIM tafel[24] AS INTEGER
+' Farbtoene: Kern warm, Arme blau, tuerkis, violett, rosa (Sternentstehung)
+DIM tonR AS ARRAY OF INTEGER : tonR = [255, 255, 120, 110, 190, 255]
+DIM tonG AS ARRAY OF INTEGER : tonG = [225, 190, 165, 245, 130, 140]
+DIM tonB AS ARRAY OF INTEGER : tonB = [170, 120, 255, 235, 255, 210]
 DIM gi AS INTEGER
+FOR gi = 0 TO 23
+    DIM st AS FLOAT : st = 0.55 + 0.3 * (gi MOD 4)
+    tafel[gi] = RGB(MIN(255, INT(tonR[gi \ 4] * st)), MIN(255, INT(tonG[gi \ 4] * st)), MIN(255, INT(tonB[gi \ 4] * st)))
+NEXT
 RANDOMIZE(7)
 FOR gi = 0 TO STERNE - 1
-    ' zwei Spiralarme, dazu ein dichter Kern
     DIM arm AS INTEGER : arm = gi MOD 2
     DIM r AS FLOAT
-    IF gi < STERNE \ 6 THEN
-        r = RND() ^ 2 * 6.0
+    IF gi < STERNE \ 8 THEN
+        r = 0.4 + RND() ^ 1.6 * 6.0
     ELSE
-        r = 4.0 + RND() * 30.0
+        r = 3.0 + RND() ^ 0.9 * 32.0
     END IF
     gR[gi] = r
-    gW[gi] = arm * PI + r * 0.22 + (RND() - 0.5) * (0.5 + 6.0 / (r + 1.0))
-    gH[gi] = (RND() - 0.5) * (2.6 - r * 0.05) * 1.2
-    gS[gi] = 0.12 + RND() ^ 3 * 0.55
-    DIM sorte AS INTEGER : sorte = INT(RND() * 4)
-    IF r < 6 THEN sorte = 4
-    SELECT CASE sorte
-        CASE 0 : gFarbe[gi] = RGB(120, 170, 255)
-        CASE 1 : gFarbe[gi] = RGB(190, 120, 255)
-        CASE 2 : gFarbe[gi] = RGB(110, 240, 230)
-        CASE 3 : gFarbe[gi] = RGB(255, 150, 200)
-        CASE ELSE : gFarbe[gi] = RGB(255, 220, 160)
-    END SELECT
+    ' um den Arm gestreut, aussen weiter
+    gW[gi] = arm * PI + r * 0.22 + (RND() - 0.5) * (0.35 + 4.0 / (r + 2.0)) + (RND() - 0.5) * 0.25
+    gH[gi] = (RND() - 0.5) * 2.0 * (0.25 + 1.6 * EXP(-r * 0.25))
+    gD[gi] = 0.022 + RND() ^ 4 * 0.07
+    DIM ton AS INTEGER
+    IF r < 6 THEN
+        ton = IIF(RND() < 0.7, 0, 1)
+    ELSE
+        ton = 2 + INT(RND() * 3)
+        IF RND() < 0.12 THEN ton = 5
+    END IF
+    gTon[gi] = ton
 NEXT
 
-SUB galaxieZeichnen(zeit AS FLOAT, kick AS FLOAT, fort AS FLOAT)
-    ' Kamera: weiter Bogen ueber der Scheibe, dann hinein
-    DIM kw AS FLOAT : kw = zeit * 0.07
-    DIM kr AS FLOAT : kr = 52.0 - fort * 26.0
-    CAMERA3D(COS(kw) * kr, 9.0 + 8.0 * COS(fort * PI), SIN(kw) * kr, 0, 0, 0, 52)
+' Die Kamera der Galaxie -- main und Shader brauchen dieselbe
+DIM kamX AS FLOAT
+DIM kamY AS FLOAT
+DIM kamZ AS FLOAT
+CONST KAM_FOV = 52.0
+
+' wie schnell eine Bahn im Abstand r umlaeuft (Bogenmass je Sekunde)
+FUNCTION umlauf(r AS FLOAT) AS FLOAT
+    RETURN 0.9 / (r + 2.0)
+END FUNCTION
+
+SUB galaxieZeichnen(zeit AS FLOAT, kick AS FLOAT, fort AS FLOAT, takt AS FLOAT)
+    ' Kamera: von hoch oben ueber der Scheibe in einem Bogen hinab, bis knapp
+    ' ueber die Arme
+    DIM kw AS FLOAT : kw = 0.6 + zeit * 0.05
+    DIM kr AS FLOAT : kr = 46.0 - 20.0 * fort
+    kamX = COS(kw) * kr
+    kamZ = SIN(kw) * kr
+    kamY = 4.0 + 30.0 * (1.0 - fort) ^ 2
+    CAMERA3D(kamX, kamY, kamZ, 0, -0.5 * fort, 0, KAM_FOV)
     LIGHT_ENABLE()
-    LIGHT_AMBIENT(RGB(60, 60, 110), 0.9)
+    LIGHT_AMBIENT(RGB(255, 255, 255), 1.0)
+    ' die Welle: auf jeden Schlag ein Ring, der in einer Viertel nach aussen laeuft
+    DIM welle AS FLOAT : welle = (takt * 4.0 - FLOOR(takt * 4.0)) * 36.0
     DIM i AS INTEGER
-    DIM puls AS FLOAT : puls = 1.0 + 0.45 * kick
     FOR i = 0 TO STERNE - 1
-        ' innen dreht es schneller als aussen
-        DIM w AS FLOAT : w = gW[i] - zeit * (0.9 / (gR[i] + 2.0))
-        DIM s AS FLOAT : s = gS[i] * IIF(gR[i] < 6.0, puls, 1.0 + 0.2 * kick)
-        gMat[i] = MAT4_MUL(MAT4_TRANSLATE(COS(w) * gR[i], gH[i], SIN(w) * gR[i]), MAT4_MUL(MAT4_ROTATE_Y(w * 3.0 + zeit), MAT4_SCALE(s, s, s)))
+        DIM r AS FLOAT : r = gR[i]
+        DIM w AS FLOAT : w = gW[i] - zeit * umlauf(r)
+        DIM abst AS FLOAT : abst = r - welle
+        DIM hub AS FLOAT : hub = EXP(-abst * abst * 0.08) * (0.25 + 0.75 * kick)
+        ' die Spur: so lang, wie der Stern in einer Drittelsekunde wandert
+        DIM lang AS FLOAT : lang = 0.25 + umlauf(r) * r * 2.6 * (1.0 + 0.6 * hub)
+        DIM d AS FLOAT : d = gD[i] * (1.0 + hub)
+        gMat[i] = MAT4_MUL(MAT4_TRANSLATE(COS(w) * r, gH[i] + hub * 1.2, SIN(w) * r), MAT4_MUL(MAT4_ROTATE_Y(-w), MAT4_SCALE(d, d, lang)))
+        ' der Kern ist dicht, dort reicht die dunkelste Stufe -- sonst nur ein weisser Fleck
+        gFarbe[i] = tafel[gTon[i] * 4 + MIN(3, INT(IIF(r < 6.0, 0.0, 1.0) + hub * 3.0))]
     NEXT
-    MODEL_INSTANCED(wuerfel, gMat, gFarbe)
+    MODEL_INSTANCED(spur, gMat, gFarbe)
 END SUB
 
 ' --- Text auf dem Bild ----------------------------------------------------------
@@ -133,20 +173,35 @@ FUNCTION zeigen(takt AS FLOAT, von AS FLOAT, bis AS FLOAT) AS FLOAT
     RETURN CLAMP(MIN((takt - von) / 1.5, (bis - takt) / 1.5), 0.0, 1.0)
 END FUNCTION
 
+' Eine Zeile deutsch, darunter englisch, kleiner und etwas zurueckhaltender.
+SUB zweisprachig(de AS STRING, en AS STRING, y AS INTEGER, groesse AS INTEGER, deck AS FLOAT, gross AS BOOLEAN)
+    mittig(de, y, groesse, deck, gross)
+    mittig(en, y + INT(groesse * 1.3), INT(groesse * 0.8), deck * 0.7, FALSE)
+END SUB
+
 SUB beschriftung(takt AS FLOAT)
-    mittig("N A C H T F L U G", 270, 64, zeigen(takt, 3, 11), TRUE)
-    mittig("eine Demo in Drachenhauch", 372, 24, zeigen(takt, 5, 11), FALSE)
-    mittig("Musik und Bild aus einem Programm -- ohne eine einzige Klang- oder Bilddatei", 640, 18, zeigen(takt, 7, 14), FALSE)
+    mittig("N A C H T F L U G", 250, 64, zeigen(takt, 3, 11), TRUE)
+    zweisprachig("eine Demo in Drachenhauch", "a demo in Drachenhauch", 352, 24, zeigen(takt, 5, 11), FALSE)
+    zweisprachig("von Hans Schnorrenberger", "by Hans Schnorrenberger", 432, 22, zeigen(takt, 6, 11), FALSE)
+    zweisprachig("Musik und Bild aus einem Programm -- ohne eine einzige Klang- oder Bilddatei", _
+        "Music and pictures from one program -- without a single sound or image file", 636, 18, zeigen(takt, 7, 14), FALSE)
     ' kleine Hinweise, was gerade zu sehen ist
-    mittig("Tiefflug: Gelaende aus Rauschen, im Fragment-Shader berechnet", 660, 18, zeigen(takt, 17, 22), FALSE)
-    mittig("Lichttunnel: die Wellen laufen auf der Audio-Uhr", 660, 18, zeigen(takt, 33, 38), FALSE)
-    mittig("Sternennebel: Volumen-Raymarching", 660, 18, zeigen(takt, 49, 54), FALSE)
-    mittig(ZAHL$(STERNE) + " Würfel, ein Zeichenaufruf (MODEL_INSTANCED)", 660, 18, zeigen(takt, 65, 70), FALSE)
+    zweisprachig("Tiefflug: Gelände aus Rauschen, im Fragment-Shader berechnet", _
+        "Low flight: terrain made of noise, computed in a fragment shader", 646, 18, zeigen(takt, 17, 22), FALSE)
+    zweisprachig("Lichttunnel: die Wellen laufen auf der Audio-Uhr", _
+        "Light tunnel: the waves run on the audio clock", 646, 18, zeigen(takt, 33, 38), FALSE)
+    zweisprachig("Sternennebel: Volumen-Raymarching", _
+        "Star nebula: volume raymarching", 646, 18, zeigen(takt, 49, 54), FALSE)
+    zweisprachig(ZAHL$(STERNE) + " Lichtspuren in einem Zeichenaufruf, die Scheibe im Shader", _
+        REPLACE$(ZAHL$(STERNE), ".", ",") + " light trails in one draw call, the disc in a shader", 646, 18, zeigen(takt, 65, 70), FALSE)
     ' Abspann
-    mittig("Nachtflug", 250, 56, zeigen(takt, 83, 93), TRUE)
-    mittig("Musik: AUDIO_NOTE, AUDIO_SOUND_MIX und eine Audio-Uhr -- 128 BPM, A-Moll", 350, 20, zeigen(takt, 84, 93), FALSE)
-    mittig("Bild: GLSL-Raymarching und 3D-Instancing in dhrt", 385, 20, zeigen(takt, 85, 93), FALSE)
-    mittig("Drachenhauch", 470, 30, zeigen(takt, 87, 95), TRUE)
+    mittig("Nachtflug", 200, 56, zeigen(takt, 83, 93), TRUE)
+    zweisprachig("von Hans Schnorrenberger", "by Hans Schnorrenberger", 290, 26, zeigen(takt, 83.5, 93), FALSE)
+    zweisprachig("Musik: Uplifting Trance, 128 BPM, a-Moll -- synthetisiert mit AUDIO_NOTE und einer Audio-Uhr", _
+        "Music: uplifting trance, 128 BPM, A minor -- synthesised with AUDIO_NOTE and an audio clock", 380, 19, zeigen(takt, 84, 93), FALSE)
+    zweisprachig("Bild: GLSL-Raymarching und 3D-Instancing in dhrt", _
+        "Pictures: GLSL raymarching and 3D instancing in dhrt", 440, 19, zeigen(takt, 85, 93), FALSE)
+    mittig("Drachenhauch", 520, 30, zeigen(takt, 87, 95), TRUE)
 END SUB
 
 ' --- Ablauf ---------------------------------------------------------------------
@@ -192,7 +247,9 @@ WHILE NOT beenden
         SHADER_SET(sh, "fort", (takt - AB_PAUSE) / 16.0)
     ELSEIF takt < AB_AUS THEN
         sh = shGlanz
-        galaxieZeichnen(zeit, kick, (takt - AB_HOCH2) / 16.0)
+        galaxieZeichnen(zeit, kick, (takt - AB_HOCH2) / 16.0, takt)
+        SHADER_SET3(sh, "kamera", kamX, kamY, kamZ)
+        SHADER_SET(sh, "fort", (takt - AB_HOCH2) / 16.0)
         SHADER_SET(sh, "hell", blende(takt, AB_HOCH2 - 0.5, AB_AUS))
         ' der weisse Blitz auf der Eins des Hoehepunkts
         SHADER_SET(sh, "blitz", MAX(0.0, 1.0 - (takt - AB_HOCH2) * 1.5))

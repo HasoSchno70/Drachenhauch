@@ -23,7 +23,8 @@ kanaele verschieden
 dauer 176.5 +-0.05
 spitze 0.9 +-0.01
 pegel 0 30000 < 0.5
-pegel 70000 71000 > 0.08
+pegel 70000 71000 > 0.05
+pegel 95000 96000 > 0.02
 pegel 175600 176400 < 0.005
 
 === intro ozean mit polarlicht

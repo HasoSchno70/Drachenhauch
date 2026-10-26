@@ -281,7 +281,7 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 | `156_gui_alle_widgets.dh` | **all 22 GUI widgets** in one fullscreen application, each with a real job |
 | `glutfaden/main.dh` | **Glutfaden** — the cross-stitch editor PySticky in Drachenhauch, with GTK 3 through foreign libraries: part and back stitches, layers, image import, PDF/HTML/OXS export, PCStitch and Pattern Maker, printing, light and dark theme |
 | `../funkenflug/main.dh` | **Funkenflug** — a schematic editor with GTK 3: hierarchy and buses, ERC, netlist/SPICE, simulation with ngspice, perfboard layout with Gerber and 3D preview, KiCad import (in the top-level folder, not in the installer) |
-| `nachtflug/main.dh` | **Nachtflug** — a demo: three minutes of trance in stereo, fully synthesised, on an audio clock; plus an ocean with aurora, a low flight, a light tunnel and a star nebula from fragment shaders and a galaxy of 1,800 cubes |
+| `nachtflug/main.dh` | **Nachtflug** — a demo: three minutes of uplifting trance in stereo (supersaw, piano, a formant choir, trance gate), fully synthesised, on an audio clock; plus an ocean with aurora, a low flight, a light tunnel and a star nebula from fragment shaders and a galaxy of 2,600 light trails |
 | `chip8/main.dh` | **CHIP-8 emulator** — all 35 instructions, an assembler and a game of its own, keypad by position, afterglow against flicker |
 | `texteditor/main.dh` | **text editor** — tabs, find and replace, encoding and line endings kept on save |
 | `fotos/main.dh` | **photo viewer with GTK 3** — overview, single view, rotation from camera data, slideshow |

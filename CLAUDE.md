@@ -2809,25 +2809,37 @@ alter laeuft, Aktualisieren nimmt ihn an. Gegen echtes GitHub ungeprueft.
 
 ## Demo Nachtflug (2026-10-26)
 
-`examples/nachtflug/` (Wunsch des Nutzers: eine Demo mit eigener
-Trance-Musik in Stereo und Bildern, die sprachlos machen, nicht hektisch).
-`musik.dh`: 128 BPM, A-Moll, 92 Takte, alles aus AUDIO_NOTE/AUDIO_SFX;
-Stereo und Ping-Pong-Echo sind VORAB in die Klaenge gemischt
-(`AUDIO_SOUND_MIX` mit pan, `mitEcho`) -- auf dem einen sfx-Bus haette ein
-Hall die Bassdrum verwischt; Bus: Hall 0.16, Kompressor, Filter per Tweener
-(Intro auf, Breakdown zu/auf). Gespielt auf einer Audio-Uhr (eine Sechzehntel
-= ein Tick, `musikPlanen` je Bild einen halben Takt voraus), dieselbe
-Routine `schrittPlanen` schreibt ueber `spielen` auch die WAV (`--wav`).
-`--ab TAKT` startet mitten im Stueck (Versatz der Uhr), `--messen` meldet
-Bildrate und Spitze am Mischer (gemessen 0.88). `main.dh`: fuenf Szenen je
-Abschnitt, vier als Fragment-Shader ueber POSTFX (`shader/*.fs`, Raymarching;
-der Text liegt in texture0 und wird obenauf gelegt), die fuenfte echtes 3D
-(MODEL_INSTANCED, 1800 Wuerfel, Glanz-Shader mit Sternen). **Falle:** in
-diesem Aufbau zaehlt `fragTexCoord.y` andersherum als gedacht -- die erste
-Fassung stand auf dem Kopf; kein `uv.y = -uv.y`. Etwa 60 Bilder je Sekunde
-in 1280x720 (Galaxie 57). Tests `tests/pruef/beispiel_nachtflug.dhtest`
-(7: die WAV mit `--- ton`, jede Szene am Bildschirmfoto); ein kaputter
-Shader und eine Fassung ohne Panorama fallen.
+`examples/nachtflug/` (Wunsch des Nutzers Hans Schnorrenberger, der im
+Titel und Abspann steht: eine Demo mit eigener Trance-Musik in Stereo und
+Bildern, die sprachlos machen, nicht hektisch; nach dem ersten Hoeren
+"traeumerischer, wie Armin van Buuren"). `musik.dh`: 128 BPM, a-Moll, 92
+Takte, alles aus AUDIO_NOTE/AUDIO_SFX: sechzehn Takte Harmonie mit None und
+Sexte, eine Melodie ueber sechzehn Takte, Supersaw (sieben Saegen), Klavier,
+Chor aus Formant-gewichteten Obertoenen, pumpende Flaechen (eine Viertel
+lang, langsamer Einsatz), Trance-Gate, Fuellungen je Phrase. Stereo und
+Ping-Pong-Echo sind VORAB in die Klaenge gemischt (`AUDIO_SOUND_MIX` mit
+pan, `mitEcho`) -- auf dem einen sfx-Bus haette ein Hall die Bassdrum
+verwischt; Bus: Hall per Tweener (weit, wo die Bassdrum schweigt),
+Kompressor, Filter per Tweener. **Die Klaenge brauchen 2,7 s** (der Chor
+allein 8 x 200 ms) -- `vorbauen` baut je Bild einen, die schweren zuerst,
+waehrend das Intro noch schwarz ist; was fehlt, entsteht beim ersten
+Gebrauch. **AUDIO_NOTE-Vibrato ist ein FAKTOR** (0.12 = 12 % = zwei
+Halbtoene), die erste Fassung leierte. Gespielt auf einer Audio-Uhr (eine
+Sechzehntel = ein Tick, je Bild einen halben Takt voraus), dieselbe Routine
+`schrittPlanen` schreibt ueber `spielen` auch die WAV (`--wav`). `--ab TAKT`
+startet mitten im Stueck, `--messen` meldet Bildrate und Spitze am Mischer
+(0.88). `main.dh`: fuenf Szenen, vier als Fragment-Shader ueber POSTFX
+(`shader/*.fs`, Raymarching; der Text liegt in texture0 und wird obenauf
+gelegt), die fuenfte eine Galaxie aus 2600 Lichtspuren (duenne, lange
+Quader entlang der Umlaufbahn, MODEL_INSTANCED) ueber einer Scheibe, die
+`glanz.fs` mit DERSELBEN Kamera und Drehung rechnet (Kamera als Uniform).
+**MODEL_INSTANCED zeichnet je verschiedener Farbe einmal** -- die Farben
+stufen darum in eine Tafel aus 24. Beschriftung deutsch mit englischer
+Zeile darunter (`zweisprachig`). **Falle:** `fragTexCoord.y` zaehlt hier
+nach oben -- kein `uv.y = -uv.y`. Etwa 60 Bilder je Sekunde in 1280x720.
+Tests `tests/pruef/beispiel_nachtflug.dhtest` (7: die WAV mit `--- ton`,
+jede Szene am Bildschirmfoto); ein kaputter Shader und eine Fassung ohne
+Panorama fallen.
 
 ## Dogfooding 13: CHIP-8-Emulator (2026-10-24)
 

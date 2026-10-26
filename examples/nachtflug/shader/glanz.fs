@@ -1,7 +1,11 @@
 #version 330
-// Nachbearbeitung fuer die 3D-Szene: Bloom (helle Stellen weich verbreitert),
-// sanfte Farbtrennung am Rand, Vignette, weich begrenzt. `blitz` legt auf der
-// Eins des Hoehepunkts ein kurzes Weiss darueber.
+// Die Galaxie: hinter den Lichtspuren der 3D-Szene (texture0) rechnet dieser
+// Shader die leuchtende Scheibe selbst -- Spiralarme, die mit derselben
+// Drehung umlaufen wie die Spuren, dunkle Staubbahnen an ihrer Innenkante,
+// rosa Knoten, wo Sterne entstehen, einen hellen Kern mit Strahlen und auf
+// jeden Schlag einen Lichtring, der nach aussen laeuft. Dazu fuer die
+// Spuren ein Bloom, eine sanfte Farbtrennung und die Vignette. `blitz`
+// legt auf der Eins des Hoehepunkts ein kurzes Weiss darueber.
 in vec2 fragTexCoord;
 uniform sampler2D texture0;
 uniform vec2 resolution;
@@ -9,17 +13,62 @@ uniform float time;
 uniform float hell;
 uniform float kick;
 uniform float blitz;
+uniform float takt;
+uniform float fort;      // 0..1 durch den Abschnitt
+uniform vec3 kamera;     // dieselbe Kamera wie CAMERA3D in main.dh
 out vec4 finalColor;
 
+const float FOV = 52.0;
+
 float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-// Sterne und ein Hauch Nebel, wo das Bild schwarz ist (hinter der Galaxie)
-vec3 grund(vec2 uv) {
-    vec2 a = (uv - 0.5) * resolution / resolution.y;
-    vec2 s = a * 240.0 + vec2(time * 0.6, 0.0);
+float rausch(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash2(i), hash2(i + vec2(1, 0)), u.x), mix(hash2(i + vec2(0, 1)), hash2(i + vec2(1, 1)), u.x), u.y);
+}
+float fbm(vec2 p) {
+    float s = 0.0, a = 0.5;
+    for (int i = 0; i < 4; i++) { s += a * rausch(p); p = p * 2.07 + vec2(5.3, 1.9); a *= 0.5; }
+    return s;
+}
+
+// Wo die Arme liegen: wie in main.dh, Winkel = r * 0.22 - Zeit * Umlauf(r)
+float armPhase(float r, float phi) {
+    return 2.0 * (phi - r * 0.22 + time * 0.9 / (r + 2.0));
+}
+
+// Leuchten und Staub an einem Punkt der Scheibe
+void scheibe(vec3 p, out vec3 licht, out float staub) {
+    float r = length(p.xz);
+    float phi = atan(p.z, p.x);
+    float ph = armPhase(r, phi);
+    float arm = pow(0.5 + 0.5 * cos(ph), 4.0);
+    float dicke = 0.3 + 1.1 * exp(-r * 0.22);
+    float senk = exp(-(p.y * p.y) / (dicke * dicke));
+    // Klumpen entlang der Arme: Rauschen in einem Feld, das mitdreht
+    vec2 q = vec2(r * 0.9, ph * 2.2);
+    float klumpen = fbm(q);
+    float scheibeHell = exp(-r / 10.0) * (0.05 + 1.5 * arm * (0.3 + 1.1 * klumpen)) * smoothstep(40.0, 26.0, r);
+    vec3 farbeArm = mix(vec3(0.45, 0.6, 1.0), vec3(0.4, 0.9, 1.0), smoothstep(0.4, 0.8, rausch(q * 0.7 + 3.0)));
+    vec3 farbe = mix(vec3(1.0, 0.78, 0.5), farbeArm, smoothstep(1.5, 9.0, r));
+    licht = farbe * scheibeHell * senk;
+    // rosa Knoten, wo Sterne entstehen: nur auf den Armen, nur wo das Rauschen hoch ist
+    licht += vec3(1.0, 0.35, 0.7) * pow(max(klumpen - 0.5, 0.0) * 2.5, 2.0) * arm * senk * smoothstep(5.0, 12.0, r) * smoothstep(32.0, 20.0, r) * 1.6;
+    // Kern
+    licht += vec3(1.0, 0.85, 0.62) * exp(-r * r / 2.5) * exp(-p.y * p.y / 0.8) * (1.3 + 1.0 * kick) * (1.0 - 0.45 * fort);
+    // der Ring des Schlags
+    float welle = fract(takt * 4.0) * 36.0;
+    licht += vec3(0.55, 0.8, 1.0) * exp(-(r - welle) * (r - welle) * 0.12) * senk * (0.08 + 0.35 * kick) * smoothstep(36.0, 20.0, welle);
+    // Staub an der Innenkante der Arme
+    float bahn = pow(0.5 + 0.5 * cos(ph + 0.6), 10.0);
+    staub = bahn * smoothstep(3.0, 7.0, r) * smoothstep(34.0, 18.0, r) * exp(-(p.y * p.y) / 0.08) * (0.6 + 0.8 * rausch(q * 1.7 + 9.0));
+}
+
+vec3 sterne(vec3 d) {
+    vec2 s = vec2(atan(d.z, d.x), asin(clamp(d.y, -1.0, 1.0))) * 160.0;
     float h = hash2(floor(s));
-    float st = step(0.995, h) * smoothstep(0.45, 0.0, length(fract(s) - 0.5)) * (0.6 + 0.4 * sin(time * 2.0 + h * 40.0));
-    vec3 n = vec3(0.10, 0.04, 0.16) * exp(-pow(a.y + 0.1 + 0.15 * sin(a.x * 1.3), 2.0) * 6.0);
-    return vec3(0.8, 0.85, 1.0) * st + n;
+    float st = step(0.993, h) * smoothstep(0.5, 0.0, length(fract(s) - 0.5)) * (0.6 + 0.4 * sin(time * 1.7 + h * 40.0));
+    return mix(vec3(0.7, 0.8, 1.0), vec3(1.0, 0.85, 0.7), fract(h * 13.0)) * st;
 }
 
 vec3 probe(vec2 uv) {
@@ -30,26 +79,72 @@ vec3 probe(vec2 uv) {
 void main() {
     vec2 uv = fragTexCoord;
     vec2 m = uv - 0.5;
-    // Farbtrennung: Rot und Blau ein wenig auseinander, zum Rand hin mehr
-    float ab = 0.0015 + 0.002 * kick;
-    vec3 c = vec3(probe(uv + m * ab).r, probe(uv).g, probe(uv - m * ab).b);
-    // Bloom: zwei Ringe von Proben um den Punkt, nur das Helle zaehlt
-    vec3 b = vec3(0.0);
-    vec2 px = 1.0 / resolution;
-    for (int r = 1; r <= 2; r++) {
-        for (int i = 0; i < 12; i++) {
-            float a = float(i) * 0.5236 + float(r);
-            vec2 o = vec2(cos(a), sin(a)) * px * float(r) * 9.0;
-            vec3 s = probe(uv + o);
-            b += max(s - 0.35, 0.0);
+
+    // der Strahl der Kamera -- wie raylib ihn fuer CAMERA3D rechnet
+    vec3 ziel = vec3(0.0, -0.5 * fort, 0.0);
+    vec3 vorne = normalize(ziel - kamera);
+    vec3 rechts = normalize(cross(vorne, vec3(0.0, 1.0, 0.0)));
+    vec3 oben = cross(rechts, vorne);
+    float tf = tan(radians(FOV) * 0.5);
+    vec2 p = m * vec2(resolution.x / resolution.y, 1.0) * 2.0 * tf;
+    vec3 d = normalize(vorne + p.x * rechts + p.y * oben);
+
+    // die Scheibe: durch die Schicht |y| < 3 marschieren
+    vec3 gal = vec3(0.0);
+    float durch = 1.0;
+    float t0 = 0.0, t1 = 0.0;
+    if (abs(d.y) > 1e-4) {
+        float ta = (3.0 - kamera.y) / d.y, tb = (-3.0 - kamera.y) / d.y;
+        t0 = max(min(ta, tb), 0.0);
+        t1 = max(ta, tb);
+    } else if (abs(kamera.y) < 3.0) {
+        t1 = 120.0;
+    }
+    t1 = min(t1, t0 + 110.0);
+    if (t1 > t0) {
+        const int N = 48;
+        float dt = (t1 - t0) / float(N);
+        float t = t0 + dt * hash2(fragTexCoord * resolution + fract(time));
+        for (int i = 0; i < N; i++) {
+            vec3 q = kamera + d * t;
+            vec3 l; float s;
+            scheibe(q, l, s);
+            gal += l * durch * dt * 1.3;
+            durch *= exp(-s * dt * 1.8);
+            t += dt;
         }
     }
-    b /= 24.0;
-    c += b * (2.4 + 2.0 * kick);
+    // Kern als Stern mit Strahlen, dort, wo die Mitte im Bild liegt
+    vec3 zurMitte = normalize(-kamera);
+    float wk = max(dot(d, zurMitte), 0.0);
+    float abw = acos(min(wk, 1.0));
+    vec3 ax = normalize(cross(zurMitte, oben));
+    vec3 ay = cross(ax, zurMitte);
+    vec2 kp = vec2(dot(d, ax), dot(d, ay));
+    float strahl = exp(-abs(kp.x) * 900.0) * exp(-abs(kp.y) * 22.0) + exp(-abs(kp.y) * 900.0) * exp(-abs(kp.x) * 22.0);
+    gal += vec3(1.0, 0.9, 0.75) * (exp(-abw * 70.0) * 0.8 + strahl * 0.5) * (0.8 + 0.6 * kick) * durch;
+
+    // die Lichtspuren: Farbtrennung und Bloom
+    float ab = 0.0012 + 0.002 * kick;
+    vec3 c = vec3(probe(uv + m * ab).r, probe(uv).g, probe(uv - m * ab).b);
+    vec3 b = vec3(0.0);
+    vec2 px = 1.0 / resolution;
+    for (int r = 1; r <= 3; r++) {
+        for (int i = 0; i < 10; i++) {
+            float a = float(i) * 0.6283 + float(r) * 0.9;
+            vec2 o = vec2(cos(a), sin(a)) * px * float(r * r) * 4.0;
+            vec3 s = probe(uv + o);
+            b += max(s - 0.3, 0.0) / float(r);
+        }
+    }
+    b /= 18.0;
+    c += b * (2.2 + 1.8 * kick);
+    c += gal;
     float l = dot(c, vec3(0.299, 0.587, 0.114));
-    c += grund(uv) * (1.0 - smoothstep(0.01, 0.12, l));
-    c *= 1.0 - 0.55 * dot(m, m) * 1.6;
-    c = c / (1.0 + 0.35 * c);
+    c += sterne(d) * durch * (1.0 - smoothstep(0.02, 0.15, l));
+    c *= 1.0 - 0.5 * dot(m, m) * 1.6;
+    c = c / (1.0 + 0.4 * c);
+    c = pow(c, vec3(0.95));
     c = mix(c, vec3(1.0, 0.97, 0.92), clamp(blitz, 0.0, 1.0) * 0.85);
     finalColor = vec4(c * hell, 1.0);
 }
