@@ -137,8 +137,8 @@ und ueberhaupt nichts speichern.
 | `IMAGE_SAVE(bild, pfad$ [, mit_alpha])` | das Bild in eine Datei schreiben (`.png`, `.bmp`, `.jpg`, `.tga`); mit `FALSE` ohne Deckkraft-Kanal (RGB) — Druckdienste lehnen ein PNG mit Alphakanal ab, auch wenn jeder Punkt deckend ist. Die Deckkraft wird dabei weggelassen, nicht verrechnet: wer einen Grund will, legt das Bild vorher auf ein deckendes |
 | `GETALPHA(bild, x, y)` | Deckkraft eines Bildpunkts, 0..255; `-1` ausserhalb (core, kein IMPORT noetig) |
 | `IMAGE_FREE(bild)` | das Bild und seine Grafikspeicher-Textur freigeben |
-| `IMAGE_FROM_BUFFER(puffer)` | IMAGE — ein Bild aus den Bytes einer Bilddatei (PNG, JPG, BMP, GIF, QOI, DDS), etwa aus `HTTP_BYTES` oder `BUFFER_FROM_BASE64`; das Format steht in den ersten Bytes (core, kein IMPORT noetig) |
-| `IMAGE_TO_BUFFER(bild [, mit_alpha])` | BUFFER — das Bild als PNG-Bytes, ohne Umweg über eine Datei; mit `FALSE` ohne Deckkraft-Kanal wie bei `IMAGE_SAVE` (core, kein IMPORT noetig) |
+| `IMAGE_FROM_BUFFER(puffer)` | IMAGE — ein Bild aus den Bytes einer Bilddatei (PNG, JPG, BMP, GIF, QOI, DDS), etwa aus `HTTP_BYTES` oder `BUFFER_FROM_BASE64`; das Format steht in den ersten Bytes |
+| `IMAGE_TO_BUFFER(bild [, mit_alpha])` | BUFFER — das Bild als PNG-Bytes, ohne Umweg über eine Datei; mit `FALSE` ohne Deckkraft-Kanal wie bei `IMAGE_SAVE` |
 | `IMAGE_MIPMAPS(bild)` | INTEGER — verkleinerte Stufen für die Textur anlegen und trilinear filtern: ein feines Muster auf einer fernen 3D-Fläche flimmert dann nicht mehr. Liefert die Zahl der Stufen; nach `IMAGE_DRAW_*` werden sie nachgezogen |
 | `IMAGE_SAVE_GIF(bilder, pfad$ [, fps_oder_dauern [, wiederholen [, anzahl]]])` | mehrere Bilder als **bewegtes GIF** schreiben |
 | `IMAGE_LOAD_GIF(pfad$)` | ARRAY OF IMAGE — alle Einzelbilder eines bewegten GIFs, schon zusammengesetzt (auch wenn ein Bild nur einen Teil erneuert); eine Datei, die kein GIF ist, ergibt ein einziges Bild |

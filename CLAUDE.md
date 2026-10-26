@@ -2807,6 +2807,36 @@ holen und aktualisieren": ZIP mit Oberordner wie von GitHub ueber
 `gegenserver.dh` (dateien), geaenderter Stand ohne --erneuern = Fehler +
 alter laeuft, Aktualisieren nimmt ihn an. Gegen echtes GitHub ungeprueft.
 
+## Dogfooding 15: Landkarte (2026-10-26)
+
+`examples/karten/`: `kern.dh` (Web-Mercator, Kachelnummern, Haversine,
+Massstab, GPX mit Abschnitten/Routen/Wegpunkten -- ueber XML_CHILD statt
+XML_AT, das je Aufruf von vorn sucht --, Marker als JSON und GPX),
+`kacheln.dh` (HTTP_GET_START, hoechstens 4 zugleich, kleiner Vorrang =
+naeher an der Mitte zuerst, HTTP_CANCEL fuer Kacheln, nach denen im letzten
+Bild keiner fragte, IMAGE_FROM_BUFFER aus HTTP_BYTES, Zwischenspeicher
+`<daten>/kacheln/z/x/y.png` ueber .teil + RENAME, `kMaxSpeicher` mit
+IMAGE_FREE der am laengsten ungenutzten; solange eine Kachel laedt, zeichnet
+`karteZeichnen` den passenden Teil einer groeberen), `main.dh` (Zeichenflaeche,
+Ziehen, Rad um den Zeiger `zoomUm`, Doppelklick, Rechtsklick = Marker per
+GUI_PROMPT, Nominatim-Suche, Hoehenprofil als `chart` mit CHART_X in km,
+Ausfuhr PNG ueber Rendertarget, PDF A4 quer, Drucken). Eigener User-Agent,
+Zuschreibung auf jeder Karte. Gegen die echten Server einmal von Hand
+ausprobiert (eine Ansicht, eine Suche), die Tests nie. **Funde:** (1) `\`
+schnitt Richtung null ab, MOD rundet nach unten -- `(a \ b) * b + a MOD b`
+war bei negativen Zahlen nicht `a`; **`\` rundet jetzt nach unten wie FLOOR**
+(Entscheidung des Nutzers; `vm::int_div`, das Falten geht dieselbe Funktion,
+`jit.rs::rechnen` mit sdiv/srem-Korrektur). Verhaltensaenderung fuer die
+Notizen von 2026.38. Das Handbuch sagte ausserdem, `\` nehme Kommazahlen --
+es ist ein Fehler. (2) Die imgfx-Doku nannte `IMAGE_FROM_BUFFER`/`_TO_BUFFER`
+"core, kein IMPORT", `--check` verlangt `IMPORT "imgfx"`. Tests
+`tests/pruef/beispiel_karten.dhtest` (5: Kern gegen JavaScript, Kacheln vom
+Gegenserver am Bild der Ausfuhr samt Platte und Vergessen, Abbruch mit
+langsamem Server, Spur/Marker/Bild/PDF, echte Maus aus einer Aufnahme) und
+`tests/pruef/ganzzahl_division.dhtest` (VM, Falten, Maschinencode mit
+DHRT_JIT=immer, Fehler); acht Verfaelschungen des Beispiels und die alte
+Laufzeit bzw. ein Bau mit altem Maschinencode fallen je in ihrem Fall.
+
 ## Dogfooding 13: CHIP-8-Emulator (2026-10-24)
 
 `examples/chip8/`: `cpu.dh` (Rechenkern ohne Fenster, alle 35 Befehle,

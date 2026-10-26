@@ -1,0 +1,270 @@
+' kacheln.dh -- Kartenkacheln holen, merken und wieder vergessen.
+'
+' kachelBild(z, x, y, vorrang) fragt nach einer Kachel: ist sie im Speicher,
+' kommt sie sofort zurueck; liegt sie im Zwischenspeicher auf der Platte, wird
+' sie von dort gelesen; sonst merkt sich die Verwaltung den Wunsch. Einmal je
+' Bild holt kachelnPumpen() die fertigen Abrufe ab, bricht Abrufe fuer
+' Kacheln ab, nach denen keiner mehr fragt (aus dem Bild gerollt), und startet
+' neue -- hoechstens KMAX_PARALLEL zugleich, kleiner Vorrang zuerst.
+'
+' Die Server von OpenStreetMap erlauben nur massvollen Gebrauch: ein eigener
+' User-Agent, wenige Abrufe zugleich und ein Zwischenspeicher, der dieselbe
+' Kachel nicht zweimal holt. Genau das tut diese Datei.
+
+IMPORT "html"
+IMPORT "imgfx"
+
+CONST KMAX_PARALLEL = 4
+CONST KWARTEN_FEHLER = 15.0   ' Sekunden bis zum naechsten Versuch
+
+DIM kUrl AS STRING : kUrl = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+DIM kCache AS STRING : kCache = ""
+DIM kBildNr AS INTEGER : kBildNr = 0
+' Kacheln im Speicher (je 256 KB als Textur); was darueber geht, wird vergessen
+DIM kMaxSpeicher AS INTEGER : kMaxSpeicher = 400
+
+' Je Platz eine Kachel. Zustand: 0 gewuenscht, 1 laedt, 2 da, 3 Fehler.
+DIM ksKey AS ARRAY OF STRING : ksKey = []
+DIM ksBild AS ARRAY OF INTEGER : ksBild = []
+DIM ksZustand AS ARRAY OF INTEGER : ksZustand = []
+DIM ksAbruf AS ARRAY OF INTEGER : ksAbruf = []
+DIM ksBenutzt AS ARRAY OF INTEGER : ksBenutzt = []
+DIM ksVorrang AS ARRAY OF FLOAT : ksVorrang = []
+DIM ksWiederAb AS ARRAY OF FLOAT : ksWiederAb = []
+DIM ksFrei AS ARRAY OF INTEGER : ksFrei = []
+DIM kIndex AS MAP OF INTEGER : kIndex = {}
+
+' Zaehler fuer die Statuszeile und die Pruefung.
+DIM kAusNetz AS INTEGER
+DIM kAusPlatte AS INTEGER
+DIM kFehler AS INTEGER
+DIM kAbgebrochen AS INTEGER
+DIM kVergessenZahl AS INTEGER
+DIM kLetzterFehler AS STRING
+
+SUB kachelnEinrichten(url AS STRING, cache AS STRING, kennung AS STRING)
+    IF url <> "" THEN kUrl = url
+    kCache = cache
+    IF kCache <> "" AND NOT DIREXISTS(kCache) THEN MKDIR(kCache)
+    HTTP_SET_HEADER("User-Agent", kennung)
+END SUB
+
+FUNCTION kachelSchluessel$(z AS INTEGER, x AS INTEGER, y AS INTEGER) AS STRING
+    RETURN STR$(z) + "/" + STR$(x) + "/" + STR$(y)
+END FUNCTION
+
+FUNCTION kachelAdresse$(z AS INTEGER, x AS INTEGER, y AS INTEGER) AS STRING
+    RETURN REPLACE$(REPLACE$(REPLACE$(kUrl, "{z}", STR$(z)), "{x}", STR$(x)), "{y}", STR$(y))
+END FUNCTION
+
+FUNCTION kachelDatei$(schluessel AS STRING) AS STRING
+    RETURN PATHJOIN(kCache, schluessel + ".png")
+END FUNCTION
+
+FUNCTION kPlatz(schluessel AS STRING) AS INTEGER
+    IF MAPHAS(kIndex, schluessel) THEN RETURN MAPGET(kIndex, schluessel)
+    DIM k AS INTEGER
+    IF LEN(ksFrei) > 0 THEN
+        k = ARRAY_POP(ksFrei)
+        ksKey[k] = schluessel : ksBild[k] = -1 : ksZustand[k] = 0 : ksAbruf[k] = -1
+        ksBenutzt[k] = kBildNr : ksVorrang[k] = 0 : ksWiederAb[k] = 0
+    ELSE
+        k = LEN(ksKey)
+        ARRAY_PUSH(ksKey, schluessel) : ARRAY_PUSH(ksBild, -1) : ARRAY_PUSH(ksZustand, 0)
+        ARRAY_PUSH(ksAbruf, -1) : ARRAY_PUSH(ksBenutzt, kBildNr) : ARRAY_PUSH(ksVorrang, 0)
+        ARRAY_PUSH(ksWiederAb, 0)
+    END IF
+    MAPPUT(kIndex, schluessel, k)
+    RETURN k
+END FUNCTION
+
+' Aus den Bytes einer Bilddatei; FALSE, wenn es keine ist.
+FUNCTION kAusBytes(k AS INTEGER, b AS BUFFER) AS BOOLEAN
+    IF BUFFER_LEN(b) = 0 THEN RETURN FALSE
+    TRY
+        ksBild[k] = IMAGE_FROM_BUFFER(b)
+        ksZustand[k] = 2
+        RETURN TRUE
+    CATCH e
+        RETURN FALSE
+    END TRY
+END FUNCTION
+
+' Die Kachel z/x/y (x schon in die Welt gelegt), sonst -1. `vorrang`: kleiner
+' = frueher holen (die Entfernung zur Bildmitte).
+FUNCTION kachelBild(z AS INTEGER, x AS INTEGER, y AS INTEGER, vorrang AS FLOAT) AS INTEGER
+    DIM s AS STRING : s = kachelSchluessel$(z, x, y)
+    DIM k AS INTEGER : k = kPlatz(s)
+    ksBenutzt[k] = kBildNr
+    ksVorrang[k] = vorrang
+    IF ksZustand[k] = 2 THEN RETURN ksBild[k]
+    IF ksZustand[k] = 0 AND kCache <> "" THEN
+        DIM d AS STRING : d = kachelDatei$(s)
+        IF FILEEXISTS(d) THEN
+            IF kAusBytes(k, READALL_BYTES(d)) THEN
+                kAusPlatte = kAusPlatte + 1
+                RETURN ksBild[k]
+            END IF
+            ' eine kaputte Datei im Zwischenspeicher: weg damit, neu holen
+            DELETEFILE(d)
+        END IF
+    END IF
+    RETURN -1
+END FUNCTION
+
+' Nur nachsehen, ohne zu wuenschen -- fuer die groebere Kachel als Ersatz,
+' solange die genaue noch laedt. Haelt sie im Speicher, wenn sie da ist.
+FUNCTION kachelDa(z AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM s AS STRING : s = kachelSchluessel$(z, x, y)
+    IF NOT MAPHAS(kIndex, s) THEN RETURN -1
+    DIM k AS INTEGER : k = MAPGET(kIndex, s)
+    IF ksZustand[k] <> 2 THEN RETURN -1
+    ksBenutzt[k] = kBildNr
+    RETURN ksBild[k]
+END FUNCTION
+
+FUNCTION kachelnLaufend() AS INTEGER
+    DIM n AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(ksZustand) - 1
+        IF ksZustand[k] = 1 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+
+FUNCTION kachelnImSpeicher() AS INTEGER
+    DIM n AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(ksZustand) - 1
+        IF ksZustand[k] = 2 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+
+SUB kSichern(schluessel AS STRING, b AS BUFFER)
+    IF kCache = "" THEN RETURN
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(schluessel, "/")
+    DIM o AS STRING : o = PATHJOIN(PATHJOIN(kCache, teile[0]), teile[1])
+    IF NOT DIREXISTS(o) THEN MKDIR(o)
+    ' erst unter anderem Namen, dann umbenennen: ein Abbruch mitten im
+    ' Schreiben laesst sonst eine halbe Kachel liegen
+    DIM d AS STRING : d = kachelDatei$(schluessel)
+    WRITEALL_BYTES(d + ".teil", b)
+    IF FILEEXISTS(d) THEN DELETEFILE(d)
+    RENAME(d + ".teil", d)
+END SUB
+
+SUB kVergessen(k AS INTEGER)
+    IF ksBild[k] >= 0 THEN IMAGE_FREE(ksBild[k])
+    MAPREMOVE(kIndex, ksKey[k])
+    ksBild[k] = -1 : ksZustand[k] = 0 : ksKey[k] = ""
+    ARRAY_PUSH(ksFrei, k)
+    kVergessenZahl = kVergessenZahl + 1
+END SUB
+
+' Einmal je Bild, nach dem Zeichnen.
+SUB kachelnPumpen()
+    DIM jetzt AS FLOAT : jetzt = GET_TIME()
+    DIM laufend AS INTEGER
+    DIM k AS INTEGER
+    ' 1. fertige Abrufe abholen, verwaiste abbrechen
+    FOR k = 0 TO LEN(ksZustand) - 1
+        IF ksZustand[k] = 1 THEN
+            IF ksBenutzt[k] < kBildNr - 1 THEN
+                HTTP_CANCEL(ksAbruf[k])
+                ksZustand[k] = 0
+                kAbgebrochen = kAbgebrochen + 1
+            ELSEIF HTTP_READY(ksAbruf[k]) THEN
+                DIM gut AS BOOLEAN : gut = FALSE
+                TRY
+                    DIM rumpf AS STRING : rumpf = HTTP_RESULT(ksAbruf[k])
+                    IF HTTP_STATUS() = 200 THEN
+                        DIM b AS BUFFER : b = HTTP_BYTES()
+                        IF kAusBytes(k, b) THEN
+                            kSichern(ksKey[k], b)
+                            gut = TRUE
+                        ELSE
+                            kLetzterFehler = ksKey[k] + ": keine Bilddatei"
+                        END IF
+                    ELSE
+                        kLetzterFehler = ksKey[k] + ": HTTP " + STR$(HTTP_STATUS())
+                    END IF
+                CATCH e
+                    kLetzterFehler = ksKey[k] + ": " + e
+                END TRY
+                IF gut THEN
+                    kAusNetz = kAusNetz + 1
+                ELSE
+                    ksZustand[k] = 3
+                    ksWiederAb[k] = jetzt + KWARTEN_FEHLER
+                    kFehler = kFehler + 1
+                END IF
+            ELSE
+                laufend = laufend + 1
+            END IF
+        END IF
+    NEXT
+    ' 2. neue Abrufe: die gewuenschten dieses Bildes, kleiner Vorrang zuerst
+    WHILE laufend < KMAX_PARALLEL
+        DIM best AS INTEGER : best = -1
+        FOR k = 0 TO LEN(ksZustand) - 1
+            IF ksBenutzt[k] = kBildNr AND ksKey[k] <> "" THEN
+                IF ksZustand[k] = 0 OR (ksZustand[k] = 3 AND jetzt >= ksWiederAb[k]) THEN
+                    IF best < 0 THEN
+                        best = k
+                    ELSEIF ksVorrang[k] < ksVorrang[best] THEN
+                        best = k
+                    END IF
+                END IF
+            END IF
+        NEXT
+        IF best < 0 THEN BREAK
+        DIM t AS ARRAY OF STRING : t = SPLIT$(ksKey[best], "/")
+        ksAbruf[best] = HTTP_GET_START(kachelAdresse$(VAL(t[0]), VAL(t[1]), VAL(t[2])))
+        ksZustand[best] = 1
+        laufend = laufend + 1
+    WEND
+    ' 3. Speicher begrenzen: die am laengsten nicht gebrauchten vergessen
+    DIM da AS INTEGER : da = kachelnImSpeicher()
+    WHILE da > kMaxSpeicher
+        DIM alt AS INTEGER : alt = -1
+        FOR k = 0 TO LEN(ksZustand) - 1
+            IF ksZustand[k] = 2 AND ksBenutzt[k] < kBildNr THEN
+                IF alt < 0 THEN
+                    alt = k
+                ELSEIF ksBenutzt[k] < ksBenutzt[alt] THEN
+                    alt = k
+                END IF
+            END IF
+        NEXT
+        IF alt < 0 THEN BREAK
+        kVergessen(alt)
+        da = da - 1
+    WEND
+    ' Wuensche ohne Abruf, nach denen keiner mehr fragt, geben den Platz frei
+    FOR k = 0 TO LEN(ksZustand) - 1
+        IF (ksZustand[k] = 0 OR ksZustand[k] = 3) AND ksKey[k] <> "" AND ksBenutzt[k] < kBildNr - 120 THEN
+            MAPREMOVE(kIndex, ksKey[k])
+            ksKey[k] = "" : ksZustand[k] = 0
+            ARRAY_PUSH(ksFrei, k)
+        END IF
+    NEXT
+    kBildNr = kBildNr + 1
+END SUB
+
+' Alles vergessen (Speicher) und, auf Wunsch, den Zwischenspeicher leeren.
+SUB kachelnLeeren(auchPlatte AS BOOLEAN)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(ksZustand) - 1
+        IF ksZustand[k] = 1 THEN HTTP_CANCEL(ksAbruf[k])
+        IF ksBild[k] >= 0 THEN IMAGE_FREE(ksBild[k])
+    NEXT
+    ksKey = [] : ksBild = [] : ksZustand = [] : ksAbruf = [] : ksBenutzt = []
+    ksVorrang = [] : ksWiederAb = [] : ksFrei = [] : kIndex = {}
+    IF auchPlatte AND kCache <> "" AND DIREXISTS(kCache) THEN
+        DIM f AS STRING
+        FOR EACH f IN DIRLIST_REC(kCache, "*.png")
+            DELETEFILE(PATHJOIN(kCache, f))
+        NEXT
+    END IF
+END SUB
