@@ -24,12 +24,17 @@ Each plugin is a folder with a `plugin.dh` in it, in one of three places:
   https address of a ZIP, a folder or a ZIP on disk) and fetches the plugin
   with `dhrt paket -C <plugin-folder> hole`; the checksum goes into the
   paket.lock.json of the plugin folder, so fetching again gets exactly the
-  same content. **Remove** takes a fetched one away again. They run like your
-  own; the manager shows "(geholt)" (fetched) after the name. A plugin of
-  your own with the same name comes first.
+  same content -- if the state at the source has changed, that is an error
+  and the old one stays. **Refresh** fetches all fetched ones again and
+  accepts a new state (`hole --erneuern`; for a plugin from a branch like
+  `@main`), **Remove** takes one away again. The IDE briefly stops running
+  fetched plugins for this and starts them again afterwards. They run like
+  your own; the manager shows "(geholt)" (fetched) after the name. A plugin
+  of your own with the same name comes first.
 
 **Plugins → New plugin …** creates one of your own from the template (a
-command, an entry in the context menu, a panel), opens its `plugin.dh` and
+command, an entry in the context menu, a panel, plus a `test.dhtest` with
+the stand-in IDE, see "Testing a plugin"), opens its `plugin.dh` and
 starts it. **Plugins → Manage plugins …** shows all of them with title,
 version and state; the tooltip gives description, author and path; the tick
 says whether it is loaded at startup. **Plugins → Reload plugins** stops all
@@ -174,6 +179,10 @@ PROBE_ENDE()
 | `PROBE_ENDE()`, `PROBE_LAEUFT()` | send `ende` and wait until the plugin has quit |
 
 The bundled plugins are tested this way (`tests/pruef/plugin_probe.dhtest`).
+A plugin from the template already brings its test: `test.dhtest` next to
+the `plugin.dh`, with `DH_PATH` pointing to the IDE's folder (where
+`dh_plugin.dh` and the probe live). Run it with Ctrl+Alt+F5 while it is in
+front, or with `dhrt test <plugin-folder>`.
 
 ## The channel
 

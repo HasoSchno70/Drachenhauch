@@ -2794,6 +2794,18 @@ ein eigenes, ohne IDE) und zwei Faelle mehr in
 `werkzeug_ide_plugin_oekosystem.dhtest`; fuenf Verfaelschungen (ohne
 Begruessung, ohne Frage, ohne `pakete`, Probe ohne Antworten, Bibliothek
 ohne hallo) fallen je in ihrem Fall.
+**Vorlage mit Pruefung, Aktualisieren** (selber Tag): "Neues Plugin ..."
+schreibt dazu `test.dhtest` (Probe, `DH_PATH` = `pluginBibOrdner$()` als
+REALPATH$, Plugin ueber `--- argumente {sammlung}`); der Vorlage-Fall laesst
+sie per `dhrt test` laufen und verdirbt das Plugin als Gegenprobe. Knopf
+**Aktualisieren** = `hole --erneuern` (`pluginsAktualisieren`). **Der Fund:**
+ein laufendes geholtes Plugin hat seinen Ordner als Arbeitsordner, Windows
+ersetzt/loescht ihn dann nicht -- `pluginHolenStarten` stoppt jetzt alle
+laufenden geholten vorher, und `pluginHolenNachziehen` laedt IMMER neu
+(sonst blieb nach einem Fehler das alte aus). Fall "ein plugin ueber http
+holen und aktualisieren": ZIP mit Oberordner wie von GitHub ueber
+`gegenserver.dh` (dateien), geaenderter Stand ohne --erneuern = Fehler +
+alter laeuft, Aktualisieren nimmt ihn an. Gegen echtes GitHub ungeprueft.
 
 ## Dogfooding 13: CHIP-8-Emulator (2026-10-24)
 
