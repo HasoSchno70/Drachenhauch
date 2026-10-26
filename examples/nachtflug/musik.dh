@@ -1,0 +1,404 @@
+' musik.dh -- "Nachtflug", ein Trance-Stueck in A-Moll, 128 Schlaege je
+' Minute, ganz in Drachenhauch synthetisiert: keine Klangdatei, keine Samples.
+'
+' Gespielt wird auf einer Audio-Uhr: ein Tick ist eine Sechzehntel, jedes
+' Bild plant die naechsten Schritte voraus (AUDIO_PLAY_AT), die Uhr spielt
+' sie sample-genau. Die Bilder fragen dieselbe Uhr -- Takt und Bassdrum
+' stimmen darum auch dann, wenn die Bildrate schwankt.
+'
+' Stereo: Flaechen und Lead sind aus mehreren leicht verstimmten Stimmen
+' links und rechts gebaut, das Arpeggio pendelt, Echos springen hin und her
+' (Ping-Pong, schon in die Klaenge eingerechnet -- ein Hall auf dem Bus wuerde
+' auch die Bassdrum verwischen). Bassdrum und Bass bleiben in der Mitte.
+IMPORT "audio"
+
+CONST TEMPO = 128
+CONST SCHRITTE_JE_TAKT = 16
+CONST TAKTE = 92
+
+' Abschnitte (in Takten): Beginn jedes Abschnitts und ein Ende dahinter
+CONST AB_INTRO = 0
+CONST AB_AUFBAU = 16
+CONST AB_HOCH1 = 32
+CONST AB_PAUSE = 48
+CONST AB_HOCH2 = 64
+CONST AB_AUS = 80
+
+FUNCTION msJeSchritt() AS FLOAT
+    RETURN 60000.0 / TEMPO / 4.0
+END FUNCTION
+
+FUNCTION hz(midi AS FLOAT) AS FLOAT
+    RETURN 440.0 * 2.0 ^ ((midi - 69.0) / 12.0)
+END FUNCTION
+
+' --- Harmonie -------------------------------------------------------------
+' Je zwei Takte ein Akkord: a-Moll, F-Dur, C-Dur, G-Dur -- die Folge, auf
+' der halb Trance gebaut ist. Enge Lage, damit die Flaeche ruhig weitergeht.
+DIM akkord AS ARRAY OF INTEGER : akkord = [57, 60, 64, 57, 60, 65, 55, 60, 64, 55, 59, 62]
+DIM grund AS ARRAY OF INTEGER : grund = [33, 29, 36, 31]
+
+FUNCTION akkordNr(takt AS INTEGER) AS INTEGER
+    RETURN (takt \ 2) MOD 4
+END FUNCTION
+
+' Die Melodie: je Takt acht Achtel, 0 = Pause, -1 = gehalten. Acht Takte,
+' dann von vorn; die zweite Haelfte antwortet auf die erste.
+DIM melodie AS ARRAY OF INTEGER : melodie = [ _
+    76, -1, 74, -1, 72, -1, 74, 76,   76, -1, -1, -1, 72, 74, 72, 69, _
+    72, -1, 69, -1, 72, -1, 74, 76,   77, -1, -1, -1, 76, 74, 72, 74, _
+    76, -1, 72, -1, 79, -1, 76, -1,   74, -1, -1, -1, 72, 74, 76, 79, _
+    79, -1, 76, -1, 74, -1, 71, -1,   74, -1, -1, -1, -1, -1, 0, 0]
+
+' --- Klaenge ----------------------------------------------------------------
+' Einmal gebaut, dann wiederverwendet: je Schluessel ein SOUND.
+DIM kKlang AS MAP OF INTEGER : kKlang = {}
+DIM klaenge AS ARRAY OF SOUND : klaenge = []
+
+FUNCTION gemerkt(schluessel AS STRING) AS INTEGER
+    IF MAPHAS(kKlang, schluessel) THEN RETURN MAPGET(kKlang, schluessel)
+    RETURN -1
+END FUNCTION
+
+FUNCTION merken(schluessel AS STRING, s AS SOUND) AS SOUND
+    MAPPUT(kKlang, schluessel, LEN(klaenge))
+    ARRAY_PUSH(klaenge, s)
+    RETURN s
+END FUNCTION
+
+' Ping-Pong-Echo: der Klang links (bzw. rechts), dann leiser gegenueber,
+' dann noch leiser wieder hier. Abstand eine punktierte Achtel.
+FUNCTION mitEcho(s AS SOUND, dauer AS INTEGER, pan AS FLOAT, laut AS FLOAT) AS SOUND
+    DIM d AS INTEGER : d = INT(msJeSchritt() * 3)
+    DIM e AS SOUND : e = AUDIO_SOUND_NEW(dauer + 3 * d)
+    AUDIO_SOUND_MIX(e, s, 0, 1.0, pan)
+    AUDIO_SOUND_MIX(e, s, d, laut, -pan)
+    AUDIO_SOUND_MIX(e, s, 2 * d, laut * 0.45, pan)
+    AUDIO_SOUND_MIX(e, s, 3 * d, laut * 0.18, -pan)
+    RETURN e
+END FUNCTION
+
+FUNCTION bassdrum() AS SOUND
+    DIM i AS INTEGER : i = gemerkt("kick")
+    IF i >= 0 THEN RETURN klaenge[i]
+    ' Koerper: Sinus, der schnell nach unten faellt; dazu ein kurzer Klick
+    DIM s AS SOUND : s = AUDIO_SOUND_NEW(420)
+    AUDIO_SOUND_MIX(s, AUDIO_SFX("sine", 150, -900, 0, 40, 260, 0, 0, 1.0), 0, 1.0)
+    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 3000, 0, 0, 2, 14, 0, 0, 0.6), 0, 0.35)
+    RETURN merken("kick", s)
+END FUNCTION
+
+FUNCTION klatschen() AS SOUND
+    DIM i AS INTEGER : i = gemerkt("clap")
+    IF i >= 0 THEN RETURN klaenge[i]
+    ' drei kurz versetzte Rauschstoesse, breit verteilt, mit kurzem Nachhall
+    DIM s AS SOUND : s = AUDIO_SOUND_NEW(700)
+    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 1600, 0, 0, 6, 30, 0, 0, 0.7), 0, 0.8, -0.3)
+    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 1700, 0, 0, 6, 30, 0, 0, 0.7), 11, 0.8, 0.3)
+    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 1500, 0, 0, 10, 170, 0, 0, 0.7), 22, 0.9)
+    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 1400, 0, 0, 30, 420, 0, 0, 0.3), 60, 0.35, -0.6)
+    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 1400, 0, 0, 30, 420, 0, 0, 0.3), 95, 0.3, 0.6)
+    RETURN merken("clap", s)
+END FUNCTION
+
+FUNCTION becken(offen AS BOOLEAN) AS SOUND
+    DIM k AS STRING : k = IIF(offen, "hho", "hhc")
+    DIM i AS INTEGER : i = gemerkt(k)
+    IF i >= 0 THEN RETURN klaenge[i]
+    IF offen THEN RETURN merken(k, AUDIO_SFX("noise", 9000, 0, 0, 20, 110, 0, 0, 0.32))
+    RETURN merken(k, AUDIO_SFX("noise", 11000, 0, 0, 3, 28, 0, 0, 0.22))
+END FUNCTION
+
+FUNCTION crash() AS SOUND
+    DIM i AS INTEGER : i = gemerkt("crash")
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM s AS SOUND : s = AUDIO_SOUND_NEW(3600)
+    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 7000, -400, 0, 60, 3000, 0, 0, 0.4), 0, 0.8, -0.55)
+    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 6500, -300, 0, 60, 3200, 0, 0, 0.4), 7, 0.8, 0.55)
+    ' und ein tiefer Schlag darunter
+    AUDIO_SOUND_MIX(s, AUDIO_SFX("sine", 90, -40, 0, 120, 1400, 0, 0, 1.0), 0, 0.8)
+    RETURN merken("crash", s)
+END FUNCTION
+
+' Aufstieg: Rauschen, das sich ueber zwei Takte oeffnet und steigt
+FUNCTION aufstieg() AS SOUND
+    DIM i AS INTEGER : i = gemerkt("riser")
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM lang AS INTEGER : lang = INT(msJeSchritt() * 32)
+    DIM s AS SOUND : s = AUDIO_SOUND_NEW(lang + 200)
+    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 500, 1600, lang - 100, 100, 100, 0, 0, 0.5), 0, 0.55, -0.4)
+    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 520, 1700, lang - 100, 100, 100, 0, 0, 0.5), 0, 0.55, 0.4)
+    AUDIO_SOUND_MIX(s, AUDIO_NOTE("sine", hz(57), lang - 300, lang - 400, 50, 1.0, 250, 0.35, 0, 0, 0, 24), 0, 0.5)
+    RETURN merken("riser", s)
+END FUNCTION
+
+' Offbeat-Bass: Saege eine Oktave ueber dem Grundton, Sinus darunter
+FUNCTION bass(nr AS INTEGER) AS SOUND
+    DIM k AS STRING : k = "bass" + STR$(nr)
+    DIM i AS INTEGER : i = gemerkt(k)
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM s AS SOUND : s = AUDIO_SOUND_NEW(260)
+    AUDIO_SOUND_MIX(s, AUDIO_NOTE("saw", hz(grund[nr] + 12), 120, 3, 90, 0.35, 60, 0.5), 0, 0.7)
+    AUDIO_SOUND_MIX(s, AUDIO_NOTE("sine", hz(grund[nr]), 140, 3, 60, 0.8, 60, 0.9), 0, 0.9)
+    RETURN merken(k, s)
+END FUNCTION
+
+' Flaeche: jeder Akkordton zweimal, links und rechts verschieden verstimmt,
+' dazu ein leises Dreieck eine Oktave hoeher. Langsamer Einsatz, langes
+' Ausklingen -- zwei Takte lang. `gross` (im Breakdown) ist breiter und lauter.
+FUNCTION flaeche(nr AS INTEGER, gross AS BOOLEAN) AS SOUND
+    DIM k AS STRING : k = "pad" + STR$(nr) + IIF(gross, "g", "")
+    DIM i AS INTEGER : i = gemerkt(k)
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM lang AS INTEGER : lang = INT(msJeSchritt() * 32)
+    DIM s AS SOUND : s = AUDIO_SOUND_NEW(lang + 1800)
+    DIM v AS INTEGER
+    DIM w AS FLOAT : w = IIF(gross, 0.85, 0.6)
+    FOR v = 0 TO 2
+        DIM f AS FLOAT : f = hz(akkord[nr * 3 + v])
+        AUDIO_SOUND_MIX(s, AUDIO_NOTE("saw", f * 0.9966, lang - 200, 900, 900, 0.7, 1500, 0.22, 0.04, 0.3, 9), 0, 1.0, -w)
+        AUDIO_SOUND_MIX(s, AUDIO_NOTE("saw", f * 1.0034, lang - 200, 1000, 900, 0.7, 1500, 0.22, 0.04, 0.27, 14), 0, 1.0, w)
+        AUDIO_SOUND_MIX(s, AUDIO_NOTE("triangle", f * 2.0, lang - 200, 1200, 900, 0.6, 1500, 0.12), 0, 1.0, IIF(v = 1, 0.0, IIF(v = 0, -0.3, 0.3)))
+        IF gross THEN AUDIO_SOUND_MIX(s, AUDIO_NOTE("saw", f * 0.5, lang - 200, 1400, 900, 0.7, 1500, 0.12, 0, 0, 7), 0, 1.0, 0.0)
+    NEXT
+    RETURN merken(k, s)
+END FUNCTION
+
+' Arpeggio-Ton: kurz gezupft, mit Ping-Pong-Echo
+FUNCTION zupf(midi AS INTEGER, pan AS FLOAT) AS SOUND
+    DIM k AS STRING : k = "arp" + STR$(midi) + IIF(pan < 0, "l", "r")
+    DIM i AS INTEGER : i = gemerkt(k)
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM t AS SOUND : t = AUDIO_SOUND_NEW(420)
+    AUDIO_SOUND_MIX(t, AUDIO_NOTE("saw", hz(midi), 40, 2, 130, 0.0, 140, 0.3, 0, 0, 8), 0, 0.8)
+    AUDIO_SOUND_MIX(t, AUDIO_NOTE("triangle", hz(midi + 12), 40, 2, 90, 0.0, 120, 0.25), 0, 0.6)
+    RETURN merken(k, mitEcho(t, 420, pan, 0.42))
+END FUNCTION
+
+' Lead: drei Stimmen (zwei Saegen auseinander verstimmt und verteilt, ein
+' Rechteck eine Oktave tiefer in der Mitte), lange Toene mit Vibrato, dazu
+' das Ping-Pong-Echo.
+FUNCTION lead(midi AS INTEGER, achtel AS INTEGER) AS SOUND
+    DIM k AS STRING : k = "lead" + STR$(midi) + "_" + STR$(achtel)
+    DIM i AS INTEGER : i = gemerkt(k)
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM dauer AS INTEGER : dauer = INT(msJeSchritt() * 2 * achtel) - 30
+    DIM vib AS FLOAT : vib = IIF(achtel >= 4, 0.12, 0.0)
+    DIM t AS SOUND : t = AUDIO_SOUND_NEW(dauer + 400)
+    DIM f AS FLOAT : f = hz(midi)
+    AUDIO_SOUND_MIX(t, AUDIO_NOTE("saw", f * 0.996, dauer, 8, 220, 0.75, 320, 0.28, vib, 5.5, 11), 0, 1.0, -0.55)
+    AUDIO_SOUND_MIX(t, AUDIO_NOTE("saw", f * 1.004, dauer, 8, 220, 0.75, 320, 0.28, vib, 5.2, 13), 0, 1.0, 0.55)
+    AUDIO_SOUND_MIX(t, AUDIO_NOTE("square", f * 0.5, dauer, 8, 220, 0.6, 320, 0.14, vib, 5.5), 0, 1.0, 0.0)
+    RETURN merken(k, mitEcho(t, dauer + 400, -0.35, 0.36))
+END FUNCTION
+
+FUNCTION wirbel(laut AS FLOAT) AS SOUND
+    DIM k AS STRING : k = "roll" + STR$(INT(laut * 10))
+    DIM i AS INTEGER : i = gemerkt(k)
+    IF i >= 0 THEN RETURN klaenge[i]
+    RETURN merken(k, AUDIO_SFX("noise", 2200, 0, 0, 5, 70, 0, 0, laut))
+END FUNCTION
+
+' --- Ablauf --------------------------------------------------------------------
+DIM uhr AS AUDIO_CLOCK
+DIM mitTon AS BOOLEAN
+DIM geplantBis AS INTEGER : geplantBis = -1
+' Ab welchem Schritt die Uhr zaehlt (--ab TAKT): Uhr-Tick 0 ist dieser Schritt
+DIM versatz AS INTEGER
+DIM stilleStart AS FLOAT
+DIM filter AS AUDIO_MOD
+DIM hall AS AUDIO_MOD
+
+FUNCTION schritteGesamt() AS INTEGER
+    RETURN TAKTE * SCHRITTE_JE_TAKT
+END FUNCTION
+
+' Ein Klang in Schritt n: live auf die Uhr, oder beim Ausschreiben (--wav)
+' in den Klang des ganzen Stuecks.
+DIM ausschreiben AS BOOLEAN
+DIM lied AS SOUND
+SUB spielen(k AS SOUND, n AS INTEGER, vol AS FLOAT)
+    IF ausschreiben THEN
+        AUDIO_SOUND_MIX(lied, k, INT(n * msJeSchritt()), vol)
+    ELSE
+        AUDIO_PLAY_AT(k, uhr, n - versatz, vol)
+    END IF
+END SUB
+
+' Das ganze Stueck trocken in eine WAV (ohne den Hall und den Filter der
+' Busse -- die wirken nur live).
+SUB musikAusschreiben(pfad AS STRING)
+    ausschreiben = TRUE
+    lied = AUDIO_SOUND_NEW(INT(schritteGesamt() * msJeSchritt()) + 4000)
+    DIM n AS INTEGER
+    FOR n = 0 TO schritteGesamt() - 1
+        schrittPlanen(n)
+    NEXT
+    AUDIO_SOUND_NORMALIZE(lied, 0.9)
+    AUDIO_SAVE_WAV(lied, pfad)
+    ausschreiben = FALSE
+END SUB
+
+' Alles, was in Schritt n erklingt.
+SUB schrittPlanen(n AS INTEGER)
+    DIM takt AS INTEGER : takt = n \ SCHRITTE_JE_TAKT
+    DIM s AS INTEGER : s = n MOD SCHRITTE_JE_TAKT
+    DIM nr AS INTEGER : nr = akkordNr(takt)
+    DIM viertel AS BOOLEAN : viertel = s MOD 4 = 0
+    DIM offbeat AS BOOLEAN : offbeat = s MOD 4 = 2
+    ' Ausklang: alles wird leiser, die Bassdrum geht nach vier Takten
+    DIM laut AS FLOAT : laut = 1.0
+    IF takt >= AB_AUS THEN laut = MAX(0.0, 1.0 - (takt - AB_AUS) / 12.0)
+
+    ' Bassdrum, Bass, Klatschen: im Aufbau, in beiden Hoehepunkten, im Anfang des Ausklangs
+    DIM treibt AS BOOLEAN
+    treibt = (takt >= AB_AUFBAU AND takt < AB_PAUSE) OR (takt >= AB_HOCH2 AND takt < AB_AUS + 4)
+    IF treibt AND viertel THEN spielen(bassdrum(), n, 0.8)
+    IF treibt AND offbeat THEN spielen(bass(nr), n, 0.55 * laut)
+    IF treibt AND takt >= AB_AUFBAU + 8 AND (s = 4 OR s = 12) THEN spielen(klatschen(), n, 0.75 * laut)
+    ' Becken: offen auf dem Offbeat, geschlossen dazwischen; im Intro ab Takt 8
+    IF takt >= 8 AND takt < AB_AUS + 8 AND NOT (takt >= AB_PAUSE AND takt < AB_PAUSE + 8) THEN
+        IF offbeat THEN spielen(becken(TRUE), n, 0.95 * laut)
+        IF s MOD 2 = 1 AND takt >= AB_AUFBAU THEN spielen(becken(FALSE), n, (0.5 + IIF(s MOD 4 = 3, 0.2, 0.0)) * laut)
+    END IF
+    ' Flaeche: am Anfang jedes Akkords
+    IF s = 0 AND takt MOD 2 = 0 AND takt < TAKTE - 2 THEN
+        DIM gross AS BOOLEAN : gross = takt >= AB_PAUSE AND takt < AB_HOCH2
+        spielen(flaeche(nr, gross), n, IIF(gross, 1.2, 1.0) * laut)
+    END IF
+    IF takt = TAKTE - 2 AND s = 0 THEN spielen(flaeche(0, TRUE), n, 0.7)
+    ' Arpeggio: Sechzehntel ueber die Akkordtoene, im Intro und in den Hoehepunkten
+    DIM arp AS BOOLEAN : arp = takt < AB_PAUSE OR (takt >= AB_HOCH2 AND takt < AB_AUS + 8)
+    IF takt >= AB_PAUSE + 8 AND takt < AB_HOCH2 THEN arp = s MOD 2 = 0
+    IF arp AND takt < TAKTE - 4 THEN
+        DIM folge AS ARRAY OF INTEGER : folge = [0, 1, 2, 3, 2, 1, 2, 3]
+        DIM stufe AS INTEGER : stufe = folge[s MOD 8]
+        DIM ton AS INTEGER
+        IF stufe = 3 THEN ton = akkord[nr * 3] + 12 ELSE ton = akkord[nr * 3 + stufe]
+        ton = ton + 12
+        ' im zweiten Hoehepunkt eine Oktave hoeher auf jedem zweiten Takt
+        IF takt >= AB_HOCH2 AND takt MOD 2 = 1 THEN ton = ton + 12
+        spielen(zupf(ton, IIF(s MOD 2 = 0, -0.6, 0.6)), n, 0.6 * laut)
+    END IF
+    ' Lead: in beiden Hoehepunkten; im Breakdown die zweite Haelfte, ruhig
+    DIM melo AS BOOLEAN
+    melo = (takt >= AB_HOCH1 AND takt < AB_PAUSE) OR (takt >= AB_HOCH2 AND takt < AB_AUS) OR (takt >= AB_PAUSE + 8 AND takt < AB_HOCH2)
+    IF melo AND s MOD 2 = 0 THEN
+        DIM pos AS INTEGER : pos = (takt MOD 8) * 8 + s \ 2
+        DIM m AS INTEGER : m = melodie[pos]
+        IF m > 0 THEN
+            DIM achtel AS INTEGER : achtel = 1
+            WHILE pos + achtel < LEN(melodie) AND melodie[(pos + achtel) MOD LEN(melodie)] = -1
+                achtel = achtel + 1
+            WEND
+            spielen(lead(m, achtel), n, IIF(takt >= AB_PAUSE AND takt < AB_HOCH2, 0.7, 0.85) * laut)
+        END IF
+    END IF
+    ' Uebergaenge: Aufstieg in den letzten zwei Takten vor jedem Hoehepunkt,
+    ' Wirbel davor, Becken auf der Eins
+    IF s = 0 AND (takt = AB_AUFBAU - 2 OR takt = AB_HOCH1 - 2 OR takt = AB_HOCH2 - 2) THEN spielen(aufstieg(), n, 0.6)
+    IF takt >= AB_HOCH2 - 4 AND takt < AB_HOCH2 THEN
+        ' immer dichter: Viertel, Achtel, Sechzehntel
+        DIM dicht AS INTEGER : dicht = IIF(takt < AB_HOCH2 - 2, 4, IIF(takt < AB_HOCH2 - 1, 2, 1))
+        IF s MOD dicht = 0 THEN spielen(wirbel(0.3 + 0.1 * (takt - AB_HOCH2 + 4)), n, 0.5)
+    END IF
+    IF s = 0 AND (takt = AB_AUFBAU OR takt = AB_HOCH1 OR takt = AB_HOCH2) THEN spielen(crash(), n, 0.55)
+END SUB
+
+' Einmal je Bild: die naechsten Schritte planen (ein halber Takt voraus).
+SUB musikPlanen()
+    IF NOT mitTon THEN RETURN
+    DIM jetzt AS INTEGER : jetzt = AUDIO_CLOCK_TICKS(uhr) + versatz
+    WHILE geplantBis < jetzt + 8 AND geplantBis < schritteGesamt() - 1
+        geplantBis = geplantBis + 1
+        schrittPlanen(geplantBis)
+    WEND
+    ' Filter: im Intro oeffnet er sich, im Breakdown geht er zu und wieder auf
+    filterNachziehen(jetzt \ SCHRITTE_JE_TAKT)
+END SUB
+
+DIM filterStand AS INTEGER : filterStand = -1
+SUB filterNachziehen(takt AS INTEGER)
+    DIM ziel AS INTEGER : ziel = 0
+    IF takt >= AB_PAUSE AND takt < AB_PAUSE + 8 THEN ziel = 1
+    IF takt >= AB_PAUSE + 8 AND takt < AB_HOCH2 THEN ziel = 2
+    IF takt >= AB_HOCH2 THEN ziel = 3
+    IF ziel = filterStand THEN RETURN
+    filterStand = ziel
+    DIM takt_ms AS FLOAT : takt_ms = msJeSchritt() * SCHRITTE_JE_TAKT
+    SELECT CASE ziel
+        CASE 1 : AUDIO_TWEENER_TO(filter, 0.25, INT(takt_ms * 4), "out")
+        CASE 2 : AUDIO_TWEENER_TO(filter, 1.0, INT(takt_ms * 8), "in")
+        CASE 3 : AUDIO_TWEENER_TO(filter, 1.0, 100)
+    END SELECT
+END SUB
+
+' Startet die Musik; FALSE, wenn es keinen Ton gibt (dann laeuft die Zeit
+' trotzdem, ueber die Uhr des Rechners).
+FUNCTION musikStarten(abTakt AS INTEGER) AS BOOLEAN
+    versatz = abTakt * SCHRITTE_JE_TAKT
+    geplantBis = versatz - 1
+    TRY
+        ' Vorab bauen, damit das erste Bild nicht stockt
+        DIM nr AS INTEGER
+        FOR nr = 0 TO 3
+            bass(nr) : flaeche(nr, FALSE) : flaeche(nr, TRUE)
+        NEXT
+        bassdrum() : klatschen() : becken(TRUE) : becken(FALSE) : crash() : aufstieg()
+        AUDIO_BUS_VOLUME("sfx", 0.6)
+        AUDIO_REVERB("sfx", 0.16, 0.82, 0.45)
+        AUDIO_COMPRESSOR("sfx", -14, 3.0, 3.0)
+        ' Filter: im Intro von dumpf nach offen
+        filter = AUDIO_TWEENER_NEW(IIF(abTakt > 0, 1.0, 0.0))
+        AUDIO_MODULATE("sfx", "filter", filter, 350.0, 18000.0)
+        IF abTakt = 0 THEN AUDIO_TWEENER_TO(filter, 1.0, INT(msJeSchritt() * SCHRITTE_JE_TAKT * 15), "in")
+        uhr = AUDIO_CLOCK_NEW(TEMPO / 60.0 * 4.0)
+        mitTon = TRUE
+        musikPlanen()
+        AUDIO_CLOCK_START(uhr)
+    CATCH e
+        mitTon = FALSE
+    END TRY
+    stilleStart = GET_TIME()
+    RETURN mitTon
+END FUNCTION
+
+' Wo das Stueck steht, in Sechzehnteln (mit Bruchteil -- fuer weiche Bilder).
+DIM letzterTick AS INTEGER : letzterTick = -1
+DIM tickSeit AS FLOAT
+FUNCTION musikSchritt() AS FLOAT
+    IF NOT mitTon THEN RETURN versatz + (GET_TIME() - stilleStart) * TEMPO / 60.0 * 4.0
+    DIM t AS INTEGER : t = AUDIO_CLOCK_TICKS(uhr) + versatz
+    IF t <> letzterTick THEN
+        letzterTick = t
+        tickSeit = GET_TIME()
+    END IF
+    ' zwischen zwei Ticks weiterzaehlen, hoechstens bis zum naechsten
+    RETURN t + MIN(0.999, (GET_TIME() - tickSeit) * TEMPO / 60.0 * 4.0)
+END FUNCTION
+
+FUNCTION musikTakt() AS FLOAT
+    RETURN musikSchritt() / SCHRITTE_JE_TAKT
+END FUNCTION
+
+FUNCTION musikZuEnde() AS BOOLEAN
+    RETURN musikSchritt() >= schritteGesamt() + 24
+END FUNCTION
+
+' Huellkurve der Bassdrum fuer die Bilder: 1 auf dem Schlag, faellt dann.
+FUNCTION musikKick() AS FLOAT
+    DIM n AS FLOAT : n = musikSchritt()
+    DIM takt AS INTEGER : takt = INT(n) \ SCHRITTE_JE_TAKT
+    DIM treibt AS BOOLEAN
+    treibt = (takt >= AB_AUFBAU AND takt < AB_PAUSE) OR (takt >= AB_HOCH2 AND takt < AB_AUS + 4)
+    IF NOT treibt THEN RETURN 0.0
+    DIM phase AS FLOAT : phase = (n - 4.0 * FLOOR(n / 4.0)) / 4.0
+    RETURN EXP(-phase * 6.0)
+END FUNCTION
+
+SUB musikStoppen()
+    IF mitTon THEN
+        AUDIO_CLOCK_REMOVE(uhr)
+        mitTon = FALSE
+    END IF
+END SUB

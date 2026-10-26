@@ -2807,6 +2807,28 @@ holen und aktualisieren": ZIP mit Oberordner wie von GitHub ueber
 `gegenserver.dh` (dateien), geaenderter Stand ohne --erneuern = Fehler +
 alter laeuft, Aktualisieren nimmt ihn an. Gegen echtes GitHub ungeprueft.
 
+## Demo Nachtflug (2026-10-26)
+
+`examples/nachtflug/` (Wunsch des Nutzers: eine Demo mit eigener
+Trance-Musik in Stereo und Bildern, die sprachlos machen, nicht hektisch).
+`musik.dh`: 128 BPM, A-Moll, 92 Takte, alles aus AUDIO_NOTE/AUDIO_SFX;
+Stereo und Ping-Pong-Echo sind VORAB in die Klaenge gemischt
+(`AUDIO_SOUND_MIX` mit pan, `mitEcho`) -- auf dem einen sfx-Bus haette ein
+Hall die Bassdrum verwischt; Bus: Hall 0.16, Kompressor, Filter per Tweener
+(Intro auf, Breakdown zu/auf). Gespielt auf einer Audio-Uhr (eine Sechzehntel
+= ein Tick, `musikPlanen` je Bild einen halben Takt voraus), dieselbe
+Routine `schrittPlanen` schreibt ueber `spielen` auch die WAV (`--wav`).
+`--ab TAKT` startet mitten im Stueck (Versatz der Uhr), `--messen` meldet
+Bildrate und Spitze am Mischer (gemessen 0.88). `main.dh`: fuenf Szenen je
+Abschnitt, vier als Fragment-Shader ueber POSTFX (`shader/*.fs`, Raymarching;
+der Text liegt in texture0 und wird obenauf gelegt), die fuenfte echtes 3D
+(MODEL_INSTANCED, 1800 Wuerfel, Glanz-Shader mit Sternen). **Falle:** in
+diesem Aufbau zaehlt `fragTexCoord.y` andersherum als gedacht -- die erste
+Fassung stand auf dem Kopf; kein `uv.y = -uv.y`. Etwa 60 Bilder je Sekunde
+in 1280x720 (Galaxie 57). Tests `tests/pruef/beispiel_nachtflug.dhtest`
+(7: die WAV mit `--- ton`, jede Szene am Bildschirmfoto); ein kaputter
+Shader und eine Fassung ohne Panorama fallen.
+
 ## Dogfooding 13: CHIP-8-Emulator (2026-10-24)
 
 `examples/chip8/`: `cpu.dh` (Rechenkern ohne Fenster, alle 35 Befehle,
