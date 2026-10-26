@@ -13354,7 +13354,10 @@ fn int_div(a: Value, b: Value) -> R<Value> {
     match (&a, &b) {
         (Value::Int(x), Value::Int(y)) => {
             if *y == 0 { return Err("Integer-Division durch 0".into()); }
-            x.checked_div(*y).map(Value::Int).ok_or_else(|| int_overflow_msg("\\"))
+            // Abgerundet wie FLOOR (seit 2026.38): -7 \ 2 = -4. So gilt mit
+            // MOD (Vorzeichen des Teilers) immer (a \ b) * b + a MOD b = a.
+            let q = x.checked_div(*y).ok_or_else(|| int_overflow_msg("\\"))?;
+            Ok(Value::Int(if x % y != 0 && (*x < 0) != (*y < 0) { q - 1 } else { q }))
         }
         // Review-Fund: dieser Zweig faengt JEDEN nicht-Int/Int-Fall ab, nicht
         // nur FLOAT -- die Meldung nannte faelschlich immer "FLOAT" auch fuer

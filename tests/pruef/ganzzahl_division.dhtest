@@ -1,0 +1,86 @@
+' Ganzzahl-Division `\` rundet nach unten wie FLOOR (seit 2026.38, vorher
+' Richtung null). Damit passt sie zu MOD, dessen Ergebnis das Vorzeichen des
+' Teilers hat: (a \ b) * b + a MOD b ist immer a. Gefunden beim
+' Kartenprogramm (Dogfooding-Runde 15): mit -7 \ 2 = -3 und -7 MOD 2 = 1
+' ergab die Gleichung -5.
+'
+' Geprueft auf allen drei Wegen: in der VM, beim Falten von Konstanten (der
+' Compiler rechnet `-7 \ 2` selbst aus) und im Maschinencode.
+
+=== die vm rundet nach unten
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM i AS INTEGER
+DIM paare AS ARRAY OF INTEGER : paare = [7, 2, -7, 2, 7, -2, -7, -2, 6, 3, -6, 3, 0, 5, 1, 1000000, -1, 1000000]
+FOR i = 0 TO LEN(paare) - 1 STEP 2
+    a = paare[i] : b = paare[i + 1]
+    PRINT a; " \ "; b; " = "; a \ b; ", MOD "; a MOD b; ", passt "; (a \ b) * b + a MOD b = a; ", wie FLOOR "; a \ b = INT(FLOOR(a / b))
+NEXT
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+7 \ 2 = 3, MOD 1, passt TRUE, wie FLOOR TRUE
+-7 \ 2 = -4, MOD 1, passt TRUE, wie FLOOR TRUE
+7 \ -2 = -4, MOD -1, passt TRUE, wie FLOOR TRUE
+-7 \ -2 = 3, MOD -1, passt TRUE, wie FLOOR TRUE
+6 \ 3 = 2, MOD 0, passt TRUE, wie FLOOR TRUE
+-6 \ 3 = -2, MOD 0, passt TRUE, wie FLOOR TRUE
+0 \ 5 = 0, MOD 0, passt TRUE, wie FLOOR TRUE
+1 \ 1000000 = 0, MOD 1, passt TRUE, wie FLOOR TRUE
+-1 \ 1000000 = -1, MOD 999999, passt TRUE, wie FLOOR TRUE
+
+=== gefaltete konstanten rechnen genauso
+CONST A = -7
+CONST B = 2
+PRINT -7 \ 2; " "; A \ B; " "; 7 \ -2; " "; -7 \ -2; " "; -1 \ 1000000
+--- erwartet
+-4 -4 -4 3 -1
+
+=== der maschinencode rechnet genauso
+' Eine reine Funktion mit einer Schleife wird uebersetzt; sie zaehlt, wie oft
+' \ von FLOOR abweicht -- ueber alle Vorzeichen.
+FUNCTION abweichungen(n AS INTEGER) AS INTEGER
+    DIM f AS INTEGER
+    DIM a AS INTEGER
+    DIM b AS INTEGER
+    FOR a = -n TO n
+        FOR b = -9 TO 9
+            IF b <> 0 THEN
+                IF (a \ b) * b + a MOD b <> a THEN f = f + 1
+                IF a \ b <> INT(FLOOR(a / b)) THEN f = f + 1
+            END IF
+        NEXT
+    NEXT
+    RETURN f
+END FUNCTION
+FUNCTION summe(n AS INTEGER) AS INTEGER
+    DIM s AS INTEGER
+    DIM a AS INTEGER
+    FOR a = -n TO n
+        s = s + a \ 3
+    NEXT
+    RETURN s
+END FUNCTION
+PRINT abweichungen(50); " "; summe(10)
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+0 -7
+
+=== durch null und der ueberlauf bleiben fehler
+DIM a AS INTEGER : a = -9223372036854775807 - 1
+DIM b AS INTEGER : b = -1
+TRY
+    PRINT a \ b
+CATCH e
+    PRINT "ueberlauf: "; INSTR(e, "\") >= 0
+END TRY
+b = 0
+TRY
+    PRINT 5 \ b
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+ueberlauf: TRUE
+Integer-Division durch 0

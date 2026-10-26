@@ -465,7 +465,14 @@ PRINT "beispiele beim nutzer "; FILEEXISTS(bsp + "/183_sfx_generator.dh"); " "; 
 PRINT "gleich viele "; (LEN(DIRLIST_REC(bsp)) = LEN(DIRLIST_REC(paket + "/examples")))
 DIM L AS ARRAY OF STRING : L = READLINES("ide.log")
 PRINT "ide bereit "; hat(L, "bereit")
-PRINT "projekt ist der beispielordner "; hat(L, "projekt ") AND INSTR(REPLACE$(L[ARRAY_INDEXOF(L, "bereit") - 1], CHR$(92), "/"), "Drachenhauch/examples") >= 0
+' die letzte projekt-Zeile vor "bereit" -- dazwischen stehen die Zeilen der
+' Plugins (plugins N, mitgeliefert N)
+DIM pz AS STRING : pz = ""
+DIM pi AS INTEGER
+FOR pi = 0 TO ARRAY_INDEXOF(L, "bereit") - 1
+    IF LEFT$(L[pi], 8) = "projekt " THEN pz = L[pi]
+NEXT
+PRINT "projekt ist der beispielordner "; INSTR(REPLACE$(pz, CHR$(92), "/"), "Drachenhauch/examples") >= 0
 PRINT "kacheln "; hat(L, "kacheln ")
 ' Zweiter Start: nichts ueberschreiben, Fehlendes nachliefern.
 DIM t AS STRING : t = BUFFER_TO_STRING$(READALL_BYTES(bsp + "/01_hello.dh"))

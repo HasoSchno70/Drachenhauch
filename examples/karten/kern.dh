@@ -1,0 +1,277 @@
+' kern.dh -- Rechnen ohne Fenster: Web-Mercator, Kachelnummern, Entfernungen,
+' GPX-Spuren und Marker. Wird von main.dh importiert und laesst sich fuer
+' sich pruefen.
+'
+' Weltpixel: bei Zoomstufe z ist die ganze Welt KACHEL * 2^z Punkte breit und
+' hoch, (0, 0) liegt oben links bei 180 Grad West und 85,0511 Grad Nord --
+' dieselbe Zaehlung wie die Kacheln von OpenStreetMap (z/x/y).
+IMPORT "xml"
+IMPORT "json"
+
+CONST KACHEL = 256
+CONST ERDRADIUS = 6371008.8          ' mittlerer Radius in Metern
+CONST MERCATOR_GRENZE = 85.0511287798 ' weiter nach Norden/Sueden reicht die Karte nicht
+
+FUNCTION weltGroesse(z AS INTEGER) AS FLOAT
+    RETURN KACHEL * (2.0 ^ z)
+END FUNCTION
+
+FUNCTION weltX(lon AS FLOAT, z AS INTEGER) AS FLOAT
+    RETURN (lon + 180.0) / 360.0 * weltGroesse(z)
+END FUNCTION
+
+FUNCTION weltY(lat AS FLOAT, z AS INTEGER) AS FLOAT
+    DIM b AS FLOAT : b = CLAMP(lat, -MERCATOR_GRENZE, MERCATOR_GRENZE)
+    DIM s AS FLOAT : s = SIN(RAD(b))
+    RETURN (0.5 - LOG((1.0 + s) / (1.0 - s)) / (4.0 * PI)) * weltGroesse(z)
+END FUNCTION
+
+FUNCTION lonAus(x AS FLOAT, z AS INTEGER) AS FLOAT
+    RETURN x / weltGroesse(z) * 360.0 - 180.0
+END FUNCTION
+
+FUNCTION latAus(y AS FLOAT, z AS INTEGER) AS FLOAT
+    DIM n AS FLOAT : n = PI - 2.0 * PI * y / weltGroesse(z)
+    ' atan(sinh(n)), sinh ueber EXP
+    RETURN DEG(ATAN(0.5 * (EXP(n) - EXP(-n))))
+END FUNCTION
+
+' Die Kachelnummer, in der ein Weltpunkt liegt.
+FUNCTION kachelNr(welt AS FLOAT) AS INTEGER
+    RETURN INT(FLOOR(welt / KACHEL))
+END FUNCTION
+
+' Waagerecht ist die Welt rund: Kachel x = -1 ist die ganz rechts. MOD hat
+' das Vorzeichen des Teilers, -1 MOD 8 ist also schon 7.
+FUNCTION kachelX(x AS INTEGER, z AS INTEGER) AS INTEGER
+    RETURN x MOD (1 SHL z)
+END FUNCTION
+
+' Meter je Bildpunkt am Breitengrad lat.
+FUNCTION meterJePunkt(lat AS FLOAT, z AS INTEGER) AS FLOAT
+    RETURN COS(RAD(lat)) * 2.0 * PI * ERDRADIUS / weltGroesse(z)
+END FUNCTION
+
+' Entfernung zweier Punkte auf der Kugel (Haversine), in Metern.
+FUNCTION abstandM(lat1 AS FLOAT, lon1 AS FLOAT, lat2 AS FLOAT, lon2 AS FLOAT) AS FLOAT
+    DIM p1 AS FLOAT : p1 = RAD(lat1)
+    DIM p2 AS FLOAT : p2 = RAD(lat2)
+    DIM dp AS FLOAT : dp = RAD(lat2 - lat1)
+    DIM dl AS FLOAT : dl = RAD(lon2 - lon1)
+    DIM a AS FLOAT : a = SIN(dp / 2) ^ 2 + COS(p1) * COS(p2) * SIN(dl / 2) ^ 2
+    RETURN 2.0 * ERDRADIUS * ATAN2(SQR(a), SQR(1.0 - a))
+END FUNCTION
+
+' Eine Strecke fuer den Massstab: 1, 2 oder 5 mal eine Zehnerpotenz Meter, so
+' lang, dass sie hoechstens `maxPunkte` breit ist.
+FUNCTION massstabMeter(lat AS FLOAT, z AS INTEGER, maxPunkte AS INTEGER) AS FLOAT
+    DIM grenze AS FLOAT : grenze = meterJePunkt(lat, z) * maxPunkte
+    DIM p AS FLOAT : p = 10.0 ^ FLOOR(LOG(grenze) / LOG(10.0))
+    IF 5.0 * p <= grenze THEN RETURN 5.0 * p
+    IF 2.0 * p <= grenze THEN RETURN 2.0 * p
+    RETURN p
+END FUNCTION
+
+FUNCTION streckeText$(m AS FLOAT) AS STRING
+    IF m < 1000 THEN RETURN ZAHL$(m, 0) + " m"
+    IF m < 10000 THEN RETURN ZAHL$(m / 1000.0, 2) + " km"
+    RETURN ZAHL$(m / 1000.0, 1) + " km"
+END FUNCTION
+
+' --- GPX ------------------------------------------------------------------
+' Eine Spur: Punkte mit Breite, Laenge, Hoehe und der Strecke bis dorthin.
+' Mehrere Abschnitte (trkseg) gehen hintereinander, `teil` sagt, wo einer
+' beginnt -- zwischen zwei Abschnitten wird nicht verbunden und nicht gezaehlt.
+CLASS Spur
+    DIM name AS STRING
+    DIM lat AS ARRAY OF FLOAT
+    DIM lon AS ARRAY OF FLOAT
+    DIM ele AS ARRAY OF FLOAT
+    DIM weg AS ARRAY OF FLOAT
+    DIM neu AS ARRAY OF BOOLEAN
+    DIM mitHoehe AS BOOLEAN
+    DIM laenge AS FLOAT
+    DIM auf AS FLOAT
+    DIM ab AS FLOAT
+
+    SUB Init()
+        Self.lat = [] : Self.lon = [] : Self.ele = [] : Self.weg = [] : Self.neu = []
+    END SUB
+
+    FUNCTION anzahl() AS INTEGER
+        RETURN LEN(Self.lat)
+    END FUNCTION
+
+    SUB punkt(la AS FLOAT, lo AS FLOAT, h AS FLOAT, beginnt AS BOOLEAN)
+        DIM n AS INTEGER : n = LEN(Self.lat)
+        DIM w AS FLOAT : w = 0
+        IF n > 0 THEN
+            w = Self.weg[n - 1]
+            IF NOT beginnt THEN w = w + abstandM(Self.lat[n - 1], Self.lon[n - 1], la, lo)
+        END IF
+        ARRAY_PUSH(Self.lat, la)
+        ARRAY_PUSH(Self.lon, lo)
+        ARRAY_PUSH(Self.ele, h)
+        ARRAY_PUSH(Self.weg, w)
+        ARRAY_PUSH(Self.neu, beginnt OR n = 0)
+        Self.laenge = w
+    END SUB
+
+    ' Auf- und Abstieg, mit 3 m Totband -- sonst zaehlt das Rauschen eines
+    ' GPS-Empfaengers bei jedem Schritt mit.
+    SUB hoehenRechnen()
+        Self.auf = 0 : Self.ab = 0
+        IF NOT Self.mitHoehe OR LEN(Self.ele) = 0 THEN RETURN
+        DIM bezug AS FLOAT : bezug = Self.ele[0]
+        DIM i AS INTEGER
+        FOR i = 1 TO LEN(Self.ele) - 1
+            IF Self.neu[i] THEN
+                bezug = Self.ele[i]
+            ELSE
+                DIM d AS FLOAT : d = Self.ele[i] - bezug
+                IF d >= 3.0 THEN
+                    Self.auf = Self.auf + d : bezug = Self.ele[i]
+                ELSEIF d <= -3.0 THEN
+                    Self.ab = Self.ab - d : bezug = Self.ele[i]
+                END IF
+            END IF
+        NEXT
+    END SUB
+END CLASS
+
+' Die Kinder eines Elements mit diesem Namen der Reihe nach, ohne XML_AT --
+' das sucht jedes Mal von vorn, bei 20000 Punkten waere das quadratisch.
+SUB gpxPunkte(sp AS Spur, k AS XML_HANDLE, kind AS STRING)
+    DIM erster AS BOOLEAN : erster = TRUE
+    DIM i AS INTEGER
+    FOR i = 0 TO XML_CHILD_COUNT(k) - 1
+        DIM c AS XML_HANDLE : c = XML_CHILD(k, i)
+        IF XML_NAME$(c) = kind THEN
+            DIM h AS FLOAT : h = 0
+            IF XML_HAS(c, "ele") THEN
+                h = VAL(XML_TEXT$(c, "ele"))
+                sp.mitHoehe = TRUE
+            END IF
+            sp.punkt(VAL(XML_ATTR$(c, "lat", "0")), VAL(XML_ATTR$(c, "lon", "0")), h, erster)
+            erster = FALSE
+        END IF
+    NEXT
+END SUB
+
+' Liest Spuren (trk/trkseg/trkpt) und Routen (rte/rtept) einer GPX-Datei in
+' EINE Spur; Wegpunkte (wpt) gehen in die Marker, wenn `mitMarkern`.
+FUNCTION gpxLesen(text AS STRING) AS Spur
+    DIM sp AS Spur : sp = NEW Spur()
+    DIM d AS XML_HANDLE : d = XML_PARSE(text)
+    IF XML_NAME$(d) <> "gpx" THEN THROW "keine GPX-Datei (Wurzel ist <" + XML_NAME$(d) + ">)"
+    DIM i AS INTEGER
+    FOR i = 0 TO XML_CHILD_COUNT(d) - 1
+        DIM c AS XML_HANDLE : c = XML_CHILD(d, i)
+        SELECT CASE XML_NAME$(c)
+            CASE "trk"
+                IF sp.name = "" AND XML_HAS(c, "name") THEN sp.name = TRIM$(XML_TEXT$(c, "name"))
+                DIM j AS INTEGER
+                FOR j = 0 TO XML_CHILD_COUNT(c) - 1
+                    DIM s AS XML_HANDLE : s = XML_CHILD(c, j)
+                    IF XML_NAME$(s) = "trkseg" THEN gpxPunkte(sp, s, "trkpt")
+                NEXT
+            CASE "rte"
+                IF sp.name = "" AND XML_HAS(c, "name") THEN sp.name = TRIM$(XML_TEXT$(c, "name"))
+                gpxPunkte(sp, c, "rtept")
+            CASE "wpt"
+                markerDazu(VAL(XML_ATTR$(c, "lat", "0")), VAL(XML_ATTR$(c, "lon", "0")), IIF(XML_HAS(c, "name"), TRIM$(XML_TEXT$(c, "name")), "Wegpunkt"))
+        END SELECT
+    NEXT
+    sp.hoehenRechnen()
+    RETURN sp
+END FUNCTION
+
+' Der Ausschnitt einer Spur: Sued, West, Nord, Ost.
+FUNCTION spurRahmen(sp AS Spur) AS TUPLE
+    DIM s AS FLOAT : s = 90 : DIM n AS FLOAT : n = -90
+    DIM w AS FLOAT : w = 180 : DIM o AS FLOAT : o = -180
+    DIM i AS INTEGER
+    FOR i = 0 TO sp.anzahl() - 1
+        s = MIN(s, sp.lat[i]) : n = MAX(n, sp.lat[i])
+        w = MIN(w, sp.lon[i]) : o = MAX(o, sp.lon[i])
+    NEXT
+    RETURN (s, w, n, o)
+END FUNCTION
+
+' Die groesste Zoomstufe, bei der ein Rahmen in b x h Punkte passt.
+FUNCTION zoomFuer(s AS FLOAT, w AS FLOAT, n AS FLOAT, o AS FLOAT, b AS INTEGER, h AS INTEGER) AS INTEGER
+    DIM z AS INTEGER
+    FOR z = 18 TO 1 STEP -1
+        IF weltX(o, z) - weltX(w, z) <= b AND weltY(s, z) - weltY(n, z) <= h THEN RETURN z
+    NEXT
+    RETURN 1
+END FUNCTION
+
+' --- Marker ---------------------------------------------------------------
+DIM mkLat AS ARRAY OF FLOAT : mkLat = []
+DIM mkLon AS ARRAY OF FLOAT : mkLon = []
+DIM mkName AS ARRAY OF STRING : mkName = []
+
+SUB markerSetzen(la AS FLOAT, lo AS FLOAT, name AS STRING)
+    ARRAY_PUSH(mkLat, la)
+    ARRAY_PUSH(mkLon, lo)
+    ARRAY_PUSH(mkName, name)
+END SUB
+
+' Wie markerSetzen, aber nicht doppelt: ein Wegpunkt einer GPX-Datei, die
+' man zum zweiten Mal oeffnet, ist schon da.
+SUB markerDazu(la AS FLOAT, lo AS FLOAT, name AS STRING)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(mkName) - 1
+        IF mkName[i] = name AND ABS(mkLat[i] - la) < 0.000001 AND ABS(mkLon[i] - lo) < 0.000001 THEN RETURN
+    NEXT
+    markerSetzen(la, lo, name)
+END SUB
+
+SUB markerEntfernen(i AS INTEGER)
+    IF i < 0 OR i >= LEN(mkName) THEN RETURN
+    ARRAY_REMOVE_AT(mkLat, i)
+    ARRAY_REMOVE_AT(mkLon, i)
+    ARRAY_REMOVE_AT(mkName, i)
+END SUB
+
+FUNCTION markerJson$() AS STRING
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("[]")
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(mkName) - 1
+        DIM m AS JSON_HANDLE : m = JSON_PARSE("{}")
+        JSON_SET_STRING(m, "name", mkName[i])
+        JSON_SET_FLOAT(m, "lat", mkLat[i])
+        JSON_SET_FLOAT(m, "lon", mkLon[i])
+        JSON_APPEND_JSON(j, "", m)
+    NEXT
+    RETURN JSON_STRINGIFY(j)
+END FUNCTION
+
+' Liest Marker; ein Eintrag ohne lat/lon wird uebergangen.
+SUB markerAusJson(text AS STRING)
+    mkLat = [] : mkLon = [] : mkName = []
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "m" + CHR$(34) + ":" + text + "}")
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "m") - 1
+        DIM p AS STRING : p = "m." + STR$(i)
+        IF JSON_HAS(j, p + ".lat") AND JSON_HAS(j, p + ".lon") THEN
+            DIM n AS STRING : n = "Marker"
+            IF JSON_HAS(j, p + ".name") THEN n = JSON_GET_STRING(j, p + ".name")
+            markerSetzen(JSON_GET_FLOAT(j, p + ".lat"), JSON_GET_FLOAT(j, p + ".lon"), n)
+        END IF
+    NEXT
+END SUB
+
+' Ein Marker als GPX-Wegpunkt -- damit gehen sie in jedes Programm, das GPX
+' liest, und kommen ueber gpxLesen auch wieder herein.
+FUNCTION markerGpx$() AS STRING
+    DIM q AS STRING : q = CHR$(34)
+    DIM t AS STRING : t = "<?xml version=" + q + "1.0" + q + " encoding=" + q + "UTF-8" + q + "?>" + CHR$(10)
+    t = t + "<gpx version=" + q + "1.1" + q + " creator=" + q + "Drachenhauch-Karten" + q + " xmlns=" + q + "http://www.topografix.com/GPX/1/1" + q + ">" + CHR$(10)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(mkName) - 1
+        t = t + "  <wpt lat=" + q + FORMAT$(mkLat[i], "%.7f") + q + " lon=" + q + FORMAT$(mkLon[i], "%.7f") + q + "><name>" + XML_ESCAPE$(mkName[i]) + "</name></wpt>" + CHR$(10)
+    NEXT
+    RETURN t + "</gpx>" + CHR$(10)
+END FUNCTION

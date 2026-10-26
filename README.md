@@ -281,6 +281,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `glutfaden/main.dh` | **Glutfaden** — der Kreuzstich-Editor PySticky in Drachenhauch, mit GTK 3 über fremde Bibliotheken: Teil- und Rückstiche, Ebenen, Bildimport, PDF/HTML/OXS-Export, PCStitch und Pattern Maker, Drucken, helles und dunkles Thema |
 | `../funkenflug/main.dh` | **Funkenflug** — ein Schaltplan-Editor mit GTK 3: Hierarchie und Busse, ERC, Netzliste/SPICE, Simulation mit ngspice, Lochraster-Platine mit Gerber und 3D-Vorschau, KiCad-Import (liegt im Hauptordner, nicht im Installer) |
 | `chip8/main.dh` | **CHIP-8-Emulator** — alle 35 Befehle, Assembler und ein eigenes Spiel, Tastenfeld nach Lage, Nachleuchten gegen das Flackern |
+| `karten/main.dh` | **Landkarte** — OpenStreetMap-Kacheln im Hintergrund geladen und auf der Platte gemerkt, Ortssuche, GPX-Spur mit Höhenprofil, Marker, als Bild oder PDF sichern, drucken |
 | `texteditor/main.dh` | **Texteditor** — Reiter, Suchen und Ersetzen, Kodierung und Zeilenenden bleiben beim Speichern |
 | `fotos/main.dh` | **Fotobetrachter mit GTK 3** — Übersicht, Einzelansicht, Drehen nach den Kameradaten, Diaschau |
 | `200_gui_akkordeon_assistent.dh` | **Akkordeon, Assistent, Baumtabelle** — eine kleine Projektablage: Einstellungen in aufklappbaren Abschnitten, Ordner und Dateien als Baum mit Spalten, neue Einträge über einen Assistenten mit Pflichtfeldern |
