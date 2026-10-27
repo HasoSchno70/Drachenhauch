@@ -378,11 +378,8 @@ FUNCTION stimmeBauen(nr AS INTEGER) AS BOOLEAN
         NEXT
         SPEAK_RATE(0.8)
         DIM roh AS SOUND : roh = SPEAK_SOUND(saetze[nr])
-        ' ueber eine WAV zum Sample -- dann laesst sie sich verstimmen
-        DIM pfad AS STRING : pfad = TEMPFILE$("nachtflug", ".wav")
-        AUDIO_SAVE_WAV(roh, pfad)
-        DIM sm AS SAMPLE : sm = SAMPLE_LOAD(pfad)
-        DELETEFILE(pfad)
+        ' als Sample laesst sie sich verstimmen
+        DIM sm AS SAMPLE : sm = SAMPLE_FROM_SOUND(roh)
         DIM lang AS INTEGER : lang = INT(SAMPLE_LEN(sm) * 1000)
         DIM t AS SOUND : t = AUDIO_SOUND_NEW(lang + 300)
         AUDIO_SOUND_MIX(t, SAMPLE_NOTE(sm, 0, lang, 60, 0, 1.0, 150, 0.8), 0, 1.0)

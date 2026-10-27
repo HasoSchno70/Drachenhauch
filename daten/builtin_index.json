@@ -9729,6 +9729,12 @@
    "module": "audio"
   },
   {
+   "name": "SAMPLE_FROM_SOUND",
+   "kind": "core",
+   "signature": "SAMPLE_FROM_SOUND(sound)",
+   "module": "audio"
+  },
+  {
    "name": "SAMPLE_NOTE",
    "kind": "core",
    "signature": "SAMPLE_NOTE(sample, halbtoene, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_halbtoene])",

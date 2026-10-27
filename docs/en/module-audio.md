@@ -190,7 +190,7 @@ For procedural sounds without audio files. Returns a `SOUND` object that you can
 |---|---|
 | `AUDIO_TONE(freq_hz, dauer_ms[, waveform$[, vol]])` | sine/square/saw/triangle tone |
 | `AUDIO_NOISE(dauer_ms[, vol])` | white noise |
-| `AUDIO_NOTE(wf$, freq, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, vib_depth, vib_speed, detune_cents, slide_halbtoene])` | a held note with a real ADSR envelope, vibrato, detune layer and portamento — the instrument for trackers and music |
+| `AUDIO_NOTE(wf$, freq, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, vib_depth, vib_speed, detune_cents, slide_halbtoene])` | a held note with a real ADSR envelope, vibrato, detune layer and portamento — the instrument for trackers and music; `vib_depth` is a fraction of the frequency (0.005 = ±0.5 %), not semitones |
 
 **Waveforms** (case-insensitive): `"sine"`, `"square"`, `"saw"`, `"triangle"`, `"noise"`.
 
@@ -228,6 +228,7 @@ AUDIO_SFX(waveform$, freq, slide, attack_ms, sustain_ms, decay_ms,
 
 | Argument | Effect |
 |---|---|
+| `vib_depth` / `vib_speed` | vibrato: the frequency swings `vib_speed` times per second by the **factor** `1 ± vib_depth`. So `vib_depth` is a fraction of the frequency, not semitones: 0.003..0.006 sounds like a natural vibrato (±5..10 cents), 0.06 is already ±1 semitone, 0.12 about ±2 semitones (it wobbles). 0 = off. |
 | `duty` | pulse width of the `square` wave (0.05..0.95; **0.5 = symmetric = as before**). Narrower = thinner/more nasal SID pulse. |
 | `pwm_depth` / `pwm_speed` | pulse-width **modulation** (PWM): the pulse width swings around `duty` at `pwm_speed` Hz — the typical SID shimmer. |
 | `flt_cutoff` | cutoff frequency of the resonant low-pass in Hz (**0 = off**). |
@@ -260,7 +261,7 @@ AUDIO_NOTE(waveform$, freq, dauer_ms, attack_ms, decay_ms, sustain, release_ms, 
 | `attack_ms` / `decay_ms` | rise to full, then fall to the sustain level |
 | `sustain` | the level 0..1 that **remains** afterwards — at `0.0` the note falls silent after the decay, no matter how long it is held (piano); at `1.0` it stays full (organ) |
 | `release_ms` | the fade-out — it is **appended at the end**, so the sound is `dauer_ms + release_ms` long and overlaps the next note as on a real synthesizer |
-| `vib_depth` / `vib_speed` | vibrato as with `AUDIO_SFX` |
+| `vib_depth` / `vib_speed` | vibrato as with `AUDIO_SFX`: `vib_depth` is the **factor** of the frequency (0.005 = ±0.5 % ≈ ±9 cents, subtle; 0.06 = ±1 semitone), `vib_speed` in Hz |
 | `detune_cents` | a second layer underneath, detuned by that many cents (chorus) — turns a bare waveform into an instrument |
 | `slide_halbtoene` | portamento: the pitch glides to the target over the held time, in semitones and exponentially (musically even), not in Hz/s as with `AUDIO_SFX` |
 
@@ -270,7 +271,7 @@ DIM piano AS SOUND
 piano = AUDIO_NOTE("triangle", 261.6, 500, 2, 700, 0.0, 200, 0.8, 0, 0, 6)
 ' An organ: stays as long as it is held
 DIM orgel AS SOUND
-orgel = AUDIO_NOTE("square", 261.6, 500, 6, 0, 1.0, 70, 0.6, 0.06, 6, 5)
+orgel = AUDIO_NOTE("square", 261.6, 500, 6, 0, 1.0, 70, 0.6, 0.005, 6, 5)
 ```
 
 The tracker in Drachenhauch (`examples/190_tracker.dh`) builds every note this way.
@@ -365,6 +366,7 @@ instrument.
 |---|---|
 | `SAMPLE_LOAD(pfad$)` → SAMPLE | load WAV/OGG/QOA, normalized to mono |
 | `SAMPLE_FROM_BUFFER(puffer, abtastrate)` → SAMPLE | sample from raw 16-bit PCM (little endian, signed, mono) |
+| `SAMPLE_FROM_SOUND(sound)` → SAMPLE | a SOUND (from `SPEAK_SOUND`, `AUDIO_NOTE`, `LOADSOUND` ...) as a sample, channels averaged to mono, sample rate kept |
 | `SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms])` → AUDIO_CHANNEL | play at a relative pitch |
 | `SAMPLE_NOTE(sample, halbtoene, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_halbtoene])` → SOUND | build a note as a sound (not play it), envelope like `AUDIO_NOTE` |
 | `SAMPLE_SET_LOOP(sample, start, end[, art$])` | loop region in frames (for held notes), `art$` = `vorwaerts` (forwards, default) or `pingpong` |
@@ -409,6 +411,11 @@ sample rate is already accounted for in the pitch.
 `SAMPLE_FROM_BUFFER` takes samples that do not exist as a file — such as
 Base64 in a JSON (`BUFFER_FROM_BASE64` before it). A value −32768..32767 is
 divided by 32768; an odd length is an error.
+`SAMPLE_FROM_SOUND` turns a finished sound into a sample without the detour
+via `AUDIO_SAVE_WAV` and `SAMPLE_LOAD` — such as a voice from `SPEAK_SOUND`
+that is then detuned or doubled with `SAMPLE_NOTE`. The channels are averaged
+as with `SAMPLE_LOAD`, the values stay floating point (no 16-bit rounding as
+via the file).
 **Ping-pong** runs the loop region backwards down again at its end instead of
 jumping to its start — a sample whose ends do not match up does not click
 that way.

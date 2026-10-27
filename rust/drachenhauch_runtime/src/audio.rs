@@ -2079,6 +2079,23 @@ resonance/reverb/distortion", other)),
         Ok((self.samples.len() - 1) as i64)
     }
 
+    /// SAMPLE_FROM_SOUND(sound) -- ein SOUND (aus SPEAK_SOUND, AUDIO_NOTE,
+    /// LOADSOUND ...) als Sample, Kanaele wie bei SAMPLE_LOAD gemittelt,
+    /// Abtastrate uebernommen. Vorher ging das nur ueber AUDIO_SAVE_WAV +
+    /// SAMPLE_LOAD, also ueber eine Zwischendatei und 16 Bit.
+    pub fn sample_from_sound(&mut self, idx: i64) -> Result<i64, String> {
+        let slot = self.sounds.get(idx as usize)
+            .ok_or_else(|| format!("SAMPLE_FROM_SOUND: ungueltiges SOUND-Handle {}", idx))?;
+        let data = slot.data.as_ref()
+            .ok_or("SAMPLE_FROM_SOUND: dieser Klang wurde bereits mit UNLOADSOUND freigegeben")?;
+        let sr = data.sample_rate;
+        let mono: Vec<f32> = data.frames.iter().map(|f| (f.left + f.right) * 0.5).collect();
+        if mono.is_empty() { return Err("SAMPLE_FROM_SOUND: der Klang ist leer".into()); }
+        self.samples.push(Sample { data: mono, sr, loop_start: 0, loop_end: 0,
+                                   loop_mode: LoopArt::Vorwaerts });
+        Ok((self.samples.len() - 1) as i64)
+    }
+
     pub fn sample_set_loop(&mut self, idx: i64, start: i64, end: i64,
                            art: Option<&str>) -> Result<(), String> {
         let modus = match art { Some(a) => Some(LoopArt::parse(a, "SAMPLE_SET_LOOP")?), None => None };

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2129,
+ "count": 2130,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -118,7 +118,7 @@
   "AUDIO_MUSIC_SET_VOLUME": "AUDIO_MUSIC_VOLUME(v)",
   "AUDIO_MUSIC_STOP": "stop, optionally fade out (non-blocking)",
   "AUDIO_NOISE": "white noise",
-  "AUDIO_NOTE": "a held note with a real ADSR envelope, vibrato, detune layer and portamento — the instrument for trackers and music",
+  "AUDIO_NOTE": "a held note with a real ADSR envelope, vibrato, detune layer and portamento — the instrument for trackers and music; vib_depth is a fraction of the frequency (0.005 = ±0.5 %), not semitones",
   "AUDIO_NUM_CHANNELS": "current channel count",
   "AUDIO_PAN": "stereo pan (both 0..1)",
   "AUDIO_PAN_POS": "set the position directly (ends a running animation)",
@@ -1632,6 +1632,7 @@
   "RTRIM$": "remove whitespace on the left only / right only",
   "SAMEFILE": "do both paths mean the same file? A text comparison goes wrong with / versus \\, with a .. in the path, with short 8.3 names and (on Windows) with upper/lower case",
   "SAMPLE_FROM_BUFFER": "sample from raw 16-bit PCM (little endian, signed, mono)",
+  "SAMPLE_FROM_SOUND": "a SOUND (from SPEAK_SOUND, AUDIO_NOTE, LOADSOUND ...) as a sample, channels averaged to mono, sample rate kept",
   "SAMPLE_LEN": "length in seconds at the original pitch",
   "SAMPLE_LOAD": "load WAV/OGG/QOA, normalized to mono",
   "SAMPLE_NOTE": "build a note as a sound (not play it), envelope like AUDIO_NOTE",

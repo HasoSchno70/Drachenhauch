@@ -10943,6 +10943,11 @@ impl<'p> Vm<'p> {
                 let sr = gi(a, 1, "SAMPLE_FROM_BUFFER")?;
                 Value::Int(self.audio_mut()?.sample_from_pcm16(&bytes, sr)?)
             }
+            "sample_from_sound" => {
+                // SAMPLE_FROM_SOUND(sound) -> SAMPLE (Kanaele gemittelt)
+                let idx = gi(a, 0, "SAMPLE_FROM_SOUND")?;
+                Value::Int(self.audio_mut()?.sample_from_sound(idx)?)
+            }
             "sample_note" => {
                 // SAMPLE_NOTE(sample, halbtoene, dauer_ms, attack, decay, sustain,
                 //   release, vol[, slide_halbtoene]) -> SOUND
