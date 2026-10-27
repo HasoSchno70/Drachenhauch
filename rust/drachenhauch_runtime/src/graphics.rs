@@ -678,6 +678,13 @@ void main()
 // raylib laedt `mvp` = view*projection ins MVP-Uniform und identitaet in
 // matModel/matNormal -> die Modell-Transform MUSS aus instanceTransform kommen,
 // inkl. der Normalen (matNormal ist bei Instancing unbrauchbar).
+//
+// Die Farbe JE INSTANZ reist in der Matrix mit: deren unterste Zeile ist bei
+// Lage, Drehung und Groesse immer (0, 0, 0, 1) und traegt hier stattdessen
+// Rot, Gruen, Blau, Deckkraft (0..1, `instanz_farben`). Der Shader liest sie
+// und setzt die Zeile vor dem Rechnen zurueck. raylibs DrawMeshInstanced
+// uebertraegt nur Matrizen -- ohne den Kniff hiesse jede Farbe ein eigener
+// Zeichenaufruf (vorher: nach Farben gruppiert, 2600 Farben = 2600 Aufrufe).
 const INST_VS: &str = r#"#version 330
 in vec3 vertexPosition;
 in vec2 vertexTexCoord;
@@ -691,13 +698,18 @@ out vec4 fragColor;
 out vec3 fragNormal;
 void main()
 {
-    fragPosition = vec3(instanceTransform*vec4(vertexPosition, 1.0));
+    // unterste Zeile = Farbe der Instanz; fuers Rechnen zurueck auf (0,0,0,1)
+    vec4 instFarbe = vec4(instanceTransform[0][3], instanceTransform[1][3],
+                          instanceTransform[2][3], instanceTransform[3][3]);
+    mat4 m = instanceTransform;
+    m[0][3] = 0.0; m[1][3] = 0.0; m[2][3] = 0.0; m[3][3] = 1.0;
+    fragPosition = vec3(m*vec4(vertexPosition, 1.0));
     fragTexCoord = vertexTexCoord;
-    fragColor = vertexColor;
+    fragColor = vertexColor*instFarbe;
     // Normale aus der Instanz-Matrix ableiten (matNormal ist hier Identitaet);
     // korrekt fuer Rotation + (uniforme) Skalierung.
-    fragNormal = normalize(mat3(instanceTransform)*vertexNormal);
-    gl_Position = mvp*instanceTransform*vec4(vertexPosition, 1.0);
+    fragNormal = normalize(mat3(m)*vertexNormal);
+    gl_Position = mvp*m*vec4(vertexPosition, 1.0);
 }
 "#;
 
@@ -1709,6 +1721,21 @@ fn ausweich_schriften() -> &'static [&'static str] {
 }
 
 /// DH-Farbe (0xRRGGBB INTEGER) -> raylib Color.
+/// Schreibt eine Farbe (0..1) in die unterste Zeile einer Matrix
+/// (column-major: Stellen 3, 7, 11, 15) -- siehe INST_VS.
+fn instanz_farbe_setzen(m: &mut [f32; 16], r: f32, g: f32, b: f32, a: f32) {
+    m[3] = r; m[7] = g; m[11] = b; m[15] = a;
+}
+
+/// Je Matrix ihre Farbe (wie `col`: Deckkraft 0 = deckend) in die unterste
+/// Zeile.
+fn instanz_farben(mats: &mut [[f32; 16]], farben: &[i64]) {
+    for (m, &c) in mats.iter_mut().zip(farben) {
+        let f = col(c);
+        instanz_farbe_setzen(m, f.r as f32 / 255.0, f.g as f32 / 255.0, f.b as f32 / 255.0, f.a as f32 / 255.0);
+    }
+}
+
 fn col(c: i64) -> Color {
     let v = c as u32;
     // Oberes Byte = Alpha. 0 bedeutet DECKEND (255) -- so bleiben die alten
@@ -2771,11 +2798,23 @@ impl Graphics {
     }
     /// Modul m3d: GPU-Instancing -- dasselbe Modell mit N Welt-Matrizen in EINEM
     /// Draw-Call (raylib DrawMeshInstanced). `mats` column-major (OpenGL-Order).
-    pub fn draw_model_instanced(&mut self, idx: i64, mats: Vec<[f32; 16]>, col_: i64) -> Result<(), String> {
+    /// Eine Farbe fuer alle: die unterste Zeile wird (1,1,1,1), die Farbe
+    /// geht als Tint ans Material.
+    pub fn draw_model_instanced(&mut self, idx: i64, mut mats: Vec<[f32; 16]>, col_: i64) -> Result<(), String> {
         let i = self.check_model(idx, "MODEL_INSTANCED")?;
         if mats.is_empty() { return Ok(()); }   // nichts zu zeichnen
+        for m in mats.iter_mut() { instanz_farbe_setzen(m, 1.0, 1.0, 1.0, 1.0); }
         self.ensure_inst_shader();
         self.emit3d(Cmd3D::ModelInstanced(i, Rc::new(mats), col(col_)));
+        Ok(())
+    }
+    /// Eine Farbe je Instanz -- trotzdem EIN Zeichenaufruf (siehe INST_VS).
+    pub fn draw_model_instanced_farben(&mut self, idx: i64, mut mats: Vec<[f32; 16]>, farben: &[i64]) -> Result<(), String> {
+        let i = self.check_model(idx, "MODEL_INSTANCED")?;
+        if mats.is_empty() { return Ok(()); }
+        instanz_farben(&mut mats, farben);
+        self.ensure_inst_shader();
+        self.emit3d(Cmd3D::ModelInstanced(i, Rc::new(mats), col(0xFF_FFFF)));
         Ok(())
     }
     /// Legt eine via LOADIMAGE geladene Textur als Diffuse-/Albedo-Map an.

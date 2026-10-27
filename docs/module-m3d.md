@@ -171,6 +171,16 @@ Die per-Instanz-Welt-Transform kommt als Vertex-Attribut `instanceTransform`
 (nicht als `matModel`-Uniform wie bei `MODEL_MATRIX`), die Normalen werden daraus
 abgeleitet (korrekt für Rotation + uniforme Skalierung).
 
+**Eine Farbe je Instanz:** Statt einer Farbe darf `tint` ein `ARRAY OF
+INTEGER` sein, eine Farbe je Matrix (auch mit Deckkraft) — und auch das bleibt
+EIN Draw-Call, gleich wie viele verschiedene Farben es sind. Die Farbe reist
+in der untersten Zeile der Matrix mit, die bei Lage, Drehung und Größe immer
+`0 0 0 1` ist; der Shader liest sie und setzt die Zeile vor dem Rechnen
+zurück. Eine Matrix, deren unterste Zeile selbst etwas bedeutet (etwa eine
+Projektion), lässt sich darum mit `MODEL_INSTANCED` nicht zeichnen. Gemessen:
+2600 Würfel in je eigener Farbe 2380 statt 653 Bilder je Sekunde (bis
+2026.37 ein Draw-Call je Farbe).
+
 **Grenze:** Der Instancing-Shader unterstützt **kein** PBR/IBL
 (`MODEL_PBR`/`LIGHT_ENV*`), **keine** Schatten (`SHADOW_*`) und **keine**
 Normal-Maps (`MODEL_TEXTURE_NORMAL`) — dafür `MODEL_MATRIX`/`MODEL_LIT` nutzen.

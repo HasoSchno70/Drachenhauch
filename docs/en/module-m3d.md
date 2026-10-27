@@ -170,6 +170,16 @@ per-instance world transform comes as the vertex attribute
 `instanceTransform` (not as the `matModel` uniform as with `MODEL_MATRIX`),
 the normals are derived from it (correct for rotation + uniform scaling).
 
+**One colour per instance:** instead of one colour, `tint` may be an `ARRAY
+OF INTEGER`, one colour per matrix (alpha included) — and that is still ONE
+draw call, however many different colours there are. The colour travels in
+the bottom row of the matrix, which is always `0 0 0 1` for position,
+rotation and size; the shader reads it and resets the row before
+transforming. A matrix whose bottom row means something itself (a
+projection, say) therefore cannot be drawn with `MODEL_INSTANCED`. Measured:
+2600 cubes in their own colours at 2380 instead of 653 frames per second
+(up to 2026.37 one draw call per colour).
+
 **Limit:** The instancing shader supports **no** PBR/IBL
 (`MODEL_PBR`/`LIGHT_ENV*`), **no** shadows (`SHADOW_*`) and **no**
 normal maps (`MODEL_TEXTURE_NORMAL`) — use `MODEL_MATRIX`/`MODEL_LIT` for
