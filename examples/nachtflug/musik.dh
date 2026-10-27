@@ -52,8 +52,27 @@ DIM akkord AS ARRAY OF INTEGER : akkord = [ _
     57, 60, 64, 69]
 DIM grund AS ARRAY OF INTEGER : grund = [33, 29, 36, 31, 29, 31, 28, 33]
 
+' Die Rueckung: ab der zweiten Haelfte des zweiten Hoehepunkts steht alles
+' einen Ganzton hoeher (a-Moll -> h-Moll) -- der Gaensehaut-Moment des
+' Uplifting Trance. Die Akkordnummern 8..15 meinen dieselben Akkorde, versetzt.
+CONST RUECKUNG = 2
+CONST AB_RUECKUNG = 72
+
+FUNCTION versatzBei(takt AS INTEGER) AS INTEGER
+    RETURN IIF(takt >= AB_RUECKUNG, RUECKUNG, 0)
+END FUNCTION
+
 FUNCTION akkordNr(takt AS INTEGER) AS INTEGER
-    RETURN (takt \ 2) MOD 8
+    RETURN (takt \ 2) MOD 8 + IIF(takt >= AB_RUECKUNG, 8, 0)
+END FUNCTION
+
+' Ton v (0..3) des Akkords nr, samt Rueckung
+FUNCTION akkTon(nr AS INTEGER, v AS INTEGER) AS INTEGER
+    RETURN akkord[(nr MOD 8) * 4 + v] + IIF(nr >= 8, RUECKUNG, 0)
+END FUNCTION
+
+FUNCTION grundTon(nr AS INTEGER) AS INTEGER
+    RETURN grund[nr MOD 8] + IIF(nr >= 8, RUECKUNG, 0)
 END FUNCTION
 
 ' Die Melodie: sechzehn Takte zu je acht Achteln, 0 = Pause, -1 = gehalten.
@@ -77,6 +96,12 @@ FUNCTION melodieLaenge(pos AS INTEGER) AS INTEGER
     WEND
     RETURN achtel
 END FUNCTION
+
+' Die Gegenmelodie fuer das Finale: halbe Noten, die gegen die Melodie
+' laufen -- wo sie steigt, faellt diese, und umgekehrt. 0 = Pause.
+DIM gegen AS ARRAY OF INTEGER : gegen = [ _
+    69, 72, 71, 72,   72, 69, 67, 65,   67, 64, 67, 69,   71, 74, 71, 67, _
+    69, 72, 74, 72,   74, 71, 74, 79,   76, 71, 74, 76,   76, 72, 69, 0]
 
 ' --- Klaenge ----------------------------------------------------------------
 ' Einmal gebaut, dann wiederverwendet: je Schluessel ein SOUND.
@@ -206,8 +231,8 @@ FUNCTION bass(nr AS INTEGER) AS SOUND
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(260)
-    AUDIO_SOUND_MIX(s, AUDIO_NOTE("saw", hz(grund[nr] + 12), 120, 3, 90, 0.35, 60, 0.45), 0, 0.7)
-    AUDIO_SOUND_MIX(s, AUDIO_NOTE("sine", hz(grund[nr]), 140, 3, 60, 0.8, 60, 0.9), 0, 0.9)
+    AUDIO_SOUND_MIX(s, AUDIO_NOTE("saw", hz(grundTon(nr) + 12), 120, 3, 90, 0.35, 60, 0.45), 0, 0.7)
+    AUDIO_SOUND_MIX(s, AUDIO_NOTE("sine", hz(grundTon(nr)), 140, 3, 60, 0.8, 60, 0.9), 0, 0.9)
     RETURN merken(k, s)
 END FUNCTION
 
@@ -217,7 +242,7 @@ FUNCTION tiefe(nr AS INTEGER) AS SOUND
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM lang AS INTEGER : lang = INT(msJeSchritt() * 32)
-    RETURN merken(k, AUDIO_NOTE("sine", hz(grund[nr] + 12), lang - 100, 600, 400, 0.8, 900, 0.5))
+    RETURN merken(k, AUDIO_NOTE("sine", hz(grundTon(nr) + 12), lang - 100, 600, 400, 0.8, 900, 0.5))
 END FUNCTION
 
 ' Flaeche: jeder Akkordton zweimal, links und rechts verschieden verstimmt,
@@ -233,7 +258,7 @@ FUNCTION flaeche(nr AS INTEGER, gross AS BOOLEAN) AS SOUND
     DIM v AS INTEGER
     DIM w AS FLOAT : w = IIF(gross, 0.9, 0.65)
     FOR v = 0 TO 3
-        DIM f AS FLOAT : f = hz(akkord[nr * 4 + v])
+        DIM f AS FLOAT : f = hz(akkTon(nr, v))
         AUDIO_SOUND_MIX(s, AUDIO_NOTE("saw", f * 0.9966, lang - 200, 1100, 900, 0.75, 2000, 0.15, 0.0025, 0.31, 9), 0, 1.0, -w)
         AUDIO_SOUND_MIX(s, AUDIO_NOTE("saw", f * 1.0034, lang - 200, 1200, 900, 0.75, 2000, 0.15, 0.0025, 0.27, 14), 0, 1.0, w)
         AUDIO_SOUND_MIX(s, AUDIO_NOTE("triangle", f * 2.0, lang - 200, 1400, 900, 0.6, 2000, 0.08), 0, 1.0, IIF(v MOD 2 = 0, -0.35, 0.35))
@@ -252,7 +277,7 @@ FUNCTION pumpe(nr AS INTEGER) AS SOUND
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(lang + 200)
     DIM v AS INTEGER
     FOR v = 0 TO 3
-        DIM f AS FLOAT : f = hz(akkord[nr * 4 + v])
+        DIM f AS FLOAT : f = hz(akkTon(nr, v))
         AUDIO_SOUND_MIX(s, AUDIO_NOTE("saw", f * 0.996, lang - 60, 150, 200, 0.8, 120, 0.11, 0, 0, 11), 0, 1.0, -0.7)
         AUDIO_SOUND_MIX(s, AUDIO_NOTE("saw", f * 1.004, lang - 60, 150, 200, 0.8, 120, 0.11, 0, 0, 13), 0, 1.0, 0.7)
     NEXT
@@ -269,7 +294,7 @@ FUNCTION gate(nr AS INTEGER) AS SOUND
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(lang + 160)
     DIM v AS INTEGER
     FOR v = 0 TO 3
-        supersaw(s, 0, hz(akkord[nr * 4 + v] + 12), lang, 3, 70, 0.5, 70, 0.045, 0.9, 0.0)
+        supersaw(s, 0, hz(akkTon(nr, v) + 12), lang, 3, 70, 0.5, 70, 0.045, 0.9, 0.0)
     NEXT
     RETURN merken(k, s)
 END FUNCTION
@@ -277,6 +302,28 @@ END FUNCTION
 ' Chor "aah": je Akkordton die Obertoene, gewichtet mit drei Formanten wie
 ' bei einem offenen A (um 750, 1150 und 2600 Hz) -- dazu ein
 ' eigenes, langsames Vibrato je Stimme, damit es nach mehreren Saengern klingt.
+' Eine Stimme des Chors fuer sich -- so laesst sich der Chor in kleinen
+' Stuecken bauen (vorbauen), ein ganzer Akkord am Stueck stockte ein Bild.
+FUNCTION chorStimme(nr AS INTEGER, v AS INTEGER) AS SOUND
+    DIM k AS STRING : k = "chorv" + STR$(nr) + "_" + STR$(v)
+    DIM i AS INTEGER : i = gemerkt(k)
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM lang AS INTEGER : lang = INT(msJeSchritt() * 32)
+    DIM s AS SOUND : s = AUDIO_SOUND_NEW(lang + 2200)
+    DIM f AS FLOAT : f = hz(akkTon(nr, v))
+    DIM h AS INTEGER
+    FOR h = 1 TO 16
+        DIM fh AS FLOAT : fh = f * h
+        IF fh > 3400 THEN EXIT FOR
+        DIM g AS FLOAT
+        g = EXP(-((fh - 750) / 190) ^ 2) + 0.6 * EXP(-((fh - 1150) / 230) ^ 2) + 0.22 * EXP(-((fh - 2600) / 320) ^ 2) + 0.12 / h
+        IF g > 0.07 THEN
+            AUDIO_SOUND_MIX(s, AUDIO_NOTE("sine", fh, lang - 200, 1500, 600, 0.85, 2000, 0.07 * g, 0.0045, 4.3 + v * 0.23), 0, 1.0, IIF(v MOD 2 = 0, -0.5, 0.5))
+        END IF
+    NEXT
+    RETURN merken(k, s)
+END FUNCTION
+
 FUNCTION chor(nr AS INTEGER) AS SOUND
     DIM k AS STRING : k = "chor" + STR$(nr)
     DIM i AS INTEGER : i = gemerkt(k)
@@ -285,17 +332,7 @@ FUNCTION chor(nr AS INTEGER) AS SOUND
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(lang + 2200)
     DIM v AS INTEGER
     FOR v = 0 TO 3
-        DIM f AS FLOAT : f = hz(akkord[nr * 4 + v])
-        DIM h AS INTEGER
-        FOR h = 1 TO 16
-            DIM fh AS FLOAT : fh = f * h
-            IF fh > 3400 THEN EXIT FOR
-            DIM g AS FLOAT
-            g = EXP(-((fh - 750) / 190) ^ 2) + 0.6 * EXP(-((fh - 1150) / 230) ^ 2) + 0.22 * EXP(-((fh - 2600) / 320) ^ 2) + 0.12 / h
-            IF g > 0.07 THEN
-                AUDIO_SOUND_MIX(s, AUDIO_NOTE("sine", fh, lang - 200, 1500, 600, 0.85, 2000, 0.07 * g, 0.0045, 4.3 + v * 0.23), 0, 1.0, IIF(v MOD 2 = 0, -0.5, 0.5))
-            END IF
-        NEXT
+        AUDIO_SOUND_MIX(s, chorStimme(nr, v), 0, 1.0)
     NEXT
     RETURN merken(k, s)
 END FUNCTION
@@ -448,10 +485,11 @@ SUB melodieSpielen(n AS INTEGER, art AS INTEGER, vol AS FLOAT, oktave AS INTEGER
     DIM pos AS INTEGER : pos = (takt MOD 16) * 8 + s \ 2
     DIM m AS INTEGER : m = melodie[pos]
     IF m <= 0 THEN RETURN
+    m = m + oktave + versatzBei(takt)
     IF art = 0 THEN
-        spielen(lead(m + oktave, melodieLaenge(pos)), n, vol)
+        spielen(lead(m, melodieLaenge(pos)), n, vol)
     ELSE
-        spielen(klavier(m + oktave, melodieLaenge(pos)), n, vol)
+        spielen(klavier(m, melodieLaenge(pos)), n, vol)
     END IF
 END SUB
 
@@ -494,7 +532,7 @@ SUB schrittPlanen(n AS INTEGER)
         ' der Chor: im Breakdown und im zweiten Hoehepunkt
         IF pause OR (takt >= AB_HOCH2 AND takt < AB_AUS + 4) THEN spielen(chor(nr), n, IIF(pause, 1.0, 0.75) * laut)
     END IF
-    IF takt = TAKTE - 2 AND s = 0 THEN spielen(flaeche(7, TRUE), n, 0.7)
+    IF takt = TAKTE - 2 AND s = 0 THEN spielen(flaeche(15, TRUE), n, 0.7)
     ' pumpende Flaeche auf jeder Viertel: ab der Mitte des Aufbaus, im ersten
     ' Hoehepunkt (erste Haelfte) und im zweiten
     DIM pumpt AS BOOLEAN
@@ -513,7 +551,7 @@ SUB schrittPlanen(n AS INTEGER)
         DIM folge AS ARRAY OF INTEGER : folge = [0, 1, 2, 3, 4, 3, 2, 1, 0, 2, 1, 3, 2, 4, 3, 1]
         DIM stufe AS INTEGER : stufe = folge[s]
         DIM ton AS INTEGER
-        IF stufe = 4 THEN ton = akkord[nr * 4] + 12 ELSE ton = akkord[nr * 4 + stufe]
+        IF stufe = 4 THEN ton = akkTon(nr, 0) + 12 ELSE ton = akkTon(nr, stufe)
         ton = ton + 12
         IF takt >= AB_HOCH2 AND takt MOD 2 = 1 THEN ton = ton + 12
         ' im Intro leiser, wird mit dem Filter heller
@@ -534,6 +572,11 @@ SUB schrittPlanen(n AS INTEGER)
         melodieSpielen(n, 0, 0.8, 0)
         IF takt >= AB_HOCH2 + 8 THEN melodieSpielen(n, 0, 0.42, 12)
     END IF
+    ' im Finale die Gegenmelodie: glockig, eine Oktave hoeher, in halben Noten
+    IF takt >= AB_RUECKUNG AND takt < AB_AUS AND s MOD 8 = 0 THEN
+        DIM gm AS INTEGER : gm = gegen[(takt MOD 16) * 2 + s \ 8]
+        IF gm > 0 THEN spielen(klavier(gm + 12 + RUECKUNG, 4), n, 0.5)
+    END IF
     ' Ausklang: das Klavier noch einmal, allein
     IF takt >= AB_AUS + 2 AND takt < AB_AUS + 10 THEN melodieSpielen(n, 1, 0.6 * laut + 0.2, 0)
 
@@ -545,13 +588,15 @@ SUB schrittPlanen(n AS INTEGER)
 
     ' --- Funken --- Glocken auf festen Stellen, die nach Zufall aussehen
     IF (takt < AB_AUFBAU OR takt >= AB_AUS) AND (n * 7919 + 13) MOD 23 = 0 THEN
-        spielen(glocke(akkord[nr * 4 + (n MOD 4)] + 24), n, 0.45 * laut + 0.1)
+        spielen(glocke(akkTon(nr, n MOD 4) + 24), n, 0.45 * laut + 0.1)
     END IF
 
     ' --- Uebergaenge --- Aufstieg vor jedem Hoehepunkt (vor dem zweiten
     ' ueber vier Takte), Wirbel davor, Becken auf der Eins
     IF s = 0 AND (takt = AB_AUFBAU - 2 OR takt = AB_HOCH1 - 2) THEN spielen(aufstieg(2), n, 0.55)
     IF s = 0 AND takt = AB_HOCH2 - 4 THEN spielen(aufstieg(4), n, 0.6)
+    ' vor der Rueckung ein kurzer Aufstieg ueber einen Takt
+    IF s = 0 AND takt = AB_RUECKUNG - 1 THEN spielen(aufstieg(1), n, 0.55)
     IF takt >= AB_HOCH2 - 4 AND takt < AB_HOCH2 THEN
         ' immer dichter: Viertel, Achtel, Sechzehntel
         DIM dicht AS INTEGER : dicht = IIF(takt < AB_HOCH2 - 2, 4, IIF(takt < AB_HOCH2 - 1, 2, 1))
@@ -602,23 +647,32 @@ SUB busNachziehen(takt AS INTEGER)
     END SELECT
 END SUB
 
-' Die Klaenge vorab bauen, damit spaeter kein Bild stockt -- einer je
-' Aufruf, die schweren zuerst: der Anfang des Stuecks ist dunkel, dort
-' faellt ein kurzes Stocken nicht auf. Was noch fehlt, wenn es gebraucht
-' wird, entsteht in dem Moment (dann eben mit Stocken).
+' Die Klaenge vorab bauen -- einer je Aufruf, keiner davon braucht laenger
+' als ein paar Hundertstel (der Chor ist darum in Stimmen zerlegt). main.dh
+' ruft es vor dem Start, waehrend das Startbild steht; was dann noch fehlt,
+' entsteht beim ersten Gebrauch.
 DIM bauStand AS INTEGER
+FUNCTION bauGesamt() AS INTEGER
+    RETURN 16 * 4 + 16 + 2 + 16 * 6 + 2 + LEN(melodie) + LEN(gegen)
+END FUNCTION
+
 FUNCTION vorbauen() AS BOOLEAN
     DIM i AS INTEGER : i = bauStand
+    IF i >= bauGesamt() THEN RETURN FALSE
     bauStand = bauStand + 1
-    IF i < 8 THEN
+    IF i < 16 * 4 THEN
+        chorStimme(i \ 4, i MOD 4) : RETURN TRUE
+    END IF
+    i = i - 16 * 4
+    IF i < 16 THEN
         chor(i) : RETURN TRUE
     END IF
-    i = i - 8
+    i = i - 16
     IF i < 2 THEN
         stimmeBauen(i) : RETURN TRUE
     END IF
     i = i - 2
-    IF i < 8 * 6 THEN
+    IF i < 16 * 6 THEN
         DIM nr AS INTEGER : nr = i \ 6
         SELECT CASE i MOD 6
             CASE 0 : flaeche(nr, FALSE)
@@ -626,30 +680,32 @@ FUNCTION vorbauen() AS BOOLEAN
             CASE 2 : bass(nr) : tiefe(nr)
             CASE 3 : pumpe(nr)
             CASE 4 : gate(nr)
-            CASE 5 : zupf(akkord[nr * 4] + 24, -0.6)
+            CASE 5 : zupf(akkTon(nr, 0) + 24, -0.6)
         END SELECT
         RETURN TRUE
     END IF
-    i = i - 8 * 6
+    i = i - 16 * 6
     IF i = 0 THEN
         bassdrum() : klatschen() : becken(TRUE) : becken(FALSE) : crash() : shaker(TRUE) : shaker(FALSE)
         RETURN TRUE
     END IF
     IF i = 1 THEN
-        aufstieg(2) : aufstieg(4)
+        aufstieg(1) : aufstieg(2) : aufstieg(4)
         RETURN TRUE
     END IF
     i = i - 2
     IF i < LEN(melodie) THEN
-        IF melodie[i] > 0 THEN
-            lead(melodie[i], melodieLaenge(i))
-            lead(melodie[i] + 12, melodieLaenge(i))
-            klavier(melodie[i], melodieLaenge(i))
-            klavier(melodie[i] + 12, melodieLaenge(i))
+        DIM m AS INTEGER : m = melodie[i]
+        IF m > 0 THEN
+            DIM l AS INTEGER : l = melodieLaenge(i)
+            lead(m, l) : lead(m + RUECKUNG, l) : lead(m + 12 + RUECKUNG, l)
+            klavier(m, l) : klavier(m + 12, l) : klavier(m + RUECKUNG, l)
         END IF
         RETURN TRUE
     END IF
-    RETURN FALSE
+    i = i - LEN(melodie)
+    IF gegen[i] > 0 THEN klavier(gegen[i] + 12 + RUECKUNG, 4)
+    RETURN TRUE
 END FUNCTION
 
 SUB klaengeBauen()
@@ -662,10 +718,9 @@ END SUB
 FUNCTION musikStarten(abTakt AS INTEGER) AS BOOLEAN
     versatz = abTakt * SCHRITTE_JE_TAKT
     geplantBis = versatz - 1
+    stilleStart = GET_TIME()
+    IF NOT tonDa() THEN RETURN FALSE
     TRY
-        ' von vorn: nur die erste Flaeche jetzt, der Rest je Bild (musikPlanen);
-        ' mitten im Stueck alles, sonst stockt es gleich
-        IF abTakt = 0 THEN flaeche(0, FALSE) ELSE klaengeBauen()
         AUDIO_BUS_VOLUME("sfx", 0.6)
         AUDIO_REVERB("sfx", 0.16, 0.86, 0.45)
         AUDIO_COMPRESSOR("sfx", -14, 3.0, 3.0)
@@ -739,9 +794,22 @@ FUNCTION tonBei(n AS FLOAT) AS FLOAT
     RETURN MAX(EXP(-seit * 0.45), 0.3)
 END FUNCTION
 
-' Der Akkord, der gerade klingt (0..7)
+' Der Akkord, der gerade klingt (0..7, ohne Rueckung)
 FUNCTION musikAkkord() AS INTEGER
-    RETURN akkordNr(INT(musikTakt()))
+    RETURN akkordNr(INT(musikTakt())) MOD 8
+END FUNCTION
+
+' Gibt es Ton? Ohne Soundkarte muss nichts gebaut werden. DH_OHNE_AUDIO (wie
+' in den Pruefungen) schaltet den Ton ab -- dann laufen Bild und Takt ueber
+' die Uhr des Rechners.
+FUNCTION tonDa() AS BOOLEAN
+    IF GETENV$("DH_OHNE_AUDIO") <> "" THEN RETURN FALSE
+    TRY
+        AUDIO_BUS_VOLUME("sfx", 0.6)
+        RETURN TRUE
+    CATCH fehler
+        RETURN FALSE
+    END TRY
 END FUNCTION
 
 ' Huellkurve der Bassdrum fuer die Bilder: 1 auf dem Schlag, faellt dann.
