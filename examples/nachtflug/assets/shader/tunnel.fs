@@ -19,7 +19,11 @@ uniform vec3 farbe;      // Farbe des Akkords
 uniform float aus;       // Szenenwechsel: Licht waechst aus der Mitte (0..1)
 uniform float ein;       // ... und weicht nach aussen (0 = nur Licht, 1 = Szene)
 uniform vec3 uebLicht;   // Farbe des Lichts beim Wechsel
+uniform float guete;     // 1 = volle Qualitaet, kleiner = weniger Schritte (--leicht)
 out vec4 finalColor;
+
+// Guete: ohne gesetzten Wert (0) gilt die volle
+float G() { return guete > 0.0 ? guete : 1.0; }
 
 const float SEG = 2.0;       // Abstand der Ringe
 const float WAND = 3.7;      // Halbmesser des Schachts
@@ -120,7 +124,8 @@ void main() {
         float nebel = exp(-t * 0.085);
         kern += mix(vec3(1.0), f, 0.8) * (0.35 + 2.0 * an) * 0.00018 / (0.0002 + h * h) * nebel;
         schein += f * (0.006 + 0.07 * an) / (0.02 + h * h * 20.0) * nebel;
-        t += max(h * 0.6, 0.03);
+        t += max(h * 0.6, 0.03 / G());
+        if (float(i) >= 100.0 * G()) break;
         if (t > tEnde) break;
     }
     vec3 c = kern * 0.06 + schein * 0.05;

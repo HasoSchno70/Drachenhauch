@@ -24,7 +24,11 @@ uniform vec3 farbe;      // Farbe des Akkords
 uniform float aus;       // Szenenwechsel: Licht waechst aus der Mitte (0..1)
 uniform float ein;       // ... und weicht nach aussen (0 = nur Licht, 1 = Szene)
 uniform vec3 uebLicht;   // Farbe des Lichts beim Wechsel
+uniform float guete;     // 1 = volle Qualitaet, kleiner = weniger Schritte (--leicht)
 out vec4 finalColor;
+
+// Guete: ohne gesetzten Wert (0) gilt die volle
+float G() { return guete > 0.0 ? guete : 1.0; }
 
 const float FOV = 52.0;
 
@@ -141,6 +145,41 @@ vec3 weltraum(vec3 d) {
     return (c + nebel) * (1.0 - staub);
 }
 
+// Ein Komet: zieht auf einer weiten Bahn ueber der Scheibe; sein Schweif
+// zeigt von der Mitte der Galaxie weg, ein zweiter, blauer (Gas) etwas
+// versetzt. Kopf und Schweifende werden in die Bildebene projiziert (mit
+// derselben Kamera wie der Strahl), der Schweif ist eine Strecke dazwischen.
+vec2 projiziere(vec3 x, vec3 vorne, vec3 rechts, vec3 oben, float tf) {
+    vec3 v = x - kamera;
+    float z = max(dot(v, vorne), 0.01);
+    return vec2(dot(v, rechts), dot(v, oben)) / (z * 2.0 * tf);
+}
+float zurStrecke(vec2 q, vec2 a, vec2 b, out float h) {
+    vec2 pa = q - a, ba = b - a;
+    h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
+    return length(pa - ba * h);
+}
+vec3 komet(vec2 q, vec3 vorne, vec3 rechts, vec3 oben, float tf) {
+    float a = time * 0.11 + 2.2;
+    vec3 kopf = vec3(cos(a) * 30.0, 9.0 + 4.0 * sin(a * 0.7), sin(a) * 20.0);
+    if (dot(kopf - kamera, vorne) < 1.0) return vec3(0.0);
+    vec3 weg = normalize(kopf + vec3(0.0, 4.0, 0.0));
+    vec2 k = projiziere(kopf, vorne, rechts, oben, tf);
+    vec2 s1 = projiziere(kopf + weg * 11.0, vorne, rechts, oben, tf);
+    vec3 seit = normalize(cross(weg, vec3(0.0, 1.0, 0.0)));
+    vec2 s2 = projiziere(kopf + weg * 14.0 + seit * 2.5, vorne, rechts, oben, tf);
+    float h1, h2;
+    float d1 = zurStrecke(q, k, s1, h1);
+    float d2 = zurStrecke(q, k, s2, h2);
+    float breite1 = 0.002 + 0.016 * h1;
+    float breite2 = 0.001 + 0.008 * h2;
+    vec3 c = vec3(1.0, 0.95, 0.85) * exp(-d1 * d1 / (breite1 * breite1)) * pow(1.0 - h1, 1.6) * 0.9;
+    c += vec3(0.4, 0.7, 1.0) * exp(-d2 * d2 / (breite2 * breite2)) * pow(1.0 - h2, 1.2) * 0.7;
+    float kd = length(q - k);
+    c += vec3(0.85, 0.95, 1.0) * (exp(-kd * kd * 9.0e4) * 2.5 + exp(-kd * 60.0) * 0.25);
+    return c;
+}
+
 vec3 probe(vec2 uv) {
     vec2 px = 0.5 / resolution;
     return texture(texture0, clamp(uv, px, 1.0 - px)).rgb;
@@ -201,7 +240,8 @@ void main() {
     t1 = min(t1, t0 + 110.0);
     if (t1 > t0) {
         const int N = 48;
-        float dt = (t1 - t0) / float(N);
+        float nEff = floor(float(N) * G());
+        float dt = (t1 - t0) / nEff;
         float t = t0 + dt * hash2(fragTexCoord * resolution + fract(time));
         for (int i = 0; i < N; i++) {
             vec3 q = kamera + d * t;
@@ -210,6 +250,7 @@ void main() {
             gal += l * durch * dt * 1.3;
             durch *= exp(-s * dt * 1.8);
             t += dt;
+            if (float(i) + 1.0 >= nEff) break;
         }
     }
     // Kern als Stern mit Strahlen, dort, wo die Mitte im Bild liegt
@@ -242,6 +283,7 @@ void main() {
     float l = dot(c, vec3(0.299, 0.587, 0.114));
     vec3 raum = weltraum(d) * durch * (1.0 - smoothstep(0.05, 0.35, l));
     c += gal + raum / (1.0 + 2.0 * dot(gal, vec3(0.333)));
+    c += komet(m * vec2(resolution.x / resolution.y, 1.0), vorne, rechts, oben, tf) * (1.0 - smoothstep(0.1, 0.5, l));
     c *= 1.0 - 0.5 * dot(m, m) * 1.6;
     c = c / (1.0 + 0.4 * c);
     c = pow(c, vec3(0.95));
