@@ -2908,7 +2908,14 @@ HasoSchno70/Nachtflug) streicht die Seite `SET_FULLSCREEN` aus der Quelle:
 raylib kennt dort die Bildschirmgroesse nicht und setzte den Zeichenpuffer
 auf die Groesse des Monitors -- man sah nur einen Teil des Bildes. Tests
 jetzt 18 (vier Szenen, Laenge, Morgen-Harmonie, wartende Funken mit und ohne
-Schwarm verglichen).
+Schwarm verglichen). **Siebte Runde (selber Tag):** Geraeusche der Reise
+(Grollen, Wind, Gaenserufe, Brandung, Moewen, Nebelhorn -- `AUDIO_SFX` mit
+Tiefpass; gemessen je Geraeusch an seinen Frequenzbaendern: das erste
+Grollen lag fast ganz bei 41 Hz, auf Laptop-Lautsprechern also stumm) und
+ein echter Sonnenaufgang im Ausklang (`aufgang` in ozean.fs); der Schwarm
+startet dort, wo die Sonne gerade steht -- `sonneImBild` rechnet Richtung
+und Kamera des Shaders in Drachenhauch nach. Test "die sonne geht im
+ausklang auf" (hellster Punkt im Streifen rechts steigt).
 
 ## Dogfooding 15: Landkarte (2026-10-26)
 

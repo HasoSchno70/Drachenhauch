@@ -59,6 +59,12 @@ Uplifting Trance von a-Moll nach C-Dur, 128 Schläge je Minute, 148 Takte
   **Becken**, **Shaker**, eine **Füllung** am Ende jeder Phrase,
   **Glocken** als Funken im Intro und im Ausklang, **Aufstieg** und
   **Wirbel** vor den Höhepunkten.
+* **Geräusche der Reise**, leise unter der Musik: ein **Grollen** beim
+  Wiedereintritt, das mit dem Plasma anschwillt und verebbt, **Wind** über
+  den Wolken, die Rufe der **Wildgänse** („ga-gang“, rechts, wo der Zug
+  fliegt), **Brandung** und **Möwen** an der Küste und am Morgen, das
+  **Nebelhorn** des Leuchtturms. Alles aus Rauschen mit Tiefpass
+  (`AUDIO_SFX` mit Filter) und ein paar Noten.
 
 Ablauf: Intro (das Filter öffnet sich), Aufbau, erster Höhepunkt mit der
 Melodie, Breakdown (erst Klavier und Chor allein, dann der Lead leise
@@ -93,7 +99,7 @@ Bus.
 | 96–112 | Wiedereintritt: Plasma strömt am Rand nach außen und glüht mit der Bassdrum, Funken fliegen vorbei, unten das Wolkenmeer im ersten Licht | `eintritt.fs` |
 | 112–128 | Über den Wolken: Gleitflug über ein aufgerissenes Wolkenmeer mit einzelnen Türmen, durch die Lücken glitzert tief unten das Meer, ein Zug Wildgänse in V-Form zieht der Sonne entgegen, der Himmel geht von Violett über Rosa nach Gold | Volumen-Raymarching durch die Wolkenschicht, je Schritt ein Blick zur Sonne (Licht und Schatten), `wolken.fs` |
 | 128–136 | Küste im Morgengrauen: zerklüftete Klippen, Brandungsfelsen, Gischt, ein Leuchtturm mit Galerie, dessen Strahl im Takt kreist, das Haus des Wärters mit erleuchtetem Fenster, Möwen, ferne Landzungen, rosa Wolkenstreifen | Raymarching gegen Felsen, Turm und Haus (SDF), der Lichtkegel im Dunst, `kueste.fs` |
-| 136–148 | Tagesanbruch auf dem Meer, wo alles begann; Abspann | wieder `ozean.fs` |
+| 136–148 | Tagesanbruch auf dem Meer, wo alles begann: die Sonne steigt über den Horizont, der Himmel wird hell, die Glitzerbahn golden; Abspann | wieder `ozean.fs` (`aufgang`) |
 
 Was pulsiert, pulsiert mit der Bassdrum; was aufblitzt, blitzt mit der
 **Melodie** (Polarlicht und Mondglitzern, ein Funkenlauf auf dem Fluss, ein
@@ -105,7 +111,7 @@ weicht.
 
 Dazu kleine Momente: Sternschnuppen über dem Ozean, Schnee im Tiefflug, ein
 Komet mit zwei Schweifen, der durch die Galaxie zieht, ein Blitz auf der
-Rückung -- und im Abspann steigt ein Schwarm aus Funken aus der Sonne auf
+Rückung -- und im Abspann steigt ein Schwarm aus Funken aus der aufgehenden Sonne auf
 und schreibt „Drachenhauch“ (die Zielpunkte kommen aus dem Schriftzug
 selbst, in ein Render-Ziel geschrieben und mit `RENDERTARGET_IMAGE` als Bild
 abgetastet).
