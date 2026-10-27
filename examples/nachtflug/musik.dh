@@ -20,15 +20,23 @@ IMPORT "audio"
 
 CONST TEMPO = 128
 CONST SCHRITTE_JE_TAKT = 16
-CONST TAKTE = 92
+CONST TAKTE = 148
 
-' Abschnitte (in Takten)
+' Abschnitte (in Takten). Die Reise: vom Meer in die Berge, durch den
+' Tunnel ins All -- und wieder zurueck: im Orbit (zweiter Breakdown, die
+' Harmonie hellt nach C-Dur auf), beim Wiedereintritt (dritter Hoehepunkt),
+' ueber den Wolken (das Hauptthema kehrt zurueck), an der Kueste und im
+' Tagesanbruch am Meer, wo alles begann.
 CONST AB_INTRO = 0
 CONST AB_AUFBAU = 16
 CONST AB_HOCH1 = 32
 CONST AB_PAUSE = 48
 CONST AB_HOCH2 = 64
-CONST AB_AUS = 80
+CONST AB_ORBIT = 80
+CONST AB_EINTRITT = 96
+CONST AB_WOLKEN = 112
+CONST AB_KUESTE = 128
+CONST AB_AUS = 136
 
 FUNCTION msJeSchritt() AS FLOAT
     RETURN 60000.0 / TEMPO / 4.0
@@ -58,20 +66,42 @@ DIM grund AS ARRAY OF INTEGER : grund = [33, 29, 36, 31, 29, 31, 28, 33]
 CONST RUECKUNG = 2
 CONST AB_RUECKUNG = 72
 
+' Der Morgen: im Orbit und beim Wiedereintritt eine eigene, helle Folge in
+' C-Dur (C, G/B, a-Moll7, F-maj7, C/E, G, F, G-sus) -- dieselben Toene wie
+' a-Moll, aber das Licht liegt jetzt auf dem Dur. Die Akkordnummern 16..23.
+DIM morgenAkkord AS ARRAY OF INTEGER : morgenAkkord = [ _
+    60, 64, 67, 74, _
+    59, 62, 67, 71, _
+    57, 60, 64, 67, _
+    53, 57, 60, 64, _
+    55, 60, 64, 72, _
+    55, 59, 62, 67, _
+    53, 57, 60, 67, _
+    55, 60, 62, 67]
+DIM morgenGrund AS ARRAY OF INTEGER : morgenGrund = [36, 35, 33, 29, 28, 31, 29, 31]
+
+' Liegt der Takt im Morgen (Orbit und Wiedereintritt)?
+FUNCTION imMorgen(takt AS INTEGER) AS BOOLEAN
+    RETURN takt >= AB_ORBIT AND takt < AB_WOLKEN
+END FUNCTION
+
 FUNCTION versatzBei(takt AS INTEGER) AS INTEGER
-    RETURN IIF(takt >= AB_RUECKUNG, RUECKUNG, 0)
+    RETURN IIF(takt >= AB_RUECKUNG AND takt < AB_ORBIT, RUECKUNG, 0)
 END FUNCTION
 
 FUNCTION akkordNr(takt AS INTEGER) AS INTEGER
-    RETURN (takt \ 2) MOD 8 + IIF(takt >= AB_RUECKUNG, 8, 0)
+    IF imMorgen(takt) THEN RETURN 16 + (takt \ 2) MOD 8
+    RETURN (takt \ 2) MOD 8 + IIF(takt >= AB_RUECKUNG AND takt < AB_ORBIT, 8, 0)
 END FUNCTION
 
 ' Ton v (0..3) des Akkords nr, samt Rueckung
 FUNCTION akkTon(nr AS INTEGER, v AS INTEGER) AS INTEGER
+    IF nr >= 16 THEN RETURN morgenAkkord[(nr - 16) * 4 + v]
     RETURN akkord[(nr MOD 8) * 4 + v] + IIF(nr >= 8, RUECKUNG, 0)
 END FUNCTION
 
 FUNCTION grundTon(nr AS INTEGER) AS INTEGER
+    IF nr >= 16 THEN RETURN morgenGrund[nr - 16]
     RETURN grund[nr MOD 8] + IIF(nr >= 8, RUECKUNG, 0)
 END FUNCTION
 
@@ -88,13 +118,30 @@ DIM melodie AS ARRAY OF INTEGER : melodie = [ _
     79, -1, -1, -1, 76, -1, -1, -1,   74, -1, 76, -1, 79, -1, 83, -1, _
     81, -1, -1, -1, -1, -1, -1, -1,   -1, -1, -1, -1, 0, 0, 0, 0]
 
-' Wie viele Achtel ein Ton der Melodie an der Stelle pos klingt
-FUNCTION melodieLaenge(pos AS INTEGER) AS INTEGER
+' Das Morgen-Motiv (Orbit und Wiedereintritt): dieselbe Form -- punktierte
+' Viertel, dann ein Schritt nach oben --, aber in C-Dur und mit weiteren
+' Boegen; es steigt bis zum hohen D und loest sich am Ende in die Eins auf.
+DIM morgenMelodie AS ARRAY OF INTEGER : morgenMelodie = [ _
+    72, -1, 74, 76, -1, -1, 79, -1,   76, -1, -1, -1, 74, -1, 72, -1, _
+    71, -1, 72, 74, -1, -1, 79, -1,   74, -1, -1, -1, 72, -1, 71, -1, _
+    72, -1, 74, 76, -1, -1, 81, -1,   79, -1, -1, -1, 76, -1, 72, -1, _
+    77, -1, -1, 76, 77, -1, 81, -1,   81, -1, -1, -1, 79, -1, 77, -1, _
+    79, -1, -1, 76, 79, -1, 84, -1,   84, -1, -1, -1, 83, -1, 81, -1, _
+    79, -1, -1, -1, 74, -1, -1, -1,   71, -1, 74, -1, 79, -1, 83, -1, _
+    81, -1, -1, 79, 81, -1, 84, -1,   84, -1, -1, -1, 86, -1, 84, -1, _
+    83, -1, -1, -1, 79, -1, -1, -1,   74, -1, 76, -1, 79, -1, 0, 0]
+
+' Wie viele Achtel ein Ton der Melodie m an der Stelle pos klingt
+FUNCTION laengeIn(m AS ARRAY OF INTEGER, pos AS INTEGER) AS INTEGER
     DIM achtel AS INTEGER : achtel = 1
-    WHILE pos + achtel < LEN(melodie) AND melodie[pos + achtel] = -1
+    WHILE pos + achtel < LEN(m) AND m[pos + achtel] = -1
         achtel = achtel + 1
     WEND
     RETURN achtel
+END FUNCTION
+
+FUNCTION melodieLaenge(pos AS INTEGER) AS INTEGER
+    RETURN laengeIn(melodie, pos)
 END FUNCTION
 
 ' Die Gegenmelodie fuer das Finale: halbe Noten, die gegen die Melodie
@@ -416,7 +463,7 @@ END FUNCTION
 ' Seiten einen Hauch hoeher und tiefer und etwas spaeter -- ein Chor aus
 ' einer Stimme) und mit langem Ping-Pong-Echo. Ohne Sprachausgabe (unter
 ' Linux ohne espeak-ng) bleibt der Breakdown ohne Stimme.
-DIM saetze AS ARRAY OF STRING : saetze = ["Schließ die Augen", "Flieg mit mir durch die Nacht"]
+DIM saetze AS ARRAY OF STRING : saetze = ["Schließ die Augen", "Flieg mit mir durch die Nacht", "Flieg mit mir nach Hause", "Der Morgen ist da"]
 DIM stimmeFehlt AS BOOLEAN
 
 FUNCTION stimmeBauen(nr AS INTEGER) AS BOOLEAN
@@ -459,9 +506,27 @@ FUNCTION schritteGesamt() AS INTEGER
     RETURN TAKTE * SCHRITTE_JE_TAKT
 END FUNCTION
 
-' Wo die Bassdrum laeuft: im Aufbau, in beiden Hoehepunkten, im Anfang des Ausklangs
+' Wo die Bassdrum laeuft: im Aufbau, in den Hoehepunkten, an der Kueste und
+' im Anfang des Ausklangs -- nicht in den beiden Breakdowns
 FUNCTION treibt(takt AS INTEGER) AS BOOLEAN
-    RETURN (takt >= AB_AUFBAU AND takt < AB_PAUSE) OR (takt >= AB_HOCH2 AND takt < AB_AUS + 4)
+    RETURN (takt >= AB_AUFBAU AND takt < AB_PAUSE) OR (takt >= AB_HOCH2 AND takt < AB_ORBIT) _
+        OR (takt >= AB_EINTRITT AND takt < AB_AUS + 4)
+END FUNCTION
+
+' Die beiden Breakdowns: im Sternennebel und im Orbit
+FUNCTION imBreakdown(takt AS INTEGER) AS BOOLEAN
+    RETURN (takt >= AB_PAUSE AND takt < AB_HOCH2) OR (takt >= AB_ORBIT AND takt < AB_EINTRITT)
+END FUNCTION
+
+' Erster Takt des Breakdowns, in dem takt liegt
+FUNCTION breakdownStart(takt AS INTEGER) AS INTEGER
+    RETURN IIF(takt >= AB_ORBIT, AB_ORBIT, AB_PAUSE)
+END FUNCTION
+
+' Die Hoehepunkte: der erste, der zweite, der dritte (Wiedereintritt und Wolken)
+FUNCTION imHoch(takt AS INTEGER) AS BOOLEAN
+    RETURN (takt >= AB_HOCH1 AND takt < AB_PAUSE) OR (takt >= AB_HOCH2 AND takt < AB_ORBIT) _
+        OR (takt >= AB_EINTRITT AND takt < AB_KUESTE)
 END FUNCTION
 
 ' Ein Klang in Schritt n: live auf die Uhr, oder beim Ausschreiben (--wav)
@@ -493,19 +558,29 @@ END SUB
 ' Das Gate-Muster ueber einen Takt (1 = Schlag)
 DIM gateMuster AS ARRAY OF INTEGER : gateMuster = [1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1]
 
-' Eine Melodie-Stimme in Schritt n: `art` 0 = Lead, 1 = Klavier
+' Eine Melodie-Stimme in Schritt n: `art` 0 = Lead, 1 = Klavier. Im Morgen
+' spielt sie das Morgen-Motiv, sonst das Hauptthema.
 SUB melodieSpielen(n AS INTEGER, art AS INTEGER, vol AS FLOAT, oktave AS INTEGER)
     DIM takt AS INTEGER : takt = n \ SCHRITTE_JE_TAKT
     DIM s AS INTEGER : s = n MOD SCHRITTE_JE_TAKT
     IF s MOD 2 = 1 THEN RETURN
     DIM pos AS INTEGER : pos = (takt MOD 16) * 8 + s \ 2
-    DIM m AS INTEGER : m = melodie[pos]
-    IF m <= 0 THEN RETURN
+    DIM m AS INTEGER
+    DIM achtel AS INTEGER
+    IF imMorgen(takt) THEN
+        m = morgenMelodie[pos]
+        IF m <= 0 THEN RETURN
+        achtel = laengeIn(morgenMelodie, pos)
+    ELSE
+        m = melodie[pos]
+        IF m <= 0 THEN RETURN
+        achtel = melodieLaenge(pos)
+    END IF
     m = m + oktave + versatzBei(takt)
     IF art = 0 THEN
-        spielen(lead(m, melodieLaenge(pos)), n, vol)
+        spielen(lead(m, achtel), n, vol)
     ELSE
-        spielen(klavier(m, melodieLaenge(pos)), n, vol)
+        spielen(klavier(m, achtel), n, vol)
     END IF
 END SUB
 
@@ -516,8 +591,10 @@ SUB schrittPlanen(n AS INTEGER)
     DIM nr AS INTEGER : nr = akkordNr(takt)
     DIM viertel AS BOOLEAN : viertel = s MOD 4 = 0
     DIM offbeat AS BOOLEAN : offbeat = s MOD 4 = 2
-    DIM hoch AS BOOLEAN : hoch = (takt >= AB_HOCH1 AND takt < AB_PAUSE) OR (takt >= AB_HOCH2 AND takt < AB_AUS)
-    DIM pause AS BOOLEAN : pause = takt >= AB_PAUSE AND takt < AB_HOCH2
+    DIM hoch AS BOOLEAN : hoch = imHoch(takt)
+    DIM pause AS BOOLEAN : pause = imBreakdown(takt)
+    ' wie weit im Breakdown (0..15), fuer seine zwei Haelften
+    DIM inPause AS INTEGER : inPause = takt - breakdownStart(takt)
     ' Ausklang: alles wird leiser
     DIM laut AS FLOAT : laut = 1.0
     IF takt >= AB_AUS THEN laut = MAX(0.0, 1.0 - (takt - AB_AUS) / 12.0)
@@ -539,37 +616,42 @@ SUB schrittPlanen(n AS INTEGER)
     IF hoch THEN spielen(shaker(s MOD 2 = 1), n, IIF(s MOD 4 = 2, 0.9, 0.5))
 
     ' --- Harmonie ---
-    ' lange Flaeche: im Intro, im Breakdown (gross), im Ausklang
+    ' lange Flaeche: im Intro, in den Breakdowns (gross), an der Kueste, im Ausklang
     IF s = 0 AND takt MOD 2 = 0 THEN
-        IF takt < AB_AUFBAU + 8 OR pause OR (takt >= AB_AUS AND takt < TAKTE - 2) THEN
+        IF takt < AB_AUFBAU + 8 OR pause OR (takt >= AB_KUESTE + 4 AND takt < TAKTE - 2) THEN
             spielen(flaeche(nr, pause), n, IIF(pause, 1.15, IIF(takt >= AB_AUFBAU, 0.6, 1.0)) * laut)
         END IF
         IF pause THEN spielen(tiefe(nr), n, 0.4)
-        ' der Chor: im Breakdown und im zweiten Hoehepunkt
-        IF pause OR (takt >= AB_HOCH2 AND takt < AB_AUS + 4) THEN spielen(chor(nr), n, IIF(pause, 1.0, 0.75) * laut)
+        ' der Chor: in den Breakdowns, im zweiten Hoehepunkt und ueber den Wolken
+        IF pause OR (takt >= AB_HOCH2 AND takt < AB_ORBIT) OR (takt >= AB_WOLKEN AND takt < AB_AUS + 4) THEN
+            spielen(chor(nr), n, IIF(pause, 1.0, 0.75) * laut)
+        END IF
     END IF
-    IF takt = TAKTE - 2 AND s = 0 THEN spielen(flaeche(15, TRUE), n, 0.7)
+    ' der Schlussakkord: C-Dur -- die Nacht ist vorbei
+    IF takt = TAKTE - 2 AND s = 0 THEN spielen(flaeche(16, TRUE), n, 0.7)
     ' pumpende Flaeche auf jeder Viertel: ab der Mitte des Aufbaus, im ersten
-    ' Hoehepunkt (erste Haelfte) und im zweiten
+    ' Hoehepunkt (erste Haelfte), im zweiten und dritten und an der Kueste
     DIM pumpt AS BOOLEAN
-    pumpt = (takt >= AB_AUFBAU + 8 AND takt < AB_HOCH1 + 8) OR (takt >= AB_HOCH2 AND takt < AB_AUS + 2)
+    pumpt = (takt >= AB_AUFBAU + 8 AND takt < AB_HOCH1 + 8) OR (takt >= AB_HOCH2 AND takt < AB_ORBIT) _
+        OR (takt >= AB_EINTRITT AND takt < AB_AUS + 2)
     IF pumpt AND viertel THEN spielen(pumpe(nr), n, 0.9 * laut)
-    ' Trance-Gate: zweite Haelfte des ersten Hoehepunkts, im zweiten ab Takt 72
+    ' Trance-Gate: je in der zweiten Haelfte der Hoehepunkte
     DIM gated AS BOOLEAN
-    gated = (takt >= AB_HOCH1 + 8 AND takt < AB_PAUSE) OR (takt >= AB_HOCH2 + 8 AND takt < AB_AUS)
+    gated = (takt >= AB_HOCH1 + 8 AND takt < AB_PAUSE) OR (takt >= AB_HOCH2 + 8 AND takt < AB_ORBIT) _
+        OR (takt >= AB_EINTRITT + 8 AND takt < AB_WOLKEN) OR (takt >= AB_WOLKEN + 8 AND takt < AB_KUESTE)
     IF gated AND gateMuster[s] = 1 THEN spielen(gate(nr), n, IIF(s MOD 4 = 0, 0.9, 0.65))
 
-    ' --- Arpeggio --- Sechzehntel ueber die vier Akkordtoene; im Breakdown
-    ' nur in seiner zweiten Haelfte, in Achteln
-    DIM arp AS BOOLEAN : arp = takt >= 4 AND (takt < AB_PAUSE OR (takt >= AB_HOCH2 AND takt < AB_AUS + 8))
-    IF takt >= AB_PAUSE + 8 AND takt < AB_HOCH2 THEN arp = s MOD 2 = 0
+    ' --- Arpeggio --- Sechzehntel ueber die vier Akkordtoene; in den
+    ' Breakdowns nur in ihrer zweiten Haelfte, in Achteln
+    DIM arp AS BOOLEAN : arp = takt >= 4 AND takt < AB_AUS + 8
+    IF pause THEN arp = inPause >= 8 AND s MOD 2 = 0
     IF arp AND takt < TAKTE - 4 THEN
         DIM folge AS ARRAY OF INTEGER : folge = [0, 1, 2, 3, 4, 3, 2, 1, 0, 2, 1, 3, 2, 4, 3, 1]
         DIM stufe AS INTEGER : stufe = folge[s]
         DIM ton AS INTEGER
         IF stufe = 4 THEN ton = akkTon(nr, 0) + 12 ELSE ton = akkTon(nr, stufe)
         ton = ton + 12
-        IF takt >= AB_HOCH2 AND takt MOD 2 = 1 THEN ton = ton + 12
+        IF takt >= AB_HOCH2 AND NOT pause AND takt MOD 2 = 1 THEN ton = ton + 12
         ' im Intro leiser, wird mit dem Filter heller
         DIM av AS FLOAT : av = IIF(takt < AB_AUFBAU, 0.35 + 0.02 * takt, 0.5)
         spielen(zupf(ton, IIF(s MOD 2 = 0, -0.6, 0.6)), n, av * laut)
@@ -580,45 +662,68 @@ SUB schrittPlanen(n AS INTEGER)
     IF takt >= 8 AND takt < AB_AUFBAU THEN melodieSpielen(n, 1, 0.45, 12)
     ' erster Hoehepunkt: der Lead
     IF takt >= AB_HOCH1 AND takt < AB_PAUSE THEN melodieSpielen(n, 0, 0.8, 0)
-    ' Breakdown: erst das Klavier allein, dann der Lead leise darueber
+    ' Breakdowns: erst das Klavier allein, dann der Lead leise darueber (im
+    ' Orbit schon das Morgen-Motiv)
     IF pause THEN melodieSpielen(n, 1, 0.85, 0)
-    IF takt >= AB_PAUSE + 8 AND takt < AB_HOCH2 THEN melodieSpielen(n, 0, 0.45, 0)
-    ' zweiter Hoehepunkt: der Lead, ab Takt 72 mit der Oktave darueber
-    IF takt >= AB_HOCH2 AND takt < AB_AUS THEN
+    IF pause AND inPause >= 8 THEN melodieSpielen(n, 0, 0.45, 0)
+    ' zweiter Hoehepunkt: der Lead, ab Takt 72 mit der Oktave darueber;
+    ' Wiedereintritt: das Morgen-Motiv als Lead, ab der Mitte mit Oktave;
+    ' ueber den Wolken kehrt das Hauptthema zurueck, gleich mit Oktave
+    IF (takt >= AB_HOCH2 AND takt < AB_ORBIT) OR (takt >= AB_EINTRITT AND takt < AB_KUESTE) THEN
         melodieSpielen(n, 0, 0.8, 0)
-        IF takt >= AB_HOCH2 + 8 THEN melodieSpielen(n, 0, 0.42, 12)
+        IF takt >= AB_HOCH2 + 8 AND takt < AB_ORBIT THEN melodieSpielen(n, 0, 0.42, 12)
+        IF takt >= AB_EINTRITT + 8 THEN melodieSpielen(n, 0, 0.42, 12)
     END IF
-    ' im Finale die Gegenmelodie: glockig, eine Oktave hoeher, in halben Noten
-    IF takt >= AB_RUECKUNG AND takt < AB_AUS AND s MOD 8 = 0 THEN
+    ' die Gegenmelodie: glockig, eine Oktave hoeher, in halben Noten -- im
+    ' Finale der Nacht (nach der Rueckung) und ueber den Wolken
+    IF s MOD 8 = 0 AND ((takt >= AB_RUECKUNG AND takt < AB_ORBIT) OR (takt >= AB_WOLKEN AND takt < AB_KUESTE)) THEN
         DIM gm AS INTEGER : gm = gegen[(takt MOD 16) * 2 + s \ 8]
-        IF gm > 0 THEN spielen(klavier(gm + 12 + RUECKUNG, 4), n, 0.5)
+        IF gm > 0 THEN spielen(klavier(gm + 12 + versatzBei(takt), 4), n, 0.5)
+    END IF
+    ' Kueste: das Klavier erinnert an den Morgen
+    IF takt >= AB_KUESTE AND takt < AB_AUS AND s MOD 2 = 0 THEN
+        DIM km AS INTEGER : km = morgenMelodie[(takt MOD 16) * 8 + s \ 2]
+        IF km > 0 THEN spielen(klavier(km, laengeIn(morgenMelodie, (takt MOD 16) * 8 + s \ 2)), n, 0.55)
     END IF
     ' Ausklang: das Klavier noch einmal, allein
     IF takt >= AB_AUS + 2 AND takt < AB_AUS + 10 THEN melodieSpielen(n, 1, 0.6 * laut + 0.2, 0)
 
-    ' --- Stimme --- im Breakdown zwei Saetze, im Ausklang noch einmal der zweite
-    IF s = 0 AND (takt = AB_PAUSE + 1 OR takt = AB_PAUSE + 9 OR takt = AB_AUS + 5) THEN
-        DIM sn AS INTEGER : sn = IIF(takt = AB_PAUSE + 1, 0, 1)
+    ' --- Stimme --- im ersten Breakdown zwei Saetze, im Orbit der dritte,
+    ' im Ausklang der vierte
+    IF s = 0 AND (takt = AB_PAUSE + 1 OR takt = AB_PAUSE + 9 OR takt = AB_ORBIT + 1 OR takt = AB_AUS + 5) THEN
+        DIM sn AS INTEGER : sn = 0
+        IF takt = AB_PAUSE + 9 THEN sn = 1
+        IF takt = AB_ORBIT + 1 THEN sn = 2
+        IF takt = AB_AUS + 5 THEN sn = 3
         IF stimmeBauen(sn) THEN spielen(klaenge[gemerkt("stimme" + STR$(sn))], n, IIF(takt >= AB_AUS, 0.9, 1.4))
     END IF
 
-    ' --- Funken --- Glocken auf festen Stellen, die nach Zufall aussehen
-    IF (takt < AB_AUFBAU OR takt >= AB_AUS) AND (n * 7919 + 13) MOD 23 = 0 THEN
+    ' --- Funken --- Glocken auf festen Stellen, die nach Zufall aussehen: im
+    ' Intro, unter den Sternen des Orbits und im Ausklang
+    IF (takt < AB_AUFBAU OR takt >= AB_AUS OR (takt >= AB_ORBIT AND takt < AB_ORBIT + 8)) AND (n * 7919 + 13) MOD 23 = 0 THEN
         spielen(glocke(akkTon(nr, n MOD 4) + 24), n, 0.45 * laut + 0.1)
     END IF
 
-    ' --- Uebergaenge --- Aufstieg vor jedem Hoehepunkt (vor dem zweiten
-    ' ueber vier Takte), Wirbel davor, Becken auf der Eins
+    ' --- Uebergaenge --- Aufstieg vor jedem Hoehepunkt (vor dem zweiten und
+    ' dritten ueber vier Takte), Wirbel davor, Becken auf der Eins
     IF s = 0 AND (takt = AB_AUFBAU - 2 OR takt = AB_HOCH1 - 2) THEN spielen(aufstieg(2), n, 0.55)
-    IF s = 0 AND takt = AB_HOCH2 - 4 THEN spielen(aufstieg(4), n, 0.6)
-    ' vor der Rueckung ein kurzer Aufstieg ueber einen Takt
-    IF s = 0 AND takt = AB_RUECKUNG - 1 THEN spielen(aufstieg(1), n, 0.55)
-    IF takt >= AB_HOCH2 - 4 AND takt < AB_HOCH2 THEN
+    IF s = 0 AND (takt = AB_HOCH2 - 4 OR takt = AB_EINTRITT - 4) THEN spielen(aufstieg(4), n, 0.6)
+    ' vor der Rueckung und vor den Wolken ein kurzer Aufstieg ueber einen Takt
+    IF s = 0 AND (takt = AB_RUECKUNG - 1 OR takt = AB_WOLKEN - 1) THEN spielen(aufstieg(1), n, 0.55)
+    DIM vor AS INTEGER : vor = -1
+    IF takt >= AB_HOCH2 - 4 AND takt < AB_HOCH2 THEN vor = takt - AB_HOCH2 + 4
+    IF takt >= AB_EINTRITT - 4 AND takt < AB_EINTRITT THEN vor = takt - AB_EINTRITT + 4
+    IF vor >= 0 THEN
         ' immer dichter: Viertel, Achtel, Sechzehntel
-        DIM dicht AS INTEGER : dicht = IIF(takt < AB_HOCH2 - 2, 4, IIF(takt < AB_HOCH2 - 1, 2, 1))
-        IF s MOD dicht = 0 THEN spielen(schlag(0.3 + 0.1 * (takt - AB_HOCH2 + 4)), n, 0.45 + 0.03 * (takt - AB_HOCH2 + 4))
+        DIM dicht AS INTEGER : dicht = IIF(vor < 2, 4, IIF(vor < 3, 2, 1))
+        IF s MOD dicht = 0 THEN spielen(schlag(0.3 + 0.1 * vor), n, 0.45 + 0.03 * vor)
     END IF
-    IF s = 0 AND (takt = AB_AUFBAU OR takt = AB_HOCH1 OR takt = AB_HOCH1 + 8 OR takt = AB_HOCH2 OR takt = AB_HOCH2 + 8 OR takt = AB_AUS) THEN spielen(crash(), n, 0.5)
+    IF s = 0 THEN
+        SELECT CASE takt
+            CASE AB_AUFBAU, AB_HOCH1, AB_HOCH1 + 8, AB_HOCH2, AB_HOCH2 + 8, AB_EINTRITT, AB_EINTRITT + 8, AB_WOLKEN, AB_WOLKEN + 8, AB_KUESTE, AB_AUS
+                spielen(crash(), n, 0.5)
+        END SELECT
+    END IF
 END SUB
 
 ' Einmal je Bild: die naechsten Schritte planen (ein halber Takt voraus).
@@ -640,9 +745,8 @@ DIM busStand AS INTEGER : busStand = -1
 SUB busNachziehen(takt AS INTEGER)
     DIM ziel AS INTEGER : ziel = 0
     IF takt >= AB_AUFBAU THEN ziel = 4
-    IF takt >= AB_PAUSE AND takt < AB_PAUSE + 8 THEN ziel = 1
-    IF takt >= AB_PAUSE + 8 AND takt < AB_HOCH2 THEN ziel = 2
-    IF takt >= AB_HOCH2 THEN ziel = 3
+    IF imBreakdown(takt) THEN ziel = IIF(takt - breakdownStart(takt) < 8, 1, 2)
+    IF (takt >= AB_HOCH2 AND takt < AB_ORBIT) OR takt >= AB_EINTRITT THEN ziel = 3
     IF takt >= AB_AUS + 4 THEN ziel = 5
     IF ziel = busStand THEN RETURN
     busStand = ziel
@@ -668,27 +772,29 @@ END SUB
 ' ruft es vor dem Start, waehrend das Startbild steht; was dann noch fehlt,
 ' entsteht beim ersten Gebrauch.
 DIM bauStand AS INTEGER
+' 0..7 die Nacht, 8..15 nach der Rueckung, 16..23 der Morgen
+CONST AKKORDE = 24
 FUNCTION bauGesamt() AS INTEGER
-    RETURN 16 * 4 + 16 + 2 + 16 * 6 + 2 + LEN(melodie) + LEN(gegen)
+    RETURN AKKORDE * 4 + AKKORDE + LEN(saetze) + AKKORDE * 6 + 2 + LEN(melodie) + LEN(morgenMelodie) + LEN(gegen)
 END FUNCTION
 
 FUNCTION vorbauen() AS BOOLEAN
     DIM i AS INTEGER : i = bauStand
     IF i >= bauGesamt() THEN RETURN FALSE
     bauStand = bauStand + 1
-    IF i < 16 * 4 THEN
+    IF i < AKKORDE * 4 THEN
         chorStimme(i \ 4, i MOD 4) : RETURN TRUE
     END IF
-    i = i - 16 * 4
-    IF i < 16 THEN
+    i = i - AKKORDE * 4
+    IF i < AKKORDE THEN
         chor(i) : RETURN TRUE
     END IF
-    i = i - 16
-    IF i < 2 THEN
+    i = i - AKKORDE
+    IF i < LEN(saetze) THEN
         stimmeBauen(i) : RETURN TRUE
     END IF
-    i = i - 2
-    IF i < 16 * 6 THEN
+    i = i - LEN(saetze)
+    IF i < AKKORDE * 6 THEN
         DIM nr AS INTEGER : nr = i \ 6
         SELECT CASE i MOD 6
             CASE 0 : flaeche(nr, FALSE)
@@ -700,7 +806,7 @@ FUNCTION vorbauen() AS BOOLEAN
         END SELECT
         RETURN TRUE
     END IF
-    i = i - 16 * 6
+    i = i - AKKORDE * 6
     IF i = 0 THEN
         bassdrum() : klatschen() : becken(TRUE) : becken(FALSE) : crash() : shaker(TRUE) : shaker(FALSE)
         RETURN TRUE
@@ -714,13 +820,24 @@ FUNCTION vorbauen() AS BOOLEAN
         DIM m AS INTEGER : m = melodie[i]
         IF m > 0 THEN
             DIM l AS INTEGER : l = melodieLaenge(i)
-            lead(m, l) : lead(m + RUECKUNG, l) : lead(m + 12 + RUECKUNG, l)
+            lead(m, l) : lead(m + RUECKUNG, l) : lead(m + 12 + RUECKUNG, l) : lead(m + 12, l)
             klavier(m, l) : klavier(m + 12, l) : klavier(m + RUECKUNG, l)
         END IF
         RETURN TRUE
     END IF
     i = i - LEN(melodie)
-    IF gegen[i] > 0 THEN klavier(gegen[i] + 12 + RUECKUNG, 4)
+    IF i < LEN(morgenMelodie) THEN
+        DIM mm AS INTEGER : mm = morgenMelodie[i]
+        IF mm > 0 THEN
+            DIM ml AS INTEGER : ml = laengeIn(morgenMelodie, i)
+            lead(mm, ml) : lead(mm + 12, ml) : klavier(mm, ml)
+        END IF
+        RETURN TRUE
+    END IF
+    i = i - LEN(morgenMelodie)
+    IF gegen[i] > 0 THEN
+        klavier(gegen[i] + 12 + RUECKUNG, 4) : klavier(gegen[i] + 12, 4)
+    END IF
     RETURN TRUE
 END FUNCTION
 
@@ -786,6 +903,12 @@ FUNCTION melodieAktiv(takt AS INTEGER) AS BOOLEAN
     RETURN (takt >= 8 AND takt < AB_AUFBAU) OR (takt >= AB_HOCH1 AND takt < AB_AUS) OR (takt >= AB_AUS + 2 AND takt < AB_AUS + 10)
 END FUNCTION
 
+' Ton der Melodie, die im Takt klingt, an der Stelle e (Achtel im Kreis)
+FUNCTION melTonIn(takt AS INTEGER, e AS INTEGER) AS INTEGER
+    IF imMorgen(takt) OR (takt >= AB_KUESTE AND takt < AB_AUS) THEN RETURN morgenMelodie[e]
+    RETURN melodie[e]
+END FUNCTION
+
 ' Huellkurve des Melodietons: 1 auf dem Anschlag, klingt ab, bleibt bei 0.3,
 ' solange der Ton gehalten wird. Dabei merkt sich tonHoehe, wie hoch er
 ' liegt (0 = das A unten, 1 = das hohe B).
@@ -799,20 +922,31 @@ FUNCTION tonBei(n AS FLOAT) AS FLOAT
     DIM ganz AS INTEGER : ganz = INT(n)
     IF NOT melodieAktiv(ganz \ SCHRITTE_JE_TAKT) THEN RETURN 0.0
     DIM kreis AS INTEGER : kreis = 16 * SCHRITTE_JE_TAKT
+    DIM takt AS INTEGER : takt = ganz \ SCHRITTE_JE_TAKT
     DIM e AS INTEGER : e = (ganz MOD kreis) \ 2
-    WHILE e > 0 AND melodie[e] = -1
+    WHILE e > 0 AND melTonIn(takt, e) = -1
         e = e - 1
     WEND
-    IF melodie[e] <= 0 THEN RETURN 0.0
-    tonHoehe = CLAMP((melodie[e] - 69) / 14.0, 0.0, 1.0)
+    DIM m AS INTEGER : m = melTonIn(takt, e)
+    IF m <= 0 THEN RETURN 0.0
+    tonHoehe = CLAMP((m - 69) / 14.0, 0.0, 1.0)
     DIM seit AS FLOAT : seit = n - (ganz - ganz MOD kreis + e * 2)
-    IF seit >= melodieLaenge(e) * 2 THEN RETURN 0.0
+    DIM lang AS INTEGER
+    IF imMorgen(takt) OR (takt >= AB_KUESTE AND takt < AB_AUS) THEN
+        lang = laengeIn(morgenMelodie, e)
+    ELSE
+        lang = melodieLaenge(e)
+    END IF
+    IF seit >= lang * 2 THEN RETURN 0.0
     RETURN MAX(EXP(-seit * 0.45), 0.3)
 END FUNCTION
 
-' Der Akkord, der gerade klingt (0..7, ohne Rueckung)
+' Der Akkord, der gerade klingt, fuer die Farben: 0..7 die Nacht (auch nach
+' der Rueckung), 8..15 der Morgen
 FUNCTION musikAkkord() AS INTEGER
-    RETURN akkordNr(INT(musikTakt())) MOD 8
+    DIM nr AS INTEGER : nr = akkordNr(INT(musikTakt()))
+    IF nr >= 16 THEN RETURN nr - 8
+    RETURN nr MOD 8
 END FUNCTION
 
 ' Gibt es Ton? Ohne Soundkarte muss nichts gebaut werden. DH_OHNE_AUDIO (wie
