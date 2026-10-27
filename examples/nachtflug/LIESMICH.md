@@ -59,12 +59,17 @@ Uplifting Trance von a-Moll nach C-Dur, 128 Schläge je Minute, 148 Takte
   **Becken**, **Shaker**, eine **Füllung** am Ende jeder Phrase,
   **Glocken** als Funken im Intro und im Ausklang, **Aufstieg** und
   **Wirbel** vor den Höhepunkten.
-* **Geräusche der Reise**, leise unter der Musik: ein **Grollen** beim
-  Wiedereintritt, das mit dem Plasma anschwillt und verebbt, **Wind** über
-  den Wolken, die Rufe der **Wildgänse** („ga-gang“, rechts, wo der Zug
-  fliegt), **Brandung** und **Möwen** an der Küste und am Morgen, das
-  **Nebelhorn** des Leuchtturms. Alles aus Rauschen mit Tiefpass
-  (`AUDIO_SFX` mit Filter) und ein paar Noten.
+* **Geräusche der Reise**, leise unter der Musik: das **Meer plätschert**
+  im Intro, **Fahrtwind** im Tiefflug, im Tunnel **rauscht** auf jede
+  Viertel ein Ring vorbei, im Weltraum ein tiefes **Brummen**, ein
+  **Komet** zieht schimmernd vorbei, im Orbit **Funkrauschen** von fern,
+  beim Wiedereintritt ein **Grollen**, das mit dem Plasma anschwillt und
+  verebbt, **Wind** über den Wolken, die Rufe der **Wildgänse**, **Brandung**
+  und **Möwen** an der Küste und am Morgen, das **Nebelhorn** des
+  Leuchtturms. Alles aus Rauschen mit Tiefpass (`AUDIO_SFX` mit Filter) und
+  Noten; der Gänseruf ist wie der Chor aus Obertönen gebaut: nasal und rau,
+  zweisilbig („a-hank“), mit Formanten um 1,1 und 2,5 kHz und einem
+  Schnarren von 60 Hz, mehrere Gänse durcheinander.
 
 Ablauf: Intro (das Filter öffnet sich), Aufbau, erster Höhepunkt mit der
 Melodie, Breakdown (erst Klavier und Chor allein, dann der Lead leise
