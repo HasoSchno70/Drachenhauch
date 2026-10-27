@@ -119,6 +119,19 @@ FUNCTION merken(schluessel AS STRING, s AS SOUND) AS SOUND
     RETURN s
 END FUNCTION
 
+' Einen Zwischenklang dazumischen und gleich freigeben -- sonst bleibt jeder
+' (jede Saege eines Supersaw, jeder Oberton des Chors) bis zum Ende im
+' Speicher liegen: gemessen 2,7 GB, im Browser (2 GB Grenze) ein Abbruch.
+SUB dazu(ziel AS SOUND, q AS SOUND, ab AS INTEGER, vol AS FLOAT)
+    AUDIO_SOUND_MIX(ziel, q, ab, vol)
+    UNLOADSOUND(q)
+END SUB
+
+SUB dazuPan(ziel AS SOUND, q AS SOUND, ab AS INTEGER, vol AS FLOAT, pan AS FLOAT)
+    AUDIO_SOUND_MIX(ziel, q, ab, vol, pan)
+    UNLOADSOUND(q)
+END SUB
+
 ' Ping-Pong-Echo: der Klang auf seiner Seite, dann leiser gegenueber, dann
 ' noch leiser wieder hier. Abstand eine punktierte Achtel.
 FUNCTION mitEcho(s AS SOUND, dauer AS INTEGER, pan AS FLOAT, laut AS FLOAT, wieder AS INTEGER) AS SOUND
@@ -131,6 +144,7 @@ FUNCTION mitEcho(s AS SOUND, dauer AS INTEGER, pan AS FLOAT, laut AS FLOAT, wied
         AUDIO_SOUND_MIX(e, s, k * d, v, IIF(k MOD 2 = 1, -pan, pan))
         v = v * 0.55
     NEXT
+    UNLOADSOUND(s)
     RETURN e
 END FUNCTION
 
@@ -144,7 +158,7 @@ SUB supersaw(ziel AS SOUND, ab AS INTEGER, f AS FLOAT, dauer AS INTEGER, a AS IN
         DIM fv AS FLOAT : fv = f * 2.0 ^ (sCent[v] / 1200.0)
         ' die aeusseren Stimmen etwas leiser, die mittlere traegt
         DIM g AS FLOAT : g = IIF(v = 3, 1.0, 0.8)
-        AUDIO_SOUND_MIX(ziel, AUDIO_NOTE("saw", fv, dauer, a, d, s, r, vol * g, vib, 4.6 + v * 0.13), ab, 1.0, sPan[v] * breite)
+        dazuPan(ziel, AUDIO_NOTE("saw", fv, dauer, a, d, s, r, vol * g, vib, 4.6 + v * 0.13), ab, 1.0, sPan[v] * breite)
     NEXT
 END SUB
 
@@ -153,8 +167,8 @@ FUNCTION bassdrum() AS SOUND
     IF i >= 0 THEN RETURN klaenge[i]
     ' Koerper: Sinus, der schnell nach unten faellt; dazu ein kurzer Klick
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(420)
-    AUDIO_SOUND_MIX(s, AUDIO_SFX("sine", 150, -900, 0, 40, 260, 0, 0, 1.0), 0, 1.0)
-    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 3000, 0, 0, 2, 14, 0, 0, 0.6), 0, 0.3)
+    dazu(s, AUDIO_SFX("sine", 150, -900, 0, 40, 260, 0, 0, 1.0), 0, 1.0)
+    dazu(s, AUDIO_SFX("noise", 3000, 0, 0, 2, 14, 0, 0, 0.6), 0, 0.3)
     RETURN merken("kick", s)
 END FUNCTION
 
@@ -163,11 +177,11 @@ FUNCTION klatschen() AS SOUND
     IF i >= 0 THEN RETURN klaenge[i]
     ' drei kurz versetzte Rauschstoesse, breit verteilt, mit kurzem Nachhall
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(700)
-    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 1600, 0, 0, 6, 30, 0, 0, 0.7), 0, 0.8, -0.3)
-    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 1700, 0, 0, 6, 30, 0, 0, 0.7), 11, 0.8, 0.3)
-    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 1500, 0, 0, 10, 170, 0, 0, 0.7), 22, 0.9)
-    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 1400, 0, 0, 30, 420, 0, 0, 0.3), 60, 0.35, -0.6)
-    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 1400, 0, 0, 30, 420, 0, 0, 0.3), 95, 0.3, 0.6)
+    dazuPan(s, AUDIO_SFX("noise", 1600, 0, 0, 6, 30, 0, 0, 0.7), 0, 0.8, -0.3)
+    dazuPan(s, AUDIO_SFX("noise", 1700, 0, 0, 6, 30, 0, 0, 0.7), 11, 0.8, 0.3)
+    dazu(s, AUDIO_SFX("noise", 1500, 0, 0, 10, 170, 0, 0, 0.7), 22, 0.9)
+    dazuPan(s, AUDIO_SFX("noise", 1400, 0, 0, 30, 420, 0, 0, 0.3), 60, 0.35, -0.6)
+    dazuPan(s, AUDIO_SFX("noise", 1400, 0, 0, 30, 420, 0, 0, 0.3), 95, 0.3, 0.6)
     RETURN merken("clap", s)
 END FUNCTION
 
@@ -177,8 +191,8 @@ FUNCTION schlag(laut AS FLOAT) AS SOUND
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(240)
-    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 1900, 0, 0, 4, 80, 0, 0, laut), 0, 1.0, -0.2)
-    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 2100, 0, 0, 4, 80, 0, 0, laut), 6, 1.0, 0.2)
+    dazuPan(s, AUDIO_SFX("noise", 1900, 0, 0, 4, 80, 0, 0, laut), 0, 1.0, -0.2)
+    dazuPan(s, AUDIO_SFX("noise", 2100, 0, 0, 4, 80, 0, 0, laut), 6, 1.0, 0.2)
     RETURN merken(k, s)
 END FUNCTION
 
@@ -196,7 +210,7 @@ FUNCTION shaker(rechts AS BOOLEAN) AS SOUND
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(120)
-    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 12500, 0, 0, 8, 45, 0, 0, 0.2), 0, 1.0, IIF(rechts, 0.55, -0.55))
+    dazuPan(s, AUDIO_SFX("noise", 12500, 0, 0, 8, 45, 0, 0, 0.2), 0, 1.0, IIF(rechts, 0.55, -0.55))
     RETURN merken(k, s)
 END FUNCTION
 
@@ -204,10 +218,10 @@ FUNCTION crash() AS SOUND
     DIM i AS INTEGER : i = gemerkt("crash")
     IF i >= 0 THEN RETURN klaenge[i]
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(4200)
-    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 7000, -400, 0, 60, 3600, 0, 0, 0.4), 0, 0.8, -0.55)
-    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 6500, -300, 0, 60, 3800, 0, 0, 0.4), 7, 0.8, 0.55)
+    dazuPan(s, AUDIO_SFX("noise", 7000, -400, 0, 60, 3600, 0, 0, 0.4), 0, 0.8, -0.55)
+    dazuPan(s, AUDIO_SFX("noise", 6500, -300, 0, 60, 3800, 0, 0, 0.4), 7, 0.8, 0.55)
     ' und ein tiefer Schlag darunter
-    AUDIO_SOUND_MIX(s, AUDIO_SFX("sine", 90, -40, 0, 120, 1600, 0, 0, 1.0), 0, 0.8)
+    dazu(s, AUDIO_SFX("sine", 90, -40, 0, 120, 1600, 0, 0, 1.0), 0, 0.8)
     RETURN merken("crash", s)
 END FUNCTION
 
@@ -219,9 +233,9 @@ FUNCTION aufstieg(takte AS INTEGER) AS SOUND
     IF i >= 0 THEN RETURN klaenge[i]
     DIM lang AS INTEGER : lang = INT(msJeSchritt() * 16 * takte)
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(lang + 200)
-    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 400, 3200 / takte, lang - 100, 100, 100, 0, 0, 0.5), 0, 0.5, -0.45)
-    AUDIO_SOUND_MIX(s, AUDIO_SFX("noise", 420, 3400 / takte, lang - 100, 100, 100, 0, 0, 0.5), 0, 0.5, 0.45)
-    AUDIO_SOUND_MIX(s, AUDIO_NOTE("sine", hz(57), lang - 300, lang - 400, 50, 1.0, 250, 0.3, 0, 0, 7, 24), 0, 0.5)
+    dazuPan(s, AUDIO_SFX("noise", 400, 3200 / takte, lang - 100, 100, 100, 0, 0, 0.5), 0, 0.5, -0.45)
+    dazuPan(s, AUDIO_SFX("noise", 420, 3400 / takte, lang - 100, 100, 100, 0, 0, 0.5), 0, 0.5, 0.45)
+    dazu(s, AUDIO_NOTE("sine", hz(57), lang - 300, lang - 400, 50, 1.0, 250, 0.3, 0, 0, 7, 24), 0, 0.5)
     RETURN merken(k, s)
 END FUNCTION
 
@@ -231,8 +245,8 @@ FUNCTION bass(nr AS INTEGER) AS SOUND
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(260)
-    AUDIO_SOUND_MIX(s, AUDIO_NOTE("saw", hz(grundTon(nr) + 12), 120, 3, 90, 0.35, 60, 0.45), 0, 0.7)
-    AUDIO_SOUND_MIX(s, AUDIO_NOTE("sine", hz(grundTon(nr)), 140, 3, 60, 0.8, 60, 0.9), 0, 0.9)
+    dazu(s, AUDIO_NOTE("saw", hz(grundTon(nr) + 12), 120, 3, 90, 0.35, 60, 0.45), 0, 0.7)
+    dazu(s, AUDIO_NOTE("sine", hz(grundTon(nr)), 140, 3, 60, 0.8, 60, 0.9), 0, 0.9)
     RETURN merken(k, s)
 END FUNCTION
 
@@ -259,10 +273,10 @@ FUNCTION flaeche(nr AS INTEGER, gross AS BOOLEAN) AS SOUND
     DIM w AS FLOAT : w = IIF(gross, 0.9, 0.65)
     FOR v = 0 TO 3
         DIM f AS FLOAT : f = hz(akkTon(nr, v))
-        AUDIO_SOUND_MIX(s, AUDIO_NOTE("saw", f * 0.9966, lang - 200, 1100, 900, 0.75, 2000, 0.15, 0.0025, 0.31, 9), 0, 1.0, -w)
-        AUDIO_SOUND_MIX(s, AUDIO_NOTE("saw", f * 1.0034, lang - 200, 1200, 900, 0.75, 2000, 0.15, 0.0025, 0.27, 14), 0, 1.0, w)
-        AUDIO_SOUND_MIX(s, AUDIO_NOTE("triangle", f * 2.0, lang - 200, 1400, 900, 0.6, 2000, 0.08), 0, 1.0, IIF(v MOD 2 = 0, -0.35, 0.35))
-        IF gross THEN AUDIO_SOUND_MIX(s, AUDIO_NOTE("saw", f * 0.5, lang - 200, 1600, 900, 0.7, 2000, 0.045, 0, 0, 7), 0, 1.0, 0.0)
+        dazuPan(s, AUDIO_NOTE("saw", f * 0.9966, lang - 200, 1100, 900, 0.75, 2000, 0.15, 0.0025, 0.31, 9), 0, 1.0, -w)
+        dazuPan(s, AUDIO_NOTE("saw", f * 1.0034, lang - 200, 1200, 900, 0.75, 2000, 0.15, 0.0025, 0.27, 14), 0, 1.0, w)
+        dazuPan(s, AUDIO_NOTE("triangle", f * 2.0, lang - 200, 1400, 900, 0.6, 2000, 0.08), 0, 1.0, IIF(v MOD 2 = 0, -0.35, 0.35))
+        IF gross THEN dazuPan(s, AUDIO_NOTE("saw", f * 0.5, lang - 200, 1600, 900, 0.7, 2000, 0.045, 0, 0, 7), 0, 1.0, 0.0)
     NEXT
     RETURN merken(k, s)
 END FUNCTION
@@ -278,8 +292,8 @@ FUNCTION pumpe(nr AS INTEGER) AS SOUND
     DIM v AS INTEGER
     FOR v = 0 TO 3
         DIM f AS FLOAT : f = hz(akkTon(nr, v))
-        AUDIO_SOUND_MIX(s, AUDIO_NOTE("saw", f * 0.996, lang - 60, 150, 200, 0.8, 120, 0.11, 0, 0, 11), 0, 1.0, -0.7)
-        AUDIO_SOUND_MIX(s, AUDIO_NOTE("saw", f * 1.004, lang - 60, 150, 200, 0.8, 120, 0.11, 0, 0, 13), 0, 1.0, 0.7)
+        dazuPan(s, AUDIO_NOTE("saw", f * 0.996, lang - 60, 150, 200, 0.8, 120, 0.11, 0, 0, 11), 0, 1.0, -0.7)
+        dazuPan(s, AUDIO_NOTE("saw", f * 1.004, lang - 60, 150, 200, 0.8, 120, 0.11, 0, 0, 13), 0, 1.0, 0.7)
     NEXT
     RETURN merken(k, s)
 END FUNCTION
@@ -318,7 +332,7 @@ FUNCTION chorStimme(nr AS INTEGER, v AS INTEGER) AS SOUND
         DIM g AS FLOAT
         g = EXP(-((fh - 750) / 190) ^ 2) + 0.6 * EXP(-((fh - 1150) / 230) ^ 2) + 0.22 * EXP(-((fh - 2600) / 320) ^ 2) + 0.12 / h
         IF g > 0.07 THEN
-            AUDIO_SOUND_MIX(s, AUDIO_NOTE("sine", fh, lang - 200, 1500, 600, 0.85, 2000, 0.07 * g, 0.0045, 4.3 + v * 0.23), 0, 1.0, IIF(v MOD 2 = 0, -0.5, 0.5))
+            dazuPan(s, AUDIO_NOTE("sine", fh, lang - 200, 1500, 600, 0.85, 2000, 0.07 * g, 0.0045, 4.3 + v * 0.23), 0, 1.0, IIF(v MOD 2 = 0, -0.5, 0.5))
         END IF
     NEXT
     RETURN merken(k, s)
@@ -332,7 +346,9 @@ FUNCTION chor(nr AS INTEGER) AS SOUND
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(lang + 2200)
     DIM v AS INTEGER
     FOR v = 0 TO 3
-        AUDIO_SOUND_MIX(s, chorStimme(nr, v), 0, 1.0)
+        DIM st AS SOUND : st = chorStimme(nr, v)
+        AUDIO_SOUND_MIX(s, st, 0, 1.0)
+        UNLOADSOUND(st)
     NEXT
     RETURN merken(k, s)
 END FUNCTION
@@ -343,9 +359,9 @@ FUNCTION zupf(midi AS INTEGER, pan AS FLOAT) AS SOUND
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM t AS SOUND : t = AUDIO_SOUND_NEW(460)
-    AUDIO_SOUND_MIX(t, AUDIO_NOTE("saw", hz(midi), 40, 2, 150, 0.0, 160, 0.22, 0, 0, 8), 0, 0.8)
-    AUDIO_SOUND_MIX(t, AUDIO_NOTE("sine", hz(midi), 40, 2, 220, 0.0, 200, 0.35), 0, 0.8)
-    AUDIO_SOUND_MIX(t, AUDIO_NOTE("triangle", hz(midi + 12), 40, 2, 100, 0.0, 120, 0.2), 0, 0.6)
+    dazu(t, AUDIO_NOTE("saw", hz(midi), 40, 2, 150, 0.0, 160, 0.22, 0, 0, 8), 0, 0.8)
+    dazu(t, AUDIO_NOTE("sine", hz(midi), 40, 2, 220, 0.0, 200, 0.35), 0, 0.8)
+    dazu(t, AUDIO_NOTE("triangle", hz(midi + 12), 40, 2, 100, 0.0, 120, 0.2), 0, 0.6)
     RETURN merken(k, mitEcho(t, 460, pan, 0.45, 3))
 END FUNCTION
 
@@ -356,9 +372,9 @@ FUNCTION glocke(midi AS INTEGER) AS SOUND
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM t AS SOUND : t = AUDIO_SOUND_NEW(2200)
-    AUDIO_SOUND_MIX(t, AUDIO_NOTE("sine", hz(midi), 60, 2, 1600, 0.0, 600, 0.35), 0, 1.0)
-    AUDIO_SOUND_MIX(t, AUDIO_NOTE("sine", hz(midi) * 2.76, 60, 2, 500, 0.0, 300, 0.12), 0, 1.0)
-    AUDIO_SOUND_MIX(t, AUDIO_NOTE("sine", hz(midi) * 5.4, 60, 1, 180, 0.0, 120, 0.05), 0, 1.0)
+    dazu(t, AUDIO_NOTE("sine", hz(midi), 60, 2, 1600, 0.0, 600, 0.35), 0, 1.0)
+    dazu(t, AUDIO_NOTE("sine", hz(midi) * 2.76, 60, 2, 500, 0.0, 300, 0.12), 0, 1.0)
+    dazu(t, AUDIO_NOTE("sine", hz(midi) * 5.4, 60, 1, 180, 0.0, 120, 0.05), 0, 1.0)
     DIM pan AS FLOAT : pan = ((midi * 37) MOD 17) / 8.0 - 1.0
     RETURN merken(k, mitEcho(t, 2200, pan * 0.8, 0.5, 5))
 END FUNCTION
@@ -372,10 +388,10 @@ FUNCTION klavier(midi AS INTEGER, achtel AS INTEGER) AS SOUND
     DIM dauer AS INTEGER : dauer = INT(msJeSchritt() * 2 * achtel)
     DIM f AS FLOAT : f = hz(midi)
     DIM t AS SOUND : t = AUDIO_SOUND_NEW(dauer + 1400)
-    AUDIO_SOUND_MIX(t, AUDIO_NOTE("sine", f, dauer, 3, 2200, 0.0, 900, 0.45), 0, 1.0, -0.15)
-    AUDIO_SOUND_MIX(t, AUDIO_NOTE("triangle", f * 1.001, dauer, 3, 1500, 0.0, 700, 0.2, 0, 0, 4), 0, 1.0, 0.15)
-    AUDIO_SOUND_MIX(t, AUDIO_NOTE("sine", f * 2.0, dauer, 2, 900, 0.0, 500, 0.18), 0, 1.0)
-    AUDIO_SOUND_MIX(t, AUDIO_NOTE("sine", f * 3.003, dauer, 2, 400, 0.0, 300, 0.07), 0, 1.0)
+    dazuPan(t, AUDIO_NOTE("sine", f, dauer, 3, 2200, 0.0, 900, 0.45), 0, 1.0, -0.15)
+    dazuPan(t, AUDIO_NOTE("triangle", f * 1.001, dauer, 3, 1500, 0.0, 700, 0.2, 0, 0, 4), 0, 1.0, 0.15)
+    dazu(t, AUDIO_NOTE("sine", f * 2.0, dauer, 2, 900, 0.0, 500, 0.18), 0, 1.0)
+    dazu(t, AUDIO_NOTE("sine", f * 3.003, dauer, 2, 400, 0.0, 300, 0.07), 0, 1.0)
     RETURN merken(k, mitEcho(t, dauer + 1400, -0.4, 0.38, 4))
 END FUNCTION
 
@@ -390,7 +406,7 @@ FUNCTION lead(midi AS INTEGER, achtel AS INTEGER) AS SOUND
     DIM t AS SOUND : t = AUDIO_SOUND_NEW(dauer + 600)
     DIM f AS FLOAT : f = hz(midi)
     supersaw(t, 0, f, dauer, 12, 350, 0.72, 520, 0.075, 0.85, vib)
-    AUDIO_SOUND_MIX(t, AUDIO_NOTE("sine", f * 0.5, dauer, 12, 350, 0.72, 520, 0.18, vib, 4.6), 0, 1.0)
+    dazu(t, AUDIO_NOTE("sine", f * 0.5, dauer, 12, 350, 0.72, 520, 0.18, vib, 4.6), 0, 1.0)
     RETURN merken(k, mitEcho(t, dauer + 600, -0.4, 0.32, 3))
 END FUNCTION
 
@@ -419,9 +435,9 @@ FUNCTION stimmeBauen(nr AS INTEGER) AS BOOLEAN
         DIM sm AS SAMPLE : sm = SAMPLE_FROM_SOUND(roh)
         DIM lang AS INTEGER : lang = INT(SAMPLE_LEN(sm) * 1000)
         DIM t AS SOUND : t = AUDIO_SOUND_NEW(lang + 300)
-        AUDIO_SOUND_MIX(t, SAMPLE_NOTE(sm, 0, lang, 60, 0, 1.0, 150, 0.8), 0, 1.0)
-        AUDIO_SOUND_MIX(t, SAMPLE_NOTE(sm, 0.12, lang, 60, 0, 1.0, 150, 0.4), 18, 1.0, -0.7)
-        AUDIO_SOUND_MIX(t, SAMPLE_NOTE(sm, -0.12, lang, 60, 0, 1.0, 150, 0.4), 31, 1.0, 0.7)
+        dazu(t, SAMPLE_NOTE(sm, 0, lang, 60, 0, 1.0, 150, 0.8), 0, 1.0)
+        dazuPan(t, SAMPLE_NOTE(sm, 0.12, lang, 60, 0, 1.0, 150, 0.4), 18, 1.0, -0.7)
+        dazuPan(t, SAMPLE_NOTE(sm, -0.12, lang, 60, 0, 1.0, 150, 0.4), 31, 1.0, 0.7)
         merken("stimme" + STR$(nr), mitEcho(t, lang + 300, -0.35, 0.42, 6))
     CATCH fehler
         stimmeFehlt = TRUE
