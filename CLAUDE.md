@@ -2853,7 +2853,15 @@ Farbe je Instanz in einem Aufruf, AUDIO_NOTE schneller (Wellenform einmal
 entschieden, Phase in Umdrehungen, Sinus als Zeiger, alle 64 Werte exakt
 nachgestellt; Vibrato/Slide als Zeiger bzw. Faktor; Rust-Test
 `schnelle_note_gleicht_der_alten` gegen die alte Rechnung): 50 Sinusnoten
-mit Vibrato 212 -> 81 ms, die Klaenge der Demo 2,8 -> 1,9 s. **Falle:** `fragTexCoord.y` zaehlt hier
+mit Vibrato 212 -> 81 ms, die Klaenge der Demo 2,8 -> 1,9 s. Dazu
+(Wunsch des Nutzers) ein neuer Tunnel (Neonringe mit Kern und Schein in
+wechselnden Toenen, Schachtwand als Zylinder mit Panelen und Lichtimpulsen,
+Funken in Polarkoordinaten, Ziel am Ende; ACES-Abbildung) und hinter der
+Galaxie der Weltraum (`weltraum(d)` in glanz.fs: 3D-Rauschen ueber die
+Blickrichtung, also fest im Raum -- Nebel mit Faeden und Staub, ein
+Milchstrassen-Band, drei Sternschichten). **Falle:** der Hintergrund darf
+nicht an der Helligkeit NACH der Scheibe maskiert werden, sonst verschwindet
+er hinter ihrem Leuchten; maskiert wird nur an den Spuren. **Falle:** `fragTexCoord.y` zaehlt hier
 nach oben -- kein `uv.y = -uv.y`. Etwa 60 Bilder je Sekunde in 1280x720.
 Tests `tests/pruef/beispiel_nachtflug.dhtest` (7: die WAV mit `--- ton`,
 jede Szene am Bildschirmfoto); ein kaputter Shader und eine Fassung ohne

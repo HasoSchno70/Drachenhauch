@@ -65,9 +65,9 @@ Bus.
 |---|---|---|
 | 0–16 | Ozean bei Nacht, Polarlicht, Mondglitzern | Fragment-Shader `assets/shader/ozean.fs` |
 | 16–32 | Tiefflug durch ein Tal, ein Fluss aus Licht, Wellen im Takt | Raymarching über ein Höhenfeld, `flug.fs` |
-| 32–48 | Lichttunnel, die Farbe folgt dem Akkord | `tunnel.fs` |
+| 32–48 | Lichttunnel aus Neonringen mit weißem Kern, Wände mit Lichtimpulsen, vorbeirasende Funken, ein helles Ziel am Ende; die Farben folgen dem Akkord | `tunnel.fs` |
 | 48–64 | Sternennebel, zum Aufstieg hin schneller und heller | Volumen-Raymarching, `nebel.fs` |
-| 64–80 | Galaxie aus 2.600 Lichtspuren, auf jeden Schlag läuft eine Welle nach außen | echte 3D-Szene (`MODEL_INSTANCED`), die leuchtende Scheibe mit Spiralarmen und Staub rechnet `glanz.fs` mit derselben Kamera |
+| 64–80 | Galaxie aus 2.600 Lichtspuren in eigenen Farben, auf jeden Schlag läuft eine Welle nach außen; dahinter kosmische Nebel, das Band einer fernen Milchstraße und drei Schichten Sterne | echte 3D-Szene (`MODEL_INSTANCED`), die leuchtende Scheibe und der Weltraum dahinter rechnet `glanz.fs` mit derselben Kamera |
 | 80–92 | Ozean in der Morgendämmerung, Abspann | wieder `ozean.fs` |
 
 Was pulsiert, pulsiert mit der Bassdrum; was aufblitzt, blitzt mit der
