@@ -11,6 +11,7 @@
 '     dhrt run main.dh                    ' im Vollbild, von vorn
 '     dhrt run main.dh -- --fenster       ' im Fenster
 '     dhrt run main.dh -- --ab 32         ' ab Takt 32
+'     dhrt run main.dh -- --leicht        ' fuer schwaechere Grafikkarten
 '     dhrt run main.dh -- --wav datei.wav ' nur die Musik als WAV schreiben (trocken)
 '     dhrt run main.dh -- --mitschnitt datei.wav  ' abspielen und mitschneiden,
 '                                         ' so wie man es hoert (mit Hall)
@@ -28,6 +29,9 @@ DIM abTakt AS INTEGER
 DIM imFenster AS BOOLEAN
 DIM wavZiel AS STRING
 DIM messen AS BOOLEAN
+' Guete der Bilder: 1 = voll, --leicht nimmt etwas mehr als die Haelfte der
+' Schritte in den Shadern und zeichnet weniger Lichtspuren
+DIM guete AS FLOAT : guete = 1.0
 DIM mitschnitt AS STRING
 DIM ai AS INTEGER
 WHILE ai < ARGC()
@@ -36,6 +40,8 @@ WHILE ai < ARGC()
             ai = ai + 1 : abTakt = CLAMP(VAL(ARG$(ai)), 0, TAKTE - 1)
         CASE "--fenster"
             imFenster = TRUE
+        CASE "--leicht"
+            guete = 0.55
         CASE "--messen"
             messen = TRUE
         CASE "--wav"
@@ -181,7 +187,7 @@ SUB galaxieZeichnen(zeit AS FLOAT, kick AS FLOAT, fort AS FLOAT, takt AS FLOAT, 
                         MIN(255, INT(((1.0 - akk) * gFG[i] + akk * farbeG) * stufe * 255.0)), _
                         MIN(255, INT(((1.0 - akk) * gFB[i] + akk * farbeB) * stufe * 255.0)))
     NEXT
-    MODEL_INSTANCED(spur, gMat, gFarbe)
+    MODEL_INSTANCED(spur, gMat, gFarbe, IIF(guete < 1.0, STERNE * 6 \ 10, STERNE))
 END SUB
 
 ' --- Text auf dem Bild ----------------------------------------------------------
@@ -202,6 +208,96 @@ END FUNCTION
 SUB zweisprachig(de AS STRING, en AS STRING, y AS INTEGER, groesse AS INTEGER, deck AS FLOAT, gross AS BOOLEAN)
     mittig(de, y, groesse, deck, gross)
     mittig(en, y + INT(groesse * 1.3), INT(groesse * 0.8), deck * 0.7, FALSE)
+END SUB
+
+' --- Lichterschwarm (Abspann) ---------------------------------------------------
+' Funken steigen aus der Sonne am Horizont auf, fliegen in weiten Boegen
+' heran und setzen sich zum Schriftzug "Drachenhauch" zusammen, funkeln dort
+' und verloeschen mit dem Bild. Die Zielpunkte kommen aus dem Schriftzug
+' selbst: einmal in ein Render-Ziel geschrieben, als Bild zurueckgeholt
+' (RENDERTARGET_IMAGE) und auf einem Raster abgetastet.
+CONST SCHWARM = 900
+DIM swZielX[SCHWARM] AS FLOAT
+DIM swZielY[SCHWARM] AS FLOAT
+DIM swStartX[SCHWARM] AS FLOAT
+DIM swStartY[SCHWARM] AS FLOAT
+DIM swBogen[SCHWARM] AS FLOAT
+DIM swVerz[SCHWARM] AS FLOAT
+DIM swX[SCHWARM] AS INTEGER
+DIM swY[SCHWARM] AS INTEGER
+DIM swR[SCHWARM] AS INTEGER
+DIM swFarbe[SCHWARM] AS INTEGER
+DIM swHofR[SCHWARM] AS INTEGER
+DIM swHof[SCHWARM] AS INTEGER
+DIM swAnz AS INTEGER
+CONST SCHWARM_Y = 565
+
+SUB schwarmVorbereiten()
+    DIM wort AS STRING : wort = "Drachenhauch"
+    DIM rt AS INTEGER : rt = RENDERTARGET_NEW(BREITE, 140)
+    RENDERTARGET_BEGIN(rt)
+    SETFONT(schriftGross, 92)
+    TEXT((BREITE - TEXT_WIDTH(wort)) \ 2, 20, wort, WHITE)
+    RENDERTARGET_END()
+    DIM bild AS INTEGER : bild = RENDERTARGET_IMAGE(rt)
+    ' alle hellen Rasterpunkte sammeln, dann zufaellig bis zu SCHWARM nehmen
+    DIM kx AS ARRAY OF INTEGER : kx = []
+    DIM ky AS ARRAY OF INTEGER : ky = []
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO 139 STEP 3
+        FOR x = 0 TO BREITE - 1 STEP 3
+            DIM f AS INTEGER : f = GETPIXEL(bild, x, y)
+            IF ((f SHR 8) BAND 255) > 128 THEN
+                ARRAY_PUSH(kx, x)
+                ARRAY_PUSH(ky, y)
+            END IF
+        NEXT
+    NEXT
+    RANDOMIZE(11)
+    DIM n AS INTEGER : n = LEN(kx)
+    swAnz = MIN(SCHWARM, n)
+    DIM i AS INTEGER
+    FOR i = 0 TO swAnz - 1
+        ' ziehen ohne Zuruecklegen: den gezogenen Platz mit dem letzten fuellen
+        DIM j AS INTEGER : j = INT(RND() * n)
+        swZielX[i] = kx[j] + (RND() - 0.5) * 1.5
+        swZielY[i] = SCHWARM_Y - 70 + ky[j] + (RND() - 0.5) * 1.5
+        kx[j] = kx[n - 1] : ky[j] = ky[n - 1]
+        n = n - 1
+        ' Start: an der Sonne ueber dem Horizont, etwas gestreut
+        swStartX[i] = BREITE * 0.72 + (RND() - 0.5) * 60.0
+        swStartY[i] = HOEHE * 0.47 + (RND() - 0.5) * 24.0
+        swBogen[i] = (RND() - 0.3) * 520.0
+        swVerz[i] = RND() * 1.6 + (swZielX[i] / BREITE) * 0.6
+    NEXT
+END SUB
+
+SUB schwarmZeichnen(takt AS FLOAT, zeit AS FLOAT)
+    IF takt < 85.3 OR swAnz = 0 THEN RETURN
+    ' verloeschen mit dem Bild am Ende
+    DIM aus AS FLOAT : aus = CLAMP((TAKTE + 1.4 - takt) * 0.8, 0.0, 1.0)
+    DIM i AS INTEGER
+    FOR i = 0 TO swAnz - 1
+        DIM t AS FLOAT : t = CLAMP((takt - 85.3 - swVerz[i]) / 2.4, 0.0, 1.0)
+        DIM e AS FLOAT : e = t * t * (3.0 - 2.0 * t)
+        ' quadratischer Bogen: vom Start ueber einen seitlich versetzten Punkt zum Ziel
+        DIM mx AS FLOAT : mx = (swStartX[i] + swZielX[i]) * 0.5 + swBogen[i]
+        DIM my AS FLOAT : my = MIN(swStartY[i], swZielY[i]) - 160.0 - ABS(swBogen[i]) * 0.3
+        DIM u AS FLOAT : u = 1.0 - e
+        swX[i] = INT(u * u * swStartX[i] + 2.0 * u * e * mx + e * e * swZielX[i])
+        swY[i] = INT(u * u * swStartY[i] + 2.0 * u * e * my + e * e * swZielY[i])
+        ' angekommen: funkeln
+        DIM funkeln AS FLOAT : funkeln = 0.75 + 0.25 * SIN(zeit * 5.0 + i * 1.7)
+        DIM hell AS FLOAT : hell = IIF(t < 1.0, 0.5 + 0.5 * t, funkeln) * aus * MIN(1.0, t * 6.0)
+        swR[i] = IIF(e < 0.9, 2, 1)
+        swHofR[i] = 4
+        DIM g AS INTEGER : g = INT(215 + 40 * e)
+        swFarbe[i] = RGBA(255, g, INT(150 + 90 * e), MAX(1, 255 - INT(255 * hell)))
+        swHof[i] = RGBA(255, 190, 120, MAX(1, 255 - INT(70 * hell)))
+    NEXT
+    CIRCLES(swX, swY, swHofR, swHof, swAnz)
+    CIRCLES(swX, swY, swR, swFarbe, swAnz)
 END SUB
 
 SUB beschriftung(takt AS FLOAT)
@@ -226,7 +322,7 @@ SUB beschriftung(takt AS FLOAT)
         "Music: uplifting trance, 128 BPM, A minor -- synthesised with AUDIO_NOTE and an audio clock", 380, 19, zeigen(takt, 84, 93), FALSE)
     zweisprachig("Bild: GLSL-Raymarching und 3D-Instancing in dhrt", _
         "Pictures: GLSL raymarching and 3D instancing in dhrt", 440, 19, zeigen(takt, 85, 93), FALSE)
-    mittig("Drachenhauch", 520, 30, zeigen(takt, 87, 95), TRUE)
+    ' "Drachenhauch" schreibt der Lichterschwarm (schwarmZeichnen)
 END SUB
 
 ' --- Ablauf ---------------------------------------------------------------------
@@ -256,6 +352,39 @@ DIM akkB AS ARRAY OF FLOAT : akkB = [1.0, 1.0, 0.3, 0.65, 0.75, 0.8, 1.0, 1.0]
 DIM farbeR AS FLOAT : farbeR = akkR[0]
 DIM farbeG AS FLOAT : farbeG = akkG[0]
 DIM farbeB AS FLOAT : farbeB = akkB[0]
+
+' --- Startbild: die Klaenge entstehen ------------------------------------------
+' Bevor die Musik beginnt, werden alle Klaenge gebaut (rund zwei Sekunden) --
+' Stueck fuer Stueck, damit das Bild dabei ruhig bleibt: ein Titel und eine
+' feine Linie, die sich fuellt. Ohne Ton gibt es nichts zu bauen.
+SUB startbild(anteil AS FLOAT, bild AS INTEGER)
+    CLS(BLACK)
+    DIM auf AS FLOAT : auf = MIN(1.0, bild / 40.0)
+    mittig("N A C H T F L U G", 300, 40, 0.55 * auf, TRUE)
+    zweisprachig("die Klänge entstehen ...", "the sounds are being synthesised ...", 372, 16, 0.6 * auf, FALSE)
+    DIM b AS INTEGER : b = 320
+    DIM x AS INTEGER : x = (BREITE - b) \ 2
+    BOX(x, 440, x + b, 441, RGB(30, 34, 52))
+    BOX(x, 440, x + INT(b * anteil), 441, RGB(150, 180, 240))
+    FLIP()
+END SUB
+
+schwarmVorbereiten()
+IF tonDa() THEN
+    DIM bild AS INTEGER
+    DIM fertig AS BOOLEAN
+    WHILE NOT fertig AND NOT QUITREQUESTED() AND NOT KEYHIT(KEY_ESCAPE)
+        DIM t0 AS FLOAT : t0 = GET_TIME()
+        WHILE GET_TIME() - t0 < 0.012
+            IF NOT vorbauen() THEN
+                fertig = TRUE
+                EXIT WHILE
+            END IF
+        WEND
+        startbild(bauStand / bauGesamt(), bild)
+        bild = bild + 1
+    WEND
+END IF
 
 musikStarten(abTakt)
 ' der Mitschnitt: der fertige Mix hinter allen Effekten, so wie man ihn hoert
@@ -317,7 +446,8 @@ WHILE NOT beenden
         SHADER_SET(sh, "fort", (takt - AB_HOCH2) / 16.0)
         SHADER_SET(sh, "hell", 1.0)
         ' der weisse Blitz auf der Eins des Hoehepunkts
-        SHADER_SET(sh, "blitz", MAX(0.0, 1.0 - (takt - AB_HOCH2) * 1.5))
+        ' ... und ein kleinerer auf der Rueckung
+        SHADER_SET(sh, "blitz", MAX(MAX(0.0, 1.0 - (takt - AB_HOCH2) * 1.5), 0.6 * MAX(0.0, 1.0 - (takt - AB_RUECKUNG) * 2.5) * IIF(takt >= AB_RUECKUNG, 1.0, 0.0)))
         uebergang(sh, vorEnde(takt, AB_AUS), 1.0, 1.0, 0.82, 0.6)
     ELSE
         sh = shOzean
@@ -329,10 +459,12 @@ WHILE NOT beenden
     SHADER_SET(sh, "time", zeit)
     SHADER_SET(sh, "kick", kick)
     SHADER_SET(sh, "takt", takt)
+    SHADER_SET(sh, "guete", guete)
     SHADER_SET(sh, "ton", melTon)
     SHADER_SET(sh, "hoehe", tonHoehe)
     SHADER_SET3(sh, "farbe", farbeR, farbeG, farbeB)
     beschriftung(takt)
+    IF takt >= AB_AUS THEN schwarmZeichnen(takt, zeit)
     POSTFX(sh)
     FLIP()
     bilder = bilder + 1

@@ -16,7 +16,11 @@ uniform vec3 farbe;      // Farbe des Akkords
 uniform float aus;       // Szenenwechsel: Licht waechst aus der Mitte (0..1)
 uniform float ein;       // ... und weicht nach aussen (0 = nur Licht, 1 = Szene)
 uniform vec3 uebLicht;   // Farbe des Lichts beim Wechsel
+uniform float guete;     // 1 = volle Qualitaet, kleiner = weniger Schritte (--leicht)
 out vec4 finalColor;
+
+// Guete: ohne gesetzten Wert (0) gilt die volle
+float G() { return guete > 0.0 ? guete : 1.0; }
 
 const vec3 MOND = vec3(-0.4924, 0.4924, 0.7176);
 
@@ -59,6 +63,7 @@ vec3 polarlicht(vec3 ro, vec3 d) {
     vec3 c = vec3(0.0);
     if (d.y < 0.02) return c;
     for (int i = 0; i < 20; i++) {
+        if (float(i) >= 20.0 * G()) break;
         float k = float(i) / 20.0;
         float hoehe = 30.0 + k * 30.0;
         float t = (hoehe - ro.y) / d.y;
@@ -136,7 +141,8 @@ void main() {
         float h = p.y - gelaende(p.xz);
         if (h < 0.0) { treffer = true; break; }
         tAlt = t;
-        t += max(h * 0.32, 0.015 + t * 0.003);
+        t += max(h * 0.32, 0.015 + t * 0.003) / G();
+        if (float(i) >= 160.0 * G()) break;
         if (t > 170.0) break;
     }
     if (treffer) {
@@ -178,6 +184,24 @@ void main() {
         c = mix(c, nebelFarbe, clamp(nebel + tief, 0.0, 1.0));
         // der Fluss scheint durch den Nebel
         c += glut * (fluss * 0.6 + ufer * 0.12) * staerke * 0.35 * exp(-t * 0.012);
+    }
+    // Schnee: drei Schichten Flocken, die aus der Ferne auf die Kamera
+    // zufliegen -- jede Schicht waechst, waehrend ihre Flocken naeher kommen,
+    // und blendet am Anfang ein und am Ende aus.
+    for (int k = 0; k < 3; k++) {
+        float tief = fract(time * 0.45 + float(k) / 3.0);
+        float massstab = mix(14.0, 1.6, tief);
+        vec2 q = uv * massstab + vec2(float(k) * 7.3 + time * 0.15, float(k) * 3.1 - time * 0.25);
+        vec2 zelle = floor(q);
+        float da = hash(zelle + float(k) * 11.0);
+        if (da > 0.55) {
+            vec2 mitte = vec2(hash(zelle + 0.31), hash(zelle + 0.77)) * 0.7 + 0.15;
+            float r = length(fract(q) - mitte);
+            float groesse = 0.05 + 0.08 * tief;
+            float flocke = smoothstep(groesse, groesse * 0.3, r);
+            float blende = smoothstep(0.0, 0.25, tief) * smoothstep(1.0, 0.8, tief);
+            c += vec3(0.75, 0.82, 1.0) * flocke * blende * 0.45;
+        }
     }
     c *= 1.0 - 0.38 * dot(uv * 0.9, uv * 0.9);
     c += (hash(fragTexCoord * resolution + time) - 0.5) * 0.012;

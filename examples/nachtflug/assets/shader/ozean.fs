@@ -17,7 +17,11 @@ uniform vec3 farbe;      // Farbe des Akkords
 uniform float aus;       // Szenenwechsel: Licht waechst aus der Mitte (0..1)
 uniform float ein;       // ... und weicht nach aussen (0 = nur Licht, 1 = Szene)
 uniform vec3 uebLicht;   // Farbe des Lichts beim Wechsel
+uniform float guete;     // 1 = volle Qualitaet, kleiner = weniger Schritte (--leicht)
 out vec4 finalColor;
+
+// Guete: ohne gesetzten Wert (0) gilt die volle
+float G() { return guete > 0.0 ? guete : 1.0; }
 
 const vec3 MOND = vec3(-0.4067, 0.2892, 0.8667);   // normalize(-0.45, 0.32, 1.0)
 const vec3 SONNE = vec3(0.4472, 0.0179, 0.8943);
@@ -50,6 +54,7 @@ vec3 polarlicht(vec3 ro, vec3 d) {
     vec3 c = vec3(0.0);
     if (d.y < 0.01) return c;
     for (int i = 0; i < 32; i++) {
+        if (float(i) >= 32.0 * G()) break;
         float k = float(i) / 32.0;
         float hoehe = 10.0 + k * 22.0;
         float t = (hoehe - ro.y) / d.y;
@@ -70,6 +75,29 @@ vec3 polarlicht(vec3 ro, vec3 d) {
     return c * (0.2 + 1.6 * licht) * (1.0 + 0.9 * ton);
 }
 
+// Sternschnuppen: alle paar Sekunden eine, nicht immer (der Zufall je
+// Zeitabschnitt entscheidet), von oben schraeg herab, knapp eine Sekunde
+// lang. Gerechnet im Winkel der Blickrichtung -- Azimut und Hoehe.
+vec3 sternschnuppe(vec3 d) {
+    const float ABSCHNITT = 5.5;
+    float id = floor(time / ABSCHNITT);
+    float tl = time - id * ABSCHNITT;
+    if (hash(vec2(id, 3.7)) < 0.35 || tl > 0.9) return vec3(0.0);
+    vec2 w = vec2(atan(d.x, d.z), asin(clamp(d.y, -1.0, 1.0)));
+    vec2 start = vec2((hash(vec2(id, 1.1)) - 0.5) * 1.4, 0.32 + hash(vec2(id, 2.3)) * 0.22);
+    vec2 richtung = normalize(vec2((hash(vec2(id, 5.9)) - 0.5) * 1.6, -0.55));
+    vec2 kopf = start + richtung * tl * 0.55;
+    float lang = 0.16;
+    // Abstand zum Schweif (Strecke von kopf zurueck)
+    vec2 pa = w - kopf;
+    float h = clamp(dot(pa, -richtung) / lang, 0.0, 1.0);
+    float abst = length(pa + richtung * h * lang);
+    float hell = sin(3.1416 * tl / 0.9);
+    float schweif = exp(-abst * abst * 9.0e4) * (1.0 - h) * (1.0 - h);
+    float glut = exp(-dot(pa, pa) * 1.5e5);
+    return vec3(0.85, 0.92, 1.0) * (schweif * 1.6 + glut * 3.0) * hell;
+}
+
 vec3 himmel(vec3 ro, vec3 d, bool mitMond) {
     float h = clamp(d.y, 0.0, 1.0);
     vec3 nacht = mix(vec3(0.02, 0.035, 0.08), vec3(0.002, 0.004, 0.015), pow(h, 0.5));
@@ -79,6 +107,7 @@ vec3 himmel(vec3 ro, vec3 d, bool mitMond) {
     vec3 c = mix(nacht, daemm, morgen);
     c += sterne(d) * (1.0 - morgen) * (1.0 - morgen) * (1.0 + 1.2 * ton);
     c += polarlicht(ro, d) * (1.0 - morgen);
+    if (mitMond) c += sternschnuppe(d) * (1.0 - morgen);
     float m = dot(d, MOND);
     if (mitMond) c += vec3(0.95, 0.95, 1.0) * smoothstep(0.9993, 0.9996, m) * (1.0 - morgen);
     c += vec3(0.22, 0.27, 0.42) * pow(max(m, 0.0), 160.0) * (1.0 - morgen);

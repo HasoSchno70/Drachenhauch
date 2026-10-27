@@ -17,7 +17,11 @@ uniform vec3 farbe;      // Farbe des Akkords
 uniform float aus;       // Szenenwechsel: Licht waechst aus der Mitte (0..1)
 uniform float ein;       // ... und weicht nach aussen (0 = nur Licht, 1 = Szene)
 uniform vec3 uebLicht;   // Farbe des Lichts beim Wechsel
+uniform float guete;     // 1 = volle Qualitaet, kleiner = weniger Schritte (--leicht)
 out vec4 finalColor;
+
+// Guete: ohne gesetzten Wert (0) gilt die volle
+float G() { return guete > 0.0 ? guete : 1.0; }
 
 float hash(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
 float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -103,7 +107,8 @@ void main() {
         sammel += mix(fGas, farbe, 0.3) * leucht * durch * 0.7 * (0.6 + 0.4 * naehe) * (1.0 + 0.4 * kick + 0.7 * ton);
         durch *= 1.0 - dunkel * 0.16 - leucht * 0.04;
         if (durch < 0.02) break;
-        t += 0.22 + t * 0.035;
+        t += (0.22 + t * 0.035) / G();
+        if (float(i) >= 56.0 * G()) break;
     }
     vec3 c = sterne(uv) * durch + sammel;
     // Kern: waechst im Aufstieg, pulsiert leise
