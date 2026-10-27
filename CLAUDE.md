@@ -2878,7 +2878,37 @@ verbraucht. **Falle:** `fragTexCoord.y` zaehlt hier
 nach oben -- kein `uv.y = -uv.y`. Etwa 60 Bilder je Sekunde in 1280x720.
 Tests `tests/pruef/beispiel_nachtflug.dhtest` (7: die WAV mit `--- ton`,
 jede Szene am Bildschirmfoto); ein kaputter Shader und eine Fassung ohne
-Panorama fallen.
+Panorama fallen. **Sechste Runde (2026-10-27, Wunsch des Nutzers):** der
+Rueckweg zur Erde, 148 statt 92 Takte (4:41): Orbit-Breakdown (80..96,
+`erde.fs`: Strahl gegen Kugel, Stadtlichter als Ballungen aus feinem
+Punktraster, Atmosphaerenrand, Sonnenaufgang ueber dem Erdrand), dritter
+Hoehepunkt beim Wiedereintritt (96..112, `eintritt.fs`: Plasma ueber
+Richtung x Abstand -- 3D-Rauschen, darum ohne Naht bei atan), ueber den
+Wolken (112..128, `wolken.fs`: Volumen -- Dichte aus 3D-Rauschen ueber
+groben Feldern, die Luecken lassen; je Schritt zwei Proben zur Sonne. Ein
+Hoehenfeld war erst eine geschlossene Decke, mit Loechern dann Tafelberge
+mit senkrechten Waenden -- der Nutzer: "eine geschlossene Decke"; dazu
+Wildgaense in V-Form, je Gans ein paar Weltstrecken -- Rumpf, Hals, Fluegel
+mit Knick -- ins Bild projiziert, in den Wolkenmarsch eingesetzt, sobald
+der Strahl ihre Tiefe passiert; von der Seite gesehen war das V eine Linie,
+darum ueberholen sie die Kamera und werden von oben gesehen), Kueste
+(128..136, `kueste.fs`: SDF-Klippe mit Saeulen und Baendern, Brandungs-
+felsen, Turm mit Galerie, Waerterhaus, Moewen als Vs im Bild, Lichtkegel
+als Abstand Blickstrahl/Kegelachse, eine Umdrehung in zwei Takten; die
+fernen Landzungen nicht in der Spiegelung, sonst harte Flecken im Wasser),
+Tagesanbruch am Meer. Musik: Akkorde 16..23 = der Morgen in C-Dur (`imMorgen`,
+`morgenMelodie`), das Hauptthema kehrt ueber den Wolken zurueck,
+Schlussakkord C-Dur, vier Saetze der Stimme. Dazu: Schnee faellt jetzt
+(vier Schichten, pendelnd), und die wartenden Funken des Schwarms waren
+sichtbar -- **RGBA nimmt 255 als deckend**, die Rechnung stand umgekehrt.
+**Falle:** ein Shader, der nicht uebersetzt, ist bei raylib nur eine
+WARNING; der Szenenfall faellt trotzdem, weil `shader()` dann abbricht. Im
+Browser (https://hasoschno70.github.io/Nachtflug/, eigenes Repository
+HasoSchno70/Nachtflug) streicht die Seite `SET_FULLSCREEN` aus der Quelle:
+raylib kennt dort die Bildschirmgroesse nicht und setzte den Zeichenpuffer
+auf die Groesse des Monitors -- man sah nur einen Teil des Bildes. Tests
+jetzt 18 (vier Szenen, Laenge, Morgen-Harmonie, wartende Funken mit und ohne
+Schwarm verglichen).
 
 ## Dogfooding 15: Landkarte (2026-10-26)
 

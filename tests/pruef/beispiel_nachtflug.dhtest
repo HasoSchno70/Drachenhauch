@@ -22,12 +22,14 @@ geschrieben:
 --- ton nachtflug.wav
 kanaele 2
 kanaele verschieden
-dauer 176.5 +-0.05
+dauer 281.5 +-0.05
 spitze 0.9 +-0.01
 pegel 0 30000 < 0.5
 pegel 70000 71000 > 0.05
 pegel 95000 96000 > 0.02
-pegel 175600 176400 < 0.005
+pegel 158000 159000 > 0.02
+pegel 190000 191000 > 0.05
+pegel 280600 281400 < 0.005
 
 === intro ozean mit polarlicht
 --- programm ../../examples/nachtflug/main.dh
@@ -195,7 +197,7 @@ IMPORT "pruefen.dh"
 --- erwartet
 nicht schwarz TRUE, nicht weiss TRUE
 
-=== ausklang in der daemmerung
+=== erdaufgang im orbit
 --- programm ../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
 IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
@@ -204,7 +206,139 @@ IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
 --- argumente
 --fenster
 --ab
-86
+90
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== wiedereintritt
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+103
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== ueber den wolken
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+120
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== kueste mit leuchtturm
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+131
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== tagesanbruch auf dem meer
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+141
 --- umgebung
 DHRT_FRAMES=40
 DHRT_SCREENSHOT={fall}/bild.png
@@ -271,6 +405,8 @@ PRINT FORMAT$(tonBei(518), "%.2f"); " "; FORMAT$(tonHoehe, "%.2f")
 PRINT FORMAT$(tonBei(320), "%.2f")
 PRINT FORMAT$(tonBei(32 * 16 + 15 * 16 + 12), "%.2f")
 PRINT melodieAktiv(10); " "; melodieAktiv(20); " "; melodieAktiv(50); " "; melodieAktiv(81)
+' im Wiedereintritt das Morgen-Motiv: es beginnt auf dem C (72)
+PRINT FORMAT$(tonBei(96 * 16), "%.2f"); " "; FORMAT$(tonHoehe, "%.2f")
 --- datei musik_hier.dh
 IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
 --- erwartet
@@ -280,7 +416,8 @@ IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
 1.00 0.36
 0.00
 0.00
-TRUE FALSE TRUE FALSE
+TRUE FALSE TRUE TRUE
+1.00 0.21
 
 === der mitschnitt ist stereo
 ' nur mit Soundkarte: der Mitschnitt nimmt den Mischer auf
@@ -316,12 +453,15 @@ IMPORT "musik_hier.dh"
 PRINT akkordNr(70); " "; akkordNr(72); " "; akkordNr(79)
 PRINT akkTon(0, 0); " "; akkTon(8, 0); " "; grundTon(0); " "; grundTon(8)
 PRINT versatzBei(71); " "; versatzBei(72); " "; versatzBei(90)
+' danach der Morgen in C-Dur (16..23), ueber den Wolken wieder die Nacht
+PRINT akkordNr(80); " "; akkordNr(111); " "; akkordNr(112); " "; akkTon(16, 0); " "; grundTon(16); " "; grundTon(23)
 --- datei musik_hier.dh
 IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
 --- erwartet
 3 12 15
 57 59 33 35
-0 2 2
+0 2 0
+16 23 0 60 36 31
 
 === der lichterschwarm schreibt im abspann
 ' kurz vor dem Ende steht der Schriftzug aus Funken ueber dem Wasser: im
@@ -335,7 +475,7 @@ IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
 --- argumente
 --fenster
 --ab
-89
+145
 --- umgebung
 DHRT_FRAMES=60
 DHRT_SCREENSHOT={fall}/bild.png
@@ -354,6 +494,50 @@ NEXT
 PRINT "schriftzug "; hell > 800
 --- erwartet
 schriftzug TRUE
+
+=== wartende funken sind unsichtbar
+' gleich nach dem Start des Schwarms warten die meisten Funken noch an der
+' Sonne; dort darf nichts zu sehen sein (bis 2026-10-27 war die Deckkraft
+' umgekehrt gerechnet, und die Wartenden bildeten ein helles Viereck).
+' Verglichen wird dasselbe Bild mit und ohne Schwarm, nur um die Sonne.
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+--- ersetzen     IF takt >= AB_AUS THEN schwarmZeichnen(takt, zeit)
+    IF takt >= AB_AUS AND NOT FILEEXISTS(STARTDIR$() + "/ohne") THEN schwarmZeichnen(takt, zeit)
+--- argumente
+--fenster
+--ab
+141
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- zwischen
+RENAME("bild.png", "mit.png")
+WRITEALL("ohne", "1")
+--- nochmal
+--fenster
+--ab
+141
+--- nachher
+DIM a AS INTEGER : a = LOADIMAGE("mit.png")
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM anders AS INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 300 TO 380
+    FOR x = 860 TO 990
+        DIM f AS INTEGER : f = GETPIXEL(a, x, y)
+        DIM g AS INTEGER : g = GETPIXEL(b, x, y)
+        IF ABS(((f SHR 8) BAND 255) - ((g SHR 8) BAND 255)) > 30 THEN anders = anders + 1
+    NEXT
+NEXT
+PRINT "wartende sichtbar "; anders > 20
+--- erwartet
+wartende sichtbar FALSE
 
 === leicht laeuft mit weniger schritten
 ' --leicht nimmt in den Shadern gut die Haelfte der Schritte -- das Bild ist

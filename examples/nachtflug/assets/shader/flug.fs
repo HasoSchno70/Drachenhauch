@@ -185,22 +185,27 @@ void main() {
         // der Fluss scheint durch den Nebel
         c += glut * (fluss * 0.6 + ufer * 0.12) * staerke * 0.35 * exp(-t * 0.012);
     }
-    // Schnee: drei Schichten Flocken, die aus der Ferne auf die Kamera
-    // zufliegen -- jede Schicht waechst, waehrend ihre Flocken naeher kommen,
-    // und blendet am Anfang ein und am Ende aus.
-    for (int k = 0; k < 3; k++) {
-        float tief = fract(time * 0.45 + float(k) / 3.0);
-        float massstab = mix(14.0, 1.6, tief);
-        vec2 q = uv * massstab + vec2(float(k) * 7.3 + time * 0.15, float(k) * 3.1 - time * 0.25);
+    // Schnee: vier Schichten Flocken, die fallen und im Wind tanzen. Ferne
+    // Schichten klein, langsam und blass, nahe gross, schnell und weicher --
+    // daraus entsteht Tiefe. (Bis 2026-10-27 wuchsen die Flocken nur aus der
+    // Mitte heraus; fallen sah man sie nicht.)
+    for (int k = 0; k < 4; k++) {
+        float nah = float(k) / 3.0;                        // 0 fern .. 1 nah
+        float massstab = mix(22.0, 5.0, nah);
+        float fall = mix(0.9, 3.2, nah);                   // Zellen je Sekunde
+        vec2 q = uv * massstab + vec2(float(k) * 7.3 - time * mix(0.25, 0.9, nah),
+                                      float(k) * 3.1 + time * fall);
         vec2 zelle = floor(q);
         float da = hash(zelle + float(k) * 11.0);
-        if (da > 0.55) {
-            vec2 mitte = vec2(hash(zelle + 0.31), hash(zelle + 0.77)) * 0.7 + 0.15;
+        if (da > 0.5) {
+            // pendeln: jede Flocke schaukelt in ihrem eigenen Takt seitwaerts
+            float phase = hash(zelle + 0.53) * 6.2832;
+            vec2 mitte = vec2(hash(zelle + 0.31), hash(zelle + 0.77)) * 0.5 + 0.25;
+            mitte.x += sin(time * (1.3 + hash(zelle + 0.19)) + phase) * 0.18;
             float r = length(fract(q) - mitte);
-            float groesse = 0.05 + 0.08 * tief;
-            float flocke = smoothstep(groesse, groesse * 0.3, r);
-            float blende = smoothstep(0.0, 0.25, tief) * smoothstep(1.0, 0.8, tief);
-            c += vec3(0.75, 0.82, 1.0) * flocke * blende * 0.45;
+            float groesse = mix(0.06, 0.13, nah) * (0.7 + 0.6 * hash(zelle + 0.91));
+            float flocke = smoothstep(groesse, groesse * mix(0.35, 0.05, nah), r);
+            c += vec3(0.75, 0.82, 1.0) * flocke * (0.25 + 0.3 * nah);
         }
     }
     c *= 1.0 - 0.38 * dot(uv * 0.9, uv * 0.9);
