@@ -9,8 +9,13 @@ dhrt run main.dh -- --fenster        # im Fenster
 dhrt run main.dh -- --ab 48          # ab Takt 48 (der Breakdown)
 dhrt run main.dh -- --wav nacht.wav  # nur die Musik als WAV schreiben (trocken, ohne Hall)
 dhrt run main.dh -- --mitschnitt nacht.wav  # abspielen und mitschneiden, wie man es hört
+dhrt run main.dh -- --leicht         # für schwächere Grafikkarten
 dhrt run main.dh -- --messen         # am Ende Bildrate und Spitze im Mischer
 ```
+
+Vor dem Start entstehen alle Klänge (rund drei Sekunden); so lange steht ein
+ruhiges Startbild mit Titel und einer feinen Linie, die sich füllt. Mit
+`DH_OHNE_AUDIO=1` läuft die Demo ohne Ton (so wie in den Prüfungen).
 
 Zum Weitergeben als eigenständiges Programm (der Ordner `assets/shader`
 kommt mit):
@@ -48,8 +53,10 @@ entsteht im Programm (`musik.dh`):
 
 Ablauf: Intro (das Filter öffnet sich), Aufbau, erster Höhepunkt mit der
 Melodie, Breakdown (erst Klavier und Chor allein, dann der Lead leise
-darüber, ein Aufstieg über vier Takte), zweiter Höhepunkt mit der Oktave
-darüber, Ausklang mit dem Klavier. Wo die Bassdrum schweigt, wird der Hall
+darüber, ein Aufstieg über vier Takte), zweiter Höhepunkt -- und in seiner
+zweiten Hälfte die **Rückung**: alles einen Ganzton höher (a-Moll nach
+h-Moll), die Melodie mit der Oktave darüber und eine **Gegenmelodie** in
+halben Noten --, Ausklang mit dem Klavier. Wo die Bassdrum schweigt, wird der Hall
 weiter.
 
 Gespielt wird auf einer **Audio-Uhr**: jedes Bild plant die nächsten
@@ -77,6 +84,13 @@ liegt, je höher der Ton ist), und die **Farbe** geht mit dem Akkord. Die
 Szenen gehen **durch Licht** ineinander über: ein Lichtkreis mit Strahlen
 wächst aus der Mitte, die nächste Szene erscheint, während er nach außen
 weicht.
+
+Dazu kleine Momente: Sternschnuppen über dem Ozean, Schnee im Tiefflug, ein
+Komet mit zwei Schweifen, der durch die Galaxie zieht, ein Blitz auf der
+Rückung -- und im Abspann steigt ein Schwarm aus Funken aus der Sonne auf
+und schreibt „Drachenhauch“ (die Zielpunkte kommen aus dem Schriftzug
+selbst, in ein Render-Ziel geschrieben und mit `RENDERTARGET_IMAGE` als Bild
+abgetastet).
 
 Die Beschriftungen stehen deutsch und darunter englisch.
 

@@ -308,3 +308,82 @@ PRINT "laenger als 4 s "; BUFFER_LEN(w) > BUFFER_GET_U32(w, 28) * 4
 RIFF TRUE
 kanaele 2
 laenger als 4 s TRUE
+
+=== die rueckung hebt das finale um einen ganzton
+' ab Takt 72 meinen die Akkordnummern 8..15 dieselben Akkorde zwei Halbtoene
+' hoeher; die Melodie folgt ueber versatzBei
+IMPORT "musik_hier.dh"
+PRINT akkordNr(70); " "; akkordNr(72); " "; akkordNr(79)
+PRINT akkTon(0, 0); " "; akkTon(8, 0); " "; grundTon(0); " "; grundTon(8)
+PRINT versatzBei(71); " "; versatzBei(72); " "; versatzBei(90)
+--- datei musik_hier.dh
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- erwartet
+3 12 15
+57 59 33 35
+0 2 2
+
+=== der lichterschwarm schreibt im abspann
+' kurz vor dem Ende steht der Schriftzug aus Funken ueber dem Wasser: im
+' Streifen y 520..600 viele helle, warme Punkte (ohne Schwarm liegt dort
+' dunkles Wasser)
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+89
+--- umgebung
+DHRT_FRAMES=60
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- nachher
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM hell AS INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 520 TO 600 STEP 2
+    FOR x = 300 TO 980 STEP 2
+        DIM f AS INTEGER : f = GETPIXEL(b, x, y)
+        IF ((f SHR 16) BAND 255) > 200 AND ((f SHR 8) BAND 255) > 170 THEN hell = hell + 1
+    NEXT
+NEXT
+PRINT "schriftzug "; hell > 800
+--- erwartet
+schriftzug TRUE
+
+=== leicht laeuft mit weniger schritten
+' --leicht nimmt in den Shadern gut die Haelfte der Schritte -- das Bild ist
+' weiter weder schwarz noch weiss
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--leicht
+--ab
+24
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- nachher
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
