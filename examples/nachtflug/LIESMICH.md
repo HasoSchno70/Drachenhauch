@@ -1,7 +1,11 @@
 # Nachtflug
 
-Eine Demo in Drachenhauch von Hans Schnorrenberger: knapp drei Minuten
+Eine Demo in Drachenhauch von Hans Schnorrenberger: gut viereinhalb Minuten
 Musik und Bild aus einem Programm, ohne eine einzige Klang- oder Bilddatei.
+Eine Reise vom nächtlichen Meer über die Berge durch einen Lichttunnel ins
+All -- und wieder heim zur Erde, bis die Sonne über dem Meer aufgeht.
+
+Im Browser: https://hasoschno70.github.io/Nachtflug/
 
 ```
 dhrt run main.dh                     # im Vollbild, von vorn
@@ -13,7 +17,7 @@ dhrt run main.dh -- --leicht         # für schwächere Grafikkarten
 dhrt run main.dh -- --messen         # am Ende Bildrate und Spitze im Mischer
 ```
 
-Vor dem Start entstehen alle Klänge (rund drei Sekunden); so lange steht ein
+Vor dem Start entstehen alle Klänge (rund vier Sekunden); so lange steht ein
 ruhiges Startbild mit Titel und einer feinen Linie, die sich füllt. Mit
 `DH_OHNE_AUDIO=1` läuft die Demo ohne Ton (so wie in den Prüfungen).
 
@@ -28,13 +32,17 @@ ESC beendet, F11 schaltet das Vollbild.
 
 ## Die Musik
 
-Uplifting Trance in a-Moll, 128 Schläge je Minute, 92 Takte. Jeder Klang
-entsteht im Programm (`musik.dh`):
+Uplifting Trance von a-Moll nach C-Dur, 128 Schläge je Minute, 148 Takte
+(4:41). Jeder Klang entsteht im Programm (`musik.dh`):
 
 * **Harmonie** über sechzehn Takte: a-Moll, F, C, G, F, G, e-Moll, a-Moll,
   jeder Akkord mit None oder Sexte -- weich und offen statt nur Dur und Moll.
+  Auf dem Rückweg zur Erde eine eigene, helle Folge in C-Dur: C, G/B,
+  a-Moll7, F-maj7, C/E, G, F, G-sus -- dieselben Töne, aber das Licht liegt
+  jetzt auf dem Dur.
 * **Melodie** über sechzehn Takte in punktierten Vierteln, die sich Phrase
-  um Phrase hinaufschraubt.
+  um Phrase hinaufschraubt, und ein **Morgen-Motiv** in derselben Form, in
+  C-Dur und mit weiteren Bögen.
 * **Supersaw-Lead**: sieben Sägen, auseinander verstimmt und über das
   Panorama verteilt, ein Sinus eine Oktave tiefer, Ping-Pong-Echo.
 * **Klavier** im Intro (angedeutet) und im Breakdown, **Chor** („aah“ aus
@@ -42,8 +50,9 @@ entsteht im Programm (`musik.dh`):
   im zweiten Höhepunkt.
 * **Flächen**, die unter der Bassdrum **pumpen**, und ein **Trance-Gate**,
   das den Akkord in Sechzehntel zerhackt.
-* **Stimme** im Breakdown und im Ausklang: „Schließ die Augen“ und „Flieg
-  mit mir durch die Nacht“, gesprochen von der Sprachausgabe des Systems
+* **Stimme** in den Breakdowns und im Ausklang: „Schließ die Augen“, „Flieg
+  mit mir durch die Nacht“, „Flieg mit mir nach Hause“ und „Der Morgen ist
+  da“, gesprochen von der Sprachausgabe des Systems
   (`SPEAK_SOUND`, unter Windows die Stimme Katja), langsamer, dreifach
   geschichtet und mit langem Echo. Ohne Sprachausgabe bleibt sie weg.
 * **Bassdrum** aus einem fallenden Sinus, **Offbeat-Bass**, **Klatschen**,
@@ -56,8 +65,13 @@ Melodie, Breakdown (erst Klavier und Chor allein, dann der Lead leise
 darüber, ein Aufstieg über vier Takte), zweiter Höhepunkt -- und in seiner
 zweiten Hälfte die **Rückung**: alles einen Ganzton höher (a-Moll nach
 h-Moll), die Melodie mit der Oktave darüber und eine **Gegenmelodie** in
-halben Noten --, Ausklang mit dem Klavier. Wo die Bassdrum schweigt, wird der Hall
-weiter.
+halben Noten. Dann der Rückweg: ein **zweiter Breakdown** im Orbit, in dem
+die Harmonie nach C-Dur aufhellt und das Klavier das Morgen-Motiv spielt,
+ein **dritter Höhepunkt** beim Wiedereintritt mit dem Morgen-Motiv als
+Lead, über den Wolken **kehrt das Hauptthema zurück** (mit Oktave und
+Gegenmelodie), an der Küste klingt der Groove aus, und im Ausklang spielt
+das Klavier allein -- der letzte Akkord ist C-Dur. Wo die Bassdrum
+schweigt, wird der Hall weiter.
 
 Gespielt wird auf einer **Audio-Uhr**: jedes Bild plant die nächsten
 Sechzehntel voraus (und baut nebenbei einen der Klänge, die noch fehlen), die Uhr spielt sie sample-genau -- und die Bilder fragen
@@ -75,7 +89,11 @@ Bus.
 | 32–48 | Lichttunnel aus Neonringen mit weißem Kern, Wände mit Lichtimpulsen, vorbeirasende Funken, ein helles Ziel am Ende; die Farben folgen dem Akkord | `tunnel.fs` |
 | 48–64 | Sternennebel, zum Aufstieg hin schneller und heller | Volumen-Raymarching, `nebel.fs` |
 | 64–80 | Galaxie aus 2.600 Lichtspuren in eigenen Farben, auf jeden Schlag läuft eine Welle nach außen; dahinter kosmische Nebel, das Band einer fernen Milchstraße und drei Schichten Sterne | echte 3D-Szene (`MODEL_INSTANCED`), die leuchtende Scheibe und der Weltraum dahinter rechnet `glanz.fs` mit derselben Kamera |
-| 80–92 | Ozean in der Morgendämmerung, Abspann | wieder `ozean.fs` |
+| 80–96 | Erdaufgang im Orbit: die Erde kommt näher, Stadtlichter an den Küsten unter Wolken, der Rand der Atmosphäre leuchtet von hinten -- am Ende geht die Sonne über dem Erdrand auf | Strahl gegen Kugel, Rauschen auf der Kugel, `erde.fs` |
+| 96–112 | Wiedereintritt: Plasma strömt am Rand nach außen und glüht mit der Bassdrum, Funken fliegen vorbei, unten das Wolkenmeer im ersten Licht | `eintritt.fs` |
+| 112–128 | Über den Wolken: Gleitflug über ein aufgerissenes Wolkenmeer mit einzelnen Türmen, durch die Lücken glitzert tief unten das Meer, der Himmel geht von Violett über Rosa nach Gold | Volumen-Raymarching durch die Wolkenschicht, je Schritt ein Blick zur Sonne (Licht und Schatten), `wolken.fs` |
+| 128–136 | Küste im Morgengrauen: zerklüftete Klippen, Brandungsfelsen, Gischt, ein Leuchtturm mit Galerie, dessen Strahl im Takt kreist, das Haus des Wärters mit erleuchtetem Fenster, Möwen, ferne Landzungen, rosa Wolkenstreifen | Raymarching gegen Felsen, Turm und Haus (SDF), der Lichtkegel im Dunst, `kueste.fs` |
+| 136–148 | Tagesanbruch auf dem Meer, wo alles begann; Abspann | wieder `ozean.fs` |
 
 Was pulsiert, pulsiert mit der Bassdrum; was aufblitzt, blitzt mit der
 **Melodie** (Polarlicht und Mondglitzern, ein Funkenlauf auf dem Fluss, ein
