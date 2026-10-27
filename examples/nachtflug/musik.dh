@@ -457,6 +457,206 @@ FUNCTION lead(midi AS INTEGER, achtel AS INTEGER) AS SOUND
     RETURN merken(k, mitEcho(t, dauer + 600, -0.4, 0.32, 3))
 END FUNCTION
 
+' --- Geraeusche der Reise --------------------------------------------------------
+' Was man auf dem Rueckweg nicht nur sieht: das Grollen beim Wiedereintritt,
+' der Wind ueber den Wolken, die Rufe der Wildgaense, Brandung und Moewen an
+' der Kueste, das Nebelhorn des Leuchtturms. Alles aus Rauschen mit Tiefpass
+' (die SID-Erweiterung von AUDIO_SFX) und ein paar Noten -- leise, unter der
+' Musik.
+
+' Grollen: ein Takt tiefes Rauschen mit Unterbass, darueber ein Fauchen
+FUNCTION grollen() AS SOUND
+    DIM i AS INTEGER : i = gemerkt("grollen")
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM lang AS INTEGER : lang = INT(msJeSchritt() * 16)
+    DIM s AS SOUND : s = AUDIO_SOUND_NEW(lang + 900)
+    dazu(s, AUDIO_SFX("noise", 7000, 0, 350, lang - 600, 800, 0, 0, 1.0, 0.9, 0.5, 0, 0, 420, 0, 0.45), 0, 1.6)
+    dazu(s, AUDIO_SFX("noise", 9000, 0, 500, lang - 800, 700, 0, 0, 0.5, 1.0, 0.5, 0, 0, 1500, 300, 0.2), 0, 0.8)
+    dazu(s, AUDIO_NOTE("sine", 55, lang - 300, 250, 300, 0.9, 600, 0.3, 0.02, 3.1), 0, 1.0)
+    RETURN merken("grollen", s)
+END FUNCTION
+
+' Wind: zwei Takte, ein Rauschen schwillt an und ab, links tiefer als rechts
+FUNCTION wind() AS SOUND
+    DIM i AS INTEGER : i = gemerkt("wind")
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM lang AS INTEGER : lang = INT(msJeSchritt() * 32)
+    DIM s AS SOUND : s = AUDIO_SOUND_NEW(lang + 1500)
+    dazuPan(s, AUDIO_SFX("noise", 9000, 0, 1500, lang - 2700, 1500, 0, 0, 0.8, 0.0, 0.5, 0, 0, 650, 120, 0.25), 0, 1.0, -0.6)
+    dazuPan(s, AUDIO_SFX("noise", 9000, 0, 1900, lang - 3000, 1400, 0, 0, 0.7, 0.0, 0.5, 0, 0, 1500, -200, 0.2), 300, 1.0, 0.6)
+    RETURN merken("wind", s)
+END FUNCTION
+
+' Die Gaense. Eine Graugans ruft nasal und rau, zweisilbig ("a-hank"): erst
+' kurz und tief, dann der laute Teil eine Sexte hoeher, der nach unten kippt.
+' Gebaut wie der Chor: Obertoene der Stimme, gewichtet mit Formanten -- hier
+' eine starke Naesel-Spitze um 1,1 kHz und eine zweite um 2,5 kHz --, alle mit
+' demselben Tonhoehenverlauf und einem schnellen Schnarren (Vibrato mit 60 Hz).
+' Ein einzelner Ruf, Silbe fuer Silbe:
+SUB silbe(ziel AS SOUND, ab AS INTEGER, f0 AS FLOAT, dauer AS INTEGER, gleit AS FLOAT, vol AS FLOAT, pan AS FLOAT)
+    DIM h AS INTEGER
+    FOR h = 1 TO 12
+        DIM fh AS FLOAT : fh = f0 * h
+        IF fh > 4200 THEN EXIT FOR
+        DIM g AS FLOAT
+        g = (0.25 + 2.6 * EXP(-((fh - 1150) / 380) ^ 2) + 1.1 * EXP(-((fh - 2500) / 520) ^ 2)) / SQR(h)
+        dazuPan(ziel, AUDIO_NOTE("sine", fh, dauer, 7, 50, 0.8, 60, vol * g * 0.18, 0.03, 61, 0, gleit), ab, 1.0, pan)
+    NEXT
+    ' der Atem davor
+    dazuPan(ziel, AUDIO_SFX("noise", 9000, 0, 4, 20, 40, 0, 0, vol * 0.25, 0, 0.5, 0, 0, 2400, 0, 0.3), ab, 1.0, pan)
+END SUB
+
+' Ein "a-hank" einer Gans: Tonlage k, Lautstaerke, Ort im Raum; kurz = nur "hank"
+SUB gansRuft(ziel AS SOUND, ab AS INTEGER, k AS FLOAT, vol AS FLOAT, pan AS FLOAT, kurz AS BOOLEAN)
+    IF NOT kurz THEN silbe(ziel, ab, 300 * k, 70, 1.5, vol * 0.6, pan)
+    silbe(ziel, ab + IIF(kurz, 0, 95), 470 * k, 150, -3.0, vol, pan)
+END SUB
+
+' Ein Zug ruft: vier Gaense, unregelmaessig durcheinander, verschieden hoch und
+' verschieden weit weg -- rechts im Raum, wo sie fliegen. nr waehlt eine von
+' vier Fassungen, damit sich der Ruf nicht hoerbar wiederholt.
+FUNCTION gaenseRuf(nr AS INTEGER) AS SOUND
+    DIM k AS STRING : k = "gans" + STR$(nr)
+    DIM i AS INTEGER : i = gemerkt(k)
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM t AS SOUND : t = AUDIO_SOUND_NEW(1900)
+    DIM g AS INTEGER
+    FOR g = 0 TO 3
+        DIM z AS INTEGER : z = (nr * 7 + g * 13) MOD 17
+        DIM ton AS FLOAT : ton = 0.9 + (z MOD 5) * 0.06
+        DIM pan AS FLOAT : pan = 0.15 + g * 0.22
+        DIM weit AS FLOAT : weit = 1.0 - g * 0.17
+        DIM ab AS INTEGER : ab = g * 170 + z * 23
+        gansRuft(t, ab, ton, weit, pan, (z MOD 3) = 0)
+        ' manche rufen gleich noch einmal
+        IF z MOD 2 = 0 THEN gansRuft(t, ab + 420 + z * 9, ton * 1.03, weit * 0.85, pan, TRUE)
+    NEXT
+    RETURN merken(k, mitEcho(t, 1900, 0.5, 0.25, 2))
+END FUNCTION
+
+' Brandung: eine Welle bricht -- erst das tiefe Rauschen, dann die Gischt
+FUNCTION brandung() AS SOUND
+    DIM i AS INTEGER : i = gemerkt("brandung")
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM s AS SOUND : s = AUDIO_SOUND_NEW(4200)
+    dazu(s, AUDIO_SFX("noise", 8000, 0, 600, 500, 2400, 0, 0, 0.8, 0.8, 0.5, 0, 0, 1100, -250, 0.2), 0, 1.0)
+    dazu(s, AUDIO_SFX("noise", 11000, 0, 900, 200, 1800, 0, 0, 0.35, 1.0, 0.5, 0, 0, 5500, -1200, 0.1), 250, 1.0)
+    RETURN merken("brandung", s)
+END FUNCTION
+
+' Moewe: ein heller Ruf, der nach unten kippt ("kjaa"), mit kurzem Nachruf
+FUNCTION moewe(nr AS INTEGER) AS SOUND
+    DIM k AS STRING : k = "moewe" + STR$(nr)
+    DIM i AS INTEGER : i = gemerkt(k)
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM t AS SOUND : t = AUDIO_SOUND_NEW(1200)
+    DIM f AS FLOAT : f = 1450.0 + nr * 130.0
+    dazu(t, AUDIO_SFX("square", f, -900, 12, 150, 110, 0.03, 22, 0.32, 0, 0.18, 0, 0, 3200, -2500, 0.5), 0, 1.0)
+    dazu(t, AUDIO_SFX("square", f * 0.92, -1100, 10, 90, 90, 0.03, 22, 0.25, 0, 0.18, 0, 0, 3000, -2500, 0.5), 300, 1.0)
+    DIM pan AS FLOAT : pan = IIF(nr MOD 2 = 0, 0.55, -0.35)
+    RETURN merken(k, mitEcho(t, 1200, pan, 0.28, 2))
+END FUNCTION
+
+' Nebelhorn: ein tiefer, rauer Ton aus der Ferne, lang ausklingend
+FUNCTION nebelhorn() AS SOUND
+    DIM i AS INTEGER : i = gemerkt("nebelhorn")
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM t AS SOUND : t = AUDIO_SOUND_NEW(4200)
+    dazu(t, AUDIO_SFX("saw", 98, 0, 350, 1700, 900, 0.004, 4.5, 0.7, 0.5, 0.5, 0, 0, 520, 0, 0.35), 0, 1.0)
+    dazu(t, AUDIO_SFX("square", 147, 0, 450, 1550, 900, 0.004, 4.5, 0.4, 0.5, 0.45, 0, 0, 480, 0, 0.3), 0, 1.0)
+    RETURN merken("nebelhorn", mitEcho(t, 4200, 0.4, 0.35, 3))
+END FUNCTION
+
+' Plaetschern: kleine Wellen am naechtlichen Meer, sanft und tief
+FUNCTION plaetschern() AS SOUND
+    DIM i AS INTEGER : i = gemerkt("plaetschern")
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM s AS SOUND : s = AUDIO_SOUND_NEW(3800)
+    dazuPan(s, AUDIO_SFX("noise", 8000, 0, 450, 250, 1300, 0, 0, 0.7, 0.6, 0.5, 0, 0, 520, -120, 0.25), 0, 1.0, -0.4)
+    dazuPan(s, AUDIO_SFX("noise", 8000, 0, 380, 200, 1100, 0, 0, 0.5, 0.6, 0.5, 0, 0, 700, -200, 0.25), 1300, 1.0, 0.45)
+    dazu(s, AUDIO_SFX("noise", 11000, 0, 300, 100, 600, 0, 0, 0.15, 1.0, 0.5, 0, 0, 3500, -1500, 0.1), 1500, 1.0)
+    RETURN merken("plaetschern", s)
+END FUNCTION
+
+' Fahrtwind im Tiefflug: heller und schneller als der Wind ueber den Wolken
+FUNCTION fahrtwind() AS SOUND
+    DIM i AS INTEGER : i = gemerkt("fahrtwind")
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM lang AS INTEGER : lang = INT(msJeSchritt() * 32)
+    DIM s AS SOUND : s = AUDIO_SOUND_NEW(lang + 1200)
+    dazuPan(s, AUDIO_SFX("noise", 9000, 0, 900, lang - 1800, 1100, 0, 0, 0.7, 0.0, 0.5, 0, 0, 1100, 250, 0.3), 0, 1.0, -0.5)
+    dazuPan(s, AUDIO_SFX("noise", 9000, 0, 1200, lang - 2100, 1000, 0, 0, 0.6, 0.0, 0.5, 0, 0, 2200, -300, 0.25), 200, 1.0, 0.5)
+    RETURN merken("fahrtwind", s)
+END FUNCTION
+
+' Ein Ring rauscht im Tunnel vorbei: kurz, der Filter oeffnet sich schnell
+FUNCTION vorbei(rechts AS BOOLEAN) AS SOUND
+    DIM k AS STRING : k = IIF(rechts, "vorbeir", "vorbeil")
+    DIM i AS INTEGER : i = gemerkt(k)
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM s AS SOUND : s = AUDIO_SOUND_NEW(500)
+    dazuPan(s, AUDIO_SFX("noise", 9000, 0, 130, 20, 190, 0, 0, 0.7, 0.0, 0.5, 0, 0, 500, 9000, 0.35), 0, 1.0, IIF(rechts, 0.65, -0.65))
+    RETURN merken(k, s)
+END FUNCTION
+
+' Weltraum: ein tiefes Brummen aus zwei Sinustoenen, die gegeneinander
+' schweben, dazu eine Quinte und ganz leises, dunkles Rauschen -- vier Takte
+FUNCTION weltraum() AS SOUND
+    DIM i AS INTEGER : i = gemerkt("weltraum")
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM lang AS INTEGER : lang = INT(msJeSchritt() * 64)
+    DIM s AS SOUND : s = AUDIO_SOUND_NEW(lang + 2500)
+    dazuPan(s, AUDIO_NOTE("sine", 55.0, lang - 500, 2500, 800, 0.85, 2500, 0.45), 0, 1.0, -0.4)
+    dazuPan(s, AUDIO_NOTE("sine", 55.35, lang - 500, 2500, 800, 0.85, 2500, 0.45), 0, 1.0, 0.4)
+    dazu(s, AUDIO_NOTE("triangle", 110.2, lang - 800, 3000, 800, 0.8, 2500, 0.12, 0.004, 0.2), 0, 1.0)
+    dazu(s, AUDIO_SFX("noise", 6000, 0, 3000, lang - 4000, 2500, 0, 0, 0.3, 1.0, 0.5, 0, 0, 300, 0, 0.4), 0, 1.0)
+    RETURN merken("weltraum", s)
+END FUNCTION
+
+' Der Komet: ein schimmerndes Rauschen zieht vorbei, darueber ein feiner
+' Ton, der nach unten gleitet
+FUNCTION kometenrauschen() AS SOUND
+    DIM i AS INTEGER : i = gemerkt("komet")
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM s AS SOUND : s = AUDIO_SOUND_NEW(5000)
+    dazuPan(s, AUDIO_SFX("noise", 10000, 0, 1600, 300, 2400, 0, 0, 0.55, 1.0, 0.5, 0, 0, 2600, -600, 0.45), 0, 1.0, 0.3)
+    dazuPan(s, AUDIO_NOTE("sine", 1760, 3200, 1400, 600, 0.6, 900, 0.08, 0.006, 5, 9, -12), 0, 1.0, -0.4)
+    RETURN merken("komet", mitEcho(s, 5000, 0.4, 0.3, 2))
+END FUNCTION
+
+' Funkrauschen im Orbit: knisterndes, enges Rauschen und zwei leise
+' Piepser, wie von einem fernen Satelliten
+FUNCTION funk() AS SOUND
+    DIM i AS INTEGER : i = gemerkt("funk")
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM s AS SOUND : s = AUDIO_SOUND_NEW(3600)
+    dazuPan(s, AUDIO_SFX("noise", 2600, 0, 400, 1600, 900, 0.05, 7, 0.35, 0.0, 0.5, 0, 0, 3200, 0, 0.6), 0, 1.0, -0.3)
+    dazuPan(s, AUDIO_NOTE("sine", 1320, 70, 3, 30, 0.7, 40, 0.12), 900, 1.0, 0.5)
+    dazuPan(s, AUDIO_NOTE("sine", 1320, 70, 3, 30, 0.7, 40, 0.12), 1150, 1.0, 0.5)
+    RETURN merken("funk", mitEcho(s, 3600, -0.3, 0.3, 2))
+END FUNCTION
+
+' In kleinen Schritten bauen (vorbauen ruft einen je Bild): der Gaenseruf
+' allein sind ein paar hundert Noten.
+CONST GERAEUSCHE = 12
+SUB geraeuschBauen(nr AS INTEGER)
+    SELECT CASE nr
+        CASE 0 : grollen()
+        CASE 1 : wind()
+        CASE 2 : brandung()
+        CASE 3 : nebelhorn()
+        CASE 4, 5, 6, 7 : gaenseRuf(nr - 4)
+        CASE 8
+            DIM m AS INTEGER
+            FOR m = 0 TO 3
+                moewe(m)
+            NEXT
+        CASE 9 : plaetschern() : fahrtwind()
+        CASE 10 : vorbei(TRUE) : vorbei(FALSE) : funk()
+        CASE 11 : weltraum() : kometenrauschen()
+    END SELECT
+END SUB
+
 ' --- Stimme --------------------------------------------------------------------
 ' Zwei Saetze, gesprochen von der Sprachausgabe des Systems (SPEAK_SOUND) und
 ' hier zur Trance-Stimme gemacht: langsamer, dreifach geschichtet (die beiden
@@ -704,6 +904,49 @@ SUB schrittPlanen(n AS INTEGER)
         spielen(glocke(akkTon(nr, n MOD 4) + 24), n, 0.45 * laut + 0.1)
     END IF
 
+    ' --- Geraeusche --- je Szene etwas, leise unter der Musik
+    ' Intro: das Meer plaetschert, ab und zu ein Hauch Wind
+    IF s = 0 AND takt < AB_AUFBAU AND takt MOD 2 = 0 THEN spielen(plaetschern(), n, 0.3 * MIN(1.0, (takt + 1) / 3.0))
+    IF s = 8 AND takt >= 2 AND takt < AB_AUFBAU AND takt MOD 4 = 2 THEN spielen(wind(), n, 0.14)
+    ' Tiefflug: Fahrtwind
+    IF s = 0 AND takt >= AB_AUFBAU AND takt < AB_HOCH1 AND takt MOD 2 = 0 THEN spielen(fahrtwind(), n, 0.24)
+    ' Tunnel: auf jede Viertel rauscht ein Ring vorbei, abwechselnd links und rechts
+    IF takt >= AB_HOCH1 AND takt < AB_PAUSE AND s MOD 4 = 0 THEN spielen(vorbei((s \ 4) MOD 2 = 1), n, 0.17)
+    ' Sternennebel, Galaxie und Orbit: das Brummen des Weltraums
+    IF s = 0 AND takt >= AB_PAUSE AND takt < AB_EINTRITT AND (takt - AB_PAUSE) MOD 4 = 0 THEN
+        spielen(weltraum(), n, IIF(takt < AB_HOCH2 OR takt >= AB_ORBIT, 0.32, 0.18))
+    END IF
+    ' Galaxie: der Komet zieht vorbei
+    IF s = 4 AND (takt = AB_HOCH2 + 2 OR takt = AB_HOCH2 + 9 OR takt = AB_HOCH2 + 13) THEN spielen(kometenrauschen(), n, 0.3)
+    ' Orbit: Funkrauschen von fern
+    IF s = 2 AND (takt = AB_ORBIT + 3 OR takt = AB_ORBIT + 7 OR takt = AB_ORBIT + 12) THEN spielen(funk(), n, 0.22)
+    ' Rueckweg: je Takt auf der Eins, die Rufe dazwischen
+    IF s = 0 AND takt >= AB_EINTRITT AND takt < AB_WOLKEN - 2 THEN
+        ' das Grollen schwillt an, bis das Plasma am staerksten ist, und
+        ' verebbt, wenn es verlischt
+        DIM gt AS FLOAT : gt = takt - AB_EINTRITT
+        spielen(grollen(), n, 0.32 * MIN(1.0, (gt + 1) / 4.0) * MIN(1.0, (13 - gt) / 4.0))
+    END IF
+    IF s = 0 AND takt >= AB_WOLKEN AND takt < AB_KUESTE AND (takt - AB_WOLKEN) MOD 2 = 0 THEN
+        spielen(wind(), n, 0.3)
+    END IF
+    ' die Gaense rufen, waehrend der Zug zu sehen ist
+    SELECT CASE takt - AB_WOLKEN
+        CASE 2, 5, 8, 11, 14
+            IF s = 6 THEN spielen(gaenseRuf((takt - AB_WOLKEN) MOD 4), n, 0.5)
+        CASE 6, 12
+            IF s = 13 THEN spielen(gaenseRuf((takt - AB_WOLKEN + 1) MOD 4), n, 0.4)
+    END SELECT
+    ' Kueste und Morgen: Brandung alle zwei Takte, am Morgen leiser
+    IF s = 0 AND takt >= AB_KUESTE AND takt < TAKTE - 1 AND (takt - AB_KUESTE) MOD 2 = 0 THEN
+        spielen(brandung(), n, IIF(takt < AB_AUS, 0.4, 0.3 * laut + 0.08))
+    END IF
+    IF s = 0 AND (takt = AB_KUESTE + 2 OR takt = AB_KUESTE + 6) THEN spielen(nebelhorn(), n, 0.45)
+    IF (takt = AB_KUESTE + 1 AND s = 8) OR (takt = AB_KUESTE + 3 AND s = 4) OR (takt = AB_KUESTE + 5 AND s = 12) _
+        OR (takt = AB_AUS + 3 AND s = 6) OR (takt = AB_AUS + 7 AND s = 10) THEN
+        spielen(moewe((takt + s) MOD 4), n, 0.4)
+    END IF
+
     ' --- Uebergaenge --- Aufstieg vor jedem Hoehepunkt (vor dem zweiten und
     ' dritten ueber vier Takte), Wirbel davor, Becken auf der Eins
     IF s = 0 AND (takt = AB_AUFBAU - 2 OR takt = AB_HOCH1 - 2) THEN spielen(aufstieg(2), n, 0.55)
@@ -775,7 +1018,7 @@ DIM bauStand AS INTEGER
 ' 0..7 die Nacht, 8..15 nach der Rueckung, 16..23 der Morgen
 CONST AKKORDE = 24
 FUNCTION bauGesamt() AS INTEGER
-    RETURN AKKORDE * 4 + AKKORDE + LEN(saetze) + AKKORDE * 6 + 2 + LEN(melodie) + LEN(morgenMelodie) + LEN(gegen)
+    RETURN AKKORDE * 4 + AKKORDE + LEN(saetze) + AKKORDE * 6 + 2 + GERAEUSCHE + LEN(melodie) + LEN(morgenMelodie) + LEN(gegen)
 END FUNCTION
 
 FUNCTION vorbauen() AS BOOLEAN
@@ -815,7 +1058,11 @@ FUNCTION vorbauen() AS BOOLEAN
         aufstieg(1) : aufstieg(2) : aufstieg(4)
         RETURN TRUE
     END IF
-    i = i - 2
+    IF i >= 2 AND i < 2 + GERAEUSCHE THEN
+        geraeuschBauen(i - 2)
+        RETURN TRUE
+    END IF
+    i = i - 2 - GERAEUSCHE
     IF i < LEN(melodie) THEN
         DIM m AS INTEGER : m = melodie[i]
         IF m > 0 THEN

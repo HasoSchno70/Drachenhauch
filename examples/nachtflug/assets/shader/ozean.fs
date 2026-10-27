@@ -1,6 +1,7 @@
 #version 330
 // Ozean bei Nacht: Sterne, Mond, Polarlicht ueber ruhigem Wasser, das den
 // Himmel spiegelt. `morgen` (0..1) faerbt den Himmel zur Daemmerung (Abspann),
+// `aufgang` (0..1) laesst danach die Sonne ueber den Horizont steigen,
 // `licht` (0..1) laesst das Polarlicht aufleben. Text und Zeichnungen der Demo
 // liegen in texture0 und werden obenauf gelegt.
 in vec2 fragTexCoord;
@@ -10,6 +11,7 @@ uniform float time;
 uniform float hell;      // Blende: 0 schwarz .. 1 voll
 uniform float licht;     // Polarlicht
 uniform float morgen;    // Daemmerung
+uniform float aufgang;   // Sonnenaufgang: 0 = am Horizont, 1 = eine Handbreit darueber
 uniform float kick;      // Huellkurve der Bassdrum
 uniform float ton;       // Melodie: 1 auf dem Anschlag, klingt ab
 uniform float hoehe;     // wie hoch der Melodieton liegt, 0..1
@@ -24,7 +26,9 @@ out vec4 finalColor;
 float G() { return guete > 0.0 ? guete : 1.0; }
 
 const vec3 MOND = vec3(-0.4067, 0.2892, 0.8667);   // normalize(-0.45, 0.32, 1.0)
-const vec3 SONNE = vec3(0.4472, 0.0179, 0.8943);
+// Die Sonne steigt mit `aufgang` (gesetzt am Anfang von main). main.dh rechnet
+// dieselbe Richtung und Kamera nach, damit der Funkenschwarm aus ihr aufsteigt.
+vec3 SONNE;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float rausch(vec2 p) {
@@ -111,8 +115,15 @@ vec3 himmel(vec3 ro, vec3 d, bool mitMond) {
     float m = dot(d, MOND);
     if (mitMond) c += vec3(0.95, 0.95, 1.0) * smoothstep(0.9993, 0.9996, m) * (1.0 - morgen);
     c += vec3(0.22, 0.27, 0.42) * pow(max(m, 0.0), 160.0) * (1.0 - morgen);
-    c += vec3(1.0, 0.65, 0.35) * pow(max(dot(d, SONNE), 0.0), 30.0) * morgen * 1.8;
+    c += vec3(1.0, 0.65, 0.35) * pow(max(dot(d, SONNE), 0.0), 30.0) * morgen * (1.8 + 1.2 * aufgang);
     c += vec3(1.0, 0.85, 0.6) * pow(max(dot(d, SONNE), 0.0), 600.0) * morgen * 3.0;
+    // Tag: der Himmel wird heller, am Horizont golden, oben ein klares Blau --
+    // und die Sonnenscheibe selbst, sobald sie ueber dem Horizont steht
+    vec3 tag = mix(vec3(1.0, 0.78, 0.52), vec3(0.30, 0.48, 0.82), smoothstep(0.0, 0.45, h));
+    c = mix(c, tag, aufgang * 0.55);
+    float sd = dot(d, SONNE);
+    c += vec3(1.0, 0.94, 0.82) * smoothstep(0.99955, 0.9997, sd) * 6.0 * aufgang;
+    c += vec3(1.0, 0.75, 0.45) * pow(max(sd, 0.0), 120.0) * 1.2 * aufgang;
     return c;
 }
 
@@ -145,6 +156,7 @@ vec3 uebergang(vec3 c, vec2 uv) {
 }
 
 void main() {
+    SONNE = normalize(vec3(0.7, mix(0.012, 0.085, aufgang), 0.8943));
     vec2 uv = (fragTexCoord * resolution - 0.5 * resolution) / resolution.y;
     // Kamera: knapp ueber dem Wasser, gleitet langsam voran, blickt leicht nach oben
     vec3 ro = vec3(time * 0.4, 1.6, time * 1.2);
@@ -174,11 +186,12 @@ void main() {
         vec3 rd = reflect(d, n);
         rd.y = abs(rd.y);
         float fres = 0.04 + 0.96 * pow(1.0 - max(dot(n, -d), 0.0), 5.0);
-        c = mix(vec3(0.004, 0.012, 0.02), himmel(ro, rd, false), fres);
+        c = mix(mix(vec3(0.004, 0.012, 0.02), vec3(0.03, 0.06, 0.1), aufgang), himmel(ro, rd, false), fres);
         // Glitzerbahn: Mond und Sonne spiegeln sich in vielen kleinen Wellen
         float glitz = pow(max(dot(rd, MOND), 0.0), 900.0) * (1.0 - morgen);
-        float sglitz = pow(max(dot(rd, SONNE), 0.0), 400.0) * morgen;
-        c += vec3(0.85, 0.9, 1.0) * glitz * (3.0 + 4.0 * ton) + vec3(1.0, 0.7, 0.4) * sglitz * 3.0;
+        // die Glitzerbahn der Sonne wird mit dem Aufgang breiter und goldener
+        float sglitz = pow(max(dot(rd, SONNE), 0.0), mix(400.0, 110.0, aufgang)) * morgen;
+        c += vec3(0.85, 0.9, 1.0) * glitz * (3.0 + 4.0 * ton) + vec3(1.0, 0.72, 0.38) * sglitz * (3.0 + 3.0 * aufgang);
         // Nebel zum Horizont
         c = mix(c, himmel(ro, normalize(vec3(d.x, 0.0, d.z)), false), smoothstep(40.0, 160.0, t));
     }
