@@ -75,9 +75,10 @@ DIM shGlanz AS INTEGER : shGlanz = shader("glanz")
 ' --- Galaxie (Szene 5): Lichtspuren auf Umlaufbahnen ---------------------------
 ' Jeder Stern ist ein langgezogener, duenner Quader entlang seiner Bahn --
 ' mit dem Glanz-Shader darueber wird daraus eine Lichtspur wie auf einer
-' Langzeitbelichtung. Alle in EINEM Aufruf (MODEL_INSTANCED); die Laufzeit
-' zeichnet je verschiedener Farbe einmal, darum stufen die Farben in eine
-' kleine Tafel (6 Toene x 4 Helligkeiten). Dahinter rechnet der Shader die
+' Langzeitbelichtung. Alle in EINEM Aufruf (MODEL_INSTANCED), jede Spur in
+' ihrer eigenen Farbe: der Kern von Weiss nach Gold, die Arme von Blau ueber
+' Tuerkis nach Violett, rosa Knoten, wo Sterne entstehen -- dazu ein Hauch der
+' Akkordfarbe und so hell, wie Welle und Melodie es gerade wollen. Dahinter rechnet der Shader die
 ' leuchtende Scheibe mit Spiralarmen und Staubbahnen (glanz.fs) -- mit
 ' derselben Kamera und derselben Drehung, damit beides deckungsgleich ist.
 ' Auf jeden Schlag laeuft eine Welle von innen nach aussen: die Spuren, die
@@ -88,19 +89,12 @@ DIM gR[STERNE] AS FLOAT       ' Abstand zur Mitte
 DIM gW[STERNE] AS FLOAT       ' Winkel
 DIM gH[STERNE] AS FLOAT       ' Hoehe ueber der Scheibe
 DIM gD[STERNE] AS FLOAT       ' Dicke
-DIM gTon[STERNE] AS INTEGER   ' Farbton 0..5
+DIM gFR[STERNE] AS FLOAT      ' Grundfarbe der Spur, 0..1
+DIM gFG[STERNE] AS FLOAT
+DIM gFB[STERNE] AS FLOAT
 DIM gMat[STERNE] AS MAT4
 DIM gFarbe[STERNE] AS INTEGER
-DIM tafel[24] AS INTEGER
-' Farbtoene: Kern warm, Arme blau, tuerkis, violett, rosa (Sternentstehung)
-DIM tonR AS ARRAY OF INTEGER : tonR = [255, 255, 120, 110, 190, 255]
-DIM tonG AS ARRAY OF INTEGER : tonG = [225, 190, 165, 245, 130, 140]
-DIM tonB AS ARRAY OF INTEGER : tonB = [170, 120, 255, 235, 255, 210]
 DIM gi AS INTEGER
-FOR gi = 0 TO 23
-    DIM st AS FLOAT : st = 0.55 + 0.3 * (gi MOD 4)
-    tafel[gi] = RGB(MIN(255, INT(tonR[gi \ 4] * st)), MIN(255, INT(tonG[gi \ 4] * st)), MIN(255, INT(tonB[gi \ 4] * st)))
-NEXT
 RANDOMIZE(7)
 FOR gi = 0 TO STERNE - 1
     DIM arm AS INTEGER : arm = gi MOD 2
@@ -115,14 +109,29 @@ FOR gi = 0 TO STERNE - 1
     gW[gi] = arm * PI + r * 0.22 + (RND() - 0.5) * (0.35 + 4.0 / (r + 2.0)) + (RND() - 0.5) * 0.25
     gH[gi] = (RND() - 0.5) * 2.0 * (0.25 + 1.6 * EXP(-r * 0.25))
     gD[gi] = 0.022 + RND() ^ 4 * 0.07
-    DIM ton AS INTEGER
+    ' Grundfarbe: im Kern von Weiss nach Gold, auf den Armen ein Verlauf von
+    ' Blau ueber Tuerkis nach Violett (mit etwas Streuung), dazwischen rosa
+    DIM k AS FLOAT
     IF r < 6 THEN
-        ton = IIF(RND() < 0.7, 0, 1)
+        k = CLAMP(r / 6.0 + (RND() - 0.5) * 0.3, 0.0, 1.0)
+        gFR[gi] = 1.0
+        gFG[gi] = 0.92 - 0.2 * k
+        gFB[gi] = 0.8 - 0.42 * k
     ELSE
-        ton = 2 + INT(RND() * 3)
-        IF RND() < 0.12 THEN ton = 5
+        k = CLAMP((r - 6.0) / 29.0 + (RND() - 0.5) * 0.35, 0.0, 1.0)
+        IF k < 0.5 THEN
+            gFR[gi] = 0.42 - 0.04 * k * 2.0
+            gFG[gi] = 0.62 + 0.33 * k * 2.0
+            gFB[gi] = 1.0 - 0.08 * k * 2.0
+        ELSE
+            gFR[gi] = 0.38 + 0.4 * (k - 0.5) * 2.0
+            gFG[gi] = 0.95 - 0.47 * (k - 0.5) * 2.0
+            gFB[gi] = 0.92 + 0.08 * (k - 0.5) * 2.0
+        END IF
+        IF RND() < 0.12 THEN
+            gFR[gi] = 1.0 : gFG[gi] = 0.5 + RND() * 0.15 : gFB[gi] = 0.78
+        END IF
     END IF
-    gTon[gi] = ton
 NEXT
 
 ' Die Kamera der Galaxie -- main und Shader brauchen dieselbe
@@ -164,8 +173,13 @@ SUB galaxieZeichnen(zeit AS FLOAT, kick AS FLOAT, fort AS FLOAT, takt AS FLOAT, 
         DIM lang AS FLOAT : lang = 0.25 + umlauf(r) * r * 2.6 * (1.0 + 0.6 * hub)
         DIM d AS FLOAT : d = gD[i] * (1.0 + hub)
         gMat[i] = MAT4_MUL(MAT4_TRANSLATE(COS(w) * r, gH[i] + hub * 1.2, SIN(w) * r), MAT4_MUL(MAT4_ROTATE_Y(-w), MAT4_SCALE(d, d, lang)))
-        ' der Kern ist dicht, dort reicht die dunkelste Stufe -- sonst nur ein weisser Fleck
-        gFarbe[i] = tafel[gTon[i] * 4 + MIN(3, INT(IIF(r < 6.0, 0.0, 1.0) + hub * 3.0))]
+        ' der Kern ist dicht, dort bleibt es dunkler -- sonst nur ein weisser Fleck;
+        ' auf den Armen ein Hauch der Akkordfarbe
+        DIM stufe AS FLOAT : stufe = MIN(1.6, IIF(r < 6.0, 0.5, 0.75) + hub * 0.9)
+        DIM akk AS FLOAT : akk = IIF(r < 6.0, 0.0, 0.25)
+        gFarbe[i] = RGB(MIN(255, INT(((1.0 - akk) * gFR[i] + akk * farbeR) * stufe * 255.0)), _
+                        MIN(255, INT(((1.0 - akk) * gFG[i] + akk * farbeG) * stufe * 255.0)), _
+                        MIN(255, INT(((1.0 - akk) * gFB[i] + akk * farbeB) * stufe * 255.0)))
     NEXT
     MODEL_INSTANCED(spur, gMat, gFarbe)
 END SUB
