@@ -2591,6 +2591,22 @@ fn waveform_value(kind: &str, freq: f64, t: f64) -> f64 {
     }
 }
 
+/// Die Wellenform einer Note, einmal aus dem Text entschieden.
+#[derive(Clone, Copy)]
+enum Welle { Sinus, Rechteck, Saege, Dreieck, Stumm }
+
+impl Welle {
+    fn von(kind: &str) -> Welle {
+        match kind {
+            "sine" => Welle::Sinus,
+            "square" => Welle::Rechteck,
+            "saw" => Welle::Saege,
+            "triangle" => Welle::Dreieck,
+            _ => Welle::Stumm,
+        }
+    }
+}
+
 fn phase_value(kind: &str, phase: f64) -> f64 {
     let ph = phase / (2.0 * PI64);
     match kind {
@@ -2674,25 +2690,90 @@ fn build_note_buffer(wf: &str, freq: f64, dauer_ms: i64, attack_ms: i64, decay_m
         // Zwei Phasen-Akkumulatoren (Grundton + Detune-Schicht): bei einem
         // Slide aendert sich die Frequenz, und `waveform_value(freq, t)`
         // ohne Akkumulator spraenge dann in der Phase.
+        //
+        // Tempo (gemessen: 50 Sinusnoten zu 5,5 s brauchten 211 ms mit
+        // Vibrato, 102 ohne): die Wellenform wird EINMAL entschieden statt je
+        // Wert als Text verglichen; die Phase zaehlt in Umdrehungen (0..1),
+        // damit Saege, Dreieck und Rechteck ohne Sinus auskommen; der Sinus
+        // ist ein Zeiger, der je Wert um den Schritt weitergedreht und alle
+        // NEU_AB Werte exakt neu gesetzt wird (sonst liefe die Rundung davon).
+        // Vibrato und Slide laufen ebenso als Zeiger bzw. Faktor weiter.
+        // Aendert sich die Frequenz (Vibrato, Slide), wird der Dreh-Schritt
+        // alle SCHRITT_AB Werte neu gerechnet -- die Abweichung bleibt unter
+        // 1e-4, weit unter allem, was man hoert.
+        const NEU_AB: usize = 64;
+        const SCHRITT_AB: usize = 8;
+        let welle = Welle::von(wf);
         let layers = if detune_cents > 0.0 { 2 } else { 1 };
         let f2 = freq * 2f64.powf(detune_cents / 1200.0);
+        let basis = [freq, f2];
         let mut phase = [0.0f64; 2];
+        let mut zeiger = [(1.0f64, 0.0f64); 2];   // (cos, sin) der Phase
+        let mut dreh = [(1.0f64, 0.0f64); 2];     // (cos, sin) des Schritts
         let ziel = 2f64.powf(slide_halbtoene / 12.0);
+        let mit_vib = vib_depth > 0.0 && vib_speed > 0.0;
+        let variiert = mit_vib || slide_halbtoene != 0.0;
+        let vw = 2.0 * PI64 * vib_speed / srf;
+        let (vc, vs) = (vw.cos(), vw.sin());
+        let (mut vsin, mut vcos) = (0.0f64, 1.0f64);
+        let gschritt = if slide_halbtoene != 0.0 { ziel.powf(1.0 / n_hold as f64) } else { 1.0 };
+        let mut glide = 1.0f64;
+        let nyquist = srf / 2.0;
+        let zwei_pi = 2.0 * PI64;
         for (i, out) in buf.iter_mut().enumerate() {
-            let t = i as f64 / srf;
-            let glide = if slide_halbtoene != 0.0 {
-                ziel.powf((i.min(n_hold) as f64 / n_hold as f64).min(1.0))
-            } else { 1.0 };
-            let vib = if vib_depth > 0.0 && vib_speed > 0.0 {
-                1.0 + vib_depth * (2.0 * PI64 * vib_speed * t).sin()
-            } else { 1.0 };
+            if i % NEU_AB == 0 {
+                if mit_vib {
+                    let a = vw * i as f64;
+                    vsin = a.sin();
+                    vcos = a.cos();
+                }
+                if slide_halbtoene != 0.0 {
+                    glide = ziel.powf((i.min(n_hold) as f64 / n_hold as f64).min(1.0));
+                }
+            }
+            let vib = if mit_vib { 1.0 + vib_depth * vsin } else { 1.0 };
             let mut v = 0.0;
-            for (k, base) in [freq, f2].iter().enumerate().take(layers) {
-                let f = (base * glide * vib).clamp(1.0, srf / 2.0);
-                phase[k] += 2.0 * PI64 * f / srf;
-                v += phase_value(wf, phase[k]);
+            for k in 0..layers {
+                let schritt = (basis[k] * glide * vib).clamp(1.0, nyquist) / srf;
+                let mut p = phase[k] + schritt;
+                if p >= 1.0 { p -= 1.0; }
+                phase[k] = p;
+                v += match welle {
+                    Welle::Sinus => {
+                        if i % NEU_AB == 0 {
+                            let a = zwei_pi * p;
+                            zeiger[k] = (a.cos(), a.sin());
+                            let b = zwei_pi * schritt;
+                            dreh[k] = (b.cos(), b.sin());
+                        } else {
+                            if variiert && i % SCHRITT_AB == 0 {
+                                let b = zwei_pi * schritt;
+                                dreh[k] = (b.cos(), b.sin());
+                            }
+                            let (c, s) = zeiger[k];
+                            let (dc, ds) = dreh[k];
+                            zeiger[k] = (c * dc - s * ds, s * dc + c * ds);
+                        }
+                        zeiger[k].1
+                    }
+                    Welle::Rechteck => if p < 0.5 { 1.0 } else { -1.0 },
+                    Welle::Saege => if p < 0.5 { 2.0 * p } else { 2.0 * p - 2.0 },
+                    Welle::Dreieck => {
+                        let sg = if p < 0.5 { 2.0 * p } else { 2.0 * p - 2.0 };
+                        2.0 * sg.abs() - 1.0
+                    }
+                    Welle::Stumm => 0.0,
+                };
             }
             *out = v / layers as f64;
+            if mit_vib {
+                let ns = vsin * vc + vcos * vs;
+                vcos = vcos * vc - vsin * vs;
+                vsin = ns;
+            }
+            if slide_halbtoene != 0.0 && i < n_hold {
+                glide *= gschritt;
+            }
         }
     }
     huellkurve_n(&mut buf, n_hold, na, nd, sustain);
@@ -2887,7 +2968,7 @@ fn lofi_chain(buf: &mut [f64], sr: u32, bits: u32, cutoff: f64) {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_note_buffer, build_sfx_buffer, db, lofi_chain, pendulum_pos, resample,
+    use super::{build_note_buffer, huellkurve_n, phase_value, PI64, build_sfx_buffer, db, lofi_chain, pendulum_pos, resample,
                 svf_lowpass, Decibels, FadeCurve, SidFx, yaw_quat,
                 LoopArt, loop_falten, sample_stimme, pcm16_zu_float, huellkurve};
     use kira::Tweenable;
@@ -3188,6 +3269,69 @@ mod tests {
         };
         assert!((hz(0, 800) - 100.0).abs() < 15.0, "{}", hz(0, 800));
         assert!((hz(7200, 8000) - 200.0).abs() < 15.0, "{}", hz(7200, 8000));
+    }
+
+    /// Die schnelle Fassung von build_note_buffer liefert dieselben Werte
+    /// wie die alte (Text je Wert, Phase unbegrenzt, Sinus, Vibrato und
+    /// Slide je Wert exakt) -- bis auf 1e-4 (mit Vibrato oder Slide wird der
+    /// Dreh-Schritt nur alle 8 Werte neu gerechnet), ohne beides bis auf
+    /// Rundung (1e-7). An der Sprungstelle von Saege und Rechteck kann ein
+    /// einzelner Wert auf die andere Seite kippen; das duerfen hoechstens
+    /// ganz wenige sein.
+    #[test]
+    fn schnelle_note_gleicht_der_alten() {
+        fn alt(wf: &str, freq: f64, dauer_ms: i64, a: i64, d: i64, sus: f64, r: i64,
+               vd: f64, vs: f64, det: f64, sl: f64, sr: u32) -> Vec<f64> {
+            let srf = sr as f64;
+            let n_hold = ((srf * dauer_ms as f64 / 1000.0) as usize).max(1);
+            let nr = (srf * r as f64 / 1000.0) as usize;
+            let n = n_hold + nr;
+            let na = ((srf * a as f64 / 1000.0) as usize).min(n_hold);
+            let nd = ((srf * d as f64 / 1000.0) as usize).min(n_hold - na);
+            let mut buf = vec![0.0f64; n];
+            let layers = if det > 0.0 { 2 } else { 1 };
+            let f2 = freq * 2f64.powf(det / 1200.0);
+            let mut phase = [0.0f64; 2];
+            let ziel = 2f64.powf(sl / 12.0);
+            for (i, out) in buf.iter_mut().enumerate() {
+                let t = i as f64 / srf;
+                let glide = if sl != 0.0 { ziel.powf((i.min(n_hold) as f64 / n_hold as f64).min(1.0)) } else { 1.0 };
+                let vib = if vd > 0.0 && vs > 0.0 { 1.0 + vd * (2.0 * PI64 * vs * t).sin() } else { 1.0 };
+                let mut v = 0.0;
+                for (k, base) in [freq, f2].iter().enumerate().take(layers) {
+                    let f = (base * glide * vib).clamp(1.0, srf / 2.0);
+                    phase[k] += 2.0 * PI64 * f / srf;
+                    v += phase_value(wf, phase[k]);
+                }
+                *out = v / layers as f64;
+            }
+            huellkurve_n(&mut buf, n_hold, na, nd, sus.clamp(0.0, 1.0));
+            buf
+        }
+        let faelle: [(&str, f64, f64, f64, f64, f64); 7] = [
+            ("sine", 440.0, 0.0, 0.0, 0.0, 0.0),
+            ("sine", 220.0, 0.0045, 4.3, 7.0, 0.0),
+            ("saw", 110.0, 0.0, 0.0, 9.0, 0.0),
+            ("saw", 523.25, 0.003, 5.0, 0.0, 12.0),
+            ("square", 82.4, 0.0, 0.0, 11.0, -7.0),
+            ("triangle", 1046.5, 0.01, 6.0, 0.0, 0.0),
+            ("sine", 57.0, 0.0, 0.0, 0.0, 24.0),
+        ];
+        for (wf, f, vd, vs, det, sl) in faelle {
+            let neu = build_note_buffer(wf, f, 3550, 30, 600, 0.7, 900, vd, vs, det, sl, 44100);
+            let ref_ = alt(wf, f, 3550, 30, 600, 0.7, 900, vd, vs, det, sl, 44100);
+            assert_eq!(neu.len(), ref_.len());
+            let gross = neu.iter().zip(&ref_).filter(|(a, b)| (*a - *b).abs() > 1e-4).count();
+            // an der Sprungstelle der Saege rutscht der Sprung um einen Wert, wenn
+            // beide Fassungen die Umdrehung verschieden runden: hoechstens 0,1 %
+            assert!(gross * 1000 < neu.len(), "{} {}: {} Werte weichen ab", wf, f, gross);
+            // ohne Vibrato und Slide ist der Zeiger genauer: dort 1e-7 (die alte
+            // Fassung verliert mit der wachsenden Phase selbst schon 1e-8)
+            if vd == 0.0 && sl == 0.0 && wf == "sine" {
+                let m = neu.iter().zip(&ref_).map(|(a, b)| (a - b).abs()).fold(0.0f64, f64::max);
+                assert!(m < 1e-7, "{} {}: {}", wf, f, m);
+            }
+        }
     }
 
 }

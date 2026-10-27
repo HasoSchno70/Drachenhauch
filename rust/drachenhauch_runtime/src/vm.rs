@@ -10625,14 +10625,9 @@ impl<'p> Vm<'p> {
                 };
                 let handle = gi(a, 0, "MODEL_INSTANCED")?;
                 // tint darf eine Farbe ODER ein ARRAY OF INTEGER sein (eine Farbe
-                // je Matrix). Der Instancing-Shader kennt nur EINE Farbe pro
-                // Draw-Call -- raylibs DrawMeshInstanced uebertraegt nur die
-                // Matrizen, keine Farb-Attribute. Deshalb wird hier nach Farben
-                // GRUPPIERT: ein Draw-Call je verschiedener Farbe, nicht je
-                // Instanz. Wer drei Farben nutzt, bekommt drei Draw-Calls fuer
-                // beliebig viele Wuerfel; wer 1600 verschiedene nutzt, bekommt
-                // 1600 -- dann ist die Gruppierung sinnlos und ein Farbverlauf
-                // im Shader die bessere Antwort.
+                // je Matrix). Die Farbe je Instanz reist in der untersten Zeile
+                // der Matrix mit (graphics.rs, INST_VS) -- EIN Zeichenaufruf,
+                // egal wie viele Farben.
                 match a.get(2) {
                     Some(Value::Array(arr)) => {
                         let farben = {
@@ -10656,18 +10651,7 @@ impl<'p> Vm<'p> {
                             }
                             v
                         };
-                        // Reihenfolge des ersten Auftretens beibehalten -- so
-                        // bleibt die Zeichenreihenfolge nachvollziehbar.
-                        let mut gruppen: Vec<(i64, Vec<[f32; 16]>)> = Vec::new();
-                        for (m, c) in mats.into_iter().zip(farben) {
-                            match gruppen.iter_mut().find(|(gc, _)| *gc == c) {
-                                Some((_, v)) => v.push(m),
-                                None => gruppen.push((c, vec![m])),
-                            }
-                        }
-                        for (c, ms) in gruppen {
-                            g!().draw_model_instanced(handle, ms, c)?;
-                        }
+                        g!().draw_model_instanced_farben(handle, mats, &farben)?;
                     }
                     _ => {
                         let tint = if a.len() >= 3 { gi(a, 2, "MODEL_INSTANCED")? } else { 0xFF_FFFF };

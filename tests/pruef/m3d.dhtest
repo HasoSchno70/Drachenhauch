@@ -228,6 +228,48 @@ FOR f = 0 TO 3
 NEXT
 SAVESCREENSHOT("inst.png")
 --- erwartet
+--- bild inst.png
+34 45 #FF0000 +-40
+86 45 #0000FF +-40
+
+=== instanced zeichnet jede farbe in einem aufruf
+' Die Farbe je Instanz reist in der untersten Zeile der Matrix mit (seit
+' 2026-10-27; vorher ein Zeichenaufruf je Farbe). Drei Wuerfel in drei
+' Farben, dazu derselbe Aufruf mit EINER Farbe fuer alle -- dort muss die
+' unterste Zeile wieder (1,1,1,1) sein, sonst kaeme die Farbe der Matrix
+' vom vorigen Aufruf durch oder w waere falsch und der Wuerfel verschwaende.
+IMPORT "m3d"
+IMPORT "g3d"
+SCREEN(160, 120, "inst", 1)
+DIM box AS INTEGER
+box = MESH_CUBE(1.0, 1.0, 1.0)
+DIM ms[3] AS MAT4
+DIM cs[3] AS INTEGER
+ms[0] = MAT4_TRANSLATE(-1.6, 0.8, 0.0)
+ms[1] = MAT4_TRANSLATE(0.0, 0.8, 0.0)
+ms[2] = MAT4_TRANSLATE(1.6, 0.8, 0.0)
+cs[0] = &HFF0000
+cs[1] = &H00FF00
+cs[2] = &H0000FF
+DIM unten[2] AS MAT4
+unten[0] = MAT4_TRANSLATE(-0.8, -1.0, 0.0)
+unten[1] = MAT4_TRANSLATE(0.8, -1.0, 0.0)
+DIM f AS INTEGER
+FOR f = 0 TO 3
+    CLS(0)
+    CAMERA3D(0, 0, 6, 0, 0, 0, 45)
+    MODEL_INSTANCED(box, ms, cs)
+    MODEL_INSTANCED(box, unten, &HFFFF00)
+    FLIP()
+NEXT
+SAVESCREENSHOT("drei.png")
+--- erwartet
+--- bild drei.png
+41 44 #FF0000 +-40
+80 44 #00FF00 +-40
+119 44 #0000FF +-40
+60 89 #FFFF00 +-40
+100 89 #FFFF00 +-40
 
 === instanced meldet ein zu kurzes farb array
 IMPORT "m3d"
