@@ -217,7 +217,8 @@ def _print_manual(info: dict, out_dir: str | Path = WEB) -> None:
     print(f'  set EMCC_CFLAGS={" ".join(emcc_flags(out_dir))}')
     print(f"  cargo build --manifest-path {CRATE / 'Cargo.toml'} \\")
     print(f"    --target {TARGET} --features \"graphics schriften\" --release")
-    print("  -> target/wasm32-unknown-emscripten/release/dhrt.{js,wasm} nach web/ kopieren")
+    print(f"  -> {release_ordner(out_dir).as_posix()}/dhrt.{{js,wasm}} "
+          "(und deps/dhrt.data) nach web/ kopieren")
 
 
 def copy_source(dh_path: str | Path, out_dir: str | Path = WEB) -> Path:
@@ -226,7 +227,11 @@ def copy_source(dh_path: str | Path, out_dir: str | Path = WEB) -> Path:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     dst = out_dir / "program.dh"
-    dst.write_text(Path(dh_path).read_text(encoding="utf-8"), encoding="utf-8")
+    text = Path(dh_path).read_text(encoding="utf-8")
+    # Gleicher Inhalt bleibt unberuehrt: das Aenderungsdatum gehoert zum
+    # Stempel, an dem erzwinge_relink erkennt, ob das Paket neu muss.
+    if not dst.exists() or dst.read_text(encoding="utf-8") != text:
+        dst.write_text(text, encoding="utf-8")
     return dst
 
 
@@ -272,26 +277,72 @@ def leere_gl_ersatzbibliotheken() -> Path:
     return ordner
 
 
-def erzwinge_relink(flags: str) -> bool:
-    """Neu linken, wenn sich die emscripten-Flags geaendert haben.
+def release_ordner(out_dir: str | Path = WEB, env=None) -> Path:
+    """Wo cargo die Ergebnisse ablegt: `<Zielordner>/<TARGET>/release`.
+
+    Der Zielordner ist `CARGO_TARGET_DIR`, wenn gesetzt -- und den braucht man
+    oft: ein Leerzeichen im Pfad des Repositorys bricht die Flags von emcc, also
+    baut man woanders (`CARGO_TARGET_DIR=C:/dht_web`). Ein relativer Wert gilt
+    von dem Ordner aus, in dem cargo laeuft, und das ist hier `out_dir`
+    (siehe `build`). Ohne die Variable: `target/` im Crate.
+    """
+    env = os.environ if env is None else env
+    ziel = env.get("CARGO_TARGET_DIR")
+    if ziel:
+        basis = Path(ziel)
+        if not basis.is_absolute():
+            basis = Path(out_dir).resolve() / basis
+    else:
+        basis = CRATE / "target"
+    return basis / TARGET / "release"
+
+
+def paket_stempel(out_dir: str | Path) -> str:
+    """Was in das Datenpaket geht (`program.dh` und `assets/`), als Text aus
+    Weg, Groesse und Aenderungszeit je Datei. Aendert sich eins davon, muss neu
+    gelinkt werden: emscripten packt `dhrt.data` beim Linken, und cargo sieht
+    weder die Quelle noch die Assets."""
+    out = Path(out_dir)
+    dateien = [out / "program.dh"]
+    assets = out / "assets"
+    if assets.is_dir():
+        dateien += sorted(f for f in assets.rglob("*") if f.is_file())
+    zeilen = []
+    for f in dateien:
+        if f.exists():
+            st = f.stat()
+            zeilen.append(f"{f.relative_to(out).as_posix()} {st.st_size} {st.st_mtime_ns}")
+    return "\n".join(zeilen)
+
+
+def erzwinge_relink(flags: str, rel: Path | None = None, paket: str = "") -> bool:
+    """Neu linken, wenn sich die emscripten-Flags oder das Datenpaket geaendert
+    haben.
 
     **Diese Falle kostet sonst Stunden:** cargo verfolgt `EMCC_CFLAGS` nicht.
     Aendert man nur ein Linker-Flag (etwa `STACK_SIZE`), sieht cargo unveraenderte
     Quellen, ueberspringt das Linken -- und die alte `.wasm` bleibt liegen. Der
     Build meldet Erfolg, das Flag ist aber nicht drin. Genau so sah es aus, als
     die Vergroesserung des Stapels "nicht half": sie war schlicht nie im Binary.
+    Dasselbe gilt fuer `program.dh` und `assets/`: sie stecken in `dhrt.data`,
+    das erst beim Linken entsteht -- mit neuen Shadern und altem Paket lief im
+    Browser still der alte Stand (2026-10-27, Demo Nachtflug).
 
     Das Loeschen der Ausgabe ist der einfachste Zwang -- cargo linkt neu, sobald
-    sie fehlt, kompiliert aber nichts unnoetig neu.
+    sie fehlt, kompiliert aber nichts unnoetig neu. Geloescht wird auch in
+    `deps/`: dort liegt das eigentliche Ergebnis des Linkers, oben nur eine
+    Kopie -- fehlte nur die, holte cargo sie aus `deps/` zurueck, ohne zu linken.
     """
-    rel = CRATE / "target" / TARGET / "release"
+    rel = release_ordner() if rel is None else Path(rel)
     stempel = rel / "emcc_flags.txt"
-    if stempel.exists() and stempel.read_text(encoding="utf-8") == flags:
+    inhalt = flags + "\n--\n" + paket
+    if stempel.exists() and stempel.read_text(encoding="utf-8") == inhalt:
         return False
-    for muster in ("dhrt.js", "dhrt.wasm", "dhrt.data", "dhrt"):
-        (rel / muster).unlink(missing_ok=True)
+    for ordner in (rel, rel / "deps"):
+        for muster in ("dhrt.js", "dhrt.wasm", "dhrt.data", "dhrt"):
+            (ordner / muster).unlink(missing_ok=True)
     rel.mkdir(parents=True, exist_ok=True)
-    stempel.write_text(flags, encoding="utf-8")
+    stempel.write_text(inhalt, encoding="utf-8")
     return True
 
 
@@ -313,7 +364,9 @@ def build(dh_path: str | Path, out_dir: str | Path = WEB) -> int:
     env = dict(os.environ)
     # emscripten-Flags (absolute Embed-Pfade -> CWD-unabhaengig).
     env["EMCC_CFLAGS"] = " ".join(emcc_flags(out_dir))
-    erzwinge_relink(env["EMCC_CFLAGS"])
+    rel = release_ordner(out_dir, env)
+    if erzwinge_relink(env["EMCC_CFLAGS"], rel, paket_stempel(out_dir)):
+        print("Flags oder Datenpaket geaendert -- es wird neu gelinkt.")
     cmd = ["cargo", "build", "--manifest-path", str(CRATE / "Cargo.toml"),
            "--target", TARGET, "--features", "graphics schriften", "--release"]
     print("Build:", " ".join(cmd))
@@ -321,22 +374,30 @@ def build(dh_path: str | Path, out_dir: str | Path = WEB) -> int:
     if rc != 0:
         print("cargo build fehlgeschlagen (siehe oben).")
         return rc
-    rel = CRATE / "target" / TARGET / "release"
     # dhrt.data entsteht nur mit --preload-file (also wenn Assets dabei sind)
     # und liegt bei den deps, nicht neben der .wasm -- ohne sie fehlen dem
     # Programm im Browser alle Dateien.
+    mit_paket = (Path(out_dir) / "assets").is_dir()
+    fehlt = []
     for name in ("dhrt.js", "dhrt.wasm", "dhrt.data"):
         src = rel / name
         if not src.exists():
-            treffer = sorted(rel.glob(f"deps/{name}"))
-            src = treffer[0] if treffer else src
+            src = rel / "deps" / name
         if src.exists():
             shutil.copy2(src, Path(out_dir) / name)
             print(f"kopiert: {Path(out_dir) / name} "
                   f"({src.stat().st_size / 1048576:.1f} MB)")
-        elif name == "dhrt.data":
+        elif name == "dhrt.data" and not mit_paket:
             # Kein Paket: das ist der Normalfall ohne assets/, kein Fehler.
             (Path(out_dir) / name).unlink(missing_ok=True)
+        else:
+            fehlt.append(name)
+    if fehlt:
+        # Nicht still "Fertig" sagen: im Ausgabeordner laege sonst der alte
+        # Stand, und der Browser zeigte ihn, ohne dass es auffaellt.
+        print(f"FEHLER: {', '.join(fehlt)} nicht gefunden in {rel} (oder deps/) "
+              "-- der Ausgabeordner ist NICHT aktualisiert.")
+        return 2
     print("\nFertig. Lokal testen:  py -m http.server -d web 8000  ->  http://localhost:8000")
     return 0
 

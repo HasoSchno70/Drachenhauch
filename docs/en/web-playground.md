@@ -167,7 +167,14 @@ nothing about whether anything is drawn.** When geometry disappears,
   in place. The build reports success, the flag is not in it. That is exactly
   how it looked when `STACK_SIZE` "did not help": it was never in the binary.
   `build_wasm.py` now deletes the output itself as soon as the flags change
-  (`erzwinge_relink`).
+  (`erzwinge_relink`) -- and likewise when `program.dh` or `assets/` have
+  changed, because both live in `dhrt.data`, which is only created when
+  linking. It also deletes in `deps/`: the real result lives there, the one
+  above is only a copy. With `CARGO_TARGET_DIR` (needed when the repository
+  path contains a space, which breaks the emcc flags) the script looks and
+  copies there; a relative value counts from the output folder. If
+  `dhrt.js`, `dhrt.wasm` or (with assets) `dhrt.data` is missing afterwards,
+  it reports an error instead of "done".
 * **The "done" status in the playground lies for graphics programs.**
   ASYNCIFY lets `callMain` return as early as the first frame; the program
   keeps running afterwards. Whoever reads "the program has ended" from that

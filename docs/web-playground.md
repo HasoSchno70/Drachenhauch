@@ -167,7 +167,14 @@ nichts darueber, ob gezeichnet wird.** Wenn Geometrie verschwindet, ist
   `.wasm` bleibt liegen. Der Build meldet Erfolg, das Flag ist nicht drin.
   Genau so sah es aus, als `STACK_SIZE` "nicht half": es war nie im Binary.
   `build_wasm.py` loescht die Ausgabe jetzt selbst, sobald sich die Flags
-  aendern (`erzwinge_relink`).
+  aendern (`erzwinge_relink`) -- und ebenso, wenn sich `program.dh` oder
+  `assets/` geaendert haben, denn beides steckt in `dhrt.data`, das erst beim
+  Linken entsteht. Geloescht wird auch in `deps/`: dort liegt das eigentliche
+  Ergebnis, oben nur eine Kopie. Mit `CARGO_TARGET_DIR` (noetig, wenn der Pfad
+  des Repositorys ein Leerzeichen hat, das bricht die Flags von emcc) sucht
+  und kopiert das Skript dort; ein relativer Wert gilt vom Ausgabeordner aus.
+  Fehlt danach `dhrt.js`, `dhrt.wasm` oder (mit Assets) `dhrt.data`, meldet
+  es einen Fehler statt "Fertig".
 * **Der Status "fertig" im Playground luegt bei Grafik-Programmen.** ASYNCIFY
   laesst `callMain` schon beim ersten Bild zurueckkehren; das Programm laeuft
   danach weiter. Wer daraus "das Programm ist zu Ende" liest, sucht Fehler an
