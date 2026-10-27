@@ -2916,6 +2916,25 @@ ein echter Sonnenaufgang im Ausklang (`aufgang` in ozean.fs); der Schwarm
 startet dort, wo die Sonne gerade steht -- `sonneImBild` rechnet Richtung
 und Kamera des Shaders in Drachenhauch nach. Test "die sonne geht im
 ausklang auf" (hellster Punkt im Streifen rechts steigt).
+**Tablet (2026-10-27, Fund des Nutzers):** auf einem Samsung-Tablet im
+Browser stockten Berge, Sternennebel und Leuchtturm -- am Rechner
+ungedrosselt die drei langsamsten Szenen (Nebel 249, Kueste 259, Wolken 300,
+Berge 395 Bilder/s gegen 640 beim Ozean), und `--leicht` beschleunigte die
+Kueste gar nicht (Kugelverfolgung endet frueh, die Schrittzahl ist nicht der
+Engpass). Neu in der Laufzeit **`POSTFX(shader, massstab)`** (0.25..1): der
+Shader rechnet in einem kleinen Ziel (`post_klein`, einmal je Groesse
+angelegt), das weich auf den Schirm vergroessert wird; die Szene liest er dann
+weich statt naechster Punkt (Text im Bild). Gemessen 0.7 -> 1,7..1,8x,
+0.5 -> 2,8..4x. Die Demo waehlt die Guete je Szene selbst (fuenf Stufen aus
+Schritten und Massstab, `gueteNachziehen`: die ersten 20 Bilder einer Szene
+zaehlen nicht, dann je 30 Bilder im Mittel ueber 20 ms -> eine Stufe tiefer;
+eine neue Szene beginnt eine ueber der tiefsten bisher); `--stufe N`/`--leicht`
+fest, unter `DHRT_FRAMES` immer Stufe 0, damit Bildproben nicht an der Last
+haengen. Der Nebel sammelt sein Licht jetzt mit der Schrittlaenge (`gew`),
+sonst war er bei Stufe 4 ein Viertel dunkler. Tests: Paar in
+`shader_uniforms_geometry.dhtest` (rechts x/120 mit und ohne Massstab) plus
+Fehlerfall, Paar in `beispiel_nachtflug.dhtest` (SLEEP(30) je Bild senkt bis
+Stufe 4; unter DHRT_FRAMES nicht); ohne das Heruntergehen faellt der erste.
 
 ## Dogfooding 15: Landkarte (2026-10-26)
 

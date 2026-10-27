@@ -15,7 +15,9 @@
 '     dhrt run main.dh                    ' im Vollbild, von vorn
 '     dhrt run main.dh -- --fenster       ' im Fenster
 '     dhrt run main.dh -- --ab 32         ' ab Takt 32
-'     dhrt run main.dh -- --leicht        ' fuer schwaechere Grafikkarten
+'     dhrt run main.dh -- --leicht        ' fuer schwaechere Grafikkarten (feste Stufe 3)
+'     dhrt run main.dh -- --stufe 0       ' feste Guete 0 (voll) .. 4; ohne Angabe
+'                                         ' waehlt die Demo sie selbst je Szene
 '     dhrt run main.dh -- --wav datei.wav ' nur die Musik als WAV schreiben (trocken)
 '     dhrt run main.dh -- --mitschnitt datei.wav  ' abspielen und mitschneiden,
 '                                         ' so wie man es hoert (mit Hall)
@@ -33,9 +35,17 @@ DIM abTakt AS INTEGER
 DIM imFenster AS BOOLEAN
 DIM wavZiel AS STRING
 DIM messen AS BOOLEAN
-' Guete der Bilder: 1 = voll, --leicht nimmt etwas mehr als die Haelfte der
-' Schritte in den Shadern und zeichnet weniger Lichtspuren
+' Guete der Bilder in fuenf Stufen: weniger Schritte in den Shadern (guete)
+' und eine kleinere Rechenaufloesung des Shaders (massstab, POSTFX), dazu
+' weniger Lichtspuren. Ohne --stufe/--leicht waehlt die Demo die Stufe je
+' Szene selbst: sind die Bilder im Mittel langsamer als 50 je Sekunde, geht
+' sie eine Stufe herunter -- so laeuft sie auch auf einem Tablet im Browser
+' fluessig, waehrend ein starker Rechner bei Stufe 0 bleibt.
+DIM stufeGuete AS ARRAY OF FLOAT : stufeGuete = [1.0, 0.8, 0.65, 0.55, 0.45]
+DIM stufeMass AS ARRAY OF FLOAT : stufeMass = [1.0, 0.85, 0.72, 0.6, 0.5]
+DIM festeStufe AS INTEGER : festeStufe = -1
 DIM guete AS FLOAT : guete = 1.0
+DIM massstab AS FLOAT : massstab = 1.0
 DIM mitschnitt AS STRING
 DIM ai AS INTEGER
 WHILE ai < ARGC()
@@ -45,7 +55,9 @@ WHILE ai < ARGC()
         CASE "--fenster"
             imFenster = TRUE
         CASE "--leicht"
-            guete = 0.55
+            festeStufe = 3
+        CASE "--stufe"
+            ai = ai + 1 : festeStufe = CLAMP(VAL(ARG$(ai)), 0, 4)
         CASE "--messen"
             messen = TRUE
         CASE "--wav"
@@ -55,6 +67,48 @@ WHILE ai < ARGC()
     END SELECT
     ai = ai + 1
 WEND
+' Unter einer festen Bildzahl (Pruefungen, Bildaufnahmen) haengt nichts an
+' der Uhr des Rechners: ohne --stufe gilt dann Stufe 0.
+IF festeStufe < 0 AND GETENV$("DHRT_FRAMES") <> "" THEN festeStufe = 0
+IF festeStufe >= 0 THEN
+    guete = stufeGuete[festeStufe] : massstab = stufeMass[festeStufe]
+END IF
+
+' Je Shader die gewaehlte Stufe (-1 = noch nicht gezeigt); eine neue Szene
+' beginnt eine Stufe ueber der tiefsten bisher, damit sie nicht erst stockt.
+DIM stufeJe[64] AS INTEGER
+DIM sj AS INTEGER
+FOR sj = 0 TO 63 : stufeJe[sj] = -1 : NEXT
+DIM tiefsteStufe AS INTEGER
+DIM letzterShader AS INTEGER : letzterShader = -1
+DIM messBilder AS INTEGER
+DIM messSumme AS FLOAT
+DIM messLetzt AS FLOAT
+SUB gueteNachziehen(sh AS INTEGER)
+    IF festeStufe >= 0 OR sh < 0 OR sh > 63 THEN RETURN
+    DIM jetzt AS FLOAT : jetzt = GET_TIME()
+    IF sh <> letzterShader THEN
+        letzterShader = sh
+        IF stufeJe[sh] < 0 THEN stufeJe[sh] = MAX(0, tiefsteStufe - 1)
+        ' die ersten Bilder einer Szene zaehlen nicht (der Grafiktreiber
+        ' uebersetzt den Shader oft erst beim ersten Zeichnen)
+        messBilder = -20 : messSumme = 0.0
+    ELSE
+        messBilder = messBilder + 1
+        IF messBilder > 0 THEN messSumme = messSumme + (jetzt - messLetzt)
+        IF messBilder >= 30 THEN
+            IF messSumme / messBilder > 0.02 AND stufeJe[sh] < 4 THEN
+                stufeJe[sh] = stufeJe[sh] + 1
+                tiefsteStufe = MAX(tiefsteStufe, stufeJe[sh])
+                IF messen THEN PRINT "Shader "; sh; " -> Stufe "; stufeJe[sh]
+            END IF
+            messBilder = 0 : messSumme = 0.0
+        END IF
+    END IF
+    messLetzt = jetzt
+    guete = stufeGuete[stufeJe[sh]] : massstab = stufeMass[stufeJe[sh]]
+END SUB
+
 IF wavZiel <> "" THEN
     musikAusschreiben(wavZiel)
     PRINT "geschrieben: "; wavZiel
@@ -547,6 +601,7 @@ WHILE NOT beenden
         SHADER_SET(sh, "aufgang", aufgangBei(takt))
         uebergang(sh, 0.0, nachBeginn(takt, AB_AUS), 1.0, 0.85, 0.6)
     END IF
+    gueteNachziehen(sh)
     SHADER_SET(sh, "time", zeit)
     SHADER_SET(sh, "kick", kick)
     SHADER_SET(sh, "takt", takt)
@@ -556,7 +611,7 @@ WHILE NOT beenden
     SHADER_SET3(sh, "farbe", farbeR, farbeG, farbeB)
     beschriftung(takt)
     IF takt >= AB_AUS THEN schwarmZeichnen(takt, zeit)
-    POSTFX(sh)
+    POSTFX(sh, massstab)
     FLIP()
     bilder = bilder + 1
     IF messen AND mitTon THEN spitze = MAX(spitze, AUDIO_PEAK())

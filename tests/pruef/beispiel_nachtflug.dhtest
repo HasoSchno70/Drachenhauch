@@ -621,3 +621,55 @@ DIM spaet AS INTEGER : spaet = hellsteZeile("bild.png")
 PRINT "steigt "; spaet < frueh - 25
 --- erwartet
 steigt TRUE
+
+=== langsame bilder senken die stufe
+' Ohne --stufe waehlt die Demo die Guete selbst: hier dauert jedes Bild
+' kuenstlich 30 ms (unter 50 je Sekunde), also geht sie Stufe um Stufe bis 4
+' herunter. Die Regel "unter fester Bildzahl Stufe 0" ist dafuer entfernt.
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+--- ersetzen IF festeStufe < 0 AND GETENV$("DHRT_FRAMES") <> "" THEN festeStufe = 0
+' (entfernt)
+--- ersetzen     gueteNachziehen(sh)
+    SLEEP(30) : gueteNachziehen(sh)
+--- ersetzen     PRINT "Bilder je Sekunde: "; FORMAT$(bilder / MAX(0.001, GET_TIME() - start), "%.1f")
+    PRINT "guete "; guete; " massstab "; massstab
+--- argumente
+--fenster
+--messen
+--ab
+20
+--- umgebung
+DHRT_FRAMES=200
+DH_OHNE_AUDIO=1
+--- enthaelt
+-> Stufe 1
+-> Stufe 4
+guete 0.45 massstab 0.5
+
+=== unter fester bildzahl bleibt die stufe
+' Gegenprobe: dieselben langsamen Bilder, aber mit DHRT_FRAMES (Pruefungen,
+' Bildaufnahmen) gilt Stufe 0 -- die Bilder der anderen Faelle haengen so
+' nicht an der Last des Rechners.
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+--- ersetzen     gueteNachziehen(sh)
+    SLEEP(30) : gueteNachziehen(sh)
+--- ersetzen     PRINT "Bilder je Sekunde: "; FORMAT$(bilder / MAX(0.001, GET_TIME() - start), "%.1f")
+    PRINT "guete "; guete; " massstab "; massstab
+--- argumente
+--fenster
+--messen
+--ab
+20
+--- umgebung
+DHRT_FRAMES=200
+DH_OHNE_AUDIO=1
+--- erwartet
+guete 1.0 massstab 1.0

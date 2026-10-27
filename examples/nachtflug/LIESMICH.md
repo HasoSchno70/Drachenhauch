@@ -13,9 +13,22 @@ dhrt run main.dh -- --fenster        # im Fenster
 dhrt run main.dh -- --ab 48          # ab Takt 48 (der Breakdown)
 dhrt run main.dh -- --wav nacht.wav  # nur die Musik als WAV schreiben (trocken, ohne Hall)
 dhrt run main.dh -- --mitschnitt nacht.wav  # abspielen und mitschneiden, wie man es hört
-dhrt run main.dh -- --leicht         # für schwächere Grafikkarten
+dhrt run main.dh -- --leicht         # feste Stufe 3, für schwächere Grafikkarten
+dhrt run main.dh -- --stufe 0        # feste Güte 0 (voll) bis 4
 dhrt run main.dh -- --messen         # am Ende Bildrate und Spitze im Mischer
 ```
+
+**Die Güte wählt die Demo selbst.** Berge, Sternennebel, Wolken und Küste
+tasten jeden Bildpunkt 50- bis 160-mal ab -- ein Tablet im Browser schafft
+das nicht in einer Sechzigstelsekunde, und weil die Musik auf ihrer eigenen
+Uhr weiterläuft, fallen dann Bilder weg. Sind die Bilder einer Szene im
+Mittel langsamer als 50 je Sekunde, geht sie eine von fünf Stufen herunter:
+weniger Schritte im Shader und eine kleinere Rechenauflösung
+(`POSTFX(shader, massstab)`, bis 0,5 -- das ist ein Viertel der Arbeit),
+weich auf das Bild vergrößert. Jede Szene merkt sich ihre Stufe, eine neue
+beginnt eine Stufe über der tiefsten bisher. Ein starker Rechner bleibt bei
+Stufe 0. `--messen` meldet jeden Wechsel. Unter `DHRT_FRAMES` (Prüfungen,
+Bildaufnahmen) gilt ohne `--stufe` immer Stufe 0.
 
 Vor dem Start entstehen alle Klänge (rund vier Sekunden); so lange steht ein
 ruhiges Startbild mit Titel und einer feinen Linie, die sich füllt. Mit
