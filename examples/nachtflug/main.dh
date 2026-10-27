@@ -1,12 +1,16 @@
 ' Nachtflug -- eine Demo in Drachenhauch: Musik und Bild aus einem Programm.
 '
-' Die Musik (musik.dh) ist ganz synthetisiert -- Trance in A-Moll, 128 Schlaege
-' je Minute, in Stereo, knapp drei Minuten. Die Bilder folgen ihr: jede
-' Szene gehoert zu einem Abschnitt des Stuecks, was pulsiert, pulsiert mit
-' der Bassdrum, was aufblitzt, blitzt mit der Melodie, und die Farbe geht
-' mit dem Akkord. Die Szenen gehen durch Licht ineinander ueber. Gezeichnet
-' wird in 1280x720; die Szenen 1 bis 4 rechnet je ein Fragment-Shader
-' (Raymarching, assets/shader), die fuenfte ist eine echte 3D-Szene.
+' Die Musik (musik.dh) ist ganz synthetisiert -- Trance von a-Moll nach
+' C-Dur, 128 Schlaege je Minute, in Stereo, gut viereinhalb Minuten. Die
+' Bilder folgen ihr: jede Szene gehoert zu einem Abschnitt des Stuecks, was
+' pulsiert, pulsiert mit der Bassdrum, was aufblitzt, blitzt mit der Melodie,
+' und die Farbe geht mit dem Akkord. Die Reise fuehrt vom naechtlichen Meer
+' ueber die Berge durch einen Lichttunnel ins All, zur Galaxie -- und wieder
+' heim: Erdaufgang im Orbit, Wiedereintritt, ueber den Wolken, an der Kueste
+' vorbei, bis zum Tagesanbruch auf dem Meer. Die Szenen gehen durch Licht
+' ineinander ueber. Gezeichnet wird in 1280x720; jede Szene rechnet ein
+' Fragment-Shader (Raymarching, assets/shader), die Galaxie ist dazu eine
+' echte 3D-Szene.
 '
 '     dhrt run main.dh                    ' im Vollbild, von vorn
 '     dhrt run main.dh -- --fenster       ' im Fenster
@@ -77,6 +81,10 @@ DIM shFlug AS INTEGER : shFlug = shader("flug")
 DIM shTunnel AS INTEGER : shTunnel = shader("tunnel")
 DIM shNebel AS INTEGER : shNebel = shader("nebel")
 DIM shGlanz AS INTEGER : shGlanz = shader("glanz")
+DIM shErde AS INTEGER : shErde = shader("erde")
+DIM shEintritt AS INTEGER : shEintritt = shader("eintritt")
+DIM shWolken AS INTEGER : shWolken = shader("wolken")
+DIM shKueste AS INTEGER : shKueste = shader("kueste")
 
 ' --- Galaxie (Szene 5): Lichtspuren auf Umlaufbahnen ---------------------------
 ' Jeder Stern ist ein langgezogener, duenner Quader entlang seiner Bahn --
@@ -266,20 +274,21 @@ SUB schwarmVorbereiten()
         kx[j] = kx[n - 1] : ky[j] = ky[n - 1]
         n = n - 1
         ' Start: an der Sonne ueber dem Horizont, etwas gestreut
-        swStartX[i] = BREITE * 0.72 + (RND() - 0.5) * 60.0
-        swStartY[i] = HOEHE * 0.47 + (RND() - 0.5) * 24.0
+        swStartX[i] = BREITE * 0.765 + (RND() - 0.5) * 60.0
+        swStartY[i] = HOEHE * 0.6 + (RND() - 0.5) * 24.0
         swBogen[i] = (RND() - 0.3) * 520.0
         swVerz[i] = RND() * 1.6 + (swZielX[i] / BREITE) * 0.6
     NEXT
 END SUB
 
 SUB schwarmZeichnen(takt AS FLOAT, zeit AS FLOAT)
-    IF takt < 85.3 OR swAnz = 0 THEN RETURN
+    DIM los AS FLOAT : los = AB_AUS + 5.3
+    IF takt < los OR swAnz = 0 THEN RETURN
     ' verloeschen mit dem Bild am Ende
     DIM aus AS FLOAT : aus = CLAMP((TAKTE + 1.4 - takt) * 0.8, 0.0, 1.0)
     DIM i AS INTEGER
     FOR i = 0 TO swAnz - 1
-        DIM t AS FLOAT : t = CLAMP((takt - 85.3 - swVerz[i]) / 2.4, 0.0, 1.0)
+        DIM t AS FLOAT : t = CLAMP((takt - los - swVerz[i]) / 2.4, 0.0, 1.0)
         DIM e AS FLOAT : e = t * t * (3.0 - 2.0 * t)
         ' quadratischer Bogen: vom Start ueber einen seitlich versetzten Punkt zum Ziel
         DIM mx AS FLOAT : mx = (swStartX[i] + swZielX[i]) * 0.5 + swBogen[i]
@@ -322,13 +331,22 @@ SUB beschriftung(takt AS FLOAT)
         "Star nebula: volume raymarching", 646, 18, zeigen(takt, 49, 54), FALSE)
     zweisprachig(ZAHL$(STERNE) + " Lichtspuren in einem Zeichenaufruf, die Scheibe im Shader", _
         REPLACE$(ZAHL$(STERNE), ".", ",") + " light trails in one draw call, the disc in a shader", 646, 18, zeigen(takt, 65, 70), FALSE)
+    zweisprachig("Erdaufgang: Atmosphäre, Wolken und Stadtlichter, alles im Shader", _
+        "Earthrise: atmosphere, clouds and city lights, all in a shader", 646, 18, zeigen(takt, AB_ORBIT + 1, AB_ORBIT + 6), FALSE)
+    zweisprachig("Wiedereintritt: Plasma aus Rauschen, das mit der Bassdrum glüht", _
+        "Re-entry: plasma made of noise, glowing with the kick drum", 646, 18, zeigen(takt, AB_EINTRITT + 1, AB_EINTRITT + 6), FALSE)
+    zweisprachig("Über den Wolken: ein Wolkenmeer aus Höhenrauschen im Morgenlicht", _
+        "Above the clouds: a sea of clouds from height noise in the morning light", 646, 18, zeigen(takt, AB_WOLKEN + 1, AB_WOLKEN + 6), FALSE)
+    zweisprachig("Küste: der Leuchtturm kreist im Takt", _
+        "Coast: the lighthouse turns in time", 646, 18, zeigen(takt, AB_KUESTE + 1, AB_KUESTE + 6), FALSE)
     ' Abspann
-    mittig("Nachtflug", 200, 56, zeigen(takt, 83, 93), TRUE)
-    zweisprachig("von Hans Schnorrenberger", "by Hans Schnorrenberger", 290, 26, zeigen(takt, 83.5, 93), FALSE)
-    zweisprachig("Musik: Uplifting Trance, 128 BPM, a-Moll -- synthetisiert mit AUDIO_NOTE und einer Audio-Uhr", _
-        "Music: uplifting trance, 128 BPM, A minor -- synthesised with AUDIO_NOTE and an audio clock", 380, 19, zeigen(takt, 84, 93), FALSE)
+    DIM a AS FLOAT : a = AB_AUS
+    mittig("Nachtflug", 200, 56, zeigen(takt, a + 3, a + 13), TRUE)
+    zweisprachig("von Hans Schnorrenberger", "by Hans Schnorrenberger", 290, 26, zeigen(takt, a + 3.5, a + 13), FALSE)
+    zweisprachig("Musik: Uplifting Trance, 128 BPM, von a-Moll nach C-Dur -- synthetisiert mit AUDIO_NOTE und einer Audio-Uhr", _
+        "Music: uplifting trance, 128 BPM, from A minor to C major -- synthesised with AUDIO_NOTE and an audio clock", 380, 19, zeigen(takt, a + 4, a + 13), FALSE)
     zweisprachig("Bild: GLSL-Raymarching und 3D-Instancing in dhrt", _
-        "Pictures: GLSL raymarching and 3D instancing in dhrt", 440, 19, zeigen(takt, 85, 93), FALSE)
+        "Pictures: GLSL raymarching and 3D instancing in dhrt", 440, 19, zeigen(takt, a + 5, a + 13), FALSE)
     ' "Drachenhauch" schreibt der Lichterschwarm (schwarmZeichnen)
 END SUB
 
@@ -351,11 +369,13 @@ SUB uebergang(sh AS INTEGER, aus AS FLOAT, ein AS FLOAT, r AS FLOAT, g AS FLOAT,
 END SUB
 
 ' Die Farbe jedes Akkords: a-Moll violett, F tuerkis, C gold, G rosa, F
-' gruenblau, G pink, e-Moll tiefblau, a-Moll hellviolett. Die Bilder ziehen
+' gruenblau, G pink, e-Moll tiefblau, a-Moll hellviolett -- und die acht des
+' Morgens warm: C weissgold, G/B pfirsich, a-Moll7 rose, F-maj7 flieder,
+' C/E hellgold, G orange, F rosegold, G-sus himmelblau. Die Bilder ziehen
 ' ihr weich nach.
-DIM akkR AS ARRAY OF FLOAT : akkR = [0.55, 0.15, 1.0, 1.0, 0.2, 1.0, 0.3, 0.75]
-DIM akkG AS ARRAY OF FLOAT : akkG = [0.3, 0.85, 0.72, 0.35, 1.0, 0.45, 0.45, 0.55]
-DIM akkB AS ARRAY OF FLOAT : akkB = [1.0, 1.0, 0.3, 0.65, 0.75, 0.8, 1.0, 1.0]
+DIM akkR AS ARRAY OF FLOAT : akkR = [0.55, 0.15, 1.0, 1.0, 0.2, 1.0, 0.3, 0.75, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 0.55]
+DIM akkG AS ARRAY OF FLOAT : akkG = [0.3, 0.85, 0.72, 0.35, 1.0, 0.45, 0.45, 0.55, 0.9, 0.7, 0.55, 0.6, 0.82, 0.6, 0.62, 0.78]
+DIM akkB AS ARRAY OF FLOAT : akkB = [1.0, 1.0, 0.3, 0.65, 0.75, 0.8, 1.0, 1.0, 0.7, 0.5, 0.65, 1.0, 0.45, 0.25, 0.55, 1.0]
 DIM farbeR AS FLOAT : farbeR = akkR[0]
 DIM farbeG AS FLOAT : farbeG = akkG[0]
 DIM farbeB AS FLOAT : farbeB = akkB[0]
@@ -446,7 +466,7 @@ WHILE NOT beenden
         SHADER_SET(sh, "hell", 1.0)
         SHADER_SET(sh, "fort", (takt - AB_PAUSE) / 16.0)
         uebergang(sh, 0.0, nachBeginn(takt, AB_PAUSE), 0.92, 0.88, 1.0)
-    ELSEIF takt < AB_AUS THEN
+    ELSEIF takt < AB_ORBIT THEN
         sh = shGlanz
         galaxieZeichnen(zeit, kick, (takt - AB_HOCH2) / 16.0, takt, melTon)
         SHADER_SET3(sh, "kamera", kamX, kamY, kamZ)
@@ -455,13 +475,35 @@ WHILE NOT beenden
         ' der weisse Blitz auf der Eins des Hoehepunkts
         ' ... und ein kleinerer auf der Rueckung
         SHADER_SET(sh, "blitz", MAX(MAX(0.0, 1.0 - (takt - AB_HOCH2) * 1.5), 0.6 * MAX(0.0, 1.0 - (takt - AB_RUECKUNG) * 2.5) * IIF(takt >= AB_RUECKUNG, 1.0, 0.0)))
-        uebergang(sh, vorEnde(takt, AB_AUS), 1.0, 1.0, 0.82, 0.6)
+        uebergang(sh, vorEnde(takt, AB_ORBIT), 1.0, 1.0, 0.82, 0.6)
+    ELSEIF takt < AB_EINTRITT THEN
+        ' Erdaufgang: am Ende geht die Sonne ueber dem Erdrand auf
+        sh = shErde
+        SHADER_SET(sh, "hell", 1.0)
+        SHADER_SET(sh, "fort", (takt - AB_ORBIT) / 16.0)
+        uebergang(sh, vorEnde(takt, AB_EINTRITT), nachBeginn(takt, AB_ORBIT), 1.0, IIF(takt < AB_ORBIT + 1, 0.82, 0.62), IIF(takt < AB_ORBIT + 1, 0.6, 0.35))
+    ELSEIF takt < AB_WOLKEN THEN
+        sh = shEintritt
+        SHADER_SET(sh, "hell", 1.0)
+        SHADER_SET(sh, "fort", (takt - AB_EINTRITT) / 16.0)
+        uebergang(sh, vorEnde(takt, AB_WOLKEN), nachBeginn(takt, AB_EINTRITT), 1.0, IIF(takt < AB_EINTRITT + 1, 0.62, 0.8), IIF(takt < AB_EINTRITT + 1, 0.35, 0.7))
+    ELSEIF takt < AB_KUESTE THEN
+        sh = shWolken
+        SHADER_SET(sh, "hell", 1.0)
+        SHADER_SET(sh, "fort", (takt - AB_WOLKEN) / 16.0)
+        uebergang(sh, vorEnde(takt, AB_KUESTE), nachBeginn(takt, AB_WOLKEN), 1.0, IIF(takt < AB_WOLKEN + 1, 0.8, 0.85), IIF(takt < AB_WOLKEN + 1, 0.7, 0.65))
+    ELSEIF takt < AB_AUS THEN
+        sh = shKueste
+        SHADER_SET(sh, "hell", 1.0)
+        SHADER_SET(sh, "fort", (takt - AB_KUESTE) / 8.0)
+        uebergang(sh, vorEnde(takt, AB_AUS), nachBeginn(takt, AB_KUESTE), 1.0, 0.85, IIF(takt < AB_KUESTE + 1, 0.65, 0.6))
     ELSE
+        ' Tagesanbruch auf dem Meer, wo alles begann
         sh = shOzean
         SHADER_SET(sh, "hell", CLAMP((TAKTE + 1.5 - takt) * 2.0, 0.0, 1.0))
         SHADER_SET(sh, "licht", 0.6)
-        SHADER_SET(sh, "morgen", CLAMP((takt - AB_AUS) / 12.0, 0.0, 1.0))
-        uebergang(sh, 0.0, nachBeginn(takt, AB_AUS), 1.0, 0.82, 0.6)
+        SHADER_SET(sh, "morgen", CLAMP(0.55 + (takt - AB_AUS) / 8.0, 0.0, 1.0))
+        uebergang(sh, 0.0, nachBeginn(takt, AB_AUS), 1.0, 0.85, 0.6)
     END IF
     SHADER_SET(sh, "time", zeit)
     SHADER_SET(sh, "kick", kick)
