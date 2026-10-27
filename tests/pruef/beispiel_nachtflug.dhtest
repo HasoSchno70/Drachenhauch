@@ -355,6 +355,50 @@ PRINT "schriftzug "; hell > 800
 --- erwartet
 schriftzug TRUE
 
+=== wartende funken sind unsichtbar
+' gleich nach dem Start des Schwarms warten die meisten Funken noch an der
+' Sonne; dort darf nichts zu sehen sein (bis 2026-10-27 war die Deckkraft
+' umgekehrt gerechnet, und die Wartenden bildeten ein helles Viereck).
+' Verglichen wird dasselbe Bild mit und ohne Schwarm, nur um die Sonne.
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+--- ersetzen     IF takt >= AB_AUS THEN schwarmZeichnen(takt, zeit)
+    IF takt >= AB_AUS AND NOT FILEEXISTS(STARTDIR$() + "/ohne") THEN schwarmZeichnen(takt, zeit)
+--- argumente
+--fenster
+--ab
+85
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- zwischen
+RENAME("bild.png", "mit.png")
+WRITEALL("ohne", "1")
+--- nochmal
+--fenster
+--ab
+85
+--- nachher
+DIM a AS INTEGER : a = LOADIMAGE("mit.png")
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM anders AS INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 300 TO 380
+    FOR x = 860 TO 990
+        DIM f AS INTEGER : f = GETPIXEL(a, x, y)
+        DIM g AS INTEGER : g = GETPIXEL(b, x, y)
+        IF ABS(((f SHR 8) BAND 255) - ((g SHR 8) BAND 255)) > 30 THEN anders = anders + 1
+    NEXT
+NEXT
+PRINT "wartende sichtbar "; anders > 20
+--- erwartet
+wartende sichtbar FALSE
+
 === leicht laeuft mit weniger schritten
 ' --leicht nimmt in den Shadern gut die Haelfte der Schritte -- das Bild ist
 ' weiter weder schwarz noch weiss

@@ -293,8 +293,15 @@ SUB schwarmZeichnen(takt AS FLOAT, zeit AS FLOAT)
         swR[i] = IIF(e < 0.9, 2, 1)
         swHofR[i] = 4
         DIM g AS INTEGER : g = INT(215 + 40 * e)
-        swFarbe[i] = RGBA(255, g, INT(150 + 90 * e), MAX(1, 255 - INT(255 * hell)))
-        swHof[i] = RGBA(255, 190, 120, MAX(1, 255 - INT(70 * hell)))
+        ' Deckkraft 255 = voll sichtbar. Wer noch an der Sonne wartet (t = 0),
+        ' ist unsichtbar -- bis 2026-10-27 stand die Rechnung umgekehrt, und
+        ' die Wartenden bildeten ein helles Viereck um die Sonne.
+        swFarbe[i] = RGBA(255, g, INT(150 + 90 * e), MAX(1, INT(255 * hell)))
+        swHof[i] = RGBA(255, 190, 120, MAX(1, INT(70 * hell)))
+        IF hell <= 0.0 THEN
+            swR[i] = 0
+            swHofR[i] = 0
+        END IF
     NEXT
     CIRCLES(swX, swY, swHofR, swHof, swAnz)
     CIRCLES(swX, swY, swR, swFarbe, swAnz)
