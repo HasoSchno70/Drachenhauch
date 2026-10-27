@@ -218,6 +218,42 @@ SUB zweisprachig(de AS STRING, en AS STRING, y AS INTEGER, groesse AS INTEGER, d
     mittig(en, y + INT(groesse * 1.3), INT(groesse * 0.8), deck * 0.7, FALSE)
 END SUB
 
+' --- Sonnenaufgang im Ausklang ------------------------------------------------
+' Die Sonne steigt ab dem zweiten Takt des Ausklangs ueber neun Takte ueber den
+' Horizont (`aufgang` in ozean.fs). Wo sie im Bild steht, rechnet sonneImBild
+' mit derselben Richtung und derselben Kamera wie der Shader nach -- daraus
+' steigt der Lichterschwarm auf.
+FUNCTION aufgangBei(takt AS FLOAT) AS FLOAT
+    DIM f AS FLOAT : f = CLAMP((takt - AB_AUS - 1.0) / 9.0, 0.0, 1.0)
+    RETURN f * f * (3.0 - 2.0 * f)
+END FUNCTION
+
+DIM sonneX AS FLOAT
+DIM sonneY AS FLOAT
+SUB sonneImBild(zeit AS FLOAT, auf AS FLOAT)
+    ' Sonnenrichtung wie in ozean.fs
+    DIM sx AS FLOAT : sx = 0.7
+    DIM sy AS FLOAT : sy = 0.012 + (0.085 - 0.012) * auf
+    DIM sz AS FLOAT : sz = 0.8943
+    DIM sl AS FLOAT : sl = SQR(sx * sx + sy * sy + sz * sz)
+    sx = sx / sl : sy = sy / sl : sz = sz / sl
+    ' Kamera wie in ozean.fs: vorne, rechts = oben x vorne, oben = vorne x rechts
+    DIM vx AS FLOAT : vx = 0.06 * SIN(zeit * 0.05)
+    DIM vy AS FLOAT : vy = 0.14
+    DIM vz AS FLOAT : vz = 1.0
+    DIM vl AS FLOAT : vl = SQR(vx * vx + vy * vy + vz * vz)
+    vx = vx / vl : vy = vy / vl : vz = vz / vl
+    DIM rl AS FLOAT : rl = SQR(vz * vz + vx * vx)
+    DIM rx AS FLOAT : rx = vz / rl
+    DIM rz AS FLOAT : rz = -vx / rl
+    DIM ox AS FLOAT : ox = vy * rz
+    DIM oy AS FLOAT : oy = vz * rx - vx * rz
+    DIM oz AS FLOAT : oz = -vy * rx
+    DIM tief AS FLOAT : tief = sx * vx + sy * vy + sz * vz
+    sonneX = BREITE / 2 + (sx * rx + sz * rz) / tief * HOEHE
+    sonneY = HOEHE / 2 - (sx * ox + sy * oy + sz * oz) / tief * HOEHE
+END SUB
+
 ' --- Lichterschwarm (Abspann) ---------------------------------------------------
 ' Funken steigen aus der Sonne am Horizont auf, fliegen in weiten Boegen
 ' heran und setzen sich zum Schriftzug "Drachenhauch" zusammen, funkeln dort
@@ -273,9 +309,10 @@ SUB schwarmVorbereiten()
         swZielY[i] = SCHWARM_Y - 70 + ky[j] + (RND() - 0.5) * 1.5
         kx[j] = kx[n - 1] : ky[j] = ky[n - 1]
         n = n - 1
-        ' Start: an der Sonne ueber dem Horizont, etwas gestreut
-        swStartX[i] = BREITE * 0.765 + (RND() - 0.5) * 60.0
-        swStartY[i] = HOEHE * 0.6 + (RND() - 0.5) * 24.0
+        ' Start: an der Sonne, etwas gestreut (hier nur die Streuung -- wo die
+        ' Sonne steht, weiss erst schwarmZeichnen)
+        swStartX[i] = (RND() - 0.5) * 50.0
+        swStartY[i] = (RND() - 0.5) * 20.0
         swBogen[i] = (RND() - 0.3) * 520.0
         swVerz[i] = RND() * 1.6 + (swZielX[i] / BREITE) * 0.6
     NEXT
@@ -286,16 +323,19 @@ SUB schwarmZeichnen(takt AS FLOAT, zeit AS FLOAT)
     IF takt < los OR swAnz = 0 THEN RETURN
     ' verloeschen mit dem Bild am Ende
     DIM aus AS FLOAT : aus = CLAMP((TAKTE + 1.4 - takt) * 0.8, 0.0, 1.0)
+    sonneImBild(zeit, aufgangBei(takt))
     DIM i AS INTEGER
     FOR i = 0 TO swAnz - 1
+        DIM stx AS FLOAT : stx = sonneX + swStartX[i]
+        DIM sty AS FLOAT : sty = sonneY + swStartY[i]
         DIM t AS FLOAT : t = CLAMP((takt - los - swVerz[i]) / 2.4, 0.0, 1.0)
         DIM e AS FLOAT : e = t * t * (3.0 - 2.0 * t)
         ' quadratischer Bogen: vom Start ueber einen seitlich versetzten Punkt zum Ziel
-        DIM mx AS FLOAT : mx = (swStartX[i] + swZielX[i]) * 0.5 + swBogen[i]
-        DIM my AS FLOAT : my = MIN(swStartY[i], swZielY[i]) - 160.0 - ABS(swBogen[i]) * 0.3
+        DIM mx AS FLOAT : mx = (stx + swZielX[i]) * 0.5 + swBogen[i]
+        DIM my AS FLOAT : my = MIN(sty, swZielY[i]) - 160.0 - ABS(swBogen[i]) * 0.3
         DIM u AS FLOAT : u = 1.0 - e
-        swX[i] = INT(u * u * swStartX[i] + 2.0 * u * e * mx + e * e * swZielX[i])
-        swY[i] = INT(u * u * swStartY[i] + 2.0 * u * e * my + e * e * swZielY[i])
+        swX[i] = INT(u * u * stx + 2.0 * u * e * mx + e * e * swZielX[i])
+        swY[i] = INT(u * u * sty + 2.0 * u * e * my + e * e * swZielY[i])
         ' angekommen: funkeln
         DIM funkeln AS FLOAT : funkeln = 0.75 + 0.25 * SIN(zeit * 5.0 + i * 1.7)
         DIM hell AS FLOAT : hell = IIF(t < 1.0, 0.5 + 0.5 * t, funkeln) * aus * MIN(1.0, t * 6.0)
@@ -450,6 +490,7 @@ WHILE NOT beenden
         SHADER_SET(sh, "hell", MIN(1.0, takt / 2.0 + 0.05))
         SHADER_SET(sh, "licht", CLAMP(takt / AB_AUFBAU, 0.0, 1.0))
         SHADER_SET(sh, "morgen", 0.0)
+        SHADER_SET(sh, "aufgang", 0.0)
         uebergang(sh, vorEnde(takt, AB_AUFBAU), 1.0, 0.55, 1.0, 0.8)
     ELSEIF takt < AB_HOCH1 THEN
         sh = shFlug
@@ -503,6 +544,7 @@ WHILE NOT beenden
         SHADER_SET(sh, "hell", CLAMP((TAKTE + 1.5 - takt) * 2.0, 0.0, 1.0))
         SHADER_SET(sh, "licht", 0.6)
         SHADER_SET(sh, "morgen", CLAMP(0.55 + (takt - AB_AUS) / 8.0, 0.0, 1.0))
+        SHADER_SET(sh, "aufgang", aufgangBei(takt))
         uebergang(sh, 0.0, nachBeginn(takt, AB_AUS), 1.0, 0.85, 0.6)
     END IF
     SHADER_SET(sh, "time", zeit)

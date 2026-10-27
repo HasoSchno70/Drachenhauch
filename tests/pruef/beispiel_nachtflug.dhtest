@@ -528,8 +528,8 @@ DIM b AS INTEGER : b = LOADIMAGE("bild.png")
 DIM anders AS INTEGER
 DIM x AS INTEGER
 DIM y AS INTEGER
-FOR y = 300 TO 380
-    FOR x = 860 TO 990
+FOR y = 360 TO 470
+    FOR x = 1060 TO 1240
         DIM f AS INTEGER : f = GETPIXEL(a, x, y)
         DIM g AS INTEGER : g = GETPIXEL(b, x, y)
         IF ABS(((f SHR 8) BAND 255) - ((g SHR 8) BAND 255)) > 30 THEN anders = anders + 1
@@ -571,3 +571,53 @@ DIM m AS FLOAT : m = s / (32 * 18 * 3)
 PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
 --- erwartet
 nicht schwarz TRUE, nicht weiss TRUE
+
+=== die sonne geht im ausklang auf
+' im Ausklang steigt die Sonne ueber den Horizont: ihr hellster Punkt liegt
+' neun Takte spaeter deutlich hoeher im Bild (rechts neben dem Abspann)
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+137
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- zwischen
+RENAME("bild.png", "frueh.png")
+--- nochmal
+--fenster
+--ab
+146
+--- datei hellste.dh
+' Zeile des hellsten Punkts im Streifen rechts neben dem Abspann
+FUNCTION hellsteZeile(pfad AS STRING) AS INTEGER
+    DIM b AS INTEGER : b = LOADIMAGE(pfad)
+    DIM beste AS INTEGER : beste = -1
+    DIM zeile AS INTEGER : zeile = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 300 TO 480 STEP 2
+        FOR x = 1080 TO 1260 STEP 3
+            DIM f AS INTEGER : f = GETPIXEL(b, x, y)
+            DIM h AS INTEGER : h = ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+            IF h > beste THEN
+                beste = h
+                zeile = y
+            END IF
+        NEXT
+    NEXT
+    RETURN zeile
+END FUNCTION
+--- nachher
+IMPORT "hellste.dh"
+DIM frueh AS INTEGER : frueh = hellsteZeile("frueh.png")
+DIM spaet AS INTEGER : spaet = hellsteZeile("bild.png")
+PRINT "steigt "; spaet < frueh - 25
+--- erwartet
+steigt TRUE
