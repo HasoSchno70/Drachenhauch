@@ -125,16 +125,111 @@ with tempfile.TemporaryDirectory() as t:
         for n in ("dhrt.js", "dhrt.wasm", "dhrt.data"):
             (rel / n).write_bytes(b"alt")
     anlegen()
-    erst = bw.erzwinge_relink("-s A=1") is True and not (rel / "dhrt.wasm").exists()
+    erst = bw.erzwinge_relink("-s A=1", rel) is True and not (rel / "dhrt.wasm").exists()
     anlegen()
-    gleich = bw.erzwinge_relink("-s A=1") is False and (rel / "dhrt.wasm").read_bytes() == b"alt"
-    neu = bw.erzwinge_relink("-s A=2") is True and not (rel / "dhrt.wasm").exists() and not (rel / "dhrt.data").exists()
+    gleich = bw.erzwinge_relink("-s A=1", rel) is False and (rel / "dhrt.wasm").read_bytes() == b"alt"
+    neu = bw.erzwinge_relink("-s A=2", rel) is True and not (rel / "dhrt.wasm").exists() and not (rel / "dhrt.data").exists()
     print("relink", erst, gleich, neu)
+
+# Der Zielordner: CARGO_TARGET_DIR, wenn gesetzt -- relativ zum Ordner, in
+# dem cargo laeuft (out_dir) --, sonst target/ im Crate
+with tempfile.TemporaryDirectory() as t:
+    t = Path(t)
+    bw.CRATE = t / "crate"
+    ohne = bw.release_ordner(t / "web", {}) == t / "crate" / "target" / bw.TARGET / "release"
+    absolut = bw.release_ordner(t / "web", {"CARGO_TARGET_DIR": str(t / "ziel")}) == t / "ziel" / bw.TARGET / "release"
+    relativ = bw.release_ordner(t / "web", {"CARGO_TARGET_DIR": "bau"}) == (t / "web").resolve() / "bau" / bw.TARGET / "release"
+    print("zielordner", ohne, absolut, relativ)
+
+# Das Datenpaket: dieselbe Quelle laesst den Stempel stehen (copy_source
+# schreibt sie dann nicht neu), ein geaendertes Asset nicht
+with tempfile.TemporaryDirectory() as t:
+    t = Path(t)
+    (t / "spiel" / "assets").mkdir(parents=True)
+    quelle = t / "spiel" / "main.dh"
+    quelle.write_text('PRINT "x"\n', encoding="utf-8")
+    (t / "spiel" / "assets" / "a.fs").write_text("alt", encoding="utf-8")
+    web = t / "web"
+    bw.copy_source(quelle, web)
+    bw.copy_assets(quelle, web)
+    s1 = bw.paket_stempel(web)
+    bw.copy_source(quelle, web)
+    bw.copy_assets(quelle, web)
+    gleich = bw.paket_stempel(web) == s1
+    (t / "spiel" / "assets" / "a.fs").write_text("neu und laenger", encoding="utf-8")
+    bw.copy_assets(quelle, web)
+    asset = bw.paket_stempel(web) != s1 and "assets/a.fs" in s1
+    quelle.write_text('PRINT "y"\n', encoding="utf-8")
+    s2 = bw.paket_stempel(web)
+    bw.copy_source(quelle, web)
+    programm = bw.paket_stempel(web) != s2
+    print("stempel", gleich, asset, programm)
+
+# Neu linken auch bei gleichen Flags, wenn sich das Paket aendert -- und dann
+# auch in deps/ loeschen (sonst holt cargo die alte Kopie von dort zurueck)
+with tempfile.TemporaryDirectory() as t:
+    rel = Path(t) / "rel"
+    (rel / "deps").mkdir(parents=True)
+    bw.erzwinge_relink("-s A=1", rel, "paket 1")
+    for n in ("dhrt.js", "dhrt.wasm", "dhrt.data"):
+        (rel / n).write_bytes(b"alt")
+        (rel / "deps" / n).write_bytes(b"alt")
+    bleibt = bw.erzwinge_relink("-s A=1", rel, "paket 1") is False and (rel / "deps" / "dhrt.data").exists()
+    neu = bw.erzwinge_relink("-s A=1", rel, "paket 2") is True
+    weg = not any((o / n).exists() for o in (rel, rel / "deps") for n in ("dhrt.js", "dhrt.wasm", "dhrt.data"))
+    print("relink paket", bleibt, neu, weg)
+
+# Der Bau mit einem nachgemachten cargo: die Ergebnisse kommen aus dem
+# Zielordner von CARGO_TARGET_DIR (dhrt.data aus deps/); fehlen sie, meldet
+# der Bau einen Fehler statt "Fertig"
+import os, types
+bw.check_toolchain = lambda: {"emcc": True, "cargo": True, "wasm_target": True}
+bw.setup_emscripten_env = lambda: False
+def bauen(liefern):
+    with tempfile.TemporaryDirectory() as t:
+        t = Path(t)
+        bw.CRATE = t / "crate"
+        (t / "spiel" / "assets").mkdir(parents=True)
+        quelle = t / "spiel" / "main.dh"
+        quelle.write_text('PRINT "x"\n', encoding="utf-8")
+        (t / "spiel" / "assets" / "a.fs").write_text("shader", encoding="utf-8")
+        web = t / "web"
+        def lauf(cmd, cwd=None, env=None):
+            rel = bw.release_ordner(cwd, env)
+            if liefern:
+                (rel / "deps").mkdir(parents=True, exist_ok=True)
+                (rel / "dhrt.js").write_bytes(b"js")
+                (rel / "dhrt.wasm").write_bytes(b"wasm")
+                (rel / "deps" / "dhrt.data").write_bytes(b"daten")
+            return types.SimpleNamespace(returncode=0)
+        bw.subprocess = types.SimpleNamespace(run=lauf)
+        alt = os.environ.get("CARGO_TARGET_DIR")
+        os.environ["CARGO_TARGET_DIR"] = str(t / "ziel")
+        puffer = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(puffer):
+                rc = bw.build(quelle, web)
+        finally:
+            if alt is None:
+                del os.environ["CARGO_TARGET_DIR"]
+            else:
+                os.environ["CARGO_TARGET_DIR"] = alt
+        da = all((web / n).exists() for n in ("dhrt.js", "dhrt.wasm", "dhrt.data"))
+        return rc, da, puffer.getvalue()
+rc, da, text = bauen(True)
+print("bau", rc == 0, da and "Fertig" in text)
+rc, da, text = bauen(False)
+print("bau ohne ergebnis", rc == 2, "FEHLER" in text and "Fertig" not in text)
 print("ergebnis fertig")
 --- erwartet
 toolchain True
 eingebettet True
 ohne toolchain True
 relink True True True
+zielordner True True True
+stempel True True True
+relink paket True True True
+bau True True
+bau ohne ergebnis True True
 ergebnis fertig
 rueckgabe 0
