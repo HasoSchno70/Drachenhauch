@@ -335,8 +335,8 @@ SUB beschriftung(takt AS FLOAT)
         "Earthrise: atmosphere, clouds and city lights, all in a shader", 646, 18, zeigen(takt, AB_ORBIT + 1, AB_ORBIT + 6), FALSE)
     zweisprachig("Wiedereintritt: Plasma aus Rauschen, das mit der Bassdrum glüht", _
         "Re-entry: plasma made of noise, glowing with the kick drum", 646, 18, zeigen(takt, AB_EINTRITT + 1, AB_EINTRITT + 6), FALSE)
-    zweisprachig("Über den Wolken: ein Wolkenmeer aus Höhenrauschen im Morgenlicht", _
-        "Above the clouds: a sea of clouds from height noise in the morning light", 646, 18, zeigen(takt, AB_WOLKEN + 1, AB_WOLKEN + 6), FALSE)
+    zweisprachig("Über den Wolken: Wolken als Volumen, Wildgänse ziehen der Sonne entgegen", _
+        "Above the clouds: clouds as a volume, wild geese heading for the sun", 646, 18, zeigen(takt, AB_WOLKEN + 1, AB_WOLKEN + 6), FALSE)
     zweisprachig("Küste: der Leuchtturm kreist im Takt", _
         "Coast: the lighthouse turns in time", 646, 18, zeigen(takt, AB_KUESTE + 1, AB_KUESTE + 6), FALSE)
     ' Abspann

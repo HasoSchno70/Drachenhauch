@@ -2887,7 +2887,11 @@ Richtung x Abstand -- 3D-Rauschen, darum ohne Naht bei atan), ueber den
 Wolken (112..128, `wolken.fs`: Volumen -- Dichte aus 3D-Rauschen ueber
 groben Feldern, die Luecken lassen; je Schritt zwei Proben zur Sonne. Ein
 Hoehenfeld war erst eine geschlossene Decke, mit Loechern dann Tafelberge
-mit senkrechten Waenden -- der Nutzer: "eine geschlossene Decke"), Kueste
+mit senkrechten Waenden -- der Nutzer: "eine geschlossene Decke"; dazu
+Wildgaense in V-Form, je Gans ein paar Weltstrecken -- Rumpf, Hals, Fluegel
+mit Knick -- ins Bild projiziert, in den Wolkenmarsch eingesetzt, sobald
+der Strahl ihre Tiefe passiert; von der Seite gesehen war das V eine Linie,
+darum ueberholen sie die Kamera und werden von oben gesehen), Kueste
 (128..136, `kueste.fs`: SDF-Klippe mit Saeulen und Baendern, Brandungs-
 felsen, Turm mit Galerie, Waerterhaus, Moewen als Vs im Bild, Lichtkegel
 als Abstand Blickstrahl/Kegelachse, eine Umdrehung in zwei Takten; die

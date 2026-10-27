@@ -97,6 +97,75 @@ vec3 himmel(vec3 d, vec3 s) {
     return c;
 }
 
+// --- Wildgaense ------------------------------------------------------------------
+// Ein Schwarm in V-Form ueberholt die Kamera und zieht voraus, der Sonne
+// entgegen, in Hoehe der Wolkentuerme -- man sieht ihn schraeg von oben und
+// hinten, das V mit der Spitze voran, die Fluegel weit ausgebreitet. Jede
+// Gans ist aus wenigen Strecken in der Welt gebaut (Rumpf, Hals, zwei
+// Fluegel mit Knick) und ins Bild projiziert; die Fluegel schlagen auf und
+// ab, jede ein wenig spaeter als die vor ihr. Zurueck kommt die Maske der
+// Gans am Bildpunkt und ihr Abstand -- damit Wolken davor sie verdecken und
+// sie die Wolken dahinter.
+float strecke(vec2 p, vec2 a, vec2 b) {
+    vec2 pa = p - a, ba = b - a;
+    float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+    return length(pa - ba * h);
+}
+
+// Weltpunkt -> Bild (xy) und Abstand vor der Kamera (z)
+vec3 insBild(vec3 w, vec3 ro, vec3 vorne, vec3 rechts, vec3 oben) {
+    vec3 zu = w - ro;
+    float z = dot(zu, vorne);
+    return vec3(vec2(dot(zu, rechts), dot(zu, oben)) / max(z, 0.01), z);
+}
+
+float gaense(vec2 uv, vec3 ro, vec3 vorne, vec3 rechts, vec3 oben, out float tiefe) {
+    tiefe = 1e9;
+    float u = clamp((fort - 0.06) / 0.9, 0.0, 1.0);
+    if (u <= 0.0 || u >= 1.0) return 0.0;
+    vec3 F = normalize(vec3(0.42, 0.03, 1.0));      // Flugrichtung: zur Sonne
+    vec3 S = normalize(vec3(F.z, 0.0, -F.x));       // quer dazu
+    vec3 H = cross(F, S) * -1.0;                    // nach oben
+    float vor = mix(24.0, 90.0, u * u * (3.0 - 2.0 * u));
+    vec3 spitze = vec3(ro.x, 0.0, ro.z) + F * vor + vec3(0.0, mix(5.6, 7.6, u), 0.0);
+    float maske = 0.0;
+    float px = 1.0 / resolution.y;
+    for (int i = 0; i < 13; i++) {
+        float fi = float(i);
+        // 0 = die Spitze, dann abwechselnd linker und rechter Arm
+        float k = floor((fi + 1.0) * 0.5);
+        float seite = mod(fi, 2.0) < 0.5 ? 1.0 : -1.0;
+        // der rechte Arm ist kuerzer -- wie meist bei einem echten Zug
+        if (seite < 0.0 && k > 4.0) continue;
+        vec3 g = spitze - F * k * 2.7 + S * seite * k * 1.5;
+        g += H * 0.25 * sin(time * 0.9 + fi * 1.3) + S * 0.15 * sin(time * 0.7 + fi * 2.1);
+        vec3 m = insBild(g, ro, vorne, rechts, oben);
+        if (m.z < 1.5) continue;
+        float gr = 1.3 / m.z;                       // ungefaehre Groesse im Bild
+        if (length(uv - m.xy) > gr * 1.6) continue;
+        float schlag = sin(time * 5.0 - k * 0.55 + seite * 0.25);
+        float dick = 1.0 / m.z;                     // 1 Welteinheit im Bild
+        // Rumpf und Hals, vorn der Kopf
+        vec3 a = insBild(g - F * 0.55, ro, vorne, rechts, oben);
+        vec3 b = insBild(g + F * 0.25, ro, vorne, rechts, oben);
+        vec3 c = insBild(g + F * 0.8 + H * 0.05, ro, vorne, rechts, oben);
+        float form = strecke(uv, a.xy, b.xy) - 0.16 * dick;
+        form = min(form, strecke(uv, b.xy, c.xy) - 0.06 * dick);
+        form = min(form, length(uv - c.xy) - 0.09 * dick);
+        // zwei Fluegel mit Knick: der innere Teil hebt sich weniger als die Spitze
+        for (int w = 0; w < 2; w++) {
+            float sw = w == 0 ? 1.0 : -1.0;
+            vec3 knick = insBild(g + S * sw * 0.6 + H * schlag * 0.25 - F * 0.05, ro, vorne, rechts, oben);
+            vec3 tip = insBild(g + S * sw * 1.15 + H * schlag * 0.65 - F * 0.3, ro, vorne, rechts, oben);
+            form = min(form, strecke(uv, b.xy * 0.6 + a.xy * 0.4, knick.xy) - 0.11 * dick);
+            form = min(form, strecke(uv, knick.xy, tip.xy) - 0.06 * dick);
+        }
+        float mk = smoothstep(px * 1.2, 0.0, form);
+        if (mk > maske) { maske = mk; tiefe = length(g - ro); }
+    }
+    return maske;
+}
+
 float uebHash(float x) { return fract(sin(x * 91.7) * 43758.5453); }
 vec3 uebergang(vec3 c, vec2 uv) {
     float r = length(uv);
@@ -151,6 +220,14 @@ void main() {
         grund = mix(grund, hm, 1.0 - exp(-tm * 0.0025));
     }
 
+    // die Gaense: dunkle Silhouetten, im Gegenlicht mit warmem Saum, in der
+    // Ferne vom Dunst aufgehellt
+    float gTiefe;
+    float gMaske = gaense(uv, ro, vorne, rechts, oben, gTiefe);
+    vec3 gFarbe = mix(vec3(0.09, 0.07, 0.1), vec3(0.55, 0.35, 0.3), 0.25 * pow(max(dot(d, s), 0.0), 3.0));
+    gFarbe = mix(gFarbe, hm, 1.0 - exp(-gTiefe * 0.006));
+    bool gDa = gMaske <= 0.0;
+
     // durch die Schicht: von oben bis unten (oder bis zur Sichtweite)
     vec3 licht = vec3(0.0);
     float durch = 1.0;          // wie viel vom Hintergrund noch durchkommt
@@ -165,6 +242,12 @@ void main() {
         for (int i = 0; i < 80; i++) {
             if (i >= schritte || t > t1 || durch < 0.03) break;
             float dt = 0.2 + t * 0.018;
+            // eine Gans vor dieser Stelle legt sich ueber das, was dahinter kommt
+            if (!gDa && t > gTiefe) {
+                licht += durch * gMaske * gFarbe;
+                durch *= 1.0 - gMaske;
+                gDa = true;
+            }
             vec3 p = ro + d * t;
             float dd = dichte(p, 4);
             if (dd > 0.002) {
@@ -184,6 +267,10 @@ void main() {
             }
             t += dt;
         }
+    }
+    if (!gDa) {
+        licht += durch * gMaske * gFarbe;
+        durch *= 1.0 - gMaske;
     }
     vec3 c = licht + grund * durch;
 
