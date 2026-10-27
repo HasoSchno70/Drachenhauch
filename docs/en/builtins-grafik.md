@@ -825,7 +825,7 @@ does nothing.
 | Function | Purpose |
 |---|---|
 | `SHADER_LOAD(pfad_oder_glsl$)` → INTEGER | load a fragment shader — from a file or directly as source text; `-1` on error |
-| `POSTFX(shader)` | send every finished frame through this shader; `-1` switches it off |
+| `POSTFX(shader [, scale])` | send every finished frame through this shader; `-1` switches it off. `scale` (0.25..1, default 1) lets the shader work at a lower resolution and enlarges the result smoothly -- for expensive shaders on weak graphics chips (at 0.7 about half the work); text in the picture becomes a little softer |
 | `SHADER_SET(shader, name$, wert)` | pass a number to a `uniform float` |
 | `SHADER_SET2(shader, name$, x, y)` | two values (`vec2`) |
 | `SHADER_SET3(shader, name$, x, y, z)` | three values (`vec3`) |

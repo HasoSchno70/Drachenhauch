@@ -1551,7 +1551,7 @@
   "POINT3D": "single point",
   "POLYGON": "filled polygon — points is an ARRAY OF INTEGER with [x1, y1, x2, y2, …] (at least 3 points)",
   "POLYGONOUTLINE": "polygon as outline only",
-  "POSTFX": "send every finished frame through this shader; -1 switches it off",
+  "POSTFX": "send every finished frame through this shader; -1 switches it off. scale (0.25..1, default 1) lets the shader work at a lower resolution and enlarges the result smoothly -- for expensive shaders on weak graphics chips (at 0.7 about half the work); text in the picture becomes a little softer",
   "POW": "b to the power of e",
   "PROCESS_CLOSE": "end it (including everything the child started itself — cmd /C ping ... also ends the ping) / free the slot",
   "PROCESS_CLOSE_INPUT": "close the input (end of file for the child)",

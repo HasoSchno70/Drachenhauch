@@ -1050,6 +1050,7 @@ struct GfxState {
     cam3d_proj: Option<[f32; 16]>,
     text: (i32, i64, f32, u8),
     post_shader_idx: Option<usize>,
+    post_massstab: f32,
 }
 
 /// Web: den PUFFER der HTML-Leinwand auf die Fenstergroesse bringen.
@@ -1396,6 +1397,12 @@ pub struct Graphics {
     /// Shader und der Sampler bleibt schwarz.
     shader_textures: HashMap<usize, Vec<(i32, raylib::ffi::Texture2D)>>,
     post_shader_idx: Option<usize>,
+    /// Rechenaufloesung des Post-Shaders (POSTFX(h, massstab)): 1 = volle
+    /// Fenstergroesse. Darunter rechnet der Shader in `post_klein` und das
+    /// Ergebnis wird weich auf das Fenster vergroessert -- ein Raymarching-
+    /// Shader kostet je Bildpunkt, bei 0,7 also rund die Haelfte.
+    post_massstab: f32,
+    post_klein: Option<(RenderTexture2D, u32, u32)>,
     /// Stapel fuer GFX_PUSH/GFX_POP.
     gfx_stack: Vec<GfxState>,
     /// Wie viele Clip-Rechtecke gerade offen sind. Wird pro Bild
@@ -1918,7 +1925,8 @@ impl Graphics {
             ansage: String::new(), ansage_dringend: false, ansage_nr: 0,
             fullscreen: false, pre_fullscreen: None,
             shaders: Vec::new(), shader_textures: HashMap::new(),
-            post_shader_idx: None, gfx_stack: Vec::new(), clip_tiefe: 0, scene_rt,
+            post_shader_idx: None, post_massstab: 1.0, post_klein: None,
+            gfx_stack: Vec::new(), clip_tiefe: 0, scene_rt,
             abgelegt: Vec::new(),
             layers: vec![Layer { z: 0, cmds: Vec::new() }],
             layer_names,
@@ -6461,6 +6469,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             cam3d_proj: self.cam3d_proj,
             text: (self.text_size, self.active_font, self.text_spacing, self.text_stil),
             post_shader_idx: self.post_shader_idx,
+            post_massstab: self.post_massstab,
         };
         self.gfx_stack.push(st);
     }
@@ -6514,6 +6523,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             Some(_) => None,   // Shader gibt es nicht mehr -> lieber ohne
             None => None,
         };
+        self.post_massstab = st.post_massstab;
         true
     }
 
@@ -6934,10 +6944,19 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     }
 
     /// Aktiven Post-Processing-Shader setzen (-1 = aus).
-    pub fn set_postfx(&mut self, h: i64) {
+    pub fn set_postfx(&mut self, h: i64, massstab: Option<f64>) -> Result<(), String> {
+        if let Some(m) = massstab {
+            if !(0.25..=1.0).contains(&m) {
+                return Err(format!("POSTFX: der Massstab muss zwischen 0.25 und 1 liegen, nicht {}", m));
+            }
+            self.post_massstab = m as f32;
+        } else {
+            self.post_massstab = 1.0;
+        }
         self.post_shader_idx = if h >= 0 && (h as usize) < self.shaders.len() {
             Some(h as usize)
         } else { None };
+        Ok(())
     }
 
     pub fn quit_requested(&self) -> bool {
@@ -7203,10 +7222,24 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         let cam_proj = self.cam3d_proj;
         // Instancing-Shader (ffi::Shader = Copy) fuer den DrawMeshInstanced-Pfad.
         let inst_ffi = self.inst_shader.as_ref().map(|s| *s.as_ref());
+        // Kleines Ziel fuer den Post-Shader (POSTFX mit Massstab < 1): einmal je
+        // Groesse anlegen, weich vergroessert.
+        let klein_mass = if self.post_shader_idx.is_some() && self.post_massstab < 1.0 {
+            Some(((tw * self.post_massstab).round().max(1.0) as u32, (th * self.post_massstab).round().max(1.0) as u32))
+        } else { None };
+        if let Some((kw, kh)) = klein_mass {
+            let neu = !matches!(self.post_klein, Some((_, w, h)) if w == kw && h == kh);
+            if neu {
+                self.post_klein = self.rl.load_render_texture(&self.thread, kw, kh).ok().map(|rt| {
+                    unsafe { raylib::ffi::SetTextureFilter(rt.texture, 1 /*BILINEAR*/); }
+                    (rt, kw, kh)
+                });
+            }
+        }
         let Graphics { rl, thread, layers, textures, fonts, ausweich, font_glyphs, cmds3d, cam3d, models,
             light_shader, normal_mapped, loc_use_normal, pbr_params, loc_metalness, loc_roughness,
             emissive, loc_emissive,
-            scene_rt, shaders, shader_textures, post_shader_idx, render_targets, .. } = self;
+            scene_rt, shaders, shader_textures, post_shader_idx, render_targets, post_klein, .. } = self;
         let mat_locs = (*loc_use_normal, *loc_metalness, *loc_roughness, *loc_emissive);
         let ausweich: &[Ausweich] = ausweich.as_slice();
         let font_glyphs: &[std::collections::HashSet<u32>] = font_glyphs.as_slice();
@@ -7259,6 +7292,30 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             // 2) RT per Fragment-Shader auf den Screen praesentieren (Y-flip).
             let src = Rectangle::new(0.0, 0.0, tw, -th);
             let dst = Rectangle::new(0.0, 0.0, tw, th);
+            // Mit Massstab < 1: der Shader rechnet in das kleine Ziel, das dann
+            // weich auf den Schirm vergroessert wird (beide Male mit Y-flip).
+            let klein = if klein_mass.is_some() { post_klein.as_mut() } else { None };
+            // Verkleinert liest der Shader die Szene (Text im Bild) zwischen den
+            // Punkten -- weich statt naechster Punkt, sonst fallen Striche weg.
+            unsafe { raylib::ffi::SetTextureFilter(rt.texture, if klein.is_some() { 1 } else { 0 }); }
+            if let Some((krt, kw, kh)) = klein {
+                let (kw, kh) = (*kw as f32, *kh as f32);
+                {
+                    let mut tx = rl.begin_texture_mode(thread, krt);
+                    tx.clear_background(Color::BLACK);
+                    let sh_ffi = *shaders[idx].as_ref();
+                    let mut sm = tx.begin_shader_mode(&mut shaders[idx]);
+                    if let Some(slots) = shader_textures.get(&idx) {
+                        for (loc, tex) in slots {
+                            unsafe { raylib::ffi::SetShaderValueTexture(sh_ffi, *loc, *tex); }
+                        }
+                    }
+                    sm.draw_texture_pro(&*rt, src, Rectangle::new(0.0, 0.0, kw, kh), Vector2::zero(), 0.0, Color::WHITE);
+                }
+                let mut d = rl.begin_drawing(thread);
+                d.clear_background(Color::BLACK);
+                d.draw_texture_pro(&*krt, Rectangle::new(0.0, 0.0, kw, -kh), dst, Vector2::zero(), 0.0, Color::WHITE);
+            } else {
             let mut d = rl.begin_drawing(thread);
             d.clear_background(Color::BLACK);
             {
@@ -7274,6 +7331,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                     }
                 }
                 sm.draw_texture_pro(&*rt, src, dst, Vector2::zero(), 0.0, Color::WHITE);
+            }
             }
         } else {
             let mut d = rl.begin_drawing(thread);

@@ -248,3 +248,64 @@ void main() {
 
 --- bild
 60 45 #808080 +-8
+
+=== postfx mit massstab rechnet in kleinerer aufloesung
+' POSTFX(h, 0.5): der Shader rechnet auf 60 x 45 Punkten, das Ergebnis wird
+' weich vergroessert -- rechts kommt also nur gut die Haelfte von x/120 an.
+SCREEN(120, 90, "P", 1)
+DIM sh AS INTEGER : sh = SHADER_LOAD("g.fs")
+POSTFX(sh, 0.5)
+WHILE NOT QUITREQUESTED()
+    CLS(&HFFFFFF)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- datei g.fs
+#version 330
+in vec2 fragTexCoord;
+uniform sampler2D texture0;
+out vec4 finalColor;
+void main() {
+  finalColor = vec4(gl_FragCoord.x / 120.0, 0.0, 0.0, 1.0);
+}
+
+--- bild
+115 45 #7B0000 +-8
+
+=== postfx ohne massstab rechnet in voller aufloesung
+' Gegenprobe zum Fall davor: derselbe Shader ohne Massstab.
+SCREEN(120, 90, "P", 1)
+DIM sh AS INTEGER : sh = SHADER_LOAD("g.fs")
+POSTFX(sh)
+WHILE NOT QUITREQUESTED()
+    CLS(&HFFFFFF)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- datei g.fs
+#version 330
+in vec2 fragTexCoord;
+uniform sampler2D texture0;
+out vec4 finalColor;
+void main() {
+  finalColor = vec4(gl_FragCoord.x / 120.0, 0.0, 0.0, 1.0);
+}
+
+--- bild
+115 45 #F50000 +-8
+
+=== postfx lehnt einen massstab ausserhalb ab
+SCREEN(120, 90, "P", 1)
+DIM sh AS INTEGER : sh = SHADER_LOAD("g.fs")
+POSTFX(sh, 2.0)
+--- datei g.fs
+#version 330
+in vec2 fragTexCoord;
+uniform sampler2D texture0;
+out vec4 finalColor;
+void main() { finalColor = texture(texture0, fragTexCoord); }
+
+--- fehler
+POSTFX: der Massstab muss zwischen 0.25 und 1 liegen
