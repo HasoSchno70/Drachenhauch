@@ -104,8 +104,11 @@ void main() {
         vec3 fGas = mix(vec3(1.0, 0.15, 0.6), vec3(0.1, 0.8, 1.0), smoothstep(0.3, 0.7, mischung));
         fGas = mix(fGas, vec3(1.0, 0.75, 0.35), smoothstep(0.85, 1.1, f));
         float naehe = exp(-t * 0.05);
-        sammel += mix(fGas, farbe, 0.3) * leucht * durch * 0.7 * (0.6 + 0.4 * naehe) * (1.0 + 0.4 * kick + 0.7 * ton);
-        durch *= 1.0 - dunkel * 0.16 - leucht * 0.04;
+        // mit weniger Schritten (guete < 1) zaehlt jeder mehr -- sonst wuerde
+        // der Nebel bei geringerer Guete dunkler
+        float gew = 1.0 / G();
+        sammel += mix(fGas, farbe, 0.3) * leucht * durch * 0.7 * (0.6 + 0.4 * naehe) * (1.0 + 0.4 * kick + 0.7 * ton) * gew;
+        durch *= pow(max(1.0 - dunkel * 0.16 - leucht * 0.04, 0.0), gew);
         if (durch < 0.02) break;
         t += (0.22 + t * 0.035) / G();
         if (float(i) >= 56.0 * G()) break;

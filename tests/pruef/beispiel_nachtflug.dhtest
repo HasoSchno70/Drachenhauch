@@ -621,3 +621,109 @@ DIM spaet AS INTEGER : spaet = hellsteZeile("bild.png")
 PRINT "steigt "; spaet < frueh - 25
 --- erwartet
 steigt TRUE
+
+=== langsame bilder senken die stufe
+' Ohne --stufe waehlt die Demo die Guete selbst: hier dauert jedes Bild
+' kuenstlich 30 ms (unter 50 je Sekunde), also geht sie Stufe um Stufe bis 4
+' herunter. Die Regel "unter fester Bildzahl Stufe 0" ist dafuer entfernt.
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+--- ersetzen IF festeStufe < 0 AND GETENV$("DHRT_FRAMES") <> "" THEN festeStufe = 0
+' (entfernt)
+--- ersetzen     gueteNachziehen(sh)
+    SLEEP(30) : gueteNachziehen(sh)
+--- ersetzen     PRINT "Bilder je Sekunde: "; FORMAT$(bilder / MAX(0.001, GET_TIME() - start), "%.1f")
+    PRINT "guete "; guete; " massstab "; massstab
+--- argumente
+--fenster
+--messen
+--ab
+20
+--- umgebung
+DHRT_FRAMES=200
+DH_OHNE_AUDIO=1
+--- enthaelt
+-> Stufe 1
+-> Stufe 4
+guete 0.45 massstab 0.5
+
+=== unter fester bildzahl bleibt die stufe
+' Gegenprobe: dieselben langsamen Bilder, aber mit DHRT_FRAMES (Pruefungen,
+' Bildaufnahmen) gilt Stufe 0 -- die Bilder der anderen Faelle haengen so
+' nicht an der Last des Rechners.
+--- programm ../../examples/nachtflug/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+--- ersetzen     gueteNachziehen(sh)
+    SLEEP(30) : gueteNachziehen(sh)
+--- ersetzen     PRINT "Bilder je Sekunde: "; FORMAT$(bilder / MAX(0.001, GET_TIME() - start), "%.1f")
+    PRINT "guete "; guete; " massstab "; massstab
+--- argumente
+--fenster
+--messen
+--ab
+20
+--- umgebung
+DHRT_FRAMES=200
+DH_OHNE_AUDIO=1
+--- erwartet
+guete 1.0 massstab 1.0
+
+=== sparsam baut erst bei bedarf und gibt wieder frei
+' Mit --sparsam (im Browser auf Geraeten mit wenig Speicher) entsteht vor dem
+' Start nur, was in den ersten Takten erklingt; waehrend der Fahrt wird jeder
+' Klang vor seinem Einsatz gebaut und danach freigegeben. Geprueft Takt fuer
+' Takt wie im Lauf (bei 2 Bildern je Schritt, also einem langsamen Geraet):
+' nichts darf erst beim Einsatz entstehen (das waere ein Ruckler), und es
+' leben nie mehr als halb so viele Klaenge wie mit allem vorab.
+IMPORT "helfer.dh"
+sparsam = TRUE
+musikVorbereiten(0)
+WHILE vorbauen()
+WEND
+PRINT "vor dem start wenige "; bauPos < 20
+' die Partitur ausschreiben lassen, damit spielen() nichts anfasst, was es
+' hier nicht gibt -- und an der Zahl der Klaenge sehen, ob einer fehlte
+ausschreiben = TRUE
+lied = AUDIO_SOUND_NEW(1000)
+DIM spitze AS INTEGER
+DIM nachgebaut AS INTEGER
+DIM jetzt AS INTEGER
+FOR jetzt = 0 TO schritteGesamt() - 1
+    bauGrenze = jetzt + VORLAUF
+    vorbauen()
+    vorbauen()
+    freigeben(jetzt)
+    DIM vorher AS INTEGER : vorher = LEN(klaenge)
+    schrittPlanen(jetzt)
+    nachgebaut = nachgebaut + LEN(klaenge) - vorher
+    spitze = MAX(spitze, AUDIO_SOUND_COUNT())
+NEXT
+PRINT "nichts erst beim einsatz gebaut "; nachgebaut = 0
+PRINT "alle eintraege gebaut "; bauPos = LEN(bauKey)
+PRINT "hoechstens 150 zugleich "; spitze <= 150
+EPRINT("zugleich hoechstens " + STR$(spitze))
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- erwartet
+vor dem start wenige TRUE
+nichts erst beim einsatz gebaut TRUE
+alle eintraege gebaut TRUE
+hoechstens 150 zugleich TRUE
+
+=== ohne sparsam steht vor dem start alles
+' Gegenprobe: ohne den Schalter baut die Demo wie bisher alles vorab.
+IMPORT "helfer.dh"
+musikVorbereiten(0)
+WHILE vorbauen()
+WEND
+PRINT "alles gebaut "; bauPos = LEN(bauKey); ", mehr als 300 klaenge "; AUDIO_SOUND_COUNT() > 300
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- erwartet
+alles gebaut TRUE, mehr als 300 klaenge TRUE

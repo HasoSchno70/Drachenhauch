@@ -1553,7 +1553,7 @@
   "POINT3D": "einzelner Punkt",
   "POLYGON": "gefülltes Polygon — points ist ein ARRAY OF INTEGER mit [x1, y1, x2, y2, …] (mind. 3 Punkte)",
   "POLYGONOUTLINE": "Polygon nur als Kontur",
-  "POSTFX": "jedes fertige Bild durch diesen Shader schicken; -1 schaltet ab",
+  "POSTFX": "jedes fertige Bild durch diesen Shader schicken; -1 schaltet ab. massstab (0.25..1, Vorgabe 1) lässt den Shader in kleinerer Auflösung rechnen und vergrößert das Ergebnis weich — für aufwendige Shader auf schwachen Grafikchips (bei 0.7 etwa die Hälfte der Arbeit); Text im Bild wird dabei etwas weicher",
   "POW": "b hoch e",
   "PROCESS_CLOSE": "beenden (samt allem, was das Kind selbst gestartet hat — cmd /C ping ... beendet auch den ping) / den Platz freigeben",
   "PROCESS_CLOSE_INPUT": "Eingabe schließen (Dateiende für das Kind)",

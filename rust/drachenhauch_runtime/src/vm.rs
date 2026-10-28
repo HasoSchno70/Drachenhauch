@@ -10439,7 +10439,14 @@ impl<'p> Vm<'p> {
                 g!().shader_set_matrix(h, &n, &m)?;
                 Value::Nil
             }
-            "postfx" => { g!().set_postfx(gi(a, 0, "POSTFX")?); Value::Nil }
+            "postfx" => {
+                if a.is_empty() || a.len() > 2 {
+                    return Err("POSTFX: erwartet (shader [, massstab])".into());
+                }
+                let m = if a.len() == 2 { Some(need_f(a, 1, "POSTFX")? as f64) } else { None };
+                g!().set_postfx(gi(a, 0, "POSTFX")?, m)?;
+                Value::Nil
+            }
 
             // --- 3D (Modul g3d) ---
             "camera3d" => {

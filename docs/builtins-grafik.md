@@ -827,7 +827,7 @@ eines anderen Ziels tut nichts.
 | Funktion | Zweck |
 |---|---|
 | `SHADER_LOAD(pfad_oder_glsl$)` → INTEGER | Fragment-Shader laden — aus einer Datei oder direkt als Quelltext; `-1` bei Fehler |
-| `POSTFX(shader)` | jedes fertige Bild durch diesen Shader schicken; `-1` schaltet ab |
+| `POSTFX(shader [, massstab])` | jedes fertige Bild durch diesen Shader schicken; `-1` schaltet ab. `massstab` (0.25..1, Vorgabe 1) lässt den Shader in kleinerer Auflösung rechnen und vergrößert das Ergebnis weich — für aufwendige Shader auf schwachen Grafikchips (bei 0.7 etwa die Hälfte der Arbeit); Text im Bild wird dabei etwas weicher |
 | `SHADER_SET(shader, name$, wert)` | eine Zahl an ein `uniform float` geben |
 | `SHADER_SET2(shader, name$, x, y)` | zwei Werte (`vec2`) |
 | `SHADER_SET3(shader, name$, x, y, z)` | drei Werte (`vec3`) |

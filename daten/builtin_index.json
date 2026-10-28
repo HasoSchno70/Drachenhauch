@@ -9203,7 +9203,7 @@
   {
    "name": "POSTFX",
    "kind": "graphics",
-   "signature": "POSTFX(h: INTEGER)",
+   "signature": "POSTFX(h: INTEGER [, massstab: FLOAT])",
    "module": "core"
   },
   {

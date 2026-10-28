@@ -155,6 +155,48 @@ DIM gegen AS ARRAY OF INTEGER : gegen = [ _
 DIM kKlang AS MAP OF INTEGER : kKlang = {}
 DIM klaenge AS ARRAY OF SOUND : klaenge = []
 
+' --- Klaenge nach Bedarf ------------------------------------------------------
+' Alle Klaenge auf einmal waren 415 MB (rund zwanzig Minuten Stereo) -- ein
+' schwaches Handy gibt einer Seite so viel nicht, die Demo blieb beim Laden
+' stehen. Darum ein Probelauf ueber die Partitur (`trocken`): jeder Baustein
+' merkt sich dabei, wann er zuerst und zuletzt erklingt, und hinterlegt eine
+' Funktion, die ihn baut. Gebaut wird kurz vor dem ersten Gebrauch
+' (`vorbauen`), freigegeben ein paar Takte nach dem letzten (`freigeben`).
+' So bleibt die Partitur die einzige Stelle, die weiss, was wann erklingt.
+' Das gilt nur mit `sparsam` (main.dh --sparsam, im Browser auf Geraeten mit
+' wenig Speicher): ohne entsteht wie bisher alles vor dem Start -- das
+' Bauen waehrend der Fahrt kostet am Rechner hin und wieder ein Bild.
+DIM sparsam AS BOOLEAN
+DIM trocken AS BOOLEAN
+DIM planN AS INTEGER
+DIM leer AS SOUND
+DIM bauIndex AS MAP OF INTEGER : bauIndex = {}
+DIM bauKey AS ARRAY OF STRING : bauKey = []
+DIM bauF AS ARRAY OF FUNCREF : bauF = []
+DIM bauErst AS ARRAY OF INTEGER : bauErst = []
+DIM bauLetzt AS ARRAY OF INTEGER : bauLetzt = []
+DIM bauWeg AS ARRAY OF BOOLEAN : bauWeg = []
+
+' Ein Klang mit einer langen Pause zwischen zwei Einsaetzen (der Chor im
+' Breakdown und wieder ueber den Wolken) bekommt fuer jeden Abschnitt einen
+' eigenen Eintrag: dazwischen wird er freigegeben und vorher neu gebaut.
+CONST PAUSE_NEU = 176      ' 11 Takte: laenger als Vor- und Nachlauf zusammen
+FUNCTION vormerken(k AS STRING, f AS FUNCREF) AS SOUND
+    DIM neu AS BOOLEAN : neu = NOT MAPHAS(bauIndex, k)
+    IF NOT neu THEN neu = planN - bauLetzt[MAPGET(bauIndex, k)] > PAUSE_NEU
+    IF NOT neu THEN
+        bauLetzt[MAPGET(bauIndex, k)] = planN
+    ELSE
+        MAPPUT(bauIndex, k, LEN(bauKey))
+        ARRAY_PUSH(bauKey, k)
+        ARRAY_PUSH(bauF, f)
+        ARRAY_PUSH(bauErst, planN)
+        ARRAY_PUSH(bauLetzt, planN)
+        ARRAY_PUSH(bauWeg, FALSE)
+    END IF
+    RETURN leer
+END FUNCTION
+
 FUNCTION gemerkt(schluessel AS STRING) AS INTEGER
     IF MAPHAS(kKlang, schluessel) THEN RETURN MAPGET(kKlang, schluessel)
     RETURN -1
@@ -210,6 +252,7 @@ SUB supersaw(ziel AS SOUND, ab AS INTEGER, f AS FLOAT, dauer AS INTEGER, a AS IN
 END SUB
 
 FUNCTION bassdrum() AS SOUND
+    IF trocken THEN RETURN vormerken("kick", FUNCTION() bassdrum())
     DIM i AS INTEGER : i = gemerkt("kick")
     IF i >= 0 THEN RETURN klaenge[i]
     ' Koerper: Sinus, der schnell nach unten faellt; dazu ein kurzer Klick
@@ -220,6 +263,7 @@ FUNCTION bassdrum() AS SOUND
 END FUNCTION
 
 FUNCTION klatschen() AS SOUND
+    IF trocken THEN RETURN vormerken("clap", FUNCTION() klatschen())
     DIM i AS INTEGER : i = gemerkt("clap")
     IF i >= 0 THEN RETURN klaenge[i]
     ' drei kurz versetzte Rauschstoesse, breit verteilt, mit kurzem Nachhall
@@ -235,6 +279,7 @@ END FUNCTION
 ' Ein kurzer Schlag aus Rauschen, fuer Fuellungen und den Wirbel
 FUNCTION schlag(laut AS FLOAT) AS SOUND
     DIM k AS STRING : k = "roll" + STR$(INT(laut * 10))
+    IF trocken THEN RETURN vormerken(k, FUNCTION() schlag(laut))
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(240)
@@ -245,6 +290,7 @@ END FUNCTION
 
 FUNCTION becken(offen AS BOOLEAN) AS SOUND
     DIM k AS STRING : k = IIF(offen, "hho", "hhc")
+    IF trocken THEN RETURN vormerken(k, FUNCTION() becken(offen))
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     IF offen THEN RETURN merken(k, AUDIO_SFX("noise", 9000, 0, 0, 20, 110, 0, 0, 0.32))
@@ -254,6 +300,7 @@ END FUNCTION
 ' Shaker: sehr kurzes, helles Rauschen, abwechselnd links und rechts
 FUNCTION shaker(rechts AS BOOLEAN) AS SOUND
     DIM k AS STRING : k = IIF(rechts, "shr", "shl")
+    IF trocken THEN RETURN vormerken(k, FUNCTION() shaker(rechts))
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(120)
@@ -262,6 +309,7 @@ FUNCTION shaker(rechts AS BOOLEAN) AS SOUND
 END FUNCTION
 
 FUNCTION crash() AS SOUND
+    IF trocken THEN RETURN vormerken("crash", FUNCTION() crash())
     DIM i AS INTEGER : i = gemerkt("crash")
     IF i >= 0 THEN RETURN klaenge[i]
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(4200)
@@ -276,6 +324,7 @@ END FUNCTION
 ' ein Sinus, der zwei Oktaven hinaufgleitet.
 FUNCTION aufstieg(takte AS INTEGER) AS SOUND
     DIM k AS STRING : k = "riser" + STR$(takte)
+    IF trocken THEN RETURN vormerken(k, FUNCTION() aufstieg(takte))
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM lang AS INTEGER : lang = INT(msJeSchritt() * 16 * takte)
@@ -289,6 +338,7 @@ END FUNCTION
 ' Offbeat-Bass: Saege eine Oktave ueber dem Grundton, Sinus darunter
 FUNCTION bass(nr AS INTEGER) AS SOUND
     DIM k AS STRING : k = "bass" + STR$(nr)
+    IF trocken THEN RETURN vormerken(k, FUNCTION() bass(nr))
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(260)
@@ -300,6 +350,7 @@ END FUNCTION
 ' Tiefer Grundton fuer den Breakdown: ein langer Sinus unter der Flaeche
 FUNCTION tiefe(nr AS INTEGER) AS SOUND
     DIM k AS STRING : k = "tief" + STR$(nr)
+    IF trocken THEN RETURN vormerken(k, FUNCTION() tiefe(nr))
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM lang AS INTEGER : lang = INT(msJeSchritt() * 32)
@@ -312,6 +363,7 @@ END FUNCTION
 ' einer tiefen Oktave darunter.
 FUNCTION flaeche(nr AS INTEGER, gross AS BOOLEAN) AS SOUND
     DIM k AS STRING : k = "pad" + STR$(nr) + IIF(gross, "g", "")
+    IF trocken THEN RETURN vormerken(k, FUNCTION() flaeche(nr, gross))
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM lang AS INTEGER : lang = INT(msJeSchritt() * 32)
@@ -332,6 +384,7 @@ END FUNCTION
 ' wieder anschwillt -- das Atmen unter dem Beat.
 FUNCTION pumpe(nr AS INTEGER) AS SOUND
     DIM k AS STRING : k = "pump" + STR$(nr)
+    IF trocken THEN RETURN vormerken(k, FUNCTION() pumpe(nr))
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM lang AS INTEGER : lang = INT(msJeSchritt() * 4)
@@ -349,6 +402,7 @@ END FUNCTION
 ' gespielt, zerhackt er die Flaeche in einen Rhythmus.
 FUNCTION gate(nr AS INTEGER) AS SOUND
     DIM k AS STRING : k = "gate" + STR$(nr)
+    IF trocken THEN RETURN vormerken(k, FUNCTION() gate(nr))
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM lang AS INTEGER : lang = INT(msJeSchritt() * 0.8)
@@ -387,6 +441,13 @@ END FUNCTION
 
 FUNCTION chor(nr AS INTEGER) AS SOUND
     DIM k AS STRING : k = "chor" + STR$(nr)
+    IF trocken THEN
+        DIM tv AS INTEGER
+        FOR tv = 0 TO 3
+            vormerken("chorv" + STR$(nr) + "_" + STR$(tv), FUNCTION() chorStimme(nr, tv))
+        NEXT
+        RETURN vormerken(k, FUNCTION() chor(nr))
+    END IF
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM lang AS INTEGER : lang = INT(msJeSchritt() * 32)
@@ -403,6 +464,7 @@ END FUNCTION
 ' Arpeggio-Ton: kurz gezupft, weich, mit Ping-Pong-Echo
 FUNCTION zupf(midi AS INTEGER, pan AS FLOAT) AS SOUND
     DIM k AS STRING : k = "arp" + STR$(midi) + IIF(pan < 0, "l", "r")
+    IF trocken THEN RETURN vormerken(k, FUNCTION() zupf(midi, pan))
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM t AS SOUND : t = AUDIO_SOUND_NEW(460)
@@ -416,6 +478,7 @@ END FUNCTION
 ' Funken im Intro und im Ausklang.
 FUNCTION glocke(midi AS INTEGER) AS SOUND
     DIM k AS STRING : k = "glocke" + STR$(midi)
+    IF trocken THEN RETURN vormerken(k, FUNCTION() glocke(midi))
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM t AS SOUND : t = AUDIO_SOUND_NEW(2200)
@@ -430,6 +493,7 @@ END FUNCTION
 ' Dreieck fuer die Waerme -- und das Ping-Pong-Echo.
 FUNCTION klavier(midi AS INTEGER, achtel AS INTEGER) AS SOUND
     DIM k AS STRING : k = "klav" + STR$(midi) + "_" + STR$(achtel)
+    IF trocken THEN RETURN vormerken(k, FUNCTION() klavier(midi, achtel))
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM dauer AS INTEGER : dauer = INT(msJeSchritt() * 2 * achtel)
@@ -446,6 +510,7 @@ END FUNCTION
 ' Lange Toene bekommen ein ganz leichtes Vibrato.
 FUNCTION lead(midi AS INTEGER, achtel AS INTEGER) AS SOUND
     DIM k AS STRING : k = "lead" + STR$(midi) + "_" + STR$(achtel)
+    IF trocken THEN RETURN vormerken(k, FUNCTION() lead(midi, achtel))
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM dauer AS INTEGER : dauer = INT(msJeSchritt() * 2 * achtel) - 25
@@ -466,6 +531,7 @@ END FUNCTION
 
 ' Grollen: ein Takt tiefes Rauschen mit Unterbass, darueber ein Fauchen
 FUNCTION grollen() AS SOUND
+    IF trocken THEN RETURN vormerken("grollen", FUNCTION() grollen())
     DIM i AS INTEGER : i = gemerkt("grollen")
     IF i >= 0 THEN RETURN klaenge[i]
     DIM lang AS INTEGER : lang = INT(msJeSchritt() * 16)
@@ -478,6 +544,7 @@ END FUNCTION
 
 ' Wind: zwei Takte, ein Rauschen schwillt an und ab, links tiefer als rechts
 FUNCTION wind() AS SOUND
+    IF trocken THEN RETURN vormerken("wind", FUNCTION() wind())
     DIM i AS INTEGER : i = gemerkt("wind")
     IF i >= 0 THEN RETURN klaenge[i]
     DIM lang AS INTEGER : lang = INT(msJeSchritt() * 32)
@@ -517,6 +584,7 @@ END SUB
 ' vier Fassungen, damit sich der Ruf nicht hoerbar wiederholt.
 FUNCTION gaenseRuf(nr AS INTEGER) AS SOUND
     DIM k AS STRING : k = "gans" + STR$(nr)
+    IF trocken THEN RETURN vormerken(k, FUNCTION() gaenseRuf(nr))
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM t AS SOUND : t = AUDIO_SOUND_NEW(1900)
@@ -536,6 +604,7 @@ END FUNCTION
 
 ' Brandung: eine Welle bricht -- erst das tiefe Rauschen, dann die Gischt
 FUNCTION brandung() AS SOUND
+    IF trocken THEN RETURN vormerken("brandung", FUNCTION() brandung())
     DIM i AS INTEGER : i = gemerkt("brandung")
     IF i >= 0 THEN RETURN klaenge[i]
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(4200)
@@ -547,6 +616,7 @@ END FUNCTION
 ' Moewe: ein heller Ruf, der nach unten kippt ("kjaa"), mit kurzem Nachruf
 FUNCTION moewe(nr AS INTEGER) AS SOUND
     DIM k AS STRING : k = "moewe" + STR$(nr)
+    IF trocken THEN RETURN vormerken(k, FUNCTION() moewe(nr))
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM t AS SOUND : t = AUDIO_SOUND_NEW(1200)
@@ -559,6 +629,7 @@ END FUNCTION
 
 ' Nebelhorn: ein tiefer, rauer Ton aus der Ferne, lang ausklingend
 FUNCTION nebelhorn() AS SOUND
+    IF trocken THEN RETURN vormerken("nebelhorn", FUNCTION() nebelhorn())
     DIM i AS INTEGER : i = gemerkt("nebelhorn")
     IF i >= 0 THEN RETURN klaenge[i]
     DIM t AS SOUND : t = AUDIO_SOUND_NEW(4200)
@@ -569,6 +640,7 @@ END FUNCTION
 
 ' Plaetschern: kleine Wellen am naechtlichen Meer, sanft und tief
 FUNCTION plaetschern() AS SOUND
+    IF trocken THEN RETURN vormerken("plaetschern", FUNCTION() plaetschern())
     DIM i AS INTEGER : i = gemerkt("plaetschern")
     IF i >= 0 THEN RETURN klaenge[i]
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(3800)
@@ -580,6 +652,7 @@ END FUNCTION
 
 ' Fahrtwind im Tiefflug: heller und schneller als der Wind ueber den Wolken
 FUNCTION fahrtwind() AS SOUND
+    IF trocken THEN RETURN vormerken("fahrtwind", FUNCTION() fahrtwind())
     DIM i AS INTEGER : i = gemerkt("fahrtwind")
     IF i >= 0 THEN RETURN klaenge[i]
     DIM lang AS INTEGER : lang = INT(msJeSchritt() * 32)
@@ -592,6 +665,7 @@ END FUNCTION
 ' Ein Ring rauscht im Tunnel vorbei: kurz, der Filter oeffnet sich schnell
 FUNCTION vorbei(rechts AS BOOLEAN) AS SOUND
     DIM k AS STRING : k = IIF(rechts, "vorbeir", "vorbeil")
+    IF trocken THEN RETURN vormerken(k, FUNCTION() vorbei(rechts))
     DIM i AS INTEGER : i = gemerkt(k)
     IF i >= 0 THEN RETURN klaenge[i]
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(500)
@@ -602,6 +676,7 @@ END FUNCTION
 ' Weltraum: ein tiefes Brummen aus zwei Sinustoenen, die gegeneinander
 ' schweben, dazu eine Quinte und ganz leises, dunkles Rauschen -- vier Takte
 FUNCTION weltraum() AS SOUND
+    IF trocken THEN RETURN vormerken("weltraum", FUNCTION() weltraum())
     DIM i AS INTEGER : i = gemerkt("weltraum")
     IF i >= 0 THEN RETURN klaenge[i]
     DIM lang AS INTEGER : lang = INT(msJeSchritt() * 64)
@@ -616,6 +691,7 @@ END FUNCTION
 ' Der Komet: ein schimmerndes Rauschen zieht vorbei, darueber ein feiner
 ' Ton, der nach unten gleitet
 FUNCTION kometenrauschen() AS SOUND
+    IF trocken THEN RETURN vormerken("komet", FUNCTION() kometenrauschen())
     DIM i AS INTEGER : i = gemerkt("komet")
     IF i >= 0 THEN RETURN klaenge[i]
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(5000)
@@ -627,6 +703,7 @@ END FUNCTION
 ' Funkrauschen im Orbit: knisterndes, enges Rauschen und zwei leise
 ' Piepser, wie von einem fernen Satelliten
 FUNCTION funk() AS SOUND
+    IF trocken THEN RETURN vormerken("funk", FUNCTION() funk())
     DIM i AS INTEGER : i = gemerkt("funk")
     IF i >= 0 THEN RETURN klaenge[i]
     DIM s AS SOUND : s = AUDIO_SOUND_NEW(3600)
@@ -635,27 +712,6 @@ FUNCTION funk() AS SOUND
     dazuPan(s, AUDIO_NOTE("sine", 1320, 70, 3, 30, 0.7, 40, 0.12), 1150, 1.0, 0.5)
     RETURN merken("funk", mitEcho(s, 3600, -0.3, 0.3, 2))
 END FUNCTION
-
-' In kleinen Schritten bauen (vorbauen ruft einen je Bild): der Gaenseruf
-' allein sind ein paar hundert Noten.
-CONST GERAEUSCHE = 12
-SUB geraeuschBauen(nr AS INTEGER)
-    SELECT CASE nr
-        CASE 0 : grollen()
-        CASE 1 : wind()
-        CASE 2 : brandung()
-        CASE 3 : nebelhorn()
-        CASE 4, 5, 6, 7 : gaenseRuf(nr - 4)
-        CASE 8
-            DIM m AS INTEGER
-            FOR m = 0 TO 3
-                moewe(m)
-            NEXT
-        CASE 9 : plaetschern() : fahrtwind()
-        CASE 10 : vorbei(TRUE) : vorbei(FALSE) : funk()
-        CASE 11 : weltraum() : kometenrauschen()
-    END SELECT
-END SUB
 
 ' --- Stimme --------------------------------------------------------------------
 ' Zwei Saetze, gesprochen von der Sprachausgabe des Systems (SPEAK_SOUND) und
@@ -668,6 +724,10 @@ DIM stimmeFehlt AS BOOLEAN
 
 FUNCTION stimmeBauen(nr AS INTEGER) AS BOOLEAN
     IF stimmeFehlt THEN RETURN FALSE
+    IF trocken THEN
+        vormerken("stimme" + STR$(nr), FUNCTION() stimmeBauen(nr))
+        RETURN FALSE
+    END IF
     IF gemerkt("stimme" + STR$(nr)) >= 0 THEN RETURN TRUE
     TRY
         ' eine weibliche Stimme, wenn es sie gibt
@@ -734,6 +794,7 @@ END FUNCTION
 DIM ausschreiben AS BOOLEAN
 DIM lied AS SOUND
 SUB spielen(k AS SOUND, n AS INTEGER, vol AS FLOAT)
+    IF trocken THEN RETURN
     IF ausschreiben THEN
         AUDIO_SOUND_MIX(lied, k, INT(n * msJeSchritt()), vol)
     ELSE
@@ -978,6 +1039,10 @@ SUB musikPlanen()
         schrittPlanen(geplantBis)
     WEND
     busNachziehen(jetzt \ SCHRITTE_JE_TAKT)
+    IF sparsam THEN
+        bauGrenze = jetzt + VORLAUF
+        freigeben(jetzt)
+    END IF
     vorbauen()
 END SUB
 
@@ -1010,87 +1075,65 @@ SUB busNachziehen(takt AS INTEGER)
     END SELECT
 END SUB
 
-' Die Klaenge vorab bauen -- einer je Aufruf, keiner davon braucht laenger
-' als ein paar Hundertstel (der Chor ist darum in Stimmen zerlegt). main.dh
-' ruft es vor dem Start, waehrend das Startbild steht; was dann noch fehlt,
-' entsteht beim ersten Gebrauch.
-DIM bauStand AS INTEGER
-' 0..7 die Nacht, 8..15 nach der Rueckung, 16..23 der Morgen
-CONST AKKORDE = 24
-FUNCTION bauGesamt() AS INTEGER
-    RETURN AKKORDE * 4 + AKKORDE + LEN(saetze) + AKKORDE * 6 + 2 + GERAEUSCHE + LEN(melodie) + LEN(morgenMelodie) + LEN(gegen)
-END FUNCTION
+' Der Probelauf: die Partitur ab dem Starttakt einmal durchgehen, ohne zu
+' spielen. Danach steht in bauKey/bauF/bauErst/bauLetzt jeder Klang, der
+' noch erklingt, in der Reihenfolge seines ersten Einsatzes.
+CONST VORLAUF = 64         ' gebaut wird bis zu 4 Takte vor dem Einsatz
+CONST NACHLAUF = 80        ' freigegeben 5 Takte nach dem letzten (so lang klingt nichts nach)
+CONST START_VORLAUF = 64   ' vor dem Start: was in den ersten 4 Takten erklingt
+DIM bauPos AS INTEGER
+DIM bauGrenze AS INTEGER
+DIM freiStand AS INTEGER : freiStand = -1
+SUB musikVorbereiten(abTakt AS INTEGER)
+    trocken = TRUE
+    DIM n AS INTEGER
+    FOR n = abTakt * SCHRITTE_JE_TAKT TO schritteGesamt() - 1
+        planN = n
+        schrittPlanen(n)
+    NEXT
+    trocken = FALSE
+    bauGrenze = IIF(sparsam, abTakt * SCHRITTE_JE_TAKT + START_VORLAUF, schritteGesamt())
+END SUB
 
+' Baut den naechsten Klang, wenn er vor bauGrenze einsetzt; FALSE, wenn
+' bis dorthin alles steht. Einer je Aufruf -- keiner braucht laenger als ein
+' paar Hundertstel (der Chor ist darum in Stimmen zerlegt).
 FUNCTION vorbauen() AS BOOLEAN
-    DIM i AS INTEGER : i = bauStand
-    IF i >= bauGesamt() THEN RETURN FALSE
-    bauStand = bauStand + 1
-    IF i < AKKORDE * 4 THEN
-        chorStimme(i \ 4, i MOD 4) : RETURN TRUE
-    END IF
-    i = i - AKKORDE * 4
-    IF i < AKKORDE THEN
-        chor(i) : RETURN TRUE
-    END IF
-    i = i - AKKORDE
-    IF i < LEN(saetze) THEN
-        stimmeBauen(i) : RETURN TRUE
-    END IF
-    i = i - LEN(saetze)
-    IF i < AKKORDE * 6 THEN
-        DIM nr AS INTEGER : nr = i \ 6
-        SELECT CASE i MOD 6
-            CASE 0 : flaeche(nr, FALSE)
-            CASE 1 : flaeche(nr, TRUE)
-            CASE 2 : bass(nr) : tiefe(nr)
-            CASE 3 : pumpe(nr)
-            CASE 4 : gate(nr)
-            CASE 5 : zupf(akkTon(nr, 0) + 24, -0.6)
-        END SELECT
-        RETURN TRUE
-    END IF
-    i = i - AKKORDE * 6
-    IF i = 0 THEN
-        bassdrum() : klatschen() : becken(TRUE) : becken(FALSE) : crash() : shaker(TRUE) : shaker(FALSE)
-        RETURN TRUE
-    END IF
-    IF i = 1 THEN
-        aufstieg(1) : aufstieg(2) : aufstieg(4)
-        RETURN TRUE
-    END IF
-    IF i >= 2 AND i < 2 + GERAEUSCHE THEN
-        geraeuschBauen(i - 2)
-        RETURN TRUE
-    END IF
-    i = i - 2 - GERAEUSCHE
-    IF i < LEN(melodie) THEN
-        DIM m AS INTEGER : m = melodie[i]
-        IF m > 0 THEN
-            DIM l AS INTEGER : l = melodieLaenge(i)
-            lead(m, l) : lead(m + RUECKUNG, l) : lead(m + 12 + RUECKUNG, l) : lead(m + 12, l)
-            klavier(m, l) : klavier(m + 12, l) : klavier(m + RUECKUNG, l)
-        END IF
-        RETURN TRUE
-    END IF
-    i = i - LEN(melodie)
-    IF i < LEN(morgenMelodie) THEN
-        DIM mm AS INTEGER : mm = morgenMelodie[i]
-        IF mm > 0 THEN
-            DIM ml AS INTEGER : ml = laengeIn(morgenMelodie, i)
-            lead(mm, ml) : lead(mm + 12, ml) : klavier(mm, ml)
-        END IF
-        RETURN TRUE
-    END IF
-    i = i - LEN(morgenMelodie)
-    IF gegen[i] > 0 THEN
-        klavier(gegen[i] + 12 + RUECKUNG, 4) : klavier(gegen[i] + 12, 4)
-    END IF
+    IF bauPos >= LEN(bauKey) THEN RETURN FALSE
+    IF bauErst[bauPos] > bauGrenze THEN RETURN FALSE
+    DIM f AS FUNCREF : f = bauF[bauPos]
+    bauPos = bauPos + 1
+    f()
     RETURN TRUE
 END FUNCTION
 
-SUB klaengeBauen()
-    WHILE vorbauen()
+' Wie weit das Bauen vor dem Start ist (0..1), fuer das Startbild
+FUNCTION bauAnteil() AS FLOAT
+    DIM bis AS INTEGER
+    WHILE bis < LEN(bauKey)
+        IF bauErst[bis] > bauGrenze THEN EXIT WHILE
+        bis = bis + 1
     WEND
+    IF bis = 0 THEN RETURN 1.0
+    RETURN MIN(1.0, bauPos / bis)
+END FUNCTION
+
+' Einmal je Takt: was nicht mehr erklingt, freigeben.
+SUB freigeben(jetzt AS INTEGER)
+    DIM takt AS INTEGER : takt = jetzt \ SCHRITTE_JE_TAKT
+    IF takt = freiStand THEN RETURN
+    freiStand = takt
+    DIM i AS INTEGER
+    FOR i = 0 TO bauPos - 1
+        IF NOT bauWeg[i] AND bauLetzt[i] + NACHLAUF < jetzt THEN
+            bauWeg[i] = TRUE
+            DIM j AS INTEGER : j = gemerkt(bauKey[i])
+            IF j >= 0 THEN
+                UNLOADSOUND(klaenge[j])
+                MAPREMOVE(kKlang, bauKey[i])
+            END IF
+        END IF
+    NEXT
 END SUB
 
 ' Startet die Musik; FALSE, wenn es keinen Ton gibt (dann laeuft die Zeit
