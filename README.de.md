@@ -369,4 +369,9 @@ Die **CI** baut `dhrt` bei jedem Push selbst und fährt die Sammlungen auf Windo
 
 ## Lizenz
 
-Privat.
+Drachenhauch steht wahlweise unter der
+
+- [MIT-Lizenz](LICENSE-MIT) oder der
+- [Apache-Lizenz, Version 2.0](LICENSE-APACHE)
+
+— du suchst dir eine aus. Programme und Spiele, die du mit Drachenhauch schreibst, gehören dir: du darfst sie weitergeben und verkaufen, samt der eingebauten Laufzeit `dhrt`. Bestandteile anderer Hersteller behalten ihre eigenen Lizenzen (Rust-Crates: `installer/lizenzen.dh` sammelt sie; Assets der Beispiele: [examples/ASSET-CREDITS.md](examples/ASSET-CREDITS.md)).

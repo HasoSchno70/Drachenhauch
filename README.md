@@ -344,4 +344,9 @@ Checks live in **test collections** (`tests/pruef/*.dhtest`, format in [docs/en/
 
 ## License
 
-Private.
+Drachenhauch is licensed under either of
+
+- [MIT License](LICENSE-MIT)
+- [Apache License, Version 2.0](LICENSE-APACHE)
+
+at your option. Programs and games you write with Drachenhauch are yours: you may distribute and sell them, including the built-in `dhrt` runtime. Third-party parts keep their own licenses (Rust crates: `installer/lizenzen.dh` collects them; example assets: [examples/ASSET-CREDITS.md](examples/ASSET-CREDITS.md)).

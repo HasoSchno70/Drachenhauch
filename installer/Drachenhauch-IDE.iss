@@ -43,7 +43,7 @@ ArchitecturesAllowed=x64compatible
 ChangesEnvironment=yes
 ChangesAssociations=yes
 SetupIconFile=Drachenhauch.ico
-LicenseFile=EULA.txt
+LicenseFile=LIZENZ.txt
 
 [Languages]
 Name: "de"; MessagesFile: "compiler:Languages\German.isl"
@@ -105,7 +105,7 @@ Source: "..\buch-referenz\buch\Drachenhauch-Handbook.docx"; DestDir: "{app}\buec
 Source: "..\buch-referenz\buch\Drachenhauch-Handbook.epub"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\buch-einstieg\buch\Drachenhauch-Einstieg.docx"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\buch-einstieg\buch\Drachenhauch-Einstieg.epub"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "EULA.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "LIZENZ.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "THIRD-PARTY-NOTICES-IDE.txt"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Icons]
@@ -130,7 +130,7 @@ Name: "{group}\Einstieg (fuer Anfaenger)"; Filename: "{app}\buecher\Drachenhauch
 Name: "{group}\Lehrbuch"; Filename: "{app}\buecher\Drachenhauch-Lehrbuch.docx"; Flags: createonlyiffileexists
 Name: "{group}\Handbook (English)"; Filename: "{app}\buecher\Drachenhauch-Handbook.docx"; Flags: createonlyiffileexists
 Name: "{group}\ESP32-Sketche"; Filename: "{commondocs}\Drachenhauch\esp32"
-Name: "{group}\Lizenzen\Lizenzvertrag (EULA)"; Filename: "{app}\EULA.txt"
+Name: "{group}\Lizenzen\Lizenz (MIT oder Apache 2.0)"; Filename: "{app}\LIZENZ.txt"
 Name: "{group}\Lizenzen\Drittanbieter-Lizenzen"; Filename: "{app}\THIRD-PARTY-NOTICES-IDE.txt"; Flags: createonlyiffileexists
 Name: "{group}\{cm:UninstallProgram,Drachenhauch IDE}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Drachenhauch IDE"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{app}\ide\ide.dh"""; AppUserModelID: "Drachenhauch.IDE"; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"; Tasks: desktopicon

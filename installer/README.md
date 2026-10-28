@@ -190,7 +190,7 @@ Inno Setup haben die Läufer nicht.
 | `posix/` | Vorlagen für Linux und macOS (Starter, `install.sh`, `Info.plist`, LIESMICH). |
 | `symbole/`, `symbole.dh` | Die Programmsymbole, fertig erzeugt aus `daten/bilder/logo.png`. |
 | `Drachenhauch.ico` | Symbol des Setup-Programms; installiert als `drachenhauch.ico` fuer Verknuepfungen, `.dh`-Dateien und die Deinstallation (dhrt.exe selbst traegt keins -- ein exportiertes Spiel ist eine Kopie davon). |
-| `EULA.txt` | Endbenutzer-Lizenzvertrag (**Vorlage** – vor Verkauf juristisch prüfen, `[PLATZHALTER]` ersetzen). |
+| `LIZENZ.txt` | Die Lizenz von Drachenhauch (MIT oder Apache 2.0, beide Volltexte; seit 2026-10-28, vorher eine EULA-Vorlage) -- Seite im Setup und im Startmenü. |
 | `THIRD-PARTY-NOTICES-IDE.txt` · `output/` | erzeugt (gitignored). |
 
 ## Lizenz-Compliance (für den Verkauf)
@@ -200,10 +200,11 @@ Inno Setup haben die Läufer nicht.
   erzeugt sie vor jedem Verpacken neu, damit sie zu den wirklich gebauten
   Features passt; nach der Installation liegt sie neben `dhrt.exe` und im
   Startmenü.
-- **`EULA.txt`** ist eine Vorlage; ersetze die `[PLATZHALTER]` und lass sie vor einem
-  kommerziellen Vertrieb prüfen. Sie regelt u.a., dass **vom Nutzer erstellte Spiele
-  ihm gehören** und samt dhrt-Runtime **frei (auch kommerziell) weitergegeben** werden
-  dürfen – wichtig, damit deine Nutzer ihre Spiele verkaufen können.
+- **`LIZENZ.txt`**: Drachenhauch steht wahlweise unter MIT oder Apache 2.0
+  (dieselben Texte wie `LICENSE-MIT`/`LICENSE-APACHE` im Repository). Damit
+  ist ausdrücklich erlaubt, dass **vom Nutzer erstellte Spiele ihm gehören**
+  und samt dhrt-Runtime **frei (auch kommerziell) weitergegeben** werden
+  dürfen.
 - Beispiel-Asset-Lizenzen sind geprüft + dokumentiert (`examples/ASSET-CREDITS.md`).
 
 ## Code-Signing (gegen die SmartScreen-„Unbekannter Herausgeber"-Warnung)
@@ -227,8 +228,8 @@ dhrt run installer\bauen.dh
 - Den **Uninstaller** signiert dieser Weg nicht; dafür bräuchte es Inno-`SignTool`
   in `Drachenhauch-IDE.iss`.
 
-Offen für den Verkauf (kein Code mehr): Zertifikat kaufen, EULA-`[PLATZHALTER]`
-ausfüllen, ggf. DE-Verbraucherrecht (Impressum/Widerruf).
+Offen für den Verkauf (kein Code mehr): Zertifikat kaufen, ggf.
+DE-Verbraucherrecht (Impressum/Widerruf).
 
 ## Nur die Runtime verteilen?
 Wer nur Drachenhauch-**Programme** ausführen/weitergeben will, braucht die IDE nicht:
