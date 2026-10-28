@@ -186,7 +186,7 @@ dhrt run hallo.dh
 or open it in the IDE and press F5. The installer ships `dhrt` (with the
 option "add to PATH" it is also available in the terminal); if you work from
 source, you build it once yourself — how is described in the
-[README](../../README.md#aus-dem-quelltext-arbeiten).
+[README](../../README.md#working-from-source).
 
 ## First game
 

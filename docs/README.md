@@ -185,7 +185,7 @@ dhrt run hallo.dh
 oder in der IDE öffnen und F5 drücken. `dhrt` bringt der Installer mit (mit
 der Option „zum PATH hinzufügen“ auch im Terminal); wer aus dem Quelltext
 arbeitet, baut es einmal selbst — wie, steht im
-[README](../README.md#aus-dem-quelltext-arbeiten).
+[README](../README.de.md#aus-dem-quelltext-arbeiten).
 
 ## Erstes Spiel
 
