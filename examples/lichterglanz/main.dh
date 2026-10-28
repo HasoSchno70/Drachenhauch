@@ -1,0 +1,680 @@
+' Lichterglanz -- eine Weihnachtsdemo in Drachenhauch: Musik und Bild aus
+' einem Programm.
+'
+' Die Reise geht ueber den Adventskranz: zu jeder Kerze ein Kapitel. Die
+' erste Kerze entzuendet sich, die Kamera faehrt in ihre Flamme -- und steht
+' im verschneiten Dorf bei Nacht. Die zweite fuehrt auf den Weihnachtsmarkt
+' (ein Karussell dreht sich im Takt), die dritte in den Winterwald an einen
+' zugefrorenen See, wo Eiskristalle mit der Melodie wachsen, die vierte auf
+' einen Schlittenflug vor dem Mond. Am Heiligabend sieht man durchs Fenster
+' in die Stube: der Baum schmueckt sich Kugel fuer Kugel zu "Stille Nacht",
+' um Mitternacht schlagen die Glocken, und der Stern auf der Spitze geht auf.
+'
+' Die Musik (musik.dh) ist ganz synthetisiert -- festlich-elektronisch, 116
+' Schlaege je Minute, um das Glockenmotiv aus "Shchedryk" ("Carol of the
+' Bells", gemeinfrei). Jede Szene rechnet ein Fragment-Shader (Raymarching,
+' assets/shader), der Schnee davor ist 2D: echte sechseckige Kristalle, und
+' was am unteren Rand ankommt, bleibt liegen. Gezeichnet wird in 1280x720.
+'
+'     dhrt run main.dh                    ' im Vollbild, von vorn
+'     dhrt run main.dh -- --fenster       ' im Fenster
+'     dhrt run main.dh -- --ab 26         ' ab Takt 26
+'     dhrt run main.dh -- --leicht        ' fuer schwaechere Grafikkarten (feste Stufe 3)
+'     dhrt run main.dh -- --stufe 0       ' feste Guete 0 (voll) .. 4; ohne Angabe
+'                                         ' waehlt die Demo sie selbst je Szene
+'     dhrt run main.dh -- --sparsam       ' Klaenge erst bei Bedarf bauen und wieder
+'                                         ' freigeben (wenig Speicher, z.B. Handys)
+'     dhrt run main.dh -- --wav datei.wav ' nur die Musik als WAV schreiben (trocken)
+'     dhrt run main.dh -- --mitschnitt datei.wav  ' abspielen und mitschneiden
+'
+' ESC beendet, F11 schaltet das Vollbild.
+IMPORT "musik.dh"
+
+CONST BREITE = 1280
+CONST HOEHE = 720
+
+' --- Argumente ------------------------------------------------------------
+DIM abTakt AS INTEGER
+DIM imFenster AS BOOLEAN
+DIM wavZiel AS STRING
+DIM messen AS BOOLEAN
+' Guete der Bilder in fuenf Stufen wie in Nachtflug: weniger Schritte in den
+' Shadern und eine kleinere Rechenaufloesung, dazu weniger Schneeflocken.
+DIM stufeGuete AS ARRAY OF FLOAT : stufeGuete = [1.0, 0.8, 0.65, 0.55, 0.45]
+DIM stufeMass AS ARRAY OF FLOAT : stufeMass = [1.0, 0.85, 0.72, 0.6, 0.5]
+DIM festeStufe AS INTEGER : festeStufe = -1
+DIM guete AS FLOAT : guete = 1.0
+DIM massstab AS FLOAT : massstab = 1.0
+DIM mitschnitt AS STRING
+DIM ai AS INTEGER
+WHILE ai < ARGC()
+    SELECT CASE ARG$(ai)
+        CASE "--ab"
+            ai = ai + 1 : abTakt = CLAMP(VAL(ARG$(ai)), 0, TAKTE - 1)
+        CASE "--fenster"
+            imFenster = TRUE
+        CASE "--leicht"
+            festeStufe = 3
+        CASE "--stufe"
+            ai = ai + 1 : festeStufe = CLAMP(VAL(ARG$(ai)), 0, 4)
+        CASE "--messen"
+            messen = TRUE
+        CASE "--sparsam"
+            sparsam = TRUE
+        CASE "--wav"
+            ai = ai + 1 : wavZiel = ARGPATH$(ai)
+        CASE "--mitschnitt"
+            ai = ai + 1 : mitschnitt = ARGPATH$(ai)
+    END SELECT
+    ai = ai + 1
+WEND
+IF festeStufe < 0 AND GETENV$("DHRT_FRAMES") <> "" THEN festeStufe = 0
+IF festeStufe >= 0 THEN
+    guete = stufeGuete[festeStufe] : massstab = stufeMass[festeStufe]
+END IF
+
+' Je Shader die gewaehlte Stufe (-1 = noch nicht gezeigt); eine neue Szene
+' beginnt eine Stufe ueber der tiefsten bisher, damit sie nicht erst stockt.
+DIM stufeJe[64] AS INTEGER
+DIM sj AS INTEGER
+FOR sj = 0 TO 63 : stufeJe[sj] = -1 : NEXT
+DIM tiefsteStufe AS INTEGER
+DIM letzterShader AS INTEGER : letzterShader = -1
+DIM messBilder AS INTEGER
+DIM messSumme AS FLOAT
+DIM messLetzt AS FLOAT
+SUB gueteNachziehen(sh AS INTEGER)
+    IF festeStufe >= 0 OR sh < 0 OR sh > 63 THEN RETURN
+    DIM jetzt AS FLOAT : jetzt = GET_TIME()
+    IF sh <> letzterShader THEN
+        letzterShader = sh
+        IF stufeJe[sh] < 0 THEN stufeJe[sh] = MAX(0, tiefsteStufe - 1)
+        messBilder = -20 : messSumme = 0.0
+    ELSE
+        messBilder = messBilder + 1
+        IF messBilder > 0 THEN messSumme = messSumme + (jetzt - messLetzt)
+        IF messBilder >= 30 THEN
+            IF messSumme / messBilder > 0.02 AND stufeJe[sh] < 4 THEN
+                stufeJe[sh] = stufeJe[sh] + 1
+                tiefsteStufe = MAX(tiefsteStufe, stufeJe[sh])
+                IF messen THEN PRINT "Shader "; sh; " -> Stufe "; stufeJe[sh]
+            END IF
+            messBilder = 0 : messSumme = 0.0
+        END IF
+    END IF
+    messLetzt = jetzt
+    guete = stufeGuete[stufeJe[sh]] : massstab = stufeMass[stufeJe[sh]]
+END SUB
+
+IF wavZiel <> "" THEN
+    musikAusschreiben(wavZiel)
+    PRINT "geschrieben: "; wavZiel
+    END
+END IF
+
+SCREEN(BREITE, HOEHE, "Lichterglanz -- eine Weihnachtsdemo in Drachenhauch", 1)
+SETFPS(60)
+WINDOW_ESC_QUIT(FALSE)
+IF NOT imFenster THEN SET_FULLSCREEN(TRUE)
+
+DIM schriftGross AS INTEGER : schriftGross = LOADFONT("serif", 72)
+DIM schrift AS INTEGER : schrift = LOADFONT("sans", 32)
+
+' --- Shader ------------------------------------------------------------------
+FUNCTION shader(name AS STRING) AS INTEGER
+    DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    IF h < 0 THEN THROW "Shader " + name + " liess sich nicht laden"
+    SHADER_SET2(h, "resolution", BREITE, HOEHE)
+    RETURN h
+END FUNCTION
+DIM shKranz AS INTEGER : shKranz = shader("kranz")
+DIM shDorf AS INTEGER : shDorf = shader("dorf")
+DIM shMarkt AS INTEGER : shMarkt = shader("markt")
+DIM shWald AS INTEGER : shWald = shader("wald")
+DIM shSchlitten AS INTEGER : shSchlitten = shader("schlitten")
+DIM shStube AS INTEGER : shStube = shader("stube")
+
+' --- Text auf dem Bild ----------------------------------------------------------
+SUB mittig(t AS STRING, y AS INTEGER, groesse AS INTEGER, deck AS FLOAT, gross AS BOOLEAN)
+    IF deck <= 0.01 THEN RETURN
+    SETFONT(IIF(gross, schriftGross, schrift), groesse)
+    DIM a AS INTEGER : a = INT(CLAMP(deck, 0.0, 1.0) * 235)
+    TEXT((BREITE - TEXT_WIDTH(t)) / 2, y, t, RGBA(255, 238, 214, MAX(1, a)))
+END SUB
+
+FUNCTION zeigen(takt AS FLOAT, von AS FLOAT, bis AS FLOAT) AS FLOAT
+    RETURN CLAMP(MIN((takt - von) / 1.2, (bis - takt) / 1.2), 0.0, 1.0)
+END FUNCTION
+
+SUB zweisprachig(de AS STRING, en AS STRING, y AS INTEGER, groesse AS INTEGER, deck AS FLOAT, gross AS BOOLEAN)
+    mittig(de, y, groesse, deck, gross)
+    mittig(en, y + INT(groesse * 1.3), INT(groesse * 0.8), deck * 0.7, FALSE)
+END SUB
+
+' Der Name eines Kapitels: gross die Kerze, darunter, wohin sie fuehrt
+SUB kapitel(nr AS STRING, de AS STRING, en AS STRING, takt AS FLOAT, von AS FLOAT)
+    DIM d AS FLOAT : d = zeigen(takt, von + 0.4, von + 5.0)
+    mittig(nr, 92, 46, d, TRUE)
+    zweisprachig(de, en, 156, 24, d, FALSE)
+END SUB
+
+' --- Schnee --------------------------------------------------------------------
+' Vor jeder Szene im Freien faellt Schnee: kleine Flocken als Punkte, die
+' nahen als echte Kristalle -- sechs Arme mit Seitenaesten, jede Flocke mit
+' eigener Form (aus ihrer Nummer gewuerfelt) und eigener Drehung. Was unten
+' ankommt, bleibt liegen: eine Schneedecke aus Saeulen, die mit jeder Flocke
+' waechst und sich glaettet. Drinnen (Kranz, Stube) schmilzt sie wieder weg.
+CONST FLOCKEN = 420
+CONST NAH = 46            ' die ersten NAH Flocken sind nah und gross
+DIM fX[FLOCKEN] AS FLOAT
+DIM fY[FLOCKEN] AS FLOAT
+DIM fZ[FLOCKEN] AS FLOAT  ' Naehe 0 (fern) .. 1 (nah)
+DIM fW[FLOCKEN] AS FLOAT  ' Drehung
+DIM fForm[FLOCKEN] AS INTEGER
+DIM fPx[FLOCKEN] AS INTEGER
+DIM fPy[FLOCKEN] AS INTEGER
+DIM fPr[FLOCKEN] AS INTEGER
+DIM fPf[FLOCKEN] AS INTEGER
+CONST SAEULEN = 160
+CONST SAEULE_B = 8        ' 160 * 8 = 1280
+DIM liegt[SAEULEN] AS FLOAT
+' fuer die Kristalle: Linien in einem Aufruf
+CONST MAX_STRICHE = 46 * 30
+DIM kx1[MAX_STRICHE] AS INTEGER
+DIM ky1[MAX_STRICHE] AS INTEGER
+DIM kx2[MAX_STRICHE] AS INTEGER
+DIM ky2[MAX_STRICHE] AS INTEGER
+DIM kf[MAX_STRICHE] AS INTEGER
+' die Decke als Saeulen
+DIM dx1[SAEULEN] AS INTEGER
+DIM dy1[SAEULEN] AS INTEGER
+DIM dx2[SAEULEN] AS INTEGER
+DIM dy2[SAEULEN] AS INTEGER
+DIM df[SAEULEN] AS INTEGER
+
+DIM si AS INTEGER
+RANDOMIZE(24)
+FOR si = 0 TO FLOCKEN - 1
+    fX[si] = RND() * BREITE
+    fY[si] = RND() * HOEHE
+    fZ[si] = IIF(si < NAH, 0.7 + RND() * 0.3, RND() ^ 1.6 * 0.6)
+    fW[si] = RND() * TAU
+    fForm[si] = INT(RND() * 1000)
+NEXT
+
+' Ein Arm eines Kristalls: vom Mittelpunkt (cx, cy) in Richtung w, Laenge r;
+' je nach Form mit zwei oder drei Paaren Seitenaesten, schraeg nach aussen.
+DIM striche AS INTEGER
+SUB strich(x1 AS FLOAT, y1 AS FLOAT, x2 AS FLOAT, y2 AS FLOAT, f AS INTEGER)
+    IF striche >= MAX_STRICHE THEN RETURN
+    kx1[striche] = INT(x1) : ky1[striche] = INT(y1)
+    kx2[striche] = INT(x2) : ky2[striche] = INT(y2)
+    kf[striche] = f
+    striche = striche + 1
+END SUB
+
+SUB kristall(cx AS FLOAT, cy AS FLOAT, r AS FLOAT, w AS FLOAT, form AS INTEGER, f AS INTEGER)
+    DIM aeste AS INTEGER : aeste = 1 + form MOD 3
+    DIM lang AS FLOAT : lang = 0.25 + (form \ 3 MOD 4) * 0.08
+    DIM a AS INTEGER
+    FOR a = 0 TO 5
+        DIM aw AS FLOAT : aw = w + a * PI / 3.0
+        DIM ex AS FLOAT : ex = COS(aw)
+        DIM ey AS FLOAT : ey = SIN(aw)
+        strich(cx, cy, cx + ex * r, cy + ey * r, f)
+        DIM b AS INTEGER
+        FOR b = 1 TO aeste
+            DIM s AS FLOAT : s = r * (0.3 + 0.55 * b / (aeste + 0.5))
+            DIM l AS FLOAT : l = r * lang * (1.1 - 0.25 * b)
+            DIM bx AS FLOAT : bx = cx + ex * s
+            DIM by AS FLOAT : by = cy + ey * s
+            strich(bx, by, bx + COS(aw + 1.05) * l, by + SIN(aw + 1.05) * l, f)
+            strich(bx, by, bx + COS(aw - 1.05) * l, by + SIN(aw - 1.05) * l, f)
+        NEXT
+    NEXT
+END SUB
+
+' Wie dicht es schneit (0 = gar nicht), wie stark der Wind von links und ob
+' die Flocken als Striche vorbeiziehen (Schlittenflug)
+DIM schneeDicht AS FLOAT
+DIM schneeWind AS FLOAT
+DIM schneeFahrt AS FLOAT
+DIM schneeDraussen AS FLOAT
+DIM schneeZuletzt AS FLOAT : schneeZuletzt = -1.0
+
+SUB schneeZeichnen(zeit AS FLOAT, takt AS FLOAT)
+    DIM dt AS FLOAT : dt = 0.016
+    IF schneeZuletzt >= 0.0 THEN dt = CLAMP(zeit - schneeZuletzt, 0.0, 0.05)
+    schneeZuletzt = zeit
+    DIM anz AS INTEGER : anz = INT(FLOCKEN * schneeDicht * IIF(guete < 0.7, 0.55, 1.0))
+    striche = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO FLOCKEN - 1
+        fPr[i] = 0
+        DIM z AS FLOAT : z = fZ[i]
+        ' fallen und treiben -- nahe Flocken schneller, alle schaukeln
+        DIM fall AS FLOAT : fall = (30.0 + 95.0 * z) * (1.0 + schneeFahrt * 2.5)
+        fY[i] = fY[i] + fall * dt
+        fX[i] = fX[i] + (schneeWind * (40.0 + 120.0 * z) + 18.0 * SIN(zeit * (0.7 + z) + i)) * dt
+        fW[i] = fW[i] + dt * (0.3 + z * 0.6) * IIF(i MOD 2 = 0, 1.0, -1.0)
+        IF fX[i] > BREITE + 30 THEN fX[i] = fX[i] - BREITE - 60
+        IF fX[i] < -30 THEN fX[i] = fX[i] + BREITE + 60
+        ' unten angekommen: liegen bleiben (nur die nahen Flocken zaehlen --
+        ' die fernen fallen weit hinten auf den Boden der Szene)
+        DIM sp AS INTEGER : sp = CLAMP(INT(fX[i] / SAEULE_B), 0, SAEULEN - 1)
+        DIM boden AS FLOAT : boden = HOEHE - liegt[sp] * schneeDraussen
+        IF z > 0.45 AND fY[i] > boden AND i < anz AND schneeDraussen > 0.5 THEN
+            liegt[sp] = MIN(liegt[sp] + 0.55 * z, 70.0)
+            fY[i] = -20.0 - RND() * 60.0
+            fX[i] = RND() * BREITE
+        ELSEIF fY[i] > HOEHE + 30 THEN
+            fY[i] = -20.0 - RND() * 40.0
+            fX[i] = RND() * BREITE
+        END IF
+        IF i < anz THEN
+            DIM hell AS FLOAT : hell = 0.25 + 0.75 * z
+            DIM g AS INTEGER : g = INT(255 * hell * MIN(1.0, schneeDicht * 1.5))
+            IF i < NAH THEN
+                ' ein Kristall, 7..17 Punkte gross, mit leichtem Hof
+                DIM r AS FLOAT : r = 7.0 + 10.0 * (z - 0.7) / 0.3
+                kristall(fX[i], fY[i], r, fW[i], fForm[i], RGBA(220, 232, 255, MAX(1, g)))
+                fPx[i] = INT(fX[i]) : fPy[i] = INT(fY[i]) : fPr[i] = INT(r * 0.35)
+                fPf[i] = RGBA(160, 190, 255, MAX(1, g \ 6))
+            ELSE
+                fPx[i] = INT(fX[i]) : fPy[i] = INT(fY[i])
+                fPr[i] = IIF(z > 0.35, 2, 1)
+                fPf[i] = RGBA(210, 225, 255, MAX(1, g))
+                IF schneeFahrt > 0.1 THEN
+                    ' im Flug: kurze Striche in Fahrtrichtung
+                    strich(fX[i], fY[i], fX[i] - schneeWind * 14.0 * z, fY[i] - 9.0 * z * schneeFahrt, fPf[i])
+                END IF
+            END IF
+        END IF
+    NEXT
+    ' die liegende Decke glaetten (Schnee rutscht ein wenig nach den Seiten)
+    DIM j AS INTEGER
+    FOR j = 1 TO SAEULEN - 2
+        DIM mitte AS FLOAT : mitte = (liegt[j - 1] + liegt[j + 1]) * 0.5
+        IF liegt[j] > mitte + 1.0 THEN liegt[j] = liegt[j] + (mitte - liegt[j]) * dt * 3.0
+    NEXT
+    CIRCLES(fPx, fPy, fPr, fPf, FLOCKEN)
+    IF striche > 0 THEN LINES(kx1, ky1, kx2, ky2, kf, striche)
+    deckeZeichnen(zeit)
+END SUB
+
+' Die Schneedecke unten: Saeulen in einem Aufruf, mit einer hellen Kante und
+' Glitzern, das mit der Melodie aufblitzt. Drinnen schmilzt sie langsam.
+SUB deckeZeichnen(zeit AS FLOAT)
+    DIM j AS INTEGER
+    DIM sicht AS FLOAT : sicht = schneeDraussen
+    IF sicht <= 0.01 THEN RETURN
+    FOR j = 0 TO SAEULEN - 1
+        DIM h AS INTEGER : h = INT(liegt[j] * sicht)
+        dx1[j] = j * SAEULE_B : dx2[j] = j * SAEULE_B + SAEULE_B - 1
+        dy1[j] = HOEHE - h : dy2[j] = HOEHE
+        df[j] = RGBA(150, 165, 195, MAX(1, INT(190 * sicht)))
+    NEXT
+    BOXES(dx1, dy1, dx2, dy2, df, SAEULEN)
+    ' die Kante: ein feiner heller Saum und hier und da ein Funkeln
+    FOR j = 0 TO SAEULEN - 1
+        dy2[j] = dy1[j] + 2
+        df[j] = RGBA(235, 242, 255, MAX(1, INT(200 * sicht)))
+    NEXT
+    BOXES(dx1, dy1, dx2, dy2, df, SAEULEN)
+    DIM ton AS FLOAT : ton = musikTon()
+    FOR j = 0 TO SAEULEN - 1
+        DIM fun AS FLOAT : fun = SIN(zeit * 3.0 + j * 2.37) * SIN(zeit * 1.3 + j * 0.71)
+        IF liegt[j] > 4.0 AND fun > 0.9 - 0.25 * ton THEN
+            CIRCLE(j * SAEULE_B + 4, HOEHE - INT(liegt[j] * sicht) + 3, 1, RGBA(255, 255, 255, MAX(1, INT(255 * sicht))))
+        END IF
+    NEXT
+END SUB
+
+' --- Lichterschwarm (Abspann) ---------------------------------------------------
+' Wie in Nachtflug: Funken steigen aus dem Stern ueber dem Dorf auf und setzen
+' sich zum Gruss zusammen -- die Zielpunkte aus dem Schriftzug selbst.
+CONST SCHWARM = 1100
+DIM swZielX[SCHWARM] AS FLOAT
+DIM swZielY[SCHWARM] AS FLOAT
+DIM swStartX[SCHWARM] AS FLOAT
+DIM swStartY[SCHWARM] AS FLOAT
+DIM swBogen[SCHWARM] AS FLOAT
+DIM swVerz[SCHWARM] AS FLOAT
+DIM swX[SCHWARM] AS INTEGER
+DIM swY[SCHWARM] AS INTEGER
+DIM swR[SCHWARM] AS INTEGER
+DIM swFarbe[SCHWARM] AS INTEGER
+DIM swHofR[SCHWARM] AS INTEGER
+DIM swHof[SCHWARM] AS INTEGER
+DIM swAnz AS INTEGER
+CONST SCHWARM_Y = 400
+' wo der Stern im Abspann steht (dorf.fs liest dieselbe Stelle als `sternPos`)
+CONST STERN_X = 860.0
+CONST STERN_Y = 120.0
+
+SUB schwarmVorbereiten()
+    DIM rt AS INTEGER : rt = RENDERTARGET_NEW(BREITE, 200)
+    RENDERTARGET_BEGIN(rt)
+    SETFONT(schriftGross, 88)
+    TEXT((BREITE - TEXT_WIDTH("Frohe Weihnachten")) \ 2, 10, "Frohe Weihnachten", WHITE)
+    SETFONT(schriftGross, 50)
+    TEXT((BREITE - TEXT_WIDTH("Merry Christmas")) \ 2, 125, "Merry Christmas", WHITE)
+    RENDERTARGET_END()
+    DIM bild AS INTEGER : bild = RENDERTARGET_IMAGE(rt)
+    DIM kx AS ARRAY OF INTEGER : kx = []
+    DIM ky AS ARRAY OF INTEGER : ky = []
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO 199 STEP 3
+        FOR x = 0 TO BREITE - 1 STEP 3
+            IF ((GETPIXEL(bild, x, y) SHR 8) BAND 255) > 128 THEN
+                ARRAY_PUSH(kx, x)
+                ARRAY_PUSH(ky, y)
+            END IF
+        NEXT
+    NEXT
+    RANDOMIZE(11)
+    DIM n AS INTEGER : n = LEN(kx)
+    swAnz = MIN(SCHWARM, n)
+    DIM i AS INTEGER
+    FOR i = 0 TO swAnz - 1
+        DIM j AS INTEGER : j = INT(RND() * n)
+        swZielX[i] = kx[j] + (RND() - 0.5) * 1.5
+        swZielY[i] = SCHWARM_Y - 70 + ky[j] + (RND() - 0.5) * 1.5
+        kx[j] = kx[n - 1] : ky[j] = ky[n - 1]
+        n = n - 1
+        swStartX[i] = (RND() - 0.5) * 30.0
+        swStartY[i] = (RND() - 0.5) * 30.0
+        swBogen[i] = (RND() - 0.5) * 560.0
+        swVerz[i] = RND() * 1.6 + (swZielX[i] / BREITE) * 0.5
+    NEXT
+END SUB
+
+SUB schwarmZeichnen(takt AS FLOAT, zeit AS FLOAT)
+    DIM los AS FLOAT : los = AB_AUS + 5.2
+    IF takt < los OR swAnz = 0 THEN RETURN
+    DIM ende AS FLOAT : ende = CLAMP((TAKTE + 1.4 - takt) * 0.8, 0.0, 1.0)
+    DIM i AS INTEGER
+    FOR i = 0 TO swAnz - 1
+        DIM stx AS FLOAT : stx = STERN_X + swStartX[i]
+        DIM sty AS FLOAT : sty = STERN_Y + swStartY[i]
+        DIM t AS FLOAT : t = CLAMP((takt - los - swVerz[i]) / 2.4, 0.0, 1.0)
+        DIM e AS FLOAT : e = t * t * (3.0 - 2.0 * t)
+        DIM mx AS FLOAT : mx = (stx + swZielX[i]) * 0.5 + swBogen[i]
+        DIM my AS FLOAT : my = MIN(sty, swZielY[i]) - 80.0 - ABS(swBogen[i]) * 0.2
+        DIM u AS FLOAT : u = 1.0 - e
+        swX[i] = INT(u * u * stx + 2.0 * u * e * mx + e * e * swZielX[i])
+        swY[i] = INT(u * u * sty + 2.0 * u * e * my + e * e * swZielY[i])
+        DIM funkeln AS FLOAT : funkeln = 0.75 + 0.25 * SIN(zeit * 5.0 + i * 1.7)
+        DIM hell AS FLOAT : hell = IIF(t < 1.0, 0.5 + 0.5 * t, funkeln) * ende * MIN(1.0, t * 6.0)
+        swR[i] = IIF(e < 0.9, 2, 1)
+        swHofR[i] = 4
+        DIM g AS INTEGER : g = INT(200 + 45 * e)
+        swFarbe[i] = RGBA(255, g, INT(130 + 80 * e), MAX(1, INT(255 * hell)))
+        swHof[i] = RGBA(255, 175, 90, MAX(1, INT(70 * hell)))
+        IF hell <= 0.0 THEN
+            swR[i] = 0
+            swHofR[i] = 0
+        END IF
+    NEXT
+    CIRCLES(swX, swY, swHofR, swHof, swAnz)
+    CIRCLES(swX, swY, swR, swFarbe, swAnz)
+END SUB
+
+SUB beschriftung(takt AS FLOAT)
+    mittig("L I C H T E R G L A N Z", 230, 64, zeigen(takt, 1.5, 6.6), TRUE)
+    zweisprachig("eine Weihnachtsdemo in Drachenhauch", "a Christmas demo in Drachenhauch", 330, 24, zeigen(takt, 2.5, 6.6), FALSE)
+    zweisprachig("von Hans Schnorrenberger", "by Hans Schnorrenberger", 410, 22, zeigen(takt, 3.0, 6.6), FALSE)
+    zweisprachig("Musik und Bild aus einem Programm -- ohne eine einzige Klang- oder Bilddatei", _
+        "Music and pictures from one program -- without a single sound or image file", 636, 18, zeigen(takt, 3.5, 7.0), FALSE)
+    kapitel("Erster Advent", "Das Dorf im Schnee", "The village in the snow", takt, AB_DORF)
+    kapitel("Zweiter Advent", "Der Weihnachtsmarkt", "The Christmas market", takt, AB_MARKT)
+    kapitel("Dritter Advent", "Der Winterwald", "The winter forest", takt, AB_WALD)
+    kapitel("Vierter Advent", "Der Flug zum Mond", "Sleigh ride past the moon", takt, AB_SCHLITTEN)
+    kapitel("Heiligabend", "Durchs Fenster in die Stube", "Through the window, Christmas Eve", takt, AB_STUBE)
+    ' kleine Hinweise, was gerade zu sehen ist
+    zweisprachig("Fachwerk, Schnee und Mondlicht: alles im Fragment-Shader berechnet", _
+        "Half-timbering, snow and moonlight: all computed in a fragment shader", 646, 18, zeigen(takt, AB_DORF + 6, AB_DORF + 11), FALSE)
+    zweisprachig("Das Karussell dreht sich auf der Audio-Uhr, im Takt der Bassdrum", _
+        "The carousel turns on the audio clock, in time with the kick drum", 646, 18, zeigen(takt, AB_MARKT + 6, AB_MARKT + 11), FALSE)
+    zweisprachig("Schneekristalle: sechs Arme, jeder anders -- was unten ankommt, bleibt liegen", _
+        "Snow crystals: six arms, each one different -- what lands at the bottom stays there", 646, 18, zeigen(takt, AB_WALD + 2, AB_WALD + 7), FALSE)
+    zweisprachig("Eisblumen wachsen mit der Melodie", _
+        "Frost flowers grow with the melody", 646, 18, zeigen(takt, AB_KRISTALL + 1, AB_KRISTALL + 6), FALSE)
+    zweisprachig("Der Baum schmückt sich Ton für Ton zu „Stille Nacht“", _
+        "The tree decorates itself note by note to “Silent Night”", 646, 18, zeigen(takt, AB_STUBE + 6, AB_STUBE + 11), FALSE)
+    zweisprachig("Mitternacht", "Midnight", 300, 30, zeigen(takt, AB_MITTERNACHT + 0.2, AB_STERN + 0.3), TRUE)
+    ' Abspann
+    DIM a AS FLOAT : a = AB_AUS
+    mittig("Lichterglanz", 150, 56, zeigen(takt, a + 3, a + 11.5), TRUE)
+    zweisprachig("von Hans Schnorrenberger", "by Hans Schnorrenberger", 226, 22, zeigen(takt, a + 3.5, a + 11.5), FALSE)
+    zweisprachig("Musik: Celesta, Glocken, Chor und Synthesizer, 116 BPM -- synthetisiert mit AUDIO_NOTE und einer Audio-Uhr", _
+        "Music: celesta, bells, choir and synthesizer, 116 BPM -- synthesised with AUDIO_NOTE and an audio clock", 596, 17, zeigen(takt, a + 4, a + 11.5), FALSE)
+    zweisprachig("Motiv aus „Shchedryk“ (M. Leontowytsch) und „Stille Nacht“ (F. X. Gruber), beide gemeinfrei", _
+        "Motif from “Shchedryk” (M. Leontovych) and “Silent Night” (F. X. Gruber), both public domain", 646, 17, zeigen(takt, a + 4.5, a + 11.5), FALSE)
+END SUB
+
+' --- Ablauf ---------------------------------------------------------------------
+FUNCTION vorEnde(takt AS FLOAT, ende AS FLOAT) AS FLOAT
+    DIM f AS FLOAT : f = CLAMP(takt - (ende - 1.0), 0.0, 1.0)
+    RETURN f * f * (3.0 - 2.0 * f)
+END FUNCTION
+FUNCTION nachBeginn(takt AS FLOAT, beginn AS FLOAT) AS FLOAT
+    DIM f AS FLOAT : f = CLAMP(takt - beginn, 0.0, 1.0)
+    RETURN f * f * (3.0 - 2.0 * f)
+END FUNCTION
+SUB uebergang(sh AS INTEGER, aus AS FLOAT, ein AS FLOAT, r AS FLOAT, g AS FLOAT, b AS FLOAT)
+    SHADER_SET(sh, "aus", aus)
+    SHADER_SET(sh, "ein", ein)
+    SHADER_SET3(sh, "uebLicht", r, g, b)
+END SUB
+
+' Ein Zwischenspiel am Kranz (zwei Takte): die naechste Kerze entzuendet sich,
+' die Kamera faehrt in ihre Flamme, das Licht fuehrt ins naechste Kapitel.
+SUB kranzZeigen(sh AS INTEGER, takt AS FLOAT, von AS FLOAT, brennen AS FLOAT, k AS INTEGER, bis AS FLOAT)
+    SHADER_SET(sh, "kerzen", brennen + CLAMP((takt - (von + 0.3)) * 2.5, 0.0, 1.0))
+    SHADER_SET(sh, "fokus", CLAMP((takt - (bis - 1.3)) / 1.3, 0.0, 1.0))
+    SHADER_SET(sh, "ziel", k)
+END SUB
+
+' Die Farbe jedes Akkords: die Nacht (g-Moll) in kalten Toenen -- tiefblau,
+' bernstein, gold, tuerkis, violett, rose, eisblau, blau --, der Markt (B-Dur)
+' warm, Stille Nacht golden und rose.
+DIM akkR AS ARRAY OF FLOAT : akkR = [0.3, 1.0, 1.0, 0.25, 0.6, 1.0, 0.45, 0.35, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.0]
+DIM akkG AS ARRAY OF FLOAT : akkG = [0.45, 0.7, 0.85, 0.85, 0.4, 0.55, 0.75, 0.55, 0.82, 0.55, 0.35, 0.5, 0.75, 0.65, 0.9, 0.88, 0.82, 0.6, 0.62]
+DIM akkB AS ARRAY OF FLOAT : akkB = [1.0, 0.4, 0.45, 0.9, 1.0, 0.65, 1.0, 1.0, 0.45, 0.3, 0.3, 0.55, 0.4, 0.3, 0.45, 0.6, 0.5, 0.35, 0.6]
+DIM farbeR AS FLOAT : farbeR = akkR[0]
+DIM farbeG AS FLOAT : farbeG = akkG[0]
+DIM farbeB AS FLOAT : farbeB = akkB[0]
+
+' Die Schlaege um Mitternacht fuer die Bilder: 1 auf jedem, faellt dann ab
+FUNCTION glockenSchlag(takt AS FLOAT) AS FLOAT
+    IF takt < AB_MITTERNACHT OR takt >= AB_STERN + 0.25 THEN RETURN 0.0
+    DIM v AS FLOAT : v = (takt - AB_MITTERNACHT) * 4.0
+    RETURN EXP(-(v - FLOOR(v)) * 3.0)
+END FUNCTION
+
+' Wie viele Kugeln am Baum haengen, mit Bruchteil: je Ton von Stille Nacht
+' eine, und die juengste geht in gut einer Achtel auf
+FUNCTION kugelnBei(schritt AS FLOAT) AS FLOAT
+    DIM k AS INTEGER : k = snNotenBis(schritt)
+    IF k = 0 THEN RETURN 0.0
+    IF k >= 2 * LEN(snTon) THEN RETURN k
+    DIM f AS FLOAT : f = schritt - AB_STUBE * SCHRITTE_JE_TAKT
+    DIM st AS FLOAT : st = f - (INT(f) \ SN_STROPHE) * SN_STROPHE
+    DIM seit AS FLOAT : seit = st - snBeginn[(k - 1) MOD LEN(snTon)]
+    RETURN k - 1 + CLAMP(seit / 2.5, 0.0, 1.0)
+END FUNCTION
+
+' --- Startbild: die Klaenge entstehen ------------------------------------------
+SUB startbild(anteil AS FLOAT, bild AS INTEGER)
+    CLS(BLACK)
+    DIM auf AS FLOAT : auf = MIN(1.0, bild / 40.0)
+    mittig("L I C H T E R G L A N Z", 300, 40, 0.55 * auf, TRUE)
+    zweisprachig("die Klänge entstehen ...", "the sounds are being synthesised ...", 372, 16, 0.6 * auf, FALSE)
+    DIM b AS INTEGER : b = 320
+    DIM x AS INTEGER : x = (BREITE - b) \ 2
+    BOX(x, 440, x + b, 441, RGB(52, 34, 30))
+    BOX(x, 440, x + INT(b * anteil), 441, RGB(240, 180, 110))
+    FLIP()
+END SUB
+
+schwarmVorbereiten()
+IF tonDa() THEN
+    musikVorbereiten(abTakt)
+    DIM bild AS INTEGER
+    DIM fertig AS BOOLEAN
+    WHILE NOT fertig AND NOT QUITREQUESTED() AND NOT KEYHIT(KEY_ESCAPE)
+        DIM t0 AS FLOAT : t0 = GET_TIME()
+        WHILE GET_TIME() - t0 < 0.012
+            IF NOT vorbauen() THEN
+                fertig = TRUE
+                EXIT WHILE
+            END IF
+        WEND
+        startbild(bauAnteil(), bild)
+        bild = bild + 1
+    WEND
+END IF
+
+musikStarten(abTakt)
+IF mitschnitt <> "" THEN
+    IF mitTon THEN AUDIO_RECORD_START(400) ELSE PRINT "kein Ton -- kein Mitschnitt"
+END IF
+DIM start AS FLOAT : start = GET_TIME()
+DIM beenden AS BOOLEAN
+DIM bilder AS INTEGER
+DIM spitze AS FLOAT
+DIM letztesBild AS FLOAT : letztesBild = GET_TIME()
+' Wer mitten im Stueck beginnt, findet schon etwas Schnee am Boden
+IF abTakt > AB_DORF + 4 THEN
+    FOR si = 0 TO SAEULEN - 1 : liegt[si] = 12.0 + 6.0 * SIN(si * 0.21) + 4.0 * SIN(si * 0.73) : NEXT
+END IF
+
+WHILE NOT beenden
+    IF QUITREQUESTED() OR KEYHIT(KEY_ESCAPE) THEN beenden = TRUE
+    IF KEYHIT(KEY_F11) THEN SET_FULLSCREEN(NOT WINDOW_IS_FULLSCREEN())
+    musikPlanen()
+    DIM takt AS FLOAT : takt = musikTakt()
+    DIM zeit AS FLOAT : zeit = GET_TIME() - start + abTakt * 60.0 / TEMPO * 4.0
+    DIM kick AS FLOAT : kick = musikKick()
+    IF musikZuEnde() THEN beenden = TRUE
+
+    DIM melTon AS FLOAT : melTon = musikTon()
+    DIM nr AS INTEGER : nr = musikAkkord()
+    DIM jetzt AS FLOAT : jetzt = GET_TIME()
+    DIM zieh AS FLOAT : zieh = 1.0 - EXP(-(jetzt - letztesBild) * 2.5)
+    letztesBild = jetzt
+    farbeR = farbeR + (akkR[nr] - farbeR) * zieh
+    farbeG = farbeG + (akkG[nr] - farbeG) * zieh
+    farbeB = farbeB + (akkB[nr] - farbeB) * zieh
+
+    CLS(BLACK)
+    DIM sh AS INTEGER
+    ' Schnee je Szene: Dichte, Wind, Fahrt, und ob er liegen bleibt
+    DIM zielDicht AS FLOAT : zielDicht = 0.0
+    DIM zielDraussen AS FLOAT : zielDraussen = 0.0
+    schneeWind = 0.25 : schneeFahrt = 0.0
+    IF takt < AB_DORF OR (takt >= AB_KRANZ2 AND takt < AB_MARKT) OR (takt >= AB_KRANZ3 AND takt < AB_WALD) OR (takt >= AB_KRANZ4 AND takt < AB_SCHLITTEN) THEN
+        sh = shKranz
+        IF takt < AB_DORF THEN
+            SHADER_SET(sh, "hell", CLAMP(takt / 1.5, 0.0, 1.0))
+            SHADER_SET(sh, "kerzen", CLAMP((takt - 4.9) * 2.5, 0.0, 1.0))
+            SHADER_SET(sh, "fokus", CLAMP((takt - 6.4) / 1.6, 0.0, 1.0))
+            SHADER_SET(sh, "ziel", 0)
+            uebergang(sh, vorEnde(takt, AB_DORF), 1.0, 1.0, 0.75, 0.45)
+        ELSEIF takt < AB_MARKT THEN
+            SHADER_SET(sh, "hell", 1.0)
+            kranzZeigen(sh, takt, AB_KRANZ2, 1.0, 1, AB_MARKT)
+            uebergang(sh, vorEnde(takt, AB_MARKT), nachBeginn(takt, AB_KRANZ2), 1.0, 0.75, 0.45)
+        ELSEIF takt < AB_WALD THEN
+            SHADER_SET(sh, "hell", 1.0)
+            kranzZeigen(sh, takt, AB_KRANZ3, 2.0, 2, AB_WALD)
+            uebergang(sh, vorEnde(takt, AB_WALD), nachBeginn(takt, AB_KRANZ3), 1.0, 0.75, 0.45)
+        ELSE
+            SHADER_SET(sh, "hell", 1.0)
+            kranzZeigen(sh, takt, AB_KRANZ4, 3.0, 3, AB_SCHLITTEN)
+            uebergang(sh, vorEnde(takt, AB_SCHLITTEN), nachBeginn(takt, AB_KRANZ4), 1.0, 0.75, 0.45)
+        END IF
+    ELSEIF takt < AB_KRANZ2 THEN
+        sh = shDorf
+        SHADER_SET(sh, "hell", 1.0)
+        SHADER_SET(sh, "fort", (takt - AB_DORF) / 16.0)
+        SHADER_SET(sh, "ende", 0.0)
+        uebergang(sh, vorEnde(takt, AB_KRANZ2), nachBeginn(takt, AB_DORF), 1.0, 0.75, 0.45)
+        zielDicht = 0.75 : zielDraussen = 1.0
+    ELSEIF takt < AB_KRANZ3 THEN
+        sh = shMarkt
+        SHADER_SET(sh, "hell", 1.0)
+        SHADER_SET(sh, "fort", (takt - AB_MARKT) / 16.0)
+        uebergang(sh, vorEnde(takt, AB_KRANZ3), nachBeginn(takt, AB_MARKT), 1.0, 0.75, 0.45)
+        zielDicht = 0.45 : zielDraussen = 1.0
+    ELSEIF takt < AB_KRANZ4 THEN
+        sh = shWald
+        SHADER_SET(sh, "hell", 1.0)
+        SHADER_SET(sh, "fort", (takt - AB_WALD) / 16.0)
+        SHADER_SET(sh, "kristall", CLAMP((takt - AB_KRISTALL) / 7.0, 0.0, 1.0))
+        uebergang(sh, vorEnde(takt, AB_KRANZ4), nachBeginn(takt, AB_WALD), 1.0, 0.75, 0.45)
+        zielDicht = IIF(takt < AB_KRISTALL, 0.9, 0.5) : zielDraussen = 1.0
+        schneeWind = 0.1
+    ELSEIF takt < AB_STUBE THEN
+        sh = shSchlitten
+        SHADER_SET(sh, "hell", 1.0)
+        SHADER_SET(sh, "fort", (takt - AB_SCHLITTEN) / 16.0)
+        SHADER_SET(sh, "rueck", CLAMP((takt - AB_RUECKUNG) * 2.0, 0.0, 1.0))
+        uebergang(sh, vorEnde(takt, AB_STUBE), nachBeginn(takt, AB_SCHLITTEN), 1.0, 0.82, 0.55)
+        zielDicht = 0.8 : zielDraussen = 0.0
+        schneeWind = 1.6 : schneeFahrt = 1.0
+    ELSEIF takt < AB_AUS + 2 THEN
+        ' (der Stern bekommt zwei Takte, bevor der Abspann kommt)
+        sh = shStube
+        SHADER_SET(sh, "hell", 1.0)
+        SHADER_SET(sh, "fort", (takt - AB_STUBE) / (AB_AUS + 2 - AB_STUBE))
+        ' die Kugeln: je Ton von Stille Nacht eine, dazu, wie weit die
+        ' juengste schon aufgegangen ist
+        DIM schritt AS FLOAT : schritt = musikSchritt()
+        SHADER_SET(sh, "kugeln", kugelnBei(schritt))
+        SHADER_SET(sh, "glocke", glockenSchlag(takt))
+        SHADER_SET(sh, "stern", CLAMP((takt - AB_STERN) * 2.0, 0.0, 1.0))
+        SHADER_SET(sh, "nacht", CLAMP((takt - (AB_MITTERNACHT - 2)) / 2.0, 0.0, 1.0))
+        uebergang(sh, vorEnde(takt, AB_AUS + 2), nachBeginn(takt, AB_STUBE), 1.0, 0.82, 0.55)
+        ' Schnee nur, solange wir noch draussen vor dem Fenster stehen
+        zielDicht = IIF(takt < AB_STUBE + 5, 0.4, 0.0) : zielDraussen = 0.0
+        schneeWind = 0.05
+    ELSE
+        ' Abspann: das Dorf, ueber ihm der Stern, aus dem der Gruss aufsteigt
+        sh = shDorf
+        SHADER_SET(sh, "hell", CLAMP((TAKTE + 1.5 - takt) * 2.0, 0.0, 1.0))
+        SHADER_SET(sh, "fort", 1.0)
+        SHADER_SET(sh, "ende", CLAMP((takt - AB_AUS - 2) / 2.0, 0.0, 1.0))
+        SHADER_SET2(sh, "sternPos", STERN_X, STERN_Y)
+        uebergang(sh, 0.0, nachBeginn(takt, AB_AUS + 2), 1.0, 0.82, 0.55)
+        zielDicht = 0.6 : zielDraussen = 1.0
+    END IF
+    schneeDicht = schneeDicht + (zielDicht - schneeDicht) * zieh * 0.8
+    schneeDraussen = schneeDraussen + (zielDraussen - schneeDraussen) * zieh * 0.5
+    gueteNachziehen(sh)
+    SHADER_SET(sh, "time", zeit)
+    SHADER_SET(sh, "kick", kick)
+    SHADER_SET(sh, "takt", takt)
+    SHADER_SET(sh, "guete", guete)
+    SHADER_SET(sh, "ton", melTon)
+    SHADER_SET(sh, "hoehe", tonHoehe)
+    SHADER_SET3(sh, "farbe", farbeR, farbeG, farbeB)
+    IF schneeDicht > 0.01 OR schneeDraussen > 0.01 THEN schneeZeichnen(zeit, takt)
+    beschriftung(takt)
+    IF takt >= AB_AUS + 2 THEN schwarmZeichnen(takt, zeit)
+    POSTFX(sh, massstab)
+    FLIP()
+    bilder = bilder + 1
+    IF messen AND mitTon THEN spitze = MAX(spitze, AUDIO_PEAK())
+WEND
+IF messen THEN
+    PRINT "Bilder je Sekunde: "; FORMAT$(bilder / MAX(0.001, GET_TIME() - start), "%.1f")
+    IF mitTon THEN PRINT "Spitze im Mischer: "; FORMAT$(spitze, "%.2f")
+END IF
+IF mitschnitt <> "" AND mitTon THEN
+    AUDIO_SAVE_WAV(AUDIO_RECORD_STOP(), mitschnitt)
+    PRINT "Mitschnitt: "; mitschnitt
+END IF
+musikStoppen()
