@@ -121,10 +121,11 @@ module.exports = (H) => [
       'crt = SHADER_LOAD("assets/shaders/crt.fs")',
       'IF crt = -1 THEN PRINT "Shader nicht ladbar"',
     ]),
-  H.cmd("POSTFX", 'POSTFX(shader)',
-    "Schickt ab jetzt jeden fertigen Frame durch den Shader, bevor er im Fenster erscheint. POSTFX(-1) schaltet den Effekt wieder ab. Intern wird die Szene dafür in eine unsichtbare Fläche gerendert und dann mit dem Shader auf den Bildschirm gebracht.",
+  H.cmd("POSTFX", 'POSTFX(shader [, massstab])',
+    "Schickt ab jetzt jeden fertigen Frame durch den Shader, bevor er im Fenster erscheint. POSTFX(-1) schaltet den Effekt wieder ab. Intern wird die Szene dafür in eine unsichtbare Fläche gerendert und dann mit dem Shader auf den Bildschirm gebracht. Mit dem zweiten Argument (0.25 bis 1) rechnet der Shader in kleinerer Auflösung, und das Ergebnis wird weich vergrößert – bei aufwendigen Shadern auf schwachen Grafikchips ist 0.7 etwa die halbe Arbeit.",
     [
       'POSTFX(crt)                    \' Effekt an',
+      'POSTFX(crt, 0.7)               \' halbe Arbeit, etwas weicher',
       'IF KEYHIT(KEY_F2) THEN POSTFX(-1)   \' und wieder aus',
     ]),
   H.cmd("SHADER_SET · SHADER_SET2 · SHADER_SET3", 'SHADER_SET(sh, name$, wert)   SHADER_SET2(sh, name$, x, y)   SHADER_SET3(sh, name$, x, y, z)',
