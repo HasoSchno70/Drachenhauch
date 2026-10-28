@@ -2939,7 +2939,7 @@ noch nicht verfuegbar". Tests `tests/pruef/werkzeug_website.dhtest`
 lokalen Verweise samt Marke -- mit falscher Markenregel 135 tote). Was
 ausserhalb des Repositorys zu tun ist: `docs/entwurf-sichtbarkeit.md`.
 **Falle beim Patchen:** ein Python-Ersatz mit `"\1"` landete als
-Steuerzeichen  in der Datei -- Rueckstriche per Edit-Werkzeug setzen.
+Steuerzeichen (Code 1) in der Datei -- Rueckstriche per Edit-Werkzeug setzen.
 
 ## Dogfooding 15: Landkarte (2026-10-26)
 
