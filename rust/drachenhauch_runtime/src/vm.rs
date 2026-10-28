@@ -6916,7 +6916,7 @@ impl<'p> Vm<'p> {
     fn try_hintergrund(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("shell_") || name.starts_with("db_query_")
              || name.starts_with("task_") || name.starts_with("window_") || name.starts_with("parent_")
-             || name.starts_with("process_") || name.starts_with("code_")
+             || name.starts_with("process_") || name.starts_with("code_") || name == "syntax_spans"
              || name == "opendoc" || name.starts_with("printer")) { return Ok(None); }
         let v = match name {
             // ===== Kindprozesse mit laufender Ausgabe (prozess.rs, fuer die IDE) =====
@@ -7094,6 +7094,24 @@ impl<'p> Vm<'p> {
                 let liste: Vec<serde_json::Value> = crate::lsp::typ_hinweise(&text, &basis).into_iter()
                     .map(|(z, n, t)| serde_json::json!({"zeile": z, "name": n, "typ": t})).collect();
                 Value::str_rc(serde_json::Value::Array(liste).to_string())
+            }
+            // Quelltext einfaerben: (starts, laengen, arten) als TUPLE. Reine
+            // Textzerlegung, darum hier und nicht bei der Grafik -- auch ein Bau
+            // ohne Fenster (die Website, tools/website.dh) faerbt damit Code.
+            // Drei Rueckgaben in einem Aufruf, weil sie IMMER zusammengehoeren
+            // -- drei getrennte Aufrufe muessten denselben Text dreimal
+            // abtasten und koennten auseinander laufen.
+            "syntax_spans" => {
+                let src = bi_str(a, 0, "SYNTAX_SPANS")?.to_string();
+                let sp = crate::syntax::spans(&src);
+                let starts: Vec<i64> = sp.iter().map(|&(s, _, _)| s as i64).collect();
+                let laengen: Vec<i64> = sp.iter().map(|&(_, l, _)| l as i64).collect();
+                let arten: Vec<String> = sp.iter().map(|&(_, _, a)| a.name().to_string()).collect();
+                Value::Tuple(std::rc::Rc::new(vec![
+                    crate::builtins::new_int_array(starts),
+                    crate::builtins::new_int_array(laengen),
+                    crate::builtins::new_string_array(arten),
+                ]))
             }
             "code_names" => {
                 let text = bi_str(a, 0, "CODE_NAMES")?;
@@ -9793,22 +9811,6 @@ impl<'p> Vm<'p> {
             "text_line_spacing" => { let n = gi(a,0,"TEXT_LINE_SPACING")?;
                                      g!().text_line_spacing(n); Value::Nil }
             // --- Clipboard + Drag&Drop (Batch 5) ---
-            // Quelltext einfaerben: (starts, laengen, arten) als TUPLE.
-            // Drei Rueckgaben in einem Aufruf, weil sie IMMER zusammengehoeren
-            // -- drei getrennte Aufrufe muessten denselben Text dreimal
-            // abtasten und koennten auseinander laufen.
-            "syntax_spans" => {
-                let src = gs(a, 0, "SYNTAX_SPANS")?.to_string();
-                let sp = crate::syntax::spans(&src);
-                let starts: Vec<i64> = sp.iter().map(|&(s, _, _)| s as i64).collect();
-                let laengen: Vec<i64> = sp.iter().map(|&(_, l, _)| l as i64).collect();
-                let arten: Vec<String> = sp.iter().map(|&(_, _, a)| a.name().to_string()).collect();
-                Value::Tuple(std::rc::Rc::new(vec![
-                    crate::builtins::new_int_array(starts),
-                    crate::builtins::new_int_array(laengen),
-                    crate::builtins::new_string_array(arten),
-                ]))
-            }
             "clipboard_get" => Value::Str(g!().clipboard_get().into()),
             // Scheitert das Schreiben, ist das ein FEHLER und kein Schweigen:
             // die Zwischenablage gehoert jeweils EINEM Prozess, und wer seinen
