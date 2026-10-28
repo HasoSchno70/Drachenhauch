@@ -1,0 +1,461 @@
+' Die Demo examples/lichterglanz: Weihnachtsmusik, ganz synthetisiert, und
+' Bilder aus Fragment-Shadern, davor Schnee in 2D.
+'
+' Die Musik wird offline ausgeschrieben (--wav) und an der Datei geprueft:
+' Stereo, Laenge, Spitze, still im Intro, laut auf dem Markt und im
+' Schlittenflug, die Glocken um Mitternacht, still am Ende. Die Bilder: jede
+' Szene einmal ab ihrem Takt, das Bildschirmfoto darf weder schwarz noch
+' weiss sein -- ein Shader, der nicht uebersetzt, liefert Schwarz (und
+' main.dh bricht ab). Dazu: Stille Nacht und die Kugeln am Baum, der
+' liegende Schnee, die Harmonie und das sparsame Bauen der Klaenge.
+--- langsam
+
+=== die musik ist stereo und hat ihre form
+--- programm ../../examples/lichterglanz/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+--- argumente
+--wav
+{fall}/lichterglanz.wav
+--- enthaelt
+geschrieben: 
+--- ton lichterglanz.wav
+kanaele 2
+kanaele verschieden
+dauer 235.7 +-0.05
+spitze 0.9 +-0.01
+pegel 0 1500 < 0.3
+pegel 62000 63000 > 0.05
+pegel 140000 141000 > 0.05
+pegel 199000 200000 > 0.02
+pegel 232000 235000 < 0.03
+
+=== adventskranz mit der ersten kerze
+--- programm ../../examples/lichterglanz/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+5
+--- umgebung
+DHRT_FRAMES=70
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+' Mittlere Helligkeit ueber ein Raster von 32 x 18 Punkten
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== das dorf im schnee
+--- programm ../../examples/lichterglanz/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+12
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+' Mittlere Helligkeit ueber ein Raster von 32 x 18 Punkten
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== der weihnachtsmarkt
+--- programm ../../examples/lichterglanz/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+30
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+' Mittlere Helligkeit ueber ein Raster von 32 x 18 Punkten
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== der winterwald
+--- programm ../../examples/lichterglanz/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+48
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+' Mittlere Helligkeit ueber ein Raster von 32 x 18 Punkten
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== eisblumen auf dem see
+--- programm ../../examples/lichterglanz/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+57
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+' Mittlere Helligkeit ueber ein Raster von 32 x 18 Punkten
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== der schlittenflug
+--- programm ../../examples/lichterglanz/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+66
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+' Mittlere Helligkeit ueber ein Raster von 32 x 18 Punkten
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== die stube am heiligabend
+--- programm ../../examples/lichterglanz/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+86
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+' Mittlere Helligkeit ueber ein Raster von 32 x 18 Punkten
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== der stern geht auf
+--- programm ../../examples/lichterglanz/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+99
+--- umgebung
+DHRT_FRAMES=90
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+' Mittlere Helligkeit ueber ein Raster von 32 x 18 Punkten
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== abspann mit dem lichterschwarm
+--- programm ../../examples/lichterglanz/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+--- argumente
+--fenster
+--ab
+108
+--- umgebung
+DHRT_FRAMES=40
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei pruefen.dh
+' Mittlere Helligkeit ueber ein Raster von 32 x 18 Punkten
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM s AS FLOAT
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 0 TO 31
+    FOR y = 0 TO 17
+        DIM f AS INTEGER : f = GETPIXEL(b, 20 + x * 40, 20 + y * 40)
+        s = s + ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+    NEXT
+NEXT
+DIM m AS FLOAT : m = s / (32 * 18 * 3)
+PRINT "nicht schwarz "; m > 4; ", nicht weiss "; m < 200
+
+--- nachher
+IMPORT "pruefen.dh"
+--- erwartet
+nicht schwarz TRUE, nicht weiss TRUE
+
+=== stille nacht schmueckt den baum
+' 46 Toene je Strophe, die Strophe 144 Sechzehntel (zwoelf 6/8-Takte); je Ton
+' eine Kugel, in zwei Strophen also 92. Die Huellkurve der Melodie beginnt
+' auf dem F (65) mit 1.
+IMPORT "musik_hier.dh"
+DIM s AS INTEGER
+DIM k AS INTEGER
+FOR k = 0 TO LEN(snDauer) - 1 : s = s + snDauer[k] : NEXT
+PRINT LEN(snTon); " "; s; " "; SN_STROPHE
+PRINT snNotenBis(AB_STUBE * 16 - 1); " "; snNotenBis(AB_STUBE * 16); " "; snNotenBis(AB_STUBE * 16 + 144); " "; snNotenBis(AB_MITTERNACHT * 16)
+PRINT FORMAT$(tonBei(AB_STUBE * 16), "%.2f"); " "; FORMAT$(tonHoehe, "%.2f")
+' zwei Strophen enden genau um Mitternacht
+PRINT AB_STUBE * 16 + 2 * SN_STROPHE = AB_MITTERNACHT * 16
+--- datei musik_hier.dh
+IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+--- erwartet
+46 144 144
+0 1 47 92
+1.00 0.50
+TRUE
+
+=== das glockenmotiv laeuft gegen den takt
+' B-A-B-G in Sechzehnteln, 6 + 6 + 4 Schritte, jeden Takt wieder auf der Eins
+IMPORT "musik_hier.dh"
+DIM s AS INTEGER
+FOR s = 0 TO 15
+    PRINT glockenmotiv(s); " ";
+NEXT
+PRINT
+--- datei musik_hier.dh
+IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+--- erwartet
+70 0 69 70 67 0 70 0 69 70 67 0 70 0 69 70 
+
+=== die harmonie folgt den kapiteln
+' die Nacht in g-Moll (0..7), ab Takt 70 dieselbe einen Ganzton hoeher
+' (8..15), der Markt in B-Dur (16..23), Stille Nacht (24..26), der Abspann
+' wieder mit dem Markt
+IMPORT "musik_hier.dh"
+PRINT akkordNr(8); " "; akkordNr(26); " "; akkordNr(70); " "; akkordNr(78); " "; akkordNr(100)
+PRINT akkTon(0, 0); " "; akkTon(8, 0); " "; versatzBei(69); " "; versatzBei(70); " "; versatzBei(78)
+PRINT treibt(10); " "; treibt(16); " "; treibt(30); " "; treibt(50); " "; treibt(65); " "; treibt(80)
+--- datei musik_hier.dh
+IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+--- erwartet
+4 16 11 24 16
+55 57 0 2 0
+FALSE TRUE TRUE FALSE TRUE FALSE
+
+=== der schnee bleibt liegen
+' Ab Takt 12 im Dorf, gut 15 Sekunden: am unteren Rand waechst eine Decke,
+' und die nahen Flocken sind Kristalle (sechs Arme mit Seitenaesten)
+--- programm ../../examples/lichterglanz/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+--- ersetzen musikStoppen()
+musikStoppen()
+DIM pruefMax AS FLOAT
+DIM pruefJ AS INTEGER
+FOR pruefJ = 0 TO SAEULEN - 1 : pruefMax = MAX(pruefMax, liegt[pruefJ]) : NEXT
+PRINT "schnee liegt "; pruefMax > 4.0
+PRINT "kristalle "; striche > 300
+--- argumente
+--fenster
+--ab
+8
+--- umgebung
+DHRT_FRAMES=900
+DH_OHNE_AUDIO=1
+--- erwartet
+schnee liegt TRUE
+kristalle TRUE
+
+=== sparsam baut erst bei bedarf und gibt wieder frei
+' Wie in Nachtflug: mit --sparsam entsteht vor dem Start nur, was in den
+' ersten Takten erklingt; waehrend der Fahrt wird jeder Klang vor seinem
+' Einsatz gebaut und danach freigegeben -- bei 2 Bildern je Schritt darf
+' nichts erst beim Einsatz entstehen.
+IMPORT "helfer.dh"
+sparsam = TRUE
+musikVorbereiten(0)
+WHILE vorbauen()
+WEND
+PRINT "vor dem start wenige "; bauPos < 20
+ausschreiben = TRUE
+lied = AUDIO_SOUND_NEW(1000)
+DIM spitze AS INTEGER
+DIM nachgebaut AS INTEGER
+DIM jetzt AS INTEGER
+FOR jetzt = 0 TO schritteGesamt() - 1
+    bauGrenze = jetzt + VORLAUF
+    vorbauen()
+    vorbauen()
+    freigeben(jetzt)
+    DIM vorher AS INTEGER : vorher = LEN(klaenge)
+    schrittPlanen(jetzt)
+    nachgebaut = nachgebaut + LEN(klaenge) - vorher
+    spitze = MAX(spitze, AUDIO_SOUND_COUNT())
+NEXT
+PRINT "nichts erst beim einsatz gebaut "; nachgebaut = 0
+PRINT "alle eintraege gebaut "; bauPos = LEN(bauKey)
+PRINT "hoechstens 150 zugleich "; spitze <= 150
+EPRINT("zugleich hoechstens " + STR$(spitze))
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+--- erwartet
+vor dem start wenige TRUE
+nichts erst beim einsatz gebaut TRUE
+alle eintraege gebaut TRUE
+hoechstens 150 zugleich TRUE
+
+=== ohne sparsam steht vor dem start alles
+IMPORT "helfer.dh"
+musikVorbereiten(0)
+WHILE vorbauen()
+WEND
+PRINT "alles gebaut "; bauPos = LEN(bauKey); ", mehr als 250 klaenge "; AUDIO_SOUND_COUNT() > 250
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+--- erwartet
+alles gebaut TRUE, mehr als 250 klaenge TRUE

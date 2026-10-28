@@ -2954,6 +2954,35 @@ Simulation (nichts erst beim Einsatz gebaut, hoechstens 150 zugleich) und
 die Gegenprobe ohne Schalter; ohne Freigeben bzw. ohne Bauanweisung im Lead
 faellt der erste.
 
+## Demo Lichterglanz (2026-10-28)
+
+`examples/lichterglanz/` (Wunsch des Nutzers: eine zweite Demo wie Nachtflug,
+Thema Advent und Weihnachten; gewaehlt: Adventskranz als Rahmen,
+festlich-elektronische Musik, alle vier Extras -- liegender Schnee, echte
+Kristalle, Geraeusche, Stimme). Gebaut aus dem Geruest von Nachtflug
+(Audio-Uhr, `vormerken`/sparsam, Guete-Stufen, Lichtuebergang, Schwarm),
+musik.dh neu: 116 BPM, 112 Takte (3:56), das Glockenmotiv aus "Shchedryk"
+(gemeinfrei) als 6+6+4 gegen den Takt, eine Nacht-Melodie in g-Moll, eine
+Markt-Melodie in B-Dur, Rueckung im Schlittenflug, "Stille Nacht" (Gruber,
+gemeinfrei) im 6/8 ab Takt 78, zwei Strophen genau bis Mitternacht (96),
+zwoelf Roehrenglocken-Schlaege, Stern bei 99. Neue Klaenge: Celesta,
+Spieluhr, Roehrenglocke, Schellen, Klavier mit Dauer, Streicher mit Chor,
+Schritte, Stimmengewirr, Eule, Kamin, Ticken. Sechs Shader (kranz, dorf,
+markt, wald, schlitten, stube); im Abspann zeigt dorf.fs den Stern an
+`sternPos`, aus dem der Lichterschwarm "Frohe Weihnachten / Merry
+Christmas" aufsteigt. Die Kugeln am Baum zaehlt `snNotenBis` (je Ton eine,
+92 bis Mitternacht), in stube.fs O(1) ueber Ebenen und Sektoren statt einer
+Schleife ueber alle. Schnee in main.dh: 420 Flocken, die 46 nahen als
+Kristalle (`LINES` in einem Aufruf), 160 Saeulen am unteren Rand, die beim
+Landen wachsen (Flocke + halbe Menge auf die Nachbarn) -- drinnen
+ausgeblendet. **Zwei Fallen beim Bau:** ein hohles Zimmer als
+`-sdBox` ist von aussen negativ (die Kamera vor dem Fenster sah nur Himmel)
+-- eine Schale aus zwei Kisten; und ein Richtungsvektor, der nur fast
+normiert ist (1.002), macht den Mond fuenfmal groesser, weil `dot` dann
+ueber 1 geht. Tests `tests/pruef/beispiel_lichterglanz.dhtest` (16: WAV,
+neun Szenenbilder, Stille Nacht und Kugeln, Glockenmotiv, Harmonie,
+liegender Schnee, sparsam samt Gegenprobe).
+
 ## Website und englisches README (2026-10-28)
 
 Wunsch des Nutzers: Drachenhauch soll genannt werden, wenn jemand eine
