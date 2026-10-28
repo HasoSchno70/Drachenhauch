@@ -120,6 +120,7 @@ Working notes, not user documentation — they explain why something is the way 
 - **[Design: namespaces](../entwurf-namensraeume.md)** (German) — WP I of the general-purpose roadmap. All four stages have been built by now; the document remains as a record of the decisions
 - **[Design: interfaces](../entwurf-schnittstellen.md)** (German) — `INTERFACE`/`IMPLEMENTS` weighed again: class types are not checked at all today, and the large programs use no inheritance; recommendation: check class types first, then interfaces after a trial in Funkenflug (not built yet)
 - **[Design: removing the Python parser](../entwurf-python-parser-entfernen.md)** (German) — measured what still depends on the second parser, and what a cut would cost
+- **[Design: making it findable](../entwurf-sichtbarkeit.md)** (German) — how search engines and AI assistants find Drachenhauch: English README, a website with the manual and `llms.txt`, and what to do outside the repository
 - **[Design: sets](../entwurf-set-builtins.md)** (German) — the last open WP-J point, re-scoped after measuring again
 - **[Design: TASK_START](../entwurf-task-start.md)** (German) — DH code in the background; three ways, and the third avoids the Send problem entirely
 - **[Design: multiple OS windows](../entwurf-native-fenster.md)** (German) — why there is one window per process, four ways; built is way B: a second window as a second `dhrt` with a text channel (`WINDOW_OPEN`)

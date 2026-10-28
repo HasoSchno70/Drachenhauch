@@ -119,6 +119,7 @@ Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie e
 - **[Entwurf: Namensräume](entwurf-namensraeume.md)** — WP I der Allzweck-Roadmap. Alle vier Stufen sind inzwischen gebaut; das Dokument bleibt als Protokoll der Entscheidungen
 - **[Entwurf: Schnittstellen](entwurf-schnittstellen.md)** — `INTERFACE`/`IMPLEMENTS` neu abgewogen: Klassentypen werden heute gar nicht geprüft, die großen Programme nutzen keine Vererbung; Empfehlung: erst Klassentypen prüfen, dann Schnittstellen nach einer Probe in Funkenflug (noch nicht gebaut)
 - **[Entwurf: Python-Parser entfernen](entwurf-python-parser-entfernen.md)** — gemessen, was noch am zweiten Parser hängt, und was ein Schnitt kostet
+- **[Entwurf: Auffindbar machen](entwurf-sichtbarkeit.md)** — wie Suchmaschinen und KI-Assistenten Drachenhauch finden: englisches README, Website mit Handbuch und `llms.txt`, und was außerhalb des Repositorys zu tun ist
 - **[Entwurf: Mengen](entwurf-set-builtins.md)** — der letzte offene WP-J-Punkt, nach dem Nachmessen neu zugeschnitten
 - **[Entwurf: TASK_START](entwurf-task-start.md)** — DH-Code im Hintergrund; drei Wege, und der dritte umgeht das Send-Problem ganz
 - **[Entwurf: Mehrere OS-Fenster](entwurf-native-fenster.md)** — warum es ein Fenster je Prozess gibt, vier Wege; gebaut ist Weg B: ein zweites Fenster als zweiter `dhrt` mit Textkanal (`WINDOW_OPEN`)
