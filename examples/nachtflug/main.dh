@@ -18,6 +18,8 @@
 '     dhrt run main.dh -- --leicht        ' fuer schwaechere Grafikkarten (feste Stufe 3)
 '     dhrt run main.dh -- --stufe 0       ' feste Guete 0 (voll) .. 4; ohne Angabe
 '                                         ' waehlt die Demo sie selbst je Szene
+'     dhrt run main.dh -- --sparsam       ' Klaenge erst bei Bedarf bauen und wieder
+'                                         ' freigeben (wenig Speicher, z.B. Handys)
 '     dhrt run main.dh -- --wav datei.wav ' nur die Musik als WAV schreiben (trocken)
 '     dhrt run main.dh -- --mitschnitt datei.wav  ' abspielen und mitschneiden,
 '                                         ' so wie man es hoert (mit Hall)
@@ -60,6 +62,8 @@ WHILE ai < ARGC()
             ai = ai + 1 : festeStufe = CLAMP(VAL(ARG$(ai)), 0, 4)
         CASE "--messen"
             messen = TRUE
+        CASE "--sparsam"
+            sparsam = TRUE
         CASE "--wav"
             ai = ai + 1 : wavZiel = ARGPATH$(ai)
         CASE "--mitschnitt"
@@ -492,6 +496,9 @@ END SUB
 
 schwarmVorbereiten()
 IF tonDa() THEN
+    ' Probelauf ueber die Partitur, dann nur bauen, was gleich erklingt --
+    ' der Rest entsteht waehrend der Fahrt (musik.dh, Klaenge nach Bedarf)
+    musikVorbereiten(abTakt)
     DIM bild AS INTEGER
     DIM fertig AS BOOLEAN
     WHILE NOT fertig AND NOT QUITREQUESTED() AND NOT KEYHIT(KEY_ESCAPE)
@@ -502,7 +509,7 @@ IF tonDa() THEN
                 EXIT WHILE
             END IF
         WEND
-        startbild(bauStand / bauGesamt(), bild)
+        startbild(bauAnteil(), bild)
         bild = bild + 1
     WEND
 END IF

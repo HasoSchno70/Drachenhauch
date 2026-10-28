@@ -673,3 +673,57 @@ DHRT_FRAMES=200
 DH_OHNE_AUDIO=1
 --- erwartet
 guete 1.0 massstab 1.0
+
+=== sparsam baut erst bei bedarf und gibt wieder frei
+' Mit --sparsam (im Browser auf Geraeten mit wenig Speicher) entsteht vor dem
+' Start nur, was in den ersten Takten erklingt; waehrend der Fahrt wird jeder
+' Klang vor seinem Einsatz gebaut und danach freigegeben. Geprueft Takt fuer
+' Takt wie im Lauf (bei 2 Bildern je Schritt, also einem langsamen Geraet):
+' nichts darf erst beim Einsatz entstehen (das waere ein Ruckler), und es
+' leben nie mehr als halb so viele Klaenge wie mit allem vorab.
+IMPORT "helfer.dh"
+sparsam = TRUE
+musikVorbereiten(0)
+WHILE vorbauen()
+WEND
+PRINT "vor dem start wenige "; bauPos < 20
+' die Partitur ausschreiben lassen, damit spielen() nichts anfasst, was es
+' hier nicht gibt -- und an der Zahl der Klaenge sehen, ob einer fehlte
+ausschreiben = TRUE
+lied = AUDIO_SOUND_NEW(1000)
+DIM spitze AS INTEGER
+DIM nachgebaut AS INTEGER
+DIM jetzt AS INTEGER
+FOR jetzt = 0 TO schritteGesamt() - 1
+    bauGrenze = jetzt + VORLAUF
+    vorbauen()
+    vorbauen()
+    freigeben(jetzt)
+    DIM vorher AS INTEGER : vorher = LEN(klaenge)
+    schrittPlanen(jetzt)
+    nachgebaut = nachgebaut + LEN(klaenge) - vorher
+    spitze = MAX(spitze, AUDIO_SOUND_COUNT())
+NEXT
+PRINT "nichts erst beim einsatz gebaut "; nachgebaut = 0
+PRINT "alle eintraege gebaut "; bauPos = LEN(bauKey)
+PRINT "hoechstens 150 zugleich "; spitze <= 150
+EPRINT("zugleich hoechstens " + STR$(spitze))
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- erwartet
+vor dem start wenige TRUE
+nichts erst beim einsatz gebaut TRUE
+alle eintraege gebaut TRUE
+hoechstens 150 zugleich TRUE
+
+=== ohne sparsam steht vor dem start alles
+' Gegenprobe: ohne den Schalter baut die Demo wie bisher alles vorab.
+IMPORT "helfer.dh"
+musikVorbereiten(0)
+WHILE vorbauen()
+WEND
+PRINT "alles gebaut "; bauPos = LEN(bauKey); ", mehr als 300 klaenge "; AUDIO_SOUND_COUNT() > 300
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+--- erwartet
+alles gebaut TRUE, mehr als 300 klaenge TRUE

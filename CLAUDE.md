@@ -2935,6 +2935,24 @@ sonst war er bei Stufe 4 ein Viertel dunkler. Tests: Paar in
 `shader_uniforms_geometry.dhtest` (rechts x/120 mit und ohne Massstab) plus
 Fehlerfall, Paar in `beispiel_nachtflug.dhtest` (SLEEP(30) je Bild senkt bis
 Stufe 4; unter DHRT_FRAMES nicht); ohne das Heruntergehen faellt der erste.
+**Schwache Handys (selber Tag):** die Demo blieb beim Laden stehen -- alle
+Klaenge vorab sind 415 MB WASM-Speicher (gemessen, rund zwanzig Minuten
+Stereo) und am Rechner schon 12 s Bauzeit im Browser. `--sparsam`: ein
+Probelauf ueber die Partitur (`trocken`; `spielen` tut nichts), in dem jeder
+Klang-Baustein `vormerken(schluessel, FUNCTION() baustein(args))` ruft --
+die Partitur bleibt die einzige Stelle, die weiss, was wann erklingt, und
+der Baustein liefert seine eigene Bauanweisung als Lambda. Gebaut wird 4
+Takte vor dem ersten Einsatz, freigegeben 5 Takte nach dem letzten
+(UNLOADSOUND stoppt auch geplante Instanzen, darum der Nachlauf); nach einer
+Pause ueber 11 Takte bekommt ein Klang einen neuen Abschnitt (der Chor im
+Breakdown und ueber den Wolken). Gemessen: vor dem Start 0,15 statt 3,5 s,
+Klaenge hoechstens ~130 statt ~330 MB. **Am Rechner aus**: Bauen waehrend
+der Fahrt kostete 4..9 Bilder ueber 25 ms je 25 s (die alte Fassung keins);
+die Browser-Seite schaltet es bei `navigator.deviceMemory` < 8 ein (ohne die
+Angabe nach der Geraeteart), `?sparsam` erzwingt es. Tests: Takt-fuer-Takt-
+Simulation (nichts erst beim Einsatz gebaut, hoechstens 150 zugleich) und
+die Gegenprobe ohne Schalter; ohne Freigeben bzw. ohne Bauanweisung im Lead
+faellt der erste.
 
 ## Dogfooding 15: Landkarte (2026-10-26)
 

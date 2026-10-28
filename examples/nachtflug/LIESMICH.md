@@ -16,7 +16,21 @@ dhrt run main.dh -- --mitschnitt nacht.wav  # abspielen und mitschneiden, wie ma
 dhrt run main.dh -- --leicht         # feste Stufe 3, für schwächere Grafikkarten
 dhrt run main.dh -- --stufe 0        # feste Güte 0 (voll) bis 4
 dhrt run main.dh -- --messen         # am Ende Bildrate und Spitze im Mischer
+dhrt run main.dh -- --sparsam        # Klänge erst bei Bedarf (wenig Speicher)
 ```
+
+**Wenig Speicher (`--sparsam`).** Alle Klänge vorab sind gut 400 MB, rund
+zwanzig Minuten Stereo -- ein schwaches Handy gibt einer Seite so viel
+nicht, die Demo blieb beim Laden stehen. Mit `--sparsam` geht ein
+Probelauf über die Partitur: jeder Klang merkt sich, wann er zuerst und
+zuletzt erklingt, gebaut wird er vier Takte vor dem Einsatz und fünf Takte
+nach dem letzten wieder freigegeben (bei langen Pausen dazwischen auch).
+Vor dem Start entsteht so nur, was in den ersten Takten erklingt (0,15 s
+statt 3,5 s), und die Klänge belegen höchstens etwa 130 statt 330 MB. Am
+Rechner kostet das Bauen während der Fahrt ab und zu ein Bild, darum ist es
+dort aus; die Browser-Seite schaltet es bei weniger als 8 GB Gerätespeicher
+ein (`navigator.deviceMemory`, ohne die Angabe auf Handys), `?sparsam` in
+der Adresse erzwingt es.
 
 **Die Güte wählt die Demo selbst.** Berge, Sternennebel, Wolken und Küste
 tasten jeden Bildpunkt 50- bis 160-mal ab -- ein Tablet im Browser schafft
