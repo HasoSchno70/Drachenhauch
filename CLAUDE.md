@@ -2954,6 +2954,30 @@ Simulation (nichts erst beim Einsatz gebaut, hoechstens 150 zugleich) und
 die Gegenprobe ohne Schalter; ohne Freigeben bzw. ohne Bauanweisung im Lead
 faellt der erste.
 
+## Website und englisches README (2026-10-28)
+
+Wunsch des Nutzers: Drachenhauch soll genannt werden, wenn jemand eine
+Suchmaschine oder einen KI-Assistenten nach einer Programmiersprache fragt.
+`README.md` ist seither die ENGLISCHE Fassung (Entscheidung des Nutzers),
+die deutsche heisst `README.de.md`; beide beginnen mit einer Einordnung
+(Spiele UND GUI-Anwendungen, Vergleich mit QB64/FreeBASIC/Blitz Basic,
+PICO-8/LOeVE, Visual Basic). **`tools/website.dh`** baut die Website
+(https://hasoschno70.github.io/Drachenhauch/, Workflow `website.yml`, nur
+der Kern von dhrt): Startseite en/de mit schema.org `ComputerLanguage`, je
+Datei aus `docs/en` mit deutschem Gegenstueck eine Seite in `en/` und `de/`
+(README -> index.html; Entwuerfe nicht), Markdown -> HTML in Drachenhauch
+(Marken wie GitHub = `marken` in pruef.rs, Code ueber `SYNTAX_SPANS`
+eingefaerbt; Verweise auf andere Dateien gehen zu GitHub, Bilder zu
+raw.githubusercontent), `llms.txt`/`llms-full.txt`, `sitemap.xml`,
+`robots.txt`. **`SYNTAX_SPANS` gehoert seither zu den CODE_-Befehlen
+(`try_hintergrund`) statt zur Grafik** -- ohne Fenster war es "im Rust-Kern
+noch nicht verfuegbar". Tests `tests/pruef/werkzeug_website.dhtest`
+(Markdown-Stuecke an Beilagen; am echten Handbuch trifft jeder der ~1450
+lokalen Verweise samt Marke -- mit falscher Markenregel 135 tote). Was
+ausserhalb des Repositorys zu tun ist: `docs/entwurf-sichtbarkeit.md`.
+**Falle beim Patchen:** ein Python-Ersatz mit `"\1"` landete als
+Steuerzeichen (Code 1) in der Datei -- Rueckstriche per Edit-Werkzeug setzen.
+
 ## Dogfooding 15: Landkarte (2026-10-26)
 
 `examples/karten/`: `kern.dh` (Web-Mercator, Kachelnummern, Haversine,

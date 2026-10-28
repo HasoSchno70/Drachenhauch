@@ -1,0 +1,372 @@
+<p align="center">
+  <img src="daten/bilder/schriftzug.png" alt="Drachenhauch" width="560">
+</p>
+
+<p align="center"><strong>Feuer frei für deine Ideen.</strong></p>
+
+<p align="center"><em><a href="README.md">English</a> · Deutsch</em></p>
+
+**Drachenhauch** ist eine moderne BASIC-Programmiersprache für **2D- und 3D-Spiele und Anwendungen mit grafischer Oberfläche** — und für die Kommandozeilen-Werkzeuge und kleinen Dienste, die dazugehören. Mit eigener Entwicklungsumgebung, Form-Designer, Sprite-, Karten- und Klang-Editoren; ein Befehl macht aus einem Programm eine eigenständige `.exe`. Läuft unter Windows, macOS und Linux und als WebAssembly im Browser.
+
+Ein BASIC im Geist von QB64, FreeBASIC oder Blitz Basic, mit dem Werkzeugkasten von PICO-8 oder LÖVE für Spiele und den Formularen und Tabellen von Visual Basic für Anwendungen — leicht anzufangen, streng genug, um damit zu wachsen.
+
+Unter der Haube: ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP — für Spiele ebenso wie für Anwendungen mit grafischer Oberfläche, Kommandozeilen-Werkzeuge und kleine Dienste. Programme laufen über **`dhrt`** — die native Rust-Runtime, die Quelltext selbst lext, parst, kompiliert und ausführt. Grafik und 3D über **raylib**, Ton über **[Kira](https://github.com/tesselode/kira)** auf einem eigenen Audio-Thread. Auch die IDE und alle Werkzeuge sind in Drachenhauch geschrieben; Python braucht nur noch das Bauskript der Laufzeit.
+
+```basic
+IMPORT "sprite"
+IMPORT "particles"
+
+SCREEN(320, 240, "Hallo Welt", 2)
+
+DIM held AS SPRITE
+held = SPRITE_NEW(LOADIMAGE("assets/hero.png"), 16, 16)
+SPRITE_SET_POS(held, 100.0, 100.0)
+
+WHILE NOT QUITREQUESTED()
+    CLS()
+    SPRITE_DRAW(held)
+    FLIP()
+    SLEEP(16)
+WEND
+```
+
+## Was damit geht
+
+<table>
+<tr>
+<td width="33%" align="center"><a href="examples/99_ibl_hdr.dh"><img src="examples/screenshots/99_ibl_hdr.png" width="260" alt="HDR-Beleuchtung"></a><br><b>HDR-Beleuchtung</b><br><sub>Metalle spiegeln eine echte Umgebung</sub></td>
+<td width="33%" align="center"><a href="examples/93_shadows.dh"><img src="examples/screenshots/93_shadows.png" width="260" alt="Schatten"></a><br><b>Schatten</b><br><sub>Tiefenpuffer mit weichen Kanten</sub></td>
+<td width="33%" align="center"><a href="examples/104_instancing.dh"><img src="examples/screenshots/104_instancing.png" width="260" alt="GPU-Instancing"></a><br><b>GPU-Instancing</b><br><sub>1024 Würfel in einem Draw-Call</sub></td>
+</tr>
+<tr>
+<td align="center"><a href="examples/108_skeletal_anim.dh"><img src="examples/screenshots/108_skeletal_anim.png" width="260" alt="Skelett-Animation"></a><br><b>Skelett-Animation</b><br><sub>geriggtes GLTF, Posen überblendet</sub></td>
+<td align="center"><a href="examples/119_vortex.dh"><img src="examples/screenshots/119_vortex.png" width="260" alt="Additives Blenden"></a><br><b>Additives Blenden</b><br><sub>Vollbild bei 60 Bildern je Sekunde</sub></td>
+<td align="center"><a href="examples/65_amiga_demo.dh"><img src="examples/screenshots/65_amiga_demo.png" width="260" alt="Demoszene"></a><br><b>Demoszene</b><br><sub>Copper-Bars und Sinus-Scroller</sub></td>
+</tr>
+<tr>
+<td align="center"><a href="examples/78_particle_catalog.dh"><img src="examples/screenshots/78_particle_catalog.png" width="260" alt="Partikel"></a><br><b>Partikel</b><br><sub>fünf Render-Modi, Farbverläufe</sub></td>
+<td align="center"><a href="examples/154_chart.dh"><img src="examples/screenshots/154_chart.png" width="260" alt="Diagramme"></a><br><b>Diagramme</b><br><sub>sechs Arten, Maus und Tooltip inklusive</sub></td>
+<td align="center"><a href="examples/157_gui_tabelle.dh"><img src="examples/screenshots/157_gui_tabelle.png" width="260" alt="Oberflächen"></a><br><b>Oberflächen</b><br><sub>sortier- und filterbare Tabelle</sub></td>
+</tr>
+</table>
+
+Alle neun sind mitgelieferte Beispiele — ein Klick aufs Bild führt zum Quelltext.
+Die Entwicklungsumgebung zeigt dieselbe Galerie mit **21 Demos** auf ihrer
+Startseite, jede per Doppelklick startbar.
+
+### Und außerdem: alles andere
+
+Drachenhauch fing als Spiele-BASIC an (damals „GameBasic“). Inzwischen
+schreibt man damit auch Anwendungen mit Fenstern, Formularen und Tabellen
+(Modul `gui`, Form-Designer, Datenbank-Bindung, Drucken) und die Dinge, die
+*neben* einem Spiel anfallen — Werkzeuge, Auswertungen, kleine Dienste:
+
+| | |
+|---|---|
+| **Betriebssystem** | Dateien und Ordner, Umgebungsvariablen, `SHELL`, Exit-Codes, Argumente — ein `.dh`-Skript ist ein vollwertiges Kommandozeilen-Programm |
+| **Netz** | `HTTP_GET`/`POST` mit Kopfzeilen und JSON, TLS, dazu `SHA256$`, `HMAC_SHA256$` und `UUID4$` für angemeldete Dienste |
+| **Daten** | SQLite, PostgreSQL und MySQL mit denselben Befehlen, CSV nach RFC 4180, ZIP, JSON, Regex, `BUFFER` für Binärdateien |
+| **Größere Programme** | Namensräume (`IMPORT "mathe.dh" AS mathe`), `PRIVATE`, `TRY`/`CATCH`/`FINALLY` mit Fehler-Codes, Vererbung mit `SUPER` und `ABSTRACT`, Typtest zur Laufzeit (`x IS Hund`, `TYPEOF`), `ASSERT_EQ` |
+| **Objekte als Rückrufe** | `obj.methode` ist eine `FUNCREF`, die ihre Instanz mitträgt — `GUI_ON_CLICK(knopf, spieler.klick)`, `TIMER_EVERY(500, gegner.zucken)`, `SORT(zahlen, regel.cmp)` |
+| **Fremde Bibliotheken** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — Windows-API, C-Bibliothek, Gerätetreiber direkt aufrufen, mit Zeigern, Structs und Rückrufen; sogar Python samt numpy einbetten ([mehr](docs/ffi.md)) |
+| **Nebenher** | HTTP, Datenbank, fremde Programme und **eigene Funktionen** im Hintergrund (`TASK_START`) — die Hauptschleife läuft weiter |
+| **Leisten und Plugins** | `GUI_DOCK` verteilt Leisten links, rechts und unten, als Reiter oder schwebend; die IDE und Glutfaden laden eigene Drachenhauch-Programme als Plugins; die IDE holt sie auch aus GitHub oder einem ZIP, bringt drei mit und prüft sie ohne Fenster ([mehr](docs/ide-plugins.md)) |
+
+Nichts davon braucht ein Fenster. Ein Drachenhauch-Programm kann eine
+Konsolenanwendung sein, ein Cron-Job oder ein Spiel — dieselbe Sprache.
+
+Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
+[Allzweck-Roadmap](docs/allzweck-roadmap.md).
+
+## Herunterladen
+
+**[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 56 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz`; aktuell Fassung 2026.37.
+
+Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 226 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Der Windows-Installer ist nicht signiert, SmartScreen meldet sich also beim ersten Start; die macOS-App ist noch nicht beglaubigt.
+
+## Aus dem Quelltext arbeiten
+
+Gebraucht werden Rust (`cargo`) und ein beliebiges Python 3 — nur für das
+Bauskript, ohne venv und ohne Pakete (es benutzt nur die Standardbibliothek).
+Einmal die Laufzeit bauen, danach läuft alles über `dhrt`:
+
+```
+python rust\build_runtime.py                              # baut dhrt (mit --hardware: serial/usb/bt/wifi/midi)
+rust\drachenhauch_runtime\target\release\dhrt run ide\ide.dh           # die IDE
+rust\drachenhauch_runtime\target\release\dhrt run datei.dh             # ein Programm
+rust\drachenhauch_runtime\target\release\dhrt test tests\pruef         # alle Prüfungen
+```
+
+## Das Lehrbuch
+
+**[Drachenhauch — Das Lehrbuch](buch-referenz/buch/)** ist beides zugleich: ein Kurs, der vom ersten schwarzen Fenster bis zu Klassen, Modulen und fertigen Spielen führt, und ein Nachschlagewerk, in dem **jeder einzelne Befehl** mit einem lauffähigen Beispielprogramm erklärt wird. Sieben Teile, 85 Kapitel, alle Codebeispiele gegen `dhrt --check` verifiziert.
+
+| Ausgabe | Zum Drucken (A4) | Fürs Lesegerät |
+|---|---|---|
+| **Deutsch** — 549 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
+| **English** — 540 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
+
+Beide Sprachen entstehen aus **denselben** Kapitelquellen (`content/NN_*.js`): die Renderer bekommen ein `H`, das jede Zeichenkette vorher durch den Katalog `i18n/en.json` schickt. Ein zweiter Satz englischer Kapiteldateien wäre binnen eines Monats vom deutschen abgedriftet — so kann er es nicht. Fehlt ein Eintrag, bleibt der deutsche Satz stehen und das Buch baut trotzdem; `node fehlend.js en` zählt, wo noch welche fehlen.
+
+```
+node build_book.js [--lang en]        # -> .docx (A4, zum Drucken)
+node build_epub.js [--lang en]        # -> .epub (fließt in die Schriftgröße des Lesers, Nachtmodus)
+dhrt run tools/buch_bauen.dh -- buch-referenz [--lang en]   # Zwei-Pass-Build mit Seitenzahlen im Inhalt
+```
+
+## Handbuch
+
+Vollständige Doku im [docs/](docs/README.md)-Ordner:
+
+- **[Sprachreferenz](docs/sprache.md)** — Variablen, Typen, `ENUM`, `SELECT CASE`, Funktionen mit Defaults und Named Arguments, Klassen, Try/Catch, f-Strings, Escape-Folgen mit `!"…\n…"`, Coroutines (`YIELD` + `CORO_*`)
+- **[Standard-Built-ins](docs/builtins-core.md)** — Math, Strings, Maps, File-I/O, …
+- **[Grafik-Built-ins](docs/builtins-grafik.md)** — native Runtime (dhrt/raylib), Z-Layer, Sprite-Atlas, Asset-Preloader
+- **[Performance](docs/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
+- **Module** — 48 Stück, [Tabelle unten](#module)
+- **[IDE](docs/ide.md)** — die Entwicklungsumgebung, selbst in Drachenhauch geschrieben: Reiter, Projektbaum, Vervollständigung, Hilfe zum Wort, Schnipsel, Mehrfach-Marken, Faltung, geteilte Ansicht, Umbauten über das ganze Projekt, **Debugger** (auch bedingte Haltepunkte), **Profiler**, git blame/diff, Handbuch im Fenster, Willkommensseite mit Beispiel-Galerie
+- **Werkzeuge** — alle in Drachenhauch geschrieben, in der IDE unter *Werkzeuge* oder direkt mit `dhrt run examples/<datei>`:
+  - **[Sprite-Editor](docs/sprite-editor.md)** (`189_sprite_editor.dh`) — Pixel-Art mit Einzelbildern, Ebenen, Lasso/Zauberstab/Verschieben, GIF mit Dauer je Bild, Atlas-Export für `ATLAS_LOAD`, DH-Code, `.dhanim`-Vorlage
+  - **[Partikel-Editor](docs/particle-editor.md)** (`185_partikel_editor.dh`) — Emitter-Regler mit Live-Vorschau, Werkseinstellungen, eigene Stände als `.ini`, DH-Code
+  - **[SFX-Generator](docs/sfx-generator.md)** (`183_sfx_generator.dh`) — Retro-Soundeffekte im sfxr-Stil, WAV-Export, DH-Code mit `AUDIO_SFX`
+  - **[Tracker](docs/tracker.md)** (`190_tracker.dh`) — mehrspuriger Musik-Editor, [Tabelle unten](#tracker)
+  - **[Notenblatt](docs/score-editor.md)** (`199_notenblatt.dh`) — echte Notensatz-Darstellung, Wiedergabe, Übergabe an den Tracker
+  - **[Tilemap-/Level-Editor](docs/tilemap-editor.md)** (`187_tilemap_editor.dh`) — Ebenen, Objekt-Ebenen, mehrere Tilesets, Kachel-Eigenschaften, Tiled-JSON (`TILED_LOAD`), DH-Code-Renderer
+  - **[Form-Designer](docs/form-designer.md)** (`197_form_designer.dh`) — GUI-Formulare im Xojo-Stil, `.dhform` für `GUI_LOAD`, F5 startet, DH-Code
+  - **[Animations-FSM-Editor](docs/anim-editor.md)** (`198_anim_fsm_editor.dh`) — Zustände, Übergänge und Bedingungen als Graph, `.dhanim` für `ANIM_FSM_LOAD` ([Modul `animfsm`](docs/module-animfsm.md)), Vorschau mit F5
+  - **[Klassendiagramm](docs/klassendiagramm.md)** (`210_klassendiagramm.dh`) — alle Klassen des Projekts mit Feldern und Methoden, Vererbung und Verwendung als Pfeile; Doppelklick springt in der IDE an die Stelle, P sichert ein Bild
+- **[Sprachserver + VS Code](docs/lsp.md)** — Drachenhauch in jedem LSP-Editor: Syntax-Highlighting, Diagnostics, Completion, Hover, Goto-Definition, References, Outline. Der Server ist die Runtime selbst (`dhrt lsp`), ohne Python (`vscode-drachenhauch/`)
+- **[Web-Playground](docs/web-playground.md)** — `dhrt` als WebAssembly im Browser, [Tabelle unten](#web-playground)
+- **[`cloud`-Modul](docs/module-cloud.md)** — Cloud-Save + Leaderboard gegen den mitgelieferten, selbst hostbaren Referenz-Server [`cloudserver/`](cloudserver/README.md) (ein Drachenhauch-Programm + SQLite, geteiltes API-Key-Secret): `CLOUD_CONFIGURE`/`CLOUD_SAVE`/`CLOUD_LOAD`, `LEADERBOARD_SUBMIT`/`LEADERBOARD_FETCH`. Plus **`NUMFMT$`** (core-Builtin) für Idle-/Incremental-Game-taugliche Big-Number-Formatierung (`1234567` → `"1.23M"`, K/M/B/T/Qa/Qi/Sx/Sp/Oc/No/Dc, danach wissenschaftliche Notation). Demo [examples/146_cloud_idle.dh](examples/146_cloud_idle.dh)
+- **[ESP32 / ESP8266 anbinden](esp32/README.md)** — fertiges Sketch-Grundgerüst (WLAN, Broker-Verbindung, Wiederverbinden, Empfang) mit vier markierten Stellen für eigenen Code; **eine Datei für beide Boards**, übersetzt für ESP32/ESP8266/ESP32-C3/ESP32-S3. Redet über [`mqtt`](docs/module-mqtt.md) mit dem Drachenhauch-Gegenstück [examples/159_esp32_bruecke.dh](examples/159_esp32_bruecke.dh) — das sich mit `mosquitto_pub` auch **ohne Board** fertig entwickeln lässt
+
+### Module
+
+48 Module, per `IMPORT "name"` verfügbar. Jedes hat eine eigene Seite unter
+[docs/](docs/README.md#module).
+
+**Spiel-Bausteine**
+
+| Modul | Wofür |
+|---|---|
+| [`sprite`](docs/module-sprite.md) | animierte Sheet-Sprites: Position, Velocity, benannte Animationen, Kollision |
+| [`animfsm`](docs/module-animfsm.md) | Animations-Zustandsautomat im Unity-Mecanim-Stil, aus `.dhanim` (Editor `examples/198_anim_fsm_editor.dh`) |
+| [`camera`](docs/module-camera.md) | Weltverschiebung, Zoom und Drehung für **alle** Zeichenbefehle; Folgen, Bildschirm↔Welt |
+| [`controller`](docs/module-controller.md) | Figuren-Steuerung mit Coyote-Zeit, Sprung-Puffer und variabler Sprunghöhe |
+| [`scene`](docs/module-scene.md) | Szenen-Stapel (`PUSH`/`POP`/`SWITCH`) mit Daten pro Szene |
+| [`save`](docs/module-save.md) | Speicherstände als JSON, mit Versionsfeld |
+| [`input`](docs/module-input.md) | benannte Aktionen statt Tastencodes, Flankenerkennung, Gamepad |
+| [`timer`](docs/module-timer.md) | geplante Aktionen (`TIMER_AFTER`/`EVERY`) + `COOLDOWN`-Ratenbegrenzer |
+| [`video`](docs/module-video.md) | Videos abspielen (MP4/H.264), jedes Bild ein `IMAGE` |
+| [`tween`](docs/module-tween.md) | Werte weich überführen, 13 Verlaufskurven |
+| [`curves`](docs/module-curves.md) | Bézier, Catmull-Rom, Hermite, Smoothstep — reine Funktionen |
+| [`astar`](docs/module-astar.md) | A*-Wegfindung auf einem Kachelgitter |
+| [`ecs`](docs/module-ecs.md) | Entity-Component-System mit Massen-Operationen für heiße Schleifen |
+
+**Physik und Mathematik**
+
+| Modul | Wofür |
+|---|---|
+| [`physics`](docs/module-physics.md) | reine Kollisionsmathematik: Rechteck/Kreis/Strahl/Strecke/Polygon, kein Zustand |
+| [`physics2d`](docs/module-physics2d.md) | **echte** 2D-Starrkörper (Rapier2D): Schwerkraft, Stapeln, Werfen, Rollen — [Demo](examples/112_physics2d.dh) |
+| [`physics3d`](docs/module-physics3d.md) | dasselbe in 3D (Rapier3D) — [Demo](examples/107_physics3d.dh) |
+| [`vec2`](docs/module-vec2.md) | 2D-Vektor mit überladenen Operatoren, unveränderlich |
+| [`m3d`](docs/module-m3d.md) | VEC3/VEC4/QUAT/MAT4, Quaternionen, Matrizen; GPU-Instancing über `MODEL_INSTANCED` |
+
+**Grafik und Klang**
+
+| Modul | Wofür |
+|---|---|
+| `g3d` | 3D: Kamera, Modelle (OBJ/GLTF), Skelett-Animation, PBR, HDR-IBL, Schatten, Normal-Maps, Picking — siehe [Grafik-Built-ins](docs/builtins-grafik.md) |
+| [`particles`](docs/module-particles.md) | Partikel-Emitter mit Schwerkraft, Farbverlauf über die Lebenszeit, fünf Zeichenarten |
+| [`imgfx`](docs/module-imgfx.md) | Bilder skalieren, drehen, spiegeln, einfärben — auch kantentreu für Pixelgrafik |
+| [`g3d`](docs/module-g3d.md) | 3D: Kamera, Grundkörper, Modelle, Skelett-Animation, Licht, Schatten, PBR |
+| [`audio`](docs/module-audio.md) | auf **Kira**: Kanäle, Busse, Echtzeit-Effekte (Filter/Hall/Echo/Verzerrer/Kompressor/EQ), Synthese, Sampler, `.mod`/`.xm`-Wiedergabe, Musik anspringen (`AUDIO_MUSIC_SEEK`), räumliches Audio, taktgenaue Uhr. [Modulatoren](docs/module-audio-modulatoren.md) laufen auf dem Audio-Thread weiter, auch wenn die Bildrate einbricht Einen Klang **anschauen und sichern**: `AUDIO_SOUND_WAVE` (Kurve zum Zeichnen) und `AUDIO_SAVE_WAV`. **Sprechen**: `SPEAK` lässt die Systemstimme jeden Text sagen — als Klang auf dem Bus `speech`, mit Warteschlange, `SPEAK_SOUND` für räumliche Stimmen und WAV; läuft ein Bildschirmleser, spricht der. |
+
+**Oberfläche**
+
+| Modul | Wofür |
+|---|---|
+| [`gui`](docs/module-gui.md) | 24 Widget-Arten mit bleibendem Zustand — darunter eine **professionelle Tabelle** (sortieren, filtern, feste und umsortierbare Spalten, Zellen bearbeiten). Plastische Glas-Themen, Kippschalter, Drehregler, 9-Slice-Skins. **Vollstaendig ohne Maus bedienbar** (TAB durch alle Widgets, Fokus-Ring), **`GUI_SCALE`** fuer hochaufloesende Bildschirme und modale Dialoge im eigenen Thema. [Alle Widgets](examples/156_gui_alle_widgets.dh) · [Tastatur/Massstab/Dialog](examples/182_gui_tastatur_massstab.dh) · [Tabelle](examples/157_gui_tabelle.dh) · [an SQLite](examples/158_gui_tabelle_sqlite.dh) Das mehrzeilige Textfeld ist ein **Code-Feld**: Syntax-Einfaerbung ueber `SYNTAX_SPANS`, Zeilennummern, aktive Zeile, Tabulator. Eigene Schrift fuer die ganze Oberflaeche (`SETFONT`); bei grossen Dateien faerbt `GUI_TEXTAREA_VIEW` nur den sichtbaren Ausschnitt (30.000 Zeilen: 272 ms -> 2,1 ms je Anschlag). Dazu **Farbwaehler** und **Datumswaehler**. |
+| [`ui`](docs/module-ui.md) | dasselbe als Immediate-Mode: kein Aufbau, alles pro Bild neu gezeichnet |
+| [`chart`](docs/module-chart.md) | sechs Diagrammarten (Kuchen, Balken, Linie, Tacho, Leiste, LED-Kette), vier Themen, Maus-Interaktion — [Demo](examples/154_chart.dh) |
+
+**Daten**
+
+| Modul | Wofür |
+|---|---|
+| [`json`](docs/module-json.md) | JSON lesen/schreiben, Pfad-Zugriff (`"user.name"`, `"items.0"`) |
+| [`db`](docs/module-db.md) | SQLite, PostgreSQL und MySQL mit `?`-Platzhaltern und Transaktionen -- `DB_OPEN` entscheidet am Ziel |
+| [`regex`](docs/module-regex.md) | Muster suchen, ersetzen, trennen |
+| [`tiled`](docs/module-tiled.md) | Karten aus dem Tiled-Editor laden, inklusive Objekte und Eigenschaften |
+| [`tile_collide`](docs/module-tile-collide.md) | Kasten-gegen-Kachelkarte, achsenweise — klassische Plattformer-Physik |
+| [`cloud`](docs/module-cloud.md) | Spielstand und Bestenliste gegen den mitgelieferten Server [`cloudserver/`](cloudserver/README.md) |
+| [`ini`](docs/module-ini.md) | Einstellungsdateien, die ein Mensch bearbeiten kann — gelesen wird eine `MAP` |
+| [`xml`](docs/module-xml.md) | XML aus fremden Systemen lesen, mit Pfad-Navigation |
+| [`geld`](docs/module-geld.md) | ein Betrag als eigener Wert: exakt, nicht mit Zahlen vermischbar, teilt ohne Cent-Schwund |
+| [`zeit`](docs/module-zeit.md) | Rechnen mit Datum und Uhrzeit: Abstände, Wochentage, Formate |
+
+**Etwas abgeben**
+
+| Modul | Wofür |
+|---|---|
+| [`pdf`](docs/module-pdf.md) | druckfertige Seiten: Rechnung, Lieferschein, Bericht, Etikett — in Millimeter gesetzt, Schriften eingebettet, Unicode |
+| [`xlsx`](docs/module-xlsx.md) | Auswertungen als Excel-Mappe: mehrere Blätter, fette Kopfzeile, Zahlen- und Datumsformate |
+| [`smtp`](docs/module-smtp.md) | die Auswertung per E-Mail rausschicken: Text und HTML, Anhänge, STARTTLS/TLS |
+
+**Netz, Hardware, Basteln**
+
+| Modul | Wofür |
+|---|---|
+| [`net`](docs/module-net.md) | TCP und UDP, von Haus aus nicht blockierend — friert den Spielablauf nicht ein |
+| [`html`](docs/module-html.md) | HTTP GET/POST/Download + HTML auslesen |
+| [`httpd`](docs/module-httpd.md) | die andere Richtung: ein kleiner Webserver im Takt der Hauptschleife — Bedienoberfläche im Heimnetz |
+| [`mqtt`](docs/module-mqtt.md) | das Pub/Sub-Protokoll der IoT-Welt — der Weg zum ESP32 **über WLAN** |
+| [`firmata`](docs/module-firmata.md) | Arduino-/ESP32-Pins direkt schalten, ohne eigenen Sketch |
+| [`serial`](docs/module-serial.md) | rohe COM-Verbindung für eigene Protokolle |
+| [`usb`](docs/module-usb.md) | USB-HID: Bastelboards, Programmieradapter, eigene Controller |
+| [`midi`](docs/module-midi.md) | Noten von einem angeschlossenen Instrument lesen und welche hinausschicken |
+| [`bt`](docs/module-bt.md) | Bluetooth Low Energy: scannen, verbinden, Charakteristiken lesen/schreiben |
+| [`wifi`](docs/module-wifi.md) | Netze suchen, verbinden, Signalstärke |
+
+Ein fertiges Sketch-Grundgerüst fürs Board liegt in **[esp32/](esp32/README.md)**.
+
+### Tracker
+
+Der mehrspurige Musik-Editor [`examples/190_tracker.dh`](docs/tracker.md) —
+ein Tracker in der Tradition von ProTracker und FastTracker, geschrieben in
+Drachenhauch selbst.
+
+| | |
+|---|---|
+| Spuren | Patterns mit 1–64 Reihen über 4–32 Kanäle, der letzte ist der Schlagzeug-Kanal; eine Reihenfolge (Order) daraus |
+| Instrumente | 18 fertige mit Hüllkurve, Vibrato und Detune, alle änderbar; je Note ein eigenes Instrument möglich |
+| Bearbeiten | je Note Lautstärke, Portamento und Effekt; Blockauswahl mit Kopieren, Transponieren, Interpolieren; Stumm/Solo und Mixer-Regler je Kanal; Rückgängig über den ganzen Song |
+| Wiedergabe | auf einer Audio-Uhr, nicht bildgetrieben — Sechzehntel bleiben im Takt, auch wenn die Bildrate schwankt |
+| Ausgabe | Song-JSON (dasselbe wie das der früheren Qt-Fassung), WAV mit Stereo und Amiga-Panning, DH-Code als eigenständiger Abspieler |
+
+### Web-Playground
+
+`dhrt` läuft als WebAssembly im Browser — nicht als abgespeckte Fassung,
+sondern als dieselbe Runtime. Quelle ins Textfeld tippen, starten, fertig.
+Ausführlich in [docs/web-playground.md](docs/web-playground.md).
+
+| Was im Browser läuft | Wie |
+|---|---|
+| Übersetzen | dhrt kompiliert die Quelle **selbst im Browser** — kein Pyodide, kein Server |
+| Konsole und Grafik | beides gleichzeitig; der Zeichen-Ablauf gibt pro Bild ab (ASYNCIFY), damit `WHILE … FLIP() … WEND` den Reiter nicht einfriert |
+| Ton | ein eigenes Kira-Backend schiebt den fertigen Mix in OpenAL-Puffer, die emscripten auf WebAudio abbildet; die Warteschlange taktet sich von selbst in Echtzeit. Browser lassen Klang erst nach dem ersten Klick zu |
+| 3D | WebGL 2 — dessen GLSL ES 3.00 ist bis auf den Kopf identisch zum Desktop-GLSL. PBR, HDR-IBL, Skybox, Schatten, Instancing und Post-Effekte sind im Browser nachgewiesen |
+| Dateien | ein `assets/`-Ordner neben der `.dh` kommt als `dhrt.data` mit — Bilder, Schriften und Musik liegen unter denselben Pfaden wie auf dem Desktop |
+| Teilbare Links | die Quelle steckt im URL-Anker: Link öffnen heißt sehen **und** starten |
+
+Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
+
+## Beispiele
+
+`examples/` enthält 214 Beispiele plus zehn Benchmarks, von "Hallo Welt" bis zum kompletten Mini-Spiel:
+
+| Datei | Zeigt |
+|---|---|
+| `01_hello.dh` … `09_shapes.dh` | Sprach-Grundlagen |
+| `10_pong.dh`, `22_tetris.dh`, `23_platformer.dh` | komplette Spiele |
+| `24_json.dh` … `33_ui.dh` | jedes Modul mit Demo |
+| `32_coinquest.dh` | Mini-Spiel mit Modulen + SELECT CASE |
+| `49_pong_scene.dh` | Pong, strukturiert mit `scene` + `save` (Highscore) |
+| `50_enum.dh` | ENUM in Compact- und Block-Form |
+| `51_astar.dh` | A*-Pathfinding mit ASCII-Render |
+| `52_named_args.dh` | Named Arguments in SUB/FUNCTION/NEW |
+| `73_ecs_bullets.dh` | ECS mit pro-Entity-Loop (klassisches Pattern) |
+| `75_preloader.dh` | `LOAD_ASSETS` — alle Bilder/Sounds aus einem Manifest |
+| `76_layers_atlas.dh` | Z-Layer + Sprite-Atlas: 600 Tiles aus einem Atlas, in Z-Reihenfolge zusammengesetzt |
+| `77_tiled_platformer.dh` | **Mini-Platformer**: Tiled-Level + Atlas + Tile-Kollision + Z-Layer + Input-Mapping |
+| `98_coroutines.dh` | **Coroutines/YIELD**: Generatoren, `FOR EACH`-Drain, send/return-Dialog, `CORO_RESULT`, Methoden-Coroutine |
+| `154_chart.dh` | **Diagramme**: alle sechs Arten, Themen, Maus-Interaktion |
+| `156_gui_alle_widgets.dh` | **alle 22 GUI-Widgets** in einer Vollbild-Anwendung, jedes mit echter Aufgabe |
+| `glutfaden/main.dh` | **Glutfaden** — der Kreuzstich-Editor PySticky in Drachenhauch, mit GTK 3 über fremde Bibliotheken: Teil- und Rückstiche, Ebenen, Bildimport, PDF/HTML/OXS-Export, PCStitch und Pattern Maker, Drucken, helles und dunkles Thema |
+| `../funkenflug/main.dh` | **Funkenflug** — ein Schaltplan-Editor mit GTK 3: Hierarchie und Busse, ERC, Netzliste/SPICE, Simulation mit ngspice, Lochraster-Platine mit Gerber und 3D-Vorschau, KiCad-Import (liegt im Hauptordner, nicht im Installer) |
+| `nachtflug/main.dh` | **Nachtflug** — eine Demo: drei Minuten Uplifting Trance in Stereo (Supersaw, Klavier, Chor aus Formanten, Trance-Gate, eine Stimme aus der Sprachausgabe), ganz synthetisiert, auf einer Audio-Uhr; dazu Ozean mit Polarlicht, Tiefflug, Lichttunnel und Sternennebel aus Fragment-Shadern und eine Galaxie aus 2.600 Lichtspuren |
+| `chip8/main.dh` | **CHIP-8-Emulator** — alle 35 Befehle, Assembler und ein eigenes Spiel, Tastenfeld nach Lage, Nachleuchten gegen das Flackern |
+| `karten/main.dh` | **Landkarte** — OpenStreetMap-Kacheln im Hintergrund geladen und auf der Platte gemerkt, Ortssuche, GPX-Spur mit Höhenprofil, Marker, als Bild oder PDF sichern, drucken |
+| `texteditor/main.dh` | **Texteditor** — Reiter, Suchen und Ersetzen, Kodierung und Zeilenenden bleiben beim Speichern |
+| `fotos/main.dh` | **Fotobetrachter mit GTK 3** — Übersicht, Einzelansicht, Drehen nach den Kameradaten, Diaschau |
+| `200_gui_akkordeon_assistent.dh` | **Akkordeon, Assistent, Baumtabelle** — eine kleine Projektablage: Einstellungen in aufklappbaren Abschnitten, Ordner und Dateien als Baum mit Spalten, neue Einträge über einen Assistenten mit Pflichtfeldern |
+| `196_rechnung_fenster.dh` | **Ein zweites OS-Fenster** — Kind der Rechnungsverwaltung: eigener `dhrt`, verbunden über `WINDOW_OPEN`/`PARENT_SEND` |
+| `196_rechnungen.dh` | **Rechnungen** — der sechste Pilot: eine Geschäftsanwendung (Kunden, Artikel, Rechnungen mit Positionen, SQLite, PDF, CSV, Rückfrage bei ungesicherten Änderungen) |
+| `195_gui_feinschliff.dh` | **gui-Feinschliff** — senkrechter Schieber, unbestimmter Fortschritt, Bildmodi, Baumsymbole, rollendes Panel, Ziehen zwischen Listen |
+| `194_gui_layout.dh` | **Layout im gui-Modul** — Größe nach Inhalt, Zeile/Spalte/Raster mit Gewichten, geschachtelt, fließt mit dem Fenster |
+| `193_gui_dialoge.dh` | **Dialoge im gui-Modul** — eigene Knopfsätze, Frage mit Eingabefeld, eigene Fenster modal |
+| `192_gui_listen.dh` | **Listen im gui-Modul** — Einträge einzeln, Sinnbilder, Kästchen, Mehrfachauswahl, Doppelklick |
+| `191_gui_formular.dh` | **Text und Formular im gui-Modul** — umbrechende Beschriftung, Ausrichtung, Passwort-, Zahlen- und Nur-Lesen-Feld, Enter/ESC als Standard- und Abbrechen-Knopf |
+| `190_tracker.dh` | **der Tracker, geschrieben IN Drachenhauch** — Patterns, Reihenfolge, 18 Instrumente, Effekte je Note, Wiedergabe auf einer Audio-Uhr, dasselbe JSON wie `dhtracker`, WAV-Mischung und DH-Code |
+| `189_sprite_editor.dh` | **der Sprite-Editor, geschrieben IN Drachenhauch** — zwoelf Werkzeuge, Ebenen, Einzelbilder, Zwiebelhaut, Spiegeln und Vierteldrehen, Streifen- und Atlas-Ausgabe |
+| `188_bild_erzeugen.dh` | **ein Bild herstellen statt nur anzeigen** — Malprogramm mit durchsichtigen Ebenen, Radierer und PNG-Export |
+| `187_tilemap_editor.dh` | **der Tilemap-Editor, geschrieben IN Drachenhauch** — sechs Werkzeuge, Auswahl mit Zwischenablage, Rueckgaengig, Ebenen (mit Umsortieren), Objekt-Ebenen, mehrere Tilesets, echtes Tiled-JSON |
+| `186_farbe_und_datum.dh` | **Farbwaehler und Datumswaehler** — zwei neue Widget-Arten, beide ohne Maus bedienbar |
+| `185_partikel_editor.dh` | **der Partikel-Editor, geschrieben IN Drachenhauch** — 17 Regler, echte Vorschau, DH-Code-Export, Rueckgaengig/Wiederholen |
+| `184_codefeld.dh` | **das TEXTAREA als Code-Feld** — Syntax-Einfaerbung, Zeilennummern, aktive Zeile, Tabulator |
+| `183_sfx_generator.dh` | **der SFX-Generator, geschrieben IN Drachenhauch** — 16 Regler, Wellenform-Anzeige, WAV-Export, Rueckgaengig/Wiederholen; das Gegenstueck zum Qt-Werkzeug `dhsfx` |
+| `182_gui_tastatur_massstab.dh` | **Bedienung ohne Maus**, `GUI_SCALE` fuer HiDPI und ein modaler Dialog im eigenen Thema |
+| `157_gui_tabelle.dh`, `158_gui_tabelle_sqlite.dh` | **professionelle Tabelle** — sortieren, filtern, Zellen bearbeiten; die zweite an einer echten SQLite-Datenbank |
+| `159_esp32_bruecke.dh` | **ESP32 anbinden** — Messwerte empfangen, Befehle zurückschicken (Sketch in [esp32/](esp32/)) |
+| `160_musik_seek.dh` | **Musik anspringen** (`AUDIO_MUSIC_SEEK`) — klickbarer Fortschrittsbalken, ±10 s, und der Vorlauf, den ein Sprung erst leerspielt |
+| `161_werkzeug.dh` | **Ein Werkzeug statt eines Spiels** — Kommandozeilenargumente, Meldungen nach stderr, Rückgabewert; zählt Zeilen/Wörter/Zeichen wie `wc` |
+| `162_binaerdatei.dh` | **Binärdaten lesen** (`BUFFER`) — Breite/Höhe und Blockliste aus einer echten PNG-Datei, ohne Bildbibliothek; dazu ein eigenes Dateiformat schreiben und einlesen |
+| `163_rest_api.dh` | **REST-Schnittstelle bedienen** (`HTTP_REQUEST`) — Token in der Kopfzeile, PUT/DELETE, JSON, und eine Bild-Antwort als rohe Bytes |
+| `164_signatur.dh` | **Signaturen und Tokens** (`HMAC_SHA256$`, `RANDOM_BYTES`) — einen Webhook prüfen, einen Schlüssel würfeln, eine Datei-Prüfsumme nachrechnen |
+| `165_pruefen.dh` | **Ein Programm, das sich selbst prüft** (`ASSERT_EQ`) — Sammel-Modus, Bilanz und ein Rückgabewert, den ein Skript auswerten kann |
+| `166_aufraeumen.dh` | **Aufräumen und entscheiden** (`FINALLY`, `ERROR_CODE$`) — eine Datei, die auf jeden Fall geschlossen wird; ein `CATCH`, das am Code entscheidet statt am Meldungstext |
+| `167_vererbung.dh` | **Vererbung ohne Wiederholung** (`SUPER`, `ABSTRACT`) — eine Basisklasse rechnet mit Methoden, die erst ihre Unterklassen schreiben |
+| `168_hintergrund.dh` | **Arbeiten lassen ohne stehenzubleiben** (`DB_QUERY_START`, `SHELL_START`) — große Abfrage und Kindprozess laufen, die Hauptschleife dreht sich weiter |
+| `181_midi.dh` | **MIDI-Klaviatur** — was auf einem angeschlossenen Keyboard gespielt wird, leuchtet auf; ein Mausklick schickt die Note zurück an den Synthesizer |
+| `bench_ecs_movement_v2.dh` | ECS-Bulk-API (`ECS_INTEGRATE_FLOAT`) — 40× schneller als pro-Entity-Loop |
+| `bench_ecs_systems.dh` | Bullet-Hell-Pattern mit 8 Bulk-Systemen pro Frame |
+
+## Architektur
+
+Pipeline: **Source → Preprocessor → Lexer → Parser → Compiler → VM**, heiße Funktionen und Schleifen übersetzt die VM beim Laufen in Maschinencode (Cranelift, `DHRT_JIT=aus` schaltet ab) — **alles in `dhrt`** (Rust). `dhrt run datei.dh` ist ein eigenständiger End-to-End-Lauf ohne Python. Korrektheit sichern die **Prüfsammlungen** (`tests/pruef/*.dhtest`, je Fall ein eigener `dhrt run`) + Rust-`#[test]`s.
+
+> **Geschichte:** Früher liefen Programme zusätzlich über einen Python-**Tree-Walker** und zwei Python-**Bytecode-VMs** (Python-VM, Cython-VM), mit „bit-identischem Output" als Garantie. Seit **Stufe B** sind Tree-Walker + Python-Toolchain (interpreter/compiler/vm/serialize) **alle entfernt** — `dhrt` ist die einzige Runtime und kompiliert den Quelltext selbst.
+
+**Native Rust-Runtime (raylib + Kira) — die einzige Runtime.** `dhrt` (`rust/drachenhauch_runtime/`)
+lext, parst, kompiliert und führt den Quelltext selbst aus — ein eigenständiges
+Rust-Frontend, kein Python im Ausführungspfad. Was davon nativ läuft:
+
+| Bereich | Umfang |
+|---|---|
+| Sprache | Skalare, Strings, Arrays, Maps, Tupel, OOP (Klassen/Methoden/Properties/Operatoren), Slicing, Comprehensions, `TRY`/`THROW` und alle puren Built-ins |
+| Coroutinen | `YIELD` über einen Frame-Schnappschuss statt Threads — sicher auf raylibs Hauptthread, von Bauart her vorhersagbar, auch in der eigenständigen `.exe` ([Demo](examples/98_coroutines.dh)) |
+| 2D | Primitive, Text, Bilder, Eingabe; Z-Ebenen, Sprite-Atlas, Render-Ziele, Mischmodi, prozedurale Texturen |
+| 3D | Kamera + Grundkörper ([Demo](examples/82_3d_intro.dh)), Modelle in OBJ/GLTF, prozedurale Netze bis zum Höhenfeld-Gelände, **Skelett-Animation** geriggter GLTF/IQM ([Demo](examples/108_skeletal_anim.dh)), Billboards, Strahl-Treffer und Maus-Auswahl — auch auf echter Fläche statt nur Hüllkörper ([Demo](examples/151_picking_flaechen.dh)) |
+| Beleuchtung | physikalisch (Cook-Torrance), bis 4 Lichter, `MODEL_PBR` für Metall und Rauheit ([Demo](examples/95_pbr.dh)); Eigenleuchten ([Demo](examples/110_emissive_glow.dh)), Schlagschatten mit PCF ([Demo](examples/93_shadows.dh)), Normal-Maps ([Demo](examples/94_normalmap.dh)), Tiefennebel ([Demo](examples/92_fog.dh)) und Umgebungslicht — analytisch ([Demo](examples/96_ibl.dh)) wie als echte HDR-Cubemap ([Demo](examples/99_ibl_hdr.dh)) |
+| Klang | **Kira** auf eigenem Audio-Thread (löste 2026-06-13 raylibs Audio ab): Klänge, Musik, `.mod`/`.xm` über einen reinen Rust-Abspieler |
+| Oberfläche | `gui` mit 22 Widget-Arten (bleibender Zustand, Themen, Ziehen, Z-Reihenfolge, Fokus, FUNCREF-Rückrufe) und `ui` im Immediate-Mode |
+| Bild und Ablauf | Spielschleife (`DELTA`/`FPS`/`SETFPS`), GPU-Shader und Nachbearbeitung (`SHADER_LOAD`/`POSTFX`), TTF-Schriften ([Demo](examples/87_ttf_fonts.dh)), Gamepad |
+| Eingabe aufzeichnen | `AUTOMATION_RECORD`/`PLAY` für Demo-Modus, nachspielbare Fehlerberichte und automatische Spieltests ([Doku](docs/automation.md), [Demo](examples/153_automation.dh)) |
+| Module | **alle** — auch die früher Python-eigenen: `regex`, `tiled`, `tile_collide`, `controller`, das erweiterte `audio`; dazu per Feature `db` (rusqlite), `net`, `mqtt`, `html` (ureq) und die Hardware-Seite `serial`, `firmata`, `usb`, `wifi`, `bt` |
+| Ausliefern | `dhrt --export datei.dh` (oder Strg+F6 in der IDE) bündelt Bytecode + `assets/` zu einer eigenständigen `.exe` |
+
+Python braucht nur noch das Bauskript. Die schweren Module kommen mit
+`build_runtime.py --hardware` bzw. `--full` dazu — **ein Bau ohne diese Schalter
+lässt sie wieder weg**, was der häufigste Grund dafür ist, dass ein Hardware-Beispiel
+plötzlich nicht mehr läuft. Ein Schaustück, das fast alles davon gleichzeitig zeigt:
+[examples/97_pbr_reactor.dh](examples/97_pbr_reactor.dh) — ein tonreaktiver Ring aus
+Chrom-Kugeln mit IBL, Schatten, Bloom und Stereo-Techno. Plan und Stand in
+[docs/rust-runtime.md](docs/rust-runtime.md).
+
+**Front-End-Portierung nach Rust — abgeschlossen.** Die komplette Toolchain (Lexer → Parser → Compiler → Preprocessor) wurde nach Rust portiert, jede Stufe per Output-Parität gegen den Python-Tree-Walker verifiziert. **`dhrt run datei.dh` ist ein eigenständiger End-to-End-Lauf ohne Python:** preprocesst (`IMPORT`-Auflösung von Quelldateien und Built-in-Modulen), lext, parst, kompiliert und führt aus — Skalare/Arithmetik/Kontrollfluss, Arrays/Maps, Funktionen, Klassen/OOP, `SELECT`/`FOR EACH`/Tupel/`WITH`/`TRY`/Slicing/Comprehensions/Coroutinen. Es wird ins Datei-Verzeichnis gewechselt, sodass relative `IMPORT`- und Asset-Pfade stimmen (`dhrt datei.dh` ohne `run` funktioniert genauso; `.dhc`-Dateien laufen weiter den direkten VM-Pfad). Debug-Einstiege `dhrt --tokens`/`--ast`/`--preprocess`/`--runsrc`. **Selbst-Export ohne Python:** `dhrt --export datei.dh` kompiliert die Quelle selbst und bündelt sie zu einer eigenständigen `.exe` (hängt den Bytecode an eine Kopie der Runtime, kopiert `assets/`). Aliasierte Modul-Imports (`IMPORT "json" AS j` → `J_PARSE`, `DIM h AS J_HANDLE`) funktionieren ebenfalls nativ. Damit ist auch der **Web-Playground ein reines Rust-WASM**, das die Quelle im Browser kompiliert (kein Pyodide): `rust/build_wasm.py datei.dh` erzeugt `web/dhrt.{js,wasm}` mit eingebetteter Quelle (emscripten-Toolchain auf Windows wird automatisch verdrahtet). **Konsole und animierte Grafik laufen im Browser** — der DH-Render-Loop yieldet pro Frame via ASYNCIFY (`emscripten_sleep(0)` in `flip()`), sodass `WHILE … FLIP() … WEND` den Tab nicht einfriert; **teilbare Links** packen die Quelle in den URL-Hash. Plan & Stufen in [docs/rust-frontend-port.md](docs/rust-frontend-port.md).
+
+Architektur-Details und Erweiterungs-Hinweise in [CLAUDE.md](CLAUDE.md).
+
+## Tests
+
+```
+rust/drachenhauch_runtime/target/release/dhrt test tests/pruef
+```
+
+Geprüft wird in **Prüfsammlungen** (`tests/pruef/*.dhtest`, Format in [docs/werkzeuge.md](docs/werkzeuge.md)): je Fall ein Programm und seine erwartete Ausgabe, dazu Bildproben, WAV-Proben, Beilagen, echte Tasten- und Mausaufnahmen für die Werkzeuge und die IDE. Jeder Fall läuft als eigener `dhrt`-Prozess; ohne Fenster oder Ton überspringt sich, was sie braucht. Dazu Rust-`#[test]`s (`cargo test` in `rust/drachenhauch_runtime`).
+
+Die **CI** baut `dhrt` bei jedem Push selbst und fährt die Sammlungen auf Windows (mit Grafik), Linux und macOS (ohne Grafik); dazu prüft ein `cargo check` auf allen drei Systemen, dass der Rust-Kern plattformunabhängig kompiliert. Bis 2026-09-20 lief das Ganze über pytest — die Python-Tests sind mit dem Python-Teil gelöscht, was sie Bleibendes prüften, steht seither in Sammlungen.
+
+## Lizenz
+
+Privat.

@@ -1,0 +1,67 @@
+# Die Website zu Drachenhauch (https://hasoschno70.github.io/Drachenhauch/):
+# tools/website.dh baut aus docs/ das Handbuch als HTML samt Startseiten,
+# llms.txt und sitemap.xml, GitHub Pages veroeffentlicht es.
+#
+# Gebaut wird nur der Kern von dhrt (ohne Grafik und Ton) -- das Werkzeug
+# braucht nur Zeichenketten, Dateien und SYNTAX_SPANS. Der Lauf gehoert NICHT
+# zu den Pflicht-Pruefungen von main; ob die Verweise stimmen, prueft
+# tests/pruef/werkzeug_website.dhtest in der normalen CI.
+#
+# Voraussetzung: in den Einstellungen des Repositorys steht Pages auf
+# "GitHub Actions" als Quelle.
+
+name: Website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "tools/website.dh"
+      - "daten/bilder/**"
+      - "examples/screenshots/**"
+      - ".github/workflows/website.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: website
+  cancel-in-progress: true
+
+jobs:
+  bauen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust-Abhaengigkeiten cachen
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust/drachenhauch_runtime
+
+      - name: dhrt bauen (nur der Kern)
+        working-directory: rust/drachenhauch_runtime
+        run: cargo build --release --locked
+
+      - name: Website bauen
+        run: rust/drachenhauch_runtime/target/release/dhrt run tools/website.dh -- --ziel _site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  veroeffentlichen:
+    needs: bauen
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,207 @@
+' Die Website (tools/website.dh): aus docs/en und docs/ entsteht das Handbuch
+' als HTML, dazu Startseiten, llms.txt, llms-full.txt, sitemap.xml und
+' robots.txt. Geprueft an kleinen Beilagen (Markdown -> HTML Stueck fuer
+' Stueck) und am echten Handbuch: jeder Verweis jeder Seite muss eine Datei
+' treffen, jede Sprungmarke eine Ueberschrift.
+
+=== markdown wird zu html
+--- programm ../../tools/website.dh
+--- argumente
+--wurzel
+{fall}/repo
+--ziel
+{fall}/site
+--adresse
+https://example.org/dh
+--- datei repo/docs/en/README.md
+# Manual
+
+Short intro line one
+continues here.
+
+- [Alpha](a.md) — the first
+- nested parent
+  - [German page](../a.md#zweiter-teil)
+1. one
+2. two
+--- datei repo/docs/README.md
+# Handbuch
+
+Kurz.
+--- datei repo/docs/en/a.md
+# Alpha page
+
+First paragraph of alpha, with `code <b>` and **bold** and *italic*.
+It goes on over a second line.
+
+## Second part
+
+| Name | Value |
+|---|--:|
+| `A\|B` | 1 |
+| [link](../nur-deutsch.md) | 2 |
+
+```basic
+PRINT "hi" ' greet
+```
+
+> quoted **text**
+
+See ../../examples/x.dh and [the example](../../examples/x.dh), ![pic](../../examples/screenshots/p.png).
+Visit https://example.com/path.
+--- datei repo/docs/a.md
+# Alpha-Seite
+
+Erster Absatz.
+
+## Zweiter Teil
+
+Text.
+--- datei repo/docs/nur-deutsch.md
+# Nur deutsch
+--- nachher
+FUNCTION hat(datei AS STRING, teil AS STRING) AS BOOLEAN
+    RETURN INSTR(JOIN$(READLINES(datei), CHR$(10)), teil) >= 0
+END FUNCTION
+DIM a AS STRING : a = "site/en/a.html"
+PRINT "ueberschrift mit marke "; hat(a, "<h2 id=" + CHR$(34) + "second-part" + CHR$(34) + ">Second part</h2>")
+PRINT "code maskiert "; hat(a, "<code>code &lt;b&gt;</code>")
+PRINT "fett und kursiv "; hat(a, "<strong>bold</strong> and <em>italic</em>")
+PRINT "tabelle rechtsbuendig "; hat(a, "<th style=" + CHR$(34) + "text-align:right" + CHR$(34) + ">Value</th>")
+PRINT "senkrechter strich in der zelle "; hat(a, "<td><code>A|B</code></td>")
+PRINT "nur deutsch -> github "; hat(a, "https://github.com/HasoSchno70/Drachenhauch/blob/main/docs/nur-deutsch.md")
+PRINT "beispiel -> github "; hat(a, "https://github.com/HasoSchno70/Drachenhauch/blob/main/examples/x.dh")
+PRINT "bild -> raw "; hat(a, "https://raw.githubusercontent.com/HasoSchno70/Drachenhauch/main/examples/screenshots/p.png")
+PRINT "code eingefaerbt "; hat(a, "<span class=" + CHR$(34) + "k-schluessel" + CHR$(34) + ">PRINT</span>")
+PRINT "kommentar eingefaerbt "; hat(a, "<span class=" + CHR$(34) + "k-kommentar" + CHR$(34) + ">' greet</span>")
+PRINT "zitat "; hat(a, "<blockquote>")
+PRINT "nackte adresse ohne punkt "; hat(a, "<a href=" + CHR$(34) + "https://example.com/path" + CHR$(34) + ">")
+PRINT "beschreibung ganzer absatz "; hat(a, "It goes on over a second line.")
+DIM r AS STRING : r = "site/en/index.html"
+PRINT "verweis en -> en "; hat(r, "href=" + CHR$(34) + "a.html" + CHR$(34))
+PRINT "verweis en -> de mit marke "; hat(r, "href=" + CHR$(34) + "../de/a.html#zweiter-teil" + CHR$(34))
+PRINT "verschachtelte liste "; hat(r, "<ul>" + CHR$(10) + "<li><a href=")
+PRINT "nummerierte liste "; hat(r, "<ol>")
+PRINT "sprachwechsel "; hat(r, "hreflang=" + CHR$(34) + "de" + CHR$(34) + " href=" + CHR$(34) + "https://example.org/dh/de/index.html" + CHR$(34))
+PRINT "nur deutsche seite ohne html "; NOT FILEEXISTS("site/de/nur-deutsch.html")
+PRINT "markdown fuer llms "; FILEEXISTS("site/en/a.md")
+PRINT "llms.txt "; hat("site/llms.txt", "- [Alpha page](https://example.org/dh/en/a.md): First paragraph of alpha, with code <b> and bold and *italic*. It goes on over a second line.")
+PRINT "sitemap "; hat("site/sitemap.xml", "<loc>https://example.org/dh/de/a.html</loc>")
+PRINT "robots "; hat("site/robots.txt", "Sitemap: https://example.org/dh/sitemap.xml")
+--- erwartet
+ueberschrift mit marke TRUE
+code maskiert TRUE
+fett und kursiv TRUE
+tabelle rechtsbuendig TRUE
+senkrechter strich in der zelle TRUE
+nur deutsch -> github TRUE
+beispiel -> github TRUE
+bild -> raw TRUE
+code eingefaerbt TRUE
+kommentar eingefaerbt TRUE
+zitat TRUE
+nackte adresse ohne punkt TRUE
+beschreibung ganzer absatz TRUE
+verweis en -> en TRUE
+verweis en -> de mit marke TRUE
+verschachtelte liste TRUE
+nummerierte liste TRUE
+sprachwechsel TRUE
+nur deutsche seite ohne html TRUE
+markdown fuer llms TRUE
+llms.txt TRUE
+sitemap TRUE
+robots TRUE
+
+=== jeder verweis des echten handbuchs trifft
+' Baut die Seite aus dem Repository und folgt jedem href/src, das nicht
+' nach draussen zeigt: die Datei muss es geben, eine Sprungmarke als id in
+' ihr. Dazu: keine Seite verweist noch auf eine .md-Datei daneben.
+--- programm ../../tools/website.dh
+--- argumente
+--wurzel
+{sammlung}/../..
+--ziel
+{fall}/site
+--- nachher
+DIM dateien AS ARRAY OF STRING : dateien = DIRLIST_REC("site", "*.html")
+DIM ids AS MAP OF STRING : ids = {}
+DIM texte AS MAP OF STRING : texte = {}
+DIM i AS INTEGER
+FOR i = 0 TO LEN(dateien) - 1
+    DIM p AS STRING : p = REPLACE$(dateien[i], "\", "/")
+    IF NOT STARTSWITH(p, "site/") THEN p = "site/" + p
+    MAPPUT(texte, p, JOIN$(READLINES(p), CHR$(10)))
+NEXT
+FUNCTION ordner$(p AS STRING) AS STRING
+    DIM l AS INTEGER : l = INSTRREV(p, "/")
+    RETURN LEFT$(p, l + 1)
+END FUNCTION
+FUNCTION normal$(pfad AS STRING) AS STRING
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(pfad, "/")
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(teile) - 1
+        IF teile[k] = ".." THEN
+            IF LEN(aus) > 0 THEN ARRAY_POP(aus)
+        ELSEIF teile[k] <> "." AND teile[k] <> "" THEN
+            ARRAY_PUSH(aus, teile[k])
+        END IF
+    NEXT
+    RETURN JOIN$(aus, "/")
+END FUNCTION
+DIM geprueft AS INTEGER
+DIM tot AS INTEGER
+DIM mdVerweise AS INTEGER
+DIM schluessel AS ARRAY OF STRING : schluessel = MAPKEYS(texte)
+DIM d AS INTEGER
+FOR d = 0 TO LEN(schluessel) - 1
+    DIM datei AS STRING : datei = schluessel[d]
+    DIM t AS STRING : t = MAPGET(texte, datei)
+    DIM ab AS INTEGER : ab = 0
+    WHILE TRUE
+        DIM h AS INTEGER : h = INSTR(t, "href=" + CHR$(34), ab)
+        DIM s AS INTEGER : s = INSTR(t, "src=" + CHR$(34), ab)
+        IF h < 0 AND s < 0 THEN EXIT WHILE
+        DIM st AS INTEGER
+        IF h < 0 THEN
+            st = s + 5
+        ELSEIF s < 0 THEN
+            st = h + 6
+        ELSE
+            st = IIF(h < s, h + 6, s + 5)
+        END IF
+        DIM e AS INTEGER : e = INSTR(t, CHR$(34), st)
+        DIM url AS STRING : url = MID$(t, st, e - st)
+        ab = e + 1
+        IF STARTSWITH(url, "http") OR STARTSWITH(url, "mailto:") THEN CONTINUE
+        DIM ziel AS STRING : ziel = datei
+        DIM marke AS STRING
+        marke = ""
+        DIM m AS INTEGER : m = INSTR(url, "#")
+        IF m >= 0 THEN
+            marke = MID$(url, m + 1, LEN(url) - m - 1)
+            url = LEFT$(url, m)
+        END IF
+        IF url <> "" THEN ziel = normal$(ordner$(datei) + url)
+        IF ENDSWITH(ziel, ".md") THEN mdVerweise = mdVerweise + 1
+        geprueft = geprueft + 1
+        DIM gut AS BOOLEAN : gut = FILEEXISTS(ziel)
+        IF gut AND marke <> "" AND MAPHAS(texte, ziel) THEN gut = INSTR(MAPGET(texte, ziel), "id=" + CHR$(34) + marke + CHR$(34)) >= 0
+        IF NOT gut THEN
+            tot = tot + 1
+            IF tot <= 8 THEN EPRINT("tot: " + datei + " -> " + url + IIF(marke <> "", "#" + marke, ""))
+        END IF
+    WEND
+NEXT
+PRINT "genug seiten "; LEN(schluessel) > 140
+PRINT "genug verweise "; geprueft > 1200
+PRINT "tote verweise "; tot
+PRINT "verweise auf md "; mdVerweise
+PRINT "llms.txt "; FILEEXISTS("site/llms.txt"); ", voll "; FILEEXISTS("site/llms-full.txt")
+--- erwartet
+genug seiten TRUE
+genug verweise TRUE
+tote verweise 0
+verweise auf md 0
+llms.txt TRUE, voll TRUE
