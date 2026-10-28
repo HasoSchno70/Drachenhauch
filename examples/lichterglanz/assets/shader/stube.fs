@@ -192,7 +192,7 @@ vec3 normale(vec3 p) {
 // Das Feuer im Kamin: Flammen aus Rauschen, die nach oben ziehen
 vec3 feuer(vec3 p) {
     vec3 kp = p - vec3(-3.7, 0.0, 3.5);
-    if (kp.x < 0.05 || abs(kp.z) > 0.55 || kp.y > 0.85) return vec3(0.0);
+    if (kp.x < 0.05 || kp.x > 0.45 || abs(kp.z) > 0.55 || kp.y > 0.85) return vec3(0.0);
     vec2 q = vec2(kp.z, kp.y);
     float n = rausch(vec2(q.x * 6.0, q.y * 4.0 - time * 3.0)) * 0.6 + rausch(vec2(q.x * 13.0, q.y * 9.0 - time * 5.0)) * 0.4;
     float form = smoothstep(0.7, 0.05, q.y + abs(q.x) * 0.9) * n;

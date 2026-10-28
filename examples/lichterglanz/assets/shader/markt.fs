@@ -126,6 +126,9 @@ float szene(vec3 p) {
     float stange = max(length(pq.xz) - 0.035, c.y - 3.05);
     float hub = 0.22 * sin(takt * PI + pid * 1.7);
     vec3 hp = pq - vec3(0.0, 1.25 + hub, 0.0);
+    // das Karussell dreht sich (von oben gesehen) gegen den Uhrzeigersinn,
+    // die Pferde schauen in Laufrichtung
+    hp.z = -hp.z;
     // Koerper laengs der Laufrichtung (tangential), Hals und Kopf vorn, vier
     // Beine im Galopp (vorn nach vorn, hinten nach hinten gestreckt)
     float koerper = kapsel(hp, vec3(0.0, 0.0, -0.22), vec3(0.0, 0.02, 0.22), 0.14);

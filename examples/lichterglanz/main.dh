@@ -259,12 +259,15 @@ SUB schneeZeichnen(zeit AS FLOAT, takt AS FLOAT)
         fW[i] = fW[i] + dt * (0.3 + z * 0.6) * IIF(i MOD 2 = 0, 1.0, -1.0)
         IF fX[i] > BREITE + 30 THEN fX[i] = fX[i] - BREITE - 60
         IF fX[i] < -30 THEN fX[i] = fX[i] + BREITE + 60
-        ' unten angekommen: liegen bleiben (nur die nahen Flocken zaehlen --
-        ' die fernen fallen weit hinten auf den Boden der Szene)
-        DIM sp AS INTEGER : sp = CLAMP(INT(fX[i] / SAEULE_B), 0, SAEULEN - 1)
+        ' unten angekommen: liegen bleiben -- die Flocke haeuft sich auf ihre
+        ' Saeule und ein wenig auf die Nachbarn
+        DIM sp AS INTEGER : sp = CLAMP(INT(fX[i] / SAEULE_B), 1, SAEULEN - 2)
         DIM boden AS FLOAT : boden = HOEHE - liegt[sp] * schneeDraussen
-        IF z > 0.45 AND fY[i] > boden AND i < anz AND schneeDraussen > 0.5 THEN
-            liegt[sp] = MIN(liegt[sp] + 0.55 * z, 70.0)
+        IF fY[i] > boden AND i < anz AND schneeDraussen > 0.5 THEN
+            DIM menge AS FLOAT : menge = 1.4 + 2.6 * z
+            liegt[sp] = MIN(liegt[sp] + menge, 90.0)
+            liegt[sp - 1] = MIN(liegt[sp - 1] + menge * 0.5, 90.0)
+            liegt[sp + 1] = MIN(liegt[sp + 1] + menge * 0.5, 90.0)
             fY[i] = -20.0 - RND() * 60.0
             fX[i] = RND() * BREITE
         ELSEIF fY[i] > HOEHE + 30 THEN

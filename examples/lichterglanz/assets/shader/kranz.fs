@@ -257,7 +257,10 @@ void main() {
             alb = vec3(0.5, 0.02, 0.05) * (0.7 + 0.3 * sin(p.y * 80.0));
         }
         // Licht der Kerzen, dazu ein Hauch kaltes Licht vom Fenster
-        vec3 licht = vec3(0.025, 0.03, 0.05) * (0.5 + 0.5 * n.y);
+        // kaltes Fensterlicht von oben links und ein warmer Rest aus dem Raum,
+        // damit der Kranz auch vor der ersten Kerze zu sehen ist
+        vec3 licht = vec3(0.07, 0.085, 0.13) * (0.4 + 0.6 * max(dot(n, normalize(vec3(-0.5, 0.8, 0.3))), 0.0))
+                   + vec3(0.05, 0.03, 0.015) * (0.5 + 0.5 * n.y);
         for (int i = 0; i < 4; i++) {
             float fi = float(i);
             float b = brennt(fi);
