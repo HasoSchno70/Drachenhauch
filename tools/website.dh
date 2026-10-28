@@ -1,0 +1,793 @@
+' website.dh -- die Website zu Drachenhauch: eine Startseite (englisch und
+' deutsch), das Handbuch aus docs/en und docs/ als HTML, dazu llms.txt,
+' llms-full.txt, sitemap.xml und robots.txt.
+'
+'     dhrt run tools/website.dh -- [--wurzel REPO] [--ziel ORDNER] [--adresse URL]
+'
+' Ohne Angaben: das Repository, in dem dieses Werkzeug liegt, und als Ziel
+' `_site` darin. Gebaut wird von `.github/workflows/website.yml` und auf
+' GitHub Pages veroeffentlicht.
+'
+' Warum eine eigene Seite, wo GitHub die Markdown-Dateien doch zeigt: wer
+' nach einer Programmiersprache sucht -- ein Mensch oder ein KI-Assistent --,
+' findet Webseiten mit Titel, Beschreibung und Verweisen untereinander
+' besser als Dateien in einem Repository. llms.txt ist die Kurzfassung fuer
+' Sprachmodelle (llmstxt.org), llms-full.txt das ganze englische Handbuch am
+' Stueck.
+'
+' Das Handbuch: veroeffentlicht wird jede Datei aus docs/en und ihr deutsches
+' Gegenstueck -- die Entwuerfe, Audits und Fassungsnotizen bleiben im
+' Repository. Verweise auf andere Dateien des Repositorys zeigen auf GitHub.
+
+IMPORT "regex"
+
+CONST REPO = "https://github.com/HasoSchno70/Drachenhauch"
+CONST ROH = "https://raw.githubusercontent.com/HasoSchno70/Drachenhauch/main/"
+
+DIM wurzel AS STRING
+DIM ziel AS STRING
+DIM adresse AS STRING : adresse = "https://hasoschno70.github.io/Drachenhauch/"
+DIM ai AS INTEGER
+WHILE ai < ARGC()
+    SELECT CASE ARG$(ai)
+        CASE "--wurzel"
+            ai = ai + 1 : wurzel = ARGPATH$(ai)
+        CASE "--ziel"
+            ai = ai + 1 : ziel = ARGPATH$(ai)
+        CASE "--adresse"
+            ai = ai + 1 : adresse = ARG$(ai)
+    END SELECT
+    ai = ai + 1
+WEND
+' dhrt run wechselt in den Ordner des Werkzeugs (tools/), das Repository
+' liegt eins darueber
+IF wurzel = "" THEN wurzel = REALPATH$(PATHJOIN(CWD$(), ".."))
+IF ziel = "" THEN ziel = PATHJOIN(wurzel, "_site")
+IF NOT ENDSWITH(adresse, "/") THEN adresse = adresse + "/"
+
+' --- Kleinigkeiten ---------------------------------------------------------
+FUNCTION esc$(s AS STRING) AS STRING
+    DIM t AS STRING : t = REPLACE$(s, "&", "&amp;")
+    t = REPLACE$(t, "<", "&lt;")
+    t = REPLACE$(t, ">", "&gt;")
+    RETURN REPLACE$(t, CHR$(34), "&quot;")
+END FUNCTION
+
+FUNCTION lesen$(pfad AS STRING) AS STRING
+    RETURN JOIN$(READLINES(pfad), CHR$(10))
+END FUNCTION
+
+SUB ordnerAnlegen(pfad AS STRING)
+    IF NOT DIREXISTS(pfad) THEN MKDIR(pfad)
+END SUB
+
+' Sprungmarken wie GitHub: klein, Leerzeichen -> '-', Buchstaben, Ziffern,
+' '-' und '_' bleiben, alles andere faellt weg; doppelte bekommen -1, -2 ...
+' (dieselbe Regel wie `marken` in pruef.rs, damit die Verweise des
+' Handbuchs hier wie dort treffen)
+DIM marken AS MAP OF INTEGER : marken = {}
+CONST SATZZEICHEN = "—–…«»“”„’‘·×→←↔•°²³´`"
+FUNCTION marke$(titel AS STRING) AS STRING
+    DIM t AS STRING : t = LOWER$(TRIM$(titel))
+    DIM m AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        DIM c AS STRING : c = MID$(t, i, 1)
+        DIM a AS INTEGER : a = ASC(c)
+        IF c = " " THEN
+            m = m + "-"
+        ELSEIF c = "-" OR c = "_" OR (c >= "a" AND c <= "z") OR (c >= "0" AND c <= "9") THEN
+            m = m + c
+        ELSEIF a > 127 AND INSTR(SATZZEICHEN, c) < 0 THEN
+            m = m + c
+        END IF
+    NEXT
+    IF MAPHAS(marken, m) THEN
+        DIM n AS INTEGER : n = MAPGET(marken, m)
+        MAPPUT(marken, m, n + 1)
+        RETURN m + "-" + STR$(n)
+    END IF
+    MAPPUT(marken, m, 1)
+    RETURN m
+END FUNCTION
+
+' --- Welche Seiten es gibt -------------------------------------------------
+' Name ohne .md; README wird zu index
+DIM namen AS ARRAY OF STRING : namen = []
+DIM enDateien AS ARRAY OF STRING : enDateien = DIRLIST(PATHJOIN(wurzel, "docs", "en"), "*.md")
+SORT(enDateien)
+DIM nd AS INTEGER
+FOR nd = 0 TO LEN(enDateien) - 1
+    DIM nn AS STRING : nn = LEFT$(enDateien[nd], LEN(enDateien[nd]) - 3)
+    IF FILEEXISTS(PATHJOIN(wurzel, "docs", nn + ".md")) THEN ARRAY_PUSH(namen, nn)
+NEXT
+DIM gibt AS MAP OF BOOLEAN : gibt = {}
+FOR nd = 0 TO LEN(namen) - 1
+    MAPPUT(gibt, namen[nd], TRUE)
+NEXT
+
+FUNCTION seitenName$(n AS STRING) AS STRING
+    IF n = "README" THEN RETURN "index"
+    RETURN n
+END FUNCTION
+
+' Ein Pfad im Repository: ".." und "." aufloesen
+FUNCTION normal$(pfad AS STRING) AS STRING
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(pfad, "/")
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 1
+        IF teile[i] = ".." THEN
+            IF LEN(aus) > 0 THEN ARRAY_POP(aus)
+        ELSEIF teile[i] <> "." AND teile[i] <> "" THEN
+            ARRAY_PUSH(aus, teile[i])
+        END IF
+    NEXT
+    RETURN JOIN$(aus, "/")
+END FUNCTION
+
+' Wohin ein Verweis aus einer Handbuchseite zeigt. `sprache` ist die der
+' Seite ("en" oder "de"); die Seite liegt in <ziel>/<sprache>/.
+FUNCTION verweis$(url AS STRING, sprache AS STRING) AS STRING
+    IF STARTSWITH(url, "http:") OR STARTSWITH(url, "https:") OR STARTSWITH(url, "mailto:") OR STARTSWITH(url, "#") THEN RETURN url
+    DIM pfad AS STRING : pfad = url
+    DIM sm AS STRING
+    DIM h AS INTEGER : h = INSTR(url, "#")
+    IF h >= 0 THEN
+        pfad = LEFT$(url, h)
+        sm = MID$(url, h, LEN(url) - h)
+    END IF
+    DIM basis AS STRING : basis = IIF(sprache = "en", "docs/en/", "docs/")
+    DIM rp AS STRING : rp = normal$(basis + pfad)
+    IF ENDSWITH(rp, ".md") THEN
+        DIM n AS STRING
+        IF STARTSWITH(rp, "docs/en/") AND INSTR(MID$(rp, 8, LEN(rp) - 8), "/") < 0 THEN
+            n = MID$(rp, 8, LEN(rp) - 11)
+            IF MAPHAS(gibt, n) THEN RETURN IIF(sprache = "en", "", "../en/") + seitenName$(n) + ".html" + sm
+        ELSEIF STARTSWITH(rp, "docs/") AND INSTR(MID$(rp, 5, LEN(rp) - 5), "/") < 0 THEN
+            n = MID$(rp, 5, LEN(rp) - 8)
+            IF MAPHAS(gibt, n) THEN RETURN IIF(sprache = "de", "", "../de/") + seitenName$(n) + ".html" + sm
+        END IF
+    END IF
+    DIM endung AS STRING : endung = LOWER$(RIGHT$(rp, 4))
+    IF endung = ".png" OR endung = ".jpg" OR endung = ".gif" OR endung = ".svg" THEN RETURN ROH + rp
+    RETURN REPO + "/blob/main/" + rp + sm
+END FUNCTION
+
+' --- Markdown -> HTML: Text in einer Zeile --------------------------------
+DIM seitenSprache AS STRING : seitenSprache = "en"
+
+' das Gegenstueck zu `auf` ab Stelle `ab`, -1 wenn keins
+FUNCTION schliesst(s AS STRING, ab AS INTEGER, zeichen AS STRING) AS INTEGER
+    RETURN INSTR(s, zeichen, ab)
+END FUNCTION
+
+FUNCTION zeile$(s AS STRING) AS STRING
+    DIM aus AS STRING
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = LEN(s)
+    WHILE i < n
+        DIM c AS STRING : c = MID$(s, i, 1)
+        DIM z AS INTEGER
+        IF c = "\" AND i + 1 < n AND INSTR("\`*_{}[]()#+-.!|<>~", MID$(s, i + 1, 1)) >= 0 THEN
+            aus = aus + esc$(MID$(s, i + 1, 1))
+            i = i + 2
+        ELSEIF c = "`" THEN
+            ' Code: so viele Backticks wie er beginnt
+            DIM k AS INTEGER : k = 1
+            WHILE i + k < n AND MID$(s, i + k, 1) = "`"
+                k = k + 1
+            WEND
+            z = INSTR(s, LEFT$("```````", k), i + k)
+            IF z < 0 THEN
+                aus = aus + LEFT$("```````", k)
+                i = i + k
+            ELSE
+                aus = aus + "<code>" + esc$(TRIM$(MID$(s, i + k, z - i - k))) + "</code>"
+                i = z + k
+            END IF
+        ELSEIF c = "[" OR (c = "!" AND i + 1 < n AND MID$(s, i + 1, 1) = "[") THEN
+            DIM bild AS BOOLEAN : bild = c = "!"
+            DIM a AS INTEGER : a = IIF(bild, i + 1, i)
+            ' die passende eckige Klammer (Code darin zaehlt nicht)
+            DIM tiefe AS INTEGER : tiefe = 0
+            DIM j AS INTEGER : j = a
+            DIM zu AS INTEGER : zu = -1
+            WHILE j < n
+                DIM cj AS STRING : cj = MID$(s, j, 1)
+                IF cj = "`" THEN
+                    DIM zc AS INTEGER : zc = INSTR(s, "`", j + 1)
+                    IF zc > 0 THEN j = zc
+                ELSEIF cj = "[" THEN
+                    tiefe = tiefe + 1
+                ELSEIF cj = "]" THEN
+                    tiefe = tiefe - 1
+                    IF tiefe = 0 THEN
+                        zu = j
+                        EXIT WHILE
+                    END IF
+                END IF
+                j = j + 1
+            WEND
+            IF zu > 0 AND zu + 1 < n AND MID$(s, zu + 1, 1) = "(" THEN
+                DIM ende AS INTEGER : ende = INSTR(s, ")", zu + 2)
+                IF ende > 0 THEN
+                    DIM text AS STRING : text = MID$(s, a + 1, zu - a - 1)
+                    DIM url AS STRING : url = TRIM$(MID$(s, zu + 2, ende - zu - 2))
+                    ' ein Titel in Anfuehrungszeichen faellt weg
+                    DIM lz AS INTEGER : lz = INSTR(url, " ")
+                    IF lz > 0 THEN url = LEFT$(url, lz)
+                    IF bild THEN
+                        aus = aus + "<img src=" + CHR$(34) + esc$(verweis$(url, seitenSprache)) + CHR$(34) + " alt=" + CHR$(34) + esc$(text) + CHR$(34) + " loading=" + CHR$(34) + "lazy" + CHR$(34) + ">"
+                    ELSE
+                        aus = aus + "<a href=" + CHR$(34) + esc$(verweis$(url, seitenSprache)) + CHR$(34) + ">" + zeile$(text) + "</a>"
+                    END IF
+                    i = ende + 1
+                    CONTINUE
+                END IF
+            END IF
+            aus = aus + esc$(c)
+            i = i + 1
+        ELSEIF c = "*" AND i + 1 < n AND MID$(s, i + 1, 1) = "*" THEN
+            z = INSTR(s, "**", i + 2)
+            IF z > i + 2 THEN
+                aus = aus + "<strong>" + zeile$(MID$(s, i + 2, z - i - 2)) + "</strong>"
+                i = z + 2
+            ELSE
+                aus = aus + "**"
+                i = i + 2
+            END IF
+        ELSEIF c = "*" AND i + 1 < n AND MID$(s, i + 1, 1) <> " " THEN
+            z = INSTR(s, "*", i + 1)
+            IF z > i + 1 THEN
+                aus = aus + "<em>" + zeile$(MID$(s, i + 1, z - i - 1)) + "</em>"
+                i = z + 1
+            ELSE
+                aus = aus + "*"
+                i = i + 1
+            END IF
+        ELSEIF c = "~" AND i + 1 < n AND MID$(s, i + 1, 1) = "~" THEN
+            z = INSTR(s, "~~", i + 2)
+            IF z > i + 2 THEN
+                aus = aus + "<del>" + zeile$(MID$(s, i + 2, z - i - 2)) + "</del>"
+                i = z + 2
+            ELSE
+                aus = aus + "~~"
+                i = i + 2
+            END IF
+        ELSEIF c = "h" AND (MID$(s, i, 8) = "https://" OR MID$(s, i, 7) = "http://") AND (i = 0 OR INSTR(" (", MID$(s, i - 1, 1)) >= 0) THEN
+            ' nackte Adresse: bis zum Leerraum, ohne Satzzeichen am Ende
+            z = i
+            WHILE z < n AND INSTR(" )<", MID$(s, z, 1)) < 0
+                z = z + 1
+            WEND
+            WHILE z > i AND INSTR(".,;:!?", MID$(s, z - 1, 1)) >= 0
+                z = z - 1
+            WEND
+            DIM adr AS STRING : adr = MID$(s, i, z - i)
+            aus = aus + "<a href=" + CHR$(34) + esc$(adr) + CHR$(34) + ">" + esc$(adr) + "</a>"
+            i = z
+        ELSE
+            aus = aus + esc$(c)
+            i = i + 1
+        END IF
+    WEND
+    RETURN aus
+END FUNCTION
+
+' Klartext einer Zeile (fuer Beschreibungen): ohne Auszeichnung und Verweise
+FUNCTION klartext$(s AS STRING) AS STRING
+    DIM t AS STRING : t = REGEX_REPLACE(s, "!?\[([^\]]*)\]\([^)]*\)", "\1")
+    t = REPLACE$(t, "**", "")
+    t = REPLACE$(t, "`", "")
+    t = REPLACE$(t, "\*", "*")
+    RETURN TRIM$(t)
+END FUNCTION
+
+' --- Code mit Farben (SYNTAX_SPANS, derselbe Zerleger wie im Editor) ------
+FUNCTION code$(text AS STRING, sprache AS STRING) AS STRING
+    IF sprache <> "basic" AND sprache <> "dh" AND sprache <> "drachenhauch" THEN RETURN esc$(text)
+    DIM sp AS TUPLE : sp = SYNTAX_SPANS(text)
+    DIM st AS ARRAY OF INTEGER
+    DIM la AS ARRAY OF INTEGER
+    DIM ar AS ARRAY OF STRING
+    (st, la, ar) = sp
+    DIM aus AS STRING
+    DIM pos AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(st) - 1
+        IF st[i] > pos THEN aus = aus + esc$(MID$(text, pos, st[i] - pos))
+        IF ar[i] = "name" OR ar[i] = "operator" THEN
+            aus = aus + esc$(MID$(text, st[i], la[i]))
+        ELSE
+            aus = aus + "<span class=" + CHR$(34) + "k-" + ar[i] + CHR$(34) + ">" + esc$(MID$(text, st[i], la[i])) + "</span>"
+        END IF
+        pos = st[i] + la[i]
+    NEXT
+    IF pos < LEN(text) THEN aus = aus + esc$(MID$(text, pos, LEN(text) - pos))
+    RETURN aus
+END FUNCTION
+
+' --- Markdown -> HTML: Bloecke ---------------------------------------------
+DIM seitenTitel AS STRING
+DIM seitenBeschreibung AS STRING
+DIM beschreibungFertig AS BOOLEAN
+
+FUNCTION einzug(z AS STRING) AS INTEGER
+    RETURN LEN(z) - LEN(LTRIM$(z))
+END FUNCTION
+
+' Ist die Zeile ein Listenpunkt? Liefert die Laenge des Zeichens samt
+' Leerzeichen (0 = nein); `nummeriert` sagt, ob "1." statt "-".
+DIM nummeriert AS BOOLEAN
+FUNCTION punkt(z AS STRING) AS INTEGER
+    DIM t AS STRING : t = LTRIM$(z)
+    nummeriert = FALSE
+    IF STARTSWITH(t, "- ") OR STARTSWITH(t, "* ") OR STARTSWITH(t, "+ ") THEN RETURN 2
+    DIM i AS INTEGER
+    WHILE i < LEN(t) AND MID$(t, i, 1) >= "0" AND MID$(t, i, 1) <= "9"
+        i = i + 1
+    WEND
+    IF i > 0 AND i < 4 AND MID$(t, i, 2) = ". " THEN
+        nummeriert = TRUE
+        RETURN i + 2
+    END IF
+    RETURN 0
+END FUNCTION
+
+FUNCTION istTrenner(z AS STRING) AS BOOLEAN
+    DIM t AS STRING : t = REPLACE$(TRIM$(z), " ", "")
+    RETURN LEN(t) >= 3 AND (t = LEFT$("----------------------------------------", LEN(t)) OR t = LEFT$("****************************************", LEN(t)) OR t = LEFT$("________________________________________", LEN(t)))
+END FUNCTION
+
+FUNCTION zellen(z AS STRING) AS ARRAY OF STRING
+    DIM t AS STRING : t = TRIM$(z)
+    IF STARTSWITH(t, "|") THEN t = MID$(t, 1, LEN(t) - 1)
+    IF ENDSWITH(t, "|") AND NOT ENDSWITH(t, "\|") THEN t = LEFT$(t, LEN(t) - 1)
+    ' "|" in Code oder als \| trennt keine Zelle
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM akt AS STRING
+    DIM imCode AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        DIM c AS STRING : c = MID$(t, i, 1)
+        IF c = "`" THEN imCode = NOT imCode
+        IF c = "\" AND i + 1 < LEN(t) AND MID$(t, i + 1, 1) = "|" THEN
+            akt = akt + "|"
+            i = i + 1
+        ELSEIF c = "|" AND NOT imCode THEN
+            ARRAY_PUSH(aus, TRIM$(akt))
+            akt = ""
+        ELSE
+            akt = akt + c
+        END IF
+    NEXT
+    ARRAY_PUSH(aus, TRIM$(akt))
+    RETURN aus
+END FUNCTION
+
+FUNCTION istTabellenTrenner(z AS STRING) AS BOOLEAN
+    DIM t AS STRING : t = TRIM$(z)
+    IF NOT STARTSWITH(t, "|") AND INSTR(t, "|") < 0 THEN RETURN FALSE
+    RETURN REGEX_TEST(t, "^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$")
+END FUNCTION
+
+FUNCTION bloecke$(zeilen AS ARRAY OF STRING) AS STRING
+    DIM aus AS STRING
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = LEN(zeilen)
+    DIM absatz AS STRING
+    ' offene Listen: Einzug und Art je Stufe
+    DIM lEinzug AS ARRAY OF INTEGER : lEinzug = []
+    DIM lArt AS ARRAY OF STRING : lArt = []
+    WHILE i < n
+        DIM z AS STRING : z = zeilen[i]
+        DIM t AS STRING : t = TRIM$(z)
+        DIM p AS INTEGER : p = punkt(z)
+        DIM neuerBlock AS BOOLEAN
+        neuerBlock = t = "" OR STARTSWITH(t, "```") OR STARTSWITH(t, "#") OR STARTSWITH(t, ">") OR istTrenner(z) OR p > 0 OR (STARTSWITH(t, "|") AND i + 1 < n AND istTabellenTrenner(zeilen[i + 1]))
+        ' eine Fortsetzungszeile eines Listenpunkts
+        IF NOT neuerBlock AND LEN(lEinzug) > 0 AND absatz = "" THEN
+            aus = aus + " " + zeile$(t)
+            i = i + 1
+            CONTINUE
+        END IF
+        IF neuerBlock AND absatz <> "" THEN
+            aus = aus + "<p>" + absatz + "</p>" + CHR$(10)
+            absatz = ""
+            IF seitenBeschreibung <> "" THEN beschreibungFertig = TRUE
+        END IF
+        ' Listen schliessen, wenn die Zeile nicht mehr dazugehoert
+        IF LEN(lEinzug) > 0 AND p = 0 AND t <> "" AND NOT (STARTSWITH(t, "```") AND einzug(z) > lEinzug[LEN(lEinzug) - 1]) THEN
+            WHILE LEN(lEinzug) > 0
+                aus = aus + "</li></" + lArt[LEN(lArt) - 1] + ">" + CHR$(10)
+                ARRAY_POP(lEinzug) : ARRAY_POP(lArt)
+            WEND
+        END IF
+        IF t = "" THEN
+            ' eine Leerzeile beendet die Liste nur, wenn danach nichts mehr dazugehoert
+            IF LEN(lEinzug) > 0 THEN
+                DIM k AS INTEGER : k = i + 1
+                WHILE k < n AND TRIM$(zeilen[k]) = ""
+                    k = k + 1
+                WEND
+                IF k >= n OR (punkt(zeilen[k]) = 0 AND einzug(zeilen[k]) = 0) THEN
+                    WHILE LEN(lEinzug) > 0
+                        aus = aus + "</li></" + lArt[LEN(lArt) - 1] + ">" + CHR$(10)
+                        ARRAY_POP(lEinzug) : ARRAY_POP(lArt)
+                    WEND
+                END IF
+            END IF
+            i = i + 1
+        ELSEIF STARTSWITH(t, "```") OR STARTSWITH(t, "~~~") THEN
+            DIM zaun AS STRING : zaun = LEFT$(t, 3)
+            DIM spr AS STRING : spr = LOWER$(TRIM$(MID$(t, 3, LEN(t) - 3)))
+            DIM ez AS INTEGER : ez = einzug(z)
+            DIM inhalt AS ARRAY OF STRING : inhalt = []
+            i = i + 1
+            WHILE i < n
+                IF STARTSWITH(TRIM$(zeilen[i]), zaun) THEN EXIT WHILE
+                DIM cz AS STRING : cz = zeilen[i]
+                IF einzug(cz) >= ez THEN cz = MID$(cz, ez, LEN(cz) - ez) ELSE cz = LTRIM$(cz)
+                ARRAY_PUSH(inhalt, cz)
+                i = i + 1
+            WEND
+            i = i + 1
+            aus = aus + "<pre><code" + IIF(spr <> "", " class=" + CHR$(34) + "language-" + esc$(spr) + CHR$(34), "") + ">" + code$(JOIN$(inhalt, CHR$(10)), spr) + "</code></pre>" + CHR$(10)
+        ELSEIF p > 0 THEN
+            DIM ein AS INTEGER : ein = einzug(z)
+            DIM art AS STRING : art = IIF(nummeriert, "ol", "ul")
+            IF LEN(lEinzug) = 0 OR ein > lEinzug[LEN(lEinzug) - 1] THEN
+                aus = aus + "<" + art + ">" + CHR$(10) + "<li>"
+                ARRAY_PUSH(lEinzug, ein) : ARRAY_PUSH(lArt, art)
+            ELSE
+                WHILE LEN(lEinzug) > 1 AND ein < lEinzug[LEN(lEinzug) - 1]
+                    aus = aus + "</li></" + lArt[LEN(lArt) - 1] + ">" + CHR$(10)
+                    ARRAY_POP(lEinzug) : ARRAY_POP(lArt)
+                WEND
+                IF lArt[LEN(lArt) - 1] <> art THEN
+                    ' andere Art auf derselben Stufe: eine neue Liste
+                    aus = aus + "</li></" + lArt[LEN(lArt) - 1] + ">" + CHR$(10) + "<" + art + ">" + CHR$(10) + "<li>"
+                    lArt[LEN(lArt) - 1] = art
+                ELSE
+                    aus = aus + "</li>" + CHR$(10) + "<li>"
+                END IF
+            END IF
+            DIM rest AS STRING : rest = MID$(LTRIM$(z), p, LEN(LTRIM$(z)) - p)
+            ' Aufgabenliste
+            IF STARTSWITH(rest, "[ ] ") THEN rest = "☐ " + MID$(rest, 4, LEN(rest) - 4)
+            IF STARTSWITH(rest, "[x] ") OR STARTSWITH(rest, "[X] ") THEN rest = "☑ " + MID$(rest, 4, LEN(rest) - 4)
+            aus = aus + zeile$(rest)
+            i = i + 1
+        ELSEIF STARTSWITH(t, "#") THEN
+            DIM ebene AS INTEGER : ebene = 0
+            WHILE ebene < LEN(t) AND MID$(t, ebene, 1) = "#"
+                ebene = ebene + 1
+            WEND
+            IF ebene <= 6 AND MID$(t, ebene, 1) = " " THEN
+                DIM titel AS STRING : titel = TRIM$(MID$(t, ebene, LEN(t) - ebene))
+                IF ebene = 1 AND seitenTitel = "" THEN seitenTitel = klartext$(titel)
+                aus = aus + "<h" + STR$(ebene) + " id=" + CHR$(34) + esc$(marke$(titel)) + CHR$(34) + ">" + zeile$(titel) + "</h" + STR$(ebene) + ">" + CHR$(10)
+            ELSE
+                absatz = IIF(absatz = "", "", absatz + " ") + zeile$(t)
+            END IF
+            i = i + 1
+        ELSEIF STARTSWITH(t, ">") THEN
+            DIM zitat AS ARRAY OF STRING : zitat = []
+            WHILE i < n AND STARTSWITH(TRIM$(zeilen[i]), ">")
+                DIM q AS STRING : q = MID$(TRIM$(zeilen[i]), 1, LEN(TRIM$(zeilen[i])) - 1)
+                IF STARTSWITH(q, " ") THEN q = MID$(q, 1, LEN(q) - 1)
+                ARRAY_PUSH(zitat, q)
+                i = i + 1
+            WEND
+            aus = aus + "<blockquote>" + CHR$(10) + bloecke$(zitat) + "</blockquote>" + CHR$(10)
+        ELSEIF istTrenner(z) THEN
+            aus = aus + "<hr>" + CHR$(10)
+            i = i + 1
+        ELSEIF STARTSWITH(t, "|") AND i + 1 < n AND istTabellenTrenner(zeilen[i + 1]) THEN
+            DIM kopf AS ARRAY OF STRING : kopf = zellen(z)
+            DIM ausr AS ARRAY OF STRING : ausr = zellen(zeilen[i + 1])
+            DIM ax AS INTEGER
+            DIM stil AS ARRAY OF STRING : stil = []
+            FOR ax = 0 TO LEN(kopf) - 1
+                DIM sx AS STRING : sx = ""
+                IF ax < LEN(ausr) THEN
+                    IF STARTSWITH(ausr[ax], ":") AND ENDSWITH(ausr[ax], ":") THEN
+                        sx = " style=" + CHR$(34) + "text-align:center" + CHR$(34)
+                    ELSEIF ENDSWITH(ausr[ax], ":") THEN
+                        sx = " style=" + CHR$(34) + "text-align:right" + CHR$(34)
+                    END IF
+                END IF
+                ARRAY_PUSH(stil, sx)
+            NEXT
+            aus = aus + "<div class=" + CHR$(34) + "tabelle" + CHR$(34) + "><table>" + CHR$(10) + "<thead><tr>"
+            FOR ax = 0 TO LEN(kopf) - 1
+                aus = aus + "<th" + stil[ax] + ">" + zeile$(kopf[ax]) + "</th>"
+            NEXT
+            aus = aus + "</tr></thead>" + CHR$(10) + "<tbody>" + CHR$(10)
+            i = i + 2
+            WHILE i < n AND INSTR(TRIM$(zeilen[i]), "|") >= 0 AND TRIM$(zeilen[i]) <> ""
+                DIM reihe AS ARRAY OF STRING : reihe = zellen(zeilen[i])
+                aus = aus + "<tr>"
+                FOR ax = 0 TO LEN(kopf) - 1
+                    aus = aus + "<td" + stil[ax] + ">" + IIF(ax < LEN(reihe), zeile$(reihe[ax]), "") + "</td>"
+                NEXT
+                aus = aus + "</tr>" + CHR$(10)
+                i = i + 1
+            WEND
+            aus = aus + "</tbody></table></div>" + CHR$(10)
+        ELSE
+            ' Absatz; zwei Leerzeichen am Ende = Zeilenumbruch
+            DIM teil AS STRING : teil = zeile$(t)
+            IF ENDSWITH(z, "  ") THEN teil = teil + "<br>"
+            IF NOT beschreibungFertig AND NOT STARTSWITH(t, "**Deutsch") AND NOT STARTSWITH(t, "**English") THEN
+                seitenBeschreibung = TRIM$(seitenBeschreibung + " " + klartext$(t))
+            END IF
+            absatz = IIF(absatz = "", "", absatz + " ") + teil
+            i = i + 1
+        END IF
+    WEND
+    IF absatz <> "" THEN aus = aus + "<p>" + absatz + "</p>" + CHR$(10)
+    WHILE LEN(lEinzug) > 0
+        aus = aus + "</li></" + lArt[LEN(lArt) - 1] + ">" + CHR$(10)
+        ARRAY_POP(lEinzug) : ARRAY_POP(lArt)
+    WEND
+    RETURN aus
+END FUNCTION
+
+' Die Beschreibung fuer <meta>: der erste Absatz, hoechstens ~155 Zeichen
+' an einer Wortgrenze
+FUNCTION kurz$(s AS STRING, hoechstens AS INTEGER) AS STRING
+    IF LEN(s) <= hoechstens THEN RETURN s
+    DIM t AS STRING : t = LEFT$(s, hoechstens)
+    DIM l AS INTEGER : l = INSTRREV(t, " ")
+    IF l > hoechstens \ 2 THEN t = LEFT$(t, l)
+    RETURN RTRIM$(t) + " …"
+END FUNCTION
+
+' --- Seitenrahmen -----------------------------------------------------------
+DIM gebaut AS ARRAY OF STRING : gebaut = []    ' fuer sitemap.xml
+
+FUNCTION kopf$(sprache AS STRING, titel AS STRING, beschreibung AS STRING, pfad AS STRING, andere AS STRING, zurWurzel AS STRING, extra AS STRING) AS STRING
+    DIM q AS STRING : q = CHR$(34)
+    DIM h AS STRING
+    h = "<!doctype html>" + CHR$(10) + "<html lang=" + q + sprache + q + ">" + CHR$(10) + "<head>" + CHR$(10)
+    h = h + "<meta charset=" + q + "utf-8" + q + ">" + CHR$(10)
+    h = h + "<meta name=" + q + "viewport" + q + " content=" + q + "width=device-width, initial-scale=1" + q + ">" + CHR$(10)
+    h = h + "<title>" + esc$(titel) + "</title>" + CHR$(10)
+    h = h + "<meta name=" + q + "description" + q + " content=" + q + esc$(beschreibung) + q + ">" + CHR$(10)
+    h = h + "<link rel=" + q + "canonical" + q + " href=" + q + adresse + pfad + q + ">" + CHR$(10)
+    IF andere <> "" THEN
+        h = h + "<link rel=" + q + "alternate" + q + " hreflang=" + q + sprache + q + " href=" + q + adresse + pfad + q + ">" + CHR$(10)
+        h = h + "<link rel=" + q + "alternate" + q + " hreflang=" + q + IIF(sprache = "en", "de", "en") + q + " href=" + q + adresse + andere + q + ">" + CHR$(10)
+    END IF
+    h = h + "<meta property=" + q + "og:title" + q + " content=" + q + esc$(titel) + q + ">" + CHR$(10)
+    h = h + "<meta property=" + q + "og:description" + q + " content=" + q + esc$(beschreibung) + q + ">" + CHR$(10)
+    h = h + "<meta property=" + q + "og:type" + q + " content=" + q + "website" + q + ">" + CHR$(10)
+    h = h + "<meta property=" + q + "og:url" + q + " content=" + q + adresse + pfad + q + ">" + CHR$(10)
+    h = h + "<meta property=" + q + "og:image" + q + " content=" + q + adresse + "bilder/schriftzug.png" + q + ">" + CHR$(10)
+    h = h + "<link rel=" + q + "icon" + q + " href=" + q + zurWurzel + "bilder/logo.png" + q + ">" + CHR$(10)
+    h = h + "<link rel=" + q + "stylesheet" + q + " href=" + q + zurWurzel + "stil.css" + q + ">" + CHR$(10)
+    h = h + extra + "</head>" + CHR$(10) + "<body>" + CHR$(10)
+    ' Kopfleiste
+    DIM handbuch AS STRING : handbuch = zurWurzel + sprache + "/index.html"
+    h = h + "<header class=" + q + "leiste" + q + "><a class=" + q + "marke" + q + " href=" + q + zurWurzel + IIF(sprache = "en", "index.html", "de.html") + q + "><img src=" + q + zurWurzel + "bilder/logo.png" + q + " alt=" + q + q + " width=" + q + "28" + q + " height=" + q + "28" + q + ">Drachenhauch</a><nav>"
+    h = h + "<a href=" + q + handbuch + q + ">" + IIF(sprache = "en", "Manual", "Handbuch") + "</a>"
+    h = h + "<a href=" + q + REPO + "/releases/latest" + q + ">Download</a>"
+    h = h + "<a href=" + q + REPO + q + ">GitHub</a>"
+    IF andere <> "" THEN h = h + "<a class=" + q + "sprache" + q + " href=" + q + zurWurzel + andere + q + " hreflang=" + q + IIF(sprache = "en", "de", "en") + q + ">" + IIF(sprache = "en", "Deutsch", "English") + "</a>"
+    h = h + "</nav></header>" + CHR$(10)
+    RETURN h
+END FUNCTION
+
+FUNCTION fuss$(sprache AS STRING) AS STRING
+    DIM q AS STRING : q = CHR$(34)
+    DIM f AS STRING
+    f = "<footer class=" + q + "fuss" + q + "><p>Drachenhauch · <a href=" + q + REPO + q + ">github.com/HasoSchno70/Drachenhauch</a> · "
+    f = f + IIF(sprache = "en", "made by Hans Schnorrenberger", "von Hans Schnorrenberger") + "</p></footer>" + CHR$(10) + "</body>" + CHR$(10) + "</html>" + CHR$(10)
+    RETURN f
+END FUNCTION
+
+SUB schreiben(rel AS STRING, inhalt AS STRING)
+    WRITEALL(PATHJOIN(ziel, rel), inhalt)
+    IF ENDSWITH(rel, ".html") THEN ARRAY_PUSH(gebaut, rel)
+END SUB
+
+' --- Handbuchseiten ---------------------------------------------------------
+DIM beschreibungEn AS MAP OF STRING : beschreibungEn = {}
+DIM titelEn AS MAP OF STRING : titelEn = {}
+
+SUB handbuchSeite(n AS STRING, sprache AS STRING)
+    DIM quelle AS STRING : quelle = IIF(sprache = "en", PATHJOIN(wurzel, "docs", "en", n + ".md"), PATHJOIN(wurzel, "docs", n + ".md"))
+    marken = {}
+    seitenTitel = ""
+    seitenBeschreibung = ""
+    beschreibungFertig = FALSE
+    seitenSprache = sprache
+    DIM rumpf AS STRING : rumpf = bloecke$(READLINES(quelle))
+    IF seitenTitel = "" THEN seitenTitel = n
+    DIM titel AS STRING : titel = seitenTitel + IIF(INSTR(seitenTitel, "Drachenhauch") >= 0, "", " – Drachenhauch")
+    IF seitenBeschreibung = "" THEN seitenBeschreibung = seitenTitel + IIF(sprache = "en", " – from the Drachenhauch manual.", " – aus dem Handbuch von Drachenhauch.")
+    DIM beschreibung AS STRING : beschreibung = kurz$(seitenBeschreibung, 155)
+    IF sprache = "en" THEN
+        MAPPUT(beschreibungEn, n, kurz$(seitenBeschreibung, 140))
+        MAPPUT(titelEn, n, seitenTitel)
+    END IF
+    DIM sn AS STRING : sn = seitenName$(n) + ".html"
+    DIM pfad AS STRING : pfad = sprache + "/" + sn
+    DIM andere AS STRING : andere = IIF(sprache = "en", "de/", "en/") + sn
+    DIM q AS STRING : q = CHR$(34)
+    DIM html AS STRING : html = kopf$(sprache, titel, beschreibung, pfad, andere, "../", "")
+    html = html + "<main class=" + q + "seite" + q + ">" + CHR$(10) + rumpf
+    html = html + "<p class=" + q + "quelle" + q + "><a href=" + q + REPO + "/blob/main/" + IIF(sprache = "en", "docs/en/", "docs/") + n + ".md" + q + ">"
+    html = html + IIF(sprache = "en", "This page on GitHub", "Diese Seite auf GitHub") + "</a></p>" + CHR$(10) + "</main>" + CHR$(10)
+    schreiben(pfad, html + fuss$(sprache))
+END SUB
+
+' --- Startseite -------------------------------------------------------------
+DIM beispiele AS ARRAY OF STRING : beispiele = ["99_ibl_hdr", "93_shadows", "104_instancing", "108_skeletal_anim", "119_vortex", "65_amiga_demo", "78_particle_catalog", "154_chart", "157_gui_tabelle"]
+DIM beispielEn AS ARRAY OF STRING : beispielEn = ["HDR lighting", "Shadows", "GPU instancing", "Skeletal animation", "Additive blending", "Demoscene", "Particles", "Charts", "User interfaces"]
+DIM beispielDe AS ARRAY OF STRING : beispielDe = ["HDR-Beleuchtung", "Schatten", "GPU-Instancing", "Skelett-Animation", "Additives Blenden", "Demoszene", "Partikel", "Diagramme", "Oberflächen"]
+
+DIM BEISPIEL AS STRING : BEISPIEL = "IMPORT ""sprite""" + CHR$(10) + CHR$(10) + "SCREEN(320, 240, ""Hello World"", 2)" + CHR$(10) + CHR$(10) + "DIM hero AS SPRITE" + CHR$(10) + "hero = SPRITE_NEW(LOADIMAGE(""assets/hero.png""), 16, 16)" + CHR$(10) + "SPRITE_SET_POS(hero, 100.0, 100.0)" + CHR$(10) + CHR$(10) + "WHILE NOT QUITREQUESTED()" + CHR$(10) + "    CLS()" + CHR$(10) + "    SPRITE_DRAW(hero)" + CHR$(10) + "    FLIP()" + CHR$(10) + "WEND"
+
+SUB startseite(sprache AS STRING)
+    DIM en AS BOOLEAN : en = sprache = "en"
+    DIM q AS STRING : q = CHR$(34)
+    DIM pfad AS STRING : pfad = IIF(en, "index.html", "de.html")
+    DIM titel AS STRING
+    DIM beschreibung AS STRING
+    IF en THEN
+        titel = "Drachenhauch – a modern BASIC for games and desktop apps"
+        beschreibung = "Drachenhauch is a modern BASIC programming language for 2D/3D games and GUI desktop applications, with its own IDE and editors. Windows, macOS, Linux and the browser."
+    ELSE
+        titel = "Drachenhauch – ein modernes BASIC für Spiele und Anwendungen"
+        beschreibung = "Drachenhauch ist eine moderne BASIC-Programmiersprache für 2D/3D-Spiele und Anwendungen mit Oberfläche, mit eigener IDE und Editoren. Windows, macOS, Linux und Browser."
+    END IF
+    ' strukturierte Angaben fuer Suchmaschinen (schema.org)
+    DIM ld AS STRING
+    ld = "<script type=" + q + "application/ld+json" + q + ">" + CHR$(10)
+    ld = ld + "{" + q + "@context" + q + ": " + q + "https://schema.org" + q + ", " + q + "@type" + q + ": " + q + "ComputerLanguage" + q + ", "
+    ld = ld + q + "name" + q + ": " + q + "Drachenhauch" + q + ", " + q + "url" + q + ": " + q + adresse + q + ", "
+    ld = ld + q + "description" + q + ": " + q + beschreibung + q + ", " + q + "sameAs" + q + ": [" + q + REPO + q + "]}" + CHR$(10) + "</script>" + CHR$(10)
+    DIM h AS STRING : h = kopf$(sprache, titel, beschreibung, pfad, IIF(en, "de.html", "index.html"), "", ld)
+    h = h + "<main class=" + q + "start" + q + ">" + CHR$(10)
+    h = h + "<section class=" + q + "held" + q + "><img class=" + q + "schriftzug" + q + " src=" + q + "bilder/schriftzug.png" + q + " alt=" + q + "Drachenhauch" + q + " width=" + q + "560" + q + ">" + CHR$(10)
+    IF en THEN
+        h = h + "<p class=" + q + "spruch" + q + ">Let your ideas breathe fire.</p>" + CHR$(10)
+        h = h + "<h1>A modern BASIC for games and desktop applications</h1>" + CHR$(10)
+        h = h + "<p><strong>Drachenhauch</strong> (German for <em>dragon's breath</em>) is a programming language for writing <strong>2D and 3D games and desktop applications with a GUI</strong> — and the command-line tools and small services that go with them. It comes with its own IDE, form designer and sprite, tilemap and sound editors, and turns a program into a standalone <code>.exe</code> with one command. Windows, macOS and Linux, and the browser via WebAssembly.</p>" + CHR$(10)
+        h = h + "<p>A BASIC in the spirit of QB64, FreeBASIC or Blitz Basic, with the batteries of PICO-8 or LÖVE for games and the forms and tables of Visual Basic for applications — easy to start with, strict enough to grow up with.</p>" + CHR$(10)
+        h = h + "<p class=" + q + "knoepfe" + q + "><a class=" + q + "knopf" + q + " href=" + q + REPO + "/releases/latest" + q + ">Download</a><a class=" + q + "knopf zweit" + q + " href=" + q + "en/index.html" + q + ">Read the manual</a><a class=" + q + "knopf zweit" + q + " href=" + q + "en/umstieg.html" + q + ">Coming from another BASIC?</a></p>" + CHR$(10)
+    ELSE
+        h = h + "<p class=" + q + "spruch" + q + ">Feuer frei für deine Ideen.</p>" + CHR$(10)
+        h = h + "<h1>Ein modernes BASIC für Spiele und Anwendungen</h1>" + CHR$(10)
+        h = h + "<p><strong>Drachenhauch</strong> ist eine Programmiersprache für <strong>2D- und 3D-Spiele und Anwendungen mit grafischer Oberfläche</strong> — und für die Kommandozeilen-Werkzeuge und kleinen Dienste, die dazugehören. Mit eigener Entwicklungsumgebung, Form-Designer, Sprite-, Karten- und Klang-Editoren; ein Befehl macht aus einem Programm eine eigenständige <code>.exe</code>. Windows, macOS und Linux und als WebAssembly im Browser.</p>" + CHR$(10)
+        h = h + "<p>Ein BASIC im Geist von QB64, FreeBASIC oder Blitz Basic, mit dem Werkzeugkasten von PICO-8 oder LÖVE für Spiele und den Formularen und Tabellen von Visual Basic für Anwendungen — leicht anzufangen, streng genug, um damit zu wachsen.</p>" + CHR$(10)
+        h = h + "<p class=" + q + "knoepfe" + q + "><a class=" + q + "knopf" + q + " href=" + q + REPO + "/releases/latest" + q + ">Herunterladen</a><a class=" + q + "knopf zweit" + q + " href=" + q + "de/index.html" + q + ">Zum Handbuch</a><a class=" + q + "knopf zweit" + q + " href=" + q + "de/umstieg.html" + q + ">Umstieg aus einem anderen BASIC</a></p>" + CHR$(10)
+    END IF
+    h = h + "</section>" + CHR$(10)
+    h = h + "<section><pre><code class=" + q + "language-basic" + q + ">" + code$(BEISPIEL, "basic") + "</code></pre></section>" + CHR$(10)
+    h = h + "<section><h2>" + IIF(en, "What it can do", "Was damit geht") + "</h2><div class=" + q + "galerie" + q + ">" + CHR$(10)
+    DIM b AS INTEGER
+    FOR b = 0 TO LEN(beispiele) - 1
+        DIM bt AS STRING : bt = IIF(en, beispielEn[b], beispielDe[b])
+        h = h + "<a href=" + q + REPO + "/blob/main/examples/" + beispiele[b] + ".dh" + q + "><img src=" + q + "bilder/" + beispiele[b] + ".png" + q + " alt=" + q + esc$(bt) + q + " loading=" + q + "lazy" + q + "><span>" + esc$(bt) + "</span></a>" + CHR$(10)
+    NEXT
+    h = h + "</div></section>" + CHR$(10)
+    IF en THEN
+        h = h + "<section><h2>What is in the box</h2><ul>" + CHR$(10)
+        h = h + "<li><strong>The language:</strong> BASIC with strict typing, classes, lambdas, coroutines, modules and packages; a compiler with machine code (Cranelift) for hot loops.</li>" + CHR$(10)
+        h = h + "<li><strong>Games:</strong> 2D and 3D graphics (raylib), shaders, sprites, Tiled maps, particles, 2D/3D physics (Rapier), sound and music with effects (Kira), gamepads.</li>" + CHR$(10)
+        h = h + "<li><strong>Applications:</strong> windows, forms, tables, trees, a form designer, SQLite, PostgreSQL and MySQL, PDF and printing, screen readers.</li>" + CHR$(10)
+        h = h + "<li><strong>Tools:</strong> an IDE with debugger and profiler, editors for sprites, tilemaps, particles, sound effects, music (tracker and score) — all written in Drachenhauch itself.</li>" + CHR$(10)
+        h = h + "<li><strong>Reach:</strong> network, HTTP, MQTT, serial ports, MIDI, Arduino (Firmata), foreign C libraries; export as a standalone program, or WebAssembly for the browser.</li>" + CHR$(10)
+        h = h + "</ul></section>" + CHR$(10)
+        h = h + "<section><h2>See it run</h2><p><a href=" + q + "https://hasoschno70.github.io/Nachtflug/" + q + ">Nachtflug (Night Flight)</a> — a trance demo in Drachenhauch: music, sounds and pictures all made by one program, running in your browser.</p></section>" + CHR$(10)
+    ELSE
+        h = h + "<section><h2>Was dabei ist</h2><ul>" + CHR$(10)
+        h = h + "<li><strong>Die Sprache:</strong> BASIC mit strenger Typisierung, Klassen, Lambdas, Koroutinen, Modulen und Paketen; ein Übersetzer mit Maschinencode (Cranelift) für heiße Schleifen.</li>" + CHR$(10)
+        h = h + "<li><strong>Spiele:</strong> 2D- und 3D-Grafik (raylib), Shader, Sprites, Tiled-Karten, Partikel, 2D/3D-Physik (Rapier), Ton und Musik mit Effekten (Kira), Gamepads.</li>" + CHR$(10)
+        h = h + "<li><strong>Anwendungen:</strong> Fenster, Formulare, Tabellen, Bäume, ein Form-Designer, SQLite, PostgreSQL und MySQL, PDF und Drucken, Bildschirmleser.</li>" + CHR$(10)
+        h = h + "<li><strong>Werkzeuge:</strong> eine IDE mit Debugger und Profiler, Editoren für Sprites, Karten, Partikel, Klangeffekte, Musik (Tracker und Notenblatt) — alle selbst in Drachenhauch geschrieben.</li>" + CHR$(10)
+        h = h + "<li><strong>Anschluss:</strong> Netzwerk, HTTP, MQTT, serielle Schnittstellen, MIDI, Arduino (Firmata), fremde C-Bibliotheken; Ausgabe als eigenständiges Programm oder als WebAssembly für den Browser.</li>" + CHR$(10)
+        h = h + "</ul></section>" + CHR$(10)
+        h = h + "<section><h2>In Aktion</h2><p><a href=" + q + "https://hasoschno70.github.io/Nachtflug/" + q + ">Nachtflug</a> — eine Trance-Demo in Drachenhauch: Musik, Geräusche und Bilder aus einem einzigen Programm, im Browser.</p></section>" + CHR$(10)
+    END IF
+    h = h + "</main>" + CHR$(10)
+    schreiben(pfad, h + fuss$(sprache))
+END SUB
+
+' --- Aussehen ---------------------------------------------------------------
+DIM STIL AS STRING : STIL = ":root{--grund:#fbfaf7;--text:#1d1b22;--leise:#5d5866;--akzent:#c2410c;--fl:#f1eee8;--rand:#e2ddd3;--code:#16141c;--codetext:#ece8f4}" _
+    + "@media (prefers-color-scheme:dark){:root{--grund:#131118;--text:#e9e5ef;--leise:#a39cad;--akzent:#fb923c;--fl:#1d1a24;--rand:#2e2a36;--code:#0c0b10;--codetext:#ece8f4}}" _
+    + "*{box-sizing:border-box}body{margin:0;background:var(--grund);color:var(--text);font:17px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif}" _
+    + "a{color:var(--akzent)}img{max-width:100%;height:auto}" _
+    + ".leiste{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 20px;border-bottom:1px solid var(--rand);position:sticky;top:0;background:var(--grund);z-index:2;flex-wrap:wrap}" _
+    + ".marke{display:flex;align-items:center;gap:8px;font-weight:700;color:var(--text);text-decoration:none}.leiste nav{display:flex;gap:16px;flex-wrap:wrap}.leiste nav a{color:var(--text);text-decoration:none}.leiste nav a:hover{color:var(--akzent)}" _
+    + ".seite,.start{max-width:980px;margin:0 auto;padding:24px 20px 48px}" _
+    + "h1,h2,h3,h4{line-height:1.25;margin:1.6em 0 .5em}h1{font-size:2rem;margin-top:.6em}h2{border-bottom:1px solid var(--rand);padding-bottom:.2em}" _
+    + "code{font:.88em/1.5 ui-monospace,Consolas,'Cascadia Mono',monospace;background:var(--fl);padding:.1em .3em;border-radius:4px}" _
+    + "pre{background:var(--code);color:var(--codetext);padding:14px 16px;border-radius:8px;overflow-x:auto}pre code{background:none;padding:0;color:inherit;font-size:.86em}" _
+    + ".k-schluessel{color:#ff9f6b;font-weight:600}.k-text{color:#a5e3a0}.k-zahl{color:#f7d774}.k-kommentar{color:#8b8698;font-style:italic}" _
+    + ".tabelle{overflow-x:auto}table{border-collapse:collapse;margin:1em 0;font-size:.95em}th,td{border:1px solid var(--rand);padding:6px 10px;vertical-align:top;text-align:left}thead th{background:var(--fl)}" _
+    + "blockquote{margin:1em 0;padding:.4em 1em;border-left:4px solid var(--akzent);background:var(--fl);border-radius:0 6px 6px 0}" _
+    + ".held{text-align:center;padding-top:20px}.schriftzug{width:min(560px,90%)}.spruch{font-size:1.2rem;color:var(--leise);margin:0}.held h1{margin-top:.4em}.held p{text-align:left}.held p.spruch{text-align:center}" _
+    + ".knoepfe{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}.knopf{display:inline-block;padding:10px 20px;border-radius:999px;background:var(--akzent);color:#fff;text-decoration:none;font-weight:600}.knopf.zweit{background:none;color:var(--akzent);border:2px solid var(--akzent)}" _
+    + ".galerie{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}.galerie a{display:block;text-decoration:none;color:var(--text)}.galerie img{border-radius:8px;display:block;aspect-ratio:4/3;object-fit:cover;width:100%}.galerie span{display:block;padding:4px 2px;font-weight:600}" _
+    + ".quelle{margin-top:3em;font-size:.9em}.fuss{border-top:1px solid var(--rand);text-align:center;color:var(--leise);font-size:.9em;padding:10px 20px}"
+
+' --- llms.txt ---------------------------------------------------------------
+FUNCTION llms$() AS STRING
+    DIM nl AS STRING : nl = CHR$(10)
+    DIM t AS STRING
+    t = "# Drachenhauch" + nl + nl
+    t = t + "> Drachenhauch is a modern BASIC programming language for 2D/3D games and desktop GUI applications. It has strict (Pascal-like) typing, classes, lambdas and modules, its own IDE and editors written in Drachenhauch, and a native runtime (dhrt, written in Rust on raylib and Kira) for Windows, macOS and Linux, plus WebAssembly for the browser." + nl + nl
+    t = t + "Key facts:" + nl
+    t = t + "- Source files end in `.dh`; programs run with `dhrt run file.dh` and are exported to a standalone executable with `dhrt --export file.dh`." + nl
+    t = t + "- Comparable to QB64, FreeBASIC and Blitz Basic (language), PICO-8 and LÖVE (games) and Visual Basic (forms and tables)." + nl
+    t = t + "- Built-in modules for 2D/3D graphics, sound and music, physics, GUI (windows, forms, tables, form designer), SQLite/PostgreSQL/MySQL, PDF and printing, networking, HTTP, MQTT, serial ports and MIDI." + nl
+    t = t + "- Keywords and built-in names are case-insensitive; string escapes only in `!" + CHR$(34) + "...\n" + CHR$(34) + "` strings; `MID$` and `INSTR` count from 0." + nl
+    t = t + "- Source code and releases: " + REPO + nl + nl
+    t = t + "## Manual" + nl + nl
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(namen) - 1
+        DIM n AS STRING : n = namen[i]
+        t = t + "- [" + MAPGET(titelEn, n) + "](" + adresse + "en/" + n + ".md)"
+        IF MAPGET(beschreibungEn, n) <> "" THEN t = t + ": " + MAPGET(beschreibungEn, n)
+        t = t + nl
+    NEXT
+    t = t + nl + "## Optional" + nl + nl
+    t = t + "- [The whole English manual in one file](" + adresse + "llms-full.txt)" + nl
+    t = t + "- [German manual](" + adresse + "de/index.html): the original, the English one is its translation" + nl
+    t = t + "- [Nachtflug](https://hasoschno70.github.io/Nachtflug/): a demo written in Drachenhauch, running in the browser" + nl
+    RETURN t
+END FUNCTION
+
+' === Bauen ==================================================================
+ordnerAnlegen(ziel)
+ordnerAnlegen(PATHJOIN(ziel, "en"))
+ordnerAnlegen(PATHJOIN(ziel, "de"))
+ordnerAnlegen(PATHJOIN(ziel, "bilder"))
+
+DIM ni AS INTEGER
+DIM voll AS STRING
+FOR ni = 0 TO LEN(namen) - 1
+    handbuchSeite(namen[ni], "en")
+    handbuchSeite(namen[ni], "de")
+    ' die englische Quelle daneben, fuer llms.txt
+    DIM md AS STRING : md = lesen$(PATHJOIN(wurzel, "docs", "en", namen[ni] + ".md"))
+    WRITEALL(PATHJOIN(ziel, "en", namen[ni] + ".md"), md + CHR$(10))
+    voll = voll + md + CHR$(10) + CHR$(10) + "---" + CHR$(10) + CHR$(10)
+NEXT
+startseite("en")
+startseite("de")
+WRITEALL(PATHJOIN(ziel, "stil.css"), STIL + CHR$(10))
+WRITEALL(PATHJOIN(ziel, "llms.txt"), llms$())
+WRITEALL(PATHJOIN(ziel, "llms-full.txt"), voll)
+WRITEALL(PATHJOIN(ziel, "robots.txt"), "User-agent: *" + CHR$(10) + "Allow: /" + CHR$(10) + CHR$(10) + "Sitemap: " + adresse + "sitemap.xml" + CHR$(10))
+WRITEALL(PATHJOIN(ziel, ".nojekyll"), "")
+
+' Bilder: Logo, Schriftzug, die Beispiele der Startseite
+SUB bildKopieren(von AS STRING, nach AS STRING)
+    IF FILEEXISTS(von) THEN COPYFILE(von, PATHJOIN(ziel, "bilder", nach))
+END SUB
+bildKopieren(PATHJOIN(wurzel, "daten", "bilder", "logo.png"), "logo.png")
+bildKopieren(PATHJOIN(wurzel, "daten", "bilder", "schriftzug.png"), "schriftzug.png")
+DIM bi AS INTEGER
+FOR bi = 0 TO LEN(beispiele) - 1
+    bildKopieren(PATHJOIN(wurzel, "examples", "screenshots", beispiele[bi] + ".png"), beispiele[bi] + ".png")
+NEXT
+
+' sitemap.xml
+DIM sm AS STRING
+sm = "<?xml version=" + CHR$(34) + "1.0" + CHR$(34) + " encoding=" + CHR$(34) + "UTF-8" + CHR$(34) + "?>" + CHR$(10)
+sm = sm + "<urlset xmlns=" + CHR$(34) + "http://www.sitemaps.org/schemas/sitemap/0.9" + CHR$(34) + ">" + CHR$(10)
+DIM gi AS INTEGER
+FOR gi = 0 TO LEN(gebaut) - 1
+    sm = sm + "<url><loc>" + adresse + gebaut[gi] + "</loc><lastmod>" + DATE$() + "</lastmod></url>" + CHR$(10)
+NEXT
+sm = sm + "</urlset>" + CHR$(10)
+WRITEALL(PATHJOIN(ziel, "sitemap.xml"), sm)
+
+PRINT "Website: "; LEN(gebaut); " Seiten ("; LEN(namen); " Handbuchseiten je Sprache) -> "; ziel

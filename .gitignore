@@ -84,3 +84,6 @@ buch-tippspiel/code/*_dist/
 # und bleiben liegen, wenn ein Lauf abbricht. Der Qt-Testlauf beendet seine
 # Prozesse per os._exit(), das `finally`-Aufraeumen laeuft dort also nie.
 _dhtmp_*.dh
+
+# Website (tools/website.dh)
+/_site/
