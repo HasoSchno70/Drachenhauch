@@ -59,9 +59,10 @@ Je Punkt: was zu tun ist, was davon vorbereitet werden kann, was es bringt.
 
 ## Zu entscheiden
 
-- **Lizenz:** das README nennt "Private". Ohne freie Lizenz nennen viele
-  Listen und Paketquellen eine Sprache nicht (awesome-Listen verlangen oft
-  Open Source, winget nicht). Eine Entscheidung des Nutzers.
+- ~~**Lizenz**~~ -- entschieden am 2026-10-28: MIT oder Apache 2.0 nach
+  Wahl (`LICENSE-MIT`, `LICENSE-APACHE`, im Installer `LIZENZ.txt` statt der
+  EULA-Vorlage). Damit kommt Drachenhauch auch in Listen, die Open Source
+  verlangen.
 - **Name:** "Drachenhauch" ist für englische Leser schwer zu tippen; die
   Website sagt einmal "German for dragon's breath". Ein englischer Beiname
   wäre eine Möglichkeit, ist aber nicht nötig.

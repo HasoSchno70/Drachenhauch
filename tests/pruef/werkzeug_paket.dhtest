@@ -50,7 +50,7 @@ PRINT "bilder "; FILEEXISTS(d + "/daten/bilder/logo.png"); " "; FILEEXISTS(d + "
 PRINT "starter ohne CR "; ohneCR(d + "/drachenhauch")
 PRINT "install.sh ohne CR "; ohneCR(d + "/install.sh")
 PRINT "starter beginnt mit sh "; (LEFT$(READLINES(d + "/drachenhauch")[0], 9) = "#!/bin/sh")
-PRINT "lizenzvertrag "; FILEEXISTS(d + "/EULA.txt")
+PRINT "lizenzvertrag "; FILEEXISTS(d + "/LIZENZ.txt")
 ' Das Symbol ist das aus installer/symbole/ -- kopiert, nicht erzeugt.
 PRINT "symbol "; (BUFFER_TO_HEX$(READALL_BYTES(d + "/drachenhauch.png")) = BUFFER_TO_HEX$(READALL_BYTES(ARG$(1) + "/installer/symbole/drachenhauch.png")))
 IF PROCESS_CODE(p) <> 0 THEN PRINT aus

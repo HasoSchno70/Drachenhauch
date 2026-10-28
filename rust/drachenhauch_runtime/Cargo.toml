@@ -6,6 +6,7 @@ name = "drachenhauch_runtime"
 # das. (Cargo verlangt drei Stellen, das Projekt nennt sich "2026.37".)
 version = "2026.37.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
 description = "Drachenhauch runtime (Rust): compiles and runs Drachenhauch programs -- games, GUI applications and command-line tools."
 
 [[bin]]

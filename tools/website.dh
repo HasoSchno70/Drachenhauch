@@ -584,7 +584,9 @@ FUNCTION fuss$(sprache AS STRING) AS STRING
     DIM q AS STRING : q = CHR$(34)
     DIM f AS STRING
     f = "<footer class=" + q + "fuss" + q + "><p>Drachenhauch · <a href=" + q + REPO + q + ">github.com/HasoSchno70/Drachenhauch</a> · "
-    f = f + IIF(sprache = "en", "made by Hans Schnorrenberger", "von Hans Schnorrenberger") + "</p></footer>" + CHR$(10) + "</body>" + CHR$(10) + "</html>" + CHR$(10)
+    f = f + IIF(sprache = "en", "made by Hans Schnorrenberger", "von Hans Schnorrenberger") + " · "
+    f = f + IIF(sprache = "en", "open source, ", "Open Source, ") + "<a href=" + q + REPO + "/blob/main/LICENSE-MIT" + q + ">MIT</a> " + IIF(sprache = "en", "or", "oder")
+    f = f + " <a href=" + q + REPO + "/blob/main/LICENSE-APACHE" + q + ">Apache 2.0</a></p></footer>" + CHR$(10) + "</body>" + CHR$(10) + "</html>" + CHR$(10)
     RETURN f
 END FUNCTION
 
@@ -728,6 +730,7 @@ FUNCTION llms$() AS STRING
     t = t + "- Comparable to QB64, FreeBASIC and Blitz Basic (language), PICO-8 and LÖVE (games) and Visual Basic (forms and tables)." + nl
     t = t + "- Built-in modules for 2D/3D graphics, sound and music, physics, GUI (windows, forms, tables, form designer), SQLite/PostgreSQL/MySQL, PDF and printing, networking, HTTP, MQTT, serial ports and MIDI." + nl
     t = t + "- Keywords and built-in names are case-insensitive; string escapes only in `!" + CHR$(34) + "...\n" + CHR$(34) + "` strings; `MID$` and `INSTR` count from 0." + nl
+    t = t + "- Open source under the MIT or Apache 2.0 license; programs written with it may be distributed and sold, including the runtime." + nl
     t = t + "- Source code and releases: " + REPO + nl + nl
     t = t + "## Manual" + nl + nl
     DIM i AS INTEGER
