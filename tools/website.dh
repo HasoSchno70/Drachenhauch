@@ -685,7 +685,7 @@ SUB startseite(sprache AS STRING)
         h = h + "<li><strong>Tools:</strong> an IDE with debugger and profiler, editors for sprites, tilemaps, particles, sound effects, music (tracker and score) — all written in Drachenhauch itself.</li>" + CHR$(10)
         h = h + "<li><strong>Reach:</strong> network, HTTP, MQTT, serial ports, MIDI, Arduino (Firmata), foreign C libraries; export as a standalone program, or WebAssembly for the browser.</li>" + CHR$(10)
         h = h + "</ul></section>" + CHR$(10)
-        h = h + "<section><h2>See it run</h2><p><a href=" + q + "https://hasoschno70.github.io/Nachtflug/" + q + ">Nachtflug (Night Flight)</a> — a trance demo in Drachenhauch: music, sounds and pictures all made by one program, running in your browser.</p></section>" + CHR$(10)
+        h = h + "<section><h2>See it run</h2><p><a href=" + q + "https://hasoschno70.github.io/Nachtflug/" + q + ">Nachtflug (Night Flight)</a> — a trance demo in Drachenhauch: music, sounds and pictures all made by one program, running in your browser.</p><p><a href=" + q + "https://hasoschno70.github.io/Lichterglanz/" + q + ">Lichterglanz (Glow of Lights)</a> — a Christmas demo: from the Advent wreath to the star above the tree, festive electronic music and falling snow.</p></section>" + CHR$(10)
     ELSE
         h = h + "<section><h2>Was dabei ist</h2><ul>" + CHR$(10)
         h = h + "<li><strong>Die Sprache:</strong> BASIC mit strenger Typisierung, Klassen, Lambdas, Koroutinen, Modulen und Paketen; ein Übersetzer mit Maschinencode (Cranelift) für heiße Schleifen.</li>" + CHR$(10)
@@ -694,7 +694,7 @@ SUB startseite(sprache AS STRING)
         h = h + "<li><strong>Werkzeuge:</strong> eine IDE mit Debugger und Profiler, Editoren für Sprites, Karten, Partikel, Klangeffekte, Musik (Tracker und Notenblatt) — alle selbst in Drachenhauch geschrieben.</li>" + CHR$(10)
         h = h + "<li><strong>Anschluss:</strong> Netzwerk, HTTP, MQTT, serielle Schnittstellen, MIDI, Arduino (Firmata), fremde C-Bibliotheken; Ausgabe als eigenständiges Programm oder als WebAssembly für den Browser.</li>" + CHR$(10)
         h = h + "</ul></section>" + CHR$(10)
-        h = h + "<section><h2>In Aktion</h2><p><a href=" + q + "https://hasoschno70.github.io/Nachtflug/" + q + ">Nachtflug</a> — eine Trance-Demo in Drachenhauch: Musik, Geräusche und Bilder aus einem einzigen Programm, im Browser.</p></section>" + CHR$(10)
+        h = h + "<section><h2>In Aktion</h2><p><a href=" + q + "https://hasoschno70.github.io/Nachtflug/" + q + ">Nachtflug</a> — eine Trance-Demo in Drachenhauch: Musik, Geräusche und Bilder aus einem einzigen Programm, im Browser.</p><p><a href=" + q + "https://hasoschno70.github.io/Lichterglanz/" + q + ">Lichterglanz</a> — eine Weihnachtsdemo: vom Adventskranz bis zum Stern über der Stube, festlich-elektronische Musik und Schnee, der liegen bleibt.</p></section>" + CHR$(10)
     END IF
     h = h + "</main>" + CHR$(10)
     schreiben(pfad, h + fuss$(sprache))
@@ -744,6 +744,7 @@ FUNCTION llms$() AS STRING
     t = t + "- [The whole English manual in one file](" + adresse + "llms-full.txt)" + nl
     t = t + "- [German manual](" + adresse + "de/index.html): the original, the English one is its translation" + nl
     t = t + "- [Nachtflug](https://hasoschno70.github.io/Nachtflug/): a demo written in Drachenhauch, running in the browser" + nl
+    t = t + "- [Lichterglanz](https://hasoschno70.github.io/Lichterglanz/): a Christmas demo written in Drachenhauch, running in the browser" + nl
     RETURN t
 END FUNCTION
 

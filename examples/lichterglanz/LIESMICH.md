@@ -5,6 +5,8 @@ Minuten Musik und Bild aus einem Programm, ohne eine einzige Klang- oder
 Bilddatei. Die Reise geht über den Adventskranz: zu jeder Kerze ein Kapitel,
 und am Heiligabend durchs Fenster in die Stube.
 
+Im Browser: https://hasoschno70.github.io/Lichterglanz/
+
 ```
 dhrt run main.dh                     # im Vollbild, von vorn
 dhrt run main.dh -- --fenster        # im Fenster
