@@ -351,6 +351,108 @@ e 32 1 341 0 0 0
 --- inhalt _programm/probe.txt
 |curC 1 curR 2|
 
+=== ein pattern bekommt einen namen
+' [Umbenennen] fragt nach dem Namen (Vorgabe markiert), Strg+V setzt ihn ein,
+' Enter uebernimmt -- der Name steht in der Liste und ist ein Schritt.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+IF bildNr = 3 THEN
+    CLIPBOARD_SET("Refrain")
+    DIM prOx AS INTEGER : prOx = GUI_CANVAS_X(gitter) - GUI_GET_X(gitter)
+    DIM prOy AS INTEGER : prOy = GUI_CANVAS_Y(gitter) - GUI_GET_Y(gitter)
+    DIM x AS INTEGER : x = prOx + GUI_GET_X(bPatUmb) + GUI_GET_W(bPatUmb) \ 2
+    DIM y AS INTEGER : y = prOy + GUI_GET_Y(bPatUmb) + GUI_GET_H(bPatUmb) \ 2
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c 12" + CHR$(10)
+    t = t + "e 0 7 0 0 0 0" + CHR$(10)
+    t = t + "e 5 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
+    t = t + "e 6 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
+    t = t + "e 6 6 0 0 0 0" + CHR$(10)
+    t = t + "e 7 5 0 0 0 0" + CHR$(10)
+    t = t + "e 20 2 341 0 0 0" + CHR$(10)
+    t = t + "e 21 2 86 0 0 0" + CHR$(10)
+    t = t + "e 22 1 86 0 0 0" + CHR$(10)
+    t = t + "e 23 1 341 0 0 0" + CHR$(10)
+    t = t + "e 30 2 257 0 0 0" + CHR$(10)
+    t = t + "e 31 1 257 0 0 0" + CHR$(10)
+    WRITEALL("umb.txt", t)
+    AUTOMATION_PLAY("umb.txt")
+END IF
+IF bildNr = 12 THEN prMerke("dialog offen " + prJa$(frageName >= 0))
+prSchreib("name " + patName[0] + " liste " + GUI_DROPDOWN_TEXT(ddPat) + " offen " + prJa$(frageName >= 0) + " dirty " + prJa$(dirty))
+--- umgebung
+DHRT_FRAMES=50
+--- inhalt _programm/probe.txt
+|dialog offen ja|
+|name Refrain liste Refrain (16) offen nein dirty ja|
+
+=== ein klick in die uebersicht waehlt das pattern
+' Die Kachelreihe ueber dem Gitter zeigt den Song in seiner Reihenfolge; ein
+' Klick auf die zweite Kachel zeigt deren Pattern und waehlt sie in der Liste.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+IF bildNr = 3 THEN
+    patternNeu(FALSE)
+    order[1] = 1 : orderAnz = 2 : orderAnzeigen()
+    patternWaehlen(0)
+    prMerke("vorher pattern " + STR$(patAkt))
+    DIM x AS INTEGER : x = GUI_CANVAS_X(uebersicht) + 4 + 1 * (KACHEL_B + 6) + KACHEL_B \ 2
+    DIM y AS INTEGER : y = GUI_CANVAS_Y(uebersicht) + GUI_CANVAS_H(uebersicht) \ 2
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c 5" + CHR$(10)
+    t = t + "e 0 7 0 0 0 0" + CHR$(10)
+    t = t + "e 5 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
+    t = t + "e 6 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
+    t = t + "e 6 6 0 0 0 0" + CHR$(10)
+    t = t + "e 7 5 0 0 0 0" + CHR$(10)
+    WRITEALL("ueb.txt", t)
+    AUTOMATION_PLAY("ueb.txt")
+END IF
+prSchreib("pattern " + STR$(patAkt) + " reihenfolge " + STR$(GUI_LISTBOX_SELECTED(lstOrder)))
+--- umgebung
+DHRT_FRAMES=25
+--- inhalt _programm/probe.txt
+|vorher pattern 0|
+|pattern 1 reihenfolge 1|
+
 === block kopieren und einfuegen
 ' Umschalt+Pfeil waehlt einen Block, Strg+C/Strg+V setzen ihn in Kanal 2.
 SET_WINDOW_POS(-3000, -3000)
