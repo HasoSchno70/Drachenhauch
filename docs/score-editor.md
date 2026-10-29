@@ -28,18 +28,31 @@ maximiert und lässt sich in der Größe ändern.
 ## Aufbau
 
 Oben die Werkzeuge (Dauer, punktiert, Vorzeichen, Modus, Fingersatz-Zahl,
-BPM, Abspielen, In Tracker, +/- Spur) unter dem Menü `Datei`/`Bearbeiten`,
-links je Spur Name, Schlüssel und Instrument (die 18 Werks-Presets des
-Trackers), in der Mitte die Notensysteme — mit den normalen Zeichenbefehlen
-gemalt: fünf Linien, Taktschattierung, Taktstriche, Hilfslinien, Köpfe
-(gefüllt unter der Halben), Hälse, Fähnchen, Balken für Achtel- und
-Sechzehntelläufe gleicher Dauer, Pausen, Bindebögen als `SPLINE`,
-Fingersatz, Staccato-Punkt, eine Vorschau an der Maus und der Spielkopf.
+BPM, Abspielen, In Tracker, +/- Spur) unter dem Menü `Datei`/`Bearbeiten`/
+`Ansicht`, rechts in der Zeile der Statusmeldung die **Notenwerte** als
+Knopfleiste (Ganze bis Sechzehntel und der Punkt), links je Spur Name,
+Schlüssel und Instrument (die 18 Werks-Presets des Trackers), in der Mitte
+die Notensysteme mit Schlüssel und Taktart 4/4, Taktschattierung,
+Taktstrichen samt Taktnummer, Hilfslinien, Köpfen, Hälsen, Fähnchen, Balken
+für Achtel- und Sechzehntelläufe gleicher Dauer, Pausen nach ihrer Dauer,
+Augmentationspunkten, Bindebögen als `SPLINE`, Fingersatz, Staccato-Punkt,
+einer Vorschau an der Maus, der **Eingabemarke** (blauer Strich) und dem
+Spielkopf; unten eine **Klaviatur** über drei Oktaven.
 
-**Schlüssel und Vorzeichen sind selbst gezeichnet** (Kurve durch feste
-Punkte, Kreuz aus vier Strichen, B als eigene Form): die Notenzeichen der
-Symbolschriften kamen als Fragezeichen an, und ein Fragezeichen am
-Zeilenanfang ist schlimmer als eine schlichte Form.
+**Schlüssel, Notenköpfe, Pausen und Vorzeichen kommen aus der Notenschrift
+Noto Music** (`examples/assets/NotoMusic-Regular.ttf`, SIL Open Font
+License, siehe `examples/assets/CREDITS_notomusic.txt`), geladen mit
+`LOADFONT` samt der gebrauchten Zeichen. Gesetzt wird jede Glyphe über ihre
+Maße in Font-Einheiten: ein Notenkopf ist 270 Einheiten hoch, also ein
+Linienabstand — daraus folgt der Maßstab, der G-Schlüssel sitzt mit seiner
+Schnecke auf der G-Linie, der F-Schlüssel mit den Punkten um die F-Linie.
+Fehlt die Datei (eine Kopie des Programms ohne den `assets`-Ordner), zeichnet
+das Notenblatt die Formen selbst wie bisher. Die Oberfläche schreibt DejaVu
+Sans, die Taktart DejaVu Serif fett.
+
+Das Blatt hat einen **Zoom** (Strg+Plus/Minus, Strg+0, Strg+Mausrad, Menü
+`Ansicht`); beim Start und nach dem Vergrößern des Fensters richtet er sich
+nach der Fensterhöhe (800 Punkte = 100 %), bis man selbst zoomt.
 
 ## Bedienung
 
@@ -60,6 +73,10 @@ Zeilenanfang ist schlimmer als eine schlichte Form.
 | Rückgängig | Strg+Z / Strg+Y — jede Änderung, der Stand wird als JSON-Text gemerkt |
 | Datei | Strg+N neu, Strg+O öffnen, Strg+S sichern, Strg+Umschalt+S sichern unter, Strg+Q beenden |
 | In Tracker öffnen | Strg+T oder der Knopf (siehe unten) |
+| Noten tippen | An der Eingabemarke: `C D E F G A H` setzen eine Note (mit dem Vorzeichen aus der Klappliste, `B` = das deutsche B) und rücken um die Dauer weiter; die Oktave ist die der vorigen Note nächstgelegene. `P` setzt eine Pause. Ein Klick aufs System setzt die Marke hinter die geklickte Note |
+| Dauer und Korrektur | `1`–`5` = Ganze bis Sechzehntel, `.` punktiert; Pfeil links/rechts bewegt die Marke, Pfeil hoch/runter verschiebt die Note vor der Marke um einen Halbton (mit Strg um eine Oktave), die Rücktaste nimmt sie weg |
+| Klaviatur | Ein Klick setzt den Ton an der Marke; drei Oktaven ab C4 (Bassschlüssel: ab C2), beim Abspielen leuchten die klingenden Tasten in der Farbe ihrer Spur |
+| Zoom | Strg+Plus/Minus, Strg+0, Strg+Mausrad, Menü `Ansicht` |
 
 **Abspielen** läuft auf einer Audio-Uhr (`AUDIO_CLOCK_NEW` +
 `AUDIO_PLAY_AT`, eine Sechzehntel je Tick): alle Noten werden beim Start
@@ -130,7 +147,7 @@ dabei ein Drachenhauch-Programm mit dem `json`-Modul.
 
 Bewusste Vereinfachungen, nicht stillschweigend verschluckt:
 
-- **Festes 4/4-Metrum** — die Oberfläche zeigt und ändert es nicht.
+- **Festes 4/4-Metrum** — die Oberfläche zeigt es, ändert es aber nicht.
 - **Ein Instrument je Spur**, höchstens acht Spuren.
 - **Akkorde werden beim Export reduziert** (ein Tracker-Kanal ist
   einstimmig); ein Klick auf eine Note eines Akkords trifft die erste am

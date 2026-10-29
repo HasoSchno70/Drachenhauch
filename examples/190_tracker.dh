@@ -35,8 +35,12 @@
 '
 '  Nicht portiert (die Qt-Fassung hat es):
 '    Samples anlegen und bearbeiten (WAV/OGG/SF2 laden, Keymap-Dialog,
-'    Loop-Marker); VU-Meter je Kanal; Umbenennen von Patterns; der
-'    Sample-Offset-Effekt.
+'    Loop-Marker); der Sample-Offset-Effekt.
+'
+'  Seit 2026-10-29 dazu: echte Schriften (Mono im Gitter), ein Fenster, das
+'  sich vergroessern laesst, Werkzeug- und Statusleiste, ein Pegel je Kanal,
+'  die Song-Uebersicht als Kachelreihe, Patterns umbenennen und eine
+'  Klaviatur, die die klingenden Noten zeigt.
 '
 '  Was dieser Pilot in der Laufzeit freigelegt hat: AUDIO_NOTE (eine Note
 '  mit Sustain-PEGEL und Ausklingen -- AUDIO_SFX kennt nur drei Zeiten),
@@ -787,6 +791,20 @@ DIM geplantPat[256] AS INTEGER
 DIM geplantRow[256] AS INTEGER
 DIM kopfPat AS INTEGER : kopfPat = -1   ' was gerade klingt
 DIM kopfRow AS INTEGER : kopfRow = -1
+DIM geplantPos[256] AS INTEGER          ' Stelle in der Reihenfolge je Reihe
+DIM kopfPos AS INTEGER : kopfPos = -1
+' Pegel je Kanal: wann (in Ticks der Uhr) die letzte Note angeschlagen
+' wurde, wie laut und welche. Gezeichnet wird daraus ein abklingender
+' Balken -- echte Pegel je Kanal liefert der Mischer nicht, und ein
+' Tracker-VU zeigt ohnehin den ANSCHLAG.
+' Vier Plaetze je Kanal (nach Reihe), weil bis zu zwei Reihen VORAUS
+' geplant wird -- mit einem Platz ueberschriebe die naechste Note den
+' Anschlag, der gerade klingt, und ein Kanal mit Noten in jeder Reihe
+' zeigte nie etwas.
+DIM vuTick[MAX_CH, 4] AS INTEGER
+DIM vuStaerke[MAX_CH, 4] AS FLOAT
+DIM vuNote[MAX_CH, 4] AS INTEGER
+DIM vuLaenge[MAX_CH, 4] AS INTEGER
 ' Beim Rendern in eine Datei laufen dieselben Routinen -- nur das Ziel ist
 ' ein Misch-Puffer statt der Uhr.
 DIM rendern AS BOOLEAN : rendern = FALSE
@@ -870,6 +888,11 @@ SUB reiheAusgeben(p AS INTEGER, r AS INTEGER, tick AS INTEGER, _
             END IF
             lautst = lautst * chVol[c]
             DIM pan AS FLOAT : pan = kanalPan(c, ii)
+            IF NOT rendern THEN
+                DIM vs AS INTEGER : vs = (tick \ TICKS) MOD 4
+                vuTick[c, vs] = tick : vuStaerke[c, vs] = lautst
+                vuNote[c, vs] = n : vuLaenge[c, vs] = ticksL
+            END IF
             DIM f AS INTEGER : f = fx[p, c, r]
             DIM par AS INTEGER : par = fxp[p, c, r]
             DIM t AS INTEGER
@@ -906,7 +929,14 @@ SUB stopp()
         AUDIO_CLOCK_REMOVE(takt)
     END IF
     spielt = FALSE
-    kopfPat = -1 : kopfRow = -1
+    kopfPat = -1 : kopfRow = -1 : kopfPos = -1
+    DIM c AS INTEGER
+    DIM k AS INTEGER
+    FOR c = 0 TO MAX_CH - 1
+        FOR k = 0 TO 3
+            vuStaerke[c, k] = 0.0
+        NEXT
+    NEXT
 END SUB
 
 ' Zwei Reihen voraus planen. Mehr waere bei einer Aenderung im Gitter zu
@@ -918,6 +948,7 @@ SUB planen()
         reiheAusgeben(plPat, plRow, planTick, songModus, plPos)
         geplantPat[(planTick \ TICKS) MOD 256] = plPat
         geplantRow[(planTick \ TICKS) MOD 256] = plRow
+        geplantPos[(planTick \ TICKS) MOD 256] = IIF(songModus, plPos, -1)
         planTick = planTick + TICKS
         plRow = plRow + 1
         IF plRow >= patRows[plPat] THEN
@@ -931,6 +962,7 @@ SUB planen()
     WEND
     kopfPat = geplantPat[(jetzt \ TICKS) MOD 256]
     kopfRow = geplantRow[(jetzt \ TICKS) MOD 256]
+    kopfPos = geplantPos[(jetzt \ TICKS) MOD 256]
 END SUB
 
 SUB starten(song AS BOOLEAN)
@@ -960,7 +992,11 @@ SUB vorhoeren(c AS INTEGER, midi AS INTEGER)
     IF ii >= 0 THEN lautst = lautst * iVol[ii] / 15.0
     DIM s AS INTEGER : s = klangFuer(midi, tks, 0, 0, 0)
     IF s >= 0 THEN AUDIO_PLAY(s, 0, lautst)
+    ' Die Klaviatur zeigt die Taste eine Weile an.
+    tasteMidi = midi : tasteBis = MILLIS() + 350
 END SUB
+DIM tasteMidi AS INTEGER : tasteMidi = -1
+DIM tasteBis AS INTEGER : tasteBis = 0
 
 ' ------------------------------------------------------------ WAV-Ausgabe
 SUB wavRendern(pfad AS STRING)
@@ -1117,100 +1153,108 @@ FUNCTION spur$(c AS INTEGER, welches AS INTEGER) AS STRING
 END FUNCTION
 
 ' ------------------------------------------------------------ Fenster
-CONST SW = 1400
-CONST SH = 840
+' Das Fenster ist groessenveraenderbar: Gitter, Uebersicht und Klaviatur
+' wachsen mit (Anker), die linke Spalte bleibt stehen.
 CONST LINKS = 300
-CONST GRID_Y = 84
+CONST TOP_Y = 84            ' unter Werkzeugleiste und Pattern-Zeile
+CONST UEB_H = 64            ' die Uebersicht ueber dem Gitter
+CONST GRID_Y = TOP_Y + UEB_H + 8
 CONST PIANO_H = 96
-CONST HDR_H = 24
+CONST HDR_H = 34            ' Kanalname + Pegel
 CONST RH_W = 40
-CONST CELL_W = 118
-CONST ROW_H = 20
+CONST CELL_W = 164
+CONST ROW_H = 21
 
-SCREEN(SW, SH, "Drachenhauch - Tracker", 1)
+SCREEN(1600, 960, "Drachenhauch - Tracker", 1)
+WINDOW_RESIZABLE(TRUE)
+WINDOW_MIN_SIZE(1400, 860)
 SETFPS(60)
 GUI_THEME_PRESET("glas_dunkel")
-TEXT_SIZE(16)
+' Echte Schriften statt der Pixelschrift: DejaVu Sans fuer die Oberflaeche,
+' DejaVu Sans Mono fuer das Gitter -- ein Tracker liest sich spaltenweise,
+' und dafuer muss jedes Zeichen gleich breit sein. Beide sind in dhrt
+' eingebettet, also auf jedem System dieselben.
+DIM uiFont AS INTEGER : uiFont = LOADFONT("sans", 32, "▶■")
+DIM monoFont AS INTEGER : monoFont = LOADFONT("mono", 32, "↑↓")
+SETFONT(uiFont, 15)
+DIM SW AS INTEGER : SW = SCREENWIDTH()
+DIM SH AS INTEGER : SH = SCREENHEIGHT()
 
 DIM win AS GUI_WINDOW
 win = GUI_WINDOW("Tracker", 0, 0, SW, SH)
 GUI_WINDOW_CHROME(win, FALSE)
 GUI_WINDOW_MOVABLE(win, FALSE)
 
-' Werkzeugleiste 1: Datei, Tempo, Wiedergabe, Verlauf, Ausgabe
-DIM bNeu AS GUI_WIDGET : bNeu = GUI_BUTTON(win, "Neu", 12, 8, 56, 28)
-DIM bAuf AS GUI_WIDGET : bAuf = GUI_BUTTON(win, "Oeffnen", 72, 8, 78, 28)
-DIM bSpei AS GUI_WIDGET : bSpei = GUI_BUTTON(win, "Sichern", 154, 8, 78, 28)
-DIM bSpeiAls AS GUI_WIDGET : bSpeiAls = GUI_BUTTON(win, "Sichern als", 236, 8, 100, 28)
-DIM lblBpm AS GUI_WIDGET : lblBpm = GUI_LABEL(win, "BPM", 350, 14)
-DIM spBpm AS GUI_WIDGET : spBpm = GUI_SPINNER(win, 386, 8, 80, 40, 300, 120)
-DIM lblKan AS GUI_WIDGET : lblKan = GUI_LABEL(win, "Kanaele", 480, 14)
-DIM spKan AS GUI_WIDGET : spKan = GUI_SPINNER(win, 546, 8, 70, MIN_CH, MAX_CH, 4)
-DIM bPlayPat AS GUI_WIDGET : bPlayPat = GUI_BUTTON(win, "> Pattern", 632, 8, 96, 28)
-DIM bPlaySong AS GUI_WIDGET : bPlaySong = GUI_BUTTON(win, "> Song", 732, 8, 80, 28)
-DIM bStop AS GUI_WIDGET : bStop = GUI_BUTTON(win, "Stopp", 816, 8, 64, 28)
-DIM bZur AS GUI_WIDGET : bZur = GUI_BUTTON(win, "Zurueck", 896, 8, 82, 28)
-GUI_TOOLTIP(bZur, "Strg+Z -- die letzte Aenderung zuruecknehmen")
-DIM bVor AS GUI_WIDGET : bVor = GUI_BUTTON(win, "Vor", 982, 8, 50, 28)
-GUI_TOOLTIP(bVor, "Strg+Y -- wieder herstellen")
-DIM bWav AS GUI_WIDGET : bWav = GUI_BUTTON(win, "WAV ...", 1046, 8, 68, 28)
-GUI_TOOLTIP(bWav, "Den ganzen Song offline mischen und als WAV sichern")
-DIM cbStereo AS GUI_WIDGET : cbStereo = GUI_CHECKBOX(win, "Stereo", 1122, 14, FALSE)
+' Zeile 1: Werkzeugleiste mit Sinnbildern, rechts daneben Tempo, Kanaele
+' und die zwei Schalter fuer die WAV.
+CONST RECHTS_B = 470
+DIM leiste AS GUI_WIDGET : leiste = GUI_TOOLBAR(win, 0, 0, SW - RECHTS_B, 40)
+GUI_SET_ANCHOR(leiste, "lrt")
+GUI_TOOLBAR_SET(leiste, "beschriftung", 1)
+DIM tbNeu AS INTEGER : tbNeu = GUI_TOOLBAR_ADD(leiste, "neu", "Neuer Song", "Neu")
+DIM tbAuf AS INTEGER : tbAuf = GUI_TOOLBAR_ADD(leiste, "oeffnen", "Song öffnen (Strg+O)", "Öffnen")
+DIM tbSpei AS INTEGER : tbSpei = GUI_TOOLBAR_ADD(leiste, "sichern", "Sichern (Strg+S)", "Sichern")
+DIM tbSpeiAls AS INTEGER : tbSpeiAls = GUI_TOOLBAR_ADD(leiste, "datei", "Unter einem neuen Namen sichern", "Als …")
+GUI_TOOLBAR_SEPARATOR(leiste)
+DIM tbPlayPat AS INTEGER : tbPlayPat = GUI_TOOLBAR_ADD(leiste, "start", "Das Pattern abspielen (Leertaste)", "Pattern")
+DIM tbPlaySong AS INTEGER : tbPlaySong = GUI_TOOLBAR_ADD(leiste, "start", "Den ganzen Song abspielen", "Song")
+DIM tbStop AS INTEGER : tbStop = GUI_TOOLBAR_ADD(leiste, "stopp", "Anhalten (Leertaste)", "Stopp")
+GUI_TOOLBAR_SEPARATOR(leiste)
+DIM tbZur AS INTEGER : tbZur = GUI_TOOLBAR_ADD(leiste, "rueckgaengig", "Die letzte Änderung zurücknehmen (Strg+Z)", "Zurück")
+DIM tbVor AS INTEGER : tbVor = GUI_TOOLBAR_ADD(leiste, "wiederholen", "Wiederherstellen (Strg+Y)", "Vor")
+GUI_TOOLBAR_SEPARATOR(leiste)
+DIM tbWav AS INTEGER : tbWav = GUI_TOOLBAR_ADD(leiste, "export", "Den ganzen Song offline mischen und als WAV sichern", "WAV")
+DIM tbCode AS INTEGER : tbCode = GUI_TOOLBAR_ADD(leiste, "kopieren", "Den frame-basierten Live-Player als .dh schreiben", "DH-Code")
+DIM lblBpm AS GUI_WIDGET : lblBpm = GUI_LABEL(win, "BPM", SW - RECHTS_B + 10, 12)
+DIM spBpm AS GUI_WIDGET : spBpm = GUI_SPINNER(win, SW - RECHTS_B + 48, 7, 80, 40, 300, 120)
+DIM lblKan AS GUI_WIDGET : lblKan = GUI_LABEL(win, "Kanäle", SW - RECHTS_B + 140, 12)
+DIM spKan AS GUI_WIDGET : spKan = GUI_SPINNER(win, SW - RECHTS_B + 196, 7, 70, MIN_CH, MAX_CH, 4)
+DIM cbStereo AS GUI_WIDGET : cbStereo = GUI_CHECKBOX(win, "Stereo", SW - RECHTS_B + 280, 12, FALSE)
 GUI_TOOLTIP(cbStereo, "WAV mit Instrument-Pan statt Mono")
-DIM cbAmiga AS GUI_WIDGET : cbAmiga = GUI_CHECKBOX(win, "Amiga", 1204, 14, FALSE)
+DIM cbAmiga AS GUI_WIDGET : cbAmiga = GUI_CHECKBOX(win, "Amiga", SW - RECHTS_B + 370, 12, FALSE)
 GUI_TOOLTIP(cbAmiga, "Kanal 1+4 links, 2+3 rechts -- der Paula-Stereoeindruck")
-DIM bCode AS GUI_WIDGET : bCode = GUI_BUTTON(win, "DH-Code", 1284, 8, 80, 28)
-GUI_TOOLTIP(bCode, "Den frame-basierten Live-Player als .dh schreiben")
+GUI_SET_ANCHOR(lblBpm, "rt") : GUI_SET_ANCHOR(spBpm, "rt") : GUI_SET_ANCHOR(lblKan, "rt")
+GUI_SET_ANCHOR(spKan, "rt") : GUI_SET_ANCHOR(cbStereo, "rt") : GUI_SET_ANCHOR(cbAmiga, "rt")
 
-' Werkzeugleiste 2: Pattern, Oktave, die Zelle unter dem Cursor
-DIM lblPat AS GUI_WIDGET : lblPat = GUI_LABEL(win, "Pattern", 12, 50)
-DIM ddPat AS GUI_WIDGET : ddPat = GUI_DROPDOWN(win, 74, 44, 90, 26, SPLIT$("P1", "|"))
-DIM lblRows AS GUI_WIDGET : lblRows = GUI_LABEL(win, "Reihen", 174, 50)
-DIM spRows AS GUI_WIDGET : spRows = GUI_SPINNER(win, 232, 44, 76, 1, MAX_ROWS, 16)
-DIM bPatNeu AS GUI_WIDGET : bPatNeu = GUI_BUTTON(win, "+", 316, 44, 30, 26)
+' Zeile 2: das Pattern und die Oktave der Tastatur
+DIM lblPat AS GUI_WIDGET : lblPat = GUI_LABEL(win, "Pattern", 12, 52)
+DIM ddPat AS GUI_WIDGET : ddPat = GUI_DROPDOWN(win, 76, 46, 120, 28, SPLIT$("P1", "|"))
+DIM lblRows AS GUI_WIDGET : lblRows = GUI_LABEL(win, "Reihen", 208, 52)
+DIM spRows AS GUI_WIDGET : spRows = GUI_SPINNER(win, 268, 46, 76, 1, MAX_ROWS, 16)
+DIM bPatNeu AS GUI_WIDGET : bPatNeu = GUI_BUTTON(win, "Neu", 356, 46, 62, 28)
 GUI_TOOLTIP(bPatNeu, "Neues Pattern anlegen")
-DIM bPatDup AS GUI_WIDGET : bPatDup = GUI_BUTTON(win, "Dup", 350, 44, 46, 26)
+DIM bPatDup AS GUI_WIDGET : bPatDup = GUI_BUTTON(win, "Kopie", 422, 46, 70, 28)
 GUI_TOOLTIP(bPatDup, "Das aktuelle Pattern kopieren")
-DIM bPatDel AS GUI_WIDGET : bPatDel = GUI_BUTTON(win, "Loesch", 400, 44, 72, 26)
-DIM bPatLeer AS GUI_WIDGET : bPatLeer = GUI_BUTTON(win, "Leeren", 476, 44, 68, 26)
-DIM lblOkt AS GUI_WIDGET : lblOkt = GUI_LABEL(win, "Oktave", 552, 50)
-DIM spOkt AS GUI_WIDGET : spOkt = GUI_SPINNER(win, 610, 44, 64, 1, 7, 4)
-DIM lblZelle AS GUI_WIDGET : lblZelle = GUI_LABEL(win, "Zelle:  Vol", 690, 50)
-DIM spVol AS GUI_WIDGET : spVol = GUI_SPINNER(win, 784, 44, 58, 0, 15, 0)
-GUI_TOOLTIP(spVol, "Lautstaerke der Note 1..15, 0 = Standard")
-DIM lblSlide AS GUI_WIDGET : lblSlide = GUI_LABEL(win, "Slide", 852, 50)
-DIM spSlide AS GUI_WIDGET : spSlide = GUI_SPINNER(win, 896, 44, 66, -12, 12, 0)
-GUI_TOOLTIP(spSlide, "Portamento in Halbtoenen ueber die Notendauer")
-DIM lblFx AS GUI_WIDGET : lblFx = GUI_LABEL(win, "FX", 970, 50)
-DIM ddFx AS GUI_WIDGET : ddFx = GUI_DROPDOWN(win, 994, 44, 62, 26, SPLIT$("-|Arp|Vib|Ret|Off", "|"))
-GUI_TOOLTIP(ddFx, "Arp xy: Akkord +x/+y -- Vib xy: x Hz, Tiefe y -- Ret n: alle n Ticks neu")
-DIM spFxp AS GUI_WIDGET : spFxp = GUI_SPINNER(win, 1060, 44, 70, 0, 255, 0)
-DIM ddZInst AS GUI_WIDGET : ddZInst = GUI_DROPDOWN(win, 1136, 44, 130, 26, SPLIT$("Standard", "|"))
-GUI_TOOLTIP(ddZInst, "Instrument NUR dieser Note (Standard = das des Kanals)")
-DIM bOff AS GUI_WIDGET : bOff = GUI_BUTTON(win, "Note aus", 1272, 44, 86, 26)
-GUI_TOOLTIP(bOff, "Taste 0 -- schneidet die klingende Note hier ab")
+DIM bPatUmb AS GUI_WIDGET : bPatUmb = GUI_BUTTON(win, "Umbenennen …", 496, 46, 124, 28)
+GUI_TOOLTIP(bPatUmb, "Dem Pattern einen Namen geben (Strophe, Refrain …)")
+DIM bPatLeer AS GUI_WIDGET : bPatLeer = GUI_BUTTON(win, "Leeren", 624, 46, 76, 28)
+DIM bPatDel AS GUI_WIDGET : bPatDel = GUI_BUTTON(win, "Löschen", 704, 46, 84, 28)
+GUI_BUTTON_VARIANT(bPatDel, "gefahr")
+DIM lblOkt AS GUI_WIDGET : lblOkt = GUI_LABEL(win, "Oktave der Tastatur", 812, 52)
+DIM spOkt AS GUI_WIDGET : spOkt = GUI_SPINNER(win, 966, 46, 64, 1, 7, 4)
 
 ' Linke Spalte: der Kanal unter dem Cursor
-DIM gKanal AS GUI_WIDGET : gKanal = GUI_GROUPBOX(win, 12, GRID_Y, LINKS - 24, 134, "Kanal")
-DIM lblKanal AS GUI_WIDGET : lblKanal = GUI_LABEL(win, "Kanal 1", 24, GRID_Y + 26)
-DIM ddChInst AS GUI_WIDGET : ddChInst = GUI_DROPDOWN(win, 24, GRID_Y + 48, 252, 26, SPLIT$("Wellenform", "|"))
+CONST KY = TOP_Y
+DIM gKanal AS GUI_WIDGET : gKanal = GUI_GROUPBOX(win, 12, KY, LINKS - 24, 134, "Kanal")
+DIM lblKanal AS GUI_WIDGET : lblKanal = GUI_LABEL(win, "Kanal 1", 24, KY + 26)
+DIM ddChInst AS GUI_WIDGET : ddChInst = GUI_DROPDOWN(win, 24, KY + 48, 252, 26, SPLIT$("Wellenform", "|"))
 GUI_TOOLTIP(ddChInst, "Standard-Klang dieses Kanals")
-DIM ddWave AS GUI_WIDGET : ddWave = GUI_DROPDOWN(win, 24, GRID_Y + 80, 110, 26, wellenformen)
+DIM ddWave AS GUI_WIDGET : ddWave = GUI_DROPDOWN(win, 24, KY + 80, 110, 26, wellenformen)
 GUI_TOOLTIP(ddWave, "Wellenform, wenn der Kanal kein Instrument hat")
-DIM cbMute AS GUI_WIDGET : cbMute = GUI_CHECKBOX(win, "M", 148, GRID_Y + 84, FALSE)
-GUI_TOOLTIP(cbMute, "Stumm")
-DIM cbSolo AS GUI_WIDGET : cbSolo = GUI_CHECKBOX(win, "S", 206, GRID_Y + 84, FALSE)
-GUI_TOOLTIP(cbSolo, "Solo -- nur die Solo-Kanaele klingen")
-DIM slChVol AS GUI_WIDGET : slChVol = GUI_SLIDER(win, 24, GRID_Y + 112, 252, 0, 100, 100)
+DIM cbMute AS GUI_WIDGET : cbMute = GUI_CHECKBOX(win, "Stumm", 148, KY + 84, FALSE)
+GUI_TOOLTIP(cbMute, "Diesen Kanal stumm schalten")
+DIM cbSolo AS GUI_WIDGET : cbSolo = GUI_CHECKBOX(win, "Solo", 222, KY + 84, FALSE)
+GUI_TOOLTIP(cbSolo, "Solo -- nur die Solo-Kanäle klingen")
+DIM slChVol AS GUI_WIDGET : slChVol = GUI_SLIDER(win, 24, KY + 112, 252, 0, 100, 100)
 GUI_TOOLTIP(slChVol, "Mixer-Regler des Kanals")
 
 ' Das Instrument des Kanals -- hier aenderbar, fuer alle Kanaele, die es nutzen
-CONST IY = GRID_Y + 146
+CONST IY = KY + 146
 DIM gInst AS GUI_WIDGET : gInst = GUI_GROUPBOX(win, 12, IY, LINKS - 24, 330, "Instrument")
 DIM lblIName AS GUI_WIDGET : lblIName = GUI_LABEL(win, "-", 24, IY + 26)
 DIM ddIWave AS GUI_WIDGET : ddIWave = GUI_DROPDOWN(win, 24, IY + 48, 110, 26, SPLIT$("square|saw|sine|triangle|noise", "|"))
-DIM lblIVol AS GUI_WIDGET : lblIVol = GUI_LABEL(win, "Vol", 146, IY + 54)
-DIM spIVol AS GUI_WIDGET : spIVol = GUI_SPINNER(win, 180, IY + 48, 96, 1, 15, 15)
+DIM lblIVol AS GUI_WIDGET : lblIVol = GUI_LABEL(win, "Laut", 142, IY + 54)
+DIM spIVol AS GUI_WIDGET : spIVol = GUI_SPINNER(win, 186, IY + 48, 90, 1, 15, 15)
 DIM lblA AS GUI_WIDGET : lblA = GUI_LABEL(win, "Attack ms", 24, IY + 84)
 DIM spA AS GUI_WIDGET : spA = GUI_SPINNER(win, 130, IY + 78, 146, 0, 2000, 0, 5)
 DIM lblD AS GUI_WIDGET : lblD = GUI_LABEL(win, "Decay ms", 24, IY + 114)
@@ -1219,33 +1263,77 @@ DIM lblS AS GUI_WIDGET : lblS = GUI_LABEL(win, "Sustain %", 24, IY + 144)
 DIM spS AS GUI_WIDGET : spS = GUI_SPINNER(win, 130, IY + 138, 146, 0, 100, 100, 5)
 DIM lblR AS GUI_WIDGET : lblR = GUI_LABEL(win, "Release ms", 24, IY + 174)
 DIM spR AS GUI_WIDGET : spR = GUI_SPINNER(win, 130, IY + 168, 146, 0, 4000, 0, 10)
-DIM lblVib AS GUI_WIDGET : lblVib = GUI_LABEL(win, "Vibrato %/Hz", 24, IY + 204)
+DIM lblVib AS GUI_WIDGET : lblVib = GUI_LABEL(win, "Vibrato", 24, IY + 204)
+GUI_TOOLTIP(lblVib, "Tiefe in % und Tempo in Hz")
 DIM spVibD AS GUI_WIDGET : spVibD = GUI_SPINNER(win, 130, IY + 198, 70, 0, 50, 0)
 DIM spVibS AS GUI_WIDGET : spVibS = GUI_SPINNER(win, 206, IY + 198, 70, 0, 15, 0)
 DIM lblDet AS GUI_WIDGET : lblDet = GUI_LABEL(win, "Detune Cent", 24, IY + 234)
 DIM spDet AS GUI_WIDGET : spDet = GUI_SPINNER(win, 130, IY + 228, 146, 0, 60, 0)
-DIM lblPan AS GUI_WIDGET : lblPan = GUI_LABEL(win, "Pan L/R", 24, IY + 264)
+DIM lblPan AS GUI_WIDGET : lblPan = GUI_LABEL(win, "Links/Rechts", 24, IY + 264)
 DIM slPan AS GUI_WIDGET : slPan = GUI_SLIDER(win, 130, IY + 262, 146, -100, 100, 0)
 DIM bINeu AS GUI_WIDGET : bINeu = GUI_BUTTON(win, "+ Instrument", 24, IY + 292, 122, 26)
 GUI_TOOLTIP(bINeu, "Eine Kopie des gezeigten Instruments anlegen")
 DIM bIDel AS GUI_WIDGET : bIDel = GUI_BUTTON(win, "Entfernen", 154, IY + 292, 122, 26)
 
-' Die Reihenfolge der Patterns
-CONST OY = IY + 342
-DIM gOrder AS GUI_WIDGET : gOrder = GUI_GROUPBOX(win, 12, OY, LINKS - 24, SH - OY - 40, "Song (Reihenfolge)")
-DIM lstOrder AS GUI_WIDGET : lstOrder = GUI_LISTBOX(win, 24, OY + 26, 252, SH - OY - 112, SPLIT$("1: P1", "|"))
-DIM bOAdd AS GUI_WIDGET : bOAdd = GUI_BUTTON(win, "+ akt.", 24, SH - 80, 62, 26)
-GUI_TOOLTIP(bOAdd, "Das gezeigte Pattern hinten anhaengen")
-DIM bODel AS GUI_WIDGET : bODel = GUI_BUTTON(win, "entf.", 90, SH - 80, 56, 26)
-DIM bOLinks AS GUI_WIDGET : bOLinks = GUI_BUTTON(win, "<", 150, SH - 80, 40, 26)
-DIM bORechts AS GUI_WIDGET : bORechts = GUI_BUTTON(win, ">", 194, SH - 80, 40, 26)
-DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_LABEL(win, "Bereit.", 12, SH - 26)
+' Die Zelle unter dem Cursor
+CONST ZY = IY + 342
+DIM gZelle AS GUI_WIDGET : gZelle = GUI_GROUPBOX(win, 12, ZY, LINKS - 24, 160, "Zelle")
+DIM lblZelle AS GUI_WIDGET : lblZelle = GUI_LABEL(win, "Lautstärke", 24, ZY + 32)
+DIM spVol AS GUI_WIDGET : spVol = GUI_SPINNER(win, 104, ZY + 26, 64, 0, 15, 0)
+GUI_TOOLTIP(spVol, "Lautstärke der Note 1..15, 0 = Standard")
+DIM lblSlide AS GUI_WIDGET : lblSlide = GUI_LABEL(win, "Slide", 176, ZY + 32)
+DIM spSlide AS GUI_WIDGET : spSlide = GUI_SPINNER(win, 220, ZY + 26, 56, -12, 12, 0)
+GUI_TOOLTIP(spSlide, "Portamento in Halbtönen über die Notendauer")
+DIM lblFx AS GUI_WIDGET : lblFx = GUI_LABEL(win, "Effekt", 24, ZY + 62)
+DIM ddFx AS GUI_WIDGET : ddFx = GUI_DROPDOWN(win, 130, ZY + 56, 70, 26, SPLIT$("-|Arp|Vib|Ret|Off", "|"))
+GUI_TOOLTIP(ddFx, "Arp xy: Akkord +x/+y -- Vib xy: x Hz, Tiefe y -- Ret n: alle n Ticks neu")
+DIM spFxp AS GUI_WIDGET : spFxp = GUI_SPINNER(win, 206, ZY + 56, 70, 0, 255, 0)
+DIM lblZInst AS GUI_WIDGET : lblZInst = GUI_LABEL(win, "Instrument", 24, ZY + 92)
+DIM ddZInst AS GUI_WIDGET : ddZInst = GUI_DROPDOWN(win, 130, ZY + 86, 146, 26, SPLIT$("Standard", "|"))
+GUI_TOOLTIP(ddZInst, "Instrument NUR dieser Note (Standard = das des Kanals)")
+DIM bOff AS GUI_WIDGET : bOff = GUI_BUTTON(win, "Note aus setzen", 24, ZY + 120, 252, 28)
+GUI_TOOLTIP(bOff, "Taste 0 -- schneidet die klingende Note hier ab")
 
-' Gitter und Klaviatur
+' Die Reihenfolge der Patterns
+CONST OY = ZY + 172
+DIM gOrder AS GUI_WIDGET : gOrder = GUI_GROUPBOX(win, 12, OY, LINKS - 24, SH - 26 - 8 - OY, "Song (Reihenfolge)")
+GUI_SET_ANCHOR(gOrder, "ltb")
+DIM lstOrder AS GUI_WIDGET : lstOrder = GUI_LISTBOX(win, 24, OY + 26, 252, SH - 26 - 8 - OY - 72, SPLIT$("1: P1", "|"))
+GUI_SET_ANCHOR(lstOrder, "ltb")
+DIM bOAdd AS GUI_WIDGET : bOAdd = GUI_BUTTON(win, "+ akt.", 24, SH - 26 - 8 - 38, 62, 26)
+GUI_TOOLTIP(bOAdd, "Das gezeigte Pattern hinten anhängen")
+DIM bODel AS GUI_WIDGET : bODel = GUI_BUTTON(win, "entf.", 90, SH - 26 - 8 - 38, 56, 26)
+DIM bOLinks AS GUI_WIDGET : bOLinks = GUI_BUTTON(win, "<", 150, SH - 26 - 8 - 38, 40, 26)
+DIM bORechts AS GUI_WIDGET : bORechts = GUI_BUTTON(win, ">", 194, SH - 26 - 8 - 38, 40, 26)
+GUI_SET_ANCHOR(bOAdd, "lb") : GUI_SET_ANCHOR(bODel, "lb") : GUI_SET_ANCHOR(bOLinks, "lb") : GUI_SET_ANCHOR(bORechts, "lb")
+
+' Statusleiste: Meldung | Stelle | Wiedergabe
+DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_STATUSBAR(win, 0, SH - 26, SW, 26, "Bereit.")
+GUI_SET_ANCHOR(lblStatus, "lrb")
+DIM sfStelle AS INTEGER : sfStelle = GUI_STATUSBAR_ADD(lblStatus, "", 300, "mitte")
+DIM sfSpiel AS INTEGER : sfSpiel = GUI_STATUSBAR_ADD(lblStatus, "", 160, "mitte")
+
+' Drehfelder messen sich nach der Schrift (32 Punkte bei DejaVu 15) --
+' die Zeilen der linken Spalte liegen aber 30 auseinander. Alle auf 28,
+' sonst ragt jedes Feld zwei Punkte in das darunter.
+SUB flach(sp AS GUI_WIDGET)
+    GUI_SET_BOUNDS(sp, GUI_GET_X(sp), GUI_GET_Y(sp), GUI_GET_W(sp), 28)
+END SUB
+flach(spBpm) : flach(spKan) : flach(spRows) : flach(spOkt) : flach(spIVol)
+flach(spA) : flach(spD) : flach(spS) : flach(spR) : flach(spVibD) : flach(spVibS)
+flach(spDet) : flach(spVol) : flach(spSlide) : flach(spFxp)
+
+' Uebersicht, Gitter und Klaviatur
+DIM uebersicht AS GUI_WIDGET
+uebersicht = GUI_CANVAS(win, LINKS, TOP_Y, SW - LINKS - 12, UEB_H)
+GUI_SET_ANCHOR(uebersicht, "lrt")
+GUI_TOOLTIP(uebersicht, "Der Song in seiner Reihenfolge -- ein Klick zeigt das Pattern")
 DIM gitter AS GUI_WIDGET
-gitter = GUI_CANVAS(win, LINKS, GRID_Y, SW - LINKS - 12, SH - GRID_Y - PIANO_H - 28)
+gitter = GUI_CANVAS(win, LINKS, GRID_Y, SW - LINKS - 12, SH - GRID_Y - PIANO_H - 26 - 16)
+GUI_SET_ANCHOR(gitter, "lrtb")
 DIM piano AS GUI_WIDGET
-piano = GUI_CANVAS(win, LINKS, SH - PIANO_H - 20, SW - LINKS - 12, PIANO_H)
+piano = GUI_CANVAS(win, LINKS, SH - PIANO_H - 26 - 8, SW - LINKS - 12, PIANO_H)
+GUI_SET_ANCHOR(piano, "lrb")
 
 ' Spiegel der Bedienelemente: ein Wert, den das PROGRAMM setzt, sieht fuer
 ' die Aenderungs-Erkennung wie eine Eingabe aus. Was zuletzt hineingestellt
@@ -1771,6 +1859,42 @@ FUNCTION kanalFarbe(c AS INTEGER) AS INTEGER
     RETURN akzent[c MOD 8]
 END FUNCTION
 
+' Der Platz eines Kanals, der gerade klingt: der juengste Anschlag, der
+' schon erreicht ist (geplante zaehlen noch nicht). -1 = keiner.
+FUNCTION vuPlatz(c AS INTEGER) AS INTEGER
+    IF NOT spielt THEN RETURN -1
+    DIM jetzt AS INTEGER : jetzt = AUDIO_CLOCK_TICKS(takt)
+    DIM best AS INTEGER : best = -1
+    DIM k AS INTEGER
+    FOR k = 0 TO 3
+        IF vuStaerke[c, k] > 0.0 AND vuTick[c, k] <= jetzt THEN
+            IF best < 0 THEN
+                best = k
+            ELSEIF vuTick[c, k] > vuTick[c, best] THEN
+                best = k
+            END IF
+        END IF
+    NEXT
+    RETURN best
+END FUNCTION
+
+' Pegel eines Kanals jetzt: der letzte Anschlag, abklingend ueber seine
+' Notenlaenge (hoechstens zwei Takte).
+FUNCTION kanalPegel(c AS INTEGER) AS FLOAT
+    DIM k AS INTEGER : k = vuPlatz(c)
+    IF k < 0 THEN RETURN 0.0
+    DIM spanne AS INTEGER : spanne = MAX(TICKS * 2, MIN(vuLaenge[c, k], TICKS * 32))
+    DIM t AS FLOAT : t = (AUDIO_CLOCK_TICKS(takt) - vuTick[c, k]) / spanne
+    IF t >= 1.0 THEN RETURN 0.0
+    RETURN vuStaerke[c, k] * (1.0 - t * 0.85)
+END FUNCTION
+
+FUNCTION kanalNote(c AS INTEGER) AS INTEGER
+    DIM k AS INTEGER : k = vuPlatz(c)
+    IF k < 0 THEN RETURN -1
+    RETURN vuNote[c, k]
+END FUNCTION
+
 SUB zeichneGitter()
     DIM gx AS INTEGER : gx = GUI_CANVAS_X(gitter)
     DIM gy AS INTEGER : gy = GUI_CANVAS_Y(gitter)
@@ -1778,20 +1902,26 @@ SUB zeichneGitter()
     DIM gh AS INTEGER : gh = GUI_CANVAS_H(gitter)
     SCISSOR(gx, gy, gw, gh)
     BOX(gx, gy, gx + gw - 1, gy + gh - 1, &H0A0E14)
+    ' Das Gitter in einer Schrift mit gleich breiten Zeichen: die Spalten
+    ' einer Zelle (Note, Lautstaerke, Effekt) stehen dann Reihe fuer Reihe
+    ' genau untereinander.
+    SETFONT(monoFont, 14)
+    DIM zw AS INTEGER : zw = TEXT_WIDTH("0")
     DIM sichtR AS INTEGER : sichtR = (gh - HDR_H) \ ROW_H + 1
     DIM sichtC AS INTEGER : sichtC = (gw - RH_W) \ CELL_W + 1
     DIM p AS INTEGER : p = patAkt
     DIM c AS INTEGER
     DIM r AS INTEGER
-    ' Reihen: Beat-Raster, Cursor, Wiedergabe
+    ' Reihen: Beat-Raster, Cursorzeile, Wiedergabe
     FOR r = rowOff TO MIN(patRows[p] - 1, rowOff + sichtR - 1)
         DIM y AS INTEGER : y = gy + HDR_H + (r - rowOff) * ROW_H
         DIM hg AS INTEGER : hg = &H0A0E14
-        IF r MOD 4 = 0 THEN hg = &H121A24
-        IF r MOD 16 = 0 THEN hg = &H18222E
-        IF kopfPat = p AND kopfRow = r THEN hg = &H1E4A2E
+        IF r MOD 4 = 0 THEN hg = &H111924
+        IF r MOD 16 = 0 THEN hg = &H17212E
+        IF r = curR THEN hg = &H1A2638
+        IF kopfPat = p AND kopfRow = r THEN hg = &H1E5634
         BOX(gx, y, gx + gw - 1, y + ROW_H - 1, hg)
-        TEXT(gx + 6, y + 2, RIGHT$("0" + STR$(r), 2), &H8090A0)
+        TEXT(gx + 8, y + 3, RIGHT$("0" + STR$(r), 2), IIF(r MOD 4 = 0, &HB0BCCC, &H66748A))
     NEXT
     ' Auswahl
     IF selAn THEN
@@ -1806,29 +1936,28 @@ SUB zeichneGitter()
         DIM x AS INTEGER : x = gx + RH_W + (c - chOff) * CELL_W
         LINE(x, gy, x, gy + gh - 1, &H1E2A38)
         FOR r = rowOff TO MIN(patRows[p] - 1, rowOff + sichtR - 1)
-            DIM y2 AS INTEGER : y2 = gy + HDR_H + (r - rowOff) * ROW_H
+            DIM y2 AS INTEGER : y2 = gy + HDR_H + (r - rowOff) * ROW_H + 3
             DIM n AS INTEGER : n = note[p, c, r]
             DIM nf AS INTEGER : nf = kanalFarbe(c)
-            IF n = LEER THEN nf = &H303A46
+            IF n = LEER THEN nf = &H2C3644
             IF n = NOTE_OFF THEN nf = &H8090A0
-            DIM tx AS INTEGER : tx = x + 5
-            TEXT(tx, y2 + 2, notenName$(n), nf)
+            DIM tx AS INTEGER : tx = x + 6
+            TEXT(tx, y2, notenName$(n), nf)
             IF n >= 0 THEN
-                tx = tx + 34
+                tx = tx + zw * 4
                 IF vol[p, c, r] > 0 THEN
-                    TEXT(tx, y2 + 2, "v" + STR$(vol[p, c, r]), &H7FE0C0) : tx = tx + 26
+                    TEXT(tx, y2, "v" + RIGHT$("0" + STR$(vol[p, c, r]), 2), &H7FE0C0)
                 END IF
+                tx = tx + zw * 4
                 IF slide[p, c, r] <> 0 THEN
-                    TEXT(tx, y2 + 2, "s" + IIF(slide[p, c, r] > 0, "+", "") + STR$(slide[p, c, r]), &HFFC060)
-                    tx = tx + 30
+                    TEXT(tx, y2, IIF(slide[p, c, r] > 0, "↑", "↓") + STR$(ABS(slide[p, c, r])), &HFFC060)
                 END IF
+                tx = tx + zw * 4
                 IF fx[p, c, r] <> 0 THEN
-                    DIM fn AS STRING
-                    fn = MID$("ArpVibRetOff", (fx[p, c, r] - 1) * 3, 3) + STR$(fxp[p, c, r])
-                    TEXT(tx, y2 + 2, fn, &HFF60E0)
+                    TEXT(tx, y2, MID$("ArpVibRetOff", (fx[p, c, r] - 1) * 3, 1) + RIGHT$("0" + HEX$(fxp[p, c, r]), 2), &HFF60E0)
                 END IF
                 IF inst[p, c, r] >= 0 THEN
-                    TEXT(x + CELL_W - 24, y2 + 2, "i" + STR$(inst[p, c, r] + 1), &HA0A8B0)
+                    TEXT(x + CELL_W - zw * 3 - 4, y2, "i" + STR$(inst[p, c, r] + 1), &HA0A8B0)
                 END IF
             END IF
         NEXT
@@ -1837,24 +1966,104 @@ SUB zeichneGitter()
     DIM cx AS INTEGER : cx = gx + RH_W + (curC - chOff) * CELL_W
     DIM cy AS INTEGER : cy = gy + HDR_H + (curR - rowOff) * ROW_H
     RECT(cx, cy, cx + CELL_W - 1, cy + ROW_H - 1, &H2BC4E8)
-    ' Kopfzeile zuletzt -- ueber den Zellen, die darunter herausrollen
-    BOX(gx, gy, gx + gw - 1, gy + HDR_H - 1, &H141C26)
+    RECT(cx + 1, cy + 1, cx + CELL_W - 2, cy + ROW_H - 2, &H802BC4E8)
+    ' Kopfzeile zuletzt -- ueber den Zellen, die darunter herausrollen.
+    ' Je Kanal: Name, Klang und der Pegel als Balken darunter.
+    SETFONT(uiFont, 14)
+    GRADIENTV(gx, gy, gx + gw - 1, gy + HDR_H - 1, &H1B2533, &H121A25)
     FOR c = chOff TO MIN(kanaele - 1, chOff + sichtC - 1)
         DIM hx AS INTEGER : hx = gx + RH_W + (c - chOff) * CELL_W
-        DIM kn AS STRING : kn = "Ch" + STR$(c + 1)
+        DIM kn AS STRING : kn = STR$(c + 1)
         IF istDrum(c) THEN kn = "Drum"
-        IF mute[c] THEN kn = kn + " M"
-        IF solo[c] THEN kn = kn + " S"
         DIM nm AS STRING : nm = wave[c]
         IF chInst[c] >= 0 THEN nm = instName$(chInst[c])
         IF istDrum(c) AND chInst[c] < 0 THEN nm = "noise"
-        TEXT(hx + 5, gy + 4, kn, kanalFarbe(c))
-        DIM kb AS INTEGER : kb = TEXT_WIDTH(kn)
-        TEXT_SIZE(12)
-        TEXT(hx + 5 + kb + 8, gy + 7, LEFT$(nm, 10), &H8090A0)
-        TEXT_SIZE(16)
+        IF mute[c] THEN nm = "stumm"
+        TEXT(hx + 6, gy + 3, kn, kanalFarbe(c))
+        DIM kb AS INTEGER : kb = TEXT_WIDTH(kn) + 8
+        SETFONT(uiFont, 12)
+        ' So viel vom Namen, wie in die Spalte passt -- mit "…" statt
+        ' mitten im Buchstaben abgeschnitten.
+        DIM platz AS INTEGER : platz = CELL_W - kb - 26
+        IF TEXT_WIDTH(nm) > platz THEN
+            WHILE LEN(nm) > 1 AND TEXT_WIDTH(nm + "…") > platz
+                nm = LEFT$(nm, LEN(nm) - 1)
+            WEND
+            nm = nm + "…"
+        END IF
+        TEXT(hx + 6 + kb, gy + 5, nm, IIF(mute[c], &HE07070, &H8C9AAE))
+        IF solo[c] THEN TEXT(hx + CELL_W - 18, gy + 5, "S", &HF2C14E)
+        SETFONT(uiFont, 14)
+        ' Pegel
+        DIM pg AS FLOAT : pg = kanalPegel(c)
+        BOXROUND(hx + 6, gy + HDR_H - 9, hx + CELL_W - 8, gy + HDR_H - 5, 2, &H0C121A)
+        IF pg > 0.01 THEN
+            DIM pb AS INTEGER : pb = INT((CELL_W - 14) * MIN(1.0, pg))
+            BOXROUND(hx + 6, gy + HDR_H - 9, hx + 6 + pb, gy + HDR_H - 5, 2, kanalFarbe(c))
+        END IF
+        LINE(hx, gy, hx, gy + HDR_H - 1, &H2A3848)
     NEXT
     LINE(gx, gy + HDR_H - 1, gx + gw - 1, gy + HDR_H - 1, &H2A3848)
+    SETFONT(uiFont, 15)
+    SCISSOR_END()
+END SUB
+
+' ------------------------------------------------------------ Uebersicht
+' Der Song als Kachelreihe: je Eintrag der Reihenfolge eine Kachel mit dem
+' Namen und einer Miniatur der Noten (je Kanal eine Zeile Punkte). Was
+' gerade klingt, ist hervorgehoben; ein Klick waehlt.
+CONST KACHEL_B = 96
+DIM uebOff AS INTEGER : uebOff = 0
+
+FUNCTION uebersichtBei(mx AS INTEGER, my AS INTEGER) AS INTEGER
+    DIM ux AS INTEGER : ux = GUI_CANVAS_X(uebersicht)
+    DIM uy AS INTEGER : uy = GUI_CANVAS_Y(uebersicht)
+    IF mx < ux OR my < uy OR mx >= ux + GUI_CANVAS_W(uebersicht) OR my >= uy + GUI_CANVAS_H(uebersicht) THEN RETURN -1
+    DIM i AS INTEGER : i = uebOff + (mx - ux - 4) \ (KACHEL_B + 6)
+    IF i < 0 OR i >= orderAnz THEN RETURN -1
+    RETURN i
+END FUNCTION
+
+SUB zeichneUebersicht()
+    DIM ux AS INTEGER : ux = GUI_CANVAS_X(uebersicht)
+    DIM uy AS INTEGER : uy = GUI_CANVAS_Y(uebersicht)
+    DIM uw AS INTEGER : uw = GUI_CANVAS_W(uebersicht)
+    DIM uh AS INTEGER : uh = GUI_CANVAS_H(uebersicht)
+    SCISSOR(ux, uy, uw, uh)
+    BOX(ux, uy, ux + uw - 1, uy + uh - 1, &H0A0E14)
+    DIM passen AS INTEGER : passen = MAX(1, (uw - 8) \ (KACHEL_B + 6))
+    ' Die gewaehlte bzw. klingende Stelle bleibt im Bild.
+    DIM ziel AS INTEGER : ziel = IIF(kopfPos >= 0, kopfPos, lOrder)
+    IF ziel < uebOff THEN uebOff = ziel
+    IF ziel >= uebOff + passen THEN uebOff = ziel - passen + 1
+    uebOff = CLAMP(uebOff, 0, MAX(0, orderAnz - passen))
+    DIM i AS INTEGER
+    SETFONT(uiFont, 12)
+    FOR i = uebOff TO MIN(orderAnz - 1, uebOff + passen)
+        DIM kx AS INTEGER : kx = ux + 4 + (i - uebOff) * (KACHEL_B + 6)
+        DIM p AS INTEGER : p = order[i]
+        DIM rand AS INTEGER : rand = &H2A3848
+        DIM grund AS INTEGER : grund = &H121A25
+        IF p = patAkt THEN grund = &H1A2A3E : rand = &H2BC4E8
+        IF i = kopfPos THEN grund = &H1E4A2E : rand = &H4BE87A
+        BOXROUND(kx, uy + 4, kx + KACHEL_B, uy + uh - 5, 5, grund)
+        RECTROUND(kx, uy + 4, kx + KACHEL_B, uy + uh - 5, 5, rand)
+        ' Miniatur: Reihen nach rechts, Kanaele nach unten.
+        DIM mh AS INTEGER : mh = uh - 32
+        DIM c AS INTEGER
+        DIM r AS INTEGER
+        FOR c = 0 TO kanaele - 1
+            DIM my AS INTEGER : my = uy + 22 + c * mh \ MAX(1, kanaele)
+            FOR r = 0 TO patRows[p] - 1
+                IF note[p, c, r] >= 0 THEN
+                    DIM mx AS INTEGER : mx = kx + 6 + r * (KACHEL_B - 12) \ patRows[p]
+                    BOX(mx, my, mx + 1, my + 1, kanalFarbe(c))
+                END IF
+            NEXT
+        NEXT
+        TEXT(kx + 6, uy + 6, STR$(i + 1) + " " + patName[p], IIF(p = patAkt, &HE8F0FA, &H9AA8BA))
+    NEXT
+    SETFONT(uiFont, 15)
     SCISSOR_END()
 END SUB
 
@@ -1896,23 +2105,50 @@ SUB zeichnePiano()
     DIM wb AS FLOAT : wb = pw / 14.0
     DIM i AS INTEGER
     DIM basis AS INTEGER : basis = INT(GUI_VALUE(spOkt)) * 12 + 12
+    DIM weissHalb AS ARRAY OF INTEGER
+    weissHalb = [0, 2, 4, 5, 7, 9, 11]
     FOR i = 0 TO 13
         DIM x0 AS INTEGER : x0 = px + INT(i * wb)
         DIM x1 AS INTEGER : x1 = px + INT((i + 1) * wb) - 2
-        BOX(x0, py, x1, py + ph - 1, &HE8ECF0)
+        DIM wf AS INTEGER : wf = tastenFarbe(basis + (i \ 7) * 12 + weissHalb[i MOD 7], -1)
+        IF wf < 0 THEN
+            GRADIENTV(x0, py, x1, py + ph - 1, &HF4F6F8, &HD2D8DE)
+        ELSE
+            GRADIENTV(x0, py, x1, py + ph - 1, wf, &HF4F6F8)
+        END IF
         IF i MOD 7 = 0 THEN
-            TEXT_SIZE(12)
-            TEXT(x0 + 4, py + ph - 16, "C" + STR$(basis \ 12 - 1 + i \ 7), &H506070)
-            TEXT_SIZE(16)
+            SETFONT(uiFont, 12)
+            TEXT(x0 + 5, py + ph - 18, "C" + STR$(basis \ 12 - 1 + i \ 7), &H506070)
+            SETFONT(uiFont, 15)
         END IF
     NEXT
     DIM schwarzPos AS ARRAY OF INTEGER
     schwarzPos = [1, 2, 4, 5, 6, 8, 9, 11, 12, 13]
+    DIM schwarz AS ARRAY OF INTEGER
+    schwarz = [1, 3, 6, 8, 10]
     FOR i = 0 TO 9
         DIM bx AS INTEGER : bx = px + INT(schwarzPos[i] * wb - wb * 0.3)
-        BOX(bx, py, bx + INT(wb * 0.6), py + INT(ph * 0.6), &H1A2028)
+        DIM sf AS INTEGER : sf = tastenFarbe(basis + (i \ 5) * 12 + schwarz[i MOD 5], -1)
+        IF sf < 0 THEN
+            GRADIENTV(bx, py, bx + INT(wb * 0.6), py + INT(ph * 0.6), &H2A323C, &H10151B)
+        ELSE
+            GRADIENTV(bx, py, bx + INT(wb * 0.6), py + INT(ph * 0.6), sf, &H10151B)
+        END IF
     NEXT
 END SUB
+
+' Leuchtet eine Taste gerade? Die eben angeschlagene (Tastatur, Klick)
+' in Akzentfarbe, eine klingende in der Farbe ihres Kanals -- sonst `sonst`.
+FUNCTION tastenFarbe(midi AS INTEGER, sonst AS INTEGER) AS INTEGER
+    IF midi = tasteMidi AND MILLIS() < tasteBis THEN RETURN &H2BC4E8
+    DIM c AS INTEGER
+    FOR c = 0 TO kanaele - 1
+        IF kanalNote(c) = midi AND NOT istDrum(c) THEN
+            IF kanalPegel(c) > 0.05 THEN RETURN kanalFarbe(c)
+        END IF
+    NEXT
+    RETURN sonst
+END FUNCTION
 
 ' ------------------------------------------------------------ Verlauf anwenden
 ' Der Cursor bleibt, wo er war -- ein Rueckgaengig soll die Noten
@@ -1947,6 +2183,7 @@ END SUB
 songNeu()
 DIM frage AS GUI_WINDOW : frage = -1
 DIM frageNeu AS GUI_WINDOW : frageNeu = -1
+DIM frageName AS GUI_WINDOW : frageName = -1
 DIM ziehen AS BOOLEAN : ziehen = FALSE
 
 ' Klaviatur auf der Tastatur (US-Lage): untere Reihe = Oktave, obere = +1.
@@ -1973,10 +2210,18 @@ WHILE TRUE
     DIM kreuz AS BOOLEAN : kreuz = WINDOW_CLOSE_REQUESTED()
     IF QUITREQUESTED() AND NOT kreuz THEN BREAK
     bildNr = bildNr + 1
+    ' Das Fenster wurde groesser oder kleiner: die gui folgt, die Anker
+    ' verteilen den Platz.
+    IF SCREENWIDTH() <> SW OR SCREENHEIGHT() <> SH THEN
+        SW = SCREENWIDTH() : SH = SCREENHEIGHT()
+        GUI_WINDOW_SET_BOUNDS(win, 0, 0, SW, SH)
+        cursorSichtbar()
+    END IF
     GUI_UPDATE()
+    DIM tb AS INTEGER : tb = GUI_TOOLBAR_CLICKED(leiste)
     DIM strg AS BOOLEAN : strg = KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
     DIM umsch AS BOOLEAN : umsch = KEYPRESSED(KEY_LSHIFT) OR KEYPRESSED(KEY_RSHIFT)
-    DIM dialogOffen AS BOOLEAN : dialogOffen = (frage >= 0 OR frageNeu >= 0)
+    DIM dialogOffen AS BOOLEAN : dialogOffen = (frage >= 0 OR frageNeu >= 0 OR frageName >= 0)
     ' Tasten gehen ins Gitter, solange kein Bedienelement den Fokus hat --
     ' ein Drehfeld mit Fokus nimmt die Pfeile selbst.
     DIM tasten AS BOOLEAN : tasten = (GUI_FOCUSED() < 0) AND NOT dialogOffen
@@ -1985,12 +2230,20 @@ WHILE TRUE
     IF spielt THEN
         planen()
         IF songModus AND kopfPat >= 0 AND kopfPat <> patAkt THEN patternWaehlen(kopfPat)
+        ' Mitlaufen: die klingende Reihe bleibt im Bild.
+        IF kopfPat = patAkt AND kopfRow >= 0 THEN
+            DIM sichtRk AS INTEGER : sichtRk = (GUI_CANVAS_H(gitter) - HDR_H) \ ROW_H
+            IF kopfRow < rowOff OR kopfRow >= rowOff + sichtRk THEN rowOff = MAX(0, kopfRow - sichtRk \ 4)
+        END IF
     END IF
+    GUI_TOOLBAR_ENABLE(leiste, tbZur, uPos > 1)
+    GUI_TOOLBAR_ENABLE(leiste, tbVor, uPos < uAnz)
+    GUI_TOOLBAR_ENABLE(leiste, tbStop, spielt)
 
     ' ---- Werkzeugleiste 1
-    IF GUI_CLICKED(bNeu) AND NOT dialogOffen THEN
+    IF tb = tbNeu AND NOT dialogOffen THEN
         IF dirty THEN
-            frageNeu = GUI_DIALOG("Neuer Song", "Ungesicherte Aenderungen verwerfen?", "janein")
+            frageNeu = GUI_DIALOG("Neuer Song", "Ungesicherte Änderungen verwerfen?", "janein")
         ELSE
             songNeu()
         END IF
@@ -1999,9 +2252,9 @@ WHILE TRUE
         IF GUI_ANSWER(frageNeu) = 1 THEN songNeu() : frageNeu = -1
         IF GUI_ANSWER(frageNeu) = 2 THEN frageNeu = -1
     END IF
-    IF GUI_CLICKED(bAuf) OR (strg AND KEYHIT(KEY_O) AND tasten) THEN oeffnen()
-    IF GUI_CLICKED(bSpei) OR (strg AND KEYHIT(KEY_S) AND tasten) THEN speichern(FALSE)
-    IF GUI_CLICKED(bSpeiAls) THEN speichern(TRUE)
+    IF tb = tbAuf OR (strg AND KEYHIT(KEY_O) AND tasten) THEN oeffnen()
+    IF tb = tbSpei OR (strg AND KEYHIT(KEY_S) AND tasten) THEN speichern(FALSE)
+    IF tb = tbSpeiAls THEN speichern(TRUE)
     IF INT(GUI_VALUE(spBpm)) <> lBpm THEN
         bpm = INT(GUI_VALUE(spBpm)) : lBpm = bpm
         cacheLeeren()
@@ -2012,9 +2265,9 @@ WHILE TRUE
         lKan = INT(GUI_VALUE(spKan))
         kanaeleSetzen(lKan)
     END IF
-    IF GUI_CLICKED(bPlayPat) THEN starten(FALSE)
-    IF GUI_CLICKED(bPlaySong) THEN starten(TRUE)
-    IF GUI_CLICKED(bStop) THEN stopp()
+    IF tb = tbPlayPat THEN starten(FALSE)
+    IF tb = tbPlaySong THEN starten(TRUE)
+    IF tb = tbStop THEN stopp()
     ' EINE Abfrage fuer beide Richtungen: zwei Zeilen hintereinander
     ' starteten und stoppten im selben Bild, weil die zweite den eben
     ' gesetzten Zustand schon sah.
@@ -2025,9 +2278,9 @@ WHILE TRUE
             starten(FALSE)
         END IF
     END IF
-    IF GUI_CLICKED(bZur) OR (strg AND KEYHIT(KEY_Z) AND tasten) THEN zurueck()
-    IF GUI_CLICKED(bVor) OR (strg AND KEYHIT(KEY_Y) AND tasten) THEN wieder()
-    IF GUI_CLICKED(bWav) THEN
+    IF tb = tbZur OR (strg AND KEYHIT(KEY_Z) AND tasten) THEN zurueck()
+    IF tb = tbVor OR (strg AND KEYHIT(KEY_Y) AND tasten) THEN wieder()
+    IF tb = tbWav THEN
         DIM wp AS STRING : wp = FILE_SAVE_DIALOG("Song als WAV", "song.wav", "wav")
         IF wp <> "" THEN
             renderStereo = GUI_CHECKED(cbStereo)
@@ -2035,7 +2288,7 @@ WHILE TRUE
             wavRendern(wp)
         END IF
     END IF
-    IF GUI_CLICKED(bCode) THEN
+    IF tb = tbCode THEN
         DIM cp AS STRING : cp = FILE_SAVE_DIALOG("DH-Code sichern", "song.dh", "dh")
         IF cp <> "" THEN dhCodeSichern(cp)
     END IF
@@ -2055,6 +2308,24 @@ WHILE TRUE
         patternLeeren(patAkt)
         geaendert()
         zelleAnzeigen()
+    END IF
+    IF GUI_CLICKED(bPatUmb) AND NOT dialogOffen THEN
+        frageName = GUI_PROMPT("Pattern umbenennen", "Name des Patterns:", patName[patAkt])
+    END IF
+    IF frageName >= 0 THEN
+        DIM an AS INTEGER : an = GUI_ANSWER(frageName)
+        IF an = 1 THEN
+            ' Ein "|" trennt die Eintraege der Listen -- im Namen hat er nichts zu suchen.
+            DIM nn AS STRING : nn = TRIM$(REPLACE$(GUI_DIALOG_TEXT(frageName), "|", "/"))
+            IF nn <> "" AND nn <> patName[patAkt] THEN
+                patName[patAkt] = nn
+                geaendert()
+                patternListeAnzeigen()
+                orderAnzeigen()
+                meldung = "Pattern heißt jetzt " + nn
+            END IF
+        END IF
+        IF an <> 0 THEN frageName = -1
     END IF
     IF GUI_CLICKED(bOff) THEN noteSetzen(NOTE_OFF)
     ' Die Zellen-Felder wirken nur, wo eine Note steht -- sonst zurueck.
@@ -2215,10 +2486,20 @@ WHILE TRUE
     END IF
     IF NOT MOUSEBUTTON(0) THEN ziehen = FALSE
 
-    ' ---- Klaviatur (Maus)
+    ' ---- Klaviatur und Uebersicht (Maus)
     IF MOUSE_HIT(0) AND NOT dialogOffen THEN
         DIM pm AS INTEGER : pm = pianoTasteBei(mx, my)
         IF pm >= 0 THEN noteSetzen(MIN(127, pm))
+        DIM ue AS INTEGER : ue = uebersichtBei(mx, my)
+        IF ue >= 0 THEN
+            lOrder = ue
+            GUI_LISTBOX_SET_SELECTED(lstOrder, ue)
+            IF NOT spielt THEN patternWaehlen(order[ue])
+        END IF
+    END IF
+    IF uebersichtBei(mx, my) >= 0 AND NOT dialogOffen THEN
+        DIM urad AS INTEGER : urad = MOUSEWHEEL()
+        IF urad <> 0 THEN uebOff = MAX(0, uebOff - urad)
     END IF
 
     ' ---- Tastatur
@@ -2260,13 +2541,17 @@ WHILE TRUE
 
     ' ---- Zeichnen
     GUI_SET_TEXT(lblStatus, meldung + IIF(dirty, "  *", ""))
+    GUI_STATUSBAR_SET(lblStatus, sfStelle, patName[patAkt] + "  ·  Reihe " + RIGHT$("0" + STR$(curR), 2) + "  ·  Kanal " + STR$(curC + 1) + "  ·  " + STR$(bpm) + " BPM")
+    GUI_STATUSBAR_SET(lblStatus, sfSpiel, IIF(spielt, IIF(songModus, "▶ Song", "▶ Pattern"), "angehalten"))
     GUI_DRAW()
+    zeichneUebersicht()
     zeichneGitter()
     zeichnePiano()
     ' Ein Dialog liegt ueber der Zeichenflaeche -- ohne diesen Aufruf
     ' sperrt er die Eingabe und ist nicht zu sehen.
     IF frage >= 0 THEN GUI_DRAW_WINDOW(frage)
     IF frageNeu >= 0 THEN GUI_DRAW_WINDOW(frageNeu)
+    IF frageName >= 0 THEN GUI_DRAW_WINDOW(frageName)
 
     ' ---- Beenden
     IF (KEYHIT(KEY_ESCAPE) OR kreuz) AND NOT dialogOffen THEN

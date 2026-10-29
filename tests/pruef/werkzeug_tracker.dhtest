@@ -16,7 +16,8 @@
 === die werkzeugleisten ueberlappen nicht und passen ins fenster
 ' Im ersten Bild lagen 'Stereo' und 'Amiga' uebereinander, und der letzte Knopf
 ' jeder Leiste war abgeschnitten -- gesehen nur im BILD. Geprueft werden die
-' RECHTECKE aller 35 Widgets paarweise und gegen den Fensterrand (1400).
+' RECHTECKE aller Widgets des Fensters paarweise (Gruppenrahmen nur gegen den
+' Fensterrand) und dass die Werkzeugleiste nichts ins Ueberlauf-Menue schiebt.
 SET_WINDOW_POS(-3000, -3000)
 IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
 DIM prFlag AS STRING : prFlag = ""
@@ -40,51 +41,34 @@ END FUNCTION
 --- programm ../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 IF bildNr = 2 THEN
-    DIM prW[34] AS GUI_WIDGET
-    prW[0] = bNeu
-    prW[1] = bAuf
-    prW[2] = bSpei
-    prW[3] = bSpeiAls
-    prW[4] = spBpm
-    prW[5] = spKan
-    prW[6] = bPlayPat
-    prW[7] = bPlaySong
-    prW[8] = bStop
-    prW[9] = bZur
-    prW[10] = bVor
-    prW[11] = bWav
-    prW[12] = cbStereo
-    prW[13] = cbAmiga
-    prW[14] = bCode
-    prW[15] = lblPat
-    prW[16] = ddPat
-    prW[17] = lblRows
-    prW[18] = spRows
-    prW[19] = bPatNeu
-    prW[20] = bPatDup
-    prW[21] = bPatDel
-    prW[22] = bPatLeer
-    prW[23] = lblOkt
-    prW[24] = spOkt
-    prW[25] = lblZelle
-    prW[26] = spVol
-    prW[27] = lblSlide
-    prW[28] = spSlide
-    prW[29] = lblFx
-    prW[30] = ddFx
-    prW[31] = spFxp
-    prW[32] = ddZInst
-    prW[33] = bOff
+    DIM n AS INTEGER : n = GUI_WINDOW_WIDGET_COUNT(win)
     DIM a AS INTEGER
     DIM b AS INTEGER
     DIM ueber AS INTEGER : ueber = 0
     DIM rand AS INTEGER : rand = 0
-    FOR a = 0 TO 33
-        IF GUI_GET_X(prW[a]) + GUI_GET_W(prW[a]) > 1400 - 8 THEN rand = rand + 1
-        FOR b = a + 1 TO 33
-            IF GUI_GET_X(prW[a]) < GUI_GET_X(prW[b]) + GUI_GET_W(prW[b]) AND GUI_GET_X(prW[b]) < GUI_GET_X(prW[a]) + GUI_GET_W(prW[a]) AND GUI_GET_Y(prW[a]) < GUI_GET_Y(prW[b]) + GUI_GET_H(prW[b]) AND GUI_GET_Y(prW[b]) < GUI_GET_Y(prW[a]) + GUI_GET_H(prW[a]) THEN ueber = ueber + 1
-        NEXT
+    DIM wa AS GUI_WIDGET
+    DIM wb AS GUI_WIDGET
+    FOR a = 0 TO n - 1
+        wa = GUI_WINDOW_WIDGET(win, a)
+        IF GUI_GET_X(wa) < 0 OR GUI_GET_Y(wa) < 0 OR GUI_GET_X(wa) + GUI_GET_W(wa) > GUI_WINDOW_CONTENT_W(win) OR GUI_GET_Y(wa) + GUI_GET_H(wa) > GUI_WINDOW_CONTENT_H(win) THEN
+            rand = rand + 1
+            prMerke("raus " + GUI_KIND(wa) + " " + GUI_TEXT(wa))
+        END IF
+        IF GUI_KIND(wa) <> "groupbox" THEN
+            FOR b = a + 1 TO n - 1
+                wb = GUI_WINDOW_WIDGET(win, b)
+                IF GUI_KIND(wb) <> "groupbox" THEN
+                    IF GUI_GET_X(wa) < GUI_GET_X(wb) + GUI_GET_W(wb) AND GUI_GET_X(wb) < GUI_GET_X(wa) + GUI_GET_W(wa) AND GUI_GET_Y(wa) < GUI_GET_Y(wb) + GUI_GET_H(wb) AND GUI_GET_Y(wb) < GUI_GET_Y(wa) + GUI_GET_H(wa) THEN
+                        ueber = ueber + 1
+                        prMerke("deckt " + GUI_KIND(wa) + " " + GUI_TEXT(wa) + " / " + GUI_KIND(wb) + " " + GUI_TEXT(wb))
+                    END IF
+                END IF
+            NEXT
+        END IF
     NEXT
+    ' Die Werkzeugleiste zeigt alle Eintraege -- ein Ueberlauf-Menue hiesse,
+    ' dass sie zu schmal geraten ist.
+    prMerke("ueberlauf " + STR$(GUI_TOOLBAR_OVERFLOW(leiste)))
     prMerke("ueberlappungen " + STR$(ueber))
     prMerke("ueber den rand " + STR$(rand))
 END IF
@@ -93,6 +77,7 @@ prSchreib("")
 --- umgebung
 DHRT_FRAMES=4
 --- inhalt _programm/probe.txt
+|ueberlauf 0|
 |ueberlappungen 0|
 |ueber den rand 0|
 
@@ -209,8 +194,8 @@ END FUNCTION
 --- programm ../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 IF bildNr = 3 THEN
-    DIM x AS INTEGER : x = GUI_CANVAS_X(gitter) + 40 + 1 * 118 + 59
-    DIM y AS INTEGER : y = GUI_CANVAS_Y(gitter) + 24 + 5 * 20 + 10
+    DIM x AS INTEGER : x = GUI_CANVAS_X(gitter) + RH_W + 1 * CELL_W + CELL_W \ 2
+    DIM y AS INTEGER : y = GUI_CANVAS_Y(gitter) + HDR_H + 5 * ROW_H + ROW_H \ 2
     DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c 7" + CHR$(10)
     t = t + "e 0 7 0 0 0 0" + CHR$(10)
     t = t + "e 5 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
@@ -365,6 +350,108 @@ e 32 1 341 0 0 0
 
 --- inhalt _programm/probe.txt
 |curC 1 curR 2|
+
+=== ein pattern bekommt einen namen
+' [Umbenennen] fragt nach dem Namen (Vorgabe markiert), Strg+V setzt ihn ein,
+' Enter uebernimmt -- der Name steht in der Liste und ist ein Schritt.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+IF bildNr = 3 THEN
+    CLIPBOARD_SET("Refrain")
+    DIM prOx AS INTEGER : prOx = GUI_CANVAS_X(gitter) - GUI_GET_X(gitter)
+    DIM prOy AS INTEGER : prOy = GUI_CANVAS_Y(gitter) - GUI_GET_Y(gitter)
+    DIM x AS INTEGER : x = prOx + GUI_GET_X(bPatUmb) + GUI_GET_W(bPatUmb) \ 2
+    DIM y AS INTEGER : y = prOy + GUI_GET_Y(bPatUmb) + GUI_GET_H(bPatUmb) \ 2
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c 12" + CHR$(10)
+    t = t + "e 0 7 0 0 0 0" + CHR$(10)
+    t = t + "e 5 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
+    t = t + "e 6 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
+    t = t + "e 6 6 0 0 0 0" + CHR$(10)
+    t = t + "e 7 5 0 0 0 0" + CHR$(10)
+    t = t + "e 20 2 341 0 0 0" + CHR$(10)
+    t = t + "e 21 2 86 0 0 0" + CHR$(10)
+    t = t + "e 22 1 86 0 0 0" + CHR$(10)
+    t = t + "e 23 1 341 0 0 0" + CHR$(10)
+    t = t + "e 30 2 257 0 0 0" + CHR$(10)
+    t = t + "e 31 1 257 0 0 0" + CHR$(10)
+    WRITEALL("umb.txt", t)
+    AUTOMATION_PLAY("umb.txt")
+END IF
+IF bildNr = 12 THEN prMerke("dialog offen " + prJa$(frageName >= 0))
+prSchreib("name " + patName[0] + " liste " + GUI_DROPDOWN_TEXT(ddPat) + " offen " + prJa$(frageName >= 0) + " dirty " + prJa$(dirty))
+--- umgebung
+DHRT_FRAMES=50
+--- inhalt _programm/probe.txt
+|dialog offen ja|
+|name Refrain liste Refrain (16) offen nein dirty ja|
+
+=== ein klick in die uebersicht waehlt das pattern
+' Die Kachelreihe ueber dem Gitter zeigt den Song in seiner Reihenfolge; ein
+' Klick auf die zweite Kachel zeigt deren Pattern und waehlt sie in der Liste.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+IF bildNr = 3 THEN
+    patternNeu(FALSE)
+    order[1] = 1 : orderAnz = 2 : orderAnzeigen()
+    patternWaehlen(0)
+    prMerke("vorher pattern " + STR$(patAkt))
+    DIM x AS INTEGER : x = GUI_CANVAS_X(uebersicht) + 4 + 1 * (KACHEL_B + 6) + KACHEL_B \ 2
+    DIM y AS INTEGER : y = GUI_CANVAS_Y(uebersicht) + GUI_CANVAS_H(uebersicht) \ 2
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c 5" + CHR$(10)
+    t = t + "e 0 7 0 0 0 0" + CHR$(10)
+    t = t + "e 5 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
+    t = t + "e 6 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
+    t = t + "e 6 6 0 0 0 0" + CHR$(10)
+    t = t + "e 7 5 0 0 0 0" + CHR$(10)
+    WRITEALL("ueb.txt", t)
+    AUTOMATION_PLAY("ueb.txt")
+END IF
+prSchreib("pattern " + STR$(patAkt) + " reihenfolge " + STR$(GUI_LISTBOX_SELECTED(lstOrder)))
+--- umgebung
+DHRT_FRAMES=25
+--- inhalt _programm/probe.txt
+|vorher pattern 0|
+|pattern 1 reihenfolge 1|
 
 === block kopieren und einfuegen
 ' Umschalt+Pfeil waehlt einen Block, Strg+C/Strg+V setzen ihn in Kanal 2.
