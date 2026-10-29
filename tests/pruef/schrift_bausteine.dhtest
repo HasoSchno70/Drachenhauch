@@ -1,0 +1,202 @@
+' Vier Bausteine rund um Schriften, gefunden beim Ueberarbeiten der
+' Ton-Werkzeuge (2026-10-29):
+'   GUI_FONT        die gui hat ihre eigene Schrift -- ein Programm, das
+'                   zwischendurch mit einer anderen zeichnet, verdirbt die
+'                   Oberflaeche nicht mehr (vorher galt die AKTIVE Schrift)
+'   Nachbacken      ein Zeichen, das ein geladener Font nicht gebacken hat,
+'                   kommt aus SEINER Datei (vorher "?" bzw. eine fremde
+'                   Ausweich-Schrift, obwohl DejaVu das Zeichen hat)
+'   GUI_FOCUS(-1)   niemand hat den Fokus
+'   FONT_GLYPH_BOX / FONT_BASELINE und LOADFONT("noten")
+'                   die Masse einer Glyphe, und die Notenschrift Noto Music
+'                   eingebaut
+' Format: docs/werkzeuge.md.
+
+=== die gui misst mit ihrer eigenen schrift
+' Ein Knopf mit Breite 0 misst sich nach seinem Text. Mit GUI_FONT gilt die
+' Schrift der gui, auch wenn das Programm davor eine andere aktiv macht --
+' gemessen wird dieselbe Breite wie ganz ohne fremde Schrift.
+IMPORT "gui"
+SCREEN(400, 200, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM sans AS INTEGER : sans = LOADFONT("sans", 32)
+DIM mono AS INTEGER : mono = LOADFONT("mono", 32)
+SETFONT(sans, 16)
+GUI_FONT(sans, 16)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("x", 0, 0, 400, 200)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "Iiiii Wwwww", 10, 10, 0, 30)
+GUI_UPDATE()
+DIM ohne AS INTEGER : ohne = GUI_GET_W(k)
+' Jetzt zeichnet das Programm mit einer ganz anderen Schrift und Groesse.
+SETFONT(mono, 30)
+GUI_SET_TEXT(k, "Iiiii Wwwww ")
+GUI_UPDATE()
+GUI_SET_TEXT(k, "Iiiii Wwwww")
+GUI_UPDATE()
+PRINT "gleich "; GUI_GET_W(k) = ohne
+' Die Schrift des Programms ist nach den gui-Befehlen wieder seine eigene.
+PRINT "programm "; TEXT_HEIGHT()
+PRINT "gui "; GUI_FONT_GET()[0] = sans; " "; GUI_FONT_GET()[1]
+GUI_FONT(-1)
+PRINT "aus "; GUI_FONT_GET()[0]
+--- erwartet
+gleich TRUE
+programm 30
+gui TRUE 16
+aus -1
+
+=== ohne gui_font misst die gui mit der aktiven schrift
+' Die Gegenprobe zum Fall davor: ohne GUI_FONT folgt die gui SETFONT, der
+' Knopf misst sich in der fremden Schrift.
+IMPORT "gui"
+SCREEN(400, 200, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM sans AS INTEGER : sans = LOADFONT("sans", 32)
+DIM mono AS INTEGER : mono = LOADFONT("mono", 32)
+SETFONT(sans, 16)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("x", 0, 0, 400, 200)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "Iiiii Wwwww", 10, 10, 0, 30)
+GUI_UPDATE()
+DIM ohne AS INTEGER : ohne = GUI_GET_W(k)
+SETFONT(mono, 30)
+GUI_SET_TEXT(k, "Iiiii Wwwww ")
+GUI_UPDATE()
+GUI_SET_TEXT(k, "Iiiii Wwwww")
+GUI_UPDATE()
+PRINT "gleich "; GUI_GET_W(k) = ohne
+--- erwartet
+gleich FALSE
+
+=== die gui zeichnet mit ihrer schrift auch wenn das programm eine andere setzt
+' Am Bild: eine Beschriftung in weisser Schrift auf schwarzem Grund. Das
+' Programm schaltet vor GUI_DRAW auf eine winzige Schrift (8 Punkte) -- ohne
+' GUI_FONT schriebe die gui in ihr, und im Feld stuende fast nichts.
+IMPORT "gui"
+SCREEN(300, 100, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM sans AS INTEGER : sans = LOADFONT("sans", 64)
+DIM mono AS INTEGER : mono = LOADFONT("mono", 32)
+GUI_FONT(sans, 40)
+GUI_THEME_SET("win_bg", &H000000)
+GUI_THEME_SET("text_fg", &HFFFFFF)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("x", 0, 0, 300, 100)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM l AS GUI_WIDGET : l = GUI_LABEL(w, "HHHHHHHH", 10, 20)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    SETFONT(mono, 8)
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+WEND
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("bild.png")
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM hell AS INTEGER : hell = 0
+FOR y = 20 TO 70
+    FOR x = 10 TO 250
+        IF (GETPIXEL(b, x, y) BAND &HFF) > 200 THEN hell = hell + 1
+    NEXT
+NEXT
+PRINT "schrift zu sehen "; hell > 400
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT={fall}/bild.png
+--- erwartet
+schrift zu sehen TRUE
+
+=== ein fehlendes zeichen kommt aus der eigenen datei
+' LOADFONT("sans") backt den Grundvorrat; das Dreieck gehoert nicht dazu.
+' Gemessen im ersten Bild ist es noch das Ersatzzeichen, nach dem FLIP
+' kommt es aus DejaVu selbst -- genau so breit wie aus einem Font, der es
+' von Anfang an gebacken hat.
+SCREEN(200, 100, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM f AS INTEGER : f = LOADFONT("sans", 32)
+DIM g AS INTEGER : g = LOADFONT("sans", 32, CHR$(&H25B6))
+SETFONT(g, 32)
+DIM soll AS INTEGER : soll = TEXT_WIDTH(CHR$(&H25B6) + CHR$(&H25B6))
+SETFONT(f, 32)
+DIM vorher AS INTEGER : vorher = TEXT_WIDTH(CHR$(&H25B6) + CHR$(&H25B6))
+FLIP()
+DIM nachher AS INTEGER : nachher = TEXT_WIDTH(CHR$(&H25B6) + CHR$(&H25B6))
+PRINT "vorher anders "; vorher <> soll
+PRINT "nachher gleich "; nachher = soll
+--- erwartet
+vorher anders TRUE
+nachher gleich TRUE
+
+=== gui_focus mit minus eins gibt den fokus frei
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("x", 0, 0, 300, 100)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "Knopf", 10, 10, 80, 30)
+GUI_FOCUS(k)
+PRINT "fokus "; GUI_FOCUSED() = k
+GUI_FOCUS(-1)
+PRINT "frei "; GUI_FOCUSED()
+--- erwartet
+fokus TRUE
+frei -1
+
+=== die masse einer glyphe aus der notenschrift
+' Bei Groesse 1787 (Oberlaenge 1389 minus Unterlaenge -398) ist ein Pixel
+' eine Font-Einheit: die Werte stehen so in der Datei. Der volle Notenkopf
+' U+1D158 reicht von x 50 bis 347 und von y -1 bis 269.
+SCREEN(100, 100, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM n AS INTEGER : n = LOADFONT("noten", 64, CHR$(&H1D158))
+PRINT "grundlinie "; INT(FONT_BASELINE(n, 1787) + 0.5)
+DIM b AS TUPLE : b = FONT_GLYPH_BOX(n, CHR$(&H1D158), 1787)
+PRINT "kopf "; INT(b[0] + 0.5); " "; INT(b[1] + 0.5); " "; INT(b[2] + 0.5); " "; INT(b[3] + 0.5)
+' Halbe Groesse, halbe Masse.
+DIM h AS TUPLE : h = FONT_GLYPH_BOX(n, CHR$(&H1D158), 893.5)
+PRINT "halb "; INT(h[2] + 0.5); " "; INT(h[3] + 0.5)
+--- erwartet
+grundlinie 1389
+kopf 50 1120 297 270
+halb 149 135
+
+=== falsche aufrufe der glyphenmasse
+SCREEN(100, 100, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM n AS INTEGER : n = LOADFONT("noten", 64)
+TRY
+    PRINT FONT_GLYPH_BOX(n, "ab", 20)
+CATCH e
+    PRINT "zwei zeichen: "; INSTR(e, "GENAU ein Zeichen") >= 0
+END TRY
+TRY
+    PRINT FONT_GLYPH_BOX(n, CHR$(&H4E00), 20)
+CATCH e
+    PRINT "nicht in der schrift: "; INSTR(e, "hat kein Zeichen") >= 0
+END TRY
+TRY
+    PRINT FONT_BASELINE(-1, 20)
+CATCH e
+    PRINT "ohne datei: "; INSTR(e, "keine Schriftdatei") >= 0
+END TRY
+--- erwartet
+zwei zeichen: TRUE
+nicht in der schrift: TRUE
+ohne datei: TRUE
+
+=== ein notenkopf landet dort wo die masse ihn hinsetzen
+' LOADFONT("noten") OHNE Zeichenliste -- der Kopf kommt beim ersten FLIP aus
+' der eigenen Datei (Nachbacken), danach steht er mittig auf (150, 100).
+SCREEN(300, 200, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM n AS INTEGER : n = LOADFONT("noten", 160)
+DIM kopf AS STRING : kopf = CHR$(&H1D158)
+DIM b AS TUPLE : b = FONT_GLYPH_BOX(n, kopf, 160)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    SETFONT(n, 160)
+    TEXT(INT(150 - b[0] - b[2] / 2), INT(100 - b[1] - b[3] / 2), kopf, &HFFFFFF)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- bild
+150 100 #FFFFFF +-40
+150 60 #000000 +-20

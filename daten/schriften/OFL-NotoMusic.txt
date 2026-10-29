@@ -1,8 +1,7 @@
-Noto Music (examples/assets/NotoMusic-Regular.ttf)
+Noto Music (daten/schriften/NotoMusic-Regular.ttf)
 Quelle: https://github.com/google/fonts/tree/main/ofl/notomusic
 (Projekt: https://github.com/notofonts/music)
-Benutzt vom Notenblatt (examples/199_notenblatt.dh) fuer Schluessel,
-Vorzeichen, Pausen und Notenkoepfe.
+In dhrt eingebettet: LOADFONT("noten", groesse, zeichen$).
 
 Copyright 2022 The Noto Project Authors (https://github.com/notofonts/music)
 

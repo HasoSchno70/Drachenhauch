@@ -409,6 +409,8 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_SET_ENABLED(wdg, on)` | — | make a widget usable or disable it (disabled = greyed out, takes no clicks) |
 | `GUI_ENABLED(wdg)` | BOOLEAN | is it usable? |
 | `GUI_SET_FONT(wdg, font)` | — | own font for this widget |
+| `GUI_FONT(font [, groesse])` | — | the gui's own font: it measures and draws with it, whatever font the program currently has active via `SETFONT` (without `groesse` the current text size); `-1` = back to the program's active font |
+| `GUI_FONT_GET()` | TUPLE | `(font, groesse)` of the own font, `(-1, 0)` without |
 | `GUI_SET_FONT_SIZE(wdg, px)` | — | own font size for this widget |
 | `GUI_SET_FONT_STYLE(wdg, stil$)` | — | font style for this widget: `fett` (bold), `kursiv` (italic), `unterstrichen` (underlined), `durchgestrichen` (strikethrough), joined with `+`; `"normal"` removes it. Real font faces where they exist as files, otherwise emulated |
 | `GUI_GET_FONT_STYLE$(wdg)` | STRING | the widget's style, e.g. `"fett+unterstrichen"` |
@@ -2185,7 +2187,7 @@ stable while doing so (deleting only marks as "dead", it does not shift any indi
 | `GUI_SET_VISIBLE(wdg, an)` / `GUI_VISIBLE(wdg)` → BOOLEAN | show/hide (invisible = not drawn, not interactive) |
 | `GUI_DESTROY(wdg)` | remove a widget (the handle becomes invalid, others stay valid) |
 | `GUI_KIND(wdg)` → STRING | `"button"`/`"label"`/`"checkbox"`/`"slider"`/`"textinput"`/`"panel"`/`"table"` |
-| `GUI_FOCUS(wdg)` | set the keyboard focus (e.g. on a TextInput) |
+| `GUI_FOCUS(wdg)` | set the keyboard focus (e.g. on a TextInput); `GUI_FOCUS(-1)` releases it, the keys then belong to the program |
 | `GUI_FOCUSED()` → GUI_WIDGET | which widget has the keyboard focus? (`-1` = none) |
 | `GUI_SCALE(faktor)` | display scale (0.5–4.0), **before** the first window |
 | `GUI_SCALE_GET()` → FLOAT | current scale |
@@ -2511,6 +2513,14 @@ GUI_SET_FONT(k, andere_schrift)   ' another typeface (handle from LOADFONT)
 
 `GUI_SET_FONT_SIZE` changes **only** the size — the typeface remains the
 globally set one. `GUI_SET_FONT(wdg, -1)` takes back a font of the widget's own.
+
+**One font for the whole gui:** `GUI_FONT(font, groesse)`. Without it the
+gui draws with the font the program currently has active — whoever draws
+with another one in between (music notation, symbols, a big heading) and
+does not set `SETFONT` back would otherwise spoil the interface. With
+`GUI_FONT` the runtime swaps the font in for every gui command and back
+afterwards; callbacks from `GUI_UPDATE` already see the program's font
+again.
 
 Via `GUI_STYLE_SET` / `GUI_APPLY_STYLE` font and size can also be transferred
 to several widgets as a named style.

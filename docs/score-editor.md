@@ -40,15 +40,15 @@ einer Vorschau an der Maus, der **Eingabemarke** (blauer Strich) und dem
 Spielkopf; unten eine **Klaviatur** über drei Oktaven.
 
 **Schlüssel, Notenköpfe, Pausen und Vorzeichen kommen aus der Notenschrift
-Noto Music** (`examples/assets/NotoMusic-Regular.ttf`, SIL Open Font
-License, siehe `examples/assets/CREDITS_notomusic.txt`), geladen mit
-`LOADFONT` samt der gebrauchten Zeichen. Gesetzt wird jede Glyphe über ihre
-Maße in Font-Einheiten: ein Notenkopf ist 270 Einheiten hoch, also ein
-Linienabstand — daraus folgt der Maßstab, der G-Schlüssel sitzt mit seiner
-Schnecke auf der G-Linie, der F-Schlüssel mit den Punkten um die F-Linie.
-Fehlt die Datei (eine Kopie des Programms ohne den `assets`-Ordner), zeichnet
-das Notenblatt die Formen selbst wie bisher. Die Oberfläche schreibt DejaVu
-Sans, die Taktart DejaVu Serif fett.
+Noto Music**, die in dhrt eingebaut ist (`LOADFONT("noten")`, SIL Open Font
+License, siehe `daten/schriften/OFL-NotoMusic.txt`). Gesetzt wird jede
+Glyphe über ihre Maße aus der Schriftdatei (`FONT_GLYPH_BOX`): ein Notenkopf
+ist 270 Einheiten hoch, also ein Linienabstand — daraus folgt der Maßstab,
+der G-Schlüssel sitzt mit seiner Schnecke auf der G-Linie, der F-Schlüssel
+mit den Punkten um die F-Linie. Ein Bau ohne eingebaute Schriften (Web)
+zeichnet die Formen selbst wie bisher. Die Oberfläche schreibt DejaVu Sans
+(`GUI_FONT`, damit das Blatt sie beim Wechsel der Schrift nicht verdirbt),
+die Taktart DejaVu Serif fett.
 
 Das Blatt hat einen **Zoom** (Strg+Plus/Minus, Strg+0, Strg+Mausrad, Menü
 `Ansicht`); beim Start und nach dem Vergrößern des Fensters richtet er sich

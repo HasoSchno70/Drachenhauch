@@ -41,14 +41,14 @@ preview at the mouse, the **input marker** (blue line) and the playhead; at
 the bottom a **keyboard** across three octaves.
 
 **Clefs, note heads, rests and accidentals come from the music font Noto
-Music** (`examples/assets/NotoMusic-Regular.ttf`, SIL Open Font License, see
-`examples/assets/CREDITS_notomusic.txt`), loaded with `LOADFONT` together
-with the characters needed. Each glyph is placed by its measurements in font
-units: a note head is 270 units tall, i.e. one staff space — that gives the
-scale; the G clef sits with its curl on the G line, the F clef with its dots
-around the F line. If the file is missing (a copy of the program without the
-`assets` folder), the score editor draws the shapes itself as before. The
-interface uses DejaVu Sans, the time signature DejaVu Serif bold.
+Music**, built into dhrt (`LOADFONT("noten")`, SIL Open Font License, see
+`daten/schriften/OFL-NotoMusic.txt`). Each glyph is placed by its
+measurements from the font file (`FONT_GLYPH_BOX`): a note head is 270 units
+tall, i.e. one staff space — that gives the scale; the G clef sits with its
+curl on the G line, the F clef with its dots around the F line. A build
+without built-in fonts (web) draws the shapes itself as before. The
+interface uses DejaVu Sans (`GUI_FONT`, so the sheet does not spoil it when
+switching fonts), the time signature DejaVu Serif bold.
 
 The sheet has a **zoom** (Ctrl+Plus/Minus, Ctrl+0, Ctrl+mouse wheel, menu
 `Ansicht`); at start and after enlarging the window it follows the window

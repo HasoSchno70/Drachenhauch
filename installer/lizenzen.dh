@@ -247,6 +247,20 @@ ARRAY_PUSH(mpl, kanonisch$(lizenzOrdner, "MPL-2.0.txt"))
 ARRAY_PUSH(mpl, "")
 ARRAY_PUSH(teile, JOIN$(mpl, CHR$(10)))
 
+' Die eingebettete Notenschrift (LOADFONT("noten")) steht unter der SIL Open
+' Font License -- deren Text gehoert zu jeder Weitergabe von dhrt.
+DIM ofl AS STRING : ofl = wurzel + "/daten/schriften/OFL-NotoMusic.txt"
+IF FILEEXISTS(ofl) THEN
+    DIM schrift AS ARRAY OF STRING : schrift = []
+    ARRAY_PUSH(schrift, SEP)
+    ARRAY_PUSH(schrift, "SCHRIFTEN (in dhrt eingebettet)")
+    ARRAY_PUSH(schrift, SEP)
+    ARRAY_PUSH(schrift, "")
+    ARRAY_PUSH(schrift, kanonisch$(wurzel + "/daten/schriften", "OFL-NotoMusic.txt"))
+    ARRAY_PUSH(schrift, "")
+    ARRAY_PUSH(teile, JOIN$(schrift, CHR$(10)))
+END IF
+
 DIM alles AS STRING : alles = JOIN$(teile, CHR$(10))
 WRITEALL(ziel, alles)
 PRINT "geschrieben: "; ziel; " ("; LEN(alles) \ 1024; " KB, "; LEN(plaetze); " Crates)"

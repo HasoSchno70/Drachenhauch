@@ -73,9 +73,12 @@ GUI_THEME_PRESET("glas_dunkel")
 ' Eine echte Schrift statt der eingebauten Pixelschrift: DejaVu Sans, in
 ' dhrt eingebettet -- also auf jedem System dieselbe. Gross geladen, klein
 ' gezeichnet: so bleibt sie scharf.
-' Dazu die paar Zeichen, die nicht im Grundvorrat stehen (Abspielen-Dreieck).
-DIM uiFont AS INTEGER : uiFont = LOADFONT("sans", 32, "▶■")
+' Zeichen ausserhalb des Grundvorrats (das Abspielen-Dreieck) backt die
+' Laufzeit beim ersten Gebrauch aus derselben Datei nach. GUI_FONT macht sie
+' zur Schrift der gui -- unabhaengig davon, womit die Wellenform zeichnet.
+DIM uiFont AS INTEGER : uiFont = LOADFONT("sans", 32)
 SETFONT(uiFont, 15)
+GUI_FONT(uiFont, 15)
 
 DIM win AS GUI_WINDOW
 win = GUI_WINDOW("SFX-Generator", 0, 0, SCREENWIDTH(), SCREENHEIGHT())

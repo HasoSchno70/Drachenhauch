@@ -532,8 +532,8 @@ mod tests {
         assert!(d.schrift_laden("helvetica-fett", dejavu::sans::bold().to_vec()).is_err());
         assert!(d.schrift_laden("kaputt", b"keine schrift".to_vec()).is_err());
         d.schrift_laden("Hausschrift", dejavu::serif::italic().to_vec()).unwrap();
-        assert_eq!(d.schrift_suchen("hausschrift"), Ok(12));
-        assert_eq!(d.schrift_name(12), "hausschrift");
+        assert_eq!(d.schrift_suchen("hausschrift"), Ok(13));
+        assert_eq!(d.schrift_name(13), "hausschrift");
         assert!(d.schrift_laden("hausschrift", dejavu::serif::italic().to_vec()).is_err());
     }
 

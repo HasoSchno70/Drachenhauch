@@ -1305,6 +1305,18 @@ pub struct Graphics {
     glyphen_fehlend: std::cell::RefCell<std::collections::HashSet<u32>>,
     /// Codepunkte, die keine Datei liefern konnte -- nicht jedes Bild neu.
     glyphen_unmoeglich: std::collections::HashSet<u32>,
+    /// Je LOADFONT-Handle Zeichen, die der Font NICHT gebacken hat, die aber
+    /// in seiner eigenen Datei stehen koennten. FLIP backt den Font damit
+    /// neu (`eigene_nachbacken`) -- vorher kam z.B. das Dreieck von
+    /// `LOADFONT("sans")` als "?", obwohl DejaVu es hat: gefragt wurden nur
+    /// die Ausweich-Schriften des Systems.
+    eigen_fehlt: std::cell::RefCell<std::collections::HashMap<i64, std::collections::BTreeSet<u32>>>,
+    /// (Handle, Zeichen), die die eigene Datei auch nicht hat -- nicht noch
+    /// einmal backen; sie gehen an die Ausweich-Schriften.
+    eigen_nie: std::collections::HashSet<(i64, u32)>,
+    /// Die Bytes je Font fuer FONT_GLYPH_BOX/FONT_BASELINE (beim ersten
+    /// Fragen gelesen).
+    font_bytes: std::cell::RefCell<HashMap<i64, std::rc::Rc<Vec<u8>>>>,
     /// Groesse, in der die Ausweich-Schriften gebacken werden.
     ausweich_groesse: i32,
     /// Zuletzt gemeldete Lage des IME-Umwandlungsfensters (Client-Pixel).
@@ -1683,7 +1695,7 @@ fn eingebauter_pfad(pfad: &str, befehl: &str) -> Result<Option<String>, String> 
     let k = pfad.trim().to_lowercase();
     let familie = k.split('-').next().unwrap_or("");
     if !k.contains('.') && !k.contains('/') && !k.contains('\\')
-        && ["sans", "serif", "mono", "helvetica", "times", "courier"].contains(&familie) {
+        && ["sans", "serif", "mono", "helvetica", "times", "courier", "noten"].contains(&familie) {
         return Err(format!("{}: '{}' ist eine eingebaute Schrift, aber dieser Bau hat keine (Feature \"schriften\") -- eine .ttf-Datei angeben", befehl, pfad));
     }
     Ok(None)
@@ -2014,6 +2026,9 @@ impl Graphics {
             ausweich: Vec::new(), font_glyphs: Vec::new(),
             glyphen_fehlend: std::cell::RefCell::new(std::collections::HashSet::new()),
             glyphen_unmoeglich: std::collections::HashSet::new(),
+            eigen_fehlt: std::cell::RefCell::new(std::collections::HashMap::new()),
+            eigen_nie: std::collections::HashSet::new(),
+            font_bytes: std::cell::RefCell::new(HashMap::new()),
             ausweich_groesse: 32, ime_zuletzt: None,
             text_spacing: 0.0,
             textures: Vec::new(),
@@ -2120,9 +2135,17 @@ impl Graphics {
         if s.is_ascii() { return; }
         let s = if h < 0 && h != FONT_AUSWEICH { pixel_ersatz(s) } else { std::borrow::Cow::Borrowed(s) };
         let mut fehlend = self.glyphen_fehlend.borrow_mut();
+        // Ein geladener Font mit einer Datei dahinter fragt zuerst seine
+        // eigene Datei (FLIP backt nach), erst danach die Ausweich-Schriften.
+        let eigene_datei = h >= 0 && self.font_herkunft.get(h as usize).map_or(false, |(p, _, n)| !p.is_empty() && *n > 0);
         for ch in s.chars() {
             let c = ch as u32;
-            if c < 0x80 || self.font_hat(h, c) || self.glyphen_unmoeglich.contains(&c) { continue; }
+            if c < 0x80 || self.font_hat(h, c) { continue; }
+            if eigene_datei && !self.eigen_nie.contains(&(h, c)) {
+                self.eigen_fehlt.borrow_mut().entry(h).or_default().insert(c);
+                continue;
+            }
+            if self.glyphen_unmoeglich.contains(&c) { continue; }
             if self.ausweich.iter().any(|a| a.hat.contains(&c)) { continue; }
             fehlend.insert(c);
         }
@@ -2156,6 +2179,7 @@ impl Graphics {
     /// Datei, damit nichts verloren geht. Ein Zeichen, das keine Datei
     /// liefert, wandert nach `glyphen_unmoeglich` und bleibt ein `?`.
     fn ausweich_nachladen(&mut self) {
+        for c in self.eigene_nachbacken() { self.glyphen_fehlend.borrow_mut().insert(c); }
         let fehlend: Vec<u32> = self.glyphen_fehlend.borrow_mut().drain().collect();
         if fehlend.is_empty() { return; }
         let mut je_datei: std::collections::BTreeMap<String, Vec<u32>> = std::collections::BTreeMap::new();
@@ -2194,6 +2218,102 @@ impl Graphics {
                 None => self.ausweich.push(eintrag),
             }
         }
+    }
+
+    /// Fonts, denen Zeichen fehlten, mit diesen Zeichen aus ihrer EIGENEN
+    /// Datei neu backen. Liefert die Zeichen, die auch dort nicht stehen --
+    /// die fragt danach die Ausweich-Schrift. Das Handle bleibt dasselbe, nur
+    /// der Font dahinter wird ersetzt; im selben Bild Gemessenes hatte noch
+    /// die alte Breite (wie bei den Ausweich-Schriften: ein Bild lang).
+    fn eigene_nachbacken(&mut self) -> Vec<u32> {
+        let auftraege: Vec<(i64, std::collections::BTreeSet<u32>)> = self.eigen_fehlt.borrow_mut().drain().collect();
+        let mut weiter = Vec::new();
+        for (h, neue) in auftraege {
+            let Some((pfad, zeichen, groesse)) = self.font_herkunft.get(h as usize).cloned() else { continue };
+            let mut alle: std::collections::BTreeSet<char> = zeichen.chars().collect();
+            for &c in &neue { if let Some(ch) = char::from_u32(c) { alle.insert(ch); } }
+            let text: String = alle.into_iter().collect();
+            let rl = &mut self.rl;
+            let thread = &self.thread;
+            let f = match schrift_laden(rl, thread, &pfad, groesse, &text) {
+                Ok(f) => f,
+                Err(_) => {
+                    for c in neue { self.eigen_nie.insert((h, c)); weiter.push(c); }
+                    continue;
+                }
+            };
+            let hat = glyph_menge(&f);
+            let gewonnen = neue.iter().any(|c| hat.contains(c));
+            for c in neue {
+                if !hat.contains(&c) { self.eigen_nie.insert((h, c)); weiter.push(c); }
+            }
+            if gewonnen {
+                unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
+                self.font_glyphs[h as usize] = hat;
+                self.fonts[h as usize] = f;
+                self.font_herkunft[h as usize].1 = text;
+            }
+        }
+        weiter
+    }
+
+    /// GUI_FONT: die gui zeichnet mit IHRER Schrift, unabhaengig davon, was
+    /// das Programm gerade mit SETFONT eingestellt hat. Die VM tauscht dafuer
+    /// die aktive Schrift fuer die Dauer eines gui-Befehls aus und stellt sie
+    /// danach zurueck. Liefert die vorige (Schrift, Groesse).
+    pub fn schrift_tauschen(&mut self, font: i64, groesse: i32) -> (i64, i32) {
+        let vorher = (self.active_font, self.text_size);
+        self.active_font = font;
+        self.text_size = groesse.max(1);
+        vorher
+    }
+
+    /// Ist `h` ein gueltiges Font-Handle (-1 = Standardschrift)?
+    pub fn font_gueltig(&self, h: i64) -> bool { h == -1 || (h >= 0 && (h as usize) < self.fonts.len()) }
+
+    /// Die Bytes der Schriftdatei hinter einem Handle -- fuer die Masse.
+    fn font_daten(&self, h: i64, befehl: &str) -> Result<std::rc::Rc<Vec<u8>>, String> {
+        if let Some(d) = self.font_bytes.borrow().get(&h) { return Ok(d.clone()); }
+        let pfad = if h >= 0 { self.font_herkunft.get(h as usize).map(|(p, _, _)| p.clone()).unwrap_or_default() } else { String::new() };
+        if pfad.is_empty() {
+            return Err(format!("{}: Font {} hat keine Schriftdatei (Masse haben nur Fonts, die LOADFONT aus einer TrueType-/OpenType-Datei geladen hat)", befehl, h));
+        }
+        let (daten, _) = schrift_daten(&pfad).map_err(|e| format!("{}: {}", befehl, e))?;
+        let d = std::rc::Rc::new(daten);
+        self.font_bytes.borrow_mut().insert(h, d.clone());
+        Ok(d)
+    }
+
+    /// Massstab wie raylib (stb_truetype `ScaleForPixelHeight`): die Groesse
+    /// ist Oberlaenge minus Unterlaenge aus der hhea-Tabelle.
+    fn font_massstab(face: &ttf_parser::Face, groesse: f64) -> f64 {
+        let h = face.tables().hhea;
+        groesse / ((h.ascender as f64) - (h.descender as f64)).max(1.0)
+    }
+
+    /// FONT_BASELINE(font, groesse): wie weit unter der Oberkante, an die
+    /// TEXT den Text setzt, die Grundlinie liegt (Pixel).
+    pub fn font_baseline(&self, h: i64, groesse: f64) -> Result<f64, String> {
+        let d = self.font_daten(h, "FONT_BASELINE")?;
+        let face = ttf_parser::Face::parse(&d, 0).map_err(|e| format!("FONT_BASELINE: Schrift nicht lesbar: {}", e))?;
+        Ok(face.tables().hhea.ascender as f64 * Self::font_massstab(&face, groesse))
+    }
+
+    /// FONT_GLYPH_BOX(font, zeichen$, groesse): das Rechteck, das die Glyphe
+    /// wirklich bedeckt -- (x, y, breite, hoehe) relativ zu dem Punkt, an den
+    /// TEXT(x, y, zeichen$) den Text setzt. Ein Zeichen ohne Umriss (das
+    /// Leerzeichen) liefert eine leere Flaeche an der Grundlinie.
+    pub fn font_glyph_box(&self, h: i64, zeichen: char, groesse: f64) -> Result<(f64, f64, f64, f64), String> {
+        let d = self.font_daten(h, "FONT_GLYPH_BOX")?;
+        let face = ttf_parser::Face::parse(&d, 0).map_err(|e| format!("FONT_GLYPH_BOX: Schrift nicht lesbar: {}", e))?;
+        let m = Self::font_massstab(&face, groesse);
+        let gid = face.glyph_index(zeichen).ok_or_else(|| format!("FONT_GLYPH_BOX: die Schrift hat kein Zeichen '{}' (U+{:04X})", zeichen, zeichen as u32))?;
+        let asc = face.tables().hhea.ascender as f64;
+        Ok(match face.glyph_bounding_box(gid) {
+            Some(b) => (b.x_min as f64 * m, (asc - b.y_max as f64) * m,
+                        (b.x_max as f64 - b.x_min as f64) * m, (b.y_max as f64 - b.y_min as f64) * m),
+            None => (0.0, asc * m, 0.0, 0.0),
+        })
     }
 
     /// SCREEN nach einem Lazy-Init (oder erneutes SCREEN): das bestehende Fenster
