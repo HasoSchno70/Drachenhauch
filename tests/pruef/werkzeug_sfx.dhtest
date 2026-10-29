@@ -98,7 +98,7 @@ END FUNCTION
 SUB prFall()
     ' Jedes Bedienelement liegt im Fenster, und keine zwei liegen
     ' uebereinander. Beschriftungen zaehlen mit (sie duerfen auf keinem
-    ' Knopf stehen); Gruppenrahmen nicht -- in ihnen liegt alles.
+    ' Knopf stehen); Gruppenrahmen nur beim Fensterrand -- in ihnen liegt alles.
     DIM n AS INTEGER : n = GUI_WINDOW_WIDGET_COUNT(win)
     DIM i AS INTEGER
     DIM j AS INTEGER
@@ -108,11 +108,11 @@ SUB prFall()
     DIM wj AS GUI_WIDGET
     FOR i = 0 TO n - 1
         wi = GUI_WINDOW_WIDGET(win, i)
+        IF GUI_GET_X(wi) < 0 OR GUI_GET_Y(wi) < 0 OR GUI_GET_X(wi) + GUI_GET_W(wi) > GUI_WINDOW_CONTENT_W(win) OR GUI_GET_Y(wi) + GUI_GET_H(wi) > GUI_WINDOW_CONTENT_H(win) THEN
+            raus = raus + 1
+            prMerke("ausserhalb " + GUI_KIND(wi) + " " + GUI_TEXT(wi))
+        END IF
         IF GUI_KIND(wi) <> "groupbox" THEN
-            IF GUI_GET_X(wi) < 0 OR GUI_GET_Y(wi) < 0 OR GUI_GET_X(wi) + GUI_GET_W(wi) > GUI_WINDOW_CONTENT_W(win) OR GUI_GET_Y(wi) + GUI_GET_H(wi) > GUI_WINDOW_CONTENT_H(win) THEN
-                raus = raus + 1
-                prMerke("ausserhalb " + GUI_KIND(wi) + " " + GUI_TEXT(wi))
-            END IF
             FOR j = i + 1 TO n - 1
                 wj = GUI_WINDOW_WIDGET(win, j)
                 IF GUI_KIND(wj) <> "groupbox" THEN
@@ -882,6 +882,432 @@ IF prStart >= 0 THEN prProbe(prBild - prStart)
 DHRT_FRAMES=68
 --- inhalt _programm/probe.txt
 |uPos 1 uAnz 2|
+
+=== zufall bleibt bei der art
+' [Zufall] wuerfelt in den Grenzen der gewaehlten Vorlage: ein Laser bleibt
+' ein Laser (Saegezahn oder Rechteck, fallender Ton), und der Verlauf nennt ihn.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prOx AS INTEGER : prOx = 0
+DIM prOy AS INTEGER : prOy = 0
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prText AS STRING : prText = ""
+DIM prMerk AS INTEGER : prMerk = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZug(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    DIM i AS INTEGER
+    prE(f, 7, x1, y1)
+    FOR i = 0 TO 6
+        prE(f + 1 + i, 7, x1 + (x2 - x1) * i \ 6, y1 + (y2 - y1) * i \ 6)
+        prE(f + 1 + i, 6, 0, 0)
+    NEXT
+    prE(f + 8, 7, x2, y2)
+    prE(f + 8, 5, 0, 0)
+END SUB
+SUB prStrg(f AS INTEGER, taste AS INTEGER)
+    prE(f, 2, 341, 0)
+    prE(f + 1, 2, taste, 0)
+    prE(f + 3, 1, taste, 0)
+    prE(f + 4, 1, 341, 0)
+END SUB
+SUB prAbspielen()
+    ' Die Wiedergabe setzt beim ERSTEN Ereignis an, egal welche Nummer es
+    ' traegt -- ein Ereignis in Bild 0 macht die Nummern zu Bildern ab jetzt.
+    prE(0, 7, 0, 0)
+    ' Nach Bild sortieren (stabil) -- die Wiedergabe arbeitet der Reihe nach ab.
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    prText = prText + "|" + z + "|" + CHR$(10)
+    WRITEALL("probe.txt", prText)
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+FUNCTION prDeckt(ax AS INTEGER, ay AS INTEGER, aw AS INTEGER, ah AS INTEGER, bx AS INTEGER, by AS INTEGER, bw AS INTEGER, bh AS INTEGER) AS BOOLEAN
+    RETURN ax < bx + bw AND bx < ax + aw AND ay < by + bh AND by < ay + ah
+END FUNCTION
+SUB prFall()
+    prKlick(6, prOx + GUI_GET_X(liste) + 60, prOy + GUI_GET_Y(liste) + 33)
+    prKlick(24, prOx + GUI_GET_X(knopfZufall) + 40, prOy + GUI_GET_Y(knopfZufall) + 14)
+    prAbspielen()
+END SUB
+SUB prProbe(k AS INTEGER)
+    IF k = 45 THEN
+        prMerke("welle laser " + prJa$(wf$() = "saw" OR wf$() = "square") + " faellt " + prJa$(p(P_SLIDE) < 0))
+        prMerke("schritt " + uName[uPos] + " uAnz " + STR$(uAnz))
+    END IF
+END SUB
+--- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN
+    prOx = GUI_CANVAS_X(flaeche) - GUI_GET_X(flaeche)
+    prOy = GUI_CANVAS_Y(flaeche) - GUI_GET_Y(flaeche)
+    prFall()
+END IF
+IF prStart >= 0 THEN prProbe(prBild - prStart)
+--- umgebung
+DHRT_FRAMES=70
+--- inhalt _programm/probe.txt
+|welle laser ja faellt ja|
+|schritt Zufall: Laser uAnz 3|
+
+=== mutieren aendert wenig und ist ein schritt
+' [Mutieren] verschiebt jeden Wert um hoechstens 6 % seines Bereichs, die
+' Wellenform bleibt -- und es ist EIN Schritt mit Namen.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prOx AS INTEGER : prOx = 0
+DIM prOy AS INTEGER : prOy = 0
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prText AS STRING : prText = ""
+DIM prMerk AS INTEGER : prMerk = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZug(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    DIM i AS INTEGER
+    prE(f, 7, x1, y1)
+    FOR i = 0 TO 6
+        prE(f + 1 + i, 7, x1 + (x2 - x1) * i \ 6, y1 + (y2 - y1) * i \ 6)
+        prE(f + 1 + i, 6, 0, 0)
+    NEXT
+    prE(f + 8, 7, x2, y2)
+    prE(f + 8, 5, 0, 0)
+END SUB
+SUB prStrg(f AS INTEGER, taste AS INTEGER)
+    prE(f, 2, 341, 0)
+    prE(f + 1, 2, taste, 0)
+    prE(f + 3, 1, taste, 0)
+    prE(f + 4, 1, 341, 0)
+END SUB
+SUB prAbspielen()
+    ' Die Wiedergabe setzt beim ERSTEN Ereignis an, egal welche Nummer es
+    ' traegt -- ein Ereignis in Bild 0 macht die Nummern zu Bildern ab jetzt.
+    prE(0, 7, 0, 0)
+    ' Nach Bild sortieren (stabil) -- die Wiedergabe arbeitet der Reihe nach ab.
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    prText = prText + "|" + z + "|" + CHR$(10)
+    WRITEALL("probe.txt", prText)
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+FUNCTION prDeckt(ax AS INTEGER, ay AS INTEGER, aw AS INTEGER, ah AS INTEGER, bx AS INTEGER, by AS INTEGER, bw AS INTEGER, bh AS INTEGER) AS BOOLEAN
+    RETURN ax < bx + bw AND bx < ax + aw AND ay < by + bh AND by < ay + ah
+END FUNCTION
+SUB prFall()
+    prMerk = INT(GUI_VALUE(regler[P_FREQ]))
+    WRITEALL("welle.txt", wf$())
+    prKlick(6, prOx + GUI_GET_X(knopfMutieren) + 40, prOy + GUI_GET_Y(knopfMutieren) + 14)
+    prAbspielen()
+END SUB
+SUB prProbe(k AS INTEGER)
+    IF k = 25 THEN
+        prMerke("wenig " + prJa$(ABS(INT(GUI_VALUE(regler[P_FREQ])) - prMerk) <= 480) + " welle bleibt " + prJa$(wf$() = READLINES("welle.txt")[0]))
+        prMerke("schritt " + uName[uPos] + " uAnz " + STR$(uAnz))
+    END IF
+END SUB
+--- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN
+    prOx = GUI_CANVAS_X(flaeche) - GUI_GET_X(flaeche)
+    prOy = GUI_CANVAS_Y(flaeche) - GUI_GET_Y(flaeche)
+    prFall()
+END IF
+IF prStart >= 0 THEN prProbe(prBild - prStart)
+--- umgebung
+DHRT_FRAMES=50
+--- inhalt _programm/probe.txt
+|wenig ja welle bleibt ja|
+|schritt Mutiert uAnz 2|
+
+=== ein klick in den verlauf holt den schritt zurueck
+' Der Verlauf links unten ist mehr als eine Anzeige: ein Klick auf den
+' ersten Eintrag stellt die Muenze wieder her, der Vor-Weg bleibt.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prOx AS INTEGER : prOx = 0
+DIM prOy AS INTEGER : prOy = 0
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prText AS STRING : prText = ""
+DIM prMerk AS INTEGER : prMerk = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZug(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    DIM i AS INTEGER
+    prE(f, 7, x1, y1)
+    FOR i = 0 TO 6
+        prE(f + 1 + i, 7, x1 + (x2 - x1) * i \ 6, y1 + (y2 - y1) * i \ 6)
+        prE(f + 1 + i, 6, 0, 0)
+    NEXT
+    prE(f + 8, 7, x2, y2)
+    prE(f + 8, 5, 0, 0)
+END SUB
+SUB prStrg(f AS INTEGER, taste AS INTEGER)
+    prE(f, 2, 341, 0)
+    prE(f + 1, 2, taste, 0)
+    prE(f + 3, 1, taste, 0)
+    prE(f + 4, 1, 341, 0)
+END SUB
+SUB prAbspielen()
+    ' Die Wiedergabe setzt beim ERSTEN Ereignis an, egal welche Nummer es
+    ' traegt -- ein Ereignis in Bild 0 macht die Nummern zu Bildern ab jetzt.
+    prE(0, 7, 0, 0)
+    ' Nach Bild sortieren (stabil) -- die Wiedergabe arbeitet der Reihe nach ab.
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    prText = prText + "|" + z + "|" + CHR$(10)
+    WRITEALL("probe.txt", prText)
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+FUNCTION prDeckt(ax AS INTEGER, ay AS INTEGER, aw AS INTEGER, ah AS INTEGER, bx AS INTEGER, by AS INTEGER, bw AS INTEGER, bh AS INTEGER) AS BOOLEAN
+    RETURN ax < bx + bw AND bx < ax + aw AND ay < by + bh AND by < ay + ah
+END FUNCTION
+SUB prFall()
+    prMerk = INT(GUI_VALUE(regler[P_FREQ]))
+    prKlick(6, prOx + GUI_GET_X(liste) + 60, prOy + GUI_GET_Y(liste) + 55)
+    prKlick(30, prOx + GUI_GET_X(listVerlauf) + 60, prOy + GUI_GET_Y(listVerlauf) + 14)
+    prAbspielen()
+END SUB
+SUB prProbe(k AS INTEGER)
+    IF k = 25 THEN prMerke("nach der vorlage " + wf$() + " uAnz " + STR$(uAnz) + " uPos " + STR$(uPos))
+    IF k = 50 THEN prMerke("zurueckgeholt " + wf$() + " frequenz wie vorher " + prJa$(INT(GUI_VALUE(regler[P_FREQ])) = prMerk) + " uAnz " + STR$(uAnz) + " uPos " + STR$(uPos))
+END SUB
+--- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN
+    prOx = GUI_CANVAS_X(flaeche) - GUI_GET_X(flaeche)
+    prOy = GUI_CANVAS_Y(flaeche) - GUI_GET_Y(flaeche)
+    prFall()
+END IF
+IF prStart >= 0 THEN prProbe(prBild - prStart)
+--- umgebung
+DHRT_FRAMES=75
+--- inhalt _programm/probe.txt
+|nach der vorlage noise uAnz 2 uPos 1|
+|zurueckgeholt square frequenz wie vorher ja uAnz 2 uPos 0|
+
+=== die huellkurve laesst sich ziehen
+' Der Endpunkt der Huellkurve (D) in der Wellenform, 100 Punkte (rund 30 ms) nach rechts
+' gezogen: das Ausklingen wird laenger, der Zug ist EIN Schritt.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prOx AS INTEGER : prOx = 0
+DIM prOy AS INTEGER : prOy = 0
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prText AS STRING : prText = ""
+DIM prMerk AS INTEGER : prMerk = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZug(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    DIM i AS INTEGER
+    prE(f, 7, x1, y1)
+    FOR i = 0 TO 6
+        prE(f + 1 + i, 7, x1 + (x2 - x1) * i \ 6, y1 + (y2 - y1) * i \ 6)
+        prE(f + 1 + i, 6, 0, 0)
+    NEXT
+    prE(f + 8, 7, x2, y2)
+    prE(f + 8, 5, 0, 0)
+END SUB
+SUB prStrg(f AS INTEGER, taste AS INTEGER)
+    prE(f, 2, 341, 0)
+    prE(f + 1, 2, taste, 0)
+    prE(f + 3, 1, taste, 0)
+    prE(f + 4, 1, 341, 0)
+END SUB
+SUB prAbspielen()
+    ' Die Wiedergabe setzt beim ERSTEN Ereignis an, egal welche Nummer es
+    ' traegt -- ein Ereignis in Bild 0 macht die Nummern zu Bildern ab jetzt.
+    prE(0, 7, 0, 0)
+    ' Nach Bild sortieren (stabil) -- die Wiedergabe arbeitet der Reihe nach ab.
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    prText = prText + "|" + z + "|" + CHR$(10)
+    WRITEALL("probe.txt", prText)
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+FUNCTION prDeckt(ax AS INTEGER, ay AS INTEGER, aw AS INTEGER, ah AS INTEGER, bx AS INTEGER, by AS INTEGER, bw AS INTEGER, bh AS INTEGER) AS BOOLEAN
+    RETURN ax < bx + bw AND bx < ax + aw AND ay < by + bh AND by < ay + ah
+END FUNCTION
+SUB prFall()
+    prMerk = INT(GUI_VALUE(regler[P_DECAY]))
+    prZug(6, punktX(2), punktY(2), punktX(2) + 100, punktY(2))
+    prAbspielen()
+END SUB
+SUB prProbe(k AS INTEGER)
+    IF k = 30 THEN prMerke("laenger " + prJa$(INT(GUI_VALUE(regler[P_DECAY])) > prMerk + 15) + " attack bleibt " + prJa$(INT(GUI_VALUE(regler[P_ATTACK])) = 0))
+    IF k = 30 THEN prMerke("schritt " + uName[uPos] + " uAnz " + STR$(uAnz))
+END SUB
+--- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN
+    prOx = GUI_CANVAS_X(flaeche) - GUI_GET_X(flaeche)
+    prOy = GUI_CANVAS_Y(flaeche) - GUI_GET_Y(flaeche)
+    prFall()
+END IF
+IF prStart >= 0 THEN prProbe(prBild - prStart)
+--- umgebung
+DHRT_FRAMES=55
+--- inhalt _programm/probe.txt
+|laenger ja attack bleibt ja|
+|schritt Hüllkurve uAnz 2|
 
 === der gb-code nimmt den pan mit und laeuft
 ' Der kopierte Code soll klingen wie die Vorschau daneben. Der Pan liegt aber
