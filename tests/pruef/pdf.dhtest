@@ -201,7 +201,7 @@ DIM p AS PDF
 p = PDF_NEW()
 PDF_FONT(p, "comic sans", 12)
 --- fehler
-PDF_FONT: Schrift 'comic sans' gibt es nicht. Eingebaut sind sans, sans-fett, sans-kursiv, sans-fett-kursiv, serif, serif-fett, serif-kursiv, serif-fett-kursiv, mono, mono-fett, mono-kursiv, mono-fett-kursiv (helvetica, times und courier meinen sans, serif und mono); eine eigene laedt PDF_FONT_LOAD
+PDF_FONT: Schrift 'comic sans' gibt es nicht. Eingebaut sind sans, sans-fett, sans-kursiv, sans-fett-kursiv, serif, serif-fett, serif-kursiv, serif-fett-kursiv, mono, mono-fett, mono-kursiv, mono-fett-kursiv, noten (helvetica, times und courier meinen sans, serif und mono); eine eigene laedt PDF_FONT_LOAD
 
 === unbekannte seitengroesse
 IMPORT "pdf"
