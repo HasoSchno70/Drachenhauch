@@ -907,7 +907,10 @@ Dieselben Namen nehmen `GUI_ICON_BUTTON`, `GUI_SET_ICON` und
 `suchen`, `start`, `stopp`, `pause`, `debug`, `haltepunkt`, `pruefen`,
 `profil`, `handbuch`, `einstellungen`, `werkzeug`, `umbruch`, `info`,
 `warnung`, `plus`, `minus`, `schliessen`, `links`, `rechts`, `hoch`,
-`runter`, `menue`, `aktualisieren`.
+`runter`, `menue`, `aktualisieren`, und für Malwerkzeuge und Editoren
+`stift`, `radierer`, `fuellen`, `linie`, `rechteck`, `ellipse`, `pipette`,
+`auswahl`, `lasso`, `zauberstab`, `verschieben`, `spruehen`, `wuerfel`,
+`raster`, `auge`, `auge_zu`, `spiegeln`, `drehen`.
 
 Ein unbekannter Name ist ein **Fehler**, der die bekannten aufzählt — ein
 still leerer Knopf fiele erst auf, wenn jemand ihn sucht. Wer ein eigenes
