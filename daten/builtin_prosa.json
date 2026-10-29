@@ -409,7 +409,7 @@
   "DRAWIMAGE9": "9-Slice: das Bild in das Rechteck gestreckt, die vier Ecken in ihrer Größe, die Ränder nur in einer Richtung, die Mitte in beiden — für Rahmen, Panels und Knöpfe, die beliebig groß werden, ohne zu verzerren. Ränder in Pixeln des Bildes; passt das Ziel nicht, werden die Ecken im Verhältnis kleiner. Camera-aware.",
   "DRAWIMAGEFLIPPED": "mit Spiegelung",
   "DRAWIMAGEPART": "Sub-Rechteck aus Sheet zeichnen",
-  "DRAWIMAGEPARTEX": "Wie DRAWIMAGEPART, aber mit eigener Zielgröße (w, h) statt 1:1 – der Ausschnitt wird beim Zeichnen auf die Zielgröße gestreckt oder gestaucht.",
+  "DRAWIMAGEPARTEX": "Sub-Rechteck auf die Größe w x h gezogen; farbe tönt es, ihr Alpha ist die Deckkraft (RGBA(255, 255, 255, 128) = halb durchsichtig)",
   "DRAWIMAGEROT": "zentriert auf (x,y), um winkel Grad gedreht (um die Mitte), optional skaliert + getönt. Ideal für rotierte Sprites / physics2d (winkel = DEG(PHYS2D_BODY_ANGLE(...))). Camera-aware.",
   "DRAWTILEMAP": "Zeichnet ein zweidimensionales Array von Kachel-Nummern als Karte.",
   "ECS_ADD_FLOAT": "FLOAT (int wird akzeptiert + konvertiert)",
