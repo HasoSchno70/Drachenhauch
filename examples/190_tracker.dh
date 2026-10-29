@@ -35,8 +35,12 @@
 '
 '  Nicht portiert (die Qt-Fassung hat es):
 '    Samples anlegen und bearbeiten (WAV/OGG/SF2 laden, Keymap-Dialog,
-'    Loop-Marker); VU-Meter je Kanal; Umbenennen von Patterns; der
-'    Sample-Offset-Effekt.
+'    Loop-Marker); der Sample-Offset-Effekt.
+'
+'  Seit 2026-10-29 dazu: echte Schriften (Mono im Gitter), ein Fenster, das
+'  sich vergroessern laesst, Werkzeug- und Statusleiste, ein Pegel je Kanal,
+'  die Song-Uebersicht als Kachelreihe, Patterns umbenennen und eine
+'  Klaviatur, die die klingenden Noten zeigt.
 '
 '  Was dieser Pilot in der Laufzeit freigelegt hat: AUDIO_NOTE (eine Note
 '  mit Sustain-PEGEL und Ausklingen -- AUDIO_SFX kennt nur drei Zeiten),

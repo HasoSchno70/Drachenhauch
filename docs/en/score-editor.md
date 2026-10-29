@@ -29,18 +29,30 @@ and can be resized.
 ## Layout
 
 At the top the tools (duration, dotted, accidental, mode, fingering number,
-BPM, play, to tracker, +/- track) below the menu `Datei`/`Bearbeiten`
-(File/Edit), on the left per track the name, clef and instrument (the
-tracker's 18 factory presets), in the middle the staves — painted with the
-normal drawing commands: five lines, bar shading, bar lines, ledger lines,
-note heads (filled below the half note), stems, flags, beams for runs of
-eighths and sixteenths of the same duration, rests, slurs as `SPLINE`,
-fingering, staccato dot, a preview at the mouse and the playhead.
+BPM, play, to tracker, +/- track) below the menu `Datei`/`Bearbeiten`/
+`Ansicht` (File/Edit/View), on the right of the status message row the
+**note values** as a button strip (whole to sixteenth and the dot), on the
+left per track the name, clef and instrument (the tracker's 18 factory
+presets), in the middle the staves with clef and 4/4 time signature, bar
+shading, bar lines with bar numbers, ledger lines, note heads, stems, flags,
+beams for runs of eighths and sixteenths of the same duration, rests by their
+duration, augmentation dots, slurs as `SPLINE`, fingering, staccato dot, a
+preview at the mouse, the **input marker** (blue line) and the playhead; at
+the bottom a **keyboard** across three octaves.
 
-**Clefs and accidentals are drawn by the tool itself** (a curve through fixed
-points, a sharp from four strokes, the flat as a shape of its own): the music
-symbols of the symbol fonts arrived as question marks, and a question mark at
-the start of the line is worse than a plain shape.
+**Clefs, note heads, rests and accidentals come from the music font Noto
+Music** (`examples/assets/NotoMusic-Regular.ttf`, SIL Open Font License, see
+`examples/assets/CREDITS_notomusic.txt`), loaded with `LOADFONT` together
+with the characters needed. Each glyph is placed by its measurements in font
+units: a note head is 270 units tall, i.e. one staff space — that gives the
+scale; the G clef sits with its curl on the G line, the F clef with its dots
+around the F line. If the file is missing (a copy of the program without the
+`assets` folder), the score editor draws the shapes itself as before. The
+interface uses DejaVu Sans, the time signature DejaVu Serif bold.
+
+The sheet has a **zoom** (Ctrl+Plus/Minus, Ctrl+0, Ctrl+mouse wheel, menu
+`Ansicht`); at start and after enlarging the window it follows the window
+height (800 pixels = 100 %) until you zoom yourself.
 
 ## Operation
 
@@ -61,6 +73,10 @@ the start of the line is worse than a plain shape.
 | Undo | Ctrl+Z / Ctrl+Y — every change; the state is remembered as JSON text |
 | File | Ctrl+N new, Ctrl+O open, Ctrl+S save, Ctrl+Shift+S save as, Ctrl+Q quit |
 | Open in tracker | Ctrl+T or the button (see below) |
+| Typing notes | At the input marker: `C D E F G A H` set a note (with the accidental from the drop-down list, `B` = the German B, i.e. B flat) and advance by the duration; the octave is the one nearest the previous note. `P` sets a rest. A click on the staff puts the marker after the clicked note |
+| Duration and corrections | `1`–`5` = whole to sixteenth, `.` dotted; arrow left/right moves the marker, arrow up/down moves the note before the marker by a semitone (with Ctrl by an octave), Backspace removes it |
+| Keyboard | A click sets the pitch at the marker; three octaves from C4 (bass clef: from C2), while playing the sounding keys light up in the colour of their track |
+| Zoom | Ctrl+Plus/Minus, Ctrl+0, Ctrl+mouse wheel, menu `Ansicht` |
 
 **Playback** runs on an audio clock (`AUDIO_CLOCK_NEW` + `AUDIO_PLAY_AT`, one
 sixteenth per tick): all notes are scheduled at the start and sound
@@ -129,7 +145,7 @@ the `json` module.
 
 Deliberate simplifications, not swallowed silently:
 
-- **Fixed 4/4 metre** — the interface neither shows nor changes it.
+- **Fixed 4/4 metre** — the interface shows it but cannot change it.
 - **One instrument per track**, at most eight tracks.
 - **Chords are reduced on export** (a tracker channel is monophonic); a click
   on a note of a chord hits the first one at that beat.

@@ -21,6 +21,11 @@
 '  Modus Pause/Bindebogen (zwei Klicks)/Fingersatz/Staccato wie in Qt.
 '  Leertaste oder F5 spielt alles auf einer Audio-Uhr, Mausrad rollt die
 '  Zeit (Umschalt: die Spuren), Strg+Z/Y Rueckgaengig/Wiederholen.
+'  Per Tastatur: C D E F G A H (B) setzen an der Eingabemarke eine Note,
+'  P eine Pause, 1..5 die Dauer, Punkt punktiert, Pfeile korrigieren;
+'  die Klaviatur unten setzt den Ton an der Marke. Strg+Plus/Minus/Rad
+'  zoomt. Schluessel, Koepfe, Pausen und Vorzeichen kommen aus der
+'  Notenschrift Noto Music (assets/NotoMusic-Regular.ttf).
 '
 '  Aufruf:  dhrt run examples/199_notenblatt.dh [-- stueck.json]
 '  Test:    DH_SCORE_LOG=<datei> protokolliert die Ereignisse zeilenweise.

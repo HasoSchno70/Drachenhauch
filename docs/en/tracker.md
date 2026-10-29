@@ -33,22 +33,29 @@ opens the tracker with the piece it just converted via **[In Tracker
 
 ## The window
 
-At the top two toolbars, on the left the column for the channel under the
-cursor, that channel's instrument and the order, on the right the **grid**
-(rows from top to bottom, one column per channel in its own colour), below
-it the **keyboard**, at the very bottom the status line (a `*` means:
-unsaved).
+At the top the toolbar and the pattern row, on the left the column for the
+channel under the cursor, its instrument, the cell under the cursor and the
+order, on the right the song **overview** and below it the **grid** (rows
+from top to bottom, one column per channel in its own colour), below it the
+**keyboard**, at the very bottom the status bar (a `*` means: unsaved). The
+window can be resized freely; overview, grid and keyboard grow with it. The
+interface uses DejaVu Sans, the grid DejaVu Sans Mono (`LOADFONT("mono")`) —
+so note, volume and effect line up exactly from row to row.
 
 | Area | What there is |
 |---|---|
-| Toolbar 1 | [Neu], [Oeffnen], [Sichern], [Sichern als] (New, Open, Save, Save as), **BPM**, **Kanäle** (channels, 4–32), [> Pattern], [> Song], [Stopp] (Stop), [Zurueck], [Vor] (Undo, Redo), [WAV ...] with the checkboxes **Stereo** and **Amiga**, [DH-Code] (DH code) |
-| Toolbar 2 | pattern selection, **Reihen** (rows, 1–64), [+] new pattern, [Dup] copy, [Loesch] delete, [Leeren] clear, **Oktave** (octave) of the keyboard, then the fields of the cell under the cursor: **Vol** (1–15, 0 = default), **Slide** (−12…+12 semitones), **FX** with parameter (0–255), **Instrument** of the note, [Note aus] (note off) |
-| Channel | default instrument of the channel (or a bare waveform `square`/`saw`/`sine`/`triangle`), **M** mute, **S** solo, mixer slider 0–100 % |
-| Instrument | waveform (plus `noise`), volume 1–15, attack/decay/sustain/release, vibrato (depth %, Hz), detune in cents, pan; [+ Instrument] creates a copy of the one shown, [Entfernen] (Remove) removes it — channels and notes pointing to the instruments after it move along |
+| Toolbar | Neu, Öffnen, Sichern, Als … (new, open, save, save as), ▶ Pattern, ▶ Song, Stopp (stop), Zurück, Vor (undo, redo), WAV, DH-Code; to the right **BPM**, **Kanäle** (channels, 4–32) and the checkboxes **Stereo** and **Amiga** for the WAV |
+| Pattern row | pattern selection, **Reihen** (rows, 1–64), [Neu], [Kopie], [Umbenennen …], [Leeren], [Löschen] (new, copy, rename, clear, delete), **Oktave der Tastatur** (keyboard octave) |
+| Overview | The song as a row of tiles in its order, each tile with the name and a miniature of the notes (one row of dots per channel). The pattern shown has a blue frame, the one playing a green one; a click shows the pattern, the mouse wheel scrolls |
+| Grid | Above each channel its number, sound and a **level** that jumps up on each note and decays over the note length; the playing row is green and stays in view while playing |
+| Channel | default instrument of the channel (or a bare waveform `square`/`saw`/`sine`/`triangle`), **Stumm** (mute), **Solo**, mixer slider 0–100 % |
+| Instrument and cell | Instrument: waveform (plus `noise`), volume 1–15, attack/decay/sustain/release, vibrato (depth %, Hz), detune in cents, Links/Rechts (pan); [+ Instrument] creates a copy, [Entfernen] (remove) removes it — channels and notes pointing to the instruments after it move along. Cell: **Lautstärke** (volume, 1–15, 0 = default), **Slide** (−12…+12 semitones), **Effekt** (effect) with parameter (0–255), **Instrument** of the note, [Note aus setzen] (note off) |
 | Song (order) | list of patterns in playing order; a click shows the pattern in the grid. [+ akt.] appends the one shown, [entf.] removes, [<]/[>] move |
 
 A pattern carries its name from the file (new ones are called `P1`, `P2` …);
-it cannot be renamed here.
+[Umbenennen …] gives it a name of its own ("verse", "chorus") that is saved
+with the song. The keyboard lights up: the key just struck in blue, and while
+playing the sounding notes in the colour of their channel.
 
 ## Operation
 
@@ -213,9 +220,6 @@ whether they should be discarded.
   keymap dialog and the instrument editor with waveform and loop markers.
   The tracker plays instruments from a Qt-version file (above), but new
   samples cannot be brought in here.
-- **VU meters** per channel.
-- **Renaming patterns** — the names from the file stay, new ones cannot be
-  assigned.
 - **The sample offset effect** (`Off`) — it is carried along but has no
   effect, because it needs samples.
 
