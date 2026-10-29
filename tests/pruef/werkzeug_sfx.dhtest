@@ -12,10 +12,11 @@
 --- seriell
 
 --- langsam
-=== die beschriftungen liegen nicht auf den knoepfen
+=== nichts liegt uebereinander oder ausserhalb
 ' Bis 2026-09-02 standen "Bereit." und die Dauer-Anzeige mitten auf [Sichern]
-' und [Laden]. Geprueft werden die RECHTECKE -- GUI_HIT_TEST lieferte dort in
-' beiden Lagen dieselbe Beschriftung.
+' und [Laden]; seit dem Umbau 2026-10-29 (Statusleiste, drei Spalten, die mit
+' dem Fenster rechnen) prueft der Fall ALLE Rechtecke paarweise und gegen
+' den Fensterrand -- GUI_HIT_TEST lieferte an einer Ueberdeckung nur eins.
 SET_WINDOW_POS(-3000, -3000)
 DIM prBild AS INTEGER : prBild = 0
 DIM prStart AS INTEGER : prStart = -1
@@ -95,12 +96,35 @@ FUNCTION prDeckt(ax AS INTEGER, ay AS INTEGER, aw AS INTEGER, ah AS INTEGER, bx 
     RETURN ax < bx + bw AND bx < ax + aw AND ay < by + bh AND by < ay + ah
 END FUNCTION
 SUB prFall()
-    DIM st AS BOOLEAN : st = prDeckt(GUI_GET_X(lblStatus), GUI_GET_Y(lblStatus), GUI_GET_W(lblStatus), GUI_GET_H(lblStatus), GUI_GET_X(knopfSichern), GUI_GET_Y(knopfSichern), GUI_GET_W(knopfSichern), GUI_GET_H(knopfSichern))
-    st = st OR prDeckt(GUI_GET_X(lblStatus), GUI_GET_Y(lblStatus), GUI_GET_W(lblStatus), GUI_GET_H(lblStatus), GUI_GET_X(knopfLaden), GUI_GET_Y(knopfLaden), GUI_GET_W(knopfLaden), GUI_GET_H(knopfLaden))
-    DIM da AS BOOLEAN : da = prDeckt(GUI_GET_X(lblDauer), GUI_GET_Y(lblDauer), GUI_GET_W(lblDauer), GUI_GET_H(lblDauer), GUI_GET_X(knopfSichern), GUI_GET_Y(knopfSichern), GUI_GET_W(knopfSichern), GUI_GET_H(knopfSichern))
-    da = da OR prDeckt(GUI_GET_X(lblDauer), GUI_GET_Y(lblDauer), GUI_GET_W(lblDauer), GUI_GET_H(lblDauer), GUI_GET_X(knopfLaden), GUI_GET_Y(knopfLaden), GUI_GET_W(knopfLaden), GUI_GET_H(knopfLaden))
-    prMerke("status deckt knopf " + prJa$(st))
-    prMerke("dauer deckt knopf " + prJa$(da))
+    ' Jedes Bedienelement liegt im Fenster, und keine zwei liegen
+    ' uebereinander. Beschriftungen zaehlen mit (sie duerfen auf keinem
+    ' Knopf stehen); Gruppenrahmen nicht -- in ihnen liegt alles.
+    DIM n AS INTEGER : n = GUI_WINDOW_WIDGET_COUNT(win)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM raus AS INTEGER : raus = 0
+    DIM paare AS INTEGER : paare = 0
+    DIM wi AS GUI_WIDGET
+    DIM wj AS GUI_WIDGET
+    FOR i = 0 TO n - 1
+        wi = GUI_WINDOW_WIDGET(win, i)
+        IF GUI_KIND(wi) <> "groupbox" THEN
+            IF GUI_GET_X(wi) < 0 OR GUI_GET_Y(wi) < 0 OR GUI_GET_X(wi) + GUI_GET_W(wi) > GUI_WINDOW_CONTENT_W(win) OR GUI_GET_Y(wi) + GUI_GET_H(wi) > GUI_WINDOW_CONTENT_H(win) THEN
+                raus = raus + 1
+                prMerke("ausserhalb " + GUI_KIND(wi) + " " + GUI_TEXT(wi))
+            END IF
+            FOR j = i + 1 TO n - 1
+                wj = GUI_WINDOW_WIDGET(win, j)
+                IF GUI_KIND(wj) <> "groupbox" THEN
+                    IF prDeckt(GUI_GET_X(wi), GUI_GET_Y(wi), GUI_GET_W(wi), GUI_GET_H(wi), GUI_GET_X(wj), GUI_GET_Y(wj), GUI_GET_W(wj), GUI_GET_H(wj)) THEN
+                        paare = paare + 1
+                        prMerke("deckt " + GUI_KIND(wi) + " " + GUI_TEXT(wi) + " / " + GUI_KIND(wj) + " " + GUI_TEXT(wj))
+                    END IF
+                END IF
+            NEXT
+        END IF
+    NEXT
+    prMerke("ausserhalb " + STR$(raus) + " uebereinander " + STR$(paare))
 END SUB
 SUB prProbe(k AS INTEGER)
     ' nichts
@@ -117,8 +141,7 @@ IF prStart >= 0 THEN prProbe(prBild - prStart)
 --- umgebung
 DHRT_FRAMES=8
 --- inhalt _programm/probe.txt
-|status deckt knopf nein|
-|dauer deckt knopf nein|
+|ausserhalb 0 uebereinander 0|
 
 === am anfang gibt es nichts zurueckzunehmen
 ' Der Start ist EIN Stand, nicht zwei gleiche.
@@ -410,8 +433,8 @@ SUB prFall()
     DIM mx AS INTEGER : mx = prOx + GUI_GET_X(regler[P_FREQ]) + GUI_GET_W(regler[P_FREQ]) \ 2
     DIM my AS INTEGER : my = prOy + GUI_GET_Y(regler[P_FREQ]) + GUI_GET_H(regler[P_FREQ]) \ 2
     prZug(6, mx, my, mx - 50, my)
-    prKlick(28, prOx + GUI_GET_X(knopfZurueck) + 40, prOy + GUI_GET_Y(knopfZurueck) + 14)
-    prKlick(46, prOx + GUI_GET_X(knopfVor) + 30, prOy + GUI_GET_Y(knopfVor) + 14)
+    prKlick(28, prOx + GUI_TOOLBAR_ITEM_X(leiste, tbZurueck) + 20, prOy + GUI_GET_Y(leiste) + 21)
+    prKlick(46, prOx + GUI_TOOLBAR_ITEM_X(leiste, tbVor) + 20, prOy + GUI_GET_Y(leiste) + 21)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -625,7 +648,7 @@ END FUNCTION
 SUB prFall()
     prMerk = INT(GUI_VALUE(regler[P_FREQ]))
     prKlick(6, prOx + GUI_GET_X(knopfZufall) + 40, prOy + GUI_GET_Y(knopfZufall) + 14)
-    prKlick(32, prOx + GUI_GET_X(knopfZurueck) + 40, prOy + GUI_GET_Y(knopfZurueck) + 14)
+    prKlick(32, prOx + GUI_TOOLBAR_ITEM_X(leiste, tbZurueck) + 20, prOy + GUI_GET_Y(leiste) + 21)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -732,7 +755,7 @@ SUB prFall()
     prMerk = INT(GUI_VALUE(regler[P_FREQ]))
     WRITEALL("welle.txt", STR$(GUI_DROPDOWN_SELECTED(waehlWave)))
     prKlick(6, prOx + GUI_GET_X(liste) + 60, prOy + GUI_GET_Y(liste) + 55)
-    prKlick(32, prOx + GUI_GET_X(knopfZurueck) + 40, prOy + GUI_GET_Y(knopfZurueck) + 14)
+    prKlick(32, prOx + GUI_TOOLBAR_ITEM_X(leiste, tbZurueck) + 20, prOy + GUI_GET_Y(leiste) + 21)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -839,7 +862,7 @@ SUB prFall()
     DIM mx AS INTEGER : mx = prOx + GUI_GET_X(regler[P_FREQ]) + GUI_GET_W(regler[P_FREQ]) \ 2
     DIM my AS INTEGER : my = prOy + GUI_GET_Y(regler[P_FREQ]) + GUI_GET_H(regler[P_FREQ]) \ 2
     prZug(6, mx, my, mx - 50, my)
-    prKlick(24, prOx + GUI_GET_X(knopfZurueck) + 40, prOy + GUI_GET_Y(knopfZurueck) + 14)
+    prKlick(24, prOx + GUI_TOOLBAR_ITEM_X(leiste, tbZurueck) + 20, prOy + GUI_GET_Y(leiste) + 21)
     prZug(32, mx, my, mx + 30, my)
     prAbspielen()
 END SUB
