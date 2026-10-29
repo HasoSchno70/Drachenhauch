@@ -3125,6 +3125,56 @@ Kopie der Schrift in `examples/assets/` ist weg. Tests
 `tests/pruef/schrift_bausteine.dhtest` (8; gegen 2026.37 fallen 7, der
 achte ist die Gegenprobe ohne GUI_FONT).
 
+## Grafik-Editoren aufgefrischt (2026-10-29)
+
+Wunsch des Nutzers: nach den Ton-Werkzeugen auch Partikel (185), Tilemap
+(187), Sprite (189) und Anim-FSM (198) -- der Form-Designer (197) bleibt fuer
+spaeter, zusammen mit "Drachenhauch soll fuer GUIs aehnlich wie Xojo
+programmierbar sein". Gemeinsam: `LOADFONT("sans")` + `GUI_FONT`, Umlaute in
+der Oberflaeche (Schluessel in Dateien und Protokolle bleiben ASCII), Menue
+mit Kuerzeln, Werkzeugleiste mit Sinnbildern, `GUI_STATUSBAR`. **Ein Kuerzel
+steht nur im Menue** -- dieselbe Taste zusaetzlich mit KEYHIT abzufragen
+liesse den Befehl zweimal laufen; Strg+C/X/V/D bleiben bei Tilemap und
+Sprite KEYHIT, weil sie an der Auswahl haengen. **In der Laufzeit:** 18 neue
+Sinnbilder (`stift`, `radierer`, `fuellen`, `linie`, `rechteck`, `ellipse`,
+`pipette`, `auswahl`, `lasso`, `zauberstab`, `verschieben`, `spruehen`,
+`wuerfel`, `raster`, `auge`, `auge_zu`, `spiegeln`, `drehen`) und
+`DRAWIMAGEPARTEX(..., farbe)` -- das zehnte Argument toent, sein Alpha ist
+die Deckkraft (`Cmd::TexturePartExTint`); ein elftes ist jetzt ein Fehler
+(2026.37 schluckte es still). Tests `tests/pruef/drawimagepartex.dhtest`.
+
+**Partikel:** Farbwaehler statt sechs RGB-Reglern (`p(idx)`/`setzeP` fuehren
+die Farben weiter als sechs Anteile, damit Vorlagen, Verlauf und `.ini`
+gleich bleiben), Zufall/Mutieren (Paare min <= max), vier Vorlagen mehr,
+Hintergruende, ein Streifen "Teilchen im Lauf seines Lebens". **Fund:** die
+`.ini` schrieb beide Farben unter `Rot`/`Gruen`/`Blau` -- die Endfarbe
+ueberschrieb die Anfangsfarbe; jetzt `Rot Anfang`/`Rot Ende`, eine alte Datei
+bringt ihre Endfarbe mit. **Anim-FSM:** Fenster oben (Menue + Leiste) und
+unten (Status); `OBEN_H` misst die Menueleiste ueber die Laufzeit. Der Graph
+hat Weltkoordinaten -- EINE Rechnung `schirmX/Y` hin, `weltX/Y` zurueck fuer
+Zeichnen und Treffer; Rad zoomt um die Maus, mittlere Taste/Leertaste
+verschiebt, `anordnen` (Breitensuche ab Start, Ziele von "Any State" in Stufe
+1), `einpassen` (beim Oeffnen per Dialog und bei der Demo -- NICHT beim Start
+mit Argument, die Pruefungen klicken feste Lagen bei Zoom 1). Rechts unten
+laeuft die Animation des gewaehlten Zustands aus dem Blatt; die Demo nennt ihr
+Blatt vom Wurzelordner aus, `blattPfad$` sucht darum auch eine Stufe ueber
+der `.dhanim`. **Tilemap:** Linie/Ellipse ueber `formZellen` (eine Rechnung
+fuer Vorschau und Setzen), Stempel aus der Palette (Zug = Block, nur der
+Stift malt ihn ganz), Uebersicht rechts unten (`miniBauen` je Kachel die
+Mittelfarbe, gebaut wenn `miniVeraltet`, beim Malen hoechstens jedes zehnte
+Bild; ein Klick darin malt nicht), Ebenen-Kaestchen = Sichtbarkeit,
+Werkzeug-Buchstaben nicht im Textfeld. **Sprite:** Werkzeugspalte (zwoelf
+Sinnbild-Knoepfe, das aktive mit Rahmen -- flache Sinnbild-Knoepfe zeigen
+eine Hintergrundfarbe kaum), Bildleiste mit Vorschaubildern, zuletzt
+benutzte Farben, Deckkraft je Ebene (`ebDeck`, im `.dhsprite` als
+`deckkraft`, nur wenn nicht deckend; `IMAGE_DRAW_IMAGE` mit Faerbung in jeder
+Ausgabe). **Die Pruefungen:** ein Menue verschiebt alle Widget-Lagen im
+Hauptfenster -- die Faelle rechnen `prOy()` = `GUI_CANVAS_Y(leinwand) -
+GUI_GET_Y(leinwand)` dazu (Nebenfenster nicht, die rechnen mit
+`GUI_WINDOW_GET_Y`); Knoepfe in der Leiste ueber `GUI_TOOLBAR_ITEM_X/W`; die
+Anim-FSM-Aufnahmen sind um die Hoehe der neuen Leisten verschoben. Neue Faelle
+je Editor (Partikel 5, Anim-FSM 5, Tilemap 5, Sprite 4), je mit Gegenprobe.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als
