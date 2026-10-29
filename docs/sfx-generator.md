@@ -19,25 +19,29 @@ Programm. Python braucht er nicht.
 
 | Bereich | Was geht |
 |---|---|
-| Wellenform | Die Kurve des aktuellen Klangs (`AUDIO_SOUND_WAVE`), je Abschnitt der größte Ausschlag. Erreicht sie den Rand, steht **Clipping** daneben |
-| Transport | **Abspielen**; **Zufall** würfelt neue Werte *um die jetzigen herum* (Lautstärke und Pan bleiben), dazu eine zufällige Wellenform; **Auto-Play** (an) spielt von selbst, sobald ein Regler sechs Bilder lang zur Ruhe gekommen ist — nicht bei jedem Zwischenwert |
-| Werkseinstellungen | Muenze, Laser, Explosion, Powerup, Treffer, Sprung, Blip, Motor — ein Klick setzt alle Regler und die Wellenform |
-| Ausgabe | **WAV sichern ...**, **DH-Code kopieren**, **Sichern ...**/**Laden ...** (`.ini`), Kästchen **8 Bit (Lo-Fi)** für die WAV |
-| Verlauf | **Zurueck**/**Vor** oder Strg+Z/Strg+Y |
-| Statuszeile | Meldung und die Dauer des Klangs (Attack + Sustain + Decay in ms) samt Wellenform |
+| Wellenform | Groß in der Mitte: die Hülle des Klangs (`AUDIO_SOUND_WAVE`, je Spalte der größte Ausschlag) über einer Zeitachse in ms, darüber die **Hüllkurve** als gelbe Linie mit drei Punkten (A, S, D) — sie lassen sich mit der Maus ziehen, ein Zug ist ein Schritt. Ein Klick daneben spielt; beim Abspielen läuft ein Strich mit, rechts zeigt ein Balken den Pegel am Ausgang (`AUDIO_PEAK`). Erreicht die Welle den Rand, steht **Übersteuert** daneben |
+| Werkzeugleiste und Menü | **Öffnen**/**Sichern** (`.ini`, Strg+O/Strg+S), **WAV** (Strg+E), **DH-Code** (Strg+Umschalt+C), **Abspielen** (Leertaste), **Stopp** (Umschalt+Leertaste), **Zurück**/**Vor** (Strg+Z/Strg+Y); darunter **Auto-Play** (spielt von selbst, sobald ein Regler sechs Bilder lang zur Ruhe gekommen ist) und **WAV mit 8 Bit (Lo-Fi)** |
+| Vorlagen | Münze, Laser, Explosion, Powerup, Treffer, Sprung, Blip, Motor, Schuss, Klick, Glocke, Alarm — ein Klick setzt alle Regler und die Wellenform. Jede Vorlage ist zugleich eine **Art** |
+| Zufall und Mutieren | **Zufall** (R) würfelt einen neuen Klang der gewählten Art — in den Grenzen, die einen Laser zum Laser machen (Lautstärke und Pan bleiben). **Mutieren** (M) verschiebt jeden Wert, der schon etwas tut, um höchstens 6 % seines Bereichs; die Wellenform bleibt |
+| Verlauf | Liste links unten: jeder Schritt mit Namen („Vorlage: Laser“, „Zufall: Laser“, „Mutiert“, „Tonrutsch“, „Hüllkurve“), ein Klick holt ihn zurück; der Vor-Weg ist gedämpft |
+| Statusleiste | Meldung, Dauer des Klangs (Anschwellen + Halten + Ausklingen in ms) samt Wellenform, Schritt im Verlauf |
+
+Das Fenster lässt sich frei vergrößern; die Wellenform wächst mit, Vorlagen und
+Regler bleiben stehen. Die Schrift ist DejaVu Sans (`LOADFONT("sans")`) statt der
+Pixelschrift.
 
 Die Regler stehen in vier Gruppen; ihre Reihenfolge ist zugleich die der
 Argumente von `AUDIO_SFX`:
 
 | Gruppe | Regler |
 |---|---|
-| Ton | Wellenform (`square`, `saw`, `sine`, `triangle`, `noise`), Frequenz (50..8000 Hz), Pitch-Slide (±8000 Hz/s, negativ = fallend), Lautstaerke |
-| Huellkurve | Attack (0..2000 ms), Sustain und Decay (0..4000 ms) |
+| Ton | Wellenform (`square`, `saw`, `sine`, `triangle`, `noise`), Frequenz (50..8000 Hz), Tonrutsch (±8000 Hz/s, negativ = fallend), Lautstärke |
+| Hüllkurve | Anschwellen (Attack, 0..2000 ms), Halten (Sustain) und Ausklingen (Decay, je 0..4000 ms) — auch in der Wellenform zu ziehen |
 | SID / Filter | Pulsbreite (0,05..0,95; wirkt auf `square`), PWM-Tiefe, PWM-Tempo, Filter (Grenzfrequenz, 0 = aus), Filter-Fahrt (Hz/s), Resonanz |
-| Vibrato / Stereo | Vib-Tiefe, Vib-Tempo, Stereo (Breite, 0 = mono), Pan (L..R) |
+| Vibrato / Stereo | Vibrato-Tiefe, Vibrato-Tempo, Stereobreite (0 = mono), Links/Rechts (Pan) |
 
-Alles geht auch ohne Maus: TAB wechselt das Bedienelement, Leertaste und Enter
-lösen aus, die Pfeile verstellen einen Regler.
+Alles geht auch ohne Maus: TAB wechselt das Bedienelement, Enter löst aus, die
+Pfeile verstellen einen Regler; jeder Regler erklärt sich im Tooltip.
 
 ## Rückgängig
 
@@ -51,8 +55,9 @@ bis zu 32 Schritte. Ein neuer Zug nach einem Zurück schneidet den Vor-Weg ab.
 ## Sichern und Laden
 
 **Sichern ...** schreibt alle Regler in eine `.ini`, **Laden ...** holt sie
-zurück. Schlüssel ist die **Beschriftung** des Reglers (`Frequenz`,
-`Pitch-Slide`, `Resonanz`, …), dazu `wellenform` — die Datei lässt sich also
+zurück. Schlüssel ist der **Name** des Reglers in der früheren Schreibweise
+(`Frequenz`, `Pitch-Slide`, `Lautstaerke`, `Attack`, …, auch wo die Anzeige
+jetzt anders heißt — alte Dateien laden weiter), dazu `wellenform` — die Datei lässt sich also
 lesen und von Hand ändern. Ein unbekannter Schlüssel wird übergangen statt
 gemeldet, und ein Wert außerhalb des Reglerbereichs wird auf den Bereich
 geklemmt.
@@ -114,9 +119,11 @@ Klang eine eigene `.ini`, die man ablegt, wo man will.
 ## Tests
 
 `tests/pruef/werkzeug_sfx.dhtest` fährt echte Mausklicks und Tasten über eine
-Aufnahme: Beschriftungen liegen nicht auf den Knöpfen, ein Zug ist ein
-Schritt, Zurück/Vor über Knopf und Tasten, Würfelwurf und Werkseinstellung
-sind je ein Schritt, ein neuer Zug schneidet den Vor-Weg ab — und der
+Aufnahme: kein Bedienelement liegt auf einem anderen oder über dem Rand, ein
+Zug ist ein Schritt, Zurück/Vor über Werkzeugleiste und Tasten, Würfelwurf und
+Vorlage sind je ein Schritt, ein neuer Zug schneidet den Vor-Weg ab, Zufall
+bleibt bei der Art, Mutieren ist ein Schritt, ein Klick in den Verlauf holt
+einen Stand zurück, der Endpunkt der Hüllkurve lässt sich ziehen — und der
 DH-Code nimmt den Pan mit und läuft durch `dhrt --check`. Die Rückfrage beim
 Schließen prüft `tests/pruef/werkzeug_kreuz.dhtest` mit echten
 Fensternachrichten.

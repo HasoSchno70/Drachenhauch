@@ -19,25 +19,30 @@ program. It does not need Python.
 
 | Area | What it does |
 |---|---|
-| Waveform | The curve of the current sound (`AUDIO_SOUND_WAVE`), the largest amplitude per section. If it reaches the edge, **Clipping** appears next to it |
-| Transport | **Abspielen** (Play); **Zufall** (Random) rolls new values *around the current ones* (volume and pan stay), plus a random waveform; **Auto-Play** (on) plays by itself as soon as a slider has come to rest for six frames — not at every intermediate value |
-| Presets | Muenze, Laser, Explosion, Powerup, Treffer, Sprung, Blip, Motor (coin, laser, explosion, power-up, hit, jump, blip, engine) — one click sets all sliders and the waveform |
-| Output | **WAV sichern ...** (Save WAV), **DH-Code kopieren** (Copy DH code), **Sichern ...**/**Laden ...** (Save/Load, `.ini`), checkbox **8 Bit (Lo-Fi)** for the WAV |
-| History | **Zurueck**/**Vor** (Back/Forward) or Ctrl+Z/Ctrl+Y |
-| Status line | Message and the duration of the sound (attack + sustain + decay in ms) along with the waveform |
+| Waveform | Large in the middle: the envelope of the sound (`AUDIO_SOUND_WAVE`, the largest amplitude per column) over a time axis in ms, with the **envelope** on top as a yellow line with three points (A, S, D) — they can be dragged with the mouse, one drag is one step. A click elsewhere plays; while playing a line runs along, and a bar on the right shows the output level (`AUDIO_PEAK`). If the wave reaches the edge, **Übersteuert** (clipping) appears next to it |
+| Toolbar and menu | **Öffnen**/**Sichern** (open/save `.ini`, Ctrl+O/Ctrl+S), **WAV** (Ctrl+E), **DH-Code** (Ctrl+Shift+C), **Abspielen** (play, Space), **Stopp** (Shift+Space), **Zurück**/**Vor** (Ctrl+Z/Ctrl+Y); below it **Auto-Play** (plays by itself as soon as a slider has come to rest for six frames) and **WAV mit 8 Bit (Lo-Fi)** |
+| Presets | Münze, Laser, Explosion, Powerup, Treffer, Sprung, Blip, Motor, Schuss, Klick, Glocke, Alarm (coin, laser, explosion, power-up, hit, jump, blip, engine, shot, click, bell, alarm) — one click sets all sliders and the waveform. Every preset is also a **kind** |
+| Random and mutate | **Zufall** (R) rolls a new sound of the selected kind — within the limits that make a laser a laser (volume and pan stay). **Mutieren** (M) shifts every value that already does something by at most 6 % of its range; the waveform stays |
+| History | List at the bottom left: every step with a name ("Vorlage: Laser", "Zufall: Laser", "Mutiert", "Tonrutsch", "Hüllkurve"), a click brings it back; the way forward is dimmed |
+| Status bar | Message, duration of the sound (attack + hold + decay in ms) with the waveform, step in the history |
+
+The window can be resized freely; the waveform grows with it, presets and
+sliders stay in place. The font is DejaVu Sans (`LOADFONT("sans")`) instead of
+the pixel font.
 
 The sliders are in four groups; their order is also the order of the
 arguments of `AUDIO_SFX`:
 
 | Group | Sliders |
 |---|---|
-| Tone | waveform (`square`, `saw`, `sine`, `triangle`, `noise`), frequency (50..8000 Hz), pitch slide (±8000 Hz/s, negative = falling), volume |
-| Envelope | attack (0..2000 ms), sustain and decay (0..4000 ms) |
+| Tone | waveform (`square`, `saw`, `sine`, `triangle`, `noise`), frequency (50..8000 Hz), Tonrutsch (pitch slide, ±8000 Hz/s, negative = falling), volume |
+| Envelope | Anschwellen (attack, 0..2000 ms), Halten (sustain) and Ausklingen (decay, each 0..4000 ms) — also draggable in the waveform |
 | SID / filter | pulse width (0.05..0.95; affects `square`), PWM depth, PWM speed, filter (cutoff frequency, 0 = off), filter sweep (Hz/s), resonance |
-| Vibrato / stereo | vib depth, vib speed, stereo (width, 0 = mono), pan (L..R) |
+| Vibrato / stereo | vibrato depth, vibrato speed, stereo width (0 = mono), Links/Rechts (pan) |
 
-Everything also works without a mouse: TAB moves between controls, Space and
-Enter trigger, the arrow keys adjust a slider.
+Everything also works without a mouse: TAB moves between controls, Enter
+triggers, the arrow keys adjust a slider; every slider explains itself in a
+tooltip.
 
 ## Undo
 
@@ -51,8 +56,10 @@ off the way forward.
 ## Saving and loading
 
 **Sichern ...** (Save) writes all sliders into an `.ini`, **Laden ...**
-(Load) brings them back. The key is the slider's **label** (`Frequenz`,
-`Pitch-Slide`, `Resonanz`, …), plus `wellenform` — so the file can be read
+(Load) brings them back. The key is the slider's **name** in the earlier
+spelling (`Frequenz`, `Pitch-Slide`, `Lautstaerke`, `Attack`, …, even where
+the display now says something else — old files keep loading), plus
+`wellenform` — so the file can be read
 and edited by hand. An unknown key is skipped instead of reported, and a
 value outside the slider's range is clamped to the range.
 
@@ -113,8 +120,10 @@ you store wherever you like.
 ## Tests
 
 `tests/pruef/werkzeug_sfx.dhtest` drives real mouse clicks and keys from a
-recording: labels do not lie on top of the buttons, one drag is one step,
-back/forward via button and keys, a dice roll and a preset are one step each,
-a new drag cuts off the way forward — and the DH code takes the pan along and
+recording: no control lies on top of another or past the edge, one drag is
+one step, back/forward via toolbar and keys, a dice roll and a preset are one
+step each, a new drag cuts off the way forward, random stays with the kind,
+mutating is one step, a click in the history brings a state back, the end
+point of the envelope can be dragged — and the DH code takes the pan along and
 passes `dhrt --check`. The prompt on closing is checked by
 `tests/pruef/werkzeug_kreuz.dhtest` with real window messages.

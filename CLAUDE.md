@@ -3058,6 +3058,50 @@ reicht `dhrt bild` an das Programm weiter. Tests
 `tests/pruef/beispiel_chip8.dhtest` (12; drei Verfaelschungen des Kerns
 fallen je in ihrem Fall), Helfer `_hilfen/chip8.dh`.
 
+## Ton-Werkzeuge ueberarbeitet (2026-10-29)
+
+Wunsch des Nutzers: SFX-Generator, Tracker und Notenblatt komfortabler und
+ansehnlicher, "der Notenschluessel sieht nicht perfekt aus". GTK war nicht
+noetig -- alles mit der gui der Laufzeit, keine Laufzeit-Aenderung.
+**Alle drei:** DejaVu ueber `LOADFONT("sans", 32, "▶■")` + `SETFONT(f, 15)`
+statt der Pixelschrift (Zeichen ausserhalb des Grundvorrats muessen in die
+Zeichenliste -- sonst `?`), Fenster groessenveraenderbar mit Ankern,
+Werkzeugleiste mit Sinnbildern, Statusleiste, Umlaute in der Anzeige.
+**SFX (183):** Menue mit Kuerzeln (R Zufall, M Mutieren, Leertaste), zwoelf
+Vorlagen, **Zufall nach Art** (`zufallArt`: Grenzen je Vorlage),
+**Mutieren** (6 % des Bereichs, nur Werte ungleich 0), der Verlauf als Liste
+mit Namen je Schritt (`uName`, Klick holt ihn zurueck), die Wellenform gross
+mit **Huellkurve zum Ziehen** (drei Punkte, Zeitachse bleibt waehrend des
+Zugs stehen), Abspielkopf und Pegel (`AUDIO_PEAK`). Die `.ini`-Schluessel
+behalten die alte Schreibweise (`parName`), angezeigt wird `anzeige`.
+**Tracker (190):** Mono im Gitter, linke Spalte mit der Zelle, Song-Uebersicht
+als Kachelreihe (Klick waehlt), **Pegel je Kanal** aus dem Anschlag (vier
+Plaetze je Kanal nach Reihe -- es wird zwei Reihen VORAUS geplant, ein Platz
+wuerde den klingenden Anschlag ueberschreiben), mitlaufende Reihe, Pattern
+umbenennen (`GUI_PROMPT`), leuchtende Klaviatur. **Falle:** ein Drehfeld ist
+mit DejaVu 15 genau 32 hoch, die Zeilen lagen 30 auseinander --
+`flach()` setzt sie per `GUI_SET_BOUNDS` auf 28 (der Lage-Test fand es).
+**Notenblatt (199):** Schluessel, Koepfe, Pausen, Vorzeichen aus **Noto
+Music** (`examples/assets/NotoMusic-Regular.ttf`, OFL,
+`CREDITS_notomusic.txt`; fehlt sie, bleiben die gezeichneten Formen).
+Gesetzt ueber Masse in Font-Einheiten (`gBox`, aus der Datei gelesen):
+Notenkopf 270 Einheiten = ein Linienabstand, also `e = 2*HALB/268`,
+raylib-Groesse `1787*e` (hhea 1389/-398), Oberkante = Ziel - (1389 - ey)*e;
+G-Schluessel mit Einheit 244 auf der G-Linie, F-Schluessel 512 auf der
+F-Linie (beides im Bild nachgemessen). **Falle:** die gui zeichnet mit der
+AKTIVEN Schrift -- nach jeder Glyphe `SETFONT(uiFont, 15)`, sonst schrieb
+die Oberflaeche in der Notenschrift. Dazu Taktart 4/4 und Taktnummern
+(`LEFT_MARGIN` 76 -> 100, die Klicklagen der Tests +24), **Zoom** (die
+Masse sind Variablen, `zoomRechnen`; beim Start nach der Fensterhoehe),
+**Eingabe per Tastatur** an einer Eingabemarke (C D E F G A H B, P, 1..5,
+Punkt, Pfeile, Ruecktaste), Klaviatur unten, Notenwerte als Knopfleiste.
+Der Fokus geht nicht mehr in die Dauer-Klappliste, sondern auf eine leere
+Beschriftung (`fokusAblage`) -- eine Klappliste mit Fokus nimmt Buchstaben
+("Tippen springt"), "a" haette die Dauer auf Achtel gestellt. Tests: je
+Werkzeug ein Fall "nichts liegt uebereinander" ueber ALLE Widgets, dazu
+Zufall/Mutieren/Verlauf/Huellkurve, Umbenennen/Uebersicht, Tastatureingabe
+(Gegenprobe: ohne `tastenEingabe()` faellt er).
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

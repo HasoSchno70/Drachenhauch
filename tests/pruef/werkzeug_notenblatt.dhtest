@@ -3,7 +3,7 @@
 '
 ' Echte Klicks ueber eine Aufnahme; die Kopie laeuft ohne WINDOW_MAXIMIZE
 ' (1280 x 800): Blatt ab x = 250, Spur i beginnt bei y = 104 + i * 190, Beat
-' b bei x = 326 + 64 b. Was der Editor sichert, liest danach ein Programm in
+' b bei x = 350 + 64 b (seit 2026-10-29 steht die Taktart vor der ersten Note). Was der Editor sichert, liest danach ein Programm in
 ' Drachenhauch (--- nachher, JSON_*).
 '
 ' Der Tracker-Export wird Zelle fuer Zelle mit einem festen Gitter verglichen.
@@ -26,8 +26,8 @@ DHRT_FRAMES=90
 DH_SCORE_LOG=score.log
 --- datei _programm/ev.txt
 c 8
-e 20 7 454 162 0 0
-e 21 7 454 162 0 0
+e 20 7 478 162 0 0
+e 21 7 478 162 0 0
 e 21 6 0 0 0 0
 e 23 5 0 0 0 0
 e 50 2 341 0 0 0
@@ -63,6 +63,74 @@ noten(h, 0)
 spuren 1 treble
 note 2 1 71
 
+=== noten per tastatur an der eingabemarke
+' Buchstaben setzen Noten an der Marke und ruecken weiter (die Oktave folgt
+' der naechstgelegenen: nach dem Start auf H4 wird c zu C5), 4 waehlt die
+' Achtel, die Ruecktaste nimmt die letzte Note weg, Pfeil hoch hebt die
+' Note vor der Marke um einen Halbton. Alles ohne einen Klick.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+neu.json
+--- umgebung
+DHRT_FRAMES=110
+DH_SCORE_LOG=score.log
+--- datei _programm/ev.txt
+c 18
+e 20 2 67 0 0 0
+e 22 1 67 0 0 0
+e 28 2 68 0 0 0
+e 30 1 68 0 0 0
+e 36 2 69 0 0 0
+e 38 1 69 0 0 0
+e 44 2 52 0 0 0
+e 46 1 52 0 0 0
+e 52 2 71 0 0 0
+e 54 1 71 0 0 0
+e 60 2 259 0 0 0
+e 62 1 259 0 0 0
+e 68 2 265 0 0 0
+e 70 1 265 0 0 0
+e 76 2 341 0 0 0
+e 76 2 83 0 0 0
+e 78 1 83 0 0 0
+e 78 1 341 0 0 0
+
+--- inhalt _programm/score.log
+note 0 0 72 1
+note 0 2 76 1
+note 0 3 79 0.5
+entfernt 0 3
+tonhoehe 0 2 77
+gesichert
+--- nachher
+IMPORT "json"
+FUNCTION zahl$(f AS FLOAT) AS STRING
+    IF f = INT(f) THEN RETURN STR$(INT(f))
+    RETURN STR$(f)
+END FUNCTION
+SUB noten(h AS JSON_HANDLE, spur AS INTEGER)
+    DIM p AS STRING : p = "tracks." + STR$(spur) + ".notes"
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        DIM q AS STRING : q = p + "." + STR$(i)
+        DIM ton AS STRING : ton = "pause"
+        DIM pause AS BOOLEAN : pause = FALSE
+        IF JSON_HAS(h, q + ".rest") THEN pause = JSON_GET_BOOL(h, q + ".rest")
+        IF NOT pause THEN ton = STR$(JSON_GET_INT(h, q + ".pitch"))
+        PRINT "note " + zahl$(JSON_GET_FLOAT(h, q + ".start")) + " " + zahl$(JSON_GET_FLOAT(h, q + ".dur")) + " " + ton
+    NEXT
+END SUB
+DIM h AS JSON_HANDLE : h = JSON_LOAD("neu.json")
+PRINT "spuren " ; JSON_LEN(h, "tracks") ; " " ; JSON_GET_STRING(h, "tracks.0.clef")
+noten(h, 0)
+--- erwartet
+spuren 1 treble
+note 0 1 72
+note 1 1 74
+note 2 1 77
+
 === zweiter klick entfernt und rechtsklick auch
 AUTOMATION_PLAY("ev.txt")
 --- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
@@ -74,20 +142,20 @@ DHRT_FRAMES=180
 DH_SCORE_LOG=score.log
 --- datei _programm/ev.txt
 c 20
-e 20 7 454 162 0 0
-e 21 7 454 162 0 0
+e 20 7 478 162 0 0
+e 21 7 478 162 0 0
 e 21 6 0 0 0 0
 e 23 5 0 0 0 0
-e 50 7 454 162 0 0
-e 51 7 454 162 0 0
+e 50 7 478 162 0 0
+e 51 7 478 162 0 0
 e 51 6 0 0 0 0
 e 53 5 0 0 0 0
-e 80 7 582 148 0 0
-e 81 7 582 148 0 0
+e 80 7 606 148 0 0
+e 81 7 606 148 0 0
 e 81 6 0 0 0 0
 e 83 5 0 0 0 0
-e 110 7 582 148 0 0
-e 111 7 582 148 0 0
+e 110 7 606 148 0 0
+e 111 7 606 148 0 0
 e 111 6 1 0 0 0
 e 113 5 1 0 0 0
 e 140 2 341 0 0 0
@@ -134,19 +202,19 @@ DHRT_FRAMES=150
 DH_SCORE_LOG=score.log
 --- datei _programm/ev.txt
 c 22
-e 20 7 454 162 0 0
-e 21 7 454 162 0 0
+e 20 7 478 162 0 0
+e 21 7 478 162 0 0
 e 21 6 0 0 0 0
 e 23 5 0 0 0 0
-e 50 7 454 162 0 0
-e 51 7 454 162 0 0
+e 50 7 478 162 0 0
+e 51 7 478 162 0 0
 e 51 6 0 0 0 0
-e 52 7 475 159 0 0
-e 53 7 496 157 0 0
-e 54 7 518 155 0 0
-e 55 7 539 152 0 0
-e 56 7 560 150 0 0
-e 57 7 582 148 0 0
+e 52 7 499 159 0 0
+e 53 7 520 157 0 0
+e 54 7 542 155 0 0
+e 55 7 563 152 0 0
+e 56 7 584 150 0 0
+e 57 7 606 148 0 0
 e 59 5 0 0 0 0
 e 90 2 341 0 0 0
 e 90 2 90 0 0 0
@@ -195,12 +263,12 @@ DHRT_FRAMES=230
 DH_SCORE_LOG=score.log
 --- datei _programm/ev.txt
 c 40
-e 20 7 326 162 0 0
-e 21 7 326 162 0 0
+e 20 7 350 162 0 0
+e 21 7 350 162 0 0
 e 21 6 0 0 0 0
 e 23 5 0 0 0 0
-e 40 7 454 162 0 0
-e 41 7 454 162 0 0
+e 40 7 478 162 0 0
+e 41 7 478 162 0 0
 e 41 6 0 0 0 0
 e 43 5 0 0 0 0
 e 60 7 394 46 0 0
@@ -211,24 +279,24 @@ e 70 7 394 91 0 0
 e 71 7 394 91 0 0
 e 71 6 0 0 0 0
 e 73 5 0 0 0 0
-e 90 7 582 162 0 0
-e 91 7 582 162 0 0
+e 90 7 606 162 0 0
+e 91 7 606 162 0 0
 e 91 6 0 0 0 0
 e 93 5 0 0 0 0
 e 110 7 394 46 0 0
 e 111 7 394 46 0 0
 e 111 6 0 0 0 0
 e 113 5 0 0 0 0
-e 120 7 394 113 0 0
-e 121 7 394 113 0 0
+e 120 7 418 113 0 0
+e 121 7 418 113 0 0
 e 121 6 0 0 0 0
 e 123 5 0 0 0 0
-e 140 7 326 162 0 0
-e 141 7 326 162 0 0
+e 140 7 350 162 0 0
+e 141 7 350 162 0 0
 e 141 6 0 0 0 0
 e 143 5 0 0 0 0
-e 160 7 454 162 0 0
-e 161 7 454 162 0 0
+e 160 7 478 162 0 0
+e 161 7 478 162 0 0
 e 161 6 0 0 0 0
 e 163 5 0 0 0 0
 e 190 2 341 0 0 0
@@ -286,8 +354,8 @@ e 20 7 895 46 0 0
 e 21 7 895 46 0 0
 e 21 6 0 0 0 0
 e 23 5 0 0 0 0
-e 40 7 454 352 0 0
-e 41 7 454 352 0 0
+e 40 7 478 352 0 0
+e 41 7 478 352 0 0
 e 41 6 0 0 0 0
 e 43 5 0 0 0 0
 e 60 7 125 198 0 0
@@ -842,8 +910,8 @@ DHRT_FRAMES=90
 DH_SCORE_LOG=score.log
 --- datei _programm/ev.txt
 c 10
-e 20 7 454 162 0 0
-e 21 7 454 162 0 0
+e 20 7 478 162 0 0
+e 21 7 478 162 0 0
 e 21 6 0 0 0 0
 e 23 5 0 0 0 0
 e 40 2 341 0 0 0
@@ -879,8 +947,8 @@ DHRT_FRAMES=100
 DH_SCORE_LOG=score.log
 --- datei _programm/ev.txt
 c 12
-e 20 7 454 162 0 0
-e 21 7 454 162 0 0
+e 20 7 478 162 0 0
+e 21 7 478 162 0 0
 e 21 6 0 0 0 0
 e 23 5 0 0 0 0
 e 40 2 341 0 0 0

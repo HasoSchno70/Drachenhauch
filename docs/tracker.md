@@ -33,21 +33,30 @@ dem eben umgerechneten Stück.
 
 ## Das Fenster
 
-Oben zwei Werkzeugleisten, links die Spalte für den Kanal unter dem Cursor,
-das Instrument dieses Kanals und die Reihenfolge, rechts das **Gitter**
+Oben die Werkzeugleiste und die Pattern-Zeile, links die Spalte für den
+Kanal unter dem Cursor, sein Instrument, die Zelle unter dem Cursor und die
+Reihenfolge, rechts die **Übersicht** des Songs und darunter das **Gitter**
 (Reihen von oben nach unten, je Kanal eine Spalte in eigener Farbe), unten
-die **Klaviatur**, ganz unten die Statuszeile (ein `*` heißt: ungesichert).
+die **Klaviatur**, ganz unten die Statusleiste (ein `*` heißt: ungesichert).
+Das Fenster lässt sich frei vergrößern; Übersicht, Gitter und Klaviatur
+wachsen mit. Die Oberfläche schreibt DejaVu Sans, das Gitter DejaVu Sans Mono
+(`LOADFONT("mono")`) — so stehen Note, Lautstärke und Effekt Reihe für Reihe
+genau untereinander.
 
 | Bereich | Was es gibt |
 |---|---|
-| Leiste 1 | [Neu], [Oeffnen], [Sichern], [Sichern als], **BPM**, **Kanäle** (4–32), [> Pattern], [> Song], [Stopp], [Zurueck], [Vor], [WAV ...] mit den Kästchen **Stereo** und **Amiga**, [DH-Code] |
-| Leiste 2 | Pattern-Auswahl, **Reihen** (1–64), [+] neues Pattern, [Dup] kopieren, [Loesch], [Leeren], **Oktave** der Tastatur, dann die Felder der Zelle unter dem Cursor: **Vol** (1–15, 0 = Standard), **Slide** (−12…+12 Halbtöne), **FX** mit Parameter (0–255), **Instrument** der Note, [Note aus] |
-| Kanal | Standard-Instrument des Kanals (oder nackte Wellenform `square`/`saw`/`sine`/`triangle`), **M** stumm, **S** solo, Mixer-Regler 0–100 % |
-| Instrument | Wellenform (dazu `noise`), Lautstärke 1–15, Attack/Decay/Sustain/Release, Vibrato (Tiefe %, Hz), Detune in Cent, Pan; [+ Instrument] legt eine Kopie des gezeigten an, [Entfernen] entfernt es — Kanäle und Noten, die auf die Instrumente dahinter zeigen, rücken mit |
+| Werkzeugleiste | Neu, Öffnen, Sichern, Als …, ▶ Pattern, ▶ Song, Stopp, Zurück, Vor, WAV, DH-Code; rechts daneben **BPM**, **Kanäle** (4–32) und die Kästchen **Stereo** und **Amiga** für die WAV |
+| Pattern-Zeile | Pattern-Auswahl, **Reihen** (1–64), [Neu], [Kopie], [Umbenennen …], [Leeren], [Löschen], **Oktave der Tastatur** |
+| Übersicht | Der Song als Kachelreihe in seiner Reihenfolge, je Kachel der Name und eine Miniatur der Noten (je Kanal eine Punktzeile). Das gezeigte Pattern ist blau umrandet, das klingende grün; ein Klick zeigt das Pattern, das Mausrad blättert |
+| Gitter | Je Kanal oben Nummer, Klang und ein **Pegel**, der beim Anschlag aufspringt und über die Notenlänge abklingt; die klingende Reihe ist grün und bleibt beim Abspielen im Bild |
+| Kanal | Standard-Instrument des Kanals (oder nackte Wellenform `square`/`saw`/`sine`/`triangle`), **Stumm**, **Solo**, Mixer-Regler 0–100 % |
+| Instrument und Zelle | Instrument: Wellenform (dazu `noise`), Lautstärke 1–15, Attack/Decay/Sustain/Release, Vibrato (Tiefe %, Hz), Detune in Cent, Links/Rechts; [+ Instrument] legt eine Kopie an, [Entfernen] entfernt es — Kanäle und Noten, die auf die Instrumente dahinter zeigen, rücken mit. Zelle: **Lautstärke** (1–15, 0 = Standard), **Slide** (−12…+12 Halbtöne), **Effekt** mit Parameter (0–255), **Instrument** der Note, [Note aus setzen] |
 | Song (Reihenfolge) | Liste der Patterns in Abspielfolge; ein Klick zeigt das Pattern im Gitter. [+ akt.] hängt das gezeigte an, [entf.] entfernt, [<]/[>] verschieben |
 
 Ein Pattern trägt seinen Namen aus der Datei (neue heißen `P1`, `P2` …);
-umbenennen lässt es sich hier nicht.
+[Umbenennen …] gibt ihm einen eigenen („Strophe“, „Refrain“), der mit dem
+Song gesichert wird. Die Klaviatur leuchtet: die eben angeschlagene Taste in
+Blau, beim Abspielen die klingenden Noten in der Farbe ihres Kanals.
 
 ## Bedienung
 
@@ -214,9 +223,6 @@ gesichert ist. Sonst kommt die Frage **Sichern | Verwerfen | Abbrechen**.
   der Keymap-Dialog und der Instrument-Editor mit Wellenform und
   Loop-Markern. Instrumente aus einer Datei der Qt-Fassung spielt der
   Tracker (oben), neue Samples bringt man hier nicht hinein.
-- **VU-Meter** je Kanal.
-- **Pattern umbenennen** — die Namen aus der Datei bleiben, neue lassen
-  sich nicht vergeben.
 - **Der Sample-Offset-Effekt** (`Off`) — er wird mitgeführt, wirkt aber
   nicht, weil er Samples braucht.
 
