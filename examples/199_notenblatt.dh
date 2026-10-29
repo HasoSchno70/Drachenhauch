@@ -33,13 +33,30 @@ CONST LINKS = 0                 ' Maustasten
 CONST RECHTS = 1
 CONST TOP_B = 96                ' Hoehe der Werkzeugleiste (mit Menue)
 CONST LINKS_B = 250             ' Breite des Spurfensters
-CONST STAFF_H = 190             ' Hoehe je Notensystem
-CONST HALB = 7                  ' halber Linienabstand (STEP ist ein Schluesselwort)
-CONST LEFT_MARGIN = 76          ' Platz fuer den Schluessel
-CONST PPB = 64                  ' Pixel je Viertel-Beat
-CONST NOTE_R = 6
-CONST STEM_LEN = 32
-CONST BARLINE_LEAD = 8
+CONST PIANO_H = 78              ' die Klaviatur am unteren Rand
+' Die Masse des Blatts haengen am ZOOM (Strg+Plus/Minus, Strg+Rad) und
+' werden in `zoomSetzen` gerechnet -- bei Zoom 1 sind es die alten Werte.
+DIM zoom AS FLOAT : zoom = 1.0
+DIM zoomVonHand AS BOOLEAN : zoomVonHand = FALSE
+DIM STAFF_H AS INTEGER          ' Hoehe je Notensystem
+DIM HALB AS INTEGER             ' halber Linienabstand (STEP ist ein Schluesselwort)
+DIM LEFT_MARGIN AS INTEGER      ' Platz fuer Schluessel und Taktart
+DIM PPB AS INTEGER              ' Pixel je Viertel-Beat
+DIM NOTE_R AS INTEGER           ' halbe Breite eines Notenkopfs
+DIM STEM_LEN AS INTEGER
+DIM BARLINE_LEAD AS INTEGER
+
+SUB zoomRechnen(z AS FLOAT)
+    zoom = CLAMP(z, 0.7, 2.5)
+    HALB = MAX(4, INT(7 * zoom + 0.5))
+    STAFF_H = INT(190 * zoom + 0.5)
+    LEFT_MARGIN = INT(100 * zoom + 0.5)
+    PPB = INT(64 * zoom + 0.5)
+    NOTE_R = MAX(4, INT(HALB * 1.1 + 0.5))
+    STEM_LEN = HALB * 5 - 3
+    BARLINE_LEAD = INT(8 * zoom + 0.5)
+END SUB
+zoomRechnen(1.0)
 CONST MID_STEP = 4              ' ab hier zeigt der Hals nach unten
 CONST MAX_SPUREN = 8
 CONST ROWS_PER_BEAT = 4         ' Tracker: eine Zeile = Sechzehntel
@@ -54,12 +71,51 @@ SETFPS(60)
 WINDOW_MAXIMIZE()
 GUI_THEME_PRESET("glas_dunkel")
 
-DIM uiFont AS INTEGER : uiFont = -1
-DIM fp AS STRING
-FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
-    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+' DejaVu Sans (in dhrt eingebettet) statt einer Systemschrift, die es nur
+' unter Windows gibt -- und fett fuer die Taktart.
+DIM uiFont AS INTEGER : uiFont = LOADFONT("sans", 32, "▶■♯♭♮")
+DIM fettFont AS INTEGER : fettFont = LOADFONT("serif-fett", 64)
+SETFONT(uiFont, 15)
+
+' Die Notenschrift: Noto Music (SIL Open Font License, assets/CREDITS_notomusic.txt).
+' Schluessel, Notenkoepfe, Pausen und Vorzeichen kommen aus ihr -- von
+' Hand gezeichnet sahen sie nie ganz richtig aus. Fehlt die Datei (eine
+' Kopie des Programms ohne den assets-Ordner), bleibt es bei den
+' gezeichneten Formen.
+CONST G_SCHLUESSEL = &H1D11E
+CONST F_SCHLUESSEL = &H1D122
+CONST G_KREUZ = &H266F
+CONST G_BE = &H266D
+CONST G_AUFLOES = &H266E
+CONST G_KOPF_VOLL = &H1D158
+CONST G_KOPF_LEER = &H1D157
+CONST G_GANZE = &H1D15D
+CONST G_P_GANZ = &H1D13B
+CONST G_P_HALB = &H1D13C
+CONST G_P_VIERTEL = &H1D13D
+CONST G_P_ACHTEL = &H1D13E
+CONST G_P_16 = &H1D13F
+CONST G_N_HALB = &H1D15E
+CONST G_N_VIERTEL = &H1D15F
+CONST G_N_ACHTEL = &H1D160
+CONST G_N_16 = &H1D161
+DIM musikFont AS INTEGER : musikFont = -1
+DIM musikZeichen AS STRING : musikZeichen = ""
+DIM mz AS INTEGER
+FOR EACH mz IN [G_SCHLUESSEL, F_SCHLUESSEL, G_KREUZ, G_BE, G_AUFLOES, G_KOPF_VOLL, G_KOPF_LEER, G_GANZE, _
+                G_P_GANZ, G_P_HALB, G_P_VIERTEL, G_P_ACHTEL, G_P_16, G_N_HALB, G_N_VIERTEL, G_N_ACHTEL, G_N_16]
+    musikZeichen = musikZeichen + CHR$(mz)
 NEXT
-IF uiFont >= 0 THEN SETFONT(uiFont) : TEXT_SIZE(16)
+DIM mp AS STRING
+FOR EACH mp IN ("assets/NotoMusic-Regular.ttf", PATHJOIN(GETENV$("DH_IDE_WURZEL"), "examples/assets/NotoMusic-Regular.ttf"), PATHJOIN(GETENV$("DHRT_START_DIR"), "assets/NotoMusic-Regular.ttf"))
+    IF musikFont < 0 AND mp <> "" AND FILEEXISTS(mp) THEN
+        TRY
+            musikFont = LOADFONT(mp, 160, musikZeichen)
+        CATCH e
+            musikFont = -1
+        END TRY
+    END IF
+NEXT
 
 DIM logDatei AS STRING : logDatei = GETENV$("DH_SCORE_LOG")
 SUB protokoll(text AS STRING)
@@ -378,19 +434,19 @@ GUI_WINDOW_CHROME(winTop, FALSE)
 GUI_WINDOW_MOVABLE(winTop, FALSE)
 DIM mDatei AS INTEGER : mDatei = GUI_MENU(winTop, "Datei")
 DIM miNeu AS INTEGER : miNeu = GUI_MENU_ITEM(mDatei, "Neu", "Strg+N")
-DIM miOeffnen AS INTEGER : miOeffnen = GUI_MENU_ITEM(mDatei, "Oeffnen ...", "Strg+O")
+DIM miOeffnen AS INTEGER : miOeffnen = GUI_MENU_ITEM(mDatei, "Öffnen …", "Strg+O")
 DIM miSichern AS INTEGER : miSichern = GUI_MENU_ITEM(mDatei, "Sichern", "Strg+S")
-DIM miSichernAls AS INTEGER : miSichernAls = GUI_MENU_ITEM(mDatei, "Sichern unter ...", "Strg+Umschalt+S")
+DIM miSichernAls AS INTEGER : miSichernAls = GUI_MENU_ITEM(mDatei, "Sichern unter …", "Strg+Umschalt+S")
 GUI_MENU_SEPARATOR(mDatei)
-DIM miTracker AS INTEGER : miTracker = GUI_MENU_ITEM(mDatei, "In Tracker oeffnen", "Strg+T")
+DIM miTracker AS INTEGER : miTracker = GUI_MENU_ITEM(mDatei, "In Tracker öffnen", "Strg+T")
 DIM miSpielen AS INTEGER : miSpielen = GUI_MENU_ITEM(mDatei, "Abspielen / Stopp", "F5")
 GUI_MENU_SEPARATOR(mDatei)
 DIM miBeenden AS INTEGER : miBeenden = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
 DIM mBearb AS INTEGER : mBearb = GUI_MENU(winTop, "Bearbeiten")
-DIM miRueck AS INTEGER : miRueck = GUI_MENU_ITEM(mBearb, "Rueckgaengig", "Strg+Z")
+DIM miRueck AS INTEGER : miRueck = GUI_MENU_ITEM(mBearb, "Rückgängig", "Strg+Z")
 DIM miWieder AS INTEGER : miWieder = GUI_MENU_ITEM(mBearb, "Wiederholen", "Strg+Y")
 GUI_MENU_SEPARATOR(mBearb)
-DIM miSpurPlus AS INTEGER : miSpurPlus = GUI_MENU_ITEM(mBearb, "Spur hinzufuegen")
+DIM miSpurPlus AS INTEGER : miSpurPlus = GUI_MENU_ITEM(mBearb, "Spur hinzufügen")
 DIM miSpurWeg AS INTEGER : miSpurWeg = GUI_MENU_ITEM(mBearb, "Letzte Spur entfernen")
 
 DIM dauerNamen AS ARRAY OF STRING : dauerNamen = ["Ganze", "Halbe", "Viertel", "Achtel", "Sechzehntel"]
@@ -399,7 +455,7 @@ DIM ddDauer AS GUI_WIDGET : ddDauer = GUI_DROPDOWN(winTop, 8, 8, 110, 24, dauerN
 GUI_DROPDOWN_SET_SELECTED(ddDauer, 2)
 GUI_TOOLTIP(ddDauer, "Notendauer -- zugleich das Raster fuer den Klick")
 DIM cbPunkt AS GUI_WIDGET : cbPunkt = GUI_CHECKBOX(winTop, "punktiert", 126, 12)
-DIM ddVorz AS GUI_WIDGET : ddVorz = GUI_DROPDOWN(winTop, 226, 8, 100, 24, ["natuerlich", "Kreuz", "B"])
+DIM ddVorz AS GUI_WIDGET : ddVorz = GUI_DROPDOWN(winTop, 226, 8, 100, 24, ["natürlich", "Kreuz", "B"])
 GUI_TOOLTIP(ddVorz, "Vorzeichen: verschiebt die geklickte Stammnote um einen Halbton")
 DIM modusNamen AS ARRAY OF STRING : modusNamen = ["Note", "Pause", "Bindebogen", "Fingersatz", "Staccato"]
 DIM ddModus AS GUI_WIDGET : ddModus = GUI_DROPDOWN(winTop, 334, 8, 120, 24, modusNamen)
@@ -414,7 +470,17 @@ DIM btnTracker AS GUI_WIDGET : btnTracker = GUI_BUTTON(winTop, "In Tracker", 742
 DIM btnSpurPlus AS GUI_WIDGET : btnSpurPlus = GUI_BUTTON(winTop, "+ Spur", 860, 7, 70, 26)
 DIM btnSpurWeg AS GUI_WIDGET : btnSpurWeg = GUI_BUTTON(winTop, "- Spur", 938, 7, 70, 26)
 DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_LABEL(winTop, "Bereit.", 8, 44)
-GUI_SET_WRAP(lblStatus, 1200)
+' Rechts in derselben Zeile stehen die Notenwerte als Knopfleiste.
+GUI_SET_WRAP(lblStatus, SCREENWIDTH() - 300)
+' Wohin der Tastaturfokus geht, wenn er aus einem Feld heraus soll: eine
+' leere Beschriftung. Vorher war es die Dauer-Klappliste -- die nimmt aber
+' Buchstaben und Ziffern selbst (Tippen springt), und mit der Eingabe per
+' Tastatur haette "a" die Dauer auf "Achtel" gestellt.
+DIM fokusAblage AS GUI_WIDGET : fokusAblage = GUI_LABEL(winTop, "", 0, 0)
+DIM mAnsicht AS INTEGER : mAnsicht = GUI_MENU(winTop, "Ansicht")
+DIM miZoomPlus AS INTEGER : miZoomPlus = GUI_MENU_ITEM(mAnsicht, "Vergrößern", "Strg+Plus")
+DIM miZoomMinus AS INTEGER : miZoomMinus = GUI_MENU_ITEM(mAnsicht, "Verkleinern", "Strg+Minus")
+DIM miZoom100 AS INTEGER : miZoom100 = GUI_MENU_ITEM(mAnsicht, "Originalgröße", "Strg+0")
 
 ' --- Fenster links: je Spur Name, Schluessel, Instrument --------------------------
 DIM winLinks AS GUI_WINDOW : winLinks = GUI_WINDOW("Spuren", 0, TOP_B, LINKS_B, SCREENHEIGHT() - TOP_B)
@@ -430,7 +496,7 @@ DIM si AS INTEGER
 FOR si = 0 TO MAX_SPUREN - 1
     sLabel[si] = GUI_LABEL(winLinks, "Spur " + STR$(si + 1), 8, 8)
     sName[si] = GUI_TEXTINPUT(winLinks, 8, 30, LINKS_B - 16, 24, "")
-    sClef[si] = GUI_DROPDOWN(winLinks, 8, 60, LINKS_B - 16, 24, ["Violinschluessel", "Bassschluessel"])
+    sClef[si] = GUI_DROPDOWN(winLinks, 8, 60, LINKS_B - 16, 24, ["Violinschlüssel", "Bassschlüssel"])
     sInst[si] = GUI_DROPDOWN(winLinks, 8, 90, LINKS_B - 16, 24, instNamen)
     sClefSel[si] = 0 : sInstSel[si] = 0
 NEXT
@@ -932,7 +998,7 @@ SUB neuesStueck()
     doc = JSON_NEW_OBJECT()
     pfad = ""
     nachLaden()
-    GUI_SET_TEXT(lblStatus, "Neues Stueck.")
+    GUI_SET_TEXT(lblStatus, "Neues Stück.")
     protokoll("neues stueck")
 END SUB
 
@@ -996,7 +1062,7 @@ DIM hoverPitch AS INTEGER : hoverPitch = 0
 DIM hoverPause AS BOOLEAN : hoverPause = FALSE
 
 FUNCTION imBlatt(mx AS INTEGER, my AS INTEGER) AS BOOLEAN
-    RETURN mx >= gx0 AND my >= TOP_B AND my < SCREENHEIGHT()
+    RETURN mx >= gx0 AND my >= TOP_B AND my < SCREENHEIGHT() - PIANO_H
 END FUNCTION
 
 FUNCTION spurBei(my AS INTEGER) AS INTEGER
@@ -1020,7 +1086,7 @@ SUB mausAufBlatt()
             END IF
             DIM k AS INTEGER : k = noteBei(i, beat)
             IF MOUSE_HIT(RECHTS) THEN
-                GUI_FOCUS(ddDauer)
+                GUI_FOCUS(fokusAblage)
                 IF entryModus = 2 THEN
                     boegenWeg(i, beat) : merken()
                     protokoll("bogen weg " + STR$(i) + " " + zahl$(beat))
@@ -1031,7 +1097,7 @@ SUB mausAufBlatt()
                 RETURN
             END IF
             IF MOUSE_HIT(LINKS) THEN
-                GUI_FOCUS(ddDauer)      ' Tastatur (Leertaste) zum Blatt, nicht in ein Feld
+                GUI_FOCUS(fokusAblage)      ' Tastatur (Leertaste) zum Blatt, nicht in ein Feld
                 IF entryModus = 3 THEN
                     IF k >= 0 AND NOT istPause(i, k) THEN
                         DIM z AS INTEGER : z = GUI_DROPDOWN_SELECTED(ddFinger) + 1
@@ -1069,8 +1135,14 @@ SUB mausAufBlatt()
                     zugSpur = i : zugNote = k : zugBewegt = FALSE : zugAlt = nStart(i, k)
                 ELSEIF entryModus = 1 THEN
                     setzen(i, beat, 0, TRUE)
+                    eingabeSpur = i : eingabeBeat = beat + entryDauer
                 ELSE
-                    setzen(i, beat, pitchBeiY(i, my, entryAcc), FALSE)
+                    DIM gp AS INTEGER : gp = pitchBeiY(i, my, entryAcc)
+                    setzen(i, beat, gp, FALSE)
+                    vorhoeren(i, gp)
+                    ' Die Eingabemarke folgt dem Klick -- ab hier geht es per
+                    ' Tastatur weiter.
+                    eingabeSpur = i : eingabeBeat = beat + entryDauer : letzterPitch = gp
                 END IF
                 RETURN
             END IF
@@ -1134,17 +1206,90 @@ SUB hilfslinien(i AS INTEGER, x AS INTEGER, s AS INTEGER, farbe AS INTEGER)
     DIM l AS INTEGER
     IF s > 8 THEN
         FOR l = 10 TO s STEP 2
-            LINE(x - 12, yStufe(i, l), x + 12, yStufe(i, l), farbe)
+            LINE(x - NOTE_R - HALB \ 2, yStufe(i, l), x + NOTE_R + HALB \ 2, yStufe(i, l), farbe)
         NEXT
     ELSEIF s < 0 THEN
         FOR l = -2 TO s STEP -2
-            LINE(x - 12, yStufe(i, l), x + 12, yStufe(i, l), farbe)
+            LINE(x - NOTE_R - HALB \ 2, yStufe(i, l), x + NOTE_R + HALB \ 2, yStufe(i, l), farbe)
         NEXT
     END IF
 END SUB
 
-SUB notenkopf(x AS INTEGER, y AS INTEGER, gefuellt AS BOOLEAN, farbe AS INTEGER)
-    IF gefuellt THEN
+' --- Die Notenschrift --------------------------------------------------------
+' Die Masse jeder Glyphe in Font-Einheiten (1000 je Em, aus der Datei
+' gelesen): links, unten, rechts, oben. Ein Notenkopf ist 270 Einheiten
+' hoch = ein Linienabstand; daraus folgt der Massstab.
+FUNCTION gBox(cp AS INTEGER, welche AS INTEGER) AS INTEGER
+    DIM b AS ARRAY OF INTEGER : b = [50, 0, 300, 270]
+    SELECT CASE cp
+        CASE G_SCHLUESSEL
+            b = [50, -398, 661, 1334]
+        CASE F_SCHLUESSEL
+            b = [50, 101, 742, 900]
+        CASE G_KREUZ
+            b = [50, -247, 275, 509]
+        CASE G_BE
+            b = [50, -55, 249, 615]
+        CASE G_AUFLOES
+            b = [50, -221, 226, 486]
+        CASE G_KOPF_VOLL, G_KOPF_LEER
+            b = [50, -1, 347, 269]
+        CASE G_GANZE
+            b = [50, 8, 464, 260]
+        CASE G_P_GANZ
+            b = [50, 378, 733, 512]
+        CASE G_P_HALB
+            b = [50, 244, 733, 378]
+        CASE G_P_VIERTEL
+            b = [51, 123, 307, 878]
+        CASE G_P_ACHTEL
+            b = [50, 269, 312, 730]
+        CASE G_P_16
+            b = [50, 147, 380, 852]
+        CASE G_N_HALB
+            b = [50, -1, 347, 1009]
+        CASE G_N_VIERTEL
+            b = [51, 11, 350, 1009]
+        CASE G_N_ACHTEL
+            b = [50, 11, 599, 1009]
+        CASE G_N_16
+            b = [50, 11, 607, 1009]
+    END SELECT
+    RETURN b[welche]
+END FUNCTION
+
+' Pixel je Font-Einheit bei einem Linienabstand von `halb` * 2.
+FUNCTION gEinheit(halb AS INTEGER) AS FLOAT
+    RETURN halb * 2 / 268.0
+END FUNCTION
+
+' Eine Glyphe so setzen, dass der Punkt (ex, ey) in Font-Einheiten auf
+' (x, y) im Bild faellt. raylib setzt Text an der OBERKANTE der Zeile, und
+' die liegt `Ascent` (1389 Einheiten) ueber der Grundlinie.
+SUB glyphAn(cp AS INTEGER, ex AS FLOAT, ey AS FLOAT, x AS FLOAT, y AS FLOAT, halb AS INTEGER, farbe AS INTEGER)
+    DIM e AS FLOAT : e = gEinheit(halb)
+    SETFONT(musikFont, INT(1787 * e + 0.5))
+    TEXT(INT(x - ex * e + 0.5), INT(y - (1389 - ey) * e + 0.5), CHR$(cp), farbe)
+END SUB
+
+' Waagerecht mittig, senkrecht der Punkt `ey` (Font-Einheiten) auf y.
+SUB glyphMitte(cp AS INTEGER, x AS FLOAT, y AS FLOAT, ey AS FLOAT, halb AS INTEGER, farbe AS INTEGER)
+    glyphAn(cp, (gBox(cp, 0) + gBox(cp, 2)) / 2.0, ey, x, y, halb, farbe)
+END SUB
+
+FUNCTION gBreite(cp AS INTEGER) AS INTEGER
+    RETURN INT((gBox(cp, 2) - gBox(cp, 0)) * gEinheit(HALB) + 0.5)
+END FUNCTION
+
+SUB notenkopf(x AS INTEGER, y AS INTEGER, d AS FLOAT, farbe AS INTEGER)
+    IF musikFont >= 0 THEN
+        DIM cp AS INTEGER : cp = G_KOPF_VOLL
+        IF d >= 2.0 THEN cp = G_KOPF_LEER
+        IF d >= 4.0 THEN cp = G_GANZE
+        glyphMitte(cp, x, y, (gBox(cp, 1) + gBox(cp, 3)) / 2.0, HALB, farbe)
+        RETURN
+    END IF
+    IF d < 2.0 THEN
         CIRCLE(x, y, NOTE_R, farbe)
     ELSE
         CIRCLEOUTLINE(x, y, NOTE_R, farbe)
@@ -1152,10 +1297,39 @@ SUB notenkopf(x AS INTEGER, y AS INTEGER, gefuellt AS BOOLEAN, farbe AS INTEGER)
     END IF
 END SUB
 
-SUB pauseZeichnen(x AS INTEGER, y AS INTEGER, farbe AS INTEGER)
-    RECT(x - 5, y - 3, x + 5, y + 3, farbe)
-    RECT(x - 4, y - 2, x + 4, y + 2, farbe)
+' Eine Pause nach ihrer Dauer: die ganze haengt an der vierten Linie, die
+' halbe sitzt auf der Mittellinie, die uebrigen stehen um sie herum.
+SUB pauseZeichnen(i AS INTEGER, x AS INTEGER, d AS FLOAT, farbe AS INTEGER)
+    IF musikFont < 0 THEN
+        DIM y AS INTEGER : y = yStufe(i, 4)
+        RECT(x - 5, y - 3, x + 5, y + 3, farbe)
+        RECT(x - 4, y - 2, x + 4, y + 2, farbe)
+        RETURN
+    END IF
+    DIM basis AS FLOAT : basis = d
+    IF punktiert(d) THEN basis = d / 1.5
+    IF basis >= 4.0 THEN
+        glyphMitte(G_P_GANZ, x, yStufe(i, 6), 512, HALB, farbe)
+    ELSEIF basis >= 2.0 THEN
+        glyphMitte(G_P_HALB, x, yStufe(i, 4), 244, HALB, farbe)
+    ELSEIF basis >= 1.0 THEN
+        glyphMitte(G_P_VIERTEL, x, yStufe(i, 4), 500, HALB, farbe)
+    ELSEIF basis >= 0.5 THEN
+        glyphMitte(G_P_ACHTEL, x, yStufe(i, 4), 500, HALB, farbe)
+    ELSE
+        glyphMitte(G_P_16, x, yStufe(i, 4), 500, HALB, farbe)
+    END IF
+    IF punktiert(d) THEN CIRCLE(x + HALB * 2, yStufe(i, 5), MAX(2, HALB \ 3), farbe)
 END SUB
+
+' Punktiert ist eine Dauer, die das Anderthalbfache einer Grunddauer ist.
+FUNCTION punktiert(d AS FLOAT) AS BOOLEAN
+    DIM g AS FLOAT
+    FOR EACH g IN [4.0, 2.0, 1.0, 0.5, 0.25]
+        IF ABS(d - g * 1.5) < 0.000001 THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
 
 ' Balkengruppen: zusammenhaengende Achtel/Sechzehntel GLEICHER Dauer im
 ' selben Beat -- markiert die Noten und zeichnet den Balken.
@@ -1195,17 +1369,18 @@ SUB balkenZeichnen(i AS INTEGER, farbe AS INTEGER)
                 NEXT
                 DIM oben AS BOOLEAN : oben = summe / LEN(gruppe) < MID_STEP
                 DIM by AS INTEGER : by = IIF(oben, minY - STEM_LEN, maxY + STEM_LEN)
-                DIM dx AS INTEGER : dx = IIF(oben, NOTE_R, -NOTE_R)
+                DIM dx AS INTEGER : dx = IIF(oben, NOTE_R - 1, -NOTE_R)
                 FOR g = 0 TO LEN(gruppe) - 1
                     DIM x AS INTEGER : x = xBeat(nStart(i, gruppe[g])) + dx
-                    LINE(x, yStufe(i, stufe(i, nPitch(i, gruppe[g]))), x, by, farbe)
+                    LINEW(x, yStufe(i, stufe(i, nPitch(i, gruppe[g]))), x, by, MAX(1, HALB \ 5), farbe)
                 NEXT
                 DIM x0 AS INTEGER : x0 = xBeat(nStart(i, gruppe[0])) + dx
                 DIM x1 AS INTEGER : x1 = xBeat(nStart(i, gruppe[LEN(gruppe) - 1])) + dx
                 DIM nb AS INTEGER : nb = IIF(nDauer(i, gruppe[0]) <= 0.25, 2, 1)
                 DIM b AS INTEGER
                 FOR b = 0 TO nb - 1
-                    LINEW(x0, by + b * IIF(oben, 5, -5), x1, by + b * IIF(oben, 5, -5), 3, farbe)
+                    DIM bd AS INTEGER : bd = MAX(3, HALB * 2 \ 3)
+                    LINEW(x0, by + b * IIF(oben, bd + 2, -bd - 2), x1, by + b * IIF(oben, bd + 2, -bd - 2), bd, farbe)
                 NEXT
             END IF
             gruppe = []
@@ -1217,7 +1392,7 @@ END SUB
 SUB noteZeichnen(i AS INTEGER, k AS INTEGER, farbe AS INTEGER)
     DIM x AS INTEGER : x = xBeat(nStart(i, k))
     IF istPause(i, k) THEN
-        pauseZeichnen(x, yStufe(i, 4), farbe)
+        pauseZeichnen(i, x, nDauer(i, k), farbe)
         RETURN
     END IF
     DIM p AS INTEGER : p = nPitch(i, k)
@@ -1225,30 +1400,38 @@ SUB noteZeichnen(i AS INTEGER, k AS INTEGER, farbe AS INTEGER)
     DIM y AS INTEGER : y = yStufe(i, s)
     DIM d AS FLOAT : d = nDauer(i, k)
     hilfslinien(i, x, s, F_LINIE)
-    notenkopf(x, y, d < 2.0, farbe)
+    notenkopf(x, y, d, farbe)
+    ' Der Punkt der punktierten Note steht rechts im Zwischenraum -- liegt
+    ' der Kopf auf einer Linie, im Raum darueber.
+    IF punktiert(d) THEN CIRCLE(x + NOTE_R + HALB, y - IIF(s MOD 2 = 0, HALB, 0), MAX(2, HALB \ 3), farbe)
     DIM oben AS BOOLEAN : oben = s < MID_STEP
-    DIM sx AS INTEGER : sx = IIF(oben, x + NOTE_R, x - NOTE_R)
+    ' Der Hals sitzt am Rand des Kopfs: rechts nach oben, links nach unten.
+    DIM sx AS INTEGER : sx = IIF(oben, x + NOTE_R - 1, x - NOTE_R)
     IF d < 4.0 AND NOT balken[k] THEN
         DIM fy AS INTEGER : fy = IIF(oben, y - STEM_LEN, y + STEM_LEN)
-        LINE(sx, y, sx, fy, farbe)
-        IF d <= 0.5 THEN
-            DIM nf AS INTEGER : nf = IIF(d <= 0.25, 2, 1)
+        LINEW(sx, y, sx, fy, MAX(1, HALB \ 5), farbe)
+        IF d <= 0.75 THEN
+            ' Faehnchen als geschwungene Linie, eins je halbierter Dauer.
+            DIM nf AS INTEGER : nf = IIF(d <= 0.375, 2, 1)
             DIM f AS INTEGER
             FOR f = 0 TO nf - 1
-                DIM off AS INTEGER : off = f * 7 * IIF(oben, 1, -1)
-                LINEW(sx, fy + off, sx + 9, fy + off + 7, 2, farbe)
+                DIM r AS INTEGER : r = IIF(oben, 1, -1)
+                DIM f0 AS INTEGER : f0 = fy + f * HALB * r
+                DIM fxs AS ARRAY OF INTEGER : fxs = [sx, sx + HALB \ 2, sx + HALB + HALB \ 2, sx + HALB]
+                DIM fys AS ARRAY OF INTEGER : fys = [f0, f0 + HALB * r, f0 + HALB * 2 * r, f0 + HALB * 3 * r]
+                SPLINE(fxs, fys, farbe, MAX(2, HALB \ 3))
             NEXT
         END IF
     END IF
     IF hatVorzeichen(p) THEN
-        IF ganz(np$(i, k, "accidental"), 1) = -1 THEN bZeichen(x - 22, y, F_VORZ) ELSE kreuz(x - 22, y, F_VORZ)
+        IF ganz(np$(i, k, "accidental"), 1) = -1 THEN bZeichen(x - NOTE_R - HALB - 3, y, F_VORZ) ELSE kreuz(x - NOTE_R - HALB - 3, y, F_VORZ)
     END IF
     IF wahr(np$(i, k, "staccato"), FALSE) THEN CIRCLE(x, IIF(oben, y + NOTE_R + 7, y - NOTE_R - 7), 3, farbe)
     DIM fz AS INTEGER : fz = ganz(np$(i, k, "fingering"), 0)
     IF fz > 0 THEN
-        TEXT_SIZE(13)
+        SETFONT(uiFont, 13)
         TEXT(x - 4, y - STEM_LEN - 22, STR$(fz), F_TEXT)
-        TEXT_SIZE(16)
+        SETFONT(uiFont, 15)
     END IF
 END SUB
 
@@ -1281,6 +1464,10 @@ SUB bassschluessel(cx AS INTEGER, yBot AS INTEGER, farbe AS INTEGER)
 END SUB
 
 SUB kreuz(x AS INTEGER, y AS INTEGER, farbe AS INTEGER)
+    IF musikFont >= 0 THEN
+        glyphMitte(G_KREUZ, x, y, 131, HALB, farbe)
+        RETURN
+    END IF
     LINE(x - 3, y - 9, x - 3, y + 9, farbe)
     LINE(x + 3, y - 10, x + 3, y + 8, farbe)
     LINEW(x - 7, y - 2, x + 7, y - 5, 2, farbe)
@@ -1288,6 +1475,10 @@ SUB kreuz(x AS INTEGER, y AS INTEGER, farbe AS INTEGER)
 END SUB
 
 SUB bZeichen(x AS INTEGER, y AS INTEGER, farbe AS INTEGER)
+    IF musikFont >= 0 THEN
+        glyphMitte(G_BE, x, y, 134, HALB, farbe)
+        RETURN
+    END IF
     LINE(x - 3, y - 14, x - 3, y + 5, farbe)
     DIM xs AS ARRAY OF INTEGER : xs = [x - 3, x + 3, x + 2, x - 3]
     DIM ys AS ARRAY OF INTEGER : ys = [y - 3, y - 2, y + 3, y + 5]
@@ -1310,19 +1501,40 @@ SUB spurZeichnen(i AS INTEGER)
     FOR l = 0 TO 4
         LINE(gx0 + LEFT_MARGIN - 14, yStufe(i, l * 2), breite, yStufe(i, l * 2), F_LINIE)
     NEXT
+    SETFONT(uiFont, 12)
     FOR m = 1 TO takte
         DIM bx AS INTEGER : bx = xBeat(m * 4.0) - BARLINE_LEAD
-        IF bx > gx0 + LEFT_MARGIN THEN LINE(bx, yTop - 6, bx, yBot + 6, F_LINIE)
+        IF bx > gx0 + LEFT_MARGIN THEN
+            LINE(bx, yTop, bx, yBot, F_LINIE)
+            ' Taktnummer ueber dem Strich: der Takt, der hier beginnt.
+            TEXT(bx + 3, yTop - HALB * 2 - 12, STR$(m + 1), &H5E7088)
+        END IF
     NEXT
-    ' Schluessel -- selbst gezeichnet: die Notenzeichen der Symbolschriften
-    ' kommen nicht durch jede Schrift, ein Fragezeichen am Zeilenanfang ist
-    ' schlimmer als eine schlichte Form.
+    SETFONT(uiFont, 15)
+    ' Schluessel und Taktart. Mit der Notenschrift aus ihr (der G-Schluessel
+    ' sitzt mit seiner Grundlinie auf der G-Linie, der F-Schluessel mit
+    ' seinen Punkten um die F-Linie), sonst die gezeichnete Kurve.
     BOX(gx0, yTop - 30, gx0 + LEFT_MARGIN - 16, yBot + 30, &H0B1119)
-    IF text$(tp$(i, "clef")) = "bass" THEN
+    DIM bass AS BOOLEAN : bass = text$(tp$(i, "clef")) = "bass"
+    IF musikFont >= 0 THEN
+        IF bass THEN
+            glyphAn(F_SCHLUESSEL, gBox(F_SCHLUESSEL, 0), 512, gx0 + HALB * 2, yStufe(i, 6), HALB, farbe)
+        ELSE
+            glyphAn(G_SCHLUESSEL, gBox(G_SCHLUESSEL, 0), 244, gx0 + HALB * 2, yStufe(i, 2), HALB, farbe)
+        END IF
+    ELSEIF bass THEN
         bassschluessel(gx0 + 26, yBot, farbe)
     ELSE
         violinschluessel(gx0 + 30, yBot, farbe)
     END IF
+    ' Die Taktart (das Format kennt nur 4/4): zwei Ziffern, je zwei
+    ' Linienabstaende hoch, eine ueber und eine unter der Mittellinie.
+    SETFONT(fettFont, HALB * 5)
+    DIM tx AS INTEGER : tx = gx0 + LEFT_MARGIN - HALB * 5
+    DIM zb AS INTEGER : zb = TEXT_WIDTH("4") \ 2
+    TEXT(tx - zb, yStufe(i, 8) - HALB + 1, "4", F_TEXT)
+    TEXT(tx - zb, yStufe(i, 4) - HALB + 1, "4", F_TEXT)
+    SETFONT(uiFont, 15)
     ' Bindeboegen
     IF JSON_HAS(doc, tp$(i, "slurs")) THEN
         DIM b AS INTEGER
@@ -1357,16 +1569,22 @@ SUB spurZeichnen(i AS INTEGER)
         DIM hx AS INTEGER : hx = xBeat(hoverBeat)
         LINE(hx, yTop - 18, hx, yBot + 18, &H3A4A5C)
         IF hoverPause THEN
-            pauseZeichnen(hx, yStufe(i, 4), &H7A8E96)
+            pauseZeichnen(i, hx, entryDauer, &H7A8E96)
         ELSE
             DIM hs AS INTEGER : hs = stufe(i, hoverPitch)
             hilfslinien(i, hx, hs, &H3A4A5C)
-            CIRCLEOUTLINE(hx, yStufe(i, hs), NOTE_R, &H9AAABB)
+            notenkopf(hx, yStufe(i, hs), entryDauer, &H5A6A7B)
         END IF
     END IF
-    TEXT_SIZE(13)
-    TEXT(gx0 + LEFT_MARGIN, oben + STAFF_H - 26, text$(tp$(i, "name")) + "  -  " + text$(tp$(i, "instrument.name")), farbe)
-    TEXT_SIZE(16)
+    ' Die Eingabemarke: wo die naechste getippte Note hinkommt.
+    IF eingabeSpur = i THEN
+        DIM ex AS INTEGER : ex = xBeat(eingabeBeat) - NOTE_R - 3
+        LINEW(ex, yTop - HALB * 2, ex, yBot + HALB * 2, 2, &H4FC8F0)
+        TRIANGLE(ex - 5, yTop - HALB * 2 - 7, ex + 5, yTop - HALB * 2 - 7, ex, yTop - HALB * 2, &H4FC8F0)
+    END IF
+    SETFONT(uiFont, 13)
+    TEXT(gx0 + LEFT_MARGIN, yBot + HALB * 6, text$(tp$(i, "name")) + "  ·  " + text$(tp$(i, "instrument.name")), farbe)
+    SETFONT(uiFont, 15)
 END SUB
 
 SUB blattZeichnen()
@@ -1377,6 +1595,291 @@ SUB blattZeichnen()
         spurZeichnen(i)
     NEXT
     SCISSOR_END()
+END SUB
+
+' --- Zoom ---------------------------------------------------------------------
+' Die Lage der Spuren-Bedienelemente links haengt an STAFF_H -- nach dem
+' Zoom ziehen sie mit. Der Rollstand wird mitgerechnet, damit dieselbe
+' Stelle im Bild bleibt.
+SUB zoomSetzen(z AS FLOAT)
+    DIM alt AS FLOAT : alt = zoom
+    zoomRechnen(z)
+    IF alt > 0.0 THEN
+        scrollX = INT(scrollX * zoom / alt)
+        scrollY = INT(scrollY * zoom / alt)
+    END IF
+    spurenAnzeigen()
+    IF zoomVonHand THEN GUI_SET_TEXT(lblStatus, "Zoom " + STR$(INT(zoom * 100 + 0.5)) + " %")
+    protokoll("zoom " + STR$(INT(zoom * 100 + 0.5)))
+END SUB
+
+' --- Eingabe per Tastatur und Klaviatur ----------------------------------------
+' Eine Eingabemarke (blauer Strich) zeigt, wo die naechste Note hinkommt.
+' Buchstaben setzen dort eine Note und ruecken weiter: C D E F G A H (B =
+' das deutsche B, ein Halbton unter H), P eine Pause, 1..5 waehlen die Dauer
+' (Ganze..Sechzehntel), der Punkt punktiert. Pfeil hoch/runter verschiebt
+' die Note VOR der Marke um einen Halbton (mit Strg um eine Oktave),
+' Pfeil links/rechts bewegt die Marke, die Ruecktaste nimmt die letzte
+' Note weg. Die Oktave folgt der vorigen Note -- der naechstgelegene Ton
+' dieses Namens wird es, wie beim Notieren von Hand.
+DIM eingabeSpur AS INTEGER : eingabeSpur = 0
+DIM eingabeBeat AS FLOAT : eingabeBeat = 0.0
+DIM letzterPitch AS INTEGER : letzterPitch = -1
+
+SUB vorhoeren(i AS INTEGER, midi AS INTEGER)
+    TRY
+        AUDIO_PLAY(klang(i, midi, 450), 0, 0.8)
+    CATCH e
+    END TRY
+END SUB
+
+FUNCTION naechsterTon(pc AS INTEGER, ref AS INTEGER) AS INTEGER
+    DIM best AS INTEGER : best = pc + 60
+    DIM o AS INTEGER
+    FOR o = 1 TO 8
+        DIM kand AS INTEGER : kand = o * 12 + pc
+        IF ABS(kand - ref) < ABS(best - ref) THEN best = kand
+    NEXT
+    RETURN best
+END FUNCTION
+
+SUB eingabeNote(pitch AS INTEGER, acc AS INTEGER)
+    IF eingabeSpur >= nt() THEN eingabeSpur = 0
+    DIM k AS INTEGER : k = noteBei(eingabeSpur, eingabeBeat)
+    DIM merkAcc AS INTEGER : merkAcc = entryAcc
+    entryAcc = acc
+    IF k < 0 OR istPause(eingabeSpur, k) OR nPitch(eingabeSpur, k) <> pitch THEN setzen(eingabeSpur, eingabeBeat, pitch, FALSE)
+    entryAcc = merkAcc
+    letzterPitch = pitch
+    vorhoeren(eingabeSpur, pitch)
+    eingabeBeat = eingabeBeat + entryDauer
+    markeSichtbar()
+END SUB
+
+SUB eingabePause()
+    IF eingabeSpur >= nt() THEN eingabeSpur = 0
+    DIM k AS INTEGER : k = noteBei(eingabeSpur, eingabeBeat)
+    IF k < 0 OR NOT istPause(eingabeSpur, k) THEN setzen(eingabeSpur, eingabeBeat, 0, TRUE)
+    eingabeBeat = eingabeBeat + entryDauer
+    markeSichtbar()
+END SUB
+
+' Die Note vor der Marke: die mit dem spaetesten Beginn davor.
+FUNCTION noteVorMarke() AS INTEGER
+    DIM best AS INTEGER : best = -1
+    DIM k AS INTEGER
+    FOR k = 0 TO nn(eingabeSpur) - 1
+        IF nStart(eingabeSpur, k) < eingabeBeat - 0.000001 THEN
+            IF best < 0 THEN
+                best = k
+            ELSEIF nStart(eingabeSpur, k) >= nStart(eingabeSpur, best) THEN
+                best = k
+            END IF
+        END IF
+    NEXT
+    RETURN best
+END FUNCTION
+
+' Rollt das Blatt so, dass die Marke im Bild bleibt.
+SUB markeSichtbar()
+    DIM mx AS INTEGER : mx = xBeat(eingabeBeat)
+    IF mx > SCREENWIDTH() - PPB * 2 THEN scrollX = scrollX + (mx - (SCREENWIDTH() - PPB * 4))
+    IF mx < gx0 + LEFT_MARGIN THEN scrollX = MAX(0, scrollX - (gx0 + LEFT_MARGIN + PPB - mx))
+END SUB
+
+SUB tastenEingabe()
+    IF GUI_MODAL() THEN RETURN
+    IF KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL) OR KEYPRESSED(KEY_LALT) OR KEYPRESSED(KEY_RALT) THEN
+        ' Strg+Pfeil: um eine Oktave
+        IF KEYHIT(KEY_UP) OR KEYHIT(KEY_DOWN) THEN noteVerschieben(IIF(KEYPRESSED(KEY_UP), 12, -12))
+        RETURN
+    END IF
+    DIM namen AS STRING : namen = "cdefgahb"
+    DIM klassen AS ARRAY OF INTEGER : klassen = [0, 2, 4, 5, 7, 9, 11, 10]
+    DIM j AS INTEGER
+    FOR j = 0 TO 7
+        IF KEYHIT(MID$(namen, j, 1)) THEN
+            DIM pc AS INTEGER : pc = (klassen[j] + IIF(j = 7, 0, entryAcc) + 12) MOD 12
+            DIM ref AS INTEGER : ref = letzterPitch
+            IF ref < 0 THEN ref = IIF(text$(tp$(eingabeSpur, "clef")) = "bass", 50, 71)
+            eingabeNote(naechsterTon(pc, ref), IIF(j = 7, -1, entryAcc))
+        END IF
+    NEXT
+    IF KEYHIT("p") THEN eingabePause()
+    FOR j = 0 TO 4
+        IF KEYHIT(STR$(j + 1)) THEN GUI_DROPDOWN_SET_SELECTED(ddDauer, j)
+    NEXT
+    ' 46 = die Punkt-Taste
+    IF KEYHIT(46) THEN GUI_SET_CHECKED(cbPunkt, NOT GUI_CHECKED(cbPunkt))
+    IF KEYHIT(KEY_LEFT) THEN eingabeBeat = MAX(0.0, eingabeBeat - entryDauer) : markeSichtbar()
+    IF KEYHIT(KEY_RIGHT) THEN eingabeBeat = eingabeBeat + entryDauer : markeSichtbar()
+    IF KEYHIT(KEY_UP) THEN noteVerschieben(1)
+    IF KEYHIT(KEY_DOWN) THEN noteVerschieben(-1)
+    IF KEYHIT(KEY_BACKSPACE) THEN
+        DIM k AS INTEGER : k = noteVorMarke()
+        IF k >= 0 THEN
+            DIM b AS FLOAT : b = nStart(eingabeSpur, k)
+            noteEntfernen(eingabeSpur, k)
+            merken()
+            spurenAnzeigen()
+            protokoll("entfernt " + STR$(eingabeSpur) + " " + zahl$(b))
+            eingabeBeat = b
+            markeSichtbar()
+        END IF
+    END IF
+END SUB
+
+SUB noteVerschieben(halbtoene AS INTEGER)
+    DIM k AS INTEGER : k = noteVorMarke()
+    IF k < 0 THEN RETURN
+    IF istPause(eingabeSpur, k) THEN RETURN
+    DIM p AS INTEGER : p = CLAMP(nPitch(eingabeSpur, k) + halbtoene, 0, 127)
+    JSON_SET_INT(doc, np$(eingabeSpur, k, "pitch"), p)
+    IF hatVorzeichen(p) THEN JSON_SET_INT(doc, np$(eingabeSpur, k, "accidental"), IIF(halbtoene < 0, -1, 1)) ELSE JSON_REMOVE(doc, np$(eingabeSpur, k, "accidental"))
+    merken()
+    letzterPitch = p
+    vorhoeren(eingabeSpur, p)
+    protokoll("tonhoehe " + STR$(eingabeSpur) + " " + zahl$(nStart(eingabeSpur, k)) + " " + STR$(p))
+END SUB
+
+' --- Klaviatur am unteren Rand -------------------------------------------------
+' Drei Oktaven um die Lage der Spur mit der Eingabemarke (Violinschluessel
+' ab C4, Bass ab C2). Ein Klick setzt die Note an der Marke wie ein
+' Buchstabe; beim Abspielen leuchten die klingenden Tasten.
+FUNCTION klavierBasis() AS INTEGER
+    IF eingabeSpur < nt() THEN
+        IF text$(tp$(eingabeSpur, "clef")) = "bass" THEN RETURN 36
+    END IF
+    RETURN 60
+END FUNCTION
+
+FUNCTION klavierY() AS INTEGER
+    RETURN SCREENHEIGHT() - PIANO_H
+END FUNCTION
+
+FUNCTION klavierTaste(mx AS INTEGER, my AS INTEGER) AS INTEGER
+    IF mx < gx0 OR my < klavierY() OR my >= SCREENHEIGHT() THEN RETURN -1
+    DIM wb AS FLOAT : wb = (SCREENWIDTH() - gx0) / 21.0
+    DIM schwarz AS ARRAY OF INTEGER : schwarz = [1, 3, -1, 6, 8, 10, -1]
+    DIM weiss AS ARRAY OF INTEGER : weiss = [0, 2, 4, 5, 7, 9, 11]
+    DIM w AS INTEGER : w = INT((mx - gx0) / wb)
+    IF my < klavierY() + PIANO_H * 0.6 THEN
+        ' die schwarze Taste ueber der Fuge rechts bzw. links
+        DIM rel AS FLOAT : rel = (mx - gx0) / wb - w
+        IF rel > 0.7 AND schwarz[w MOD 7] >= 0 THEN RETURN klavierBasis() + (w \ 7) * 12 + schwarz[w MOD 7]
+        IF rel < 0.3 AND w > 0 THEN
+            IF schwarz[(w - 1) MOD 7] >= 0 THEN RETURN klavierBasis() + ((w - 1) \ 7) * 12 + schwarz[(w - 1) MOD 7]
+        END IF
+    END IF
+    RETURN klavierBasis() + (w \ 7) * 12 + weiss[w MOD 7]
+END FUNCTION
+
+FUNCTION klingt(midi AS INTEGER) AS INTEGER
+    IF NOT spielt THEN RETURN -1
+    DIM t AS FLOAT : t = AUDIO_CLOCK_TICKS(takt) / (ROWS_PER_BEAT * 1.0)
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO nt() - 1
+        FOR k = 0 TO nn(i) - 1
+            IF NOT istPause(i, k) THEN
+                IF nPitch(i, k) = midi AND nStart(i, k) <= t AND t < nStart(i, k) + nDauer(i, k) THEN RETURN spurFarbe(i)
+            END IF
+        NEXT
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB klavierZeichnen()
+    DIM py AS INTEGER : py = klavierY()
+    DIM pw AS INTEGER : pw = SCREENWIDTH() - gx0
+    DIM wb AS FLOAT : wb = pw / 21.0
+    DIM unter AS INTEGER : unter = klavierTaste(MOUSEX(), MOUSEY())
+    DIM weiss AS ARRAY OF INTEGER : weiss = [0, 2, 4, 5, 7, 9, 11]
+    DIM schwarz AS ARRAY OF INTEGER : schwarz = [1, 3, -1, 6, 8, 10, -1]
+    BOX(gx0, py - 2, SCREENWIDTH(), SCREENHEIGHT(), &H0A0E14)
+    DIM w AS INTEGER
+    FOR w = 0 TO 20
+        DIM midi AS INTEGER : midi = klavierBasis() + (w \ 7) * 12 + weiss[w MOD 7]
+        DIM x0 AS INTEGER : x0 = gx0 + INT(w * wb)
+        DIM x1 AS INTEGER : x1 = gx0 + INT((w + 1) * wb) - 2
+        DIM f AS INTEGER : f = klingt(midi)
+        IF f >= 0 THEN
+            GRADIENTV(x0, py, x1, SCREENHEIGHT() - 1, f, &HF4F6F8)
+        ELSEIF midi = unter THEN
+            GRADIENTV(x0, py, x1, SCREENHEIGHT() - 1, &HC8E8F8, &HF4F6F8)
+        ELSE
+            GRADIENTV(x0, py, x1, SCREENHEIGHT() - 1, &HF4F6F8, &HD2D8DE)
+        END IF
+        IF w MOD 7 = 0 THEN
+            SETFONT(uiFont, 12)
+            TEXT(x0 + 4, SCREENHEIGHT() - 17, "C" + STR$(midi \ 12 - 1), &H506070)
+        END IF
+    NEXT
+    FOR w = 0 TO 20
+        IF schwarz[w MOD 7] >= 0 THEN
+            DIM sm AS INTEGER : sm = klavierBasis() + (w \ 7) * 12 + schwarz[w MOD 7]
+            DIM bx AS INTEGER : bx = gx0 + INT((w + 0.7) * wb)
+            DIM bf AS INTEGER : bf = klingt(sm)
+            IF bf < 0 AND sm = unter THEN bf = &H4A7A9A
+            IF bf < 0 THEN
+                GRADIENTV(bx, py, bx + INT(wb * 0.6), py + INT(PIANO_H * 0.6), &H2A323C, &H10151B)
+            ELSE
+                GRADIENTV(bx, py, bx + INT(wb * 0.6), py + INT(PIANO_H * 0.6), bf, &H10151B)
+            END IF
+        END IF
+    NEXT
+    SETFONT(uiFont, 15)
+END SUB
+
+' --- Notenwerte als Knopfleiste -------------------------------------------------
+' Rechts in der Zeile der Statusmeldung: die fuenf Dauern als Notenzeichen und
+' der Punkt. Sie stellen dieselbe Klappliste wie Taste 1..5 -- die bleibt,
+' damit alles an EINER Stelle steht.
+CONST STREIF_B = 40
+FUNCTION streifenX() AS INTEGER
+    RETURN SCREENWIDTH() - 6 * (STREIF_B + 4) - 10
+END FUNCTION
+FUNCTION streifenY() AS INTEGER
+    RETURN TOP_B - 34
+END FUNCTION
+
+FUNCTION streifenBei(mx AS INTEGER, my AS INTEGER) AS INTEGER
+    IF my < streifenY() OR my >= streifenY() + 30 THEN RETURN -1
+    IF mx < streifenX() THEN RETURN -1
+    DIM j AS INTEGER : j = (mx - streifenX()) \ (STREIF_B + 4)
+    IF j > 5 THEN RETURN -1
+    RETURN j
+END FUNCTION
+
+SUB streifenZeichnen()
+    DIM zeichen AS ARRAY OF INTEGER : zeichen = [G_GANZE, G_N_HALB, G_N_VIERTEL, G_N_ACHTEL, G_N_16]
+    DIM tasten AS ARRAY OF STRING : tasten = ["1", "2", "3", "4", "5"]
+    DIM j AS INTEGER
+    DIM wahl AS INTEGER : wahl = GUI_DROPDOWN_SELECTED(ddDauer)
+    DIM unter AS INTEGER : unter = streifenBei(MOUSEX(), MOUSEY())
+    FOR j = 0 TO 5
+        DIM x AS INTEGER : x = streifenX() + j * (STREIF_B + 4)
+        DIM y AS INTEGER : y = streifenY()
+        DIM an AS BOOLEAN : an = IIF(j = 5, GUI_CHECKED(cbPunkt), j = wahl)
+        DIM grund AS INTEGER : grund = IIF(an, &H1F6F9A, IIF(j = unter, &H2A3A4C, &H1A2230))
+        BOXROUND(x, y, x + STREIF_B, y + 30, 5, grund)
+        RECTROUND(x, y, x + STREIF_B, y + 30, 5, IIF(an, &H4FC8F0, &H34404E))
+        IF j = 5 THEN
+            CIRCLE(x + STREIF_B \ 2, y + 15, 4, F_TEXT)
+        ELSEIF musikFont >= 0 THEN
+            DIM cp AS INTEGER : cp = zeichen[j]
+            ' Ganze Note mittig, die uebrigen mit dem Kopf unten im Kasten.
+            IF j = 0 THEN
+                glyphMitte(cp, x + STREIF_B \ 2, y + 15, 134, 4, F_TEXT)
+            ELSE
+                glyphMitte(cp, x + STREIF_B \ 2 - 2, y + 26, 134, 4, F_TEXT)
+            END IF
+        ELSE
+            SETFONT(uiFont, 13)
+            TEXT(x + 6, y + 7, ["1", "1/2", "1/4", "1/8", "1/16"][j], F_TEXT)
+        END IF
+    NEXT
+    SETFONT(uiFont, 15)
 END SUB
 
 ' --- Start --------------------------------------------------------------------
@@ -1390,9 +1893,14 @@ IF ARGC() >= 1 THEN
 ELSE
     neuesStueck()
 END IF
-GUI_FOCUS(ddDauer)
+GUI_FOCUS(fokusAblage)
 protokoll("bereit")
 
+' Zoom nach der Fensterhoehe: 800 Punkte = 1, auf zehntel gerundet.
+FUNCTION zoomFuerSchirm() AS FLOAT
+    RETURN CLAMP(INT(SCREENHEIGHT() / 80.0) / 10.0, 1.0, 1.8)
+END FUNCTION
+IF zoomFuerSchirm() <> zoom THEN zoomSetzen(zoomFuerSchirm())
 DIM warBreite AS INTEGER : warBreite = SCREENWIDTH()
 DIM warHoehe AS INTEGER : warHoehe = SCREENHEIGHT()
 DIM beenden AS BOOLEAN : beenden = FALSE
@@ -1448,6 +1956,11 @@ WHILE NOT beenden
         warBreite = SCREENWIDTH() : warHoehe = SCREENHEIGHT()
         GUI_WINDOW_SET_BOUNDS(winTop, 0, 0, warBreite, TOP_B)
         GUI_WINDOW_SET_BOUNDS(winLinks, 0, TOP_B, LINKS_B, warHoehe - TOP_B)
+        GUI_SET_WRAP(lblStatus, warBreite - 300)
+        ' Auf einem grossen Schirm (das Fenster startet maximiert) waeren die
+        ' Systeme bei Zoom 1 winzig -- einmal anpassen, solange niemand von
+        ' Hand gezoomt hat.
+        IF NOT zoomVonHand THEN zoomSetzen(zoomFuerSchirm())
     END IF
 
     ' Menue und Knoepfe
@@ -1504,7 +2017,7 @@ WHILE NOT beenden
         DIM b AS INTEGER : b = CLAMP(INT(VAL(GUI_TEXT(fBpm))), 20, 400)
         IF b <> bpm() THEN JSON_SET_INT(doc, "bpm", b) : merken() : protokoll("bpm " + STR$(b))
         spurenAnzeigen()
-        GUI_FOCUS(ddDauer)
+        GUI_FOCUS(fokusAblage)
     END IF
 
     ' Spuren: Name (Enter), Schluessel und Instrument (Auswahl ist das Ereignis)
@@ -1516,7 +2029,7 @@ WHILE NOT beenden
                 IF nm = "" THEN nm = "Stimme " + STR$(i + 1)
                 IF nm <> text$(tp$(i, "name")) THEN JSON_SET_STRING(doc, tp$(i, "name"), nm) : merken() : protokoll("name " + STR$(i) + " " + nm)
                 spurenAnzeigen()
-                GUI_FOCUS(ddDauer)
+                GUI_FOCUS(fokusAblage)
             END IF
             IF GUI_DROPDOWN_SELECTED(sClef[i]) <> sClefSel[i] AND GUI_DROPDOWN_SELECTED(sClef[i]) >= 0 THEN
                 sClefSel[i] = GUI_DROPDOWN_SELECTED(sClef[i])
@@ -1544,10 +2057,17 @@ WHILE NOT beenden
             IF spielt THEN stopp() ELSE starten()
         END IF
         IF KEYHIT(KEY_ESCAPE) THEN ankerSpur = -1
+        tastenEingabe()
     END IF
+    IF GUI_CLICKED(miZoomPlus) THEN zoomVonHand = TRUE : zoomSetzen(zoom + 0.1)
+    IF GUI_CLICKED(miZoomMinus) THEN zoomVonHand = TRUE : zoomSetzen(zoom - 0.1)
+    IF GUI_CLICKED(miZoom100) THEN zoomVonHand = TRUE : zoomSetzen(1.0)
     DIM rad AS INTEGER : rad = MOUSEWHEEL()
     IF rad <> 0 AND imBlatt(MOUSEX(), MOUSEY()) THEN
-        IF KEYPRESSED(KEY_LSHIFT) OR KEYPRESSED(KEY_RSHIFT) THEN
+        IF KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL) THEN
+            zoomVonHand = TRUE
+            zoomSetzen(zoom + rad * 0.1)
+        ELSEIF KEYPRESSED(KEY_LSHIFT) OR KEYPRESSED(KEY_RSHIFT) THEN
             scrollY = CLAMP(scrollY - rad * 40, 0, MAX(0, nt() * STAFF_H - (SCREENHEIGHT() - TOP_B - 20)))
             spurenAnzeigen()
         ELSE
@@ -1563,10 +2083,28 @@ WHILE NOT beenden
     END IF
 
     mausAufBlatt()
+    ' Klaviatur und Notenwerte: ein Klick setzt die Note an der Marke bzw.
+    ' waehlt die Dauer.
+    IF MOUSE_HIT(LINKS) AND NOT GUI_MODAL() THEN
+        DIM kt AS INTEGER : kt = klavierTaste(MOUSEX(), MOUSEY())
+        IF kt >= 0 THEN
+            letzterPitch = kt
+            eingabeNote(kt, IIF(hatVorzeichen(kt), 1, 0))
+            GUI_FOCUS(fokusAblage)
+        END IF
+        DIM sj AS INTEGER : sj = streifenBei(MOUSEX(), MOUSEY())
+        IF sj = 5 THEN
+            GUI_SET_CHECKED(cbPunkt, NOT GUI_CHECKED(cbPunkt))
+        ELSEIF sj >= 0 THEN
+            GUI_DROPDOWN_SET_SELECTED(ddDauer, sj)
+        END IF
+    END IF
 
     CLS(&H0B1119)
     blattZeichnen()
+    klavierZeichnen()
     GUI_DRAW()
+    streifenZeichnen()
     FLIP()
 WEND
 
