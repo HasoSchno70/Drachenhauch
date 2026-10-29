@@ -5570,7 +5570,7 @@ SUB prProbe()
         DIM mox AS INTEGER : DIM moy AS INTEGER : DIM mm AS INTEGER
         (mox, moy, mm) = miniLage(GUI_CANVAS_X(leinwand), GUI_CANVAS_Y(leinwand), GUI_CANVAS_W(leinwand), GUI_CANVAS_H(leinwand))
         prF = [] : prZ = []
-        prKlick(1, mox + 110 * mm, moy + 90 * mm)
+        prKlick(1, mox + 60 * mm, moy + 50 * mm)
         prAbspielen()
     END IF
     IF prBild - prStart = 10 AND FILEEXISTS("ev.txt") THEN prMerke("verschoben " + IIF(panX > 1000 AND panY > 800, "ja", "nein") + " gemalt " + STR$(TILED_COUNT_GID(karte, 0, 1)))
