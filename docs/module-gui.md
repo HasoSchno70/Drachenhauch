@@ -409,6 +409,8 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_SET_ENABLED(wdg, on)` | — | Widget bedienbar machen oder sperren (gesperrt = ausgegraut, nimmt keine Klicks) |
 | `GUI_ENABLED(wdg)` | BOOLEAN | ist es bedienbar? |
 | `GUI_SET_FONT(wdg, font)` | — | eigene Schrift fuer dieses Widget |
+| `GUI_FONT(font [, groesse])` | — | die eigene Schrift der ganzen gui: gemessen und gezeichnet wird mit ihr, egal welche Schrift das Programm gerade mit `SETFONT` aktiv hat (ohne `groesse` die aktuelle Textgröße); `-1` = wieder die aktive des Programms |
+| `GUI_FONT_GET()` | TUPLE | `(font, groesse)` der eigenen Schrift, `(-1, 0)` ohne |
 | `GUI_SET_FONT_SIZE(wdg, px)` | — | eigene Schriftgroesse fuer dieses Widget |
 | `GUI_SET_FONT_STYLE(wdg, stil$)` | — | Schriftstil fuer dieses Widget: `fett`, `kursiv`, `unterstrichen`, `durchgestrichen`, verbunden mit `+`; `"normal"` nimmt ihn weg. Echte Schnitte, wo es sie als Datei gibt, sonst nachgebildet |
 | `GUI_GET_FONT_STYLE$(wdg)` | STRING | der Stil des Widgets, z. B. `"fett+unterstrichen"` |
@@ -2195,7 +2197,7 @@ stabil (Löschen markiert nur als „tot", verschiebt keine Indizes).
 | `GUI_SET_VISIBLE(wdg, an)` / `GUI_VISIBLE(wdg)` → BOOLEAN | ein-/ausblenden (unsichtbar = nicht gezeichnet, nicht interaktiv) |
 | `GUI_DESTROY(wdg)` | Widget entfernen (Handle wird ungültig, andere bleiben gültig) |
 | `GUI_KIND(wdg)` → STRING | `"button"`/`"label"`/`"checkbox"`/`"slider"`/`"textinput"`/`"panel"`/`"table"` |
-| `GUI_FOCUS(wdg)` | Tastatur-Fokus setzen (z.B. auf ein TextInput) |
+| `GUI_FOCUS(wdg)` | Tastatur-Fokus setzen (z.B. auf ein TextInput); `GUI_FOCUS(-1)` gibt ihn frei, die Tasten gehören dann dem Programm |
 | `GUI_FOCUSED()` → GUI_WIDGET | welches Widget hat den Tastatur-Fokus? (`-1` = keins) |
 | `GUI_SCALE(faktor)` | Anzeige-Maßstab (0.5–4.0), **vor** dem ersten Fenster |
 | `GUI_SCALE_GET()` → FLOAT | aktueller Maßstab |
@@ -2522,6 +2524,14 @@ GUI_SET_FONT(k, andere_schrift)   ' andere Schriftart (Handle aus LOADFONT)
 `GUI_SET_FONT_SIZE` ändert **nur** die Größe — die Schriftart bleibt die
 global gesetzte. `GUI_SET_FONT(wdg, -1)` nimmt eine eigene Schrift wieder
 zurück.
+
+**Eine Schrift für die ganze gui:** `GUI_FONT(font, groesse)`. Ohne sie
+zeichnet die gui mit der Schrift, die das Programm gerade aktiv hat — wer
+zwischendurch mit einer anderen zeichnet (Notensatz, Symbole, eine große
+Überschrift) und `SETFONT` nicht zurückstellt, verdirbt sonst die
+Oberfläche. Mit `GUI_FONT` tauscht die Laufzeit die Schrift für jeden
+gui-Befehl ein und danach wieder zurück; Rückrufe aus `GUI_UPDATE` sehen
+schon wieder die Schrift des Programms.
 
 Über `GUI_STYLE_SET` / `GUI_APPLY_STYLE` lassen sich Schrift und Größe auch
 als benannter Stil auf mehrere Widgets übertragen.
