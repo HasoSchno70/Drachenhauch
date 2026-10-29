@@ -3082,25 +3082,48 @@ umbenennen (`GUI_PROMPT`), leuchtende Klaviatur. **Falle:** ein Drehfeld ist
 mit DejaVu 15 genau 32 hoch, die Zeilen lagen 30 auseinander --
 `flach()` setzt sie per `GUI_SET_BOUNDS` auf 28 (der Lage-Test fand es).
 **Notenblatt (199):** Schluessel, Koepfe, Pausen, Vorzeichen aus **Noto
-Music** (`examples/assets/NotoMusic-Regular.ttf`, OFL,
-`CREDITS_notomusic.txt`; fehlt sie, bleiben die gezeichneten Formen).
-Gesetzt ueber Masse in Font-Einheiten (`gBox`, aus der Datei gelesen):
+Music** (seit dem Folgeschritt in dhrt eingebaut, `LOADFONT("noten")`, OFL in
+`daten/schriften/OFL-NotoMusic.txt`; ohne eingebaute Schriften bleiben die
+gezeichneten Formen). Gesetzt ueber Masse in Font-Einheiten (`gBox`, ueber
+`FONT_GLYPH_BOX` aus der Datei):
 Notenkopf 270 Einheiten = ein Linienabstand, also `e = 2*HALB/268`,
 raylib-Groesse `1787*e` (hhea 1389/-398), Oberkante = Ziel - (1389 - ey)*e;
 G-Schluessel mit Einheit 244 auf der G-Linie, F-Schluessel 512 auf der
-F-Linie (beides im Bild nachgemessen). **Falle:** die gui zeichnet mit der
-AKTIVEN Schrift -- nach jeder Glyphe `SETFONT(uiFont, 15)`, sonst schrieb
-die Oberflaeche in der Notenschrift. Dazu Taktart 4/4 und Taktnummern
+F-Linie (beides im Bild nachgemessen). **Falle:** die gui zeichnete mit der
+AKTIVEN Schrift -- ohne `SETFONT(uiFont, 15)` nach jeder Glyphe schrieb die
+Oberflaeche in der Notenschrift (seit dem Folgeschritt `GUI_FONT`). Dazu Taktart 4/4 und Taktnummern
 (`LEFT_MARGIN` 76 -> 100, die Klicklagen der Tests +24), **Zoom** (die
 Masse sind Variablen, `zoomRechnen`; beim Start nach der Fensterhoehe),
 **Eingabe per Tastatur** an einer Eingabemarke (C D E F G A H B, P, 1..5,
 Punkt, Pfeile, Ruecktaste), Klaviatur unten, Notenwerte als Knopfleiste.
-Der Fokus geht nicht mehr in die Dauer-Klappliste, sondern auf eine leere
-Beschriftung (`fokusAblage`) -- eine Klappliste mit Fokus nimmt Buchstaben
+Der Fokus geht nicht mehr in die Dauer-Klappliste, sondern wird mit
+`GUI_FOCUS(-1)` freigegeben -- eine Klappliste mit Fokus nimmt Buchstaben
 ("Tippen springt"), "a" haette die Dauer auf Achtel gestellt. Tests: je
 Werkzeug ein Fall "nichts liegt uebereinander" ueber ALLE Widgets, dazu
 Zufall/Mutieren/Verlauf/Huellkurve, Umbenennen/Uebersicht, Tastatureingabe
 (Gegenprobe: ohne `tastenEingabe()` faellt er).
+
+**Folgeschritt in der Laufzeit (2026-10-29, Wunsch des Nutzers: "die
+Stolpersteine beheben"):** (1) **`GUI_FONT(font [, groesse])`** /
+`GUI_FONT_GET()` -- die gui hat eine eigene Schrift; `Vm::try_gui` tauscht
+sie fuer JEDEN gui-Befehl ein (`Graphics::schrift_tauschen`) und danach
+zurueck, bei GUI_UPDATE schon VOR den Rueckrufen (`gui_tausch_zurueck`), die
+sind Programmcode. (2) **Fehlende Zeichen aus der eigenen Datei**: ein
+geladener Font, dem ein Zeichen fehlt, merkt es in `eigen_fehlt`, FLIP backt
+ihn mit diesem Zeichen neu (`eigene_nachbacken`, gleiches Handle); was auch
+dort fehlt, steht in `eigen_nie` und geht an die Ausweich-Schriften. Vorher
+fragte die Laufzeit nur die Systemschriften -- das ▶ von `LOADFONT("sans")`
+kam als "?" oder aus Segoe. (3) **`GUI_FOCUS(-1)`** gibt den Fokus frei.
+(4) **`FONT_GLYPH_BOX(font, zeichen$, groesse)`** -> (x, y, b, h) relativ zum
+Punkt, an den TEXT setzt, und **`FONT_BASELINE(font, groesse)`** -- ueber
+`ttf-parser` (im Bau schon da, jetzt im graphics-Feature), Massstab wie stb
+(`groesse / (hhea.asc - hhea.desc)`); und **`LOADFONT("noten")`** = Noto
+Music eingebettet (`schriften.rs`, `daten/schriften/`, 124 KB; der
+PDF-Fehlertext nennt sie mit, die OFL steht in den Drittanbieter-Lizenzen
+ueber `installer/lizenzen.dh`). Die drei Werkzeuge benutzen alles davon; die
+Kopie der Schrift in `examples/assets/` ist weg. Tests
+`tests/pruef/schrift_bausteine.dhtest` (8; gegen 2026.37 fallen 7, der
+achte ist die Gegenprobe ohne GUI_FONT).
 
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 

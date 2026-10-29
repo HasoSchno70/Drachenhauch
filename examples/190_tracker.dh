@@ -1174,9 +1174,12 @@ GUI_THEME_PRESET("glas_dunkel")
 ' DejaVu Sans Mono fuer das Gitter -- ein Tracker liest sich spaltenweise,
 ' und dafuer muss jedes Zeichen gleich breit sein. Beide sind in dhrt
 ' eingebettet, also auf jedem System dieselben.
-DIM uiFont AS INTEGER : uiFont = LOADFONT("sans", 32, "▶■")
-DIM monoFont AS INTEGER : monoFont = LOADFONT("mono", 32, "↑↓")
+DIM uiFont AS INTEGER : uiFont = LOADFONT("sans", 32)
+DIM monoFont AS INTEGER : monoFont = LOADFONT("mono", 32)
 SETFONT(uiFont, 15)
+' Die gui schreibt immer in DejaVu Sans 15, auch waehrend das Gitter mit
+' der Mono-Schrift gezeichnet wird.
+GUI_FONT(uiFont, 15)
 DIM SW AS INTEGER : SW = SCREENWIDTH()
 DIM SH AS INTEGER : SH = SCREENHEIGHT()
 

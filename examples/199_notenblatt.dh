@@ -25,7 +25,7 @@
 '  P eine Pause, 1..5 die Dauer, Punkt punktiert, Pfeile korrigieren;
 '  die Klaviatur unten setzt den Ton an der Marke. Strg+Plus/Minus/Rad
 '  zoomt. Schluessel, Koepfe, Pausen und Vorzeichen kommen aus der
-'  Notenschrift Noto Music (assets/NotoMusic-Regular.ttf).
+'  Notenschrift Noto Music (eingebaut: LOADFONT("noten")).
 '
 '  Aufruf:  dhrt run examples/199_notenblatt.dh [-- stueck.json]
 '  Test:    DH_SCORE_LOG=<datei> protokolliert die Ereignisse zeilenweise.
@@ -78,15 +78,19 @@ GUI_THEME_PRESET("glas_dunkel")
 
 ' DejaVu Sans (in dhrt eingebettet) statt einer Systemschrift, die es nur
 ' unter Windows gibt -- und fett fuer die Taktart.
-DIM uiFont AS INTEGER : uiFont = LOADFONT("sans", 32, "▶■♯♭♮")
+DIM uiFont AS INTEGER : uiFont = LOADFONT("sans", 32)
 DIM fettFont AS INTEGER : fettFont = LOADFONT("serif-fett", 64)
 SETFONT(uiFont, 15)
+' Die gui schreibt in ihrer eigenen Schrift -- das Blatt wechselt fuer jede
+' Notenglyphe die aktive Schrift, und ohne GUI_FONT stuende die Oberflaeche
+' sonst in der Notenschrift.
+GUI_FONT(uiFont, 15)
 
-' Die Notenschrift: Noto Music (SIL Open Font License, assets/CREDITS_notomusic.txt).
-' Schluessel, Notenkoepfe, Pausen und Vorzeichen kommen aus ihr -- von
-' Hand gezeichnet sahen sie nie ganz richtig aus. Fehlt die Datei (eine
-' Kopie des Programms ohne den assets-Ordner), bleibt es bei den
-' gezeichneten Formen.
+' Die Notenschrift: Noto Music, in dhrt eingebettet (LOADFONT("noten"),
+' SIL Open Font License, daten/schriften/OFL-NotoMusic.txt). Schluessel,
+' Notenkoepfe, Pausen und Vorzeichen kommen aus ihr -- von Hand gezeichnet
+' sahen sie nie ganz richtig aus. Ein Bau ohne eingebaute Schriften (Web)
+' behaelt die gezeichneten Formen.
 CONST G_SCHLUESSEL = &H1D11E
 CONST F_SCHLUESSEL = &H1D122
 CONST G_KREUZ = &H266F
@@ -111,16 +115,11 @@ FOR EACH mz IN [G_SCHLUESSEL, F_SCHLUESSEL, G_KREUZ, G_BE, G_AUFLOES, G_KOPF_VOL
                 G_P_GANZ, G_P_HALB, G_P_VIERTEL, G_P_ACHTEL, G_P_16, G_N_HALB, G_N_VIERTEL, G_N_ACHTEL, G_N_16]
     musikZeichen = musikZeichen + CHR$(mz)
 NEXT
-DIM mp AS STRING
-FOR EACH mp IN ("assets/NotoMusic-Regular.ttf", PATHJOIN(GETENV$("DH_IDE_WURZEL"), "examples/assets/NotoMusic-Regular.ttf"), PATHJOIN(GETENV$("DHRT_START_DIR"), "assets/NotoMusic-Regular.ttf"))
-    IF musikFont < 0 AND mp <> "" AND FILEEXISTS(mp) THEN
-        TRY
-            musikFont = LOADFONT(mp, 160, musikZeichen)
-        CATCH e
-            musikFont = -1
-        END TRY
-    END IF
-NEXT
+TRY
+    musikFont = LOADFONT("noten", 160, musikZeichen)
+CATCH e
+    musikFont = -1
+END TRY
 
 DIM logDatei AS STRING : logDatei = GETENV$("DH_SCORE_LOG")
 SUB protokoll(text AS STRING)
@@ -477,11 +476,6 @@ DIM btnSpurWeg AS GUI_WIDGET : btnSpurWeg = GUI_BUTTON(winTop, "- Spur", 938, 7,
 DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_LABEL(winTop, "Bereit.", 8, 44)
 ' Rechts in derselben Zeile stehen die Notenwerte als Knopfleiste.
 GUI_SET_WRAP(lblStatus, SCREENWIDTH() - 300)
-' Wohin der Tastaturfokus geht, wenn er aus einem Feld heraus soll: eine
-' leere Beschriftung. Vorher war es die Dauer-Klappliste -- die nimmt aber
-' Buchstaben und Ziffern selbst (Tippen springt), und mit der Eingabe per
-' Tastatur haette "a" die Dauer auf "Achtel" gestellt.
-DIM fokusAblage AS GUI_WIDGET : fokusAblage = GUI_LABEL(winTop, "", 0, 0)
 DIM mAnsicht AS INTEGER : mAnsicht = GUI_MENU(winTop, "Ansicht")
 DIM miZoomPlus AS INTEGER : miZoomPlus = GUI_MENU_ITEM(mAnsicht, "Vergrößern", "Strg+Plus")
 DIM miZoomMinus AS INTEGER : miZoomMinus = GUI_MENU_ITEM(mAnsicht, "Verkleinern", "Strg+Minus")
@@ -1091,7 +1085,7 @@ SUB mausAufBlatt()
             END IF
             DIM k AS INTEGER : k = noteBei(i, beat)
             IF MOUSE_HIT(RECHTS) THEN
-                GUI_FOCUS(fokusAblage)
+                GUI_FOCUS(-1)
                 IF entryModus = 2 THEN
                     boegenWeg(i, beat) : merken()
                     protokoll("bogen weg " + STR$(i) + " " + zahl$(beat))
@@ -1102,7 +1096,7 @@ SUB mausAufBlatt()
                 RETURN
             END IF
             IF MOUSE_HIT(LINKS) THEN
-                GUI_FOCUS(fokusAblage)      ' Tastatur (Leertaste) zum Blatt, nicht in ein Feld
+                GUI_FOCUS(-1)      ' Tastatur (Leertaste) zum Blatt, nicht in ein Feld
                 IF entryModus = 3 THEN
                     IF k >= 0 AND NOT istPause(i, k) THEN
                         DIM z AS INTEGER : z = GUI_DROPDOWN_SELECTED(ddFinger) + 1
@@ -1221,46 +1215,22 @@ SUB hilfslinien(i AS INTEGER, x AS INTEGER, s AS INTEGER, farbe AS INTEGER)
 END SUB
 
 ' --- Die Notenschrift --------------------------------------------------------
-' Die Masse jeder Glyphe in Font-Einheiten (1000 je Em, aus der Datei
-' gelesen): links, unten, rechts, oben. Ein Notenkopf ist 270 Einheiten
-' hoch = ein Linienabstand; daraus folgt der Massstab.
-FUNCTION gBox(cp AS INTEGER, welche AS INTEGER) AS INTEGER
-    DIM b AS ARRAY OF INTEGER : b = [50, 0, 300, 270]
-    SELECT CASE cp
-        CASE G_SCHLUESSEL
-            b = [50, -398, 661, 1334]
-        CASE F_SCHLUESSEL
-            b = [50, 101, 742, 900]
-        CASE G_KREUZ
-            b = [50, -247, 275, 509]
-        CASE G_BE
-            b = [50, -55, 249, 615]
-        CASE G_AUFLOES
-            b = [50, -221, 226, 486]
-        CASE G_KOPF_VOLL, G_KOPF_LEER
-            b = [50, -1, 347, 269]
-        CASE G_GANZE
-            b = [50, 8, 464, 260]
-        CASE G_P_GANZ
-            b = [50, 378, 733, 512]
-        CASE G_P_HALB
-            b = [50, 244, 733, 378]
-        CASE G_P_VIERTEL
-            b = [51, 123, 307, 878]
-        CASE G_P_ACHTEL
-            b = [50, 269, 312, 730]
-        CASE G_P_16
-            b = [50, 147, 380, 852]
-        CASE G_N_HALB
-            b = [50, -1, 347, 1009]
-        CASE G_N_VIERTEL
-            b = [51, 11, 350, 1009]
-        CASE G_N_ACHTEL
-            b = [50, 11, 599, 1009]
-        CASE G_N_16
-            b = [50, 11, 607, 1009]
-    END SELECT
-    RETURN b[welche]
+' Die Masse jeder Glyphe in Font-Einheiten (1000 je Em): links, unten,
+' rechts, oben. Sie kommen aus der Datei selbst -- FONT_GLYPH_BOX bei
+' Groesse 1787 (Oberlaenge 1389 minus Unterlaenge -398) liefert sie 1:1 in
+' Einheiten, gezaehlt von der Oberkante der Zeile. Ein Notenkopf ist 270
+' Einheiten hoch = ein Linienabstand; daraus folgt der Massstab.
+DIM gMasse AS MAP OF FLOAT
+FUNCTION gBox(cp AS INTEGER, welche AS INTEGER) AS FLOAT
+    DIM k AS STRING : k = STR$(cp) + ":" + STR$(welche)
+    IF MAPHAS(gMasse, k) THEN RETURN MAPGET(gMasse, k)
+    DIM b AS TUPLE : b = FONT_GLYPH_BOX(musikFont, CHR$(cp), 1787)
+    DIM oben AS FLOAT : oben = 1389 - b[1]
+    MAPPUT(gMasse, STR$(cp) + ":0", b[0])
+    MAPPUT(gMasse, STR$(cp) + ":1", oben - b[3])
+    MAPPUT(gMasse, STR$(cp) + ":2", b[0] + b[2])
+    MAPPUT(gMasse, STR$(cp) + ":3", oben)
+    RETURN MAPGET(gMasse, k)
 END FUNCTION
 
 ' Pixel je Font-Einheit bei einem Linienabstand von `halb` * 2.
@@ -1898,7 +1868,7 @@ IF ARGC() >= 1 THEN
 ELSE
     neuesStueck()
 END IF
-GUI_FOCUS(fokusAblage)
+GUI_FOCUS(-1)
 protokoll("bereit")
 
 ' Zoom nach der Fensterhoehe: 800 Punkte = 1, auf zehntel gerundet.
@@ -2022,7 +1992,7 @@ WHILE NOT beenden
         DIM b AS INTEGER : b = CLAMP(INT(VAL(GUI_TEXT(fBpm))), 20, 400)
         IF b <> bpm() THEN JSON_SET_INT(doc, "bpm", b) : merken() : protokoll("bpm " + STR$(b))
         spurenAnzeigen()
-        GUI_FOCUS(fokusAblage)
+        GUI_FOCUS(-1)
     END IF
 
     ' Spuren: Name (Enter), Schluessel und Instrument (Auswahl ist das Ereignis)
@@ -2034,7 +2004,7 @@ WHILE NOT beenden
                 IF nm = "" THEN nm = "Stimme " + STR$(i + 1)
                 IF nm <> text$(tp$(i, "name")) THEN JSON_SET_STRING(doc, tp$(i, "name"), nm) : merken() : protokoll("name " + STR$(i) + " " + nm)
                 spurenAnzeigen()
-                GUI_FOCUS(fokusAblage)
+                GUI_FOCUS(-1)
             END IF
             IF GUI_DROPDOWN_SELECTED(sClef[i]) <> sClefSel[i] AND GUI_DROPDOWN_SELECTED(sClef[i]) >= 0 THEN
                 sClefSel[i] = GUI_DROPDOWN_SELECTED(sClef[i])
@@ -2095,7 +2065,7 @@ WHILE NOT beenden
         IF kt >= 0 THEN
             letzterPitch = kt
             eingabeNote(kt, IIF(hatVorzeichen(kt), 1, 0))
-            GUI_FOCUS(fokusAblage)
+            GUI_FOCUS(-1)
         END IF
         DIM sj AS INTEGER : sj = streifenBei(MOUSEX(), MOUSEY())
         IF sj = 5 THEN
