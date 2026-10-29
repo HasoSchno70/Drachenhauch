@@ -3261,6 +3261,12 @@ struct TGeom {
 }
 
 pub struct Gui {
+    /// GUI_FONT: die eigene Schrift (Handle, Groesse) der gui. `None` = wie
+    /// bisher die AKTIVE Schrift des Programms. Gesetzt, tauscht die VM sie
+    /// fuer jeden gui-Befehl ein -- ein Programm, das zwischendurch mit einer
+    /// anderen Schrift zeichnet (Notensatz, Symbole), verdirbt damit nicht
+    /// mehr die Oberflaeche.
+    pub schrift: Option<(i64, i32)>,
     windows: Vec<Window>,        // stabile Indizes (Handles!)
     // Zeichen und Zeilenanfaenge eines Textbereichs, je Handle, solange sein
     // Text derselbe ist (verglichen wird der Text selbst -- es gibt viele
@@ -3448,6 +3454,7 @@ fn dec_item(h: i64) -> (usize, usize, usize) {
 impl Gui {
     pub fn new() -> Gui {
         Gui {
+            schrift: None,
             windows: Vec::new(), z_order: Vec::new(),
             ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
             focus_window: None, focus_widget: None, modal: None, cp_drag: None,
@@ -10268,6 +10275,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         Ok(self.wdg(h, "GUI_KIND")?.kind.as_str())
     }
     pub fn focus(&mut self, h: i64) -> Result<(), String> {
+        // GUI_FOCUS(-1): niemand hat den Fokus -- die Tasten gehoeren dem
+        // Programm. Vorher musste man ihn auf ein anderes Element legen, und
+        // das nahm womoeglich selbst Tasten (eine Klappliste springt beim
+        // Tippen). on_blur feuert wie bei jedem Fokuswechsel.
+        if h < 0 { self.focus_widget = None; return Ok(()); }
         let (wi, i) = Self::dec_widget(h);
         let wd = self.wdg(h, "GUI_FOCUS")?;
         // Review-Fund: `wdg()` prueft nur, ob der Handle ueberhaupt in den

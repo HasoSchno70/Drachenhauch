@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2183,
+ "count": 2188,
  "builtins": [
   {
    "name": "ABS",
@@ -2847,6 +2847,18 @@
    "module": "core"
   },
   {
+   "name": "FONT_BASELINE",
+   "kind": "graphics",
+   "signature": "FONT_BASELINE(font, groesse) AS FLOAT",
+   "module": "core"
+  },
+  {
+   "name": "FONT_GLYPH_BOX",
+   "kind": "graphics",
+   "signature": "FONT_GLYPH_BOX(font, zeichen$, groesse) AS TUPLE",
+   "module": "core"
+  },
+  {
    "name": "FORMAT$",
    "kind": "core",
    "signature": "FORMAT$(value, mask)",
@@ -4722,6 +4734,18 @@
    "name": "GUI_SET_FONT",
    "kind": "core",
    "signature": "GUI_SET_FONT(wdg, font)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_FONT",
+   "kind": "core",
+   "signature": "GUI_FONT(font [, groesse])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_FONT_GET",
+   "kind": "core",
+   "signature": "GUI_FONT_GET() AS TUPLE",
    "module": "gui"
   },
   {

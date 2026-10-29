@@ -3,8 +3,15 @@
 //! LOADFONT laedt sie unter denselben Namen -- auch im Web-Bau, der das
 //! pdf-Modul nicht hat (Feature `schriften`, Messdaten-/Web-Runde 2026-10-13).
 
+/// Noto Music (SIL Open Font License, daten/schriften/OFL-NotoMusic.txt):
+/// die Notenzeichen des Unicode-Blocks "Musical Symbols" -- Schluessel,
+/// Notenkoepfe, Pausen, Vorzeichen. 124 KB. Fuer `LOADFONT("noten", n,
+/// zeichen$)`; ohne Zeichenliste backt LOADFONT nur den Grundvorrat, und den
+/// hat die Notenschrift kaum (die fehlenden Zeichen laedt FLIP nach).
+fn noten() -> &'static [u8] { include_bytes!("../../../daten/schriften/NotoMusic-Regular.ttf") }
+
 /// Die eingebauten Schriften: Name im Programm und Dateiinhalt.
-pub const EINGEBAUT: [(&str, fn() -> &'static [u8]); 12] = [
+pub const EINGEBAUT: [(&str, fn() -> &'static [u8]); 13] = [
     ("sans", dejavu::sans::regular),
     ("sans-fett", dejavu::sans::bold),
     ("sans-kursiv", dejavu::sans::oblique),
@@ -17,6 +24,7 @@ pub const EINGEBAUT: [(&str, fn() -> &'static [u8]); 12] = [
     ("mono-fett", dejavu::sans_mono::bold),
     ("mono-kursiv", dejavu::sans_mono::oblique),
     ("mono-fett-kursiv", dejavu::sans_mono::bold_oblique),
+    ("noten", noten),
 ];
 
 /// Die Bytes einer eingebauten Schrift ("sans", "serif-fett", "mono", auch

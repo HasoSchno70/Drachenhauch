@@ -959,6 +959,11 @@ pub struct Vm<'p> {
     // Retained-Mode-GUI (Modul gui): persistente Fenster/Widgets.
     #[cfg(feature = "graphics")]
     gui: crate::gui::Gui,
+    /// Die Schrift des Programms, waehrend ein gui-Befehl mit der eigenen
+    /// Schrift der gui (GUI_FONT) laeuft -- zurueckgetauscht wird am Ende
+    /// des Befehls, bei GUI_UPDATE schon VOR den Rueckrufen (die sind
+    /// Programmcode und sollen dessen Schrift sehen).
+    gui_tausch: Option<(i64, i32)>,
     // Sprachausgabe (SPEAK): Stimme, Tempo, Vorrat, geplantes Ende.
     #[cfg(feature = "graphics")]
     sprecher: crate::sprache::Sprecher,
@@ -1158,6 +1163,7 @@ impl<'p> Vm<'p> {
             audio: None,
             #[cfg(feature = "graphics")]
             gui: crate::gui::Gui::new(),
+            gui_tausch: None,
             #[cfg(feature = "graphics")]
             sprecher: crate::sprache::Sprecher::new(),
             #[cfg(feature = "db")]
@@ -7626,9 +7632,55 @@ impl<'p> Vm<'p> {
     /// Retained-Mode-GUI (Modul `gui`). Liefert Ok(None) wenn `name` kein
     /// gui-Builtin ist. GUI_UPDATE/GUI_DRAW brauchen die Grafik (self.gfx),
     /// alles andere nur den GUI-State (self.gui).
+    ///
+    /// Hat die gui eine eigene Schrift (GUI_FONT), gilt sie fuer die Dauer
+    /// des Befehls als aktive -- gemessen und gezeichnet wird mit ihr, egal
+    /// was das Programm davor mit SETFONT eingestellt hat. Danach wird
+    /// zurueckgetauscht, auch nach einem Fehler.
     #[cfg(feature = "graphics")]
     fn try_gui(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !name.starts_with("gui_") { return Ok(None); }
+        if name == "gui_font" || name == "gui_font_get" { return self.gui_font_befehl(name, a).map(Some); }
+        self.gui_tausch = match (self.gui.schrift, self.gfx.as_mut()) {
+            (Some((f, n)), Some(g)) => Some(g.schrift_tauschen(f, n)),
+            _ => None,
+        };
+        let r = self.try_gui_innen(name, a);
+        self.gui_tausch_zurueck();
+        r
+    }
+
+    #[cfg(feature = "graphics")]
+    fn gui_tausch_zurueck(&mut self) {
+        if let (Some((f, n)), Some(g)) = (self.gui_tausch.take(), self.gfx.as_mut()) { g.schrift_tauschen(f, n); }
+    }
+
+    /// GUI_FONT(font [, groesse]): die eigene Schrift der gui; -1 = wieder
+    /// die aktive des Programms. GUI_FONT_GET() -> TUPLE (font, groesse),
+    /// (-1, 0) ohne eigene.
+    #[cfg(feature = "graphics")]
+    fn gui_font_befehl(&mut self, name: &str, a: &[Value]) -> R<Value> {
+        if name == "gui_font_get" {
+            let (f, n) = self.gui.schrift.unwrap_or((-1, 0));
+            return Ok(Value::Tuple(std::rc::Rc::new(vec![Value::Int(f), Value::Int(n as i64)])));
+        }
+        let f = match a.first() { Some(Value::Int(n)) => *n,
+            _ => return Err("GUI_FONT: erwartet ein Font-Handle (LOADFONT) oder -1 (Arg 1)".into()) };
+        if f < 0 { self.gui.schrift = None; return Ok(Value::Nil); }
+        let g = self.gfx.as_ref().ok_or("GUI_FONT: vor SCREEN aufgerufen")?;
+        if !g.font_gueltig(f) { return Err(format!("GUI_FONT: {} ist kein geladener Font", f)); }
+        let n = match a.get(1) {
+            None => g.text_height(),
+            Some(Value::Int(n)) if *n >= 4 && *n <= 400 => *n as i32,
+            Some(Value::Float(x)) if *x >= 4.0 && *x <= 400.0 => *x as i32,
+            _ => return Err("GUI_FONT: erwartet eine Groesse 4..400 (Arg 2)".into()),
+        };
+        self.gui.schrift = Some((f, n));
+        Ok(Value::Nil)
+    }
+
+    #[cfg(feature = "graphics")]
+    fn try_gui_innen(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         fn gi(a: &[Value], i: usize, f: &str) -> R<i64> {
             match a.get(i) { Some(Value::Int(n)) => Ok(*n),
                 Some(Value::Float(x)) => crate::builtins::glatt_int(*x).ok_or_else(|| format!("{}: erwartet INTEGER (Arg {}), erhalten {}{}",
@@ -8819,6 +8871,8 @@ impl<'p> Vm<'p> {
                 // Ausgeloeste FUNCREF-Callbacks feuern (parameterlos), nachdem
                 // der State-Update fertig ist -- so kann ein Callback die GUI
                 // sicher veraendern; neu ausgeloeste Events landen naechsten Frame.
+                // Vorher die Schrift des Programms zurueck (GUI_FONT).
+                self.gui_tausch_zurueck();
                 for cb in self.gui.take_pending() {
                     self.rueckruf_rufen(&cb, "GUI-Callback")?;
                 }
@@ -10005,6 +10059,26 @@ impl<'p> Vm<'p> {
                 let bits = crate::schnitt::stil_parsen(&gs(a,1,f)?).map_err(|e| format!("{}: {}", f, e))?;
                 let (h, echt) = g!().font_schnitt(gi(a,0,f)?, bits)?;
                 if name == "font_style" { Value::Int(h) } else { Value::Bool(echt) }
+            }
+            // Masse aus der Schriftdatei: Grundlinie und das Rechteck, das eine
+            // Glyphe bedeckt -- relativ zu dem Punkt, an den TEXT den Text
+            // setzt. Damit laesst sich ein Zeichen genau platzieren (ein
+            // Notenschluessel auf seine Linie, ein Symbol mittig in einen
+            // Knopf), ohne die Datei selbst auszulesen.
+            "font_baseline" => {
+                if a.len() != 2 { return Err("FONT_BASELINE: erwartet (font, groesse)".into()); }
+                Value::Float(g!().font_baseline(gi(a,0,"FONT_BASELINE")?, zahl_arg(a,1,"FONT_BASELINE")?)?)
+            }
+            "font_glyph_box" => {
+                if a.len() != 3 { return Err("FONT_GLYPH_BOX: erwartet (font, zeichen$, groesse)".into()); }
+                let t = gs(a,1,"FONT_GLYPH_BOX")?;
+                let mut it = t.chars();
+                let c = match (it.next(), it.next()) {
+                    (Some(c), None) => c,
+                    _ => return Err("FONT_GLYPH_BOX: erwartet GENAU ein Zeichen (Arg 2)".into()),
+                };
+                let (x, y, b, h) = g!().font_glyph_box(gi(a,0,"FONT_GLYPH_BOX")?, c, zahl_arg(a,2,"FONT_GLYPH_BOX")?)?;
+                Value::Tuple(std::rc::Rc::new(vec![Value::Float(x), Value::Float(y), Value::Float(b), Value::Float(h)]))
             }
             "loadfont" => {
                 if a.len() > 3 { return Err("LOADFONT: erwartet (pfad$, groesse[, zeichen$])".into()); }
@@ -13792,5 +13866,16 @@ mod anhaengen_tests {
         // Ein Zahlenfeld ist kein Platz fuer Text.
         let z = Value::Array(Rc::new(RefCell::new(DhArray::new("integer".into(), vec![1], || Value::Int(0)))));
         assert!(index_anhaengen(&z, &[Value::Int(0)], text("1"), &text("x")).is_err());
+    }
+}
+
+/// Ein Zahl-Argument (INTEGER oder FLOAT) als Kommazahl -- fuer die
+/// Font-Masse (FONT_BASELINE, FONT_GLYPH_BOX).
+#[cfg(feature = "graphics")]
+fn zahl_arg(a: &[Value], i: usize, f: &str) -> R<f64> {
+    match a.get(i) {
+        Some(Value::Int(n)) => Ok(*n as f64),
+        Some(Value::Float(x)) => Ok(*x),
+        _ => Err(format!("{}: erwartet eine Zahl (Arg {})", f, i + 1)),
     }
 }

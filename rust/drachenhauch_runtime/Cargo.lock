@@ -1384,6 +1384,7 @@ dependencies = [
  "symphonia",
  "tokio",
  "tokio-postgres-rustls",
+ "ttf-parser",
  "ureq",
  "uuid",
  "wasm-bindgen",
