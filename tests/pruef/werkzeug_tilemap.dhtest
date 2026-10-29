@@ -40,6 +40,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -88,7 +92,7 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(3, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -153,6 +157,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -201,7 +209,7 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(3, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -278,6 +286,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -326,8 +338,8 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, 320 + zell() * 2, 60 + zell() * 2)
-    prKlick(10, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(3, 320 + zell() * 2, GUI_CANVAS_Y(leinwand) + 6 + zell() * 2)
+    prKlick(10, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -403,6 +415,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -451,8 +467,8 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(cbSolid) + 8, GUI_GET_Y(cbSolid) + 8)
-    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(3, GUI_GET_X(cbSolid) + 8, prOy() + GUI_GET_Y(cbSolid) + 8)
+    prKlick(9, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -575,6 +591,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -623,10 +643,10 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(cbSolid) + 8, GUI_GET_Y(cbSolid) + 8)
-    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
-    prKlick(28, GUI_GET_X(cbSolid) + 8, GUI_GET_Y(cbSolid) + 8)
-    prKlick(34, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(3, GUI_GET_X(cbSolid) + 8, prOy() + GUI_GET_Y(cbSolid) + 8)
+    prKlick(9, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
+    prKlick(28, GUI_GET_X(cbSolid) + 8, prOy() + GUI_GET_Y(cbSolid) + 8)
+    prKlick(34, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -749,6 +769,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -797,8 +821,8 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
-    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(3, GUI_GET_X(bPropSetz) + 50, prOy() + GUI_GET_Y(bPropSetz) + 14)
+    prKlick(9, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -927,6 +951,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -975,8 +1003,8 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
-    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(3, GUI_GET_X(bPropSetz) + 50, prOy() + GUI_GET_Y(bPropSetz) + 14)
+    prKlick(9, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -1105,6 +1133,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -1153,8 +1185,8 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
-    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(3, GUI_GET_X(bPropSetz) + 50, prOy() + GUI_GET_Y(bPropSetz) + 14)
+    prKlick(9, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -1283,6 +1315,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -1331,8 +1367,8 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
-    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(3, GUI_GET_X(bPropSetz) + 50, prOy() + GUI_GET_Y(bPropSetz) + 14)
+    prKlick(9, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -1461,6 +1497,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -1509,8 +1549,8 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
-    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(3, GUI_GET_X(bPropSetz) + 50, prOy() + GUI_GET_Y(bPropSetz) + 14)
+    prKlick(9, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -1639,6 +1679,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -1687,8 +1731,8 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
-    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(3, GUI_GET_X(bPropSetz) + 50, prOy() + GUI_GET_Y(bPropSetz) + 14)
+    prKlick(9, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -1817,6 +1861,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -1865,8 +1913,8 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
-    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(3, GUI_GET_X(bPropSetz) + 50, prOy() + GUI_GET_Y(bPropSetz) + 14)
+    prKlick(9, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -1994,6 +2042,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -2042,10 +2094,10 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
-    prKlick(9, GUI_GET_X(lstProp) + 40, GUI_GET_Y(lstProp) + 10)
-    prKlick(15, GUI_GET_X(bPropWeg) + 40, GUI_GET_Y(bPropWeg) + 14)
-    prKlick(21, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(3, GUI_GET_X(bPropSetz) + 50, prOy() + GUI_GET_Y(bPropSetz) + 14)
+    prKlick(9, GUI_GET_X(lstProp) + 40, prOy() + GUI_GET_Y(lstProp) + 10)
+    prKlick(15, GUI_GET_X(bPropWeg) + 40, prOy() + GUI_GET_Y(bPropWeg) + 14)
+    prKlick(21, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -2174,6 +2226,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -2223,8 +2279,8 @@ SUB prSchreib(z AS STRING)
 END SUB
 SUB prFall()
     prKlick(3, GUI_CANVAS_X(palette) + 48, GUI_CANVAS_Y(palette) + 16)
-    prKlick(9, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
-    prKlick(15, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(9, GUI_GET_X(bPropSetz) + 50, prOy() + GUI_GET_Y(bPropSetz) + 14)
+    prKlick(15, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -2357,6 +2413,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -2466,6 +2526,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -2514,7 +2578,7 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bObjEbene) + 70, GUI_GET_Y(bObjEbene) + 14)
+    prKlick(3, GUI_GET_X(bObjEbene) + 70, prOy() + GUI_GET_Y(bObjEbene) + 14)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -2575,6 +2639,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -2623,9 +2691,9 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bObjEbene) + 70, GUI_GET_Y(bObjEbene) + 14)
+    prKlick(3, GUI_GET_X(bObjEbene) + 70, prOy() + GUI_GET_Y(bObjEbene) + 14)
     prZiehen(10, prKx(16), prKy(16), prKx(48), prKy(32))
-    prKlick(20, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(20, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -2759,6 +2827,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -2807,9 +2879,9 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bObjEbene) + 70, GUI_GET_Y(bObjEbene) + 14)
+    prKlick(3, GUI_GET_X(bObjEbene) + 70, prOy() + GUI_GET_Y(bObjEbene) + 14)
     prKlick(10, prKx(32), prKy(32))
-    prKlick(18, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(18, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -2940,6 +3012,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -2988,7 +3064,7 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bObjEbene) + 70, GUI_GET_Y(bObjEbene) + 14)
+    prKlick(3, GUI_GET_X(bObjEbene) + 70, prOy() + GUI_GET_Y(bObjEbene) + 14)
     prZiehen(10, prKx(16), prKy(16), prKx(48), prKy(48))
     prKlick(20, prKx(32), prKy(32))
     prAbspielen()
@@ -3051,6 +3127,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -3099,7 +3179,7 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bObjEbene) + 70, GUI_GET_Y(bObjEbene) + 14)
+    prKlick(3, GUI_GET_X(bObjEbene) + 70, prOy() + GUI_GET_Y(bObjEbene) + 14)
     prZiehen(10, prKx(16), prKy(16), prKx(48), prKy(48))
     prE(20, 2, 261, 0)
     prE(21, 1, 261, 0)
@@ -3163,6 +3243,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -3211,10 +3295,10 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bObjEbene) + 70, GUI_GET_Y(bObjEbene) + 14)
+    prKlick(3, GUI_GET_X(bObjEbene) + 70, prOy() + GUI_GET_Y(bObjEbene) + 14)
     prZiehen(10, prKx(0), prKy(0), prKx(16), prKy(16))
     prZiehen(20, prKx(32), prKy(32), prKx(64), prKy(48))
-    prKlick(30, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(30, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -3345,6 +3429,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -3449,6 +3537,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -3497,7 +3589,7 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bTsNeu) + 16, GUI_GET_Y(bTsNeu) + 13)
+    prKlick(3, GUI_GET_X(bTsNeu) + 16, prOy() + GUI_GET_Y(bTsNeu) + 13)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -3552,6 +3644,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -3601,10 +3697,10 @@ SUB prSchreib(z AS STRING)
 END SUB
 SUB prFall()
     prKlick(3, prKx(16), prKy(16))
-    prKlick(9, GUI_GET_X(bTsNeu) + 16, GUI_GET_Y(bTsNeu) + 13)
+    prKlick(9, GUI_GET_X(bTsNeu) + 16, prOy() + GUI_GET_Y(bTsNeu) + 13)
     prKlick(18, GUI_CANVAS_X(palette) + 48, GUI_CANVAS_Y(palette) + 16)
     prKlick(24, prKx(80), prKy(16))
-    prKlick(30, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(30, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -3732,6 +3828,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -3781,7 +3881,7 @@ SUB prSchreib(z AS STRING)
 END SUB
 SUB prFall()
     prKlick(3, prKx(16), prKy(16))
-    prKlick(9, GUI_GET_X(bTsNeu) + 16, GUI_GET_Y(bTsNeu) + 13)
+    prKlick(9, GUI_GET_X(bTsNeu) + 16, prOy() + GUI_GET_Y(bTsNeu) + 13)
     prE(16, 2, 73, 0)
     prE(17, 1, 73, 0)
     prKlick(22, prKx(16), prKy(16))
@@ -3842,6 +3942,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -3891,10 +3995,10 @@ SUB prSchreib(z AS STRING)
 END SUB
 SUB prFall()
     prKlick(3, prKx(16), prKy(16))
-    prKlick(9, GUI_GET_X(bTsNeu) + 16, GUI_GET_Y(bTsNeu) + 13)
+    prKlick(9, GUI_GET_X(bTsNeu) + 16, prOy() + GUI_GET_Y(bTsNeu) + 13)
     prKlick(18, GUI_CANVAS_X(palette) + 48, GUI_CANVAS_Y(palette) + 16)
     prKlick(24, prKx(80), prKy(16))
-    prKlick(30, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(30, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -3984,6 +4088,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -4032,7 +4140,7 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bTsNeu) + 16, GUI_GET_Y(bTsNeu) + 13)
+    prKlick(3, GUI_GET_X(bTsNeu) + 16, prOy() + GUI_GET_Y(bTsNeu) + 13)
     prE(10, 7, GUI_CANVAS_X(palette) + 8, GUI_CANVAS_Y(palette) + 8)
     prE(12, 8, 0, -1)
     prE(14, 8, 0, -1)
@@ -4096,6 +4204,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -4144,7 +4256,7 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bTsNeu) + 16, GUI_GET_Y(bTsNeu) + 13)
+    prKlick(3, GUI_GET_X(bTsNeu) + 16, prOy() + GUI_GET_Y(bTsNeu) + 13)
     prE(10, 7, GUI_CANVAS_X(palette) + 8, GUI_CANVAS_Y(palette) + 8)
     prE(12, 2, 340, 0)
     prE(14, 2, 340, 0)
@@ -4211,6 +4323,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -4259,9 +4375,9 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bEbNeu) + 40, GUI_GET_Y(bEbNeu) + 14)
-    prKlick(10, GUI_GET_X(bEbHinten) + 60, GUI_GET_Y(bEbHinten) + 14)
-    prKlick(18, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(3, GUI_GET_X(bEbNeu) + 40, prOy() + GUI_GET_Y(bEbNeu) + 14)
+    prKlick(10, GUI_GET_X(bEbHinten) + 60, prOy() + GUI_GET_Y(bEbHinten) + 14)
+    prKlick(18, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -4386,6 +4502,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -4434,10 +4554,10 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_GET_X(bEbNeu) + 40, GUI_GET_Y(bEbNeu) + 14)
-    prKlick(10, GUI_GET_X(bEbHinten) + 60, GUI_GET_Y(bEbHinten) + 14)
-    prKlick(16, GUI_GET_X(bEbVorne) + 60, GUI_GET_Y(bEbVorne) + 14)
-    prKlick(24, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(3, GUI_GET_X(bEbNeu) + 40, prOy() + GUI_GET_Y(bEbNeu) + 14)
+    prKlick(10, GUI_GET_X(bEbHinten) + 60, prOy() + GUI_GET_Y(bEbHinten) + 14)
+    prKlick(16, GUI_GET_X(bEbVorne) + 60, prOy() + GUI_GET_Y(bEbVorne) + 14)
+    prKlick(24, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -4562,6 +4682,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -4611,9 +4735,9 @@ SUB prSchreib(z AS STRING)
 END SUB
 SUB prFall()
     prKlick(3, prKx(16), prKy(16))
-    prKlick(10, GUI_GET_X(bEbNeu) + 40, GUI_GET_Y(bEbNeu) + 14)
-    prKlick(18, GUI_GET_X(bEbHinten) + 60, GUI_GET_Y(bEbHinten) + 14)
-    prKlick(26, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(10, GUI_GET_X(bEbNeu) + 40, prOy() + GUI_GET_Y(bEbNeu) + 14)
+    prKlick(18, GUI_GET_X(bEbHinten) + 60, prOy() + GUI_GET_Y(bEbHinten) + 14)
+    prKlick(26, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -4738,6 +4862,10 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
     prE(f + 3, 7, x2, y2)
     prE(f + 4, 5, 0, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
     RETURN GUI_CANVAS_X(leinwand) + px * zoom
 END FUNCTION
@@ -4787,14 +4915,14 @@ SUB prSchreib(z AS STRING)
 END SUB
 SUB prFall()
     prKlick(3, prKx(16), prKy(16))
-    prKlick(10, GUI_GET_X(bEbNeu) + 40, GUI_GET_Y(bEbNeu) + 14)
+    prKlick(10, GUI_GET_X(bEbNeu) + 40, prOy() + GUI_GET_Y(bEbNeu) + 14)
     prKlick(16, prKx(48), prKy(16))
-    prKlick(24, GUI_GET_X(bEbHinten) + 60, GUI_GET_Y(bEbHinten) + 14)
+    prKlick(24, GUI_GET_X(bEbHinten) + 60, prOy() + GUI_GET_Y(bEbHinten) + 14)
     prE(32, 2, 341, 0)
     prE(33, 2, 90, 0)
     prE(34, 1, 90, 0)
     prE(36, 1, 341, 0)
-    prKlick(42, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(42, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -4892,3 +5020,575 @@ PRINT "zurueckgenommen " ; gid(0, 3, 1) ; " boden " ; gid(1, 1, 1)
 Ebene 2, Boden
 zurueckgenommen 0 boden 1
 
+=== linie und ellipse bestehen aus den richtigen zellen
+' Dieselbe Rechnung fuer Vorschau und Setzen (formZellen): eine Linie nach
+' Bresenham, eine Ellipse als Rand -- jede Zelle drin mit einem Nachbarn
+' draussen.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    DIM z AS ARRAY OF INTEGER : z = formZellen(WZ_LINIE, 0, 0, 4, 2)
+    DIM t AS STRING : t = "linie"
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        t = t + " " + STR$(z[i] MOD kb) + "," + STR$(z[i] \ kb)
+    NEXT
+    prMerke(t)
+    z = formZellen(WZ_ELLIPSE, 2, 2, 8, 6)
+    DIM rund AS BOOLEAN : rund = TRUE
+    FOR i = 0 TO LEN(z) - 1
+        ' Gespiegelt um die Mitte (5, 4) liegt jede Randzelle wieder auf dem Rand.
+        DIM sp AS INTEGER : sp = (8 - z[i] \ kb) * kb + (10 - z[i] MOD kb)
+        IF ARRAY_INDEXOF(z, sp) < 0 THEN rund = FALSE
+    NEXT
+    prMerke("ellipse " + STR$(LEN(z)) + " spiegelgleich " + IIF(rund, "ja", "nein") + " mitte frei " + IIF(ARRAY_INDEXOF(z, 4 * kb + 5) < 0, "ja", "nein"))
+    prStart = prBild
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=6
+--- inhalt _programm/probe.txt
+|linie 0,0 1,1 2,1 3,2 4,2|
+|ellipse 16 spiegelgleich ja mitte frei ja|
+
+=== eine gezogene linie setzt ihre kacheln in einem schritt
+' Werkzeug Linie (Taste L), von Kachel (1,1) nach (5,3) gezogen: genau die
+' Bresenham-Zellen bekommen die gewaehlte Kachel, und Strg+Z nimmt alles in
+' EINEM Schritt zurueck.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prE(3, 2, 76, 0)
+    prE(4, 1, 76, 0)
+    prZiehen(8, prKx(1 * 16 + 8), prKy(1 * 16 + 8), prKx(5 * 16 + 8), prKy(3 * 16 + 8))
+    prE(20, 2, 341, 0)
+    prE(21, 2, 90, 0)
+    prE(23, 1, 90, 0)
+    prE(24, 1, 341, 0)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    IF prBild - prStart = 16 THEN
+        DIM t AS STRING : t = "gesetzt"
+        DIM y AS INTEGER
+        DIM x AS INTEGER
+        FOR y = 0 TO 4
+            FOR x = 0 TO 6
+                IF TILED_TILE_AT(karte, 0, x, y) > 0 THEN t = t + " " + STR$(x) + "," + STR$(y)
+            NEXT
+        NEXT
+        prMerke(t + " werkzeug " + STR$(werkzeug))
+    END IF
+    IF prBild - prStart = 30 THEN prMerke("zurueck " + STR$(TILED_COUNT_GID(karte, 0, 1)))
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=36
+--- inhalt _programm/probe.txt
+|gesetzt 1,1 2,2 3,2 4,3 5,3 werkzeug 6|
+|zurueck 0|
+
+=== ein zug in der palette waehlt einen stempel und der stift malt ihn
+' In der Kachelauswahl von Kachel (0,0) bis (2,1) gezogen: ein Stempel aus
+' 3 x 2 Kacheln. Ein Klick mit dem Stift setzt den ganzen Block.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    DIM px AS INTEGER : px = GUI_CANVAS_X(palette)
+    DIM py AS INTEGER : py = GUI_CANVAS_Y(palette)
+    prZiehen(3, px + 16, py + 16, px + 2 * 32 + 16, py + 32 + 16)
+    prKlick(14, prKx(4 * 16 + 8), prKy(4 * 16 + 8))
+    prAbspielen()
+END SUB
+SUB prProbe()
+    IF prBild - prStart = 12 THEN prMerke("stempel " + STR$(stB) + "x" + STR$(stH) + " ab " + STR$(gewaehlt))
+    IF prBild - prStart = 22 THEN
+        DIM t AS STRING : t = "block"
+        DIM y AS INTEGER
+        DIM x AS INTEGER
+        FOR y = 4 TO 5
+            FOR x = 4 TO 6
+                t = t + " " + STR$(TILED_TILE_AT(karte, 0, x, y))
+            NEXT
+        NEXT
+        prMerke(t + " daneben " + STR$(TILED_TILE_AT(karte, 0, 7, 4)))
+    END IF
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=28
+--- inhalt _programm/probe.txt
+|stempel 3x2 ab 0|
+|block 1 2 3 9 10 11 daneben 0|
+
+=== das kaestchen in der ebenenliste blendet die ebene aus
+' Das Kaestchen vor einer Ebene IST ihre Sichtbarkeit (Tiled speichert sie).
+' Der Klick darauf aendert die gewaehlte Ebene nicht.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    TILED_TILE_SET(karte, 0, 2, 2, 5)
+    prKlick(3, GUI_GET_X(lstEbenen) + 12, prOy() + GUI_GET_Y(lstEbenen) + 12)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    IF prBild - prStart = 10 THEN prMerke("sichtbar " + IIF(TILED_LAYER_VISIBLE(karte, 0), "ja", "nein") + " ebene " + STR$(ebene) + " geaendert " + IIF(geaendert, "ja", "nein"))
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=16
+--- inhalt _programm/probe.txt
+|sichtbar nein ebene 0 geaendert ja|
+
+=== ein klick in die uebersicht springt dorthin
+' Eine Karte, groesser als die Leinwand: ein Klick rechts unten in die
+' Uebersicht schiebt den Ausschnitt dorthin -- gemalt wird dabei nichts.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    neueKarte(120, 100)
+    listeAuffrischen()
+    prStart = prBild
+END SUB
+SUB prProbe()
+    IF prBild - prStart = 4 AND NOT FILEEXISTS("ev.txt") THEN
+        DIM mox AS INTEGER : DIM moy AS INTEGER : DIM mm AS INTEGER
+        (mox, moy, mm) = miniLage(GUI_CANVAS_X(leinwand), GUI_CANVAS_Y(leinwand), GUI_CANVAS_W(leinwand), GUI_CANVAS_H(leinwand))
+        prF = [] : prZ = []
+        prKlick(1, mox + 110 * mm, moy + 90 * mm)
+        prAbspielen()
+    END IF
+    IF prBild - prStart = 10 AND FILEEXISTS("ev.txt") THEN prMerke("verschoben " + IIF(panX > 1000 AND panY > 800, "ja", "nein") + " gemalt " + STR$(TILED_COUNT_GID(karte, 0, 1)))
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=22
+--- inhalt _programm/probe.txt
+|verschoben ja gemalt 0|

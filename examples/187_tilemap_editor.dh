@@ -10,7 +10,12 @@
 '  ein FREMDES Programm lesen koennen muss (Tiled-JSON).
 '
 '  Was drin ist:
-'    Werkzeuge   Stift, Radierer, Fuellen, Rechteck, Pipette, Auswahl
+'    Werkzeuge   Stift, Radierer, Fuellen, Linie, Rechteck, Ellipse,
+'                Pipette, Auswahl -- in der Werkzeugleiste mit Sinnbildern
+'    Stempel     in der Kachelauswahl ein Rechteck ziehen: der Stift malt
+'                dann den ganzen Block
+'    Uebersicht  die ganze Karte rechts unten, mit dem sichtbaren
+'                Ausschnitt; ein Klick springt dorthin
 '    Auswahl     Strg+C/X/V kopieren/ausschneiden/einfuegen, Entf leert
 '    Ebenen      anlegen, umbenennen, ein-/ausblenden, loeschen und
 '                umsortieren -- die Reihenfolge IST die Zeichenreihenfolge,
@@ -18,7 +23,8 @@
 '    Kacheln     Eigenschaften je Kachel ([solid] und beliebige
 '                Schluessel/Werte) -- sie gehoeren dem Tileset, gelten also
 '                fuer jedes Vorkommen dieser Kachel
-'    Ansicht     Zoom 1..6, schieben (rechte Maustaste oder Pfeiltasten),
+'    Ansicht     Zoom 1..6, schieben (rechte oder mittlere Maustaste,
+'                Pfeiltasten),
 '                Gitter, Kachelnummern
 '    Datei       Neu / Oeffnen / Speichern -- echtes Tiled-JSON
 '    Historie    Strg+Z / Strg+Y, 16 Schritte
@@ -54,13 +60,11 @@ SCREEN(1400, 880, "Drachenhauch - Tilemap-Editor", 1)
 SET_FULLSCREEN(TRUE)
 SETFPS(60)
 
-DIM uiFont AS INTEGER : uiFont = -1
-DIM fp AS STRING
-FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf")
-    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 30)
-NEXT
-IF uiFont >= 0 THEN SETFONT(uiFont)
-TEXT_SIZE(15)
+' DejaVu Sans aus der Laufzeit -- auf jedem System dieselbe Schrift, und
+' GUI_FONT haelt die Oberflaeche bei 15 Punkten, egal was auf der Karte steht.
+DIM uiFont AS INTEGER : uiFont = LOADFONT("sans", 32)
+SETFONT(uiFont, 15)
+GUI_FONT(uiFont, 15)
 GUI_THEME_PRESET("glas_dunkel")
 
 ' ---------------------------------------------------------------- Groessen
@@ -132,6 +136,23 @@ CONST WZ_FUELL = 2
 CONST WZ_RECHT = 3
 CONST WZ_PIPETTE = 4
 CONST WZ_AUSWAHL = 5
+CONST WZ_LINIE = 6
+CONST WZ_ELLIPSE = 7
+CONST N_WZ = 8
+
+' Stempel: ein Block aus der Kachelauswahl (Breite/Hoehe in Kacheln, links
+' oben ist `gewaehlt`). Der Stift malt ihn ganz, die anderen Werkzeuge nur
+' seine erste Kachel.
+DIM stB AS INTEGER : stB = 1
+DIM stH AS INTEGER : stH = 1
+DIM palZug AS BOOLEAN : palZug = FALSE
+DIM palAx AS INTEGER : palAx = 0
+DIM palAy AS INTEGER : palAy = 0
+
+' Ansicht
+DIM gitterAn AS BOOLEAN : gitterAn = TRUE
+DIM nummernAn AS BOOLEAN : nummernAn = FALSE
+DIM uebersichtAn AS BOOLEAN : uebersichtAn = TRUE
 
 ' Zugbewegung: Anker der laufenden Geste in Kachelkoordinaten.
 DIM zieht AS BOOLEAN : zieht = FALSE
@@ -219,6 +240,9 @@ SUB neueKarte(b AS INTEGER, h AS INTEGER)
     uStart = 0 : uAnz = 0 : uPos = 0
     dateiname = ""
     geaendert = FALSE
+    stB = 1 : stH = 1
+    miniVeraltet = TRUE
+    kachelMittel = {}
 END SUB
 
 ' ---------------------------------------------------------------- Verlauf
@@ -230,6 +254,7 @@ SUB schrittBeginn()
 END SUB
 
 SUB schrittEnde()
+    miniVeraltet = TRUE
     DIM n AS INTEGER : n = kb * kh
     DIM i AS INTEGER
     DIM anders AS BOOLEAN : anders = FALSE
@@ -260,6 +285,7 @@ SUB schrittEnde()
 END SUB
 
 SUB verlaufAnwenden(s AS INTEGER, nachher AS BOOLEAN)
+    miniVeraltet = TRUE
     ebene = uEbene[s]
     DIM i AS INTEGER
     FOR i = 0 TO kb * kh - 1
@@ -341,39 +367,79 @@ DIM win AS GUI_WINDOW
 win = GUI_WINDOW("Tilemap", 0, 0, SW, SH)
 GUI_WINDOW_CHROME(win, FALSE)
 
+' Das Menue. Jedes Kuerzel steht an EINER Stelle -- hier --, die
+' Hauptschleife fragt nur noch GUI_CLICKED; dieselbe Taste zusaetzlich mit
+' KEYHIT abzufragen, liesse den Befehl zweimal laufen.
+DIM mDatei AS INTEGER : mDatei = GUI_MENU(win, "Datei")
+DIM miNeu AS INTEGER : miNeu = GUI_MENU_ITEM(mDatei, "Neue Karte …", "Strg+N")
+DIM miAuf AS INTEGER : miAuf = GUI_MENU_ITEM(mDatei, "Öffnen …", "Strg+O")
+DIM miSpei AS INTEGER : miSpei = GUI_MENU_ITEM(mDatei, "Speichern", "Strg+S")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miTs AS INTEGER : miTs = GUI_MENU_ITEM(mDatei, "Tileset hinzufügen …")
+DIM miCode AS INTEGER : miCode = GUI_MENU_ITEM(mDatei, "DH-Code schreiben …", "Strg+E")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miEnde AS INTEGER : miEnde = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
+DIM mBearb AS INTEGER : mBearb = GUI_MENU(win, "Bearbeiten")
+DIM miZur AS INTEGER : miZur = GUI_MENU_ITEM(mBearb, "Rückgängig", "Strg+Z")
+DIM miVor AS INTEGER : miVor = GUI_MENU_ITEM(mBearb, "Wiederholen", "Strg+Y")
+GUI_MENU_SEPARATOR(mBearb)
+DIM miAus AS INTEGER : miAus = GUI_MENU_ITEM(mBearb, "Ausschneiden", "Strg+X")
+DIM miKop AS INTEGER : miKop = GUI_MENU_ITEM(mBearb, "Kopieren", "Strg+C")
+DIM miEin AS INTEGER : miEin = GUI_MENU_ITEM(mBearb, "Einfügen", "Strg+V")
+DIM mAnsicht AS INTEGER : mAnsicht = GUI_MENU(win, "Ansicht")
+DIM miGitter AS INTEGER : miGitter = GUI_MENU_ITEM(mAnsicht, "Gitter", "Strg+G")
+GUI_MENU_CHECK(miGitter, TRUE)
+DIM miNr AS INTEGER : miNr = GUI_MENU_ITEM(mAnsicht, "Kachelnummern")
+GUI_MENU_CHECK(miNr, FALSE)
+DIM miUeb AS INTEGER : miUeb = GUI_MENU_ITEM(mAnsicht, "Übersicht", "Strg+M")
+GUI_MENU_CHECK(miUeb, TRUE)
+GUI_MENU_SEPARATOR(mAnsicht)
+DIM miGroesser AS INTEGER : miGroesser = GUI_MENU_ITEM(mAnsicht, "Vergrößern", "Strg+Plus")
+DIM miKleiner AS INTEGER : miKleiner = GUI_MENU_ITEM(mAnsicht, "Verkleinern", "Strg+Minus")
+
+DIM INHALT_H AS INTEGER : INHALT_H = GUI_WINDOW_CONTENT_H(win)
+
+' Die Werkzeugleiste: Datei, die acht Werkzeuge (kippbar, eins ist immer
+' gedrueckt), Verlauf, Gitter.
 DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(win, 0, 0, SW, TB_H)
 GUI_SET_ANCHOR(tb, "lr")
-
-DIM bNeu AS GUI_WIDGET  : bNeu  = GUI_BUTTON(win, "Neu", 10, 7, 62, 32)
-DIM bAuf AS GUI_WIDGET  : bAuf  = GUI_BUTTON(win, "Oeffnen", 76, 7, 84, 32)
-DIM bSpei AS GUI_WIDGET : bSpei = GUI_BUTTON(win, "Speichern", 164, 7, 100, 32)
-DIM bCode AS GUI_WIDGET : bCode = GUI_BUTTON(win, "DH-Code", 268, 7, 104, 32)
-GUI_TOOLTIP(bCode, "Ein lauffaehiger Renderer + Karte + Tileset daneben -- alles unter einem Namen")
-
-' Werkzeuge. GUI_TOGGLE waere das naheliegende Widget, ist aber ein
-' SCHIEBEschalter: schmal, mit dem Text daneben statt darin -- sechs davon
-' in einer Reihe sind weder lesbar noch treffsicher. Also Knoepfe, und das
-' aktive Werkzeug faerbt sich selbst.
-CONST WZ_B = 92                          ' Knopfbreite
+GUI_TOOLBAR_SET(tb, "beschriftung", 1)
+DIM tbNeu AS INTEGER : tbNeu = GUI_TOOLBAR_ADD(tb, "neu", "Neue Karte (Strg+N)", "Neu")
+DIM tbAuf AS INTEGER : tbAuf = GUI_TOOLBAR_ADD(tb, "oeffnen", "Öffnen (Strg+O)", "Öffnen")
+DIM tbSpei AS INTEGER : tbSpei = GUI_TOOLBAR_ADD(tb, "sichern", "Speichern (Strg+S)", "Speichern")
+DIM tbCode AS INTEGER : tbCode = GUI_TOOLBAR_ADD(tb, "export", "Ein lauffähiger Renderer + Karte + Tileset daneben -- alles unter einem Namen (Strg+E)", "DH-Code")
+GUI_TOOLBAR_SEPARATOR(tb)
 DIM wzName AS ARRAY OF STRING
-wzName = SPLIT$("Stift|Radierer|Fuellen|Rechteck|Pipette|Auswahl", "|")
-DIM wzKnopf[6] AS GUI_WIDGET
-DIM wx AS INTEGER : wx = 384
+wzName = SPLIT$("Stift|Radierer|Füllen|Rechteck|Pipette|Auswahl|Linie|Ellipse", "|")
+DIM wzSinn AS ARRAY OF STRING
+wzSinn = SPLIT$("stift|radierer|fuellen|rechteck|pipette|auswahl|linie|ellipse", "|")
+DIM wzTaste AS ARRAY OF STRING
+wzTaste = SPLIT$("P|E|F|R|I|S|L|O", "|")
+' In der Leiste in der Reihenfolge, in der man sie braucht -- die Nummern
+' (WZ_*) bleiben, wie sie waren.
+DIM wzReihe AS ARRAY OF INTEGER : wzReihe = [0, 1, 2, 6, 3, 7, 4, 5]
+DIM tbWz[N_WZ] AS INTEGER
 DIM i AS INTEGER
-FOR i = 0 TO 5
-    wzKnopf[i] = GUI_BUTTON(win, wzName[i], wx, 7, WZ_B, 32)
-    wx = wx + WZ_B + 4
+FOR i = 0 TO N_WZ - 1
+    DIM wnr AS INTEGER : wnr = wzReihe[i]
+    tbWz[wnr] = GUI_TOOLBAR_ADD(tb, wzSinn[wnr], wzName[wnr] + " (" + wzTaste[wnr] + ")")
+    GUI_TOOLBAR_CHECKABLE(tb, tbWz[wnr], TRUE)
 NEXT
-
-DIM bZur AS GUI_WIDGET : bZur = GUI_BUTTON(win, "Zurueck", wx + 10, 7, 84, 32)
-DIM bVor AS GUI_WIDGET : bVor = GUI_BUTTON(win, "Vor", wx + 98, 7, 60, 32)
-DIM cbGitter AS GUI_WIDGET : cbGitter = GUI_CHECKBOX(win, "Gitter", wx + 168, 15, TRUE)
-DIM cbNr AS GUI_WIDGET : cbNr = GUI_CHECKBOX(win, "Nummern", wx + 250, 15, FALSE)
+GUI_TOOLBAR_SEPARATOR(tb)
+DIM tbZur AS INTEGER : tbZur = GUI_TOOLBAR_ADD(tb, "rueckgaengig", "Rückgängig (Strg+Z)", "Zurück")
+DIM tbVor AS INTEGER : tbVor = GUI_TOOLBAR_ADD(tb, "wiederholen", "Wiederholen (Strg+Y)", "Vor")
+GUI_TOOLBAR_SEPARATOR(tb)
+DIM tbGitter AS INTEGER : tbGitter = GUI_TOOLBAR_ADD(tb, "raster", "Gitter ein/aus (Strg+G)")
+GUI_TOOLBAR_CHECKABLE(tb, tbGitter, TRUE)
+GUI_TOOLBAR_SET_CHECKED(tb, tbGitter, TRUE)
+DIM tbKleiner AS INTEGER : tbKleiner = GUI_TOOLBAR_ADD(tb, "minus", "Verkleinern (Strg+Minus, Mausrad)")
+DIM tbGroesser AS INTEGER : tbGroesser = GUI_TOOLBAR_ADD(tb, "plus", "Vergrößern (Strg+Plus, Mausrad)")
 
 ' --------------------------------------------------------- linke Spalte
 DIM y AS INTEGER : y = TB_H + 10
 DIM lbl AS GUI_WIDGET
-lbl = GUI_LABEL(win, "Kacheln", 12, y) : y = y + 22
+lbl = GUI_LABEL(win, "Kacheln   (ziehen = Stempel)", 12, y) : y = y + 22
+GUI_SET_FONT_STYLE(lbl, "fett")
 
 ' Welches Tileset die Palette zeigt. Entfernen gibt es NICHT: die GIDs
 ' dahinter wuerden sich verschieben, und jede damit gemalte Kachel zeigte
@@ -381,7 +447,8 @@ lbl = GUI_LABEL(win, "Kacheln", 12, y) : y = y + 22
 DIM ddTs AS GUI_WIDGET
 ddTs = GUI_DROPDOWN(win, 12, y, LINKS - 24 - 38, 26, SPLIT$("tileset", "|"))
 DIM bTsNeu AS GUI_WIDGET
-bTsNeu = GUI_BUTTON(win, "+", LINKS - 12 - 32, y, 32, 26)
+bTsNeu = GUI_ICON_BUTTON(win, LINKS - 12 - 32, y, 32, 26, "plus")
+GUI_TOOLTIP(bTsNeu, "Ein weiteres Tileset anhängen")
 y = y + 32
 
 ' Die Palette ist ein AUSSCHNITT fester Groesse: ein zweites Tileset hat
@@ -395,8 +462,13 @@ palette = GUI_CANVAS(win, 12, y, PAL_SP * KACHEL * PZ, palH)
 y = y + palH + 14
 
 lbl = GUI_LABEL(win, "Ebenen   (weiter unten = weiter vorne)", 12, y) : y = y + 22
+GUI_SET_FONT_STYLE(lbl, "fett")
 DIM lstEbenen AS GUI_WIDGET
 lstEbenen = GUI_LISTBOX(win, 12, y, LINKS - 24, 132, SPLIT$("Boden", "|"))
+' Das Kaestchen vor jeder Ebene IST ihre Sichtbarkeit -- ein Klick blendet
+' sie aus, ohne die Auswahl zu wechseln.
+GUI_LISTBOX_SET(lstEbenen, "kaestchen", 1)
+GUI_TOOLTIP(lstEbenen, "Kästchen = sichtbar. Ein Klick auf den Namen wählt die Ebene zum Malen.")
 y = y + 140
 
 DIM edName AS GUI_WIDGET
@@ -406,6 +478,7 @@ y = y + 34
 DIM bEbNeu AS GUI_WIDGET  : bEbNeu  = GUI_BUTTON(win, "Anlegen", 12, y, 86, 28)
 DIM bEbUm AS GUI_WIDGET   : bEbUm   = GUI_BUTTON(win, "Umbenennen", 102, y, 116, 28)
 DIM bEbWeg AS GUI_WIDGET  : bEbWeg  = GUI_BUTTON(win, "Weg", 222, y, 54, 28)
+GUI_BUTTON_VARIANT(bEbWeg, "gefahr")
 y = y + 36
 ' Nach der ZEICHENwirkung benannt, nicht nach der Liste: "hoch/runter"
 ' waere doppeldeutig, weil die Liste die hinterste Ebene oben zeigt.
@@ -414,11 +487,10 @@ bEbHinten = GUI_BUTTON(win, "Nach hinten", 12, y, 130, 28)
 DIM bEbVorne AS GUI_WIDGET
 bEbVorne = GUI_BUTTON(win, "Nach vorne", 146, y, 130, 28)
 y = y + 36
-DIM cbSicht AS GUI_WIDGET : cbSicht = GUI_CHECKBOX(win, "sichtbar", 12, y, TRUE)
 DIM bObjEbene AS GUI_WIDGET
-bObjEbene = GUI_BUTTON(win, "Objekt-Ebene", 126, y - 6, 150, 28)
-GUI_TOOLTIP(bObjEbene, "Eine Ebene fuer Spawns, Trigger und Zonen -- ohne Kacheln")
-y = y + 32
+bObjEbene = GUI_BUTTON(win, "Objekt-Ebene anlegen", 12, y, LINKS - 24, 28)
+GUI_TOOLTIP(bObjEbene, "Eine Ebene für Spawns, Trigger und Zonen -- ohne Kacheln")
+y = y + 38
 
 ' Ab hier zwei Bloecke auf DEMSELBEN Platz: welcher zu sehen ist, entscheidet
 ' die Art der aktiven Ebene. Untereinander waere die Spalte laenger als der
@@ -430,8 +502,9 @@ DIM blockY AS INTEGER : blockY = y
 ' Tileset, nicht der Karte, gelten also fuer jedes Vorkommen dieser Kachel.
 DIM lblProp AS GUI_WIDGET
 lblProp = GUI_LABEL(win, "Eigenschaften der Kachel", 12, y) : y = y + 22
+GUI_SET_FONT_STYLE(lblProp, "fett")
 DIM cbSolid AS GUI_WIDGET : cbSolid = GUI_CHECKBOX(win, "solid", 12, y, FALSE)
-GUI_TOOLTIP(cbSolid, "Die haeufigste Eigenschaft -- genau sie fragt tile_collide ab")
+GUI_TOOLTIP(cbSolid, "Die häufigste Eigenschaft -- genau sie fragt tile_collide ab")
 y = y + 28
 DIM lstProp AS GUI_WIDGET
 lstProp = GUI_LISTBOX(win, 12, y, LINKS - 24, 88, SPLIT$("", "|"))
@@ -441,20 +514,21 @@ DIM edWert AS GUI_WIDGET : edWert = GUI_TEXTINPUT(win, 148, y, 128, 28, "5")
 y = y + 34
 DIM bPropSetz AS GUI_WIDGET : bPropSetz = GUI_BUTTON(win, "Setzen", 12, y, 100, 28)
 DIM bPropWeg AS GUI_WIDGET : bPropWeg = GUI_BUTTON(win, "Weg", 116, y, 80, 28)
-GUI_TOOLTIP(bPropWeg, "Die in der Liste gewaehlte Eigenschaft entfernen")
+GUI_TOOLTIP(bPropWeg, "Die in der Liste gewählte Eigenschaft entfernen")
 
 ' --- Block B: die Objekte der aktiven Objekt-Ebene.
 y = blockY
 DIM lblObj AS GUI_WIDGET
 lblObj = GUI_LABEL(win, "Objekte  (ziehen legt eins an)", 12, y) : y = y + 22
+GUI_SET_FONT_STYLE(lblObj, "fett")
 DIM lstObj AS GUI_WIDGET
 lstObj = GUI_LISTBOX(win, 12, y, LINKS - 24, 110, SPLIT$("", "|"))
 y = y + 118
 DIM edObjName AS GUI_WIDGET : edObjName = GUI_TEXTINPUT(win, 12, y, 130, 28, "held")
 DIM edObjTyp AS GUI_WIDGET : edObjTyp = GUI_TEXTINPUT(win, 148, y, 128, 28, "spawn")
-GUI_TOOLTIP(edObjName, "Name des NAECHSTEN Objekts -- und mit [Uebernehmen] auch des gewaehlten")
+GUI_TOOLTIP(edObjName, "Name des NÄCHSTEN Objekts -- und mit [Übernehmen] auch des gewählten")
 y = y + 34
-DIM bObjUeb AS GUI_WIDGET : bObjUeb = GUI_BUTTON(win, "Uebernehmen", 12, y, 130, 28)
+DIM bObjUeb AS GUI_WIDGET : bObjUeb = GUI_BUTTON(win, "Übernehmen", 12, y, 130, 28)
 DIM bObjWeg AS GUI_WIDGET : bObjWeg = GUI_BUTTON(win, "Objekt weg", 148, y, 128, 28)
 
 ' Die beiden Bloecke als Listen -- so laeuft das Umschalten ueber EINE
@@ -472,21 +546,25 @@ blockB[3] = edObjTyp : blockB[4] = bObjUeb : blockB[5] = bObjWeg
 
 ' --------------------------------------------------------- Karten-Flaeche
 DIM leinwand AS GUI_WIDGET
-leinwand = GUI_CANVAS(win, LINKS, TB_H + 8, SW - LINKS - 10, SH - TB_H - FUSS - 16)
+leinwand = GUI_CANVAS(win, LINKS, TB_H + 8, SW - LINKS - 10, INHALT_H - TB_H - FUSS - 16)
 GUI_SET_ANCHOR(leinwand, "lrtb")
 
+' Statusleiste: Meldung und Datei | Lage unter der Maus | Zoom
 DIM status AS GUI_WIDGET
-status = GUI_LABEL(win, "", 12, SH - FUSS + 4)
-GUI_SET_ANCHOR(status, "lb")
+status = GUI_STATUSBAR(win, 0, INHALT_H - FUSS, SW, FUSS, "")
+GUI_SET_ANCHOR(status, "lrb")
+DIM sfLage AS INTEGER : sfLage = GUI_STATUSBAR_ADD(status, "", 220, "mitte")
+DIM sfZoom AS INTEGER : sfZoom = GUI_STATUSBAR_ADD(status, "", 100, "mitte")
 
 ' ------------------------------------------------- Fenster "Neue Karte"
 DIM winNeu AS GUI_WINDOW
 winNeu = GUI_WINDOW("Neue Karte", SW \ 2 - 150, SH \ 2 - 90, 300, 170)
 DIM lblB AS GUI_WIDGET : lblB = GUI_LABEL(winNeu, "Breite", 16, 16)
 DIM spB AS GUI_WIDGET  : spB = GUI_SPINNER(winNeu, 110, 12, 160, 4, MAXB, 40)
-DIM lblH AS GUI_WIDGET : lblH = GUI_LABEL(winNeu, "Hoehe", 16, 52)
+DIM lblH AS GUI_WIDGET : lblH = GUI_LABEL(winNeu, "Höhe", 16, 52)
 DIM spH AS GUI_WIDGET  : spH = GUI_SPINNER(winNeu, 110, 48, 160, 4, MAXH, 30)
 DIM bNeuOk AS GUI_WIDGET : bNeuOk = GUI_BUTTON(winNeu, "Anlegen", 110, 92, 90, 30)
+GUI_BUTTON_VARIANT(bNeuOk, "primaer")
 DIM bNeuAb AS GUI_WIDGET : bNeuAb = GUI_BUTTON(winNeu, "Abbrechen", 206, 92, 90, 30)
 GUI_WINDOW_VISIBLE(winNeu, FALSE)
 
@@ -630,20 +708,19 @@ SUB listeAuffrischen()
     DIM namen[MAX(n, 1)] AS STRING
     DIM k AS INTEGER
     FOR k = 0 TO n - 1
-        IF TILED_LAYER_VISIBLE(karte, k) THEN
-            namen[k] = IIF(TILED_LAYER_TYPE(karte, k) = "object", "[Obj] ", "") + _
-                       TILED_LAYER_NAME(karte, k)
-        ELSE
-            namen[k] = "(aus)  " + TILED_LAYER_NAME(karte, k)
-        END IF
+        namen[k] = IIF(TILED_LAYER_TYPE(karte, k) = "object", "[Obj] ", "") + _
+                   TILED_LAYER_NAME(karte, k)
     NEXT
     IF n = 0 THEN namen[0] = ""
     GUI_SET_LISTBOX(lstEbenen, namen)
+    FOR k = 0 TO n - 1
+        GUI_LISTBOX_SET_CHECKED(lstEbenen, k, TILED_LAYER_VISIBLE(karte, k))
+    NEXT
     GUI_LISTBOX_SET_SELECTED(lstEbenen, ebene)
     IF n > 0 THEN
         GUI_SET_TEXT(edName, TILED_LAYER_NAME(karte, ebene))
-        GUI_SET_CHECKED(cbSicht, TILED_LAYER_VISIBLE(karte, ebene))
     END IF
+    miniVeraltet = TRUE
 END SUB
 
 ' ============================================================ Datei
@@ -861,6 +938,148 @@ SUB dhCodeSichern(pfad AS STRING)
     meldung = "Renderer + Karte + " + STR$(tsAnz) + " Tileset(s): " + BASENAME(pfad)
 END SUB
 
+' Die Zellen einer Linie (Bresenham) oder eines Ellipsenrands im Rechteck
+' (x1,y1)-(x2,y2), als y * kb + x. EINE Rechnung fuer die Vorschau beim
+' Ziehen und fuers Setzen beim Loslassen -- sonst saehe man etwas anderes,
+' als hinterher dasteht.
+FUNCTION formZellen(art AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER) AS ARRAY OF INTEGER
+    DIM z AS ARRAY OF INTEGER : z = []
+    IF art = WZ_LINIE THEN
+        DIM dx AS INTEGER : dx = ABS(x2 - x1)
+        DIM dy AS INTEGER : dy = -ABS(y2 - y1)
+        DIM sxx AS INTEGER : sxx = IIF(x1 < x2, 1, -1)
+        DIM syy AS INTEGER : syy = IIF(y1 < y2, 1, -1)
+        DIM fe AS INTEGER : fe = dx + dy
+        DIM x AS INTEGER : x = x1
+        DIM y AS INTEGER : y = y1
+        WHILE TRUE
+            IF x >= 0 AND x < kb AND y >= 0 AND y < kh THEN ARRAY_PUSH(z, y * kb + x)
+            IF x = x2 AND y = y2 THEN BREAK
+            DIM e2 AS INTEGER : e2 = 2 * fe
+            IF e2 >= dy THEN
+                fe = fe + dy
+                x = x + sxx
+            END IF
+            IF e2 <= dx THEN
+                fe = fe + dx
+                y = y + syy
+            END IF
+        WEND
+    ELSE
+        ' Ellipse: eine Zelle gehoert zum Rand, wenn sie drin liegt und
+        ' wenigstens einer ihrer vier Nachbarn draussen.
+        DIM ax AS INTEGER : ax = MIN(x1, x2)
+        DIM bx AS INTEGER : bx = MAX(x1, x2)
+        DIM ay AS INTEGER : ay = MIN(y1, y2)
+        DIM by AS INTEGER : by = MAX(y1, y2)
+        DIM xx AS INTEGER
+        DIM yy AS INTEGER
+        FOR yy = ay TO by
+            FOR xx = ax TO bx
+                IF inEllipse(xx, yy, ax, ay, bx, by) THEN
+                    IF NOT inEllipse(xx - 1, yy, ax, ay, bx, by) OR NOT inEllipse(xx + 1, yy, ax, ay, bx, by) OR _
+                       NOT inEllipse(xx, yy - 1, ax, ay, bx, by) OR NOT inEllipse(xx, yy + 1, ax, ay, bx, by) THEN
+                        IF xx >= 0 AND xx < kb AND yy >= 0 AND yy < kh THEN ARRAY_PUSH(z, yy * kb + xx)
+                    END IF
+                END IF
+            NEXT
+        NEXT
+    END IF
+    RETURN z
+END FUNCTION
+
+FUNCTION inEllipse(x AS INTEGER, y AS INTEGER, ax AS INTEGER, ay AS INTEGER, bx AS INTEGER, by AS INTEGER) AS BOOLEAN
+    IF x < ax OR x > bx OR y < ay OR y > by THEN RETURN FALSE
+    DIM rx AS FLOAT : rx = (bx - ax) / 2.0 + 0.5
+    DIM ry AS FLOAT : ry = (by - ay) / 2.0 + 0.5
+    DIM mx2 AS FLOAT : mx2 = (ax + bx) / 2.0
+    DIM my2 AS FLOAT : my2 = (ay + by) / 2.0
+    RETURN ((x - mx2) / rx) ^ 2 + ((y - my2) / ry) ^ 2 <= 1.0
+END FUNCTION
+
+' Den Stempel (stB x stH Kacheln ab `gewaehlt`) bei (tx, ty) setzen.
+SUB stempeln(tx AS INTEGER, ty AS INTEGER)
+    DIM c0 AS INTEGER : c0 = gewaehlt MOD tsSp
+    DIM r0 AS INTEGER : r0 = gewaehlt \ tsSp
+    DIM dx AS INTEGER
+    DIM dy AS INTEGER
+    FOR dy = 0 TO stH - 1
+        FOR dx = 0 TO stB - 1
+            IF tx + dx < kb AND ty + dy < kh AND c0 + dx < tsSp AND (r0 + dy) * tsSp + c0 + dx < tsN THEN
+                TILED_TILE_SET(karte, ebene, tx + dx, ty + dy, basisGid() + (r0 + dy) * tsSp + c0 + dx)
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+' --- Die Uebersicht: die ganze Karte klein, je Kachel ihre Mittelfarbe ---------
+DIM miniBild AS IMAGE
+DIM miniDa AS BOOLEAN : miniDa = FALSE
+DIM miniVeraltet AS BOOLEAN : miniVeraltet = TRUE
+DIM miniWarte AS INTEGER : miniWarte = 0
+DIM kachelMittel AS MAP OF INTEGER
+
+' Die Mittelfarbe einer Kachel: neun Punkte, die durchsichtigen nicht
+' mitgezaehlt. -1 = ganz durchsichtig. Einmal je GID gerechnet.
+FUNCTION kachelFarbe(g AS INTEGER) AS INTEGER
+    DIM k AS STRING : k = STR$(g)
+    IF MAPHAS(kachelMittel, k) THEN RETURN MAPGET(kachelMittel, k)
+    DIM its AS INTEGER : its = tsFuerGid(g)
+    DIM f AS INTEGER : f = -1
+    IF its >= 0 THEN
+        IF tsDaA[its] THEN
+            DIM lokal AS INTEGER : lokal = g - TILED_TILESET_FIRSTGID(karte, its)
+            DIM bx AS INTEGER : bx = (lokal MOD tsSpA[its]) * KACHEL
+            DIM by AS INTEGER : by = (lokal \ tsSpA[its]) * KACHEL
+            DIM r AS INTEGER : DIM gg AS INTEGER : DIM b AS INTEGER : DIM n AS INTEGER
+            DIM i AS INTEGER
+            DIM j AS INTEGER
+            FOR j = 0 TO 2
+                FOR i = 0 TO 2
+                    DIM px AS INTEGER : px = bx + 2 + i * 6
+                    DIM py AS INTEGER : py = by + 2 + j * 6
+                    IF GETALPHA(tsBildA[its], px, py) > 100 THEN
+                        DIM c AS INTEGER : c = GETPIXEL(tsBildA[its], px, py)
+                        r = r + ((c SHR 16) BAND 255) : gg = gg + ((c SHR 8) BAND 255) : b = b + (c BAND 255)
+                        n = n + 1
+                    END IF
+                NEXT
+            NEXT
+            IF n > 0 THEN f = RGB(r \ n, gg \ n, b \ n)
+        END IF
+    END IF
+    MAPPUT(kachelMittel, k, f)
+    RETURN f
+END FUNCTION
+
+SUB miniBauen()
+    IF miniDa THEN IMAGE_FREE(miniBild)
+    miniBild = IMAGE_NEW(kb, kh, &H0C1118)
+    miniDa = TRUE
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM lay AS INTEGER
+    FOR y = 0 TO kh - 1
+        FOR x = 0 TO kb - 1
+            DIM f AS INTEGER : f = -1
+            FOR lay = TILED_LAYER_COUNT(karte) - 1 TO 0 STEP -1
+                IF f < 0 AND TILED_LAYER_VISIBLE(karte, lay) AND TILED_LAYER_TYPE(karte, lay) <> "object" THEN
+                    DIM g AS INTEGER : g = TILED_TILE_AT(karte, lay, x, y)
+                    IF g > 0 THEN f = kachelFarbe(g)
+                END IF
+            NEXT
+            IF f >= 0 THEN IMAGE_FILL_RECT(miniBild, x, y, x, y, f)
+        NEXT
+    NEXT
+    miniVeraltet = FALSE
+END SUB
+
+' Lage der Uebersicht in der Leinwand (rechts unten): x, y, Punkte je Kachel.
+FUNCTION miniLage(cx AS INTEGER, cy AS INTEGER, cw AS INTEGER, ch AS INTEGER) AS TUPLE
+    DIM m AS INTEGER : m = MAX(1, MIN(200 \ MAX(1, kb), 150 \ MAX(1, kh)))
+    RETURN (cx + cw - kb * m - 14, cy + ch - kh * m - 14, m)
+END FUNCTION
+
 SUB rechteckFuellen(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, gid AS INTEGER)
     DIM ax AS INTEGER : ax = MIN(x1, x2)
     DIM ay AS INTEGER : ay = MIN(y1, y2)
@@ -960,25 +1179,50 @@ WHILE NOT beenden
     strg = KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
 
     ' ------------------------------------------------------ Werkzeugwahl
-    FOR i = 0 TO 5
-        IF GUI_CLICKED(wzKnopf[i]) THEN werkzeug = i
+    DIM tbKlick AS INTEGER : tbKlick = GUI_TOOLBAR_CLICKED(tb)
+    FOR i = 0 TO N_WZ - 1
+        IF tbKlick = tbWz[i] THEN werkzeug = i
     NEXT
-    ' Welches Werkzeug gilt, muss man SEHEN -- ein Knopf zeigt es von sich
-    ' aus nicht an (anders als ein Radio, das aber keine Knopfform hat).
-    FOR i = 0 TO 5
-        GUI_SET_COLOR(wzKnopf[i], "bg", IIF(i = werkzeug, &H1B5C74, &H1A2430))
-    NEXT
-    IF NOT neuOffen THEN
+    ' Die Buchstaben gelten nur, wenn kein Eingabefeld sie braucht -- sonst
+    ' schaltete das Tippen eines Ebenennamens das Werkzeug um.
+    DIM fokusArt AS STRING : fokusArt = ""
+    IF GUI_FOCUSED() >= 0 THEN fokusArt = GUI_KIND(GUI_FOCUSED())
+    IF NOT neuOffen AND fokusArt <> "textinput" AND NOT strg THEN
         IF KEYHIT(KEY_P) THEN werkzeug = WZ_STIFT
         IF KEYHIT(KEY_E) THEN werkzeug = WZ_RADIER
         IF KEYHIT(KEY_F) THEN werkzeug = WZ_FUELL
         IF KEYHIT(KEY_R) THEN werkzeug = WZ_RECHT
         IF KEYHIT(KEY_I) THEN werkzeug = WZ_PIPETTE
-        IF KEYHIT(KEY_S) AND NOT strg THEN werkzeug = WZ_AUSWAHL
+        IF KEYHIT(KEY_S) THEN werkzeug = WZ_AUSWAHL
+        IF KEYHIT(KEY_L) THEN werkzeug = WZ_LINIE
+        IF KEYHIT(KEY_O) THEN werkzeug = WZ_ELLIPSE
     END IF
+    ' Welches Werkzeug gilt, muss man SEHEN: genau sein Knopf ist gedrueckt.
+    FOR i = 0 TO N_WZ - 1
+        GUI_TOOLBAR_SET_CHECKED(tb, tbWz[i], i = werkzeug)
+    NEXT
+
+    ' --------------------------------------------------------- Ansicht
+    IF GUI_CLICKED(miGitter) OR tbKlick = tbGitter THEN
+        gitterAn = NOT gitterAn
+        GUI_MENU_CHECK(miGitter, gitterAn)
+        GUI_TOOLBAR_SET_CHECKED(tb, tbGitter, gitterAn)
+    END IF
+    IF GUI_CLICKED(miNr) THEN
+        nummernAn = NOT nummernAn
+        GUI_MENU_CHECK(miNr, nummernAn)
+    END IF
+    IF GUI_CLICKED(miUeb) THEN
+        uebersichtAn = NOT uebersichtAn
+        GUI_MENU_CHECK(miUeb, uebersichtAn)
+    END IF
+    DIM zoomWunsch AS INTEGER : zoomWunsch = 0
+    IF GUI_CLICKED(miGroesser) OR tbKlick = tbGroesser THEN zoomWunsch = 1
+    IF GUI_CLICKED(miKleiner) OR tbKlick = tbKleiner THEN zoomWunsch = -1
+    IF GUI_CLICKED(miEnde) AND dlgEnde < 0 THEN endeAnfragen()
 
     ' ------------------------------------------------------------ Datei
-    IF GUI_CLICKED(bNeu) THEN
+    IF GUI_CLICKED(miNeu) OR tbKlick = tbNeu THEN
         GUI_WINDOW_VISIBLE(winNeu, TRUE)
         neuOffen = TRUE
     END IF
@@ -992,8 +1236,12 @@ WHILE NOT beenden
         GUI_WINDOW_VISIBLE(winNeu, FALSE)
         neuOffen = FALSE
     END IF
-    IF GUI_CLICKED(bAuf) OR (strg AND KEYHIT(KEY_O)) THEN oeffnen()
-    IF GUI_CLICKED(bSpei) OR (strg AND KEYHIT(KEY_S)) THEN speichern()
+    IF GUI_CLICKED(miAuf) OR tbKlick = tbAuf THEN
+        oeffnen()
+        miniVeraltet = TRUE
+        kachelMittel = {}
+    END IF
+    IF GUI_CLICKED(miSpei) OR tbKlick = tbSpei THEN speichern()
     ' ------------------------------------------------------- Objekt-Ebenen
     IF GUI_CLICKED(bObjEbene) THEN
         DIM on2 AS STRING : on2 = TRIM$(GUI_TEXT(edName))
@@ -1082,7 +1330,7 @@ WHILE NOT beenden
         END IF
     END IF
 
-    IF GUI_CLICKED(bCode) THEN
+    IF GUI_CLICKED(miCode) OR tbKlick = tbCode THEN
         DIM pc AS STRING
         pc = FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
         IF pc <> "" THEN
@@ -1095,15 +1343,17 @@ WHILE NOT beenden
     END IF
 
     ' ---------------------------------------------------------- Verlauf
-    IF GUI_CLICKED(bZur) OR (strg AND KEYHIT(KEY_Z)) THEN zurueck()
-    IF GUI_CLICKED(bVor) OR (strg AND KEYHIT(KEY_Y)) THEN wieder()
-    GUI_SET_ENABLED(bZur, uPos > 0)
-    GUI_SET_ENABLED(bVor, uPos < uAnz)
+    IF GUI_CLICKED(miZur) OR tbKlick = tbZur THEN zurueck()
+    IF GUI_CLICKED(miVor) OR tbKlick = tbVor THEN wieder()
+    GUI_TOOLBAR_ENABLE(tb, tbZur, uPos > 0)
+    GUI_TOOLBAR_ENABLE(tb, tbVor, uPos < uAnz)
+    GUI_MENU_ENABLE(miZur, uPos > 0)
+    GUI_MENU_ENABLE(miVor, uPos < uAnz)
 
     ' --------------------------------------------------------- Tilesets
     DIM tsel AS INTEGER : tsel = GUI_DROPDOWN_SELECTED(ddTs)
     IF tsel >= 0 AND tsel <> tsAkt AND tsel < tsAnz THEN tsWaehlen(tsel)
-    IF GUI_CLICKED(bTsNeu) THEN
+    IF GUI_CLICKED(bTsNeu) OR GUI_CLICKED(miTs) THEN
         DIM tp AS STRING : tp = FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
         IF tp <> "" THEN
             TRY
@@ -1166,11 +1416,16 @@ WHILE NOT beenden
             meldung = "Die letzte Ebene bleibt."
         END IF
     END IF
-    IF GUI_CLICKED(cbSicht) THEN
-        TILED_LAYER_SET_VISIBLE(karte, ebene, GUI_CHECKED(cbSicht))
-        geaendert = TRUE
-        listeAuffrischen()
-    END IF
+    ' Die Kaestchen der Ebenenliste sind die Sichtbarkeit.
+    DIM lk AS INTEGER
+    FOR lk = 0 TO TILED_LAYER_COUNT(karte) - 1
+        IF GUI_LISTBOX_CHECKED(lstEbenen, lk) <> TILED_LAYER_VISIBLE(karte, lk) THEN
+            TILED_LAYER_SET_VISIBLE(karte, lk, GUI_LISTBOX_CHECKED(lstEbenen, lk))
+            geaendert = TRUE
+            miniVeraltet = TRUE
+            meldung = "Ebene '" + TILED_LAYER_NAME(karte, lk) + "' " + IIF(TILED_LAYER_VISIBLE(karte, lk), "eingeblendet", "ausgeblendet")
+        END IF
+    NEXT
 
     ' ------------------------------------------------------- Kartenmaus
     DIM cx AS INTEGER : cx = GUI_CANVAS_X(leinwand)
@@ -1181,7 +1436,20 @@ WHILE NOT beenden
     DIM my AS INTEGER : my = MOUSEY()
     DIM z AS INTEGER : z = zell()
     DIM ueber AS BOOLEAN
-    ueber = mx >= cx AND mx < cx + cw AND my >= cy AND my < cy + ch AND NOT neuOffen
+    ueber = mx >= cx AND mx < cx + cw AND my >= cy AND my < cy + ch AND NOT neuOffen AND GUI_WINDOW_AT(mx, my) = win
+    ' Die Uebersicht liegt UEBER der Karte: ein Klick dort springt, statt zu
+    ' malen.
+    DIM mox AS INTEGER : DIM moy AS INTEGER : DIM mm AS INTEGER
+    (mox, moy, mm) = miniLage(cx, cy, cw, ch)
+    DIM ueberMini AS BOOLEAN
+    ueberMini = uebersichtAn AND ueber AND mx >= mox - 4 AND mx < mox + kb * mm + 4 AND my >= moy - 4 AND my < moy + kh * mm + 4
+    IF ueberMini THEN
+        IF MOUSEBUTTON(0) THEN
+            panX = ((mx - mox) * KACHEL * zoom) \ mm - cw \ 2
+            panY = ((my - moy) * KACHEL * zoom) \ mm - ch \ 2
+        END IF
+        ueber = FALSE
+    END IF
     DIM tx AS INTEGER : tx = (mx - cx + panX) \ z
     DIM ty AS INTEGER : ty = (my - cy + panY) \ z
     DIM aufKarte AS BOOLEAN
@@ -1189,23 +1457,30 @@ WHILE NOT beenden
 
     ' Zoom am Mausrad -- der Punkt unter dem Zeiger bleibt stehen, sonst
     ' rutscht einem beim Hineinzoomen die Stelle weg, die man ansieht.
-    IF ueber AND MOUSEWHEEL() <> 0 THEN
+    IF (ueber AND MOUSEWHEEL() <> 0) OR zoomWunsch <> 0 THEN
         DIM altZ AS INTEGER : altZ = zoom
-        zoom = MAX(1, MIN(6, zoom + SGN(MOUSEWHEEL())))
+        IF zoomWunsch <> 0 THEN
+            ' Aus dem Menue: um die Mitte der Leinwand.
+            mx = cx + cw \ 2 : my = cy + ch \ 2
+            zoom = MAX(1, MIN(6, zoom + zoomWunsch))
+        ELSE
+            zoom = MAX(1, MIN(6, zoom + SGN(MOUSEWHEEL())))
+        END IF
         IF zoom <> altZ THEN
             DIM wx2 AS FLOAT : wx2 = (mx - cx + panX) / (KACHEL * altZ)
             DIM wy2 AS FLOAT : wy2 = (my - cy + panY) / (KACHEL * altZ)
             panX = INT(wx2 * KACHEL * zoom) - (mx - cx)
             panY = INT(wy2 * KACHEL * zoom) - (my - cy)
         END IF
+        mx = MOUSEX() : my = MOUSEY()
     END IF
 
-    ' Schieben mit der rechten Maustaste.
-    IF ueber AND MOUSE_HIT(1) THEN
+    ' Schieben mit der rechten oder mittleren Maustaste.
+    IF ueber AND (MOUSE_HIT(1) OR MOUSE_HIT(2)) THEN
         schiebt = TRUE : schiebX = mx : schiebY = my
     END IF
     IF schiebt THEN
-        IF MOUSEBUTTON(1) THEN
+        IF MOUSEBUTTON(1) OR MOUSEBUTTON(2) THEN
             panX = panX - (mx - schiebX)
             panY = panY - (my - schiebY)
             schiebX = mx : schiebY = my
@@ -1242,10 +1517,31 @@ WHILE NOT beenden
         DIM pyi AS INTEGER : pyi = (my - py) \ (KACHEL * PZ) + palZe
         IF pxi < tsSp AND pyi < tsRe THEN
             DIM k AS INTEGER : k = pyi * tsSp + pxi
-            IF k < tsN AND k <> gewaehlt THEN
-                gewaehlt = k
+            IF k < tsN THEN
+                IF k <> gewaehlt THEN
+                    gewaehlt = k
+                    eigenschaftenAuffrischen()
+                END IF
+                stB = 1 : stH = 1
+                palZug = TRUE : palAx = pxi : palAy = pyi
+            END IF
+        END IF
+    END IF
+    ' Ein Zug in der Palette waehlt einen Block: den Stempel.
+    IF palZug THEN
+        IF MOUSEBUTTON(0) THEN
+            DIM qx2 AS INTEGER : qx2 = MAX(0, MIN(tsSp - 1, (mx - px) \ (KACHEL * PZ) + palSp))
+            DIM qy2 AS INTEGER : qy2 = MAX(0, MIN(tsRe - 1, (my - py) \ (KACHEL * PZ) + palZe))
+            DIM nk AS INTEGER : nk = MIN(palAy, qy2) * tsSp + MIN(palAx, qx2)
+            IF nk <> gewaehlt THEN
+                gewaehlt = nk
                 eigenschaftenAuffrischen()
             END IF
+            stB = ABS(qx2 - palAx) + 1
+            stH = ABS(qy2 - palAy) + 1
+        ELSE
+            palZug = FALSE
+            IF stB * stH > 1 THEN meldung = "Stempel " + STR$(stB) + "x" + STR$(stH) + " -- der Stift malt den ganzen Block"
         END IF
     END IF
 
@@ -1302,10 +1598,12 @@ WHILE NOT beenden
         SELECT CASE werkzeug
             CASE WZ_STIFT
                 schrittBeginn()
-                TILED_TILE_SET(karte, ebene, tx, ty, gid)
+                stempeln(tx, ty)
             CASE WZ_RADIER
                 schrittBeginn()
                 TILED_TILE_SET(karte, ebene, tx, ty, 0)
+            CASE WZ_LINIE, WZ_ELLIPSE
+                schrittBeginn()
             CASE WZ_FUELL
                 schrittBeginn()
                 TILED_FLOOD_FILL(karte, ebene, tx, ty, gid)
@@ -1322,6 +1620,7 @@ WHILE NOT beenden
                     ' Strich malte eine andere.
                     IF pts <> tsAkt THEN tsWaehlen(pts)
                     gewaehlt = g - TILED_TILESET_FIRSTGID(karte, pts)
+                    stB = 1 : stH = 1
                     ' Den Ausschnitt mitziehen, wenn sie ausserhalb liegt.
                     DIM ps2 AS INTEGER : ps2 = gewaehlt MOD tsSp
                     DIM pz2 AS INTEGER : pz2 = gewaehlt \ tsSp
@@ -1341,7 +1640,7 @@ WHILE NOT beenden
     IF zieht AND MOUSEBUTTON(0) AND aufKarte THEN
         SELECT CASE werkzeug
             CASE WZ_STIFT
-                TILED_TILE_SET(karte, ebene, tx, ty, gid)
+                stempeln(tx, ty)
             CASE WZ_RADIER
                 TILED_TILE_SET(karte, ebene, tx, ty, 0)
             CASE WZ_AUSWAHL
@@ -1359,16 +1658,24 @@ WHILE NOT beenden
                 rechteckFuellen(ankerX, ankerY, MAX(0, MIN(kb - 1, tx)), _
                                 MAX(0, MIN(kh - 1, ty)), gid)
                 schrittEnde()
+            CASE WZ_LINIE, WZ_ELLIPSE
+                DIM fz AS ARRAY OF INTEGER
+                fz = formZellen(werkzeug, ankerX, ankerY, MAX(0, MIN(kb - 1, tx)), MAX(0, MIN(kh - 1, ty)))
+                DIM fi AS INTEGER
+                FOR fi = 0 TO LEN(fz) - 1
+                    TILED_TILE_SET(karte, ebene, fz[fi] MOD kb, fz[fi] \ kb, gid)
+                NEXT
+                schrittEnde()
         END SELECT
     END IF
 
     ' -------------------------------------------------- Zwischenablage
     ' Nur auf Kachel-Ebenen: sie kopiert ein KACHELfeld, und `TILED_TILE_AT`
     ' auf einer Objekt-Ebene ist ein Fehler, kein leeres Ergebnis.
-    IF strg AND NOT neuOffen AND NOT istObjEbene() THEN
-        IF KEYHIT(KEY_C) THEN auswahlKopieren(FALSE)
-        IF KEYHIT(KEY_X) THEN auswahlKopieren(TRUE)
-        IF KEYHIT(KEY_V) THEN
+    IF NOT neuOffen AND NOT istObjEbene() THEN
+        IF GUI_CLICKED(miKop) THEN auswahlKopieren(FALSE)
+        IF GUI_CLICKED(miAus) THEN auswahlKopieren(TRUE)
+        IF GUI_CLICKED(miEin) THEN
             IF selAn THEN
                 einfuegen(selX, selY)
             ELSEIF aufKarte THEN
@@ -1391,7 +1698,7 @@ WHILE NOT beenden
 
     ' ============================================================ Bild
     GRADIENTV(0, 0, SW - 1, SH - 1, &H0A0F16, &H161E29)
-    GUI_DRAW()
+    GUI_DRAW(FALSE)
 
     ' ---------------------------------------------------- Kachelauswahl
     ' Nur der Ausschnitt: bei einem grossen Tileset liefe der Rest sonst in
@@ -1416,9 +1723,15 @@ WHILE NOT beenden
     DIM gsp AS INTEGER : gsp = (gewaehlt MOD tsSp) - palSp
     DIM gze AS INTEGER : gze = (gewaehlt \ tsSp) - palZe
     IF gsp >= 0 AND gsp < PAL_SP AND gze >= 0 AND gze < PAL_RE THEN
+        ' Der ganze Stempel, so weit er im Ausschnitt liegt.
+        DIM gbr AS INTEGER : gbr = MIN(stB, PAL_SP - gsp)
+        DIM gho AS INTEGER : gho = MIN(stH, PAL_RE - gze)
         RECT(px + gsp * KACHEL * PZ, py + gze * KACHEL * PZ, _
-             px + gsp * KACHEL * PZ + KACHEL * PZ - 1, _
-             py + gze * KACHEL * PZ + KACHEL * PZ - 1, &H2BC4E8)
+             px + (gsp + gbr) * KACHEL * PZ - 1, _
+             py + (gze + gho) * KACHEL * PZ - 1, &H2BC4E8)
+        RECT(px + gsp * KACHEL * PZ + 1, py + gze * KACHEL * PZ + 1, _
+             px + (gsp + gbr) * KACHEL * PZ - 2, _
+             py + (gze + gho) * KACHEL * PZ - 2, &H2BC4E8)
     END IF
     ' Ein Hinweis, dass mehr da ist als zu sehen -- ohne ihn sucht man die
     ' fehlenden Kacheln im Tileset statt im Ausschnitt.
@@ -1475,7 +1788,7 @@ WHILE NOT beenden
     ' Gitter -- nur solange eine Linie noch etwas trennt, und nur UEBER der
     ' Karte: ueber die volle Leinwand gezogen liefen die Linien ins Leere
     ' weiter und die Karte verlor ihre Kante.
-    IF GUI_CHECKED(cbGitter) AND z >= 12 THEN
+    IF gitterAn AND z >= 12 THEN
         DIM g0 AS INTEGER : g0 = cy - panY
         DIM g1 AS INTEGER : g1 = cy + kh * z - panY - 1
         FOR ax2 = vonX TO bisX + 1
@@ -1490,7 +1803,7 @@ WHILE NOT beenden
     ' Rand der Karte
     RECT(cx - panX, cy - panY, cx + kb * z - panX - 1, cy + kh * z - panY - 1, &H33455A)
 
-    IF GUI_CHECKED(cbNr) AND z >= 24 AND NOT istObjEbene() THEN
+    IF nummernAn AND z >= 24 AND NOT istObjEbene() THEN
         FOR ay2 = vonY TO bisY
             FOR ax2 = vonX TO bisX
                 DIM g2 AS INTEGER : g2 = TILED_TILE_AT(karte, ebene, ax2, ay2)
@@ -1550,16 +1863,54 @@ WHILE NOT beenden
             hx = MIN(ankerX, tx) : hy = MIN(ankerY, ty)
             hb = ABS(tx - ankerX) + 1 : hh = ABS(ty - ankerY) + 1
         END IF
-        RECT(cx + hx * z - panX, cy + hy * z - panY, _
-             cx + (hx + hb) * z - panX - 1, cy + (hy + hh) * z - panY - 1, &HFFFFFF)
+        IF werkzeug = WZ_STIFT THEN
+            hb = stB : hh = stH
+        END IF
+        IF zieht AND (werkzeug = WZ_LINIE OR werkzeug = WZ_ELLIPSE) THEN
+            ' Die Form, die beim Loslassen gesetzt wird -- Zelle fuer Zelle.
+            DIM vz AS ARRAY OF INTEGER : vz = formZellen(werkzeug, ankerX, ankerY, tx, ty)
+            DIM vi AS INTEGER
+            FOR vi = 0 TO LEN(vz) - 1
+                DIM vx AS INTEGER : vx = cx + (vz[vi] MOD kb) * z - panX
+                DIM vy AS INTEGER : vy = cy + (vz[vi] \ kb) * z - panY
+                BOX(vx, vy, vx + z - 1, vy + z - 1, &H502BC4E8)
+                RECT(vx, vy, vx + z - 1, vy + z - 1, &HFFFFFF)
+            NEXT
+        ELSE
+            RECT(cx + hx * z - panX, cy + hy * z - panY, _
+                 cx + (hx + hb) * z - panX - 1, cy + (hy + hh) * z - panY - 1, &HFFFFFF)
+        END IF
+    END IF
+
+    ' Die Uebersicht: neu gebaut, wenn sich etwas geaendert hat -- hoechstens
+    ' jedes zehnte Bild, waehrend gemalt wird, sonst kostete jeder Strich
+    ' einen Durchgang ueber die ganze Karte.
+    IF uebersichtAn THEN
+        miniWarte = miniWarte - 1
+        IF miniVeraltet AND (miniWarte <= 0 OR NOT zieht) THEN
+            miniBauen()
+            miniWarte = 10
+        END IF
+        IF miniDa THEN
+            BOXROUND(mox - 6, moy - 6, mox + kb * mm + 5, moy + kh * mm + 5, 6, &HD0101722)
+            DRAWIMAGEPARTEX(miniBild, 0, 0, kb, kh, mox, moy, kb * mm, kh * mm)
+            ' Der sichtbare Ausschnitt.
+            DIM vrx AS INTEGER : vrx = mox + (panX * mm) \ z
+            DIM vry AS INTEGER : vry = moy + (panY * mm) \ z
+            DIM vrb AS INTEGER : vrb = MIN(kb * mm, (cw * mm) \ z)
+            DIM vrh AS INTEGER : vrh = MIN(kh * mm, (ch * mm) \ z)
+            RECT(vrx, vry, MIN(mox + kb * mm, vrx + vrb) - 1, MIN(moy + kh * mm, vry + vrh) - 1, &HE8C44B)
+        END IF
     END IF
     SCISSOR_END()
 
     ' -------------------------------------------------------- Statuszeile
     DIM info AS STRING
     info = wzName[werkzeug] + "   " + IIF(tsAnz > 0, BASENAME(tsPfad), "-") + _
-           " #" + STR$(gewaehlt) + "   Zoom " + STR$(zoom) + "x"
-    IF aufKarte THEN info = info + "   [" + STR$(tx) + ", " + STR$(ty) + "]"
+           " #" + STR$(gewaehlt)
+    IF stB * stH > 1 THEN info = info + " (Stempel " + STR$(stB) + "x" + STR$(stH) + ")"
+    GUI_STATUSBAR_SET(status, sfLage, IIF(aufKarte, "Kachel " + STR$(tx) + ", " + STR$(ty), STR$(kb) + " x " + STR$(kh) + " Kacheln"))
+    GUI_STATUSBAR_SET(status, sfZoom, "Zoom " + STR$(zoom) + "x")
     IF selAn THEN info = info + "   Auswahl " + STR$(selB) + "x" + STR$(selH)
     IF clipB > 0 THEN info = info + "   Ablage " + STR$(clipB) + "x" + STR$(clipH)
     info = info + "   |   " + IIF(dateiname = "", "(ungespeichert)", dateiname)
@@ -1570,6 +1921,9 @@ WHILE NOT beenden
     ' Die Karte entsteht nach GUI_DRAW -- ohne diesen Aufruf laege sie ueber
     ' dem Kasten.
     IF dlgEnde >= 0 THEN GUI_DRAW_WINDOW(dlgEnde)
+    IF neuOffen THEN GUI_DRAW_WINDOW(winNeu)
+    ' Menues, Klapplisten und Tooltips liegen ueber allem, auch ueber der Karte.
+    GUI_DRAW_TOP()
 
     FLIP()
 WEND
