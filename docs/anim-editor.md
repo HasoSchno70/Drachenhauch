@@ -30,6 +30,12 @@ man sofort sieht, wie ein fertiger Graph aussieht. `Strg+N` leert.
 
 ## Oberfläche
 
+Oben über die ganze Breite Menü und Werkzeugleiste (Neu, Öffnen, Sichern ·
+Zurück, Vor · Zustand, Verbinden, Löschen · Anordnen, Einpassen, Zoom ·
+Vorschau), unten die Statusleiste mit Meldung, der Zahl der Zustände und
+Übergänge und dem Zoom (ein Klick darauf = 100 %). Die Oberfläche schreibt in
+DejaVu Sans.
+
 - **Mitte — der Graph:** Zustände als Knoten, Übergänge als Pfeile mit
   Spitze und Beschriftung (Hin- und Rückweg zwischen denselben Knoten liegen
   seitlich versetzt). Ein Eingangspfeil markiert den **Startzustand**, die
@@ -40,7 +46,10 @@ man sofort sieht, wie ein fertiger Graph aussieht. `Strg+N` leert.
 - **Rechts — Inspektor:** je nach Auswahl der Zustand (Name, Animation,
   Bild von/bis, Bilder je Sekunde, endlos, Startzustand) oder der Übergang
   („erst wenn fertig" und bis zu **sechs Bedingungen** aus Parameter,
-  Operator und Wert).
+  Operator und Wert). Darunter **„So läuft der Zustand“**: die Animation des
+  gewählten Zustands (ohne Wahl die des Startzustands), aus dem Sprite-Blatt
+  selbst, mit ihren Bildern je Sekunde; ein Zustand, der nur einmal läuft,
+  bleibt kurz auf dem letzten Bild stehen und beginnt dann von vorn.
 
 ## Bedienung
 
@@ -57,6 +66,10 @@ man sofort sieht, wie ein fertiger Graph aussieht. `Strg+N` leert.
 | Rückgängig / Wiederholen | `Strg+Z` / `Strg+Y` |
 | Neu / Öffnen / Sichern / Sichern unter | `Strg+N` / `Strg+O` / `Strg+S` / `Strg+Umschalt+S` |
 | Vorschau | `F5` |
+| Zoomen | Mausrad über dem Graphen (um den Punkt unter der Maus), `Strg+Plus` / `Strg+Minus`, `Strg+0` = 100 % |
+| Verschieben | mittlere Maustaste ziehen, oder Leertaste halten und mit der linken ziehen |
+| Anordnen | `Strg+L`: Stufen ab dem Startzustand, je Stufe eine Spalte — was „Any State“ erreicht, steht in der ersten Stufe dahinter; ein Schritt im Verlauf |
+| Einpassen | `Strg+E`: der ganze Graph ins Bild (beim Öffnen von selbst) |
 | Beenden | `Strg+Q` oder das Kreuz des Fensters |
 
 Beim Beenden mit ungesicherten Änderungen fragt der Editor nach
@@ -139,7 +152,10 @@ Datei mit der Laufzeit selbst — `ANIM_FSM_LOAD`, `ANIM_FSM_SETUP`, ein
 Schritt, Zustandsname vergleichen (bei der Bedingung: mit `speed` 10 wird
 `run` erreicht, mit 1 bleibt es `idle`). Dass die JSON gültig ist, wäre die
 schwächere Aussage: ein Übergang zu einem gelöschten Zustand lädt nicht,
-und genau das prüft der Fall nach `Entf`. Die Rückfrage beim Kreuz prüft
+und genau das prüft der Fall nach `Entf`. Dazu Anordnen (Lagen nach Stufen
+und Rückgängig), Zoomen um einen festen Punkt samt Treffertest, ein echter
+Radschritt, Einpassen und die Animation im Inspektor als Bildprobe. Die
+Rückfrage beim Kreuz prüft
 `tests/pruef/werkzeug_kreuz.dhtest` mit echten Fensternachrichten.
 
 ## Was der Qt-Editor hatte und 198 fehlt
@@ -147,5 +163,3 @@ und genau das prüft der Fall nach `Entf`. Die Rückfrage beim Kreuz prüft
 - **Umbenennen und Startzustand per Rechtsklick auf einen Knoten** — die
   rechte Taste zieht hier Übergänge; beides geht über den Inspektor bzw.
   das Menü Bearbeiten.
-- **Rollen des Graphen:** der sichtbare Ausschnitt ist fest, Knoten jenseits
-  des Fensters erreicht man nicht.

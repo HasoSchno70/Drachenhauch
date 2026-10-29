@@ -16,46 +16,61 @@ Programm. Python braucht er nicht.
 
 ## Das Fenster
 
+Das Fenster füllt den Schirm und wächst mit (mindestens 1300 × 820). Die
+Oberfläche schreibt in DejaVu Sans; oben Menü und Werkzeugleiste, unten die
+Statusleiste mit der Zahl der lebenden Teilchen und dem Verlaufsschritt.
+
 | Bereich | Was geht |
 |---|---|
-| Vorschau | Die Teilchen, beschnitten auf die Fläche; die Quelle sitzt in der Mitte oder, mit **folgt der Maus**, unter dem Zeiger. Unten die Zahl der lebenden Teilchen |
-| Bedienung | **Pause**/**Weiter**, **Leeren**, **Salve** (200 Teilchen auf einmal — für Explosionen) |
-| Werkseinstellungen | Funken, Rauch, Feuer, Regen, Schnee, Explosion, Zauber, Springbrunnen — ein Klick setzt alle Regler, Darstellung und Schalter und leert die Vorschau |
-| Ausgabe | **Sichern ...**/**Laden ...** (`.ini`), **DH-Code kopieren** |
-| Verlauf | **Zurueck**/**Vor** oder Strg+Z/Strg+Y |
+| Werkzeugleiste | Öffnen, Sichern, DH-Code · Zurück/Vor · **Zufall**, **Mutieren** · **Pause**/**Weiter**, **Leeren**, **Salve** (200 Teilchen auf einmal — für Explosionen) |
+| Vorlagen (links) | Funken, Rauch, Feuer, Regen, Schnee, Explosion, Zauber, Springbrunnen, Blasen, Sterne, Staub, Glut — ein Klick setzt alle Werte, Darstellung und Schalter und leert die Vorschau; darunter **Zufall** und **Mutieren** |
+| Hintergrund (links) | Nacht, Dämmerung (Verlauf), Hell, Schachbrett — wie der Effekt vor verschiedenem Grund wirkt; **Quelle folgt der Maus** setzt die Quelle unter den Zeiger |
+| Vorschau (Mitte) | Die Teilchen, beschnitten auf die Fläche; sie wächst mit dem Fenster |
+| Farben (unter der Vorschau) | Zwei Farbwähler: **Farbe am Anfang** und **Farbe am Ende** (mit **Farbverlauf benutzen**) |
+| Verlauf | Strg+Z/Strg+Y oder die Knöpfe in der Leiste |
 
-Die Regler:
+**Zufall** (Strg+R) würfelt einen Effekt, der nach etwas aussieht: die Werte
+kommen als Paare (min ≤ max), die Endfarbe passt im Farbton zur Anfangsfarbe.
+**Mutieren** (Strg+M) verstellt jeden Regler um höchstens 6 % seines
+Bereichs und die Farben um wenige Stufen — der Effekt bleibt erkennbar
+derselbe. Beides ist ein Schritt im Verlauf.
+
+Die Regler (rechts):
 
 | Gruppe | Regler |
 |---|---|
 | Bewegung | Tempo X min/max, Tempo Y min/max (±400 px/s), Kraft X/Y (±600 px/s²) |
-| Lebenszeit (ms) und Ausstoss | Leben min/max (50..4000 ms), je Bild (0..60 Teilchen) |
-| Aussehen | Darstellung (`circle`, `pixel`, `square`, `streak`, `glow`), Groesse min/max, **am Ende ausblenden** |
-| Farbe am Anfang | Rot, Gruen, Blau, darunter ein Farbfeld mit dem Ergebnis |
-| Farbe am Ende | **Farbverlauf benutzen**, Rot, Gruen, Blau, Farbfeld |
+| Lebenszeit (ms) und Ausstoß | Leben min/max (50..4000 ms), je Bild (0..60 Teilchen) |
+| Aussehen | Darstellung (Kreis, Pixel, Quadrat, Strich, Leuchten — im Code `circle`, `pixel`, `square`, `streak`, `glow`), Größe min/max, **am Ende ausblenden** |
+| Ein Teilchen im Lauf seines Lebens | Ein Streifen von der Geburt (links) bis zum Ende (rechts): Farbe und, mit Ausblenden, Deckkraft auf Schachbrettgrund |
 
 Ohne Farbverlauf bekommt das System die Startfarbe auch als Endfarbe — das
 Modul kennt kein „aus“. `glow` zeichnet `PARTICLE_DRAW` derzeit wie `circle`;
 für echtes Leuchten im Spiel `BLEND_MODE("add")` um den Aufruf legen.
 
 Alles geht auch ohne Maus: TAB wechselt das Bedienelement, die Leertaste löst
-aus, die Pfeile verstellen einen Regler.
+aus, die Pfeile verstellen einen Regler; F5 hält an, F6 leert, F7 ist die
+Salve.
 
 ## Rückgängig
 
 Ein **Zug** am Regler ist **ein** Schritt: aufgezeichnet wird erst, wenn sich
 ein Bild lang nichts geändert hat und keine Maustaste mehr gedrückt ist.
-Werkseinstellung und geladene `.ini` sind auf demselben Weg je ein Schritt.
-Gemerkt wird der volle Stand (17 Regler, Darstellung, zwei Schalter), bis zu
-32 Schritte; ein neuer Zug nach einem Zurück schneidet den Vor-Weg ab.
+Ein Zug durch einen Farbwähler ebenso. Vorlage, Zufall, Mutieren und eine
+geladene `.ini` sind auf demselben Weg je ein Schritt. Gemerkt wird der volle
+Stand (11 Regler, zwei Farben, Darstellung, zwei Schalter), bis zu 32 Schritte;
+ein neuer Zug nach einem Zurück schneidet den Vor-Weg ab.
 
 ## Sichern und Laden
 
-**Sichern ...** schreibt alle Regler in eine `.ini`, **Laden ...** holt sie
-zurück. Schlüssel ist die **Beschriftung** des Reglers, dazu `modus` für die
-Darstellung — lesbar und von Hand änderbar. Ein unbekannter Schlüssel wird
-übergangen, ein Wert außerhalb des Reglerbereichs geklemmt. Die beiden Schalter
-(Ausblenden, Farbverlauf) stehen nicht in der Datei.
+**Datei → Einstellung sichern** (Strg+S) schreibt alle Werte in eine `.ini`,
+**Öffnen** (Strg+O) holt sie zurück. Schlüssel ist der Name des Wertes
+(`Tempo X min`, …, `Rot Anfang`, `Rot Ende`, …), dazu `modus` für die
+Darstellung und `ausblenden`/`verlauf` für die beiden Schalter — lesbar und
+von Hand änderbar. Ein unbekannter Schlüssel wird übergangen, ein Wert
+außerhalb des Reglerbereichs geklemmt. Bis 2026-10-29 hießen beide Farben
+`Rot`/`Gruen`/`Blau` (die Endfarbe überschrieb die Anfangsfarbe); eine solche
+Datei bringt ihre Endfarbe weiter mit.
 
 Beim Schließen (Kreuz, Alt+F4 oder ESC) fragt der Editor nach
 (Sichern / Verwerfen / Abbrechen), aber nur, wenn etwas vom letzten Sichern,
@@ -108,6 +123,8 @@ DH-Code in einem eigenen Fenster. Hier ist jede eigene Einstellung eine eigene
 eine Aufnahme: ein Zug ist ein Schritt, Zurück nimmt den ganzen Zug zurück und
 Vor holt ihn wieder, Strg+Z/Strg+Y tun dasselbe wie die Knöpfe, eine
 Werkseinstellung ist ein Schritt, ein neuer Zug schneidet den Vor-Weg ab, und
-der erste Eintrag der Werkseinstellungen ist anklickbar (früher lagen die
-Knöpfe darauf). Die Rückfrage beim Schließen prüft
+der erste Eintrag der Vorlagen ist anklickbar (früher lagen die Knöpfe
+darauf). Dazu Zufall (andere Werte, ein Schritt, Paare richtig herum),
+Mutieren (nah am Vorigen), ein Zug im Farbwähler samt Zurück, und die `.ini`
+mit beiden Farben getrennt sowie eine alte Datei. Die Rückfrage beim Schließen prüft
 `tests/pruef/werkzeug_kreuz.dhtest` mit echten Fensternachrichten.
