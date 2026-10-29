@@ -59,6 +59,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -250,6 +254,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -440,6 +448,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -635,6 +647,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -834,6 +850,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -1023,6 +1043,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -1212,6 +1236,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -1405,6 +1433,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -1597,6 +1629,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -1795,6 +1831,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -1992,6 +2032,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -2184,6 +2228,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -2307,7 +2355,7 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
-    prKnopf(2, GUI_GET_X(bPalLaden), GUI_GET_Y(bPalLaden), 128)
+    prKnopf(2, GUI_GET_X(bPalLaden), prOy() + GUI_GET_Y(bPalLaden), 128)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -2402,6 +2450,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -2525,7 +2577,7 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
-    prKnopf(2, GUI_GET_X(bPalSichern), GUI_GET_Y(bPalSichern), 128)
+    prKnopf(2, GUI_GET_X(bPalSichern), prOy() + GUI_GET_Y(bPalSichern), 128)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -2622,6 +2674,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -2745,7 +2801,7 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
-    prKnopf(2, GUI_GET_X(bPalLaden), GUI_GET_Y(bPalLaden), 128)
+    prKnopf(2, GUI_GET_X(bPalLaden), prOy() + GUI_GET_Y(bPalLaden), 128)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -2835,6 +2891,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -2960,7 +3020,7 @@ SUB prFall()
     DIM t AS INTEGER
     prA = zoom
     prMerke("erst einfach eingepasst " + prJa$(zoom = MAX(1, MIN(32, MIN((cw - 40) \ (32 * 1), (ch - 40) \ (32 * 1))))))
-    prKlick(2, GUI_GET_X(cbKacheln) + 8, GUI_GET_Y(cbKacheln) + 8)
+    prKlick(2, GUI_GET_X(cbKacheln) + 8, prOy() + GUI_GET_Y(cbKacheln) + 8)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -3027,6 +3087,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -3151,7 +3215,7 @@ END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
     t = 1 + prStrich(1, 16, 4, 20) + 2
-    prKnopf(t, GUI_GET_X(bStat), GUI_GET_Y(bStat), 128)
+    prKnopf(t, GUI_GET_X(bStat), prOy() + GUI_GET_Y(bStat), 128)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -3257,6 +3321,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -3387,7 +3455,7 @@ SUB prFall()
     t = t + 3 + prStrich(t + 3, 10, 2, 22) + 2
     prTaste(t, 50)
     t = t + 3 + prStrich(t + 3, 25, 2, 12) + 2
-    prKnopf(t, GUI_GET_X(bStat), GUI_GET_Y(bStat), 128)
+    prKnopf(t, GUI_GET_X(bStat), prOy() + GUI_GET_Y(bStat), 128)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -3478,6 +3546,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -3602,7 +3674,7 @@ END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
     t = 1 + prStrich(1, 10, 10, 21) + 2
-    prKnopf(t, GUI_GET_X(bZuschnitt), GUI_GET_Y(bZuschnitt), 128)
+    prKnopf(t, GUI_GET_X(bZuschnitt), prOy() + GUI_GET_Y(bZuschnitt), 128)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -3667,6 +3739,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -3791,10 +3867,10 @@ END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
     prStrich(1, 10, 4, 8)
-    prKnopf(7, GUI_GET_X(bEbNeu), GUI_GET_Y(bEbNeu), 128)
+    prKnopf(7, GUI_GET_X(bEbNeu), prOy() + GUI_GET_Y(bEbNeu), 128)
     prStrich(13, 20, 24, 28)
-    prKlick(19, GUI_GET_X(cbEbSicht) + 8, GUI_GET_Y(cbEbSicht) + 8)
-    prKnopf(25, GUI_GET_X(bZuschnitt), GUI_GET_Y(bZuschnitt), 128)
+    prKlick(19, GUI_GET_X(cbEbSicht) + 8, prOy() + GUI_GET_Y(cbEbSicht) + 8)
+    prKnopf(25, GUI_GET_X(bZuschnitt), prOy() + GUI_GET_Y(bZuschnitt), 128)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -3860,6 +3936,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -3984,7 +4064,7 @@ END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
     t = 1 + prStrich(1, 3, 2, 9) + 2
-    prKnopf(t, GUI_GET_X(bGroesse), GUI_GET_Y(bGroesse), 128)
+    prKnopf(t, GUI_GET_X(bGroesse), prOy() + GUI_GET_Y(bGroesse), 128)
     prKnopf(t + 6, GUI_WINDOW_GET_X(winGr) + GUI_GET_X(bGrOk), GUI_WINDOW_GET_Y(winGr) + GUI_GET_Y(bGrOk), 128)
     prAbspielen()
 END SUB
@@ -4062,6 +4142,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -4185,8 +4269,8 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
-    prKnopf(2, GUI_GET_X(bAnimNeu), GUI_GET_Y(bAnimNeu), 128)
-    prKnopf(10, GUI_GET_X(bAnimWeg), GUI_GET_Y(bAnimWeg), 128)
+    prKnopf(2, GUI_GET_X(bAnimNeu), prOy() + GUI_GET_Y(bAnimNeu), 128)
+    prKnopf(10, GUI_GET_X(bAnimWeg), prOy() + GUI_GET_Y(bAnimWeg), 128)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -4253,6 +4337,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -4376,11 +4464,11 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
-    prKnopf(2, GUI_GET_X(bBildKopie), GUI_GET_Y(bBildKopie), 128)
-    prKnopf(8, GUI_GET_X(bBildKopie), GUI_GET_Y(bBildKopie), 128)
-    prKnopf(14, GUI_GET_X(bAnimNeu), GUI_GET_Y(bAnimNeu), 128)
-    prKlick(24, GUI_GET_X(lstBild) + 40, GUI_GET_Y(lstBild) + 10)
-    prKnopf(32, GUI_GET_X(bBildWeg), GUI_GET_Y(bBildWeg), 128)
+    prKnopf(2, GUI_GET_X(bBildKopie), prOy() + GUI_GET_Y(bBildKopie), 128)
+    prKnopf(8, GUI_GET_X(bBildKopie), prOy() + GUI_GET_Y(bBildKopie), 128)
+    prKnopf(14, GUI_GET_X(bAnimNeu), prOy() + GUI_GET_Y(bAnimNeu), 128)
+    prKlick(24, GUI_GET_X(lstBild) + 40, prOy() + GUI_GET_Y(lstBild) + 10)
+    prKnopf(32, GUI_GET_X(bBildWeg), prOy() + GUI_GET_Y(bBildWeg), 128)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -4454,6 +4542,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -4578,9 +4670,9 @@ END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
     t = 1 + prStrich(1, 10, 6, 18) + 2
-    prKnopf(t, GUI_GET_X(bBildKopie), GUI_GET_Y(bBildKopie), 128)
-    prKnopf(t + 6, GUI_GET_X(bAnimNeu), GUI_GET_Y(bAnimNeu), 128)
-    prKnopf(t + 12, GUI_GET_X(bDhCode), GUI_GET_Y(bDhCode), 128)
+    prKnopf(t, GUI_GET_X(bBildKopie), prOy() + GUI_GET_Y(bBildKopie), 128)
+    prKnopf(t + 6, GUI_GET_X(bAnimNeu), prOy() + GUI_GET_Y(bAnimNeu), 128)
+    prKnopf(t + 12, GUI_GET_X(bDhCode), prOy() + GUI_GET_Y(bDhCode), 128)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -4674,6 +4766,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -4797,8 +4893,8 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
-    prKnopf(2, GUI_GET_X(bBildKopie), GUI_GET_Y(bBildKopie), 128)
-    prKnopf(10, GUI_GET_X(bDhCode), GUI_GET_Y(bDhCode), 128)
+    prKnopf(2, GUI_GET_X(bBildKopie), prOy() + GUI_GET_Y(bBildKopie), 128)
+    prKnopf(10, GUI_GET_X(bDhCode), prOy() + GUI_GET_Y(bDhCode), 128)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -4891,6 +4987,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -5014,10 +5114,10 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
-    prKnopf(2, GUI_GET_X(bBildKopie), GUI_GET_Y(bBildKopie), 128)
-    prKnopf(8, GUI_GET_X(bAnimNeu), GUI_GET_Y(bAnimNeu), 128)
-    prKnopf(14, GUI_GET_X(bDhCode), GUI_GET_Y(bDhCode), 128)
-    prKnopf(20, GUI_GET_X(bDhanim), GUI_GET_Y(bDhanim), 128)
+    prKnopf(2, GUI_GET_X(bBildKopie), prOy() + GUI_GET_Y(bBildKopie), 128)
+    prKnopf(8, GUI_GET_X(bAnimNeu), prOy() + GUI_GET_Y(bAnimNeu), 128)
+    prKnopf(14, GUI_GET_X(bDhCode), prOy() + GUI_GET_Y(bDhCode), 128)
+    prKnopf(20, GUI_GET_X(bDhanim), prOy() + GUI_GET_Y(bDhanim), 128)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -5124,6 +5224,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -5247,9 +5351,9 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
-    prKnopf(2, GUI_GET_X(bBildKopie), GUI_GET_Y(bBildKopie), 128)
-    prKnopf(8, GUI_GET_X(bDhCode), GUI_GET_Y(bDhCode), 128)
-    prKnopf(14, GUI_GET_X(bDhanim), GUI_GET_Y(bDhanim), 128)
+    prKnopf(2, GUI_GET_X(bBildKopie), prOy() + GUI_GET_Y(bBildKopie), 128)
+    prKnopf(8, GUI_GET_X(bDhCode), prOy() + GUI_GET_Y(bDhCode), 128)
+    prKnopf(14, GUI_GET_X(bDhanim), prOy() + GUI_GET_Y(bDhanim), 128)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -5353,6 +5457,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -5476,9 +5584,9 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
-    prKnopf(2, GUI_GET_X(bBildName), GUI_GET_Y(bBildName), 128)
+    prKnopf(2, GUI_GET_X(bBildName), prOy() + GUI_GET_Y(bBildName), 128)
     prKnopf(10, GUI_WINDOW_GET_X(winName) + GUI_GET_X(bNamOk), GUI_WINDOW_GET_Y(winName) + GUI_GET_Y(bNamOk), 128)
-    prKnopf(18, GUI_GET_X(bBlatt), GUI_GET_Y(bBlatt), 128)
+    prKnopf(18, GUI_TOOLBAR_ITEM_X(tb, tbBlatt), prOy() + GUI_GET_Y(tb) + 7, GUI_TOOLBAR_ITEM_W(tb, tbBlatt))
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -5587,6 +5695,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -5710,9 +5822,9 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
-    prKnopf(2, GUI_GET_X(bBildName), GUI_GET_Y(bBildName), 128)
+    prKnopf(2, GUI_GET_X(bBildName), prOy() + GUI_GET_Y(bBildName), 128)
     prKnopf(10, GUI_WINDOW_GET_X(winName) + GUI_GET_X(bNamOk), GUI_WINDOW_GET_Y(winName) + GUI_GET_Y(bNamOk), 128)
-    prKnopf(18, GUI_GET_X(bBlatt), GUI_GET_Y(bBlatt), 128)
+    prKnopf(18, GUI_TOOLBAR_ITEM_X(tb, tbBlatt), prOy() + GUI_GET_Y(tb) + 7, GUI_TOOLBAR_ITEM_W(tb, tbBlatt))
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -5819,6 +5931,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -5942,9 +6058,9 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
-    prKnopf(2, GUI_GET_X(bBildName), GUI_GET_Y(bBildName), 128)
+    prKnopf(2, GUI_GET_X(bBildName), prOy() + GUI_GET_Y(bBildName), 128)
     prKnopf(10, GUI_WINDOW_GET_X(winName) + GUI_GET_X(bNamOk), GUI_WINDOW_GET_Y(winName) + GUI_GET_Y(bNamOk), 128)
-    prKnopf(18, GUI_GET_X(bBlatt), GUI_GET_Y(bBlatt), 128)
+    prKnopf(18, GUI_TOOLBAR_ITEM_X(tb, tbBlatt), prOy() + GUI_GET_Y(tb) + 7, GUI_TOOLBAR_ITEM_W(tb, tbBlatt))
     prKlick(32, 66, 7)
     prAbspielen()
 END SUB
@@ -6027,6 +6143,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -6150,9 +6270,9 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
-    prKnopf(2, GUI_GET_X(bGroesse), GUI_GET_Y(bGroesse), 128)
+    prKnopf(2, GUI_GET_X(bGroesse), prOy() + GUI_GET_Y(bGroesse), 128)
     prKnopf(8, GUI_WINDOW_GET_X(winGr) + GUI_GET_X(bGrOk), GUI_WINDOW_GET_Y(winGr) + GUI_GET_Y(bGrOk), 128)
-    prKnopf(16, GUI_GET_X(bDrehR), GUI_GET_Y(bDrehR), 62)
+    prKnopf(16, GUI_GET_X(bDrehR), prOy() + GUI_GET_Y(bDrehR), 62)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -6230,6 +6350,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -6354,7 +6478,7 @@ END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
     prZugPunkte(4, [0, 0], [0, 0])
-    prKnopf(18, GUI_GET_X(bDrehR), GUI_GET_Y(bDrehR), 62)
+    prKnopf(18, GUI_GET_X(bDrehR), prOy() + GUI_GET_Y(bDrehR), 62)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -6425,6 +6549,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -6549,7 +6677,7 @@ END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
     prZugPunkte(4, [0, 0], [0, 0])
-    prKnopf(18, GUI_GET_X(bDrehL), GUI_GET_Y(bDrehL), 62)
+    prKnopf(18, GUI_GET_X(bDrehL), prOy() + GUI_GET_Y(bDrehL), 62)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -6620,6 +6748,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -6744,7 +6876,7 @@ END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
     prZugPunkte(4, [0, 0], [0, 0])
-    prKnopf(18, GUI_GET_X(bSpiegelX), GUI_GET_Y(bSpiegelX), 62)
+    prKnopf(18, GUI_GET_X(bSpiegelX), prOy() + GUI_GET_Y(bSpiegelX), 62)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -6815,6 +6947,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -6939,7 +7075,7 @@ END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
     prZugPunkte(4, [0, 0], [0, 0])
-    prKnopf(18, GUI_GET_X(bSpiegelY), GUI_GET_Y(bSpiegelY), 62)
+    prKnopf(18, GUI_GET_X(bSpiegelY), prOy() + GUI_GET_Y(bSpiegelY), 62)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -7010,6 +7146,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -7134,8 +7274,8 @@ END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
     prZugPunkte(4, [0, 0], [0, 0])
-    prKnopf(18, GUI_GET_X(bDrehR), GUI_GET_Y(bDrehR), 62)
-    prKnopf(26, GUI_GET_X(bDrehL), GUI_GET_Y(bDrehL), 62)
+    prKnopf(18, GUI_GET_X(bDrehR), prOy() + GUI_GET_Y(bDrehR), 62)
+    prKnopf(26, GUI_GET_X(bDrehL), prOy() + GUI_GET_Y(bDrehL), 62)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -7209,6 +7349,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -7333,7 +7477,7 @@ END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
     prZugPunkte(4, [0, 0], [0, 0])
-    prKnopf(18, GUI_GET_X(bSpiegelX), GUI_GET_Y(bSpiegelX), 62)
+    prKnopf(18, GUI_GET_X(bSpiegelX), prOy() + GUI_GET_Y(bSpiegelX), 62)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -7400,6 +7544,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -7588,6 +7736,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -7711,9 +7863,9 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
-    prKlick(4, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, GUI_GET_Y(spMs) + 6)
-    prKlick(7, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, GUI_GET_Y(spMs) + 6)
-    prKlick(10, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, GUI_GET_Y(spMs) + 6)
+    prKlick(4, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, prOy() + GUI_GET_Y(spMs) + 6)
+    prKlick(7, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, prOy() + GUI_GET_Y(spMs) + 6)
+    prKlick(10, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, prOy() + GUI_GET_Y(spMs) + 6)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -7780,6 +7932,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -7903,12 +8059,12 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
-    prKnopf(4, GUI_GET_X(bBildWeg) - 92, GUI_GET_Y(bBildWeg), 88)
-    prKlick(12, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, GUI_GET_Y(spMs) + 6)
-    prKlick(15, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, GUI_GET_Y(spMs) + 6)
-    prKlick(18, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, GUI_GET_Y(spMs) + 6)
-    prKlick(21, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, GUI_GET_Y(spMs) + 6)
-    prKnopf(30, GUI_GET_X(bGif), GUI_GET_Y(bGif), 52)
+    prKnopf(4, GUI_GET_X(bBildWeg) - 92, prOy() + GUI_GET_Y(bBildWeg), 88)
+    prKlick(12, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, prOy() + GUI_GET_Y(spMs) + 6)
+    prKlick(15, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, prOy() + GUI_GET_Y(spMs) + 6)
+    prKlick(18, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, prOy() + GUI_GET_Y(spMs) + 6)
+    prKlick(21, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, prOy() + GUI_GET_Y(spMs) + 6)
+    prKnopf(30, GUI_TOOLBAR_ITEM_X(tb, tbGif), prOy() + GUI_GET_Y(tb) + 7, GUI_TOOLBAR_ITEM_W(tb, tbGif))
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -7988,6 +8144,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -8111,15 +8271,15 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
-    prKlick(4, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, GUI_GET_Y(spMs) + 6)
-    prKlick(7, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, GUI_GET_Y(spMs) + 6)
-    prKlick(10, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, GUI_GET_Y(spMs) + 6)
-    prKlick(13, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, GUI_GET_Y(spMs) + 6)
-    prKlick(16, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, GUI_GET_Y(spMs) + 6)
-    prKnopf(24, GUI_GET_X(bSichern), GUI_GET_Y(bNeu), GUI_GET_W(bSichern))
-    prKnopf(34, GUI_GET_X(bNeu), GUI_GET_Y(bNeu), GUI_GET_W(bNeu))
+    prKlick(4, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, prOy() + GUI_GET_Y(spMs) + 6)
+    prKlick(7, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, prOy() + GUI_GET_Y(spMs) + 6)
+    prKlick(10, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, prOy() + GUI_GET_Y(spMs) + 6)
+    prKlick(13, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, prOy() + GUI_GET_Y(spMs) + 6)
+    prKlick(16, GUI_GET_X(spMs) + GUI_GET_W(spMs) - 8, prOy() + GUI_GET_Y(spMs) + 6)
+    prKnopf(24, GUI_TOOLBAR_ITEM_X(tb, tbSichern), prOy() + GUI_GET_Y(tb) + 7, GUI_TOOLBAR_ITEM_W(tb, tbSichern))
+    prKnopf(34, GUI_TOOLBAR_ITEM_X(tb, tbNeu), prOy() + GUI_GET_Y(tb) + 7, GUI_TOOLBAR_ITEM_W(tb, tbNeu))
     prKnopf(44, GUI_WINDOW_GET_X(winNeu) + GUI_GET_X(bNeuOk), GUI_WINDOW_GET_Y(winNeu) + GUI_GET_Y(bNeuOk), 90)
-    prKnopf(64, GUI_GET_X(bOeffnen), GUI_GET_Y(bNeu), GUI_GET_W(bOeffnen))
+    prKnopf(64, GUI_TOOLBAR_ITEM_X(tb, tbOeffnen), prOy() + GUI_GET_Y(tb) + 7, GUI_TOOLBAR_ITEM_W(tb, tbOeffnen))
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -8200,6 +8360,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -8323,11 +8487,11 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
-    prKnopf(4, GUI_GET_X(bAnimNeu), GUI_GET_Y(bAnimNeu), 100)
-    prKnopf(14, GUI_GET_X(bSichern), GUI_GET_Y(bNeu), GUI_GET_W(bSichern))
-    prKnopf(24, GUI_GET_X(bNeu), GUI_GET_Y(bNeu), GUI_GET_W(bNeu))
+    prKnopf(4, GUI_GET_X(bAnimNeu), prOy() + GUI_GET_Y(bAnimNeu), 100)
+    prKnopf(14, GUI_TOOLBAR_ITEM_X(tb, tbSichern), prOy() + GUI_GET_Y(tb) + 7, GUI_TOOLBAR_ITEM_W(tb, tbSichern))
+    prKnopf(24, GUI_TOOLBAR_ITEM_X(tb, tbNeu), prOy() + GUI_GET_Y(tb) + 7, GUI_TOOLBAR_ITEM_W(tb, tbNeu))
     prKnopf(34, GUI_WINDOW_GET_X(winNeu) + GUI_GET_X(bNeuOk), GUI_WINDOW_GET_Y(winNeu) + GUI_GET_Y(bNeuOk), 90)
-    prKnopf(54, GUI_GET_X(bOeffnen), GUI_GET_Y(bNeu), GUI_GET_W(bOeffnen))
+    prKnopf(54, GUI_TOOLBAR_ITEM_X(tb, tbOeffnen), prOy() + GUI_GET_Y(tb) + 7, GUI_TOOLBAR_ITEM_W(tb, tbOeffnen))
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -8411,6 +8575,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -8560,11 +8728,11 @@ SUB prFall()
     DIM t AS INTEGER : t = 1
     DIM n AS INTEGER
     FOR n = 1 TO 70
-        prKnopf(t, GUI_GET_X(bBildNeu), GUI_GET_Y(bBildNeu), 78)
+        prKnopf(t, GUI_GET_X(bBildNeu), prOy() + GUI_GET_Y(bBildNeu), 78)
         t = t + 4
     NEXT
     FOR n = 1 TO 10
-        prKnopf(t, GUI_GET_X(bEbNeu), GUI_GET_Y(bEbNeu), 78)
+        prKnopf(t, GUI_GET_X(bEbNeu), prOy() + GUI_GET_Y(bEbNeu), 78)
         t = t + 4
     NEXT
     prEnde = t + 4
@@ -8636,6 +8804,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -8782,15 +8954,15 @@ FUNCTION prGemalt(i AS INTEGER, k AS INTEGER) AS INTEGER
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER : t = 1
-    prKnopf(t, GUI_GET_X(bBildNeu), GUI_GET_Y(bBildNeu), 78)
+    prKnopf(t, GUI_GET_X(bBildNeu), prOy() + GUI_GET_Y(bBildNeu), 78)
     t = t + 4
     t = t + prStrich(t, 3, 2, 9) + 3
-    prKnopf(t, GUI_GET_X(bBildWeg), GUI_GET_Y(bBildWeg), 70)
+    prKnopf(t, GUI_GET_X(bBildWeg), prOy() + GUI_GET_Y(bBildWeg), 70)
     t = t + 4
-    prKnopf(t, GUI_GET_X(bGroesse), GUI_GET_Y(bGroesse), 128)
+    prKnopf(t, GUI_GET_X(bGroesse), prOy() + GUI_GET_Y(bGroesse), 128)
     prKnopf(t + 6, GUI_WINDOW_GET_X(winGr) + GUI_GET_X(bGrOk), GUI_WINDOW_GET_Y(winGr) + GUI_GET_Y(bGrOk), 128)
     t = t + 12
-    prKnopf(t, GUI_GET_X(bBildNeu), GUI_GET_Y(bBildNeu), 78)
+    prKnopf(t, GUI_GET_X(bBildNeu), prOy() + GUI_GET_Y(bBildNeu), 78)
     prEnde = t + 6
     prAbspielen()
 END SUB
@@ -8871,6 +9043,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -9017,12 +9193,12 @@ FUNCTION prGemalt(i AS INTEGER, k AS INTEGER) AS INTEGER
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER : t = 1
-    prKnopf(t, GUI_GET_X(bEbNeu), GUI_GET_Y(bEbNeu), 78)
+    prKnopf(t, GUI_GET_X(bEbNeu), prOy() + GUI_GET_Y(bEbNeu), 78)
     t = t + 4
     t = t + prStrich(t, 3, 2, 9) + 3
-    prKnopf(t, GUI_GET_X(bEbWeg), GUI_GET_Y(bEbWeg), 70)
+    prKnopf(t, GUI_GET_X(bEbWeg), prOy() + GUI_GET_Y(bEbWeg), 70)
     t = t + 4
-    prKnopf(t, GUI_GET_X(bEbNeu), GUI_GET_Y(bEbNeu), 78)
+    prKnopf(t, GUI_GET_X(bEbNeu), prOy() + GUI_GET_Y(bEbNeu), 78)
     prEnde = t + 6
     prAbspielen()
 END SUB
@@ -9090,6 +9266,10 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
     prE(f + 3, 1, code, 0)
     prE(f + 5, 1, 341, 0)
 END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
 END FUNCTION
@@ -9236,12 +9416,12 @@ FUNCTION prGemalt(i AS INTEGER, k AS INTEGER) AS INTEGER
 END FUNCTION
 SUB prFall()
     DIM t AS INTEGER : t = 1
-    prKnopf(t, GUI_GET_X(bBildNeu), GUI_GET_Y(bBildNeu), 78)
+    prKnopf(t, GUI_GET_X(bBildNeu), prOy() + GUI_GET_Y(bBildNeu), 78)
     t = t + 4
     t = t + prStrich(t, 3, 2, 9) + 3
-    prKnopf(t, GUI_GET_X(bBildWeg), GUI_GET_Y(bBildWeg), 70)
+    prKnopf(t, GUI_GET_X(bBildWeg), prOy() + GUI_GET_Y(bBildWeg), 70)
     t = t + 4
-    prKnopf(t, GUI_GET_X(bBildNeu), GUI_GET_Y(bBildNeu), 78)
+    prKnopf(t, GUI_GET_X(bBildNeu), prOy() + GUI_GET_Y(bBildNeu), 78)
     prEnde = t + 6
     prAbspielen()
 END SUB
@@ -9265,3 +9445,778 @@ DHRT_FRAMES=40
 --- inhalt _programm/probe.txt
 |bild 2 gemalt 7|
 |bilder 2 gemalt 0|
+
+=== die deckkraft der ebene gilt im streifen und steht im dhsprite
+' Der Regler stellt die Deckkraft der gewaehlten Ebene ein. Sie aendert die
+' Pixel nicht, gilt aber in jeder Ausgabe -- und das .dhsprite traegt sie,
+' damit sie nach dem Oeffnen wieder da ist.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prG AS INTEGER : prG = 0
+DIM prD AS INTEGER : prD = 0
+DIM prL AS INTEGER : prL = 0
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prE4 AS INTEGER : prE4 = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prKnopf(f AS INTEGER, x AS INTEGER, y AS INTEGER, breite AS INTEGER)
+    ' Mitte eines Knopfes -- die Lage ist seine linke obere Ecke.
+    prKlick(f, x + breite \ 2, y + 14)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER)
+    prE(f, 2, code, 0)
+    prE(f + 1, 1, code, 0)
+END SUB
+SUB prStrg(f AS INTEGER, code AS INTEGER)
+    ' Strg in JEDEM Bild; der Buchstabe hat seine Flanke, waehrend Strg steht.
+    DIM i AS INTEGER
+    FOR i = 0 TO 4
+        prE(f + i, 2, 341, 0)
+    NEXT
+    prE(f + 2, 2, code, 0)
+    prE(f + 3, 1, code, 0)
+    prE(f + 5, 1, 341, 0)
+END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
+FUNCTION prMx(x AS INTEGER) AS INTEGER
+    RETURN ox + x * zoom + zoom \ 2
+END FUNCTION
+FUNCTION prMy(y AS INTEGER) AS INTEGER
+    RETURN oy + y * zoom + zoom \ 2
+END FUNCTION
+SUB prZugPunkte(f AS INTEGER, xs AS ARRAY OF INTEGER, ys AS ARRAY OF INTEGER)
+    ' Ein Mausweg in Bildpunkten; der Knopf wird in JEDEM Bild gemeldet.
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(xs) - 1
+        prE(f + i, 7, prMx(xs[i]), prMy(ys[i]))
+        prE(f + i, 6, 0, 0)
+    NEXT
+    prE(f + LEN(xs), 5, 0, 0)
+END SUB
+FUNCTION prStrich(f AS INTEGER, y AS INTEGER, von AS INTEGER, bis AS INTEGER) AS INTEGER
+    ' Waagerechter Strich x = von .. bis - 1; liefert die Zahl der Punkte.
+    DIM xs AS ARRAY OF INTEGER : xs = []
+    DIM ys AS ARRAY OF INTEGER : ys = []
+    DIM x AS INTEGER
+    FOR x = von TO bis - 1
+        ARRAY_PUSH(xs, x) : ARRAY_PUSH(ys, y)
+    NEXT
+    prZugPunkte(f, xs, ys)
+    RETURN LEN(xs)
+END FUNCTION
+FUNCTION prDreieck(f AS INTEGER) AS INTEGER
+    ' Ein Weg um das Dreieck (2,2)-(20,2)-(2,20), je Kante 7 Punkte.
+    DIM ex AS ARRAY OF INTEGER : ex = [2, 20, 2]
+    DIM ey AS ARRAY OF INTEGER : ey = [2, 2, 20]
+    DIM xs AS ARRAY OF INTEGER : xs = []
+    DIM ys AS ARRAY OF INTEGER : ys = []
+    DIM i AS INTEGER
+    DIM t AS INTEGER
+    FOR i = 0 TO 2
+        DIM ax AS INTEGER : ax = ex[i]
+        DIM ay AS INTEGER : ay = ey[i]
+        DIM bx AS INTEGER : bx = ex[(i + 1) MOD 3]
+        DIM by AS INTEGER : by = ey[(i + 1) MOD 3]
+        FOR t = 0 TO 6
+            ARRAY_PUSH(xs, INT(ROUND(ax + (bx - ax) * t / 7.0)))
+            ARRAY_PUSH(ys, INT(ROUND(ay + (by - ay) * t / 7.0)))
+        NEXT
+    NEXT
+    prZugPunkte(f, xs, ys)
+    RETURN LEN(xs)
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prZaehlen()
+    ' Gemalt auf der aktiven Ebene, davon ausserhalb der Auswahl, und Loecher
+    ' (nicht gewaehlte Punkte zwischen gewaehlten Nachbarn einer Zeile).
+    prG = 0 : prD = 0 : prL = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO gh - 1
+        FOR x = 0 TO gw - 1
+            IF GETALPHA(ebene[aktBild, aktEb], x, y) > 0 THEN
+                prG = prG + 1
+                IF NOT gewaehlt(x, y) THEN prD = prD + 1
+            END IF
+        NEXT
+    NEXT
+    IF selAn THEN
+        FOR y = selY TO selY + selH - 1
+            DIM links AS BOOLEAN : links = FALSE
+            DIM luecke AS INTEGER : luecke = 0
+            FOR x = selX TO selX + selB - 1
+                IF gewaehlt(x, y) THEN
+                    prL = prL + luecke
+                    luecke = 0
+                    links = TRUE
+                ELSE
+                    IF links THEN luecke = luecke + 1
+                END IF
+            NEXT
+        NEXT
+    END IF
+END SUB
+FUNCTION prEcken$() AS STRING
+    RETURN STR$(GETALPHA(ebene[0, 0], 0, 0)) + " " + STR$(GETALPHA(ebene[0, 0], gw - 1, 0)) + " " + _
+           STR$(GETALPHA(ebene[0, 0], gw - 1, gh - 1)) + " " + STR$(GETALPHA(ebene[0, 0], 0, gh - 1))
+END FUNCTION
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+SUB prFall()
+    IMAGE_FILL_RECT(ebene[0, 0], 0, 0, 3, 3, &HFF0000)
+    GUI_SET_VALUE(slDeck, 50.0)
+    prStart = prBild
+END SUB
+SUB prProbe(k AS INTEGER)
+    IF k = 4 THEN
+        baueStreifen()
+        prMerke("deck " + STR$(ebDeck[0]) + " streifen " + STR$(GETALPHA(streifen, 1, 1)) + " ebene " + STR$(GETALPHA(ebene[0, 0], 1, 1)))
+        nativSichern("probe.dhsprite")
+        ebDeck[0] = 255
+        nativLaden("probe.dhsprite")
+    END IF
+    IF k = 8 THEN prSchreib("geladen " + STR$(ebDeck[0]) + " regler " + STR$(INT(GUI_VALUE(slDeck) + 0.5)) + " ungesichert " + IIF(ungesichert, "ja", "nein"))
+END SUB
+--- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe(prBild - prStart)
+
+--- umgebung
+DHRT_FRAMES=14
+--- inhalt _programm/probe.txt
+|deck 127 streifen 127 ebene 255|
+|geladen 127 regler 50 ungesichert nein|
+
+=== ein klick in die bildleiste waehlt das einzelbild
+' Zwei neue Bilder ([Neu] rechts), dann ein Klick auf das erste Bild in der
+' Leiste unter der Zeichenflaeche.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prG AS INTEGER : prG = 0
+DIM prD AS INTEGER : prD = 0
+DIM prL AS INTEGER : prL = 0
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prE4 AS INTEGER : prE4 = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prKnopf(f AS INTEGER, x AS INTEGER, y AS INTEGER, breite AS INTEGER)
+    ' Mitte eines Knopfes -- die Lage ist seine linke obere Ecke.
+    prKlick(f, x + breite \ 2, y + 14)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER)
+    prE(f, 2, code, 0)
+    prE(f + 1, 1, code, 0)
+END SUB
+SUB prStrg(f AS INTEGER, code AS INTEGER)
+    ' Strg in JEDEM Bild; der Buchstabe hat seine Flanke, waehrend Strg steht.
+    DIM i AS INTEGER
+    FOR i = 0 TO 4
+        prE(f + i, 2, 341, 0)
+    NEXT
+    prE(f + 2, 2, code, 0)
+    prE(f + 3, 1, code, 0)
+    prE(f + 5, 1, 341, 0)
+END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
+FUNCTION prMx(x AS INTEGER) AS INTEGER
+    RETURN ox + x * zoom + zoom \ 2
+END FUNCTION
+FUNCTION prMy(y AS INTEGER) AS INTEGER
+    RETURN oy + y * zoom + zoom \ 2
+END FUNCTION
+SUB prZugPunkte(f AS INTEGER, xs AS ARRAY OF INTEGER, ys AS ARRAY OF INTEGER)
+    ' Ein Mausweg in Bildpunkten; der Knopf wird in JEDEM Bild gemeldet.
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(xs) - 1
+        prE(f + i, 7, prMx(xs[i]), prMy(ys[i]))
+        prE(f + i, 6, 0, 0)
+    NEXT
+    prE(f + LEN(xs), 5, 0, 0)
+END SUB
+FUNCTION prStrich(f AS INTEGER, y AS INTEGER, von AS INTEGER, bis AS INTEGER) AS INTEGER
+    ' Waagerechter Strich x = von .. bis - 1; liefert die Zahl der Punkte.
+    DIM xs AS ARRAY OF INTEGER : xs = []
+    DIM ys AS ARRAY OF INTEGER : ys = []
+    DIM x AS INTEGER
+    FOR x = von TO bis - 1
+        ARRAY_PUSH(xs, x) : ARRAY_PUSH(ys, y)
+    NEXT
+    prZugPunkte(f, xs, ys)
+    RETURN LEN(xs)
+END FUNCTION
+FUNCTION prDreieck(f AS INTEGER) AS INTEGER
+    ' Ein Weg um das Dreieck (2,2)-(20,2)-(2,20), je Kante 7 Punkte.
+    DIM ex AS ARRAY OF INTEGER : ex = [2, 20, 2]
+    DIM ey AS ARRAY OF INTEGER : ey = [2, 2, 20]
+    DIM xs AS ARRAY OF INTEGER : xs = []
+    DIM ys AS ARRAY OF INTEGER : ys = []
+    DIM i AS INTEGER
+    DIM t AS INTEGER
+    FOR i = 0 TO 2
+        DIM ax AS INTEGER : ax = ex[i]
+        DIM ay AS INTEGER : ay = ey[i]
+        DIM bx AS INTEGER : bx = ex[(i + 1) MOD 3]
+        DIM by AS INTEGER : by = ey[(i + 1) MOD 3]
+        FOR t = 0 TO 6
+            ARRAY_PUSH(xs, INT(ROUND(ax + (bx - ax) * t / 7.0)))
+            ARRAY_PUSH(ys, INT(ROUND(ay + (by - ay) * t / 7.0)))
+        NEXT
+    NEXT
+    prZugPunkte(f, xs, ys)
+    RETURN LEN(xs)
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prZaehlen()
+    ' Gemalt auf der aktiven Ebene, davon ausserhalb der Auswahl, und Loecher
+    ' (nicht gewaehlte Punkte zwischen gewaehlten Nachbarn einer Zeile).
+    prG = 0 : prD = 0 : prL = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO gh - 1
+        FOR x = 0 TO gw - 1
+            IF GETALPHA(ebene[aktBild, aktEb], x, y) > 0 THEN
+                prG = prG + 1
+                IF NOT gewaehlt(x, y) THEN prD = prD + 1
+            END IF
+        NEXT
+    NEXT
+    IF selAn THEN
+        FOR y = selY TO selY + selH - 1
+            DIM links AS BOOLEAN : links = FALSE
+            DIM luecke AS INTEGER : luecke = 0
+            FOR x = selX TO selX + selB - 1
+                IF gewaehlt(x, y) THEN
+                    prL = prL + luecke
+                    luecke = 0
+                    links = TRUE
+                ELSE
+                    IF links THEN luecke = luecke + 1
+                END IF
+            NEXT
+        NEXT
+    END IF
+END SUB
+FUNCTION prEcken$() AS STRING
+    RETURN STR$(GETALPHA(ebene[0, 0], 0, 0)) + " " + STR$(GETALPHA(ebene[0, 0], gw - 1, 0)) + " " + _
+           STR$(GETALPHA(ebene[0, 0], gw - 1, gh - 1)) + " " + STR$(GETALPHA(ebene[0, 0], 0, gh - 1))
+END FUNCTION
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+SUB prFall()
+    prKnopf(2, GUI_GET_X(bBildNeu), prOy() + GUI_GET_Y(bBildNeu), 78)
+    prKnopf(6, GUI_GET_X(bBildNeu), prOy() + GUI_GET_Y(bBildNeu), 78)
+    prKlick(12, GUI_CANVAS_X(bildLeiste) + 6 + 30, GUI_CANVAS_Y(bildLeiste) + 6 + 30)
+    prAbspielen()
+END SUB
+SUB prProbe(k AS INTEGER)
+    IF k = 10 THEN prMerke("vorher " + STR$(aktBild) + " von " + STR$(anzBild))
+    IF k >= 18 THEN prSchreib("jetzt " + STR$(aktBild) + " liste " + STR$(GUI_LISTBOX_SELECTED(lstBild)))
+END SUB
+--- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe(prBild - prStart)
+
+--- umgebung
+DHRT_FRAMES=24
+--- inhalt _programm/probe.txt
+|vorher 2 von 3|
+|jetzt 0 liste 0|
+
+=== die zuletzt benutzten farben merken sich das gemalte
+' Erst gruen, dann blau gemalt: vorn steht blau, dahinter gruen -- und ein
+' Klick auf das zweite Feld holt gruen zurueck.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prG AS INTEGER : prG = 0
+DIM prD AS INTEGER : prD = 0
+DIM prL AS INTEGER : prL = 0
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prE4 AS INTEGER : prE4 = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prKnopf(f AS INTEGER, x AS INTEGER, y AS INTEGER, breite AS INTEGER)
+    ' Mitte eines Knopfes -- die Lage ist seine linke obere Ecke.
+    prKlick(f, x + breite \ 2, y + 14)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER)
+    prE(f, 2, code, 0)
+    prE(f + 1, 1, code, 0)
+END SUB
+SUB prStrg(f AS INTEGER, code AS INTEGER)
+    ' Strg in JEDEM Bild; der Buchstabe hat seine Flanke, waehrend Strg steht.
+    DIM i AS INTEGER
+    FOR i = 0 TO 4
+        prE(f + i, 2, 341, 0)
+    NEXT
+    prE(f + 2, 2, code, 0)
+    prE(f + 3, 1, code, 0)
+    prE(f + 5, 1, 341, 0)
+END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
+FUNCTION prMx(x AS INTEGER) AS INTEGER
+    RETURN ox + x * zoom + zoom \ 2
+END FUNCTION
+FUNCTION prMy(y AS INTEGER) AS INTEGER
+    RETURN oy + y * zoom + zoom \ 2
+END FUNCTION
+SUB prZugPunkte(f AS INTEGER, xs AS ARRAY OF INTEGER, ys AS ARRAY OF INTEGER)
+    ' Ein Mausweg in Bildpunkten; der Knopf wird in JEDEM Bild gemeldet.
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(xs) - 1
+        prE(f + i, 7, prMx(xs[i]), prMy(ys[i]))
+        prE(f + i, 6, 0, 0)
+    NEXT
+    prE(f + LEN(xs), 5, 0, 0)
+END SUB
+FUNCTION prStrich(f AS INTEGER, y AS INTEGER, von AS INTEGER, bis AS INTEGER) AS INTEGER
+    ' Waagerechter Strich x = von .. bis - 1; liefert die Zahl der Punkte.
+    DIM xs AS ARRAY OF INTEGER : xs = []
+    DIM ys AS ARRAY OF INTEGER : ys = []
+    DIM x AS INTEGER
+    FOR x = von TO bis - 1
+        ARRAY_PUSH(xs, x) : ARRAY_PUSH(ys, y)
+    NEXT
+    prZugPunkte(f, xs, ys)
+    RETURN LEN(xs)
+END FUNCTION
+FUNCTION prDreieck(f AS INTEGER) AS INTEGER
+    ' Ein Weg um das Dreieck (2,2)-(20,2)-(2,20), je Kante 7 Punkte.
+    DIM ex AS ARRAY OF INTEGER : ex = [2, 20, 2]
+    DIM ey AS ARRAY OF INTEGER : ey = [2, 2, 20]
+    DIM xs AS ARRAY OF INTEGER : xs = []
+    DIM ys AS ARRAY OF INTEGER : ys = []
+    DIM i AS INTEGER
+    DIM t AS INTEGER
+    FOR i = 0 TO 2
+        DIM ax AS INTEGER : ax = ex[i]
+        DIM ay AS INTEGER : ay = ey[i]
+        DIM bx AS INTEGER : bx = ex[(i + 1) MOD 3]
+        DIM by AS INTEGER : by = ey[(i + 1) MOD 3]
+        FOR t = 0 TO 6
+            ARRAY_PUSH(xs, INT(ROUND(ax + (bx - ax) * t / 7.0)))
+            ARRAY_PUSH(ys, INT(ROUND(ay + (by - ay) * t / 7.0)))
+        NEXT
+    NEXT
+    prZugPunkte(f, xs, ys)
+    RETURN LEN(xs)
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prZaehlen()
+    ' Gemalt auf der aktiven Ebene, davon ausserhalb der Auswahl, und Loecher
+    ' (nicht gewaehlte Punkte zwischen gewaehlten Nachbarn einer Zeile).
+    prG = 0 : prD = 0 : prL = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO gh - 1
+        FOR x = 0 TO gw - 1
+            IF GETALPHA(ebene[aktBild, aktEb], x, y) > 0 THEN
+                prG = prG + 1
+                IF NOT gewaehlt(x, y) THEN prD = prD + 1
+            END IF
+        NEXT
+    NEXT
+    IF selAn THEN
+        FOR y = selY TO selY + selH - 1
+            DIM links AS BOOLEAN : links = FALSE
+            DIM luecke AS INTEGER : luecke = 0
+            FOR x = selX TO selX + selB - 1
+                IF gewaehlt(x, y) THEN
+                    prL = prL + luecke
+                    luecke = 0
+                    links = TRUE
+                ELSE
+                    IF links THEN luecke = luecke + 1
+                END IF
+            NEXT
+        NEXT
+    END IF
+END SUB
+FUNCTION prEcken$() AS STRING
+    RETURN STR$(GETALPHA(ebene[0, 0], 0, 0)) + " " + STR$(GETALPHA(ebene[0, 0], gw - 1, 0)) + " " + _
+           STR$(GETALPHA(ebene[0, 0], gw - 1, gh - 1)) + " " + STR$(GETALPHA(ebene[0, 0], 0, gh - 1))
+END FUNCTION
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+SUB prFall()
+    GUI_SET_PICKED_COLOR(cp, &H00FF00)
+    prKlick(2, prMx(4), prMy(4))
+    prKlick(14, prMx(8), prMy(8))
+    prKlick(22, GUI_CANVAS_X(zuletztFl) + 26 + 10, GUI_CANVAS_Y(zuletztFl) + 12)
+    prAbspielen()
+END SUB
+SUB prProbe(k AS INTEGER)
+    IF k = 8 THEN GUI_SET_PICKED_COLOR(cp, &H0000FF)
+    IF k = 18 THEN prMerke("zuletzt " + STR$(LEN(zuFarben)) + " vorn " + COLOR_HEX$(zuFarben[0]) + " dann " + COLOR_HEX$(zuFarben[1]))
+    IF k >= 28 THEN prSchreib("farbe " + COLOR_HEX$(farbe))
+END SUB
+--- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe(prBild - prStart)
+
+--- umgebung
+DHRT_FRAMES=34
+--- inhalt _programm/probe.txt
+|zuletzt 2 vorn #0000FF dann #00FF00|
+|farbe #00FF00|
+
+=== die werkzeugspalte waehlt das werkzeug
+' Ein Klick auf das Linien-Sinnbild in der Spalte neben der Zeichenflaeche.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prG AS INTEGER : prG = 0
+DIM prD AS INTEGER : prD = 0
+DIM prL AS INTEGER : prL = 0
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prE4 AS INTEGER : prE4 = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prKnopf(f AS INTEGER, x AS INTEGER, y AS INTEGER, breite AS INTEGER)
+    ' Mitte eines Knopfes -- die Lage ist seine linke obere Ecke.
+    prKlick(f, x + breite \ 2, y + 14)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER)
+    prE(f, 2, code, 0)
+    prE(f + 1, 1, code, 0)
+END SUB
+SUB prStrg(f AS INTEGER, code AS INTEGER)
+    ' Strg in JEDEM Bild; der Buchstabe hat seine Flanke, waehrend Strg steht.
+    DIM i AS INTEGER
+    FOR i = 0 TO 4
+        prE(f + i, 2, 341, 0)
+    NEXT
+    prE(f + 2, 2, code, 0)
+    prE(f + 3, 1, code, 0)
+    prE(f + 5, 1, 341, 0)
+END SUB
+' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
+FUNCTION prOy() AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+END FUNCTION
+FUNCTION prMx(x AS INTEGER) AS INTEGER
+    RETURN ox + x * zoom + zoom \ 2
+END FUNCTION
+FUNCTION prMy(y AS INTEGER) AS INTEGER
+    RETURN oy + y * zoom + zoom \ 2
+END FUNCTION
+SUB prZugPunkte(f AS INTEGER, xs AS ARRAY OF INTEGER, ys AS ARRAY OF INTEGER)
+    ' Ein Mausweg in Bildpunkten; der Knopf wird in JEDEM Bild gemeldet.
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(xs) - 1
+        prE(f + i, 7, prMx(xs[i]), prMy(ys[i]))
+        prE(f + i, 6, 0, 0)
+    NEXT
+    prE(f + LEN(xs), 5, 0, 0)
+END SUB
+FUNCTION prStrich(f AS INTEGER, y AS INTEGER, von AS INTEGER, bis AS INTEGER) AS INTEGER
+    ' Waagerechter Strich x = von .. bis - 1; liefert die Zahl der Punkte.
+    DIM xs AS ARRAY OF INTEGER : xs = []
+    DIM ys AS ARRAY OF INTEGER : ys = []
+    DIM x AS INTEGER
+    FOR x = von TO bis - 1
+        ARRAY_PUSH(xs, x) : ARRAY_PUSH(ys, y)
+    NEXT
+    prZugPunkte(f, xs, ys)
+    RETURN LEN(xs)
+END FUNCTION
+FUNCTION prDreieck(f AS INTEGER) AS INTEGER
+    ' Ein Weg um das Dreieck (2,2)-(20,2)-(2,20), je Kante 7 Punkte.
+    DIM ex AS ARRAY OF INTEGER : ex = [2, 20, 2]
+    DIM ey AS ARRAY OF INTEGER : ey = [2, 2, 20]
+    DIM xs AS ARRAY OF INTEGER : xs = []
+    DIM ys AS ARRAY OF INTEGER : ys = []
+    DIM i AS INTEGER
+    DIM t AS INTEGER
+    FOR i = 0 TO 2
+        DIM ax AS INTEGER : ax = ex[i]
+        DIM ay AS INTEGER : ay = ey[i]
+        DIM bx AS INTEGER : bx = ex[(i + 1) MOD 3]
+        DIM by AS INTEGER : by = ey[(i + 1) MOD 3]
+        FOR t = 0 TO 6
+            ARRAY_PUSH(xs, INT(ROUND(ax + (bx - ax) * t / 7.0)))
+            ARRAY_PUSH(ys, INT(ROUND(ay + (by - ay) * t / 7.0)))
+        NEXT
+    NEXT
+    prZugPunkte(f, xs, ys)
+    RETURN LEN(xs)
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prZaehlen()
+    ' Gemalt auf der aktiven Ebene, davon ausserhalb der Auswahl, und Loecher
+    ' (nicht gewaehlte Punkte zwischen gewaehlten Nachbarn einer Zeile).
+    prG = 0 : prD = 0 : prL = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO gh - 1
+        FOR x = 0 TO gw - 1
+            IF GETALPHA(ebene[aktBild, aktEb], x, y) > 0 THEN
+                prG = prG + 1
+                IF NOT gewaehlt(x, y) THEN prD = prD + 1
+            END IF
+        NEXT
+    NEXT
+    IF selAn THEN
+        FOR y = selY TO selY + selH - 1
+            DIM links AS BOOLEAN : links = FALSE
+            DIM luecke AS INTEGER : luecke = 0
+            FOR x = selX TO selX + selB - 1
+                IF gewaehlt(x, y) THEN
+                    prL = prL + luecke
+                    luecke = 0
+                    links = TRUE
+                ELSE
+                    IF links THEN luecke = luecke + 1
+                END IF
+            NEXT
+        NEXT
+    END IF
+END SUB
+FUNCTION prEcken$() AS STRING
+    RETURN STR$(GETALPHA(ebene[0, 0], 0, 0)) + " " + STR$(GETALPHA(ebene[0, 0], gw - 1, 0)) + " " + _
+           STR$(GETALPHA(ebene[0, 0], gw - 1, gh - 1)) + " " + STR$(GETALPHA(ebene[0, 0], 0, gh - 1))
+END FUNCTION
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+SUB prFall()
+    prKlick(2, GUI_GET_X(wzKnopf[WZ_LINIE]) + 20, prOy() + GUI_GET_Y(wzKnopf[WZ_LINIE]) + 18)
+    prAbspielen()
+END SUB
+SUB prProbe(k AS INTEGER)
+    IF k >= 8 THEN prSchreib("werkzeug " + STR$(werkzeug) + " " + wzName[werkzeug])
+END SUB
+--- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe(prBild - prStart)
+
+--- umgebung
+DHRT_FRAMES=14
+--- inhalt _programm/probe.txt
+|werkzeug 3 Linie|

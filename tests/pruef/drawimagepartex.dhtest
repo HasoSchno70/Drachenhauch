@@ -1,0 +1,43 @@
+' DRAWIMAGEPARTEX mit Toenung (2026-10-29, fuer die Deckkraft je Ebene im
+' Sprite-Editor): das zehnte Argument ist eine Farbe, ihr Alpha die
+' Deckkraft. Weisses Bild halb durchsichtig auf Schwarz = Grau; ohne Farbe
+' bleibt es weiss wie vorher.
+
+=== halb durchsichtig gibt grau
+SCREEN(100, 100, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM b AS IMAGE : b = IMAGE_NEW(4, 4, &HFFFFFF)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    DRAWIMAGEPARTEX(b, 0, 0, 4, 4, 10, 10, 40, 40, RGBA(255, 255, 255, 128))
+    DRAWIMAGEPARTEX(b, 0, 0, 4, 4, 50, 50, 40, 40)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+30 30 #808080 +-6
+70 70 #FFFFFF +-2
+5 5 #000000 +-2
+
+=== eine farbe toent das bild
+SCREEN(100, 100, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM b AS IMAGE : b = IMAGE_NEW(4, 4, &HFFFFFF)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    DRAWIMAGEPARTEX(b, 0, 0, 4, 4, 10, 10, 40, 40, &HFF0000)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+30 30 #FF0000 +-2
+
+=== zu viele argumente sind ein fehler
+SCREEN(100, 100, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM b AS IMAGE : b = IMAGE_NEW(4, 4, &HFFFFFF)
+DRAWIMAGEPARTEX(b, 0, 0, 4, 4, 10, 10, 40, 40, 0, 1)
+--- fehler
+DRAWIMAGEPARTEX

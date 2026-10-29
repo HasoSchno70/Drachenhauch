@@ -23,11 +23,13 @@ the built-in tileset `examples/assets/editor_tileset.png`.
 
 ## Layout
 
-At the top the toolbar (New, Open, Save, DH code, the six tools, Undo/Redo,
-switches "Gitter" (grid) and "Nummern" (numbers)). On the left the column
-with tileset choice, tile palette, layer list and below it — depending on the
-kind of the active layer — either the properties of the selected tile or the
-object list. On the right the map, at the bottom a status line.
+At the top the menu (Datei, Bearbeiten, Ansicht — File, Edit, View) and the
+toolbar with icons (New, Open, Save, DH code, the eight tools, Undo/Redo,
+grid, zoom). On the left the column with tileset choice, tile palette, layer
+list and below it — depending on the kind of the active layer — either the
+properties of the selected tile or the object list. On the right the map with
+the overview in the corner, at the bottom the status bar (message and file,
+position under the mouse, zoom). The interface writes in DejaVu Sans.
 
 ## Tools
 
@@ -36,11 +38,20 @@ object list. On the right the map, at the bottom a status line.
 | Pen | `P` | paints the selected tile, also while dragging |
 | Eraser | `E` | empties cells, also while dragging |
 | Fill | `F` | fills the connected area of identical tiles |
+| Line | `L` | dragging sets a line on release (Bresenham) |
 | Rectangle | `R` | dragging fills the rectangle on release |
+| Ellipse | `O` | dragging sets the outline of an ellipse on release |
 | Eyedropper | `I` | picks up the tile under the mouse |
 | Selection | `S` | drags a rectangle for the clipboard |
 
-The active tool has a coloured background in the toolbar. The eyedropper
+The active tool is pressed in the toolbar. Line and ellipse show cell by cell
+while dragging what will be set on release — it is the same calculation. The
+letters do not apply while an input field has the focus.
+
+**Stamp:** dragging a rectangle in the tile palette selects a block of
+several tiles; the pen then paints the whole block (fill, line, rectangle and
+ellipse take its first tile). A click in the palette or the eyedropper makes
+it a single tile again. The eyedropper
 also switches to the **tileset** the picked-up tile belongs to, and scrolls
 the palette so that it is visible — otherwise the next stroke would paint a
 different tile.
@@ -53,8 +64,12 @@ the map does not grow in the process. All of this only applies on tile
 layers.
 
 **View:** the mouse wheel over the map zooms (1 to 6, the point under the
-pointer stays put), the right mouse button or the arrow keys pan.
-"Nummern" (numbers) writes the tile number into each cell (from zoom 2;
+pointer stays put; in the menu `Strg+Plus`/`Strg+Minus`), the right or middle
+mouse button or the arrow keys pan. **Übersicht** (overview, `Strg+M`): the
+whole map small at the bottom right, each tile as its average colour, with the
+visible area as a frame — a click or drag in it jumps there, nothing is
+painted. **Gitter** (grid, `Strg+G`) in the toolbar, **Kachelnummern** (tile
+numbers) in the Ansicht menu write the number into each cell (from zoom 2;
 below that it would not be readable).
 
 **Undo/Redo:** `Strg+Z` / `Strg+Y` (Ctrl+Z / Ctrl+Y) or the buttons, 16
@@ -90,9 +105,11 @@ further down means further to the front. Below it:
   effect in the picture, not after the list. The tiles stay with their layer,
   and a recorded undo step moves along instead of writing into a foreign
   layer afterwards,
-- **sichtbar** (visible) — Tiled saves the visibility too, so it is more
-  than a display setting,
-- **Objekt-Ebene** (Object layer) creates a layer without tiles.
+- the **check box** in front of each layer is its visibility — Tiled saves
+  it too, so it is more than a display setting; clicking it does not select
+  the layer,
+- **Objekt-Ebene anlegen** (create object layer) creates a layer without
+  tiles.
 
 ## Object layers
 
@@ -181,6 +198,9 @@ What the Qt version could do and this editor cannot:
 keys: DH code including the image of the generated renderer (empty and
 painted map), the interpretation of property values, setting and removing
 `solid`, object layers (drag, click, select, `Entf`), several tilesets with
-eyedropper and palette scrolling, reordering the layers including undo. The
+eyedropper and palette scrolling, reordering the layers including undo;
+plus line and ellipse (cells and a dragged stroke with `Strg+Z`), the stamp
+from the palette, the check box in the layer list and the jump via the
+overview that paints nothing. The
 written file is read with the json module according to the rules of the
 Tiled format, not with the editor's own writer.

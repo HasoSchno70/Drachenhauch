@@ -18,7 +18,10 @@ dhrt run examples/189_sprite_editor.dh
 ```
 
 The editor starts full screen with an empty sprite of 32×32 pixels. It does
-not take a file on the command line, but through **[Oeffnen]** (Open).
+not take a file on the command line, but through **Öffnen** (Open, Datei menu
+or toolbar). At the top a menu (Datei, Bearbeiten, Bild, Ansicht — File,
+Edit, Image, View) and a toolbar, at the bottom the status bar (tool and
+message, frame and layer, zoom); the interface writes in DejaVu Sans.
 
 ## Operation
 
@@ -32,6 +35,7 @@ not take a file on the command line, but through **[Oeffnen]** (Open).
 | `1`..`6` | palette colour 1 to 6 |
 | `+` / `-` | brush larger / smaller (1 to 6 pixels) |
 | `Strg+Z` / `Strg+Y` | undo / redo (24 steps) |
+| `Strg+N` / `Strg+O` / `Strg+S` / `Strg+Q` (Ctrl+N / O / S / Q) | new / open / save / quit |
 | `Strg+C` / `Strg+X` / `Strg+V` | copy / cut / paste the selection |
 | `Strg+D` | clear the selection |
 | `Entf` | empty the selection |
@@ -46,8 +50,9 @@ gone there.
 
 ## Tools
 
-The toolbar at the top carries all twelve as buttons, next to them
-**[Zurueck]**/**[Vor]** (Undo/Redo) and the switches **gefuellt** (filled),
+The twelve tools stand as icons in a **column** to the left of the canvas;
+the selected one has a frame in the accent colour. In the toolbar at the top,
+next to file, outputs and undo/redo, the switches **Gefüllt** (filled),
 **Spiegel X**, **Spiegel Y** (mirror X/Y), **Zwiebelhaut** (onion skin) and
 **Raster** (grid).
 
@@ -82,7 +87,8 @@ their opacity in the process.
 ## Left column: colour, palette, canvas
 
 - **Farbe** (Colour) — a colour picker, below it the **palette** with 16
-  slots.
+  slots and **Zuletzt** (recent): the eight colours last used for painting,
+  the newest first — a click picks one again.
 - **[Palette laden]** / **[Palette sichern]** (Load/Save palette) — GIMP
   palettes (`.gpl`), the format spoken by GIMP, Aseprite, Krita and the
   palette collections on the web. When loading, malformed lines are skipped
@@ -95,9 +101,9 @@ their opacity in the process.
   colour, in total and per frame.
 - **[Zuschneiden]** (Crop) — to the content, measured over **all** layers,
   hidden ones too (otherwise content you just do not see would vanish).
-- **[Groesse aendern]** (Resize) — new width and height; an added border is
+- **[Größe ändern]** (Resize) — new width and height; an added border is
   transparent.
-- **[Spiegeln |]**, **[Spiegeln --]**, **[90 >]**, **[< 90]** — mirror and
+- **[↔]**, **[↕]**, **[↻ 90°]**, **[↺ 90°]** (also in the Bild menu) — mirror and
   rotate by quarter turns. All four apply to the **whole** sprite (all frames,
   all layers); a rotation swaps width and height. They are **not** in the
   history — it records one layer per step, and an undo afterwards would turn
@@ -110,7 +116,9 @@ their opacity in the process.
 ### Frames
 
 **[Neu]** (New) appends an empty frame, **[Kopie]** (Copy) a copy of the
-current one, **[Weg]** (Remove) removes it. **[Name]** gives the frame a
+current one, **[Weg]** (Remove) removes it. Below the canvas is the **frame
+strip**: each frame as a small picture of its visible layers, the current one
+centred and framed — a click selects it. **[Name]** gives the frame a
 name — it becomes its key in the atlas (`ATLAS_DRAW(atlas, "kopf", ...)`
 instead of `"bild_0"`). Names are identifiers: letters, digits, `_` and `-`
 are allowed, everything else becomes an underscore. A dot would not work,
@@ -125,9 +133,11 @@ GIF alike.
 ### Layers
 
 Layers apply to **all** frames, as in Aseprite: hiding a layer hides it
-everywhere. **[Neu]**, **[Weg]** and **sichtbar** (visible). Drawing happens
-on the selected layer; the display and all outputs except the `.dhsprite`
-show the visible layers combined.
+everywhere. **[Neu]**, **[Weg]** and **sichtbar** (visible). **Deckkraft**
+(opacity, 0..100 %) applies to the selected layer when drawing and in every
+output (PNG, strip, GIF); the layer's pixels themselves stay unchanged.
+Drawing happens on the selected layer; the display and all outputs except the
+`.dhsprite` show the visible layers combined.
 
 ### Preview and ranges
 
@@ -161,8 +171,9 @@ allocated in advance; the limit of 256 pixels depends on them.
 **[Sichern]** (Save) writes two files: the description `name.dhsprite`
 (JSON) and next to it the grid `name.dhsprite.png` — columns are the frames,
 rows the layers. Any image viewer opens the PNG; the JSON carries
-dimensions, layer names and visibility and, if present, frame names,
-individual durations and ranges:
+dimensions, layer names and visibility (a layer that is not opaque also
+`"deckkraft"` 1..255) and, if present, frame names, individual durations and
+ranges:
 
 ```json
 {
@@ -271,7 +282,7 @@ empty — when which state changes into which is a statement about the game.
 - Export scaling (1×–8×) for all image outputs.
 - Sheet import of an arbitrary PNG with the frame size given, pasting an
   image from the system clipboard as a new frame.
-- Layers per frame with opacity, reordering and merging.
+- Layers per frame, reordering and merging.
 - Frame operations on the frame list: reverse, append ping-pong, reduce to
   the current frame.
 - Replace colour, take the palette from the sprite, adjustable onion skin
@@ -285,4 +296,5 @@ with real mouse paths via recording playback: selection, lasso and magic
 wand, moving, palettes against a foreign reader, statistics, cropping,
 ranges, DH code and `.dhanim` (started or loaded by the runtime), atlas
 keys, rotating and mirroring, individual durations in the GIF and the limits
-of 64 frames and 8 layers.
+of 64 frames and 8 layers; plus the opacity in the strip and in the
+`.dhsprite`, the frame strip, the recently used colours and the tool column.

@@ -514,6 +514,7 @@ of 16 would have silently shortened a confirmed sentence).
 | `GETALPHA(img, x, y)` → INTEGER | opacity at `(x, y)`, `0..255`; `-1` for an index outside. Needed because `GETPIXEL` returns a **colour**, and there opacity 0 means *opaque* — a transparent pixel would come back as a black one |
 | `DRAWIMAGE(img, x, y)` | draw the image at (x, y) |
 | `DRAWIMAGEPART(img, sx, sy, sw, sh, x, y)` | draw a sub-rectangle from a sheet |
+| `DRAWIMAGEPARTEX(img, sx, sy, sw, sh, x, y, w, h [, farbe])` | a sub-rectangle stretched to `w` x `h`; `farbe` tints it, its alpha is the opacity (`RGBA(255, 255, 255, 128)` = half transparent) |
 | `DRAWIMAGEFLIPPED(img, x, y[, flipX[, flipY]])` | with mirroring |
 | `DRAWIMAGEROT(img, x, y, winkel[, skala[, tint]])` | **centred** on (x,y), rotated by `winkel` **degrees** (about the centre), optionally scaled + tinted. Ideal for rotated sprites / `physics2d` (`winkel = DEG(PHYS2D_BODY_ANGLE(...))`). Camera-aware. |
 | `DRAWIMAGE9(img, x, y, breite, hoehe, links, oben, rechts, unten[, tint])` | **9-slice**: the image stretched into the rectangle, the four corners at their own size, the edges in one direction only, the centre in both — for frames, panels and buttons that grow to any size without distorting. Edges in pixels of the image; if the target does not fit, the corners shrink proportionally. Camera-aware. |

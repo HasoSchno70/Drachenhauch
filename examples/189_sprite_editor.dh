@@ -112,13 +112,11 @@ SCREEN(1440, 900, "Drachenhauch - Sprite-Editor", 1)
 SET_FULLSCREEN(TRUE)
 SETFPS(60)
 
-DIM uiFont AS INTEGER : uiFont = -1
-DIM fp AS STRING
-FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf")
-    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 30)
-NEXT
-IF uiFont >= 0 THEN SETFONT(uiFont)
-TEXT_SIZE(15)
+' DejaVu Sans aus der Laufzeit; GUI_FONT haelt die Oberflaeche bei 15
+' Punkten, egal was in die Zeichenflaeche geschrieben wird.
+DIM uiFont AS INTEGER : uiFont = LOADFONT("sans", 32)
+SETFONT(uiFont, 15)
+GUI_FONT(uiFont, 15)
 GUI_THEME_PRESET("glas_dunkel")
 
 DIM SW AS INTEGER : SW = SCREENWIDTH()
@@ -146,6 +144,19 @@ DIM ebDa[MAXBILD, MAXEB] AS INTEGER
 DIM ungesichert AS BOOLEAN : ungesichert = FALSE
 DIM ebName[MAXEB] AS STRING
 DIM ebSicht[MAXEB] AS INTEGER
+' Deckkraft je Ebene, 1..255. Sie gilt beim Zeichnen UND bei jeder Ausgabe
+' (PNG, Streifen, GIF) -- die Pixel der Ebene selbst bleiben unberuehrt, im
+' .dhsprite steht sie als eigener Wert.
+DIM ebDeck[MAXEB] AS INTEGER
+
+' Die zuletzt benutzten Farben, die juengste vorn -- gemerkt, sobald mit
+' einer Farbe gemalt wird.
+DIM zuFarben AS ARRAY OF INTEGER : zuFarben = []
+
+' Ansicht und Formen, geschaltet in der Werkzeugleiste.
+DIM gefuellt AS BOOLEAN : gefuellt = FALSE
+DIM zwiebelAn AS BOOLEAN : zwiebelAn = FALSE
+DIM rasterAn AS BOOLEAN : rasterAn = TRUE
 
 DIM zoom AS INTEGER : zoom = 10
 DIM panX AS INTEGER : panX = 0
@@ -294,6 +305,23 @@ DIM schachbrett AS IMAGE
 DIM streifen AS IMAGE                  ' Arbeitsflaeche fuer den Export
 
 ' ============================================================ Hilfsmittel
+
+' Die Toenung, mit der eine Ebene gezeichnet und ausgegeben wird: weiss mit
+' ihrer Deckkraft. Deckend ist schlicht weiss (Alpha 0 = deckend).
+FUNCTION deckFarbe(k AS INTEGER) AS INTEGER
+    IF ebDeck[k] >= 255 OR ebDeck[k] <= 0 THEN RETURN &HFFFFFF
+    RETURN RGBA(255, 255, 255, ebDeck[k])
+END FUNCTION
+
+SUB farbeMerken(f AS INTEGER)
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(zuFarben, f)
+    IF i = 0 THEN RETURN
+    IF i > 0 THEN ARRAY_REMOVE_AT(zuFarben, i)
+    ARRAY_INSERT(zuFarben, 0, f)
+    WHILE LEN(zuFarben) > 8
+        ARRAY_REMOVE_AT(zuFarben, LEN(zuFarben) - 1)
+    WEND
+END SUB
 
 SUB kopiere(ziel AS IMAGE, quelle AS IMAGE)
     IMAGE_CLEAR(ziel)
@@ -722,6 +750,7 @@ SUB neuesSprite(b AS INTEGER, h AS INTEGER)
     FOR k = 0 TO MAXEB - 1
         ebName[k] = "Ebene " + STR$(k + 1)
         ebSicht[k] = 1
+        ebDeck[k] = 255
     NEXT
     hilfsbilderNeu(FALSE)          ' die alten hat der Block oben schon frei
     anzAnim = 0 : aktAnim = -1
@@ -1359,7 +1388,7 @@ SUB baueStreifen()
     FOR i = 0 TO anzBild - 1
         FOR k = 0 TO anzEb - 1
             IF ebSicht[k] = 1 THEN
-                IMAGE_DRAW_IMAGE(streifen, ebene[i, k], i * gw, 0)
+                IMAGE_DRAW_IMAGE(streifen, ebene[i, k], i * gw, 0, deckFarbe(k))
             END IF
         NEXT
     NEXT
@@ -1439,7 +1468,7 @@ SUB gifSichern(pfad AS STRING, fps AS FLOAT)
     FOR i = 0 TO anzBild - 1
         ausgabe[i] = IMAGE_NEW(gw, gh)
         FOR k = 0 TO anzEb - 1
-            IF ebSicht[k] = 1 THEN IMAGE_DRAW_IMAGE(ausgabe[i], ebene[i, k], 0, 0)
+            IF ebSicht[k] = 1 THEN IMAGE_DRAW_IMAGE(ausgabe[i], ebene[i, k], 0, 0, deckFarbe(k))
         NEXT
         zeiten[i] = dauerMs(i)
         IF bildMs[i] > 0 THEN eigene = eigene + 1
@@ -1486,6 +1515,9 @@ SUB nativSichern(pfad AS STRING)
         DIM e AS JSON_HANDLE : e = JSON_NEW_OBJECT()
         JSON_SET_STRING(e, "name", ebName[k])
         JSON_SET_BOOL(e, "sichtbar", ebSicht[k] = 1)
+        ' Nur wenn sie nicht deckend ist -- alte Leser kennen den Schluessel
+        ' nicht, und eine deckende Ebene braucht ihn nicht.
+        IF ebDeck[k] < 255 THEN JSON_SET_INT(e, "deckkraft", ebDeck[k])
         JSON_APPEND_JSON(h, "ebenen", e)
     NEXT
     ' Die Bereiche gehoeren zum Sprite, nicht zur Sitzung -- ohne sie waere
@@ -1572,6 +1604,8 @@ SUB nativLaden(pfad AS STRING)
                 ebName[k] = JSON_GET_STRING(h, "ebenen." + STR$(k) + ".name")
                 IF ebName[k] = "" THEN ebName[k] = "Ebene " + STR$(k + 1)
                 ebSicht[k] = IIF(JSON_GET_BOOL(h, "ebenen." + STR$(k) + ".sichtbar"), 1, 0)
+                ebDeck[k] = 255
+                IF JSON_HAS(h, "ebenen." + STR$(k) + ".deckkraft") THEN ebDeck[k] = MAX(1, MIN(255, JSON_GET_INT(h, "ebenen." + STR$(k) + ".deckkraft")))
                 FOR i = 0 TO anzBild - 1
                     IMAGE_DRAW_IMAGE(ebene[i, k], raster, 0, 0, i * bw, k * bh, bw, bh)
                 NEXT
@@ -1680,67 +1714,107 @@ END SUB
 CONST TB_H = 46
 CONST LINKS = 300
 CONST RECHTS = 340
+CONST WZ_SPALTE = 52           ' die Werkzeugspalte links neben der Zeichenflaeche
+CONST LEISTE_H = 84            ' die Bildleiste unter der Zeichenflaeche
 
 DIM win AS GUI_WINDOW
 win = GUI_WINDOW("Sprite", 0, 0, SW, SH)
 GUI_WINDOW_CHROME(win, FALSE)
+' Das Menue. Die Tastenkuerzel stehen hier und nirgends sonst -- eine
+' zusaetzliche KEYHIT-Abfrage derselben Taste liesse den Befehl zweimal
+' laufen. (Strg+C/X/V/D bleiben bei der Zeichenflaeche: sie haengen an der
+' Auswahl und gelten nur dort.)
+DIM mDatei AS INTEGER : mDatei = GUI_MENU(win, "Datei")
+DIM miNeu AS INTEGER : miNeu = GUI_MENU_ITEM(mDatei, "Neues Sprite …", "Strg+N")
+DIM miOeffnen AS INTEGER : miOeffnen = GUI_MENU_ITEM(mDatei, "Öffnen …", "Strg+O")
+DIM miSichern AS INTEGER : miSichern = GUI_MENU_ITEM(mDatei, "Sichern …", "Strg+S")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miPng AS INTEGER : miPng = GUI_MENU_ITEM(mDatei, "Einzelbild als PNG …")
+DIM miBlatt AS INTEGER : miBlatt = GUI_MENU_ITEM(mDatei, "Streifen + Atlas …")
+DIM miGif AS INTEGER : miGif = GUI_MENU_ITEM(mDatei, "Bewegtes GIF …")
+DIM miDhCode AS INTEGER : miDhCode = GUI_MENU_ITEM(mDatei, "DH-Code …")
+DIM miDhanim AS INTEGER : miDhanim = GUI_MENU_ITEM(mDatei, "Zustandsmaschine (.dhanim) …")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miEnde AS INTEGER : miEnde = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
+DIM mBearb AS INTEGER : mBearb = GUI_MENU(win, "Bearbeiten")
+DIM miZur AS INTEGER : miZur = GUI_MENU_ITEM(mBearb, "Rückgängig", "Strg+Z")
+DIM miVor AS INTEGER : miVor = GUI_MENU_ITEM(mBearb, "Wiederholen", "Strg+Y")
+DIM mBild AS INTEGER : mBild = GUI_MENU(win, "Bild")
+DIM miGroesse AS INTEGER : miGroesse = GUI_MENU_ITEM(mBild, "Größe ändern …")
+DIM miZuschnitt AS INTEGER : miZuschnitt = GUI_MENU_ITEM(mBild, "Auf den Inhalt zuschneiden")
+GUI_MENU_SEPARATOR(mBild)
+DIM miSpiegelX AS INTEGER : miSpiegelX = GUI_MENU_ITEM(mBild, "Waagerecht spiegeln")
+DIM miSpiegelY AS INTEGER : miSpiegelY = GUI_MENU_ITEM(mBild, "Senkrecht spiegeln")
+DIM miDrehR AS INTEGER : miDrehR = GUI_MENU_ITEM(mBild, "Nach rechts drehen")
+DIM miDrehL AS INTEGER : miDrehL = GUI_MENU_ITEM(mBild, "Nach links drehen")
+GUI_MENU_SEPARATOR(mBild)
+DIM miStat AS INTEGER : miStat = GUI_MENU_ITEM(mBild, "Statistik")
+DIM mAnsicht AS INTEGER : mAnsicht = GUI_MENU(win, "Ansicht")
+DIM miKacheln AS INTEGER : miKacheln = GUI_MENU_ITEM(mAnsicht, "Kachel-Ansicht 3 x 3")
+
+DIM INHALT_H AS INTEGER : INHALT_H = GUI_WINDOW_CONTENT_H(win)
+
 DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(win, 0, 0, SW, TB_H)
 GUI_SET_ANCHOR(tb, "lr")
-
-' Die Dateiknoepfe. Ihre Breiten sind gerechnet, nicht geraten -- der
-' "Oeffnen"-Knopf lag vorher UNTER dem ersten Werkzeug und war damit gar
-' nicht anklickbar. Das zeigt kein Test, nur das gerenderte Bild.
-DIM bNeu AS GUI_WIDGET     : bNeu     = GUI_BUTTON(win, "Neu", 10, 7, 52, 32)
-DIM bOeffnen AS GUI_WIDGET : bOeffnen = GUI_BUTTON(win, "Oeffnen", 66, 7, 74, 32)
-GUI_TOOLTIP(bOeffnen, "Eigenes Format (.dhsprite, mit Ebenen) ODER einen Streifen + Atlas")
-DIM bSichern AS GUI_WIDGET : bSichern = GUI_BUTTON(win, "Sichern", 144, 7, 74, 32)
-GUI_TOOLTIP(bSichern, "Eigenes Format .dhsprite -- behaelt Ebenen und Namen")
-DIM bPng AS GUI_WIDGET     : bPng     = GUI_BUTTON(win, "PNG", 222, 7, 52, 32)
-GUI_TOOLTIP(bPng, "Nur das aktuelle Einzelbild, zusammengerechnet")
-DIM bBlatt AS GUI_WIDGET   : bBlatt   = GUI_BUTTON(win, "Streifen", 278, 7, 86, 32)
-GUI_TOOLTIP(bBlatt, "Alle Einzelbilder nebeneinander als PNG + Atlas-JSON (ohne Ebenen)")
-DIM bGif AS GUI_WIDGET     : bGif     = GUI_BUTTON(win, "GIF", 368, 7, 52, 32)
-GUI_TOOLTIP(bGif, "Alle Einzelbilder als bewegtes GIF -- Tempo aus dem Regler, je Bild mit eigener Dauer die eigene")
-
-' Zwoelf Werkzeuge auf demselben Platz wie vorher neun: die Knopfbreite ist
-' aus der Zahl gerechnet, damit alles rechts davon (Zurueck/Vor, die
-' Schalter) stehen bleibt, wo es war.
-CONST WZ_B = 64
-DIM wzName AS ARRAY OF STRING
-wzName = SPLIT$("Stift|Radierer|Fuellen|Linie|Rechteck|Ellipse|Spruehen|Pipette|Auswahl|Lasso|Zauber|Schieben", "|")
-DIM wzKnopf[WZ_ANZ] AS GUI_WIDGET
-DIM wx AS INTEGER : wx = 432
+GUI_TOOLBAR_SET(tb, "beschriftung", 1)
+DIM tbNeu AS INTEGER : tbNeu = GUI_TOOLBAR_ADD(tb, "neu", "Neues Sprite (Strg+N)", "Neu")
+DIM tbOeffnen AS INTEGER : tbOeffnen = GUI_TOOLBAR_ADD(tb, "oeffnen", "Eigenes Format (.dhsprite, mit Ebenen) ODER einen Streifen + Atlas (Strg+O)", "Öffnen")
+DIM tbSichern AS INTEGER : tbSichern = GUI_TOOLBAR_ADD(tb, "sichern", "Eigenes Format .dhsprite -- behält Ebenen und Namen (Strg+S)", "Sichern")
+GUI_TOOLBAR_SEPARATOR(tb)
+DIM tbPng AS INTEGER : tbPng = GUI_TOOLBAR_ADD(tb, "export", "Nur das aktuelle Einzelbild, zusammengerechnet", "PNG")
+DIM tbBlatt AS INTEGER : tbBlatt = GUI_TOOLBAR_ADD(tb, "export", "Alle Einzelbilder nebeneinander als PNG + Atlas-JSON (ohne Ebenen)", "Streifen")
+DIM tbGif AS INTEGER : tbGif = GUI_TOOLBAR_ADD(tb, "start", "Alle Einzelbilder als bewegtes GIF -- Tempo aus dem Regler, je Bild mit eigener Dauer die eigene", "GIF")
+GUI_TOOLBAR_SEPARATOR(tb)
+DIM tbZur AS INTEGER : tbZur = GUI_TOOLBAR_ADD(tb, "rueckgaengig", "Rückgängig (Strg+Z)", "Zurück")
+DIM tbVor AS INTEGER : tbVor = GUI_TOOLBAR_ADD(tb, "wiederholen", "Wiederholen (Strg+Y)", "Vor")
+GUI_TOOLBAR_SEPARATOR(tb)
+DIM tbGefuellt AS INTEGER : tbGefuellt = GUI_TOOLBAR_ADD(tb, "rechteck", "Rechteck und Ellipse gefüllt zeichnen", "Gefüllt")
+DIM tbSymX AS INTEGER : tbSymX = GUI_TOOLBAR_ADD(tb, "spiegeln", "Symmetrisch malen: links und rechts gespiegelt", "Spiegel X")
+DIM tbSymY AS INTEGER : tbSymY = GUI_TOOLBAR_ADD(tb, "spiegeln", "Symmetrisch malen: oben und unten gespiegelt", "Spiegel Y")
+DIM tbZwiebel AS INTEGER : tbZwiebel = GUI_TOOLBAR_ADD(tb, "auge", "Zwiebelhaut: das vorige Einzelbild blass darunter", "Zwiebelhaut")
+DIM tbRaster AS INTEGER : tbRaster = GUI_TOOLBAR_ADD(tb, "raster", "Das Punkteraster ab Zoom 6", "Raster")
 DIM i AS INTEGER
-FOR i = 0 TO WZ_ANZ - 1
-    wzKnopf[i] = GUI_BUTTON(win, wzName[i], wx, 7, WZ_B, 32)
-    wx = wx + WZ_B + 4
+FOR i = tbGefuellt TO tbRaster
+    GUI_TOOLBAR_CHECKABLE(tb, i, TRUE)
 NEXT
-GUI_TOOLTIP(wzKnopf[WZ_AUSWAHL], "Rechteck aufziehen (S) -- Klick ohne Zug hebt die Auswahl auf")
-GUI_TOOLTIP(wzKnopf[WZ_LASSO], "Freiform umfahren (Q) -- der Weg schliesst sich von selbst")
-GUI_TOOLTIP(wzKnopf[WZ_ZAUBER], "Zusammenhaengende Flaeche gleicher Farbe waehlen (Z)")
-GUI_TOOLTIP(wzKnopf[WZ_VERSCHIEB], "Die Auswahl versetzen (V) -- ohne Auswahl die ganze Ebene")
+GUI_TOOLBAR_SET_CHECKED(tb, tbRaster, TRUE)
 
-DIM bZur AS GUI_WIDGET : bZur = GUI_BUTTON(win, "Zurueck", wx + 10, 7, 84, 32)
-DIM bVor AS GUI_WIDGET : bVor = GUI_BUTTON(win, "Vor", wx + 98, 7, 56, 32)
-DIM cbGefuellt AS GUI_WIDGET : cbGefuellt = GUI_CHECKBOX(win, "gefuellt", wx + 164, 15, FALSE)
-DIM cbSymX AS GUI_WIDGET : cbSymX = GUI_CHECKBOX(win, "Spiegel X", wx + 254, 15, FALSE)
-DIM cbSymY AS GUI_WIDGET : cbSymY = GUI_CHECKBOX(win, "Spiegel Y", wx + 358, 15, FALSE)
-DIM cbZwiebel AS GUI_WIDGET : cbZwiebel = GUI_CHECKBOX(win, "Zwiebelhaut", wx + 462, 15, FALSE)
-DIM cbRaster AS GUI_WIDGET : cbRaster = GUI_CHECKBOX(win, "Raster", wx + 580, 15, TRUE)
+' Die Werkzeugspalte links neben der Zeichenflaeche: zwoelf Sinnbilder
+' untereinander, das gewaehlte hervorgehoben.
+DIM wzName AS ARRAY OF STRING
+wzName = SPLIT$("Stift|Radierer|Füllen|Linie|Rechteck|Ellipse|Sprühen|Pipette|Auswahl|Lasso|Zauberstab|Verschieben", "|")
+DIM wzSinn AS ARRAY OF STRING
+wzSinn = SPLIT$("stift|radierer|fuellen|linie|rechteck|ellipse|spruehen|pipette|auswahl|lasso|zauberstab|verschieben", "|")
+DIM wzTipp AS ARRAY OF STRING
+wzTipp = SPLIT$("P|E|F|L|R|O|Y|I|S -- Klick ohne Zug hebt die Auswahl auf|Q -- der Weg schließt sich von selbst|Z -- zusammenhängende Fläche gleicher Farbe|V -- ohne Auswahl die ganze Ebene", "|")
+DIM wzKnopf[WZ_ANZ] AS GUI_WIDGET
+FOR i = 0 TO WZ_ANZ - 1
+    wzKnopf[i] = GUI_ICON_BUTTON(win, LINKS + 4, TB_H + 8 + i * 42 + (i \ 3) * 6, 42, 38, wzSinn[i])
+    GUI_TOOLTIP(wzKnopf[i], wzName[i] + " (" + wzTipp[i] + ")")
+NEXT
+DIM wzZuletzt AS INTEGER : wzZuletzt = -1
 
 ' ------------------------------------------------------------ links: Farbe
 DIM y AS INTEGER : y = TB_H + 12
 DIM lbl AS GUI_WIDGET
 lbl = GUI_LABEL(win, "Farbe", 12, y) : y = y + 22
+GUI_SET_FONT_STYLE(lbl, "fett")
 DIM cp AS GUI_WIDGET : cp = GUI_COLORPICKER(win, 12, y, LINKS - 24, 170)
 GUI_SET_PICKED_COLOR(cp, farbe)
 y = y + 182
 
-lbl = GUI_LABEL(win, "Palette   (1..6 waehlen)", 12, y) : y = y + 22
+lbl = GUI_LABEL(win, "Palette   (1..6 wählen)", 12, y) : y = y + 22
+GUI_SET_FONT_STYLE(lbl, "fett")
 DIM palY AS INTEGER : palY = y
 DIM palette AS GUI_WIDGET
 palette = GUI_CANVAS(win, 12, y, LINKS - 24, 72)
 y = y + 78
+' Die zuletzt benutzten Farben, ein Klick holt eine zurueck.
+lbl = GUI_LABEL(win, "Zuletzt", 12, y + 4)
+DIM zuletztFl AS GUI_WIDGET
+zuletztFl = GUI_CANVAS(win, 70, y, LINKS - 82, 26)
+GUI_TOOLTIP(zuletztFl, "Die zuletzt benutzten Farben -- ein Klick wählt sie wieder")
+y = y + 36
 
 DIM bPalLaden AS GUI_WIDGET
 bPalLaden = GUI_BUTTON(win, "Palette laden", 12, y, 128, 28)
@@ -1763,34 +1837,34 @@ GUI_TOOLTIP(cbKacheln, "Das Bild acht Mal ringsum (T) -- zeigt, ob es nahtlos ka
 y = y + 32
 DIM bStat AS GUI_WIDGET
 bStat = GUI_BUTTON(win, "Statistik", 12, y, 128, 28)
-GUI_TOOLTIP(bStat, "Punkte, Farben und haeufigste Farbe -- gesamt und je Bild")
+GUI_TOOLTIP(bStat, "Punkte, Farben und häufigste Farbe -- gesamt und je Bild")
 DIM bZuschnitt AS GUI_WIDGET
 bZuschnitt = GUI_BUTTON(win, "Zuschneiden", 144, y, 128, 28)
-GUI_TOOLTIP(bZuschnitt, "Auf den Inhalt zuschneiden -- ueber alle Bilder und ALLE Ebenen")
+GUI_TOOLTIP(bZuschnitt, "Auf den Inhalt zuschneiden -- über alle Bilder und ALLE Ebenen")
 y = y + 34
 DIM bGroesse AS GUI_WIDGET
-bGroesse = GUI_BUTTON(win, "Groesse aendern", 12, y, 260, 28)
-GUI_TOOLTIP(bGroesse, "Leinwand vergroessern oder beschneiden -- der Inhalt bleibt links oben")
+bGroesse = GUI_BUTTON(win, "Größe ändern", 12, y, 260, 28)
+GUI_TOOLTIP(bGroesse, "Leinwand vergrößern oder beschneiden -- der Inhalt bleibt links oben")
 y = y + 34
 DIM bSpiegelX AS GUI_WIDGET
-bSpiegelX = GUI_BUTTON(win, "Spiegeln |", 12, y, 62, 28)
+bSpiegelX = GUI_BUTTON(win, "↔", 12, y, 62, 28)
 GUI_TOOLTIP(bSpiegelX, "Waagerecht spiegeln -- ALLE Bilder und Ebenen")
 DIM bSpiegelY AS GUI_WIDGET
-bSpiegelY = GUI_BUTTON(win, "Spiegeln --", 78, y, 62, 28)
+bSpiegelY = GUI_BUTTON(win, "↕", 78, y, 62, 28)
 GUI_TOOLTIP(bSpiegelY, "Senkrecht spiegeln -- ALLE Bilder und Ebenen")
 DIM bDrehR AS GUI_WIDGET
-bDrehR = GUI_BUTTON(win, "90 >", 144, y, 62, 28)
-GUI_TOOLTIP(bDrehR, "Vierteldrehung nach rechts -- Breite und Hoehe tauschen. Nicht im Verlauf: die Gegendrehung nimmt sie zurueck")
+bDrehR = GUI_BUTTON(win, "↻ 90°", 144, y, 62, 28)
+GUI_TOOLTIP(bDrehR, "Vierteldrehung nach rechts -- Breite und Höhe tauschen. Nicht im Verlauf: die Gegendrehung nimmt sie zurück")
 DIM bDrehL AS GUI_WIDGET
-bDrehL = GUI_BUTTON(win, "< 90", 210, y, 62, 28)
-GUI_TOOLTIP(bDrehL, "Vierteldrehung nach links -- Breite und Hoehe tauschen")
+bDrehL = GUI_BUTTON(win, "↺ 90°", 210, y, 62, 28)
+GUI_TOOLTIP(bDrehL, "Vierteldrehung nach links -- Breite und Höhe tauschen")
 y = y + 34
 DIM bDhCode AS GUI_WIDGET
 bDhCode = GUI_BUTTON(win, "DH-Code", 12, y, 128, 28)
-GUI_TOOLTIP(bDhCode, "Ein lauffaehiges Programm + das Blatt daneben -- je Bereich eine SPRITE_ADD_ANIM-Zeile")
+GUI_TOOLTIP(bDhCode, "Ein lauffähiges Programm + das Blatt daneben -- je Bereich eine SPRITE_ADD_ANIM-Zeile")
 DIM bDhanim AS GUI_WIDGET
 bDhanim = GUI_BUTTON(win, "dhanim", 144, y, 128, 28)
-GUI_TOOLTIP(bDhanim, "Die Bereiche als Zustandsmaschine (.dhanim) -- Uebergaenge ergaenzt der dhanim-Editor")
+GUI_TOOLTIP(bDhanim, "Die Bereiche als Zustandsmaschine (.dhanim) -- Übergänge ergänzt der dhanim-Editor")
 
 DIM pal AS ARRAY OF INTEGER
 pal = [&H000000, &HFFFFFF, &HE84B4B, &HE8C44B, &H4BE87A, &H2BC4E8, _
@@ -1801,14 +1875,15 @@ pal = [&H000000, &HFFFFFF, &HE84B4B, &HE8C44B, &H4BE87A, &H2BC4E8, _
 DIM rx AS INTEGER : rx = SW - RECHTS
 DIM ry AS INTEGER : ry = TB_H + 12
 lbl = GUI_LABEL(win, "Einzelbilder", rx, ry) : ry = ry + 22
+GUI_SET_FONT_STYLE(lbl, "fett")
 DIM lstBild AS GUI_WIDGET
-lstBild = GUI_LISTBOX(win, rx, ry, RECHTS - 16, 120, SPLIT$("Bild 1", "|"))
-ry = ry + 128
+lstBild = GUI_LISTBOX(win, rx, ry, RECHTS - 16, 88, SPLIT$("Bild 1", "|"))
+ry = ry + 96
 DIM bBildNeu AS GUI_WIDGET  : bBildNeu  = GUI_BUTTON(win, "Neu", rx, ry, 78, 28)
 DIM bBildKopie AS GUI_WIDGET: bBildKopie= GUI_BUTTON(win, "Kopie", rx + 82, ry, 88, 28)
 DIM bBildWeg AS GUI_WIDGET  : bBildWeg  = GUI_BUTTON(win, "Weg", rx + 174, ry, 70, 28)
 DIM bBildName AS GUI_WIDGET : bBildName = GUI_BUTTON(win, "Name", rx + 248, ry, 72, 28)
-GUI_TOOLTIP(bBildName, "Dem Einzelbild einen Namen geben -- er wird sein Schluessel im Atlas")
+GUI_TOOLTIP(bBildName, "Dem Einzelbild einen Namen geben -- er wird sein Schlüssel im Atlas")
 ry = ry + 34
 lbl = GUI_LABEL(win, "Dauer", rx, ry + 6)
 DIM spMs AS GUI_WIDGET : spMs = GUI_SPINNER(win, rx + 56, ry, 84, 0, 10000, 0, 20)
@@ -1816,38 +1891,47 @@ DIM spMs AS GUI_WIDGET : spMs = GUI_SPINNER(win, rx + 56, ry, 84, 0, 10000, 0, 2
 ' Klicks. 20 ist die kleinste Stufe, die ein GIF ueberhaupt haelt (es
 ' rechnet in Hundertstelsekunden, und unter 2 legen die Betrachter ihre
 ' eigene fest).
-GUI_TOOLTIP(spMs, "Millisekunden fuer DIESES Bild. 0 = das Tempo darunter gilt")
+GUI_TOOLTIP(spMs, "Millisekunden für DIESES Bild. 0 = das Tempo darunter gilt")
 lbl = GUI_LABEL(win, "ms   (0 = Tempo)", rx + 148, ry + 6)
 ry = ry + 38
 
 lbl = GUI_LABEL(win, "Ebenen", rx, ry) : ry = ry + 22
+GUI_SET_FONT_STYLE(lbl, "fett")
 DIM lstEb AS GUI_WIDGET
 lstEb = GUI_LISTBOX(win, rx, ry, RECHTS - 16, 100, SPLIT$("Ebene 1", "|"))
 ry = ry + 108
 DIM bEbNeu AS GUI_WIDGET : bEbNeu = GUI_BUTTON(win, "Neu", rx, ry, 78, 28)
 DIM bEbWeg AS GUI_WIDGET : bEbWeg = GUI_BUTTON(win, "Weg", rx + 82, ry, 70, 28)
 DIM cbEbSicht AS GUI_WIDGET : cbEbSicht = GUI_CHECKBOX(win, "sichtbar", rx + 160, ry + 8, TRUE)
-ry = ry + 40
+ry = ry + 36
+lbl = GUI_LABEL(win, "Deckkraft", rx, ry + 4)
+DIM slDeck AS GUI_WIDGET : slDeck = GUI_SLIDER(win, rx + 86, ry + 6, 170, 0.0, 100.0, 100.0)
+GUI_TOOLTIP(slDeck, "Deckkraft der gewählten Ebene -- gilt beim Zeichnen und bei jeder Ausgabe")
+DIM lblDeck AS GUI_WIDGET : lblDeck = GUI_LABEL(win, "100 %", rx + 264, ry + 4)
+DIM deckLetzt AS INTEGER : deckLetzt = 100
+ry = ry + 36
 
 lbl = GUI_LABEL(win, "Vorschau", rx, ry) : ry = ry + 22
+GUI_SET_FONT_STYLE(lbl, "fett")
 DIM vorschau AS GUI_WIDGET
-vorschau = GUI_CANVAS(win, rx, ry, RECHTS - 16, 140)
+vorschau = GUI_CANVAS(win, rx, ry, RECHTS - 16, 112)
 DIM vorY AS INTEGER : vorY = ry
-ry = ry + 148
+ry = ry + 120
 lbl = GUI_LABEL(win, "Tempo", rx, ry + 4)
 DIM slTempo AS GUI_WIDGET : slTempo = GUI_SLIDER(win, rx + 70, ry + 6, 180, 1.0, 24.0, 8.0)
 ry = ry + 38
 
-lbl = GUI_LABEL(win, "Bereiche   (die Vorschau spielt den gewaehlten)", rx, ry) : ry = ry + 22
+lbl = GUI_LABEL(win, "Bereiche   (die Vorschau spielt den gewählten)", rx, ry) : ry = ry + 22
+GUI_SET_FONT_STYLE(lbl, "fett")
 DIM lstAnim AS GUI_WIDGET
-lstAnim = GUI_LISTBOX(win, rx, ry, RECHTS - 16, 84, SPLIT$("", "|"))
-ry = ry + 92
+lstAnim = GUI_LISTBOX(win, rx, ry, RECHTS - 16, 72, SPLIT$("", "|"))
+ry = ry + 80
 DIM tiAnim AS GUI_WIDGET
 tiAnim = GUI_TEXTINPUT(win, rx, ry, RECHTS - 16, 28, "lauf")
-GUI_TOOLTIP(tiAnim, "Name des Bereichs -- so heisst er spaeter in SPRITE_ADD_ANIM")
+GUI_TOOLTIP(tiAnim, "Name des Bereichs -- so heißt er später in SPRITE_ADD_ANIM")
 ry = ry + 34
 DIM bAnimNeu AS GUI_WIDGET : bAnimNeu = GUI_BUTTON(win, "Hinzu", rx, ry, 100, 28)
-DIM bAnimAend AS GUI_WIDGET : bAnimAend = GUI_BUTTON(win, "Aendern", rx + 106, ry, 106, 28)
+DIM bAnimAend AS GUI_WIDGET : bAnimAend = GUI_BUTTON(win, "Ändern", rx + 106, ry, 106, 28)
 DIM bAnimWeg AS GUI_WIDGET : bAnimWeg = GUI_BUTTON(win, "Weg", rx + 218, ry, 90, 28)
 ry = ry + 34
 lbl = GUI_LABEL(win, "von", rx, ry + 6)
@@ -1859,19 +1943,28 @@ DIM spFps AS GUI_WIDGET : spFps = GUI_SPINNER(win, rx + 242, ry, 68, 1, 60, 8)
 
 ' ------------------------------------------------------------- Zeichenflaeche
 DIM leinwand AS GUI_WIDGET
-leinwand = GUI_CANVAS(win, LINKS, TB_H + 8, SW - LINKS - RECHTS - 12, SH - TB_H - 44)
+leinwand = GUI_CANVAS(win, LINKS + WZ_SPALTE, TB_H + 8, SW - LINKS - WZ_SPALTE - RECHTS - 12, INHALT_H - TB_H - 44 - LEISTE_H)
 GUI_SET_ANCHOR(leinwand, "lrtb")
 
+' Die Bildleiste: jedes Einzelbild als kleines Bild, ein Klick waehlt es.
+DIM bildLeiste AS GUI_WIDGET
+bildLeiste = GUI_CANVAS(win, LINKS + WZ_SPALTE, INHALT_H - 34 - LEISTE_H, SW - LINKS - WZ_SPALTE - RECHTS - 12, LEISTE_H - 4)
+GUI_SET_ANCHOR(bildLeiste, "lrb")
+GUI_TOOLTIP(bildLeiste, "Ein Klick wählt das Einzelbild")
+
+' Statusleiste: Werkzeug und Meldung | Bild und Ebene | Zoom
 DIM status AS GUI_WIDGET
-status = GUI_LABEL(win, "", 12, SH - 24)
-GUI_SET_ANCHOR(status, "lb")
+status = GUI_STATUSBAR(win, 0, INHALT_H - 26, SW, 26, "")
+GUI_SET_ANCHOR(status, "lrb")
+DIM sfBild AS INTEGER : sfBild = GUI_STATUSBAR_ADD(status, "", 260, "mitte")
+DIM sfZoom AS INTEGER : sfZoom = GUI_STATUSBAR_ADD(status, "", 100, "mitte")
 
 ' --------------------------------------------------- Fenster "Neues Sprite"
 DIM winNeu AS GUI_WINDOW
 winNeu = GUI_WINDOW("Neues Sprite", SW \ 2 - 150, SH \ 2 - 90, 300, 170)
 lbl = GUI_LABEL(winNeu, "Breite", 16, 16)
 DIM spB AS GUI_WIDGET : spB = GUI_SPINNER(winNeu, 110, 12, 160, 4, MAXG, 32)
-lbl = GUI_LABEL(winNeu, "Hoehe", 16, 52)
+lbl = GUI_LABEL(winNeu, "Höhe", 16, 52)
 DIM spH AS GUI_WIDGET : spH = GUI_SPINNER(winNeu, 110, 48, 160, 4, MAXG, 32)
 DIM bNeuOk AS GUI_WIDGET : bNeuOk = GUI_BUTTON(winNeu, "Anlegen", 110, 92, 90, 30)
 DIM bNeuAb AS GUI_WIDGET : bNeuAb = GUI_BUTTON(winNeu, "Abbrechen", 206, 92, 90, 30)
@@ -1882,12 +1975,12 @@ DIM neuOffen AS BOOLEAN : neuOffen = FALSE
 ' Eigenes Fenster statt zweier Regler in der Spalte: eine Groessenaenderung
 ' braucht BEIDE Zahlen auf einmal, und dazwischen soll nichts passieren.
 DIM winGr AS GUI_WINDOW
-winGr = GUI_WINDOW("Groesse aendern", SW \ 2 - 150, SH \ 2 - 90, 300, 170)
+winGr = GUI_WINDOW("Größe ändern", SW \ 2 - 150, SH \ 2 - 90, 300, 170)
 lbl = GUI_LABEL(winGr, "Breite", 16, 16)
 DIM spGrB AS GUI_WIDGET : spGrB = GUI_SPINNER(winGr, 110, 12, 160, 4, MAXG, 32)
-lbl = GUI_LABEL(winGr, "Hoehe", 16, 52)
+lbl = GUI_LABEL(winGr, "Höhe", 16, 52)
 DIM spGrH AS GUI_WIDGET : spGrH = GUI_SPINNER(winGr, 110, 48, 160, 4, MAXG, 32)
-DIM bGrOk AS GUI_WIDGET : bGrOk = GUI_BUTTON(winGr, "Aendern", 110, 92, 90, 30)
+DIM bGrOk AS GUI_WIDGET : bGrOk = GUI_BUTTON(winGr, "Ändern", 110, 92, 90, 30)
 DIM bGrAb AS GUI_WIDGET : bGrAb = GUI_BUTTON(winGr, "Abbrechen", 206, 92, 90, 30)
 GUI_WINDOW_VISIBLE(winGr, FALSE)
 DIM grOffen AS BOOLEAN : grOffen = FALSE
@@ -1900,13 +1993,59 @@ DIM winName AS GUI_WINDOW
 winName = GUI_WINDOW("Bild benennen", SW \ 2 - 170, SH \ 2 - 70, 340, 140)
 lbl = GUI_LABEL(winName, "Name", 16, 18)
 DIM tiBild AS GUI_WIDGET : tiBild = GUI_TEXTINPUT(winName, 16, 42, 308, 30, "")
-DIM bNamOk AS GUI_WIDGET : bNamOk = GUI_BUTTON(winName, "Uebernehmen", 130, 84, 110, 30)
+DIM bNamOk AS GUI_WIDGET : bNamOk = GUI_BUTTON(winName, "Übernehmen", 130, 84, 110, 30)
 DIM bNamAb AS GUI_WIDGET : bNamAb = GUI_BUTTON(winName, "Abbrechen", 246, 84, 90, 30)
 GUI_WINDOW_VISIBLE(winName, FALSE)
 DIM namOffen AS BOOLEAN : namOffen = FALSE
 
 DIM statOffen AS BOOLEAN : statOffen = FALSE
 DIM statDlg AS GUI_WINDOW
+
+' ============================================================ Bildleiste
+
+' Das erste Bild, das die Leiste zeigt: so, dass das aktuelle mittig steht.
+FUNCTION leisteErstes() AS INTEGER
+    DIM n AS INTEGER : n = MAX(1, (GUI_CANVAS_W(bildLeiste) - 12) \ 74)
+    RETURN MAX(0, MIN(aktBild - n \ 2, anzBild - n))
+END FUNCTION
+
+SUB leisteZeichnen()
+    DIM lx AS INTEGER : lx = GUI_CANVAS_X(bildLeiste)
+    DIM ly AS INTEGER : ly = GUI_CANVAS_Y(bildLeiste)
+    DIM lb AS INTEGER : lb = GUI_CANVAS_W(bildLeiste)
+    DIM lh AS INTEGER : lh = GUI_CANVAS_H(bildLeiste)
+    BOXROUND(lx, ly, lx + lb - 1, ly + lh - 1, 6, &H0B1018)
+    DIM n AS INTEGER : n = MAX(1, (lb - 12) \ 74)
+    DIM f0 AS INTEGER : f0 = leisteErstes()
+    DIM sk AS FLOAT : sk = MIN(60.0 / gw, 60.0 / gh)
+    DIM dw AS INTEGER : dw = MAX(1, INT(gw * sk))
+    DIM dh AS INTEGER : dh = MAX(1, INT(gh * sk))
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    SCISSOR(lx, ly, lb, lh)
+    FOR j = 0 TO n - 1
+        DIM b AS INTEGER : b = f0 + j
+        IF b < anzBild THEN
+            DIM tx2 AS INTEGER : tx2 = lx + 6 + j * 74
+            DIM ty2 AS INTEGER : ty2 = ly + 6
+            BOXROUND(tx2, ty2, tx2 + 67, ty2 + 67, 5, IIF(b = aktBild, &H1B4A60, &H151C27))
+            DIM bx2 AS INTEGER : bx2 = tx2 + 4 + (60 - dw) \ 2
+            DIM by2 AS INTEGER : by2 = ty2 + 4 + (60 - dh) \ 2
+            DRAWIMAGEPARTEX(schachbrett, 0, 0, gw, gh, bx2, by2, dw, dh)
+            FOR k = 0 TO anzEb - 1
+                IF ebSicht[k] = 1 THEN DRAWIMAGEPARTEX(ebene[b, k], 0, 0, gw, gh, bx2, by2, dw, dh, deckFarbe(k))
+            NEXT
+            SETFONT(uiFont, 11)
+            TEXT(tx2 + 4, ty2 + 2, STR$(b + 1), IIF(b = aktBild, &HFFFFFF, &H8FA3B3))
+            SETFONT(uiFont, 15)
+            IF b = aktBild THEN
+                RECTROUND(tx2, ty2, tx2 + 67, ty2 + 67, 5, &H2BC4E8)
+                RECTROUND(tx2 + 1, ty2 + 1, tx2 + 66, ty2 + 66, 5, &H2BC4E8)
+            END IF
+        END IF
+    NEXT
+    SCISSOR_END()
+END SUB
 
 ' ============================================================ Listen
 
@@ -2050,8 +2189,14 @@ WHILE NOT beenden
 
     farbe = GUI_PICKED_COLOR(cp)
     pinsel = INT(GUI_VALUE(spPinsel))
-    symX = GUI_CHECKED(cbSymX)
-    symY = GUI_CHECKED(cbSymY)
+    DIM tbK AS INTEGER : tbK = GUI_TOOLBAR_CLICKED(tb)
+    symX = GUI_TOOLBAR_CHECKED(tb, tbSymX)
+    symY = GUI_TOOLBAR_CHECKED(tb, tbSymY)
+    gefuellt = GUI_TOOLBAR_CHECKED(tb, tbGefuellt)
+    zwiebelAn = GUI_TOOLBAR_CHECKED(tb, tbZwiebel)
+    rasterAn = GUI_TOOLBAR_CHECKED(tb, tbRaster)
+    IF GUI_CLICKED(miKacheln) THEN GUI_SET_CHECKED(cbKacheln, NOT kacheln)
+    IF GUI_CLICKED(miEnde) AND NOT sperre THEN endeAnfragen()
     DIM kachelnJetzt AS BOOLEAN : kachelnJetzt = GUI_CHECKED(cbKacheln)
     IF kachelnJetzt <> kacheln THEN
         kacheln = kachelnJetzt
@@ -2063,7 +2208,6 @@ WHILE NOT beenden
     ' ------------------------------------------------------ Werkzeugwahl
     FOR i = 0 TO WZ_ANZ - 1
         IF GUI_CLICKED(wzKnopf[i]) THEN werkzeug = i
-        GUI_SET_COLOR(wzKnopf[i], "bg", IIF(i = werkzeug, &H1B5C74, &H1A2430))
     NEXT
     IF NOT sperre AND NOT strg THEN
         IF KEYHIT(KEY_P) THEN werkzeug = WZ_STIFT
@@ -2088,9 +2232,17 @@ WHILE NOT beenden
         IF KEYHIT(43) THEN GUI_SET_VALUE(spPinsel, MIN(6, pinsel + 1))
         IF KEYHIT(45) THEN GUI_SET_VALUE(spPinsel, MAX(1, pinsel - 1))
     END IF
+    ' Das gewaehlte Werkzeug traegt die Akzentfarbe -- nur bei einem Wechsel
+    ' umgestellt, nicht in jedem Bild.
+    IF werkzeug <> wzZuletzt THEN
+        FOR i = 0 TO WZ_ANZ - 1
+            GUI_SET_COLOR(wzKnopf[i], "bg", IIF(i = werkzeug, &H1B5C74, &H1A2430))
+        NEXT
+        wzZuletzt = werkzeug
+    END IF
 
     ' ------------------------------------------------------------ Datei
-    IF GUI_CLICKED(bNeu) THEN
+    IF GUI_CLICKED(miNeu) OR tbK = tbNeu THEN
         GUI_WINDOW_VISIBLE(winNeu, TRUE) : neuOffen = TRUE
         ' Nach VORNE holen, sonst ist es nicht bedienbar: ein Klick bringt
         ' immer sein Fenster nach oben, und der Klick auf [Neu] war einer
@@ -2108,7 +2260,7 @@ WHILE NOT beenden
         listenAuffrischen()
         GUI_WINDOW_VISIBLE(winNeu, FALSE) : neuOffen = FALSE
     END IF
-    IF GUI_CLICKED(bPng) THEN
+    IF GUI_CLICKED(miPng) OR tbK = tbPng THEN
         DIM p AS STRING : p = FILE_SAVE_DIALOG("Bild sichern", "sprite.png", "png")
         IF p <> "" THEN
             ' Nur das aktuelle Einzelbild -- ueber den Streifen gebaut und
@@ -2116,7 +2268,7 @@ WHILE NOT beenden
             DIM eins AS IMAGE : eins = IMAGE_NEW(gw, gh)
             DIM k AS INTEGER
             FOR k = 0 TO anzEb - 1
-                IF ebSicht[k] = 1 THEN IMAGE_DRAW_IMAGE(eins, ebene[aktBild, k], 0, 0)
+                IF ebSicht[k] = 1 THEN IMAGE_DRAW_IMAGE(eins, ebene[aktBild, k], 0, 0, deckFarbe(k))
             NEXT
             TRY
                 IMAGE_SAVE(eins, p)
@@ -2127,7 +2279,7 @@ WHILE NOT beenden
             IMAGE_FREE(eins)             ' nur zum Schreiben gebraucht
         END IF
     END IF
-    IF GUI_CLICKED(bOeffnen) THEN
+    IF GUI_CLICKED(miOeffnen) OR tbK = tbOeffnen THEN
         DIM po AS STRING
         po = FILE_OPEN_DIALOG("Oeffnen", "dhsprite,png")
         IF po <> "" THEN
@@ -2144,7 +2296,7 @@ WHILE NOT beenden
             END TRY
         END IF
     END IF
-    IF GUI_CLICKED(bDhCode) THEN
+    IF (GUI_CLICKED(bDhCode) OR GUI_CLICKED(miDhCode)) THEN
         DIM pc AS STRING
         pc = FILE_SAVE_DIALOG("DH-Code sichern", "sprite.dh", "dh")
         IF pc <> "" THEN
@@ -2155,7 +2307,7 @@ WHILE NOT beenden
             END TRY
         END IF
     END IF
-    IF GUI_CLICKED(bDhanim) THEN
+    IF (GUI_CLICKED(bDhanim) OR GUI_CLICKED(miDhanim)) THEN
         DIM pa AS STRING
         pa = FILE_SAVE_DIALOG("Zustandsmaschine sichern", "sprite.dhanim", "dhanim")
         IF pa <> "" THEN
@@ -2166,24 +2318,24 @@ WHILE NOT beenden
             END TRY
         END IF
     END IF
-    IF GUI_CLICKED(bZuschnitt) THEN zuschneiden()
-    IF GUI_CLICKED(bSpiegelX) THEN
+    IF (GUI_CLICKED(bZuschnitt) OR GUI_CLICKED(miZuschnitt)) THEN zuschneiden()
+    IF (GUI_CLICKED(bSpiegelX) OR GUI_CLICKED(miSpiegelX)) THEN
         alleWandeln("x")
         meldung = "Waagerecht gespiegelt -- alle Bilder und Ebenen"
     END IF
-    IF GUI_CLICKED(bSpiegelY) THEN
+    IF (GUI_CLICKED(bSpiegelY) OR GUI_CLICKED(miSpiegelY)) THEN
         alleWandeln("y")
         meldung = "Senkrecht gespiegelt -- alle Bilder und Ebenen"
     END IF
-    IF GUI_CLICKED(bDrehR) THEN
+    IF (GUI_CLICKED(bDrehR) OR GUI_CLICKED(miDrehR)) THEN
         alleWandeln("cw")
         meldung = "Gedreht auf " + STR$(gw) + "x" + STR$(gh)
     END IF
-    IF GUI_CLICKED(bDrehL) THEN
+    IF (GUI_CLICKED(bDrehL) OR GUI_CLICKED(miDrehL)) THEN
         alleWandeln("ccw")
         meldung = "Gedreht auf " + STR$(gw) + "x" + STR$(gh)
     END IF
-    IF GUI_CLICKED(bGroesse) THEN
+    IF (GUI_CLICKED(bGroesse) OR GUI_CLICKED(miGroesse)) THEN
         ' Mit der AKTUELLEN Groesse vorbelegen -- wer nur die Breite aendern
         ' will, soll die Hoehe nicht von Hand nachstellen muessen.
         GUI_SET_VALUE(spGrB, gw)
@@ -2203,7 +2355,7 @@ WHILE NOT beenden
         END IF
         GUI_WINDOW_VISIBLE(winGr, FALSE) : grOffen = FALSE
     END IF
-    IF GUI_CLICKED(bStat) AND NOT statOffen THEN
+    IF (GUI_CLICKED(bStat) OR GUI_CLICKED(miStat)) AND NOT statOffen THEN
         statDlg = GUI_DIALOG("Statistik", statistik$())
         statOffen = TRUE
     END IF
@@ -2233,7 +2385,7 @@ WHILE NOT beenden
             END TRY
         END IF
     END IF
-    IF GUI_CLICKED(bGif) THEN
+    IF GUI_CLICKED(miGif) OR tbK = tbGif THEN
         DIM pg AS STRING
         pg = FILE_SAVE_DIALOG("Bewegtes GIF sichern", "sprite.gif", "gif")
         IF pg <> "" THEN
@@ -2244,10 +2396,10 @@ WHILE NOT beenden
             END TRY
         END IF
     END IF
-    IF GUI_CLICKED(bSichern) THEN
+    IF GUI_CLICKED(miSichern) OR tbK = tbSichern THEN
         DIM ok AS BOOLEAN : ok = alsDhspriteSichern()
     END IF
-    IF GUI_CLICKED(bBlatt) THEN
+    IF GUI_CLICKED(miBlatt) OR tbK = tbBlatt THEN
         DIM pb AS STRING : pb = FILE_SAVE_DIALOG("Streifen sichern", "sprites.png", "png")
         IF pb <> "" THEN
             baueStreifen()
@@ -2268,10 +2420,12 @@ WHILE NOT beenden
     END IF
 
     ' ---------------------------------------------------------- Verlauf
-    IF GUI_CLICKED(bZur) OR (strg AND KEYHIT(KEY_Z)) THEN zurueck()
-    IF GUI_CLICKED(bVor) OR (strg AND KEYHIT(KEY_Y)) THEN wieder()
-    GUI_SET_ENABLED(bZur, uPos > 0)
-    GUI_SET_ENABLED(bVor, uPos < uAnz)
+    IF GUI_CLICKED(miZur) OR tbK = tbZur THEN zurueck()
+    IF GUI_CLICKED(miVor) OR tbK = tbVor THEN wieder()
+    GUI_TOOLBAR_ENABLE(tb, tbZur, uPos > 0)
+    GUI_TOOLBAR_ENABLE(tb, tbVor, uPos < uAnz)
+    GUI_MENU_ENABLE(miZur, uPos > 0)
+    GUI_MENU_ENABLE(miVor, uPos < uAnz)
 
     ' ------------------------------------------------- Einzelbilder/Ebenen
     DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstBild)
@@ -2424,6 +2578,7 @@ WHILE NOT beenden
             IMAGE_CLEAR(ebene[j2, aktEb])
         NEXT
         ebSicht[aktEb] = 1
+        ebDeck[aktEb] = 255
         ungesichert = TRUE
         listenAuffrischen()
     END IF
@@ -2436,6 +2591,7 @@ WHILE NOT beenden
                     kopiere(ebene[j3, k5], ebene[j3, k5 + 1])
                 NEXT
                 ebSicht[k5] = ebSicht[k5 + 1]
+                ebDeck[k5] = ebDeck[k5 + 1]
             NEXT
             anzEb = anzEb - 1
             ungesichert = TRUE
@@ -2451,6 +2607,16 @@ WHILE NOT beenden
         ungesichert = TRUE
         listenAuffrischen()
     END IF
+    ' Die Deckkraft der gewaehlten Ebene. Ein Wert, den das PROGRAMM setzt
+    ' (Ebene gewechselt, geladen), ist kein Zug am Regler -- darum der Spiegel
+    ' `deckLetzt`, wie `msLetzt` beim Drehfeld der Dauer.
+    DIM deckJetzt AS INTEGER : deckJetzt = INT(GUI_VALUE(slDeck) + 0.5)
+    IF deckJetzt <> deckLetzt THEN
+        deckLetzt = deckJetzt
+        ebDeck[aktEb] = MAX(1, INT(deckJetzt * 2.55 + 0.5))
+        ungesichert = TRUE
+    END IF
+    GUI_SET_TEXT(lblDeck, STR$(deckJetzt) + " %")
 
     ' ------------------------------------------------------------- Maus
     DIM cx AS INTEGER : cx = GUI_CANVAS_X(leinwand)
@@ -2506,12 +2672,31 @@ WHILE NOT beenden
             farbe = pal[pZe * 8 + pSp]
             GUI_SET_PICKED_COLOR(cp, farbe)
         END IF
+        ' Die zuletzt benutzten Farben
+        DIM zfx AS INTEGER : zfx = GUI_CANVAS_X(zuletztFl)
+        DIM zfy AS INTEGER : zfy = GUI_CANVAS_Y(zuletztFl)
+        IF mx >= zfx AND my >= zfy AND my < zfy + GUI_CANVAS_H(zuletztFl) THEN
+            DIM zfi AS INTEGER : zfi = (mx - zfx) \ 26
+            IF zfi < LEN(zuFarben) THEN
+                farbe = zuFarben[zfi]
+                GUI_SET_PICKED_COLOR(cp, farbe)
+            END IF
+        END IF
+        ' Die Bildleiste
+        DIM blx AS INTEGER : blx = GUI_CANVAS_X(bildLeiste)
+        DIM bly AS INTEGER : bly = GUI_CANVAS_Y(bildLeiste)
+        IF mx >= blx AND mx < blx + GUI_CANVAS_W(bildLeiste) AND my >= bly AND my < bly + GUI_CANVAS_H(bildLeiste) THEN
+            DIM bli AS INTEGER : bli = leisteErstes() + (mx - blx - 6) \ 74
+            IF bli >= 0 AND bli < anzBild AND (mx - blx - 6) MOD 74 < 68 THEN GUI_LISTBOX_SET_SELECTED(lstBild, bli)
+        END IF
     END IF
 
     ' ------------------------------------------------------- Werkzeuge
     IF drauf AND MOUSE_HIT(0) THEN
         zieht = TRUE
         ziehWz = werkzeug
+        IF werkzeug = WZ_STIFT OR werkzeug = WZ_FUELL OR werkzeug = WZ_LINIE OR werkzeug = WZ_RECHT OR _
+           werkzeug = WZ_ELLIPSE OR werkzeug = WZ_SPRUEH THEN farbeMerken(farbe)
         ankerX = tx : ankerY = ty
         letztX = tx : letztY = ty
         SELECT CASE werkzeug
@@ -2583,7 +2768,7 @@ WHILE NOT beenden
             CASE WZ_LINIE, WZ_RECHT, WZ_ELLIPSE
                 formPunkte(ziehWz, ankerX, ankerY, _
                            MAX(0, MIN(gw - 1, tx)), MAX(0, MIN(gh - 1, ty)), _
-                           GUI_CHECKED(cbGefuellt))
+                           gefuellt)
                 FOR i = 0 TO pN - 1
                     punkt(pX[i], pY[i], farbe, FALSE)
                 NEXT
@@ -2676,9 +2861,28 @@ WHILE NOT beenden
     FOR i = 0 TO 15
         DIM qx AS INTEGER : qx = px2 + (i MOD 8) * 34
         DIM qy AS INTEGER : qy = py2 + (i \ 8) * 34
-        BOX(qx, qy, qx + 30, qy + 30, pal[i])
-        IF pal[i] = farbe THEN RECT(qx - 1, qy - 1, qx + 31, qy + 31, &HFFFFFF)
+        BOXROUND(qx, qy, qx + 30, qy + 30, 4, pal[i])
+        IF pal[i] = farbe THEN RECTROUND(qx - 1, qy - 1, qx + 31, qy + 31, 5, &HFFFFFF)
     NEXT
+    ' Zuletzt benutzt
+    DIM zlx AS INTEGER : zlx = GUI_CANVAS_X(zuletztFl)
+    DIM zly AS INTEGER : zly = GUI_CANVAS_Y(zuletztFl)
+    FOR i = 0 TO 7
+        IF i < LEN(zuFarben) THEN
+            BOXROUND(zlx + i * 26, zly + 2, zlx + i * 26 + 21, zly + 23, 4, zuFarben[i])
+            IF zuFarben[i] = farbe THEN RECTROUND(zlx + i * 26 - 1, zly + 1, zlx + i * 26 + 22, zly + 24, 5, &HFFFFFF)
+        ELSE
+            RECTROUND(zlx + i * 26, zly + 2, zlx + i * 26 + 21, zly + 23, 4, &H2A3442)
+        END IF
+    NEXT
+    leisteZeichnen()
+    ' Das gewaehlte Werkzeug in der Spalte: ein Rahmen in der Akzentfarbe.
+    ' Sinnbild-Knoepfe sind flach, ein Farbton allein faellt kaum auf.
+    DIM wzOy AS INTEGER : wzOy = GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    DIM wzX AS INTEGER : wzX = GUI_GET_X(wzKnopf[werkzeug])
+    DIM wzY AS INTEGER : wzY = GUI_GET_Y(wzKnopf[werkzeug]) + wzOy
+    BOXROUND(wzX, wzY, wzX + GUI_GET_W(wzKnopf[werkzeug]) - 1, wzY + GUI_GET_H(wzKnopf[werkzeug]) - 1, 6, &H402BC4E8)
+    RECTROUND(wzX, wzY, wzX + GUI_GET_W(wzKnopf[werkzeug]) - 1, wzY + GUI_GET_H(wzKnopf[werkzeug]) - 1, 6, &H2BC4E8)
 
     ' -------------------------------------------------------- Zeichenflaeche
     SCISSOR(cx, cy, cw, ch)
@@ -2700,7 +2904,7 @@ WHILE NOT beenden
                     FOR kk = 0 TO anzEb - 1
                         IF ebSicht[kk] = 1 THEN
                             DRAWIMAGEPARTEX(ebene[aktBild, kk], 0, 0, gw, gh, _
-                                            rx2, ry2, gw * zoom, gh * zoom)
+                                            rx2, ry2, gw * zoom, gh * zoom, deckFarbe(kk))
                         END IF
                     NEXT
                     ' Gedaempft. Ohne das saehe man neun gleichwertige Bilder
@@ -2714,12 +2918,12 @@ WHILE NOT beenden
     DRAWIMAGEPARTEX(schachbrett, 0, 0, gw, gh, ox, oy, gw * zoom, gh * zoom)
 
     ' Zwiebelhaut: das vorige Bild blass darunter.
-    IF GUI_CHECKED(cbZwiebel) AND aktBild > 0 THEN
+    IF zwiebelAn AND aktBild > 0 THEN
         DIM k6 AS INTEGER
         FOR k6 = 0 TO anzEb - 1
             IF ebSicht[k6] = 1 THEN
                 DRAWIMAGEROT(ebene[aktBild - 1, k6], ox + gw * zoom \ 2, oy + gh * zoom \ 2, _
-                             0, zoom, RGBA(255, 255, 255, 70))
+                             0, zoom, RGBA(255, 255, 255, MAX(1, 70 * ebDeck[k6] \ 255)))
             END IF
         NEXT
     END IF
@@ -2727,12 +2931,12 @@ WHILE NOT beenden
     DIM k7 AS INTEGER
     FOR k7 = 0 TO anzEb - 1
         IF ebSicht[k7] = 1 THEN
-            DRAWIMAGEPARTEX(ebene[aktBild, k7], 0, 0, gw, gh, ox, oy, gw * zoom, gh * zoom)
+            DRAWIMAGEPARTEX(ebene[aktBild, k7], 0, 0, gw, gh, ox, oy, gw * zoom, gh * zoom, deckFarbe(k7))
         END IF
     NEXT
 
     ' Raster erst, wenn eine Linie noch etwas trennt.
-    IF GUI_CHECKED(cbRaster) AND zoom >= 6 THEN
+    IF rasterAn AND zoom >= 6 THEN
         DIM g AS INTEGER
         FOR g = 0 TO gw
             LINE(ox + g * zoom, oy, ox + g * zoom, oy + gh * zoom - 1, &H1E2A38)
@@ -2747,7 +2951,7 @@ WHILE NOT beenden
     ' geschrieben werden.
     IF zieht AND drauf THEN
         IF ziehWz = WZ_LINIE OR ziehWz = WZ_RECHT OR ziehWz = WZ_ELLIPSE THEN
-            formPunkte(ziehWz, ankerX, ankerY, tx, ty, GUI_CHECKED(cbGefuellt))
+            formPunkte(ziehWz, ankerX, ankerY, tx, ty, gefuellt)
             FOR i = 0 TO pN - 1
                 IF pX[i] >= 0 AND pY[i] >= 0 AND pX[i] < gw AND pY[i] < gh THEN
                     BOX(ox + pX[i] * zoom, oy + pY[i] * zoom, _
@@ -2895,16 +3099,16 @@ WHILE NOT beenden
     DIM k8 AS INTEGER
     FOR k8 = 0 TO anzEb - 1
         IF ebSicht[k8] = 1 THEN
-            DRAWIMAGEPARTEX(ebene[vb, k8], 0, 0, gw, gh, vox, voy, gw * vz, gh * vz)
+            DRAWIMAGEPARTEX(ebene[vb, k8], 0, 0, gw, gh, vox, voy, gw * vz, gh * vz, deckFarbe(k8))
         END IF
     NEXT
 
     ' -------------------------------------------------------- Statuszeile
     DIM info AS STRING
     info = wzName[werkzeug] + "   " + STR$(gw) + "x" + STR$(gh) + _
-           "   Bild " + STR$(aktBild + 1) + "/" + STR$(anzBild) + _
-           "   " + ebName[aktEb] + "   Pinsel " + STR$(pinsel) + _
-           "   Zoom " + STR$(zoom) + "x   Farbe " + COLOR_HEX$(farbe)
+           "   Pinsel " + STR$(pinsel) + "   Farbe " + COLOR_HEX$(farbe)
+    GUI_STATUSBAR_SET(status, sfBild, "Bild " + STR$(aktBild + 1) + "/" + STR$(anzBild) + "  ·  " + ebName[aktEb])
+    GUI_STATUSBAR_SET(status, sfZoom, "Zoom " + STR$(zoom) + "x")
     IF drauf THEN info = info + "   [" + STR$(tx) + ", " + STR$(ty) + "]"
     IF selAn THEN
         ' Bei einer Freiform sagt BxH nichts -- der Rahmen ist gross, die
