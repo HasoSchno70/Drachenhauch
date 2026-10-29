@@ -1895,6 +1895,10 @@ pub const SINNBILDER: &[&str] = &[
     "profil", "handbuch", "einstellungen", "werkzeug", "umbruch", "info",
     "warnung", "plus", "minus", "schliessen", "links", "rechts", "hoch",
     "runter", "menue", "aktualisieren",
+    // Malwerkzeuge und Editoren (2026-10-29)
+    "stift", "radierer", "fuellen", "linie", "rechteck", "ellipse",
+    "pipette", "auswahl", "lasso", "zauberstab", "verschieben", "spruehen",
+    "wuerfel", "raster", "auge", "auge_zu", "spiegeln", "drehen",
 ];
 
 fn sinnbild_pruefen(name: &str, fn_: &str) -> Result<String, String> {
@@ -2067,6 +2071,133 @@ fn sinnbild(g: &mut Graphics, name: &str, x: i32, y: i32, s: i32, c: i64, gesper
         "aktualisieren" => {
             bogen(g, 8.0, 8.0, 6.0, 0.0, 290.0, t, c);
             g.triangle(px(10.0), py(0.5), px(15.5), py(3.0), px(11.0), py(7.0), c);
+        }
+        // Ein Bleistift schraeg von unten links nach oben rechts.
+        "stift" => {
+            zug(g, &[(2.0, 14.0), (2.5, 10.5), (11.5, 1.5), (14.5, 4.5), (5.5, 13.5), (2.0, 14.0)], t, c);
+            zug(g, &[(9.5, 3.5), (12.5, 6.5)], t, c);
+            zug(g, &[(2.5, 10.5), (5.5, 13.5)], t, c);
+        }
+        // Ein Radiergummi: schraeger Quader, die Spitze gefuellt.
+        "radierer" => {
+            zug(g, &[(1.5, 10.5), (9.0, 3.0), (14.5, 8.5), (8.0, 15.0), (4.5, 15.0), (1.5, 12.0), (1.5, 10.5)], t, c);
+            g.triangle(px(1.5), py(11.0), px(5.5), py(7.0), px(9.5), py(11.0), c);
+            g.triangle(px(1.5), py(11.0), px(9.5), py(11.0), px(5.5), py(15.0), c);
+            zug(g, &[(6.0, 15.0), (15.0, 15.0)], t, c);
+        }
+        // Ein gekippter Eimer, aus dem Farbe laeuft.
+        "fuellen" => {
+            zug(g, &[(6.5, 1.5), (13.0, 8.0), (8.0, 13.0), (1.5, 6.5), (6.5, 1.5)], t, c);
+            zug(g, &[(1.5, 6.5), (13.0, 8.0)], t, c);
+            g.circle(px(14.0), py(12.5), (1.8 * f).round().max(1.0) as i32, c);
+            zug(g, &[(13.0, 8.0), (14.0, 11.0)], t, c);
+        }
+        "linie" => {
+            zug(g, &[(2.5, 13.5), (13.5, 2.5)], t * 1.2, c);
+            g.circle(px(2.5), py(13.5), (1.7 * f).round().max(1.0) as i32, c);
+            g.circle(px(13.5), py(2.5), (1.7 * f).round().max(1.0) as i32, c);
+        }
+        "rechteck" => zug(g, &[(2.0, 3.5), (14.0, 3.5), (14.0, 12.5), (2.0, 12.5), (2.0, 3.5)], t, c),
+        "ellipse" => {
+            let mut p = Vec::with_capacity(33);
+            for k in 0..=32 {
+                let a = k as f64 / 32.0 * std::f64::consts::TAU;
+                p.push((8.0 + 6.5 * a.cos(), 8.0 + 5.0 * a.sin()));
+            }
+            zug(g, &p, t, c);
+        }
+        // Eine Pipette: Gummikappe oben rechts, Roehre nach unten links.
+        "pipette" => {
+            g.circle(px(12.0), py(4.0), (2.6 * f).round() as i32, c);
+            zug(g, &[(8.5, 4.5), (11.5, 7.5)], t * 1.3, c);
+            zug(g, &[(10.0, 6.0), (3.0, 13.0), (2.0, 14.5), (3.5, 13.5)], t, c);
+        }
+        // Auswahl: gestricheltes Rechteck.
+        "auswahl" => {
+            for (a, b) in [((2.0, 2.5), (5.0, 2.5)), ((7.0, 2.5), (9.0, 2.5)), ((11.0, 2.5), (14.0, 2.5)),
+                           ((2.0, 13.5), (5.0, 13.5)), ((7.0, 13.5), (9.0, 13.5)), ((11.0, 13.5), (14.0, 13.5)),
+                           ((2.0, 2.5), (2.0, 5.5)), ((2.0, 7.0), (2.0, 9.0)), ((2.0, 10.5), (2.0, 13.5)),
+                           ((14.0, 2.5), (14.0, 5.5)), ((14.0, 7.0), (14.0, 9.0)), ((14.0, 10.5), (14.0, 13.5))] {
+                zug(g, &[a, b], t, c);
+            }
+        }
+        // Lasso: eine Schlinge mit Schwanz.
+        "lasso" => {
+            let mut p = Vec::with_capacity(28);
+            for k in 0..=26 {
+                let a = (k as f64 / 26.0) * 5.4 + 1.6;
+                p.push((8.5 + 6.0 * a.cos(), 6.0 + 4.0 * a.sin()));
+            }
+            zug(g, &p, t, c);
+            zug(g, &[(4.6, 9.0), (4.0, 12.0), (6.0, 15.0)], t, c);
+        }
+        // Zauberstab mit Funkeln an der Spitze.
+        "zauberstab" => {
+            zug(g, &[(2.0, 14.0), (10.0, 6.0)], t * 1.4, c);
+            zug(g, &[(12.5, 1.0), (12.5, 6.0)], t, c);
+            zug(g, &[(10.0, 3.5), (15.0, 3.5)], t, c);
+            zug(g, &[(14.5, 7.0), (15.5, 8.0)], t, c);
+            zug(g, &[(8.5, 1.0), (9.5, 2.0)], t, c);
+        }
+        // Verschieben: Kreuz mit vier Pfeilspitzen.
+        "verschieben" => {
+            zug(g, &[(8.0, 1.5), (8.0, 14.5)], t, c);
+            zug(g, &[(1.5, 8.0), (14.5, 8.0)], t, c);
+            g.triangle(px(8.0), py(0.5), px(5.5), py(3.5), px(10.5), py(3.5), c);
+            g.triangle(px(8.0), py(15.5), px(10.5), py(12.5), px(5.5), py(12.5), c);
+            g.triangle(px(0.5), py(8.0), px(3.5), py(10.5), px(3.5), py(5.5), c);
+            g.triangle(px(15.5), py(8.0), px(12.5), py(5.5), px(12.5), py(10.5), c);
+        }
+        // Spruehdose: Dose links, Spruehpunkte rechts oben.
+        "spruehen" => {
+            zug(g, &[(2.0, 6.5), (7.5, 6.5), (7.5, 15.0), (2.0, 15.0), (2.0, 6.5)], t, c);
+            zug(g, &[(3.5, 6.5), (3.5, 4.0), (6.0, 4.0), (6.0, 6.5)], t, c);
+            for (x, y) in [(10.0, 2.0), (13.0, 3.0), (11.0, 5.0), (14.5, 6.0), (12.0, 8.0), (15.0, 9.5), (10.0, 9.0)] {
+                g.circle(px(x), py(y), (0.9 * f).round().max(1.0) as i32, c);
+            }
+        }
+        // Ein Wuerfel von oben mit fuenf Augen.
+        "wuerfel" => {
+            g.round_rect(px(1.5), py(1.5), px(14.5), py(14.5), (f * 2.5).round() as i32, c, false);
+            for (x, y) in [(5.0, 5.0), (11.0, 5.0), (8.0, 8.0), (5.0, 11.0), (11.0, 11.0)] {
+                g.circle(px(x), py(y), (1.3 * f).round().max(1.0) as i32, c);
+            }
+        }
+        "raster" => {
+            zug(g, &[(1.5, 1.5), (14.5, 1.5), (14.5, 14.5), (1.5, 14.5), (1.5, 1.5)], t, c);
+            zug(g, &[(5.8, 1.5), (5.8, 14.5)], t, c);
+            zug(g, &[(10.2, 1.5), (10.2, 14.5)], t, c);
+            zug(g, &[(1.5, 5.8), (14.5, 5.8)], t, c);
+            zug(g, &[(1.5, 10.2), (14.5, 10.2)], t, c);
+        }
+        "auge" | "auge_zu" => {
+            let mut p = Vec::with_capacity(34);
+            for k in 0..=16 {
+                let a = k as f64 / 16.0 * std::f64::consts::PI;
+                p.push((8.0 - 7.0 * a.cos(), 8.0 - 4.5 * a.sin()));
+            }
+            for k in 0..=16 {
+                let a = k as f64 / 16.0 * std::f64::consts::PI;
+                p.push((8.0 + 7.0 * a.cos(), 8.0 + 4.5 * a.sin()));
+            }
+            zug(g, &p, t, c);
+            g.circle(px(8.0), py(8.0), (2.2 * f).round().max(1.0) as i32, c);
+            if name == "auge_zu" {
+                zug(g, &[(2.0, 14.0), (14.0, 2.0)], t * 1.2, c);
+            }
+        }
+        // Spiegeln: zwei Dreiecke an einer gestrichelten Achse.
+        "spiegeln" => {
+            zug(g, &[(1.5, 13.0), (6.5, 3.0), (6.5, 13.0), (1.5, 13.0)], t, c);
+            g.triangle(px(9.5), py(3.0), px(9.5), py(13.0), px(14.5), py(13.0), c);
+            for y in [1.0, 5.0, 9.0, 13.0] {
+                zug(g, &[(8.0, y), (8.0, y + 2.0)], t, c);
+            }
+        }
+        // Drehen: Dreiviertelkreis mit Pfeil im Uhrzeigersinn.
+        "drehen" => {
+            bogen(g, 8.0, 8.5, 6.0, 270.0, 540.0, t, c);
+            g.triangle(px(7.0), py(0.0), px(7.0), py(5.5), px(11.5), py(2.5), c);
         }
         _ => g.circle(px(8.0), py(8.0), (3.0 * f).round() as i32, c),
     }

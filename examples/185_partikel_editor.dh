@@ -9,23 +9,24 @@
 '  PARTICLE_SYSTEM mit denselben Aufrufen, die auch im Spiel stehen.
 '  Was du siehst, ist was du bekommst.
 '
-'  [Sichern] schreibt alle Regler in eine `.ini`, [Laden] holt sie zurueck.
-'  Lesbares Format: die Datei laesst sich auch von Hand aendern.
+'  Datei -> Sichern schreibt alle Werte in eine `.ini`, Oeffnen holt sie
+'  zurueck. Lesbares Format: die Datei laesst sich auch von Hand aendern.
 '
-'  [Zurueck]/[Vor] (Strg+Z, Strg+Y) nehmen eine Aenderung zurueck. EIN Zug
-'  am Regler ist EIN Schritt -- nicht 60 pro Sekunde.
+'  Rueckgaengig/Wiederholen (Strg+Z, Strg+Y): EIN Zug am Regler ist EIN
+'  Schritt -- nicht 60 pro Sekunde. [Zufall] wuerfelt einen neuen Effekt,
+'  [Mutieren] veraendert den jetzigen nur ein wenig.
 '
 '  Bedienung:
-'    Regler ziehen, Werkseinstellung links waehlen.
+'    Regler ziehen, Farbe im Farbwaehler waehlen, Vorlage links waehlen.
 '    Alles auch ohne Maus: TAB wechselt, Leertaste loest aus,
 '    Pfeile verstellen Regler.
-'    [ESC] beendet.
+'    [ESC] beendet (fragt nach, wenn etwas nicht gesichert ist).
 ' ============================================================
 IMPORT "gui"
 IMPORT "particles"
 IMPORT "ini"
 
-' --- Parameter: EINE Reihenfolge fuer Regler und Werkseinstellungen ---
+' --- Parameter: EINE Reihenfolge fuer Regler, Farben und Vorlagen ---
 CONST P_VXMIN  = 0
 CONST P_VXMAX  = 1
 CONST P_VYMIN  = 2
@@ -37,6 +38,8 @@ CONST P_LMAX   = 7
 CONST P_RATE   = 8
 CONST P_SMIN   = 9
 CONST P_SMAX   = 10
+' Die Farben sind keine Regler mehr, sondern zwei Farbwaehler -- als Zahlen
+' gefuehrt bleiben sie trotzdem (Vorlagen, Verlauf und .ini kennen sie so).
 CONST P_R1     = 11
 CONST P_G1     = 12
 CONST P_B1     = 13
@@ -44,138 +47,245 @@ CONST P_R2     = 14
 CONST P_G2     = 15
 CONST P_B2     = 16
 CONST N_PARAM  = 17
+CONST N_REGLER = 11
 
-DIM regler[N_PARAM] AS GUI_WIDGET
-DIM wertText[N_PARAM] AS GUI_WIDGET
-DIM nachkomma[N_PARAM] AS INTEGER
+DIM regler[N_REGLER] AS GUI_WIDGET
+DIM wertText[N_REGLER] AS GUI_WIDGET
+DIM reglerLo[N_REGLER] AS FLOAT
+DIM reglerHi[N_REGLER] AS FLOAT
 DIM parName[N_PARAM] AS STRING         ' Schluessel in der gesicherten Datei
-DIM letzter[N_PARAM] AS FLOAT
+DIM letzter[N_REGLER] AS FLOAT
 
+' Die Darstellungsarten: intern die Namen des Moduls, angezeigt deutsch.
 DIM modi AS ARRAY OF STRING
 modi = SPLIT$("circle|pixel|square|streak|glow", "|")
+DIM modiText AS ARRAY OF STRING
+modiText = SPLIT$("Kreis|Pixel|Quadrat|Strich|Leuchten", "|")
 
-SCREEN(1240, 760, "Drachenhauch - Partikel-Editor", 1)
+SCREEN(1500, 900, "Drachenhauch - Partikel-Editor", 1)
+WINDOW_RESIZABLE(TRUE)
+WINDOW_MIN_SIZE(1300, 820)
 SETFPS(60)
 GUI_THEME_PRESET("glas_dunkel")
 
+' Die Oberflaeche schreibt in DejaVu Sans -- nicht in der Pixelschrift.
+' GUI_FONT macht sie zur Schrift der gui, egal was danach gezeichnet wird.
+DIM uiFont AS INTEGER : uiFont = LOADFONT("sans", 32)
+SETFONT(uiFont, 15)
+GUI_FONT(uiFont, 15)
+
 DIM win AS GUI_WINDOW
-win = GUI_WINDOW("Partikel-Editor", 10, 10, 1220, 740)
+win = GUI_WINDOW("Partikel-Editor", 0, 0, SCREENWIDTH(), SCREENHEIGHT())
+GUI_WINDOW_CHROME(win, FALSE)
 GUI_WINDOW_MOVABLE(win, FALSE)
 
 ' ============================================================
-'  Links: Vorschau, Bedienung, Werkseinstellungen
+'  Menue
 ' ============================================================
-DIM flaeche AS GUI_WIDGET
-flaeche = GUI_CANVAS(win, 16, 16, 520, 400)
+DIM mDatei AS INTEGER : mDatei = GUI_MENU(win, "Datei")
+DIM miLaden AS INTEGER : miLaden = GUI_MENU_ITEM(mDatei, "Einstellung öffnen …", "Strg+O")
+DIM miSichern AS INTEGER : miSichern = GUI_MENU_ITEM(mDatei, "Einstellung sichern …", "Strg+S")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miCode AS INTEGER : miCode = GUI_MENU_ITEM(mDatei, "DH-Code kopieren", "Strg+Umschalt+C")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miEnde AS INTEGER : miEnde = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
 
-DIM knopfPause AS GUI_WIDGET
-knopfPause = GUI_BUTTON(win, "Pause", 16, 428, 100, 30)
-DIM knopfLeeren AS GUI_WIDGET
-knopfLeeren = GUI_BUTTON(win, "Leeren", 124, 428, 100, 30)
-DIM knopfSalve AS GUI_WIDGET
-knopfSalve = GUI_BUTTON(win, "Salve", 232, 428, 100, 30)
-GUI_TOOLTIP(knopfSalve, "200 Teilchen auf einmal -- fuer Explosionen")
-DIM folgtMaus AS GUI_WIDGET
-folgtMaus = GUI_CHECKBOX(win, "folgt der Maus", 344, 434)
+DIM mBearb AS INTEGER : mBearb = GUI_MENU(win, "Bearbeiten")
+DIM miZurueck AS INTEGER : miZurueck = GUI_MENU_ITEM(mBearb, "Rückgängig", "Strg+Z")
+DIM miVor AS INTEGER : miVor = GUI_MENU_ITEM(mBearb, "Wiederholen", "Strg+Y")
+GUI_MENU_SEPARATOR(mBearb)
+DIM miZufall AS INTEGER : miZufall = GUI_MENU_ITEM(mBearb, "Zufälliger Effekt", "Strg+R")
+DIM miMutieren AS INTEGER : miMutieren = GUI_MENU_ITEM(mBearb, "Mutieren", "Strg+M")
 
+DIM mVorschau AS INTEGER : mVorschau = GUI_MENU(win, "Vorschau")
+DIM miPause AS INTEGER : miPause = GUI_MENU_ITEM(mVorschau, "Anhalten / weiter", "F5")
+DIM miLeeren AS INTEGER : miLeeren = GUI_MENU_ITEM(mVorschau, "Leeren", "F6")
+DIM miSalve AS INTEGER : miSalve = GUI_MENU_ITEM(mVorschau, "Salve (200 Teilchen)", "F7")
+
+DIM CW AS INTEGER : CW = GUI_WINDOW_CONTENT_W(win)
+DIM CH AS INTEGER : CH = GUI_WINDOW_CONTENT_H(win)
+
+' ============================================================
+'  Werkzeugleiste und Statusleiste
+' ============================================================
+DIM leiste AS GUI_WIDGET : leiste = GUI_TOOLBAR(win, 0, 0, CW, 42)
+GUI_SET_ANCHOR(leiste, "lrt")
+GUI_TOOLBAR_SET(leiste, "beschriftung", 1)
+DIM tbLaden AS INTEGER : tbLaden = GUI_TOOLBAR_ADD(leiste, "oeffnen", "Einstellung öffnen (Strg+O)", "Öffnen")
+DIM tbSichern AS INTEGER : tbSichern = GUI_TOOLBAR_ADD(leiste, "sichern", "Einstellung sichern (Strg+S)", "Sichern")
+DIM tbCode AS INTEGER : tbCode = GUI_TOOLBAR_ADD(leiste, "kopieren", "Die Aufrufe in die Zwischenablage (Strg+Umschalt+C)", "DH-Code")
+GUI_TOOLBAR_SEPARATOR(leiste)
+DIM tbZurueck AS INTEGER : tbZurueck = GUI_TOOLBAR_ADD(leiste, "rueckgaengig", "Die letzte Änderung zurücknehmen (Strg+Z)", "Zurück")
+DIM tbVor AS INTEGER : tbVor = GUI_TOOLBAR_ADD(leiste, "wiederholen", "Wiederherstellen (Strg+Y)", "Vor")
+GUI_TOOLBAR_SEPARATOR(leiste)
+DIM tbZufall AS INTEGER : tbZufall = GUI_TOOLBAR_ADD(leiste, "wuerfel", "Einen neuen Effekt würfeln (Strg+R)", "Zufall")
+DIM tbMutieren AS INTEGER : tbMutieren = GUI_TOOLBAR_ADD(leiste, "aktualisieren", "Den jetzigen Effekt ein wenig verändern (Strg+M)", "Mutieren")
+GUI_TOOLBAR_SEPARATOR(leiste)
+DIM tbPause AS INTEGER : tbPause = GUI_TOOLBAR_ADD(leiste, "pause", "Vorschau anhalten / weiter (F5)", "Pause")
+DIM tbLeeren AS INTEGER : tbLeeren = GUI_TOOLBAR_ADD(leiste, "schliessen", "Alle Teilchen entfernen (F6)", "Leeren")
+DIM tbSalve AS INTEGER : tbSalve = GUI_TOOLBAR_ADD(leiste, "plus", "200 Teilchen auf einmal -- für Explosionen (F7)", "Salve")
+
+DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_STATUSBAR(win, 0, CH - 26, CW, 26, "Bereit.")
+GUI_SET_ANCHOR(lblStatus, "lrb")
+DIM sfZahl AS INTEGER : sfZahl = GUI_STATUSBAR_ADD(lblStatus, "", 160, "mitte")
+DIM sfSchritt AS INTEGER : sfSchritt = GUI_STATUSBAR_ADD(lblStatus, "", 150, "mitte")
+
+' ============================================================
+'  Links: Vorlagen, Zufall, Hintergrund
+' ============================================================
+CONST LINKS_X = 14
+CONST LINKS_B = 240
 DIM lblPresets AS GUI_WIDGET
-lblPresets = GUI_LABEL(win, "Werkseinstellungen", 16, 472)
+lblPresets = GUI_LABEL(win, "Vorlagen", LINKS_X, 54)
+GUI_SET_FONT_STYLE(lblPresets, "fett")
 DIM presetNamen AS ARRAY OF STRING
-presetNamen = SPLIT$("Funken|Rauch|Feuer|Regen|Schnee|Explosion|Zauber|Springbrunnen", "|")
+presetNamen = SPLIT$("Funken|Rauch|Feuer|Regen|Schnee|Explosion|Zauber|Springbrunnen|Blasen|Sterne|Staub|Glut", "|")
+CONST N_PRESET = 12
 DIM liste AS GUI_WIDGET
-liste = GUI_LISTBOX(win, 16, 494, 220, 190, presetNamen)
+liste = GUI_LISTBOX(win, LINKS_X, 78, LINKS_B, 22 * N_PRESET + 6, presetNamen)
+GUI_TOOLTIP(liste, "Ein Klick setzt alle Werte auf die Vorlage")
 
-' NEBEN die Liste, nicht darauf. Vorher standen [Sichern] und [Laden] bei
-' x = 16 -- also genau auf den ersten beiden Eintraegen der Liste: "Funken"
-' war verdeckt und nicht anzuklicken, weil die Knoepfe den Klick fingen.
-DIM knopfZurueck AS GUI_WIDGET
-knopfZurueck = GUI_BUTTON(win, "Zurueck", 250, 494, 102, 30)
-GUI_TOOLTIP(knopfZurueck, "Strg+Z -- die letzte Aenderung zuruecknehmen")
-DIM knopfVor AS GUI_WIDGET
-knopfVor = GUI_BUTTON(win, "Vor", 358, 494, 102, 30)
-GUI_TOOLTIP(knopfVor, "Strg+Y -- wieder herstellen")
-DIM knopfSichern AS GUI_WIDGET
-knopfSichern = GUI_BUTTON(win, "Sichern ...", 250, 532, 102, 30)
-GUI_TOOLTIP(knopfSichern, "Alle Regler in eine .ini schreiben")
-DIM knopfLaden AS GUI_WIDGET
-knopfLaden = GUI_BUTTON(win, "Laden ...", 358, 532, 102, 30)
-GUI_TOOLTIP(knopfLaden, "Eine gesicherte Einstellung zurueckholen")
-DIM knopfCode AS GUI_WIDGET
-knopfCode = GUI_BUTTON(win, "DH-Code kopieren", 250, 570, 210, 30)
-DIM lblStatus AS GUI_WIDGET
-lblStatus = GUI_LABEL(win, "Bereit.", 250, 612)
-DIM lblZahl AS GUI_WIDGET
-lblZahl = GUI_LABEL(win, "", 250, 634)
+DIM ZY AS INTEGER : ZY = 78 + 22 * N_PRESET + 16
+DIM knopfZufall AS GUI_WIDGET
+knopfZufall = GUI_BUTTON(win, "Zufall", LINKS_X, ZY, 116, 32)
+GUI_BUTTON_VARIANT(knopfZufall, "primaer")
+GUI_TOOLTIP(knopfZufall, "Einen neuen Effekt würfeln (Strg+R)")
+DIM knopfMutieren AS GUI_WIDGET
+knopfMutieren = GUI_BUTTON(win, "Mutieren", LINKS_X + 124, ZY, 116, 32)
+GUI_TOOLTIP(knopfMutieren, "Den jetzigen Effekt nur ein wenig verändern (Strg+M)")
+
+DIM lblHg AS GUI_WIDGET
+lblHg = GUI_LABEL(win, "Hintergrund", LINKS_X, ZY + 54)
+GUI_SET_FONT_STYLE(lblHg, "fett")
+DIM waehlHg AS GUI_WIDGET
+waehlHg = GUI_DROPDOWN(win, LINKS_X, ZY + 78, LINKS_B, 28, SPLIT$("Nacht|Dämmerung|Hell|Schachbrett", "|"))
+GUI_TOOLTIP(waehlHg, "Wie der Effekt vor verschiedenem Grund wirkt")
+DIM folgtMaus AS GUI_WIDGET
+folgtMaus = GUI_CHECKBOX(win, "Quelle folgt der Maus", LINKS_X, ZY + 118)
+GUI_TOOLTIP(folgtMaus, "Die Teilchen entstehen dort, wo die Maus über der Vorschau steht")
 
 ' ============================================================
-'  Rechts: die Regler
+'  Rechts: die Regler in drei Gruppen
 ' ============================================================
+CONST RECHTS_B = 380
+DIM RX AS INTEGER : RX = CW - RECHTS_B - 14
 DIM gBeweg AS GUI_WIDGET
-gBeweg = GUI_GROUPBOX(win, 556, 16, 330, 216, "Bewegung")
+gBeweg = GUI_GROUPBOX(win, RX, 54, RECHTS_B, 216, "Bewegung")
 DIM gLeben AS GUI_WIDGET
-gLeben = GUI_GROUPBOX(win, 556, 246, 330, 126, "Lebenszeit (ms) und Ausstoss")
+gLeben = GUI_GROUPBOX(win, RX, 280, RECHTS_B, 126, "Lebenszeit (ms) und Ausstoß")
 DIM gAussehen AS GUI_WIDGET
-gAussehen = GUI_GROUPBOX(win, 906, 16, 306, 156, "Aussehen")
-DIM gFarbe1 AS GUI_WIDGET
-gFarbe1 = GUI_GROUPBOX(win, 906, 186, 306, 150, "Farbe am Anfang")
-DIM gFarbe2 AS GUI_WIDGET
-gFarbe2 = GUI_GROUPBOX(win, 906, 350, 306, 180, "Farbe am Ende")
+gAussehen = GUI_GROUPBOX(win, RX, 416, RECHTS_B, 158, "Aussehen")
+GUI_SET_ANCHOR(gBeweg, "rt") : GUI_SET_ANCHOR(gLeben, "rt") : GUI_SET_ANCHOR(gAussehen, "rt")
 
 DIM lblModus AS GUI_WIDGET
-lblModus = GUI_LABEL(win, "Darstellung", 918, 46)
+lblModus = GUI_LABEL(win, "Darstellung", RX + 12, 450)
 DIM waehlModus AS GUI_WIDGET
-waehlModus = GUI_DROPDOWN(win, 1052, 42, 148, 24, modi)
+waehlModus = GUI_DROPDOWN(win, RX + 158, 446, 200, 26, modiText)
 DIM schalterFade AS GUI_WIDGET
-schalterFade = GUI_CHECKBOX(win, "am Ende ausblenden", 918, 140, TRUE)
-DIM schalterEnde AS GUI_WIDGET
-schalterEnde = GUI_CHECKBOX(win, "Farbverlauf benutzen", 918, 380)
+schalterFade = GUI_CHECKBOX(win, "am Ende ausblenden", RX + 12, 542, TRUE)
+GUI_SET_ANCHOR(lblModus, "rt") : GUI_SET_ANCHOR(waehlModus, "rt") : GUI_SET_ANCHOR(schalterFade, "rt")
 
-' Farbfelder -- zeigen, was die drei Regler darunter ergeben.
-DIM feld1 AS GUI_WIDGET
-feld1 = GUI_CANVAS(win, 918, 306, 282, 18)
-DIM feld2 AS GUI_WIDGET
-feld2 = GUI_CANVAS(win, 918, 500, 282, 18)
+' Der Verlauf ueber die Lebenszeit: so sieht ein Teilchen von der Geburt
+' (links) bis zum Ende (rechts) aus -- Farbe, und mit Ausblenden die Deckkraft.
+DIM gVerlauf AS GUI_WIDGET
+gVerlauf = GUI_GROUPBOX(win, RX, 584, RECHTS_B, 92, "Ein Teilchen im Lauf seines Lebens")
+DIM streifen AS GUI_WIDGET
+streifen = GUI_CANVAS(win, RX + 12, 614, RECHTS_B - 24, 48)
+GUI_SET_ANCHOR(gVerlauf, "rt") : GUI_SET_ANCHOR(streifen, "rt")
 
-SUB machRegler(idx AS INTEGER, name AS STRING, x AS INTEGER, y AS INTEGER, _
-               lo AS FLOAT, hi AS FLOAT, vorgabe AS FLOAT, stellen AS INTEGER)
+SUB machRegler(idx AS INTEGER, name AS STRING, schluessel AS STRING, x AS INTEGER, y AS INTEGER, _
+               lo AS FLOAT, hi AS FLOAT, vorgabe AS FLOAT)
     DIM l AS GUI_WIDGET
     l = GUI_LABEL(win, name, x, y + 3)
-    regler[idx] = GUI_SLIDER(win, x + 146, y, 98, lo, hi, vorgabe)
-    wertText[idx] = GUI_LABEL(win, "", x + 252, y + 3)
-    nachkomma[idx] = stellen
-    parName[idx] = name
+    regler[idx] = GUI_SLIDER(win, x + 146, y, 140, lo, hi, vorgabe)
+    wertText[idx] = GUI_LABEL(win, "", x + 296, y + 3)
+    GUI_SET_ANCHOR(l, "rt") : GUI_SET_ANCHOR(regler[idx], "rt") : GUI_SET_ANCHOR(wertText[idx], "rt")
+    reglerLo[idx] = lo
+    reglerHi[idx] = hi
+    parName[idx] = schluessel
     letzter[idx] = vorgabe
 END SUB
 
-machRegler(P_VXMIN, "Tempo X min", 568, 46,  -400, 400, -60, 0)
-machRegler(P_VXMAX, "Tempo X max", 568, 76,  -400, 400,  60, 0)
-machRegler(P_VYMIN, "Tempo Y min", 568, 106, -400, 400, -140, 0)
-machRegler(P_VYMAX, "Tempo Y max", 568, 136, -400, 400, -40, 0)
-machRegler(P_GX,    "Kraft X", 568, 166, -600, 600, 0, 0)
-machRegler(P_GY,    "Kraft Y", 568, 196, -600, 600, 220, 0)
+' Der dritte Text ist der Schluessel in der .ini -- er bleibt, wie er war,
+' damit alte Dateien weiter aufgehen.
+machRegler(P_VXMIN, "Tempo X min", "Tempo X min", RX + 12, 84,  -400, 400, -60)
+machRegler(P_VXMAX, "Tempo X max", "Tempo X max", RX + 12, 114, -400, 400,  60)
+machRegler(P_VYMIN, "Tempo Y min", "Tempo Y min", RX + 12, 144, -400, 400, -140)
+machRegler(P_VYMAX, "Tempo Y max", "Tempo Y max", RX + 12, 174, -400, 400, -40)
+machRegler(P_GX,    "Kraft X", "Kraft X", RX + 12, 204, -600, 600, 0)
+machRegler(P_GY,    "Kraft Y", "Kraft Y", RX + 12, 234, -600, 600, 220)
 
-machRegler(P_LMIN,  "Leben min", 568, 276, 50, 4000, 500, 0)
-machRegler(P_LMAX,  "Leben max", 568, 306, 50, 4000, 1100, 0)
-machRegler(P_RATE,  "je Bild", 568, 336, 0, 60, 6, 0)
+machRegler(P_LMIN,  "Leben min", "Leben min", RX + 12, 310, 50, 4000, 500)
+machRegler(P_LMAX,  "Leben max", "Leben max", RX + 12, 340, 50, 4000, 1100)
+machRegler(P_RATE,  "je Bild", "je Bild", RX + 12, 370, 0, 60, 6)
 
-machRegler(P_SMIN,  "Groesse min", 918, 76, 1, 40, 2, 0)
-machRegler(P_SMAX,  "Groesse max", 918, 106, 1, 40, 5, 0)
+machRegler(P_SMIN,  "Größe min", "Groesse min", RX + 12, 480, 1, 40, 2)
+machRegler(P_SMAX,  "Größe max", "Groesse max", RX + 12, 510, 1, 40, 5)
 
-machRegler(P_R1, "Rot", 918, 216, 0, 255, 255, 0)
-machRegler(P_G1, "Gruen", 918, 246, 0, 255, 200, 0)
-machRegler(P_B1, "Blau", 918, 276, 0, 255, 60, 0)
-
-machRegler(P_R2, "Rot", 918, 410, 0, 255, 200, 0)
-machRegler(P_G2, "Gruen", 918, 440, 0, 255, 40, 0)
-machRegler(P_B2, "Blau", 918, 470, 0, 255, 20, 0)
+parName[P_R1] = "Rot Anfang" : parName[P_G1] = "Gruen Anfang" : parName[P_B1] = "Blau Anfang"
+parName[P_R2] = "Rot Ende" : parName[P_G2] = "Gruen Ende" : parName[P_B2] = "Blau Ende"
 
 ' ============================================================
-'  Werkseinstellungen
+'  Mitte: die Vorschau, darunter die beiden Farbwaehler
 ' ============================================================
-DIM presetModus[8] AS STRING
-DIM presetWert[8, N_PARAM] AS FLOAT
-DIM presetFade[8] AS INTEGER
-DIM presetVerlauf[8] AS INTEGER
+CONST MX = 270
+DIM MW AS INTEGER : MW = RX - MX - 16
+CONST FARB_H = 196
+DIM FY AS INTEGER : FY = CH - 26 - 12 - FARB_H
+
+DIM flaeche AS GUI_WIDGET
+flaeche = GUI_CANVAS(win, MX, 54, MW, FY - 54 - 12)
+GUI_SET_ANCHOR(flaeche, "lrtb")
+
+DIM FB AS INTEGER : FB = (MW - 12) \ 2
+DIM gFarbe1 AS GUI_WIDGET
+gFarbe1 = GUI_GROUPBOX(win, MX, FY, FB, FARB_H, "Farbe am Anfang")
+DIM wahl1 AS GUI_WIDGET
+wahl1 = GUI_COLORPICKER(win, MX + 12, FY + 30, FB - 24, FARB_H - 42)
+DIM gFarbe2 AS GUI_WIDGET
+gFarbe2 = GUI_GROUPBOX(win, MX + FB + 12, FY, FB, FARB_H, "Farbe am Ende")
+DIM schalterEnde AS GUI_WIDGET
+schalterEnde = GUI_CHECKBOX(win, "Farbverlauf benutzen", MX + FB + 24, FY + 30)
+DIM wahl2 AS GUI_WIDGET
+wahl2 = GUI_COLORPICKER(win, MX + FB + 24, FY + 58, FB - 24, FARB_H - 70)
+GUI_SET_ANCHOR(gFarbe1, "lb") : GUI_SET_ANCHOR(wahl1, "lb")
+GUI_SET_ANCHOR(gFarbe2, "lb") : GUI_SET_ANCHOR(schalterEnde, "lb") : GUI_SET_ANCHOR(wahl2, "lb")
+
+' ============================================================
+'  Werte lesen und setzen -- Regler und Farbwaehler hinter EINER Nummer
+' ============================================================
+FUNCTION farbAnteil(farbe AS INTEGER, k AS INTEGER) AS FLOAT
+    ' k: 0 = rot, 1 = gruen, 2 = blau
+    RETURN FLT((farbe SHR (16 - 8 * k)) BAND 255)
+END FUNCTION
+
+FUNCTION p(idx AS INTEGER) AS FLOAT
+    IF idx < N_REGLER THEN RETURN GUI_VALUE(regler[idx])
+    IF idx < P_R2 THEN RETURN farbAnteil(GUI_PICKED_COLOR(wahl1), idx - P_R1)
+    RETURN farbAnteil(GUI_PICKED_COLOR(wahl2), idx - P_R2)
+END FUNCTION
+
+SUB setzeP(idx AS INTEGER, v AS FLOAT)
+    IF idx < N_REGLER THEN
+        GUI_SET_VALUE(regler[idx], v)
+        RETURN
+    END IF
+    DIM w AS GUI_WIDGET : w = IIF(idx < P_R2, wahl1, wahl2)
+    DIM k AS INTEGER : k = IIF(idx < P_R2, idx - P_R1, idx - P_R2)
+    DIM f AS INTEGER : f = GUI_PICKED_COLOR(w)
+    DIM a AS INTEGER : a = CLAMP(INT(v + 0.5), 0, 255)
+    DIM schieb AS INTEGER : schieb = 16 - 8 * k
+    f = (f BAND (BNOT (255 SHL schieb))) BOR (a SHL schieb)
+    GUI_SET_PICKED_COLOR(w, f)
+END SUB
+
+' ============================================================
+'  Vorlagen
+' ============================================================
+DIM presetModus[N_PRESET] AS STRING
+DIM presetWert[N_PRESET, N_PARAM] AS FLOAT
+DIM presetFade[N_PRESET] AS INTEGER
+DIM presetVerlauf[N_PRESET] AS INTEGER
 
 ' Der Reihe nach: vx min/max, vy min/max, gx, gy, leben min/max, rate,
 ' groesse min/max, Startfarbe r/g/b, Endfarbe r/g/b.
@@ -207,17 +317,80 @@ setzePreset(4, "circle", -25, 25,   30,   80,  0,  20, 2600, 4000,  6,  2,  4, 2
 setzePreset(5, "circle",-260, 260,-260, 260,   0, 200,  400,  900,  0,  2,  6, 255, 230, 140, 200,  30,  10, 1, 1)
 setzePreset(6, "pixel",  -60, 60,  -60,  60,   0, -30,  700, 1500, 16,  1,  3, 180, 120, 255,  60, 200, 255, 1, 1)
 setzePreset(7, "circle", -70, 70, -320, -240,  0, 420, 1000, 1600, 10,  2,  4, 120, 200, 255,  40,  90, 200, 1, 1)
+' Blasen steigen langsam und werden durchsichtig.
+setzePreset(8, "circle", -20, 20, -90,  -40,   0, -40, 1800, 3200,  3,  4, 12, 170, 220, 255, 120, 180, 230, 1, 1)
+' Sterne: kaum Bewegung, kurzes Funkeln, Leuchten.
+setzePreset(9, "glow",  -12, 12,  -12,   12,   0,   0,  300,  900,  5,  1,  3, 255, 255, 200, 140, 160, 255, 1, 1)
+' Staub: braun, schwer, verweht nach rechts.
+setzePreset(10, "square", 10, 80,  -40,  10,  60, 90,  900, 1800,  8,  1,  3, 160, 130,  90, 110,  90,  70, 1, 1)
+' Glut: wenige grosse Teilchen, steigen auf, verloeschen dunkelrot.
+setzePreset(11, "glow",  -30, 30, -110, -50,  0, -60,  900, 1700,  3,  5, 12, 255, 150,  40, 120,  20,  10, 1, 1)
+
+SUB modusSetzen(name AS STRING)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(modi) - 1
+        IF modi[k] = name THEN GUI_DROPDOWN_SET_SELECTED(waehlModus, k)
+    NEXT
+END SUB
 
 SUB ladePreset(i AS INTEGER)
     DIM k AS INTEGER
     FOR k = 0 TO N_PARAM - 1
-        GUI_SET_VALUE(regler[k], presetWert[i, k])
+        setzeP(k, presetWert[i, k])
     NEXT
-    FOR k = 0 TO LEN(modi) - 1
-        IF modi[k] = presetModus[i] THEN GUI_DROPDOWN_SET_SELECTED(waehlModus, k)
-    NEXT
+    modusSetzen(presetModus[i])
     GUI_SET_CHECKED(schalterFade, presetFade[i] = 1)
     GUI_SET_CHECKED(schalterEnde, presetVerlauf[i] = 1)
+END SUB
+
+' ============================================================
+'  Zufall und Mutieren
+' ============================================================
+FUNCTION zw(lo AS FLOAT, hi AS FLOAT) AS FLOAT
+    RETURN lo + RND() * (hi - lo)
+END FUNCTION
+
+' Ein neuer Effekt, der nach etwas aussieht: die Zahlen werden nicht jede fuer
+' sich gewuerfelt, sondern als Paare (min <= max) und mit einer Farbe, deren
+' Ende zum Anfang passt -- ein voellig freier Wurf ergibt fast immer Brei.
+SUB zufallEffekt()
+    modusSetzen(modi[INT(RND() * LEN(modi))])
+    DIM s AS FLOAT : s = zw(10, 260)
+    DIM schief AS FLOAT : schief = zw(-1, 1) * s * 0.5
+    setzeP(P_VXMIN, -s + schief) : setzeP(P_VXMAX, s + schief)
+    DIM a AS FLOAT : a = zw(-380, 300)
+    setzeP(P_VYMIN, a) : setzeP(P_VYMAX, a + zw(20, 240))
+    setzeP(P_GX, IIF(RND() < 0.7, 0, zw(-120, 120)))
+    setzeP(P_GY, zw(-200, 480))
+    DIM l AS FLOAT : l = zw(250, 2200)
+    setzeP(P_LMIN, l) : setzeP(P_LMAX, l + zw(150, 1600))
+    setzeP(P_RATE, zw(2, 24))
+    DIM g AS FLOAT : g = zw(1, 8)
+    setzeP(P_SMIN, g) : setzeP(P_SMAX, g + zw(1, 10))
+    DIM ton AS FLOAT : ton = zw(0, 360)
+    GUI_SET_PICKED_COLOR(wahl1, HSV(ton, zw(0.3, 1), zw(0.75, 1)))
+    GUI_SET_PICKED_COLOR(wahl2, HSV(ton + zw(-60, 60), zw(0.4, 1), zw(0.25, 0.8)))
+    GUI_SET_CHECKED(schalterEnde, RND() < 0.8)
+    GUI_SET_CHECKED(schalterFade, RND() < 0.85)
+    GUI_SET_TEXT(lblStatus, "Neuer Effekt gewürfelt.")
+END SUB
+
+' Jeder Regler ein wenig, die Farben um wenige Stufen -- der Effekt bleibt
+' erkennbar derselbe.
+SUB mutiere()
+    DIM k AS INTEGER
+    FOR k = 0 TO N_REGLER - 1
+        IF RND() < 0.7 THEN setzeP(k, p(k) + (RND() - 0.5) * 0.12 * (reglerHi[k] - reglerLo[k]))
+    NEXT
+    FOR k = P_R1 TO P_B2
+        setzeP(k, p(k) + (RND() - 0.5) * 40)
+    NEXT
+    ' Ein Paar darf durch das Wackeln nicht verkehrt herum liegen.
+    IF p(P_VXMIN) > p(P_VXMAX) THEN setzeP(P_VXMAX, p(P_VXMIN))
+    IF p(P_VYMIN) > p(P_VYMAX) THEN setzeP(P_VYMAX, p(P_VYMIN))
+    IF p(P_LMIN) > p(P_LMAX) THEN setzeP(P_LMAX, p(P_LMIN))
+    IF p(P_SMIN) > p(P_SMAX) THEN setzeP(P_SMAX, p(P_SMIN))
+    GUI_SET_TEXT(lblStatus, "Ein wenig verändert.")
 END SUB
 
 ' ============================================================
@@ -226,20 +399,23 @@ END SUB
 DIM sys AS PARTICLE_SYSTEM
 sys = PARTICLE_SYSTEM_NEW(0, 0)
 
-FUNCTION p(idx AS INTEGER) AS FLOAT
-    RETURN GUI_VALUE(regler[idx])
-END FUNCTION
-
 ' ============================================================
 '  Einstellungen sichern und laden
 '
-'  Format: eine schlichte `.ini` -- Schluessel ist die BESCHRIFTUNG des
-'  Reglers. Das macht die Datei lesbar und von Hand aenderbar, was bei einem
-'  Werkzeug fuer Bastler mehr wert ist als ein kompaktes Format. Der Preis:
-'  wer eine Beschriftung umbenennt, macht alte Dateien an dieser Stelle
-'  stumm -- deshalb wird ein unbekannter Schluessel UEBERGANGEN und nicht
-'  als Fehler gemeldet.
+'  Format: eine schlichte `.ini` -- Schluessel ist der Name des Wertes. Das
+'  macht die Datei lesbar und von Hand aenderbar, was bei einem Werkzeug fuer
+'  Bastler mehr wert ist als ein kompaktes Format. Ein unbekannter Schluessel
+'  wird UEBERGANGEN und nicht als Fehler gemeldet. (Bis 2026-10-29 hiessen die
+'  sechs Farbanteile "Rot"/"Gruen"/"Blau", je zweimal -- die Endfarbe
+'  ueberschrieb die Anfangsfarbe. Alte Dateien bringen darum nur die Endfarbe
+'  mit, und so werden sie gelesen.)
 ' ============================================================
+' Ganze Zahlen ohne ".0" -- die Datei soll man von Hand lesen koennen.
+FUNCTION zahlText$(v AS FLOAT) AS STRING
+    IF v = INT(v) THEN RETURN STR$(INT(v))
+    RETURN STR$(v)
+END FUNCTION
+
 SUB einstellungSichern()
     DIM datei AS STRING
     datei = FILE_SAVE_DIALOG("Einstellung sichern", "partikel.ini", "ini")
@@ -248,8 +424,10 @@ SUB einstellungSichern()
         MAPPUT(m, "modus", modi[GUI_DROPDOWN_SELECTED(waehlModus)])
         DIM k AS INTEGER
         FOR k = 0 TO N_PARAM - 1
-            MAPPUT(m, parName[k], STR$(GUI_VALUE(regler[k])))
+            MAPPUT(m, parName[k], zahlText$(p(k)))
         NEXT
+        MAPPUT(m, "ausblenden", IIF(GUI_CHECKED(schalterFade), "1", "0"))
+        MAPPUT(m, "verlauf", IIF(GUI_CHECKED(schalterEnde), "1", "0"))
         TRY
             INI_SAVE(datei, m)
             standLesen(U_GESICHERT)
@@ -274,25 +452,29 @@ SUB einstellungLaden()
                     ' GUI_SET_VALUE klemmt auf den Reglerbereich -- eine von
                     ' Hand verstellte Datei kann also nichts Unmoegliches
                     ' erzwingen.
-                    GUI_SET_VALUE(regler[k], VAL(MAPGET(m, parName[k])))
+                    setzeP(k, VAL(MAPGET(m, parName[k])))
                     gefunden = gefunden + 1
                 END IF
             NEXT
-            IF MAPHAS(m, "modus") THEN
-                DIM w AS STRING : w = MAPGET(m, "modus")
-                FOR k = 0 TO LEN(modi) - 1
-                    IF modi[k] = w THEN GUI_DROPDOWN_SET_SELECTED(waehlModus, k)
-                NEXT
-            END IF
+            ' Die alten Schluessel (siehe oben): sie trugen die Endfarbe.
+            DIM altName AS ARRAY OF STRING : altName = SPLIT$("Rot|Gruen|Blau", "|")
+            FOR k = 0 TO 2
+                IF MAPHAS(m, altName[k]) THEN
+                    setzeP(P_R2 + k, VAL(MAPGET(m, altName[k])))
+                    gefunden = gefunden + 1
+                END IF
+            NEXT
+            IF MAPHAS(m, "modus") THEN modusSetzen(MAPGET(m, "modus"))
+            IF MAPHAS(m, "ausblenden") THEN GUI_SET_CHECKED(schalterFade, MAPGET(m, "ausblenden") = "1")
+            IF MAPHAS(m, "verlauf") THEN GUI_SET_CHECKED(schalterEnde, MAPGET(m, "verlauf") = "1")
             ' Die Werte wandern von selbst in den Emitter: die Schleife
-            ' vergleicht jeden Regler mit `letzter[]` -- ein per
-            ' GUI_SET_VALUE gesetzter Wert sieht fuer sie aus wie eine
-            ' Bewegung von Hand.
+            ' vergleicht jeden Wert mit dem zuletzt gesehenen -- ein gesetzter
+            ' Wert sieht fuer sie aus wie eine Bewegung von Hand.
             standLesen(U_GESICHERT)
             IF gefunden = 0 THEN
-                GUI_SET_TEXT(lblStatus, "Keine bekannten Regler in " + datei)
+                GUI_SET_TEXT(lblStatus, "Keine bekannten Werte in " + datei)
             ELSE
-                GUI_SET_TEXT(lblStatus, STR$(gefunden) + " Regler geladen: " + datei)
+                GUI_SET_TEXT(lblStatus, STR$(gefunden) + " Werte geladen: " + datei)
             END IF
         CATCH e
             GUI_SET_TEXT(lblStatus, e)
@@ -301,14 +483,14 @@ SUB einstellungLaden()
 END SUB
 
 FUNCTION farbe1() AS INTEGER
-    RETURN RGB(INT(p(P_R1)), INT(p(P_G1)), INT(p(P_B1)))
+    RETURN GUI_PICKED_COLOR(wahl1)
 END FUNCTION
 
 FUNCTION farbe2() AS INTEGER
-    RETURN RGB(INT(p(P_R2)), INT(p(P_G2)), INT(p(P_B2)))
+    RETURN GUI_PICKED_COLOR(wahl2)
 END FUNCTION
 
-' Alle Regler ins System uebertragen. Wird nur bei Aenderung gerufen.
+' Alle Werte ins System uebertragen. Wird nur bei Aenderung gerufen.
 SUB uebertrage()
     PARTICLE_SET_VELOCITY(sys, p(P_VXMIN), p(P_VXMAX), p(P_VYMIN), p(P_VYMAX))
     PARTICLE_SET_GRAVITY(sys, p(P_GX), p(P_GY))
@@ -360,26 +542,21 @@ END FUNCTION
 ' ============================================================
 '  Rueckgaengig / Wiederholen
 '
-'  Der ganze Zustand dieses Werkzeugs sind 17 Reglerwerte, die Darstellungs-
-'  art und zwei Schalter -- also 20 Zahlen. Ein Schritt ist deshalb der VOLLE
-'  Stand, nicht eine Beschreibung dessen, was sich geaendert hat: das ist
-'  hier kuerzer als jede Buchfuehrung darueber, und es kann nichts
-'  auseinanderlaufen.
-'
-'  Der Ringpuffer der anderen Piloten waere hier fehl am Platz -- bei 20
-'  Zahlen je Stand kostet das Aufruecken nichts, und eine Liste ohne Modulo
-'  ist die Fassung, die man noch versteht.
+'  Der ganze Zustand dieses Werkzeugs sind 11 Reglerwerte, zwei Farben (als
+'  sechs Anteile), die Darstellungsart und zwei Schalter -- also 20 Zahlen.
+'  Ein Schritt ist deshalb der VOLLE Stand, nicht eine Beschreibung dessen,
+'  was sich geaendert hat: das ist hier kuerzer als jede Buchfuehrung
+'  darueber, und es kann nichts auseinanderlaufen.
 '
 '  **Wann ist ein Schritt fertig?** Das ist bei einem Regler-Editor die
-'  eigentliche Frage: ein gezogener Regler aendert sich in JEDEM Bild. Wer
-'  das aufzeichnet, hat nach einer Sekunde Ziehen 60 Schritte, und
-'  Rueckgaengig nimmt ein Sechzigstel der Bewegung zurueck -- unbrauchbar.
-'  Gesichert wird deshalb erst, wenn sich ein Bild lang NICHTS geaendert hat
-'  und keine Maustaste mehr haengt: ein Zug ist ein Schritt. Werkseinstellung
-'  waehlen und eine .ini laden sind auf demselben Weg genau ein Schritt.
+'  eigentliche Frage: ein gezogener Regler (und ein gezogener Farbpunkt)
+'  aendert sich in JEDEM Bild. Gesichert wird deshalb erst, wenn sich ein
+'  Bild lang NICHTS geaendert hat und keine Maustaste mehr haengt: ein Zug
+'  ist ein Schritt. Vorlage waehlen, Zufall, Mutieren und eine .ini laden
+'  sind auf demselben Weg genau ein Schritt.
 ' ============================================================
 CONST U_MAX = 32
-CONST U_FELDER = N_PARAM + 3           ' Regler + Darstellung + zwei Schalter
+CONST U_FELDER = N_PARAM + 3           ' Werte + Darstellung + zwei Schalter
 ' Ein Platz mehr als der Verlauf braucht: dort liegt der Stand beim letzten
 ' Sichern oder Laden -- ungesichert ist, was davon abweicht.
 DIM uStand[U_MAX + 1, U_FELDER] AS FLOAT
@@ -391,21 +568,24 @@ DIM uOffen AS BOOLEAN : uOffen = FALSE ' eine Aenderung wartet auf ihr Ende
 SUB standLesen(ziel AS INTEGER)
     DIM k AS INTEGER
     FOR k = 0 TO N_PARAM - 1
-        uStand[ziel, k] = GUI_VALUE(regler[k])
+        uStand[ziel, k] = p(k)
     NEXT
     uStand[ziel, N_PARAM] = GUI_DROPDOWN_SELECTED(waehlModus)
     uStand[ziel, N_PARAM + 1] = IIF(GUI_CHECKED(schalterFade), 1, 0)
     uStand[ziel, N_PARAM + 2] = IIF(GUI_CHECKED(schalterEnde), 1, 0)
 END SUB
 
-' Die Erkennung im Hauptteil vergleicht jeden Regler mit `letzter[]`. Nach
-' einem Rueckgaengig muss sie den neuen Stand als BEKANNT ansehen -- sonst
-' zeichnet sie ihn als frische Aenderung auf und der Vor-Weg waere weg.
+' Die Erkennung im Hauptteil vergleicht jeden Wert mit dem zuletzt
+' gesehenen. Nach einem Rueckgaengig muss sie den neuen Stand als BEKANNT
+' ansehen -- sonst zeichnet sie ihn als frische Aenderung auf und der Vor-Weg
+' waere weg.
 SUB letzteAuffrischen()
     DIM k AS INTEGER
-    FOR k = 0 TO N_PARAM - 1
+    FOR k = 0 TO N_REGLER - 1
         letzter[k] = GUI_VALUE(regler[k])
     NEXT
+    letzteFarbe1 = farbe1()
+    letzteFarbe2 = farbe2()
     letzterModus = GUI_DROPDOWN_SELECTED(waehlModus)
     letztesFade = GUI_CHECKED(schalterFade)
     letzterVerlauf = GUI_CHECKED(schalterEnde)
@@ -414,7 +594,7 @@ END SUB
 SUB standAnwenden(quelle AS INTEGER)
     DIM k AS INTEGER
     FOR k = 0 TO N_PARAM - 1
-        GUI_SET_VALUE(regler[k], uStand[quelle, k])
+        setzeP(k, uStand[quelle, k])
     NEXT
     GUI_DROPDOWN_SET_SELECTED(waehlModus, INT(uStand[quelle, N_PARAM]))
     GUI_SET_CHECKED(schalterFade, uStand[quelle, N_PARAM + 1] = 1)
@@ -428,7 +608,7 @@ FUNCTION standGleich(i AS INTEGER) AS BOOLEAN
     ' Ist der aufgezeichnete Stand `i` derselbe wie der jetzige?
     DIM k AS INTEGER
     FOR k = 0 TO N_PARAM - 1
-        IF uStand[i, k] <> GUI_VALUE(regler[k]) THEN RETURN FALSE
+        IF uStand[i, k] <> p(k) THEN RETURN FALSE
     NEXT
     IF uStand[i, N_PARAM] <> GUI_DROPDOWN_SELECTED(waehlModus) THEN RETURN FALSE
     IF (uStand[i, N_PARAM + 1] = 1) <> GUI_CHECKED(schalterFade) THEN RETURN FALSE
@@ -467,7 +647,7 @@ SUB zurueck()
     IF uPos > 0 THEN
         uPos = uPos - 1
         standAnwenden(uPos)
-        GUI_SET_TEXT(lblStatus, "Zurueck (" + STR$(uPos) + "/" + STR$(uAnz - 1) + ")")
+        GUI_SET_TEXT(lblStatus, "Zurückgenommen.")
     END IF
 END SUB
 
@@ -475,8 +655,63 @@ SUB wieder()
     IF uPos < uAnz - 1 THEN
         uPos = uPos + 1
         standAnwenden(uPos)
-        GUI_SET_TEXT(lblStatus, "Vor (" + STR$(uPos) + "/" + STR$(uAnz - 1) + ")")
+        GUI_SET_TEXT(lblStatus, "Wiederhergestellt.")
     END IF
+END SUB
+
+' ============================================================
+'  Die Vorschau zeichnen: Grund, Teilchen, Rahmen
+' ============================================================
+SUB grundZeichnen(cx AS INTEGER, cy AS INTEGER, cw AS INTEGER, ch AS INTEGER)
+    DIM art AS INTEGER : art = GUI_DROPDOWN_SELECTED(waehlHg)
+    IF art = 1 THEN
+        GRADIENTV(cx, cy, cx + cw - 1, cy + ch - 1, &H1B2A4A, &H7A4256)
+    ELSEIF art = 2 THEN
+        BOX(cx, cy, cx + cw - 1, cy + ch - 1, &HE6EAF0)
+    ELSEIF art = 3 THEN
+        BOX(cx, cy, cx + cw - 1, cy + ch - 1, &H2A2F3A)
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        FOR y = 0 TO (ch - 1) \ 24
+            FOR x = 0 TO (cw - 1) \ 24
+                IF (x + y) MOD 2 = 0 THEN BOX(cx + x * 24, cy + y * 24, MIN(cx + x * 24 + 23, cx + cw - 1), MIN(cy + y * 24 + 23, cy + ch - 1), &H3A414F)
+            NEXT
+        NEXT
+    ELSE
+        BOX(cx, cy, cx + cw - 1, cy + ch - 1, &H0E1620)
+    END IF
+END SUB
+
+' ============================================================
+'  Der Streifen: Farbe und Deckkraft ueber die Lebenszeit
+' ============================================================
+SUB streifenZeichnen()
+    DIM sx AS INTEGER : sx = GUI_CANVAS_X(streifen)
+    DIM sy AS INTEGER : sy = GUI_CANVAS_Y(streifen)
+    DIM sb AS INTEGER : sb = GUI_CANVAS_W(streifen)
+    DIM sh AS INTEGER : sh = GUI_CANVAS_H(streifen)
+    ' Schachbrett darunter -- sonst sieht man dem Ausblenden nicht an, wo es
+    ' durchsichtig wird.
+    DIM i AS INTEGER
+    FOR i = 0 TO (sb - 1) \ 8
+        BOX(sx + i * 8, sy, MIN(sx + i * 8 + 7, sx + sb - 1), sy + sh \ 2 - 1, IIF(i MOD 2 = 0, &H3A414F, &H23282F))
+        BOX(sx + i * 8, sy + sh \ 2, MIN(sx + i * 8 + 7, sx + sb - 1), sy + sh - 1, IIF(i MOD 2 = 0, &H23282F, &H3A414F))
+    NEXT
+    DIM f2 AS INTEGER : f2 = IIF(GUI_CHECKED(schalterEnde), farbe2(), farbe1())
+    DIM t AS FLOAT
+    DIM r AS INTEGER
+    DIM g AS INTEGER
+    DIM b AS INTEGER
+    DIM a AS INTEGER
+    FOR i = 0 TO sb - 1
+        t = i / MAX(1, sb - 1)
+        r = INT(farbAnteil(farbe1(), 0) * (1 - t) + farbAnteil(f2, 0) * t)
+        g = INT(farbAnteil(farbe1(), 1) * (1 - t) + farbAnteil(f2, 1) * t)
+        b = INT(farbAnteil(farbe1(), 2) * (1 - t) + farbAnteil(f2, 2) * t)
+        a = IIF(GUI_CHECKED(schalterFade), MAX(1, INT(255 * (1 - t))), 255)
+        LINE(sx + i, sy, sx + i, sy + sh - 1, RGBA(r, g, b, a))
+    NEXT
+    RECT(sx, sy, sx + sb - 1, sy + sh - 1, &H2E3C50)
 END SUB
 
 ' ============================================================
@@ -486,21 +721,18 @@ GUI_LISTBOX_SET_SELECTED(liste, 0)
 ladePreset(0)
 uebertrage()
 
-DIM letzteWahl AS INTEGER
-letzteWahl = 0
-DIM letzterModus AS INTEGER
-letzterModus = 0
-DIM letztesFade AS BOOLEAN
-letztesFade = GUI_CHECKED(schalterFade)
-DIM letzterVerlauf AS BOOLEAN
-letzterVerlauf = GUI_CHECKED(schalterEnde)
-DIM pausiert AS INTEGER
-pausiert = 0
+DIM letzteWahl AS INTEGER : letzteWahl = 0
+DIM letzterModus AS INTEGER : letzterModus = 0
+DIM letztesFade AS BOOLEAN : letztesFade = GUI_CHECKED(schalterFade)
+DIM letzterVerlauf AS BOOLEAN : letzterVerlauf = GUI_CHECKED(schalterEnde)
+DIM letzteFarbe1 AS INTEGER : letzteFarbe1 = farbe1()
+DIM letzteFarbe2 AS INTEGER : letzteFarbe2 = farbe2()
+DIM pausiert AS INTEGER : pausiert = 0
 
 ' Der Anfangsstand ist Schritt 0 -- ohne ihn haette das erste Rueckgaengig
 ' nichts, wohin es zurueckkoennte. `letzteAuffrischen` gehoert dazu: sonst
-' sieht die Erkennung im ersten Bild die Werkseinstellung als frische
-' Aenderung und legt einen zweiten, gleichen Stand an.
+' sieht die Erkennung im ersten Bild die Vorlage als frische Aenderung und
+' legt einen zweiten, gleichen Stand an.
 letzteAuffrischen()
 schrittSichern()
 standLesen(U_GESICHERT)
@@ -513,7 +745,7 @@ FUNCTION ungesichert() AS BOOLEAN
 END FUNCTION
 
 ' ESC beendete den Editor bis 2026-09-19 sofort, das Kreuz ebenso -- auch mit
-' ungesicherten Reglern. Jetzt fragen beide nach, aber nur dann.
+' ungesicherten Werten. Jetzt fragen beide nach, aber nur dann.
 SUB endeAnfragen()
     IF ungesichert() THEN
         frage = GUI_DIALOG("Beenden", "Die Einstellung ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen")
@@ -522,14 +754,29 @@ SUB endeAnfragen()
     END IF
 END SUB
 
+SUB pauseUmschalten()
+    pausiert = 1 - pausiert
+    GUI_TOOLBAR_SET_ICON(leiste, tbPause, IIF(pausiert = 1, "start", "pause"))
+    GUI_TOOLBAR_SET_TEXT(leiste, tbPause, IIF(pausiert = 1, "Weiter", "Pause"))
+END SUB
+
+DIM warB AS INTEGER : warB = SCREENWIDTH()
+DIM warH AS INTEGER : warH = SCREENHEIGHT()
+
 WHILE NOT beenden
-    ' Das Kreuz (und Alt+F4) fragt wie [Beenden] nach, wenn etwas nicht
-    ' gesichert ist. QUITREQUESTED ohne das Kreuz ist das Bildlimit eines
-    ' Testlaufs -- dort endet das Programm hart wie bisher.
+    ' Das Kreuz (und Alt+F4) fragt nach, wenn etwas nicht gesichert ist.
+    ' QUITREQUESTED ohne das Kreuz ist das Bildlimit eines Testlaufs -- dort
+    ' endet das Programm hart wie bisher.
     IF WINDOW_CLOSE_REQUESTED() THEN
         IF frage < 0 THEN endeAnfragen()
     ELSEIF QUITREQUESTED() THEN
         BREAK
+    END IF
+    ' Das Fenster wurde groesser oder kleiner: die gui folgt, die Anker
+    ' verteilen den Platz (die Vorschau waechst, der Rest rueckt mit).
+    IF SCREENWIDTH() <> warB OR SCREENHEIGHT() <> warH THEN
+        warB = SCREENWIDTH() : warH = SCREENHEIGHT()
+        GUI_WINDOW_SET_BOUNDS(win, 0, 0, warB, warH)
     END IF
     CLS(&H0B1119)
     GUI_UPDATE()
@@ -537,24 +784,46 @@ WHILE NOT beenden
     ' das GUI_UPDATE desselben Bildes nahm sie gleich als "Abbrechen".
     IF KEYHIT(KEY_ESCAPE) AND frage < 0 THEN endeAnfragen()
 
-    IF GUI_LISTBOX_SELECTED(liste) <> letzteWahl THEN
+    IF GUI_LISTBOX_SELECTED(liste) <> letzteWahl AND GUI_LISTBOX_SELECTED(liste) >= 0 THEN
         letzteWahl = GUI_LISTBOX_SELECTED(liste)
         ladePreset(letzteWahl)
         PARTICLE_CLEAR(sys)
-        ' Eine Werkseinstellung laesst sich jederzeit wieder waehlen.
+        GUI_SET_TEXT(lblStatus, "Vorlage: " + presetNamen[letzteWahl])
+        ' Eine Vorlage laesst sich jederzeit wieder waehlen.
         standLesen(U_GESICHERT)
+    END IF
+
+    ' --- Befehle ---
+    DIM tb AS INTEGER : tb = GUI_TOOLBAR_CLICKED(leiste)
+    IF GUI_CLICKED(miZurueck) OR tb = tbZurueck THEN zurueck()
+    IF GUI_CLICKED(miVor) OR tb = tbVor THEN wieder()
+    IF GUI_CLICKED(knopfZufall) OR GUI_CLICKED(miZufall) OR tb = tbZufall THEN zufallEffekt()
+    IF GUI_CLICKED(knopfMutieren) OR GUI_CLICKED(miMutieren) OR tb = tbMutieren THEN mutiere()
+    IF GUI_CLICKED(miPause) OR tb = tbPause THEN pauseUmschalten()
+    IF GUI_CLICKED(miLeeren) OR tb = tbLeeren THEN PARTICLE_CLEAR(sys)
+    IF GUI_CLICKED(miSichern) OR tb = tbSichern THEN einstellungSichern()
+    IF GUI_CLICKED(miLaden) OR tb = tbLaden THEN einstellungLaden()
+    IF GUI_CLICKED(miEnde) AND frage < 0 THEN endeAnfragen()
+    IF GUI_CLICKED(miCode) OR tb = tbCode THEN
+        CLIPBOARD_SET(dhCode$())
+        GUI_SET_TEXT(lblStatus, "Aufrufe in der Zwischenablage.")
     END IF
 
     ' --- Aenderungen erkennen ---
     DIM geaendert AS INTEGER
     geaendert = 0
     DIM k AS INTEGER
-    FOR k = 0 TO N_PARAM - 1
+    FOR k = 0 TO N_REGLER - 1
         IF GUI_VALUE(regler[k]) <> letzter[k] THEN
             letzter[k] = GUI_VALUE(regler[k])
             geaendert = 1
         END IF
     NEXT
+    IF farbe1() <> letzteFarbe1 OR farbe2() <> letzteFarbe2 THEN
+        letzteFarbe1 = farbe1()
+        letzteFarbe2 = farbe2()
+        geaendert = 1
+    END IF
     IF GUI_DROPDOWN_SELECTED(waehlModus) <> letzterModus THEN
         letzterModus = GUI_DROPDOWN_SELECTED(waehlModus)
         geaendert = 1
@@ -577,47 +846,23 @@ WHILE NOT beenden
         uOffen = FALSE
         schrittSichern()
     END IF
-
-    ' --- Bedienung ---
-    DIM strg AS BOOLEAN
-    strg = KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
-    IF GUI_CLICKED(knopfZurueck) OR (strg AND KEYHIT(KEY_Z)) THEN zurueck()
-    IF GUI_CLICKED(knopfVor) OR (strg AND KEYHIT(KEY_Y)) THEN wieder()
-    GUI_SET_ENABLED(knopfZurueck, uPos > 0)
-    GUI_SET_ENABLED(knopfVor, uPos < uAnz - 1)
-
-    IF GUI_CLICKED(knopfPause) THEN
-        pausiert = 1 - pausiert
-        GUI_SET_TEXT(knopfPause, IIF(pausiert = 1, "Weiter", "Pause"))
-    END IF
-    IF GUI_CLICKED(knopfLeeren) THEN PARTICLE_CLEAR(sys)
-    IF GUI_CLICKED(knopfSichern) THEN einstellungSichern()
-    IF GUI_CLICKED(knopfLaden) THEN einstellungLaden()
-
-    IF GUI_CLICKED(knopfCode) THEN
-        CLIPBOARD_SET(dhCode$())
-        GUI_SET_TEXT(lblStatus, "Aufrufe in der Zwischenablage.")
-    END IF
+    GUI_MENU_ENABLE(miZurueck, uPos > 0)
+    GUI_MENU_ENABLE(miVor, uPos < uAnz - 1)
+    GUI_TOOLBAR_ENABLE(leiste, tbZurueck, uPos > 0)
+    GUI_TOOLBAR_ENABLE(leiste, tbVor, uPos < uAnz - 1)
+    GUI_SET_ENABLED(wahl2, GUI_CHECKED(schalterEnde))
 
     ' --- Vorschau ---
-    DIM cx AS INTEGER
-    DIM cy AS INTEGER
-    DIM cw AS INTEGER
-    DIM ch AS INTEGER
-    cx = GUI_CANVAS_X(flaeche)
-    cy = GUI_CANVAS_Y(flaeche)
-    cw = GUI_CANVAS_W(flaeche)
-    ch = GUI_CANVAS_H(flaeche)
+    DIM vx AS INTEGER : vx = GUI_CANVAS_X(flaeche)
+    DIM vy AS INTEGER : vy = GUI_CANVAS_Y(flaeche)
+    DIM vb AS INTEGER : vb = GUI_CANVAS_W(flaeche)
+    DIM vh AS INTEGER : vh = GUI_CANVAS_H(flaeche)
 
     ' Quelle: Mitte der Flaeche, oder unter der Maus wenn gewuenscht.
-    DIM qx AS INTEGER
-    DIM qy AS INTEGER
-    ' INT(): `/` liefert eine Kommazahl, und die Zuweisung an ein INTEGER
-    ' bricht ab, sobald sie nicht ganzzahlig ist (der Compiler warnt).
-    qx = cx + INT(cw / 2)
-    qy = cy + INT(ch / 2)
+    DIM qx AS INTEGER : qx = vx + vb \ 2
+    DIM qy AS INTEGER : qy = vy + vh \ 2
     IF GUI_CHECKED(folgtMaus) THEN
-        IF MOUSEX() >= cx AND MOUSEX() < cx + cw AND MOUSEY() >= cy AND MOUSEY() < cy + ch THEN
+        IF MOUSEX() >= vx AND MOUSEX() < vx + vb AND MOUSEY() >= vy AND MOUSEY() < vy + vh THEN
             qx = MOUSEX()
             qy = MOUSEY()
         END IF
@@ -625,34 +870,28 @@ WHILE NOT beenden
     PARTICLE_SET_POS(sys, qx, qy)
 
     IF pausiert = 0 THEN
-        IF GUI_CLICKED(knopfSalve) THEN PARTICLE_EMIT(sys, 200)
+        IF GUI_CLICKED(miSalve) OR tb = tbSalve THEN PARTICLE_EMIT(sys, 200)
         PARTICLE_EMIT(sys, INT(p(P_RATE)))
         PARTICLE_UPDATE(sys, 16)
     END IF
 
-    GUI_DRAW()
+    GUI_DRAW(FALSE)
 
     ' Nach GUI_DRAW, sonst zeichnet das Fenster darueber. SCISSOR haelt die
     ' Teilchen in der Flaeche -- ohne das fliegen sie ueber die Regler.
-    BOX(cx, cy, cx + cw - 1, cy + ch - 1, &H0E1620)
-    SCISSOR(cx, cy, cw, ch)
+    grundZeichnen(vx, vy, vb, vh)
+    SCISSOR(vx, vy, vb, vh)
     PARTICLE_DRAW(sys)
     SCISSOR_END()
-    RECT(cx, cy, cx + cw - 1, cy + ch - 1, &H2E3C50)
-
-    ' Farbfelder
-    BOX(GUI_CANVAS_X(feld1), GUI_CANVAS_Y(feld1), _
-        GUI_CANVAS_X(feld1) + GUI_CANVAS_W(feld1) - 1, _
-        GUI_CANVAS_Y(feld1) + GUI_CANVAS_H(feld1) - 1, farbe1())
-    BOX(GUI_CANVAS_X(feld2), GUI_CANVAS_Y(feld2), _
-        GUI_CANVAS_X(feld2) + GUI_CANVAS_W(feld2) - 1, _
-        GUI_CANVAS_Y(feld2) + GUI_CANVAS_H(feld2) - 1, farbe2())
+    RECT(vx, vy, vx + vb - 1, vy + vh - 1, &H2E3C50)
+    streifenZeichnen()
 
     ' Zahlen neben den Reglern
-    FOR k = 0 TO N_PARAM - 1
-        GUI_SET_TEXT(wertText[k], FORMAT$(GUI_VALUE(regler[k]), "%." + STR$(nachkomma[k]) + "f"))
+    FOR k = 0 TO N_REGLER - 1
+        GUI_SET_TEXT(wertText[k], FORMAT$(GUI_VALUE(regler[k]), "%.0f"))
     NEXT
-    GUI_SET_TEXT(lblZahl, STR$(PARTICLE_COUNT(sys)) + " Teilchen")
+    GUI_STATUSBAR_SET(lblStatus, sfZahl, STR$(PARTICLE_COUNT(sys)) + " Teilchen")
+    GUI_STATUSBAR_SET(lblStatus, sfSchritt, "Schritt " + STR$(uPos + 1) + " von " + STR$(uAnz))
 
     IF frage >= 0 THEN
         DIM ea AS INTEGER : ea = GUI_ANSWER(frage)
@@ -669,6 +908,9 @@ WHILE NOT beenden
         ' ueber dem Kasten.
         IF frage >= 0 THEN GUI_DRAW_WINDOW(frage)
     END IF
+    ' Menues, Klapplisten und Tooltips liegen ueber allem, auch ueber der
+    ' Vorschau.
+    GUI_DRAW_TOP()
 
     FLIP()
 WEND

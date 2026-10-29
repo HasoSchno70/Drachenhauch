@@ -19,7 +19,10 @@ dhrt run examples/189_sprite_editor.dh
 ```
 
 Der Editor startet im Vollbild mit einem leeren Sprite von 32×32 Punkten.
-Eine Datei nimmt er nicht auf der Kommandozeile, sondern über **[Oeffnen]**.
+Eine Datei nimmt er nicht auf der Kommandozeile, sondern über **Öffnen**
+(Menü Datei oder Werkzeugleiste). Oben Menü (Datei, Bearbeiten, Bild,
+Ansicht) und Werkzeugleiste, unten die Statusleiste (Werkzeug und Meldung,
+Bild und Ebene, Zoom); die Oberfläche schreibt in DejaVu Sans.
 
 ## Bedienung
 
@@ -33,6 +36,7 @@ Eine Datei nimmt er nicht auf der Kommandozeile, sondern über **[Oeffnen]**.
 | `1`..`6` | Palettenfarbe 1 bis 6 |
 | `+` / `-` | Pinsel größer / kleiner (1 bis 6 Punkte) |
 | `Strg+Z` / `Strg+Y` | zurück / vor (24 Schritte) |
+| `Strg+N` / `Strg+O` / `Strg+S` / `Strg+Q` | neu / öffnen / sichern / beenden |
 | `Strg+C` / `Strg+X` / `Strg+V` | Auswahl kopieren / ausschneiden / einsetzen |
 | `Strg+D` | Auswahl aufheben |
 | `Entf` | Auswahl leeren |
@@ -45,9 +49,10 @@ die Ebenen weg.
 
 ## Werkzeuge
 
-Die Werkzeugleiste oben trägt alle zwölf als Knöpfe, daneben
-**[Zurueck]**/**[Vor]** und die Schalter **gefuellt**, **Spiegel X**,
-**Spiegel Y**, **Zwiebelhaut** und **Raster**.
+Die zwölf Werkzeuge stehen als Sinnbilder in einer **Spalte** links neben der
+Zeichenfläche, das gewählte trägt einen Rahmen in der Akzentfarbe. In der
+Werkzeugleiste oben neben Datei, Ausgaben und Zurück/Vor die Schalter
+**Gefüllt**, **Spiegel X**, **Spiegel Y**, **Zwiebelhaut** und **Raster**.
 
 | Taste | Werkzeug | Wirkung |
 |---|---|---|
@@ -78,7 +83,9 @@ wandert mit. Halbdurchsichtige Punkte behalten dabei ihre Deckkraft.
 
 ## Linke Spalte: Farbe, Palette, Leinwand
 
-- **Farbe** — ein Farbwähler, darunter die **Palette** mit 16 Plätzen.
+- **Farbe** — ein Farbwähler, darunter die **Palette** mit 16 Plätzen und
+  **Zuletzt**: die acht zuletzt zum Malen benutzten Farben, die jüngste vorn —
+  ein Klick wählt eine wieder.
 - **[Palette laden]** / **[Palette sichern]** — GIMP-Paletten (`.gpl`), das
   Format, das GIMP, Aseprite, Krita und die Palettensammlungen im Netz
   sprechen. Beim Laden werden krumme Zeilen übergangen statt gemeldet (die
@@ -90,9 +97,9 @@ wandert mit. Halbdurchsichtige Punkte behalten dabei ihre Deckkraft.
 - **[Statistik]** — Punkte, Farben und häufigste Farbe, gesamt und je Bild.
 - **[Zuschneiden]** — auf den Inhalt, gemessen über **alle** Ebenen, auch
   ausgeblendete (sonst verschwände Inhalt, den man gerade nicht sieht).
-- **[Groesse aendern]** — neue Breite und Höhe; dazukommender Rand ist
+- **[Größe ändern]** — neue Breite und Höhe; dazukommender Rand ist
   durchsichtig.
-- **[Spiegeln |]**, **[Spiegeln --]**, **[90 >]**, **[< 90]** — spiegeln und
+- **[↔]**, **[↕]**, **[↻ 90°]**, **[↺ 90°]** (auch im Menü Bild) — spiegeln und
   vierteldrehen. Alle vier gelten für das **ganze** Sprite (alle Bilder,
   alle Ebenen); eine Drehung tauscht Breite und Höhe. Sie stehen **nicht** im
   Verlauf — der zeichnet je Schritt eine Ebene auf, ein Rückgängig danach
@@ -105,7 +112,9 @@ wandert mit. Halbdurchsichtige Punkte behalten dabei ihre Deckkraft.
 ### Einzelbilder
 
 **[Neu]** hängt ein leeres Bild an, **[Kopie]** eine Kopie des aktuellen,
-**[Weg]** entfernt es. **[Name]** gibt dem Bild einen Namen — er wird sein
+**[Weg]** entfernt es. Unter der Zeichenfläche steht die **Bildleiste**: jedes
+Einzelbild als kleines Bild aus seinen sichtbaren Ebenen, das aktuelle mittig
+und umrahmt — ein Klick wählt es. **[Name]** gibt dem Bild einen Namen — er wird sein
 Schlüssel im Atlas (`ATLAS_DRAW(atlas, "kopf", ...)` statt `"bild_0"`).
 Namen sind Kennungen: erlaubt sind Buchstaben, Ziffern, `_` und `-`, alles
 andere wird zum Unterstrich. Ein Punkt ginge nicht, weil das json-Modul einen
@@ -120,8 +129,10 @@ nicht — er ist eine Kennung) und gilt für Vorschau und GIF gleichermaßen.
 
 Ebenen gelten für **alle** Einzelbilder, wie in Aseprite: eine Ebene
 ausblenden blendet sie überall aus. **[Neu]**, **[Weg]** und **sichtbar**.
-Gezeichnet wird auf der gewählten Ebene; Anzeige und alle Ausgaben außer der
-`.dhsprite` zeigen die sichtbaren Ebenen zusammengerechnet.
+**Deckkraft** (0..100 %) gilt für die gewählte Ebene beim Zeichnen und in
+jeder Ausgabe (PNG, Streifen, GIF); die Punkte der Ebene selbst bleiben
+unverändert. Gezeichnet wird auf der gewählten Ebene; Anzeige und alle
+Ausgaben außer der `.dhsprite` zeigen die sichtbaren Ebenen zusammengerechnet.
 
 ### Vorschau und Bereiche
 
@@ -154,8 +165,9 @@ Verlaufs in Sprite-Größe; daran hängt die Grenze von 256 Punkten.
 **[Sichern]** schreibt zwei Dateien: die Beschreibung `name.dhsprite` (JSON)
 und daneben das Raster `name.dhsprite.png` — Spalten sind die Einzelbilder,
 Zeilen die Ebenen. Das PNG öffnet jeder Bildbetrachter; die JSON trägt
-Maße, Ebenennamen und Sichtbarkeit und, falls vorhanden, Bildnamen,
-Einzeldauern und Bereiche:
+Maße, Ebenennamen und Sichtbarkeit (eine Ebene, die nicht deckend ist, dazu
+`"deckkraft"` 1..255) und, falls vorhanden, Bildnamen, Einzeldauern und
+Bereiche:
 
 ```json
 {
@@ -262,7 +274,7 @@ Aussage über das Spiel. Die Datei lädt `ANIM_FSM_LOAD` so, wie sie ist; die
 - Export-Skalierung (1×–8×) für alle Bild-Ausgaben.
 - Sheet-Import eines beliebigen PNG mit Angabe der Bildgröße, Einsetzen eines
   Bildes aus der System-Zwischenablage als neues Einzelbild.
-- Ebenen je Einzelbild mit Deckkraft, Umordnen und Zusammenführen.
+- Ebenen je Einzelbild, Umordnen und Zusammenführen.
 - Bild-Operationen auf der Bildliste: umkehren, Ping-Pong anhängen, auf das
   aktuelle Bild reduzieren.
 - Farbe ersetzen, Palette aus dem Sprite übernehmen, einstellbare
@@ -275,4 +287,6 @@ mit echten Mauswegen über die Aufnahme-Wiedergabe: Auswahl, Lasso und
 Zauberstab, Verschieben, Paletten gegen einen fremden Leser, Statistik,
 Zuschneiden, Bereiche, DH-Code und `.dhanim` (gestartet bzw. von der Laufzeit
 geladen), Atlas-Schlüssel, Drehen und Spiegeln, Einzeldauern im GIF und die
-Grenzen von 64 Bildern und 8 Ebenen.
+Grenzen von 64 Bildern und 8 Ebenen; dazu die Deckkraft im Streifen und in der
+`.dhsprite`, die Bildleiste, die zuletzt benutzten Farben und die
+Werkzeugspalte.

@@ -3,7 +3,7 @@
 '
 ' Echte Klicks ueber eine Aufnahme (Einschub hinter SETFPS(60)); die Kopie
 ' laeuft ohne WINDOW_MAXIMIZE, damit die Lagen fest sind (1280 x 800:
-' Graph-Ursprung 290/20, Inspektor ab x = 940). Was der Editor sichert, liest
+' Graph-Ursprung 290/88 unter Menue und Werkzeugleiste, Inspektor ab x = 940 und y = 68). Was der Editor sichert, liest
 ' danach die LAUFZEIT (--- nachher: JSON_* und ANIM_FSM_LOAD plus ein Schritt
 ' der Maschine) -- dass die JSON gueltig ist, waere die schwaechere Aussage;
 ' ein Uebergang zu einem geloeschten Zustand laedt nicht.
@@ -11,7 +11,7 @@
 
 --- langsam
 === doppelklick legt einen zustand an
-' Doppelklick auf freie Flaeche (700,500) -> (700-290-75, 500-20-25) aufs Raster.
+' Doppelklick auf freie Flaeche (700,568) -> (700-290-75, 568-88-25) aufs Raster.
 AUTOMATION_PLAY("ev.txt")
 --- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
@@ -22,12 +22,12 @@ DHRT_FRAMES=100
 DH_ANIM_LOG=anim.log
 --- datei _programm/ev.txt
 c 12
-e 20 7 700 500 0 0
-e 21 7 700 500 0 0
+e 20 7 700 568 0 0
+e 21 7 700 568 0 0
 e 21 6 0 0 0 0
 e 23 5 0 0 0 0
-e 26 7 700 500 0 0
-e 27 7 700 500 0 0
+e 26 7 700 568 0 0
+e 27 7 700 568 0 0
 e 27 6 0 0 0 0
 e 29 5 0 0 0 0
 e 60 2 341 0 0 0
@@ -75,15 +75,15 @@ DHRT_FRAMES=100
 DH_ANIM_LOG=anim.log
 --- datei _programm/ev.txt
 c 14
-e 20 7 485 221 0 0
-e 21 7 485 221 0 0
+e 20 7 485 289 0 0
+e 21 7 485 289 0 0
 e 21 6 1 0 0 0
-e 22 7 510 247 0 0
-e 23 7 535 274 0 0
-e 24 7 561 301 0 0
-e 25 7 586 327 0 0
-e 26 7 611 354 0 0
-e 27 7 637 381 0 0
+e 22 7 510 315 0 0
+e 23 7 535 342 0 0
+e 24 7 561 369 0 0
+e 25 7 586 395 0 0
+e 26 7 611 422 0 0
+e 27 7 637 449 0 0
 e 29 5 1 0 0 0
 e 60 2 341 0 0 0
 e 60 2 83 0 0 0
@@ -248,15 +248,15 @@ DHRT_FRAMES=120
 DH_ANIM_LOG=anim.log
 --- datei _programm/ev.txt
 c 18
-e 20 7 485 221 0 0
-e 21 7 485 221 0 0
+e 20 7 485 289 0 0
+e 21 7 485 289 0 0
 e 21 6 0 0 0 0
-e 22 7 498 221 0 0
-e 23 7 511 221 0 0
-e 24 7 525 221 0 0
-e 25 7 538 221 0 0
-e 26 7 551 221 0 0
-e 27 7 565 221 0 0
+e 22 7 498 289 0 0
+e 23 7 511 289 0 0
+e 24 7 525 289 0 0
+e 25 7 538 289 0 0
+e 26 7 551 289 0 0
+e 27 7 565 289 0 0
 e 29 5 0 0 0 0
 e 60 2 341 0 0 0
 e 60 2 90 0 0 0
@@ -407,8 +407,8 @@ DHRT_FRAMES=100
 DH_ANIM_LOG=anim.log
 --- datei _programm/ev.txt
 c 10
-e 20 7 637 381 0 0
-e 21 7 637 381 0 0
+e 20 7 637 449 0 0
+e 21 7 637 449 0 0
 e 21 6 0 0 0 0
 e 23 5 0 0 0 0
 e 40 2 261 0 0 0
@@ -585,12 +585,12 @@ DHRT_FRAMES=110
 DH_ANIM_LOG=anim.log
 --- datei _programm/ev.txt
 c 12
-e 20 7 641 230 0 0
-e 21 7 641 230 0 0
+e 20 7 641 298 0 0
+e 21 7 641 298 0 0
 e 21 6 0 0 0 0
 e 23 5 0 0 0 0
-e 40 7 1013 309 0 0
-e 41 7 1013 309 0 0
+e 40 7 1013 377 0 0
+e 41 7 1013 377 0 0
 e 41 6 0 0 0 0
 e 43 5 0 0 0 0
 e 70 2 341 0 0 0
@@ -761,8 +761,8 @@ DHRT_FRAMES=90
 DH_ANIM_LOG=anim.log
 --- datei _programm/ev.txt
 c 8
-e 20 7 28 348 0 0
-e 21 7 28 348 0 0
+e 20 7 28 390 0 0
+e 21 7 28 390 0 0
 e 21 6 0 0 0 0
 e 23 5 0 0 0 0
 e 50 2 341 0 0 0
@@ -1072,3 +1072,719 @@ PRINT "lauf " ; PROCESS_CODE(pb)
 check []
 lauf 0
 
+=== anordnen legt die zustaende nach stufen aus
+' [Anordnen]: Start in die erste Spalte, was er oder "Any State" erreicht in
+' die naechste, und so weiter -- je Stufe untereinander. Ein Schritt im
+' Verlauf: Rueckgaengig stellt die alten Lagen wieder her.
+SET_WINDOW_POS(-3000, -3000)
+--- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- einschub nach FLIP()
+IF GETENV$("PR_FERTIG") = "" THEN
+    SETENV("PR_FERTIG", "1")
+    anordnen()
+    DIM i AS INTEGER
+    FOR i = 0 TO nz() - 1
+        PRINT text$(zp$(i, "name")); " "; ganz(zp$(i, "x"), 0); " "; ganz(zp$(i, "y"), 0)
+    NEXT
+    rueckgaengig()
+    PRINT "zurueck "; ganz(zp$(0, "x"), 0); " "; ganz(zp$(0, "y"), 0)
+END IF
+--- argumente
+held.dhanim
+--- umgebung
+DHRT_FRAMES=4
+--- datei held.dhanim
+{
+  "version": 1,
+  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "frame_w": 16,
+  "frame_h": 16,
+  "scale": 5.0,
+  "default": "idle",
+  "params": [
+    {
+      "name": "speed",
+      "type": "float",
+      "default": 0.0
+    },
+    {
+      "name": "grounded",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "jump",
+      "type": "trigger"
+    }
+  ],
+  "states": [
+    {
+      "name": "idle",
+      "anim": "idle",
+      "loop": true,
+      "first": 0,
+      "last": 0,
+      "fps": 2.0,
+      "x": 120,
+      "y": 176
+    },
+    {
+      "name": "run",
+      "anim": "run",
+      "loop": true,
+      "first": 0,
+      "last": 3,
+      "fps": 10.0,
+      "x": 432,
+      "y": 176
+    },
+    {
+      "name": "jump",
+      "anim": "jump",
+      "loop": false,
+      "first": 2,
+      "last": 3,
+      "fps": 8.0,
+      "x": 272,
+      "y": 40
+    },
+    {
+      "name": "fall",
+      "anim": "fall",
+      "loop": true,
+      "first": 1,
+      "last": 1,
+      "fps": 1.0,
+      "x": 272,
+      "y": 336
+    }
+  ],
+  "transitions": [
+    {
+      "from": "idle",
+      "to": "run",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "gt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "run",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "lt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "*",
+      "to": "jump",
+      "conditions": [
+        {
+          "param": "jump",
+          "op": "trigger"
+        }
+      ]
+    },
+    {
+      "from": "jump",
+      "to": "fall",
+      "wait_finished": true,
+      "conditions": []
+    },
+    {
+      "from": "fall",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "grounded",
+          "op": "is_true"
+        }
+      ]
+    }
+  ]
+}
+--- erwartet
+idle 80 120
+run 312 120
+jump 312 216
+fall 544 120
+zurueck 120 176
+
+=== zoomen haelt den punkt unter der maus fest
+' Zoom um einen Schirmpunkt: der Weltpunkt darunter bleibt, und Knoten
+' werden an ihrer neuen Lage getroffen.
+SET_WINDOW_POS(-3000, -3000)
+--- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- einschub nach FLIP()
+IF GETENV$("PR_FERTIG") = "" THEN
+    SETENV("PR_FERTIG", "1")
+    DIM vx AS FLOAT : vx = weltX(700)
+    DIM vy AS FLOAT : vy = weltY(500)
+    zoomUm(2.0, 700, 500)
+    PRINT "zoom "; zoom; " fest "; ABS(weltX(700) - vx) < 0.01 AND ABS(weltY(500) - vy) < 0.01
+    DIM x AS INTEGER : DIM y AS INTEGER : DIM w AS INTEGER : DIM h AS INTEGER
+    (x, y, w, h) = knotenRect("run")
+    PRINT "breite "; w; " getroffen "; knotenBei(x + w \ 2, y + h \ 2)
+    zoomUm(9.0, 700, 500)
+    PRINT "grenze "; zoom
+END IF
+--- argumente
+held.dhanim
+--- umgebung
+DHRT_FRAMES=4
+--- datei held.dhanim
+{
+  "version": 1,
+  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "frame_w": 16,
+  "frame_h": 16,
+  "scale": 5.0,
+  "default": "idle",
+  "params": [
+    {
+      "name": "speed",
+      "type": "float",
+      "default": 0.0
+    },
+    {
+      "name": "grounded",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "jump",
+      "type": "trigger"
+    }
+  ],
+  "states": [
+    {
+      "name": "idle",
+      "anim": "idle",
+      "loop": true,
+      "first": 0,
+      "last": 0,
+      "fps": 2.0,
+      "x": 120,
+      "y": 176
+    },
+    {
+      "name": "run",
+      "anim": "run",
+      "loop": true,
+      "first": 0,
+      "last": 3,
+      "fps": 10.0,
+      "x": 432,
+      "y": 176
+    },
+    {
+      "name": "jump",
+      "anim": "jump",
+      "loop": false,
+      "first": 2,
+      "last": 3,
+      "fps": 8.0,
+      "x": 272,
+      "y": 40
+    },
+    {
+      "name": "fall",
+      "anim": "fall",
+      "loop": true,
+      "first": 1,
+      "last": 1,
+      "fps": 1.0,
+      "x": 272,
+      "y": 336
+    }
+  ],
+  "transitions": [
+    {
+      "from": "idle",
+      "to": "run",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "gt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "run",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "lt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "*",
+      "to": "jump",
+      "conditions": [
+        {
+          "param": "jump",
+          "op": "trigger"
+        }
+      ]
+    },
+    {
+      "from": "jump",
+      "to": "fall",
+      "wait_finished": true,
+      "conditions": []
+    },
+    {
+      "from": "fall",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "grounded",
+          "op": "is_true"
+        }
+      ]
+    }
+  ]
+}
+--- erwartet
+zoom 2.0 fest TRUE
+breite 300 getroffen run
+grenze 2.5
+
+=== das mausrad zoomt den graphen
+' Ein Radschritt nach oben ueber dem Graphen vergroessert um 15 Prozent.
+SET_WINDOW_POS(-3000, -3000)
+DIM prN AS INTEGER
+--- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- datei _programm/ev.txt
+c 3
+e 0 7 700 500 0 0
+e 3 7 700 500 0 0
+e 4 8 0 1 0 0
+
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN AUTOMATION_PLAY("ev.txt")
+IF prN = 15 THEN PRINT "zoom "; INT(zoom * 100 + 0.5)
+--- argumente
+held.dhanim
+--- umgebung
+DHRT_FRAMES=20
+--- datei held.dhanim
+{
+  "version": 1,
+  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "frame_w": 16,
+  "frame_h": 16,
+  "scale": 5.0,
+  "default": "idle",
+  "params": [
+    {
+      "name": "speed",
+      "type": "float",
+      "default": 0.0
+    },
+    {
+      "name": "grounded",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "jump",
+      "type": "trigger"
+    }
+  ],
+  "states": [
+    {
+      "name": "idle",
+      "anim": "idle",
+      "loop": true,
+      "first": 0,
+      "last": 0,
+      "fps": 2.0,
+      "x": 120,
+      "y": 176
+    },
+    {
+      "name": "run",
+      "anim": "run",
+      "loop": true,
+      "first": 0,
+      "last": 3,
+      "fps": 10.0,
+      "x": 432,
+      "y": 176
+    },
+    {
+      "name": "jump",
+      "anim": "jump",
+      "loop": false,
+      "first": 2,
+      "last": 3,
+      "fps": 8.0,
+      "x": 272,
+      "y": 40
+    },
+    {
+      "name": "fall",
+      "anim": "fall",
+      "loop": true,
+      "first": 1,
+      "last": 1,
+      "fps": 1.0,
+      "x": 272,
+      "y": 336
+    }
+  ],
+  "transitions": [
+    {
+      "from": "idle",
+      "to": "run",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "gt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "run",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "lt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "*",
+      "to": "jump",
+      "conditions": [
+        {
+          "param": "jump",
+          "op": "trigger"
+        }
+      ]
+    },
+    {
+      "from": "jump",
+      "to": "fall",
+      "wait_finished": true,
+      "conditions": []
+    },
+    {
+      "from": "fall",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "grounded",
+          "op": "is_true"
+        }
+      ]
+    }
+  ]
+}
+--- erwartet
+zoom 115
+
+=== einpassen holt den ganzen graphen ins bild
+' Nach [Einpassen] liegt jeder Knoten ganz in der Flaeche zwischen den
+' beiden Seitenleisten, unter der Werkzeugleiste und ueber der Statusleiste.
+SET_WINDOW_POS(-3000, -3000)
+--- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- einschub nach FLIP()
+IF GETENV$("PR_FERTIG") = "" THEN
+    SETENV("PR_FERTIG", "1")
+    zoomUm(0.4, 300, 100)
+    einpassen()
+    DIM i AS INTEGER
+    DIM drin AS BOOLEAN : drin = TRUE
+    DIM x AS INTEGER : DIM y AS INTEGER : DIM w AS INTEGER : DIM h AS INTEGER
+    FOR i = 0 TO nz() - 1
+        (x, y, w, h) = knotenRect(text$(zp$(i, "name")))
+        IF x < LINKS_B OR x + w > SCREENWIDTH() - INSP_B OR y < OBEN_H OR y + h > SCREENHEIGHT() - UNTEN_H THEN drin = FALSE
+    NEXT
+    PRINT "drin "; drin; " groesser "; zoom > 0.4
+END IF
+--- argumente
+held.dhanim
+--- umgebung
+DHRT_FRAMES=4
+--- datei held.dhanim
+{
+  "version": 1,
+  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "frame_w": 16,
+  "frame_h": 16,
+  "scale": 5.0,
+  "default": "idle",
+  "params": [
+    {
+      "name": "speed",
+      "type": "float",
+      "default": 0.0
+    },
+    {
+      "name": "grounded",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "jump",
+      "type": "trigger"
+    }
+  ],
+  "states": [
+    {
+      "name": "idle",
+      "anim": "idle",
+      "loop": true,
+      "first": 0,
+      "last": 0,
+      "fps": 2.0,
+      "x": 120,
+      "y": 176
+    },
+    {
+      "name": "run",
+      "anim": "run",
+      "loop": true,
+      "first": 0,
+      "last": 3,
+      "fps": 10.0,
+      "x": 432,
+      "y": 176
+    },
+    {
+      "name": "jump",
+      "anim": "jump",
+      "loop": false,
+      "first": 2,
+      "last": 3,
+      "fps": 8.0,
+      "x": 272,
+      "y": 40
+    },
+    {
+      "name": "fall",
+      "anim": "fall",
+      "loop": true,
+      "first": 1,
+      "last": 1,
+      "fps": 1.0,
+      "x": 272,
+      "y": 336
+    }
+  ],
+  "transitions": [
+    {
+      "from": "idle",
+      "to": "run",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "gt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "run",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "lt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "*",
+      "to": "jump",
+      "conditions": [
+        {
+          "param": "jump",
+          "op": "trigger"
+        }
+      ]
+    },
+    {
+      "from": "jump",
+      "to": "fall",
+      "wait_finished": true,
+      "conditions": []
+    },
+    {
+      "from": "fall",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "grounded",
+          "op": "is_true"
+        }
+      ]
+    }
+  ]
+}
+--- erwartet
+drin TRUE groesser TRUE
+
+=== rechts laeuft die animation des startzustands
+' Ohne Wahl zeigt der Inspektor unten den Startzustand (idle, Bild 0) aus
+' dem Blatt, zehnfach: die Figur steht mittig in der Flaeche ab x 948, y 562.
+SET_WINDOW_POS(-3000, -3000)
+--- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+held.dhanim
+--- umgebung
+DHRT_FRAMES=6
+DHRT_SCREENSHOT=bild.png
+--- datei held.dhanim
+{
+  "version": 1,
+  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "frame_w": 16,
+  "frame_h": 16,
+  "scale": 5.0,
+  "default": "idle",
+  "params": [
+    {
+      "name": "speed",
+      "type": "float",
+      "default": 0.0
+    },
+    {
+      "name": "grounded",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "jump",
+      "type": "trigger"
+    }
+  ],
+  "states": [
+    {
+      "name": "idle",
+      "anim": "idle",
+      "loop": true,
+      "first": 0,
+      "last": 0,
+      "fps": 2.0,
+      "x": 120,
+      "y": 176
+    },
+    {
+      "name": "run",
+      "anim": "run",
+      "loop": true,
+      "first": 0,
+      "last": 3,
+      "fps": 10.0,
+      "x": 432,
+      "y": 176
+    },
+    {
+      "name": "jump",
+      "anim": "jump",
+      "loop": false,
+      "first": 2,
+      "last": 3,
+      "fps": 8.0,
+      "x": 272,
+      "y": 40
+    },
+    {
+      "name": "fall",
+      "anim": "fall",
+      "loop": true,
+      "first": 1,
+      "last": 1,
+      "fps": 1.0,
+      "x": 272,
+      "y": 336
+    }
+  ],
+  "transitions": [
+    {
+      "from": "idle",
+      "to": "run",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "gt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "run",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "lt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "*",
+      "to": "jump",
+      "conditions": [
+        {
+          "param": "jump",
+          "op": "trigger"
+        }
+      ]
+    },
+    {
+      "from": "jump",
+      "to": "fall",
+      "wait_finished": true,
+      "conditions": []
+    },
+    {
+      "from": "fall",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "grounded",
+          "op": "is_true"
+        }
+      ]
+    }
+  ]
+}
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("_programm/bild.png")
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM figur AS INTEGER : figur = 0
+FOR y = 570 TO 730 STEP 4
+    FOR x = 1030 TO 1190 STEP 4
+        IF GETPIXEL(b, x, y) <> &H0E1620 AND (GETPIXEL(b, x, y) BAND &HFF0000) > &H800000 THEN figur = figur + 1
+    NEXT
+NEXT
+PRINT "figur zu sehen "; figur > 40
+--- erwartet
+figur zu sehen TRUE

@@ -2399,7 +2399,7 @@
   {
    "name": "DRAWIMAGEPARTEX",
    "kind": "graphics",
-   "signature": "DRAWIMAGEPARTEX(img, sx, sy, sw, sh, x, y, w, h)",
+   "signature": "DRAWIMAGEPARTEX(img, sx, sy, sw, sh, x, y, w, h [, farbe])",
    "module": "core"
   },
   {

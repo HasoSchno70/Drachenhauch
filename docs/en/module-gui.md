@@ -905,7 +905,10 @@ Breakpoint carry their own colour. `GUI_ICON_BUTTON`, `GUI_SET_ICON` and
 `suchen`, `start`, `stopp`, `pause`, `debug`, `haltepunkt`, `pruefen`,
 `profil`, `handbuch`, `einstellungen`, `werkzeug`, `umbruch`, `info`,
 `warnung`, `plus`, `minus`, `schliessen`, `links`, `rechts`, `hoch`,
-`runter`, `menue`, `aktualisieren`.
+`runter`, `menue`, `aktualisieren`, and for paint tools and editors
+`stift`, `radierer`, `fuellen`, `linie`, `rechteck`, `ellipse`, `pipette`,
+`auswahl`, `lasso`, `zauberstab`, `verschieben`, `spruehen`, `wuerfel`,
+`raster`, `auge`, `auge_zu`, `spiegeln`, `drehen`.
 
 An unknown name is an **error** that lists the known ones — a silently empty
 button would only be noticed when someone looks for it. Whoever wants their

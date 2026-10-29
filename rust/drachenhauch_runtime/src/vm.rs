@@ -11674,10 +11674,14 @@ impl<'p> Vm<'p> {
             }
             "drawimagepartex" => {
                 let idx = gi(a,0,"DRAWIMAGEPARTEX")?;
+                if a.len() < 9 || a.len() > 10 { return Err("DRAWIMAGEPARTEX: erwartet (img, sx, sy, sw, sh, x, y, w, h [, farbe])".into()); }
+                // Die Farbe toent das Bild; ihr Alpha-Byte ist die Deckkraft
+                // (RGBA(255, 255, 255, 128) = halb durchsichtig, Farben wie ueberall).
+                let tint = if a.len() == 10 { Some(gi(a,9,"DRAWIMAGEPARTEX")?) } else { None };
                 g!().draw_image_part_ex(idx, gi(a,1,"DRAWIMAGEPARTEX")? as i32, gi(a,2,"DRAWIMAGEPARTEX")? as i32,
                     gi(a,3,"DRAWIMAGEPARTEX")? as i32, gi(a,4,"DRAWIMAGEPARTEX")? as i32,
                     gi(a,5,"DRAWIMAGEPARTEX")? as i32, gi(a,6,"DRAWIMAGEPARTEX")? as i32,
-                    gi(a,7,"DRAWIMAGEPARTEX")? as i32, gi(a,8,"DRAWIMAGEPARTEX")? as i32)?; Value::Nil
+                    gi(a,7,"DRAWIMAGEPARTEX")? as i32, gi(a,8,"DRAWIMAGEPARTEX")? as i32, tint)?; Value::Nil
             }
             "drawimageflipped" => {
                 let idx = gi(a,0,"DRAWIMAGEFLIPPED")?;

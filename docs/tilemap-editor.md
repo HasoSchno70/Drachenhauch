@@ -23,11 +23,13 @@ Der Editor geht im Vollbild auf und beginnt mit einer leeren Karte von
 
 ## Aufbau
 
-Oben die Werkzeugleiste (Neu, Öffnen, Speichern, DH-Code, die sechs
-Werkzeuge, Zurück/Vor, Schalter „Gitter" und „Nummern"). Links die Spalte
-mit Tileset-Wahl, Kachel-Palette, Ebenenliste und darunter — je nach Art der
-aktiven Ebene — entweder die Eigenschaften der gewählten Kachel oder die
-Objektliste. Rechts die Karte, unten eine Statuszeile.
+Oben das Menü (Datei, Bearbeiten, Ansicht) und die Werkzeugleiste mit
+Sinnbildern (Neu, Öffnen, Speichern, DH-Code, die acht Werkzeuge,
+Zurück/Vor, Gitter, Zoom). Links die Spalte mit Tileset-Wahl, Kachel-Palette,
+Ebenenliste und darunter — je nach Art der aktiven Ebene — entweder die
+Eigenschaften der gewählten Kachel oder die Objektliste. Rechts die Karte mit
+der Übersicht in der Ecke, unten die Statusleiste (Meldung und Datei, Lage
+unter der Maus, Zoom). Die Oberfläche schreibt in DejaVu Sans.
 
 ## Werkzeuge
 
@@ -36,11 +38,21 @@ Objektliste. Rechts die Karte, unten eine Statuszeile.
 | Stift | `P` | malt die gewählte Kachel, auch im Zug |
 | Radierer | `E` | leert Zellen, auch im Zug |
 | Füllen | `F` | füllt die zusammenhängende Fläche gleicher Kacheln |
+| Linie | `L` | ziehen setzt beim Loslassen eine Linie (Bresenham) |
 | Rechteck | `R` | ziehen füllt beim Loslassen das Rechteck |
+| Ellipse | `O` | ziehen setzt beim Loslassen den Rand einer Ellipse |
 | Pipette | `I` | nimmt die Kachel unter der Maus auf |
 | Auswahl | `S` | zieht ein Rechteck für die Zwischenablage |
 
-Das aktive Werkzeug ist in der Leiste farbig hinterlegt. Die Pipette schaltet
+Das aktive Werkzeug ist in der Leiste gedrückt. Linie und Ellipse zeigen
+beim Ziehen Zelle für Zelle, was beim Loslassen gesetzt wird — es ist
+dieselbe Rechnung. Die Buchstaben gelten nicht, solange ein Eingabefeld den
+Fokus hat.
+
+**Stempel:** in der Kachel-Palette ein Rechteck ziehen wählt einen Block aus
+mehreren Kacheln; der Stift malt dann den ganzen Block (Füllen, Linie,
+Rechteck und Ellipse nehmen seine erste Kachel). Ein Klick in die Palette
+oder die Pipette macht wieder eine einzelne Kachel daraus. Die Pipette schaltet
 auch das **Tileset** um, zu dem die aufgenommene Kachel gehört, und rollt die
 Palette so, dass sie zu sehen ist — sonst malte der nächste Strich eine
 andere Kachel.
@@ -52,9 +64,13 @@ Einfügen über den Kartenrand ragt, fällt weg — die Karte wächst dabei nich
 All das gilt nur auf Kachel-Ebenen.
 
 **Ansicht:** Mausrad über der Karte zoomt (1 bis 6, der Punkt unter dem
-Zeiger bleibt stehen), die rechte Maustaste oder die Pfeiltasten schieben.
-„Nummern" schreibt die Kachelnummer in jede Zelle (ab Zoom 2, darunter wäre
-sie nicht lesbar).
+Zeiger bleibt stehen; im Menü `Strg+Plus`/`Strg+Minus`), die rechte oder
+mittlere Maustaste oder die Pfeiltasten schieben. **Übersicht** (`Strg+M`):
+die ganze Karte klein rechts unten, je Kachel ihre Mittelfarbe, mit dem
+sichtbaren Ausschnitt als Rahmen — ein Klick oder Zug darin springt dorthin,
+gemalt wird dabei nichts. **Gitter** (`Strg+G`) ab Zoom 1 in der Leiste,
+**Kachelnummern** im Menü Ansicht schreiben die Nummer in jede Zelle (ab Zoom
+2, darunter wäre sie nicht lesbar).
 
 **Rückgängig/Wiederholen:** `Strg+Z` / `Strg+Y` oder die Knöpfe, 16
 Schritte. Ein Strich, ein Rechteck, ein Füllen ist jeweils **ein** Schritt.
@@ -90,9 +106,10 @@ weiter unten heißt weiter vorne. Darunter:
   nach der Liste. Die Kacheln bleiben bei ihrer Ebene, und ein
   aufgezeichneter Rückgängig-Schritt wandert mit, statt danach in eine
   fremde Ebene zu schreiben,
-- **sichtbar** — Tiled speichert die Sichtbarkeit mit, also ist es mehr als
-  eine Anzeige,
-- **Objekt-Ebene** legt eine Ebene ohne Kacheln an.
+- das **Kästchen** vor jeder Ebene ist ihre Sichtbarkeit — Tiled speichert
+  sie mit, also ist es mehr als eine Anzeige; der Klick darauf wählt die
+  Ebene nicht,
+- **Objekt-Ebene anlegen** legt eine Ebene ohne Kacheln an.
 
 ## Objekt-Ebenen
 
@@ -181,6 +198,9 @@ Was die Qt-Fassung konnte und dieser Editor nicht:
 Tasten: DH-Code samt Bild des erzeugten Renderers (leere und gemalte Karte),
 das Deuten der Eigenschaftswerte, `solid` setzen und entfernen, Objekt-Ebenen
 (ziehen, klicken, wählen, `Entf`), mehrere Tilesets mit Pipette und
-Palette-Rollen, Umsortieren der Ebenen samt Rückgängig. Gelesen wird die
+Palette-Rollen, Umsortieren der Ebenen samt Rückgängig; dazu Linie und
+Ellipse (Zellen und ein gezogener Strich samt `Strg+Z`), der Stempel aus der
+Palette, das Kästchen in der Ebenenliste und der Sprung über die Übersicht,
+der nichts malt. Gelesen wird die
 geschriebene Datei mit dem json-Modul nach den Regeln des Tiled-Formats, nicht
 mit dem eigenen Schreiber.

@@ -13,6 +13,12 @@
 '  JSON, Rueckgaengig ist ein JSON-Text je Stand. Was der Inspektor nicht
 '  kennt, laeuft unveraendert mit durch.
 '
+'  Der Graph laesst sich zoomen (Mausrad, um die Maus herum) und verschieben
+'  (mittlere Maustaste oder Leertaste + Ziehen); [Anordnen] legt die Knoten
+'  nach Stufen ab dem Startzustand aus, [Einpassen] holt alles ins Bild.
+'  Rechts unter dem Inspektor laeuft die Animation des gewaehlten Zustands
+'  (ohne Wahl die des Startzustands) -- aus dem Sprite-Blatt selbst.
+'
 '  Bedienung: Doppelklick auf freie Flaeche = neuer Zustand (auch Einfg);
 '  Knoten ziehen = verschieben (Raster 8); Klick auf einen Pfeil = Uebergang
 '  waehlen; MIT DER RECHTEN Maustaste von einem Knoten auf einen anderen
@@ -38,6 +44,9 @@ CONST ANY_W = 120
 CONST ANY_H = 36
 CONST TREFFER = 7               ' Klick-Toleranz auf einen Pfeil (px)
 CONST MAX_BED = 6               ' Bedingungszeilen im Inspektor
+CONST UNTEN_H = 26              ' Statusleiste
+CONST ZOOM_MIN = 0.3
+CONST ZOOM_MAX = 2.5
 CONST NL = CHR$(10)
 
 SCREEN(1280, 800, "Drachenhauch - Anim-FSM-Editor", 1)
@@ -47,12 +56,12 @@ SETFPS(60)
 WINDOW_MAXIMIZE()
 GUI_THEME_PRESET("glas_dunkel")
 
-DIM uiFont AS INTEGER : uiFont = -1
-DIM fp AS STRING
-FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
-    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
-NEXT
-IF uiFont >= 0 THEN SETFONT(uiFont) : TEXT_SIZE(16)
+' DejaVu Sans aus der Laufzeit -- auf jedem System dieselbe Schrift. GUI_FONT
+' haelt die Oberflaeche bei 15 Punkten, waehrend der Graph seine eigenen
+' Groessen (mit dem Zoom) setzt.
+DIM uiFont AS INTEGER : uiFont = LOADFONT("sans", 32)
+SETFONT(uiFont, 16)
+GUI_FONT(uiFont, 15)
 
 DIM logDatei AS STRING : logDatei = GETENV$("DH_ANIM_LOG")
 SUB protokoll(text AS STRING)
@@ -201,28 +210,77 @@ SUB merken()
     geaendert = TRUE
 END SUB
 
-' --- Fenster links: Dokument + Parameter (mit Menue) --------------------------
-DIM winLinks AS GUI_WINDOW : winLinks = GUI_WINDOW("Dokument", 0, 0, LINKS_B, SCREENHEIGHT())
-GUI_WINDOW_CHROME(winLinks, FALSE)
-GUI_WINDOW_MOVABLE(winLinks, FALSE)
-DIM mDatei AS INTEGER : mDatei = GUI_MENU(winLinks, "Datei")
+' --- Oben: Menue und Werkzeugleiste ueber die ganze Breite ---------------------
+DIM winOben AS GUI_WINDOW : winOben = GUI_WINDOW("Anim-FSM", 0, 0, SCREENWIDTH(), 120)
+GUI_WINDOW_CHROME(winOben, FALSE)
+GUI_WINDOW_MOVABLE(winOben, FALSE)
+DIM mDatei AS INTEGER : mDatei = GUI_MENU(winOben, "Datei")
 DIM miNeu AS INTEGER : miNeu = GUI_MENU_ITEM(mDatei, "Neu", "Strg+N")
-DIM miOeffnen AS INTEGER : miOeffnen = GUI_MENU_ITEM(mDatei, "Oeffnen ...", "Strg+O")
+DIM miOeffnen AS INTEGER : miOeffnen = GUI_MENU_ITEM(mDatei, "Öffnen …", "Strg+O")
 DIM miSichern AS INTEGER : miSichern = GUI_MENU_ITEM(mDatei, "Sichern", "Strg+S")
-DIM miSichernAls AS INTEGER : miSichernAls = GUI_MENU_ITEM(mDatei, "Sichern unter ...", "Strg+Umschalt+S")
+DIM miSichernAls AS INTEGER : miSichernAls = GUI_MENU_ITEM(mDatei, "Sichern unter …", "Strg+Umschalt+S")
 GUI_MENU_SEPARATOR(mDatei)
 DIM miVorschau AS INTEGER : miVorschau = GUI_MENU_ITEM(mDatei, "Vorschau", "F5")
 GUI_MENU_SEPARATOR(mDatei)
 DIM miBeenden AS INTEGER : miBeenden = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
-DIM mBearb AS INTEGER : mBearb = GUI_MENU(winLinks, "Bearbeiten")
-DIM miRueck AS INTEGER : miRueck = GUI_MENU_ITEM(mBearb, "Rueckgaengig", "Strg+Z")
+DIM mBearb AS INTEGER : mBearb = GUI_MENU(winOben, "Bearbeiten")
+DIM miRueck AS INTEGER : miRueck = GUI_MENU_ITEM(mBearb, "Rückgängig", "Strg+Z")
 DIM miWieder AS INTEGER : miWieder = GUI_MENU_ITEM(mBearb, "Wiederholen", "Strg+Y")
 GUI_MENU_SEPARATOR(mBearb)
 DIM miZustand AS INTEGER : miZustand = GUI_MENU_ITEM(mBearb, "Zustand anlegen", "Einfg")
 DIM miStart AS INTEGER : miStart = GUI_MENU_ITEM(mBearb, "Als Startzustand")
-DIM miLoeschen AS INTEGER : miLoeschen = GUI_MENU_ITEM(mBearb, "Loeschen")
+DIM miLoeschen AS INTEGER : miLoeschen = GUI_MENU_ITEM(mBearb, "Löschen")
+GUI_MENU_SEPARATOR(mBearb)
+DIM miAnordnen AS INTEGER : miAnordnen = GUI_MENU_ITEM(mBearb, "Automatisch anordnen", "Strg+L")
+DIM mAnsicht AS INTEGER : mAnsicht = GUI_MENU(winOben, "Ansicht")
+DIM miGroesser AS INTEGER : miGroesser = GUI_MENU_ITEM(mAnsicht, "Vergrößern", "Strg+Plus")
+DIM miKleiner AS INTEGER : miKleiner = GUI_MENU_ITEM(mAnsicht, "Verkleinern", "Strg+Minus")
+DIM miEcht AS INTEGER : miEcht = GUI_MENU_ITEM(mAnsicht, "Originalgröße", "Strg+0")
+DIM miEinpassen AS INTEGER : miEinpassen = GUI_MENU_ITEM(mAnsicht, "Alles einpassen", "Strg+E")
+
+' Wie hoch die Menueleiste ist, sagt die Laufzeit: Fensterhoehe minus Inhalt.
+DIM OBEN_H AS INTEGER : OBEN_H = (120 - GUI_WINDOW_CONTENT_H(winOben)) + 42
+GUI_WINDOW_SET_BOUNDS(winOben, 0, 0, SCREENWIDTH(), OBEN_H)
+DIM leiste AS GUI_WIDGET : leiste = GUI_TOOLBAR(winOben, 0, 0, SCREENWIDTH(), 42)
+GUI_SET_ANCHOR(leiste, "lrt")
+GUI_TOOLBAR_SET(leiste, "beschriftung", 1)
+DIM tbNeu AS INTEGER : tbNeu = GUI_TOOLBAR_ADD(leiste, "neu", "Neue Zustandsmaschine (Strg+N)", "Neu")
+DIM tbOeffnen AS INTEGER : tbOeffnen = GUI_TOOLBAR_ADD(leiste, "oeffnen", "Öffnen (Strg+O)", "Öffnen")
+DIM tbSichern AS INTEGER : tbSichern = GUI_TOOLBAR_ADD(leiste, "sichern", "Sichern (Strg+S)", "Sichern")
+GUI_TOOLBAR_SEPARATOR(leiste)
+DIM tbRueck AS INTEGER : tbRueck = GUI_TOOLBAR_ADD(leiste, "rueckgaengig", "Rückgängig (Strg+Z)", "Zurück")
+DIM tbWieder AS INTEGER : tbWieder = GUI_TOOLBAR_ADD(leiste, "wiederholen", "Wiederholen (Strg+Y)", "Vor")
+GUI_TOOLBAR_SEPARATOR(leiste)
+DIM tbZustand AS INTEGER : tbZustand = GUI_TOOLBAR_ADD(leiste, "plus", "Zustand anlegen (Einfg, oder Doppelklick in den Graphen)", "Zustand")
+DIM tbVerbinden AS INTEGER : tbVerbinden = GUI_TOOLBAR_ADD(leiste, "linie", "Verbinden: Knoten mit der linken Taste zu Knoten ziehen (L) -- die rechte Taste verbindet immer", "Verbinden")
+GUI_TOOLBAR_CHECKABLE(leiste, tbVerbinden, TRUE)
+DIM tbLoeschen AS INTEGER : tbLoeschen = GUI_TOOLBAR_ADD(leiste, "schliessen", "Gewählten Zustand oder Übergang löschen (Entf)", "Löschen")
+GUI_TOOLBAR_SEPARATOR(leiste)
+DIM tbAnordnen AS INTEGER : tbAnordnen = GUI_TOOLBAR_ADD(leiste, "raster", "Nach Stufen ab dem Startzustand anordnen (Strg+L)", "Anordnen")
+DIM tbEinpassen AS INTEGER : tbEinpassen = GUI_TOOLBAR_ADD(leiste, "suchen", "Den ganzen Graphen ins Bild holen (Strg+E)", "Einpassen")
+DIM tbKleiner AS INTEGER : tbKleiner = GUI_TOOLBAR_ADD(leiste, "minus", "Verkleinern (Strg+Minus, Mausrad)")
+DIM tbGroesser AS INTEGER : tbGroesser = GUI_TOOLBAR_ADD(leiste, "plus", "Vergrößern (Strg+Plus, Mausrad)")
+GUI_TOOLBAR_SEPARATOR(leiste)
+DIM tbVorschau AS INTEGER : tbVorschau = GUI_TOOLBAR_ADD(leiste, "start", "Vorschau mit Reglern starten (F5)", "Vorschau")
+
+' --- Unten: die Statusleiste ---------------------------------------------------
+DIM winUnten AS GUI_WINDOW : winUnten = GUI_WINDOW("Status", 0, SCREENHEIGHT() - UNTEN_H, SCREENWIDTH(), UNTEN_H)
+GUI_WINDOW_CHROME(winUnten, FALSE)
+GUI_WINDOW_MOVABLE(winUnten, FALSE)
+DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_STATUSBAR(winUnten, 0, 0, SCREENWIDTH(), UNTEN_H, "Bereit.")
+GUI_SET_ANCHOR(lblStatus, "lrt")
+DIM sfZahl AS INTEGER : sfZahl = GUI_STATUSBAR_ADD(lblStatus, "", 220, "mitte")
+DIM sfZoom AS INTEGER : sfZoom = GUI_STATUSBAR_ADD(lblStatus, "", 110, "mitte")
+GUI_STATUSBAR_TIP(lblStatus, sfZoom, "Klick = Originalgröße")
+GUI_STATUSBAR_CLICKABLE(lblStatus, sfZoom, TRUE)
+
+' --- Fenster links: Dokument + Parameter ---------------------------------------
+DIM winLinks AS GUI_WINDOW : winLinks = GUI_WINDOW("Dokument", 0, OBEN_H, LINKS_B, SCREENHEIGHT() - OBEN_H - UNTEN_H)
+GUI_WINDOW_CHROME(winLinks, FALSE)
+GUI_WINDOW_MOVABLE(winLinks, FALSE)
 
 DIM lblDok AS GUI_WIDGET : lblDok = GUI_LABEL(winLinks, "Sprite-Blatt", 8, 10)
+GUI_SET_FONT_STYLE(lblDok, "fett")
 DIM fSheet AS GUI_WIDGET : fSheet = GUI_TEXTINPUT(winLinks, 8, 30, LINKS_B - 58, 26, "")
 DIM btnSheet AS GUI_WIDGET : btnSheet = GUI_BUTTON(winLinks, "...", LINKS_B - 44, 30, 36, 26)
 DIM lblBild AS GUI_WIDGET : lblBild = GUI_LABEL(winLinks, "Bild B x H", 8, 66)
@@ -233,28 +291,31 @@ DIM fSkala AS GUI_WIDGET : fSkala = GUI_TEXTINPUT(winLinks, 96, 94, 60, 26, "")
 GUI_TEXTINPUT_SET(fFrameW, "zahlen", 1) : GUI_TEXTINPUT_SET(fFrameH, "zahlen", 1) : GUI_TEXTINPUT_SET(fSkala, "zahlen", 2)
 
 DIM lblPar AS GUI_WIDGET : lblPar = GUI_LABEL(winLinks, "Parameter", 8, 134)
+GUI_SET_FONT_STYLE(lblPar, "fett")
 DIM lstParam AS GUI_WIDGET : lstParam = GUI_LISTBOX(winLinks, 8, 154, LINKS_B - 16, 150, [])
-DIM btnParPlus AS GUI_WIDGET : btnParPlus = GUI_BUTTON(winLinks, "+", 8, 310, 40, 24)
-DIM btnParMinus AS GUI_WIDGET : btnParMinus = GUI_BUTTON(winLinks, "-", 54, 310, 40, 24)
+DIM btnParPlus AS GUI_WIDGET : btnParPlus = GUI_ICON_BUTTON(winLinks, 8, 310, 40, 26, "plus")
+GUI_TOOLTIP(btnParPlus, "Parameter anlegen")
+DIM btnParMinus AS GUI_WIDGET : btnParMinus = GUI_ICON_BUTTON(winLinks, 54, 310, 40, 26, "minus")
+GUI_TOOLTIP(btnParMinus, "Gewählten Parameter löschen")
 DIM lblPName AS GUI_WIDGET : lblPName = GUI_LABEL(winLinks, "Name", 8, 346)
 DIM fPName AS GUI_WIDGET : fPName = GUI_TEXTINPUT(winLinks, 96, 342, LINKS_B - 104, 26, "")
 DIM lblPTyp AS GUI_WIDGET : lblPTyp = GUI_LABEL(winLinks, "Typ", 8, 378)
 DIM ddPTyp AS GUI_WIDGET : ddPTyp = GUI_DROPDOWN(winLinks, 96, 374, LINKS_B - 104, 24, typNamen)
 DIM lblPVor AS GUI_WIDGET : lblPVor = GUI_LABEL(winLinks, "Vorgabe", 8, 410)
 DIM fPVor AS GUI_WIDGET : fPVor = GUI_TEXTINPUT(winLinks, 96, 406, LINKS_B - 104, 26, "")
-DIM btnPUeb AS GUI_WIDGET : btnPUeb = GUI_BUTTON(winLinks, "Uebernehmen", 96, 440, 130, 26)
-DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_LABEL(winLinks, "Bereit.", 8, 490)
-GUI_SET_WRAP(lblStatus, LINKS_B - 16)
-DIM lblHilfe AS GUI_WIDGET : lblHilfe = GUI_LABEL(winLinks, "Doppelklick = Zustand. Rechte Maustaste von Knoten zu Knoten ziehen = Uebergang. Klick auf den Pfeil = bearbeiten. Entf loescht.", 8, 560)
+DIM btnPUeb AS GUI_WIDGET : btnPUeb = GUI_BUTTON(winLinks, "Übernehmen", 96, 440, 130, 26)
+GUI_BUTTON_VARIANT(btnPUeb, "primaer")
+DIM lblHilfe AS GUI_WIDGET : lblHilfe = GUI_LABEL(winLinks, "Doppelklick = Zustand. Rechte Maustaste von Knoten zu Knoten ziehen = Übergang. Klick auf den Pfeil = bearbeiten. Entf löscht. Mausrad zoomt, mittlere Taste (oder Leertaste + Ziehen) verschiebt.", 8, 490)
 GUI_SET_WRAP(lblHilfe, LINKS_B - 16)
 DIM paramSel AS INTEGER : paramSel = -1
 DIM stumm AS BOOLEAN : stumm = FALSE         ' beim Fuellen nicht als Eingabe werten
 
 ' --- Fenster rechts: Inspektor -------------------------------------------------
-DIM winInsp AS GUI_WINDOW : winInsp = GUI_WINDOW("Inspektor", SCREENWIDTH() - INSP_B, 0, INSP_B, SCREENHEIGHT())
+DIM winInsp AS GUI_WINDOW : winInsp = GUI_WINDOW("Inspektor", SCREENWIDTH() - INSP_B, OBEN_H, INSP_B, SCREENHEIGHT() - OBEN_H - UNTEN_H)
 GUI_WINDOW_CHROME(winInsp, FALSE)
 GUI_WINDOW_MOVABLE(winInsp, FALSE)
-DIM lblInsp AS GUI_WIDGET : lblInsp = GUI_LABEL(winInsp, "Nichts gewaehlt", 8, 8)
+DIM lblInsp AS GUI_WIDGET : lblInsp = GUI_LABEL(winInsp, "Nichts gewählt", 8, 8)
+GUI_SET_FONT_STYLE(lblInsp, "fett")
 GUI_SET_WRAP(lblInsp, INSP_B - 16)
 
 ' Zustand
@@ -275,11 +336,12 @@ DIM fZFps AS GUI_WIDGET : fZFps = zFeld("Bilder/s", 4)
 GUI_TEXTINPUT_SET(fZVon, "zahlen", 1) : GUI_TEXTINPUT_SET(fZBis, "zahlen", 1) : GUI_TEXTINPUT_SET(fZFps, "zahlen", 2)
 DIM cbLoop AS GUI_WIDGET : cbLoop = GUI_CHECKBOX(winInsp, "Endlos (sonst einmal)", 110, 36 + 5 * 34)
 DIM cbStart AS GUI_WIDGET : cbStart = GUI_CHECKBOX(winInsp, "Startzustand", 110, 36 + 6 * 34)
-DIM btnZUeb AS GUI_WIDGET : btnZUeb = GUI_BUTTON(winInsp, "Uebernehmen", 110, 36 + 7 * 34, 140, 28)
+DIM btnZUeb AS GUI_WIDGET : btnZUeb = GUI_BUTTON(winInsp, "Übernehmen", 110, 36 + 7 * 34, 140, 28)
+GUI_BUTTON_VARIANT(btnZUeb, "primaer")
 
 ' Uebergang
 DIM cbWarten AS GUI_WIDGET : cbWarten = GUI_CHECKBOX(winInsp, "Erst wenn die Animation fertig ist", 8, 40)
-DIM lblBed AS GUI_WIDGET : lblBed = GUI_LABEL(winInsp, "Bedingungen (alle muessen gelten):", 8, 74)
+DIM lblBed AS GUI_WIDGET : lblBed = GUI_LABEL(winInsp, "Bedingungen (alle müssen gelten):", 8, 74)
 DIM bParam[MAX_BED] AS GUI_WIDGET
 DIM bOp[MAX_BED] AS GUI_WIDGET
 DIM bWert[MAX_BED] AS GUI_WIDGET
@@ -291,12 +353,20 @@ FOR bi = 0 TO MAX_BED - 1
     bOp[bi] = GUI_DROPDOWN(winInsp, 110, by, 92, 24, opName)
     bWert[bi] = GUI_TEXTINPUT(winInsp, 208, by, 84, 24, "")
     GUI_TEXTINPUT_SET(bWert[bi], "zahlen", 2)
-    bWeg[bi] = GUI_BUTTON(winInsp, "x", 298, by, 30, 24)
+    bWeg[bi] = GUI_ICON_BUTTON(winInsp, 298, by, 30, 24, "schliessen")
+    GUI_TOOLTIP(bWeg[bi], "Diese Bedingung entfernen")
 NEXT
 DIM btnBedPlus AS GUI_WIDGET : btnBedPlus = GUI_BUTTON(winInsp, "+ Bedingung", 8, 98 + MAX_BED * 32 + 6, 130, 26)
-DIM btnUUeb AS GUI_WIDGET : btnUUeb = GUI_BUTTON(winInsp, "Uebernehmen", 148, 98 + MAX_BED * 32 + 6, 140, 26)
+DIM btnUUeb AS GUI_WIDGET : btnUUeb = GUI_BUTTON(winInsp, "Übernehmen", 148, 98 + MAX_BED * 32 + 6, 140, 26)
+GUI_BUTTON_VARIANT(btnUUeb, "primaer")
 DIM lblHinweis AS GUI_WIDGET : lblHinweis = GUI_LABEL(winInsp, "", 8, 98 + MAX_BED * 32 + 48)
 GUI_SET_WRAP(lblHinweis, INSP_B - 16)
+
+' Unten im Inspektor: die Animation des gewaehlten Zustands, aus dem Blatt.
+DIM lblLauf AS GUI_WIDGET : lblLauf = GUI_LABEL(winInsp, "So läuft der Zustand", 8, 470)
+GUI_SET_FONT_STYLE(lblLauf, "fett")
+DIM laufFlaeche AS GUI_WIDGET : laufFlaeche = GUI_CANVAS(winInsp, 8, 494, INSP_B - 16, 200)
+GUI_SET_ANCHOR(lblLauf, "lb") : GUI_SET_ANCHOR(laufFlaeche, "lb")
 
 FUNCTION paramNamen() AS ARRAY OF STRING
     DIM n AS ARRAY OF STRING : n = []
@@ -337,11 +407,11 @@ SUB inspektorFuellen()
         GUI_SET_TEXT(fZFps, zahl$(komma(zp$(selIdx, "fps"), 8.0)))
         GUI_SET_CHECKED(cbLoop, wahr(zp$(selIdx, "loop"), TRUE))
         GUI_SET_CHECKED(cbStart, startZustand$() = text$(zp$(selIdx, "name")))
-        GUI_SET_TEXT(lblHinweis, "Enter in einem Feld oder [Uebernehmen] schreibt die Werte. Bild von/bis sind Einzelbilder auf dem Blatt.")
+        GUI_SET_TEXT(lblHinweis, "Enter in einem Feld oder [Übernehmen] schreibt die Werte. Bild von/bis sind Einzelbilder auf dem Blatt.")
     ELSEIF selArt = 2 AND selIdx >= 0 AND selIdx < nu() THEN
         DIM von AS STRING : von = text$(up$(selIdx, "from"))
         IF von = "" OR von = "*" THEN von = "Any State"
-        GUI_SET_TEXT(lblInsp, "Uebergang  " + von + "  ->  " + text$(up$(selIdx, "to")))
+        GUI_SET_TEXT(lblInsp, "Übergang  " + von + "  ->  " + text$(up$(selIdx, "to")))
         GUI_SET_CHECKED(cbWarten, wahr(up$(selIdx, "wait_finished"), FALSE))
         DIM namen AS ARRAY OF STRING : namen = paramNamen()
         DIM anz AS INTEGER : anz = JSON_LEN(doc, up$(selIdx, "conditions"))
@@ -356,12 +426,12 @@ SUB inspektorFuellen()
             GUI_SET_TEXT(bWert[k], zahl$(komma(cp + ".value", 0.0)))
         NEXT
         IF np() = 0 THEN
-            GUI_SET_TEXT(lblHinweis, "Ohne Parameter gibt es keine Bedingung -- links einen anlegen. Ein Uebergang ohne Bedingung feuert sofort (mit 'fertig': nach der Animation).")
+            GUI_SET_TEXT(lblHinweis, "Ohne Parameter gibt es keine Bedingung -- links einen anlegen. Ein Übergang ohne Bedingung feuert sofort (mit 'fertig': nach der Animation).")
         ELSE
             GUI_SET_TEXT(lblHinweis, "Hoechstens " + STR$(MAX_BED) + " Bedingungen je Uebergang. Zahlvergleiche lesen den Wert, 'ist wahr/falsch' und 'ausgeloest' nicht.")
         END IF
     ELSE
-        GUI_SET_TEXT(lblInsp, "Nichts gewaehlt")
+        GUI_SET_TEXT(lblInsp, "Nichts gewählt")
         GUI_SET_TEXT(lblHinweis, "Ein Klick auf einen Knoten oder Pfeil zeigt hier seine Werte.")
     END IF
     stumm = FALSE
@@ -713,7 +783,7 @@ SUB laden(p AS STRING)
     doc = JSON_LOAD(p)
     pfad = p
     nachLaden()
-    GUI_SET_TEXT(lblStatus, "Geladen: " + p + " (" + STR$(nz()) + " Zustaende, " + STR$(nu()) + " Uebergaenge)")
+    GUI_SET_TEXT(lblStatus, "Geladen: " + p + " (" + STR$(nz()) + " Zustände, " + STR$(nu()) + " Übergänge)")
     protokoll("geladen " + STR$(nz()) + " " + STR$(nu()))
 END SUB
 
@@ -750,7 +820,9 @@ FUNCTION blattPfad$() AS STRING
     DIM s AS STRING : s = text$("sheet")
     IF s = "" THEN RETURN ""
     DIM k AS STRING
-    FOR EACH k IN (s, PATHJOIN(DIRNAME(pfad), s), PATHJOIN(GETENV$("DHRT_START_DIR"), s))
+    ' Dazu eine Stufe ueber der .dhanim: die mitgelieferte Demo nennt ihr Blatt
+    ' vom Wurzelordner aus ("examples/assets/..."), liegt aber in examples/.
+    FOR EACH k IN (s, PATHJOIN(DIRNAME(pfad), s), PATHJOIN(GETENV$("DHRT_START_DIR"), s), PATHJOIN(PATHJOIN(DIRNAME(absolut$(pfad)), ".."), s))
         IF FILEEXISTS(k) THEN RETURN REPLACE$(absolut$(k), "\", "/")
     NEXT
     RETURN ""
@@ -868,27 +940,151 @@ SUB vorschau()
 END SUB
 
 ' --- Graph: Geometrie ---------------------------------------------------------
+' Der Graph hat eigene Koordinaten (die x/y in der .dhanim). Auf den Schirm
+' kommen sie ueber Zoom und Verschiebung -- EINE Rechnung (`sx`/`sy` hin,
+' `wx`/`wy` zurueck), die Zeichnen und Treffertest gemeinsam benutzen.
 DIM gx0 AS INTEGER : gx0 = LINKS_B + 20        ' Ursprung des Graphen auf dem Schirm
-DIM gy0 AS INTEGER : gy0 = 20
+DIM gy0 AS INTEGER : gy0 = OBEN_H + 20
+DIM zoom AS FLOAT : zoom = 1.0
+DIM panX AS FLOAT : panX = 0.0                 ' Weltpunkt in der linken oberen Ecke
+DIM panY AS FLOAT : panY = 0.0
+
+FUNCTION schirmX(wxw AS FLOAT) AS INTEGER
+    RETURN INT(gx0 + (wxw - panX) * zoom + 0.5)
+END FUNCTION
+FUNCTION schirmY(wyw AS FLOAT) AS INTEGER
+    RETURN INT(gy0 + (wyw - panY) * zoom + 0.5)
+END FUNCTION
+FUNCTION weltX(mx AS FLOAT) AS FLOAT
+    RETURN (mx - gx0) / zoom + panX
+END FUNCTION
+FUNCTION weltY(my AS FLOAT) AS FLOAT
+    RETURN (my - gy0) / zoom + panY
+END FUNCTION
+FUNCTION zm(v AS FLOAT) AS INTEGER
+    RETURN MAX(1, INT(v * zoom + 0.5))
+END FUNCTION
 
 FUNCTION knotenRect(name AS STRING) AS TUPLE
-    IF name = "*" THEN RETURN (gx0 + anyX, gy0 + anyY, ANY_W, ANY_H)
+    IF name = "*" THEN RETURN (schirmX(anyX), schirmY(anyY), zm(ANY_W), zm(ANY_H))
     DIM i AS INTEGER : i = zustandIndex(name)
     IF i < 0 THEN RETURN (0, 0, 0, 0)
-    RETURN (gx0 + ganz(zp$(i, "x"), 0), gy0 + ganz(zp$(i, "y"), 0), NODE_W, NODE_H)
+    RETURN (schirmX(ganz(zp$(i, "x"), 0)), schirmY(ganz(zp$(i, "y"), 0)), zm(NODE_W), zm(NODE_H))
 END FUNCTION
 
 ' Knoten unter der Maus: Zustaende zuerst (die spaeteren liegen oben), dann die Pille.
 FUNCTION knotenBei(mx AS INTEGER, my AS INTEGER) AS STRING
     DIM i AS INTEGER
+    DIM x AS INTEGER : DIM y AS INTEGER : DIM w AS INTEGER : DIM h AS INTEGER
     FOR i = nz() - 1 TO 0 STEP -1
-        DIM x AS INTEGER : x = gx0 + ganz(zp$(i, "x"), 0)
-        DIM y AS INTEGER : y = gy0 + ganz(zp$(i, "y"), 0)
-        IF mx >= x AND mx < x + NODE_W AND my >= y AND my < y + NODE_H THEN RETURN text$(zp$(i, "name"))
+        (x, y, w, h) = knotenRect(text$(zp$(i, "name")))
+        IF mx >= x AND mx < x + w AND my >= y AND my < y + h THEN RETURN text$(zp$(i, "name"))
     NEXT
-    IF mx >= gx0 + anyX AND mx < gx0 + anyX + ANY_W AND my >= gy0 + anyY AND my < gy0 + anyY + ANY_H THEN RETURN "*"
+    (x, y, w, h) = knotenRect("*")
+    IF mx >= x AND mx < x + w AND my >= y AND my < y + h THEN RETURN "*"
     RETURN ""
 END FUNCTION
+
+' Zoom auf `neu`, der Punkt (mx, my) auf dem Schirm bleibt dabei stehen.
+SUB zoomUm(neu AS FLOAT, mx AS INTEGER, my AS INTEGER)
+    neu = MAX(ZOOM_MIN, MIN(ZOOM_MAX, neu))
+    DIM ax AS FLOAT : ax = weltX(mx)
+    DIM ay AS FLOAT : ay = weltY(my)
+    zoom = neu
+    panX = ax - (mx - gx0) / zoom
+    panY = ay - (my - gy0) / zoom
+END SUB
+
+FUNCTION graphMitteX() AS INTEGER
+    RETURN (LINKS_B + SCREENWIDTH() - INSP_B) \ 2
+END FUNCTION
+FUNCTION graphMitteY() AS INTEGER
+    RETURN (OBEN_H + SCREENHEIGHT() - UNTEN_H) \ 2
+END FUNCTION
+
+' Den ganzen Graphen (Zustaende und Pille) ins Bild holen.
+SUB einpassen()
+    DIM x0 AS FLOAT : x0 = anyX
+    DIM y0 AS FLOAT : y0 = anyY
+    DIM x1 AS FLOAT : x1 = anyX + ANY_W
+    DIM y1 AS FLOAT : y1 = anyY + ANY_H
+    DIM i AS INTEGER
+    FOR i = 0 TO nz() - 1
+        x0 = MIN(x0, ganz(zp$(i, "x"), 0)) : y0 = MIN(y0, ganz(zp$(i, "y"), 0))
+        x1 = MAX(x1, ganz(zp$(i, "x"), 0) + NODE_W) : y1 = MAX(y1, ganz(zp$(i, "y"), 0) + NODE_H)
+    NEXT
+    DIM gb AS FLOAT : gb = SCREENWIDTH() - INSP_B - LINKS_B - 80
+    DIM gh AS FLOAT : gh = SCREENHEIGHT() - UNTEN_H - OBEN_H - 80
+    zoom = MAX(ZOOM_MIN, MIN(1.5, MIN(gb / MAX(1.0, x1 - x0), gh / MAX(1.0, y1 - y0))))
+    ' Die Mitte des Graphen in die Mitte der Flaeche.
+    panX = (x0 + x1) / 2.0 - (graphMitteX() - gx0) / zoom
+    panY = (y0 + y1) / 2.0 - (graphMitteY() - gy0) / zoom
+END SUB
+
+' Automatisch anordnen: Stufen ab dem Startzustand (Breitensuche ueber die
+' Uebergaenge), je Stufe eine Spalte; was der Start nicht erreicht, kommt in
+' eine Spalte dahinter. Die Pille "Any State" bleibt links oben. EIN Schritt
+' im Verlauf.
+SUB anordnen()
+    IF nz() = 0 THEN RETURN
+    DIM stufe AS ARRAY OF INTEGER : stufe = []
+    DIM i AS INTEGER
+    FOR i = 0 TO nz() - 1
+        ARRAY_PUSH(stufe, -1)
+    NEXT
+    DIM warte AS ARRAY OF INTEGER : warte = []
+    DIM t AS INTEGER
+    DIM st AS INTEGER : st = zustandIndex(startZustand$())
+    IF st < 0 THEN st = 0
+    stufe[st] = 0 : ARRAY_PUSH(warte, st)
+    ' Was "Any State" erreicht, kann von ueberall her kommen -- es steht in
+    ' der ersten Stufe hinter dem Start, nicht abgehaengt am Ende.
+    FOR t = 0 TO nu() - 1
+        DIM vonAny AS STRING : vonAny = text$(up$(t, "from"))
+        IF vonAny = "" OR vonAny = "*" THEN
+            DIM za AS INTEGER : za = zustandIndex(text$(up$(t, "to")))
+            IF za >= 0 THEN
+                IF stufe[za] < 0 THEN
+                    stufe[za] = 1
+                    ARRAY_PUSH(warte, za)
+                END IF
+            END IF
+        END IF
+    NEXT
+    DIM kopf AS INTEGER : kopf = 0
+    WHILE kopf < LEN(warte)
+        DIM a AS INTEGER : a = warte[kopf] : kopf = kopf + 1
+        FOR t = 0 TO nu() - 1
+            IF text$(up$(t, "from")) = text$(zp$(a, "name")) THEN
+                DIM b AS INTEGER : b = zustandIndex(text$(up$(t, "to")))
+                IF b >= 0 THEN
+                    IF stufe[b] < 0 THEN
+                        stufe[b] = stufe[a] + 1
+                        ARRAY_PUSH(warte, b)
+                    END IF
+                END IF
+            END IF
+        NEXT
+    WEND
+    DIM tiefste AS INTEGER : tiefste = 0
+    FOR i = 0 TO nz() - 1
+        tiefste = MAX(tiefste, stufe[i])
+    NEXT
+    DIM zeile AS ARRAY OF INTEGER : zeile = []
+    FOR i = 0 TO tiefste + 1
+        ARRAY_PUSH(zeile, 0)
+    NEXT
+    FOR i = 0 TO nz() - 1
+        DIM sp AS INTEGER : sp = IIF(stufe[i] < 0, tiefste + 1, stufe[i])
+        JSON_SET_INT(doc, zp$(i, "x"), 80 + sp * 232)
+        JSON_SET_INT(doc, zp$(i, "y"), 120 + zeile[sp] * 96)
+        zeile[sp] = zeile[sp] + 1
+    NEXT
+    anyX = 40 : anyY = 40
+    merken()
+    GUI_SET_TEXT(lblStatus, "Angeordnet: " + STR$(tiefste + 1) + " Stufen ab " + startZustand$() + ".")
+    protokoll("angeordnet")
+END SUB
 
 ' Punkt auf dem Rand eines Rechtecks in Richtung eines Zielpunkts (vom Mittelpunkt aus).
 FUNCTION randPunkt(x AS INTEGER, y AS INTEGER, w AS INTEGER, h AS INTEGER, zx AS FLOAT, zy AS FLOAT) AS TUPLE
@@ -926,8 +1122,8 @@ FUNCTION kante(t AS INTEGER) AS TUPLE
         DIM dx AS FLOAT : dx = p2x - p1x
         DIM dy AS FLOAT : dy = p2y - p1y
         DIM l AS FLOAT : l = MAX(1.0, SQR(dx * dx + dy * dy))
-        p1x = p1x - dy / l * 9.0 : p1y = p1y + dx / l * 9.0
-        p2x = p2x - dy / l * 9.0 : p2y = p2y + dx / l * 9.0
+        p1x = p1x - dy / l * 9.0 * zoom : p1y = p1y + dx / l * 9.0 * zoom
+        p2x = p2x - dy / l * 9.0 * zoom : p2y = p2y + dx / l * 9.0 * zoom
     END IF
     RETURN (p1x, p1y, p2x, p2y, TRUE, gegen)
 END FUNCTION
@@ -992,8 +1188,11 @@ DIM letzterKlick AS INTEGER : letzterKlick = -100000
 DIM letzterKx AS INTEGER : DIM letzterKy AS INTEGER
 DIM verbinden AS BOOLEAN : verbinden = FALSE    ' Verbinden-Modus: auch die linke Taste zieht Pfeile
 
+DIM panMx AS INTEGER : DIM panMy AS INTEGER
+DIM panStartX AS FLOAT : DIM panStartY AS FLOAT
+
 FUNCTION imGraph(mx AS INTEGER, my AS INTEGER) AS BOOLEAN
-    RETURN mx >= LINKS_B AND mx < SCREENWIDTH() - INSP_B AND my >= 0 AND my < SCREENHEIGHT()
+    RETURN mx >= LINKS_B AND mx < SCREENWIDTH() - INSP_B AND my >= OBEN_H AND my < SCREENHEIGHT() - UNTEN_H
 END FUNCTION
 
 SUB waehlen(art AS INTEGER, idx AS INTEGER)
@@ -1007,6 +1206,25 @@ END SUB
 SUB mausImGraph()
     DIM mx AS INTEGER : mx = MOUSEX()
     DIM my AS INTEGER : my = MOUSEY()
+    ' Zoom mit dem Rad, um die Maus herum -- nur ueber dem Graphen, und nicht,
+    ' wenn ein Menue oder eine Klappliste darueber liegt.
+    IF modus = 0 AND imGraph(mx, my) AND MOUSEWHEEL_Y() <> 0 AND GUI_WINDOW_AT(mx, my) < 0 THEN
+        zoomUm(zoom * (1.15 ^ MOUSEWHEEL_Y()), mx, my)
+    END IF
+    ' Verschieben: mittlere Taste, oder Leertaste + linke Taste.
+    IF modus = 0 AND imGraph(mx, my) AND GUI_WINDOW_AT(mx, my) < 0 AND (MOUSE_HIT(2) OR (KEYPRESSED(KEY_SPACE) AND MOUSE_HIT(LINKS))) THEN
+        modus = 4 : panMx = mx : panMy = my : panStartX = panX : panStartY = panY
+        RETURN
+    END IF
+    IF modus = 4 THEN
+        IF MOUSEBUTTON(2) OR MOUSEBUTTON(LINKS) THEN
+            panX = panStartX - (mx - panMx) / zoom
+            panY = panStartY - (my - panMy) / zoom
+        ELSE
+            modus = 0
+        END IF
+        RETURN
+    END IF
     IF modus = 0 AND imGraph(mx, my) AND (MOUSE_HIT(LINKS) OR MOUSE_HIT(RECHTS)) THEN
         GUI_FOCUS(lstParam)          ' Tastatur (Entf, Pfeile) zum Graphen, nicht in ein Feld
         DIM n AS STRING : n = knotenBei(mx, my)
@@ -1033,7 +1251,7 @@ SUB mausImGraph()
             ELSE
                 ' Doppelklick auf freie Flaeche = neuer Zustand
                 IF MILLIS() - letzterKlick < 400 AND ABS(mx - letzterKx) <= 4 AND ABS(my - letzterKy) <= 4 THEN
-                    zustandAnlegen(mx - gx0 - NODE_W \ 2, my - gy0 - NODE_H \ 2)
+                    zustandAnlegen(INT(weltX(mx)) - NODE_W \ 2, INT(weltY(my)) - NODE_H \ 2)
                     letzterKlick = -100000
                     RETURN
                 END IF
@@ -1046,8 +1264,8 @@ SUB mausImGraph()
     IF modus = 1 AND MOUSEBUTTON(LINKS) THEN
         DIM i AS INTEGER : i = zustandIndex(zugName)
         IF i >= 0 THEN
-            DIM nx AS INTEGER : nx = MAX(0, amRaster(startX + mx - startMx))
-            DIM ny AS INTEGER : ny = MAX(0, amRaster(startY + my - startMy))
+            DIM nx AS INTEGER : nx = MAX(0, amRaster(startX + INT((mx - startMx) / zoom)))
+            DIM ny AS INTEGER : ny = MAX(0, amRaster(startY + INT((my - startMy) / zoom)))
             IF nx <> ganz(zp$(i, "x"), 0) OR ny <> ganz(zp$(i, "y"), 0) THEN
                 JSON_SET_INT(doc, zp$(i, "x"), nx) : JSON_SET_INT(doc, zp$(i, "y"), ny)
                 bewegt = TRUE
@@ -1056,7 +1274,7 @@ SUB mausImGraph()
         RETURN
     END IF
     IF modus = 2 AND MOUSEBUTTON(LINKS) THEN
-        anyX = MAX(0, amRaster(startX + mx - startMx)) : anyY = MAX(0, amRaster(startY + my - startMy))
+        anyX = MAX(0, amRaster(startX + INT((mx - startMx) / zoom))) : anyY = MAX(0, amRaster(startY + INT((my - startMy) / zoom)))
         RETURN
     END IF
     IF modus = 3 AND MOUSEBUTTON(zugTaste) THEN RETURN
@@ -1095,31 +1313,45 @@ CONST F_RAND = &H3A4A5C
 
 SUB pfeilspitze(ax AS FLOAT, ay AS FLOAT, bx AS FLOAT, bby AS FLOAT, farbe AS INTEGER)
     DIM w AS FLOAT : w = ATAN2(bby - ay, bx - ax)
-    DIM p1x AS FLOAT : p1x = bx - 11.0 * COS(w - 0.4)
-    DIM p1y AS FLOAT : p1y = bby - 11.0 * SIN(w - 0.4)
-    DIM p2x AS FLOAT : p2x = bx - 11.0 * COS(w + 0.4)
-    DIM p2y AS FLOAT : p2y = bby - 11.0 * SIN(w + 0.4)
+    DIM lg AS FLOAT : lg = MAX(6.0, 11.0 * zoom)
+    DIM p1x AS FLOAT : p1x = bx - lg * COS(w - 0.4)
+    DIM p1y AS FLOAT : p1y = bby - lg * SIN(w - 0.4)
+    DIM p2x AS FLOAT : p2x = bx - lg * COS(w + 0.4)
+    DIM p2y AS FLOAT : p2y = bby - lg * SIN(w + 0.4)
     TRIANGLE(INT(bx), INT(bby), INT(p1x), INT(p1y), INT(p2x), INT(p2y), farbe)
+END SUB
+
+' Eine Schriftgroesse, die mit dem Zoom geht -- aber nicht unter 7 Punkte.
+SUB schrift(groesse AS FLOAT)
+    SETFONT(uiFont, MAX(7, INT(groesse * zoom + 0.5)))
 END SUB
 
 SUB graphZeichnen()
     DIM gl AS INTEGER : gl = LINKS_B
     DIM gr AS INTEGER : gr = SCREENWIDTH() - INSP_B
-    DIM gh AS INTEGER : gh = SCREENHEIGHT()
-    SCISSOR(gl, 0, gr - gl, gh)
-    BOX(gl, 0, gr, gh, &H0B1119)
-    DIM x AS INTEGER
-    FOR x = gx0 TO gr STEP 32
-        LINE(x, 0, x, gh, &H141E2A)
-    NEXT
-    DIM y AS INTEGER
-    FOR y = gy0 TO gh STEP 32
-        LINE(gl, y, gr, y, &H141E2A)
-    NEXT
+    DIM go AS INTEGER : go = OBEN_H
+    DIM gu AS INTEGER : gu = SCREENHEIGHT() - UNTEN_H
+    SCISSOR(gl, go, gr - gl, gu - go)
+    BOX(gl, go, gr, gu, &H0B1119)
+    ' Das Raster liegt in der Welt (alle 32 Einheiten) und zoomt mit; zu
+    ' dicht wird es nur jede vierte Linie gezeigt.
+    DIM schritt AS INTEGER : schritt = IIF(32 * zoom < 12, 128, 32)
+    DIM w0 AS INTEGER : w0 = INT(weltX(gl) / schritt) * schritt - schritt
+    DIM x AS INTEGER : x = w0
+    WHILE schirmX(x) <= gr
+        LINE(schirmX(x), go, schirmX(x), gu, IIF(x MOD (schritt * 4) = 0, &H1A2634, &H141E2A))
+        x = x + schritt
+    WEND
+    DIM h0 AS INTEGER : h0 = INT(weltY(go) / schritt) * schritt - schritt
+    DIM y AS INTEGER : y = h0
+    WHILE schirmY(y) <= gu
+        LINE(gl, schirmY(y), gr, schirmY(y), IIF(y MOD (schritt * 4) = 0, &H1A2634, &H141E2A))
+        y = y + schritt
+    WEND
 
     ' Uebergaenge
     DIM t AS INTEGER
-    TEXT_SIZE(13)
+    schrift(13)
     FOR t = 0 TO nu() - 1
         DIM x1 AS FLOAT : DIM y1 AS FLOAT : DIM x2 AS FLOAT : DIM y2 AS FLOAT : DIM ok AS BOOLEAN : DIM gegen AS BOOLEAN
         (x1, y1, x2, y2, ok, gegen) = kante(t)
@@ -1129,22 +1361,23 @@ SUB graphZeichnen()
             IF hatTrigger(t) THEN farbe = F_TRIGGER
             IF wahr(up$(t, "wait_finished"), FALSE) AND JSON_LEN(doc, up$(t, "conditions")) = 0 THEN farbe = F_START
             IF gewaehlt THEN farbe = F_WAHL
-            LINEW(INT(x1), INT(y1), INT(x2), INT(y2), IIF(gewaehlt, 3, 2), farbe)
+            LINEW(INT(x1), INT(y1), INT(x2), INT(y2), MAX(1, zm(IIF(gewaehlt, 3, 2))), farbe)
             pfeilspitze(x1, y1, x2, y2, farbe)
             DIM lbl AS STRING : lbl = uebergangText$(t)
             IF lbl <> "" THEN
                 DIM mx AS INTEGER : mx = INT((x1 + x2) / 2.0)
-                DIM my AS INTEGER : my = INT((y1 + y2) / 2.0) - 10
+                DIM my AS INTEGER : my = INT((y1 + y2) / 2.0) - zm(10)
                 IF gegen THEN
                     ' Hin- und Rueckweg: jede Beschriftung auf ihre Seite der Linie,
                     ' sonst liegen beide aufeinander.
                     DIM dl AS FLOAT : dl = MAX(1.0, SQR((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1)))
-                    mx = INT((x1 + x2) / 2.0 - (y2 - y1) / dl * 14.0)
-                    my = INT((y1 + y2) / 2.0 + (x2 - x1) / dl * 14.0) - 7
+                    mx = INT((x1 + x2) / 2.0 - (y2 - y1) / dl * 14.0 * zoom)
+                    my = INT((y1 + y2) / 2.0 + (x2 - x1) / dl * 14.0 * zoom) - zm(7)
                 END IF
                 DIM tb AS INTEGER : tb = TEXT_WIDTH(lbl)
-                BOX(mx - tb \ 2 - 3, my - 8, mx + tb \ 2 + 3, my + 7, &H0B1119)
-                TEXT(mx - tb \ 2, my - 7, lbl, IIF(gewaehlt, F_TEXT, F_SUB))
+                DIM th AS INTEGER : th = TEXT_HEIGHT()
+                BOXROUND(mx - tb \ 2 - 4, my - th \ 2 - 2, mx + tb \ 2 + 4, my + th \ 2 + 2, 4, &H0E1824)
+                TEXT(mx - tb \ 2, my - th \ 2, lbl, IIF(gewaehlt, F_TEXT, F_SUB))
             END IF
         END IF
     NEXT
@@ -1152,49 +1385,117 @@ SUB graphZeichnen()
     IF modus = 3 THEN
         DIM ax AS INTEGER : DIM ay AS INTEGER : DIM aw AS INTEGER : DIM ah AS INTEGER
         (ax, ay, aw, ah) = knotenRect(zugName)
-        LINEW(ax + aw \ 2, ay + ah \ 2, MOUSEX(), MOUSEY(), 2, F_WAHL)
+        LINEW(ax + aw \ 2, ay + ah \ 2, MOUSEX(), MOUSEY(), MAX(1, zm(2)), F_WAHL)
     END IF
     ' Eingangspfeil zum Startzustand
     DIM sz AS STRING : sz = startZustand$()
     IF sz <> "" THEN
         DIM sx AS INTEGER : DIM sy AS INTEGER : DIM sw AS INTEGER : DIM sh AS INTEGER
         (sx, sy, sw, sh) = knotenRect(sz)
-        LINEW(sx - 34, sy + sh \ 2, sx - 2, sy + sh \ 2, 2, F_START)
-        pfeilspitze(sx - 34, sy + sh \ 2, sx - 2, sy + sh \ 2, F_START)
+        LINEW(sx - zm(34), sy + sh \ 2, sx - 2, sy + sh \ 2, MAX(1, zm(2)), F_START)
+        pfeilspitze(sx - zm(34), sy + sh \ 2, sx - 2, sy + sh \ 2, F_START)
     END IF
     ' Pille "Any State"
-    DIM px AS INTEGER : px = gx0 + anyX
-    DIM py AS INTEGER : py = gy0 + anyY
-    BOXROUND(px, py, px + ANY_W, py + ANY_H, 16, &H5A3E8C)
-    RECTROUND(px, py, px + ANY_W, py + ANY_H, 16, F_RAND)
-    TEXT_SIZE(15)
-    TEXT(px + (ANY_W - TEXT_WIDTH("Any State")) \ 2, py + 9, "Any State", F_TEXT)
+    DIM px AS INTEGER : DIM py AS INTEGER : DIM pw AS INTEGER : DIM ph AS INTEGER
+    (px, py, pw, ph) = knotenRect("*")
+    BOXROUND(px, py, px + pw, py + ph, zm(16), &H5A3E8C)
+    RECTROUND(px, py, px + pw, py + ph, zm(16), F_RAND)
+    schrift(15)
+    TEXT(px + (pw - TEXT_WIDTH("Any State")) \ 2, py + (ph - TEXT_HEIGHT()) \ 2, "Any State", F_TEXT)
     ' Zustaende
     DIM i AS INTEGER
     FOR i = 0 TO nz() - 1
-        DIM nx AS INTEGER : nx = gx0 + ganz(zp$(i, "x"), 0)
-        DIM ny AS INTEGER : ny = gy0 + ganz(zp$(i, "y"), 0)
+        DIM nx AS INTEGER : nx = schirmX(ganz(zp$(i, "x"), 0))
+        DIM ny AS INTEGER : ny = schirmY(ganz(zp$(i, "y"), 0))
+        DIM nw AS INTEGER : nw = zm(NODE_W)
+        DIM nh AS INTEGER : nh = zm(NODE_H)
         DIM endlos AS BOOLEAN : endlos = wahr(zp$(i, "loop"), TRUE)
         DIM istWahl AS BOOLEAN : istWahl = selArt = 1 AND selIdx = i
         DIM istStart AS BOOLEAN : istStart = text$(zp$(i, "name")) = sz
         DIM fuell AS INTEGER : fuell = IIF(endlos, &H1C3644, &H44341C)
         IF istWahl THEN fuell = IIF(endlos, &H2A4E60, &H604A2A)
-        BOXROUND(nx, ny, nx + NODE_W, ny + NODE_H, 9, fuell)
+        ' Ein Schatten unter dem Knoten hebt ihn vom Raster ab.
+        BOXROUND(nx + zm(3), ny + zm(4), nx + nw + zm(3), ny + nh + zm(4), zm(9), &H05080C)
+        BOXROUND(nx, ny, nx + nw, ny + nh, zm(9), fuell)
         DIM rand AS INTEGER : rand = F_RAND
         IF istStart THEN rand = F_START
         IF istWahl THEN rand = F_WAHL
-        RECTROUND(nx, ny, nx + NODE_W, ny + NODE_H, 9, rand)
-        IF istWahl OR istStart THEN RECTROUND(nx - 1, ny - 1, nx + NODE_W + 1, ny + NODE_H + 1, 9, rand)
-        BOX(nx + 4, ny + 7, nx + 8, ny + NODE_H - 7, IIF(endlos, F_START, F_TRIGGER))
-        TEXT_SIZE(16)
-        TEXT(nx + 16, ny + 6, text$(zp$(i, "name")), F_TEXT)
-        TEXT_SIZE(12)
-        IF istStart THEN TEXT(nx + NODE_W - 44, ny + 5, "START", F_START)
+        RECTROUND(nx, ny, nx + nw, ny + nh, zm(9), rand)
+        IF istWahl OR istStart THEN RECTROUND(nx - 1, ny - 1, nx + nw + 1, ny + nh + 1, zm(9), rand)
+        BOX(nx + zm(4), ny + zm(7), nx + zm(8), ny + nh - zm(7), IIF(endlos, F_START, F_TRIGGER))
+        schrift(16)
+        TEXT(nx + zm(16), ny + zm(6), text$(zp$(i, "name")), F_TEXT)
+        schrift(11)
+        IF istStart THEN TEXT(nx + nw - zm(8) - TEXT_WIDTH("START"), ny + zm(6), "START", F_START)
         DIM unter AS STRING : unter = animName$(i) + "  [" + STR$(ganz(zp$(i, "first"), 0)) + "-" + STR$(ganz(zp$(i, "last"), 0)) + "]  " + IIF(endlos, "endlos", "einmal")
-        TEXT(nx + 16, ny + 29, unter, F_SUB)
+        TEXT(nx + zm(16), ny + zm(29), unter, F_SUB)
     NEXT
-    TEXT_SIZE(16)
+    SETFONT(uiFont, 16)
     SCISSOR_END()
+END SUB
+
+' --- Die Animation des Zustands, rechts unten im Inspektor ------------------------
+DIM blattBild AS IMAGE
+DIM blattGeladen AS STRING : blattGeladen = ""
+DIM blattDa AS BOOLEAN : blattDa = FALSE
+DIM laufBild AS FLOAT : laufBild = 0.0
+
+SUB blattNachziehen()
+    DIM b AS STRING : b = blattPfad$()
+    IF b = blattGeladen THEN RETURN
+    blattGeladen = b
+    blattDa = FALSE
+    IF b = "" THEN RETURN
+    TRY
+        blattBild = LOADIMAGE(b)
+        blattDa = TRUE
+    CATCH e
+        blattDa = FALSE
+    END TRY
+END SUB
+
+SUB laufZeichnen()
+    DIM lx AS INTEGER : lx = GUI_CANVAS_X(laufFlaeche)
+    DIM ly AS INTEGER : ly = GUI_CANVAS_Y(laufFlaeche)
+    DIM lb AS INTEGER : lb = GUI_CANVAS_W(laufFlaeche)
+    DIM lh AS INTEGER : lh = GUI_CANVAS_H(laufFlaeche)
+    BOXROUND(lx, ly, lx + lb - 1, ly + lh - 1, 6, &H0E1620)
+    ' Welcher Zustand: der gewaehlte, sonst der Start.
+    DIM i AS INTEGER : i = -1
+    IF selArt = 1 AND selIdx >= 0 AND selIdx < nz() THEN i = selIdx ELSE i = zustandIndex(startZustand$())
+    blattNachziehen()
+    SETFONT(uiFont, 14)
+    IF NOT blattDa OR i < 0 THEN
+        DIM hinweis AS STRING : hinweis = IIF(i < 0, "Noch kein Zustand.", "Kein Sprite-Blatt gefunden.")
+        TEXT(lx + (lb - TEXT_WIDTH(hinweis)) \ 2, ly + lh \ 2 - 8, hinweis, F_SUB)
+        SETFONT(uiFont, 16)
+        RETURN
+    END IF
+    DIM fw AS INTEGER : fw = MAX(1, ganz("frame_w", 16))
+    DIM fh AS INTEGER : fh = MAX(1, ganz("frame_h", 16))
+    DIM spalten AS INTEGER : spalten = MAX(1, IMAGE_WIDTH(blattBild) \ fw)
+    DIM erste AS INTEGER : erste = ganz(zp$(i, "first"), 0)
+    DIM letzte AS INTEGER : letzte = MAX(erste, ganz(zp$(i, "last"), erste))
+    DIM fps AS FLOAT : fps = MAX(0.5, komma(zp$(i, "fps"), 8.0))
+    DIM anzahl AS INTEGER : anzahl = letzte - erste + 1
+    laufBild = laufBild + fps * DELTA()
+    DIM k AS INTEGER
+    IF wahr(zp$(i, "loop"), TRUE) THEN
+        k = INT(laufBild) MOD anzahl
+    ELSE
+        ' Einmal: durchlaufen, auf dem letzten Bild stehen bleiben, nach einer
+        ' Pause von vorn -- sonst sieht man es nur ein einziges Mal.
+        k = INT(laufBild) MOD (anzahl + INT(fps))
+        k = MIN(k, anzahl - 1)
+    END IF
+    DIM nr AS INTEGER : nr = erste + k
+    DIM m AS INTEGER : m = MAX(1, MIN((lb - 20) \ fw, (lh - 40) \ fh))
+    DIM zx AS INTEGER : zx = lx + (lb - fw * m) \ 2
+    DIM zy AS INTEGER : zy = ly + (lh - 24 - fh * m) \ 2
+    DRAWIMAGEPARTEX(blattBild, (nr MOD spalten) * fw, (nr \ spalten) * fh, fw, fh, zx, zy, fw * m, fh * m)
+    DIM unter AS STRING : unter = text$(zp$(i, "name")) + "  ·  Bild " + STR$(nr) + "  (" + STR$(erste) + "–" + STR$(letzte) + ")"
+    TEXT(lx + (lb - TEXT_WIDTH(unter)) \ 2, ly + lh - 22, unter, F_SUB)
+    SETFONT(uiFont, 16)
 END SUB
 
 ' --- Start ------------------------------------------------------------------
@@ -1209,6 +1510,7 @@ ELSEIF FILEEXISTS("anim_demo.dhanim") THEN
     ' Ohne Datei die mitgelieferte Beispielmaschine -- so sieht man sofort,
     ' wie ein fertiger Graph aussieht (Strg+N leert).
     laden("anim_demo.dhanim")
+    einpassen()
 ELSE
     neueMaschine()
 END IF
@@ -1239,15 +1541,46 @@ WHILE NOT beenden
     GUI_UPDATE()
     IF SCREENWIDTH() <> warBreite OR SCREENHEIGHT() <> warHoehe THEN
         warBreite = SCREENWIDTH() : warHoehe = SCREENHEIGHT()
-        GUI_WINDOW_SET_BOUNDS(winLinks, 0, 0, LINKS_B, warHoehe)
-        GUI_WINDOW_SET_BOUNDS(winInsp, warBreite - INSP_B, 0, INSP_B, warHoehe)
+        GUI_WINDOW_SET_BOUNDS(winOben, 0, 0, warBreite, OBEN_H)
+        GUI_WINDOW_SET_BOUNDS(winUnten, 0, warHoehe - UNTEN_H, warBreite, UNTEN_H)
+        GUI_WINDOW_SET_BOUNDS(winLinks, 0, OBEN_H, LINKS_B, warHoehe - OBEN_H - UNTEN_H)
+        GUI_WINDOW_SET_BOUNDS(winInsp, warBreite - INSP_B, OBEN_H, INSP_B, warHoehe - OBEN_H - UNTEN_H)
     END IF
+
+    ' Werkzeugleiste und Ansicht
+    DIM tb AS INTEGER : tb = GUI_TOOLBAR_CLICKED(leiste)
+    IF tb = tbNeu THEN neueMaschine()
+    IF tb = tbOeffnen THEN
+        DIM po AS STRING : po = FILE_OPEN_DIALOG("Zustandsmaschine öffnen", "dhanim")
+        IF po <> "" THEN
+            laden(po)
+            einpassen()
+        END IF
+    END IF
+    IF tb = tbSichern THEN sichern(FALSE)
+    IF tb = tbRueck THEN rueckgaengig()
+    IF tb = tbWieder THEN wiederholen()
+    IF tb = tbZustand THEN zustandAnlegen(INT(weltX(graphMitteX())) - NODE_W \ 2, INT(weltY(graphMitteY())) - NODE_H \ 2)
+    IF tb = tbVerbinden THEN
+        verbinden = GUI_TOOLBAR_CHECKED(leiste, tbVerbinden)
+        GUI_SET_TEXT(lblStatus, IIF(verbinden, "Verbinden: von Knoten zu Knoten ziehen.", "Verbinden aus."))
+    END IF
+    IF tb = tbLoeschen THEN loeschen()
+    IF tb = tbAnordnen OR GUI_CLICKED(miAnordnen) THEN anordnen()
+    IF tb = tbEinpassen OR GUI_CLICKED(miEinpassen) THEN einpassen()
+    IF tb = tbGroesser OR GUI_CLICKED(miGroesser) THEN zoomUm(zoom * 1.25, graphMitteX(), graphMitteY())
+    IF tb = tbKleiner OR GUI_CLICKED(miKleiner) THEN zoomUm(zoom / 1.25, graphMitteX(), graphMitteY())
+    IF GUI_CLICKED(miEcht) OR GUI_STATUSBAR_CLICKED(lblStatus) = sfZoom THEN zoomUm(1.0, graphMitteX(), graphMitteY())
+    IF tb = tbVorschau THEN vorschau()
 
     ' Menue
     IF GUI_CLICKED(miNeu) THEN neueMaschine()
     IF GUI_CLICKED(miOeffnen) THEN
         DIM p AS STRING : p = FILE_OPEN_DIALOG("Zustandsmaschine oeffnen", "dhanim")
-        IF p <> "" THEN laden(p)
+        IF p <> "" THEN
+            laden(p)
+            einpassen()
+        END IF
     END IF
     IF GUI_CLICKED(miSichern) THEN sichern(FALSE)
     IF GUI_CLICKED(miSichernAls) THEN sichern(TRUE)
@@ -1318,7 +1651,11 @@ WHILE NOT beenden
         IF KEYHIT(KEY_UP) THEN schieben(0, -schritt)
         IF KEYHIT(KEY_DOWN) THEN schieben(0, schritt)
         IF KEYHIT(KEY_ESCAPE) THEN modus = 0 : waehlen(0, -1)
-        IF KEYHIT(KEY_L) THEN verbinden = NOT verbinden : GUI_SET_TEXT(lblStatus, IIF(verbinden, "Verbinden-Modus: von Knoten zu Knoten ziehen.", "Verbinden-Modus aus."))
+        IF KEYHIT(KEY_L) AND NOT (KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)) THEN
+            verbinden = NOT verbinden
+            GUI_TOOLBAR_SET_CHECKED(leiste, tbVerbinden, verbinden)
+            GUI_SET_TEXT(lblStatus, IIF(verbinden, "Verbinden: von Knoten zu Knoten ziehen.", "Verbinden aus."))
+        END IF
     END IF
 
     mausImGraph()
@@ -1331,9 +1668,22 @@ WHILE NOT beenden
         END IF
     END IF
 
+    ' Zahlen in der Statusleiste; Rueckgaengig nur, wenn es etwas gibt.
+    GUI_STATUSBAR_SET(lblStatus, sfZahl, STR$(nz()) + " Zustände · " + STR$(nu()) + " Übergänge")
+    GUI_STATUSBAR_SET(lblStatus, sfZoom, "Zoom " + STR$(INT(zoom * 100 + 0.5)) + " %")
+    GUI_TOOLBAR_ENABLE(leiste, tbRueck, standPos > 0)
+    GUI_TOOLBAR_ENABLE(leiste, tbWieder, standPos < LEN(staende) - 1)
+    GUI_MENU_ENABLE(miRueck, standPos > 0)
+    GUI_MENU_ENABLE(miWieder, standPos < LEN(staende) - 1)
+
     CLS(&H0B1119)
     graphZeichnen()
-    GUI_DRAW()
+    GUI_DRAW(FALSE)
+    ' Die Animation entsteht nach GUI_DRAW (sie ist selbst gezeichnet); ein
+    ' offener Kasten muss danach noch einmal obenauf.
+    laufZeichnen()
+    IF dlgSchliessen <> 0 THEN GUI_DRAW_WINDOW(dlgSchliessen)
+    GUI_DRAW_TOP()
     FLIP()
 WEND
 

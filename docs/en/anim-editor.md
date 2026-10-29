@@ -30,6 +30,11 @@ that you immediately see what a finished graph looks like. `Ctrl+N` clears it.
 
 ## User interface
 
+At the top across the full width a menu and a toolbar (New, Open, Save ·
+Back, Forward · State, Connect, Delete · Arrange, Fit, zoom · Preview), at the
+bottom the status bar with the message, the number of states and transitions
+and the zoom (a click on it = 100 %). The interface writes in DejaVu Sans.
+
 - **Centre — the graph:** states as nodes, transitions as arrows with a
   head and a label (the way there and back between the same nodes is offset
   to the side). An entry arrow marks the **start state**; the pill
@@ -40,7 +45,11 @@ that you immediately see what a finished graph looks like. `Ctrl+N` clears it.
 - **Right — inspector:** depending on the selection, the state (name,
   animation, frame from/to, frames per second, looping, start state) or the
   transition ("only when finished" and up to **six conditions** made of
-  parameter, operator and value).
+  parameter, operator and value). Below it **"So läuft der Zustand"** (how the
+  state runs): the animation of the selected state (without a selection that
+  of the start state), from the sprite sheet itself, at its frames per second;
+  a state that runs only once stays briefly on its last frame and then starts
+  again.
 
 ## Operation
 
@@ -57,6 +66,10 @@ that you immediately see what a finished graph looks like. `Ctrl+N` clears it.
 | Undo / Redo | `Strg+Z` / `Strg+Y` (Ctrl+Z / Ctrl+Y) |
 | New / Open / Save / Save as | `Strg+N` / `Strg+O` / `Strg+S` / `Strg+Umschalt+S` (Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Shift+S) |
 | Preview | `F5` |
+| Zoom | mouse wheel over the graph (around the point under the mouse), `Strg+Plus` / `Strg+Minus` (Ctrl+Plus / Ctrl+Minus), `Strg+0` (Ctrl+0) = 100 % |
+| Pan | drag with the middle mouse button, or hold Space and drag with the left |
+| Arrange | `Strg+L` (Ctrl+L): levels from the start state, one column per level — what "Any State" reaches stands in the first level after it; one step in the history |
+| Fit | `Strg+E` (Ctrl+E): the whole graph into view (automatically on opening) |
 | Quit | `Strg+Q` (Ctrl+Q) or the window's close button |
 
 When you quit with unsaved changes, the editor asks
@@ -139,7 +152,10 @@ checked with the runtime itself — `ANIM_FSM_LOAD`, `ANIM_FSM_SETUP`, one
 step, compare the state name (for the condition: with `speed` 10, `run` is
 reached; with 1, it stays `idle`). That the JSON is valid would be the
 weaker statement: a transition to a deleted state does not load, and that is
-exactly what the case checks after `Entf`. The prompt on the close button is
+exactly what the case checks after `Entf`. Plus arranging (positions by
+level and undo), zooming around a fixed point including hit testing, a real
+wheel step, fitting and the animation in the inspector as an image probe. The
+prompt on the close button is
 checked by `tests/pruef/werkzeug_kreuz.dhtest` with real window messages.
 
 ## What the Qt editor had and 198 lacks
@@ -147,5 +163,3 @@ checked by `tests/pruef/werkzeug_kreuz.dhtest` with real window messages.
 - **Renaming and setting the start state by right-clicking a node** — here
   the right button drags transitions; both are done via the inspector or the
   Bearbeiten (Edit) menu.
-- **Scrolling the graph:** the visible area is fixed; nodes beyond the
-  window cannot be reached.

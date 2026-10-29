@@ -116,6 +116,7 @@ enum Cmd {
     TexturePartEx(usize, i32, i32, i32, i32, i32, i32, i32, i32), // +dw,dh (skaliert)
     TextureRect(usize, i32, i32, i32, i32),           // tex skaliert in dx,dy,dw,dh (bounds-safe)
     TextureRectTint(usize, i32, i32, i32, i32, Color), // dasselbe mit Toenung/Deckkraft
+    TexturePartExTint(usize, i32, i32, i32, i32, i32, i32, i32, i32, Color), // Ausschnitt skaliert, getoent
     TextureFlipped(usize, i32, i32, i32, i32, bool, bool), // tex, x, y, dw, dh, flip_h, flip_v
     TextureRot(usize, i32, i32, f32, f32, Color),      // tex, cx, cy, winkel_grad, skala (inkl. cam_zoom), tint (um Zentrum)
     AtlasDraw(usize, i32, i32, i32, i32, i32, i32, i32, i32, bool, bool, Color), // tex, sx,sy,sw,sh, dx,dy, dw,dh, flip_h, flip_v, tint
@@ -5551,12 +5552,17 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// Wie draw_image_part, aber mit Ziel-Groesse (dw,dh) -> skaliertes Blitten
     /// eines Sub-Rechtecks (z. B. Sprite-Sheet-Kachel gross zeichnen).
     pub fn draw_image_part_ex(&mut self, idx: i64, sx: i32, sy: i32, sw: i32, sh: i32,
-                              dx: i32, dy: i32, dw: i32, dh: i32) -> Result<(), String> {
+                              dx: i32, dy: i32, dw: i32, dh: i32, tint: Option<i64>) -> Result<(), String> {
         let i = idx as usize;
         if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "DRAWIMAGEPARTEX")); }
         let (dw, dh) = (self.ssize(dw), self.ssize(dh));
         let (dx, dy) = self.w2s(dx, dy);
-        self.emit(Cmd::TexturePartEx(i, sx, sy, sw, sh, dx, dy, dw, dh));
+        // Ohne Toenung der alte Befehl -- jedes bestehende Programm zeichnet
+        // genau wie vorher.
+        match tint {
+            None => self.emit(Cmd::TexturePartEx(i, sx, sy, sw, sh, dx, dy, dw, dh)),
+            Some(c) => self.emit(Cmd::TexturePartExTint(i, sx, sy, sw, sh, dx, dy, dw, dh, col(c))),
+        }
         Ok(())
     }
     /// 9-Slice: ein Bild auf eine beliebige Groesse ziehen, ohne dass die
@@ -5575,7 +5581,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         let (bw, bh) = (self.textures[i].tex.width, self.textures[i].tex.height);
         let r = neun_rand(bw, bh, w, h, rand);
         if r <= 0 {
-            return self.draw_image_part_ex(idx, 0, 0, bw, bh, x, y, w, h);
+            return self.draw_image_part_ex(idx, 0, 0, bw, bh, x, y, w, h, None);
         }
         let (sx, sw) = neun_spannen(0, bw, r);
         let (sy, sh) = neun_spannen(0, bh, r);
@@ -5587,7 +5593,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                     continue;
                 }
                 self.draw_image_part_ex(idx, sx[c], sy[z], sw[c], sh[z],
-                                        dx[c], dy[z], dw[c], dh[z])?;
+                                        dx[c], dy[z], dw[c], dh[z], None)?;
             }
         }
         Ok(())
@@ -8363,6 +8369,11 @@ fn render_scene<D: RaylibDraw>(
                         let src = Rectangle::new(*sx as f32, *sy as f32, *sw as f32, *sh as f32);
                         let dst = Rectangle::new((dx * s) as f32, (dy * s) as f32, (dw * s) as f32, (dh * s) as f32);
                         d.draw_texture_pro(&textures[*i].tex, src, dst, Vector2::zero(), 0.0, Color::WHITE);
+                    }
+                    Cmd::TexturePartExTint(i, sx, sy, sw, sh, dx, dy, dw, dh, tint) => {
+                        let src = Rectangle::new(*sx as f32, *sy as f32, *sw as f32, *sh as f32);
+                        let dst = Rectangle::new((dx * s) as f32, (dy * s) as f32, (dw * s) as f32, (dh * s) as f32);
+                        d.draw_texture_pro(&textures[*i].tex, src, dst, Vector2::zero(), 0.0, *tint);
                     }
                     Cmd::TextureRectTint(i, dx, dy, dw, dh, tint) => {
                         if let Some(t) = textures.get(*i) {

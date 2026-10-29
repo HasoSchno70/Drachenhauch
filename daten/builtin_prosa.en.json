@@ -409,7 +409,7 @@
   "DRAWIMAGE9": "9-slice: the image stretched into the rectangle, the four corners at their own size, the edges in one direction only, the centre in both — for frames, panels and buttons that grow to any size without distorting. Edges in pixels of the image; if the target does not fit, the corners shrink proportionally. Camera-aware.",
   "DRAWIMAGEFLIPPED": "with mirroring",
   "DRAWIMAGEPART": "draw a sub-rectangle from a sheet",
-  "DRAWIMAGEPARTEX": "Like DRAWIMAGEPART, but with a target size of your own (w, h) rather than 1:1 — the section is stretched or squeezed to the target size as it is drawn.",
+  "DRAWIMAGEPARTEX": "a sub-rectangle stretched to w x h; farbe tints it, its alpha is the opacity (RGBA(255, 255, 255, 128) = half transparent)",
   "DRAWIMAGEROT": "centred on (x,y), rotated by winkel degrees (about the centre), optionally scaled + tinted. Ideal for rotated sprites / physics2d (winkel = DEG(PHYS2D_BODY_ANGLE(...))). Camera-aware.",
   "DRAWTILEMAP": "Draws a two-dimensional array of tile numbers as a map.",
   "ECS_ADD_FLOAT": "FLOAT (an int is accepted + converted)",

@@ -515,6 +515,7 @@ wie getippt über die Tipp-Warteschlange, die 256 Zeichen je Bild fasst
 | `GETALPHA(img, x, y)` → INTEGER | Deckkraft an `(x, y)`, `0..255`; `-1` bei Index außerhalb. Nötig, weil `GETPIXEL` eine **Farbe** liefert und dort Deckkraft 0 *deckend* bedeutet — ein durchsichtiger Punkt käme als schwarzer zurück |
 | `DRAWIMAGE(img, x, y)` | Bild bei (x, y) zeichnen |
 | `DRAWIMAGEPART(img, sx, sy, sw, sh, x, y)` | Sub-Rechteck aus Sheet zeichnen |
+| `DRAWIMAGEPARTEX(img, sx, sy, sw, sh, x, y, w, h [, farbe])` | Sub-Rechteck auf die Größe `w` x `h` gezogen; `farbe` tönt es, ihr Alpha ist die Deckkraft (`RGBA(255, 255, 255, 128)` = halb durchsichtig) |
 | `DRAWIMAGEFLIPPED(img, x, y[, flipX[, flipY]])` | mit Spiegelung |
 | `DRAWIMAGEROT(img, x, y, winkel[, skala[, tint]])` | **zentriert** auf (x,y), um `winkel` **Grad** gedreht (um die Mitte), optional skaliert + getönt. Ideal für rotierte Sprites / `physics2d` (`winkel = DEG(PHYS2D_BODY_ANGLE(...))`). Camera-aware. |
 | `DRAWIMAGE9(img, x, y, breite, hoehe, links, oben, rechts, unten[, tint])` | **9-Slice**: das Bild in das Rechteck gestreckt, die vier Ecken in ihrer Größe, die Ränder nur in einer Richtung, die Mitte in beiden — für Rahmen, Panels und Knöpfe, die beliebig groß werden, ohne zu verzerren. Ränder in Pixeln des Bildes; passt das Ziel nicht, werden die Ecken im Verhältnis kleiner. Camera-aware. |
