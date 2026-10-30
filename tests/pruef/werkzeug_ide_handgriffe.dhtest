@@ -319,9 +319,10 @@ gemerkt TRUE TRUE
 ' Die Messung ist erfunden (drei Zeilen in held.lauf, eine in zeige, eine
 ' im Hauptprogramm), gezaehlt wird, was die Tabelle daraus macht.
 profQuelle = SPLIT$(READLINES_JOIN$(), NL)
-profRohZ = [3, 4, 9, 8, 1]
-profRohA = [10, 10, 5, 5, 1]
-profRohT = [0.004, 0.003, 0.002, 0.001, 0.0005]
+profMessung = []
+profMessungDazu(3, 10, 0.004, prozessDatei) : profMessungDazu(4, 10, 0.003, prozessDatei)
+profMessungDazu(9, 5, 0.002, prozessDatei) : profMessungDazu(8, 5, 0.001, prozessDatei)
+profMessungDazu(1, 1, 0.0005, prozessDatei)
 profGesamt = 0.0105
 GUI_SET_CHECKED(cbProfilFunk, TRUE)
 profilTabelleFuellen()

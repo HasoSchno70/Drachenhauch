@@ -543,20 +543,50 @@ DIM profilZeilen AS ARRAY OF INTEGER : profilZeilen = []
 ' Die Datei je Tabellenzeile -- mit IMPORT misst der Profiler auch Zeilen
 ' anderer Dateien, und ein Klick muss dorthin.
 DIM profilDateien AS ARRAY OF STRING : profilDateien = []
-DIM profRohD AS ARRAY OF STRING : profRohD = []
-DIM profBerDatei AS ARRAY OF STRING : profBerDatei = []
 DIM profLeseDatei AS STRING : profLeseDatei = ""
 DIM profLeseZeilen AS ARRAY OF STRING : profLeseZeilen = []
+' Eine gemessene Zeile. Bis 2026-10-30 vier Felder (profRohZ/A/T/D), die
+' ueber eine Indexliste sortiert und zweimal umkopiert wurden.
+CLASS ProfilZeile
+    DIM zeile AS INTEGER
+    DIM anzahl AS INTEGER
+    DIM zeit AS FLOAT               ' Sekunden
+    DIM datei AS STRING             ' mit IMPORT auch Zeilen anderer Dateien
+    SUB Init(z AS INTEGER, a AS INTEGER, t AS FLOAT, d AS STRING)
+        zeile = z : anzahl = a : zeit = t : datei = d
+    END SUB
+END CLASS
+' Ein Unterprogramm einer gemessenen Datei (Methoden als `Klasse.methode`).
+CLASS ProfilBereich
+    DIM name AS STRING
+    DIM von AS INTEGER
+    DIM bis AS INTEGER
+    DIM datei AS STRING
+    SUB Init(n AS STRING, v AS INTEGER, b AS INTEGER, d AS STRING)
+        name = n : von = v : bis = b : datei = d
+    END SUB
+END CLASS
+' Eine Zeile der Ansicht "nach Funktionen": alle Messzeilen eines Bereichs.
+CLASS ProfilGruppe
+    DIM name AS STRING
+    DIM datei AS STRING
+    DIM von AS INTEGER
+    DIM zeilen AS INTEGER
+    DIM zeit AS FLOAT
+    SUB Init(n AS STRING, d AS STRING, v AS INTEGER)
+        name = n : datei = d : von = v
+    END SUB
+END CLASS
 ' Die Messung selbst, nach Zeit absteigend -- die Tabelle zeigt sie je
 ' Zeile oder je Funktion, ohne neu zu messen.
-DIM profRohZ AS ARRAY OF INTEGER : profRohZ = []
-DIM profRohA AS ARRAY OF INTEGER : profRohA = []
-DIM profRohT AS ARRAY OF FLOAT : profRohT = []
+DIM profMessung AS ARRAY OF ProfilZeile : profMessung = []
 DIM profGesamt AS FLOAT : profGesamt = 0.0
 DIM profQuelle AS ARRAY OF STRING : profQuelle = []
-DIM profBerName AS ARRAY OF STRING : profBerName = []
-DIM profBerVon AS ARRAY OF INTEGER : profBerVon = []
-DIM profBerBis AS ARRAY OF INTEGER : profBerBis = []
+DIM profBereiche AS ARRAY OF ProfilBereich : profBereiche = []
+
+SUB profMessungDazu(zeile AS INTEGER, anzahl AS INTEGER, zeit AS FLOAT, datei AS STRING)
+    ARRAY_PUSH(profMessung, NEW ProfilZeile(zeile, anzahl, zeit, datei))
+END SUB
 
 ' Wo Handbuch und Beispiele liegen: neben ide/ (dhrt hat nach ide/ gewechselt).
 DIM wurzel AS STRING : wurzel = GETENV$("DH_IDE_WURZEL")
@@ -15261,13 +15291,26 @@ SUB profilAufnehmen()
     IF prozessStarten("profile") THEN protokoll("profil gestartet")
 END SUB
 
-' Vergleich fuer SORT in profilAnzeigen: teurer zuerst, bei gleicher Zeit
-' die fruehere Zeile (es gibt keine Closures, daher das Feld daneben).
-DIM profSortZeit AS ARRAY OF FLOAT : profSortZeit = []
-FUNCTION profVergleich(a AS INTEGER, b AS INTEGER) AS INTEGER
-    IF profSortZeit[b] > profSortZeit[a] THEN RETURN 1
-    IF profSortZeit[b] < profSortZeit[a] THEN RETURN -1
-    RETURN a - b
+' Vergleiche fuer SORT (stabil: bei Gleichstand bleibt die Folge der
+' Messung bzw. des Auftretens). Teurer zuerst.
+FUNCTION profZeileVergleich(a AS ProfilZeile, b AS ProfilZeile) AS INTEGER
+    IF b.zeit > a.zeit THEN RETURN 1
+    IF b.zeit < a.zeit THEN RETURN -1
+    RETURN 0
+END FUNCTION
+
+FUNCTION profGruppeVergleich(a AS ProfilGruppe, b AS ProfilGruppe) AS INTEGER
+    IF b.zeit > a.zeit THEN RETURN 1
+    IF b.zeit < a.zeit THEN RETURN -1
+    RETURN 0
+END FUNCTION
+
+' Groessere Bereiche zuerst -- jeder kleinere ueberschreibt danach seine
+' Zeilen, so gewinnt der innerste.
+FUNCTION profBereichVergleich(a AS ProfilBereich, b AS ProfilBereich) AS INTEGER
+    IF b.bis - b.von > a.bis - a.von THEN RETURN 1
+    IF b.bis - b.von < a.bis - a.von THEN RETURN -1
+    RETURN 0
 END FUNCTION
 
 SUB profilAnzeigen(zeile AS STRING)
@@ -15275,43 +15318,21 @@ SUB profilAnzeigen(zeile AS STRING)
     ausgabeVerteilen(JSON_GET_STRING(j, "output"))
     DIM gesamt AS FLOAT : gesamt = JSON_GET_FLOAT(j, "total_time")
     DIM n AS INTEGER : n = JSON_LEN(j, "lines")
-    DIM zl[MAX(n, 1)] AS INTEGER
-    DIM za[MAX(n, 1)] AS INTEGER
-    DIM zt[MAX(n, 1)] AS FLOAT
-    DIM zd[MAX(n, 1)] AS STRING
     DIM i AS INTEGER
+    profMessung = []
     FOR i = 0 TO n - 1
         DIM p AS STRING : p = "lines." + STR$(i)
-        zl[i] = JSON_GET_INT(j, p + ".line")
-        za[i] = JSON_GET_INT(j, p + ".count")
-        zt[i] = JSON_GET_FLOAT(j, p + ".time")
         ' Die Hauptdatei heisst wie beim Start, eine importierte kanonisch.
-        zd[i] = prozessDatei
+        DIM zd AS STRING : zd = prozessDatei
         IF JSON_HAS(j, p + ".file") THEN
-            IF JSON_GET_STRING(j, p + ".file") <> prozessDatei AND JSON_GET_STRING(j, p + ".file") <> "" THEN zd[i] = JSON_GET_STRING(j, p + ".file")
+            IF JSON_GET_STRING(j, p + ".file") <> prozessDatei AND JSON_GET_STRING(j, p + ".file") <> "" THEN zd = JSON_GET_STRING(j, p + ".file")
         END IF
+        profMessungDazu(JSON_GET_INT(j, p + ".line"), JSON_GET_INT(j, p + ".count"), JSON_GET_FLOAT(j, p + ".time"), zd)
     NEXT
-    ' Nach Zeit absteigend -- die teuerste Zeile zuerst. Mit SORT ueber die
-    ' Indizes: die Auswahlsortierung davor war quadratisch, ein Programm mit
-    ' 20000 Zeilen hielt die IDE beim Anzeigen 13,7 s fest (Stresstest
-    ' 2026-10-02).
-    profSortZeit = []
-    DIM folge AS ARRAY OF INTEGER : folge = []
-    FOR i = 0 TO n - 1
-        ARRAY_PUSH(profSortZeit, zt[i])
-        ARRAY_PUSH(folge, i)
-    NEXT
-    SORT(folge, profVergleich)
-    DIM sl[MAX(n, 1)] AS INTEGER
-    DIM sa[MAX(n, 1)] AS INTEGER
-    DIM st[MAX(n, 1)] AS FLOAT
-    DIM sd[MAX(n, 1)] AS STRING
-    FOR i = 0 TO n - 1
-        sl[i] = zl[folge[i]] : sa[i] = za[folge[i]] : st[i] = zt[folge[i]] : sd[i] = zd[folge[i]]
-    NEXT
-    FOR i = 0 TO n - 1
-        zl[i] = sl[i] : za[i] = sa[i] : zt[i] = st[i] : zd[i] = sd[i]
-    NEXT
+    ' Nach Zeit absteigend -- die teuerste Zeile zuerst (SORT ist stabil;
+    ' die Auswahlsortierung frueherer Staende war quadratisch, ein Programm
+    ' mit 20000 Zeilen hielt die IDE 13,7 s fest, Stresstest 2026-10-02).
+    SORT(profMessung, profZeileVergleich)
     ' Die Quelle zur Messung: der offene Reiter, sonst die Datei -- ohne sie
     ' gaebe es weder den Quelltext je Zeile noch die Funktionen.
     DIM quelle AS ARRAY OF STRING : quelle = []
@@ -15325,10 +15346,6 @@ SUB profilAnzeigen(zeile AS STRING)
             quelle = []
         END TRY
     END IF
-    profRohZ = [] : profRohA = [] : profRohT = [] : profRohD = []
-    FOR i = 0 TO n - 1
-        ARRAY_PUSH(profRohZ, zl[i]) : ARRAY_PUSH(profRohA, za[i]) : ARRAY_PUSH(profRohT, zt[i]) : ARRAY_PUSH(profRohD, zd[i])
-    NEXT
     profLeseDatei = ""
     profGesamt = gesamt
     profQuelle = quelle
@@ -15339,7 +15356,7 @@ SUB profilAnzeigen(zeile AS STRING)
     profDatei = prozessDatei
     profZeilen = [] : profAnzahl = []
     FOR i = 0 TO n - 1
-        IF zd[i] = prozessDatei THEN ARRAY_PUSH(profZeilen, zl[i]) : ARRAY_PUSH(profAnzahl, za[i])
+        IF profMessung[i].datei = prozessDatei THEN ARRAY_PUSH(profZeilen, profMessung[i].zeile) : ARRAY_PUSH(profAnzahl, profMessung[i].anzahl)
     NEXT
     GUI_SET_TEXT(lblProfil, BASENAME(prozessDatei) + ": " + FORMAT$(gesamt * 1000.0, "%.2f") + tr$(" ms gesamt, ") + STR$(n) + tr$(" Zeilen gemessen"))
     IF JSON_HAS(j, "error") THEN
@@ -15363,32 +15380,33 @@ END SUB
 SUB profilTabelleFuellen()
     GUI_TABLE_CLEAR(tblProfil)
     DIM pz AS ARRAY OF INTEGER : pz = []
-    DIM n AS INTEGER : n = LEN(profRohZ)
+    DIM n AS INTEGER : n = LEN(profMessung)
     DIM i AS INTEGER
     IF NOT GUI_CHECKED(cbProfilFunk) THEN
         GUI_TABLE_HEADERS(tblProfil, [tr$("Zeile"), tr$("Anzahl"), "ms", tr$("Anteil"), tr$("Quelltext")])
         GUI_TABLE_COL_WIDTHS(tblProfil, [110, 70, 70, 70, 300])
         DIM pd AS ARRAY OF STRING : pd = []
         FOR i = 0 TO MIN(n, 300) - 1
+            DIM pm AS ProfilZeile : pm = profMessung[i]
             DIM anteil AS STRING : anteil = "-"
-            IF profGesamt > 0.0 THEN anteil = FORMAT$(profRohT[i] / profGesamt * 100.0, "%.1f") + " %"
-            DIM q AS STRING : q = profZeileText$(profDatei$(i), profRohZ[i])
-            DIM zs AS STRING : zs = STR$(profRohZ[i])
+            IF profGesamt > 0.0 THEN anteil = FORMAT$(pm.zeit / profGesamt * 100.0, "%.1f") + " %"
+            DIM q AS STRING : q = profZeileText$(pm.datei, pm.zeile)
+            DIM zs AS STRING : zs = STR$(pm.zeile)
             ' Die Zeile zuerst, wie im Aufrufstapel: "mathe.dh:10" verlor in
             ' der schmalen Spalte genau die Zahl.
-            IF NOT gleicherWeg(profDatei$(i), prozessDatei) THEN zs = zs + "  " + BASENAME(profDatei$(i))
-            GUI_TABLE_ADD_ROW(tblProfil, [zs, STR$(profRohA[i]), FORMAT$(profRohT[i] * 1000.0, "%.2f"), anteil, q])
-            ARRAY_PUSH(pz, profRohZ[i]) : ARRAY_PUSH(pd, profDatei$(i))
+            IF NOT gleicherWeg(pm.datei, prozessDatei) THEN zs = zs + "  " + BASENAME(pm.datei)
+            GUI_TABLE_ADD_ROW(tblProfil, [zs, STR$(pm.anzahl), FORMAT$(pm.zeit * 1000.0, "%.2f"), anteil, q])
+            ARRAY_PUSH(pz, pm.zeile) : ARRAY_PUSH(pd, pm.datei)
         NEXT
         profilZeilen = pz : profilDateien = pd
         protokoll("profiltabelle zeilen " + STR$(LEN(pz)))
         RETURN
     END IF
-    profBerName = [] : profBerVon = [] : profBerBis = [] : profBerDatei = []
+    profBereiche = []
     ' Die Bereiche JEDER gemessenen Datei, je mit ihrer Datei gemerkt.
     DIM dateien AS ARRAY OF STRING : dateien = []
     FOR i = 0 TO n - 1
-        IF ARRAY_INDEXOF(dateien, profDatei$(i)) < 0 THEN ARRAY_PUSH(dateien, profDatei$(i))
+        IF ARRAY_INDEXOF(dateien, profMessung[i].datei) < 0 THEN ARRAY_PUSH(dateien, profMessung[i].datei)
     NEXT
     DIM di AS INTEGER
     FOR di = 0 TO LEN(dateien) - 1
@@ -15403,97 +15421,64 @@ SUB profilTabelleFuellen()
             END TRY
         END IF
         DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "s" + CHR$(34) + ": " + CODE_SYMBOLS$(text) + "}")
-        profilBereiche(j, "s", "")
-        WHILE LEN(profBerDatei) < LEN(profBerName)
-            ARRAY_PUSH(profBerDatei, dateien[di])
-        WEND
+        profilBereiche(j, "s", "", dateien[di])
     NEXT
-    DIM gName AS ARRAY OF STRING : gName = []
-    DIM gDatei AS ARRAY OF STRING : gDatei = []
-    DIM gVon AS ARRAY OF INTEGER : gVon = []
-    DIM gZeilen AS ARRAY OF INTEGER : gZeilen = []
-    DIM gZeit AS ARRAY OF FLOAT : gZeit = []
+    DIM gruppen AS ARRAY OF ProfilGruppe : gruppen = []
     ' Zeile -> innerster Bereich, EINMAL aufgebaut: die groessten Bereiche
     ' zuerst, jeder kleinere ueberschreibt seine Zeilen. Vorher ging jede
     ' gemessene Zeile alle Bereiche durch und suchte ihre Gruppe mit
     ' ARRAY_INDEXOF, sortiert wurde per Auswahl -- bei 2000 Unterprogrammen
     ' 2,9 s in einem Bild (Stresstest 2026-10-02).
     DIM innen AS MAP OF INTEGER : innen = {}
-    profSortZeit = []
-    DIM folgeB AS ARRAY OF INTEGER : folgeB = []
+    DIM nachGroesse AS ARRAY OF ProfilBereich : nachGroesse = ARRAY_COPY(profBereiche)
+    SORT(nachGroesse, profBereichVergleich)
+    DIM pb AS ProfilBereich
     DIM k AS INTEGER
-    FOR k = 0 TO LEN(profBerName) - 1
-        ARRAY_PUSH(profSortZeit, profBerBis[k] - profBerVon[k])
-        ARRAY_PUSH(folgeB, k)
-    NEXT
-    SORT(folgeB, profVergleich)
-    FOR EACH k IN folgeB
+    FOR k = 0 TO LEN(nachGroesse) - 1
+        pb = nachGroesse[k]
         DIM zz AS INTEGER
-        FOR zz = profBerVon[k] TO profBerBis[k]
-            MAPPUT(innen, profBerDatei[k] + "|" + STR$(zz), k)
+        FOR zz = pb.von TO pb.bis
+            MAPPUT(innen, pb.datei + "|" + STR$(zz), k)
         NEXT
     NEXT
     DIM gNr AS MAP OF INTEGER : gNr = {}
     FOR i = 0 TO n - 1
-        DIM z AS INTEGER : z = profRohZ[i]
+        DIM pm2 AS ProfilZeile : pm2 = profMessung[i]
         DIM name AS STRING : name = "(Hauptprogramm)"
-        IF profDatei$(i) <> prozessDatei THEN name = "(" + BASENAME(profDatei$(i)) + ")"
+        IF pm2.datei <> prozessDatei THEN name = "(" + BASENAME(pm2.datei) + ")"
         DIM von AS INTEGER : von = 1
-        DIM schl AS STRING : schl = profDatei$(i) + "|" + STR$(z)
+        DIM schl AS STRING : schl = pm2.datei + "|" + STR$(pm2.zeile)
         IF MAPHAS(innen, schl) THEN
-            k = MAPGET(innen, schl)
-            name = profBerName[k] : von = profBerVon[k]
-            IF profDatei$(i) <> prozessDatei THEN name = BASENAME(profDatei$(i)) + ": " + name
+            pb = nachGroesse[MAPGET(innen, schl)]
+            name = pb.name : von = pb.von
+            IF pm2.datei <> prozessDatei THEN name = BASENAME(pm2.datei) + ": " + name
         END IF
-        DIM g AS INTEGER : g = -1
-        IF MAPHAS(gNr, name) THEN g = MAPGET(gNr, name)
-        IF g < 0 THEN
-            ARRAY_PUSH(gName, name) : ARRAY_PUSH(gVon, von) : ARRAY_PUSH(gZeilen, 0) : ARRAY_PUSH(gZeit, 0.0) : ARRAY_PUSH(gDatei, profDatei$(i))
-            g = LEN(gName) - 1
-            MAPPUT(gNr, name, g)
+        IF NOT MAPHAS(gNr, name) THEN
+            ARRAY_PUSH(gruppen, NEW ProfilGruppe(name, pm2.datei, von))
+            MAPPUT(gNr, name, LEN(gruppen) - 1)
         END IF
-        gZeilen[g] = gZeilen[g] + 1
-        gZeit[g] = gZeit[g] + profRohT[i]
+        DIM gr AS ProfilGruppe : gr = gruppen[MAPGET(gNr, name)]
+        gr.zeilen = gr.zeilen + 1
+        gr.zeit = gr.zeit + pm2.zeit
     NEXT
     ' Nach Zeit absteigend (bei gleicher Zeit in der Folge des Auftretens).
-    DIM m AS INTEGER : m = LEN(gName)
-    profSortZeit = []
-    DIM folgeG AS ARRAY OF INTEGER : folgeG = []
-    DIM a AS INTEGER
-    FOR a = 0 TO m - 1
-        ARRAY_PUSH(profSortZeit, gZeit[a])
-        ARRAY_PUSH(folgeG, a)
-    NEXT
-    SORT(folgeG, profVergleich)
-    DIM sName AS ARRAY OF STRING : sName = []
-    DIM sDatei AS ARRAY OF STRING : sDatei = []
-    DIM sVon AS ARRAY OF INTEGER : sVon = []
-    DIM sZeilen AS ARRAY OF INTEGER : sZeilen = []
-    DIM sZeit AS ARRAY OF FLOAT : sZeit = []
-    FOR EACH a IN folgeG
-        ARRAY_PUSH(sName, gName[a]) : ARRAY_PUSH(sDatei, gDatei[a]) : ARRAY_PUSH(sVon, gVon[a])
-        ARRAY_PUSH(sZeilen, gZeilen[a]) : ARRAY_PUSH(sZeit, gZeit[a])
-    NEXT
-    gName = sName : gDatei = sDatei : gVon = sVon : gZeilen = sZeilen : gZeit = sZeit
+    SORT(gruppen, profGruppeVergleich)
     GUI_TABLE_HEADERS(tblProfil, [tr$("Funktion"), tr$("ab Zeile"), tr$("Zeilen"), "ms", tr$("Anteil")])
     GUI_TABLE_COL_WIDTHS(tblProfil, [240, 80, 70, 90, 80])
+    DIM gDatei AS ARRAY OF STRING : gDatei = []
+    DIM m AS INTEGER : m = LEN(gruppen)
+    DIM a AS INTEGER
     FOR a = 0 TO m - 1
+        DIM g AS ProfilGruppe : g = gruppen[a]
         DIM ant AS STRING : ant = "-"
-        IF profGesamt > 0.0 THEN ant = FORMAT$(gZeit[a] / profGesamt * 100.0, "%.1f") + " %"
-        GUI_TABLE_ADD_ROW(tblProfil, [gName[a], STR$(gVon[a]), STR$(gZeilen[a]), FORMAT$(gZeit[a] * 1000.0, "%.2f"), ant])
-        ARRAY_PUSH(pz, gVon[a])
-        protokoll("profiltabelle funktion " + gName[a] + " " + STR$(gZeilen[a]))
+        IF profGesamt > 0.0 THEN ant = FORMAT$(g.zeit / profGesamt * 100.0, "%.1f") + " %"
+        GUI_TABLE_ADD_ROW(tblProfil, [g.name, STR$(g.von), STR$(g.zeilen), FORMAT$(g.zeit * 1000.0, "%.2f"), ant])
+        ARRAY_PUSH(pz, g.von) : ARRAY_PUSH(gDatei, g.datei)
+        protokoll("profiltabelle funktion " + g.name + " " + STR$(g.zeilen))
     NEXT
     profilZeilen = pz : profilDateien = gDatei
     protokoll("profiltabelle funktionen " + STR$(m))
 END SUB
-
-' Die Datei einer Messzeile -- fehlt sie (Messung ohne Dateien), die
-' gestartete.
-FUNCTION profDatei$(i AS INTEGER) AS STRING
-    IF i < LEN(profRohD) THEN RETURN profRohD[i]
-    RETURN prozessDatei
-END FUNCTION
 
 ' Der Quelltext einer gemessenen Zeile -- aus der Hauptdatei (so, wie sie
 ' im Editor steht) oder aus einer importierten, die einmal gelesen und
@@ -15517,7 +15502,7 @@ END FUNCTION
 
 ' Die Funktionsbereiche aus CODE_SYMBOLS$ einsammeln, Methoden als
 ' `Klasse.methode`.
-SUB profilBereiche(j AS JSON_HANDLE, pfad AS STRING, vor AS STRING)
+SUB profilBereiche(j AS JSON_HANDLE, pfad AS STRING, vor AS STRING, datei AS STRING)
     DIM n AS INTEGER : n = JSON_LEN(j, pfad)
     DIM i AS INTEGER
     FOR i = 0 TO n - 1
@@ -15525,12 +15510,10 @@ SUB profilBereiche(j AS JSON_HANDLE, pfad AS STRING, vor AS STRING)
         DIM art AS STRING : art = JSON_GET_STRING(j, p + ".art")
         DIM name AS STRING : name = JSON_GET_STRING(j, p + ".name")
         IF art = "function" OR art = "sub" THEN
-            ARRAY_PUSH(profBerName, vor + name)
-            ARRAY_PUSH(profBerVon, JSON_GET_INT(j, p + ".von"))
-            ARRAY_PUSH(profBerBis, JSON_GET_INT(j, p + ".bis"))
+            ARRAY_PUSH(profBereiche, NEW ProfilBereich(vor + name, JSON_GET_INT(j, p + ".von"), JSON_GET_INT(j, p + ".bis"), datei))
         END IF
         IF JSON_LEN(j, p + ".kinder") > 0 THEN
-            profilBereiche(j, p + ".kinder", IIF(art = "class", vor + name + ".", vor))
+            profilBereiche(j, p + ".kinder", IIF(art = "class", vor + name + ".", vor), datei)
         END IF
     NEXT
 END SUB
@@ -17418,20 +17401,21 @@ SUB waermeFeld(t AS INTEGER)
     DIM pfad AS STRING : pfad = reiter[t].pfad
     IF waermeAn AND waermeDaten AND pfad <> "" THEN
         DIM hoechst AS FLOAT : hoechst = 0.0
-        FOR i = 0 TO LEN(profRohT) - 1
-            hoechst = MAX(hoechst, profRohT[i])
+        FOR i = 0 TO LEN(profMessung) - 1
+            hoechst = MAX(hoechst, profMessung[i].zeit)
         NEXT
-        ' profRoh* ist nach Zeit absteigend: die ersten 30 bekommen Zahlen.
-        FOR i = 0 TO LEN(profRohZ) - 1
-            IF NOT gleicherWeg(profDatei$(i), pfad) THEN CONTINUE
-            IF profRohT[i] <= 0.0 OR hoechst <= 0.0 THEN CONTINUE
-            ARRAY_PUSH(zl, profRohZ[i])
-            ARRAY_PUSH(fa, waermeFarbe(profRohT[i] / hoechst))
+        ' Die Messung ist nach Zeit absteigend: die ersten 30 bekommen Zahlen.
+        FOR i = 0 TO LEN(profMessung) - 1
+            DIM wm AS ProfilZeile : wm = profMessung[i]
+            IF NOT gleicherWeg(wm.datei, pfad) THEN CONTINUE
+            IF wm.zeit <= 0.0 OR hoechst <= 0.0 THEN CONTINUE
+            ARRAY_PUSH(zl, wm.zeile)
+            ARRAY_PUSH(fa, waermeFarbe(wm.zeit / hoechst))
             DIM text AS STRING : text = ""
             IF i < 30 THEN
-                text = FORMAT$(profRohT[i] * 1000.0, "%.2f") + " ms"
-                IF profGesamt > 0.0 THEN text = text + "  " + FORMAT$(profRohT[i] / profGesamt * 100.0, "%.1f") + " %"
-                text = text + "  " + STR$(profRohA[i]) + "x"
+                text = FORMAT$(wm.zeit * 1000.0, "%.2f") + " ms"
+                IF profGesamt > 0.0 THEN text = text + "  " + FORMAT$(wm.zeit / profGesamt * 100.0, "%.1f") + " %"
+                text = text + "  " + STR$(wm.anzahl) + "x"
             END IF
             ARRAY_PUSH(waermeFelder, ta) : ARRAY_PUSH(waermeNr, LEN(zl) - 1) : ARRAY_PUSH(waermeTexte, text)
         NEXT
