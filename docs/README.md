@@ -121,6 +121,7 @@ Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie e
 - **[Entwurf: Python-Parser entfernen](entwurf-python-parser-entfernen.md)** — gemessen, was noch am zweiten Parser hängt, und was ein Schnitt kostet
 - **[Entwurf: Auffindbar machen](entwurf-sichtbarkeit.md)** — wie Suchmaschinen und KI-Assistenten Drachenhauch finden: englisches README, Website mit Handbuch und `llms.txt`, und was außerhalb des Repositorys zu tun ist
 - **[Entwurf: Mengen](entwurf-set-builtins.md)** — der letzte offene WP-J-Punkt, nach dem Nachmessen neu zugeschnitten
+- **[Entwurf: Felder mit eigener Untergrenze](entwurf-feld-untergrenze.md)** — `DIM tage[1 TO 31]`, `DIM feld[-10 TO 10, -10 TO 10]`: die Grenzen gehören zum Feld, nicht zur Variable; was das an Befehlen, Meldungen und Maschinencode berührt (noch nicht gebaut)
 - **[Entwurf: TASK_START](entwurf-task-start.md)** — DH-Code im Hintergrund; drei Wege, und der dritte umgeht das Send-Problem ganz
 - **[Entwurf: Mehrere OS-Fenster](entwurf-native-fenster.md)** — warum es ein Fenster je Prozess gibt, vier Wege; gebaut ist Weg B: ein zweites Fenster als zweiter `dhrt` mit Textkanal (`WINDOW_OPEN`)
 - **[Entwurf: Python abbauen](entwurf-python-abbau.md)** — 110 000 Zeilen Python gemessen (58 % Tests, 32 000 IDE und Editoren, zwei Drittel des Installers); Wege Werkzeugkette/LSP nach dhrt, IDE und Editoren in Drachenhauch, Tests als `dhrt test`; Empfehlung: Werkzeugkette zuerst, dann die IDE
