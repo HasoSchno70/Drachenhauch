@@ -502,6 +502,15 @@ CLASS Zeilenhinweis
     END SUB
 END CLASS
 DIM paramHinweise AS ARRAY OF Zeilenhinweis : paramHinweise = []
+' Ein Hinweis mit eigener Farbe: der Fehlertext am Zeilenende (rot bei einem
+' Fehler, gelb bei einer Warnung).
+CLASS FarbHinweis EXTENDS Zeilenhinweis
+    DIM farbe AS INTEGER
+    SUB Init(z AS INTEGER, t AS STRING, f AS INTEGER)
+        SUPER.Init(z, t)
+        farbe = f
+    END SUB
+END CLASS
 ' Signaturen je Name (klein), "" = keine. Eingebaute Befehle aendern sich nie,
 ' fremde Dateien erst beim Sichern -- darum ueber die Pruefungen hinweg
 ' gemerkt und beim Sichern geleert.
@@ -514,21 +523,24 @@ DIM einfuegenEinrueckenAn AS BOOLEAN : einfuegenEinrueckenAn = TRUE
 ' als eingefuegt.
 DIM strgVBilder AS INTEGER : strgVBilder = 0
 DIM typFeld AS GUI_WIDGET : typFeld = -1
-DIM typZeilen AS ARRAY OF INTEGER : typZeilen = []
-DIM typTexte AS ARRAY OF STRING : typTexte = []
+DIM typHinweise AS ARRAY OF Zeilenhinweis : typHinweise = []
 DIM fehlerFeld AS GUI_WIDGET : fehlerFeld = -1
-DIM fehlerZeilen AS ARRAY OF INTEGER : fehlerZeilen = []
-DIM fehlerTexte AS ARRAY OF STRING : fehlerTexte = []
-DIM fehlerFarben AS ARRAY OF INTEGER : fehlerFarben = []
+DIM fehlerHinweise AS ARRAY OF FarbHinweis : fehlerHinweise = []
 ' Beim Sichern neu starten: laeuft ein Programm (F5), startet Strg+S es neu.
 ' Aus per Vorgabe -- ein Neustart wirft den Zustand des Programms weg.
 DIM neustartSichernAn AS BOOLEAN : neustartSichernAn = FALSE
 ' Startargumente und Umgebung je Datei (ide.json `start`: Liste von
 ' {datei, argumente, umgebung}). Eine Liste statt Pfad-Schluesseln, weil ein
 ' Punkt im Schluessel fuer das json-Modul ein Pfad waere.
-DIM startDateien AS ARRAY OF STRING : startDateien = []
-DIM startArgs AS ARRAY OF STRING : startArgs = []
-DIM startUmg AS ARRAY OF STRING : startUmg = []
+CLASS StartEintrag
+    DIM datei AS STRING
+    DIM argumente AS STRING
+    DIM umgebung AS STRING
+    SUB Init(d AS STRING, a AS STRING, u AS STRING)
+        datei = d : argumente = a : umgebung = u
+    END SUB
+END CLASS
+DIM startListe AS ARRAY OF StartEintrag : startListe = []
 ' Das Geruest, das beim Tippen mitwaechst: `IF ... THEN` und Enter setzen
 ' das `END IF` gleich mit (GUI_TEXTAREA_CLOSE_WORDS).
 DIM geruestAn AS BOOLEAN : geruestAn = TRUE
@@ -971,9 +983,23 @@ DIM dlgWieder AS GUI_WINDOW : dlgWieder = 0
 ' ein Pfad als JSON-Schluessel kollidierte ohnehin mit der Punkt-Notation
 ' ("mein.spiel" waere zwei Ebenen).
 CONST PROJEKTE_MAX = 12
-DIM projOrdner AS ARRAY OF STRING : projOrdner = []
-DIM projDateien AS ARRAY OF STRING : projDateien = []     ' Pfade, mit | getrennt
-DIM projAktiv AS ARRAY OF INTEGER : projAktiv = []
+CLASS ProjektSitzung
+    DIM ordner AS STRING
+    DIM dateien AS STRING             ' Pfade, mit | getrennt
+    DIM aktiv AS INTEGER
+    SUB Init(o AS STRING, d AS STRING, a AS INTEGER)
+        ordner = o : dateien = d : aktiv = a
+    END SUB
+END CLASS
+DIM projekte AS ARRAY OF ProjektSitzung : projekte = []
+
+FUNCTION projektNr(ordner AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(projekte) - 1
+        IF projekte[i].ordner = ordner THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
 IF JSON_HAS(konfig, "projekte") THEN
     DIM pj AS INTEGER
     FOR pj = 0 TO kLen("projekte") - 1
@@ -986,9 +1012,7 @@ IF JSON_HAS(konfig, "projekte") THEN
         NEXT
         DIM pord AS STRING : pord = kText(pp + ".ordner", "")
         IF pord = "" THEN CONTINUE
-        ARRAY_PUSH(projOrdner, pord)
-        ARRAY_PUSH(projDateien, JOIN$(pfl, "|"))
-        ARRAY_PUSH(projAktiv, kInt(pp + ".aktiv", 0))
+        ARRAY_PUSH(projekte, NEW ProjektSitzung(pord, JOIN$(pfl, "|"), kInt(pp + ".aktiv", 0)))
     NEXT
 END IF
 
@@ -1027,9 +1051,7 @@ IF JSON_HAS(konfig, "start") THEN
         DIM skp AS STRING : skp = "start." + STR$(sk)
         DIM skd AS STRING : skd = kText(skp + ".datei", "")
         IF skd = "" THEN CONTINUE
-        ARRAY_PUSH(startDateien, skd)
-        ARRAY_PUSH(startArgs, kText(skp + ".argumente", ""))
-        ARRAY_PUSH(startUmg, kText(skp + ".umgebung", ""))
+        ARRAY_PUSH(startListe, NEW StartEintrag(skd, kText(skp + ".argumente", ""), kText(skp + ".umgebung", "")))
     NEXT
 END IF
 geruestAn = kBool("geruest", geruestAn)
@@ -2617,11 +2639,11 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "neustart_beim_sichern", neustartSichernAn)
     JSON_SET_JSON(konfig, "start", JSON_PARSE("[]"))
     DIM sti AS INTEGER
-    FOR sti = 0 TO LEN(startDateien) - 1
+    FOR sti = 0 TO LEN(startListe) - 1
         DIM stE AS JSON_HANDLE : stE = JSON_NEW_OBJECT()
-        JSON_SET_STRING(stE, "datei", startDateien[sti])
-        JSON_SET_STRING(stE, "argumente", startArgs[sti])
-        JSON_SET_STRING(stE, "umgebung", startUmg[sti])
+        JSON_SET_STRING(stE, "datei", startListe[sti].datei)
+        JSON_SET_STRING(stE, "argumente", startListe[sti].argumente)
+        JSON_SET_STRING(stE, "umgebung", startListe[sti].umgebung)
         JSON_APPEND_JSON(konfig, "start", stE)
     NEXT
     JSON_SET_BOOL(konfig, "geruest", geruestAn)
@@ -2691,27 +2713,22 @@ SUB konfigSichern()
     FOR pi = 0 TO tabAnzahl - 1
         IF reiter[pi].pfad <> "" THEN ARRAY_PUSH(offen, reiter[pi].pfad)
     NEXT
-    DIM alt AS INTEGER : alt = ARRAY_INDEXOF(projOrdner, projektOrdner)
-    IF alt >= 0 THEN
-        ARRAY_REMOVE_AT(projOrdner, alt) : ARRAY_REMOVE_AT(projDateien, alt) : ARRAY_REMOVE_AT(projAktiv, alt)
-    END IF
-    ARRAY_INSERT(projOrdner, 0, projektOrdner)
-    ARRAY_INSERT(projDateien, 0, JOIN$(offen, "|"))
-    ARRAY_INSERT(projAktiv, 0, aktiverTab)
-    WHILE LEN(projOrdner) > PROJEKTE_MAX
-        DIM letzt AS INTEGER : letzt = LEN(projOrdner) - 1
-        ARRAY_REMOVE_AT(projOrdner, letzt) : ARRAY_REMOVE_AT(projDateien, letzt) : ARRAY_REMOVE_AT(projAktiv, letzt)
+    DIM alt AS INTEGER : alt = projektNr(projektOrdner)
+    IF alt >= 0 THEN ARRAY_REMOVE_AT(projekte, alt)
+    ARRAY_INSERT(projekte, 0, NEW ProjektSitzung(projektOrdner, JOIN$(offen, "|"), aktiverTab))
+    WHILE LEN(projekte) > PROJEKTE_MAX
+        ARRAY_POP(projekte)
     WEND
     JSON_SET_JSON(konfig, "projekte", JSON_NEW_ARRAY())
     DIM pk AS INTEGER
-    FOR pk = 0 TO LEN(projOrdner) - 1
+    FOR pk = 0 TO LEN(projekte) - 1
         DIM e AS JSON_HANDLE : e = JSON_NEW_OBJECT()
-        JSON_SET_STRING(e, "ordner", projOrdner[pk])
-        JSON_SET_INT(e, "aktiv", projAktiv[pk])
+        JSON_SET_STRING(e, "ordner", projekte[pk].ordner)
+        JSON_SET_INT(e, "aktiv", projekte[pk].aktiv)
         JSON_SET_JSON(e, "sitzung", JSON_NEW_ARRAY())
         DIM sp AS STRING
-        IF projDateien[pk] <> "" THEN
-            FOR EACH sp IN SPLIT$(projDateien[pk], "|")
+        IF projekte[pk].dateien <> "" THEN
+            FOR EACH sp IN SPLIT$(projekte[pk].dateien, "|")
                 JSON_APPEND_STRING(e, "sitzung", sp)
             NEXT
         END IF
@@ -4742,15 +4759,13 @@ SUB pruefen()
     DIM fehler AS INTEGER : fehler = 0
     DIM hinweise AS INTEGER : hinweise = 0
     problemHinweis = []
-    DIM fz AS ARRAY OF INTEGER : fz = []
-    DIM ftx AS ARRAY OF STRING : ftx = []
-    DIM ffa AS ARRAY OF INTEGER : ffa = []
+    DIM fh AS ARRAY OF FarbHinweis : fh = []
     fehlerSammelNr = {}
     FOR i = 0 TO n - 1
         DIM p AS STRING : p = STR$(i)
         zeilen[i] = JSON_GET_INT(j, p + ".zeile")
         DIM art AS STRING : art = JSON_GET_STRING(j, p + ".schwere")
-        IF art <> "hinweis" THEN fehlerSammeln(fz, ftx, ffa, zeilen[i], JSON_GET_STRING(j, p + ".meldung"), art = "fehler")
+        IF art <> "hinweis" THEN fehlerSammeln(fh, zeilen[i], JSON_GET_STRING(j, p + ".meldung"), art = "fehler")
         IF art = "fehler" THEN fehler = fehler + 1
         IF art = "hinweis" THEN hinweise = hinweise + 1
         ARRAY_PUSH(problemHinweis, art = "hinweis")
@@ -4770,10 +4785,10 @@ SUB pruefen()
     typenSammeln(ta, basis)
     parameterSammeln(ta)
     DIM altF AS GUI_WIDGET : altF = fehlerFeld
-    fehlerFeld = ta : fehlerZeilen = fz : fehlerTexte = ftx : fehlerFarben = ffa
+    fehlerFeld = ta : fehlerHinweise = fh
     IF altF >= 0 AND altF <> ta THEN hinweiseZeigen(altF)
     hinweiseZeigen(ta)
-    IF fehlerEndeAn AND LEN(fz) > 0 THEN protokoll("fehlertexte " + STR$(LEN(fz)))
+    IF fehlerEndeAn AND LEN(fh) > 0 THEN protokoll("fehlertexte " + STR$(LEN(fh)))
     IF problemModus = 0 THEN
         IF n = 0 THEN
             GUI_SET_TEXT(lblProbleme, tr$("Probleme: keine"))
@@ -6769,25 +6784,25 @@ SUB hinweiseZeigen(ta AS GUI_WIDGET)
         NEXT
     END IF
     IF typHinweiseAn AND ta = typFeld THEN
-        FOR i = 0 TO LEN(typZeilen) - 1
-            DIM tk AS INTEGER : tk = IIF(MAPHAS(zlNr, STR$(typZeilen[i])), MAPGET(zlNr, STR$(typZeilen[i])), -1)
+        FOR i = 0 TO LEN(typHinweise) - 1
+            DIM tk AS INTEGER : tk = IIF(MAPHAS(zlNr, STR$(typHinweise[i].zeile)), MAPGET(zlNr, STR$(typHinweise[i].zeile)), -1)
             IF tk >= 0 THEN
-                tx[tk] = tx[tk] + "   ·   " + typTexte[i]
+                tx[tk] = tx[tk] + "   ·   " + typHinweise[i].text
             ELSE
-                ARRAY_PUSH(zl, typZeilen[i]) : MAPPUT(zlNr, STR$(typZeilen[i]), LEN(zl) - 1) : ARRAY_PUSH(tx, typTexte[i])
+                ARRAY_PUSH(zl, typHinweise[i].zeile) : MAPPUT(zlNr, STR$(typHinweise[i].zeile), LEN(zl) - 1) : ARRAY_PUSH(tx, typHinweise[i].text)
                 ARRAY_PUSH(farben, F_TYP)
             END IF
         NEXT
     END IF
     IF fehlerEndeAn AND ta = fehlerFeld THEN
-        FOR i = 0 TO LEN(fehlerZeilen) - 1
-            DIM fk AS INTEGER : fk = IIF(MAPHAS(zlNr, STR$(fehlerZeilen[i])), MAPGET(zlNr, STR$(fehlerZeilen[i])), -1)
+        FOR i = 0 TO LEN(fehlerHinweise) - 1
+            DIM fk AS INTEGER : fk = IIF(MAPHAS(zlNr, STR$(fehlerHinweise[i].zeile)), MAPGET(zlNr, STR$(fehlerHinweise[i].zeile)), -1)
             IF fk >= 0 THEN
-                tx[fk] = fehlerTexte[i] + "   ·   " + tx[fk]
-                farben[fk] = fehlerFarben[i]
+                tx[fk] = fehlerHinweise[i].text + "   ·   " + tx[fk]
+                farben[fk] = fehlerHinweise[i].farbe
             ELSE
-                ARRAY_PUSH(zl, fehlerZeilen[i]) : MAPPUT(zlNr, STR$(fehlerZeilen[i]), LEN(zl) - 1) : ARRAY_PUSH(tx, fehlerTexte[i])
-                ARRAY_PUSH(farben, fehlerFarben[i])
+                ARRAY_PUSH(zl, fehlerHinweise[i].zeile) : MAPPUT(zlNr, STR$(fehlerHinweise[i].zeile), LEN(zl) - 1) : ARRAY_PUSH(tx, fehlerHinweise[i].text)
+                ARRAY_PUSH(farben, fehlerHinweise[i].farbe)
             END IF
         NEXT
     END IF
@@ -6799,8 +6814,7 @@ END SUB
 ' Warnung zuerst kam. Lange Meldungen werden gekuerzt -- der ganze Satz
 ' steht in der Liste und im Tooltip.
 DIM fehlerSammelNr AS MAP OF INTEGER
-SUB fehlerSammeln(fz AS ARRAY OF INTEGER, ftx AS ARRAY OF STRING, ffa AS ARRAY OF INTEGER, _
-                  zeile AS INTEGER, meldung AS STRING, istFehler AS BOOLEAN)
+SUB fehlerSammeln(fh AS ARRAY OF FarbHinweis, zeile AS INTEGER, meldung AS STRING, istFehler AS BOOLEAN)
     DIM m AS STRING : m = TRIM$(REPLACE$(meldung, NL, " "))
     IF LEN(m) > 90 THEN m = LEFT$(m, 87) + "..."
     DIM farbe AS INTEGER : farbe = IIF(istFehler, &HE06060, &HD8B048)
@@ -6809,32 +6823,39 @@ SUB fehlerSammeln(fz AS ARRAY OF INTEGER, ftx AS ARRAY OF STRING, ffa AS ARRAY O
     DIM k AS INTEGER : k = -1
     IF MAPHAS(fehlerSammelNr, STR$(zeile)) THEN k = MAPGET(fehlerSammelNr, STR$(zeile))
     IF k >= 0 THEN
-        ftx[k] = ftx[k] + "  ·  " + m
-        IF istFehler THEN ffa[k] = farbe
+        fh[k].text = fh[k].text + "  ·  " + m
+        IF istFehler THEN fh[k].farbe = farbe
     ELSE
-        ARRAY_PUSH(fz, zeile) : ARRAY_PUSH(ftx, m) : ARRAY_PUSH(ffa, farbe)
-        MAPPUT(fehlerSammelNr, STR$(zeile), LEN(fz) - 1)
+        ARRAY_PUSH(fh, NEW FarbHinweis(zeile, m, farbe))
+        MAPPUT(fehlerSammelNr, STR$(zeile), LEN(fh) - 1)
     END IF
 END SUB
 
 ' Die Typen, die der Uebersetzer fuer Stellen ohne geschriebenen Typ kennt
 ' (FOR EACH), als Hinweise je Zeile: "x: INTEGER", mehrere mit Komma.
 SUB typenSammeln(ta AS GUI_WIDGET, basis AS STRING)
-    typFeld = ta : typZeilen = [] : typTexte = []
+    typFeld = ta : typHinweise = []
     IF NOT typHinweiseAn THEN RETURN
     DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_TYPES$(GUI_TEXT(ta), basis))
     DIM i AS INTEGER
     FOR i = 0 TO JSON_LEN(j, "") - 1
         DIM z AS INTEGER : z = JSON_GET_INT(j, STR$(i) + ".zeile")
         DIM t AS STRING : t = JSON_GET_STRING(j, STR$(i) + ".name") + ": " + JSON_GET_STRING(j, STR$(i) + ".typ")
-        DIM k AS INTEGER : k = ARRAY_INDEXOF(typZeilen, z)
+        DIM k AS INTEGER : k = -1
+        DIM ti AS INTEGER
+        FOR ti = 0 TO LEN(typHinweise) - 1
+            IF typHinweise[ti].zeile = z THEN
+                k = ti
+                BREAK
+            END IF
+        NEXT
         IF k >= 0 THEN
-            typTexte[k] = typTexte[k] + ", " + t
+            typHinweise[k].text = typHinweise[k].text + ", " + t
         ELSE
-            ARRAY_PUSH(typZeilen, z) : ARRAY_PUSH(typTexte, t)
+            ARRAY_PUSH(typHinweise, NEW Zeilenhinweis(z, t))
         END IF
     NEXT
-    IF LEN(typZeilen) > 0 THEN protokoll("typen " + STR$(LEN(typZeilen)))
+    IF LEN(typHinweise) > 0 THEN protokoll("typen " + STR$(LEN(typHinweise)))
 END SUB
 
 SUB typHinweiseSetzen(an AS BOOLEAN)
@@ -14435,8 +14456,8 @@ SUB baumUmbenennen(alt AS STRING, name AS STRING)
     FOR i = 0 TO LEN(lesezeichen) - 1
         lesezeichen[i].pfad = wegUmziehen$(lesezeichen[i].pfad, alt, neu, istOrdner)
     NEXT
-    FOR i = 0 TO LEN(startDateien) - 1
-        startDateien[i] = wegUmziehen$(startDateien[i], alt, neu, istOrdner)
+    FOR i = 0 TO LEN(startListe) - 1
+        startListe[i].datei = wegUmziehen$(startListe[i].datei, alt, neu, istOrdner)
     NEXT
     ' Die gefundenen IMPORTs schreiben: in einen offenen Reiter als eigener
     ' Rueckgaengig-Schritt (und gesichert, wenn er es vorher war), sonst auf
@@ -14656,9 +14677,9 @@ END SUB
 ' Gemerkte Argumente (umgebung = FALSE) bzw. Umgebung einer Datei, "" = keine.
 FUNCTION startWert$(datei AS STRING, umgebung AS BOOLEAN) AS STRING
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(startDateien) - 1
-        IF gleicherWeg(startDateien[i], datei) THEN
-            RETURN IIF(umgebung, startUmg[i], startArgs[i])
+    FOR i = 0 TO LEN(startListe) - 1
+        IF gleicherWeg(startListe[i].datei, datei) THEN
+            RETURN IIF(umgebung, startListe[i].umgebung, startListe[i].argumente)
         END IF
     NEXT
     RETURN ""
@@ -14666,20 +14687,18 @@ END FUNCTION
 
 SUB startWertSetzen(datei AS STRING, umgebung AS BOOLEAN, wert AS STRING)
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(startDateien) - 1
-        IF gleicherWeg(startDateien[i], datei) THEN
+    FOR i = 0 TO LEN(startListe) - 1
+        IF gleicherWeg(startListe[i].datei, datei) THEN
             IF umgebung THEN
-                startUmg[i] = wert
+                startListe[i].umgebung = wert
             ELSE
-                startArgs[i] = wert
+                startListe[i].argumente = wert
             END IF
             RETURN
         END IF
     NEXT
     IF wert = "" THEN RETURN
-    ARRAY_PUSH(startDateien, datei)
-    ARRAY_PUSH(startArgs, IIF(umgebung, "", wert))
-    ARRAY_PUSH(startUmg, IIF(umgebung, wert, ""))
+    ARRAY_PUSH(startListe, NEW StartEintrag(datei, IIF(umgebung, "", wert), IIF(umgebung, wert, "")))
 END SUB
 
 ' Eine Zeile in Woerter: getrennt an Leerraum, "in Anfuehrungszeichen" bleibt
@@ -19626,10 +19645,10 @@ zuletztAnzeigen()
 ' Ordner nicht, gilt die zuletzt geschlossene Sitzung, wie bis Stand 4.
 DIM sitzDateien AS ARRAY OF STRING : sitzDateien = []
 DIM sitzAktiv AS INTEGER : sitzAktiv = 0
-DIM sp0 AS INTEGER : sp0 = ARRAY_INDEXOF(projOrdner, startOrdner)
+DIM sp0 AS INTEGER : sp0 = projektNr(startOrdner)
 IF sp0 >= 0 THEN
-    IF projDateien[sp0] <> "" THEN sitzDateien = SPLIT$(projDateien[sp0], "|")
-    sitzAktiv = projAktiv[sp0]
+    IF projekte[sp0].dateien <> "" THEN sitzDateien = SPLIT$(projekte[sp0].dateien, "|")
+    sitzAktiv = projekte[sp0].aktiv
 ELSEIF NOT JSON_HAS(konfig, "projekte") AND JSON_HAS(konfig, "sitzung") THEN
     ' Nur beim ersten Start nach Stand 4: da gab es die Sitzung nur einmal
     ' fuer alles. Sobald es Projekte gibt, faengt ein unbekannter Ordner

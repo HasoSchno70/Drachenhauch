@@ -3173,7 +3173,7 @@ pr alle geaendert TRUE 12 Höchstens
 ' hinweiseZeigen). Jetzt rund 0,2 s. Grenze grob: 2 s.
 DIM prT AS FLOAT : prT = GET_TIME()
 pruefen()
-protokoll("pr probleme " + STR$(GUI_LISTBOX_COUNT(lstProbleme)) + " flott " + STR$(GET_TIME() - prT < 2.0) + " hinweise " + STR$(LEN(fehlerZeilen)))
+protokoll("pr probleme " + STR$(GUI_LISTBOX_COUNT(lstProbleme)) + " flott " + STR$(GET_TIME() - prT < 2.0) + " hinweise " + STR$(LEN(fehlerHinweise)))
 EXIT(0)
 --- programm ../../ide/ide.dh nach protokoll("bereit")
 --- argumente

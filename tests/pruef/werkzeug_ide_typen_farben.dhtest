@@ -42,8 +42,8 @@ prBild = prBild + 1
 IF prBild = 40 THEN pruefen()
 IF prBild = 46 THEN
     DIM prI AS INTEGER
-    FOR prI = 0 TO LEN(typZeilen) - 1
-        protokoll("pr typ " + STR$(typZeilen[prI]) + " " + typTexte[prI])
+    FOR prI = 0 TO LEN(typHinweise) - 1
+        protokoll("pr typ " + STR$(typHinweise[prI].zeile) + " " + typHinweise[prI].text)
     NEXT
     protokoll("pr zeile 3 blau " + STR$(prBlau(3) > 20))
     protokoll("pr zeile 2 blau " + STR$(prBlau(2)))
