@@ -2184,9 +2184,15 @@ GUI_WINDOW_CANCEL(winUmbau, btnUmbauWeg)
 ' Reiter werden ueber Auswahl+INSERT geschrieben (EIN Undo-Schritt), Dateien
 ' geschrieben und der offene Reiter nachgezogen -- genau die zwei Wege, die
 ' es vorher schon gab.
-DIM umbauTabs AS ARRAY OF INTEGER : umbauTabs = []
-DIM umbauPfade AS ARRAY OF STRING : umbauPfade = []
-DIM umbauTexte AS ARRAY OF STRING : umbauTexte = []
+CLASS UmbauZiel
+    DIM tab AS INTEGER              ' der Reiter, -1 = eine Datei auf der Platte
+    DIM pfad AS STRING
+    DIM text AS STRING              ' was hineinkommt
+    SUB Init(t AS INTEGER, p AS STRING, x AS STRING)
+        tab = t : pfad = p : text = x
+    END SUB
+END CLASS
+DIM umbauZiele AS ARRAY OF UmbauZiel : umbauZiele = []
 DIM umbauMeldung AS STRING : umbauMeldung = ""
 DIM umbauProt AS STRING : umbauProt = ""
 ' Ein Einwand gegen den Umbau (leer = keiner). Er steht OBEN in der
@@ -2199,26 +2205,38 @@ DIM umbauProt AS STRING : umbauProt = ""
 ' die man dafuer erst oeffnen muss.
 ' Ein STAPEL, kein einzelner Stand: wer zwei Umbauten hintereinander
 ' macht und beide zurueckwill, kaeme mit einem nur bis zur Haelfte.
-' Je Umbau eine Zeile "tab|pfad|text"-Listen, gehalten als drei Felder mit
-' einer Grenzliste (`zurAnzahl`) -- ein Feld von Feldern gibt es nicht.
+' Je Umbau ein UmbauStand. Bis 2026-10-30 lagen alle Umbauten
+' hintereinander in vier Feldern mit einer Grenzliste (`zurAnzahl`) -- "ein
+' Feld von Feldern gibt es nicht"; eine Klasse kann Felder halten.
 CONST ZUR_MAX = 10
-DIM zurTabs AS ARRAY OF INTEGER : zurTabs = []
-DIM zurPfade AS ARRAY OF STRING : zurPfade = []
-DIM zurTexte AS ARRAY OF STRING : zurTexte = []
-' Was der Umbau GESCHRIEBEN hat: steht in einer Datei inzwischen etwas
-' anderes, wurde sie danach geaendert -- dann nimmt das Zuruecknehmen
-' nichts zurueck, sonst waere die spaetere Arbeit wortlos weg.
-DIM zurNachher AS ARRAY OF STRING : zurNachher = []
-DIM zurAnzahl AS ARRAY OF INTEGER : zurAnzahl = []
-DIM zurNamen AS ARRAY OF STRING : zurNamen = []
-' Zurueckgenommene Umbauten, zum Wiederholen -- dieselben Felder. Ein neuer
-' Umbau leert sie.
-DIM wdhTabs AS ARRAY OF INTEGER : wdhTabs = []
-DIM wdhPfade AS ARRAY OF STRING : wdhPfade = []
-DIM wdhVorher AS ARRAY OF STRING : wdhVorher = []
-DIM wdhNachher AS ARRAY OF STRING : wdhNachher = []
-DIM wdhAnzahl AS ARRAY OF INTEGER : wdhAnzahl = []
-DIM wdhNamen AS ARRAY OF STRING : wdhNamen = []
+CLASS UmbauStand
+    DIM name AS STRING              ' was der Umbau war ("umbenannt ...")
+    DIM tabs AS ARRAY OF INTEGER
+    DIM pfade AS ARRAY OF STRING
+    DIM vorher AS ARRAY OF STRING
+    ' Was der Umbau GESCHRIEBEN hat: steht in einer Datei inzwischen etwas
+    ' anderes, wurde sie danach geaendert -- dann nimmt das Zuruecknehmen
+    ' nichts zurueck, sonst waere die spaetere Arbeit wortlos weg.
+    DIM nachher AS ARRAY OF STRING
+
+    SUB Init(n AS STRING)
+        ' Jedes Objekt bekommt EIGENE Listen -- gemeinsame waeren ein
+        ' Vorrat, in dem jeder Umbau alle anderen mitveraendert.
+        name = n : tabs = [] : pfade = [] : vorher = [] : nachher = []
+    END SUB
+
+    SUB dazu(tab AS INTEGER, pfad AS STRING, vor AS STRING, nach AS STRING)
+        ARRAY_PUSH(tabs, tab) : ARRAY_PUSH(pfade, pfad)
+        ARRAY_PUSH(vorher, vor) : ARRAY_PUSH(nachher, nach)
+    END SUB
+
+    FUNCTION anzahl() AS INTEGER
+        RETURN LEN(tabs)
+    END FUNCTION
+END CLASS
+DIM zurStapel AS ARRAY OF UmbauStand : zurStapel = []
+' Zurueckgenommene Umbauten, zum Wiederholen. Ein neuer Umbau leert sie.
+DIM wdhStapel AS ARRAY OF UmbauStand : wdhStapel = []
 ' Der zuletzt UEBERNOMMENE Umbau, damit er sich nachbessern laesst: die
 ' Schritte (`op*`) stehen ohnehin noch, hier die Dateien dazu.
 DIM umbauNachTabs AS ARRAY OF INTEGER : umbauNachTabs = []
@@ -7319,7 +7337,7 @@ SUB subInFunction()
     DIM sagen AS STRING : sagen = "SUB " + name + " -> FUNCTION " + name + " AS " + ptyp + " (Ergebnis in " + pname + ")."
     IF sfUebergangen > 0 THEN sagen = sagen + " " + STR$(sfUebergangen) + " Stelle(n) nennen den Namen ohne Aufruf als Anweisung -- bitte ansehen."
     umbauZeile = uv : umbauSpalte = 1
-    umbauStarten("SUB " + name + " in FUNCTION umwandeln", sagen, "subfunction " + name + " " + STR$(LEN(umbauTexte)))
+    umbauStarten("SUB " + name + " in FUNCTION umwandeln", sagen, "subfunction " + name + " " + STR$(LEN(umbauZiele)))
 END SUB
 
 ' --- Live-Vorschau: Logik ------------------------------------------------
@@ -11905,13 +11923,13 @@ SUB laufSchritt()
     END IF
     ' Fertig gesammelt -- ab hier wie bisher. Die Statuszeile sagt es, sonst
     ' stand dort neben der Vorschau weiter "Sammle ... 0 von 2 Dateien".
-    GUI_SET_TEXT(lblStatus, tr$("Gesammelt: ") + STR$(LEN(umbauTexte)) + tr$(" Datei(en) betroffen."))
+    GUI_SET_TEXT(lblStatus, tr$("Gesammelt: ") + STR$(LEN(umbauZiele)) + tr$(" Datei(en) betroffen."))
     DIM art AS STRING : art = laufArt
     laufArt = ""
     IF art = "parameter" THEN
         DIM psagen AS STRING
         psagen = "Parameter von " + paramName + ": " + STR$(laufGeaendert) + " Stelle(n) in " + _
-                 STR$(LEN(umbauTexte)) + " Datei(en)."
+                 STR$(LEN(umbauZiele)) + " Datei(en)."
         IF laufUebergangen > 0 THEN
             psagen = psagen + " " + STR$(laufUebergangen) + " Aufruf(e) übergangen (andere Zahl " + _
                      "von Argumenten oder mit Namen übergeben)."
@@ -11923,7 +11941,7 @@ SUB laufSchritt()
     IF art = "verschieben" THEN
         DIM vsagen AS STRING
         vsagen = verschName + " (" + STR$(laufBlock) + " Zeilen) nach " + BASENAME(laufZiel) + _
-                 ", " + STR$(LEN(umbauTexte)) + " Datei(en) betroffen."
+                 ", " + STR$(LEN(umbauZiele)) + " Datei(en) betroffen."
         IF laufGeaendert > 0 THEN
             vsagen = vsagen + " " + STR$(laufGeaendert) + " davon bekommen den IMPORT dazu."
         END IF
@@ -11935,12 +11953,12 @@ SUB laufSchritt()
         formulareNachziehen(laufAlt, laufNeu)
         umbauWarnung = umbenennEinwand$(laufAlt, laufNeu)
         umbauStarten("'" + laufAlt + "' -> '" + laufNeu + "' im Projekt", _
-                     "'" + laufAlt + "' -> '" + laufNeu + "' in " + STR$(LEN(umbauTexte)) + " Datei(en).", _
-                     "projekt umbenannt " + STR$(LEN(umbauTexte)))
+                     "'" + laufAlt + "' -> '" + laufNeu + "' in " + STR$(LEN(umbauZiele)) + " Datei(en).", _
+                     "projekt umbenannt " + STR$(LEN(umbauZiele)))
     ELSE
         umbauStarten("'" + laufAlt + "' -> '" + laufNeu + "' im Projekt", _
-                     "Ersetzt in " + STR$(LEN(umbauTexte)) + " Datei(en).", _
-                     "projekt ersetzt " + STR$(LEN(umbauTexte)))
+                     "Ersetzt in " + STR$(LEN(umbauZiele)) + " Datei(en).", _
+                     "projekt ersetzt " + STR$(LEN(umbauZiele)))
     END IF
 END SUB
 
@@ -12037,7 +12055,7 @@ END SUB
 ' fragt; ist sie aus, wird gleich geschrieben. Eine Stelle, an der ein
 ' Umbau ankommt, und keine zwei Wege, die auseinanderlaufen koennen.
 SUB umbauLeeren()
-    umbauTabs = [] : umbauPfade = [] : umbauTexte = []
+    umbauZiele = []
     umbauZeile = 0 : umbauSpalte = 1
     umbauWarnung = ""
     umbauBefunde = []
@@ -12047,17 +12065,17 @@ END SUB
 
 ' `tab` >= 0 schreibt in den Reiter (Undo bleibt), sonst in die Datei.
 SUB umbauVormerken(tab AS INTEGER, pfad AS STRING, neu AS STRING)
-    ARRAY_PUSH(umbauTabs, tab) : ARRAY_PUSH(umbauPfade, pfad) : ARRAY_PUSH(umbauTexte, neu)
+    ARRAY_PUSH(umbauZiele, NEW UmbauZiel(tab, pfad, neu))
 END SUB
 
 ' Der Text eines Eintrags, wie er JETZT ist -- das, wogegen verglichen wird.
 FUNCTION umbauAlt$(k AS INTEGER) AS STRING
-    IF umbauTabs[k] >= 0 THEN RETURN GUI_TEXT(reiter[umbauTabs[k]].feld)
+    IF umbauZiele[k].tab >= 0 THEN RETURN GUI_TEXT(reiter[umbauZiele[k].tab].feld)
     ' Eine Datei, die es noch NICHT gibt, ist ein leerer Vorher-Stand --
     ' beim Verschieben in eine neue Datei entsteht sie erst beim Uebernehmen.
     DIM t AS STRING : t = ""
     TRY
-        t = dateiLesen(umbauPfade[k])
+        t = dateiLesen(umbauZiele[k].pfad)
     CATCH e
         t = ""
     END TRY
@@ -12172,10 +12190,10 @@ SUB umbauAnzeigeBauen()
         ARRAY_PUSH(zeilen, "") : ARRAY_PUSH(zeigHunk, -1)
     END IF
     DIM k AS INTEGER
-    FOR k = 0 TO LEN(umbauTexte) - 1
-        umbauTexte[k] = umbauTextAus$(k)
-        DIM name AS STRING : name = umbauPfade[k]
-        IF name = "" AND umbauTabs[k] >= 0 THEN name = reiter[umbauTabs[k]].name$()
+    FOR k = 0 TO LEN(umbauZiele) - 1
+        umbauZiele[k].text = umbauTextAus$(k)
+        DIM name AS STRING : name = umbauZiele[k].pfad
+        IF name = "" AND umbauZiele[k].tab >= 0 THEN name = reiter[umbauZiele[k].tab].name$()
         IF k > 0 THEN
             ARRAY_PUSH(zeilen, "") : ARRAY_PUSH(zeigHunk, -1)
         END IF
@@ -12214,7 +12232,7 @@ SUB umbauAnzeigeBauen()
     GUI_SET_TEXT(taUmbau, JOIN$(zeilen, NL))
     diffFaerben(taUmbau)
     DIM zeile AS STRING
-    zeile = STR$(LEN(umbauTexte)) + " Datei(en), " + STR$(minus) + _
+    zeile = STR$(LEN(umbauZiele)) + " Datei(en), " + STR$(minus) + _
             " Zeilen weniger, " + STR$(plus) + " mehr"
     IF ausgelassen > 0 THEN zeile = zeile + ", " + STR$(ausgelassen) + " Block/Blöcke ausgelassen"
     zeile = zeile + " -- Enter übernimmt, ESC verwirft."
@@ -12247,7 +12265,7 @@ SUB umbauBlockKippen()
 END SUB
 
 SUB umbauStarten(titel AS STRING, meldung AS STRING, prot AS STRING)
-    IF LEN(umbauTexte) = 0 THEN
+    IF LEN(umbauZiele) = 0 THEN
         GUI_SET_TEXT(lblStatus, titel + tr$(": nichts zu tun."))
         umbauLeeren()
         RETURN
@@ -12271,14 +12289,14 @@ SUB umbauStarten(titel AS STRING, meldung AS STRING, prot AS STRING)
     END IF
     opsLeeren()
     DIM k AS INTEGER
-    FOR k = 0 TO LEN(umbauTexte) - 1
-        opsBauen(k, SPLIT$(umbauAlt$(k), NL), SPLIT$(umbauTexte[k], NL))
+    FOR k = 0 TO LEN(umbauZiele) - 1
+        opsBauen(k, SPLIT$(umbauAlt$(k), NL), SPLIT$(umbauZiele[k].text, NL))
     NEXT
     GUI_LISTBOX_CLEAR(lstUmbau)
     DIM ln AS INTEGER
-    FOR ln = 0 TO LEN(umbauTexte) - 1
-        DIM lname AS STRING : lname = umbauPfade[ln]
-        IF lname = "" AND umbauTabs[ln] >= 0 THEN lname = reiter[umbauTabs[ln]].name$()
+    FOR ln = 0 TO LEN(umbauZiele) - 1
+        DIM lname AS STRING : lname = umbauZiele[ln].pfad
+        IF lname = "" AND umbauZiele[ln].tab >= 0 THEN lname = reiter[umbauZiele[ln].tab].name$()
         GUI_LISTBOX_ADD(lstUmbau, BASENAME(lname))
         GUI_LISTBOX_SET_CHECKED(lstUmbau, ln, TRUE)
     NEXT
@@ -12294,7 +12312,7 @@ SUB umbauStarten(titel AS STRING, meldung AS STRING, prot AS STRING)
         IF opArt[po] = 1 THEN pm = pm + 1
         IF opArt[po] = 2 THEN pp = pp + 1
     NEXT
-    protokoll("umbau vorschau " + STR$(LEN(umbauTexte)) + " " + STR$(pm) + " " + STR$(pp))
+    protokoll("umbau vorschau " + STR$(LEN(umbauZiele)) + " " + STR$(pm) + " " + STR$(pp))
     IF umbauWarnung <> "" THEN protokoll("umbau einwand")
 END SUB
 
@@ -12372,7 +12390,7 @@ FUNCTION umbauGeaendert$(tabs AS ARRAY OF INTEGER, pfade AS ARRAY OF STRING, _
 END FUNCTION
 
 SUB umbauZurueck()
-    IF LEN(zurAnzahl) = 0 THEN
+    IF LEN(zurStapel) = 0 THEN
         GUI_SET_TEXT(lblStatus, tr$("Kein Umbau zum Zurücknehmen."))
         protokoll("umbau zurueck 0")
         RETURN
@@ -12381,13 +12399,12 @@ SUB umbauZurueck()
     DIM mz AS INTEGER : mz = 0
     DIM ms AS INTEGER : ms = 1
     IF aktivesFeld() >= 0 THEN (mz, ms) = GUI_TEXTAREA_CURSOR(aktivesFeld())
-    DIM letzt AS INTEGER : letzt = LEN(zurAnzahl) - 1
-    DIM n AS INTEGER : n = zurAnzahl[letzt]
-    DIM ab AS INTEGER : ab = LEN(zurTexte) - n
-    DIM zurWas AS STRING : zurWas = zurNamen[letzt]
+    DIM st AS UmbauStand : st = zurStapel[LEN(zurStapel) - 1]
+    DIM n AS INTEGER : n = st.anzahl()
+    DIM zurWas AS STRING : zurWas = st.name
     ' Seit dem Umbau geaendert? Dann GAR NICHTS zuruecknehmen -- halb
     ' zurueckgenommen waere schlimmer als gar nicht.
-    DIM geaendert AS STRING : geaendert = umbauGeaendert$(zurTabs, zurPfade, zurNachher, ab, n)
+    DIM geaendert AS STRING : geaendert = umbauGeaendert$(st.tabs, st.pfade, st.nachher, 0, n)
     IF geaendert <> "" THEN
         GUI_SET_TEXT(lblStatus, tr$("Nicht zurückgenommen: seit dem Umbau geändert -- ") + geaendert + tr$(". Strg+Z im Reiter nimmt die eigenen Änderungen zurück."))
         protokoll("umbau zurueck geaendert " + geaendert)
@@ -12395,20 +12412,15 @@ SUB umbauZurueck()
     END IF
     DIM k AS INTEGER
     standAbgelehnt = ""
-    FOR k = ab TO ab + n - 1
-        umbauStandSetzen(zurTabs[k], zurPfade[k], zurTexte[k])
-        ARRAY_PUSH(wdhTabs, zurTabs[k]) : ARRAY_PUSH(wdhPfade, zurPfade[k])
-        ARRAY_PUSH(wdhVorher, zurTexte[k]) : ARRAY_PUSH(wdhNachher, zurNachher[k])
+    FOR k = 0 TO n - 1
+        umbauStandSetzen(st.tabs[k], st.pfade[k], st.vorher[k])
     NEXT
-    ARRAY_PUSH(wdhAnzahl, n) : ARRAY_PUSH(wdhNamen, zurWas)
-    FOR k = 1 TO n
-        ARRAY_POP(zurTabs) : ARRAY_POP(zurPfade) : ARRAY_POP(zurTexte) : ARRAY_POP(zurNachher)
-    NEXT
-    ARRAY_POP(zurAnzahl) : ARRAY_POP(zurNamen)
+    ARRAY_PUSH(wdhStapel, st)
+    ARRAY_POP(zurStapel)
     reiterNeuSetzen()
     symSchluessel = "-"
     GUI_SET_TEXT(lblStatus, tr$("Zurückgenommen: ") + zurWas + " (" + STR$(n) + tr$(" Datei(en), ") + _
-                 STR$(LEN(zurAnzahl)) + " weitere im Vorrat)" + IIF(standAbgelehnt = "", "", tr$(" Nicht geschrieben: ") + standAbgelehnt))
+                 STR$(LEN(zurStapel)) + " weitere im Vorrat)" + IIF(standAbgelehnt = "", "", tr$(" Nicht geschrieben: ") + standAbgelehnt))
     protokoll("umbau zurueck " + STR$(n))
     IF aktivesFeld() >= 0 THEN
         IF mz > 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), mz, ms)
@@ -12420,16 +12432,15 @@ END SUB
 ' der Gegenrichtung: steht nicht mehr der Stand von vor dem Umbau da, bleibt
 ' alles, wie es ist.
 SUB umbauWiederholen()
-    IF LEN(wdhAnzahl) = 0 THEN
+    IF LEN(wdhStapel) = 0 THEN
         GUI_SET_TEXT(lblStatus, tr$("Kein zurückgenommener Umbau zum Wiederholen."))
         protokoll("umbau wieder 0")
         RETURN
     END IF
-    DIM letzt AS INTEGER : letzt = LEN(wdhAnzahl) - 1
-    DIM n AS INTEGER : n = wdhAnzahl[letzt]
-    DIM ab AS INTEGER : ab = LEN(wdhVorher) - n
-    DIM was AS STRING : was = wdhNamen[letzt]
-    DIM geaendert AS STRING : geaendert = umbauGeaendert$(wdhTabs, wdhPfade, wdhVorher, ab, n)
+    DIM st AS UmbauStand : st = wdhStapel[LEN(wdhStapel) - 1]
+    DIM n AS INTEGER : n = st.anzahl()
+    DIM was AS STRING : was = st.name
+    DIM geaendert AS STRING : geaendert = umbauGeaendert$(st.tabs, st.pfade, st.vorher, 0, n)
     IF geaendert <> "" THEN
         GUI_SET_TEXT(lblStatus, tr$("Nicht wiederholt: seit dem Zurücknehmen geändert -- ") + geaendert + ".")
         protokoll("umbau wieder geaendert " + geaendert)
@@ -12437,16 +12448,11 @@ SUB umbauWiederholen()
     END IF
     DIM k AS INTEGER
     standAbgelehnt = ""
-    FOR k = ab TO ab + n - 1
-        umbauStandSetzen(wdhTabs[k], wdhPfade[k], wdhNachher[k])
-        ARRAY_PUSH(zurTabs, wdhTabs[k]) : ARRAY_PUSH(zurPfade, wdhPfade[k])
-        ARRAY_PUSH(zurTexte, wdhVorher[k]) : ARRAY_PUSH(zurNachher, wdhNachher[k])
+    FOR k = 0 TO n - 1
+        umbauStandSetzen(st.tabs[k], st.pfade[k], st.nachher[k])
     NEXT
-    ARRAY_PUSH(zurAnzahl, n) : ARRAY_PUSH(zurNamen, was)
-    FOR k = 1 TO n
-        ARRAY_POP(wdhTabs) : ARRAY_POP(wdhPfade) : ARRAY_POP(wdhVorher) : ARRAY_POP(wdhNachher)
-    NEXT
-    ARRAY_POP(wdhAnzahl) : ARRAY_POP(wdhNamen)
+    ARRAY_PUSH(zurStapel, st)
+    ARRAY_POP(wdhStapel)
     reiterNeuSetzen()
     symSchluessel = "-"
     GUI_SET_TEXT(lblStatus, tr$("Wiederholt: ") + was + " (" + STR$(n) + tr$(" Datei(en))") + IIF(standAbgelehnt = "", "", tr$(" Nicht geschrieben: ") + standAbgelehnt))
@@ -12466,22 +12472,20 @@ SUB umbauNachbessern()
         protokoll("umbau nachbessern 0")
         RETURN
     END IF
-    umbauTabs = [] : umbauPfade = [] : umbauTexte = []
+    umbauZiele = []
     DIM k AS INTEGER
     FOR k = 0 TO LEN(umbauNachPfade) - 1
-        ARRAY_PUSH(umbauTabs, umbauNachTabs[k])
-        ARRAY_PUSH(umbauPfade, umbauNachPfade[k])
-        ARRAY_PUSH(umbauTexte, "")
+        ARRAY_PUSH(umbauZiele, NEW UmbauZiel(umbauNachTabs[k], umbauNachPfade[k], ""))
     NEXT
     umbauMeldung = "Nachgebessert: " + umbauNachWas
-    umbauProt = "umbau nachgebessert " + STR$(LEN(umbauTexte))
+    umbauProt = "umbau nachgebessert " + STR$(LEN(umbauZiele))
     umbauWarnung = ""
     umbauZeile = 0 : umbauSpalte = 1
     GUI_LISTBOX_CLEAR(lstUmbau)
     DIM ln AS INTEGER
-    FOR ln = 0 TO LEN(umbauTexte) - 1
-        DIM lname AS STRING : lname = umbauPfade[ln]
-        IF lname = "" AND umbauTabs[ln] >= 0 THEN lname = reiter[umbauTabs[ln]].name$()
+    FOR ln = 0 TO LEN(umbauZiele) - 1
+        DIM lname AS STRING : lname = umbauZiele[ln].pfad
+        IF lname = "" AND umbauZiele[ln].tab >= 0 THEN lname = reiter[umbauZiele[ln].tab].name$()
         GUI_LISTBOX_ADD(lstUmbau, BASENAME(lname))
         GUI_LISTBOX_SET_CHECKED(lstUmbau, ln, TRUE)
     NEXT
@@ -12490,7 +12494,7 @@ SUB umbauNachbessern()
     umbauFensterSetzen()
     GUI_WINDOW_VISIBLE(winUmbau, TRUE)
     GUI_FOCUS(btnUmbauOk)
-    protokoll("umbau nachbessern " + STR$(LEN(umbauTexte)))
+    protokoll("umbau nachbessern " + STR$(LEN(umbauZiele)))
 END SUB
 
 ' Den Umbau pruefen, BEVOR er geschrieben ist.
@@ -12504,11 +12508,11 @@ END SUB
 ' sonst zwoelf Uebersetzungslaeufe, ehe man den Unterschied ueberhaupt zu
 ' sehen bekommt.
 SUB umbauPruefen()
-    IF LEN(umbauTexte) = 0 THEN RETURN
+    IF LEN(umbauZiele) = 0 THEN RETURN
     DIM summe AS INTEGER : summe = umbauZaehlen()
     DIM sagen AS STRING
     IF summe = 0 THEN
-        sagen = "Geprueft: kein Fehler in " + STR$(LEN(umbauTexte)) + " Datei(en)."
+        sagen = "Geprueft: kein Fehler in " + STR$(LEN(umbauZiele)) + " Datei(en)."
     ELSE
         sagen = "Geprueft: " + STR$(summe) + " Fehler -- sie stehen oben im Unterschied."
     END IF
@@ -12527,12 +12531,12 @@ END SUB
 FUNCTION umbauNeueFehler() AS INTEGER
     DIM summe AS INTEGER : summe = 0
     DIM k AS INTEGER
-    FOR k = 0 TO LEN(umbauTexte) - 1
-        DIM name AS STRING : name = umbauPfade[k]
-        IF name = "" AND umbauTabs[k] >= 0 THEN name = reiter[umbauTabs[k]].name$()
+    FOR k = 0 TO LEN(umbauZiele) - 1
+        DIM name AS STRING : name = umbauZiele[k].pfad
+        IF name = "" AND umbauZiele[k].tab >= 0 THEN name = reiter[umbauZiele[k].tab].name$()
         IF LOWER$(RIGHT$(name, 3)) <> ".dh" THEN CONTINUE
         DIM vorher AS INTEGER : vorher = fehlerZahl(umbauAlt$(k))
-        DIM nachher AS INTEGER : nachher = fehlerZahl(umbauTexte[k])
+        DIM nachher AS INTEGER : nachher = fehlerZahl(umbauZiele[k].text)
         IF nachher > vorher THEN summe = summe + (nachher - vorher)
     NEXT
     RETURN summe
@@ -12545,13 +12549,13 @@ FUNCTION umbauZaehlen() AS INTEGER
     umbauBefunde = []
     DIM summe AS INTEGER : summe = 0
     DIM k AS INTEGER
-    FOR k = 0 TO LEN(umbauTexte) - 1
-        DIM name AS STRING : name = umbauPfade[k]
-        IF name = "" AND umbauTabs[k] >= 0 THEN name = reiter[umbauTabs[k]].name$()
+    FOR k = 0 TO LEN(umbauZiele) - 1
+        DIM name AS STRING : name = umbauZiele[k].pfad
+        IF name = "" AND umbauZiele[k].tab >= 0 THEN name = reiter[umbauZiele[k].tab].name$()
         ' Nur .dh: eine .dhform ist JSON, da hat der Uebersetzer nichts zu
         ' suchen (und meldete jede Zeile als Fehler).
         IF LOWER$(RIGHT$(name, 3)) <> ".dh" THEN CONTINUE
-        DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_CHECK$(umbauTexte[k], projektOrdner))
+        DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_CHECK$(umbauZiele[k].text, projektOrdner))
         DIM i AS INTEGER
         FOR i = 0 TO JSON_LEN(j, "") - 1
             DIM pp AS STRING : pp = STR$(i)
@@ -12584,15 +12588,14 @@ SUB umbauSchreiben()
     ' geaendert wurde.
     IF GUI_WINDOW_SHOWN(winUmbau) THEN
         DIM ab AS INTEGER
-        FOR ab = LEN(umbauTexte) - 1 TO 0 STEP -1
+        FOR ab = LEN(umbauZiele) - 1 TO 0 STEP -1
             IF NOT GUI_LISTBOX_CHECKED(lstUmbau, ab) THEN
-                ARRAY_REMOVE_AT(umbauTabs, ab) : ARRAY_REMOVE_AT(umbauPfade, ab)
-                ARRAY_REMOVE_AT(umbauTexte, ab)
+                ARRAY_REMOVE_AT(umbauZiele, ab)
             END IF
         NEXT
     END IF
     GUI_WINDOW_VISIBLE(winUmbau, FALSE)
-    IF LEN(umbauTexte) = 0 THEN
+    IF LEN(umbauZiele) = 0 THEN
         GUI_SET_TEXT(lblStatus, tr$("Alles abgewählt -- nichts geändert."))
         protokoll("umbau abgewaehlt alles")
         umbauLeeren()
@@ -12600,56 +12603,46 @@ SUB umbauSchreiben()
         RETURN
     END IF
     ' Den Stand VOR dem Umbau aufheben, bevor er ueberschrieben wird.
+    DIM neuStand AS UmbauStand : neuStand = NEW UmbauStand(umbauMeldung)
     DIM v AS INTEGER
-    FOR v = 0 TO LEN(umbauTexte) - 1
-        ARRAY_PUSH(zurTabs, umbauTabs[v])
-        ARRAY_PUSH(zurPfade, umbauPfade[v])
-        ARRAY_PUSH(zurTexte, umbauAlt$(v))
-        ARRAY_PUSH(zurNachher, umbauTexte[v])
+    FOR v = 0 TO LEN(umbauZiele) - 1
+        neuStand.dazu(umbauZiele[v].tab, umbauZiele[v].pfad, umbauAlt$(v), umbauZiele[v].text)
     NEXT
-    ARRAY_PUSH(zurAnzahl, LEN(umbauTexte))
-    ARRAY_PUSH(zurNamen, umbauMeldung)
-    wdhTabs = [] : wdhPfade = [] : wdhVorher = [] : wdhNachher = []
-    wdhAnzahl = [] : wdhNamen = []
+    ARRAY_PUSH(zurStapel, neuStand)
+    wdhStapel = []
     ' Der aelteste faellt heraus -- ein Vorrat, der mit jedem Umbau waechst,
     ' haelt irgendwann das ganze Projekt in mehreren Fassungen.
-    WHILE LEN(zurAnzahl) > ZUR_MAX
-        DIM weg AS INTEGER : weg = zurAnzahl[0]
-        DIM k2 AS INTEGER
-        FOR k2 = 1 TO weg
-            ARRAY_REMOVE_AT(zurTabs, 0) : ARRAY_REMOVE_AT(zurPfade, 0) : ARRAY_REMOVE_AT(zurTexte, 0)
-            ARRAY_REMOVE_AT(zurNachher, 0)
-        NEXT
-        ARRAY_REMOVE_AT(zurAnzahl, 0) : ARRAY_REMOVE_AT(zurNamen, 0)
+    WHILE LEN(zurStapel) > ZUR_MAX
+        ARRAY_REMOVE_AT(zurStapel, 0)
     WEND
     ' Abgelehnte Dateien (schreibgeschuetzt, Ordner weg) werden genannt, die
     ' uebrigen trotzdem geschrieben. Ohne TRY beendete die erste abgelehnte
     ' die IDE mitten im Umbau.
     DIM abgelehnt AS STRING : abgelehnt = ""
     DIM k AS INTEGER
-    FOR k = 0 TO LEN(umbauTexte) - 1
-        IF umbauTabs[k] >= 0 THEN
+    FOR k = 0 TO LEN(umbauZiele) - 1
+        IF umbauZiele[k].tab >= 0 THEN
             ' In den Reiter: Auswahl ueber alles + INSERT. GUI_SET_TEXT
             ' leerte den Verlauf -- so nimmt EIN Strg+Z den Umbau zurueck.
-            DIM ta AS GUI_WIDGET : ta = reiter[umbauTabs[k]].feld
+            DIM ta AS GUI_WIDGET : ta = reiter[umbauZiele[k].tab].feld
             DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
             DIM letzte AS INTEGER : letzte = LEN(zeilen)
             GUI_TEXTAREA_SELECT(ta, 1, 1, letzte, LEN(zeilen[letzte - 1]) + 1)
-            GUI_TEXTAREA_INSERT(ta, umbauTexte[k])
+            GUI_TEXTAREA_INSERT(ta, umbauZiele[k].text)
         ELSE
             DIM geschrieben AS BOOLEAN : geschrieben = TRUE
             TRY
-                WRITEALL(umbauPfade[k], umbauTexte[k] + NL)
+                WRITEALL(umbauZiele[k].pfad, umbauZiele[k].text + NL)
             CATCH e
                 geschrieben = FALSE
-                abgelehnt = abgelehnt + IIF(abgelehnt = "", "", ", ") + BASENAME(umbauPfade[k])
-                protokoll("umbau nicht geschrieben " + BASENAME(umbauPfade[k]))
+                abgelehnt = abgelehnt + IIF(abgelehnt = "", "", ", ") + BASENAME(umbauZiele[k].pfad)
+                protokoll("umbau nicht geschrieben " + BASENAME(umbauZiele[k].pfad))
             END TRY
             IF NOT geschrieben THEN CONTINUE
-            DIM t AS INTEGER : t = tabMitPfad(umbauPfade[k])
+            DIM t AS INTEGER : t = tabMitPfad(umbauZiele[k].pfad)
             IF t >= 0 THEN
-                GUI_SET_TEXT(reiter[t].feld, umbauTexte[k])
-                reiter[t].gesichert = umbauTexte[k]
+                GUI_SET_TEXT(reiter[t].feld, umbauZiele[k].text)
+                reiter[t].gesichert = umbauZiele[k].text
                 reiter[t].letzterText = ""
             END IF
         END IF
@@ -12660,10 +12653,10 @@ SUB umbauSchreiben()
     DIM neuDa AS INTEGER : neuDa = 0
     DIM warTab AS INTEGER : warTab = aktiverTab
     DIM nk2 AS INTEGER
-    FOR nk2 = 0 TO LEN(umbauTexte) - 1
-        IF umbauTabs[nk2] >= 0 OR umbauPfade[nk2] = "" THEN CONTINUE
-        IF zurTexte[LEN(zurTexte) - LEN(umbauTexte) + nk2] <> "" THEN CONTINUE
-        dateiOeffnen(umbauPfade[nk2])
+    FOR nk2 = 0 TO LEN(umbauZiele) - 1
+        IF umbauZiele[nk2].tab >= 0 OR umbauZiele[nk2].pfad = "" THEN CONTINUE
+        IF neuStand.vorher[nk2] <> "" THEN CONTINUE
+        dateiOeffnen(umbauZiele[nk2].pfad)
         neuDa = neuDa + 1
     NEXT
     IF neuDa > 0 THEN
@@ -12686,9 +12679,9 @@ SUB umbauSchreiben()
     ' stehen, nur die Zuordnung zu den Dateien geht mit umbauLeeren weg.
     umbauNachTabs = [] : umbauNachPfade = [] : umbauNachWas = umbauMeldung
     DIM nk AS INTEGER
-    FOR nk = 0 TO LEN(umbauTexte) - 1
-        ARRAY_PUSH(umbauNachTabs, umbauTabs[nk])
-        ARRAY_PUSH(umbauNachPfade, umbauPfade[nk])
+    FOR nk = 0 TO LEN(umbauZiele) - 1
+        ARRAY_PUSH(umbauNachTabs, umbauZiele[nk].tab)
+        ARRAY_PUSH(umbauNachPfade, umbauZiele[nk].pfad)
     NEXT
     IF abgelehnt = "" THEN
         GUI_SET_TEXT(lblStatus, umbauMeldung)
@@ -14118,8 +14111,8 @@ SUB trefferErsetzen(nurEiner AS BOOLEAN, ersatz AS STRING)
         NEXT
         IF geaendert THEN umbauVormerken(t, pfad, JOIN$(zl, NL))
     NEXT
-    umbauStarten(tr$("Suchtreffer ersetzen"), STR$(zeilenZahl) + tr$(" Zeile(n) in ") + STR$(LEN(umbauTexte)) + tr$(" Datei(en)."), _
-                 "treffer ersetzt " + STR$(zeilenZahl) + " " + STR$(LEN(umbauTexte)))
+    umbauStarten(tr$("Suchtreffer ersetzen"), STR$(zeilenZahl) + tr$(" Zeile(n) in ") + STR$(LEN(umbauZiele)) + tr$(" Datei(en)."), _
+                 "treffer ersetzt " + STR$(zeilenZahl) + " " + STR$(LEN(umbauZiele)))
 END SUB
 
 ' --- Projektbaum: anlegen, umbenennen, loeschen -------------------------

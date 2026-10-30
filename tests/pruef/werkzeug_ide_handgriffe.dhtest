@@ -499,7 +499,7 @@ baumfilter [HELD] 2
 === ein umbau wird nicht zurueckgenommen, wenn die datei danach geaendert wurde
 ' Ein Umbau schreibt b.dh (sie ist nicht offen), danach aendert jemand die
 ' Datei noch einmal. Zuruecknehmen schriebe die spaetere Arbeit weg.
-umbauTabs = [-1] : umbauPfade = [PATHJOIN(projektOrdner, "b.dh")] : umbauTexte = ["PRINT " + CHR$(34) + "neu" + CHR$(34)]
+umbauZiele = [] : ARRAY_PUSH(umbauZiele, NEW UmbauZiel(-1, PATHJOIN(projektOrdner, "b.dh"), "PRINT " + CHR$(34) + "neu" + CHR$(34)))
 umbauSchreiben()
 WRITEALL(PATHJOIN(projektOrdner, "b.dh"), "PRINT " + CHR$(34) + "spaeter" + CHR$(34) + NL)
 umbauZurueck()
@@ -527,7 +527,7 @@ umbau zurueck geaendert b.dh
 datei PRINT "spaeter"
 
 === zurueckgenommen und wiederholt
-umbauTabs = [-1] : umbauPfade = [PATHJOIN(projektOrdner, "b.dh")] : umbauTexte = ["PRINT " + CHR$(34) + "neu" + CHR$(34)]
+umbauZiele = [] : ARRAY_PUSH(umbauZiele, NEW UmbauZiel(-1, PATHJOIN(projektOrdner, "b.dh"), "PRINT " + CHR$(34) + "neu" + CHR$(34)))
 umbauSchreiben()
 umbauZurueck()
 PRINT "nach dem zuruecknehmen " ; READLINES(PATHJOIN(projektOrdner, "b.dh"))[0]
