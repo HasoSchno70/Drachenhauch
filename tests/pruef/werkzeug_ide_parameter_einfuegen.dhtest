@@ -13,8 +13,8 @@
 === parameternamen an aufrufen mit festen argumenten
 pruefen()
 DIM prI AS INTEGER
-FOR prI = 0 TO LEN(paramZeilen) - 1
-    protokoll("pr param " + STR$(paramZeilen[prI]) + " " + paramTexte[prI])
+FOR prI = 0 TO LEN(paramHinweise) - 1
+    protokoll("pr param " + STR$(paramHinweise[prI].zeile) + " " + paramHinweise[prI].text)
 NEXT
 befehl("parameter_namen")
 protokoll("pr aus " + STR$(paramNamenAn))
@@ -74,8 +74,8 @@ DIM prT AS FLOAT : prT = GET_TIME()
 parameterSammeln(reiter[aktiverTab].feld)
 DIM prD AS FLOAT : prD = GET_TIME() - prT
 DIM prI AS INTEGER
-FOR prI = 0 TO LEN(paramZeilen) - 1
-    protokoll("pr param " + STR$(paramZeilen[prI]) + " " + paramTexte[prI])
+FOR prI = 0 TO LEN(paramHinweise) - 1
+    protokoll("pr param " + STR$(paramHinweise[prI].zeile) + " " + paramHinweise[prI].text)
 NEXT
 protokoll("pr flott " + STR$(prD < 1.0))
 EXIT(0)
@@ -238,8 +238,8 @@ pr spalte0 |SUB s()/    IF a THEN/        b = 1/    ELSE/        b = 2/    END I
 ' ihrer Klasse -- der Fall danach.)
 pruefen()
 DIM prI AS INTEGER
-FOR prI = 0 TO LEN(paramZeilen) - 1
-    protokoll("pr param " + STR$(paramZeilen[prI]) + " " + paramTexte[prI])
+FOR prI = 0 TO LEN(paramHinweise) - 1
+    protokoll("pr param " + STR$(paramHinweise[prI].zeile) + " " + paramHinweise[prI].text)
 NEXT
 EXIT(0)
 --- programm ../../ide/ide.dh nach protokoll("bereit")
@@ -292,8 +292,8 @@ pr param 21 s, n
 ' (CODE_METHOD_CALLS$), je aus der Klasse des Objekts.
 pruefen()
 DIM prI AS INTEGER
-FOR prI = 0 TO LEN(paramZeilen) - 1
-    protokoll("pr param " + STR$(paramZeilen[prI]) + " " + paramTexte[prI])
+FOR prI = 0 TO LEN(paramHinweise) - 1
+    protokoll("pr param " + STR$(paramHinweise[prI].zeile) + " " + paramHinweise[prI].text)
 NEXT
 EXIT(0)
 --- programm ../../ide/ide.dh nach protokoll("bereit")

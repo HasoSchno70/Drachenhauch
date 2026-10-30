@@ -471,8 +471,15 @@ DIM typHinweiseAn AS BOOLEAN : typHinweiseAn = TRUE
 ' Signatur -- `kreis(100, 50, 20)` sagt sonst nicht, was 50 ist.
 DIM paramNamenAn AS BOOLEAN : paramNamenAn = TRUE
 DIM paramFeld AS GUI_WIDGET : paramFeld = -1
-DIM paramZeilen AS ARRAY OF INTEGER : paramZeilen = []
-DIM paramTexte AS ARRAY OF STRING : paramTexte = []
+' Ein Hinweis hinter einer Zeile (GUI_TEXTAREA_HINTS).
+CLASS Zeilenhinweis
+    DIM zeile AS INTEGER
+    DIM text AS STRING
+    SUB Init(z AS INTEGER, t AS STRING)
+        zeile = z : text = t
+    END SUB
+END CLASS
+DIM paramHinweise AS ARRAY OF Zeilenhinweis : paramHinweise = []
 ' Signaturen je Name (klein), "" = keine. Eingebaute Befehle aendern sich nie,
 ' fremde Dateien erst beim Sichern -- darum ueber die Pruefungen hinweg
 ' gemerkt und beim Sichern geleert.
@@ -5523,9 +5530,25 @@ SUB zaehlNachsehen()
     WEND
 END SUB
 DIM zaehlFeld AS GUI_WIDGET : zaehlFeld = -1
-DIM zaehlZeilen AS ARRAY OF INTEGER : zaehlZeilen = []
-DIM zaehlNamen AS ARRAY OF STRING : zaehlNamen = []
-DIM zaehlTexte AS ARRAY OF STRING : zaehlTexte = []
+' Ein Aufrufzaehler: die Zeile einer SUB/FUNCTION, ihr Name und was
+' dahinter steht ("3 Aufrufe   ·   ueberschreibt Tier.gehen").
+CLASS Zaehlstelle
+    DIM zeile AS INTEGER
+    DIM name AS STRING
+    DIM text AS STRING
+    SUB Init(z AS INTEGER, n AS STRING, t AS STRING)
+        zeile = z : name = n : text = t
+    END SUB
+END CLASS
+DIM zaehlStellen AS ARRAY OF Zaehlstelle : zaehlStellen = []
+
+FUNCTION zaehlStelleNr(zeile AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zaehlStellen) - 1
+        IF zaehlStellen[i].zeile = zeile THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
 
 SUB zaehlerSetzen(an AS BOOLEAN)
     zaehlerAn = an
@@ -5585,7 +5608,7 @@ SUB zaehlerSetzen_(ta AS GUI_WIDGET)
     IF ta < 0 OR ta = werteFeld THEN RETURN
     IF NOT zaehlerAn THEN
         IF zaehlFeld = ta THEN
-            zaehlFeld = -1 : zaehlZeilen = [] : zaehlNamen = []
+            zaehlFeld = -1 : zaehlStellen = []
             hinweiseZeigen(ta)
         END IF
         RETURN
@@ -5614,7 +5637,7 @@ SUB zaehlerSetzen_(ta AS GUI_WIDGET)
         ARRAY_PUSH(nm, TRIM$(LEFT$(rest, kl)))
     NEXT
     IF LEN(zl) = 0 THEN
-        zaehlFeld = -1 : zaehlZeilen = [] : zaehlNamen = []
+        zaehlFeld = -1 : zaehlStellen = []
         hinweiseZeigen(ta)
         RETURN
     END IF
@@ -5649,15 +5672,15 @@ SUB zaehlerSetzen_(ta AS GUI_WIDGET)
         END IF
         zaehlerAddieren(summe, zaehlungVon$(pfad))
     NEXT
-    DIM texte AS ARRAY OF STRING : texte = []
+    DIM stellen AS ARRAY OF Zaehlstelle : stellen = []
     DIM ueber AS MAP OF STRING : ueber = ueberschreibTexte(quelle)
     FOR i = 0 TO LEN(nm) - 1
         DIM k AS INTEGER : k = MAPGET(summe, LOWER$(nm[i]))
         DIM zt AS STRING : zt = IIF(k = 0, "nicht aufgerufen", IIF(k = 1, "1 Aufruf", STR$(k) + " Aufrufe"))
         IF MAPHAS(ueber, STR$(zl[i])) THEN zt = zt + "   ·   " + MAPGET(ueber, STR$(zl[i]))
-        ARRAY_PUSH(texte, zt)
+        ARRAY_PUSH(stellen, NEW Zaehlstelle(zl[i], nm[i], zt))
     NEXT
-    zaehlFeld = ta : zaehlZeilen = zl : zaehlNamen = nm : zaehlTexte = texte
+    zaehlFeld = ta : zaehlStellen = stellen
     hinweiseZeigen(ta)
     protokoll("aufrufzaehler " + STR$(LEN(zl)))
 END SUB
@@ -5784,10 +5807,10 @@ END SUB
 
 SUB zaehlerKlick(ta AS GUI_WIDGET, zeile AS INTEGER)
     IF ta <> zaehlFeld THEN RETURN
-    DIM i AS INTEGER : i = ARRAY_INDEXOF(zaehlZeilen, zeile)
+    DIM i AS INTEGER : i = zaehlStelleNr(zeile)
     IF i < 0 THEN RETURN
-    protokoll("aufrufzaehler klick " + zaehlNamen[i])
-    aufruferZeigenFuer(zaehlNamen[i])
+    protokoll("aufrufzaehler klick " + zaehlStellen[i].name)
+    aufruferZeigenFuer(zaehlStellen[i].name)
 END SUB
 
 ' --- Pruefsammlungen ----------------------------------------------------
@@ -6682,9 +6705,10 @@ SUB hinweiseZeigen(ta AS GUI_WIDGET)
     ' ARRAY_INDEXOF findet (bei tausenden Meldungen quadratisch).
     DIM zlNr AS MAP OF INTEGER : zlNr = {}
     IF ta = zaehlFeld THEN
-        FOR i = 0 TO LEN(zaehlZeilen) - 1
-            ARRAY_PUSH(zl, zaehlZeilen[i]) : ARRAY_PUSH(tx, zaehlTexte[i])
-            IF NOT MAPHAS(zlNr, STR$(zaehlZeilen[i])) THEN MAPPUT(zlNr, STR$(zaehlZeilen[i]), LEN(zl) - 1)
+        FOR i = 0 TO LEN(zaehlStellen) - 1
+            DIM zs AS Zaehlstelle : zs = zaehlStellen[i]
+            ARRAY_PUSH(zl, zs.zeile) : ARRAY_PUSH(tx, zs.text)
+            IF NOT MAPHAS(zlNr, STR$(zs.zeile)) THEN MAPPUT(zlNr, STR$(zs.zeile), LEN(zl) - 1)
         NEXT
     END IF
     ' Die Profilzahlen: an den Zeilen, an denen ihre Farben JETZT stehen
@@ -6720,12 +6744,13 @@ SUB hinweiseZeigen(ta AS GUI_WIDGET)
         ARRAY_PUSH(farben, -1)
     NEXT
     IF paramNamenAn AND ta = paramFeld THEN
-        FOR i = 0 TO LEN(paramZeilen) - 1
-            DIM pk AS INTEGER : pk = IIF(MAPHAS(zlNr, STR$(paramZeilen[i])), MAPGET(zlNr, STR$(paramZeilen[i])), -1)
+        FOR i = 0 TO LEN(paramHinweise) - 1
+            DIM ph AS Zeilenhinweis : ph = paramHinweise[i]
+            DIM pk AS INTEGER : pk = IIF(MAPHAS(zlNr, STR$(ph.zeile)), MAPGET(zlNr, STR$(ph.zeile)), -1)
             IF pk >= 0 THEN
-                tx[pk] = tx[pk] + "   ·   " + paramTexte[i]
+                tx[pk] = tx[pk] + "   ·   " + ph.text
             ELSE
-                ARRAY_PUSH(zl, paramZeilen[i]) : MAPPUT(zlNr, STR$(paramZeilen[i]), LEN(zl) - 1) : ARRAY_PUSH(tx, paramTexte[i])
+                ARRAY_PUSH(zl, ph.zeile) : MAPPUT(zlNr, STR$(ph.zeile), LEN(zl) - 1) : ARRAY_PUSH(tx, ph.text)
                 ARRAY_PUSH(farben, F_TYP)
             END IF
         NEXT
@@ -10742,13 +10767,23 @@ END FUNCTION
 ' es auch von einem Aufruf aus), sonst das Unterprogramm um die Marke.
 DIM paramName AS STRING : paramName = ""
 DIM paramArgs AS ARRAY OF STRING : paramArgs = []
-' Welche Argumente die neue Liste hat: >= 0 ist die Nummer des alten,
-' negativ steht fuer einen NEUEN Parameter (-1 = der erste in paramNeuDecl).
-DIM paramFolge AS ARRAY OF INTEGER : paramFolge = []
-' Je neuem Parameter die Deklaration (fuer die Definition) und der Wert
-' (fuer jede Aufrufstelle) -- `hp AS INTEGER = 0` und `0`.
-DIM paramNeuDecl AS ARRAY OF STRING : paramNeuDecl = []
-DIM paramNeuWert AS ARRAY OF STRING : paramNeuWert = []
+' Ein Platz der neuen Parameterliste: das alte Argument Nummer `alt`, oder
+' (alt = -1) ein NEUER Parameter mit Deklaration fuer die Definition und
+' Wert fuer jede Aufrufstelle -- `hp AS INTEGER = 0` und `0`. Bis
+' 2026-10-30 eine Zahlenliste, in der eine negative Zahl auf ein zweites
+' Feldpaar zeigte.
+CLASS ParamPlatz
+    DIM alt AS INTEGER
+    DIM decl AS STRING
+    DIM wert AS STRING
+    SUB Init(a AS INTEGER, d AS STRING, w AS STRING)
+        alt = a : decl = d : wert = w
+    END SUB
+    FUNCTION istNeu() AS BOOLEAN
+        RETURN alt < 0
+    END FUNCTION
+END CLASS
+DIM paramPlaetze AS ARRAY OF ParamPlatz : paramPlaetze = []
 
 FUNCTION defStelle(quelle AS STRING, name AS STRING) AS INTEGER
     IF name = "" THEN RETURN -1
@@ -10829,12 +10864,12 @@ SUB parameterFragen()
         RETURN
     END IF
     paramName = name
-    paramArgs = [] : paramFolge = [] : paramNeuDecl = [] : paramNeuWert = []
+    paramArgs = [] : paramPlaetze = []
     DIM k AS INTEGER
     FOR k = 0 TO LEN(pvon) - 1
         DIM stueck AS STRING : stueck = TRIM$(MID$(quelle, pvon[k], pbis[k] - pvon[k]))
         ARRAY_PUSH(paramArgs, stueck)
-        ARRAY_PUSH(paramFolge, k)
+        ARRAY_PUSH(paramPlaetze, NEW ParamPlatz(k, "", ""))
     NEXT
     parameterListe()
     GUI_LISTBOX_SET_SELECTED(lstParam, 0)
@@ -10850,9 +10885,9 @@ END SUB
 SUB parameterSchieben(richtung AS INTEGER)
     DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstParam)
     DIM ziel AS INTEGER : ziel = sel + richtung
-    IF sel < 0 OR ziel < 0 OR ziel >= LEN(paramFolge) THEN RETURN
-    DIM h AS INTEGER : h = paramFolge[sel]
-    paramFolge[sel] = paramFolge[ziel] : paramFolge[ziel] = h
+    IF sel < 0 OR ziel < 0 OR ziel >= LEN(paramPlaetze) THEN RETURN
+    DIM h AS ParamPlatz : h = paramPlaetze[sel]
+    paramPlaetze[sel] = paramPlaetze[ziel] : paramPlaetze[ziel] = h
     parameterListe()
     GUI_LISTBOX_SET_SELECTED(lstParam, ziel)
 END SUB
@@ -10896,8 +10931,7 @@ END SUB
 ' `alteZahl` ist die Zahl der Parameter VORHER: nur Aufrufe mit genau so
 ' vielen Argumenten werden angefasst.
 ' `zaehler` kommt gefuellt zurueck: [0] geaenderte Stellen, [1] uebergangene.
-FUNCTION parameterInText$(quelle AS STRING, name AS STRING, folge AS ARRAY OF INTEGER, _
-                          neuDecl AS ARRAY OF STRING, neuWert AS ARRAY OF STRING, _
+FUNCTION parameterInText$(quelle AS STRING, name AS STRING, plaetze AS ARRAY OF ParamPlatz, _
                           alteZahl AS INTEGER, zaehler AS ARRAY OF INTEGER) AS STRING
     DIM neu AS STRING : neu = quelle
     DIM stellen AS ARRAY OF INTEGER : stellen = []
@@ -10934,12 +10968,11 @@ FUNCTION parameterInText$(quelle AS STRING, name AS STRING, folge AS ARRAY OF IN
         END IF
         DIM istDef AS BOOLEAN : istDef = stellen[s] = defAuf
         DIM neuArgs AS ARRAY OF STRING : neuArgs = []
-        FOR k = 0 TO LEN(folge) - 1
-            IF folge[k] >= 0 THEN
-                ARRAY_PUSH(neuArgs, randWeg$(stuecke[folge[k]]))
+        FOR k = 0 TO LEN(plaetze) - 1
+            IF plaetze[k].istNeu() THEN
+                ARRAY_PUSH(neuArgs, IIF(istDef, plaetze[k].decl, plaetze[k].wert))
             ELSE
-                DIM j AS INTEGER : j = -folge[k] - 1
-                ARRAY_PUSH(neuArgs, IIF(istDef, neuDecl[j], neuWert[j]))
+                ARRAY_PUSH(neuArgs, randWeg$(stuecke[plaetze[k].alt]))
             END IF
         NEXT
         neu = LEFT$(neu, avon[0]) + JOIN$(neuArgs, ", ") + MID$(neu, abis[LEN(abis) - 1])
@@ -10959,18 +10992,18 @@ FUNCTION andererUngesichert(ausser AS INTEGER) AS BOOLEAN
     RETURN FALSE
 END FUNCTION
 
-' Die Liste im Fenster neu aus `paramFolge` aufbauen.
+' Die Liste im Fenster neu aus `paramPlaetze` aufbauen.
 SUB parameterListe()
     GUI_LISTBOX_CLEAR(lstParam)
     DIM k AS INTEGER
-    FOR k = 0 TO LEN(paramFolge) - 1
-        IF paramFolge[k] >= 0 THEN
-            GUI_LISTBOX_ADD(lstParam, paramArgs[paramFolge[k]])
+    FOR k = 0 TO LEN(paramPlaetze) - 1
+        IF paramPlaetze[k].istNeu() THEN
+            GUI_LISTBOX_ADD(lstParam, paramPlaetze[k].decl + "   [neu]")
         ELSE
-            GUI_LISTBOX_ADD(lstParam, paramNeuDecl[-paramFolge[k] - 1] + "   [neu]")
+            GUI_LISTBOX_ADD(lstParam, paramArgs[paramPlaetze[k].alt])
         END IF
     NEXT
-    GUI_SET_TEXT(lblParam, STR$(LEN(paramFolge)) + tr$(" Parameter (vorher ") + _
+    GUI_SET_TEXT(lblParam, STR$(LEN(paramPlaetze)) + tr$(" Parameter (vorher ") + _
                  STR$(LEN(paramArgs)) + ") -- die Aufrufe ziehen mit.")
 END SUB
 
@@ -10985,26 +11018,24 @@ SUB parameterNeu(text AS STRING)
                      "der Wert hinter dem = kommt an jede Aufrufstelle.")
         RETURN
     END IF
-    ARRAY_PUSH(paramNeuDecl, t)
-    ARRAY_PUSH(paramNeuWert, TRIM$(MID$(t, gl + 1)))
-    ARRAY_PUSH(paramFolge, -LEN(paramNeuDecl))
+    ARRAY_PUSH(paramPlaetze, NEW ParamPlatz(-1, t, TRIM$(MID$(t, gl + 1))))
     parameterListe()
-    GUI_LISTBOX_SET_SELECTED(lstParam, LEN(paramFolge) - 1)
+    GUI_LISTBOX_SET_SELECTED(lstParam, LEN(paramPlaetze) - 1)
     GUI_FOCUS(lstParam)
     protokoll("parameter neu " + t)
 END SUB
 
 SUB parameterWeg()
     DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstParam)
-    IF sel < 0 OR sel >= LEN(paramFolge) THEN RETURN
-    IF LEN(paramFolge) <= 1 THEN
+    IF sel < 0 OR sel >= LEN(paramPlaetze) THEN RETURN
+    IF LEN(paramPlaetze) <= 1 THEN
         GUI_SET_TEXT(lblStatus, tr$("Der letzte Parameter bleibt -- ein Unterprogramm ganz ohne ") + _
                      "Klammerinhalt wäre ein anderer Umbau.")
         RETURN
     END IF
-    ARRAY_REMOVE_AT(paramFolge, sel)
+    ARRAY_REMOVE_AT(paramPlaetze, sel)
     parameterListe()
-    GUI_LISTBOX_SET_SELECTED(lstParam, MIN(sel, LEN(paramFolge) - 1))
+    GUI_LISTBOX_SET_SELECTED(lstParam, MIN(sel, LEN(paramPlaetze) - 1))
     GUI_FOCUS(lstParam)
     protokoll("parameter weg " + STR$(sel))
 END SUB
@@ -11013,11 +11044,11 @@ SUB parameterUebernehmen()
     GUI_WINDOW_VISIBLE(winParam, FALSE)
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 OR paramName = "" THEN RETURN
-    DIM gleich AS BOOLEAN : gleich = LEN(paramFolge) = LEN(paramArgs)
+    DIM gleich AS BOOLEAN : gleich = LEN(paramPlaetze) = LEN(paramArgs)
     DIM k AS INTEGER
     IF gleich THEN
-        FOR k = 0 TO LEN(paramFolge) - 1
-            IF paramFolge[k] <> k THEN gleich = FALSE
+        FOR k = 0 TO LEN(paramPlaetze) - 1
+            IF paramPlaetze[k].alt <> k THEN gleich = FALSE
         NEXT
     END IF
     IF gleich THEN
@@ -11044,8 +11075,7 @@ SUB parameterUebernehmen()
     DIM alteZahl AS INTEGER : alteZahl = LEN(paramArgs)
     DIM zaehler AS ARRAY OF INTEGER : zaehler = []
     DIM neu AS STRING
-    neu = parameterInText$(GUI_TEXT(ta), paramName, paramFolge, paramNeuDecl, paramNeuWert, _
-                           alteZahl, zaehler)
+    neu = parameterInText$(GUI_TEXT(ta), paramName, paramPlaetze, alteZahl, zaehler)
     DIM geaendert AS INTEGER : geaendert = zaehler[0]
     DIM uebergangen AS INTEGER : uebergangen = zaehler[1]
     umbauVormerken(aktiverTab, reiter[aktiverTab].pfad, neu)
@@ -12027,8 +12057,7 @@ SUB laufSchritt()
             IF gleicherWeg(pfad, reiter[aktiverTab].pfad) THEN CONTINUE
             IF INSTR(alt, paramName) < 0 THEN CONTINUE
             DIM z2 AS ARRAY OF INTEGER : z2 = []
-            frisch = parameterInText$(alt, paramName, paramFolge, paramNeuDecl, paramNeuWert, _
-                                      laufZahl, z2)
+            frisch = parameterInText$(alt, paramName, paramPlaetze, laufZahl, z2)
             laufGeaendert = laufGeaendert + z2[0]
             laufUebergangen = laufUebergangen + z2[1]
         ELSEIF laufArt = "verschieben" THEN
@@ -13564,7 +13593,7 @@ SUB kopfZeilenSammeln(zeilen AS ARRAY OF STRING, BYREF kopf AS MAP OF STRING)
 END SUB
 
 SUB parameterSammeln(ta AS GUI_WIDGET)
-    paramFeld = ta : paramZeilen = [] : paramTexte = []
+    paramFeld = ta : paramHinweise = []
     IF NOT paramNamenAn THEN RETURN
     DIM quelle AS STRING : quelle = GUI_TEXT(ta)
     DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
@@ -13693,10 +13722,10 @@ SUB parameterSammeln(ta AS GUI_WIDGET)
             IF a > 0 THEN zeig = zeig + ", "
             zeig = zeig + alle[a]
         NEXT
-        ARRAY_PUSH(paramZeilen, li + 1) : ARRAY_PUSH(paramTexte, zeig)
+        ARRAY_PUSH(paramHinweise, NEW Zeilenhinweis(li + 1, zeig))
         erledigt = li
     NEXT
-    IF LEN(paramZeilen) > 0 THEN protokoll("parameternamen " + STR$(LEN(paramZeilen)))
+    IF LEN(paramHinweise) > 0 THEN protokoll("parameternamen " + STR$(LEN(paramHinweise)))
 END SUB
 
 ' Alle Methodenaufrufe des Textes mit ihren Parameternamen (CODE_METHOD_CALLS$):
