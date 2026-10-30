@@ -26,10 +26,11 @@ IF prSchritt = 1 AND waermeDaten THEN
     protokoll("pr heisseste in der schleife " + STR$(profMessung[0].zeile = 3 OR profMessung[0].zeile = 4))
     DIM prZahlen AS INTEGER : prZahlen = 0
     DIM prT AS STRING
-    FOR EACH prT IN waermeTexte
-        IF prT <> "" THEN prZahlen = prZahlen + 1
+    DIM prW AS WaermeHinweis
+    FOR EACH prW IN waermeHinweise
+        IF prW.text <> "" THEN prZahlen = prZahlen + 1
     NEXT
-    protokoll("pr mit zahlen " + STR$(prZahlen) + " " + STR$(INSTR(waermeTexte[0], " ms  ") > 0))
+    protokoll("pr mit zahlen " + STR$(prZahlen) + " " + STR$(INSTR(waermeHinweise[0].text, " ms  ") > 0))
     ' eine Zeile oben einfuegen: alle Baender ruecken eine weiter
     GUI_TEXTAREA_SELECT(prTa, 1, 1, 1, 1)
     GUI_TEXTAREA_INSERT(prTa, "' neu" + NL)

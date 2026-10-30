@@ -16,7 +16,7 @@ IF prN = 20 THEN protokoll("pr gesprungen " + STR$(GUI_RICHTEXT_SCROLL_GET(rtHan
 IF prN = 22 THEN handbuchVerweis("bbb.md")
 IF prN = 30 THEN protokoll("pr doku " + docNamen[docLetzteWahl]) : hbVerlauf(TRUE)
 IF prN = 40 THEN protokoll("pr zurueck " + docNamen[docLetzteWahl] + " " + STR$(GUI_RICHTEXT_SCROLL_GET(rtHandbuch) > 300)) : hbVerlauf(FALSE)
-IF prN = 50 THEN protokoll("pr vor " + docNamen[docLetzteWahl] + " " + STR$(LEN(hbVorDatei))) : EXIT(0)
+IF prN = 50 THEN protokoll("pr vor " + docNamen[docLetzteWahl] + " " + STR$(LEN(hbVor))) : EXIT(0)
 --- argumente
 spiel.dh
 --- umgebung

@@ -446,9 +446,17 @@ DIM waermeAn AS BOOLEAN : waermeAn = TRUE
 ' Gibt es eine Messung, die im Code stehen soll? (Entfernen laesst die
 ' Tabelle stehen, nimmt aber die Farben weg.)
 DIM waermeDaten AS BOOLEAN : waermeDaten = FALSE
-DIM waermeFelder AS ARRAY OF INTEGER : waermeFelder = []
-DIM waermeNr AS ARRAY OF INTEGER : waermeNr = []
-DIM waermeTexte AS ARRAY OF STRING : waermeTexte = []
+' Eine Profilzahl im Code: das Feld, die Nummer ihres Farbbandes (die
+' Baender wandern beim Tippen mit, eine gemerkte Zeile nicht) und der Text.
+CLASS WaermeHinweis
+    DIM feld AS GUI_WIDGET
+    DIM nr AS INTEGER
+    DIM text AS STRING
+    SUB Init(f AS GUI_WIDGET, n AS INTEGER, t AS STRING)
+        feld = f : nr = n : text = t
+    END SUB
+END CLASS
+DIM waermeHinweise AS ARRAY OF WaermeHinweis : waermeHinweise = []
 ' Aufrufzaehler: hinter jeder SUB/FUNCTION steht, wie oft sie im Projekt
 ' vorkommt; ein Klick darauf zeigt die Aufrufer.
 DIM zaehlerAn AS BOOLEAN : zaehlerAn = TRUE
@@ -1894,10 +1902,17 @@ DIM rtHandbuch AS GUI_WIDGET : rtHandbuch = GUI_RICHTEXT(winHandbuch, HB_INHALT_
 DIM btnHbAnsicht AS GUI_WIDGET : btnHbAnsicht = GUI_BUTTON(winHandbuch, tr$("Quelltext"), 1060, 8, 104, 28)
 GUI_TOOLTIP(btnHbAnsicht, tr$("Zwischen gesetzter Ansicht und Markdown-Quelltext wechseln"))
 ' Verlauf wie im Browser: je Eintrag Dokument und Rollstand.
-DIM hbZurDatei AS ARRAY OF STRING : hbZurDatei = []
-DIM hbZurScroll AS ARRAY OF INTEGER : hbZurScroll = []
-DIM hbVorDatei AS ARRAY OF STRING : hbVorDatei = []
-DIM hbVorScroll AS ARRAY OF INTEGER : hbVorScroll = []
+' Ein Stand im Verlauf des Handbuchs: Dokument und Rollstand. Zurueck und
+' vorwaerts sind zwei Stapel davon (bis 2026-10-30 je zwei Felder).
+CLASS HandbuchStand
+    DIM datei AS STRING
+    DIM scroll AS INTEGER
+    SUB Init(d AS STRING, sc AS INTEGER)
+        datei = d : scroll = sc
+    END SUB
+END CLASS
+DIM hbZurueck AS ARRAY OF HandbuchStand : hbZurueck = []
+DIM hbVor AS ARRAY OF HandbuchStand : hbVor = []
 DIM hbInhaltWahl AS INTEGER : hbInhaltWahl = -1   ' was die Liste zuletzt zeigte
 DIM hbInhaltHalt AS INTEGER : hbInhaltHalt = -1   ' Rollstand nach einem Klick; -2 = noch zu lesen
 DIM hbMassStand AS STRING : hbMassStand = ""
@@ -1930,8 +1945,14 @@ DIM hbGesetzt AS BOOLEAN : hbGesetzt = TRUE
 ' Die Liste links zeigt Treffer statt Inhalt: je Eintrag Datei und Zeile
 ' (0 = Kopf eines Dokuments).
 DIM hbTrModus AS BOOLEAN : hbTrModus = FALSE
-DIM hbTrDatei AS ARRAY OF STRING : hbTrDatei = []
-DIM hbTrZeile AS ARRAY OF INTEGER : hbTrZeile = []
+CLASS HandbuchTreffer
+    DIM datei AS STRING
+    DIM zeile AS INTEGER            ' 0 = der Kopf des Dokuments
+    SUB Init(d AS STRING, z AS INTEGER)
+        datei = d : zeile = z
+    END SUB
+END CLASS
+DIM hbTreffer AS ARRAY OF HandbuchTreffer : hbTreffer = []
 DIM hbTrWahl AS INTEGER : hbTrWahl = -1
 DIM hbTrNadel AS STRING : hbTrNadel = ""
 ' Knoepfe an jedem Codeblock: ein Beispiel ausprobieren, ohne es abzutippen.
@@ -5959,9 +5980,17 @@ END SUB
 
 ' --- Quellcodeverwaltung: Logik ----------------------------------------
 DIM qvWurzel AS STRING : qvWurzel = ""
-DIM qvPfade AS ARRAY OF STRING : qvPfade = []
-DIM qvArten AS ARRAY OF STRING : qvArten = []
-DIM qvHaken AS ARRAY OF BOOLEAN : qvHaken = []
+' Eine Zeile im Git-Fenster: Datei, die zwei Zeichen von `git status`
+' (Index, Arbeitskopie) und ob sie vorgemerkt ist.
+CLASS GitEintrag
+    DIM pfad AS STRING
+    DIM art AS STRING
+    DIM haken AS BOOLEAN
+    SUB Init(p AS STRING, a AS STRING, h AS BOOLEAN)
+        pfad = p : art = a : haken = h
+    END SUB
+END CLASS
+DIM qvEintraege AS ARRAY OF GitEintrag : qvEintraege = []
 DIM qvWahl AS INTEGER : qvWahl = -2
 DIM qvVorgemerkt AS INTEGER : qvVorgemerkt = 0
 DIM gitProz AS INTEGER : gitProz = -1
@@ -6009,7 +6038,7 @@ END SUB
 SUB qvAuffrischen()
     DIM text AS STRING : text = REPLACE$(qvGit$("status", "--porcelain=v1", "-b", "-uall", ""), CHR$(13), "")
     GUI_LISTBOX_CLEAR(lstQv)
-    qvPfade = [] : qvArten = [] : qvHaken = []
+    qvEintraege = []
     qvVorgemerkt = 0
     DIM z AS STRING
     FOR EACH z IN SPLIT$(text, NL)
@@ -6043,15 +6072,15 @@ SUB qvAuffrischen()
         DIM k AS INTEGER : k = GUI_LISTBOX_COUNT(lstQv) - 1
         GUI_LISTBOX_DETAIL(lstQv, k, art)
         GUI_LISTBOX_SET_CHECKED(lstQv, k, vor)
-        ARRAY_PUSH(qvPfade, pfad) : ARRAY_PUSH(qvArten, x + y) : ARRAY_PUSH(qvHaken, vor)
+        ARRAY_PUSH(qvEintraege, NEW GitEintrag(pfad, x + y, vor))
         IF vor THEN qvVorgemerkt = qvVorgemerkt + 1
     NEXT
     qvZweigeFuellen()
     qvWahl = -2
     GUI_SET_TEXT(taQvDiff, "")
-    IF LEN(qvPfade) > 0 THEN GUI_LISTBOX_SET_SELECTED(lstQv, 0)
-    GUI_SET_TEXT(lblQvStatus, STR$(LEN(qvPfade)) + tr$(" geänderte Datei(en), ") + STR$(qvVorgemerkt) + tr$(" vorgemerkt."))
-    protokoll("qv " + STR$(LEN(qvPfade)) + " " + STR$(qvVorgemerkt))
+    IF LEN(qvEintraege) > 0 THEN GUI_LISTBOX_SET_SELECTED(lstQv, 0)
+    GUI_SET_TEXT(lblQvStatus, STR$(LEN(qvEintraege)) + tr$(" geänderte Datei(en), ") + STR$(qvVorgemerkt) + tr$(" vorgemerkt."))
+    protokoll("qv " + STR$(LEN(qvEintraege)) + " " + STR$(qvVorgemerkt))
 END SUB
 
 ' Wie viel der Unterschied hoechstens zeigt. Beim Oeffnen des Fensters
@@ -6061,11 +6090,11 @@ END SUB
 CONST QV_ZEIGEN_MAX = 512000
 
 SUB qvDiffZeigen(i AS INTEGER)
-    IF i < 0 OR i >= LEN(qvPfade) THEN GUI_SET_TEXT(taQvDiff, "") : RETURN
+    IF i < 0 OR i >= LEN(qvEintraege) THEN GUI_SET_TEXT(taQvDiff, "") : RETURN
     DIM text AS STRING
-    IF LEFT$(qvArten[i], 1) = "?" THEN
+    IF LEFT$(qvEintraege[i].art, 1) = "?" THEN
         ' neu, noch nie vorgemerkt: der ganze Inhalt ist der Unterschied
-        DIM weg AS STRING : weg = PATHJOIN(qvWurzel, qvPfade[i])
+        DIM weg AS STRING : weg = PATHJOIN(qvWurzel, qvEintraege[i].pfad)
         DIM groesse AS INTEGER : groesse = 0
         TRY
             groesse = FILESIZE(weg)
@@ -6073,7 +6102,7 @@ SUB qvDiffZeigen(i AS INTEGER)
             groesse = 0
         END TRY
         IF groesse > QV_ZEIGEN_MAX THEN
-            text = "+++ " + qvPfade[i] + tr$(" (neu, ") + STR$(groesse \ 1024) + tr$(" KB -- zu groß zum Anzeigen)")
+            text = "+++ " + qvEintraege[i].pfad + tr$(" (neu, ") + STR$(groesse \ 1024) + tr$(" KB -- zu groß zum Anzeigen)")
         ELSE
             DIM inhalt AS STRING : inhalt = ""
             TRY
@@ -6082,14 +6111,14 @@ SUB qvDiffZeigen(i AS INTEGER)
                 inhalt = ""
             END TRY
             IF INSTR(inhalt, CHR$(0)) >= 0 THEN
-                text = "+++ " + qvPfade[i] + tr$(" (neu, binär)")
+                text = "+++ " + qvEintraege[i].pfad + tr$(" (neu, binär)")
             ELSE
-                text = "+++ " + qvPfade[i] + " (neu)" + NL + "+" + REPLACE$(inhalt, NL, NL + "+")
+                text = "+++ " + qvEintraege[i].pfad + " (neu)" + NL + "+" + REPLACE$(inhalt, NL, NL + "+")
             END IF
         END IF
     ELSE
-        text = qvGit$("diff", "--no-color", "HEAD", "--", qvPfade[i])
-        IF TRIM$(text) = "" THEN text = qvGit$("diff", "--no-color", "--staged", "--", qvPfade[i])
+        text = qvGit$("diff", "--no-color", "HEAD", "--", qvEintraege[i].pfad)
+        IF TRIM$(text) = "" THEN text = qvGit$("diff", "--no-color", "--staged", "--", qvEintraege[i].pfad)
     END IF
     IF LEN(text) > QV_ZEIGEN_MAX THEN
         ' An einer Zeilengrenze kuerzen -- eine halbe Zeile saehe aus wie
@@ -6130,16 +6159,16 @@ END SUB
 ' wieder hin). Neue Dateien loescht die IDE nicht -- das tut man selbst.
 SUB qvVerwerfenFragen()
     DIM i AS INTEGER : i = GUI_LISTBOX_SELECTED(lstQv)
-    IF i < 0 OR i >= LEN(qvPfade) THEN
+    IF i < 0 OR i >= LEN(qvEintraege) THEN
         GUI_SET_TEXT(lblQvStatus, tr$("Erst links eine Datei wählen."))
         RETURN
     END IF
-    IF LEFT$(qvArten[i], 1) = "?" THEN
-        GUI_SET_TEXT(lblQvStatus, qvPfade[i] + tr$(" ist neu -- verwerfen hieße löschen, das tut die IDE nicht."))
+    IF LEFT$(qvEintraege[i].art, 1) = "?" THEN
+        GUI_SET_TEXT(lblQvStatus, qvEintraege[i].pfad + tr$(" ist neu -- verwerfen hieße löschen, das tut die IDE nicht."))
         RETURN
     END IF
-    qvVerwerfenPfad = qvPfade[i]
-    dlgQvVerwerfen = GUI_DIALOG(tr$("Änderung verwerfen"), tr$("Alle Änderungen an ") + qvPfade[i] + _
+    qvVerwerfenPfad = qvEintraege[i].pfad
+    dlgQvVerwerfen = GUI_DIALOG(tr$("Änderung verwerfen"), tr$("Alle Änderungen an ") + qvEintraege[i].pfad + _
         " seit der letzten Übergabe verwerfen? Das lässt sich nicht zurücknehmen.", "Verwerfen|Abbrechen")
 END SUB
 
@@ -6207,11 +6236,11 @@ SUB qvNachziehen()
     IF NOT GUI_WINDOW_SHOWN(winQv) THEN RETURN
     ' Ein Kaestchen umgelegt: vormerken bzw. zuruecknehmen.
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(qvPfade) - 1
+    FOR i = 0 TO LEN(qvEintraege) - 1
         IF i >= GUI_LISTBOX_COUNT(lstQv) THEN EXIT FOR
         DIM an AS BOOLEAN : an = GUI_LISTBOX_CHECKED(lstQv, i)
-        IF an <> qvHaken[i] THEN
-            DIM p AS STRING : p = qvPfade[i]
+        IF an <> qvEintraege[i].haken THEN
+            DIM p AS STRING : p = qvEintraege[i].pfad
             IF an THEN
                 qvGit$("add", "--", p, "", "")
             ELSE
@@ -6661,16 +6690,16 @@ SUB hinweiseZeigen(ta AS GUI_WIDGET)
     ' Die Profilzahlen: an den Zeilen, an denen ihre Farben JETZT stehen
     ' (sie wandern beim Tippen mit, die gemerkten Nummern nicht).
     DIM wz AS ARRAY OF INTEGER : wz = []
-    FOR i = 0 TO LEN(waermeFelder) - 1
-        IF waermeFelder[i] = ta THEN
+    FOR i = 0 TO LEN(waermeHinweise) - 1
+        IF waermeHinweise[i].feld = ta THEN
             IF LEN(wz) = 0 THEN wz = GUI_TEXTAREA_LINE_COLORS_GET(ta)
-            DIM wk AS INTEGER : wk = waermeNr[i]
-            IF waermeTexte[i] <> "" AND wk < LEN(wz) THEN
+            DIM wk AS INTEGER : wk = waermeHinweise[i].nr
+            IF waermeHinweise[i].text <> "" AND wk < LEN(wz) THEN
                 DIM wi AS INTEGER : wi = IIF(MAPHAS(zlNr, STR$(wz[wk])), MAPGET(zlNr, STR$(wz[wk])), -1)
                 IF wi >= 0 THEN
-                    tx[wi] = tx[wi] + "   ·   " + waermeTexte[i]
+                    tx[wi] = tx[wi] + "   ·   " + waermeHinweise[i].text
                 ELSE
-                    ARRAY_PUSH(zl, wz[wk]) : MAPPUT(zlNr, STR$(wz[wk]), LEN(zl) - 1) : ARRAY_PUSH(tx, waermeTexte[i])
+                    ARRAY_PUSH(zl, wz[wk]) : MAPPUT(zlNr, STR$(wz[wk]), LEN(zl) - 1) : ARRAY_PUSH(tx, waermeHinweise[i].text)
                 END IF
             END IF
         END IF
@@ -7572,10 +7601,26 @@ END SUB
 ' ist der Weg der Sammlung (klein, mit Schraegstrichen) und die Zeile ihres
 ' "=== Name". Er bleibt ueber das Schliessen des Fensters hinaus.
 DIM testStatus AS MAP OF STRING
-DIM tuKnoten AS ARRAY OF INTEGER : tuKnoten = []
-DIM tuDatei AS ARRAY OF STRING : tuDatei = []
-DIM tuZeile AS ARRAY OF INTEGER : tuZeile = []
-DIM tuName AS ARRAY OF STRING : tuName = []
+' Ein Knoten der Testuebersicht: eine Sammlung (zeile 0, name "") oder ein
+' Fall darin.
+CLASS TestKnoten
+    DIM knoten AS INTEGER           ' im Baum
+    DIM datei AS STRING
+    DIM zeile AS INTEGER            ' die `===`-Zeile des Falls, 0 = die Sammlung
+    DIM name AS STRING
+    SUB Init(k AS INTEGER, d AS STRING, z AS INTEGER, n AS STRING)
+        knoten = k : datei = d : zeile = z : name = n
+    END SUB
+END CLASS
+DIM testEintraege AS ARRAY OF TestKnoten : testEintraege = []
+
+FUNCTION testKnotenNr(knoten AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(testEintraege) - 1
+        IF testEintraege[i].knoten = knoten THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
 DIM tuPunkte AS ARRAY OF IMAGE : tuPunkte = []
 
 ' Kanonisch: `dhrt test` nennt den Weg, wie er ihm gegeben wurde -- auch in
@@ -7648,10 +7693,10 @@ SUB testUebersichtFuellen()
     DIM wahlDatei AS STRING : wahlDatei = ""
     DIM wahlZeile AS INTEGER : wahlZeile = -1
     DIM sel AS INTEGER : sel = GUI_TREE_SELECTED(baumTests)
-    DIM k AS INTEGER : k = ARRAY_INDEXOF(tuKnoten, sel)
-    IF sel >= 0 AND k >= 0 THEN wahlDatei = tuDatei[k] : wahlZeile = tuZeile[k]
+    DIM k AS INTEGER : k = testKnotenNr(sel)
+    IF sel >= 0 AND k >= 0 THEN wahlDatei = testEintraege[k].datei : wahlZeile = testEintraege[k].zeile
     GUI_TREE_CLEAR(baumTests)
-    tuKnoten = [] : tuDatei = [] : tuZeile = [] : tuName = []
+    testEintraege = []
     DIM dateien AS ARRAY OF STRING : dateien = []
     IF projektOrdner <> "" THEN dateien = projektDateien("*.dhtest")
     DIM gesamt AS INTEGER : gesamt = 0
@@ -7664,14 +7709,14 @@ SUB testUebersichtFuellen()
         DIM nm AS ARRAY OF STRING
         (zl, nm) = testFaelleVon(pfad)
         DIM fk AS INTEGER : fk = GUI_TREE_ADD(baumTests, -1, d)
-        ARRAY_PUSH(tuKnoten, fk) : ARRAY_PUSH(tuDatei, pfad) : ARRAY_PUSH(tuZeile, 0) : ARRAY_PUSH(tuName, "")
+        ARRAY_PUSH(testEintraege, NEW TestKnoten(fk, pfad, 0, ""))
         DIM fOk AS INTEGER : fOk = 0
         DIM fFehl AS INTEGER : fFehl = 0
         DIM i AS INTEGER
         FOR i = 0 TO LEN(zl) - 1
             DIM stand AS STRING : stand = MAPGETOR(testStatus, testSchluessel$(pfad, zl[i]), "")
             DIM kk AS INTEGER : kk = GUI_TREE_ADD(baumTests, fk, nm[i])
-            ARRAY_PUSH(tuKnoten, kk) : ARRAY_PUSH(tuDatei, pfad) : ARRAY_PUSH(tuZeile, zl[i]) : ARRAY_PUSH(tuName, nm[i])
+            ARRAY_PUSH(testEintraege, NEW TestKnoten(kk, pfad, zl[i], nm[i]))
             DIM bild AS INTEGER : bild = 0
             IF stand = "ok" THEN bild = 1 : fOk = fOk + 1
             IF stand = "fehl" THEN bild = 2 : fFehl = fFehl + 1
@@ -7703,22 +7748,22 @@ END SUB
 ' Die gewaehlten Knoten als Laeufe: eine Datei ganz, ein Fall allein.
 SUB testAuswahlAusfuehren()
     DIM sel AS INTEGER : sel = GUI_TREE_SELECTED(baumTests)
-    DIM k AS INTEGER : k = ARRAY_INDEXOF(tuKnoten, sel)
+    DIM k AS INTEGER : k = testKnotenNr(sel)
     IF sel < 0 OR k < 0 THEN
         GUI_SET_TEXT(lblTests, tr$("Erst eine Sammlung oder einen Fall wählen."))
         RETURN
     END IF
-    testLaufStarten([tuDatei[k]], [tuName[k]])
+    testLaufStarten([testEintraege[k].datei], [testEintraege[k].name])
 END SUB
 
 SUB testFehlgeschlageneAusfuehren()
     DIM ziele AS ARRAY OF STRING : ziele = []
     DIM faelle AS ARRAY OF STRING : faelle = []
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(tuKnoten) - 1
-        IF tuZeile[i] = 0 THEN CONTINUE
-        IF MAPGETOR(testStatus, testSchluessel$(tuDatei[i], tuZeile[i]), "") = "fehl" THEN
-            ARRAY_PUSH(ziele, tuDatei[i]) : ARRAY_PUSH(faelle, tuName[i])
+    FOR i = 0 TO LEN(testEintraege) - 1
+        IF testEintraege[i].zeile = 0 THEN CONTINUE
+        IF MAPGETOR(testStatus, testSchluessel$(testEintraege[i].datei, testEintraege[i].zeile), "") = "fehl" THEN
+            ARRAY_PUSH(ziele, testEintraege[i].datei) : ARRAY_PUSH(faelle, testEintraege[i].name)
         END IF
     NEXT
     IF LEN(ziele) = 0 THEN
@@ -7738,11 +7783,11 @@ SUB testUebersichtNachziehen()
         IF GUI_CLICKED(btnTestsFehl) THEN testFehlgeschlageneAusfuehren()
     END IF
     IF GUI_DOUBLE_CLICKED(baumTests) THEN
-        DIM k AS INTEGER : k = ARRAY_INDEXOF(tuKnoten, GUI_TREE_SELECTED(baumTests))
+        DIM k AS INTEGER : k = testKnotenNr(GUI_TREE_SELECTED(baumTests))
         IF k >= 0 THEN
-            dateiOeffnen(tuDatei[k])
-            IF tuZeile[k] > 0 AND aktivesFeld() >= 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), tuZeile[k], 1)
-            protokoll("tests sprung " + BASENAME(tuDatei[k]) + " " + STR$(tuZeile[k]))
+            dateiOeffnen(testEintraege[k].datei)
+            IF testEintraege[k].zeile > 0 AND aktivesFeld() >= 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), testEintraege[k].zeile, 1)
+            protokoll("tests sprung " + BASENAME(testEintraege[k].datei) + " " + STR$(testEintraege[k].zeile))
         END IF
     END IF
 END SUB
@@ -15794,7 +15839,7 @@ SUB hbSucheAlle()
     DIM klein AS STRING : klein = LOWER$(gesucht)
     DIM eintraege AS ARRAY OF STRING : eintraege = []
     DIM details AS ARRAY OF STRING : details = []
-    hbTrDatei = [] : hbTrZeile = []
+    hbTreffer = []
     DIM treffer AS INTEGER : treffer = 0
     DIM dokumente AS INTEGER : dokumente = 0
     DIM voll AS BOOLEAN : voll = FALSE
@@ -15808,13 +15853,13 @@ SUB hbSucheAlle()
             IF INSTR(LOWER$(zeilen[i]), klein) >= 0 THEN
                 IF NOT kopf THEN
                     ARRAY_PUSH(eintraege, d) : ARRAY_PUSH(details, "")
-                    ARRAY_PUSH(hbTrDatei, d) : ARRAY_PUSH(hbTrZeile, 0)
+                    ARRAY_PUSH(hbTreffer, NEW HandbuchTreffer(d, 0))
                     kopf = TRUE
                     dokumente = dokumente + 1
                 END IF
                 ARRAY_PUSH(eintraege, "   " + hbAusschnitt$(zeilen[i], klein))
                 ARRAY_PUSH(details, STR$(i + 1))
-                ARRAY_PUSH(hbTrDatei, d) : ARRAY_PUSH(hbTrZeile, i + 1)
+                ARRAY_PUSH(hbTreffer, NEW HandbuchTreffer(d, i + 1))
                 treffer = treffer + 1
                 ' Mehr liest niemand -- und die Liste bliebe bedienbar.
                 IF treffer >= 500 THEN
@@ -15831,11 +15876,11 @@ SUB hbSucheAlle()
     GUI_LISTBOX_SET_SELECTED(lstHbInhalt, -1)
     DIM k AS INTEGER
     FOR k = 0 TO LEN(eintraege) - 1
-        IF hbTrZeile[k] = 0 THEN
+        IF hbTreffer[k].zeile = 0 THEN
             GUI_LISTBOX_HEADER(lstHbInhalt, k, TRUE)
         ELSE
             GUI_LISTBOX_DETAIL(lstHbInhalt, k, details[k])
-            GUI_LISTBOX_TIP(lstHbInhalt, k, hbTrDatei[k] + ", Zeile " + details[k])
+            GUI_LISTBOX_TIP(lstHbInhalt, k, hbTreffer[k].datei + ", Zeile " + details[k])
         END IF
     NEXT
     GUI_LISTBOX_PLACEHOLDER(lstHbInhalt, tr$("Kein Treffer"))
@@ -15995,28 +16040,26 @@ END SUB
 SUB hbMerken()
     IF docLetzteWahl < 0 OR docLetzteWahl >= LEN(docNamen) THEN RETURN
     IF NOT GUI_WINDOW_SHOWN(winHandbuch) THEN RETURN
-    ARRAY_PUSH(hbZurDatei, docNamen[docLetzteWahl])
-    ARRAY_PUSH(hbZurScroll, GUI_RICHTEXT_SCROLL_GET(rtHandbuch))
-    hbVorDatei = [] : hbVorScroll = []
+    ARRAY_PUSH(hbZurueck, NEW HandbuchStand(docNamen[docLetzteWahl], GUI_RICHTEXT_SCROLL_GET(rtHandbuch)))
+    hbVor = []
 END SUB
 
 ' Zurueck (rueck = TRUE) oder vorwaerts im Verlauf.
 SUB hbVerlauf(rueck AS BOOLEAN)
-    IF rueck AND LEN(hbZurDatei) = 0 THEN RETURN
-    IF NOT rueck AND LEN(hbVorDatei) = 0 THEN RETURN
+    IF rueck AND LEN(hbZurueck) = 0 THEN RETURN
+    IF NOT rueck AND LEN(hbVor) = 0 THEN RETURN
     DIM jetzt AS STRING : jetzt = docNamen[docLetzteWahl]
     DIM js AS INTEGER : js = GUI_RICHTEXT_SCROLL_GET(rtHandbuch)
-    DIM d AS STRING
-    DIM sc AS INTEGER
+    DIM ziel AS HandbuchStand
     IF rueck THEN
-        d = hbZurDatei[LEN(hbZurDatei) - 1] : sc = hbZurScroll[LEN(hbZurScroll) - 1]
-        ARRAY_POP(hbZurDatei) : ARRAY_POP(hbZurScroll)
-        ARRAY_PUSH(hbVorDatei, jetzt) : ARRAY_PUSH(hbVorScroll, js)
+        ziel = ARRAY_POP(hbZurueck)
+        ARRAY_PUSH(hbVor, NEW HandbuchStand(jetzt, js))
     ELSE
-        d = hbVorDatei[LEN(hbVorDatei) - 1] : sc = hbVorScroll[LEN(hbVorScroll) - 1]
-        ARRAY_POP(hbVorDatei) : ARRAY_POP(hbVorScroll)
-        ARRAY_PUSH(hbZurDatei, jetzt) : ARRAY_PUSH(hbZurScroll, js)
+        ziel = ARRAY_POP(hbVor)
+        ARRAY_PUSH(hbZurueck, NEW HandbuchStand(jetzt, js))
     END IF
+    DIM d AS STRING : d = ziel.datei
+    DIM sc AS INTEGER : sc = ziel.scroll
     IF d <> jetzt THEN handbuchLaden(d, 1)
     GUI_RICHTEXT_SCROLL(rtHandbuch, sc)
     hbInhaltHalt = -1
@@ -16034,12 +16077,12 @@ SUB hbInhaltNachziehen()
     IF mass <> hbMassStand THEN handbuchLayout()
     DIM k AS INTEGER : k = GUI_LISTBOX_SELECTED(lstHbInhalt)
     IF hbTrModus THEN
-        IF k >= 0 AND k <> hbTrWahl AND k < LEN(hbTrZeile) THEN
+        IF k >= 0 AND k <> hbTrWahl AND k < LEN(hbTreffer) THEN
             hbTrWahl = k
-            IF hbTrZeile[k] > 0 THEN
-                handbuchZeigen(hbTrDatei[k], hbTrZeile[k])
+            IF hbTreffer[k].zeile > 0 THEN
+                handbuchZeigen(hbTreffer[k].datei, hbTreffer[k].zeile)
                 GUI_RICHTEXT_MARK_ALL(rtHandbuch, hbTrNadel)
-                protokoll("hbtreffer " + hbTrDatei[k] + " " + STR$(hbTrZeile[k]))
+                protokoll("hbtreffer " + hbTreffer[k].datei + " " + STR$(hbTreffer[k].zeile))
             END IF
         END IF
         RETURN
@@ -17386,16 +17429,8 @@ SUB waermeFeld(t AS INTEGER)
     IF t < 0 OR t >= tabAnzahl THEN RETURN
     DIM ta AS GUI_WIDGET : ta = reiter[t].feld
     ' die alten Eintraege dieses Feldes weg
-    DIM nf AS ARRAY OF INTEGER : nf = []
-    DIM nn AS ARRAY OF INTEGER : nn = []
-    DIM nt AS ARRAY OF STRING : nt = []
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(waermeFelder) - 1
-        IF waermeFelder[i] <> ta THEN
-            ARRAY_PUSH(nf, waermeFelder[i]) : ARRAY_PUSH(nn, waermeNr[i]) : ARRAY_PUSH(nt, waermeTexte[i])
-        END IF
-    NEXT
-    waermeFelder = nf : waermeNr = nn : waermeTexte = nt
+    waermeHinweise = ARRAY_FILTER(waermeHinweise, FUNCTION(w) w.feld <> ta)
     DIM zl AS ARRAY OF INTEGER : zl = []
     DIM fa AS ARRAY OF INTEGER : fa = []
     DIM pfad AS STRING : pfad = reiter[t].pfad
@@ -17417,7 +17452,7 @@ SUB waermeFeld(t AS INTEGER)
                 IF profGesamt > 0.0 THEN text = text + "  " + FORMAT$(wm.zeit / profGesamt * 100.0, "%.1f") + " %"
                 text = text + "  " + STR$(wm.anzahl) + "x"
             END IF
-            ARRAY_PUSH(waermeFelder, ta) : ARRAY_PUSH(waermeNr, LEN(zl) - 1) : ARRAY_PUSH(waermeTexte, text)
+            ARRAY_PUSH(waermeHinweise, NEW WaermeHinweis(ta, LEN(zl) - 1, text))
         NEXT
     END IF
     GUI_TEXTAREA_LINE_COLORS(ta, zl, fa)
