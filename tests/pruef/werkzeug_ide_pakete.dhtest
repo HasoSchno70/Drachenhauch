@@ -26,7 +26,7 @@ ELSEIF prSchritt = 2 AND pakProz < 0 THEN
     protokoll("pr eigene " + JOIN$(projektDateien("*.dh"), ","))
     protokoll("pr lesend " + JOIN$(projektDateien("*.dh", TRUE), ","))
     symbolIndexBauen(TRUE)
-    protokoll("pr symbol " + STR$(ARRAY_INDEXOF(symNamen, "verdopple") >= 0))
+    protokoll("pr symbol " + STR$(symbolNr("verdopple") >= 0))
     dateiOeffnen(PATHJOIN(projektOrdner, "pakete/wz/helfer.dh"))
     ' Zurueck zu main.dh: nach dem Entfernen zeigt der IMPORT wieder ins Leere.
     dateiOeffnen(PATHJOIN(projektOrdner, "main.dh"))

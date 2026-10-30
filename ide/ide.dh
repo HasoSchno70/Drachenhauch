@@ -1397,10 +1397,22 @@ wzKnopf("einstellungen", "Einstellungen (Strg+U)", "einstellungen")
 ' (`dhrt bild`), eines nach dem anderen und unsichtbar, und das Bild liegt
 ' danach neben der Sitzung. Ohne showcase.json gelten die acht von frueher.
 CONST KACHEL_PLAETZE = 32
-DIM kachelDatei AS ARRAY OF STRING : kachelDatei = []
-DIM kachelName AS ARRAY OF STRING : kachelName = []
-DIM kachelBeschr AS ARRAY OF STRING : kachelBeschr = []
-DIM kachelBilderZahl AS ARRAY OF INTEGER : kachelBilderZahl = []
+' Eine Kachel: das Beispiel, Titel, Beschreibung, wie viele Bilder es fuer
+' sein Vorschaubild laeuft, dazu ihr Widget (GUI_CARD) und die Textur des
+' Bildes. Bis 2026-10-30 sechs Felder nebeneinander.
+CLASS Kachel
+    DIM datei AS STRING
+    DIM name AS STRING
+    DIM beschr AS STRING
+    DIM bilderZahl AS INTEGER
+    DIM karte AS GUI_WIDGET
+    DIM textur AS IMAGE
+    SUB Init(d AS STRING, n AS STRING, b AS STRING, z AS INTEGER)
+        datei = d : name = n : beschr = b : bilderZahl = z
+        karte = -1 : textur = -1
+    END SUB
+END CLASS
+DIM kacheln AS ARRAY OF Kachel : kacheln = []
 DIM kai AS INTEGER
 DIM showcasePfad AS STRING : showcasePfad = PATHJOIN(beispielOrdner, "showcase.json")
 IF FILEEXISTS(showcasePfad) THEN
@@ -1408,33 +1420,33 @@ IF FILEEXISTS(showcasePfad) THEN
         DIM scListe AS JSON_HANDLE : scListe = JSON_PARSE("{""l"":" + JOIN$(READLINES(showcasePfad), CHR$(10)) + "}")
         FOR kai = 0 TO MIN(JSON_LEN(scListe, "l"), KACHEL_PLAETZE) - 1
             DIM scWo AS STRING : scWo = "l." + STR$(kai) + "."
-            ARRAY_PUSH(kachelDatei, JSON_GET_STRING(scListe, scWo + "file"))
-            ARRAY_PUSH(kachelName, JSON_GET_STRING(scListe, scWo + "title"))
-            IF JSON_HAS(scListe, scWo + "desc") THEN ARRAY_PUSH(kachelBeschr, JSON_GET_STRING(scListe, scWo + "desc")) ELSE ARRAY_PUSH(kachelBeschr, "")
-            IF JSON_HAS(scListe, scWo + "frames") THEN ARRAY_PUSH(kachelBilderZahl, JSON_GET_INT(scListe, scWo + "frames")) ELSE ARRAY_PUSH(kachelBilderZahl, 90)
+            DIM scBeschr AS STRING : scBeschr = ""
+            IF JSON_HAS(scListe, scWo + "desc") THEN scBeschr = JSON_GET_STRING(scListe, scWo + "desc")
+            DIM scBilder AS INTEGER : scBilder = 90
+            IF JSON_HAS(scListe, scWo + "frames") THEN scBilder = JSON_GET_INT(scListe, scWo + "frames")
+            ARRAY_PUSH(kacheln, NEW Kachel(JSON_GET_STRING(scListe, scWo + "file"), JSON_GET_STRING(scListe, scWo + "title"), scBeschr, scBilder))
         NEXT
     CATCH scFehler
         ' Eine kaputte Liste darf die IDE nicht aufhalten: dann die acht.
-        kachelDatei = [] : kachelName = [] : kachelBeschr = [] : kachelBilderZahl = []
+        kacheln = []
     END TRY
 END IF
-IF LEN(kachelDatei) = 0 THEN
-    kachelDatei = ["09_shapes.dh", "10_pong.dh", "100_2d_extras.dh", "112_physics2d.dh", _
-                   "154_chart.dh", "156_gui_alle_widgets.dh", "95_pbr.dh", "119_vortex.dh"]
-    kachelName = ["Formen zeichnen", "Pong", "2D-Extras", "Physik", _
-                  "Diagramme", "Oberflächen", "3D mit Licht", "Effekte"]
-    kachelBeschr = ["", "", "", "", "", "", "", ""]
-    kachelBilderZahl = [90, 90, 90, 90, 90, 90, 90, 90]
+IF LEN(kacheln) = 0 THEN
+    DIM kaAlt AS ARRAY OF STRING
+    kaAlt = ["09_shapes.dh", "Formen zeichnen", "10_pong.dh", "Pong", "100_2d_extras.dh", "2D-Extras", _
+             "112_physics2d.dh", "Physik", "154_chart.dh", "Diagramme", "156_gui_alle_widgets.dh", "Oberflächen", _
+             "95_pbr.dh", "3D mit Licht", "119_vortex.dh", "Effekte"]
+    FOR kai = 0 TO LEN(kaAlt) - 1 STEP 2
+        ARRAY_PUSH(kacheln, NEW Kachel(kaAlt[kai], kaAlt[kai + 1], "", 90))
+    NEXT
 END IF
-DIM kachelAnzahl AS INTEGER : kachelAnzahl = LEN(kachelDatei)
+DIM kachelAnzahl AS INTEGER : kachelAnzahl = LEN(kacheln)
 ' Eine Beschreibung braucht eine eigene Zeile unter dem Titel -- ohne eine
 ' einzige bleibt die Kachel so hoch wie vorher.
 DIM kachelMitText AS BOOLEAN : kachelMitText = FALSE
 ' Eine Kachel ist EIN Widget (GUI_CARD): Bild, Titel und Beschreibung, und
 ' ueberall darauf nimmt sie den Klick an. Bis 2026-09-21 waren es drei --
 ' Bild, Knopf, Beschriftung --, und nur der schmale Knopf reagierte.
-DIM kachelKarte[KACHEL_PLAETZE] AS GUI_WIDGET
-DIM kachelTextur[KACHEL_PLAETZE] AS IMAGE
 ' Weggeblaetterte Reihen (Mausrad ueber den Kacheln) und das Feld, in dem
 ' das Rad zaehlt -- beides setzt `layout`.
 DIM kachelVersatz AS INTEGER : kachelVersatz = 0
@@ -1445,12 +1457,12 @@ DIM kfB AS INTEGER : kfB = 0
 DIM kfH AS INTEGER : kfH = 0
 DIM lblKacheln AS GUI_WIDGET : lblKacheln = GUI_LABEL(win, tr$("Showcase -- ein Klick öffnet das Beispiel"), 0, 0)
 FOR kai = 0 TO kachelAnzahl - 1
-    kachelKarte[kai] = GUI_CARD(win, 0, 0, 10, 10, -1, kachelName[kai], kachelBeschr[kai])
-    IF kachelBeschr[kai] <> "" THEN
+    kacheln[kai].karte = GUI_CARD(win, 0, 0, 10, 10, -1, kacheln[kai].name, kacheln[kai].beschr)
+    IF kacheln[kai].beschr <> "" THEN
         kachelMitText = TRUE
-        GUI_TOOLTIP(kachelKarte[kai], kachelBeschr[kai] + "  (" + kachelDatei[kai] + ")")
+        GUI_TOOLTIP(kacheln[kai].karte, kacheln[kai].beschr + "  (" + kacheln[kai].datei + ")")
     ELSE
-        GUI_TOOLTIP(kachelKarte[kai], kachelDatei[kai])
+        GUI_TOOLTIP(kacheln[kai].karte, kacheln[kai].datei)
     END IF
 NEXT
 
@@ -2402,12 +2414,12 @@ DIM vorschauFertig AS INTEGER : vorschauFertig = 0
 DIM vorschauRuhe AS BOOLEAN : vorschauRuhe = FALSE
 
 FUNCTION vorschauPfad$(i AS INTEGER) AS STRING
-    RETURN PATHJOIN(vorschauOrdner, REPLACE$(kachelDatei[i], ".dh", "") + ".png")
+    RETURN PATHJOIN(vorschauOrdner, REPLACE$(kacheln[i].datei, ".dh", "") + ".png")
 END FUNCTION
 
 ' Das mitgelieferte Bild aus examples/screenshots/ (tools/showcase_bilder.dh).
 FUNCTION showcaseBild$(i AS INTEGER) AS STRING
-    RETURN PATHJOIN(beispielOrdner, "screenshots/" + REPLACE$(kachelDatei[i], ".dh", "") + ".png")
+    RETURN PATHJOIN(beispielOrdner, "screenshots/" + REPLACE$(kacheln[i].datei, ".dh", "") + ".png")
 END FUNCTION
 
 ' Das Bild an seine Kachel haengen. Eine alte Textur wird vorher
@@ -2422,13 +2434,13 @@ SUB kachelBildSetzen(i AS INTEGER)
         herkunft = "screenshots"
     END IF
     IF NOT FILEEXISTS(pfad) THEN RETURN
-    protokoll("kachelbild " + kachelDatei[i] + " " + herkunft)
+    protokoll("kachelbild " + kacheln[i].datei + " " + herkunft)
     TRY
-        IF kachelTextur[i] >= 0 THEN IMAGE_FREE(kachelTextur[i])
-        kachelTextur[i] = LOADIMAGE(pfad)
-        GUI_SET_IMAGE(kachelKarte[i], kachelTextur[i])
+        IF kacheln[i].textur >= 0 THEN IMAGE_FREE(kacheln[i].textur)
+        kacheln[i].textur = LOADIMAGE(pfad)
+        GUI_SET_IMAGE(kacheln[i].karte, kacheln[i].textur)
     CATCH e
-        kachelTextur[i] = -1
+        kacheln[i].textur = -1
     END TRY
 END SUB
 
@@ -2446,13 +2458,13 @@ SUB vorschauNachziehen()
     DIM i AS INTEGER
     FOR i = 0 TO kachelAnzahl - 1
         IF FILEEXISTS(vorschauPfad$(i)) OR FILEEXISTS(showcaseBild$(i)) THEN CONTINUE
-        DIM quelle AS STRING : quelle = PATHJOIN(beispielOrdner, kachelDatei[i])
+        DIM quelle AS STRING : quelle = PATHJOIN(beispielOrdner, kacheln[i].datei)
         IF NOT FILEEXISTS(quelle) THEN CONTINUE
         IF NOT DIREXISTS(vorschauOrdner) THEN MKDIR(vorschauOrdner)
-        vorschauLauf = PROCESS_START("dhrt", "bild", quelle, vorschauPfad$(i), STR$(kachelBilderZahl[i]))
+        vorschauLauf = PROCESS_START("dhrt", "bild", quelle, vorschauPfad$(i), STR$(kacheln[i].bilderZahl))
         vorschauIdx = i
-        GUI_SET_TEXT(lblStatus, tr$("Vorschau: ") + kachelName[i] + " ...")
-        protokoll("vorschau " + kachelDatei[i])
+        GUI_SET_TEXT(lblStatus, tr$("Vorschau: ") + kacheln[i].name + " ...")
+        protokoll("vorschau " + kacheln[i].datei)
         RETURN
     NEXT
     vorschauRuhe = TRUE
@@ -2464,11 +2476,11 @@ END SUB
 SUB vorschauNeu()
     DIM i AS INTEGER
     FOR i = 0 TO kachelAnzahl - 1
-        IF kachelTextur[i] >= 0 THEN
-            IMAGE_FREE(kachelTextur[i])
-            kachelTextur[i] = -1
+        IF kacheln[i].textur >= 0 THEN
+            IMAGE_FREE(kacheln[i].textur)
+            kacheln[i].textur = -1
         END IF
-        GUI_SET_IMAGE(kachelKarte[i], -1)
+        GUI_SET_IMAGE(kacheln[i].karte, -1)
         IF FILEEXISTS(vorschauPfad$(i)) THEN DELETEFILE(vorschauPfad$(i))
     NEXT
     vorschauFertig = 0
@@ -2492,7 +2504,7 @@ SUB willkommenZeigen(an AS BOOLEAN)
         GUI_SET_VISIBLE(lblKacheln, FALSE)
         DIM wk AS INTEGER
         FOR wk = 0 TO kachelAnzahl - 1
-            GUI_SET_VISIBLE(kachelKarte[wk], FALSE)
+            GUI_SET_VISIBLE(kacheln[wk].karte, FALSE)
         NEXT
     END IF
 END SUB
@@ -2920,11 +2932,11 @@ SUB layout()
     FOR kk = 0 TO kachelAnzahl - 1
         DIM kReihe AS INTEGER : kReihe = kk \ 4 - kachelVersatz
         DIM sichtbar AS BOOLEAN : sichtbar = tabAnzahl = 0 AND kReihe >= 0 AND kReihe < reihen
-        GUI_SET_VISIBLE(kachelKarte[kk], sichtbar)
+        GUI_SET_VISIBLE(kacheln[kk].karte, sichtbar)
         IF sichtbar THEN
             DIM kx AS INTEGER : kx = wx + (kk MOD 4) * (kb + 12)
             DIM ky AS INTEGER : ky = oben + 198 + kReihe * (kh + 10)
-            GUI_SET_BOUNDS(kachelKarte[kk], kx, ky, kb, kh)
+            GUI_SET_BOUNDS(kacheln[kk].karte, kx, ky, kb, kh)
         END IF
     NEXT
     IF reihen > 0 AND reihen < reihenGesamt THEN
@@ -3429,8 +3441,8 @@ SUB peekZeigen()
             GUI_SET_TEXT(lblStatus, tr$("Keine Definition zu '") + wortUnterMarke$() + tr$("' -- auch nicht im Projekt."))
             RETURN
         END IF
-        peekPfad = symPfade[k]
-        dz = symZeilen[k]
+        peekPfad = symbole[k].pfad
+        dz = symbole[k].zeile
         DIM offen AS INTEGER : offen = tabMitPfad(peekPfad)
         IF offen >= 0 THEN
             q = GUI_TEXT(reiter[offen].feld)
@@ -4991,10 +5003,24 @@ END SUB
 ' der Index eine eigene Sache, und er wird auf ZURUF gebaut statt je Bild:
 ' ein paar hundert Dateien lesen und zerlegen dauert seine Zeit, und der
 ' Nutzen faengt erst an, wenn jemand danach fragt.
-DIM symPfade AS ARRAY OF STRING : symPfade = []
-DIM symZeilen AS ARRAY OF INTEGER : symZeilen = []
-DIM symNamen AS ARRAY OF STRING : symNamen = []       ' der blanke Name, fuer die Suche
-DIM symAnzeige AS ARRAY OF STRING : symAnzeige = []   ' was in der Liste steht
+CLASS SymbolEintrag
+    DIM pfad AS STRING
+    DIM zeile AS INTEGER
+    DIM name AS STRING              ' der blanke Name, fuer die Suche
+    DIM anzeige AS STRING           ' was in der Liste steht
+    SUB Init(p AS STRING, a AS STRING, n AS STRING, z AS INTEGER)
+        pfad = p : anzeige = a : name = n : zeile = z
+    END SUB
+END CLASS
+DIM symbole AS ARRAY OF SymbolEintrag : symbole = []
+
+FUNCTION symbolNr(name AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(symbole) - 1
+        IF symbole[i].name = name THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
 DIM symSchluessel AS STRING : symSchluessel = "-"
 
 FUNCTION tabMitPfad(pfad AS STRING) AS INTEGER
@@ -5055,10 +5081,7 @@ END FUNCTION
 
 SUB symbolMerken(pfad AS STRING, anzeige AS STRING, name AS STRING, zeile AS INTEGER)
     IF name = "" THEN RETURN
-    ARRAY_PUSH(symPfade, pfad)
-    ARRAY_PUSH(symZeilen, zeile)
-    ARRAY_PUSH(symNamen, name)
-    ARRAY_PUSH(symAnzeige, anzeige)
+    ARRAY_PUSH(symbole, NEW SymbolEintrag(pfad, anzeige, name, zeile))
 END SUB
 
 SUB symbolEinerDatei(pfad AS STRING, kurz AS STRING, quelle AS STRING)
@@ -5086,7 +5109,7 @@ SUB symbolIndexBauen(erzwingen AS BOOLEAN)
     DIM schl AS STRING : schl = projektOrdner + "|" + STR$(LEN(dateien))
     IF NOT erzwingen AND schl = symSchluessel THEN RETURN
     symSchluessel = schl
-    symPfade = [] : symZeilen = [] : symNamen = [] : symAnzeige = []
+    symbole = []
     DIM d AS STRING
     FOR EACH d IN dateien
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
@@ -5107,7 +5130,7 @@ SUB symbolIndexBauen(erzwingen AS BOOLEAN)
         END IF
         IF gut THEN symbolEinerDatei(pfad, d, quelle)
     NEXT
-    protokoll("symbolindex " + STR$(LEN(symNamen)))
+    protokoll("symbolindex " + STR$(LEN(symbole)))
 END SUB
 
 ' Den Namen im ganzen Projekt suchen -- die Nummer im Index oder -1.
@@ -5115,34 +5138,34 @@ FUNCTION symbolSuchen(name AS STRING) AS INTEGER
     IF name = "" THEN RETURN -1
     symbolIndexBauen(FALSE)
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(symNamen) - 1
-        IF LOWER$(symNamen[i]) = LOWER$(name) THEN RETURN i
+    FOR i = 0 TO LEN(symbole) - 1
+        IF LOWER$(symbole[i].name) = LOWER$(name) THEN RETURN i
     NEXT
     RETURN -1
 END FUNCTION
 
 SUB symbolAnspringen(nummer AS INTEGER)
-    IF nummer < 0 OR nummer >= LEN(symPfade) THEN RETURN
-    DIM pfad AS STRING : pfad = symPfade[nummer]
-    DIM zeile AS INTEGER : zeile = symZeilen[nummer]
+    IF nummer < 0 OR nummer >= LEN(symbole) THEN RETURN
+    DIM pfad AS STRING : pfad = symbole[nummer].pfad
+    DIM zeile AS INTEGER : zeile = symbole[nummer].zeile
     IF aktiverTab < 0 OR reiter[aktiverTab].pfad <> pfad THEN dateiOeffnen(pfad)
     IF aktivesFeld() >= 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), zeile, 1)
-    GUI_SET_TEXT(lblStatus, symAnzeige[nummer])
+    GUI_SET_TEXT(lblStatus, symbole[nummer].anzeige)
     protokoll("symbol " + BASENAME(pfad) + " " + STR$(zeile))
 END SUB
 
 SUB symbolVerzeichnis()
     symbolIndexBauen(TRUE)
-    IF LEN(symNamen) = 0 THEN
+    IF LEN(symbole) = 0 THEN
         GUI_SET_TEXT(lblStatus, tr$("Keine Symbole in ") + projektOrdner + ".")
         RETURN
     END IF
     waehlerListe = []
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(symAnzeige) - 1
-        waehlerDazu(symAnzeige[i], STR$(i), "")
+    FOR i = 0 TO LEN(symbole) - 1
+        waehlerDazu(symbole[i].anzeige, STR$(i), "")
     NEXT
-    waehlerOeffnen("symbol", tr$("Symbole im Projekt (") + STR$(LEN(symNamen)) + ")")
+    waehlerOeffnen("symbol", tr$("Symbole im Projekt (") + STR$(LEN(symbole)) + ")")
     ' Wie beim Schnipsel: das Wort unter der Marke fuellt den Filter aus.
     DIM anfang AS STRING : anfang = wortUnterMarke$()
     IF anfang <> "" THEN
@@ -11819,9 +11842,9 @@ FUNCTION nameVergeben$(name AS STRING) AS STRING
     symbolIndexBauen(TRUE)
     DIM klein AS STRING : klein = LOWER$(name)
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(symNamen) - 1
-        IF LOWER$(symNamen[i]) = klein THEN
-            RETURN BASENAME(symPfade[i]) + ":" + STR$(symZeilen[i])
+    FOR i = 0 TO LEN(symbole) - 1
+        IF LOWER$(symbole[i].name) = klein THEN
+            RETURN BASENAME(symbole[i].pfad) + ":" + STR$(symbole[i].zeile)
         END IF
     NEXT
     RETURN ""
@@ -12732,14 +12755,23 @@ END SUB
 ' EINER Klasse keine Umbenennung, sondern eine Trennung: die Ueberschreibung
 ' greift nicht mehr, und zwar ohne Uebersetzungsfehler -- gerufen wird von
 ' da an die Fassung der Oberklasse. Genau darum steht es in der Vorschau.
-DIM klsName AS ARRAY OF STRING : klsName = []
-DIM klsBasis AS ARRAY OF STRING : klsBasis = []
-DIM klsDatei AS ARRAY OF STRING : klsDatei = []
-DIM klsMethoden AS ARRAY OF STRING : klsMethoden = []
+CLASS KlassenInfo
+    DIM name AS STRING
+    DIM basis AS STRING             ' die Oberklasse, "" = keine
+    DIM datei AS STRING
+    DIM methoden AS STRING          ' "|name|name|", klein
+    SUB Init(n AS STRING, b AS STRING, d AS STRING, m AS STRING)
+        name = n : basis = b : datei = d : methoden = m
+    END SUB
+    FUNCTION hat(methode AS STRING) AS BOOLEAN
+        RETURN INSTR(methoden, "|" + LOWER$(methode) + "|") >= 0
+    END FUNCTION
+END CLASS
+DIM klassen AS ARRAY OF KlassenInfo : klassen = []
 
 ' Alle Klassen des Projekts einlesen: Name, Oberklasse, Methoden.
 SUB klassenLesen()
-    klsName = [] : klsBasis = [] : klsDatei = [] : klsMethoden = []
+    klassen = []
     DIM d AS STRING
     FOR EACH d IN projektDateien("*.dh", TRUE)
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
@@ -12762,8 +12794,7 @@ SUB klassenLesen()
             FOR m = 0 TO JSON_LEN(j, p + ".kinder") - 1
                 mm = mm + LOWER$(JSON_GET_STRING(j, p + ".kinder." + STR$(m) + ".name")) + "|"
             NEXT
-            ARRAY_PUSH(klsName, name) : ARRAY_PUSH(klsBasis, basis)
-            ARRAY_PUSH(klsDatei, d) : ARRAY_PUSH(klsMethoden, mm)
+            ARRAY_PUSH(klassen, NEW KlassenInfo(name, basis, d, mm))
         NEXT
     NEXT
 END SUB
@@ -12786,8 +12817,8 @@ END FUNCTION
 FUNCTION klasseIndex(name AS STRING) AS INTEGER
     DIM klein AS STRING : klein = LOWER$(name)
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(klsName) - 1
-        IF LOWER$(klsName[i]) = klein THEN RETURN i
+    FOR i = 0 TO LEN(klassen) - 1
+        IF LOWER$(klassen[i].name) = klein THEN RETURN i
     NEXT
     RETURN -1
 END FUNCTION
@@ -12797,18 +12828,17 @@ END FUNCTION
 ' EXTENDS und nach unten ueber alle, die davon erben -- eine Umbenennung
 ' zerreisst die Verbindung in beide Richtungen gleichermassen.
 FUNCTION familieHatMethode$(klasse AS STRING, methode AS STRING) AS STRING
-    DIM ziel AS STRING : ziel = "|" + LOWER$(methode) + "|"
     ' nach oben
     DIM oben AS STRING : oben = klasse
     DIM runde AS INTEGER : runde = 0
     WHILE runde < 20
         runde = runde + 1
         DIM k AS INTEGER : k = klasseIndex(oben)
-        IF k < 0 OR klsBasis[k] = "" THEN BREAK
-        oben = klsBasis[k]
+        IF k < 0 OR klassen[k].basis = "" THEN BREAK
+        oben = klassen[k].basis
         DIM o AS INTEGER : o = klasseIndex(oben)
         IF o < 0 THEN BREAK
-        IF INSTR(klsMethoden[o], ziel) >= 0 THEN RETURN klsName[o] + " (" + klsDatei[o] + ")"
+        IF klassen[o].hat(methode) THEN RETURN klassen[o].name + " (" + klassen[o].datei + ")"
     WEND
     ' nach unten: alles, was (ueber Zwischenstufen) von `klasse` erbt
     DIM unten AS ARRAY OF STRING : unten = [LOWER$(klasse)]
@@ -12818,13 +12848,13 @@ FUNCTION familieHatMethode$(klasse AS STRING, methode AS STRING) AS STRING
         gewachsen = FALSE
         tiefe = tiefe + 1
         DIM i AS INTEGER
-        FOR i = 0 TO LEN(klsName) - 1
-            IF klsBasis[i] = "" THEN CONTINUE
-            IF ARRAY_INDEXOF(unten, LOWER$(klsBasis[i])) < 0 THEN CONTINUE
-            IF ARRAY_INDEXOF(unten, LOWER$(klsName[i])) >= 0 THEN CONTINUE
-            ARRAY_PUSH(unten, LOWER$(klsName[i]))
+        FOR i = 0 TO LEN(klassen) - 1
+            IF klassen[i].basis = "" THEN CONTINUE
+            IF ARRAY_INDEXOF(unten, LOWER$(klassen[i].basis)) < 0 THEN CONTINUE
+            IF ARRAY_INDEXOF(unten, LOWER$(klassen[i].name)) >= 0 THEN CONTINUE
+            ARRAY_PUSH(unten, LOWER$(klassen[i].name))
             gewachsen = TRUE
-            IF INSTR(klsMethoden[i], ziel) >= 0 THEN RETURN klsName[i] + " (" + klsDatei[i] + ")"
+            IF klassen[i].hat(methode) THEN RETURN klassen[i].name + " (" + klassen[i].datei + ")"
         NEXT
     WEND
     RETURN ""
@@ -12842,13 +12872,12 @@ FUNCTION umbenennEinwand$(alt AS STRING, neu AS STRING) AS STRING
     ' auf einem Aufruf, und der kann ueberall stehen. Gefragt wird, WELCHE
     ' Klassen eine Methode dieses Namens haben.
     klassenLesen()
-    DIM ziel AS STRING : ziel = "|" + LOWER$(alt) + "|"
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(klsName) - 1
-        IF INSTR(klsMethoden[i], ziel) < 0 THEN CONTINUE
-        DIM wo AS STRING : wo = familieHatMethode$(klsName[i], alt)
+    FOR i = 0 TO LEN(klassen) - 1
+        IF NOT klassen[i].hat(alt) THEN CONTINUE
+        DIM wo AS STRING : wo = familieHatMethode$(klassen[i].name, alt)
         IF wo = "" THEN CONTINUE
-        RETURN "Achtung: '" + alt + "' gibt es in " + klsName[i] + " UND in " + wo + _
+        RETURN "Achtung: '" + alt + "' gibt es in " + klassen[i].name + " UND in " + wo + _
                " -- wird nur eine umbenannt, greift die Überschreibung nicht mehr, " + _
                "und zwar ohne Fehlermeldung."
     NEXT
@@ -19447,9 +19476,6 @@ symbol(miUmbruch, "umbruch") : symbol(miLeiste, "menue")
 
 ' Vorschaubilder, die es schon gibt, sofort zeigen.
 DIM kvs AS INTEGER
-FOR kvs = 0 TO KACHEL_PLAETZE - 1
-    kachelTextur[kvs] = -1
-NEXT
 protokoll("kacheln " + STR$(kachelAnzahl))
 FOR kvs = 0 TO kachelAnzahl - 1
     kachelBildSetzen(kvs)
@@ -19709,9 +19735,9 @@ WHILE NOT beenden
     ' Kacheln: ein Klick oeffnet das Beispiel.
     DIM kc AS INTEGER
     FOR kc = 0 TO kachelAnzahl - 1
-        IF GUI_CLICKED(kachelKarte[kc]) THEN
-            protokoll("kachel " + kachelDatei[kc])
-            dateiOeffnen(PATHJOIN(beispielOrdner, kachelDatei[kc]))
+        IF GUI_CLICKED(kacheln[kc].karte) THEN
+            protokoll("kachel " + kacheln[kc].datei)
+            dateiOeffnen(PATHJOIN(beispielOrdner, kacheln[kc].datei))
         END IF
     NEXT
     ' Mausrad ueber den Kacheln blaettert reihenweise.
