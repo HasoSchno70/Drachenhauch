@@ -20,14 +20,14 @@ IF prSchritt = 0 AND prB > 30 THEN
     FOR prI = 0 TO GUI_LISTBOX_COUNT(lstPlug) - 1
         protokoll("pr zeile " + GUI_LISTBOX_ITEM(lstPlug, prI) + " | " + STR$(GUI_LISTBOX_CHECKED(lstPlug, prI)))
     NEXT
-    protokoll("pr zustand neu " + plugZustand[ARRAY_INDEXOF(plugNamen, "zukunft")])
+    protokoll("pr zustand neu " + plugins[pluginNr("zukunft")].zustand)
     ' Ein mitgeliefertes anhaken: es startet und steht in plugins_an.
-    DIM prK AS INTEGER : prK = ARRAY_INDEXOF(plugNamen, "todo")
+    DIM prK AS INTEGER : prK = pluginNr("todo")
     GUI_LISTBOX_SET_CHECKED(lstPlug, prK, TRUE)
     prSchritt = 1
 END IF
 IF prSchritt = 1 AND prB > 40 THEN
-    protokoll("pr todo " + plugZustand[ARRAY_INDEXOF(plugNamen, "todo")] + " an " + STR$(pluginAn("todo")))
+    protokoll("pr todo " + plugins[pluginNr("todo")].zustand + " an " + STR$(pluginAn("todo")))
     protokoll("pr datenordner " + STR$(DIREXISTS("plugin-daten/meins")))
     EXIT(0)
 END IF
@@ -91,7 +91,7 @@ DIM prB AS INTEGER
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
 IF prB = 20 THEN
-    protokoll("pr todo " + STR$(LEN(plugNamen)) + " " + STR$(plugMit[ARRAY_INDEXOF(plugNamen, "todo")]) + " " + plugPfade[ARRAY_INDEXOF(plugNamen, "todo")])
+    protokoll("pr todo " + STR$(LEN(plugins)) + " " + STR$(plugins[pluginNr("todo")].mitgeliefert) + " " + plugins[pluginNr("todo")].pfad)
     EXIT(0)
 END IF
 --- umgebung
@@ -129,14 +129,14 @@ IF prSchritt = 0 AND prB > 10 THEN
     prSchritt = 1
 END IF
 ' Gestartet: Befehl, Kontext und Leiste sind angemeldet.
-IF prSchritt = 1 AND ARRAY_INDEXOF(plugBefKennung, "plugin:probe:zaehlen") >= 0 AND ARRAY_INDEXOF(ctxKennung, "plugin:probe:zaehlen") >= 0 AND LEN(plugLeisteName) > 0 THEN
+IF prSchritt = 1 AND pluginBefehlNr("plugin:probe:zaehlen") >= 0 AND ARRAY_INDEXOF(ctxKennung, "plugin:probe:zaehlen") >= 0 AND LEN(plugLeisten) > 0 THEN
     ' Die Marke auf "zaehlen" in "SUB zaehlen()" (Zeile 5), dann der Befehl.
     GUI_TEXTAREA_GOTO(aktivesFeld(), 5, 7)
     befehl("plugin:probe:zaehlen")
     prSchritt = 2
 END IF
-IF prSchritt = 2 AND INSTR(GUI_TEXT(GUI_WINDOW_WIDGET(plugLeisteFenster[0], 0)), " mal") >= 0 THEN
-    protokoll("pr leiste " + GUI_TEXT(GUI_WINDOW_WIDGET(plugLeisteFenster[0], 0)))
+IF prSchritt = 2 AND INSTR(GUI_TEXT(GUI_WINDOW_WIDGET(plugLeisten[0].fenster, 0)), " mal") >= 0 THEN
+    protokoll("pr leiste " + GUI_TEXT(GUI_WINDOW_WIDGET(plugLeisten[0].fenster, 0)))
     EXIT(0)
 END IF
 IF prB > 600 THEN protokoll("pr zeit um " + STR$(prSchritt)) : EXIT(0)
@@ -194,7 +194,7 @@ DIM prSchritt AS INTEGER
 --- programm ../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
-IF prSchritt = 0 AND ARRAY_INDEXOF(plugBefKennung, "plugin:text:los") >= 0 THEN
+IF prSchritt = 0 AND pluginBefehlNr("plugin:text:los") >= 0 THEN
     befehl("plugin:text:los")
     prSchritt = 1
 END IF
@@ -259,7 +259,7 @@ DIM prSchritt AS INTEGER
 --- programm ../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
-IF prSchritt = 0 AND ARRAY_INDEXOF(plugBefKennung, "plugin:farben:fassung") >= 0 THEN
+IF prSchritt = 0 AND pluginBefehlNr("plugin:farben:fassung") >= 0 THEN
     befehl("plugin:farben:fassung")
     GUI_TEXTAREA_GOTO(aktivesFeld(), 1, 11)
     vervollstaendigen(FALSE)
@@ -322,15 +322,15 @@ IF prSchritt = 0 AND prB > 10 THEN
     pluginHolenStarten(["hole", PATHJOIN(projektOrdner, "quelle/geholt")])
     prSchritt = 1
 END IF
-IF prSchritt = 1 AND ARRAY_INDEXOF(plugNamen, "geholt") >= 0 THEN
-    DIM prK AS INTEGER : prK = ARRAY_INDEXOF(plugNamen, "geholt")
-    IF plugZustand[prK] = "läuft" THEN
-        protokoll("pr geholt " + plugTitel[prK] + " geholt " + STR$(plugGeholt[prK]) + " " + STR$(FILEEXISTS("plugins/pakete/geholt/plugin.dh")) + " " + STR$(FILEEXISTS("plugins/paket.lock.json")))
+IF prSchritt = 1 AND pluginNr("geholt") >= 0 THEN
+    DIM prK AS INTEGER : prK = pluginNr("geholt")
+    IF plugins[prK].zustand = "läuft" THEN
+        protokoll("pr geholt " + plugins[prK].titel + " geholt " + STR$(plugins[prK].geholt) + " " + STR$(FILEEXISTS("plugins/pakete/geholt/plugin.dh")) + " " + STR$(FILEEXISTS("plugins/paket.lock.json")))
         pluginHolenStarten(["entferne", "geholt"])
         prSchritt = 2
     END IF
 END IF
-IF prSchritt = 2 AND plugHolProz < 0 AND ARRAY_INDEXOF(plugNamen, "geholt") < 0 THEN
+IF prSchritt = 2 AND plugHolProz < 0 AND pluginNr("geholt") < 0 THEN
     protokoll("pr entfernt " + STR$(DIREXISTS("plugins/pakete/geholt")))
     EXIT(0)
 END IF
@@ -377,9 +377,9 @@ SUB prZip(fassung AS STRING)
     ZIP_WRITE("srv/geholt.zip", ["geholt-1.0/plugin.dh", "geholt-1.0/plugin.json"], [code, "{" + q + "name" + q + ": " + q + "Netz" + q + ", " + q + "fassung" + q + ": " + q + fassung + q + "}"])
 END SUB
 FUNCTION prFassung$() AS STRING
-    DIM k AS INTEGER : k = ARRAY_INDEXOF(plugNamen, "geholt")
+    DIM k AS INTEGER : k = pluginNr("geholt")
     IF k < 0 THEN RETURN "-"
-    RETURN plugFassung[k] + " " + plugZustand[k]
+    RETURN plugins[k].fassung + " " + plugins[k].zustand
 END FUNCTION
 --- programm ../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()

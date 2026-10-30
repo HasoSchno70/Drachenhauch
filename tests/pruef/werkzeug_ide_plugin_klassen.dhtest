@@ -32,15 +32,15 @@ END FUNCTION
 --- programm ../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
-IF prSchritt = 0 AND LEN(plugLeisteName) > 0 THEN
-    IF GUI_WINDOW_SHOWN(plugLeisteFenster[0]) THEN
-        prBaum = GUI_WINDOW_WIDGET(plugLeisteFenster[0], 3)
+IF prSchritt = 0 AND LEN(plugLeisten) > 0 THEN
+    IF GUI_WINDOW_SHOWN(plugLeisten[0].fenster) THEN
+        prBaum = GUI_WINDOW_WIDGET(plugLeisten[0].fenster, 3)
         IF INSTR(prBaumText$(), "bellen") >= 0 THEN
             protokoll("pr baum " + prBaumText$())
-            protokoll("pr kopf " + GUI_TEXT(GUI_WINDOW_WIDGET(plugLeisteFenster[0], 0)))
+            protokoll("pr kopf " + GUI_TEXT(GUI_WINDOW_WIDGET(plugLeisten[0].fenster, 0)))
             ' Ein echter Klick auf den sechsten Knoten (bellen in b.dh).
-            DIM prKx AS INTEGER : prKx = GUI_WINDOW_GET_X(plugLeisteFenster[0]) + GUI_GET_X(prBaum) + 70
-            DIM prKy AS INTEGER : prKy = GUI_WINDOW_GET_Y(plugLeisteFenster[0]) + GUI_GET_Y(prBaum) + 1 + 5 * 22 + 11
+            DIM prKx AS INTEGER : prKx = GUI_WINDOW_GET_X(plugLeisten[0].fenster) + GUI_GET_X(prBaum) + 70
+            DIM prKy AS INTEGER : prKy = GUI_WINDOW_GET_Y(plugLeisten[0].fenster) + GUI_GET_Y(prBaum) + 1 + 5 * 22 + 11
             WRITEALL("ev.txt", "c 4" + CHR$(10) + "e 0 7 " + STR$(prKx) + " " + STR$(prKy) + " 0 0" + CHR$(10) + "e 1 7 " + STR$(prKx) + " " + STR$(prKy) + " 0 0" + CHR$(10) + "e 2 6 0 0 0 0" + CHR$(10) + "e 4 5 0 0 0 0" + CHR$(10))
             AUTOMATION_PLAY("ev.txt")
             prSchritt = 1 : prSeit = prB
@@ -54,7 +54,7 @@ IF prSchritt = 1 AND aktiverTab >= 0 THEN
         (prZ, prS) = GUI_TEXTAREA_CURSOR(aktivesFeld())
         protokoll("pr geoeffnet " + BASENAME(reiter[aktiverTab].pfad) + " zeile " + STR$(prZ))
         ' Der Filter: nur noch, was "rasse" heisst -- samt seiner Klasse.
-        GUI_SET_TEXT(GUI_WINDOW_WIDGET(plugLeisteFenster[0], 1), "")
+        GUI_SET_TEXT(GUI_WINDOW_WIDGET(plugLeisten[0].fenster, 1), "")
         pluginWidgetEreignis(0, "geaendert", "klassen", 1, "rasse")
         prSchritt = 2 : prSeit = prB
     END IF

@@ -606,24 +606,41 @@ SUB konfigFalsch(pfad AS STRING)
 END SUB
 
 ' --- Plugins: der Stand (die Unterprogramme stehen bei der Befehlspalette) --
-' Je Plugin: Ordnername, Pfad zur plugin.dh, Handle der Leitung (WINDOW_OPEN,
-' -1 = laeuft nicht), Zustand und die Ereignisse, die es hoeren will.
-DIM plugNamen AS ARRAY OF STRING : plugNamen = []
-DIM plugPfade AS ARRAY OF STRING : plugPfade = []
-DIM plugLeitung AS ARRAY OF INTEGER : plugLeitung = []
-DIM plugZustand AS ARRAY OF STRING : plugZustand = []
-DIM plugHoert AS ARRAY OF STRING : plugHoert = []
-' Aus dem Steckbrief (plugin.json): Titel, Fassung, Beschreibung, Autor,
-' kleinste IDE-Fassung. Mitgeliefert = aus examples/plugins/; die sind aus,
-' bis man sie anhakt ("plugins_an" in der ide.json).
-DIM plugTitel AS ARRAY OF STRING : plugTitel = []
-DIM plugFassung AS ARRAY OF STRING : plugFassung = []
-DIM plugInfo AS ARRAY OF STRING : plugInfo = []
-DIM plugAutor AS ARRAY OF STRING : plugAutor = []
-DIM plugIdeMin AS ARRAY OF STRING : plugIdeMin = []
-DIM plugMit AS ARRAY OF BOOLEAN : plugMit = []
-' Geholt = mit `dhrt paket` nach plugins/pakete/<name>/ geholt.
-DIM plugGeholt AS ARRAY OF BOOLEAN : plugGeholt = []
+' Ein angemeldetes Plugin. Bis 2026-10-30 waren das zwoelf Felder
+' nebeneinander (plugNamen, plugPfade, plugLeitung ...), die beim Anmelden
+' alle einzeln wachsen und beim Neuladen alle einzeln geleert werden mussten.
+CLASS Plugin
+    DIM name AS STRING              ' der Ordnername, zugleich die Kennung
+    DIM pfad AS STRING              ' Pfad zur plugin.dh
+    DIM leitung AS INTEGER          ' WINDOW_OPEN, -1 = laeuft nicht
+    DIM zustand AS STRING           ' aus / laeuft / Fehler ...
+    DIM hoert AS STRING             ' ";gesichert;geoeffnet;" -- die Ereignisse, die es will
+    ' Aus dem Steckbrief (plugin.json); fehlt er, gilt der Ordnername.
+    DIM titel AS STRING
+    DIM fassung AS STRING
+    DIM info AS STRING
+    DIM autor AS STRING
+    DIM ideMin AS STRING            ' kleinste IDE-Fassung
+    ' Mitgeliefert = aus examples/plugins/; die sind aus, bis man sie anhakt
+    ' ("plugins_an" in der ide.json).
+    DIM mitgeliefert AS BOOLEAN
+    ' Geholt = mit `dhrt paket` nach plugins/pakete/<name>/ geholt.
+    DIM geholt AS BOOLEAN
+
+    SUB Init(n AS STRING, p AS STRING, mit AS BOOLEAN, hol AS BOOLEAN)
+        name = n : pfad = p : mitgeliefert = mit : geholt = hol
+        leitung = -1 : zustand = "aus" : hoert = ";" : titel = n
+    END SUB
+
+    FUNCTION laeuft() AS BOOLEAN
+        RETURN leitung >= 0
+    END FUNCTION
+
+    FUNCTION hoertAuf(ereignis AS STRING) AS BOOLEAN
+        RETURN INSTR(hoert, ";" + ereignis + ";") >= 0
+    END FUNCTION
+END CLASS
+DIM plugins AS ARRAY OF Plugin : plugins = []
 ' Die Fassung des Protokolls zwischen IDE und Plugin: 1 = 2026.35, 2 = 2026.36
 ' (Code-Hilfen, Baum), 3 = Ersetzen, Vervollstaendigen, Begruessung.
 CONST PLUGIN_PROTOKOLL_FASSUNG = 3
@@ -632,12 +649,24 @@ CONST PLUGIN_PROTOKOLL_FASSUNG = 3
 DIM plugVervollNr AS INTEGER : plugVervollNr = 0
 DIM plugVervollWort AS STRING : plugVervollWort = ""
 DIM plugHolProz AS INTEGER : plugHolProz = -1
-' Befehle der Plugins: Kennung "plugin:<plugin>:<id>", Menuepunkt, Plugin.
-DIM plugBefKennung AS ARRAY OF STRING : plugBefKennung = []
-DIM plugBefItem AS ARRAY OF INTEGER : plugBefItem = []
-' Leisten der Plugins: Name im Dock "plugin.<plugin>.<id>", Fenster.
-DIM plugLeisteName AS ARRAY OF STRING : plugLeisteName = []
-DIM plugLeisteFenster AS ARRAY OF INTEGER : plugLeisteFenster = []
+' Ein Befehl, den ein Plugin angemeldet hat (Menue und Palette).
+CLASS PluginMenuepunkt
+    DIM kennung AS STRING           ' "plugin:<plugin>:<id>"
+    DIM item AS INTEGER             ' der Menuepunkt
+    SUB Init(k AS STRING, i AS INTEGER)
+        kennung = k : item = i
+    END SUB
+END CLASS
+DIM plugBefehle AS ARRAY OF PluginMenuepunkt : plugBefehle = []
+' Eine Leiste eines Plugins im Dock.
+CLASS PluginLeiste
+    DIM name AS STRING              ' im Dock "plugin.<plugin>.<id>"
+    DIM fenster AS INTEGER          ' das Fenster aus GUI_FROM_JSON
+    SUB Init(n AS STRING, f AS INTEGER)
+        name = n : fenster = f
+    END SUB
+END CLASS
+DIM plugLeisten AS ARRAY OF PluginLeiste : plugLeisten = []
 ' Befunde je "<plugin>|<datei>" als JSON-Text (PLUGIN_BEFUNDE_SENDEN).
 DIM plugBefunde AS MAP OF STRING : plugBefunde = {}
 ' Hover-Beitraege: eine Frage je Stelle (Nummer), die Antworten kommen
@@ -647,14 +676,29 @@ DIM plugHoverStelle AS STRING : plugHoverStelle = ""
 DIM plugHoverFeld AS GUI_WIDGET : plugHoverFeld = -1
 DIM plugHoverText AS STRING : plugHoverText = ""
 DIM plugKontextTrenner AS BOOLEAN : plugKontextTrenner = FALSE
-' Schnipsel und Faerbungen der Plugins.
-DIM plugSchnName AS ARRAY OF STRING : plugSchnName = []
-DIM plugSchnAbk AS ARRAY OF STRING : plugSchnAbk = []
-DIM plugSchnText AS ARRAY OF STRING : plugSchnText = []
-DIM plugSchnHerkunft AS ARRAY OF STRING : plugSchnHerkunft = []
-DIM plugFaerbEndung AS ARRAY OF STRING : plugFaerbEndung = []
-DIM plugFaerbMuster AS ARRAY OF STRING : plugFaerbMuster = []
-DIM plugFaerbFarbe AS ARRAY OF INTEGER : plugFaerbFarbe = []
+' Ein Schnipsel: Name in der Liste, Kuerzel fuer den Tabulator, Text
+' (`|` = wohin die Marke kommt) und woher er stammt.
+CLASS SchnipselEintrag
+    DIM name AS STRING
+    DIM abk AS STRING
+    DIM text AS STRING
+    DIM herkunft AS STRING
+    SUB Init(n AS STRING, a AS STRING, t AS STRING, h AS STRING)
+        name = n : abk = a : text = t : herkunft = h
+    END SUB
+END CLASS
+' Eine Faerberegel eines Plugins fuer eine Dateiart (PLUGIN_FAERBUNG).
+CLASS Faerbung
+    DIM vonPlugin AS STRING
+    DIM endung AS STRING            ' ".csv", klein
+    DIM muster AS STRING            ' regulaerer Ausdruck
+    DIM farbe AS INTEGER
+    SUB Init(p AS STRING, e AS STRING, m AS STRING, f AS INTEGER)
+        vonPlugin = p : endung = e : muster = m : farbe = f
+    END SUB
+END CLASS
+DIM plugSchnipsel AS ARRAY OF SchnipselEintrag : plugSchnipsel = []
+DIM plugFaerbungen AS ARRAY OF Faerbung : plugFaerbungen = []
 FUNCTION kBool(pfad AS STRING, vorgabe AS BOOLEAN) AS BOOLEAN
     IF NOT JSON_HAS(konfig, pfad) THEN RETURN vorgabe
     SELECT CASE JSON_TYPE(konfig, pfad)
@@ -16900,11 +16944,11 @@ SUB schnipselLaden()
     NEXT
     ' Schnipsel der Plugins (PLUGIN_SCHNIPSEL) vor den eigenen -- ein eigener
     ' mit demselben Kuerzel ersetzt sie wie die eingebauten.
-    FOR i = 0 TO LEN(plugSchnName) - 1
-        ARRAY_PUSH(schnipselNamen, plugSchnName[i])
-        ARRAY_PUSH(schnipselAbk, plugSchnAbk[i])
-        ARRAY_PUSH(schnipselText, plugSchnText[i])
-        ARRAY_PUSH(schnipselHerkunft, plugSchnHerkunft[i])
+    FOR i = 0 TO LEN(plugSchnipsel) - 1
+        ARRAY_PUSH(schnipselNamen, plugSchnipsel[i].name)
+        ARRAY_PUSH(schnipselAbk, plugSchnipsel[i].abk)
+        ARRAY_PUSH(schnipselText, plugSchnipsel[i].text)
+        ARRAY_PUSH(schnipselHerkunft, plugSchnipsel[i].herkunft)
     NEXT
     DIM eigene AS INTEGER : eigene = 0
     DIM fehler AS INTEGER : fehler = 0
@@ -17465,12 +17509,12 @@ END SUB
 ' Soll das Plugin laufen? Eigene: ja, ausser abgeschaltet; mitgelieferte:
 ' nur angehakt.
 FUNCTION pluginGewollt(k AS INTEGER) AS BOOLEAN
-    IF plugMit[k] THEN RETURN pluginAn(plugNamen[k])
-    RETURN NOT pluginAus(plugNamen[k])
+    IF plugins[k].mitgeliefert THEN RETURN pluginAn(plugins[k].name)
+    RETURN NOT pluginAus(plugins[k].name)
 END FUNCTION
 
 SUB pluginGewolltSetzen(k AS INTEGER, an AS BOOLEAN)
-    IF plugMit[k] THEN pluginAnSetzen(plugNamen[k], an) ELSE pluginAusSetzen(plugNamen[k], NOT an)
+    IF plugins[k].mitgeliefert THEN pluginAnSetzen(plugins[k].name, an) ELSE pluginAusSetzen(plugins[k].name, NOT an)
 END SUB
 
 ' Fassungen wie "2026.36" der Reihe nach vergleichen: -1, 0, 1.
@@ -17492,27 +17536,19 @@ END FUNCTION
 ' Den Steckbrief lesen: plugin.json neben plugin.dh. Fehlt er oder ist er
 ' krumm, gelten der Ordnername und leere Angaben -- ein Plugin laeuft auch
 ' ohne.
-SUB pluginSteckbrief(k AS INTEGER, ordner AS STRING)
-    DIM titel AS STRING : titel = plugNamen[k]
-    DIM fassung AS STRING : fassung = ""
-    DIM info AS STRING : info = ""
-    DIM autor AS STRING : autor = ""
-    DIM ide AS STRING : ide = ""
+SUB pluginSteckbrief(pl AS Plugin, ordner AS STRING)
     DIM sb AS STRING : sb = PATHJOIN(ordner, "plugin.json")
-    IF FILEEXISTS(sb) THEN
-        TRY
-            DIM j AS JSON_HANDLE : j = JSON_LOAD(sb)
-            IF JSON_HAS(j, "name") THEN titel = JSON_GET_STRING(j, "name")
-            IF JSON_HAS(j, "fassung") THEN fassung = JSON_GET_STRING(j, "fassung")
-            IF JSON_HAS(j, "beschreibung") THEN info = JSON_GET_STRING(j, "beschreibung")
-            IF JSON_HAS(j, "autor") THEN autor = JSON_GET_STRING(j, "autor")
-            IF JSON_HAS(j, "ide") THEN ide = JSON_GET_STRING(j, "ide")
-        CATCH e
-            protokoll("plugin " + plugNamen[k] + " steckbrief unlesbar")
-        END TRY
-    END IF
-    ARRAY_PUSH(plugTitel, titel) : ARRAY_PUSH(plugFassung, fassung)
-    ARRAY_PUSH(plugInfo, info) : ARRAY_PUSH(plugAutor, autor) : ARRAY_PUSH(plugIdeMin, ide)
+    IF NOT FILEEXISTS(sb) THEN RETURN
+    TRY
+        DIM j AS JSON_HANDLE : j = JSON_LOAD(sb)
+        IF JSON_HAS(j, "name") THEN pl.titel = JSON_GET_STRING(j, "name")
+        IF JSON_HAS(j, "fassung") THEN pl.fassung = JSON_GET_STRING(j, "fassung")
+        IF JSON_HAS(j, "beschreibung") THEN pl.info = JSON_GET_STRING(j, "beschreibung")
+        IF JSON_HAS(j, "autor") THEN pl.autor = JSON_GET_STRING(j, "autor")
+        IF JSON_HAS(j, "ide") THEN pl.ideMin = JSON_GET_STRING(j, "ide")
+    CATCH e
+        protokoll("plugin " + pl.name + " steckbrief unlesbar")
+    END TRY
 END SUB
 
 ' Alle Plugins eines Ordners anmelden; ein Name, den es schon gibt, zaehlt
@@ -17526,16 +17562,11 @@ SUB pluginsAusOrdner(ordner AS STRING, mit AS BOOLEAN, geholt AS BOOLEAN = FALSE
     FOR EACH n IN namen
         DIM pfad AS STRING : pfad = PATHJOIN(PATHJOIN(ordner, n), "plugin.dh")
         IF LEFT$(n, 1) = "." OR NOT FILEEXISTS(pfad) THEN CONTINUE
-        IF ARRAY_INDEXOF(plugNamen, n) >= 0 THEN CONTINUE
-        ARRAY_PUSH(plugNamen, n)
-        ARRAY_PUSH(plugPfade, pfad)
-        ARRAY_PUSH(plugLeitung, -1)
-        ARRAY_PUSH(plugZustand, "aus")
-        ARRAY_PUSH(plugHoert, ";")
-        ARRAY_PUSH(plugMit, mit)
-        ARRAY_PUSH(plugGeholt, geholt)
-        pluginSteckbrief(LEN(plugNamen) - 1, PATHJOIN(ordner, n))
-        IF pluginGewollt(LEN(plugNamen) - 1) THEN pluginStarten(LEN(plugNamen) - 1)
+        IF pluginNr(n) >= 0 THEN CONTINUE
+        DIM pl AS Plugin : pl = NEW Plugin(n, pfad, mit, geholt)
+        pluginSteckbrief(pl, PATHJOIN(ordner, n))
+        ARRAY_PUSH(plugins, pl)
+        IF pluginGewollt(LEN(plugins) - 1) THEN pluginStarten(LEN(plugins) - 1)
     NEXT
 END SUB
 
@@ -17545,10 +17576,10 @@ SUB pluginsStarten()
     ' Geholte (dhrt paket) zaehlen zu den eigenen.
     pluginsAusOrdner(PATHJOIN(pluginOrdner$(), "pakete"), FALSE, TRUE)
     ' Gezaehlt werden die eigenen; die mitgelieferten in einer eigenen Zeile.
-    protokoll("plugins " + STR$(LEN(plugNamen)))
-    DIM eigene AS INTEGER : eigene = LEN(plugNamen)
+    protokoll("plugins " + STR$(LEN(plugins)))
+    DIM eigene AS INTEGER : eigene = LEN(plugins)
     pluginsAusOrdner(pluginMitOrdner$(), TRUE)
-    protokoll("mitgeliefert " + STR$(LEN(plugNamen) - eigene))
+    protokoll("mitgeliefert " + STR$(LEN(plugins) - eigene))
 END SUB
 
 ' Der Ordner, in den ein Plugin schreiben darf (Einstellungen, Listen): neben
@@ -17559,99 +17590,102 @@ FUNCTION pluginDaten$(name AS STRING) AS STRING
 END FUNCTION
 
 SUB pluginStarten(k AS INTEGER)
-    IF plugLeitung[k] >= 0 THEN RETURN
+    IF plugins[k].laeuft() THEN RETURN
     ' Braucht es eine neuere IDE, startet es nicht -- es liefe womoeglich
     ' gegen Nachrichten, die diese IDE nicht kennt.
-    IF plugIdeMin[k] <> "" AND fassungVergleich(plugIdeMin[k], VERSION$()) > 0 THEN
-        plugZustand[k] = tr$("braucht IDE ") + plugIdeMin[k]
-        protokoll("plugin " + plugNamen[k] + " braucht " + plugIdeMin[k])
+    IF plugins[k].ideMin <> "" AND fassungVergleich(plugins[k].ideMin, VERSION$()) > 0 THEN
+        plugins[k].zustand = tr$("braucht IDE ") + plugins[k].ideMin
+        protokoll("plugin " + plugins[k].name + " braucht " + plugins[k].ideMin)
         RETURN
     END IF
     TRY
-        DIM daten AS STRING : daten = pluginDaten$(plugNamen[k])
+        DIM daten AS STRING : daten = pluginDaten$(plugins[k].name)
         IF NOT DIREXISTS(PATHJOIN(konfigOrdner$(), "plugin-daten")) THEN MKDIR(PATHJOIN(konfigOrdner$(), "plugin-daten"))
         IF NOT DIREXISTS(daten) THEN MKDIR(daten)
         ' Das Kind erbt die Umgebung beim Start (PLUGIN_DATENORDNER$) -- als
         ' voller Pfad, denn es laeuft in seinem eigenen Ordner, und der
         ' Konfig-Ordner ist bei einer ide.json ohne Ordner nur ".".
         SETENV("DH_PLUGIN_DATEN", REALPATH$(daten))
-        plugLeitung[k] = WINDOW_OPEN(plugPfade[k])
+        plugins[k].leitung = WINDOW_OPEN(plugins[k].pfad)
         ' Die erste Nachricht: Fassung des Protokolls und der IDE. Vor der
         ' Verbindung Gesendetes merkt sich die Leitung vor.
         DIM hallo AS JSON_HANDLE : hallo = JSON_PARSE("{}")
         JSON_SET_STRING(hallo, "art", "hallo")
         JSON_SET_INT(hallo, "protokoll", PLUGIN_PROTOKOLL_FASSUNG)
         JSON_SET_STRING(hallo, "ide", VERSION$())
-        WINDOW_SEND(plugLeitung[k], JSON_STRINGIFY(hallo))
-        plugZustand[k] = "läuft"
-        plugHoert[k] = ";"
-        protokoll("plugin " + plugNamen[k] + " gestartet")
+        WINDOW_SEND(plugins[k].leitung, JSON_STRINGIFY(hallo))
+        plugins[k].zustand = "läuft"
+        plugins[k].hoert = ";"
+        protokoll("plugin " + plugins[k].name + " gestartet")
     CATCH e
-        plugZustand[k] = "Fehler: " + e
-        protokoll("plugin " + plugNamen[k] + " fehler " + e)
+        plugins[k].zustand = "Fehler: " + e
+        protokoll("plugin " + plugins[k].name + " fehler " + e)
     END TRY
 END SUB
 
 ' Beenden: "ende" schicken, dann die Leitung zu. Leisten gehen zu, Befehle
 ' werden gesperrt -- ein neuer Start meldet sie wieder an.
 SUB pluginStoppen(k AS INTEGER, zustand AS STRING)
-    IF plugLeitung[k] >= 0 THEN
+    IF plugins[k].laeuft() THEN
         TRY
-            WINDOW_SEND(plugLeitung[k], "{" + CHR$(34) + "art" + CHR$(34) + ":" + CHR$(34) + "ende" + CHR$(34) + "}")
-            WINDOW_CLOSE(plugLeitung[k])
+            WINDOW_SEND(plugins[k].leitung, "{" + CHR$(34) + "art" + CHR$(34) + ":" + CHR$(34) + "ende" + CHR$(34) + "}")
+            WINDOW_CLOSE(plugins[k].leitung)
         CATCH e
         END TRY
     END IF
-    plugLeitung[k] = -1
-    plugZustand[k] = zustand
-    DIM vor AS STRING : vor = "plugin:" + plugNamen[k] + ":"
+    plugins[k].leitung = -1
+    plugins[k].zustand = zustand
+    DIM vor AS STRING : vor = "plugin:" + plugins[k].name + ":"
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(plugBefKennung) - 1
-        IF LEFT$(plugBefKennung[i], LEN(vor)) = vor THEN GUI_MENU_ENABLE(plugBefItem[i], FALSE)
+    FOR i = 0 TO LEN(plugBefehle) - 1
+        IF LEFT$(plugBefehle[i].kennung, LEN(vor)) = vor THEN GUI_MENU_ENABLE(plugBefehle[i].item, FALSE)
     NEXT
     ' Ein Menue wird Eintraege nicht wieder los -- gesperrt, und ein Neustart
     ' gibt sie frei (pluginKontextAnmelden).
     FOR i = 0 TO LEN(ctxKennung) - 1
         IF LEFT$(ctxKennung[i], LEN(vor)) = vor THEN GUI_MENU_ENABLE(ctxItems[i], FALSE)
     NEXT
-    DIM lv AS STRING : lv = "plugin." + plugNamen[k] + "."
-    FOR i = 0 TO LEN(plugLeisteName) - 1
-        IF LEFT$(plugLeisteName[i], LEN(lv)) = lv THEN GUI_DOCK_SHOW(win, plugLeisteName[i], FALSE)
+    DIM lv AS STRING : lv = "plugin." + plugins[k].name + "."
+    FOR i = 0 TO LEN(plugLeisten) - 1
+        IF LEFT$(plugLeisten[i].name, LEN(lv)) = lv THEN GUI_DOCK_SHOW(win, plugLeisten[i].name, FALSE)
     NEXT
     ' Befunde, Schnipsel und Faerbungen des Plugins gelten nicht mehr.
     DIM bk AS STRING
     FOR EACH bk IN MAPKEYS(plugBefunde)
-        IF LEFT$(bk, LEN(plugNamen[k]) + 1) = plugNamen[k] + "|" THEN MAPREMOVE(plugBefunde, bk)
+        IF LEFT$(bk, LEN(plugins[k].name) + 1) = plugins[k].name + "|" THEN MAPREMOVE(plugBefunde, bk)
     NEXT
-    pluginSchnipselWeg(plugNamen[k])
-    pluginFaerbungWeg(plugNamen[k])
-    protokoll("plugin " + plugNamen[k] + " " + zustand)
+    pluginSchnipselWeg(plugins[k].name)
+    pluginFaerbungWeg(plugins[k].name)
+    protokoll("plugin " + plugins[k].name + " " + zustand)
 END SUB
 
 SUB pluginsBeenden()
     DIM k AS INTEGER
-    FOR k = 0 TO LEN(plugNamen) - 1
-        IF plugLeitung[k] >= 0 THEN pluginStoppen(k, "aus")
+    FOR k = 0 TO LEN(plugins) - 1
+        IF plugins[k].laeuft() THEN pluginStoppen(k, "aus")
     NEXT
 END SUB
 
 SUB pluginsNeuLaden()
     pluginsBeenden()
-    plugNamen = [] : plugPfade = [] : plugLeitung = [] : plugZustand = [] : plugHoert = []
-    plugTitel = [] : plugFassung = [] : plugInfo = [] : plugAutor = [] : plugIdeMin = [] : plugMit = [] : plugGeholt = []
+    plugins = []
     pluginsStarten()
-    GUI_SET_TEXT(lblStatus, tr$("Plugins neu geladen: ") + STR$(LEN(plugNamen)))
+    GUI_SET_TEXT(lblStatus, tr$("Plugins neu geladen: ") + STR$(LEN(plugins)))
     IF GUI_WINDOW_SHOWN(winPlug) THEN pluginListeFuellen()
 END SUB
 
 FUNCTION pluginNr(name AS STRING) AS INTEGER
-    RETURN ARRAY_INDEXOF(plugNamen, name)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(plugins) - 1
+        IF plugins[k].name = name THEN RETURN k
+    NEXT
+    RETURN -1
 END FUNCTION
 
 SUB pluginSenden(k AS INTEGER, j AS JSON_HANDLE)
-    IF k < 0 OR plugLeitung[k] < 0 THEN RETURN
+    IF k < 0 OR NOT plugins[k].laeuft() THEN RETURN
     TRY
-        WINDOW_SEND(plugLeitung[k], JSON_STRINGIFY(j))
+        WINDOW_SEND(plugins[k].leitung, JSON_STRINGIFY(j))
     CATCH e
     END TRY
 END SUB
@@ -17659,9 +17693,9 @@ END SUB
 ' Ein Ereignis an alle, die es hoeren wollen (PLUGIN_HOERE).
 SUB pluginEreignis(name AS STRING, datei AS STRING)
     DIM k AS INTEGER
-    FOR k = 0 TO LEN(plugNamen) - 1
-        IF plugLeitung[k] < 0 THEN CONTINUE
-        IF INSTR(plugHoert[k], ";" + name + ";") < 0 THEN CONTINUE
+    FOR k = 0 TO LEN(plugins) - 1
+        IF NOT plugins[k].laeuft() THEN CONTINUE
+        IF NOT plugins[k].hoertAuf(name) THEN CONTINUE
         DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
         JSON_SET_STRING(j, "art", "ereignis")
         JSON_SET_STRING(j, "name", name)
@@ -17677,8 +17711,8 @@ SUB pluginBefehl(kennung AS STRING)
     IF t < 0 THEN RETURN
     DIM k AS INTEGER : k = pluginNr(LEFT$(rest, t))
     IF k < 0 THEN RETURN
-    IF plugLeitung[k] < 0 THEN
-        GUI_SET_TEXT(lblStatus, tr$("Das Plugin läuft nicht: ") + plugNamen[k])
+    IF NOT plugins[k].laeuft() THEN
+        GUI_SET_TEXT(lblStatus, tr$("Das Plugin läuft nicht: ") + plugins[k].name)
         RETURN
     END IF
     DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
@@ -17696,34 +17730,34 @@ END SUB
 ' und Aenderungen in ihren Leisten weitergeben.
 SUB pluginsNachziehen()
     DIM k AS INTEGER
-    FOR k = 0 TO LEN(plugNamen) - 1
-        IF plugLeitung[k] < 0 THEN CONTINUE
+    FOR k = 0 TO LEN(plugins) - 1
+        IF NOT plugins[k].laeuft() THEN CONTINUE
         DIM zaehl AS INTEGER : zaehl = 0
         WHILE zaehl < 50
             DIM z AS STRING : z = ""
             TRY
-                z = WINDOW_RECV$(plugLeitung[k])
+                z = WINDOW_RECV$(plugins[k].leitung)
             CATCH e
                 z = ""
             END TRY
             IF z = "" THEN BREAK
             pluginNachricht(k, z)
             zaehl = zaehl + 1
-            IF plugLeitung[k] < 0 THEN BREAK
+            IF NOT plugins[k].laeuft() THEN BREAK
         WEND
-        IF plugLeitung[k] >= 0 THEN
-            IF NOT WINDOW_ALIVE(plugLeitung[k]) THEN pluginStoppen(k, "abgestürzt")
+        IF plugins[k].laeuft() THEN
+            IF NOT WINDOW_ALIVE(plugins[k].leitung) THEN pluginStoppen(k, "abgestürzt")
         END IF
     NEXT
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(plugLeisteName) - 1
-        IF NOT GUI_DOCK_SHOWN(win, plugLeisteName[i]) THEN CONTINUE
-        DIM pw AS INTEGER : pw = plugLeisteFenster[i]
-        DIM teile AS ARRAY OF STRING : teile = SPLIT$(plugLeisteName[i], ".")
+    FOR i = 0 TO LEN(plugLeisten) - 1
+        IF NOT GUI_DOCK_SHOWN(win, plugLeisten[i].name) THEN CONTINUE
+        DIM pw AS INTEGER : pw = plugLeisten[i].fenster
+        DIM teile AS ARRAY OF STRING : teile = SPLIT$(plugLeisten[i].name, ".")
         IF LEN(teile) < 3 THEN CONTINUE
         DIM pk AS INTEGER : pk = pluginNr(teile[1])
         IF pk < 0 THEN CONTINUE
-        DIM leisteId AS STRING : leisteId = MID$(plugLeisteName[i], LEN(teile[0]) + LEN(teile[1]) + 2)
+        DIM leisteId AS STRING : leisteId = MID$(plugLeisten[i].name, LEN(teile[0]) + LEN(teile[1]) + 2)
         DIM wi AS INTEGER
         FOR wi = 0 TO GUI_WINDOW_WIDGET_COUNT(pw) - 1
             DIM h AS GUI_WIDGET : h = GUI_WINDOW_WIDGET(pw, wi)
@@ -17773,7 +17807,7 @@ SUB pluginNachricht(k AS INTEGER, zeile AS STRING)
     TRY
         j = JSON_PARSE(zeile)
     CATCH e
-        protokoll("plugin " + plugNamen[k] + " unlesbar")
+        protokoll("plugin " + plugins[k].name + " unlesbar")
         RETURN
     END TRY
     DIM art AS STRING : art = plugText$(j, "art")
@@ -17786,44 +17820,57 @@ SUB pluginNachricht(k AS INTEGER, zeile AS STRING)
             CASE "leiste" : pluginLeisteAnmelden(k, j)
             CASE "hoere"
                 DIM ev AS STRING : ev = plugText$(j, "ereignis")
-                IF INSTR(plugHoert[k], ";" + ev + ";") < 0 THEN plugHoert[k] = plugHoert[k] + ev + ";"
+                IF NOT plugins[k].hoertAuf(ev) THEN plugins[k].hoert = plugins[k].hoert + ev + ";"
             CASE "setze" : pluginSetze(k, j)
             CASE "liste" : pluginListe(k, j)
             CASE "baum" : pluginBaum(k, j)
             CASE "frage" : pluginAntwort(k, j)
             CASE "tue" : pluginTue(k, j)
             CASE "befunde"
-                MAPPUT(plugBefunde, plugNamen[k] + "|" + wegGleich$(plugText$(j, "datei")), JSON_STRINGIFY(JSON_GET_JSON(j, "liste")))
+                MAPPUT(plugBefunde, plugins[k].name + "|" + wegGleich$(plugText$(j, "datei")), JSON_STRINGIFY(JSON_GET_JSON(j, "liste")))
                 pruefungFaellig = GET_TIME()
             CASE "schnipsel"
-                ARRAY_PUSH(plugSchnName, plugText$(j, "name"))
-                ARRAY_PUSH(plugSchnAbk, plugText$(j, "kuerzel"))
-                ARRAY_PUSH(plugSchnText, plugText$(j, "text"))
-                ARRAY_PUSH(plugSchnHerkunft, "Plugin " + plugNamen[k])
+                ARRAY_PUSH(plugSchnipsel, NEW SchnipselEintrag(plugText$(j, "name"), plugText$(j, "kuerzel"), _
+                                                        plugText$(j, "text"), "Plugin " + plugins[k].name))
                 schnipselLaden()
             CASE "faerbung"
-                ARRAY_PUSH(plugFaerbEndung, plugNamen[k] + "|" + LOWER$(plugText$(j, "endung")))
-                ARRAY_PUSH(plugFaerbMuster, plugText$(j, "muster"))
-                ARRAY_PUSH(plugFaerbFarbe, plugZahl(j, "farbe"))
+                ARRAY_PUSH(plugFaerbungen, NEW Faerbung(plugins[k].name, LOWER$(plugText$(j, "endung")), _
+                                                        plugText$(j, "muster"), plugZahl(j, "farbe")))
                 faerbSchluessel = ""
             CASE ELSE
-                protokoll("plugin " + plugNamen[k] + " unbekannt " + art)
+                protokoll("plugin " + plugins[k].name + " unbekannt " + art)
         END SELECT
     CATCH e
-        protokoll("plugin " + plugNamen[k] + " fehler " + e)
-        ausgabe("[" + plugNamen[k] + "] " + e)
+        protokoll("plugin " + plugins[k].name + " fehler " + e)
+        ausgabe("[" + plugins[k].name + "] " + e)
     END TRY
 END SUB
 
+FUNCTION pluginBefehlNr(kennung AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(plugBefehle) - 1
+        IF plugBefehle[i].kennung = kennung THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION pluginLeisteNr(name AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(plugLeisten) - 1
+        IF plugLeisten[i].name = name THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
 SUB pluginBefehlAnmelden(k AS INTEGER, j AS JSON_HANDLE)
-    DIM kennung AS STRING : kennung = "plugin:" + plugNamen[k] + ":" + plugText$(j, "id")
+    DIM kennung AS STRING : kennung = "plugin:" + plugins[k].name + ":" + plugText$(j, "id")
     DIM titel AS STRING : titel = plugText$(j, "titel")
     DIM kuerzel AS STRING : kuerzel = plugText$(j, "kuerzel")
-    DIM i AS INTEGER : i = ARRAY_INDEXOF(plugBefKennung, kennung)
+    DIM i AS INTEGER : i = pluginBefehlNr(kennung)
     IF i >= 0 THEN
         ' Neu gestartet: derselbe Menuepunkt, wieder bedienbar.
-        GUI_MENU_ENABLE(plugBefItem[i], TRUE)
-        GUI_MENU_TEXT(plugBefItem[i], titel)
+        GUI_MENU_ENABLE(plugBefehle[i].item, TRUE)
+        GUI_MENU_TEXT(plugBefehle[i].item, titel)
         RETURN
     END IF
     DIM item AS INTEGER
@@ -17832,29 +17879,27 @@ SUB pluginBefehlAnmelden(k AS INTEGER, j AS JSON_HANDLE)
     ELSE
         item = GUI_MENU_ITEM(mPlugins, titel, kz$(kuerzel))
     END IF
-    ARRAY_PUSH(plugBefKennung, kennung)
-    ARRAY_PUSH(plugBefItem, item)
+    ARRAY_PUSH(plugBefehle, NEW PluginMenuepunkt(kennung, item))
     menueBefehl(item, kennung, kuerzel)
     paletteEintrag(titel, kennung, kuerzel)
     protokoll("plugin befehl angemeldet " + kennung)
 END SUB
 
 SUB pluginLeisteAnmelden(k AS INTEGER, j AS JSON_HANDLE)
-    DIM name AS STRING : name = "plugin." + plugNamen[k] + "." + plugText$(j, "id")
+    DIM name AS STRING : name = "plugin." + plugins[k].name + "." + plugText$(j, "id")
     DIM bereich AS STRING : bereich = plugText$(j, "bereich")
     IF bereich = "" THEN bereich = "rechts"
     DIM pw AS INTEGER : pw = GUI_FROM_JSON(JSON_STRINGIFY(JSON_GET_JSON(j, "form")))
-    DIM i AS INTEGER : i = ARRAY_INDEXOF(plugLeisteName, name)
+    DIM i AS INTEGER : i = pluginLeisteNr(name)
     IF i >= 0 THEN
         ' Neu gestartet: das alte Fenster weg, das neue an seinen Platz.
-        GUI_WINDOW_DESTROY(plugLeisteFenster[i])
-        plugLeisteFenster[i] = pw
+        GUI_WINDOW_DESTROY(plugLeisten[i].fenster)
+        plugLeisten[i].fenster = pw
         GUI_DOCK_TITLE(win, name, plugText$(j, "titel"))
         GUI_DOCK_SHOW(win, name, TRUE)
     ELSE
         GUI_DOCK_PANEL(win, name, plugText$(j, "titel"), bereich)
-        ARRAY_PUSH(plugLeisteName, name)
-        ARRAY_PUSH(plugLeisteFenster, pw)
+        ARRAY_PUSH(plugLeisten, NEW PluginLeiste(name, pw))
     END IF
     GUI_DOCK_WINDOW(win, name, pw)
     layout()
@@ -17862,9 +17907,9 @@ SUB pluginLeisteAnmelden(k AS INTEGER, j AS JSON_HANDLE)
 END SUB
 
 FUNCTION pluginLeisteFenster(k AS INTEGER, j AS JSON_HANDLE) AS INTEGER
-    DIM i AS INTEGER : i = ARRAY_INDEXOF(plugLeisteName, "plugin." + plugNamen[k] + "." + plugText$(j, "leiste"))
+    DIM i AS INTEGER : i = pluginLeisteNr("plugin." + plugins[k].name + "." + plugText$(j, "leiste"))
     IF i < 0 THEN RETURN -1
-    RETURN plugLeisteFenster[i]
+    RETURN plugLeisten[i].fenster
 END FUNCTION
 
 SUB pluginSetze(k AS INTEGER, j AS JSON_HANDLE)
@@ -17953,7 +17998,7 @@ END FUNCTION
 ' denselben Weg aus wie ein Befehl ("plugin:<name>:<id>"); bei einem
 ' Neustart des Plugins wird der alte Eintrag wieder bedienbar.
 SUB pluginKontextAnmelden(k AS INTEGER, j AS JSON_HANDLE)
-    DIM kennung AS STRING : kennung = "plugin:" + plugNamen[k] + ":" + plugText$(j, "id")
+    DIM kennung AS STRING : kennung = "plugin:" + plugins[k].name + ":" + plugText$(j, "id")
     DIM titel AS STRING : titel = plugText$(j, "titel")
     DIM i AS INTEGER : i = ARRAY_INDEXOF(ctxKennung, kennung)
     IF i >= 0 THEN
@@ -17978,9 +18023,9 @@ SUB pluginHoverFragen(ta AS GUI_WIDGET, z AS INTEGER, sp AS INTEGER, wort AS STR
     IF wort = "" THEN RETURN
     DIM k AS INTEGER
     DIM gefragt AS BOOLEAN : gefragt = FALSE
-    FOR k = 0 TO LEN(plugNamen) - 1
-        IF plugLeitung[k] < 0 THEN CONTINUE
-        IF INSTR(plugHoert[k], ";hover;") < 0 THEN CONTINUE
+    FOR k = 0 TO LEN(plugins) - 1
+        IF NOT plugins[k].laeuft() THEN CONTINUE
+        IF NOT plugins[k].hoertAuf("hover") THEN CONTINUE
         IF NOT gefragt THEN plugHoverNr = plugHoverNr + 1
         gefragt = TRUE
         DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
@@ -18007,9 +18052,9 @@ SUB pluginVervollFragen(z AS INTEGER, sp AS INTEGER, wort AS STRING)
     plugVervollWort = ""
     DIM k AS INTEGER
     DIM gefragt AS BOOLEAN : gefragt = FALSE
-    FOR k = 0 TO LEN(plugNamen) - 1
-        IF plugLeitung[k] < 0 THEN CONTINUE
-        IF INSTR(plugHoert[k], ";vervollstaendigen;") < 0 THEN CONTINUE
+    FOR k = 0 TO LEN(plugins) - 1
+        IF NOT plugins[k].laeuft() THEN CONTINUE
+        IF NOT plugins[k].hoertAuf("vervollstaendigen") THEN CONTINUE
         IF NOT gefragt THEN plugVervollNr = plugVervollNr + 1
         gefragt = TRUE
         DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
@@ -18053,7 +18098,7 @@ SUB pluginVervollAntwort(k AS INTEGER, j AS JSON_HANDLE)
         GUI_LISTBOX_SET_SELECTED(lstVervoll, 0)
         vervollFensterZeigen(FALSE)
     END IF
-    protokoll("plugin vorschlaege " + plugNamen[k] + " " + STR$(neu))
+    protokoll("plugin vorschlaege " + plugins[k].name + " " + STR$(neu))
 END SUB
 
 SUB pluginHoverAntwort(k AS INTEGER, j AS JSON_HANDLE)
@@ -18064,7 +18109,7 @@ SUB pluginHoverAntwort(k AS INTEGER, j AS JSON_HANDLE)
     IF plugHoverText = "" THEN plugHoverText = teil ELSE plugHoverText = plugHoverText + NL + NL + teil
     GUI_TOOLTIP(plugHoverFeld, plugHoverText)
     tippFeld = plugHoverFeld
-    protokoll("plugin hover " + plugNamen[k] + " " + LEFT$(t, 40))
+    protokoll("plugin hover " + plugins[k].name + " " + LEFT$(t, 40))
 END SUB
 
 SUB pluginAntwort(k AS INTEGER, j AS JSON_HANDLE)
@@ -18161,12 +18206,11 @@ SUB pluginBefundeAnhaengen(datei AS STRING, liste AS JSON_HANDLE, text AS STRING
 END SUB
 
 SUB pluginSchnipselWeg(name AS STRING)
-    DIM i AS INTEGER : i = LEN(plugSchnName) - 1
+    DIM i AS INTEGER : i = LEN(plugSchnipsel) - 1
     DIM weg AS BOOLEAN : weg = FALSE
     WHILE i >= 0
-        IF plugSchnHerkunft[i] = "Plugin " + name THEN
-            ARRAY_REMOVE_AT(plugSchnName, i) : ARRAY_REMOVE_AT(plugSchnAbk, i)
-            ARRAY_REMOVE_AT(plugSchnText, i) : ARRAY_REMOVE_AT(plugSchnHerkunft, i)
+        IF plugSchnipsel[i].herkunft = "Plugin " + name THEN
+            ARRAY_REMOVE_AT(plugSchnipsel, i)
             weg = TRUE
         END IF
         i = i - 1
@@ -18175,11 +18219,9 @@ SUB pluginSchnipselWeg(name AS STRING)
 END SUB
 
 SUB pluginFaerbungWeg(name AS STRING)
-    DIM i AS INTEGER : i = LEN(plugFaerbEndung) - 1
+    DIM i AS INTEGER : i = LEN(plugFaerbungen) - 1
     WHILE i >= 0
-        IF LEFT$(plugFaerbEndung[i], LEN(name) + 1) = name + "|" THEN
-            ARRAY_REMOVE_AT(plugFaerbEndung, i) : ARRAY_REMOVE_AT(plugFaerbMuster, i) : ARRAY_REMOVE_AT(plugFaerbFarbe, i)
-        END IF
+        IF plugFaerbungen[i].vonPlugin = name THEN ARRAY_REMOVE_AT(plugFaerbungen, i)
         i = i - 1
     WEND
     faerbSchluessel = ""
@@ -18189,7 +18231,7 @@ END SUB
 ' Treffer im Ausschnitt faerben, zeilenweise wie die Suche. FALSE heisst:
 ' keine Regel, die Faerbung fuer Drachenhauch gilt.
 FUNCTION pluginFaerben(ta AS GUI_WIDGET, stueck AS STRING, von AS INTEGER) AS BOOLEAN
-    IF LEN(plugFaerbEndung) = 0 THEN RETURN FALSE
+    IF LEN(plugFaerbungen) = 0 THEN RETURN FALSE
     DIM pfad AS STRING : pfad = ""
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
@@ -18203,9 +18245,8 @@ FUNCTION pluginFaerben(ta AS GUI_WIDGET, stueck AS STRING, von AS INTEGER) AS BO
     DIM f2 AS ARRAY OF INTEGER : f2 = []
     DIM treffer AS BOOLEAN : treffer = FALSE
     DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(stueck, NL)
-    FOR i = 0 TO LEN(plugFaerbEndung) - 1
-        DIM e AS STRING : e = plugFaerbEndung[i]
-        IF MID$(e, INSTR(e, "|") + 1) <> endung THEN CONTINUE
+    FOR i = 0 TO LEN(plugFaerbungen) - 1
+        IF plugFaerbungen[i].endung <> endung THEN CONTINUE
         treffer = TRUE
         DIM off AS INTEGER : off = 0
         DIM zi AS INTEGER
@@ -18216,13 +18257,13 @@ FUNCTION pluginFaerben(ta AS GUI_WIDGET, stueck AS STRING, von AS INTEGER) AS BO
                 DIM sp AS INTEGER
                 DIM sl AS INTEGER
                 TRY
-                    (sp, sl) = REGEX_FIND_POS(zeilen[zi], plugFaerbMuster[i], ab)
+                    (sp, sl) = REGEX_FIND_POS(zeilen[zi], plugFaerbungen[i].muster, ab)
                 CATCH fe
                     sp = -1
                 END TRY
                 IF sp < 0 THEN BREAK
                 IF sl > 0 THEN
-                    ARRAY_PUSH(s2, von + off + sp) : ARRAY_PUSH(l2, sl) : ARRAY_PUSH(f2, plugFaerbFarbe[i])
+                    ARRAY_PUSH(s2, von + off + sp) : ARRAY_PUSH(l2, sl) : ARRAY_PUSH(f2, plugFaerbungen[i].farbe)
                 END IF
                 ab = sp + MAX(sl, 1)
                 wie = wie + 1
@@ -18258,17 +18299,17 @@ GUI_WINDOW_VISIBLE(winPlug, FALSE)
 SUB pluginListeFuellen()
     GUI_LISTBOX_CLEAR(lstPlug)
     DIM k AS INTEGER
-    FOR k = 0 TO LEN(plugNamen) - 1
-        DIM zeile AS STRING : zeile = plugTitel[k]
-        IF plugFassung[k] <> "" THEN zeile = zeile + " " + plugFassung[k]
-        IF plugMit[k] THEN zeile = zeile + tr$(" (mitgeliefert)")
-        IF plugGeholt[k] THEN zeile = zeile + tr$(" (geholt)")
+    FOR k = 0 TO LEN(plugins) - 1
+        DIM zeile AS STRING : zeile = plugins[k].titel
+        IF plugins[k].fassung <> "" THEN zeile = zeile + " " + plugins[k].fassung
+        IF plugins[k].mitgeliefert THEN zeile = zeile + tr$(" (mitgeliefert)")
+        IF plugins[k].geholt THEN zeile = zeile + tr$(" (geholt)")
         DIM z AS INTEGER : z = GUI_LISTBOX_ADD(lstPlug, zeile)
-        GUI_LISTBOX_DETAIL(lstPlug, z, plugZustand[k])
+        GUI_LISTBOX_DETAIL(lstPlug, z, plugins[k].zustand)
         GUI_LISTBOX_SET_CHECKED(lstPlug, z, pluginGewollt(k))
-        DIM tipp AS STRING : tipp = plugInfo[k]
-        IF plugAutor[k] <> "" THEN tipp = tipp + IIF(tipp = "", "", NL) + tr$("Von: ") + plugAutor[k]
-        tipp = tipp + IIF(tipp = "", "", NL) + plugPfade[k]
+        DIM tipp AS STRING : tipp = plugins[k].info
+        IF plugins[k].autor <> "" THEN tipp = tipp + IIF(tipp = "", "", NL) + tr$("Von: ") + plugins[k].autor
+        tipp = tipp + IIF(tipp = "", "", NL) + plugins[k].pfad
         GUI_LISTBOX_TIP(lstPlug, z, tipp)
     NEXT
 END SUB
@@ -18375,7 +18416,7 @@ FUNCTION pluginAnlegen(name AS STRING) AS BOOLEAN
 END FUNCTION
 
 SUB pluginsVerwalten()
-    IF LEN(plugNamen) = 0 THEN pluginsStarten()
+    IF LEN(plugins) = 0 THEN pluginsStarten()
     pluginListeFuellen()
     GUI_WINDOW_VISIBLE(winPlug, TRUE)
     GUI_FOCUS(lstPlug)
@@ -18403,8 +18444,8 @@ SUB pluginHolenStarten(mehr AS ARRAY OF STRING)
     ' und Entfernen scheiterten sonst. Danach startet pluginHolenNachziehen
     ' alle neu, auch nach einem Fehler (dann laeuft das alte weiter).
     DIM gk AS INTEGER
-    FOR gk = 0 TO LEN(plugNamen) - 1
-        IF plugGeholt[gk] AND plugLeitung[gk] >= 0 THEN pluginStoppen(gk, "aus")
+    FOR gk = 0 TO LEN(plugins) - 1
+        IF plugins[gk].geholt AND plugins[gk].laeuft() THEN pluginStoppen(gk, "aus")
     NEXT
     DIM a AS ARRAY OF STRING : a = ["paket", "-C", pluginOrdner$()]
     DIM m AS STRING
@@ -18484,21 +18525,21 @@ SUB pluginsVerwaltenNachziehen()
     IF GUI_CLICKED(btnPlugAktuell) THEN pluginsAktualisieren()
     IF GUI_CLICKED(btnPlugEntfernen) THEN
         DIM wk AS INTEGER : wk = GUI_LISTBOX_SELECTED(lstPlug)
-        IF wk >= 0 AND wk < LEN(plugNamen) THEN
-            IF plugGeholt[wk] THEN
-                pluginHolenStarten(["entferne", plugNamen[wk]])
+        IF wk >= 0 AND wk < LEN(plugins) THEN
+            IF plugins[wk].geholt THEN
+                pluginHolenStarten(["entferne", plugins[wk].name])
             ELSE
                 GUI_SET_TEXT(lblStatus, tr$("Entfernen geht nur bei geholten Plugins -- eigene liegen im Plugin-Ordner."))
             END IF
         END IF
     END IF
     DIM k AS INTEGER
-    FOR k = 0 TO MIN(LEN(plugNamen), GUI_LISTBOX_COUNT(lstPlug)) - 1
+    FOR k = 0 TO MIN(LEN(plugins), GUI_LISTBOX_COUNT(lstPlug)) - 1
         DIM an AS BOOLEAN : an = GUI_LISTBOX_CHECKED(lstPlug, k)
         IF an <> pluginGewollt(k) THEN
             pluginGewolltSetzen(k, an)
             IF an THEN pluginStarten(k) ELSE pluginStoppen(k, "aus")
-            GUI_LISTBOX_DETAIL(lstPlug, k, plugZustand[k])
+            GUI_LISTBOX_DETAIL(lstPlug, k, plugins[k].zustand)
         END IF
     NEXT
 END SUB
@@ -18889,25 +18930,25 @@ SUB whSuchen()
     FOR EACH name IN DIRLIST(whOrdner)
         DIM d AS STRING : d = PATHJOIN(whOrdner, name)
         DIM st AS STRING : st = PATHJOIN(d, "stand.json")
-        DIM reiter AS INTEGER : reiter = -1
+        DIM reiterZahl AS INTEGER : reiterZahl = -1
         IF name <> whKennung AND FILEEXISTS(st) THEN
             TRY
                 DIM h AS JSON_HANDLE : h = JSON_LOAD(st)
                 DIM lebt AS BOOLEAN
                 lebt = JSON_GET_BOOL(h, "offen") AND ZEIT_JETZT() - JSON_GET_INT(h, "zeit") < 3 * whTakt
-                IF NOT lebt THEN reiter = JSON_LEN(h, "reiter")
+                IF NOT lebt THEN reiterZahl = JSON_LEN(h, "reiter")
             CATCH fehler
                 ' unlesbar: liegen lassen -- vielleicht schreibt ihn gerade jemand
-                reiter = -1
+                reiterZahl = -1
             END TRY
         END IF
-        IF reiter = 0 THEN
+        IF reiterZahl = 0 THEN
             TRY
                 RMDIR(d, TRUE)
             CATCH fehler
                 protokoll("wiederherstellung nicht entfernbar " + name)
             END TRY
-        ELSEIF reiter > 0 THEN
+        ELSEIF reiterZahl > 0 THEN
             ARRAY_PUSH(whFremd, d)
         END IF
     NEXT
