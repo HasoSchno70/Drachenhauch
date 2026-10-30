@@ -1862,14 +1862,23 @@ DIM hbMassStand AS STRING : hbMassStand = ""
 DIM stoppFrist AS FLOAT : stoppFrist = 0
 ' Die zuletzt geprueften Stellen (fuer den Tooltip an der Wellenlinie).
 DIM probFeld AS GUI_WIDGET : probFeld = -1
-DIM probZeile AS ARRAY OF INTEGER : probZeile = []
-DIM probSpalte AS ARRAY OF INTEGER : probSpalte = []
-DIM probLaenge AS ARRAY OF INTEGER : probLaenge = []
-DIM probMeldung AS ARRAY OF STRING : probMeldung = []
-DIM probFehler AS ARRAY OF BOOLEAN : probFehler = []
-DIM probHinw AS ARRAY OF BOOLEAN : probHinw = []
-' Je Meldung ihre Korrekturen als JSON-Text (leer = keine), aus CODE_CHECK$.
-DIM probKorr AS ARRAY OF STRING : probKorr = []
+' Eine Meldung der Pruefung an ihrer Stelle. Bis 2026-10-30 sieben Felder
+' nebeneinander.
+CLASS Problem
+    DIM zeile AS INTEGER
+    DIM spalte AS INTEGER
+    DIM laenge AS INTEGER
+    DIM meldung AS STRING
+    DIM fehler AS BOOLEAN           ' sonst Warnung oder Hinweis
+    DIM hinweis AS BOOLEAN
+    DIM korr AS STRING              ' die Korrekturen als JSON-Text, "" = keine (CODE_CHECK$)
+
+    ' Trifft die Spalte `sp` die Stelle (samt dem Zeichen dahinter)?
+    FUNCTION trifft(sp AS INTEGER) AS BOOLEAN
+        RETURN sp >= spalte AND sp <= spalte + laenge
+    END FUNCTION
+END CLASS
+DIM probleme AS ARRAY OF Problem : probleme = []
 ' Die angebotenen Korrekturen der offenen Auswahl (je eine als JSON) und der
 ' Text, zu dem sie gehoeren: probKorr baut jede Pruefung neu, und eine
 ' Nummer dort zeigte nach einer Aenderung auf eine andere Meldung.
@@ -3661,10 +3670,10 @@ SUB minimapZeichnen()
     BOX(cx, my, cx + 2, my + 1, &HE0E0E0)
     IF ta = probFeld THEN
         DIM pk AS INTEGER
-        FOR pk = 0 TO LEN(probZeile) - 1
-            IF probHinw[pk] THEN CONTINUE
-            DIM py AS INTEGER : py = cy + MIN(ch - 3, (probZeile[pk] - 1) \ proZeile)
-            BOX(cx + cw - 5, py, cx + cw - 2, py + 2, IIF(probFehler[pk], &HE84848, &HE0B040))
+        FOR pk = 0 TO LEN(probleme) - 1
+            IF probleme[pk].hinweis THEN CONTINUE
+            DIM py AS INTEGER : py = cy + MIN(ch - 3, (probleme[pk].zeile - 1) \ proZeile)
+            BOX(cx + cw - 5, py, cx + cw - 2, py + 2, IIF(probleme[pk].fehler, &HE84848, &HE0B040))
         NEXT
     END IF
     ' Klick und Zug. Die Leinwand nimmt selbst keine Klicks an, der
@@ -4710,7 +4719,7 @@ SUB wellenSetzen(ta AS GUI_WIDGET, j AS JSON_HANDLE, n AS INTEGER)
     DIM wl AS ARRAY OF INTEGER : wl = []
     DIM wf AS ARRAY OF INTEGER : wf = []
     probFeld = ta
-    probZeile = [] : probSpalte = [] : probLaenge = [] : probMeldung = [] : probFehler = [] : probKorr = [] : probHinw = []
+    probleme = []
     DIM i AS INTEGER
     FOR i = 0 TO n - 1
         DIM p AS STRING : p = STR$(i)
@@ -4723,15 +4732,13 @@ SUB wellenSetzen(ta AS GUI_WIDGET, j AS JSON_HANDLE, n AS INTEGER)
         ARRAY_PUSH(wl, ln)
         DIM schw AS STRING : schw = JSON_GET_STRING(j, p + ".schwere")
         ARRAY_PUSH(wf, IIF(schw = "fehler", &HE84848, IIF(schw = "hinweis", &H8894A0, &HE0B040)))
-        ARRAY_PUSH(probZeile, z) : ARRAY_PUSH(probSpalte, sp) : ARRAY_PUSH(probLaenge, ln)
-        ARRAY_PUSH(probMeldung, JSON_GET_STRING(j, p + ".meldung"))
-        ARRAY_PUSH(probFehler, JSON_GET_STRING(j, p + ".schwere") = "fehler")
-        ARRAY_PUSH(probHinw, JSON_GET_STRING(j, p + ".schwere") = "hinweis")
-        IF JSON_HAS(j, p + ".korrekturen") THEN
-            ARRAY_PUSH(probKorr, JSON_STRINGIFY(JSON_GET_JSON(j, p + ".korrekturen")))
-        ELSE
-            ARRAY_PUSH(probKorr, "")
-        END IF
+        DIM pb AS Problem : pb = NEW Problem()
+        pb.zeile = z : pb.spalte = sp : pb.laenge = ln
+        pb.meldung = JSON_GET_STRING(j, p + ".meldung")
+        pb.fehler = (schw = "fehler")
+        pb.hinweis = (schw = "hinweis")
+        IF JSON_HAS(j, p + ".korrekturen") THEN pb.korr = JSON_STRINGIFY(JSON_GET_JSON(j, p + ".korrekturen"))
+        ARRAY_PUSH(probleme, pb)
     NEXT
     GUI_TEXTAREA_SQUIGGLES(ta, ws, wl, wf)
     protokoll("wellen " + STR$(LEN(ws)))
@@ -4752,18 +4759,18 @@ SUB korrekturZeigen()
     (z, sp) = GUI_TEXTAREA_CURSOR(ta)
     DIM genau AS BOOLEAN : genau = FALSE
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(probZeile) - 1
-        IF probZeile[i] = z AND probKorr[i] <> "" AND sp >= probSpalte[i] AND sp <= probSpalte[i] + probLaenge[i] THEN genau = TRUE
+    FOR i = 0 TO LEN(probleme) - 1
+        IF probleme[i].zeile = z AND probleme[i].korr <> "" AND probleme[i].trifft(sp) THEN genau = TRUE
     NEXT
     waehlerListe = []
     korrAngebote = [] : korrText = GUI_TEXT(ta)
-    FOR i = 0 TO LEN(probZeile) - 1
-        IF probZeile[i] <> z OR probKorr[i] = "" THEN CONTINUE
-        IF genau AND (sp < probSpalte[i] OR sp > probSpalte[i] + probLaenge[i]) THEN CONTINUE
-        DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "k" + CHR$(34) + ":" + probKorr[i] + "}")
+    FOR i = 0 TO LEN(probleme) - 1
+        IF probleme[i].zeile <> z OR probleme[i].korr = "" THEN CONTINUE
+        IF genau AND NOT probleme[i].trifft(sp) THEN CONTINUE
+        DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "k" + CHR$(34) + ":" + probleme[i].korr + "}")
         DIM k AS INTEGER
         FOR k = 0 TO JSON_LEN(j, "k") - 1
-            DIM kurz AS STRING : kurz = probMeldung[i]
+            DIM kurz AS STRING : kurz = probleme[i].meldung
             IF LEN(kurz) > 40 THEN kurz = LEFT$(kurz, 39) + "…"
             waehlerDazu(JSON_GET_STRING(j, "k." + STR$(k) + ".titel"), STR$(LEN(korrAngebote)), kurz)
             ARRAY_PUSH(korrAngebote, JSON_STRINGIFY(JSON_GET_JSON(j, "k." + STR$(k))))
@@ -4825,11 +4832,11 @@ FUNCTION meldungBei$(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER) AS STRING
     IF ta <> probFeld OR z < 1 THEN RETURN ""
     DIM i AS INTEGER
     DIM raus AS STRING : raus = ""
-    FOR i = 0 TO LEN(probZeile) - 1
-        IF probZeile[i] = z AND s >= probSpalte[i] AND s <= probSpalte[i] + probLaenge[i] THEN
+    FOR i = 0 TO LEN(probleme) - 1
+        IF probleme[i].zeile = z AND s >= probleme[i].spalte AND s <= probleme[i].spalte + probleme[i].laenge THEN
             IF raus <> "" THEN raus = raus + NL
-            raus = raus + probMeldung[i]
-            IF probKorr[i] <> "" THEN raus = raus + NL + "Strg+. schlägt eine Korrektur vor."
+            raus = raus + probleme[i].meldung
+            IF probleme[i].korr <> "" THEN raus = raus + NL + "Strg+. schlägt eine Korrektur vor."
         END IF
     NEXT
     RETURN raus
@@ -13697,15 +13704,15 @@ SUB problemSpringen(vor AS BOOLEAN)
     DIM beste AS INTEGER : beste = -1
     DIM rand AS INTEGER : rand = -1
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(probZeile) - 1
-        IF probHinw[i] THEN CONTINUE
-        DIM st AS INTEGER : st = probZeile[i] * 100000 + probSpalte[i]
+    FOR i = 0 TO LEN(probleme) - 1
+        IF probleme[i].hinweis THEN CONTINUE
+        DIM st AS INTEGER : st = probleme[i].zeile * 100000 + probleme[i].spalte
         IF vor THEN
-            IF st > marke AND (beste < 0 OR st < probZeile[beste] * 100000 + probSpalte[beste]) THEN beste = i
-            IF rand < 0 OR st < probZeile[rand] * 100000 + probSpalte[rand] THEN rand = i
+            IF st > marke AND (beste < 0 OR st < probleme[beste].zeile * 100000 + probleme[beste].spalte) THEN beste = i
+            IF rand < 0 OR st < probleme[rand].zeile * 100000 + probleme[rand].spalte THEN rand = i
         ELSE
-            IF st < marke AND (beste < 0 OR st > probZeile[beste] * 100000 + probSpalte[beste]) THEN beste = i
-            IF rand < 0 OR st > probZeile[rand] * 100000 + probSpalte[rand] THEN rand = i
+            IF st < marke AND (beste < 0 OR st > probleme[beste].zeile * 100000 + probleme[beste].spalte) THEN beste = i
+            IF rand < 0 OR st > probleme[rand].zeile * 100000 + probleme[rand].spalte THEN rand = i
         END IF
     NEXT
     IF beste < 0 THEN beste = rand
@@ -13714,10 +13721,10 @@ SUB problemSpringen(vor AS BOOLEAN)
         protokoll("problem keins")
         RETURN
     END IF
-    GUI_TEXTAREA_GOTO(ta, probZeile[beste], probSpalte[beste])
+    GUI_TEXTAREA_GOTO(ta, probleme[beste].zeile, probleme[beste].spalte)
     GUI_FOCUS(ta)
-    GUI_SET_TEXT(lblStatus, tr$("Zeile ") + STR$(probZeile[beste]) + ": " + probMeldung[beste])
-    protokoll("problem " + STR$(probZeile[beste]) + " " + STR$(probSpalte[beste]))
+    GUI_SET_TEXT(lblStatus, tr$("Zeile ") + STR$(probleme[beste].zeile) + ": " + probleme[beste].meldung)
+    protokoll("problem " + STR$(probleme[beste].zeile) + " " + STR$(probleme[beste].spalte))
 END SUB
 
 ' --- Zur letzten Aenderung ------------------------------------------------
