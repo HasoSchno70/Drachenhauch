@@ -2970,7 +2970,7 @@ neu da TRUE
 --- programm ../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 protokoll("pr hell " + STR$(hell) + " schrift " + STR$(codeGroesse) + " umbruch " + STR$(umbruchAn))
-protokoll("pr zuletzt " + STR$(LEN(zuletzt)) + " haltepunkte " + STR$(LEN(hpDateien)) + " sprache " + sprache)
+protokoll("pr zuletzt " + STR$(LEN(zuletzt)) + " haltepunkte " + STR$(LEN(haltepunkte)) + " sprache " + sprache)
 EXIT(0)
 --- argumente
 haupt.dh

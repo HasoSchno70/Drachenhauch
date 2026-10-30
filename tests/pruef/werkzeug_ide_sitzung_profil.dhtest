@@ -113,8 +113,8 @@ IF NOT FILEEXISTS("zweiter.txt") THEN
     EXIT(0)
 END IF
 DIM prI AS INTEGER
-FOR prI = 0 TO LEN(hpZeilen) - 1
-    protokoll("probe hp " + BASENAME(hpDateien[prI]) + " " + STR$(hpZeilen[prI]) + " [" + hpBedingungen[prI] + "]")
+FOR prI = 0 TO LEN(haltepunkte) - 1
+    protokoll("probe hp " + BASENAME(haltepunkte[prI].datei) + " " + STR$(haltepunkte[prI].zeile) + " [" + haltepunkte[prI].bedingung + "]")
 NEXT
 FOR prI = 0 TO LEN(lzZeilen) - 1
     protokoll("probe lz " + BASENAME(lzDateien[prI]) + " " + STR$(lzZeilen[prI]))

@@ -342,16 +342,26 @@ DIM debugEingabe AS BOOLEAN : debugEingabe = FALSE
 ' Die Datei je Zeile des Aufrufstapels (Doppelklick springt dorthin).
 DIM stapelDateien AS ARRAY OF STRING : stapelDateien = []
 DIM stapelZeilen AS ARRAY OF INTEGER : stapelZeilen = []
-DIM hpDateien AS ARRAY OF STRING : hpDateien = []
-DIM hpZeilen AS ARRAY OF INTEGER : hpZeilen = []
-DIM hpBedingungen AS ARRAY OF STRING : hpBedingungen = []   ' "" = unbedingt
-' Abgeschaltete Haltepunkte bleiben stehen (grau), halten aber nicht --
-' man will einen nicht jedes Mal neu setzen, nur weil er gerade stoert.
-DIM hpAktiv AS ARRAY OF BOOLEAN : hpAktiv = []
-' Trefferzahl ("5" = ab dem 5. Mal, "=5" genau, "%5" jedes 5. Mal) und
-' Protokolltext (ein Protokollpunkt haelt nicht, er schreibt "i = {i}").
-DIM hpTreffer AS ARRAY OF STRING : hpTreffer = []
-DIM hpLog AS ARRAY OF STRING : hpLog = []
+' Ein Haltepunkt. Bis 2026-10-30 sechs Felder nebeneinander -- und weil die
+' hinteren erst spaeter dazukamen, gab es eine Routine, die sie fuer eine
+' alte ide.json auf die Laenge der Zeilen auffuellte, und Abfragen, die
+' einen zu kurzen Platz abfingen.
+CLASS Haltepunkt
+    DIM datei AS STRING
+    DIM zeile AS INTEGER
+    DIM bedingung AS STRING         ' "" = unbedingt
+    ' Abgeschaltete Haltepunkte bleiben stehen (grau), halten aber nicht --
+    ' man will einen nicht jedes Mal neu setzen, nur weil er gerade stoert.
+    DIM aktiv AS BOOLEAN
+    ' Trefferzahl ("5" = ab dem 5. Mal, "=5" genau, "%5" jedes 5. Mal) und
+    ' Protokolltext (ein Protokollpunkt haelt nicht, er schreibt "i = {i}").
+    DIM treffer AS STRING
+    DIM log AS STRING
+    SUB Init(d AS STRING, z AS INTEGER, bed AS STRING)
+        datei = d : zeile = z : bedingung = bed : aktiv = TRUE
+    END SUB
+END CLASS
+DIM haltepunkte AS ARRAY OF Haltepunkt : haltepunkte = []
 DIM markenSchluessel AS STRING : markenSchluessel = ""
 ' Welche gesetzte Marke wofuer steht: beim Bearbeiten wandern die Marken im
 ' Feld mit ihrer Zeile (GUI_TEXTAREA_MARKS_GET), und Haltepunkte und
@@ -980,12 +990,11 @@ IF JSON_HAS(konfig, "haltepunkte") THEN
         DIM hlD AS STRING : hlD = kText(hlP + ".datei", "")
         DIM hlZ AS INTEGER : hlZ = kInt(hlP + ".zeile", 0)
         IF hlD = "" OR hlZ < 1 THEN CONTINUE
-        ARRAY_PUSH(hpDateien, hlD)
-        ARRAY_PUSH(hpZeilen, hlZ)
-        ARRAY_PUSH(hpBedingungen, kText(hlP + ".bedingung", ""))
-        ARRAY_PUSH(hpAktiv, kBool(hlP + ".aktiv", TRUE))
-        ARRAY_PUSH(hpTreffer, kText(hlP + ".treffer", ""))
-        ARRAY_PUSH(hpLog, kText(hlP + ".log", ""))
+        DIM hlH AS Haltepunkt : hlH = NEW Haltepunkt(hlD, hlZ, kText(hlP + ".bedingung", ""))
+        hlH.aktiv = kBool(hlP + ".aktiv", TRUE)
+        hlH.treffer = kText(hlP + ".treffer", "")
+        hlH.log = kText(hlP + ".log", "")
+        ARRAY_PUSH(haltepunkte, hlH)
     NEXT
 END IF
 IF JSON_HAS(konfig, "lesezeichen") THEN
@@ -2508,11 +2517,11 @@ SUB konfigSichern()
     ' musste man sie nach jedem Start neu setzen).
     JSON_SET_JSON(konfig, "haltepunkte", JSON_NEW_ARRAY())
     DIM hk AS INTEGER
-    FOR hk = 0 TO LEN(hpZeilen) - 1
+    FOR hk = 0 TO LEN(haltepunkte) - 1
         DIM hpE AS JSON_HANDLE : hpE = JSON_NEW_OBJECT()
-        JSON_SET_STRING(hpE, "datei", hpDateien[hk])
-        JSON_SET_INT(hpE, "zeile", hpZeilen[hk])
-        IF hpBedingungen[hk] <> "" THEN JSON_SET_STRING(hpE, "bedingung", hpBedingungen[hk])
+        JSON_SET_STRING(hpE, "datei", haltepunkte[hk].datei)
+        JSON_SET_INT(hpE, "zeile", haltepunkte[hk].zeile)
+        IF haltepunkte[hk].bedingung <> "" THEN JSON_SET_STRING(hpE, "bedingung", haltepunkte[hk].bedingung)
         IF NOT hpIstAktiv(hk) THEN JSON_SET_BOOL(hpE, "aktiv", FALSE)
         IF hpTreffer$(hk) <> "" THEN JSON_SET_STRING(hpE, "treffer", hpTreffer$(hk))
         IF hpLog$(hk) <> "" THEN JSON_SET_STRING(hpE, "log", hpLog$(hk))
@@ -8416,46 +8425,31 @@ SUB gitRandNachziehen(erzwingen AS BOOLEAN)
     protokoll("git rand " + STR$(LEN(neu)))
 END SUB
 
-' Die Haltepunkt-Felder gehen nur hier hinein und hinaus -- vier Felder,
-' die gleich lang bleiben muessen.
 SUB hpNeu(pfad AS STRING, z AS INTEGER, bed AS STRING)
-    hpAuffuellen()
-    ARRAY_PUSH(hpDateien, pfad) : ARRAY_PUSH(hpZeilen, z) : ARRAY_PUSH(hpBedingungen, bed)
-    ARRAY_PUSH(hpAktiv, TRUE) : ARRAY_PUSH(hpTreffer, "") : ARRAY_PUSH(hpLog, "")
+    ARRAY_PUSH(haltepunkte, NEW Haltepunkt(pfad, z, bed))
 END SUB
 
 SUB hpEntfernen(k AS INTEGER)
-    hpAuffuellen()
-    ARRAY_REMOVE_AT(hpDateien, k) : ARRAY_REMOVE_AT(hpZeilen, k) : ARRAY_REMOVE_AT(hpBedingungen, k)
-    ARRAY_REMOVE_AT(hpAktiv, k) : ARRAY_REMOVE_AT(hpTreffer, k) : ARRAY_REMOVE_AT(hpLog, k)
+    ARRAY_REMOVE_AT(haltepunkte, k)
 END SUB
 
-' Die Zusatzfelder so lang wie die Zeilen (Stand aus einer alten ide.json).
-SUB hpAuffuellen()
-    WHILE LEN(hpAktiv) < LEN(hpZeilen) : ARRAY_PUSH(hpAktiv, TRUE) : WEND
-    WHILE LEN(hpTreffer) < LEN(hpZeilen) : ARRAY_PUSH(hpTreffer, "") : WEND
-    WHILE LEN(hpLog) < LEN(hpZeilen) : ARRAY_PUSH(hpLog, "") : WEND
-END SUB
-
+' Kurzformen fuer die Liste und die Pruefsammlungen.
 FUNCTION hpTreffer$(k AS INTEGER) AS STRING
-    IF k >= LEN(hpTreffer) THEN RETURN ""
-    RETURN hpTreffer[k]
+    RETURN haltepunkte[k].treffer
 END FUNCTION
 
 FUNCTION hpLog$(k AS INTEGER) AS STRING
-    IF k >= LEN(hpLog) THEN RETURN ""
-    RETURN hpLog[k]
+    RETURN haltepunkte[k].log
 END FUNCTION
 
 FUNCTION hpIstAktiv(k AS INTEGER) AS BOOLEAN
-    IF k >= LEN(hpAktiv) THEN RETURN TRUE
-    RETURN hpAktiv[k]
+    RETURN haltepunkte[k].aktiv
 END FUNCTION
 
 FUNCTION haltepunktIndex(pfad AS STRING, zeile AS INTEGER) AS INTEGER
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(hpZeilen) - 1
-        IF hpDateien[i] = pfad AND hpZeilen[i] = zeile THEN RETURN i
+    FOR i = 0 TO LEN(haltepunkte) - 1
+        IF haltepunkte[i].datei = pfad AND haltepunkte[i].zeile = zeile THEN RETURN i
     NEXT
     RETURN -1
 END FUNCTION
@@ -8503,7 +8497,7 @@ SUB haltepunktBedingungFragenIn(pfad AS STRING, z AS INTEGER)
     bedingungPfad = pfad
     DIM vorgabe AS STRING : vorgabe = ""
     DIM k AS INTEGER : k = haltepunktIndex(pfad, bedingungZeile)
-    IF k >= 0 THEN vorgabe = hpBedingungen[k]
+    IF k >= 0 THEN vorgabe = haltepunkte[k].bedingung
     dlgBedingung = GUI_PROMPT(tr$("Bedingter Haltepunkt"), tr$("Halten in Zeile ") + STR$(bedingungZeile) + tr$(", wenn (leer = immer):"), vorgabe)
 END SUB
 
@@ -8514,7 +8508,7 @@ SUB haltepunktBedingungSetzen(ausdruck AS STRING)
     IF k < 0 THEN
         hpNeu(pfad, bedingungZeile, TRIM$(ausdruck))
     ELSE
-        hpBedingungen[k] = TRIM$(ausdruck)
+        haltepunkte[k].bedingung = TRIM$(ausdruck)
     END IF
     IF TRIM$(ausdruck) = "" THEN
         protokoll("haltepunkt " + STR$(bedingungZeile) + " an")
@@ -8549,7 +8543,7 @@ SUB haltepunkteListeZeigen()
     haltepunkteListeFuellen()
     GUI_WINDOW_VISIBLE(winHp, TRUE)
     GUI_FOCUS(lstHp)            ' holt das Fenster vor das Hauptfenster
-    protokoll("haltepunkte liste " + STR$(LEN(hpZeilen)))
+    protokoll("haltepunkte liste " + STR$(LEN(haltepunkte)))
 END SUB
 
 ' Neu fuellen, wenn sich etwas geaendert hat (auch von aussen: F9 im Code,
@@ -8557,46 +8551,44 @@ END SUB
 SUB haltepunkteListeFuellen()
     DIM stand AS STRING : stand = ""
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(hpZeilen) - 1
-        stand = stand + hpDateien[i] + ":" + STR$(hpZeilen[i]) + ":" + hpBedingungen[i] + ":" + IIF(hpIstAktiv(i), "1", "0") + ":" + hpTreffer$(i) + ":" + hpLog$(i) + "|"
+    FOR i = 0 TO LEN(haltepunkte) - 1
+        stand = stand + haltepunkte[i].datei + ":" + STR$(haltepunkte[i].zeile) + ":" + haltepunkte[i].bedingung + ":" + IIF(hpIstAktiv(i), "1", "0") + ":" + hpTreffer$(i) + ":" + hpLog$(i) + "|"
     NEXT
     IF stand = hpListeStand THEN RETURN
     hpListeStand = stand
     DIM wahl AS INTEGER : wahl = GUI_LISTBOX_SELECTED(lstHp)
     GUI_LISTBOX_CLEAR(lstHp)
     DIM dateien AS ARRAY OF STRING : dateien = []
-    FOR i = 0 TO LEN(hpZeilen) - 1
-        DIM eintrag AS STRING : eintrag = BASENAME(hpDateien[i]) + ":" + STR$(hpZeilen[i])
-        IF hpBedingungen[i] <> "" THEN eintrag = eintrag + "   wenn " + hpBedingungen[i]
+    FOR i = 0 TO LEN(haltepunkte) - 1
+        DIM eintrag AS STRING : eintrag = BASENAME(haltepunkte[i].datei) + ":" + STR$(haltepunkte[i].zeile)
+        IF haltepunkte[i].bedingung <> "" THEN eintrag = eintrag + "   wenn " + haltepunkte[i].bedingung
         IF hpTreffer$(i) <> "" THEN eintrag = eintrag + "   Treffer " + hpTreffer$(i)
         IF hpLog$(i) <> "" THEN eintrag = eintrag + "   schreibt: " + hpLog$(i)
         GUI_LISTBOX_ADD(lstHp, eintrag)
         GUI_LISTBOX_SET_CHECKED(lstHp, i, hpIstAktiv(i))
-        GUI_LISTBOX_DETAIL(lstHp, i, zeileAusDatei$(hpDateien[i], hpZeilen[i]))
-        IF ARRAY_INDEXOF(dateien, hpDateien[i]) < 0 THEN ARRAY_PUSH(dateien, hpDateien[i])
+        GUI_LISTBOX_DETAIL(lstHp, i, zeileAusDatei$(haltepunkte[i].datei, haltepunkte[i].zeile))
+        IF ARRAY_INDEXOF(dateien, haltepunkte[i].datei) < 0 THEN ARRAY_PUSH(dateien, haltepunkte[i].datei)
     NEXT
-    IF wahl >= 0 AND wahl < LEN(hpZeilen) THEN GUI_LISTBOX_SET_SELECTED(lstHp, wahl)
-    GUI_SET_TEXT(lblHp, STR$(LEN(hpZeilen)) + IIF(LEN(hpZeilen) = 1, tr$(" Haltepunkt in "), tr$(" Haltepunkte in ")) + STR$(LEN(dateien)) + IIF(LEN(dateien) = 1, tr$(" Datei"), tr$(" Dateien")) + tr$(" -- das Kästchen schaltet einen an und aus, Doppelklick springt hin"))
+    IF wahl >= 0 AND wahl < LEN(haltepunkte) THEN GUI_LISTBOX_SET_SELECTED(lstHp, wahl)
+    GUI_SET_TEXT(lblHp, STR$(LEN(haltepunkte)) + IIF(LEN(haltepunkte) = 1, tr$(" Haltepunkt in "), tr$(" Haltepunkte in ")) + STR$(LEN(dateien)) + IIF(LEN(dateien) = 1, tr$(" Datei"), tr$(" Dateien")) + tr$(" -- das Kästchen schaltet einen an und aus, Doppelklick springt hin"))
 END SUB
 
 ' Trefferzahl setzen: nur lesbare Angaben, sonst sagt es die Statuszeile.
 SUB haltepunktTrefferSetzen(k AS INTEGER, text AS STRING)
-    IF k < 0 OR k >= LEN(hpZeilen) THEN RETURN
-    hpAuffuellen()
+    IF k < 0 OR k >= LEN(haltepunkte) THEN RETURN
     DIM t AS STRING : t = TRIM$(text)
     IF t <> "" AND NOT REGEX_TEST(t, "^(%|>=|==|=)?\s*[1-9][0-9]*$") THEN
         GUI_SET_TEXT(lblStatus, tr$("Trefferzahl: eine Zahl ab 1, davor wahlweise = oder % (") + t + tr$(" passt nicht)."))
         RETURN
     END IF
-    hpTreffer[k] = t
-    protokoll("haltepunkt " + STR$(hpZeilen[k]) + " treffer " + t)
+    haltepunkte[k].treffer = t
+    protokoll("haltepunkt " + STR$(haltepunkte[k].zeile) + " treffer " + t)
 END SUB
 
 SUB haltepunktLogSetzen(k AS INTEGER, text AS STRING)
-    IF k < 0 OR k >= LEN(hpZeilen) THEN RETURN
-    hpAuffuellen()
-    hpLog[k] = TRIM$(text)
-    protokoll("haltepunkt " + STR$(hpZeilen[k]) + " schreibt " + TRIM$(text))
+    IF k < 0 OR k >= LEN(haltepunkte) THEN RETURN
+    haltepunkte[k].log = TRIM$(text)
+    protokoll("haltepunkt " + STR$(haltepunkte[k].zeile) + " schreibt " + TRIM$(text))
 END SUB
 
 ' Nach jeder Aenderung: Marken neu, und ein laufender Debugger erfaehrt es.
@@ -8610,29 +8602,28 @@ SUB haltepunkteListeNachziehen()
     haltepunkteListeFuellen()
     DIM i AS INTEGER
     DIM anders AS BOOLEAN : anders = FALSE
-    FOR i = 0 TO MIN(GUI_LISTBOX_COUNT(lstHp), LEN(hpZeilen)) - 1
+    FOR i = 0 TO MIN(GUI_LISTBOX_COUNT(lstHp), LEN(haltepunkte)) - 1
         IF GUI_LISTBOX_CHECKED(lstHp, i) <> hpIstAktiv(i) THEN
-            WHILE LEN(hpAktiv) < LEN(hpZeilen) : ARRAY_PUSH(hpAktiv, TRUE) : WEND
-            hpAktiv[i] = GUI_LISTBOX_CHECKED(lstHp, i)
-            protokoll("haltepunkt " + STR$(hpZeilen[i]) + IIF(hpAktiv[i], " eingeschaltet", " ausgeschaltet"))
+            haltepunkte[i].aktiv = GUI_LISTBOX_CHECKED(lstHp, i)
+            protokoll("haltepunkt " + STR$(haltepunkte[i].zeile) + IIF(haltepunkte[i].aktiv, " eingeschaltet", " ausgeschaltet"))
             anders = TRUE
         END IF
     NEXT
     DIM w AS INTEGER : w = GUI_LISTBOX_SELECTED(lstHp)
     IF GUI_DOUBLE_CLICKED(lstHp) OR GUI_CLICKED(btnHpSpringen) THEN
-        IF w >= 0 AND w < LEN(hpZeilen) THEN
-            dateiOeffnen(hpDateien[w])
+        IF w >= 0 AND w < LEN(haltepunkte) THEN
+            dateiOeffnen(haltepunkte[w].datei)
             DIM ta AS GUI_WIDGET : ta = aktivesFeld()
-            IF ta >= 0 THEN GUI_TEXTAREA_GOTO(ta, hpZeilen[w], 1) : GUI_FOCUS(ta)
-            protokoll("haltepunkt sprung " + BASENAME(hpDateien[w]) + " " + STR$(hpZeilen[w]))
+            IF ta >= 0 THEN GUI_TEXTAREA_GOTO(ta, haltepunkte[w].zeile, 1) : GUI_FOCUS(ta)
+            protokoll("haltepunkt sprung " + BASENAME(haltepunkte[w].datei) + " " + STR$(haltepunkte[w].zeile))
         END IF
     END IF
-    IF GUI_CLICKED(btnHpBed) AND w >= 0 AND w < LEN(hpZeilen) THEN haltepunktBedingungFragenIn(hpDateien[w], hpZeilen[w])
-    IF GUI_CLICKED(btnHpTreffer) AND w >= 0 AND w < LEN(hpZeilen) THEN
+    IF GUI_CLICKED(btnHpBed) AND w >= 0 AND w < LEN(haltepunkte) THEN haltepunktBedingungFragenIn(haltepunkte[w].datei, haltepunkte[w].zeile)
+    IF GUI_CLICKED(btnHpTreffer) AND w >= 0 AND w < LEN(haltepunkte) THEN
         hpBearbeitet = w
-        dlgTreffer = GUI_PROMPT(tr$("Trefferzahl"), tr$("Halten in ") + BASENAME(hpDateien[w]) + ":" + STR$(hpZeilen[w]) + tr$(" erst ... (5 = ab dem 5. Mal, =5 genau, %5 jedes 5. Mal, leer = immer):"), hpTreffer$(w))
+        dlgTreffer = GUI_PROMPT(tr$("Trefferzahl"), tr$("Halten in ") + BASENAME(haltepunkte[w].datei) + ":" + STR$(haltepunkte[w].zeile) + tr$(" erst ... (5 = ab dem 5. Mal, =5 genau, %5 jedes 5. Mal, leer = immer):"), hpTreffer$(w))
     END IF
-    IF GUI_CLICKED(btnHpLog) AND w >= 0 AND w < LEN(hpZeilen) THEN
+    IF GUI_CLICKED(btnHpLog) AND w >= 0 AND w < LEN(haltepunkte) THEN
         hpBearbeitet = w
         dlgLog = GUI_PROMPT(tr$("Protokollpunkt"), tr$("Statt anzuhalten schreiben (Ausdrücke in {}, z. B. i = {i}; leer = anhalten):"), hpLog$(w))
     END IF
@@ -8646,22 +8637,21 @@ SUB haltepunkteListeNachziehen()
         IF al = 1 THEN haltepunktLogSetzen(hpBearbeitet, GUI_DIALOG_TEXT(dlgLog)) : anders = TRUE
         IF al <> 0 THEN dlgLog = 0
     END IF
-    IF GUI_CLICKED(btnHpWeg) AND w >= 0 AND w < LEN(hpZeilen) THEN
-        protokoll("haltepunkt " + STR$(hpZeilen[w]) + " aus")
+    IF GUI_CLICKED(btnHpWeg) AND w >= 0 AND w < LEN(haltepunkte) THEN
+        protokoll("haltepunkt " + STR$(haltepunkte[w].zeile) + " aus")
         hpEntfernen(w)
         anders = TRUE
     END IF
     IF GUI_CLICKED(btnHpAn) OR GUI_CLICKED(btnHpAus) THEN
         DIM an AS BOOLEAN : an = GUI_CLICKED(btnHpAn)
-        hpAktiv = []
-        FOR i = 0 TO LEN(hpZeilen) - 1
-            ARRAY_PUSH(hpAktiv, an)
+        FOR i = 0 TO LEN(haltepunkte) - 1
+            haltepunkte[i].aktiv = an
         NEXT
         protokoll("haltepunkte alle " + IIF(an, "an", "aus"))
         anders = TRUE
     END IF
     IF GUI_CLICKED(btnHpAlleWeg) THEN
-        hpDateien = [] : hpZeilen = [] : hpBedingungen = [] : hpAktiv = [] : hpTreffer = [] : hpLog = []
+        haltepunkte = []
         protokoll("haltepunkte alle entfernt")
         anders = TRUE
     END IF
@@ -8821,8 +8811,8 @@ SUB markenZurueckholen(ta AS GUI_WIDGET, pfad AS STRING)
     FOR k = 0 TO LEN(jetzt) - 1
         IF jetzt[k] = markenGesetzt[k] THEN CONTINUE
         DIM i AS INTEGER : i = markenIdx[k]
-        IF markenArt[k] = "h" AND i < LEN(hpZeilen) THEN
-            hpZeilen[i] = jetzt[k] : anders = TRUE
+        IF markenArt[k] = "h" AND i < LEN(haltepunkte) THEN
+            haltepunkte[i].zeile = jetzt[k] : anders = TRUE
         ELSEIF markenArt[k] = "l" AND i < LEN(lzZeilen) THEN
             lzZeilen[i] = jetzt[k] : anders = TRUE
         END IF
@@ -8830,8 +8820,8 @@ SUB markenZurueckholen(ta AS GUI_WIDGET, pfad AS STRING)
     NEXT
     IF anders THEN
         DIM liste AS STRING : liste = ""
-        FOR k = 0 TO LEN(hpZeilen) - 1
-            liste = liste + " " + STR$(hpZeilen[k])
+        FOR k = 0 TO LEN(haltepunkte) - 1
+            liste = liste + " " + STR$(haltepunkte[k].zeile)
         NEXT
         protokoll("marken gewandert" + liste)
     END IF
@@ -8856,19 +8846,19 @@ SUB markenNachziehen()
         END IF
     END IF
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(hpZeilen) - 1
-        IF hpDateien[i] = pfad THEN
-            ARRAY_PUSH(zeilen, hpZeilen[i])
+    FOR i = 0 TO LEN(haltepunkte) - 1
+        IF haltepunkte[i].datei = pfad THEN
+            ARRAY_PUSH(zeilen, haltepunkte[i].zeile)
             IF NOT hpIstAktiv(i) THEN
                 ARRAY_PUSH(farben, &H7A7A86)
             ELSEIF hpLog$(i) <> "" THEN
                 ARRAY_PUSH(farben, &H40A8E0)
-            ELSEIF hpBedingungen[i] = "" AND hpTreffer$(i) = "" THEN
+            ELSEIF haltepunkte[i].bedingung = "" AND hpTreffer$(i) = "" THEN
                 ARRAY_PUSH(farben, &HE05050)
             ELSE
                 ARRAY_PUSH(farben, &HC060E0)
             END IF
-            schl = schl + "h" + STR$(hpZeilen[i]) + hpBedingungen[i] + IIF(hpIstAktiv(i), "", "-") + hpTreffer$(i) + "~" + hpLog$(i)
+            schl = schl + "h" + STR$(haltepunkte[i].zeile) + haltepunkte[i].bedingung + IIF(hpIstAktiv(i), "", "-") + hpTreffer$(i) + "~" + hpLog$(i)
             ARRAY_PUSH(arten, "h") : ARRAY_PUSH(idx, i)
         END IF
     NEXT
@@ -14275,8 +14265,8 @@ SUB baumUmbenennen(alt AS STRING, name AS STRING)
     FOR i = 0 TO tabAnzahl - 1
         reiter[i].pfad = wegUmziehen$(reiter[i].pfad, alt, neu, istOrdner)
     NEXT
-    FOR i = 0 TO LEN(hpDateien) - 1
-        hpDateien[i] = wegUmziehen$(hpDateien[i], alt, neu, istOrdner)
+    FOR i = 0 TO LEN(haltepunkte) - 1
+        haltepunkte[i].datei = wegUmziehen$(haltepunkte[i].datei, alt, neu, istOrdner)
     NEXT
     FOR i = 0 TO LEN(lzDateien) - 1
         lzDateien[i] = wegUmziehen$(lzDateien[i], alt, neu, istOrdner)
@@ -14687,10 +14677,10 @@ SUB debugHaltepunkteSenden()
     IF prozess < 0 OR prozessArt <> "debug" THEN RETURN
     DIM teile AS ARRAY OF STRING : teile = []
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(hpZeilen) - 1
+    FOR i = 0 TO LEN(haltepunkte) - 1
         IF NOT hpIstAktiv(i) THEN CONTINUE
-        DIM e AS STRING : e = "{" + jsonText$("file") + ":" + jsonText$(hpDateien[i]) + "," + jsonText$("line") + ":" + STR$(hpZeilen[i])
-        IF hpBedingungen[i] <> "" THEN e = e + "," + jsonText$("condition") + ":" + jsonText$(hpBedingungen[i])
+        DIM e AS STRING : e = "{" + jsonText$("file") + ":" + jsonText$(haltepunkte[i].datei) + "," + jsonText$("line") + ":" + STR$(haltepunkte[i].zeile)
+        IF haltepunkte[i].bedingung <> "" THEN e = e + "," + jsonText$("condition") + ":" + jsonText$(haltepunkte[i].bedingung)
         IF hpTreffer$(i) <> "" THEN e = e + "," + jsonText$("hits") + ":" + jsonText$(hpTreffer$(i))
         IF hpLog$(i) <> "" THEN e = e + "," + jsonText$("log") + ":" + jsonText$(hpLog$(i))
         ARRAY_PUSH(teile, e + "}")
@@ -14733,13 +14723,13 @@ SUB haltepunkteBestaetigt(j AS JSON_HANDLE)
         DIM echt AS INTEGER : echt = JSON_GET_INT(j, p + ".actual")
         IF echt = z THEN CONTINUE
         DIM i AS INTEGER
-        FOR i = 0 TO LEN(hpZeilen) - 1
-            IF hpZeilen[i] = z AND gleicheDatei(hpDateien[i], datei) THEN
-                IF haltepunktIndex(hpDateien[i], echt) >= 0 THEN
+        FOR i = 0 TO LEN(haltepunkte) - 1
+            IF haltepunkte[i].zeile = z AND gleicheDatei(haltepunkte[i].datei, datei) THEN
+                IF haltepunktIndex(haltepunkte[i].datei, echt) >= 0 THEN
                     ' Dort steht schon einer: dieser faellt weg.
                     hpEntfernen(i)
                 ELSE
-                    hpZeilen[i] = echt
+                    haltepunkte[i].zeile = echt
                 END IF
                 protokoll("haltepunkt verschoben " + STR$(z) + " " + STR$(echt))
                 markenSchluessel = ""
@@ -14857,7 +14847,7 @@ SUB debugEreignis(zeile AS STRING)
                     debugBis = 0
                     RETURN
                 END IF
-                IF LEN(hpZeilen) > 0 THEN
+                IF LEN(haltepunkte) > 0 THEN
                     debugErstWarten = TRUE
                     debugErstHalt = zeile
                     RETURN

@@ -43,8 +43,8 @@ IF prBild = 30 THEN
 END IF
 IF prBild = 70 THEN
     DIM prI AS INTEGER
-    FOR prI = 0 TO LEN(hpZeilen) - 1
-        protokoll("pr haltepunkt " + BASENAME(hpDateien[prI]) + " " + STR$(hpZeilen[prI]))
+    FOR prI = 0 TO LEN(haltepunkte) - 1
+        protokoll("pr haltepunkt " + BASENAME(haltepunkte[prI].datei) + " " + STR$(haltepunkte[prI].zeile))
     NEXT
     EXIT(0)
 END IF

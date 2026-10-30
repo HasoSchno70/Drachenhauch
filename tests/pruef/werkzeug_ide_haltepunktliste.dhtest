@@ -28,8 +28,8 @@ IF prBild = 200 AND NOT FILEEXISTS("zweiter.txt") THEN
     EXIT(0)
 END IF
 IF prBild = 20 AND FILEEXISTS("zweiter.txt") THEN
-    FOR prI = 0 TO LEN(hpZeilen) - 1
-        protokoll("probe gemerkt " + STR$(hpZeilen[prI]) + " " + STR$(hpIstAktiv(prI)))
+    FOR prI = 0 TO LEN(haltepunkte) - 1
+        protokoll("probe gemerkt " + STR$(haltepunkte[prI].zeile) + " " + STR$(hpIstAktiv(prI)))
     NEXT
     EXIT(0)
 END IF
