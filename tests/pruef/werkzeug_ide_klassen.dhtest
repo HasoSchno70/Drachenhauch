@@ -1,0 +1,155 @@
+' Vererbung in der IDE und der Feinschliff dazu: die Gliederung nennt die
+' Oberklasse und markiert ABSTRACT-Methoden, an jeder Methode steht, wen sie
+' ueberschreibt und wo sie ueberschrieben wird, die neuen Schnipsel, die
+' Werkzeugleiste (Stoppen/Sichern nur wenn sinnvoll), der Massstab fuer
+' hochaufloesende Schirme und die Willkommensseite ohne Ueberlauf.
+--- langsam
+
+=== die gliederung nennt die oberklasse und markiert abstract
+gliederungFuellen("CLASS Tier" + NL + "    ABSTRACT FUNCTION laut() AS STRING" + NL + "    SUB zeigen()" + NL + "    END SUB" + NL + "END CLASS" + NL + "CLASS Hund EXTENDS Tier ' Haustier" + NL + "    FUNCTION laut() AS STRING" + NL + "        RETURN " + CHR$(34) + "Wuff" + CHR$(34) + NL + "    END FUNCTION" + NL + "END CLASS" + NL)
+DIM prI AS INTEGER
+FOR prI = 0 TO GUI_LISTBOX_COUNT(lstGliederung) - 1
+    PRINT "|"; GUI_LISTBOX_ITEM(lstGliederung, prI); "|"
+NEXT
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- erwartet
+|class Tier|
+|    laut  abstract|
+|    zeigen|
+|class Hund : Tier|
+|    laut|
+
+=== an jeder methode steht, wen sie ueberschreibt
+DIM prQ AS STRING
+prQ = "CLASS Tier" + NL + "    ABSTRACT FUNCTION laut() AS STRING" + NL + "    SUB gehen()" + NL + "    END SUB" + NL + "    SUB schlafen()" + NL + "    END SUB" + NL + "END CLASS" + NL
+prQ = prQ + "CLASS Hund EXTENDS Tier" + NL + "    FUNCTION laut() AS STRING" + NL + "    END FUNCTION" + NL + "    SUB gehen()" + NL + "    END SUB" + NL + "END CLASS" + NL
+prQ = prQ + "CLASS Welpe EXTENDS Hund" + NL + "    SUB gehen()" + NL + "    END SUB" + NL + "END CLASS" + NL
+prQ = prQ + "CLASS Fisch EXTENDS Tier" + NL + "END CLASS" + NL
+DIM prM AS MAP OF STRING : prM = ueberschreibTexte(prQ)
+DIM prZ AS INTEGER
+FOR prZ = 1 TO 30
+    IF MAPHAS(prM, STR$(prZ)) THEN PRINT prZ; ": "; MAPGET(prM, STR$(prZ))
+NEXT
+' Eine Klasse allein: nichts zu sagen.
+PRINT "allein "; MAPSIZE(ueberschreibTexte("CLASS A" + NL + "    SUB s()" + NL + "    END SUB" + NL + "END CLASS"))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- erwartet
+2: ausgefüllt in Hund
+3: überschrieben in Hund, Welpe
+9: füllt Tier.laut aus
+11: überschreibt Tier.gehen   ·   überschrieben in Welpe
+15: überschreibt Hund.gehen
+allein 0
+
+=== die neuen schnipsel sind da und ihre kuerzel eindeutig
+DIM prA AS STRING
+FOR EACH prA IN ["extends", "abstract", "property", "finally", "lambda", "enum", "do", "declare", "importas"]
+    PRINT prA; " "; ARRAY_INDEXOF(schnipselAbk, prA) >= 0
+NEXT
+DIM prDoppelt AS INTEGER : prDoppelt = 0
+DIM prJ AS INTEGER
+FOR prI = 0 TO LEN(schnipselAbk) - 1
+    FOR prJ = prI + 1 TO LEN(schnipselAbk) - 1
+        IF schnipselAbk[prI] <> "" AND schnipselAbk[prI] = schnipselAbk[prJ] THEN prDoppelt = prDoppelt + 1
+    NEXT
+NEXT
+PRINT "doppelt "; prDoppelt
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- erwartet
+extends TRUE
+abstract TRUE
+property TRUE
+finally TRUE
+lambda TRUE
+enum TRUE
+do TRUE
+declare TRUE
+importas TRUE
+doppelt 0
+
+=== ohne reiter und ohne lauf sind sichern und stoppen gesperrt
+PRINT "sichern "; GUI_TOOLBAR_ENABLED(leiste, wzSichern); " stoppen "; GUI_TOOLBAR_ENABLED(leiste, wzStopp); " starten "; GUI_TOOLBAR_ENABLED(leiste, wzSichern + 2)
+EXIT(0)
+--- programm ../../ide/ide.dh nach DIM wzc AS INTEGER : wzc = GUI_TOOLBAR_CLICKED(leiste)
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- erwartet
+sichern FALSE stoppen FALSE starten TRUE
+
+=== mit einem reiter laesst sich sichern
+PRINT "sichern "; GUI_TOOLBAR_ENABLED(leiste, wzSichern); " stoppen "; GUI_TOOLBAR_ENABLED(leiste, wzStopp)
+EXIT(0)
+--- programm ../../ide/ide.dh nach DIM wzc AS INTEGER : wzc = GUI_TOOLBAR_CLICKED(leiste)
+--- datei a.dh
+PRINT "hallo"
+--- argumente
+{fall}/a.dh
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- erwartet
+sichern TRUE stoppen FALSE
+
+=== der massstab aus der einstellung vergroessert die oberflaeche
+PRINT "massstab "; uiMassstab; " gui "; GUI_SCALE_GET()
+PRINT "breite "; schirmB() = INT(SCREENWIDTH() / 1.5); " "; GUI_GET_W(lstAusgabe) < SCREENWIDTH()
+PRINT "logisch "; logisch(300)
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- datei _programm/ide.json
+{"massstab": 1.5}
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- erwartet
+massstab 1.5 gui 1.5
+breite TRUE TRUE
+logisch 200
+
+=== die willkommensseite laeuft nicht in die leisten
+' Mit Uebersichtskarte in der Einstellung: ohne Reiter steht sie nicht da,
+' der Satz unter "Zuletzt geoeffnet" endet ueber den Leisten oder fehlt, und
+' der Kopf der Probleme-Leiste wiederholt den Reiter nicht.
+layout()
+GUI_UPDATE()
+DIM prCx AS INTEGER
+DIM prCy AS INTEGER
+DIM prCw AS INTEGER
+DIM prCh AS INTEGER
+(prCx, prCy, prCw, prCh) = GUI_DOCK_CENTER(win)
+PRINT "karte "; GUI_VISIBLE(karte)
+PRINT "satz passt "; NOT GUI_VISIBLE(lblWkKuerzel) OR GUI_GET_Y(lblWkKuerzel) + GUI_GET_H(lblWkKuerzel) <= prCy + prCh
+PRINT "probleme |"; GUI_TEXT(lblProbleme); "|"
+PRINT "zuletzt "; zuletztText$("C:/Spiele/neu/held.dh")
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- datei _programm/ide.json
+{"karte": true}
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- erwartet
+karte FALSE
+satz passt TRUE
+probleme ||
+zuletzt held.dh   (C:\Spiele\neu)

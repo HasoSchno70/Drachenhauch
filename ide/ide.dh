@@ -158,6 +158,21 @@ SUB codeFarben(licht AS BOOLEAN)
 END SUB
 
 SCREEN(1280, 800, "Drachenhauch", 1)
+' Massstab der Oberflaeche (GUI_SCALE): auf einem Schirm mit 150 oder 200 %
+' waren alle Masse feste Pixel und die IDE winzig. Die gui rechnet in
+' LOGISCHEN Punkten, SCREENWIDTH und die Maus liefern Bildschirm-Pixel --
+' was beides vergleicht, geht ueber diese Helfer.
+DIM uiMassstab AS FLOAT : uiMassstab = 1.0
+FUNCTION schirmB() AS INTEGER
+    RETURN INT(SCREENWIDTH() / uiMassstab)
+END FUNCTION
+FUNCTION schirmH() AS INTEGER
+    RETURN INT(SCREENHEIGHT() / uiMassstab)
+END FUNCTION
+' Ein Bildschirm-Pixel (Maus) als logischer Punkt der gui.
+FUNCTION logisch(px AS INTEGER) AS INTEGER
+    RETURN INT(px / uiMassstab)
+END FUNCTION
 WINDOW_RESIZABLE(TRUE)
 WINDOW_MIN_SIZE(800, 500)
 SETFPS(60)
@@ -955,7 +970,24 @@ END SUB
 
 ' --- Hauptfenster ------------------------------------------------------
 DIM win AS GUI_WINDOW
-win = GUI_WINDOW(tr$("Drachenhauch"), 0, 0, SCREENWIDTH(), SCREENHEIGHT())
+' `massstab` in der ide.json: fest (0.5 .. 4.0); fehlt er oder ist er 0,
+' gilt die Skalierung des Systems (WINDOW_DPI_X), auf eine Viertelstufe
+' gerundet -- 1,0 heisst: wie bisher.
+DIM massWunsch AS FLOAT : massWunsch = 0.0
+IF JSON_HAS(konfig, "massstab") THEN
+    IF JSON_TYPE(konfig, "massstab") = "number" THEN massWunsch = JSON_GET_FLOAT(konfig, "massstab") ELSE konfigFalsch("massstab")
+END IF
+IF massWunsch <= 0.0 THEN massWunsch = INT(WINDOW_DPI_X() * 4.0 + 0.5) / 4.0
+massWunsch = MAX(0.5, MIN(4.0, massWunsch))
+IF ABS(massWunsch - 1.0) > 0.01 THEN
+    TRY
+        GUI_SCALE(massWunsch)
+        uiMassstab = massWunsch
+    CATCH massFehler
+        uiMassstab = 1.0
+    END TRY
+END IF
+win = GUI_WINDOW(tr$("Drachenhauch"), 0, 0, schirmB(), schirmH())
 ' Jeder Reiter bekommt ein Kreuz -- ohne das war ein Reiter mit der MAUS
 ' gar nicht zu schliessen, nur mit Strg+W. Die mittlere Taste tut es auch.
 GUI_TABS_CLOSABLE(win, TRUE)
@@ -967,7 +999,7 @@ GUI_WINDOW_MOVABLE(win, FALSE)
 ' abtrennen; die Anordnung steht in der ide.json (`dock`). Das Rechteck
 ' setzt layout(), die Inhalte verteilt layoutLeisten -- die Widgets kommen
 ' weiter unten dazu (GUI_DOCK_ADD), wenn es sie gibt.
-GUI_DOCK(win, 0, 0, SCREENWIDTH(), SCREENHEIGHT())
+GUI_DOCK(win, 0, 0, schirmB(), schirmH())
 GUI_DOCK_PANEL(win, "projekt", tr$("Projekt"), "links")
 GUI_DOCK_PANEL(win, "gliederung", tr$("Gliederung"), "links")
 GUI_DOCK_PANEL(win, "ausgabe", tr$("Ausgabe"), "unten")
@@ -1250,9 +1282,16 @@ END SUB
 wzKnopf("neu", "Neue Datei (Strg+N)", "neu")
 wzKnopf("oeffnen", "Öffnen (Strg+O)", "oeffnen")
 wzKnopf("sichern", "Sichern (Strg+S)", "sichern")
+DIM wzSichern AS INTEGER : wzSichern = LEN(wzBefehle) - 1
 wzTrenner()
 wzKnopf("start", "Starten (F5)", "start")
 wzKnopf("stopp", "Stoppen (Umschalt+F5)", "stopp")
+DIM wzStopp AS INTEGER : wzStopp = LEN(wzBefehle) - 1
+' Stoppen geht nur, wenn etwas laeuft, Sichern nur mit einem Reiter -- vorher
+' sahen beide Knoepfe immer gleich bedienbar aus. Gesetzt wird nur beim
+' Wechsel (wzNachziehen in der Bildschleife).
+DIM wzStoppAn AS BOOLEAN : wzStoppAn = TRUE
+DIM wzSichernAn AS BOOLEAN : wzSichernAn = TRUE
 wzKnopf("debug", "Debuggen (F7)", "debuggen")
 wzKnopf("pruefen", "Prüfen (Umschalt+F7)", "pruefen")
 wzTrenner()
@@ -2447,11 +2486,21 @@ SUB konfigSichern()
     END TRY
 END SUB
 
+' Ein Eintrag der Liste: Name, dahinter der Ordner -- unter Windows mit
+' Rueckstrichen. Die Liste sammelt Wege aus dem Dialog (`\`), aus PATHJOIN
+' (`/`) und von der Kommandozeile; gemischt sah dieselbe Ablage nach zwei
+' verschiedenen aus.
+FUNCTION zuletztText$(pfad AS STRING) AS STRING
+    DIM ordner AS STRING : ordner = DIRNAME(pfad)
+    IF MID$(ordner, 1, 1) = ":" THEN ordner = REPLACE$(ordner, "/", CHR$(92))
+    RETURN BASENAME(pfad) + "   (" + ordner + ")"
+END FUNCTION
+
 SUB zuletztAnzeigen()
     DIM k AS INTEGER
     FOR k = 0 TO ZULETZT_MAX - 1
         IF k < LEN(zuletzt) THEN
-            GUI_MENU_TEXT(miZuletzt[k], BASENAME(zuletzt[k]) + "   (" + DIRNAME(zuletzt[k]) + ")")
+            GUI_MENU_TEXT(miZuletzt[k], zuletztText$(zuletzt[k]))
             GUI_MENU_ENABLE(miZuletzt[k], TRUE)
         ELSE
             GUI_MENU_TEXT(miZuletzt[k], "-")
@@ -2460,7 +2509,7 @@ SUB zuletztAnzeigen()
     NEXT
     GUI_LISTBOX_CLEAR(lstWkZuletzt)
     FOR k = 0 TO LEN(zuletzt) - 1
-        GUI_LISTBOX_ADD(lstWkZuletzt, BASENAME(zuletzt[k]) + "   (" + DIRNAME(zuletzt[k]) + ")")
+        GUI_LISTBOX_ADD(lstWkZuletzt, zuletztText$(zuletzt[k]))
     NEXT
 END SUB
 
@@ -2615,14 +2664,15 @@ FUNCTION aktivesFeldOderWk() AS GUI_WIDGET
 END FUNCTION
 
 SUB layout()
-    DIM w AS INTEGER : w = SCREENWIDTH()
-    DIM h AS INTEGER : h = SCREENHEIGHT()
+    DIM w AS INTEGER : w = schirmB()
+    DIM h AS INTEGER : h = schirmH()
     GUI_WINDOW_SET_BOUNDS(win, 0, 0, w, h)
     ' Widget-Koordinaten zaehlen ab dem INHALT: Menueleiste und Reiterleiste
     ' liegen darueber (zusammen 56 px) und gehen von der Hoehe ab -- sonst
     ' rutschen Eingabezeile und Status unter den Fensterrand (Stand 1 tat das).
-    DIM kopf AS INTEGER : kopf = 56
-    DIM hi AS INTEGER : hi = h - kopf
+    ' Seit es GUI_WINDOW_CONTENT_H gibt, sagt die Laufzeit, wie hoch Menue-
+    ' und Reiterleiste sind -- fest 56 stimmte nur bei der Vorgabeschrift.
+    DIM hi AS INTEGER : hi = GUI_WINDOW_CONTENT_H(win)
     DIM oben AS INTEGER : oben = 4
     ' Die Werkzeugleiste liegt ueber allem anderen und nimmt sich ihre Hoehe.
     DIM leisteH AS INTEGER : leisteH = 0
@@ -2956,7 +3006,7 @@ DIM ueberOffen AS BOOLEAN : ueberOffen = FALSE
 
 SUB ueberZeigen()
     GUI_SET_TEXT(lblUeber, ueberText$())
-    GUI_WINDOW_SET_BOUNDS(winUeber, (SCREENWIDTH() - 480) \ 2, 150, 480, 330)
+    GUI_WINDOW_SET_BOUNDS(winUeber, (schirmB() - 480) \ 2, 150, 480, 330)
     GUI_WINDOW_VISIBLE(winUeber, TRUE)
     GUI_WINDOW_MODAL(winUeber, TRUE)
     GUI_FOCUS(btnUeberOk)
@@ -3064,7 +3114,7 @@ SUB einstellungenZeigen()
     GUI_SET_VALUE(spHbGr, handbuchGroesse)
     GUI_SET_VALUE(spAuto, autoSichern)
     ' Die linke Kante bleibt, wo sie war: die zweite Spalte waechst nach rechts.
-    GUI_WINDOW_SET_BOUNDS(winEinst, (SCREENWIDTH() - 420) \ 2, 150, 820, 530)
+    GUI_WINDOW_SET_BOUNDS(winEinst, (schirmB() - 420) \ 2, 150, 820, 530)
     GUI_WINDOW_VISIBLE(winEinst, TRUE)
     einstOffen = TRUE
     GUI_FOCUS(cbHell)
@@ -3250,7 +3300,7 @@ SUB peekZeigen()
     NEXT
     GUI_SET_TEXT(taPeek, text)
     GUI_SET_TEXT(lblPeek, wortUnterMarke$() + " -- " + IIF(peekPfad = "", "", BASENAME(peekPfad) + ", ") + tr$("Zeile ") + STR$(dz))
-    GUI_WINDOW_SET_BOUNDS(winPeek, (SCREENWIDTH() - 720) \ 2, 240, 720, 300)
+    GUI_WINDOW_SET_BOUNDS(winPeek, (schirmB() - 720) \ 2, 240, 720, 300)
     GUI_WINDOW_VISIBLE(winPeek, TRUE)
     GUI_FOCUS(taPeek)
     ' Die Datei steht nur dann dabei, wenn es eine ANDERE ist -- sonst
@@ -3271,7 +3321,7 @@ SUB farbfeldNachziehen()
     IF LEN(roh) = 8 THEN roh = RIGHT$(roh, 6)
     GUI_SET_PICKED_COLOR(cpFarbe, COLOR_FROM_HEX("#" + roh))
     GUI_SET_TEXT(lblFarbe, "&H" + roh)
-    GUI_WINDOW_SET_BOUNDS(winFarbe, (SCREENWIDTH() - 320) \ 2, 200, 320, 300)
+    GUI_WINDOW_SET_BOUNDS(winFarbe, (schirmB() - 320) \ 2, 200, 320, 300)
     GUI_WINDOW_VISIBLE(winFarbe, TRUE)
     GUI_FOCUS(cpFarbe)
     protokoll("farbfeld " + STR$(farbStart))
@@ -4695,19 +4745,35 @@ SUB gliederungFuellen(quelle AS STRING)
     DIM zeilen AS ARRAY OF INTEGER : zeilen = []
     DIM artLaenge AS ARRAY OF INTEGER : artLaenge = []   ' -1 = ein Kind (nur der Name)
     DIM schl AS STRING : schl = ""
+    ' Die Quelltextzeilen: die Oberklasse und ABSTRACT stehen nur im TEXT,
+    ' CODE_SYMBOLS$ nennt Art, Name und Zeilen.
+    DIM qz AS ARRAY OF STRING : qz = SPLIT$(quelle, NL)
     DIM i AS INTEGER
     FOR i = 0 TO n - 1
         DIM p AS STRING : p = STR$(i)
+        DIM gVon AS INTEGER : gVon = JSON_GET_INT(j, p + ".von")
         DIM eintrag AS STRING : eintrag = JSON_GET_STRING(j, p + ".art") + " " + JSON_GET_STRING(j, p + ".name")
-        ARRAY_PUSH(namen, eintrag) : ARRAY_PUSH(zeilen, JSON_GET_INT(j, p + ".von"))
+        ' `class Hund : Tier` -- welche Klasse wovon erbt, sieht man sonst
+        ' nur in der Kopfzeile selbst.
+        IF LOWER$(JSON_GET_STRING(j, p + ".art")) = "class" AND gVon >= 1 AND gVon <= LEN(qz) THEN
+            DIM gBasis AS STRING : gBasis = extendsName$(qz[gVon - 1])
+            IF gBasis <> "" THEN eintrag = eintrag + " : " + gBasis
+        END IF
+        ARRAY_PUSH(namen, eintrag) : ARRAY_PUSH(zeilen, gVon)
         ARRAY_PUSH(artLaenge, LEN(JSON_GET_STRING(j, p + ".art")))
-        schl = schl + eintrag + ":" + STR$(JSON_GET_INT(j, p + ".von")) + ";"
+        schl = schl + eintrag + ":" + STR$(gVon) + ";"
         DIM m AS INTEGER
         FOR m = 0 TO JSON_LEN(j, p + ".kinder") - 1
             DIM pk AS STRING : pk = p + ".kinder." + STR$(m)
-            ARRAY_PUSH(namen, "    " + JSON_GET_STRING(j, pk + ".name")) : ARRAY_PUSH(zeilen, JSON_GET_INT(j, pk + ".von"))
+            DIM kVon AS INTEGER : kVon = JSON_GET_INT(j, pk + ".von")
+            DIM kName AS STRING : kName = JSON_GET_STRING(j, pk + ".name")
+            ' Eine nur angekuendigte Methode (ABSTRACT) traegt das Wort dahinter.
+            IF kVon >= 1 AND kVon <= LEN(qz) THEN
+                IF LEFT$(UPPER$(TRIM$(qz[kVon - 1])), 9) = "ABSTRACT " THEN kName = kName + "  abstract"
+            END IF
+            ARRAY_PUSH(namen, "    " + kName) : ARRAY_PUSH(zeilen, kVon)
             ARRAY_PUSH(artLaenge, -1)
-            schl = schl + JSON_GET_STRING(j, pk + ".name") + ":" + STR$(JSON_GET_INT(j, pk + ".von")) + ";"
+            schl = schl + kName + ":" + STR$(kVon) + ";"
         NEXT
     NEXT
     ' Dieselben Bloecke sind die faltbaren -- die Laufzeit kennt keine
@@ -4755,6 +4821,8 @@ SUB gliederungFuellen(quelle AS STRING)
         IF artLaenge[k] >= 0 THEN
             GUI_LISTBOX_SPANS(lstGliederung, gz, [0, artLaenge[k] + 1], _
                 [artLaenge[k], LEN(namen[k]) - artLaenge[k] - 1], [F_SCHLUESSEL, F_GRUND])
+        ELSEIF RIGHT$(namen[k], 10) = "  abstract" THEN
+            GUI_LISTBOX_SPANS(lstGliederung, gz, [4, LEN(namen[k]) - 8], [LEN(namen[k]) - 14, 8], [F_GRUND, F_SCHLUESSEL])
         ELSE
             GUI_LISTBOX_SPANS(lstGliederung, gz, [4], [LEN(namen[k]) - 4], [F_GRUND])
         END IF
@@ -5008,7 +5076,7 @@ SUB gliederungNachziehen()
     DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstGliederung)
     DIM ueber AS BOOLEAN : ueber = GUI_HIT_TEST(MOUSEX(), MOUSEY()) = lstGliederung
     DIM randX AS INTEGER : randX = GUI_GET_X(lstGliederung) + GUI_GET_W(lstGliederung) - 16
-    IF MOUSE_HIT(0) THEN glDruck = ueber AND MOUSEX() < randX
+    IF MOUSE_HIT(0) THEN glDruck = ueber AND logisch(MOUSEX()) < randX
     IF MOUSE_RELEASED(0) THEN
         IF glDruck AND ueber THEN gliederungAnspringen(TRUE)
         glDruck = FALSE
@@ -5313,8 +5381,13 @@ SUB zaehlerSetzen_(ta AS GUI_WIDGET)
         DIM t AS STRING : t = TRIM$(zeilen[i])
         DIM gross AS STRING : gross = UPPER$(t)
         DIM ab AS INTEGER : ab = -1
-        IF LEFT$(gross, 4) = "SUB " THEN ab = 4
-        IF LEFT$(gross, 9) = "FUNCTION " THEN ab = 9
+        ' PRIVATE und ABSTRACT davor: auch eine nur angekuendigte Methode
+        ' wird aufgerufen (ueber ihre Unterklassen).
+        DIM vorn AS INTEGER : vorn = 0
+        IF LEFT$(gross, 8) = "PRIVATE " THEN vorn = 8
+        IF LEFT$(gross, 9) = "ABSTRACT " THEN vorn = 9
+        IF MID$(gross, vorn, 4) = "SUB " THEN ab = vorn + 4
+        IF MID$(gross, vorn, 9) = "FUNCTION " THEN ab = vorn + 9
         IF ab < 0 THEN CONTINUE
         DIM rest AS STRING : rest = TRIM$(MID$(t, ab))
         DIM kl AS INTEGER : kl = INSTR(rest, "(")
@@ -5359,14 +5432,123 @@ SUB zaehlerSetzen_(ta AS GUI_WIDGET)
         zaehlerAddieren(summe, zaehlungVon$(pfad))
     NEXT
     DIM texte AS ARRAY OF STRING : texte = []
+    DIM ueber AS MAP OF STRING : ueber = ueberschreibTexte(quelle)
     FOR i = 0 TO LEN(nm) - 1
         DIM k AS INTEGER : k = MAPGET(summe, LOWER$(nm[i]))
-        ARRAY_PUSH(texte, IIF(k = 0, "nicht aufgerufen", IIF(k = 1, "1 Aufruf", STR$(k) + " Aufrufe")))
+        DIM zt AS STRING : zt = IIF(k = 0, "nicht aufgerufen", IIF(k = 1, "1 Aufruf", STR$(k) + " Aufrufe"))
+        IF MAPHAS(ueber, STR$(zl[i])) THEN zt = zt + "   ·   " + MAPGET(ueber, STR$(zl[i]))
+        ARRAY_PUSH(texte, zt)
     NEXT
     zaehlFeld = ta : zaehlZeilen = zl : zaehlNamen = nm : zaehlTexte = texte
     hinweiseZeigen(ta)
     protokoll("aufrufzaehler " + STR$(LEN(zl)))
 END SUB
+
+' Wer was ueberschreibt, je Zeile einer Methode (Schluessel = Zeilennummer):
+' "überschreibt Tier.laut" / "füllt Tier.laut aus" (die Vorfahrin kuendigt
+' sie nur an) und "überschrieben in Hund, Katze" / "ausgefüllt in Hund" bzw.
+' "nirgends ausgefüllt". Nur die Klassen DIESER Datei -- eine Oberklasse in
+' einer anderen Datei kennt CODE_CLASSES$ nicht.
+FUNCTION ueberschreibTexte(quelle AS STRING) AS MAP OF STRING
+    DIM aus AS MAP OF STRING : aus = {}
+    IF INSTR(UPPER$(quelle), "CLASS ") < 0 THEN RETURN aus
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_CLASSES$(quelle))
+    DIM qz AS ARRAY OF STRING : qz = SPLIT$(quelle, NL)
+    DIM kName AS ARRAY OF STRING : kName = []
+    DIM kBasis AS ARRAY OF STRING : kBasis = []
+    ' je Methode: Klasse (Index), Name klein, Name wie geschrieben, Zeile, ABSTRACT?
+    DIM mK AS ARRAY OF INTEGER : mK = []
+    DIM mName AS ARRAY OF STRING : mName = []
+    DIM mSchrift AS ARRAY OF STRING : mSchrift = []
+    DIM mZeile AS ARRAY OF INTEGER : mZeile = []
+    DIM mAbstr AS ARRAY OF BOOLEAN : mAbstr = []
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "") - 1
+        DIM p AS STRING : p = STR$(i)
+        IF JSON_GET_STRING(j, p + ".art") <> "class" THEN CONTINUE
+        ARRAY_PUSH(kName, JSON_GET_STRING(j, p + ".name"))
+        ARRAY_PUSH(kBasis, JSON_GET_STRING(j, p + ".basis"))
+        DIM m AS INTEGER
+        FOR m = 0 TO JSON_LEN(j, p + ".mitglieder") - 1
+            DIM pm AS STRING : pm = p + ".mitglieder." + STR$(m)
+            DIM art AS STRING : art = JSON_GET_STRING(j, pm + ".art")
+            IF art <> "sub" AND art <> "function" THEN CONTINUE
+            DIM z AS INTEGER : z = JSON_GET_INT(j, pm + ".zeile")
+            ARRAY_PUSH(mK, LEN(kName) - 1)
+            ARRAY_PUSH(mName, LOWER$(JSON_GET_STRING(j, pm + ".name")))
+            ARRAY_PUSH(mSchrift, JSON_GET_STRING(j, pm + ".name"))
+            ARRAY_PUSH(mZeile, z)
+            DIM ab AS BOOLEAN : ab = FALSE
+            IF z >= 1 AND z <= LEN(qz) THEN ab = LEFT$(UPPER$(TRIM$(qz[z - 1])), 9) = "ABSTRACT "
+            ARRAY_PUSH(mAbstr, ab)
+        NEXT
+    NEXT
+    IF LEN(kName) < 2 THEN RETURN aus
+    FOR i = 0 TO LEN(mK) - 1
+        DIM teile AS ARRAY OF STRING : teile = []
+        ' nach oben: die naechste Vorfahrin mit derselben Methode
+        DIM oben AS INTEGER : oben = klassenIndexIn(kName, kBasis[mK[i]])
+        DIM runde AS INTEGER : runde = 0
+        WHILE oben >= 0 AND runde < 30
+            runde = runde + 1
+            DIM vt AS INTEGER : vt = methodeIn(mK, mName, oben, mName[i])
+            IF vt >= 0 THEN
+                IF mAbstr[vt] THEN
+                    ARRAY_PUSH(teile, "füllt " + kName[oben] + "." + mSchrift[vt] + " aus")
+                ELSE
+                    ARRAY_PUSH(teile, "überschreibt " + kName[oben] + "." + mSchrift[vt])
+                END IF
+                BREAK
+            END IF
+            oben = klassenIndexIn(kName, kBasis[oben])
+        WEND
+        ' nach unten: jede Klasse, die (ueber Zwischenstufen) erbt und sie hat
+        DIM unten AS ARRAY OF STRING : unten = []
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(kName) - 1
+            IF k = mK[i] THEN CONTINUE
+            IF NOT erbtVon(kName, kBasis, k, mK[i]) THEN CONTINUE
+            IF methodeIn(mK, mName, k, mName[i]) >= 0 THEN ARRAY_PUSH(unten, kName[k])
+        NEXT
+        IF LEN(unten) > 0 THEN
+            ARRAY_PUSH(teile, IIF(mAbstr[i], "ausgefüllt in ", "überschrieben in ") + JOIN$(unten, ", "))
+        ELSEIF mAbstr[i] THEN
+            ARRAY_PUSH(teile, "nirgends ausgefüllt")
+        END IF
+        IF LEN(teile) > 0 THEN MAPPUT(aus, STR$(mZeile[i]), JOIN$(teile, "   ·   "))
+    NEXT
+    RETURN aus
+END FUNCTION
+
+FUNCTION klassenIndexIn(namen AS ARRAY OF STRING, name AS STRING) AS INTEGER
+    IF name = "" THEN RETURN -1
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(namen) - 1
+        IF LOWER$(namen[i]) = LOWER$(name) THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Die Methode `name` (klein) der Klasse Nummer `k`, -1 = hat sie nicht.
+FUNCTION methodeIn(mK AS ARRAY OF INTEGER, mName AS ARRAY OF STRING, k AS INTEGER, name AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(mK) - 1
+        IF mK[i] = k AND mName[i] = name THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Erbt Klasse `k` (ueber Zwischenstufen) von Klasse `vorfahr`?
+FUNCTION erbtVon(kName AS ARRAY OF STRING, kBasis AS ARRAY OF STRING, k AS INTEGER, vorfahr AS INTEGER) AS BOOLEAN
+    DIM b AS INTEGER : b = klassenIndexIn(kName, kBasis[k])
+    DIM runde AS INTEGER : runde = 0
+    WHILE b >= 0 AND runde < 30
+        IF b = vorfahr THEN RETURN TRUE
+        b = klassenIndexIn(kName, kBasis[b])
+        runde = runde + 1
+    WEND
+    RETURN FALSE
+END FUNCTION
 
 ' Ueber die Eintraege der Zaehlung, nicht je gesuchtem Namen mit INSTR
 ' durch die ganze Zaehlung: das war Namen mal Laenge, und das je Datei des
@@ -7629,9 +7811,10 @@ SUB bildTippNachziehen(pfad AS STRING, mx AS INTEGER, my AS INTEGER)
     IF btBild < 0 THEN RETURN
     GUI_SET_IMAGE(imgBildTipp, btBild)
     GUI_SET_TEXT(lblBildTipp, BASENAME(pfad) + "  " + STR$(IMAGEWIDTH(btBild)) + "x" + STR$(IMAGEHEIGHT(btBild)))
-    DIM x AS INTEGER : x = MIN(mx + 18, SCREENWIDTH() - 190)
-    DIM y AS INTEGER : y = my + 22
-    IF y + 210 > SCREENHEIGHT() THEN y = my - 222
+    ' mx/my sind Bildschirm-Pixel (die Maus), das Fenster liegt in Punkten.
+    DIM x AS INTEGER : x = MIN(logisch(mx) + 18, schirmB() - 190)
+    DIM y AS INTEGER : y = logisch(my) + 22
+    IF y + 210 > schirmH() THEN y = logisch(my) - 222
     GUI_WINDOW_SET_BOUNDS(winBildTipp, x, y, 180, 200)
     GUI_WINDOW_VISIBLE(winBildTipp, TRUE)
     protokoll("bildtipp " + BASENAME(pfad) + " " + STR$(IMAGEWIDTH(btBild)) + "x" + STR$(IMAGEHEIGHT(btBild)))
@@ -9083,9 +9266,9 @@ SUB vervollFensterZeigen(fokus AS BOOLEAN)
     DIM mh AS INTEGER
     (mx, my, mh) = GUI_TEXTAREA_CARET_XY(ta)
     IF mx >= 0 THEN
-        vx = MAX(0, MIN(mx, SCREENWIDTH() - 330))
+        vx = MAX(0, MIN(mx, schirmB() - 330))
         vy = my + mh + 2
-        IF vy + 240 > SCREENHEIGHT() THEN vy = MAX(0, my - 242)
+        IF vy + 240 > schirmH() THEN vy = MAX(0, my - 242)
     END IF
     GUI_WINDOW_SET_BOUNDS(winVervoll, vx, vy, 320, 240)
     GUI_WINDOW_VISIBLE(winVervoll, TRUE)
@@ -9563,7 +9746,7 @@ SUB sucheOeffnen(mitErsetzen AS BOOLEAN)
     GUI_SET_VISIBLE(btnSuErsetzen, mitErsetzen)
     GUI_SET_VISIBLE(btnSuAlle, mitErsetzen)
     GUI_WINDOW_TITLE(winSuche, IIF(mitErsetzen, tr$("Suchen und ersetzen"), tr$("Suchen")))
-    GUI_WINDOW_SET_BOUNDS(winSuche, MAX(0, SCREENWIDTH() - 500), 104, 480, IIF(mitErsetzen, 146, 112))
+    GUI_WINDOW_SET_BOUNDS(winSuche, MAX(0, schirmB() - 500), 104, 480, IIF(mitErsetzen, 146, 112))
     GUI_WINDOW_VISIBLE(winSuche, TRUE)
     sucheOffen = TRUE
     GUI_FOCUS(tfSuche)
@@ -11892,7 +12075,7 @@ END FUNCTION
 ' linke obere Ecke und die Hoehe bleiben, damit die Knoepfe dort stehen,
 ' wo man sie kennt.
 SUB umbauFensterSetzen()
-    DIM b AS INTEGER : b = MAX(900, SCREENWIDTH() - 280)
+    DIM b AS INTEGER : b = MAX(900, schirmB() - 280)
     GUI_WINDOW_SET_BOUNDS(winUmbau, 240, 90, b, 620)
     protokoll("umbau fenster " + STR$(b) + " text " + STR$(GUI_GET_W(taUmbau)))
 END SUB
@@ -12475,11 +12658,7 @@ SUB klassenLesen()
             ' Die Oberklasse steht nur im TEXT der Kopfzeile -- CODE_SYMBOLS$
             ' kennt sie nicht.
             DIM basis AS STRING : basis = ""
-            IF von >= 1 AND von <= LEN(zeilen) THEN
-                DIM kopf AS STRING : kopf = UPPER$(zeilen[von - 1])
-                DIM ex AS INTEGER : ex = INSTR(kopf, " EXTENDS ")
-                IF ex >= 0 THEN basis = TRIM$(MID$(zeilen[von - 1], ex + 9))
-            END IF
+            IF von >= 1 AND von <= LEN(zeilen) THEN basis = extendsName$(zeilen[von - 1])
             DIM mm AS STRING : mm = "|"
             DIM m AS INTEGER
             FOR m = 0 TO JSON_LEN(j, p + ".kinder") - 1
@@ -12490,6 +12669,21 @@ SUB klassenLesen()
         NEXT
     NEXT
 END SUB
+
+' Der Name hinter EXTENDS in einer CLASS-Kopfzeile, "" ohne. Nur der Name:
+' ein Kommentar dahinter (`CLASS Hund EXTENDS Tier ' Haustier`) gehoerte
+' sonst mit zum Namen, und die Klasse fand ihre Oberklasse nicht.
+FUNCTION extendsName$(zeile AS STRING) AS STRING
+    DIM ex AS INTEGER : ex = INSTR(UPPER$(zeile), " EXTENDS ")
+    IF ex < 0 THEN RETURN ""
+    DIM rest AS STRING : rest = TRIM$(MID$(zeile, ex + 9))
+    DIM e AS INTEGER : e = 0
+    WHILE e < LEN(rest)
+        IF NOT istWortzeichen(MID$(rest, e, 1)) THEN BREAK
+        e = e + 1
+    WEND
+    RETURN LEFT$(rest, e)
+END FUNCTION
 
 FUNCTION klasseIndex(name AS STRING) AS INTEGER
     DIM klein AS STRING : klein = LOWER$(name)
@@ -15423,8 +15617,8 @@ SUB handbuchLayout()
     DIM b AS INTEGER : b = GUI_WINDOW_GET_W(winHandbuch)
     DIM h AS INTEGER : h = GUI_WINDOW_GET_H(winHandbuch)
     IF NOT GUI_WINDOW_SHOWN(winHandbuch) THEN
-        b = MAX(900, MIN(1500, SCREENWIDTH() - HB_X - 40))
-        h = MAX(500, MIN(1000, SCREENHEIGHT() - HB_Y - 40))
+        b = MAX(900, MIN(1500, schirmB() - HB_X - 40))
+        h = MAX(500, MIN(1000, schirmH() - HB_Y - 40))
         GUI_WINDOW_SET_BOUNDS(winHandbuch, HB_X, HB_Y, b, h)
     END IF
     hbMassStand = STR$(b) + "x" + STR$(h)
@@ -16060,7 +16254,7 @@ SUB listingDrucken()
     DIM hatAuswahl AS BOOLEAN : hatAuswahl = GUI_TEXTAREA_SELECTION$(aktivesFeld()) <> ""
     GUI_SET_ENABLED(cbDruckAuswahl, hatAuswahl)
     GUI_SET_CHECKED(cbDruckAuswahl, hatAuswahl AND GUI_CHECKED(cbDruckAuswahl))
-    GUI_WINDOW_SET_BOUNDS(winDruck, (SCREENWIDTH() - 400) \ 2, (SCREENHEIGHT() - 270) \ 2, 400, 270)
+    GUI_WINDOW_SET_BOUNDS(winDruck, (schirmB() - 400) \ 2, (schirmH() - 270) \ 2, 400, 270)
     GUI_WINDOW_VISIBLE(winDruck, TRUE)
     GUI_FOCUS(btnDruckOk)              ' holt das Fenster nach vorn
 END SUB
@@ -16329,7 +16523,7 @@ SUB themenZeigen()
     themenFilterZuletzt = ""
     GUI_LISTBOX_FILTER(lstThemen, "")
     GUI_SET_TEXT(lblThemen, STR$(zahl) + tr$(" Beispiele in ") + STR$(themen) + tr$(" Themen"))
-    GUI_WINDOW_SET_BOUNDS(winThemen, MAX(0, (SCREENWIDTH() - 760) \ 2), 80, 760, 620)
+    GUI_WINDOW_SET_BOUNDS(winThemen, MAX(0, (schirmB() - 760) \ 2), 80, 760, 620)
     GUI_WINDOW_VISIBLE(winThemen, TRUE)
     GUI_FOCUS(tfThemenFilter)          ' holt das Fenster nach vorn
     protokoll("themen " + STR$(themen) + " beispiele " + STR$(zahl))
@@ -18508,7 +18702,7 @@ SUB waehlerOeffnen(art AS STRING, titel AS STRING)
     GUI_WINDOW_TITLE(winPalette, titel)
     GUI_SET_TEXT(tfPalette, "")
     paletteLetzterFilter = "-"
-    GUI_WINDOW_SET_BOUNDS(winPalette, (SCREENWIDTH() - 440) \ 2, 80, 440, 340)
+    GUI_WINDOW_SET_BOUNDS(winPalette, (schirmB() - 440) \ 2, 80, 440, 340)
     GUI_WINDOW_VISIBLE(winPalette, TRUE)
     paletteOffen = TRUE
     GUI_FOCUS(tfPalette)
@@ -19168,6 +19362,15 @@ schnipsel("SUB", "sub", "SUB |()" + NL + NL + "END SUB")
 schnipsel("FUNCTION", "function", "FUNCTION |() AS INTEGER" + NL + "    RETURN 0" + NL + "END FUNCTION")
 schnipsel("CLASS mit Init", "class", "CLASS |" + NL + "    DIM wert AS INTEGER" + NL + NL + "    SUB Init()" + NL + "        Self.wert = 0" + NL + "    END SUB" + NL + "END CLASS")
 schnipsel("TRY ... CATCH", "try", "TRY" + NL + "    |" + NL + "CATCH e" + NL + "    PRINT " + CHR$(34) + "Fehler: " + CHR$(34) + " + e" + NL + "END TRY")
+schnipsel("CLASS mit Oberklasse (EXTENDS)", "extends", "CLASS | EXTENDS Basis" + NL + "    SUB Init()" + NL + "        SUPER.Init()" + NL + "    END SUB" + NL + "END CLASS")
+schnipsel("ABSTRACT-Methode (nur angekündigt)", "abstract", "ABSTRACT FUNCTION |() AS INTEGER")
+schnipsel("PROPERTY GET/SET", "property", "PROPERTY GET |() AS INTEGER" + NL + "    RETURN Self.wert" + NL + "END PROPERTY" + NL + NL + "PROPERTY SET wert(neu AS INTEGER)" + NL + "    Self.wert = neu" + NL + "END PROPERTY")
+schnipsel("TRY ... CATCH ... FINALLY", "finally", "TRY" + NL + "    |" + NL + "CATCH e" + NL + "    PRINT " + CHR$(34) + "Fehler: " + CHR$(34) + " + e" + NL + "FINALLY" + NL + NL + "END TRY")
+schnipsel("Lambda (Funktion als Wert)", "lambda", "DIM f AS FUNCREF" + NL + "f = FUNCTION(x) |")
+schnipsel("ENUM", "enum", "ENUM |" + NL + "    ERSTER" + NL + "    ZWEITER" + NL + "END ENUM")
+schnipsel("DO ... LOOP UNTIL", "do", "DO" + NL + "    |" + NL + "LOOP UNTIL fertig")
+schnipsel("Fremde Bibliothek (DECLARE ... LIB)", "declare", "DECLARE FUNCTION |name LIB " + CHR$(34) + "c" + CHR$(34) + " (s AS TEXT) AS ZEIGER")
+schnipsel("IMPORT als Namensraum", "importas", "IMPORT " + CHR$(34) + "|.dh" + CHR$(34) + " AS name")
 schnipsel("Datei zeilenweise lesen", "readlines", "DIM zeilen AS ARRAY OF STRING" + NL + "zeilen = READLINES(|)" + NL + "DIM z AS STRING" + NL + "FOR EACH z IN zeilen" + NL + "    PRINT z" + NL + "NEXT")
 schnipsel(tr$("gui-Fenster mit Knopf"), "gui", "IMPORT " + CHR$(34) + "gui" + CHR$(34) + NL + "DIM win AS GUI_WINDOW" + NL + "win = GUI_WINDOW(" + CHR$(34) + tr$("Fenster") + CHR$(34) + ", 60, 60, 320, 200)" + NL + "DIM knopf AS GUI_WIDGET" + NL + "knopf = GUI_BUTTON(win, " + CHR$(34) + tr$("Los") + CHR$(34) + ", 20, 20, 100, 30)" + NL + NL + "WHILE NOT QUITREQUESTED()" + NL + "    GUI_UPDATE()" + NL + "    IF GUI_CLICKED(knopf) THEN |" + NL + "    CLS(BLACK)" + NL + "    GUI_DRAW()" + NL + "    FLIP()" + NL + "WEND")
 schnipsel("Sprite mit Animation", "sprite", "DIM held AS SPRITE" + NL + "held = SPRITE_NEW(LOADIMAGE(|), 32, 32)" + NL + "SPRITE_ADD_ANIM(held, " + CHR$(34) + "lauf" + CHR$(34) + ", 0, 3, 8.0)" + NL + "SPRITE_PLAY(held, " + CHR$(34) + "lauf" + CHR$(34) + ")")
@@ -19374,6 +19577,14 @@ WHILE NOT beenden
     terminalNachziehen()
     terminalVerlaufTasten()
     ' Werkzeugleiste: jeder Knopf ruft denselben Befehl wie sein Menuepunkt.
+    IF (prozess >= 0) <> wzStoppAn THEN
+        wzStoppAn = prozess >= 0
+        GUI_TOOLBAR_ENABLE(leiste, wzStopp, wzStoppAn)
+    END IF
+    IF (tabAnzahl > 0) <> wzSichernAn THEN
+        wzSichernAn = tabAnzahl > 0
+        GUI_TOOLBAR_ENABLE(leiste, wzSichern, wzSichernAn)
+    END IF
     DIM wzc AS INTEGER : wzc = GUI_TOOLBAR_CLICKED(leiste)
     IF wzc >= 0 THEN
         IF wzBefehle[wzc] <> "" THEN
@@ -19404,7 +19615,9 @@ WHILE NOT beenden
         ' Nur wenn das Hauptfenster an der Stelle OBEN liegt -- sonst gehoert
         ' das Rad dem Fenster darueber (Handbuch, Palette ...), und bis
         ' 2026-09-21 rollten beide zugleich.
-        IF kmx >= kfX AND kmx < kfX + kfB AND kmy >= kfY AND kmy < kfY + kfH AND GUI_WINDOW_AT(kmx, kmy) = win THEN
+        DIM klx AS INTEGER : klx = logisch(kmx)
+        DIM kly AS INTEGER : kly = logisch(kmy)
+        IF klx >= kfX AND klx < kfX + kfB AND kly >= kfY AND kly < kfY + kfH AND GUI_WINDOW_AT(kmx, kmy) = win THEN
             DIM krad AS FLOAT : krad = MOUSEWHEEL_Y()
             IF krad <> 0 THEN
                 DIM kalt AS INTEGER : kalt = kachelVersatz
