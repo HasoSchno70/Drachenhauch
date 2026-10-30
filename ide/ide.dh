@@ -339,9 +339,32 @@ DIM debugErstWarten AS BOOLEAN : debugErstWarten = FALSE
 DIM debugErstHalt AS STRING : debugErstHalt = ""
 ' Das Programm steht in einem INPUT und wartet auf die Eingabezeile.
 DIM debugEingabe AS BOOLEAN : debugEingabe = FALSE
-' Die Datei je Zeile des Aufrufstapels (Doppelklick springt dorthin).
-DIM stapelDateien AS ARRAY OF STRING : stapelDateien = []
-DIM stapelZeilen AS ARRAY OF INTEGER : stapelZeilen = []
+' Eine Stelle im Projekt: Datei, Zeile und, wo man sie kennt, die Spalte.
+' Zurueck/Vorwaerts, Lesezeichen, Aufrufstapel, Fundstellen und der
+' Aufrufer-Baum fuehrten die Teile bis 2026-10-30 in je eigenen Feldern.
+CLASS CodeStelle
+    DIM pfad AS STRING
+    DIM zeile AS INTEGER
+    DIM spalte AS INTEGER
+    SUB Init(p AS STRING, z AS INTEGER, sp AS INTEGER)
+        pfad = p : zeile = z : spalte = sp
+    END SUB
+    FUNCTION gleich(p AS STRING, z AS INTEGER) AS BOOLEAN
+        RETURN pfad = p AND zeile = z
+    END FUNCTION
+END CLASS
+
+' Ein Knoten im Aufrufer-Baum ist eine Stelle mit seiner Knotennummer.
+CLASS AufrufStelle EXTENDS CodeStelle
+    DIM knoten AS INTEGER
+    SUB Init(k AS INTEGER, p AS STRING, z AS INTEGER)
+        SUPER.Init(p, z, 1)
+        knoten = k
+    END SUB
+END CLASS
+
+' Je Zeile des Aufrufstapels die Stelle (Doppelklick springt dorthin).
+DIM stapelStellen AS ARRAY OF CodeStelle : stapelStellen = []
 ' Ein Haltepunkt. Bis 2026-10-30 sechs Felder nebeneinander -- und weil die
 ' hinteren erst spaeter dazukamen, gab es eine Routine, die sie fuer eine
 ' alte ide.json auf die Laenge der Zeilen auffuellte, und Abfragen, die
@@ -373,8 +396,7 @@ DIM markenIdx AS ARRAY OF INTEGER : markenIdx = []
 DIM markenGesetzt AS ARRAY OF INTEGER : markenGesetzt = []
 
 ' Lesezeichen (Strg+F2 setzt, F2 springt zum naechsten)
-DIM lzDateien AS ARRAY OF STRING : lzDateien = []
-DIM lzZeilen AS ARRAY OF INTEGER : lzZeilen = []
+DIM lesezeichen AS ARRAY OF CodeStelle : lesezeichen = []
 
 ' Export als eigenstaendiges Programm (dhrt --export), ein eigener Prozess
 DIM exportProzess AS INTEGER : exportProzess = -1
@@ -550,8 +572,7 @@ DIM blockBis AS ARRAY OF INTEGER : blockBis = []   ' "" waere eine echte Glieder
 
 ' Suche im Projekt: die Trefferliste teilt sich die Liste mit den Problemen.
 DIM problemModus AS INTEGER : problemModus = 0      ' 0 Probleme, 1 Suche
-DIM sucheDateien AS ARRAY OF STRING : sucheDateien = []
-DIM sucheZeilen AS ARRAY OF INTEGER : sucheZeilen = []
+DIM fundstellen AS ARRAY OF CodeStelle : fundstellen = []
 
 ' Profil
 DIM profilZeilen AS ARRAY OF INTEGER : profilZeilen = []
@@ -1049,8 +1070,7 @@ IF JSON_HAS(konfig, "lesezeichen") THEN
         DIM llD AS STRING : llD = kText(llP + ".datei", "")
         DIM llZ AS INTEGER : llZ = kInt(llP + ".zeile", 0)
         IF llD = "" OR llZ < 1 THEN CONTINUE
-        ARRAY_PUSH(lzDateien, llD)
-        ARRAY_PUSH(lzZeilen, llZ)
+        ARRAY_PUSH(lesezeichen, NEW CodeStelle(llD, llZ, 1))
     NEXT
 END IF
 autoSichern = MAX(0, MIN(120, kInt("autosichern", autoSichern)))
@@ -2647,10 +2667,10 @@ SUB konfigSichern()
         JSON_APPEND_JSON(konfig, "haltepunkte", hpE)
     NEXT
     JSON_SET_JSON(konfig, "lesezeichen", JSON_NEW_ARRAY())
-    FOR hk = 0 TO LEN(lzZeilen) - 1
+    FOR hk = 0 TO LEN(lesezeichen) - 1
         DIM lzE AS JSON_HANDLE : lzE = JSON_NEW_OBJECT()
-        JSON_SET_STRING(lzE, "datei", lzDateien[hk])
-        JSON_SET_INT(lzE, "zeile", lzZeilen[hk])
+        JSON_SET_STRING(lzE, "datei", lesezeichen[hk].pfad)
+        JSON_SET_INT(lzE, "zeile", lesezeichen[hk].zeile)
         JSON_APPEND_JSON(konfig, "lesezeichen", lzE)
     NEXT
     JSON_SET_JSON(konfig, "falten_pfade", JSON_PARSE("[]"))
@@ -5320,11 +5340,11 @@ END SUB
 SUB problemAnspringen()
     DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstProbleme)
     IF problemModus = 1 THEN
-        IF sel < 0 OR sel >= LEN(sucheZeilen) THEN RETURN
-        DIM sd AS STRING : sd = sucheDateien[sel]
+        IF sel < 0 OR sel >= LEN(fundstellen) THEN RETURN
+        DIM sd AS STRING : sd = fundstellen[sel].pfad
         IF MID$(sd, 1, 1) = ":" OR LEFT$(sd, 1) = "/" THEN dateiOeffnen(sd) ELSE dateiOeffnen(PATHJOIN(projektOrdner, sd))
         DIM tf AS GUI_WIDGET : tf = aktivesFeld()
-        IF tf >= 0 THEN GUI_TEXTAREA_GOTO(tf, sucheZeilen[sel], 1) : GUI_FOCUS(tf)
+        IF tf >= 0 THEN GUI_TEXTAREA_GOTO(tf, fundstellen[sel].zeile, 1) : GUI_FOCUS(tf)
         RETURN
     END IF
     IF sel < 0 OR sel >= LEN(problemZeilen) THEN RETURN
@@ -5349,8 +5369,7 @@ DIM suchLaufGesucht AS STRING : suchLaufGesucht = ""
 DIM suchLaufZweitens AS STRING : suchLaufZweitens = ""
 DIM suchLaufTreffer AS INTEGER : suchLaufTreffer = 0
 DIM suchLaufInDateien AS INTEGER : suchLaufInDateien = 0
-DIM suchLaufSd AS ARRAY OF STRING : suchLaufSd = []
-DIM suchLaufSz AS ARRAY OF INTEGER : suchLaufSz = []
+DIM suchLaufFunde AS ARRAY OF CodeStelle : suchLaufFunde = []
 
 SUB projektSuchen(gesucht AS STRING, zweitens AS STRING)
     IF gesucht = "" THEN RETURN
@@ -5361,8 +5380,7 @@ SUB projektSuchen(gesucht AS STRING, zweitens AS STRING)
     suchLaufZweitens = zweitens
     suchLaufTreffer = 0
     suchLaufInDateien = 0
-    suchLaufSd = []
-    suchLaufSz = []
+    suchLaufFunde = []
     suchLauf = TRUE
     problemModus = 1
     trefferKaestchen(FALSE)
@@ -5388,8 +5406,7 @@ SUB suchSchritt()
         FOR i = 0 TO LEN(zeilen) - 1
             IF suchLaufTreffer >= 500 THEN BREAK
             IF passtSuche(zeilen[i], suchLaufGesucht) OR (suchLaufZweitens <> "" AND passtSuche(zeilen[i], suchLaufZweitens)) THEN
-                ARRAY_PUSH(suchLaufSd, d)
-                ARRAY_PUSH(suchLaufSz, i + 1)
+                ARRAY_PUSH(suchLaufFunde, NEW CodeStelle(d, i + 1, 1))
                 GUI_LISTBOX_ADD(lstProbleme, d + ":" + STR$(i + 1) + ": " + TRIM$(zeilen[i]))
                 suchLaufTreffer = suchLaufTreffer + 1
             END IF
@@ -5404,8 +5421,7 @@ SUB suchSchritt()
         RETURN
     END IF
     suchLauf = FALSE
-    sucheDateien = suchLaufSd
-    sucheZeilen = suchLaufSz
+    fundstellen = suchLaufFunde
     ' Ein einzelner Suchtext laesst sich ersetzen: jeder Treffer bekommt
     ' einen Haken (alle an), der Rechtsklick ersetzt die angehakten.
     DIM treffer AS INTEGER : treffer = suchLaufTreffer
@@ -5432,8 +5448,7 @@ END SUB
 SUB suchAbbrechen()
     IF NOT suchLauf THEN RETURN
     suchLauf = FALSE
-    sucheDateien = suchLaufSd
-    sucheZeilen = suchLaufSz
+    fundstellen = suchLaufFunde
     GUI_SET_TEXT(lblProbleme, tr$("Suche abgebrochen nach ") + STR$(suchLaufIndex) + " / " + STR$(LEN(suchLaufDateien)) + tr$(" Dateien: ") + STR$(suchLaufTreffer) + tr$(" Treffer"))
     protokoll("suche abgebrochen " + STR$(suchLaufIndex))
 END SUB
@@ -5893,8 +5908,7 @@ SUB testLaufStarten(ziele AS ARRAY OF STRING, faelle AS ARRAY OF STRING)
     IF testProz >= 0 OR LEN(ziele) = 0 THEN RETURN
     GUI_LISTBOX_CLEAR(lstAusgabe)
     GUI_LISTBOX_CLEAR(lstProbleme)
-    sucheDateien = []
-    sucheZeilen = []
+    fundstellen = []
     problemModus = 1
     testFehlSumme = 0 : testOkSumme = 0
     testZiele = ziele
@@ -5944,10 +5958,9 @@ SUB testZeile(z AS STRING)
             ' relativ zum Projekt, wie die Suche (problemAnspringen haengt an)
             DIM po AS STRING : po = wegGleich$(projektOrdner) + "/"
             IF LOWER$(LEFT$(wegGleich$(d), LEN(po))) = LOWER$(po) THEN d = MID$(wegGleich$(d), LEN(po))
-            ARRAY_PUSH(sucheDateien, d)
-            ARRAY_PUSH(sucheZeilen, nr)
+            ARRAY_PUSH(fundstellen, NEW CodeStelle(d, nr, 1))
             GUI_LISTBOX_ADD(lstProbleme, BASENAME(d) + ":" + STR$(nr) + ": " + TRIM$(MID$(rest, dp + 1)))
-            GUI_LISTBOX_COLOR(lstProbleme, LEN(sucheZeilen) - 1, &HE06060)
+            GUI_LISTBOX_COLOR(lstProbleme, LEN(fundstellen) - 1, &HE06060)
             testFehl = testFehl + 1
             testStatusSetzen(testDatei, nr, "fehl")
         END IF
@@ -8198,8 +8211,7 @@ SUB projektPruefenStarten()
         RETURN
     END IF
     GUI_LISTBOX_CLEAR(lstProbleme)
-    sucheDateien = []
-    sucheZeilen = []
+    fundstellen = []
     problemModus = 1
     prjIndex = 0 : prjFehler = 0 : prjWarn = 0
     prjGesehen = {}
@@ -8225,14 +8237,13 @@ SUB projektBefund(d AS STRING, zeile AS INTEGER, meldung AS STRING, art AS STRIN
     IF MAPHAS(prjGesehen, schluessel) THEN RETURN
     MAPPUT(prjGesehen, schluessel, TRUE)
     MAPPUT(prjMitBefund, d, TRUE)
-    ARRAY_PUSH(sucheDateien, d)
-    ARRAY_PUSH(sucheZeilen, zeile)
+    ARRAY_PUSH(fundstellen, NEW CodeStelle(d, zeile, 1))
     GUI_LISTBOX_ADD(lstProbleme, d + ":" + STR$(zeile) + ": " + meldung)
     IF art = "fehler" THEN
-        GUI_LISTBOX_COLOR(lstProbleme, LEN(sucheZeilen) - 1, &HE06060)
+        GUI_LISTBOX_COLOR(lstProbleme, LEN(fundstellen) - 1, &HE06060)
         prjFehler = prjFehler + 1
     ELSE
-        GUI_LISTBOX_COLOR(lstProbleme, LEN(sucheZeilen) - 1, &HE0C060)
+        GUI_LISTBOX_COLOR(lstProbleme, LEN(fundstellen) - 1, &HE0C060)
         prjWarn = prjWarn + 1
     END IF
 END SUB
@@ -8332,8 +8343,7 @@ SUB fundstellenZeigen()
     END IF
     GUI_LISTBOX_CLEAR(lstProbleme)
     DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
-    DIM sd AS ARRAY OF STRING : sd = []
-    DIM sz AS ARRAY OF INTEGER : sz = []
+    DIM funde AS ARRAY OF CodeStelle : funde = []
     DIM treffer AS INTEGER : treffer = 0
     DIM inDateien AS INTEGER : inDateien = 0
     DIM d AS STRING
@@ -8358,16 +8368,14 @@ SUB fundstellenZeigen()
             ' Namen sind schreibungsunabhaengig: `Punkte` und `punkte` sind
             ' dieselbe Variable.
             IF benutztWort(LOWER$(zeilen[i]), LOWER$(name)) THEN
-                ARRAY_PUSH(sd, d)
-                ARRAY_PUSH(sz, i + 1)
+                ARRAY_PUSH(funde, NEW CodeStelle(d, i + 1, 1))
                 GUI_LISTBOX_ADD(lstProbleme, d + ":" + STR$(i + 1) + ": " + TRIM$(zeilen[i]))
                 treffer = treffer + 1
             END IF
         NEXT
         IF treffer > vorher THEN inDateien = inDateien + 1
     NEXT
-    sucheDateien = sd
-    sucheZeilen = sz
+    fundstellen = funde
     problemModus = 1
     GUI_SET_TEXT(lblProbleme, tr$("Fundstellen von '") + name + "': " + STR$(treffer) + tr$(" in ") + STR$(inDateien) + tr$(" Dateien -- Umschalt+F7 zeigt wieder die Probleme"))
     GUI_SET_TEXT(lblStatus, STR$(treffer) + tr$(" Fundstelle(n) von '") + name + "'.")
@@ -8400,8 +8408,7 @@ SUB blameZeigen()
         RETURN
     END IF
     GUI_LISTBOX_CLEAR(lstProbleme)
-    DIM sd AS ARRAY OF STRING : sd = []
-    DIM sz AS ARRAY OF INTEGER : sz = []
+    DIM funde AS ARRAY OF CodeStelle : funde = []
     DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(ausgabe, NL)
     DIM n AS INTEGER : n = 0
     DIM z AS STRING
@@ -8430,12 +8437,10 @@ SUB blameZeigen()
         NEXT
         IF nr <= 0 THEN CONTINUE
         n = n + 1
-        ARRAY_PUSH(sd, BASENAME(pfad))
-        ARRAY_PUSH(sz, nr)
+        ARRAY_PUSH(funde, NEW CodeStelle(BASENAME(pfad), nr, 1))
         GUI_LISTBOX_ADD(lstProbleme, PADL$(STR$(nr), 5) + "  " + datum + "  " + wer + "  " + TRIM$(MID$(z, zu + 1, LEN(z))))
     NEXT
-    sucheDateien = sd
-    sucheZeilen = sz
+    fundstellen = funde
     problemModus = 1
     GUI_SET_TEXT(lblProbleme, tr$("git blame ") + BASENAME(pfad) + ": " + STR$(n) + tr$(" Zeilen -- Umschalt+F7 zeigt wieder die Probleme"))
     protokoll("blame " + STR$(n))
@@ -8834,8 +8839,8 @@ END SUB
 ' --- Lesezeichen -------------------------------------------------------
 FUNCTION lesezeichenIndex(pfad AS STRING, zeile AS INTEGER) AS INTEGER
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(lzZeilen) - 1
-        IF lzDateien[i] = pfad AND lzZeilen[i] = zeile THEN RETURN i
+    FOR i = 0 TO LEN(lesezeichen) - 1
+        IF lesezeichen[i].gleich(pfad, zeile) THEN RETURN i
     NEXT
     RETURN -1
 END FUNCTION
@@ -8848,10 +8853,10 @@ SUB lesezeichenUmschalten()
     (z, s) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
     DIM k AS INTEGER : k = lesezeichenIndex(pfad, z)
     IF k >= 0 THEN
-        ARRAY_REMOVE_AT(lzDateien, k) : ARRAY_REMOVE_AT(lzZeilen, k)
+        ARRAY_REMOVE_AT(lesezeichen, k)
         protokoll("lesezeichen " + STR$(z) + " aus")
     ELSE
-        ARRAY_PUSH(lzDateien, pfad) : ARRAY_PUSH(lzZeilen, z)
+        ARRAY_PUSH(lesezeichen, NEW CodeStelle(pfad, z, 1))
         protokoll("lesezeichen " + STR$(z) + " an")
     END IF
     markenSchluessel = ""
@@ -8863,7 +8868,7 @@ END SUB
 ' das man nur in seiner Datei wiederfindet, ist eins zu wenig.
 SUB lesezeichenSpringen(vorwaerts AS BOOLEAN)
     IF aktiverTab < 0 THEN RETURN
-    IF LEN(lzZeilen) = 0 THEN
+    IF LEN(lesezeichen) = 0 THEN
         GUI_SET_TEXT(lblStatus, tr$("Kein Lesezeichen gesetzt -- Strg+F2 setzt eins."))
         RETURN
     END IF
@@ -8876,11 +8881,11 @@ SUB lesezeichenSpringen(vorwaerts AS BOOLEAN)
     DIM reihe AS ARRAY OF INTEGER : reihe = []
     DIM i AS INTEGER
     DIM k AS INTEGER
-    FOR i = 0 TO LEN(lzZeilen) - 1
+    FOR i = 0 TO LEN(lesezeichen) - 1
         DIM platz AS INTEGER : platz = LEN(reihe)
         FOR k = 0 TO LEN(reihe) - 1
             DIM j AS INTEGER : j = reihe[k]
-            IF lzDateien[j] > lzDateien[i] OR (lzDateien[j] = lzDateien[i] AND lzZeilen[j] > lzZeilen[i]) THEN
+            IF lesezeichen[j].pfad > lesezeichen[i].pfad OR (lesezeichen[j].pfad = lesezeichen[i].pfad AND lesezeichen[j].zeile > lesezeichen[i].zeile) THEN
                 platz = k
                 BREAK
             END IF
@@ -8891,7 +8896,7 @@ SUB lesezeichenSpringen(vorwaerts AS BOOLEAN)
     DIM hier AS INTEGER : hier = -1
     FOR k = 0 TO LEN(reihe) - 1
         DIM m AS INTEGER : m = reihe[k]
-        IF lzDateien[m] < pfad OR (lzDateien[m] = pfad AND lzZeilen[m] <= z) THEN hier = k
+        IF lesezeichen[m].pfad < pfad OR (lesezeichen[m].pfad = pfad AND lesezeichen[m].zeile <= z) THEN hier = k
     NEXT
     DIM ziel AS INTEGER
     IF vorwaerts THEN
@@ -8902,46 +8907,44 @@ SUB lesezeichenSpringen(vorwaerts AS BOOLEAN)
         ' Steht die Marke GENAU auf einem Lesezeichen, ist "zurueck" das
         ' davor -- sonst kaeme man nie von der Stelle.
         DIM h AS INTEGER : h = reihe[ziel]
-        IF lzDateien[h] = pfad AND lzZeilen[h] = z THEN ziel = ziel - 1
+        IF lesezeichen[h].pfad = pfad AND lesezeichen[h].zeile = z THEN ziel = ziel - 1
         IF ziel < 0 THEN ziel = LEN(reihe) - 1
     END IF
     DIM t AS INTEGER : t = reihe[ziel]
-    IF lzDateien[t] <> pfad THEN
-        IF NOT FILEEXISTS(lzDateien[t]) THEN
-            GUI_SET_TEXT(lblStatus, tr$("Die Datei des Lesezeichens gibt es nicht mehr: ") + lzDateien[t])
+    IF lesezeichen[t].pfad <> pfad THEN
+        IF NOT FILEEXISTS(lesezeichen[t].pfad) THEN
+            GUI_SET_TEXT(lblStatus, tr$("Die Datei des Lesezeichens gibt es nicht mehr: ") + lesezeichen[t].pfad)
             RETURN
         END IF
-        dateiOeffnen(lzDateien[t])
+        dateiOeffnen(lesezeichen[t].pfad)
     END IF
-    GUI_TEXTAREA_GOTO(aktivesFeld(), lzZeilen[t], 1)
+    GUI_TEXTAREA_GOTO(aktivesFeld(), lesezeichen[t].zeile, 1)
     GUI_FOCUS(aktivesFeld())
     ' Nur die Zeile ins Protokoll: welche Datei, sagt die "geoeffnet"-Zeile
     ' davor, wenn der Sprung ueber die Grenze ging.
-    protokoll("lesezeichen sprung " + STR$(lzZeilen[t]))
+    protokoll("lesezeichen sprung " + STR$(lesezeichen[t].zeile))
 END SUB
 
 ' Alle Lesezeichen in der Liste unten rechts -- dieselbe wie Suche und
 ' blame; ein eigenes Panel fuer dieselbe Frage waere eins zu viel.
 SUB lesezeichenListe()
     GUI_LISTBOX_CLEAR(lstProbleme)
-    DIM sd AS ARRAY OF STRING : sd = []
-    DIM sz AS ARRAY OF INTEGER : sz = []
+    DIM funde AS ARRAY OF CodeStelle : funde = []
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(lzZeilen) - 1
-        ARRAY_PUSH(sd, lzDateien[i]) : ARRAY_PUSH(sz, lzZeilen[i])
+    FOR i = 0 TO LEN(lesezeichen) - 1
+        ARRAY_PUSH(funde, lesezeichen[i])
         DIM text AS STRING : text = ""
         TRY
-            DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(lzDateien[i])
-            IF lzZeilen[i] <= LEN(zeilen) THEN text = TRIM$(zeilen[lzZeilen[i] - 1])
+            DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(lesezeichen[i].pfad)
+            IF lesezeichen[i].zeile <= LEN(zeilen) THEN text = TRIM$(zeilen[lesezeichen[i].zeile - 1])
         CATCH e
             text = ""
         END TRY
-        GUI_LISTBOX_ADD(lstProbleme, BASENAME(lzDateien[i]) + ":" + STR$(lzZeilen[i]) + ": " + text)
+        GUI_LISTBOX_ADD(lstProbleme, BASENAME(lesezeichen[i].pfad) + ":" + STR$(lesezeichen[i].zeile) + ": " + text)
     NEXT
-    sucheDateien = sd
-    sucheZeilen = sz
+    fundstellen = funde
     problemModus = 1
-    GUI_SET_TEXT(lblProbleme, STR$(LEN(sz)) + tr$(" Lesezeichen -- Umschalt+F7 zeigt wieder die Probleme"))
+    GUI_SET_TEXT(lblProbleme, STR$(LEN(funde)) + tr$(" Lesezeichen -- Umschalt+F7 zeigt wieder die Probleme"))
     protokoll("lesezeichen liste " + STR$(LEN(sz)))
 END SUB
 
@@ -8983,8 +8986,8 @@ SUB markenZurueckholen(ta AS GUI_WIDGET, pfad AS STRING)
         DIM i AS INTEGER : i = markenIdx[k]
         IF markenArt[k] = "h" AND i < LEN(haltepunkte) THEN
             haltepunkte[i].zeile = jetzt[k] : anders = TRUE
-        ELSEIF markenArt[k] = "l" AND i < LEN(lzZeilen) THEN
-            lzZeilen[i] = jetzt[k] : anders = TRUE
+        ELSEIF markenArt[k] = "l" AND i < LEN(lesezeichen) THEN
+            lesezeichen[i].zeile = jetzt[k] : anders = TRUE
         END IF
         markenGesetzt[k] = jetzt[k]
     NEXT
@@ -9039,9 +9042,9 @@ SUB markenNachziehen()
         ARRAY_PUSH(zeilen, problemZeilen[i]) : ARRAY_PUSH(farben, &HD08040) : schl = schl + "f" + STR$(problemZeilen[i])
         ARRAY_PUSH(arten, "f") : ARRAY_PUSH(idx, i)
     NEXT
-    FOR i = 0 TO LEN(lzZeilen) - 1
-        IF lzDateien[i] = pfad THEN
-            ARRAY_PUSH(zeilen, lzZeilen[i]) : ARRAY_PUSH(farben, &H5090E0) : schl = schl + "l" + STR$(lzZeilen[i])
+    FOR i = 0 TO LEN(lesezeichen) - 1
+        IF lesezeichen[i].pfad = pfad THEN
+            ARRAY_PUSH(zeilen, lesezeichen[i].zeile) : ARRAY_PUSH(farben, &H5090E0) : schl = schl + "l" + STR$(lesezeichen[i].zeile)
             ARRAY_PUSH(arten, "l") : ARRAY_PUSH(idx, i)
         END IF
     NEXT
@@ -11504,9 +11507,7 @@ FUNCTION projektQuelle$(pfad AS STRING) AS STRING
 END FUNCTION
 
 ' Je Knoten des Baums die Datei und die Zeile, zu der er gehoert.
-DIM aufrKnoten AS ARRAY OF INTEGER : aufrKnoten = []
-DIM aufrDateien AS ARRAY OF STRING : aufrDateien = []
-DIM aufrZeilen AS ARRAY OF INTEGER : aufrZeilen = []
+DIM aufrStellen AS ARRAY OF AufrufStelle : aufrStellen = []
 DIM aufrWahl AS INTEGER : aufrWahl = -1
 DIM aufrZahl AS INTEGER : aufrZahl = 0
 
@@ -11535,9 +11536,7 @@ SUB aufruferAeste(name AS STRING, eltern AS INTEGER, tiefe AS INTEGER, gesehen A
             IF oft <> "" THEN aufrGemessen = aufrGemessen + 1
             knoten = GUI_TREE_ADD(baumAufruf, eltern, d + ":" + STR$(i + 1) + _
                                   "  (" + wo + ")" + oft + "   " + TRIM$(zeilen[i]))
-            ARRAY_PUSH(aufrKnoten, knoten)
-            ARRAY_PUSH(aufrDateien, pfad)
-            ARRAY_PUSH(aufrZeilen, i + 1)
+            ARRAY_PUSH(aufrStellen, NEW AufrufStelle(knoten, pfad, i + 1))
             aufrZahl = aufrZahl + 1
             IF tiefe = 0 THEN aufrDirekt = aufrDirekt + 1
             aufruferAeste(ober, knoten, tiefe + 1, gesehen)
@@ -11570,7 +11569,7 @@ SUB aufruferZeigenFuer(name AS STRING)
         RETURN
     END IF
     GUI_TREE_CLEAR(baumAufruf)
-    aufrKnoten = [] : aufrDateien = [] : aufrZeilen = []
+    aufrStellen = []
     aufrZahl = 0 : aufrDirekt = 0 : aufrWahl = -1 : aufrGemessen = 0
     DIM gesehen AS ARRAY OF STRING : gesehen = []
     aufruferAeste(name, -1, 0, gesehen)
@@ -11600,11 +11599,11 @@ SUB aufruferAbfragen()
     IF sel < 0 OR sel = aufrWahl THEN RETURN
     aufrWahl = sel
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(aufrKnoten) - 1
-        IF aufrKnoten[i] <> sel THEN CONTINUE
-        dateiOeffnen(aufrDateien[i])
-        IF aktivesFeld() >= 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), aufrZeilen[i], 1)
-        protokoll("aufrufer sprung " + STR$(aufrZeilen[i]))
+    FOR i = 0 TO LEN(aufrStellen) - 1
+        IF aufrStellen[i].knoten <> sel THEN CONTINUE
+        dateiOeffnen(aufrStellen[i].pfad)
+        IF aktivesFeld() >= 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), aufrStellen[i].zeile, 1)
+        protokoll("aufrufer sprung " + STR$(aufrStellen[i].zeile))
         RETURN
     NEXT
 END SUB
@@ -13458,12 +13457,8 @@ END SUB
 ' jeder der dreissig Sprungstellen einzeln: eine neue Sprungstelle waere
 ' sonst eine, die man vergisst. Bild auf/ab und Pos1/Ende sind Blaettern,
 ' kein Sprung.
-DIM navPfade AS ARRAY OF STRING : navPfade = []
-DIM navZeilen AS ARRAY OF INTEGER : navZeilen = []
-DIM navSpalten AS ARRAY OF INTEGER : navSpalten = []
-DIM vorPfade AS ARRAY OF STRING : vorPfade = []
-DIM vorZeilen AS ARRAY OF INTEGER : vorZeilen = []
-DIM vorSpalten AS ARRAY OF INTEGER : vorSpalten = []
+DIM navZurueck AS ARRAY OF CodeStelle : navZurueck = []
+DIM navVor AS ARRAY OF CodeStelle : navVor = []
 DIM navLetztPfad AS STRING : navLetztPfad = ""
 DIM navLetztZeile AS INTEGER : navLetztZeile = 0
 DIM navLetztSpalte AS INTEGER : navLetztSpalte = 0
@@ -13490,8 +13485,8 @@ SUB navNachziehen()
             sprung = NOT (KEYHIT(KEY_PAGEUP) OR KEYHIT(KEY_PAGEDOWN) OR KEYHIT(KEY_HOME) OR KEYHIT(KEY_END))
         END IF
         IF sprung THEN
-            navAblegen(navPfade, navZeilen, navSpalten, navLetztPfad, navLetztZeile, navLetztSpalte)
-            vorPfade = [] : vorZeilen = [] : vorSpalten = []
+            navAblegen(navZurueck, navLetztPfad, navLetztZeile, navLetztSpalte)
+            navVor = []
             protokoll("nav gemerkt " + BASENAME(navLetztPfad) + " " + STR$(navLetztZeile))
         END IF
     END IF
@@ -13499,44 +13494,37 @@ SUB navNachziehen()
     navLetztPfad = p : navLetztZeile = z : navLetztSpalte = sp : navLetztLaenge = laenge
 END SUB
 
-SUB navAblegen(ps AS ARRAY OF STRING, zs AS ARRAY OF INTEGER, ss AS ARRAY OF INTEGER, _
-               p AS STRING, z AS INTEGER, sp AS INTEGER)
-    DIM n AS INTEGER : n = LEN(ps)
+SUB navAblegen(liste AS ARRAY OF CodeStelle, p AS STRING, z AS INTEGER, sp AS INTEGER)
+    DIM n AS INTEGER : n = LEN(liste)
     IF n > 0 THEN
-        IF ps[n - 1] = p AND zs[n - 1] = z THEN RETURN
+        IF liste[n - 1].gleich(p, z) THEN RETURN
     END IF
-    ARRAY_PUSH(ps, p) : ARRAY_PUSH(zs, z) : ARRAY_PUSH(ss, sp)
-    IF LEN(ps) > NAV_MAX THEN
-        ARRAY_REMOVE_AT(ps, 0) : ARRAY_REMOVE_AT(zs, 0) : ARRAY_REMOVE_AT(ss, 0)
-    END IF
+    ARRAY_PUSH(liste, NEW CodeStelle(p, z, sp))
+    IF LEN(liste) > NAV_MAX THEN ARRAY_REMOVE_AT(liste, 0)
 END SUB
 
 ' zurueck = TRUE: zur vorigen Stelle, sonst wieder vorwaerts. Die Stelle, an
 ' der man steht, kommt dabei auf den anderen Stapel.
 SUB navGehen(zurueck AS BOOLEAN)
-    IF zurueck AND LEN(navPfade) = 0 THEN
+    IF zurueck AND LEN(navZurueck) = 0 THEN
         GUI_SET_TEXT(lblStatus, tr$("Keine vorige Stelle."))
         RETURN
     END IF
-    IF NOT zurueck AND LEN(vorPfade) = 0 THEN
+    IF NOT zurueck AND LEN(navVor) = 0 THEN
         GUI_SET_TEXT(lblStatus, tr$("Keine Stelle zum Vorwärtsgehen."))
         RETURN
     END IF
-    DIM p AS STRING
-    DIM z AS INTEGER
-    DIM sp AS INTEGER
-    DIM n AS INTEGER
+    DIM ziel AS CodeStelle
     IF zurueck THEN
-        n = LEN(navPfade) - 1
-        p = navPfade[n] : z = navZeilen[n] : sp = navSpalten[n]
-        ARRAY_REMOVE_AT(navPfade, n) : ARRAY_REMOVE_AT(navZeilen, n) : ARRAY_REMOVE_AT(navSpalten, n)
-        IF navLetztPfad <> "" THEN navAblegen(vorPfade, vorZeilen, vorSpalten, navLetztPfad, navLetztZeile, navLetztSpalte)
+        ziel = ARRAY_POP(navZurueck)
+        IF navLetztPfad <> "" THEN navAblegen(navVor, navLetztPfad, navLetztZeile, navLetztSpalte)
     ELSE
-        n = LEN(vorPfade) - 1
-        p = vorPfade[n] : z = vorZeilen[n] : sp = vorSpalten[n]
-        ARRAY_REMOVE_AT(vorPfade, n) : ARRAY_REMOVE_AT(vorZeilen, n) : ARRAY_REMOVE_AT(vorSpalten, n)
-        IF navLetztPfad <> "" THEN navAblegen(navPfade, navZeilen, navSpalten, navLetztPfad, navLetztZeile, navLetztSpalte)
+        ziel = ARRAY_POP(navVor)
+        IF navLetztPfad <> "" THEN navAblegen(navZurueck, navLetztPfad, navLetztZeile, navLetztSpalte)
     END IF
+    DIM p AS STRING : p = ziel.pfad
+    DIM z AS INTEGER : z = ziel.zeile
+    DIM sp AS INTEGER : sp = ziel.spalte
     IF NOT FILEEXISTS(p) THEN
         GUI_SET_TEXT(lblStatus, tr$("Gibt es nicht mehr: ") + p)
         RETURN
@@ -13883,7 +13871,7 @@ SUB zurLetztenAenderung()
         GUI_SET_TEXT(lblStatus, tr$("Gibt es nicht mehr: ") + aendPfad)
         RETURN
     END IF
-    IF navLetztPfad <> "" THEN navAblegen(navPfade, navZeilen, navSpalten, navLetztPfad, navLetztZeile, navLetztSpalte)
+    IF navLetztPfad <> "" THEN navAblegen(navZurueck, navLetztPfad, navLetztZeile, navLetztSpalte)
     navSperre = TRUE
     DIM schonDa AS BOOLEAN : schonDa = FALSE
     IF aktiverTab >= 0 THEN schonDa = gleicherWeg(reiter[aktiverTab].pfad, aendPfad)
@@ -14255,8 +14243,8 @@ SUB trefferErsetzen(nurEiner AS BOOLEAN, ersatz AS STRING)
     DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstProbleme)
     DIM dateien AS ARRAY OF STRING : dateien = []
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(sucheDateien) - 1
-        IF ARRAY_INDEXOF(dateien, sucheDateien[i]) < 0 THEN ARRAY_PUSH(dateien, sucheDateien[i])
+    FOR i = 0 TO LEN(fundstellen) - 1
+        IF ARRAY_INDEXOF(dateien, fundstellen[i].pfad) < 0 THEN ARRAY_PUSH(dateien, fundstellen[i].pfad)
     NEXT
     umbauLeeren()
     DIM zeilenZahl AS INTEGER : zeilenZahl = 0
@@ -14276,11 +14264,11 @@ SUB trefferErsetzen(nurEiner AS BOOLEAN, ersatz AS STRING)
         END IF
         DIM zl AS ARRAY OF STRING : zl = SPLIT$(text, NL)
         DIM geaendert AS BOOLEAN : geaendert = FALSE
-        FOR i = 0 TO LEN(sucheDateien) - 1
-            IF sucheDateien[i] <> d THEN CONTINUE
+        FOR i = 0 TO LEN(fundstellen) - 1
+            IF fundstellen[i].pfad <> d THEN CONTINUE
             IF nurEiner AND i <> sel THEN CONTINUE
             IF NOT nurEiner AND NOT GUI_LISTBOX_CHECKED(lstProbleme, i) THEN CONTINUE
-            DIM zn AS INTEGER : zn = sucheZeilen[i] - 1
+            DIM zn AS INTEGER : zn = fundstellen[i].zeile - 1
             IF zn < 0 OR zn >= LEN(zl) THEN CONTINUE
             DIM neu AS STRING : neu = zl[zn]
             TRY
@@ -14444,8 +14432,8 @@ SUB baumUmbenennen(alt AS STRING, name AS STRING)
     FOR i = 0 TO LEN(haltepunkte) - 1
         haltepunkte[i].datei = wegUmziehen$(haltepunkte[i].datei, alt, neu, istOrdner)
     NEXT
-    FOR i = 0 TO LEN(lzDateien) - 1
-        lzDateien[i] = wegUmziehen$(lzDateien[i], alt, neu, istOrdner)
+    FOR i = 0 TO LEN(lesezeichen) - 1
+        lesezeichen[i].pfad = wegUmziehen$(lesezeichen[i].pfad, alt, neu, istOrdner)
     NEXT
     FOR i = 0 TO LEN(startDateien) - 1
         startDateien[i] = wegUmziehen$(startDateien[i], alt, neu, istOrdner)
@@ -15197,7 +15185,7 @@ END SUB
 ' "__main__" -- hier heisst es, wie man es nennt.
 SUB stapelZeigen(j AS JSON_HANDLE)
     GUI_TABLE_CLEAR(tblStapel)
-    stapelDateien = [] : stapelZeilen = []
+    stapelStellen = []
     IF NOT JSON_HAS(j, "stack") THEN RETURN
     DIM teile AS ARRAY OF STRING : teile = []
     DIM i AS INTEGER
@@ -15209,8 +15197,7 @@ SUB stapelZeigen(j AS JSON_HANDLE)
         IF JSON_HAS(j, p + ".file") THEN
             IF JSON_GET_STRING(j, p + ".file") <> "" THEN sdatei = JSON_GET_STRING(j, p + ".file")
         END IF
-        ARRAY_PUSH(stapelDateien, sdatei)
-        ARRAY_PUSH(stapelZeilen, JSON_GET_INT(j, p + ".line"))
+        ARRAY_PUSH(stapelStellen, NEW CodeStelle(sdatei, JSON_GET_INT(j, p + ".line"), 1))
         DIM szeile AS STRING : szeile = STR$(JSON_GET_INT(j, p + ".line"))
         ' Die Zeile zuerst: in der schmalen Spalte schnitt "mathe.dh:10" genau
         ' die Zahl ab, um die es geht.
@@ -15338,11 +15325,11 @@ SUB debugPanelNachziehen()
     END IF
     IF GUI_DOUBLE_CLICKED(tblStapel) THEN
         DIM sr AS INTEGER : sr = GUI_TABLE_SELECTED(tblStapel)
-        IF sr >= 0 AND sr < LEN(stapelZeilen) THEN
-            DIM zl AS INTEGER : zl = stapelZeilen[sr]
+        IF sr >= 0 AND sr < LEN(stapelStellen) THEN
+            DIM zl AS INTEGER : zl = stapelStellen[sr].zeile
             ' Die Zeile gehoert zu IHRER Datei -- ein Aufruf aus einer
             ' importierten Datei steht nicht im Reiter, der gerade vorn ist.
-            IF NOT gleicheDatei(stapelDateien[sr], reiter[aktiverTab].pfad) THEN dateiOeffnen(stapelDateien[sr])
+            IF NOT gleicheDatei(stapelStellen[sr].pfad, reiter[aktiverTab].pfad) THEN dateiOeffnen(stapelStellen[sr].pfad)
             DIM ta AS GUI_WIDGET : ta = aktivesFeld()
             IF ta >= 0 AND zl > 0 THEN GUI_TEXTAREA_GOTO(ta, zl, 1)
             protokoll("stapel sprung " + STR$(zl))

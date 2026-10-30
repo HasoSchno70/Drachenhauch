@@ -106,7 +106,7 @@ IF NOT FILEEXISTS("zweiter.txt") THEN
     haltepunktUmschaltenIn(reiter[aktiverTab].pfad, 2)
     bedingungZeile = 3 : bedingungPfad = reiter[aktiverTab].pfad
     haltepunktBedingungSetzen("x > 1")
-    lzDateien = [reiter[aktiverTab].pfad] : lzZeilen = [3]
+    lesezeichen = [] : ARRAY_PUSH(lesezeichen, NEW CodeStelle(reiter[aktiverTab].pfad, 3, 1))
     WRITEALL("zweiter.txt", "ja")
     ' Wie beim Beenden: die Einstellungen sichern.
     konfigSichern()
@@ -116,8 +116,8 @@ DIM prI AS INTEGER
 FOR prI = 0 TO LEN(haltepunkte) - 1
     protokoll("probe hp " + BASENAME(haltepunkte[prI].datei) + " " + STR$(haltepunkte[prI].zeile) + " [" + haltepunkte[prI].bedingung + "]")
 NEXT
-FOR prI = 0 TO LEN(lzZeilen) - 1
-    protokoll("probe lz " + BASENAME(lzDateien[prI]) + " " + STR$(lzZeilen[prI]))
+FOR prI = 0 TO LEN(lesezeichen) - 1
+    protokoll("probe lz " + BASENAME(lesezeichen[prI].pfad) + " " + STR$(lesezeichen[prI].zeile))
 NEXT
 EXIT(0)
 --- programm ../../ide/ide.dh nach protokoll("bereit")
