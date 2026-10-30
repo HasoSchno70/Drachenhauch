@@ -19,7 +19,7 @@ DIM prSeit AS INTEGER
 prB = prB + 1
 IF prSchritt = 0 AND LEN(plugBefehle) > 0 AND LEN(plugLeisten) > 0 AND LEN(plugSchnipsel) > 0 AND LEN(plugFaerbungen) > 0 THEN
     protokoll("pr angemeldet " + plugBefehle[0].kennung + " " + plugLeisten[0].name + " " + GUI_DOCK_WHERE$(win, plugLeisten[0].name))
-    protokoll("pr schnipsel " + STR$(ARRAY_INDEXOF(schnipselNamen, "Hallo-Schnipsel") >= 0))
+    protokoll("pr schnipsel " + STR$(schnipselMitNamen("Hallo-Schnipsel") >= 0))
     protokoll("pr faerbung " + STR$(pluginFaerben(aktivesFeld(), "[x] fertig", 0)))
     ' Das Fenster der Leiste liegt auf ihrem Rechteck im Dock.
     DIM prX AS INTEGER

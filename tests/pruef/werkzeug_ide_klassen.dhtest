@@ -54,13 +54,13 @@ allein 0
 === die neuen schnipsel sind da und ihre kuerzel eindeutig
 DIM prA AS STRING
 FOR EACH prA IN ["extends", "abstract", "property", "finally", "lambda", "enum", "do", "declare", "importas"]
-    PRINT prA; " "; ARRAY_INDEXOF(schnipselAbk, prA) >= 0
+    PRINT prA; " "; schnipselNr(prA) >= 0
 NEXT
 DIM prDoppelt AS INTEGER : prDoppelt = 0
 DIM prJ AS INTEGER
-FOR prI = 0 TO LEN(schnipselAbk) - 1
-    FOR prJ = prI + 1 TO LEN(schnipselAbk) - 1
-        IF schnipselAbk[prI] <> "" AND schnipselAbk[prI] = schnipselAbk[prJ] THEN prDoppelt = prDoppelt + 1
+FOR prI = 0 TO LEN(schnipselListe) - 1
+    FOR prJ = prI + 1 TO LEN(schnipselListe) - 1
+        IF schnipselListe[prI].abk <> "" AND schnipselListe[prI].abk = schnipselListe[prJ].abk THEN prDoppelt = prDoppelt + 1
     NEXT
 NEXT
 PRINT "doppelt "; prDoppelt
@@ -153,3 +153,25 @@ karte FALSE
 satz passt TRUE
 probleme ||
 zuletzt held.dh   (C:\Spiele\neu)
+
+=== ein eigener schnipsel ersetzt nur die liste, nicht den vorrat
+' schnipselLaden legt Kopien an: ersetzt ein eigener Schnipsel den
+' eingebauten "for", muss der eingebaute zurueckkommen, sobald die eigene
+' Datei weg ist (mit geteilten Objekten waere er dauerhaft ueberschrieben).
+WRITEALL(schnipselPfad$(), "=== Meine Schleife | for" + NL + "FOR k = 1 TO 3" + NL + "NEXT" + NL)
+schnipselLaden()
+DIM prF AS INTEGER : prF = schnipselNr("for")
+PRINT "eigen: "; schnipselListe[prF].herkunft; " | "; LEFT$(schnipselListe[prF].text, 14)
+DELETEFILE(schnipselPfad$())
+schnipselLaden()
+prF = schnipselNr("for")
+PRINT "wieder: |"; schnipselListe[prF].herkunft; "| "; LEFT$(schnipselListe[prF].text, 16)
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- erwartet
+eigen: eigen, ersetzt | FOR k = 1 TO 3
+wieder: || DIM i AS INTEGER

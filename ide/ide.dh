@@ -9568,9 +9568,9 @@ SUB tabulator()
     ' 2. Eine Abkuerzung links der Marke klappt ihren Schnipsel auf.
     DIM wort AS STRING : wort = LOWER$(wortAnfang$())
     IF wort <> "" THEN
-        DIM k AS INTEGER : k = ARRAY_INDEXOF(schnipselAbk, wort)
+        DIM k AS INTEGER : k = schnipselNr(wort)
         IF k >= 0 THEN
-            schnipselEinfuegen(k, LEN(schnipselAbk[k]))
+            schnipselEinfuegen(k, LEN(schnipselListe[k].abk))
             RETURN
         END IF
     END IF
@@ -12868,26 +12868,45 @@ END SUB
 ' Vorlagen mit einem Platzhalter `|` fuer die Schreibmarke. Die Einrueckung
 ' der laufenden Zeile wird auf jede weitere Zeile uebernommen -- sonst
 ' klebte ein eingefuegter Block am linken Rand.
-DIM schnipselNamen AS ARRAY OF STRING : schnipselNamen = []
-DIM schnipselText AS ARRAY OF STRING : schnipselText = []
-' Das kurze Wort, das den Schnipsel am Tabulator aufklappt. Die Laufzeit
-' meldet nur, DASS eines links der Marke steht (GUI_TEXTAREA_ABBREV) --
-' was an seine Stelle kommt, steht hier.
-DIM schnipselAbk AS ARRAY OF STRING : schnipselAbk = []
-' "" = eingebaut, "eigen" = aus der eigenen Datei (steht in der Liste rechts).
-DIM schnipselHerkunft AS ARRAY OF STRING : schnipselHerkunft = []
+' Je Eintrag (SchnipselEintrag): der Name, wie ihn die Liste zeigt, das
+' kurze Wort, das ihn am Tabulator aufklappt (die Laufzeit meldet nur, DASS
+' eines links der Marke steht -- was an seine Stelle kommt, steht hier), der
+' Text und die Herkunft ("" = eingebaut, "eigen" = aus der eigenen Datei,
+' "Plugin x"; steht in der Liste rechts). Bis 2026-10-30 vier Felder
+' nebeneinander.
+DIM schnipselListe AS ARRAY OF SchnipselEintrag : schnipselListe = []
+
+' Der Name, wie ihn die Liste zeigt: mit dem Kuerzel in Klammern.
+FUNCTION schnipselAnzeige$(name AS STRING, abk AS STRING) AS STRING
+    RETURN IIF(abk = "", name, name + "   [" + abk + "]")
+END FUNCTION
 
 SUB schnipsel(name AS STRING, abk AS STRING, text AS STRING)
-    ARRAY_PUSH(schnipselNamen, IIF(abk = "", name, name + "   [" + abk + "]"))
-    ARRAY_PUSH(schnipselAbk, abk)
-    ARRAY_PUSH(schnipselText, text)
-    ARRAY_PUSH(schnipselHerkunft, "")
+    ARRAY_PUSH(schnipselListe, NEW SchnipselEintrag(schnipselAnzeige$(name, abk), abk, text, ""))
 END SUB
+
+' Der Schnipsel mit diesem Namen (wie die Liste ihn zeigt), -1 = keiner.
+FUNCTION schnipselMitNamen(name AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(schnipselListe) - 1
+        IF schnipselListe[i].name = name THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Der Schnipsel mit diesem Kuerzel, -1 = keiner.
+FUNCTION schnipselNr(abk AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(schnipselListe) - 1
+        IF schnipselListe[i].abk = abk THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
 
 ' `weg` = so viele Zeichen links der Marke weichen (das getippte Kuerzel).
 SUB schnipselEinfuegen(nummer AS INTEGER, weg AS INTEGER = 0)
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
-    IF ta < 0 OR nummer < 0 OR nummer >= LEN(schnipselText) THEN RETURN
+    IF ta < 0 OR nummer < 0 OR nummer >= LEN(schnipselListe) THEN RETURN
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(ta)
@@ -12909,7 +12928,7 @@ SUB schnipselEinfuegen(nummer AS INTEGER, weg AS INTEGER = 0)
     ' Eingerueckt wird Zeile fuer Zeile, LEERE ausgenommen: ein blindes
     ' REPLACE$ machte aus jeder Leerzeile vier Leerzeichen, und die sieht man
     ' erst im Diff.
-    DIM roh AS ARRAY OF STRING : roh = SPLIT$(schnipselText[nummer], NL)
+    DIM roh AS ARRAY OF STRING : roh = SPLIT$(schnipselListe[nummer].text, NL)
     DIM zusammen AS ARRAY OF STRING : zusammen = []
     DIM ri AS INTEGER
     FOR ri = 0 TO LEN(roh) - 1
@@ -12935,8 +12954,8 @@ SUB schnipselEinfuegen(nummer AS INTEGER, weg AS INTEGER = 0)
         GUI_TEXTAREA_GOTO(ta, neueZ, neueS)
     END IF
     GUI_FOCUS(ta)
-    GUI_SET_TEXT(lblStatus, tr$("Schnipsel: ") + schnipselNamen[nummer])
-    protokoll("schnipsel " + schnipselNamen[nummer])
+    GUI_SET_TEXT(lblStatus, tr$("Schnipsel: ") + schnipselListe[nummer].name)
+    protokoll("schnipsel " + schnipselListe[nummer].name)
 END SUB
 
 SUB schnipselWaehlen()
@@ -12945,8 +12964,8 @@ SUB schnipselWaehlen()
     paletteKennungen = []
     paletteDetails = []
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(schnipselNamen) - 1
-        ARRAY_PUSH(paletteNamen, schnipselNamen[i]) : ARRAY_PUSH(paletteKennungen, STR$(i)) : ARRAY_PUSH(paletteDetails, schnipselHerkunft[i])
+    FOR i = 0 TO LEN(schnipselListe) - 1
+        ARRAY_PUSH(paletteNamen, schnipselListe[i].name) : ARRAY_PUSH(paletteKennungen, STR$(i)) : ARRAY_PUSH(paletteDetails, schnipselListe[i].herkunft)
     NEXT
     waehlerOeffnen("schnipsel", tr$("Schnipsel einfügen"))
     ' Der Wortanfang links der Marke fuellt den Filter schon aus: wer `for`
@@ -16893,9 +16912,7 @@ END SUB
 ' und reicht bis zum naechsten. Ein eigenes Kuerzel, das es schon gibt,
 ' ERSETZT den eingebauten Schnipsel -- wer "for" anders haben will, soll
 ' nicht zwei Eintraege fuer dasselbe Wort bekommen.
-DIM schnipselEingebautNamen AS ARRAY OF STRING : schnipselEingebautNamen = []
-DIM schnipselEingebautAbk AS ARRAY OF STRING : schnipselEingebautAbk = []
-DIM schnipselEingebautText AS ARRAY OF STRING : schnipselEingebautText = []
+DIM schnipselEingebaut AS ARRAY OF SchnipselEintrag : schnipselEingebaut = []
 
 FUNCTION schnipselPfad$() AS STRING
     RETURN PATHJOIN(konfigOrdner$(), "schnipsel.txt")
@@ -16903,45 +16920,42 @@ END FUNCTION
 
 SUB schnipselEingebautMerken()
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(schnipselNamen) - 1
-        ARRAY_PUSH(schnipselEingebautNamen, schnipselNamen[i])
-        ARRAY_PUSH(schnipselEingebautAbk, schnipselAbk[i])
-        ARRAY_PUSH(schnipselEingebautText, schnipselText[i])
+    FOR i = 0 TO LEN(schnipselListe) - 1
+        ARRAY_PUSH(schnipselEingebaut, schnipselListe[i])
     NEXT
 END SUB
 
 SUB eigenerSchnipsel(name AS STRING, abk AS STRING, text AS STRING)
-    DIM anzeige AS STRING : anzeige = IIF(abk = "", name, name + "   [" + abk + "]")
+    DIM anzeige AS STRING : anzeige = schnipselAnzeige$(name, abk)
     DIM k AS INTEGER : k = -1
-    IF abk <> "" THEN k = ARRAY_INDEXOF(schnipselAbk, abk)
+    IF abk <> "" THEN k = schnipselNr(abk)
     IF k >= 0 THEN
-        schnipselNamen[k] = anzeige
-        schnipselText[k] = text
-        schnipselHerkunft[k] = "eigen, ersetzt"
+        ' Ersetzt wird der Eintrag der LISTE -- schnipselLaden legt ihn als
+        ' Kopie an, die eingebauten im Vorrat bleiben unberuehrt.
+        schnipselListe[k].name = anzeige
+        schnipselListe[k].text = text
+        schnipselListe[k].herkunft = "eigen, ersetzt"
     ELSE
-        ARRAY_PUSH(schnipselNamen, anzeige)
-        ARRAY_PUSH(schnipselAbk, abk)
-        ARRAY_PUSH(schnipselText, text)
-        ARRAY_PUSH(schnipselHerkunft, "eigen")
+        ARRAY_PUSH(schnipselListe, NEW SchnipselEintrag(anzeige, abk, text, "eigen"))
     END IF
 END SUB
 
 SUB schnipselLaden()
-    schnipselNamen = [] : schnipselAbk = [] : schnipselText = [] : schnipselHerkunft = []
+    ' KOPIEN, keine geteilten Objekte: ein eigener Schnipsel mit demselben
+    ' Kuerzel ersetzt den Eintrag an Ort und Stelle (eigenerSchnipsel) -- mit
+    ' demselben Objekt aenderte das den Vorrat, und nach dem naechsten Laden
+    ' waere der eingebaute weg.
+    schnipselListe = []
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(schnipselEingebautNamen) - 1
-        ARRAY_PUSH(schnipselNamen, schnipselEingebautNamen[i])
-        ARRAY_PUSH(schnipselAbk, schnipselEingebautAbk[i])
-        ARRAY_PUSH(schnipselText, schnipselEingebautText[i])
-        ARRAY_PUSH(schnipselHerkunft, "")
+    FOR i = 0 TO LEN(schnipselEingebaut) - 1
+        DIM se AS SchnipselEintrag : se = schnipselEingebaut[i]
+        ARRAY_PUSH(schnipselListe, NEW SchnipselEintrag(se.name, se.abk, se.text, ""))
     NEXT
     ' Schnipsel der Plugins (PLUGIN_SCHNIPSEL) vor den eigenen -- ein eigener
     ' mit demselben Kuerzel ersetzt sie wie die eingebauten.
     FOR i = 0 TO LEN(plugSchnipsel) - 1
-        ARRAY_PUSH(schnipselNamen, plugSchnipsel[i].name)
-        ARRAY_PUSH(schnipselAbk, plugSchnipsel[i].abk)
-        ARRAY_PUSH(schnipselText, plugSchnipsel[i].text)
-        ARRAY_PUSH(schnipselHerkunft, plugSchnipsel[i].herkunft)
+        DIM sp AS SchnipselEintrag : sp = plugSchnipsel[i]
+        ARRAY_PUSH(schnipselListe, NEW SchnipselEintrag(sp.name, sp.abk, sp.text, sp.herkunft))
     NEXT
     DIM eigene AS INTEGER : eigene = 0
     DIM fehler AS INTEGER : fehler = 0
