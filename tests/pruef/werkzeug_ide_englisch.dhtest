@@ -51,8 +51,8 @@ DIM prBild AS INTEGER : prBild = 0
 prBild = prBild + 1
 IF prBild = 20 THEN
     protokoll("pr knopf " + GUI_TEXT(btnWkNeu))
-    DIM prI AS INTEGER : prI = ARRAY_INDEXOF(befehlKennungen, "sichern")
-    protokoll("pr palette " + befehlNamen[prI] + " | " + befehlKuerzel[prI])
+    DIM prI AS INTEGER : prI = befehlNr("sichern")
+    protokoll("pr palette " + befehle[prI].name + " | " + befehle[prI].kuerzel)
     protokoll("pr kuerzel " + kz$("Strg+Umschalt+Runter") + " " + kz$("Strg++") + " " + kz$("F5"))
     protokoll("pr reiter " + STR$(tabAnzahl))
     ' Die Meldungen der Laufzeit folgen der Oberflaeche (DHRT_LANG).
@@ -104,8 +104,8 @@ DIM prBild AS INTEGER : prBild = 0
 prBild = prBild + 1
 IF prBild = 20 THEN
     protokoll("pr knopf " + GUI_TEXT(btnWkNeu))
-    DIM prI AS INTEGER : prI = ARRAY_INDEXOF(befehlKennungen, "sichern")
-    protokoll("pr palette " + befehlNamen[prI] + " | " + befehlKuerzel[prI])
+    DIM prI AS INTEGER : prI = befehlNr("sichern")
+    protokoll("pr palette " + befehle[prI].name + " | " + befehle[prI].kuerzel)
     protokoll("pr dhrt_lang [" + GETENV$("DHRT_LANG") + "]")
     befehl("sprache")
     protokoll("pr jetzt noch " + GUI_TEXT(btnWkNeu))
@@ -141,8 +141,8 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
-    protokoll("pr zeile " + befehlKuerzel[ARRAY_INDEXOF(befehlKennungen, "zeile")] + ".")
-    protokoll("pr schnell " + befehlKuerzel[ARRAY_INDEXOF(befehlKennungen, "schnell")] + ".")
+    protokoll("pr zeile " + befehle[befehlNr("zeile")].kuerzel + ".")
+    protokoll("pr schnell " + befehle[befehlNr("schnell")].kuerzel + ".")
     EXIT(0)
 END IF
 --- datei _programm/ide.json

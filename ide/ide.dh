@@ -2267,14 +2267,54 @@ GUI_WINDOW_VISIBLE(winPalette, FALSE)
 DIM paletteOffen AS BOOLEAN : paletteOffen = FALSE
 DIM paletteArt AS STRING : paletteArt = "befehl"
 DIM paletteLetzterFilter AS STRING : paletteLetzterFilter = "-"
-DIM befehlNamen AS ARRAY OF STRING : befehlNamen = []
-DIM befehlKennungen AS ARRAY OF STRING : befehlKennungen = []
-DIM befehlKuerzel AS ARRAY OF STRING : befehlKuerzel = []
-DIM paletteNamen AS ARRAY OF STRING : paletteNamen = []
-DIM paletteKennungen AS ARRAY OF STRING : paletteKennungen = []
+' Ein Befehl der Palette. Name SUB befehl gibt es schon -- darum
+' BefehlEintrag. `vorgabe` ist das Kuerzel ohne tasten.json (bis
+' 2026-10-30 ein eigenes Feld befehlKuerzelVorgabe daneben).
+CLASS BefehlEintrag
+    DIM name AS STRING
+    DIM kennung AS STRING
+    DIM kuerzel AS STRING
+    DIM vorgabe AS STRING
+    SUB Init(n AS STRING, k AS STRING, kz AS STRING)
+        name = n : kennung = k : kuerzel = kz : vorgabe = kz
+    END SUB
+END CLASS
+DIM befehle AS ARRAY OF BefehlEintrag : befehle = []
+
+FUNCTION befehlNr(kennung AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(befehle) - 1
+        IF befehle[i].kennung = kennung THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Ein Eintrag des Waehlers (Befehle, Dateien, Schnipsel, Korrekturen ...):
+' was dasteht, was gewaehlt wird, der Zusatz rechts und die Form ohne
+' Umlaute fuer die Suche (einmal je Eintrag gerechnet, nicht je Taste).
+CLASS WaehlerEintrag
+    DIM name AS STRING
+    DIM kennung AS STRING
+    DIM detail AS STRING
+    DIM norm AS STRING
+    SUB Init(n AS STRING, k AS STRING, d AS STRING)
+        name = n : kennung = k : detail = d
+    END SUB
+END CLASS
+DIM waehlerListe AS ARRAY OF WaehlerEintrag : waehlerListe = []
+
+SUB waehlerDazu(name AS STRING, kennung AS STRING, detail AS STRING)
+    ARRAY_PUSH(waehlerListe, NEW WaehlerEintrag(name, kennung, detail))
+END SUB
+
+FUNCTION waehlerNr(kennung AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(waehlerListe) - 1
+        IF waehlerListe[i].kennung = kennung THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
 ' Zusatztext je Eintrag (Kuerzel, Ordner) -- rechts in der Liste, nicht an den Namen gehaengt.
-DIM paletteDetails AS ARRAY OF STRING : paletteDetails = []
-DIM paletteNorm AS ARRAY OF STRING : paletteNorm = []   ' ohne Umlaute, je Oeffnen (paletteFuellen)
 DIM paletteSichtbar AS ARRAY OF STRING : paletteSichtbar = []
 
 ' --- Suchleiste: ein Fenster, das offen bleibt (siehe sucheOeffnen) ---
@@ -4715,7 +4755,7 @@ SUB korrekturZeigen()
     FOR i = 0 TO LEN(probZeile) - 1
         IF probZeile[i] = z AND probKorr[i] <> "" AND sp >= probSpalte[i] AND sp <= probSpalte[i] + probLaenge[i] THEN genau = TRUE
     NEXT
-    paletteNamen = [] : paletteKennungen = [] : paletteDetails = []
+    waehlerListe = []
     korrAngebote = [] : korrText = GUI_TEXT(ta)
     FOR i = 0 TO LEN(probZeile) - 1
         IF probZeile[i] <> z OR probKorr[i] = "" THEN CONTINUE
@@ -4723,20 +4763,22 @@ SUB korrekturZeigen()
         DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "k" + CHR$(34) + ":" + probKorr[i] + "}")
         DIM k AS INTEGER
         FOR k = 0 TO JSON_LEN(j, "k") - 1
-            ARRAY_PUSH(paletteNamen, JSON_GET_STRING(j, "k." + STR$(k) + ".titel"))
-            ARRAY_PUSH(paletteKennungen, STR$(LEN(korrAngebote)))
-            ARRAY_PUSH(korrAngebote, JSON_STRINGIFY(JSON_GET_JSON(j, "k." + STR$(k))))
             DIM kurz AS STRING : kurz = probMeldung[i]
             IF LEN(kurz) > 40 THEN kurz = LEFT$(kurz, 39) + "…"
-            ARRAY_PUSH(paletteDetails, kurz)
+            waehlerDazu(JSON_GET_STRING(j, "k." + STR$(k) + ".titel"), STR$(LEN(korrAngebote)), kurz)
+            ARRAY_PUSH(korrAngebote, JSON_STRINGIFY(JSON_GET_JSON(j, "k." + STR$(k))))
         NEXT
     NEXT
-    IF LEN(paletteNamen) = 0 THEN
+    IF LEN(waehlerListe) = 0 THEN
         GUI_SET_TEXT(lblStatus, tr$("Hier gibt es nichts zu korrigieren."))
         protokoll("korrektur keine")
         RETURN
     END IF
-    protokoll("korrektur angebot " + JOIN$(paletteNamen, " | "))
+    DIM korrNamen AS ARRAY OF STRING : korrNamen = []
+    FOR i = 0 TO LEN(waehlerListe) - 1
+        ARRAY_PUSH(korrNamen, waehlerListe[i].name)
+    NEXT
+    protokoll("korrektur angebot " + JOIN$(korrNamen, " | "))
     waehlerOeffnen("korrektur", tr$("Schnellkorrektur"))
 END SUB
 
@@ -5088,12 +5130,10 @@ SUB symbolVerzeichnis()
         GUI_SET_TEXT(lblStatus, tr$("Keine Symbole in ") + projektOrdner + ".")
         RETURN
     END IF
-    paletteNamen = []
-    paletteKennungen = []
-    paletteDetails = []
+    waehlerListe = []
     DIM i AS INTEGER
     FOR i = 0 TO LEN(symAnzeige) - 1
-        ARRAY_PUSH(paletteNamen, symAnzeige[i]) : ARRAY_PUSH(paletteKennungen, STR$(i)) : ARRAY_PUSH(paletteDetails, "")
+        waehlerDazu(symAnzeige[i], STR$(i), "")
     NEXT
     waehlerOeffnen("symbol", tr$("Symbole im Projekt (") + STR$(LEN(symNamen)) + ")")
     ' Wie beim Schnipsel: das Wort unter der Marke fuellt den Filter aus.
@@ -11103,15 +11143,13 @@ SUB verschiebenFragen()
     ' Die Zieldatei waehlen -- alle .dh des Projekts ausser dieser, und
     ' ganz oben eine neue. Ohne die waere der erste Umzug in eine frische
     ' Datei ein Umweg ueber Datei/Neu und Sichern.
-    paletteNamen = []
-    paletteKennungen = []
-    paletteDetails = []
-    ARRAY_PUSH(paletteNamen, "(neue Datei ...)") : ARRAY_PUSH(paletteKennungen, "*neu*") : ARRAY_PUSH(paletteDetails, "")
+    waehlerListe = []
+    waehlerDazu("(neue Datei ...)", "*neu*", "")
     DIM d AS STRING
     FOR EACH d IN projektDateien("*.dh")
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
         IF gleicherWeg(pfad, reiter[aktiverTab].pfad) THEN CONTINUE
-        ARRAY_PUSH(paletteNamen, d) : ARRAY_PUSH(paletteKennungen, pfad) : ARRAY_PUSH(paletteDetails, "")
+        waehlerDazu(d, pfad, "")
     NEXT
     waehlerOeffnen("verschieben", verschName + tr$(" verschieben nach ..."))
 END SUB
@@ -12950,12 +12988,10 @@ END SUB
 
 SUB schnipselWaehlen()
     IF aktivesFeld() < 0 THEN RETURN
-    paletteNamen = []
-    paletteKennungen = []
-    paletteDetails = []
+    waehlerListe = []
     DIM i AS INTEGER
     FOR i = 0 TO LEN(schnipselListe) - 1
-        ARRAY_PUSH(paletteNamen, schnipselListe[i].name) : ARRAY_PUSH(paletteKennungen, STR$(i)) : ARRAY_PUSH(paletteDetails, schnipselListe[i].herkunft)
+        waehlerDazu(schnipselListe[i].name, STR$(i), schnipselListe[i].herkunft)
     NEXT
     waehlerOeffnen("schnipsel", tr$("Schnipsel einfügen"))
     ' Der Wortanfang links der Marke fuellt den Filter schon aus: wer `for`
@@ -16358,8 +16394,8 @@ SUB kuerzelZeigen()
     ' zeigte weiter das vorige Dokument).
     DIM text AS STRING : text = tr$("# Tastenkürzel der IDE") + NL + NL + tr$("| Kürzel | Befehl |") + NL + "|---|---|" + NL
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(befehlNamen) - 1
-        IF befehlKuerzel[i] <> "" THEN text = text + "| `" + befehlKuerzel[i] + "` | " + befehlNamen[i] + " |" + NL
+    FOR i = 0 TO LEN(befehle) - 1
+        IF befehle[i].kuerzel <> "" THEN text = text + "| `" + befehle[i].kuerzel + "` | " + befehle[i].name + " |" + NL
     NEXT
     text = text + NL + tr$("## Im Code-Feld") + NL + NL + tr$("Tab rückt bis zur nächsten Spalte ein, Strg+Z/Y nimmt zurück und wiederholt, Strg+A/C/V/X wie üblich, Pos1/Ende, Bild auf/ab.") + NL + NL
     text = text + tr$("Alle Befehle ohne Kürzel stehen in der Befehlspalette (`Strg+Umschalt+P`).") + NL
@@ -16371,7 +16407,7 @@ SUB kuerzelZeigen()
     GUI_WINDOW_VISIBLE(winHandbuch, TRUE)
     GUI_TEXTAREA_GOTO(taHandbuch, 1, 1)
     GUI_FOCUS(taHandbuch)
-    protokoll("kuerzel " + STR$(LEN(befehlNamen)))
+    protokoll("kuerzel " + STR$(LEN(befehle)))
 END SUB
 
 ' --- Werkzeuge: die Begleit-Editoren in Drachenhauch --------------------
@@ -16657,25 +16693,36 @@ END SUB
 ' IF-Zeilen in der Bildschleife, und ein Kuerzel liess sich nur im
 ' Quelltext aendern. `klickt` = FALSE: der Klick wird woanders abgefragt
 ' (zusammen mit einem Knopf), der Punkt steht nur fuers Kuerzel hier.
-DIM menueItems AS ARRAY OF INTEGER : menueItems = []
-DIM menueKennung AS ARRAY OF STRING : menueKennung = []
-DIM menueVorgabe AS ARRAY OF STRING : menueVorgabe = []
-DIM menueJetzt AS ARRAY OF STRING : menueJetzt = []
-DIM menueKlickt AS ARRAY OF BOOLEAN : menueKlickt = []
+CLASS Menuepunkt
+    DIM item AS INTEGER             ' der Menuepunkt (GUI_MENU_ITEM)
+    DIM kennung AS STRING           ' der Befehl, den er ruft
+    DIM vorgabe AS STRING           ' das Kuerzel, mit dem er angelegt wurde
+    DIM jetzt AS STRING             ' das Kuerzel, das er gerade hat (tasten.json)
+    DIM klickt AS BOOLEAN
+    SUB Init(i AS INTEGER, k AS STRING, kz AS STRING, kl AS BOOLEAN)
+        item = i : kennung = k : vorgabe = kz : jetzt = kz : klickt = kl
+    END SUB
+END CLASS
+DIM menuepunkte AS ARRAY OF Menuepunkt : menuepunkte = []
 
 SUB menueBefehl(item AS INTEGER, kennung AS STRING, kuerzel AS STRING, klickt AS BOOLEAN = TRUE)
-    ARRAY_PUSH(menueItems, item)
-    ARRAY_PUSH(menueKennung, kennung)
-    ARRAY_PUSH(menueVorgabe, kuerzel)
-    ARRAY_PUSH(menueJetzt, kuerzel)
-    ARRAY_PUSH(menueKlickt, klickt)
+    ARRAY_PUSH(menuepunkte, NEW Menuepunkt(item, kennung, kuerzel, klickt))
 END SUB
+
+' Gibt es einen Menuepunkt fuer diesen Befehl?
+FUNCTION hatMenuepunkt(kennung AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(menuepunkte) - 1
+        IF menuepunkte[i].kennung = kennung THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
 
 SUB menueKlicks()
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(menueItems) - 1
-        IF menueKlickt[i] THEN
-            IF GUI_CLICKED(menueItems[i]) THEN befehl(menueKennung[i])
+    FOR i = 0 TO LEN(menuepunkte) - 1
+        IF menuepunkte[i].klickt THEN
+            IF GUI_CLICKED(menuepunkte[i].item) THEN befehl(menuepunkte[i].kennung)
         END IF
     NEXT
 END SUB
@@ -16685,7 +16732,6 @@ END SUB
 ' heisst "kein Kuerzel". Geht ein Kuerzel an einen Befehl, der es nicht
 ' hatte, verliert es der, dem es vorher gehoerte -- zwei Befehle auf einer
 ' Taste feuerten beide, und welcher gewinnt, saehe man nicht.
-DIM befehlKuerzelVorgabe AS ARRAY OF STRING : befehlKuerzelVorgabe = []
 DIM tastenMeldungen AS ARRAY OF STRING : tastenMeldungen = []
 DIM tastenKennung AS STRING : tastenKennung = ""
 
@@ -16753,14 +16799,14 @@ END SUB
 SUB tastenAnwenden()
     tastenMeldungen = []
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(menueItems) - 1
-        IF menueJetzt[i] <> menueVorgabe[i] THEN
-            GUI_MENU_SHORTCUT(menueItems[i], kz$(menueVorgabe[i]))
-            menueJetzt[i] = menueVorgabe[i]
+    FOR i = 0 TO LEN(menuepunkte) - 1
+        IF menuepunkte[i].jetzt <> menuepunkte[i].vorgabe THEN
+            GUI_MENU_SHORTCUT(menuepunkte[i].item, kz$(menuepunkte[i].vorgabe))
+            menuepunkte[i].jetzt = menuepunkte[i].vorgabe
         END IF
     NEXT
-    FOR i = 0 TO LEN(befehlKuerzel) - 1
-        befehlKuerzel[i] = befehlKuerzelVorgabe[i]
+    FOR i = 0 TO LEN(befehle) - 1
+        befehle[i].kuerzel = befehle[i].vorgabe
     NEXT
     DIM gesetzt AS INTEGER : gesetzt = 0
     IF FILEEXISTS(tastenPfad$()) THEN
@@ -16797,18 +16843,18 @@ END SUB
 
 ' Ein Eintrag der Datei. TRUE, wenn er gilt.
 FUNCTION tastenEins(k AS STRING, neu AS STRING) AS BOOLEAN
-    DIM idx AS INTEGER : idx = ARRAY_INDEXOF(befehlKennungen, k)
+    DIM idx AS INTEGER : idx = befehlNr(k)
     DIM i AS INTEGER
     DIM treffer AS INTEGER : treffer = 0
-    FOR i = 0 TO LEN(menueItems) - 1
-        IF menueKennung[i] = k THEN
+    FOR i = 0 TO LEN(menuepunkte) - 1
+        IF menuepunkte[i].kennung = k THEN
             TRY
-                GUI_MENU_SHORTCUT(menueItems[i], neu)
+                GUI_MENU_SHORTCUT(menuepunkte[i].item, neu)
             CATCH e
                 tastenMelden(k + ": " + CHR$(34) + neu + CHR$(34) + " ist kein Kürzel, das die IDE kennt (" + e + ")")
                 RETURN FALSE
             END TRY
-            menueJetzt[i] = neu
+            menuepunkte[i].jetzt = neu
             treffer = treffer + 1
         END IF
     NEXT
@@ -16816,23 +16862,23 @@ FUNCTION tastenEins(k AS STRING, neu AS STRING) AS BOOLEAN
         IF idx < 0 THEN
             tastenMelden(k + ": diesen Befehl gibt es nicht")
         ELSE
-            tastenMelden(k + ": " + befehlNamen[idx] + " hat keinen Menüpunkt, sein Kürzel lässt sich nicht ändern")
+            tastenMelden(k + ": " + befehle[idx].name + " hat keinen Menüpunkt, sein Kürzel lässt sich nicht ändern")
         END IF
         RETURN FALSE
     END IF
-    IF idx >= 0 THEN befehlKuerzel[idx] = neu
+    IF idx >= 0 THEN befehle[idx].kuerzel = neu
     ' Wem gehoerte das Kuerzel vorher?
     DIM form AS STRING : form = kuerzelForm$(neu)
     IF form = "" THEN RETURN TRUE
-    FOR i = 0 TO LEN(menueItems) - 1
-        IF menueKennung[i] <> k AND kuerzelForm$(menueJetzt[i]) = form THEN
-            GUI_MENU_SHORTCUT(menueItems[i], "")
-            menueJetzt[i] = ""
-            DIM andere AS INTEGER : andere = ARRAY_INDEXOF(befehlKennungen, menueKennung[i])
-            DIM andererName AS STRING : andererName = menueKennung[i]
+    FOR i = 0 TO LEN(menuepunkte) - 1
+        IF menuepunkte[i].kennung <> k AND kuerzelForm$(menuepunkte[i].jetzt) = form THEN
+            GUI_MENU_SHORTCUT(menuepunkte[i].item, "")
+            menuepunkte[i].jetzt = ""
+            DIM andere AS INTEGER : andere = befehlNr(menuepunkte[i].kennung)
+            DIM andererName AS STRING : andererName = menuepunkte[i].kennung
             IF andere >= 0 THEN
-                befehlKuerzel[andere] = ""
-                andererName = befehlNamen[andere]
+                befehle[andere].kuerzel = ""
+                andererName = befehle[andere].name
             END IF
             tastenMelden(neu + " gehörte vorher zu " + CHR$(34) + andererName + CHR$(34) + " -- der hat jetzt keins mehr")
         END IF
@@ -16843,23 +16889,21 @@ END FUNCTION
 ' Hilfe -> Tastenkuerzel aendern: erst den Befehl waehlen (nur die mit
 ' Menuepunkt -- die anderen haben keinen Ort fuer ein Kuerzel), dann fragen.
 SUB tastenWaehlen()
-    paletteNamen = []
-    paletteKennungen = []
-    paletteDetails = []
+    waehlerListe = []
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(befehlNamen) - 1
-        IF ARRAY_INDEXOF(menueKennung, befehlKennungen[i]) >= 0 THEN
-            ARRAY_PUSH(paletteNamen, befehlNamen[i]) : ARRAY_PUSH(paletteKennungen, befehlKennungen[i]) : ARRAY_PUSH(paletteDetails, befehlKuerzel[i])
+    FOR i = 0 TO LEN(befehle) - 1
+        IF hatMenuepunkt(befehle[i].kennung) THEN
+            waehlerDazu(befehle[i].name, befehle[i].kennung, befehle[i].kuerzel)
         END IF
     NEXT
     waehlerOeffnen("tasten", tr$("Tastenkürzel ändern: Befehl wählen"))
 END SUB
 
 SUB tastenFragen(k AS STRING)
-    DIM idx AS INTEGER : idx = ARRAY_INDEXOF(befehlKennungen, k)
+    DIM idx AS INTEGER : idx = befehlNr(k)
     IF idx < 0 THEN RETURN
     tastenKennung = k
-    dlgTasten = GUI_PROMPT(tr$("Tastenkürzel"), tr$("Neues Kürzel für ") + CHR$(34) + befehlNamen[idx] + CHR$(34) + tr$(" (z. B. Strg+Alt+K; leer = keins):"), befehlKuerzel[idx])
+    dlgTasten = GUI_PROMPT(tr$("Tastenkürzel"), tr$("Neues Kürzel für ") + CHR$(34) + befehle[idx].name + CHR$(34) + tr$(" (z. B. Strg+Alt+K; leer = keins):"), befehle[idx].kuerzel)
 END SUB
 
 ' In die Datei schreiben und neu anwenden. Wer die Vorgabe zurueckstellt,
@@ -16873,8 +16917,8 @@ SUB tastenSetzen(k AS STRING, neu AS STRING)
             j = JSON_PARSE("{}")
         END TRY
     END IF
-    DIM idx AS INTEGER : idx = ARRAY_INDEXOF(befehlKennungen, k)
-    IF idx >= 0 AND kuerzelForm$(neu) = kuerzelForm$(befehlKuerzelVorgabe[idx]) THEN
+    DIM idx AS INTEGER : idx = befehlNr(k)
+    IF idx >= 0 AND kuerzelForm$(neu) = kuerzelForm$(befehle[idx].vorgabe) THEN
         IF JSON_HAS(j, k) THEN JSON_REMOVE(j, k)
     ELSE
         JSON_SET_STRING(j, k, neu)
@@ -16882,9 +16926,9 @@ SUB tastenSetzen(k AS STRING, neu AS STRING)
     WRITEALL(tastenPfad$(), JSON_STRINGIFY(j) + NL)
     tastenAnwenden()
     IF idx >= 0 THEN
-        DIM zeigen AS STRING : zeigen = befehlKuerzel[idx]
+        DIM zeigen AS STRING : zeigen = befehle[idx].kuerzel
         IF zeigen = "" THEN zeigen = "keins"
-        IF LEN(tastenMeldungen) = 0 THEN GUI_SET_TEXT(lblStatus, befehlNamen[idx] + ": " + zeigen)
+        IF LEN(tastenMeldungen) = 0 THEN GUI_SET_TEXT(lblStatus, befehle[idx].name + ": " + zeigen)
     END IF
     protokoll("tasten gesetzt " + k + " " + neu)
 END SUB
@@ -18542,9 +18586,7 @@ SUB pluginsVerwaltenNachziehen()
 END SUB
 
 SUB paletteEintrag(name AS STRING, kennung AS STRING, kuerzel AS STRING)
-    ARRAY_PUSH(befehlNamen, tr$(name))
-    ARRAY_PUSH(befehlKennungen, kennung)
-    ARRAY_PUSH(befehlKuerzel, kz$(kuerzel))
+    ARRAY_PUSH(befehle, NEW BefehlEintrag(tr$(name), kennung, kz$(kuerzel)))
 END SUB
 
 paletteEintrag("Neu", "neu", "Strg+N") : paletteEintrag("Öffnen ...", "oeffnen", "Strg+O")
@@ -18735,24 +18777,21 @@ SUB paletteFuellen(filter AS STRING)
     ' Durchgang, und "Buchstabe fuer Buchstabe" als Ausdruck (a.*b.*c) statt
     ' einer MID$-Schleife: bei 20000 Dateien hakte jeder Tastendruck
     ' (Stresstest 2026-10-02). Dieselbe Frage wie passtUnscharf.
-    IF LEN(paletteNorm) <> LEN(paletteNamen) THEN
-        paletteNorm = []
-        FOR i = 0 TO LEN(paletteNamen) - 1
-            ARRAY_PUSH(paletteNorm, ohneUmlaute$(paletteNamen[i] + " " + paletteDetails[i]))
-        NEXT
-    END IF
+    FOR i = 0 TO LEN(waehlerListe) - 1
+        IF waehlerListe[i].norm = "" THEN waehlerListe[i].norm = ohneUmlaute$(waehlerListe[i].name + " " + waehlerListe[i].detail)
+    NEXT
     DIM muster AS STRING : muster = "(?s)"
     FOR i = 0 TO LEN(ff) - 1
         IF i > 0 THEN muster = muster + ".*"
         muster = muster + REGEX_ESCAPE$(MID$(ff, i, 1))
     NEXT
     FOR gang = 1 TO 2
-        FOR i = 0 TO LEN(paletteNamen) - 1
-            DIM amStueck AS BOOLEAN : amStueck = INSTR(paletteNorm[i], ff) >= 0
-            IF (gang = 1 AND amStueck) OR (gang = 2 AND NOT amStueck AND REGEX_TEST(paletteNorm[i], muster)) THEN
-                DIM pz AS INTEGER : pz = GUI_LISTBOX_ADD(lstPalette, paletteNamen[i])
-                IF paletteDetails[i] <> "" THEN GUI_LISTBOX_DETAIL(lstPalette, pz, paletteDetails[i])
-                ARRAY_PUSH(sichtbar, paletteKennungen[i])
+        FOR i = 0 TO LEN(waehlerListe) - 1
+            DIM amStueck AS BOOLEAN : amStueck = INSTR(waehlerListe[i].norm, ff) >= 0
+            IF (gang = 1 AND amStueck) OR (gang = 2 AND NOT amStueck AND REGEX_TEST(waehlerListe[i].norm, muster)) THEN
+                DIM pz AS INTEGER : pz = GUI_LISTBOX_ADD(lstPalette, waehlerListe[i].name)
+                IF waehlerListe[i].detail <> "" THEN GUI_LISTBOX_DETAIL(lstPalette, pz, waehlerListe[i].detail)
+                ARRAY_PUSH(sichtbar, waehlerListe[i].kennung)
             END IF
         NEXT
     NEXT
@@ -18762,7 +18801,6 @@ END SUB
 
 SUB waehlerOeffnen(art AS STRING, titel AS STRING)
     paletteArt = art
-    paletteNorm = []
     GUI_WINDOW_TITLE(winPalette, titel)
     GUI_SET_TEXT(tfPalette, "")
     paletteLetzterFilter = "-"
@@ -18773,29 +18811,25 @@ SUB waehlerOeffnen(art AS STRING, titel AS STRING)
 END SUB
 
 SUB paletteOeffnen()
-    paletteNamen = []
-    paletteKennungen = []
-    paletteDetails = []
+    waehlerListe = []
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(befehlNamen) - 1
-        DIM n AS STRING : n = befehlNamen[i]
-        ARRAY_PUSH(paletteNamen, n) : ARRAY_PUSH(paletteKennungen, befehlKennungen[i]) : ARRAY_PUSH(paletteDetails, befehlKuerzel[i])
+    FOR i = 0 TO LEN(befehle) - 1
+        DIM n AS STRING : n = befehle[i].name
+        waehlerDazu(n, befehle[i].kennung, befehle[i].kuerzel)
     NEXT
     waehlerOeffnen("befehl", tr$("Befehle"))
 END SUB
 
 ' Strg+Umschalt+O: die .dh des Projektordners und die zuletzt geoeffneten.
 SUB schnellOeffnen()
-    paletteNamen = []
-    paletteKennungen = []
-    paletteDetails = []
+    waehlerListe = []
     DIM d AS STRING
     FOR EACH d IN projektDateien("*.dh", TRUE)
-        ARRAY_PUSH(paletteNamen, d) : ARRAY_PUSH(paletteKennungen, PATHJOIN(projektOrdner, d)) : ARRAY_PUSH(paletteDetails, "")
+        waehlerDazu(d, PATHJOIN(projektOrdner, d), "")
     NEXT
     FOR EACH d IN zuletzt
-        IF ARRAY_INDEXOF(paletteKennungen, d) < 0 THEN
-            ARRAY_PUSH(paletteNamen, BASENAME(d)) : ARRAY_PUSH(paletteKennungen, d) : ARRAY_PUSH(paletteDetails, DIRNAME(d))
+        IF waehlerNr(d) < 0 THEN
+            waehlerDazu(BASENAME(d), d, DIRNAME(d))
         END IF
     NEXT
     waehlerOeffnen("datei", tr$("Datei öffnen: ") + BASENAME(projektOrdner))
@@ -19504,9 +19538,11 @@ menueBefehl(miNormal, "schrift_normal", "Strg+0") : menueBefehl(miKuerzel, "kuer
 menueBefehl(miDrueber, "drueber", "F10", FALSE) : menueBefehl(miHinein, "hinein", "F11", FALSE) : menueBefehl(miHeraus, "heraus", "Umschalt+F11", FALSE)
 menueBefehl(miBisMarke, "bis_marke", "Strg+F10", FALSE) : menueBefehl(miSchnipselEigen, "schnipsel_eigen", "") : menueBefehl(miSchnipselAuswahl, "schnipsel_auswahl", "")
 menueBefehl(miTerminal, "terminal", "Alt+3") : menueBefehl(miSprache, "sprache", "") : menueBefehl(miTasten, "tasten", "") : menueBefehl(miTastenZurueck, "tasten_zurueck", "")
+' Die Vorgabe der Kuerzel: was die Befehle bis hierher bekommen haben
+' (Plugins melden ihre spaeter an und haben ihre eigene).
 DIM bkv AS INTEGER
-FOR bkv = 0 TO LEN(befehlKuerzel) - 1
-    ARRAY_PUSH(befehlKuerzelVorgabe, befehlKuerzel[bkv])
+FOR bkv = 0 TO LEN(befehle) - 1
+    befehle[bkv].vorgabe = befehle[bkv].kuerzel
 NEXT
 schnipselEingebautMerken()
 schnipselLaden()

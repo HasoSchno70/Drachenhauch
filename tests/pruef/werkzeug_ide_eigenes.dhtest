@@ -115,7 +115,7 @@ prBild = prBild + 1
 IF prBild = 20 THEN
     DIM prW AS STRING
     FOR EACH prW IN ["neu", "zeile", "schnell", "suchen", "sichern"]
-        protokoll("pr " + prW + " " + befehlKuerzel[ARRAY_INDEXOF(befehlKennungen, prW)] + ".")
+        protokoll("pr " + prW + " " + befehle[befehlNr(prW)].kuerzel + ".")
     NEXT
     EXIT(0)
 END IF
@@ -224,9 +224,9 @@ IF prBild = 20 THEN
     protokoll("pr datei " + JOIN$(READLINES(tastenPfad$()), ""))
     tastenSetzen("neu", "strg+n")
     protokoll("pr datei " + JOIN$(READLINES(tastenPfad$()), ""))
-    protokoll("pr zeile " + befehlKuerzel[ARRAY_INDEXOF(befehlKennungen, "zeile")] + ".")
+    protokoll("pr zeile " + befehle[befehlNr("zeile")].kuerzel + ".")
     tastenZuruecksetzen()
-    protokoll("pr zeile " + befehlKuerzel[ARRAY_INDEXOF(befehlKennungen, "zeile")] + " " + STR$(FILEEXISTS(tastenPfad$())))
+    protokoll("pr zeile " + befehle[befehlNr("zeile")].kuerzel + " " + STR$(FILEEXISTS(tastenPfad$())))
     EXIT(0)
 END IF
 --- umgebung
