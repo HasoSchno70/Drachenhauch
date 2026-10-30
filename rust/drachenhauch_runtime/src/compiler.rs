@@ -2412,9 +2412,11 @@ impl Compiler {
                 concat!("NEW {}: die Klasse kuendigt {} an, ohne sie auszufuellen ({}). ",
                        "Entweder eine Unterklasse nehmen, die sie ausschreibt, oder ",
                        "die Methode in {} mit einem Rumpf versehen."),
-                class_name,
+                // Gross wie in den Typmeldungen -- der Parser fuehrt Namen klein,
+                // und "NEW katze" sah nach einem Tippfehler im Programm aus.
+                crate::namensraum::lesbar_text(&class_name.to_uppercase()),
                 if offen.len() == 1 { "eine Methode" } else { "Methoden" },
-                offen.join(", "), class_name));
+                offen.join(", "), crate::namensraum::lesbar_text(&class_name.to_uppercase())));
         }
         let args = match args {
             // Review-Fund: `NEW Klasse` (ohne Klammern) emittierte hier den
