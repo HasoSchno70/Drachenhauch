@@ -1431,6 +1431,9 @@ DIM btnWkThemen AS GUI_WIDGET : btnWkThemen = GUI_BUTTON(win, tr$("Beispiele nac
 DIM lblWkZuletzt AS GUI_WIDGET : lblWkZuletzt = GUI_LABEL(win, tr$("Zuletzt geöffnet -- Doppelklick öffnet"), 0, 0)
 DIM lstWkZuletzt AS GUI_WIDGET : lstWkZuletzt = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 DIM lblWkKuerzel AS GUI_WIDGET : lblWkKuerzel = GUI_LABEL(win, tr$("F5 startet das Programm, F7 debuggt es, Umschalt+F7 prüft. F1 schlägt das Wort unter der Marke im Handbuch nach, Strg+Umschalt+P öffnet die Befehlspalette, Strg+Umschalt+O eine Datei des Projekts. Alle Kürzel: Hilfe -> Tastenkürzel (Strg+F1)."), 0, 0)
+' Passt der Satz nicht mehr unter die Liste, bleibt er weg -- sonst lief er
+' in die Ausgabe-Leiste darunter (layout() rechnet es aus).
+DIM wkKuerzelPasst AS BOOLEAN : wkKuerzelPasst = TRUE
 ' Uebersichtskarte: eine Zeichenflaeche rechts neben dem Code -- gezeichnet
 ' wird nach GUI_DRAW, wie bei jeder Leinwand.
 ' Symbolspur ueber dem Code: Datei > Klasse > Unterprogramm. Sie sagt,
@@ -1467,7 +1470,9 @@ GUI_SET_VISIBLE(btnTermStopp, FALSE)
 ' Hier oben, weil layout() sie liest -- es laeuft vor dem Terminal-Abschnitt.
 DIM terminalAn AS BOOLEAN : terminalAn = FALSE
 DIM termProz AS INTEGER : termProz = -1
-DIM lblProbleme AS GUI_WIDGET : lblProbleme = GUI_LABEL(win, tr$("Probleme"), 0, 0)
+' Der Reiter der Leiste heisst schon "Probleme" -- ohne Ergebnis bleibt der
+' Kopf daneben leer, sonst stuende das Wort zweimal nebeneinander.
+DIM lblProbleme AS GUI_WIDGET : lblProbleme = GUI_LABEL(win, "", 0, 0)
 DIM lstProbleme AS GUI_WIDGET : lstProbleme = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 ' Rechtsklick auf die Liste der Suchtreffer (Strg+Umschalt+F): einzeln
 ' ersetzen, die angehakten ersetzen, alle/keinen anhaken.
@@ -2293,7 +2298,8 @@ SUB willkommenZeigen(an AS BOOLEAN)
     GUI_SET_VISIBLE(lblWkUnter, an)
     GUI_SET_VISIBLE(btnWkNeu, an) : GUI_SET_VISIBLE(btnWkOeffnen, an) : GUI_SET_VISIBLE(btnWkBeispiele, an)
     GUI_SET_VISIBLE(btnWkThemen, an)
-    GUI_SET_VISIBLE(lblWkZuletzt, an) : GUI_SET_VISIBLE(lstWkZuletzt, an) : GUI_SET_VISIBLE(lblWkKuerzel, an)
+    GUI_SET_VISIBLE(lblWkZuletzt, an) : GUI_SET_VISIBLE(lstWkZuletzt, an)
+    GUI_SET_VISIBLE(lblWkKuerzel, an AND wkKuerzelPasst)
     IF NOT an THEN
         GUI_SET_VISIBLE(lblKacheln, FALSE)
         DIM wk AS INTEGER
@@ -2651,11 +2657,13 @@ SUB layout()
     GUI_SET_VISIBLE(lblSpur, tabAnzahl > 0)
     oben = oben + spurH
     mitteH = mitteH - spurH
-    ' Die Uebersichtskarte nimmt sich einen Streifen am rechten Rand.
+    ' Die Uebersichtskarte nimmt sich einen Streifen am rechten Rand -- nur
+    ' mit einem Reiter; auf der Willkommensseite stuende sie leer da.
+    DIM karteDa AS BOOLEAN : karteDa = minimapAn AND tabAnzahl > 0
     DIM kartenB AS INTEGER : kartenB = 0
-    IF minimapAn THEN kartenB = 92
-    GUI_SET_VISIBLE(karte, minimapAn)
-    IF minimapAn THEN GUI_SET_BOUNDS(karte, ex + ew - kartenB, oben, kartenB - 6, mitteH)
+    IF karteDa THEN kartenB = 92
+    GUI_SET_VISIBLE(karte, karteDa)
+    IF karteDa THEN GUI_SET_BOUNDS(karte, ex + ew - kartenB, oben, kartenB - 6, mitteH)
     ew = ew - kartenB
     ' Geteilt: der linke Reiter bekommt die linke Haelfte, alle anderen die
     ' rechte -- so hat jede Haelfte ein ECHTES Feld, keine Spiegelung.
@@ -2729,10 +2737,15 @@ SUB layout()
     DIM nachKacheln AS INTEGER : nachKacheln = oben + 198 + reihen * (kh + 10) + 8
     IF reihen = 0 THEN nachKacheln = oben + 180
     GUI_SET_BOUNDS(lblWkZuletzt, wx, nachKacheln, ew - 80, 18)
-    DIM zlH AS INTEGER : zlH = MAX(60, MIN(200, oben + mitteH - nachKacheln - 70))
-    GUI_SET_BOUNDS(lstWkZuletzt, wx, nachKacheln + 22, MIN(ew - 80, 620), zlH)
-    GUI_SET_BOUNDS(lblWkKuerzel, wx, nachKacheln + 34 + zlH, MIN(ew - 80, 620), 18)
-    GUI_SET_WRAP(lblWkKuerzel, MIN(ew - 80, 620))
+    ' Der Satz unter der Liste bricht um -- seine Zeilen gehen von der Liste
+    ' ab (mit 70 Punkten fest lief er bei der groesseren Schrift unten hinaus).
+    DIM kzB AS INTEGER : kzB = MIN(ew - 80, 620)
+    DIM kzH AS INTEGER : kzH = (TEXT_WIDTH(GUI_TEXT(lblWkKuerzel)) \ MAX(1, kzB - 40) + 1) * (TEXT_HEIGHT() + 4)
+    DIM zlH AS INTEGER : zlH = MAX(60, MIN(200, oben + mitteH - nachKacheln - 34 - kzH - 8))
+    GUI_SET_BOUNDS(lstWkZuletzt, wx, nachKacheln + 22, kzB, zlH)
+    GUI_SET_BOUNDS(lblWkKuerzel, wx, nachKacheln + 34 + zlH, kzB, 18)
+    GUI_SET_WRAP(lblWkKuerzel, kzB)
+    wkKuerzelPasst = nachKacheln + 34 + zlH + kzH <= oben + mitteH
     willkommenZeigen(tabAnzahl = 0)
     GUI_SET_BOUNDS(tfEingabe, 8, ey, w - 108, 26)
     GUI_SET_BOUNDS(btnEingabe, w - 92, ey, 84, 26)
@@ -3932,7 +3945,7 @@ SUB tabSchliessen(i AS INTEGER)
     ' Pruefen eines Reiters, ohne Reiter bliebe sie stehen und zeigte die
     ' Unterprogramme einer Datei, die nicht mehr offen ist.
     IF tabAnzahl = 0 THEN
-        GUI_SET_TEXT(lblProbleme, tr$("Probleme"))
+        GUI_SET_TEXT(lblProbleme, "")
         gliederungLeeren()
     END IF
 END SUB
