@@ -384,8 +384,8 @@ nachher 0
 ' ihn selbst wieder zu, sobald die Gliederung die Bloecke kennt.
 IF NOT FILEEXISTS("lauf1") THEN
     WRITEALL("lauf1", "x")
-    GUI_TEXTAREA_FOLDABLE(tabFelder[0], [2], [4])
-    GUI_TEXTAREA_FOLD(tabFelder[0], 2, TRUE)
+    GUI_TEXTAREA_FOLDABLE(reiter[0].feld, [2], [4])
+    GUI_TEXTAREA_FOLD(reiter[0].feld, 2, TRUE)
     konfigSichern()
 END IF
 --- programm ../../ide/ide.dh nach protokoll("bereit")
@@ -428,7 +428,7 @@ GUI_SET_VALUE(spDruckGr, 12)
 GUI_SET_VALUE(spDruckRand, 30)
 GUI_SET_CHECKED(cbDruckNr, FALSE)
 druckOptionenLesen()
-GUI_TEXTAREA_SELECT(tabFelder[0], 2, 3, 3, 2)
+GUI_TEXTAREA_SELECT(reiter[0].feld, 2, 3, 3, 2)
 p = listingPdf(TRUE)
 PDF_SAVE(p, "auswahl.pdf")
 PDF_CLOSE(p)
@@ -622,7 +622,7 @@ themenNachziehen()
 GUI_LISTBOX_SET_SELECTED(lstThemen, GUI_LISTBOX_VIEW_ROW(lstThemen, 1))
 themenOeffnen(FALSE)
 PRINT "sichtbar " ; GUI_WINDOW_SHOWN(winThemen)
-PRINT "reiter " ; BASENAME(tabPfade[aktiverTab])
+PRINT "reiter " ; BASENAME(reiter[aktiverTab].pfad)
 --- programm ../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=20

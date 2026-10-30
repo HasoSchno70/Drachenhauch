@@ -141,12 +141,12 @@ pr wieder dunkel #FF0000
 
 === die vorlage traegt die werte des themas, gesichert gilt sie sofort
 befehl("farben_eigen")
-protokoll("pr reiter " + BASENAME(tabPfade[aktiverTab]))
-DIM prT AS STRING : prT = GUI_TEXT(tabFelder[aktiverTab])
+protokoll("pr reiter " + BASENAME(reiter[aktiverTab].pfad))
+DIM prT AS STRING : prT = GUI_TEXT(reiter[aktiverTab].feld)
 DIM prJ AS JSON_HANDLE : prJ = JSON_PARSE(prT)
 protokoll("pr vorlage " + JSON_GET_STRING(prJ, "dunkel.schluessel") + " " + JSON_GET_STRING(prJ, "hell.schluessel") + " " + STR$(LEN(JSON_KEYS(prJ, "dunkel"))))
 protokoll("pr vorher " + COLOR_HEX$(F_SCHLUESSEL))
-GUI_SET_TEXT(tabFelder[aktiverTab], REPLACE$(prT, JSON_GET_STRING(prJ, "dunkel.schluessel"), "#FF00FF"))
+GUI_SET_TEXT(reiter[aktiverTab].feld, REPLACE$(prT, JSON_GET_STRING(prJ, "dunkel.schluessel"), "#FF00FF"))
 befehl("sichern")
 protokoll("pr nachher " + COLOR_HEX$(F_SCHLUESSEL) + " meldungen " + STR$(LEN(farbMeldungen)))
 EXIT(0)

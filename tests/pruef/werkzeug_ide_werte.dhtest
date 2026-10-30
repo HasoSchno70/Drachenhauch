@@ -10,7 +10,7 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 5, 1)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 5, 1)
     befehl("haltepunkt")
     befehl("debug")
 END IF

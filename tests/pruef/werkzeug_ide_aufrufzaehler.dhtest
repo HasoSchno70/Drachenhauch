@@ -15,7 +15,7 @@ IF prBild = 62 THEN
     FOR prI = 0 TO LEN(zaehlZeilen) - 1
         protokoll("pr zeile " + STR$(zaehlZeilen[prI]) + " " + zaehlNamen[prI] + ": " + zaehlTexte[prI])
     NEXT
-    zaehlerKlick(tabFelder[aktiverTab], 1)
+    zaehlerKlick(reiter[aktiverTab].feld, 1)
 END IF
 IF prBild = 66 THEN
     protokoll("pr fenster " + GUI_TEXT(lblAufruf))
@@ -81,7 +81,7 @@ IF prBild = 60 THEN
     FOR prI = 0 TO LEN(zaehlZeilen) - 1
         protokoll("pr links " + zaehlNamen[prI] + ": " + zaehlTexte[prI])
     NEXT
-    zaehlerSetzen_(tabFelder[aktiverTab])
+    zaehlerSetzen_(reiter[aktiverTab].feld)
     FOR prI = 0 TO LEN(zaehlZeilen) - 1
         protokoll("pr rechts " + zaehlNamen[prI] + ": " + zaehlTexte[prI])
     NEXT
@@ -121,7 +121,7 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
-    zaehlerSetzen_(tabFelder[aktiverTab])
+    zaehlerSetzen_(reiter[aktiverTab].feld)
     DIM prI AS INTEGER
     FOR prI = 0 TO LEN(zaehlZeilen) - 1
         protokoll("pr " + zaehlNamen[prI] + ": " + zaehlTexte[prI])
@@ -171,10 +171,10 @@ IF prBild > 2 AND prJ - prLetzt > prMax THEN prMax = prJ - prLetzt
 prLetzt = prJ
 IF prBild = 160 THEN
     protokoll("pr erst " + zaehlTexte[0] + " flott " + STR$(prMax < 0.6))
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 4, 1)
-    GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "' x" + NL)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 4, 1)
+    GUI_TEXTAREA_INSERT(reiter[aktiverTab].feld, "' x" + NL)
     sichern(aktiverTab, FALSE)
-    GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "' y" + NL)
+    GUI_TEXTAREA_INSERT(reiter[aktiverTab].feld, "' y" + NL)
     prMax = 0.0
     prGelesen = zaehlGelesenGesamt
 END IF
@@ -184,7 +184,7 @@ IF prBild = 260 THEN
     WRITEALL(PATHJOIN(projektOrdner, "teil0/m1.dh"), "gruss()" + NL + "gruss()" + NL)
     zaehlFokusVorher = FALSE
 END IF
-IF prBild = 300 THEN GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "' z" + NL)
+IF prBild = 300 THEN GUI_TEXTAREA_INSERT(reiter[aktiverTab].feld, "' z" + NL)
 IF prBild = 400 THEN
     protokoll("pr von aussen " + zaehlTexte[0])
     EXIT(0)
@@ -227,7 +227,7 @@ pr von aussen 23 Aufrufe
 ' Geprueft: die Zaehler stimmen (aus der eigenen Datei und fuenf weiteren),
 ' und es geht flott (grob: 1,2 s; hier 0,4 s, vorher 1,9 s).
 DIM prT AS FLOAT : prT = GET_TIME()
-zaehlerSetzen_(tabFelder[aktiverTab])
+zaehlerSetzen_(reiter[aktiverTab].feld)
 DIM prD AS FLOAT : prD = GET_TIME() - prT
 DIM prK AS INTEGER
 FOR prK = 0 TO LEN(zaehlNamen) - 1

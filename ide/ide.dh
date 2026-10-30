@@ -252,13 +252,44 @@ DIM startOrdner AS STRING : startOrdner = GETENV$("DHRT_START_DIR")
 IF startOrdner = "" THEN startOrdner = CWD$()
 DIM projektOrdner AS STRING : projektOrdner = startOrdner
 
-DIM tabPfade[MAX_TABS] AS STRING
-DIM tabFelder[MAX_TABS] AS GUI_WIDGET
-DIM tabGesichert[MAX_TABS] AS STRING
-DIM tabLetzterText[MAX_TABS] AS STRING
-' Gefaltete Zeilen, die beim Oeffnen wieder zugeklappt werden sollen ("3,17")
-' -- erst, wenn der Reiter seine faltbaren Bloecke kennt.
-DIM tabFaltenOffen[MAX_TABS] AS STRING
+' Ein Reiter: sein Code-Feld und was zu seiner Datei gehoert. Bis
+' 2026-10-30 waren das fuenf Felder nebeneinander (tabPfade, tabFelder,
+' tabGesichert, tabLetzterText, tabFaltenOffen), die beim Schliessen eines
+' Reiters alle einzeln aufruecken mussten -- eines vergessen hiesse, dass
+' ein Reiter den Pfad des Nachbarn traegt.
+CLASS Reiter
+    DIM feld AS GUI_WIDGET          ' das Code-Feld, -1 = keins
+    DIM pfad AS STRING              ' "" = noch nie gesichert
+    DIM gesichert AS STRING         ' der Text beim Oeffnen bzw. letzten Sichern
+    DIM letzterText AS STRING       ' fuer die Aenderungs-Erkennung je Bild
+    ' Gefaltete Zeilen, die beim Oeffnen wieder zugeklappt werden sollen
+    ' ("3,17") -- erst, wenn der Reiter seine faltbaren Bloecke kennt.
+    DIM faltenOffen AS STRING
+
+    SUB Init()
+        feld = -1
+    END SUB
+
+    ' Steht im Feld etwas anderes als zuletzt gesichert?
+    FUNCTION geaendert() AS BOOLEAN
+        RETURN feld >= 0 AND GUI_TEXT(feld) <> gesichert
+    END FUNCTION
+
+    ' Der Dateiname, ohne Pfad "Unbenannt".
+    FUNCTION name$() AS STRING
+        IF pfad = "" THEN RETURN "Unbenannt"
+        RETURN BASENAME(pfad)
+    END FUNCTION
+END CLASS
+
+' Jeder Platz haelt immer einen Reiter (auch die freien hinter tabAnzahl),
+' wie vorher jedes Feld seinen Platz hatte -- ein NIL-Platz braeche dort ab,
+' wo der alte Code einen veralteten Wert las.
+DIM reiter[MAX_TABS] AS Reiter
+DIM reiterNr AS INTEGER
+FOR reiterNr = 0 TO MAX_TABS - 1
+    reiter[reiterNr] = NEW Reiter()
+NEXT
 ' Gemerkte Faltungen je Datei (ide.json `falten_pfade`/`falten_zeilen`),
 ' die zuletzt benutzte zuerst.
 DIM faltPfade AS ARRAY OF STRING : faltPfade = []
@@ -1618,7 +1649,7 @@ END FUNCTION
 ' der Datei im Reiter, sonst der Projektordner.
 FUNCTION codeBasis$() AS STRING
     IF aktiverTab >= 0 THEN
-        IF tabPfade[aktiverTab] <> "" THEN RETURN DIRNAME(tabPfade[aktiverTab])
+        IF reiter[aktiverTab].pfad <> "" THEN RETURN DIRNAME(reiter[aktiverTab].pfad)
     END IF
     RETURN projektOrdner
 END FUNCTION
@@ -2233,8 +2264,6 @@ GUI_WINDOW_CANCEL(winDruck, btnDruckWeg)
 GUI_WINDOW_VISIBLE(winDruck, FALSE)
 DIM druckerNamen AS ARRAY OF STRING : druckerNamen = []
 
-' Alle Widgets auf jedem Reiter sichtbar -- die Reiter schalten nur die Code-Felder.
-DIM tabTitel[MAX_TABS] AS STRING
 
 DIM breiteLinks AS INTEGER : breiteLinks = 220
 DIM hoeheUnten AS INTEGER : hoeheUnten = 200
@@ -2410,7 +2439,7 @@ SUB konfigSichern()
     JSON_SET_JSON(konfig, "sitzung", JSON_PARSE("[]"))
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        IF tabPfade[i] <> "" THEN JSON_APPEND_STRING(konfig, "sitzung", tabPfade[i])
+        IF reiter[i].pfad <> "" THEN JSON_APPEND_STRING(konfig, "sitzung", reiter[i].pfad)
         faltenMerken(i)
     NEXT
     ' Haltepunkte und Lesezeichen ueberleben den Neustart (bis 2026-09-27
@@ -2450,7 +2479,7 @@ SUB konfigSichern()
     DIM offen AS ARRAY OF STRING : offen = []
     DIM pi AS INTEGER
     FOR pi = 0 TO tabAnzahl - 1
-        IF tabPfade[pi] <> "" THEN ARRAY_PUSH(offen, tabPfade[pi])
+        IF reiter[pi].pfad <> "" THEN ARRAY_PUSH(offen, reiter[pi].pfad)
     NEXT
     DIM alt AS INTEGER : alt = ARRAY_INDEXOF(projOrdner, projektOrdner)
     IF alt >= 0 THEN
@@ -2527,7 +2556,7 @@ SUB schriftSetzen(groesse AS INTEGER)
     codeGroesse = MAX(10, MIN(32, groesse))
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        GUI_SET_FONT_SIZE(tabFelder[i], codeGroesse)
+        GUI_SET_FONT_SIZE(reiter[i].feld, codeGroesse)
     NEXT
     GUI_SET_TEXT(lblStatus, tr$("Schrift: ") + STR$(codeGroesse) + tr$(" px"))
     ' Das Drehfeld der Einstellungen mitziehen -- sind sie offen, setzte es
@@ -2659,7 +2688,7 @@ END SUB
 ' Fuers Protokoll: das Code-Feld, oder ohne Reiter die Willkommensseite --
 ' beide stehen auf derselben Flaeche.
 FUNCTION aktivesFeldOderWk() AS GUI_WIDGET
-    IF aktiverTab >= 0 THEN RETURN tabFelder[aktiverTab]
+    IF aktiverTab >= 0 THEN RETURN reiter[aktiverTab].feld
     RETURN lblWkTitel
 END FUNCTION
 
@@ -2722,13 +2751,13 @@ SUB layout()
     IF spiegelAn AND taSpiegel >= 0 THEN GUI_SET_BOUNDS(taSpiegel, ex, oben, halbeB, mitteH)
     FOR i = 0 TO tabAnzahl - 1
         IF geteilt AND linkerTab >= 0 AND linkerTab < tabAnzahl AND i = linkerTab THEN
-            GUI_SET_BOUNDS(tabFelder[i], ex, oben, halbeB, mitteH)
+            GUI_SET_BOUNDS(reiter[i].feld, ex, oben, halbeB, mitteH)
         ELSEIF spiegelAn THEN
-            GUI_SET_BOUNDS(tabFelder[i], ex + halbeB + 6, oben, ew - halbeB - 6, mitteH)
+            GUI_SET_BOUNDS(reiter[i].feld, ex + halbeB + 6, oben, ew - halbeB - 6, mitteH)
         ELSEIF geteilt AND linkerTab >= 0 AND linkerTab < tabAnzahl THEN
-            GUI_SET_BOUNDS(tabFelder[i], ex + halbeB + 6, oben, ew - halbeB - 6, mitteH)
+            GUI_SET_BOUNDS(reiter[i].feld, ex + halbeB + 6, oben, ew - halbeB - 6, mitteH)
         ELSE
-            GUI_SET_BOUNDS(tabFelder[i], ex, oben, ew, mitteH)
+            GUI_SET_BOUNDS(reiter[i].feld, ex, oben, ew, mitteH)
         END IF
     NEXT
     ' Willkommensseite auf derselben Flaeche
@@ -2808,8 +2837,8 @@ SUB reiterNeuSetzen()
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
         DIM t AS STRING
-        IF tabPfade[i] = "" THEN t = "Unbenannt" ELSE t = BASENAME(tabPfade[i])
-        IF GUI_TEXT(tabFelder[i]) <> tabGesichert[i] THEN t = t + " *"
+        t = reiter[i].name$()
+        IF reiter[i].geaendert() THEN t = t + " *"
         titel[i] = t
     NEXT
     IF tabAnzahl = 0 THEN titel[0] = "Drachenhauch"
@@ -2830,7 +2859,7 @@ END SUB
 SUB wasserzeichenAlle()
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        wasserzeichenSetzen(tabFelder[i])
+        wasserzeichenSetzen(reiter[i].feld)
     NEXT
     IF taSpiegel >= 0 THEN wasserzeichenSetzen(taSpiegel)
     protokoll("wasserzeichen " + IIF(wasserzeichenAn AND hgBild >= 0, "an", "aus"))
@@ -2884,7 +2913,7 @@ SUB klammernSetzen(an AS BOOLEAN)
     klammernAn = an
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        klammernSetzenAn(tabFelder[i])
+        klammernSetzenAn(reiter[i].feld)
     NEXT
     konfigSichern()
     GUI_SET_TEXT(lblStatus, IIF(an, tr$("Klammern schließen an."), tr$("Klammern schließen aus.")))
@@ -2916,7 +2945,7 @@ SUB geruestSetzen(an AS BOOLEAN)
     geruestAn = an
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        geruestSetzenAn(tabFelder[i])
+        geruestSetzenAn(reiter[i].feld)
     NEXT
     konfigSichern()
     GUI_SET_TEXT(lblStatus, IIF(an, tr$("Gerüst beim Tippen an."), tr$("Gerüst beim Tippen aus.")))
@@ -2930,7 +2959,7 @@ SUB linienSetzen(an AS BOOLEAN)
     GUI_MENU_CHECK(miLinien, an)
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        GUI_TEXTAREA_SET(tabFelder[i], "einzugslinien", IIF(an, 1, 0))
+        GUI_TEXTAREA_SET(reiter[i].feld, "einzugslinien", IIF(an, 1, 0))
     NEXT
     GUI_SET_TEXT(lblStatus, IIF(an, tr$("Einrückungslinien an."), tr$("Einrückungslinien aus.")))
     protokoll("linien " + IIF(an, "an", "aus"))
@@ -2945,7 +2974,7 @@ SUB kopfSetzen(an AS BOOLEAN)
     GUI_MENU_CHECK(miKopf, an)
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        GUI_TEXTAREA_SET(tabFelder[i], "kopfzeilen", IIF(an, 3, 0))
+        GUI_TEXTAREA_SET(reiter[i].feld, "kopfzeilen", IIF(an, 3, 0))
     NEXT
     IF taSpiegel >= 0 THEN GUI_TEXTAREA_SET(taSpiegel, "kopfzeilen", IIF(an, 3, 0))
     GUI_SET_TEXT(lblStatus, IIF(an, tr$("Mitlaufender Blockkopf an."), tr$("Mitlaufender Blockkopf aus.")))
@@ -2963,7 +2992,7 @@ SUB umbruchSetzen(an AS BOOLEAN)
     GUI_TOOLBAR_SET_CHECKED(leiste, wzUmbruch, an)
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        GUI_TEXTAREA_SET(tabFelder[i], "umbruch", IIF(an, 1, 0))
+        GUI_TEXTAREA_SET(reiter[i].feld, "umbruch", IIF(an, 1, 0))
     NEXT
     GUI_SET_TEXT(lblStatus, IIF(an, tr$("Zeilenumbruch an."), tr$("Zeilenumbruch aus.")))
     GUI_STATUSBAR_SET(lblStatus, sfUmbruch, IIF(an, tr$("Umbruch an"), tr$("Umbruch aus")))
@@ -3284,7 +3313,7 @@ SUB peekZeigen()
         dz = symZeilen[k]
         DIM offen AS INTEGER : offen = tabMitPfad(peekPfad)
         IF offen >= 0 THEN
-            q = GUI_TEXT(tabFelder[offen])
+            q = GUI_TEXT(reiter[offen].feld)
         ELSE
             q = dateiLesen(peekPfad)
         END IF
@@ -3361,24 +3390,24 @@ SUB geteiltSetzen(an AS BOOLEAN)
     IF NOT an AND linkerTab >= 0 AND linkerTab < tabAnzahl THEN
         ' Zurueck auf seinen eigenen Reiter -- sonst bliebe das Feld
         ' ueber allen Reitern stehen.
-        GUI_SET_TAB(tabFelder[linkerTab], linkerTab)
+        GUI_SET_TAB(reiter[linkerTab].feld, linkerTab)
     END IF
     geteilt = an
     IF an THEN
         linkerTab = IIF(aktiverTab = 0, 1, 0)
         ' -1 heisst "auf jedem Reiter sichtbar" -- nur so stehen zwei
         ' Felder gleichzeitig im Bild.
-        GUI_SET_TAB(tabFelder[linkerTab], -1)
+        GUI_SET_TAB(reiter[linkerTab].feld, -1)
     ELSE
         linkerTab = -1
     END IF
     GUI_MENU_CHECK(miGeteilt, geteilt)
     layout()
-    GUI_SET_TEXT(lblStatus, IIF(geteilt, tr$("Geteilt: links ") + BASENAME(tabPfade[linkerTab]), tr$("Geteilte Ansicht aus.")))
+    GUI_SET_TEXT(lblStatus, IIF(geteilt, tr$("Geteilt: links ") + BASENAME(reiter[linkerTab].pfad), tr$("Geteilte Ansicht aus.")))
     ' Die Lagen mitschreiben: dass der Befehl LIEF, sagt nichts darueber, ob
     ' die beiden Felder auch nebeneinander liegen.
     IF geteilt THEN
-        protokoll("geteilt " + STR$(linkerTab) + " x " + STR$(GUI_GET_X(tabFelder[linkerTab])) + "+" + STR$(GUI_GET_W(tabFelder[linkerTab])) + " " + STR$(GUI_GET_X(tabFelder[aktiverTab])) + "+" + STR$(GUI_GET_W(tabFelder[aktiverTab])))
+        protokoll("geteilt " + STR$(linkerTab) + " x " + STR$(GUI_GET_X(reiter[linkerTab].feld)) + "+" + STR$(GUI_GET_W(reiter[linkerTab].feld)) + " " + STR$(GUI_GET_X(reiter[aktiverTab].feld)) + "+" + STR$(GUI_GET_W(reiter[aktiverTab].feld)))
     ELSE
         protokoll("geteilt aus")
     END IF
@@ -3393,9 +3422,9 @@ SUB geteiltNachziehen(vorher AS INTEGER)
         geteiltSetzen(FALSE)
         RETURN
     END IF
-    GUI_SET_TAB(tabFelder[linkerTab], linkerTab)
+    GUI_SET_TAB(reiter[linkerTab].feld, linkerTab)
     linkerTab = vorher
-    GUI_SET_TAB(tabFelder[linkerTab], -1)
+    GUI_SET_TAB(reiter[linkerTab].feld, -1)
     layout()
 END SUB
 
@@ -3418,20 +3447,20 @@ SUB spiegelSetzen(an AS BOOLEAN)
         feldEinrichten(taSpiegel)
         GUI_SET_TAB(taSpiegel, -1)
         GUI_SET_VISIBLE(taSpiegel, TRUE)
-        spiegelBesitzer = tabFelder[aktiverTab]
+        spiegelBesitzer = reiter[aktiverTab].feld
         GUI_TEXTAREA_SHARE(taSpiegel, spiegelBesitzer)
         spiegelFaerbSchl = ""
     ELSEIF taSpiegel >= 0 THEN
         GUI_TEXTAREA_SHARE(taSpiegel, -1)
         GUI_SET_VISIBLE(taSpiegel, FALSE)
         spiegelBesitzer = -1
-        IF aktiverTab >= 0 THEN GUI_FOCUS(tabFelder[aktiverTab])
+        IF aktiverTab >= 0 THEN GUI_FOCUS(reiter[aktiverTab].feld)
     END IF
     GUI_MENU_CHECK(miSpiegel, spiegelAn)
     layout()
     IF spiegelAn THEN
-        GUI_SET_TEXT(lblStatus, tr$("Dieselbe Datei nebeneinander: ") + BASENAME(tabPfade[aktiverTab]))
-        protokoll("spiegel an x " + STR$(GUI_GET_X(taSpiegel)) + "+" + STR$(GUI_GET_W(taSpiegel)) + " " + STR$(GUI_GET_X(tabFelder[aktiverTab])) + "+" + STR$(GUI_GET_W(tabFelder[aktiverTab])))
+        GUI_SET_TEXT(lblStatus, tr$("Dieselbe Datei nebeneinander: ") + BASENAME(reiter[aktiverTab].pfad))
+        protokoll("spiegel an x " + STR$(GUI_GET_X(taSpiegel)) + "+" + STR$(GUI_GET_W(taSpiegel)) + " " + STR$(GUI_GET_X(reiter[aktiverTab].feld)) + "+" + STR$(GUI_GET_W(reiter[aktiverTab].feld)))
     ELSE
         GUI_SET_TEXT(lblStatus, tr$("Zweite Ansicht aus."))
         protokoll("spiegel aus")
@@ -3446,8 +3475,8 @@ SUB spiegelNachziehen()
         spiegelSetzen(FALSE)
         RETURN
     END IF
-    IF tabFelder[aktiverTab] = spiegelBesitzer THEN RETURN
-    spiegelBesitzer = tabFelder[aktiverTab]
+    IF reiter[aktiverTab].feld = spiegelBesitzer THEN RETURN
+    spiegelBesitzer = reiter[aktiverTab].feld
     GUI_TEXTAREA_SHARE(taSpiegel, spiegelBesitzer)
     spiegelFaerbSchl = ""
     layout()
@@ -3632,17 +3661,17 @@ END FUNCTION
 ' gemerkte zuerst.
 SUB faltenMerken(i AS INTEGER)
     IF i < 0 OR i >= tabAnzahl THEN RETURN
-    IF tabPfade[i] = "" THEN RETURN
+    IF reiter[i].pfad = "" THEN RETURN
     ' Noch nicht zurueckgeholt (der Reiter war nie vorn): die gemerkte
     ' Faltung gilt weiter -- das Feld selbst hat ja noch keine.
-    IF tabFaltenOffen[i] <> "" THEN RETURN
-    DIM z AS ARRAY OF INTEGER : z = GUI_TEXTAREA_FOLDS(tabFelder[i])
+    IF reiter[i].faltenOffen <> "" THEN RETURN
+    DIM z AS ARRAY OF INTEGER : z = GUI_TEXTAREA_FOLDS(reiter[i].feld)
     DIM teile AS ARRAY OF STRING : teile = []
     DIM k AS INTEGER
     FOR k = 0 TO LEN(z) - 1
         ARRAY_PUSH(teile, STR$(z[k]))
     NEXT
-    DIM weg AS STRING : weg = wegGleich$(tabPfade[i])
+    DIM weg AS STRING : weg = wegGleich$(reiter[i].pfad)
     DIM neuP AS ARRAY OF STRING : neuP = []
     DIM neuL AS ARRAY OF STRING : neuL = []
     IF LEN(teile) > 0 THEN
@@ -3668,18 +3697,18 @@ END FUNCTION
 ' gemerkte Faltung wieder zuklappen. Eine Zeile, die inzwischen keinen
 ' Block mehr anfaengt (die Datei wurde woanders geaendert), bleibt offen.
 SUB faltenZurueck(ta AS GUI_WIDGET)
-    IF aktiverTab < 0 OR ta <> tabFelder[aktiverTab] THEN RETURN
-    IF tabFaltenOffen[aktiverTab] = "" THEN RETURN
+    IF aktiverTab < 0 OR ta <> reiter[aktiverTab].feld THEN RETURN
+    IF reiter[aktiverTab].faltenOffen = "" THEN RETURN
     DIM zs AS STRING
     DIM n AS INTEGER : n = 0
-    FOR EACH zs IN SPLIT$(tabFaltenOffen[aktiverTab], ",")
+    FOR EACH zs IN SPLIT$(reiter[aktiverTab].faltenOffen, ",")
         TRY
             ' FOLD liefert, ob die Zeile jetzt zu ist (FALSE: kein Block dort).
             IF GUI_TEXTAREA_FOLD(ta, INT(VAL(zs)), TRUE) THEN n = n + 1
         CATCH e
         END TRY
     NEXT
-    tabFaltenOffen[aktiverTab] = ""
+    reiter[aktiverTab].faltenOffen = ""
     protokoll("falten wieder " + STR$(n))
 END SUB
 
@@ -3692,10 +3721,10 @@ SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
     DIM i AS INTEGER
     IF pfad <> "" THEN
         FOR i = 0 TO tabAnzahl - 1
-            IF wegGleich$(tabPfade[i]) = wegGleich$(pfad) THEN
+            IF wegGleich$(reiter[i].pfad) = wegGleich$(pfad) THEN
                 aktiverTab = i
                 reiterNeuSetzen()
-                GUI_FOCUS(tabFelder[i])
+                GUI_FOCUS(reiter[i].feld)
                 RETURN
             END IF
         NEXT
@@ -3707,7 +3736,7 @@ SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
         IF i >= 0 THEN
             aktiverTab = i
             reiterNeuSetzen()
-            GUI_FOCUS(tabFelder[i])
+            GUI_FOCUS(reiter[i].feld)
             RETURN
         END IF
     END IF
@@ -3717,13 +3746,13 @@ SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
         ' geaendert, bleibt es bei der Meldung.
         DIM frei AS INTEGER : frei = -1
         FOR i = 0 TO tabAnzahl - 1
-            IF frei < 0 AND i <> aktiverTab AND GUI_TEXT(tabFelder[i]) = tabGesichert[i] THEN frei = i
+            IF frei < 0 AND i <> aktiverTab AND NOT reiter[i].geaendert() THEN frei = i
         NEXT
         IF frei < 0 THEN
             GUI_SET_TEXT(lblStatus, tr$("Höchstens ") + STR$(MAX_TABS) + tr$(" Reiter -- erst einen schließen."))
             RETURN
         END IF
-        reiterPlatz = IIF(tabPfade[frei] = "", tr$("(neu)"), BASENAME(tabPfade[frei]))
+        reiterPlatz = IIF(reiter[frei].pfad = "", tr$("(neu)"), BASENAME(reiter[frei].pfad))
         protokoll("reiter platz " + reiterPlatz)
         tabSchliessen(frei)
     END IF
@@ -3732,11 +3761,12 @@ SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
     feldEinrichten(ta)
     GUI_SET_TEXT(ta, inhalt)
     GUI_SET_TAB(ta, tabAnzahl)
-    tabPfade[tabAnzahl] = pfad
-    tabFelder[tabAnzahl] = ta
-    tabGesichert[tabAnzahl] = inhalt
-    tabLetzterText[tabAnzahl] = ""
-    tabFaltenOffen[tabAnzahl] = gemerkteFalten$(pfad)
+    reiter[tabAnzahl] = NEW Reiter()
+    reiter[tabAnzahl].pfad = pfad
+    reiter[tabAnzahl].feld = ta
+    reiter[tabAnzahl].gesichert = inhalt
+    reiter[tabAnzahl].letzterText = ""
+    reiter[tabAnzahl].faltenOffen = gemerkteFalten$(pfad)
     aktiverTab = tabAnzahl
     tabAnzahl = tabAnzahl + 1
     reiterNeuSetzen()
@@ -3836,17 +3866,17 @@ FUNCTION aktivesFeld() AS GUI_WIDGET
     ' derselbe, geschrieben wird ueber GUI_TEXTAREA_INSERT und die Laufzeit
     ' gleicht ab.
     IF spiegelAn AND taSpiegel >= 0 AND GUI_FOCUSED() = taSpiegel THEN RETURN taSpiegel
-    RETURN tabFelder[aktiverTab]
+    RETURN reiter[aktiverTab].feld
 END FUNCTION
 
 FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
     IF i < 0 THEN RETURN FALSE
-    DIM pfad AS STRING : pfad = tabPfade[i]
+    DIM pfad AS STRING : pfad = reiter[i].pfad
     IF pfad = "" OR alsNeu THEN
         pfad = FILE_SAVE_DIALOG("Sichern unter", "programm.dh", "dh")
         IF pfad = "" THEN RETURN FALSE
     END IF
-    DIM text AS STRING : text = GUI_TEXT(tabFelder[i])
+    DIM text AS STRING : text = GUI_TEXT(reiter[i].feld)
     ' Formatieren beim Sichern: nur Drachenhauch-Quelltext, nie beim
     ' automatischen Sichern. Der Formatierer arbeitet auf Tokens: eine halbe
     ' Anweisung rueckt er ein wie jede andere, nur was sich gar nicht lesen
@@ -3857,7 +3887,7 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
         IF geformt <> "" THEN
             IF RIGHT$(text, 1) = NL THEN geformt = geformt + NL
             IF geformt <> text THEN
-                feldAustauschen(tabFelder[i], text, geformt)
+                feldAustauschen(reiter[i].feld, text, geformt)
                 text = geformt
                 protokoll("beim sichern formatiert")
             END IF
@@ -3880,8 +3910,8 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
         protokoll("sichern fehlgeschlagen " + pfad)
         RETURN FALSE
     END TRY
-    tabPfade[i] = pfad
-    tabGesichert[i] = text
+    reiter[i].pfad = pfad
+    reiter[i].gesichert = text
     ' Nur der Eintrag DIESER Datei ist veraltet -- den ganzen Zaehl-Cache zu
     ' leeren hiess, dass in einem Projekt mit 2000 Dateien jedes Strg+S beim
     ' naechsten Pruefen alle neu las (0,8 s Stillstand, Stresstest
@@ -3933,11 +3963,11 @@ END FUNCTION
 ' Nummern der noch offenen gueltig bleiben -- tabSchliessen rueckt sie auf.
 SUB andereSchliessen()
     IF aktiverTab < 0 THEN RETURN
-    DIM behalten AS GUI_WIDGET : behalten = tabFelder[aktiverTab]
+    DIM behalten AS GUI_WIDGET : behalten = reiter[aktiverTab].feld
     DIM weg AS INTEGER : weg = 0
     DIM i AS INTEGER
     FOR i = tabAnzahl - 1 TO 0 STEP -1
-        IF tabFelder[i] <> behalten THEN
+        IF reiter[i].feld <> behalten THEN
             tabSchliessen(i)
             weg = weg + 1
         END IF
@@ -3951,13 +3981,12 @@ END SUB
 ' faellt das noch mehr ins Gewicht, weil man es aus Versehen trifft.
 SUB tabSchliessenFragen(i AS INTEGER)
     IF i < 0 OR i >= tabAnzahl THEN RETURN
-    IF GUI_TEXT(tabFelder[i]) = tabGesichert[i] THEN
+    IF NOT reiter[i].geaendert() THEN
         tabSchliessen(i)
         RETURN
     END IF
     tabZuIndex = i
-    DIM wie AS STRING : wie = "Unbenannt"
-    IF tabPfade[i] <> "" THEN wie = BASENAME(tabPfade[i])
+    DIM wie AS STRING : wie = reiter[i].name$()
     dlgTabZu = GUI_DIALOG(tr$("Schließen"), wie + tr$(" hat ungesicherte Änderungen."), _
                           "Sichern|Verwerfen|Abbrechen")
 END SUB
@@ -3966,21 +3995,18 @@ SUB tabSchliessen(i AS INTEGER)
     IF i < 0 OR i >= tabAnzahl THEN RETURN
     ' Den Pfad merken: Strg+Umschalt+T holt ihn zurueck. Nur gesicherte
     ' Dateien -- ein leerer Reiter haette nichts, was wiederzufinden waere.
-    IF tabPfade[i] <> "" THEN ARRAY_PUSH(zuGemacht, tabPfade[i])
+    IF reiter[i].pfad <> "" THEN ARRAY_PUSH(zuGemacht, reiter[i].pfad)
     ' Die Reiter ruecken auf, der linke der geteilten Ansicht zeigte danach
     ' auf eine andere Datei -- lieber ganz aus als still auf die falsche.
     IF geteilt THEN geteiltSetzen(FALSE)
     faltenMerken(i)
-    GUI_DESTROY(tabFelder[i])
+    GUI_DESTROY(reiter[i].feld)
     DIM k AS INTEGER
     FOR k = i TO tabAnzahl - 2
-        tabPfade[k] = tabPfade[k + 1]
-        tabFelder[k] = tabFelder[k + 1]
-        tabGesichert[k] = tabGesichert[k + 1]
-        tabLetzterText[k] = tabLetzterText[k + 1]
-        tabFaltenOffen[k] = tabFaltenOffen[k + 1]
-        GUI_SET_TAB(tabFelder[k], k)
+        reiter[k] = reiter[k + 1]
+        GUI_SET_TAB(reiter[k].feld, k)
     NEXT
+    reiter[tabAnzahl - 1] = NEW Reiter()
     tabAnzahl = tabAnzahl - 1
     ' Faellt ein Reiter LINKS vom aktiven weg, ruecken die anderen auf --
     ' dieselbe Nummer meinte danach die Datei daneben. Mit Strg+W fiel das
@@ -4487,19 +4513,19 @@ SUB pruefen()
     ' Nur Drachenhauch pruefen: eine .json oder .md durch den Uebersetzer
     ' zu schicken fuellt die Liste mit Meldungen ueber etwas, das gar kein
     ' Programm ist.
-    IF tabPfade[aktiverTab] <> "" AND LOWER$(RIGHT$(tabPfade[aktiverTab], 3)) <> ".dh" THEN
-        GUI_SET_TEXT(lblProbleme, tr$("Probleme: -- (") + BASENAME(tabPfade[aktiverTab]) + _
+    IF reiter[aktiverTab].pfad <> "" AND LOWER$(RIGHT$(reiter[aktiverTab].pfad, 3)) <> ".dh" THEN
+        GUI_SET_TEXT(lblProbleme, tr$("Probleme: -- (") + BASENAME(reiter[aktiverTab].pfad) + _
                      " ist kein Drachenhauch)")
         gliederungLeeren()
         RETURN
     END IF
     DIM basis AS STRING : basis = projektOrdner
-    IF tabPfade[aktiverTab] <> "" THEN basis = DIRNAME(tabPfade[aktiverTab])
+    IF reiter[aktiverTab].pfad <> "" THEN basis = DIRNAME(reiter[aktiverTab].pfad)
     DIM j AS JSON_HANDLE
     j = JSON_PARSE(CODE_CHECK$(GUI_TEXT(ta), basis))
     ' Befunde der Plugins fuer diese Datei hinten an (PLUGIN_BEFUND) -- in
     ' derselben Form, also mit Wellenlinie, Tooltip und Schnellkorrektur.
-    pluginBefundeAnhaengen(tabPfade[aktiverTab], j, GUI_TEXT(ta))
+    pluginBefundeAnhaengen(reiter[aktiverTab].pfad, j, GUI_TEXT(ta))
     DIM n AS INTEGER : n = JSON_LEN(j, "")
     DIM zeilen[MAX(n, 1)] AS INTEGER
     DIM i AS INTEGER
@@ -4552,7 +4578,7 @@ SUB pruefen()
     IF hinweise > 0 THEN protokoll("hinweise " + STR$(hinweise))
     gliederungFuellen(GUI_TEXT(ta))
     zaehlerSetzen_(ta)
-    pluginEreignis("geprueft", tabPfade[aktiverTab])
+    pluginEreignis("geprueft", reiter[aktiverTab].pfad)
 END SUB
 
 ' Fehler und Warnungen DORT unterstreichen, wo sie stehen (rot bzw. gelb),
@@ -4854,7 +4880,7 @@ DIM symSchluessel AS STRING : symSchluessel = "-"
 FUNCTION tabMitPfad(pfad AS STRING) AS INTEGER
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        IF wegGleich$(tabPfade[i]) = wegGleich$(pfad) THEN RETURN i
+        IF wegGleich$(reiter[i].pfad) = wegGleich$(pfad) THEN RETURN i
     NEXT
     ' Derselbe Weg anders geschrieben: kurzer und langer Name (HANSGA~1
     ' gegen "Hans Gaming"), ".." im Weg. Erst die Platte weiss es -- am
@@ -4868,16 +4894,16 @@ FUNCTION tabMitPfad(pfad AS STRING) AS INTEGER
     DIM name AS STRING : name = LOWER$(BASENAME(pfad))
     DIM moeglich AS BOOLEAN : moeglich = FALSE
     FOR i = 0 TO tabAnzahl - 1
-        IF tabPfade[i] <> "" THEN
-            DIM tn AS STRING : tn = LOWER$(BASENAME(tabPfade[i]))
+        IF reiter[i].pfad <> "" THEN
+            DIM tn AS STRING : tn = LOWER$(BASENAME(reiter[i].pfad))
             IF tn = name OR INSTR(tn, "~") >= 0 OR INSTR(name, "~") >= 0 THEN moeglich = TRUE
         END IF
     NEXT
     IF NOT moeglich THEN RETURN -1
     DIM e AS STRING : e = echterWeg$(pfad)
     FOR i = 0 TO tabAnzahl - 1
-        IF tabPfade[i] <> "" THEN
-            IF echterWeg$(tabPfade[i]) = e THEN RETURN i
+        IF reiter[i].pfad <> "" THEN
+            IF echterWeg$(reiter[i].pfad) = e THEN RETURN i
         END IF
     NEXT
     RETURN -1
@@ -4951,7 +4977,7 @@ SUB symbolIndexBauen(erzwingen AS BOOLEAN)
         DIM quelle AS STRING : quelle = ""
         DIM gut AS BOOLEAN : gut = TRUE
         IF t >= 0 THEN
-            quelle = GUI_TEXT(tabFelder[t])
+            quelle = GUI_TEXT(reiter[t].feld)
         ELSE
             TRY
                 quelle = dateiLesen(pfad)
@@ -4979,7 +5005,7 @@ SUB symbolAnspringen(nummer AS INTEGER)
     IF nummer < 0 OR nummer >= LEN(symPfade) THEN RETURN
     DIM pfad AS STRING : pfad = symPfade[nummer]
     DIM zeile AS INTEGER : zeile = symZeilen[nummer]
-    IF aktiverTab < 0 OR tabPfade[aktiverTab] <> pfad THEN dateiOeffnen(pfad)
+    IF aktiverTab < 0 OR reiter[aktiverTab].pfad <> pfad THEN dateiOeffnen(pfad)
     IF aktivesFeld() >= 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), zeile, 1)
     GUI_SET_TEXT(lblStatus, symAnzeige[nummer])
     protokoll("symbol " + BASENAME(pfad) + " " + STR$(zeile))
@@ -5015,14 +5041,14 @@ DIM spurSchluessel AS STRING : spurSchluessel = "-"
 
 SUB spurNachziehen()
     IF aktiverTab < 0 THEN RETURN
-    DIM ta AS GUI_WIDGET : ta = tabFelder[aktiverTab]
+    DIM ta AS GUI_WIDGET : ta = reiter[aktiverTab].feld
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(ta)
     DIM schl AS STRING : schl = STR$(aktiverTab) + ":" + STR$(z) + ":" + gliederungSchluessel
     IF schl = spurSchluessel THEN RETURN
     spurSchluessel = schl
-    DIM datei AS STRING : datei = IIF(tabPfade[aktiverTab] = "", "Unbenannt", BASENAME(tabPfade[aktiverTab]))
+    DIM datei AS STRING : datei = reiter[aktiverTab].name$()
     DIM spur AS STRING : spur = datei
     ' Die Pfadleiste bekommt je Teil die ZEILE seines Blocks als Wert --
     ' ein Klick springt dorthin (pfadAnspringen).
@@ -5154,7 +5180,7 @@ SUB suchSchritt()
         DIM zeilen AS ARRAY OF STRING
         DIM t AS INTEGER : t = tabMitPfad(pfad)
         IF t >= 0 THEN
-            zeilen = SPLIT$(GUI_TEXT(tabFelder[t]), NL)
+            zeilen = SPLIT$(GUI_TEXT(reiter[t].feld), NL)
         ELSE
             zeilen = zeilenLesen(pfad)
         END IF
@@ -5337,7 +5363,7 @@ END FUNCTION
 ' Die Zaehlung einer Projektdatei -- aus dem Reiter frisch, von der
 ' Platte ueber den Cache.
 FUNCTION zaehlungVon$(pfad AS STRING) AS STRING
-    IF tabMitPfad(pfad) >= 0 THEN RETURN woerterZaehlen$(GUI_TEXT(tabFelder[tabMitPfad(pfad)]))
+    IF tabMitPfad(pfad) >= 0 THEN RETURN woerterZaehlen$(GUI_TEXT(reiter[tabMitPfad(pfad)].feld))
     DIM schl AS STRING : schl = LOWER$(wegGleich$(pfad))
     IF MAPHAS(zaehlCache, schl) THEN RETURN MAPGET(zaehlCache, schl)
     DIM q AS STRING : q = ""
@@ -5409,11 +5435,11 @@ SUB zaehlerSetzen_(ta AS GUI_WIDGET)
     DIM eigen AS STRING : eigen = ""
     DIM t2 AS INTEGER
     FOR t2 = 0 TO tabAnzahl - 1
-        IF tabFelder[t2] = ta THEN eigen = tabPfade[t2]
+        IF reiter[t2].feld = ta THEN eigen = reiter[t2].pfad
     NEXT
     ' Die zweite Ansicht (Alt+Umschalt+G) gehoert keinem Reiter, zeigt aber
     ' die Datei des aktiven -- ohne das zaehlte die Platte noch einmal mit.
-    IF eigen = "" AND ta = taSpiegel AND aktiverTab >= 0 THEN eigen = tabPfade[aktiverTab]
+    IF eigen = "" AND ta = taSpiegel AND aktiverTab >= 0 THEN eigen = reiter[aktiverTab].pfad
     DIM dateien AS ARRAY OF STRING : dateien = []
     IF projektOrdner <> "" THEN dateien = zaehlProjektDateien()
     zaehlerAddieren(summe, woerterZaehlen$(quelle))
@@ -5606,15 +5632,15 @@ SUB pruefsammlungStarten(nurFall AS BOOLEAN)
     DIM ziel AS STRING : ziel = ""
     DIM filter AS STRING : filter = ""
     DIM istSammlung AS BOOLEAN : istSammlung = FALSE
-    IF aktiverTab >= 0 THEN istSammlung = LOWER$(RIGHT$(tabPfade[aktiverTab], 7)) = ".dhtest"
+    IF aktiverTab >= 0 THEN istSammlung = LOWER$(RIGHT$(reiter[aktiverTab].pfad, 7)) = ".dhtest"
     IF istSammlung THEN
         ' Geprueft wird die Datei auf der Platte -- also erst sichern.
-        IF GUI_TEXT(tabFelder[aktiverTab]) <> tabGesichert[aktiverTab] THEN
+        IF reiter[aktiverTab].geaendert() THEN
             IF NOT sichern(aktiverTab, FALSE) THEN RETURN
         END IF
-        ziel = tabPfade[aktiverTab]
+        ziel = reiter[aktiverTab].pfad
         IF nurFall THEN
-            filter = fallUnterMarke$(tabFelder[aktiverTab])
+            filter = fallUnterMarke$(reiter[aktiverTab].feld)
             IF filter = "" THEN
                 GUI_SET_TEXT(lblStatus, tr$("Die Marke steht in keinem Fall (=== Name darüber)."))
                 RETURN
@@ -5630,7 +5656,7 @@ SUB pruefsammlungStarten(nurFall AS BOOLEAN)
         ' Auch der Reiter selbst: er ist vermutlich der Code, den die
         ' Sammlungen pruefen.
         IF aktiverTab >= 0 THEN
-            IF tabPfade[aktiverTab] <> "" AND GUI_TEXT(tabFelder[aktiverTab]) <> tabGesichert[aktiverTab] THEN
+            IF reiter[aktiverTab].pfad <> "" AND reiter[aktiverTab].geaendert() THEN
                 IF NOT sichern(aktiverTab, FALSE) THEN RETURN
             END IF
         END IF
@@ -5786,7 +5812,7 @@ END FUNCTION
 
 SUB qvZeigen()
     DIM ordner AS STRING : ordner = projektOrdner
-    IF ordner = "" AND aktiverTab >= 0 AND tabPfade[aktiverTab] <> "" THEN ordner = DIRNAME(tabPfade[aktiverTab])
+    IF ordner = "" AND aktiverTab >= 0 AND reiter[aktiverTab].pfad <> "" THEN ordner = DIRNAME(reiter[aktiverTab].pfad)
     IF ordner = "" OR NOT gitRepo(ordner) THEN
         GUI_SET_TEXT(lblStatus, tr$("Quellcodeverwaltung: das Projekt liegt in keinem git-Verzeichnis."))
         protokoll("qv kein repo")
@@ -5950,7 +5976,7 @@ SUB qvVerwerfen(pfad AS STRING)
     DIM voll AS STRING : voll = PATHJOIN(qvWurzel, pfad)
     DIM t AS INTEGER : t = tabMitPfad(voll)
     IF t >= 0 THEN
-        IF GUI_TEXT(tabFelder[t]) <> tabGesichert[t] THEN
+        IF reiter[t].geaendert() THEN
             GUI_SET_TEXT(lblQvStatus, pfad + tr$(" ist im Reiter ungesichert -- erst sichern oder dort zurücknehmen."))
             protokoll("qv verwerfen ungesichert")
             RETURN
@@ -5964,8 +5990,8 @@ SUB qvVerwerfen(pfad AS STRING)
         CATCH e
             neu = ""
         END TRY
-        feldAustauschen(tabFelder[t], GUI_TEXT(tabFelder[t]), neu)
-        tabGesichert[t] = GUI_TEXT(tabFelder[t])
+        feldAustauschen(reiter[t].feld, GUI_TEXT(reiter[t].feld), neu)
+        reiter[t].gesichert = GUI_TEXT(reiter[t].feld)
     END IF
     zaehlCache = {} : zaehlZeit = {} : zaehlWeg = {} : echteWege = {} : zaehlDateienAlt = TRUE
     qvAuffrischen()
@@ -6082,7 +6108,7 @@ DIM pakEntfernenName AS STRING : pakEntfernenName = ""
 FUNCTION pakOrdner$() AS STRING
     IF projektOrdner <> "" THEN RETURN projektOrdner
     IF aktiverTab >= 0 AND tabAnzahl > 0 THEN
-        IF tabPfade[aktiverTab] <> "" THEN RETURN DIRNAME(tabPfade[aktiverTab])
+        IF reiter[aktiverTab].pfad <> "" THEN RETURN DIRNAME(reiter[aktiverTab].pfad)
     END IF
     RETURN ""
 END FUNCTION
@@ -6292,8 +6318,8 @@ END SUB
 FUNCTION qvReiterSauber() AS BOOLEAN
     DIM t AS INTEGER
     FOR t = 0 TO tabAnzahl - 1
-        IF tabPfade[t] <> "" AND GUI_TEXT(tabFelder[t]) <> tabGesichert[t] THEN
-            GUI_SET_TEXT(lblQvStatus, BASENAME(tabPfade[t]) + tr$(" ist ungesichert -- erst sichern."))
+        IF reiter[t].pfad <> "" AND reiter[t].geaendert() THEN
+            GUI_SET_TEXT(lblQvStatus, BASENAME(reiter[t].pfad) + tr$(" ist ungesichert -- erst sichern."))
             protokoll("qv reiter ungesichert")
             RETURN FALSE
         END IF
@@ -6305,16 +6331,16 @@ END FUNCTION
 SUB qvReiterNachziehen()
     DIM t AS INTEGER
     FOR t = 0 TO tabAnzahl - 1
-        IF tabPfade[t] = "" OR NOT FILEEXISTS(tabPfade[t]) THEN CONTINUE
+        IF reiter[t].pfad = "" OR NOT FILEEXISTS(reiter[t].pfad) THEN CONTINUE
         DIM neu AS STRING : neu = ""
         TRY
-            neu = dateiLesen(tabPfade[t])
+            neu = dateiLesen(reiter[t].pfad)
         CATCH e
             CONTINUE
         END TRY
-        IF neu <> GUI_TEXT(tabFelder[t]) THEN
-            feldAustauschen(tabFelder[t], GUI_TEXT(tabFelder[t]), neu)
-            tabGesichert[t] = GUI_TEXT(tabFelder[t])
+        IF neu <> GUI_TEXT(reiter[t].feld) THEN
+            feldAustauschen(reiter[t].feld, GUI_TEXT(reiter[t].feld), neu)
+            reiter[t].gesichert = GUI_TEXT(reiter[t].feld)
         END IF
     NEXT
     zaehlCache = {} : zaehlZeit = {} : zaehlWeg = {} : echteWege = {} : zaehlDateienAlt = TRUE
@@ -6703,7 +6729,7 @@ SUB themaAnwenden()
     faerbSchluessel = "" : gliederungSchluessel = ""
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        hinweiseZeigen(tabFelder[i])
+        hinweiseZeigen(reiter[i].feld)
     NEXT
 END SUB
 
@@ -6747,7 +6773,7 @@ END SUB
 
 SUB blameZeileNachziehen()
     IF NOT blameZeileAn OR aktiverTab < 0 THEN RETURN
-    DIM ta AS GUI_WIDGET : ta = tabFelder[aktiverTab]
+    DIM ta AS GUI_WIDGET : ta = reiter[aktiverTab].feld
     DIM z AS INTEGER
     DIM sp AS INTEGER
     (z, sp) = GUI_TEXTAREA_CURSOR(ta)
@@ -6756,8 +6782,8 @@ SUB blameZeileNachziehen()
     blameMarkeZeile = z
     blameFeld = ta
     blameText = ""
-    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
-    IF pfad <> "" AND GUI_TEXT(ta) = tabGesichert[aktiverTab] THEN blameText = blameFuer$(pfad, z)
+    DIM pfad AS STRING : pfad = reiter[aktiverTab].pfad
+    IF pfad <> "" AND GUI_TEXT(ta) = reiter[aktiverTab].gesichert THEN blameText = blameFuer$(pfad, z)
     IF altFeld >= 0 AND altFeld <> ta THEN hinweiseZeigen(altFeld)
     hinweiseZeigen(ta)
     IF blameText <> "" THEN protokoll("blame zeile " + STR$(z) + " " + blameText)
@@ -6913,7 +6939,7 @@ SUB variableEinfuehren(angabe AS STRING)
     DIM neuText AS STRING : neuText = JOIN$(neu, NL)
     DIM mehr AS INTEGER : mehr = fehlerZahl(neuText) - fehlerZahl(quelle)
     umbauLeeren()
-    umbauVormerken(aktiverTab, tabPfade[aktiverTab], neuText)
+    umbauVormerken(aktiverTab, reiter[aktiverTab].pfad, neuText)
     umbauZeile = einfZeile + 1 : umbauSpalte = einfVon
     umbauStarten("Variable " + name + " einführen", _
                  IIF(mehr > 0, "Achtung: " + STR$(mehr) + " Fehler mehr -- passt der Typ " + typ + "?", _
@@ -7029,7 +7055,7 @@ SUB variableEinsetzen()
     DIM neuText AS STRING : neuText = JOIN$(neu, NL)
     DIM mehr AS INTEGER : mehr = fehlerZahl(neuText) - fehlerZahl(quelle)
     umbauLeeren()
-    umbauVormerken(aktiverTab, tabPfade[aktiverTab], neuText)
+    umbauVormerken(aktiverTab, reiter[aktiverTab].pfad, neuText)
     umbauZeile = MAX(1, dimZeile) : umbauSpalte = 1
     umbauStarten("Variable " + name + " einsetzen", _
                  IIF(mehr > 0, "Achtung: " + STR$(mehr) + " Fehler mehr.", _
@@ -7081,7 +7107,7 @@ FUNCTION hatByref(name AS STRING) AS BOOLEAN
     IF name = "" THEN RETURN FALSE
     DIM muster AS STRING : muster = "^\s*(sub|function)\s+" + REGEX_ESCAPE$(LOWER$(name)) + "\s*\(.*\bbyref\b"
     DIM texte AS ARRAY OF STRING : texte = []
-    IF aktiverTab >= 0 THEN ARRAY_PUSH(texte, GUI_TEXT(tabFelder[aktiverTab]))
+    IF aktiverTab >= 0 THEN ARRAY_PUSH(texte, GUI_TEXT(reiter[aktiverTab].feld))
     DIM d AS STRING
     FOR EACH d IN projektDateien("*.dh", TRUE)
         ARRAY_PUSH(texte, projektQuelle$(PATHJOIN(projektOrdner, d)))
@@ -7224,14 +7250,14 @@ SUB subInFunction()
         END IF
     NEXT
     umbauLeeren()
-    umbauVormerken(aktiverTab, tabPfade[aktiverTab], JOIN$(neu, NL))
+    umbauVormerken(aktiverTab, reiter[aktiverTab].pfad, JOIN$(neu, NL))
     ' Die Aufrufe in den anderen Dateien des Projekts.
     DIM gezaehlt AS INTEGER : gezaehlt = 0
     sfUebergangen = 0
     DIM d AS STRING
     FOR EACH d IN projektDateien("*.dh")
         DIM pf AS STRING : pf = PATHJOIN(projektOrdner, d)
-        IF tabPfade[aktiverTab] <> "" AND gleicherWeg(pf, tabPfade[aktiverTab]) THEN CONTINUE
+        IF reiter[aktiverTab].pfad <> "" AND gleicherWeg(pf, reiter[aktiverTab].pfad) THEN CONTINUE
         DIM q AS STRING : q = projektQuelle$(pf)
         IF q = "" OR INSTR(LOWER$(q), LOWER$(name)) < 0 THEN CONTINUE
         DIM qz AS ARRAY OF STRING : qz = SPLIT$(q, NL)
@@ -7333,12 +7359,12 @@ SUB liveNachziehen()
         RETURN
     END IF
     IF aktiverTab < 0 THEN RETURN
-    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
+    DIM pfad AS STRING : pfad = reiter[aktiverTab].pfad
     IF pfad = "" OR LOWER$(RIGHT$(pfad, 3)) <> ".dh" THEN
         GUI_SET_TEXT(lblLive, tr$("Nur für gesicherte .dh-Dateien."))
         RETURN
     END IF
-    DIM text AS STRING : text = GUI_TEXT(tabFelder[aktiverTab])
+    DIM text AS STRING : text = GUI_TEXT(reiter[aktiverTab].feld)
     IF text = liveStand THEN RETURN
     IF text <> liveKandidat THEN
         liveKandidat = text
@@ -7764,7 +7790,7 @@ FUNCTION bildPfadBei$(ta AS GUI_WIDGET, zeile AS STRING, spalte AS INTEGER) AS S
                     DIM basis AS STRING : basis = projektOrdner
                     DIM t AS INTEGER
                     FOR t = 0 TO tabAnzahl - 1
-                        IF (tabFelder[t] = ta OR ta = taSpiegel) AND t = aktiverTab AND tabPfade[t] <> "" THEN basis = DIRNAME(tabPfade[t])
+                        IF (reiter[t].feld = ta OR ta = taSpiegel) AND t = aktiverTab AND reiter[t].pfad <> "" THEN basis = DIRNAME(reiter[t].pfad)
                     NEXT
                     IF FILEEXISTS(PATHJOIN(basis, text)) THEN RETURN PATHJOIN(basis, text)
                     IF projektOrdner <> "" AND FILEEXISTS(PATHJOIN(projektOrdner, text)) THEN RETURN PATHJOIN(projektOrdner, text)
@@ -7980,7 +8006,7 @@ SUB projektPruefenSchritt()
         DIM t AS INTEGER : t = tabMitPfad(pfad)
         DIM quelle AS STRING : quelle = ""
         IF t >= 0 THEN
-            quelle = GUI_TEXT(tabFelder[t])
+            quelle = GUI_TEXT(reiter[t].feld)
         ELSE
             TRY
                 quelle = dateiLesen(pfad)
@@ -8075,7 +8101,7 @@ SUB fundstellenZeigen()
         DIM t AS INTEGER : t = tabMitPfad(pfad)
         DIM quelle AS STRING : quelle = ""
         IF t >= 0 THEN
-            quelle = GUI_TEXT(tabFelder[t])
+            quelle = GUI_TEXT(reiter[t].feld)
         ELSE
             TRY
                 quelle = dateiLesen(pfad)
@@ -8116,7 +8142,7 @@ END SUB
 ' mehr Buchfuehrung als Nutzen.
 SUB blameZeigen()
     IF aktiverTab < 0 THEN RETURN
-    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
+    DIM pfad AS STRING : pfad = reiter[aktiverTab].pfad
     IF pfad = "" THEN
         GUI_SET_TEXT(lblStatus, tr$("Git-Blame: die Datei ist noch nicht gesichert."))
         RETURN
@@ -8201,7 +8227,7 @@ END FUNCTION
 
 FUNCTION gitAusgabe$(erst AS STRING, zweit AS STRING, dritt AS STRING) AS STRING
     IF aktiverTab < 0 THEN RETURN ""
-    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
+    DIM pfad AS STRING : pfad = reiter[aktiverTab].pfad
     IF pfad = "" THEN RETURN ""
     TRY
         IF dritt = "" THEN
@@ -8217,7 +8243,7 @@ END FUNCTION
 ' dieser Datei passiert?"), nur einmal seit dem letzten Sichern und einmal
 ' ueber die Zeit.
 SUB gitZeigen(art AS STRING)
-    IF aktiverTab < 0 OR tabPfade[aktiverTab] = "" THEN
+    IF aktiverTab < 0 OR reiter[aktiverTab].pfad = "" THEN
         GUI_SET_TEXT(lblStatus, tr$("git: die Datei ist noch nicht gesichert."))
         RETURN
     END IF
@@ -8234,7 +8260,7 @@ SUB gitZeigen(art AS STRING)
         RETURN
     END IF
     GUI_SET_TEXT(taGit, text)
-    GUI_WINDOW_TITLE(winGit, IIF(art = "diff", tr$("Änderungen"), tr$("Verlauf")) + ": " + BASENAME(tabPfade[aktiverTab]))
+    GUI_WINDOW_TITLE(winGit, IIF(art = "diff", tr$("Änderungen"), tr$("Verlauf")) + ": " + BASENAME(reiter[aktiverTab].pfad))
     GUI_SET_TEXT(lblGit, STR$(LEN(SPLIT$(text, NL))) + tr$(" Zeilen"))
     GUI_WINDOW_VISIBLE(winGit, TRUE)
     GUI_FOCUS(taGit)
@@ -8290,14 +8316,14 @@ DIM gitDateiStand AS STRING : gitDateiStand = "-"
 
 SUB gitRandNachziehen(erzwingen AS BOOLEAN)
     IF aktiverTab < 0 THEN RETURN
-    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
+    DIM pfad AS STRING : pfad = reiter[aktiverTab].pfad
     IF NOT gitRandAn OR pfad = "" THEN
         IF LEN(gitZeilen) > 0 THEN gitZeilen = [] : markenSchluessel = ""
         RETURN
     END IF
     ' Nur nach dem Sichern oder Oeffnen neu fragen: ein Prozessstart je
     ' Bild waere die IDE zum Stillstand gebracht.
-    DIM stand AS STRING : stand = pfad + "|" + STR$(LEN(tabGesichert[aktiverTab]))
+    DIM stand AS STRING : stand = pfad + "|" + STR$(LEN(reiter[aktiverTab].gesichert))
     IF NOT erzwingen AND stand = gitDateiStand THEN RETURN
     gitDateiStand = stand
     IF NOT gitRepo(DIRNAME(pfad)) THEN
@@ -8376,8 +8402,8 @@ SUB haltepunktUmschalten()
     IF aktiverTab < 0 THEN RETURN
     DIM z AS INTEGER
     DIM s AS INTEGER
-    (z, s) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
-    haltepunktUmschaltenIn(tabPfade[aktiverTab], z)
+    (z, s) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
+    haltepunktUmschaltenIn(reiter[aktiverTab].pfad, z)
 END SUB
 
 ' Derselbe Schalter fuer eine BESTIMMTE Zeile -- F9 nimmt die der Marke,
@@ -8405,8 +8431,8 @@ SUB haltepunktBedingungFragen()
     IF aktiverTab < 0 THEN RETURN
     DIM z AS INTEGER
     DIM s AS INTEGER
-    (z, s) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
-    haltepunktBedingungFragenIn(tabPfade[aktiverTab], z)
+    (z, s) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
+    haltepunktBedingungFragenIn(reiter[aktiverTab].pfad, z)
 END SUB
 
 SUB haltepunktBedingungFragenIn(pfad AS STRING, z AS INTEGER)
@@ -8443,7 +8469,7 @@ FUNCTION zeileAusDatei$(pfad AS STRING, z AS INTEGER) AS STRING
     DIM text AS STRING : text = ""
     DIM t AS INTEGER : t = tabMitPfad(pfad)
     IF t >= 0 THEN
-        text = GUI_TEXT(tabFelder[t])
+        text = GUI_TEXT(reiter[t].feld)
     ELSE
         TRY
             text = dateiLesen(pfad)
@@ -8594,10 +8620,10 @@ END FUNCTION
 
 SUB lesezeichenUmschalten()
     IF aktiverTab < 0 THEN RETURN
-    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
+    DIM pfad AS STRING : pfad = reiter[aktiverTab].pfad
     DIM z AS INTEGER
     DIM s AS INTEGER
-    (z, s) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
+    (z, s) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
     DIM k AS INTEGER : k = lesezeichenIndex(pfad, z)
     IF k >= 0 THEN
         ARRAY_REMOVE_AT(lzDateien, k) : ARRAY_REMOVE_AT(lzZeilen, k)
@@ -8619,10 +8645,10 @@ SUB lesezeichenSpringen(vorwaerts AS BOOLEAN)
         GUI_SET_TEXT(lblStatus, tr$("Kein Lesezeichen gesetzt -- Strg+F2 setzt eins."))
         RETURN
     END IF
-    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
+    DIM pfad AS STRING : pfad = reiter[aktiverTab].pfad
     DIM z AS INTEGER
     DIM s AS INTEGER
-    (z, s) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
+    (z, s) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
     ' Alle Marken in EINE Reihenfolge bringen: erst nach Datei, dann nach
     ' Zeile. So ist "das naechste" auch ueber die Dateigrenze eindeutig.
     DIM reihe AS ARRAY OF INTEGER : reihe = []
@@ -8752,7 +8778,7 @@ END SUB
 SUB markenNachziehen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
-    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
+    DIM pfad AS STRING : pfad = reiter[aktiverTab].pfad
     markenZurueckholen(ta, pfad)
     DIM zeilen AS ARRAY OF INTEGER : zeilen = []
     DIM farben AS ARRAY OF INTEGER : farben = []
@@ -9040,8 +9066,8 @@ DIM tippDoku AS STRING : tippDoku = ""
 
 FUNCTION debugWertMoeglich() AS BOOLEAN
     IF prozessArt <> "debug" OR NOT debugPause OR prozess < 0 OR aktiverTab < 0 THEN RETURN FALSE
-    IF tabPfade[aktiverTab] = "" THEN RETURN FALSE
-    RETURN gleicheDatei(debugDatei, tabPfade[aktiverTab])
+    IF reiter[aktiverTab].pfad = "" THEN RETURN FALSE
+    RETURN gleicheDatei(debugDatei, reiter[aktiverTab].pfad)
 END FUNCTION
 
 ' Das Wort samt davorstehender Mitglieds-Kette: bei `spieler.hp` unter der
@@ -9199,17 +9225,17 @@ END SUB
 SUB randKlicksNachziehen()
     DIM t AS INTEGER
     FOR t = 0 TO tabAnzahl - 1
-        DIM hz AS INTEGER : hz = GUI_TEXTAREA_HINT_CLICKED(tabFelder[t])
-        IF hz > 0 THEN zaehlerKlick(tabFelder[t], hz)
-        DIM z AS INTEGER : z = GUI_TEXTAREA_GUTTER_CLICKED(tabFelder[t])
+        DIM hz AS INTEGER : hz = GUI_TEXTAREA_HINT_CLICKED(reiter[t].feld)
+        IF hz > 0 THEN zaehlerKlick(reiter[t].feld, hz)
+        DIM z AS INTEGER : z = GUI_TEXTAREA_GUTTER_CLICKED(reiter[t].feld)
         IF z > 0 THEN
             protokoll("rand klick " + STR$(z))
-            haltepunktUmschaltenIn(tabPfade[t], z)
+            haltepunktUmschaltenIn(reiter[t].pfad, z)
         END IF
-        z = GUI_TEXTAREA_GUTTER_CLICKED(tabFelder[t], 1)
+        z = GUI_TEXTAREA_GUTTER_CLICKED(reiter[t].feld, 1)
         IF z > 0 THEN
             protokoll("rand rechts " + STR$(z))
-            haltepunktBedingungFragenIn(tabPfade[t], z)
+            haltepunktBedingungFragenIn(reiter[t].pfad, z)
         END IF
     NEXT
 END SUB
@@ -10133,7 +10159,7 @@ END FUNCTION
 FUNCTION projektUngesichert() AS BOOLEAN
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        IF tabPfade[i] <> "" AND GUI_TEXT(tabFelder[i]) <> tabGesichert[i] THEN RETURN TRUE
+        IF reiter[i].pfad <> "" AND reiter[i].geaendert() THEN RETURN TRUE
     NEXT
     RETURN FALSE
 END FUNCTION
@@ -10421,7 +10447,7 @@ SUB herausloesen(name AS STRING)
                 "war die Auswahl ausgewogen? Strg+Z nimmt es zurück."
     END IF
     umbauLeeren()
-    umbauVormerken(aktiverTab, tabPfade[aktiverTab], neuText)
+    umbauVormerken(aktiverTab, reiter[aktiverTab].pfad, neuText)
     umbauZeile = z1 : umbauSpalte = 1
     umbauStarten("Herauslösen nach SUB " + name, sagen, _
                  "herausgeloest " + name + " " + STR$(LEN(pNamen)) + " " + STR$(nachher - vorher))
@@ -10731,7 +10757,7 @@ END FUNCTION
 FUNCTION andererUngesichert(ausser AS INTEGER) AS BOOLEAN
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        IF i <> ausser AND tabPfade[i] <> "" AND GUI_TEXT(tabFelder[i]) <> tabGesichert[i] THEN RETURN TRUE
+        IF i <> ausser AND reiter[i].pfad <> "" AND reiter[i].geaendert() THEN RETURN TRUE
     NEXT
     RETURN FALSE
 END FUNCTION
@@ -10825,7 +10851,7 @@ SUB parameterUebernehmen()
                            alteZahl, zaehler)
     DIM geaendert AS INTEGER : geaendert = zaehler[0]
     DIM uebergangen AS INTEGER : uebergangen = zaehler[1]
-    umbauVormerken(aktiverTab, tabPfade[aktiverTab], neu)
+    umbauVormerken(aktiverTab, reiter[aktiverTab].pfad, neu)
     ' Die uebrigen Dateien sammelt der Schritt-Laeufer (ESC bricht ab) --
     ' bei vierhundert Dateien steht die IDE sonst lange genug, dass man sie
     ' fuer haengend haelt. Die Zaehler dieser Datei gehen als Startwert mit.
@@ -10965,7 +10991,7 @@ END FUNCTION
 
 SUB verschiebenFragen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
-    IF ta < 0 OR tabPfade[aktiverTab] = "" THEN
+    IF ta < 0 OR reiter[aktiverTab].pfad = "" THEN
         GUI_SET_TEXT(lblStatus, tr$("Verschieben: diese Datei ist noch nicht gesichert."))
         protokoll("verschieben 0")
         RETURN
@@ -11032,7 +11058,7 @@ SUB verschiebenFragen()
     DIM d AS STRING
     FOR EACH d IN projektDateien("*.dh")
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
-        IF gleicherWeg(pfad, tabPfade[aktiverTab]) THEN CONTINUE
+        IF gleicherWeg(pfad, reiter[aktiverTab].pfad) THEN CONTINUE
         ARRAY_PUSH(paletteNamen, d) : ARRAY_PUSH(paletteKennungen, pfad) : ARRAY_PUSH(paletteDetails, "")
     NEXT
     waehlerOeffnen("verschieben", verschName + tr$(" verschieben nach ..."))
@@ -11058,7 +11084,7 @@ SUB verschiebenNach(ziel AS STRING)
     WEND
     IF kopf < verschVon THEN block = zeilenHolen(zeilen, kopf, verschBis)
     DIM zielName AS STRING : zielName = BASENAME(ziel)
-    DIM meinName AS STRING : meinName = BASENAME(tabPfade[aktiverTab])
+    DIM meinName AS STRING : meinName = BASENAME(reiter[aktiverTab].pfad)
     umbauLeeren()
     ' 1. Die Quelle: die Zeilen heraus, und wenn sie das Unterprogramm noch
     '    ruft, den IMPORT der Zieldatei hinein.
@@ -11077,7 +11103,7 @@ SUB verschiebenNach(ziel AS STRING)
     IF ruftNoch AND NOT importiert(neuQuelle, zielName) THEN
         neuQuelle = mitImport$(neuQuelle, zielName)
     END IF
-    umbauVormerken(aktiverTab, tabPfade[aktiverTab], neuQuelle)
+    umbauVormerken(aktiverTab, reiter[aktiverTab].pfad, neuQuelle)
     ' 1b. Was der Block SELBST braucht: ruft er Unterprogramme, die in der
     '     Quelle bleiben, muss die ZIELdatei die Quelle importieren. Sonst
     '     wandert das Unterprogramm weg und findet seine Helfer nicht mehr.
@@ -11242,7 +11268,7 @@ END FUNCTION
 ' Der Quelltext einer Projektdatei -- aus dem REITER, wenn sie offen ist.
 FUNCTION projektQuelle$(pfad AS STRING) AS STRING
     DIM t AS INTEGER : t = tabMitPfad(pfad)
-    IF t >= 0 THEN RETURN GUI_TEXT(tabFelder[t])
+    IF t >= 0 THEN RETURN GUI_TEXT(reiter[t].feld)
     DIM q AS STRING : q = ""
     TRY
         q = dateiLesen(pfad)
@@ -11573,8 +11599,8 @@ SUB reiterVergleichen()
         GUI_SET_TEXT(lblStatus, tr$("Vergleichen: rechts einen anderen Reiter wählen."))
         RETURN
     END IF
-    zeilenVergleichen(SPLIT$(GUI_TEXT(tabFelder[diffTabL]), NL), _
-                      SPLIT$(GUI_TEXT(tabFelder[diffTabR]), NL))
+    zeilenVergleichen(SPLIT$(GUI_TEXT(reiter[diffTabL].feld), NL), _
+                      SPLIT$(GUI_TEXT(reiter[diffTabR].feld), NL))
     ' Das linke Feld markieren wir hier -- markenNachziehen kuemmert sich
     ' nur um das vordere.
     DIM farbenL AS ARRAY OF INTEGER : farbenL = []
@@ -11582,9 +11608,9 @@ SUB reiterVergleichen()
     FOR EACH x IN diffLinks
         ARRAY_PUSH(farbenL, &HE07070)
     NEXT
-    GUI_TEXTAREA_MARKS(tabFelder[diffTabL], diffLinks, farbenL)
+    GUI_TEXTAREA_MARKS(reiter[diffTabL].feld, diffLinks, farbenL)
     markenSchluessel = ""
-    GUI_SET_TEXT(lblStatus, BASENAME(tabPfade[diffTabL]) + tr$(" gegen ") + BASENAME(tabPfade[diffTabR]) + _
+    GUI_SET_TEXT(lblStatus, BASENAME(reiter[diffTabL].pfad) + tr$(" gegen ") + BASENAME(reiter[diffTabR].pfad) + _
                  ": " + STR$(LEN(diffLinks)) + " Zeilen links, " + STR$(LEN(diffRechts)) + " rechts.")
     protokoll("reiter vergleich " + STR$(LEN(diffLinks)) + " " + STR$(LEN(diffRechts)))
 END SUB
@@ -11803,7 +11829,7 @@ SUB laufSchritt()
         IF laufArt = "parameter" THEN
             ' Die eigene Datei ist schon vorgemerkt (dort steht der Stand
             ' AUS DEM REITER, nicht der von der Platte).
-            IF gleicherWeg(pfad, tabPfade[aktiverTab]) THEN CONTINUE
+            IF gleicherWeg(pfad, reiter[aktiverTab].pfad) THEN CONTINUE
             IF INSTR(alt, paramName) < 0 THEN CONTINUE
             DIM z2 AS ARRAY OF INTEGER : z2 = []
             frisch = parameterInText$(alt, paramName, paramFolge, paramNeuDecl, paramNeuWert, _
@@ -11811,7 +11837,7 @@ SUB laufSchritt()
             laufGeaendert = laufGeaendert + z2[0]
             laufUebergangen = laufUebergangen + z2[1]
         ELSEIF laufArt = "verschieben" THEN
-            IF gleicherWeg(pfad, tabPfade[aktiverTab]) THEN CONTINUE
+            IF gleicherWeg(pfad, reiter[aktiverTab].pfad) THEN CONTINUE
             IF gleicherWeg(pfad, laufZiel) THEN CONTINUE
             IF NOT benutztWort(alt, verschName) THEN CONTINUE
             frisch = mitImport$(alt, BASENAME(laufZiel))
@@ -11890,7 +11916,7 @@ END SUB
 ' Verzeichnis unter Versionsverwaltung liegen. Gezeigt wird es im selben
 ' Fenster und mit derselben Faerbung wie git diff.
 SUB dateienVergleichen()
-    IF aktiverTab < 0 OR tabPfade[aktiverTab] = "" THEN
+    IF aktiverTab < 0 OR reiter[aktiverTab].pfad = "" THEN
         GUI_SET_TEXT(lblStatus, tr$("Vergleichen: diese Datei ist noch nicht gesichert."))
         RETURN
     END IF
@@ -11899,10 +11925,10 @@ SUB dateienVergleichen()
     ' auch wenn die Antwort schon dasteht, ist einer zu viel.
     DIM anderer AS STRING : anderer = GUI_FILETREE_SELECTED$(baum)
     IF anderer <> "" AND GUI_FILETREE_IS_DIR(baum) THEN anderer = ""
-    IF anderer <> "" AND gleicherWeg(anderer, tabPfade[aktiverTab]) THEN anderer = ""
+    IF anderer <> "" AND gleicherWeg(anderer, reiter[aktiverTab].pfad) THEN anderer = ""
     IF anderer = "" THEN anderer = FILE_OPEN_DIALOG("Womit vergleichen?", "dh")
     IF anderer = "" THEN RETURN
-    DIM meiner AS STRING : meiner = tabPfade[aktiverTab]
+    DIM meiner AS STRING : meiner = reiter[aktiverTab].pfad
     DIM text AS STRING : text = ""
     TRY
         text = SHELL_OUT$("git", "diff", "--no-index", "--no-color", "--", meiner, anderer)
@@ -11982,7 +12008,7 @@ END SUB
 
 ' Der Text eines Eintrags, wie er JETZT ist -- das, wogegen verglichen wird.
 FUNCTION umbauAlt$(k AS INTEGER) AS STRING
-    IF umbauTabs[k] >= 0 THEN RETURN GUI_TEXT(tabFelder[umbauTabs[k]])
+    IF umbauTabs[k] >= 0 THEN RETURN GUI_TEXT(reiter[umbauTabs[k]].feld)
     ' Eine Datei, die es noch NICHT gibt, ist ein leerer Vorher-Stand --
     ' beim Verschieben in eine neue Datei entsteht sie erst beim Uebernehmen.
     DIM t AS STRING : t = ""
@@ -12105,7 +12131,7 @@ SUB umbauAnzeigeBauen()
     FOR k = 0 TO LEN(umbauTexte) - 1
         umbauTexte[k] = umbauTextAus$(k)
         DIM name AS STRING : name = umbauPfade[k]
-        IF name = "" AND umbauTabs[k] >= 0 THEN name = tabTitel[umbauTabs[k]]
+        IF name = "" AND umbauTabs[k] >= 0 THEN name = reiter[umbauTabs[k]].name$()
         IF k > 0 THEN
             ARRAY_PUSH(zeilen, "") : ARRAY_PUSH(zeigHunk, -1)
         END IF
@@ -12208,7 +12234,7 @@ SUB umbauStarten(titel AS STRING, meldung AS STRING, prot AS STRING)
     DIM ln AS INTEGER
     FOR ln = 0 TO LEN(umbauTexte) - 1
         DIM lname AS STRING : lname = umbauPfade[ln]
-        IF lname = "" AND umbauTabs[ln] >= 0 THEN lname = tabTitel[umbauTabs[ln]]
+        IF lname = "" AND umbauTabs[ln] >= 0 THEN lname = reiter[umbauTabs[ln]].name$()
         GUI_LISTBOX_ADD(lstUmbau, BASENAME(lname))
         GUI_LISTBOX_SET_CHECKED(lstUmbau, ln, TRUE)
     NEXT
@@ -12247,7 +12273,7 @@ END FUNCTION
 ' CHR$(0), wenn es ihn nicht mehr gibt.
 FUNCTION umbauJetzt$(tab AS INTEGER, pfad AS STRING) AS STRING
     DIM t AS INTEGER : t = umbauReiter(tab, pfad)
-    IF t >= 0 THEN RETURN GUI_TEXT(tabFelder[t])
+    IF t >= 0 THEN RETURN GUI_TEXT(reiter[t].feld)
     IF pfad = "" THEN RETURN CHR$(0)
     TRY
         RETURN dateiLesen(pfad)
@@ -12269,7 +12295,7 @@ SUB umbauStandSetzen(tab AS INTEGER, pfad AS STRING, text AS STRING)
     IF t >= 0 THEN
         ' Offen: in den Reiter, Auswahl ueber alles + INSERT -- ein
         ' Undo-Schritt dort, gesichert wird wie immer mit Strg+S.
-        DIM ta AS GUI_WIDGET : ta = tabFelder[t]
+        DIM ta AS GUI_WIDGET : ta = reiter[t].feld
         DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
         DIM letzte AS INTEGER : letzte = LEN(zeilen)
         GUI_TEXTAREA_SELECT(ta, 1, 1, letzte, LEN(zeilen[letzte - 1]) + 1)
@@ -12411,7 +12437,7 @@ SUB umbauNachbessern()
     DIM ln AS INTEGER
     FOR ln = 0 TO LEN(umbauTexte) - 1
         DIM lname AS STRING : lname = umbauPfade[ln]
-        IF lname = "" AND umbauTabs[ln] >= 0 THEN lname = tabTitel[umbauTabs[ln]]
+        IF lname = "" AND umbauTabs[ln] >= 0 THEN lname = reiter[umbauTabs[ln]].name$()
         GUI_LISTBOX_ADD(lstUmbau, BASENAME(lname))
         GUI_LISTBOX_SET_CHECKED(lstUmbau, ln, TRUE)
     NEXT
@@ -12459,7 +12485,7 @@ FUNCTION umbauNeueFehler() AS INTEGER
     DIM k AS INTEGER
     FOR k = 0 TO LEN(umbauTexte) - 1
         DIM name AS STRING : name = umbauPfade[k]
-        IF name = "" AND umbauTabs[k] >= 0 THEN name = tabTitel[umbauTabs[k]]
+        IF name = "" AND umbauTabs[k] >= 0 THEN name = reiter[umbauTabs[k]].name$()
         IF LOWER$(RIGHT$(name, 3)) <> ".dh" THEN CONTINUE
         DIM vorher AS INTEGER : vorher = fehlerZahl(umbauAlt$(k))
         DIM nachher AS INTEGER : nachher = fehlerZahl(umbauTexte[k])
@@ -12477,7 +12503,7 @@ FUNCTION umbauZaehlen() AS INTEGER
     DIM k AS INTEGER
     FOR k = 0 TO LEN(umbauTexte) - 1
         DIM name AS STRING : name = umbauPfade[k]
-        IF name = "" AND umbauTabs[k] >= 0 THEN name = tabTitel[umbauTabs[k]]
+        IF name = "" AND umbauTabs[k] >= 0 THEN name = reiter[umbauTabs[k]].name$()
         ' Nur .dh: eine .dhform ist JSON, da hat der Uebersetzer nichts zu
         ' suchen (und meldete jede Zeile als Fehler).
         IF LOWER$(RIGHT$(name, 3)) <> ".dh" THEN CONTINUE
@@ -12561,7 +12587,7 @@ SUB umbauSchreiben()
         IF umbauTabs[k] >= 0 THEN
             ' In den Reiter: Auswahl ueber alles + INSERT. GUI_SET_TEXT
             ' leerte den Verlauf -- so nimmt EIN Strg+Z den Umbau zurueck.
-            DIM ta AS GUI_WIDGET : ta = tabFelder[umbauTabs[k]]
+            DIM ta AS GUI_WIDGET : ta = reiter[umbauTabs[k]].feld
             DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
             DIM letzte AS INTEGER : letzte = LEN(zeilen)
             GUI_TEXTAREA_SELECT(ta, 1, 1, letzte, LEN(zeilen[letzte - 1]) + 1)
@@ -12578,9 +12604,9 @@ SUB umbauSchreiben()
             IF NOT geschrieben THEN CONTINUE
             DIM t AS INTEGER : t = tabMitPfad(umbauPfade[k])
             IF t >= 0 THEN
-                GUI_SET_TEXT(tabFelder[t], umbauTexte[k])
-                tabGesichert[t] = umbauTexte[k]
-                tabLetzterText[t] = ""
+                GUI_SET_TEXT(reiter[t].feld, umbauTexte[k])
+                reiter[t].gesichert = umbauTexte[k]
+                reiter[t].letzterText = ""
             END IF
         END IF
     NEXT
@@ -12792,7 +12818,7 @@ SUB umbenennenAusfuehren(neu AS STRING)
     ' im neuen heisst der Name schon anders.
     DIM n AS INTEGER : n = LEN(CODE_REFERENCES(q, umbenennZeile, umbenennSpalte))
     umbauLeeren()
-    umbauVormerken(aktiverTab, tabPfade[aktiverTab], neuText)
+    umbauVormerken(aktiverTab, reiter[aktiverTab].pfad, neuText)
     umbauZeile = umbenennZeile : umbauSpalte = umbenennSpalte
     formulareNachziehen(umbenennWort, neu)
     umbauWarnung = umbenennEinwand$(umbenennWort, neu)
@@ -13052,10 +13078,10 @@ END SUB
 SUB exportieren()
     IF aktiverTab < 0 THEN RETURN
     IF exportProzess >= 0 THEN GUI_SET_TEXT(lblStatus, tr$("Ein Export läuft noch.")) : RETURN
-    IF tabPfade[aktiverTab] = "" OR GUI_TEXT(tabFelder[aktiverTab]) <> tabGesichert[aktiverTab] THEN
+    IF reiter[aktiverTab].pfad = "" OR reiter[aktiverTab].geaendert() THEN
         IF NOT sichern(aktiverTab, FALSE) THEN RETURN
     END IF
-    exportDatei = tabPfade[aktiverTab]
+    exportDatei = reiter[aktiverTab].pfad
     ' --schlank: die kleinste Laufzeit, die alle Befehle des Programms hat
     ' (welche, steht in der Ausgabe); ohne passende die volle.
     exportProzess = PROCESS_START("dhrt", "--export", exportDatei, "--schlank")
@@ -13139,11 +13165,11 @@ FUNCTION prozessStarten(art AS STRING) AS BOOLEAN
         GUI_SET_TEXT(lblStatus, tr$("Es läuft noch ein Programm -- erst stoppen (Umschalt+F5)."))
         RETURN FALSE
     END IF
-    IF tabPfade[aktiverTab] = "" OR GUI_TEXT(tabFelder[aktiverTab]) <> tabGesichert[aktiverTab] THEN
+    IF reiter[aktiverTab].pfad = "" OR reiter[aktiverTab].geaendert() THEN
         IF NOT sichern(aktiverTab, FALSE) THEN RETURN FALSE
     END IF
     andereSichern()
-    RETURN prozessStartenDatei(art, tabPfade[aktiverTab])
+    RETURN prozessStartenDatei(art, reiter[aktiverTab].pfad)
 END FUNCTION
 
 ' Die ANDEREN geaenderten Reiter sichern, bevor etwas von der Platte liest:
@@ -13156,8 +13182,8 @@ SUB andereSichern()
     DIM tg AS INTEGER
     DIM tgN AS INTEGER : tgN = 0
     FOR tg = 0 TO tabAnzahl - 1
-        IF tg <> aktiverTab AND tabPfade[tg] <> "" THEN
-            IF GUI_TEXT(tabFelder[tg]) <> tabGesichert[tg] THEN
+        IF tg <> aktiverTab AND reiter[tg].pfad <> "" THEN
+            IF reiter[tg].geaendert() THEN
                 IF sichern(tg, FALSE) THEN tgN = tgN + 1
             END IF
         END IF
@@ -13227,9 +13253,9 @@ SUB navNachziehen()
     IF MOUSE_HIT(3) THEN navGehen(TRUE)
     IF MOUSE_HIT(4) THEN navGehen(FALSE)
     IF aktiverTab < 0 THEN navLetztPfad = "" : RETURN
-    DIM p AS STRING : p = tabPfade[aktiverTab]
+    DIM p AS STRING : p = reiter[aktiverTab].pfad
     IF p = "" THEN navLetztPfad = "" : RETURN
-    DIM ta AS GUI_WIDGET : ta = tabFelder[aktiverTab]
+    DIM ta AS GUI_WIDGET : ta = reiter[aktiverTab].feld
     DIM z AS INTEGER
     DIM sp AS INTEGER
     (z, sp) = GUI_TEXTAREA_CURSOR(ta)
@@ -13295,9 +13321,9 @@ SUB navGehen(zurueck AS BOOLEAN)
     END IF
     navSperre = TRUE
     DIM schonDa AS BOOLEAN : schonDa = FALSE
-    IF aktiverTab >= 0 THEN schonDa = gleicherWeg(tabPfade[aktiverTab], p)
+    IF aktiverTab >= 0 THEN schonDa = gleicherWeg(reiter[aktiverTab].pfad, p)
     IF NOT schonDa THEN dateiOeffnen(p)
-    IF aktiverTab >= 0 THEN GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], z, sp)
+    IF aktiverTab >= 0 THEN GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, z, sp)
     protokoll(IIF(zurueck, "nav zurueck ", "nav vor ") + BASENAME(p) + " " + STR$(z))
 END SUB
 
@@ -13638,11 +13664,11 @@ SUB zurLetztenAenderung()
     IF navLetztPfad <> "" THEN navAblegen(navPfade, navZeilen, navSpalten, navLetztPfad, navLetztZeile, navLetztSpalte)
     navSperre = TRUE
     DIM schonDa AS BOOLEAN : schonDa = FALSE
-    IF aktiverTab >= 0 THEN schonDa = gleicherWeg(tabPfade[aktiverTab], aendPfad)
+    IF aktiverTab >= 0 THEN schonDa = gleicherWeg(reiter[aktiverTab].pfad, aendPfad)
     IF NOT schonDa THEN dateiOeffnen(aendPfad)
     IF aktiverTab >= 0 THEN
-        GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], aendZeile, aendSpalte)
-        GUI_FOCUS(tabFelder[aktiverTab])
+        GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, aendZeile, aendSpalte)
+        GUI_FOCUS(reiter[aktiverTab].feld)
     END IF
     protokoll("letzte aenderung " + BASENAME(aendPfad) + " " + STR$(aendZeile))
 END SUB
@@ -13700,23 +13726,23 @@ END FUNCTION
 
 SUB gesichertVergleichen(k AS INTEGER)
     IF k < 0 OR k >= tabAnzahl THEN RETURN
-    IF tabPfade[k] = "" THEN
+    IF reiter[k].pfad = "" THEN
         GUI_SET_TEXT(lblStatus, tr$("Der Reiter hat noch keine Datei."))
         RETURN
     END IF
-    DIM jetzt AS STRING : jetzt = GUI_TEXT(tabFelder[k])
+    DIM jetzt AS STRING : jetzt = GUI_TEXT(reiter[k].feld)
     DIM platte AS STRING : platte = ""
     TRY
-        platte = dateiLesen(tabPfade[k])
+        platte = dateiLesen(reiter[k].pfad)
     CATCH e
         platte = ""
     END TRY
     IF jetzt = platte THEN
-        GUI_SET_TEXT(lblStatus, BASENAME(tabPfade[k]) + tr$(": keine ungesicherten Änderungen."))
+        GUI_SET_TEXT(lblStatus, BASENAME(reiter[k].pfad) + tr$(": keine ungesicherten Änderungen."))
         protokoll("vergleich gleich")
         RETURN
     END IF
-    DIM d AS STRING : d = diffText$(SPLIT$(platte, NL), SPLIT$(jetzt, NL), BASENAME(tabPfade[k]))
+    DIM d AS STRING : d = diffText$(SPLIT$(platte, NL), SPLIT$(jetzt, NL), BASENAME(reiter[k].pfad))
     GUI_SET_TEXT(taVgl, d)
     diffFaerben(taVgl)
     GUI_TEXTAREA_GOTO(taVgl, 1, 1)
@@ -13727,8 +13753,8 @@ SUB gesichertVergleichen(k AS INTEGER)
         IF LEFT$(z, 1) = "+" AND LEFT$(z, 3) <> "+++" THEN plus = plus + 1
         IF LEFT$(z, 1) = "-" AND LEFT$(z, 3) <> "---" THEN minus = minus + 1
     NEXT
-    GUI_SET_TEXT(lblVgl, BASENAME(tabPfade[k]) + ": " + STR$(plus) + tr$(" Zeile(n) dazu, ") + STR$(minus) + tr$(" weg (gegenüber der Datei auf der Platte)"))
-    vglFeld = tabFelder[k] : vglPlatte = platte
+    GUI_SET_TEXT(lblVgl, BASENAME(reiter[k].pfad) + ": " + STR$(plus) + tr$(" Zeile(n) dazu, ") + STR$(minus) + tr$(" weg (gegenüber der Datei auf der Platte)"))
+    vglFeld = reiter[k].feld : vglPlatte = platte
     GUI_WINDOW_VISIBLE(winVgl, TRUE)
     GUI_FOCUS(btnVglZu)
     protokoll("vergleich +" + STR$(plus) + " -" + STR$(minus))
@@ -13739,7 +13765,7 @@ SUB vergleichNachziehen()
     DIM k AS INTEGER : k = -1
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        IF tabFelder[i] = vglFeld THEN k = i
+        IF reiter[i].feld = vglFeld THEN k = i
     NEXT
     IF GUI_CLICKED(btnVglZu) OR k < 0 THEN
         GUI_WINDOW_VISIBLE(winVgl, FALSE)
@@ -13752,10 +13778,10 @@ SUB vergleichNachziehen()
         GUI_WINDOW_VISIBLE(winVgl, FALSE)
         ' Ein Rueckgaengig-Schritt: wer sich verklickt hat, holt es mit Strg+Z
         ' zurueck.
-        feldAustauschen(tabFelder[k], GUI_TEXT(tabFelder[k]), vglPlatte)
-        tabGesichert[k] = vglPlatte
+        feldAustauschen(reiter[k].feld, GUI_TEXT(reiter[k].feld), vglPlatte)
+        reiter[k].gesichert = vglPlatte
         reiterNeuSetzen()
-        GUI_SET_TEXT(lblStatus, BASENAME(tabPfade[k]) + tr$(": Änderungen verworfen (Strg+Z holt sie zurück)."))
+        GUI_SET_TEXT(lblStatus, BASENAME(reiter[k].pfad) + tr$(": Änderungen verworfen (Strg+Z holt sie zurück)."))
         protokoll("vergleich verworfen")
     END IF
 END SUB
@@ -13774,7 +13800,7 @@ SUB kontextNachziehen()
     IF h < 0 OR h = ctxCodeZiel THEN RETURN
     DIM ist AS BOOLEAN : ist = taSpiegel >= 0 AND h = taSpiegel
     FOR i = 0 TO tabAnzahl - 1
-        IF tabFelder[i] = h THEN ist = TRUE
+        IF reiter[i].feld = h THEN ist = TRUE
     NEXT
     IF NOT ist THEN RETURN
     GUI_CONTEXT_WIDGET(ctxCode, h)
@@ -13807,13 +13833,13 @@ END SUB
 ' ungefragt verwerfen waere hier genau der Verlust, den Strg+W vermeidet.
 SUB reiterSchliessenAusser(k AS INTEGER, nurRechts AS BOOLEAN)
     IF k < 0 OR k >= tabAnzahl THEN RETURN
-    DIM behalten AS GUI_WIDGET : behalten = tabFelder[k]
+    DIM behalten AS GUI_WIDGET : behalten = reiter[k].feld
     DIM weg AS INTEGER : weg = 0
     DIM offen AS INTEGER : offen = 0
     DIM i AS INTEGER
     FOR i = tabAnzahl - 1 TO 0 STEP -1
         IF i = k OR (nurRechts AND i < k) THEN CONTINUE
-        IF GUI_TEXT(tabFelder[i]) <> tabGesichert[i] THEN
+        IF reiter[i].geaendert() THEN
             offen = offen + 1
         ELSE
             tabSchliessen(i)
@@ -13822,7 +13848,7 @@ SUB reiterSchliessenAusser(k AS INTEGER, nurRechts AS BOOLEAN)
     NEXT
     ' Den behaltenen Reiter nach vorn holen.
     FOR i = 0 TO tabAnzahl - 1
-        IF tabFelder[i] = behalten THEN
+        IF reiter[i].feld = behalten THEN
             aktiverTab = i
             GUI_SET_ACTIVE_TAB(win, i)
         END IF
@@ -14018,7 +14044,7 @@ SUB trefferErsetzen(nurEiner AS BOOLEAN, ersatz AS STRING)
         DIM t AS INTEGER : t = tabVonWeg(pfad)
         DIM text AS STRING
         IF t >= 0 THEN
-            text = GUI_TEXT(tabFelder[t])
+            text = GUI_TEXT(reiter[t].feld)
         ELSE
             TRY
                 text = JOIN$(READLINES(pfad), NL)
@@ -14063,7 +14089,7 @@ DIM baumZiel AS STRING : baumZiel = ""
 FUNCTION baumWahl$() AS STRING
     DIM w AS STRING : w = GUI_FILETREE_SELECTED$(baum)
     IF w <> "" THEN RETURN w
-    IF aktiverTab >= 0 THEN RETURN tabPfade[aktiverTab]
+    IF aktiverTab >= 0 THEN RETURN reiter[aktiverTab].pfad
     RETURN ""
 END FUNCTION
 
@@ -14191,7 +14217,7 @@ SUB baumUmbenennen(alt AS STRING, name AS STRING)
     END TRY
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        tabPfade[i] = wegUmziehen$(tabPfade[i], alt, neu, istOrdner)
+        reiter[i].pfad = wegUmziehen$(reiter[i].pfad, alt, neu, istOrdner)
     NEXT
     FOR i = 0 TO LEN(hpDateien) - 1
         hpDateien[i] = wegUmziehen$(hpDateien[i], alt, neu, istOrdner)
@@ -14213,13 +14239,13 @@ SUB baumUmbenennen(alt AS STRING, name AS STRING)
         DIM t AS INTEGER : t = tabVonWeg(d)
         DIM schreiben AS BOOLEAN : schreiben = TRUE
         IF t >= 0 THEN
-            schreiben = GUI_TEXT(tabFelder[t]) = tabGesichert[t]
-            feldAustauschen(tabFelder[t], GUI_TEXT(tabFelder[t]), impTexte[i])
+            schreiben = NOT reiter[t].geaendert()
+            feldAustauschen(reiter[t].feld, GUI_TEXT(reiter[t].feld), impTexte[i])
         END IF
         IF schreiben THEN
             TRY
                 WRITEALL(d, impTexte[i] + IIF(RIGHT$(impTexte[i], 1) = NL, "", NL))
-                IF t >= 0 THEN tabGesichert[t] = impTexte[i]
+                IF t >= 0 THEN reiter[t].gesichert = impTexte[i]
             CATCH e2
                 abgelehnt = abgelehnt + IIF(abgelehnt = "", "", ", ") + BASENAME(d)
                 protokoll("baum import nicht geschrieben " + BASENAME(d))
@@ -14253,7 +14279,7 @@ END FUNCTION
 FUNCTION tabVonWeg(weg AS STRING) AS INTEGER
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        IF tabPfade[i] <> "" AND gleicherWeg(tabPfade[i], weg) THEN RETURN i
+        IF reiter[i].pfad <> "" AND gleicherWeg(reiter[i].pfad, weg) THEN RETURN i
     NEXT
     RETURN -1
 END FUNCTION
@@ -14269,7 +14295,7 @@ SUB importsSuchen(alt AS STRING, name AS STRING, dateien AS ARRAY OF STRING, tex
         DIM t AS INTEGER : t = tabVonWeg(pfad)
         DIM text AS STRING
         IF t >= 0 THEN
-            text = GUI_TEXT(tabFelder[t])
+            text = GUI_TEXT(reiter[t].feld)
         ELSE
             TRY
                 text = JOIN$(READLINES(pfad), NL)
@@ -14340,8 +14366,8 @@ SUB baumLoeschen(ziel AS STRING)
     ' der uebrigen gelten.
     DIM i AS INTEGER
     FOR i = tabAnzahl - 1 TO 0 STEP -1
-        IF tabPfade[i] <> "" THEN
-            IF wegUmziehen$(tabPfade[i], ziel, "", istOrdner) <> tabPfade[i] THEN tabSchliessen(i)
+        IF reiter[i].pfad <> "" THEN
+            IF wegUmziehen$(reiter[i].pfad, ziel, "", istOrdner) <> reiter[i].pfad THEN tabSchliessen(i)
         END IF
     NEXT
     baumLetzteWahl = ""
@@ -14487,11 +14513,11 @@ DIM startFrageUmg AS BOOLEAN : startFrageUmg = FALSE
 DIM startFrageDatei AS STRING : startFrageDatei = ""
 SUB startEinstellungFragen(umgebung AS BOOLEAN)
     IF aktiverTab < 0 THEN RETURN
-    IF tabPfade[aktiverTab] = "" THEN
+    IF reiter[aktiverTab].pfad = "" THEN
         GUI_SET_TEXT(lblStatus, tr$("Erst sichern -- die Einstellung gehört zu einer Datei."))
         RETURN
     END IF
-    startFrageDatei = tabPfade[aktiverTab]
+    startFrageDatei = reiter[aktiverTab].pfad
     startFrageUmg = umgebung
     IF umgebung THEN
         startFrageDlg = GUI_PROMPT(tr$("Umgebung für den Start"), _
@@ -15014,7 +15040,7 @@ END SUB
 SUB debugRunTo(zeile AS INTEGER)
     DIM datei AS STRING : datei = prozessDatei
     IF aktiverTab >= 0 THEN
-        IF tabPfade[aktiverTab] <> "" THEN datei = tabPfade[aktiverTab]
+        IF reiter[aktiverTab].pfad <> "" THEN datei = reiter[aktiverTab].pfad
     END IF
     PROCESS_WRITE(prozess, "{" + jsonText$("cmd") + ":" + jsonText$("run-to") + "," + jsonText$("line") + ":" + STR$(zeile) + "," + jsonText$("file") + ":" + jsonText$(datei) + "}" + NL)
     programmNachVorn()
@@ -15094,7 +15120,7 @@ SUB debugPanelNachziehen()
             DIM zl AS INTEGER : zl = stapelZeilen[sr]
             ' Die Zeile gehoert zu IHRER Datei -- ein Aufruf aus einer
             ' importierten Datei steht nicht im Reiter, der gerade vorn ist.
-            IF NOT gleicheDatei(stapelDateien[sr], tabPfade[aktiverTab]) THEN dateiOeffnen(stapelDateien[sr])
+            IF NOT gleicheDatei(stapelDateien[sr], reiter[aktiverTab].pfad) THEN dateiOeffnen(stapelDateien[sr])
             DIM ta AS GUI_WIDGET : ta = aktivesFeld()
             IF ta >= 0 AND zl > 0 THEN GUI_TEXTAREA_GOTO(ta, zl, 1)
             protokoll("stapel sprung " + STR$(zl))
@@ -15173,7 +15199,7 @@ SUB profilAnzeigen(zeile AS STRING)
     DIM quelle AS ARRAY OF STRING : quelle = []
     DIM tq AS INTEGER : tq = tabMitPfad(prozessDatei)
     IF tq >= 0 THEN
-        quelle = SPLIT$(GUI_TEXT(tabFelder[tq]), NL)
+        quelle = SPLIT$(GUI_TEXT(reiter[tq].feld), NL)
     ELSE
         TRY
             quelle = SPLIT$(dateiLesen(prozessDatei), NL)
@@ -15514,11 +15540,11 @@ SUB debugAenderungNachsehen()
     IF debugGeaendertGesagt THEN RETURN
     DIM t AS INTEGER
     FOR t = 0 TO tabAnzahl - 1
-        IF tabPfade[t] <> "" THEN
-            IF GUI_TEXT(tabFelder[t]) <> tabGesichert[t] THEN
+        IF reiter[t].pfad <> "" THEN
+            IF reiter[t].geaendert() THEN
                 debugGeaendertGesagt = TRUE
-                GUI_SET_TEXT(lblStatus, BASENAME(tabPfade[t]) + tr$(" geändert, während der Debugger läuft -- das Programm kennt noch die alten Zeilen. Strg+Umschalt+F5 startet neu."))
-                protokoll("debug geaendert " + BASENAME(tabPfade[t]))
+                GUI_SET_TEXT(lblStatus, BASENAME(reiter[t].pfad) + tr$(" geändert, während der Debugger läuft -- das Programm kennt noch die alten Zeilen. Strg+Umschalt+F5 startet neu."))
+                protokoll("debug geaendert " + BASENAME(reiter[t].pfad))
                 RETURN
             END IF
         END IF
@@ -15747,7 +15773,7 @@ SUB hbCodeAktion(aktion AS STRING, code AS STRING)
         DIM vorher AS INTEGER : vorher = tabAnzahl
         tabOeffnen("", code)
         ' Als ungesichert markieren -- sonst ginge es beim Schliessen wortlos weg.
-        IF tabAnzahl > vorher THEN tabGesichert[aktiverTab] = ""
+        IF tabAnzahl > vorher THEN reiter[aktiverTab].gesichert = ""
     ELSEIF aktion = "Starten" THEN
         DIM pfad AS STRING : pfad = PATHJOIN(DIRNAME(konfigPfad), "handbuch_beispiel.dh")
         TRY
@@ -16165,7 +16191,7 @@ END SUB
 FUNCTION listingPdf(nurAuswahl AS BOOLEAN) AS PDF
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     DIM name AS STRING : name = "Unbenannt"
-    IF tabPfade[aktiverTab] <> "" THEN name = BASENAME(tabPfade[aktiverTab])
+    IF reiter[aktiverTab].pfad <> "" THEN name = BASENAME(reiter[aktiverTab].pfad)
     DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
     DIM von AS INTEGER : von = 0
     DIM bis AS INTEGER : bis = LEN(zeilen) - 1
@@ -16229,7 +16255,7 @@ END FUNCTION
 
 SUB listingAlsPdf()
     IF aktiverTab < 0 THEN RETURN
-    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
+    DIM pfad AS STRING : pfad = reiter[aktiverTab].pfad
     IF pfad = "" THEN GUI_SET_TEXT(lblStatus, tr$("Erst sichern -- die PDF kommt neben die Quelle.")) : RETURN
     DIM ziel AS STRING : ziel = pfad
     IF LOWER$(RIGHT$(ziel, 3)) = ".dh" THEN ziel = LEFT$(ziel, LEN(ziel) - 3)
@@ -16340,7 +16366,7 @@ END SUB
 ' Projektordner das der Datei vorn.
 SUB klassendiagrammStarten()
     DIM ziel AS STRING : ziel = projektOrdner
-    IF ziel = "" AND aktiverTab >= 0 THEN ziel = tabPfade[aktiverTab]
+    IF ziel = "" AND aktiverTab >= 0 THEN ziel = reiter[aktiverTab].pfad
     IF ziel = "" THEN
         GUI_SET_TEXT(lblStatus, tr$("Erst ein Projekt oder eine Datei öffnen."))
         RETURN
@@ -16982,10 +17008,10 @@ SUB schnipselAuswahlSichern(eingabe AS STRING)
     ' Steht die Datei in einem Reiter, soll er nicht den alten Stand halten.
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        IF gleicherWeg(tabPfade[i], p) AND GUI_TEXT(tabFelder[i]) = tabGesichert[i] THEN
+        IF gleicherWeg(reiter[i].pfad, p) AND NOT reiter[i].geaendert() THEN
             DIM neuT AS STRING : neuT = JOIN$(READLINES(p), NL)
-            GUI_SET_TEXT(tabFelder[i], neuT)
-            tabGesichert[i] = neuT
+            GUI_SET_TEXT(reiter[i].feld, neuT)
+            reiter[i].gesichert = neuT
         END IF
     NEXT
     GUI_SET_TEXT(lblStatus, tr$("Als Schnipsel gesichert: ") + TRIM$(eingabe))
@@ -17254,7 +17280,7 @@ END FUNCTION
 ' Die Waerme EINES Reiters aus der letzten Messung setzen (oder wegnehmen).
 SUB waermeFeld(t AS INTEGER)
     IF t < 0 OR t >= tabAnzahl THEN RETURN
-    DIM ta AS GUI_WIDGET : ta = tabFelder[t]
+    DIM ta AS GUI_WIDGET : ta = reiter[t].feld
     ' die alten Eintraege dieses Feldes weg
     DIM nf AS ARRAY OF INTEGER : nf = []
     DIM nn AS ARRAY OF INTEGER : nn = []
@@ -17268,7 +17294,7 @@ SUB waermeFeld(t AS INTEGER)
     waermeFelder = nf : waermeNr = nn : waermeTexte = nt
     DIM zl AS ARRAY OF INTEGER : zl = []
     DIM fa AS ARRAY OF INTEGER : fa = []
-    DIM pfad AS STRING : pfad = tabPfade[t]
+    DIM pfad AS STRING : pfad = reiter[t].pfad
     IF waermeAn AND waermeDaten AND pfad <> "" THEN
         DIM hoechst AS FLOAT : hoechst = 0.0
         FOR i = 0 TO LEN(profRohT) - 1
@@ -17964,7 +17990,7 @@ SUB pluginHoverFragen(ta AS GUI_WIDGET, z AS INTEGER, sp AS INTEGER, wort AS STR
         JSON_SET_INT(j, "zeile", z)
         JSON_SET_INT(j, "spalte", sp)
         DIM d AS STRING : d = ""
-        IF aktiverTab >= 0 THEN d = tabPfade[aktiverTab]
+        IF aktiverTab >= 0 THEN d = reiter[aktiverTab].pfad
         JSON_SET_STRING(j, "datei", d)
         pluginSenden(k, j)
     NEXT
@@ -17993,7 +18019,7 @@ SUB pluginVervollFragen(z AS INTEGER, sp AS INTEGER, wort AS STRING)
         JSON_SET_INT(j, "zeile", z)
         JSON_SET_INT(j, "spalte", sp)
         DIM d AS STRING : d = ""
-        IF aktiverTab >= 0 THEN d = tabPfade[aktiverTab]
+        IF aktiverTab >= 0 THEN d = reiter[aktiverTab].pfad
         JSON_SET_STRING(j, "datei", d)
         pluginSenden(k, j)
     NEXT
@@ -18049,7 +18075,7 @@ SUB pluginAntwort(k AS INTEGER, j AS JSON_HANDLE)
     DIM wert AS STRING : wert = ""
     SELECT CASE plugText$(j, "was")
         CASE "text" : IF ta >= 0 THEN wert = GUI_TEXT(ta)
-        CASE "datei" : IF aktiverTab >= 0 THEN wert = tabPfade[aktiverTab]
+        CASE "datei" : IF aktiverTab >= 0 THEN wert = reiter[aktiverTab].pfad
         CASE "auswahl" : IF ta >= 0 THEN wert = GUI_TEXTAREA_SELECTION$(ta)
         CASE "projekt" : wert = projektOrdner
         CASE "wort" : wert = wortAnDerMarke$()
@@ -18167,7 +18193,7 @@ FUNCTION pluginFaerben(ta AS GUI_WIDGET, stueck AS STRING, von AS INTEGER) AS BO
     DIM pfad AS STRING : pfad = ""
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        IF tabFelder[i] = ta THEN pfad = tabPfade[i]
+        IF reiter[i].feld = ta THEN pfad = reiter[i].pfad
     NEXT
     DIM pkt AS INTEGER : pkt = INSTRREV(pfad, ".")
     IF pkt < 0 THEN RETURN FALSE
@@ -18823,10 +18849,10 @@ SUB whSchreiben(offen AS BOOLEAN)
     DIM n AS INTEGER : n = 0
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        DIM txt AS STRING : txt = GUI_TEXT(tabFelder[i])
-        IF txt <> tabGesichert[i] THEN
+        DIM txt AS STRING : txt = GUI_TEXT(reiter[i].feld)
+        IF txt <> reiter[i].gesichert THEN
             DIM e AS JSON_HANDLE : e = JSON_NEW_OBJECT()
-            JSON_SET_STRING(e, "pfad", tabPfade[i])
+            JSON_SET_STRING(e, "pfad", reiter[i].pfad)
             JSON_SET_STRING(e, "text", txt)
             JSON_APPEND_JSON(h, "reiter", e)
             n = n + 1
@@ -18939,7 +18965,7 @@ SUB whHolen()
                     ziel = tabMitPfad(p)
                 END IF
                 IF ziel >= 0 THEN
-                    GUI_SET_TEXT(tabFelder[ziel], txt)
+                    GUI_SET_TEXT(reiter[ziel].feld, txt)
                     n = n + 1
                     protokoll("wiederhergestellt " + IIF(p = "", "(neu)", p))
                 END IF
@@ -18974,7 +19000,7 @@ END SUB
 FUNCTION ungesichert() AS BOOLEAN
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        IF GUI_TEXT(tabFelder[i]) <> tabGesichert[i] THEN RETURN TRUE
+        IF reiter[i].geaendert() THEN RETURN TRUE
     NEXT
     RETURN FALSE
 END FUNCTION
@@ -19138,7 +19164,7 @@ SUB befehl(k AS STRING)
         CASE "treffer_springen" : problemAnspringen()
         CASE "treffer_alle" : trefferAlleAnhaken(TRUE)
         CASE "treffer_keine" : trefferAlleAnhaken(FALSE)
-        CASE "im_baum_zeigen" : IF aktiverTab >= 0 THEN imBaumZeigen(tabPfade[aktiverTab])
+        CASE "im_baum_zeigen" : IF aktiverTab >= 0 THEN imBaumZeigen(reiter[aktiverTab].pfad)
         CASE "problem_vor" : problemSpringen(TRUE)
         CASE "problem_zurueck" : problemSpringen(FALSE)
         CASE "letzte_aenderung" : zurLetztenAenderung()
@@ -19153,10 +19179,10 @@ SUB befehl(k AS STRING)
         CASE "reiter_pfad"
             DIM rpI AS INTEGER : rpI = GUI_TAB_CONTEXT(win)
             IF rpI >= 0 AND rpI < tabAnzahl THEN
-                IF tabPfade[rpI] <> "" THEN
+                IF reiter[rpI].pfad <> "" THEN
                     TRY
-                        CLIPBOARD_SET(tabPfade[rpI])
-                        GUI_SET_TEXT(lblStatus, tr$("Pfad kopiert: ") + tabPfade[rpI])
+                        CLIPBOARD_SET(reiter[rpI].pfad)
+                        GUI_SET_TEXT(lblStatus, tr$("Pfad kopiert: ") + reiter[rpI].pfad)
                     CATCH e
                         GUI_SET_TEXT(lblStatus, tr$("Zwischenablage nicht erreichbar."))
                     END TRY
@@ -19164,7 +19190,7 @@ SUB befehl(k AS STRING)
             END IF
         CASE "reiter_im_baum"
             DIM rbI AS INTEGER : rbI = GUI_TAB_CONTEXT(win)
-            IF rbI >= 0 AND rbI < tabAnzahl THEN imBaumZeigen(tabPfade[rbI])
+            IF rbI >= 0 AND rbI < tabAnzahl THEN imBaumZeigen(reiter[rbI].pfad)
         CASE "nav_vor" : navGehen(FALSE)
         CASE "baum_neue_datei" : baumFragen("datei")
         CASE "baum_neuer_ordner" : baumFragen("ordner")
@@ -19848,7 +19874,7 @@ WHILE NOT beenden
             DIM i AS INTEGER
             DIM alles AS BOOLEAN : alles = TRUE
             FOR i = 0 TO tabAnzahl - 1
-                IF GUI_TEXT(tabFelder[i]) <> tabGesichert[i] THEN
+                IF reiter[i].geaendert() THEN
                     IF NOT sichern(i, FALSE) THEN alles = FALSE
                 END IF
             NEXT
@@ -20010,16 +20036,16 @@ WHILE NOT beenden
     statusNachziehen()
     ' --- Aenderungen im aktiven Feld: einfaerben, Pruefung vormerken ---
     IF aktiverTab >= 0 THEN
-        DIM tf AS GUI_WIDGET : tf = tabFelder[aktiverTab]
+        DIM tf AS GUI_WIDGET : tf = reiter[aktiverTab].feld
         DIM jetzt AS STRING : jetzt = GUI_TEXT(tf)
-        IF jetzt <> tabLetzterText[aktiverTab] THEN
+        IF jetzt <> reiter[aktiverTab].letzterText THEN
             ' Getippt heisst: genau ein Zeichen kam dazu. Ein eingefuegter
             ' Block oder ein Umbau aendert den Text auch -- danach ging die
             ' Liste mit dem Wort an der Marke auf (beim Stresstest gefunden).
-            IF LEN(jetzt) = LEN(tabLetzterText[aktiverTab]) + 1 THEN vervollGetippt = TRUE
+            IF LEN(jetzt) = LEN(reiter[aktiverTab].letzterText) + 1 THEN vervollGetippt = TRUE
             ' Beim ersten Bild nach dem Oeffnen ist der gemerkte Text leer --
             ' das ist kein Bearbeiten.
-            IF tabLetzterText[aktiverTab] <> "" AND tabPfade[aktiverTab] <> "" THEN aenderungMerken(tf, tabPfade[aktiverTab])
+            IF reiter[aktiverTab].letzterText <> "" AND reiter[aktiverTab].pfad <> "" THEN aenderungMerken(tf, reiter[aktiverTab].pfad)
             ' Strg+V hat das Feld selbst eingefuegt -- danach die Einrueckung
             ' anpassen (ein eigener Rueckgaengig-Schritt).
             DIM strgV AS BOOLEAN : strgV = strgVBilder > 0
@@ -20034,7 +20060,7 @@ WHILE NOT beenden
                 END TRY
                 IF einfuegenAnpassen(tf, clipV) THEN jetzt = GUI_TEXT(tf)
             END IF
-            tabLetzterText[aktiverTab] = jetzt
+            reiter[aktiverTab].letzterText = jetzt
             pruefungFaellig = GET_TIME() + 0.6
             IF autoSichern > 0 THEN autoFaellig = GET_TIME() + autoSichern
             reiterNeuSetzen()
@@ -20044,7 +20070,7 @@ WHILE NOT beenden
         ' im Tippen ein Datei-Dialog.
         IF autoSichern > 0 AND autoFaellig >= 0.0 AND GET_TIME() >= autoFaellig THEN
             autoFaellig = -1.0
-            IF tabPfade[aktiverTab] <> "" AND jetzt <> tabGesichert[aktiverTab] THEN
+            IF reiter[aktiverTab].pfad <> "" AND jetzt <> reiter[aktiverTab].gesichert THEN
                 sichernOhneFormat = TRUE
                 sichern(aktiverTab, FALSE)
                 sichernOhneFormat = FALSE
@@ -20084,7 +20110,7 @@ WHILE NOT beenden
     pluginsVerwaltenNachziehen()
     IF aktiverTab <> letzterTab THEN
         letzterTab = aktiverTab
-        IF aktiverTab >= 0 THEN pluginEreignis("reiter", tabPfade[aktiverTab])
+        IF aktiverTab >= 0 THEN pluginEreignis("reiter", reiter[aktiverTab].pfad)
     END IF
     IF suchLauf THEN
         IF KEYHIT(KEY_ESCAPE) THEN suchAbbrechen() ELSE suchSchritt()

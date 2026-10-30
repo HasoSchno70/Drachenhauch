@@ -2696,11 +2696,11 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 30 THEN
-    GUI_TEXTAREA_INSERT(tabFelder[0], "' neu" + CHR$(10))
-    DELETEFILE(tabPfade[0])
-    MKDIR(tabPfade[0])
+    GUI_TEXTAREA_INSERT(reiter[0].feld, "' neu" + CHR$(10))
+    DELETEFILE(reiter[0].pfad)
+    MKDIR(reiter[0].pfad)
     protokoll("pr gesichert " + STR$(sichern(0, FALSE)))
-    protokoll("pr ungesichert " + STR$(GUI_TEXT(tabFelder[0]) <> tabGesichert[0]))
+    protokoll("pr ungesichert " + STR$(GUI_TEXT(reiter[0].feld) <> reiter[0].gesichert))
     protokoll("pr status " + LEFT$(GUI_STATUSBAR_TEXT$(lblStatus, 0), 19))
 END IF
 IF prBild = 50 THEN
@@ -2740,7 +2740,7 @@ DIM prBild AS INTEGER : prBild = 0
 prBild = prBild + 1
 IF prBild = 30 THEN
     dateiOeffnen(PATHJOIN(projektOrdner, "alt.dh"))
-    protokoll("pr reiter " + STR$(tabAnzahl) + " " + SPLIT$(GUI_TEXT(tabFelder[aktiverTab]), CHR$(10))[0])
+    protokoll("pr reiter " + STR$(tabAnzahl) + " " + SPLIT$(GUI_TEXT(reiter[aktiverTab].feld), CHR$(10))[0])
     protokoll("pr status " + STR$(INSTR(GUI_STATUSBAR_TEXT$(lblStatus, 0), "cp1252") >= 0))
     projektSuchen("Grüße", "")
 END IF
@@ -3045,7 +3045,7 @@ END IF
 IF prBild = 60 THEN
     DIM prZ AS INTEGER
     DIM prS AS INTEGER
-    (prZ, prS) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
+    (prZ, prS) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
     protokoll("pr laeuft weiter, marke " + STR$(prZ) + " dialog " + STR$(dlgZeile))
     EXIT(0)
 END IF
@@ -3128,16 +3128,16 @@ FOR prI = 1 TO 11
 NEXT
 protokoll("pr offen " + STR$(tabAnzahl))
 dateiOeffnen(PATHJOIN(projektOrdner, "d3.dh"))
-protokoll("pr gewechselt " + BASENAME(tabPfade[aktiverTab]) + " " + STR$(tabAnzahl))
+protokoll("pr gewechselt " + BASENAME(reiter[aktiverTab].pfad) + " " + STR$(tabAnzahl))
 dateiOeffnen(PATHJOIN(projektOrdner, "neu.dh"))
-protokoll("pr neu " + BASENAME(tabPfade[aktiverTab]) + " " + STR$(tabAnzahl) + " haupt noch da " + STR$(tabMitPfad(PATHJOIN(projektOrdner, "haupt.dh")) >= 0))
+protokoll("pr neu " + BASENAME(reiter[aktiverTab].pfad) + " " + STR$(tabAnzahl) + " haupt noch da " + STR$(tabMitPfad(PATHJOIN(projektOrdner, "haupt.dh")) >= 0))
 FOR prI = 0 TO tabAnzahl - 1
-    GUI_TEXTAREA_SELECT(tabFelder[prI], 1, 1, 1, 1)
-    GUI_TEXTAREA_INSERT(tabFelder[prI], "' x" + NL)
+    GUI_TEXTAREA_SELECT(reiter[prI].feld, 1, 1, 1, 1)
+    GUI_TEXTAREA_INSERT(reiter[prI].feld, "' x" + NL)
 NEXT
-DIM prVorher AS STRING : prVorher = tabPfade[aktiverTab]
+DIM prVorher AS STRING : prVorher = reiter[aktiverTab].pfad
 dateiOeffnen(PATHJOIN(projektOrdner, "haupt.dh"))
-protokoll("pr alle geaendert " + STR$(tabPfade[aktiverTab] = prVorher) + " " + STR$(tabAnzahl) + " " + LEFT$(GUI_STATUSBAR_TEXT$(lblStatus, 0), 9))
+protokoll("pr alle geaendert " + STR$(reiter[aktiverTab].pfad = prVorher) + " " + STR$(tabAnzahl) + " " + LEFT$(GUI_STATUSBAR_TEXT$(lblStatus, 0), 9))
 EXIT(0)
 --- programm ../../ide/ide.dh nach protokoll("bereit")
 --- argumente

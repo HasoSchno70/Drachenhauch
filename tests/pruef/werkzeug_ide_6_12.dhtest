@@ -4510,8 +4510,8 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 260 THEN
-    protokoll("pr reiter " + REPLACE$(GUI_TEXT(tabFelder[0]), CHR$(10), "|"))
-    protokoll("pr gesichert " + STR$(GUI_TEXT(tabFelder[0]) = tabGesichert[0]))
+    protokoll("pr reiter " + REPLACE$(GUI_TEXT(reiter[0].feld), CHR$(10), "|"))
+    protokoll("pr gesichert " + STR$(GUI_TEXT(reiter[0].feld) = reiter[0].gesichert))
 END IF
 --- argumente
 unter/../spiel.dh

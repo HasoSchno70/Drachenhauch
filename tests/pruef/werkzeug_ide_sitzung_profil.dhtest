@@ -28,7 +28,7 @@ IF prBild = 150 THEN
     DIM prZ AS INTEGER
     DIM prS AS INTEGER
     (prZ, prS) = GUI_TEXTAREA_CURSOR(aktivesFeld())
-    protokoll("probe sprung " + BASENAME(tabPfade[aktiverTab]) + " " + STR$(prZ))
+    protokoll("probe sprung " + BASENAME(reiter[aktiverTab].pfad) + " " + STR$(prZ))
 END IF
 --- argumente
 spiel.dh
@@ -66,7 +66,7 @@ DIM prBild AS INTEGER : prBild = 0
 prBild = prBild + 1
 IF prBild = 20 THEN
     dateiOeffnen(PATHJOIN(projektOrdner, "helfer.dh"))
-    GUI_SET_TEXT(tabFelder[aktiverTab], "SUB hallo()" + CHR$(10) + "    PRINT " + CHR$(34) + "neu" + CHR$(34) + CHR$(10) + "END SUB" + CHR$(10))
+    GUI_SET_TEXT(reiter[aktiverTab].feld, "SUB hallo()" + CHR$(10) + "    PRINT " + CHR$(34) + "neu" + CHR$(34) + CHR$(10) + "END SUB" + CHR$(10))
     dateiOeffnen(PATHJOIN(projektOrdner, "spiel.dh"))
     befehl("start")
 END IF
@@ -103,10 +103,10 @@ probe ausgabe neu
 === haltepunkte und lesezeichen ueberleben den neustart
 ' Erster Lauf setzt je einen (mit Bedingung), der zweite liest sie zurueck.
 IF NOT FILEEXISTS("zweiter.txt") THEN
-    haltepunktUmschaltenIn(tabPfade[aktiverTab], 2)
-    bedingungZeile = 3 : bedingungPfad = tabPfade[aktiverTab]
+    haltepunktUmschaltenIn(reiter[aktiverTab].pfad, 2)
+    bedingungZeile = 3 : bedingungPfad = reiter[aktiverTab].pfad
     haltepunktBedingungSetzen("x > 1")
-    lzDateien = [tabPfade[aktiverTab]] : lzZeilen = [3]
+    lzDateien = [reiter[aktiverTab].pfad] : lzZeilen = [3]
     WRITEALL("zweiter.txt", "ja")
     ' Wie beim Beenden: die Einstellungen sichern.
     konfigSichern()

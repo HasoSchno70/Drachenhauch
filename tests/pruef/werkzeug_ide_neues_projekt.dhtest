@@ -17,7 +17,7 @@ IF prBild = 40 THEN
     DIM prI AS INTEGER
     FOR prI = 0 TO 3
         protokoll("pr anlegen " + STR$(prI) + " " + STR$(neuProjektAnlegen(prI, "p" + STR$(prI), prOrt)))
-        protokoll("pr projekt " + BASENAME(projektOrdner) + " reiter " + BASENAME(tabPfade[aktiverTab]))
+        protokoll("pr projekt " + BASENAME(projektOrdner) + " reiter " + BASENAME(reiter[aktiverTab].pfad))
     NEXT
     protokoll("pr schraeg " + STR$(neuProjektAnlegen(0, "a/b", prOrt)) + " " + GUI_TEXT(lblNpMeldung))
     protokoll("pr belegt " + STR$(neuProjektAnlegen(3, "p1", prOrt)) + " " + GUI_TEXT(lblNpMeldung))

@@ -12,7 +12,7 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 1, 2)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 1, 2)
     umbenennenFragen()
     umbenennenAusfuehren("summe_mit_einem_langen_namen")
 END IF

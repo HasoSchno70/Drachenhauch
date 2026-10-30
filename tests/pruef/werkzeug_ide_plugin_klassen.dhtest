@@ -48,11 +48,11 @@ IF prSchritt = 0 AND LEN(plugLeisteName) > 0 THEN
     END IF
 END IF
 IF prSchritt = 1 AND aktiverTab >= 0 THEN
-    IF BASENAME(tabPfade[aktiverTab]) = "b.dh" THEN
+    IF BASENAME(reiter[aktiverTab].pfad) = "b.dh" THEN
         DIM prZ AS INTEGER
         DIM prS AS INTEGER
         (prZ, prS) = GUI_TEXTAREA_CURSOR(aktivesFeld())
-        protokoll("pr geoeffnet " + BASENAME(tabPfade[aktiverTab]) + " zeile " + STR$(prZ))
+        protokoll("pr geoeffnet " + BASENAME(reiter[aktiverTab].pfad) + " zeile " + STR$(prZ))
         ' Der Filter: nur noch, was "rasse" heisst -- samt seiner Klasse.
         GUI_SET_TEXT(GUI_WINDOW_WIDGET(plugLeisteFenster[0], 1), "")
         pluginWidgetEreignis(0, "geaendert", "klassen", 1, "rasse")

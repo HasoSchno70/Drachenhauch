@@ -134,15 +134,15 @@ IF prSchritt = 0 AND prB > 5 THEN
     prSchritt = 1
 END IF
 IF prSchritt = 1 AND aktiverTab >= 0 THEN
-    IF BASENAME(tabPfade[aktiverTab]) = "b.dh" THEN
+    IF BASENAME(reiter[aktiverTab].pfad) = "b.dh" THEN
         DIM prZ AS INTEGER
         DIM prS AS INTEGER
         (prZ, prS) = GUI_TEXTAREA_CURSOR(aktivesFeld())
-        protokoll("pr vorn " + BASENAME(tabPfade[aktiverTab]) + " zeile " + STR$(prZ))
+        protokoll("pr vorn " + BASENAME(reiter[aktiverTab].pfad) + " zeile " + STR$(prZ))
         EXIT(0)
     END IF
 END IF
-IF prB > 600 THEN protokoll("pr zeit um " + STR$(aktiverTab) + " " + IIF(aktiverTab >= 0, tabPfade[MAX(0, aktiverTab)], "-")) : EXIT(0)
+IF prB > 600 THEN protokoll("pr zeit um " + STR$(aktiverTab) + " " + IIF(aktiverTab >= 0, reiter[MAX(0, aktiverTab)].pfad, "-")) : EXIT(0)
 --- argumente
 a.dh
 --- umgebung

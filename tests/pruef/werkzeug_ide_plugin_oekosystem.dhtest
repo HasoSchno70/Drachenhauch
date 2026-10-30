@@ -125,7 +125,7 @@ IF prSchritt = 0 AND prB > 10 THEN
     protokoll("pr angelegt " + STR$(pluginAnlegen("probe")))
     protokoll("pr nochmal " + STR$(pluginAnlegen("probe")))
     protokoll("pr dateien " + STR$(FILEEXISTS("plugins/probe/plugin.dh")) + " " + STR$(FILEEXISTS("plugins/probe/plugin.json")) + " " + STR$(FILEEXISTS("plugins/probe/leiste.dhform")) + " " + STR$(FILEEXISTS("plugins/probe/test.dhtest")))
-    protokoll("pr vorn " + BASENAME(tabPfade[aktiverTab]))
+    protokoll("pr vorn " + BASENAME(reiter[aktiverTab].pfad))
     prSchritt = 1
 END IF
 ' Gestartet: Befehl, Kontext und Leiste sind angemeldet.
@@ -199,7 +199,7 @@ IF prSchritt = 0 AND ARRAY_INDEXOF(plugBefKennung, "plugin:text:los") >= 0 THEN
     prSchritt = 1
 END IF
 IF prSchritt = 1 AND aktiverTab >= 0 THEN
-    IF BASENAME(tabPfade[aktiverTab]) = "b.dh" AND INSTR(GUI_TEXT(aktivesFeld()), "NEU") >= 0 THEN
+    IF BASENAME(reiter[aktiverTab].pfad) = "b.dh" AND INSTR(GUI_TEXT(aktivesFeld()), "NEU") >= 0 THEN
         protokoll("pr b " + REPLACE$(GUI_TEXT(aktivesFeld()), NL, " / "))
         ' Zurueck zu a.dh: ersetzt und ausgewaehlt?
         dateiOeffnen(PATHJOIN(projektOrdner, "a.dh"))

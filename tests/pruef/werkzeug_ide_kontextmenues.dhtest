@@ -18,7 +18,7 @@ DIM prBild AS INTEGER : prBild = 0
 prBild = prBild + 1
 IF prBild = 30 THEN
     ' Die Lage von Zeile 3, Spalte 2 suchen.
-    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    DIM prTa AS GUI_WIDGET : prTa = reiter[aktiverTab].feld
     DIM prX AS INTEGER : prX = -1
     DIM prY AS INTEGER : prY = -1
     DIM prYY AS INTEGER
@@ -80,7 +80,7 @@ prBild = prBild + 1
 IF prBild = 20 THEN
     dateiOeffnen(PATHJOIN(projektOrdner, "b_zwei.dh"))
     dateiOeffnen(PATHJOIN(projektOrdner, "c_drei.dh"))
-    GUI_SET_TEXT(tabFelder[aktiverTab], "PRINT 33")
+    GUI_SET_TEXT(reiter[aktiverTab].feld, "PRINT 33")
     ' Wieder vorn: der erste Reiter, damit "andere" etwas zu tun hat.
     aktiverTab = 0 : GUI_SET_ACTIVE_TAB(win, 0)
     WRITEALL("prmaus.txt", "c 6" + CHR$(10) + "e 0 7 140 40 0" + CHR$(10) + "e 10 7 140 40 0" + CHR$(10) + _
@@ -91,9 +91,9 @@ IF prBild = 60 THEN
     DIM prI AS INTEGER
     DIM prT AS STRING : prT = ""
     FOR prI = 0 TO tabAnzahl - 1
-        prT = prT + " " + BASENAME(tabPfade[prI])
+        prT = prT + " " + BASENAME(reiter[prI].pfad)
     NEXT
-    protokoll("pr reiter" + prT + " vorn " + BASENAME(tabPfade[aktiverTab]))
+    protokoll("pr reiter" + prT + " vorn " + BASENAME(reiter[aktiverTab].pfad))
     EXIT(0)
 END IF
 --- argumente
@@ -149,7 +149,7 @@ IF prBild = 45 THEN
     protokoll("pr baum " + BASENAME(GUI_FILETREE_SELECTED$(baum)) + " reiter " + STR$(tabAnzahl))
 END IF
 IF prBild = 90 THEN
-    protokoll("pr reiter " + STR$(tabAnzahl) + " " + BASENAME(tabPfade[0]))
+    protokoll("pr reiter " + STR$(tabAnzahl) + " " + BASENAME(reiter[0].pfad))
     EXIT(0)
 END IF
 --- argumente

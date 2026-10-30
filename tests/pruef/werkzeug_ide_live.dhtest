@@ -22,7 +22,7 @@ IF prSchritt = 4 AND prBild = prWarte + 1 THEN
     protokoll("pr kopie da " + STR$(FILEEXISTS(".dh_live_vorschau.dh") OR FILEEXISTS(PATHJOIN(projektOrdner, ".dh_live_vorschau.dh"))))
     DIM prF AS INTEGER : prF = GETPIXEL(liveBild, 20, 20)
     protokoll("pr farbe rot " + STR$(((prF SHR 16) BAND 255) > 200 AND ((prF SHR 8) BAND 255) < 60))
-    GUI_SET_TEXT(tabFelder[aktiverTab], "PRINT(" + CHR$(34) + "ohne fenster" + CHR$(34) + ")" + NL + "LINE(0, 0, 10, 10, RED)" + NL)
+    GUI_SET_TEXT(reiter[aktiverTab].feld, "PRINT(" + CHR$(34) + "ohne fenster" + CHR$(34) + ")" + NL + "LINE(0, 0, 10, 10, RED)" + NL)
     prSchritt = 2
 END IF
 IF prSchritt = 2 AND liveProz >= 0 THEN prSchritt = 3
@@ -75,13 +75,13 @@ DIM prY0 AS INTEGER
 prBild = prBild + 1
 IF prBild = 30 THEN befehl("live")
 IF prBild = 40 THEN
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 1, 1)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 1, 1)
 END IF
 IF prBild = 42 THEN
     DIM prMx AS INTEGER
     DIM prMy AS INTEGER
     DIM prMh AS INTEGER
-    (prMx, prMy, prMh) = GUI_TEXTAREA_CARET_XY(tabFelder[aktiverTab])
+    (prMx, prMy, prMh) = GUI_TEXTAREA_CARET_XY(reiter[aktiverTab].feld)
     prX0 = GUI_WINDOW_GET_X(winLive)
     prY0 = GUI_WINDOW_GET_Y(winLive)
     DIM prA AS STRING
@@ -99,7 +99,7 @@ IF prBild = 42 THEN
     AUTOMATION_PLAY("przug.txt")
 END IF
 IF prBild = 90 THEN
-    protokoll("pr fokus im code " + STR$(GUI_FOCUSED() = tabFelder[aktiverTab]))
+    protokoll("pr fokus im code " + STR$(GUI_FOCUSED() = reiter[aktiverTab].feld))
     protokoll("pr verschoben " + STR$(GUI_WINDOW_GET_X(winLive) - prX0) + " " + STR$(GUI_WINDOW_GET_Y(winLive) - prY0))
     EXIT(0)
 END IF
@@ -137,7 +137,7 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 30 THEN
-    tabPfade[aktiverTab] = PATHJOIN(projektOrdner, "weg/bild.dh")
+    reiter[aktiverTab].pfad = PATHJOIN(projektOrdner, "weg/bild.dh")
     befehl("live")
 END IF
 IF prBild = 150 THEN

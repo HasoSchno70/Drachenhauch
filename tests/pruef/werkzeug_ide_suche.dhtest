@@ -910,8 +910,8 @@ DIM prFertig AS INTEGER : prFertig = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 30 THEN
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 2, 1)
-    GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "' drachenwort ungesichert" + NL)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 2, 1)
+    GUI_TEXTAREA_INSERT(reiter[aktiverTab].feld, "' drachenwort ungesichert" + NL)
     projektSuchen("drachenwort", "")
     protokoll("pr gleich fertig " + STR$(NOT suchLauf))
 END IF

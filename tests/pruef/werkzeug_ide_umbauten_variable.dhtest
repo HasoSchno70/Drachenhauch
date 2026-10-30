@@ -10,7 +10,7 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
-    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    DIM prTa AS GUI_WIDGET : prTa = reiter[aktiverTab].feld
     protokoll("pr typ " + typRaten$("breite * 2 + 1") + " " + typRaten$("x / 3") + " " + typRaten$("name$ + " + CHR$(34) + "!" + CHR$(34)) + " " + typRaten$("a > 3"))
     ' ohne Auswahl: abgelehnt
     einfuehrenFragen()
@@ -53,7 +53,7 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
-    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    DIM prTa AS GUI_WIDGET : prTa = reiter[aktiverTab].feld
     ' zweimal belegt: nein
     GUI_TEXTAREA_GOTO(prTa, 9, 9)
     variableEinsetzen()
@@ -113,7 +113,7 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
-    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    DIM prTa AS GUI_WIDGET : prTa = reiter[aktiverTab].feld
     ' liest r, bevor es gesetzt wird: nein
     GUI_TEXTAREA_GOTO(prTa, 12, 5)
     subInFunction()

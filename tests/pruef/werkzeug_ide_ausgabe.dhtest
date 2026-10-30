@@ -31,7 +31,7 @@ IF prBild = 200 AND aktiverTab >= 0 THEN
     DIM prZ AS INTEGER
     DIM prS AS INTEGER
     (prZ, prS) = GUI_TEXTAREA_CURSOR(aktivesFeld())
-    protokoll("probe " + BASENAME(tabPfade[aktiverTab]) + " " + STR$(prZ) + IIF(INSTR(GUI_TEXT(lblStatus), "keine Stelle") >= 0, " keine stelle", ""))
+    protokoll("probe " + BASENAME(reiter[aktiverTab].pfad) + " " + STR$(prZ) + IIF(INSTR(GUI_TEXT(lblStatus), "keine Stelle") >= 0, " keine stelle", ""))
 END IF
 --- argumente
 sub/spiel.dh
@@ -81,7 +81,7 @@ IF prBild = 200 AND aktiverTab >= 0 THEN
     DIM prZ AS INTEGER
     DIM prS AS INTEGER
     (prZ, prS) = GUI_TEXTAREA_CURSOR(aktivesFeld())
-    protokoll("probe " + BASENAME(tabPfade[aktiverTab]) + " " + STR$(prZ) + IIF(INSTR(GUI_TEXT(lblStatus), "keine Stelle") >= 0, " keine stelle", ""))
+    protokoll("probe " + BASENAME(reiter[aktiverTab].pfad) + " " + STR$(prZ) + IIF(INSTR(GUI_TEXT(lblStatus), "keine Stelle") >= 0, " keine stelle", ""))
 END IF
 --- argumente
 spiel.dh
@@ -131,7 +131,7 @@ IF prBild = 200 AND aktiverTab >= 0 THEN
     DIM prZ AS INTEGER
     DIM prS AS INTEGER
     (prZ, prS) = GUI_TEXTAREA_CURSOR(aktivesFeld())
-    protokoll("probe " + BASENAME(tabPfade[aktiverTab]) + " " + STR$(prZ) + IIF(INSTR(GUI_TEXT(lblStatus), "keine Stelle") >= 0, " keine stelle", ""))
+    protokoll("probe " + BASENAME(reiter[aktiverTab].pfad) + " " + STR$(prZ) + IIF(INSTR(GUI_TEXT(lblStatus), "keine Stelle") >= 0, " keine stelle", ""))
 END IF
 --- argumente
 spiel.dh

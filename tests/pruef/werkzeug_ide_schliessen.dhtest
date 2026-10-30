@@ -16,7 +16,7 @@
 
 === mit ungesicherter arbeit fragt das kreuz nach
 SETWINDOWTITLE(ARG$(1))
-GUI_SET_TEXT(tabFelder[0], "PRINT 2")
+GUI_SET_TEXT(reiter[0].feld, "PRINT 2")
 DIM prSender AS INTEGER : prSender = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ARG$(2), ARG$(1), "kreuz")
 --- programm ../../ide/ide.dh nach protokoll("bereit")
 --- argumente
