@@ -396,17 +396,19 @@ Siehe auch [Sprachreferenz → Arrays](sprache.md#arrays).
 | Funktion | Zweck |
 |---|---|
 | `LEN(arr)` → INTEGER | Anzahl Elemente (1. Dimension) |
+| `LBOUND(arr [, dimension])` → INTEGER | kleinster Index; Dimension ab 1, ohne Angabe die erste. 0, außer bei `DIM a[1 TO 31]` |
+| `UBOUND(arr [, dimension])` → INTEGER | größter Index; bei einem leeren Feld `LBOUND - 1` |
 | `DIMCOUNT(arr)` → INTEGER | Anzahl Dimensionen |
 | `DIMSIZE(arr, n)` → INTEGER | Größe der n-ten Dimension (0-basiert) |
 | `SORT(arr)`, `REVERSE(arr)` | 1D IN PLACE sortieren / umkehren |
 | `SORT(arr, absteigend)` | mit BOOLEAN-Flag absteigend sortieren *(nur native Runtime)* |
 | `SORT(arr, comparator)` | mit FUNCREF-Comparator `cmp(a, b)` → INTEGER (<0/0/>0) sortieren, stabil. Auch eine gebundene Methode (`regel.cmp`) ist erlaubt *(nur native Runtime)* |
-| `ARRAY_INDEXOF(arr, v)` → INTEGER | erster Index von v, sonst -1 |
-| `ARRAY_MAP(arr, funktion)` → ARRAY | neues Feld mit `funktion(x)` je Element, z.B. `ARRAY_MAP(a, FUNCTION(x) x * 2)` |
+| `ARRAY_INDEXOF(arr, v)` → INTEGER | erster Index von v, sonst -1 (bei einem Feld mit eigener Untergrenze `LBOUND - 1`) |
+| `ARRAY_MAP(arr, funktion)` → ARRAY | neues Feld mit `funktion(x)` je Element, z.B. `ARRAY_MAP(a, FUNCTION(x) x * 2)`; behält eine eigene Untergrenze |
 | `ARRAY_FILTER(arr, funktion)` → ARRAY | neues Feld mit den Elementen, für die `funktion(x)` TRUE liefert (gleicher Elementtyp) |
 | `ARRAY_OF_TYPE(arr, Typ)` → ARRAY OF Typ | neues Feld mit den Elementen, die `IS Typ` sind, in ihrer Reihenfolge. `Typ` ist ein Typname wie rechts von `IS` (Klasse samt Unterklassen, oder ein Werttyp wie `INTEGER`); das Ergebnis passt an ein `ARRAY OF Typ` |
 | `ARRAY_REDUCE(arr, funktion, start)` | faltet das Feld: `funktion(bisher, x)` je Element, beginnend mit `start` |
-| `ARRAY_FIND(arr, funktion)` → INTEGER | Index des ersten Elements, für das `funktion(x)` TRUE liefert, sonst -1 |
+| `ARRAY_FIND(arr, funktion)` → INTEGER | Index des ersten Elements, für das `funktion(x)` TRUE liefert, sonst -1 (bei einem Feld mit eigener Untergrenze `LBOUND - 1`) |
 
 **Aggregate** (1D `ARRAY OF INTEGER`/`FLOAT`) und Helfer:
 

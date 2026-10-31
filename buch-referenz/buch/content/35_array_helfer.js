@@ -16,6 +16,14 @@ module.exports = (H) => [
       'PRINT DIMCOUNT(brett)',
       'PRINT DIMSIZE(brett, 0); " x "; DIMSIZE(brett, 1)',
     ], { out: ["2", "3 x 4"] }),
+  H.cmd("LBOUND · UBOUND", "LBOUND(array[, dimension])   UBOUND(array[, dimension])",
+    "Kleinster und größter gültiger Index. Interessant bei Arrays mit eigener Untergrenze (DIM noten[1 TO 6], siehe Kapitel „Arrays“); bei einem Array ab 0 ist LBOUND 0 und UBOUND gleich LEN - 1. Anders als bei DIMSIZE zählt die Dimension hier ab 1, und ohne sie gilt die erste.",
+    [
+      'DIM noten[1 TO 6] AS INTEGER',
+      'PRINT LBOUND(noten); " "; UBOUND(noten)',
+      'DIM b[4] AS INTEGER',
+      'PRINT LBOUND(b); " "; UBOUND(b)',
+    ], { out: ["1 6", "0 3"] }),
 
   H.h2("Sortieren, Umkehren, Suchen"),
   H.cmd("SORT", "SORT(array[, absteigend])",
@@ -37,7 +45,7 @@ module.exports = (H) => [
       'PRINT a[0]; a[1]; a[2]',
     ], { out: ["321"] }),
   H.cmd("ARRAY_INDEXOF", "ARRAY_INDEXOF(array, wert)",
-    "Liefert den ersten Index, an dem wert steht, oder -1, wenn er nicht vorkommt.",
+    "Liefert den ersten Index, an dem wert steht, oder -1, wenn er nicht vorkommt. Bei einem Array mit eigener Untergrenze zählt der Index ab ihr, und „nicht gefunden“ ist dann LBOUND - 1.",
     [
       'DIM a[3] AS INTEGER',
       'a[0]=10 : a[1]=20 : a[2]=30',

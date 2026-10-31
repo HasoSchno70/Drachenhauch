@@ -92,7 +92,7 @@ ARRAY_POP(s)
 PRINT LEN(s)
 PRINT s[0]
 --- fehler
-Index 0 ausserhalb [0..-1] in Dimension 0
+Index 0 ausserhalb [0..-1] in Dimension 1
 --- erwartet
 0
 

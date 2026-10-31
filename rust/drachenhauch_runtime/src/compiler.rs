@@ -225,6 +225,17 @@ struct Ctx {
     /// also noch "offen" ist. Zwei DIM in getrennten Bloecken (zwei IF
     /// hintereinander) bleiben still: dort ist der Name nur Hilfsvariable.
     dim_pfade: HashMap<String, Vec<u32>>,
+    /// Felder dieses Bereichs, deren Grenzen beim Uebersetzen feststehen
+    /// (`DIM tage[1 TO 31]`, `DIM a[3]`): je Dimension (von, bis). Nur fuer
+    /// die Warnung bei festem Index.
+    feste_grenzen: HashMap<String, Vec<(i64, i64)>>,
+    /// Die Warnungen dazu (Zeile, Name, Text) -- ausgegeben erst am Ende des
+    /// Bereichs und nur fuer Felder, die nirgends darin ersetzt werden oder an
+    /// einen Aufruf gehen (REDIM, ARRAY_PUSH, eine SUB, die fuellt). Am Ende,
+    /// weil der Aufruf in einer Schleife auch HINTER dem Zugriff stehen kann.
+    grenz_warnungen: Vec<(u32, String, String)>,
+    /// Namen, deren Feld im Bereich ersetzt wird oder an einen Aufruf geht.
+    grenz_frei: std::collections::HashSet<String>,
     /// Die Anweisungen, in denen der Compiler gerade steht (je Node::Stmt
     /// eine eindeutige Nummer).
     stmt_pfad: Vec<u32>,
@@ -244,7 +255,8 @@ impl Ctx {
               try_stack: vec![],
               try_gesamt: 0,
               local_slots: HashMap::new(), local_types: vec![], local_defaults: vec![],
-              dim_types: HashMap::new(), dim_pfade: HashMap::new(), stmt_pfad: vec![],
+              dim_types: HashMap::new(), dim_pfade: HashMap::new(), feste_grenzen: HashMap::new(),
+              grenz_warnungen: vec![], grenz_frei: Default::default(), stmt_pfad: vec![],
               is_main: true, is_sub: true, current_class: None,
               return_type: String::new() }
     }
@@ -336,6 +348,8 @@ struct FnSig {
 
 /// Ein Feld einer Klasse/Struct.
 struct FieldInfo { name: String, type_name: String, array_dims: Vec<i64>,
+                   /// Untergrenze je Dimension (`DIM a[1 TO 9]`), leer = alle 0.
+                   array_unten: Vec<i64>,
                    /// Ein STRUCT ... LAYOUT C (oder ein Feld davon): so viele
                    /// Bytes bekommt das Feld bei NEW als eigenen Puffer.
                    struct_bytes: usize }
@@ -898,7 +912,16 @@ impl Compiler {
     /// aber genau dort blind gemacht, wo ein Tippfehler am ehesten unbemerkt
     /// bleibt: `punkte` in einer SUB, das nur deshalb durchging, weil eine
     /// ANDERE SUB eine Variable dieses Namens hat.
+    /// Die gesammelten Warnungen zu festen Grenzen ausgeben (siehe
+    /// `Ctx::grenz_warnungen`).
+    fn grenz_warnungen_ausgeben(&mut self, ctx: &Ctx) {
+        for (z, n, t) in &ctx.grenz_warnungen {
+            if !ctx.grenz_frei.contains(n) { self.warnings.push((*z, t.clone())); }
+        }
+    }
+
     fn bereich_beenden(&mut self, alt: usize, neu: usize, ctx: &Ctx) {
+        self.grenz_warnungen_ausgeben(ctx);
         for n in ctx.local_slots.keys() {
             self.lokale_namen[neu].insert(n.to_lowercase());
         }
@@ -1064,6 +1087,7 @@ impl Compiler {
             Node::Const { name, type_name, value } =>
                 self.stmt_const(name, type_name.as_deref(), value),
             Node::Assign { name, value } => {
+                self.ctx.grenz_frei.insert(name.to_lowercase());
                 if let Node::Call { callee, .. } = &**value {
                     if let Node::Identifier(n) = &**callee { self.pruefe_sub_als_wert(n)?; }
                 }
@@ -1202,7 +1226,7 @@ impl Compiler {
             Node::IndexAssign { target, indices, value } => {
                 let ziel = Node::IndexAccess { target: target.clone(), indices: indices.clone() };
                 if let Some(o) = self.struct_ort(&ziel) { return self.struct_schreiben(o?, value); }
-                self.index_pruefen(indices);
+                self.index_pruefen(target, indices);
                 self.expr(target)?;
                 for ix in indices { self.expr(ix)?; }
                 // `c[i] = c[i] + e`: derselbe Code wie unten, nur ADD +
@@ -1283,7 +1307,10 @@ impl Compiler {
                 Ok(())
             }
             Node::With { var_name, target, body } => self.stmt_with(var_name, target, body),
-            Node::TupleAssign { targets, value } => self.stmt_tuple_assign(targets, value),
+            Node::TupleAssign { targets, value } => {
+                for t in targets { if let Node::Identifier(n) = t { self.ctx.grenz_frei.insert(n.to_lowercase()); } }
+                self.stmt_tuple_assign(targets, value)
+            }
             Node::DeclareLib { .. } => Err(
                 "DECLARE ... LIB gehoert auf die oberste Ebene des Programms, nicht in ein Unterprogramm oder einen Block".into()),
             Node::StructLayout { .. } => Err(
@@ -1575,7 +1602,33 @@ impl Compiler {
     /// ("Array-Index muss INTEGER sein"). Seit `/` immer FLOAT liefert
     /// (2026-09-24), ist `feld[n / 2]` genau so ein Fall -- vorher lief er,
     /// solange die Division aufging. Die Warnung findet ihn vor dem Lauf.
-    fn index_pruefen(&mut self, indices: &[Node]) {
+    fn index_pruefen(&mut self, target: &Node, indices: &[Node]) {
+        // Ein fester Index ausserhalb fester Grenzen (`tage[0]` bei
+        // `DIM tage[1 TO 31]`). Eine Warnung, kein Fehler: dazwischen kann das
+        // Feld ersetzt worden sein, auf einem Weg, den der Uebersetzer nicht
+        // sieht (BYREF, eine SUB).
+        if let Node::Identifier(name) = target {
+            if let Some(gr) = self.ctx.feste_grenzen.get(&name.to_lowercase()).cloned() {
+                if gr.len() == indices.len() {
+                    for (k, (ix, &(lo, hi))) in indices.iter().zip(gr.iter()).enumerate() {
+                        if let Some(crate::value::Value::Int(i)) = self.falten(ix) {
+                            if i < lo || i > hi {
+                                let text = if gr.len() > 1 {
+                                    format!("Index {} liegt ausserhalb [{}..{}] in Dimension {} von '{}' -- das bricht beim Laufen ab, solange das Feld so angelegt bleibt",
+                                            i, lo, hi, k + 1, name)
+                                } else {
+                                    format!("Index {} liegt ausserhalb [{}..{}] von '{}' -- das bricht beim Laufen ab, solange das Feld so angelegt bleibt",
+                                            i, lo, hi, name)
+                                };
+                                let zeile = self.ctx.cur_line;
+                                self.ctx.grenz_warnungen.push((zeile, name.to_lowercase(), text));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
         for ix in indices {
             if self.typ_von(ix) == Typ::Float {
                 let mit_teilung = matches!(ix, Node::BinaryOp { op, .. } if op == "/");
@@ -2247,6 +2300,10 @@ impl Compiler {
         // eine Bibliothek. Ohne Groesse (ARRAY OF Punkt) ein leerer Puffer.
         let elem = type_name.strip_prefix("array:").unwrap_or(if array_dims.is_some() { type_name } else { "" });
         if let Some(groesse) = self.lagen.get(elem).map(|l| l.groesse) {
+            if array_dims.iter().flatten().any(|d| matches!(d, Node::Bereich { .. })) {
+                return Err(format!("DIM {}: ein Feld von Structs liegt wie in C und zaehlt ab 0 -- [von TO bis] geht hier nicht, nur die Groesse: DIM {}[10]",
+                                   name, name));
+            }
             // Mehrere Dimensionen wie in C: die hinteren Groessen stehen beim
             // Uebersetzen fest, nur die erste darf erst zur Laufzeit kommen.
             let mut innen: Vec<u32> = Vec::new();
@@ -2288,23 +2345,56 @@ impl Compiler {
             if !self.known_elem(type_name) {
                 return Err(unknown_dim_type_msg(type_name));
             }
-            for de in dims { self.expr(de)?; }   // Dim-Werte auf den Stack
+            // Dim-Werte auf den Stack: je Groesse einer, je Bereich `von TO
+            // bis` zwei. Das vierte Argument sagt der VM, welche Dimension
+            // welche Form hat; ohne Bereich fehlt es -- dann sieht der
+            // Bytecode aus wie immer.
+            let mut bereich: Vec<u8> = Vec::with_capacity(dims.len());
+            for de in dims {
+                match de {
+                    Node::Bereich { von, bis } => { self.expr(von)?; self.expr(bis)?; bereich.push(1); }
+                    _ => { self.expr(de)?; bereich.push(0); }
+                }
+            }
+            let mit = bereich.iter().any(|&b| b == 1);
+            // Stehen alle Grenzen fest, merkt der Bereich sie sich fuer die
+            // Warnung bei festem Index.
+            let mut fest: Option<Vec<(i64, i64)>> = Some(Vec::new());
+            for de in dims {
+                let g = match de {
+                    Node::Bereich { von, bis } => match (self.falten(von), self.falten(bis)) {
+                        (Some(crate::value::Value::Int(lo)), Some(crate::value::Value::Int(hi))) => Some((lo, hi)),
+                        _ => None,
+                    },
+                    _ => match self.falten(de) {
+                        Some(crate::value::Value::Int(n)) if n >= 0 => Some((0, n - 1)),
+                        _ => None,
+                    },
+                };
+                match (g, fest.as_mut()) { (Some(g), Some(v)) => v.push(g), _ => fest = None }
+            }
+            match fest {
+                Some(v) => { self.ctx.feste_grenzen.insert(name.to_lowercase(), v); }
+                None => { self.ctx.feste_grenzen.remove(&name.to_lowercase()); }
+            }
+            let arg = |ziel: Value| if mit { json!([ziel, type_name, dims.len(), bereich]) }
+                                    else { json!([ziel, type_name, dims.len()]) };
             if self.ctx.is_main {
                 let name_idx = self.ctx.add_const(json!(name));
-                self.ctx.emit(oc::DECLARE_ARRAY_NAME, json!([name_idx, type_name, dims.len()]));
+                self.ctx.emit(oc::DECLARE_ARRAY_NAME, arg(json!(name_idx)));
                 self.bind_global(name, name_idx);
             } else if let Some(&slot) = self.ctx.local_slots.get(name) {
                 // Erneutes DIM (Schleifenrumpf): NEU anlegen wie im
                 // Hauptprogramm -- bis 2026.27 wurden die Groessen verworfen und
                 // das alte Feld behalten.
-                self.ctx.emit(oc::DECLARE_ARRAY_LOCAL, json!([slot, type_name, dims.len()]));
+                self.ctx.emit(oc::DECLARE_ARRAY_LOCAL, arg(json!(slot)));
             } else {
                 // Funktions-lokales Array (eigener Slot statt globaler Name).
                 let slot = self.ctx.local_types.len();
                 self.ctx.local_slots.insert(name.to_string(), slot);
                 self.ctx.local_types.push(format!("array:{}", type_name));
                 self.ctx.local_defaults.push(CVal::Nil);
-                self.ctx.emit(oc::DECLARE_ARRAY_LOCAL, json!([slot, type_name, dims.len()]));
+                self.ctx.emit(oc::DECLARE_ARRAY_LOCAL, arg(json!(slot)));
             }
             return Ok(());
         }
@@ -3196,7 +3286,7 @@ impl Compiler {
             Node::Call { callee, args } => self.expr_call(callee, args),
             Node::IndexAccess { target, indices } => {
                 if let Some(o) = self.struct_ort(e) { return self.struct_lesen(o?); }
-                self.index_pruefen(indices);
+                self.index_pruefen(target, indices);
                 self.expr(target)?;
                 for ix in indices { self.expr(ix)?; }
                 self.ctx.emit(oc::LOAD_INDEX, json!(indices.len()));
@@ -3248,6 +3338,9 @@ impl Compiler {
                 self.ctx.emit(oc::BUILD_TUPLE, json!(paare.len()));
                 self.ctx.emit(oc::CALL_BUILTIN, json!(["__dict_from_pairs", 1]));
                 Ok(())
+            }
+            Node::Bereich { .. } => {
+                Err("TO steht nur in den eckigen Klammern eines DIM: DIM tage[1 TO 31] AS INTEGER".to_string())
             }
             Node::IsTyp { wert, typ } => {
                 let t = typ.to_lowercase();
@@ -3418,6 +3511,14 @@ impl Compiler {
     }
 
     fn expr_call(&mut self, callee: &Node, args: &[Node]) -> CR {
+        // Ein Feld, das an einen Aufruf geht, kann dort wachsen oder schrumpfen.
+        for a in args {
+            let a = if let Node::NamedArg { value, .. } = a { &**value } else { a };
+            if let Node::Identifier(n) = a { self.ctx.grenz_frei.insert(n.to_lowercase()); }
+        }
+        if let Node::MemberAccess { target, .. } = callee {
+            if let Node::Identifier(n) = &**target { self.ctx.grenz_frei.insert(n.to_lowercase()); }
+        }
         if let Some(typ) = array_of_type_typ(callee, args) {
             let t = typ.to_lowercase();
             if matches!(t.as_str(), "nil" | "array" | "map") {
@@ -4492,10 +4593,16 @@ impl Compiler {
         }
         let mut klassen = Map::new();
         for (cname, ci) in classes {
-            let fields: Vec<Value> = ci.fields.iter().map(|f| json!({
-                "name": f.name, "type_name": f.type_name, "array_dims": f.array_dims,
-                "struct_bytes": f.struct_bytes,
-            })).collect();
+            let fields: Vec<Value> = ci.fields.iter().map(|f| {
+                let mut o = json!({
+                    "name": f.name, "type_name": f.type_name, "array_dims": f.array_dims,
+                    "struct_bytes": f.struct_bytes,
+                });
+                // Nur wenn es eine gibt -- so bleibt jedes .dhc ohne Untergrenze,
+                // wie es war.
+                if !f.array_unten.is_empty() { o["array_unten"] = json!(f.array_unten); }
+                o
+            }).collect();
             let mut props: Vec<String> = ci.property_set.iter().cloned().collect();
             props.sort();
             let mut methods = Map::new();
@@ -4524,7 +4631,7 @@ impl Compiler {
         for (cname, ci) in classes {
             let fields = ci.fields.iter().map(|f| crate::model::FieldDecl {
                 name: f.name.clone(), type_name: f.type_name.clone(), array_dims: f.array_dims.clone(),
-                struct_bytes: f.struct_bytes,
+                array_unten: f.array_unten.clone(), struct_bytes: f.struct_bytes,
             }).collect();
             let methods = ci.compiled.into_iter().map(|(n, m)| (n, m.zu_func())).collect();
             klassen.insert(cname, crate::model::ClassInfo {
@@ -5074,26 +5181,39 @@ impl Compiler {
                     }
                     let n: usize = dims.iter().map(|&k| k as usize).product();
                     let t = if array_dims.is_some() { struct_feldtyp_text(type_name, &dims[1..]) } else { type_name.clone() };
-                    field_infos.push(FieldInfo { name: fname.clone(), type_name: t, array_dims: vec![],
+                    field_infos.push(FieldInfo { name: fname.clone(), type_name: t, array_dims: vec![], array_unten: vec![],
                                                  struct_bytes: groesse * n });
                     continue;
                 }
-                let dims: Vec<i64> = match array_dims {
-                    None => vec![],
-                    Some(des) => {
-                        let mut v = vec![];
-                        for de in des {
-                            match de {
-                                Node::NumberLit(NumV::Int(i)) => v.push(*i),
-                                _ => return Err(format!(
-                                    "Array-Feld '{}' braucht konstante INTEGER-Groesse", fname)),
+                let mut dims: Vec<i64> = vec![];
+                let mut unten: Vec<i64> = vec![];
+                for de in array_dims.iter().flatten() {
+                    match de {
+                        Node::NumberLit(NumV::Int(i)) => { dims.push(*i); unten.push(0); }
+                        // `[1 TO 9]`: beide Grenzen muessen beim Uebersetzen
+                        // feststehen, wie die Groesse.
+                        Node::Bereich { von, bis } => {
+                            let (lo, hi) = match (self.falten(von), self.falten(bis)) {
+                                (Some(crate::value::Value::Int(lo)), Some(crate::value::Value::Int(hi))) => (lo, hi),
+                                _ => {
+                                    self.err_line = zeile;
+                                    return Err(format!("Array-Feld '{}' braucht konstante INTEGER-Grenzen", fname));
+                                }
+                            };
+                            if hi < lo - 1 {
+                                self.err_line = zeile;
+                                return Err(format!("Array-Feld '{}': die Obergrenze {} liegt unter der Untergrenze {}", fname, hi, lo));
                             }
+                            dims.push(hi - lo + 1);
+                            unten.push(lo);
                         }
-                        v
+                        _ => return Err(format!(
+                            "Array-Feld '{}' braucht konstante INTEGER-Groesse", fname)),
                     }
-                };
+                }
+                if unten.iter().all(|&u| u == 0) { unten.clear(); }
                 field_infos.push(FieldInfo { name: fname.clone(),
-                    type_name: type_name.clone(), array_dims: dims, struct_bytes: 0 });
+                    type_name: type_name.clone(), array_dims: dims, array_unten: unten, struct_bytes: 0 });
             }
         }
         let mut method_sigs = HashMap::new();
@@ -6384,6 +6504,9 @@ fn uebersetzen(ast: &Node, external_types: &std::collections::HashSet<String>,
         for (cd, _) in &cls_decls { c.emit_class_statics(cd)?; }
         for s in &main_owned { c.stmt(s)?; }
         c.ctx.emit(oc::HALT, Value::Null);
+        let haupt = std::mem::take(&mut c.ctx.grenz_warnungen);
+        let frei = std::mem::take(&mut c.ctx.grenz_frei);
+        for (z, n, t) in haupt { if !frei.contains(&n) { c.warnings.push((z, t)); } }
         collect_data(stmts, &mut data)?;
         Ok(())
     })();

@@ -43,7 +43,7 @@ Drachenhauch understands these forms from other BASICs the way you know them:
 | From other BASICs | In Drachenhauch |
 |---|---|
 | `a$ = "x"` without DIM | `DIM a$ AS STRING` — every variable needs DIM and a type |
-| `DIM a(10)` | `DIM a[10] AS INTEGER` — square brackets, index 0 to 9 |
+| `DIM a(10)` | `DIM a[10] AS INTEGER` — square brackets, index 0 to 9; with a lower bound of your own `DIM a[1 TO 10]` |
 | `DIM SHARED g` | not needed: whatever is declared with `DIM` at the top is visible to all SUBs |
 | `x%`, `wert!`, `d#` | no type characters — `DIM x AS INTEGER` |
 | `DOUBLE`, `SINGLE` | `FLOAT` (always 64 bits) |
@@ -52,7 +52,7 @@ Drachenhauch understands these forms from other BASICs the way you know them:
 | `STRING * 10` | strings have no fixed length — `LEFT$`/`PADR$` bring them to width |
 | `TYPE ... END TYPE` | `STRUCT ... END STRUCT`, fields with `DIM` |
 | `REDIM a(20)` | array without size + `ARRAY_PUSH`, or `DIM a[20] AS INTEGER` again |
-| `LBOUND` / `UBOUND` | `0` / `LEN(a) - 1` |
+| `LBOUND` / `UBOUND` | exist as well (`LBOUND(a [, dimension])`, dimension counts from 1) |
 | `GOTO`, `GOSUB`, line numbers | do not exist — loops (`WHILE`, `DO`, `FOR`) and `SUB` |
 | `ON ERROR GOTO` | `TRY ... CATCH meldung ... END TRY` |
 | `DEF FN q(x) = x * x` | `FUNCTION q(x AS INTEGER) AS INTEGER` … `RETURN x * x` |

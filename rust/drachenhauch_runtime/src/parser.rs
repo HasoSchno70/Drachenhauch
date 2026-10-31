@@ -603,6 +603,18 @@ impl Parser {
         if knoten.len() == 1 { Ok(knoten.pop().unwrap()) } else { Ok(Node::MultiDim { dims: knoten }) }
     }
 
+    /// Eine Dimension in den eckigen Klammern eines DIM: die Groesse
+    /// (`[10]`, Index 0 bis 9) oder ein Bereich mit eigener Untergrenze
+    /// (`[1 TO 31]`). `TO` steht in diesen Klammern sonst nirgends.
+    fn dim_grenze(&mut self) -> R<Node> {
+        let e = self.expression()?;
+        if self.matches(Tt::To) {
+            let bis = self.expression()?;
+            return Ok(Node::Bereich { von: Box::new(e), bis: Box::new(bis) });
+        }
+        Ok(e)
+    }
+
     /// Eine Gruppe einer DIM-Zeile: `name[, name ...] AS Typ [= Startwert]`.
     fn dim_gruppe(&mut self) -> R<(Vec<(String, Option<Vec<Node>>)>, String, Option<Node>)> {
         let mut decls: Vec<(String, Option<Vec<Node>>)> = Vec::new();
@@ -628,12 +640,13 @@ impl Parser {
             let name = sval(&self.expect(Tt::Ident, "Erwartet Variablenname nach DIM")?);
             if self.check(Tt::Lparen) {
                 return self.err(&format!(
-                    "Felder werden mit eckigen Klammern angelegt: DIM {}[10] AS INTEGER (Index 0 bis 9)", name));
+                    "Felder werden mit eckigen Klammern angelegt: DIM {}[10] AS INTEGER (Index 0 bis 9), mit eigener Untergrenze DIM {}[1 TO 10]",
+                    name, name));
             }
             let mut array_dims = None;
             if self.matches(Tt::Lbracket) {
-                let mut dims = vec![self.expression()?];
-                while self.matches(Tt::Comma) { dims.push(self.expression()?); }
+                let mut dims = vec![self.dim_grenze()?];
+                while self.matches(Tt::Comma) { dims.push(self.dim_grenze()?); }
                 self.expect(Tt::Rbracket, "Erwartet ']'")?;
                 array_dims = Some(dims);
             }

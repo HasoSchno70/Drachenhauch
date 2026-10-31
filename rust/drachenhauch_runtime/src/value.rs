@@ -488,6 +488,10 @@ pub struct DhArray {
     pub dims: Vec<i64>,
     pub strides: Vec<i64>,
     pub cells: Cells,
+    /// Untergrenze je Dimension (`DIM a[1 TO 31]`). LEER heisst: alle 0 --
+    /// so bleibt jedes Feld ohne eigene Grenze, was es war, und die schnellen
+    /// Wege (VM-Abkuerzung, Maschinencode) fragen nur `is_empty()`.
+    pub unten: Vec<i64>,
 }
 
 impl DhArray {
@@ -504,7 +508,18 @@ impl DhArray {
             "float" => Cells::Float(vec![0.0f64; total]),
             _ => Cells::Val((0..total).map(|_| default()).collect()),
         };
-        DhArray { element_type, dims, strides, cells }
+        DhArray { element_type, dims, strides, cells, unten: Vec::new() }
+    }
+
+    /// Dieselben Grenzen setzen; lauter Nullen bleiben ein leeres `unten`.
+    pub fn mit_unten(mut self, unten: Vec<i64>) -> Self {
+        self.unten = if unten.iter().all(|&u| u == 0) { Vec::new() } else { unten };
+        self
+    }
+
+    /// Untergrenze der Dimension `k` (ab 0 gezaehlt).
+    pub fn unten_von(&self, k: usize) -> i64 {
+        self.unten.get(k).copied().unwrap_or(0)
     }
 
     /// Flacher Index mit Bounds-Check (entspricht `_GBArray.flat_index`).
@@ -517,20 +532,25 @@ impl DhArray {
         }
         let mut flat = 0i64;
         for (k, &idx) in indices.iter().enumerate() {
-            if idx < 0 || idx >= self.dims[k] {
+            let lo = self.unten_von(k);
+            let rel = idx.wrapping_sub(lo);
+            if rel < 0 || rel >= self.dims[k] {
                 // Genau EINS zu weit ist fast immer die Zaehlung von 1 aus
                 // (oder `FOR i = 1 TO LEN(a)`). Der Satz steht nur dann da --
-                // bei Index 99 in einem Feld mit 3 Plaetzen hilft er nicht.
-                let ab_null = if idx == self.dims[k] {
+                // bei Index 99 in einem Feld mit 3 Plaetzen hilft er nicht,
+                // und bei einem Feld mit eigener Untergrenze waere er falsch.
+                let ab_null = if lo == 0 && idx == self.dims[k] {
                     format!(" -- Felder zaehlen ab 0: DIM a[{}] hat a[0] bis a[{}]",
                             self.dims[k], self.dims[k] - 1)
                 } else { String::new() };
+                // Die Dimension zaehlt ab 1, wie man sie liest: `a[x, y]`
+                // hat x in der ersten und y in der zweiten.
                 return Err(format!(
-                    "Index {} ausserhalb [0..{}] in Dimension {}{}",
-                    idx, self.dims[k] - 1, k, ab_null
+                    "Index {} ausserhalb [{}..{}] in Dimension {}{}",
+                    idx, lo, lo + self.dims[k] - 1, k + 1, ab_null
                 ));
             }
-            flat += idx * self.strides[k];
+            flat += rel * self.strides[k];
         }
         Ok(flat as usize)
     }
@@ -789,7 +809,11 @@ impl Value {
             Value::CompMarker => "<COMP-MARKER>".to_string(),
             Value::Array(a) => {
                 let a = a.borrow();
-                let shape = a.dims.iter().map(|d| d.to_string()).collect::<Vec<_>>().join(",");
+                // Mit eigener Untergrenze steht die Dimension wie im DIM da.
+                let shape = a.dims.iter().enumerate().map(|(k, d)| match a.unten.get(k) {
+                    Some(&lo) if lo != 0 => format!("{} TO {}", lo, lo + d - 1),
+                    _ => d.to_string(),
+                }).collect::<Vec<_>>().join(",");
                 format!("<ARRAY[{}] OF {}>", shape, a.element_type.to_uppercase())
             }
             Value::Map(m) => {

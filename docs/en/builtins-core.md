@@ -397,17 +397,19 @@ See also [Language reference → Arrays](sprache.md#arrays).
 | Function | Purpose |
 |---|---|
 | `LEN(arr)` → INTEGER | number of elements (1st dimension) |
+| `LBOUND(arr [, dimension])` → INTEGER | smallest index; dimension counts from 1, the first if omitted. 0, except with `DIM a[1 TO 31]` |
+| `UBOUND(arr [, dimension])` → INTEGER | largest index; for an empty array `LBOUND - 1` |
 | `DIMCOUNT(arr)` → INTEGER | number of dimensions |
 | `DIMSIZE(arr, n)` → INTEGER | size of the n-th dimension (0-based) |
 | `SORT(arr)`, `REVERSE(arr)` | sort / reverse a 1D array IN PLACE |
 | `SORT(arr, absteigend)` | sort descending with a BOOLEAN flag *(native runtime only)* |
 | `SORT(arr, comparator)` | sort with a FUNCREF comparator `cmp(a, b)` → INTEGER (<0/0/>0), stable. A bound method (`regel.cmp`) is allowed too *(native runtime only)* |
-| `ARRAY_INDEXOF(arr, v)` → INTEGER | first index of v, otherwise -1 |
-| `ARRAY_MAP(arr, funktion)` → ARRAY | new array with `funktion(x)` for each element, e.g. `ARRAY_MAP(a, FUNCTION(x) x * 2)` |
+| `ARRAY_INDEXOF(arr, v)` → INTEGER | first index of v, otherwise -1 (`LBOUND - 1` for an array with a lower bound of its own) |
+| `ARRAY_MAP(arr, funktion)` → ARRAY | new array with `funktion(x)` for each element, e.g. `ARRAY_MAP(a, FUNCTION(x) x * 2)`; keeps a lower bound of its own |
 | `ARRAY_FILTER(arr, funktion)` → ARRAY | new array with the elements for which `funktion(x)` returns TRUE (same element type) |
 | `ARRAY_OF_TYPE(arr, Typ)` → ARRAY OF Typ | new array with the elements that are `IS Typ`, in their order. `Typ` is a type name as on the right of `IS` (a class including its subclasses, or a value type such as `INTEGER`); the result fits an `ARRAY OF Typ` |
 | `ARRAY_REDUCE(arr, funktion, start)` | folds the array: `funktion(bisher, x)` for each element, starting with `start` |
-| `ARRAY_FIND(arr, funktion)` → INTEGER | index of the first element for which `funktion(x)` returns TRUE, otherwise -1 |
+| `ARRAY_FIND(arr, funktion)` → INTEGER | index of the first element for which `funktion(x)` returns TRUE, otherwise -1 (`LBOUND - 1` for an array with a lower bound of its own) |
 
 **Aggregates** (1D `ARRAY OF INTEGER`/`FLOAT`) and helpers:
 

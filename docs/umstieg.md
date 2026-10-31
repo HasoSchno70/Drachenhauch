@@ -43,7 +43,7 @@ Diese Formen aus anderen BASICs versteht Drachenhauch so, wie man sie kennt:
 | Aus anderen BASICs | In Drachenhauch |
 |---|---|
 | `a$ = "x"` ohne DIM | `DIM a$ AS STRING` — jede Variable braucht DIM und Typ |
-| `DIM a(10)` | `DIM a[10] AS INTEGER` — eckige Klammern, Index 0 bis 9 |
+| `DIM a(10)` | `DIM a[10] AS INTEGER` — eckige Klammern, Index 0 bis 9; mit eigener Untergrenze `DIM a[1 TO 10]` |
 | `DIM SHARED g` | nicht nötig: oben mit `DIM` Angelegtes sehen alle SUBs |
 | `x%`, `wert!`, `d#` | kein Typzeichen — `DIM x AS INTEGER` |
 | `DOUBLE`, `SINGLE` | `FLOAT` (immer 64 Bit) |
@@ -52,7 +52,7 @@ Diese Formen aus anderen BASICs versteht Drachenhauch so, wie man sie kennt:
 | `STRING * 10` | Texte haben keine feste Länge — `LEFT$`/`PADR$` bringen auf Breite |
 | `TYPE ... END TYPE` | `STRUCT ... END STRUCT`, Felder mit `DIM` |
 | `REDIM a(20)` | Feld ohne Größe + `ARRAY_PUSH`, oder `DIM a[20] AS INTEGER` neu |
-| `LBOUND` / `UBOUND` | `0` / `LEN(a) - 1` |
+| `LBOUND` / `UBOUND` | gibt es auch (`LBOUND(a [, dimension])`, Dimension ab 1) |
 | `GOTO`, `GOSUB`, Zeilennummern | gibt es nicht — Schleifen (`WHILE`, `DO`, `FOR`) und `SUB` |
 | `ON ERROR GOTO` | `TRY ... CATCH meldung ... END TRY` |
 | `DEF FN q(x) = x * x` | `FUNCTION q(x AS INTEGER) AS INTEGER` … `RETURN x * x` |

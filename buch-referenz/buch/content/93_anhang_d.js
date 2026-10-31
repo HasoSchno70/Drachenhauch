@@ -27,7 +27,7 @@ module.exports = (H) => {
     T([
       err("Variable 'x' nicht deklariert (DIM fehlt?)",
         "Die Variable wurde nie mit DIM angelegt – oder ihr Name ist vertippt. Lege sie mit DIM an, bevor du sie benutzt (Konstanten wie KEY_* oder Farbnamen sind dagegen immer verfügbar)."),
-      err("Index 5 ausserhalb [0..2] in Dimension 0",
+      err("Index 5 ausserhalb [0..2] in Dimension 1",
         "Du greifst auf einen Array-/String-Platz zu, den es nicht gibt. Gültig sind die Indizes 0 bis LEN(...) - 1. Schleifengrenzen und Bedingungen prüfen."),
       err("Zuweisung an global: Erwartet STRING, erhalten INTEGER",
         "Der zugewiesene Wert passt nicht zum deklarierten Typ der Variable. Wandle ihn um (STR$/VAL) oder deklariere die Variable mit dem richtigen Typ."),

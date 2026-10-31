@@ -94,7 +94,7 @@ Ein Startwert gilt fuer genau eine Variable -- DIM a AS INTEGER = 1, b AS INTEGE
 '{}' ist ein reserviertes Wort und kann kein Variablenname sein - waehle einen anderen Namen	'{}' is a reserved word and cannot be a variable name - choose another name
 DIM SHARED gibt es in Drachenhauch nicht -- was oben im Programm mit DIM angelegt ist, sehen alle SUBs und FUNCTIONs ohnehin	There is no DIM SHARED in Drachenhauch -- what is declared with DIM at the top of the program is visible to all SUBs and FUNCTIONs anyway
 Erwartet Variablenname nach DIM	Expected a variable name after DIM
-Felder werden mit eckigen Klammern angelegt: DIM {}[10] AS INTEGER (Index 0 bis 9)	Arrays are declared with square brackets: DIM {}[10] AS INTEGER (index 0 to 9)
+Felder werden mit eckigen Klammern angelegt: DIM {}[10] AS INTEGER (Index 0 bis 9), mit eigener Untergrenze DIM {}[1 TO 10]	Arrays are declared with square brackets: DIM {}[10] AS INTEGER (index 0 to 9), with a lower bound of your own DIM {}[1 TO 10]
 Erwartet AS nach Variablenname -- jede Variable braucht einen Typ: DIM {} AS {}{}	Expected AS after the variable name -- every variable needs a type: DIM {} AS {}{}
  (oder FLOAT, STRING, BOOLEAN)	 (or FLOAT, STRING, BOOLEAN)
 Erwartet AS nach Variablenname	Expected AS after the variable name
@@ -352,8 +352,6 @@ heisst in Drachenhauch RND() (0 bis unter 1) -- ganze Zahl 1..6: INT(RND() * 6) 
 heisst in Drachenhauch LEFT$(text, n) bzw. RIGHT$(text, n)	is called LEFT$(text, n) or RIGHT$(text, n) in Drachenhauch
 heisst in Drachenhauch RTRIM$(text) bzw. LTRIM$(text)	is called RTRIM$(text) or LTRIM$(text) in Drachenhauch
 heisst GUI_WINDOW(titel$, x, y, breite, hoehe)	is called GUI_WINDOW(title$, x, y, width, height)
-Felder beginnen immer bei 0 -- LBOUND ist also 0	Arrays always start at 0 -- so LBOUND is 0
-der letzte Index ist LEN(feld) - 1 (Felder beginnen bei 0)	the last index is LEN(array) - 1 (arrays start at 0)
 INT rundet ab (INT(-3.7) = -4); in Richtung 0: IIF(x < 0, -INT(-x), INT(x))	INT rounds down (INT(-3.7) = -4); toward 0: IIF(x < 0, -INT(-x), INT(x))
 INT(x) rundet ab; Richtung 0: IIF(x < 0, -INT(-x), INT(x))	INT(x) rounds down; toward 0: IIF(x < 0, -INT(-x), INT(x))
 Umwandeln: INT(x) oder ROUND(x) fuer Ganzzahlen, FLT(x) fuer Kommazahlen, VAL(text) aus Text	Converting: INT(x) or ROUND(x) for integers, FLT(x) for decimals, VAL(text) from text
@@ -428,12 +426,15 @@ Array-Index muss INTEGER sein, erhalten {}	Array index must be INTEGER, got {}
 String-Index muss INTEGER sein, erhalten {}	String index must be INTEGER, got {}
 Tupel-Index muss INTEGER sein, erhalten {}	Tuple index must be INTEGER, got {}
 Slice-Index muss INTEGER sein, erhalten {}	Slice index must be INTEGER, got {}
-Index {} ausserhalb [0..{}] in Dimension {}{}	Index {} outside [0..{}] in dimension {}{}
+Index {} ausserhalb [{}..{}] in Dimension {}{}	Index {} outside [{}..{}] in dimension {}{}
+Index {} liegt ausserhalb [{}..{}] in Dimension {} von '{}' -- das bricht beim Laufen ab, solange das Feld so angelegt bleibt	Index {} lies outside [{}..{}] in dimension {} of '{}' -- this aborts at run time as long as the array stays declared like this
+Index {} liegt ausserhalb [{}..{}] von '{}' -- das bricht beim Laufen ab, solange das Feld so angelegt bleibt	Index {} lies outside [{}..{}] of '{}' -- this aborts at run time as long as the array stays declared like this
 Felder zaehlen ab 0: DIM a[{}] hat a[0] bis a[{}]	arrays count from 0: DIM a[{}] has a[0] to a[{}]
 String-Index {} ausserhalb des Bereichs (Laenge {})	String index {} out of range (length {})
 Tupel-Index {} ausserhalb des Bereichs (Laenge {})	Tuple index {} out of range (length {})
 Array hat {} Dimension(en), erhalten {} Index/-e	The array has {} dimension(s), got {} index(es)
 {}: Index {} ausserhalb [0..{}]	{}: index {} outside [0..{}]
+{}: Index {} ausserhalb [{}..{}]	{}: index {} outside [{}..{}]
 MAP-Schluessel muss STRING sein, erhalten {}	MAP key must be STRING, got {}
 Schluessel '{}' nicht in der MAP -- vorher mit MAPHAS(m, "{}") fragen oder MAPGETOR(m, "{}", vorgabe) nehmen	Key '{}' is not in the MAP -- ask first with MAPHAS(m, "{}") or use MAPGETOR(m, "{}", default)
 Index-Zugriff auf NIL	Index access on NIL

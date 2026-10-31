@@ -267,6 +267,10 @@ struct FeldInfo {
     dims: u8,
     /// Ein Tupel (unveraenderlich, eine Dimension) statt eines Feldes.
     tupel: bool,
+    /// Ein Feld mit eigener Untergrenze (`DIM a[1 TO 9]`): die Beschreibung
+    /// traegt dann je Dimension die Untergrenze mit, und jeder Index wird um
+    /// sie verschoben. Felder ab 0 bekommen denselben Code wie vorher.
+    unten: bool,
 }
 
 impl FeldInfo {
@@ -282,20 +286,22 @@ impl FeldInfo {
 
 /// Ein Feld von Zahlen (INTEGER/FLOAT), ein Feld von Werten oder ein Tupel,
 /// dessen erstes Element eine Zahl, ein Wahrheitswert oder ein Objekt ist:
-/// (Element, Dimensionen, Tupel?). Alles andere bleibt der VM.
-fn feld_beschreiben(prog: &Program, v: &Value, klassen: &mut Vec<Klasse>) -> Option<(Elem, u8, bool)> {
+/// (Element, Dimensionen, Tupel?, eigene Untergrenze?). Alles andere bleibt
+/// der VM.
+fn feld_beschreiben(prog: &Program, v: &Value, klassen: &mut Vec<Klasse>) -> Option<(Elem, u8, bool, bool)> {
     match v {
         Value::Array(a) => {
             let a = a.borrow();
             if a.dims.is_empty() || a.dims.len() > 8 { return None; }
             let d = a.dims.len() as u8;
+            let unten = !a.unten.is_empty();
             match &a.cells {
-                crate::value::Cells::Int(_) => Some((Elem::I, d, false)),
-                crate::value::Cells::Float(_) => Some((Elem::F, d, false)),
-                crate::value::Cells::Val(w) => Some((Elem::Wert(elemente_art(prog, w, klassen)?), d, false)),
+                crate::value::Cells::Int(_) => Some((Elem::I, d, false, unten)),
+                crate::value::Cells::Float(_) => Some((Elem::F, d, false, unten)),
+                crate::value::Cells::Val(w) => Some((Elem::Wert(elemente_art(prog, w, klassen)?), d, false, unten)),
             }
         }
-        Value::Tuple(t) => Some((Elem::Wert(elemente_art(prog, t, klassen)?), 1, true)),
+        Value::Tuple(t) => Some((Elem::Wert(elemente_art(prog, t, klassen)?), 1, true, false)),
         _ => None,
     }
 }
@@ -308,7 +314,9 @@ fn feld_passt(v: &Value, fi: &FeldInfo) -> bool {
         (Value::Tuple(t), Elem::Wert(_)) => fi.tupel && !t.is_empty(),
         (Value::Array(a), e) => {
             let a = a.borrow();
-            !fi.tupel && a.dims.len() == fi.dims as usize && matches!((&a.cells, e),
+            // Mit und ohne Untergrenze ist anderer Code -- ein Feld, das
+            // inzwischen die andere Form hat, braucht einen neuen Bau.
+            !fi.tupel && a.dims.len() == fi.dims as usize && a.unten.is_empty() != fi.unten && matches!((&a.cells, e),
                 (crate::value::Cells::Int(_), Elem::I) | (crate::value::Cells::Float(_), Elem::F)
                 | (crate::value::Cells::Val(_), Elem::Wert(_)))
         }
@@ -677,8 +685,11 @@ extern "C" fn gfeld_lesen(k: *mut Kontext, g: u64, n: u64, i0: i64, i1: i64, i2:
             if a.dims.len() != n as usize { return None; }
             let mut off = 0i64;
             for j in 0..n as usize {
-                if idx[j] < 0 || idx[j] >= a.dims[j] { return None; }
-                off += idx[j] * a.strides[j];
+                // Ein Index ausserhalb (auch unter der Untergrenze) ist ein
+                // Fehler, den die VM selbst meldet.
+                let rel = idx[j].checked_sub(a.unten_von(j))?;
+                if rel < 0 || rel >= a.dims[j] { return None; }
+                off += rel * a.strides[j];
             }
             match (&a.cells, art) {
                 (crate::value::Cells::Int(x), 1) => x.get(off as usize).copied(),
@@ -1484,6 +1495,8 @@ fn globale_lesen(prog: &Program) -> Globale {
         match (ins.op, &ins.arg) {
             (op::DECLARE_ARRAY_NAME, Arg::List(l)) => {
                 let name = f.constants.get(l[0].as_usize()).map(|v| v.fmt()).unwrap_or_default();
+                // Die Untergrenze (viertes Argument) braucht hier nichts: der
+                // Helfer `gfeld_lesen` liest sie zur Laufzeit am Feld selbst.
                 offen = Some((name, elem(l[1].str()).map(|e| (e, l[2].as_usize().min(255) as u8))));
             }
             (op::DECLARE_NAME, Arg::List(l)) => {
@@ -1542,7 +1555,7 @@ struct Bereich {
     /// Die Felder in Locals (schon als `Art::Feld` im Startzustand) und je
     /// globalem Platz, ob er gerade ein Feld von Zahlen haelt.
     felder: Vec<FeldInfo>,
-    glob_felder: Vec<Option<(Elem, u8, bool)>>,
+    glob_felder: Vec<Option<(Elem, u8, bool, bool)>>,
     /// Objekte: die Klassen, `Self` (wenn der Bereich es benutzt), die
     /// globalen Plaetze, die er wie Locals fuehrt, und die Typen aller
     /// Locals samt dieser.
@@ -1853,10 +1866,10 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
             op::LOAD_GLOBAL_SLOT if glob.art.get(ins.arg.as_usize()).copied().flatten().is_none()
                 && bereich.map_or(false, |b| b.glob_felder.get(ins.arg.as_usize()).copied().flatten().is_some()) => {
                 let g = ins.arg.as_usize();
-                let (elem, dims, tupel) = bereich.unwrap().glob_felder[g].unwrap();
+                let (elem, dims, tupel, unten) = bereich.unwrap().glob_felder[g].unwrap();
                 let nr = match felder.iter().position(|x| x.quelle == Quelle::Global(g)) {
                     Some(nr) => nr,
-                    None => { felder.push(FeldInfo { quelle: Quelle::Global(g), elem, dims, tupel }); felder.len() - 1 }
+                    None => { felder.push(FeldInfo { quelle: Quelle::Global(g), elem, dims, tupel, unten }); felder.len() - 1 }
                 };
                 z.stapel.push(Art::Feld(nr as u16));
             }
@@ -1867,7 +1880,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 if dims == 0 || dims > 3 { return Err("globales Feld mit mehr als drei Dimensionen".into()); }
                 let nr = match felder.iter().position(|x| x.quelle == Quelle::Global(g)) {
                     Some(nr) => nr,
-                    None => { felder.push(FeldInfo { quelle: Quelle::Global(g), elem, dims, tupel: false }); felder.len() - 1 }
+                    None => { felder.push(FeldInfo { quelle: Quelle::Global(g), elem, dims, tupel: false, unten: false }); felder.len() - 1 }
                 };
                 z.stapel.push(Art::Feld(nr as u16));
             }
@@ -2382,7 +2395,9 @@ struct Bauer<'a, 'b> {
     befoerdert: HashMap<usize, (Variable, Art)>,
     /// Je Feld: Zeiger auf die Daten, Groessen, Schritte (beim Eintritt
     /// geladen -- die Felder aendern ihre Groesse im Bereich nicht).
-    felder: Vec<(CWert, Vec<CWert>, Vec<CWert>)>,
+    /// Je Feld: Zeiger, Groessen, Schritte und -- nur bei einem Feld mit
+    /// eigener Untergrenze -- die Untergrenzen.
+    felder: Vec<(CWert, Vec<CWert>, Vec<CWert>, Option<Vec<CWert>>)>,
     /// Aussteigen mitten im Bereich (siehe `Jit::schleife`): statt aufzugeben
     /// wird der Stand VOR dem Befehl zurueckgeschrieben, und die VM macht bei
     /// genau diesem Befehl weiter. `punkt` ist dieser Stand (Stelle, Stapel,
@@ -2462,12 +2477,16 @@ impl<'a, 'b> Bauer<'a, 'b> {
     }
     /// Adresse eines Feldelements, mit Pruefung jedes Index (sonst Ausstieg).
     fn feld_adresse(&mut self, nr: usize, idx: &[(CWert, Art)], breite: i64) -> CWert {
-        let (zeiger, dims, schritte) = self.felder[nr].clone();
+        let (zeiger, dims, schritte, unten) = self.felder[nr].clone();
         let mut flach: Option<CWert> = None;
         for (k, (i, _)) in idx.iter().enumerate() {
-            let aus = self.b.ins().icmp(IntCC::UnsignedGreaterThanOrEqual, *i, dims[k]);
+            // Mit eigener Untergrenze zaehlt der Index ab ihr; darunter wird
+            // er negativ und ist ohne Vorzeichen gross -- dieselbe Pruefung
+            // faengt beide Seiten.
+            let i: CWert = match &unten { Some(u) => self.b.ins().isub(*i, u[k]), None => *i };
+            let aus = self.b.ins().icmp(IntCC::UnsignedGreaterThanOrEqual, i, dims[k]);
             self.aussteigen_wenn(aus);
-            let teil = if idx.len() == 1 { *i } else { self.b.ins().imul(*i, schritte[k]) };
+            let teil = if idx.len() == 1 { i } else { self.b.ins().imul(i, schritte[k]) };
             flach = Some(match flach { None => teil, Some(f) => self.b.ins().iadd(f, teil) });
         }
         let off = if breite == 8 { self.b.ins().ishl_imm_s(flach.unwrap(), 3) } else { self.b.ins().imul_imm_s(flach.unwrap(), breite) };
@@ -2737,8 +2756,11 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                 let z = bau.b.ins().load(types::I64, MemFlagsData::trusted(), fz, off * 8);
                 let dims: Vec<CWert> = (0..d).map(|k| bau.b.ins().load(types::I64, MemFlagsData::trusted(), fz, (off + 1 + k) * 8)).collect();
                 let schr: Vec<CWert> = (0..d).map(|k| bau.b.ins().load(types::I64, MemFlagsData::trusted(), fz, (off + 1 + d + k) * 8)).collect();
-                bau.felder.push((z, dims, schr));
-                off += 1 + 2 * d;
+                let unten = if fi.unten {
+                    Some((0..d).map(|k| bau.b.ins().load(types::I64, MemFlagsData::trusted(), fz, (off + 1 + 2 * d + k) * 8)).collect())
+                } else { None };
+                bau.felder.push((z, dims, schr, unten));
+                off += 1 + (if fi.unten { 3 } else { 2 }) * d;
             }
         }
 
@@ -4128,6 +4150,7 @@ impl Jit {
                     besch.push(zeiger);
                     for &d in &ab.dims { besch.push(d as u64); }
                     for &st in &ab.strides { besch.push(st as u64); }
+                    if fi.unten { for k in 0..ab.dims.len() { besch.push(ab.unten_von(k) as u64); } }
                 }
                 Value::Tuple(t) => { besch.push(t.as_ptr() as u64); besch.push(t.len() as u64); besch.push(1); }
                 _ => return None,
@@ -4275,15 +4298,15 @@ impl Jit {
         let mut lokal: Vec<Option<Art>> = Vec::with_capacity(locals.len());
         for (i, v) in locals.iter().enumerate() {
             lokal.push(match feld_beschreiben(prog, v, &mut klassen) {
-                Some((elem, dims, tupel)) => {
-                    felder.push(FeldInfo { quelle: Quelle::Lokal(i), elem, dims, tupel });
+                Some((elem, dims, tupel, unten)) => {
+                    felder.push(FeldInfo { quelle: Quelle::Lokal(i), elem, dims, tupel, unten });
                     Some(Art::Feld((felder.len() - 1) as u16))
                 }
                 None => wert_art(v, &mut klassen),
             });
         }
         let globale_da = slots.iter().map(|x| x.is_some()).collect();
-        let glob_felder: Vec<Option<(Elem, u8, bool)>> = slots.iter()
+        let glob_felder: Vec<Option<(Elem, u8, bool, bool)>> = slots.iter()
             .map(|x| x.as_ref().and_then(|sl| feld_beschreiben(prog, &sl.borrow().value, &mut klassen))).collect();
         // Globale Plaetze ohne festen Zahlentyp (ein Objekt, eine Zahl in
         // einer Variable ohne Typ wie der Laufvariable von FOR EACH, oder noch

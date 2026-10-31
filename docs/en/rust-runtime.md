@@ -277,7 +277,7 @@ an error propagates, the **innermost** failing line is kept. `dhrt run` knows
 the source file name, so the message reads:
 
 ```
-Laufzeitfehler in spiel.dh:42: Index 10 ausserhalb [0..2] in Dimension 0
+Laufzeitfehler in spiel.dh:42: Index 10 ausserhalb [0..2] in Dimension 1
 ```
 
 `dhrt <datei.dhc>` without a label uses the `.dhc` path. Line `0` (untracked)
@@ -294,7 +294,7 @@ with IMPORT, `file` gives its path.
 With `DHRT_LANG=en` (also `en_US` etc.) dhrt writes its messages in English:
 
 ```
-Runtime error in game.dh:42: Index 10 outside [0..2] in dimension 0
+Runtime error in game.dh:42: Index 10 outside [0..2] in dimension 1
 game.dh:3: Parse error (12): Expected END IF, reached the end of the program
 ```
 

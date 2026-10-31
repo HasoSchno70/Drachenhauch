@@ -28,7 +28,7 @@ module.exports = (H) => [
 
   H.figure("kap26_1_reiter.png", "Drei Reiter, aber nur eine Seite ist zu sehen. Der Knopf unten gehört zu allen.", 440, 280),
 
-  H.warn("Das Array hat DREI Fächer, weil es drei Reiter sind — DIM reiter[3] und die Nummern 0, 1, 2. Beim Schreiben dieses Kapitels stand dort zuerst DIM reiter[2], und das Programm brach ab mit „Index 2 ausserhalb [0..1] in Dimension 0“. Es ist genau die Falle, vor der Kapitel 9 warnt, und sie erwischt einen auch dann noch, wenn man den Warnkasten selbst geschrieben hat.", "Die Zahl ist die Anzahl"),
+  H.warn("Das Array hat DREI Fächer, weil es drei Reiter sind — DIM reiter[3] und die Nummern 0, 1, 2. Beim Schreiben dieses Kapitels stand dort zuerst DIM reiter[2], und das Programm brach ab mit „Index 2 ausserhalb [0..1] in Dimension 1“. Es ist genau die Falle, vor der Kapitel 9 warnt, und sie erwischt einen auch dann noch, wenn man den Warnkasten selbst geschrieben hat.", "Die Zahl ist die Anzahl"),
 
   H.pmix(["Bedienelemente ohne ", ["GUI_SET_TAB", true], " sind auf allen Seiten sichtbar. Das ist genau richtig für den „Fertig“-Knopf: Er gehört zum Fenster, nicht zu einer Seite."]),
 

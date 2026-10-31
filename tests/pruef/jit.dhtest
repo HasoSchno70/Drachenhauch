@@ -1606,7 +1606,7 @@ PRINT s; " "; n
 --- umgebung
 DHRT_JIT=aus
 --- erwartet
-Index 10 ausserhalb [0..9] in Dimension 0 -- Felder zaehlen ab 0: DIM a[10] hat a[0] bis a[9]
+Index 10 ausserhalb [0..9] in Dimension 1 -- Felder zaehlen ab 0: DIM a[10] hat a[0] bis a[9]
 10 10
 
 === index ausserhalb mitten in der schleife (maschinencode)
@@ -1630,7 +1630,7 @@ PRINT s; " "; n
 DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
-Index 10 ausserhalb [0..9] in Dimension 0 -- Felder zaehlen ab 0: DIM a[10] hat a[0] bis a[9]
+Index 10 ausserhalb [0..9] in Dimension 1 -- Felder zaehlen ab 0: DIM a[10] hat a[0] bis a[9]
 10 10
 --- stderr
 jit: 0 Funktionen, 2 Schleifen, 1 Schleifenlaeufe
@@ -1771,7 +1771,7 @@ PRINT "nie"
 DHRT_JIT=aus
 --- erwartet
 --- fehler
-Index 5 ausserhalb [0..4] in Dimension 0 -- Felder zaehlen ab 0: DIM a[5] hat a[0] bis a[4]
+Index 5 ausserhalb [0..4] in Dimension 1 -- Felder zaehlen ab 0: DIM a[5] hat a[0] bis a[4]
 
 === fehler im feld ohne try (maschinencode)
 DIM a[5] AS INTEGER
@@ -1785,7 +1785,7 @@ DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
 --- fehler
-Index 5 ausserhalb [0..4] in Dimension 0 -- Felder zaehlen ab 0: DIM a[5] hat a[0] bis a[4]
+Index 5 ausserhalb [0..4] in Dimension 1 -- Felder zaehlen ab 0: DIM a[5] hat a[0] bis a[4]
 
 === feld in einer funktion
 FUNCTION summe(n AS INTEGER) AS INTEGER
@@ -2052,7 +2052,7 @@ PRINT zaehler; " "; a[9]; " "; i
 --- umgebung
 DHRT_JIT=aus
 --- erwartet
-Index 10 ausserhalb [0..9] in Dimension 0 -- Felder zaehlen ab 0: DIM a[10] hat a[0] bis a[9]
+Index 10 ausserhalb [0..9] in Dimension 1 -- Felder zaehlen ab 0: DIM a[10] hat a[0] bis a[9]
 22 20 10
 
 === globaler zaehler und aussteigen (maschinencode)
@@ -2072,7 +2072,7 @@ PRINT zaehler; " "; a[9]; " "; i
 DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
-Index 10 ausserhalb [0..9] in Dimension 0 -- Felder zaehlen ab 0: DIM a[10] hat a[0] bis a[9]
+Index 10 ausserhalb [0..9] in Dimension 1 -- Felder zaehlen ab 0: DIM a[10] hat a[0] bis a[9]
 22 20 10
 --- stderr
 jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
@@ -2094,7 +2094,7 @@ PRINT s; " "; i
 --- umgebung
 DHRT_JIT=aus
 --- erwartet
-Index 4 ausserhalb [0..3] in Dimension 0 -- Felder zaehlen ab 0: DIM a[4] hat a[0] bis a[3]
+Index 4 ausserhalb [0..3] in Dimension 1 -- Felder zaehlen ab 0: DIM a[4] hat a[0] bis a[3]
 40 4
 
 === feld liest am index ausserhalb (maschinencode)
@@ -2114,7 +2114,7 @@ PRINT s; " "; i
 DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
-Index 4 ausserhalb [0..3] in Dimension 0 -- Felder zaehlen ab 0: DIM a[4] hat a[0] bis a[3]
+Index 4 ausserhalb [0..3] in Dimension 1 -- Felder zaehlen ab 0: DIM a[4] hat a[0] bis a[3]
 40 4
 --- stderr
 jit: 0 Funktionen, 2 Schleifen, 1 Schleifenlaeufe
@@ -2139,7 +2139,7 @@ PRINT f(10); " "; f(3)
 --- umgebung
 DHRT_JIT=aus
 --- erwartet
-Index 5 ausserhalb [0..4] in Dimension 0 -- Felder zaehlen ab 0: DIM a[5] hat a[0] bis a[4]
+Index 5 ausserhalb [0..4] in Dimension 1 -- Felder zaehlen ab 0: DIM a[5] hat a[0] bis a[4]
 5062 4040
 
 === aussteigen in einer funktion mit locals (maschinencode)
@@ -2162,7 +2162,7 @@ PRINT f(10); " "; f(3)
 DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
-Index 5 ausserhalb [0..4] in Dimension 0 -- Felder zaehlen ab 0: DIM a[5] hat a[0] bis a[4]
+Index 5 ausserhalb [0..4] in Dimension 1 -- Felder zaehlen ab 0: DIM a[5] hat a[0] bis a[4]
 5062 4040
 --- stderr
 jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
@@ -5636,7 +5636,7 @@ PRINT i; " "; s
 --- umgebung
 DHRT_JIT=aus
 --- erwartet
-gefangen: Index 4 ausserhalb [0..3] in Dimension 0 -- Felder zaehlen ab 0: DIM a[4] hat a[0] bis a[3]
+gefangen: Index 4 ausserhalb [0..3] in Dimension 1 -- Felder zaehlen ab 0: DIM a[4] hat a[0] bis a[3]
 4 5
 
 === funktion liest ein globales feld ausserhalb (maschinencode)
@@ -5659,7 +5659,7 @@ PRINT i; " "; s
 DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
-gefangen: Index 4 ausserhalb [0..3] in Dimension 0 -- Felder zaehlen ab 0: DIM a[4] hat a[0] bis a[3]
+gefangen: Index 4 ausserhalb [0..3] in Dimension 1 -- Felder zaehlen ab 0: DIM a[4] hat a[0] bis a[3]
 4 5
 --- stderr
 jit: 1 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
@@ -6118,7 +6118,7 @@ PRINT i; " "; t
 --- umgebung
 DHRT_JIT=aus
 --- erwartet
-gefangen: Index 3 ausserhalb [0..2] in Dimension 0 -- Felder zaehlen ab 0: DIM a[3] hat a[0] bis a[2]
+gefangen: Index 3 ausserhalb [0..2] in Dimension 1 -- Felder zaehlen ab 0: DIM a[3] hat a[0] bis a[2]
 3 n0n1n2
 
 === funktion ueber die vm mit laufzeitfehler (maschinencode)
@@ -6141,7 +6141,7 @@ PRINT i; " "; t
 DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
-gefangen: Index 3 ausserhalb [0..2] in Dimension 0 -- Felder zaehlen ab 0: DIM a[3] hat a[0] bis a[2]
+gefangen: Index 3 ausserhalb [0..2] in Dimension 1 -- Felder zaehlen ab 0: DIM a[3] hat a[0] bis a[2]
 3 n0n1n2
 --- stderr
 jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe

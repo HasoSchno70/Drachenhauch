@@ -162,7 +162,7 @@ module.exports = (H) => [
 
   H.pmix(["Solange noch nichts gefunden wurde, ist ", ["best", true], " gleich ", ["-1", true], " — und ", ["faellig[-1]", true], " wäre ein Fehler. Trotzdem läuft die Zeile. Der Grund: ", ["OR", true], " ist kurzgeschlossen. Steht links schon TRUE, wird rechts gar nicht mehr hingesehen."]),
 
-  H.tip("Nachgemessen", "Dieselbe Zeile mit einem echten faellig[-1] daneben: Die IF-Zeile läuft ohne Murren durch, das direkte faellig[-1] bricht ab mit „Index -1 ausserhalb [0..2] in Dimension 0“. Bei AND gilt dasselbe umgekehrt: Steht links FALSE, wird rechts nicht ausgewertet. Man kann sich also darauf verlassen — und das erspart in Prüfungen wie „IF i < LEN(a) AND a[i] = x“ eine ganze Verschachtelung."),
+  H.tip("Nachgemessen", "Dieselbe Zeile mit einem echten faellig[-1] daneben: Die IF-Zeile läuft ohne Murren durch, das direkte faellig[-1] bricht ab mit „Index -1 ausserhalb [0..2] in Dimension 1“. Bei AND gilt dasselbe umgekehrt: Steht links FALSE, wird rechts nicht ausgewertet. Man kann sich also darauf verlassen — und das erspart in Prüfungen wie „IF i < LEN(a) AND a[i] = x“ eine ganze Verschachtelung."),
 
   H.h2("Wenn etwas nicht geht"),
 

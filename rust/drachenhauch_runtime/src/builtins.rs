@@ -1460,6 +1460,30 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 Ok(Value::Map(Rc::new(RefCell::new(m))))
             } else { err("__DICT_FROM_PAIRS erwartet TUPLE".to_string()) }
         }
+        // Kleinster und groesster Index einer Dimension (ab 1 gezaehlt, ohne
+        // Angabe die erste). Bei einem leeren Feld ist UBOUND = LBOUND - 1,
+        // also `FOR i = LBOUND(a) TO UBOUND(a)` laeuft dann nicht.
+        "lbound" | "ubound" => {
+            let gross = name.to_uppercase();
+            if a.is_empty() || a.len() > 2 {
+                return err(format!("{}: erwartet 1 oder 2 Argumente, erhalten {} -- Aufruf: {}(feld [, dimension])",
+                                   gross, a.len(), gross));
+            }
+            let Value::Array(arr) = &a[0] else {
+                return err(format!("{}: erwartet ARRAY, erhalten {}", gross, a[0].type_name()));
+            };
+            let arr = arr.borrow();
+            let k = if a.len() == 2 { need_int(&a[1], &gross)? } else { 1 };
+            let n_dims = arr.dims.len().max(1) as i64;
+            if k < 1 || k > n_dims {
+                return err(format!("{}: Dimension {} gibt es nicht -- das Feld hat {} (gezaehlt ab 1)",
+                                   gross, k, n_dims));
+            }
+            let k = (k - 1) as usize;
+            let lo = arr.unten_von(k);
+            let n = arr.dims.get(k).copied().unwrap_or(0);
+            Ok(Value::Int(if name == "lbound" { lo } else { lo + n - 1 }))
+        }
         "len" => {
             arity!(1);
             match &a[0] {
@@ -2141,10 +2165,13 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if let Value::Array(arr) = &a[0] {
                 let arr = arr.borrow();
                 if arr.dims.len() != 1 { return err("ARRAY_INDEXOF: nur 1D".to_string()); }
+                // Mit eigener Untergrenze zaehlt das Ergebnis wie der Index,
+                // und "nicht gefunden" ist LBOUND - 1 (bei 0 also wie immer -1).
+                let lo = arr.unten_von(0);
                 for (i, v) in arr.cells.iter().enumerate() {
-                    if value_eq(&v, &a[1]) { return Ok(Value::Int(i as i64)); }
+                    if value_eq(&v, &a[1]) { return Ok(Value::Int(lo + i as i64)); }
                 }
-                Ok(Value::Int(-1))
+                Ok(Value::Int(lo - 1))
             } else { err("ARRAY_INDEXOF erwartet ARRAY".to_string()) }
         }
         // --- Array-Aggregate (1D) ---
@@ -2212,6 +2239,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                     dims: arr.dims.clone(),
                     strides: arr.strides.clone(),
                     cells: arr.cells.clone(),
+                    unten: arr.unten.clone(),
                 };
                 Ok(Value::Array(Rc::new(RefCell::new(new))))
             } else { err("ARRAY_COPY erwartet ARRAY".to_string()) }
@@ -2249,8 +2277,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let idx = need_int(&a[1], "ARRAY_INSERT")?;
                 let v = coerce_elem(a[2].clone(), &b.element_type, "ARRAY_INSERT")?;
                 let n = b.cells.len() as i64;
-                if idx < 0 || idx > n { return err(format!("ARRAY_INSERT: Index {} ausserhalb [0..{}]", idx, n)); }
-                b.cells.insert(idx as usize, v);
+                let lo = b.unten_von(0);
+                let rel = idx.wrapping_sub(lo);
+                if rel < 0 || rel > n { return err(format!("ARRAY_INSERT: Index {} ausserhalb [{}..{}]", idx, lo, lo + n)); }
+                b.cells.insert(rel as usize, v);
                 Ok(Value::Int(laenge_setzen(&mut b)))
             } else { err("ARRAY_INSERT erwartet ARRAY".to_string()) }
         }
@@ -2261,8 +2291,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let idx = need_int(&a[1], "ARRAY_REMOVE_AT")?;
                 let mut b = arr.borrow_mut();
                 let n = b.cells.len() as i64;
-                if idx < 0 || idx >= n { return err(format!("ARRAY_REMOVE_AT: Index {} ausserhalb [0..{}]", idx, n - 1)); }
-                let v = b.cells.remove(idx as usize);
+                let lo = b.unten_von(0);
+                let rel = idx.wrapping_sub(lo);
+                if rel < 0 || rel >= n { return err(format!("ARRAY_REMOVE_AT: Index {} ausserhalb [{}..{}]", idx, lo, lo + n - 1)); }
+                let v = b.cells.remove(rel as usize);
                 laenge_setzen(&mut b);
                 Ok(v)
             } else { err("ARRAY_REMOVE_AT erwartet ARRAY".to_string()) }
