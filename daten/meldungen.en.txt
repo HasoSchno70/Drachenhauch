@@ -427,6 +427,8 @@ String-Index muss INTEGER sein, erhalten {}	String index must be INTEGER, got {}
 Tupel-Index muss INTEGER sein, erhalten {}	Tuple index must be INTEGER, got {}
 Slice-Index muss INTEGER sein, erhalten {}	Slice index must be INTEGER, got {}
 Index {} ausserhalb [{}..{}] in Dimension {}{}	Index {} outside [{}..{}] in dimension {}{}
+Index {} liegt ausserhalb [{}..{}] in Dimension {} von '{}' -- das bricht beim Laufen ab, solange das Feld so angelegt bleibt	Index {} lies outside [{}..{}] in dimension {} of '{}' -- this aborts at run time as long as the array stays declared like this
+Index {} liegt ausserhalb [{}..{}] von '{}' -- das bricht beim Laufen ab, solange das Feld so angelegt bleibt	Index {} lies outside [{}..{}] of '{}' -- this aborts at run time as long as the array stays declared like this
 Felder zaehlen ab 0: DIM a[{}] hat a[0] bis a[{}]	arrays count from 0: DIM a[{}] has a[0] to a[{}]
 String-Index {} ausserhalb des Bereichs (Laenge {})	String index {} out of range (length {})
 Tupel-Index {} ausserhalb des Bereichs (Laenge {})	Tuple index {} out of range (length {})

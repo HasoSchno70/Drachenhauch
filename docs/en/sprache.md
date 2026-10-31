@@ -1103,7 +1103,10 @@ when the array goes to a subroutine, is returned or is passed on with `b = a`.
 at 0. Commands that name or return a position (`ARRAY_INSERT`,
 `ARRAY_REMOVE_AT`, `ARRAY_INDEXOF`, `ARRAY_FIND`, slicing) count in the
 array's indices; "not found" is then `LBOUND(array) - 1` -- compare with
-`LBOUND`, not with 0. Arrays of `STRUCT … LAYOUT C` have no lower bound of
+`LBOUND`, not with 0. `ARRAY_MAP` and `ARRAY_COPY` keep the bounds,
+`PRINT array` shows them (`<ARRAY[1 TO 31] OF INTEGER>`), the debugger counts
+the slots from `LBOUND`, and `dhrt --check` warns about a fixed index outside
+fixed bounds (`tage[0]`). Arrays of `STRUCT … LAYOUT C` have no lower bound of
 their own (they are laid out as in C).
 
 Arrays of external types (e.g. SPRITE) are possible; the default value is `NIL`:

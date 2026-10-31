@@ -225,6 +225,17 @@ struct Ctx {
     /// also noch "offen" ist. Zwei DIM in getrennten Bloecken (zwei IF
     /// hintereinander) bleiben still: dort ist der Name nur Hilfsvariable.
     dim_pfade: HashMap<String, Vec<u32>>,
+    /// Felder dieses Bereichs, deren Grenzen beim Uebersetzen feststehen
+    /// (`DIM tage[1 TO 31]`, `DIM a[3]`): je Dimension (von, bis). Nur fuer
+    /// die Warnung bei festem Index.
+    feste_grenzen: HashMap<String, Vec<(i64, i64)>>,
+    /// Die Warnungen dazu (Zeile, Name, Text) -- ausgegeben erst am Ende des
+    /// Bereichs und nur fuer Felder, die nirgends darin ersetzt werden oder an
+    /// einen Aufruf gehen (REDIM, ARRAY_PUSH, eine SUB, die fuellt). Am Ende,
+    /// weil der Aufruf in einer Schleife auch HINTER dem Zugriff stehen kann.
+    grenz_warnungen: Vec<(u32, String, String)>,
+    /// Namen, deren Feld im Bereich ersetzt wird oder an einen Aufruf geht.
+    grenz_frei: std::collections::HashSet<String>,
     /// Die Anweisungen, in denen der Compiler gerade steht (je Node::Stmt
     /// eine eindeutige Nummer).
     stmt_pfad: Vec<u32>,
@@ -244,7 +255,8 @@ impl Ctx {
               try_stack: vec![],
               try_gesamt: 0,
               local_slots: HashMap::new(), local_types: vec![], local_defaults: vec![],
-              dim_types: HashMap::new(), dim_pfade: HashMap::new(), stmt_pfad: vec![],
+              dim_types: HashMap::new(), dim_pfade: HashMap::new(), feste_grenzen: HashMap::new(),
+              grenz_warnungen: vec![], grenz_frei: Default::default(), stmt_pfad: vec![],
               is_main: true, is_sub: true, current_class: None,
               return_type: String::new() }
     }
@@ -900,7 +912,16 @@ impl Compiler {
     /// aber genau dort blind gemacht, wo ein Tippfehler am ehesten unbemerkt
     /// bleibt: `punkte` in einer SUB, das nur deshalb durchging, weil eine
     /// ANDERE SUB eine Variable dieses Namens hat.
+    /// Die gesammelten Warnungen zu festen Grenzen ausgeben (siehe
+    /// `Ctx::grenz_warnungen`).
+    fn grenz_warnungen_ausgeben(&mut self, ctx: &Ctx) {
+        for (z, n, t) in &ctx.grenz_warnungen {
+            if !ctx.grenz_frei.contains(n) { self.warnings.push((*z, t.clone())); }
+        }
+    }
+
     fn bereich_beenden(&mut self, alt: usize, neu: usize, ctx: &Ctx) {
+        self.grenz_warnungen_ausgeben(ctx);
         for n in ctx.local_slots.keys() {
             self.lokale_namen[neu].insert(n.to_lowercase());
         }
@@ -1066,6 +1087,7 @@ impl Compiler {
             Node::Const { name, type_name, value } =>
                 self.stmt_const(name, type_name.as_deref(), value),
             Node::Assign { name, value } => {
+                self.ctx.grenz_frei.insert(name.to_lowercase());
                 if let Node::Call { callee, .. } = &**value {
                     if let Node::Identifier(n) = &**callee { self.pruefe_sub_als_wert(n)?; }
                 }
@@ -1204,7 +1226,7 @@ impl Compiler {
             Node::IndexAssign { target, indices, value } => {
                 let ziel = Node::IndexAccess { target: target.clone(), indices: indices.clone() };
                 if let Some(o) = self.struct_ort(&ziel) { return self.struct_schreiben(o?, value); }
-                self.index_pruefen(indices);
+                self.index_pruefen(target, indices);
                 self.expr(target)?;
                 for ix in indices { self.expr(ix)?; }
                 // `c[i] = c[i] + e`: derselbe Code wie unten, nur ADD +
@@ -1285,7 +1307,10 @@ impl Compiler {
                 Ok(())
             }
             Node::With { var_name, target, body } => self.stmt_with(var_name, target, body),
-            Node::TupleAssign { targets, value } => self.stmt_tuple_assign(targets, value),
+            Node::TupleAssign { targets, value } => {
+                for t in targets { if let Node::Identifier(n) = t { self.ctx.grenz_frei.insert(n.to_lowercase()); } }
+                self.stmt_tuple_assign(targets, value)
+            }
             Node::DeclareLib { .. } => Err(
                 "DECLARE ... LIB gehoert auf die oberste Ebene des Programms, nicht in ein Unterprogramm oder einen Block".into()),
             Node::StructLayout { .. } => Err(
@@ -1577,7 +1602,33 @@ impl Compiler {
     /// ("Array-Index muss INTEGER sein"). Seit `/` immer FLOAT liefert
     /// (2026-09-24), ist `feld[n / 2]` genau so ein Fall -- vorher lief er,
     /// solange die Division aufging. Die Warnung findet ihn vor dem Lauf.
-    fn index_pruefen(&mut self, indices: &[Node]) {
+    fn index_pruefen(&mut self, target: &Node, indices: &[Node]) {
+        // Ein fester Index ausserhalb fester Grenzen (`tage[0]` bei
+        // `DIM tage[1 TO 31]`). Eine Warnung, kein Fehler: dazwischen kann das
+        // Feld ersetzt worden sein, auf einem Weg, den der Uebersetzer nicht
+        // sieht (BYREF, eine SUB).
+        if let Node::Identifier(name) = target {
+            if let Some(gr) = self.ctx.feste_grenzen.get(&name.to_lowercase()).cloned() {
+                if gr.len() == indices.len() {
+                    for (k, (ix, &(lo, hi))) in indices.iter().zip(gr.iter()).enumerate() {
+                        if let Some(crate::value::Value::Int(i)) = self.falten(ix) {
+                            if i < lo || i > hi {
+                                let text = if gr.len() > 1 {
+                                    format!("Index {} liegt ausserhalb [{}..{}] in Dimension {} von '{}' -- das bricht beim Laufen ab, solange das Feld so angelegt bleibt",
+                                            i, lo, hi, k + 1, name)
+                                } else {
+                                    format!("Index {} liegt ausserhalb [{}..{}] von '{}' -- das bricht beim Laufen ab, solange das Feld so angelegt bleibt",
+                                            i, lo, hi, name)
+                                };
+                                let zeile = self.ctx.cur_line;
+                                self.ctx.grenz_warnungen.push((zeile, name.to_lowercase(), text));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
         for ix in indices {
             if self.typ_von(ix) == Typ::Float {
                 let mit_teilung = matches!(ix, Node::BinaryOp { op, .. } if op == "/");
@@ -2306,6 +2357,26 @@ impl Compiler {
                 }
             }
             let mit = bereich.iter().any(|&b| b == 1);
+            // Stehen alle Grenzen fest, merkt der Bereich sie sich fuer die
+            // Warnung bei festem Index.
+            let mut fest: Option<Vec<(i64, i64)>> = Some(Vec::new());
+            for de in dims {
+                let g = match de {
+                    Node::Bereich { von, bis } => match (self.falten(von), self.falten(bis)) {
+                        (Some(crate::value::Value::Int(lo)), Some(crate::value::Value::Int(hi))) => Some((lo, hi)),
+                        _ => None,
+                    },
+                    _ => match self.falten(de) {
+                        Some(crate::value::Value::Int(n)) if n >= 0 => Some((0, n - 1)),
+                        _ => None,
+                    },
+                };
+                match (g, fest.as_mut()) { (Some(g), Some(v)) => v.push(g), _ => fest = None }
+            }
+            match fest {
+                Some(v) => { self.ctx.feste_grenzen.insert(name.to_lowercase(), v); }
+                None => { self.ctx.feste_grenzen.remove(&name.to_lowercase()); }
+            }
             let arg = |ziel: Value| if mit { json!([ziel, type_name, dims.len(), bereich]) }
                                     else { json!([ziel, type_name, dims.len()]) };
             if self.ctx.is_main {
@@ -3213,7 +3284,7 @@ impl Compiler {
             Node::Call { callee, args } => self.expr_call(callee, args),
             Node::IndexAccess { target, indices } => {
                 if let Some(o) = self.struct_ort(e) { return self.struct_lesen(o?); }
-                self.index_pruefen(indices);
+                self.index_pruefen(target, indices);
                 self.expr(target)?;
                 for ix in indices { self.expr(ix)?; }
                 self.ctx.emit(oc::LOAD_INDEX, json!(indices.len()));
@@ -3438,6 +3509,14 @@ impl Compiler {
     }
 
     fn expr_call(&mut self, callee: &Node, args: &[Node]) -> CR {
+        // Ein Feld, das an einen Aufruf geht, kann dort wachsen oder schrumpfen.
+        for a in args {
+            let a = if let Node::NamedArg { value, .. } = a { &**value } else { a };
+            if let Node::Identifier(n) = a { self.ctx.grenz_frei.insert(n.to_lowercase()); }
+        }
+        if let Node::MemberAccess { target, .. } = callee {
+            if let Node::Identifier(n) = &**target { self.ctx.grenz_frei.insert(n.to_lowercase()); }
+        }
         if let Some(typ) = array_of_type_typ(callee, args) {
             let t = typ.to_lowercase();
             if matches!(t.as_str(), "nil" | "array" | "map") {
@@ -6423,6 +6502,9 @@ fn uebersetzen(ast: &Node, external_types: &std::collections::HashSet<String>,
         for (cd, _) in &cls_decls { c.emit_class_statics(cd)?; }
         for s in &main_owned { c.stmt(s)?; }
         c.ctx.emit(oc::HALT, Value::Null);
+        let haupt = std::mem::take(&mut c.ctx.grenz_warnungen);
+        let frei = std::mem::take(&mut c.ctx.grenz_frei);
+        for (z, n, t) in haupt { if !frei.contains(&n) { c.warnings.push((z, t)); } }
         collect_data(stmts, &mut data)?;
         Ok(())
     })();

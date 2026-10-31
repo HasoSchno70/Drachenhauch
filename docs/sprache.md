@@ -1106,7 +1106,10 @@ wird. `a = [1, 2, 3]` dagegen setzt ein neues Feld ein, und das beginnt bei 0.
 Befehle, die eine Stelle nennen oder liefern (`ARRAY_INSERT`,
 `ARRAY_REMOVE_AT`, `ARRAY_INDEXOF`, `ARRAY_FIND`, Slicing), zählen in den
 Indizes des Feldes; „nicht gefunden" ist dann `LBOUND(feld) - 1` -- vergleiche
-mit `LBOUND`, nicht mit 0. Für Felder von `STRUCT … LAYOUT C` gibt es keine
+mit `LBOUND`, nicht mit 0. `ARRAY_MAP` und `ARRAY_COPY` behalten die Grenzen,
+`PRINT feld` zeigt sie (`<ARRAY[1 TO 31] OF INTEGER>`), der Debugger zählt die
+Plätze ab `LBOUND`, und `dhrt --check` warnt bei einem festen Index außerhalb
+fester Grenzen (`tage[0]`). Für Felder von `STRUCT … LAYOUT C` gibt es keine
 eigene Untergrenze (sie liegen wie in C).
 
 Array von externen Typen (z.B. SPRITE) ist möglich; Default-Wert ist `NIL`:

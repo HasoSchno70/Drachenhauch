@@ -147,6 +147,13 @@ found” (not `0`). Consistent with the language's 0-index line, but a trap for
 people coming from other BASICs. (Changing it would break everything — better just document it
 clearly.)
 
+### D4. The lower bound belongs to the array, not to the variable
+`DIM tage[1 TO 31]` creates an array starting at 1 (since 2026-10-31). The
+bounds travel with the array -- as a parameter, a return value, via
+`b = a` --, but `tage = [1, 2, 3]` puts a **new** array in, and that one starts
+at 0. When looking for a position, compare with `LBOUND`: `ARRAY_INDEXOF`
+returns `LBOUND - 1` for "not found", so `-1` as always for an array from 0.
+
 ---
 
 ## E — Smaller inconsistencies

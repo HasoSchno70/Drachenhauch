@@ -809,7 +809,11 @@ impl Value {
             Value::CompMarker => "<COMP-MARKER>".to_string(),
             Value::Array(a) => {
                 let a = a.borrow();
-                let shape = a.dims.iter().map(|d| d.to_string()).collect::<Vec<_>>().join(",");
+                // Mit eigener Untergrenze steht die Dimension wie im DIM da.
+                let shape = a.dims.iter().enumerate().map(|(k, d)| match a.unten.get(k) {
+                    Some(&lo) if lo != 0 => format!("{} TO {}", lo, lo + d - 1),
+                    _ => d.to_string(),
+                }).collect::<Vec<_>>().join(",");
                 format!("<ARRAY[{}] OF {}>", shape, a.element_type.to_uppercase())
             }
             Value::Map(m) => {

@@ -522,3 +522,147 @@ PRINT TRIM$(lauf$(p))
 {"format":"dhc","version":1,"n_globals":2,"global_names":["a","k"],"main":{"name":"__main__","n_params":0,"n_required":0,"is_variadic":false,"is_sub":true,"is_main":true,"is_coroutine":false,"return_type":"","param_defaults":[],"param_names":[],"param_byref":[],"param_default_is_expr":[],"local_types":[],"local_defaults":[],"local_names":[],"constants":[3,"a",2,7,"k",null,"w",1,4],"code":[[1,0],[92,[1,"integer",1]],[122,[0,1]],[111,0],[1,2],[1,3],[91,1],[113,[1,4,4,5]],[80,["k",0,true]],[112,1],[111,1],[83,6],[1,7],[1,8],[91,1],[111,0],[1,2],[90,1],[111,1],[83,6],[1,7],[90,1],[20,null],[111,0],[51,["len",1]],[111,0],[51,["lbound",1]],[70,[3,true,",",","]],[99,null]],"lines":[4,4,4,5,5,5,5,6,7,7,8,8,8,8,8,9,9,9,9,9,9,9,9,9,9,9,9,9,9]},"functions":{},"classes":{"k":{"name":"k","parent_name":"","is_struct":false,"fields":[{"name":"w","type_name":"integer","array_dims":[2],"struct_bytes":0}],"methods":{},"properties":[]}},"data":[]}
 --- erwartet
 11 3 0
+
+=== array_map behaelt die grenzen, array_filter beginnt bei 0
+DIM a[1 TO 3] AS INTEGER
+a[1] = 1 : a[2] = 2 : a[3] = 3
+DIM b AS ARRAY OF INTEGER
+b = ARRAY_MAP(a, FUNCTION(x) x * 10)
+PRINT LBOUND(b), UBOUND(b), b[1], b[3]
+DIM c AS ARRAY OF INTEGER
+c = ARRAY_FILTER(a, FUNCTION(x) x > 1)
+PRINT LBOUND(c), c[0]
+PRINT a
+DIM f[-1 TO 1, 4] AS STRING
+PRINT f
+DIM n[3] AS INTEGER
+PRINT n
+--- erwartet
+1 3 10 30
+0 2
+<ARRAY[1 TO 3] OF INTEGER>
+<ARRAY[-1 TO 1,4] OF STRING>
+<ARRAY[3] OF INTEGER>
+
+=== der debugger nennt die indizes ab der untergrenze
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[5]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM h AS INTEGER : h = ersteMit("paused", 5)
+DIM k AS JSON_HANDLE : k = JSON_PARSE(ereignisse[h])
+' Die Globalen kommen in keiner festen Reihenfolge -- sortiert ausgeben.
+DIM zeilen AS ARRAY OF STRING
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(k, "globals") - 1
+    DIM p AS STRING : p = "globals." + STR$(i)
+    DIM z AS STRING : z = JSON_GET_STRING(k, p + ".name") + " " + JSON_GET_STRING(k, p + ".value")
+    IF JSON_HAS(k, p + ".children") THEN
+        DIM j AS INTEGER
+        FOR j = 0 TO JSON_LEN(k, p + ".children") - 1
+            z = z + " " + JSON_GET_STRING(k, p + ".children." + STR$(j) + ".name") + "=" + JSON_GET_STRING(k, p + ".children." + STR$(j) + ".value")
+        NEXT
+    END IF
+    ARRAY_PUSH(zeilen, z)
+NEXT
+SORT(zeilen)
+FOR i = 0 TO LEN(zeilen) - 1 : PRINT zeilen[i] : NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM tage[1 TO 3] AS INTEGER
+tage[1] = 10 : tage[3] = 30
+DIM f[-1 TO 0, 1 TO 2] AS INTEGER
+f[-1, 1] = 5 : f[0, 2] = 6
+PRINT tage[1]
+
+--- erwartet
+f <ARRAY[-1 TO 0,1 TO 2] OF INTEGER> [-1, 1]=5 [-1, 2]=0 [0, 1]=0 [0, 2]=6
+tage <ARRAY[1 TO 3] OF INTEGER> [1]=10 [2]=0 [3]=30
+
+=== check warnt bei festem index ausserhalb fester grenzen
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{" + CHR$(34) + "w" + CHR$(34) + ":" + lauf$(PROCESS_START("dhrt", "--check", CWD$() + "/w.dh")) + "}")
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "w") - 1
+    PRINT JSON_GET_INT(h, "w." + STR$(i) + ".line"); ": "; JSON_GET_STRING(h, "w." + STR$(i) + ".message")
+NEXT
+--- datei w.dh
+CONST N = 31
+DIM tage[1 TO N] AS INTEGER
+DIM f[-2 TO 2, 5] AS INTEGER
+tage[0] = 1
+PRINT tage[N], f[0, 5], f[-3, 0]
+DIM a[3] AS INTEGER
+PRINT a[3]
+SUB s()
+    DIM b[1 TO 2] AS STRING
+    PRINT b[0]
+END SUB
+
+--- erwartet
+10: Index 0 liegt ausserhalb [1..2] von 'b' -- das bricht beim Laufen ab, solange das Feld so angelegt bleibt
+4: Index 0 liegt ausserhalb [1..31] von 'tage' -- das bricht beim Laufen ab, solange das Feld so angelegt bleibt
+5: Index 5 liegt ausserhalb [0..4] in Dimension 2 von 'f' -- das bricht beim Laufen ab, solange das Feld so angelegt bleibt
+5: Index -3 liegt ausserhalb [-2..2] in Dimension 1 von 'f' -- das bricht beim Laufen ab, solange das Feld so angelegt bleibt
+7: Index 3 liegt ausserhalb [0..2] von 'a' -- das bricht beim Laufen ab, solange das Feld so angelegt bleibt
+
+=== check schweigt, wenn das feld ersetzt wird oder an einen aufruf geht
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+PRINT TRIM$(lauf$(PROCESS_START("dhrt", "--check", CWD$() + "/w.dh")))
+--- datei w.dh
+SUB fuellen(z AS ARRAY OF INTEGER)
+    ARRAY_PUSH(z, 1)
+END SUB
+DIM a[0] AS INTEGER
+DIM b[0] AS INTEGER
+DIM c[2] AS INTEGER
+DIM d[0] AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 2
+    IF LEN(a) > 0 THEN PRINT a[0]
+    ARRAY_PUSH(a, i)
+    IF LEN(b) > 0 THEN PRINT b[0]
+    fuellen(b)
+    IF LEN(c) > 2 THEN PRINT c[2]
+    c = [1, 2, 3]
+    IF LEN(d) > 0 THEN PRINT d[0]
+    d.push(1)
+NEXT
+
+--- erwartet
+[]

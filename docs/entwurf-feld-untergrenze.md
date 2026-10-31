@@ -244,5 +244,17 @@ entschieden:
 * Prueft `tests/pruef/feld_untergrenze.dhtest` (20 Faelle, VM und
   Maschinencode mit derselben Erwartung, ein .dhc von 2026.38). Gegenprobe:
   ohne den Abzug in `flat_index` fallen 12 der 20.
-* Offen fuer Stufe 2: `ARRAY_MAP` mit Grenzen, Debugger-Anzeige ab `LBOUND`,
-  `--check`-Warnung bei festem Index ausserhalb, Maschinencode Stufe 2.
+
+**Stufe 2 (selber Tag):** `ARRAY_MAP` behaelt die Untergrenze; `PRINT feld`
+zeigt `<ARRAY[1 TO 31] OF INTEGER>`; der Debugger nennt die Kinder eines
+Feldes ab `LBOUND` (`[1]`, `[-1, 1]`). `dhrt --check` warnt bei einem festen
+Index ausserhalb fester Grenzen (auch bei Feldern ab 0: `DIM a[3]` + `a[3]`).
+Die Warnung sammelt der Bereich und gibt sie erst an seinem Ende aus -- nur
+fuer Felder, die darin nirgends ersetzt werden (Zuweisung, Tupel) und nie an
+einen Aufruf gehen (REDIM, ARRAY_PUSH, eine SUB, `a.push`): erst so blieben
+die zwei Fehlalarme im Einstiegsbuch (`REDIM`, ein Feld, das eine SUB fuellt)
+weg, auch wenn der Aufruf in einer Schleife hinter dem Zugriff steht. Ueber
+die 553 `.dh` des Repos: keine Meldung. Drei Verfaelschungen (Debugger,
+ARRAY_MAP, die Freigabe-Regel) fallen je in ihrem Fall.
+
+Offen: Maschinencode Stufe 2 (Untergrenze in die Beschreibung, mit Messung).

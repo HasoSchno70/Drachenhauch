@@ -147,6 +147,13 @@ gefunden" (nicht `0`). Konsistent mit der 0-Index-Linie der Sprache, aber für
 BASIC-Umsteiger eine Falle. (Ändern würde alles brechen — eher nur klar
 dokumentieren.)
 
+### D4. Die Untergrenze gehört zum Feld, nicht zur Variable
+`DIM tage[1 TO 31]` legt ein Feld ab 1 an (seit 2026-10-31). Die Grenzen reisen
+mit dem Feld -- als Parameter, Rückgabe, über `b = a` --, aber
+`tage = [1, 2, 3]` setzt ein **neues** Feld ein, und das beginnt bei 0. Wer
+eine Stelle sucht, vergleicht mit `LBOUND`: `ARRAY_INDEXOF` liefert bei „nicht
+gefunden" `LBOUND - 1`, bei einem Feld ab 0 also wie immer `-1`.
+
 ---
 
 ## E — Kleinere Inkonsistenzen

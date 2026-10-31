@@ -30,7 +30,7 @@
   "ARRAY_FIND": "Index des ersten Elements, für das funktion(x) TRUE liefert, sonst -1 (bei einem Feld mit eigener Untergrenze LBOUND - 1)",
   "ARRAY_INDEXOF": "erster Index von v, sonst -1 (bei einem Feld mit eigener Untergrenze LBOUND - 1)",
   "ARRAY_INSERT": "an Index idx (0..len) einfügen; neue Länge",
-  "ARRAY_MAP": "neues Feld mit funktion(x) je Element, z.B. ARRAY_MAP(a, FUNCTION(x) x * 2)",
+  "ARRAY_MAP": "neues Feld mit funktion(x) je Element, z.B. ARRAY_MAP(a, FUNCTION(x) x * 2); behält eine eigene Untergrenze",
   "ARRAY_MAX": "kleinstes / größtes Element",
   "ARRAY_MIN": "kleinstes / größtes Element",
   "ARRAY_OF_TYPE": "neues Feld mit den Elementen, die IS Typ sind, in ihrer Reihenfolge. Typ ist ein Typname wie rechts von IS (Klasse samt Unterklassen, oder ein Werttyp wie INTEGER); das Ergebnis passt an ein ARRAY OF Typ",

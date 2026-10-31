@@ -30,7 +30,7 @@
   "ARRAY_FIND": "index of the first element for which funktion(x) returns TRUE, otherwise -1 (LBOUND - 1 for an array with a lower bound of its own)",
   "ARRAY_INDEXOF": "first index of v, otherwise -1 (LBOUND - 1 for an array with a lower bound of its own)",
   "ARRAY_INSERT": "insert at index idx (0..len); new length",
-  "ARRAY_MAP": "new array with funktion(x) for each element, e.g. ARRAY_MAP(a, FUNCTION(x) x * 2)",
+  "ARRAY_MAP": "new array with funktion(x) for each element, e.g. ARRAY_MAP(a, FUNCTION(x) x * 2); keeps a lower bound of its own",
   "ARRAY_MAX": "smallest / largest element",
   "ARRAY_MIN": "smallest / largest element",
   "ARRAY_OF_TYPE": "new array with the elements that are IS Typ, in their order. Typ is a type name as on the right of IS (a class including its subclasses, or a value type such as INTEGER); the result fits an ARRAY OF Typ",

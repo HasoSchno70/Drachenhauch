@@ -1607,8 +1607,13 @@ gefunden = `LBOUND - 1`), Slicing (Ergebnis ab 0), `ARRAY_COPY` behaelt die
 Grenzen. **Regel fuer neue Feldbefehle:** wer einen Index entgegennimmt oder
 liefert, rechnet ueber `unten_von(k)`, sonst zaehlt er bei solchen Feldern
 still falsch. Der Maschinencode lehnt Felder mit Untergrenze ab (Stufe 1).
-Nicht fuer Felder von `STRUCT ... LAYOUT C`. Tests
-`tests/pruef/feld_untergrenze.dhtest` (20).
+Nicht fuer Felder von `STRUCT ... LAYOUT C`. **Stufe 2:** `ARRAY_MAP`
+behaelt die Grenzen, `PRINT` zeigt `<ARRAY[1 TO 31] OF ...>`, der Debugger
+zaehlt Kinder ab `LBOUND`, `--check` warnt bei festem Index ausserhalb fester
+Grenzen (`Ctx::feste_grenzen`; gesammelt in `grenz_warnungen` und erst am
+Ende des Bereichs ausgegeben, nur wenn das Feld dort nie ersetzt wird und
+nie an einen Aufruf geht -- `grenz_frei`). Tests
+`tests/pruef/feld_untergrenze.dhtest` (24).
 
 ## Index und Feld auf dem Ergebnis eines Aufrufs (2026-10-09)
 

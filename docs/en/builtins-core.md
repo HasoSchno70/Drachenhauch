@@ -405,7 +405,7 @@ See also [Language reference → Arrays](sprache.md#arrays).
 | `SORT(arr, absteigend)` | sort descending with a BOOLEAN flag *(native runtime only)* |
 | `SORT(arr, comparator)` | sort with a FUNCREF comparator `cmp(a, b)` → INTEGER (<0/0/>0), stable. A bound method (`regel.cmp`) is allowed too *(native runtime only)* |
 | `ARRAY_INDEXOF(arr, v)` → INTEGER | first index of v, otherwise -1 (`LBOUND - 1` for an array with a lower bound of its own) |
-| `ARRAY_MAP(arr, funktion)` → ARRAY | new array with `funktion(x)` for each element, e.g. `ARRAY_MAP(a, FUNCTION(x) x * 2)` |
+| `ARRAY_MAP(arr, funktion)` → ARRAY | new array with `funktion(x)` for each element, e.g. `ARRAY_MAP(a, FUNCTION(x) x * 2)`; keeps a lower bound of its own |
 | `ARRAY_FILTER(arr, funktion)` → ARRAY | new array with the elements for which `funktion(x)` returns TRUE (same element type) |
 | `ARRAY_OF_TYPE(arr, Typ)` → ARRAY OF Typ | new array with the elements that are `IS Typ`, in their order. `Typ` is a type name as on the right of `IS` (a class including its subclasses, or a value type such as `INTEGER`); the result fits an `ARRAY OF Typ` |
 | `ARRAY_REDUCE(arr, funktion, start)` | folds the array: `funktion(bisher, x)` for each element, starting with `start` |

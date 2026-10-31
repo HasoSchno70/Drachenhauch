@@ -2334,9 +2334,13 @@ impl<'p> Vm<'p> {
                 let a = rc.borrow();
                 gesamt = a.cells.len();
                 for i in 0..gesamt.min(JE_EBENE) {
-                    let name = if a.dims.len() <= 1 { format!("[{}]", i) } else {
+                    // Die Indizes so, wie das Programm sie schreibt -- bei
+                    // `DIM tage[1 TO 31]` also ab [1].
+                    let name = if a.dims.len() <= 1 { format!("[{}]", i as i64 + a.unten_von(0)) } else {
                         let mut rest = i as i64;
-                        let teile: Vec<String> = a.strides.iter().map(|&s| { let q = rest / s.max(1); rest %= s.max(1); q.to_string() }).collect();
+                        let teile: Vec<String> = a.strides.iter().enumerate().map(|(k, &s)| {
+                            let q = rest / s.max(1); rest %= s.max(1); (q + a.unten_von(k)).to_string()
+                        }).collect();
                         format!("[{}]", teile.join(", "))
                     };
                     paare.push((name, a.cells.get(i)));
@@ -3276,7 +3280,11 @@ impl<'p> Vm<'p> {
             "array_map" => {
                 let mut aus = Vec::with_capacity(werte.len());
                 for v in werte { aus.push(self.rueckruf_exec(&cb, f, &empf, vec![v])?); }
-                Ok(array_literal(aus))
+                // Dieselbe Form wie das Feld: Platz i des Ergebnisses gehoert zu
+                // Platz i des Feldes, also auch dieselbe Untergrenze.
+                let neu = array_literal(aus);
+                if let Value::Array(n) = &neu { n.borrow_mut().unten = arr.borrow().unten.clone(); }
+                Ok(neu)
             }
             "array_filter" => {
                 let mut aus = Vec::new();
