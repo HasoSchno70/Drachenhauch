@@ -163,6 +163,9 @@ SCREEN(1280, 800, "Drachenhauch", 1)
 ' LOGISCHEN Punkten, SCREENWIDTH und die Maus liefern Bildschirm-Pixel --
 ' was beides vergleicht, geht ueber diese Helfer.
 DIM uiMassstab AS FLOAT : uiMassstab = 1.0
+' Was in der ide.json steht (0 = wie das System) -- nicht der wirksame
+' Wert: der kommt erst beim naechsten Start zur Geltung.
+DIM massEinst AS FLOAT : massEinst = 0.0
 FUNCTION schirmB() AS INTEGER
     RETURN INT(SCREENWIDTH() / uiMassstab)
 END FUNCTION
@@ -1148,6 +1151,7 @@ DIM massWunsch AS FLOAT : massWunsch = 0.0
 IF JSON_HAS(konfig, "massstab") THEN
     IF JSON_TYPE(konfig, "massstab") = "number" THEN massWunsch = JSON_GET_FLOAT(konfig, "massstab") ELSE konfigFalsch("massstab")
 END IF
+massEinst = massWunsch
 IF massWunsch <= 0.0 THEN massWunsch = INT(WINDOW_DPI_X() * 4.0 + 0.5) / 4.0
 massWunsch = MAX(0.5, MIN(4.0, massWunsch))
 IF ABS(massWunsch - 1.0) > 0.01 THEN
@@ -2043,6 +2047,13 @@ DIM cbBaumHaken AS GUI_WIDGET : cbBaumHaken = GUI_CHECKBOX(winEinst, tr$("Kästc
 DIM cbWasser AS GUI_WIDGET : cbWasser = GUI_CHECKBOX(winEinst, tr$("Schriftzug schwach hinter dem Code"), 400, 244, TRUE)
 DIM lblUi AS GUI_WIDGET : lblUi = GUI_LABEL(winEinst, tr$("Schrift der Oberfläche"), 400, 290)
 DIM spUi AS GUI_WIDGET : spUi = GUI_SPINNER(winEinst, 600, 286, 90, 12, 22, 18)
+' Der Massstab gilt erst beim naechsten Start -- GUI_SCALE muss vor dem
+' ersten Fenster kommen, und alles Bestehende umzurechnen ginge nur ungefaehr.
+DIM MASS_STUFEN AS ARRAY OF FLOAT : MASS_STUFEN = [0.0, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0]
+DIM lblMass AS GUI_WIDGET : lblMass = GUI_LABEL(winEinst, tr$("Größe der Oberfläche"), 400, 326)
+DIM ddMass AS GUI_WIDGET : ddMass = GUI_DROPDOWN(winEinst, 600, 322, 160, 28, [tr$("Wie das System"), "100 %", "125 %", "150 %", "175 %", "200 %", "250 %", "300 %"])
+DIM lblMassHinweis AS GUI_WIDGET : lblMassHinweis = GUI_LABEL(winEinst, "", 400, 358)
+DIM massWahlStand AS INTEGER : massWahlStand = 0
 DIM lblSchrift AS GUI_WIDGET : lblSchrift = GUI_LABEL(winEinst, tr$("Schriftgröße"), 16, 290)
 DIM spSchrift AS GUI_WIDGET : spSchrift = GUI_SPINNER(winEinst, 200, 286, 90, 10, 32, 16)
 DIM lblListen AS GUI_WIDGET : lblListen = GUI_LABEL(winEinst, tr$("Schrift der Listen"), 16, 326)
@@ -2653,6 +2664,7 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "glanz", glanzAn)
     JSON_SET_BOOL(konfig, "wasserzeichen", wasserzeichenAn)
     JSON_SET_INT(konfig, "ui_schrift", uiGroesse)
+    JSON_SET_FLOAT(konfig, "massstab", massEinst)
     JSON_SET_BOOL(konfig, "baum_haken", baumHakenAn)
     JSON_SET_BOOL(konfig, "format_sichern", formatSichernAn)
     JSON_SET_BOOL(konfig, "umbau_vorschau", vorschauAn)
@@ -3347,6 +3359,30 @@ SUB vorspannAuswahlFuellen()
     vorspannWahlStand = wahl
 END SUB
 
+' Die Stufe der Klappliste, die einem Massstab am naechsten liegt (0 =
+' "wie das System"). Ein krummer Wert von Hand faellt auf die naechste.
+FUNCTION massStufe(m AS FLOAT) AS INTEGER
+    IF m <= 0.0 THEN RETURN 0
+    DIM best AS INTEGER : best = 1
+    DIM k AS INTEGER
+    FOR k = 2 TO LEN(MASS_STUFEN) - 1
+        IF ABS(MASS_STUFEN[k] - m) < ABS(MASS_STUFEN[best] - m) THEN best = k
+    NEXT
+    RETURN best
+END FUNCTION
+
+FUNCTION prozent$(m AS FLOAT) AS STRING
+    RETURN STR$(INT(m * 100.0 + 0.5)) + " %"
+END FUNCTION
+
+SUB massHinweisSetzen()
+    DIM t AS STRING : t = tr$("Jetzt: ") + prozent$(uiMassstab)
+    DIM soll AS FLOAT : soll = massEinst
+    IF soll <= 0.0 THEN soll = MAX(0.5, MIN(4.0, INT(WINDOW_DPI_X() * 4.0 + 0.5) / 4.0))
+    IF ABS(soll - uiMassstab) > 0.01 THEN t = t + tr$(" -- nach dem Neustart: ") + prozent$(soll)
+    GUI_SET_TEXT(lblMassHinweis, t)
+END SUB
+
 SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbHell, hell)
     GUI_SET_CHECKED(cbUmbruch, umbruchAn)
@@ -3364,6 +3400,9 @@ SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbBaumHaken, baumHakenAn)
     GUI_SET_CHECKED(cbWasser, wasserzeichenAn)
     GUI_SET_VALUE(spUi, uiGroesse)
+    massWahlStand = massStufe(massEinst)
+    GUI_DROPDOWN_SET_SELECTED(ddMass, massWahlStand)
+    massHinweisSetzen()
     vorspannAuswahlFuellen()
     GUI_SET_VALUE(spSchrift, codeGroesse)
     GUI_SET_VALUE(spListen, listenGroesse)
@@ -3426,6 +3465,13 @@ SUB einstellungenNachziehen()
     IF INT(GUI_VALUE(spUi)) <> uiGroesse THEN
         uiSchrift(INT(GUI_VALUE(spUi)))
         konfigSichern()
+    END IF
+    IF GUI_DROPDOWN_SELECTED(ddMass) <> massWahlStand AND GUI_DROPDOWN_SELECTED(ddMass) >= 0 THEN
+        massWahlStand = GUI_DROPDOWN_SELECTED(ddMass)
+        massEinst = MASS_STUFEN[massWahlStand]
+        konfigSichern()
+        massHinweisSetzen()
+        protokoll("massstab " + FORMAT$(massEinst, "%.2f"))
     END IF
     IF GUI_CHECKED(cbGlanz) <> glanzAn THEN
         glanzAn = GUI_CHECKED(cbGlanz)
