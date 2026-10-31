@@ -48,7 +48,7 @@ module.exports = (H) => [
     'PRINT summe',
   ]),
   H.code(["60"], { out: true }),
-  H.note("Ein leeres Array-Literal [] ist nicht erlaubt – ohne Werte ließe sich der Typ nicht erkennen. Für ein leeres Array, das du erst nach und nach füllst, nimmst du DIM name[0] AS Typ (siehe „Arrays, die wachsen und schrumpfen“ weiter unten). Und Vorsicht: [x FOR x IN …] mit dem Schlüsselwort FOR ist KEIN Array-Literal, sondern eine „Comprehension“ – ein anderes Werkzeug, das du in einem späteren Kapitel kennenlernst."),
+  H.note("Auch das leere Array-Literal [] ist erlaubt. Weist du es einer Variablen vom Typ ARRAY OF … zu, bestimmt die Variable den Typ – so leerst du ein Array, um es neu zu füllen. Ein mit DIM name AS ARRAY OF Typ angelegtes Array ist ohnehin schon leer und wächst mit ARRAY_PUSH (siehe „Arrays, die wachsen und schrumpfen“ weiter unten). Und Vorsicht: [x FOR x IN …] mit dem Schlüsselwort FOR ist KEIN Array-Literal, sondern eine „Comprehension“ – ein anderes Werkzeug, das du in einem späteren Kapitel kennenlernst."),
 
   H.h2("Wie viele Fächer? LEN"),
   H.p("LEN sagt dir, wie viele Elemente ein Array hat. Das brauchst du ständig – vor allem, um mit einer Schleife sicher über alle Fächer zu laufen. Weil die Indizes bei 0 beginnen, läuft die Schleife von 0 bis LEN minus 1."),
