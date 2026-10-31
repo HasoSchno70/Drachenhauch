@@ -153,7 +153,7 @@ kacheln
 TRUE TRUE TRUE
 GUI_IMAGE_MODE: 'schief' ist kein Modus -- strecken, einpassen, fuellen, mitte oder kacheln
 GUI_TREE_ICON: ungueltige Knoten-id 7
-GUI_PROGRESS_SET: unbekannter Schluessel 'farbe' -- erwartet unbestimmt
+GUI_PROGRESS_SET: unbekannter Schluessel 'farbe' -- erwartet unbestimmt oder kreis
 gezeichnet
 
 === panel rollt und klemmt

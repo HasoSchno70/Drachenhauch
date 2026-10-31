@@ -1528,7 +1528,7 @@ GUI_ON_ENTER: nur ein Textfeld (GUI_TEXTINPUT) meldet Enter	GUI_ON_ENTER: only a
 {}: ungueltiges Fenster-Handle {}	{}: invalid window handle {}
 {}: ungueltiges Widget-Handle {}	{}: invalid widget handle {}
 {}: nur ein Knopf (GUI_BUTTON) kann Standard- oder Abbrechen-Knopf sein	{}: only a button (GUI_BUTTON) can be the default or cancel button
-GUI_LAYOUT: '{}' ist keine Art -- zeile, spalte oder raster:N	GUI_LAYOUT: '{}' is not a kind -- zeile, spalte or raster:N
+GUI_LAYOUT: '{}' ist keine Art -- zeile, spalte, fluss oder raster:N	GUI_LAYOUT: '{}' is not a kind -- zeile, spalte, fluss or raster:N
 {}: das Widget ist kein Layout (GUI_LAYOUT)	{}: the widget is not a layout (GUI_LAYOUT)
 GUI_LAYOUT_ADD: ein Layout kann sich nicht selbst aufnehmen	GUI_LAYOUT_ADD: a layout cannot contain itself
 GUI_LAYOUT_ADD: das Widget ist ein Behaelter, in dem dieses Layout schon steckt	GUI_LAYOUT_ADD: the widget is a container this layout is already in

@@ -11,7 +11,8 @@ GTK 3 und sagt, was noch fehlt, in welcher Reihenfolge und wie es sich
 bauen ließe. **Paket 1 ist gebaut** (2026-10-31, `gui_ueber.rs`, Handbuch
 `docs/module-gui.md` Abschnitte „Popover, Toast und Infoleiste“ und
 „Suchfeld, Sinnbilder, Vorschläge“), **Paket 4 in der ersten Stufe** ebenso
-(2026-10-31, `gui_stil.rs`, Abschnitt „Stildatei“); Paket 2, Paket 3 und die
+(2026-10-31, `gui_stil.rs`, Abschnitt „Stildatei“), **Paket 2** ebenso
+(2026-10-31, `gui_bausteine.rs`, Abschnitt „Bausteine“); Paket 3 und die
 weiteren Stufen von Paket 4 noch nicht.
 
 ## Gemessen statt vermutet: große Tabellen sind keine Lücke
@@ -52,7 +53,14 @@ IDE baut sich Popover und Suchfelder heute aus Fenstern und Textfeldern
 selbst. Alles in diesem Paket setzt auf Vorhandenes auf: obere Schicht,
 Übergänge, Popup der Klappliste, Knopfarten.
 
-### Paket 2: Bausteine, die eine Anwendung erwartet
+### Paket 2: Bausteine, die eine Anwendung erwartet (gebaut)
+
+Anders als hier geplant heißt der Kreisel `GUI_BUSY` (`GUI_SPINNER` ist
+schon das Zahlenfeld) und ist ein Fortschritt, keine neue Widget-Art -- so
+braucht der Form-Designer keinen neuen Eintrag. Eine markierbare
+Beschriftung wird nicht gekürzt. Dazu kamen `GUI_DATE_UNMARK`,
+`GUI_DATE_MARKED`, `GUI_LABEL_SELECTION$` und der Ring für einen Kreisel
+mit Wert.
 
 | GTK 3 | in der gui | Vorschlag |
 |---|---|---|

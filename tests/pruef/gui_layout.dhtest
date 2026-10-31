@@ -264,8 +264,8 @@ DHRT_FRAMES=1
 GUI_LAYOUT_ADD: das Widget ist ein Behaelter, in dem dieses Layout schon steckt
 GUI_LAYOUT_ADD: ein Layout kann sich nicht selbst aufnehmen
 GUI_LAYOUT_ADD: das Widget gehoert zu einem anderen Fenster
-GUI_LAYOUT: 'kreis' ist keine Art -- zeile, spalte oder raster:N
-GUI_LAYOUT_SET: unbekannter Schluessel 'farbe' -- abstand, rand, ausrichtung, dehnen, rahmen
+GUI_LAYOUT: 'kreis' ist keine Art -- zeile, spalte, fluss oder raster:N
+GUI_LAYOUT_SET: unbekannter Schluessel 'farbe' -- abstand, rand, ausrichtung, dehnen, rahmen, auswahl
 
 === ein behaelter ist luft fuer klicks
 ' GUI_HIT_TEST ueber einem Behaelter liefert das Kind darunter -- oder

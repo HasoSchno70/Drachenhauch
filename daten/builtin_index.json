@@ -3249,6 +3249,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_BUSY",
+   "kind": "core",
+   "signature": "GUI_BUSY(win, x, y, d)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_BUTTON",
    "kind": "core",
    "signature": "GUI_BUTTON(win, text, x, y, w, h)",
@@ -3387,6 +3393,48 @@
    "module": "gui"
   },
   {
+   "name": "GUI_DATE_CLEAR_MARKS",
+   "kind": "core",
+   "signature": "GUI_DATE_CLEAR_MARKS(dp)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DATE_MARK",
+   "kind": "core",
+   "signature": "GUI_DATE_MARK(dp, datum$ [, farbe])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DATE_MARKED",
+   "kind": "core",
+   "signature": "GUI_DATE_MARKED(dp, datum$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DATE_UNMARK",
+   "kind": "core",
+   "signature": "GUI_DATE_UNMARK(dp, datum$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_FONT_DIALOG",
+   "kind": "core",
+   "signature": "GUI_FONT_DIALOG(titel$ [, groesse])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_FONT_DIALOG_PATH$",
+   "kind": "core",
+   "signature": "GUI_FONT_DIALOG_PATH$(dlg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_FONT_DIALOG_SIZE",
+   "kind": "core",
+   "signature": "GUI_FONT_DIALOG_SIZE(dlg)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_GET_COLOR",
    "kind": "core",
    "signature": "GUI_GET_COLOR(wdg, rolle$)",
@@ -3441,6 +3489,36 @@
    "module": "gui"
   },
   {
+   "name": "GUI_LABEL_SELECTION$",
+   "kind": "core",
+   "signature": "GUI_LABEL_SELECTION$(lbl)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LABEL_SET",
+   "kind": "core",
+   "signature": "GUI_LABEL_SET(lbl, key$, wert)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LAYOUT_SELECT",
+   "kind": "core",
+   "signature": "GUI_LAYOUT_SELECT(layout, wdg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LAYOUT_SELECTED",
+   "kind": "core",
+   "signature": "GUI_LAYOUT_SELECTED(layout)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_MNEMONICS",
+   "kind": "core",
+   "signature": "GUI_MNEMONICS(an)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_POPOVER",
    "kind": "core",
    "signature": "GUI_POPOVER(anker, b, h [, seite$])",
@@ -3480,6 +3558,30 @@
    "name": "GUI_SET_NAME",
    "kind": "core",
    "signature": "GUI_SET_NAME(wdg, name$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SIZE_GROUP",
+   "kind": "core",
+   "signature": "GUI_SIZE_GROUP(wdg, gruppe$ [, art$])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SLIDER_CLEAR_MARKS",
+   "kind": "core",
+   "signature": "GUI_SLIDER_CLEAR_MARKS(sl)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SLIDER_MARK",
+   "kind": "core",
+   "signature": "GUI_SLIDER_MARK(sl, wert [, text$])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SLIDER_SET",
+   "kind": "core",
+   "signature": "GUI_SLIDER_SET(sl, key$, wert)",
    "module": "gui"
   },
   {

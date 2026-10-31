@@ -1,0 +1,612 @@
+' Bausteine (gui_bausteine.rs, docs/entwurf-gui-wie-gtk.md Paket 2):
+' Fliesslayout mit Auswahl, Alt-Buchstaben, Beschriftung kuerzen und
+' markieren, Reglermarken, Kreisel, Kalendermarken, Groessengruppen,
+' Schriftwahl. Format: docs/werkzeuge.md.
+'
+' Tasten in den Aufnahmen: 342 Alt, 341 Strg, 83 S, 82 R, 78 N, 67 C,
+' 262 rechts, 257 Enter, 256 ESC. Die Fenster sind randlos bei (0, 0).
+
+=== das fliesslayout bricht um und folgt seiner breite
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM l AS GUI_WIDGET : l = GUI_LAYOUT(w, "fluss", 10, 10, 300, 200)
+DIM b[5] AS GUI_WIDGET
+DIM i AS INTEGER
+FOR i = 0 TO 4
+    b[i] = GUI_BUTTON(w, "K" + STR$(i), 0, 0, 100, 30)
+    GUI_LAYOUT_ADD(l, b[i])
+NEXT
+GUI_UPDATE()
+DIM s AS STRING
+FOR i = 0 TO 4
+    s = s + STR$(GUI_GET_X(b[i])) + "/" + STR$(GUI_GET_Y(b[i])) + " "
+NEXT
+PRINT TRIM$(s)
+GUI_SET_BOUNDS(l, 10, 10, 400, 200)
+GUI_UPDATE()
+s = ""
+FOR i = 0 TO 4
+    s = s + STR$(GUI_GET_X(b[i])) + "/" + STR$(GUI_GET_Y(b[i])) + " "
+NEXT
+PRINT TRIM$(s)
+--- erwartet
+10/10 116/10 10/46 116/46 10/82
+10/10 116/10 222/10 10/46 116/46
+
+=== im fliesslayout waehlt ein klick ein kind
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM l AS GUI_WIDGET : l = GUI_LAYOUT(w, "fluss", 10, 10, 380, 200)
+GUI_LAYOUT_SET(l, "auswahl", 1)
+DIM a AS GUI_WIDGET : a = GUI_BUTTON(w, "A", 0, 0, 100, 60)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "B", 0, 0, 100, 60)
+GUI_LAYOUT_ADD(l, a)
+GUI_LAYOUT_ADD(l, b)
+DIM fremd AS GUI_WIDGET : fremd = GUI_BUTTON(w, "C", 10, 250, 50, 20)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+DIM meldungen AS INTEGER : meldungen = 0
+DIM bk AS BOOLEAN : bk = FALSE
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF GUI_CLICKED(l) THEN meldungen = meldungen + 1
+    IF GUI_CLICKED(b) THEN bk = TRUE
+    IF n = 20 THEN PRINT "gewaehlt b " + STR$(GUI_LAYOUT_SELECTED(l) = b) + " geklickt b " + STR$(bk) + " meldungen " + STR$(meldungen)
+    IF n = 21 THEN
+        GUI_LAYOUT_SELECT(l, a)
+        PRINT "per programm a " + STR$(GUI_LAYOUT_SELECTED(l) = a)
+        GUI_LAYOUT_SELECT(l, -1)
+        PRINT "keins " + STR$(GUI_LAYOUT_SELECTED(l))
+        TRY
+            GUI_LAYOUT_SELECT(l, fremd)
+        CATCH e
+            PRINT e
+        END TRY
+        GUI_LAYOUT_SELECT(l, b)
+    END IF
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 4
+e 4 7 160 40 0 0
+e 5 7 160 40 0 0
+e 6 6 0 0 0 0
+e 8 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+gewaehlt b TRUE geklickt b TRUE meldungen 1
+per programm a TRUE
+keins -1
+GUI_LAYOUT_SELECT: das Widget gehoert nicht zu diesem Layout
+
+=== die auswahl im fliesslayout ist zu sehen
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+GUI_THEME_SET("accent", &HFF00FF)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM l AS GUI_WIDGET : l = GUI_LAYOUT(w, "fluss", 20, 20, 360, 200)
+GUI_LAYOUT_SET(l, "auswahl", 1)
+DIM a AS GUI_WIDGET : a = GUI_BUTTON(w, "A", 0, 0, 100, 60)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "B", 0, 0, 100, 60)
+GUI_LAYOUT_ADD(l, a)
+GUI_LAYOUT_ADD(l, b)
+GUI_UPDATE()
+GUI_LAYOUT_SELECT(l, b)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- bild
+121 50 #FF00FF +-50
+123 50 #521962 +-24
+16 50 nicht #FF00FF +-80
+
+=== alt-buchstaben druecken, kippen und springen
+' Ohne GUI_MNEMONICS steht das & woertlich da und Alt tut nichts (zweiter
+' Fall). GUI_TEXT liefert den Text samt &; gemessen wird ohne.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+GUI_MNEMONICS(TRUE)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM sp AS GUI_WIDGET : sp = GUI_BUTTON(w, "&Speichern", 10, 10, 0, 0)
+DIM ohne AS GUI_WIDGET : ohne = GUI_BUTTON(w, "Speichern", 10, 50, 0, 0)
+DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(w, "&Raster", 10, 90)
+DIM lb AS GUI_WIDGET : lb = GUI_LABEL(w, "&Name:", 10, 130)
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(w, 80, 126, 150, 28)
+GUI_FOCUS(sp)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+DIM geklickt AS INTEGER : geklickt = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF GUI_CLICKED(sp) THEN geklickt = geklickt + 1
+    IF n = 3 THEN PRINT "text " + GUI_TEXT(sp) + " gleich breit " + STR$(GUI_GET_W(sp) = GUI_GET_W(ohne))
+    IF n = 40 THEN PRINT "geklickt " + STR$(geklickt) + " haken " + STR$(GUI_CHECKED(cb)) + " feld hat fokus " + STR$(GUI_FOCUSED() = tf)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 12
+e 4 2 342 0 0 0
+e 5 2 83 0 0 0
+e 7 1 83 0 0 0
+e 8 1 342 0 0 0
+e 12 2 342 0 0 0
+e 13 2 82 0 0 0
+e 15 1 82 0 0 0
+e 16 1 342 0 0 0
+e 20 2 342 0 0 0
+e 21 2 78 0 0 0
+e 23 1 78 0 0 0
+e 24 1 342 0 0 0
+
+--- umgebung
+DHRT_FRAMES=45
+--- erwartet
+text &Speichern gleich breit TRUE
+geklickt 1 haken TRUE feld hat fokus TRUE
+
+=== ohne gui_mnemonics tut alt nichts
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM sp AS GUI_WIDGET : sp = GUI_BUTTON(w, "&Speichern", 10, 10, 0, 0)
+DIM ohne AS GUI_WIDGET : ohne = GUI_BUTTON(w, "Speichern", 10, 50, 0, 0)
+DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(w, "&Raster", 10, 90)
+GUI_FOCUS(sp)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+DIM geklickt AS INTEGER : geklickt = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF GUI_CLICKED(sp) THEN geklickt = geklickt + 1
+    IF n = 3 THEN PRINT "breiter " + STR$(GUI_GET_W(sp) > GUI_GET_W(ohne))
+    IF n = 30 THEN PRINT "geklickt " + STR$(geklickt) + " haken " + STR$(GUI_CHECKED(cb))
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 8
+e 4 2 342 0 0 0
+e 5 2 83 0 0 0
+e 7 1 83 0 0 0
+e 8 1 342 0 0 0
+e 12 2 342 0 0 0
+e 13 2 82 0 0 0
+e 15 1 82 0 0 0
+e 16 1 342 0 0 0
+
+--- umgebung
+DHRT_FRAMES=35
+--- erwartet
+breiter TRUE
+geklickt 0 haken FALSE
+
+=== eine gekuerzte beschriftung bleibt in ihrer breite
+' Gezaehlt werden helle Punkte rechts neben der 80 Punkte breiten
+' Beschriftung: gekuerzt keine, ungekuerzt laeuft der Text hinaus.
+IMPORT "gui"
+SCREEN(400, 120, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 120)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM a AS GUI_WIDGET : a = GUI_LABEL(w, "Ein sehr langer Dateiname.txt", 10, 10)
+DIM b AS GUI_WIDGET : b = GUI_LABEL(w, "Ein sehr langer Dateiname.txt", 10, 60)
+GUI_SET_BOUNDS(a, 10, 10, 80, 20)
+GUI_SET_BOUNDS(b, 10, 60, 80, 20)
+GUI_LABEL_SET(a, "kuerzen", "ende")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H000000)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+DHRT_SCREENSHOT={fall}/bild.png
+--- nachher
+SCREEN(10, 10, "N", 1)
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+FUNCTION hell(y0 AS INTEGER, y1 AS INTEGER) AS INTEGER
+    DIM n AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = y0 TO y1
+        FOR x = 95 TO 380
+            IF (GETPIXEL(b, x, y) BAND &HFF) > 128 THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "gekuerzt " + STR$(hell(10, 30) = 0) + " ungekuerzt " + STR$(hell(60, 80) > 0)
+--- erwartet
+gekuerzt TRUE ungekuerzt TRUE
+
+=== eine markierbare beschriftung kopiert mit strg+c
+IMPORT "gui"
+SCREEN(400, 200, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM lb AS GUI_WIDGET : lb = GUI_LABEL(w, "Hallo Welt", 20, 20)
+GUI_LABEL_SET(lb, "auswaehlbar", 1)
+CLIPBOARD_SET("vorher")
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 15 THEN PRINT "gezogen '" + GUI_LABEL_SELECTION$(lb) + "'"
+    IF n = 25 THEN PRINT "kopiert '" + CLIPBOARD_GET() + "'"
+    IF n = 45 THEN PRINT "doppelklick '" + GUI_LABEL_SELECTION$(lb) + "'"
+    IF n = 55 THEN PRINT "daneben '" + GUI_LABEL_SELECTION$(lb) + "'"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 22
+e 0 7 21 25 0 0
+e 2 7 21 25 0 0
+e 3 6 0 0 0 0
+e 5 7 100 25 0 0
+e 7 7 300 25 0 0
+e 9 5 0 0 0 0
+e 16 2 341 0 0 0
+e 17 2 67 0 0 0
+e 19 1 67 0 0 0
+e 20 1 341 0 0 0
+e 30 7 85 25 0 0
+e 31 7 85 25 0 0
+e 32 6 0 0 0 0
+e 33 5 0 0 0 0
+e 34 6 0 0 0 0
+e 35 5 0 0 0 0
+e 48 7 300 150 0 0
+e 49 7 300 150 0 0
+e 50 6 0 0 0 0
+e 51 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+gezogen 'Hallo Welt'
+kopiert 'Hallo Welt'
+doppelklick 'Welt'
+daneben ''
+
+=== reglermarken: einrasten per klick und von marke zu marke
+IMPORT "gui"
+SCREEN(400, 200, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM sl AS GUI_WIDGET : sl = GUI_SLIDER(w, 20, 20, 200, 0, 100, 0)
+GUI_SLIDER_SET(sl, "marken", 5)
+GUI_SLIDER_SET(sl, "einrasten", 1)
+GUI_SLIDER_SET(sl, "wert_zeigen", 1)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 12 THEN PRINT "klick bei 30 % -> " + STR$(GUI_VALUE(sl))
+    IF n = 25 THEN PRINT "pfeil -> " + STR$(GUI_VALUE(sl))
+    IF n = 26 THEN
+        GUI_SLIDER_CLEAR_MARKS(sl)
+        GUI_SLIDER_MARK(sl, 10, "wenig")
+        GUI_SLIDER_MARK(sl, 90, "viel")
+        GUI_SET_VALUE(sl, 10)
+    END IF
+    IF n = 40 THEN PRINT "benannte marken -> " + STR$(GUI_VALUE(sl))
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 10
+e 0 7 80 30 0 0
+e 2 7 80 30 0 0
+e 3 6 0 0 0 0
+e 5 5 0 0 0 0
+e 15 2 262 0 0 0
+e 17 1 262 0 0 0
+e 30 2 262 0 0 0
+e 32 1 262 0 0 0
+e 34 2 262 0 0 0
+e 36 1 262 0 0 0
+
+--- umgebung
+DHRT_FRAMES=45
+--- erwartet
+klick bei 30 % -> 25.0
+pfeil -> 50.0
+benannte marken -> 90.0
+
+=== kreisel und kalendermarken sind zu sehen
+' Gezaehlt werden kraeftig magentafarbene Punkte: der Kreisel (Akzent) und
+' der Punkt unter dem markierten Tag. Unten die Gegenprobe ohne Marke.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+GUI_THEME_SET("accent", &HFF00FF)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM k AS GUI_WIDGET : k = GUI_BUSY(w, 320, 20, 48)
+DIM dp AS GUI_WIDGET : dp = GUI_DATEPICKER(w, 10, 10, 280, 240)
+GUI_SET_DATE(dp, "2026-10-15")
+GUI_DATE_MARK(dp, "2026-10-20", &H00FF00)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H000000)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=6
+DHRT_SCREENSHOT={fall}/bild.png
+--- nachher
+SCREEN(10, 10, "N", 1)
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+FUNCTION zaehlen(x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, gruen AS BOOLEAN) AS INTEGER
+    DIM n AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM c AS INTEGER
+    FOR y = y0 TO y1
+        FOR x = x0 TO x1
+            c = GETPIXEL(b, x, y)
+            IF gruen THEN
+                IF ((c SHR 8) BAND &HFF) > 200 AND ((c SHR 16) BAND &HFF) < 80 AND (c BAND &HFF) < 80 THEN n = n + 1
+            ELSE
+                IF ((c SHR 16) BAND &HFF) > 150 AND (c BAND &HFF) > 150 AND ((c SHR 8) BAND &HFF) < 90 THEN n = n + 1
+            END IF
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "kreisel " + STR$(zaehlen(318, 18, 370, 70, FALSE) >= 6)
+PRINT "tagesmarke " + STR$(zaehlen(10, 60, 290, 250, TRUE) >= 3)
+--- erwartet
+kreisel TRUE
+tagesmarke TRUE
+
+=== der kreisel mit wert ist ein ring, kein balken
+' Ein Viertel: der Ring fuellt oben rechts, ein Balken fuellte links.
+IMPORT "gui"
+SCREEN(200, 120, "T", 1)
+GUI_THEME_SET("accent", &HFF00FF)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 200, 120)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM k AS GUI_WIDGET : k = GUI_BUSY(w, 20, 20, 60)
+GUI_PROGRESS_SET(k, "unbestimmt", 0)
+GUI_SET_VALUE(k, 0.25)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H000000)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+DHRT_SCREENSHOT={fall}/bild.png
+--- nachher
+SCREEN(10, 10, "N", 1)
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+FUNCTION zaehlen(x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER) AS INTEGER
+    DIM n AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM c AS INTEGER
+    FOR y = y0 TO y1
+        FOR x = x0 TO x1
+            c = GETPIXEL(b, x, y)
+            IF ((c SHR 16) BAND &HFF) > 150 AND (c BAND &HFF) > 150 AND ((c SHR 8) BAND &HFF) < 90 THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "oben rechts " + STR$(zaehlen(51, 20, 79, 49) > 20) + " links " + STR$(zaehlen(20, 20, 48, 79) = 0)
+--- erwartet
+oben rechts TRUE links TRUE
+
+=== tage markieren und wieder freigeben
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM dp AS GUI_WIDGET : dp = GUI_DATEPICKER(w, 10, 10, 280, 180)
+GUI_DATE_MARK(dp, "2026-10-20", &H00FF00)
+GUI_DATE_MARK(dp, "2026-10-22")
+GUI_DATE_UNMARK(dp, "2026-10-22")
+PRINT "markiert " + STR$(GUI_DATE_MARKED(dp, "2026-10-20")) + " " + STR$(GUI_DATE_MARKED(dp, "2026-10-22"))
+GUI_DATE_CLEAR_MARKS(dp)
+PRINT "geleert " + STR$(GUI_DATE_MARKED(dp, "2026-10-20"))
+--- erwartet
+markiert TRUE FALSE
+geleert FALSE
+
+=== groessengruppen machen gleich breit
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 10, 10, 0, 0)
+DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 10, 50, 0, 0)
+DIM f1 AS GUI_WIDGET : f1 = GUI_TEXTINPUT(w, 10, 90, 100, 28)
+DIM f2 AS GUI_WIDGET : f2 = GUI_TEXTINPUT(w, 10, 130, 180, 28)
+DIM sp AS GUI_WIDGET : sp = GUI_LAYOUT(w, "spalte", 200, 10, 190, 200)
+GUI_LAYOUT_SET(sp, "dehnen", 0)
+DIM l1 AS GUI_WIDGET : l1 = GUI_LABEL(w, "Name", 0, 0)
+DIM l2 AS GUI_WIDGET : l2 = GUI_LABEL(w, "Postleitzahl", 0, 0)
+GUI_LAYOUT_ADD(sp, l1)
+GUI_LAYOUT_ADD(sp, l2)
+GUI_UPDATE()
+PRINT "vorher " + STR$(GUI_GET_W(ok) < GUI_GET_W(ab)) + " " + STR$(GUI_GET_W(f1)) + " " + STR$(GUI_GET_W(l1) < GUI_GET_W(l2))
+GUI_SIZE_GROUP(ok, "knoepfe")
+GUI_SIZE_GROUP(ab, "knoepfe")
+GUI_SIZE_GROUP(f1, "felder", "breite")
+GUI_SIZE_GROUP(f2, "felder")
+GUI_SIZE_GROUP(l1, "marken")
+GUI_SIZE_GROUP(l2, "marken")
+GUI_UPDATE()
+GUI_UPDATE()
+PRINT "knoepfe " + STR$(GUI_GET_W(ok) = GUI_GET_W(ab)) + " felder " + STR$(GUI_GET_W(f1)) + " " + STR$(GUI_GET_W(f2)) + " beschriftungen " + STR$(GUI_GET_W(l1) = GUI_GET_W(l2))
+GUI_SIZE_GROUP(ok, "")
+GUI_UPDATE()
+PRINT "ohne gruppe wieder schmal " + STR$(GUI_GET_W(ok) < GUI_GET_W(ab))
+--- erwartet
+vorher TRUE 100 TRUE
+knoepfe TRUE felder 180 180 beschriftungen TRUE
+ohne gruppe wieder schmal TRUE
+
+=== die schriftwahl listet, filtert und liefert die wahl
+IMPORT "gui"
+SCREEN(600, 500, "T", 1)
+DIM dlg AS GUI_WINDOW
+dlg = GUI_FONT_DIALOG("Schrift", 20)
+DIM liste AS GUI_WIDGET : liste = GUI_WINDOW_WIDGET(dlg, 1)
+DIM such AS GUI_WIDGET : such = GUI_WINDOW_WIDGET(dlg, 0)
+GUI_UPDATE()
+PRINT "eintraege " + STR$(GUI_LISTBOX_COUNT(liste)) + " erster " + GUI_LISTBOX_ITEM(liste, 0)
+PRINT "pfad " + STR$(RIGHT$(GUI_FONT_DIALOG_PATH$(dlg), 17) = "roboto_medium.ttf") + " groesse " + STR$(GUI_FONT_DIALOG_SIZE(dlg))
+GUI_SET_TEXT(such, "gibtsnicht")
+GUI_UPDATE()
+PRINT "gefiltert " + STR$(GUI_LISTBOX_COUNT(liste)) + " pfad '" + GUI_FONT_DIALOG_PATH$(dlg) + "'"
+GUI_SET_TEXT(such, "ROBO")
+GUI_UPDATE()
+PRINT "wieder " + STR$(GUI_LISTBOX_COUNT(liste)) + " modal " + STR$(GUI_MODAL())
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF GUI_ANSWER(dlg) > 0 THEN PRINT "antwort " + STR$(GUI_ANSWER(dlg)) + " pfad danach " + STR$(RIGHT$(GUI_FONT_DIALOG_PATH$(dlg), 4) = ".ttf")
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 2
+e 4 2 257 0 0 0
+e 6 1 257 0 0 0
+
+--- umgebung
+DHRT_SCHRIFT_ORDNER={sammlung}/../../examples/assets
+DHRT_FRAMES=20
+--- erwartet
+eintraege 1 erster roboto_medium
+pfad TRUE groesse 20
+gefiltert 0 pfad ''
+wieder 1 modal TRUE
+antwort 1 pfad danach TRUE
+
+=== die zusaetze stehen in der dhform
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM lb AS GUI_WIDGET : lb = GUI_LABEL(w, "x", 10, 10)
+GUI_LABEL_SET(lb, "kuerzen", "mitte")
+GUI_LABEL_SET(lb, "auswaehlbar", TRUE)
+DIM sl AS GUI_WIDGET : sl = GUI_SLIDER(w, 10, 40, 100, 0, 10, 0)
+GUI_SLIDER_SET(sl, "marken", 3)
+GUI_SLIDER_MARK(sl, 5, "Mitte")
+GUI_SLIDER_SET(sl, "einrasten", 1)
+DIM k AS GUI_WIDGET : k = GUI_BUSY(w, 10, 80, 24)
+DIM l AS GUI_WIDGET : l = GUI_LAYOUT(w, "fluss", 10, 110, 200, 60)
+GUI_LAYOUT_SET(l, "auswahl", 1)
+GUI_SIZE_GROUP(lb, "g", "beide")
+DIM j AS STRING : j = GUI_TO_JSON(w)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+PRINT "rundweg " + STR$(GUI_TO_JSON(w2) = j)
+DIM q AS STRING : q = CHR$(34)
+PRINT STR$(INSTR(j, q + "kuerzen" + q + ": " + q + "mitte" + q) >= 0) + " " + STR$(INSTR(j, q + "fluss" + q) >= 0) + " " + STR$(INSTR(j, q + "kreis" + q + ": true") >= 0) + " " + STR$(INSTR(j, q + "Mitte" + q) >= 0)
+--- erwartet
+rundweg TRUE
+TRUE TRUE TRUE TRUE
+
+=== falsche angaben sind fehler
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 10, 10, 50, 20)
+DIM sl AS GUI_WIDGET : sl = GUI_SLIDER(w, 10, 40, 100, 0, 10, 0)
+DIM dp AS GUI_WIDGET : dp = GUI_DATEPICKER(w, 10, 80, 200, 100)
+TRY
+    GUI_LABEL_SET(b, "kuerzen", "ende")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    DIM lb AS GUI_WIDGET : lb = GUI_LABEL(w, "x", 0, 0)
+    GUI_LABEL_SET(lb, "kuerzen", "links")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_SLIDER_MARK(sl, 20, "zu weit")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_SLIDER_SET(sl, "marken", 1)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_DATE_MARK(dp, "31.12.2026")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_SIZE_GROUP(b, "g", "diagonal")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    DIM x AS GUI_WIDGET : x = GUI_BUSY(w, 0, 0, 4)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    DIM l AS GUI_WIDGET : l = GUI_LAYOUT(w, "kreis", 0, 0, 10, 10)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+GUI_LABEL_SET: Widget ist keine Beschriftung (GUI_LABEL)
+GUI_LABEL_SET: kuerzen ist aus, ende, mitte oder anfang -- nicht 'links'
+GUI_SLIDER_MARK: 20 liegt ausserhalb des Reglers (0..10)
+GUI_SLIDER_SET: marken ist 0 oder 2..101
+GUI_DATE_MARK: '31.12.2026' ist kein Datum JJJJ-MM-TT
+GUI_SIZE_GROUP: 'diagonal' -- breite, hoehe oder beide
+GUI_BUSY: der Durchmesser muss mindestens 8 sein
+GUI_LAYOUT: 'kreis' ist keine Art -- zeile, spalte, fluss oder raster:N
