@@ -3720,7 +3720,8 @@ Example: [`examples/186_farbe_und_datum.dh`](../../examples/186_farbe_und_datum.
 
 **Without a font of its own the gui uses the built-in Sans** (DejaVu Sans)
 at the program's text size -- not raylib's pixel font, which looks like a
-home computer. `TEXT` and the other drawing commands keep the pixel font;
+home computer. The same goes for the `ui` module and the charts (`chart`).
+`TEXT` and the other drawing commands keep the pixel font;
 a game looks as before. If you want the pixel font in the gui too (a retro
 tool), write `GUI_FONT(-1)`. If the program has set a font with `SETFONT`,
 the gui follows it as before.

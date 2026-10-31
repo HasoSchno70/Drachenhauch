@@ -2260,7 +2260,7 @@ impl<'p> Vm<'p> {
             24 => self.try_bt(name, a),
             25 => self.try_video(name, a),
             26 => self.try_gui(name, a),
-            27 => self.try_graphics(name, a),
+            27 => self.try_graphics_app(name, a),
             28 => if name == "__ffi" { crate::ffi::vm_setzen(self); crate::ffi::rufen(a).map(Some) }
                   else { crate::ffi::zeiger_befehl(name, a).transpose() },
             _ => match safe_call_builtin(name, a) {
@@ -7706,20 +7706,43 @@ impl<'p> Vm<'p> {
         // gui die eingebaute Sans in der Textgroesse des Programms -- die
         // Pixelschrift von raylib sieht nach 1990 aus, nicht nach einer
         // Anwendung. GUI_FONT(-1) holt sie ausdruecklich zurueck.
-        let pixel = self.gui_pixel;
-        let sans = &mut self.gui_sans;
         self.gui_tausch = match (self.gui.schrift, self.gfx.as_mut()) {
             (Some((f, n)), Some(g)) => Some(g.schrift_tauschen(f, n)),
-            (None, Some(g)) if !pixel && g.active_font() == -1 => {
-                let h = *sans.get_or_insert_with(|| g.load_font("sans", 40).unwrap_or(-2));
-                if h >= 0 { let n = g.text_height(); Some(g.schrift_tauschen(h, n)) } else { None }
-            }
-            _ => None,
+            _ => self.sans_eintauschen(),
         };
         let r = self.try_gui_innen(name, a);
         self.gui_tausch_zurueck();
         r
     }
+
+    /// Die eingebaute Sans fuer die Dauer eines Befehls eintauschen, wenn das
+    /// Programm bei der Pixelschrift ist (kein SETFONT) und nicht per
+    /// GUI_FONT(-1) die Pixelschrift will. Liefert, was zurueckzutauschen ist.
+    /// Gilt fuer gui, `ui` und Diagramme -- die Oberflaeche einer Anwendung.
+    #[cfg(feature = "graphics")]
+    fn sans_eintauschen(&mut self) -> Option<(i64, i32)> {
+        if self.gui_pixel { return None; }
+        let sans = &mut self.gui_sans;
+        let g = self.gfx.as_mut()?;
+        if g.active_font() != -1 { return None; }
+        let h = *sans.get_or_insert_with(|| g.load_font("sans", 40).unwrap_or(-2));
+        if h < 0 { return None; }
+        let n = g.text_height();
+        Some(g.schrift_tauschen(h, n))
+    }
+
+    /// Grafikbefehle; `UI_*` mit der Schrift der Oberflaeche (CHART_DRAW
+    /// regelt es selbst, weil ein Diagramm eine eigene Schrift haben kann).
+    #[cfg(feature = "graphics")]
+    fn try_graphics_app(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !name.starts_with("ui_") { return self.try_graphics(name, a); }
+        let tausch = self.sans_eintauschen();
+        let r = self.try_graphics(name, a);
+        if let (Some((f, n)), Some(g)) = (tausch, self.gfx.as_mut()) { g.schrift_tauschen(f, n); }
+        r
+    }
+    #[cfg(not(feature = "graphics"))]
+    fn try_graphics_app(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> { self.try_graphics(name, a) }
 
     #[cfg(feature = "graphics")]
     fn gui_tausch_zurueck(&mut self) {
@@ -12689,8 +12712,20 @@ wie viele Plaetze gelten", i + 1)),
                 // CHART_DRAW wertet auch die Maus aus und schreibt Hover/Klick
                 // ins Handle zurueck -> veraenderlicher Zugriff.
                 let mut c = c.borrow_mut();
+                // Die Schrift: die eigene des Diagramms (`schrift`), sonst die
+                // der Oberflaeche -- SETFONT des Programms oder die eingebaute
+                // Sans (GUI_FONT(-1) = Pixelschrift). Gemessen wird mit der
+                // aktiven Schrift, gezeichnet mit `schrift` -- darum gelten
+                // beide fuer die Dauer des Zeichnens als dieselbe.
+                let eigen = c.style.schrift;
+                let tausch = if eigen >= 0 {
+                    self.gfx.as_mut().map(|g| { let n = g.text_height(); g.schrift_tauschen(eigen, n) })
+                } else { self.sans_eintauschen() };
                 let g = self.gfx.as_mut().ok_or("CHART_DRAW vor SCREEN aufgerufen")?;
+                c.style.schrift = g.active_font();
                 c.draw(g);
+                c.style.schrift = eigen;
+                if let Some((f, n)) = tausch { g.schrift_tauschen(f, n); }
                 Value::Nil
             }
 

@@ -127,7 +127,7 @@ CHART_SET_NUM: unbekannte Eigenschaft 'innen_radius' (gueltig: min, max, innenra
 | `gitter` | step size of the value axis (grid); 0 = automatic (round steps) |
 | `nachkomma` | decimal places of all numbers |
 | `titel_groesse`, `text_groesse` | font sizes (title, text) |
-| `schrift` | FONT handle from `LOADFONT`; -1 = default font |
+| `schrift` | FONT handle from `LOADFONT`; -1 = the interface font (built-in Sans or the one set via `SETFONT`) |
 | `start_winkel`, `end_winkel` | gauge arc in degrees (default 135…405) |
 | `striche`, `unterstriche` | major and minor ticks of the gauge scale |
 | `linien_dicke`, `punkt_radius` | line chart (line width, point radius) |
@@ -249,8 +249,9 @@ in the tone of the current theme).
 ## Font
 
 The charts write their text with the font from `schrift` — a
-FONT handle from `LOADFONT`. `-1` (the default) is the built-in pixel font;
-a real TTF is much easier to read at small sizes.
+FONT handle from `LOADFONT`. `-1` (the default) is the interface font as in
+the gui: the built-in Sans, or the font the program has set with `SETFONT`;
+after `GUI_FONT(-1)` the pixel font. You set a font of your own like this:
 
 ```basic
 DIM schrift AS INTEGER

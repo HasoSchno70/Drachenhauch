@@ -3729,7 +3729,8 @@ Beispiel: [`examples/186_farbe_und_datum.dh`](../examples/186_farbe_und_datum.dh
 
 **Ohne eigene Schrift nimmt die gui die eingebaute Sans** (DejaVu Sans) in
 der Textgröße des Programms -- nicht die Pixelschrift von raylib, die nach
-einem Heimcomputer aussieht. `TEXT` und die übrigen Zeichenbefehle bleiben
+einem Heimcomputer aussieht. Dasselbe gilt für das Modul `ui` und die
+Diagramme (`chart`). `TEXT` und die übrigen Zeichenbefehle bleiben
 bei der Pixelschrift; ein Spiel sieht also aus wie bisher. Wer die
 Pixelschrift auch in der gui will (Retro-Werkzeug), schreibt
 `GUI_FONT(-1)`. Hat das Programm mit `SETFONT` eine Schrift gesetzt, folgt
