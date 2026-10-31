@@ -3159,6 +3159,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_ADD_CLASS",
+   "kind": "core",
+   "signature": "GUI_ADD_CLASS(wdg, klasse$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_ANNOUNCE",
    "kind": "core",
    "signature": "GUI_ANNOUNCE(text$[, dringend])",
@@ -3381,6 +3387,24 @@
    "module": "gui"
   },
   {
+   "name": "GUI_GET_COLOR",
+   "kind": "core",
+   "signature": "GUI_GET_COLOR(wdg, rolle$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_NAME$",
+   "kind": "core",
+   "signature": "GUI_GET_NAME$(wdg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_HAS_CLASS",
+   "kind": "core",
+   "signature": "GUI_HAS_CLASS(wdg, klasse$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_ICON_CLICKED",
    "kind": "core",
    "signature": "GUI_ICON_CLICKED(tf)",
@@ -3441,9 +3465,33 @@
    "module": "gui"
   },
   {
+   "name": "GUI_REMOVE_CLASS",
+   "kind": "core",
+   "signature": "GUI_REMOVE_CLASS(wdg, klasse$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_SEARCH_CHANGED",
    "kind": "core",
    "signature": "GUI_SEARCH_CHANGED(tf)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_NAME",
+   "kind": "core",
+   "signature": "GUI_SET_NAME(wdg, name$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_STYLESHEET",
+   "kind": "core",
+   "signature": "GUI_STYLESHEET(text$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_STYLESHEET_LOAD",
+   "kind": "core",
+   "signature": "GUI_STYLESHEET_LOAD(pfad$)",
    "module": "gui"
   },
   {

@@ -10,7 +10,9 @@ Barrierefreiheit über AccessKit, Drucken. Dieses Dokument vergleicht sie mit
 GTK 3 und sagt, was noch fehlt, in welcher Reihenfolge und wie es sich
 bauen ließe. **Paket 1 ist gebaut** (2026-10-31, `gui_ueber.rs`, Handbuch
 `docs/module-gui.md` Abschnitte „Popover, Toast und Infoleiste“ und
-„Suchfeld, Sinnbilder, Vorschläge“); die Pakete 2 bis 4 noch nicht.
+„Suchfeld, Sinnbilder, Vorschläge“), **Paket 4 in der ersten Stufe** ebenso
+(2026-10-31, `gui_stil.rs`, Abschnitt „Stildatei“); Paket 2, Paket 3 und die
+weiteren Stufen von Paket 4 noch nicht.
 
 ## Gemessen statt vermutet: große Tabellen sind keine Lücke
 
@@ -75,7 +77,15 @@ selbst. Alles in diesem Paket setzt auf Vorhandenes auf: obere Schicht,
 oder Hebräisch schreibt, merkt es keiner. Rechtschreibung lässt sich davon
 getrennt vorziehen.
 
-### Paket 4: Styling wie GTK-CSS
+### Paket 4: Styling wie GTK-CSS (erste Stufe gebaut)
+
+Gebaut ist die erste Stufe: Stildatei mit Art, Klasse, Name und Zuständen,
+`bg`/`fg`/`border`/`accent`, `radius`, `groesse`, `stil`. Anders als hier
+geplant gibt es kein `padding`, `border-width`, `schatten` und `verlauf` je
+Widget (das braucht den Umbau der Zeichenwege Art für Art) und keinen
+`uebergang` je Regel; die Farben gehen über die vorhandenen Stellen
+(`wcol` und die eigenen Farben), das deckt alle Arten auf einmal. Neu dazu:
+`GUI_GET_COLOR`, damit sich die Auflösung ohne Bildlagen prüfen lässt.
 
 Was die gui **hat**:
 

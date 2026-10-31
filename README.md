@@ -71,6 +71,7 @@ happen *next to* a game — tools, reports, small services:
 | **In the background** | HTTP, database, external programs and **your own functions** (`TASK_START`) — the main loop keeps running |
 | **Panels and plugins** | `GUI_DOCK` arranges panels on the left, right and bottom, as tabs or floating; the IDE and Glutfaden load your own Drachenhauch programs as plugins; the IDE also fetches them from GitHub or a ZIP, ships three and tests them without a window ([more](docs/en/ide-plugins.md)) |
 | **Feedback without dialogs** | popovers on a widget (`GUI_POPOVER`), toasts that fade out by themselves, an info bar with buttons, search fields with magnifier and clear button, suggestions while typing ([more](docs/en/module-gui.md#popover-toast-and-info-bar)) |
+| **Look by rules** | a stylesheet like CSS: `button.gefahr:hover { bg: #E74C3C }`, rules by kind, class, name and state, live classes, colours from the theme ([more](docs/en/module-gui.md#7-stylesheet-rules-by-kind-class-name-and-state)) |
 
 None of it needs a window. A Drachenhauch program can be a console
 application, a cron job or a game — same language.

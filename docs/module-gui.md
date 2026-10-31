@@ -434,6 +434,14 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_GET_FONT_STYLE$(wdg)` | STRING | der Stil des Widgets, z. B. `"fett+unterstrichen"` |
 | `GUI_STYLE_SET(name$, prop$, wert)` | — | benannten Stil festlegen (`bg`, `fg`, `border`, `accent`, `font`, `font_size`) |
 | `GUI_APPLY_STYLE(widget, name$)` | — | einen benannten Stil auf ein Widget uebertragen -- spart, ihn Widget fuer Widget zu wiederholen |
+| `GUI_STYLESHEET(text$)` | — | eine Stildatei setzen: Regeln nach Art, Klasse, Name und Zustand wie in CSS ("" = keine) -- siehe [Stildatei](#7-stildatei-regeln-nach-art-klasse-name-und-zustand) |
+| `GUI_STYLESHEET_LOAD(pfad$)` | — | dasselbe aus einer Datei (üblich `.dhstil`) |
+| `GUI_ADD_CLASS(wdg, klasse$)` | — | eine Klasse anhängen; sie wirkt sofort und solange sie dran ist |
+| `GUI_REMOVE_CLASS(wdg, klasse$)` | — | eine Klasse wegnehmen |
+| `GUI_HAS_CLASS(wdg, klasse$)` | BOOLEAN | trägt das Widget die Klasse (die Knopfart zählt mit)? |
+| `GUI_SET_NAME(wdg, name$)` | — | der Name, den `#name` in der Stildatei meint |
+| `GUI_GET_NAME$(wdg)` | STRING | der Name des Widgets ("" = keiner) |
+| `GUI_GET_COLOR(wdg, rolle$)` | INTEGER | die Farbe, die `GUI_SET_COLOR` oder die Stildatei im jetzigen Zustand vorgeben (`bg`, `fg`, `border`, `accent`); -1 = das Thema entscheidet |
 | `GUI_GET_Y(wdg)` / `GUI_GET_W(wdg)` / `GUI_GET_H(wdg)` | INTEGER | Lage und Groesse des Widgets im Fenster (Gegenstueck zu `GUI_SET_BOUNDS`) |
 | `GUI_WINDOW_GET_Y(win)` / `GUI_WINDOW_GET_W(win)` / `GUI_WINDOW_GET_H(win)` | INTEGER | Lage und Groesse des Fensters auf dem Bildschirm |
 | `GUI_WINDOW_CONTENT_W(win)` / `GUI_WINDOW_CONTENT_H(win)` | INTEGER | Breite und Hoehe des Inhaltsbereichs unter Titel-, Menue- und Reiterleiste -- dort zaehlen die Widget-Koordinaten; so sitzt eine Statusleiste unten, ohne die Hoehe der Menueleiste zu raten |
@@ -2150,6 +2158,72 @@ GUI_APPLY_STYLE(saveBtn, "primary")
 `GUI_APPLY_STYLE` überträgt die Style-Properties als Per-Widget-Overrides
 (Farben) bzw. Font/Größe. Inkrementell erweiterbar; `GUI_RESET()` löscht auch
 die Styles.
+
+### 7. Stildatei: Regeln nach Art, Klasse, Name und Zustand
+
+Ein benannter Stil wird **kopiert** -- wer ihn danach ändert, erreicht die
+Widgets nicht mehr. Eine **Stildatei** sagt dagegen per Regel, wie Widgets
+aussehen, und gilt, solange sie gesetzt ist: wie CSS in GTK, aber nur die
+Teilmenge, die zur gui passt.
+
+```basic
+IMPORT "gui"
+SCREEN(500, 260, "Stil", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Stil", 0, 0, 500, 260)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "Sichern", 20, 20, 120, 32)
+DIM weg AS GUI_WIDGET : weg = GUI_BUTTON(w, "Löschen", 160, 20, 120, 32)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 20, 70, 260, 30, "Name")
+GUI_SET_NAME(ok, "sichern")
+GUI_ADD_CLASS(weg, "gefahr")
+GUI_STYLESHEET("button { radius: 8 }" + CHR$(10) + "button.gefahr { bg: #C0392B; fg: #FFFFFF }" + CHR$(10) + "button.gefahr:hover { bg: #E74C3C }" + CHR$(10) + "#sichern { bg: accent; stil: fett }" + CHR$(10) + "textinput:focus { border: #E0A030 }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+```
+
+```text
+/* thema.dhstil -- mit GUI_STYLESHEET_LOAD("thema.dhstil") */
+button               { radius: 6 }
+button.gefahr:hover  { bg: #E74C3C }
+textinput:focus      { border: accent }
+#titel               { groesse: 20; stil: fett }
+checkbox:checked     { accent: #2E9E5B }
+```
+
+**Selektoren:** eine Art (die Namen aus der `.dhform`: `button`, `label`,
+`textinput`, `listbox`, `checkbox` ...; `*` = jede), Klassen `.name`
+(`GUI_ADD_CLASS`; die Knopfart aus `GUI_BUTTON_VARIANT` zählt als Klasse,
+`.gefahr` trifft also auch einen Gefahr-Knopf), ein Name `#name`
+(`GUI_SET_NAME`) und Zustände: `:hover`, `:focus`, `:active` (gedrückt),
+`:disabled`, `:checked`. Mehrere Selektoren für eine Regel trennt ein Komma.
+Selektoren für Nachfahren (`panel button`) gibt es noch nicht.
+
+**Eigenschaften:** `bg`, `fg`, `border`, `accent` (Farbe als `#RGB`,
+`#RRGGBB`, `#AARRGGBB` oder als Name aus dem Thema wie `accent`,
+`text_fg`, `widget_bg` -- dann folgt sie einem Themenwechsel), `radius`
+(Eckenrundung 0..64), `groesse` (Schriftgröße 4..200) und `stil` (wie bei
+`GUI_SET_FONT_STYLE`: `fett`, `kursiv`, `unterstrichen` ...). Deutsche und
+englische Namen gehen (`hintergrund`, `background`, `rundung`, `size`).
+Kommentare stehen in `/* ... */` oder hinter `//`.
+
+**Vorrang** wie in CSS: ein Name zählt 100, eine Klasse oder ein Zustand 10,
+eine Art 1; bei gleichem Gewicht gewinnt die spätere Regel. `GUI_SET_COLOR`
+am Widget schlägt jede Regel, eine Regel schlägt das Thema.
+
+**Zustände blenden:** `:hover`, `:focus` und `:active` kommen über die
+Übergänge des Widgets (Metrik `uebergang`), eine Hover-Farbe blendet also
+ein, statt zu springen. Ein Fokusrahmen aus der Stildatei
+(`textinput:focus { border: ... }`) ersetzt den Rahmen in der Akzentfarbe;
+ein gesperrter Knopf mit eigener `:disabled`-Farbe wird nicht zusätzlich
+gedämpft.
+
+**Ein Fehler in der Datei ist eine Meldung mit Zeile** (unbekannte
+Eigenschaft, krumme Farbe, unbekannte Art) -- nichts wird still übergangen,
+sonst suchte man ihn im Programm. Name und Klassen stehen in der `.dhform`
+(`name`, `klassen`). `GUI_GET_COLOR` sagt, welche Farbe gerade gilt.
 
 ## Callbacks: GUI_ON_CLICK
 
