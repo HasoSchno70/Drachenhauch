@@ -28,6 +28,7 @@ TRUE TRUE
 === ende und pfeil runter bleiben in der sichtbaren zeile (1)
 IMPORT "gui"
 SCREEN(500, 400, "T", 1)
+GUI_FONT(-1)   ' Lagen und Masse sind mit der Pixelschrift gemessen
 SET_WINDOW_POS(-3000, -3000)
 AUTOMATION_PLAY("ev.txt")
 DIM w AS GUI_WINDOW
@@ -109,6 +110,7 @@ T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man
 === ende und pfeil runter bleiben in der sichtbaren zeile (2)
 IMPORT "gui"
 SCREEN(500, 400, "T", 1)
+GUI_FONT(-1)   ' Lagen und Masse sind mit der Pixelschrift gemessen
 SET_WINDOW_POS(-3000, -3000)
 AUTOMATION_PLAY("ev.txt")
 DIM w AS GUI_WINDOW
@@ -191,6 +193,7 @@ T Ein langer Absatz #der in einem schmalen Feld mehrfach umbrechen muss damit ma
 === ende und pfeil runter bleiben in der sichtbaren zeile (3)
 IMPORT "gui"
 SCREEN(500, 400, "T", 1)
+GUI_FONT(-1)   ' Lagen und Masse sind mit der Pixelschrift gemessen
 SET_WINDOW_POS(-3000, -3000)
 AUTOMATION_PLAY("ev.txt")
 DIM w AS GUI_WINDOW

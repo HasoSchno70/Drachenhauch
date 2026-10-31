@@ -6,6 +6,7 @@
 === eine zweifach eingerueckte zeile bekommt einen strich (Bild)
 IMPORT "gui"
 SCREEN(400, 200, "E", 1)
+GUI_FONT(-1)   ' Lagen und Masse sind mit der Pixelschrift gemessen
 DIM w AS GUI_WINDOW
 w = GUI_WINDOW("E", 0, 0, 400, 200)
 GUI_WINDOW_CHROME(w, FALSE)
@@ -53,6 +54,7 @@ groesse 400 200
 ' kleinere Tiefe ihrer Nachbarn -- sonst haette jeder Absatz ein Loch.
 IMPORT "gui"
 SCREEN(400, 200, "E", 1)
+GUI_FONT(-1)   ' Lagen und Masse sind mit der Pixelschrift gemessen
 DIM w AS GUI_WINDOW
 w = GUI_WINDOW("E", 0, 0, 400, 200)
 GUI_WINDOW_CHROME(w, FALSE)

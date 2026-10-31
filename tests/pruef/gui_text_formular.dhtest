@@ -5,6 +5,7 @@
 === umbruch laesst die hoehe wachsen
 IMPORT "gui"
 SCREEN(400, 300, "T", 1)
+GUI_FONT(-1)   ' Lagen und Masse sind mit der Pixelschrift gemessen
 SET_WINDOW_POS(-3000, -3000)
 DIM w AS GUI_WINDOW
 w = GUI_WINDOW("T", 10, 10, 360, 260)
@@ -450,7 +451,7 @@ END TRY
 --- umgebung
 DHRT_FRAMES=1
 --- erwartet
-GUI_TEXTINPUT_SET: unbekannter Schluessel 'farbe' -- passwort, nur_lesen, maxlaenge, zahlen
+GUI_TEXTINPUT_SET: unbekannter Schluessel 'farbe' -- passwort, nur_lesen, maxlaenge, zahlen, suche
 
 === enter meldet sich ein bild lang und ruft den handler
 IMPORT "gui"

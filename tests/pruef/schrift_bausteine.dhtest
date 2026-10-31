@@ -200,3 +200,51 @@ DHRT_FRAMES=4
 --- bild
 150 100 #FFFFFF +-40
 150 60 #000000 +-20
+
+=== ohne gui_font nimmt die gui die eingebaute sans
+' Die Vorgabe (2026-10-31): ohne GUI_FONT und ohne SETFONT misst und
+' zeichnet die gui mit der eingebauten Sans in der Textgroesse des
+' Programms -- gemessen an einer Beschriftung nach Inhalt. GUI_FONT(-1)
+' holt die Pixelschrift zurueck, und TEXT bleibt bei ihr.
+IMPORT "gui"
+SCREEN(400, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM l AS GUI_WIDGET : l = GUI_LABEL(w, "Hallo Welt", 10, 10)
+GUI_AUTOSIZE(l)
+GUI_UPDATE()
+DIM vorgabe AS INTEGER : vorgabe = GUI_GET_W(l)
+GUI_FONT(LOADFONT("sans", 40), TEXT_HEIGHT())
+GUI_AUTOSIZE(l)
+GUI_UPDATE()
+DIM sans AS INTEGER : sans = GUI_GET_W(l)
+GUI_FONT(-1)
+GUI_AUTOSIZE(l)
+GUI_UPDATE()
+DIM pixel AS INTEGER : pixel = GUI_GET_W(l)
+PRINT "vorgabe ist sans "; vorgabe = sans
+PRINT "gui_font -1 ist die pixelschrift "; pixel = TEXT_WIDTH("Hallo Welt")
+PRINT "und das ist etwas anderes "; pixel <> vorgabe
+PRINT "text bleibt pixelig "; TEXT_WIDTH("Hallo Welt") = pixel
+--- erwartet
+vorgabe ist sans TRUE
+gui_font -1 ist die pixelschrift TRUE
+und das ist etwas anderes TRUE
+text bleibt pixelig TRUE
+
+=== setfont des programms gilt weiter fuer die gui
+' Wer mit SETFONT eine Schrift setzt, bekommt sie auch in der gui -- die
+' Vorgabe greift nur, solange das Programm bei der Pixelschrift ist.
+IMPORT "gui"
+SCREEN(400, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM mono AS INTEGER : mono = LOADFONT("mono", 40)
+SETFONT(mono, 20)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM l AS GUI_WIDGET : l = GUI_LABEL(w, "iiiiiiii", 10, 10)
+GUI_AUTOSIZE(l)
+GUI_UPDATE()
+' In einer Monospace-Schrift sind acht i so breit wie acht M.
+PRINT "folgt setfont "; GUI_GET_W(l) = TEXT_WIDTH("MMMMMMMM")
+--- erwartet
+folgt setfont TRUE

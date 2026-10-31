@@ -444,7 +444,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_SET_ENABLED(wdg, on)` | — | Widget bedienbar machen oder sperren (gesperrt = ausgegraut, nimmt keine Klicks) |
 | `GUI_ENABLED(wdg)` | BOOLEAN | ist es bedienbar? |
 | `GUI_SET_FONT(wdg, font)` | — | eigene Schrift fuer dieses Widget |
-| `GUI_FONT(font [, groesse])` | — | die eigene Schrift der ganzen gui: gemessen und gezeichnet wird mit ihr, egal welche Schrift das Programm gerade mit `SETFONT` aktiv hat (ohne `groesse` die aktuelle Textgröße); `-1` = wieder die aktive des Programms |
+| `GUI_FONT(font [, groesse])` | — | die eigene Schrift der ganzen gui: gemessen und gezeichnet wird mit ihr, egal welche Schrift das Programm gerade mit `SETFONT` aktiv hat (ohne `groesse` die aktuelle Textgröße); `-1` = die aktive des Programms, auch die Pixelschrift (ohne `GUI_FONT` und ohne `SETFONT` nimmt die gui die eingebaute Sans) |
 | `GUI_FONT_GET()` | TUPLE | `(font, groesse)` der eigenen Schrift, `(-1, 0)` ohne |
 | `GUI_SET_FONT_SIZE(wdg, px)` | — | eigene Schriftgroesse fuer dieses Widget |
 | `GUI_SET_FONT_STYLE(wdg, stil$)` | — | Schriftstil fuer dieses Widget: `fett`, `kursiv`, `unterstrichen`, `durchgestrichen`, verbunden mit `+`; `"normal"` nimmt ihn weg. Echte Schnitte, wo es sie als Datei gibt, sonst nachgebildet |
@@ -2695,7 +2695,8 @@ global gesetzte. `GUI_SET_FONT(wdg, -1)` nimmt eine eigene Schrift wieder
 zurück.
 
 **Eine Schrift für die ganze gui:** `GUI_FONT(font, groesse)`. Ohne sie
-zeichnet die gui mit der Schrift, die das Programm gerade aktiv hat — wer
+zeichnet die gui mit der Schrift, die das Programm gerade aktiv hat (solange
+das die Pixelschrift ist, mit der eingebauten Sans) — wer
 zwischendurch mit einer anderen zeichnet (Notensatz, Symbole, eine große
 Überschrift) und `SETFONT` nicht zurückstellt, verdirbt sonst die
 Oberfläche. Mit `GUI_FONT` tauscht die Laufzeit die Schrift für jeden
@@ -3726,7 +3727,15 @@ Beispiel: [`examples/186_farbe_und_datum.dh`](../examples/186_farbe_und_datum.dh
 
 ## Eigene Schrift
 
-Die eingebaute raylib-Schrift muss nicht bleiben. Zwei Zeilen genügen, und
+**Ohne eigene Schrift nimmt die gui die eingebaute Sans** (DejaVu Sans) in
+der Textgröße des Programms -- nicht die Pixelschrift von raylib, die nach
+einem Heimcomputer aussieht. `TEXT` und die übrigen Zeichenbefehle bleiben
+bei der Pixelschrift; ein Spiel sieht also aus wie bisher. Wer die
+Pixelschrift auch in der gui will (Retro-Werkzeug), schreibt
+`GUI_FONT(-1)`. Hat das Programm mit `SETFONT` eine Schrift gesetzt, folgt
+die gui ihr wie bisher.
+
+Eine andere Schrift ist schnell gesetzt. Zwei Zeilen genügen, und
 sie gilt für **alles** — Fenstertitel, Beschriftungen, Knöpfe, Eingabefelder,
 Code-Feld, Zeilennummern:
 

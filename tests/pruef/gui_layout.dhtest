@@ -3,6 +3,7 @@
 === null heisst nach inhalt
 IMPORT "gui"
 SCREEN(500, 400, "T", 1)
+GUI_FONT(-1)   ' Lagen und Masse sind mit der Pixelschrift gemessen
 SET_WINDOW_POS(-3000, -3000)
 DIM w AS GUI_WINDOW
 w = GUI_WINDOW("T", 0, 0, 500, 400)
@@ -21,6 +22,7 @@ DHRT_FRAMES=2
 === autosize misst sofort und set bounds hebt es auf
 IMPORT "gui"
 SCREEN(500, 400, "T", 1)
+GUI_FONT(-1)   ' Lagen und Masse sind mit der Pixelschrift gemessen
 SET_WINDOW_POS(-3000, -3000)
 DIM w AS GUI_WINDOW
 w = GUI_WINDOW("T", 0, 0, 500, 400)
@@ -40,6 +42,7 @@ DHRT_FRAMES=2
 === beschriftung nach inhalt
 IMPORT "gui"
 SCREEN(500, 400, "T", 1)
+GUI_FONT(-1)   ' Lagen und Masse sind mit der Pixelschrift gemessen
 SET_WINDOW_POS(-3000, -3000)
 DIM w AS GUI_WINDOW
 w = GUI_WINDOW("T", 0, 0, 500, 400)

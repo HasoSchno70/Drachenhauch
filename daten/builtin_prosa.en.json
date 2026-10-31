@@ -648,7 +648,7 @@
   "GUI_FILETREE_SKIP": "names or patterns it skips — folders and files alike (target;__pycache__;_*)",
   "GUI_FOCUS": "set the keyboard focus (e.g. on a TextInput); GUI_FOCUS(-1) releases it, the keys then belong to the program",
   "GUI_FOCUSED": "which widget has the keyboard focus? (-1 = none)",
-  "GUI_FONT": "the gui's own font: it measures and draws with it, whatever font the program currently has active via SETFONT (without groesse the current text size); -1 = back to the program's active font",
+  "GUI_FONT": "the gui's own font: it measures and draws with it, whatever font the program currently has active via SETFONT (without groesse the current text size); -1 = the program's active font, the pixel font included (without GUI_FONT and without SETFONT the gui uses the built-in Sans)",
   "GUI_FONT_DIALOG": "GUI_WINDOW — modal font chooser: search field, list of system fonts, size, preview; answer through GUI_ANSWER",
   "GUI_FONT_DIALOG_PATH$": "STRING — the chosen font -- for LOADFONT (readable after the answer too)",
   "GUI_FONT_DIALOG_SIZE": "INTEGER — the chosen size",

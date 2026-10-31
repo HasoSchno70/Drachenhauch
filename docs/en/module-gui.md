@@ -444,7 +444,7 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_SET_ENABLED(wdg, on)` | — | make a widget usable or disable it (disabled = greyed out, takes no clicks) |
 | `GUI_ENABLED(wdg)` | BOOLEAN | is it usable? |
 | `GUI_SET_FONT(wdg, font)` | — | own font for this widget |
-| `GUI_FONT(font [, groesse])` | — | the gui's own font: it measures and draws with it, whatever font the program currently has active via `SETFONT` (without `groesse` the current text size); `-1` = back to the program's active font |
+| `GUI_FONT(font [, groesse])` | — | the gui's own font: it measures and draws with it, whatever font the program currently has active via `SETFONT` (without `groesse` the current text size); `-1` = the program's active font, the pixel font included (without `GUI_FONT` and without `SETFONT` the gui uses the built-in Sans) |
 | `GUI_FONT_GET()` | TUPLE | `(font, groesse)` of the own font, `(-1, 0)` without |
 | `GUI_SET_FONT_SIZE(wdg, px)` | — | own font size for this widget |
 | `GUI_SET_FONT_STYLE(wdg, stil$)` | — | font style for this widget: `fett` (bold), `kursiv` (italic), `unterstrichen` (underlined), `durchgestrichen` (strikethrough), joined with `+`; `"normal"` removes it. Real font faces where they exist as files, otherwise emulated |
@@ -2685,7 +2685,8 @@ GUI_SET_FONT(k, andere_schrift)   ' another typeface (handle from LOADFONT)
 globally set one. `GUI_SET_FONT(wdg, -1)` takes back a font of the widget's own.
 
 **One font for the whole gui:** `GUI_FONT(font, groesse)`. Without it the
-gui draws with the font the program currently has active — whoever draws
+gui draws with the font the program currently has active (as long as that is
+the pixel font, with the built-in Sans) — whoever draws
 with another one in between (music notation, symbols, a big heading) and
 does not set `SETFONT` back would otherwise spoil the interface. With
 `GUI_FONT` the runtime swaps the font in for every gui command and back
@@ -3717,7 +3718,14 @@ Example: [`examples/186_farbe_und_datum.dh`](../../examples/186_farbe_und_datum.
 
 ## Custom font
 
-The built-in raylib font does not have to stay. Two lines are enough, and it
+**Without a font of its own the gui uses the built-in Sans** (DejaVu Sans)
+at the program's text size -- not raylib's pixel font, which looks like a
+home computer. `TEXT` and the other drawing commands keep the pixel font;
+a game looks as before. If you want the pixel font in the gui too (a retro
+tool), write `GUI_FONT(-1)`. If the program has set a font with `SETFONT`,
+the gui follows it as before.
+
+Another font is quickly set. Two lines are enough, and it
 applies to **everything** — window titles, labels, buttons, input fields,
 code field, line numbers:
 
