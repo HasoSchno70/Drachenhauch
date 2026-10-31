@@ -54,6 +54,7 @@ mod resample;
 #[allow(dead_code)]
 mod objschreiber;
 mod schnitt;
+mod rechtschreibung;
 mod geld;
 mod httpd;
 #[cfg(feature = "smtp")]

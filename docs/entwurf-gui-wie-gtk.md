@@ -12,8 +12,10 @@ bauen ließe. **Paket 1 ist gebaut** (2026-10-31, `gui_ueber.rs`, Handbuch
 `docs/module-gui.md` Abschnitte „Popover, Toast und Infoleiste“ und
 „Suchfeld, Sinnbilder, Vorschläge“), **Paket 4 in der ersten Stufe** ebenso
 (2026-10-31, `gui_stil.rs`, Abschnitt „Stildatei“), **Paket 2** ebenso
-(2026-10-31, `gui_bausteine.rs`, Abschnitt „Bausteine“); Paket 3 und die
-weiteren Stufen von Paket 4 noch nicht.
+(2026-10-31, `gui_bausteine.rs`, Abschnitt „Bausteine“), von **Paket 3 die
+Rechtschreibung** (2026-10-31, `rechtschreibung.rs` und
+`gui_rechtschreibung.rs`, Abschnitt „Rechtschreibung“); Formen und
+Rechts-nach-links aus Paket 3 und die weiteren Stufen von Paket 4 noch nicht.
 
 ## Gemessen statt vermutet: große Tabellen sind keine Lücke
 
@@ -73,7 +75,7 @@ mit Wert.
 | `GtkFontChooser` | keine Schriftwahl | `GUI_FONT_DIALOG` (...) als `GUI_DIALOG` mit Liste der Systemschriften (aus den Ordnern, die `ausweich_datei_fuer` schon kennt), Größe, Schnitt und Vorschau; liefert Pfad und Größe für `LOADFONT`. |
 | `GtkSizeGroup`: gleiche Breite über Behälter hinweg | Layouts messen nur ihre eigenen Kinder | `GUI_SIZE_GROUP` (name$, wdg, ...): im `layout_pass` bekommt jedes Mitglied das größte natürliche Maß der Gruppe (Beschriftungen vor Feldern in mehreren Zeilen). |
 
-### Paket 3: Text, wie GTK ihn kann (Pango)
+### Paket 3: Text, wie GTK ihn kann (Pango; Rechtschreibung gebaut)
 
 | GTK 3 | in der gui | Vorschlag |
 |---|---|---|

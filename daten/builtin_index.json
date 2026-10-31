@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2188,
+ "count": 2244,
  "builtins": [
   {
    "name": "ABS",
@@ -5076,6 +5076,18 @@
    "name": "GUI_SLIDER",
    "kind": "core",
    "signature": "GUI_SLIDER(win, x, y, w, min, max[, default])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SPELL",
+   "kind": "core",
+   "signature": "GUI_SPELL(feld, woerterbuch)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SPELL_COUNT",
+   "kind": "core",
+   "signature": "GUI_SPELL_COUNT(feld) -> INTEGER",
    "module": "gui"
   },
   {
@@ -10885,6 +10897,60 @@
    "kind": "core",
    "signature": "SPEAK_WAIT()",
    "module": "audio"
+  },
+  {
+   "name": "SPELL_CHECK",
+   "kind": "function",
+   "signature": "SPELL_CHECK(woerterbuch, wort$) -> BOOLEAN",
+   "module": "core"
+  },
+  {
+   "name": "SPELL_ERRORS",
+   "kind": "function",
+   "signature": "SPELL_ERRORS(woerterbuch, text$) -> TUPLE",
+   "module": "core"
+  },
+  {
+   "name": "SPELL_FREE",
+   "kind": "function",
+   "signature": "SPELL_FREE(woerterbuch)",
+   "module": "core"
+  },
+  {
+   "name": "SPELL_IGNORE",
+   "kind": "function",
+   "signature": "SPELL_IGNORE(woerterbuch, wort$)",
+   "module": "core"
+  },
+  {
+   "name": "SPELL_LANGUAGE$",
+   "kind": "function",
+   "signature": "SPELL_LANGUAGE$(woerterbuch) -> STRING",
+   "module": "core"
+  },
+  {
+   "name": "SPELL_LANGUAGES",
+   "kind": "function",
+   "signature": "SPELL_LANGUAGES() -> ARRAY OF STRING",
+   "module": "core"
+  },
+  {
+   "name": "SPELL_LOAD",
+   "kind": "function",
+   "signature": "SPELL_LOAD(dic$ [, aff$]) -> INTEGER",
+   "module": "core"
+  },
+  {
+   "name": "SPELL_SUGGEST",
+   "kind": "function",
+   "signature": "SPELL_SUGGEST(woerterbuch, wort$ [, max]) -> ARRAY OF STRING",
+   "module": "core"
+  },
+  {
+   "name": "SPELL_SYSTEM",
+   "kind": "function",
+   "signature": "SPELL_SYSTEM(sprache$) -> INTEGER",
+   "module": "core"
   },
   {
    "name": "SPHERE",

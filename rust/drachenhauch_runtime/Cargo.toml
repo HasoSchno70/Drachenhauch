@@ -24,6 +24,8 @@ serde_json = { version = "1", features = ["preserve_order"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
 # regex-Modul (REGEX_*). Pure-Rust, klein -> immer dabei (kein Feature-Gate).
 regex = "1"
+# Rechtschreibung (SPELL_*): Hunspell-Woerterbuecher, reines Rust.
+spellbook = "0.4"
 # Schneller Nicht-DoS-Hasher fuer interne Lookup-Maps (Funktionen/Klassen/
 # Instanz-Felder) -- Keys kommen aus dem Compiler, nicht von Angreifern.
 rustc-hash = "2"
@@ -227,7 +229,7 @@ libloading = { version = "0.8", optional = true }
 mimalloc = { version = "0.1", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing", "Win32_Storage_Xps", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_Ime", "Win32_UI_Input_KeyboardAndMouse", "Win32_System_WinRT", "Win32_System_Console", "Foundation", "Foundation_Collections", "Media_Core", "Media_SpeechSynthesis", "Storage_Streams"] }
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing", "Win32_Storage_Xps", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_Ime", "Win32_UI_Input_KeyboardAndMouse", "Win32_System_WinRT", "Win32_System_Console", "Win32_System_Com", "Win32_Globalization", "Foundation", "Foundation_Collections", "Media_Core", "Media_SpeechSynthesis", "Storage_Streams"] }
 # UIA-Adapter von AccessKit: haengt sich per Subclassing an raylibs GLFW-Fenster.
 accesskit_windows = { version = "0.35", optional = true }
 

@@ -8469,6 +8469,9 @@ impl<'p> Vm<'p> {
                 let art = if a.len() > 2 { gs(a,2,n)? } else { String::new() };
                 let ms = if a.len() > 3 { gnum(a,3,n)? } else { 3000.0 };
                 self.gui.toast(gi(a,0,n)?, gs(a,1,n)?, &art, ms)?; Value::Nil }
+            "gui_spell" => { if a.len() != 2 { return Err("GUI_SPELL: erwartet (feld, woerterbuch) -- woerterbuch -1 schaltet ab".into()); }
+                self.gui.spell(gi(a,0,"GUI_SPELL")?, gi(a,1,"GUI_SPELL")?)?; Value::Nil }
+            "gui_spell_count" => Value::Int(self.gui.spell_count(gi(a,0,"GUI_SPELL_COUNT")?)?),
             "gui_toast_count" => Value::Int(self.gui.toast_count(gi(a,0,"GUI_TOAST_COUNT")?)?),
             "gui_toast_clear" => { self.gui.toast_clear(gi(a,0,"GUI_TOAST_CLEAR")?)?; Value::Nil }
             "gui_infobar" => { let n = "GUI_INFOBAR";

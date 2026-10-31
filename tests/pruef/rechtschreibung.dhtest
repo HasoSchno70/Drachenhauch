@@ -1,0 +1,537 @@
+' Rechtschreibung (rechtschreibung.rs, gui_rechtschreibung.rs;
+' docs/entwurf-gui-wie-gtk.md Paket 3). Format: docs/werkzeuge.md.
+'
+' Die Woerterbuecher sind winzige Hunspell-Dateien als Beilage -- so ist das
+' Ergebnis auf jedem System dasselbe. Nur ein Fall fragt die Pruefung von
+' Windows selbst, und der uebergeht sich ohne deutsche oder englische Sprache.
+'
+' Die Fenster sind randlos bei (0, 0): eine Widget-Lage ist dann eine
+' Bildschirmlage. Tasten in den Aufnahmen: 256 ESC, 257 Enter, 264 runter,
+' 265 hoch, 299 F10, 340 Umschalt, 341 Strg, 90 Z. Maustaste rechts = 1.
+
+=== ein woerterbuch aus dateien
+DIM h AS INTEGER
+h = SPELL_LOAD("de-TEST.dic")
+PRINT SPELL_LANGUAGE$(h)
+PRINT SPELL_CHECK(h, "Haus"); " "; SPELL_CHECK(h, "Hause"); " "; SPELL_CHECK(h, "Hasu")
+DIM v AS ARRAY OF STRING
+v = SPELL_SUGGEST(h, "Hasu")
+PRINT "vorschlag haus "; ARRAY_INDEXOF(v, "Haus") >= 0
+PRINT "hoechstens eins "; LEN(SPELL_SUGGEST(h, "Hasu", 1))
+DIM s AS ARRAY OF INTEGER
+DIM l AS ARRAY OF INTEGER
+DIM t AS STRING
+t = "Ein Hasu im Gartn, da ist ein Apfel."
+(s, l) = SPELL_ERRORS(h, t)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(s) - 1
+    PRINT s[i]; " "; l[i]; " "; MID$(t, s[i], l[i])
+NEXT
+SPELL_IGNORE(h, "Gartn")
+(s, l) = SPELL_ERRORS(h, t)
+PRINT "nach ignorieren "; LEN(s); " "; SPELL_CHECK(h, "Gartn")
+SPELL_FREE(h)
+TRY
+    PRINT SPELL_CHECK(h, "Haus")
+CATCH e
+    PRINT e
+END TRY
+--- datei de-TEST.dic
+8
+Haus/S
+Baum
+Garten
+Apfel
+ein
+im
+ist
+da
+
+--- datei de-TEST.aff
+SET UTF-8
+TRY esianrtolcdugmphbyfvkwzESIANRTOLCDUGMPHBYFVKWZ
+SFX S Y 1
+SFX S 0 e .
+
+--- erwartet
+de-TEST
+TRUE TRUE FALSE
+vorschlag haus TRUE
+hoechstens eins 1
+4 4 Hasu
+12 5 Gartn
+nach ignorieren 1 TRUE
+SPELL_CHECK: 0 ist kein Woerterbuch (SPELL_LOAD oder SPELL_SYSTEM)
+
+=== woerter mit umlaut und apostroph, zahlen und einzelbuchstaben zaehlen nicht
+DIM h AS INTEGER
+h = SPELL_LOAD("de-TEST.dic", "de-TEST.aff")
+DIM s AS ARRAY OF INTEGER
+DIM l AS ARRAY OF INTEGER
+DIM t AS STRING
+t = "x 42 Äpfl's Haus-Baum Grün"
+(s, l) = SPELL_ERRORS(h, t)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(s) - 1
+    PRINT MID$(t, s[i], l[i])
+NEXT
+--- datei de-TEST.dic
+2
+Haus
+Baum
+
+--- datei de-TEST.aff
+SET UTF-8
+
+--- erwartet
+Äpfl's
+Grün
+
+=== fehler beim laden sagen, was fehlt
+TRY
+    PRINT SPELL_LOAD("gibtsnicht.dic")
+CATCH e
+    PRINT LEFT$(e, 46)
+END TRY
+TRY
+    PRINT SPELL_SUGGEST(0, "x", 0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+SPELL_LOAD: 'gibtsnicht.dic' laesst sich nicht
+SPELL_SUGGEST: hoechstens 0 Vorschlaege -- erwartet 1 oder mehr
+
+=== die sprachen kommen aus dem ordner
+' DHRT_WOERTERBUECHER geht vor -- auch unter Windows, dann ohne die
+' Systempruefung.
+DIM n AS ARRAY OF STRING
+n = SPELL_LANGUAGES()
+PRINT JOIN$(n, ",")
+DIM h AS INTEGER
+h = SPELL_SYSTEM("de")
+PRINT SPELL_LANGUAGE$(h); " "; SPELL_CHECK(h, "Baum")
+h = SPELL_SYSTEM("en_US")
+PRINT SPELL_LANGUAGE$(h); " "; SPELL_CHECK(h, "tree")
+TRY
+    PRINT SPELL_SYSTEM("fr")
+CATCH e
+    PRINT e
+END TRY
+--- verzeichnis buecher
+--- datei buecher/de_AT.dic
+1
+Baum
+
+--- datei buecher/de_AT.aff
+SET UTF-8
+
+--- datei buecher/en_US.dic
+1
+tree
+
+--- datei buecher/en_US.aff
+SET UTF-8
+
+--- datei buecher/nur.dic
+1
+x
+
+--- umgebung
+DHRT_WOERTERBUECHER={fall}/buecher
+--- erwartet
+de-AT,en-US
+de-AT TRUE
+en-US TRUE
+SPELL_SYSTEM: kein Woerterbuch fuer 'fr' -- verfuegbar sind: de-AT, en-US
+
+=== die pruefung von windows
+' Die Sprachen sind die, die Windows installiert hat. Ohne Deutsch und
+' Englisch uebergeht sich der Fall. Das Emoji vorn prueft die Umrechnung von
+' UTF-16-Einheiten (Windows) in Zeichen (Drachenhauch).
+DIM n AS ARRAY OF STRING
+n = SPELL_LANGUAGES()
+DIM sprache AS STRING
+DIM gut AS STRING
+DIM falsch AS STRING
+DIM satz AS STRING
+IF ARRAY_INDEXOF(n, "de-DE") >= 0 THEN
+    sprache = "de-DE" : gut = "Haus" : falsch = "Hasu" : satz = "😀 Ein Hasu im Garten"
+ELSEIF ARRAY_INDEXOF(n, "en-US") >= 0 THEN
+    sprache = "en-US" : gut = "house" : falsch = "hosue" : satz = "😀 A hosue in the garden"
+ELSE
+    PRINT "UEBERSPRINGEN: weder de-DE noch en-US in der Rechtschreibung von Windows"
+    END
+END IF
+DIM h AS INTEGER
+h = SPELL_SYSTEM(sprache)
+PRINT SPELL_CHECK(h, gut); " "; SPELL_CHECK(h, falsch)
+PRINT "vorschlag "; ARRAY_INDEXOF(SPELL_SUGGEST(h, falsch), gut) >= 0
+DIM s AS ARRAY OF INTEGER
+DIM l AS ARRAY OF INTEGER
+(s, l) = SPELL_ERRORS(h, satz)
+PRINT LEN(s); " "; MID$(satz, s[0], l[0]) = falsch
+SPELL_IGNORE(h, falsch)
+PRINT SPELL_CHECK(h, falsch)
+--- system windows
+--- erwartet
+TRUE FALSE
+vorschlag TRUE
+1 TRUE
+TRUE
+
+=== ein textbereich prueft nach einer pause
+IMPORT "gui"
+SCREEN(500, 200, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 20, 20, 460, 150)
+GUI_SET_TEXT(ta, "Ein Hasu im Gartn")
+DIM h AS INTEGER
+h = SPELL_LOAD("de-TEST.dic")
+GUI_SPELL(ta, h)
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 3 THEN PRINT "gleich "; GUI_SPELL_COUNT(ta)
+    IF n = 30 THEN
+        ' Im ersten Wort korrigiert: dessen Welle faellt sofort weg, die
+        ' andere bleibt; gefunden wird das neue Wort erst nach der Pause.
+        GUI_SET_TEXT(ta, "Ein Haus Bam im Gartn")
+    END IF
+    IF n = 31 THEN PRINT "nach dem tippen "; GUI_SPELL_COUNT(ta)
+    IF n = 40 THEN PRINT "in der pause "; GUI_SPELL_COUNT(ta)
+    IF n = 60 THEN PRINT "danach "; GUI_SPELL_COUNT(ta)
+    IF n = 61 THEN GUI_SPELL(ta, -1)
+    IF n = 62 THEN PRINT "abgeschaltet "; GUI_SPELL_COUNT(ta)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei de-TEST.dic
+4
+Haus
+Garten
+ein
+im
+
+--- datei de-TEST.aff
+SET UTF-8
+
+--- umgebung
+DHRT_FRAMES=64
+--- erwartet
+gleich 2
+nach dem tippen 1
+in der pause 1
+danach 2
+abgeschaltet 0
+
+=== die wellen stehen unter dem falschen wort
+' Rot unter dem Text, und nur dort, wo ein falsches Wort steht.
+IMPORT "gui"
+SCREEN(500, 200, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 20, 20, 460, 70)
+GUI_SET_TEXT(ta, "Haus Hasu Haus")
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 20, 120, 460, 30)
+GUI_SET_TEXT(tf, "Haus Hasu Haus")
+DIM h AS INTEGER
+h = SPELL_LOAD("de-TEST.dic")
+GUI_SPELL(ta, h)
+GUI_SPELL(tf, h)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei de-TEST.dic
+1
+Haus
+
+--- datei de-TEST.aff
+SET UTF-8
+
+--- umgebung
+DHRT_FRAMES=10
+DHRT_SCREENSHOT={fall}/bild.png
+--- nachher
+' Rote Punkte je Fuenftel der Breite, getrennt fuer Bereich und Feld.
+DIM b AS IMAGE
+b = LOADIMAGE("bild.png")
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM c AS INTEGER
+DIM zeile AS STRING
+DIM von AS INTEGER
+DIM bis AS INTEGER
+DIM k AS INTEGER
+FOR k = 0 TO 1
+    IF k = 0 THEN von = 20 : bis = 90 ELSE von = 120 : bis = 150
+    zeile = ""
+    DIM teil AS INTEGER
+    FOR teil = 0 TO 4
+        DIM rot AS INTEGER : rot = 0
+        FOR x = 20 + teil * 40 TO 20 + teil * 40 + 39
+            FOR y = von TO bis
+                c = GETPIXEL(b, x, y)
+                IF RED(c) > 170 AND GREEN(c) < 110 AND BLUE(c) < 110 THEN rot = rot + 1
+            NEXT
+        NEXT
+        zeile = zeile + IIF(rot > 3, "x", ".")
+    NEXT
+    PRINT zeile
+NEXT
+--- erwartet
+.xx..
+.xx..
+
+=== rechtsklick auf das wort schlaegt vor und setzt ein
+' Ein Rechtsklick auf "Hasu" oeffnet das Menue, ein Klick auf den ersten
+' Vorschlag setzt ihn ein -- ein eigener Schritt fuer Strg+Z.
+IMPORT "gui"
+SCREEN(500, 200, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 20, 20, 360, 28)
+GUI_SET_TEXT(tf, "Hasu ist da")
+DIM h AS INTEGER
+h = SPELL_LOAD("de-TEST.dic")
+GUI_SPELL(tf, h)
+DIM geaendert AS INTEGER : geaendert = 0
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 12 THEN PRINT "offen, text "; GUI_TEXT(tf)
+    IF n = 25 THEN PRINT "gewaehlt "; GUI_TEXT(tf); " = "; SPELL_SUGGEST(h, "Hasu")[0]
+    IF n = 45 THEN PRINT "zurueck "; GUI_TEXT(tf)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei de-TEST.dic
+4
+Haus
+ist
+da
+Hase
+
+--- datei de-TEST.aff
+SET UTF-8
+TRY esianrtolcdugmphbyfvkwzESIANRTOLCDUGMPHBYFVKWZ
+
+--- datei ev.txt
+c 13
+e 0 7 28 34 0 0
+e 5 7 28 34 0 0
+e 6 6 1 0 0 0
+e 8 5 1 0 0 0
+e 15 7 60 47 0 0
+e 16 7 60 47 0 0
+e 17 6 0 0 0 0
+e 19 5 0 0 0 0
+e 30 2 341 0 0 0
+e 31 2 90 0 0 0
+e 33 1 90 0 0 0
+e 34 1 341 0 0 0
+e 40 7 60 47 0 0
+
+--- umgebung
+DHRT_FRAMES=48
+--- erwartet
+offen, text Hasu ist da
+gewaehlt Haus ist da = Haus
+zurueck Hasu ist da
+
+=== umschalt f10 oeffnet an der marke, ignorieren per tastatur
+IMPORT "gui"
+SCREEN(500, 200, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 20, 20, 360, 28)
+GUI_SET_TEXT(tf, "da ist Hasu")
+GUI_FOCUS(tf)
+DIM h AS INTEGER
+h = SPELL_LOAD("de-TEST.dic")
+GUI_SPELL(tf, h)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 4 THEN PRINT "vorher "; GUI_SPELL_COUNT(tf)
+    IF n = 30 THEN PRINT "nachher "; GUI_SPELL_COUNT(tf); " "; SPELL_CHECK(h, "Hasu"); " "; GUI_TEXT(tf)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei de-TEST.dic
+3
+Haus
+ist
+da
+
+--- datei de-TEST.aff
+SET UTF-8
+
+--- datei ev.txt
+c 9
+e 0 7 450 180 0 0
+e 5 2 340 0 0 0
+e 6 2 299 0 0 0
+e 8 1 299 0 0 0
+e 9 1 340 0 0 0
+e 15 2 265 0 0 0
+e 16 1 265 0 0 0
+e 20 2 257 0 0 0
+e 21 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=34
+--- erwartet
+vorher 1
+nachher 0 TRUE da ist Hasu
+
+=== esc schliesst das menue und drueckt nicht abbrechen
+' Gegenprobe im Fall: das zweite ESC (ohne Menue) drueckt den Knopf.
+IMPORT "gui"
+SCREEN(500, 200, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 20, 20, 360, 28)
+GUI_SET_TEXT(tf, "da ist Hasu")
+DIM ab AS GUI_WIDGET
+ab = GUI_BUTTON(w, "Abbrechen", 20, 100, 120, 30)
+GUI_WINDOW_CANCEL(w, ab)
+GUI_FOCUS(tf)
+DIM h AS INTEGER
+h = SPELL_LOAD("de-TEST.dic")
+GUI_SPELL(tf, h)
+AUTOMATION_PLAY("ev.txt")
+DIM gedrueckt AS BOOLEAN : gedrueckt = FALSE
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(ab) THEN gedrueckt = TRUE
+    n = n + 1
+    IF n = 20 THEN PRINT "erstes esc "; gedrueckt
+    IF n = 35 THEN PRINT "zweites esc "; gedrueckt
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei de-TEST.dic
+2
+ist
+da
+
+--- datei de-TEST.aff
+SET UTF-8
+
+--- datei ev.txt
+c 9
+e 0 7 450 180 0 0
+e 5 2 340 0 0 0
+e 6 2 299 0 0 0
+e 8 1 299 0 0 0
+e 9 1 340 0 0 0
+e 12 2 256 0 0 0
+e 13 1 256 0 0 0
+e 25 2 256 0 0 0
+e 26 1 256 0 0 0
+
+--- umgebung
+DHRT_FRAMES=38
+--- erwartet
+erstes esc FALSE
+zweites esc TRUE
+
+=== falsche ziele und ein freigegebenes woerterbuch
+IMPORT "gui"
+SCREEN(300, 100, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 300, 100)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "x", 10, 10, 50, 20)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 40, 200, 28)
+DIM h AS INTEGER
+h = SPELL_LOAD("de-TEST.dic")
+TRY
+    GUI_SPELL(b, h)
+CATCH e
+    PRINT e
+END TRY
+SPELL_FREE(h)
+TRY
+    GUI_SPELL(tf, h)
+CATCH e
+    PRINT e
+END TRY
+GUI_SPELL(tf, -1)
+PRINT GUI_SPELL_COUNT(tf)
+--- datei de-TEST.dic
+1
+da
+
+--- datei de-TEST.aff
+SET UTF-8
+
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+GUI_SPELL: nur fuer Textfeld und Textbereich, nicht fuer button
+GUI_SPELL: 0 ist kein Woerterbuch (SPELL_LOAD oder SPELL_SYSTEM)
+0
+
+=== ein passwortfeld prueft nicht
+IMPORT "gui"
+SCREEN(300, 100, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 300, 100)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 40, 200, 28)
+GUI_SET_TEXT(tf, "Hasu Gartn")
+GUI_TEXTINPUT_SET(tf, "passwort", 1)
+DIM tf2 AS GUI_WIDGET
+tf2 = GUI_TEXTINPUT(w, 10, 70, 200, 28)
+GUI_SET_TEXT(tf2, "Hasu Gartn")
+DIM h AS INTEGER
+h = SPELL_LOAD("de-TEST.dic")
+GUI_SPELL(tf, h)
+GUI_SPELL(tf2, h)
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 5 THEN PRINT GUI_SPELL_COUNT(tf); " "; GUI_SPELL_COUNT(tf2)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei de-TEST.dic
+1
+da
+
+--- datei de-TEST.aff
+SET UTF-8
+
+--- umgebung
+DHRT_FRAMES=7
+--- erwartet
+0 2
