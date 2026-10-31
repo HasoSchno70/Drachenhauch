@@ -179,8 +179,8 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 30 THEN
-    haltepunktUmschaltenIn(tabPfade[aktiverTab], 4)
-    haltepunktUmschaltenIn(PATHJOIN(DIRNAME(tabPfade[aktiverTab]), "helfer.dh"), 2)
+    haltepunktUmschaltenIn(reiter[aktiverTab].pfad, 4)
+    haltepunktUmschaltenIn(PATHJOIN(DIRNAME(reiter[aktiverTab].pfad), "helfer.dh"), 2)
     befehl("debug")
 END IF
 IF (prBild = 150 OR prBild = 230) AND debugPause THEN befehl("weiter_d")
@@ -230,10 +230,10 @@ DIM prBild AS INTEGER : prBild = 0
 --- programm ../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
-IF prBild = 30 THEN haltepunktUmschaltenIn(tabPfade[aktiverTab], 3)
+IF prBild = 30 THEN haltepunktUmschaltenIn(reiter[aktiverTab].pfad, 3)
 IF prBild = 40 THEN
-    GUI_TEXTAREA_SELECT(tabFelder[aktiverTab], 1, 1, 1, 1)
-    GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "PRINT " + CHR$(34) + "neu" + CHR$(34) + CHR$(10))
+    GUI_TEXTAREA_SELECT(reiter[aktiverTab].feld, 1, 1, 1, 1)
+    GUI_TEXTAREA_INSERT(reiter[aktiverTab].feld, "PRINT " + CHR$(34) + "neu" + CHR$(34) + CHR$(10))
 END IF
 IF prBild = 60 THEN
     sichern(aktiverTab, FALSE)
@@ -363,7 +363,7 @@ DIM prBild AS INTEGER : prBild = 0
 prBild = prBild + 1
 IF prBild = 30 THEN
     hpNeu(PATHJOIN(projektOrdner, "anders.dh"), 1, "")
-    hpNeu(tabPfade[aktiverTab], 99, "")
+    hpNeu(reiter[aktiverTab].pfad, 99, "")
     befehl("debug")
 END IF
 --- argumente
@@ -400,7 +400,7 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 40 THEN
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 3, 1)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 3, 1)
     haltepunktUmschalten()
     WRITEALL("prtasten.txt", "c 6" + CHR$(10) + "e 0 2 296 0 0" + CHR$(10) + "e 2 1 296 0 0" + CHR$(10) + "e 100 2 299 0 0" + CHR$(10) + "e 102 1 299 0 0" + CHR$(10) + "e 160 2 297 0 0" + CHR$(10) + "e 162 1 297 0 0" + CHR$(10) + CHR$(10))
     AUTOMATION_PLAY("prtasten.txt")
@@ -445,7 +445,7 @@ DIM prFertig AS BOOLEAN : prFertig = FALSE
 --- programm ../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
-IF prBild = 20 THEN haltepunktUmschaltenIn(tabPfade[aktiverTab], 4) : befehl("debug")
+IF prBild = 20 THEN haltepunktUmschaltenIn(reiter[aktiverTab].pfad, 4) : befehl("debug")
 IF prBild > 20 AND NOT prFertig AND debugPause AND debugZeile = 4 THEN
     prFertig = TRUE
     protokoll("pr stapel " + STR$(GUI_TABLE_ROW_COUNT(tblStapel)) + " oben " + GUI_TABLE_GET_CELL(tblStapel, 0, 0))

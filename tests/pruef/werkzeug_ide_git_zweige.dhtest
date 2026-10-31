@@ -11,7 +11,7 @@ DIM prBild AS INTEGER : prBild = 0
 prBild = prBild + 1
 IF prBild = 40 THEN
     blameZeileSetzen(TRUE)
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 1, 1)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 1, 1)
 END IF
 IF prBild = 44 THEN
     befehl("git_fenster")
@@ -20,12 +20,12 @@ IF prBild = 44 THEN
     qvWechseln("haupt")
     protokoll("pr jetzt " + GUI_DROPDOWN_TEXT(ddQvZweig))
     ' eine gesicherte Aenderung im offenen Reiter
-    GUI_SET_TEXT(tabFelder[aktiverTab], "PRINT(99)")
+    GUI_SET_TEXT(reiter[aktiverTab].feld, "PRINT(99)")
     befehl("sichern")
     qvBeiseite(TRUE)
-    protokoll("pr nach beiseite " + GUI_TEXT(tabFelder[aktiverTab]))
+    protokoll("pr nach beiseite " + GUI_TEXT(reiter[aktiverTab].feld))
     qvBeiseite(FALSE)
-    protokoll("pr nach zurueck " + GUI_TEXT(tabFelder[aktiverTab]))
+    protokoll("pr nach zurueck " + GUI_TEXT(reiter[aktiverTab].feld))
     EXIT(0)
 END IF
 --- argumente
@@ -87,7 +87,7 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
-    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    DIM prTa AS GUI_WIDGET : prTa = reiter[aktiverTab].feld
     DIM prAlt AS STRING : prAlt = GUI_TEXT(prTa)
     GUI_TEXTAREA_GOTO(prTa, 1, 1)
     konfliktLoesen(1)

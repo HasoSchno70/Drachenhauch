@@ -43,6 +43,68 @@ impl Art {
 fn ist_name_start(c: char) -> bool { c.is_alphabetic() || c == '_' }
 fn ist_name_teil(c: char) -> bool { c.is_alphanumeric() || c == '_' }
 
+/// Das Wort ab `i` (Leerraum davor uebersprungen, nicht ueber das
+/// Zeilenende), klein -- leer, wenn dort kein Name steht.
+fn wort_ab(z: &[char], mut i: usize) -> (String, usize) {
+    while i < z.len() && (z[i] == ' ' || z[i] == '\t') { i += 1; }
+    let a = i;
+    while i < z.len() && ist_name_teil(z[i]) { i += 1; }
+    (z[a..i].iter().collect::<String>().to_lowercase(), a)
+}
+
+/// Das Wort vor `ende` in derselben Zeile, klein; leer am Anweisungsanfang
+/// (Zeilenanfang oder `:`).
+fn wort_vor(z: &[char], ende: usize) -> String {
+    let mut i = ende;
+    while i > 0 && (z[i - 1] == ' ' || z[i - 1] == '\t') { i -= 1; }
+    let e = i;
+    while i > 0 && ist_name_teil(z[i - 1]) { i -= 1; }
+    z[i..e].iter().collect::<String>().to_lowercase()
+}
+
+/// Steht vor `start` nur Leerraum bis zum Zeilenanfang oder einem `:`?
+fn anweisungsanfang(z: &[char], start: usize) -> bool {
+    let mut i = start;
+    while i > 0 && (z[i - 1] == ' ' || z[i - 1] == '\t') { i -= 1; }
+    i == 0 || z[i - 1] == '\n' || z[i - 1] == ':'
+}
+
+/// Woerter, die nur an ihrer Stelle Schluesselwoerter sind (der Parser
+/// liest sie als Namen mit Vorausschau, damit `DIM do` oder `DIM abstract`
+/// in altem Code gueltig bleibt). Der Hervorheber faerbt sie darum auch nur
+/// dort -- vorher standen `ABSTRACT FUNCTION`, `DO ... LOOP`, `FOR EACH` und
+/// `EXIT FOR` halb weiss im Editor.
+fn kontext_schluessel(z: &[char], start: usize, ende: usize, w: &str) -> bool {
+    let (nach, nach_ab) = wort_ab(z, ende);
+    let davor = wort_vor(z, start);
+    let am_anfang = anweisungsanfang(z, start);
+    // Nach dem Wort: Zeilenende, Kommentar oder `:` -- `DO` / `LOOP` allein.
+    let rest_leer = {
+        let mut i = ende;
+        while i < z.len() && (z[i] == ' ' || z[i] == '\t') { i += 1; }
+        i >= z.len() || matches!(z[i], '\n' | '\'' | ':' | '\r')
+    };
+    let name_folgt = !nach.is_empty() && nach_ab < z.len() && ist_name_start(z[nach_ab]);
+    match w {
+        "abstract" | "declare" => matches!(nach.as_str(), "sub" | "function"),
+        "each" => davor == "for" && name_folgt,
+        "exit" => am_anfang && matches!(nach.as_str(), "for" | "do" | "while" | "repeat" | "sub" | "function"),
+        "do" => am_anfang && (rest_leer || matches!(nach.as_str(), "while" | "until")),
+        "loop" => am_anfang && (rest_leer || matches!(nach.as_str(), "while" | "until")),
+        "swap" | "let" | "call" => am_anfang && name_folgt,
+        "byval" => matches!(davor.as_str(), "" | "sub" | "function") && name_folgt
+                   && start > 0 && z[..start].iter().rev().find(|c| **c != ' ').map_or(false, |c| *c == '(' || *c == ','),
+        "get" | "set" => davor == "property",
+        "lib" | "alias" => {
+            // nur in einer DECLARE-Zeile
+            let mut a = start;
+            while a > 0 && z[a - 1] != '\n' { a -= 1; }
+            wort_ab(z, a).0 == "declare"
+        }
+        _ => false,
+    }
+}
+
 /// Quelltext in Abschnitte zerlegen. Leerraum bekommt keinen Abschnitt --
 /// was nicht genannt ist, zeichnet das Textfeld in seiner Grundfarbe.
 pub fn spans(src: &str) -> Vec<(usize, usize, Art)> {
@@ -128,7 +190,9 @@ pub fn spans(src: &str) -> Vec<(usize, usize, Art)> {
                 out.push((start, i - start, Art::Kommentar));
                 continue;
             }
-            let art = if crate::lexer::keyword(&ohne_sigil.to_lowercase()).is_some() {
+            let klein = ohne_sigil.to_lowercase();
+            let art = if crate::lexer::keyword(&klein).is_some()
+                || (wort.len() == ohne_sigil.len() && kontext_schluessel(&z, start, i, &klein)) {
                 Art::Schluessel
             } else {
                 Art::Name
@@ -171,7 +235,9 @@ pub fn namen_zaehlen(src: &str) -> Vec<(String, i64)> {
         match art {
             Art::Schluessel => {
                 nach_def = if (wort == "sub" || wort == "function") && !vorher_end { Some(s + l) } else { None };
-                vorher_end = wort == "end" || wort == "exit" || wort == "declare";
+                // Hinter DECLARE steht eine Definition (aus einer Bibliothek),
+                // hinter END/EXIT keine.
+                vorher_end = wort == "end" || wort == "exit";
             }
             Art::Name => {
                 let def = nach_def.map_or(false, |e| !z[e..s].contains(&'\n'));
@@ -222,6 +288,33 @@ mod tests {
             ("schluessel", "AS".into()),
             ("schluessel", "INTEGER".into()),
         ]);
+    }
+
+    #[test]
+    fn woerter_mit_kontext() {
+        let schl = |src: &str, w: &str| arten(src).iter().any(|(a, t)| *a == "schluessel" && t.eq_ignore_ascii_case(w));
+        assert!(schl("    ABSTRACT FUNCTION laut() AS STRING", "abstract"));
+        assert!(schl("FOR EACH e IN liste", "each"));
+        assert!(schl("DO WHILE x < 3", "do"));
+        assert!(schl("DO", "do"));
+        assert!(schl("LOOP UNTIL fertig", "loop"));
+        assert!(schl("    EXIT FOR", "exit"));
+        assert!(schl("DECLARE FUNCTION f LIB \"c\" ALIAS \"g\" () AS LONG", "lib"));
+        assert!(schl("DECLARE FUNCTION f LIB \"c\" ALIAS \"g\" () AS LONG", "alias"));
+        assert!(schl("PROPERTY GET hp() AS INTEGER", "get"));
+        assert!(schl("SWAP a, b", "swap"));
+        assert!(schl("SUB s(BYVAL p AS Punkt)", "byval"));
+        // Als Name bleiben sie Namen.
+        assert!(!schl("DIM abstract AS INTEGER", "abstract"));
+        assert!(!schl("DIM do AS INTEGER", "do"));
+        assert!(!schl("do = 3", "do"));
+        assert!(!schl("PRINT each", "each"));
+        assert!(!schl("x = loop + 1", "loop"));
+        assert!(!schl("exit = 2", "exit"));
+        assert!(!schl("lib = 1", "lib"));
+        // DECLARE FUNCTION f: f ist eine Definition, keine Benutzung.
+        let v = namen_zaehlen("DECLARE FUNCTION f LIB \"c\" () AS LONG\nPRINT(f())");
+        assert_eq!(v.iter().find(|(k, _)| k == "f").map(|p| p.1), Some(1));
     }
 
     #[test]

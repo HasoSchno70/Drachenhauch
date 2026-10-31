@@ -9,8 +9,8 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 10 THEN
-    haltepunktUmschaltenIn(tabPfade[aktiverTab], 8)
-    haltepunktUmschaltenIn(tabPfade[aktiverTab], 9)
+    haltepunktUmschaltenIn(reiter[aktiverTab].pfad, 8)
+    haltepunktUmschaltenIn(reiter[aktiverTab].pfad, 9)
     befehl("debug")
 END IF
 IF prBild = 120 AND debugPause THEN

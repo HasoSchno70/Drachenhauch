@@ -518,7 +518,80 @@ pub fn korrekturen_mit(kx: &KorrKontext, z0: usize, von: usize, bis: usize, meld
                       vec![(oben, 0, 0, format!("DIM {} AS {}\n", wort, typ))]));
         }
     }
+
+    // "NEW KATZE: die Klasse kuendigt eine Methode an, ohne sie auszufuellen
+    // (laut). ..." -- das Geruest der fehlenden Methoden vor das END CLASS
+    // der Klasse, mit der Kopfzeile der Ankuendigung (ohne ABSTRACT).
+    if let (Some(a), Some(p)) = (meldung.find("NEW "), meldung.find("ohne sie auszufuellen (")) {
+        let klasse = meldung[a + 4..].split(':').next().unwrap_or("").trim().to_string();
+        let namen: Vec<String> = meldung[p + "ohne sie auszufuellen (".len()..].split(')').next().unwrap_or("")
+            .split(',').map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty()).collect();
+        if let Some(k) = fehlende_methoden(kx, &klasse, &namen) { aus.push(k); }
+    }
     aus
+}
+
+/// Die Korrektur zu "die Klasse kuendigt ... an, ohne sie auszufuellen": je
+/// fehlender Methode ihre Kopfzeile (aus der ABSTRACT-Zeile der naechsten
+/// Vorfahrin, die sie ankuendigt) mit leerem Rumpf, eingefuegt vor END CLASS.
+/// `None`, wenn die Klasse nicht in diesem Text steht oder eine Ankuendigung
+/// nicht zu finden ist -- lieber keine Korrektur als eine halbe.
+fn fehlende_methoden(kx: &KorrKontext, klasse: &str, namen: &[String]) -> Option<(String, Vec<Aenderung>)> {
+    if namen.is_empty() { return None; }
+    let bereiche = kx.bereiche();
+    let finde = |n: &str| bereiche.iter().find(|b| matches!(b.art, "class" | "struct") && b.name.eq_ignore_ascii_case(n));
+    let ziel = finde(klasse)?;
+    if ziel.ende <= ziel.zeile || ziel.ende > kx.zeilen.len() { return None; }
+    let einzug_von = |z: &str| z.chars().take_while(|c| *c == ' ' || *c == '\t').collect::<String>();
+    let kopf_einzug = einzug_von(kx.zeilen[ziel.zeile - 1]);
+    // Einrueckung der Mitglieder: die erste nicht leere Zeile im Rumpf, sonst vier mehr.
+    let ein = (ziel.zeile..ziel.ende - 1).map(|i| kx.zeilen[i]).find(|z| !z.trim().is_empty())
+        .map(einzug_von).unwrap_or_else(|| format!("{}    ", kopf_einzug));
+    let mut text = String::new();
+    let rumpf_leer = (ziel.zeile..ziel.ende - 1).all(|i| kx.zeilen[i].trim().is_empty());
+    for (k, name) in namen.iter().enumerate() {
+        // Die Kette der Vorfahrinnen hinauf bis zur ersten Ankuendigung.
+        let mut gefunden: Option<String> = None;
+        let mut aktuell = ziel;
+        let mut schritte = 0;
+        while gefunden.is_none() && schritte < 50 {
+            schritte += 1;
+            let kopf = crate::symbole::ohne_kommentare_und_texte(kx.zeilen[aktuell.zeile - 1]);
+            let gross = kopf.to_ascii_uppercase();
+            let Some(p) = gross.find(" EXTENDS ") else { break };
+            let basis: String = kopf[p + 9..].trim_start().chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+            let Some(b) = finde(&basis) else { break };
+            for i in b.zeile..b.ende.saturating_sub(1) {
+                let roh = kx.zeilen[i];
+                let ohne = crate::symbole::ohne_kommentare_und_texte(roh);
+                let t = ohne.trim();
+                let tg = t.to_ascii_uppercase();
+                let Some(rest) = tg.strip_prefix("ABSTRACT ").map(|_| t[9..].trim_start()) else { continue };
+                let rg = rest.to_ascii_uppercase();
+                let nach = if rg.starts_with("SUB ") { &rest[4..] } else if rg.starts_with("FUNCTION ") { &rest[9..] } else { continue };
+                let n: String = nach.trim_start().chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+                if n.eq_ignore_ascii_case(name) {
+                    // Die Kopfzeile wie geschrieben (samt Zeichenketten in Vorgabewerten).
+                    // `ohne` hat so viele ZEICHEN wie `roh` (Kommentar und Texte als
+                    // Leerzeichen) -- gezaehlt wird darum in Zeichen, nicht in Bytes.
+                    let oz: Vec<char> = ohne.chars().collect();
+                    let ab = (0..oz.len()).find(|&q| oz[q..].iter().take(8).collect::<String>().eq_ignore_ascii_case("abstract"))
+                        .map(|q| q + 8).unwrap_or(0);
+                    let laenge = ohne.trim_end().chars().count();
+                    gefunden = Some(roh.chars().skip(ab).take(laenge.saturating_sub(ab)).collect::<String>().trim().to_string());
+                    break;
+                }
+            }
+            aktuell = b;
+        }
+        let kopf = gefunden?;
+        let ende = if kopf.to_ascii_uppercase().starts_with("SUB") { "END SUB" } else { "END FUNCTION" };
+        if k > 0 || !rumpf_leer { text.push('\n'); }
+        text.push_str(&format!("{ein}{kopf}\n{ein}    \n{ein}{ende}\n"));
+    }
+    let titel = if namen.len() == 1 { format!("Fehlende Methode {} einfuegen", namen[0]) }
+                else { format!("Fehlende Methoden einfuegen ({})", namen.join(", ")) };
+    Some((titel, vec![(ziel.ende - 1, 0, 0, text)]))
 }
 
 /// Wo oben in der Datei etwas Neues hingehoert: hinter die IMPORTs, die schon
@@ -727,6 +800,22 @@ pub fn vervollstaendigung(text: &str, basis: Option<&Path>, z0: usize, c0: usize
         gesehen.insert(k);
         out.push(json!({"label": label, "kind": art, "detail": detail}));
     };
+    // Hinter einem Punkt, dessen Klasse nicht festzustellen war (ohne basis,
+    // oder der Text uebersetzt gerade nicht): die Mitglieder ALLER Klassen
+    // des Textes -- Befehle, Schluesselwoerter und Farben gehoeren nie hinter
+    // einen Punkt (`t.la` bot sonst LAYER, LAYER_CLEAR ... an).
+    if mitglied_stelle(text, z0, c0, false).is_some() {
+        if let Value::Array(klassen) = klassen_struktur(text) {
+            for k in &klassen {
+                for m in k["mitglieder"].as_array().into_iter().flatten() {
+                    let art = match m["art"].as_str().unwrap_or("") { "feld" | "konstante" => CK_FIELD,
+                                                                      "property" => CK_PROPERTY, _ => CK_METHOD };
+                    add(m["name"].as_str().unwrap_or(""), art, m["kopf"].as_str().unwrap_or(""));
+                }
+            }
+        }
+        return out;
+    }
     for d in symbole::definitionen(text) {
         let art = match d.art { "sub" | "function" => CK_FUNCTION,
                                 "class" | "struct" | "enum" | "const" => CK_CONSTANT, _ => CK_VARIABLE };
@@ -975,6 +1064,41 @@ pub fn klassen_struktur(quelle: &str) -> Value {
     Value::Array(aus)
 }
 
+/// Ein Name in einer Methode: erst ein Parameter oder eine Variable DIESER
+/// Methode (die erste Definition im Text waere womoeglich ein gleichnamiges
+/// Feld der Klasse), sonst das
+/// Mitglied der umgebenden Klasse, dann ihrer Vorfahrinnen (EXTENDS). Ohne
+/// das sprang F12 auf `laut()` in `Tier` in die erste Unterklasse, die
+/// `laut` ausschreibt -- die erste Definition im Text.
+fn mitglied_in_klassenkette(text: &str, zeile: usize, wort: &str) -> Option<symbole::Definition> {
+    let bereiche = symbole::bereiche(text);
+    let klasse = bereiche.iter().filter(|b| matches!(b.art, "class" | "struct") && b.zeile <= zeile && zeile <= b.ende)
+        .max_by_key(|b| b.zeile)?;
+    let ziel = wort.to_lowercase();
+    let alle = symbole::definitionen(text);
+    if let Some(m) = bereiche.iter().filter(|b| matches!(b.art, "sub" | "function" | "property")
+                                         && b.zeile <= zeile && zeile <= b.ende).max_by_key(|b| b.zeile) {
+        if let Some(d) = alle.iter().find(|d| matches!(d.art, "param" | "dim" | "const") && d.zeile >= m.zeile
+                                         && d.zeile <= m.ende && d.name.to_lowercase() == ziel) {
+            return Some(d.clone());
+        }
+    }
+    let mut name = klasse.name.clone();
+    let mut gesehen = std::collections::HashSet::new();
+    while gesehen.insert(name.to_lowercase()) {
+        let Some(k) = bereiche.iter().find(|b| matches!(b.art, "class" | "struct") && b.name.eq_ignore_ascii_case(&name)) else { break };
+        if let Some(d) = klassen_mitglieder(text, k, &bereiche).into_iter().find(|d| d.name.to_lowercase() == ziel) {
+            return Some(d);
+        }
+        let kopf = text.lines().nth(k.zeile - 1).map(symbole::ohne_kommentare_und_texte).unwrap_or_default();
+        let gross = kopf.to_ascii_uppercase();
+        let Some(p) = gross.find(" EXTENDS ") else { break };
+        name = kopf[p + 9..].trim().split(|c: char| !(c.is_alphanumeric() || c == '_')).next().unwrap_or("").to_string();
+        if name.is_empty() { break; }
+    }
+    None
+}
+
 /// Die Mitglieder der Klasse `klasse` im Quelltext samt Importen.
 fn mitglied_definitionen(quelle: &str, klasse: &str) -> Vec<symbole::Definition> {
     let bereiche = symbole::bereiche(quelle);
@@ -1119,6 +1243,9 @@ pub fn umbenennen(text: &str, z0: usize, c0: usize, neu: &str) -> Option<String>
 pub fn definition(text: &str, uri: &str, z0: usize, c0: usize) -> Value {
     let (wort, _, _) = symbole::wort_bei(text, z0, c0);
     if wort.is_empty() { return Value::Null; }
+    if let Some(d) = mitglied_in_klassenkette(text, z0 + 1, &wort) {
+        return ort(uri, d.zeile, d.spalte, d.spalte_ende);
+    }
     match symbole::definition(text, &wort) {
         Some(d) => ort(uri, d.zeile, d.spalte, d.spalte_ende),
         None => Value::Null,
@@ -1540,6 +1667,40 @@ WEND";
         let alle = vervollstaendigung("", None, 0, 0);
         assert!(alle.iter().any(|i| i["label"] == "KEY_SPACE"));
         assert!(alle.iter().any(|i| i["label"] == "WHILE"));
+    }
+
+    const TIERE: &str = "CLASS Tier\n    DIM name AS STRING\n    ABSTRACT FUNCTION laut(n AS INTEGER) AS STRING ' Ankuendigung\n    SUB vorstellen()\n        PRINT laut(1)\n    END SUB\nEND CLASS\nCLASS Hund EXTENDS Tier\n    FUNCTION laut(n AS INTEGER) AS STRING\n        RETURN laut(n)\n    END FUNCTION\nEND CLASS\nCLASS Katze EXTENDS Tier\nEND CLASS\nDIM t AS Tier\nt.la";
+
+    #[test]
+    fn vererbung_in_werkzeugen() {
+        // F12 auf laut() in Tier: die Ankuendigung in Tier, nicht Hund.laut.
+        assert_eq!(definition(TIERE, "u", 4, 15)["range"]["start"]["line"], 2);
+        // In Hund: die eigene Methode.
+        assert_eq!(definition(TIERE, "u", 9, 16)["range"]["start"]["line"], 8);
+        // Ein Parameter der Methode gewinnt vor einem Mitglied gleichen Namens.
+        let p = "CLASS A\n    DIM n AS INTEGER\n    SUB s(n AS INTEGER)\n        PRINT n\n    END SUB\nEND CLASS";
+        assert_eq!(definition(p, "u", 3, 15)["range"]["start"]["line"], 2);
+        // CODE_CLASSES$ kennt die ABSTRACT-Methode.
+        let k = klassen_struktur(TIERE);
+        assert!(k[0]["mitglieder"].as_array().unwrap().iter().any(|m| m["name"] == "laut" && m["typ"] == "STRING"));
+        // Hinter einem Punkt ohne bekannte Klasse: nur Mitglieder, keine Befehle.
+        let items = vervollstaendigung(TIERE, None, 15, 4);
+        let namen: Vec<&str> = items.iter().map(|i| i["label"].as_str().unwrap()).collect();
+        assert_eq!(namen, ["laut"]);
+        // Die Gliederung zeigt sie als Kind von Tier.
+        let g = gliederung(TIERE);
+        assert!(g[0]["children"].as_array().unwrap().iter().any(|c| c["name"] == "laut"));
+    }
+
+    #[test]
+    fn fehlende_methoden_einfuegen() {
+        let m = "NEW KATZE: die Klasse kuendigt eine Methode an, ohne sie auszufuellen (laut). Entweder ...";
+        let k = korrekturen(TIERE, 14, 0, 1, m);
+        let e = k.iter().find(|x| x.0 == "Fehlende Methode laut einfuegen").expect("Korrektur");
+        // Vor END CLASS von Katze (Zeile 14 = Index 13), Kommentar faellt weg.
+        assert_eq!(e.1, vec![(13, 0, 0, "    FUNCTION laut(n AS INTEGER) AS STRING\n        \n    END FUNCTION\n".to_string())]);
+        // Eine Klasse, die nicht im Text steht: keine Korrektur.
+        assert!(korrekturen(TIERE, 14, 0, 1, &m.replace("KATZE", "MAUS")).iter().all(|x| !x.0.starts_with("Fehlende")));
     }
 
     #[test]

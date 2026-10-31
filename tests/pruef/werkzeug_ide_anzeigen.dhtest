@@ -22,20 +22,20 @@ IF prBild = 60 THEN
     FOR prI = 0 TO GUI_LISTBOX_COUNT(lstGliederung) - 1
         protokoll("pr gliederung " + GUI_LISTBOX_ITEM(lstGliederung, prI))
     NEXT
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 7, 9)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 7, 9)
     zurDefinition()
     protokoll("pr status " + GUI_TEXT(lblStatus))
 END IF
 IF prBild = 62 THEN
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 8, 7)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 8, 7)
     zurDefinition()
     protokoll("pr status " + GUI_TEXT(lblStatus))
 END IF
-IF prBild = 64 THEN GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 1, 1)
+IF prBild = 64 THEN GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 1, 1)
 IF prBild = 68 THEN
     prHilfeA = GUI_TEXT(lblHilfe)
     dateiOeffnen(PATHJOIN(projektOrdner, "b.dh"))
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 1, 1)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 1, 1)
 END IF
 IF prBild = 72 THEN
     protokoll("pr hilfe gewechselt " + STR$(GUI_TEXT(lblHilfe) <> prHilfeA AND INSTR(GUI_TEXT(lblHilfe), "CLS") >= 0))

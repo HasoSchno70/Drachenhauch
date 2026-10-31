@@ -23,7 +23,7 @@ IF prBild = 60 THEN
     AUTOMATION_PLAY("ev.txt")
 END IF
 IF prBild = 90 THEN
-    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    DIM prTa AS GUI_WIDGET : prTa = reiter[aktiverTab].feld
     DIM prE AS INTEGER
     DIM prS AS INTEGER
     DIM prV AS INTEGER
@@ -100,11 +100,11 @@ IF prBild = 72 THEN
     DIM prS1 AS INTEGER
     DIM prV1 AS INTEGER
     DIM prL1 AS INTEGER
-    (prE1, prS1, prV1, prL1) = GUI_TEXTAREA_VIEW(tabFelder[aktiverTab])
+    (prE1, prS1, prV1, prL1) = GUI_TEXTAREA_VIEW(reiter[aktiverTab].feld)
     protokoll("pr unterwegs " + STR$(prE1 > 0))
 END IF
 IF prBild = 100 THEN
-    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    DIM prTa AS GUI_WIDGET : prTa = reiter[aktiverTab].feld
     DIM prE AS INTEGER
     DIM prS AS INTEGER
     DIM prV AS INTEGER
@@ -126,7 +126,7 @@ IF prBild = 110 THEN
     DIM prS2 AS INTEGER
     DIM prV2 AS INTEGER
     DIM prL2 AS INTEGER
-    (prE2, prS2, prV2, prL2) = GUI_TEXTAREA_VIEW(tabFelder[aktiverTab])
+    (prE2, prS2, prV2, prL2) = GUI_TEXTAREA_VIEW(reiter[aktiverTab].feld)
     protokoll("pr steht " + STR$(prE2))
     EXIT(0)
 END IF

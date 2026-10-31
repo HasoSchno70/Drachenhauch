@@ -9,8 +9,8 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 10 AND NOT FILEEXISTS("zweiter.txt") THEN
-    haltepunktUmschaltenIn(tabPfade[aktiverTab], 2)
-    haltepunktUmschaltenIn(tabPfade[aktiverTab], 4)
+    haltepunktUmschaltenIn(reiter[aktiverTab].pfad, 2)
+    haltepunktUmschaltenIn(reiter[aktiverTab].pfad, 4)
     befehl("hp_liste")
 END IF
 IF prBild = 15 AND NOT FILEEXISTS("zweiter.txt") THEN
@@ -28,8 +28,8 @@ IF prBild = 200 AND NOT FILEEXISTS("zweiter.txt") THEN
     EXIT(0)
 END IF
 IF prBild = 20 AND FILEEXISTS("zweiter.txt") THEN
-    FOR prI = 0 TO LEN(hpZeilen) - 1
-        protokoll("probe gemerkt " + STR$(hpZeilen[prI]) + " " + STR$(hpIstAktiv(prI)))
+    FOR prI = 0 TO LEN(haltepunkte) - 1
+        protokoll("probe gemerkt " + STR$(haltepunkte[prI].zeile) + " " + STR$(hpIstAktiv(prI)))
     NEXT
     EXIT(0)
 END IF
@@ -69,14 +69,14 @@ DIM prBild AS INTEGER : prBild = 0
 prBild = prBild + 1
 IF prBild = 10 THEN
     protokoll("probe kette " + ausdruckBeiWort$("    s = held.hp + held.name", "hp", 14) + " / " + ausdruckBeiWort$("x = a.b.c", "c", 9) + " / " + ausdruckBeiWort$("f(x).y", "y", 6))
-    haltepunktUmschaltenIn(tabPfade[aktiverTab], 8)
+    haltepunktUmschaltenIn(reiter[aktiverTab].pfad, 8)
     befehl("debug")
 END IF
 IF prBild = 150 AND debugPause THEN
     protokoll("probe moeglich " + STR$(debugWertMoeglich()))
-    debugWertFragen(tabFelder[aktiverTab], "held.hp", "")
+    debugWertFragen(reiter[aktiverTab].feld, "held.hp", "")
 END IF
-IF prBild = 190 THEN protokoll("probe tooltip " + STR$(tippFeld = tabFelder[aktiverTab]))
+IF prBild = 190 THEN protokoll("probe tooltip " + STR$(tippFeld = reiter[aktiverTab].feld))
 IF prBild = 200 AND debugPause THEN befehl("stopp")
 --- argumente
 spiel.dh
@@ -112,9 +112,9 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 10 THEN
-    haltepunktUmschaltenIn(tabPfade[aktiverTab], 4)
+    haltepunktUmschaltenIn(reiter[aktiverTab].pfad, 4)
     haltepunktLogSetzen(0, "i = {i}")
-    haltepunktUmschaltenIn(tabPfade[aktiverTab], 5)
+    haltepunktUmschaltenIn(reiter[aktiverTab].pfad, 5)
     haltepunktTrefferSetzen(1, "x")
     haltepunktTrefferSetzen(1, "3")
     befehl("debug")
@@ -165,8 +165,8 @@ DIM prBild AS INTEGER : prBild = 0
 prBild = prBild + 1
 IF prBild = 10 THEN befehl("debug")
 IF prBild = 80 AND debugPause THEN
-    GUI_TEXTAREA_SELECT(tabFelder[aktiverTab], 2, 1, 2, 1)
-    GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "' neu" + CHR$(10))
+    GUI_TEXTAREA_SELECT(reiter[aktiverTab].feld, 2, 1, 2, 1)
+    GUI_TEXTAREA_INSERT(reiter[aktiverTab].feld, "' neu" + CHR$(10))
 END IF
 IF prBild = 100 THEN befehl("neustart")
 IF prBild = 200 THEN befehl("stopp")

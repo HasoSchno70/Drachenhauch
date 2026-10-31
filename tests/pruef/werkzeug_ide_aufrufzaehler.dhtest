@@ -12,10 +12,10 @@ prBild = prBild + 1
 IF prBild = 60 THEN pruefen()
 IF prBild = 62 THEN
     DIM prI AS INTEGER
-    FOR prI = 0 TO LEN(zaehlZeilen) - 1
-        protokoll("pr zeile " + STR$(zaehlZeilen[prI]) + " " + zaehlNamen[prI] + ": " + zaehlTexte[prI])
+    FOR prI = 0 TO LEN(zaehlStellen) - 1
+        protokoll("pr zeile " + STR$(zaehlStellen[prI].zeile) + " " + zaehlStellen[prI].name + ": " + zaehlStellen[prI].text)
     NEXT
-    zaehlerKlick(tabFelder[aktiverTab], 1)
+    zaehlerKlick(reiter[aktiverTab].feld, 1)
 END IF
 IF prBild = 66 THEN
     protokoll("pr fenster " + GUI_TEXT(lblAufruf))
@@ -78,12 +78,12 @@ IF prBild = 50 THEN befehl("spiegel")
 IF prBild = 60 THEN
     zaehlerSetzen_(taSpiegel)
     DIM prI AS INTEGER
-    FOR prI = 0 TO LEN(zaehlZeilen) - 1
-        protokoll("pr links " + zaehlNamen[prI] + ": " + zaehlTexte[prI])
+    FOR prI = 0 TO LEN(zaehlStellen) - 1
+        protokoll("pr links " + zaehlStellen[prI].name + ": " + zaehlStellen[prI].text)
     NEXT
-    zaehlerSetzen_(tabFelder[aktiverTab])
-    FOR prI = 0 TO LEN(zaehlZeilen) - 1
-        protokoll("pr rechts " + zaehlNamen[prI] + ": " + zaehlTexte[prI])
+    zaehlerSetzen_(reiter[aktiverTab].feld)
+    FOR prI = 0 TO LEN(zaehlStellen) - 1
+        protokoll("pr rechts " + zaehlStellen[prI].name + ": " + zaehlStellen[prI].text)
     NEXT
     EXIT(0)
 END IF
@@ -121,10 +121,10 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
-    zaehlerSetzen_(tabFelder[aktiverTab])
+    zaehlerSetzen_(reiter[aktiverTab].feld)
     DIM prI AS INTEGER
-    FOR prI = 0 TO LEN(zaehlZeilen) - 1
-        protokoll("pr " + zaehlNamen[prI] + ": " + zaehlTexte[prI])
+    FOR prI = 0 TO LEN(zaehlStellen) - 1
+        protokoll("pr " + zaehlStellen[prI].name + ": " + zaehlStellen[prI].text)
     NEXT
     EXIT(0)
 END IF
@@ -170,23 +170,23 @@ DIM prJ AS FLOAT : prJ = GET_TIME()
 IF prBild > 2 AND prJ - prLetzt > prMax THEN prMax = prJ - prLetzt
 prLetzt = prJ
 IF prBild = 160 THEN
-    protokoll("pr erst " + zaehlTexte[0] + " flott " + STR$(prMax < 0.6))
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 4, 1)
-    GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "' x" + NL)
+    protokoll("pr erst " + zaehlStellen[0].text + " flott " + STR$(prMax < 0.6))
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 4, 1)
+    GUI_TEXTAREA_INSERT(reiter[aktiverTab].feld, "' x" + NL)
     sichern(aktiverTab, FALSE)
-    GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "' y" + NL)
+    GUI_TEXTAREA_INSERT(reiter[aktiverTab].feld, "' y" + NL)
     prMax = 0.0
     prGelesen = zaehlGelesenGesamt
 END IF
 IF prBild = 260 THEN
-    protokoll("pr nach sichern " + zaehlTexte[0] + " flott " + STR$(prMax < 0.6) + " neu gelesen " + STR$(zaehlGelesenGesamt - prGelesen))
+    protokoll("pr nach sichern " + zaehlStellen[0].text + " flott " + STR$(prMax < 0.6) + " neu gelesen " + STR$(zaehlGelesenGesamt - prGelesen))
     ' von aussen: ein weiterer Aufruf in einer Datei, die nicht offen ist
     WRITEALL(PATHJOIN(projektOrdner, "teil0/m1.dh"), "gruss()" + NL + "gruss()" + NL)
     zaehlFokusVorher = FALSE
 END IF
-IF prBild = 300 THEN GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "' z" + NL)
+IF prBild = 300 THEN GUI_TEXTAREA_INSERT(reiter[aktiverTab].feld, "' z" + NL)
 IF prBild = 400 THEN
-    protokoll("pr von aussen " + zaehlTexte[0])
+    protokoll("pr von aussen " + zaehlStellen[0].text)
     EXIT(0)
 END IF
 --- argumente
@@ -227,11 +227,11 @@ pr von aussen 23 Aufrufe
 ' Geprueft: die Zaehler stimmen (aus der eigenen Datei und fuenf weiteren),
 ' und es geht flott (grob: 1,2 s; hier 0,4 s, vorher 1,9 s).
 DIM prT AS FLOAT : prT = GET_TIME()
-zaehlerSetzen_(tabFelder[aktiverTab])
+zaehlerSetzen_(reiter[aktiverTab].feld)
 DIM prD AS FLOAT : prD = GET_TIME() - prT
 DIM prK AS INTEGER
-FOR prK = 0 TO LEN(zaehlNamen) - 1
-    IF zaehlNamen[prK] = "s0" OR zaehlNamen[prK] = "s7" OR zaehlNamen[prK] = "s19999" THEN protokoll("pr " + zaehlNamen[prK] + " " + zaehlTexte[prK])
+FOR prK = 0 TO LEN(zaehlStellen) - 1
+    IF zaehlStellen[prK].name = "s0" OR zaehlStellen[prK].name = "s7" OR zaehlStellen[prK].name = "s19999" THEN protokoll("pr " + zaehlStellen[prK].name + " " + zaehlStellen[prK].text)
 NEXT
 protokoll("pr flott " + STR$(prD < 1.2))
 EXIT(0)

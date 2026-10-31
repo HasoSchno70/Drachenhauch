@@ -1332,7 +1332,7 @@ Whoever tries to create a class with announcements still open using `NEW` gets
 a **compile error** — not only at run time:
 
 ```
-NEW form: die Klasse kuendigt eine Methode an, ohne sie auszufuellen (zeichne).
+NEW FORM: die Klasse kuendigt eine Methode an, ohne sie auszufuellen (zeichne).
 ```
 
 This way you can write a base class that works with methods that do not

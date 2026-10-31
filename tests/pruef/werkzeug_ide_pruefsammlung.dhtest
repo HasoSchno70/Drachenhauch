@@ -19,10 +19,10 @@ IF prSchritt = 1 AND prBild > 42 AND testProz < 0 THEN
     problemAnspringen()
     DIM prZ AS INTEGER
     DIM prS AS INTEGER
-    (prZ, prS) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
+    (prZ, prS) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
     protokoll("pr marke " + STR$(prZ))
     ' Marke in den ersten (gruenen) Fall, nur ihn laufen lassen.
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 3, 1)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 3, 1)
     befehl("prueffall")
     prSchritt = 2
 END IF
@@ -72,7 +72,7 @@ prBild = prBild + 1
 IF prBild = 30 THEN
     DIM prSam AS INTEGER : prSam = aktiverTab
     dateiOeffnen(PATHJOIN(projektOrdner, "rechnen.dh"))
-    GUI_SET_TEXT(tabFelder[aktiverTab], "FUNCTION mal(a AS INTEGER, b AS INTEGER) AS INTEGER" + NL + "    RETURN a + b" + NL + "END FUNCTION")
+    GUI_SET_TEXT(reiter[aktiverTab].feld, "FUNCTION mal(a AS INTEGER, b AS INTEGER) AS INTEGER" + NL + "    RETURN a + b" + NL + "END FUNCTION")
     aktiverTab = prSam
     reiterNeuSetzen()
     befehl("pruefsammlung")

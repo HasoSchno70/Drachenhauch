@@ -343,7 +343,9 @@ PRINT "ohne basis "; hat(CODE_HOVER$(q, 19, 17), "Rufname.")
 PRINT "in der klasse "; hat(CODE_HOVER$(q, 7, 10), "Bestenliste.")
 PRINT "mitglieder "; JOIN$(CODE_COMPLETE(q, 20, 9, CWD$()), ",")
 PRINT "mit anfang "; JOIN$(CODE_COMPLETE(q, 20, 10, CWD$()), ",")
-PRINT "ohne basis viele "; LEN(CODE_COMPLETE(q, 20, 9)) > 100
+' Ohne basis$ ist die Klasse unbekannt: hinter dem Punkt die Mitglieder ALLER
+' Klassen des Textes -- keine Befehle (bis 2026-10-30 kamen alle ~1500).
+PRINT "ohne basis "; JOIN$(CODE_COMPLETE(q, 20, 9), ",")
 --- datei q.dh
 CLASS Tier
     ' Rufname.
@@ -374,7 +376,7 @@ ohne basis TRUE
 in der klasse TRUE
 mitglieder name,hp,heilen
 mit anfang hp,heilen
-ohne basis viele TRUE
+ohne basis name,hp,heilen
 
 === namensraum und methodenaufrufe
 ' Hinter `kern.` (IMPORT ... AS kern) die obersten Definitionen der Datei

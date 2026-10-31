@@ -8,7 +8,7 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 80 THEN
-    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    DIM prTa AS GUI_WIDGET : prTa = reiter[aktiverTab].feld
     protokoll("pr auf zaehlr " + STR$(INSTR(meldungBei$(prTa, 2, 4), "zaehlr") >= 0))
     protokoll("pr daneben " + STR$(meldungBei$(prTa, 2, 12) = ""))
     protokoll("pr andere zeile " + STR$(meldungBei$(prTa, 1, 4) = ""))

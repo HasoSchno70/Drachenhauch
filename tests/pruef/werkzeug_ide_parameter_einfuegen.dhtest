@@ -13,8 +13,8 @@
 === parameternamen an aufrufen mit festen argumenten
 pruefen()
 DIM prI AS INTEGER
-FOR prI = 0 TO LEN(paramZeilen) - 1
-    protokoll("pr param " + STR$(paramZeilen[prI]) + " " + paramTexte[prI])
+FOR prI = 0 TO LEN(paramHinweise) - 1
+    protokoll("pr param " + STR$(paramHinweise[prI].zeile) + " " + paramHinweise[prI].text)
 NEXT
 befehl("parameter_namen")
 protokoll("pr aus " + STR$(paramNamenAn))
@@ -71,11 +71,11 @@ gemerkt FALSE
 ' der Zeile. Geprueft: die Hinweise ganz hinten stimmen (auch ein Aufruf
 ' ueber zwei Zeilen), und es geht flott (grob: 1 s).
 DIM prT AS FLOAT : prT = GET_TIME()
-parameterSammeln(tabFelder[aktiverTab])
+parameterSammeln(reiter[aktiverTab].feld)
 DIM prD AS FLOAT : prD = GET_TIME() - prT
 DIM prI AS INTEGER
-FOR prI = 0 TO LEN(paramZeilen) - 1
-    protokoll("pr param " + STR$(paramZeilen[prI]) + " " + paramTexte[prI])
+FOR prI = 0 TO LEN(paramHinweise) - 1
+    protokoll("pr param " + STR$(paramHinweise[prI].zeile) + " " + paramHinweise[prI].text)
 NEXT
 protokoll("pr flott " + STR$(prD < 1.0))
 EXIT(0)
@@ -114,7 +114,7 @@ pr flott TRUE
 === strg v rueckt den block an seine stelle ein, strg z nimmt es zurueck
 DIM prBild AS INTEGER : prBild = 0
 FUNCTION prText$() AS STRING
-    RETURN REPLACE$(GUI_TEXT(tabFelder[aktiverTab]), NL, "/")
+    RETURN REPLACE$(GUI_TEXT(reiter[aktiverTab].feld), NL, "/")
 END FUNCTION
 --- programm ../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
@@ -122,9 +122,9 @@ prBild = prBild + 1
 IF prBild = 20 THEN
     CLIPBOARD_SET("FOR i = 1 TO 3" + NL + "        PRINT i" + NL + "    NEXT")
     ' Zeile 4 traegt acht Leerzeichen (eine Beilage verloere sie).
-    GUI_SET_TEXT(tabFelder[aktiverTab], "SUB s()" + NL + "    IF TRUE THEN" + NL + "        PRINT 1" + NL + "        " + NL + "    END IF" + NL + "END SUB")
-    GUI_FOCUS(tabFelder[aktiverTab])
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 4, 9)
+    GUI_SET_TEXT(reiter[aktiverTab].feld, "SUB s()" + NL + "    IF TRUE THEN" + NL + "        PRINT 1" + NL + "        " + NL + "    END IF" + NL + "END SUB")
+    GUI_FOCUS(reiter[aktiverTab].feld)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 4, 9)
     ' Strg+V, spaeter Strg+Z
     WRITEALL("prtaste.txt", "c 9" + CHR$(10) + "e 0 1 340 0 0" + CHR$(10) + _
              "e 4 2 341 0 0" + CHR$(10) + "e 5 2 86 0 0" + CHR$(10) + "e 7 1 86 0 0" + CHR$(10) + "e 8 1 341 0 0" + CHR$(10) + _
@@ -162,7 +162,7 @@ pr eingefuegt |SUB s()/    IF TRUE THEN/        PRINT 1/        FOR i = 1 TO 3/ 
 pr nach z |SUB s()/    IF TRUE THEN/        PRINT 1/        FOR i = 1 TO 3/        PRINT i/    NEXT/    END IF/END SUB|
 
 === mitten in der zeile und abgeschaltet
-DIM prT AS GUI_WIDGET : prT = tabFelder[aktiverTab]
+DIM prT AS GUI_WIDGET : prT = reiter[aktiverTab].feld
 CLIPBOARD_SET("a," + NL + "  b)")
 GUI_TEXTAREA_GOTO(prT, 1, 11)
 befehl("code_einfuegen")
@@ -201,7 +201,7 @@ pr aus |    x = f(a,/    b)/    y = 1/    z = g(a,/  b)|
 ' Umschalt+Pos1) und einen eingerueckten Block darueber gesetzt -- IF, ELSE
 ' und END IF landeten in Spalte 0, der Rumpf eingerueckt. In Spalte 0 sagt
 ' nichts, wohin der Block gehoert; er bleibt, wie er kopiert wurde.
-DIM prT AS GUI_WIDGET : prT = tabFelder[aktiverTab]
+DIM prT AS GUI_WIDGET : prT = reiter[aktiverTab].feld
 CLIPBOARD_SET("    IF a THEN" + NL + "        b = 1" + NL + "    ELSE" + NL + "        b = 2" + NL + "    END IF")
 GUI_TEXTAREA_SELECT(prT, 2, 1, 2, 1000000)
 befehl("code_einfuegen")
@@ -238,8 +238,8 @@ pr spalte0 |SUB s()/    IF a THEN/        b = 1/    ELSE/        b = 2/    END I
 ' ihrer Klasse -- der Fall danach.)
 pruefen()
 DIM prI AS INTEGER
-FOR prI = 0 TO LEN(paramZeilen) - 1
-    protokoll("pr param " + STR$(paramZeilen[prI]) + " " + paramTexte[prI])
+FOR prI = 0 TO LEN(paramHinweise) - 1
+    protokoll("pr param " + STR$(paramHinweise[prI].zeile) + " " + paramHinweise[prI].text)
 NEXT
 EXIT(0)
 --- programm ../../ide/ide.dh nach protokoll("bereit")
@@ -292,8 +292,8 @@ pr param 21 s, n
 ' (CODE_METHOD_CALLS$), je aus der Klasse des Objekts.
 pruefen()
 DIM prI AS INTEGER
-FOR prI = 0 TO LEN(paramZeilen) - 1
-    protokoll("pr param " + STR$(paramZeilen[prI]) + " " + paramTexte[prI])
+FOR prI = 0 TO LEN(paramHinweise) - 1
+    protokoll("pr param " + STR$(paramHinweise[prI].zeile) + " " + paramHinweise[prI].text)
 NEXT
 EXIT(0)
 --- programm ../../ide/ide.dh nach protokoll("bereit")
@@ -338,18 +338,18 @@ pr param 18 pWert, qWert
 === vervollstaendigen hinter dem punkt setzt die platzhalter der klasse
 ' `ob.se` vervollstaendigt zu `setz` und bekommt die Argumente als
 ' Platzhalter -- die von Bb, nicht die der ersten `setz` im Text (Aa).
-GUI_FOCUS(tabFelder[0])
-GUI_TEXTAREA_GOTO(tabFelder[0], 12, 1)
-GUI_TEXTAREA_INSERT(tabFelder[0], "ob.se")
+GUI_FOCUS(reiter[0].feld)
+GUI_TEXTAREA_GOTO(reiter[0].feld, 12, 1)
+GUI_TEXTAREA_INSERT(reiter[0].feld, "ob.se")
 vervollstaendigen(TRUE)
 DIM prK AS INTEGER
 FOR prK = 0 TO GUI_LISTBOX_COUNT(lstVervoll) - 1
     IF GUI_LISTBOX_ITEM(lstVervoll, prK) = "setz" THEN GUI_LISTBOX_SET_SELECTED(lstVervoll, prK)
 NEXT
 vervollUebernehmen()
-DIM prZeilen AS ARRAY OF STRING : prZeilen = SPLIT$(GUI_TEXT(tabFelder[0]), NL)
+DIM prZeilen AS ARRAY OF STRING : prZeilen = SPLIT$(GUI_TEXT(reiter[0].feld), NL)
 protokoll("pr zeile " + prZeilen[11])
-protokoll("pr markiert " + GUI_TEXTAREA_SELECTION$(tabFelder[0]))
+protokoll("pr markiert " + GUI_TEXTAREA_SELECTION$(reiter[0].feld))
 EXIT(0)
 --- programm ../../ide/ide.dh nach protokoll("bereit")
 --- argumente

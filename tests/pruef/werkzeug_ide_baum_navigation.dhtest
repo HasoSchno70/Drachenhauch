@@ -37,7 +37,7 @@ IF prBild = 45 THEN
     protokoll("pr gewaehlt " + BASENAME(GUI_FILETREE_SELECTED$(baum)) + " reiter " + STR$(tabAnzahl))
 END IF
 IF prBild = 110 THEN
-    protokoll("pr reiter " + STR$(tabAnzahl) + " vorn " + BASENAME(tabPfade[aktiverTab]))
+    protokoll("pr reiter " + STR$(tabAnzahl) + " vorn " + BASENAME(reiter[aktiverTab].pfad))
     EXIT(0)
 END IF
 --- argumente
@@ -69,9 +69,9 @@ neu.dh da TRUE
 ' haupt.dh ist offen und gesichert, andere.dh nicht offen: beide bekommen
 ' den neuen Namen im IMPORT, der Kommentar nicht.
 baumUmbenennen(PATHJOIN(projektOrdner, "lib/helfer.dh"), "werkzeug.dh")
-protokoll("pr reiter " + BASENAME(tabPfade[aktiverTab]) + " sauber " + STR$(GUI_TEXT(tabFelder[aktiverTab]) = tabGesichert[aktiverTab]))
+protokoll("pr reiter " + BASENAME(reiter[aktiverTab].pfad) + " sauber " + STR$(GUI_TEXT(reiter[aktiverTab].feld) = reiter[aktiverTab].gesichert))
 dateiOeffnen(PATHJOIN(projektOrdner, "lib/werkzeug.dh"))
-protokoll("pr zweiter reiter " + BASENAME(tabPfade[aktiverTab]) + " reiter " + STR$(tabAnzahl))
+protokoll("pr zweiter reiter " + BASENAME(reiter[aktiverTab].pfad) + " reiter " + STR$(tabAnzahl))
 EXIT(0)
 --- programm ../../ide/ide.dh nach protokoll("bereit")
 --- argumente
@@ -202,18 +202,18 @@ DIM prBild AS INTEGER : prBild = 0
 FUNCTION prStelle$() AS STRING
     DIM z AS INTEGER
     DIM s AS INTEGER
-    (z, s) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
-    RETURN BASENAME(tabPfade[aktiverTab]) + ":" + STR$(z)
+    (z, s) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
+    RETURN BASENAME(reiter[aktiverTab].pfad) + ":" + STR$(z)
 END FUNCTION
 --- programm ../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
-IF prBild = 20 THEN GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 3, 1)
+IF prBild = 20 THEN GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 3, 1)
 ' ein kleiner Schritt: kein Sprung
-IF prBild = 22 THEN GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 5, 1)
-IF prBild = 24 THEN GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 25, 1)
+IF prBild = 22 THEN GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 5, 1)
+IF prBild = 24 THEN GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 25, 1)
 IF prBild = 26 THEN dateiOeffnen(PATHJOIN(projektOrdner, "zwei.dh"))
-IF prBild = 28 THEN GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 2, 1)
+IF prBild = 28 THEN GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 2, 1)
 IF prBild = 30 THEN protokoll("pr jetzt " + prStelle$()) : befehl("nav_zurueck")
 IF prBild = 32 THEN protokoll("pr nach 1 " + prStelle$()) : befehl("nav_zurueck")
 IF prBild = 34 THEN protokoll("pr nach 2 " + prStelle$()) : befehl("nav_zurueck")
@@ -222,7 +222,7 @@ IF prBild = 38 THEN protokoll("pr nach 4 " + prStelle$()) : befehl("nav_vor")
 IF prBild = 40 THEN protokoll("pr vor 1 " + prStelle$()) : befehl("nav_vor")
 IF prBild = 42 THEN protokoll("pr vor 2 " + prStelle$())
 ' Ein neuer Sprung nimmt die Vorwaerts-Liste weg.
-IF prBild = 44 THEN GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 20, 1)
+IF prBild = 44 THEN GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 20, 1)
 IF prBild = 46 THEN befehl("nav_vor") : protokoll("pr status " + GUI_TEXT(lblStatus))
 IF prBild = 48 THEN EXIT(0)
 --- argumente

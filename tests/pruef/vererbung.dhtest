@@ -262,7 +262,7 @@ END CLASS
 DIM f AS Form
 f = NEW Form("x")
 --- fehler
-NEW form: die Klasse kuendigt eine Methode an, ohne sie auszufuellen (flaeche). Entweder eine Unterklasse nehmen, die sie ausschreibt, oder die Methode in form mit einem Rumpf versehen.
+NEW FORM: die Klasse kuendigt eine Methode an, ohne sie auszufuellen (flaeche). Entweder eine Unterklasse nehmen, die sie ausschreibt, oder die Methode in FORM mit einem Rumpf versehen.
 
 === die meldung nennt die fehlende methode
 CLASS Form
@@ -278,7 +278,7 @@ END CLASS
 DIM f AS Form
 f = NEW Form("x")
 --- fehler
-NEW form: die Klasse kuendigt eine Methode an, ohne sie auszufuellen (flaeche). Entweder eine Unterklasse nehmen, die sie ausschreibt, oder die Methode in form mit einem Rumpf versehen.
+NEW FORM: die Klasse kuendigt eine Methode an, ohne sie auszufuellen (flaeche). Entweder eine Unterklasse nehmen, die sie ausschreibt, oder die Methode in FORM mit einem Rumpf versehen.
 
 === halb ausgefuellte unterklasse bleibt unfertig
 CLASS Form
@@ -293,7 +293,7 @@ END CLASS
 DIM h AS Halb
 h = NEW Halb()
 --- fehler
-NEW halb: die Klasse kuendigt eine Methode an, ohne sie auszufuellen (zeichne). Entweder eine Unterklasse nehmen, die sie ausschreibt, oder die Methode in halb mit einem Rumpf versehen.
+NEW HALB: die Klasse kuendigt eine Methode an, ohne sie auszufuellen (zeichne). Entweder eine Unterklasse nehmen, die sie ausschreibt, oder die Methode in HALB mit einem Rumpf versehen.
 
 === zwei offene methoden werden beide genannt
 CLASS Form
@@ -303,7 +303,7 @@ END CLASS
 DIM f AS Form
 f = NEW Form()
 --- fehler
-NEW form: die Klasse kuendigt Methoden an, ohne sie auszufuellen (flaeche, zeichne). Entweder eine Unterklasse nehmen, die sie ausschreibt, oder die Methode in form mit einem Rumpf versehen.
+NEW FORM: die Klasse kuendigt Methoden an, ohne sie auszufuellen (flaeche, zeichne). Entweder eine Unterklasse nehmen, die sie ausschreibt, oder die Methode in FORM mit einem Rumpf versehen.
 
 === ganz ausgefuellte unterklasse geht
 CLASS Form

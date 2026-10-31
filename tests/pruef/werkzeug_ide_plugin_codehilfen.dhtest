@@ -36,8 +36,8 @@ IF prSchritt = 0 AND prProbleme$() <> "" AND ARRAY_INDEXOF(ctxKennung, "plugin:s
     protokoll("pr probleme " + prProbleme$())
     ' Die Stellen der Wellenlinien: Zeile, Spalte, Laenge.
     DIM prI AS INTEGER
-    FOR prI = 0 TO LEN(probZeile) - 1
-        IF LEFT$(probMeldung[prI], 14) = "[schreibweise]" THEN protokoll("pr stelle " + STR$(probZeile[prI]) + " " + STR$(probSpalte[prI]) + " " + STR$(probLaenge[prI]))
+    FOR prI = 0 TO LEN(probleme) - 1
+        IF LEFT$(probleme[prI].meldung, 14) = "[schreibweise]" THEN protokoll("pr stelle " + STR$(probleme[prI].zeile) + " " + STR$(probleme[prI].spalte) + " " + STR$(probleme[prI].laenge))
     NEXT
     ' Gegenprobe zuerst: "seperat" in einer Zeichenkette (Zeile 2).
     prZiel(2, 10, FALSE, FALSE)

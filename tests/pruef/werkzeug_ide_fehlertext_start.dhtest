@@ -161,8 +161,8 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
-    startWertSetzen(tabPfade[aktiverTab], FALSE, "eins " + CHR$(34) + "zwei drei" + CHR$(34))
-    startWertSetzen(tabPfade[aktiverTab], TRUE, "DH_PROBE_STUFE=7")
+    startWertSetzen(reiter[aktiverTab].pfad, FALSE, "eins " + CHR$(34) + "zwei drei" + CHR$(34))
+    startWertSetzen(reiter[aktiverTab].pfad, TRUE, "DH_PROBE_STUFE=7")
     befehl("start_argumente")
     WRITEALL("prtaste.txt", "c 3" + CHR$(10) + "e 0 1 340 0 0 0" + CHR$(10) + "e 4 2 257 0 0 0" + CHR$(10) + "e 8 1 257 0 0 0" + CHR$(10) + CHR$(10))
     AUTOMATION_PLAY("prtaste.txt")
@@ -214,7 +214,7 @@ IF prBild = 20 THEN
     befehl("start")
 END IF
 IF prBild = 80 THEN
-    GUI_SET_TEXT(tabFelder[aktiverTab], "PRINT " + CHR$(34) + "zweite fassung" + CHR$(34) + CHR$(10) + "WHILE TRUE : SLEEP(50) : WEND" + CHR$(10))
+    GUI_SET_TEXT(reiter[aktiverTab].feld, "PRINT " + CHR$(34) + "zweite fassung" + CHR$(34) + CHR$(10) + "WHILE TRUE : SLEEP(50) : WEND" + CHR$(10))
     befehl("sichern")
 END IF
 IF prBild = 200 THEN
@@ -260,7 +260,7 @@ DIM prBild AS INTEGER : prBild = 0
 prBild = prBild + 1
 IF prBild = 20 THEN befehl("start")
 IF prBild = 80 THEN
-    GUI_SET_TEXT(tabFelder[aktiverTab], "PRINT " + CHR$(34) + "zweite fassung" + CHR$(34) + CHR$(10) + "WHILE TRUE : SLEEP(50) : WEND" + CHR$(10))
+    GUI_SET_TEXT(reiter[aktiverTab].feld, "PRINT " + CHR$(34) + "zweite fassung" + CHR$(34) + CHR$(10) + "WHILE TRUE : SLEEP(50) : WEND" + CHR$(10))
     befehl("sichern")
 END IF
 IF prBild = 200 THEN

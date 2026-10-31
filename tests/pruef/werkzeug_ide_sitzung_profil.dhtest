@@ -28,7 +28,7 @@ IF prBild = 150 THEN
     DIM prZ AS INTEGER
     DIM prS AS INTEGER
     (prZ, prS) = GUI_TEXTAREA_CURSOR(aktivesFeld())
-    protokoll("probe sprung " + BASENAME(tabPfade[aktiverTab]) + " " + STR$(prZ))
+    protokoll("probe sprung " + BASENAME(reiter[aktiverTab].pfad) + " " + STR$(prZ))
 END IF
 --- argumente
 spiel.dh
@@ -66,7 +66,7 @@ DIM prBild AS INTEGER : prBild = 0
 prBild = prBild + 1
 IF prBild = 20 THEN
     dateiOeffnen(PATHJOIN(projektOrdner, "helfer.dh"))
-    GUI_SET_TEXT(tabFelder[aktiverTab], "SUB hallo()" + CHR$(10) + "    PRINT " + CHR$(34) + "neu" + CHR$(34) + CHR$(10) + "END SUB" + CHR$(10))
+    GUI_SET_TEXT(reiter[aktiverTab].feld, "SUB hallo()" + CHR$(10) + "    PRINT " + CHR$(34) + "neu" + CHR$(34) + CHR$(10) + "END SUB" + CHR$(10))
     dateiOeffnen(PATHJOIN(projektOrdner, "spiel.dh"))
     befehl("start")
 END IF
@@ -103,21 +103,21 @@ probe ausgabe neu
 === haltepunkte und lesezeichen ueberleben den neustart
 ' Erster Lauf setzt je einen (mit Bedingung), der zweite liest sie zurueck.
 IF NOT FILEEXISTS("zweiter.txt") THEN
-    haltepunktUmschaltenIn(tabPfade[aktiverTab], 2)
-    bedingungZeile = 3 : bedingungPfad = tabPfade[aktiverTab]
+    haltepunktUmschaltenIn(reiter[aktiverTab].pfad, 2)
+    bedingungZeile = 3 : bedingungPfad = reiter[aktiverTab].pfad
     haltepunktBedingungSetzen("x > 1")
-    lzDateien = [tabPfade[aktiverTab]] : lzZeilen = [3]
+    lesezeichen = [] : ARRAY_PUSH(lesezeichen, NEW CodeStelle(reiter[aktiverTab].pfad, 3, 1))
     WRITEALL("zweiter.txt", "ja")
     ' Wie beim Beenden: die Einstellungen sichern.
     konfigSichern()
     EXIT(0)
 END IF
 DIM prI AS INTEGER
-FOR prI = 0 TO LEN(hpZeilen) - 1
-    protokoll("probe hp " + BASENAME(hpDateien[prI]) + " " + STR$(hpZeilen[prI]) + " [" + hpBedingungen[prI] + "]")
+FOR prI = 0 TO LEN(haltepunkte) - 1
+    protokoll("probe hp " + BASENAME(haltepunkte[prI].datei) + " " + STR$(haltepunkte[prI].zeile) + " [" + haltepunkte[prI].bedingung + "]")
 NEXT
-FOR prI = 0 TO LEN(lzZeilen) - 1
-    protokoll("probe lz " + BASENAME(lzDateien[prI]) + " " + STR$(lzZeilen[prI]))
+FOR prI = 0 TO LEN(lesezeichen) - 1
+    protokoll("probe lz " + BASENAME(lesezeichen[prI].pfad) + " " + STR$(lesezeichen[prI].zeile))
 NEXT
 EXIT(0)
 --- programm ../../ide/ide.dh nach protokoll("bereit")
@@ -215,11 +215,11 @@ IF prBild > 35 AND prozess < 0 AND prEnde = 0 THEN
     prEnde = prBild
     DIM prOk AS BOOLEAN : prOk = TRUE
     DIM prK AS INTEGER
-    FOR prK = 1 TO LEN(profRohT) - 1
-        IF profRohT[prK] > profRohT[prK - 1] THEN prOk = FALSE
-        IF profRohT[prK] = profRohT[prK - 1] AND profRohZ[prK] < profRohZ[prK - 1] THEN prOk = FALSE
+    FOR prK = 1 TO LEN(profMessung) - 1
+        IF profMessung[prK].zeit > profMessung[prK - 1].zeit THEN prOk = FALSE
+        IF profMessung[prK].zeit = profMessung[prK - 1].zeit AND profMessung[prK].zeile < profMessung[prK - 1].zeile THEN prOk = FALSE
     NEXT
-    protokoll("pr zeilen " + STR$(LEN(profRohT)) + " absteigend " + STR$(prOk) + " flott " + STR$(prMax < 5.0))
+    protokoll("pr zeilen " + STR$(LEN(profMessung)) + " absteigend " + STR$(prOk) + " flott " + STR$(prMax < 5.0))
     EXIT(0)
 END IF
 --- argumente

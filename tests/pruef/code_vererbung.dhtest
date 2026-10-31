@@ -1,0 +1,112 @@
+' Die Code-Werkzeuge der Laufzeit kennen Vererbung: ABSTRACT-Methoden sind
+' Definitionen (CODE_CLASSES$, Gliederung, Sprung), F12 sucht in der eigenen
+' Klasse und ihren Vorfahrinnen, hinter einem Punkt stehen nur Mitglieder,
+' kontextabhaengige Woerter werden eingefaerbt, und zu "NEW Katze" mit
+' fehlender Methode gibt es eine Schnellkorrektur.
+
+=== abstract steht in code_classes und code_symbols
+IMPORT "json"
+DIM NL AS STRING : NL = CHR$(10)
+DIM q AS STRING : q = "CLASS Tier" + NL + "    ABSTRACT FUNCTION laut(n AS INTEGER) AS STRING" + NL + "    SUB zeigen()" + NL + "    END SUB" + NL + "END CLASS"
+DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "k" + CHR$(34) + ":" + CODE_CLASSES$(q) + "}")
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(j, "k.0.mitglieder") - 1
+    PRINT JSON_GET_STRING(j, "k.0.mitglieder." + STR$(i) + ".name"); " ["; JSON_GET_STRING(j, "k.0.mitglieder." + STR$(i) + ".typ"); "]"
+NEXT
+DIM s AS JSON_HANDLE : s = JSON_PARSE("{" + CHR$(34) + "s" + CHR$(34) + ":" + CODE_SYMBOLS$(q) + "}")
+FOR i = 0 TO JSON_LEN(s, "s.0.kinder") - 1
+    PRINT "kind "; JSON_GET_STRING(s, "s.0.kinder." + STR$(i) + ".name"); " "; JSON_GET_INT(s, "s.0.kinder." + STR$(i) + ".von"); "-"; JSON_GET_INT(s, "s.0.kinder." + STR$(i) + ".bis")
+NEXT
+PRINT "klasse bis "; JSON_GET_INT(s, "s.0.bis")
+--- erwartet
+laut [STRING]
+zeigen []
+kind laut 2-2
+kind zeigen 3-4
+klasse bis 5
+
+=== f12 bleibt in der klassenkette
+DIM NL AS STRING : NL = CHR$(10)
+DIM q AS STRING
+q = "CLASS Tier" + NL + "    ABSTRACT FUNCTION laut() AS STRING" + NL + "    SUB zeigen()" + NL + "        PRINT laut()" + NL + "    END SUB" + NL + "END CLASS" + NL
+q = q + "CLASS Hund EXTENDS Tier" + NL + "    FUNCTION laut() AS STRING" + NL + "        zeigen()" + NL + "        RETURN laut()" + NL + "    END FUNCTION" + NL + "END CLASS"
+' laut() in Tier -> die Ankuendigung (Zeile 2), nicht Hund.laut (Zeile 8)
+PRINT CODE_DEFINITION(q, 4, 16)
+' zeigen() in Hund -> geerbt aus Tier (Zeile 3)
+PRINT CODE_DEFINITION(q, 9, 10)
+' laut() in Hund -> die eigene (Zeile 8)
+PRINT CODE_DEFINITION(q, 10, 17)
+--- erwartet
+(2, 23)
+(3, 9)
+(8, 14)
+
+=== hinter dem punkt nur mitglieder
+DIM NL AS STRING : NL = CHR$(10)
+DIM q AS STRING : q = "CLASS Tier" + NL + "    DIM lage AS INTEGER" + NL + "    ABSTRACT FUNCTION laut() AS STRING" + NL + "END CLASS" + NL + "DIM t AS Tier" + NL + "t.la"
+PRINT "["; JOIN$(CODE_COMPLETE(q, 6, 5), ","); "]"
+' ohne Punkt weiter alles
+PRINT ARRAY_INDEXOF(CODE_COMPLETE("LA", 1, 3), "LAYER") >= 0
+--- erwartet
+[lage,laut]
+TRUE
+
+=== kontextwoerter werden eingefaerbt
+DIM q AS STRING : q = "ABSTRACT FUNCTION f() : FOR EACH e IN a : DIM do AS INTEGER"
+DIM st AS ARRAY OF INTEGER
+DIM ln AS ARRAY OF INTEGER
+DIM ar AS ARRAY OF STRING
+(st, ln, ar) = SYNTAX_SPANS(q)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(st) - 1
+    IF ar[i] = "schluessel" OR ar[i] = "name" THEN PRINT MID$(q, st[i], ln[i]); "="; ar[i]
+NEXT
+--- erwartet
+ABSTRACT=schluessel
+FUNCTION=schluessel
+f=name
+FOR=schluessel
+EACH=schluessel
+e=name
+IN=schluessel
+a=name
+DIM=schluessel
+do=name
+AS=schluessel
+INTEGER=schluessel
+
+=== fehlende methoden einfuegen
+IMPORT "json"
+DIM NL AS STRING : NL = CHR$(10)
+DIM q AS STRING
+q = "CLASS Tier" + NL + "    ABSTRACT FUNCTION laut(n AS INTEGER) AS STRING ' Ton" + NL + "    ABSTRACT SUB gehen()" + NL + "END CLASS" + NL
+q = q + "CLASS Katze EXTENDS Tier" + NL + "    DIM name AS STRING" + NL + "END CLASS" + NL + "DIM k AS Katze" + NL + "k = NEW Katze()"
+DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "d" + CHR$(34) + ":" + CODE_CHECK$(q) + "}")
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(j, "d") - 1
+    DIM p AS STRING : p = "d." + STR$(i)
+    PRINT JSON_GET_STRING(j, p + ".meldung")
+    IF NOT JSON_HAS(j, p + ".korrekturen") THEN CONTINUE
+    FOR k = 0 TO JSON_LEN(j, p + ".korrekturen") - 1
+        DIM a AS STRING : a = p + ".korrekturen." + STR$(k) + ".aenderungen.0"
+        PRINT "  "; JSON_GET_STRING(j, p + ".korrekturen." + STR$(k) + ".titel"); " @"; JSON_GET_INT(j, a + ".zeile"); ":"; JSON_GET_INT(j, a + ".spalte"); "+"; JSON_GET_INT(j, a + ".laenge")
+        DIM neu AS STRING : neu = JSON_GET_STRING(j, a + ".text")
+        DIM z AS STRING
+        FOR EACH z IN SPLIT$(neu, NL)
+            PRINT "  |"; z; "|"
+        NEXT
+    NEXT
+NEXT
+--- erwartet
+NEW KATZE: die Klasse kuendigt Methoden an, ohne sie auszufuellen (gehen, laut). Entweder eine Unterklasse nehmen, die sie ausschreibt, oder die Methode in KATZE mit einem Rumpf versehen.
+  Fehlende Methoden einfuegen (gehen, laut) @7:1+0
+  ||
+  |    SUB gehen()|
+  |        |
+  |    END SUB|
+  ||
+  |    FUNCTION laut(n AS INTEGER) AS STRING|
+  |        |
+  |    END FUNCTION|
+  ||

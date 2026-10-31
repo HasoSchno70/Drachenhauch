@@ -12,10 +12,10 @@ DIM prY AS INTEGER : prY = -1
 --- programm ../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
-IF prBild = 60 THEN GUI_TEXTAREA_SCROLL(tabFelder[aktiverTab], 30)
+IF prBild = 60 THEN GUI_TEXTAREA_SCROLL(reiter[aktiverTab].feld, 30)
 IF prBild = 64 THEN befehl("blockkopf")
 IF prBild = 68 THEN
-    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    DIM prTa AS GUI_WIDGET : prTa = reiter[aktiverTab].feld
     DIM prZ AS INTEGER
     DIM prS AS INTEGER
     DIM prYy AS INTEGER
@@ -35,7 +35,7 @@ IF prBild = 68 THEN
     befehl("blockkopf")
 END IF
 IF prBild = 72 THEN
-    (prZ, prS) = GUI_TEXTAREA_POS_AT(tabFelder[aktiverTab], prX, prY)
+    (prZ, prS) = GUI_TEXTAREA_POS_AT(reiter[aktiverTab].feld, prX, prY)
     protokoll("pr an oben " + STR$(prZ))
     befehl("blockkopf")
     EXIT(0)

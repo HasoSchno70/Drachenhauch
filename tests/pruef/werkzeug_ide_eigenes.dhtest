@@ -12,18 +12,18 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
-    DIM prK AS INTEGER : prK = ARRAY_INDEXOF(schnipselAbk, "zaehl")
-    protokoll("pr zaehl " + schnipselHerkunft[prK] + " " + schnipselNamen[prK])
-    prK = ARRAY_INDEXOF(schnipselAbk, "for")
-    protokoll("pr for " + schnipselHerkunft[prK] + " " + REPLACE$(schnipselText[prK], NL, "/"))
-    protokoll("pr leer " + STR$(ARRAY_INDEXOF(schnipselNamen, "Leer")))
-    prK = ARRAY_INDEXOF(schnipselNamen, "Kaputt")
-    protokoll("pr ohne kuerzel " + STR$(prK >= 0) + " [" + schnipselAbk[prK] + "]")
+    DIM prK AS INTEGER : prK = schnipselNr("zaehl")
+    protokoll("pr zaehl " + schnipselListe[prK].herkunft + " " + schnipselListe[prK].name)
+    prK = schnipselNr("for")
+    protokoll("pr for " + schnipselListe[prK].herkunft + " " + REPLACE$(schnipselListe[prK].text, NL, "/"))
+    protokoll("pr leer " + STR$(schnipselMitNamen("Leer")))
+    prK = schnipselMitNamen("Kaputt")
+    protokoll("pr ohne kuerzel " + STR$(prK >= 0) + " [" + schnipselListe[prK].abk + "]")
     befehl("neu")
-    GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "zaehl")
-    schnipselEinfuegen(ARRAY_INDEXOF(schnipselAbk, "zaehl"), 5)
-    GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "1")
-    protokoll("pr text " + REPLACE$(GUI_TEXT(tabFelder[aktiverTab]), NL, "/"))
+    GUI_TEXTAREA_INSERT(reiter[aktiverTab].feld, "zaehl")
+    schnipselEinfuegen(schnipselNr("zaehl"), 5)
+    GUI_TEXTAREA_INSERT(reiter[aktiverTab].feld, "1")
+    protokoll("pr text " + REPLACE$(GUI_TEXT(reiter[aktiverTab].feld), NL, "/"))
     EXIT(0)
 END IF
 --- vorher
@@ -65,15 +65,15 @@ prBild = prBild + 1
 IF prBild = 20 THEN
     DIM prOrt AS STRING : prOrt = projektOrdner
     befehl("neu")
-    GUI_SET_TEXT(tabFelder[aktiverTab], "PRINT 42")
-    GUI_TEXTAREA_SELECT(tabFelder[aktiverTab], 1, 1, 1, 100)
+    GUI_SET_TEXT(reiter[aktiverTab].feld, "PRINT 42")
+    GUI_TEXTAREA_SELECT(reiter[aktiverTab].feld, 1, 1, 1, 100)
     schnipselAuswahlSichern("Antwort | antwort")
-    protokoll("pr antwort " + STR$(ARRAY_INDEXOF(schnipselAbk, "antwort") >= 0))
+    protokoll("pr antwort " + STR$(schnipselNr("antwort") >= 0))
     befehl("schnipsel_eigen")
-    GUI_SET_TEXT(tabFelder[aktiverTab], GUI_TEXT(tabFelder[aktiverTab]) + NL + "=== Gruss | gruss" + NL + "PRINT " + CHR$(34) + "hallo" + CHR$(34) + NL)
-    protokoll("pr gruss vorher " + STR$(ARRAY_INDEXOF(schnipselAbk, "gruss")))
+    GUI_SET_TEXT(reiter[aktiverTab].feld, GUI_TEXT(reiter[aktiverTab].feld) + NL + "=== Gruss | gruss" + NL + "PRINT " + CHR$(34) + "hallo" + CHR$(34) + NL)
+    protokoll("pr gruss vorher " + STR$(schnipselNr("gruss")))
     DIM prOk AS BOOLEAN : prOk = sichern(aktiverTab, FALSE)
-    protokoll("pr gruss nachher " + STR$(ARRAY_INDEXOF(schnipselAbk, "gruss") >= 0))
+    protokoll("pr gruss nachher " + STR$(schnipselNr("gruss") >= 0))
     protokoll("pr projekt gleich " + STR$(projektOrdner = prOrt))
     EXIT(0)
 END IF
@@ -115,7 +115,7 @@ prBild = prBild + 1
 IF prBild = 20 THEN
     DIM prW AS STRING
     FOR EACH prW IN ["neu", "zeile", "schnell", "suchen", "sichern"]
-        protokoll("pr " + prW + " " + befehlKuerzel[ARRAY_INDEXOF(befehlKennungen, prW)] + ".")
+        protokoll("pr " + prW + " " + befehle[befehlNr(prW)].kuerzel + ".")
     NEXT
     EXIT(0)
 END IF
@@ -224,9 +224,9 @@ IF prBild = 20 THEN
     protokoll("pr datei " + JOIN$(READLINES(tastenPfad$()), ""))
     tastenSetzen("neu", "strg+n")
     protokoll("pr datei " + JOIN$(READLINES(tastenPfad$()), ""))
-    protokoll("pr zeile " + befehlKuerzel[ARRAY_INDEXOF(befehlKennungen, "zeile")] + ".")
+    protokoll("pr zeile " + befehle[befehlNr("zeile")].kuerzel + ".")
     tastenZuruecksetzen()
-    protokoll("pr zeile " + befehlKuerzel[ARRAY_INDEXOF(befehlKennungen, "zeile")] + " " + STR$(FILEEXISTS(tastenPfad$())))
+    protokoll("pr zeile " + befehle[befehlNr("zeile")].kuerzel + " " + STR$(FILEEXISTS(tastenPfad$())))
     EXIT(0)
 END IF
 --- umgebung

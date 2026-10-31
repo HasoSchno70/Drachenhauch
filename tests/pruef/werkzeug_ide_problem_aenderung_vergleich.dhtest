@@ -13,7 +13,7 @@ DIM prBild AS INTEGER : prBild = 0
 FUNCTION prStelle$() AS STRING
     DIM z AS INTEGER
     DIM s AS INTEGER
-    (z, s) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
+    (z, s) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
     RETURN STR$(z) + ":" + STR$(s)
 END FUNCTION
 --- programm ../../ide/ide.dh nach SETFPS(60)
@@ -21,13 +21,13 @@ END FUNCTION
 prBild = prBild + 1
 IF prBild = 20 THEN
     pruefen()
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 1, 1)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 1, 1)
     befehl("problem_vor") : protokoll("pr vor " + prStelle$())
     befehl("problem_vor") : protokoll("pr vor " + prStelle$())
     befehl("problem_vor") : protokoll("pr vor " + prStelle$())
     befehl("problem_zurueck") : protokoll("pr zurueck " + prStelle$())
     protokoll("pr status " + GUI_TEXT(lblStatus))
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 3, 1)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 3, 1)
     ' Alt+F8 als echte Tasten
     WRITEALL("prtaste.txt", "c 5" + CHR$(10) + "e 0 1 340 0 0" + CHR$(10) + "e 4 2 342 0 0" + CHR$(10) + _
              "e 5 2 297 0 0" + CHR$(10) + "e 7 1 297 0 0" + CHR$(10) + "e 8 1 342 0 0" + CHR$(10) + CHR$(10))
@@ -78,15 +78,15 @@ DIM prBild AS INTEGER : prBild = 0
 FUNCTION prStelle$() AS STRING
     DIM z AS INTEGER
     DIM s AS INTEGER
-    (z, s) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
-    RETURN BASENAME(tabPfade[aktiverTab]) + ":" + STR$(z)
+    (z, s) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
+    RETURN BASENAME(reiter[aktiverTab].pfad) + ":" + STR$(z)
 END FUNCTION
 --- programm ../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 3, 8)
-    GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "0")
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 3, 8)
+    GUI_TEXTAREA_INSERT(reiter[aktiverTab].feld, "0")
 END IF
 IF prBild = 24 THEN dateiOeffnen(PATHJOIN(projektOrdner, "b.dh"))
 IF prBild = 28 THEN
@@ -136,7 +136,7 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
-    DIM prT AS GUI_WIDGET : prT = tabFelder[aktiverTab]
+    DIM prT AS GUI_WIDGET : prT = reiter[aktiverTab].feld
     GUI_SET_TEXT(prT, "eins" + NL + "ZWEI" + NL + "drei" + NL + "vier neu")
     befehl("gesichert_vergleichen")
     DIM prZ AS STRING
@@ -161,7 +161,7 @@ IF prBild = 26 THEN
     AUTOMATION_PLAY("prmaus.txt")
 END IF
 IF prBild = 50 THEN
-    protokoll("pr nachher |" + REPLACE$(GUI_TEXT(tabFelder[aktiverTab]), NL, "/") + "| sauber " + STR$(GUI_TEXT(tabFelder[aktiverTab]) = tabGesichert[aktiverTab]) + " fenster " + STR$(GUI_WINDOW_SHOWN(winVgl)))
+    protokoll("pr nachher |" + REPLACE$(GUI_TEXT(reiter[aktiverTab].feld), NL, "/") + "| sauber " + STR$(GUI_TEXT(reiter[aktiverTab].feld) = reiter[aktiverTab].gesichert) + " fenster " + STR$(GUI_WINDOW_SHOWN(winVgl)))
     befehl("gesichert_vergleichen")
     protokoll("pr status " + GUI_TEXT(lblStatus))
     EXIT(0)
@@ -207,7 +207,7 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
-    GUI_SET_TEXT(tabFelder[aktiverTab], "neu")
+    GUI_SET_TEXT(reiter[aktiverTab].feld, "neu")
     befehl("gesichert_vergleichen")
 END IF
 IF prBild = 26 THEN

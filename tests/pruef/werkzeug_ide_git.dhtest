@@ -11,9 +11,9 @@ prBild = prBild + 1
 IF prBild = 40 THEN befehl("git_fenster")
 IF prBild = 42 THEN
     DIM prI AS INTEGER
-    FOR prI = 0 TO LEN(qvPfade) - 1
-        protokoll("pr datei " + qvPfade[prI] + " " + GUI_LISTBOX_ITEM(lstQv, prI))
-        IF qvPfade[prI] = "a.dh" THEN GUI_LISTBOX_SET_CHECKED(lstQv, prI, TRUE)
+    FOR prI = 0 TO LEN(qvEintraege) - 1
+        protokoll("pr datei " + qvEintraege[prI].pfad + " " + GUI_LISTBOX_ITEM(lstQv, prI))
+        IF qvEintraege[prI].pfad = "a.dh" THEN GUI_LISTBOX_SET_CHECKED(lstQv, prI, TRUE)
     NEXT
 END IF
 IF prBild = 46 THEN
@@ -117,12 +117,12 @@ IF prBild = 40 THEN
 END IF
 IF prBild = 44 THEN
     DIM prI AS INTEGER
-    FOR prI = 0 TO LEN(qvPfade) - 1
+    FOR prI = 0 TO LEN(qvEintraege) - 1
         DIM prU AS FLOAT : prU = GET_TIME()
         qvDiffZeigen(prI)
         DIM prText AS STRING : prText = GUI_TEXT(taQvDiff)
         DIM prZ AS ARRAY OF STRING : prZ = SPLIT$(prText, NL)
-        protokoll("pr " + qvPfade[prI] + " kurz " + STR$(LEN(prText) < 600000) + " flott " + STR$(GET_TIME() - prU < 0.5) + " schluss " + LEFT$(prZ[LEN(prZ) - 1], 31))
+        protokoll("pr " + qvEintraege[prI].pfad + " kurz " + STR$(LEN(prText) < 600000) + " flott " + STR$(GET_TIME() - prU < 0.5) + " schluss " + LEFT$(prZ[LEN(prZ) - 1], 31))
     NEXT
     protokoll("pr fenster flott " + STR$(prD < 0.5))
     EXIT(0)

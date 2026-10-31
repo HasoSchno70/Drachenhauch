@@ -7,7 +7,7 @@
 --- langsam
 
 === gross klein und anfangsbuchstaben auf auswahl und wort
-DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+DIM prTa AS GUI_WIDGET : prTa = reiter[aktiverTab].feld
 DIM prZ1 AS INTEGER
 DIM prS1 AS INTEGER
 DIM prZ2 AS INTEGER
@@ -50,7 +50,7 @@ pr klein |hallo welt_neu x2|
 pr wort |ZWEITE zeile|
 
 === zeilen verbinden
-DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+DIM prTa AS GUI_WIDGET : prTa = reiter[aktiverTab].feld
 GUI_TEXTAREA_SELECT(prTa, 1, 3, 2, 2)
 befehl("zl_verbinden")
 ' Ohne Auswahl: diese und die naechste (die leere faellt weg).
@@ -116,7 +116,7 @@ END FUNCTION
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 ' Die Marke ans Ende von Zeile 2 -- sonst faerbt das Paar um die Marke mit.
-IF prBild = 20 THEN GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 2, 3)
+IF prBild = 20 THEN GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 2, 3)
 IF prBild = 30 THEN
     protokoll("pr aussen gold " + STR$(prFarbe(1, 6, F_KLAMMER1) > 3) + " violett " + STR$(prFarbe(1, 6, F_KLAMMER2)))
     protokoll("pr innen violett " + STR$(prFarbe(1, 7, F_KLAMMER2) > 3) + " gold " + STR$(prFarbe(1, 7, F_KLAMMER1)))
@@ -166,7 +166,7 @@ GUI_LISTBOX_SET_CHECKED(lstProbleme, 1, FALSE)
 trefferErsetzen(FALSE, "neu")
 ' a.dh ist offen: der Text steht im Reiter (ungesichert), b.dh auf der Platte.
 DIM prZ AS STRING
-FOR EACH prZ IN SPLIT$(GUI_TEXT(tabFelder[aktiverTab]), NL)
+FOR EACH prZ IN SPLIT$(GUI_TEXT(reiter[aktiverTab].feld), NL)
     protokoll("pr reiter |" + prZ + "|")
 NEXT
 ' Einzeln: nur der gewaehlte Treffer. Die Suche liest eine offene Datei

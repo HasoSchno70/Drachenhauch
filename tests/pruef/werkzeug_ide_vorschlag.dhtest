@@ -17,8 +17,8 @@
 --- langsam
 === die liste liegt beim tippen oben und unter der marke
 SETWINDOWTITLE(ARG$(1))
-GUI_FOCUS(tabFelder[0])
-GUI_TEXTAREA_GOTO(tabFelder[0], 2, 100)
+GUI_FOCUS(reiter[0].feld)
+GUI_TEXTAREA_GOTO(reiter[0].feld, 2, 100)
 DIM prSender AS INTEGER : prSender = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ARG$(2), ARG$(1), "tippe:GUI_WI")
 --- programm ../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach     trefferNachziehen()
@@ -27,12 +27,12 @@ DIM prSender AS INTEGER : prSender = PROCESS_START("powershell", "-NoProfile", "
         DIM prMx AS INTEGER
         DIM prMy AS INTEGER
         DIM prMh AS INTEGER
-        (prMx, prMy, prMh) = GUI_TEXTAREA_CARET_XY(tabFelder[0])
+        (prMx, prMy, prMh) = GUI_TEXTAREA_CARET_XY(reiter[0].feld)
         DIM prWx AS INTEGER : prWx = GUI_WINDOW_GET_X(winVervoll)
         DIM prWy AS INTEGER : prWy = GUI_WINDOW_GET_Y(winVervoll)
         protokoll("pr oben " + STR$(GUI_WINDOW_AT(prWx + 50, prWy + 60) = winVervoll))
         protokoll("pr unter der marke " + STR$(prWy >= prMy + prMh AND prWy <= prMy + prMh + 10))
-        protokoll("pr fokus im code " + STR$(GUI_FOCUSED() = tabFelder[0]))
+        protokoll("pr fokus im code " + STR$(GUI_FOCUSED() = reiter[0].feld))
     END IF
 --- einschub nach SETFPS(60)
 DIM prGesehen AS BOOLEAN : prGesehen = FALSE
@@ -62,8 +62,8 @@ pr fokus im code TRUE
 
 === die liste laesst sich an der titelleiste ziehen
 SETWINDOWTITLE(ARG$(1))
-GUI_FOCUS(tabFelder[0])
-GUI_TEXTAREA_GOTO(tabFelder[0], 2, 100)
+GUI_FOCUS(reiter[0].feld)
+GUI_TEXTAREA_GOTO(reiter[0].feld, 2, 100)
 DIM prSender AS INTEGER : prSender = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ARG$(2), ARG$(1), "tippe:GUI_WI")
 --- programm ../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach     trefferNachziehen()
@@ -186,8 +186,8 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
-    GUI_FOCUS(tabFelder[aktiverTab])
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 1, 6)
+    GUI_FOCUS(reiter[aktiverTab].feld)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 1, 6)
 END IF
 IF prBild = 60 THEN
     protokoll("pr offen nach dem setzen " + STR$(vervollOffen))
@@ -223,9 +223,9 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
-    GUI_FOCUS(tabFelder[aktiverTab])
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 3, 1)
-    GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "SUB malen()" + NL + "    PRINT 1" + NL + "END SUB")
+    GUI_FOCUS(reiter[aktiverTab].feld)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 3, 1)
+    GUI_TEXTAREA_INSERT(reiter[aktiverTab].feld, "SUB malen()" + NL + "    PRINT 1" + NL + "END SUB")
 END IF
 IF prBild = 60 THEN
     protokoll("pr offen nach dem einfuegen " + STR$(vervollOffen))
@@ -263,12 +263,12 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 30 THEN
-    GUI_FOCUS(tabFelder[0])
-    GUI_TEXTAREA_GOTO(tabFelder[0], 3002, 1)
+    GUI_FOCUS(reiter[0].feld)
+    GUI_TEXTAREA_GOTO(reiter[0].feld, 3002, 1)
 END IF
-IF prBild = 40 THEN GUI_TEXTAREA_INSERT(tabFelder[0], "t")
-IF prBild = 41 THEN GUI_TEXTAREA_INSERT(tabFelder[0], "e")
-IF prBild = 42 THEN GUI_TEXTAREA_INSERT(tabFelder[0], "i")
+IF prBild = 40 THEN GUI_TEXTAREA_INSERT(reiter[0].feld, "t")
+IF prBild = 41 THEN GUI_TEXTAREA_INSERT(reiter[0].feld, "e")
+IF prBild = 42 THEN GUI_TEXTAREA_INSERT(reiter[0].feld, "i")
 IF prBild = 44 THEN protokoll("pr gleich offen " + STR$(vervollOffen))
 IF prBild = 90 THEN
     protokoll("pr spaeter offen " + STR$(vervollOffen))
@@ -308,8 +308,8 @@ gross TRUE
 ' Hinter `s.` gleich die Felder und Methoden der Klasse von `s` -- ohne die
 ' drei Zeichen, die die Liste sonst braucht (2026-10-24).
 SETWINDOWTITLE(ARG$(1))
-GUI_FOCUS(tabFelder[0])
-GUI_TEXTAREA_GOTO(tabFelder[0], 7, 1)
+GUI_FOCUS(reiter[0].feld)
+GUI_TEXTAREA_GOTO(reiter[0].feld, 7, 1)
 DIM prSender AS INTEGER : prSender = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ARG$(2), ARG$(1), "tippe:s.")
 --- programm ../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach     trefferNachziehen()
@@ -355,8 +355,8 @@ pr liste leben,springen
 ' Gegenprobe: hinter einem Punkt, vor dem kein Objekt steht, kommt die
 ' ganze Liste -- die geht von selbst nicht auf.
 SETWINDOWTITLE(ARG$(1))
-GUI_FOCUS(tabFelder[0])
-GUI_TEXTAREA_GOTO(tabFelder[0], 2, 1)
+GUI_FOCUS(reiter[0].feld)
+GUI_TEXTAREA_GOTO(reiter[0].feld, 2, 1)
 DIM prSender AS INTEGER : prSender = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ARG$(2), ARG$(1), "tippe:' ja.")
 --- programm ../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach     trefferNachziehen()

@@ -30,8 +30,8 @@ END IF
 IF prFertig > 0 AND prBild = prFertig + 5 THEN
     DIM prZ AS INTEGER
     DIM prS AS INTEGER
-    (prZ, prS) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
-    protokoll("pr offen " + BASENAME(tabPfade[aktiverTab]) + " zeile " + STR$(prZ))
+    (prZ, prS) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
+    protokoll("pr offen " + BASENAME(reiter[aktiverTab].pfad) + " zeile " + STR$(prZ))
     EXIT(0)
 END IF
 --- argumente

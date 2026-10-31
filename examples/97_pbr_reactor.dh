@@ -24,7 +24,7 @@ IMPORT "g3d"
 IMPORT "particles"
 IMPORT "audio"
 
-CONST W AS INTEGER = 1280
+CONST W AS INTEGER = 1280             ' Fenstergroesse vor dem Vollbild
 CONST H AS INTEGER = 720
 CONST TWO_PI AS FLOAT = 6.2831853
 CONST NB AS INTEGER = 64             ' FFT-Baender (feiner aufgeloest)
@@ -106,10 +106,26 @@ DIM last_scene AS INTEGER
 last_scene = -1
 DIM scene_age AS FLOAT
 scene_age = 0.0                      ' Sekunden seit dem letzten Szenenwechsel
+' Im Vollbild ist der Schirm groesser als W x H -- das 2D-Overlay rechnet darum
+' mit der echten Groesse, und Bloom bekommt sie, sobald sie sich aendert.
+DIM sw AS INTEGER
+DIM sh AS INTEGER
+DIM bloom_w AS INTEGER
+DIM bloom_h AS INTEGER
+bloom_w = W
+bloom_h = H
 
 WHILE NOT QUITREQUESTED()
     DIM t AS FLOAT
     t = (MILLIS() - t0) / 1000.0
+    sw = SCREENWIDTH()
+    sh = SCREENHEIGHT()
+    IF bloom >= 0 AND (sw <> bloom_w OR sh <> bloom_h) THEN
+        SHADER_SET2(bloom, "resolution", sw, sh)
+        bloom_w = sw
+        bloom_h = sh
+    END IF
+    PARTICLE_SET_POS(sparks, sw / 2, sh - 60)
 
     ' --- Audio-Analyse (zeitlich geglaettet -> feiner, weniger zappelig) ---
     AUDIO_FFT(fft)
@@ -204,14 +220,14 @@ WHILE NOT QUITREQUESTED()
     ' --- 2D-Overlay: feines Spektrum unten (geglaettet), Titel, Funken ---
     DIM bw AS INTEGER
     DIM maxbh AS INTEGER
-    bw = W \ NB
-    maxbh = INT(H * 0.28)                 ' Balken nie hoeher als 28% -> kein Vollbild
+    bw = sw \ NB
+    maxbh = INT(sh * 0.28)                 ' Balken nie hoeher als 28% -> kein Vollbild
     FOR i = 0 TO NB - 1
         DIM bh AS INTEGER
-        bh = INT(sm[i] * (H * 0.30))
+        bh = INT(sm[i] * (sh * 0.30))
         IF bh > maxbh THEN bh = maxbh      ' laute Baender deckeln
         IF bh > 2 THEN
-            BOX(i * bw + 1, H - bh, i * bw + bw - 1, H - 1, hue(i * 0.09 + t * 0.4, 1.0))
+            BOX(i * bw + 1, sh - bh, i * bw + bw - 1, sh - 1, hue(i * 0.09 + t * 0.4, 1.0))
         END IF
     NEXT
 
@@ -236,7 +252,7 @@ WHILE NOT QUITREQUESTED()
         CASE ELSE
             scenename = "HELIX"
     END SELECT
-    TEXT(30, H - 28, f"scene {scenename}  bass={bass:.2f}  energy={energy:.2f}  fps={FPS()}", &H607890)
+    TEXT(30, sh - 28, f"scene {scenename}  bass={bass:.2f}  energy={energy:.2f}  fps={FPS()}", &H607890)
 
     FLIP()
 WEND

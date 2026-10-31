@@ -21,15 +21,16 @@ END FUNCTION
 prBild = prBild + 1
 IF prBild = 20 THEN befehl("profil") : prSchritt = 1
 IF prSchritt = 1 AND waermeDaten THEN
-    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    DIM prTa AS GUI_WIDGET : prTa = reiter[aktiverTab].feld
     protokoll("pr baender " + prListe$(GUI_TEXTAREA_LINE_COLORS_GET(prTa)))
-    protokoll("pr heisseste in der schleife " + STR$(profRohZ[0] = 3 OR profRohZ[0] = 4))
+    protokoll("pr heisseste in der schleife " + STR$(profMessung[0].zeile = 3 OR profMessung[0].zeile = 4))
     DIM prZahlen AS INTEGER : prZahlen = 0
     DIM prT AS STRING
-    FOR EACH prT IN waermeTexte
-        IF prT <> "" THEN prZahlen = prZahlen + 1
+    DIM prW AS WaermeHinweis
+    FOR EACH prW IN waermeHinweise
+        IF prW.text <> "" THEN prZahlen = prZahlen + 1
     NEXT
-    protokoll("pr mit zahlen " + STR$(prZahlen) + " " + STR$(INSTR(waermeTexte[0], " ms  ") > 0))
+    protokoll("pr mit zahlen " + STR$(prZahlen) + " " + STR$(INSTR(waermeHinweise[0].text, " ms  ") > 0))
     ' eine Zeile oben einfuegen: alle Baender ruecken eine weiter
     GUI_TEXTAREA_SELECT(prTa, 1, 1, 1, 1)
     GUI_TEXTAREA_INSERT(prTa, "' neu" + NL)

@@ -10,8 +10,8 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 80 THEN
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 2, 5)
-    GUI_FOCUS(tabFelder[aktiverTab])
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 2, 5)
+    GUI_FOCUS(reiter[aktiverTab].feld)
     DIM prEv AS STRING : prEv = "c 6" + NL
     prEv = prEv + "e 0 2 341 0 0 0" + NL + "e 1 2 46 0 0 0" + NL + "e 3 1 46 0 0 0" + NL + "e 4 1 341 0 0 0" + NL
     prEv = prEv + "e 20 2 257 0 0 0" + NL + "e 22 1 257 0 0 0" + NL + NL
@@ -19,7 +19,7 @@ IF prBild = 80 THEN
     AUTOMATION_PLAY("ev.txt")
 END IF
 IF prBild = 200 THEN
-    protokoll("pr text " + REPLACE$(GUI_TEXT(tabFelder[aktiverTab]), NL, "/"))
+    protokoll("pr text " + REPLACE$(GUI_TEXT(reiter[aktiverTab].feld), NL, "/"))
     EXIT(0)
 END IF
 --- argumente
@@ -53,8 +53,8 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 80 THEN
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 2, 5)
-    GUI_FOCUS(tabFelder[aktiverTab])
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 2, 5)
+    GUI_FOCUS(reiter[aktiverTab].feld)
     DIM prEv AS STRING : prEv = "c 8" + NL
     prEv = prEv + "e 0 2 341 0 0 0" + NL + "e 1 2 46 0 0 0" + NL + "e 3 1 46 0 0 0" + NL + "e 4 1 341 0 0 0" + NL
     prEv = prEv + "e 20 2 264 0 0 0" + NL + "e 22 1 264 0 0 0" + NL
@@ -63,7 +63,7 @@ IF prBild = 80 THEN
     AUTOMATION_PLAY("ev.txt")
 END IF
 IF prBild = 200 THEN
-    protokoll("pr text " + REPLACE$(GUI_TEXT(tabFelder[aktiverTab]), NL, "/"))
+    protokoll("pr text " + REPLACE$(GUI_TEXT(reiter[aktiverTab].feld), NL, "/"))
     EXIT(0)
 END IF
 --- argumente
@@ -97,7 +97,7 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 80 THEN
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 1, 3)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 1, 3)
     befehl("korrektur")
     protokoll("pr status " + GUI_TEXT(lblStatus))
     EXIT(0)
@@ -129,12 +129,12 @@ DIM prBild AS INTEGER : prBild = 0
 prBild = prBild + 1
 IF prBild = 80 THEN
     ' Die Meldung steht am Programmende, hinter der letzten Zeile.
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 5, 1)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 5, 1)
     befehl("korrektur")
 END IF
 IF prBild = 90 THEN paletteAusfuehren()
 IF prBild = 150 THEN
-    protokoll("pr text " + REPLACE$(GUI_TEXT(tabFelder[aktiverTab]), NL, "/"))
+    protokoll("pr text " + REPLACE$(GUI_TEXT(reiter[aktiverTab].feld), NL, "/"))
     EXIT(0)
 END IF
 --- argumente
@@ -171,12 +171,12 @@ DIM prBild AS INTEGER : prBild = 0
 prBild = prBild + 1
 IF prBild = 80 THEN
     protokoll("pr probleme " + GUI_TEXT(lblProbleme))
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 2, 10)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 2, 10)
     befehl("korrektur")
 END IF
 IF prBild = 90 THEN paletteAusfuehren()
 IF prBild = 150 THEN
-    protokoll("pr text " + REPLACE$(GUI_TEXT(tabFelder[aktiverTab]), NL, "/"))
+    protokoll("pr text " + REPLACE$(GUI_TEXT(reiter[aktiverTab].feld), NL, "/"))
     EXIT(0)
 END IF
 --- argumente
@@ -219,18 +219,18 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 80 THEN
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 2, 5)
-    GUI_FOCUS(tabFelder[aktiverTab])
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 2, 5)
+    GUI_FOCUS(reiter[aktiverTab].feld)
     befehl("korrektur")
 END IF
-IF prBild = 84 THEN GUI_SET_TEXT(tabFelder[aktiverTab], "DIM zaehler AS INTEGER" + NL + "  zaehler = zaehler + 1" + NL)
+IF prBild = 84 THEN GUI_SET_TEXT(reiter[aktiverTab].feld, "DIM zaehler AS INTEGER" + NL + "  zaehler = zaehler + 1" + NL)
 IF prBild = 170 THEN
     DIM prEv AS STRING : prEv = "c 2" + NL + "e 0 2 257 0 0 0" + NL + "e 2 1 257 0 0 0" + NL + NL
     WRITEALL("ev.txt", prEv)
     AUTOMATION_PLAY("ev.txt")
 END IF
 IF prBild = 220 THEN
-    protokoll("pr text " + REPLACE$(GUI_TEXT(tabFelder[aktiverTab]), NL, "/"))
+    protokoll("pr text " + REPLACE$(GUI_TEXT(reiter[aktiverTab].feld), NL, "/"))
     protokoll("pr status " + GUI_TEXT(lblStatus))
     EXIT(0)
 END IF

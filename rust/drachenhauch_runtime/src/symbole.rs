@@ -129,8 +129,11 @@ fn definitions_muster() -> Vec<Muster> {
         // Springen, Hover (die Zeile ist die Signatur) und Vervollstaendigung.
         (r"(?i)^\s*DECLARE\s+SUB\s+", "sub"),
         (r"(?i)^\s*DECLARE\s+FUNCTION\s+", "function"),
-        (r"(?i)^\s*(?:PRIVATE\s+)?SUB\s+", "sub"),
-        (r"(?i)^\s*(?:PRIVATE\s+)?FUNCTION\s+", "function"),
+        // ABSTRACT kuendigt eine Methode nur an -- sie ist trotzdem eine
+        // Definition: ohne sie fehlte sie in CODE_CLASSES$, in der
+        // Gliederung, und F12 sprang in die erste Unterklasse.
+        (r"(?i)^\s*(?:PRIVATE\s+|ABSTRACT\s+)?SUB\s+", "sub"),
+        (r"(?i)^\s*(?:PRIVATE\s+|ABSTRACT\s+)?FUNCTION\s+", "function"),
         (r"(?i)^\s*CLASS\s+", "class"),
         (r"(?i)^\s*STRUCT\s+", "struct"),
         (r"(?i)^\s*ENUM\s+", "enum"),
@@ -182,6 +185,7 @@ pub fn definitionen(quelle: &str) -> Vec<Definition> {
         let kopf = sauber.trim_start().to_ascii_uppercase();
         if kopf.starts_with("SUB ") || kopf.starts_with("FUNCTION ") || kopf.starts_with("PROPERTY ")
             || kopf.starts_with("PRIVATE SUB ") || kopf.starts_with("PRIVATE FUNCTION ")
+            || kopf.starts_with("ABSTRACT SUB ") || kopf.starts_with("ABSTRACT FUNCTION ")
         {
             if let Some(auf) = sauber.find('(') {
                 if let Some(zu_rel) = sauber[auf + 1..].find(')') {
@@ -307,6 +311,21 @@ pub fn bereiche(quelle: &str) -> Vec<Bereich> {
         }
         let rest = gross.strip_prefix("PRIVATE ").map(|_| s[8..].trim_start()).unwrap_or(s);
         let rest_gross = rest.to_ascii_uppercase();
+        // `ABSTRACT FUNCTION laut() AS STRING` hat keinen Rumpf und kein END:
+        // ein Bereich aus EINER Zeile, der nicht auf den Stapel kommt -- sonst
+        // reichte er bis zum naechsten END FUNCTION.
+        if let Some(nach) = rest_gross.strip_prefix("ABSTRACT ").map(|_| rest[9..].trim_start()) {
+            let nach_gross = nach.to_ascii_uppercase();
+            for (kopf, art) in [("SUB ", "sub"), ("FUNCTION ", "function")] {
+                if nach_gross.starts_with(kopf) {
+                    let name = name_re.captures(nach[kopf.len()..].trim_start())
+                        .map(|c| c[1].to_string()).unwrap_or_else(|| "?".into());
+                    out.push(Bereich { art, name, zeile: ln, ende: ln });
+                    break;
+                }
+            }
+            continue;
+        }
         // ENUM hat zwei Formen: der Block bis END ENUM und die Kurzform
         // `ENUM State = MENU, PLAYING` in EINER Zeile -- die bekommt keinen
         // Platz auf dem Stapel, sonst reichte sie bis zum naechsten END ENUM
@@ -538,6 +557,21 @@ DECLARE SUB qsort LIB \"c\" (f AS BUFFER, n AS ZEIGER, g AS ZEIGER, cmp AS FUNCT
         // Kommentar nach dem Namen ist keine Kurzform, "enum" klein geschrieben auch ein Block.
         let b2 = bereiche("enum Modus ' Auswahl\n  AN\nend enum\n");
         assert_eq!((b2[0].zeile, b2[0].ende), (1, 3));
+    }
+
+    #[test]
+    fn abstract_ist_definition_und_einzeiliger_bereich() {
+        let src = "CLASS Tier\n    ABSTRACT FUNCTION laut(n AS INTEGER) AS STRING\n    abstract sub zeigen()\n    SUB x()\n    END SUB\nEND CLASS\n";
+        let b = bereiche(src);
+        let namen: Vec<(&str, &str, usize, usize)> = b.iter().map(|x| (x.art, x.name.as_str(), x.zeile, x.ende)).collect();
+        // Die Klasse reicht weiter bis END CLASS, die SUB danach bis END SUB.
+        assert_eq!(namen, [("class", "Tier", 1, 6), ("function", "laut", 2, 2), ("sub", "zeigen", 3, 3), ("sub", "x", 4, 5)]);
+        let d = definitionen(src);
+        assert!(d.iter().any(|x| x.art == "function" && x.name == "laut" && x.zeile == 2));
+        assert!(d.iter().any(|x| x.art == "sub" && x.name == "zeigen"));
+        assert!(d.iter().any(|x| x.art == "param" && x.name == "n" && x.zeile == 2));
+        // `DIM abstract` bleibt eine Variable.
+        assert!(definitionen("DIM abstract AS INTEGER\n").iter().any(|x| x.art == "dim" && x.name == "abstract"));
     }
 
     #[test]

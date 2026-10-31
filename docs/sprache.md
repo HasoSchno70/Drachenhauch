@@ -1335,7 +1335,7 @@ Wer eine Klasse mit noch offenen Ankündigungen mit `NEW` erzeugen will, bekommt
 einen **Fehler beim Übersetzen** — nicht erst zur Laufzeit:
 
 ```
-NEW form: die Klasse kuendigt eine Methode an, ohne sie auszufuellen (zeichne).
+NEW FORM: die Klasse kuendigt eine Methode an, ohne sie auszufuellen (zeichne).
 ```
 
 So lässt sich eine Basisklasse schreiben, die mit Methoden arbeitet, die es bei

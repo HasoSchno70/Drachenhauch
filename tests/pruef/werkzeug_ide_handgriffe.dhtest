@@ -319,9 +319,10 @@ gemerkt TRUE TRUE
 ' Die Messung ist erfunden (drei Zeilen in held.lauf, eine in zeige, eine
 ' im Hauptprogramm), gezaehlt wird, was die Tabelle daraus macht.
 profQuelle = SPLIT$(READLINES_JOIN$(), NL)
-profRohZ = [3, 4, 9, 8, 1]
-profRohA = [10, 10, 5, 5, 1]
-profRohT = [0.004, 0.003, 0.002, 0.001, 0.0005]
+profMessung = []
+profMessungDazu(3, 10, 0.004, prozessDatei) : profMessungDazu(4, 10, 0.003, prozessDatei)
+profMessungDazu(9, 5, 0.002, prozessDatei) : profMessungDazu(8, 5, 0.001, prozessDatei)
+profMessungDazu(1, 1, 0.0005, prozessDatei)
 profGesamt = 0.0105
 GUI_SET_CHECKED(cbProfilFunk, TRUE)
 profilTabelleFuellen()
@@ -384,8 +385,8 @@ nachher 0
 ' ihn selbst wieder zu, sobald die Gliederung die Bloecke kennt.
 IF NOT FILEEXISTS("lauf1") THEN
     WRITEALL("lauf1", "x")
-    GUI_TEXTAREA_FOLDABLE(tabFelder[0], [2], [4])
-    GUI_TEXTAREA_FOLD(tabFelder[0], 2, TRUE)
+    GUI_TEXTAREA_FOLDABLE(reiter[0].feld, [2], [4])
+    GUI_TEXTAREA_FOLD(reiter[0].feld, 2, TRUE)
     konfigSichern()
 END IF
 --- programm ../../ide/ide.dh nach protokoll("bereit")
@@ -428,7 +429,7 @@ GUI_SET_VALUE(spDruckGr, 12)
 GUI_SET_VALUE(spDruckRand, 30)
 GUI_SET_CHECKED(cbDruckNr, FALSE)
 druckOptionenLesen()
-GUI_TEXTAREA_SELECT(tabFelder[0], 2, 3, 3, 2)
+GUI_TEXTAREA_SELECT(reiter[0].feld, 2, 3, 3, 2)
 p = listingPdf(TRUE)
 PDF_SAVE(p, "auswahl.pdf")
 PDF_CLOSE(p)
@@ -499,7 +500,7 @@ baumfilter [HELD] 2
 === ein umbau wird nicht zurueckgenommen, wenn die datei danach geaendert wurde
 ' Ein Umbau schreibt b.dh (sie ist nicht offen), danach aendert jemand die
 ' Datei noch einmal. Zuruecknehmen schriebe die spaetere Arbeit weg.
-umbauTabs = [-1] : umbauPfade = [PATHJOIN(projektOrdner, "b.dh")] : umbauTexte = ["PRINT " + CHR$(34) + "neu" + CHR$(34)]
+umbauZiele = [] : ARRAY_PUSH(umbauZiele, NEW UmbauZiel(-1, PATHJOIN(projektOrdner, "b.dh"), "PRINT " + CHR$(34) + "neu" + CHR$(34)))
 umbauSchreiben()
 WRITEALL(PATHJOIN(projektOrdner, "b.dh"), "PRINT " + CHR$(34) + "spaeter" + CHR$(34) + NL)
 umbauZurueck()
@@ -527,7 +528,7 @@ umbau zurueck geaendert b.dh
 datei PRINT "spaeter"
 
 === zurueckgenommen und wiederholt
-umbauTabs = [-1] : umbauPfade = [PATHJOIN(projektOrdner, "b.dh")] : umbauTexte = ["PRINT " + CHR$(34) + "neu" + CHR$(34)]
+umbauZiele = [] : ARRAY_PUSH(umbauZiele, NEW UmbauZiel(-1, PATHJOIN(projektOrdner, "b.dh"), "PRINT " + CHR$(34) + "neu" + CHR$(34)))
 umbauSchreiben()
 umbauZurueck()
 PRINT "nach dem zuruecknehmen " ; READLINES(PATHJOIN(projektOrdner, "b.dh"))[0]
@@ -622,7 +623,7 @@ themenNachziehen()
 GUI_LISTBOX_SET_SELECTED(lstThemen, GUI_LISTBOX_VIEW_ROW(lstThemen, 1))
 themenOeffnen(FALSE)
 PRINT "sichtbar " ; GUI_WINDOW_SHOWN(winThemen)
-PRINT "reiter " ; BASENAME(tabPfade[aktiverTab])
+PRINT "reiter " ; BASENAME(reiter[aktiverTab].pfad)
 --- programm ../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=20
