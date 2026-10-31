@@ -1587,6 +1587,29 @@ rufen es je System; die CI baut dafuer `tray` mit. Gegengeprueft unter Linux
 mit GLibs `gdbus` als fremdem Leser (Eigenschaften, Layout `(u(ia{sv}av))`,
 Event). Lokal laeuft Linux in der WSL (`~/.cargo`, `CARGO_TARGET_DIR=$HOME/dht`).
 
+## Felder mit eigener Untergrenze (2026-10-31, Stufe 1)
+
+`DIM tage[1 TO 31] AS INTEGER`, `DIM f[-10 TO 10, 5]`, Grenzen als
+Ausdruecke, `[1 TO 0]` leer. Entwurf `docs/entwurf-feld-untergrenze.md`
+(Abschnitt 12 = Stand). `DhArray::unten` (value.rs; LEER = alle 0 -- die
+schnellen Wege fragen nur `is_empty()`, `mit_unten` macht aus lauter Nullen
+wieder leer), `flat_index` meldet `Index 0 ausserhalb [1..31] in Dimension 1`
+(**die Dimension zaehlt seither ab 1**, auch bei Feldern ab 0; der Hinweis
+"Felder zaehlen ab 0" nur bei Untergrenze 0). Parser: Knoten
+`Node::Bereich { von, bis }` nur in DIM-Klammern (`dim_grenze`). Bytecode:
+`DECLARE_ARRAY_NAME/LOCAL` mit viertem, freiwilligem Argument (je Dimension
+1 = zwei Werte `von, bis`, 0 = Groesse; `Vm::pop_feld_dims`), Klassenfelder
+mit `array_unten` im .dhc -- ohne Bereich bleibt beides wie vorher, alte .dhc
+laufen. `LBOUND/UBOUND(feld [, dimension])` (Dimension ab 1, leeres Feld
+UBOUND = LBOUND - 1). Wer eine Stelle nennt oder liefert, zaehlt in den
+Indizes des Feldes: `ARRAY_INSERT/REMOVE_AT`, `ARRAY_INDEXOF/FIND` (nicht
+gefunden = `LBOUND - 1`), Slicing (Ergebnis ab 0), `ARRAY_COPY` behaelt die
+Grenzen. **Regel fuer neue Feldbefehle:** wer einen Index entgegennimmt oder
+liefert, rechnet ueber `unten_von(k)`, sonst zaehlt er bei solchen Feldern
+still falsch. Der Maschinencode lehnt Felder mit Untergrenze ab (Stufe 1).
+Nicht fuer Felder von `STRUCT ... LAYOUT C`. Tests
+`tests/pruef/feld_untergrenze.dhtest` (20).
+
 ## Index und Feld auf dem Ergebnis eines Aufrufs (2026-10-09)
 
 `reihe(5)[0].x`, `ort(7).y`, `LEN(reihe(4))`, `FOR EACH p IN reihe(3)` --

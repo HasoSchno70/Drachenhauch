@@ -299,6 +299,8 @@ pub struct FieldDecl {
     pub name: String,
     pub type_name: String,
     pub array_dims: Vec<i64>,
+    /// Untergrenze je Dimension, leer = alle 0 (fehlt in alten .dhc).
+    pub array_unten: Vec<i64>,
     /// Ein STRUCT ... LAYOUT C als Feld: so viele Bytes Puffer je Objekt.
     pub struct_bytes: usize,
 }
@@ -630,6 +632,10 @@ fn decode_class(j: &J) -> ClassInfo {
                         name: fo.get("name").and_then(|x| x.as_str()).unwrap_or("").to_string(),
                         type_name: fo.get("type_name").and_then(|x| x.as_str()).unwrap_or("any").to_string(),
                         array_dims: fo.get("array_dims")
+                            .and_then(|x| x.as_array())
+                            .map(|a| a.iter().filter_map(|d| d.as_i64()).collect())
+                            .unwrap_or_default(),
+                        array_unten: fo.get("array_unten")
                             .and_then(|x| x.as_array())
                             .map(|a| a.iter().filter_map(|d| d.as_i64()).collect())
                             .unwrap_or_default(),

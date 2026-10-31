@@ -13,8 +13,6 @@ pub fn befehl(name: &str) -> Option<&'static str> {
         "ucase$" | "ucase" | "toupper" | "upper" => "heisst in Drachenhauch UPPER$(text)",
         "lcase$" | "lcase" | "tolower" | "lower" => "heisst in Drachenhauch LOWER$(text)",
         "string$" => "heisst in Drachenhauch REPEAT$(text, anzahl) -- oder \"*\" * 3",
-        "lbound" => "Felder beginnen immer bei 0 -- LBOUND ist also 0",
-        "ubound" => "der letzte Index ist LEN(feld) - 1 (Felder beginnen bei 0)",
         "fix" => "INT rundet ab (INT(-3.7) = -4); in Richtung 0: IIF(x < 0, -INT(-x), INT(x))",
         "cint" | "clng" | "cdbl" | "csng" | "cbool" =>
             "Umwandeln: INT(x) oder ROUND(x) fuer Ganzzahlen, FLT(x) fuer Kommazahlen, VAL(text) aus Text",
@@ -176,7 +174,9 @@ mod tests {
     #[test]
     fn bekannte_umsteiger_namen() {
         assert!(befehl("ucase$").unwrap().contains("UPPER$"));
-        assert!(befehl("ubound").unwrap().contains("LEN"));
+        // LBOUND/UBOUND gibt es seit den Feldern mit Untergrenze selbst.
+        assert!(befehl("ubound").is_none());
+        assert!(befehl("fix").unwrap().contains("INT"));
         assert!(befehl("printf").unwrap().contains("PRINT"));
         assert!(befehl("gibtsnicht").is_none());
         assert!(typ("double").unwrap().contains("FLOAT"));

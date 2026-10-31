@@ -1083,6 +1083,32 @@ PRINT DIMSIZE(brett, 0)           ' 8
 PRINT DIMSIZE(brett, 1)           ' 8
 ```
 
+**Eigene Untergrenze:** `[von TO bis]` statt der Größe -- dann zählt das Feld
+ab `von`. Die Grenzen dürfen Ausdrücke sein, `[1 TO 0]` ist ein leeres Feld.
+`LBOUND(feld [, dimension])` und `UBOUND(feld [, dimension])` nennen den
+kleinsten und größten Index (Dimension ab 1, ohne Angabe die erste):
+
+```basic
+DIM tage[1 TO 31] AS INTEGER      ' 31 Plätze, tage[1] bis tage[31]
+DIM feld[-10 TO 10, -10 TO 10] AS INTEGER
+DIM gemischt[5, 1 TO 3] AS STRING ' erste Dimension ab 0, zweite ab 1
+
+DIM i AS INTEGER
+FOR i = LBOUND(tage) TO UBOUND(tage)
+    tage[i] = i
+NEXT
+PRINT LBOUND(feld, 2), UBOUND(feld, 2)   ' -10  10
+```
+
+Die Grenzen gehören zum **Feld**, nicht zur Variable: sie reisen mit, wenn das
+Feld an ein Unterprogramm geht, zurückgegeben oder mit `b = a` weitergereicht
+wird. `a = [1, 2, 3]` dagegen setzt ein neues Feld ein, und das beginnt bei 0.
+Befehle, die eine Stelle nennen oder liefern (`ARRAY_INSERT`,
+`ARRAY_REMOVE_AT`, `ARRAY_INDEXOF`, `ARRAY_FIND`, Slicing), zählen in den
+Indizes des Feldes; „nicht gefunden" ist dann `LBOUND(feld) - 1` -- vergleiche
+mit `LBOUND`, nicht mit 0. Für Felder von `STRUCT … LAYOUT C` gibt es keine
+eigene Untergrenze (sie liegen wie in C).
+
 Array von externen Typen (z.B. SPRITE) ist möglich; Default-Wert ist `NIL`:
 
 ```basic

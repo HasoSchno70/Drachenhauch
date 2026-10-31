@@ -385,7 +385,7 @@ reflections/mirror effects become possible.
 > SUB (previously “Stufe 3e: … noch nicht unterstuetzt”, stage 3e: … not supported yet), foreign type names
 > (DOUBLE, LONG, BOOL …), array of arrays, `RND`/`TIMER` without parentheses, a
 > name followed by a value (`LOCATE 1, 1` → “in parentheses”), `INSTR(start, …)`,
-> foreign command names (UCASE$, UBOUND, FIX, CINT …). An unknown command
+> foreign command names (UCASE$, FIX, CINT …). An unknown command
 > is now called “Unknown command” at run time instead of “im Rust-Kern noch nicht
 > verfuegbar” (not yet available in the Rust core) — that phrase stays reserved for builds without graphics/sound;
 > the test collections recognise such a build by it. The tables live in

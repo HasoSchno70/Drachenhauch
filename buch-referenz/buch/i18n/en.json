@@ -3340,7 +3340,7 @@
  "Ursache und Lösung": "Cause and cure",
  "Variable 'x' nicht deklariert (DIM fehlt?)": "Variable 'x' nicht deklariert (DIM fehlt?)",
  "Die Variable wurde nie mit DIM angelegt – oder ihr Name ist vertippt. Lege sie mit DIM an, bevor du sie benutzt (Konstanten wie KEY_* oder Farbnamen sind dagegen immer verfügbar).": "The variable was never created with DIM — or its name is mistyped. Create it with DIM before you use it (constants such as KEY_* or the colour names, by contrast, are always available).",
- "Index 5 ausserhalb [0..2] in Dimension 0": "Index 5 ausserhalb [0..2] in Dimension 0",
+ "Index 5 ausserhalb [0..2] in Dimension 1": "Index 5 ausserhalb [0..2] in Dimension 1",
  "Du greifst auf einen Array-/String-Platz zu, den es nicht gibt. Gültig sind die Indizes 0 bis LEN(...) - 1. Schleifengrenzen und Bedingungen prüfen.": "You are reaching for an array or string position that does not exist. The valid indices are 0 to LEN(...) - 1. Check your loop bounds and conditions.",
  "Zuweisung an global: Erwartet STRING, erhalten INTEGER": "Zuweisung an global: Erwartet STRING, erhalten INTEGER",
  "Der zugewiesene Wert passt nicht zum deklarierten Typ der Variable. Wandle ihn um (STR$/VAL) oder deklariere die Variable mit dem richtigen Typ.": "The value assigned does not fit the variable's declared type. Convert it (STR$/VAL) or declare the variable with the right type.",

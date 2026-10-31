@@ -223,3 +223,26 @@ entschieden:
 * **`ARRAY_INDEXOF` und `ARRAY_FIND` liefern bei „nicht gefunden"
   `LBOUND - 1`** -- bei einem Feld ab 0 also weiter `-1`. Die Doku sagt dazu:
   vergleiche mit `LBOUND` des Feldes, nicht mit 0.
+
+## 12. Stand (2026-10-31): Stufe 1 gebaut
+
+* `DhArray::unten` (leer = alle 0), `flat_index` zieht sie ab und meldet
+  `Index 0 ausserhalb [1..31] in Dimension 1`. Der Parser liest
+  `von TO bis` in den Klammern eines DIM als Knoten `Bereich`; der Compiler
+  gibt `DECLARE_ARRAY_NAME/LOCAL` dann ein viertes Argument (je Dimension 1 =
+  Bereich, 0 = Groesse), ohne Bereich bleibt der Bytecode, wie er war.
+  Klassenfelder tragen `array_unten` im .dhc (nur wenn es eine gibt).
+* `LBOUND`/`UBOUND` sind Befehle; die Umsteiger-Hinweise dazu sind weg.
+* **Abweichend von Abschnitt 10 gleich mitgenommen:** die Befehle mit einer
+  Stelle aus Abschnitt 4 (`ARRAY_INSERT`, `ARRAY_REMOVE_AT`, `ARRAY_INDEXOF`,
+  `ARRAY_FIND`, `ARRAY_COPY`, Slicing) -- ohne sie haetten sie bei einem Feld
+  mit Untergrenze still falsch gezaehlt. `ARRAY_MAP` liefert noch eine Liste
+  ab 0 (offen fuer Stufe 2).
+* Der Maschinencode lehnt Felder mit Untergrenze ab (`feld_beschreiben`,
+  `feld_passt`, `gfeld_lesen`, und statisch beim DECLARE_ARRAY_NAME mit
+  Bereich).
+* Prueft `tests/pruef/feld_untergrenze.dhtest` (20 Faelle, VM und
+  Maschinencode mit derselben Erwartung, ein .dhc von 2026.38). Gegenprobe:
+  ohne den Abzug in `flat_index` fallen 12 der 20.
+* Offen fuer Stufe 2: `ARRAY_MAP` mit Grenzen, Debugger-Anzeige ab `LBOUND`,
+  `--check`-Warnung bei festem Index ausserhalb, Maschinencode Stufe 2.

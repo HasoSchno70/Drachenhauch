@@ -336,6 +336,8 @@ struct FnSig {
 
 /// Ein Feld einer Klasse/Struct.
 struct FieldInfo { name: String, type_name: String, array_dims: Vec<i64>,
+                   /// Untergrenze je Dimension (`DIM a[1 TO 9]`), leer = alle 0.
+                   array_unten: Vec<i64>,
                    /// Ein STRUCT ... LAYOUT C (oder ein Feld davon): so viele
                    /// Bytes bekommt das Feld bei NEW als eigenen Puffer.
                    struct_bytes: usize }
@@ -2247,6 +2249,10 @@ impl Compiler {
         // eine Bibliothek. Ohne Groesse (ARRAY OF Punkt) ein leerer Puffer.
         let elem = type_name.strip_prefix("array:").unwrap_or(if array_dims.is_some() { type_name } else { "" });
         if let Some(groesse) = self.lagen.get(elem).map(|l| l.groesse) {
+            if array_dims.iter().flatten().any(|d| matches!(d, Node::Bereich { .. })) {
+                return Err(format!("DIM {}: ein Feld von Structs liegt wie in C und zaehlt ab 0 -- [von TO bis] geht hier nicht, nur die Groesse: DIM {}[10]",
+                                   name, name));
+            }
             // Mehrere Dimensionen wie in C: die hinteren Groessen stehen beim
             // Uebersetzen fest, nur die erste darf erst zur Laufzeit kommen.
             let mut innen: Vec<u32> = Vec::new();
@@ -2288,23 +2294,36 @@ impl Compiler {
             if !self.known_elem(type_name) {
                 return Err(unknown_dim_type_msg(type_name));
             }
-            for de in dims { self.expr(de)?; }   // Dim-Werte auf den Stack
+            // Dim-Werte auf den Stack: je Groesse einer, je Bereich `von TO
+            // bis` zwei. Das vierte Argument sagt der VM, welche Dimension
+            // welche Form hat; ohne Bereich fehlt es -- dann sieht der
+            // Bytecode aus wie immer.
+            let mut bereich: Vec<u8> = Vec::with_capacity(dims.len());
+            for de in dims {
+                match de {
+                    Node::Bereich { von, bis } => { self.expr(von)?; self.expr(bis)?; bereich.push(1); }
+                    _ => { self.expr(de)?; bereich.push(0); }
+                }
+            }
+            let mit = bereich.iter().any(|&b| b == 1);
+            let arg = |ziel: Value| if mit { json!([ziel, type_name, dims.len(), bereich]) }
+                                    else { json!([ziel, type_name, dims.len()]) };
             if self.ctx.is_main {
                 let name_idx = self.ctx.add_const(json!(name));
-                self.ctx.emit(oc::DECLARE_ARRAY_NAME, json!([name_idx, type_name, dims.len()]));
+                self.ctx.emit(oc::DECLARE_ARRAY_NAME, arg(json!(name_idx)));
                 self.bind_global(name, name_idx);
             } else if let Some(&slot) = self.ctx.local_slots.get(name) {
                 // Erneutes DIM (Schleifenrumpf): NEU anlegen wie im
                 // Hauptprogramm -- bis 2026.27 wurden die Groessen verworfen und
                 // das alte Feld behalten.
-                self.ctx.emit(oc::DECLARE_ARRAY_LOCAL, json!([slot, type_name, dims.len()]));
+                self.ctx.emit(oc::DECLARE_ARRAY_LOCAL, arg(json!(slot)));
             } else {
                 // Funktions-lokales Array (eigener Slot statt globaler Name).
                 let slot = self.ctx.local_types.len();
                 self.ctx.local_slots.insert(name.to_string(), slot);
                 self.ctx.local_types.push(format!("array:{}", type_name));
                 self.ctx.local_defaults.push(CVal::Nil);
-                self.ctx.emit(oc::DECLARE_ARRAY_LOCAL, json!([slot, type_name, dims.len()]));
+                self.ctx.emit(oc::DECLARE_ARRAY_LOCAL, arg(json!(slot)));
             }
             return Ok(());
         }
@@ -3246,6 +3265,9 @@ impl Compiler {
                 self.ctx.emit(oc::BUILD_TUPLE, json!(paare.len()));
                 self.ctx.emit(oc::CALL_BUILTIN, json!(["__dict_from_pairs", 1]));
                 Ok(())
+            }
+            Node::Bereich { .. } => {
+                Err("TO steht nur in den eckigen Klammern eines DIM: DIM tage[1 TO 31] AS INTEGER".to_string())
             }
             Node::IsTyp { wert, typ } => {
                 let t = typ.to_lowercase();
@@ -4490,10 +4512,16 @@ impl Compiler {
         }
         let mut klassen = Map::new();
         for (cname, ci) in classes {
-            let fields: Vec<Value> = ci.fields.iter().map(|f| json!({
-                "name": f.name, "type_name": f.type_name, "array_dims": f.array_dims,
-                "struct_bytes": f.struct_bytes,
-            })).collect();
+            let fields: Vec<Value> = ci.fields.iter().map(|f| {
+                let mut o = json!({
+                    "name": f.name, "type_name": f.type_name, "array_dims": f.array_dims,
+                    "struct_bytes": f.struct_bytes,
+                });
+                // Nur wenn es eine gibt -- so bleibt jedes .dhc ohne Untergrenze,
+                // wie es war.
+                if !f.array_unten.is_empty() { o["array_unten"] = json!(f.array_unten); }
+                o
+            }).collect();
             let mut props: Vec<String> = ci.property_set.iter().cloned().collect();
             props.sort();
             let mut methods = Map::new();
@@ -4522,7 +4550,7 @@ impl Compiler {
         for (cname, ci) in classes {
             let fields = ci.fields.iter().map(|f| crate::model::FieldDecl {
                 name: f.name.clone(), type_name: f.type_name.clone(), array_dims: f.array_dims.clone(),
-                struct_bytes: f.struct_bytes,
+                array_unten: f.array_unten.clone(), struct_bytes: f.struct_bytes,
             }).collect();
             let methods = ci.compiled.into_iter().map(|(n, m)| (n, m.zu_func())).collect();
             klassen.insert(cname, crate::model::ClassInfo {
@@ -5072,26 +5100,39 @@ impl Compiler {
                     }
                     let n: usize = dims.iter().map(|&k| k as usize).product();
                     let t = if array_dims.is_some() { struct_feldtyp_text(type_name, &dims[1..]) } else { type_name.clone() };
-                    field_infos.push(FieldInfo { name: fname.clone(), type_name: t, array_dims: vec![],
+                    field_infos.push(FieldInfo { name: fname.clone(), type_name: t, array_dims: vec![], array_unten: vec![],
                                                  struct_bytes: groesse * n });
                     continue;
                 }
-                let dims: Vec<i64> = match array_dims {
-                    None => vec![],
-                    Some(des) => {
-                        let mut v = vec![];
-                        for de in des {
-                            match de {
-                                Node::NumberLit(NumV::Int(i)) => v.push(*i),
-                                _ => return Err(format!(
-                                    "Array-Feld '{}' braucht konstante INTEGER-Groesse", fname)),
+                let mut dims: Vec<i64> = vec![];
+                let mut unten: Vec<i64> = vec![];
+                for de in array_dims.iter().flatten() {
+                    match de {
+                        Node::NumberLit(NumV::Int(i)) => { dims.push(*i); unten.push(0); }
+                        // `[1 TO 9]`: beide Grenzen muessen beim Uebersetzen
+                        // feststehen, wie die Groesse.
+                        Node::Bereich { von, bis } => {
+                            let (lo, hi) = match (self.falten(von), self.falten(bis)) {
+                                (Some(crate::value::Value::Int(lo)), Some(crate::value::Value::Int(hi))) => (lo, hi),
+                                _ => {
+                                    self.err_line = zeile;
+                                    return Err(format!("Array-Feld '{}' braucht konstante INTEGER-Grenzen", fname));
+                                }
+                            };
+                            if hi < lo - 1 {
+                                self.err_line = zeile;
+                                return Err(format!("Array-Feld '{}': die Obergrenze {} liegt unter der Untergrenze {}", fname, hi, lo));
                             }
+                            dims.push(hi - lo + 1);
+                            unten.push(lo);
                         }
-                        v
+                        _ => return Err(format!(
+                            "Array-Feld '{}' braucht konstante INTEGER-Groesse", fname)),
                     }
-                };
+                }
+                if unten.iter().all(|&u| u == 0) { unten.clear(); }
                 field_infos.push(FieldInfo { name: fname.clone(),
-                    type_name: type_name.clone(), array_dims: dims, struct_bytes: 0 });
+                    type_name: type_name.clone(), array_dims: dims, array_unten: unten, struct_bytes: 0 });
             }
         }
         let mut method_sigs = HashMap::new();

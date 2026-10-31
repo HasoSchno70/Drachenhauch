@@ -270,7 +270,7 @@ einem propagierenden Fehler bleibt die **innerste** fehlschlagende Zeile
 stehen. `dhrt run` kennt den Quell-Dateinamen, sodass die Meldung lautet:
 
 ```
-Laufzeitfehler in spiel.dh:42: Index 10 ausserhalb [0..2] in Dimension 0
+Laufzeitfehler in spiel.dh:42: Index 10 ausserhalb [0..2] in Dimension 1
 ```
 
 `dhrt <datei.dhc>` ohne Label nutzt den `.dhc`-Pfad. Zeile `0` (untracked) →
@@ -288,7 +288,7 @@ Mit `DHRT_LANG=en` (auch `en_US` usw.) schreibt dhrt seine Meldungen
 englisch:
 
 ```
-Runtime error in game.dh:42: Index 10 outside [0..2] in dimension 0
+Runtime error in game.dh:42: Index 10 outside [0..2] in dimension 1
 game.dh:3: Parse error (12): Expected END IF, reached the end of the program
 ```
 

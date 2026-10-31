@@ -7275,6 +7275,12 @@
    "module": "core"
   },
   {
+   "name": "LBOUND",
+   "kind": "core",
+   "signature": "LBOUND(feld [, dimension])",
+   "module": "core"
+  },
+  {
    "name": "LEADERBOARD_FETCH",
    "kind": "core",
    "signature": "LEADERBOARD_FETCH(board$, n[, ascending]) AS ARRAY OF TUPLE",
@@ -11526,6 +11532,12 @@
    "name": "TYPEOF",
    "kind": "core",
    "signature": "TYPEOF(x)",
+   "module": "core"
+  },
+  {
+   "name": "UBOUND",
+   "kind": "core",
+   "signature": "UBOUND(feld [, dimension])",
    "module": "core"
   },
   {

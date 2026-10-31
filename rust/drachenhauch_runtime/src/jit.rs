@@ -287,7 +287,9 @@ fn feld_beschreiben(prog: &Program, v: &Value, klassen: &mut Vec<Klasse>) -> Opt
     match v {
         Value::Array(a) => {
             let a = a.borrow();
-            if a.dims.is_empty() || a.dims.len() > 8 { return None; }
+            // Ein Feld mit eigener Untergrenze (`DIM a[1 TO 9]`) bleibt der VM
+            // -- die Beschreibung kennt nur Felder ab 0 (Stufe 1 des Entwurfs).
+            if a.dims.is_empty() || a.dims.len() > 8 || !a.unten.is_empty() { return None; }
             let d = a.dims.len() as u8;
             match &a.cells {
                 crate::value::Cells::Int(_) => Some((Elem::I, d, false)),
@@ -308,7 +310,7 @@ fn feld_passt(v: &Value, fi: &FeldInfo) -> bool {
         (Value::Tuple(t), Elem::Wert(_)) => fi.tupel && !t.is_empty(),
         (Value::Array(a), e) => {
             let a = a.borrow();
-            !fi.tupel && a.dims.len() == fi.dims as usize && matches!((&a.cells, e),
+            !fi.tupel && a.dims.len() == fi.dims as usize && a.unten.is_empty() && matches!((&a.cells, e),
                 (crate::value::Cells::Int(_), Elem::I) | (crate::value::Cells::Float(_), Elem::F)
                 | (crate::value::Cells::Val(_), Elem::Wert(_)))
         }
@@ -674,7 +676,7 @@ extern "C" fn gfeld_lesen(k: *mut Kontext, g: u64, n: u64, i0: i64, i1: i64, i2:
     let wert = slots.get(g as usize).and_then(|s| s.as_ref()).and_then(|sl| match &sl.borrow().value {
         Value::Array(a) => {
             let a = a.borrow();
-            if a.dims.len() != n as usize { return None; }
+            if a.dims.len() != n as usize || !a.unten.is_empty() { return None; }
             let mut off = 0i64;
             for j in 0..n as usize {
                 if idx[j] < 0 || idx[j] >= a.dims[j] { return None; }
@@ -1484,7 +1486,9 @@ fn globale_lesen(prog: &Program) -> Globale {
         match (ins.op, &ins.arg) {
             (op::DECLARE_ARRAY_NAME, Arg::List(l)) => {
                 let name = f.constants.get(l[0].as_usize()).map(|v| v.fmt()).unwrap_or_default();
-                offen = Some((name, elem(l[1].str()).map(|e| (e, l[2].as_usize().min(255) as u8))));
+                // Mit eigener Untergrenze (viertes Argument) bleibt das Feld der VM.
+                let grenzen = matches!(l.get(3), Some(Arg::List(b)) if b.iter().any(|x| x.as_usize() != 0));
+                offen = Some((name, if grenzen { None } else { elem(l[1].str()).map(|e| (e, l[2].as_usize().min(255) as u8)) }));
             }
             (op::DECLARE_NAME, Arg::List(l)) => {
                 let name = f.constants.get(l[0].as_usize()).map(|v| v.fmt()).unwrap_or_default();

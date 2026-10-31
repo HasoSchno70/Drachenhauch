@@ -131,7 +131,7 @@ pub fn builtin_typ(name: &str) -> Option<Typ> {
         // dem Ergebnis dann als Zahl weiter statt im Wertemodus (ASC in einer
         // Schleife: 42 -> ~15 ns).
         "len" | "int" | "millis" | "asc" | "instr" | "instrrev" | "mapsize" | "count"
-        | "array_push" => Typ::Int,
+        | "array_push" | "lbound" | "ubound" => Typ::Int,
         "sqr" | "sin" | "cos" | "timer" => Typ::Float,
         "abs" => Typ::Zahl,
         _ => return None,

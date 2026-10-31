@@ -532,11 +532,11 @@ ARGPATH$(n)
 
 === befehle anderer basics beim uebersetzen
 PRINT "vorher"
-PRINT UBOUND(3)
+PRINT FIX(3)
 --- stderr
-UBOUND: der letzte Index ist LEN(feld) - 1
+FIX: INT rundet ab
 --- fehler
-Unbekannter Befehl 'UBOUND'
+Unbekannter Befehl 'FIX'
 
 === and auf zwei ganzzahlen warnt
 DIM a AS INTEGER = 6
@@ -981,7 +981,7 @@ Felder zaehlen ab 0: DIM a[3] hat a[0] bis a[2]
 DIM a[3] AS INTEGER
 PRINT a[99]
 --- fehler
-Index 99 ausserhalb [0..2] in Dimension 0
+Index 99 ausserhalb [0..2] in Dimension 1
 
 === eine taste als buchstabe
 ' Bis 2026.27 ein Fehler mit dem Hinweis auf KEY_A -- seither meint ein

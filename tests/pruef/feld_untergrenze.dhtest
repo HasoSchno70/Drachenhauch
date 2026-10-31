@@ -1,0 +1,524 @@
+' Felder mit eigener Untergrenze (docs/entwurf-feld-untergrenze.md, Stufe 1):
+' `DIM a[1 TO 31]`, LBOUND/UBOUND, Meldungen mit den Grenzen aus dem DIM und
+' der Dimension ab 1, die Befehle mit einer Stelle (INSERT/REMOVE_AT/
+' INDEXOF/FIND/COPY, Slicing). Jeder Fall laeuft in der VM (DHRT_JIT=aus)
+' und mit Maschinencode (DHRT_JIT=immer) mit derselben Erwartung -- in Stufe 1
+' lehnt der Maschinencode ein Feld mit Untergrenze ab, die VM rechnet.
+' Format: docs/werkzeuge.md.
+
+=== lesen und schreiben an beiden raendern
+DIM tage[1 TO 31] AS INTEGER
+tage[1] = 5
+tage[31] = 7
+PRINT tage[1], tage[31], LEN(tage)
+TRY
+    PRINT tage[0]
+CATCH e
+    PRINT e
+END TRY
+TRY
+    tage[32] = 1
+CATCH e
+    PRINT e
+END TRY
+DIM n[3] AS INTEGER
+TRY
+    PRINT n[3]
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+5 7 31
+Index 0 ausserhalb [1..31] in Dimension 1
+Index 32 ausserhalb [1..31] in Dimension 1
+Index 3 ausserhalb [0..2] in Dimension 1 -- Felder zaehlen ab 0: DIM a[3] hat a[0] bis a[2]
+
+=== lesen und schreiben an beiden raendern (maschinencode)
+DIM tage[1 TO 31] AS INTEGER
+tage[1] = 5
+tage[31] = 7
+PRINT tage[1], tage[31], LEN(tage)
+TRY
+    PRINT tage[0]
+CATCH e
+    PRINT e
+END TRY
+TRY
+    tage[32] = 1
+CATCH e
+    PRINT e
+END TRY
+DIM n[3] AS INTEGER
+TRY
+    PRINT n[3]
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+5 7 31
+Index 0 ausserhalb [1..31] in Dimension 1
+Index 32 ausserhalb [1..31] in Dimension 1
+Index 3 ausserhalb [0..2] in Dimension 1 -- Felder zaehlen ab 0: DIM a[3] hat a[0] bis a[2]
+
+=== zwei dimensionen negativ und gemischt
+DIM f[-2 TO 2, -1 TO 1] AS STRING
+f[-2, -1] = "links oben"
+f[2, 1] = "rechts unten"
+f[0, 0] = "mitte"
+PRINT f[-2, -1]; " | "; f[0, 0]; " | "; f[2, 1]; " | "; LEN(f)
+DIM g[5, 1 TO 3] AS FLOAT
+g[4, 3] = 2.5
+g[0, 1] = 1.5
+PRINT g[0, 1] + g[4, 3]
+TRY
+    PRINT g[0, 0]
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT f[-3, 0]
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+links oben | mitte | rechts unten | 5
+4.0
+Index 0 ausserhalb [1..3] in Dimension 2
+Index -3 ausserhalb [-2..2] in Dimension 1
+
+=== zwei dimensionen negativ und gemischt (maschinencode)
+DIM f[-2 TO 2, -1 TO 1] AS STRING
+f[-2, -1] = "links oben"
+f[2, 1] = "rechts unten"
+f[0, 0] = "mitte"
+PRINT f[-2, -1]; " | "; f[0, 0]; " | "; f[2, 1]; " | "; LEN(f)
+DIM g[5, 1 TO 3] AS FLOAT
+g[4, 3] = 2.5
+g[0, 1] = 1.5
+PRINT g[0, 1] + g[4, 3]
+TRY
+    PRINT g[0, 0]
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT f[-3, 0]
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+links oben | mitte | rechts unten | 5
+4.0
+Index 0 ausserhalb [1..3] in Dimension 2
+Index -3 ausserhalb [-2..2] in Dimension 1
+
+=== lbound und ubound je dimension
+DIM f[-10 TO 10, 1 TO 4, 3] AS INTEGER
+PRINT LBOUND(f), UBOUND(f)
+PRINT LBOUND(f, 1), UBOUND(f, 1)
+PRINT LBOUND(f, 2), UBOUND(f, 2)
+PRINT LBOUND(f, 3), UBOUND(f, 3)
+DIM leer[1 TO 0] AS INTEGER
+PRINT LEN(leer), LBOUND(leer), UBOUND(leer)
+DIM liste AS ARRAY OF STRING
+liste = []
+PRINT LBOUND(liste), UBOUND(liste)
+DIM von AS INTEGER
+von = 1990
+DIM jahre[von TO von + 35] AS FLOAT
+PRINT LBOUND(jahre), UBOUND(jahre), LEN(jahre)
+TRY
+    PRINT LBOUND(f, 4)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT UBOUND(3)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+-10 10
+-10 10
+1 4
+0 2
+0 1 0
+0 -1
+1990 2025 36
+LBOUND: Dimension 4 gibt es nicht -- das Feld hat 3 (gezaehlt ab 1)
+UBOUND: erwartet ARRAY, erhalten INTEGER
+
+=== lbound und ubound je dimension (maschinencode)
+DIM f[-10 TO 10, 1 TO 4, 3] AS INTEGER
+PRINT LBOUND(f), UBOUND(f)
+PRINT LBOUND(f, 1), UBOUND(f, 1)
+PRINT LBOUND(f, 2), UBOUND(f, 2)
+PRINT LBOUND(f, 3), UBOUND(f, 3)
+DIM leer[1 TO 0] AS INTEGER
+PRINT LEN(leer), LBOUND(leer), UBOUND(leer)
+DIM liste AS ARRAY OF STRING
+liste = []
+PRINT LBOUND(liste), UBOUND(liste)
+DIM von AS INTEGER
+von = 1990
+DIM jahre[von TO von + 35] AS FLOAT
+PRINT LBOUND(jahre), UBOUND(jahre), LEN(jahre)
+TRY
+    PRINT LBOUND(f, 4)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT UBOUND(3)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+-10 10
+-10 10
+1 4
+0 2
+0 1 0
+0 -1
+1990 2025 36
+LBOUND: Dimension 4 gibt es nicht -- das Feld hat 3 (gezaehlt ab 1)
+UBOUND: erwartet ARRAY, erhalten INTEGER
+
+=== die grenzen reisen mit dem feld
+FUNCTION summe(a AS ARRAY OF INTEGER) AS INTEGER
+    DIM s AS INTEGER
+    DIM i AS INTEGER
+    FOR i = LBOUND(a) TO UBOUND(a)
+        s = s + a[i] * i
+    NEXT
+    RETURN s
+END FUNCTION
+FUNCTION neu() AS ARRAY OF INTEGER
+    DIM r[-1 TO 1] AS INTEGER
+    r[-1] = 10 : r[1] = 30
+    RETURN r
+END FUNCTION
+CLASS Monat
+    DIM tage[1 TO 3] AS INTEGER
+END CLASS
+DIM a[1 TO 3] AS INTEGER
+a[1] = 1 : a[2] = 1 : a[3] = 1
+PRINT summe(a)
+DIM b AS ARRAY OF INTEGER
+b = a
+b[3] = 5
+PRINT a[3], LBOUND(b)
+DIM c AS ARRAY OF INTEGER
+c = neu()
+PRINT LBOUND(c), c[-1], c[1]
+DIM m AS Monat
+m = NEW Monat()
+m.tage[3] = 9
+PRINT LBOUND(m.tage), UBOUND(m.tage), m.tage[3]
+DIM m2 AS Monat
+m2 = NEW Monat()
+PRINT m2.tage[3]
+a = [7, 8, 9]
+PRINT LBOUND(a), a[0]
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+6
+5 1
+-1 10 30
+1 3 9
+0
+0 7
+
+=== die grenzen reisen mit dem feld (maschinencode)
+FUNCTION summe(a AS ARRAY OF INTEGER) AS INTEGER
+    DIM s AS INTEGER
+    DIM i AS INTEGER
+    FOR i = LBOUND(a) TO UBOUND(a)
+        s = s + a[i] * i
+    NEXT
+    RETURN s
+END FUNCTION
+FUNCTION neu() AS ARRAY OF INTEGER
+    DIM r[-1 TO 1] AS INTEGER
+    r[-1] = 10 : r[1] = 30
+    RETURN r
+END FUNCTION
+CLASS Monat
+    DIM tage[1 TO 3] AS INTEGER
+END CLASS
+DIM a[1 TO 3] AS INTEGER
+a[1] = 1 : a[2] = 1 : a[3] = 1
+PRINT summe(a)
+DIM b AS ARRAY OF INTEGER
+b = a
+b[3] = 5
+PRINT a[3], LBOUND(b)
+DIM c AS ARRAY OF INTEGER
+c = neu()
+PRINT LBOUND(c), c[-1], c[1]
+DIM m AS Monat
+m = NEW Monat()
+m.tage[3] = 9
+PRINT LBOUND(m.tage), UBOUND(m.tage), m.tage[3]
+DIM m2 AS Monat
+m2 = NEW Monat()
+PRINT m2.tage[3]
+a = [7, 8, 9]
+PRINT LBOUND(a), a[0]
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+6
+5 1
+-1 10 30
+1 3 9
+0
+0 7
+
+=== befehle mit einer stelle zaehlen im feld
+DIM a[-10 TO -8] AS INTEGER
+a[-10] = 4 : a[-9] = 5 : a[-8] = 6
+PRINT ARRAY_INDEXOF(a, 6), ARRAY_INDEXOF(a, 99), LBOUND(a) - 1
+PRINT ARRAY_FIND(a, FUNCTION(x) x = 5), ARRAY_FIND(a, FUNCTION(x) x > 100)
+ARRAY_PUSH(a, 7)
+PRINT UBOUND(a), a[-7]
+PRINT ARRAY_POP(a), UBOUND(a)
+ARRAY_INSERT(a, -10, 3)
+PRINT a[-10], a[-9], UBOUND(a)
+PRINT ARRAY_REMOVE_AT(a, -8), UBOUND(a)
+TRY
+    ARRAY_REMOVE_AT(a, 0)
+CATCH e
+    PRINT e
+END TRY
+DIM k AS ARRAY OF INTEGER
+k = ARRAY_COPY(a)
+PRINT LBOUND(k), k[-10]
+DIM s AS ARRAY OF INTEGER
+s = a[-9:-7]
+PRINT LEN(s), LBOUND(s), s[0], s[1]
+DIM n[3] AS INTEGER
+PRINT ARRAY_INDEXOF(n, 5)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+-8 -11 -11
+-9 -11
+-7 7
+7 -8
+3 4 -7
+5 -8
+ARRAY_REMOVE_AT: Index 0 ausserhalb [-10..-8]
+-10 3
+2 0 4 6
+-1
+
+=== befehle mit einer stelle zaehlen im feld (maschinencode)
+DIM a[-10 TO -8] AS INTEGER
+a[-10] = 4 : a[-9] = 5 : a[-8] = 6
+PRINT ARRAY_INDEXOF(a, 6), ARRAY_INDEXOF(a, 99), LBOUND(a) - 1
+PRINT ARRAY_FIND(a, FUNCTION(x) x = 5), ARRAY_FIND(a, FUNCTION(x) x > 100)
+ARRAY_PUSH(a, 7)
+PRINT UBOUND(a), a[-7]
+PRINT ARRAY_POP(a), UBOUND(a)
+ARRAY_INSERT(a, -10, 3)
+PRINT a[-10], a[-9], UBOUND(a)
+PRINT ARRAY_REMOVE_AT(a, -8), UBOUND(a)
+TRY
+    ARRAY_REMOVE_AT(a, 0)
+CATCH e
+    PRINT e
+END TRY
+DIM k AS ARRAY OF INTEGER
+k = ARRAY_COPY(a)
+PRINT LBOUND(k), k[-10]
+DIM s AS ARRAY OF INTEGER
+s = a[-9:-7]
+PRINT LEN(s), LBOUND(s), s[0], s[1]
+DIM n[3] AS INTEGER
+PRINT ARRAY_INDEXOF(n, 5)
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+-8 -11 -11
+-9 -11
+-7 7
+7 -8
+3 4 -7
+5 -8
+ARRAY_REMOVE_AT: Index 0 ausserhalb [-10..-8]
+-10 3
+2 0 4 6
+-1
+
+=== dim in einer schleife beginnt wieder bei der untergrenze
+SUB runde(k AS INTEGER)
+    DIM z[k TO k + 1] AS INTEGER
+    PRINT LBOUND(z), UBOUND(z), z[k]
+    z[k] = 99
+END SUB
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    DIM w[i TO 5] AS STRING
+    PRINT LBOUND(w), LEN(w), "["; w[i]; "]"
+    w[i] = "x"
+    runde(i * 10)
+NEXT
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1 5 []
+10 11 0
+2 4 []
+20 21 0
+3 3 []
+30 31 0
+
+=== dim in einer schleife beginnt wieder bei der untergrenze (maschinencode)
+SUB runde(k AS INTEGER)
+    DIM z[k TO k + 1] AS INTEGER
+    PRINT LBOUND(z), UBOUND(z), z[k]
+    z[k] = 99
+END SUB
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    DIM w[i TO 5] AS STRING
+    PRINT LBOUND(w), LEN(w), "["; w[i]; "]"
+    w[i] = "x"
+    runde(i * 10)
+NEXT
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+1 5 []
+10 11 0
+2 4 []
+20 21 0
+3 3 []
+30 31 0
+
+=== schleife ueber ein feld mit untergrenze
+DIM werte[-500 TO 500] AS INTEGER
+DIM summe AS INTEGER
+DIM i AS INTEGER
+DIM r AS INTEGER
+FOR r = 1 TO 20
+    FOR i = LBOUND(werte) TO UBOUND(werte)
+        werte[i] = werte[i] + i
+    NEXT
+NEXT
+FOR i = LBOUND(werte) TO UBOUND(werte)
+    summe = summe + ABS(werte[i])
+NEXT
+PRINT summe, werte[-500], werte[500]
+FUNCTION mitte() AS INTEGER
+    RETURN werte[0] + werte[1]
+END FUNCTION
+PRINT mitte()
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+5010000 -10000 10000
+20
+
+=== schleife ueber ein feld mit untergrenze (maschinencode)
+DIM werte[-500 TO 500] AS INTEGER
+DIM summe AS INTEGER
+DIM i AS INTEGER
+DIM r AS INTEGER
+FOR r = 1 TO 20
+    FOR i = LBOUND(werte) TO UBOUND(werte)
+        werte[i] = werte[i] + i
+    NEXT
+NEXT
+FOR i = LBOUND(werte) TO UBOUND(werte)
+    summe = summe + ABS(werte[i])
+NEXT
+PRINT summe, werte[-500], werte[500]
+FUNCTION mitte() AS INTEGER
+    RETURN werte[0] + werte[1]
+END FUNCTION
+PRINT mitte()
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+5010000 -10000 10000
+20
+
+=== obergrenze unter der untergrenze
+DIM a[5 TO 3] AS INTEGER
+--- fehler
+DIM: in Dimension 1 liegt die Obergrenze 3 unter der Untergrenze 5
+
+=== grenzen muessen ganzzahlen sein
+DIM a[1.5 TO 3] AS INTEGER
+--- fehler
+DIM: die Grenzen eines Feldes muessen INTEGER sein
+
+=== feld von structs bleibt ab 0
+STRUCT Punkt LAYOUT C
+    x AS LONG
+END STRUCT
+DIM p[1 TO 3] AS Punkt
+--- fehler
+ein Feld von Structs liegt wie in C und zaehlt ab 0
+
+=== runde klammern nennen die form mit untergrenze
+DIM a(1 TO 10) AS INTEGER
+--- fehler
+mit eigener Untergrenze DIM a[1 TO 10]
+
+=== klassenfeld braucht feste grenzen
+DIM n AS INTEGER
+CLASS K
+    DIM a[1 TO n] AS INTEGER
+END CLASS
+--- fehler
+braucht konstante INTEGER-Grenzen
+
+=== ein dhc von 2026.38 ohne das neue argument laeuft unveraendert
+' Die Beilage hat dhrt 2026.38 aus diesem Programm geschrieben:
+' CLASS K
+'     DIM w[2] AS INTEGER
+' END CLASS
+' DIM a[3] AS INTEGER
+' a[2] = 7
+' DIM k AS K
+' k = NEW K()
+' k.w[1] = 4
+' PRINT a[2] + k.w[1], LEN(a), LBOUND(a)
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", CWD$() + "/alt.dhc")
+PRINT TRIM$(lauf$(p))
+--- datei alt.dhc
+{"format":"dhc","version":1,"n_globals":2,"global_names":["a","k"],"main":{"name":"__main__","n_params":0,"n_required":0,"is_variadic":false,"is_sub":true,"is_main":true,"is_coroutine":false,"return_type":"","param_defaults":[],"param_names":[],"param_byref":[],"param_default_is_expr":[],"local_types":[],"local_defaults":[],"local_names":[],"constants":[3,"a",2,7,"k",null,"w",1,4],"code":[[1,0],[92,[1,"integer",1]],[122,[0,1]],[111,0],[1,2],[1,3],[91,1],[113,[1,4,4,5]],[80,["k",0,true]],[112,1],[111,1],[83,6],[1,7],[1,8],[91,1],[111,0],[1,2],[90,1],[111,1],[83,6],[1,7],[90,1],[20,null],[111,0],[51,["len",1]],[111,0],[51,["lbound",1]],[70,[3,true,",",","]],[99,null]],"lines":[4,4,4,5,5,5,5,6,7,7,8,8,8,8,8,9,9,9,9,9,9,9,9,9,9,9,9,9,9]},"functions":{},"classes":{"k":{"name":"k","parent_name":"","is_struct":false,"fields":[{"name":"w","type_name":"integer","array_dims":[2],"struct_bytes":0}],"methods":{},"properties":[]}},"data":[]}
+--- erwartet
+11 3 0

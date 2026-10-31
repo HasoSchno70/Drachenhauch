@@ -385,7 +385,7 @@ Reflexionen/Mirror-Effekte.
 > SUB (vorher „Stufe 3e: … noch nicht unterstuetzt"), fremde Typnamen
 > (DOUBLE, LONG, BOOL …), Feld von Feldern, `RND`/`TIMER` ohne Klammern, ein
 > Name mit Wert dahinter (`LOCATE 1, 1` → „in Klammern"), `INSTR(start, …)`,
-> fremde Befehlsnamen (UCASE$, UBOUND, FIX, CINT …). Ein unbekannter Befehl
+> fremde Befehlsnamen (UCASE$, FIX, CINT …). Ein unbekannter Befehl
 > heißt beim Laufen jetzt „Unbekannter Befehl" statt „im Rust-Kern noch nicht
 > verfuegbar" — diese Wendung bleibt den Bauten ohne Grafik/Ton vorbehalten,
 > an ihr erkennen die Prüfsammlungen einen solchen Bau. Die Tabellen liegen in

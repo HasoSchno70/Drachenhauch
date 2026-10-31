@@ -516,6 +516,7 @@ fn knoten(l: &mut Lauf, n: &mut Node) {
         NamedArg { value, .. } => knoten(l, value),
         // `x IS Gegner`: der Typname wird umgeschrieben wie bei DIM/NEW.
         IsTyp { wert, typ } => { knoten(l, wert); l.typ(typ); }
+        Bereich { von, bis } => { knoten(l, von); knoten(l, bis); }
         // Die Parameter eines Lambdas sind lokal -- sie duerfen kein Praefix
         // des Moduls bekommen, auch wenn das Modul einen gleichnamigen Namen hat.
         Lambda { params, body, .. } => {

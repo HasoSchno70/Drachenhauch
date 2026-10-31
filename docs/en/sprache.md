@@ -1080,6 +1080,32 @@ PRINT DIMSIZE(brett, 0)           ' 8
 PRINT DIMSIZE(brett, 1)           ' 8
 ```
 
+**A lower bound of your own:** `[from TO to]` instead of the size -- the array
+then counts from `from`. The bounds may be expressions, `[1 TO 0]` is an empty
+array. `LBOUND(array [, dimension])` and `UBOUND(array [, dimension])` give the
+smallest and largest index (dimension counts from 1, the first if omitted):
+
+```basic
+DIM tage[1 TO 31] AS INTEGER      ' 31 slots, tage[1] to tage[31]
+DIM feld[-10 TO 10, -10 TO 10] AS INTEGER
+DIM gemischt[5, 1 TO 3] AS STRING ' first dimension from 0, second from 1
+
+DIM i AS INTEGER
+FOR i = LBOUND(tage) TO UBOUND(tage)
+    tage[i] = i
+NEXT
+PRINT LBOUND(feld, 2), UBOUND(feld, 2)   ' -10  10
+```
+
+The bounds belong to the **array**, not to the variable: they travel along
+when the array goes to a subroutine, is returned or is passed on with `b = a`.
+`a = [1, 2, 3]`, on the other hand, puts a new array in, and that one starts
+at 0. Commands that name or return a position (`ARRAY_INSERT`,
+`ARRAY_REMOVE_AT`, `ARRAY_INDEXOF`, `ARRAY_FIND`, slicing) count in the
+array's indices; "not found" is then `LBOUND(array) - 1` -- compare with
+`LBOUND`, not with 0. Arrays of `STRUCT … LAYOUT C` have no lower bound of
+their own (they are laid out as in C).
+
 Arrays of external types (e.g. SPRITE) are possible; the default value is `NIL`:
 
 ```basic

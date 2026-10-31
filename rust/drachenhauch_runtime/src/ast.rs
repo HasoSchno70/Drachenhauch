@@ -111,6 +111,9 @@ pub enum Node {
     /// fuer den eigenen Knoten -- so kann `namensraum.rs` ihn wie jeden
     /// anderen Typnamen umschreiben (`x IS mathe.Punkt`).
     IsTyp { wert: Box<Node>, typ: String },
+    /// `von TO bis` in den eckigen Klammern eines DIM -- eine Dimension mit
+    /// eigener Untergrenze (`DIM tage[1 TO 31]`). Steht sonst nirgends.
+    Bereich { von: Box<Node>, bis: Box<Node> },
 
     // --- Anweisungen ---
     Dim { name: String, type_name: String, array_dims: Option<Vec<Node>> },
@@ -242,6 +245,8 @@ impl Node {
                 ("target", target.to_json()), ("lo", bopt(lo)), ("hi", bopt(hi))]),
             IsTyp { wert, typ } => obj("IsTyp", vec![
                 ("wert", wert.to_json()), ("typ", json!(typ))]),
+            Bereich { von, bis } => obj("Bereich", vec![
+                ("von", von.to_json()), ("bis", bis.to_json())]),
 
             Dim { name, type_name, array_dims } => obj("Dim", vec![
                 ("name", json!(name)), ("type_name", json!(type_name)),

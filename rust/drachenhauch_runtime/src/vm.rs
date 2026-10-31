@@ -2007,9 +2007,10 @@ impl<'p> Vm<'p> {
                     Some(Frisch::Puffer(fd.struct_bytes))
                 } else if !fd.array_dims.is_empty() {
                     let et = fd.type_name.clone();
-                    let arr = DhArray::new(et.clone(), fd.array_dims.clone(), || self.element_default(&et));
+                    let arr = DhArray::new(et.clone(), fd.array_dims.clone(), || self.element_default(&et))
+                        .mit_unten(fd.array_unten.clone());
                     if arr.cells.iter().all(|v| teilbar(&v)) { Some(Frisch::FeldKopie(arr)) }
-                    else { Some(Frisch::Feld(et, fd.array_dims.clone())) }
+                    else { Some(Frisch::Feld(et, fd.array_dims.clone(), fd.array_unten.clone())) }
                 } else if self.prog.classes.get(&fd.type_name).map(|c| c.is_struct).unwrap_or(false) {
                     Some(Frisch::Struktur(fd.type_name.clone()))
                 } else {
@@ -2039,9 +2040,10 @@ impl<'p> Vm<'p> {
                     dims: a.dims.clone(),
                     strides: a.strides.clone(),
                     cells: a.cells.clone(),
+                    unten: a.unten.clone(),
                 }))),
-                Frisch::Feld(et, dims) => Value::Array(Rc::new(RefCell::new(
-                    DhArray::new(et.clone(), dims.clone(), || self.element_default(et))))),
+                Frisch::Feld(et, dims, unten) => Value::Array(Rc::new(RefCell::new(
+                    DhArray::new(et.clone(), dims.clone(), || self.element_default(et)).mit_unten(unten.clone())))),
                 Frisch::Struktur(k) => self.allocate_instance(k),
                 Frisch::Wert(t) => self.element_default(t),
             };
@@ -3299,15 +3301,16 @@ impl<'p> Vm<'p> {
                 Ok(akku)
             }
             _ => {
+                let lo = arr.borrow().unten_von(0);
                 for (i, v) in werte.into_iter().enumerate() {
                     match self.rueckruf_exec(&cb, f, &empf, vec![v])? {
-                        Value::Bool(true) => return Ok(Value::Int(i as i64)),
+                        Value::Bool(true) => return Ok(Value::Int(lo + i as i64)),
                         Value::Bool(false) => {}
                         andere => return Err(format!(
                             "ARRAY_FIND: die Funktion muss TRUE oder FALSE liefern, lieferte {}", andere.type_name())),
                     }
                 }
-                Ok(Value::Int(-1))
+                Ok(Value::Int(lo - 1))
             }
         }
     }
@@ -4162,7 +4165,7 @@ impl<'p> Vm<'p> {
                         let mut fast = None;
                         if let (Value::Array(a), Value::Int(i)) = (&arr, &ix) {
                             let ab = a.borrow();
-                            if ab.dims.len() == 1 && *i >= 0 && (*i as usize) < ab.cells.len() {
+                            if ab.dims.len() == 1 && ab.unten.is_empty() && *i >= 0 && (*i as usize) < ab.cells.len() {
                                 fast = Some(ab.cells.get(*i as usize));
                             }
                         }
@@ -4186,7 +4189,7 @@ impl<'p> Vm<'p> {
                         let mut rest = Some(v);
                         if let (Value::Array(a), Value::Int(i)) = (&arr, &ix) {
                             let mut ab = a.borrow_mut();
-                            if ab.dims.len() == 1 && *i >= 0 && (*i as usize) < ab.cells.len() {
+                            if ab.dims.len() == 1 && ab.unten.is_empty() && *i >= 0 && (*i as usize) < ab.cells.len() {
                                 let val = rest.take().unwrap();
                                 let iu = *i as usize;
                                 // Typisiertes Backing zuerst: Int/Float-Stores
@@ -4694,9 +4697,9 @@ impl<'p> Vm<'p> {
                     let name = constants[l[0].as_usize()].fmt();
                     let elem_type = l[1].str().to_string();
                     let num_dims = l[2].as_usize();
-                    let dims = self.pop_dims(stack, num_dims)?;
+                    let (dims, unten) = self.pop_feld_dims(stack, l, num_dims)?;
                     let et = elem_type.clone();
-                    let arr = DhArray::new(elem_type.clone(), dims, || self.element_default(&et));
+                    let arr = DhArray::new(elem_type.clone(), dims, || self.element_default(&et)).mit_unten(unten);
                     self.globals.insert(name, Rc::new(RefCell::new(Slot {
                         ty: format!("array:{}", elem_type),
                         value: Value::Array(Rc::new(RefCell::new(arr))),
@@ -4708,9 +4711,9 @@ impl<'p> Vm<'p> {
                     let slot = l[0].as_usize();
                     let elem_type = l[1].str().to_string();
                     let num_dims = l[2].as_usize();
-                    let dims = self.pop_dims(stack, num_dims)?;
+                    let (dims, unten) = self.pop_feld_dims(stack, l, num_dims)?;
                     let et = elem_type.clone();
-                    let arr = DhArray::new(elem_type, dims, || self.element_default(&et));
+                    let arr = DhArray::new(elem_type, dims, || self.element_default(&et)).mit_unten(unten);
                     locals[slot] = Value::Array(Rc::new(RefCell::new(arr)));
                 }
 
@@ -4826,6 +4829,48 @@ impl<'p> Vm<'p> {
                 other => return Err(format!("Opcode {} im Rust-VM noch nicht implementiert (ip={})", other, *ip - 1)),
         }
         Ok(None)
+    }
+
+    /// Groessen und Untergrenzen eines DIM mit Feld vom Stapel nehmen. Das
+    /// vierte Argument des Befehls (`grenzen`, fehlt in alten .dhc) sagt je
+    /// Dimension, ob sie als Bereich `von TO bis` kam (zwei Werte) oder als
+    /// Groesse (einer).
+    fn pop_feld_dims(&self, stack: &mut Vec<Value>, l: &[Arg], num_dims: usize) -> R<(Vec<i64>, Vec<i64>)> {
+        let bereich: Vec<bool> = match l.get(3) {
+            Some(Arg::List(b)) => b.iter().map(|x| x.as_usize() != 0).collect(),
+            _ => vec![false; num_dims],
+        };
+        if !bereich.iter().any(|&b| b) {
+            return Ok((self.pop_dims(stack, num_dims)?, Vec::new()));
+        }
+        let n_werte: usize = bereich.iter().map(|&b| if b { 2 } else { 1 }).sum();
+        let split = stack.len() - n_werte;
+        let raw = stack.split_off(split);
+        let mut it = raw.into_iter();
+        let mut groessen = Vec::with_capacity(num_dims);
+        let mut unten = Vec::with_capacity(num_dims);
+        for (k, &b) in bereich.iter().enumerate() {
+            if b {
+                let (von, bis) = (it.next().unwrap(), it.next().unwrap());
+                let (Value::Int(lo), Value::Int(hi)) = (&von, &bis) else {
+                    return Err(format!("DIM: die Grenzen eines Feldes muessen INTEGER sein, erhalten {} TO {}",
+                                       von.type_name(), bis.type_name()));
+                };
+                if *hi < lo.saturating_sub(1) {
+                    return Err(format!("DIM: in Dimension {} liegt die Obergrenze {} unter der Untergrenze {} -- [{} TO {}] ist schon leer",
+                                       k + 1, hi, lo, lo, lo.saturating_sub(1)));
+                }
+                let n = hi.checked_sub(*lo).and_then(|d| d.checked_add(1)).ok_or_else(||
+                    "Array-Groesse: Ganzzahl-Ueberlauf beim Berechnen der Gesamtgroesse".to_string())?;
+                groessen.push(Value::Int(n));
+                unten.push(*lo);
+            } else {
+                groessen.push(it.next().unwrap());
+                unten.push(0);
+            }
+        }
+        stack.extend(groessen);
+        Ok((self.pop_dims(stack, num_dims)?, unten))
     }
 
     fn pop_dims(&self, stack: &mut Vec<Value>, num_dims: usize) -> R<Vec<i64>> {
@@ -12914,8 +12959,22 @@ fn apply_slice(target: &Value, lo: Option<&Value>, hi: Option<&Value>) -> R<Valu
             let arr = arr.borrow();
             if arr.dims.len() != 1 { return Err("Slicing nur fuer 1D-Arrays".into()); }
             let n = arr.dims[0];
-            let a = to_idx(lo, 0)?.min(n).max(0);
-            let b = to_idx(hi, n)?.min(n).max(0);
+            // Mit eigener Untergrenze zaehlen `von` und `bis` in den Indizes
+            // des Feldes (a[-5:0] bei DIM a[-10 TO 10]); das Ergebnis ist eine
+            // neue Liste ab 0, wie bei ARRAY_FILTER.
+            let u = arr.unten_von(0);
+            let (a, b) = if u == 0 {
+                (to_idx(lo, 0)?.min(n).max(0), to_idx(hi, n)?.min(n).max(0))
+            } else {
+                let feld = |o: Option<&Value>, def: i64| -> R<i64> {
+                    match o {
+                        None => Ok(def),
+                        Some(Value::Int(i)) => Ok(i.saturating_sub(u)),
+                        Some(v) => Err(format!("Slice-Index muss INTEGER sein, erhalten {}", v.type_name())),
+                    }
+                };
+                (feld(lo, 0)?.min(n).max(0), feld(hi, n)?.min(n).max(0))
+            };
             let slice = if a >= b { Cells::Val(vec![]) } else { arr.cells.slice(a as usize, b as usize) };
             let len = slice.len() as i64;
             let mut new = DhArray::new(arr.element_type.clone(), vec![len], || Value::Nil);
@@ -13333,7 +13392,7 @@ enum Frisch {
     /// Feld mit Groesse, dessen Elemente teilbar sind: die Vorlage kopieren.
     FeldKopie(DhArray),
     /// Feld mit Groesse, dessen Elemente selbst je Objekt neu entstehen.
-    Feld(String, Vec<i64>),
+    Feld(String, Vec<i64>, Vec<i64>),
     /// Ein STRUCT als Feld.
     Struktur(String),
     /// Ein Anfangswert mit eigenem Speicher (MAT4, Tupel, leeres Feld ...).
@@ -13411,7 +13470,7 @@ fn array_literal(vals: Vec<Value>) -> Value {
     } else {
         ("any", Cells::Val(vals))
     };
-    let arr = DhArray { element_type: etype.to_string(), dims: vec![n], strides: vec![1], cells };
+    let arr = DhArray { element_type: etype.to_string(), dims: vec![n], strides: vec![1], cells, unten: Vec::new() };
     Value::Array(Rc::new(RefCell::new(arr)))
 }
 
