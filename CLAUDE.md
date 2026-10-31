@@ -1606,14 +1606,19 @@ Indizes des Feldes: `ARRAY_INSERT/REMOVE_AT`, `ARRAY_INDEXOF/FIND` (nicht
 gefunden = `LBOUND - 1`), Slicing (Ergebnis ab 0), `ARRAY_COPY` behaelt die
 Grenzen. **Regel fuer neue Feldbefehle:** wer einen Index entgegennimmt oder
 liefert, rechnet ueber `unten_von(k)`, sonst zaehlt er bei solchen Feldern
-still falsch. Der Maschinencode lehnt Felder mit Untergrenze ab (Stufe 1).
+still falsch. **Stufe 3:** der Maschinencode rechnet solche Felder selbst --
+`FeldInfo::unten` (nur dann traegt die Beschreibung die Untergrenzen, und
+`feld_adresse` zieht sie vor der Pruefung ab; Felder ab 0 bekommen denselben
+Code wie vorher, gegen 2026.38 A/B 0,97..0,98), `feld_passt` verlangt die
+Form des Baus, `gfeld_lesen` liest die Grenze am Feld; ein Feld mit
+Untergrenze laeuft ~60x schneller als in der VM.
 Nicht fuer Felder von `STRUCT ... LAYOUT C`. **Stufe 2:** `ARRAY_MAP`
 behaelt die Grenzen, `PRINT` zeigt `<ARRAY[1 TO 31] OF ...>`, der Debugger
 zaehlt Kinder ab `LBOUND`, `--check` warnt bei festem Index ausserhalb fester
 Grenzen (`Ctx::feste_grenzen`; gesammelt in `grenz_warnungen` und erst am
 Ende des Bereichs ausgegeben, nur wenn das Feld dort nie ersetzt wird und
 nie an einen Aufruf geht -- `grenz_frei`). Tests
-`tests/pruef/feld_untergrenze.dhtest` (24).
+`tests/pruef/feld_untergrenze.dhtest` (27).
 
 ## Index und Feld auf dem Ergebnis eines Aufrufs (2026-10-09)
 

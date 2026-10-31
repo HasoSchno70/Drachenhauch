@@ -145,7 +145,7 @@ der zweiten Runde bei 0 an.
 
 Zwei Stufen:
 
-1. **Erst bleibt ein Feld mit Untergrenze der VM.** `feld_passt` und
+1. **Erst bleibt ein Feld mit Untergrenze der VM** (Stufe 1, inzwischen abgeloest). `feld_passt` und
    `feld_beschreiben` lehnen ein Feld mit nicht leerem `unten` ab,
    `gfeld_lesen` ebenso. Die Schleife läuft dann im Wertemodus oder in der VM
    -- langsamer, aber richtig, und es gibt keine zweite Rechnung, die
@@ -257,4 +257,32 @@ weg, auch wenn der Aufruf in einer Schleife hinter dem Zugriff steht. Ueber
 die 553 `.dh` des Repos: keine Meldung. Drei Verfaelschungen (Debugger,
 ARRAY_MAP, die Freigabe-Regel) fallen je in ihrem Fall.
 
-Offen: Maschinencode Stufe 2 (Untergrenze in die Beschreibung, mit Messung).
+**Stufe 3 (selber Tag): der Maschinencode rechnet mit.** Gebaut wie in
+Abschnitt 7 vorgesehen, gleich mit dem Schalter: `FeldInfo::unten` sagt, ob
+das Feld eine eigene Untergrenze hat. Nur dann traegt die Beschreibung je
+Dimension die Untergrenze (hinter Groessen und Schritten), und der Code
+zieht sie vor der Bereichspruefung ab -- ein Index unter der Grenze wird
+negativ, ohne Vorzeichen gross, und dieselbe Pruefung faengt beide Seiten.
+Felder ab 0 bekommen denselben Code wie vorher. `feld_passt` verlangt beim
+Eintritt dieselbe Form wie beim Bau (ein Bau fuer "ab 0" darf kein Feld mit
+Untergrenze nehmen; andersherum rechnete er sogar richtig, weil er dann 0
+abzieht -- die erste Fassung des Falls rief in dieser Reihenfolge und blieb
+gegen die Verfaelschung gruen). `gfeld_lesen` (Funktionen, die ein globales
+Feld lesen) liest die Untergrenze am Feld selbst; die statische Marke beim
+DECLARE_ARRAY_NAME mit Bereich ist weg.
+
+Gemessen (best of 7, je 10 x 1 Mio. Plaetze fuellen und lesen):
+
+| Feld | Maschinencode | VM |
+|---|---|---|
+| `a[1000000]` | 17,5 ms | 939 ms |
+| `a[1 TO 1000000]` | 18,0 ms | 1092 ms |
+| `a[1000, 1000]` | 16,1 ms | 1132 ms |
+| `a[1 TO 1000, -499 TO 500]` | 19,7 ms | 1139 ms |
+
+Gegen 2026.38 (ohne jede Untergrenze) bleiben Felder ab 0 gleich schnell:
+A/B 0,98 (`a[1000000]`, `a[1000, 1000]`), 0,97 (`tools/tempo/felder.dh`,
+`teilchen.dh`, `ganzzahl.dh`). Drei Faelle mehr in `feld_untergrenze.dhtest`
+(Bereich mit Bilanz, Funktion ueber ein globales Feld, dieselbe Schleife mit
+beiden Formen); ohne den Abzug im Code und im Helfer fallen vier, ohne die
+Formpruefung beim Eintritt einer.
