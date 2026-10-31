@@ -30,13 +30,13 @@ prQ = "CLASS Tier" + NL + "    ABSTRACT FUNCTION laut() AS STRING" + NL + "    S
 prQ = prQ + "CLASS Hund EXTENDS Tier" + NL + "    FUNCTION laut() AS STRING" + NL + "    END FUNCTION" + NL + "    SUB gehen()" + NL + "    END SUB" + NL + "END CLASS" + NL
 prQ = prQ + "CLASS Welpe EXTENDS Hund" + NL + "    SUB gehen()" + NL + "    END SUB" + NL + "END CLASS" + NL
 prQ = prQ + "CLASS Fisch EXTENDS Tier" + NL + "END CLASS" + NL
-DIM prM AS MAP OF STRING : prM = ueberschreibTexte(prQ)
+DIM prM AS MAP OF STRING : prM = ueberschreibTexte(prQ, [])
 DIM prZ AS INTEGER
 FOR prZ = 1 TO 30
     IF MAPHAS(prM, STR$(prZ)) THEN PRINT prZ; ": "; MAPGET(prM, STR$(prZ))
 NEXT
 ' Eine Klasse allein: nichts zu sagen.
-PRINT "allein "; MAPSIZE(ueberschreibTexte("CLASS A" + NL + "    SUB s()" + NL + "    END SUB" + NL + "END CLASS"))
+PRINT "allein "; MAPSIZE(ueberschreibTexte("CLASS A" + NL + "    SUB s()" + NL + "    END SUB" + NL + "END CLASS", []))
 EXIT(0)
 --- programm ../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
@@ -50,6 +50,79 @@ DH_IDE_KONFIG=ide.json
 11: überschreibt Tier.gehen   ·   überschrieben in Welpe
 15: überschreibt Hund.gehen
 allein 0
+
+=== die hinweise kennen die klassen der anderen projektdateien
+' Hund steht hier, Tier und Welpe in anderen Dateien des Projekts. Heisst
+' eine fremde Klasse wie eine eigene (Hund in alt.dh), gilt die eigene.
+zaehlerAn = TRUE
+DIM prR AS INTEGER
+FOR prR = 1 TO 5
+    zaehlerSetzen_(aktivesFeld())
+NEXT
+DIM prSt AS Zaehlstelle
+FOR EACH prSt IN zaehlStellen
+    PRINT prSt.zeile; " "; prSt.name; ": "; prSt.text
+NEXT
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- datei hund.dh
+CLASS Hund EXTENDS Tier
+    FUNCTION laut() AS STRING
+        RETURN "Wuff"
+    END FUNCTION
+    SUB gehen()
+    END SUB
+END CLASS
+--- datei tiere.dh
+CLASS Tier
+    ABSTRACT FUNCTION laut() AS STRING
+    SUB gehen()
+    END SUB
+    SUB fressen()
+    END SUB
+END CLASS
+--- datei welpe.dh
+CLASS Welpe EXTENDS Hund
+    FUNCTION laut() AS STRING
+        RETURN "Wiff"
+    END FUNCTION
+END CLASS
+--- datei alt.dh
+CLASS Hund EXTENDS Tier
+    SUB fressen()
+    END SUB
+END CLASS
+--- argumente
+{fall}/hund.dh
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- erwartet
+2 laut: nicht aufgerufen   ·   füllt Tier.laut aus (tiere.dh)   ·   überschrieben in Welpe
+5 gehen: nicht aufgerufen   ·   überschreibt Tier.gehen (tiere.dh)
+
+=== eine gleichnamige fremde klasse zaehlt nicht als unterklasse
+' Hier erbt Hund von Tier, ohne gehen; eine alte Hund-Fassung in alt.dh
+' hat gehen -- Tier.gehen ist trotzdem nirgends ueberschrieben.
+DIM prQ AS STRING
+prQ = "CLASS Tier" + NL + "    SUB gehen()" + NL + "    END SUB" + NL + "END CLASS" + NL + "CLASS Hund EXTENDS Tier" + NL + "END CLASS" + NL
+DIM prAlt AS STRING : prAlt = "CLASS Hund EXTENDS Tier" + NL + "    SUB gehen()" + NL + "    END SUB" + NL + "END CLASS" + NL
+DIM prF AS ARRAY OF UeQuelle : prF = [NEW UeQuelle("alt.dh", CODE_CLASSES$(prAlt))]
+PRINT "hinweise "; MAPSIZE(ueberschreibTexte(prQ, prF))
+' Eine fremde Unterklasse mit anderem Namen zaehlt.
+DIM prNeu AS STRING : prNeu = "CLASS Dackel EXTENDS Hund" + NL + "    SUB gehen()" + NL + "    END SUB" + NL + "END CLASS" + NL
+prF = [NEW UeQuelle("dackel.dh", CODE_CLASSES$(prNeu))]
+PRINT MAPGET(ueberschreibTexte(prQ, prF), "2")
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- erwartet
+hinweise 0
+überschrieben in Dackel
 
 === die neuen schnipsel sind da und ihre kuerzel eindeutig
 DIM prA AS STRING

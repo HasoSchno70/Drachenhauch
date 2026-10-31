@@ -303,7 +303,10 @@ as well. These building blocks came with it:
   aus" = fills in an announced one) and where it is overridden
   ("überschrieben in Hund, Welpe", "ausgefüllt in Hund", "nirgends
   ausgefüllt" = filled in nowhere) -- computed over the classes of the file
-  (`CODE_CLASSES$`). The outline names the base class (`class Hund : Tier`)
+  and of the other project files (`CODE_CLASSES$`); if the ancestor stands
+  elsewhere, the hint names the file ("überschreibt Tier.gehen (tiere.dh)").
+  If a class in another file has the same name as one of your own, your own
+  applies. The outline names the base class (`class Hund : Tier`)
   and marks ABSTRACT methods. For "NEW KATZE: die Klasse kuendigt ... an"
   Ctrl+. offers **Fehlende Methoden einfuegen** (insert missing methods):
   their header lines from the announcement with an empty body before
@@ -313,6 +316,8 @@ as well. These building blocks came with it:
   display scaling applies (`WINDOW_DPI_X`, rounded to quarters), so on a
   150 % screen the IDE is one and a half times as large. It takes effect at
   the next start (`GUI_SCALE` has to come before the first window).
+  It can also be set under Settings → "Interface size"; below it the IDE
+  says what applies now and what applies after the restart.
 - **Test collections** (Run → Run test collection, Ctrl+Alt+F5): `dhrt
   test` over the `.dhtest` in the tab (otherwise over the project folder), the
   output runs along; every failed case appears with file and line in

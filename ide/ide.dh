@@ -5532,6 +5532,9 @@ DIM zaehlCache AS MAP OF STRING
 ' anderer Editor), prueft zaehlNachsehen stueckweise, was sich auf der
 ' Platte geaendert hat.
 DIM zaehlZeit AS MAP OF INTEGER
+' Die Klassen jeder gelesenen Datei (CODE_CLASSES$, "" ohne CLASS), mit
+' derselben Gueltigkeit wie zaehlCache -- fuer die Ueberschreib-Hinweise.
+DIM klassenCache AS MAP OF STRING : klassenCache = {}
 DIM zaehlWeg AS MAP OF STRING        ' Schluessel -> Weg, wie er gelesen wurde
 DIM zaehlPruefListe AS ARRAY OF STRING : zaehlPruefListe = []
 ' Die Dateiliste fuer die Zaehlung, gemerkt: DIRLIST_REC kostet bei 2000
@@ -5548,6 +5551,7 @@ SUB zaehlVergessen(pfad AS STRING)
     DIM schl AS STRING : schl = LOWER$(wegGleich$(pfad))
     IF MAPHAS(zaehlCache, schl) THEN MAPREMOVE(zaehlCache, schl)
     IF MAPHAS(zaehlZeit, schl) THEN MAPREMOVE(zaehlZeit, schl)
+    IF MAPHAS(klassenCache, schl) THEN MAPREMOVE(klassenCache, schl)
     IF MAPHAS(zaehlWeg, schl) THEN MAPREMOVE(zaehlWeg, schl)
     DIM e AS STRING : e = wegGleich$(pfad)
     IF MAPHAS(echteWege, e) THEN MAPREMOVE(echteWege, e)
@@ -5600,6 +5604,7 @@ SUB zaehlNachsehen()
         END TRY
         IF jetzt <> MAPGET(zaehlZeit, schl) THEN
             IF MAPHAS(zaehlCache, schl) THEN MAPREMOVE(zaehlCache, schl)
+            IF MAPHAS(klassenCache, schl) THEN MAPREMOVE(klassenCache, schl)
             MAPREMOVE(zaehlZeit, schl)
             protokoll("zaehlung veraltet " + BASENAME(weg))
         END IF
@@ -5667,6 +5672,7 @@ FUNCTION zaehlungVon$(pfad AS STRING) AS STRING
     zaehlGelesenGesamt = zaehlGelesenGesamt + 1
     DIM m AS STRING : m = woerterZaehlen$(q)
     MAPPUT(zaehlCache, schl, m)
+    MAPPUT(klassenCache, schl, klassenAus$(q))
     DIM zeit AS INTEGER : zeit = -1
     TRY
         IF FILEEXISTS(pfad) THEN zeit = FILETIME(pfad)
@@ -5676,6 +5682,28 @@ FUNCTION zaehlungVon$(pfad AS STRING) AS STRING
     MAPPUT(zaehlZeit, schl, zeit)
     MAPPUT(zaehlWeg, schl, pfad)
     RETURN m
+END FUNCTION
+
+FUNCTION klassenAus$(q AS STRING) AS STRING
+    IF INSTR(UPPER$(q), "CLASS ") < 0 THEN RETURN ""
+    RETURN CODE_CLASSES$(q)
+END FUNCTION
+
+' Die Klassen einer Projektdatei fuer die Ueberschreib-Hinweise: ein offener
+' Reiter mit dem Stand im Editor, sonst aus dem Cache (gefuellt beim Zaehlen).
+FUNCTION klassenVon$(pfad AS STRING) AS STRING
+    IF tabMitPfad(pfad) >= 0 THEN RETURN klassenAus$(GUI_TEXT(reiter[tabMitPfad(pfad)].feld))
+    DIM schl AS STRING : schl = LOWER$(wegGleich$(pfad))
+    IF MAPHAS(klassenCache, schl) THEN RETURN MAPGET(klassenCache, schl)
+    DIM q AS STRING : q = ""
+    TRY
+        q = dateiLesen(pfad)
+    CATCH e
+        q = ""
+    END TRY
+    DIM k AS STRING : k = klassenAus$(q)
+    MAPPUT(klassenCache, schl, k)
+    RETURN k
 END FUNCTION
 
 ' Die Zaehler fuer das Feld setzen (oder wegnehmen). Waehrend der Debugger
@@ -5735,6 +5763,7 @@ SUB zaehlerSetzen_(ta AS GUI_WIDGET)
     IF projektOrdner <> "" THEN dateien = zaehlProjektDateien()
     zaehlerAddieren(summe, woerterZaehlen$(quelle))
     DIM d AS STRING
+    DIM fremd AS ARRAY OF UeQuelle : fremd = []
     zaehlGelesen = 0
     FOR EACH d IN dateien
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
@@ -5747,9 +5776,11 @@ SUB zaehlerSetzen_(ta AS GUI_WIDGET)
             RETURN
         END IF
         zaehlerAddieren(summe, zaehlungVon$(pfad))
+        DIM fk AS STRING : fk = klassenVon$(pfad)
+        IF fk <> "" THEN ARRAY_PUSH(fremd, NEW UeQuelle(d, fk))
     NEXT
     DIM stellen AS ARRAY OF Zaehlstelle : stellen = []
-    DIM ueber AS MAP OF STRING : ueber = ueberschreibTexte(quelle)
+    DIM ueber AS MAP OF STRING : ueber = ueberschreibTexte(quelle, fremd)
     FOR i = 0 TO LEN(nm) - 1
         DIM k AS INTEGER : k = MAPGET(summe, LOWER$(nm[i]))
         DIM zt AS STRING : zt = IIF(k = 0, "nicht aufgerufen", IIF(k = 1, "1 Aufruf", STR$(k) + " Aufrufe"))
@@ -5764,104 +5795,141 @@ END SUB
 ' Wer was ueberschreibt, je Zeile einer Methode (Schluessel = Zeilennummer):
 ' "überschreibt Tier.laut" / "füllt Tier.laut aus" (die Vorfahrin kuendigt
 ' sie nur an) und "überschrieben in Hund, Katze" / "ausgefüllt in Hund" bzw.
-' "nirgends ausgefüllt". Nur die Klassen DIESER Datei -- eine Oberklasse in
-' einer anderen Datei kennt CODE_CLASSES$ nicht.
-FUNCTION ueberschreibTexte(quelle AS STRING) AS MAP OF STRING
-    DIM aus AS MAP OF STRING : aus = {}
-    IF INSTR(UPPER$(quelle), "CLASS ") < 0 THEN RETURN aus
-    DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_CLASSES$(quelle))
-    DIM qz AS ARRAY OF STRING : qz = SPLIT$(quelle, NL)
-    DIM kName AS ARRAY OF STRING : kName = []
-    DIM kBasis AS ARRAY OF STRING : kBasis = []
-    ' je Methode: Klasse (Index), Name klein, Name wie geschrieben, Zeile, ABSTRACT?
-    DIM mK AS ARRAY OF INTEGER : mK = []
-    DIM mName AS ARRAY OF STRING : mName = []
-    DIM mSchrift AS ARRAY OF STRING : mSchrift = []
-    DIM mZeile AS ARRAY OF INTEGER : mZeile = []
-    DIM mAbstr AS ARRAY OF BOOLEAN : mAbstr = []
+' "nirgends ausgefüllt". Hinweise bekommen nur die Methoden DIESER Quelle;
+' gesucht wird aber auch in den Klassen der anderen Projektdateien
+' (`fremd`, je Datei die Ausgabe von CODE_CLASSES$) -- eine Oberklasse steht
+' oft in einer eigenen Datei. Heisst eine fremde Klasse wie eine eigene,
+' gilt die eigene: der Text im Editor ist neuer als die Platte.
+CLASS UeKlasse
+    DIM name AS STRING
+    DIM basis AS STRING
+    DIM datei AS STRING      ' "" = diese Quelle
+    SUB Init(n AS STRING, b AS STRING, d AS STRING)
+        name = n : basis = b : datei = d
+    END SUB
+END CLASS
+CLASS UeMethode
+    DIM klasse AS INTEGER    ' Index in der Klassenliste
+    DIM name AS STRING       ' klein
+    DIM schrift AS STRING    ' wie geschrieben
+    DIM zeile AS INTEGER
+    DIM abstrakt AS BOOLEAN
+    SUB Init(k AS INTEGER, s AS STRING, z AS INTEGER, ab AS BOOLEAN)
+        klasse = k : name = LOWER$(s) : schrift = s : zeile = z : abstrakt = ab
+    END SUB
+END CLASS
+CLASS UeQuelle
+    DIM datei AS STRING
+    DIM klassen AS STRING    ' CODE_CLASSES$
+    SUB Init(d AS STRING, k AS STRING)
+        datei = d : klassen = k
+    END SUB
+END CLASS
+
+SUB ueKlassenLesen(json AS STRING, datei AS STRING, kl AS ARRAY OF UeKlasse, me AS ARRAY OF UeMethode)
+    IF json = "" THEN RETURN
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_PARSE(json)
+    CATCH ueFehler
+        RETURN
+    END TRY
     DIM i AS INTEGER
     FOR i = 0 TO JSON_LEN(j, "") - 1
         DIM p AS STRING : p = STR$(i)
         IF JSON_GET_STRING(j, p + ".art") <> "class" THEN CONTINUE
-        ARRAY_PUSH(kName, JSON_GET_STRING(j, p + ".name"))
-        ARRAY_PUSH(kBasis, JSON_GET_STRING(j, p + ".basis"))
+        DIM kn AS STRING : kn = JSON_GET_STRING(j, p + ".name")
+        IF ueKlasseNr(kl, kn) >= 0 THEN CONTINUE
+        ARRAY_PUSH(kl, NEW UeKlasse(kn, JSON_GET_STRING(j, p + ".basis"), datei))
         DIM m AS INTEGER
         FOR m = 0 TO JSON_LEN(j, p + ".mitglieder") - 1
             DIM pm AS STRING : pm = p + ".mitglieder." + STR$(m)
             DIM art AS STRING : art = JSON_GET_STRING(j, pm + ".art")
             IF art <> "sub" AND art <> "function" THEN CONTINUE
-            DIM z AS INTEGER : z = JSON_GET_INT(j, pm + ".zeile")
-            ARRAY_PUSH(mK, LEN(kName) - 1)
-            ARRAY_PUSH(mName, LOWER$(JSON_GET_STRING(j, pm + ".name")))
-            ARRAY_PUSH(mSchrift, JSON_GET_STRING(j, pm + ".name"))
-            ARRAY_PUSH(mZeile, z)
-            DIM ab AS BOOLEAN : ab = FALSE
-            IF z >= 1 AND z <= LEN(qz) THEN ab = LEFT$(UPPER$(TRIM$(qz[z - 1])), 9) = "ABSTRACT "
-            ARRAY_PUSH(mAbstr, ab)
+            DIM ab AS BOOLEAN : ab = LEFT$(UPPER$(TRIM$(JSON_GET_STRING(j, pm + ".kopf"))), 9) = "ABSTRACT "
+            ARRAY_PUSH(me, NEW UeMethode(LEN(kl) - 1, JSON_GET_STRING(j, pm + ".name"), JSON_GET_INT(j, pm + ".zeile"), ab))
         NEXT
     NEXT
-    IF LEN(kName) < 2 THEN RETURN aus
-    FOR i = 0 TO LEN(mK) - 1
+END SUB
+
+FUNCTION ueberschreibTexte(quelle AS STRING, fremd AS ARRAY OF UeQuelle) AS MAP OF STRING
+    DIM aus AS MAP OF STRING : aus = {}
+    IF INSTR(UPPER$(quelle), "CLASS ") < 0 THEN RETURN aus
+    DIM kl AS ARRAY OF UeKlasse : kl = []
+    DIM me AS ARRAY OF UeMethode : me = []
+    ueKlassenLesen(CODE_CLASSES$(quelle), "", kl, me)
+    DIM eigene AS INTEGER : eigene = LEN(kl)
+    IF eigene = 0 THEN RETURN aus
+    DIM q AS UeQuelle
+    FOR EACH q IN fremd
+        ueKlassenLesen(q.klassen, q.datei, kl, me)
+    NEXT
+    IF LEN(kl) < 2 THEN RETURN aus
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(me) - 1
+        IF me[i].klasse >= eigene THEN CONTINUE
         DIM teile AS ARRAY OF STRING : teile = []
         ' nach oben: die naechste Vorfahrin mit derselben Methode
-        DIM oben AS INTEGER : oben = klassenIndexIn(kName, kBasis[mK[i]])
+        DIM oben AS INTEGER : oben = ueKlasseNr(kl, kl[me[i].klasse].basis)
         DIM runde AS INTEGER : runde = 0
         WHILE oben >= 0 AND runde < 30
             runde = runde + 1
-            DIM vt AS INTEGER : vt = methodeIn(mK, mName, oben, mName[i])
+            DIM vt AS INTEGER : vt = ueMethodeNr(me, oben, me[i].name)
             IF vt >= 0 THEN
-                IF mAbstr[vt] THEN
-                    ARRAY_PUSH(teile, "füllt " + kName[oben] + "." + mSchrift[vt] + " aus")
+                DIM wo AS STRING : wo = ""
+                IF kl[oben].datei <> "" THEN wo = " (" + kl[oben].datei + ")"
+                IF me[vt].abstrakt THEN
+                    ARRAY_PUSH(teile, "füllt " + kl[oben].name + "." + me[vt].schrift + " aus" + wo)
                 ELSE
-                    ARRAY_PUSH(teile, "überschreibt " + kName[oben] + "." + mSchrift[vt])
+                    ARRAY_PUSH(teile, "überschreibt " + kl[oben].name + "." + me[vt].schrift + wo)
                 END IF
                 BREAK
             END IF
-            oben = klassenIndexIn(kName, kBasis[oben])
+            oben = ueKlasseNr(kl, kl[oben].basis)
         WEND
         ' nach unten: jede Klasse, die (ueber Zwischenstufen) erbt und sie hat
         DIM unten AS ARRAY OF STRING : unten = []
         DIM k AS INTEGER
-        FOR k = 0 TO LEN(kName) - 1
-            IF k = mK[i] THEN CONTINUE
-            IF NOT erbtVon(kName, kBasis, k, mK[i]) THEN CONTINUE
-            IF methodeIn(mK, mName, k, mName[i]) >= 0 THEN ARRAY_PUSH(unten, kName[k])
+        FOR k = 0 TO LEN(kl) - 1
+            IF k = me[i].klasse THEN CONTINUE
+            IF NOT ueErbtVon(kl, k, me[i].klasse) THEN CONTINUE
+            IF ueMethodeNr(me, k, me[i].name) >= 0 THEN ARRAY_PUSH(unten, kl[k].name)
         NEXT
         IF LEN(unten) > 0 THEN
-            ARRAY_PUSH(teile, IIF(mAbstr[i], "ausgefüllt in ", "überschrieben in ") + JOIN$(unten, ", "))
-        ELSEIF mAbstr[i] THEN
+            ARRAY_PUSH(teile, IIF(me[i].abstrakt, "ausgefüllt in ", "überschrieben in ") + JOIN$(unten, ", "))
+        ELSEIF me[i].abstrakt THEN
             ARRAY_PUSH(teile, "nirgends ausgefüllt")
         END IF
-        IF LEN(teile) > 0 THEN MAPPUT(aus, STR$(mZeile[i]), JOIN$(teile, "   ·   "))
+        IF LEN(teile) > 0 THEN MAPPUT(aus, STR$(me[i].zeile), JOIN$(teile, "   ·   "))
     NEXT
     RETURN aus
 END FUNCTION
 
-FUNCTION klassenIndexIn(namen AS ARRAY OF STRING, name AS STRING) AS INTEGER
+FUNCTION ueKlasseNr(kl AS ARRAY OF UeKlasse, name AS STRING) AS INTEGER
     IF name = "" THEN RETURN -1
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(namen) - 1
-        IF LOWER$(namen[i]) = LOWER$(name) THEN RETURN i
+    FOR i = 0 TO LEN(kl) - 1
+        IF LOWER$(kl[i].name) = LOWER$(name) THEN RETURN i
     NEXT
     RETURN -1
 END FUNCTION
 
 ' Die Methode `name` (klein) der Klasse Nummer `k`, -1 = hat sie nicht.
-FUNCTION methodeIn(mK AS ARRAY OF INTEGER, mName AS ARRAY OF STRING, k AS INTEGER, name AS STRING) AS INTEGER
+FUNCTION ueMethodeNr(me AS ARRAY OF UeMethode, k AS INTEGER, name AS STRING) AS INTEGER
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(mK) - 1
-        IF mK[i] = k AND mName[i] = name THEN RETURN i
+    FOR i = 0 TO LEN(me) - 1
+        IF me[i].klasse = k AND me[i].name = name THEN RETURN i
     NEXT
     RETURN -1
 END FUNCTION
 
 ' Erbt Klasse `k` (ueber Zwischenstufen) von Klasse `vorfahr`?
-FUNCTION erbtVon(kName AS ARRAY OF STRING, kBasis AS ARRAY OF STRING, k AS INTEGER, vorfahr AS INTEGER) AS BOOLEAN
-    DIM b AS INTEGER : b = klassenIndexIn(kName, kBasis[k])
+FUNCTION ueErbtVon(kl AS ARRAY OF UeKlasse, k AS INTEGER, vorfahr AS INTEGER) AS BOOLEAN
+    DIM b AS INTEGER : b = ueKlasseNr(kl, kl[k].basis)
     DIM runde AS INTEGER : runde = 0
     WHILE b >= 0 AND runde < 30
         IF b = vorfahr THEN RETURN TRUE
-        b = klassenIndexIn(kName, kBasis[b])
+        b = ueKlasseNr(kl, kl[b].basis)
         runde = runde + 1
     WEND
     RETURN FALSE
@@ -6290,7 +6358,7 @@ SUB qvVerwerfen(pfad AS STRING)
         feldAustauschen(reiter[t].feld, GUI_TEXT(reiter[t].feld), neu)
         reiter[t].gesichert = GUI_TEXT(reiter[t].feld)
     END IF
-    zaehlCache = {} : zaehlZeit = {} : zaehlWeg = {} : echteWege = {} : zaehlDateienAlt = TRUE
+    zaehlCache = {} : zaehlZeit = {} : klassenCache = {} : zaehlWeg = {} : echteWege = {} : zaehlDateienAlt = TRUE
     qvAuffrischen()
     GUI_SET_TEXT(lblQvStatus, tr$("Verworfen: ") + pfad)
     protokoll("qv verworfen " + pfad)
@@ -6507,7 +6575,7 @@ SUB pakFertig(code AS INTEGER)
     protokoll("pak " + pakArt + " " + STR$(code))
     GUI_FILETREE_REFRESH(baum)
     symSchluessel = ""
-    zaehlCache = {} : zaehlZeit = {} : zaehlWeg = {} : echteWege = {} : zaehlDateienAlt = TRUE
+    zaehlCache = {} : zaehlZeit = {} : klassenCache = {} : zaehlWeg = {} : echteWege = {} : zaehlDateienAlt = TRUE
     pakFuellen()
     pruefen()
 END SUB
@@ -6640,7 +6708,7 @@ SUB qvReiterNachziehen()
             reiter[t].gesichert = GUI_TEXT(reiter[t].feld)
         END IF
     NEXT
-    zaehlCache = {} : zaehlZeit = {} : zaehlWeg = {} : echteWege = {} : zaehlDateienAlt = TRUE
+    zaehlCache = {} : zaehlZeit = {} : klassenCache = {} : zaehlWeg = {} : echteWege = {} : zaehlDateienAlt = TRUE
     blameCache = {}
     baumFuellen()
 END SUB
