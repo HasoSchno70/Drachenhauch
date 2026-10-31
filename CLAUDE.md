@@ -663,6 +663,30 @@ sechs Verfaelschungen fallen je in ihrem Fall), Rust-Tests in
 `gui_stil.rs`. Bewusst NICHT: Nachfahren-Selektoren, padding/Schatten/
 Verlauf je Widget, Uebergang je Regel, `window`-Selektor.
 
+**Bausteine** (2026-10-31, Paket 2): `gui_bausteine.rs`, Zusaetze je
+Widget in `Widget::bau` (`Bauzusatz`, nur bei Bedarf). Fliesslayout = Art 3
+(`"fluss"`) in `layout_anwenden` (`fluss_legen`), Auswahl per Klick in
+`fluss_druck` (gleich nach `ueber_druck`, der Druck geht weiter ans Kind),
+`GUI_CLICKED(layout)` meldet. Alt-Buchstaben (`GUI_MNEMONICS`): Anzeigetext
+ueber `anzeige_text`/`ohne_marke` (Messen in `inhalt_mass_roh`, Zeichnen
+ueber `wtext_mn`), ausgeloest in `mn_pruefen` direkt nach
+`kuerzel_pruefen` (Menue-Kuerzel gehen vor); eine Beschriftung gibt den
+Fokus an das naechste bedienbare Widget nach ihr. Beschriftung: Zeilen aus
+EINER Quelle `label_zeilen` (Kuerzen, Umbruch, Zeichenversatz fuer die
+Auswahl) fuer Zeichnen (`label_zeichnen`) und Treffer (`label_stelle`);
+Markieren/Strg+C in `label_pass`, gekuerzt fuellt `ganzer_text` den
+Hilfetext. Regler: Marken/Einrasten (`regler_einrasten` in `drag_slider`,
+`regler_nachbar` fuer Pfeile). Kreisel = Fortschritt mit `kreis`
+(`GUI_BUSY`, keine neue Widget-Art), mit Wert ein Ring. Datumsmarken
+(`dp_marke` in `draw_datepicker`). Groessengruppen: `gruppen_pass` am Anfang
+von `layout_pass` (feste Widgets sofort, nach Inhalt ueber `inhalt_mass` ->
+`gruppe_anwenden`). Schriftwahl: ein Dialog aus gewoehnlichen Widgets
+(`SchriftWahl`, Filter und Vorschau in `schriftwahl_pass`), die Wahl
+bleibt im Tombstone lesbar; `DHRT_SCHRIFT_ORDNER` fuer Pruefungen. Tests
+`tests/pruef/gui_bausteine.dhtest` (15; zwoelf Verfaelschungen fallen je in
+ihrem Fall -- der Kreisel erst mit dem Ring-Fall, weil der Balken seine
+laufende Flaeche ebenfalls in Akzentfarbe malt).
+
 **Uebergaenge** (2026-09-23, erster Punkt der Feinschliff-Liste): Metrik
 `uebergang` (ms, Vorgabe 120, 0 = springen wie frueher). Je Widget
 `ueber_t`/`druck_t`/`fokus_t` (0..1), dazu `LeisteState::hover_t` je

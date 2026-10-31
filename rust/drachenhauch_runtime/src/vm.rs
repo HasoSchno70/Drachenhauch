@@ -8491,6 +8491,38 @@ impl<'p> Vm<'p> {
             "gui_remove_class" => { self.gui.remove_class(gi(a,0,"GUI_REMOVE_CLASS")?, &gs(a,1,"GUI_REMOVE_CLASS")?)?; Value::Nil }
             "gui_get_color" => Value::Int(self.gui.get_color(gi(a,0,"GUI_GET_COLOR")?, &gs(a,1,"GUI_GET_COLOR")?)?),
             "gui_has_class" => Value::Bool(self.gui.has_class(gi(a,0,"GUI_HAS_CLASS")?, &gs(a,1,"GUI_HAS_CLASS")?)?),
+            // Bausteine (gui_bausteine.rs).
+            "gui_mnemonics" => { self.gui.mnemonics(gbool(a,0,"GUI_MNEMONICS")?); Value::Nil }
+            "gui_layout_selected" => Value::Int(self.gui.layout_selected(gi(a,0,"GUI_LAYOUT_SELECTED")?)?),
+            "gui_layout_select" => { self.gui.layout_select(gi(a,0,"GUI_LAYOUT_SELECT")?, gi(a,1,"GUI_LAYOUT_SELECT")?)?; Value::Nil }
+            "gui_label_set" => { let n = "GUI_LABEL_SET";
+                let wert = match a.get(2) { Some(Value::Str(s)) => s.to_string(), Some(Value::Int(i)) => i.to_string(),
+                    Some(Value::Bool(b)) => (if *b { "1" } else { "0" }).to_string(), Some(Value::Float(f)) => f.to_string(),
+                    _ => return Err(format!("{}: erwartet (lbl, schluessel$, wert)", n)) };
+                self.gui.label_set(gi(a,0,n)?, &gs(a,1,n)?, &wert)?; Value::Nil }
+            "gui_label_selection$" | "gui_label_selection" => Value::str_rc(&self.gui.label_selection(gi(a,0,"GUI_LABEL_SELECTION$")?)?),
+            "gui_slider_set" => { let n = "GUI_SLIDER_SET"; self.gui.slider_set(gi(a,0,n)?, &gs(a,1,n)?, gnum(a,2,n)?)?; Value::Nil }
+            "gui_slider_mark" => { let n = "GUI_SLIDER_MARK";
+                let t = if a.len() > 2 { gs(a,2,n)? } else { String::new() };
+                self.gui.slider_mark(gi(a,0,n)?, gnum(a,1,n)?, t)?; Value::Nil }
+            "gui_slider_clear_marks" => { self.gui.slider_clear_marks(gi(a,0,"GUI_SLIDER_CLEAR_MARKS")?)?; Value::Nil }
+            "gui_busy" => { let n = "GUI_BUSY"; Value::Int(self.gui.busy(gi(a,0,n)?, gi(a,1,n)? as i32, gi(a,2,n)? as i32, gi(a,3,n)? as i32)?) }
+            "gui_date_mark" => { let n = "GUI_DATE_MARK";
+                let c = if a.len() > 2 { gi(a,2,n)? } else { -1 };
+                self.gui.date_mark(gi(a,0,n)?, &gs(a,1,n)?, c)?; Value::Nil }
+            "gui_date_unmark" => { let n = "GUI_DATE_UNMARK"; self.gui.date_unmark(gi(a,0,n)?, &gs(a,1,n)?)?; Value::Nil }
+            "gui_date_clear_marks" => { self.gui.date_clear_marks(gi(a,0,"GUI_DATE_CLEAR_MARKS")?)?; Value::Nil }
+            "gui_date_marked" => { let n = "GUI_DATE_MARKED"; Value::Bool(self.gui.date_marked(gi(a,0,n)?, &gs(a,1,n)?)?) }
+            "gui_size_group" => { let n = "GUI_SIZE_GROUP";
+                let art = if a.len() > 2 { gs(a,2,n)? } else { String::new() };
+                self.gui.size_group(gi(a,0,n)?, &gs(a,1,n)?, &art)?; Value::Nil }
+            "gui_font_dialog" => { let n = "GUI_FONT_DIALOG";
+                let gr = if a.len() > 1 { gi(a,1,n)? as i32 } else { 16 };
+                let titel = gs(a,0,n)?;
+                let g = self.gfx.as_ref().ok_or("GUI_FONT_DIALOG: vor SCREEN aufgerufen")?;
+                Value::Int(self.gui.font_dialog(g, titel, gr)?) }
+            "gui_font_dialog_path$" | "gui_font_dialog_path" => Value::str_rc(&self.gui.font_dialog_path(gi(a,0,"GUI_FONT_DIALOG_PATH$")?)?),
+            "gui_font_dialog_size" => Value::Int(self.gui.font_dialog_size(gi(a,0,"GUI_FONT_DIALOG_SIZE")?)?),
             "gui_window_default" => { self.gui.window_default(gi(a,0,"GUI_WINDOW_DEFAULT")?, gi(a,1,"GUI_WINDOW_DEFAULT")?, false)?; Value::Nil }
             "gui_window_cancel" => { self.gui.window_default(gi(a,0,"GUI_WINDOW_CANCEL")?, gi(a,1,"GUI_WINDOW_CANCEL")?, true)?; Value::Nil }
             "gui_on_hover" => { self.gui.on_hover(gi(a,0,"GUI_ON_HOVER")?, gfunc(a,1,"GUI_ON_HOVER")?)?; Value::Nil }

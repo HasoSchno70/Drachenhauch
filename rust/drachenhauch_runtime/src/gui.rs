@@ -23,6 +23,8 @@ mod dock;
 mod ueber;
 #[path = "gui_stil.rs"]
 mod stil;
+#[path = "gui_bausteine.rs"]
+mod bausteine;
 
 const KEY_BACKSPACE: i64 = 8;
 const KEY_TAB: i64 = 9;
@@ -2693,6 +2695,9 @@ struct LayoutState {
     ausrichtung: u8,         // quer zur Richtung: 0 Anfang, 1 Mitte, 2 Ende
     dehnen: bool,            // quer dehnen
     rahmen: bool,            // zum Entwickeln sichtbar machen
+    /// Nur Fliesslayout (art 3): ein Kind per Klick waehlbar, und welches.
+    auswahl: bool,
+    gewaehlt: i32,
 }
 
 /// Die Einrueckungs-Regeln eines Textbereichs, aus dem Widget gezogen.
@@ -3080,6 +3085,8 @@ pub struct Widget {
     /// Knopfart). None = neu aufloesen.
     stil_auf: Option<Box<stil::StilAufgeloest>>,
     stil_key: Option<(u64, bool, bool, u8)>,
+    /// Zusaetze aus Paket 2 (gui_bausteine.rs) -- nur bei Bedarf angelegt.
+    bau: Option<Box<bausteine::Bauzusatz>>,
 }
 
 /// Datenbank-Buchfuehrung eines Formulars (siehe `Window::form_db`).
@@ -3541,6 +3548,16 @@ pub struct Gui {
     /// Stildatei), None = die Metrik. Gesetzt in `draw_widget`, gelesen in
     /// `flaeche` -- so gilt sie fuer jede Flaeche des Widgets.
     rad_jetzt: std::cell::Cell<Option<i32>>,
+    /// Alt-Buchstaben (GUI_MNEMONICS): `&` im Text markiert sie.
+    mnemonics: bool,
+    /// Markierbare Beschriftung: die, in der gerade gezogen wird, und die,
+    /// deren Auswahl Strg+C kopiert.
+    label_zug: Option<(usize, usize)>,
+    label_wahl: Option<(usize, usize)>,
+    /// Groessengruppen (GUI_SIZE_GROUP): das groesste Mass je Gruppe.
+    gruppen: HashMap<String, (i32, i32)>,
+    /// Offene Schriftwahlen (GUI_FONT_DIALOG).
+    schriftwahl: Vec<bausteine::SchriftWahl>,
     // Benannte Styles (Stylesheet): Name -> {prop -> wert}. Props: bg/fg/border/
     // accent (Farbe), font (Handle), font_size (px). Via GUI_APPLY_STYLE auf
     // Widgets uebertragen (-> ov-Overrides + font/font_size).
@@ -3633,6 +3650,7 @@ impl Gui {
             was_mouse_down: false, zug_feld: None, frame_count: 0,
             theme: default_theme(), metrics: default_metrics(),
             stil: None, stil_stand: 0, rad_jetzt: std::cell::Cell::new(None),
+            mnemonics: false, label_zug: None, label_wahl: None, gruppen: HashMap::new(), schriftwahl: Vec::new(),
             styles: HashMap::new(),
             pending: Vec::new(),
             hover_w: None, hover_frame: 0, hover_teil: -1, leiste_popup: None, hover_x: 0, hover_y: 0,
@@ -4674,6 +4692,7 @@ impl Gui {
             entered: false, on_enter: None, undo: Vec::new(), redo: Vec::new(), undo_zeit: -10.0,
             feld: None,
             name: String::new(), klassen: Vec::new(), stil_auf: None, stil_key: None,
+            bau: None,
         }
     }
 
@@ -10918,7 +10937,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         match a.as_str() {
             "zeile" | "row" | "waagerecht" | "horizontal" => Ok((0, 0)),
             "spalte" | "column" | "senkrecht" | "vertikal" | "vertical" => Ok((1, 0)),
-            _ => Err(format!("GUI_LAYOUT: '{}' ist keine Art -- zeile, spalte oder raster:N", art)),
+            "fluss" | "flow" => Ok((3, 0)),
+            _ => Err(format!("GUI_LAYOUT: '{}' ist keine Art -- zeile, spalte, fluss oder raster:N", art)),
         }
     }
     /// GUI_LAYOUT(win, art$, x, y, w, h) -> GUI_WIDGET
@@ -10926,7 +10946,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let (a, n) = Self::layout_art(art)?;
         let mut wd = Self::blank(Kind::Layout, x, y, w, h);
         wd.layout = Some(Box::new(LayoutState { art: a, spalten: n, abstand: 6, rand: 0,
-                                                ausrichtung: 0, dehnen: true, rahmen: false, kinder: Vec::new() }));
+                                                ausrichtung: 0, dehnen: true, rahmen: false, kinder: Vec::new(),
+                                                auswahl: false, gewaehlt: -1 }));
         self.add_widget(win, "GUI_LAYOUT", wd)
     }
     fn layout_mut(&mut self, h: i64, fn_: &str) -> Result<&mut LayoutState, String> {
@@ -10991,18 +11012,25 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
             "dehnen" | "stretch" => l.dehnen = wert != 0.0,
             "rahmen" | "frame" => l.rahmen = wert != 0.0,
-            _ => return Err(format!("GUI_LAYOUT_SET: unbekannter Schluessel '{}' -- abstand, rand, ausrichtung, dehnen, rahmen", key)),
+            "auswahl" | "selection" => { l.auswahl = wert != 0.0; if !l.auswahl { l.gewaehlt = -1; } }
+            _ => return Err(format!("GUI_LAYOUT_SET: unbekannter Schluessel '{}' -- abstand, rand, ausrichtung, dehnen, rahmen, auswahl", key)),
         }
         Ok(())
     }
 
     /// Mass eines Widgets nach seinem Inhalt (skalierte Pixel).
     fn inhalt_mass(&self, g: &Graphics, w: &Widget) -> (i32, i32) {
+        let m = self.inhalt_mass_roh(g, w);
+        self.gruppe_anwenden(w, m)
+    }
+    /// Mass nach Inhalt ohne Groessengruppe.
+    fn inhalt_mass_roh(&self, g: &Graphics, w: &Widget) -> (i32, i32) {
         let sz = self.wsize(g, w);
-        let tw = self.wtext_width(g, w, &w.text);
+        let text = self.anzeige_text(w);
+        let tw = self.wtext_width(g, w, &text);
         match w.kind {
             Kind::Label => {
-                let zeilen: Vec<&str> = w.text.split('\n').collect();
+                let zeilen: Vec<&str> = text.split('\n').collect();
                 let bw = zeilen.iter().map(|z| self.wtext_width(g, w, z)).max().unwrap_or(0);
                 (bw.max(1), (zeilen.len().max(1) as i32) * (sz + self.sk(4)))
             }
@@ -11042,6 +11070,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Jedes Bild: erst das Automass, dann jeder Wurzel-Behaelter (einer,
     /// der in keinem anderen steckt) von oben nach unten.
     fn layout_pass(&mut self, g: &Graphics) {
+        self.gruppen_pass(g);
         for wi in 0..self.windows.len() {
             if !self.windows[wi].alive { continue; }
             let n = self.windows[wi].widgets.len();
@@ -11225,6 +11254,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     setzen.push((k as usize, nx, ny, nw.max(1), nh.max(1)));
                 }
             }
+            3 => setzen.extend(self.fluss_legen(wi, &kinder, ix, iy, iw, ab, l.ausrichtung)),
             _ => {
                 let sp = l.spalten.max(1);
                 let zw = ((iw - ab * (sp - 1)) / sp).max(1);
@@ -11328,7 +11358,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
         }
         if let Some(l) = w.layout.as_ref() {
-            let art = match l.art { 0 => "zeile", 1 => "spalte", _ => "raster" };
+            let art = match l.art { 0 => "zeile", 1 => "spalte", 3 => "fluss", _ => "raster" };
             let mut lo = serde_json::json!({ "art": art, "kinder": l.kinder.iter().map(|&(k, g)| serde_json::json!([k, g])).collect::<Vec<_>>() });
             if l.art == 2 { lo["spalten"] = serde_json::json!(l.spalten); }
             if l.abstand != 6 { lo["abstand"] = serde_json::json!(l.abstand); }
@@ -11336,6 +11366,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             if l.ausrichtung != 0 { lo["ausrichtung"] = serde_json::json!(l.ausrichtung); }
             if !l.dehnen { lo["dehnen"] = serde_json::json!(false); }
             if l.rahmen { lo["rahmen"] = serde_json::json!(true); }
+            if l.auswahl { lo["auswahl"] = serde_json::json!(true); }
             o["layout"] = lo;
         }
         if w.auto_w { o["auto_w"] = serde_json::json!(true); }
@@ -11385,6 +11416,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if w.maxlaenge > 0 { o["maxlaenge"] = serde_json::json!(w.maxlaenge); }
         if w.zahlen != 0 { o["zahlen"] = serde_json::json!(w.zahlen); }
         if !w.name.is_empty() { o["name"] = serde_json::json!(w.name); }
+        bausteine::bau_json(w, &mut o);
         if !w.klassen.is_empty() { o["klassen"] = serde_json::json!(w.klassen); }
         ueber::feld_json(w, &mut o);
         // Der Tooltip fehlte in der Datei -- ein im Designer gesetzter war
@@ -11598,6 +11630,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         w.name = wj["name"].as_str().map(|s| s.to_lowercase())
             .filter(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-'))
             .unwrap_or_default();
+        bausteine::bau_aus_json(&mut w, wj);
         w.klassen = wj["klassen"].as_array().map(|a| a.iter().filter_map(|x| x.as_str())
             .map(|s| s.to_lowercase()).collect()).unwrap_or_default();
         if w.kind == Kind::TextInput { ueber::feld_aus_json(&mut w, wj); }
@@ -11646,7 +11679,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         if kind == Kind::Layout {
             let lj = &wj["layout"];
-            let art = match lj["art"].as_str().unwrap_or("spalte") { "zeile" => 0, "raster" => 2, _ => 1 };
+            let art = match lj["art"].as_str().unwrap_or("spalte") { "zeile" => 0, "raster" => 2, "fluss" => 3, _ => 1 };
             let kinder: Vec<(i32, i32)> = lj["kinder"].as_array().map(|a| a.iter().filter_map(|p| {
                 let arr = p.as_array()?;
                 Some((arr.first()?.as_i64()? as i32, arr.get(1).and_then(|g| g.as_i64()).unwrap_or(0) as i32))
@@ -11658,6 +11691,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 ausrichtung: lj["ausrichtung"].as_i64().unwrap_or(0).clamp(0, 2) as u8,
                 dehnen: lj["dehnen"].as_bool().unwrap_or(true),
                 rahmen: lj["rahmen"].as_bool().unwrap_or(false),
+                auswahl: lj["auswahl"].as_bool().unwrap_or(false),
+                gewaehlt: -1,
             }));
         }
         if let Some(lj) = wj.get("list").and_then(|v| v.as_object()) {
@@ -12874,6 +12909,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let ueber_weg = (just_pressed || right_just) && self.ueber_druck(mx, my, just_pressed);
         let just_pressed = just_pressed && !ueber_weg;
         let right_just = right_just && !ueber_weg;
+        if just_pressed { self.fluss_druck(mx, my); }
+        self.schriftwahl_pass(g);
         // Rad ueber der offenen Klappliste rollt SIE -- vor allem anderen, denn
         // sie liegt ueber allem, und das Rad gibt es nur einmal.
         if let Some((dw, di)) = self.open_dropdown {
@@ -12906,7 +12943,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                             else { self.menu_input(mx, my, just_pressed, right_just, g) };
         self.untermenues_folgen(g, mx, my);
         self.kuerzel_gefeuert = false;
-        if !menu_consumed { self.kuerzel_pruefen(g); }
+        if !menu_consumed { self.kuerzel_pruefen(g); self.mn_pruefen(g); }
 
         // Inhalts-Scroll: Mausrad ueber scrollbarem Fenster.
         if let Some(top) = self.topmost_at(mx, my) {
@@ -13325,6 +13362,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             self.dbl_click = false;
         }
         self.rt_auswahl_pass(g, is_down, mx, my);
+        self.label_pass(g, mx, my, just_pressed, is_down);
         self.tabellen_pass();
         // Farbwaehler weiterziehen, auch ausserhalb seiner Flaeche.
         if let Some((cw, ci, _)) = self.cp_drag {
@@ -15712,7 +15750,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Senkrecht waechst der Wert nach OBEN -- wie an jedem Mischpult.
         let rel = if w.vert { 1.0 - ((my - ay) as f64 / (w.h - 1).max(1) as f64).clamp(0.0, 1.0) }
                   else { ((mx - ax) as f64 / (w.w - 1).max(1) as f64).clamp(0.0, 1.0) };
-        let new_val = w.min + rel * (w.max - w.min);
+        let new_val = Self::regler_einrasten(w, w.min + rel * (w.max - w.min));
         if new_val != w.value {
             w.value = new_val;
             let f = w.on_change.clone();
@@ -16078,8 +16116,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 // Pos1/Ende springen an die Enden.
                 let (lo, hi, v) = { let w = &self.windows[wi].widgets[i]; (w.min, w.max, w.value) };
                 let schritt = (hi - lo) / 20.0;
-                if rechts || auf { self.set_value_fire(wi, i, v + schritt); }
-                if links || ab { self.set_value_fire(wi, i, v - schritt); }
+                // Eingerastet: von Marke zu Marke.
+                let hoch = Self::regler_nachbar(&self.windows[wi].widgets[i], v, true);
+                let runter = Self::regler_nachbar(&self.windows[wi].widgets[i], v, false);
+                if rechts || auf { self.set_value_fire(wi, i, hoch.unwrap_or(v + schritt)); }
+                if links || ab { self.set_value_fire(wi, i, runter.unwrap_or(v - schritt)); }
                 if g.key_pressed(KEY_HOME) { self.set_value_fire(wi, i, lo); }
                 if g.key_pressed(KEY_END) { self.set_value_fire(wi, i, hi); }
             }
@@ -17399,7 +17440,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if w.kind != Kind::Progress { return Err("GUI_PROGRESS_SET: Widget ist kein Fortschrittsbalken".into()); }
         match key.to_ascii_lowercase().as_str() {
             "unbestimmt" | "indeterminate" => { w.unbestimmt = wert != 0.0; Ok(()) }
-            k => Err(format!("GUI_PROGRESS_SET: unbekannter Schluessel '{}' -- erwartet unbestimmt", k)),
+            "kreis" | "circle" => self.progress_kreis_setzen(h, wert != 0.0),
+            k => Err(format!("GUI_PROGRESS_SET: unbekannter Schluessel '{}' -- erwartet unbestimmt oder kreis", k)),
         }
     }
     pub fn image_mode(&mut self, h: i64, modus: &str) -> Result<(), String> {
@@ -17910,7 +17952,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
         }
         // Ein gekuerzter Eintrag ("...") zeigt seinen ganzen Text.
-        if w.kind == Kind::ListBox && !w.ganzer_text.is_empty() { return Some(w.ganzer_text.clone()); }
+        if matches!(w.kind, Kind::ListBox | Kind::Label) && !w.ganzer_text.is_empty() && w.tooltip.is_empty() {
+            return Some(w.ganzer_text.clone());
+        }
         if let Some(l) = w.leiste.as_ref() {
             if l.hover >= 0 {
                 if let Some(e) = l.eintraege.get(l.hover as usize).filter(|e| !e.tip.is_empty()) {
@@ -19673,6 +19717,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let pad = self.m("pad");
         match wdg.kind {
             Kind::Layout => {
+                self.fluss_auswahl_zeichnen(g, wi, wdg);
                 // Unsichtbar -- nur mit `rahmen` zum Entwickeln als gestrichelte Linie.
                 if wdg.layout.as_ref().map(|l| l.rahmen).unwrap_or(false) {
                     let c = self.th("muted_fg");
@@ -19691,18 +19736,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                          else { self.stil_misch(wdg, "fg", self.stil_farbe(wdg, "fg", stil::BASIS).unwrap_or(eigen)) };
                 // Zeilen einzeln: so gilt die Ausrichtung je Zeile, und ein
                 // umbrechendes Label zeichnet genau das, was umbruch_layout
-                // gemessen hat.
-                let zeilen: Vec<String> = if wdg.wrap { self.umbrechen(g, wdg, &wdg.text, w) }
-                                          else { wdg.text.split('\n').map(str::to_string).collect() };
-                let lh = self.wsize(g, wdg) + self.sk(4);
-                for (k, z) in zeilen.iter().enumerate() {
-                    let x = match wdg.align {
-                        1 => ax + (w - self.wtext_width(g, wdg, z)) / 2,
-                        2 => ax + w - self.wtext_width(g, wdg, z),
-                        _ => ax,
-                    };
-                    self.wtext(g, wdg, x, ay + k as i32 * lh, z.clone(), fg);
-                }
+                // gemessen hat (samt Kuerzen, Auswahl und Alt-Buchstabe).
+                self.label_zeichnen(g, wdg, ax, ay, w, fg);
             }
             Kind::Panel => {
                 self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
@@ -19823,7 +19858,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     // Mit Sinnbild bleibt der Platz dafuer links stehen und
                     // der Text zentriert sich im Rest.
                     let sz = self.wsize(g, wdg);
-                    let tw = self.wtext_width(g, wdg, &wdg.text);
+                    let tw = self.wtext_width(g, wdg, &self.anzeige_text(wdg));
                     let links = if has_icon { pad + isz + 4 } else { pad };
                     let frei = (w - links - pad).max(0);
                     let (versatz, beschnitten) = knopf_text_x(frei, tw);
@@ -19838,7 +19873,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         g.push_clip(ax + links, ay + 1, frei, (h - 2).max(0));
                     }
                     let tc = self.knopf_text(wdg);
-                    self.wtext(g, wdg, tx, ty, wdg.text.clone(), tc);
+                    self.wtext_mn(g, wdg, tx, ty, &wdg.text, tc);
                     if wdg.variante == 7 && wdg.enabled && (wdg.hovered || pressed) {
                         let ul = ty + sz + self.sk(1);
                         g.line(tx, ul, tx + tw.min(frei), ul, tc);
@@ -19883,7 +19918,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     if wdg.ueber_t > 0.0 { g.rect(ax - 1, ay - 1, ax + w, ay + h, deckkraft(acc, weich(wdg.ueber_t))); }
                     if wdg.checked { g.box_fill(ax + 3, ay + 3, ax + w - 4, ay + h - 4, acc); }
                 }
-                self.wtext(g, wdg, ax + w + pad, ay, wdg.text.clone(), self.txt_col(wdg));
+                self.wtext_mn(g, wdg, ax + w + pad, ay, &wdg.text, self.txt_col(wdg));
             }
             Kind::Slider if wdg.vert => self.draw_vslider(g, wdg, ax, ay, w, h),
             Kind::Slider => {
@@ -19912,6 +19947,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     let hx = ax + (ratio * (w - handle_w) as f64) as i32;
                     g.box_fill(hx, ay, hx + handle_w - 1, ay + h - 1, acc);
                 }
+                self.regler_marken_zeichnen(g, wdg, ax, ay, w, h);
             }
             Kind::Toggle => {
                 // Die Pille ist doppelt so breit wie hoch; das Rechteck
@@ -19930,7 +19966,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let kx = ax + r + ((w - h) as f64 * mix) as i32;
                 self.knauf(g, kx, ay + r, r - 2, self.griff_farbe(wdg));
                 if !wdg.text.is_empty() {
-                    self.wtext(g, wdg, ax + w + pad, ay + (h - self.wsize(g, wdg)).max(0) / 2, wdg.text.clone(), self.txt_col(wdg));
+                    self.wtext_mn(g, wdg, ax + w + pad, ay + (h - self.wsize(g, wdg)).max(0) / 2, &wdg.text, self.txt_col(wdg));
                 }
             }
             Kind::Knob => {
@@ -20373,8 +20409,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     g.circle(cx, cy, (r - 1).max(1), self.th("win_bg"));
                 }
                 if wdg.checked { g.circle(cx, cy, (r - 4).max(1), acc); }   // Punkt
-                self.wtext(g, wdg, ax + w + pad, ay, wdg.text.clone(), self.txt_col(wdg));
+                self.wtext_mn(g, wdg, ax + w + pad, ay, &wdg.text, self.txt_col(wdg));
             }
+            Kind::Progress if Self::ist_kreisel(wdg) => self.kreisel_zeichnen(g, wdg, ax, ay, w, h),
             Kind::Progress => {
                 let acc = self.acc_col(wdg);
                 self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
@@ -21192,6 +21229,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         else if zahl == t { self.th("win_bg") }
                         else { fg };
             self.wtext(g, wdg, cx + (zw - bw) / 2, cy + (zh - schrift).max(0) / 2, txt, farbe);
+            // Markierter Tag (GUI_DATE_MARK): ein Punkt unter der Zahl.
+            if aktiv {
+                if let Some(c) = self.dp_marke(wdg, [j, m, zahl]) {
+                    let c = if zahl == t { self.th("win_bg") } else { c };
+                    g.circle(cx + zw / 2, cy + zh - self.sk(4), self.sk(2).max(2), c);
+                }
+            }
         }
     }
 

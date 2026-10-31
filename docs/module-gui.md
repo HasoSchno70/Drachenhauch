@@ -104,9 +104,26 @@ IMPORT "gui"
 | `GUI_DRAGGING()` / `GUI_DROPPED(wdg)` / `GUI_DROP_TEXT()` / `GUI_DROP_SOURCE()` / `GUI_DRAG_INDEX()` / `GUI_DROP_INDEX()` | GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER | laufender Zug, Ablage in diesem Bild, was gezogen wurde, woher, welche Zeile, auf welche Zeile |
 | `GUI_CURSORS(an)` | — | Zeigerformen je nach Stelle im Widget (Vorgabe an): Textstrich über Text, Hand über allem Anklickbaren, Doppelpfeil an Trennern, Spaltenkanten und am Fenstergriff |
 | `GUI_SET_CURSOR(wdg, form$)` / `GUI_GET_CURSOR$(wdg)` | — / STRING | eigene Zeigerform über einem Widget (etwa einer Zeichenfläche); `auto` oder `""` = die gui entscheidet |
-| `GUI_LAYOUT(win, art$, x, y, w, h)` | GUI_WIDGET | unsichtbarer **Layout-Behälter**: `zeile`, `spalte` oder `raster:N` — verteilt seine Kinder in jedem `GUI_UPDATE` (siehe [Layout](#layout-größe-nach-inhalt-und-behälter)) |
+| `GUI_LAYOUT(win, art$, x, y, w, h)` | GUI_WIDGET | unsichtbarer **Layout-Behälter**: `zeile`, `spalte`, `fluss` (umbrechend) oder `raster:N` — verteilt seine Kinder in jedem `GUI_UPDATE` (siehe [Layout](#layout-größe-nach-inhalt-und-behälter)) |
 | `GUI_LAYOUT_ADD(layout, wdg[, gewicht])` / `GUI_LAYOUT_SPACER(layout[, gewicht])` / `GUI_LAYOUT_REMOVE(layout, wdg)` | — | Kind anhängen (Gewicht 0 = eigene Größe, ab 1 = Anteil am Restplatz), Leerraum, lösen |
-| `GUI_LAYOUT_SET(layout, key$, wert)` | — | `abstand`, `rand`, `ausrichtung` (0/1/2 quer), `dehnen` (quer, Vorgabe an), `rahmen` (sichtbar zum Entwickeln) |
+| `GUI_LAYOUT_SET(layout, key$, wert)` | — | `abstand`, `rand`, `ausrichtung` (0/1/2 quer), `dehnen` (quer, Vorgabe an), `rahmen` (sichtbar zum Entwickeln), `auswahl` (Fließlayout: ein Klick wählt ein Kind) |
+| `GUI_LAYOUT_SELECTED(layout)` | GUI_WIDGET | im Fließlayout mit `auswahl` gewähltes Kind (-1 = keins); ein Klick wählt, `GUI_CLICKED(layout)` meldet es -- siehe [Bausteine](#bausteine-fließlayout-alt-buchstaben-marken) |
+| `GUI_LAYOUT_SELECT(layout, wdg)` | — | ein Kind wählen (-1 = keins) |
+| `GUI_MNEMONICS(an)` | — | Alt-Buchstaben: `&` im Text von Knopf, Kästchen, Radio, Kippschalter und Beschriftung markiert ihn (`&&` = ein `&`) |
+| `GUI_LABEL_SET(lbl, key$, wert)` | — | `kuerzen` (`aus`, `ende`, `mitte`, `anfang` -- mit "..." auf die Breite, der Hilfetext zeigt den ganzen Text), `auswaehlbar` (mit der Maus markieren, Strg+C kopiert) |
+| `GUI_LABEL_SELECTION$(lbl)` | STRING | was in einer markierbaren Beschriftung markiert ist |
+| `GUI_SLIDER_SET(sl, key$, wert)` | — | `marken` (so viele gleichmäßig verteilte, 0 oder 2..101), `wert_zeigen`, `einrasten` (an den Marken), `stellen` (Nachkommastellen der Anzeige) |
+| `GUI_SLIDER_MARK(sl, wert [, text$])` | — | eine Marke an diesem Wert, beschriftet unter dem Regler |
+| `GUI_SLIDER_CLEAR_MARKS(sl)` | — | alle Marken weg |
+| `GUI_BUSY(win, x, y, d)` | GUI_WIDGET | ein Kreisel (drehende Punkte) für etwas ohne bekannte Dauer; mit `GUI_PROGRESS_SET(k, "unbestimmt", 0)` ein Ring, der den Wert zeigt |
+| `GUI_DATE_MARK(dp, datum$ [, farbe])` | — | einen Tag im Datumswähler markieren (ein Punkt unter der Zahl; Vorgabe Akzent) |
+| `GUI_DATE_UNMARK(dp, datum$)` | — | eine Marke wegnehmen |
+| `GUI_DATE_CLEAR_MARKS(dp)` | — | alle Marken weg |
+| `GUI_DATE_MARKED(dp, datum$)` | BOOLEAN | ist der Tag markiert? |
+| `GUI_SIZE_GROUP(wdg, gruppe$ [, art$])` | — | alle Widgets einer Gruppe bekommen dasselbe Maß, das größte (`breite`, `hoehe`, `beide`; Gruppe "" = heraus) |
+| `GUI_FONT_DIALOG(titel$ [, groesse])` | GUI_WINDOW | modale Schriftwahl: Suchfeld, Liste der Systemschriften, Größe, Vorschau; Antwort über `GUI_ANSWER` |
+| `GUI_FONT_DIALOG_PATH$(dlg)` | STRING | die gewählte Schrift -- für `LOADFONT` (auch nach der Antwort lesbar) |
+| `GUI_FONT_DIALOG_SIZE(dlg)` | INTEGER | die gewählte Größe |
 | `GUI_AUTOSIZE(wdg)` | — | Breite und Höhe aus dem Inhalt; Breite oder Höhe `0` beim Anlegen heißt dasselbe |
 | `GUI_SET_ANCHOR(wdg, edges$)` | — | Anchoring: an welchen Kanten das Widget klebt (Teilmenge von `"lrtb"`, Default `"lt"` = oben-links). Beim Fenster-Resize fließen die Widgets mit: links+rechts → dehnen, nur rechts → mitwandern, keiner → zentrieren (analog oben/unten). |
 | `GUI_WINDOW_CLOSED(win)` | BOOLEAN | wurde das Fenster geschlossen? |
@@ -3820,6 +3837,94 @@ höchstens 50 ms weiter: hängt ein Bild, bleibt der Streif kurz stehen und
 zieht dann weiter, statt ein Stück zu überspringen. Ein zweiter Aufruf
 von `GUI_WINDOW_GLOW` beginnt von vorn. Die IDE zeigt ihn beim Start und
 wenn ein Programm losgeht.
+
+## Bausteine: Fließlayout, Alt-Buchstaben, Marken
+
+```basic
+IMPORT "gui"
+SCREEN(760, 480, "Bausteine", 1)
+GUI_MNEMONICS(TRUE)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Bausteine", 0, 0, 760, 480)
+DIM kacheln AS GUI_WIDGET : kacheln = GUI_LAYOUT(w, "fluss", 10, 10, 330, 200)
+GUI_LAYOUT_SET(kacheln, "auswahl", 1)
+DIM i AS INTEGER
+FOR i = 1 TO 7
+    GUI_LAYOUT_ADD(kacheln, GUI_BUTTON(w, "Bild " + STR$(i), 0, 0, 100, 60))
+NEXT
+DIM lautst AS GUI_WIDGET : lautst = GUI_SLIDER(w, 380, 40, 300, 0, 100, 50)
+GUI_SLIDER_SET(lautst, "marken", 5)
+GUI_SLIDER_SET(lautst, "einrasten", 1)
+GUI_SLIDER_MARK(lautst, 0, "leise")
+GUI_SLIDER_MARK(lautst, 100, "laut")
+DIM pfad AS GUI_WIDGET : pfad = GUI_LABEL(w, "C:\Projekte\Drachenhauch\beispiele\sehr_langer_name.dh", 380, 100)
+GUI_SET_BOUNDS(pfad, 380, 100, 300, 20)
+GUI_LABEL_SET(pfad, "kuerzen", "mitte")
+DIM sichern AS GUI_WIDGET : sichern = GUI_BUTTON(w, "&Speichern", 380, 140, 0, 0)
+DIM ende AS GUI_WIDGET : ende = GUI_BUTTON(w, "&Beenden", 380, 180, 0, 0)
+GUI_SIZE_GROUP(sichern, "knoepfe")
+GUI_SIZE_GROUP(ende, "knoepfe")
+DIM laden AS GUI_WIDGET : laden = GUI_BUSY(w, 380, 230, 32)
+DIM kal AS GUI_WIDGET : kal = GUI_DATEPICKER(w, 10, 230, 330, 240)
+GUI_DATE_MARK(kal, DATE$())
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(kacheln) THEN PRINT "gewaehlt: " + GUI_TEXT(GUI_LAYOUT_SELECTED(kacheln))
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+```
+
+**Fließlayout** (`GUI_LAYOUT(win, "fluss", ...)`): die Kinder stehen der Reihe
+nach in ihrer eigenen Größe und brechen um, sobald die Zeile voll ist -- wie
+Bilder in einer Galerie. Ändert sich die Breite, verteilt es neu. Mit
+`GUI_LAYOUT_SET(l, "auswahl", 1)` wählt ein Klick ein Kind (der Klick geht
+trotzdem an das Kind weiter); das gewählte bekommt eine getönte Fläche mit
+Akzentrand, `GUI_LAYOUT_SELECTED` sagt welches, `GUI_CLICKED(layout)` meldet
+die Änderung.
+
+**Alt-Buchstaben** (`GUI_MNEMONICS(TRUE)`): ein `&` im Text markiert den
+Buchstaben dahinter, `&&` schreibt ein `&`. Solange Alt gehalten wird, steht
+der Buchstabe unterstrichen da; Alt+Buchstabe drückt den Knopf, kippt das
+Kästchen oder den Kippschalter, wählt den Radioknopf -- und bei einer
+Beschriftung setzt es den Fokus in das Feld dahinter (das nächste bedienbare
+Widget, das nach ihr angelegt wurde). Menü-Kürzel gehen vor. Gemessen und
+gezeichnet wird ohne `&`, `GUI_TEXT` liefert den Text, wie er gesetzt wurde.
+Ohne den Schalter bleibt ein `&` ein Zeichen wie jedes andere.
+
+**Beschriftung:** `kuerzen` setzt ein "..." an das Ende, in die Mitte (für
+Pfade) oder an den Anfang, wenn der Text nicht in die Breite passt; der
+Hilfetext zeigt dann den ganzen. `auswaehlbar` lässt den Text mit der Maus
+markieren (Doppelklick = ein Wort), Strg+C kopiert -- solange kein Textfeld
+die Taste hat. Eine markierbare Beschriftung wird nicht gekürzt.
+
+**Regler:** Marken stehen unter dem Regler, beschriftete mit ihrem Text
+darunter, der Wert (`wert_zeigen`) über dem Knauf -- dafür braucht der Regler
+oben und unten Platz. Mit `einrasten` springt er beim Ziehen zur nächsten
+Marke, und die Pfeiltasten gehen von Marke zu Marke.
+
+**Kreisel** (`GUI_BUSY`): zwölf Punkte, der hellste läuft im Kreis. Ein
+Kreisel ist ein Fortschritt (`GUI_PROGRESS_SET(k, "kreis", 1)` macht jeden
+Fortschritt dazu); ohne `unbestimmt` zeigt er seinen Wert als Ring.
+
+**Datumswähler:** `GUI_DATE_MARK` setzt einen Punkt unter einen Tag -- für
+Termine, Feiertage, gefüllte Tage. Die Marken gehören zum Programm, nicht in
+die `.dhform`.
+
+**Größengruppen** (`GUI_SIZE_GROUP`): alle Widgets einer Gruppe bekommen das
+größte Maß unter ihnen -- gleich breite Knöpfe, Beschriftungen vor Feldern in
+mehreren Zeilen, auch über Behälter hinweg. Ein Widget nach Inhalt wird so
+gemessen, eines mit fester Größe nimmt seine Größe beim Eintritt.
+
+**Schriftwahl** (`GUI_FONT_DIALOG`): ein modaler Dialog mit Suchfeld, der
+Liste der Systemschriften (vorn die eingebauten `sans`, `serif`, `mono`),
+der Größe und einer Vorschau in der gewählten Schrift. Nach der Antwort
+(`GUI_ANSWER` 1 = OK) liefert `GUI_FONT_DIALOG_PATH$` den Pfad für
+`LOADFONT`, `GUI_FONT_DIALOG_SIZE` die Größe. `DHRT_SCHRIFT_ORDNER` legt den
+Ordner fest, den die Liste zeigt (für Prüfungen).
+
+In der `.dhform` stehen `kuerzen`, `auswaehlbar`, die Reglermarken, `kreis`,
+die Größengruppe und beim Layout `auswahl`.
 
 ## Popover, Toast und Infoleiste
 
