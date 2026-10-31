@@ -3895,6 +3895,57 @@ Ein Wort sind Buchstaben, dazu ein Apostroph zwischen zwei Buchstaben;
 einzelne Buchstaben und Zahlen prüft der Hunspell-Weg nicht. Die Prüfung von
 Windows zerlegt selbst und kennt dabei auch doppelte Wörter.
 
+## Rechts nach links
+
+```basic
+IMPORT "gui"
+SCREEN(640, 260, "Gruß", 1)
+GUI_FONT(LOADFONT("sans", 28), 18)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Gruß", 0, 0, 640, 260)
+DIM text AS GUI_WIDGET : text = GUI_TEXTAREA(w, 10, 10, 610, 160)
+GUI_SET_TEXT(text, "مرحبا بالعالم 123" + CHR$(10) + "שלום עולם (abc)")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    TEXT(20, 200, "Hallo שלום Welt", WHITE)
+    GUI_DRAW()
+    FLIP()
+WEND
+```
+
+Hebräisch und Arabisch stehen so da, wie man sie liest: ein Stück von
+rechts nach links wird umgedreht, Arabisch verbunden (jeder Buchstabe in
+seiner Form am Anfang, in der Mitte, am Ende oder allein, Lam und Alef als
+eine Ligatur), Klammern werden gespiegelt, Ziffern bleiben in ihrer
+Reihenfolge. Das gilt für jeden Text, den die Laufzeit zeichnet --
+`TEXT`, Beschriftungen, Knöpfe, Listen, Tabellen, Menüs -- und für das
+Messen (`TEXT_WIDTH`, Umbruch). Die Richtung einer Zeile bestimmt ihr
+erstes starkes Zeichen (Unicode-Bidi-Algorithmus, UAX 9); die
+Steuerzeichen LRM/RLM, LRE/RLE/PDF, LRO/RLO und die Isolate wirken und
+werden nicht gezeichnet.
+
+Textfeld und Textbereich bearbeiten solchen Text so, wie man es erwartet:
+ein Klick trifft das Zeichen, das dort steht, die Schreibmarke steht an
+der Stelle, an der weitergeschrieben wird, und eine Auswahl über
+gemischten Text sind mehrere Stücke. In einer Zeile, die als Ganzes von
+rechts nach links steht, tauschen die Pfeiltasten: links heißt dort im
+Text weiter. `GUI_TEXTAREA_POS_AT` und `GUI_TEXTAREA_CARET_XY` rechnen
+mit der Lage, die man sieht. Gespeichert wird der Text immer in der
+Reihenfolge, in der er getippt wurde.
+
+| Befehl | Was er tut |
+|---|---|
+| `TEXT_VISUAL$(text$ [, richtung$])` | Der Text so, wie er dasteht -- für eigene Ausgaben wie Dateien oder Bilder. `richtung$` = `auto` (Vorgabe), `ltr` oder `rtl` |
+
+Was (noch) nicht geht: Ligaturen anderer Schriften und indische Schriften
+(dafür bräuchte es eine volle Textformung); die Ausrichtung folgt nicht der
+Richtung -- eine Zeile von rechts nach links steht links, solange
+`GUI_SET_ALIGN` nichts anderes sagt; in einer solchen Zeile eines
+Textbereichs fallen Fett, Kursiv und Unterstrichen weg (die Farben der
+Einfärbung bleiben); Hinweise am Zeilenende und Farbfelder rechnen weiter
+mit der logischen Lage. Das pdf-Modul ordnet nicht -- dort hilft
+`TEXT_VISUAL$` vor `PDF_TEXT`.
+
 ## Bausteine: Fließlayout, Alt-Buchstaben, Marken
 
 ```basic

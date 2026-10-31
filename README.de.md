@@ -74,6 +74,7 @@ schreibt man damit auch Anwendungen mit Fenstern, Formularen und Tabellen
 | **Rückmeldung ohne Dialog** | Popover an einem Widget (`GUI_POPOVER`), Meldungen, die von selbst ausblenden, eine Infoleiste mit Knöpfen, Suchfelder mit Lupe und Kreuz, Vorschläge beim Tippen ([mehr](docs/module-gui.md#popover-toast-und-infoleiste)) |
 | **Aussehen per Regel** | eine Stildatei wie CSS: `button.gefahr:hover { bg: #E74C3C }`, Regeln nach Art, Klasse, Name und Zustand, Klassen, die live wirken, Farben aus dem Thema ([mehr](docs/module-gui.md#7-stildatei-regeln-nach-art-klasse-name-und-zustand)) |
 | **Rechtschreibung** | rote Wellen in Textfeld und Textbereich, Vorschläge per Rechtsklick, die Prüfung von Windows oder Hunspell-Wörterbücher, auch ohne Fenster ([mehr](docs/module-gui.md#rechtschreibung)) |
+| **Rechts nach links** | Hebräisch und Arabisch in der richtigen Reihenfolge und Arabisch verbunden, in jedem gezeichneten Text, mit Klick, Schreibmarke und Auswahl in Textfeld und Textbereich ([mehr](docs/module-gui.md#rechts-nach-links)) |
 | **Bausteine** | umbrechende Kachelreihe mit Auswahl, Alt-Buchstaben auf Knöpfen und Beschriftungen, Beschriftungen mit „...“ gekürzt, Marken am Regler, ein Kreisel, markierte Tage im Datumswähler, Größengruppen, eine Schriftwahl ([mehr](docs/module-gui.md#bausteine-fließlayout-alt-buchstaben-marken)) |
 
 Nichts davon braucht ein Fenster. Ein Drachenhauch-Programm kann eine

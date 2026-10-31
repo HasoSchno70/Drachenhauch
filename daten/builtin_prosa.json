@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2195,
+ "count": 2196,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1898,6 +1898,7 @@
   "TEXT_SIZE": "Schriftgröße für folgende TEXT-Aufrufe (4–400)",
   "TEXT_SPACING": "Buchstabenabstand für TTF (nativ)",
   "TEXT_STYLE": "Stil für folgende TEXT-Aufrufe: fett, kursiv, unterstrichen, durchgestrichen, verbunden mit + (\"fett+unterstrichen\"); \"normal\" schaltet zurück",
+  "TEXT_VISUAL$": "der Text so, wie er dasteht: Stücke von rechts nach links umgedreht, Arabisch in seinen verbundenen Formen; richtung = auto (Vorgabe, erstes starkes Zeichen), ltr oder rtl. Für eigene Ausgaben -- TEXT und die gui tun das selbst",
   "TEXT_WIDTH": "Pixelbreite von s$ in der aktiven Schrift/Größe",
   "TILED_ADD_LAYER": "INTEGER (Index) eine leere Kachel-Ebene anhaengen",
   "TILED_ADD_OBJECT": "INTEGER (Index) ein Objekt in eine Objekt-Ebene legen",

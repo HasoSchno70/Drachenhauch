@@ -712,6 +712,37 @@ Passwortfelder pruefen nie. Tests `tests/pruef/rechtschreibung.dhtest`
 (Hunspell-Beilagen, ein Fall mit der Windows-Pruefung samt Emoji vorn),
 Rust-Tests in beiden Dateien.
 
+**Rechts nach links** (2026-10-31, Paket 3, zweiter Teil):
+`schreibrichtung.rs` (rein, Rust-Tests) ordnet eine Zeile mit
+`unicode-bidi` (UAX 9, erstes starkes Zeichen) und formt Arabisch in die
+Praesentationsformen (FE70-FEFF, Persisch aus Forms-A; Lam-Alef = EINE
+Glyphe) -- nicht ueber rustybuzz, weil raylib Zeichen fuer Zeichen aus dem
+Atlas zeichnet und die Formen dort Zeichen sind. `Zeile` traegt
+`log_von_vis`/`vis_von_log`/`rtl` je logischem Zeichen; Steuerzeichen
+(LRM, LRO, Isolate) fallen weg, Klammern werden gespiegelt. **Umgewandelt
+wird beim Eintritt in Graphics** (`visuell`/`visuell_string` in
+`text_emit`, `text_rot*`, `text_styled`, `text_nachgebildet` und
+`breite_mit`) -- damit kann es jeder gezeichnete Text ohne Zutun. Wer schon
+geordnete Stuecke zeichnet, schaltet `richtung_roh` (Cell) ein, sonst
+drehte sich ein Stueck zweimal. Die gui (`gui_richtung.rs`): `Lage` =
+Anzeige-Zeichen samt Vorspannbreiten; `marke(i)` nimmt das Zeichen NACH der
+Marke (rtl: rechte Kante), `bereiche(a, b)` = mehrere Stuecke,
+`index(x)` = Klick (eine Ligatur deckt zwei logische Zeichen).
+`caret_index_at` selbst fragt die Lage zuerst -- damit stimmen ALLE
+Klickwege auf einmal (Textfeld, Textbereich, Zelle, Rechtsklick,
+Rechtschreibmenue). Schreibmarke/Auswahl/Wellen/Vorschau in
+`zeichne_textfeld`, im Textbereich und in `marke_von` ueber
+`zeilen_x`/`zeilen_bereiche`; Pfeile tauschen, wenn die Zeile als Ganzes
+rtl steht; `GUI_TEXTAREA_POS_AT` ueber `Lage::zeichen_bei`. Eine eingefaerbte
+Zeile von rechts nach links zeichnet `rtl_bunt` Stueck fuer Stueck roh
+(`zeilen_farben` aus `zeile_bunt` herausgeloest), Inline-Formate fallen dort
+weg. Neu `TEXT_VISUAL$(text$ [, richtung$])`. Bewusst nicht: volle
+Textformung, Ausrichtung nach Richtung, Hinweise/Farbfelder (logische Lage),
+pdf. Tests `tests/pruef/schreibrichtung.dhtest` (7; Bilder als Paar gegen
+LRO-erzwungene Reihenfolge; fuenf Verfaelschungen fallen je in ihrem Fall --
+die erste Fassung der Zeichen-Verfaelschung traf `visuell` statt
+`visuell_string` und blieb gruen), 10 Rust-Tests.
+
 **Uebergaenge** (2026-09-23, erster Punkt der Feinschliff-Liste): Metrik
 `uebergang` (ms, Vorgabe 120, 0 = springen wie frueher). Je Widget
 `ueber_t`/`druck_t`/`fokus_t` (0..1), dazu `LeisteState::hover_t` je

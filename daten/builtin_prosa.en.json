@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2190,
+ "count": 2191,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -1894,6 +1894,7 @@
   "TEXT_SIZE": "font size for subsequent TEXT calls (4–400)",
   "TEXT_SPACING": "letter spacing for TTF (native)",
   "TEXT_STYLE": "style for subsequent TEXT calls: fett (bold), kursiv (italic), unterstrichen (underlined), durchgestrichen (strikethrough), joined with + (\"fett+unterstrichen\"); \"normal\" switches back",
+  "TEXT_VISUAL$": "the text as it is displayed: right-to-left runs reversed, Arabic in its joined forms; direction = auto (default, first strong character), ltr or rtl. For your own output -- TEXT and the gui do this themselves",
   "TEXT_WIDTH": "pixel width of s$ in the active font/size",
   "TILED_ADD_LAYER": "INTEGER (index) append an empty tile layer",
   "TILED_ADD_OBJECT": "INTEGER (index) put an object into an object layer",
