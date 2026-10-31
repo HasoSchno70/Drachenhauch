@@ -163,6 +163,9 @@ SCREEN(1280, 800, "Drachenhauch", 1)
 ' LOGISCHEN Punkten, SCREENWIDTH und die Maus liefern Bildschirm-Pixel --
 ' was beides vergleicht, geht ueber diese Helfer.
 DIM uiMassstab AS FLOAT : uiMassstab = 1.0
+' Was in der ide.json steht (0 = wie das System) -- nicht der wirksame
+' Wert: der kommt erst beim naechsten Start zur Geltung.
+DIM massEinst AS FLOAT : massEinst = 0.0
 FUNCTION schirmB() AS INTEGER
     RETURN INT(SCREENWIDTH() / uiMassstab)
 END FUNCTION
@@ -292,8 +295,14 @@ FOR reiterNr = 0 TO MAX_TABS - 1
 NEXT
 ' Gemerkte Faltungen je Datei (ide.json `falten_pfade`/`falten_zeilen`),
 ' die zuletzt benutzte zuerst.
-DIM faltPfade AS ARRAY OF STRING : faltPfade = []
-DIM faltListe AS ARRAY OF STRING : faltListe = []
+CLASS GemerkteFaltung
+    DIM pfad AS STRING
+    DIM zeilen AS STRING     ' "3,17,40"
+    SUB Init(p AS STRING, z AS STRING)
+        pfad = p : zeilen = z
+    END SUB
+END CLASS
+DIM faltungen AS ARRAY OF GemerkteFaltung : faltungen = []
 DIM tabAnzahl AS INTEGER : tabAnzahl = 0
 DIM aktiverTab AS INTEGER : aktiverTab = -1
 
@@ -302,8 +311,7 @@ DIM prozessDatei AS STRING : prozessDatei = ""
 ' Der letzte Profillauf: welche Datei, und wie oft jede Zeile lief. Die
 ' Aufrufer-Liste haengt die Zahl an ihre Zeilen.
 DIM profDatei AS STRING : profDatei = ""
-DIM profZeilen AS ARRAY OF INTEGER : profZeilen = []
-DIM profAnzahl AS ARRAY OF INTEGER : profAnzahl = []
+DIM profHier AS ARRAY OF ProfilZeile : profHier = []
 DIM pruefungFaellig AS FLOAT : pruefungFaellig = -1.0
 DIM letzteMarke AS STRING : letzteMarke = ""
 DIM hilfeKandidat AS STRING : hilfeKandidat = ""
@@ -391,9 +399,17 @@ DIM markenSchluessel AS STRING : markenSchluessel = ""
 ' Lesezeichen ziehen hier nach.
 DIM markenFeld AS GUI_WIDGET : markenFeld = -1
 DIM markenPfad AS STRING : markenPfad = ""
-DIM markenArt AS ARRAY OF STRING : markenArt = []
-DIM markenIdx AS ARRAY OF INTEGER : markenIdx = []
-DIM markenGesetzt AS ARRAY OF INTEGER : markenGesetzt = []
+' Eine gesetzte Marke: Art ("h" Haltepunkt, "l" Lesezeichen, ...), ihr Platz
+' in der Liste dieser Art und die Zeile, auf die sie gesetzt wurde.
+CLASS GesetzteMarke
+    DIM art AS STRING
+    DIM idx AS INTEGER
+    DIM zeile AS INTEGER
+    SUB Init(a AS STRING, i AS INTEGER, z AS INTEGER)
+        art = a : idx = i : zeile = z
+    END SUB
+END CLASS
+DIM markenGesetzt AS ARRAY OF GesetzteMarke : markenGesetzt = []
 
 ' Lesezeichen (Strg+F2 setzt, F2 springt zum naechsten)
 DIM lesezeichen AS ARRAY OF CodeStelle : lesezeichen = []
@@ -1067,8 +1083,7 @@ druckNummern = kBool("druck_nummern", druckNummern)
 IF JSON_HAS(konfig, "falten_pfade") AND JSON_HAS(konfig, "falten_zeilen") THEN
     DIM fk AS INTEGER
     FOR fk = 0 TO MIN(kLen("falten_pfade"), kLen("falten_zeilen")) - 1
-        ARRAY_PUSH(faltPfade, kText("falten_pfade." + STR$(fk), ""))
-        ARRAY_PUSH(faltListe, kText("falten_zeilen." + STR$(fk), ""))
+        ARRAY_PUSH(faltungen, NEW GemerkteFaltung(kText("falten_pfade." + STR$(fk), ""), kText("falten_zeilen." + STR$(fk), "")))
     NEXT
 END IF
 IF JSON_HAS(konfig, "haltepunkte") THEN
@@ -1148,6 +1163,7 @@ DIM massWunsch AS FLOAT : massWunsch = 0.0
 IF JSON_HAS(konfig, "massstab") THEN
     IF JSON_TYPE(konfig, "massstab") = "number" THEN massWunsch = JSON_GET_FLOAT(konfig, "massstab") ELSE konfigFalsch("massstab")
 END IF
+massEinst = massWunsch
 IF massWunsch <= 0.0 THEN massWunsch = INT(WINDOW_DPI_X() * 4.0 + 0.5) / 4.0
 massWunsch = MAX(0.5, MIN(4.0, massWunsch))
 IF ABS(massWunsch - 1.0) > 0.01 THEN
@@ -1574,12 +1590,25 @@ GUI_CONTEXT_WIDGET(ctxBaum, baum)
 ' Kontextmenues von Code-Feld und Reiterleiste. Ihre Eintraege rufen
 ' vorhandene Befehle; sie laufen ueber eine eigene Liste statt ueber die
 ' Menue-Tafel, damit ein Befehl nicht zweimal ein Kuerzel bekommt.
-DIM ctxItems AS ARRAY OF INTEGER : ctxItems = []
-DIM ctxKennung AS ARRAY OF STRING : ctxKennung = []
+CLASS KontextEintrag
+    DIM item AS INTEGER
+    DIM kennung AS STRING
+    SUB Init(i AS INTEGER, k AS STRING)
+        item = i : kennung = k
+    END SUB
+END CLASS
+DIM ctxEintraege AS ARRAY OF KontextEintrag : ctxEintraege = []
 SUB ctxEintrag(menu AS INTEGER, text AS STRING, kennung AS STRING)
-    ARRAY_PUSH(ctxItems, GUI_MENU_ITEM(menu, text))
-    ARRAY_PUSH(ctxKennung, kennung)
+    ARRAY_PUSH(ctxEintraege, NEW KontextEintrag(GUI_MENU_ITEM(menu, text), kennung))
 END SUB
+' Der Eintrag mit dieser Kennung, -1 = keiner.
+FUNCTION ctxNr(kennung AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(ctxEintraege) - 1
+        IF ctxEintraege[i].kennung = kennung THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
 ' Das Code-Feld wechselt mit dem Reiter -- das Menue haengt je Bild an dem
 ' Code-Feld, ueber dem die Maus steht (kontextNachziehen).
 DIM ctxCode AS INTEGER : ctxCode = GUI_CONTEXT(win)
@@ -2043,6 +2072,13 @@ DIM cbBaumHaken AS GUI_WIDGET : cbBaumHaken = GUI_CHECKBOX(winEinst, tr$("Kästc
 DIM cbWasser AS GUI_WIDGET : cbWasser = GUI_CHECKBOX(winEinst, tr$("Schriftzug schwach hinter dem Code"), 400, 244, TRUE)
 DIM lblUi AS GUI_WIDGET : lblUi = GUI_LABEL(winEinst, tr$("Schrift der Oberfläche"), 400, 290)
 DIM spUi AS GUI_WIDGET : spUi = GUI_SPINNER(winEinst, 600, 286, 90, 12, 22, 18)
+' Der Massstab gilt erst beim naechsten Start -- GUI_SCALE muss vor dem
+' ersten Fenster kommen, und alles Bestehende umzurechnen ginge nur ungefaehr.
+DIM MASS_STUFEN AS ARRAY OF FLOAT : MASS_STUFEN = [0.0, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0]
+DIM lblMass AS GUI_WIDGET : lblMass = GUI_LABEL(winEinst, tr$("Größe der Oberfläche"), 400, 326)
+DIM ddMass AS GUI_WIDGET : ddMass = GUI_DROPDOWN(winEinst, 600, 322, 160, 28, [tr$("Wie das System"), "100 %", "125 %", "150 %", "175 %", "200 %", "250 %", "300 %"])
+DIM lblMassHinweis AS GUI_WIDGET : lblMassHinweis = GUI_LABEL(winEinst, "", 400, 358)
+DIM massWahlStand AS INTEGER : massWahlStand = 0
 DIM lblSchrift AS GUI_WIDGET : lblSchrift = GUI_LABEL(winEinst, tr$("Schriftgröße"), 16, 290)
 DIM spSchrift AS GUI_WIDGET : spSchrift = GUI_SPINNER(winEinst, 200, 286, 90, 10, 32, 16)
 DIM lblListen AS GUI_WIDGET : lblListen = GUI_LABEL(winEinst, tr$("Schrift der Listen"), 16, 326)
@@ -2369,8 +2405,7 @@ DIM zurStapel AS ARRAY OF UmbauStand : zurStapel = []
 DIM wdhStapel AS ARRAY OF UmbauStand : wdhStapel = []
 ' Der zuletzt UEBERNOMMENE Umbau, damit er sich nachbessern laesst: die
 ' Schritte (`op*`) stehen ohnehin noch, hier die Dateien dazu.
-DIM umbauNachTabs AS ARRAY OF INTEGER : umbauNachTabs = []
-DIM umbauNachPfade AS ARRAY OF STRING : umbauNachPfade = []
+DIM umbauNach AS ARRAY OF UmbauZiel : umbauNach = []    ' nur Reiter und Pfad
 DIM umbauNachWas AS STRING : umbauNachWas = ""
 DIM umbauWarnung AS STRING : umbauWarnung = ""
 ' Was das Pruefen gefunden hat -- je Zeile "datei:zeile: meldung". Steht
@@ -2653,6 +2688,7 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "glanz", glanzAn)
     JSON_SET_BOOL(konfig, "wasserzeichen", wasserzeichenAn)
     JSON_SET_INT(konfig, "ui_schrift", uiGroesse)
+    JSON_SET_FLOAT(konfig, "massstab", massEinst)
     JSON_SET_BOOL(konfig, "baum_haken", baumHakenAn)
     JSON_SET_BOOL(konfig, "format_sichern", formatSichernAn)
     JSON_SET_BOOL(konfig, "umbau_vorschau", vorschauAn)
@@ -2698,9 +2734,9 @@ SUB konfigSichern()
     JSON_SET_JSON(konfig, "falten_pfade", JSON_PARSE("[]"))
     JSON_SET_JSON(konfig, "falten_zeilen", JSON_PARSE("[]"))
     DIM fi AS INTEGER
-    FOR fi = 0 TO LEN(faltPfade) - 1
-        JSON_APPEND_STRING(konfig, "falten_pfade", faltPfade[fi])
-        JSON_APPEND_STRING(konfig, "falten_zeilen", faltListe[fi])
+    FOR fi = 0 TO LEN(faltungen) - 1
+        JSON_APPEND_STRING(konfig, "falten_pfade", faltungen[fi].pfad)
+        JSON_APPEND_STRING(konfig, "falten_zeilen", faltungen[fi].zeilen)
     NEXT
     JSON_SET_INT(konfig, "aktiv", aktiverTab)
     ' Dieselbe Sitzung noch einmal unter dem PROJEKTordner: wer an zwei
@@ -3347,6 +3383,30 @@ SUB vorspannAuswahlFuellen()
     vorspannWahlStand = wahl
 END SUB
 
+' Die Stufe der Klappliste, die einem Massstab am naechsten liegt (0 =
+' "wie das System"). Ein krummer Wert von Hand faellt auf die naechste.
+FUNCTION massStufe(m AS FLOAT) AS INTEGER
+    IF m <= 0.0 THEN RETURN 0
+    DIM best AS INTEGER : best = 1
+    DIM k AS INTEGER
+    FOR k = 2 TO LEN(MASS_STUFEN) - 1
+        IF ABS(MASS_STUFEN[k] - m) < ABS(MASS_STUFEN[best] - m) THEN best = k
+    NEXT
+    RETURN best
+END FUNCTION
+
+FUNCTION prozent$(m AS FLOAT) AS STRING
+    RETURN STR$(INT(m * 100.0 + 0.5)) + " %"
+END FUNCTION
+
+SUB massHinweisSetzen()
+    DIM t AS STRING : t = tr$("Jetzt: ") + prozent$(uiMassstab)
+    DIM soll AS FLOAT : soll = massEinst
+    IF soll <= 0.0 THEN soll = MAX(0.5, MIN(4.0, INT(WINDOW_DPI_X() * 4.0 + 0.5) / 4.0))
+    IF ABS(soll - uiMassstab) > 0.01 THEN t = t + tr$(" -- nach dem Neustart: ") + prozent$(soll)
+    GUI_SET_TEXT(lblMassHinweis, t)
+END SUB
+
 SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbHell, hell)
     GUI_SET_CHECKED(cbUmbruch, umbruchAn)
@@ -3364,6 +3424,9 @@ SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbBaumHaken, baumHakenAn)
     GUI_SET_CHECKED(cbWasser, wasserzeichenAn)
     GUI_SET_VALUE(spUi, uiGroesse)
+    massWahlStand = massStufe(massEinst)
+    GUI_DROPDOWN_SET_SELECTED(ddMass, massWahlStand)
+    massHinweisSetzen()
     vorspannAuswahlFuellen()
     GUI_SET_VALUE(spSchrift, codeGroesse)
     GUI_SET_VALUE(spListen, listenGroesse)
@@ -3426,6 +3489,13 @@ SUB einstellungenNachziehen()
     IF INT(GUI_VALUE(spUi)) <> uiGroesse THEN
         uiSchrift(INT(GUI_VALUE(spUi)))
         konfigSichern()
+    END IF
+    IF GUI_DROPDOWN_SELECTED(ddMass) <> massWahlStand AND GUI_DROPDOWN_SELECTED(ddMass) >= 0 THEN
+        massWahlStand = GUI_DROPDOWN_SELECTED(ddMass)
+        massEinst = MASS_STUFEN[massWahlStand]
+        konfigSichern()
+        massHinweisSetzen()
+        protokoll("massstab " + FORMAT$(massEinst, "%.2f"))
     END IF
     IF GUI_CHECKED(cbGlanz) <> glanzAn THEN
         glanzAn = GUI_CHECKED(cbGlanz)
@@ -3899,25 +3969,22 @@ SUB faltenMerken(i AS INTEGER)
         ARRAY_PUSH(teile, STR$(z[k]))
     NEXT
     DIM weg AS STRING : weg = wegGleich$(reiter[i].pfad)
-    DIM neuP AS ARRAY OF STRING : neuP = []
-    DIM neuL AS ARRAY OF STRING : neuL = []
-    IF LEN(teile) > 0 THEN
-        ARRAY_PUSH(neuP, weg) : ARRAY_PUSH(neuL, JOIN$(teile, ","))
-    END IF
-    FOR k = 0 TO LEN(faltPfade) - 1
-        IF faltPfade[k] <> weg AND LEN(neuP) < 100 THEN
-            ARRAY_PUSH(neuP, faltPfade[k]) : ARRAY_PUSH(neuL, faltListe[k])
-        END IF
+    DIM neu AS ARRAY OF GemerkteFaltung : neu = []
+    IF LEN(teile) > 0 THEN ARRAY_PUSH(neu, NEW GemerkteFaltung(weg, JOIN$(teile, ",")))
+    FOR k = 0 TO LEN(faltungen) - 1
+        IF faltungen[k].pfad <> weg AND LEN(neu) < 100 THEN ARRAY_PUSH(neu, faltungen[k])
     NEXT
-    faltPfade = neuP
-    faltListe = neuL
+    faltungen = neu
 END SUB
 
 FUNCTION gemerkteFalten$(pfad AS STRING) AS STRING
     IF pfad = "" THEN RETURN ""
-    DIM k AS INTEGER : k = ARRAY_INDEXOF(faltPfade, wegGleich$(pfad))
-    IF k < 0 THEN RETURN ""
-    RETURN faltListe[k]
+    DIM weg AS STRING : weg = wegGleich$(pfad)
+    DIM f AS GemerkteFaltung
+    FOR EACH f IN faltungen
+        IF f.pfad = weg THEN RETURN f.zeilen
+    NEXT
+    RETURN ""
 END FUNCTION
 
 ' Nachdem der aktive Reiter seine faltbaren Bloecke bekommen hat: die
@@ -5486,6 +5553,9 @@ DIM zaehlCache AS MAP OF STRING
 ' anderer Editor), prueft zaehlNachsehen stueckweise, was sich auf der
 ' Platte geaendert hat.
 DIM zaehlZeit AS MAP OF INTEGER
+' Die Klassen jeder gelesenen Datei (CODE_CLASSES$, "" ohne CLASS), mit
+' derselben Gueltigkeit wie zaehlCache -- fuer die Ueberschreib-Hinweise.
+DIM klassenCache AS MAP OF STRING : klassenCache = {}
 DIM zaehlWeg AS MAP OF STRING        ' Schluessel -> Weg, wie er gelesen wurde
 DIM zaehlPruefListe AS ARRAY OF STRING : zaehlPruefListe = []
 ' Die Dateiliste fuer die Zaehlung, gemerkt: DIRLIST_REC kostet bei 2000
@@ -5502,6 +5572,7 @@ SUB zaehlVergessen(pfad AS STRING)
     DIM schl AS STRING : schl = LOWER$(wegGleich$(pfad))
     IF MAPHAS(zaehlCache, schl) THEN MAPREMOVE(zaehlCache, schl)
     IF MAPHAS(zaehlZeit, schl) THEN MAPREMOVE(zaehlZeit, schl)
+    IF MAPHAS(klassenCache, schl) THEN MAPREMOVE(klassenCache, schl)
     IF MAPHAS(zaehlWeg, schl) THEN MAPREMOVE(zaehlWeg, schl)
     DIM e AS STRING : e = wegGleich$(pfad)
     IF MAPHAS(echteWege, e) THEN MAPREMOVE(echteWege, e)
@@ -5554,6 +5625,7 @@ SUB zaehlNachsehen()
         END TRY
         IF jetzt <> MAPGET(zaehlZeit, schl) THEN
             IF MAPHAS(zaehlCache, schl) THEN MAPREMOVE(zaehlCache, schl)
+            IF MAPHAS(klassenCache, schl) THEN MAPREMOVE(klassenCache, schl)
             MAPREMOVE(zaehlZeit, schl)
             protokoll("zaehlung veraltet " + BASENAME(weg))
         END IF
@@ -5621,6 +5693,7 @@ FUNCTION zaehlungVon$(pfad AS STRING) AS STRING
     zaehlGelesenGesamt = zaehlGelesenGesamt + 1
     DIM m AS STRING : m = woerterZaehlen$(q)
     MAPPUT(zaehlCache, schl, m)
+    MAPPUT(klassenCache, schl, klassenAus$(q))
     DIM zeit AS INTEGER : zeit = -1
     TRY
         IF FILEEXISTS(pfad) THEN zeit = FILETIME(pfad)
@@ -5630,6 +5703,28 @@ FUNCTION zaehlungVon$(pfad AS STRING) AS STRING
     MAPPUT(zaehlZeit, schl, zeit)
     MAPPUT(zaehlWeg, schl, pfad)
     RETURN m
+END FUNCTION
+
+FUNCTION klassenAus$(q AS STRING) AS STRING
+    IF INSTR(UPPER$(q), "CLASS ") < 0 THEN RETURN ""
+    RETURN CODE_CLASSES$(q)
+END FUNCTION
+
+' Die Klassen einer Projektdatei fuer die Ueberschreib-Hinweise: ein offener
+' Reiter mit dem Stand im Editor, sonst aus dem Cache (gefuellt beim Zaehlen).
+FUNCTION klassenVon$(pfad AS STRING) AS STRING
+    IF tabMitPfad(pfad) >= 0 THEN RETURN klassenAus$(GUI_TEXT(reiter[tabMitPfad(pfad)].feld))
+    DIM schl AS STRING : schl = LOWER$(wegGleich$(pfad))
+    IF MAPHAS(klassenCache, schl) THEN RETURN MAPGET(klassenCache, schl)
+    DIM q AS STRING : q = ""
+    TRY
+        q = dateiLesen(pfad)
+    CATCH e
+        q = ""
+    END TRY
+    DIM k AS STRING : k = klassenAus$(q)
+    MAPPUT(klassenCache, schl, k)
+    RETURN k
 END FUNCTION
 
 ' Die Zaehler fuer das Feld setzen (oder wegnehmen). Waehrend der Debugger
@@ -5689,6 +5784,7 @@ SUB zaehlerSetzen_(ta AS GUI_WIDGET)
     IF projektOrdner <> "" THEN dateien = zaehlProjektDateien()
     zaehlerAddieren(summe, woerterZaehlen$(quelle))
     DIM d AS STRING
+    DIM fremd AS ARRAY OF UeQuelle : fremd = []
     zaehlGelesen = 0
     FOR EACH d IN dateien
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
@@ -5701,9 +5797,11 @@ SUB zaehlerSetzen_(ta AS GUI_WIDGET)
             RETURN
         END IF
         zaehlerAddieren(summe, zaehlungVon$(pfad))
+        DIM fk AS STRING : fk = klassenVon$(pfad)
+        IF fk <> "" THEN ARRAY_PUSH(fremd, NEW UeQuelle(d, fk))
     NEXT
     DIM stellen AS ARRAY OF Zaehlstelle : stellen = []
-    DIM ueber AS MAP OF STRING : ueber = ueberschreibTexte(quelle)
+    DIM ueber AS MAP OF STRING : ueber = ueberschreibTexte(quelle, fremd)
     FOR i = 0 TO LEN(nm) - 1
         DIM k AS INTEGER : k = MAPGET(summe, LOWER$(nm[i]))
         DIM zt AS STRING : zt = IIF(k = 0, "nicht aufgerufen", IIF(k = 1, "1 Aufruf", STR$(k) + " Aufrufe"))
@@ -5718,104 +5816,141 @@ END SUB
 ' Wer was ueberschreibt, je Zeile einer Methode (Schluessel = Zeilennummer):
 ' "überschreibt Tier.laut" / "füllt Tier.laut aus" (die Vorfahrin kuendigt
 ' sie nur an) und "überschrieben in Hund, Katze" / "ausgefüllt in Hund" bzw.
-' "nirgends ausgefüllt". Nur die Klassen DIESER Datei -- eine Oberklasse in
-' einer anderen Datei kennt CODE_CLASSES$ nicht.
-FUNCTION ueberschreibTexte(quelle AS STRING) AS MAP OF STRING
-    DIM aus AS MAP OF STRING : aus = {}
-    IF INSTR(UPPER$(quelle), "CLASS ") < 0 THEN RETURN aus
-    DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_CLASSES$(quelle))
-    DIM qz AS ARRAY OF STRING : qz = SPLIT$(quelle, NL)
-    DIM kName AS ARRAY OF STRING : kName = []
-    DIM kBasis AS ARRAY OF STRING : kBasis = []
-    ' je Methode: Klasse (Index), Name klein, Name wie geschrieben, Zeile, ABSTRACT?
-    DIM mK AS ARRAY OF INTEGER : mK = []
-    DIM mName AS ARRAY OF STRING : mName = []
-    DIM mSchrift AS ARRAY OF STRING : mSchrift = []
-    DIM mZeile AS ARRAY OF INTEGER : mZeile = []
-    DIM mAbstr AS ARRAY OF BOOLEAN : mAbstr = []
+' "nirgends ausgefüllt". Hinweise bekommen nur die Methoden DIESER Quelle;
+' gesucht wird aber auch in den Klassen der anderen Projektdateien
+' (`fremd`, je Datei die Ausgabe von CODE_CLASSES$) -- eine Oberklasse steht
+' oft in einer eigenen Datei. Heisst eine fremde Klasse wie eine eigene,
+' gilt die eigene: der Text im Editor ist neuer als die Platte.
+CLASS UeKlasse
+    DIM name AS STRING
+    DIM basis AS STRING
+    DIM datei AS STRING      ' "" = diese Quelle
+    SUB Init(n AS STRING, b AS STRING, d AS STRING)
+        name = n : basis = b : datei = d
+    END SUB
+END CLASS
+CLASS UeMethode
+    DIM klasse AS INTEGER    ' Index in der Klassenliste
+    DIM name AS STRING       ' klein
+    DIM schrift AS STRING    ' wie geschrieben
+    DIM zeile AS INTEGER
+    DIM abstrakt AS BOOLEAN
+    SUB Init(k AS INTEGER, s AS STRING, z AS INTEGER, ab AS BOOLEAN)
+        klasse = k : name = LOWER$(s) : schrift = s : zeile = z : abstrakt = ab
+    END SUB
+END CLASS
+CLASS UeQuelle
+    DIM datei AS STRING
+    DIM klassen AS STRING    ' CODE_CLASSES$
+    SUB Init(d AS STRING, k AS STRING)
+        datei = d : klassen = k
+    END SUB
+END CLASS
+
+SUB ueKlassenLesen(json AS STRING, datei AS STRING, kl AS ARRAY OF UeKlasse, me AS ARRAY OF UeMethode)
+    IF json = "" THEN RETURN
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_PARSE(json)
+    CATCH ueFehler
+        RETURN
+    END TRY
     DIM i AS INTEGER
     FOR i = 0 TO JSON_LEN(j, "") - 1
         DIM p AS STRING : p = STR$(i)
         IF JSON_GET_STRING(j, p + ".art") <> "class" THEN CONTINUE
-        ARRAY_PUSH(kName, JSON_GET_STRING(j, p + ".name"))
-        ARRAY_PUSH(kBasis, JSON_GET_STRING(j, p + ".basis"))
+        DIM kn AS STRING : kn = JSON_GET_STRING(j, p + ".name")
+        IF ueKlasseNr(kl, kn) >= 0 THEN CONTINUE
+        ARRAY_PUSH(kl, NEW UeKlasse(kn, JSON_GET_STRING(j, p + ".basis"), datei))
         DIM m AS INTEGER
         FOR m = 0 TO JSON_LEN(j, p + ".mitglieder") - 1
             DIM pm AS STRING : pm = p + ".mitglieder." + STR$(m)
             DIM art AS STRING : art = JSON_GET_STRING(j, pm + ".art")
             IF art <> "sub" AND art <> "function" THEN CONTINUE
-            DIM z AS INTEGER : z = JSON_GET_INT(j, pm + ".zeile")
-            ARRAY_PUSH(mK, LEN(kName) - 1)
-            ARRAY_PUSH(mName, LOWER$(JSON_GET_STRING(j, pm + ".name")))
-            ARRAY_PUSH(mSchrift, JSON_GET_STRING(j, pm + ".name"))
-            ARRAY_PUSH(mZeile, z)
-            DIM ab AS BOOLEAN : ab = FALSE
-            IF z >= 1 AND z <= LEN(qz) THEN ab = LEFT$(UPPER$(TRIM$(qz[z - 1])), 9) = "ABSTRACT "
-            ARRAY_PUSH(mAbstr, ab)
+            DIM ab AS BOOLEAN : ab = LEFT$(UPPER$(TRIM$(JSON_GET_STRING(j, pm + ".kopf"))), 9) = "ABSTRACT "
+            ARRAY_PUSH(me, NEW UeMethode(LEN(kl) - 1, JSON_GET_STRING(j, pm + ".name"), JSON_GET_INT(j, pm + ".zeile"), ab))
         NEXT
     NEXT
-    IF LEN(kName) < 2 THEN RETURN aus
-    FOR i = 0 TO LEN(mK) - 1
+END SUB
+
+FUNCTION ueberschreibTexte(quelle AS STRING, fremd AS ARRAY OF UeQuelle) AS MAP OF STRING
+    DIM aus AS MAP OF STRING : aus = {}
+    IF INSTR(UPPER$(quelle), "CLASS ") < 0 THEN RETURN aus
+    DIM kl AS ARRAY OF UeKlasse : kl = []
+    DIM me AS ARRAY OF UeMethode : me = []
+    ueKlassenLesen(CODE_CLASSES$(quelle), "", kl, me)
+    DIM eigene AS INTEGER : eigene = LEN(kl)
+    IF eigene = 0 THEN RETURN aus
+    DIM q AS UeQuelle
+    FOR EACH q IN fremd
+        ueKlassenLesen(q.klassen, q.datei, kl, me)
+    NEXT
+    IF LEN(kl) < 2 THEN RETURN aus
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(me) - 1
+        IF me[i].klasse >= eigene THEN CONTINUE
         DIM teile AS ARRAY OF STRING : teile = []
         ' nach oben: die naechste Vorfahrin mit derselben Methode
-        DIM oben AS INTEGER : oben = klassenIndexIn(kName, kBasis[mK[i]])
+        DIM oben AS INTEGER : oben = ueKlasseNr(kl, kl[me[i].klasse].basis)
         DIM runde AS INTEGER : runde = 0
         WHILE oben >= 0 AND runde < 30
             runde = runde + 1
-            DIM vt AS INTEGER : vt = methodeIn(mK, mName, oben, mName[i])
+            DIM vt AS INTEGER : vt = ueMethodeNr(me, oben, me[i].name)
             IF vt >= 0 THEN
-                IF mAbstr[vt] THEN
-                    ARRAY_PUSH(teile, "füllt " + kName[oben] + "." + mSchrift[vt] + " aus")
+                DIM wo AS STRING : wo = ""
+                IF kl[oben].datei <> "" THEN wo = " (" + kl[oben].datei + ")"
+                IF me[vt].abstrakt THEN
+                    ARRAY_PUSH(teile, "füllt " + kl[oben].name + "." + me[vt].schrift + " aus" + wo)
                 ELSE
-                    ARRAY_PUSH(teile, "überschreibt " + kName[oben] + "." + mSchrift[vt])
+                    ARRAY_PUSH(teile, "überschreibt " + kl[oben].name + "." + me[vt].schrift + wo)
                 END IF
                 BREAK
             END IF
-            oben = klassenIndexIn(kName, kBasis[oben])
+            oben = ueKlasseNr(kl, kl[oben].basis)
         WEND
         ' nach unten: jede Klasse, die (ueber Zwischenstufen) erbt und sie hat
         DIM unten AS ARRAY OF STRING : unten = []
         DIM k AS INTEGER
-        FOR k = 0 TO LEN(kName) - 1
-            IF k = mK[i] THEN CONTINUE
-            IF NOT erbtVon(kName, kBasis, k, mK[i]) THEN CONTINUE
-            IF methodeIn(mK, mName, k, mName[i]) >= 0 THEN ARRAY_PUSH(unten, kName[k])
+        FOR k = 0 TO LEN(kl) - 1
+            IF k = me[i].klasse THEN CONTINUE
+            IF NOT ueErbtVon(kl, k, me[i].klasse) THEN CONTINUE
+            IF ueMethodeNr(me, k, me[i].name) >= 0 THEN ARRAY_PUSH(unten, kl[k].name)
         NEXT
         IF LEN(unten) > 0 THEN
-            ARRAY_PUSH(teile, IIF(mAbstr[i], "ausgefüllt in ", "überschrieben in ") + JOIN$(unten, ", "))
-        ELSEIF mAbstr[i] THEN
+            ARRAY_PUSH(teile, IIF(me[i].abstrakt, "ausgefüllt in ", "überschrieben in ") + JOIN$(unten, ", "))
+        ELSEIF me[i].abstrakt THEN
             ARRAY_PUSH(teile, "nirgends ausgefüllt")
         END IF
-        IF LEN(teile) > 0 THEN MAPPUT(aus, STR$(mZeile[i]), JOIN$(teile, "   ·   "))
+        IF LEN(teile) > 0 THEN MAPPUT(aus, STR$(me[i].zeile), JOIN$(teile, "   ·   "))
     NEXT
     RETURN aus
 END FUNCTION
 
-FUNCTION klassenIndexIn(namen AS ARRAY OF STRING, name AS STRING) AS INTEGER
+FUNCTION ueKlasseNr(kl AS ARRAY OF UeKlasse, name AS STRING) AS INTEGER
     IF name = "" THEN RETURN -1
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(namen) - 1
-        IF LOWER$(namen[i]) = LOWER$(name) THEN RETURN i
+    FOR i = 0 TO LEN(kl) - 1
+        IF LOWER$(kl[i].name) = LOWER$(name) THEN RETURN i
     NEXT
     RETURN -1
 END FUNCTION
 
 ' Die Methode `name` (klein) der Klasse Nummer `k`, -1 = hat sie nicht.
-FUNCTION methodeIn(mK AS ARRAY OF INTEGER, mName AS ARRAY OF STRING, k AS INTEGER, name AS STRING) AS INTEGER
+FUNCTION ueMethodeNr(me AS ARRAY OF UeMethode, k AS INTEGER, name AS STRING) AS INTEGER
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(mK) - 1
-        IF mK[i] = k AND mName[i] = name THEN RETURN i
+    FOR i = 0 TO LEN(me) - 1
+        IF me[i].klasse = k AND me[i].name = name THEN RETURN i
     NEXT
     RETURN -1
 END FUNCTION
 
 ' Erbt Klasse `k` (ueber Zwischenstufen) von Klasse `vorfahr`?
-FUNCTION erbtVon(kName AS ARRAY OF STRING, kBasis AS ARRAY OF STRING, k AS INTEGER, vorfahr AS INTEGER) AS BOOLEAN
-    DIM b AS INTEGER : b = klassenIndexIn(kName, kBasis[k])
+FUNCTION ueErbtVon(kl AS ARRAY OF UeKlasse, k AS INTEGER, vorfahr AS INTEGER) AS BOOLEAN
+    DIM b AS INTEGER : b = ueKlasseNr(kl, kl[k].basis)
     DIM runde AS INTEGER : runde = 0
     WHILE b >= 0 AND runde < 30
         IF b = vorfahr THEN RETURN TRUE
-        b = klassenIndexIn(kName, kBasis[b])
+        b = ueKlasseNr(kl, kl[b].basis)
         runde = runde + 1
     WEND
     RETURN FALSE
@@ -5913,8 +6048,14 @@ END SUB
 ' Eine Folge von Laeufen: je Ziel (Datei oder Ordner) ein `dhrt test`, mit
 ' Fall-Namen nur dieser Fall. Ausgabe und Liste werden nur am Anfang
 ' geleert -- die Fehlgeschlagenen aus drei Dateien sollen zusammen dastehen.
-DIM testZiele AS ARRAY OF STRING : testZiele = []
-DIM testFaelle AS ARRAY OF STRING : testFaelle = []
+CLASS TestLauf
+    DIM ziel AS STRING
+    DIM fall AS STRING       ' "" = alle Faelle
+    SUB Init(z AS STRING, f AS STRING)
+        ziel = z : fall = f
+    END SUB
+END CLASS
+DIM testLaeufe AS ARRAY OF TestLauf : testLaeufe = []
 DIM testFall AS STRING : testFall = ""
 DIM testFehlSumme AS INTEGER : testFehlSumme = 0
 DIM testOkSumme AS INTEGER : testOkSumme = 0
@@ -5926,16 +6067,18 @@ SUB testLaufStarten(ziele AS ARRAY OF STRING, faelle AS ARRAY OF STRING)
     fundstellen = []
     problemModus = 1
     testFehlSumme = 0 : testOkSumme = 0
-    testZiele = ziele
-    testFaelle = faelle
+    testLaeufe = []
+    DIM tz AS INTEGER
+    FOR tz = 0 TO LEN(ziele) - 1
+        ARRAY_PUSH(testLaeufe, NEW TestLauf(ziele[tz], IIF(tz < LEN(faelle), faelle[tz], "")))
+    NEXT
     testNaechster()
 END SUB
 
 SUB testNaechster()
-    DIM ziel AS STRING : ziel = testZiele[0]
-    testFall = testFaelle[0]
-    ARRAY_REMOVE_AT(testZiele, 0)
-    ARRAY_REMOVE_AT(testFaelle, 0)
+    DIM ziel AS STRING : ziel = testLaeufe[0].ziel
+    testFall = testLaeufe[0].fall
+    ARRAY_REMOVE_AT(testLaeufe, 0)
     testRest = "" : testDatei = "" : testBilanz = "" : testFehl = 0
     IF testFall = "" THEN
         testProz = PROCESS_START("dhrt", "test", ziel)
@@ -6017,7 +6160,7 @@ SUB testNachsehen()
     testProz = -1
     testFehlSumme = testFehlSumme + testFehl
     IF GUI_WINDOW_SHOWN(winTests) THEN testUebersichtFuellen()
-    IF LEN(testZiele) > 0 THEN
+    IF LEN(testLaeufe) > 0 THEN
         protokoll("pruefsammlung fertig " + STR$(testFehl) + " " + STR$(code))
         testNaechster()
         RETURN
@@ -6244,7 +6387,7 @@ SUB qvVerwerfen(pfad AS STRING)
         feldAustauschen(reiter[t].feld, GUI_TEXT(reiter[t].feld), neu)
         reiter[t].gesichert = GUI_TEXT(reiter[t].feld)
     END IF
-    zaehlCache = {} : zaehlZeit = {} : zaehlWeg = {} : echteWege = {} : zaehlDateienAlt = TRUE
+    zaehlCache = {} : zaehlZeit = {} : klassenCache = {} : zaehlWeg = {} : echteWege = {} : zaehlDateienAlt = TRUE
     qvAuffrischen()
     GUI_SET_TEXT(lblQvStatus, tr$("Verworfen: ") + pfad)
     protokoll("qv verworfen " + pfad)
@@ -6461,7 +6604,7 @@ SUB pakFertig(code AS INTEGER)
     protokoll("pak " + pakArt + " " + STR$(code))
     GUI_FILETREE_REFRESH(baum)
     symSchluessel = ""
-    zaehlCache = {} : zaehlZeit = {} : zaehlWeg = {} : echteWege = {} : zaehlDateienAlt = TRUE
+    zaehlCache = {} : zaehlZeit = {} : klassenCache = {} : zaehlWeg = {} : echteWege = {} : zaehlDateienAlt = TRUE
     pakFuellen()
     pruefen()
 END SUB
@@ -6594,7 +6737,7 @@ SUB qvReiterNachziehen()
             reiter[t].gesichert = GUI_TEXT(reiter[t].feld)
         END IF
     NEXT
-    zaehlCache = {} : zaehlZeit = {} : zaehlWeg = {} : echteWege = {} : zaehlDateienAlt = TRUE
+    zaehlCache = {} : zaehlZeit = {} : klassenCache = {} : zaehlWeg = {} : echteWege = {} : zaehlDateienAlt = TRUE
     blameCache = {}
     baumFuellen()
 END SUB
@@ -9003,14 +9146,14 @@ SUB markenZurueckholen(ta AS GUI_WIDGET, pfad AS STRING)
     DIM k AS INTEGER
     DIM anders AS BOOLEAN : anders = FALSE
     FOR k = 0 TO LEN(jetzt) - 1
-        IF jetzt[k] = markenGesetzt[k] THEN CONTINUE
-        DIM i AS INTEGER : i = markenIdx[k]
-        IF markenArt[k] = "h" AND i < LEN(haltepunkte) THEN
+        IF jetzt[k] = markenGesetzt[k].zeile THEN CONTINUE
+        DIM i AS INTEGER : i = markenGesetzt[k].idx
+        IF markenGesetzt[k].art = "h" AND i < LEN(haltepunkte) THEN
             haltepunkte[i].zeile = jetzt[k] : anders = TRUE
-        ELSEIF markenArt[k] = "l" AND i < LEN(lesezeichen) THEN
+        ELSEIF markenGesetzt[k].art = "l" AND i < LEN(lesezeichen) THEN
             lesezeichen[i].zeile = jetzt[k] : anders = TRUE
         END IF
-        markenGesetzt[k] = jetzt[k]
+        markenGesetzt[k].zeile = jetzt[k]
     NEXT
     IF anders THEN
         DIM liste AS STRING : liste = ""
@@ -9086,17 +9229,11 @@ SUB markenNachziehen()
     markenSchluessel = schl
     GUI_TEXTAREA_MARKS(ta, zeilen, farben)
     markenFeld = ta : markenPfad = pfad
-    markenArt = arten : markenIdx = idx
     ' Nur gueltige Zeilen stehen im Feld (GUI_TEXTAREA_MARKS laesst < 1 weg).
     markenGesetzt = []
-    DIM gz AS ARRAY OF STRING : gz = []
-    DIM ga AS ARRAY OF INTEGER : ga = []
     FOR i = 0 TO LEN(zeilen) - 1
-        IF zeilen[i] >= 1 THEN
-            ARRAY_PUSH(markenGesetzt, zeilen[i]) : ARRAY_PUSH(gz, arten[i]) : ARRAY_PUSH(ga, idx[i])
-        END IF
+        IF zeilen[i] >= 1 THEN ARRAY_PUSH(markenGesetzt, NEW GesetzteMarke(arten[i], idx[i], zeilen[i]))
     NEXT
-    markenArt = gz : markenIdx = ga
 END SUB
 
 ' --- Hilfe zum Wort unter der Marke ----------------------------------
@@ -9870,9 +10007,15 @@ END FUNCTION
 ' Stelle, an der die Leiste aufging; der Fokus bleibt dabei im Suchfeld.
 ' Die Treffer eines Feldes: Zeile, Spalte (ab 1 wie GUI_TEXTAREA_SELECT) und
 ' Laenge -- gerechnet, wenn sich Muster, Feld oder Text geaendert haben.
-DIM trefferZ AS ARRAY OF INTEGER : trefferZ = []
-DIM trefferS AS ARRAY OF INTEGER : trefferS = []
-DIM trefferL AS ARRAY OF INTEGER : trefferL = []
+CLASS Fundort
+    DIM zeile AS INTEGER
+    DIM spalte AS INTEGER
+    DIM laenge AS INTEGER
+    SUB Init(z AS INTEGER, sp AS INTEGER, l AS INTEGER)
+        zeile = z : spalte = sp : laenge = l
+    END SUB
+END CLASS
+DIM fundorte AS ARRAY OF Fundort : fundorte = []
 DIM trefferFehler AS BOOLEAN : trefferFehler = FALSE
 DIM trefferMusterAlt AS STRING : trefferMusterAlt = "-"
 DIM trefferFeldAlt AS GUI_WIDGET : trefferFeldAlt = -2
@@ -9886,14 +10029,14 @@ SUB trefferAktuell(ta AS GUI_WIDGET)
     IF ta >= 0 THEN t = GUI_TEXT(ta)
     IF m = trefferMusterAlt AND ta = trefferFeldAlt AND t = trefferTextAlt THEN RETURN
     trefferMusterAlt = m : trefferFeldAlt = ta : trefferTextAlt = t
-    trefferZ = [] : trefferS = [] : trefferL = []
+    fundorte = []
     trefferFehler = FALSE
     IF m = "" THEN RETURN
     DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(t, NL)
     DIM z AS INTEGER
     FOR z = 0 TO LEN(zeilen) - 1
         DIM ab AS INTEGER : ab = 0
-        WHILE ab <= LEN(zeilen[z]) AND LEN(trefferZ) < TREFFER_HOECHSTENS
+        WHILE ab <= LEN(zeilen[z]) AND LEN(fundorte) < TREFFER_HOECHSTENS
             DIM p AS INTEGER
             DIM l AS INTEGER
             TRY
@@ -9906,7 +10049,7 @@ SUB trefferAktuell(ta AS GUI_WIDGET)
             ' Ein leerer Treffer (`x*` auf einer Zeile ohne x) markiert
             ' nichts -- er zaehlt nicht und schiebt nur weiter.
             IF l > 0 THEN
-                ARRAY_PUSH(trefferZ, z + 1) : ARRAY_PUSH(trefferS, p + 1) : ARRAY_PUSH(trefferL, l)
+                ARRAY_PUSH(fundorte, NEW Fundort(z + 1, p + 1, l))
             END IF
             ab = p + MAX(l, 1)
         WEND
@@ -9916,17 +10059,17 @@ END SUB
 ' Der naechste Treffer: vorwaerts der erste, der bei (z, s) oder dahinter
 ' anfaengt, rueckwaerts der letzte davor -- mit Umlauf am Dateiende.
 FUNCTION trefferIndex(z AS INTEGER, s AS INTEGER, vorwaerts AS BOOLEAN) AS INTEGER
-    DIM n AS INTEGER : n = LEN(trefferZ)
+    DIM n AS INTEGER : n = LEN(fundorte)
     IF n = 0 THEN RETURN -1
     DIM k AS INTEGER
     IF vorwaerts THEN
         FOR k = 0 TO n - 1
-            IF trefferZ[k] > z OR (trefferZ[k] = z AND trefferS[k] >= s) THEN RETURN k
+            IF fundorte[k].zeile > z OR (fundorte[k].zeile = z AND fundorte[k].spalte >= s) THEN RETURN k
         NEXT
         RETURN 0
     END IF
     FOR k = n - 1 TO 0 STEP -1
-        IF trefferZ[k] < z OR (trefferZ[k] = z AND trefferS[k] < s) THEN RETURN k
+        IF fundorte[k].zeile < z OR (fundorte[k].zeile = z AND fundorte[k].spalte < s) THEN RETURN k
     NEXT
     RETURN n - 1
 END FUNCTION
@@ -9940,17 +10083,17 @@ FUNCTION trefferMarkiert(ta AS GUI_WIDGET) AS INTEGER
     (z1, s1, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
     IF z1 <> z2 THEN RETURN -1
     DIM k AS INTEGER
-    FOR k = 0 TO LEN(trefferZ) - 1
-        IF trefferZ[k] = z1 AND trefferS[k] = s1 AND trefferS[k] + trefferL[k] = s2 THEN RETURN k
-        IF trefferZ[k] > z1 THEN RETURN -1
+    FOR k = 0 TO LEN(fundorte) - 1
+        IF fundorte[k].zeile = z1 AND fundorte[k].spalte = s1 AND fundorte[k].spalte + fundorte[k].laenge = s2 THEN RETURN k
+        IF fundorte[k].zeile > z1 THEN RETURN -1
     NEXT
     RETURN -1
 END FUNCTION
 
 SUB trefferMarkieren(ta AS GUI_WIDGET, k AS INTEGER)
-    GUI_TEXTAREA_SELECT(ta, trefferZ[k], trefferS[k], trefferZ[k], trefferS[k] + trefferL[k])
-    protokoll("treffer " + STR$(k + 1) + " von " + STR$(LEN(trefferZ)) + " zeile " + STR$(trefferZ[k]) + _
-              " spalte " + STR$(trefferS[k]))
+    GUI_TEXTAREA_SELECT(ta, fundorte[k].zeile, fundorte[k].spalte, fundorte[k].zeile, fundorte[k].spalte + fundorte[k].laenge)
+    protokoll("treffer " + STR$(k + 1) + " von " + STR$(LEN(fundorte)) + " zeile " + STR$(fundorte[k].zeile) + _
+              " spalte " + STR$(fundorte[k].spalte))
 END SUB
 
 ' F3 / Umschalt+F3 / Enter im Suchfeld. Vorwaerts ab dem ENDE der Auswahl
@@ -9961,7 +10104,7 @@ FUNCTION trefferSpringen(vorwaerts AS BOOLEAN) AS BOOLEAN
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 OR suchtext = "" THEN RETURN FALSE
     trefferAktuell(ta)
-    IF LEN(trefferZ) = 0 THEN
+    IF LEN(fundorte) = 0 THEN
         IF trefferFehler THEN
             GUI_SET_TEXT(lblStatus, tr$("Ungültiger Ausdruck: ") + suchtext)
         ELSE
@@ -10054,7 +10197,7 @@ SUB ersetzenEinzeln()
             END TRY
         END IF
         GUI_TEXTAREA_INSERT(ta, neu)
-        protokoll("ersetzt einzeln zeile " + STR$(trefferZ[k]))
+        protokoll("ersetzt einzeln zeile " + STR$(fundorte[k].zeile))
     END IF
     trefferSpringen(TRUE)
 END SUB
@@ -10065,7 +10208,7 @@ SUB alleErsetzen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 OR suchtext = "" THEN RETURN
     trefferAktuell(ta)
-    DIM n AS INTEGER : n = LEN(trefferZ)
+    DIM n AS INTEGER : n = LEN(fundorte)
     IF n = 0 THEN
         GUI_SET_TEXT(lblStatus, IIF(trefferFehler, tr$("Ungültiger Ausdruck: "), tr$("Nicht gefunden: ")) + suchtext)
         protokoll("ersetzt 0")
@@ -10100,7 +10243,7 @@ SUB sucheNachziehen()
         ' mit jedem Buchstaben weiter nach unten.
         IF ta >= 0 THEN
             trefferAktuell(ta)
-            IF LEN(trefferZ) > 0 THEN trefferMarkieren(ta, trefferIndex(sucheAnkerZ, sucheAnkerS, TRUE))
+            IF LEN(fundorte) > 0 THEN trefferMarkieren(ta, trefferIndex(sucheAnkerZ, sucheAnkerS, TRUE))
         END IF
     END IF
     ersatztext = GUI_TEXT(tfErsatz)
@@ -10123,11 +10266,11 @@ SUB sucheNachziehen()
         trefferAktuell(ta)
         IF trefferFehler THEN
             zahl = "Ausdruck ungueltig"
-        ELSEIF LEN(trefferZ) = 0 THEN
+        ELSEIF LEN(fundorte) = 0 THEN
             zahl = "keine Treffer"
         ELSE
             DIM k AS INTEGER : k = trefferMarkiert(ta)
-            IF k >= 0 THEN zahl = STR$(k + 1) + " von " + STR$(LEN(trefferZ)) ELSE zahl = STR$(LEN(trefferZ)) + " Treffer"
+            IF k >= 0 THEN zahl = STR$(k + 1) + " von " + STR$(LEN(fundorte)) ELSE zahl = STR$(LEN(fundorte)) + " Treffer"
         END IF
     END IF
     IF zahl <> sucheZahlAlt THEN
@@ -11571,8 +11714,8 @@ END SUB
 FUNCTION laufZahl$(pfad AS STRING, zeile AS INTEGER) AS STRING
     IF profDatei = "" OR NOT gleicherWeg(pfad, profDatei) THEN RETURN ""
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(profZeilen) - 1
-        IF profZeilen[i] = zeile THEN RETURN "  [" + STR$(profAnzahl[i]) + "x]"
+    FOR i = 0 TO LEN(profHier) - 1
+        IF profHier[i].zeile = zeile THEN RETURN "  [" + STR$(profHier[i].anzahl) + "x]"
     NEXT
     RETURN ""
 END FUNCTION
@@ -12649,15 +12792,15 @@ END SUB
 ' und uebernimmt; gerechnet wird aus den Schritten, nicht aus dem, was
 ' gerade in der Datei steht.
 SUB umbauNachbessern()
-    IF LEN(opArt) = 0 OR LEN(umbauNachPfade) = 0 THEN
+    IF LEN(opArt) = 0 OR LEN(umbauNach) = 0 THEN
         GUI_SET_TEXT(lblStatus, tr$("Nachbessern: es liegt kein übernommener Umbau vor."))
         protokoll("umbau nachbessern 0")
         RETURN
     END IF
     umbauZiele = []
     DIM k AS INTEGER
-    FOR k = 0 TO LEN(umbauNachPfade) - 1
-        ARRAY_PUSH(umbauZiele, NEW UmbauZiel(umbauNachTabs[k], umbauNachPfade[k], ""))
+    FOR k = 0 TO LEN(umbauNach) - 1
+        ARRAY_PUSH(umbauZiele, NEW UmbauZiel(umbauNach[k].tab, umbauNach[k].pfad, ""))
     NEXT
     umbauMeldung = "Nachgebessert: " + umbauNachWas
     umbauProt = "umbau nachgebessert " + STR$(LEN(umbauZiele))
@@ -12859,11 +13002,10 @@ SUB umbauSchreiben()
     symSchluessel = "-"
     ' Fuer das Nachbessern merken -- die Schritte selbst bleiben ohnehin
     ' stehen, nur die Zuordnung zu den Dateien geht mit umbauLeeren weg.
-    umbauNachTabs = [] : umbauNachPfade = [] : umbauNachWas = umbauMeldung
+    umbauNach = [] : umbauNachWas = umbauMeldung
     DIM nk AS INTEGER
     FOR nk = 0 TO LEN(umbauZiele) - 1
-        ARRAY_PUSH(umbauNachTabs, umbauZiele[nk].tab)
-        ARRAY_PUSH(umbauNachPfade, umbauZiele[nk].pfad)
+        ARRAY_PUSH(umbauNach, NEW UmbauZiel(umbauZiele[nk].tab, umbauZiele[nk].pfad, ""))
     NEXT
     IF abgelehnt = "" THEN
         GUI_SET_TEXT(lblStatus, umbauMeldung)
@@ -14020,10 +14162,10 @@ END SUB
 ' --- Kontextmenues von Code-Feld und Reiterleiste ------------------------
 SUB kontextNachziehen()
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(ctxItems) - 1
-        IF GUI_CLICKED(ctxItems[i]) THEN
-            protokoll("kontext " + ctxKennung[i])
-            befehl(ctxKennung[i])
+    FOR i = 0 TO LEN(ctxEintraege) - 1
+        IF GUI_CLICKED(ctxEintraege[i].item) THEN
+            protokoll("kontext " + ctxEintraege[i].kennung)
+            befehl(ctxEintraege[i].kennung)
         END IF
     NEXT
     ' Das Menue dem Code-Feld unter der Maus geben (nur wenn es wechselt).
@@ -15434,9 +15576,9 @@ SUB profilAnzeigen(zeile AS STRING)
     ' Wer wissen will, welcher Weg der heisse ist, sieht es dann im Baum,
     ' statt Aufrufstellen und Profil im Kopf zusammenzubringen.
     profDatei = prozessDatei
-    profZeilen = [] : profAnzahl = []
+    profHier = []
     FOR i = 0 TO n - 1
-        IF profMessung[i].datei = prozessDatei THEN ARRAY_PUSH(profZeilen, profMessung[i].zeile) : ARRAY_PUSH(profAnzahl, profMessung[i].anzahl)
+        IF profMessung[i].datei = prozessDatei THEN ARRAY_PUSH(profHier, profMessung[i])
     NEXT
     GUI_SET_TEXT(lblProfil, BASENAME(prozessDatei) + ": " + FORMAT$(gesamt * 1000.0, "%.2f") + tr$(" ms gesamt, ") + STR$(n) + tr$(" Zeilen gemessen"))
     IF JSON_HAS(j, "error") THEN
@@ -17773,8 +17915,8 @@ SUB pluginStoppen(k AS INTEGER, zustand AS STRING)
     NEXT
     ' Ein Menue wird Eintraege nicht wieder los -- gesperrt, und ein Neustart
     ' gibt sie frei (pluginKontextAnmelden).
-    FOR i = 0 TO LEN(ctxKennung) - 1
-        IF LEFT$(ctxKennung[i], LEN(vor)) = vor THEN GUI_MENU_ENABLE(ctxItems[i], FALSE)
+    FOR i = 0 TO LEN(ctxEintraege) - 1
+        IF LEFT$(ctxEintraege[i].kennung, LEN(vor)) = vor THEN GUI_MENU_ENABLE(ctxEintraege[i].item, FALSE)
     NEXT
     DIM lv AS STRING : lv = "plugin." + plugins[k].name + "."
     FOR i = 0 TO LEN(plugLeisten) - 1
@@ -18131,10 +18273,10 @@ END FUNCTION
 SUB pluginKontextAnmelden(k AS INTEGER, j AS JSON_HANDLE)
     DIM kennung AS STRING : kennung = "plugin:" + plugins[k].name + ":" + plugText$(j, "id")
     DIM titel AS STRING : titel = plugText$(j, "titel")
-    DIM i AS INTEGER : i = ARRAY_INDEXOF(ctxKennung, kennung)
+    DIM i AS INTEGER : i = ctxNr(kennung)
     IF i >= 0 THEN
-        GUI_MENU_ENABLE(ctxItems[i], TRUE)
-        GUI_MENU_TEXT(ctxItems[i], titel)
+        GUI_MENU_ENABLE(ctxEintraege[i].item, TRUE)
+        GUI_MENU_TEXT(ctxEintraege[i].item, titel)
         RETURN
     END IF
     IF NOT plugKontextTrenner THEN

@@ -15,17 +15,17 @@ IF prBild = 40 THEN
     testLaufStarten([projektOrdner], [""])
     prSchritt = 1
 END IF
-IF prSchritt = 1 AND testProz < 0 AND LEN(testZiele) = 0 THEN
+IF prSchritt = 1 AND testProz < 0 AND LEN(testLaeufe) = 0 THEN
     testFehlgeschlageneAusfuehren()
     prSchritt = 2
 END IF
-IF prSchritt = 2 AND testProz < 0 AND LEN(testZiele) = 0 THEN
+IF prSchritt = 2 AND testProz < 0 AND LEN(testLaeufe) = 0 THEN
     ' den Fehler beheben und die roten noch einmal laufen lassen
     WRITEALL(PATHJOIN(projektOrdner, "eins.dhtest"), REPLACE$(dateiLesen(PATHJOIN(projektOrdner, "eins.dhtest")), "--- erwartet" + NL + "5", "--- erwartet" + NL + "4"))
     testFehlgeschlageneAusfuehren()
     prSchritt = 3
 END IF
-IF prSchritt = 3 AND testProz < 0 AND LEN(testZiele) = 0 THEN
+IF prSchritt = 3 AND testProz < 0 AND LEN(testLaeufe) = 0 THEN
     testFehlgeschlageneAusfuehren()
     EXIT(0)
 END IF

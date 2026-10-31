@@ -287,6 +287,10 @@ Den gewählten Vorspann jetzt abspielen (eine Taste oder ein Klick bricht ab)	Pl
 Kästchen im Projektbaum (Suche/Umbau begrenzen)	Checkboxes in project tree (limit search/refactoring)
 Schriftzug schwach hinter dem Code	Faint logo behind the code
 Schrift der Oberfläche	Interface font
+Größe der Oberfläche	Interface size
+Wie das System	As the system
+Jetzt: 	Now: 
+ -- nach dem Neustart: 	 -- after restart: 
 Schriftgröße	Font size
 Schrift der Listen	List font
 Schrift des Handbuchs	Manual font

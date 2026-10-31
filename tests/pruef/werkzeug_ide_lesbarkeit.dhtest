@@ -132,6 +132,73 @@ DH_IDE_KONFIG=ide.json
 --- erwartet
 listen 12 handbuch 24
 
+=== der massstab steht in den einstellungen und gilt ab dem neustart
+' Fest 1,0 in der Datei, damit die Skalierung dieses Rechners nicht mitredet.
+' Die Ausgabe des Laufs geht in eine Datei -- mit `--- nachher` zaehlt nur
+' dessen Ausgabe.
+DIM prAus AS STRING : prAus = ""
+einstellungenZeigen()
+prAus = prAus + "vorgabe " + STR$(GUI_DROPDOWN_SELECTED(ddMass)) + " " + GUI_TEXT(lblMassHinweis) + CHR$(10)
+GUI_DROPDOWN_SET_SELECTED(ddMass, 3)
+einstellungenNachziehen()
+prAus = prAus + "gewaehlt " + STR$(massEinst) + " wirksam " + STR$(uiMassstab) + " " + STR$(GUI_SCALE_GET()) + CHR$(10)
+prAus = prAus + GUI_TEXT(lblMassHinweis) + CHR$(10)
+prAus = prAus + "unter der schrift " + STR$(GUI_GET_Y(ddMass) >= GUI_GET_Y(spUi) + GUI_GET_H(spUi)) + CHR$(10)
+prAus = prAus + "hinweis darunter " + STR$(GUI_GET_Y(lblMassHinweis) >= GUI_GET_Y(ddMass) + GUI_GET_H(ddMass)) + CHR$(10)
+prAus = prAus + "im fenster " + STR$(GUI_GET_X(ddMass) + GUI_GET_W(ddMass) <= GUI_WINDOW_GET_W(winEinst)) + CHR$(10)
+WRITEALL("aus.txt", prAus)
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- datei _programm/ide.json
+{"massstab": 1.0}
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- nachher
+IMPORT "json"
+DIM a AS ARRAY OF STRING : a = READLINES("_programm/aus.txt")
+DIM k AS INTEGER
+FOR k = 0 TO LEN(a) - 1
+    PRINT a[k]
+NEXT
+DIM j AS JSON_HANDLE : j = JSON_LOAD("_programm/ide.json")
+PRINT "gesichert "; JSON_GET_FLOAT(j, "massstab")
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 9) = "massstab " THEN PRINT L[i]
+NEXT
+--- erwartet
+vorgabe 1 Jetzt: 100 %
+gewaehlt 1.5 wirksam 1.0 1.0
+Jetzt: 100 % -- nach dem Neustart: 150 %
+unter der schrift TRUE
+hinweis darunter TRUE
+im fenster TRUE
+gesichert 1.5
+massstab 1.50
+
+=== ein gesicherter massstab gilt beim naechsten start
+einstellungenZeigen()
+PRINT "wirksam "; uiMassstab; " "; GUI_SCALE_GET(); " stufe "; GUI_DROPDOWN_SELECTED(ddMass)
+PRINT GUI_TEXT(lblMassHinweis)
+' Ein krummer Wert von Hand faellt auf die naechste Stufe.
+PRINT "1,4 -> "; massStufe(1.4); "  0 -> "; massStufe(0.0); "  9 -> "; massStufe(9.0)
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- datei _programm/ide.json
+{"massstab": 1.25}
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- erwartet
+wirksam 1.25 1.25 stufe 2
+Jetzt: 125 %
+1,4 -> 3  0 -> 0  9 -> 7
+
 === umlaute in der oberflaeche, die suche nimmt beide schreibweisen
 PRINT "knopf "; GUI_TEXT(btnWkOeffnen)
 PRINT "oe trifft "; passtUnscharf("Datei öffnen", "oeffnen")

@@ -302,7 +302,10 @@ bekäme. Diese Bausteine kamen mit ihr:
   auch, wen sie überschreibt ("überschreibt Tier.gehen", "füllt Tier.laut
   aus" für eine nur angekündigte) und wo sie überschrieben wird
   ("überschrieben in Hund, Welpe", "ausgefüllt in Hund", "nirgends
-  ausgefüllt") -- gerechnet über die Klassen der Datei (`CODE_CLASSES$`).
+  ausgefüllt") -- gerechnet über die Klassen der Datei und der übrigen
+  Projektdateien (`CODE_CLASSES$`); steht die Vorfahrin woanders, nennt der
+  Hinweis die Datei ("überschreibt Tier.gehen (tiere.dh)"). Heißt eine
+  Klasse einer anderen Datei wie eine eigene, gilt die eigene.
   Die Gliederung nennt die Oberklasse (`class Hund : Tier`) und markiert
   ABSTRACT-Methoden. Zu "NEW KATZE: die Klasse kündigt ... an" bietet Strg+.
   **Fehlende Methoden einfügen** an: ihre Kopfzeilen aus der Ankündigung mit
@@ -313,6 +316,8 @@ bekäme. Diese Bausteine kamen mit ihr:
   Bildschirm-Skalierung des Systems (`WINDOW_DPI_X`, auf Viertel gerundet),
   auf einem Schirm mit 150 % ist die IDE also anderthalbmal so groß. Er gilt
   ab dem nächsten Start (`GUI_SCALE` muss vor dem ersten Fenster stehen).
+  Einzustellen auch unter Einstellungen → "Größe der Oberfläche"; darunter
+  steht, was jetzt gilt und was nach dem Neustart gilt.
 - **Prüfsammlungen** (Ausführen → Prüfsammlung ausführen, Strg+Alt+F5): `dhrt
   test` über die `.dhtest` im Reiter (sonst über den Projektordner), die
   Ausgabe läuft mit; jeder fehlgeschlagene Fall steht mit Datei und Zeile in

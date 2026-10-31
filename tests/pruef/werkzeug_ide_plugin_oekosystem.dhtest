@@ -129,7 +129,7 @@ IF prSchritt = 0 AND prB > 10 THEN
     prSchritt = 1
 END IF
 ' Gestartet: Befehl, Kontext und Leiste sind angemeldet.
-IF prSchritt = 1 AND pluginBefehlNr("plugin:probe:zaehlen") >= 0 AND ARRAY_INDEXOF(ctxKennung, "plugin:probe:zaehlen") >= 0 AND LEN(plugLeisten) > 0 THEN
+IF prSchritt = 1 AND pluginBefehlNr("plugin:probe:zaehlen") >= 0 AND ctxNr("plugin:probe:zaehlen") >= 0 AND LEN(plugLeisten) > 0 THEN
     ' Die Marke auf "zaehlen" in "SUB zaehlen()" (Zeile 5), dann der Befehl.
     GUI_TEXTAREA_GOTO(aktivesFeld(), 5, 7)
     befehl("plugin:probe:zaehlen")
