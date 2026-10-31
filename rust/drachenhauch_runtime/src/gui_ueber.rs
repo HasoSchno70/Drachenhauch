@@ -351,6 +351,16 @@ impl Gui {
     /// Wie viel Platz die Sinnbilder links und rechts im Textfeld nehmen --
     /// die EINE Stelle fuer Zeichnen, Klick, Schreibmarke und Rollen.
     pub(super) fn ti_rand(&self, w: &Widget) -> (i32, i32) {
+        let (l, r) = self.ti_symbole(w);
+        // Ein Innenabstand aus der Stildatei ersetzt die 5 Punkte, mit denen
+        // der Text sonst vom Rand absteht -- auf beiden Seiten.
+        match self.w_abstand(w) {
+            Some((_, h)) => (l + h - 5, r + h - 5),
+            None => (l, r),
+        }
+    }
+    /// Nur der Platz der Sinnbilder (fuer Treffer und Zeichnen der Sinnbilder).
+    pub(super) fn ti_symbole(&self, w: &Widget) -> (i32, i32) {
         let Some(z) = w.feld.as_ref() else { return (0, 0) };
         let b = self.sk(FELD_SYMBOL_B);
         let l = if z.suche || !z.icon[0].is_empty() { b } else { 0 };
@@ -366,7 +376,7 @@ impl Gui {
         let Some(z) = w.feld.as_ref() else { return 0 };
         let (ax, ay, fw, fh) = self.abs_rect(wi, w);
         if my < ay || my >= ay + fh { return 0; }
-        let (l, r) = self.ti_rand(w);
+        let (l, r) = self.ti_symbole(w);
         if l > 0 && mx >= ax && mx < ax + l { return 1; }
         if r > 0 && mx >= ax + fw - r && mx < ax + fw {
             if z.suche && z.icon[1].is_empty() && w.text.is_empty() { return 0; }
@@ -872,7 +882,7 @@ impl Gui {
     /// Die Sinnbilder im Textfeld (aus `zeichne_textfeld`).
     pub(super) fn feld_symbole_zeichnen(&self, g: &mut Graphics, wdg: &Widget, ax: i32, ay: i32, w: i32, h: i32) {
         if wdg.feld.is_none() { return; }
-        let (l, r) = self.ti_rand(wdg);
+        let (l, r) = self.ti_symbole(wdg);
         let s = self.sk(14);
         let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
         let leise = self.leise(self.wcol(wdg, "bg", "win_bg"));

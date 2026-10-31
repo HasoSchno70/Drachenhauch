@@ -660,8 +660,21 @@ folgen einem Themenwechsel. Die Knopfart zaehlt als Klasse. `GUI_GET_COLOR`
 liefert die Farbe des jetzigen Zustands ohne Ueberblenden (-1 = Thema).
 `.dhform` `name`/`klassen`. Tests `tests/pruef/gui_stildatei.dhtest` (12;
 sechs Verfaelschungen fallen je in ihrem Fall), Rust-Tests in
-`gui_stil.rs`. Bewusst NICHT: Nachfahren-Selektoren, padding/Schatten/
-Verlauf je Widget, Uebergang je Regel, `window`-Selektor.
+`gui_stil.rs`. Bewusst NICHT: Nachfahren-Selektoren, Uebergang je
+Eigenschaft, `window`-Selektor. **Zweite Stufe (selber Tag): Form je
+Widget** -- `abstand`, `randbreite`, `schatten`, `verlauf`, `glanz`,
+`fase`, `uebergang` (englisch padding/border-width/shadow/gradient/gloss/
+bevel/transition), NUR in Regeln ohne fluechtigen Zustand (sonst Fehler
+mit Zeile). Ohne Umbau Art fuer Art: `form_jetzt` (Cell `FormStil`, in
+`draw_widget` neben `rad_jetzt` gesetzt) -> `m_form("gradient"|"gloss"|
+"bevel")` ersetzt ueberall `self.m(...)` dieser drei, die Randbreite zieht
+`flaeche` als Ringe nach innen; `schatten_zeichnen` vor dem Widget
+(gestaffelte runde Rechtecke, Deckkraft 0 = deckend beachten);
+`uebergaenge` nimmt je Widget `w_uebergang`; `abstand` wirkt im Mass nach
+Inhalt (Knopf exakt Text + 2 x Abstand, Feld-Hoehe) und im Textfeld ueber
+`ti_rand` (ersetzt die 5 Punkte Einzug -- ALLE Wege fragen ti_rand; die
+Sinnbilder selbst ueber `ti_symbole`). Tests sechs Faelle mehr in
+`gui_stildatei.dhtest` (18); sieben Verfaelschungen fallen je in ihrem Fall.
 
 **Bausteine** (2026-10-31, Paket 2): `gui_bausteine.rs`, Zusaetze je
 Widget in `Widget::bau` (`Bauzusatz`, nur bei Bedarf). Fliesslayout = Art 3

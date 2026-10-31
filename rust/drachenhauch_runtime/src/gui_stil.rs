@@ -22,6 +22,12 @@
 //! liegen als eigene Schichten daneben; gemischt wird beim Zeichnen ueber
 //! die Uebergaenge des Widgets (`ueber_t`, `fokus_t`, `druck_t`), so blendet
 //! eine Hover-Farbe ein, statt zu springen.
+//!
+//! Zweite Stufe: Form je Widget -- `abstand` (Innenabstand), `randbreite`,
+//! `schatten`, `verlauf`, `glanz`, `fase`, `uebergang`. Sie gelten nur in
+//! Regeln ohne fluechtigen Zustand (eine Form, die beim Ueberfahren springt,
+//! waere ein Wackeln) und gehen beim Zeichnen ueber `form_jetzt` in
+//! `flaeche`, so wie die Rundung ueber `rad_jetzt`.
 use super::*;
 
 /// Schichten der Aufloesung.
@@ -31,7 +37,7 @@ pub(super) const FOKUS: usize = 2;
 pub(super) const AKTIV: usize = 3;
 pub(super) const AUS: usize = 4;
 
-const EIGENSCHAFTEN: &str = "bg, fg, border, accent, radius, groesse, stil";
+const EIGENSCHAFTEN: &str = "bg, fg, border, accent, radius, groesse, stil, abstand, randbreite, schatten, verlauf, glanz, fase, uebergang";
 const ZUSTAENDE: &str = ":hover, :focus, :active, :disabled, :checked";
 
 /// Eine Farbe aus der Stildatei: fest oder ein Name des Themas (dann folgt
@@ -46,6 +52,28 @@ pub(super) struct StilWerte {
     radius: Option<i32>,
     groesse: Option<i32>,
     stil: Option<u8>,
+    /// Innenabstand (senkrecht, waagerecht) in logischen Punkten.
+    abstand: Option<(i32, i32)>,
+    randbreite: Option<i32>,
+    schatten: Option<Schatten>,
+    verlauf: Option<i32>,
+    glanz: Option<i32>,
+    fase: Option<i32>,
+    uebergang: Option<i32>,
+}
+
+/// Schlagschatten eines Widgets: Versatz, Weichheit, Farbe (ohne Farbe ein
+/// halbdurchsichtiges Schwarz). `weich` 0 und Versatz 0 = kein Schatten.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct Schatten { dx: i32, dy: i32, weich: i32, farbe: Option<StilFarbe> }
+
+/// Was `flaeche` beim Zeichnen eines Widgets statt der Metriken nimmt.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(super) struct FormStil {
+    pub verlauf: Option<i32>,
+    pub glanz: Option<i32>,
+    pub fase: Option<i32>,
+    pub rand: Option<i32>,
 }
 
 impl StilWerte {
@@ -62,6 +90,13 @@ impl StilWerte {
         if o.radius.is_some() { self.radius = o.radius; }
         if o.groesse.is_some() { self.groesse = o.groesse; }
         if o.stil.is_some() { self.stil = o.stil; }
+        if o.abstand.is_some() { self.abstand = o.abstand; }
+        if o.randbreite.is_some() { self.randbreite = o.randbreite; }
+        if o.schatten.is_some() { self.schatten = o.schatten.clone(); }
+        if o.verlauf.is_some() { self.verlauf = o.verlauf; }
+        if o.glanz.is_some() { self.glanz = o.glanz; }
+        if o.fase.is_some() { self.fase = o.fase; }
+        if o.uebergang.is_some() { self.uebergang = o.uebergang; }
     }
 }
 
@@ -199,6 +234,25 @@ fn zahl_lesen_stil(wert: &str, zeile: usize, was: &str, von: i32, bis: i32) -> R
     }
 }
 
+/// `schatten: weich` oder `schatten: dx dy weich [farbe]`.
+fn schatten_lesen(wert: &str, zeile: usize, thema: &dyn Fn(&str) -> bool) -> Result<Schatten, String> {
+    let teile: Vec<&str> = wert.split_whitespace().collect();
+    let zahl = |s: &str, was: &str, von: i32, bis: i32| zahl_lesen_stil(s, zeile, was, von, bis);
+    match teile.len() {
+        1 => {
+            let w = zahl(teile[0], "schatten", 0, 32)?;
+            Ok(Schatten { dx: 0, dy: if w > 0 { (w / 3).max(1) } else { 0 }, weich: w, farbe: None })
+        }
+        3 | 4 => Ok(Schatten {
+            dx: zahl(teile[0], "schatten (dx)", -32, 32)?,
+            dy: zahl(teile[1], "schatten (dy)", -32, 32)?,
+            weich: zahl(teile[2], "schatten (weich)", 0, 32)?,
+            farbe: match teile.get(3) { Some(f) => Some(farbe_lesen(f, zeile, thema)?), None => None },
+        }),
+        _ => Err(format!("Zeile {}: schatten erwartet 'weich' oder 'dx dy weich [farbe]', erhalten '{}'", zeile, wert)),
+    }
+}
+
 /// Eine Stildatei lesen. `thema` sagt, ob ein Name eine Farbe des Themas ist.
 pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildatei, String> {
     let t = ohne_kommentare(text)?;
@@ -218,6 +272,7 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
         let kopf_zeile = zeile_von(&t, pos + kopf.len() - kopf.trim_start().len());
         let selektoren: Vec<Selektor> = kopf.split(',')
             .map(|s| selektor_lesen(s, kopf_zeile)).collect::<Result<_, _>>()?;
+        let mit_zustand = selektoren.iter().any(|s| s.schicht != BASIS);
         let mut werte = StilWerte::default();
         let mut off = auf + 1;
         for decl in rumpf.split(|c| c == ';' || c == '\n') {
@@ -228,6 +283,12 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
             let (name, wert) = d.split_once(':').ok_or_else(|| format!("Zeile {}: '{}' -- erwartet eigenschaft: wert", zeile, d))?;
             let name = name.trim().to_lowercase();
             let wert = wert.trim();
+            let form = matches!(name.as_str(), "abstand" | "padding" | "innenabstand" | "randbreite" | "border-width"
+                | "border_width" | "schatten" | "shadow" | "verlauf" | "gradient" | "glanz" | "gloss" | "fase" | "bevel"
+                | "uebergang" | "transition");
+            if form && mit_zustand {
+                return Err(format!("Zeile {}: '{}' gilt nur in Regeln ohne :hover, :focus, :active, :disabled -- eine Form, die mit dem Zustand springt, waere ein Wackeln", zeile, name));
+            }
             match name.as_str() {
                 "bg" | "hintergrund" | "background" => werte.farben.push(("bg".into(), farbe_lesen(wert, zeile, thema)?)),
                 "fg" | "farbe" | "text" | "color" => werte.farben.push(("fg".into(), farbe_lesen(wert, zeile, thema)?)),
@@ -237,6 +298,21 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
                 "groesse" | "size" | "schriftgroesse" => werte.groesse = Some(zahl_lesen_stil(wert, zeile, "groesse", 4, 200)?),
                 "stil" | "style" | "schriftstil" => werte.stil = Some(crate::schnitt::stil_parsen(wert)
                     .map_err(|e| format!("Zeile {}: {}", zeile, e))?),
+                "abstand" | "padding" | "innenabstand" => {
+                    let teile: Vec<&str> = wert.split_whitespace().collect();
+                    let v = match teile.as_slice() {
+                        [a] => { let n = zahl_lesen_stil(a, zeile, "abstand", 0, 40)?; (n, n) }
+                        [a, b] => (zahl_lesen_stil(a, zeile, "abstand", 0, 40)?, zahl_lesen_stil(b, zeile, "abstand", 0, 40)?),
+                        _ => return Err(format!("Zeile {}: abstand erwartet eine oder zwei Zahlen (senkrecht waagerecht), erhalten '{}'", zeile, wert)),
+                    };
+                    werte.abstand = Some(v);
+                }
+                "randbreite" | "border-width" | "border_width" => werte.randbreite = Some(zahl_lesen_stil(wert, zeile, "randbreite", 0, 8)?),
+                "schatten" | "shadow" => werte.schatten = Some(schatten_lesen(wert, zeile, thema)?),
+                "verlauf" | "gradient" => werte.verlauf = Some(zahl_lesen_stil(wert, zeile, "verlauf", 0, 64)?),
+                "glanz" | "gloss" => werte.glanz = Some(zahl_lesen_stil(wert, zeile, "glanz", 0, 100)?),
+                "fase" | "bevel" => werte.fase = Some(zahl_lesen_stil(wert, zeile, "fase", 0, 1)?),
+                "uebergang" | "transition" => werte.uebergang = Some(zahl_lesen_stil(wert, zeile, "uebergang", 0, 2000)?),
                 _ => return Err(format!("Zeile {}: Eigenschaft '{}' gibt es nicht -- bekannt sind {}", zeile, name, EIGENSCHAFTEN)),
             }
         }
@@ -407,7 +483,46 @@ impl Gui {
         if w.stil != 0 { return w.stil; }
         w.stil_auf.as_ref().and_then(|s| s[BASIS].stil).unwrap_or(0)
     }
-    /// Eckenrundung aus der Stildatei, None = die Metrik.
+    /// Verlauf, Glanz, Fase und Randbreite aus der Stildatei (nichts gesetzt
+    /// = die Metriken).
+    pub(super) fn w_form(&self, w: &Widget) -> FormStil {
+        match w.stil_auf.as_ref() {
+            Some(s) => FormStil { verlauf: s[BASIS].verlauf, glanz: s[BASIS].glanz, fase: s[BASIS].fase,
+                                  rand: s[BASIS].randbreite.map(|r| if r > 0 { self.sk(r).max(1) } else { 0 }) },
+            None => FormStil::default(),
+        }
+    }
+    /// Innenabstand (senkrecht, waagerecht) in Bildpunkten, None = wie bisher.
+    pub(super) fn w_abstand(&self, w: &Widget) -> Option<(i32, i32)> {
+        w.stil_auf.as_ref().and_then(|s| s[BASIS].abstand).map(|(v, h)| (self.sk(v), self.sk(h)))
+    }
+    /// Schlagschatten (dx, dy, weich, farbe) in Bildpunkten.
+    pub(super) fn w_schatten(&self, w: &Widget) -> Option<(i32, i32, i32, i64)> {
+        let s = w.stil_auf.as_ref()?[BASIS].schatten.as_ref()?;
+        if s.weich == 0 && s.dx == 0 && s.dy == 0 { return None; }
+        let farbe = s.farbe.as_ref().map(|f| self.stil_wert(f)).unwrap_or(0x50000000);
+        Some((self.sk(s.dx), self.sk(s.dy), self.sk(s.weich), farbe))
+    }
+    /// Dauer der Uebergaenge dieses Widgets in ms, None = die Metrik.
+    pub(super) fn w_uebergang(w: &Widget) -> Option<i32> {
+        w.stil_auf.as_ref().and_then(|s| s[BASIS].uebergang)
+    }
+    /// Der Schlagschatten unter einem Widget: gestaffelte, nach aussen
+    /// blasser werdende Lagen -- raylib hat keinen Weichzeichner fuer Formen.
+    pub(super) fn schatten_zeichnen(&self, g: &mut Graphics, w: &Widget, x: i32, y: i32, b: i32, h: i32) {
+        let Some((dx, dy, weich, farbe)) = self.w_schatten(w) else { return };
+        let rad = self.w_radius(w).unwrap_or_else(|| self.m("corner_radius"));
+        // Deckkraft 0 heisst in dhrt DECKEND.
+        let a = match (farbe >> 24) & 0xFF { 0 => 255, a => a };
+        let rgb = farbe & 0xFF_FFFF;
+        let n = weich.clamp(1, 8);
+        for k in (0..n).rev() {
+            let e = if n == 1 { 0 } else { weich * k / (n - 1) };
+            let la = ((a as f64) * 1.6 / (n as f64 + 0.6)).round().clamp(1.0, 255.0) as i64;
+            g.round_rect(x + dx - e, y + dy - e, x + b - 1 + dx + e, y + h - 1 + dy + e, (rad + e).max(0),
+                         (la << 24) | rgb, true);
+        }
+    }
     pub(super) fn w_radius(&self, w: &Widget) -> Option<i32> {
         w.stil_auf.as_ref().and_then(|s| s[BASIS].radius).map(|r| self.sk(r))
     }

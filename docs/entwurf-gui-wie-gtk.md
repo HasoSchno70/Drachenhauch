@@ -93,10 +93,15 @@ getrennt vorziehen.
 ### Paket 4: Styling wie GTK-CSS (erste Stufe gebaut)
 
 Gebaut ist die erste Stufe: Stildatei mit Art, Klasse, Name und Zuständen,
-`bg`/`fg`/`border`/`accent`, `radius`, `groesse`, `stil`. Anders als hier
-geplant gibt es kein `padding`, `border-width`, `schatten` und `verlauf` je
-Widget (das braucht den Umbau der Zeichenwege Art für Art) und keinen
-`uebergang` je Regel; die Farben gehen über die vorhandenen Stellen
+`bg`/`fg`/`border`/`accent`, `radius`, `groesse`, `stil`. **Die zweite
+Stufe** (2026-10-31) bringt die Form je Widget: `abstand`, `randbreite`,
+`schatten`, `verlauf`, `glanz`, `fase`, `uebergang` -- ohne Umbau Art für
+Art: Verlauf, Glanz, Fase und Rand gehen über `flaeche` (wie die Rundung
+über `rad_jetzt`), der Schatten liegt unter jedem Widget, der Abstand
+wirkt im Mass nach Inhalt von Knopf und Feld und im Textfeld über
+`ti_rand`. Nur in Regeln ohne flüchtigen Zustand. Weiter offen:
+Nachfahren-Selektoren, Abstand für die übrigen Arten, Übergang je
+Eigenschaft; die Farben gehen über die vorhandenen Stellen
 (`wcol` und die eigenen Farben), das deckt alle Arten auf einmal. Neu dazu:
 `GUI_GET_COLOR`, damit sich die Auflösung ohne Bildlagen prüfen lässt.
 

@@ -3556,6 +3556,8 @@ pub struct Gui {
     /// Stildatei), None = die Metrik. Gesetzt in `draw_widget`, gelesen in
     /// `flaeche` -- so gilt sie fuer jede Flaeche des Widgets.
     rad_jetzt: std::cell::Cell<Option<i32>>,
+    /// Verlauf, Glanz, Fase und Rand des Widgets, das gerade gezeichnet wird.
+    form_jetzt: std::cell::Cell<stil::FormStil>,
     /// Alt-Buchstaben (GUI_MNEMONICS): `&` im Text markiert sie.
     mnemonics: bool,
     /// Markierbare Beschriftung: die, in der gerade gezogen wird, und die,
@@ -3657,7 +3659,7 @@ impl Gui {
             scroll_drag: None,
             was_mouse_down: false, zug_feld: None, frame_count: 0,
             theme: default_theme(), metrics: default_metrics(),
-            stil: None, stil_stand: 0, rad_jetzt: std::cell::Cell::new(None),
+            stil: None, stil_stand: 0, rad_jetzt: std::cell::Cell::new(None), form_jetzt: std::cell::Cell::new(stil::FormStil::default()),
             mnemonics: false, label_zug: None, label_wahl: None, gruppen: HashMap::new(), schriftwahl: Vec::new(),
             styles: HashMap::new(),
             pending: Vec::new(),
@@ -3708,6 +3710,13 @@ impl Gui {
     /// durch `add_widget` laeuft -- der skaliert selbst, und zweimal waere
     /// zweimal zu viel.
     fn m_roh(&self, k: &str) -> i32 { *self.metrics.get(k).unwrap_or(&0) }
+    /// Eine Plastik-Metrik fuer das Widget, das gerade gezeichnet wird: die
+    /// Stildatei (`verlauf`, `glanz`, `fase`) vor der Metrik.
+    fn m_form(&self, k: &str) -> i32 {
+        let f = self.form_jetzt.get();
+        let eigen = match k { "gradient" => f.verlauf, "gloss" => f.glanz, "bevel" => f.fase, _ => None };
+        eigen.unwrap_or_else(|| self.m(k))
+    }
     fn th(&self, k: &str) -> i64 { *self.theme.get(k).unwrap_or(&0) }
 
     /// Anzeige-Massstab setzen. Muss VOR dem ersten Fenster kommen: schon
@@ -11046,7 +11055,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             Kind::Card => (self.sk(200), self.sk(190)),
             Kind::Button => {
                 let icon = if w.sel >= 0 { self.sk(22) } else { 0 };
-                ((tw + icon + self.sk(24)).max(self.sk(28)), (sz + self.sk(12)).max(self.sk(26)))
+                match self.w_abstand(w) {
+                    // Mit Innenabstand: genau der Text samt Abstand, ohne Mindestmass.
+                    Some((v, h)) => (tw + icon + 2 * h, sz + 2 * v),
+                    None => ((tw + icon + self.sk(24)).max(self.sk(28)), (sz + self.sk(12)).max(self.sk(26))),
+                }
             }
             Kind::Checkbox | Kind::Radio => {
                 let cs = self.m("check_size");
@@ -11056,7 +11069,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let ph = self.m("check_size").max(self.sk(14));
                 (ph * 2 + self.sk(8) + tw, ph.max(sz))
             }
-            Kind::TextInput | Kind::Dropdown | Kind::Spinner => (if w.w > 0 { w.w } else { self.sk(160) }, sz + self.sk(12)),
+            Kind::TextInput | Kind::Dropdown | Kind::Spinner => (if w.w > 0 { w.w } else { self.sk(160) },
+                sz + 2 * self.w_abstand(w).map(|a| a.0).unwrap_or(self.sk(6))),
             _ => (if w.w > 0 { w.w } else { self.sk(100) }, if w.h > 0 { w.h } else { self.sk(24) }),
         }
     }
@@ -12577,7 +12591,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                fill: i64, border: i64, tief: bool) {
         let rad = self.rad_jetzt.get().unwrap_or_else(|| self.m("corner_radius"));
         let anteil = self.verlauf_anteil(y2 - y1);
-        let grad = (self.m("gradient") as f64 * anteil).round() as i32;
+        let grad = (self.m_form("gradient") as f64 * anteil).round() as i32;
         if grad > 0 {
             // Erhaben: hell oben, dunkel unten. Versenkt: genau umgekehrt --
             // so faellt das Licht scheinbar weiter von oben ein, die Flaeche
@@ -12597,10 +12611,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             g.box_fill(x1, y1, x2, y2, fill);
         }
         self.bevel(g, x1, y1, x2, y2, rad, tief);
-        if rad > 0 {
-            g.round_rect(x1, y1, x2, y2, rad, border, false);
-        } else {
-            g.rect(x1, y1, x2, y2, border);
+        // Randbreite aus der Stildatei: 0 = kein Rand, mehr = Ringe nach innen.
+        let breite = self.form_jetzt.get().rand.unwrap_or(1);
+        for k in 0..breite.min((x2 - x1).min(y2 - y1) / 2) {
+            if rad > 0 {
+                g.round_rect(x1 + k, y1 + k, x2 - k, y2 - k, (rad - k).max(0), border, false);
+            } else {
+                g.rect(x1 + k, y1 + k, x2 - k, y2 - k, border);
+            }
         }
     }
 
@@ -12609,7 +12627,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// blosser Verlauf sieht weiterhin flach aus.
     fn gloss(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32, rad: i32,
              anteil: f64) {
-        let s = (self.m("gloss") as f64 * anteil).round() as i32;
+        let s = (self.m_form("gloss") as f64 * anteil).round() as i32;
         let h = y2 - y1;
         if s <= 0 || h < 4 {
             return;
@@ -12647,7 +12665,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// gestaffelte Ringe sind die Naeherung, die ohne Textur auskommt.
     fn knauf(&self, g: &mut Graphics, cx: i32, cy: i32, r: i32, grund: i64) {
         let r = r.max(2);
-        if self.m("gradient") <= 0 {
+        if self.m_form("gradient") <= 0 {
             g.circle(cx, cy, r, grund);
             return;
         }
@@ -12671,7 +12689,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// mit der groessten Wirkung -- sie trennt die Flaeche sichtbar vom
     /// Untergrund.
     fn bevel(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32, rad: i32, tief: bool) {
-        if self.m("bevel") <= 0 || x2 - x1 < 4 {
+        if self.m_form("bevel") <= 0 || x2 - x1 < 4 {
             return;
         }
         let ein = rad.max(1);
@@ -12760,6 +12778,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         for (wi, win) in self.windows.iter_mut().enumerate() {
             for (i, wdg) in win.widgets.iter_mut().enumerate() {
+                // Eine eigene Dauer aus der Stildatei (`uebergang`).
+                let schritt = match Self::w_uebergang(wdg) {
+                    Some(d) if d > 0 => (dt as f32 * 1000.0 / d as f32).clamp(0.0, 1.0),
+                    Some(_) => 1.0,
+                    None => schritt,
+                };
                 naeher(&mut wdg.ueber_t, if wdg.hovered && wdg.enabled { 1.0 } else { 0.0 }, schritt);
                 if druck == Some((wi, i)) { wdg.druck_t = 1.0; } else { naeher(&mut wdg.druck_t, 0.0, schritt); }
                 if fokus == Some((wi, i)) { wdg.fokus_t = 1.0; } else { naeher(&mut wdg.fokus_t, 0.0, schritt); }
@@ -19737,7 +19761,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     fn draw_widget(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget) {
         // Die Rundung aus der Stildatei gilt fuer jede Flaeche dieses Widgets.
         let vorher = self.rad_jetzt.replace(self.w_radius(wdg));
+        let form_vorher = self.form_jetzt.replace(self.w_form(wdg));
+        if wdg.stil_auf.is_some() {
+            let (ax, ay, w, h) = self.abs_rect(wi, wdg);
+            self.schatten_zeichnen(g, wdg, ax, ay, w, h);
+        }
         self.draw_widget_innen(g, wi, idx, wdg);
+        self.form_jetzt.set(form_vorher);
         self.rad_jetzt.set(vorher);
     }
 
@@ -19803,7 +19833,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     let grund = self.wcol(wdg, "bg", "widget_bg");
                     let bg = mischen(mischen(grund, shade(grund, 30), eh), shade(grund, -30), ed);
                     let r = (w.min(h) / 2).max(2);
-                    let gr = self.m("gradient");
+                    let gr = self.m_form("gradient");
                     if gr > 0 {
                         g.round_gradient(ax, ay, ax + w - 1, ay + h - 1, r, shade(bg, gr), shade(bg, -gr));
                         self.gloss(g, ax, ay, ax + w - 1, ay + h - 1, r, self.verlauf_anteil(h));
@@ -19922,7 +19952,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 if self.modern() {
                     // Gerundetes Kaestchen; gefuellt + Haekchen wenn aktiv.
                     if wdg.checked {
-                        if self.m("gradient") > 0 {
+                        if self.m_form("gradient") > 0 {
                             g.round_gradient(ax, ay, ax + w - 1, ay + h - 1, 3,
                                              shade(acc, 26), shade(acc, -22));
                             self.gloss(g, ax, ay, ax + w - 1, ay + h - 1, 3, self.verlauf_anteil(h));
@@ -19955,7 +19985,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let span = wdg.max - wdg.min;
                 let ratio = if span != 0.0 { (wdg.value - wdg.min) / span } else { 0.0 };
                 let acc = self.acc_col(wdg);
-                if self.m("gradient") > 0 {
+                if self.m_form("gradient") > 0 {
                     // Rinne: schmal und versenkt. Der zurueckgelegte Teil wird
                     // in der Akzentfarbe gefuellt -- so ist der Wert auch ohne
                     // Zahl ablesbar.
@@ -20685,7 +20715,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 // Streifen: ein ruhiger Verlauf wie eine Flaeche, aber ohne
                 // Rahmen ringsum -- nur die Unterkante trennt ihn vom Inhalt.
                 let bg = self.th("win_bg");
-                let grad = (self.m("gradient") as f64 * self.verlauf_anteil(h) * 0.6).round() as i32;
+                let grad = (self.m_form("gradient") as f64 * self.verlauf_anteil(h) * 0.6).round() as i32;
                 if grad > 0 {
                     g.round_gradient(ax, ay, ax + w - 1, ay + h - 1, 0, shade(bg, 8 + grad), shade(bg, 4 - grad / 2));
                 } else {
@@ -21600,7 +21630,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let span = wdg.max - wdg.min;
         let ratio = if span != 0.0 { ((wdg.value - wdg.min) / span).clamp(0.0, 1.0) } else { 0.0 };
         let acc = self.acc_col(wdg);
-        if self.m("gradient") > 0 {
+        if self.m_form("gradient") > 0 {
             let (tx, tr) = (ax + w / 2 - 3, ax + w / 2 + 3);
             self.fbox_tief(g, tx, ay, tr, ay + h - 1,
                            self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
