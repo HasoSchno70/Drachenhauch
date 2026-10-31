@@ -648,7 +648,7 @@
   "GUI_FILETREE_SKIP": "Namen oder Muster, die er überspringt — Ordner wie Dateien (target;__pycache__;_*)",
   "GUI_FOCUS": "Tastatur-Fokus setzen (z.B. auf ein TextInput); GUI_FOCUS(-1) gibt ihn frei, die Tasten gehören dann dem Programm",
   "GUI_FOCUSED": "welches Widget hat den Tastatur-Fokus? (-1 = keins)",
-  "GUI_FONT": "die eigene Schrift der ganzen gui: gemessen und gezeichnet wird mit ihr, egal welche Schrift das Programm gerade mit SETFONT aktiv hat (ohne groesse die aktuelle Textgröße); -1 = wieder die aktive des Programms",
+  "GUI_FONT": "die eigene Schrift der ganzen gui: gemessen und gezeichnet wird mit ihr, egal welche Schrift das Programm gerade mit SETFONT aktiv hat (ohne groesse die aktuelle Textgröße); -1 = die aktive des Programms, auch die Pixelschrift (ohne GUI_FONT und ohne SETFONT nimmt die gui die eingebaute Sans)",
   "GUI_FONT_DIALOG": "GUI_WINDOW — modale Schriftwahl: Suchfeld, Liste der Systemschriften, Größe, Vorschau; Antwort über GUI_ANSWER",
   "GUI_FONT_DIALOG_PATH$": "STRING — die gewählte Schrift -- für LOADFONT (auch nach der Antwort lesbar)",
   "GUI_FONT_DIALOG_SIZE": "INTEGER — die gewählte Größe",

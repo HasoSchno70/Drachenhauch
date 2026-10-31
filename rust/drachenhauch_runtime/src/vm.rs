@@ -964,6 +964,12 @@ pub struct Vm<'p> {
     /// des Befehls, bei GUI_UPDATE schon VOR den Rueckrufen (die sind
     /// Programmcode und sollen dessen Schrift sehen).
     gui_tausch: Option<(i64, i32)>,
+    /// Die eingebaute Sans als Vorgabe der gui (einmal geladen; -2 = es gibt
+    /// keine, etwa ohne das Feature `schriften`).
+    gui_sans: Option<i64>,
+    /// GUI_FONT(-1): die gui folgt ausdruecklich der Schrift des Programms,
+    /// auch der Pixelschrift.
+    gui_pixel: bool,
     // Sprachausgabe (SPEAK): Stimme, Tempo, Vorrat, geplantes Ende.
     #[cfg(feature = "graphics")]
     sprecher: crate::sprache::Sprecher,
@@ -1164,6 +1170,8 @@ impl<'p> Vm<'p> {
             #[cfg(feature = "graphics")]
             gui: crate::gui::Gui::new(),
             gui_tausch: None,
+            gui_sans: None,
+            gui_pixel: false,
             #[cfg(feature = "graphics")]
             sprecher: crate::sprache::Sprecher::new(),
             #[cfg(feature = "db")]
@@ -7694,8 +7702,18 @@ impl<'p> Vm<'p> {
     fn try_gui(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !name.starts_with("gui_") { return Ok(None); }
         if name == "gui_font" || name == "gui_font_get" { return self.gui_font_befehl(name, a).map(Some); }
+        // Ohne eigene Schrift der gui und ohne SETFONT des Programms nimmt die
+        // gui die eingebaute Sans in der Textgroesse des Programms -- die
+        // Pixelschrift von raylib sieht nach 1990 aus, nicht nach einer
+        // Anwendung. GUI_FONT(-1) holt sie ausdruecklich zurueck.
+        let pixel = self.gui_pixel;
+        let sans = &mut self.gui_sans;
         self.gui_tausch = match (self.gui.schrift, self.gfx.as_mut()) {
             (Some((f, n)), Some(g)) => Some(g.schrift_tauschen(f, n)),
+            (None, Some(g)) if !pixel && g.active_font() == -1 => {
+                let h = *sans.get_or_insert_with(|| g.load_font("sans", 40).unwrap_or(-2));
+                if h >= 0 { let n = g.text_height(); Some(g.schrift_tauschen(h, n)) } else { None }
+            }
             _ => None,
         };
         let r = self.try_gui_innen(name, a);
@@ -7708,9 +7726,10 @@ impl<'p> Vm<'p> {
         if let (Some((f, n)), Some(g)) = (self.gui_tausch.take(), self.gfx.as_mut()) { g.schrift_tauschen(f, n); }
     }
 
-    /// GUI_FONT(font [, groesse]): die eigene Schrift der gui; -1 = wieder
-    /// die aktive des Programms. GUI_FONT_GET() -> TUPLE (font, groesse),
-    /// (-1, 0) ohne eigene.
+    /// GUI_FONT(font [, groesse]): die eigene Schrift der gui; -1 = die
+    /// aktive des Programms, auch die Pixelschrift (ohne GUI_FONT nimmt die
+    /// gui sonst die eingebaute Sans). GUI_FONT_GET() -> TUPLE (font,
+    /// groesse), (-1, 0) ohne eigene.
     #[cfg(feature = "graphics")]
     fn gui_font_befehl(&mut self, name: &str, a: &[Value]) -> R<Value> {
         if name == "gui_font_get" {
@@ -7719,7 +7738,7 @@ impl<'p> Vm<'p> {
         }
         let f = match a.first() { Some(Value::Int(n)) => *n,
             _ => return Err("GUI_FONT: erwartet ein Font-Handle (LOADFONT) oder -1 (Arg 1)".into()) };
-        if f < 0 { self.gui.schrift = None; return Ok(Value::Nil); }
+        if f < 0 { self.gui.schrift = None; self.gui_pixel = true; return Ok(Value::Nil); }
         let g = self.gfx.as_ref().ok_or("GUI_FONT: vor SCREEN aufgerufen")?;
         if !g.font_gueltig(f) { return Err(format!("GUI_FONT: {} ist kein geladener Font", f)); }
         let n = match a.get(1) {
@@ -7729,6 +7748,7 @@ impl<'p> Vm<'p> {
             _ => return Err("GUI_FONT: erwartet eine Groesse 4..400 (Arg 2)".into()),
         };
         self.gui.schrift = Some((f, n));
+        self.gui_pixel = false;
         Ok(Value::Nil)
     }
 

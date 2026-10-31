@@ -114,6 +114,7 @@ GUI_TEXTAREA_SELECT_COLUMNS: leerer Bereich
 ' beginnt bei x = 20, eine Zeile ist 25 Punkte hoch, ein Zeichen gut 7 breit.
 IMPORT "gui"
 SCREEN(600, 400, "S", 1)
+GUI_FONT(-1)   ' Lagen und Masse sind mit der Pixelschrift gemessen
 SET_WINDOW_POS(-3000, -3000)
 AUTOMATION_PLAY("ev.txt")
 DIM w AS GUI_WINDOW
