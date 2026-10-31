@@ -3827,6 +3827,64 @@ and then moves on instead of skipping a piece. A second call
 of `GUI_WINDOW_GLOW` starts from the beginning. The IDE shows it at startup
 and when a program starts.
 
+## Spell checking
+
+```basic
+IMPORT "gui"
+SCREEN(640, 300, "Notiz", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Notiz", 0, 0, 640, 300)
+DIM text AS GUI_WIDGET : text = GUI_TEXTAREA(w, 10, 10, 610, 240)
+GUI_TEXTAREA_SET(text, "umbruch", 1)
+DIM buch AS INTEGER : buch = SPELL_SYSTEM("de")
+GUI_SPELL(text, buch)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+```
+
+A text field or text area with `GUI_SPELL` draws a red squiggle under every
+word the dictionary does not know. It checks after a short pause (0.3 s)
+following the last change, not on every keystroke -- otherwise every
+half-typed word would carry a squiggle. Until then the old squiggles move
+with the text, and those in the changed part disappear. A right-click on a
+misspelled word opens a menu with suggestions and "ignore", Shift+F10 opens
+it at the caret; it takes precedence over a context menu of the program. A
+chosen suggestion is a step of its own for Ctrl+Z and reports like typed
+text (`on_change`). A password field never checks.
+
+The dictionary comes from the system or from files. On Windows
+`SPELL_SYSTEM` is the Windows spell checker with the languages installed
+there; on Linux and macOS it uses Hunspell dictionaries (`.dic` + `.aff`)
+from `~/.local/share/hunspell`, `/usr/share/hunspell` and
+`/usr/share/myspell` (on Linux for instance the package `hunspell-en-us`).
+The environment variable `DHRT_WOERTERBUECHER` names your own folders and
+takes precedence on every system -- then Windows uses the files too.
+`SPELL_LOAD` loads a Hunspell dictionary directly, for instance one a
+program ships with.
+
+The commands without a window also work in a console program:
+
+| Command | What it does |
+|---|---|
+| `SPELL_SYSTEM(sprache$)` | System dictionary for a language ("de-DE", "en-US"; "en" takes the first English one) -> handle |
+| `SPELL_LOAD(dic$ [, aff$])` | Hunspell dictionary from files (without `aff$` the `.aff` next to it) -> handle |
+| `SPELL_LANGUAGES()` | Languages for which `SPELL_SYSTEM` has a dictionary |
+| `SPELL_LANGUAGE$(h)` | Language of a dictionary |
+| `SPELL_CHECK(h, wort$)` | Is the word spelled correctly? |
+| `SPELL_SUGGEST(h, wort$ [, max])` | Suggestions for a word (at most 8 by default) |
+| `SPELL_IGNORE(h, wort$)` | The word counts as correct for the rest of the run |
+| `SPELL_ERRORS(h, text$)` | Misspelled words of a text as TUPLE (starts, lengths) in characters from 0 |
+| `SPELL_FREE(h)` | Release a dictionary; fields checking with it stop |
+| `GUI_SPELL(feld, h)` | Check a text field or text area with this dictionary, -1 turns it off |
+| `GUI_SPELL_COUNT(feld)` | How many words are currently marked as misspelled |
+
+A word is letters, plus an apostrophe between two letters; the Hunspell
+path does not check single letters and numbers. The Windows checker splits
+the text itself and also reports repeated words.
+
 ## Building blocks: flow layout, Alt letters, marks
 
 ```basic

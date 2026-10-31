@@ -1952,6 +1952,49 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 Err(_) => err("DECOMPRESS$: entpackte Bytes sind kein gueltiges UTF-8".to_string()),
             }
         }
+        // Rechtschreibung (rechtschreibung.rs): ein Woerterbuch ist ein Handle.
+        "spell_load" => {
+            arity!(1, 2);
+            let dic = need_str(&a[0], "SPELL_LOAD")?;
+            let aff = if a.len() > 1 { need_str(&a[1], "SPELL_LOAD")? } else { "" };
+            Ok(Value::Int(crate::rechtschreibung::laden(dic, aff)?))
+        }
+        "spell_system" => {
+            arity!(1);
+            Ok(Value::Int(crate::rechtschreibung::system(need_str(&a[0], "SPELL_SYSTEM")?)?))
+        }
+        "spell_languages" => { arity!(0); Ok(new_str_array(crate::rechtschreibung::sprachen())) }
+        "spell_language$" | "spell_language" => {
+            arity!(1);
+            Ok(Value::str_rc(crate::rechtschreibung::sprache(need_int(&a[0], "SPELL_LANGUAGE$")?)?))
+        }
+        "spell_check" => {
+            arity!(2);
+            Ok(Value::Bool(crate::rechtschreibung::pruefen(need_int(&a[0], "SPELL_CHECK")?, need_str(&a[1], "SPELL_CHECK")?)?))
+        }
+        "spell_suggest" => {
+            arity!(2, 3);
+            let max = if a.len() > 2 { need_int(&a[2], "SPELL_SUGGEST")? } else { 8 };
+            if max < 1 { return err(format!("SPELL_SUGGEST: hoechstens {} Vorschlaege -- erwartet 1 oder mehr", max)); }
+            Ok(new_str_array(crate::rechtschreibung::vorschlaege(need_int(&a[0], "SPELL_SUGGEST")?, need_str(&a[1], "SPELL_SUGGEST")?, max as usize)?))
+        }
+        "spell_ignore" => {
+            arity!(2);
+            crate::rechtschreibung::ignorieren(need_int(&a[0], "SPELL_IGNORE")?, need_str(&a[1], "SPELL_IGNORE")?)?;
+            Ok(Value::Nil)
+        }
+        "spell_errors" => {
+            arity!(2);
+            let f = crate::rechtschreibung::fehler(need_int(&a[0], "SPELL_ERRORS")?, need_str(&a[1], "SPELL_ERRORS")?)?;
+            let starts = new_int_array(f.iter().map(|x| x.0 as i64).collect());
+            let laengen = new_int_array(f.iter().map(|x| x.1 as i64).collect());
+            Ok(Value::Tuple(Rc::new(vec![starts, laengen])))
+        }
+        "spell_free" => {
+            arity!(1);
+            crate::rechtschreibung::freigeben(need_int(&a[0], "SPELL_FREE")?);
+            Ok(Value::Nil)
+        }
         "crc32" => { arity!(1); Ok(Value::Int(crc32(need_str(&a[0], "CRC32")?.as_bytes()) as i64)) }
         "hash" => { arity!(1); Ok(Value::Int(fnv1a64(need_str(&a[0], "HASH")?.as_bytes()) as i64)) }
         "red" => { arity!(1); Ok(Value::Int((need_int(&a[0], "RED")? >> 16) & 0xFF)) }

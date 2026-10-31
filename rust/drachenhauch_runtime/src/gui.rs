@@ -25,6 +25,8 @@ mod ueber;
 mod stil;
 #[path = "gui_bausteine.rs"]
 mod bausteine;
+#[path = "gui_rechtschreibung.rs"]
+mod rechtschreibung;
 
 const KEY_BACKSPACE: i64 = 8;
 const KEY_TAB: i64 = 9;
@@ -3087,6 +3089,8 @@ pub struct Widget {
     stil_key: Option<(u64, bool, bool, u8)>,
     /// Zusaetze aus Paket 2 (gui_bausteine.rs) -- nur bei Bedarf angelegt.
     bau: Option<Box<bausteine::Bauzusatz>>,
+    /// Rechtschreibung (GUI_SPELL).
+    rs: Option<Box<rechtschreibung::RsZusatz>>,
 }
 
 /// Datenbank-Buchfuehrung eines Formulars (siehe `Window::form_db`).
@@ -3497,6 +3501,8 @@ pub struct Gui {
     /// DIESEM BILD aufging -- es bekommt seinen Rechtsklick trotzdem (ein
     /// Textbereich setzt die Marke, bevor ein Befehl aus dem Menue sie liest).
     kontext_neu: Option<(usize, usize)>,
+    /// Offenes Menue mit Rechtschreib-Vorschlaegen.
+    rs_menue: Option<rechtschreibung::RsMenue>,
     // Strg/Umschalt zum Zeitpunkt des Drucks -- handle_press hat kein `g`.
     tasten_mod: (bool, bool),
     // Hat in diesem Bild ein Menue-Kuerzel gefeuert? Dann gehoert die Taste
@@ -3644,7 +3650,7 @@ impl Gui {
             open_dropdown: None, dd_auf_t: 0.0, dd_auf_von: None, dd_mark: -1, dd_pfeil: false, dd_scroll: 0, dd_tipp: String::new(), dd_tipp_zeit: 0.0, schirm_h: 0, schirm_b: 0, listbar_zug: None, tabar_zug: None, liste_taste: false, active_table: None, table_press: None, press_origin: None,
             drag: None, drop: None, cursors: true,
             editing_table: None, last_click: None, dbl_click: false,
-            open_menu: None, context_open: None, kontext_neu: None, sub_chain: Vec::new(), tasten_mod: (false, false),
+            open_menu: None, context_open: None, kontext_neu: None, rs_menue: None, sub_chain: Vec::new(), tasten_mod: (false, false),
             kuerzel_gefeuert: false, was_right_down: false, was_mitte_down: false,
             scroll_drag: None,
             was_mouse_down: false, zug_feld: None, frame_count: 0,
@@ -4693,6 +4699,7 @@ impl Gui {
             feld: None,
             name: String::new(), klassen: Vec::new(), stil_auf: None, stil_key: None,
             bau: None,
+            rs: None,
         }
     }
 
@@ -12846,6 +12853,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // GUI_DOCK_CHANGED, wenn das Programm nach GUI_UPDATE fragt.
         self.dock_pass(g);
         self.stil_pass();
+        self.rs_pass(g.delta());
         for wi in 0..self.windows.len() {
             for i in 0..self.windows[wi].widgets.len() {
                 if self.windows[wi].widgets[i].beobachtet {
@@ -12907,6 +12915,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         self.ueber_zuruecksetzen();
         self.ueber_pass(g, mx, my);
         let ueber_weg = (just_pressed || right_just) && self.ueber_druck(mx, my, just_pressed);
+        // Das Rechtschreib-Menue (gui_rechtschreibung.rs): ein Rechtsklick auf
+        // ein falsches Wort geht dem Kontextmenue des Programms vor.
+        let ueber_weg = ueber_weg || self.rs_druck(g, mx, my, just_pressed, right_just);
         let just_pressed = just_pressed && !ueber_weg;
         let right_just = right_just && !ueber_weg;
         if just_pressed { self.fluss_druck(mx, my); }
@@ -13427,7 +13438,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Menue per Tastatur (Alt / F10, Pfeile, Enter, ESC). Solange ein
         // Leistenmenue offen ist, gehoeren die Tasten dem Menue -- sonst
         // tippte man in ein Textfeld, waehrend das Menue aufsteht.
-        let menue_hat_tasten = self.menue_tasten(g);
+        let menue_hat_tasten = self.menue_tasten(g) || self.rs_tasten(g);
         if !menue_hat_tasten {
         // Tastatur + Maus fuer das fokussierte Textfeld (Caret/Selektion/Editieren).
         if let Some((wi, i)) = self.focus_widget {
@@ -17830,6 +17841,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Popover, Infoleisten, Toasts, Vorschlaege -- ueber den Fenstern und
         // dem, was ein Programm in eine Zeichenflaeche gemalt hat.
         self.ueber_zeichnen(g);
+        self.rs_zeichnen(g);
         // Kontextmenue ueber ALLEM (nach allen Fenstern).
         // Die Lagen kommen aus `popup_chain` -- derselben Quelle wie der
         // Treffertest, dort weicht ein Popup am Bildschirmrand aus.
@@ -19684,6 +19696,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 }
             }
             self.wtext(g, wdg, tx - scroll, ty, anzeige.clone(), fg);
+            self.rs_textfeld_wellen(g, wdg, &chars, tx - scroll, ay + h - self.sk(6));
             // Die IME-Vorschau unterstreichen -- so sieht man, was
             // noch nicht fertig ist.
             if !wdg.vorschau.is_empty() {
@@ -20179,14 +20192,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     // Wellenlinien unter Fehlern und Warnungen: je sichtbare
                     // Zeile der Teil, der in sie faellt, als Zickzack knapp
                     // unter der Grundlinie.
-                    if !wdg.wellen.is_empty() {
+                    let rs_wellen = Self::rs_wellen(wdg);
+                    if !wdg.wellen.is_empty() || !rs_wellen.is_empty() {
                         let zacke = self.sk(2).max(2);
                         for r in 0..view_lines {
                             let ri = scroll + r;
                             if ri < 0 || ri as usize >= rows.len() { continue; }
                             let (_, rs, re) = rows[ri as usize];
                             let yb = ay + pad + r * lh + lh - self.sk(4);
-                            for &(s, l, c) in &wdg.wellen {
+                            for &(s, l, c) in wdg.wellen.iter().chain(rs_wellen.iter()) {
                                 let (s, e) = (s as usize, s as usize + l as usize);
                                 if s > re || e < rs || (l > 0 && e <= rs) { continue; }
                                 if l > 0 && s >= re && re > rs { continue; }

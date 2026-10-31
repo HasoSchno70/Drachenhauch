@@ -687,6 +687,31 @@ bleibt im Tombstone lesbar; `DHRT_SCHRIFT_ORDNER` fuer Pruefungen. Tests
 ihrem Fall -- der Kreisel erst mit dem Ring-Fall, weil der Balken seine
 laufende Flaeche ebenfalls in Akzentfarbe malt).
 
+**Rechtschreibung** (2026-10-31, Paket 3, erster Teil): `rechtschreibung.rs`
+(ungated, Woerterbuecher als Handles in einem `thread_local`, das am
+Programmende NICHT abgeraeumt wird -- das Freigeben der Windows-Pruefung beim
+Abbau des Fadens hing, das Programm endete nie). Zwei Quellen, ein Vertrag:
+unter Windows `ISpellChecker` (Win32_Globalization, Spannen in UTF-16 ->
+Zeichen umgerechnet), sonst Hunspell ueber `spellbook` aus den ueblichen
+Ordnern; `DHRT_WOERTERBUECHER` geht vor (Pruefungen, eigene Sammlungen) und
+schaltet auch unter Windows auf Dateien. Befehle `SPELL_LOAD/SYSTEM/
+LANGUAGES/LANGUAGE$/CHECK/SUGGEST/IGNORE/ERRORS/FREE` (builtins.rs).
+`gui_rechtschreibung.rs`: `GUI_SPELL(feld, h)` / `GUI_SPELL_COUNT` fuer
+Textfeld und Textbereich (`Widget::rs`); `rs_pass` am Ende von GUI_UPDATE
+prueft 0,3 s nach der letzten Aenderung, bis dahin wandern die Wellen ueber
+gemeinsamen Anfang/Ende mit (`verschieben`: an der Aenderung grenzend bleibt
+ein Wort nur, wenn dort kein Wortzeichen steht). Die Wellen des Textbereichs
+laufen durch dieselbe Zeichenschleife wie `wellen` (Fehler/Warnungen),
+das Textfeld ueber `rs_textfeld_wellen`. Rechtsklick auf ein falsches Wort
+(`rs_druck`, gleich nach `ueber_druck` -- geht dem Kontextmenue des
+Programms vor) oder Umschalt+F10 (`rs_tasten`, neben `menue_tasten`)
+oeffnet ein Menue mit Vorschlaegen und "ignorieren"; ein Vorschlag ist ein
+Undo-Schritt mit on_change; solange es offen ist, gehoeren ihm die Tasten
+(auch Enter/ESC -- Standard- und Abbrechen-Knopf liegen hinter derselben Sperre).
+Passwortfelder pruefen nie. Tests `tests/pruef/rechtschreibung.dhtest`
+(Hunspell-Beilagen, ein Fall mit der Windows-Pruefung samt Emoji vorn),
+Rust-Tests in beiden Dateien.
+
 **Uebergaenge** (2026-09-23, erster Punkt der Feinschliff-Liste): Metrik
 `uebergang` (ms, Vorgabe 120, 0 = springen wie frueher). Je Widget
 `ueber_t`/`druck_t`/`fokus_t` (0..1), dazu `LeisteState::hover_t` je

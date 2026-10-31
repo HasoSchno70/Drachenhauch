@@ -3838,6 +3838,63 @@ zieht dann weiter, statt ein Stück zu überspringen. Ein zweiter Aufruf
 von `GUI_WINDOW_GLOW` beginnt von vorn. Die IDE zeigt ihn beim Start und
 wenn ein Programm losgeht.
 
+## Rechtschreibung
+
+```basic
+IMPORT "gui"
+SCREEN(640, 300, "Notiz", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Notiz", 0, 0, 640, 300)
+DIM text AS GUI_WIDGET : text = GUI_TEXTAREA(w, 10, 10, 610, 240)
+GUI_TEXTAREA_SET(text, "umbruch", 1)
+DIM buch AS INTEGER : buch = SPELL_SYSTEM("de")
+GUI_SPELL(text, buch)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+```
+
+Ein Textfeld oder Textbereich mit `GUI_SPELL` zieht eine rote Welle unter
+jedes Wort, das das Wörterbuch nicht kennt. Geprüft wird eine kurze Pause
+(0,3 s) nach der letzten Änderung, nicht bei jedem Anschlag -- sonst stünde
+unter jedem halb getippten Wort eine Welle. Bis dahin wandern die alten
+Wellen mit dem Text, die im geänderten Stück fallen weg. Ein Rechtsklick auf
+ein falsches Wort öffnet ein Menü mit Vorschlägen und „ignorieren“, an der
+Schreibmarke Umschalt+F10; es geht einem Kontextmenü des Programms vor. Ein
+gewählter Vorschlag ist ein eigener Schritt für Strg+Z und meldet sich wie
+getippter Text (`on_change`). Ein Passwortfeld prüft nie.
+
+Das Wörterbuch kommt aus dem System oder aus Dateien. Unter Windows ist
+`SPELL_SYSTEM` die Rechtschreibprüfung von Windows mit den dort
+installierten Sprachen; unter Linux und macOS sind es Hunspell-Wörterbücher
+(`.dic` + `.aff`) aus `~/.local/share/hunspell`, `/usr/share/hunspell` und
+`/usr/share/myspell` (unter Linux etwa das Paket `hunspell-de-de`). Die
+Umgebungsvariable `DHRT_WOERTERBUECHER` nennt eigene Ordner und geht auf
+jedem System vor -- dann nimmt auch Windows die Dateien. `SPELL_LOAD` lädt
+ein Hunspell-Wörterbuch direkt, etwa eines, das ein Programm mitbringt.
+
+Die Befehle ohne Fenster gehen auch in einem Konsolenprogramm:
+
+| Befehl | Was er tut |
+|---|---|
+| `SPELL_SYSTEM(sprache$)` | Wörterbuch des Systems für eine Sprache („de-DE“, „en-US“; „de“ nimmt das erste deutsche) -> Handle |
+| `SPELL_LOAD(dic$ [, aff$])` | Hunspell-Wörterbuch aus Dateien (ohne `aff$` die `.aff` daneben) -> Handle |
+| `SPELL_LANGUAGES()` | Sprachen, für die `SPELL_SYSTEM` ein Wörterbuch hat |
+| `SPELL_LANGUAGE$(h)` | Sprache eines Wörterbuchs |
+| `SPELL_CHECK(h, wort$)` | Ist das Wort richtig geschrieben? |
+| `SPELL_SUGGEST(h, wort$ [, max])` | Vorschläge für ein Wort (Vorgabe höchstens 8) |
+| `SPELL_IGNORE(h, wort$)` | Wort gilt für den Rest des Laufs als richtig |
+| `SPELL_ERRORS(h, text$)` | Falsche Wörter eines Textes als TUPLE (Anfänge, Längen) in Zeichen ab 0 |
+| `SPELL_FREE(h)` | Wörterbuch freigeben; Felder, die damit prüfen, hören auf |
+| `GUI_SPELL(feld, h)` | Textfeld oder Textbereich mit diesem Wörterbuch prüfen, -1 schaltet ab |
+| `GUI_SPELL_COUNT(feld)` | Wie viele Wörter gerade als falsch markiert sind |
+
+Ein Wort sind Buchstaben, dazu ein Apostroph zwischen zwei Buchstaben;
+einzelne Buchstaben und Zahlen prüft der Hunspell-Weg nicht. Die Prüfung von
+Windows zerlegt selbst und kennt dabei auch doppelte Wörter.
+
 ## Bausteine: Fließlayout, Alt-Buchstaben, Marken
 
 ```basic
