@@ -32,7 +32,7 @@ END FUNCTION
 IMPORT "hilfe.dh"
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
-IF prSchritt = 0 AND prProbleme$() <> "" AND ARRAY_INDEXOF(ctxKennung, "plugin:schreibweise:erlauben") >= 0 THEN
+IF prSchritt = 0 AND prProbleme$() <> "" AND ctxNr("plugin:schreibweise:erlauben") >= 0 THEN
     protokoll("pr probleme " + prProbleme$())
     ' Die Stellen der Wellenlinien: Zeile, Spalte, Laenge.
     DIM prI AS INTEGER
@@ -63,7 +63,7 @@ END IF
 IF prSchritt = 3 AND prB - prSeit > 5 THEN
     ' Rechtsklick-Menue: "Wort erlauben" auf "Standart" in Zeile 1.
     GUI_TEXTAREA_GOTO(aktivesFeld(), 1, 17)
-    befehl(ctxKennung[ARRAY_INDEXOF(ctxKennung, "plugin:schreibweise:erlauben")])
+    befehl(ctxEintraege[ctxNr("plugin:schreibweise:erlauben")].kennung)
     prSchritt = 4 : prSeit = prB
 END IF
 IF prSchritt = 4 AND FILEEXISTS("plugin-daten/schreibweise/erlaubt.txt") THEN
