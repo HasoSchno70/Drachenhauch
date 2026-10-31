@@ -1,0 +1,344 @@
+' Stildatei (GUI_STYLESHEET, gui_stil.rs; docs/entwurf-gui-wie-gtk.md
+' Paket 4): Selektoren nach Art, Klasse, Name und Zustand, Vorrang wie in
+' CSS, GUI_SET_COLOR vor allem. Format: docs/werkzeuge.md.
+'
+' Die Bildfaelle schalten Verlauf, Glanz, Fase und Rundung ab und proben
+' nahe der linken oberen Ecke eines Knopfs -- dort steht keine Schrift.
+
+=== die stildatei faerbt nach art, klasse und name, set_color schlaegt alles
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+GUI_METRIC_SET("gradient", 0)
+GUI_METRIC_SET("gloss", 0)
+GUI_METRIC_SET("bevel", 0)
+GUI_METRIC_SET("corner_radius", 0)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b1 AS GUI_WIDGET : b1 = GUI_BUTTON(w, "eins", 10, 10, 100, 30)
+DIM b2 AS GUI_WIDGET : b2 = GUI_BUTTON(w, "zwei", 10, 50, 100, 30)
+DIM b3 AS GUI_WIDGET : b3 = GUI_BUTTON(w, "drei", 10, 90, 100, 30)
+DIM b4 AS GUI_WIDGET : b4 = GUI_BUTTON(w, "vier", 10, 130, 100, 30)
+DIM b5 AS GUI_WIDGET : b5 = GUI_BUTTON(w, "fuenf", 10, 170, 100, 30)
+GUI_ADD_CLASS(b2, "gefahr")
+GUI_ADD_CLASS(b3, "Gefahr")
+GUI_SET_NAME(b3, "ok")
+GUI_ADD_CLASS(b4, "gefahr")
+GUI_SET_COLOR(b4, "bg", &HFFFFFF)
+GUI_BUTTON_VARIANT(b5, "primaer")
+GUI_STYLESHEET("/* Grundregel */" + CHR$(10) + "button { bg: #2050C0 }" + CHR$(10) + "button.gefahr { bg: #C0392B }" + CHR$(10) + "#ok { bg: #00A000 }" + CHR$(10) + ".primaer { bg: #808000 }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- bild
+14 14 #2050C0 +-16
+14 54 #C0392B +-16
+14 94 #00A000 +-16
+14 134 #FFFFFF +-16
+14 174 #808000 +-16
+
+=== ohne stildatei bleibt das thema
+' Die Gegenprobe: dieselben Knoepfe, keine Regel.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+GUI_METRIC_SET("gradient", 0)
+GUI_METRIC_SET("gloss", 0)
+GUI_METRIC_SET("bevel", 0)
+GUI_METRIC_SET("corner_radius", 0)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b1 AS GUI_WIDGET : b1 = GUI_BUTTON(w, "eins", 10, 10, 100, 30)
+GUI_ADD_CLASS(b1, "gefahr")
+GUI_STYLESHEET("button { bg: #2050C0 }")
+GUI_STYLESHEET("")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- bild
+14 14 nicht #2050C0 +-40
+14 14 nicht #C0392B +-40
+
+=== der vorrang haengt am gewicht, nicht an der reihenfolge
+' Die spezifischen Regeln stehen ZUERST -- ohne Gewicht gewaenne die letzte.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM b1 AS GUI_WIDGET : b1 = GUI_BUTTON(w, "eins", 10, 10, 100, 30)
+DIM b2 AS GUI_WIDGET : b2 = GUI_BUTTON(w, "zwei", 10, 50, 100, 30)
+DIM b3 AS GUI_WIDGET : b3 = GUI_BUTTON(w, "drei", 10, 90, 100, 30)
+GUI_ADD_CLASS(b2, "gefahr")
+GUI_ADD_CLASS(b3, "gefahr")
+GUI_SET_NAME(b3, "ok")
+GUI_STYLESHEET("#ok { bg: #00A000 } button.gefahr { bg: #C0392B } .gefahr:hover { bg: #FFFF00 } button { bg: #2050C0 } * { bg: #777777 }")
+GUI_UPDATE()
+PRINT COLOR_HEX$(GUI_GET_COLOR(b1, "bg")) + " " + COLOR_HEX$(GUI_GET_COLOR(b2, "bg")) + " " + COLOR_HEX$(GUI_GET_COLOR(b3, "bg"))
+--- erwartet
+#2050C0 #C0392B #00A000
+
+=== eine klasse wirkt live, eine entfernte nicht mehr
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 10, 10, 100, 30)
+GUI_STYLESHEET("button { bg: #2050C0 } button.gefahr { bg: #C0392B }")
+GUI_UPDATE()
+PRINT "ohne " + COLOR_HEX$(GUI_GET_COLOR(b, "bg"))
+GUI_ADD_CLASS(b, "gefahr")
+GUI_UPDATE()
+PRINT "mit " + COLOR_HEX$(GUI_GET_COLOR(b, "bg")) + " " + STR$(GUI_HAS_CLASS(b, "GEFAHR"))
+GUI_STYLESHEET("button { bg: #2050C0 } button.gefahr { bg: #112233 }")
+GUI_UPDATE()
+PRINT "neue datei " + COLOR_HEX$(GUI_GET_COLOR(b, "bg"))
+GUI_REMOVE_CLASS(b, "gefahr")
+GUI_UPDATE()
+PRINT "entfernt " + COLOR_HEX$(GUI_GET_COLOR(b, "bg")) + " " + STR$(GUI_HAS_CLASS(b, "gefahr"))
+GUI_STYLESHEET("")
+GUI_UPDATE()
+PRINT "keine datei " + STR$(GUI_GET_COLOR(b, "bg"))
+--- erwartet
+ohne #2050C0
+mit #C0392B TRUE
+neue datei #112233
+entfernt #2050C0 FALSE
+keine datei -1
+
+=== zustaende checked und disabled, die knopfart als klasse
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(w, "an", 10, 10)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 10, 50, 100, 30)
+GUI_STYLESHEET("checkbox { accent: #111111 } checkbox:checked { accent: #FF8000 } button:disabled { fg: #445566 } .gefahr { bg: #C0392B }")
+GUI_UPDATE()
+PRINT "aus " + COLOR_HEX$(GUI_GET_COLOR(cb, "accent"))
+GUI_SET_CHECKED(cb, TRUE)
+GUI_UPDATE()
+PRINT "an " + COLOR_HEX$(GUI_GET_COLOR(cb, "accent"))
+PRINT "bedienbar " + STR$(GUI_GET_COLOR(b, "fg"))
+GUI_SET_ENABLED(b, FALSE)
+GUI_UPDATE()
+PRINT "gesperrt " + COLOR_HEX$(GUI_GET_COLOR(b, "fg"))
+GUI_BUTTON_VARIANT(b, "gefahr")
+GUI_UPDATE()
+PRINT "knopfart " + COLOR_HEX$(GUI_GET_COLOR(b, "bg")) + " " + STR$(GUI_HAS_CLASS(b, "gefahr"))
+--- erwartet
+aus #111111
+an #FF8000
+bedienbar -1
+gesperrt #445566
+knopfart #C0392B TRUE
+
+=== hover blendet die farbe ein
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+GUI_METRIC_SET("gradient", 0)
+GUI_METRIC_SET("gloss", 0)
+GUI_METRIC_SET("bevel", 0)
+GUI_METRIC_SET("corner_radius", 0)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 10, 10, 100, 30)
+DIM c AS GUI_WIDGET : c = GUI_BUTTON(w, "y", 10, 60, 100, 30)
+GUI_STYLESHEET("button { bg: #2050C0 } button:hover { bg: #00C000 }")
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 20 THEN PRINT "ueber " + COLOR_HEX$(GUI_GET_COLOR(b, "bg")) + " daneben " + COLOR_HEX$(GUI_GET_COLOR(c, "bg"))
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 2
+e 0 7 60 25 0 0
+e 1 7 60 25 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+ueber #00C000 daneben #2050C0
+--- bild
+14 14 #00C000 +-16
+14 64 #2050C0 +-16
+
+=== der fokusrahmen eines textfelds kommt aus der stildatei
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+GUI_METRIC_SET("corner_radius", 0)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(w, 20, 20, 200, 30)
+DIM tf2 AS GUI_WIDGET : tf2 = GUI_TEXTINPUT(w, 20, 80, 200, 30)
+GUI_STYLESHEET("textinput:focus { border: #FF00FF; bg: #203020 }")
+GUI_FOCUS(tf)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=30
+--- bild
+20 35 #FF00FF +-30
+120 25 #203020 +-16
+20 95 nicht #FF00FF +-60
+120 85 nicht #203020 +-6
+
+=== rundung aus der stildatei
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+GUI_METRIC_SET("gradient", 0)
+GUI_METRIC_SET("gloss", 0)
+GUI_METRIC_SET("bevel", 0)
+GUI_METRIC_SET("corner_radius", 0)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM rund AS GUI_WIDGET : rund = GUI_BUTTON(w, "rund", 10, 10, 120, 40)
+DIM eckig AS GUI_WIDGET : eckig = GUI_BUTTON(w, "eckig", 10, 70, 120, 40)
+GUI_ADD_CLASS(rund, "rund")
+GUI_STYLESHEET("button { bg: #2050C0 } .rund { radius: 14 }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- bild
+11 11 nicht #2050C0 +-60
+11 71 #2050C0 +-30
+30 30 #2050C0 +-16
+
+=== schriftgroesse und eine themenfarbe aus der stildatei
+' Ein Knopf mit Breite 0 misst seinen Text in jedem Bild: mit groesse 30
+' wird er breiter. Eine Themenfarbe folgt dem Thema.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM klein AS GUI_WIDGET : klein = GUI_BUTTON(w, "Breite", 10, 10, 0, 0)
+DIM gross AS GUI_WIDGET : gross = GUI_BUTTON(w, "Breite", 10, 60, 0, 0)
+GUI_SET_NAME(gross, "titel")
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 10, 120, 100, 30)
+GUI_STYLESHEET("#titel { groesse: 30; stil: fett } button { bg: accent }")
+PRINT "vorher gleich " + STR$(GUI_GET_W(gross) = GUI_GET_W(klein))
+GUI_UPDATE()
+GUI_UPDATE()
+PRINT "groesser " + STR$(GUI_GET_W(gross) > GUI_GET_W(klein) + 20)
+GUI_THEME_SET("accent", &H123456)
+GUI_UPDATE()
+PRINT "thema " + COLOR_HEX$(GUI_GET_COLOR(b, "bg"))
+PRINT "name " + GUI_GET_NAME$(gross)
+--- erwartet
+vorher gleich TRUE
+groesser TRUE
+thema #123456
+name titel
+
+=== eine stildatei aus einer datei
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 10, 10, 100, 30)
+GUI_STYLESHEET_LOAD("thema.dhstil")
+GUI_UPDATE()
+PRINT COLOR_HEX$(GUI_GET_COLOR(b, "bg")) + " " + COLOR_HEX$(GUI_GET_COLOR(b, "fg"))
+--- datei thema.dhstil
+// Ein Thema als Datei
+button {
+    bg: #304050;
+    fg: #F0E0D0
+}
+
+--- erwartet
+#304050 #F0E0D0
+
+=== name und klassen stehen in der dhform
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 10, 10, 100, 30)
+GUI_SET_NAME(b, "Speichern")
+GUI_ADD_CLASS(b, "gross")
+GUI_ADD_CLASS(b, "gefahr")
+DIM j AS STRING : j = GUI_TO_JSON(w)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+DIM b2 AS GUI_WIDGET : b2 = GUI_WINDOW_WIDGET(w2, 0)
+PRINT GUI_GET_NAME$(b2) + " " + STR$(GUI_HAS_CLASS(b2, "gross")) + " " + STR$(GUI_HAS_CLASS(b2, "gefahr")) + " " + STR$(GUI_HAS_CLASS(b2, "klein"))
+PRINT "rundweg " + STR$(GUI_TO_JSON(w2) = j)
+--- erwartet
+speichern TRUE TRUE FALSE
+rundweg TRUE
+
+=== fehler in der stildatei nennen die zeile
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 10, 10, 100, 30)
+DIM q AS ARRAY OF STRING
+q = ["button {" + CHR$(10) + "  farb: #fff" + CHR$(10) + "}", "knopf { bg: #fff }", "button:wackeln { bg: #fff }", "button { bg: rot }", "button { radius: 99 }", "panel button { bg: #fff }", "button { bg: #fff"]
+DIM s AS STRING
+FOR EACH s IN q
+    TRY
+        GUI_STYLESHEET(s)
+        PRINT "kein fehler"
+    CATCH e
+        PRINT LEFT$(e, 60)
+    END TRY
+NEXT
+TRY
+    GUI_STYLESHEET_LOAD("gibtsnicht.dhstil")
+CATCH e
+    PRINT LEFT$(e, 58)
+END TRY
+TRY
+    GUI_SET_NAME(b, "mit leer")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_ADD_CLASS(b, "")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT GUI_GET_COLOR(b, "schatten")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+GUI_STYLESHEET: Zeile 2: Eigenschaft 'farb' gibt es nicht --
+GUI_STYLESHEET: Zeile 1: eine Widget-Art 'knopf' gibt es nic
+GUI_STYLESHEET: Zeile 1: Zustand ':wackeln' gibt es nicht --
+GUI_STYLESHEET: Zeile 1: 'rot' ist keine Farbe -- erwartet #
+GUI_STYLESHEET: Zeile 1: radius erwartet eine ganze Zahl 0..
+GUI_STYLESHEET: Zeile 1: 'panel button' -- Selektoren fuer N
+GUI_STYLESHEET: Zeile 1: '{' ohne '}'
+GUI_STYLESHEET_LOAD: 'gibtsnicht.dhstil' laesst sich nicht
+GUI_SET_NAME: Name 'mit leer' -- erlaubt sind Buchstaben, Ziffern, _ und -
+GUI_ADD_CLASS: Klasse '' -- erlaubt sind Buchstaben, Ziffern, _ und -
+GUI_GET_COLOR: Rolle 'schatten' gibt es nicht -- bg, fg, border oder accent

@@ -21,6 +21,8 @@ use crate::value::{Rueckruf, Value};
 mod dock;
 #[path = "gui_ueber.rs"]
 mod ueber;
+#[path = "gui_stil.rs"]
+mod stil;
 
 const KEY_BACKSPACE: i64 = 8;
 const KEY_TAB: i64 = 9;
@@ -3069,6 +3071,15 @@ pub struct Widget {
     /// Nur TextInput: Sinnbilder, Suchfeld, Vorschlaege (gui_ueber.rs) --
     /// nur bei Bedarf angelegt.
     feld: Option<Box<ueber::FeldZusatz>>,
+    /// Name und Klassen fuer die Stildatei (GUI_SET_NAME, GUI_ADD_CLASS),
+    /// klein geschrieben.
+    name: String,
+    klassen: Vec<String>,
+    /// Was die Stildatei fuer dieses Widget sagt (je Schicht) und wofuer
+    /// das aufgeloest wurde: (Stand der Stildatei, checked, enabled,
+    /// Knopfart). None = neu aufloesen.
+    stil_auf: Option<Box<stil::StilAufgeloest>>,
+    stil_key: Option<(u64, bool, bool, u8)>,
 }
 
 /// Datenbank-Buchfuehrung eines Formulars (siehe `Window::form_db`).
@@ -3522,6 +3533,14 @@ pub struct Gui {
     frame_count: i64,
     theme: HashMap<String, i64>,
     metrics: HashMap<String, i32>,
+    /// Die Stildatei (GUI_STYLESHEET, gui_stil.rs) und ihr Stand -- jede
+    /// neue zaehlt hoch, damit die Widgets neu aufloesen.
+    stil: Option<Box<stil::Stildatei>>,
+    stil_stand: u64,
+    /// Eckenrundung des Widgets, das gerade gezeichnet wird (aus der
+    /// Stildatei), None = die Metrik. Gesetzt in `draw_widget`, gelesen in
+    /// `flaeche` -- so gilt sie fuer jede Flaeche des Widgets.
+    rad_jetzt: std::cell::Cell<Option<i32>>,
     // Benannte Styles (Stylesheet): Name -> {prop -> wert}. Props: bg/fg/border/
     // accent (Farbe), font (Handle), font_size (px). Via GUI_APPLY_STYLE auf
     // Widgets uebertragen (-> ov-Overrides + font/font_size).
@@ -3613,6 +3632,7 @@ impl Gui {
             scroll_drag: None,
             was_mouse_down: false, zug_feld: None, frame_count: 0,
             theme: default_theme(), metrics: default_metrics(),
+            stil: None, stil_stand: 0, rad_jetzt: std::cell::Cell::new(None),
             styles: HashMap::new(),
             pending: Vec::new(),
             hover_w: None, hover_frame: 0, hover_teil: -1, leiste_popup: None, hover_x: 0, hover_y: 0,
@@ -4653,6 +4673,7 @@ impl Gui {
             align: -1, wrap: false, passwort: false, nur_lesen: false, maxlaenge: 0, zahlen: 0, frei: false,
             entered: false, on_enter: None, undo: Vec::new(), redo: Vec::new(), undo_zeit: -10.0,
             feld: None,
+            name: String::new(), klassen: Vec::new(), stil_auf: None, stil_key: None,
         }
     }
 
@@ -6285,7 +6306,10 @@ impl Gui {
     /// Grundfarbe eines gefuellten Knopfes -- eigene Farbe vor Knopfart; None =
     /// die Farbe des Themas.
     fn knopf_grund(&self, w: &Widget) -> Option<i64> {
-        if let Some(c) = w.ov.get("bg") { return Some(*c); }
+        if !w.enabled && !w.ov.contains_key("bg") {
+            if let Some(c) = self.stil_farbe(w, "bg", stil::AUS) { return Some(c); }
+        }
+        if let Some(c) = self.eigen(w, "bg") { return Some(c); }
         match w.variante {
             1 => Some(self.wcol(w, "accent", "accent")),
             2 => Some(0x2E9E5B),
@@ -6296,13 +6320,15 @@ impl Gui {
     }
     /// Textfarbe eines Knopfes: eigene vor lesbarer vor Thema.
     fn knopf_text(&self, w: &Widget) -> i64 {
-        if !w.enabled { return self.th("muted_fg"); }
-        if let Some(c) = w.ov.get("fg") { return *c; }
-        match w.variante {
+        if !w.enabled { return self.stil_farbe(w, "fg", stil::AUS).unwrap_or_else(|| self.th("muted_fg")); }
+        if let Some(c) = self.eigen(w, "fg") { return self.stil_misch(w, "fg", c); }
+        let c = match w.variante {
             5 | 7 => self.wcol(w, "accent", "accent"),
             6 => self.th("text_fg"),
             _ => match self.knopf_grund(w) { Some(bg) => lesbar_auf(bg), None => self.th("text_fg") },
-        }
+        };
+        // Eine Hover-Regel fuer die Schrift greift auch ohne eigene Grundfarbe.
+        self.stil_misch(w, "fg", c)
     }
 
     // --- Tabelle ---
@@ -8531,7 +8557,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             for w in &win.widgets {
                 if !w.alive { continue; }
                 let basis = font_wahl(w.font, aktiv);
-                if w.stil != 0 { g.schnitt(basis, w.stil); }
+                let st = self.w_stil(w);
+                if st != 0 { g.schnitt(basis, st); }
                 if w.kind == Kind::RichText {
                     for s in [FETT, KURSIV, FETT | KURSIV] { g.schnitt(basis, s); }
                 }
@@ -11357,6 +11384,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if w.frei { o["bearbeitbar"] = serde_json::json!(true); }
         if w.maxlaenge > 0 { o["maxlaenge"] = serde_json::json!(w.maxlaenge); }
         if w.zahlen != 0 { o["zahlen"] = serde_json::json!(w.zahlen); }
+        if !w.name.is_empty() { o["name"] = serde_json::json!(w.name); }
+        if !w.klassen.is_empty() { o["klassen"] = serde_json::json!(w.klassen); }
         ueber::feld_json(w, &mut o);
         // Der Tooltip fehlte in der Datei -- ein im Designer gesetzter war
         // nach dem Laden weg.
@@ -11564,6 +11593,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         w.frei = w.kind == Kind::Dropdown && wj["bearbeitbar"].as_bool().unwrap_or(false);
         w.maxlaenge = wj["maxlaenge"].as_i64().unwrap_or(0).max(0) as i32;
         w.zahlen = wj["zahlen"].as_i64().unwrap_or(0).clamp(0, 3) as u8;
+        // Name und Klassen fuer die Stildatei; ein Name, der dort nicht
+        // stehen koennte (der Form-Designer erlaubt mehr), zaehlt nicht.
+        w.name = wj["name"].as_str().map(|s| s.to_lowercase())
+            .filter(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-'))
+            .unwrap_or_default();
+        w.klassen = wj["klassen"].as_array().map(|a| a.iter().filter_map(|x| x.as_str())
+            .map(|s| s.to_lowercase()).collect()).unwrap_or_default();
         if w.kind == Kind::TextInput { ueber::feld_aus_json(&mut w, wj); }
         w.tooltip = wj["tooltip"].as_str().unwrap_or("").to_string();
         w.tab_index = wj["tab_index"].as_i64().unwrap_or(0).max(0) as i32;
@@ -12295,7 +12331,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     }
 
     fn wcol(&self, w: &Widget, role: &str, theme_key: &str) -> i64 {
-        if let Some(c) = w.ov.get(role) { *c } else { self.th(theme_key) }
+        // GUI_SET_COLOR, sonst die Stildatei (samt Zustaenden), sonst das Thema.
+        if let Some(c) = w.ov.get(role) { return *c; }
+        let basis = self.eigen(w, role).unwrap_or_else(|| self.th(theme_key));
+        self.stil_misch(w, role, basis)
     }
     // Styling-aware Farb-/Text-Helfer (beruecksichtigen den enabled-Zustand).
     /// Die gedaempfte Farbe fuer Hinweise (Platzhalter, Zusatztext, leere
@@ -12315,7 +12354,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         t
     }
     fn txt_col(&self, w: &Widget) -> i64 {
-        if !w.enabled { self.th("muted_fg") } else { self.wcol(w, "fg", "text_fg") }
+        if !w.enabled { self.stil_farbe(w, "fg", stil::AUS).unwrap_or_else(|| self.th("muted_fg")) }
+        else { self.wcol(w, "fg", "text_fg") }
     }
     fn acc_col(&self, w: &Widget) -> i64 {
         let a = self.wcol(w, "accent", "accent");
@@ -12336,7 +12376,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Text mit per-Widget-Font/-Groesse (sonst unveraendert via g.text).
     /// Schriftgroesse dieses Widgets in Pixeln.
     fn wsize(&self, g: &Graphics, w: &Widget) -> i32 {
-        self.sk(if w.font_size > 0 { w.font_size } else { g.text_height() })
+        let n = self.w_groesse(w);
+        self.sk(if n > 0 { n } else { g.text_height() })
     }
 
     /// Breite eines Textes so, wie `wtext` ihn zeichnen WIRD.
@@ -12347,11 +12388,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Weicht das Messen davon ab, sitzt zentrierter Text schief und der
     /// Beschnitt greift an der falschen Stelle.
     fn wtext_width(&self, g: &Graphics, w: &Widget, s: &str) -> i32 {
-        if w.stil != 0 {
+        let st = self.w_stil(w);
+        if st != 0 {
             let basis = font_wahl(w.font, g.active_font());
-            return g.text_width_stil(s, self.wsize(g, w), basis, w.stil);
+            return g.text_width_stil(s, self.wsize(g, w), basis, st);
         }
-        if w.font == -1 && w.font_size == 0 && self.scale == 1.0 {
+        if w.font == -1 && self.w_groesse(w) == 0 && self.scale == 1.0 {
             g.text_width(s)
         } else {
             g.text_width_in(s, self.wsize(g, w), self.wfont(g, w))
@@ -12362,8 +12404,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// nur, wenn der Font fest ist (geladen, ohne Stil): dann laesst sich eine
     /// Zeile stueckweise vermessen (`Graphics::text_breite_fest`).
     fn wtext_fest(&self, g: &Graphics, w: &Widget) -> Option<(i32, i64)> {
-        if w.stil != 0 { return None; }
-        let (size, font) = if w.font == -1 && w.font_size == 0 && self.scale == 1.0 {
+        if self.w_stil(w) != 0 { return None; }
+        let (size, font) = if w.font == -1 && self.w_groesse(w) == 0 && self.scale == 1.0 {
             (g.text_height(), g.active_font())
         } else {
             (self.wsize(g, w), self.wfont(g, w))
@@ -12381,7 +12423,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     fn wfont(&self, g: &Graphics, w: &Widget) -> i64 {
         // Mit Stil der geladene Schnitt -- so messen auch die Editier-Helfer
         // (Schreibmarke, Auswahl) mit der Schrift, die dasteht.
-        g.schnitt_von(font_wahl(w.font, g.active_font()), w.stil)
+        g.schnitt_von(font_wahl(w.font, g.active_font()), self.w_stil(w))
     }
 
     /// Text der Fenster-Chrome: Titel, Menueleiste, Reiter, Popup-Eintrag,
@@ -12414,12 +12456,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     }
 
     fn wtext(&self, g: &mut Graphics, w: &Widget, x: i32, y: i32, s: String, c: i64) {
-        if w.stil != 0 {
+        let st = self.w_stil(w);
+        if st != 0 {
             let (sz, basis) = (self.wsize(g, w), font_wahl(w.font, g.active_font()));
-            g.text_styled_stil(x, y, s, c, basis, sz, w.stil);
+            g.text_styled_stil(x, y, s, c, basis, sz, st);
             return;
         }
-        if w.font == -1 && w.font_size == 0 && self.scale == 1.0 {
+        if w.font == -1 && self.w_groesse(w) == 0 && self.scale == 1.0 {
             g.text(x, y, s, c);
         } else {
             let (sz, font) = (self.wsize(g, w), self.wfont(g, w));
@@ -12488,7 +12531,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     #[allow(clippy::too_many_arguments)]
     fn flaeche(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32,
                fill: i64, border: i64, tief: bool) {
-        let rad = self.m("corner_radius");
+        let rad = self.rad_jetzt.get().unwrap_or_else(|| self.m("corner_radius"));
         let anteil = self.verlauf_anteil(y2 - y1);
         let grad = (self.m("gradient") as f64 * anteil).round() as i32;
         if grad > 0 {
@@ -12767,6 +12810,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // oder ein Zug an der Trennlinie steht so schon in GUI_DOCK_RECT und
         // GUI_DOCK_CHANGED, wenn das Programm nach GUI_UPDATE fragt.
         self.dock_pass(g);
+        self.stil_pass();
         for wi in 0..self.windows.len() {
             for i in 0..self.windows[wi].widgets.len() {
                 if self.windows[wi].widgets[i].beobachtet {
@@ -19556,7 +19600,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         ax: i32, ay: i32, w: i32, h: i32, rechts: i32) {
         let focused = self.focus_widget == Some((wi, idx));
         let fg = self.txt_col(wdg);
-        let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
+        let bcol = if focused && !self.stil_hat(wdg, "border", stil::FOKUS) { self.wcol(wdg, "accent", "accent") }
+                   else { self.wcol(wdg, "border", "widget_border") };
         self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
         // Im Passwortmodus stehen Punkte -- gemessen wird dann auch an
         // den Punkten, sonst saesse die Schreibmarke neben dem Text.
@@ -19617,6 +19662,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     }
 
     fn draw_widget(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget) {
+        // Die Rundung aus der Stildatei gilt fuer jede Flaeche dieses Widgets.
+        let vorher = self.rad_jetzt.replace(self.w_radius(wdg));
+        self.draw_widget_innen(g, wi, idx, wdg);
+        self.rad_jetzt.set(vorher);
+    }
+
+    fn draw_widget_innen(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget) {
         let (ax, ay, w, h) = self.abs_rect(wi, wdg);
         let pad = self.m("pad");
         match wdg.kind {
@@ -19634,7 +19686,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             Kind::Label => {
                 let eigen = if wdg.color < 0 { self.th("text_fg") } else { wdg.color };
                 let fg = if !wdg.enabled { self.th("muted_fg") }
-                         else { wdg.ov.get("fg").copied().unwrap_or(eigen) };
+                         else if let Some(c) = wdg.ov.get("fg") { *c }
+                         else if wdg.color >= 0 { wdg.color }
+                         else { self.stil_misch(wdg, "fg", self.stil_farbe(wdg, "fg", stil::BASIS).unwrap_or(eigen)) };
                 // Zeilen einzeln: so gilt die Ausrichtung je Zeile, und ein
                 // umbrechendes Label zeichnet genau das, was umbruch_layout
                 // gemessen hat.
@@ -19727,15 +19781,23 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     // Farben (Rollen hover/pressed), sonst hell/dunkel vom Grund.
                     let grund = self.knopf_grund(wdg);
                     let mut bg = grund.unwrap_or_else(|| self.th("widget_bg"));
-                    if !wdg.enabled && grund.is_some() { bg = mischen(bg, self.th("widget_bg"), 0.65); }
-                    let bg_h = wdg.ov.get("hover").copied().unwrap_or(shade(bg, if grund.is_some() { 18 } else { 30 }));
-                    let bg_d = wdg.ov.get("pressed").copied().unwrap_or(shade(bg, -30));
+                    // Gesperrt: gedaempft -- ausser die Stildatei sagt selbst,
+                    // wie ein gesperrter Knopf aussieht (:disabled).
+                    if !wdg.enabled && grund.is_some() && !self.stil_hat(wdg, "bg", stil::AUS) {
+                        bg = mischen(bg, self.th("widget_bg"), 0.65);
+                    }
+                    // Hover/Druck: eigene Rollen, sonst die Schichten der
+                    // Stildatei (button:hover { bg }), sonst hell/dunkel.
+                    let bg_h = wdg.ov.get("hover").copied().or_else(|| self.stil_farbe(wdg, "bg", stil::HOVER))
+                        .unwrap_or(shade(bg, if grund.is_some() { 18 } else { 30 }));
+                    let bg_d = wdg.ov.get("pressed").copied().or_else(|| self.stil_farbe(wdg, "bg", stil::AKTIV))
+                        .unwrap_or(shade(bg, -30));
                     bg = mischen(mischen(bg, bg_h, eh), bg_d, ed);
                     // Der Standard-Knopf traegt den Akzent als Rahmen -- man
                     // soll sehen, was Enter tun wird.
                     let rahmen = if self.windows[wi].default_btn == idx as i32 && wdg.variante != 1 {
                         self.wcol(wdg, "accent", "accent")
-                    } else if let (Some(gr), None) = (grund, wdg.ov.get("border")) {
+                    } else if let (Some(gr), None) = (grund, self.eigen(wdg, "border")) {
                         shade(gr, -40)
                     } else { self.wcol(wdg, "border", "widget_border") };
                     self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, bg, rahmen);
@@ -19749,7 +19811,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     let ix = if icon_only { ax + (w - isz) / 2 } else { ax + pad };
                     if !wdg.sinnbild.is_empty() {
                         let s = if icon_only { isz.min(self.sk(24)) } else { isz.min(self.sk(18)) };
-                        let c = if wdg.variante > 0 || wdg.ov.contains_key("bg") || wdg.ov.contains_key("fg") { self.knopf_text(wdg) }
+                        let c = if wdg.variante > 0 || self.eigen(wdg, "bg").is_some() || self.eigen(wdg, "fg").is_some() { self.knopf_text(wdg) }
                                 else if wdg.enabled { mischen(self.th("text_fg"), self.th("muted_fg"), 0.25) } else { self.th("muted_fg") };
                         sinnbild(g, &wdg.sinnbild, ix + (isz - s) / 2, iy + (isz - s) / 2, s, c, !wdg.enabled);
                     } else {

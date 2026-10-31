@@ -640,6 +640,29 @@ werden ueber die Breite des GANZEN Textes minus den Rest gelegt. Tests
 ihrem Fall). **Testfalle:** die Wiedergabe beginnt beim ERSTEN Ereignis --
 ein spaeter Klick braucht ein Ereignis in Bild 0 davor.
 
+**Stildatei** (2026-10-31, Paket 4 erste Stufe): `gui_stil.rs`, `#[path]`
+wie Dock und Ueberlagerungen. `GUI_STYLESHEET`/`_LOAD` liest Regeln
+(`art.klasse#name:zustand { eigenschaft: wert }`, Kommentare `/* */` und
+`//`), Fehler mit Zeile; Gewicht Name 100, Klasse/Zustand 10, Art 1, gleich
+= spaeter gewinnt. `stil_pass` (am Ende von GUI_UPDATE) loest je Widget nur
+neu auf, wenn sich `(stil_stand, checked, enabled, variante)` oder Klassen/
+Name (`stil_key = None`) geaendert haben -- in FUENF Schichten (Basis,
+hover, fokus, aktiv, aus). Farben: `wcol` = GUI_SET_COLOR > `eigen`
+(Basis) > Thema, dann `stil_misch` (hover/fokus/aktiv ueber
+`ueber_t`/`fokus_t`/`druck_t` gemischt, gesperrt = Schicht aus); die
+sieben frueheren `ov.get`-Stellen gehen ueber `eigen`/`stil_farbe`. Der
+Knopf nimmt seine Hover-/Druckfarbe aus den Schichten (`bg_h`/`bg_d`),
+nicht aus `stil_misch` -- sonst blendete er doppelt. Schrift ueber
+`w_groesse`/`w_stil` (eigene vor Stildatei), Rundung ueber
+`rad_jetzt` (Cell, in `draw_widget` gesetzt, in `flaeche` gelesen).
+Themenfarben (`bg: accent`) werden erst beim Zeichnen aufgeloest und
+folgen einem Themenwechsel. Die Knopfart zaehlt als Klasse. `GUI_GET_COLOR`
+liefert die Farbe des jetzigen Zustands ohne Ueberblenden (-1 = Thema).
+`.dhform` `name`/`klassen`. Tests `tests/pruef/gui_stildatei.dhtest` (12;
+sechs Verfaelschungen fallen je in ihrem Fall), Rust-Tests in
+`gui_stil.rs`. Bewusst NICHT: Nachfahren-Selektoren, padding/Schatten/
+Verlauf je Widget, Uebergang je Regel, `window`-Selektor.
+
 **Uebergaenge** (2026-09-23, erster Punkt der Feinschliff-Liste): Metrik
 `uebergang` (ms, Vorgabe 120, 0 = springen wie frueher). Je Widget
 `ueber_t`/`druck_t`/`fokus_t` (0..1), dazu `LeisteState::hover_t` je

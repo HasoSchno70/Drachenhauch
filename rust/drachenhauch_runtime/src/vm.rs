@@ -8482,6 +8482,15 @@ impl<'p> Vm<'p> {
                 let (x, y, b, h) = self.gui.infobar_button_rect(gi(a,0,n)?, gi(a,1,n)?)?;
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(x), Value::Int(y), Value::Int(b), Value::Int(h)])) }
             "gui_infobar_shown" => Value::Bool(self.gui.infobar_shown(gi(a,0,"GUI_INFOBAR_SHOWN")?)?),
+            // Stildatei, Name, Klassen (gui_stil.rs).
+            "gui_stylesheet" => { self.gui.stylesheet(&gs(a,0,"GUI_STYLESHEET")?)?; Value::Nil }
+            "gui_stylesheet_load" => { self.gui.stylesheet_load(&gs(a,0,"GUI_STYLESHEET_LOAD")?)?; Value::Nil }
+            "gui_set_name" => { self.gui.set_name(gi(a,0,"GUI_SET_NAME")?, &gs(a,1,"GUI_SET_NAME")?)?; Value::Nil }
+            "gui_get_name$" | "gui_get_name" => Value::str_rc(&self.gui.get_name(gi(a,0,"GUI_GET_NAME$")?)?),
+            "gui_add_class" => { self.gui.add_class(gi(a,0,"GUI_ADD_CLASS")?, &gs(a,1,"GUI_ADD_CLASS")?)?; Value::Nil }
+            "gui_remove_class" => { self.gui.remove_class(gi(a,0,"GUI_REMOVE_CLASS")?, &gs(a,1,"GUI_REMOVE_CLASS")?)?; Value::Nil }
+            "gui_get_color" => Value::Int(self.gui.get_color(gi(a,0,"GUI_GET_COLOR")?, &gs(a,1,"GUI_GET_COLOR")?)?),
+            "gui_has_class" => Value::Bool(self.gui.has_class(gi(a,0,"GUI_HAS_CLASS")?, &gs(a,1,"GUI_HAS_CLASS")?)?),
             "gui_window_default" => { self.gui.window_default(gi(a,0,"GUI_WINDOW_DEFAULT")?, gi(a,1,"GUI_WINDOW_DEFAULT")?, false)?; Value::Nil }
             "gui_window_cancel" => { self.gui.window_default(gi(a,0,"GUI_WINDOW_CANCEL")?, gi(a,1,"GUI_WINDOW_CANCEL")?, true)?; Value::Nil }
             "gui_on_hover" => { self.gui.on_hover(gi(a,0,"GUI_ON_HOVER")?, gfunc(a,1,"GUI_ON_HOVER")?)?; Value::Nil }

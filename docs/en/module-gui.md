@@ -434,6 +434,14 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_GET_FONT_STYLE$(wdg)` | STRING | the widget's style, e.g. `"fett+unterstrichen"` |
 | `GUI_STYLE_SET(name$, prop$, wert)` | — | define a named style (`bg`, `fg`, `border`, `accent`, `font`, `font_size`) |
 | `GUI_APPLY_STYLE(widget, name$)` | — | apply a named style to a widget -- saves repeating it widget by widget |
+| `GUI_STYLESHEET(text$)` | — | set a stylesheet: rules by kind, class, name and state as in CSS ("" = none) -- see [Stylesheet](#7-stylesheet-rules-by-kind-class-name-and-state) |
+| `GUI_STYLESHEET_LOAD(pfad$)` | — | the same from a file (usually `.dhstil`) |
+| `GUI_ADD_CLASS(wdg, klasse$)` | — | add a class; it takes effect at once and as long as it stays |
+| `GUI_REMOVE_CLASS(wdg, klasse$)` | — | remove a class |
+| `GUI_HAS_CLASS(wdg, klasse$)` | BOOLEAN | does the widget carry the class (the button variant counts too)? |
+| `GUI_SET_NAME(wdg, name$)` | — | the name that `#name` in the stylesheet refers to |
+| `GUI_GET_NAME$(wdg)` | STRING | the widget's name ("" = none) |
+| `GUI_GET_COLOR(wdg, rolle$)` | INTEGER | the colour that `GUI_SET_COLOR` or the stylesheet sets in the current state (`bg`, `fg`, `border`, `accent`); -1 = the theme decides |
 | `GUI_GET_Y(wdg)` / `GUI_GET_W(wdg)` / `GUI_GET_H(wdg)` | INTEGER | position and size of the widget in the window (counterpart to `GUI_SET_BOUNDS`) |
 | `GUI_WINDOW_GET_Y(win)` / `GUI_WINDOW_GET_W(win)` / `GUI_WINDOW_GET_H(win)` | INTEGER | position and size of the window on the screen |
 | `GUI_WINDOW_CONTENT_W(win)` / `GUI_WINDOW_CONTENT_H(win)` | INTEGER | width and height of the content area below the title, menu and tab bar -- widget coordinates count from there; a status bar sits at the bottom without guessing the height of the menu bar |
@@ -2141,6 +2149,72 @@ GUI_APPLY_STYLE(saveBtn, "primary")
 `GUI_APPLY_STYLE` transfers the style properties as per-widget overrides
 (colours) or font/size. Can be extended incrementally; `GUI_RESET()` also deletes
 the styles.
+
+### 7. Stylesheet: rules by kind, class, name and state
+
+A named style is **copied** -- whoever changes it afterwards no longer
+reaches the widgets. A **stylesheet** instead says by rule what widgets look
+like and applies as long as it is set: like CSS in GTK, but only the subset
+that fits the gui.
+
+```basic
+IMPORT "gui"
+SCREEN(500, 260, "Stil", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Stil", 0, 0, 500, 260)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "Sichern", 20, 20, 120, 32)
+DIM weg AS GUI_WIDGET : weg = GUI_BUTTON(w, "Löschen", 160, 20, 120, 32)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 20, 70, 260, 30, "Name")
+GUI_SET_NAME(ok, "sichern")
+GUI_ADD_CLASS(weg, "gefahr")
+GUI_STYLESHEET("button { radius: 8 }" + CHR$(10) + "button.gefahr { bg: #C0392B; fg: #FFFFFF }" + CHR$(10) + "button.gefahr:hover { bg: #E74C3C }" + CHR$(10) + "#sichern { bg: accent; stil: fett }" + CHR$(10) + "textinput:focus { border: #E0A030 }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+```
+
+```text
+/* thema.dhstil -- mit GUI_STYLESHEET_LOAD("thema.dhstil") */
+button               { radius: 6 }
+button.gefahr:hover  { bg: #E74C3C }
+textinput:focus      { border: accent }
+#titel               { groesse: 20; stil: fett }
+checkbox:checked     { accent: #2E9E5B }
+```
+
+**Selectors:** a kind (the names from the `.dhform`: `button`, `label`,
+`textinput`, `listbox`, `checkbox` ...; `*` = any), classes `.name`
+(`GUI_ADD_CLASS`; the button variant from `GUI_BUTTON_VARIANT` counts as a
+class, so `.gefahr` also hits a danger button), a name `#name`
+(`GUI_SET_NAME`) and states: `:hover`, `:focus`, `:active` (pressed),
+`:disabled`, `:checked`. Several selectors for one rule are separated by a
+comma. Selectors for descendants (`panel button`) do not exist yet.
+
+**Properties:** `bg`, `fg`, `border`, `accent` (colour as `#RGB`, `#RRGGBB`,
+`#AARRGGBB` or as a name from the theme such as `accent`, `text_fg`,
+`widget_bg` -- then it follows a theme change), `radius` (corner rounding
+0..64), `groesse` (font size 4..200) and `stil` (as with
+`GUI_SET_FONT_STYLE`: `fett` bold, `kursiv` italic, `unterstrichen`
+underlined ...). German and English names work (`hintergrund`,
+`background`, `rundung`, `size`). Comments go in `/* ... */` or after `//`.
+
+**Precedence** as in CSS: a name counts 100, a class or a state 10, a kind 1;
+with equal weight the later rule wins. `GUI_SET_COLOR` on the widget beats
+every rule, a rule beats the theme.
+
+**States blend:** `:hover`, `:focus` and `:active` come through the widget's
+transitions (metric `uebergang`), so a hover colour fades in instead of
+jumping. A focus border from the stylesheet (`textinput:focus { border: ...
+}`) replaces the border in the accent colour; a disabled button with its own
+`:disabled` colour is not dimmed on top.
+
+**An error in the file is a message with a line number** (unknown property,
+malformed colour, unknown kind) -- nothing is silently skipped, otherwise
+you would look for it in the program. Name and classes are stored in the
+`.dhform` (`name`, `klassen`). `GUI_GET_COLOR` tells which colour applies
+right now.
 
 ## Callbacks: GUI_ON_CLICK
 
