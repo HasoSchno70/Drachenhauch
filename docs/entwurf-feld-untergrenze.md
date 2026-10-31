@@ -1,6 +1,6 @@
 # Entwurf: Felder mit eigener Untergrenze
 
-**Stand:** 2026-10-30, nichts davon gebaut.
+**Stand:** 2026-10-30, entschieden 2026-10-31 (Abschnitt 11); nichts davon gebaut.
 
 ```
 DIM tage[1 TO 31] AS INTEGER
@@ -129,9 +129,8 @@ Doku sagt: vergleiche mit `LBOUND` des Feldes, nicht mit 0.
 * Der Hinweis „Felder zaehlen ab 0" steht nur noch bei Feldern ab 0.
 * **Dimension in der Meldung ab 1** statt ab 0, damit sie zu `LBOUND` mit Dimension 2
   passt. Das ändert drei Erwartungen in den Prüfsammlungen und die
-  englische Vorlage in `daten/meldungen.en.txt`. Wer das nicht will, lässt
-  die Meldung bei 0 -- dann zählen Meldung und `LBOUND` verschieden, und das
-  wäre der schlechtere Handel.
+  englische Vorlage in `daten/meldungen.en.txt`. Bei 0 zu bleiben hieße,
+  dass Meldung und `LBOUND` verschieden zählen (entschieden: ab 1).
 
 ## 6. Bytecode und `.dhc`
 
@@ -210,11 +209,17 @@ jeder davon ist ein Ausgleich für die Zählung ab 0 -- oft ist es der
 Nachbar in einer Schleife --, die Zahl sagt also nur, dass das Muster
 vorkommt, nicht wie oft es fehlt.
 
-## 11. Offene Fragen
+## 11. Entschieden (2026-10-31)
 
-* **Slicing:** soll `a[3:5]` eines Feldes ab 1 eine Liste ab 0 liefern
-  (Vorschlag: ja, wie `ARRAY_FILTER`) oder die Untergrenze 3 behalten?
-* **Dimension in Meldungen ab 1** (Vorschlag) oder ab 0 lassen?
-* **`ARRAY_INDEXOF` bei Feldern ab 0:** bleibt `-1`. Bei anderen
-  `LBOUND - 1` -- oder lieber gar nicht zulassen und einen Fehler melden, der
-  auf `ARRAY_FIND` verweist?
+Die drei Fragen, die der Entwurf offen ließ, sind wie vorgeschlagen
+entschieden:
+
+* **Slicing** liefert eine neue Liste ab 0, wie `ARRAY_FILTER` -- ihre
+  Plätze entsprechen keinen Plätzen des alten Feldes mehr. `von` und `bis`
+  zählen dabei in den Indizes des Feldes.
+* **Die Dimension in Meldungen zählt ab 1**, passend zu `LBOUND` mit
+  Dimension 2. Die drei betroffenen Erwartungen in den Prüfsammlungen und
+  die englische Vorlage ziehen mit.
+* **`ARRAY_INDEXOF` und `ARRAY_FIND` liefern bei „nicht gefunden"
+  `LBOUND - 1`** -- bei einem Feld ab 0 also weiter `-1`. Die Doku sagt dazu:
+  vergleiche mit `LBOUND` des Feldes, nicht mit 0.
