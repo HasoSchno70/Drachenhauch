@@ -8447,6 +8447,41 @@ impl<'p> Vm<'p> {
                 self.gui.textinput_set(gi(a,0,"GUI_TEXTINPUT_SET")?, &gs(a,1,"GUI_TEXTINPUT_SET")?,
                                        gnum(a,2,"GUI_TEXTINPUT_SET")?)?; Value::Nil
             }
+            // Ueberlagerungen und Rueckmeldung (gui_ueber.rs).
+            "gui_textinput_icon" => { let n = "GUI_TEXTINPUT_ICON";
+                if a.len() != 3 { return Err(format!("{}: erwartet (tf, links$, rechts$)", n)); }
+                self.gui.textinput_icon(gi(a,0,n)?, &gs(a,1,n)?, &gs(a,2,n)?)?; Value::Nil }
+            "gui_icon_clicked" => Value::Int(self.gui.icon_clicked(gi(a,0,"GUI_ICON_CLICKED")?)?),
+            "gui_search_changed" => Value::Bool(self.gui.search_changed(gi(a,0,"GUI_SEARCH_CHANGED")?)?),
+            "gui_textinput_completion" => { let n = "GUI_TEXTINPUT_COMPLETION";
+                self.gui.textinput_completion(gi(a,0,n)?, gstrs(a,1,n)?)?; Value::Nil }
+            "gui_completion_chosen" => Value::Int(self.gui.completion_chosen(gi(a,0,"GUI_COMPLETION_CHOSEN")?)?),
+            "gui_completion_open" => Value::Bool(self.gui.completion_open(gi(a,0,"GUI_COMPLETION_OPEN")?)?),
+            "gui_popover" => { let n = "GUI_POPOVER";
+                if a.len() < 3 || a.len() > 4 { return Err(format!("{}: erwartet (anker, b, h [, seite$])", n)); }
+                let seite = if a.len() == 4 { gs(a,3,n)? } else { String::new() };
+                Value::Int(self.gui.popover(gi(a,0,n)?, gi(a,1,n)? as i32, gi(a,2,n)? as i32, &seite)?) }
+            "gui_popover_show" => { self.gui.popover_show(gi(a,0,"GUI_POPOVER_SHOW")?)?; Value::Nil }
+            "gui_popover_hide" => { self.gui.popover_hide(gi(a,0,"GUI_POPOVER_HIDE")?)?; Value::Nil }
+            "gui_popover_closed" => Value::Bool(self.gui.popover_closed(gi(a,0,"GUI_POPOVER_CLOSED")?)?),
+            "gui_toast" => { let n = "GUI_TOAST";
+                if a.len() < 2 || a.len() > 4 { return Err(format!("{}: erwartet (win, text$ [, art$ [, ms]])", n)); }
+                let art = if a.len() > 2 { gs(a,2,n)? } else { String::new() };
+                let ms = if a.len() > 3 { gnum(a,3,n)? } else { 3000.0 };
+                self.gui.toast(gi(a,0,n)?, gs(a,1,n)?, &art, ms)?; Value::Nil }
+            "gui_toast_count" => Value::Int(self.gui.toast_count(gi(a,0,"GUI_TOAST_COUNT")?)?),
+            "gui_toast_clear" => { self.gui.toast_clear(gi(a,0,"GUI_TOAST_CLEAR")?)?; Value::Nil }
+            "gui_infobar" => { let n = "GUI_INFOBAR";
+                if a.len() < 2 || a.len() > 4 { return Err(format!("{}: erwartet (win, text$ [, art$ [, knoepfe$]])", n)); }
+                let art = if a.len() > 2 { gs(a,2,n)? } else { String::new() };
+                let kn = if a.len() > 3 { gs(a,3,n)? } else { String::new() };
+                self.gui.infobar(gi(a,0,n)?, gs(a,1,n)?, &art, &kn)?; Value::Nil }
+            "gui_infobar_hide" => { self.gui.infobar_hide(gi(a,0,"GUI_INFOBAR_HIDE")?)?; Value::Nil }
+            "gui_infobar_answer" => Value::Int(self.gui.infobar_answer(gi(a,0,"GUI_INFOBAR_ANSWER")?)?),
+            "gui_infobar_button_rect" => { let n = "GUI_INFOBAR_BUTTON_RECT";
+                let (x, y, b, h) = self.gui.infobar_button_rect(gi(a,0,n)?, gi(a,1,n)?)?;
+                Value::Tuple(std::rc::Rc::new(vec![Value::Int(x), Value::Int(y), Value::Int(b), Value::Int(h)])) }
+            "gui_infobar_shown" => Value::Bool(self.gui.infobar_shown(gi(a,0,"GUI_INFOBAR_SHOWN")?)?),
             "gui_window_default" => { self.gui.window_default(gi(a,0,"GUI_WINDOW_DEFAULT")?, gi(a,1,"GUI_WINDOW_DEFAULT")?, false)?; Value::Nil }
             "gui_window_cancel" => { self.gui.window_default(gi(a,0,"GUI_WINDOW_CANCEL")?, gi(a,1,"GUI_WINDOW_CANCEL")?, true)?; Value::Nil }
             "gui_on_hover" => { self.gui.on_hover(gi(a,0,"GUI_ON_HOVER")?, gfunc(a,1,"GUI_ON_HOVER")?)?; Value::Nil }

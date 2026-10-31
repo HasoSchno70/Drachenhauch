@@ -8,7 +8,9 @@ Dateibaum, Reiterwerk, Akkordeon, Assistent, Dock, gesetzter Text, Code-Feld
 mit Faltung und mehreren Marken, Formularprüfung, Datenbindung,
 Barrierefreiheit über AccessKit, Drucken. Dieses Dokument vergleicht sie mit
 GTK 3 und sagt, was noch fehlt, in welcher Reihenfolge und wie es sich
-bauen ließe. **Noch nichts davon ist gebaut.**
+bauen ließe. **Paket 1 ist gebaut** (2026-10-31, `gui_ueber.rs`, Handbuch
+`docs/module-gui.md` Abschnitte „Popover, Toast und Infoleiste“ und
+„Suchfeld, Sinnbilder, Vorschläge“); die Pakete 2 bis 4 noch nicht.
 
 ## Gemessen statt vermutet: große Tabellen sind keine Lücke
 
@@ -30,7 +32,11 @@ ohne Ertrag.
 
 ## Die Lücken
 
-### Paket 1: Überlagerungen und Rückmeldung
+### Paket 1: Überlagerungen und Rückmeldung (gebaut)
+
+Anders als hier zuerst geplant liegt die Infoleiste über dem Inhalt, statt
+ihn zu verschieben (ein verschobener Inhalt liefe unten aus dem Fenster),
+und `GUI_INFOBAR_BUTTON_RECT` kam dazu, damit sich die Knöpfe prüfen lassen.
 
 | GTK 3 | in der gui | Vorschlag |
 |---|---|---|

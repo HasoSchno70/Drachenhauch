@@ -19,6 +19,8 @@ use crate::value::{Rueckruf, Value};
 
 #[path = "gui_dock.rs"]
 mod dock;
+#[path = "gui_ueber.rs"]
+mod ueber;
 
 const KEY_BACKSPACE: i64 = 8;
 const KEY_TAB: i64 = 9;
@@ -3064,6 +3066,9 @@ pub struct Widget {
     undo: Vec<(String, i32, Vec<u8>)>,
     redo: Vec<(String, i32, Vec<u8>)>,
     undo_zeit: f64,
+    /// Nur TextInput: Sinnbilder, Suchfeld, Vorschlaege (gui_ueber.rs) --
+    /// nur bei Bedarf angelegt.
+    feld: Option<Box<ueber::FeldZusatz>>,
 }
 
 /// Datenbank-Buchfuehrung eines Formulars (siehe `Window::form_db`).
@@ -3150,6 +3155,12 @@ pub struct Window {
     /// Steckt das Fenster selbst in einem Dock (GUI_DOCK_WINDOW): das
     /// Gastfenster, sonst -1.
     dock_host: i32,
+    /// Ist das Fenster ein Popover (GUI_POPOVER): woran er haengt.
+    pop: Option<Box<ueber::PopAnker>>,
+    /// Meldungen unten im Fenster (GUI_TOAST), die neueste zuletzt.
+    toasts: Vec<ueber::Toast>,
+    /// Die Leiste oben im Inhalt (GUI_INFOBAR).
+    info: Option<Box<ueber::InfoLeiste>>,
 }
 
 /// Groesster Zeitschritt des Lichtstreifs je Bild (Sekunden), siehe
@@ -3714,6 +3725,7 @@ impl Gui {
             default_btn: -1, cancel_btn: -1,
             glanz: Glanz::neu(),
             dock: None, dock_host: -1,
+            pop: None, toasts: Vec::new(), info: None,
         });
         self.z_order.push(idx);
         self.focus_window = Some(idx);
@@ -4640,6 +4652,7 @@ impl Gui {
             step: 1.0,
             align: -1, wrap: false, passwort: false, nur_lesen: false, maxlaenge: 0, zahlen: 0, frei: false,
             entered: false, on_enter: None, undo: Vec::new(), redo: Vec::new(), undo_zeit: -10.0,
+            feld: None,
         }
     }
 
@@ -10639,8 +10652,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 }
                 w.zahlen = wert as u8;
             }
+            "suche" | "search" => return self.feld_suche_setzen(h, wert != 0.0),
             _ => return Err(format!(
-                "GUI_TEXTINPUT_SET: unbekannter Schluessel '{}' -- passwort, nur_lesen, maxlaenge, zahlen", key)),
+                "GUI_TEXTINPUT_SET: unbekannter Schluessel '{}' -- passwort, nur_lesen, maxlaenge, zahlen, suche", key)),
         }
         Ok(())
     }
@@ -11343,6 +11357,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if w.frei { o["bearbeitbar"] = serde_json::json!(true); }
         if w.maxlaenge > 0 { o["maxlaenge"] = serde_json::json!(w.maxlaenge); }
         if w.zahlen != 0 { o["zahlen"] = serde_json::json!(w.zahlen); }
+        ueber::feld_json(w, &mut o);
         // Der Tooltip fehlte in der Datei -- ein im Designer gesetzter war
         // nach dem Laden weg.
         if !w.tooltip.is_empty() { o["tooltip"] = serde_json::json!(w.tooltip); }
@@ -11549,6 +11564,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         w.frei = w.kind == Kind::Dropdown && wj["bearbeitbar"].as_bool().unwrap_or(false);
         w.maxlaenge = wj["maxlaenge"].as_i64().unwrap_or(0).max(0) as i32;
         w.zahlen = wj["zahlen"].as_i64().unwrap_or(0).clamp(0, 3) as u8;
+        if w.kind == Kind::TextInput { ueber::feld_aus_json(&mut w, wj); }
         w.tooltip = wj["tooltip"].as_str().unwrap_or("").to_string();
         w.tab_index = wj["tab_index"].as_i64().unwrap_or(0).max(0) as i32;
         w.on_enter = wj["on_enter"].as_str().map(Rueckruf::benannt);
@@ -12275,6 +12291,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         self.z_order.retain(|&i| i != wi);
         self.z_order.push(wi);
         self.dock_ordnen();
+        self.pops_nach_vorn();
     }
 
     fn wcol(&self, w: &Widget, role: &str, theme_key: &str) -> i64 {
@@ -12805,6 +12822,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         self.liste_taste = false;
         self.schirm_h = g.screen_height() as i32;
         self.schirm_b = g.screen_width() as i32;
+        // Popover, Toasts, Infoleisten, Suchfelder, Vorschlaege (gui_ueber.rs):
+        // erst legen, dann bekommen sie den Druck -- was dort landet oder
+        // einen Popover schliesst, erreicht kein Widget mehr.
+        self.ueber_zuruecksetzen();
+        self.ueber_pass(g, mx, my);
+        let ueber_weg = (just_pressed || right_just) && self.ueber_druck(mx, my, just_pressed);
+        let just_pressed = just_pressed && !ueber_weg;
+        let right_just = right_just && !ueber_weg;
         // Rad ueber der offenen Klappliste rollt SIE -- vor allem anderen, denn
         // sie liegt ueber allem, und das Rad gibt es nur einmal.
         if let Some((dw, di)) = self.open_dropdown {
@@ -13326,7 +13351,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if let Some((wi, i)) = self.focus_widget {
             let frei_dd = self.windows[wi].widgets[i].frei;
             match self.windows[wi].widgets[i].kind {
-                Kind::TextInput => self.edit_textinput(wi, i, g),
+                Kind::TextInput => if !self.feld_tasten(wi, i, g) { self.edit_textinput(wi, i, g) },
                 Kind::Dropdown if frei_dd => self.edit_combo(wi, i, g),
                 Kind::TextArea => self.edit_textarea(wi, i, g),
                 Kind::Spinner => self.spinner_keys(wi, i, g),
@@ -13382,6 +13407,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     }
                 }
             }
+        }
+        // ESC schliesst zuerst einen offenen Popover -- er liegt obenauf und
+        // ist das, was man zuletzt geoeffnet hat.
+        if g.key_pressed(KEY_ESC) && !self.liste_taste && self.open_dropdown.is_none() && self.pop_esc() {
+            self.liste_taste = true;
         }
         // Standard- und Abbrechen-Knopf: Enter loest den einen aus, ESC den
         // anderen -- aber nur, wenn die Taste nicht schon einem Widget gehoert.
@@ -13768,11 +13798,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if !g.mouse_button(0) { self.windows[wi].widgets[i].wort_zug = false; }
         if g.mouse_button(0) {
             let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
-            let target = mx - (ax + 5) + scroll;
+            let (sl, sr) = self.ti_rand(&self.windows[wi].widgets[i]);
+            let target = mx - (ax + 5 + sl) + scroll;
             let idx = Self::caret_index_at(g, &sichtbar(&chars), target, ms);
             if !self.was_mouse_down {
-                let r = self.abs_rect(wi, &self.windows[wi].widgets[i]);
-                if Self::in_rect(mx, my, r) {
+                // Ueber einem Sinnbild setzt der Druck keine Marke.
+                let (rx, ry, rw, rh) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+                if Self::in_rect(mx, my, (rx + sl, ry, (rw - sl - sr).max(0), rh)) {
                     self.zug_feld = Some((wi, i));
                     caret = idx; anchor = idx;
                     let jetzt = g.get_time();
@@ -13823,7 +13855,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let vor = sichtbar(&chars[..caret as usize]);
         let caret_px = ms.breite(g, &vor.iter().collect::<String>());
         let pfeil = if self.windows[wi].widgets[i].frei { self.sk(DD_PFEIL_B) } else { 0 };
-        let inner = (fw - 10 - pfeil).max(1);
+        let (sl, sr) = self.ti_rand(&self.windows[wi].widgets[i]);
+        let inner = (fw - 10 - pfeil - sl - sr).max(1);
         let mut scroll = scroll;
         if caret_px - scroll > inner { scroll = caret_px - inner; }
         if caret_px - scroll < 0 { scroll = caret_px; }
@@ -13838,6 +13871,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         w.caret = caret; w.sel_anchor = anchor; w.scroll = scroll;
         if geaendert {
             if let Some(f) = w.on_change.clone() { self.pending.push(f); }
+            if self.windows[wi].widgets[i].kind == Kind::TextInput { self.feld_getippt(wi, i); }
         }
         if enter {
             let w = &mut self.windows[wi].widgets[i];
@@ -15576,7 +15610,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let w = &self.windows[wi].widgets[i];
         let chars: Vec<char> = if w.passwort { vec!['\u{2022}'; w.text.chars().count()] }
                                else { w.text.chars().collect() };
-        let idx = Self::caret_index_at(g, &chars, mx - (ax + 5) + w.scroll, ms);
+        let sl = self.ti_rand(w).0;
+        let idx = Self::caret_index_at(g, &chars, mx - (ax + 5 + sl) + w.scroll, ms);
         let w = &mut self.windows[wi].widgets[i];
         let (lo, hi) = (w.caret.min(w.sel_anchor), w.caret.max(w.sel_anchor));
         if !(lo != hi && idx >= lo && idx <= hi) { w.caret = idx; w.sel_anchor = idx; }
@@ -16889,7 +16924,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     pub fn draw(&self, g: &mut Graphics, obenauf: bool) {
         for (k, &wi) in self.z_order.iter().enumerate() {
             if self.modal == Some(wi) { self.schleier(g); }
-            if self.windows[wi].alive && self.windows[wi].visible { self.draw_window_sicht(g, wi); }
+            // Ein Popover kommt in der oberen Schicht (draw_top).
+            if self.windows[wi].alive && self.windows[wi].visible && self.windows[wi].pop.is_none() { self.draw_window_sicht(g, wi); }
             // Schwebende Leisten eines Gastfensters liegen ueber seinen
             // angedockten Fenstern: gezeichnet nach dem letzten davon.
             if let Some(h) = self.dock_angedockter_gast(wi) {
@@ -17705,6 +17741,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Was ueber allen Fenstern liegt: ein offenes Kontextmenue und der
     /// Tooltip (GUI_DRAW_TOP).
     pub fn draw_top(&self, g: &mut Graphics) {
+        // Popover, Infoleisten, Toasts, Vorschlaege -- ueber den Fenstern und
+        // dem, was ein Programm in eine Zeichenflaeche gemalt hat.
+        self.ueber_zeichnen(g);
         // Kontextmenue ueber ALLEM (nach allen Fenstern).
         // Die Lagen kommen aus `popup_chain` -- derselben Quelle wie der
         // Treffertest, dort weicht ein Popup am Bildschirmrand aus.
@@ -17797,7 +17836,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         };
         if !w.visible { return Ok(()); }
         if self.modal == Some(wi) { self.schleier(g); }
-        self.draw_window_sicht(g, wi);
+        if w.pop.is_some() { self.pop_zeichnen(g, wi); } else { self.draw_window_sicht(g, wi); }
         if self.dock_hat_angedockte(wi) { self.dock_oben_nachholen(g, wi); }
         self.bring_to_front(wi);
         Ok(())
@@ -18200,11 +18239,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             Kind::TextInput => {
                 let (anz, caret_anz) = self.anzeige_mit_vorschau(wdg);
                 let anzeige: String = anz.iter().collect();
-                let inner = (w - 10).max(1);
+                let (sl, sr) = self.ti_rand(wdg);
+                let inner = (w - 10 - sl - sr).max(1);
                 let tw = self.wtext_width(g, wdg, &anzeige);
                 let (tx, scroll) = if wdg.align >= 1 && tw <= inner {
-                    (if wdg.align == 1 { ax + 5 + (inner - tw) / 2 } else { ax + 5 + inner - tw }, 0)
-                } else { (ax + 5, wdg.scroll) };
+                    (if wdg.align == 1 { ax + 5 + sl + (inner - tw) / 2 } else { ax + 5 + sl + inner - tw }, 0)
+                } else { (ax + 5 + sl, wdg.scroll) };
                 let pre: String = anz.iter().take(caret_anz.max(0) as usize).collect();
                 let cx = tx + self.wtext_width(g, wdg, &pre) - scroll;
                 Some((cx, ay + 3, (h - 7).max(1)))
@@ -19524,15 +19564,17 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let (anz_chars, caret_anz) = self.anzeige_mit_vorschau(wdg);
         let anzeige: String = anz_chars.iter().collect();
         let ty = ay + (h - self.wsize(g, wdg)).max(0) / 2;
-        let inner = (w - 10 - rechts).max(1);
+        // Sinnbilder links/rechts (Suchfeld, GUI_TEXTINPUT_ICON) nehmen Platz.
+        let (sl, sr) = self.ti_rand(wdg);
+        let inner = (w - 10 - rechts - sl - sr).max(1);
         let tw = self.wtext_width(g, wdg, &anzeige);
         // Ausrichtung nur, solange der Text hineinpasst -- sonst gilt
         // links mit Rollen, damit die Schreibmarke sichtbar bleibt.
         let (tx, scroll) = if wdg.align >= 1 && tw <= inner {
-            (if wdg.align == 1 { ax + 5 + (inner - tw) / 2 } else { ax + 5 + inner - tw }, 0)
-        } else { (ax + 5, wdg.scroll) };
+            (if wdg.align == 1 { ax + 5 + sl + (inner - tw) / 2 } else { ax + 5 + sl + inner - tw }, 0)
+        } else { (ax + 5 + sl, wdg.scroll) };
         // Inhalt auf das Feld-Innere clippen (langer Text laeuft nicht raus).
-        g.push_clip(ax + 2, ay + 1, (w - 4 - rechts).max(0), (h - 2).max(0));
+        g.push_clip(ax + 2 + sl, ay + 1, (w - 4 - rechts - sl - sr).max(0), (h - 2).max(0));
         if anzeige.is_empty() {
             // Der Platzhalter bleibt, bis getippt wird -- auch mit Fokus. Vorher
             // verschwand er mit dem Fokus, und ein Feld, das beim Start den
@@ -19571,6 +19613,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             g.line(cx, ay + 3, cx, ay + h - 4, fg);
         }
         g.pop_clip();
+        self.feld_symbole_zeichnen(g, wdg, ax, ay, w, h);
     }
 
     fn draw_widget(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget) {

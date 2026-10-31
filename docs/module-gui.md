@@ -28,6 +28,18 @@ IMPORT "gui"
 | `GUI_WINDOW_GLOW_SET(win, schluessel$, wert)` | — | Lichtstreif einstellen: `farbe`, `dauer`, `pause` (ms bis zur Wiederkehr, 0 = einmal), `richtung` (rechts/links/unten/oben), `breite`, `staerke` (0..1), `rand`, `art` (`streif`, `lampe` oder `rahmen`) |
 | `GUI_WINDOW_GLOW_STOP(win)` | — | den Lichtstreif anhalten |
 | `GUI_WINDOW_GLOWING(win)` | BOOLEAN | läuft ein Lichtstreif (auch in der Pause zwischen zwei)? |
+| `GUI_POPOVER(anker, b, h [, seite$])` | GUI_WINDOW | ein Kasten ohne Rahmen mit Pfeil, an ein Widget gehängt (`unten`, `oben`, `rechts`, `links`); beginnt verborgen -- siehe [Popover, Toast und Infoleiste](#popover-toast-und-infoleiste) |
+| `GUI_POPOVER_SHOW(pop)` | — | den Popover zeigen, an sein Widget legen (am Bildschirmrand weicht er aus) und nach vorn holen |
+| `GUI_POPOVER_HIDE(pop)` | — | den Popover verbergen |
+| `GUI_POPOVER_CLOSED(pop)` | BOOLEAN | hat ihn der Nutzer in diesem Bild geschlossen (Klick daneben oder ESC)? |
+| `GUI_TOAST(win, text$ [, art$ [, ms]])` | — | eine Meldung unten im Fenster, die nach `ms` (Vorgabe 3000, 0 = bis zum Klick) ausblendet; Art `info`, `erfolg`, `warnung`, `fehler` |
+| `GUI_TOAST_COUNT(win)` | INTEGER | wie viele Meldungen stehen da (höchstens vier)? |
+| `GUI_TOAST_CLEAR(win)` | — | alle Meldungen ausblenden |
+| `GUI_INFOBAR(win, text$ [, art$ [, knoepfe$]])` | — | eine Leiste oben im Inhalt mit Text, bis zu vier Knöpfen (`"Neu laden\|Behalten"`) und einem Kreuz |
+| `GUI_INFOBAR_ANSWER(win)` | INTEGER | in diesem Bild geklickt: Knopfnummer ab 1, -1 = das Kreuz, 0 = nichts |
+| `GUI_INFOBAR_SHOWN(win)` | BOOLEAN | steht die Infoleiste da? |
+| `GUI_INFOBAR_HIDE(win)` | — | die Infoleiste ausblenden |
+| `GUI_INFOBAR_BUTTON_RECT(win, k)` | TUPLE | wo Knopf `k` steht (ab 1; 0 = das Kreuz) -- (x, y, b, h), nach dem ersten GUI_UPDATE |
 | `GUI_DOCK(win, x, y, w, h)` | — | ein Dock auf dem Fenster einrichten bzw. sein Rechteck setzen -- Leisten links, rechts und unten, die Mitte bleibt dem Programm (siehe [Dock](#dock-andockbare-leisten)) |
 | `GUI_DOCK_SET(win, schluessel$, n)` | — | Maße des Docks: `kopf` (Höhe der Reiterzeile, 22), `rand` (8), `abstand` (zwischen Gruppen, 8), `fuge` (über dem unteren Bereich, 2) |
 | `GUI_DOCK_PANEL(win, name$, titel$, bereich$)` | — | eine Leiste als neue Gruppe am Ende von `links`, `rechts`, `unten` oder `schwebend` |
@@ -152,7 +164,13 @@ IMPORT "gui"
 | `GUI_SPLITTER(win, x, y, length, orient$, min, max)` | GUI_WIDGET | verschiebbare Trennlinie (`"v"`/`"h"`); Position via `GUI_VALUE` |
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | Container (Deko) |
 | `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | einzeiliges Eingabefeld (Caret + Selektion, Strg+Z/Y); der Platzhalter steht gedaempft da, bis getippt wird -- auch mit Fokus |
-| `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort`, `nur_lesen`, `maxlaenge`, `zahlen` (0 frei, 1 ganze Zahl, 2 Kommazahl, 3 Geldbetrag in Cent) |
+| `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort`, `nur_lesen`, `maxlaenge`, `zahlen` (0 frei, 1 ganze Zahl, 2 Kommazahl, 3 Geldbetrag in Cent), `suche` (Suchfeld mit Lupe und Kreuz) |
+| `GUI_TEXTINPUT_ICON(tf, links$, rechts$)` | — | ein eingebautes Sinnbild links und rechts im Feld ("" = keins) -- siehe [Suchfeld, Sinnbilder, Vorschläge](#suchfeld-sinnbilder-vorschläge) |
+| `GUI_ICON_CLICKED(tf)` | INTEGER | in diesem Bild angeklicktes Sinnbild: 1 links, 2 rechts, 0 keins |
+| `GUI_SEARCH_CHANGED(tf)` | BOOLEAN | ein Suchfeld meldet seinen Text: 150 ms nach dem letzten Anschlag, sofort bei Enter, Kreuz und ESC |
+| `GUI_TEXTINPUT_COMPLETION(tf, eintraege)` | — | Vorschläge beim Tippen: was mit dem Getippten anfängt zuerst, dann was es enthält ([] = keine) |
+| `GUI_COMPLETION_CHOSEN(tf)` | INTEGER | in diesem Bild übernommener Vorschlag (Index in `eintraege`, -1 = keiner) |
+| `GUI_COMPLETION_OPEN(tf)` | BOOLEAN | steht die Vorschlagsliste offen? |
 | `GUI_ENTERED(tf)` | BOOLEAN | wurde in diesem Bild Enter im Textfeld gedrückt? |
 | `GUI_ON_ENTER(tf, handler)` | — | Rückruf dafür |
 | `GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | **mehrzeiliges** Textfeld (ENTER = neue Zeile, scrollt senkrecht und waagerecht, Pfeile, Selektion via Maus-Drag/Shift+Pfeil, Strg+A/C/X/V). Als **Code-Feld** einfärbbar — siehe [Code-Feld](#das-textarea-als-code-feld) |
@@ -727,6 +745,50 @@ negative Zahl gar nicht tippen. **Enter** meldet das Feld über
 `GUI_ENTERED(tf)` (genau ein Bild lang, wie `GUI_CLICKED`) oder den Rückruf
 `GUI_ON_ENTER(tf, handler)`; hat das Fenster einen Standard-Knopf, klickt der
 im selben Bild (siehe [Button](#button)).
+
+
+### Suchfeld, Sinnbilder, Vorschläge
+
+```basic
+IMPORT "gui"
+SCREEN(500, 300, "Suche", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Suche", 0, 0, 500, 300)
+DIM such AS GUI_WIDGET : such = GUI_TEXTINPUT(w, 10, 10, 260, 28, "Suchen ...")
+GUI_TEXTINPUT_SET(such, "suche", 1)        ' Lupe links, Kreuz rechts, Meldung nach einer Pause
+DIM land AS GUI_WIDGET : land = GUI_TEXTINPUT(w, 10, 50, 260, 28, "Land")
+GUI_TEXTINPUT_COMPLETION(land, ["Deutschland", "Dänemark", "Österreich", "Schweiz"])
+DIM pw AS GUI_WIDGET : pw = GUI_TEXTINPUT(w, 10, 90, 260, 28, "Kennwort")
+GUI_TEXTINPUT_SET(pw, "passwort", 1)
+GUI_TEXTINPUT_ICON(pw, "", "auge")         ' ein Sinnbild rechts im Feld
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_SEARCH_CHANGED(such) THEN PRINT "suchen nach " + GUI_TEXT(such)
+    IF GUI_COMPLETION_CHOSEN(land) >= 0 THEN PRINT "gewählt: " + GUI_TEXT(land)
+    IF GUI_ICON_CLICKED(pw) = 2 THEN GUI_TEXTINPUT_SET(pw, "passwort", 0)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+```
+
+Ein **Suchfeld** meldet seinen Text erst, wenn 150 ms lang nichts getippt
+wurde -- sonst liefe eine Suche über tausend Einträge bei jedem Buchstaben.
+Enter, das Kreuz und ESC melden sofort; das Kreuz und ESC leeren das Feld.
+ESC in einem leeren Suchfeld gehört wieder dem Abbrechen-Knopf des Fensters.
+`GUI_TEXT` und `on_change` folgen weiter jedem Anschlag.
+
+**Sinnbilder** (`GUI_TEXTINPUT_ICON`, dieselben Namen wie bei Knöpfen und
+Menüs) nehmen links bzw. rechts Platz; der Text beginnt dahinter, und ein
+Klick auf ein Sinnbild setzt keine Schreibmarke, sondern meldet sich über
+`GUI_ICON_CLICKED` (und gibt dem Feld den Fokus).
+
+**Vorschläge** erscheinen beim Tippen unter dem Feld (über dem Feld, wenn
+unten kein Platz ist): was mit dem Getippten anfängt zuerst, dann was es
+irgendwo enthält, Groß/klein egal; der passende Teil steht in der
+Akzentfarbe. Pfeile wählen, Enter oder ein Klick übernimmt, ESC schließt die
+Liste. Solange ein Vorschlag markiert ist, gehört Enter der Liste, nicht dem
+Standard-Knopf. Höchstens acht Zeilen stehen auf einmal da. In der `.dhform`
+stehen `suche`, `icons` und `vorschlaege`.
 
 ## Panel
 
@@ -3684,6 +3746,56 @@ höchstens 50 ms weiter: hängt ein Bild, bleibt der Streif kurz stehen und
 zieht dann weiter, statt ein Stück zu überspringen. Ein zweiter Aufruf
 von `GUI_WINDOW_GLOW` beginnt von vorn. Die IDE zeigt ihn beim Start und
 wenn ein Programm losgeht.
+
+## Popover, Toast und Infoleiste
+
+Drei Arten, etwas mitzuteilen oder anzubieten, ohne einen Dialog zu öffnen.
+Alle drei liegen über den Fenstern -- auch über dem, was ein Programm in eine
+Zeichenfläche malt -- und werden mit der oberen Schicht gezeichnet
+(`GUI_DRAW` bzw. `GUI_DRAW_TOP`).
+
+```basic
+IMPORT "gui"
+SCREEN(700, 450, "Rückmeldung", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Rückmeldung", 0, 0, 700, 450)
+DIM knopf AS GUI_WIDGET : knopf = GUI_BUTTON(w, "Ansicht ...", 20, 20, 140, 30)
+DIM pop AS GUI_WINDOW : pop = GUI_POPOVER(knopf, 220, 110)
+DIM raster AS GUI_WIDGET : raster = GUI_CHECKBOX(pop, "Raster zeigen", 12, 12)
+DIM lineale AS GUI_WIDGET : lineale = GUI_CHECKBOX(pop, "Lineale zeigen", 12, 44)
+DIM sichern AS GUI_WIDGET : sichern = GUI_BUTTON(w, "Sichern", 180, 20, 120, 30)
+GUI_INFOBAR(w, "Die Datei wurde außerhalb geändert.", "warnung", "Neu laden|Behalten")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(knopf) THEN GUI_POPOVER_SHOW(pop)
+    IF GUI_CLICKED(sichern) THEN GUI_TOAST(w, "Gesichert.", "erfolg")
+    IF GUI_INFOBAR_ANSWER(w) = 1 THEN GUI_TOAST(w, "Neu geladen.")
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+```
+
+**Popover:** ein randloses Fenster mit Pfeil, das an einem Widget hängt --
+Inhalt wie in jedem Fenster. Er steht auf der gewünschten Seite und weicht
+aus, wenn dort der Bildschirm endet. Ein Klick daneben schließt ihn und tut
+sonst nichts; auch ein Klick auf das Widget, an dem er hängt, schließt ihn
+nur (er ginge sonst im selben Klick wieder auf). ESC schließt ihn vor dem
+Abbrechen-Knopf des Fensters. Was der Nutzer so geschlossen hat, meldet
+`GUI_POPOVER_CLOSED` ein Bild lang; `GUI_POPOVER_HIDE` meldet nichts. Ein
+Popover, der an einem Widget in einem anderen Popover hängt, hält diesen
+offen. Ist das Widget nicht mehr zu sehen, geht er zu.
+
+**Toast:** eine Meldung unten in der Mitte des Fensters, mit Sinnbild und
+Farbe nach ihrer Art; sie blendet ein, nach ihrer Zeit wieder aus, und ein
+Klick nimmt sie gleich weg. Höchstens vier stehen übereinander; eine fünfte
+verdrängt die älteste. Ein Bildschirmleser liest die Meldung vor (wie
+`GUI_ANNOUNCE`).
+
+**Infoleiste:** oben über dem Inhalt des Fensters (sie verschiebt ihn nicht),
+mit Text, bis zu vier Knöpfen und einem Kreuz. Sie bleibt, bis man antwortet;
+die Antwort steht ein Bild lang in `GUI_INFOBAR_ANSWER`, danach rollt die
+Leiste weg. Ein neues `GUI_INFOBAR` ersetzt die alte. Ein Druck auf die
+Leiste erreicht kein Widget darunter.
 
 ## Dock: andockbare Leisten
 

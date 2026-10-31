@@ -28,6 +28,18 @@ IMPORT "gui"
 | `GUI_WINDOW_GLOW_SET(win, schluessel$, wert)` | — | configure the streak of light: `farbe` (colour), `dauer` (duration), `pause` (ms until it returns, 0 = once), `richtung` (direction: rechts/links/unten/oben), `breite` (width), `staerke` (strength, 0..1), `rand` (edge), `art` (kind: `streif`, `lampe` or `rahmen`) |
 | `GUI_WINDOW_GLOW_STOP(win)` | — | stop the streak of light |
 | `GUI_WINDOW_GLOWING(win)` | BOOLEAN | is a streak of light running (also during the pause between two)? |
+| `GUI_POPOVER(anker, b, h [, seite$])` | GUI_WINDOW | a borderless box with an arrow, attached to a widget (`unten` below, `oben` above, `rechts` right, `links` left); starts hidden -- see [Popover, toast and info bar](#popover-toast-and-info-bar) |
+| `GUI_POPOVER_SHOW(pop)` | — | show the popover, place it at its widget (it moves aside at the screen edge) and bring it to the front |
+| `GUI_POPOVER_HIDE(pop)` | — | hide the popover |
+| `GUI_POPOVER_CLOSED(pop)` | BOOLEAN | did the user close it in this frame (click beside it or ESC)? |
+| `GUI_TOAST(win, text$ [, art$ [, ms]])` | — | a message at the bottom of the window that fades out after `ms` (default 3000, 0 = until clicked); kind `info`, `erfolg` (success), `warnung` (warning), `fehler` (error) |
+| `GUI_TOAST_COUNT(win)` | INTEGER | how many messages are showing (at most four)? |
+| `GUI_TOAST_CLEAR(win)` | — | fade out all messages |
+| `GUI_INFOBAR(win, text$ [, art$ [, knoepfe$]])` | — | a bar at the top of the content with text, up to four buttons (`"Reload\|Keep"`) and a cross |
+| `GUI_INFOBAR_ANSWER(win)` | INTEGER | clicked in this frame: button number from 1, -1 = the cross, 0 = nothing |
+| `GUI_INFOBAR_SHOWN(win)` | BOOLEAN | is the info bar showing? |
+| `GUI_INFOBAR_HIDE(win)` | — | hide the info bar |
+| `GUI_INFOBAR_BUTTON_RECT(win, k)` | TUPLE | where button `k` is (from 1; 0 = the cross) -- (x, y, b, h), after the first GUI_UPDATE |
 | `GUI_DOCK(win, x, y, w, h)` | — | set up a dock on the window or set its rectangle -- panels on the left, right and bottom, the centre stays with the program (see [Dock](#dock-dockable-panels)) |
 | `GUI_DOCK_SET(win, schluessel$, n)` | — | dimensions of the dock: `kopf` (height of the tab row, 22), `rand` (margin, 8), `abstand` (between groups, 8), `fuge` (above the bottom area, 2) |
 | `GUI_DOCK_PANEL(win, name$, titel$, bereich$)` | — | a panel as a new group at the end of `links` (left), `rechts` (right), `unten` (bottom) or `schwebend` (floating) |
@@ -152,7 +164,13 @@ IMPORT "gui"
 | `GUI_SPLITTER(win, x, y, length, orient$, min, max)` | GUI_WIDGET | movable divider (`"v"`/`"h"`); position via `GUI_VALUE` |
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | container (decoration) |
 | `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | single-line input field (cursor + selection, Ctrl+Z/Y); the placeholder stays, dimmed, until something is typed -- also with focus |
-| `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort` (password), `nur_lesen` (read-only), `maxlaenge` (max length), `zahlen` (numbers: 0 free, 1 integer, 2 decimal, 3 amount of money in cents) |
+| `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort` (password), `nur_lesen` (read-only), `maxlaenge` (max length), `zahlen` (numbers: 0 free, 1 integer, 2 decimal, 3 amount of money in cents), `suche` (search field with magnifier and cross) |
+| `GUI_TEXTINPUT_ICON(tf, links$, rechts$)` | — | a built-in symbol on the left and right inside the field ("" = none) -- see [Search field, symbols, suggestions](#search-field-symbols-suggestions) |
+| `GUI_ICON_CLICKED(tf)` | INTEGER | symbol clicked in this frame: 1 left, 2 right, 0 none |
+| `GUI_SEARCH_CHANGED(tf)` | BOOLEAN | a search field reports its text: 150 ms after the last keystroke, at once on Enter, the cross and ESC |
+| `GUI_TEXTINPUT_COMPLETION(tf, eintraege)` | — | suggestions while typing: entries that start with what was typed first, then entries that contain it ([] = none) |
+| `GUI_COMPLETION_CHOSEN(tf)` | INTEGER | suggestion taken in this frame (index into `eintraege`, -1 = none) |
+| `GUI_COMPLETION_OPEN(tf)` | BOOLEAN | is the suggestion list open? |
 | `GUI_ENTERED(tf)` | BOOLEAN | was Enter pressed in the text input in this frame? |
 | `GUI_ON_ENTER(tf, handler)` | — | callback for it |
 | `GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | **multi-line** text field (ENTER = new line, scrolls vertically and horizontally, arrows, selection via mouse drag/Shift+arrow, Ctrl+A/C/X/V). Can be coloured as a **code field** — see [Code field](#the-textarea-as-a-code-field) |
@@ -726,6 +744,50 @@ negative number could not be typed at all. **Enter** reports the field via
 `GUI_ENTERED(tf)` (for exactly one frame, like `GUI_CLICKED`) or the callback
 `GUI_ON_ENTER(tf, handler)`; if the window has a default button, it clicks
 in the same frame (see [Button](#button)).
+
+
+### Search field, symbols, suggestions
+
+```basic
+IMPORT "gui"
+SCREEN(500, 300, "Suche", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Suche", 0, 0, 500, 300)
+DIM such AS GUI_WIDGET : such = GUI_TEXTINPUT(w, 10, 10, 260, 28, "Suchen ...")
+GUI_TEXTINPUT_SET(such, "suche", 1)        ' magnifier on the left, cross on the right, reports after a pause
+DIM land AS GUI_WIDGET : land = GUI_TEXTINPUT(w, 10, 50, 260, 28, "Land")
+GUI_TEXTINPUT_COMPLETION(land, ["Deutschland", "Dänemark", "Österreich", "Schweiz"])
+DIM pw AS GUI_WIDGET : pw = GUI_TEXTINPUT(w, 10, 90, 260, 28, "Kennwort")
+GUI_TEXTINPUT_SET(pw, "passwort", 1)
+GUI_TEXTINPUT_ICON(pw, "", "auge")         ' a symbol on the right inside the field
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_SEARCH_CHANGED(such) THEN PRINT "suchen nach " + GUI_TEXT(such)
+    IF GUI_COMPLETION_CHOSEN(land) >= 0 THEN PRINT "gewählt: " + GUI_TEXT(land)
+    IF GUI_ICON_CLICKED(pw) = 2 THEN GUI_TEXTINPUT_SET(pw, "passwort", 0)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+```
+
+A **search field** reports its text only when nothing has been typed for
+150 ms -- otherwise a search over a thousand entries would run on every
+letter. Enter, the cross and ESC report at once; the cross and ESC clear the
+field. ESC in an empty search field belongs to the window's cancel button
+again. `GUI_TEXT` and `on_change` still follow every keystroke.
+
+**Symbols** (`GUI_TEXTINPUT_ICON`, the same names as for buttons and menus)
+take space on the left or right; the text starts after them, and a click on a
+symbol does not place the cursor but reports through `GUI_ICON_CLICKED` (and
+gives the field the focus).
+
+**Suggestions** appear below the field while typing (above it if there is no
+room below): entries that start with what was typed first, then entries that
+contain it anywhere, ignoring case; the matching part is in the accent
+colour. Arrows select, Enter or a click takes the suggestion, ESC closes the
+list. While a suggestion is marked, Enter belongs to the list, not to the
+default button. At most eight rows show at a time. The `.dhform` stores
+`suche`, `icons` and `vorschlaege`.
 
 ## Panel
 
@@ -3673,6 +3735,54 @@ advances by at most 50 ms: if a frame hangs, the sweep stays put for a moment
 and then moves on instead of skipping a piece. A second call
 of `GUI_WINDOW_GLOW` starts from the beginning. The IDE shows it at startup
 and when a program starts.
+
+## Popover, toast and info bar
+
+Three ways to tell or offer something without opening a dialog. All three
+lie above the windows -- also above what a program paints into a canvas --
+and are drawn with the top layer (`GUI_DRAW` or `GUI_DRAW_TOP`).
+
+```basic
+IMPORT "gui"
+SCREEN(700, 450, "Rückmeldung", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Rückmeldung", 0, 0, 700, 450)
+DIM knopf AS GUI_WIDGET : knopf = GUI_BUTTON(w, "Ansicht ...", 20, 20, 140, 30)
+DIM pop AS GUI_WINDOW : pop = GUI_POPOVER(knopf, 220, 110)
+DIM raster AS GUI_WIDGET : raster = GUI_CHECKBOX(pop, "Raster zeigen", 12, 12)
+DIM lineale AS GUI_WIDGET : lineale = GUI_CHECKBOX(pop, "Lineale zeigen", 12, 44)
+DIM sichern AS GUI_WIDGET : sichern = GUI_BUTTON(w, "Sichern", 180, 20, 120, 30)
+GUI_INFOBAR(w, "Die Datei wurde außerhalb geändert.", "warnung", "Neu laden|Behalten")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(knopf) THEN GUI_POPOVER_SHOW(pop)
+    IF GUI_CLICKED(sichern) THEN GUI_TOAST(w, "Gesichert.", "erfolg")
+    IF GUI_INFOBAR_ANSWER(w) = 1 THEN GUI_TOAST(w, "Neu geladen.")
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+```
+
+**Popover:** a borderless window with an arrow that hangs on a widget -- its
+content is like that of any window. It stands on the side you asked for and
+moves aside where the screen ends. A click beside it closes it and does
+nothing else; a click on the widget it hangs on also only closes it (it would
+otherwise open again in the same click). ESC closes it before the window's
+cancel button. What the user closed this way is reported by
+`GUI_POPOVER_CLOSED` for one frame; `GUI_POPOVER_HIDE` reports nothing. A
+popover hanging on a widget inside another popover keeps that one open. If
+the widget is no longer visible, the popover closes.
+
+**Toast:** a message at the bottom centre of the window, with a symbol and a
+colour by its kind; it fades in, fades out after its time, and a click
+removes it at once. At most four stack up; a fifth pushes out the oldest. A
+screen reader reads the message aloud (like `GUI_ANNOUNCE`).
+
+**Info bar:** at the top, over the content of the window (it does not move
+the content), with text, up to four buttons and a cross. It stays until
+answered; the answer is in `GUI_INFOBAR_ANSWER` for one frame, then the bar
+rolls away. A new `GUI_INFOBAR` replaces the old one. A press on the bar
+reaches no widget underneath.
 
 ## Dock: dockable panels
 
