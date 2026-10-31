@@ -611,7 +611,13 @@ kleinere Versalhoehe als die Pixelschrift bei 20 -- die Felder passen
 unveraendert. Elf Pruefungen, die Lagen/Masse der Pixelschrift festhalten
 (Umbruchstellen, Einzugslinien, Autosize, Tooltip-Lage), tragen dafuer
 `GUI_FONT(-1)`; IDE und Werkzeuge hatten ohnehin eigene Schriften. Tests
-zwei Faelle in `schrift_bausteine.dhtest`.
+zwei Faelle in `schrift_bausteine.dhtest`. **Danach auch `ui` und
+Diagramme** (`Vm::sans_eintauschen`, eine Stelle fuer gui, `UI_*` ueber
+`try_graphics_app`, CHART_DRAW selbst): ein Diagramm mit `schrift` -1 nimmt
+die Schrift der Oberflaeche, eines mit eigener Schrift gilt waehrend des
+Zeichnens auch als aktive -- vorher mass `text_width_at` mit der aktiven
+und zeichnete mit `schrift`, eine eigene Diagrammschrift sass also schief.
+`GUI_FONT(-1)` schaltet alle drei auf die Pixelschrift.
 
 **TEXTAREA als Code-Feld** (2026-08-30): `GUI_TEXTAREA_SPANS(ta, starts, laengen, farben)` faerbt Zeichen-Abschnitte ein, `SYNTAX_SPANS(quelltext$)` -> TUPLE `(starts, laengen, arten)` zerlegt Drachenhauch-Quelltext (Arten: kommentar/text/zahl/schluessel/name/operator), `GUI_TEXTAREA_SET(ta, key$, wert)` mit `zeilennummern`/`aktive_zeile`/`tab_fuegt_ein`/`tabbreite`. **Der Hervorheber (`syntax.rs`) ist bewusst KEIN Lexer** -- der lexer.rs wirft Kommentare weg, expandiert f-Strings und bricht bei Fehlern ab; ein Editor sieht halb getippten Text und muss ihn trotzdem darstellen (offene Zeichenkette endet an der ZEILE, sonst faerbt ein Anfuehrungszeichen den Rest der Datei). Die Wortliste teilen sich beide ueber `lexer::keyword`. **Zwei Fallen:** (1) Farbige Laeufe werden ueber die Breite des VORSPANNS positioniert, nicht durch Addieren der Laufbreiten -- eine Textbreite enthaelt den Abstand ZWISCHEN Zeichen, aber keinen dahinter, also klebten die Woerter an jeder Farbgrenze zusammen; ausserdem rechnen Schreibmarke und Auswahl schon so. (2) Die Nummernspalte verschiebt ALLES, was eine Spalte verortet -> eine Quelle `ta_gutter()`, die Zeichnen, Treffertest und Schreibmarke gemeinsam fragen; der Text wird auf den Bereich rechts davon geclippt, sonst laeuft eine waagerecht gescrollte Zeile in die Zahlen. `scroll` ist beim TextArea die erste sichtbare ZEILE, `scroll_x` der Versatz in PIXELN. `GUI_SET_TEXT` loescht die Abschnitte (sie gehoerten zum alten Text). `tab_fuegt_ein` per Vorgabe AUS -- sonst kaeme man im Formular nicht mehr aus dem Feld heraus; an, rueckt TAB bis zur naechsten SPALTE ein. Doku `docs/module-gui.md`, Demo `examples/184_codefeld.dh`, Tests `tests/pruef/syntax_spans.dhtest` + 12 Rust-`#[test]`s in `syntax.rs` + Tabulator in `tests/pruef/gui_tastatur.dhtest`.
 

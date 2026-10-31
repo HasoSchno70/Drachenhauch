@@ -248,3 +248,67 @@ GUI_UPDATE()
 PRINT "folgt setfont "; GUI_GET_W(l) = TEXT_WIDTH("MMMMMMMM")
 --- erwartet
 folgt setfont TRUE
+
+=== ui und diagramme nehmen die schrift der oberflaeche
+' Dasselbe fuer das Modul ui und die Diagramme: ohne SETFONT die
+' eingebaute Sans -- Punkt fuer Punkt dasselbe wie mit ausdruecklich
+' gesetzter Sans, und anders als nach GUI_FONT(-1). Beim Diagramm steht
+' die eigene Schrift in `schrift`; mit ihr muss der zentrierte Titel an
+' derselben Stelle stehen wie mit der Vorgabe (vorher mass das Diagramm
+' mit der aktiven Schrift und zeichnete mit seiner eigenen).
+IMPORT "gui"
+IMPORT "ui"
+IMPORT "chart"
+SCREEN(600, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM f AS INTEGER : f = LOADFONT("sans", 40)
+DIM ca AS CHART : ca = CHART_NEW("balken", 0, 150, 200, 140)
+DIM cb AS CHART : cb = CHART_NEW("balken", 200, 150, 200, 140)
+DIM cc AS CHART : cc = CHART_NEW("balken", 400, 150, 200, 140)
+DIM c AS CHART
+FOR EACH c IN (ca, cb, cc)
+    CHART_SET(c, "titel", "Umsatz je Monat")
+    CHART_ADD(c, "Mo", 3)
+    CHART_ADD(c, "Di", 5)
+NEXT
+CHART_SET_NUM(cb, "schrift", f)
+WHILE NOT QUITREQUESTED()
+    CLS(&H101820)
+    GUI_FONT(f, 20)          ' gui_pixel aus: ui und Diagramme wieder mit der Vorgabe
+    DIM k AS BOOLEAN
+    k = UI_BUTTON("a", 10, 10, 180, 40, "Speichern")
+    CHART_DRAW(ca)
+    SETFONT(f, 20)
+    k = UI_BUTTON("b", 210, 10, 180, 40, "Speichern")
+    SETFONT(-1, 20)
+    CHART_DRAW(cb)
+    GUI_FONT(-1)
+    k = UI_BUTTON("c", 410, 10, 180, 40, "Speichern")
+    CHART_DRAW(cc)
+    UI_END_FRAME()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT=s.png
+--- nachher
+DIM img AS IMAGE : img = LOADIMAGE("s.png")
+FUNCTION gleich(x1 AS INTEGER, x2 AS INTEGER, y0 AS INTEGER, h AS INTEGER) AS BOOLEAN
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = y0 TO y0 + h - 1
+        FOR x = 0 TO 199
+            IF GETPIXEL(img, x1 + x, y) <> GETPIXEL(img, x2 + x, y) THEN RETURN FALSE
+        NEXT
+    NEXT
+    RETURN TRUE
+END FUNCTION
+PRINT "ui vorgabe wie sans "; gleich(0, 200, 0, 60)
+PRINT "ui pixelschrift anders "; NOT gleich(0, 400, 0, 60)
+PRINT "diagramm vorgabe wie eigene sans "; gleich(0, 200, 150, 140)
+PRINT "diagramm pixelschrift anders "; NOT gleich(0, 400, 150, 140)
+--- erwartet
+ui vorgabe wie sans TRUE
+ui pixelschrift anders TRUE
+diagramm vorgabe wie eigene sans TRUE
+diagramm pixelschrift anders TRUE

@@ -530,7 +530,7 @@ UI_METRIC_SET("win_title_h", 24)     ' title bar of the UI_WINDOW_BEGIN windows
 
 - **No dropdown / list box** — so far easily substituted with a radio group + panel or a row of buttons.
 - **Layout is absolute** — no automatic layouts like "horizontal/vertical stack". You place the pixels yourself.
-- **Fixed font** — the standard sans-serif of the native runtime. You can change the size globally with `TEXT_SIZE(n)` — but that affects all subsequent TEXT/UI calls.
+- **Font per program** — without `SETFONT` the built-in Sans as in the gui (`GUI_FONT(-1)` takes the pixel font), otherwise the one set via `SETFONT`. You change the size globally with `TEXT_SIZE(n)` — but that affects all subsequent TEXT/UI calls.
 - **No multi-line text field** — `UI_TEXTFIELD` is single-line. Enter is not handled; you can use it yourself via `KEYPRESSED(13)` as a submit trigger.
 
 If you need one of these features, it is easy to add in a later iteration.

@@ -127,7 +127,7 @@ CHART_SET_NUM: unbekannte Eigenschaft 'innen_radius' (gueltig: min, max, innenra
 | `gitter` | Schrittweite der Wertachse; 0 = automatisch (runde Schritte) |
 | `nachkomma` | Nachkommastellen aller Zahlen |
 | `titel_groesse`, `text_groesse` | Schriftgrößen |
-| `schrift` | FONT-Handle aus `LOADFONT`; -1 = Standardschrift |
+| `schrift` | FONT-Handle aus `LOADFONT`; -1 = die Schrift der Oberfläche (eingebaute Sans bzw. die per `SETFONT` gesetzte) |
 | `start_winkel`, `end_winkel` | Tacho-Bogen in Grad (Vorgabe 135…405) |
 | `striche`, `unterstriche` | Haupt- und Nebenstriche der Tacho-Skala |
 | `linien_dicke`, `punkt_radius` | Liniendiagramm |
@@ -245,8 +245,10 @@ im Ton des jeweiligen Themas).
 ## Schrift
 
 Die Diagramme schreiben ihren Text mit der Schrift aus `schrift` — einem
-FONT-Handle aus `LOADFONT`. `-1` (die Vorgabe) ist die eingebaute Pixelschrift;
-eine echte TTF ist bei kleinen Größen deutlich besser lesbar.
+FONT-Handle aus `LOADFONT`. `-1` (die Vorgabe) ist die Schrift der
+Oberfläche wie in der gui: die eingebaute Sans, oder die Schrift, die das
+Programm mit `SETFONT` gesetzt hat; nach `GUI_FONT(-1)` die Pixelschrift.
+Eine eigene Schrift setzt man so:
 
 ```basic
 DIM schrift AS INTEGER

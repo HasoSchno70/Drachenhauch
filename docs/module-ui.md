@@ -530,7 +530,7 @@ UI_METRIC_SET("win_title_h", 24)     ' Titelleiste der UI_WINDOW_BEGIN-Fenster
 
 - **Kein Dropdown / ListBox** — bisher mit Radio-Group + Panel oder einer Reihe Buttons gut substituierbar.
 - **Layout ist absolut** — keine automatischen Layouts à la "horizontal/vertical stack". Du legst Pixel selbst.
-- **Schriftart fix** — die Standard-SansSerif der nativen Runtime. Du kannst die Größe global mit `TEXT_SIZE(n)` umstellen — das wirkt aber auf alle nachfolgenden TEXT/UI-Aufrufe.
+- **Schriftart je Programm** — ohne `SETFONT` die eingebaute Sans wie in der gui (`GUI_FONT(-1)` nimmt die Pixelschrift), sonst die per `SETFONT` gesetzte. Die Größe stellst du global mit `TEXT_SIZE(n)` um — das wirkt aber auf alle nachfolgenden TEXT/UI-Aufrufe.
 - **Kein Multi-Line-Textfeld** — `UI_TEXTFIELD` ist single-line. Enter wird nicht behandelt; du kannst's selbst per `KEYPRESSED(13)` als Submit-Trigger nutzen.
 
 Wenn du eines dieser Features brauchst, in einer späteren Iteration leicht zu ergänzen.
