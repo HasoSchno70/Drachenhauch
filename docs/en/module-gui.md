@@ -3885,6 +3885,53 @@ A word is letters, plus an apostrophe between two letters; the Hunspell
 path does not check single letters and numbers. The Windows checker splits
 the text itself and also reports repeated words.
 
+## Right to left
+
+```basic
+IMPORT "gui"
+SCREEN(640, 260, "Gruß", 1)
+GUI_FONT(LOADFONT("sans", 28), 18)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Gruß", 0, 0, 640, 260)
+DIM text AS GUI_WIDGET : text = GUI_TEXTAREA(w, 10, 10, 610, 160)
+GUI_SET_TEXT(text, "مرحبا بالعالم 123" + CHR$(10) + "שלום עולם (abc)")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    TEXT(20, 200, "Hallo שלום Welt", WHITE)
+    GUI_DRAW()
+    FLIP()
+WEND
+```
+
+Hebrew and Arabic appear the way they are read: a right-to-left run is
+reversed, Arabic is joined (each letter in its initial, medial, final or
+isolated form, lam and alef as one ligature), brackets are mirrored, digits
+keep their order. This applies to all text the runtime draws -- `TEXT`,
+labels, buttons, lists, tables, menus -- and to measuring (`TEXT_WIDTH`,
+wrapping). A line's direction is set by its first strong character (Unicode
+bidi algorithm, UAX 9); the control characters LRM/RLM, LRE/RLE/PDF,
+LRO/RLO and the isolates take effect and are not drawn.
+
+Text fields and text areas edit such text the way you expect: a click hits
+the character that is shown there, the caret stands where typing
+continues, and a selection across mixed text is several pieces. In a line
+that runs right to left as a whole, the arrow keys swap: left means forward
+in the text there. `GUI_TEXTAREA_POS_AT` and `GUI_TEXTAREA_CARET_XY` work
+with the position you see. The text is always stored in the order it was
+typed.
+
+| Command | What it does |
+|---|---|
+| `TEXT_VISUAL$(text$ [, direction$])` | The text as it is displayed -- for your own output such as files or images. `direction$` = `auto` (default), `ltr` or `rtl` |
+
+What does not work (yet): ligatures of other scripts and Indic scripts
+(that would need full text shaping); alignment does not follow direction --
+a right-to-left line stays on the left unless `GUI_SET_ALIGN` says
+otherwise; in such a line of a text area bold, italic and underline are
+dropped (the colours of the highlighting stay); end-of-line hints and
+colour swatches still use the logical position. The pdf module does not
+reorder -- use `TEXT_VISUAL$` before `PDF_TEXT` there.
+
 ## Building blocks: flow layout, Alt letters, marks
 
 ```basic

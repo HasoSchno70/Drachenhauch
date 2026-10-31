@@ -26,6 +26,8 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 regex = "1"
 # Rechtschreibung (SPELL_*): Hunspell-Woerterbuecher, reines Rust.
 spellbook = "0.4"
+# Rechts-nach-links (schreibrichtung.rs): dieselbe Fassung, die schon im Baum liegt.
+unicode-bidi = "0.3"
 # Schneller Nicht-DoS-Hasher fuer interne Lookup-Maps (Funktionen/Klassen/
 # Instanz-Felder) -- Keys kommen aus dem Compiler, nicht von Angreifern.
 rustc-hash = "2"

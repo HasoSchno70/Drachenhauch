@@ -321,6 +321,7 @@ Erweiterungen *(nur native Runtime)*:
 |---|---|
 | `LTRIM$(s)`, `RTRIM$(s)` | Whitespace nur links / nur rechts entfernen |
 | `REVERSE$(s)` | Zeichen umkehren |
+| `TEXT_VISUAL$(text[, richtung])` | der Text so, wie er dasteht: Stücke von rechts nach links umgedreht, Arabisch in seinen verbundenen Formen; `richtung` = `auto` (Vorgabe, erstes starkes Zeichen), `ltr` oder `rtl`. Für eigene Ausgaben -- `TEXT` und die gui tun das selbst |
 | `STARTSWITH(s, präfix)`, `ENDSWITH(s, suffix)` → BOOLEAN | Anfang/Ende prüfen |
 | `CONTAINS(s, teil)` → BOOLEAN | Teilstring enthalten? (Funktionsform von `teil IN s`) |
 | `COUNT(s, teil)` → INTEGER | Anzahl nicht-überlappender Vorkommen von `teil` |

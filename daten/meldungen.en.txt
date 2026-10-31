@@ -1795,3 +1795,4 @@ verfuegbar sind: {}	available are: {}
 SPELL_SUGGEST: hoechstens {} Vorschlaege -- erwartet 1 oder mehr	SPELL_SUGGEST: at most {} suggestions -- expects 1 or more
 {}: nur fuer Textfeld und Textbereich, nicht fuer {}	{}: only for text field and text area, not for {}
 GUI_SPELL: erwartet (feld, woerterbuch) -- woerterbuch -1 schaltet ab	GUI_SPELL: expects (field, dictionary) -- dictionary -1 turns it off
+TEXT_VISUAL$: unbekannte Richtung '{}' -- erlaubt: auto, ltr, rtl	TEXT_VISUAL$: unknown direction '{}' -- allowed: auto, ltr, rtl

@@ -9969,6 +9969,12 @@
    "module": "dhrt"
   },
   {
+   "name": "TEXT_VISUAL$",
+   "kind": "core",
+   "signature": "TEXT_VISUAL$(text [, richtung]) AS STRING",
+   "module": "dhrt"
+  },
+  {
    "name": "RGB",
    "kind": "core",
    "signature": "RGB(r: INTEGER, g: INTEGER, b: INTEGER)",

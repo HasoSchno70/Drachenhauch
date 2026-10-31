@@ -322,6 +322,7 @@ Extensions *(native runtime only)*:
 |---|---|
 | `LTRIM$(s)`, `RTRIM$(s)` | remove whitespace on the left only / right only |
 | `REVERSE$(s)` | reverse the characters |
+| `TEXT_VISUAL$(text[, direction])` | the text as it is displayed: right-to-left runs reversed, Arabic in its joined forms; `direction` = `auto` (default, first strong character), `ltr` or `rtl`. For your own output -- `TEXT` and the gui do this themselves |
 | `STARTSWITH(s, präfix)`, `ENDSWITH(s, suffix)` → BOOLEAN | check start/end |
 | `CONTAINS(s, teil)` → BOOLEAN | substring contained? (function form of `teil IN s`) |
 | `COUNT(s, teil)` → INTEGER | number of non-overlapping occurrences of `teil` |

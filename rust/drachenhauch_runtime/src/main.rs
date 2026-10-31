@@ -55,6 +55,7 @@ mod resample;
 mod objschreiber;
 mod schnitt;
 mod rechtschreibung;
+mod schreibrichtung;
 mod geld;
 mod httpd;
 #[cfg(feature = "smtp")]

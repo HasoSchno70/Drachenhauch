@@ -1304,6 +1304,10 @@ pub struct Graphics {
     /// Codepunkte, fuer die beim Messen oder Aufzeichnen keine Glyphe da war;
     /// FLIP backt daraus nach. RefCell, weil das Messen `&self` ist.
     glyphen_fehlend: std::cell::RefCell<std::collections::HashSet<u32>>,
+    /// Text ist schon in Anzeige-Reihenfolge (schreibrichtung.rs) -- die gui
+    /// setzt das, wenn sie eine Zeile selbst geordnet hat und Stuecke davon
+    /// zeichnet oder misst. Sonst drehte sich ein Stueck ein zweites Mal.
+    richtung_roh: std::cell::Cell<bool>,
     /// Codepunkte, die keine Datei liefern konnte -- nicht jedes Bild neu.
     glyphen_unmoeglich: std::collections::HashSet<u32>,
     /// Je LOADFONT-Handle Zeichen, die der Font NICHT gebacken hat, die aber
@@ -2026,6 +2030,7 @@ impl Graphics {
             active_font: -1,
             ausweich: Vec::new(), font_glyphs: Vec::new(),
             glyphen_fehlend: std::cell::RefCell::new(std::collections::HashSet::new()),
+            richtung_roh: std::cell::Cell::new(false),
             glyphen_unmoeglich: std::collections::HashSet::new(),
             eigen_fehlt: std::cell::RefCell::new(std::collections::HashMap::new()),
             eigen_nie: std::collections::HashSet::new(),
@@ -2099,6 +2104,19 @@ impl Graphics {
     /// aus der Ausweichschrift. Bis 2026-10-01 ging jeder Text mit einem Zeichen
     /// ueber ASCII GANZ an die Ausweichschrift, bis 2026.27 noch jeder mit
     /// einem Zeichen jenseits von Latin-1 (`„`, `–`, `€`).
+    /// Text so, wie er dasteht: rechts nach links geordnet, arabisch
+    /// verbunden. Ohne solche Zeichen (oder im rohen Modus) unveraendert.
+    pub fn visuell<'a>(&self, s: &'a str) -> std::borrow::Cow<'a, str> {
+        if self.richtung_roh.get() || !crate::schreibrichtung::braucht(s) { return std::borrow::Cow::Borrowed(s); }
+        std::borrow::Cow::Owned(crate::schreibrichtung::anzeige(s))
+    }
+    fn visuell_string(&self, s: String) -> String {
+        if self.richtung_roh.get() || !crate::schreibrichtung::braucht(&s) { return s; }
+        crate::schreibrichtung::anzeige(&s)
+    }
+    /// Rohen Modus setzen (Text schon geordnet) -> alter Wert.
+    pub fn richtung_roh(&self, an: bool) -> bool { self.richtung_roh.replace(an) }
+
     fn font_fuer(&self, _s: &str) -> i64 {
         if self.active_font >= 0 { self.active_font } else { -1 }
     }
@@ -2156,6 +2174,8 @@ impl Graphics {
     /// Ausweich-Schriften -- dieselbe Aufteilung wie `zeichne_text`, sonst
     /// misst ein Layout etwas anderes, als am Ende dasteht.
     fn breite_mit(&self, h: i64, s: &str, size: f32) -> f32 {
+        // Gemessen wird, was dasteht -- geformte Glyphen sind anders breit.
+        let s = &*self.visuell(s);
         self.glyphen_pruefen(h, s);
         let basis = self.font_von(h);
         if s.is_ascii() || basis.is_none() {
@@ -4215,6 +4235,7 @@ impl Graphics {
     /// so zeichnet jedes bestehende Programm wie zuvor.
     #[allow(clippy::too_many_arguments)]
     fn text_emit(&mut self, x: i32, y: i32, s: String, sz: i32, c: i64, font: i64, spacing: f32, stil: u8) {
+        let s = self.visuell_string(s);
         let (h, emu) = self.schnitt(font, stil);
         let emu = emu | (stil & (crate::schnitt::UNTER | crate::schnitt::DURCH));
         self.glyphen_pruefen(h, &s);
@@ -4309,6 +4330,7 @@ impl Graphics {
     /// durch die Camera (w2s) wie TEXT.
     pub fn text_rot(&mut self, x: i32, y: i32, s: String, angle_deg: f32, scale: f32, c: i64) {
         let (x, y) = self.w2s(x, y);
+        let s = self.visuell_string(s);
         let font = self.font_fuer_gedreht(&s);
         self.emit(Cmd::TextRot(x, y, s, self.text_size, col(c), font,
                                self.text_spacing, angle_deg, scale.max(0.0001)));
@@ -4323,6 +4345,7 @@ impl Graphics {
     pub fn text_rot_styled(&mut self, x: i32, y: i32, s: String, angle_deg: f32,
                            c: i64, font: i64, size: i32) {
         let (x, y) = self.w2s(x, y);
+        let s = self.visuell_string(s);
         let font = if font < 0 { self.font_fuer_gedreht(&s) } else { font };
         self.emit(Cmd::TextRot(x, y, s, size.max(1), col(c), font,
                                self.text_spacing, angle_deg, 1.0));
@@ -4334,6 +4357,7 @@ impl Graphics {
         let (x, y) = self.w2s(x, y);
         // Auch hier ausweichen: ein Widget ohne eigene Schrift (font = -1)
         // zeigt sonst "K?ln" in der Tabelle.
+        let s = self.visuell_string(s);
         self.glyphen_pruefen(font, &s);
         self.emit(Cmd::Text(x, y, s, size.max(1), col(c), font, self.text_spacing));
     }
@@ -4354,6 +4378,7 @@ impl Graphics {
     pub fn text_nachgebildet(&mut self, x: i32, y: i32, s: String, c: i64, font: i64, size: i32, stil: u8) {
         if stil == 0 { return self.text_styled(x, y, s, c, font, size); }
         let (x, y) = self.w2s(x, y);
+        let s = self.visuell_string(s);
         self.glyphen_pruefen(font, &s);
         let sp = self.text_spacing;
         self.emit(Cmd::TextStil(x, y, s, size.max(1), col(c), font, sp, stil));

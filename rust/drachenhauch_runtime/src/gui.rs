@@ -27,6 +27,8 @@ mod stil;
 mod bausteine;
 #[path = "gui_rechtschreibung.rs"]
 mod rechtschreibung;
+#[path = "gui_richtung.rs"]
+mod richtung;
 
 const KEY_BACKSPACE: i64 = 8;
 const KEY_TAB: i64 = 9;
@@ -13773,6 +13775,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         (a, e)
     }
     fn caret_index_at(g: &Graphics, chars: &[char], target_px: i32, ms: Mass) -> i32 {
+        // Eine Zeile mit Text von rechts nach links steht anders da, als sie
+        // gespeichert ist -- der Klick trifft dann ein Anzeige-Zeichen.
+        if let Some(l) = Self::rtl_lage_mit(g, chars, |s| ms.breite(g, s)) { return l.index(target_px) as i32; }
         if target_px <= 0 { return 0; }
         // Gesucht ist das erste n, bei dem der Punkt vor der Mitte des n-ten
         // Zeichens liegt. Die Mitte waechst mit n -- also binaer statt Zeichen
@@ -13945,8 +13950,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
 
         // --- Horizontalen Scroll so anpassen, dass das Caret sichtbar bleibt ---
-        let vor = sichtbar(&chars[..caret as usize]);
-        let caret_px = ms.breite(g, &vor.iter().collect::<String>());
+        let sicht = sichtbar(&chars);
+        let caret_px = match Self::rtl_lage_mit(g, &sicht, |s| ms.breite(g, s)) {
+            Some(l) => l.marke(caret as usize),
+            None => ms.breite(g, &sicht[..caret as usize].iter().collect::<String>()),
+        };
         let pfeil = if self.windows[wi].widgets[i].frei { self.sk(DD_PFEIL_B) } else { 0 };
         let (sl, sr) = self.ti_rand(&self.windows[wi].widgets[i]);
         let inner = (fw - 10 - pfeil - sl - sr).max(1);
@@ -14037,12 +14045,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // --- Navigation (Umschalt = Auswahl erweitern) ---
         let len = chars.len() as i32;
         *caret = (*caret).clamp(0, len); *anchor = (*anchor).clamp(0, len);
-        if g.key_pressed(KEY_LEFT) {
+        // Steht die Zeile rechts nach links, geht "links" im Text weiter.
+        let (k_zurueck, k_vor) = if richtung::zeile_rtl(chars) { (KEY_RIGHT, KEY_LEFT) } else { (KEY_LEFT, KEY_RIGHT) };
+        if g.key_pressed(k_zurueck) {
             let (lo, hi) = ((*caret).min(*anchor), (*caret).max(*anchor));
             if !shift && lo != hi { *caret = lo; } else { *caret = (*caret - 1).max(0); }
             if !shift { *anchor = *caret; }
         }
-        if g.key_pressed(KEY_RIGHT) {
+        if g.key_pressed(k_vor) {
             let (lo, hi) = ((*caret).min(*anchor), (*caret).max(*anchor));
             if !shift && lo != hi { *caret = hi; } else { *caret = (*caret + 1).min(len); }
             if !shift { *anchor = *caret; }
@@ -14656,6 +14666,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let target = mx - (ax + pad + gut - wd.scroll_x);
         let ms = self.mass(g, wd);
         let sub = &chars[lstart..lend];
+        if let Some(lage) = Self::rtl_lage_mit(g, sub, |s| ms.breite(g, s)) {
+            return Ok(match lage.zeichen_bei(target) {
+                Some(l) => (rli as i64 + 1, ((lstart + l) - starts[rli] + 1) as i64),
+                None => (0, 0),
+            });
+        }
         // Das erste n, dessen Vorspann breiter ist als der Abstand -- binaer,
         // wie in caret_index_at (die Breite waechst mit n).
         let breite = |n: usize| -> i32 { let t: String = sub[..n].iter().collect(); ms.breite(g, &t) };
@@ -15257,12 +15273,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let (mut c, mut a) = (m.0.clamp(0, len), m.1.clamp(0, len));
             let row = Self::ta_row_of(&rows, c.max(0) as usize);
             let col = c - rows[row].1 as i32;
-            if g.key_pressed(KEY_LEFT) {
+            let (k_zurueck, k_vor) = if richtung::zeile_rtl(&chars[rows[row].1..rows[row].2]) { (KEY_RIGHT, KEY_LEFT) } else { (KEY_LEFT, KEY_RIGHT) };
+            if g.key_pressed(k_zurueck) {
                 let (lo, hi) = (c.min(a), c.max(a));
                 if !shift && lo != hi { c = lo; } else { c = (c - 1).max(0); }
                 if !shift { a = c; }
             }
-            if g.key_pressed(KEY_RIGHT) {
+            if g.key_pressed(k_vor) {
                 let (lo, hi) = (c.min(a), c.max(a));
                 if !shift && lo != hi { c = hi; } else { c = (c + 1).min(len); }
                 if !shift { a = c; }
@@ -18345,8 +18362,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let (tx, scroll) = if wdg.align >= 1 && tw <= inner {
                     (if wdg.align == 1 { ax + 5 + sl + (inner - tw) / 2 } else { ax + 5 + sl + inner - tw }, 0)
                 } else { (ax + 5 + sl, wdg.scroll) };
-                let pre: String = anz.iter().take(caret_anz.max(0) as usize).collect();
-                let cx = tx + self.wtext_width(g, wdg, &pre) - scroll;
+                let cx = tx + self.zeilen_x(g, wdg, &anz, caret_anz.max(0) as usize) - scroll;
                 Some((cx, ay + 3, (h - 7).max(1)))
             }
             Kind::TextArea => {
@@ -18356,10 +18372,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let starts = Self::line_starts(&chars);
                 let rows = self.ta_rows(g, wdg, &chars, &starts, self.ta_breite(g, wdg, starts.len()));
                 let crow = Self::ta_row_of(&rows, caret_anz.max(0) as usize);
-                let lstart = rows.get(crow)?.1;
+                let (_, lstart, lend) = *rows.get(crow)?;
                 let cend = (lstart + (caret_anz - lstart as i32).max(0) as usize).min(chars.len());
-                let prefix: String = chars[lstart..cend].iter().collect();
-                let cx = ax + pad + self.ta_gutter(g, wdg, starts.len()) - wdg.scroll_x + self.wtext_width(g, wdg, &prefix);
+                let cx = ax + pad + self.ta_gutter(g, wdg, starts.len()) - wdg.scroll_x
+                         + self.zeilen_x(g, wdg, &chars[lstart..lend], cend - lstart);
                 let cy = ay + pad + (crow as i32 - wdg.scroll) * lh;
                 Some((cx, cy, lh))
             }
@@ -19690,9 +19706,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let lo = wdg.caret.min(wdg.sel_anchor).clamp(0, chars.len() as i32);
                 let hi = wdg.caret.max(wdg.sel_anchor).clamp(0, chars.len() as i32);
                 if lo != hi {
-                    let x0 = tx + self.wtext_width(g, wdg, &chars[..lo as usize].iter().collect::<String>()) - scroll;
-                    let x1 = tx + self.wtext_width(g, wdg, &chars[..hi as usize].iter().collect::<String>()) - scroll;
-                    g.box_fill(x0, ay + 2, x1, ay + h - 3, self.selection_bg(wdg));
+                    for (x0, x1) in self.zeilen_bereiche(g, wdg, &chars, lo as usize, hi as usize) {
+                        g.box_fill(tx + x0 - scroll, ay + 2, tx + x1 - scroll, ay + h - 3, self.selection_bg(wdg));
+                    }
                 }
             }
             self.wtext(g, wdg, tx - scroll, ty, anzeige.clone(), fg);
@@ -19702,16 +19718,16 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             if !wdg.vorschau.is_empty() {
                 let von = wdg.caret.clamp(0, chars.len() as i32) as usize;
                 let bis = (von + wdg.vorschau.chars().count()).min(chars.len());
-                let x0 = tx + self.wtext_width(g, wdg, &chars[..von].iter().collect::<String>()) - scroll;
-                let x1 = tx + self.wtext_width(g, wdg, &chars[..bis].iter().collect::<String>()) - scroll;
-                g.line(x0, ay + h - 5, x1, ay + h - 5, fg);
+                for (x0, x1) in self.zeilen_bereiche(g, wdg, &chars, von, bis) {
+                    g.line(tx + x0 - scroll, ay + h - 5, tx + x1 - scroll, ay + h - 5, fg);
+                }
             }
         }
         // Caret (blinkend) an der gemessenen Position -- in der
         // Vorschau dort, wo die IME ihre Marke hat.
         if focused && self.caret_blink_on() {
-            let pre: String = anzeige.chars().take(caret_anz.max(0) as usize).collect();
-            let cx = tx + self.wtext_width(g, wdg, &pre) - scroll;
+            let az: Vec<char> = anzeige.chars().collect();
+            let cx = tx + self.zeilen_x(g, wdg, &az, caret_anz.max(0) as usize) - scroll;
             g.line(cx, ay + 3, cx, ay + h - 4, fg);
         }
         g.pop_clip();
@@ -20136,11 +20152,17 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                                 let a = lo.max(lstart);
                                 let b = hi.min(lend);
                                 if b < a || (a == b && hi <= lend) { continue; }
-                                let x0 = tx0 + self.wtext_width(g, wdg, &chars[lstart as usize..a as usize].iter().collect::<String>());
-                                let mut x1 = tx0 + self.wtext_width(g, wdg, &chars[lstart as usize..b as usize].iter().collect::<String>());
-                                if hi > lend { x1 += self.wtext_width(g, wdg, " ").max(self.sk(4)); }   // Auswahl laeuft weiter
+                                let zeile = &chars[lstart as usize..lend as usize];
                                 let y = ay + pad + r * lh;
-                                g.box_fill(x0, y, x1, y + lh - 2, selbg);
+                                let mut stuecke = self.zeilen_bereiche(g, wdg, zeile, (a - lstart) as usize, (b - lstart) as usize);
+                                stuecke.retain(|s| s.0 != s.1);
+                                // Laeuft die Auswahl ueber das Zeilenende, kommt am
+                                // Ende der Zeile ein Stueck dazu.
+                                if hi > lend {
+                                    let ende = self.zeilen_x(g, wdg, zeile, zeile.len());
+                                    stuecke.push((ende, ende + self.wtext_width(g, wdg, " ").max(self.sk(4))));
+                                }
+                                for (x0, x1) in stuecke { g.box_fill(tx0 + x0, y, tx0 + x1, y + lh - 2, selbg); }
                             }
                         }
                     }
@@ -20154,9 +20176,16 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         let geformt = wdg.formatiert && wdg.stile_text == wdg.text
                             && wdg.stile.len() == chars.len()
                             && wdg.stile[rs..re].iter().any(|&b| b != 0);
+                        let rtl = if wdg.spans.is_empty() && !geformt { None } else { self.rtl_lage(g, wdg, &chars[rs..re]) };
                         let breite = if wdg.spans.is_empty() && !geformt {
                             self.wtext(g, wdg, tx0, y, zeile.clone(), fg);
                             self.wtext_width(g, wdg, &zeile)
+                        } else if let Some(lage) = rtl {
+                            // Farben je logischem Zeichen; die Inline-Formate fallen
+                            // in einer solchen Zeile weg.
+                            let farben = self.zeilen_farben(wdg, rs, re - rs, fg);
+                            self.rtl_bunt(g, wdg, tx0, y, &lage, |l| farben[l]);
+                            lage.breite()
                         } else {
                             self.zeile_bunt(g, wdg, tx0, y, &zeile, rs, fg, ax + 2 + gutter, ax + w - 2);
                             self.wtext_width(g, wdg, &zeile)
@@ -20206,18 +20235,23 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                                 if l > 0 && s >= re && re > rs { continue; }
                                 let a = s.max(rs).min(re);
                                 let b = e.max(a).min(re);
-                                let x0 = tx0 + self.wtext_width(g, wdg, &chars[rs..a].iter().collect::<String>());
-                                let mut x1 = tx0 + self.wtext_width(g, wdg, &chars[rs..b].iter().collect::<String>());
-                                // Ohne Laenge (oder am Zeilenende) ein kurzes Stueck.
-                                if x1 < x0 + self.sk(8) { x1 = x0 + self.sk(8); }
-                                let mut x = x0;
-                                let mut oben = true;
-                                while x < x1 {
-                                    let nx = (x + zacke).min(x1);
-                                    let (y0, y1) = if oben { (yb, yb + zacke) } else { (yb + zacke, yb) };
-                                    g.line(x, y0, nx, y1, c);
-                                    x = nx;
-                                    oben = !oben;
+                                let zeile = &chars[rs..re];
+                                let mut stuecke = self.zeilen_bereiche(g, wdg, zeile, a - rs, b - rs);
+                                stuecke.retain(|s| s.0 != s.1);
+                                if stuecke.is_empty() { let x = self.zeilen_x(g, wdg, zeile, a - rs); stuecke.push((x, x)); }
+                                for (x0, x1) in stuecke {
+                                    let (x0, mut x1) = (tx0 + x0, tx0 + x1);
+                                    // Ohne Laenge (oder am Zeilenende) ein kurzes Stueck.
+                                    if x1 < x0 + self.sk(8) { x1 = x0 + self.sk(8); }
+                                    let mut x = x0;
+                                    let mut oben = true;
+                                    while x < x1 {
+                                        let nx = (x + zacke).min(x1);
+                                        let (y0, y1) = if oben { (yb, yb + zacke) } else { (yb + zacke, yb) };
+                                        g.line(x, y0, nx, y1, c);
+                                        x = nx;
+                                        oben = !oben;
+                                    }
                                 }
                             }
                         }
@@ -20287,9 +20321,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         if b <= a { continue; }
                         let y = ay + pad + (r as i32 - scroll) * lh + lh - 3;
                         if y < ay + 2 || y > ay + h - 3 { continue; }
-                        let x0 = tx0 + self.wtext_width(g, wdg, &chars[rs..a].iter().collect::<String>());
-                        let x1 = tx0 + self.wtext_width(g, wdg, &chars[rs..b].iter().collect::<String>());
-                        g.line(x0, y, x1, y, fg);
+                        for (x0, x1) in self.zeilen_bereiche(g, wdg, &chars[rs..re], a - rs, b - rs) {
+                            g.line(tx0 + x0, y, tx0 + x1, y, fg);
+                        }
                     }
                 }
                 if focused && self.caret_blink_on() {
@@ -20301,11 +20335,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     for &(mc, _) in wdg.marken_zusatz.iter() {
                         let mc = mc.clamp(0, chars.len() as i32);
                         let mrow = Self::ta_row_of(&rows, mc as usize);
-                        let ms = rows[mrow].1;
+                        let (_, ms, mend) = rows[mrow];
                         let me = (ms + (mc - ms as i32).max(0) as usize).min(chars.len());
-                        let vorspann: String = chars[ms..me].iter().collect();
                         let mx = ax + pad + self.ta_gutter(g, wdg, starts.len()) - wdg.scroll_x
-                                 + self.wtext_width(g, wdg, &vorspann);
+                                 + self.zeilen_x(g, wdg, &chars[ms..mend], me - ms);
                         let my = ay + pad + (mrow as i32 - scroll) * lh;
                         if my >= ay + 2 && my + lh <= ay + h
                            && mx >= ax + 2 + self.ta_gutter(g, wdg, starts.len()) {
@@ -20313,11 +20346,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         }
                     }
                     let crow = Self::ta_row_of(&rows, caret_anz.max(0) as usize);
-                    let lstart = rows[crow].1;
+                    let (_, lstart, lend) = rows[crow];
                     let cend = (lstart + (caret_anz - lstart as i32).max(0) as usize).min(chars.len());
-                    let prefix: String = chars[lstart..cend].iter().collect();
                     let cx = ax + pad + self.ta_gutter(g, wdg, starts.len()) - wdg.scroll_x
-                             + self.wtext_width(g, wdg, &prefix);
+                             + self.zeilen_x(g, wdg, &chars[lstart..lend], cend - lstart);
                     let cy = ay + pad + (crow as i32 - scroll) * lh;
                     // Auch die Schreibmarke bleibt rechts der Nummernspalte --
                     // sonst blinkte sie beim Scrollen nach rechts in den Zahlen.
@@ -21011,19 +21043,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         s.chars().take(cap).collect()
     }
 
-    fn zeile_bunt(&self, g: &mut Graphics, wdg: &Widget, x: i32, y: i32,
-                  zeile: &str, zeilen_start: usize, grund: i64, links: i32, rechts: i32) {
-        let z: Vec<char> = zeile.chars().collect();
-        if z.is_empty() { return; }
-        let mut farbe = vec![grund; z.len()];
-        // Inline-Formate: derselbe Lauf-Mechanismus, ein Lauf endet auch am
-        // Stilwechsel. Gezeichnet wird der Stil NACHGEBILDET auf der
-        // Grundschrift -- ein echter fetter Schnitt waere breiter, und
-        // Schreibmarke, Auswahl und Klick messen am ungeformten Text.
-        let geformt = wdg.formatiert && wdg.stile_text == wdg.text
-            && wdg.stile.len() >= zeilen_start + z.len();
-        let stil = |k: usize| -> u8 { if geformt { wdg.stile[zeilen_start + k] } else { 0 } };
-        let ende = zeilen_start + z.len();
+    /// Farbe je Zeichen einer Zeile aus den Abschnitten (GUI_TEXTAREA_SPANS).
+    fn zeilen_farben(&self, wdg: &Widget, zeilen_start: usize, n: usize, grund: i64) -> Vec<i64> {
+        let mut farbe = vec![grund; n];
+        let ende = zeilen_start + n;
         // Die Abschnitte liegen sortiert -- ab dem ersten, der noch in die
         // Zeile hineinreicht, und nur solange er vor ihrem Ende beginnt.
         let erster = wdg.spans.partition_point(|&(s, l, _)| (s as usize + l as usize) <= zeilen_start);
@@ -21034,6 +21057,21 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let bis = ((s + l as usize).min(ende)) - zeilen_start;
             for f in &mut farbe[von..bis] { *f = c; }
         }
+        farbe
+    }
+
+    fn zeile_bunt(&self, g: &mut Graphics, wdg: &Widget, x: i32, y: i32,
+                  zeile: &str, zeilen_start: usize, grund: i64, links: i32, rechts: i32) {
+        let z: Vec<char> = zeile.chars().collect();
+        if z.is_empty() { return; }
+        let farbe = self.zeilen_farben(wdg, zeilen_start, z.len(), grund);
+        // Inline-Formate: derselbe Lauf-Mechanismus, ein Lauf endet auch am
+        // Stilwechsel. Gezeichnet wird der Stil NACHGEBILDET auf der
+        // Grundschrift -- ein echter fetter Schnitt waere breiter, und
+        // Schreibmarke, Auswahl und Klick messen am ungeformten Text.
+        let geformt = wdg.formatiert && wdg.stile_text == wdg.text
+            && wdg.stile.len() >= zeilen_start + z.len();
+        let stil = |k: usize| -> u8 { if geformt { wdg.stile[zeilen_start + k] } else { 0 } };
         // Gleichfarbige Laeufe zeichnen. Die Position kommt aus der Breite des
         // VORSPANNS (Zeilenanfang bis hierher), nicht aus der Summe der
         // bisherigen Laeufe.

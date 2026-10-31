@@ -315,9 +315,9 @@ impl Gui {
         let zacke = self.sk(2).max(2);
         for &(s, l) in &z.fehler {
             if s + l > chars.len() { continue; }
-            let x0 = tx + self.wtext_width(g, wdg, &chars[..s].iter().collect::<String>());
-            let x1 = tx + self.wtext_width(g, wdg, &chars[..s + l].iter().collect::<String>());
-            zickzack(g, x0, x1, yb, zacke, RS_FARBE);
+            for (x0, x1) in self.zeilen_bereiche(g, wdg, chars, s, s + l) {
+                zickzack(g, tx + x0, tx + x1, yb, zacke, RS_FARBE);
+            }
         }
     }
 

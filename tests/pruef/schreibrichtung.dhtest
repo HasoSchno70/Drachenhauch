@@ -1,0 +1,229 @@
+' Rechts nach links (Paket 3, zweiter Teil): Hebraeisch und Arabisch stehen
+' so da, wie man sie liest -- umgedreht, Arabisch verbunden -- und Klick,
+' Schreibmarke und Pfeile meinen die logische Stelle.
+'
+' Die Bildfaelle vergleichen zwei Zeichnungen Punkt fuer Punkt statt feste
+' Pixel: "אב" muss genau so aussehen wie "בא" mit erzwungener Richtung
+' links-nach-rechts (LRO ... PDF, die Steuerzeichen fallen weg) -- und die
+' Gegenprobe, "בא" ohne Erzwingen, muss anders aussehen.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== text_visual ordnet und formt
+FUNCTION codes$(s AS STRING) AS STRING
+    DIM r AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(s) - 1
+        r = r + " " + HEX$(ASC(MID$(s, i, 1)))
+    NEXT
+    RETURN TRIM$(r)
+END FUNCTION
+PRINT codes$(TEXT_VISUAL$("שלום"))
+' Ziffern hinter Hebraeisch gehoeren zum Lauf von rechts nach links (UAX 9, N1).
+PRINT codes$(TEXT_VISUAL$("ab שלום 12"))
+PRINT codes$(TEXT_VISUAL$("لا"))
+PRINT codes$(TEXT_VISUAL$("سلام"))
+PRINT codes$(TEXT_VISUAL$("א b"))
+PRINT codes$(TEXT_VISUAL$("א b", "ltr"))
+PRINT codes$(TEXT_VISUAL$("b א", "rtl"))
+PRINT codes$(TEXT_VISUAL$("שלום (א)"))
+PRINT TEXT_VISUAL$("nur links")
+PRINT codes$(TEXT_VISUAL$("שלום" + CHR$(10) + "ab"))
+--- erwartet
+5DD 5D5 5DC 5E9
+61 62 20 31 32 20 5DD 5D5 5DC 5E9
+FEFB
+FEE1 FEFC FEB3
+62 20 5D0
+5D0 20 62
+5D0 20 62
+28 5D0 29 20 5DD 5D5 5DC 5E9
+nur links
+5DD 5D5 5DC 5E9 A 61 62
+
+=== unbekannte richtung ist ein fehler
+PRINT TEXT_VISUAL$("x", "quer")
+--- fehler
+TEXT_VISUAL$: unbekannte Richtung 'quer'
+
+=== hebraeisch steht umgedreht da
+FUNCTION bild(s AS STRING) AS IMAGE
+    DIM rt AS INTEGER : rt = RENDERTARGET_NEW(120, 40)
+    RENDERTARGET_BEGIN(rt)
+    TEXT(4, 4, s, WHITE)
+    RENDERTARGET_END()
+    RETURN RENDERTARGET_IMAGE(rt)
+END FUNCTION
+FUNCTION gleich(a AS IMAGE, b AS IMAGE) AS BOOLEAN
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO 39
+        FOR x = 0 TO 119
+            IF GETPIXEL(a, x, y) <> GETPIXEL(b, x, y) THEN RETURN FALSE
+        NEXT
+    NEXT
+    RETURN TRUE
+END FUNCTION
+FUNCTION punkte(a AS IMAGE) AS INTEGER
+    DIM n AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO 39
+        FOR x = 0 TO 119
+            IF GETPIXEL(a, x, y) <> 0 THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+SCREEN(200, 100, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+TEXT_SIZE(24)
+DIM a AS IMAGE : a = bild("אב")
+DIM b AS IMAGE : b = bild(CHR$(&H202D) + "בא" + CHR$(&H202C))
+DIM c AS IMAGE : c = bild("בא")
+PRINT "gezeichnet "; punkte(a) > 20
+PRINT "wie erzwungen "; gleich(a, b)
+PRINT "gegenprobe anders "; NOT gleich(a, c)
+--- erwartet
+gezeichnet TRUE
+wie erzwungen TRUE
+gegenprobe anders TRUE
+
+=== arabisch wird verbunden gezeichnet
+FUNCTION bild(s AS STRING) AS IMAGE
+    DIM rt AS INTEGER : rt = RENDERTARGET_NEW(120, 40)
+    RENDERTARGET_BEGIN(rt)
+    TEXT(4, 4, s, WHITE)
+    RENDERTARGET_END()
+    RETURN RENDERTARGET_IMAGE(rt)
+END FUNCTION
+FUNCTION gleich(a AS IMAGE, b AS IMAGE) AS BOOLEAN
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO 39
+        FOR x = 0 TO 119
+            IF GETPIXEL(a, x, y) <> GETPIXEL(b, x, y) THEN RETURN FALSE
+        NEXT
+    NEXT
+    RETURN TRUE
+END FUNCTION
+SCREEN(200, 100, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+TEXT_SIZE(24)
+' Lam + Alef wird die Ligatur U+FEFB, nicht zwei Einzelformen.
+DIM a AS IMAGE : a = bild("لا")
+DIM b AS IMAGE : b = bild("ﻻ")
+DIM c AS IMAGE : c = bild(CHR$(&H202D) + "ﺍﻝ" + CHR$(&H202C))
+PRINT "ligatur "; gleich(a, b)
+PRINT "nicht einzeln "; NOT gleich(a, c)
+--- erwartet
+ligatur TRUE
+nicht einzeln TRUE
+
+=== im textbereich liegt die erste spalte rechts
+IMPORT "gui"
+SCREEN(400, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 360, 150)
+GUI_SET_TEXT(ta, "שלום")
+DIM n AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 3 THEN
+        ' die Zeile von links nach rechts abgetastet, nur die Wechsel
+        DIM yz AS INTEGER : yz = -1
+        DIM t AS INTEGER
+        DIM xx AS INTEGER
+        DIM zz AS INTEGER
+        DIM ss AS INTEGER
+        FOR t = 0 TO 199
+            (zz, ss) = GUI_TEXTAREA_POS_AT(ta, 30, t)
+            IF zz = 1 AND yz < 0 THEN yz = t + 3
+        NEXT
+        DIM folge AS STRING
+        DIM letzt AS INTEGER : letzt = -1
+        FOR xx = 0 TO 399
+            (zz, ss) = GUI_TEXTAREA_POS_AT(ta, xx, yz)
+            IF ss <> letzt THEN folge = folge + " " + STR$(ss) : letzt = ss
+        NEXT
+        PRINT "spalten" + folge
+    END IF
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=5
+--- erwartet
+spalten 0 4 3 2 1 0
+
+=== die schreibmarke vor zeichen 1 steht rechts
+' Derselbe Aufbau, nur die Schreibmarke.
+IMPORT "gui"
+SCREEN(400, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 360, 150)
+GUI_SET_TEXT(ta, "שלום")
+DIM n AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 3 THEN
+        DIM x1 AS INTEGER
+        DIM x5 AS INTEGER
+        DIM y AS INTEGER
+        DIM h AS INTEGER
+        GUI_TEXTAREA_GOTO(ta, 1, 1)
+        (x1, y, h) = GUI_TEXTAREA_CARET_XY(ta)
+        GUI_TEXTAREA_GOTO(ta, 1, 5)
+        (x5, y, h) = GUI_TEXTAREA_CARET_XY(ta)
+        PRINT "anfang rechts "; x1 > x5 + 10
+    END IF
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=5
+--- erwartet
+anfang rechts TRUE
+
+=== die pfeile tauschen in einer zeile von rechts nach links
+' Pfeil links geht in einer hebraeischen Zeile im Text WEITER (Spalte 3 -> 4),
+' Pfeil rechts zurueck. In einer lateinischen Zeile umgekehrt (Gegenprobe).
+IMPORT "gui"
+SCREEN(400, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 360, 150)
+GUI_SET_TEXT(ta, "שלום" + CHR$(10) + "abcd")
+GUI_FOCUS(ta)
+GUI_TEXTAREA_GOTO(ta, 1, 3)
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+DIM z AS INTEGER
+DIM s AS INTEGER
+FOR f = 0 TO 15
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+    IF f = 4 THEN (z, s) = GUI_TEXTAREA_CURSOR(ta) : PRINT "nach links "; z; " "; s
+    IF f = 8 THEN (z, s) = GUI_TEXTAREA_CURSOR(ta) : PRINT "nach rechts "; z; " "; s : GUI_TEXTAREA_GOTO(ta, 2, 3)
+    IF f = 13 THEN (z, s) = GUI_TEXTAREA_CURSOR(ta) : PRINT "latein links "; z; " "; s
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 6
+e 0 1 0 0 0 0 // Event: test
+e 2 2 263 0 0 0 // Event: test
+e 3 1 263 0 0 0 // Event: test
+e 6 2 262 0 0 0 // Event: test
+e 7 1 262 0 0 0 // Event: test
+e 11 2 263 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+nach links 1 4
+nach rechts 1 3
+latein links 2 2

@@ -14,8 +14,11 @@ bauen ließe. **Paket 1 ist gebaut** (2026-10-31, `gui_ueber.rs`, Handbuch
 (2026-10-31, `gui_stil.rs`, Abschnitt „Stildatei“), **Paket 2** ebenso
 (2026-10-31, `gui_bausteine.rs`, Abschnitt „Bausteine“), von **Paket 3 die
 Rechtschreibung** (2026-10-31, `rechtschreibung.rs` und
-`gui_rechtschreibung.rs`, Abschnitt „Rechtschreibung“); Formen und
-Rechts-nach-links aus Paket 3 und die weiteren Stufen von Paket 4 noch nicht.
+`gui_rechtschreibung.rs`, Abschnitt „Rechtschreibung“) und **Rechts nach
+links samt arabischen Formen** (2026-10-31, `schreibrichtung.rs` und
+`gui_richtung.rs`, Abschnitt „Rechts nach links“); die volle Textformung
+(Ligaturen anderer Schriften, indische Schriften) und die weiteren Stufen
+von Paket 4 noch nicht.
 
 ## Gemessen statt vermutet: große Tabellen sind keine Lücke
 
@@ -75,12 +78,12 @@ mit Wert.
 | `GtkFontChooser` | keine Schriftwahl | `GUI_FONT_DIALOG` (...) als `GUI_DIALOG` mit Liste der Systemschriften (aus den Ordnern, die `ausweich_datei_fuer` schon kennt), Größe, Schnitt und Vorschau; liefert Pfad und Größe für `LOADFONT`. |
 | `GtkSizeGroup`: gleiche Breite über Behälter hinweg | Layouts messen nur ihre eigenen Kinder | `GUI_SIZE_GROUP` (name$, wdg, ...): im `layout_pass` bekommt jedes Mitglied das größte natürliche Maß der Gruppe (Beschriftungen vor Feldern in mehreren Zeilen). |
 
-### Paket 3: Text, wie GTK ihn kann (Pango; Rechtschreibung gebaut)
+### Paket 3: Text, wie GTK ihn kann (Pango; Rechtschreibung und Rechts-nach-links gebaut)
 
 | GTK 3 | in der gui | Vorschlag |
 |---|---|---|
 | Textformung (Ligaturen, Arabisch, Indische Schriften) | Glyphe für Glyphe aus raylib; `rustybuzz` ist schon im Bau, aber nur fürs PDF | Formen über `rustybuzz` und die Glyphenatlanten von raylib zeichnen; nur für Läufe, die es brauchen (Schriftblock-Erkennung), damit das Messen der gewöhnlichen Fälle nicht langsamer wird. Schreibmarke, Auswahl und Klick müssen mit den geformten Glyphen rechnen -- der größte Teil der Arbeit. |
-| Rechts-nach-links, gemischte Richtung | nein | Crate `unicode-bidi` für die Reihenfolge der Läufe, danach Formen wie oben. Betrifft Textfeld, Textbereich, Liste, Tabelle, Beschriftung. |
+| Rechts-nach-links, gemischte Richtung | **gebaut** (2026-10-31): Reihenfolge über `unicode-bidi`, Arabisch über die Präsentationsformen statt `rustybuzz` -- raylib zeichnet Zeichen für Zeichen aus dem Atlas, und die Formen sind dort Zeichen | Crate `unicode-bidi` für die Reihenfolge der Läufe, danach Formen wie oben. Betrifft Textfeld, Textbereich, Liste, Tabelle, Beschriftung. |
 | Rechtschreibung (gspell) | Wellenlinien gibt es (`GUI_TEXTAREA_SQUIGGLES`), ein Wörterbuch nicht | Hunspell-Wörterbücher (`.dic`/`.aff`) über eine reine Rust-Crate lesen, `SPELL_CHECK` (wort$)/`SPELL_SUGGEST`; das Feld unterstreicht über die vorhandenen Wellenlinien, Vorschläge im Kontextmenü. Das Plugin `schreibweise` der IDE wäre der erste Nutzer. |
 
 **Warum zuletzt:** das ist der teuerste Teil, und solange niemand Arabisch

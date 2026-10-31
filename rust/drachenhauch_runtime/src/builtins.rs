@@ -2481,6 +2481,21 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // --- String-Erweiterungen (WP3) ---
         "ltrim$" | "ltrim" => { arity!(1); Ok(Value::str_rc(need_str(&a[0], "LTRIM$")?.trim_start())) }
         "rtrim$" | "rtrim" => { arity!(1); Ok(Value::str_rc(need_str(&a[0], "RTRIM$")?.trim_end())) }
+        "text_visual$" => {
+            // Der Text so, wie er dasteht: Rechts-nach-links-Stuecke umgedreht,
+            // Arabisch in seinen Formen. Fuer eigene Ausgaben (PDF, Dateien).
+            arity!(1, 2);
+            let s = need_str(&a[0], "TEXT_VISUAL$")?;
+            let aus = if a.len() == 2 {
+                match need_str(&a[1], "TEXT_VISUAL$")?.to_lowercase().as_str() {
+                    "auto" | "" => crate::schreibrichtung::anzeige(&s),
+                    "rtl" | "rechts" => crate::schreibrichtung::anzeige_mit(&s, true),
+                    "ltr" | "links" => crate::schreibrichtung::anzeige_mit(&s, false),
+                    r => return err(format!("TEXT_VISUAL$: unbekannte Richtung '{}' -- erlaubt: auto, ltr, rtl", r)),
+                }
+            } else { crate::schreibrichtung::anzeige(&s) };
+            Ok(Value::str_rc(aus))
+        }
         "reverse$" => { arity!(1); Ok(Value::str_rc(need_str(&a[0], "REVERSE$")?.chars().rev().collect::<String>())) }
         "startswith" => { arity!(2); Ok(Value::Bool(need_str(&a[0], "STARTSWITH")?.starts_with(need_str(&a[1], "STARTSWITH")?))) }
         "endswith" => { arity!(2); Ok(Value::Bool(need_str(&a[0], "ENDSWITH")?.ends_with(need_str(&a[1], "ENDSWITH")?))) }
