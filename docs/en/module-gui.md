@@ -2199,6 +2199,7 @@ button.gefahr:hover  { bg: #E74C3C }
 textinput:focus      { border: accent }
 #titel               { groesse: 20; stil: fett }
 checkbox:checked     { accent: #2E9E5B }
+.karte               { schatten: 0 4 10; abstand: 8 16; randbreite: 2 }
 ```
 
 **Selectors:** a kind (the names from the `.dhform`: `button`, `label`,
@@ -2216,6 +2217,19 @@ comma. Selectors for descendants (`panel button`) do not exist yet.
 `GUI_SET_FONT_STYLE`: `fett` bold, `kursiv` italic, `unterstrichen`
 underlined ...). German and English names work (`hintergrund`,
 `background`, `rundung`, `size`). Comments go in `/* ... */` or after `//`.
+
+**Shape per widget:** `abstand` (padding, one number or vertical and
+horizontal, 0..40 -- a button sized by content is then exactly text plus
+padding, in a text field the text is indented by the horizontal padding),
+`randbreite` (border width 0..8, 0 = no border), `schatten` (shadow: one
+number = softness, or `dx dy weich [colour]`, without a colour a
+semi-transparent black), `verlauf` (gradient 0..64), `glanz` (gloss
+0..100) and `fase` (bevel, 0 or 1) instead of the metrics `gradient`,
+`gloss`, `bevel`, and `uebergang` (transition in ms, 0..2000) instead of
+the metric of the same name. English names work too (`padding`,
+`border-width`, `shadow`, `transition`). They only apply in rules without
+`:hover`, `:focus`, `:active` or `:disabled` -- a shape that jumps on hover
+would be a wobble; the stylesheet reports that as an error.
 
 **Precedence** as in CSS: a name counts 100, a class or a state 10, a kind 1;
 with equal weight the later rule wins. `GUI_SET_COLOR` on the widget beats

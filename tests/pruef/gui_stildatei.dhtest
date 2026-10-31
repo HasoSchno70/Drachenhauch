@@ -342,3 +342,222 @@ GUI_STYLESHEET_LOAD: 'gibtsnicht.dhstil' laesst sich nicht
 GUI_SET_NAME: Name 'mit leer' -- erlaubt sind Buchstaben, Ziffern, _ und -
 GUI_ADD_CLASS: Klasse '' -- erlaubt sind Buchstaben, Ziffern, _ und -
 GUI_GET_COLOR: Rolle 'schatten' gibt es nicht -- bg, fg, border oder accent
+
+=== randbreite und schatten aus der stildatei
+' Zweite Stufe: Form je Widget. Der Rand drei Punkte breit, ein Knopf ohne
+' Rand, ein harter Schatten (weich 0) sechs Punkte unter dem Knopf -- die
+' Gegenprobe ist der Knopf daneben ohne Klasse.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+GUI_METRIC_SET("gradient", 0)
+GUI_METRIC_SET("gloss", 0)
+GUI_METRIC_SET("bevel", 0)
+GUI_METRIC_SET("corner_radius", 0)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b1 AS GUI_WIDGET : b1 = GUI_BUTTON(w, "", 10, 10, 100, 30)
+DIM b2 AS GUI_WIDGET : b2 = GUI_BUTTON(w, "", 150, 10, 100, 30)
+DIM b3 AS GUI_WIDGET : b3 = GUI_BUTTON(w, "", 10, 80, 100, 30)
+DIM b4 AS GUI_WIDGET : b4 = GUI_BUTTON(w, "", 150, 80, 100, 30)
+DIM b5 AS GUI_WIDGET : b5 = GUI_BUTTON(w, "", 10, 160, 100, 30)
+GUI_ADD_CLASS(b1, "dick")
+GUI_ADD_CLASS(b3, "ohne")
+GUI_ADD_CLASS(b5, "schatten")
+GUI_STYLESHEET("button { bg: #2050C0; border: #FF0000 } .dick { randbreite: 3 } .ohne { randbreite: 0 } .schatten { schatten: 0 6 0 #FF00FF }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- bild
+10 25 #FF0000 +-16
+12 25 #FF0000 +-16
+13 25 #2050C0 +-16
+150 25 #FF0000 +-16
+151 25 #2050C0 +-16
+10 95 #2050C0 +-16
+150 95 #FF0000 +-16
+60 193 #FF00FF +-16
+60 113 #101820 +-16
+
+=== verlauf, glanz und fase aus der stildatei
+' Ohne Metriken ist ein Knopf eben; mit `verlauf` ist er oben heller als
+' unten -- der Knopf daneben bleibt eben.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+GUI_METRIC_SET("gradient", 0)
+GUI_METRIC_SET("gloss", 0)
+GUI_METRIC_SET("bevel", 0)
+GUI_METRIC_SET("corner_radius", 0)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b1 AS GUI_WIDGET : b1 = GUI_BUTTON(w, "", 10, 10, 100, 40)
+DIM b2 AS GUI_WIDGET : b2 = GUI_BUTTON(w, "", 150, 10, 100, 40)
+GUI_ADD_CLASS(b1, "glas")
+GUI_STYLESHEET("button { bg: #406080 } .glas { verlauf: 40; glanz: 30; fase: 1 }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- bild
+40 14 <> 40 46
+190 14 = 190 46
+190 30 #406080 +-8
+
+=== abstand misst knopf und textfeld
+' Innenabstand (senkrecht waagerecht): ein Knopf nach Inhalt ist genau
+' Text plus zweimal der Abstand breit und hoch; im Textfeld rueckt der Text
+' um den waagerechten Abstand statt um fuenf Punkte ein.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b1 AS GUI_WIDGET : b1 = GUI_BUTTON(w, "Speichern", 10, 10, 0, 0)
+DIM b2 AS GUI_WIDGET : b2 = GUI_BUTTON(w, "Speichern", 10, 60, 0, 0)
+DIM b3 AS GUI_WIDGET : b3 = GUI_BUTTON(w, "Speichern", 10, 110, 0, 0)
+DIM t1 AS GUI_WIDGET : t1 = GUI_TEXTINPUT(w, 10, 180, 200, 30)
+DIM t2 AS GUI_WIDGET : t2 = GUI_TEXTINPUT(w, 10, 230, 200, 30)
+GUI_SET_TEXT(t1, "HHHH")
+GUI_SET_TEXT(t2, "HHHH")
+GUI_ADD_CLASS(b1, "a")
+GUI_ADD_CLASS(b2, "b")
+GUI_ADD_CLASS(b3, "c")
+GUI_ADD_CLASS(t2, "weit")
+GUI_STYLESHEET(".a { abstand: 4 10 } .b { abstand: 4 30 } .c { abstand: 14 10 } .weit { abstand: 0 40 }")
+DIM n AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 2 THEN
+        ' Ein --- nachher vergleicht nur seine eigene Ausgabe -- die Masse
+        ' gehen darum ueber eine Datei.
+        WRITEALL("masse.txt", "breiter um " + STR$(GUI_GET_W(b2) - GUI_GET_W(b1)) + CHR$(10) + _
+            "gleich hoch " + STR$(GUI_GET_H(b2) = GUI_GET_H(b1)) + CHR$(10) + _
+            "hoeher um " + STR$(GUI_GET_H(b3) - GUI_GET_H(b1)) + CHR$(10) + _
+            "gleich breit " + STR$(GUI_GET_W(b3) = GUI_GET_W(b1)))
+    END IF
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+DHRT_SCREENSHOT=s.png
+--- nachher
+DIM img AS IMAGE : img = LOADIMAGE("s.png")
+FUNCTION erste(y AS INTEGER) AS INTEGER
+    DIM x AS INTEGER
+    FOR x = 12 TO 200
+        IF (GETPIXEL(img, x, y) SHR 16) BAND 255 > 150 THEN RETURN x
+    NEXT
+    RETURN -1
+END FUNCTION
+DIM z AS STRING
+FOR EACH z IN READLINES("masse.txt")
+    PRINT z
+NEXT
+PRINT "eingerueckt um "; erste(245) - erste(195)
+--- erwartet
+breiter um 40
+gleich hoch TRUE
+hoeher um 20
+gleich breit TRUE
+eingerueckt um 35
+
+=== uebergang je widget
+' Die Metrik sagt 2000 ms, die Klasse `flink` 0: ein Knopf mit der Klasse
+' ist nach dem Ueberfahren sofort in der Hover-Farbe.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+GUI_METRIC_SET("gradient", 0)
+GUI_METRIC_SET("gloss", 0)
+GUI_METRIC_SET("bevel", 0)
+GUI_METRIC_SET("corner_radius", 0)
+GUI_METRIC_SET("uebergang", 2000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 10, 10, 100, 30)
+GUI_ADD_CLASS(b, "flink")
+GUI_STYLESHEET("button { bg: #2050C0 } button:hover { bg: #00C000 } .flink { uebergang: 0 }")
+AUTOMATION_PLAY("ev.txt")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 2
+e 0 7 60 25 0 0
+e 1 7 60 25 0 0
+
+--- umgebung
+DHRT_FRAMES=8
+--- bild
+14 14 #00C000 +-16
+
+=== uebergang je widget langsam
+' Die Gegenrichtung: Metrik 0, die Klasse `langsam` 2000 ms -- nach
+' wenigen Bildern ist der Knopf noch fast blau.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+GUI_METRIC_SET("gradient", 0)
+GUI_METRIC_SET("gloss", 0)
+GUI_METRIC_SET("bevel", 0)
+GUI_METRIC_SET("corner_radius", 0)
+GUI_METRIC_SET("uebergang", 0)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 10, 10, 100, 30)
+GUI_ADD_CLASS(b, "langsam")
+GUI_STYLESHEET("button { bg: #2050C0 } button:hover { bg: #00C000 } .langsam { uebergang: 2000 }")
+AUTOMATION_PLAY("ev.txt")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 2
+e 0 7 60 25 0 0
+e 1 7 60 25 0 0
+
+--- umgebung
+DHRT_FRAMES=8
+--- bild
+14 14 #2050C0 +-24
+
+=== form gilt nur ohne fluechtigen zustand und hat grenzen
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+DIM q AS ARRAY OF STRING
+q = ["button:hover { schatten: 4 }", "button { randbreite: 9 }", "button { abstand: 1 2 3 }", "button { schatten: 1 2 }", "button { uebergang: -1 }", "button:checked { schatten: 0 2 4 #000000 }"]
+DIM s AS STRING
+FOR EACH s IN q
+    TRY
+        GUI_STYLESHEET(s)
+        PRINT "kein fehler"
+    CATCH e
+        PRINT LEFT$(e, 50)
+    END TRY
+NEXT
+--- erwartet
+GUI_STYLESHEET: Zeile 1: 'schatten' gilt nur in Re
+GUI_STYLESHEET: Zeile 1: randbreite erwartet eine 
+GUI_STYLESHEET: Zeile 1: abstand erwartet eine ode
+GUI_STYLESHEET: Zeile 1: schatten erwartet 'weich'
+GUI_STYLESHEET: Zeile 1: uebergang erwartet eine g
+kein fehler

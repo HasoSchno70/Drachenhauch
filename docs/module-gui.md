@@ -2208,6 +2208,7 @@ button.gefahr:hover  { bg: #E74C3C }
 textinput:focus      { border: accent }
 #titel               { groesse: 20; stil: fett }
 checkbox:checked     { accent: #2E9E5B }
+.karte               { schatten: 0 4 10; abstand: 8 16; randbreite: 2 }
 ```
 
 **Selektoren:** eine Art (die Namen aus der `.dhform`: `button`, `label`,
@@ -2225,6 +2226,18 @@ Selektoren für Nachfahren (`panel button`) gibt es noch nicht.
 `GUI_SET_FONT_STYLE`: `fett`, `kursiv`, `unterstrichen` ...). Deutsche und
 englische Namen gehen (`hintergrund`, `background`, `rundung`, `size`).
 Kommentare stehen in `/* ... */` oder hinter `//`.
+
+**Form je Widget:** `abstand` (Innenabstand, eine Zahl oder senkrecht und
+waagerecht, 0..40 -- ein Knopf nach Inhalt ist dann genau Text plus Abstand
+groß, im Textfeld rückt der Text um den waagerechten Abstand ein),
+`randbreite` (0..8, 0 = kein Rand), `schatten` (eine Zahl = Weichheit, oder
+`dx dy weich [farbe]`, ohne Farbe ein halbdurchsichtiges Schwarz),
+`verlauf` (0..64), `glanz` (0..100) und `fase` (0 oder 1) statt der
+Metriken `gradient`, `gloss`, `bevel`, und `uebergang` (ms, 0..2000) statt
+der Metrik gleichen Namens; englisch `padding`, `border-width`, `shadow`,
+`transition`. Sie gelten nur in Regeln ohne `:hover`,
+`:focus`, `:active` oder `:disabled` -- eine Form, die beim Überfahren
+springt, wäre ein Wackeln; die Stildatei sagt das als Fehler.
 
 **Vorrang** wie in CSS: ein Name zählt 100, eine Klasse oder ein Zustand 10,
 eine Art 1; bei gleichem Gewicht gewinnt die spätere Regel. `GUI_SET_COLOR`
