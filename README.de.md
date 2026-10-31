@@ -71,6 +71,7 @@ schreibt man damit auch Anwendungen mit Fenstern, Formularen und Tabellen
 | **Fremde Bibliotheken** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — Windows-API, C-Bibliothek, Gerätetreiber direkt aufrufen, mit Zeigern, Structs und Rückrufen; sogar Python samt numpy einbetten ([mehr](docs/ffi.md)) |
 | **Nebenher** | HTTP, Datenbank, fremde Programme und **eigene Funktionen** im Hintergrund (`TASK_START`) — die Hauptschleife läuft weiter |
 | **Leisten und Plugins** | `GUI_DOCK` verteilt Leisten links, rechts und unten, als Reiter oder schwebend; die IDE und Glutfaden laden eigene Drachenhauch-Programme als Plugins; die IDE holt sie auch aus GitHub oder einem ZIP, bringt drei mit und prüft sie ohne Fenster ([mehr](docs/ide-plugins.md)) |
+| **Rückmeldung ohne Dialog** | Popover an einem Widget (`GUI_POPOVER`), Meldungen, die von selbst ausblenden, eine Infoleiste mit Knöpfen, Suchfelder mit Lupe und Kreuz, Vorschläge beim Tippen ([mehr](docs/module-gui.md#popover-toast-und-infoleiste)) |
 
 Nichts davon braucht ein Fenster. Ein Drachenhauch-Programm kann eine
 Konsolenanwendung sein, ein Cron-Job oder ein Spiel — dieselbe Sprache.

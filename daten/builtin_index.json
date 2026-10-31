@@ -3351,6 +3351,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_COMPLETION_CHOSEN",
+   "kind": "core",
+   "signature": "GUI_COMPLETION_CHOSEN(tf)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_COMPLETION_OPEN",
+   "kind": "core",
+   "signature": "GUI_COMPLETION_OPEN(tf)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_CONFIRM",
    "kind": "graphics",
    "signature": "GUI_CONFIRM(titel$, text$[, stil$]) AS BOOLEAN",
@@ -3366,6 +3378,72 @@
    "name": "GUI_CONTEXT_TABS",
    "kind": "core",
    "signature": "GUI_CONTEXT_TABS(menu)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_ICON_CLICKED",
+   "kind": "core",
+   "signature": "GUI_ICON_CLICKED(tf)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_INFOBAR",
+   "kind": "core",
+   "signature": "GUI_INFOBAR(win, text$ [, art$ [, knoepfe$]])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_INFOBAR_ANSWER",
+   "kind": "core",
+   "signature": "GUI_INFOBAR_ANSWER(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_INFOBAR_BUTTON_RECT",
+   "kind": "core",
+   "signature": "GUI_INFOBAR_BUTTON_RECT(win, k)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_INFOBAR_HIDE",
+   "kind": "core",
+   "signature": "GUI_INFOBAR_HIDE(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_INFOBAR_SHOWN",
+   "kind": "core",
+   "signature": "GUI_INFOBAR_SHOWN(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_POPOVER",
+   "kind": "core",
+   "signature": "GUI_POPOVER(anker, b, h [, seite$])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_POPOVER_CLOSED",
+   "kind": "core",
+   "signature": "GUI_POPOVER_CLOSED(pop)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_POPOVER_HIDE",
+   "kind": "core",
+   "signature": "GUI_POPOVER_HIDE(pop)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_POPOVER_SHOW",
+   "kind": "core",
+   "signature": "GUI_POPOVER_SHOW(pop)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SEARCH_CHANGED",
+   "kind": "core",
+   "signature": "GUI_SEARCH_CHANGED(tf)",
    "module": "gui"
   },
   {
@@ -5607,6 +5685,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTINPUT_COMPLETION",
+   "kind": "core",
+   "signature": "GUI_TEXTINPUT_COMPLETION(tf, eintraege)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTINPUT_ICON",
+   "kind": "core",
+   "signature": "GUI_TEXTINPUT_ICON(tf, links$, rechts$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTINPUT_SET",
    "kind": "core",
    "signature": "GUI_TEXTINPUT_SET(tf, key$, wert)",
@@ -5652,6 +5742,24 @@
    "name": "GUI_TIMEPICKER_SET",
    "kind": "core",
    "signature": "GUI_TIMEPICKER_SET(tp, key$, wert)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOAST",
+   "kind": "core",
+   "signature": "GUI_TOAST(win, text$ [, art$ [, ms]])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOAST_CLEAR",
+   "kind": "core",
+   "signature": "GUI_TOAST_CLEAR(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOAST_COUNT",
+   "kind": "core",
+   "signature": "GUI_TOAST_COUNT(win)",
    "module": "gui"
   },
   {

@@ -614,6 +614,32 @@ angeklickt", und beides meldet genau ein Bild lang. Der Zustand kommt weiter aus
 `GUI_CHECKED`. Tests `tests/pruef/gui_clicked_schalter.dhtest` (mit Gegenprobe:
 danebengeklickt meldet nichts).
 
+**Popover, Toast, Infoleiste, Suchfeld, Vorschlaege** (2026-10-31, Paket 1
+aus `docs/entwurf-gui-wie-gtk.md`): eigenes Untermodul `gui_ueber.rs`
+(`#[path]` wie das Dock). `GUI_POPOVER(anker, b, h [, seite$])` ist ein
+randloses GUI_WINDOW mit `Window::pop` (Anker, Seite, Pfeil); gelegt in
+`pop_lage` je Bild (weicht am Bildschirmrand aus, geht zu, wenn der Anker
+nicht mehr zu sehen ist), gezeichnet in der OBEREN Schicht (`draw` laesst
+Popover aus, `draw_top` -> `ueber_zeichnen`), in der Fensterreihenfolge
+immer oben (`pops_nach_vorn` am Ende von `bring_to_front`). `GUI_TOAST`
+(`Window::toasts`, Zeit ueber `g.delta()`, hoechstens vier, liest vor wie
+GUI_ANNOUNCE) und `GUI_INFOBAR` (`Window::info`, ueber dem Inhalt, NICHT
+verschiebend; `GUI_INFOBAR_BUTTON_RECT` fuer Pruefungen). Textfeld:
+`Widget::feld` (`FeldZusatz`, nur bei Bedarf) mit Sinnbildern
+(`GUI_TEXTINPUT_ICON`), Suchfeld (`GUI_TEXTINPUT_SET "suche"`,
+`GUI_SEARCH_CHANGED` 150 ms nach dem letzten Anschlag) und Vorschlaegen
+(`GUI_TEXTINPUT_COMPLETION`). **Ein Druck geht zuerst durch
+`ueber_druck`** (in `update_innen`, gleich nach dem Legen): was dort landet
+oder einen Popover schliesst, ist verbraucht -- `just_pressed`/`right_just`
+werden danach ueberschattet. Die Lage des Textes im Textfeld geht ueber
+`ti_rand` (Zeichnen, `marke_von`, Klick in `edit_textinput`,
+`ti_rechtsklick`). Tasten: `feld_tasten` vor `edit_textinput`, `pop_esc`
+vor dem Abbrechen-Knopf, beide setzen `liste_taste`. Farbteile im Vorschlag
+werden ueber die Breite des GANZEN Textes minus den Rest gelegt. Tests
+`tests/pruef/gui_ueberlagerung.dhtest` (18; neun Verfaelschungen fallen je in
+ihrem Fall). **Testfalle:** die Wiedergabe beginnt beim ERSTEN Ereignis --
+ein spaeter Klick braucht ein Ereignis in Bild 0 davor.
+
 **Uebergaenge** (2026-09-23, erster Punkt der Feinschliff-Liste): Metrik
 `uebergang` (ms, Vorgabe 120, 0 = springen wie frueher). Je Widget
 `ueber_t`/`druck_t`/`fokus_t` (0..1), dazu `LeisteState::hover_t` je

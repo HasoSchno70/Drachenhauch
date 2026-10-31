@@ -1,0 +1,718 @@
+' Ueberlagerungen und Rueckmeldung (gui_ueber.rs, docs/entwurf-gui-wie-gtk.md
+' Paket 1): Popover, Toast, Infoleiste, Suchfeld, Sinnbilder im Textfeld,
+' Vorschlaege unter dem Textfeld. Format: docs/werkzeuge.md.
+'
+' Die Fenster sind randlos (GUI_WINDOW_CHROME FALSE) bei (0, 0): eine
+' Widget-Lage ist dann eine Bildschirmlage. Tasten in den Aufnahmen:
+' 256 ESC, 257 Enter, 264 runter, 341 Strg, 86 V. Getippt wird ueber die
+' Zwischenablage (Strg+V) -- eine Aufnahme fuellt die Zeichenwarteschlange
+' nicht.
+
+=== der popover haengt unter dem knopf und geht per klick daneben zu
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM knopf AS GUI_WIDGET
+knopf = GUI_BUTTON(w, "Optionen", 20, 20, 120, 30)
+DIM anders AS GUI_WIDGET
+anders = GUI_BUTTON(w, "Anders", 400, 300, 120, 30)
+DIM pop AS GUI_WINDOW
+pop = GUI_POPOVER(knopf, 200, 120)
+AUTOMATION_PLAY("ev.txt")
+DIM zu AS BOOLEAN : zu = FALSE
+DIM an AS BOOLEAN : an = FALSE
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(knopf) THEN GUI_POPOVER_SHOW(pop)
+    IF GUI_POPOVER_CLOSED(pop) THEN zu = TRUE
+    IF GUI_CLICKED(anders) THEN an = TRUE
+    n = n + 1
+    IF n = 15 THEN PRINT "lage " + STR$(GUI_WINDOW_GET_X(pop)) + " " + STR$(GUI_WINDOW_GET_Y(pop)) + " offen " + STR$(GUI_WINDOW_SHOWN(pop))
+    IF n = 40 THEN PRINT "zu " + STR$(zu) + " anders " + STR$(an) + " offen " + STR$(GUI_WINDOW_SHOWN(pop))
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 8
+e 4 7 80 35 0 0 // Maus auf den Knopf
+e 5 7 80 35 0 0
+e 6 6 0 0 0 0 // runter
+e 8 5 0 0 0 0 // hoch -> Popover auf
+e 20 7 460 315 0 0 // Maus auf "Anders"
+e 21 7 460 315 0 0
+e 22 6 0 0 0 0
+e 24 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=45
+--- erwartet
+lage 4 58 offen TRUE
+zu TRUE anders FALSE offen FALSE
+
+=== ohne popover kommt derselbe klick an
+' Die Gegenprobe zum Fall davor.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM anders AS GUI_WIDGET
+anders = GUI_BUTTON(w, "Anders", 400, 300, 120, 30)
+AUTOMATION_PLAY("ev.txt")
+DIM an AS BOOLEAN : an = FALSE
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(anders) THEN an = TRUE
+    n = n + 1
+    IF n = 40 THEN PRINT "anders " + STR$(an)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 4
+e 20 7 460 315 0 0
+e 21 7 460 315 0 0
+e 22 6 0 0 0 0
+e 24 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=45
+--- erwartet
+anders TRUE
+
+=== ein klick auf den knopf schliesst und oeffnet nicht wieder
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM knopf AS GUI_WIDGET
+knopf = GUI_BUTTON(w, "Optionen", 20, 20, 120, 30)
+DIM pop AS GUI_WINDOW
+pop = GUI_POPOVER(knopf, 200, 120)
+AUTOMATION_PLAY("ev.txt")
+DIM zu AS BOOLEAN : zu = FALSE
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(knopf) THEN GUI_POPOVER_SHOW(pop)
+    IF GUI_POPOVER_CLOSED(pop) THEN zu = TRUE
+    n = n + 1
+    IF n = 15 THEN PRINT "offen " + STR$(GUI_WINDOW_SHOWN(pop))
+    IF n = 40 THEN PRINT "zu " + STR$(zu) + " offen " + STR$(GUI_WINDOW_SHOWN(pop))
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 6
+e 4 7 80 35 0 0
+e 5 7 80 35 0 0
+e 6 6 0 0 0 0
+e 8 5 0 0 0 0
+e 22 6 0 0 0 0 // derselbe Knopf noch einmal
+e 24 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=45
+--- erwartet
+offen TRUE
+zu TRUE offen FALSE
+
+=== ein klick im popover erreicht sein widget
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM knopf AS GUI_WIDGET
+knopf = GUI_BUTTON(w, "Optionen", 20, 20, 120, 30)
+DIM pop AS GUI_WINDOW
+pop = GUI_POPOVER(knopf, 200, 120)
+DIM kb AS GUI_WIDGET
+kb = GUI_CHECKBOX(pop, "Raster", 10, 10)
+GUI_POPOVER_SHOW(pop)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "haken " + STR$(GUI_CHECKED(kb)) + " offen " + STR$(GUI_WINDOW_SHOWN(pop))
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 4
+e 4 7 22 77 0 0 // aufs Kaestchen (Popover bei 4/58, Kaestchen bei 10/10)
+e 5 7 22 77 0 0
+e 6 6 0 0 0 0
+e 8 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=35
+--- erwartet
+haken TRUE offen TRUE
+
+=== esc schliesst den popover und nicht das fenster
+' Der Fokus liegt im Hauptfenster, dessen Abbrechen-Knopf ESC sonst
+' ausloest (Gegenprobe: das zweite ESC tut es).
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM knopf AS GUI_WIDGET
+knopf = GUI_BUTTON(w, "Optionen", 20, 20, 120, 30)
+DIM abbr AS GUI_WIDGET
+abbr = GUI_BUTTON(w, "Abbrechen", 400, 300, 120, 30)
+GUI_WINDOW_CANCEL(w, abbr)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 300, 20, 200, 28)
+DIM pop AS GUI_WINDOW
+pop = GUI_POPOVER(knopf, 200, 120)
+GUI_POPOVER_SHOW(pop)
+GUI_FOCUS(tf)
+AUTOMATION_PLAY("ev.txt")
+DIM zu AS BOOLEAN : zu = FALSE
+DIM ab AS INTEGER : ab = 0
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_POPOVER_CLOSED(pop) THEN zu = TRUE
+    IF GUI_CLICKED(abbr) THEN ab = ab + 1
+    n = n + 1
+    IF n = 15 THEN PRINT "zu " + STR$(zu) + " abbrechen " + STR$(ab) + " offen " + STR$(GUI_WINDOW_SHOWN(pop))
+    IF n = 35 THEN PRINT "abbrechen " + STR$(ab)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 4
+e 4 2 256 0 0 0
+e 6 1 256 0 0 0
+e 24 2 256 0 0 0
+e 26 1 256 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+zu TRUE abbrechen 0 offen FALSE
+abbrechen 1
+
+=== der popover weicht am rand aus
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM unten AS GUI_WIDGET
+unten = GUI_BUTTON(w, "Unten", 20, 360, 120, 30)
+DIM rechts AS GUI_WIDGET
+rechts = GUI_BUTTON(w, "Rechts", 470, 150, 120, 30)
+DIM p1 AS GUI_WINDOW
+p1 = GUI_POPOVER(unten, 200, 120)
+DIM p2 AS GUI_WINDOW
+p2 = GUI_POPOVER(rechts, 100, 80, "rechts")
+DIM p3 AS GUI_WINDOW
+p3 = GUI_POPOVER(unten, 100, 60, "rechts")
+GUI_UPDATE()
+GUI_POPOVER_SHOW(p1)
+GUI_POPOVER_SHOW(p2)
+GUI_POPOVER_SHOW(p3)
+GUI_UPDATE()
+PRINT "oben statt unten: " + STR$(GUI_WINDOW_GET_X(p1)) + " " + STR$(GUI_WINDOW_GET_Y(p1))
+PRINT "links statt rechts: " + STR$(GUI_WINDOW_GET_X(p2)) + " " + STR$(GUI_WINDOW_GET_Y(p2))
+PRINT "rechts, ans untere ende geklemmt: " + STR$(GUI_WINDOW_GET_X(p3)) + " " + STR$(GUI_WINDOW_GET_Y(p3))
+--- erwartet
+oben statt unten: 4 232
+links statt rechts: 362 125
+rechts, ans untere ende geklemmt: 148 336
+
+=== der popover liegt ueber dem gemalten
+' Das Programm malt nach GUI_DRAW(FALSE) selbst ueber alles; der Popover
+' kommt mit der oberen Schicht danach -- samt Pfeil zum Knopf.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM knopf AS GUI_WIDGET
+knopf = GUI_BUTTON(w, "Optionen", 20, 20, 120, 30)
+DIM pop AS GUI_WINDOW
+pop = GUI_POPOVER(knopf, 200, 120)
+GUI_POPOVER_SHOW(pop)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW(FALSE)
+    BOX(0, 0, 599, 399, &HFF0000)
+    GUI_DRAW_TOP()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- bild
+100 120 nicht #FF0000 +-40
+80 56 nicht #FF0000 +-40
+60 53 #FF0000 +-10
+300 300 #FF0000 +-10
+
+=== toasts zaehlen, verschwinden und lassen sich wegklicken
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM unter AS GUI_WIDGET
+unter = GUI_BUTTON(w, "Darunter", 250, 350, 100, 40)
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    GUI_TOAST(w, "Meldung " + STR$(i), "info", 0)
+NEXT
+PRINT "hoechstens vier: " + STR$(GUI_TOAST_COUNT(w))
+GUI_TOAST_CLEAR(w)
+PRINT "geleert: " + STR$(GUI_TOAST_COUNT(w))
+GUI_TOAST(w, "kurz", "erfolg", 200)
+AUTOMATION_PLAY("ev.txt")
+DIM getroffen AS BOOLEAN : getroffen = FALSE
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(unter) THEN getroffen = TRUE
+    n = n + 1
+    IF n = 3 THEN PRINT "nach 3 bildern: " + STR$(GUI_TOAST_COUNT(w))
+    IF n = 20 THEN PRINT "nach 200 ms: " + STR$(GUI_TOAST_COUNT(w)) : GUI_TOAST(w, "bleibt", "fehler", 0)
+    IF n = 30 THEN PRINT "ohne zeit: " + STR$(GUI_TOAST_COUNT(w))
+    IF n = 60 THEN PRINT "weggeklickt: " + STR$(GUI_TOAST_COUNT(w)) + " knopf darunter " + STR$(getroffen)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 5
+e 0 7 10 10 0 0 // ab Bild 0 -- die Wiedergabe beginnt beim ersten Ereignis
+e 40 7 300 375 0 0
+e 41 7 300 375 0 0
+e 42 6 0 0 0 0
+e 44 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=65
+--- erwartet
+hoechstens vier: 4
+geleert: 0
+nach 3 bildern: 1
+nach 200 ms: 0
+ohne zeit: 1
+weggeklickt: 0 knopf darunter FALSE
+
+=== ein toast hat die farbe seiner art
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_METRIC_SET("uebergang", 0)
+GUI_TOAST(w, "Fehler", "fehler", 0)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- bild
+300 381 #C94A3F +-12
+
+=== die infoleiste meldet ihren knopf und das kreuz
+' Die Lage der Knoepfe kommt aus GUI_INFOBAR_BUTTON_RECT -- das Programm
+' schreibt seine Aufnahme selbst, sobald die Leiste gelegt ist.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM unter AS GUI_WIDGET
+unter = GUI_BUTTON(w, "Darunter", 0, 0, 600, 30)
+GUI_INFOBAR(w, "Die Datei wurde geaendert.", "warnung", "Neu laden|Behalten")
+GUI_UPDATE()
+DIM r AS TUPLE
+r = GUI_INFOBAR_BUTTON_RECT(w, 2)
+DIM k AS TUPLE
+k = GUI_INFOBAR_BUTTON_RECT(w, 0)
+DIM bx AS INTEGER : bx = r[0] + r[2] \ 2
+DIM by AS INTEGER : by = r[1] + r[3] \ 2
+DIM kx AS INTEGER : kx = k[0] + k[2] \ 2
+DIM ky AS INTEGER : ky = k[1] + k[3] \ 2
+PRINT "kreuz rechts von den knoepfen: " + STR$(k[0] > r[0] + r[2])
+WRITEALL("ev.txt", "c 8" + CHR$(10) + "e 4 7 " + STR$(bx) + " " + STR$(by) + " 0 0" + CHR$(10) + "e 5 7 " + STR$(bx) + " " + STR$(by) + " 0 0" + CHR$(10) + "e 6 6 0 0 0 0" + CHR$(10) + "e 8 5 0 0 0 0" + CHR$(10) + "e 30 7 " + STR$(kx) + " " + STR$(ky) + " 0 0" + CHR$(10) + "e 31 7 " + STR$(kx) + " " + STR$(ky) + " 0 0" + CHR$(10) + "e 32 6 0 0 0 0" + CHR$(10) + "e 34 5 0 0 0 0" + CHR$(10) + CHR$(10))
+AUTOMATION_PLAY("ev.txt")
+DIM getroffen AS BOOLEAN : getroffen = FALSE
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_INFOBAR_ANSWER(w) <> 0 THEN PRINT "antwort " + STR$(GUI_INFOBAR_ANSWER(w)) + " sichtbar " + STR$(GUI_INFOBAR_SHOWN(w))
+    IF GUI_CLICKED(unter) THEN getroffen = TRUE
+    n = n + 1
+    IF n = 20 THEN GUI_INFOBAR(w, "Noch einmal.", "info")
+    IF n = 50 THEN PRINT "knopf darunter " + STR$(getroffen)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=55
+--- erwartet
+kreuz rechts von den knoepfen: TRUE
+antwort 2 sichtbar FALSE
+antwort -1 sichtbar FALSE
+knopf darunter FALSE
+
+=== das suchfeld meldet erst nach der pause
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 20, 20, 200, 28)
+GUI_TEXTINPUT_SET(tf, "suche", 1)
+GUI_FOCUS(tf)
+CLIPBOARD_SET("ap")
+AUTOMATION_PLAY("ev.txt")
+DIM getippt AS INTEGER : getippt = -1
+DIM gemeldet AS INTEGER : gemeldet = -1
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF getippt < 0 AND GUI_TEXT(tf) <> "" THEN getippt = n
+    IF GUI_SEARCH_CHANGED(tf) AND gemeldet < 0 THEN gemeldet = n
+    IF n = 40 THEN PRINT "text " + GUI_TEXT(tf) + " pause " + STR$(gemeldet - getippt) + " nicht sofort " + STR$(gemeldet > getippt)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 4
+e 4 2 341 0 0 0
+e 5 2 86 0 0 0
+e 7 1 86 0 0 0
+e 8 1 341 0 0 0
+
+--- umgebung
+DHRT_FRAMES=45
+--- erwartet
+text ap pause 9 nicht sofort TRUE
+
+=== ohne den schalter meldet kein suchfeld
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 20, 20, 200, 28)
+GUI_FOCUS(tf)
+CLIPBOARD_SET("ap")
+AUTOMATION_PLAY("ev.txt")
+DIM gemeldet AS BOOLEAN : gemeldet = FALSE
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF GUI_SEARCH_CHANGED(tf) THEN gemeldet = TRUE
+    IF n = 40 THEN PRINT "text " + GUI_TEXT(tf) + " gemeldet " + STR$(gemeldet)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 4
+e 4 2 341 0 0 0
+e 5 2 86 0 0 0
+e 7 1 86 0 0 0
+e 8 1 341 0 0 0
+
+--- umgebung
+DHRT_FRAMES=45
+--- erwartet
+text ap gemeldet FALSE
+
+=== das kreuz und esc leeren das suchfeld
+' Das zweite ESC (Feld schon leer) gehoert wieder dem Abbrechen-Knopf.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM abbr AS GUI_WIDGET
+abbr = GUI_BUTTON(w, "Abbrechen", 400, 300, 120, 30)
+GUI_WINDOW_CANCEL(w, abbr)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 20, 20, 200, 28)
+GUI_TEXTINPUT_SET(tf, "suche", 1)
+GUI_SET_TEXT(tf, "apfel")
+AUTOMATION_PLAY("ev.txt")
+DIM ab AS INTEGER : ab = 0
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF GUI_ICON_CLICKED(tf) <> 0 THEN PRINT "sinnbild " + STR$(GUI_ICON_CLICKED(tf)) + " text '" + GUI_TEXT(tf) + "' gemeldet " + STR$(GUI_SEARCH_CHANGED(tf))
+    IF GUI_CLICKED(abbr) THEN ab = ab + 1
+    IF n = 20 THEN GUI_SET_TEXT(tf, "birne")
+    IF n = 30 THEN PRINT "vor esc '" + GUI_TEXT(tf) + "'"
+    IF n = 45 THEN PRINT "nach esc '" + GUI_TEXT(tf) + "' abbrechen " + STR$(ab)
+    IF n = 60 THEN PRINT "zweites esc: abbrechen " + STR$(ab)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 10
+e 4 7 209 34 0 0 // aufs Kreuz rechts im Feld
+e 5 7 209 34 0 0
+e 6 6 0 0 0 0
+e 8 5 0 0 0 0
+e 34 2 256 0 0 0
+e 36 1 256 0 0 0
+e 50 2 256 0 0 0
+e 52 1 256 0 0 0
+e 53 7 31 34 0 0 // auf die Lupe
+e 54 6 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=65
+--- erwartet
+sinnbild 2 text '' gemeldet TRUE
+vor esc 'birne'
+nach esc '' abbrechen 0
+sinnbild 1 text '' gemeldet FALSE
+zweites esc: abbrechen 1
+
+=== ein eigenes sinnbild meldet seinen klick und setzt keine marke
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 20, 20, 200, 28)
+GUI_TEXTINPUT_SET(tf, "passwort", 1)
+GUI_TEXTINPUT_ICON(tf, "", "auge")
+GUI_SET_TEXT(tf, "geheim")
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF GUI_ICON_CLICKED(tf) = 2 THEN
+        GUI_TEXTINPUT_SET(tf, "passwort", 0)
+        PRINT "auge geklickt, fokus im feld " + STR$(GUI_FOCUSED() = tf)
+    END IF
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 4
+e 4 7 209 34 0 0
+e 5 7 209 34 0 0
+e 6 6 0 0 0 0
+e 8 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+auge geklickt, fokus im feld TRUE
+
+=== vorschlaege unter dem textfeld, mit pfeilen und enter genommen
+' Was so anfaengt, steht vorn; Enter nimmt den markierten und loest den
+' Standard-Knopf NICHT aus (das zweite Enter tut es).
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ok AS GUI_WIDGET
+ok = GUI_BUTTON(w, "OK", 400, 300, 120, 30)
+GUI_WINDOW_DEFAULT(w, ok)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 20, 20, 200, 28)
+GUI_TEXTINPUT_COMPLETION(tf, ["Banane", "Papaya", "Apfel", "Aprikose"])
+GUI_FOCUS(tf)
+CLIPBOARD_SET("ap")
+AUTOMATION_PLAY("ev.txt")
+DIM oks AS INTEGER : oks = 0
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF GUI_CLICKED(ok) THEN oks = oks + 1
+    IF GUI_COMPLETION_CHOSEN(tf) >= 0 THEN PRINT "gewaehlt " + STR$(GUI_COMPLETION_CHOSEN(tf)) + " text " + GUI_TEXT(tf) + " ok " + STR$(oks)
+    IF n = 15 THEN PRINT "offen " + STR$(GUI_COMPLETION_OPEN(tf))
+    IF n = 50 THEN PRINT "zu " + STR$(NOT GUI_COMPLETION_OPEN(tf)) + " ok " + STR$(oks)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 14
+e 4 2 341 0 0 0
+e 5 2 86 0 0 0
+e 7 1 86 0 0 0
+e 8 1 341 0 0 0
+e 20 2 264 0 0 0
+e 22 1 264 0 0 0
+e 24 2 264 0 0 0
+e 26 1 264 0 0 0
+e 28 2 264 0 0 0
+e 30 1 264 0 0 0
+e 32 2 257 0 0 0
+e 34 1 257 0 0 0
+e 40 2 257 0 0 0
+e 42 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=55
+--- erwartet
+offen TRUE
+gewaehlt 1 text Papaya ok 0
+zu TRUE ok 1
+
+=== ein klick nimmt den vorschlag, esc schliesst die liste
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM abbr AS GUI_WIDGET
+abbr = GUI_BUTTON(w, "Abbrechen", 400, 300, 120, 30)
+GUI_WINDOW_CANCEL(w, abbr)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 20, 20, 200, 28)
+GUI_TEXTINPUT_COMPLETION(tf, ["Banane", "Papaya", "Apfel", "Aprikose"])
+GUI_FOCUS(tf)
+CLIPBOARD_SET("ap")
+AUTOMATION_PLAY("ev.txt")
+DIM ab AS INTEGER : ab = 0
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF GUI_CLICKED(abbr) THEN ab = ab + 1
+    IF GUI_COMPLETION_CHOSEN(tf) >= 0 THEN PRINT "gewaehlt " + STR$(GUI_COMPLETION_CHOSEN(tf)) + " text " + GUI_TEXT(tf)
+    IF n = 15 THEN PRINT "offen " + STR$(GUI_COMPLETION_OPEN(tf))
+    IF n = 35 THEN PRINT "nach esc offen " + STR$(GUI_COMPLETION_OPEN(tf)) + " text " + GUI_TEXT(tf) + " abbrechen " + STR$(ab)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 16
+e 4 2 341 0 0 0
+e 5 2 86 0 0 0
+e 7 1 86 0 0 0
+e 8 1 341 0 0 0
+e 20 2 256 0 0 0
+e 22 1 256 0 0 0
+e 40 2 341 0 0 0 // noch einmal "ap" dahinter -> "apap" passt auf nichts
+e 41 2 86 0 0 0
+e 43 1 86 0 0 0
+e 44 1 341 0 0 0
+e 46 2 259 0 0 0 // Ruecktaste zweimal -> "ap", die Liste ist wieder da
+e 47 1 259 0 0 0
+e 48 2 259 0 0 0
+e 49 1 259 0 0 0
+e 60 7 60 82 0 0 // zweite Zeile der Liste (Aprikose)
+e 62 6 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=75
+--- erwartet
+offen TRUE
+nach esc offen FALSE text ap abbrechen 0
+gewaehlt 3 text Aprikose
+
+=== suchfeld, sinnbilder und vorschlaege stehen in der dhform
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 28)
+GUI_TEXTINPUT_SET(tf, "suche", 1)
+GUI_TEXTINPUT_ICON(tf, "", "auge")
+GUI_TEXTINPUT_COMPLETION(tf, ["eins", "zwei"])
+DIM j AS STRING
+j = GUI_TO_JSON(w)
+DIM q AS STRING : q = CHR$(34)
+PRINT "suche " + STR$(INSTR(j, q + "suche" + q + ": true") >= 0)
+PRINT "icons " + STR$(INSTR(j, q + "icons" + q) >= 0 AND INSTR(j, q + "auge" + q) >= 0)
+PRINT "vorschlaege " + STR$(INSTR(j, q + "vorschlaege" + q) >= 0 AND INSTR(j, q + "zwei" + q) >= 0)
+DIM w2 AS GUI_WINDOW
+w2 = GUI_FROM_JSON(j)
+PRINT "rundweg " + STR$(GUI_TO_JSON(w2) = j)
+--- erwartet
+suche TRUE
+icons TRUE
+vorschlaege TRUE
+rundweg TRUE
+
+=== falsche angaben sind fehler mit der liste
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "x", 10, 10, 50, 20)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 40, 200, 28)
+TRY
+    GUI_TOAST(w, "x", "rot")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    DIM p AS GUI_WINDOW
+    p = GUI_POPOVER(b, 100, 100, "mitte")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_POPOVER_SHOW(w)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_TEXTINPUT_ICON(tf, "lupe", "")
+CATCH e
+    PRINT LEFT$(e, 64)
+END TRY
+TRY
+    GUI_TEXTINPUT_ICON(b, "", "")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_INFOBAR(w, "x", "info", "a|b|c|d|e")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+GUI_TOAST: Art 'rot' gibt es nicht -- bekannt sind: info, erfolg, warnung, fehler
+GUI_POPOVER: Seite 'mitte' gibt es nicht -- unten, oben, rechts oder links
+GUI_POPOVER_SHOW: dieses Fenster ist kein Popover (GUI_POPOVER)
+GUI_TEXTINPUT_ICON: ein Sinnbild 'lupe' gibt es nicht -- bekannt
+GUI_TEXTINPUT_ICON: Widget ist kein Textfeld (GUI_TEXTINPUT)
+GUI_INFOBAR: hoechstens vier Knoepfe
