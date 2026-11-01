@@ -411,7 +411,8 @@ SUB bibGeistZeichnen()
     DIM b AS Baustein : b = bausteine[bibZug]
     DIM mx AS INTEGER : mx = MOUSEX()
     DIM my AS INTEGER : my = MOUSEY()
-    IF imFenster(mx, my) THEN
+    ' Ueber einem Layout zeigt die Einfuegemarke, wohin es geht.
+    IF imFenster(mx, my) AND zielL < 0 THEN
         DIM w AS INTEGER : w = zS(b.b)
         DIM h AS INTEGER : h = zS(b.h)
         BOXROUND(mx - w \ 2, my - h \ 2, mx + w \ 2, my + h \ 2, 4, RGBA(58, 168, 240, 50))
@@ -479,7 +480,13 @@ END SUB
 
 SUB lageAnzeigen()
     IF auswahl >= 0 THEN
-        GUI_STATUSBAR_SET(sb, 1, feldText$(auswahl, "name") + "   " + STR$(feldZahl(auswahl, "x")) + ", " + STR$(feldZahl(auswahl, "y")) + "   " + STR$(feldZahl(auswahl, "w")) + " × " + STR$(feldZahl(auswahl, "h")))
+        ' Wie man es sieht -- ein Kind eines Layouts legt die Laufzeit.
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        DIM w AS INTEGER
+        DIM h AS INTEGER
+        (x, y, w, h) = lageVon(auswahl)
+        GUI_STATUSBAR_SET(sb, 1, feldText$(auswahl, "name") + "   " + STR$(x) + ", " + STR$(y) + "   " + STR$(w) + " × " + STR$(h))
     ELSE
         GUI_STATUSBAR_SET(sb, 1, fensterText$("name") + "   " + STR$(fensterB()) + " × " + STR$(fensterH()))
     END IF

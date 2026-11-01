@@ -247,10 +247,29 @@ angeklickten Control aus: Kanten, Mitten, gleiche Breite, Höhe oder Größe.
 Verteilen setzt ab drei Controls gleiche Lücken. Nach vorn und nach hinten
 ändern die Reihenfolge, in der gezeichnet wird.
 
+**Layouts** (Bibliothek, Gruppe Behälter: Zeile, Spalte, Raster) ordnen
+ihre Controls selbst: nebeneinander, untereinander oder in Zeilen und
+Spalten, mit Abstand und Rand. Im Entwurf ist ein Layout gestrichelt
+umrandet, ein leeres sagt „Controls hierher ziehen“. Ein Baustein, der auf
+einem Layout landet, kommt hinein, ebenso ein einzelnes Control, das man
+hineinzieht; eine blaue Marke zeigt die Stelle. Ein Kind wird nicht
+verschoben, sondern umgesetzt: es bleibt stehen, sein Umriss folgt der Maus,
+und losgelassen kommt es an die Stelle der Marke -- neben jedem Layout
+losgelassen steht es danach frei. Die Pfeiltasten rücken ein Kind eine
+Stelle weiter. Verdoppeln nimmt bei einem Layout die Kinder mit, Löschen
+lässt sie frei stehen. Im Navigator stehen die Kinder unter ihrem Layout.
+Wer das Layout im Inspektor verankert (etwa links, rechts, oben), lässt es
+mit dem Fenster wachsen, und es verteilt seine Kinder neu -- im erzeugten
+Programm legt die Laufzeit sie genauso wie im Entwurf.
+
 ## Der Inspektor
 
 Die Eigenschaften stehen in Gruppen, die auf- und zuklappen: Kennung, Lage,
-Inhalt, Aussehen, Verhalten. Zu sehen ist nur, was zur Art des Controls passt.
+Layout, Inhalt, Aussehen, Verhalten. Zu sehen ist nur, was zur Art des
+Controls passt: ein Layout hat seine Anordnung, Spalten (beim Raster),
+Abstand, Rand, Ausrichtung, „Kinder dehnen“ und einen Rahmen; ein Kind
+eines Layouts hat statt Links, Oben und Anker sein Gewicht (0 = eigene
+Größe, sonst sein Anteil am freien Platz).
 Jede Eigenschaft hat ihren Editor:
 - Text und Zahlen in Feldern;
 - Schalter als Kippschalter;

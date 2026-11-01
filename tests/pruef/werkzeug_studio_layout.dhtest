@@ -244,3 +244,73 @@ slStudio = ARG$(0)
 gewicht TRUE
 anordnung TRUE
 links einmal 1
+
+=== das erzeugte programm legt die kinder wie der entwurf
+' F5 erzeugt das Programm; danach laeuft es mit einem Klick auf knopf1. Die
+' Spalte (40, 40, 200 breit) dehnt ihn auf ihre Breite -- im Modell ist er
+' 100 breit und steht bei 0, 0. Das Ereignis gibt aus, wo er wirklich ist.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "geprueft "; slHat(log, "geprueft 0 0")
+PRINT "erzeugt "; slHat(log, "erzeugt 2")
+DIM basis AS STRING : basis = JOIN$(READLINES(p + "/_studio/Hauptfenster_basis.dh"), CHR$(10))
+PRINT "kinder in der basis "; INSTR(basis, "kinder") >= 0
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN ARRAY_PUSH(neu, "AUTOMATION_PLAY(" + CHR$(34) + "klick.txt" + CHR$(34) + ")")
+    ARRAY_PUSH(neu, s)
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+WRITEALL(p + "/_studio/klick.txt", "c 4" + CHR$(10) + "e 0 7 200 55 0 0" + CHR$(10) + "e 5 7 200 55 0 0" + CHR$(10) + "e 10 6 0 0 0 0" + CHR$(10) + "e 12 5 0 0 0 0" + CHR$(10))
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "30", p + "/_studio/probe.dh")
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM kt AS STRING : kt = PROCESS_READ$(k)
+    IF kt <> "" THEN
+        IF LEFT$(kt, 8) <> "WARNING:" THEN PRINT "lauf "; TRIM$(REPLACE$(kt, CHR$(13), ""))
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(k) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+PRINT "code "; PROCESS_CODE(k)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":0,"y":0,"w":100,"h":30},
+{"kind":"label","name":"anzeige","text":"Zwei","x":0,"y":0,"w":100,"h":20},
+{"kind":"layout","name":"Spalte1","x":40,"y":40,"w":200,"h":120,"layout":{"art":"spalte","kinder":[[0,0],[1,0]],"abstand":6}}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB knopf1_Klick()
+        PRINT "knopf "; GUI_GET_X(Self.knopf1); " "; GUI_GET_Y(Self.knopf1); " "; GUI_GET_W(Self.knopf1)
+        PRINT "anzeige "; GUI_GET_X(Self.anzeige); " "; GUI_GET_Y(Self.anzeige)
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- erwartet
+geprueft TRUE
+erzeugt TRUE
+kinder in der basis TRUE
+lauf knopf 40 40 200
+lauf anzeige 40 76
+code 0
