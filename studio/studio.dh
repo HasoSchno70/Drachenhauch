@@ -320,7 +320,7 @@ SUB befehle()
     IF GUI_CLICKED(miZurueck) OR t = tbZurueck THEN zurueck()
     IF GUI_CLICKED(miVor) OR t = tbVor THEN vor()
     IF GUI_CLICKED(miVerdoppeln) AND auswahl >= 0 THEN controlsVerdoppeln() : nachAenderung(TRUE) : protokoll("verdoppelt")
-    IF GUI_CLICKED(miLoeschen) AND (auswahl >= 0 OR trayWahl >= 0) THEN loeschen()
+    IF GUI_CLICKED(miLoeschen) AND (auswahl >= 0 OR trayWahl >= 0 OR abstandL >= 0) THEN loeschen()
     IF GUI_CLICKED(miAlles) THEN allesWaehlen() : auswahlGeaendert()
     IF t = tbLinks THEN anordnen("links")
     IF t = tbOben THEN anordnen("oben")
@@ -394,6 +394,15 @@ SUB vor()
 END SUB
 
 SUB loeschen()
+    IF abstandL >= 0 THEN
+        DIM ln AS STRING : ln = feldText$(abstandL, "name")
+        abstandEntfernen(abstandL, abstandK)
+        auswahlSetzen(-1)
+        nachAenderung(TRUE)
+        status("Abstandhalter aus " + ln + " gelöscht.")
+        protokoll("geloescht abstand " + ln)
+        RETURN
+    END IF
     IF trayWahl >= 0 THEN
         DIM tn AS STRING : tn = timerName$(trayWahl)
         JSON_REMOVE(doc, "timer." + STR$(trayWahl))

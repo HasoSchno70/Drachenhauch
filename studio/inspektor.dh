@@ -191,6 +191,7 @@ SUB inspDazu(w AS GUI_WIDGET)
 END SUB
 
 FUNCTION giltFuer(z AS InspZeile, art AS STRING) AS BOOLEAN
+    IF abstandL >= 0 THEN RETURN z.art = "gewicht"
     IF trayWahl >= 0 THEN RETURN z.fuer = "timer"
     IF auswahl < 0 THEN RETURN z.fuer = "fenster"
     IF z.fuer = "fenster" THEN RETURN FALSE
@@ -260,7 +261,11 @@ SUB inspektorFuellen()
     inspStumm = TRUE
     inspAnhaengig = -1
     DIM art AS STRING : art = ""
-    IF trayWahl >= 0 THEN
+    IF abstandL >= 0 THEN
+        art = "abstand"
+        GUI_SET_TEXT(inspTitel, "Abstandhalter")
+        GUI_SET_TEXT(inspArt, "in " + feldText$(abstandL, "name") + ", Stelle " + STR$(abstandK + 1))
+    ELSEIF trayWahl >= 0 THEN
         art = "timer"
         GUI_SET_TEXT(inspTitel, timerName$(trayWahl))
         GUI_SET_TEXT(inspArt, "Timer")
@@ -293,7 +298,11 @@ SUB inspektorFuellen()
                 IF JSON_HAS(doc, p) THEN v = INT(JSON_GET_FLOAT(doc, p))
                 GUI_SET_VALUE(z.ed, v)
             CASE "gewicht"
-                GUI_SET_VALUE(z.ed, gewichtVon(auswahl))
+                IF abstandL >= 0 THEN
+                    GUI_SET_VALUE(z.ed, gewichtListe(abstandL)[abstandK])
+                ELSE
+                    GUI_SET_VALUE(z.ed, gewichtVon(auswahl))
+                END IF
             CASE "wahlindex"
                 DIM wi AS INTEGER : wi = 0
                 IF JSON_HAS(doc, p) THEN wi = INT(JSON_GET_FLOAT(doc, p))
@@ -435,6 +444,12 @@ SUB zeileUebernehmen(zi AS INTEGER)
         ziele = [IIF(trayWahl >= 0, -1, auswahl)]
     END IF
     DIM i AS INTEGER
+    IF z.art = "gewicht" AND abstandL >= 0 THEN
+        eintragGewichtSetzen(abstandL, abstandK, INT(GUI_VALUE(z.ed)))
+        entwurfBauen()
+        behaelterProtokollieren()
+        RETURN
+    END IF
     IF z.art = "gewicht" THEN
         FOR EACH i IN ziele
             IF verwaltet(i) THEN gewichtSetzen(i, INT(GUI_VALUE(z.ed)))
