@@ -6,7 +6,7 @@
 
 <p align="center"><em><a href="README.md">English</a> · Deutsch</em></p>
 
-**Drachenhauch** ist eine moderne BASIC-Programmiersprache für **2D- und 3D-Spiele und Anwendungen mit grafischer Oberfläche** — und für die Kommandozeilen-Werkzeuge und kleinen Dienste, die dazugehören. Mit eigener Entwicklungsumgebung, Form-Designer, Sprite-, Karten- und Klang-Editoren; ein Befehl macht aus einem Programm eine eigenständige `.exe`. Läuft unter Windows, macOS und Linux und als WebAssembly im Browser.
+**Drachenhauch** ist eine moderne BASIC-Programmiersprache für **2D- und 3D-Spiele und Anwendungen mit grafischer Oberfläche** — und für die Kommandozeilen-Werkzeuge und kleinen Dienste, die dazugehören. Mit eigener Entwicklungsumgebung, dem **Drachenhauch Studio** für Anwendungen mit Oberfläche im Stil von Xojo, Form-Designer, Sprite-, Karten- und Klang-Editoren; ein Befehl macht aus einem Programm eine eigenständige `.exe`. Läuft unter Windows, macOS und Linux und als WebAssembly im Browser.
 
 Ein BASIC im Geist von QB64, FreeBASIC oder Blitz Basic, mit dem Werkzeugkasten von PICO-8 oder LÖVE für Spiele und den Formularen und Tabellen von Visual Basic für Anwendungen — leicht anzufangen, streng genug, um damit zu wachsen.
 
@@ -70,6 +70,7 @@ schreibt man damit auch Anwendungen mit Fenstern, Formularen und Tabellen
 | **Objekte als Rückrufe** | `obj.methode` ist eine `FUNCREF`, die ihre Instanz mitträgt — `GUI_ON_CLICK(knopf, spieler.klick)`, `TIMER_EVERY(500, gegner.zucken)`, `SORT(zahlen, regel.cmp)` |
 | **Fremde Bibliotheken** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — Windows-API, C-Bibliothek, Gerätetreiber direkt aufrufen, mit Zeigern, Structs und Rückrufen; sogar Python samt numpy einbetten ([mehr](docs/ffi.md)) |
 | **Nebenher** | HTTP, Datenbank, fremde Programme und **eigene Funktionen** im Hintergrund (`TASK_START`) — die Hauptschleife läuft weiter |
+| **Anwendungen wie mit Xojo** | Drachenhauch Studio: Fenster aus einer Bibliothek von Controls zeichnen, Eigenschaften im Inspektor setzen, Doppelklick aufs Control und den Code seines Ereignisses schreiben; ein Fenster ist eine Klasse, das Projekt ein Ordner; F5 startet, Strg+B baut eine `.exe`, F7 debuggt ([mehr](docs/studio.md)) |
 | **Leisten und Plugins** | `GUI_DOCK` verteilt Leisten links, rechts und unten, als Reiter oder schwebend; die IDE und Glutfaden laden eigene Drachenhauch-Programme als Plugins; die IDE holt sie auch aus GitHub oder einem ZIP, bringt drei mit und prüft sie ohne Fenster ([mehr](docs/ide-plugins.md)) |
 | **Rückmeldung ohne Dialog** | Popover an einem Widget (`GUI_POPOVER`), Meldungen, die von selbst ausblenden, eine Infoleiste mit Knöpfen, Suchfelder mit Lupe und Kreuz, Vorschläge beim Tippen ([mehr](docs/module-gui.md#popover-toast-und-infoleiste)) |
 | **Aussehen per Regel** | eine Stildatei wie CSS: `button.gefahr:hover { bg: #E74C3C }`, Regeln nach Art, Klasse, Name und Zustand, Klassen, die live wirken, Farben aus dem Thema ([mehr](docs/module-gui.md#7-stildatei-regeln-nach-art-klasse-name-und-zustand)) |
@@ -85,7 +86,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 ## Herunterladen
 
-**[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 56 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz`; aktuell Fassung 2026.39.
+**[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 58 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz`; aktuell Fassung 2026.40.
 
 Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 226 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Der Windows-Installer ist nicht signiert, SmartScreen meldet sich also beim ersten Start; die macOS-App ist noch nicht beglaubigt.
 
@@ -129,6 +130,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Performance](docs/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
 - **Module** — 48 Stück, [Tabelle unten](#module)
 - **[IDE](docs/ide.md)** — die Entwicklungsumgebung, selbst in Drachenhauch geschrieben: Reiter, Projektbaum, Vervollständigung, Hilfe zum Wort, Schnipsel, Mehrfach-Marken, Faltung, geteilte Ansicht, Umbauten über das ganze Projekt, **Debugger** (auch bedingte Haltepunkte), **Profiler**, git blame/diff, Handbuch im Fenster, Willkommensseite mit Beispiel-Galerie
+- **[Drachenhauch Studio](docs/studio.md)** (`studio/studio.dh`) — Anwendungen mit Oberfläche im Stil von Xojo: Fenster-Entwurf mit Ausrichtungslinien, Inspektor, Navigator, Code je Ereignis, Menüs, Timer, Bilder, Dialoge, Starten/Bauen/Debuggen; Beispielprojekt `examples/studio/rechnungen/`
 - **Werkzeuge** — alle in Drachenhauch geschrieben, in der IDE unter *Werkzeuge* oder direkt mit `dhrt run examples/<datei>`:
   - **[Sprite-Editor](docs/sprite-editor.md)** (`189_sprite_editor.dh`) — Pixel-Art mit Einzelbildern, Ebenen, Lasso/Zauberstab/Verschieben, GIF mit Dauer je Bild, Atlas-Export für `ATLAS_LOAD`, DH-Code, `.dhanim`-Vorlage
   - **[Partikel-Editor](docs/particle-editor.md)** (`185_partikel_editor.dh`) — Emitter-Regler mit Live-Vorschau, Werkseinstellungen, eigene Stände als `.ini`, DH-Code

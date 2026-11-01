@@ -136,6 +136,7 @@ Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie e
 - **[Entwurf: Was der gui gegen GTK 3 fehlt](entwurf-gui-wie-gtk.md)** — gemessen: 100 000 Tabellenzeilen sind keine Lücke; vier Pakete (Popover/Toast/Suchfeld, Bausteine wie Fluss-Layout und Mnemonics, Textformung/RTL/Rechtschreibung, Stildatei mit Selektoren und Klassen wie GTK-CSS) und ihre Reihenfolge; alles gebaut bis auf die volle Textformung (Ligaturen, indische Schriften)
 - **[Entwurf: Drachenhauch Studio](entwurf-studio.md)** — eine eigenständige IDE für Programme mit Oberfläche im Stil von Xojo: Projekt als Ordner, Fenster als Klasse mit Ereignis-Methoden, Layout-Editor, Bibliothek, Inspektor, Starten und Bauen; fünf Stufen
 - **[Entwurf: Drucken](entwurf-drucken.md)** — kein raylib fuers Papier: geprüfte Bausteine, vier Wege; Empfehlung: die Seite selbst zeichnen (GDI/CUPS als Ziele des pdf-Moduls), dazu ein Befehl, der eine Datei öffnet
+- **[Release 2026.40](release-2026.40.md)** — was in dieser Fassung neu ist
 - **[Release 2026.39](release-2026.39.md)** — was in dieser Fassung neu ist
 - **[Release 2026.38](release-2026.38.md)** — was in dieser Fassung neu ist
 - **[Release 2026.37](release-2026.37.md)** — was in dieser Fassung neu ist
