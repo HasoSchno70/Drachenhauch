@@ -68,81 +68,270 @@ FUNCTION enthaelt(liste AS ARRAY OF STRING, wert AS STRING) AS BOOLEAN
     RETURN FALSE
 END FUNCTION
 
+' Die Methode eines Elements beim Namen (NIL, wenn es sie nicht gibt).
+FUNCTION methodeNach(e AS Element, name AS STRING) AS Methode
+    DIM m AS Methode
+    FOR EACH m IN methoden
+        IF m.el = e AND LOWER$(m.name) = LOWER$(name) THEN RETURN m
+    NEXT
+    DIM keine AS Methode
+    RETURN keine
+END FUNCTION
+
+' Die Controls eines Fensters samt Timern und benannten Menueeintraegen,
+' in dieser Reihenfolge -- dieselbe wie controlsVon (projekt.dh).
+SUB menueNamenSammeln(d AS JSON_HANDLE, pfad AS STRING, namen AS ARRAY OF STRING, arten AS ARRAY OF STRING)
+    IF NOT JSON_HAS(d, pfad) THEN RETURN
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(d, pfad) - 1
+        DIM p AS STRING : p = pfad + "." + STR$(k)
+        IF JSON_HAS(d, p + ".items") THEN
+            menueNamenSammeln(d, p + ".items", namen, arten)
+        ELSEIF JSON_HAS(d, p + ".name") THEN
+            ARRAY_PUSH(namen, JSON_GET_STRING(d, p + ".name"))
+            ARRAY_PUSH(arten, "menue")
+        END IF
+    NEXT
+END SUB
+
+' Die Zeilen, die die Menues eines Fensters bauen: oberste mit GUI_MENU,
+' Untermenues mit GUI_SUBMENU, Eintraege mit GUI_MENU_ITEM -- ein benannter
+' Eintrag landet in seinem Feld (Self.<name>), sonst in einer Hilfsvariable.
+SUB menueCode(z AS ARRAY OF STRING, d AS JSON_HANDLE, pfad AS STRING, menue AS STRING, BYREF zaehler AS INTEGER)
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(d, pfad) - 1
+        DIM p AS STRING : p = pfad + "." + STR$(k)
+        DIM label AS STRING : label = IIF(JSON_HAS(d, p + ".label"), JSON_GET_STRING(d, p + ".label"), "")
+        DIM sep AS BOOLEAN : sep = FALSE
+        IF JSON_HAS(d, p + ".separator") THEN sep = JSON_GET_BOOL(d, p + ".separator")
+        IF sep THEN
+            ARRAY_PUSH(z, "        GUI_MENU_SEPARATOR(" + menue + ")")
+            CONTINUE
+        END IF
+        IF JSON_HAS(d, p + ".items") THEN
+            DIM unter AS STRING : unter = "studioM" + STR$(zaehler)
+            zaehler = zaehler + 1
+            ARRAY_PUSH(z, "        DIM " + unter + " AS INTEGER : " + unter + " = GUI_SUBMENU(" + menue + ", " + dhText$(label) + ")")
+            menueCode(z, d, p + ".items", unter, zaehler)
+            CONTINUE
+        END IF
+        DIM ruf AS STRING : ruf = "GUI_MENU_ITEM(" + menue + ", " + dhText$(label)
+        IF JSON_HAS(d, p + ".shortcut") THEN ruf = ruf + ", " + dhText$(JSON_GET_STRING(d, p + ".shortcut"))
+        ruf = ruf + ")"
+        DIM ziel AS STRING
+        IF JSON_HAS(d, p + ".name") THEN
+            ziel = "Self." + JSON_GET_STRING(d, p + ".name")
+        ELSE
+            ziel = "studioM" + STR$(zaehler)
+            zaehler = zaehler + 1
+            ARRAY_PUSH(z, "        DIM " + ziel + " AS INTEGER")
+        END IF
+        ARRAY_PUSH(z, "        " + ziel + " = " + ruf)
+        IF JSON_HAS(d, p + ".checkable") THEN
+            IF JSON_GET_BOOL(d, p + ".checkable") THEN
+                DIM an AS BOOLEAN : an = FALSE
+                IF JSON_HAS(d, p + ".checked") THEN an = JSON_GET_BOOL(d, p + ".checked")
+                ARRAY_PUSH(z, "        GUI_MENU_CHECK(" + ziel + ", " + IIF(an, "TRUE", "FALSE") + ")")
+            END IF
+        END IF
+        IF JSON_HAS(d, p + ".enabled") THEN
+            IF NOT JSON_GET_BOOL(d, p + ".enabled") THEN ARRAY_PUSH(z, "        GUI_MENU_ENABLE(" + ziel + ", FALSE)")
+        END IF
+    NEXT
+END SUB
+
+FUNCTION jsonSchalter(d AS JSON_HANDLE, pfad AS STRING, vorgabe AS BOOLEAN) AS BOOLEAN
+    IF NOT JSON_HAS(d, pfad) THEN RETURN vorgabe
+    IF JSON_TYPE(d, pfad) <> "boolean" THEN RETURN vorgabe
+    RETURN JSON_GET_BOOL(d, pfad)
+END FUNCTION
+
 ' Die erzeugte Basisklasse eines Fensters.
+'
+' Die Ereignisse werden NACH dem GUI_UPDATE abgefragt (studioTakt), nicht als
+' Rueckruf der gui verdrahtet: so laeuft eine Ereignis-Methode ausserhalb
+' von GUI_UPDATE und darf selbst Bilder drehen (Frage, ZeigenModal).
 FUNCTION basisCode$(ei AS INTEGER) AS STRING
     DIM e AS Element : e = elemente[ei]
     DIM d AS JSON_HANDLE : d = layoutFuerBasis(ei)
-    DIM n AS INTEGER : n = JSON_LEN(d, "widgets")
+    DIM nW AS INTEGER : nW = JSON_LEN(d, "widgets")
     DIM namen AS ARRAY OF STRING : namen = []
     DIM arten AS ARRAY OF STRING : arten = []
     DIM i AS INTEGER
-    FOR i = 0 TO n - 1
+    FOR i = 0 TO nW - 1
         DIM p AS STRING : p = "widgets." + STR$(i)
         ARRAY_PUSH(namen, IIF(JSON_HAS(d, p + ".name"), JSON_GET_STRING(d, p + ".name"), ""))
         ARRAY_PUSH(arten, JSON_GET_STRING(d, p + ".kind"))
+    NEXT
+    DIM nT AS INTEGER : nT = 0
+    IF JSON_HAS(d, "timer") THEN nT = JSON_LEN(d, "timer")
+    FOR i = 0 TO nT - 1
+        ARRAY_PUSH(namen, JSON_GET_STRING(d, "timer." + STR$(i) + ".name"))
+        ARRAY_PUSH(arten, "timer")
+    NEXT
+    menueNamenSammeln(d, "menus", namen, arten)
+    ' Je Control: welche Ereignisse der Nutzer geschrieben hat ("" = keins).
+    DIM evMeth AS MAP OF STRING
+    DIM m AS Methode
+    FOR EACH m IN methoden
+        IF NOT (m.el = e) THEN CONTINUE
+        FOR i = 0 TO LEN(namen) - 1
+            IF NOT istBezeichner(namen[i]) THEN CONTINUE
+            DIM ev AS STRING : ev = ereignisVon$(m.name, namen[i])
+            IF ev = "" OR NOT enthaelt(ereignisseFuer(arten[i]), ev) THEN CONTINUE
+            MAPPUT(evMeth, STR$(i) + "|" + LOWER$(ev), m.name)
+            BREAK
+        NEXT
     NEXT
     DIM z AS ARRAY OF STRING : z = []
     ARRAY_PUSH(z, "' Erzeugt vom Drachenhauch Studio aus " + layoutDatei$(e) + " -- nicht von Hand aendern,")
     ARRAY_PUSH(z, "' beim naechsten Starten wird die Datei neu geschrieben. Der Code des Fensters")
     ARRAY_PUSH(z, "' steht in " + codeDatei$(e) + " (CLASS " + e.name + " EXTENDS " + e.name + "_Basis).")
     ARRAY_PUSH(z, "CLASS " + e.name + "_Basis EXTENDS StudioFenster")
-    FOR i = 0 TO n - 1
-        IF istBezeichner(namen[i]) THEN ARRAY_PUSH(z, "    DIM " + namen[i] + " AS GUI_WIDGET")
+    FOR i = 0 TO LEN(namen) - 1
+        IF NOT istBezeichner(namen[i]) THEN CONTINUE
+        DIM typ AS STRING : typ = "GUI_WIDGET"
+        IF arten[i] = "timer" THEN typ = "StudioTimer"
+        IF arten[i] = "menue" THEN typ = "INTEGER"
+        ARRAY_PUSH(z, "    DIM " + namen[i] + " AS " + typ)
+        IF MAPHAS(evMeth, STR$(i) + "|mausrein") OR MAPHAS(evMeth, STR$(i) + "|mausraus") THEN
+            ARRAY_PUSH(z, "    DIM studioUeber_" + namen[i] + " AS BOOLEAN")
+        END IF
+        IF MAPHAS(evMeth, STR$(i) + "|ziehen") THEN ARRAY_PUSH(z, "    DIM studioZug_" + namen[i] + " AS BOOLEAN")
     NEXT
     ARRAY_PUSH(z, "")
     ARRAY_PUSH(z, "    SUB studioAufbauen()")
+    ' Das Fenster aus dem Layout -- ohne Timer und Menues, die baut der Code.
+    DIM rumpf AS JSON_HANDLE : rumpf = JSON_PARSE(JSON_STRINGIFY(d))
+    IF JSON_HAS(rumpf, "timer") THEN JSON_REMOVE(rumpf, "timer")
+    IF JSON_HAS(rumpf, "menus") THEN JSON_REMOVE(rumpf, "menus")
     ARRAY_PUSH(z, "        DIM j AS STRING : j = " + CHR$(34) + CHR$(34))
-    DIM json AS STRING : json = JSON_STRINGIFY(d)
+    DIM json AS STRING : json = JSON_STRINGIFY(rumpf)
     DIM pos AS INTEGER : pos = 0
     WHILE pos < LEN(json)
         ARRAY_PUSH(z, "        j = j + " + dhText$(MID$(json, pos, 96)))
         pos = pos + 96
     WEND
     ARRAY_PUSH(z, "        Self.studioWin = GUI_FROM_JSON(j)")
-    FOR i = 0 TO n - 1
+    FOR i = 0 TO nW - 1
         IF istBezeichner(namen[i]) THEN ARRAY_PUSH(z, "        Self." + namen[i] + " = GUI_WINDOW_WIDGET(Self.studioWin, " + STR$(i) + ")")
     NEXT
-    ' Je Ereignis-Methode des Nutzers: verdrahten oder in takt/zeichnen abfragen.
-    DIM m2 AS STRING
+    ' Bilder aus dem Projekt.
+    FOR i = 0 TO nW - 1
+        DIM bp AS STRING : bp = "widgets." + STR$(i) + ".studio_bild"
+        IF JSON_HAS(d, bp) THEN
+            IF JSON_GET_STRING(d, bp) <> "" THEN ARRAY_PUSH(z, "        GUI_SET_IMAGE(GUI_WINDOW_WIDGET(Self.studioWin, " + STR$(i) + "), Bild(" + dhText$(JSON_GET_STRING(d, bp)) + "))")
+        END IF
+    NEXT
+    ' Timer.
+    FOR i = 0 TO nT - 1
+        DIM tp AS STRING : tp = "timer." + STR$(i)
+        DIM tn AS STRING : tn = "Self." + JSON_GET_STRING(d, tp + ".name")
+        DIM iv AS INTEGER : iv = 1000
+        IF JSON_HAS(d, tp + ".intervall") THEN iv = INT(JSON_GET_FLOAT(d, tp + ".intervall"))
+        ARRAY_PUSH(z, "        " + tn + " = NEW StudioTimer()")
+        ARRAY_PUSH(z, "        " + tn + ".Intervall = " + STR$(iv))
+        ARRAY_PUSH(z, "        " + tn + ".Wiederholen = " + IIF(jsonSchalter(d, tp + ".wiederholen", TRUE), "TRUE", "FALSE"))
+        IF jsonSchalter(d, tp + ".aktiv", TRUE) THEN ARRAY_PUSH(z, "        " + tn + ".Starten()")
+    NEXT
+    ' Menues.
+    IF JSON_HAS(d, "menus") THEN
+        DIM zaehler AS INTEGER : zaehler = 0
+        DIM k AS INTEGER
+        FOR k = 0 TO JSON_LEN(d, "menus") - 1
+            DIM mp AS STRING : mp = "menus." + STR$(k)
+            DIM mv AS STRING : mv = "studioM" + STR$(zaehler)
+            zaehler = zaehler + 1
+            DIM ml AS STRING : ml = IIF(JSON_HAS(d, mp + ".label"), JSON_GET_STRING(d, mp + ".label"), "")
+            ARRAY_PUSH(z, "        DIM " + mv + " AS INTEGER : " + mv + " = GUI_MENU(Self.studioWin, " + dhText$(ml) + ")")
+            IF JSON_HAS(d, mp + ".items") THEN menueCode(z, d, mp + ".items", mv, zaehler)
+        NEXT
+    END IF
+    ARRAY_PUSH(z, "    END SUB")
+    ' Die Abfragen je Bild, die leeren Ereignis-Methoden fuer die Basis.
     DIM takt AS ARRAY OF STRING : takt = []
     DIM zeichnen AS ARRAY OF STRING : zeichnen = []
     DIM leer AS ARRAY OF STRING : leer = []
-    DIM m AS Methode
-    FOR EACH m IN methoden
-        IF NOT (m.el = e) THEN CONTINUE
-        FOR i = 0 TO n - 1
-            IF NOT istBezeichner(namen[i]) THEN CONTINUE
-            DIM ev AS STRING : ev = ereignisVon$(m.name, namen[i])
-            IF ev = "" OR NOT enthaelt(ereignisseFuer(arten[i]), ev) THEN CONTINUE
-            DIM ctl AS STRING : ctl = "Self." + namen[i]
-            DIM befehl AS STRING : befehl = rueckrufBefehl$(ev)
-            IF befehl <> "" THEN
-                ARRAY_PUSH(z, "        " + befehl + "(" + ctl + ", Self." + m.name + ")")
-            ELSEIF LOWER$(ev) = "doppelklick" THEN
-                ARRAY_PUSH(takt, "        IF GUI_DOUBLE_CLICKED(" + ctl + ") THEN Self." + m.name + "()")
-            ELSEIF LOWER$(ev) = "maus" THEN
-                ARRAY_PUSH(takt, "        IF MOUSE_HIT(0) THEN")
-                ARRAY_PUSH(takt, "            IF GUI_HIT_TEST(MOUSEX(), MOUSEY()) = " + ctl + " THEN Self." + m.name + "()")
-                ARRAY_PUSH(takt, "        END IF")
-            ELSEIF LOWER$(ev) = "zeichnen" THEN
-                ARRAY_PUSH(zeichnen, "        SCISSOR(GUI_CANVAS_X(" + ctl + "), GUI_CANVAS_Y(" + ctl + "), GUI_CANVAS_W(" + ctl + "), GUI_CANVAS_H(" + ctl + "))")
-                ARRAY_PUSH(zeichnen, "        Self." + m.name + "()")
-                ARRAY_PUSH(zeichnen, "        SCISSOR_END()")
+    FOR i = 0 TO LEN(namen) - 1
+        IF NOT istBezeichner(namen[i]) THEN CONTINUE
+        DIM ctl AS STRING : ctl = "Self." + namen[i]
+        DIM evs AS ARRAY OF STRING : evs = ereignisseFuer(arten[i])
+        DIM ereig AS STRING
+        FOR EACH ereig IN evs
+            DIM schl AS STRING : schl = STR$(i) + "|" + LOWER$(ereig)
+            IF NOT MAPHAS(evMeth, schl) THEN CONTINUE
+            DIM mn AS STRING : mn = "Self." + MAPGET(evMeth, schl) + "()"
+            DIM bed AS STRING : bed = ""
+            SELECT CASE LOWER$(ereig)
+                CASE "klick"
+                    bed = "GUI_CLICKED(" + ctl + ")"
+                CASE "aktion"
+                    IF arten[i] = "timer" THEN bed = ctl + ".studioFaellig()" ELSE bed = "GUI_CLICKED(" + ctl + ")"
+                CASE "geaendert"
+                    bed = "GUI_CHANGED(" + ctl + ")"
+                CASE "enter"
+                    bed = "GUI_ENTERED(" + ctl + ")"
+                CASE "fokusrein"
+                    bed = "studioFokusJetzt = " + ctl + " AND studioFokusAlt <> " + ctl
+                CASE "fokusraus"
+                    bed = "studioFokusAlt = " + ctl + " AND studioFokusJetzt <> " + ctl
+                CASE "doppelklick"
+                    bed = "GUI_DOUBLE_CLICKED(" + ctl + ")"
+                CASE "maus"
+                    bed = "MOUSE_HIT(0) AND GUI_HIT_TEST(MOUSEX(), MOUSEY()) = " + ctl
+                CASE "rad"
+                    ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
+                    ARRAY_PUSH(takt, "        IF MOUSEWHEEL_Y() <> 0.0 AND GUI_HIT_TEST(MOUSEX(), MOUSEY()) = " + ctl + " THEN Self." + MAPGET(evMeth, schl) + "(MOUSEWHEEL_Y())")
+                CASE "ziehen"
+                    ' Ab dem Druck auf die Flaeche, solange die Taste haengt --
+                    ' auch wenn die Maus die Flaeche dabei verlaesst.
+                    DIM zf AS STRING : zf = "Self.studioZug_" + namen[i]
+                    ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
+                    ARRAY_PUSH(takt, "        IF MOUSE_HIT(0) AND GUI_HIT_TEST(MOUSEX(), MOUSEY()) = " + ctl + " THEN " + zf + " = TRUE")
+                    ARRAY_PUSH(takt, "        IF " + zf + " THEN")
+                    ARRAY_PUSH(takt, "            IF MOUSEBUTTON(0) THEN")
+                    ARRAY_PUSH(takt, "                Self." + MAPGET(evMeth, schl) + "(MOUSEX() - GUI_CANVAS_X(" + ctl + "), MOUSEY() - GUI_CANVAS_Y(" + ctl + "))")
+                    ARRAY_PUSH(takt, "            ELSE")
+                    ARRAY_PUSH(takt, "                " + zf + " = FALSE")
+                    ARRAY_PUSH(takt, "            END IF")
+                    ARRAY_PUSH(takt, "        END IF")
+                CASE "zeichnen"
+                    ARRAY_PUSH(zeichnen, "        SCISSOR(GUI_CANVAS_X(" + ctl + "), GUI_CANVAS_Y(" + ctl + "), GUI_CANVAS_W(" + ctl + "), GUI_CANVAS_H(" + ctl + "))")
+                    ARRAY_PUSH(zeichnen, "        " + mn)
+                    ARRAY_PUSH(zeichnen, "        SCISSOR_END()")
+            END SELECT
+            IF bed <> "" THEN
+                ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
+                ARRAY_PUSH(takt, "        IF " + bed + " THEN " + mn)
             END IF
             ' Leer in der Basis, damit der Verweis auf Self.<methode> schon
             ' hier aufgeloest werden kann; die Nutzerklasse ueberschreibt sie.
-            ARRAY_PUSH(leer, "")
-            ARRAY_PUSH(leer, "    " + m.kopf)
-            ARRAY_PUSH(leer, "    END " + UPPER$(m.art))
-            BREAK
+            DIM mk AS Methode : mk = methodeNach(e, MAPGET(evMeth, schl))
+            IF mk IS NOT NIL THEN
+                ARRAY_PUSH(leer, "")
+                ARRAY_PUSH(leer, "    " + mk.kopf)
+                ARRAY_PUSH(leer, "    END " + UPPER$(mk.art))
+            END IF
         NEXT
+        ' Maus darueber und wieder weg: aus dem Zustand des vorigen Bildes.
+        DIM rein AS STRING : rein = STR$(i) + "|mausrein"
+        DIM raus AS STRING : raus = STR$(i) + "|mausraus"
+        IF MAPHAS(evMeth, rein) OR MAPHAS(evMeth, raus) THEN
+            DIM uf AS STRING : uf = "Self.studioUeber_" + namen[i]
+            ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
+            ARRAY_PUSH(takt, "        IF GUI_HOVERED(" + ctl + ") <> " + uf + " THEN")
+            ARRAY_PUSH(takt, "            " + uf + " = NOT " + uf)
+            IF MAPHAS(evMeth, rein) THEN ARRAY_PUSH(takt, "            IF " + uf + " THEN Self." + MAPGET(evMeth, rein) + "()")
+            IF MAPHAS(evMeth, raus) THEN ARRAY_PUSH(takt, "            IF NOT " + uf + " THEN Self." + MAPGET(evMeth, raus) + "()")
+            ARRAY_PUSH(takt, "        END IF")
+        END IF
     NEXT
-    ARRAY_PUSH(z, "    END SUB")
+    DIM zl AS STRING
     IF LEN(takt) > 0 THEN
         ARRAY_PUSH(z, "")
         ARRAY_PUSH(z, "    SUB studioTakt()")
-        FOR EACH m2 IN takt
-            ARRAY_PUSH(z, m2)
+        FOR EACH zl IN takt
+            ARRAY_PUSH(z, zl)
         NEXT
         ARRAY_PUSH(z, "    END SUB")
     END IF
@@ -150,17 +339,18 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
         ARRAY_PUSH(z, "")
         ARRAY_PUSH(z, "    SUB studioZeichnen()")
         ARRAY_PUSH(z, "        IF NOT GUI_WINDOW_SHOWN(Self.studioWin) THEN RETURN")
-        FOR EACH m2 IN zeichnen
-            ARRAY_PUSH(z, m2)
+        FOR EACH zl IN zeichnen
+            ARRAY_PUSH(z, zl)
         NEXT
         ARRAY_PUSH(z, "    END SUB")
     END IF
-    FOR EACH m2 IN leer
-        ARRAY_PUSH(z, m2)
+    FOR EACH zl IN leer
+        ARRAY_PUSH(z, zl)
     NEXT
     ARRAY_PUSH(z, "END CLASS")
     RETURN JOIN$(z, CHR$(10)) + CHR$(10)
 END FUNCTION
+
 
 ' Die Elemente in der Reihenfolge, in der main.dh sie einbindet: Module,
 ' Klassen (eine Oberklasse vor ihren Unterklassen), App, Fenster.
@@ -269,6 +459,22 @@ SUB erzeugen()
     FOR i = 0 TO LEN(elemente) - 1
         WRITEALL(PATHJOIN(pk, codeDatei$(elemente[i])), codeSetzen$(elemente[i]))
     NEXT
+    ' Die Bilder des Projekts unter assets/bilder/ -- dorthin schaut Bild(),
+    ' und dhrt --export nimmt assets/ neben der Exe mit.
+    DIM ab AS STRING : ab = PATHJOIN(PATHJOIN(o, "assets"), "bilder")
+    IF DIREXISTS(ab) THEN
+        FOR EACH alt IN DIRLIST(ab)
+            DELETEFILE(PATHJOIN(ab, alt))
+        NEXT
+    END IF
+    DIM pb AS STRING : pb = bilderOrdner$()
+    IF DIREXISTS(pb) THEN
+        IF NOT DIREXISTS(PATHJOIN(o, "assets")) THEN MKDIR(PATHJOIN(o, "assets"))
+        IF NOT DIREXISTS(ab) THEN MKDIR(ab)
+        FOR EACH alt IN DIRLIST(pb)
+            COPYFILE(PATHJOIN(pb, alt), PATHJOIN(ab, alt))
+        NEXT
+    END IF
     WRITEALL(PATHJOIN(o, "main.dh"), mainCode$())
     protokoll("erzeugt " + STR$(LEN(elemente)))
 END SUB
@@ -469,6 +675,20 @@ SUB feldBefunde(r AS Reiter)
         ARRAY_PUSH(hz, z)
         ARRAY_PUSH(ht, IIF(LEN(b.meldung) > 80, LEFT$(b.meldung, 77) + "...", b.meldung))
     NEXT
+    IF r.art = "code" THEN
+        DIM hp AS Haltepunkt
+        FOR EACH hp IN haltepunkte
+            IF hp.m = r.meth THEN
+                ARRAY_PUSH(mz, hp.zeile)
+                ARRAY_PUSH(mf, &HE03C3C)
+            END IF
+        NEXT
+        IF dbgMeth IS NOT NIL AND r.meth = dbgMeth AND dbgZeile > 0 THEN
+            GUI_TEXTAREA_LINE_COLORS(r.feld, [dbgZeile], [&H60E8C040])
+        ELSE
+            GUI_TEXTAREA_LINE_COLORS(r.feld, [], [])
+        END IF
+    END IF
     GUI_TEXTAREA_SQUIGGLES(r.feld, ws, wl, wf)
     GUI_TEXTAREA_MARKS(r.feld, mz, mf)
     GUI_TEXTAREA_HINTS(r.feld, hz, ht, &HC07070)
@@ -490,6 +710,68 @@ SUB befundAnspringen(k AS INTEGER)
     feldBefunde(r)
     IF b.zeile > 0 AND r.feld >= 0 THEN GUI_TEXTAREA_GOTO(r.feld, b.zeile, b.spalte)
     protokoll("angesprungen " + befundOrt$(b))
+END SUB
+
+' --- Bilder des Projekts ------------------------------------------------------------
+FUNCTION bilderOrdner$() AS STRING
+    IF projOrdner = "" THEN RETURN ""
+    RETURN PATHJOIN(projOrdner, "bilder")
+END FUNCTION
+
+' Die Bilder im Ordner bilder/ des Projekts, sortiert.
+FUNCTION projektBilder() AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM o AS STRING : o = bilderOrdner$()
+    IF o = "" THEN RETURN aus
+    IF NOT DIREXISTS(o) THEN RETURN aus
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(o)
+        DIM e AS STRING : e = LOWER$(n)
+        IF RIGHT$(e, 4) = ".png" OR RIGHT$(e, 4) = ".jpg" OR RIGHT$(e, 5) = ".jpeg" OR RIGHT$(e, 4) = ".bmp" OR RIGHT$(e, 4) = ".gif" OR RIGHT$(e, 4) = ".tga" THEN ARRAY_PUSH(aus, n)
+    NEXT
+    SORT(aus)
+    RETURN aus
+END FUNCTION
+
+' Projekt -> Bild hinzufuegen: die Datei nach bilder/ kopieren; ist ein
+' Bild-Control gewaehlt, zeigt es sie gleich.
+SUB bildHinzufuegen()
+    IF projLose OR projOrdner = "" THEN
+        IF NOT sichern(FALSE) THEN
+            status("Bilder gehören zu einem Projekt -- erst sichern.")
+            RETURN
+        END IF
+    END IF
+    DIM q AS STRING : q = GETENV$("DH_STUDIO_DATEI")
+    IF q = "" THEN q = FILE_OPEN_DIALOG("Bild hinzufügen", "png,jpg,jpeg,bmp,gif,tga")
+    IF q = "" THEN RETURN
+    IF NOT FILEEXISTS(q) THEN
+        status("Die Datei gibt es nicht: " + q)
+        RETURN
+    END IF
+    DIM o AS STRING : o = bilderOrdner$()
+    IF NOT DIREXISTS(o) THEN MKDIR(o)
+    DIM name AS STRING : name = BASENAME(q)
+    COPYFILE(q, PATHJOIN(o, name))
+    IF auswahl >= 0 THEN
+        IF feldText$(auswahl, "kind") = "image" THEN JSON_SET_STRING(doc, wz$(auswahl, "studio_bild"), name)
+    END IF
+    nachAenderung(TRUE)
+    status("Bild hinzugefügt: bilder/" + name)
+    protokoll("bild " + name)
+END SUB
+
+' Im Entwurf: Bild-Controls zeigen ihr Bild aus dem Projekt.
+SUB entwurfBilder()
+    IF frm < 0 THEN RETURN
+    DIM i AS INTEGER
+    FOR i = 0 TO anzahl() - 1
+        IF feldText$(i, "kind") <> "image" THEN CONTINUE
+        DIM n AS STRING : n = feldText$(i, "studio_bild")
+        IF n = "" THEN CONTINUE
+        DIM pfad AS STRING : pfad = PATHJOIN(bilderOrdner$(), n)
+        IF bilderOrdner$() <> "" AND FILEEXISTS(pfad) THEN GUI_SET_IMAGE(GUI_WINDOW_WIDGET(frm, i), LOADIMAGE(pfad))
+    NEXT
 END SUB
 
 ' --- Starten, Anhalten, Bauen ---------------------------------------------------------
@@ -532,6 +814,10 @@ FUNCTION vorbereiten(wozu AS STRING) AS BOOLEAN
 END FUNCTION
 
 SUB starten()
+    IF dbgProz >= 0 THEN
+        IF dbgHaelt THEN dbgKommando("continue")
+        RETURN
+    END IF
     IF lauf >= 0 THEN anhalten()
     IF NOT vorbereiten("Starten") THEN RETURN
     GUI_LISTBOX_CLEAR(lstAusgabe)
@@ -551,6 +837,10 @@ SUB starten()
 END SUB
 
 SUB anhalten()
+    IF dbgProz >= 0 THEN
+        debugBeenden()
+        RETURN
+    END IF
     IF lauf < 0 THEN RETURN
     PROCESS_KILL(lauf)
     lauf = -1

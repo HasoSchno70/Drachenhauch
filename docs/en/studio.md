@@ -15,9 +15,19 @@ dhrt run studio/studio.dh -- fenster.dhform
 A folder with `projekt.dhstudio` opens as a project, a folder without one
 gets a new project, a `.dhform` opens as a single window.
 
-**Status: stage 3.** Projects with several windows, modules and classes,
+When installed, "Drachenhauch Studio" is in the start menu or application
+menu, and a `.dhstudio` opens in the studio with a double-click (on Windows,
+if the association was chosen during installation). On macOS and Linux
+`drachenhauch --studio [project]` starts it from the terminal. In the IDE:
+Werkzeuge → Drachenhauch Studio (with the project folder if it is a studio
+project), and a `.dhstudio` in the project tree opens in the studio. The form
+designer opens its form with Datei → Im Drachenhauch Studio öffnen
+(Ctrl+Shift+O).
+
+**Status: stage 4.** Projects with several windows, modules and classes,
 events and a code field per method; starting, building and errors shown at
-the method they belong to.
+the method they belong to; timers, menus, dialogs that wait, images and a
+debugger.
 
 ## The user interface
 
@@ -77,6 +87,7 @@ wires them up.
 | double-click a control in the design | "add event" for this control; on empty space: for the window |
 | Ctrl+Shift+E | the same for the selection (or for the element of the front tab) |
 | Ctrl+Shift+M | add a method: name, parameters (`a AS INTEGER, b AS STRING`), return type (empty = SUB) |
+| Ctrl+Space | suggestions at the cursor; after `Self.` or `objekt.` they open by themselves. In the list typing jumps, Enter or Tab inserts, Esc closes |
 | click a method in the navigator | opens its code in a tab |
 | click "Eigenschaften" | opens DIM, CONST and whatever else is outside the methods |
 | Projekt → Methode entfernen | the method in the front tab |
@@ -90,12 +101,21 @@ The events per kind:
 | checkbox, toggle, radio button | Klick, Geaendert |
 | text field | Geaendert, Enter, FokusRein, FokusRaus |
 | text area | Geaendert, FokusRein, FokusRaus |
-| list, tree | Geaendert, Doppelklick |
-| slider, number field, dropdown, pickers, tab control, table | Geaendert |
-| canvas | Zeichnen, Maus |
+| list, tree, table | Geaendert, Doppelklick (for list and table also Enter) |
+| slider, number field, dropdown, pickers, tab control | Geaendert |
+| canvas | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
 | every control in addition | MausRein, MausRaus |
-| window | Geoeffnet, Schliessen, Groesse |
+| timer, menu entry | Aktion |
+| window | Geoeffnet, Schliessen, Groesse, Taste(taste) |
 | App | Geoeffnet, Beenden |
+
+An event with parentheses calls its method with values: `Ziehen` (drag)
+with the position on the canvas (while the button is held after a press on
+it), `Rad` (wheel) with the steps of the mouse wheel, `Taste` (key) with the
+key code (`KEY_A`, `KEY_SPACE` ...), as long as the window is in front and
+no input field takes the key. The suggestions know the whole text of the
+program including the generated base class -- so after `Self.` the
+controls, timers and menu entries of the window appear too.
 
 Above the code stands the header of the method (`SUB knopf1_Klick()`), which
 you do not type; to its right, what it is for. The code field colours,
@@ -139,6 +159,59 @@ window, and closing the start window ends the program. The base class builds
 the window from the layout as JSON (`GUI_FROM_JSON`) instead of call by
 call -- so it looks exactly as in the designer. Without the studio, start the
 program with `dhrt run _studio/main.dh`.
+
+## What a program needs
+
+**Timers.** In the library under "Unsichtbar" (invisible). A timer does not
+sit in the window but in a strip below it (as in Xojo); a click selects it,
+the inspector shows name, interval, "runs at start" and "repeat", Del
+deletes it. Its event is `<Name>_Aktion`. In code it is a field of the window
+class with `Intervall`, `Aktiv`, `Wiederholen`, `Starten()` and `Stoppen()`.
+
+**Menus.** Projekt → Menüs des Fensters (Ctrl+Shift+U) opens the menu
+editor: the tree on the left, text, name and shortcut (`Strg+S`, `F5` ...)
+on the right, plus "with check mark". A new entry gets a name from its text
+(`miOeffnen`) that follows the text until you change it yourself. Only OK
+writes the menus into the layout -- one undo step; renamed entries take
+their event methods with them. Named entries appear in the navigator under
+the window, their event is `<Name>_Aktion`.
+
+**Dialogs that wait.** The runtime of the project offers:
+
+| Call | what it does |
+|---|---|
+| `Meldung(text$ [, titel$])` | a message with OK |
+| `Frage(text$ [, knoepfe$ [, titel$]])` | buttons separated by `\|` (default `Ja\|Nein`), returns the number of the button; Enter = the first, Esc = the last |
+| `Eingabe(text$ [, vorgabe$ [, titel$]])` | asks for a text, `""` on cancel |
+| `fenster.ZeigenModal()` | shows a window modally and returns only when it is closed |
+| `Bild(name$)` | an image from the project's `bilder/` as IMAGE |
+
+All four return only with the answer, as in Xojo or Visual Basic. This works
+because the generated base class polls the events **after** `GUI_UPDATE`
+instead of running them as gui callbacks -- so an event method may run
+frames itself. If the program ends meanwhile, `Frage` returns 0. Timers keep
+running during a dialog.
+
+**Images.** Projekt → Bild hinzufügen (Ctrl+Shift+B) copies a file into `bilder/` in the
+project folder; an image control picks its image in the inspector under
+"Bild" and shows it in the designer already. When starting and building,
+the images go to `_studio/assets/bilder/`, and `dhrt --export` takes
+`assets/` next to the executable.
+
+**Debugger.**
+
+| Action | effect |
+|---|---|
+| Click into the line numbers, F9 | breakpoint on the line on/off (red dot) |
+| F7, Debug | generates `_studio/` and starts the program under `dhrt debug` |
+| F5 | continue while it is halted |
+| F10, F11, Shift+F11 | step, step into, step out |
+| Shift+F5 | ends the program |
+
+When it halts, the code tab of the method opens, the line is marked, and the
+**Debugger** panel at the bottom shows the variables (for `Self` the fields
+of the window) and the call stack. The position is translated by the same
+line map that brings errors to their method.
 
 ## Designing a window
 
@@ -198,6 +271,36 @@ edited, Save writes exactly this file. When code or another element is
 added, it becomes a project and Save asks for a folder. New, Open and Quit
 ask when there are unsaved changes.
 
+## The example project
+
+`examples/studio/rechnungen/` is a small invoicing program (after the pilot
+`examples/196_rechnungen.dh`) as a studio project: Datei → Öffnen, choose the
+folder, F5.
+
+| Element | Kind | What it does |
+|---|---|---|
+| App | App | opens the database before the first window appears |
+| Datenbank | module | SQLite file `rechnungen.db`, with sample data on the first start; next invoice number |
+| Ausgabe | module | date and amounts for display, CSV export |
+| Rechnung | class | an invoice with its items: load, calculate, save (one transaction), as PDF |
+| Hauptfenster | window | all invoices with a filter row, menu with shortcuts, new/edit/PDF/delete |
+| RechnungFenster | window | create or change an invoice, modal |
+| KundenFenster, ArtikelFenster | window | master data through data binding (inspector: Bindung) |
+
+What it shows: money is an INTEGER in cents, the tax is rounded per item; the
+master data fields are bound to the columns, so loading and saving are one
+call each (`GUI_FORM_LOAD`/`GUI_FORM_SAVE`), and `GUI_VALIDATE` checks the
+rules (required, postcode, e-mail); a double-click on an invoice opens it
+(`tabelle_Doppelklick`); unsaved input is asked about with
+`Frage(..., "Sichern|Verwerfen|Abbrechen")`, and `ZeigenModal` waits until
+the window is closed. When started from the studio, the database, PDFs and
+the CSV end up in `_studio/`.
+
+**A pitfall when naming:** names are not case-sensitive. A method
+`zeigen(id)` in a window overrides the inherited `Zeigen()` -- `dhrt --check`
+(and so the problem list) warns when a method overrides an inherited one with
+a different number of parameters.
+
 ## For tests
 
 | Environment | effect |
@@ -207,6 +310,7 @@ ask when there are unsaved changes.
 | `DH_STUDIO_AUFNAHME=file` | plays a recording (`AUTOMATION_PLAY`) |
 | `DH_STUDIO_ABLAGE=text` | puts text on the clipboard, for typing with Ctrl+V |
 | `DH_STUDIO_LAUF_BILDER=n` | Start runs the program for only n frames (`dhrt run --bilder n`) |
+| `DH_STUDIO_DATEI=path` | Bild hinzufügen takes this file instead of a dialog |
 
 The test collections `tests/pruef/werkzeug_studio.dhtest` (stage 1) and
 `tests/pruef/werkzeug_studio2.dhtest` (stage 2) start the studio twice: once
@@ -214,4 +318,6 @@ to measure, once with real clicks and keys. They also test the project model
 (`studio/projekt.dh`) without a window.
 `tests/pruef/werkzeug_studio3.dhtest` (stage 3) presses F5 and Ctrl+B, runs
 the generated program with a click and checks at which method and line an
-error lands.
+error lands. `tests/pruef/werkzeug_studio4.dhtest` (stage 4) creates timers
+and menus, runs the generated program through questions, a modal window,
+timers, a menu shortcut and an image, and halts in the debugger.

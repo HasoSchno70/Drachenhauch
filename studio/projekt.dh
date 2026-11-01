@@ -519,14 +519,16 @@ FUNCTION ereignisseFuer(kind AS STRING) AS ARRAY OF STRING
             aus = ["Geaendert", "Enter", "FokusRein", "FokusRaus"]
         CASE "textarea"
             aus = ["Geaendert", "FokusRein", "FokusRaus"]
-        CASE "listbox", "tree"
+        CASE "listbox", "tree", "table"
             aus = ["Geaendert", "Doppelklick"]
-        CASE "slider", "spinner", "dropdown", "colorpicker", "datepicker", "timepicker", "tabcontrol", "table"
+        CASE "slider", "spinner", "dropdown", "colorpicker", "datepicker", "timepicker", "tabcontrol"
             aus = ["Geaendert"]
         CASE "canvas"
-            aus = ["Zeichnen", "Maus"]
+            aus = ["Zeichnen", "Maus", "Ziehen", "Rad"]
+        CASE "timer", "menue"
+            RETURN ["Aktion"]
         CASE "fenster"
-            RETURN ["Geoeffnet", "Schliessen", "Groesse"]
+            RETURN ["Geoeffnet", "Schliessen", "Groesse", "Taste"]
         CASE "app"
             RETURN ["Geoeffnet", "Beenden"]
     END SELECT
@@ -538,6 +540,10 @@ END FUNCTION
 FUNCTION ereignisBeschreibung$(ereignis AS STRING) AS STRING
     SELECT CASE ereignis
         CASE "Klick" : RETURN "wenn es angeklickt wird"
+        CASE "Ziehen" : RETURN "solange die Maus nach einem Druck auf die Fläche gehalten wird (x, y auf der Fläche)"
+        CASE "Rad" : RETURN "wenn das Mausrad über der Fläche gedreht wird"
+        CASE "Taste" : RETURN "wenn eine Taste gedrückt wird und kein Eingabefeld sie nimmt (Tastencode)"
+        CASE "Aktion" : RETURN "wenn die Zeit des Timers um ist bzw. der Menüeintrag gewählt wird"
         CASE "Geaendert" : RETURN "wenn sich sein Wert durch die Bedienung ändert"
         CASE "Enter" : RETURN "wenn im Feld Enter gedrückt wird"
         CASE "FokusRein" : RETURN "wenn es den Tastaturfokus bekommt"
@@ -555,6 +561,16 @@ FUNCTION ereignisBeschreibung$(ereignis AS STRING) AS STRING
     RETURN ""
 END FUNCTION
 
+' Die Parameter, mit denen ein Ereignis seine Methode ruft ("" = keine).
+FUNCTION ereignisParameter$(ev AS STRING) AS STRING
+    SELECT CASE ev
+        CASE "Ziehen" : RETURN "x AS INTEGER, y AS INTEGER"
+        CASE "Rad" : RETURN "schritte AS FLOAT"
+        CASE "Taste" : RETURN "taste AS INTEGER"
+    END SELECT
+    RETURN ""
+END FUNCTION
+
 ' Gehoert eine Methode zu einem Control? (Name = <control>_<Ereignis>)
 FUNCTION ereignisVon$(mname AS STRING, control AS STRING) AS STRING
     DIM p AS STRING : p = LOWER$(control) + "_"
@@ -566,8 +582,9 @@ END FUNCTION
 ' vorn ist, sonst aus seinem gemerkten Layout.
 DIM ctrlNamen AS ARRAY OF STRING : ctrlNamen = []
 DIM ctrlArten AS ARRAY OF STRING : ctrlArten = []
+DIM ctrlWidgets AS INTEGER : ctrlWidgets = 0    ' davon Widgets; dahinter Timer und Menueeintraege
 SUB controlsVon(ei AS INTEGER)
-    ctrlNamen = [] : ctrlArten = []
+    ctrlNamen = [] : ctrlArten = [] : ctrlWidgets = 0
     DIM d AS JSON_HANDLE
     IF ei = aktFenster THEN d = doc ELSE d = JSON_PARSE(elemente[ei].layout)
     IF NOT JSON_HAS(d, "widgets") THEN RETURN
@@ -577,6 +594,14 @@ SUB controlsVon(ei AS INTEGER)
         ARRAY_PUSH(ctrlNamen, IIF(JSON_HAS(d, p + ".name"), JSON_GET_STRING(d, p + ".name"), ""))
         ARRAY_PUSH(ctrlArten, JSON_GET_STRING(d, p + ".kind"))
     NEXT
+    ctrlWidgets = LEN(ctrlNamen)
+    IF JSON_HAS(d, "timer") THEN
+        FOR i = 0 TO JSON_LEN(d, "timer") - 1
+            ARRAY_PUSH(ctrlNamen, JSON_GET_STRING(d, "timer." + STR$(i) + ".name"))
+            ARRAY_PUSH(ctrlArten, "timer")
+        NEXT
+    END IF
+    menueNamenSammeln(d, "menus", ctrlNamen, ctrlArten)
 END SUB
 
 ' Benennt ein Control um: seine Ereignis-Methoden ziehen mit, und im Code

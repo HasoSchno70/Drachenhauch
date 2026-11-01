@@ -1,0 +1,254 @@
+' Drachenhauch Studio, Stufe 5 Teil 4: das Beispielprojekt
+' examples/studio/rechnungen (vier Fenster, eine Klasse, zwei Module,
+' SQLite, PDF, CSV). Der erste Fall prueft, dass das Projekt genau so im
+' Ordner steht, wie das Studio es schreiben wuerde. Der zweite oeffnet eine
+' Kopie im Studio, startet sie mit F5 und laesst danach das erzeugte
+' Programm eine Probe fahren, die seine Teile direkt aufruft -- Datenbank,
+' Rechnen, PDF, CSV und die drei Formularfenster.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== das beispiel steht so im ordner, wie das studio es schreibt
+' Laden und wieder setzen gibt jede Datei Zeichen fuer Zeichen zurueck: wer
+' das Projekt im Studio oeffnet und sichert, aendert nichts daran.
+IMPORT "modell_imp.dh"
+DIM o AS STRING : o = ARG$(0)
+PRINT "laden ["; projektLaden$(o); "]"
+PRINT "elemente "; LEN(elemente); " start "; projStart
+DIM e AS Element
+FOR EACH e IN elemente
+    DIM code AS STRING : code = JOIN$(READLINES(PATHJOIN(o, codeDatei$(e))), CHR$(10)) + CHR$(10)
+    DIM gleich AS BOOLEAN : gleich = codeSetzen$(e) = code
+    IF e.art = "fenster" THEN
+        DIM lay AS STRING : lay = JOIN$(READLINES(PATHJOIN(o, layoutDatei$(e))), CHR$(10))
+        gleich = gleich AND JSON_PRETTY(JSON_PARSE(e.layout)) = lay
+    END IF
+    PRINT e.art; " "; e.name; " "; gleich
+NEXT
+PRINT "projektdatei "; projektJson$() = JOIN$(READLINES(PATHJOIN(o, PROJEKT_DATEI)), CHR$(10))
+--- argumente
+{sammlung}/../../examples/studio/rechnungen
+--- datei modell_imp.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "{sammlung}/../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../studio/modell.dh"
+IMPORT "{sammlung}/../../studio/projekt.dh"
+--- erwartet
+laden []
+elemente 8 start Hauptfenster
+app App TRUE
+modul Datenbank TRUE
+modul Ausgabe TRUE
+klasse Rechnung TRUE
+fenster Hauptfenster TRUE
+fenster RechnungFenster TRUE
+fenster KundenFenster TRUE
+fenster ArtikelFenster TRUE
+projektdatei TRUE
+
+=== f5 startet das beispiel, und das erzeugte programm rechnet richtig
+' Erst im Studio: F5 prueft (ohne Befund), erzeugt _studio/ und laesst das
+' Programm 20 Bilder laufen -- dabei legt es die Datenbank mit den
+' Beispieldaten an. Dann eine Probe: dasselbe main.dh, nur dass statt der
+' Bildschleife die Teile direkt aufgerufen werden. Fragen und modale
+' Fenster kommen darin nicht vor (sie warten auf eine Antwort).
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+MKDIR(p)
+DIM n AS STRING
+FOR EACH n IN DIRLIST(ARG$(1))
+    IF n <> "_studio" AND NOT DIREXISTS(PATHJOIN(ARG$(1), n)) THEN COPYFILE(PATHJOIN(ARG$(1), n), PATHJOIN(p, n))
+NEXT
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "geprueft "; slHat(log, "geprueft 0 0")
+PRINT "erzeugt "; slHat(log, "erzeugt 8")
+PRINT "beendet "; slHat(log, "beendet 0")
+PRINT "datenbank "; FILEEXISTS(p + "/_studio/rechnungen.db")
+' Die Tabelle des Hauptfensters hat ein Doppelklick-Ereignis (Enter zaehlt mit).
+PRINT "doppelklick verdrahtet "; INSTR(JOIN$(READLINES(p + "/_studio/Hauptfenster_basis.dh"), CHR$(10)), "GUI_DOUBLE_CLICKED(Self.tabelle)") >= 0
+FUNCTION lauf$(k AS INTEGER, mitAus AS BOOLEAN) AS STRING
+    DIM z AS STRING : z = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(k)
+        IF t <> "" THEN
+            t = TRIM$(REPLACE$(t, CHR$(13), ""))
+            IF mitAus AND LEFT$(t, 8) <> "WARNING:" AND LEFT$(t, 5) <> "INFO:" THEN PRINT t
+            z = z + t
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(k) THEN
+            leer = leer + 1
+            SLEEP(30)
+        END IF
+    WEND
+    RETURN z
+END FUNCTION
+PRINT "check "; lauf$(PROCESS_START("dhrt", "--check", p + "/_studio/main.dh"), FALSE)
+' Die Probe: statt studioLauf(...) die Schritte von studioLauf ohne die
+' Schleife, dann die Aufrufe aus probe_teil.dh.
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN
+        ARRAY_PUSH(neu, "SCREEN(900, 600, " + CHR$(34) + "Probe" + CHR$(34) + ")")
+        ARRAY_PUSH(neu, "studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()")
+        ARRAY_PUSH(neu, "studioDieStartseite = studioStartFenster")
+        ARRAY_PUSH(neu, "studioDieApp.Geoeffnet()")
+        ARRAY_PUSH(neu, "studioStartFenster.studioHaupt = TRUE")
+        ARRAY_PUSH(neu, "studioStartFenster.Zeigen()")
+        DIM t AS STRING
+        FOR EACH t IN READLINES(CWD$() + "/probe_teil.dh")
+            ARRAY_PUSH(neu, t)
+        NEXT
+    ELSE
+        ARRAY_PUSH(neu, s)
+    END IF
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "5", p + "/_studio/probe.dh")
+lauf$(k, TRUE)
+PRINT "code "; PROCESS_CODE(k)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+{sammlung}/../../examples/studio/rechnungen
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei probe_teil.dh
+' --- Die Beispieldaten, die der erste Start angelegt hat.
+PRINT "kunden "; dbZahl("SELECT COUNT(*) FROM kunden"); " artikel "; dbZahl("SELECT COUNT(*) FROM artikel"); " rechnungen "; dbZahl("SELECT COUNT(*) FROM rechnungen")
+DIM jahr AS STRING : jahr = LEFT$(DATE$(), 4)
+DIM r AS Rechnung : r = NEW Rechnung()
+PRINT "laden "; r.laden(1); " nummer "; r.nummer = jahr + "-0001"; " kunde "; kundeName$(r.kunde)
+PRINT "positionen "; r.anzahl(); " netto "; r.netto(); " steuer "; r.steuer(); " brutto "; r.brutto()
+' --- Die Steuer wird je Position gerundet: dreimal 5 Cent zu 7 % sind je
+' 0,35 Cent, also 0 -- ueber die Summe gerundet waeren es 1,05 = 1 Cent.
+r.neu()
+PRINT "neu "; r.id; " nummer "; r.nummer = jahr + "-0002"
+r.kunde = 2
+r.dazu("A", 1, 5, 7)
+r.dazu("B", 1, 5, 7)
+r.dazu("C", 1, 5, 7)
+PRINT "drei positionen netto "; r.netto(); " steuer "; r.steuer()
+' Dieselbe Position noch einmal: die Menge waechst, keine vierte Zeile.
+r.dazu("A", 2, 5, 7)
+PRINT "zusammengefasst "; r.anzahl(); " menge a "; r.mengen[0]; " steuer "; r.steuer(); " brutto "; r.brutto()
+PRINT "speichern "; r.speichern(); " id "; r.id; " positionen in der db "; dbZahlMit("SELECT COUNT(*) FROM positionen WHERE rechnung = ?", r.id)
+r.entfernen(1)
+PRINT "aendern "; r.speichern(); " positionen in der db "; dbZahlMit("SELECT COUNT(*) FROM positionen WHERE rechnung = ?", r.id)
+' Eine doppelte Nummer verstoesst gegen UNIQUE: nichts wird geschrieben.
+DIM d AS Rechnung : d = NEW Rechnung()
+d.neu()
+d.nummer = jahr + "-0001"
+d.kunde = 1
+d.dazu("X", 1, 100, 19)
+PRINT "doppelt "; d.speichern(); " id "; d.id; " fehler da "; d.fehler <> ""; " rechnungen "; dbZahl("SELECT COUNT(*) FROM rechnungen")
+' Scheitern erst die Positionen, nimmt die Transaktion auch den schon
+' geschriebenen Kopf zurueck.
+DB_EXEC(db, "ALTER TABLE positionen RENAME TO positionen_weg")
+DIM halb AS Rechnung : halb = NEW Rechnung()
+halb.neu()
+halb.kunde = 1
+halb.dazu("Y", 1, 100, 19)
+PRINT "halb "; halb.speichern(); " id "; halb.id; " rechnungen "; dbZahl("SELECT COUNT(*) FROM rechnungen")
+DB_EXEC(db, "ALTER TABLE positionen_weg RENAME TO positionen")
+' --- Das Hauptfenster zeigt beide Rechnungen, die neueste oben.
+studioStartFenster.liste()
+PRINT "liste "; GUI_TABLE_ROW_COUNT(studioStartFenster.tabelle); " status "; GUI_TEXT(studioStartFenster.status)
+' --- PDF und CSV.
+DIM eins AS Rechnung : eins = NEW Rechnung()
+eins.laden(1)
+eins.alsPdf("probe.pdf")
+DIM kopf AS BUFFER : kopf = READALL_BYTES("probe.pdf")
+PRINT "pdf "; BUFFER_TO_STRING$(BUFFER_SLICE(kopf, 0, 5)); " gross genug "; BUFFER_LEN(kopf) > 5000
+PRINT "csv "; csvExport("probe.csv")
+DIM zeile AS STRING
+FOR EACH zeile IN READLINES("probe.csv")
+    PRINT "zeile "; REGEX_REPLACE(REGEX_REPLACE(zeile, "[0-9]{2}\.[0-9]{2}\.[0-9]{4}", "DATUM"), "^[0-9]{4}-", "JJJJ-")
+NEXT
+' --- Kunden: laden ueber die Bindung, eine falsche PLZ haelt das Sichern an.
+DIM kf AS KundenFenster : kf = NEW KundenFenster()
+kf.Zeigen()
+kf.datensatzZeigen(2)
+PRINT "kunde "; GUI_TEXT(kf.feldName); " | "; GUI_TEXT(kf.feldOrt); " | "; kf.aktId
+GUI_SET_TEXT(kf.feldPlz, "123")
+PRINT "falsche plz "; kf.sichern(); " "; GUI_TEXT(kf.hinweis)
+GUI_SET_TEXT(kf.feldPlz, "01069")
+PRINT "richtige plz "; kf.sichern(); " db "; dbZahlMit("SELECT COUNT(*) FROM kunden WHERE plz = '01069' AND id = ?", 2)
+kf.neu()
+PRINT "neuer kunde ohne namen "; kf.sichern()
+GUI_SET_TEXT(kf.feldName, "Zeichenwerk AG")
+PRINT "neuer kunde "; kf.sichern(); " id "; kf.aktId; " kunden "; dbZahl("SELECT COUNT(*) FROM kunden")
+kf.aktId = 2
+kf.knopfLoeschen_Klick()
+PRINT "kunde mit rechnung "; GUI_TEXT(kf.hinweis)
+kf.Zumachen()
+' --- Artikel: das Geldfeld bindet Cent, die Klappliste den Satz.
+DIM af AS ArtikelFenster : af = NEW ArtikelFenster()
+af.Zeigen()
+af.neu()
+GUI_SET_TEXT(af.feldBezeichnung, "Testartikel")
+GUI_SET_TEXT(af.feldPreis, "12,34")
+GUI_DROPDOWN_SET_SELECTED(af.auswahlMwst, 1)
+PRINT "artikel "; af.sichern(); " preis "; dbZahlMit("SELECT preis FROM artikel WHERE id = ?", af.aktId); " mwst "; dbZahlMit("SELECT mwst FROM artikel WHERE id = ?", af.aktId)
+af.Zumachen()
+' --- Eine Rechnung ueber das Fenster: ohne Kunde geht Sichern nicht.
+DIM rf AS RechnungFenster : rf = NEW RechnungFenster()
+rf.rechnungId = -1
+rf.Zeigen()
+GUI_SET_VALUE(rf.feldMenge, 4)
+rf.knopfDazu_Klick()
+rf.knopfSichern_Klick()
+PRINT "ohne kunde "; rf.gespeichert; " offen "; rf.studioOffen; " "; GUI_TEXT(rf.hinweis)
+GUI_DROPDOWN_SET_SELECTED(rf.auswahlKunde, 0)
+rf.knopfSichern_Klick()
+PRINT "mit kunde "; rf.gespeichert; " offen "; rf.studioOffen; " nummer "; rf.beleg.nummer = jahr + "-0003"
+PRINT "erste position "; rf.beleg.texte[0]; " x "; rf.beleg.mengen[0]; " brutto "; rf.beleg.brutto()
+PRINT "rechnungen "; dbZahl("SELECT COUNT(*) FROM rechnungen")
+DB_CLOSE(db)
+EXIT(0)
+--- erwartet
+geprueft TRUE
+erzeugt TRUE
+beendet TRUE
+datenbank TRUE
+doppelklick verdrahtet TRUE
+check []
+kunden 3 artikel 4 rechnungen 1
+laden TRUE nummer TRUE kunde Bäckerei Sonnenschein
+positionen 3 netto 35070 steuer 5946 brutto 41016
+neu -1 nummer TRUE
+drei positionen netto 15 steuer 0
+zusammengefasst 3 menge a 3 steuer 1 brutto 26
+speichern TRUE id 2 positionen in der db 3
+aendern TRUE positionen in der db 2
+doppelt FALSE id -1 fehler da TRUE rechnungen 2
+halb FALSE id -1 rechnungen 2
+liste 2 status 2 Rechnungen, zusammen 410,37 € brutto.
+pdf %PDF- gross genug TRUE
+csv 2
+zeile Nummer;Datum;Kunde;Netto;MwSt;Brutto
+zeile JJJJ-0001;DATUM;Bäckerei Sonnenschein;350,70;59,46;410,16
+zeile JJJJ-0002;DATUM;Tischlerei Holzwurm GmbH;0,20;0,01;0,21
+kunde Tischlerei Holzwurm GmbH | Dresden | 2
+falsche plz FALSE Die PLZ hat fünf Ziffern.
+richtige plz TRUE db 1
+neuer kunde ohne namen FALSE
+neuer kunde TRUE id 4 kunden 4
+kunde mit rechnung Der Kunde hat Rechnungen und bleibt.
+artikel TRUE preis 1234 mwst 7
+ohne kunde FALSE offen TRUE Bitte einen Kunden wählen.
+mit kunde TRUE offen FALSE nummer TRUE
+erste position Beratung (Stunde) x 4 brutto 45220
+rechnungen 3
+code 0

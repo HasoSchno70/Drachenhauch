@@ -15,9 +15,19 @@ dhrt run studio/studio.dh -- fenster.dhform
 Ein Ordner mit `projekt.dhstudio` geht als Projekt auf, ein Ordner ohne
 bekommt ein neues Projekt, eine `.dhform` geht als einzelnes Fenster auf.
 
-**Stand: Stufe 3.** Projekte mit mehreren Fenstern, Modulen und Klassen,
+Installiert steht „Drachenhauch Studio“ im Startmenü bzw. im
+Anwendungsmenü, und eine `.dhstudio` öffnet per Doppelklick im Studio (unter
+Windows, wenn die Verknüpfung beim Installieren gewählt war). Unter macOS und
+Linux startet `drachenhauch --studio [projekt]` es aus dem Terminal. In der
+IDE: Werkzeuge → Drachenhauch Studio (mit dem Projektordner, wenn er ein
+Studio-Projekt ist), und eine `.dhstudio` im Projektbaum geht im Studio auf.
+Der Form-Designer öffnet sein Formular mit Datei → Im Drachenhauch Studio
+öffnen (Strg+Umschalt+O).
+
+**Stand: Stufe 4.** Projekte mit mehreren Fenstern, Modulen und Klassen,
 Ereignisse und ein Code-Feld je Methode; Starten, Bauen und Fehler an der
-Methode, in der sie stehen.
+Methode, in der sie stehen; Timer, Menüs, Dialoge, die warten, Bilder und
+ein Debugger.
 
 ## Die Oberfläche
 
@@ -79,6 +89,7 @@ Studio beim Starten erzeugt, verdrahtet sie.
 | Doppelklick auf ein Control im Entwurf | „Ereignis hinzufügen“ für dieses Control; auf leere Fläche: für das Fenster |
 | Strg+Umschalt+E | dasselbe für die Auswahl (oder für das Element des vorderen Reiters) |
 | Strg+Umschalt+M | Methode hinzufügen: Name, Parameter (`a AS INTEGER, b AS STRING`), Rückgabe (leer = SUB) |
+| Strg+Leertaste | Vorschläge an der Schreibmarke; hinter `Self.` oder `objekt.` gehen sie von selbst auf. In der Liste springt Tippen, Enter oder Tab setzt ein, Esc schließt |
 | Klick auf eine Methode im Navigator | öffnet ihren Code in einem Reiter |
 | Klick auf „Eigenschaften“ | öffnet DIM, CONST und was sonst außerhalb der Methoden steht |
 | Projekt → Methode entfernen | die Methode im vorderen Reiter |
@@ -92,12 +103,21 @@ Die Ereignisse je Art:
 | Kästchen, Umschalter, Optionsfeld | Klick, Geaendert |
 | Textfeld | Geaendert, Enter, FokusRein, FokusRaus |
 | Textbereich | Geaendert, FokusRein, FokusRaus |
-| Liste, Baum | Geaendert, Doppelklick |
-| Regler, Zahlenfeld, Klappliste, Wähler, Reiterwerk, Tabelle | Geaendert |
-| Zeichenfläche | Zeichnen, Maus |
+| Liste, Baum, Tabelle | Geaendert, Doppelklick (bei Liste und Tabelle auch Enter) |
+| Regler, Zahlenfeld, Klappliste, Wähler, Reiterwerk | Geaendert |
+| Zeichenfläche | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
 | jedes Control zusätzlich | MausRein, MausRaus |
-| Fenster | Geoeffnet, Schliessen, Groesse |
+| Timer, Menüeintrag | Aktion |
+| Fenster | Geoeffnet, Schliessen, Groesse, Taste(taste) |
 | App | Geoeffnet, Beenden |
+
+Ein Ereignis mit Klammern ruft seine Methode mit Werten: `Ziehen` mit der
+Lage auf der Fläche (solange die Taste nach einem Druck auf die Fläche
+hängt), `Rad` mit den Schritten des Mausrads, `Taste` mit dem Tastencode
+(`KEY_A`, `KEY_SPACE` ...), solange das Fenster vorn ist und kein
+Eingabefeld die Taste nimmt. Die Vorschläge kennen den ganzen Text des
+Programms samt der erzeugten Basisklasse -- hinter `Self.` stehen also auch
+die Controls, Timer und Menüeinträge des Fensters.
 
 Über dem Code steht die Kopfzeile der Methode (`SUB knopf1_Klick()`), die
 man nicht tippt; rechts daneben, wozu sie da ist. Das Code-Feld färbt,
@@ -142,6 +162,59 @@ Programm. Die Basisklasse baut das Fenster aus dem Layout als JSON
 (`GUI_FROM_JSON`) statt Aufruf für Aufruf -- so sieht es genau so aus wie im
 Entwurf. Ohne Studio startet man das Programm mit
 `dhrt run _studio/main.dh`.
+
+## Was ein Programm braucht
+
+**Timer.** In der Bibliothek unter „Unsichtbar“. Ein Timer liegt nicht im
+Fenster, sondern in einer Leiste darunter (wie in Xojo); ein Klick wählt
+ihn, der Inspektor zeigt Name, Intervall, „Läuft beim Start“ und
+„Wiederholen“, Entf löscht ihn. Sein Ereignis heißt `<Name>_Aktion`. Im Code
+ist er ein Feld der Fensterklasse mit `Intervall`, `Aktiv`, `Wiederholen`,
+`Starten()` und `Stoppen()`.
+
+**Menüs.** Projekt → Menüs des Fensters (Strg+Umschalt+U) öffnet den
+Menü-Editor: links der Baum, rechts Text, Name und Kürzel (`Strg+S`, `F5`
+...), dazu „Mit Haken“. Ein neuer Eintrag bekommt einen Namen aus seinem
+Text (`miOeffnen`), der dem Text folgt, bis man ihn selbst ändert. Erst OK
+schreibt die Menüs ins Layout -- ein Rückgängig-Schritt; umbenannte Einträge
+nehmen ihre Ereignis-Methoden mit. Benannte Einträge stehen im Navigator
+unter dem Fenster, ihr Ereignis heißt `<Name>_Aktion`.
+
+**Dialoge, die warten.** Die Laufzeit des Projekts bietet:
+
+| Aufruf | was er tut |
+|---|---|
+| `Meldung(text$ [, titel$])` | eine Meldung mit OK |
+| `Frage(text$ [, knoepfe$ [, titel$]])` | Knöpfe mit `\|` getrennt (Vorgabe `Ja\|Nein`), liefert die Nummer des Knopfs; Enter = der erste, ESC = der letzte |
+| `Eingabe(text$ [, vorgabe$ [, titel$]])` | fragt nach einem Text, `""` bei Abbrechen |
+| `fenster.ZeigenModal()` | zeigt ein Fenster modal und kehrt erst zurück, wenn es geschlossen ist |
+| `Bild(name$)` | ein Bild aus `bilder/` des Projekts als IMAGE |
+
+Alle vier kehren erst mit der Antwort zurück, wie in Xojo oder Visual
+Basic. Das geht, weil die erzeugte Basisklasse die Ereignisse **nach** dem
+`GUI_UPDATE` abfragt, statt sie als Rückruf der gui laufen zu lassen -- eine
+Ereignis-Methode darf darum selbst Bilder drehen. Endet das Programm
+währenddessen, liefert `Frage` 0. Timer laufen auch während eines Dialogs.
+
+**Bilder.** Projekt → Bild hinzufügen (Strg+Umschalt+B) kopiert eine Datei nach `bilder/` im
+Projektordner; ein Bild-Control wählt seins im Inspektor unter „Bild“ und
+zeigt es schon im Entwurf. Beim Starten und Bauen kommen die Bilder nach
+`_studio/assets/bilder/`, und `dhrt --export` nimmt `assets/` neben die Exe.
+
+**Debugger.**
+
+| Handgriff | wirkt so |
+|---|---|
+| Klick in die Nummernspalte, F9 | Haltepunkt an der Zeile an/aus (roter Punkt) |
+| F7, Debuggen | erzeugt `_studio/` und startet das Programm unter `dhrt debug` |
+| F5 | weiter, solange es hält |
+| F10, F11, Umschalt+F11 | Schritt, Schritt hinein, Schritt heraus |
+| Umschalt+F5 | beendet das Programm |
+
+Hält es, geht der Code-Reiter der Methode auf, die Zeile ist markiert, und
+die Leiste **Debugger** unten zeigt die Variablen (bei `Self` die Felder des
+Fensters) und den Aufrufstapel. Die Stelle rechnet dieselbe Zeilenkarte um,
+die auch Fehler an ihre Methode bringt.
 
 ## Fenster entwerfen
 
@@ -203,6 +276,36 @@ ein weiteres Element dazu, wird daraus ein Projekt, und Sichern fragt nach
 einem Ordner. Neu, Öffnen und Beenden fragen bei ungesicherten Änderungen
 nach.
 
+## Das Beispielprojekt
+
+`examples/studio/rechnungen/` ist eine kleine Rechnungsverwaltung (nach dem
+Piloten `examples/196_rechnungen.dh`) als Studio-Projekt: Datei → Öffnen, den
+Ordner wählen, F5.
+
+| Element | Art | Was es tut |
+|---|---|---|
+| App | App | öffnet die Datenbank, bevor das erste Fenster aufgeht |
+| Datenbank | Modul | SQLite-Datei `rechnungen.db`, beim ersten Start mit Beispieldaten; nächste Rechnungsnummer |
+| Ausgabe | Modul | Datum und Beträge für die Anzeige, CSV-Export |
+| Rechnung | Klasse | eine Rechnung samt Positionen: laden, rechnen, sichern (eine Transaktion), als PDF |
+| Hauptfenster | Fenster | alle Rechnungen mit Filterzeile, Menü mit Kürzeln, Neu/Bearbeiten/PDF/Löschen |
+| RechnungFenster | Fenster | eine Rechnung anlegen oder ändern, modal |
+| KundenFenster, ArtikelFenster | Fenster | Stammdaten über die Datenbindung (Inspektor: Bindung) |
+
+Was man daran sieht: Geld steht als INTEGER in Cent, die Steuer wird je
+Position gerundet; die Felder der Stammdaten sind an die Spalten gebunden,
+Laden und Sichern sind also je ein Aufruf (`GUI_FORM_LOAD`/`GUI_FORM_SAVE`),
+und die Regeln (Pflichtfeld, PLZ, E-Mail) prüft `GUI_VALIDATE`; ein
+Doppelklick auf eine Rechnung öffnet sie (`tabelle_Doppelklick`); ungesicherte
+Eingaben werden mit `Frage(..., "Sichern|Verwerfen|Abbrechen")` erfragt, und
+`ZeigenModal` wartet, bis das Fenster zu ist. Die Datenbank, PDFs und die CSV
+landen beim Starten aus dem Studio in `_studio/`.
+
+**Stolperstein beim Benennen:** Namen kennen keine Groß-/Kleinschreibung. Eine
+Methode `zeigen(id)` in einem Fenster überschreibt das geerbte `Zeigen()` --
+`dhrt --check` (und damit die Problemliste) warnt, wenn eine Methode eine
+geerbte mit einer anderen Zahl von Parametern überschreibt.
+
 ## Für Prüfungen
 
 | Umgebung | wirkt so |
@@ -212,6 +315,7 @@ nach.
 | `DH_STUDIO_AUFNAHME=datei` | spielt eine Aufnahme ab (`AUTOMATION_PLAY`) |
 | `DH_STUDIO_ABLAGE=text` | legt Text in die Zwischenablage, zum Tippen per Strg+V |
 | `DH_STUDIO_LAUF_BILDER=n` | Starten lässt das Programm nur n Bilder laufen (`dhrt run --bilder n`) |
+| `DH_STUDIO_DATEI=pfad` | Bild hinzufügen nimmt diese Datei statt eines Dialogs |
 
 Die Prüfsammlungen `tests/pruef/werkzeug_studio.dhtest` (Stufe 1) und
 `tests/pruef/werkzeug_studio2.dhtest` (Stufe 2) starten das Studio zweimal:
@@ -219,4 +323,6 @@ einmal zum Messen, einmal mit echten Klicks und Tasten. Das Projektmodell
 (`studio/projekt.dh`) prüfen sie auch ohne Fenster.
 `tests/pruef/werkzeug_studio3.dhtest` (Stufe 3) drückt F5 und Strg+B, lässt
 das erzeugte Programm mit einem Klick laufen und prüft, an welcher Methode
-und Zeile ein Fehler landet.
+und Zeile ein Fehler landet. `tests/pruef/werkzeug_studio4.dhtest` (Stufe 4)
+legt Timer und Menüs an, lässt das erzeugte Programm Fragen, ein modales
+Fenster, Timer, Menükürzel und ein Bild durchlaufen und hält im Debugger.

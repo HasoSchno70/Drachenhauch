@@ -6494,6 +6494,35 @@ fn uebersetzen(ast: &Node, external_types: &std::collections::HashSet<String>,
                 }
             }
         }
+        // Eine Methode, die eine geerbte GLEICHEN Namens mit einer anderen Zahl
+        // von Parametern ueberschreibt, ersetzt sie still -- gefunden am
+        // Studio-Beispiel: `SUB zeigen(kid)` in einem Fenster verdeckte das
+        // geerbte `Zeigen()` (Gross-/Kleinschreibung zaehlt nicht), und der
+        // Aufruf ohne Argument brach erst zur Laufzeit ab.
+        for (cd, cline) in &cls_decls {
+            let Node::ClassDecl { name: cname, methods, .. } = cd else { continue };
+            let parent = c.classes.get(cname).map(|ci| ci.parent_name.clone()).unwrap_or_default();
+            if parent.is_empty() { continue; }
+            for m in methods {
+                let (mname, _, body, _, _) = fn_parts(m);
+                // Init ist der Konstruktor: eigene Parameter je Klasse sind dort Absicht.
+                if mname.starts_with("__") || mname == "init" { continue; }
+                let Some(eigen) = c.classes.get(cname).and_then(|ci| ci.method_sigs.get(mname)) else { continue };
+                let Some(geerbt) = c.find_method_sig(&parent, mname) else { continue };
+                if eigen.n_params == geerbt.n_params { continue; }
+                // Die Zeile der Kopfzeile: eine vor der ersten Anweisung.
+                let zeile = body.iter().find_map(|s| match s { Node::Stmt { line, .. } => Some(line.saturating_sub(1)), _ => None })
+                    .unwrap_or(*cline);
+                let mut wo = parent.clone();
+                while let Some(ci) = c.classes.get(&wo) {
+                    if ci.method_sigs.contains_key(mname) || ci.parent_name.is_empty() { break; }
+                    wo = ci.parent_name.clone();
+                }
+                c.warnings.push((zeile, format!(
+                    "Methode '{}' in {} ueberschreibt '{}' aus {} -- dort mit {} Parameter(n), hier mit {} (Gross-/Kleinschreibung zaehlt nicht). Jeder Aufruf der geerbten Methode landet jetzt hier. Ist eine eigene Methode gemeint, einen anderen Namen vergeben.",
+                    mname, Compiler::typ_klartext(cname), mname, Compiler::typ_klartext(&wo), geerbt.n_params, eigen.n_params)));
+            }
+        }
         // Phase 2/3: Funktions-Stubs + -Bodies (Forward-Refs/Rekursion).
         for (d, line) in &fn_decls { c.register_stub(d, *line)?; }
         for (d, line) in &ffi_decls { c.register_ffi(d, *line)?; }

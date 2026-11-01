@@ -1,0 +1,423 @@
+' ============================================================
+'  Drachenhauch Studio -- der Debugger (Stufe 4)
+' ============================================================
+'  Haltepunkte sitzen an einer Zeile einer Methode (Klick in die
+'  Nummernspalte des Code-Felds oder F9). Debuggen (F7) erzeugt _studio/
+'  wie beim Starten und laesst es unter `dhrt debug` laufen. Das Protokoll
+'  sind JSON-Zeilen: auf stdout Ereignisse (paused, output, finished ...),
+'  auf stdin Kommandos (continue, step-over, step-into, step-out, stop,
+'  set-breakpoints). Die Stelle eines Halts (Datei + Zeile) rechnet die
+'  Zeilenkarte aus codeSetzen$ auf Methode und Zeile um -- dieselbe, mit der
+'  Fehler an ihre Methode kommen; ein Haltepunkt geht den Weg zurueck.
+' ============================================================
+
+CLASS Haltepunkt
+    DIM m AS Methode
+    DIM zeile AS INTEGER
+END CLASS
+
+DIM haltepunkte AS ARRAY OF Haltepunkt : haltepunkte = []
+DIM dbgProz AS INTEGER : dbgProz = -1
+DIM dbgRest AS STRING : dbgRest = ""
+DIM dbgErst AS BOOLEAN : dbgErst = TRUE
+DIM dbgHaelt AS BOOLEAN : dbgHaelt = FALSE
+DIM dbgMeth AS Methode                  ' wo es haelt (NIL = in erzeugtem Code)
+DIM dbgZeile AS INTEGER : dbgZeile = 0
+DIM lblDbg AS GUI_WIDGET
+DIM lstVariablen AS GUI_WIDGET
+DIM lstStapel AS GUI_WIDGET
+DIM btDbgWeiter AS GUI_WIDGET
+DIM btDbgSchritt AS GUI_WIDGET
+DIM btDbgHinein AS GUI_WIDGET
+DIM btDbgHeraus AS GUI_WIDGET
+DIM btDbgStopp AS GUI_WIDGET
+
+' --- Haltepunkte ------------------------------------------------------------------
+FUNCTION haltepunktIndex(m AS Methode, zeile AS INTEGER) AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(haltepunkte) - 1
+        IF haltepunkte[k].m = m AND haltepunkte[k].zeile = zeile THEN RETURN k
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB haltepunktUmschalten(m AS Methode, zeile AS INTEGER)
+    IF zeile < 1 THEN RETURN
+    DIM k AS INTEGER : k = haltepunktIndex(m, zeile)
+    IF k >= 0 THEN
+        ARRAY_REMOVE_AT(haltepunkte, k)
+        protokoll("haltepunkt weg " + m.el.name + "." + m.name + " " + STR$(zeile))
+    ELSE
+        DIM h AS Haltepunkt : h = NEW Haltepunkt()
+        h.m = m : h.zeile = zeile
+        ARRAY_PUSH(haltepunkte, h)
+        protokoll("haltepunkt " + m.el.name + "." + m.name + " " + STR$(zeile))
+    END IF
+    DIM r AS Reiter
+    FOR EACH r IN reiter
+        IF r.art = "code" THEN
+            IF r.meth = m THEN feldBefunde(r)
+        END IF
+    NEXT
+    IF dbgProz >= 0 THEN dbgHaltepunkteSenden()
+END SUB
+
+' Haltepunkte, deren Methode es nicht mehr gibt, fallen weg.
+SUB haltepunkteBereinigen()
+    DIM noch AS ARRAY OF Haltepunkt : noch = []
+    DIM h AS Haltepunkt
+    FOR EACH h IN haltepunkte
+        IF ARRAY_INDEXOF(methoden, h.m) >= 0 THEN ARRAY_PUSH(noch, h)
+    NEXT
+    haltepunkte = noch
+END SUB
+
+' Datei und Zeile in _studio/projekt/ zu einem Haltepunkt (Datei "" = keine).
+FUNCTION haltepunktOrt(h AS Haltepunkt) AS TUPLE
+    DIM e AS Element : e = h.m.el
+    DIM mi AS INTEGER : mi = ARRAY_INDEXOF(methoden, h.m)
+    IF mi < 0 THEN RETURN ("", 0)
+    codeSetzen$(e)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(karteMeth) - 1
+        IF karteMeth[i] = mi AND karteZeile[i] = h.zeile THEN
+            RETURN (PATHJOIN(PATHJOIN(studioOrdner$(), "projekt"), codeDatei$(e)), i + 1)
+        END IF
+    NEXT
+    RETURN ("", 0)
+END FUNCTION
+
+' --- Die Leiste -------------------------------------------------------------------
+SUB debugLeisteAnlegen()
+    GUI_DOCK_TAB(win, "debugger", "Debugger", "ausgabe")
+    lblDbg = GUI_LABEL(win, "Debuggen (F7) startet das Programm und hält an Haltepunkten.", 0, 0)
+    GUI_ADD_CLASS(lblDbg, "leise")
+    GUI_DOCK_ADD(win, "debugger", lblDbg)
+    btDbgWeiter = GUI_BUTTON(win, "Weiter (F5)", 0, 0, 110, 28)
+    btDbgSchritt = GUI_BUTTON(win, "Schritt (F10)", 0, 0, 120, 28)
+    btDbgHinein = GUI_BUTTON(win, "Hinein (F11)", 0, 0, 116, 28)
+    btDbgHeraus = GUI_BUTTON(win, "Heraus", 0, 0, 90, 28)
+    btDbgStopp = GUI_BUTTON(win, "Beenden", 0, 0, 96, 28)
+    GUI_BUTTON_VARIANT(btDbgStopp, "gefahr")
+    DIM b AS INTEGER
+    FOR EACH b IN [btDbgWeiter, btDbgSchritt, btDbgHinein, btDbgHeraus, btDbgStopp]
+        GUI_DOCK_ADD(win, "debugger", b)
+    NEXT
+    lstVariablen = GUI_LISTBOX(win, 0, 0, 10, 10, [])
+    GUI_LISTBOX_PLACEHOLDER(lstVariablen, "Variablen erscheinen, wenn das Programm hält.")
+    GUI_DOCK_ADD(win, "debugger", lstVariablen)
+    lstStapel = GUI_LISTBOX(win, 0, 0, 10, 10, [])
+    GUI_LISTBOX_PLACEHOLDER(lstStapel, "Aufrufstapel")
+    GUI_DOCK_ADD(win, "debugger", lstStapel)
+    debugKnoepfe()
+END SUB
+
+SUB debugVerteilen()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM b AS INTEGER
+    DIM h AS INTEGER
+    (x, y, b, h) = GUI_DOCK_RECT(win, "debugger")
+    IF b <= 0 THEN RETURN
+    GUI_SET_BOUNDS(lblDbg, x + 8, y + 10, MAX(10, b - 600), 20)
+    DIM bx AS INTEGER : bx = x + b - 556
+    DIM w AS INTEGER
+    FOR EACH w IN [btDbgWeiter, btDbgSchritt, btDbgHinein, btDbgHeraus, btDbgStopp]
+        GUI_SET_BOUNDS(w, bx, y + 4, GUI_GET_W(w), 28)
+        bx = bx + GUI_GET_W(w) + 6
+    NEXT
+    DIM lh AS INTEGER : lh = MAX(20, h - 40)
+    DIM vb AS INTEGER : vb = (b * 3) \ 5
+    GUI_SET_BOUNDS(lstVariablen, x, y + 38, vb - 4, lh)
+    GUI_SET_BOUNDS(lstStapel, x + vb + 4, y + 38, b - vb - 4, lh)
+END SUB
+
+' Die Knoepfe der Leiste und die Menuepunkte (ein gesperrter Menuepunkt
+' nimmt auch sein Kuerzel nicht an -- F10 ginge sonst ins Leere).
+SUB debugKnoepfe()
+    GUI_MENU_ENABLE(miSchritt, dbgHaelt)
+    GUI_MENU_ENABLE(miHinein, dbgHaelt)
+    GUI_MENU_ENABLE(miHeraus, dbgHaelt)
+    GUI_MENU_ENABLE(miAnhalten, lauf >= 0 OR dbgProz >= 0)
+    GUI_SET_ENABLED(btDbgWeiter, dbgHaelt)
+    GUI_SET_ENABLED(btDbgSchritt, dbgHaelt)
+    GUI_SET_ENABLED(btDbgHinein, dbgHaelt)
+    GUI_SET_ENABLED(btDbgHeraus, dbgHaelt)
+    GUI_SET_ENABLED(btDbgStopp, dbgProz >= 0)
+END SUB
+
+' --- Ablauf ------------------------------------------------------------------------
+SUB debuggen()
+    IF dbgProz >= 0 THEN
+        IF dbgHaelt THEN dbgKommando("continue")
+        RETURN
+    END IF
+    IF lauf >= 0 THEN anhalten()
+    IF NOT vorbereiten("Debuggen") THEN RETURN
+    haltepunkteBereinigen()
+    GUI_LISTBOX_CLEAR(lstAusgabe)
+    GUI_LISTBOX_CLEAR(lstVariablen)
+    GUI_LISTBOX_CLEAR(lstStapel)
+    GUI_DOCK_ACTIVATE(win, "debugger")
+    DIM main AS STRING : main = PATHJOIN(studioOrdner$(), "main.dh")
+    ausgabe("▶ " + projName + " startet im Debugger …", &H70C070)
+    dbgProz = PROCESS_START("dhrt", "debug", main)
+    dbgRest = ""
+    dbgErst = TRUE
+    dbgHaelt = FALSE
+    GUI_SET_TEXT(lblDbg, "Läuft …")
+    debugKnoepfe()
+    werkzeugeNachziehen()
+    status("Debuggen: " + projName)
+    protokoll("debug gestartet")
+END SUB
+
+SUB dbgKommando(cmd AS STRING)
+    IF dbgProz < 0 THEN RETURN
+    DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+    JSON_SET_STRING(j, "cmd", cmd)
+    PROCESS_WRITE(dbgProz, JSON_STRINGIFY(j) + CHR$(10))
+    IF cmd <> "stop" THEN
+        dbgHaelt = FALSE
+        dbgHaltWeg()
+        GUI_SET_TEXT(lblDbg, "Läuft …")
+        debugKnoepfe()
+    END IF
+    protokoll("debug " + cmd)
+END SUB
+
+SUB dbgHaltepunkteSenden()
+    DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+    JSON_SET_STRING(j, "cmd", "set-breakpoints")
+    JSON_SET_BOOL(j, "now", TRUE)
+    JSON_SET_JSON(j, "breakpoints", JSON_NEW_ARRAY())
+    DIM h AS Haltepunkt
+    FOR EACH h IN haltepunkte
+        DIM datei AS STRING
+        DIM zeile AS INTEGER
+        (datei, zeile) = haltepunktOrt(h)
+        IF datei = "" THEN CONTINUE
+        DIM b AS JSON_HANDLE : b = JSON_NEW_OBJECT()
+        JSON_SET_STRING(b, "file", datei)
+        JSON_SET_INT(b, "line", zeile)
+        JSON_APPEND_JSON(j, "breakpoints", b)
+    NEXT
+    PROCESS_WRITE(dbgProz, JSON_STRINGIFY(j) + CHR$(10))
+END SUB
+
+SUB debugBeenden()
+    IF dbgProz < 0 THEN RETURN
+    dbgKommando("stop")
+    PROCESS_KILL(dbgProz)
+    dbgEnde("■ Debuggen beendet.")
+END SUB
+
+SUB dbgEnde(text AS STRING)
+    dbgProz = -1
+    dbgHaelt = FALSE
+    dbgHaltWeg()
+    ausgabe(text, &HB0B0B0)
+    GUI_SET_TEXT(lblDbg, "Debuggen (F7) startet das Programm und hält an Haltepunkten.")
+    debugKnoepfe()
+    werkzeugeNachziehen()
+    status("Debuggen beendet.")
+    protokoll("debug ende")
+END SUB
+
+' Die Markierung der Haltezeile weg.
+SUB dbgHaltWeg()
+    DIM alt AS Methode : alt = dbgMeth
+    DIM keine AS Methode
+    dbgMeth = keine
+    dbgZeile = 0
+    IF alt IS NIL THEN RETURN
+    DIM r AS Reiter
+    FOR EACH r IN reiter
+        IF r.art = "code" THEN
+            IF r.meth = alt THEN feldBefunde(r)
+        END IF
+    NEXT
+END SUB
+
+' Je Bild: Ereignisse lesen, Klicks auf Knoepfe und in die Nummernspalte.
+SUB debugPruefen()
+    ' Haltepunkte per Klick in die Nummernspalte (auch ohne laufenden Debugger).
+    DIM r AS Reiter
+    FOR EACH r IN reiter
+        IF r.art <> "code" OR r.feld < 0 THEN CONTINUE
+        DIM gz AS INTEGER : gz = GUI_TEXTAREA_GUTTER_CLICKED(r.feld)
+        IF gz > 0 THEN haltepunktUmschalten(r.meth, gz)
+    NEXT
+    IF GUI_CLICKED(btDbgWeiter) THEN dbgKommando("continue")
+    IF GUI_CLICKED(btDbgSchritt) THEN dbgKommando("step-over")
+    IF GUI_CLICKED(btDbgHinein) THEN dbgKommando("step-into")
+    IF GUI_CLICKED(btDbgHeraus) THEN dbgKommando("step-out")
+    IF GUI_CLICKED(btDbgStopp) THEN debugBeenden()
+    IF GUI_DOUBLE_CLICKED(lstStapel) THEN dbgStapelOeffnen(GUI_LISTBOX_SELECTED(lstStapel))
+    IF dbgProz < 0 THEN RETURN
+    DIM t AS STRING : t = PROCESS_READ$(dbgProz)
+    WHILE t <> ""
+        dbgRest = dbgRest + REPLACE$(t, CHR$(13), "")
+        t = PROCESS_READ$(dbgProz)
+    WEND
+    WHILE INSTR(dbgRest, CHR$(10)) >= 0
+        DIM p AS INTEGER : p = INSTR(dbgRest, CHR$(10))
+        DIM zeile AS STRING : zeile = LEFT$(dbgRest, p)
+        dbgRest = MID$(dbgRest, p + 1, LEN(dbgRest))
+        IF dbgProz < 0 THEN RETURN
+        dbgEreignis(zeile)
+    WEND
+    IF dbgProz < 0 THEN RETURN
+    DIM fe AS STRING : fe = PROCESS_ERR$(dbgProz)
+    IF fe <> "" THEN
+        DIM fz AS STRING
+        FOR EACH fz IN SPLIT(REPLACE$(fe, CHR$(13), ""), CHR$(10))
+            IF bauZeileZeigen(fz) THEN ausgabe(fz, &HE86060)
+        NEXT
+    END IF
+    IF NOT PROCESS_RUNNING(dbgProz) AND PROCESS_READ$(dbgProz) = "" THEN dbgEnde("■ Beendet.")
+END SUB
+
+SUB dbgEreignis(zeile AS STRING)
+    IF LEFT$(TRIM$(zeile), 1) <> "{" THEN
+        IF TRIM$(zeile) <> "" THEN ausgabe(zeile, -1)
+        RETURN
+    END IF
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_PARSE(zeile)
+    CATCH
+        RETURN
+    END TRY
+    DIM ev AS STRING : ev = IIF(JSON_HAS(j, "event"), JSON_GET_STRING(j, "event"), "")
+    SELECT CASE ev
+        CASE "output"
+            DIM tx AS STRING : tx = JSON_GET_STRING(j, "text")
+            DIM tz AS STRING
+            FOR EACH tz IN SPLIT(tx, CHR$(10))
+                IF tz <> "" THEN ausgabe(tz, -1)
+            NEXT
+        CASE "input"
+            ' Eine Eingabe von der Konsole hat ein Fenster-Programm nicht.
+            PROCESS_WRITE(dbgProz, "{" + CHR$(34) + "cmd" + CHR$(34) + ":" + CHR$(34) + "input" + CHR$(34) + "," + CHR$(34) + "text" + CHR$(34) + ":" + CHR$(34) + CHR$(34) + "}" + CHR$(10))
+        CASE "paused"
+            IF dbgErst THEN
+                ' Der erste Halt ist Zeile 1 -- dort die Haltepunkte hin und weiter.
+                dbgErst = FALSE
+                dbgHaltepunkteSenden()
+                dbgKommando("continue")
+                RETURN
+            END IF
+            dbgHalt(j)
+        CASE "finished"
+            dbgEnde("■ Beendet.")
+    END SELECT
+END SUB
+
+' Ein Halt: die Stelle auf Methode und Zeile umrechnen, dorthin, Variablen.
+SUB dbgHalt(j AS JSON_HANDLE)
+    dbgHaelt = TRUE
+    DIM datei AS STRING : datei = IIF(JSON_HAS(j, "file"), JSON_GET_STRING(j, "file"), "")
+    DIM zeile AS INTEGER : zeile = IIF(JSON_HAS(j, "line"), JSON_GET_INT(j, "line"), 0)
+    DIM wo AS STRING : wo = BASENAME(datei) + ":" + STR$(zeile)
+    DIM keine AS Methode
+    dbgMeth = keine
+    dbgZeile = 0
+    DIM ei AS INTEGER : ei = -1
+    IF LOWER$(BASENAME(DIRNAME(datei))) = "projekt" AND LOWER$(RIGHT$(datei, 3)) = ".dh" THEN
+        DIM n AS STRING : n = BASENAME(datei)
+        ei = elementIndex(LEFT$(n, LEN(n) - 3))
+    END IF
+    IF ei >= 0 THEN
+        codeSetzen$(elemente[ei])
+        IF zeile >= 1 AND zeile <= LEN(karteMeth) THEN
+            DIM mi AS INTEGER : mi = karteMeth[zeile - 1]
+            IF mi >= 0 AND mi < LEN(methoden) THEN
+                dbgMeth = methoden[mi]
+                dbgZeile = MAX(1, MIN(karteZeile[zeile - 1], LEN(SPLIT(dbgMeth.rumpf, CHR$(10)))))
+                wo = elemente[ei].name + "." + dbgMeth.name + ", Zeile " + STR$(dbgZeile)
+                codeOeffnen(dbgMeth)
+                DIM r AS Reiter : r = reiter[reiterVorn()]
+                feldBefunde(r)
+                IF r.feld >= 0 THEN GUI_TEXTAREA_GOTO(r.feld, dbgZeile, 1)
+            END IF
+        END IF
+    END IF
+    DIM grund AS STRING : grund = IIF(JSON_HAS(j, "reason"), JSON_GET_STRING(j, "reason"), "")
+    IF grund = "error" THEN
+        DIM msg AS STRING : msg = IIF(JSON_HAS(j, "message"), JSON_GET_STRING(j, "message"), "Fehler")
+        GUI_SET_TEXT(lblDbg, "Fehler in " + wo + ": " + msg)
+        ausgabe("Laufzeitfehler in " + wo + ": " + msg, &HE86060)
+    ELSE
+        GUI_SET_TEXT(lblDbg, "Hält in " + wo)
+    END IF
+    dbgVariablen(j)
+    dbgStapel(j)
+    GUI_DOCK_ACTIVATE(win, "debugger")
+    debugKnoepfe()
+    status("Angehalten: " + wo)
+    protokoll("angehalten " + wo)
+END SUB
+
+SUB dbgVariableDazu(j AS JSON_HANDLE, p AS STRING, einzug AS STRING)
+    DIM n AS STRING : n = JSON_GET_STRING(j, p + ".name")
+    DIM t AS STRING : t = IIF(JSON_HAS(j, p + ".type"), JSON_GET_STRING(j, p + ".type"), "")
+    DIM v AS STRING : v = ""
+    IF JSON_HAS(j, p + ".value") THEN
+        IF JSON_TYPE(j, p + ".value") = "string" THEN v = JSON_GET_STRING(j, p + ".value") ELSE v = JSON_STRINGIFY(JSON_GET_JSON(j, p + ".value"))
+    END IF
+    GUI_LISTBOX_ADD(lstVariablen, einzug + n + " = " + v)
+    GUI_LISTBOX_DETAIL(lstVariablen, GUI_LISTBOX_COUNT(lstVariablen) - 1, t)
+    protokoll("variable " + TRIM$(einzug) + n + " = " + v)
+END SUB
+
+SUB dbgVariablen(j AS JSON_HANDLE)
+    GUI_LISTBOX_CLEAR(lstVariablen)
+    DIM k AS INTEGER
+    IF JSON_HAS(j, "locals") THEN
+        FOR k = 0 TO JSON_LEN(j, "locals") - 1
+            DIM p AS STRING : p = "locals." + STR$(k)
+            dbgVariableDazu(j, p, "")
+            ' Self (und andere Objekte): die Felder eine Ebene tief -- dort
+            ' steht, was ein Fenster sich merkt.
+            IF JSON_HAS(j, p + ".children") THEN
+                DIM c AS INTEGER
+                FOR c = 0 TO MIN(40, JSON_LEN(j, p + ".children")) - 1
+                    dbgVariableDazu(j, p + ".children." + STR$(c), "    ")
+                NEXT
+            END IF
+        NEXT
+    END IF
+END SUB
+
+SUB dbgStapel(j AS JSON_HANDLE)
+    GUI_LISTBOX_CLEAR(lstStapel)
+    IF NOT JSON_HAS(j, "stack") THEN RETURN
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(j, "stack") - 1
+        DIM p AS STRING : p = "stack." + STR$(k)
+        DIM n AS STRING : n = IIF(JSON_HAS(j, p + ".name"), JSON_GET_STRING(j, p + ".name"), "")
+        DIM f AS STRING : f = IIF(JSON_HAS(j, p + ".file"), BASENAME(JSON_GET_STRING(j, p + ".file")), "")
+        DIM z AS INTEGER : z = IIF(JSON_HAS(j, p + ".line"), JSON_GET_INT(j, p + ".line"), 0)
+        GUI_LISTBOX_ADD(lstStapel, n)
+        GUI_LISTBOX_DETAIL(lstStapel, k, f + ":" + STR$(z))
+    NEXT
+END SUB
+
+SUB dbgStapelOeffnen(k AS INTEGER)
+    ' Bewusst schlicht: ein Doppelklick zeigt, wohin der Eintrag gehoert.
+    IF k < 0 THEN RETURN
+    status("Aufruf: " + GUI_LISTBOX_ITEM(lstStapel, k))
+END SUB
+
+' F9: Haltepunkt an der Zeile der Schreibmarke im vorderen Code-Reiter.
+SUB haltepunktAnDerMarke()
+    DIM k AS INTEGER : k = reiterVorn()
+    IF k < 0 OR k >= LEN(reiter) THEN RETURN
+    DIM r AS Reiter : r = reiter[k]
+    IF r.art <> "code" OR r.feld < 0 THEN RETURN
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(r.feld)
+    haltepunktUmschalten(r.meth, z)
+END SUB

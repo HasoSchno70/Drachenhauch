@@ -237,6 +237,9 @@ DIM teile AS INTEGER
 FOR i = 0 TO LEN(roh) - 1
     IF INSTR(roh[i], "_smoketest") >= 0 THEN CONTINUE
     IF LEFT$(BASENAME(roh[i]), 7) = "_dhtmp_" THEN CONTINUE
+    ' Ein Projekt des Studios (projekt.dhstudio daneben) ist erst zusammen
+    ' mit der erzeugten Basis ein Programm: das prueft werkzeug_studio_beispiel.
+    IF FILEEXISTS(ordner + "/" + DIRNAME(roh[i]) + "/projekt.dhstudio") THEN CONTINUE
     DIM d AS STRING : d = DIRNAME(DIRNAME(roh[i]))
     DIM teil AS BOOLEAN : teil = FALSE
     WHILE d <> "" AND d <> "."
@@ -321,6 +324,9 @@ FOR i = 0 TO LEN(roh) - 1
     ' Funkenflug (Schaltplan-Editor) ist genauso gebaut: ansicht/*.dh sind
     ' Teile von funkenflug/main.dh (gDok, gBlatt ... legt main.dh an).
     IF INSTR(REPLACE$(roh[i], CHR$(92), "/"), "funkenflug/ansicht/") >= 0 THEN CONTINUE
+    ' Die Dateien eines Studio-Projekts erben von erzeugten Basisklassen
+    ' (werkzeug_studio_beispiel.dhtest prueft das erzeugte Programm).
+    IF FILEEXISTS(wurzel + "/" + DIRNAME(roh[i]) + "/projekt.dhstudio") THEN CONTINUE
     ARRAY_PUSH(dateien, wurzel + "/" + roh[i])
 NEXT
 PRINT "genug dateien "; (LEN(dateien) > 300)

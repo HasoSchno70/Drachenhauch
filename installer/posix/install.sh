@@ -7,7 +7,8 @@
 #
 # Danach: "Drachenhauch IDE" im Anwendungsmenue, `drachenhauch` und `dhrt`
 # im Terminal (liegt ~/.local/bin nicht im PATH, sagt das Skript es),
-# .dh-Dateien oeffnen in der IDE.
+# .dh-Dateien oeffnen in der IDE; dazu "Drachenhauch Studio" im Menue, und
+# Studio-Projekte (.dhstudio) oeffnen im Studio.
 set -e
 HIER="$(cd "$(dirname "$0")" && pwd)"
 DATEN="${XDG_DATA_HOME:-$HOME/.local/share}"
@@ -34,7 +35,7 @@ if [ "$1" = "--entfernen" ]; then
     for f in "$BIN/drachenhauch" "$BIN/dhrt"; do
         if unserer "$f"; then rm -f "$f"; fi
     done
-    rm -f "$APPS/drachenhauch-ide.desktop" "$ICONS/drachenhauch-ide.png" "$MIME/drachenhauch-ide.xml"
+    rm -f "$APPS/drachenhauch-ide.desktop" "$APPS/drachenhauch-studio.desktop" "$ICONS/drachenhauch-ide.png" "$MIME/drachenhauch-ide.xml"
     auffrischen
     echo "Drachenhauch IDE entfernt. Deine Beispiele (Dokumente/Drachenhauch oder ~/Drachenhauch) bleiben liegen."
     exit 0
@@ -74,6 +75,11 @@ cat > "$MIME/drachenhauch-ide.xml" <<EOF
     <sub-class-of type="text/plain"/>
     <glob pattern="*.dh"/>
   </mime-type>
+  <mime-type type="application/x-drachenhauch-studio">
+    <comment>Drachenhauch-Studio-Projekt</comment>
+    <sub-class-of type="application/json"/>
+    <glob pattern="*.dhstudio"/>
+  </mime-type>
 </mime-info>
 EOF
 
@@ -89,9 +95,21 @@ Categories=Development;IDE;
 MimeType=text/x-drachenhauch;
 EOF
 
+cat > "$APPS/drachenhauch-studio.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Drachenhauch Studio
+Comment=Programme mit Oberflaeche entwerfen, schreiben, starten und bauen
+Exec="$ZIEL/drachenhauch" --studio %f
+Icon=drachenhauch-ide
+Terminal=false
+Categories=Development;IDE;
+MimeType=application/x-drachenhauch-studio;
+EOF
+
 auffrischen
 
-echo "Fertig: \"Drachenhauch IDE\" im Anwendungsmenue, 'drachenhauch' im Terminal."
+echo "Fertig: \"Drachenhauch IDE\" und \"Drachenhauch Studio\" im Anwendungsmenue, 'drachenhauch' im Terminal."
 case ":$PATH:" in
     *":$BIN:"*) ;;
     *) echo "Hinweis: $BIN steht nicht im PATH -- in ~/.profile ergaenzen:"

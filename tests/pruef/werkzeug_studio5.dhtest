@@ -1,0 +1,152 @@
+' Drachenhauch Studio, Stufe 5 (docs/entwurf-studio.md): das Studio ist
+' erreichbar -- aus der IDE (Werkzeuge, eine .dhstudio im Projektbaum) und
+' aus dem Form-Designer (Datei -> Im Drachenhauch Studio oeffnen). Was die
+' Pakete mitnehmen, pruefen werkzeug_paket.dhtest und
+' werkzeug_installer.dhtest.
+'
+' Das gestartete Studio schreibt sein Protokoll (DH_STUDIO_LOG erbt es aus
+' der Umgebung des Falls); sobald es das Projekt geladen hat, beendet der
+' Fall es wieder.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== eine dhstudio aus der ide geht im studio auf
+DIM prB AS INTEGER
+DIM prSchritt AS INTEGER
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prSchritt = 0 AND prB > 5 THEN
+    dateiOeffnen(PATHJOIN(projektOrdner, "proj/projekt.dhstudio"))
+    prSchritt = 1
+END IF
+IF prSchritt = 1 AND FILEEXISTS(PATHJOIN(projektOrdner, "studio.log")) THEN
+    DIM prZ AS STRING
+    FOR EACH prZ IN READLINES(PATHJOIN(projektOrdner, "studio.log"))
+        IF LEFT$(prZ, 16) = "projekt geladen " THEN
+            protokoll("pr " + prZ)
+            DIM prW AS INTEGER
+            FOR EACH prW IN werkzeuge
+                PROCESS_KILL(prW)
+            NEXT
+            EXIT(0)
+        END IF
+    NEXT
+END IF
+IF prB > 900 THEN protokoll("pr zeit um") : EXIT(0)
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=1000
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+DH_STUDIO_LOG={fall}/studio.log
+DH_STUDIO_GROESSE=1200x800
+--- datei a.dh
+PRINT 1
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}]}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 7) = "studio " THEN PRINT L[i]
+NEXT
+--- erwartet
+studio projekt.dhstudio
+pr projekt geladen proj 2 0
+
+=== werkzeuge drachenhauch studio nimmt den projektordner, wenn er ein studio-projekt ist
+DIM prB AS INTEGER
+DIM prSchritt AS INTEGER
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prSchritt = 0 AND prB > 5 THEN
+    befehl("wz_studio")
+    prSchritt = 1
+END IF
+IF prSchritt = 1 AND FILEEXISTS(PATHJOIN(projektOrdner, "studio.log")) THEN
+    DIM prZ AS STRING
+    FOR EACH prZ IN READLINES(PATHJOIN(projektOrdner, "studio.log"))
+        IF LEFT$(prZ, 16) = "projekt geladen " THEN
+            protokoll("pr " + prZ)
+            DIM prW AS INTEGER
+            FOR EACH prW IN werkzeuge
+                PROCESS_KILL(prW)
+            NEXT
+            EXIT(0)
+        END IF
+    NEXT
+END IF
+IF prB > 900 THEN protokoll("pr zeit um") : EXIT(0)
+--- argumente
+Hauptfenster.dh
+--- umgebung
+DHRT_FRAMES=1000
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+DH_STUDIO_LOG={fall}/studio.log
+DH_STUDIO_GROESSE=1200x800
+--- datei Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"meins","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[]}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 7) = "studio " THEN PRINT L[i]
+NEXT
+--- erwartet
+studio projekt.dhstudio
+pr projekt geladen meins 2 0
+
+=== der form-designer findet das studio und oeffnet sein formular dort
+' Ohne Datei sagt die Statuszeile beim Start, dass es das Studio gibt.
+' Mit einem gesicherten Formular startet Strg+Umschalt+O das Studio damit.
+PRINT "pfad "; RIGHT$(REPLACE$(studioPfad$(), CHR$(92), "/"), 16); " "; FILEEXISTS(studioPfad$())
+PRINT "hinweis "; LEFT$(GUI_TEXT(lblStatus), 34)
+DIM prOrt AS STRING : prOrt = GETENV$("DHRT_START_DIR")
+formularLaden(prOrt + "/form.dhform")
+imStudioOeffnen()
+PRINT "status "; GUI_TEXT(lblStatus)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM gesehen AS STRING : gesehen = ""
+WHILE MILLIS() - t0 < 30000 AND gesehen = ""
+    IF FILEEXISTS(GETENV$("DH_STUDIO_LOG")) THEN
+        DIM z AS STRING
+        FOR EACH z IN READLINES(GETENV$("DH_STUDIO_LOG"))
+            IF z = "bereit" THEN gesehen = z
+        NEXT
+        IF gesehen <> "" THEN
+            FOR EACH z IN READLINES(GETENV$("DH_STUDIO_LOG"))
+                IF LEFT$(z, 8) = "fenster " THEN PRINT "studio "; z
+            NEXT
+        END IF
+    END IF
+    SLEEP(100)
+WEND
+PROCESS_KILL(studioProz)
+EXIT(0)
+--- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- umgebung
+DH_IDE_WURZEL={sammlung}/../..
+DH_STUDIO_LOG={fall}/studio.log
+DH_STUDIO_GROESSE=1200x800
+--- datei form.dhform
+{"title":"Probe","name":"Probeform","w":300,"h":200,"widgets":[
+{"kind":"button","name":"ok","text":"OK","x":20,"y":20,"w":80,"h":28}]}
+--- erwartet
+pfad studio/studio.dh TRUE
+hinweis Neu: das Drachenhauch Studio entwi
+status Im Drachenhauch Studio geoeffnet: form.dhform
+studio fenster Probeform

@@ -75,6 +75,11 @@ SUB inspektorAnlegen()
     inspZeile("Fenster", "w", "Breite", "zahl", "fenster", "")
     inspZeile("Fenster", "h", "Höhe", "zahl", "fenster", "")
     inspZeile("Fenster", "resizable", "Größe änderbar", "schalter", "fenster", "")
+    inspGruppe("Timer")
+    inspZeile("Timer", "name", "Name", "text", "timer", "")
+    inspZeile("Timer", "intervall", "Intervall (ms)", "zahl", "timer", "")
+    inspZeile("Timer", "aktiv", "Läuft beim Start", "schalter", "timer", "")
+    inspZeile("Timer", "wiederholen", "Wiederholen", "schalter", "timer", "")
     inspGruppe("Kennung")
     inspZeile("Kennung", "name", "Name", "text", "*", "")
     inspZeile("Kennung", "kind", "Art", "info", "*", "")
@@ -90,6 +95,7 @@ SUB inspektorAnlegen()
     inspZeile("Inhalt", "items", "Einträge", "eintraege", LISTENARTEN, "")
     inspZeile("Inhalt", "table.headers", "Spalten", "eintraege", "table", "")
     inspZeile("Inhalt", "group", "Gruppe", "text", "radio", "")
+    inspZeile("Inhalt", "studio_bild", "Bild", "wahl", "image", "(keins)")
     inspZeile("Inhalt", "checked", "Gesetzt", "schalter", "checkbox,radio,toggle", "")
     inspZeile("Inhalt", "min", "Minimum", "komma", WERTARTEN, "")
     inspZeile("Inhalt", "max", "Maximum", "komma", WERTARTEN, "")
@@ -129,7 +135,11 @@ SUB inspektorAnlegen()
                 z.ed = GUI_TEXTINPUT(win, 0, 0, 10, 26)
                 GUI_TEXTINPUT_SET(z.ed, "zahlen", 2)
             CASE "zahl"
-                z.ed = GUI_SPINNER(win, 0, 0, 10, -9999, 9999, 0, 1)
+                IF z.schluessel = "intervall" THEN
+                    z.ed = GUI_SPINNER(win, 0, 0, 10, 1, 3600000, 1000, 100)
+                ELSE
+                    z.ed = GUI_SPINNER(win, 0, 0, 10, -9999, 9999, 0, 1)
+                END IF
             CASE "schalter"
                 z.ed = GUI_TOGGLE(win, "", 0, 0, FALSE)
             CASE "wahl"
@@ -168,6 +178,7 @@ SUB inspDazu(w AS GUI_WIDGET)
 END SUB
 
 FUNCTION giltFuer(z AS InspZeile, art AS STRING) AS BOOLEAN
+    IF trayWahl >= 0 THEN RETURN z.fuer = "timer"
     IF auswahl < 0 THEN RETURN z.fuer = "fenster"
     IF z.fuer = "fenster" THEN RETURN FALSE
     IF z.fuer = "*" THEN RETURN TRUE
@@ -176,6 +187,7 @@ END FUNCTION
 
 ' --- Werte lesen und schreiben ---------------------------------------------------
 FUNCTION pfadFuer$(z AS InspZeile, i AS INTEGER) AS STRING
+    IF trayWahl >= 0 THEN RETURN "timer." + STR$(trayWahl) + "." + z.schluessel
     IF i < 0 THEN RETURN z.schluessel
     RETURN wz$(i, z.schluessel)
 END FUNCTION
@@ -230,7 +242,11 @@ SUB inspektorFuellen()
     inspStumm = TRUE
     inspAnhaengig = -1
     DIM art AS STRING : art = ""
-    IF auswahl >= 0 THEN
+    IF trayWahl >= 0 THEN
+        art = "timer"
+        GUI_SET_TEXT(inspTitel, timerName$(trayWahl))
+        GUI_SET_TEXT(inspArt, "Timer")
+    ELSEIF auswahl >= 0 THEN
         art = feldText$(auswahl, "kind")
         GUI_SET_TEXT(inspTitel, feldText$(auswahl, "name"))
         DIM text AS STRING : text = bausteinName$(auswahl)
@@ -256,12 +272,22 @@ SUB inspektorFuellen()
                 IF JSON_HAS(doc, p) THEN v = INT(JSON_GET_FLOAT(doc, p))
                 GUI_SET_VALUE(z.ed, v)
             CASE "schalter"
-                DIM an AS BOOLEAN : an = z.schluessel = "enabled" OR z.schluessel = "visible"
+                DIM an AS BOOLEAN : an = z.schluessel = "enabled" OR z.schluessel = "visible" OR z.schluessel = "aktiv" OR z.schluessel = "wiederholen"
                 IF JSON_HAS(doc, p) THEN
                     IF JSON_TYPE(doc, p) = "boolean" THEN an = JSON_GET_BOOL(doc, p)
                 END IF
                 GUI_SET_CHECKED(z.ed, an)
             CASE "wahl"
+                IF z.schluessel = "studio_bild" THEN
+                    ' Die Bilder des Projekts -- die Liste aendert sich mit ihm.
+                    DIM bl AS ARRAY OF STRING : bl = projektBilder()
+                    z.wahl = "(keins)" + IIF(LEN(bl) > 0, ";" + JOIN$(bl, ";"), "")
+                    GUI_LISTBOX_CLEAR(z.ed)
+                    DIM bn AS STRING
+                    FOR EACH bn IN SPLIT(z.wahl, ";")
+                        GUI_LISTBOX_ADD(z.ed, bn)
+                    NEXT
+                END IF
                 DIM eintraege AS ARRAY OF STRING : eintraege = SPLIT(z.wahl, ";")
                 DIM w AS STRING : w = wertText$(p)
                 DIM idx AS INTEGER : idx = ARRAY_INDEXOF(eintraege, w)
@@ -351,6 +377,7 @@ SUB zeileUebernehmen(zi AS INTEGER)
     DIM z AS InspZeile : z = inspZeilen[zi]
     DIM ziele AS ARRAY OF INTEGER
     IF auswahl < 0 THEN ziele = [-1] ELSE ziele = gewaehlt
+    IF trayWahl >= 0 THEN ziele = [-1]
     ' Ein Name ist ein Bezeichner und eindeutig -- er wird zum Feld der Klasse.
     IF z.schluessel = "name" THEN
         DIM n AS STRING : n = TRIM$(GUI_TEXT(z.ed))
@@ -358,12 +385,16 @@ SUB zeileUebernehmen(zi AS INTEGER)
             GUI_SET_ERROR(z.ed, "Ein Name beginnt mit einem Buchstaben und hat nur Buchstaben, Ziffern und _.")
             RETURN
         END IF
-        IF auswahl >= 0 AND nameVergeben(n, auswahl) THEN
+        IF trayWahl >= 0 AND nameVergeben(n, TRAY + trayWahl) THEN
+            GUI_SET_ERROR(z.ed, "Den Namen '" + n + "' gibt es in diesem Fenster schon.")
+            RETURN
+        END IF
+        IF trayWahl < 0 AND auswahl >= 0 AND nameVergeben(n, auswahl) THEN
             GUI_SET_ERROR(z.ed, "Den Namen '" + n + "' gibt es in diesem Fenster schon.")
             RETURN
         END IF
         ' Der Name des Fensters ist der Name seiner Klasse -- eindeutig im Projekt.
-        IF auswahl < 0 AND aktFenster >= 0 THEN
+        IF trayWahl < 0 AND auswahl < 0 AND aktFenster >= 0 THEN
             DIM schon AS INTEGER : schon = elementIndex(n)
             IF schon >= 0 AND schon <> aktFenster THEN
                 GUI_SET_ERROR(z.ed, "Ein Element '" + n + "' gibt es im Projekt schon.")
@@ -371,8 +402,9 @@ SUB zeileUebernehmen(zi AS INTEGER)
             END IF
         END IF
         nameAlt = IIF(auswahl >= 0, feldText$(auswahl, "name"), fensterText$("name"))
+        IF trayWahl >= 0 THEN nameAlt = timerName$(trayWahl)
         GUI_SET_ERROR(z.ed, "")
-        ziele = [auswahl]
+        ziele = [IIF(trayWahl >= 0, -1, auswahl)]
     END IF
     DIM i AS INTEGER
     FOR EACH i IN ziele
@@ -405,7 +437,7 @@ SUB zeileUebernehmen(zi AS INTEGER)
                 JSON_SET_BOOL(doc, p, GUI_CHECKED(z.ed))
             CASE "wahl"
                 DIM w AS STRING : w = GUI_DROPDOWN_TEXT(z.ed)
-                IF w = "normal" OR w = "standard" OR (z.schluessel = "align" AND w = "links") THEN
+                IF w = "normal" OR w = "standard" OR w = "(keins)" OR (z.schluessel = "align" AND w = "links") THEN
                     IF JSON_HAS(doc, p) THEN JSON_REMOVE(doc, p)
                 ELSE
                     JSON_SET_STRING(doc, p, w)
@@ -425,7 +457,7 @@ SUB zeileUebernehmen(zi AS INTEGER)
     NEXT
     entwurfBauen()
     IF z.schluessel = "name" THEN
-        IF nameAlt <> TRIM$(GUI_TEXT(z.ed)) THEN nameGeaendert(nameAlt, TRIM$(GUI_TEXT(z.ed)), auswahl < 0)
+        IF nameAlt <> TRIM$(GUI_TEXT(z.ed)) THEN nameGeaendert(nameAlt, TRIM$(GUI_TEXT(z.ed)), auswahl < 0 AND trayWahl < 0)
         navigatorFuellen()
         GUI_SET_TEXT(inspTitel, TRIM$(GUI_TEXT(z.ed)))
     END IF

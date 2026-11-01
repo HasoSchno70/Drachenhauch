@@ -3513,6 +3513,116 @@ Strg+B baut eine Exe ohne Quelltext daneben und sie laeuft); sechs
 Verfaelschungen fallen je in ihrem Fall. Offen: Vervollstaendigung im
 Code-Feld, Ziehen/Rad/Taste/Timer (Stufe 4).
 
+**Stufe 4 = was ein Programm braucht** (selber Tag, Zweig
+`thema/studio-stufe4`, auf Stufe 3). **Die Basisklasse fragt alle Ereignisse
+je Bild ab** (`studioTakt`: `GUI_CLICKED`/`GUI_CHANGED`/`GUI_ENTERED`, Fokus
+ueber `studioFokusAlt/Jetzt` aus `GUI_FOCUSED`, Maus rein/raus ueber ein Feld
+`studioUeber_<name>`), statt `GUI_ON_*` zu setzen -- ein Rueckruf laeuft IN
+`GUI_UPDATE`, und eine Methode darin koennte nicht auf einen Dialog warten.
+Die Bildschleife ist jetzt `studioBild()` (FALSE = Programm endet; ueber eine
+KOPIE der Fensterliste, weil ein Ereignis Fenster oeffnen und schliessen
+kann), und `Frage/Meldung/Eingabe` (`studioAntwort`: Dialog in
+`studioDialoge`, damit er ueber Zeichenflaechen obenauf kommt) und
+`StudioFenster.ZeigenModal()` drehen selbst Bilder, bis die Antwort da ist;
+endet das Programm dabei, liefert `Frage` 0. **Timer**: Layout-Liste
+`timer` (name, intervall, aktiv, wiederholen), in der Basis ein Feld
+`StudioTimer` mit `studioFaellig()` je Bild (MILLIS, nicht TIMER_EVERY);
+im Studio eine Leiste unter dem Entwurf (`trayRect`/`trayBei`, `trayWahl`
+neben `auswahl`; `auswahlSetzen` setzt es zurueck; der Inspektor fragt in
+`giltFuer`/`pfadFuer$` zuerst `trayWahl`), Baustein "Timer" (Gruppe
+Unsichtbar), Entf loescht. **Menues**: `studio/menue.dh`, Editor auf einer
+Kopie `{"menus": ...}` (Pfade je Baumknoten; Einfuegen/Tauschen bauen die
+Liste neu, das json-Modul haengt nur an), Name `mi<Text>` mit
+`studio_auto`, bis man ihn aendert; OK = ein Rueckgaengig-Schritt, danach
+`controlUmbenannt` je Umbenennung. Die Basis nimmt `timer` und `menus` aus
+dem Layout-JSON und baut Menues per `GUI_MENU/GUI_SUBMENU/GUI_MENU_ITEM`
+(benannte in ihr Feld, `GUI_CLICKED` = `<name>_Aktion`). `controlsVon`
+haengt Timer und benannte Menueeintraege hinter die Widgets
+(`ctrlWidgets` = wo sie beginnen) -- so kennen Navigator und
+Ereignis-Dialog sie ohne eigenen Weg. **Bilder**: `bilder/` im Projekt,
+Projekt -> Bild hinzufuegen (`DH_STUDIO_DATEI` fuer Pruefungen),
+Widget-Schluessel `studio_bild`, Auswahl im Inspektor (Liste je Fuellen neu),
+Vorschau im Entwurf (`entwurfBilder`), beim Erzeugen nach
+`_studio/assets/bilder/` (Konvention von `dhrt --export`), `Bild(name)` in
+der Laufzeit. **Debugger**: `studio/debug.dh`, Haltepunkte je
+(Methode, Rumpfzeile) per Klick in die Nummernspalte oder F9, F7 =
+`dhrt debug`, erster Halt -> `set-breakpoints` (Datei/Zeile ueber die
+Zeilenkarte zurueck) + continue, ein Halt -> Methode und Zeile ueber
+dieselbe Karte, Leiste "Debugger" mit Variablen (Self eine Ebene tief) und
+Stapel, F10/F11/Umschalt+F11, Umschalt+F5 beendet. **Falle:** ein
+gesperrter Menuepunkt nimmt auch sein Kuerzel nicht an -- `debugKnoepfe`
+gibt Schritt/Hinein/Heraus beim Halt frei, sonst ging F10 ins Leere (vom
+Test gefunden). Die Menueleiste verschiebt den Inhalt um 26 Punkte (auch im
+erzeugten Programm). Tests `tests/pruef/werkzeug_studio4.dhtest` (5: Timer
+aus der Bibliothek ueber Suche + Doppelklick, Timer waehlen/Inspektor/Entf,
+Menue-Editor, das erzeugte Programm mit Frage + Enter, modalem Fenster,
+Timer, Strg+H und Bild-Pixel, Debugger mit Halt/Schritt/Weiter); zehn
+Verfaelschungen fallen je in ihrem Fall. Bild hinzufuegen selbst (Dialog)
+ist nur von Hand geprueft. **Nachtrag (selber Tag):** Ereignisse mit
+Parametern (`ereignisParameter$`, der Ereignis-Dialog setzt sie in die
+Kopfzeile): `Ziehen(x, y)` und `Rad(schritte)` der Zeichenflaeche (Feld
+`studioZug_<name>`, ab dem Druck auf die Flaeche), `Taste(taste)` des
+obersten Fensters (`StudioFenster.Taste`, in `studioBild` aus
+`KEY_ANY_HIT`, nicht wenn ein Eingabefeld den Fokus hat). **Falle beim
+Pruefen:** `KEY_ANY_HIT` blendet aus, was eine Wiedergabe einspeist -- der
+Fall dafuer schickt echte Fensternachrichten
+(`werkzeug_studio4_taste.dhtest`, seriell, nur Windows). Vervollstaendigung
+im Code-Feld (`studio/vervoll.dh`): Strg+Leertaste oder hinter `.` (dann
+nur bis 100 Eintraege), gefragt wird `CODE_COMPLETE` ueber `ganzerText$`,
+die Zeile der Marke findet die gz-Karte -- so kennt sie Felder der
+Basisklasse und die Laufzeit. **Falle:** `GUI_CHANGED` muss jedes Bild
+gefragt werden, der erste Aufruf meldet nichts. Bild hinzufuegen hat
+Strg+Umschalt+B und ist mit `DH_STUDIO_DATEI` geprueft. Vier Faelle mehr in
+`werkzeug_studio4.dhtest` (8) plus die Taste-Sammlung; fuenf Verfaelschungen
+fallen je in ihrem Fall.
+
+**Stufe 5, erster Teil = erreichbar** (Zweig `thema/studio-stufe5`, auf
+Stufe 4): **Installer** `Drachenhauch-IDE.iss` nimmt `studio\*.dh` und
+`*.dhstil` nach `{app}\studio`, Verknuepfung "Drachenhauch Studio"
+(eigene AppUserModelID `Drachenhauch.Studio` -- der Installer-Fall zaehlt
+jetzt 11), Task `assocstudio` fuer `.dhstudio` -> `dhrt run studio.dh --
+"%1"`. **Pakete**: `paket.dh` kopiert `studio/` (nur wenn es die Wurzel
+hat -- die Faelle mit einer Attrappen-Wurzel haben keins), der Starter
+`drachenhauch --studio [projekt]` (und eine `.dhstudio` als Argument)
+startet das Studio, `install.sh` legt `drachenhauch-studio.desktop` und
+den MIME-Typ `application/x-drachenhauch-studio` an und raeumt beides ab,
+`Info.plist` meldet `.dhstudio` an (macOS gibt die Datei an die App, also
+an die IDE, die sie ans Studio weiterreicht). **IDE**: Werkzeuge ->
+Drachenhauch Studio (`studioStarten`, studio/studio.dh neben ide/; ohne
+Argument mit dem Projektordner, wenn dort `projekt.dhstudio` liegt),
+`dateiOeffnen` gibt eine `.dhstudio` ans Studio, `BAUM_MUSTER` zeigt sie.
+**Form-Designer 197**: Datei -> Im Drachenhauch Studio oeffnen
+(Strg+Umschalt+O, `studioPfad$`: DH_IDE_WURZEL, neben der Laufzeit,
+macOS-Resources, `../studio`), ohne Datei ein Hinweis in der Statuszeile.
+Tests `tests/pruef/werkzeug_studio5.dhtest` (3; das gestartete Studio
+erbt `DH_STUDIO_LOG`, der Fall wartet auf "projekt geladen" und beendet
+es), Zeilen in `werkzeug_paket.dhtest` (Linux-Ordner, macOS-Bundle,
+install.sh, `--studio` mit der echten Laufzeit). Der Installer baut mit
+ISCC (lokal nachgesehen).
+
+**Stufe 5, Teil 4 = das Beispielprojekt** `examples/studio/rechnungen/`
+(nach dem Piloten 196): App, Module Datenbank (SQLite, Beispieldaten beim
+ersten Start, `naechsteNummer$`) und Ausgabe (CSV, `datumDeutsch$`),
+Klasse Rechnung (laden/rechnen/sichern in einer Transaktion/PDF; Steuer je
+Position gerundet), vier Fenster: Hauptfenster (Tabelle mit Filterzeile,
+Menue mit Kuerzeln, Doppelklick oeffnet), RechnungFenster (modal),
+Kunden-/ArtikelFenster (Datenbindung `GUI_FORM_LOAD/SAVE`, Regeln, Geldfeld,
+Klappliste mit Werten, Rueckfrage bei Ungesichertem). Die Layouts sind aus
+echten gui-Aufrufen ueber `GUI_TO_JSON` entstanden, die Namen danach in der
+JSON gesetzt (GUI_SET_NAME schreibt klein); alle Dateien stehen so da, wie
+`projektSchreiben` sie schreibt. Dazu im Studio: **Tabelle hat
+"Doppelklick"** (`ereignisseFuer`), und in der Laufzeit eine
+**`--check`-Warnung**, wenn eine Methode eine geerbte gleichen Namens mit
+anderer Parameterzahl ueberschreibt (gefunden am Beispiel: `SUB
+zeigen(kid)` verdeckte `StudioFenster.Zeigen()`; `Init` ausgenommen, Zeile
+= eine vor der ersten Anweisung des Rumpfs). Die Repo-Durchlaeufe in
+`dhrt_check.dhtest` lassen Ordner mit `projekt.dhstudio` aus. Tests
+`tests/pruef/werkzeug_studio_beispiel.dhtest` (2: Rundweg durch das Modell;
+F5 im Studio + `--check` + eine Probe, die statt `studioLauf` die Teile
+direkt aufruft -- Daten, Rundung, UNIQUE-Rollback, Liste, PDF, CSV,
+Bindung, Regeln, RechnungFenster), ein Fall in
+`compiler_warnungen.dhtest`.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

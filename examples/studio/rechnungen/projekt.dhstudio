@@ -1,0 +1,52 @@
+{
+  "format": "drachenhauch-studio",
+  "fassung": 1,
+  "name": "Rechnungen",
+  "start": "Hauptfenster",
+  "elemente": [
+    {
+      "art": "app",
+      "name": "App",
+      "code": "App.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Datenbank",
+      "code": "Datenbank.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Ausgabe",
+      "code": "Ausgabe.dh"
+    },
+    {
+      "art": "klasse",
+      "name": "Rechnung",
+      "code": "Rechnung.dh"
+    },
+    {
+      "art": "fenster",
+      "name": "Hauptfenster",
+      "code": "Hauptfenster.dh",
+      "layout": "Hauptfenster.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "RechnungFenster",
+      "code": "RechnungFenster.dh",
+      "layout": "RechnungFenster.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "KundenFenster",
+      "code": "KundenFenster.dh",
+      "layout": "KundenFenster.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "ArtikelFenster",
+      "code": "ArtikelFenster.dh",
+      "layout": "ArtikelFenster.dhform"
+    }
+  ]
+}

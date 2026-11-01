@@ -974,3 +974,7 @@ Plugins: fertig -- neu geladen.	Plugins: done -- reloaded.
 Plugins holen fehlgeschlagen -- siehe Ausgabe.	Fetching plugins failed -- see the output.
 Alle geholten Plugins neu holen und einen neuen Stand annehmen (dhrt paket hole --erneuern)	Fetch all fetched plugins again and accept a new state (dhrt paket hole --erneuern)
 Es gibt keine geholten Plugins.	There are no fetched plugins.
+Drachenhauch Studio	Drachenhauch Studio
+Werkzeug: Drachenhauch Studio	Tool: Drachenhauch Studio
+Drachenhauch Studio gestartet.	Drachenhauch Studio started.
+Im Drachenhauch Studio geöffnet: 	Opened in Drachenhauch Studio:

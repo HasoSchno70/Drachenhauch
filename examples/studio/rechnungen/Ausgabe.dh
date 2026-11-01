@@ -1,0 +1,44 @@
+' Was das Programm nach draussen schreibt: Datum und Betraege fuer die
+' Anzeige, die Rechnung als PDF und alle Rechnungen als CSV.
+IMPORT "pdf"
+
+' 2026-11-01 -> 01.11.2026
+FUNCTION datumDeutsch$(d AS STRING) AS STRING
+    IF LEN(d) <> 10 THEN RETURN d
+    RETURN MID$(d, 8, 2) + "." + MID$(d, 5, 2) + "." + LEFT$(d, 4)
+END FUNCTION
+
+' Cent als Zahl mit Komma, ohne Waehrung: 123450 -> 1234,50 (fuer die CSV).
+FUNCTION centText$(cent AS INTEGER) AS STRING
+    RETURN STR$(cent \ 100) + "," + RIGHT$("0" + STR$(cent MOD 100), 2)
+END FUNCTION
+
+' Text so setzen, dass er bei x = rechts endet.
+SUB pdfRechts(p AS PDF, rechts AS FLOAT, y AS FLOAT, t AS STRING)
+    PDF_TEXT(p, rechts - PDF_TEXT_WIDTH(p, t), y, t)
+END SUB
+
+' Ein Feld der CSV: in Anfuehrungszeichen, wenn es ; oder " enthaelt.
+FUNCTION csvFeld$(t AS STRING) AS STRING
+    IF INSTR(t, ";") < 0 AND INSTR(t, CHR$(34)) < 0 THEN RETURN t
+    RETURN CHR$(34) + REPLACE$(t, CHR$(34), CHR$(34) + CHR$(34)) + CHR$(34)
+END FUNCTION
+
+' Alle Rechnungen als CSV (Semikolon, Komma in den Betraegen -- so liest
+' sie eine deutsche Tabellenkalkulation). Liefert die Zahl der Rechnungen.
+FUNCTION csvExport(pfad AS STRING) AS INTEGER
+    DIM ids AS ARRAY OF INTEGER : ids = []
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT id FROM rechnungen ORDER BY nummer")
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(ids, DB_GET_INT(r, 0))
+    WEND
+    DIM zeilen AS ARRAY OF STRING : zeilen = ["Nummer;Datum;Kunde;Netto;MwSt;Brutto"]
+    DIM beleg AS Rechnung : beleg = NEW Rechnung()
+    DIM rid AS INTEGER
+    FOR EACH rid IN ids
+        IF NOT beleg.laden(rid) THEN CONTINUE
+        ARRAY_PUSH(zeilen, beleg.nummer + ";" + datumDeutsch$(beleg.datum) + ";" + csvFeld$(kundeName$(beleg.kunde)) + ";" + centText$(beleg.netto()) + ";" + centText$(beleg.steuer()) + ";" + centText$(beleg.brutto()))
+    NEXT
+    WRITEALL(pfad, JOIN$(zeilen, CHR$(10)) + CHR$(10))
+    RETURN LEN(ids)
+END FUNCTION

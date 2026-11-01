@@ -1,0 +1,65 @@
+' Drachenhauch Studio, Stufe 4: das Ereignis Taste eines Fensters. Eine
+' eingespielte Aufnahme taugt dafuer nicht -- KEY_ANY_HIT blendet aus, was
+' die Wiedergabe selbst einspeist. Darum ECHTE Fensternachrichten
+' (_hilfen/fenstersender.ps1 "buchstabe:a"), und darum seriell und nur unter
+' Windows. Format: docs/werkzeuge.md, dhrt test.
+
+--- seriell
+--- langsam
+=== eine taste ruft taste(code) des obersten fensters
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(100)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; slHat(log, "erzeugt 2")
+' Dasselbe Programm mit einem Titel, an dem PowerShell das Fenster findet.
+DIM kennung AS STRING : kennung = "StudioTaste-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 100000))
+DIM q AS STRING : q = JOIN$(READLINES(p + "/_studio/main.dh"), CHR$(10))
+WRITEALL(p + "/_studio/probe.dh", REPLACE$(q, "!" + CHR$(34) + "Haupt" + CHR$(34), "ARG$(0)") + CHR$(10))
+DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", "--bilder", "300", p + "/_studio/probe.dh", "--", kennung)
+DIM ps AS INTEGER : ps = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", skript$(), kennung, "buchstabe:a|buchstabe:q")
+PRINT TRIM$(REPLACE$(auslesen$(ps, 30000), CHR$(13), ""))
+DIM aus AS STRING : aus = auslesen$(kind, 30000)
+IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END IF
+DIM z AS STRING
+FOR EACH z IN SPLIT(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+    IF LEFT$(z, 6) = "taste " THEN PRINT z
+NEXT
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/_hilfen/uialeser.dh"
+slStudio = ARG$(0)
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB Taste(taste AS INTEGER)
+        PRINT "taste " + STR$(taste)
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- system windows
+--- erwartet
+erzeugt TRUE
+gesendet
+taste 97
+taste 113

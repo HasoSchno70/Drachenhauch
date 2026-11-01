@@ -34,6 +34,9 @@ IMPORT "inspektor.dh"
 IMPORT "oberflaeche.dh"
 IMPORT "code.dh"
 IMPORT "erzeugen.dh"
+IMPORT "menue.dh"
+IMPORT "debug.dh"
+IMPORT "vervoll.dh"
 
 ' Fuer Pruefungen: DH_STUDIO_GROESSE=BxH haelt das Fenster fest (sonst haengen
 ' alle Lagen am Bildschirm), DH_STUDIO_AUFNAHME spielt eine Aufnahme ab,
@@ -317,7 +320,7 @@ SUB befehle()
     IF GUI_CLICKED(miZurueck) OR t = tbZurueck THEN zurueck()
     IF GUI_CLICKED(miVor) OR t = tbVor THEN vor()
     IF GUI_CLICKED(miVerdoppeln) AND auswahl >= 0 THEN controlsVerdoppeln() : nachAenderung(TRUE) : protokoll("verdoppelt")
-    IF GUI_CLICKED(miLoeschen) AND auswahl >= 0 THEN loeschen()
+    IF GUI_CLICKED(miLoeschen) AND (auswahl >= 0 OR trayWahl >= 0) THEN loeschen()
     IF GUI_CLICKED(miAlles) THEN allesWaehlen() : auswahlGeaendert()
     IF t = tbLinks THEN anordnen("links")
     IF t = tbOben THEN anordnen("oben")
@@ -339,6 +342,13 @@ SUB befehle()
     IF GUI_CLICKED(miStarten) OR t = tbStart THEN starten()
     IF GUI_CLICKED(miAnhalten) OR t = tbStopp THEN anhalten()
     IF GUI_CLICKED(miBauen) OR t = tbBauen THEN bauen()
+    IF GUI_CLICKED(miMenues) THEN menueEditor()
+    IF GUI_CLICKED(miDebug) THEN debuggen()
+    IF GUI_CLICKED(miSchritt) AND dbgHaelt THEN dbgKommando("step-over")
+    IF GUI_CLICKED(miHinein) AND dbgHaelt THEN dbgKommando("step-into")
+    IF GUI_CLICKED(miHeraus) AND dbgHaelt THEN dbgKommando("step-out")
+    IF GUI_CLICKED(miHaltepunkt) THEN haltepunktAnDerMarke()
+    IF GUI_CLICKED(miBildNeu) THEN bildHinzufuegen()
     IF GUI_CLICKED(miPruefen) OR t = tbPruefen THEN
         DIM pf AS INTEGER : pf = projektPruefen()
         GUI_DOCK_ACTIVATE(win, "probleme")
@@ -384,6 +394,15 @@ SUB vor()
 END SUB
 
 SUB loeschen()
+    IF trayWahl >= 0 THEN
+        DIM tn AS STRING : tn = timerName$(trayWahl)
+        JSON_REMOVE(doc, "timer." + STR$(trayWahl))
+        trayWahl = -1
+        nachAenderung(TRUE)
+        status("Timer gelöscht: " + tn)
+        protokoll("geloescht timer " + tn)
+        RETURN
+    END IF
     DIM n AS INTEGER : n = LEN(gewaehlt)
     controlsLoeschen()
     nachAenderung(TRUE)
@@ -464,6 +483,7 @@ SUB lagenProtokollieren()
         protokoll("lage leiste " + STR$(k) + " " + STR$(GUI_TOOLBAR_ITEM_X(tb, k) + GUI_TOOLBAR_ITEM_W(tb, k) \ 2) + " " + STR$(inhaltOben + LEISTE_H \ 2))
     NEXT
     protokoll("lage suche " + STR$(GUI_GET_X(tfSuche) + 40) + " " + STR$(GUI_GET_Y(tfSuche) + inhaltOben + 12))
+    trayProtokollieren()
 END SUB
 
 ' Die Lage der Inspektorfelder (nach jeder Auswahl neu, darum eine eigene SUB).
@@ -493,6 +513,10 @@ WHILE NOT beenden
     GUI_UPDATE()
     bildNr = bildNr + 1
     IF bildNr = 3 AND logDatei <> "" THEN lagenProtokollieren() : felderProtokollieren()
+    IF lagenNachSuche > 0 THEN
+        lagenNachSuche = lagenNachSuche - 1
+        IF lagenNachSuche = 0 AND logDatei <> "" THEN lagenProtokollieren()
+    END IF
     IF GUI_DOCK_CHANGED(win) THEN verteilen() : mitteNachziehen()
     befehle()
     bibNachUpdate()
@@ -504,6 +528,8 @@ WHILE NOT beenden
     frageAuswerten()
     dialogePruefen()
     prozessePruefen()
+    debugPruefen()
+    vervollPruefen()
     ' Das Entwurfsfenster obenauf -- ein Klick ins Hauptfenster legte es
     ' sonst darunter. Dialoge, Menues und Popover liegen weiter oben.
     IF frm >= 0 AND NOT GUI_MODAL() AND layoutVorn() THEN GUI_WINDOW_FRONT(frm)
@@ -521,5 +547,6 @@ WHILE NOT beenden
     FLIP()
 WEND
 IF lauf >= 0 THEN PROCESS_KILL(lauf)
+IF dbgProz >= 0 THEN PROCESS_KILL(dbgProz)
 IF bau >= 0 THEN PROCESS_KILL(bau)
 protokoll("ende")

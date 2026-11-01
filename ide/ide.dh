@@ -1372,6 +1372,7 @@ DIM miWzForm AS INTEGER : miWzForm = GUI_MENU_ITEM(mWerkzeuge, tr$("Form-Designe
 DIM miWzAnim AS INTEGER : miWzAnim = GUI_MENU_ITEM(mWerkzeuge, tr$("Anim-FSM-Editor"))
 DIM miWzNoten AS INTEGER : miWzNoten = GUI_MENU_ITEM(mWerkzeuge, tr$("Notenblatt"))
 DIM miWzKlassen AS INTEGER : miWzKlassen = GUI_MENU_ITEM(mWerkzeuge, tr$("Klassendiagramm"))
+DIM miWzStudio AS INTEGER : miWzStudio = GUI_MENU_ITEM(mWerkzeuge, tr$("Drachenhauch Studio"))
 GUI_MENU_SEPARATOR(mWerkzeuge)
 DIM miBeispiele AS INTEGER : miBeispiele = GUI_MENU_ITEM(mWerkzeuge, tr$("Beispiele als Projekt öffnen"))
 DIM miThemen AS INTEGER : miThemen = GUI_MENU_ITEM(mWerkzeuge, tr$("Beispiele nach Themen ..."))
@@ -4084,6 +4085,11 @@ SUB dateiOeffnen(pfad AS STRING)
         GUI_SET_TEXT(lblStatus, tr$("Gibt es nicht: ") + pfad)
         RETURN
     END IF
+    ' Ein Studio-Projekt geht im Drachenhauch Studio auf (studio/).
+    IF LOWER$(RIGHT$(pfad, 9)) = ".dhstudio" THEN
+        studioStarten(pfad)
+        RETURN
+    END IF
     IF LOWER$(RIGHT$(pfad, 7)) = ".dhform" AND NOT formAlsText THEN
         letzteForm = pfad
         werkzeugMit("197_form_designer.dh", pfad)
@@ -4391,7 +4397,7 @@ END FUNCTION
 ' Was im Projektbaum steht. Quelltext zuerst, dann was dazugehoert --
 ' Formulare und Sprites bearbeitet man mit den Werkzeugen, Daten liest man
 ' nach, und ein Bild will man wenigstens ansehen koennen.
-CONST BAUM_MUSTER = "*.dh;*.dhform;*.dhsprite;*.dhanim;*.dhtest;*.json;*.md;*.txt;*.csv;*.ini;*.png;*.wav;*.ogg"
+CONST BAUM_MUSTER = "*.dh;*.dhstudio;*.dhform;*.dhsprite;*.dhanim;*.dhtest;*.json;*.md;*.txt;*.csv;*.ini;*.png;*.wav;*.ogg"
 ' Uebergangen wird, wo Erzeugtes liegt: ein Bau-Ordner kann zehntausend
 ' Dateien haben. Namen, die mit `.` anfangen, laesst der Baum von sich aus
 ' weg (Einstellung `verborgene`).
@@ -16672,6 +16678,31 @@ SUB werkzeugMit(datei AS STRING, arg AS STRING)
     END IF
 END SUB
 
+' Das Drachenhauch Studio (studio/studio.dh neben ide/) -- mit einem Projekt
+' (`projekt.dhstudio` oder sein Ordner), sonst mit dem des Projektordners,
+' wenn er eins ist, sonst leer.
+SUB studioStarten(arg AS STRING)
+    DIM pfad AS STRING : pfad = PATHJOIN(wurzel, "studio/studio.dh")
+    IF NOT FILEEXISTS(pfad) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Nicht gefunden: ") + pfad)
+        protokoll("studio fehlt")
+        RETURN
+    END IF
+    DIM ziel AS STRING : ziel = arg
+    IF ziel = "" AND projektOrdner <> "" THEN
+        IF FILEEXISTS(PATHJOIN(projektOrdner, "projekt.dhstudio")) THEN ziel = PATHJOIN(projektOrdner, "projekt.dhstudio")
+    END IF
+    IF ziel = "" THEN
+        ARRAY_PUSH(werkzeuge, PROCESS_START("dhrt", "run", pfad))
+        GUI_SET_TEXT(lblStatus, tr$("Drachenhauch Studio gestartet."))
+        protokoll("studio")
+    ELSE
+        ARRAY_PUSH(werkzeuge, PROCESS_START("dhrt", "run", pfad, "--", ziel))
+        GUI_SET_TEXT(lblStatus, tr$("Im Drachenhauch Studio geöffnet: ") + BASENAME(DIRNAME(ziel)))
+        protokoll("studio " + BASENAME(ziel))
+    END IF
+END SUB
+
 ' Befehlspalette: das zuletzt im Designer geoeffnete Formular als Text.
 SUB formularAlsText()
     IF letzteForm = "" THEN
@@ -18964,7 +18995,7 @@ paletteEintrag("Listing drucken ...", "drucken", "Strg+P")
 paletteEintrag("Listing als PDF neben die Quelle", "pdf", "")
 paletteEintrag("Werkzeug: SFX-Generator", "wz_sfx", "") : paletteEintrag("Werkzeug: Partikel-Editor", "wz_partikel", "")
 paletteEintrag("Werkzeug: Tilemap-Editor", "wz_tilemap", "") : paletteEintrag("Werkzeug: Sprite-Editor", "wz_sprite", "")
-paletteEintrag("Werkzeug: Tracker", "wz_tracker", "") : paletteEintrag("Werkzeug: Form-Designer", "wz_form", "") : paletteEintrag("Werkzeug: Anim-FSM-Editor", "wz_anim", "") : paletteEintrag("Werkzeug: Notenblatt", "wz_noten", "") : paletteEintrag("Werkzeug: Klassendiagramm", "wz_klassen", "") : paletteEintrag("Beispiele als Projekt öffnen", "beispiele", "") : paletteEintrag("Beispiele nach Themen ...", "beispiele_themen", "")
+paletteEintrag("Werkzeug: Tracker", "wz_tracker", "") : paletteEintrag("Werkzeug: Form-Designer", "wz_form", "") : paletteEintrag("Werkzeug: Anim-FSM-Editor", "wz_anim", "") : paletteEintrag("Werkzeug: Notenblatt", "wz_noten", "") : paletteEintrag("Werkzeug: Klassendiagramm", "wz_klassen", "") : paletteEintrag("Werkzeug: Drachenhauch Studio", "wz_studio", "") : paletteEintrag("Beispiele als Projekt öffnen", "beispiele", "") : paletteEintrag("Beispiele nach Themen ...", "beispiele_themen", "")
 paletteEintrag("Ausdruck im Debugger auswerten", "ausdruck", "Strg+E")
 paletteEintrag("Eigene Schnipsel bearbeiten", "schnipsel_eigen", "") : paletteEintrag("Auswahl als Schnipsel sichern ...", "schnipsel_auswahl", "")
 paletteEintrag("Tastenkürzel ändern ...", "tasten", "") : paletteEintrag("Tastenkürzel zurücksetzen", "tasten_zurueck", "")
@@ -19627,6 +19658,7 @@ SUB befehl(k AS STRING)
         CASE "wz_anim" : werkzeugStarten("198_anim_fsm_editor.dh")
         CASE "wz_noten" : werkzeugStarten("199_notenblatt.dh")
         CASE "wz_klassen" : klassendiagrammStarten()
+        CASE "wz_studio" : studioStarten("")
         CASE "beispiele" : beispieleOeffnen()
         CASE "beispiele_themen" : themenZeigen()
         CASE "ausdruck"
@@ -19665,7 +19697,7 @@ symbol(miStart, "start") : symbol(miStopp, "stopp") : symbol(miPruefen, "pruefen
 symbol(miDebug, "debug") : symbol(miHaltepunkt, "haltepunkt") : symbol(miBedingung, "haltepunkt")
 symbol(miExport, "export")
 symbol(miWzSfx, "werkzeug") : symbol(miWzPartikel, "werkzeug") : symbol(miWzTilemap, "werkzeug")
-symbol(miWzSprite, "werkzeug") : symbol(miWzTracker, "werkzeug") : symbol(miWzForm, "werkzeug")
+symbol(miWzSprite, "werkzeug") : symbol(miWzTracker, "werkzeug") : symbol(miWzForm, "werkzeug") : symbol(miWzStudio, "werkzeug")
 symbol(miWzAnim, "werkzeug") : symbol(miWzNoten, "werkzeug") : symbol(miWzKlassen, "werkzeug")
 symbol(miHandbuch, "handbuch") : symbol(miKuerzel, "handbuch")
 symbol(miUmbruch, "umbruch") : symbol(miLeiste, "menue")
@@ -19753,7 +19785,7 @@ menueBefehl(miFaltenAuf, "falten_auf", "Umschalt+F4") : menueBefehl(miUeber, "ue
 menueBefehl(miDrucken, "drucken", "Strg+P") : menueBefehl(miPdf, "pdf", "") : menueBefehl(miWzSfx, "wz_sfx", "")
 menueBefehl(miWzPartikel, "wz_partikel", "") : menueBefehl(miWzTilemap, "wz_tilemap", "") : menueBefehl(miWzSprite, "wz_sprite", "")
 menueBefehl(miWzTracker, "wz_tracker", "") : menueBefehl(miWzForm, "wz_form", "") : menueBefehl(miWzAnim, "wz_anim", "")
-menueBefehl(miWzNoten, "wz_noten", "") : menueBefehl(miWzKlassen, "wz_klassen", "") : menueBefehl(miBeispiele, "beispiele", "") : menueBefehl(miThemen, "beispiele_themen", "")
+menueBefehl(miWzNoten, "wz_noten", "") : menueBefehl(miWzKlassen, "wz_klassen", "") : menueBefehl(miWzStudio, "wz_studio", "") : menueBefehl(miBeispiele, "beispiele", "") : menueBefehl(miThemen, "beispiele_themen", "")
 menueBefehl(miAusdruck, "ausdruck", "Strg+E") : menueBefehl(miSchnell, "schnell", "Strg+Umschalt+O") : menueBefehl(miTodo, "todo", "Strg+Umschalt+M")
 menueBefehl(miBlame, "blame", "Strg+Umschalt+B") : menueBefehl(miDiff, "diff", "Strg+Umschalt+D") : menueBefehl(miVerlauf, "verlauf", "")
 menueBefehl(miGitRand, "git_rand", "") : menueBefehl(miKommentar, "kommentar", "Strg+K") : menueBefehl(miDuplizieren, "duplizieren", "Strg+D")

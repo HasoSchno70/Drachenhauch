@@ -3878,3 +3878,64 @@ DIM n AS INTEGER : n = zahlen[0]
 19: GARN hat kein Mitglied 'farb' -- weder GARN selbst noch eine ihrer Eltern- oder Kindklassen. Dieses Feld gibt es nicht, der Zugriff bricht beim Laufen ab. Meintest du 'farbe'?
 20: 's' ist als STRING angesagt, rechts steht INTEGER. Das bricht beim Laufen ab ('Erwartet STRING, erhalten INTEGER'). Mit STR$() in Text umwandeln.
 gesamt: 4
+
+=== eine methode, die eine geerbte mit anderen parametern ueberschreibt
+' Gefunden am Beispielprojekt des Studios: `SUB zeigen(kid)` in einem Fenster
+' verdeckte das geerbte `Zeigen()` -- Namen kennen keine Gross-/Klein-
+' schreibung. Gleiche Parameterzahl (echtes Ueberschreiben) und Init (der
+' Konstruktor) melden nichts.
+IMPORT "json"
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = ""
+DIM stille AS INTEGER : stille = 0
+WHILE stille < 5
+    DIM zz AS STRING : zz = PROCESS_READ$(pc)
+    IF zz <> "" THEN
+        roh = roh + zz
+        stille = 0
+    ELSEIF NOT PROCESS_RUNNING(pc) THEN
+        stille = stille + 1
+        SLEEP(30)
+    END IF
+WEND
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + TRIM$(roh) + "}")
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM m AS STRING : m = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(m, "ueberschreibt") >= 0 THEN PRINT JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; LEFT$(m, INSTR(m, " (Gross"))
+NEXT
+PRINT "fertig"
+--- datei w.dh
+CLASS Fenster
+    SUB Init(t AS STRING)
+    END SUB
+
+    SUB Zeigen()
+    END SUB
+
+    SUB malen(x AS INTEGER)
+    END SUB
+END CLASS
+
+CLASS Kunden EXTENDS Fenster
+    SUB Init(t AS STRING, n AS INTEGER)
+    END SUB
+
+    SUB malen(y AS INTEGER)
+        PRINT y
+    END SUB
+
+    SUB zeigen(kid AS INTEGER)
+        PRINT kid
+    END SUB
+END CLASS
+
+CLASS Enkel EXTENDS Kunden
+    FUNCTION Zeigen() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+--- erwartet
+20 Methode 'zeigen' in KUNDEN ueberschreibt 'zeigen' aus FENSTER -- dort mit 0 Parameter(n), hier mit 1
+26 Methode 'zeigen' in ENKEL ueberschreibt 'zeigen' aus KUNDEN -- dort mit 1 Parameter(n), hier mit 0
+fertig

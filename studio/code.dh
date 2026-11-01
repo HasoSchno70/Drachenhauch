@@ -587,7 +587,11 @@ SUB navigatorAuswahl()
             IF navEl[n] <> ei THEN CONTINUE
             IF r.art = "layout" THEN
                 IF auswahl >= 0 AND navArt[n] = "control" AND navCtrl[n] = auswahl THEN ziel = n
-                IF auswahl < 0 AND navArt[n] = "element" THEN ziel = n
+                IF trayWahl >= 0 AND navArt[n] = "control" THEN
+                    controlsVon(ei)
+                    IF navCtrl[n] = ctrlWidgets + trayWahl THEN ziel = n
+                END IF
+                IF auswahl < 0 AND trayWahl < 0 AND navArt[n] = "element" THEN ziel = n
             ELSEIF r.art = "dekl" AND navArt[n] = "dekl" THEN
                 ziel = n
             ELSEIF r.art = "code" AND navArt[n] = "methode" THEN
@@ -617,7 +621,16 @@ SUB navigatorPruefen()
             END IF
         CASE "control"
             layoutOeffnen(ei)
-            auswahlSetzen(navCtrl[n])
+            controlsVon(ei)
+            IF navCtrl[n] < ctrlWidgets THEN
+                auswahlSetzen(navCtrl[n])
+            ELSEIF ctrlArten[navCtrl[n]] = "timer" THEN
+                auswahlSetzen(-1)
+                trayWahl = navCtrl[n] - ctrlWidgets
+            ELSE
+                auswahlSetzen(-1)
+                menueEditor()
+            END IF
             auswahlGeaendert()
         CASE "methode"
             codeOeffnen(methoden[navMeth[n]])
@@ -704,7 +717,10 @@ SUB ereignisDialog(ei AS INTEGER, ci AS INTEGER)
     GUI_WINDOW_CHROME(dlgEr, FALSE)
     DIM t AS GUI_WIDGET : t = GUI_LABEL(dlgEr, "Ereignis hinzufügen", 20, 16)
     GUI_ADD_CLASS(t, "dialogtitel")
-    DIM wofuer AS STRING : wofuer = IIF(ci >= 0, erZiel + " (" + bausteinName$(ci) + ")", e.name)
+    DIM wofuer AS STRING : wofuer = e.name
+    IF ci >= 0 AND ci < ctrlWidgets THEN wofuer = erZiel + " (" + bausteinName$(ci) + ")"
+    IF ci >= ctrlWidgets AND art = "timer" THEN wofuer = erZiel + " (Timer)"
+    IF ci >= ctrlWidgets AND art = "menue" THEN wofuer = erZiel + " (Menüeintrag)"
     GUI_LABEL(dlgEr, "Was soll " + wofuer + " tun? Wähle das Ereignis:", 20, 46)
     erListe = GUI_LISTBOX(dlgEr, 20, 72, b - 40, h - 190, [])
     DIM k AS INTEGER
@@ -776,7 +792,7 @@ SUB ereignisAnlegen(ei AS INTEGER, control AS STRING, ev AS STRING)
     IF mi >= 0 THEN
         m = methoden[mi]
     ELSE
-        m = methodeNeu(e, "sub", n, "SUB " + n + "()")
+        m = methodeNeu(e, "sub", n, "SUB " + n + "(" + ereignisParameter$(ev) + ")")
         navigatorFuellen()
         protokoll("ereignis neu " + e.name + "." + n)
     END IF
@@ -1034,12 +1050,14 @@ SUB dialogePruefen()
     ereignisDialogPruefen()
     methodeDialogPruefen()
     elementDialogPruefen()
+    menueEditorPruefen()
 END SUB
 
 ' Was das Studio selbst zeichnet (Titelleiste, Griffe des Entwurfs), liegt
 ' ueber GUI_DRAW -- ein offener Dialog kommt darum noch einmal obenauf.
 SUB dialogeObenauf()
-    DIM d AS ARRAY OF INTEGER : d = [dlgEr, dlgMe, dlgEl, dlgWeg, frage, ueber]
+    DIM d AS ARRAY OF INTEGER : d = [dlgEr, dlgMe, dlgEl, dlgWeg, dlgMn, frage, ueber]
+    IF vvOffen THEN ARRAY_PUSH(d, winVv)
     DIM w AS INTEGER
     FOR EACH w IN d
         IF w >= 0 THEN GUI_DRAW_WINDOW(w)

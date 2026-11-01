@@ -38,6 +38,18 @@
                 <string>de.drachenhauch.quelltext</string>
             </array>
         </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Drachenhauch-Studio-Projekt</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>de.drachenhauch.studio</string>
+            </array>
+        </dict>
     </array>
     <key>UTExportedTypeDeclarations</key>
     <array>
@@ -56,6 +68,23 @@
                 <key>public.filename-extension</key>
                 <array>
                     <string>dh</string>
+                </array>
+            </dict>
+        </dict>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>de.drachenhauch.studio</string>
+            <key>UTTypeDescription</key>
+            <string>Drachenhauch-Studio-Projekt</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.json</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>dhstudio</string>
                 </array>
             </dict>
         </dict>

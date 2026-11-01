@@ -61,6 +61,7 @@ Name: "de"; MessagesFile: "compiler:Languages\German.isl"
 Name: "desktopicon"; Description: "Desktop-Verknuepfung anlegen"; GroupDescription: "Zusaetzliche Symbole:"
 Name: "addtopath"; Description: "Installationsordner zum PATH hinzufuegen (dhrt im Terminal nutzbar)"; GroupDescription: "Optionen:"
 Name: "assocdh"; Description: ".dh-Dateien mit der Drachenhauch IDE verknuepfen"; GroupDescription: "Optionen:"
+Name: "assocstudio"; Description: "Studio-Projekte (.dhstudio) mit dem Drachenhauch Studio verknuepfen"; GroupDescription: "Optionen:"
 
 [InstallDelete]
 ; --- Reste der GameBasic-Installation --- (dieselben wie in Drachenhauch.iss:
@@ -93,6 +94,10 @@ Source: "..\daten\bilder\*.png"; DestDir: "{app}\daten\bilder"; Flags: ignorever
 Source: "..\daten\video\*.mp4"; DestDir: "{app}\daten\video"; Flags: ignoreversion
 ; Die IDE selbst -- Quelltext, den der Nutzer lesen und aendern kann.
 Source: "..\ide\*.dh"; DestDir: "{app}\ide"; Flags: ignoreversion
+; Das Drachenhauch Studio -- wie die IDE ein Drachenhauch-Programm samt
+; seiner Stildatei; laufzeit.dh kopiert es in jedes Projekt, das es startet.
+Source: "..\studio\*.dh"; DestDir: "{app}\studio"; Flags: ignoreversion
+Source: "..\studio\*.dhstil"; DestDir: "{app}\studio"; Flags: ignoreversion
 ; Die englische Oberflaeche der IDE (Ansicht -> Language).
 Source: "..\ide\sprache\*.txt"; DestDir: "{app}\ide\sprache"; Flags: ignoreversion
 ; Das Handbuch: die IDE liest docs\ neben ide\ (F1 schlaegt dort nach).
@@ -133,6 +138,7 @@ Name: "{group}\Tracker"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commond
 Name: "{group}\Form-Designer"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\197_form_designer.dh"""; AppUserModelID: "Drachenhauch.FormDesigner"; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"
 Name: "{group}\Anim-FSM-Editor"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\198_anim_fsm_editor.dh"""; AppUserModelID: "Drachenhauch.AnimFSM"; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"
 Name: "{group}\Notenblatt"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\199_notenblatt.dh"""; AppUserModelID: "Drachenhauch.Notenblatt"; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"
+Name: "{group}\Drachenhauch Studio"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{app}\studio\studio.dh"""; AppUserModelID: "Drachenhauch.Studio"; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch"; Comment: "Programme mit Oberflaeche entwerfen, schreiben, starten und bauen"
 Name: "{group}\Beispiele"; Filename: "{commondocs}\Drachenhauch\examples"
 Name: "{group}\Handbuch (Markdown)"; Filename: "{app}\docs"
 Name: "{group}\Einstieg (fuer Anfaenger)"; Filename: "{app}\buecher\Drachenhauch-Einstieg.docx"; Flags: createonlyiffileexists
@@ -152,6 +158,11 @@ Root: HKA; Subkey: "Software\Classes\DrachenhauchIDE.Source\DefaultIcon"; ValueT
 Root: HKA; Subkey: "Software\Classes\DrachenhauchIDE.Source\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\dhrt.exe"" run ""{app}\ide\ide.dh"" -- ""%1"""; Tasks: assocdh
 Root: HKA; Subkey: "Software\Classes\DrachenhauchIDE.Source\shell\run"; ValueType: string; ValueName: ""; ValueData: "Mit Drachenhauch ausfuehren"; Tasks: assocdh
 Root: HKA; Subkey: "Software\Classes\DrachenhauchIDE.Source\shell\run\command"; ValueType: string; ValueName: ""; ValueData: """{app}\dhrt.exe"" run ""%1"""; Tasks: assocdh
+; .dhstudio: das Projekt geht im Studio auf (es nimmt die Datei oder ihren Ordner).
+Root: HKA; Subkey: "Software\Classes\.dhstudio"; ValueType: string; ValueName: ""; ValueData: "DrachenhauchStudio.Projekt"; Tasks: assocstudio; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\DrachenhauchStudio.Projekt"; ValueType: string; ValueName: ""; ValueData: "Drachenhauch-Studio-Projekt"; Tasks: assocstudio; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\DrachenhauchStudio.Projekt\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\drachenhauch.ico"; Tasks: assocstudio
+Root: HKA; Subkey: "Software\Classes\DrachenhauchStudio.Projekt\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\dhrt.exe"" run ""{app}\studio\studio.dh"" -- ""%1"""; Tasks: assocstudio
 
 [Code]
 // --- Registry-Reste der GameBasic-Installation --- (wie in Drachenhauch.iss)
