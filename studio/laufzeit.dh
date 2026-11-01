@@ -4,9 +4,14 @@
 ' Geaendert wird sie in studio/laufzeit.dh, nicht in der Kopie.
 '
 ' StudioApp ist die Basis der App, StudioFenster die Basis jeder erzeugten
-' Fensterklasse (<Fenster>_Basis). studioLauf() ist die Bildschleife: sie
-' fuehrt alle offenen Fenster, fragt die Ereignisse ab, die die gui nicht als
-' Rueckruf kennt, und zeichnet.
+' Fensterklasse (<Fenster>_Basis), StudioTimer ein Timer im Fenster.
+' studioLauf() dreht die Bildschleife; ein Bild ist studioBild().
+'
+' Die Ereignisse fragt jedes Fenster NACH dem GUI_UPDATE ab (studioTakt),
+' statt sie als Rueckruf der gui laufen zu lassen. Darum darf eine
+' Ereignis-Methode warten: Frage(), Meldung(), Eingabe() und
+' fenster.ZeigenModal() drehen selbst Bilder, bis eine Antwort da ist, und
+' kehren erst dann zurueck -- wie in Xojo oder Visual Basic.
 
 IMPORT "gui"
 
@@ -20,6 +25,33 @@ CLASS StudioApp
     END SUB
 END CLASS
 
+' Ein Timer: ruft sein Ereignis Aktion alle `Intervall` Millisekunden, solange
+' er aktiv ist; ohne `Wiederholen` nur einmal.
+CLASS StudioTimer
+    DIM Intervall AS INTEGER
+    DIM Aktiv AS BOOLEAN
+    DIM Wiederholen AS BOOLEAN
+    DIM studioStart AS INTEGER
+
+    SUB Starten()
+        Self.Aktiv = TRUE
+        Self.studioStart = MILLIS()
+    END SUB
+
+    SUB Stoppen()
+        Self.Aktiv = FALSE
+    END SUB
+
+    ' Je Bild gefragt: ist die Zeit um? Dann beginnt sie von vorn.
+    FUNCTION studioFaellig() AS BOOLEAN
+        IF NOT Self.Aktiv THEN RETURN FALSE
+        IF MILLIS() - Self.studioStart < MAX(1, Self.Intervall) THEN RETURN FALSE
+        Self.studioStart = MILLIS()
+        IF NOT Self.Wiederholen THEN Self.Aktiv = FALSE
+        RETURN TRUE
+    END FUNCTION
+END CLASS
+
 CLASS StudioFenster
     DIM studioWin AS GUI_WINDOW
     DIM studioOffen AS BOOLEAN
@@ -27,11 +59,11 @@ CLASS StudioFenster
     DIM studioWarB AS INTEGER
     DIM studioWarH AS INTEGER
 
-    ' Die erzeugte Basisklasse baut hier das Fenster und verdrahtet es.
+    ' Die erzeugte Basisklasse baut hier das Fenster.
     SUB studioAufbauen()
     END SUB
 
-    ' Je Bild: Ereignisse, die die gui nicht als Rueckruf meldet.
+    ' Je Bild nach GUI_UPDATE: die Ereignisse des Fensters.
     SUB studioTakt()
     END SUB
 
@@ -75,6 +107,17 @@ CLASS StudioFenster
         Self.Geoeffnet()
     END SUB
 
+    ' Zeigt das Fenster modal und kehrt erst zurueck, wenn es geschlossen ist.
+    ' Solange nimmt kein anderes Fenster Klicks an.
+    SUB ZeigenModal()
+        Self.Zeigen()
+        IF NOT Self.studioOffen THEN RETURN
+        GUI_WINDOW_MODAL(Self.studioWin, TRUE)
+        WHILE Self.studioOffen
+            IF NOT studioBild() THEN RETURN
+        WEND
+    END SUB
+
     ' Schliesst das Fenster. Das Startfenster zu schliessen beendet das Programm.
     SUB Zumachen()
         IF NOT Self.studioOffen THEN RETURN
@@ -92,6 +135,14 @@ END CLASS
 
 DIM studioFenster AS ARRAY OF StudioFenster : studioFenster = []
 DIM studioEnde AS BOOLEAN : studioEnde = FALSE
+DIM studioDieStartseite AS StudioFenster
+DIM studioDialoge AS ARRAY OF GUI_WINDOW : studioDialoge = []
+DIM studioSchirmB AS INTEGER : studioSchirmB = 0
+DIM studioSchirmH AS INTEGER : studioSchirmH = 0
+' Der Tastaturfokus im vorigen und in diesem Bild -- daraus werden
+' FokusRein und FokusRaus.
+DIM studioFokusAlt AS INTEGER : studioFokusAlt = -1
+DIM studioFokusJetzt AS INTEGER : studioFokusJetzt = -1
 
 SUB studioAnmelden(f AS StudioFenster)
     ARRAY_PUSH(studioFenster, f)
@@ -102,65 +153,128 @@ SUB studioBeenden()
     studioEnde = TRUE
 END SUB
 
+' Ein Bild: Eingaben, Ereignisse aller Fenster, Zeichnen. FALSE, wenn das
+' Programm endet -- dann soll jede Schleife, die Bilder dreht, aufhoeren.
+FUNCTION studioBild() AS BOOLEAN
+    IF studioEnde THEN RETURN FALSE
+    IF WINDOW_CLOSE_REQUESTED() THEN
+        studioDieStartseite.Zumachen()
+        studioEnde = TRUE
+        RETURN FALSE
+    END IF
+    IF QUITREQUESTED() THEN
+        studioEnde = TRUE
+        RETURN FALSE
+    END IF
+    IF SCREENWIDTH() <> studioSchirmB OR SCREENHEIGHT() <> studioSchirmH THEN
+        studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
+        IF studioDieStartseite.studioOffen THEN GUI_WINDOW_SET_BOUNDS(studioDieStartseite.studioWin, 0, 0, studioSchirmB, studioSchirmH)
+    END IF
+    GUI_UPDATE()
+    studioFokusAlt = studioFokusJetzt
+    studioFokusJetzt = GUI_FOCUSED()
+    ' Eine Kopie der Liste: ein Ereignis kann Fenster oeffnen und schliessen.
+    DIM jetzt AS ARRAY OF StudioFenster : jetzt = ARRAY_COPY(studioFenster)
+    DIM f AS StudioFenster
+    FOR EACH f IN jetzt
+        IF studioEnde THEN BREAK
+        IF NOT f.studioOffen THEN CONTINUE
+        IF GUI_WINDOW_CLOSED(f.studioWin) THEN
+            f.Zumachen()
+            CONTINUE
+        END IF
+        f.studioTakt()
+        IF f.studioOffen THEN
+            IF GUI_WINDOW_GET_W(f.studioWin) <> f.studioWarB OR GUI_WINDOW_GET_H(f.studioWin) <> f.studioWarH THEN
+                f.studioWarB = GUI_WINDOW_GET_W(f.studioWin)
+                f.studioWarH = GUI_WINDOW_GET_H(f.studioWin)
+                f.Groesse()
+            END IF
+        END IF
+    NEXT
+    ' Geschlossene Fenster aus der Liste nehmen.
+    DIM noch AS ARRAY OF StudioFenster : noch = []
+    FOR EACH f IN studioFenster
+        IF f.studioOffen THEN ARRAY_PUSH(noch, f)
+    NEXT
+    studioFenster = noch
+    IF studioEnde THEN RETURN FALSE
+    CLS(0)
+    GUI_DRAW(FALSE)
+    FOR EACH f IN studioFenster
+        f.studioZeichnen()
+    NEXT
+    FOR EACH f IN studioFenster
+        IF NOT f.studioHaupt THEN GUI_DRAW_WINDOW(f.studioWin)
+    NEXT
+    DIM d AS GUI_WINDOW
+    FOR EACH d IN studioDialoge
+        GUI_DRAW_WINDOW(d)
+    NEXT
+    GUI_DRAW_TOP()
+    FLIP()
+    RETURN TRUE
+END FUNCTION
+
 ' Der Einstieg: oeffnet das Programmfenster in der Groesse des Startfensters,
 ' laesst die App beginnen, zeigt das Startfenster und dreht die Bildschleife.
 SUB studioLauf(app AS StudioApp, start AS StudioFenster, b AS INTEGER, h AS INTEGER, titel AS STRING, veraenderbar AS BOOLEAN)
     SCREEN(b, h, titel)
     IF veraenderbar THEN WINDOW_RESIZABLE(TRUE)
     SETFPS(60)
+    studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
+    studioDieStartseite = start
     app.Geoeffnet()
     start.studioHaupt = TRUE
     start.Zeigen()
-    DIM schirmB AS INTEGER : schirmB = SCREENWIDTH()
-    DIM schirmH AS INTEGER : schirmH = SCREENHEIGHT()
-    WHILE NOT studioEnde
-        IF WINDOW_CLOSE_REQUESTED() THEN
-            start.Zumachen()
-            BREAK
-        END IF
-        IF QUITREQUESTED() THEN BREAK
-        IF SCREENWIDTH() <> schirmB OR SCREENHEIGHT() <> schirmH THEN
-            schirmB = SCREENWIDTH() : schirmH = SCREENHEIGHT()
-            IF start.studioOffen THEN GUI_WINDOW_SET_BOUNDS(start.studioWin, 0, 0, schirmB, schirmH)
-        END IF
-        GUI_UPDATE()
-        DIM i AS INTEGER : i = 0
-        WHILE i < LEN(studioFenster)
-            DIM f AS StudioFenster : f = studioFenster[i]
-            IF f.studioOffen THEN
-                IF GUI_WINDOW_CLOSED(f.studioWin) THEN
-                    f.Zumachen()
-                ELSE
-                    f.studioTakt()
-                    IF f.studioOffen THEN
-                        IF GUI_WINDOW_GET_W(f.studioWin) <> f.studioWarB OR GUI_WINDOW_GET_H(f.studioWin) <> f.studioWarH THEN
-                            f.studioWarB = GUI_WINDOW_GET_W(f.studioWin)
-                            f.studioWarH = GUI_WINDOW_GET_H(f.studioWin)
-                            f.Groesse()
-                        END IF
-                    END IF
-                END IF
-            END IF
-            i = i + 1
-        WEND
-        ' Geschlossene Fenster aus der Liste nehmen.
-        DIM noch AS ARRAY OF StudioFenster : noch = []
-        DIM g AS StudioFenster
-        FOR EACH g IN studioFenster
-            IF g.studioOffen THEN ARRAY_PUSH(noch, g)
-        NEXT
-        studioFenster = noch
-        IF studioEnde THEN BREAK
-        CLS(0)
-        GUI_DRAW(FALSE)
-        FOR EACH g IN studioFenster
-            g.studioZeichnen()
-        NEXT
-        FOR EACH g IN studioFenster
-            IF NOT g.studioHaupt THEN GUI_DRAW_WINDOW(g.studioWin)
-        NEXT
-        GUI_DRAW_TOP()
-        FLIP()
+    WHILE studioBild()
     WEND
     app.Beenden()
 END SUB
+
+' --- Dialoge, die warten ------------------------------------------------
+
+' Wartet auf die Antwort eines Dialogs der gui (0 = Programm endet).
+FUNCTION studioAntwort(d AS GUI_WINDOW) AS INTEGER
+    ARRAY_PUSH(studioDialoge, d)
+    DIM a AS INTEGER : a = 0
+    WHILE a = 0
+        IF NOT studioBild() THEN BREAK
+        a = GUI_ANSWER(d)
+    WEND
+    DIM rest AS ARRAY OF GUI_WINDOW : rest = []
+    DIM x AS GUI_WINDOW
+    FOR EACH x IN studioDialoge
+        IF NOT (x = d) THEN ARRAY_PUSH(rest, x)
+    NEXT
+    studioDialoge = rest
+    RETURN a
+END FUNCTION
+
+' Eine Meldung mit OK.
+SUB Meldung(text AS STRING, titel AS STRING = "")
+    studioAntwort(GUI_DIALOG(titel, text, "ok"))
+END SUB
+
+' Eine Frage; die Antwort ist die Nummer des Knopfs (1 = der erste).
+' Knoepfe mit | getrennt, Enter = der erste, ESC = der letzte.
+FUNCTION Frage(text AS STRING, knoepfe AS STRING = "Ja|Nein", titel AS STRING = "") AS INTEGER
+    RETURN studioAntwort(GUI_DIALOG(titel, text, knoepfe))
+END FUNCTION
+
+' Fragt nach einem Text; "" bei Abbrechen.
+FUNCTION Eingabe(text AS STRING, vorgabe AS STRING = "", titel AS STRING = "") AS STRING
+    DIM d AS GUI_WINDOW : d = GUI_PROMPT(titel, text, vorgabe)
+    IF studioAntwort(d) <> 1 THEN RETURN ""
+    RETURN GUI_DIALOG_TEXT(d)
+END FUNCTION
+
+' Ein Bild aus dem Ordner bilder/ des Projekts (beim Starten und in der
+' gebauten Fassung unter assets/bilder/).
+FUNCTION Bild(name AS STRING) AS IMAGE
+    RETURN LOADIMAGE(studioDatei$("bilder/" + name))
+END FUNCTION
+
+FUNCTION studioDatei$(rel AS STRING) AS STRING
+    RETURN "assets/" + rel
+END FUNCTION
