@@ -3513,6 +3513,53 @@ Strg+B baut eine Exe ohne Quelltext daneben und sie laeuft); sechs
 Verfaelschungen fallen je in ihrem Fall. Offen: Vervollstaendigung im
 Code-Feld, Ziehen/Rad/Taste/Timer (Stufe 4).
 
+**Stufe 4 = was ein Programm braucht** (selber Tag, Zweig
+`thema/studio-stufe4`, auf Stufe 3). **Die Basisklasse fragt alle Ereignisse
+je Bild ab** (`studioTakt`: `GUI_CLICKED`/`GUI_CHANGED`/`GUI_ENTERED`, Fokus
+ueber `studioFokusAlt/Jetzt` aus `GUI_FOCUSED`, Maus rein/raus ueber ein Feld
+`studioUeber_<name>`), statt `GUI_ON_*` zu setzen -- ein Rueckruf laeuft IN
+`GUI_UPDATE`, und eine Methode darin koennte nicht auf einen Dialog warten.
+Die Bildschleife ist jetzt `studioBild()` (FALSE = Programm endet; ueber eine
+KOPIE der Fensterliste, weil ein Ereignis Fenster oeffnen und schliessen
+kann), und `Frage/Meldung/Eingabe` (`studioAntwort`: Dialog in
+`studioDialoge`, damit er ueber Zeichenflaechen obenauf kommt) und
+`StudioFenster.ZeigenModal()` drehen selbst Bilder, bis die Antwort da ist;
+endet das Programm dabei, liefert `Frage` 0. **Timer**: Layout-Liste
+`timer` (name, intervall, aktiv, wiederholen), in der Basis ein Feld
+`StudioTimer` mit `studioFaellig()` je Bild (MILLIS, nicht TIMER_EVERY);
+im Studio eine Leiste unter dem Entwurf (`trayRect`/`trayBei`, `trayWahl`
+neben `auswahl`; `auswahlSetzen` setzt es zurueck; der Inspektor fragt in
+`giltFuer`/`pfadFuer$` zuerst `trayWahl`), Baustein "Timer" (Gruppe
+Unsichtbar), Entf loescht. **Menues**: `studio/menue.dh`, Editor auf einer
+Kopie `{"menus": ...}` (Pfade je Baumknoten; Einfuegen/Tauschen bauen die
+Liste neu, das json-Modul haengt nur an), Name `mi<Text>` mit
+`studio_auto`, bis man ihn aendert; OK = ein Rueckgaengig-Schritt, danach
+`controlUmbenannt` je Umbenennung. Die Basis nimmt `timer` und `menus` aus
+dem Layout-JSON und baut Menues per `GUI_MENU/GUI_SUBMENU/GUI_MENU_ITEM`
+(benannte in ihr Feld, `GUI_CLICKED` = `<name>_Aktion`). `controlsVon`
+haengt Timer und benannte Menueeintraege hinter die Widgets
+(`ctrlWidgets` = wo sie beginnen) -- so kennen Navigator und
+Ereignis-Dialog sie ohne eigenen Weg. **Bilder**: `bilder/` im Projekt,
+Projekt -> Bild hinzufuegen (`DH_STUDIO_DATEI` fuer Pruefungen),
+Widget-Schluessel `studio_bild`, Auswahl im Inspektor (Liste je Fuellen neu),
+Vorschau im Entwurf (`entwurfBilder`), beim Erzeugen nach
+`_studio/assets/bilder/` (Konvention von `dhrt --export`), `Bild(name)` in
+der Laufzeit. **Debugger**: `studio/debug.dh`, Haltepunkte je
+(Methode, Rumpfzeile) per Klick in die Nummernspalte oder F9, F7 =
+`dhrt debug`, erster Halt -> `set-breakpoints` (Datei/Zeile ueber die
+Zeilenkarte zurueck) + continue, ein Halt -> Methode und Zeile ueber
+dieselbe Karte, Leiste "Debugger" mit Variablen (Self eine Ebene tief) und
+Stapel, F10/F11/Umschalt+F11, Umschalt+F5 beendet. **Falle:** ein
+gesperrter Menuepunkt nimmt auch sein Kuerzel nicht an -- `debugKnoepfe`
+gibt Schritt/Hinein/Heraus beim Halt frei, sonst ging F10 ins Leere (vom
+Test gefunden). Die Menueleiste verschiebt den Inhalt um 26 Punkte (auch im
+erzeugten Programm). Tests `tests/pruef/werkzeug_studio4.dhtest` (5: Timer
+aus der Bibliothek ueber Suche + Doppelklick, Timer waehlen/Inspektor/Entf,
+Menue-Editor, das erzeugte Programm mit Frage + Enter, modalem Fenster,
+Timer, Strg+H und Bild-Pixel, Debugger mit Halt/Schritt/Weiter); zehn
+Verfaelschungen fallen je in ihrem Fall. Bild hinzufuegen selbst (Dialog)
+ist nur von Hand geprueft.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

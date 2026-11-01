@@ -15,9 +15,10 @@ dhrt run studio/studio.dh -- fenster.dhform
 Ein Ordner mit `projekt.dhstudio` geht als Projekt auf, ein Ordner ohne
 bekommt ein neues Projekt, eine `.dhform` geht als einzelnes Fenster auf.
 
-**Stand: Stufe 3.** Projekte mit mehreren Fenstern, Modulen und Klassen,
+**Stand: Stufe 4.** Projekte mit mehreren Fenstern, Modulen und Klassen,
 Ereignisse und ein Code-Feld je Methode; Starten, Bauen und Fehler an der
-Methode, in der sie stehen.
+Methode, in der sie stehen; Timer, Menüs, Dialoge, die warten, Bilder und
+ein Debugger.
 
 ## Die Oberfläche
 
@@ -143,6 +144,59 @@ Programm. Die Basisklasse baut das Fenster aus dem Layout als JSON
 Entwurf. Ohne Studio startet man das Programm mit
 `dhrt run _studio/main.dh`.
 
+## Was ein Programm braucht
+
+**Timer.** In der Bibliothek unter „Unsichtbar“. Ein Timer liegt nicht im
+Fenster, sondern in einer Leiste darunter (wie in Xojo); ein Klick wählt
+ihn, der Inspektor zeigt Name, Intervall, „Läuft beim Start“ und
+„Wiederholen“, Entf löscht ihn. Sein Ereignis heißt `<Name>_Aktion`. Im Code
+ist er ein Feld der Fensterklasse mit `Intervall`, `Aktiv`, `Wiederholen`,
+`Starten()` und `Stoppen()`.
+
+**Menüs.** Projekt → Menüs des Fensters (Strg+Umschalt+U) öffnet den
+Menü-Editor: links der Baum, rechts Text, Name und Kürzel (`Strg+S`, `F5`
+...), dazu „Mit Haken“. Ein neuer Eintrag bekommt einen Namen aus seinem
+Text (`miOeffnen`), der dem Text folgt, bis man ihn selbst ändert. Erst OK
+schreibt die Menüs ins Layout -- ein Rückgängig-Schritt; umbenannte Einträge
+nehmen ihre Ereignis-Methoden mit. Benannte Einträge stehen im Navigator
+unter dem Fenster, ihr Ereignis heißt `<Name>_Aktion`.
+
+**Dialoge, die warten.** Die Laufzeit des Projekts bietet:
+
+| Aufruf | was er tut |
+|---|---|
+| `Meldung(text$ [, titel$])` | eine Meldung mit OK |
+| `Frage(text$ [, knoepfe$ [, titel$]])` | Knöpfe mit `\|` getrennt (Vorgabe `Ja\|Nein`), liefert die Nummer des Knopfs; Enter = der erste, ESC = der letzte |
+| `Eingabe(text$ [, vorgabe$ [, titel$]])` | fragt nach einem Text, `""` bei Abbrechen |
+| `fenster.ZeigenModal()` | zeigt ein Fenster modal und kehrt erst zurück, wenn es geschlossen ist |
+| `Bild(name$)` | ein Bild aus `bilder/` des Projekts als IMAGE |
+
+Alle vier kehren erst mit der Antwort zurück, wie in Xojo oder Visual
+Basic. Das geht, weil die erzeugte Basisklasse die Ereignisse **nach** dem
+`GUI_UPDATE` abfragt, statt sie als Rückruf der gui laufen zu lassen -- eine
+Ereignis-Methode darf darum selbst Bilder drehen. Endet das Programm
+währenddessen, liefert `Frage` 0. Timer laufen auch während eines Dialogs.
+
+**Bilder.** Projekt → Bild hinzufügen kopiert eine Datei nach `bilder/` im
+Projektordner; ein Bild-Control wählt seins im Inspektor unter „Bild“ und
+zeigt es schon im Entwurf. Beim Starten und Bauen kommen die Bilder nach
+`_studio/assets/bilder/`, und `dhrt --export` nimmt `assets/` neben die Exe.
+
+**Debugger.**
+
+| Handgriff | wirkt so |
+|---|---|
+| Klick in die Nummernspalte, F9 | Haltepunkt an der Zeile an/aus (roter Punkt) |
+| F7, Debuggen | erzeugt `_studio/` und startet das Programm unter `dhrt debug` |
+| F5 | weiter, solange es hält |
+| F10, F11, Umschalt+F11 | Schritt, Schritt hinein, Schritt heraus |
+| Umschalt+F5 | beendet das Programm |
+
+Hält es, geht der Code-Reiter der Methode auf, die Zeile ist markiert, und
+die Leiste **Debugger** unten zeigt die Variablen (bei `Self` die Felder des
+Fensters) und den Aufrufstapel. Die Stelle rechnet dieselbe Zeilenkarte um,
+die auch Fehler an ihre Methode bringt.
+
 ## Fenster entwerfen
 
 | Handgriff | wirkt so |
@@ -212,6 +266,7 @@ nach.
 | `DH_STUDIO_AUFNAHME=datei` | spielt eine Aufnahme ab (`AUTOMATION_PLAY`) |
 | `DH_STUDIO_ABLAGE=text` | legt Text in die Zwischenablage, zum Tippen per Strg+V |
 | `DH_STUDIO_LAUF_BILDER=n` | Starten lässt das Programm nur n Bilder laufen (`dhrt run --bilder n`) |
+| `DH_STUDIO_DATEI=pfad` | Bild hinzufügen nimmt diese Datei statt eines Dialogs |
 
 Die Prüfsammlungen `tests/pruef/werkzeug_studio.dhtest` (Stufe 1) und
 `tests/pruef/werkzeug_studio2.dhtest` (Stufe 2) starten das Studio zweimal:
@@ -219,4 +274,6 @@ einmal zum Messen, einmal mit echten Klicks und Tasten. Das Projektmodell
 (`studio/projekt.dh`) prüfen sie auch ohne Fenster.
 `tests/pruef/werkzeug_studio3.dhtest` (Stufe 3) drückt F5 und Strg+B, lässt
 das erzeugte Programm mit einem Klick laufen und prüft, an welcher Methode
-und Zeile ein Fehler landet.
+und Zeile ein Fehler landet. `tests/pruef/werkzeug_studio4.dhtest` (Stufe 4)
+legt Timer und Menüs an, lässt das erzeugte Programm Fragen, ein modales
+Fenster, Timer, Menükürzel und ein Bild durchlaufen und hält im Debugger.

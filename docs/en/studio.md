@@ -15,9 +15,10 @@ dhrt run studio/studio.dh -- fenster.dhform
 A folder with `projekt.dhstudio` opens as a project, a folder without one
 gets a new project, a `.dhform` opens as a single window.
 
-**Status: stage 3.** Projects with several windows, modules and classes,
+**Status: stage 4.** Projects with several windows, modules and classes,
 events and a code field per method; starting, building and errors shown at
-the method they belong to.
+the method they belong to; timers, menus, dialogs that wait, images and a
+debugger.
 
 ## The user interface
 
@@ -140,6 +141,59 @@ the window from the layout as JSON (`GUI_FROM_JSON`) instead of call by
 call -- so it looks exactly as in the designer. Without the studio, start the
 program with `dhrt run _studio/main.dh`.
 
+## What a program needs
+
+**Timers.** In the library under "Unsichtbar" (invisible). A timer does not
+sit in the window but in a strip below it (as in Xojo); a click selects it,
+the inspector shows name, interval, "runs at start" and "repeat", Del
+deletes it. Its event is `<Name>_Aktion`. In code it is a field of the window
+class with `Intervall`, `Aktiv`, `Wiederholen`, `Starten()` and `Stoppen()`.
+
+**Menus.** Projekt → Menüs des Fensters (Ctrl+Shift+U) opens the menu
+editor: the tree on the left, text, name and shortcut (`Strg+S`, `F5` ...)
+on the right, plus "with check mark". A new entry gets a name from its text
+(`miOeffnen`) that follows the text until you change it yourself. Only OK
+writes the menus into the layout -- one undo step; renamed entries take
+their event methods with them. Named entries appear in the navigator under
+the window, their event is `<Name>_Aktion`.
+
+**Dialogs that wait.** The runtime of the project offers:
+
+| Call | what it does |
+|---|---|
+| `Meldung(text$ [, titel$])` | a message with OK |
+| `Frage(text$ [, knoepfe$ [, titel$]])` | buttons separated by `\|` (default `Ja\|Nein`), returns the number of the button; Enter = the first, Esc = the last |
+| `Eingabe(text$ [, vorgabe$ [, titel$]])` | asks for a text, `""` on cancel |
+| `fenster.ZeigenModal()` | shows a window modally and returns only when it is closed |
+| `Bild(name$)` | an image from the project's `bilder/` as IMAGE |
+
+All four return only with the answer, as in Xojo or Visual Basic. This works
+because the generated base class polls the events **after** `GUI_UPDATE`
+instead of running them as gui callbacks -- so an event method may run
+frames itself. If the program ends meanwhile, `Frage` returns 0. Timers keep
+running during a dialog.
+
+**Images.** Projekt → Bild hinzufügen copies a file into `bilder/` in the
+project folder; an image control picks its image in the inspector under
+"Bild" and shows it in the designer already. When starting and building,
+the images go to `_studio/assets/bilder/`, and `dhrt --export` takes
+`assets/` next to the executable.
+
+**Debugger.**
+
+| Action | effect |
+|---|---|
+| Click into the line numbers, F9 | breakpoint on the line on/off (red dot) |
+| F7, Debug | generates `_studio/` and starts the program under `dhrt debug` |
+| F5 | continue while it is halted |
+| F10, F11, Shift+F11 | step, step into, step out |
+| Shift+F5 | ends the program |
+
+When it halts, the code tab of the method opens, the line is marked, and the
+**Debugger** panel at the bottom shows the variables (for `Self` the fields
+of the window) and the call stack. The position is translated by the same
+line map that brings errors to their method.
+
 ## Designing a window
 
 | Action | effect |
@@ -207,6 +261,7 @@ ask when there are unsaved changes.
 | `DH_STUDIO_AUFNAHME=file` | plays a recording (`AUTOMATION_PLAY`) |
 | `DH_STUDIO_ABLAGE=text` | puts text on the clipboard, for typing with Ctrl+V |
 | `DH_STUDIO_LAUF_BILDER=n` | Start runs the program for only n frames (`dhrt run --bilder n`) |
+| `DH_STUDIO_DATEI=path` | Bild hinzufügen takes this file instead of a dialog |
 
 The test collections `tests/pruef/werkzeug_studio.dhtest` (stage 1) and
 `tests/pruef/werkzeug_studio2.dhtest` (stage 2) start the studio twice: once
@@ -214,4 +269,6 @@ to measure, once with real clicks and keys. They also test the project model
 (`studio/projekt.dh`) without a window.
 `tests/pruef/werkzeug_studio3.dhtest` (stage 3) presses F5 and Ctrl+B, runs
 the generated program with a click and checks at which method and line an
-error lands.
+error lands. `tests/pruef/werkzeug_studio4.dhtest` (stage 4) creates timers
+and menus, runs the generated program through questions, a modal window,
+timers, a menu shortcut and an image, and halts in the debugger.

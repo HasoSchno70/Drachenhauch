@@ -9,9 +9,10 @@ aber mit der Laufzeit `dhrt`. Sie ersetzt den Form-Designer
 * *Ein Projekt ist ein Ordner mit lesbaren Dateien.*
 * *Der Name ist „Drachenhauch Studio“.*
 
-**Stand:** Stufe 1 bis 3 sind gebaut (2026-11-01, Ordner `studio/`, Handbuch
+**Stand:** Stufe 1 bis 4 sind gebaut (2026-11-01, Ordner `studio/`, Handbuch
 [studio.md](studio.md), Prüfungen `tests/pruef/werkzeug_studio.dhtest`,
-`tests/pruef/werkzeug_studio2.dhtest` und `tests/pruef/werkzeug_studio3.dhtest`).
+`tests/pruef/werkzeug_studio2.dhtest`, `tests/pruef/werkzeug_studio3.dhtest` und
+`tests/pruef/werkzeug_studio4.dhtest`).
 Für Stufe 2 kamen in die Laufzeit schließbare Reiter im Reiterwerk
 (`GUI_TABCONTROL_SET "schliessbar"`, `GUI_TABCONTROL_CLOSED`) und
 `GUI_TREE_ITEM_RECT`. Für Stufe 3 kopiert `dhrt --export` keine importierten
@@ -124,12 +125,22 @@ und Verlassen (`GUI_ON_*`). Was Xojo darüber hinaus hat, setzt eine kleine
 Bibliothek *laufzeit.dh* im Ordner des Studios aus vorhandenen Abfragen zusammen, je Bild
 in der Bildschleife:
 
+**Seit Stufe 4 fragt die Basisklasse alle Ereignisse je Bild ab**
+(`GUI_CLICKED`, `GUI_CHANGED`, `GUI_ENTERED`, Fokus und Maus über den Stand
+des vorigen Bildes), statt `GUI_ON_*`-Rückrufe zu setzen. Ein Rückruf läuft
+innerhalb von `GUI_UPDATE`; eine Methode darin könnte keinen Dialog
+aufmachen und auf seine Antwort warten. Abgefragt läuft sie danach, und
+`Frage()`, `Meldung()`, `Eingabe()` und `ZeigenModal()` drehen selbst Bilder
+(`studioBild`), bis die Antwort da ist.
+
 * **Fenster:** `Geoeffnet` nach dem Aufbau, `Schliessen` über
   `GUI_WINDOW_CLOSED`, `Groesse` bei geänderter Fenstergröße.
 * **Listen und Bäume:** `Doppelklick` über `GUI_DOUBLE_CLICKED`.
 * **Zeichenfläche:** `Zeichnen` je Bild nach `GUI_DRAW`, beschnitten auf die
   Fläche; `Maus` bei einem Klick darauf. `Ziehen` und `Rad` sind noch offen.
-* **Timer:** über `TIMER_EVERY` mit einer gebundenen Methode (Stufe 4).
+* **Timer:** ein Feld vom Typ `StudioTimer` (Intervall, Aktiv,
+  Wiederholen), je Bild gefragt (`studioFaellig`), nicht über `TIMER_EVERY`
+  -- ein Rückruf liefe wieder innerhalb einer Aktualisierung.
 * **Tasten:** `Taste` im Fenster mit Fokus (noch offen).
 
 Die Basisklasse `StudioFenster` in derselben Bibliothek trägt das Fenster,
@@ -177,7 +188,7 @@ Klammern schließen, Einrückung. `ide/ide.dh` wird nicht eingebunden: das sind
    * Startcode und Basisklassen erzeugen, `dhrt run` mit Ausgabe.
    * Fehler an der Methode anzeigen.
    * Bauen über `dhrt --export`.
-4. **Was ein Programm braucht.**
+4. **Was ein Programm braucht.** (gebaut)
    * Menü-Editor, Timer, Dialoge und modale Fenster.
    * Bilder im Projekt.
    * Debugger über `dhrt debug`.
