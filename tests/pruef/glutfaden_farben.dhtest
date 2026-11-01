@@ -1,0 +1,46 @@
+' Glutfaden: Themenfarben der Teile, die GTKs eigenes Thema zeichnet. Bis
+' 2026.40 kamen die Notizbuecher der Leisten (Seitengrund und Reiterkopf), das
+' Logo-Menue, die Aufklapper und die Zoom-Anzeige der Statusleiste hell aus
+' Adwaita -- im dunklen Erscheinungsbild ein weisser Block rechts, im Menue
+' helle Schrift auf Weiss. --probe-farben zeichnet die Teile in beiden
+' Erscheinungsbildern und vergleicht ihren Grund mit kern.themaTafel; ohne die
+' Regeln im Stylesheet fallen alle dunklen Zeilen.
+--- langsam
+
+=== probe: leisten, menue, aufklapper und statusleiste im thema
+IMPORT "helfer.dh"
+MKDIR("app")
+SETENV("APPDATA", CWD$() + "/app")
+SETENV("HOME", CWD$() + "/app")
+dlStarten(["run", BEISPIEL, "--", "--probe-farben"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT REPLACE$(dlAus, CHR$(13), "");
+    ' GTK warnt, dass das Menue ohne ausloesendes Ereignis aufgeht -- in der
+    ' Probe gibt es keinen Klick; alles andere waere ein Befund
+    DIM z AS STRING
+    FOR EACH z IN SPLIT(REPLACE$(dlErr, CHR$(13), ""), CHR$(10))
+        IF TRIM$(z) <> "" AND INSTR(z, "no trigger event for menu popup") < 0 THEN PRINT "stderr: "; z
+    NEXT
+END IF
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- erwartet
+rueckgabe 0
+dunkel:
+  leiste unten: 202228 wie leiste
+  reiterkopf: 16171b wie status
+  uebersicht kopf: 16171b wie status
+  zoomanzeige hebt sich ab: TRUE
+  menue: 2a2c33 wie feld
+  aufklapper: 2a2c33 wie feld
+hell:
+  leiste unten: ecedf3 wie leiste
+  reiterkopf: e6e8ef wie status
+  uebersicht kopf: e6e8ef wie status
+  zoomanzeige hebt sich ab: TRUE
+  menue: ffffff wie feld
+  aufklapper: ffffff wie feld

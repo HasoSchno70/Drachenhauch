@@ -3264,3 +3264,148 @@ FUNCTION vorfuehrenStufe26(daten AS INTEGER) AS BOOLEAN
     END SELECT
     RETURN TRUE
 END FUNCTION
+
+' Themenfarben der Teile, die GTKs eigenes Thema zeichnet: Notizbuecher der
+' Leisten, das Logo-Menue und ein Aufklapper -- in beiden Erscheinungsbildern.
+DIM vfaMenue AS INTEGER
+' wie viele Takte schon gewartet wurde, bis ein Menue/Aufklapper ausgelegt ist
+DIM vfaWarte AS INTEGER
+
+' Ein Widget so, wie es gezeichnet wird, in ein Bild (cairo_surface_t)
+FUNCTION vfaBild(w AS INTEGER) AS INTEGER
+    WHILE gtk_events_pending()
+        DIM weiter AS BOOLEAN : weiter = gtk_main_iteration_do(FALSE)
+    WEND
+    gtk_container_check_resize(gtk_widget_get_toplevel(w))
+    DIM f AS INTEGER : f = cairo_image_surface_create(CAIRO_ARGB32, gtk_widget_get_allocated_width(w), gtk_widget_get_allocated_height(w))
+    DIM cr AS INTEGER : cr = cairo_create(f)
+    gtk_widget_draw(w, cr)
+    cairo_destroy(cr)
+    cairo_surface_flush(f)
+    RETURN f
+END FUNCTION
+
+SUB vfaPunkt(name AS STRING, w AS INTEGER, x AS INTEGER, y AS INTEGER, rolle AS STRING)
+    DIM f AS INTEGER : f = vfaBild(w)
+    DIM bw AS INTEGER : bw = gtk_widget_get_allocated_width(w)
+    DIM bh AS INTEGER : bh = gtk_widget_get_allocated_height(w)
+    IF x < 0 THEN x = bw + x
+    IF y < 0 THEN y = bh + y
+    DIM ist AS INTEGER : ist = v20Punkt(f, x, y)
+    cairo_surface_destroy(f)
+    DIM soll AS INTEGER : soll = vfaRolle(rolle)
+    PRINT "  "; name; ": "; LOWER$(RIGHT$("00000" + HEX$(ist), 6)); " "; IIF(ABS(ist - soll) = 0, "wie " + rolle, "NICHT " + rolle + " (" + LOWER$(RIGHT$("00000" + HEX$(soll), 6)) + ")")
+END SUB
+
+' Kontrast zwischen hellstem und dunkelstem Punkt eines Bildes (WCAG)
+FUNCTION vfaKontrast(f AS INTEGER, grund AS INTEGER) AS FLOAT
+    ' die Punkte (vormultipliziert) auf den Grund gelegt, dann hellster gegen
+    ' dunkelsten
+    DIM d AS BUFFER : d = v20Daten(f)
+    DIM lo AS FLOAT : lo = 2.0
+    DIM hi AS FLOAT : hi = -1.0
+    DIM i AS INTEGER
+    FOR i = 0 TO BUFFER_LEN(d) \ 4 - 1
+        DIM c AS INTEGER : c = BUFFER_GET_U32(d, i * 4)
+        DIM a AS INTEGER : a = (c SHR 24) BAND 255
+        DIM r AS INTEGER : r = ((c SHR 16) BAND 255) + (((grund SHR 16) BAND 255) * (255 - a)) \ 255
+        DIM g AS INTEGER : g = ((c SHR 8) BAND 255) + (((grund SHR 8) BAND 255) * (255 - a)) \ 255
+        DIM bl AS INTEGER : bl = (c BAND 255) + ((grund BAND 255) * (255 - a)) \ 255
+        DIM l AS FLOAT : l = vfaHell(r) * 0.2126 + vfaHell(g) * 0.7152 + vfaHell(bl) * 0.0722
+        IF l < lo THEN lo = l
+        IF l > hi THEN hi = l
+    NEXT
+    IF hi < 0 THEN RETURN 0.0
+    RETURN (hi + 0.05) / (lo + 0.05)
+END FUNCTION
+
+' Die haeufigste deckende Farbe eines Widgets -- sein Grund
+SUB vfaGrund(name AS STRING, w AS INTEGER, rolle AS STRING)
+    DIM f AS INTEGER : f = vfaBild(w)
+    DIM d AS BUFFER : d = v20Daten(f)
+    DIM zahl AS MAP OF INTEGER
+    DIM best AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO BUFFER_LEN(d) \ 4 - 1
+        DIM c AS INTEGER : c = BUFFER_GET_U32(d, i * 4)
+        IF (c SHR 24) BAND 255 = 255 THEN
+            DIM k AS STRING : k = LOWER$(RIGHT$("00000" + HEX$(c BAND &HFFFFFF), 6))
+            IF MAPHAS(zahl, k) THEN MAPPUT(zahl, k, MAPGET(zahl, k) + 1) ELSE MAPPUT(zahl, k, 1)
+            IF best = "" THEN best = k
+            IF MAPGET(zahl, k) > MAPGET(zahl, best) THEN best = k
+        END IF
+    NEXT
+    cairo_surface_destroy(f)
+    DIM soll AS STRING : soll = LOWER$(RIGHT$("00000" + HEX$(vfaRolle(rolle)), 6))
+    PRINT "  "; name; ": "; best; " "; IIF(best = soll, "wie " + rolle, "NICHT " + rolle + " (" + soll + ")")
+END SUB
+
+FUNCTION vfaHell(k AS INTEGER) AS FLOAT
+    DIM c AS FLOAT : c = k / 255.0
+    IF c <= 0.03928 THEN RETURN c / 12.92
+    RETURN ((c + 0.055) / 1.055) ^ 2.4
+END FUNCTION
+
+FUNCTION vfaRolle(rolle AS STRING) AS INTEGER
+    DIM t AS ARRAY OF STRING : t = kern.themaTafel()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1 STEP 3
+        IF t[i] = rolle THEN RETURN VAL("&H" + t[i + IIF(kern.themaHell(einst), 2, 1)])
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION vorfuehrenFarben(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM art AS STRING : art = IIF(schritt <= 4, "dunkel", "hell")
+    SELECT CASE schritt
+        CASE 1, 5
+            IF schritt = 5 THEN
+                einst.thema = "light"
+                einstellungenAnwenden()
+            END IF
+            leisteZeigen("fortschritt")
+        CASE 2, 6
+            PRINT art; ":"
+            ok = vfFoto(fenster, art)
+            vfaPunkt("leiste unten", lsBuch[2], 12, -12, "leiste")
+            vfaPunkt("reiterkopf", lsBuch[2], -8, 6, "status")
+            vfaPunkt("uebersicht kopf", lsBuch[1], -8, 6, "status")
+            DIM zf AS INTEGER : zf = vfaBild(zoomProzent)
+            PRINT "  zoomanzeige hebt sich ab: "; vfaKontrast(zf, vfaRolle("status")) > 3.0
+            cairo_surface_destroy(zf)
+            vfaMenue = ueberMenue()
+            gtk_menu_popup_at_widget(vfaMenue, fenster, GDK_SCHWERE_OBEN_LINKS, GDK_SCHWERE_OBEN_LINKS, 0)
+        CASE 3, 7
+            ' unter Last ist das Menue einen Takt spaeter noch nicht ausgelegt
+            IF gtk_widget_get_allocated_width(vfaMenue) <= 1 AND vfaWarte < 30 THEN
+                vfaWarte = vfaWarte + 1
+                schritt = schritt - 1
+                RETURN TRUE
+            END IF
+            vfaWarte = 0
+            ok = vfFoto(vfaMenue, art + "_menue")
+            vfaGrund("menue", vfaMenue, "feld")
+            gtk_menu_popdown(vfaMenue)
+            gtk_widget_destroy(vfaMenue)
+            gtk_popover_popup(musterPopover)
+        CASE 4, 8
+            IF gtk_widget_get_allocated_width(musterPopover) <= 1 AND vfaWarte < 30 THEN
+                vfaWarte = vfaWarte + 1
+                schritt = schritt - 1
+                RETURN TRUE
+            END IF
+            vfaWarte = 0
+            ok = vfFoto(musterPopover, art + "_aufklapper")
+            vfaGrund("aufklapper", musterPopover, "feld")
+            gtk_popover_popdown(musterPopover)
+        CASE ELSE
+            einst.thema = "dark"
+            einstellungenAnwenden()
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION

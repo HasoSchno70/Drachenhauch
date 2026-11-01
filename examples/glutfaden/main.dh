@@ -115,6 +115,20 @@ CONST STIL = "window, .flaeche { background-color: @gf_fenster; color: @gf_text;
     " .seitenleiste list, .seitenleiste row { background-color: transparent; color: @gf_knopf_text; }" + _
     " .seitenleiste row:selected { background-color: rgba(255,138,61,0.22); }" + _
     " .seitenleiste row:selected label { color: @gf_gewaehlt_text; }" + _
+    " notebook.seitenleiste { border: none; } notebook.seitenleiste > stack, notebook.seitenleiste scrolledwindow, notebook.seitenleiste viewport { background-color: @gf_leiste; color: @gf_text; }" + _
+    " notebook.seitenleiste > header { background-color: @gf_status; border-color: @gf_linie; box-shadow: none; }" + _
+    " notebook.seitenleiste > header tab { background-color: transparent; color: @gf_leise; border: none; box-shadow: none; padding: 4px 12px; min-height: 0; }" + _
+    " notebook.seitenleiste > header tab label { color: inherit; } notebook.seitenleiste > header tab:hover { color: @gf_text; background-color: @gf_hover; }" + _
+    " notebook.seitenleiste > header tab:checked { color: @gf_gewaehlt_text; background-color: @gf_leiste; box-shadow: inset 0 -2px @gf_akzent; }" + _
+    " notebook.seitenleiste > header arrow { color: @gf_leise; }" + _
+    " menu, .menu, .context-menu { background-color: @gf_feld; color: @gf_text; border: 1px solid @gf_rand; padding: 4px 0; }" + _
+    " menu menuitem { color: @gf_text; padding: 5px 14px; } menu menuitem label { color: inherit; } menu menuitem arrow { color: @gf_leise; }" + _
+    " menu menuitem:hover { background-color: alpha(@gf_akzent, 0.28); color: @gf_gewaehlt_text; }" + _
+    " menu menuitem:disabled, menu menuitem:disabled label { color: @gf_zahl; } menu separator { background-color: @gf_rand; margin: 3px 0; }" + _
+    " menu menuitem check, menu menuitem radio { color: @gf_text; background-color: @gf_feld; border-color: @gf_rand; }" + _
+    " popover { background-color: @gf_feld; color: @gf_text; border: 1px solid @gf_rand; } popover modelbutton, popover modelbutton label { color: @gf_text; } popover modelbutton:hover { background-color: alpha(@gf_akzent, 0.28); }" + _
+    " popover button.flat { background-image: none; background-color: transparent; border: none; box-shadow: none; text-shadow: none; color: @gf_text; } popover button.flat label { color: inherit; } popover button.flat:hover { background-color: alpha(@gf_akzent, 0.28); color: @gf_gewaehlt_text; }" + _
+    " popover radiobutton, popover checkbutton, popover radiobutton label, popover checkbutton label { color: @gf_text; } popover radio, popover check { background-image: none; background-color: @gf_feld; border: 1px solid @gf_rand; color: @gf_akzent; } popover separator { background-color: @gf_rand; } popover .abschnitt { color: @gf_leise; }" + _
     " .ueberschrift { color: @gf_leise; font-weight: 700; font-size: 9pt; margin: 14px 14px 4px 14px; }" + _
     " .farbzeile { padding: 3px 14px; }" + _
     " .farbzeile label { color: @gf_knopf_text; } .nebensache { color: @gf_leise; } .wert { color: @gf_akzent; } .karte { border: 1px solid alpha(@gf_leise, 0.35); border-radius: 8px; padding: 8px 12px; } .kartenwert { font-size: 15pt; font-weight: 700; } .benutzt { color: @gf_benutzt; }" + _
@@ -130,6 +144,7 @@ CONST STIL = "window, .flaeche { background-color: @gf_fenster; color: @gf_text;
     " button.schloss { background-image: none; background-color: transparent; border: none; box-shadow: none; padding: 2px; min-height: 0; min-width: 0; }" + _
     " scale trough { background-color: @gf_flaeche2; } scale highlight { background-color: @gf_akzent; } scale value { color: @gf_leise; }" + _
     " .status { background-color: @gf_status; color: @gf_leise2; padding: 4px 12px; border-top: 1px solid @gf_linie; font-size: 9pt; }" + _
+    " .status button.flat { background-image: none; background-color: transparent; border: none; box-shadow: none; text-shadow: none; color: @gf_leise2; padding: 0 6px; min-height: 0; } .status button.flat label { color: inherit; } .status button.flat:hover { color: @gf_text; background-color: @gf_hover; }" + _
     " .farbleiste { background-color: @gf_leiste; border-top: 1px solid @gf_linie; padding: 4px 8px 2px 8px; }" + _
     " .fb-titel { font-size: 8pt; font-weight: 700; color: @gf_leise; letter-spacing: 1px; } .fb-zahl { font-size: 8pt; color: @gf_zahl; } .fb-aktuell { font-size: 8pt; color: @gf_akzent; font-weight: 700; padding-left: 10px; }" + _
     " .willkommen { background-image: linear-gradient(to bottom, @gf_status, @gf_kopf_unten); }" + _
@@ -573,6 +588,10 @@ END FUNCTION
 
 ' Der Logo-Knopf: ein kleines Menue mit Ueber, Neuigkeiten und Tastenkuerzeln
 SUB ueberGeklickt(knopf AS INTEGER, daten AS INTEGER)
+    gtk_menu_popup_at_widget(ueberMenue(), knopf, GDK_SCHWERE_UNTEN_LINKS, GDK_SCHWERE_OBEN_LINKS, 0)
+END SUB
+
+FUNCTION ueberMenue() AS INTEGER
     DIM m AS INTEGER : m = gtk_menu_new()
     ueberPunkt(m, tr$("Über Glutfaden …"), 0)
     ueberPunkt(m, tr$("Neu in Glutfaden …"), 1)
@@ -581,8 +600,8 @@ SUB ueberGeklickt(knopf AS INTEGER, daten AS INTEGER)
     ueberPunkt(m, tr$("Leisten zurücksetzen"), 3)
     pluginMenue(m)
     gtk_widget_show_all(m)
-    gtk_menu_popup_at_widget(m, knopf, GDK_SCHWERE_UNTEN_LINKS, GDK_SCHWERE_OBEN_LINKS, 0)
-END SUB
+    RETURN m
+END FUNCTION
 
 SUB ueberPunkt(m AS INTEGER, text AS STRING, was AS INTEGER)
     DIM e AS INTEGER : e = gtk_menu_item_new_with_label(text)
@@ -1000,6 +1019,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe23"
     ELSEIF ARG$(a) = "--probe-stufe26" THEN
         probe = "stufe26"
+    ELSEIF ARG$(a) = "--probe-farben" THEN
+        probe = "farben"
     ELSEIF ARG$(a) = "--probe-sprache" THEN
         probe = "sprache"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
@@ -1074,6 +1095,7 @@ IF probe = "stufe22" THEN g_timeout_add(300, vorfuehrenStufe22, 0)
 IF probe = "stufe23" THEN g_timeout_add(300, vorfuehrenStufe23, 0)
 IF probe = "stufe26" THEN g_timeout_add(300, vorfuehrenStufe26, 0)
 IF probe = "sprache" THEN g_timeout_add(300, vorfuehrenSprache, 0)
+IF probe = "farben" THEN g_timeout_add(300, vorfuehrenFarben, 0)
 ' Alle fuenf Minuten ein Schnappschuss, wenn etwas ungesichert ist
 DIM takt AS INTEGER : takt = g_timeout_add(300000, vwTakt, 0)
 
