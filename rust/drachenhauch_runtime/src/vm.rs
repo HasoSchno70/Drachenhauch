@@ -8097,6 +8097,10 @@ impl<'p> Vm<'p> {
             "gui_listbox_scroll_to" => { self.gui.list_scroll_to(gi(a,0,"GUI_LISTBOX_SCROLL_TO")?, gi(a,1,"GUI_LISTBOX_SCROLL_TO")?)?; Value::Nil }
             "gui_dropdown_set" => { self.gui.dropdown_set(gi(a,0,"GUI_DROPDOWN_SET")?, &gs(a,1,"GUI_DROPDOWN_SET")?, gnum(a,2,"GUI_DROPDOWN_SET")?)?; Value::Nil }
             "gui_dropdown_placeholder" => { self.gui.dropdown_placeholder(gi(a,0,"GUI_DROPDOWN_PLACEHOLDER")?, gs(a,1,"GUI_DROPDOWN_PLACEHOLDER")?.to_string())?; Value::Nil }
+            "gui_tree_item_rect" => {
+                let (x, y, w, h) = self.gui.tree_item_rect(gi(a,0,"GUI_TREE_ITEM_RECT")?, gi(a,1,"GUI_TREE_ITEM_RECT")?)?;
+                Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
+            }
             "gui_tree_edit" => { self.gui.tree_edit(gi(a,0,"GUI_TREE_EDIT")?, gi(a,1,"GUI_TREE_EDIT")?)?; Value::Nil }
             "gui_tree_edited" => Value::Int(self.gui.tree_edited(gi(a,0,"GUI_TREE_EDITED")?)?),
             "gui_tree_editing" => Value::Int(self.gui.tree_editing(gi(a,0,"GUI_TREE_EDITING")?)?),
@@ -8915,6 +8919,12 @@ impl<'p> Vm<'p> {
             "gui_tabcontrol_title$" | "gui_tabcontrol_title" => Value::str_rc(&self.gui.tabcontrol_title(gi(a,0,"GUI_TABCONTROL_TITLE")?, gi(a,1,"GUI_TABCONTROL_TITLE")?)?),
             "gui_tabcontrol_set_title" => { self.gui.tabcontrol_set_title(gi(a,0,"GUI_TABCONTROL_SET_TITLE")?, gi(a,1,"GUI_TABCONTROL_SET_TITLE")?, gs(a,2,"GUI_TABCONTROL_SET_TITLE")?)?; Value::Nil }
             "gui_tabcontrol_add_widget" => { self.gui.tabcontrol_add_widget(gi(a,0,"GUI_TABCONTROL_ADD_WIDGET")?, gi(a,1,"GUI_TABCONTROL_ADD_WIDGET")?, gi(a,2,"GUI_TABCONTROL_ADD_WIDGET")?)?; Value::Nil }
+            "gui_tabcontrol_set" => {
+                let schl = match a.get(1) { Some(Value::Str(s)) => s.to_string(), _ => return Err("GUI_TABCONTROL_SET: erwartet (reiterwerk, schluessel$, wert)".into()) };
+                let wert = match a.get(2) { Some(Value::Bool(b)) => *b, Some(Value::Int(n)) => *n != 0, _ => return Err("GUI_TABCONTROL_SET: erwartet (reiterwerk, schluessel$, wert)".into()) };
+                self.gui.tabcontrol_set(gi(a,0,"GUI_TABCONTROL_SET")?, &schl, wert)?; Value::Nil
+            }
+            "gui_tabcontrol_closed" => Value::Int(self.gui.tabcontrol_closed(gi(a,0,"GUI_TABCONTROL_CLOSED")?)?),
             "gui_tabcontrol_remove" => { self.gui.tabcontrol_remove(gi(a,0,"GUI_TABCONTROL_REMOVE")?, gi(a,1,"GUI_TABCONTROL_REMOVE")?)?; Value::Nil }
             // --- Akkordeon ---
             "gui_accordion" => Value::Int(self.gui.accordion(gi(a,0,"GUI_ACCORDION")?, gi(a,1,"GUI_ACCORDION")? as i32,

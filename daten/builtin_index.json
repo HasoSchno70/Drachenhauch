@@ -5199,6 +5199,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABCONTROL_CLOSED",
+   "kind": "core",
+   "signature": "GUI_TABCONTROL_CLOSED(tc) AS INTEGER",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TABCONTROL_COUNT",
    "kind": "core",
    "signature": "GUI_TABCONTROL_COUNT(tc) AS INTEGER",
@@ -5214,6 +5220,12 @@
    "name": "GUI_TABCONTROL_REMOVE",
    "kind": "core",
    "signature": "GUI_TABCONTROL_REMOVE(tc, i)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABCONTROL_SET",
+   "kind": "core",
+   "signature": "GUI_TABCONTROL_SET(tc, schluessel$, wert)",
    "module": "gui"
   },
   {
@@ -6180,6 +6192,12 @@
    "name": "GUI_TREE_IS_SELECTED",
    "kind": "core",
    "signature": "GUI_TREE_IS_SELECTED(tree, node)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREE_ITEM_RECT",
+   "kind": "core",
+   "signature": "GUI_TREE_ITEM_RECT(tree, node) AS TUPLE",
    "module": "gui"
   },
   {

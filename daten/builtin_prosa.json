@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2199,
+ "count": 2201,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -865,9 +865,11 @@
   "GUI_TABCONTROL": "GUI_WIDGET — Reiter innerhalb eines Fensters (Karteikasten)",
   "GUI_TABCONTROL_ADD": "INTEGER — eine Seite anhängen, liefert ihre Nummer",
   "GUI_TABCONTROL_ADD_WIDGET": "ein Widget auf eine Seite legen; es behält seine Lage im Fenster",
+  "GUI_TABCONTROL_CLOSED": "INTEGER — welche Seite in diesem Bild zu soll (Kreuz oder mittlere Maustaste), -1 = keine; das Programm entfernt sie selbst",
   "GUI_TABCONTROL_COUNT": "INTEGER — wie viele Seiten es gibt",
   "GUI_TABCONTROL_PAGE": "INTEGER / — — vordere Seite lesen und setzen",
   "GUI_TABCONTROL_REMOVE": "eine Seite entfernen; ihre Kinder bleiben als Widgets bestehen",
+  "GUI_TABCONTROL_SET": "jeder Reiter bekommt ein Kreuz; geschlossen wird nichts, gemeldet wird über GUI_TABCONTROL_CLOSED",
   "GUI_TABCONTROL_SET_PAGE": "INTEGER / — — vordere Seite lesen und setzen",
   "GUI_TABCONTROL_SET_TITLE": "STRING / — — Beschriftung einer Seite lesen und setzen",
   "GUI_TABCONTROL_TITLE$": "STRING / — — Beschriftung einer Seite lesen und setzen",

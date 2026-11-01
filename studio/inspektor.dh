@@ -346,6 +346,7 @@ END SUB
 
 ' Einen Wert aus dem Editor ins Modell -- fuer alle gewaehlten Controls, die
 ' die Eigenschaft haben (wie in Xojo).
+DIM nameAlt AS STRING : nameAlt = ""
 SUB zeileUebernehmen(zi AS INTEGER)
     DIM z AS InspZeile : z = inspZeilen[zi]
     DIM ziele AS ARRAY OF INTEGER
@@ -361,6 +362,15 @@ SUB zeileUebernehmen(zi AS INTEGER)
             GUI_SET_ERROR(z.ed, "Den Namen '" + n + "' gibt es in diesem Fenster schon.")
             RETURN
         END IF
+        ' Der Name des Fensters ist der Name seiner Klasse -- eindeutig im Projekt.
+        IF auswahl < 0 AND aktFenster >= 0 THEN
+            DIM schon AS INTEGER : schon = elementIndex(n)
+            IF schon >= 0 AND schon <> aktFenster THEN
+                GUI_SET_ERROR(z.ed, "Ein Element '" + n + "' gibt es im Projekt schon.")
+                RETURN
+            END IF
+        END IF
+        nameAlt = IIF(auswahl >= 0, feldText$(auswahl, "name"), fensterText$("name"))
         GUI_SET_ERROR(z.ed, "")
         ziele = [auswahl]
     END IF
@@ -415,6 +425,7 @@ SUB zeileUebernehmen(zi AS INTEGER)
     NEXT
     entwurfBauen()
     IF z.schluessel = "name" THEN
+        IF nameAlt <> TRIM$(GUI_TEXT(z.ed)) THEN nameGeaendert(nameAlt, TRIM$(GUI_TEXT(z.ed)), auswahl < 0)
         navigatorFuellen()
         GUI_SET_TEXT(inspTitel, TRIM$(GUI_TEXT(z.ed)))
     END IF
