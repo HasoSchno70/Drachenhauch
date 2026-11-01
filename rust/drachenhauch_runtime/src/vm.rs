@@ -7894,6 +7894,8 @@ impl<'p> Vm<'p> {
                 gi(a,3,"GUI_WINDOW")? as i32, gi(a,4,"GUI_WINDOW")? as i32)),
             "gui_window_movable" => { self.gui.window_movable(gi(a,0,"GUI_WINDOW_MOVABLE")?, gbool(a,1,"GUI_WINDOW_MOVABLE")?)?; Value::Nil }
             "gui_window_title" => { self.gui.window_title(gi(a,0,"GUI_WINDOW_TITLE")?, &gs(a,1,"GUI_WINDOW_TITLE")?)?; Value::Nil }
+            "gui_window_set_name" => { self.gui.window_set_name(gi(a,0,"GUI_WINDOW_SET_NAME")?, &gs(a,1,"GUI_WINDOW_SET_NAME")?)?; Value::Nil }
+            "gui_window_get_name$" | "gui_window_get_name" => Value::str_rc(&self.gui.window_get_name(gi(a,0,"GUI_WINDOW_GET_NAME$")?)?),
             // Lichtstreif ueber ein Fenster (docs/module-gui.md, Abschnitt Glanz).
             "gui_window_glow" => {
                 let n = "GUI_WINDOW_GLOW";

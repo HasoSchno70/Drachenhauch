@@ -2751,6 +2751,10 @@ pub struct Widget {
     ueber_t: f32,
     druck_t: f32,
     fokus_t: f32,
+    /// Nur mit eigenen Dauern je Farbrolle (Stildatei `uebergang: bg 400`):
+    /// je Rolle (bg, fg, border, accent) Ueberfahren, Fokus, Druck -- wie
+    /// die drei oben, nur mit der Dauer der Rolle nachgefuehrt.
+    rollen_t: Option<Box<[[f32; 3]; 4]>>,
     /// Die ZEILE unter der Maus, weich: Liste, Tabelle, Baum und die offene
     /// Klappliste (dort ihr Eintrag).
     zeile_b: Blende,
@@ -3086,9 +3090,9 @@ pub struct Widget {
     klassen: Vec<String>,
     /// Was die Stildatei fuer dieses Widget sagt (je Schicht) und wofuer
     /// das aufgeloest wurde: (Stand der Stildatei, checked, enabled,
-    /// Knopfart). None = neu aufloesen.
+    /// Knopfart, Hash der Kette darueber). None = neu aufloesen.
     stil_auf: Option<Box<stil::StilAufgeloest>>,
-    stil_key: Option<(u64, bool, bool, u8)>,
+    stil_key: Option<(u64, bool, bool, u8, u64)>,
     /// Zusaetze aus Paket 2 (gui_bausteine.rs) -- nur bei Bedarf angelegt.
     bau: Option<Box<bausteine::Bauzusatz>>,
     /// Rechtschreibung (GUI_SPELL).
@@ -3106,6 +3110,8 @@ struct FormDb {
 
 pub struct Window {
     title: String,
+    /// Name fuer `window#name` in der Stildatei (GUI_WINDOW_SET_NAME).
+    name: String,
     x: i32, y: i32, w: i32, h: i32,
     widgets: Vec<Widget>,
     movable: bool,
@@ -3769,7 +3775,7 @@ impl Gui {
         let (x, y, w, h) = (self.sk(x), self.sk(y), self.sk(w), self.sk(h));
         let idx = self.windows.len();
         self.windows.push(Window {
-            title, x, y, w, h, widgets: Vec::new(),
+            title, name: String::new(), x, y, w, h, widgets: Vec::new(),
             movable: true, closable: false, visible: true, entwurf: false, zoom: 1.0,
             resizable: false, pruefung_live: false, form_stand: Vec::new(), form_db: Vec::new(), chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
@@ -4677,7 +4683,7 @@ impl Gui {
             min_w: 0, min_h: 0, nat_w: w, nat_h: h, regeln: Vec::new(), fehler: String::new(), fehler_label: -1,
             on_hover: None, on_leave: None, on_focus: None, on_blur: None,
             was_hovered: false, was_focused: false,
-            ueber_t: 0.0, druck_t: 0.0, fokus_t: 0.0, zeile_b: Blende::default(), zeile_jetzt: -1, ganzer_text: String::new(), rad_ziel: None, rad_letzt: 0.0,
+            ueber_t: 0.0, druck_t: 0.0, fokus_t: 0.0, rollen_t: None, zeile_b: Blende::default(), zeile_jetzt: -1, ganzer_text: String::new(), rad_ziel: None, rad_letzt: 0.0,
             alive: true, visible: true, rund: false, variante: 0,
             group: String::new(), items: Vec::new(), sel: -1,
             enabled: true, font: -1, font_size: 0, stil: 0,
@@ -5862,6 +5868,12 @@ impl Gui {
     /// (GUI_SET_FONT_SIZE) mindestens Schrift + 6 -- sonst stiessen groessere
     /// Buchstaben oben und unten an. Ohne eigene Groesse bleibt es, wie es war.
     fn list_zeile_h(&self, w: &Widget) -> i32 {
+        // Mit Innenabstand aus der Stildatei: Schrift plus der Abstand oben
+        // und unten -- genau, ohne Mindestmass, wie beim Knopf.
+        if let Some((v, _)) = self.w_abstand(w) {
+            let schrift = match self.w_groesse(w) { 0 => DROPDOWN_ITEM_H - 6, n => n };
+            return (self.sk(schrift) + 2 * v).max(self.sk(8));
+        }
         if w.font_size > 0 { self.sk(DROPDOWN_ITEM_H.max(w.font_size + 6)) } else { self.sk(DROPDOWN_ITEM_H) }
     }
     /// Breite der Kaestchen-Spalte einer Liste (0 ohne Kaestchen).
@@ -6173,7 +6185,7 @@ impl Gui {
         let box_w = self.list_box_w(w);
         let ih = self.list_zeile_h(w);
         let hat_icon = w.list.as_ref().map(|l| l.icons.iter().any(|&i| i >= 0)).unwrap_or(false);
-        let mut tx = if box_w > 0 { ax + box_w } else { ax + self.m("pad") };
+        let mut tx = if box_w > 0 { ax + box_w } else { ax + self.w_pad(w) };
         if hat_icon { tx += ih + 2; }
         tx
     }
@@ -10789,8 +10801,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             for i in 0..self.windows[wi].widgets.len() {
                 let w = &self.windows[wi].widgets[i];
                 if !w.alive || w.kind != Kind::Label || !w.wrap { continue; }
-                let n = self.umbrechen(g, w, &w.text, w.w).len().max(1) as i32;
-                let h = n * (self.wsize(g, w) + self.sk(4));
+                let (pv, ph) = self.w_abstand(w).unwrap_or((0, 0));
+                let n = self.umbrechen(g, w, &w.text, (w.w - 2 * ph).max(1)).len().max(1) as i32;
+                let h = n * (self.wsize(g, w) + self.sk(4)) + 2 * pv;
                 if h != w.h { neu.push((wi, i, h)); }
             }
         }
@@ -11050,7 +11063,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             Kind::Label => {
                 let zeilen: Vec<&str> = text.split('\n').collect();
                 let bw = zeilen.iter().map(|z| self.wtext_width(g, w, z)).max().unwrap_or(0);
-                (bw.max(1), (zeilen.len().max(1) as i32) * (sz + self.sk(4)))
+                let (pv, ph) = self.w_abstand(w).unwrap_or((0, 0));
+                (bw.max(1) + 2 * ph, (zeilen.len().max(1) as i32) * (sz + self.sk(4)) + 2 * pv)
             }
             Kind::Card => (self.sk(200), self.sk(190)),
             Kind::Button => {
@@ -11063,11 +11077,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
             Kind::Checkbox | Kind::Radio => {
                 let cs = self.m("check_size");
-                (cs + self.sk(8) + tw, cs.max(sz))
+                (cs + self.w_abstand(w).map(|a| a.1).unwrap_or(self.sk(8)) + tw, cs.max(sz))
             }
             Kind::Toggle => {
                 let ph = self.m("check_size").max(self.sk(14));
-                (ph * 2 + self.sk(8) + tw, ph.max(sz))
+                (ph * 2 + self.w_abstand(w).map(|a| a.1).unwrap_or(self.sk(8)) + tw, ph.max(sz))
             }
             Kind::TextInput | Kind::Dropdown | Kind::Spinner => (if w.w > 0 { w.w } else { self.sk(160) },
                 sz + 2 * self.w_abstand(w).map(|a| a.0).unwrap_or(self.sk(6))),
@@ -12049,6 +12063,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             "tabs_closable": win.tabs_closable,
             "default_button": win.default_btn, "cancel_button": win.cancel_btn,
         });
+        // Nur mit Namen -- sonst bliebe jede alte .dhform beim Sichern nicht gleich.
+        let mut obj = obj;
+        if !win.name.is_empty() { obj["name"] = serde_json::json!(win.name); }
         serde_json::to_string_pretty(&obj).map_err(|e| format!("GUI_SAVE: {}", e))
     }
     /// Aus JSON ein neues Fenster bauen, Handle zurueck (GUI_LOAD/FROM_JSON).
@@ -12060,6 +12077,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let h = self.new_window(title, gi("x", 0), gi("y", 0), gi("w", 200), gi("h", 150));
         let wi = h as usize;
         self.windows[wi].movable = v["movable"].as_bool().unwrap_or(true);
+        self.windows[wi].name = v["name"].as_str().unwrap_or("").to_lowercase();
         self.windows[wi].closable = v["closable"].as_bool().unwrap_or(false);
         self.windows[wi].visible = v["visible"].as_bool().unwrap_or(true);
         self.windows[wi].resizable = v["resizable"].as_bool().unwrap_or(false);
@@ -12784,9 +12802,33 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     Some(_) => 1.0,
                     None => schritt,
                 };
+                // Der Stand VOR diesem Schritt: damit beginnen die Rollen, wenn
+                // sie neu angelegt werden -- mit dem Stand danach waere eine
+                // Rolle mit eigener, langer Dauer im ersten Bild schon am Ziel.
+                let vorher = (wdg.ueber_t, wdg.fokus_t, wdg.druck_t);
                 naeher(&mut wdg.ueber_t, if wdg.hovered && wdg.enabled { 1.0 } else { 0.0 }, schritt);
                 if druck == Some((wi, i)) { wdg.druck_t = 1.0; } else { naeher(&mut wdg.druck_t, 0.0, schritt); }
                 if fokus == Some((wi, i)) { wdg.fokus_t = 1.0; } else { naeher(&mut wdg.fokus_t, 0.0, schritt); }
+                // Eigene Dauern je Farbrolle: dieselben drei Ziele, jede Rolle
+                // mit ihrer Dauer (ohne eigene die des Widgets).
+                match Self::w_uebergang_je(wdg) {
+                    Some(je) => {
+                        let (u, f, d) = vorher;
+                        let ziel_u = if wdg.hovered && wdg.enabled { 1.0 } else { 0.0 };
+                        let rt = wdg.rollen_t.get_or_insert_with(|| Box::new([[u, f, d]; 4]));
+                        for k in 0..4 {
+                            let s = match je[k] {
+                                Some(ms) if ms > 0 => (dt as f32 * 1000.0 / ms as f32).clamp(0.0, 1.0),
+                                Some(_) => 1.0,
+                                None => schritt,
+                            };
+                            naeher(&mut rt[k][0], ziel_u, s);
+                            if fokus == Some((wi, i)) { rt[k][1] = 1.0; } else { naeher(&mut rt[k][1], 0.0, s); }
+                            if druck == Some((wi, i)) { rt[k][2] = 1.0; } else { naeher(&mut rt[k][2], 0.0, s); }
+                        }
+                    }
+                    None => wdg.rollen_t = None,
+                }
                 // Kippschalter: `value` gleitet dem Zustand nach, gezeichnet
                 // ueber `weich()`, damit der Knopf anfaehrt und abbremst.
                 if wdg.kind == Kind::Toggle {
@@ -19773,7 +19815,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
     fn draw_widget_innen(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget) {
         let (ax, ay, w, h) = self.abs_rect(wi, wdg);
-        let pad = self.m("pad");
+        // Innenabstand: aus der Stildatei, sonst die Metrik -- eine Stelle
+        // fuer Knopf, Kaestchen, Klappliste, Drehfeld und Liste.
+        let pad = self.w_pad(wdg);
         match wdg.kind {
             Kind::Layout => {
                 self.fluss_auswahl_zeichnen(g, wi, wdg);
@@ -19796,7 +19840,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 // Zeilen einzeln: so gilt die Ausrichtung je Zeile, und ein
                 // umbrechendes Label zeichnet genau das, was umbruch_layout
                 // gemessen hat (samt Kuerzen, Auswahl und Alt-Buchstabe).
-                self.label_zeichnen(g, wdg, ax, ay, w, fg);
+                let (pv, ph) = self.w_abstand(wdg).unwrap_or((0, 0));
+                self.label_zeichnen(g, wdg, ax + ph, ay + pv, (w - 2 * ph).max(1), fg);
             }
             Kind::Panel => {
                 self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
@@ -19886,7 +19931,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         .unwrap_or(shade(bg, if grund.is_some() { 18 } else { 30 }));
                     let bg_d = wdg.ov.get("pressed").copied().or_else(|| self.stil_farbe(wdg, "bg", stil::AKTIV))
                         .unwrap_or(shade(bg, -30));
-                    bg = mischen(mischen(bg, bg_h, eh), bg_d, ed);
+                    // Die Grundfarbe nimmt ihre eigene Dauer, wenn die
+                    // Stildatei eine nennt (`uebergang: bg 400`).
+                    let (eh_bg, ed_bg) = if wdg.enabled { (Self::rolle_t(wdg, "bg", 0), Self::rolle_t(wdg, "bg", 2)) } else { (0.0, 0.0) };
+                    bg = mischen(mischen(bg, bg_h, eh_bg), bg_d, ed_bg);
                     // Der Standard-Knopf traegt den Akzent als Rahmen -- man
                     // soll sehen, was Enter tun wird.
                     let rahmen = if self.windows[wi].default_btn == idx as i32 && wdg.variante != 1 {
@@ -21668,23 +21716,24 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let rad = self.m("corner_radius");
             g.round_rect(ax + 1, ay + 1, ax + w - 2, ay + h - 2, (rad - 1).max(0), deckkraft(self.acc_col(wdg), eh), false);
         }
-        let pad = self.sk(6);
+        // Innenabstand: aus der Stildatei (senkrecht, waagerecht), sonst 6.
+        let (pv, ph) = self.w_abstand(wdg).unwrap_or((self.sk(6), self.sk(6)));
         let sz = self.wsize(g, wdg);
         let font = self.wfont(g, wdg);
         let titel_sz = sz + self.sk(1);
         let zeile_h = sz + self.sk(3);
-        let innen_w = (w - 2 * pad).max(1);
+        let innen_w = (w - 2 * ph).max(1);
         // Bild: 16:10 der Innenbreite, aber nie so hoch, dass fuer Titel und
         // eine Zeile Beschreibung kein Platz bleibt.
         let rest_mind = titel_sz + self.sk(8) + if wdg.placeholder.is_empty() { 0 } else { zeile_h };
-        let bild_h = if wdg.sel >= 0 { (innen_w * 10 / 16).min(h - 2 * pad - rest_mind).max(0) } else { 0 };
+        let bild_h = if wdg.sel >= 0 { (innen_w * 10 / 16).min(h - 2 * pv - rest_mind).max(0) } else { 0 };
         if bild_h > 0 {
-            self.draw_bild(g, wdg, ax + pad, ay + pad, innen_w, bild_h);
-            g.rect(ax + pad, ay + pad, ax + pad + innen_w - 1, ay + pad + bild_h - 1, shade(rahmen, -20));
+            self.draw_bild(g, wdg, ax + ph, ay + pv, innen_w, bild_h);
+            g.rect(ax + ph, ay + pv, ax + ph + innen_w - 1, ay + pv + bild_h - 1, shade(rahmen, -20));
         }
-        let mut y = ay + pad + bild_h + if bild_h > 0 { self.sk(6) } else { 0 };
+        let mut y = ay + pv + bild_h + if bild_h > 0 { self.sk(6) } else { 0 };
         let tfarbe = mischen(self.txt_col(wdg), self.acc_col(wdg), eh);
-        g.push_clip(ax + pad, ay, innen_w, h);
+        g.push_clip(ax + ph, ay, innen_w, h);
         if !wdg.text.is_empty() {
             // Kraeftig: zweimal, um einen Punkt versetzt -- aus einer Schrift
             // laesst sich keine Strichstaerke rechnen (wie beim gesetzten Text).
@@ -21693,12 +21742,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 titel.pop();
             }
             if titel != wdg.text { titel = format!("{}...", titel.trim_end().trim_end_matches('.')); }
-            g.text_styled(ax + pad, y, titel.clone(), tfarbe, font, titel_sz);
-            g.text_styled(ax + pad + 1, y, titel, tfarbe, font, titel_sz);
+            g.text_styled(ax + ph, y, titel.clone(), tfarbe, font, titel_sz);
+            g.text_styled(ax + ph + 1, y, titel, tfarbe, font, titel_sz);
             y += titel_sz + self.sk(4);
         }
         if !wdg.placeholder.is_empty() {
-            let unten = ay + h - pad;
+            let unten = ay + h - pv;
             let platz = ((unten - y) / zeile_h).max(0) as usize;
             let mut zeilen = self.umbrechen(g, wdg, &wdg.placeholder, innen_w);
             if zeilen.len() > platz && platz > 0 {
@@ -21717,7 +21766,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
             let farbe = self.leise(bg);
             for z in zeilen {
-                self.wtext(g, wdg, ax + pad, y, z, farbe);
+                self.wtext(g, wdg, ax + ph, y, z, farbe);
                 y += zeile_h;
             }
         }

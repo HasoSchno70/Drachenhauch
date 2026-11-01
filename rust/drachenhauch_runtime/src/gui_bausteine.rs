@@ -414,6 +414,9 @@ impl Gui {
     fn label_stelle(&self, g: &Graphics, wi: usize, i: usize, mx: i32, my: i32) -> i32 {
         let w = &self.windows[wi].widgets[i];
         let (ax, ay, bw, _) = self.abs_rect(wi, w);
+        // Dieselbe Innenflaeche wie beim Zeichnen (Innenabstand der Stildatei).
+        let (pv, ph) = self.w_abstand(w).unwrap_or((0, 0));
+        let (ax, ay, bw) = (ax + ph, ay + pv, (bw - 2 * ph).max(1));
         let lh = (self.wsize(g, w) + self.sk(4)).max(1);
         let zeilen = self.label_zeilen(g, w, bw);
         if zeilen.is_empty() { return 0; }
@@ -432,7 +435,8 @@ impl Gui {
             for i in 0..self.windows[wi].widgets.len() {
                 let w = &self.windows[wi].widgets[i];
                 if w.kind != Kind::Label || Self::bau(w).map(|z| z.kuerzen == 0 || z.auswaehlbar).unwrap_or(true) { continue; }
-                let gekuerzt = self.label_zeilen(g, w, w.w).iter().any(|(z, _)| z.ends_with("...") || z.starts_with("..."))
+                let innen = (w.w - 2 * self.w_abstand(w).map(|a| a.1).unwrap_or(0)).max(1);
+                let gekuerzt = self.label_zeilen(g, w, innen).iter().any(|(z, _)| z.ends_with("...") || z.starts_with("..."))
                     && !self.anzeige_text(w).contains("...");
                 let ganz = if gekuerzt { self.anzeige_text(w).into_owned() } else { String::new() };
                 self.windows[wi].widgets[i].ganzer_text = ganz;

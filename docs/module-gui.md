@@ -458,6 +458,8 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_HAS_CLASS(wdg, klasse$)` | BOOLEAN | trägt das Widget die Klasse (die Knopfart zählt mit)? |
 | `GUI_SET_NAME(wdg, name$)` | — | der Name, den `#name` in der Stildatei meint |
 | `GUI_GET_NAME$(wdg)` | STRING | der Name des Widgets ("" = keiner) |
+| `GUI_WINDOW_SET_NAME(win, name$)` | — | der Name eines Fensters, den `window#name` in der Stildatei meint ("" = keiner; steht in der `.dhform`) |
+| `GUI_WINDOW_GET_NAME$(win)` | STRING | der Name des Fensters ("" = keiner) |
 | `GUI_GET_COLOR(wdg, rolle$)` | INTEGER | die Farbe, die `GUI_SET_COLOR` oder die Stildatei im jetzigen Zustand vorgeben (`bg`, `fg`, `border`, `accent`); -1 = das Thema entscheidet |
 | `GUI_GET_Y(wdg)` / `GUI_GET_W(wdg)` / `GUI_GET_H(wdg)` | INTEGER | Lage und Groesse des Widgets im Fenster (Gegenstueck zu `GUI_SET_BOUNDS`) |
 | `GUI_WINDOW_GET_Y(win)` / `GUI_WINDOW_GET_W(win)` / `GUI_WINDOW_GET_H(win)` | INTEGER | Lage und Groesse des Fensters auf dem Bildschirm |
@@ -2217,7 +2219,18 @@ checkbox:checked     { accent: #2E9E5B }
 `.gefahr` trifft also auch einen Gefahr-Knopf), ein Name `#name`
 (`GUI_SET_NAME`) und Zustände: `:hover`, `:focus`, `:active` (gedrückt),
 `:disabled`, `:checked`. Mehrere Selektoren für eine Regel trennt ein Komma.
-Selektoren für Nachfahren (`panel button`) gibt es noch nicht.
+
+**Nachfahren:** vor dem Widget dürfen Behälter stehen, durch Leerraum
+getrennt (irgendwo darüber) oder durch `>` (direkt darüber):
+`panel.leiste button`, `layout > button`, `groupbox#kopf label`. Ein Behälter
+ist das Layout, in dem ein Widget steht, sonst das Reiterwerk, Akkordeon
+oder der Assistent mit seiner Seite, sonst das rollende Panel
+(`GUI_PANEL_ADD`) -- und ganz oben das Fenster, das nur als Vorfahre
+vorkommt: `window#einstellungen button` (Name per `GUI_WINDOW_SET_NAME`).
+Ein Zustand steht nur am letzten Teil (`panel:hover button` ist ein
+Fehler). Jeder Teil zählt zum Gewicht wie ein eigener Selektor; ändert sich
+eine Klasse weiter oben oder zieht ein Widget um, gilt die neue Regel im
+nächsten Bild.
 
 **Eigenschaften:** `bg`, `fg`, `border`, `accent` (Farbe als `#RGB`,
 `#RRGGBB`, `#AARRGGBB` oder als Name aus dem Thema wie `accent`,
@@ -2229,12 +2242,21 @@ Kommentare stehen in `/* ... */` oder hinter `//`.
 
 **Form je Widget:** `abstand` (Innenabstand, eine Zahl oder senkrecht und
 waagerecht, 0..40 -- ein Knopf nach Inhalt ist dann genau Text plus Abstand
-groß, im Textfeld rückt der Text um den waagerechten Abstand ein),
+groß, im Textfeld rückt der Text um den waagerechten Abstand ein; eine
+Beschriftung rückt ihren Text ein und misst sich größer, bei Kästchen,
+Radio und Kippschalter ist der waagerechte Abstand die Lücke vor dem Text,
+eine Listen- oder Klapplistenzeile ist Schrift plus zweimal der senkrechte
+Abstand hoch, Klappliste, Drehfeld und Kachel rücken ein; Baum, Tabelle
+und Textbereich behalten ihre eigenen Abstände),
 `randbreite` (0..8, 0 = kein Rand), `schatten` (eine Zahl = Weichheit, oder
 `dx dy weich [farbe]`, ohne Farbe ein halbdurchsichtiges Schwarz),
 `verlauf` (0..64), `glanz` (0..100) und `fase` (0 oder 1) statt der
 Metriken `gradient`, `gloss`, `bevel`, und `uebergang` (ms, 0..2000) statt
-der Metrik gleichen Namens; englisch `padding`, `border-width`, `shadow`,
+der Metrik gleichen Namens -- auch je Farbe: `uebergang: 120, bg 400,
+border 0` (eine nackte Zahl gilt für alles, `bg`/`fg`/`border`/`accent` mit
+Zahl nur für diese Farbe; das gilt für die Zustandsfarben der Stildatei und
+die Grundfarbe eines Knopfs, die Hover-Aufhellung des Themas folgt der
+Dauer des Widgets); englisch `padding`, `border-width`, `shadow`,
 `transition`. Sie gelten nur in Regeln ohne `:hover`,
 `:focus`, `:active` oder `:disabled` -- eine Form, die beim Überfahren
 springt, wäre ein Wackeln; die Stildatei sagt das als Fehler.
