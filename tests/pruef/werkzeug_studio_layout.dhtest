@@ -142,3 +142,105 @@ slStudio = ARG$(0)
 eingesetzt knopfB Zeile1 0
 frei TRUE
 behaelter Zeile1 knopfB:0,knopfA:0
+
+=== verdoppeln nimmt die kinder mit, loeschen laesst sie frei stehen
+' knopfA verdoppelt: die Kopie steht in der Zeile gleich dahinter. Zeile1
+' verdoppelt (gewaehlt im Navigator): Zeile2 mit Kopien aller Kinder.
+' Zeile1 geloescht: ihre Kinder bleiben frei, Zeile2 zeigt weiter auf IHRE.
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 8, CWD$() + "/f.dhform")
+DIM ax AS INTEGER
+DIM ay AS INTEGER
+DIM nx AS INTEGER
+DIM ny AS INTEGER
+(ax, ay) = slLage(m, "control knopfA")
+(nx, ny) = slLage(m, "knoten Fenster1.Zeile1")
+slHin(10, 10)
+slKlick(ax, ay)
+slWarten(4)
+slMit([341], 68)
+slWarten(6)
+slKlick(nx, ny)
+slWarten(4)
+slMit([341], 68)
+slWarten(6)
+slKlick(nx, ny)
+slWarten(4)
+slTaste(261)
+slWarten(8)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+' Je Aenderung ein Stand (nach "behaelter --"); gleiche hintereinander einmal.
+DIM staende AS ARRAY OF STRING : staende = []
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "behaelter ")
+    IF z = "behaelter --" THEN
+        ARRAY_PUSH(staende, "")
+    ELSEIF LEN(staende) > 0 THEN
+        staende[LEN(staende) - 1] = staende[LEN(staende) - 1] + TRIM$(MID$(z, 10, 999)) + " | "
+    END IF
+NEXT
+DIM vorher AS STRING : vorher = "?"
+DIM st AS STRING
+FOR EACH st IN staende
+    IF st <> vorher THEN PRINT st
+    vorher = st
+NEXT
+DIM kx AS INTEGER
+DIM ky AS INTEGER
+(kx, ky) = slLage(log, "control knopfA")
+PRINT "knopfA steht noch "; kx > 0
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfA","text":"Neu","x":0,"y":0,"w":90,"h":30},{"kind":"button","name":"knopfB","text":"Oeffnen","x":0,"y":0,"w":90,"h":30},{"kind":"textinput","name":"feldSuche","text":"","x":0,"y":0,"w":120,"h":30},{"kind":"layout","name":"Zeile1","x":20,"y":20,"w":560,"h":44,"anchor":"lrt","layout":{"art":"zeile","kinder":[[0,0],[1,0],[2,1]],"abstand":6}},{"kind":"layout","name":"Spalte1","x":20,"y":90,"w":240,"h":200,"layout":{"art":"spalte","kinder":[],"abstand":6}},{"kind":"label","name":"frei","text":"frei","x":320,"y":120,"w":100,"h":20}]}
+
+--- erwartet
+Zeile1 knopfA:0,knopfB:0,feldSuche:1 | Spalte1 | 
+Zeile1 knopfA:0,knopfA1:0,knopfB:0,feldSuche:1 | Spalte1 | 
+Zeile1 knopfA:0,knopfA1:0,knopfB:0,feldSuche:1 | Spalte1 | Zeile2 knopfA2:0,knopfA3:0,knopfB1:0,feldSuche1:1 | 
+Spalte1 | Zeile2 knopfA2:0,knopfA3:0,knopfB1:0,feldSuche1:1 | 
+knopfA steht noch TRUE
+
+=== der inspektor zeigt beim kind das gewicht, beim layout die anordnung
+' Ein Kind hat kein Links/Oben (das Layout legt es), ein freies Layout schon:
+' "lage feld x" kommt genau einmal, von Spalte1.
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 8, CWD$() + "/f.dhform")
+DIM ax AS INTEGER
+DIM ay AS INTEGER
+DIM px AS INTEGER
+DIM py AS INTEGER
+(ax, ay) = slLage(m, "control knopfA")
+(px, py) = slLage(m, "control Spalte1")
+slHin(10, 10)
+slKlick(ax, ay)
+slWarten(6)
+slKlick(px, py)
+slWarten(6)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+PRINT "gewicht "; LEN(slAnfang(log, "lage feld studio_gewicht ")) > 0
+PRINT "anordnung "; LEN(slAnfang(log, "lage feld layout.art ")) > 0
+PRINT "links einmal "; LEN(slAnfang(log, "lage feld x "))
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfA","text":"Neu","x":0,"y":0,"w":90,"h":30},{"kind":"button","name":"knopfB","text":"Oeffnen","x":0,"y":0,"w":90,"h":30},{"kind":"textinput","name":"feldSuche","text":"","x":0,"y":0,"w":120,"h":30},{"kind":"layout","name":"Zeile1","x":20,"y":20,"w":560,"h":44,"anchor":"lrt","layout":{"art":"zeile","kinder":[[0,0],[1,0],[2,1]],"abstand":6}},{"kind":"layout","name":"Spalte1","x":20,"y":90,"w":240,"h":200,"layout":{"art":"spalte","kinder":[],"abstand":6}},{"kind":"label","name":"frei","text":"frei","x":320,"y":120,"w":100,"h":20}]}
+
+--- erwartet
+gewicht TRUE
+anordnung TRUE
+links einmal 1

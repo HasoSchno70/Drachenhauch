@@ -302,6 +302,8 @@ END SUB
 ' Fuer Pruefungen: die Kinderliste jedes Layouts, "behaelter L a:0,b:1".
 SUB behaelterProtokollieren()
     IF logDatei = "" THEN RETURN
+    ' Ein Strich vorweg: so liest eine Pruefung den Stand nach JEDER Aenderung.
+    protokoll("behaelter --")
     DIM l AS INTEGER
     FOR l = 0 TO anzahl() - 1
         IF NOT istLayout(l) THEN CONTINUE
