@@ -1,0 +1,166 @@
+' studio_laufzeit.dh -- die Laufzeit eines Projekts aus dem Drachenhauch Studio.
+'
+' Das Studio kopiert diese Datei bei jedem Starten und Bauen nach _studio/.
+' Geaendert wird sie in studio/laufzeit.dh, nicht in der Kopie.
+'
+' StudioApp ist die Basis der App, StudioFenster die Basis jeder erzeugten
+' Fensterklasse (<Fenster>_Basis). studioLauf() ist die Bildschleife: sie
+' fuehrt alle offenen Fenster, fragt die Ereignisse ab, die die gui nicht als
+' Rueckruf kennt, und zeichnet.
+
+IMPORT "gui"
+
+CLASS StudioApp
+    ' Nach dem Start, bevor das Startfenster aufgeht.
+    SUB Geoeffnet()
+    END SUB
+
+    ' Bevor das Programm endet.
+    SUB Beenden()
+    END SUB
+END CLASS
+
+CLASS StudioFenster
+    DIM studioWin AS GUI_WINDOW
+    DIM studioOffen AS BOOLEAN
+    DIM studioHaupt AS BOOLEAN
+    DIM studioWarB AS INTEGER
+    DIM studioWarH AS INTEGER
+
+    ' Die erzeugte Basisklasse baut hier das Fenster und verdrahtet es.
+    SUB studioAufbauen()
+    END SUB
+
+    ' Je Bild: Ereignisse, die die gui nicht als Rueckruf meldet.
+    SUB studioTakt()
+    END SUB
+
+    ' Je Bild nach GUI_DRAW: die Zeichenflaechen.
+    SUB studioZeichnen()
+    END SUB
+
+    ' Nachdem das Fenster aufgebaut ist.
+    SUB Geoeffnet()
+    END SUB
+
+    ' Wenn das Fenster geschlossen wird (Kreuz oder Zumachen).
+    SUB Schliessen()
+    END SUB
+
+    ' Wenn sich die Groesse des Fensters geaendert hat.
+    SUB Groesse()
+    END SUB
+
+    ' Zeigt das Fenster; beim ersten Mal wird es aufgebaut.
+    SUB Zeigen()
+        IF Self.studioOffen THEN
+            GUI_WINDOW_VISIBLE(Self.studioWin, TRUE)
+            GUI_WINDOW_FRONT(Self.studioWin)
+            RETURN
+        END IF
+        Self.studioAufbauen()
+        Self.studioOffen = TRUE
+        IF Self.studioHaupt THEN
+            GUI_WINDOW_CHROME(Self.studioWin, FALSE)
+            GUI_WINDOW_SET_BOUNDS(Self.studioWin, 0, 0, SCREENWIDTH(), SCREENHEIGHT())
+        ELSE
+            DIM b AS INTEGER : b = GUI_WINDOW_GET_W(Self.studioWin)
+            DIM h AS INTEGER : h = GUI_WINDOW_GET_H(Self.studioWin)
+            GUI_WINDOW_SET_BOUNDS(Self.studioWin, MAX(0, (SCREENWIDTH() - b) \ 2), MAX(0, (SCREENHEIGHT() - h) \ 2), b, h)
+            GUI_WINDOW_FRONT(Self.studioWin)
+        END IF
+        Self.studioWarB = GUI_WINDOW_GET_W(Self.studioWin)
+        Self.studioWarH = GUI_WINDOW_GET_H(Self.studioWin)
+        studioAnmelden(Self)
+        Self.Geoeffnet()
+    END SUB
+
+    ' Schliesst das Fenster. Das Startfenster zu schliessen beendet das Programm.
+    SUB Zumachen()
+        IF NOT Self.studioOffen THEN RETURN
+        Self.Schliessen()
+        Self.studioOffen = FALSE
+        GUI_WINDOW_DESTROY(Self.studioWin)
+        IF Self.studioHaupt THEN studioBeenden()
+    END SUB
+
+    ' Das Fenster der gui, fuer alles, was die Klasse nicht selbst anbietet.
+    FUNCTION Fenster() AS GUI_WINDOW
+        RETURN Self.studioWin
+    END FUNCTION
+END CLASS
+
+DIM studioFenster AS ARRAY OF StudioFenster : studioFenster = []
+DIM studioEnde AS BOOLEAN : studioEnde = FALSE
+
+SUB studioAnmelden(f AS StudioFenster)
+    ARRAY_PUSH(studioFenster, f)
+END SUB
+
+' Beendet das Programm nach dem laufenden Bild.
+SUB studioBeenden()
+    studioEnde = TRUE
+END SUB
+
+' Der Einstieg: oeffnet das Programmfenster in der Groesse des Startfensters,
+' laesst die App beginnen, zeigt das Startfenster und dreht die Bildschleife.
+SUB studioLauf(app AS StudioApp, start AS StudioFenster, b AS INTEGER, h AS INTEGER, titel AS STRING, veraenderbar AS BOOLEAN)
+    SCREEN(b, h, titel)
+    IF veraenderbar THEN WINDOW_RESIZABLE(TRUE)
+    SETFPS(60)
+    app.Geoeffnet()
+    start.studioHaupt = TRUE
+    start.Zeigen()
+    DIM schirmB AS INTEGER : schirmB = SCREENWIDTH()
+    DIM schirmH AS INTEGER : schirmH = SCREENHEIGHT()
+    WHILE NOT studioEnde
+        IF WINDOW_CLOSE_REQUESTED() THEN
+            start.Zumachen()
+            BREAK
+        END IF
+        IF QUITREQUESTED() THEN BREAK
+        IF SCREENWIDTH() <> schirmB OR SCREENHEIGHT() <> schirmH THEN
+            schirmB = SCREENWIDTH() : schirmH = SCREENHEIGHT()
+            IF start.studioOffen THEN GUI_WINDOW_SET_BOUNDS(start.studioWin, 0, 0, schirmB, schirmH)
+        END IF
+        GUI_UPDATE()
+        DIM i AS INTEGER : i = 0
+        WHILE i < LEN(studioFenster)
+            DIM f AS StudioFenster : f = studioFenster[i]
+            IF f.studioOffen THEN
+                IF GUI_WINDOW_CLOSED(f.studioWin) THEN
+                    f.Zumachen()
+                ELSE
+                    f.studioTakt()
+                    IF f.studioOffen THEN
+                        IF GUI_WINDOW_GET_W(f.studioWin) <> f.studioWarB OR GUI_WINDOW_GET_H(f.studioWin) <> f.studioWarH THEN
+                            f.studioWarB = GUI_WINDOW_GET_W(f.studioWin)
+                            f.studioWarH = GUI_WINDOW_GET_H(f.studioWin)
+                            f.Groesse()
+                        END IF
+                    END IF
+                END IF
+            END IF
+            i = i + 1
+        WEND
+        ' Geschlossene Fenster aus der Liste nehmen.
+        DIM noch AS ARRAY OF StudioFenster : noch = []
+        DIM g AS StudioFenster
+        FOR EACH g IN studioFenster
+            IF g.studioOffen THEN ARRAY_PUSH(noch, g)
+        NEXT
+        studioFenster = noch
+        IF studioEnde THEN BREAK
+        CLS(0)
+        GUI_DRAW(FALSE)
+        FOR EACH g IN studioFenster
+            g.studioZeichnen()
+        NEXT
+        FOR EACH g IN studioFenster
+            IF NOT g.studioHaupt THEN GUI_DRAW_WINDOW(g.studioWin)
+        NEXT
+        GUI_DRAW_TOP()
+        FLIP()
+    WEND
+    app.Beenden()
+END SUB

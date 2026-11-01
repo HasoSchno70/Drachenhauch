@@ -1,0 +1,669 @@
+' erzeugen.dh -- Stufe 3: aus dem Projekt ein lauffaehiges Programm machen,
+' es pruefen, starten und bauen.
+'
+' Erzeugt wird in den Ordner _studio/ des Projekts:
+'   studio_laufzeit.dh      Kopie von studio/laufzeit.dh (StudioApp, StudioFenster)
+'   <Fenster>_basis.dh      je Fenster die Klasse <Fenster>_Basis: ein Feld je
+'                           Control, der Aufbau aus dem Layout, die Verdrahtung
+'   main.dh                 der Einstieg: IMPORTs und studioLauf(...)
+' Das Projekt laeuft damit auch ohne das Studio: dhrt run _studio/main.dh
+'
+' Geprueft wird NICHT ueber die Dateien, sondern ueber einen Text im
+' Speicher, der dasselbe enthaelt (Laufzeit, Module, Klassen, App, je Fenster
+' Basis und Nutzerklasse, Start) -- so zeigen sich Fehler schon beim Tippen,
+' ohne dass etwas gesichert wird. Je Zeile dieses Textes merkt sich das
+' Studio, woher sie kommt (`gzEl`/`gzMeth`/`gzZeile`/`gzEinzug`), und setzt
+' einen Fehler damit an seine Stelle im Code-Feld.
+
+CONST STUDIO_UNTERORDNER = "_studio"
+DIM studioQuelle AS STRING : studioQuelle = CWD$()   ' dhrt run wechselt in den Ordner des Studios
+DIM laufzeitText AS STRING : laufzeitText = ""
+
+FUNCTION laufzeitQuelle$() AS STRING
+    IF laufzeitText = "" THEN laufzeitText = JOIN$(READLINES(PATHJOIN(studioQuelle, "laufzeit.dh")), CHR$(10)) + CHR$(10)
+    RETURN laufzeitText
+END FUNCTION
+
+' Ein Text als Zeichenkette mit Escape-Folgen (!"..."): nur \ und " brauchen eine.
+FUNCTION dhText$(roh AS STRING) AS STRING
+    RETURN "!" + CHR$(34) + REPLACE$(REPLACE$(roh, "\", "\\"), CHR$(34), "\" + CHR$(34)) + CHR$(34)
+END FUNCTION
+
+' Das Layout eines Fensters ohne die Rueckrufe alter Formulare (die nennen
+' freie Funktionen beim Namen; verdrahtet wird hier ueber Methoden).
+FUNCTION layoutFuerBasis(ei AS INTEGER) AS JSON_HANDLE
+    DIM d AS JSON_HANDLE
+    IF ei = aktFenster THEN d = JSON_PARSE(JSON_STRINGIFY(doc)) ELSE d = JSON_PARSE(elemente[ei].layout)
+    IF NOT JSON_HAS(d, "widgets") THEN JSON_SET_JSON(d, "widgets", JSON_NEW_ARRAY())
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(d, "widgets") - 1
+        DIM p AS STRING : p = "widgets." + STR$(i)
+        DIM k AS STRING
+        FOR EACH k IN JSON_KEYS(d, p)
+            IF LEFT$(k, 3) = "on_" THEN JSON_REMOVE(d, p + "." + JSON_KEY$(k))
+        NEXT
+    NEXT
+    RETURN d
+END FUNCTION
+
+' Der Befehl, der ein Ereignis als Rueckruf verdrahtet ("" = je Bild abgefragt).
+FUNCTION rueckrufBefehl$(ev AS STRING) AS STRING
+    SELECT CASE ev
+        CASE "Klick" : RETURN "GUI_ON_CLICK"
+        CASE "Geaendert" : RETURN "GUI_ON_CHANGE"
+        CASE "Enter" : RETURN "GUI_ON_ENTER"
+        CASE "FokusRein" : RETURN "GUI_ON_FOCUS"
+        CASE "FokusRaus" : RETURN "GUI_ON_BLUR"
+        CASE "MausRein" : RETURN "GUI_ON_HOVER"
+        CASE "MausRaus" : RETURN "GUI_ON_LEAVE"
+    END SELECT
+    RETURN ""
+END FUNCTION
+
+FUNCTION enthaelt(liste AS ARRAY OF STRING, wert AS STRING) AS BOOLEAN
+    DIM s AS STRING
+    FOR EACH s IN liste
+        IF LOWER$(s) = LOWER$(wert) THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Die erzeugte Basisklasse eines Fensters.
+FUNCTION basisCode$(ei AS INTEGER) AS STRING
+    DIM e AS Element : e = elemente[ei]
+    DIM d AS JSON_HANDLE : d = layoutFuerBasis(ei)
+    DIM n AS INTEGER : n = JSON_LEN(d, "widgets")
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM arten AS ARRAY OF STRING : arten = []
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM p AS STRING : p = "widgets." + STR$(i)
+        ARRAY_PUSH(namen, IIF(JSON_HAS(d, p + ".name"), JSON_GET_STRING(d, p + ".name"), ""))
+        ARRAY_PUSH(arten, JSON_GET_STRING(d, p + ".kind"))
+    NEXT
+    DIM z AS ARRAY OF STRING : z = []
+    ARRAY_PUSH(z, "' Erzeugt vom Drachenhauch Studio aus " + layoutDatei$(e) + " -- nicht von Hand aendern,")
+    ARRAY_PUSH(z, "' beim naechsten Starten wird die Datei neu geschrieben. Der Code des Fensters")
+    ARRAY_PUSH(z, "' steht in " + codeDatei$(e) + " (CLASS " + e.name + " EXTENDS " + e.name + "_Basis).")
+    ARRAY_PUSH(z, "CLASS " + e.name + "_Basis EXTENDS StudioFenster")
+    FOR i = 0 TO n - 1
+        IF istBezeichner(namen[i]) THEN ARRAY_PUSH(z, "    DIM " + namen[i] + " AS GUI_WIDGET")
+    NEXT
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "    SUB studioAufbauen()")
+    ARRAY_PUSH(z, "        DIM j AS STRING : j = " + CHR$(34) + CHR$(34))
+    DIM json AS STRING : json = JSON_STRINGIFY(d)
+    DIM pos AS INTEGER : pos = 0
+    WHILE pos < LEN(json)
+        ARRAY_PUSH(z, "        j = j + " + dhText$(MID$(json, pos, 96)))
+        pos = pos + 96
+    WEND
+    ARRAY_PUSH(z, "        Self.studioWin = GUI_FROM_JSON(j)")
+    FOR i = 0 TO n - 1
+        IF istBezeichner(namen[i]) THEN ARRAY_PUSH(z, "        Self." + namen[i] + " = GUI_WINDOW_WIDGET(Self.studioWin, " + STR$(i) + ")")
+    NEXT
+    ' Je Ereignis-Methode des Nutzers: verdrahten oder in takt/zeichnen abfragen.
+    DIM m2 AS STRING
+    DIM takt AS ARRAY OF STRING : takt = []
+    DIM zeichnen AS ARRAY OF STRING : zeichnen = []
+    DIM leer AS ARRAY OF STRING : leer = []
+    DIM m AS Methode
+    FOR EACH m IN methoden
+        IF NOT (m.el = e) THEN CONTINUE
+        FOR i = 0 TO n - 1
+            IF NOT istBezeichner(namen[i]) THEN CONTINUE
+            DIM ev AS STRING : ev = ereignisVon$(m.name, namen[i])
+            IF ev = "" OR NOT enthaelt(ereignisseFuer(arten[i]), ev) THEN CONTINUE
+            DIM ctl AS STRING : ctl = "Self." + namen[i]
+            DIM befehl AS STRING : befehl = rueckrufBefehl$(ev)
+            IF befehl <> "" THEN
+                ARRAY_PUSH(z, "        " + befehl + "(" + ctl + ", Self." + m.name + ")")
+            ELSEIF LOWER$(ev) = "doppelklick" THEN
+                ARRAY_PUSH(takt, "        IF GUI_DOUBLE_CLICKED(" + ctl + ") THEN Self." + m.name + "()")
+            ELSEIF LOWER$(ev) = "maus" THEN
+                ARRAY_PUSH(takt, "        IF MOUSE_HIT(0) THEN")
+                ARRAY_PUSH(takt, "            IF GUI_HIT_TEST(MOUSEX(), MOUSEY()) = " + ctl + " THEN Self." + m.name + "()")
+                ARRAY_PUSH(takt, "        END IF")
+            ELSEIF LOWER$(ev) = "zeichnen" THEN
+                ARRAY_PUSH(zeichnen, "        SCISSOR(GUI_CANVAS_X(" + ctl + "), GUI_CANVAS_Y(" + ctl + "), GUI_CANVAS_W(" + ctl + "), GUI_CANVAS_H(" + ctl + "))")
+                ARRAY_PUSH(zeichnen, "        Self." + m.name + "()")
+                ARRAY_PUSH(zeichnen, "        SCISSOR_END()")
+            END IF
+            ' Leer in der Basis, damit der Verweis auf Self.<methode> schon
+            ' hier aufgeloest werden kann; die Nutzerklasse ueberschreibt sie.
+            ARRAY_PUSH(leer, "")
+            ARRAY_PUSH(leer, "    " + m.kopf)
+            ARRAY_PUSH(leer, "    END " + UPPER$(m.art))
+            BREAK
+        NEXT
+    NEXT
+    ARRAY_PUSH(z, "    END SUB")
+    IF LEN(takt) > 0 THEN
+        ARRAY_PUSH(z, "")
+        ARRAY_PUSH(z, "    SUB studioTakt()")
+        FOR EACH m2 IN takt
+            ARRAY_PUSH(z, m2)
+        NEXT
+        ARRAY_PUSH(z, "    END SUB")
+    END IF
+    IF LEN(zeichnen) > 0 THEN
+        ARRAY_PUSH(z, "")
+        ARRAY_PUSH(z, "    SUB studioZeichnen()")
+        ARRAY_PUSH(z, "        IF NOT GUI_WINDOW_SHOWN(Self.studioWin) THEN RETURN")
+        FOR EACH m2 IN zeichnen
+            ARRAY_PUSH(z, m2)
+        NEXT
+        ARRAY_PUSH(z, "    END SUB")
+    END IF
+    FOR EACH m2 IN leer
+        ARRAY_PUSH(z, m2)
+    NEXT
+    ARRAY_PUSH(z, "END CLASS")
+    RETURN JOIN$(z, CHR$(10)) + CHR$(10)
+END FUNCTION
+
+' Die Elemente in der Reihenfolge, in der main.dh sie einbindet: Module,
+' Klassen (eine Oberklasse vor ihren Unterklassen), App, Fenster.
+FUNCTION reihenfolge() AS ARRAY OF INTEGER
+    DIM aus AS ARRAY OF INTEGER : aus = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(elemente) - 1
+        IF elemente[i].art = "modul" THEN ARRAY_PUSH(aus, i)
+    NEXT
+    ' Klassen: so lange durchgehen, bis jede steht, deren Oberklasse schon
+    ' steht oder keine Projektklasse ist.
+    DIM drin AS ARRAY OF STRING : drin = []
+    DIM runde AS INTEGER
+    FOR runde = 0 TO LEN(elemente)
+        FOR i = 0 TO LEN(elemente) - 1
+            DIM e AS Element : e = elemente[i]
+            IF e.art <> "klasse" OR enthaelt(drin, e.name) THEN CONTINUE
+            DIM ob AS INTEGER : ob = elementIndex(e.basis)
+            DIM bereit AS BOOLEAN : bereit = (e.basis = "" OR ob < 0)
+            IF NOT bereit THEN bereit = (elemente[ob].art <> "klasse") OR enthaelt(drin, e.basis)
+            IF bereit OR runde = LEN(elemente) THEN
+                ARRAY_PUSH(aus, i)
+                ARRAY_PUSH(drin, e.name)
+            END IF
+        NEXT
+    NEXT
+    FOR i = 0 TO LEN(elemente) - 1
+        IF elemente[i].art = "app" THEN ARRAY_PUSH(aus, i)
+    NEXT
+    FOR i = 0 TO LEN(elemente) - 1
+        IF elemente[i].art = "fenster" THEN ARRAY_PUSH(aus, i)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+FUNCTION startIndex() AS INTEGER
+    DIM s AS INTEGER : s = elementIndex(projStart)
+    IF s >= 0 THEN
+        IF elemente[s].art = "fenster" THEN RETURN s
+    END IF
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(elemente) - 1
+        IF elemente[i].art = "fenster" THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Die Zeilen, die das Programm starten (am Ende von main.dh).
+FUNCTION startZeilen$() AS STRING
+    DIM s AS INTEGER : s = startIndex()
+    IF s < 0 THEN RETURN "PRINT " + CHR$(34) + "Das Projekt hat kein Fenster." + CHR$(34) + CHR$(10)
+    DIM d AS JSON_HANDLE : d = layoutFuerBasis(s)
+    DIM b AS INTEGER : b = IIF(JSON_HAS(d, "w"), JSON_GET_INT(d, "w"), 600)
+    DIM h AS INTEGER : h = IIF(JSON_HAS(d, "h"), JSON_GET_INT(d, "h"), 400)
+    DIM titel AS STRING : titel = IIF(JSON_HAS(d, "title"), JSON_GET_STRING(d, "title"), elemente[s].name)
+    DIM groesse AS BOOLEAN : groesse = FALSE
+    IF JSON_HAS(d, "resizable") THEN groesse = JSON_GET_BOOL(d, "resizable")
+    DIM app AS STRING : app = IIF(elementIndex("App") >= 0, "App", "StudioApp")
+    IF elementIndex("App") >= 0 THEN
+        IF elemente[elementIndex("App")].art <> "app" THEN app = "StudioApp"
+    END IF
+    DIM z AS ARRAY OF STRING : z = []
+    ARRAY_PUSH(z, "DIM studioDieApp AS " + app + " : studioDieApp = NEW " + app + "()")
+    ARRAY_PUSH(z, "DIM studioStartFenster AS " + elemente[s].name + " : studioStartFenster = NEW " + elemente[s].name + "()")
+    ARRAY_PUSH(z, "studioLauf(studioDieApp, studioStartFenster, " + STR$(b) + ", " + STR$(h) + ", " + dhText$(titel) + ", " + IIF(groesse, "TRUE", "FALSE") + ")")
+    RETURN JOIN$(z, CHR$(10)) + CHR$(10)
+END FUNCTION
+
+FUNCTION mainCode$() AS STRING
+    DIM z AS ARRAY OF STRING : z = []
+    ARRAY_PUSH(z, "' Erzeugt vom Drachenhauch Studio -- der Einstieg des Projekts " + projName + ".")
+    ARRAY_PUSH(z, "' Ohne das Studio starten: dhrt run _studio/main.dh")
+    ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "studio_laufzeit.dh" + CHR$(34))
+    DIM i AS INTEGER
+    FOR EACH i IN reihenfolge()
+        DIM e AS Element : e = elemente[i]
+        IF e.art = "fenster" THEN ARRAY_PUSH(z, "IMPORT " + CHR$(34) + e.name + "_basis.dh" + CHR$(34))
+        ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "projekt/" + codeDatei$(e) + CHR$(34))
+    NEXT
+    ARRAY_PUSH(z, "")
+    RETURN JOIN$(z, CHR$(10)) + CHR$(10) + startZeilen$()
+END FUNCTION
+
+FUNCTION studioOrdner$() AS STRING
+    RETURN PATHJOIN(projOrdner, STUDIO_UNTERORDNER)
+END FUNCTION
+
+' Schreibt _studio/ neu. Erwartet ein gesichertes Projekt.
+SUB erzeugen()
+    DIM o AS STRING : o = studioOrdner$()
+    IF NOT DIREXISTS(o) THEN MKDIR(o)
+    WRITEALL(PATHJOIN(o, "studio_laufzeit.dh"), laufzeitQuelle$())
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(elemente) - 1
+        IF elemente[i].art = "fenster" THEN WRITEALL(PATHJOIN(o, elemente[i].name + "_basis.dh"), basisCode$(i))
+    NEXT
+    ' Der Code des Projekts so, wie er im Editor steht -- dann passen die
+    ' Zeilen einer Meldung genau auf die Karte aus codeSetzen$, auch wenn die
+    ' Datei im Projektordner von Hand anders geschrieben ist.
+    DIM pk AS STRING : pk = PATHJOIN(o, "projekt")
+    IF NOT DIREXISTS(pk) THEN MKDIR(pk)
+    DIM alt AS STRING
+    FOR EACH alt IN DIRLIST(pk, "*.dh")
+        DELETEFILE(PATHJOIN(pk, alt))
+    NEXT
+    FOR i = 0 TO LEN(elemente) - 1
+        WRITEALL(PATHJOIN(pk, codeDatei$(elemente[i])), codeSetzen$(elemente[i]))
+    NEXT
+    WRITEALL(PATHJOIN(o, "main.dh"), mainCode$())
+    protokoll("erzeugt " + STR$(LEN(elemente)))
+END SUB
+
+' --- Pruefen ---------------------------------------------------------------------
+CLASS Befund
+    DIM el AS INTEGER          ' Element (-1 = keines)
+    DIM meth AS INTEGER        ' Methode, KARTE_DEKL, KARTE_SONST
+    DIM zeile AS INTEGER       ' Zeile im Feld (ab 1, 0 = keine)
+    DIM spalte AS INTEGER      ' Spalte im Feld (ab 1)
+    DIM laenge AS INTEGER
+    DIM meldung AS STRING
+    DIM fehler AS BOOLEAN
+    DIM erzeugt AS BOOLEAN     ' in der erzeugten Basisklasse
+END CLASS
+
+DIM befunde AS ARRAY OF Befund : befunde = []
+DIM gzEl AS ARRAY OF INTEGER : gzEl = []
+DIM gzMeth AS ARRAY OF INTEGER : gzMeth = []
+DIM gzZeile AS ARRAY OF INTEGER : gzZeile = []
+DIM gzEinzug AS ARRAY OF INTEGER : gzEinzug = []
+DIM gzErzeugt AS ARRAY OF BOOLEAN : gzErzeugt = []
+DIM pruefZeit AS INTEGER : pruefZeit = 0      ' MILLIS der letzten Aenderung, 0 = nichts faellig
+DIM pruefText AS STRING : pruefText = ""
+
+SUB gzDazu(teile AS ARRAY OF STRING, text AS STRING, el AS INTEGER, erzeugt AS BOOLEAN, mitKarte AS BOOLEAN)
+    DIM zz AS ARRAY OF STRING : zz = SPLIT(text, CHR$(10))
+    ' Der Text endet mit einem Umbruch -- das leere Stueck dahinter ist keine Zeile.
+    IF LEN(zz) > 0 THEN
+        IF zz[LEN(zz) - 1] = "" THEN ARRAY_REMOVE_AT(zz, LEN(zz) - 1)
+    END IF
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(zz) - 1
+        ARRAY_PUSH(teile, zz[k])
+        ARRAY_PUSH(gzEl, el)
+        ARRAY_PUSH(gzErzeugt, erzeugt)
+        IF mitKarte AND k < LEN(karteMeth) THEN
+            ARRAY_PUSH(gzMeth, karteMeth[k])
+            ARRAY_PUSH(gzZeile, karteZeile[k])
+            ARRAY_PUSH(gzEinzug, karteEinzug[k])
+        ELSE
+            ARRAY_PUSH(gzMeth, KARTE_SONST)
+            ARRAY_PUSH(gzZeile, 0)
+            ARRAY_PUSH(gzEinzug, 0)
+        END IF
+    NEXT
+END SUB
+
+' Der ganze Programmtext in einem Stueck, mit seiner Herkunft je Zeile.
+FUNCTION ganzerText$() AS STRING
+    gzEl = [] : gzMeth = [] : gzZeile = [] : gzEinzug = [] : gzErzeugt = []
+    DIM teile AS ARRAY OF STRING : teile = []
+    gzDazu(teile, laufzeitQuelle$(), -1, TRUE, FALSE)
+    DIM i AS INTEGER
+    FOR EACH i IN reihenfolge()
+        IF elemente[i].art = "fenster" THEN gzDazu(teile, basisCode$(i), i, TRUE, FALSE)
+        DIM c AS STRING : c = codeSetzen$(elemente[i])
+        gzDazu(teile, c, i, FALSE, TRUE)
+    NEXT
+    gzDazu(teile, startZeilen$(), -1, TRUE, FALSE)
+    RETURN JOIN$(teile, CHR$(10)) + CHR$(10)
+END FUNCTION
+
+' Prueft das Projekt; liefert die Zahl der Fehler (ohne Warnungen).
+FUNCTION projektPruefen() AS INTEGER
+    pruefZeit = 0
+    DIM r AS Reiter
+    FOR EACH r IN reiter
+        codeUebernehmen(r)
+    NEXT
+    pruefText = ganzerText$()
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + CODE_CHECK$(pruefText, projOrdner) + "}")
+    befunde = []
+    DIM fehler AS INTEGER : fehler = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(j, "b") - 1
+        DIM p AS STRING : p = "b." + STR$(k)
+        DIM schw AS STRING : schw = JSON_GET_STRING(j, p + ".schwere")
+        IF schw = "hinweis" THEN CONTINUE
+        DIM z AS INTEGER : z = JSON_GET_INT(j, p + ".zeile")
+        DIM b AS Befund : b = NEW Befund()
+        b.meldung = JSON_GET_STRING(j, p + ".meldung")
+        b.fehler = (schw = "fehler")
+        b.el = -1 : b.meth = KARTE_SONST : b.zeile = 0 : b.spalte = 1 : b.laenge = 1
+        IF z >= 1 AND z <= LEN(gzEl) THEN
+            b.el = gzEl[z - 1]
+            b.erzeugt = gzErzeugt[z - 1]
+            b.meth = gzMeth[z - 1]
+            b.zeile = gzZeile[z - 1]
+            IF JSON_HAS(j, p + ".spalte") THEN
+                b.spalte = MAX(1, JSON_GET_INT(j, p + ".spalte") - gzEinzug[z - 1])
+                b.laenge = MAX(1, JSON_GET_INT(j, p + ".laenge"))
+            END IF
+        END IF
+        ' Die Laufzeit selbst sollte keine Befunde haben; Warnungen dort zeigt
+        ' das Studio nicht, Fehler schon (sonst laeuft nichts).
+        IF b.el < 0 AND NOT b.fehler THEN CONTINUE
+        IF b.fehler THEN fehler = fehler + 1
+        ARRAY_PUSH(befunde, b)
+    NEXT
+    befundeAnzeigen()
+    protokoll("geprueft " + STR$(fehler) + " " + STR$(LEN(befunde) - fehler))
+    RETURN fehler
+END FUNCTION
+
+' Wo ein Befund hingehoert, als Text fuer die Liste.
+FUNCTION befundOrt$(b AS Befund) AS STRING
+    IF b.el < 0 THEN RETURN "Programm"
+    DIM e AS Element : e = elemente[b.el]
+    IF b.erzeugt THEN RETURN e.name + " (erzeugt)"
+    IF b.meth >= 0 AND b.meth < LEN(methoden) THEN
+        DIM s AS STRING : s = e.name + "." + methoden[b.meth].name
+        DIM rz AS INTEGER : rz = LEN(SPLIT(methoden[b.meth].rumpf, CHR$(10)))
+        IF b.zeile > rz THEN
+            s = s + ", am Ende"
+        ELSEIF b.zeile > 0 THEN
+            s = s + ", Zeile " + STR$(b.zeile)
+        END IF
+        RETURN s
+    END IF
+    IF b.meth = KARTE_DEKL THEN RETURN e.name + ".Eigenschaften, Zeile " + STR$(b.zeile)
+    RETURN e.name
+END FUNCTION
+
+' Die Befunde in der Liste und in den offenen Code-Feldern.
+' Fuer Pruefungen: zwei Bilder nach dem Fuellen die Lage jeder Zeile der
+' Problemliste ("lage befund k x y") -- erst dann ist sie verteilt.
+DIM befundLagen AS INTEGER : befundLagen = 0
+
+SUB befundLagenNachziehen()
+    IF befundLagen = 0 THEN RETURN
+    befundLagen = befundLagen - 1
+    IF befundLagen > 0 OR logDatei = "" THEN RETURN
+    DIM k AS INTEGER
+    FOR k = 0 TO GUI_LISTBOX_COUNT(lstProbleme) - 1
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        DIM b AS INTEGER
+        DIM h AS INTEGER
+        (x, y, b, h) = GUI_LISTBOX_ITEM_RECT(lstProbleme, k)
+        IF h > 0 THEN protokoll("lage befund " + STR$(k) + " " + STR$(x + b \ 2) + " " + STR$(y + h \ 2))
+    NEXT
+END SUB
+
+SUB befundeAnzeigen()
+    GUI_LISTBOX_CLEAR(lstProbleme)
+    DIM b AS Befund
+    DIM fehler AS INTEGER : fehler = 0
+    FOR EACH b IN befunde
+        GUI_LISTBOX_ADD(lstProbleme, IIF(b.fehler, "✕ ", "⚠ ") + befundOrt$(b) + ": " + b.meldung)
+        GUI_LISTBOX_COLOR(lstProbleme, GUI_LISTBOX_COUNT(lstProbleme) - 1, IIF(b.fehler, &HE86060, &HE0B040))
+        IF b.fehler THEN fehler = fehler + 1
+    NEXT
+    IF LEN(befunde) = 0 THEN GUI_LISTBOX_PLACEHOLDER(lstProbleme, "Keine Probleme.")
+    GUI_DOCK_TITLE(win, "probleme", IIF(LEN(befunde) = 0, "Probleme", "Probleme (" + STR$(LEN(befunde)) + ")"))
+    befundLagen = 2
+    DIM r AS Reiter
+    FOR EACH r IN reiter
+        feldBefunde(r)
+    NEXT
+END SUB
+
+' Wellenlinien und Marken in einem Code-Feld.
+SUB feldBefunde(r AS Reiter)
+    IF r.art = "layout" OR r.feld < 0 THEN RETURN
+    DIM tz AS ARRAY OF STRING : tz = SPLIT(GUI_TEXT(r.feld), CHR$(10))
+    DIM ws AS ARRAY OF INTEGER : ws = []
+    DIM wl AS ARRAY OF INTEGER : wl = []
+    DIM wf AS ARRAY OF INTEGER : wf = []
+    DIM mz AS ARRAY OF INTEGER : mz = []
+    DIM mf AS ARRAY OF INTEGER : mf = []
+    DIM hz AS ARRAY OF INTEGER : hz = []
+    DIM ht AS ARRAY OF STRING : ht = []
+    DIM b AS Befund
+    FOR EACH b IN befunde
+        IF b.el < 0 OR b.erzeugt OR b.zeile < 1 THEN CONTINUE
+        IF NOT (elemente[b.el] = r.el) THEN CONTINUE
+        IF r.art = "code" THEN
+            IF b.meth < 0 THEN CONTINUE
+            IF NOT (methoden[b.meth] = r.meth) THEN CONTINUE
+        ELSEIF b.meth <> KARTE_DEKL THEN
+            CONTINUE
+        END IF
+        ' Hinter der letzten Zeile = gemeldet am END SUB: ans Ende der letzten.
+        DIM z AS INTEGER : z = MIN(b.zeile, LEN(tz))
+        DIM sp AS INTEGER : sp = IIF(b.zeile > LEN(tz), LEN(tz[z - 1]) + 1, b.spalte)
+        DIM anfang AS INTEGER : anfang = 0
+        DIM k AS INTEGER
+        FOR k = 0 TO z - 2
+            anfang = anfang + LEN(tz[k]) + 1
+        NEXT
+        DIM farbe AS INTEGER : farbe = IIF(b.fehler, &HE84848, &HE0B040)
+        ARRAY_PUSH(ws, anfang + MAX(0, MIN(sp - 1, LEN(tz[z - 1]) - 1)))
+        ARRAY_PUSH(wl, MAX(1, MIN(b.laenge, LEN(tz[z - 1]) - sp + 1)))
+        ARRAY_PUSH(wf, farbe)
+        ARRAY_PUSH(mz, z)
+        ARRAY_PUSH(mf, farbe)
+        ARRAY_PUSH(hz, z)
+        ARRAY_PUSH(ht, IIF(LEN(b.meldung) > 80, LEFT$(b.meldung, 77) + "...", b.meldung))
+    NEXT
+    GUI_TEXTAREA_SQUIGGLES(r.feld, ws, wl, wf)
+    GUI_TEXTAREA_MARKS(r.feld, mz, mf)
+    GUI_TEXTAREA_HINTS(r.feld, hz, ht, &HC07070)
+END SUB
+
+' Einen Befund ansteuern: die Methode oeffnen und an die Zeile gehen.
+SUB befundAnspringen(k AS INTEGER)
+    IF k < 0 OR k >= LEN(befunde) THEN RETURN
+    DIM b AS Befund : b = befunde[k]
+    IF b.el < 0 THEN RETURN
+    IF b.meth >= 0 AND b.meth < LEN(methoden) THEN
+        codeOeffnen(methoden[b.meth])
+    ELSEIF b.meth = KARTE_DEKL THEN
+        deklOeffnen(elemente[b.el])
+    ELSE
+        RETURN
+    END IF
+    DIM r AS Reiter : r = reiter[reiterVorn()]
+    feldBefunde(r)
+    IF b.zeile > 0 AND r.feld >= 0 THEN GUI_TEXTAREA_GOTO(r.feld, b.zeile, b.spalte)
+    protokoll("angesprungen " + befundOrt$(b))
+END SUB
+
+' --- Starten, Anhalten, Bauen ---------------------------------------------------------
+DIM lauf AS INTEGER : lauf = -1          ' Prozess des laufenden Programms
+DIM bau AS INTEGER : bau = -1            ' Prozess des Bauens
+DIM bauZiel AS STRING : bauZiel = ""
+DIM lstAusgabe AS GUI_WIDGET
+DIM lstProbleme AS GUI_WIDGET
+DIM ausgabeRest AS STRING : ausgabeRest = ""
+
+SUB ausgabe(text AS STRING, farbe AS INTEGER)
+    GUI_LISTBOX_ADD(lstAusgabe, text)
+    DIM i AS INTEGER : i = GUI_LISTBOX_COUNT(lstAusgabe) - 1
+    IF farbe >= 0 THEN GUI_LISTBOX_COLOR(lstAusgabe, i, farbe)
+    GUI_LISTBOX_SCROLL_TO(lstAusgabe, i)
+    protokoll("ausgabe " + text)
+END SUB
+
+' Vor Starten und Bauen: gesichert, geprueft, erzeugt.
+FUNCTION vorbereiten(wozu AS STRING) AS BOOLEAN
+    IF projLose OR projOrdner = "" OR projektGeaendert() THEN
+        IF NOT sichern(FALSE) THEN
+            status(wozu + " braucht ein gesichertes Projekt.")
+            RETURN FALSE
+        END IF
+    END IF
+    IF startIndex() < 0 THEN
+        status("Das Projekt hat kein Fenster.")
+        RETURN FALSE
+    END IF
+    DIM f AS INTEGER : f = projektPruefen()
+    IF f > 0 THEN
+        GUI_DOCK_ACTIVATE(win, "probleme")
+        status(STR$(f) + IIF(f = 1, " Fehler", " Fehler") + " -- erst beheben, dann " + LOWER$(wozu) + ".")
+        protokoll("nicht " + LOWER$(wozu) + " " + STR$(f))
+        RETURN FALSE
+    END IF
+    erzeugen()
+    RETURN TRUE
+END FUNCTION
+
+SUB starten()
+    IF lauf >= 0 THEN anhalten()
+    IF NOT vorbereiten("Starten") THEN RETURN
+    GUI_LISTBOX_CLEAR(lstAusgabe)
+    GUI_DOCK_ACTIVATE(win, "ausgabe")
+    DIM main AS STRING : main = PATHJOIN(studioOrdner$(), "main.dh")
+    ausgabe("▶ " + projName + " startet …", &H70C070)
+    DIM bilder AS STRING : bilder = GETENV$("DH_STUDIO_LAUF_BILDER")
+    IF bilder <> "" THEN
+        lauf = PROCESS_START("dhrt", "run", "--bilder", bilder, main)
+    ELSE
+        lauf = PROCESS_START("dhrt", "run", main)
+    END IF
+    ausgabeRest = ""
+    werkzeugeNachziehen()
+    status("Läuft: " + projName)
+    protokoll("gestartet " + main)
+END SUB
+
+SUB anhalten()
+    IF lauf < 0 THEN RETURN
+    PROCESS_KILL(lauf)
+    lauf = -1
+    ausgabe("■ Angehalten.", &HB0B0B0)
+    werkzeugeNachziehen()
+    status("Angehalten.")
+    protokoll("angehalten")
+END SUB
+
+FUNCTION unterWindows() AS BOOLEAN
+    RETURN LOWER$(RIGHT$(EXEPATH$(), 4)) = ".exe"
+END FUNCTION
+
+SUB bauen()
+    IF bau >= 0 THEN RETURN
+    IF NOT vorbereiten("Bauen") THEN RETURN
+    GUI_LISTBOX_CLEAR(lstAusgabe)
+    GUI_DOCK_ACTIVATE(win, "ausgabe")
+    DIM o AS STRING : o = PATHJOIN(projOrdner, "bau")
+    IF NOT DIREXISTS(o) THEN MKDIR(o)
+    bauZiel = PATHJOIN(o, projName + IIF(unterWindows(), ".exe", ""))
+    ausgabe("⚙ Baue " + bauZiel + " …", &H70A0E0)
+    bau = PROCESS_START("dhrt", "--export", PATHJOIN(studioOrdner$(), "main.dh"), bauZiel)
+    werkzeugeNachziehen()
+    status("Baue …")
+    protokoll("bauen " + bauZiel)
+END SUB
+
+' Eine Zeile der Ausgabe; ein Laufzeitfehler mit Datei und Zeile wird zum
+' Befund an seiner Methode.
+SUB ausgabeZeile(z AS STRING)
+    IF TRIM$(z) = "" THEN RETURN
+    ' Warnungen des Uebersetzers stehen schon unter Probleme.
+    IF REGEX_TEST(z, "^[^ ]+\.dh:[0-9]+: Warnung:") THEN RETURN
+    DIM fund AS STRING : fund = REGEX_FIND(z, "[A-Za-z0-9_]+\.dh:[0-9]+")
+    DIM istFehler AS BOOLEAN : istFehler = INSTR(z, "Laufzeitfehler") >= 0 OR INSTR(z, "Fehler") >= 0
+    ausgabe(z, IIF(istFehler, &HE86060, -1))
+    IF NOT istFehler OR fund = "" THEN RETURN
+    DIM pk AS INTEGER : pk = INSTR(fund, ".dh:")
+    DIM name AS STRING : name = LEFT$(fund, pk)
+    DIM zeile AS INTEGER : zeile = INT(VAL(MID$(fund, pk + 4, 20)))
+    DIM ei AS INTEGER : ei = elementIndex(name)
+    IF ei < 0 THEN RETURN
+    DIM gesetzt AS STRING : gesetzt = codeSetzen$(elemente[ei])
+    IF zeile < 1 OR zeile > LEN(karteMeth) THEN RETURN
+    DIM b AS Befund : b = NEW Befund()
+    b.el = ei : b.meth = karteMeth[zeile - 1] : b.zeile = karteZeile[zeile - 1]
+    b.spalte = 1 : b.laenge = 1 : b.fehler = TRUE
+    b.meldung = TRIM$(MID$(z, INSTR(z, fund) + LEN(fund) + 1, LEN(z)))
+    ARRAY_PUSH(befunde, b)
+    befundeAnzeigen()
+    protokoll("laufzeitfehler " + befundOrt$(b))
+END SUB
+
+' Was beim Bauen in die Ausgabe gehoert: Warnungen stehen schon unter
+' Probleme, und dass der Bau-Ordner nicht geraeumt wird, ist Absicht.
+FUNCTION bauZeileZeigen(z AS STRING) AS BOOLEAN
+    IF TRIM$(z) = "" THEN RETURN FALSE
+    IF REGEX_TEST(z, "^[^ ]+[.]dh:[0-9]+: Warnung:") THEN RETURN FALSE
+    IF LEFT$(z, 9) = "Hinweis: " AND INSTR(z, "nicht geraeumt") >= 0 THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+
+' Je Bild: Ausgabe der Prozesse abholen, Ende erkennen, faellige Pruefung.
+SUB prozessePruefen()
+    IF lauf >= 0 THEN
+        DIM t AS STRING : t = PROCESS_READ$(lauf) + PROCESS_ERR$(lauf)
+        WHILE t <> ""
+            ausgabeRest = ausgabeRest + REPLACE$(t, CHR$(13), "")
+            t = PROCESS_READ$(lauf) + PROCESS_ERR$(lauf)
+        WEND
+        WHILE INSTR(ausgabeRest, CHR$(10)) >= 0
+            DIM p AS INTEGER : p = INSTR(ausgabeRest, CHR$(10))
+            ausgabeZeile(LEFT$(ausgabeRest, p))
+            ausgabeRest = MID$(ausgabeRest, p + 1, LEN(ausgabeRest))
+        WEND
+        IF NOT PROCESS_RUNNING(lauf) AND PROCESS_READ$(lauf) = "" THEN
+            IF ausgabeRest <> "" THEN ausgabeZeile(ausgabeRest) : ausgabeRest = ""
+            DIM code AS INTEGER : code = PROCESS_CODE(lauf)
+            ausgabe(IIF(code = 0, "■ Beendet.", "■ Beendet mit Rückgabe " + STR$(code) + "."), &HB0B0B0)
+            protokoll("beendet " + STR$(code))
+            lauf = -1
+            werkzeugeNachziehen()
+            status("Beendet.")
+        END IF
+    END IF
+    IF bau >= 0 THEN
+        DIM bt AS STRING : bt = PROCESS_READ$(bau) + PROCESS_ERR$(bau)
+        IF bt <> "" THEN
+            DIM bz AS STRING
+            FOR EACH bz IN SPLIT(REPLACE$(bt, CHR$(13), ""), CHR$(10))
+                IF bauZeileZeigen(bz) THEN ausgabe(bz, -1)
+            NEXT
+        ELSEIF NOT PROCESS_RUNNING(bau) THEN
+            DIM bc AS INTEGER : bc = PROCESS_CODE(bau)
+            IF bc = 0 AND FILEEXISTS(bauZiel) THEN
+                ausgabe("✓ Gebaut: " + bauZiel, &H70C070)
+                status("Gebaut: " + BASENAME(bauZiel))
+                protokoll("gebaut " + bauZiel)
+            ELSE
+                ausgabe("✕ Bauen fehlgeschlagen (Rückgabe " + STR$(bc) + ").", &HE86060)
+                status("Bauen fehlgeschlagen.")
+                protokoll("bau fehlgeschlagen " + STR$(bc))
+            END IF
+            bau = -1
+            werkzeugeNachziehen()
+        END IF
+    END IF
+    IF pruefZeit > 0 AND MILLIS() - pruefZeit > 600 THEN projektPruefen()
+    befundLagenNachziehen()
+END SUB
+
+' Nach einer Aenderung: in einem Augenblick pruefen (nicht je Anschlag).
+SUB pruefenVormerken()
+    pruefZeit = MILLIS()
+END SUB
