@@ -3558,7 +3558,23 @@ aus der Bibliothek ueber Suche + Doppelklick, Timer waehlen/Inspektor/Entf,
 Menue-Editor, das erzeugte Programm mit Frage + Enter, modalem Fenster,
 Timer, Strg+H und Bild-Pixel, Debugger mit Halt/Schritt/Weiter); zehn
 Verfaelschungen fallen je in ihrem Fall. Bild hinzufuegen selbst (Dialog)
-ist nur von Hand geprueft.
+ist nur von Hand geprueft. **Nachtrag (selber Tag):** Ereignisse mit
+Parametern (`ereignisParameter$`, der Ereignis-Dialog setzt sie in die
+Kopfzeile): `Ziehen(x, y)` und `Rad(schritte)` der Zeichenflaeche (Feld
+`studioZug_<name>`, ab dem Druck auf die Flaeche), `Taste(taste)` des
+obersten Fensters (`StudioFenster.Taste`, in `studioBild` aus
+`KEY_ANY_HIT`, nicht wenn ein Eingabefeld den Fokus hat). **Falle beim
+Pruefen:** `KEY_ANY_HIT` blendet aus, was eine Wiedergabe einspeist -- der
+Fall dafuer schickt echte Fensternachrichten
+(`werkzeug_studio4_taste.dhtest`, seriell, nur Windows). Vervollstaendigung
+im Code-Feld (`studio/vervoll.dh`): Strg+Leertaste oder hinter `.` (dann
+nur bis 100 Eintraege), gefragt wird `CODE_COMPLETE` ueber `ganzerText$`,
+die Zeile der Marke findet die gz-Karte -- so kennt sie Felder der
+Basisklasse und die Laufzeit. **Falle:** `GUI_CHANGED` muss jedes Bild
+gefragt werden, der erste Aufruf meldet nichts. Bild hinzufuegen hat
+Strg+Umschalt+B und ist mit `DH_STUDIO_DATEI` geprueft. Vier Faelle mehr in
+`werkzeug_studio4.dhtest` (8) plus die Taste-Sammlung; fuenf Verfaelschungen
+fallen je in ihrem Fall.
 
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 

@@ -78,6 +78,7 @@ wires them up.
 | double-click a control in the design | "add event" for this control; on empty space: for the window |
 | Ctrl+Shift+E | the same for the selection (or for the element of the front tab) |
 | Ctrl+Shift+M | add a method: name, parameters (`a AS INTEGER, b AS STRING`), return type (empty = SUB) |
+| Ctrl+Space | suggestions at the cursor; after `Self.` or `objekt.` they open by themselves. In the list typing jumps, Enter or Tab inserts, Esc closes |
 | click a method in the navigator | opens its code in a tab |
 | click "Eigenschaften" | opens DIM, CONST and whatever else is outside the methods |
 | Projekt → Methode entfernen | the method in the front tab |
@@ -93,10 +94,19 @@ The events per kind:
 | text area | Geaendert, FokusRein, FokusRaus |
 | list, tree | Geaendert, Doppelklick |
 | slider, number field, dropdown, pickers, tab control, table | Geaendert |
-| canvas | Zeichnen, Maus |
+| canvas | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
 | every control in addition | MausRein, MausRaus |
-| window | Geoeffnet, Schliessen, Groesse |
+| timer, menu entry | Aktion |
+| window | Geoeffnet, Schliessen, Groesse, Taste(taste) |
 | App | Geoeffnet, Beenden |
+
+An event with parentheses calls its method with values: `Ziehen` (drag)
+with the position on the canvas (while the button is held after a press on
+it), `Rad` (wheel) with the steps of the mouse wheel, `Taste` (key) with the
+key code (`KEY_A`, `KEY_SPACE` ...), as long as the window is in front and
+no input field takes the key. The suggestions know the whole text of the
+program including the generated base class -- so after `Self.` the
+controls, timers and menu entries of the window appear too.
 
 Above the code stands the header of the method (`SUB knopf1_Klick()`), which
 you do not type; to its right, what it is for. The code field colours,
@@ -173,7 +183,7 @@ instead of running them as gui callbacks -- so an event method may run
 frames itself. If the program ends meanwhile, `Frage` returns 0. Timers keep
 running during a dialog.
 
-**Images.** Projekt → Bild hinzufügen copies a file into `bilder/` in the
+**Images.** Projekt → Bild hinzufügen (Ctrl+Shift+B) copies a file into `bilder/` in the
 project folder; an image control picks its image in the inspector under
 "Bild" and shows it in the designer already. When starting and building,
 the images go to `_studio/assets/bilder/`, and `dhrt --export` takes

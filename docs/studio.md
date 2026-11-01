@@ -80,6 +80,7 @@ Studio beim Starten erzeugt, verdrahtet sie.
 | Doppelklick auf ein Control im Entwurf | „Ereignis hinzufügen“ für dieses Control; auf leere Fläche: für das Fenster |
 | Strg+Umschalt+E | dasselbe für die Auswahl (oder für das Element des vorderen Reiters) |
 | Strg+Umschalt+M | Methode hinzufügen: Name, Parameter (`a AS INTEGER, b AS STRING`), Rückgabe (leer = SUB) |
+| Strg+Leertaste | Vorschläge an der Schreibmarke; hinter `Self.` oder `objekt.` gehen sie von selbst auf. In der Liste springt Tippen, Enter oder Tab setzt ein, Esc schließt |
 | Klick auf eine Methode im Navigator | öffnet ihren Code in einem Reiter |
 | Klick auf „Eigenschaften“ | öffnet DIM, CONST und was sonst außerhalb der Methoden steht |
 | Projekt → Methode entfernen | die Methode im vorderen Reiter |
@@ -95,10 +96,19 @@ Die Ereignisse je Art:
 | Textbereich | Geaendert, FokusRein, FokusRaus |
 | Liste, Baum | Geaendert, Doppelklick |
 | Regler, Zahlenfeld, Klappliste, Wähler, Reiterwerk, Tabelle | Geaendert |
-| Zeichenfläche | Zeichnen, Maus |
+| Zeichenfläche | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
 | jedes Control zusätzlich | MausRein, MausRaus |
-| Fenster | Geoeffnet, Schliessen, Groesse |
+| Timer, Menüeintrag | Aktion |
+| Fenster | Geoeffnet, Schliessen, Groesse, Taste(taste) |
 | App | Geoeffnet, Beenden |
+
+Ein Ereignis mit Klammern ruft seine Methode mit Werten: `Ziehen` mit der
+Lage auf der Fläche (solange die Taste nach einem Druck auf die Fläche
+hängt), `Rad` mit den Schritten des Mausrads, `Taste` mit dem Tastencode
+(`KEY_A`, `KEY_SPACE` ...), solange das Fenster vorn ist und kein
+Eingabefeld die Taste nimmt. Die Vorschläge kennen den ganzen Text des
+Programms samt der erzeugten Basisklasse -- hinter `Self.` stehen also auch
+die Controls, Timer und Menüeinträge des Fensters.
 
 Über dem Code steht die Kopfzeile der Methode (`SUB knopf1_Klick()`), die
 man nicht tippt; rechts daneben, wozu sie da ist. Das Code-Feld färbt,
@@ -177,7 +187,7 @@ Basic. Das geht, weil die erzeugte Basisklasse die Ereignisse **nach** dem
 Ereignis-Methode darf darum selbst Bilder drehen. Endet das Programm
 währenddessen, liefert `Frage` 0. Timer laufen auch während eines Dialogs.
 
-**Bilder.** Projekt → Bild hinzufügen kopiert eine Datei nach `bilder/` im
+**Bilder.** Projekt → Bild hinzufügen (Strg+Umschalt+B) kopiert eine Datei nach `bilder/` im
 Projektordner; ein Bild-Control wählt seins im Inspektor unter „Bild“ und
 zeigt es schon im Entwurf. Beim Starten und Bauen kommen die Bilder nach
 `_studio/assets/bilder/`, und `dhrt --export` nimmt `assets/` neben die Exe.
