@@ -132,7 +132,13 @@ SUB debugVerteilen()
     GUI_SET_BOUNDS(lstStapel, x + vb + 4, y + 38, b - vb - 4, lh)
 END SUB
 
+' Die Knoepfe der Leiste und die Menuepunkte (ein gesperrter Menuepunkt
+' nimmt auch sein Kuerzel nicht an -- F10 ginge sonst ins Leere).
 SUB debugKnoepfe()
+    GUI_MENU_ENABLE(miSchritt, dbgHaelt)
+    GUI_MENU_ENABLE(miHinein, dbgHaelt)
+    GUI_MENU_ENABLE(miHeraus, dbgHaelt)
+    GUI_MENU_ENABLE(miAnhalten, lauf >= 0 OR dbgProz >= 0)
     GUI_SET_ENABLED(btDbgWeiter, dbgHaelt)
     GUI_SET_ENABLED(btDbgSchritt, dbgHaelt)
     GUI_SET_ENABLED(btDbgHinein, dbgHaelt)

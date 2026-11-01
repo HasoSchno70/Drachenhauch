@@ -1,0 +1,374 @@
+' Drachenhauch Studio, Stufe 4 (studio/, docs/entwurf-studio.md): was ein
+' Programm braucht -- Timer, Menues, Dialoge, die warten, modale Fenster,
+' Bilder im Projekt und ein Debugger.
+'
+' Die Faelle starten das Studio als Kind (_hilfen/studiolauf.dh), messen in
+' einem ersten Lauf, wo etwas liegt (Protokoll DH_STUDIO_LOG), und bedienen
+' es im zweiten mit echten Klicks und Tasten. Das erzeugte Programm laeuft
+' danach mit einer eingeschobenen Aufnahme.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== ein timer aus der bibliothek landet in der leiste und im layout
+' Suchen nach "Timer", Doppelklick auf die Zeile: kein Control im Fenster,
+' sondern ein Eintrag in "timer" -- mit Namen, 1000 ms, aktiv, wiederholt.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+SETENV("DH_STUDIO_ABLAGE", "Timer")
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, p)
+DIM sx AS INTEGER
+DIM sy AS INTEGER
+(sx, sy) = slLage(m, "suche")
+slHin(10, 10)
+slKlick(sx, sy)
+slMit([341], 86)
+slWarten(30)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(m, CWD$() + "/ev.txt", slBild + 10, p)
+DIM zx AS INTEGER
+DIM zy AS INTEGER
+(zx, zy) = slLage(m, "zeile timer/Timer")
+PRINT "zeile "; zx > 0
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slKlick(sx, sy)
+slMit([341], 86)
+slWarten(30)
+slHin(zx, zy)
+slHin(zx, zy)
+slRunter()
+slHoch()
+slRunter()
+slHoch()
+slWarten(10)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "neu "; slHat(log, "neu timer Timer1")
+DIM tx AS INTEGER
+DIM ty AS INTEGER
+(tx, ty) = slLage(log, "timer Timer1")
+PRINT "in der leiste "; tx > 0
+DIM d AS JSON_HANDLE : d = JSON_PARSE(JOIN$(READLINES(p + "/Hauptfenster.dhform"), CHR$(10)))
+PRINT "widgets "; JSON_LEN(d, "widgets")
+PRINT "timer "; JSON_LEN(d, "timer"); " "; JSON_GET_STRING(d, "timer.0.name"); " "; JSON_GET_INT(d, "timer.0.intervall"); " "; JSON_GET_BOOL(d, "timer.0.aktiv"); " "; JSON_GET_BOOL(d, "timer.0.wiederholen")
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "json"
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}]}
+--- erwartet
+zeile TRUE
+neu TRUE
+in der leiste TRUE
+widgets 1
+timer 1 Timer1 1000 TRUE TRUE
+
+=== ein timer in der leiste wird gewaehlt, steht im inspektor und laesst sich loeschen
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, p)
+DIM tx AS INTEGER
+DIM ty AS INTEGER
+(tx, ty) = slLage(m, "timer takt")
+PRINT "leiste "; tx > 0
+slHin(10, 10)
+slKlick(tx, ty)
+slWarten(6)
+slTaste(261)
+slWarten(6)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(fx, fy) = slLage(log, "feld intervall")
+PRINT "im inspektor "; fx > 0
+PRINT "geloescht "; slHat(log, "geloescht timer takt")
+DIM d AS JSON_HANDLE : d = JSON_PARSE(JOIN$(READLINES(p + "/Hauptfenster.dhform"), CHR$(10)))
+PRINT "timer "; JSON_LEN(d, "timer")
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "json"
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}],
+"timer":[{"name":"takt","intervall":500,"aktiv":true,"wiederholen":true}]}
+--- erwartet
+leiste TRUE
+im inspektor TRUE
+geloescht TRUE
+timer 0
+
+=== der menue-editor legt menue und eintrag an, ok schreibt ins layout
+' Strg+Umschalt+U oeffnet den Editor; ein neuer Eintrag bekommt einen
+' Namen aus seinem Text -- er wird zum Feld des Fensters.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(4)
+slMit([341, 340], 85)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, CWD$() + "/ev.txt", slBild + 10, p)
+PRINT "editor "; slHat(m, "menueeditor Hauptfenster")
+DIM ax AS INTEGER
+DIM ay AS INTEGER
+DIM bx AS INTEGER
+DIM by AS INTEGER
+DIM ox AS INTEGER
+DIM oy AS INTEGER
+(ax, ay) = slLage(m, "menue neumenue")
+(bx, by) = slLage(m, "menue neueintrag")
+(ox, oy) = slLage(m, "menue ok")
+slKlick(ax, ay)
+slWarten(6)
+slKlick(bx, by)
+slWarten(6)
+slKlick(ox, oy)
+slWarten(10)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "menues ")
+    PRINT z
+NEXT
+DIM d AS JSON_HANDLE : d = JSON_PARSE(JOIN$(READLINES(p + "/Hauptfenster.dhform"), CHR$(10)))
+PRINT "datei "; JSON_GET_STRING(d, "menus.0.label"); " / "; JSON_GET_STRING(d, "menus.0.items.0.label"); " / "; JSON_GET_STRING(d, "menus.0.items.0.name")
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "json"
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}]}
+--- erwartet
+editor TRUE
+menues 1 Menü 1[Eintrag:miEintrag]
+datei Menü 1 / Eintrag / miEintrag
+
+=== das erzeugte programm: frage wartet, modales fenster, timer, menue, bild
+' F5 erzeugt _studio/; dasselbe main.dh laeuft dann mit einer Aufnahme:
+' "Fragen" -> Frage() wartet, Enter = Ja; "Info" -> ZeigenModal() kehrt
+' erst nach OK zurueck; der Timer tickt; Strg+H ist das Menuekuerzel. Das
+' Bild aus bilder/ steht unter assets/bilder/ und im Fenster.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM bild AS IMAGE : bild = IMAGE_NEW(80, 60, &H3060C0)
+IMAGE_FILL_ELLIPSE(bild, 40, 30, 20, 20, &HF0C030)
+MKDIR(p + "/bilder")
+IMAGE_SAVE(bild, p + "/bilder/logo.png")
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(100)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; slHat(log, "erzeugt 3")
+PRINT "asset "; FILEEXISTS(p + "/_studio/assets/bilder/logo.png")
+DIM basis AS STRING : basis = JOIN$(READLINES(p + "/_studio/Hauptfenster_basis.dh"), CHR$(10))
+DIM probe AS STRING
+FOR EACH probe IN ["IF GUI_CLICKED(Self.knopf1) THEN Self.knopf1_Klick()", "Self.timer1 = NEW StudioTimer()", "IF Self.timer1.studioFaellig() THEN Self.timer1_Aktion()", "= GUI_MENU(Self.studioWin, ", "Self.miHallo = GUI_MENU_ITEM(", "Bild(!" + CHR$(34) + "logo.png"]
+    PRINT "basis "; INSTR(basis, probe) >= 0
+NEXT
+' Dasselbe Programm mit einer Aufnahme. Die Menueleiste ist 26 hoch.
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN ARRAY_PUSH(neu, "AUTOMATION_PLAY(" + CHR$(34) + "k.txt" + CHR$(34) + ")")
+    ARRAY_PUSH(neu, s)
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+DIM e AS ARRAY OF STRING : e = ["e 0 7 90 81 0 0", "e 10 7 90 81 0 0", "e 12 6 0 0 0 0", "e 14 5 0 0 0 0", "e 30 2 257 0 0 0", "e 32 1 257 0 0 0", "e 40 7 90 131 0 0", "e 42 6 0 0 0 0", "e 44 5 0 0 0 0", "e 60 7 210 185 0 0", "e 62 6 0 0 0 0", "e 64 5 0 0 0 0", "e 80 2 341 0 0 0", "e 82 2 72 0 0 0", "e 84 1 72 0 0 0", "e 86 1 341 0 0 0"]
+WRITEALL(p + "/_studio/k.txt", "c " + STR$(LEN(e)) + CHR$(10) + JOIN$(e, CHR$(10)) + CHR$(10))
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "110", p + "/_studio/probe.dh")
+DIM aus AS STRING : aus = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM kt AS STRING : kt = PROCESS_READ$(k)
+    IF kt <> "" THEN
+        aus = aus + REPLACE$(kt, CHR$(13), "")
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(k) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+FOR EACH probe IN ["antwort 1", "ok", "zurueck", "drei ticks", "hallo aus dem menue"]
+    PRINT probe; " "; INSTR(aus, probe + CHR$(10)) >= 0
+NEXT
+PRINT "ok vor zurueck "; INSTR(aus, "ok" + CHR$(10)) < INSTR(aus, "zurueck")
+PRINT "code "; PROCESS_CODE(k)
+' Das Bild im Fenster: Mitte der Ellipse gelb.
+DIM b AS INTEGER : b = PROCESS_START("dhrt", "bild", p + "/_studio/main.dh", CWD$() + "/f.png", "8")
+WHILE PROCESS_RUNNING(b)
+    SLEEP(30)
+WEND
+DIM f AS IMAGE : f = LOADIMAGE(CWD$() + "/f.png")
+DIM px AS INTEGER : px = GETPIXEL(f, 260, 191)
+PRINT "bild gelb "; (px SHR 16) BAND 255 > 200 AND (px BAND 255) < 100
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "json"
+IMPORT "imgfx"
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"fenster","name":"Info"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"button","name":"knopf1","text":"Fragen","x":40,"y":40,"w":100,"h":30},
+{"kind":"button","name":"knopf2","text":"Info","x":40,"y":90,"w":100,"h":30},
+{"kind":"image","name":"logo","studio_bild":"logo.png","x":200,"y":120,"w":120,"h":90},
+{"kind":"label","name":"anzeige","text":"0","x":160,"y":46,"w":160,"h":20}],
+"timer":[{"name":"timer1","intervall":200,"aktiv":true,"wiederholen":true}],
+"menus":[{"label":"Datei","items":[{"label":"Hallo","name":"miHallo","shortcut":"Strg+H"},{"label":"","separator":true},{"label":"Mehr","items":[{"label":"Tief","name":"miTief"}]}]}]}
+--- datei proj/Info.dhform
+{"title":"Info","name":"Info","w":260,"h":140,"widgets":[
+{"kind":"button","name":"ok","text":"OK","x":80,"y":60,"w":100,"h":30}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM ticks AS INTEGER
+
+    SUB knopf1_Klick()
+        DIM a AS INTEGER : a = Frage("Weiter?", "Ja|Nein")
+        PRINT "antwort " + STR$(a)
+    END SUB
+
+    SUB knopf2_Klick()
+        DIM f AS Info : f = NEW Info()
+        f.ZeigenModal()
+        PRINT "zurueck"
+    END SUB
+
+    SUB timer1_Aktion()
+        Self.ticks = Self.ticks + 1
+        GUI_SET_TEXT(Self.anzeige, STR$(Self.ticks))
+        IF Self.ticks = 3 THEN PRINT "drei ticks"
+    END SUB
+
+    SUB miHallo_Aktion()
+        PRINT "hallo aus dem menue"
+    END SUB
+END CLASS
+--- datei proj/Info.dh
+CLASS Info EXTENDS Info_Basis
+    SUB ok_Klick()
+        PRINT "ok"
+        Self.Zumachen()
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- erwartet
+erzeugt TRUE
+asset TRUE
+basis TRUE
+basis TRUE
+basis TRUE
+basis TRUE
+basis TRUE
+basis TRUE
+antwort 1 TRUE
+ok TRUE
+zurueck TRUE
+drei ticks TRUE
+hallo aus dem menue TRUE
+ok vor zurueck TRUE
+code 0
+bild gelb TRUE
+
+=== der debugger haelt am haltepunkt, zeigt variablen und geht einen schritt
+' Strg+Pos1 an den Anfang, F9 setzt den Haltepunkt in Zeile 1, F7 startet;
+' der Halt kommt aus dhrt debug und wird ueber die Zeilenkarte auf
+' App.Geoeffnet, Zeile 1 umgerechnet. F10 geht eine Zeile weiter, F5 laesst
+' es weiterlaufen, Umschalt+F5 beendet.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, p)
+DIM nx AS INTEGER
+DIM ny AS INTEGER
+(nx, ny) = slLage(m, "knoten App.Geoeffnet")
+slHin(10, 10)
+slKlick(nx, ny)
+slWarten(10)
+slMit([341], 268)
+slWarten(4)
+slTaste(298)
+slWarten(4)
+slTaste(296)
+slWarten(300)
+slTaste(299)
+slWarten(120)
+slTaste(294)
+slWarten(120)
+slMit([340], 294)
+slWarten(30)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM z AS STRING
+FOR EACH z IN slProtokoll(log)
+    IF LEFT$(z, 11) = "haltepunkt " OR LEFT$(z, 11) = "angehalten " OR LEFT$(z, 6) = "debug " OR LEFT$(z, 9) = "variable " OR z = "ausgabe x ist 42" THEN PRINT z
+NEXT
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}]}
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+    SUB Geoeffnet()
+        DIM x AS INTEGER : x = 41
+        x = x + 1
+        PRINT "x ist " + STR$(x)
+    END SUB
+END CLASS
+--- erwartet
+haltepunkt App.Geoeffnet 1
+debug gestartet
+debug continue
+variable x = 0
+angehalten App.Geoeffnet, Zeile 1
+debug step-over
+variable x = 41
+angehalten App.Geoeffnet, Zeile 2
+debug continue
+ausgabe x ist 42
+debug stop
+debug ende

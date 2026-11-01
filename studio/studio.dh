@@ -482,6 +482,7 @@ SUB lagenProtokollieren()
         protokoll("lage leiste " + STR$(k) + " " + STR$(GUI_TOOLBAR_ITEM_X(tb, k) + GUI_TOOLBAR_ITEM_W(tb, k) \ 2) + " " + STR$(inhaltOben + LEISTE_H \ 2))
     NEXT
     protokoll("lage suche " + STR$(GUI_GET_X(tfSuche) + 40) + " " + STR$(GUI_GET_Y(tfSuche) + inhaltOben + 12))
+    trayProtokollieren()
 END SUB
 
 ' Die Lage der Inspektorfelder (nach jeder Auswahl neu, darum eine eigene SUB).
