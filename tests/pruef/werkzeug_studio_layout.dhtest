@@ -1,0 +1,316 @@
+' Drachenhauch Studio: Layout-Behaelter (Zeile, Spalte, Raster) im Entwurf.
+'
+' Ein Control kommt in ein Layout, wenn man es darauf ablegt oder hineinzieht;
+' ein Kind wird umgesetzt (es bleibt stehen, eine Marke zeigt die neue
+' Stelle) oder neben jedes Layout gezogen und damit frei. Die Laufzeit legt
+' die Kinder auch im Entwurfsfenster selbst -- die Lagen kommen darum aus
+' dem Protokoll ("lage control NAME x y w h"), nicht aus dem Modell.
+' Jeder Fall: ein erster Lauf misst, ein zweiter spielt echte Klicks ab
+' (_hilfen/studiolauf.dh).
+
+--- langsam
+=== die zeile legt ihre kinder, die leere spalte zeigt sich
+IMPORT "laeufer.dh"
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, "", 8, CWD$() + "/f.dhform")
+DIM ax AS INTEGER
+DIM ay AS INTEGER
+DIM bx AS INTEGER
+DIM by AS INTEGER
+DIM sx AS INTEGER
+DIM sy AS INTEGER
+(ax, ay) = slLage(log, "control knopfA")
+(bx, by) = slLage(log, "control knopfB")
+(sx, sy) = slLage(log, "control feldSuche")
+PRINT "nebeneinander "; ax < bx AND bx < sx AND ay = by AND by = sy
+PRINT slAnfang(log, "behaelter Zeile1")[0]
+PRINT "das gewicht nimmt den rest "; slBreite(log, "feldSuche") > 300
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+' Breite aus "lage control NAME x y w h" (die letzte Nennung).
+FUNCTION slBreite(log AS STRING, name AS STRING) AS INTEGER
+    DIM w AS INTEGER : w = -1
+    DIM z AS STRING
+    FOR EACH z IN slAnfang(log, "lage control " + name + " ")
+        DIM t AS ARRAY OF STRING : t = SPLIT(z, " ")
+        w = INT(VAL(t[5]))
+    NEXT
+    RETURN w
+END FUNCTION
+--- datei f.dhform
+{"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfA","text":"Neu","x":0,"y":0,"w":90,"h":30},{"kind":"button","name":"knopfB","text":"Oeffnen","x":0,"y":0,"w":90,"h":30},{"kind":"textinput","name":"feldSuche","text":"","x":0,"y":0,"w":120,"h":30},{"kind":"layout","name":"Zeile1","x":20,"y":20,"w":560,"h":44,"anchor":"lrt","layout":{"art":"zeile","kinder":[[0,0],[1,0],[2,1]],"abstand":6}},{"kind":"layout","name":"Spalte1","x":20,"y":90,"w":240,"h":200,"layout":{"art":"spalte","kinder":[],"abstand":6}},{"kind":"label","name":"frei","text":"frei","x":320,"y":120,"w":100,"h":20}]}
+
+--- erwartet
+nebeneinander TRUE
+behaelter Zeile1 knopfA:0,knopfB:0,feldSuche:1
+das gewicht nimmt den rest TRUE
+
+=== ein baustein auf die spalte gezogen kommt hinein, ein freies control ebenso
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 8, CWD$() + "/f.dhform")
+DIM kx AS INTEGER
+DIM ky AS INTEGER
+DIM px AS INTEGER
+DIM py AS INTEGER
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(kx, ky) = slLage(m, "zeile button/Knopf")
+(px, py) = slLage(m, "control Spalte1")
+(fx, fy) = slLage(m, "control frei")
+slHin(10, 10)
+slZug(kx, ky, px, py, 12, TRUE)
+slWarten(8)
+' das Label unter den Knopf -- er liegt jetzt oben in der Spalte
+slZug(fx, fy, px, py + 60, 12, TRUE)
+slWarten(8)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "eingesetzt ")
+    PRINT z
+NEXT
+DIM b AS ARRAY OF STRING : b = slAnfang(log, "behaelter Spalte1")
+PRINT b[LEN(b) - 1]
+DIM k1x AS INTEGER
+DIM k1y AS INTEGER
+DIM frx AS INTEGER
+DIM fry AS INTEGER
+(k1x, k1y) = slLage(log, "control Knopf1")
+(frx, fry) = slLage(log, "control frei")
+PRINT "untereinander "; k1y < fry AND ABS(k1x - frx) < 2
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfA","text":"Neu","x":0,"y":0,"w":90,"h":30},{"kind":"button","name":"knopfB","text":"Oeffnen","x":0,"y":0,"w":90,"h":30},{"kind":"textinput","name":"feldSuche","text":"","x":0,"y":0,"w":120,"h":30},{"kind":"layout","name":"Zeile1","x":20,"y":20,"w":560,"h":44,"anchor":"lrt","layout":{"art":"zeile","kinder":[[0,0],[1,0],[2,1]],"abstand":6}},{"kind":"layout","name":"Spalte1","x":20,"y":90,"w":240,"h":200,"layout":{"art":"spalte","kinder":[],"abstand":6}},{"kind":"label","name":"frei","text":"frei","x":320,"y":120,"w":100,"h":20}]}
+
+--- erwartet
+eingesetzt Knopf1 Spalte1 0
+eingesetzt frei Spalte1 1
+behaelter Spalte1 Knopf1:0,frei:0
+untereinander TRUE
+
+=== ein kind wird umgesetzt und herausgezogen
+' knopfB vor knopfA, dann das Suchfeld unter die Zeile -- dort ist kein
+' Layout, es steht danach frei.
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 8, CWD$() + "/f.dhform")
+DIM ax AS INTEGER
+DIM ay AS INTEGER
+DIM bx AS INTEGER
+DIM by AS INTEGER
+DIM sx AS INTEGER
+DIM sy AS INTEGER
+(ax, ay) = slLage(m, "control knopfA")
+(bx, by) = slLage(m, "control knopfB")
+(sx, sy) = slLage(m, "control feldSuche")
+slHin(10, 10)
+slZug(bx, by, ax - 30, ay, 12, TRUE)
+slWarten(8)
+slZug(sx, sy, sx, sy + 280, 12, TRUE)
+slWarten(8)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "eingesetzt ")
+    PRINT z
+NEXT
+PRINT "frei "; LEN(slAnfang(log, "herausgenommen feldSuche ")) = 1
+DIM b AS ARRAY OF STRING : b = slAnfang(log, "behaelter Zeile1")
+PRINT b[LEN(b) - 1]
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfA","text":"Neu","x":0,"y":0,"w":90,"h":30},{"kind":"button","name":"knopfB","text":"Oeffnen","x":0,"y":0,"w":90,"h":30},{"kind":"textinput","name":"feldSuche","text":"","x":0,"y":0,"w":120,"h":30},{"kind":"layout","name":"Zeile1","x":20,"y":20,"w":560,"h":44,"anchor":"lrt","layout":{"art":"zeile","kinder":[[0,0],[1,0],[2,1]],"abstand":6}},{"kind":"layout","name":"Spalte1","x":20,"y":90,"w":240,"h":200,"layout":{"art":"spalte","kinder":[],"abstand":6}},{"kind":"label","name":"frei","text":"frei","x":320,"y":120,"w":100,"h":20}]}
+
+--- erwartet
+eingesetzt knopfB Zeile1 0
+frei TRUE
+behaelter Zeile1 knopfB:0,knopfA:0
+
+=== verdoppeln nimmt die kinder mit, loeschen laesst sie frei stehen
+' knopfA verdoppelt: die Kopie steht in der Zeile gleich dahinter. Zeile1
+' verdoppelt (gewaehlt im Navigator): Zeile2 mit Kopien aller Kinder.
+' Zeile1 geloescht: ihre Kinder bleiben frei, Zeile2 zeigt weiter auf IHRE.
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 8, CWD$() + "/f.dhform")
+DIM ax AS INTEGER
+DIM ay AS INTEGER
+DIM nx AS INTEGER
+DIM ny AS INTEGER
+(ax, ay) = slLage(m, "control knopfA")
+(nx, ny) = slLage(m, "knoten Fenster1.Zeile1")
+slHin(10, 10)
+slKlick(ax, ay)
+slWarten(4)
+slMit([341], 68)
+slWarten(6)
+slKlick(nx, ny)
+slWarten(4)
+slMit([341], 68)
+slWarten(6)
+slKlick(nx, ny)
+slWarten(4)
+slTaste(261)
+slWarten(8)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+' Je Aenderung ein Stand (nach "behaelter --"); gleiche hintereinander einmal.
+DIM staende AS ARRAY OF STRING : staende = []
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "behaelter ")
+    IF z = "behaelter --" THEN
+        ARRAY_PUSH(staende, "")
+    ELSEIF LEN(staende) > 0 THEN
+        staende[LEN(staende) - 1] = staende[LEN(staende) - 1] + TRIM$(MID$(z, 10, 999)) + " | "
+    END IF
+NEXT
+DIM vorher AS STRING : vorher = "?"
+DIM st AS STRING
+FOR EACH st IN staende
+    IF st <> vorher THEN PRINT st
+    vorher = st
+NEXT
+DIM kx AS INTEGER
+DIM ky AS INTEGER
+(kx, ky) = slLage(log, "control knopfA")
+PRINT "knopfA steht noch "; kx > 0
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfA","text":"Neu","x":0,"y":0,"w":90,"h":30},{"kind":"button","name":"knopfB","text":"Oeffnen","x":0,"y":0,"w":90,"h":30},{"kind":"textinput","name":"feldSuche","text":"","x":0,"y":0,"w":120,"h":30},{"kind":"layout","name":"Zeile1","x":20,"y":20,"w":560,"h":44,"anchor":"lrt","layout":{"art":"zeile","kinder":[[0,0],[1,0],[2,1]],"abstand":6}},{"kind":"layout","name":"Spalte1","x":20,"y":90,"w":240,"h":200,"layout":{"art":"spalte","kinder":[],"abstand":6}},{"kind":"label","name":"frei","text":"frei","x":320,"y":120,"w":100,"h":20}]}
+
+--- erwartet
+Zeile1 knopfA:0,knopfB:0,feldSuche:1 | Spalte1 | 
+Zeile1 knopfA:0,knopfA1:0,knopfB:0,feldSuche:1 | Spalte1 | 
+Zeile1 knopfA:0,knopfA1:0,knopfB:0,feldSuche:1 | Spalte1 | Zeile2 knopfA2:0,knopfA3:0,knopfB1:0,feldSuche1:1 | 
+Spalte1 | Zeile2 knopfA2:0,knopfA3:0,knopfB1:0,feldSuche1:1 | 
+knopfA steht noch TRUE
+
+=== der inspektor zeigt beim kind das gewicht, beim layout die anordnung
+' Ein Kind hat kein Links/Oben (das Layout legt es), ein freies Layout schon:
+' "lage feld x" kommt genau einmal, von Spalte1.
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 8, CWD$() + "/f.dhform")
+DIM ax AS INTEGER
+DIM ay AS INTEGER
+DIM px AS INTEGER
+DIM py AS INTEGER
+(ax, ay) = slLage(m, "control knopfA")
+(px, py) = slLage(m, "control Spalte1")
+slHin(10, 10)
+slKlick(ax, ay)
+slWarten(6)
+slKlick(px, py)
+slWarten(6)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+PRINT "gewicht "; LEN(slAnfang(log, "lage feld studio_gewicht ")) > 0
+PRINT "anordnung "; LEN(slAnfang(log, "lage feld layout.art ")) > 0
+PRINT "links einmal "; LEN(slAnfang(log, "lage feld x "))
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfA","text":"Neu","x":0,"y":0,"w":90,"h":30},{"kind":"button","name":"knopfB","text":"Oeffnen","x":0,"y":0,"w":90,"h":30},{"kind":"textinput","name":"feldSuche","text":"","x":0,"y":0,"w":120,"h":30},{"kind":"layout","name":"Zeile1","x":20,"y":20,"w":560,"h":44,"anchor":"lrt","layout":{"art":"zeile","kinder":[[0,0],[1,0],[2,1]],"abstand":6}},{"kind":"layout","name":"Spalte1","x":20,"y":90,"w":240,"h":200,"layout":{"art":"spalte","kinder":[],"abstand":6}},{"kind":"label","name":"frei","text":"frei","x":320,"y":120,"w":100,"h":20}]}
+
+--- erwartet
+gewicht TRUE
+anordnung TRUE
+links einmal 1
+
+=== das erzeugte programm legt die kinder wie der entwurf
+' F5 erzeugt das Programm; danach laeuft es mit einem Klick auf knopf1. Die
+' Spalte (40, 40, 200 breit) dehnt ihn auf ihre Breite -- im Modell ist er
+' 100 breit und steht bei 0, 0. Das Ereignis gibt aus, wo er wirklich ist.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "geprueft "; slHat(log, "geprueft 0 0")
+PRINT "erzeugt "; slHat(log, "erzeugt 2")
+DIM basis AS STRING : basis = JOIN$(READLINES(p + "/_studio/Hauptfenster_basis.dh"), CHR$(10))
+PRINT "kinder in der basis "; INSTR(basis, "kinder") >= 0
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN ARRAY_PUSH(neu, "AUTOMATION_PLAY(" + CHR$(34) + "klick.txt" + CHR$(34) + ")")
+    ARRAY_PUSH(neu, s)
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+WRITEALL(p + "/_studio/klick.txt", "c 4" + CHR$(10) + "e 0 7 200 55 0 0" + CHR$(10) + "e 5 7 200 55 0 0" + CHR$(10) + "e 10 6 0 0 0 0" + CHR$(10) + "e 12 5 0 0 0 0" + CHR$(10))
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "30", p + "/_studio/probe.dh")
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM kt AS STRING : kt = PROCESS_READ$(k)
+    IF kt <> "" THEN
+        IF LEFT$(kt, 8) <> "WARNING:" THEN PRINT "lauf "; TRIM$(REPLACE$(kt, CHR$(13), ""))
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(k) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+PRINT "code "; PROCESS_CODE(k)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":0,"y":0,"w":100,"h":30},
+{"kind":"label","name":"anzeige","text":"Zwei","x":0,"y":0,"w":100,"h":20},
+{"kind":"layout","name":"Spalte1","x":40,"y":40,"w":200,"h":120,"layout":{"art":"spalte","kinder":[[0,0],[1,0]],"abstand":6}}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB knopf1_Klick()
+        PRINT "knopf "; GUI_GET_X(Self.knopf1); " "; GUI_GET_Y(Self.knopf1); " "; GUI_GET_W(Self.knopf1)
+        PRINT "anzeige "; GUI_GET_X(Self.anzeige); " "; GUI_GET_Y(Self.anzeige)
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- erwartet
+geprueft TRUE
+erzeugt TRUE
+kinder in der basis TRUE
+lauf knopf 40 40 200
+lauf anzeige 40 76
+code 0

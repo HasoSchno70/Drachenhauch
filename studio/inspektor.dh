@@ -17,7 +17,7 @@ CLASS InspZeile
     DIM gruppe AS STRING
     DIM schluessel AS STRING
     DIM titel AS STRING
-    DIM art AS STRING        ' text, zahl, komma, schalter, wahl, farbe, eintraege, info, anker
+    DIM art AS STRING        ' text, zahl, komma, schalter, wahl, wahlindex, farbe, eintraege, info, anker, gewicht
     DIM fuer AS STRING       ' Arten, durch Komma; "*" = jedes Control, "fenster" = das Fenster
     DIM wahl AS STRING       ' Eintraege der Auswahl, durch Semikolon
     DIM lbl AS GUI_WIDGET
@@ -89,6 +89,17 @@ SUB inspektorAnlegen()
     inspZeile("Lage", "w", "Breite", "zahl", "*", "")
     inspZeile("Lage", "h", "Höhe", "zahl", "*", "")
     inspZeile("Lage", "anchor", "Anker", "anker", "*", "")
+    ' Steht das Control in einem Layout, legt das Layout es: statt Links/Oben
+    ' und Anker zaehlt sein Anteil am freien Platz (0 = eigene Groesse).
+    inspZeile("Lage", "studio_gewicht", "Gewicht", "gewicht", "*", "")
+    inspGruppe("Layout")
+    inspZeile("Layout", "layout.art", "Anordnung", "wahl", "layout", "zeile;spalte;raster;fluss")
+    inspZeile("Layout", "layout.spalten", "Spalten", "zahl", "layout", "")
+    inspZeile("Layout", "layout.abstand", "Abstand", "zahl", "layout", "")
+    inspZeile("Layout", "layout.rand", "Rand", "zahl", "layout", "")
+    inspZeile("Layout", "layout.ausrichtung", "Ausrichtung", "wahlindex", "layout", "Anfang;Mitte;Ende")
+    inspZeile("Layout", "layout.dehnen", "Kinder dehnen", "schalter", "layout", "")
+    inspZeile("Layout", "layout.rahmen", "Rahmen", "schalter", "layout", "")
     inspGruppe("Inhalt")
     inspZeile("Inhalt", "text", "Text", "text", TEXTARTEN, "")
     inspZeile("Inhalt", "placeholder", "Platzhalter", "text", "textinput,textarea,dropdown", "")
@@ -134,15 +145,17 @@ SUB inspektorAnlegen()
             CASE "komma"
                 z.ed = GUI_TEXTINPUT(win, 0, 0, 10, 26)
                 GUI_TEXTINPUT_SET(z.ed, "zahlen", 2)
-            CASE "zahl"
+            CASE "zahl", "gewicht"
                 IF z.schluessel = "intervall" THEN
                     z.ed = GUI_SPINNER(win, 0, 0, 10, 1, 3600000, 1000, 100)
+                ELSEIF z.art = "gewicht" OR LEFT$(z.schluessel, 7) = "layout." THEN
+                    z.ed = GUI_SPINNER(win, 0, 0, 10, 0, 999, 0, 1)
                 ELSE
                     z.ed = GUI_SPINNER(win, 0, 0, 10, -9999, 9999, 0, 1)
                 END IF
             CASE "schalter"
                 z.ed = GUI_TOGGLE(win, "", 0, 0, FALSE)
-            CASE "wahl"
+            CASE "wahl", "wahlindex"
                 z.ed = GUI_DROPDOWN(win, 0, 0, 10, 26, SPLIT(z.wahl, ";"))
             CASE "farbe"
                 z.ed = GUI_BUTTON(win, "Vorgabe", 0, 0, 10, 26)
@@ -181,6 +194,11 @@ FUNCTION giltFuer(z AS InspZeile, art AS STRING) AS BOOLEAN
     IF trayWahl >= 0 THEN RETURN z.fuer = "timer"
     IF auswahl < 0 THEN RETURN z.fuer = "fenster"
     IF z.fuer = "fenster" THEN RETURN FALSE
+    ' In einem Layout: kein Links/Oben/Anker, dafuer das Gewicht.
+    DIM imLayout AS BOOLEAN : imLayout = verwaltet(auswahl)
+    IF z.art = "gewicht" THEN RETURN imLayout
+    IF imLayout AND (z.schluessel = "x" OR z.schluessel = "y" OR z.schluessel = "anchor") THEN RETURN FALSE
+    IF z.schluessel = "layout.spalten" THEN RETURN art = "layout" AND feldText$(auswahl, "layout.art") = "raster"
     IF z.fuer = "*" THEN RETURN TRUE
     RETURN INSTR("," + z.fuer + ",", "," + art + ",") >= 0
 END FUNCTION
@@ -268,11 +286,20 @@ SUB inspektorFuellen()
             CASE "eintraege"
                 GUI_SET_TEXT(z.ed, listeText$(p))
             CASE "zahl"
+                ' Was die Laufzeit ohne Angabe nimmt (GUI_SAVE laesst es weg).
                 DIM v AS INTEGER : v = 0
+                IF z.schluessel = "layout.abstand" THEN v = 6
+                IF z.schluessel = "layout.spalten" THEN v = 2
                 IF JSON_HAS(doc, p) THEN v = INT(JSON_GET_FLOAT(doc, p))
                 GUI_SET_VALUE(z.ed, v)
+            CASE "gewicht"
+                GUI_SET_VALUE(z.ed, gewichtVon(auswahl))
+            CASE "wahlindex"
+                DIM wi AS INTEGER : wi = 0
+                IF JSON_HAS(doc, p) THEN wi = INT(JSON_GET_FLOAT(doc, p))
+                GUI_DROPDOWN_SET_SELECTED(z.ed, MAX(0, wi))
             CASE "schalter"
-                DIM an AS BOOLEAN : an = z.schluessel = "enabled" OR z.schluessel = "visible" OR z.schluessel = "aktiv" OR z.schluessel = "wiederholen"
+                DIM an AS BOOLEAN : an = z.schluessel = "enabled" OR z.schluessel = "visible" OR z.schluessel = "aktiv" OR z.schluessel = "wiederholen" OR z.schluessel = "layout.dehnen"
                 IF JSON_HAS(doc, p) THEN
                     IF JSON_TYPE(doc, p) = "boolean" THEN an = JSON_GET_BOOL(doc, p)
                 END IF
@@ -290,6 +317,7 @@ SUB inspektorFuellen()
                 END IF
                 DIM eintraege AS ARRAY OF STRING : eintraege = SPLIT(z.wahl, ";")
                 DIM w AS STRING : w = wertText$(p)
+                IF w = "" AND z.schluessel = "layout.art" THEN w = "spalte"
                 DIM idx AS INTEGER : idx = ARRAY_INDEXOF(eintraege, w)
                 GUI_DROPDOWN_SET_SELECTED(z.ed, MAX(0, idx))
             CASE "farbe"
@@ -407,6 +435,13 @@ SUB zeileUebernehmen(zi AS INTEGER)
         ziele = [IIF(trayWahl >= 0, -1, auswahl)]
     END IF
     DIM i AS INTEGER
+    IF z.art = "gewicht" THEN
+        FOR EACH i IN ziele
+            IF verwaltet(i) THEN gewichtSetzen(i, INT(GUI_VALUE(z.ed)))
+        NEXT
+        entwurfBauen()
+        RETURN
+    END IF
     FOR EACH i IN ziele
         IF i >= 0 THEN
             IF NOT giltFuer(z, feldText$(i, "kind")) THEN CONTINUE
@@ -427,7 +462,7 @@ SUB zeileUebernehmen(zi AS INTEGER)
                 IF TRIM$(GUI_TEXT(z.ed)) <> "" THEN JSON_SET_FLOAT(doc, p, VAL(REPLACE$(GUI_TEXT(z.ed), ",", ".")))
             CASE "zahl"
                 DIM v AS INTEGER : v = INT(GUI_VALUE(z.ed))
-                IF (z.schluessel = "w" OR z.schluessel = "h") AND v < 1 THEN v = 1
+                IF (z.schluessel = "w" OR z.schluessel = "h" OR z.schluessel = "layout.spalten") AND v < 1 THEN v = 1
                 IF (z.schluessel = "font_size" OR z.schluessel = "tab_index") AND v <= 0 THEN
                     IF JSON_HAS(doc, p) THEN JSON_REMOVE(doc, p)
                 ELSE
@@ -435,6 +470,8 @@ SUB zeileUebernehmen(zi AS INTEGER)
                 END IF
             CASE "schalter"
                 JSON_SET_BOOL(doc, p, GUI_CHECKED(z.ed))
+            CASE "wahlindex"
+                JSON_SET_INT(doc, p, MAX(0, GUI_DROPDOWN_SELECTED(z.ed)))
             CASE "wahl"
                 DIM w AS STRING : w = GUI_DROPDOWN_TEXT(z.ed)
                 IF w = "normal" OR w = "standard" OR w = "(keins)" OR (z.schluessel = "align" AND w = "links") THEN
@@ -462,6 +499,13 @@ SUB zeileUebernehmen(zi AS INTEGER)
         GUI_SET_TEXT(inspTitel, TRIM$(GUI_TEXT(z.ed)))
     END IF
     IF z.schluessel = "w" OR z.schluessel = "h" THEN lageAnzeigen()
+    ' Die Anordnung entscheidet, ob es Spalten gibt -- und wie das Control im
+    ' Navigator heisst.
+    IF z.schluessel = "layout.art" THEN
+        inspektorFuellen()
+        navigatorFuellen()
+    END IF
+    IF LEFT$(z.schluessel, 7) = "layout." THEN behaelterProtokollieren()
 END SUB
 
 ' Je Bild nach GUI_UPDATE: was der Nutzer im Inspektor geaendert hat.
@@ -502,7 +546,7 @@ SUB inspektorPruefen()
         END IF
         IF NOT geaendertJetzt THEN CONTINUE
         zeileUebernehmen(zi)
-        IF z.art = "text" OR z.art = "komma" OR z.art = "eintraege" OR z.art = "zahl" THEN
+        IF z.art = "text" OR z.art = "komma" OR z.art = "eintraege" OR z.art = "zahl" OR z.art = "gewicht" THEN
             IF inspAnhaengig >= 0 AND inspAnhaengig <> zi THEN merken()
             inspAnhaengig = zi
         ELSE

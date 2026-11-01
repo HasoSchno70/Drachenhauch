@@ -64,7 +64,11 @@ SUB bausteineAnlegen()
     baustein("Behälter", "tabcontrol", "Reiterwerk", "Reiter", 320, 200, "", "{'items':['Seite 1','Seite 2']}", "Seiten mit Reitern")
     baustein("Behälter", "accordion", "Akkordeon", "Akkordeon", 260, 240, "", "{'items':['Abschnitt 1','Abschnitt 2']}", "Abschnitte, die auf- und zuklappen")
     baustein("Behälter", "wizard", "Assistent", "Assistent", 440, 300, "", "{'items':['Schritt 1','Schritt 2']}", "Schritt für Schritt mit Weiter und Zurück")
-    baustein("Behälter", "layout", "Layout", "Layout", 240, 120, "", "", "ordnet seine Controls in Zeile, Spalte oder Raster")
+    ' Layouts: was man hineinlegt, ordnen sie selbst -- und wenn das Fenster
+    ' waechst, waechst ein verankertes Layout mit und verteilt neu.
+    baustein("Behälter", "layout", "Zeile", "Zeile", 320, 44, "", "{'layout':{'art':'zeile','kinder':[],'abstand':6}}", "ordnet seine Controls nebeneinander")
+    baustein("Behälter", "layout", "Spalte", "Spalte", 220, 180, "", "{'layout':{'art':'spalte','kinder':[],'abstand':6}}", "ordnet seine Controls untereinander")
+    baustein("Behälter", "layout", "Raster", "Raster", 320, 140, "", "{'layout':{'art':'raster','spalten':2,'kinder':[],'abstand':6}}", "ordnet seine Controls in Zeilen und Spalten")
     baustein("Leisten", "toolbar", "Werkzeugleiste", "Werkzeugleiste", 320, 36, "", "", "Knöpfe mit Sinnbildern oben im Fenster")
     baustein("Leisten", "statusbar", "Statusleiste", "Statusleiste", 400, 24, "Bereit.", "", "Meldungen unten im Fenster")
     baustein("Leisten", "breadcrumb", "Pfadleiste", "Pfad", 320, 26, "", "", "wo man gerade ist, zum Anklicken")
@@ -231,10 +235,22 @@ FUNCTION symbolZeichnen(name AS STRING) AS IMAGE
             NEXT
             IMAGE_FILL_ROUNDRECT(img, 24, 17, 36, 22, 2, S_AKZENT)
             IMAGE_FILL_ROUNDRECT(img, 10, 17, 22, 22, 2, S_FLAECHE)
-        CASE "Layout"
+        CASE "Zeile"
             FOR k = 0 TO 2
-                IMAGE_FILL_ROUNDRECT(img, 3 + k * 12, 7, 12 + k * 12, 18, 2, S_FLAECHE)
+                IMAGE_FILL_ROUNDRECT(img, 3 + k * 12, 7, 12 + k * 12, 18, 2, IIF(k = 0, S_AKZENT, S_FLAECHE))
                 IMAGE_FRAME(img, 3 + k * 12, 7, 12 + k * 12, 18, 1, S_RAND)
+            NEXT
+        CASE "Spalte"
+            FOR k = 0 TO 2
+                IMAGE_FILL_ROUNDRECT(img, 9, 2 + k * 8, 30, 7 + k * 8, 2, IIF(k = 0, S_AKZENT, S_FLAECHE))
+                IMAGE_FRAME(img, 9, 2 + k * 8, 30, 7 + k * 8, 1, S_RAND)
+            NEXT
+        CASE "Raster"
+            FOR k = 0 TO 3
+                DIM rx AS INTEGER : rx = 6 + (k MOD 2) * 15
+                DIM ry AS INTEGER : ry = 3 + (k \ 2) * 10
+                IMAGE_FILL_ROUNDRECT(img, rx, ry, rx + 12, ry + 7, 2, IIF(k = 0, S_AKZENT, S_FLAECHE))
+                IMAGE_FRAME(img, rx, ry, rx + 12, ry + 7, 1, S_RAND)
             NEXT
         CASE "Werkzeugleiste"
             IMAGE_FILL_RECT(img, 2, 7, 37, 19, S_FLAECHE)

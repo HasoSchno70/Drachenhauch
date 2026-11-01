@@ -487,19 +487,16 @@ SUB navigatorFuellen()
         DIM en AS INTEGER : en = navKnoten(wurzel, text, "element", ei, -1, -1, e.art)
         IF e.art = "fenster" THEN
             controlsVon(ei)
+            DIM d AS JSON_HANDLE
+            IF ei = aktFenster THEN d = doc ELSE d = JSON_PARSE(e.layout)
+            DIM eltern AS ARRAY OF INTEGER : eltern = elternAus(d)
             DIM ci AS INTEGER
             FOR ci = 0 TO LEN(ctrlNamen) - 1
-                DIM cn AS INTEGER : cn = navKnoten(en, ctrlNamen[ci], "control", ei, ci, -1, "")
-                DIM p AS INTEGER : p = bausteinNach(ctrlArten[ci])
-                IF p >= 0 THEN GUI_TREE_ICON(baum, cn, bausteine[p].symbol)
-                DIM mi AS INTEGER
-                FOR mi = 0 TO LEN(methoden) - 1
-                    IF NOT (methoden[mi].el = e) THEN CONTINUE
-                    DIM ev AS STRING : ev = ereignisVon$(methoden[mi].name, ctrlNamen[ci])
-                    IF ev = "" THEN CONTINUE
-                    navKnoten(cn, ev, "methode", ei, ci, mi, "ereignis")
-                NEXT
-                GUI_TREE_EXPAND(baum, cn, TRUE)
+                ' Was in einem Layout steht, kommt unter sein Layout.
+                IF ci < LEN(eltern) THEN
+                    IF eltern[ci] >= 0 THEN CONTINUE
+                END IF
+                navControl(en, ei, e, ci, d, eltern)
             NEXT
         END IF
         DIM mj AS INTEGER
@@ -527,6 +524,46 @@ SUB navigatorFuellen()
     navStumm = FALSE
     knotenProtokollieren()
 END SUB
+
+' Ein Control im Navigator, darunter seine Ereignisse und -- bei einem Layout
+' -- seine Kinder in ihrer Reihenfolge.
+SUB navControl(en AS INTEGER, ei AS INTEGER, e AS Element, ci AS INTEGER, d AS JSON_HANDLE, eltern AS ARRAY OF INTEGER)
+    DIM cn AS INTEGER : cn = navKnoten(en, ctrlNamen[ci], "control", ei, ci, -1, "")
+    DIM p AS INTEGER : p = bausteinNach(ctrlArten[ci])
+    DIM pfad AS STRING : pfad = "widgets." + STR$(ci) + ".layout"
+    IF ctrlArten[ci] = "layout" THEN
+        DIM art AS STRING : art = "spalte"
+        IF JSON_HAS(d, pfad + ".art") THEN art = JSON_GET_STRING(d, pfad + ".art")
+        p = layoutBaustein(art)
+    END IF
+    IF p >= 0 THEN GUI_TREE_ICON(baum, cn, bausteine[p].symbol)
+    DIM mi AS INTEGER
+    FOR mi = 0 TO LEN(methoden) - 1
+        IF NOT (methoden[mi].el = e) THEN CONTINUE
+        DIM ev AS STRING : ev = ereignisVon$(methoden[mi].name, ctrlNamen[ci])
+        IF ev = "" THEN CONTINUE
+        navKnoten(cn, ev, "methode", ei, ci, mi, "ereignis")
+    NEXT
+    IF ctrlArten[ci] = "layout" AND JSON_HAS(d, pfad + ".kinder") THEN
+        DIM k AS INTEGER
+        FOR k = 0 TO JSON_LEN(d, pfad + ".kinder") - 1
+            DIM c AS INTEGER : c = JSON_GET_INT(d, pfad + ".kinder." + STR$(k) + ".0")
+            IF c < 0 OR c >= LEN(eltern) THEN CONTINUE
+            IF eltern[c] = ci THEN navControl(cn, ei, e, c, d, eltern)
+        NEXT
+    END IF
+    GUI_TREE_EXPAND(baum, cn, TRUE)
+END SUB
+
+' Der Baustein zu einer Anordnung -- sein Sinnbild steht im Navigator.
+FUNCTION layoutBaustein(art AS STRING) AS INTEGER
+    DIM name AS STRING : name = IIF(art = "spalte", "Spalte", IIF(art = "raster", "Raster", "Zeile"))
+    DIM p AS INTEGER
+    FOR p = 0 TO LEN(bausteine) - 1
+        IF bausteine[p].kind = "layout" AND bausteine[p].name = name THEN RETURN p
+    NEXT
+    RETURN -1
+END FUNCTION
 
 ' Fuer Pruefungen: wo jeder Knoten steht, als "lage knoten <Pfad> x y".
 SUB knotenProtokollieren()

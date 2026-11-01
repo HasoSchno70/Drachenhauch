@@ -243,10 +243,29 @@ last: edges, centres, same width, height or size. Distribute sets equal gaps
 from three controls on. Bring to front and send to back change the drawing
 order.
 
+**Layouts** (library, group containers: row, column, grid) arrange their
+controls themselves: side by side, one below the other or in rows and
+columns, with spacing and margin. In the design a layout has a dashed
+outline; an empty one says "Controls hierher ziehen". A building block that
+lands on a layout goes into it, and so does a single control dragged into
+it; a blue marker shows the place. A child is not moved but repositioned: it
+stays where it is, its outline follows the mouse, and when released it goes
+to the place of the marker -- released next to every layout it is free
+afterwards. The arrow keys move a child one place on. Duplicating a layout
+takes its children along, deleting leaves them standing free. In the
+navigator the children are listed under their layout. Anchoring the layout in
+the inspector (say left, right, top) lets it grow with the window, and it
+spreads its children anew -- in the generated program the runtime places
+them just as in the design.
+
 ## The inspector
 
 The properties are in groups that fold open and closed: identity, position,
-content, appearance, behaviour. Only what fits the kind of control is shown.
+layout, content, appearance, behaviour. Only what fits the kind of control
+is shown: a layout has its arrangement, columns (for the grid), spacing,
+margin, alignment, "Kinder dehnen" (stretch children) and a frame; a child
+of a layout has its weight instead of left, top and anchor (0 = its own
+size, otherwise its share of the free space).
 Every property has its editor:
 - text and numbers in fields;
 - switches as toggles;
