@@ -3474,6 +3474,45 @@ Kreuz schliesst, Fenster und Methode hinzufuegen, Umbenennen im Inspektor),
 vier Faelle in `gui_reiterwerk.dhtest`; acht Verfaelschungen des Studios
 fallen je genau in ihrem Fall.
 
+**Stufe 3 = Starten und Bauen** (selber Tag, Zweig `thema/studio-stufe3`):
+`studio/laufzeit.dh` (wird beim Starten als studio_laufzeit.dh nach _studio/ kopiert:
+`StudioApp`, `StudioFenster` mit `Zeigen`/`Zumachen`/`Fenster()` und den
+leeren Haken `studioAufbauen`/`studioTakt`/`studioZeichnen`, `studioLauf` =
+die Bildschleife: Kreuz schliesst das Startfenster, GUI_WINDOW_CLOSED,
+Groesse, geschlossene Fenster raus, `GUI_DRAW(FALSE)` + Zeichenflaechen +
+`GUI_DRAW_WINDOW` fuer Nebenfenster + `GUI_DRAW_TOP`). `studio/erzeugen.dh`:
+je Fenster `<F>_Basis EXTENDS StudioFenster` -- **gebaut aus dem Layout als
+JSON** (`!"..."`-Stuecke zu 96 Zeichen, `on_*` herausgenommen,
+`GUI_FROM_JSON`, Felder ueber `GUI_WINDOW_WIDGET`), Verdrahtung Klick/
+Geaendert/Enter/Fokus/Maus-rein-raus ueber `GUI_ON_*` mit gebundenen
+Methoden, Doppelklick/Maus/Zeichnen in `studioTakt`/`studioZeichnen`; alle
+Rueckrufe sind parameterlos. `main.dh` bindet Laufzeit, Basisklassen und
+`projekt/<Element>.dh` ein -- **der Code kommt im Editorstand nach
+`_studio/projekt/`**, nicht aus dem Projektordner: nur so passt die
+**Zeilenkarte** aus `codeSetzen$` (`karteMeth/karteZeile/karteEinzug`;
+`KARTE_DEKL`, `KARTE_SONST`; das END einer Methode = Zeile hinter dem Rumpf,
+dort meldet der Uebersetzer ein offenes IF) auf eine Meldung -- die erste
+Fassung band die Dateien des Projektordners ein und lag eine Zeile daneben, weil die Datei von
+Hand anders geschrieben war. Pruefen: `ganzerText$` setzt dieselben Teile im
+Speicher zusammen (`gz*` je Zeile), `CODE_CHECK$` mit Projektordner, 600 ms
+nach der letzten Aenderung und vor jedem Start; ein Fehler haelt an.
+Befunde in der Problemliste (Klick oeffnet die Methode an der Zeile), im
+Code-Feld als Welle/Marke/Hinweis. Starten = `dhrt run` (`DH_STUDIO_LAUF_BILDER`
+fuer Pruefungen), Laufzeitfehler `x.dh:N` ueber die Karte an die Methode;
+Warnungen des Uebersetzers fallen aus der Ausgabe (stehen unter Probleme).
+Bauen = `dhrt --export main.dh bau/<name>(.exe)`. **Fund in der Laufzeit:**
+der Export kopierte jede per IMPORT eingebundene `.dh` als "referenzierte
+Datei" neben die Exe -- der ganze Quelltext lag mit im Bau; jetzt
+uebergeht `bundle_referenced_assets` IMPORT-Zeilen (Rust-Test
+`export_kopiert_importierte_quellen_nicht`). Tests
+`tests/pruef/werkzeug_studio3.dhtest` (5: Zeilenkarte ohne Fenster, F5
+erzeugt + `--check` leer + ein Klick im erzeugten Programm ruft das
+Ereignis, Laufzeitfehler an Methode/Zeile trotz anders geschriebener Datei,
+Uebersetzungsfehler haelt an + Klick in die Problemliste springt "am Ende",
+Strg+B baut eine Exe ohne Quelltext daneben und sie laeuft); sechs
+Verfaelschungen fallen je in ihrem Fall. Offen: Vervollstaendigung im
+Code-Feld, Ziehen/Rad/Taste/Timer (Stufe 4).
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

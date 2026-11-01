@@ -15,15 +15,15 @@ dhrt run studio/studio.dh -- fenster.dhform
 Ein Ordner mit `projekt.dhstudio` geht als Projekt auf, ein Ordner ohne
 bekommt ein neues Projekt, eine `.dhform` geht als einzelnes Fenster auf.
 
-**Stand: Stufe 2.** Projekte mit mehreren Fenstern, Modulen und Klassen,
-Ereignisse und ein Code-Feld je Methode. Starten und Bauen kommen mit
-Stufe 3 (erst sie erzeugt die Basisklassen der Fenster).
+**Stand: Stufe 3.** Projekte mit mehreren Fenstern, Modulen und Klassen,
+Ereignisse und ein Code-Feld je Methode; Starten, Bauen und Fehler an der
+Methode, in der sie stehen.
 
 ## Die Oberfläche
 
 | Bereich | was er tut |
 |---|---|
-| Werkzeugleiste | Neu, Öffnen, Sichern; Fenster, Methode, Ereignis hinzufügen; Rückgängig, Wiederholen, Ausrichten, Zoom; Starten folgt mit Stufe 3 |
+| Werkzeugleiste | Neu, Öffnen, Sichern; Fenster, Methode, Ereignis hinzufügen; Rückgängig, Wiederholen, Ausrichten, Zoom; Starten, Anhalten, Prüfen, Bauen |
 | Navigator (links oben) | das Projekt als Baum: App, Fenster mit ihren Controls und Ereignissen, Module, Klassen, ihre Methoden und Eigenschaften; ein Klick öffnet |
 | Bibliothek (links unten) | alle Bausteine der gui in Gruppen, mit Vorschau; Suchfeld darüber |
 | Mitte | Reiter mit Kreuz: je Fenster das Layout, je Methode ihr Code, je Element seine Eigenschaften |
@@ -71,8 +71,8 @@ Inspektor (ohne Auswahl).
 
 Ein Fenster ist eine Klasse, seine Ereignisse sind Methoden. Eine Methode
 heißt `<Control>_<Ereignis>` (`knopf1_Klick`), ein Ereignis des Fensters
-oder der App nur `<Ereignis>` (`Geoeffnet`). Die Basisklasse, die Stufe 3
-erzeugt, verdrahtet sie.
+oder der App nur `<Ereignis>` (`Geoeffnet`). Die Basisklasse, die das
+Studio beim Starten erzeugt, verdrahtet sie.
 
 | Handgriff | wirkt so |
 |---|---|
@@ -106,6 +106,42 @@ Blocks mit (`IF` → `END IF`). Strg+Z/Y gehören im Code-Reiter dem Code.
 
 Wird ein Control im Inspektor umbenannt, ziehen seine Ereignis-Methoden mit,
 und im Code des Fensters wird der alte Name als ganzes Wort ersetzt.
+
+## Starten und Bauen
+
+| Handgriff | wirkt so |
+|---|---|
+| F5, Starten | sichert, prüft, erzeugt `_studio/` und startet das Programm mit `dhrt run` |
+| Umschalt+F5, Anhalten | beendet das laufende Programm |
+| Umschalt+F7, Prüfen | prüft das ganze Projekt, ohne zu starten |
+| Strg+B, Bauen | erzeugt `_studio/` und schreibt mit `dhrt --export` eine eigenständige Exe nach `bau/` |
+
+Was das Programm ausgibt, steht in der Leiste **Ausgabe** unten; daneben
+liegen die **Probleme**. Geprüft wird auch ohne Zutun, einen Augenblick nach
+jeder Änderung. Ein Befund steht an der Methode, in der er liegt
+(`Hauptfenster.knopf1_Klick, Zeile 3`), dort als Wellenlinie, Marke und Text
+am Zeilenende; ein Klick in der Liste öffnet die Methode an der Stelle. Was
+der Übersetzer erst am Ende einer Methode bemerkt (ein offenes `IF`), steht
+„am Ende“. Ein Fehler hält den Start an. Ein Laufzeitfehler kommt ebenso an
+seine Methode.
+
+In `_studio/` (nicht ins Repository, siehe `.gitignore`) erzeugt das Studio:
+
+| Datei | was darin steht |
+|---|---|
+| `main.dh` | der Einstieg: bindet alles ein und ruft `studioLauf` mit App und Startfenster |
+| `studio_laufzeit.dh` | `StudioApp`, `StudioFenster` und die Bildschleife |
+| `<Fenster>_basis.dh` | je Fenster die Klasse `<Fenster>_Basis`: Controls als Felder, Aufbau, Verdrahtung der Ereignisse, leere Ereignis-Methoden |
+| `projekt/<Element>.dh` | der Code des Projekts, so wie er im Editor steht |
+
+Die Nutzerklasse `<Fenster> EXTENDS <Fenster>_Basis` überschreibt die
+Ereignis-Methoden. Ein Control ist dort ein Feld (`Self.knopf1`), das Fenster
+der gui liefert `Self.Fenster()`; `Self.Zeigen()` und `Self.Zumachen()`
+öffnen und schließen ein Fenster, das Startfenster zu schließen beendet das
+Programm. Die Basisklasse baut das Fenster aus dem Layout als JSON
+(`GUI_FROM_JSON`) statt Aufruf für Aufruf -- so sieht es genau so aus wie im
+Entwurf. Ohne Studio startet man das Programm mit
+`dhrt run _studio/main.dh`.
 
 ## Fenster entwerfen
 
@@ -175,8 +211,12 @@ nach.
 | `DH_STUDIO_GROESSE=BxH` | feste Fenstergröße statt maximiert |
 | `DH_STUDIO_AUFNAHME=datei` | spielt eine Aufnahme ab (`AUTOMATION_PLAY`) |
 | `DH_STUDIO_ABLAGE=text` | legt Text in die Zwischenablage, zum Tippen per Strg+V |
+| `DH_STUDIO_LAUF_BILDER=n` | Starten lässt das Programm nur n Bilder laufen (`dhrt run --bilder n`) |
 
 Die Prüfsammlungen `tests/pruef/werkzeug_studio.dhtest` (Stufe 1) und
 `tests/pruef/werkzeug_studio2.dhtest` (Stufe 2) starten das Studio zweimal:
 einmal zum Messen, einmal mit echten Klicks und Tasten. Das Projektmodell
 (`studio/projekt.dh`) prüfen sie auch ohne Fenster.
+`tests/pruef/werkzeug_studio3.dhtest` (Stufe 3) drückt F5 und Strg+B, lässt
+das erzeugte Programm mit einem Klick laufen und prüft, an welcher Methode
+und Zeile ein Fehler landet.
