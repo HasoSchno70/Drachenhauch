@@ -416,6 +416,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_LISTBOX_DATA$(lb, i)` | STRING | den unsichtbaren Wert eines Eintrags lesen |
 | `GUI_LISTBOX_FIND_DATA(lb, wert$)` | INTEGER | erster Eintrag mit diesem Wert, -1 = keiner |
 | `GUI_LISTBOX_DETAIL(lb, i, text$)` | — | Zusatztext rechts im Eintrag, gedämpft (Kürzel, Größe, Zeilennummer) |
+| `GUI_LISTBOX_ITEM_RECT(lb, i)` | TUPLE | wo Eintrag i auf dem Bildschirm steht (x, y, b, h), in Bildschirmpunkten wie `GUI_HIT_TEST`; weggefiltert (0, 0, 0, 0) -- für Prüfungen mit echten Klicks, die Zeilenhöhe hängt an Schrift und Stildatei |
 | `GUI_LISTBOX_TIP(lb, i, text$)` | — | Tooltip je Eintrag. Ohne ihn zeigt ein Eintrag, der nicht in die Zeile passt (er endet mit „...“), beim Überfahren seinen ganzen Text |
 | `GUI_LISTBOX_ENABLE(lb, i, an)` | — | Eintrag sperren: sichtbar, aber weder anklickbar noch mit Pfeilen erreichbar |
 | `GUI_LISTBOX_ENABLED(lb, i)` | BOOLEAN | ob ein Eintrag wählbar ist |

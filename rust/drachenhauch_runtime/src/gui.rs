@@ -5942,6 +5942,29 @@ impl Gui {
         let p = Self::list_idx(self.list_ref(h, "GUI_LISTBOX_DETAIL")?, i, "GUI_LISTBOX_DETAIL")?;
         self.list_mut(h, "GUI_LISTBOX_DETAIL")?.details[p] = text; Ok(())
     }
+    /// GUI_LISTBOX_ITEM_RECT: wo ein Eintrag auf dem Bildschirm steht (x, y, b, h),
+    /// in Bildschirmpunkten wie GUI_HIT_TEST -- aus derselben Rechnung wie
+    /// Zeichnen und Klick (Ansicht nach Filter, Rollstand, Zeilenhoehe). Ein
+    /// weggefilterter Eintrag liefert (0, 0, 0, 0); ein herausgerollter eine
+    /// Lage ausserhalb der Liste. Gebraucht fuer Pruefungen mit echten Klicks
+    /// -- die Zeilenhoehe haengt an Schrift und Stildatei.
+    pub fn list_item_rect(&self, h: i64, k: i64) -> Result<(i32, i32, i32, i32), String> {
+        let w = self.wdg(h, "GUI_LISTBOX_ITEM_RECT")?;
+        if !matches!(w.kind, Kind::ListBox) {
+            return Err("GUI_LISTBOX_ITEM_RECT: Widget ist keine Liste".into());
+        }
+        if k < 0 || k as usize >= w.items.len() {
+            return Err(format!("GUI_LISTBOX_ITEM_RECT: Eintrag {} ausserhalb [0..{}]", k, w.items.len() as i64 - 1));
+        }
+        let (wi, _) = Self::dec_widget(h);
+        let pos = match liste_ansicht(&w.items, w.list.as_deref()).iter().position(|&x| x == k as usize) {
+            Some(p) => p as i32,
+            None => return Ok((0, 0, 0, 0)),
+        };
+        let (ax, ay, aw, _) = self.abs_rect(wi, w);
+        let ih = self.list_zeile_h(w);
+        Ok((ax, ay + pos * ih - w.value as i32, aw, ih))
+    }
     pub fn list_tip(&mut self, h: i64, i: i64, text: String) -> Result<(), String> {
         let p = Self::list_idx(self.list_ref(h, "GUI_LISTBOX_TIP")?, i, "GUI_LISTBOX_TIP")?;
         self.list_mut(h, "GUI_LISTBOX_TIP")?.tips[p] = text; Ok(())
@@ -12892,7 +12915,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Der Baum haelt seine Auswahl im eigenen Zustand -- ohne sie hier
         // meldete GUI_CHANGED bei einem Baum nie, dass ein Knoten gewaehlt wurde.
         let baum = w.tree.as_ref().map(|t| t.selected).unwrap_or(-1);
-        format!("{}|{}|{}|{}|{}|{}", self.wert_text(w), w.sel, w.value, w.checked, tab, baum)
+        // Beim Kippschalter ist `value` die LAGE des Knopfs, die nach einem
+        // Wechsel einige Bilder lang nachgleitet -- auch nach GUI_SET_CHECKED
+        // aus dem Programm. Sie zaehlte als Bedienung, GUI_CHANGED meldete
+        // dann jedes Bild (gefunden am Inspektor des Studios). Der Zustand
+        // steht in `checked`.
+        let wert = if w.kind == Kind::Toggle { 0.0 } else { w.value };
+        format!("{}|{}|{}|{}|{}|{}", self.wert_text(w), w.sel, wert, w.checked, tab, baum)
     }
 
     /// GUI_CHANGED(wdg): hat die Bedienung das Widget im letzten GUI_UPDATE
@@ -21636,7 +21665,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 if node.icon >= 0 { g.draw_image_rect(node.icon, lx, ry + 2, isz, isz); }
                 lx += isz + 3;
             }
-            let farbe = if node.color >= 0 { node.color } else { fg };
+            // Auf der Auswahl folgt die Schrift dem GRUND, wie in der Liste --
+            // im hellen Thema stand sonst dunkle Schrift auf dunkelblauer Zeile
+            // (gesehen im Navigator des Studios).
+            let farbe = if markiert { lesbar_auf(shade(acc, -110)) } else if node.color >= 0 { node.color } else { fg };
             self.wtext(g, wdg, lx, ry + (self.sk(TREE_ROW_H) - self.wsize(g, wdg)).max(0) / 2, node.label.clone(), farbe);
             if teil { g.pop_clip(); }
         }

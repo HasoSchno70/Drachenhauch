@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2247,
+ "count": 2248,
  "builtins": [
   {
    "name": "ABS",
@@ -4512,6 +4512,12 @@
    "name": "GUI_LISTBOX_TEXT",
    "kind": "core",
    "signature": "GUI_LISTBOX_TEXT(lb)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_ITEM_RECT",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_ITEM_RECT(lb, i) AS TUPLE",
    "module": "gui"
   },
   {

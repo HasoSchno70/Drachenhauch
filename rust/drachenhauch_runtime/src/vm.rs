@@ -8073,6 +8073,10 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "gui_listbox_detail" => { self.gui.list_detail(gi(a,0,"GUI_LISTBOX_DETAIL")?, gi(a,1,"GUI_LISTBOX_DETAIL")?, gs(a,2,"GUI_LISTBOX_DETAIL")?)?; Value::Nil }
+            "gui_listbox_item_rect" => {
+                let (x, y, w, h) = self.gui.list_item_rect(gi(a,0,"GUI_LISTBOX_ITEM_RECT")?, gi(a,1,"GUI_LISTBOX_ITEM_RECT")?)?;
+                Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
+            }
             "gui_listbox_tip" => { self.gui.list_tip(gi(a,0,"GUI_LISTBOX_TIP")?, gi(a,1,"GUI_LISTBOX_TIP")?, gs(a,2,"GUI_LISTBOX_TIP")?)?; Value::Nil }
             "gui_listbox_enable" => { self.gui.list_enable(gi(a,0,"GUI_LISTBOX_ENABLE")?, gi(a,1,"GUI_LISTBOX_ENABLE")?, gbool(a,2,"GUI_LISTBOX_ENABLE")?)?; Value::Nil }
             "gui_listbox_enabled" => Value::Bool(self.gui.list_enabled(gi(a,0,"GUI_LISTBOX_ENABLED")?, gi(a,1,"GUI_LISTBOX_ENABLED")?)?),

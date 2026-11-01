@@ -1,0 +1,519 @@
+' ============================================================
+'  Drachenhauch Studio -- der Inspektor
+' ============================================================
+'  Die Eigenschaften des gewaehlten Controls (oder des Fensters) in Gruppen,
+'  die auf- und zuklappen, je Eigenschaft der passende Editor: Text, Zahl,
+'  Schalter, Auswahl, Farbe (Farbwaehler im Popover), Anker. Alle Zeilen
+'  gibt es einmal; welche zu sehen sind, haengt an der Art des Controls --
+'  inspektorLegen schichtet die sichtbaren untereinander. Sie liegen in einem
+'  rollenden Bereich der Leiste "inspektor".
+'
+'  Uebernommen wird sofort, das Entwurfsfenster folgt jedem Anschlag. Einen
+'  Schritt fuer Rueckgaengig gibt es erst, wenn das Feld den Fokus abgibt
+'  oder Enter kommt -- sonst waere "Knopf" in "Speichern" sieben Schritte.
+' ============================================================
+
+CLASS InspZeile
+    DIM gruppe AS STRING
+    DIM schluessel AS STRING
+    DIM titel AS STRING
+    DIM art AS STRING        ' text, zahl, komma, schalter, wahl, farbe, eintraege, info, anker
+    DIM fuer AS STRING       ' Arten, durch Komma; "*" = jedes Control, "fenster" = das Fenster
+    DIM wahl AS STRING       ' Eintraege der Auswahl, durch Semikolon
+    DIM lbl AS GUI_WIDGET
+    DIM ed AS GUI_WIDGET
+    DIM anker AS ARRAY OF GUI_WIDGET
+    DIM sichtbar AS BOOLEAN
+END CLASS
+
+DIM inspZeilen AS ARRAY OF InspZeile : inspZeilen = []
+DIM inspGruppen AS ARRAY OF STRING : inspGruppen = []
+DIM inspKoepfe AS ARRAY OF GUI_WIDGET : inspKoepfe = []
+DIM inspOffen AS MAP OF BOOLEAN
+DIM inspPanel AS GUI_WIDGET
+DIM inspTitel AS GUI_WIDGET
+DIM inspArt AS GUI_WIDGET
+DIM inspAnhaengig AS INTEGER : inspAnhaengig = -1    ' Zeile mit Aenderung ohne Rueckgaengig-Schritt
+DIM inspStumm AS BOOLEAN : inspStumm = FALSE
+' Farbe: ein Popover mit Farbwaehler, an die Zeile gehaengt.
+DIM farbPop AS GUI_WINDOW
+DIM farbWahl AS GUI_WIDGET
+DIM farbVorgabe AS GUI_WIDGET
+DIM farbZeile AS INTEGER : farbZeile = -1
+
+CONST TEXTARTEN = "button,label,checkbox,radio,toggle,groupbox,card,richtext,statusbar,textinput,textarea"
+CONST WERTARTEN = "slider,spinner,knob,progress"
+CONST LISTENARTEN = "dropdown,listbox,tabcontrol,accordion,wizard"
+
+SUB inspGruppe(name AS STRING)
+    ARRAY_PUSH(inspGruppen, name)
+    IF NOT MAPHAS(inspOffen, name) THEN MAPPUT(inspOffen, name, TRUE)
+END SUB
+
+SUB inspZeile(gruppe AS STRING, schluessel AS STRING, titel AS STRING, art AS STRING, fuer AS STRING, wahl AS STRING)
+    DIM z AS InspZeile : z = NEW InspZeile()
+    z.gruppe = gruppe : z.schluessel = schluessel : z.titel = titel
+    z.art = art : z.fuer = fuer : z.wahl = wahl
+    z.anker = []
+    ARRAY_PUSH(inspZeilen, z)
+END SUB
+
+SUB inspektorAnlegen()
+    inspPanel = GUI_PANEL(win, 0, 0, 10, 10)
+    GUI_ADD_CLASS(inspPanel, "inspektor")
+    GUI_DOCK_ADD(win, "inspektor", inspPanel)
+    inspTitel = GUI_LABEL(win, "", 0, 0)
+    GUI_ADD_CLASS(inspTitel, "insptitel")
+    inspArt = GUI_LABEL(win, "", 0, 0)
+    GUI_ADD_CLASS(inspArt, "leise")
+    inspDazu(inspTitel)
+    inspDazu(inspArt)
+
+    inspGruppe("Fenster")
+    inspZeile("Fenster", "name", "Name", "text", "fenster", "")
+    inspZeile("Fenster", "title", "Titel", "text", "fenster", "")
+    inspZeile("Fenster", "w", "Breite", "zahl", "fenster", "")
+    inspZeile("Fenster", "h", "Höhe", "zahl", "fenster", "")
+    inspZeile("Fenster", "resizable", "Größe änderbar", "schalter", "fenster", "")
+    inspGruppe("Kennung")
+    inspZeile("Kennung", "name", "Name", "text", "*", "")
+    inspZeile("Kennung", "kind", "Art", "info", "*", "")
+    inspGruppe("Lage")
+    inspZeile("Lage", "x", "Links", "zahl", "*", "")
+    inspZeile("Lage", "y", "Oben", "zahl", "*", "")
+    inspZeile("Lage", "w", "Breite", "zahl", "*", "")
+    inspZeile("Lage", "h", "Höhe", "zahl", "*", "")
+    inspZeile("Lage", "anchor", "Anker", "anker", "*", "")
+    inspGruppe("Inhalt")
+    inspZeile("Inhalt", "text", "Text", "text", TEXTARTEN, "")
+    inspZeile("Inhalt", "placeholder", "Platzhalter", "text", "textinput,textarea,dropdown", "")
+    inspZeile("Inhalt", "items", "Einträge", "eintraege", LISTENARTEN, "")
+    inspZeile("Inhalt", "table.headers", "Spalten", "eintraege", "table", "")
+    inspZeile("Inhalt", "group", "Gruppe", "text", "radio", "")
+    inspZeile("Inhalt", "checked", "Gesetzt", "schalter", "checkbox,radio,toggle", "")
+    inspZeile("Inhalt", "min", "Minimum", "komma", WERTARTEN, "")
+    inspZeile("Inhalt", "max", "Maximum", "komma", WERTARTEN, "")
+    inspZeile("Inhalt", "value", "Wert", "komma", WERTARTEN, "")
+    inspGruppe("Aussehen")
+    inspZeile("Aussehen", "variant", "Knopfart", "wahl", "button", JOIN$(["standard", "primaer", "erfolg", "warnung", "gefahr", "umriss", "flach", "link"], ";"))
+    inspZeile("Aussehen", "font_size", "Schriftgröße", "zahl", "*", "")
+    inspZeile("Aussehen", "font_style", "Schriftstil", "wahl", "*", "normal;fett;kursiv;fett+kursiv;unterstrichen")
+    inspZeile("Aussehen", "align", "Ausrichtung", "wahl", "button,label,textinput", "links;mitte;rechts")
+    inspZeile("Aussehen", "ov.bg", "Hintergrund", "farbe", "*", "")
+    inspZeile("Aussehen", "ov.fg", "Textfarbe", "farbe", "*", "")
+    inspGruppe("Verhalten")
+    inspZeile("Verhalten", "enabled", "Aktiviert", "schalter", "*", "")
+    inspZeile("Verhalten", "visible", "Sichtbar", "schalter", "*", "")
+    inspZeile("Verhalten", "tooltip", "Hinweis", "text", "*", "")
+    inspZeile("Verhalten", "tab_index", "Tab-Folge", "zahl", "*", "")
+
+    DIM g AS INTEGER
+    FOR g = 0 TO LEN(inspGruppen) - 1
+        DIM kopf AS GUI_WIDGET : kopf = GUI_BUTTON(win, inspGruppen[g], 0, 0, 10, 26)
+        GUI_ADD_CLASS(kopf, "gruppenkopf")
+        GUI_SET_ALIGN(kopf, "links")
+        GUI_SET_ICON(kopf, "runter")
+        ARRAY_PUSH(inspKoepfe, kopf)
+        inspDazu(kopf)
+    NEXT
+    DIM z AS InspZeile
+    FOR EACH z IN inspZeilen
+        z.lbl = GUI_LABEL(win, z.titel, 0, 0)
+        GUI_ADD_CLASS(z.lbl, "feldname")
+        inspDazu(z.lbl)
+        SELECT CASE z.art
+            CASE "text", "eintraege"
+                z.ed = GUI_TEXTINPUT(win, 0, 0, 10, 26)
+                IF z.art = "eintraege" THEN GUI_TOOLTIP(z.ed, "Einträge durch Semikolon getrennt")
+            CASE "komma"
+                z.ed = GUI_TEXTINPUT(win, 0, 0, 10, 26)
+                GUI_TEXTINPUT_SET(z.ed, "zahlen", 2)
+            CASE "zahl"
+                z.ed = GUI_SPINNER(win, 0, 0, 10, -9999, 9999, 0, 1)
+            CASE "schalter"
+                z.ed = GUI_TOGGLE(win, "", 0, 0, FALSE)
+            CASE "wahl"
+                z.ed = GUI_DROPDOWN(win, 0, 0, 10, 26, SPLIT(z.wahl, ";"))
+            CASE "farbe"
+                z.ed = GUI_BUTTON(win, "Vorgabe", 0, 0, 10, 26)
+                GUI_ADD_CLASS(z.ed, "farbfeld")
+            CASE "info"
+                z.ed = GUI_LABEL(win, "", 0, 0)
+                GUI_ADD_CLASS(z.ed, "leise")
+            CASE "anker"
+                DIM k AS INTEGER
+                DIM namen AS ARRAY OF STRING : namen = ["links", "oben", "rechts", "unten"]
+                FOR k = 0 TO 3
+                    DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(win, LEFT$(UPPER$(namen[k]), 1), 0, 0)
+                    GUI_TOOLTIP(cb, "klebt am " + IIF(k = 0, "linken", IIF(k = 1, "oberen", IIF(k = 2, "rechten", "unteren"))) + " Rand, wenn das Fenster wächst")
+                    ARRAY_PUSH(z.anker, cb)
+                    inspDazu(cb)
+                NEXT
+                z.ed = z.anker[0]
+        END SELECT
+        IF z.art <> "anker" THEN inspDazu(z.ed)
+    NEXT
+
+    ' Das Popover fuer Farben.
+    farbPop = GUI_POPOVER(inspPanel, 236, 236, "links")
+    farbWahl = GUI_COLORPICKER(farbPop, 8, 8, 220, 180)
+    farbVorgabe = GUI_BUTTON(farbPop, "Vorgabe des Themas", 8, 196, 220, 30)
+END SUB
+
+' Ein Widget gehoert zum Inspektor: zur Leiste (ein- und ausgeblendet mit
+' ihr) und in den rollenden Bereich.
+SUB inspDazu(w AS GUI_WIDGET)
+    GUI_DOCK_ADD(win, "inspektor", w)
+    GUI_PANEL_ADD(inspPanel, w)
+END SUB
+
+FUNCTION giltFuer(z AS InspZeile, art AS STRING) AS BOOLEAN
+    IF auswahl < 0 THEN RETURN z.fuer = "fenster"
+    IF z.fuer = "fenster" THEN RETURN FALSE
+    IF z.fuer = "*" THEN RETURN TRUE
+    RETURN INSTR("," + z.fuer + ",", "," + art + ",") >= 0
+END FUNCTION
+
+' --- Werte lesen und schreiben ---------------------------------------------------
+FUNCTION pfadFuer$(z AS InspZeile, i AS INTEGER) AS STRING
+    IF i < 0 THEN RETURN z.schluessel
+    RETURN wz$(i, z.schluessel)
+END FUNCTION
+
+FUNCTION wertText$(pfad AS STRING) AS STRING
+    IF NOT JSON_HAS(doc, pfad) THEN RETURN ""
+    DIM t AS STRING : t = JSON_TYPE(doc, pfad)
+    IF t = "string" THEN RETURN JSON_GET_STRING(doc, pfad)
+    IF t = "number" THEN
+        DIM f AS FLOAT : f = JSON_GET_FLOAT(doc, pfad)
+        IF f = INT(f) THEN RETURN STR$(INT(f))
+        RETURN STR$(f)
+    END IF
+    RETURN ""
+END FUNCTION
+
+FUNCTION listeText$(pfad AS STRING) AS STRING
+    IF NOT JSON_HAS(doc, pfad) THEN RETURN ""
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(doc, pfad) - 1
+        ARRAY_PUSH(teile, JSON_GET_STRING(doc, pfad + "." + STR$(k)))
+    NEXT
+    RETURN JOIN$(teile, "; ")
+END FUNCTION
+
+SUB listeSetzen(pfad AS STRING, text AS STRING)
+    DIM a AS JSON_HANDLE : a = JSON_NEW_ARRAY()
+    DIM t AS STRING
+    FOR EACH t IN SPLIT(text, ";")
+        IF TRIM$(t) <> "" THEN JSON_APPEND_STRING(a, "", TRIM$(t))
+    NEXT
+    JSON_SET_JSON(doc, pfad, a)
+END SUB
+
+SUB farbfeldZeigen(z AS InspZeile, pfad AS STRING)
+    IF JSON_HAS(doc, pfad) THEN
+        DIM c AS INTEGER : c = INT(JSON_GET_FLOAT(doc, pfad))
+        GUI_SET_TEXT(z.ed, COLOR_HEX$(c))
+        GUI_SET_COLOR(z.ed, "bg", c)
+        DIM hell AS BOOLEAN : hell = ((c SHR 16) BAND 255) * 3 + ((c SHR 8) BAND 255) * 6 + (c BAND 255) > 1400
+        GUI_SET_COLOR(z.ed, "fg", IIF(hell, &H101010, &HFFFFFF))
+    ELSE
+        GUI_SET_TEXT(z.ed, "Vorgabe")
+        GUI_SET_COLOR(z.ed, "bg", -1)
+        GUI_SET_COLOR(z.ed, "fg", -1)
+    END IF
+END SUB
+
+' Die Editoren auf den Stand des Modells.
+SUB inspektorFuellen()
+    inspStumm = TRUE
+    inspAnhaengig = -1
+    DIM art AS STRING : art = ""
+    IF auswahl >= 0 THEN
+        art = feldText$(auswahl, "kind")
+        GUI_SET_TEXT(inspTitel, feldText$(auswahl, "name"))
+        DIM text AS STRING : text = bausteinName$(auswahl)
+        IF LEN(gewaehlt) > 1 THEN text = text + " -- " + STR$(LEN(gewaehlt)) + " gewählt"
+        GUI_SET_TEXT(inspArt, text)
+    ELSE
+        GUI_SET_TEXT(inspTitel, fensterText$("name"))
+        GUI_SET_TEXT(inspArt, "Fenster")
+    END IF
+    DIM z AS InspZeile
+    FOR EACH z IN inspZeilen
+        z.sichtbar = giltFuer(z, art)
+        IF NOT z.sichtbar THEN CONTINUE
+        DIM p AS STRING : p = pfadFuer$(z, auswahl)
+        SELECT CASE z.art
+            CASE "text", "komma"
+                GUI_SET_TEXT(z.ed, wertText$(p))
+                GUI_SET_ERROR(z.ed, "")
+            CASE "eintraege"
+                GUI_SET_TEXT(z.ed, listeText$(p))
+            CASE "zahl"
+                DIM v AS INTEGER : v = 0
+                IF JSON_HAS(doc, p) THEN v = INT(JSON_GET_FLOAT(doc, p))
+                GUI_SET_VALUE(z.ed, v)
+            CASE "schalter"
+                DIM an AS BOOLEAN : an = z.schluessel = "enabled" OR z.schluessel = "visible"
+                IF JSON_HAS(doc, p) THEN
+                    IF JSON_TYPE(doc, p) = "boolean" THEN an = JSON_GET_BOOL(doc, p)
+                END IF
+                GUI_SET_CHECKED(z.ed, an)
+            CASE "wahl"
+                DIM eintraege AS ARRAY OF STRING : eintraege = SPLIT(z.wahl, ";")
+                DIM w AS STRING : w = wertText$(p)
+                DIM idx AS INTEGER : idx = ARRAY_INDEXOF(eintraege, w)
+                GUI_DROPDOWN_SET_SELECTED(z.ed, MAX(0, idx))
+            CASE "farbe"
+                farbfeldZeigen(z, p)
+            CASE "info"
+                GUI_SET_TEXT(z.ed, bausteinName$(auswahl) + "  (" + wertText$(p) + ")")
+            CASE "anker"
+                DIM a AS STRING : a = wertText$(p)
+                IF a = "" THEN a = "lt"
+                GUI_SET_CHECKED(z.anker[0], INSTR(a, "l") >= 0)
+                GUI_SET_CHECKED(z.anker[1], INSTR(a, "t") >= 0)
+                GUI_SET_CHECKED(z.anker[2], INSTR(a, "r") >= 0)
+                GUI_SET_CHECKED(z.anker[3], INSTR(a, "b") >= 0)
+        END SELECT
+    NEXT
+    inspektorLegen()
+    inspStumm = FALSE
+    felderProtokollieren()
+END SUB
+
+' Die sichtbaren Zeilen untereinander, Gruppen mit Kopf.
+SUB inspektorLegen()
+    DIM px AS INTEGER
+    DIM py AS INTEGER
+    DIM pw AS INTEGER
+    DIM ph AS INTEGER
+    (px, py, pw, ph) = GUI_DOCK_RECT(win, "inspektor")
+    IF pw <= 0 THEN RETURN
+    GUI_SET_BOUNDS(inspPanel, px, py, pw, ph)
+    DIM lx AS INTEGER : lx = px + 14
+    DIM ex AS INTEGER : ex = px + 128
+    DIM eb AS INTEGER : eb = MAX(60, pw - 128 - 14)
+    DIM y AS INTEGER : y = py + 12
+    GUI_SET_BOUNDS(inspTitel, lx, y, pw - 28, 24)
+    y = y + 26
+    GUI_SET_BOUNDS(inspArt, lx, y, pw - 28, 18)
+    y = y + 30
+    DIM g AS INTEGER
+    FOR g = 0 TO LEN(inspGruppen) - 1
+        DIM gname AS STRING : gname = inspGruppen[g]
+        DIM hat AS BOOLEAN : hat = FALSE
+        DIM z AS InspZeile
+        FOR EACH z IN inspZeilen
+            IF z.gruppe = gname AND z.sichtbar THEN hat = TRUE
+        NEXT
+        GUI_SET_VISIBLE(inspKoepfe[g], hat)
+        DIM offen AS BOOLEAN : offen = MAPGET(inspOffen, gname)
+        IF hat THEN
+            GUI_SET_BOUNDS(inspKoepfe[g], px + 6, y, pw - 12, 28)
+            GUI_SET_ICON(inspKoepfe[g], IIF(offen, "runter", "rechts"))
+            y = y + 32
+        END IF
+        FOR EACH z IN inspZeilen
+            IF z.gruppe <> gname THEN CONTINUE
+            DIM zeigen AS BOOLEAN : zeigen = z.sichtbar AND offen
+            GUI_SET_VISIBLE(z.lbl, zeigen)
+            IF z.art = "anker" THEN
+                DIM k AS INTEGER
+                FOR k = 0 TO 3
+                    GUI_SET_VISIBLE(z.anker[k], zeigen)
+                    IF zeigen THEN GUI_SET_BOUNDS(z.anker[k], ex + k * (eb \ 4), y + 4, eb \ 4 - 4, 20)
+                NEXT
+            ELSE
+                GUI_SET_VISIBLE(z.ed, zeigen)
+            END IF
+            IF NOT zeigen THEN CONTINUE
+            GUI_SET_BOUNDS(z.lbl, lx, y + 5, 112, 18)
+            IF z.art = "schalter" THEN
+                GUI_SET_BOUNDS(z.ed, ex, y + 3, 48, 22)
+            ELSEIF z.art = "info" THEN
+                GUI_SET_BOUNDS(z.ed, ex, y + 5, eb, 18)
+            ELSEIF z.art <> "anker" THEN
+                GUI_SET_BOUNDS(z.ed, ex, y, eb, 28)
+            END IF
+            y = y + 34
+        NEXT
+        IF hat THEN y = y + 6
+    NEXT
+END SUB
+
+' Einen Wert aus dem Editor ins Modell -- fuer alle gewaehlten Controls, die
+' die Eigenschaft haben (wie in Xojo).
+SUB zeileUebernehmen(zi AS INTEGER)
+    DIM z AS InspZeile : z = inspZeilen[zi]
+    DIM ziele AS ARRAY OF INTEGER
+    IF auswahl < 0 THEN ziele = [-1] ELSE ziele = gewaehlt
+    ' Ein Name ist ein Bezeichner und eindeutig -- er wird zum Feld der Klasse.
+    IF z.schluessel = "name" THEN
+        DIM n AS STRING : n = TRIM$(GUI_TEXT(z.ed))
+        IF NOT istBezeichner(n) THEN
+            GUI_SET_ERROR(z.ed, "Ein Name beginnt mit einem Buchstaben und hat nur Buchstaben, Ziffern und _.")
+            RETURN
+        END IF
+        IF auswahl >= 0 AND nameVergeben(n, auswahl) THEN
+            GUI_SET_ERROR(z.ed, "Den Namen '" + n + "' gibt es in diesem Fenster schon.")
+            RETURN
+        END IF
+        GUI_SET_ERROR(z.ed, "")
+        ziele = [auswahl]
+    END IF
+    DIM i AS INTEGER
+    FOR EACH i IN ziele
+        IF i >= 0 THEN
+            IF NOT giltFuer(z, feldText$(i, "kind")) THEN CONTINUE
+        END IF
+        DIM p AS STRING : p = pfadFuer$(z, i)
+        SELECT CASE z.art
+            CASE "text"
+                IF z.schluessel = "name" THEN
+                    JSON_SET_STRING(doc, p, TRIM$(GUI_TEXT(z.ed)))
+                ELSEIF GUI_TEXT(z.ed) = "" AND z.schluessel <> "text" AND z.schluessel <> "title" THEN
+                    IF JSON_HAS(doc, p) THEN JSON_REMOVE(doc, p)
+                ELSE
+                    JSON_SET_STRING(doc, p, GUI_TEXT(z.ed))
+                END IF
+            CASE "eintraege"
+                listeSetzen(p, GUI_TEXT(z.ed))
+            CASE "komma"
+                IF TRIM$(GUI_TEXT(z.ed)) <> "" THEN JSON_SET_FLOAT(doc, p, VAL(REPLACE$(GUI_TEXT(z.ed), ",", ".")))
+            CASE "zahl"
+                DIM v AS INTEGER : v = INT(GUI_VALUE(z.ed))
+                IF (z.schluessel = "w" OR z.schluessel = "h") AND v < 1 THEN v = 1
+                IF (z.schluessel = "font_size" OR z.schluessel = "tab_index") AND v <= 0 THEN
+                    IF JSON_HAS(doc, p) THEN JSON_REMOVE(doc, p)
+                ELSE
+                    JSON_SET_INT(doc, p, v)
+                END IF
+            CASE "schalter"
+                JSON_SET_BOOL(doc, p, GUI_CHECKED(z.ed))
+            CASE "wahl"
+                DIM w AS STRING : w = GUI_DROPDOWN_TEXT(z.ed)
+                IF w = "normal" OR w = "standard" OR (z.schluessel = "align" AND w = "links") THEN
+                    IF JSON_HAS(doc, p) THEN JSON_REMOVE(doc, p)
+                ELSE
+                    JSON_SET_STRING(doc, p, w)
+                END IF
+            CASE "anker"
+                DIM a AS STRING : a = ""
+                IF GUI_CHECKED(z.anker[0]) THEN a = a + "l"
+                IF GUI_CHECKED(z.anker[2]) THEN a = a + "r"
+                IF GUI_CHECKED(z.anker[1]) THEN a = a + "t"
+                IF GUI_CHECKED(z.anker[3]) THEN a = a + "b"
+                IF a = "lt" THEN
+                    IF JSON_HAS(doc, p) THEN JSON_REMOVE(doc, p)
+                ELSE
+                    JSON_SET_STRING(doc, p, a)
+                END IF
+        END SELECT
+    NEXT
+    entwurfBauen()
+    IF z.schluessel = "name" THEN
+        navigatorFuellen()
+        GUI_SET_TEXT(inspTitel, TRIM$(GUI_TEXT(z.ed)))
+    END IF
+    IF z.schluessel = "w" OR z.schluessel = "h" THEN lageAnzeigen()
+END SUB
+
+' Je Bild nach GUI_UPDATE: was der Nutzer im Inspektor geaendert hat.
+SUB inspektorPruefen()
+    IF inspStumm THEN RETURN
+    ' Gruppen auf- und zuklappen.
+    DIM g AS INTEGER
+    FOR g = 0 TO LEN(inspGruppen) - 1
+        IF GUI_CLICKED(inspKoepfe[g]) THEN
+            MAPPUT(inspOffen, inspGruppen[g], NOT MAPGET(inspOffen, inspGruppen[g]))
+            inspektorLegen()
+        END IF
+    NEXT
+    ' Ein anhaengiger Schritt wird fest, wenn sein Feld den Fokus abgibt.
+    IF inspAnhaengig >= 0 THEN
+        DIM za AS InspZeile : za = inspZeilen[inspAnhaengig]
+        IF GUI_FOCUSED() <> za.ed OR GUI_ENTERED(za.ed) THEN
+            inspAnhaengig = -1
+            merken()
+            werkzeugeNachziehen()
+            protokoll("inspektor " + za.schluessel)
+        END IF
+    END IF
+    DIM zi AS INTEGER
+    FOR zi = 0 TO LEN(inspZeilen) - 1
+        DIM z AS InspZeile : z = inspZeilen[zi]
+        IF NOT z.sichtbar THEN CONTINUE
+        DIM geaendertJetzt AS BOOLEAN : geaendertJetzt = FALSE
+        IF z.art = "anker" THEN
+            DIM k AS INTEGER
+            FOR k = 0 TO 3
+                IF GUI_CHANGED(z.anker[k]) THEN geaendertJetzt = TRUE
+            NEXT
+        ELSEIF z.art = "farbe" THEN
+            IF GUI_CLICKED(z.ed) THEN farbeOeffnen(zi)
+        ELSEIF z.art <> "info" THEN
+            geaendertJetzt = GUI_CHANGED(z.ed)
+        END IF
+        IF NOT geaendertJetzt THEN CONTINUE
+        zeileUebernehmen(zi)
+        IF z.art = "text" OR z.art = "komma" OR z.art = "eintraege" OR z.art = "zahl" THEN
+            IF inspAnhaengig >= 0 AND inspAnhaengig <> zi THEN merken()
+            inspAnhaengig = zi
+        ELSE
+            merken()
+            werkzeugeNachziehen()
+            protokoll("inspektor " + z.schluessel)
+        END IF
+    NEXT
+    farbePruefen()
+END SUB
+
+' --- Farbe -----------------------------------------------------------------
+SUB farbeOeffnen(zi AS INTEGER)
+    farbZeile = zi
+    DIM z AS InspZeile : z = inspZeilen[zi]
+    DIM p AS STRING : p = pfadFuer$(z, auswahl)
+    IF JSON_HAS(doc, p) THEN GUI_SET_PICKED_COLOR(farbWahl, INT(JSON_GET_FLOAT(doc, p))) ELSE GUI_SET_PICKED_COLOR(farbWahl, &H2BA8E0)
+    ' Am Farbfeld haengen, nicht am Bereich.
+    GUI_WINDOW_DESTROY(farbPop)
+    farbPop = GUI_POPOVER(z.ed, 236, 236, "links")
+    farbWahl = GUI_COLORPICKER(farbPop, 8, 8, 220, 180)
+    farbVorgabe = GUI_BUTTON(farbPop, "Vorgabe des Themas", 8, 196, 220, 30)
+    IF JSON_HAS(doc, p) THEN GUI_SET_PICKED_COLOR(farbWahl, INT(JSON_GET_FLOAT(doc, p)))
+    GUI_POPOVER_SHOW(farbPop)
+END SUB
+
+SUB farbePruefen()
+    IF farbZeile < 0 THEN RETURN
+    DIM z AS InspZeile : z = inspZeilen[farbZeile]
+    DIM ziele AS ARRAY OF INTEGER
+    IF auswahl < 0 THEN RETURN
+    ziele = gewaehlt
+    DIM i AS INTEGER
+    IF GUI_CHANGED(farbWahl) THEN
+        FOR EACH i IN ziele
+            JSON_SET_INT(doc, wz$(i, z.schluessel), GUI_PICKED_COLOR(farbWahl))
+        NEXT
+        farbfeldZeigen(z, wz$(auswahl, z.schluessel))
+        entwurfBauen()
+    END IF
+    IF GUI_CLICKED(farbVorgabe) THEN
+        FOR EACH i IN ziele
+            IF JSON_HAS(doc, wz$(i, z.schluessel)) THEN JSON_REMOVE(doc, wz$(i, z.schluessel))
+        NEXT
+        farbfeldZeigen(z, wz$(auswahl, z.schluessel))
+        entwurfBauen()
+        GUI_POPOVER_HIDE(farbPop)
+    END IF
+    IF GUI_POPOVER_CLOSED(farbPop) OR NOT GUI_WINDOW_SHOWN(farbPop) THEN
+        IF JSON_STRINGIFY(doc) <> staende[standPos] THEN
+            merken()
+            werkzeugeNachziehen()
+            protokoll("inspektor " + z.schluessel)
+        END IF
+        farbZeile = -1
+    END IF
+END SUB

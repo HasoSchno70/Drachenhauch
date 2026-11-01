@@ -99,6 +99,7 @@ entworfen, empfohlen; entschieden ist nichts davon.
 - **[Plugins der IDE](ide-plugins.md)** — eigene Befehle, Leisten, Ereignisse und Code-Hilfen als eigenes Programm
 - **[Sprite-Editor](sprite-editor.md)** (`examples/189_sprite_editor.dh`) — Pixel-Art mit Einzelbildern, Ebenen, Auswahlmaske, GIF, Atlas-Export
 - **[Tilemap-Editor](tilemap-editor.md)** (`examples/187_tilemap_editor.dh`) — Level bauen, Tiled-JSON lesen und schreiben
+- **[Drachenhauch Studio](studio.md)** (`studio/studio.dh`) — die IDE für Programme mit Oberfläche im Stil von Xojo; Stufe 1: Fenster entwerfen mit Bibliothek, Ausrichtungslinien und Inspektor
 - **[Form-Designer](form-designer.md)** (`examples/197_form_designer.dh`) — Oberflächen zusammenklicken, Xojo-Stil, F5 startet sie
 - **[Partikel-Editor](particle-editor.md)** (`examples/185_partikel_editor.dh`) — Effekte live einstellen
 - **[Animations-Editor](anim-editor.md)** (`examples/198_anim_fsm_editor.dh`) — Zustandsautomat für Sprite-Animationen
@@ -133,6 +134,7 @@ Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie e
 - **[Entwurf: Eingabemethoden (IME)](entwurf-eingabemethoden.md)** — gemessen: der Speicher ist Unicode, die Anzeige Latin-1 (das Euro-Zeichen ist ein Fragezeichen); Wege Zeichenvorrat, Umwandlungsfenster, Preedit, SDL; Empfehlung: erst sehen, dann tippen
 - **[Entwurf: Barrierefreiheit](entwurf-barrierefreiheit.md)** — der UIA-Baum eines dhrt-Fensters ist leer, gemessen; AccessKit, Sprachausgabe und Handwerk als Wege; Empfehlung: Handwerk sofort, dann AccessKit mit Windows zuerst
 - **[Entwurf: Was der gui gegen GTK 3 fehlt](entwurf-gui-wie-gtk.md)** — gemessen: 100 000 Tabellenzeilen sind keine Lücke; vier Pakete (Popover/Toast/Suchfeld, Bausteine wie Fluss-Layout und Mnemonics, Textformung/RTL/Rechtschreibung, Stildatei mit Selektoren und Klassen wie GTK-CSS) und ihre Reihenfolge; alles gebaut bis auf die volle Textformung (Ligaturen, indische Schriften)
+- **[Entwurf: Drachenhauch Studio](entwurf-studio.md)** — eine eigenständige IDE für Programme mit Oberfläche im Stil von Xojo: Projekt als Ordner, Fenster als Klasse mit Ereignis-Methoden, Layout-Editor, Bibliothek, Inspektor, Starten und Bauen; fünf Stufen
 - **[Entwurf: Drucken](entwurf-drucken.md)** — kein raylib fuers Papier: geprüfte Bausteine, vier Wege; Empfehlung: die Seite selbst zeichnen (GDI/CUPS als Ziele des pdf-Moduls), dazu ein Befehl, der eine Datei öffnet
 - **[Release 2026.39](release-2026.39.md)** — was in dieser Fassung neu ist
 - **[Release 2026.38](release-2026.38.md)** — was in dieser Fassung neu ist

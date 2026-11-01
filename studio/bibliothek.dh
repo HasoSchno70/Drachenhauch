@@ -1,0 +1,258 @@
+' ============================================================
+'  Drachenhauch Studio -- die Bibliothek der Bausteine
+' ============================================================
+'  Jeder Baustein: die Art der Laufzeit (die Namen aus der .dhform), ein
+'  Anzeigename, das Grundwort fuer den Namen im Fenster (Knopf1, Liste2 ...
+'  -- er wird zum Feld der Fensterklasse, darum ohne Umlaute), die Gruppe,
+'  die Vorgabegroesse, ein Vorgabetext und zusaetzliche Felder als JSON.
+'  Das Sinnbild ist eine kleine gezeichnete Vorschau des Controls, wie in
+'  der Bibliothek von Xojo -- ein Wort allein liest man langsamer.
+' ============================================================
+
+CLASS Baustein
+    DIM kind AS STRING
+    DIM name AS STRING
+    DIM grundname AS STRING
+    DIM gruppe AS STRING
+    DIM b AS INTEGER
+    DIM h AS INTEGER
+    DIM text AS STRING
+    DIM vorlage AS STRING
+    DIM beschreibung AS STRING
+    DIM symbol AS IMAGE       ' quadratisch: Liste und Baum zeichnen Sinnbilder in Zeilenhoehe
+    DIM breit AS IMAGE        ' die breite Vorschau (beim Ziehen)
+END CLASS
+
+DIM bausteine AS ARRAY OF Baustein : bausteine = []
+DIM gruppen AS ARRAY OF STRING : gruppen = []
+
+SUB baustein(gruppe AS STRING, kind AS STRING, name AS STRING, grund AS STRING, b AS INTEGER, h AS INTEGER, text AS STRING, vorlage AS STRING, beschreibung AS STRING)
+    DIM s AS Baustein : s = NEW Baustein()
+    s.kind = kind : s.name = name : s.grundname = grund : s.gruppe = gruppe
+    s.b = b : s.h = h : s.text = text : s.vorlage = vorlage : s.beschreibung = beschreibung
+    ARRAY_PUSH(bausteine, s)
+    IF ARRAY_INDEXOF(gruppen, gruppe) < 0 THEN ARRAY_PUSH(gruppen, gruppe)
+END SUB
+
+SUB bausteineAnlegen()
+    baustein("Knöpfe und Schalter", "button", "Knopf", "Knopf", 100, 30, "Knopf", "", "löst beim Klick eine Aktion aus")
+    baustein("Knöpfe und Schalter", "checkbox", "Kästchen", "Kaestchen", 120, 20, "Kästchen", "", "an oder aus, mit Beschriftung")
+    baustein("Knöpfe und Schalter", "radio", "Optionsfeld", "Option", 120, 20, "Option", "{'group':'gruppe1'}", "eines aus einer Gruppe")
+    baustein("Knöpfe und Schalter", "toggle", "Umschalter", "Schalter", 120, 22, "Schalter", "", "Kippschalter wie am Telefon")
+    baustein("Eingabe", "textinput", "Textfeld", "Textfeld", 180, 28, "", "", "eine Zeile Text")
+    baustein("Eingabe", "textarea", "Textbereich", "Textbereich", 240, 100, "", "", "mehrzeiliger Text")
+    baustein("Eingabe", "spinner", "Zahlenfeld", "Zahlenfeld", 110, 28, "", "{'min':0,'max':100,'value':0}", "eine Zahl mit Pfeilen")
+    baustein("Eingabe", "slider", "Regler", "Regler", 180, 20, "", "{'min':0,'max':100,'value':50}", "ein Wert zwischen zwei Grenzen")
+    baustein("Eingabe", "knob", "Drehknopf", "Drehknopf", 56, 56, "", "{'min':0,'max':100,'value':50}", "ein Wert zum Drehen")
+    baustein("Auswahl", "dropdown", "Klappliste", "Klappliste", 180, 28, "", "{'items':['Eintrag 1','Eintrag 2','Eintrag 3'],'sel':0}", "eines aus einer Liste, aufklappend")
+    baustein("Auswahl", "listbox", "Liste", "Liste", 180, 120, "", "{'items':['Eintrag 1','Eintrag 2','Eintrag 3']}", "Einträge untereinander")
+    baustein("Auswahl", "tree", "Baum", "Baum", 200, 160, "", "", "Einträge mit Unterpunkten")
+    baustein("Auswahl", "datepicker", "Datumswähler", "Datum", 220, 200, "", "", "ein Tag aus dem Kalender")
+    baustein("Auswahl", "timepicker", "Uhrzeit", "Uhrzeit", 150, 28, "", "", "Stunde und Minute")
+    baustein("Auswahl", "colorpicker", "Farbwähler", "Farbe", 220, 170, "", "", "eine Farbe aus Fläche und Streifen")
+    baustein("Anzeige", "label", "Beschriftung", "Beschriftung", 100, 20, "Beschriftung", "", "Text, den man nicht ändert")
+    baustein("Anzeige", "image", "Bild", "Bild", 120, 90, "", "", "ein Bild aus dem Projekt")
+    baustein("Anzeige", "progress", "Fortschrittsbalken", "Fortschritt", 200, 18, "", "{'min':0,'max':1,'value':0.4}", "wie weit etwas ist")
+    baustein("Anzeige", "richtext", "Gesetzter Text", "Text", 260, 140, "# Überschrift", "", "Markdown, gesetzt mit Überschriften und Listen")
+    baustein("Anzeige", "card", "Kachel", "Kachel", 200, 190, "Titel", "", "Bild, Titel und Beschreibung -- ganz ein Knopf")
+    baustein("Anzeige", "separator", "Trennlinie", "Linie", 200, 8, "", "", "eine waagerechte Linie")
+    baustein("Daten", "table", "Tabelle", "Tabelle", 340, 160, "", "{'table':{'headers':['Name','Wert']}}", "Zeilen und Spalten, sortierbar")
+    baustein("Daten", "table", "Gitter", "Gitter", 340, 160, "", "{'table':{'headers':['A','B','C'],'zellmodus':true,'col_edit':[true,true,true]}}", "eine Tabelle zum Bearbeiten wie in einer Tabellenkalkulation")
+    baustein("Daten", "table", "Baumtabelle", "Baumtabelle", 340, 160, "", "{'table':{'headers':['Name','Wert'],'baum':true}}", "eine Tabelle, deren Zeilen einen Baum bilden")
+    baustein("Behälter", "panel", "Bereich", "Bereich", 200, 120, "", "", "eine Fläche, die Controls zusammenfasst")
+    baustein("Behälter", "groupbox", "Gruppe", "Gruppe", 220, 140, "Gruppe", "", "ein Rahmen mit Titel")
+    baustein("Behälter", "tabcontrol", "Reiterwerk", "Reiter", 320, 200, "", "{'items':['Seite 1','Seite 2']}", "Seiten mit Reitern")
+    baustein("Behälter", "accordion", "Akkordeon", "Akkordeon", 260, 240, "", "{'items':['Abschnitt 1','Abschnitt 2']}", "Abschnitte, die auf- und zuklappen")
+    baustein("Behälter", "wizard", "Assistent", "Assistent", 440, 300, "", "{'items':['Schritt 1','Schritt 2']}", "Schritt für Schritt mit Weiter und Zurück")
+    baustein("Behälter", "layout", "Layout", "Layout", 240, 120, "", "", "ordnet seine Controls in Zeile, Spalte oder Raster")
+    baustein("Leisten", "toolbar", "Werkzeugleiste", "Werkzeugleiste", 320, 36, "", "", "Knöpfe mit Sinnbildern oben im Fenster")
+    baustein("Leisten", "statusbar", "Statusleiste", "Statusleiste", 400, 24, "Bereit.", "", "Meldungen unten im Fenster")
+    baustein("Leisten", "breadcrumb", "Pfadleiste", "Pfad", 320, 26, "", "", "wo man gerade ist, zum Anklicken")
+    baustein("Zeichnen", "canvas", "Zeichenfläche", "Zeichenflaeche", 240, 180, "", "", "eine Fläche, auf die das Programm selbst zeichnet")
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bausteine) - 1
+        bausteine[i].breit = symbolZeichnen(bausteine[i].name)
+        ' Unverzerrt in ein Quadrat -- gestreckt saehe ein Knopf wie ein Punkt aus.
+        DIM q AS IMAGE : q = IMAGE_NEW(SYM_B, SYM_B)
+        IMAGE_DRAW_IMAGE(q, bausteine[i].breit, 0, (SYM_B - SYM_H) \ 2)
+        bausteine[i].symbol = q
+    NEXT
+END SUB
+
+' --- Sinnbilder -----------------------------------------------------------
+CONST SYM_B = 40
+CONST SYM_H = 26
+' Neutrale Toene, die auf hellem und dunklem Grund stehen.
+CONST S_FLAECHE = &H44505F
+CONST S_HELL = &HE4EAF2
+CONST S_RAND = &H8D9AAB
+CONST S_TEXT = &HB8C3D0
+CONST S_AKZENT = &H2BA8E0
+CONST S_GRUEN = &H3FBF7F
+
+SUB symText(img AS IMAGE, x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER)
+    IMAGE_FILL_ROUNDRECT(img, x0, y0, x1, y0 + 2, 1, S_TEXT)
+END SUB
+
+FUNCTION symbolZeichnen(name AS STRING) AS IMAGE
+    DIM img AS IMAGE : img = IMAGE_NEW(SYM_B, SYM_H)
+    DIM k AS INTEGER
+    SELECT CASE name
+        CASE "Knopf"
+            IMAGE_FILL_ROUNDRECT(img, 3, 6, 36, 20, 5, S_AKZENT)
+            IMAGE_FILL_ROUNDRECT(img, 11, 12, 28, 14, 1, S_HELL)
+        CASE "Kästchen"
+            IMAGE_FILL_ROUNDRECT(img, 3, 7, 14, 18, 3, S_AKZENT)
+            IMAGE_POLYLINE(img, [5, 8, 12], [12, 15, 9], 2, S_HELL)
+            symText(img, 18, 12, 36)
+        CASE "Optionsfeld"
+            IMAGE_RING(img, 9, 13, 6, 2, S_RAND)
+            IMAGE_FILL_ELLIPSE(img, 9, 13, 3, 3, S_AKZENT)
+            symText(img, 18, 12, 36)
+        CASE "Umschalter"
+            IMAGE_FILL_ROUNDRECT(img, 4, 7, 24, 19, 6, S_GRUEN)
+            IMAGE_FILL_ELLIPSE(img, 18, 13, 5, 5, S_HELL)
+            symText(img, 28, 12, 37)
+        CASE "Textfeld"
+            IMAGE_FILL_ROUNDRECT(img, 2, 6, 37, 20, 3, S_FLAECHE)
+            IMAGE_FRAME(img, 2, 6, 37, 20, 1, S_RAND)
+            symText(img, 6, 12, 20)
+            IMAGE_FILL_RECT(img, 22, 9, 22, 17, S_AKZENT)
+        CASE "Textbereich"
+            IMAGE_FILL_ROUNDRECT(img, 2, 2, 37, 23, 3, S_FLAECHE)
+            IMAGE_FRAME(img, 2, 2, 37, 23, 1, S_RAND)
+            FOR k = 0 TO 3
+                symText(img, 6, 6 + k * 4, IIF(k = 3, 22, 32))
+            NEXT
+        CASE "Zahlenfeld"
+            IMAGE_FILL_ROUNDRECT(img, 2, 6, 37, 20, 3, S_FLAECHE)
+            IMAGE_FRAME(img, 2, 6, 37, 20, 1, S_RAND)
+            IMAGE_DRAW_TEXT(img, 6, 8, "42", 10, S_HELL)
+            IMAGE_FILL_POLY(img, [29, 35, 32], [12, 12, 9], S_HELL)
+            IMAGE_FILL_POLY(img, [29, 35, 32], [15, 15, 18], S_HELL)
+        CASE "Regler"
+            IMAGE_FILL_ROUNDRECT(img, 3, 12, 36, 14, 1, S_RAND)
+            IMAGE_FILL_ROUNDRECT(img, 3, 12, 20, 14, 1, S_AKZENT)
+            IMAGE_FILL_ELLIPSE(img, 20, 13, 5, 5, S_HELL)
+        CASE "Drehknopf"
+            IMAGE_FILL_ELLIPSE(img, 20, 13, 10, 10, S_FLAECHE)
+            IMAGE_RING(img, 20, 13, 10, 2, S_AKZENT)
+            IMAGE_DRAW_LINE(img, 20, 13, 26, 7, S_HELL)
+        CASE "Klappliste"
+            IMAGE_FILL_ROUNDRECT(img, 2, 6, 37, 20, 3, S_FLAECHE)
+            IMAGE_FRAME(img, 2, 6, 37, 20, 1, S_RAND)
+            symText(img, 6, 12, 22)
+            IMAGE_FILL_POLY(img, [28, 34, 31], [11, 11, 15], S_HELL)
+        CASE "Liste"
+            IMAGE_FILL_ROUNDRECT(img, 4, 2, 35, 23, 2, S_FLAECHE)
+            IMAGE_FILL_RECT(img, 5, 9, 34, 14, S_AKZENT)
+            symText(img, 8, 5, 26) : symText(img, 8, 11, 28) : symText(img, 8, 18, 24)
+        CASE "Baum"
+            IMAGE_FILL_POLY(img, [5, 10, 7], [5, 5, 9], S_HELL)
+            symText(img, 12, 5, 30)
+            IMAGE_DRAW_LINE(img, 7, 10, 7, 20, S_RAND)
+            IMAGE_DRAW_LINE(img, 7, 14, 12, 14, S_RAND) : symText(img, 14, 13, 32)
+            IMAGE_DRAW_LINE(img, 7, 20, 12, 20, S_RAND) : symText(img, 14, 19, 28)
+        CASE "Datumswähler"
+            IMAGE_FILL_ROUNDRECT(img, 7, 3, 32, 23, 3, S_FLAECHE)
+            IMAGE_FILL_RECT(img, 7, 3, 32, 8, S_AKZENT)
+            FOR k = 0 TO 11
+                IMAGE_FILL_RECT(img, 10 + (k MOD 4) * 6, 11 + (k \ 4) * 4, 12 + (k MOD 4) * 6, 12 + (k \ 4) * 4, IIF(k = 6, S_AKZENT, S_TEXT))
+            NEXT
+        CASE "Uhrzeit"
+            IMAGE_RING(img, 20, 13, 10, 2, S_RAND)
+            IMAGE_DRAW_LINE(img, 20, 13, 20, 6, S_HELL)
+            IMAGE_DRAW_LINE(img, 20, 13, 25, 15, S_AKZENT)
+        CASE "Farbwähler"
+            ' Die Bild-Befehle ueberschreiben statt zu mischen -- also Zeile fuer
+            ' Zeile ein Verlauf von Weiss nach Rot, nach unten dunkler.
+            FOR k = 0 TO 19
+                DIM dunkel AS INTEGER : dunkel = 255 - k * 11
+                IMAGE_GRADIENT(img, 3, 3 + k, 28, 3 + k, RGB(dunkel, dunkel, dunkel), RGB(dunkel * 224 \ 255, dunkel * 48 \ 255, dunkel * 48 \ 255), FALSE)
+            NEXT
+            IMAGE_GRADIENT(img, 31, 3, 36, 22, &HE03030, &H3050E0, TRUE)
+        CASE "Beschriftung"
+            IMAGE_DRAW_TEXT(img, 6, 6, "Abc", 13, S_RAND)
+        CASE "Bild"
+            IMAGE_FILL_ROUNDRECT(img, 4, 3, 35, 22, 2, &H35617E)
+            IMAGE_FILL_POLY(img, [6, 16, 24, 33, 33, 6], [21, 10, 16, 8, 21, 21], &H6FBF6F)
+            IMAGE_FILL_ELLIPSE(img, 27, 8, 3, 3, &HF0D060)
+        CASE "Fortschrittsbalken"
+            IMAGE_FILL_ROUNDRECT(img, 3, 10, 36, 16, 3, S_FLAECHE)
+            IMAGE_FILL_ROUNDRECT(img, 3, 10, 22, 16, 3, S_AKZENT)
+        CASE "Gesetzter Text"
+            IMAGE_FILL_ROUNDRECT(img, 4, 3, 26, 6, 1, S_HELL)
+            symText(img, 4, 10, 35) : symText(img, 4, 14, 32)
+            IMAGE_FILL_ELLIPSE(img, 6, 20, 1, 1, S_TEXT) : symText(img, 9, 19, 28)
+        CASE "Kachel"
+            IMAGE_FILL_ROUNDRECT(img, 7, 1, 32, 24, 3, S_FLAECHE)
+            IMAGE_FILL_RECT(img, 9, 3, 30, 13, &H35617E)
+            IMAGE_FILL_ROUNDRECT(img, 9, 16, 24, 17, 1, S_HELL)
+            symText(img, 9, 20, 28)
+        CASE "Trennlinie"
+            IMAGE_FILL_RECT(img, 3, 12, 36, 13, S_RAND)
+        CASE "Tabelle", "Baumtabelle"
+            IMAGE_FILL_RECT(img, 3, 3, 36, 22, S_FLAECHE)
+            IMAGE_FILL_RECT(img, 3, 3, 36, 8, S_RAND)
+            FOR k = 0 TO 2
+                IMAGE_FILL_RECT(img, 3, 12 + k * 4, 36, 12 + k * 4, &H5A6676)
+            NEXT
+            IMAGE_FILL_RECT(img, 16, 3, 16, 22, &H5A6676)
+            IF name = "Baumtabelle" THEN IMAGE_FILL_POLY(img, [5, 9, 7], [10, 10, 13], S_HELL)
+        CASE "Gitter"
+            IMAGE_FILL_RECT(img, 3, 3, 36, 22, S_FLAECHE)
+            FOR k = 0 TO 4
+                IMAGE_FILL_RECT(img, 3, 3 + k * 5, 36, 3 + k * 5, &H5A6676)
+            NEXT
+            FOR k = 0 TO 3
+                IMAGE_FILL_RECT(img, 3 + k * 11, 3, 3 + k * 11, 22, &H5A6676)
+            NEXT
+            IMAGE_FRAME(img, 14, 8, 25, 13, 1, S_AKZENT)
+        CASE "Bereich"
+            IMAGE_FILL_ROUNDRECT(img, 3, 3, 36, 22, 3, S_FLAECHE)
+            IMAGE_FRAME(img, 3, 3, 36, 22, 1, S_RAND)
+        CASE "Gruppe"
+            IMAGE_FRAME(img, 3, 6, 36, 22, 1, S_RAND)
+            IMAGE_CLEAR(img, 6, 3, 17, 7)
+            symText(img, 8, 5, 21)
+        CASE "Reiterwerk"
+            IMAGE_FILL_ROUNDRECT(img, 3, 3, 15, 9, 2, S_AKZENT)
+            IMAGE_FILL_ROUNDRECT(img, 16, 3, 28, 9, 2, S_FLAECHE)
+            IMAGE_FILL_RECT(img, 3, 9, 36, 22, S_FLAECHE)
+            IMAGE_FRAME(img, 3, 9, 36, 22, 1, S_RAND)
+        CASE "Akkordeon"
+            FOR k = 0 TO 2
+                IMAGE_FILL_ROUNDRECT(img, 3, 2 + k * 8, 36, 7 + k * 8, 2, IIF(k = 0, S_AKZENT, S_FLAECHE))
+            NEXT
+        CASE "Assistent"
+            FOR k = 0 TO 2
+                IMAGE_FILL_ELLIPSE(img, 10 + k * 10, 6, 3, 3, IIF(k = 0, S_AKZENT, S_RAND))
+            NEXT
+            IMAGE_FILL_ROUNDRECT(img, 24, 17, 36, 22, 2, S_AKZENT)
+            IMAGE_FILL_ROUNDRECT(img, 10, 17, 22, 22, 2, S_FLAECHE)
+        CASE "Layout"
+            FOR k = 0 TO 2
+                IMAGE_FILL_ROUNDRECT(img, 3 + k * 12, 7, 12 + k * 12, 18, 2, S_FLAECHE)
+                IMAGE_FRAME(img, 3 + k * 12, 7, 12 + k * 12, 18, 1, S_RAND)
+            NEXT
+        CASE "Werkzeugleiste"
+            IMAGE_FILL_RECT(img, 2, 7, 37, 19, S_FLAECHE)
+            FOR k = 0 TO 3
+                IMAGE_FILL_ROUNDRECT(img, 5 + k * 8, 9, 10 + k * 8, 17, 1, IIF(k = 0, S_AKZENT, S_TEXT))
+            NEXT
+        CASE "Statusleiste"
+            IMAGE_FILL_RECT(img, 2, 16, 37, 23, S_FLAECHE)
+            symText(img, 5, 18, 20)
+            IMAGE_FILL_RECT(img, 26, 17, 26, 22, S_RAND)
+        CASE "Pfadleiste"
+            symText(img, 3, 12, 10)
+            IMAGE_POLYLINE(img, [13, 15, 13], [10, 13, 16], 1, S_RAND)
+            symText(img, 18, 12, 25)
+            IMAGE_POLYLINE(img, [28, 30, 28], [10, 13, 16], 1, S_RAND)
+            IMAGE_FILL_ROUNDRECT(img, 32, 12, 37, 14, 1, S_HELL)
+        CASE "Zeichenfläche"
+            IMAGE_FILL_RECT(img, 3, 3, 36, 22, S_FLAECHE)
+            IMAGE_POLYLINE(img, [6, 12, 18, 24, 30, 34], [19, 10, 15, 7, 13, 9], 2, S_AKZENT)
+    END SELECT
+    RETURN img
+END FUNCTION

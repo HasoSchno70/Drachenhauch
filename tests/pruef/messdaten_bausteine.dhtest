@@ -321,6 +321,34 @@ DHRT_FRAMES=8
 7 FALSE FALSE FALSE
 8 FALSE FALSE FALSE
 
+=== gui changed beim kippschalter zaehlt nicht das nachgleiten
+' Ein Kippschalter gleitet nach einem Wechsel einige Bilder lang in seine
+' neue Lage -- auch nach GUI_SET_CHECKED aus dem Programm. Das ist keine
+' Bedienung; bis 2026.39 meldete GUI_CHANGED es in jedem Bild des Gleitens.
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_METRIC_SET("uebergang", 300)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Kasten", 10, 10, 300, 200)
+DIM ks AS GUI_WIDGET : ks = GUI_TOGGLE(w, "an", 20, 20, FALSE)
+DIM n AS INTEGER
+DIM gemeldet AS INTEGER : gemeldet = 0
+WHILE NOT QUITREQUESTED()
+    n = n + 1
+    IF n = 3 THEN GUI_SET_CHECKED(ks, TRUE)
+    GUI_UPDATE()
+    IF GUI_CHANGED(ks) THEN gemeldet = gemeldet + 1
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "gemeldet "; gemeldet; " an "; GUI_CHECKED(ks)
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+gemeldet 0 an TRUE
+
 === glatte kommazahl gilt als integer
 ' Aus der Web-Runde: "/" liefert immer FLOAT, und GUI_WINDOW("...", BREITE / 2
 ' - 170, ...) brach mit "erwartet INTEGER" ab -- obwohl x = BREITE / 2 in eine

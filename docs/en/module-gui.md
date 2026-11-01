@@ -416,6 +416,7 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_LISTBOX_DATA$(lb, i)` | STRING | read the invisible value of an entry |
 | `GUI_LISTBOX_FIND_DATA(lb, wert$)` | INTEGER | first entry with this value, -1 = none |
 | `GUI_LISTBOX_DETAIL(lb, i, text$)` | — | extra text on the right of the entry, dimmed (shortcut, size, line number) |
+| `GUI_LISTBOX_ITEM_RECT(lb, i)` | TUPLE | where item i is on screen (x, y, w, h), in screen pixels like `GUI_HIT_TEST`; filtered out (0, 0, 0, 0) -- for tests with real clicks, the row height depends on font and stylesheet |
 | `GUI_LISTBOX_TIP(lb, i, text$)` | — | tooltip per entry. Without one, an entry that does not fit the row (it ends with "...") shows its whole text when hovered |
 | `GUI_LISTBOX_ENABLE(lb, i, an)` | — | disable an entry: visible, but neither clickable nor reachable with the arrow keys |
 | `GUI_LISTBOX_ENABLED(lb, i)` | BOOLEAN | whether an entry is selectable |

@@ -1,0 +1,671 @@
+' ============================================================
+'  Drachenhauch Studio -- die Entwurfsflaeche
+' ============================================================
+'  Das Fenster, das man entwirft, ist ein echtes GUI_WINDOW im Entwurfsmodus
+'  (GUI_WINDOW_DESIGN): die Laufzeit zeichnet die Controls genau so, wie das
+'  Programm sie spaeter bekommt, nimmt ihnen aber die Eingabe. Die Maus
+'  gehoert dem Studio. Gezeichnet wird darum herum: ein Fensterrahmen mit
+'  Titelleiste und Schatten, die Auswahl mit acht Griffen, der Rahmen beim
+'  Aufziehen und die Ausrichtungslinien, die beim Ziehen an Kanten und
+'  Mitten der Nachbarn und an die Raender des Fensters einrasten.
+'
+'  Lagen: im Modell stehen Fensterkoordinaten (ab der linken oberen Ecke des
+'  Inhalts, unvergroessert). Auf dem Schirm liegt der Inhalt bei formX/formY
+'  und ist um zoomF vergroessert: zS rechnet hin, zF zurueck.
+' ============================================================
+
+CONST TITEL_H = 30              ' Hoehe der gezeichneten Titelleiste
+CONST RAND_FENSTER = 20         ' der Abstand zum Fensterrand, den Xojo vorschlaegt
+CONST ABSTAND_NACHBAR = 12      ' der Abstand zwischen zwei Controls
+CONST FANG = 6                  ' wie nah (in Fensterpunkten) eine Linie einrastet
+CONST F_LINIE = &HE0409A        ' Ausrichtungslinien
+CONST F_AUSWAHL = &H3AA8F0
+CONST F_GRIFF_RAND = &H1C6FB0
+
+DIM frm AS GUI_WINDOW : frm = -1
+DIM formX AS INTEGER : formX = 400
+DIM formY AS INTEGER : formY = 120
+DIM zoomF AS FLOAT : zoomF = 1.0
+DIM rasterAn AS BOOLEAN : rasterAn = TRUE
+DIM linienAn AS BOOLEAN : linienAn = TRUE
+
+' Mittelbereich auf dem Schirm (vom Dock, oberflaeche.dh setzt ihn).
+DIM mitteX AS INTEGER
+DIM mitteY AS INTEGER
+DIM mitteB AS INTEGER
+DIM mitteH AS INTEGER
+
+' Zug
+DIM modus AS INTEGER : modus = 0      ' 1 ziehen, 2 Griff, 3 Rahmen
+DIM griff AS INTEGER : griff = -1
+DIM startMx AS INTEGER
+DIM startMy AS INTEGER
+DIM startX AS INTEGER
+DIM startY AS INTEGER
+DIM startW AS INTEGER
+DIM startH AS INTEGER
+DIM zugX AS ARRAY OF INTEGER : zugX = []
+DIM zugY AS ARRAY OF INTEGER : zugY = []
+DIM bewegt AS BOOLEAN : bewegt = FALSE
+DIM rahmenDazu AS BOOLEAN : rahmenDazu = FALSE
+DIM mausFx AS INTEGER                 ' Maus in Fensterlage, je Bild
+DIM mausFy AS INTEGER
+
+' Ausrichtungslinien des laufenden Zugs (Fensterlage)
+DIM linX1 AS ARRAY OF INTEGER : linX1 = []
+DIM linY1 AS ARRAY OF INTEGER : linY1 = []
+DIM linX2 AS ARRAY OF INTEGER : linX2 = []
+DIM linY2 AS ARRAY OF INTEGER : linY2 = []
+
+FUNCTION zS(v AS INTEGER) AS INTEGER
+    RETURN INT(v * zoomF + 0.5)
+END FUNCTION
+
+FUNCTION zF(v AS INTEGER) AS INTEGER
+    IF v >= 0 THEN RETURN INT(v / zoomF)
+    RETURN -INT(-v / zoomF)
+END FUNCTION
+
+FUNCTION fensterB() AS INTEGER
+    RETURN MAX(40, fensterZahl("w"))
+END FUNCTION
+
+FUNCTION fensterH() AS INTEGER
+    RETURN MAX(40, fensterZahl("h"))
+END FUNCTION
+
+' --- Lage und Neuaufbau --------------------------------------------------------
+' Das Fenster mittig in den Mittelbereich, mit Platz fuer die Titelleiste.
+SUB entwurfLegen()
+    DIM b AS INTEGER : b = zS(fensterB())
+    DIM h AS INTEGER : h = zS(fensterH())
+    formX = mitteX + MAX(32, (mitteB - b) \ 2)
+    formY = mitteY + MAX(32 + TITEL_H, (mitteH - h - TITEL_H) \ 2 + TITEL_H)
+    IF frm >= 0 THEN GUI_WINDOW_SET_BOUNDS(frm, formX, formY, fensterB(), fensterH())
+END SUB
+
+SUB entwurfBauen()
+    ' Ein neues Fenster nimmt den Fokus -- und Kuerzel gelten im Fenster mit
+    ' Fokus. Also merken und zurueckgeben.
+    DIM fokus AS GUI_WIDGET : fokus = GUI_FOCUSED()
+    IF frm >= 0 THEN GUI_WINDOW_DESTROY(frm)
+    frm = GUI_FROM_JSON(JSON_STRINGIFY(doc))
+    GUI_WINDOW_DESIGN(frm, TRUE)
+    GUI_WINDOW_CHROME(frm, FALSE)
+    GUI_WINDOW_MOVABLE(frm, FALSE)
+    GUI_WINDOW_RESIZABLE(frm, FALSE)
+    GUI_WINDOW_ZOOM(frm, zoomF)
+    entwurfLegen()
+    GUI_WINDOW_VISIBLE(frm, TRUE)
+    IF fokus >= 0 THEN GUI_FOCUS(fokus) ELSE GUI_FOCUS(-1)
+END SUB
+
+' Nach jeder Aenderung am Modell: neu bauen, Navigator und Inspektor nach.
+SUB nachAenderung(festhalten AS BOOLEAN)
+    entwurfBauen()
+    IF festhalten THEN merken()
+    navigatorFuellen()
+    inspektorFuellen()
+    werkzeugeNachziehen()
+END SUB
+
+FUNCTION indexVonHandle(h AS GUI_WIDGET) AS INTEGER
+    IF h < 0 OR frm < 0 THEN RETURN -1
+    DIM i AS INTEGER
+    FOR i = 0 TO GUI_WINDOW_WIDGET_COUNT(frm) - 1
+        IF GUI_WINDOW_WIDGET(frm, i) = h THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Lage waehrend eines Zugs: ins Modell UND live ins Widget (kein Neuaufbau).
+SUB lageSetzenVon(i AS INTEGER, x AS INTEGER, y AS INTEGER, w AS INTEGER, h AS INTEGER)
+    JSON_SET_INT(doc, wz$(i, "x"), x) : JSON_SET_INT(doc, wz$(i, "y"), y)
+    JSON_SET_INT(doc, wz$(i, "w"), w) : JSON_SET_INT(doc, wz$(i, "h"), h)
+    IF frm >= 0 THEN
+        DIM hd AS GUI_WIDGET : hd = GUI_WINDOW_WIDGET(frm, i)
+        IF hd >= 0 THEN GUI_SET_BOUNDS(hd, x, y, w, h)
+    END IF
+END SUB
+
+' --- Zoom -------------------------------------------------------------------
+SUB zoomStufe(richtung AS INTEGER)
+    DIM stufen AS ARRAY OF FLOAT : stufen = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0]
+    DIM k AS INTEGER
+    IF richtung = 0 THEN
+        zoomF = 1.0
+    ELSEIF richtung > 0 THEN
+        FOR k = 0 TO LEN(stufen) - 1
+            IF stufen[k] > zoomF + 0.01 THEN zoomF = stufen[k] : BREAK
+        NEXT
+    ELSE
+        FOR k = LEN(stufen) - 1 TO 0 STEP -1
+            IF stufen[k] < zoomF - 0.01 THEN zoomF = stufen[k] : BREAK
+        NEXT
+    END IF
+    IF frm >= 0 THEN GUI_WINDOW_ZOOM(frm, zoomF)
+    entwurfLegen()
+    statusZoom()
+    protokoll("zoom " + STR$(INT(zoomF * 100 + 0.5)))
+END SUB
+
+' --- Ausrichtungslinien --------------------------------------------------------
+SUB linienLeeren()
+    linX1 = [] : linY1 = [] : linX2 = [] : linY2 = []
+END SUB
+
+SUB linie(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    ARRAY_PUSH(linX1, x1) : ARRAY_PUSH(linY1, y1)
+    ARRAY_PUSH(linX2, x2) : ARRAY_PUSH(linY2, y2)
+END SUB
+
+' Ziele einer Achse: Fensterraender, Rand von 20, Mitte; Kanten und Mitten der
+' Controls, die nicht mitgezogen werden; Abstand 12 neben einem Nachbarn.
+' `art` sagt, was der Wert ist (0 Kante/Mitte, 1 "links von mir endet ein
+' Nachbar" = meine linke Kante darf dort hin, 2 = meine rechte Kante).
+DIM zielWert AS ARRAY OF INTEGER : zielWert = []
+DIM zielArt AS ARRAY OF INTEGER : zielArt = []
+DIM zielVon AS ARRAY OF INTEGER : zielVon = []     ' Control oder -1 (Fenster)
+
+SUB zieleSammeln(senkrecht AS BOOLEAN)
+    zielWert = [] : zielArt = [] : zielVon = []
+    DIM groesse AS INTEGER : groesse = IIF(senkrecht, fensterH(), fensterB())
+    DIM v AS INTEGER
+    FOR EACH v IN [0, groesse, groesse \ 2]
+        ARRAY_PUSH(zielWert, v) : ARRAY_PUSH(zielArt, 0) : ARRAY_PUSH(zielVon, -1)
+    NEXT
+    ARRAY_PUSH(zielWert, RAND_FENSTER) : ARRAY_PUSH(zielArt, 1) : ARRAY_PUSH(zielVon, -1)
+    ARRAY_PUSH(zielWert, groesse - RAND_FENSTER) : ARRAY_PUSH(zielArt, 2) : ARRAY_PUSH(zielVon, -1)
+    DIM i AS INTEGER
+    FOR i = 0 TO anzahl() - 1
+        IF istGewaehlt(i) THEN CONTINUE
+        DIM a AS INTEGER : a = feldZahl(i, IIF(senkrecht, "y", "x"))
+        DIM l AS INTEGER : l = feldZahl(i, IIF(senkrecht, "h", "w"))
+        FOR EACH v IN [a, a + l, a + l \ 2]
+            ARRAY_PUSH(zielWert, v) : ARRAY_PUSH(zielArt, 0) : ARRAY_PUSH(zielVon, i)
+        NEXT
+        ARRAY_PUSH(zielWert, a + l + ABSTAND_NACHBAR) : ARRAY_PUSH(zielArt, 1) : ARRAY_PUSH(zielVon, i)
+        ARRAY_PUSH(zielWert, a - ABSTAND_NACHBAR) : ARRAY_PUSH(zielArt, 2) : ARRAY_PUSH(zielVon, i)
+    NEXT
+END SUB
+
+' Die beste Verschiebung, damit eine der Kanten (anfang, mitte, ende) eines
+' Bereichs auf einem Ziel liegt. `kanten`: 1 = nur Anfang, 2 = nur Ende,
+' 3 = alle drei. Liefert die Verschiebung; `treffer` den Zielindex (-1 = keiner).
+DIM treffer AS INTEGER
+DIM trefferKante AS INTEGER
+FUNCTION einrasten(anfang AS INTEGER, laenge AS INTEGER, kanten AS INTEGER) AS INTEGER
+    treffer = -1
+    DIM beste AS INTEGER : beste = FANG + 1
+    DIM d AS INTEGER : d = 0
+    DIM z AS INTEGER
+    FOR z = 0 TO LEN(zielWert) - 1
+        DIM k AS INTEGER
+        FOR k = 0 TO 2
+            IF kanten = 1 AND k <> 0 THEN CONTINUE
+            IF kanten = 2 AND k <> 2 THEN CONTINUE
+            ' Abstandsziele nur fuer die passende Kante.
+            IF zielArt[z] = 1 AND k <> 0 THEN CONTINUE
+            IF zielArt[z] = 2 AND k <> 2 THEN CONTINUE
+            DIM pos AS INTEGER : pos = anfang + IIF(k = 0, 0, IIF(k = 1, laenge \ 2, laenge))
+            DIM abst AS INTEGER : abst = ABS(zielWert[z] - pos)
+            IF abst < beste THEN
+                beste = abst
+                d = zielWert[z] - pos
+                treffer = z
+                trefferKante = k
+            END IF
+        NEXT
+    NEXT
+    RETURN d
+END FUNCTION
+
+' Eine Linie fuer den gefundenen Treffer: ueber Bereich und Ziel hinweg.
+SUB linieZuTreffer(senkrecht AS BOOLEAN, wert AS INTEGER, a1 AS INTEGER, a2 AS INTEGER)
+    IF treffer < 0 THEN RETURN
+    DIM von AS INTEGER : von = a1
+    DIM bis AS INTEGER : bis = a2
+    DIM c AS INTEGER : c = zielVon[treffer]
+    IF c >= 0 THEN
+        DIM ca AS INTEGER : ca = feldZahl(c, IIF(senkrecht, "x", "y"))
+        DIM cl AS INTEGER : cl = feldZahl(c, IIF(senkrecht, "w", "h"))
+        von = MIN(von, ca) : bis = MAX(bis, ca + cl)
+    ELSE
+        von = 0 : bis = IIF(senkrecht, fensterB(), fensterH())
+    END IF
+    IF senkrecht THEN linie(von, wert, bis, wert) ELSE linie(wert, von, wert, bis)
+END SUB
+
+' --- Griffe -----------------------------------------------------------------
+FUNCTION griffBei(mx AS INTEGER, my AS INTEGER) AS INTEGER
+    IF auswahl < 0 OR LEN(gewaehlt) <> 1 THEN RETURN -1
+    DIM x AS INTEGER : x = feldZahl(auswahl, "x")
+    DIM y AS INTEGER : y = feldZahl(auswahl, "y")
+    DIM w AS INTEGER : w = feldZahl(auswahl, "w")
+    DIM h AS INTEGER : h = feldZahl(auswahl, "h")
+    DIM gx AS ARRAY OF INTEGER : gx = [x, x + w \ 2, x + w, x + w, x + w, x + w \ 2, x, x]
+    DIM gy AS ARRAY OF INTEGER : gy = [y, y, y, y + h \ 2, y + h, y + h, y + h, y + h \ 2]
+    DIM weite AS INTEGER : weite = MAX(3, zF(6))
+    DIM i AS INTEGER
+    FOR i = 0 TO 7
+        IF ABS(mx - gx[i]) <= weite AND ABS(my - gy[i]) <= weite THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION griffZeiger$(g AS INTEGER) AS STRING
+    SELECT CASE g
+        CASE 0, 4 : RETURN "resize_nwse"
+        CASE 2, 6 : RETURN "resize_nesw"
+        CASE 1, 5 : RETURN "resize_ns"
+        CASE 3, 7 : RETURN "resize_ew"
+    END SELECT
+    RETURN "default"
+END FUNCTION
+
+' --- Maus ---------------------------------------------------------------------
+FUNCTION imFenster(sx AS INTEGER, sy AS INTEGER) AS BOOLEAN
+    RETURN sx >= formX AND sy >= formY AND sx < formX + zS(fensterB()) AND sy < formY + zS(fensterH())
+END FUNCTION
+
+FUNCTION inDerMitte(sx AS INTEGER, sy AS INTEGER) AS BOOLEAN
+    RETURN sx >= mitteX AND sy >= mitteY AND sx < mitteX + mitteB AND sy < mitteY + mitteH
+END FUNCTION
+
+FUNCTION umschalt() AS BOOLEAN
+    RETURN KEYPRESSED(KEY_LSHIFT) OR KEYPRESSED(KEY_RSHIFT)
+END FUNCTION
+
+FUNCTION strg() AS BOOLEAN
+    RETURN KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
+END FUNCTION
+
+FUNCTION alt() AS BOOLEAN
+    RETURN KEYPRESSED(KEY_LALT) OR KEYPRESSED(KEY_RALT)
+END FUNCTION
+
+' Ein Wert ans Raster -- es sei denn, das Raster ist aus oder Alt gedrueckt.
+FUNCTION rasterWert(v AS INTEGER) AS INTEGER
+    IF NOT rasterAn OR alt() THEN RETURN v
+    RETURN amRaster(v)
+END FUNCTION
+
+SUB mausAufEntwurf()
+    DIM smx AS INTEGER : smx = MOUSEX()
+    DIM smy AS INTEGER : smy = MOUSEY()
+    mausFx = zF(smx - formX)
+    mausFy = zF(smy - formY)
+    IF strg() AND MOUSEWHEEL_Y() <> 0.0 AND inDerMitte(smx, smy) THEN zoomStufe(IIF(MOUSEWHEEL_Y() > 0.0, 1, -1))
+
+    ' Zeiger: ueber einem Griff die passende Form.
+    IF modus = 0 AND imFenster(smx, smy) AND NOT bibScharf() THEN
+        DIM gz AS INTEGER : gz = griffBei(mausFx, mausFy)
+        IF gz >= 0 THEN MOUSE_CURSOR(griffZeiger$(gz)) ELSE MOUSE_CURSOR("auto")
+    ELSEIF modus = 0 AND bibScharf() AND imFenster(smx, smy) THEN
+        MOUSE_CURSOR("crosshair")
+    ELSEIF modus = 0 THEN
+        MOUSE_CURSOR("auto")
+    END IF
+
+    IF MOUSE_HIT(0) AND inDerMitte(smx, smy) AND fensterOben(smx, smy) THEN
+        ' Ein Baustein ist scharf: ablegen.
+        IF bibScharf() AND imFenster(smx, smy) THEN
+            ablegen(bibAusgewaehlt(), mausFx, mausFy, TRUE)
+            bibEntschaerfen()
+            RETURN
+        END IF
+        griff = IIF(imFenster(smx, smy), griffBei(mausFx, mausFy), -1)
+        IF griff >= 0 THEN
+            modus = 2
+        ELSE
+            DIM i AS INTEGER : i = -1
+            IF imFenster(smx, smy) THEN i = indexVonHandle(GUI_HIT_TEST(smx, smy))
+            DIM dazu AS BOOLEAN : dazu = umschalt() OR strg()
+            IF i >= 0 AND dazu THEN
+                auswahlUmschalten(i)
+                auswahlGeaendert()
+                modus = 0
+                RETURN
+            ELSEIF i >= 0 THEN
+                IF NOT istGewaehlt(i) THEN auswahlSetzen(i)
+                auswahl = i
+                auswahlGeaendert()
+                modus = 1
+            ELSE
+                IF NOT dazu THEN auswahlSetzen(-1) : auswahlGeaendert()
+                modus = 3
+                rahmenDazu = dazu
+            END IF
+        END IF
+        startMx = mausFx : startMy = mausFy
+        bewegt = FALSE
+        IF auswahl >= 0 THEN
+            startX = feldZahl(auswahl, "x") : startY = feldZahl(auswahl, "y")
+            startW = feldZahl(auswahl, "w") : startH = feldZahl(auswahl, "h")
+            zugX = [] : zugY = []
+            DIM gj AS INTEGER
+            FOR EACH gj IN gewaehlt
+                ARRAY_PUSH(zugX, feldZahl(gj, "x")) : ARRAY_PUSH(zugY, feldZahl(gj, "y"))
+            NEXT
+        END IF
+        GUI_FOCUS(-1)
+        RETURN
+    END IF
+
+    IF modus = 3 THEN
+        IF MOUSEBUTTON(0) THEN RETURN
+        modus = 0
+        IF ABS(mausFx - startMx) < 3 AND ABS(mausFy - startMy) < 3 THEN RETURN
+        DIM rx1 AS INTEGER : rx1 = MIN(startMx, mausFx)
+        DIM ry1 AS INTEGER : ry1 = MIN(startMy, mausFy)
+        DIM rx2 AS INTEGER : rx2 = MAX(startMx, mausFx)
+        DIM ry2 AS INTEGER : ry2 = MAX(startMy, mausFy)
+        IF NOT rahmenDazu THEN gewaehlt = []
+        DIM k AS INTEGER
+        FOR k = 0 TO anzahl() - 1
+            DIM kx AS INTEGER : kx = feldZahl(k, "x")
+            DIM ky AS INTEGER : ky = feldZahl(k, "y")
+            IF kx >= rx1 AND ky >= ry1 AND kx + feldZahl(k, "w") <= rx2 AND ky + feldZahl(k, "h") <= ry2 AND NOT istGewaehlt(k) THEN
+                DIM kh AS GUI_WIDGET : kh = GUI_WINDOW_WIDGET(frm, k)
+                IF kh >= 0 AND GUI_VISIBLE(kh) THEN ARRAY_PUSH(gewaehlt, k)
+            END IF
+        NEXT
+        IF LEN(gewaehlt) > 0 THEN auswahl = gewaehlt[LEN(gewaehlt) - 1] ELSE auswahl = -1
+        auswahlGeaendert()
+        protokoll("rahmen " + STR$(LEN(gewaehlt)))
+        RETURN
+    END IF
+
+    IF modus > 0 AND MOUSEBUTTON(0) AND auswahl >= 0 THEN
+        DIM dx AS INTEGER : dx = mausFx - startMx
+        DIM dy AS INTEGER : dy = mausFy - startMy
+        IF NOT bewegt AND ABS(dx) < 2 AND ABS(dy) < 2 THEN RETURN
+        bewegt = TRUE
+        linienLeeren()
+        IF modus = 1 THEN
+            ziehenRechnen(dx, dy)
+        ELSE
+            groesseRechnen(dx, dy)
+        END IF
+        lageAnzeigen()
+        RETURN
+    END IF
+
+    IF modus > 0 AND NOT MOUSEBUTTON(0) THEN
+        linienLeeren()
+        IF bewegt THEN
+            nachAenderung(TRUE)
+            protokoll("bewegt " + STR$(auswahl) + " " + STR$(feldZahl(auswahl, "x")) + " " + STR$(feldZahl(auswahl, "y")) + " " + STR$(feldZahl(auswahl, "w")) + " " + STR$(feldZahl(auswahl, "h")))
+        END IF
+        modus = 0
+    END IF
+END SUB
+
+' Verschieben: die ganze Auswahl um denselben Weg. Eingerastet wird ihr
+' umschliessendes Rechteck -- erst an Linien, sonst ans Raster.
+SUB ziehenRechnen(dx AS INTEGER, dy AS INTEGER)
+    ' Umschliessendes Rechteck der Auswahl beim Start.
+    DIM bx1 AS INTEGER : bx1 = 99999
+    DIM by1 AS INTEGER : by1 = 99999
+    DIM bx2 AS INTEGER : bx2 = -99999
+    DIM by2 AS INTEGER : by2 = -99999
+    DIM z AS INTEGER
+    FOR z = 0 TO LEN(gewaehlt) - 1
+        IF z >= LEN(zugX) THEN CONTINUE
+        DIM g AS INTEGER : g = gewaehlt[z]
+        bx1 = MIN(bx1, zugX[z]) : by1 = MIN(by1, zugY[z])
+        bx2 = MAX(bx2, zugX[z] + feldZahl(g, "w")) : by2 = MAX(by2, zugY[z] + feldZahl(g, "h"))
+    NEXT
+    DIM nx AS INTEGER : nx = bx1 + dx
+    DIM ny AS INTEGER : ny = by1 + dy
+    DIM bw AS INTEGER : bw = bx2 - bx1
+    DIM bh AS INTEGER : bh = by2 - by1
+    DIM eingerastetX AS BOOLEAN : eingerastetX = FALSE
+    DIM eingerastetY AS BOOLEAN : eingerastetY = FALSE
+    IF linienAn AND NOT alt() THEN
+        zieleSammeln(FALSE)
+        DIM ddx AS INTEGER : ddx = einrasten(nx, bw, 3)
+        IF treffer >= 0 THEN
+            nx = nx + ddx : eingerastetX = TRUE
+            linieZuTreffer(FALSE, nx + IIF(trefferKante = 0, 0, IIF(trefferKante = 1, bw \ 2, bw)), ny, ny + bh)
+        END IF
+        zieleSammeln(TRUE)
+        DIM ddy AS INTEGER : ddy = einrasten(ny, bh, 3)
+        IF treffer >= 0 THEN
+            ny = ny + ddy : eingerastetY = TRUE
+            linieZuTreffer(TRUE, ny + IIF(trefferKante = 0, 0, IIF(trefferKante = 1, bh \ 2, bh)), nx, nx + bw)
+        END IF
+    END IF
+    IF NOT eingerastetX THEN nx = rasterWert(nx)
+    IF NOT eingerastetY THEN ny = rasterWert(ny)
+    DIM wx AS INTEGER : wx = nx - bx1
+    DIM wy AS INTEGER : wy = ny - by1
+    FOR z = 0 TO LEN(gewaehlt) - 1
+        IF z < LEN(zugX) THEN
+            DIM gz AS INTEGER : gz = gewaehlt[z]
+            lageSetzenVon(gz, zugX[z] + wx, zugY[z] + wy, feldZahl(gz, "w"), feldZahl(gz, "h"))
+        END IF
+    NEXT
+END SUB
+
+' Groesse an einem Griff: die bewegten Kanten rasten ein.
+SUB groesseRechnen(dx AS INTEGER, dy AS INTEGER)
+    DIM x1 AS INTEGER : x1 = startX
+    DIM y1 AS INTEGER : y1 = startY
+    DIM x2 AS INTEGER : x2 = startX + startW
+    DIM y2 AS INTEGER : y2 = startY + startH
+    DIM links AS BOOLEAN : links = griff = 0 OR griff = 6 OR griff = 7
+    DIM rechts AS BOOLEAN : rechts = griff = 2 OR griff = 3 OR griff = 4
+    DIM oben AS BOOLEAN : oben = griff = 0 OR griff = 1 OR griff = 2
+    DIM unten AS BOOLEAN : unten = griff = 4 OR griff = 5 OR griff = 6
+    IF links THEN x1 = x1 + dx
+    IF rechts THEN x2 = x2 + dx
+    IF oben THEN y1 = y1 + dy
+    IF unten THEN y2 = y2 + dy
+    DIM mitLinien AS BOOLEAN : mitLinien = linienAn AND NOT alt()
+    IF links OR rechts THEN
+        DIM rx AS INTEGER : rx = IIF(links, x1, x2)
+        DIM fertigX AS BOOLEAN : fertigX = FALSE
+        IF mitLinien THEN
+            zieleSammeln(FALSE)
+            DIM dvx AS INTEGER : dvx = einrasten(rx, 0, IIF(links, 1, 2))
+            IF treffer >= 0 THEN
+                rx = rx + dvx : fertigX = TRUE
+                linieZuTreffer(FALSE, rx, y1, y2)
+            END IF
+        END IF
+        IF NOT fertigX THEN rx = rasterWert(rx)
+        IF links THEN x1 = MIN(rx, x2 - RASTER) ELSE x2 = MAX(rx, x1 + RASTER)
+    END IF
+    IF oben OR unten THEN
+        DIM ry AS INTEGER : ry = IIF(oben, y1, y2)
+        DIM fertigY AS BOOLEAN : fertigY = FALSE
+        IF mitLinien THEN
+            zieleSammeln(TRUE)
+            DIM dvy AS INTEGER : dvy = einrasten(ry, 0, IIF(oben, 1, 2))
+            IF treffer >= 0 THEN
+                ry = ry + dvy : fertigY = TRUE
+                linieZuTreffer(TRUE, ry, x1, x2)
+            END IF
+        END IF
+        IF NOT fertigY THEN ry = rasterWert(ry)
+        IF oben THEN y1 = MIN(ry, y2 - RASTER) ELSE y2 = MAX(ry, y1 + RASTER)
+    END IF
+    lageSetzenVon(auswahl, x1, y1, x2 - x1, y2 - y1)
+END SUB
+
+' Ein Baustein an eine Stelle im Fenster (Fensterlage). `mittig`: die Stelle
+' ist die Mitte des neuen Controls (Ablegen per Zug), sonst die linke obere
+' Ecke (Klick mit scharfem Baustein).
+SUB ablegen(p AS INTEGER, fx AS INTEGER, fy AS INTEGER, mittig AS BOOLEAN)
+    IF p < 0 THEN RETURN
+    DIM b AS Baustein : b = bausteine[p]
+    DIM x AS INTEGER : x = fx
+    DIM y AS INTEGER : y = fy
+    IF mittig THEN x = fx - b.b \ 2 : y = fy - b.h \ 2
+    x = MAX(0, MIN(rasterWert(x), fensterB() - MIN(b.b, fensterB())))
+    y = MAX(0, MIN(rasterWert(y), fensterH() - MIN(b.h, fensterH())))
+    DIM i AS INTEGER : i = controlAnlegen(p, x, y)
+    auswahlSetzen(i)
+    nachAenderung(TRUE)
+    status(b.name + " abgelegt: " + feldText$(i, "name"))
+    protokoll("neu " + b.kind + " " + feldText$(i, "name") + " " + STR$(x) + " " + STR$(y))
+END SUB
+
+' Liegt an der Stelle das Entwurfsfenster oben (und kein Popover, Menue,
+' Dialog darueber)?
+FUNCTION fensterOben(sx AS INTEGER, sy AS INTEGER) AS BOOLEAN
+    IF GUI_MODAL() THEN RETURN FALSE
+    DIM w AS GUI_WINDOW : w = GUI_WINDOW_AT(sx, sy)
+    RETURN w = frm OR w = win
+END FUNCTION
+
+' --- Tastatur -----------------------------------------------------------------
+SUB schieben(dx AS INTEGER, dy AS INTEGER)
+    IF auswahl < 0 THEN RETURN
+    DIM j AS INTEGER
+    FOR EACH j IN gewaehlt
+        lageSetzenVon(j, feldZahl(j, "x") + dx, feldZahl(j, "y") + dy, feldZahl(j, "w"), feldZahl(j, "h"))
+    NEXT
+    nachAenderung(TRUE)
+END SUB
+
+' --- Anordnen -------------------------------------------------------------------
+SUB anordnen(was AS STRING)
+    IF was = "vorn" OR was = "hinten" THEN
+        IF auswahl < 0 THEN RETURN
+        controlOrdnen(was = "vorn")
+        nachAenderung(TRUE)
+        RETURN
+    END IF
+    IF auswahl < 0 OR LEN(gewaehlt) < 2 THEN
+        status("Anordnen braucht mindestens zwei gewählte Controls (Umschalt+Klick oder ein Rahmen).")
+        RETURN
+    END IF
+    DIM bx AS INTEGER : bx = feldZahl(auswahl, "x")
+    DIM by AS INTEGER : by = feldZahl(auswahl, "y")
+    DIM bw AS INTEGER : bw = feldZahl(auswahl, "w")
+    DIM bh AS INTEGER : bh = feldZahl(auswahl, "h")
+    DIM j AS INTEGER
+    IF was = "vert_w" OR was = "vert_s" THEN
+        IF LEN(gewaehlt) < 3 THEN
+            status("Verteilen braucht mindestens drei gewählte Controls.")
+            RETURN
+        END IF
+        DIM feld AS STRING : feld = IIF(was = "vert_w", "x", "y")
+        DIM mass AS STRING : mass = IIF(was = "vert_w", "w", "h")
+        DIM reihe AS ARRAY OF INTEGER : reihe = gewaehlt
+        SORT(reihe, FUNCTION(a, b) feldZahl(a, feld) - feldZahl(b, feld))
+        DIM erste AS INTEGER : erste = reihe[0]
+        DIM letzte AS INTEGER : letzte = reihe[LEN(reihe) - 1]
+        DIM spanne AS INTEGER : spanne = feldZahl(letzte, feld) + feldZahl(letzte, mass) - feldZahl(erste, feld)
+        DIM summe AS INTEGER : summe = 0
+        FOR EACH j IN reihe
+            summe = summe + feldZahl(j, mass)
+        NEXT
+        DIM luecke AS FLOAT : luecke = (spanne - summe) / (LEN(reihe) - 1)
+        DIM pos AS FLOAT : pos = feldZahl(erste, feld)
+        DIM a AS INTEGER
+        FOR a = 0 TO LEN(reihe) - 1
+            j = reihe[a]
+            IF a > 0 AND a < LEN(reihe) - 1 THEN
+                IF was = "vert_w" THEN
+                    lageSetzenVon(j, INT(pos + 0.5), feldZahl(j, "y"), feldZahl(j, "w"), feldZahl(j, "h"))
+                ELSE
+                    lageSetzenVon(j, feldZahl(j, "x"), INT(pos + 0.5), feldZahl(j, "w"), feldZahl(j, "h"))
+                END IF
+            END IF
+            pos = pos + feldZahl(j, mass) + luecke
+        NEXT
+    ELSE
+        FOR EACH j IN gewaehlt
+            IF j = auswahl THEN CONTINUE
+            DIM x AS INTEGER : x = feldZahl(j, "x")
+            DIM y AS INTEGER : y = feldZahl(j, "y")
+            DIM w AS INTEGER : w = feldZahl(j, "w")
+            DIM h AS INTEGER : h = feldZahl(j, "h")
+            SELECT CASE was
+                CASE "links" : x = bx
+                CASE "rechts" : x = bx + bw - w
+                CASE "oben" : y = by
+                CASE "unten" : y = by + bh - h
+                CASE "mitte_w" : x = bx + (bw - w) \ 2
+                CASE "mitte_s" : y = by + (bh - h) \ 2
+                CASE "breite" : w = bw
+                CASE "hoehe" : h = bh
+                CASE "groesse" : w = bw : h = bh
+            END SELECT
+            lageSetzenVon(j, x, y, w, h)
+        NEXT
+    END IF
+    nachAenderung(TRUE)
+    status("Angeordnet: " + STR$(LEN(gewaehlt)) + " Controls.")
+    protokoll("angeordnet " + was + " " + STR$(LEN(gewaehlt)))
+END SUB
+
+' --- Zeichnen (nach GUI_DRAW, vor GUI_DRAW_TOP) -------------------------------
+SUB entwurfZeichnen()
+    DIM b AS INTEGER : b = zS(fensterB())
+    DIM h AS INTEGER : h = zS(fensterH())
+    DIM x0 AS INTEGER : x0 = formX
+    DIM y0 AS INTEGER : y0 = formY - TITEL_H
+    SCISSOR(mitteX, mitteY, mitteB, mitteH)
+    ' Schatten: Ringe AUSSEN herum, nach aussen blasser. Gefuellte Flaechen
+    ' gingen nicht -- die Entwurfsflaeche ist schon gezeichnet und laege
+    ' darunter.
+    DIM s AS INTEGER
+    FOR s = 1 TO 16
+        RECTROUND(x0 - s, y0 - s + 3, x0 + b + s - 1, formY + h + s + 2, 8 + s, RGBA(0, 0, 0, MAX(3, 46 - s * 3)))
+    NEXT
+    ' Titelleiste wie bei einem echten Fenster: oben rund, unten gerade.
+    BOXROUND(x0, y0, x0 + b - 1, formY - 1, 8, farbe("titel"))
+    BOX(x0, y0 + 10, x0 + b - 1, formY - 1, farbe("titel"))
+    DIM k AS INTEGER
+    FOR k = 0 TO 2
+        CIRCLE(x0 + 18 + k * 20, y0 + TITEL_H \ 2, 6, IIF(k = 0, &HEC6A5E, IIF(k = 1, &HF4BF4F, &H61C554)))
+    NEXT
+    DIM titel AS STRING : titel = fensterText$("title")
+    DIM tb AS INTEGER : tb = TEXT_WIDTH(titel)
+    TEXT(x0 + MAX(80, (b - tb) \ 2), y0 + (TITEL_H - 15) \ 2, titel, farbe("titeltext"))
+    RECT(x0 - 1, y0 - 1, x0 + b, formY + h, farbe("fensterrand"))
+    ' Groesse des Fensters unten rechts, und ein Griff, der sie aendert.
+    TEXT(x0 + b - TEXT_WIDTH(STR$(fensterB()) + " × " + STR$(fensterH())), formY + h + 8, STR$(fensterB()) + " × " + STR$(fensterH()), farbe("leise"))
+
+    ' Ausrichtungslinien
+    DIM l AS INTEGER
+    FOR l = 0 TO LEN(linX1) - 1
+        ' Immer waagerecht oder senkrecht -- als Rechteck gezeichnet ist die
+        ' Linie scharf; eine LINEW von einem Punkt Breite kam halb durchsichtig.
+        BOX(formX + zS(linX1[l]), formY + zS(linY1[l]), formX + zS(linX2[l]), formY + zS(linY2[l]), F_LINIE)
+    NEXT
+    ' Auswahl
+    IF modus = 3 AND MOUSEBUTTON(0) THEN
+        DIM rx1 AS INTEGER : rx1 = formX + zS(MIN(startMx, mausFx))
+        DIM ry1 AS INTEGER : ry1 = formY + zS(MIN(startMy, mausFy))
+        DIM rx2 AS INTEGER : rx2 = formX + zS(MAX(startMx, mausFx))
+        DIM ry2 AS INTEGER : ry2 = formY + zS(MAX(startMy, mausFy))
+        BOX(rx1, ry1, rx2, ry2, RGBA(58, 168, 240, 40))
+        RECT(rx1, ry1, rx2, ry2, F_AUSWAHL)
+    END IF
+    DIM j AS INTEGER
+    FOR EACH j IN gewaehlt
+        IF j < 0 OR j >= anzahl() THEN CONTINUE
+        DIM jx AS INTEGER : jx = formX + zS(feldZahl(j, "x"))
+        DIM jy AS INTEGER : jy = formY + zS(feldZahl(j, "y"))
+        DIM jw AS INTEGER : jw = zS(feldZahl(j, "w"))
+        DIM jh AS INTEGER : jh = zS(feldZahl(j, "h"))
+        RECT(jx - 1, jy - 1, jx + jw, jy + jh, IIF(j = auswahl, F_AUSWAHL, &H6F9FC0))
+        IF LEN(gewaehlt) = 1 THEN
+            DIM gx AS ARRAY OF INTEGER : gx = [jx, jx + jw \ 2, jx + jw, jx + jw, jx + jw, jx + jw \ 2, jx, jx]
+            DIM gy AS ARRAY OF INTEGER : gy = [jy, jy, jy, jy + jh \ 2, jy + jh, jy + jh, jy + jh, jy + jh \ 2]
+            DIM gi AS INTEGER
+            FOR gi = 0 TO 7
+                BOXROUND(gx[gi] - 4, gy[gi] - 4, gx[gi] + 4, gy[gi] + 4, 2, &HFFFFFF)
+                RECTROUND(gx[gi] - 4, gy[gi] - 4, gx[gi] + 4, gy[gi] + 4, 2, F_GRIFF_RAND)
+            NEXT
+        END IF
+    NEXT
+    ' Zug aus der Bibliothek: das Control als Umriss, wo es landet.
+    bibGeistZeichnen()
+    SCISSOR_END()
+END SUB

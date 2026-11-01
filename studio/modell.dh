@@ -1,0 +1,256 @@
+' ============================================================
+'  Drachenhauch Studio -- das Modell eines Fensters
+' ============================================================
+'  Das Fenster IST sein .dhform-JSON (json-Modul): Sichern, Laden und
+'  Rueckgaengig benutzen dasselbe Format, das GUI_SAVE/GUI_LOAD lesen. Die
+'  Entwurfsflaeche (entwurf.dh) ist nur eine Ansicht davon -- jede Aenderung
+'  schreibt hierher und baut sie neu (gemessen: 1000 Controls in 2,7 ms).
+'  Uebernommen aus dem Form-Designer (examples/197_form_designer.dh).
+' ============================================================
+
+CONST RASTER = 8
+
+DIM doc AS JSON_HANDLE : doc = JSON_PARSE(leeresFenster$())
+DIM formPfad AS STRING : formPfad = ""
+DIM auswahl AS INTEGER : auswahl = -1           ' Index in doc.widgets, -1 = das Fenster
+' Mehrfachauswahl: alle gewaehlten Indizes; `auswahl` ist darunter das zuletzt
+' angeklickte -- der Inspektor zeigt es, "Anordnen" richtet an ihm aus.
+DIM gewaehlt AS ARRAY OF INTEGER : gewaehlt = []
+DIM geaendert AS BOOLEAN : geaendert = FALSE
+
+' Rueckgaengig: ein JSON-Text je Stand, ein Zeiger darauf.
+DIM staende AS ARRAY OF STRING : staende = []
+DIM standPos AS INTEGER : standPos = -1
+
+FUNCTION leeresFenster$() AS STRING
+    RETURN REPLACE$("{'title':'Fenster1','name':'Fenster1','x':0,'y':0,'w':600,'h':400,'movable':true,'closable':true,'visible':true,'resizable':false,'widgets':[]}", "'", CHR$(34))
+END FUNCTION
+
+FUNCTION anzahl() AS INTEGER
+    RETURN JSON_LEN(doc, "widgets")
+END FUNCTION
+
+' Pfad zu einem Feld eines Controls.
+FUNCTION wz$(i AS INTEGER, feld AS STRING) AS STRING
+    RETURN "widgets." + STR$(i) + "." + feld
+END FUNCTION
+
+FUNCTION feldText$(i AS INTEGER, feld AS STRING) AS STRING
+    IF NOT JSON_HAS(doc, wz$(i, feld)) THEN RETURN ""
+    IF JSON_TYPE(doc, wz$(i, feld)) <> "string" THEN RETURN ""
+    RETURN JSON_GET_STRING(doc, wz$(i, feld))
+END FUNCTION
+
+FUNCTION feldZahl(i AS INTEGER, feld AS STRING) AS INTEGER
+    IF NOT JSON_HAS(doc, wz$(i, feld)) THEN RETURN 0
+    IF JSON_TYPE(doc, wz$(i, feld)) <> "number" THEN RETURN 0
+    RETURN INT(JSON_GET_FLOAT(doc, wz$(i, feld)))
+END FUNCTION
+
+FUNCTION feldKomma(i AS INTEGER, feld AS STRING, vorgabe AS FLOAT) AS FLOAT
+    IF NOT JSON_HAS(doc, wz$(i, feld)) THEN RETURN vorgabe
+    IF JSON_TYPE(doc, wz$(i, feld)) <> "number" THEN RETURN vorgabe
+    RETURN JSON_GET_FLOAT(doc, wz$(i, feld))
+END FUNCTION
+
+FUNCTION feldSchalter(i AS INTEGER, feld AS STRING, vorgabe AS BOOLEAN) AS BOOLEAN
+    IF NOT JSON_HAS(doc, wz$(i, feld)) THEN RETURN vorgabe
+    IF JSON_TYPE(doc, wz$(i, feld)) <> "boolean" THEN RETURN vorgabe
+    RETURN JSON_GET_BOOL(doc, wz$(i, feld))
+END FUNCTION
+
+FUNCTION fensterZahl(feld AS STRING) AS INTEGER
+    IF NOT JSON_HAS(doc, feld) THEN RETURN 0
+    RETURN INT(JSON_GET_FLOAT(doc, feld))
+END FUNCTION
+
+FUNCTION fensterText$(feld AS STRING) AS STRING
+    IF NOT JSON_HAS(doc, feld) THEN RETURN ""
+    RETURN JSON_GET_STRING(doc, feld)
+END FUNCTION
+
+' Einträge (items) als Text mit Semikolon -- so stehen sie im Inspektor.
+FUNCTION eintraegeText$(i AS INTEGER) AS STRING
+    IF NOT JSON_HAS(doc, wz$(i, "items")) THEN RETURN ""
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(doc, wz$(i, "items")) - 1
+        ARRAY_PUSH(teile, JSON_GET_STRING(doc, wz$(i, "items") + "." + STR$(k)))
+    NEXT
+    RETURN JOIN$(teile, "; ")
+END FUNCTION
+
+SUB eintraegeSetzen(i AS INTEGER, text AS STRING)
+    DIM a AS JSON_HANDLE : a = JSON_NEW_ARRAY()
+    DIM t AS STRING
+    FOR EACH t IN SPLIT(text, ";")
+        IF TRIM$(t) <> "" THEN JSON_APPEND_STRING(a, "", TRIM$(t))
+    NEXT
+    JSON_SET_JSON(doc, wz$(i, "items"), a)
+END SUB
+
+' --- Auswahl ------------------------------------------------------------------
+SUB auswahlSetzen(i AS INTEGER)
+    auswahl = i
+    IF i >= 0 THEN gewaehlt = [i] ELSE gewaehlt = []
+END SUB
+
+FUNCTION istGewaehlt(i AS INTEGER) AS BOOLEAN
+    RETURN ARRAY_INDEXOF(gewaehlt, i) >= 0
+END FUNCTION
+
+' Umschalt/Strg+Klick: dazu oder wieder weg.
+SUB auswahlUmschalten(i AS INTEGER)
+    IF istGewaehlt(i) THEN
+        gewaehlt = ARRAY_FILTER(gewaehlt, FUNCTION(j) j <> i)
+        IF LEN(gewaehlt) > 0 THEN auswahl = gewaehlt[LEN(gewaehlt) - 1] ELSE auswahl = -1
+    ELSE
+        ARRAY_PUSH(gewaehlt, i)
+        auswahl = i
+    END IF
+END SUB
+
+' Nach Rueckgaengig oder Loeschen: was es nicht mehr gibt, faellt heraus.
+SUB auswahlBereinigen()
+    DIM n AS INTEGER : n = anzahl()
+    gewaehlt = ARRAY_FILTER(gewaehlt, FUNCTION(j) j >= 0 AND j < n)
+    IF auswahl >= n OR NOT istGewaehlt(auswahl) THEN
+        IF LEN(gewaehlt) > 0 THEN auswahl = gewaehlt[LEN(gewaehlt) - 1] ELSE auswahl = -1
+    END IF
+END SUB
+
+SUB allesWaehlen()
+    gewaehlt = []
+    DIM i AS INTEGER
+    FOR i = 0 TO anzahl() - 1
+        ARRAY_PUSH(gewaehlt, i)
+    NEXT
+    IF anzahl() > 0 THEN auswahl = anzahl() - 1 ELSE auswahl = -1
+END SUB
+
+' --- Namen --------------------------------------------------------------------
+FUNCTION nameVergeben(kandidat AS STRING, ausser AS INTEGER) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO anzahl() - 1
+        IF i <> ausser AND LOWER$(feldText$(i, "name")) = LOWER$(kandidat) THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Ein Name, wie Xojo ihn vergibt: Grundwort und die naechste freie Zahl.
+FUNCTION eindeutigerName$(grund AS STRING) AS STRING
+    DIM n AS INTEGER : n = 1
+    WHILE nameVergeben(grund + STR$(n), -1)
+        n = n + 1
+    WEND
+    RETURN grund + STR$(n)
+END FUNCTION
+
+' Ein Name muss ein Bezeichner sein: er wird zum Feld der Fensterklasse.
+FUNCTION istBezeichner(s AS STRING) AS BOOLEAN
+    RETURN REGEX_TEST(s, "^[A-Za-z][A-Za-z0-9_]*$")
+END FUNCTION
+
+FUNCTION amRaster(v AS INTEGER) AS INTEGER
+    IF v >= 0 THEN RETURN ((v + RASTER \ 2) \ RASTER) * RASTER
+    RETURN -(((-v) + RASTER \ 2) \ RASTER) * RASTER
+END FUNCTION
+
+' --- Rueckgaengig -------------------------------------------------------------
+' Stand merken, nach jeder abgeschlossenen Aenderung.
+SUB merken()
+    DIM text AS STRING : text = JSON_STRINGIFY(doc)
+    ' Derselbe Stand noch einmal ist kein Schritt -- sonst braeuchte ein
+    ' Rueckgaengig zwei Tastendruecke, ohne dass sich etwas tut.
+    IF standPos >= 0 AND standPos < LEN(staende) THEN
+        IF staende[standPos] = text THEN RETURN
+    END IF
+    WHILE LEN(staende) > standPos + 1
+        ARRAY_REMOVE_AT(staende, LEN(staende) - 1)
+    WEND
+    ARRAY_PUSH(staende, text)
+    IF LEN(staende) > 200 THEN ARRAY_REMOVE_AT(staende, 0)
+    standPos = LEN(staende) - 1
+    geaendert = TRUE
+END SUB
+
+FUNCTION kannZurueck() AS BOOLEAN
+    RETURN standPos > 0
+END FUNCTION
+
+FUNCTION kannVor() AS BOOLEAN
+    RETURN standPos < LEN(staende) - 1
+END FUNCTION
+
+' --- Controls anlegen, loeschen, verdoppeln, ordnen ----------------------------
+' Liefert den Index des neuen Controls. `p` ist der Baustein (bibliothek.dh).
+FUNCTION controlAnlegen(p AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM b AS Baustein : b = bausteine[p]
+    DIM w AS JSON_HANDLE : w = JSON_NEW_OBJECT()
+    JSON_SET_STRING(w, "kind", b.kind)
+    JSON_SET_STRING(w, "name", eindeutigerName$(b.grundname))
+    JSON_SET_INT(w, "x", x) : JSON_SET_INT(w, "y", y)
+    JSON_SET_INT(w, "w", b.b) : JSON_SET_INT(w, "h", b.h)
+    IF b.text <> "" THEN JSON_SET_STRING(w, "text", b.text)
+    IF b.vorlage <> "" THEN
+        ' Zusaetzliche Felder (Eintraege, Tabellenkopf, Gitter ...) als JSON.
+        DIM v AS JSON_HANDLE : v = JSON_PARSE(REPLACE$(b.vorlage, "'", CHR$(34)))
+        DIM k AS STRING
+        FOR EACH k IN JSON_KEYS(v, "")
+            JSON_SET_JSON(w, k, JSON_GET_JSON(v, k))
+        NEXT
+    END IF
+    JSON_APPEND_JSON(doc, "widgets", w)
+    RETURN anzahl() - 1
+END FUNCTION
+
+SUB controlsLoeschen()
+    ' Von hinten nach vorn -- sonst rueckten die Nummern der uebrigen auf.
+    DIM weg AS ARRAY OF INTEGER : weg = gewaehlt
+    SORT(weg)
+    DIM k AS INTEGER
+    FOR k = LEN(weg) - 1 TO 0 STEP -1
+        JSON_REMOVE(doc, "widgets." + STR$(weg[k]))
+    NEXT
+    auswahlSetzen(-1)
+END SUB
+
+SUB controlsVerdoppeln()
+    DIM neue AS ARRAY OF INTEGER : neue = []
+    DIM neuHaupt AS INTEGER : neuHaupt = -1
+    DIM q AS INTEGER
+    FOR EACH q IN gewaehlt
+        DIM neu AS JSON_HANDLE : neu = JSON_GET_JSON(doc, "widgets." + STR$(q))
+        JSON_SET_INT(neu, "x", feldZahl(q, "x") + 2 * RASTER)
+        JSON_SET_INT(neu, "y", feldZahl(q, "y") + 2 * RASTER)
+        DIM grund AS STRING : grund = REGEX_REPLACE(feldText$(q, "name"), "[0-9]+$", "")
+        IF grund = "" THEN grund = feldText$(q, "kind")
+        JSON_SET_STRING(neu, "name", eindeutigerName$(grund))
+        JSON_APPEND_JSON(doc, "widgets", neu)
+        ARRAY_PUSH(neue, anzahl() - 1)
+        IF q = auswahl THEN neuHaupt = anzahl() - 1
+    NEXT
+    gewaehlt = neue
+    auswahl = neuHaupt
+END SUB
+
+' Reihenfolge = Zeichenreihenfolge: das letzte liegt vorn.
+SUB controlOrdnen(nachVorn AS BOOLEAN)
+    IF auswahl < 0 THEN RETURN
+    DIM n AS INTEGER : n = anzahl()
+    DIM kopie AS JSON_HANDLE : kopie = JSON_GET_JSON(doc, "widgets." + STR$(auswahl))
+    JSON_REMOVE(doc, "widgets." + STR$(auswahl))
+    IF nachVorn THEN
+        JSON_APPEND_JSON(doc, "widgets", kopie)
+        auswahlSetzen(n - 1)
+    ELSE
+        DIM neu AS JSON_HANDLE : neu = JSON_NEW_ARRAY()
+        JSON_APPEND_JSON(neu, "", kopie)
+        DIM i AS INTEGER
+        FOR i = 0 TO n - 2
+            JSON_APPEND_JSON(neu, "", JSON_GET_JSON(doc, "widgets." + STR$(i)))
+        NEXT
+        JSON_SET_JSON(doc, "widgets", neu)
+        auswahlSetzen(0)
+    END IF
+END SUB

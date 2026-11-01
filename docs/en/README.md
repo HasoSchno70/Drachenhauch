@@ -100,6 +100,7 @@ designed, recommended; none of it is decided.
 - **[Plugins of the IDE](ide-plugins.md)** — own commands, panels, events and code helpers as a program of their own
 - **[Sprite editor](sprite-editor.md)** (`examples/189_sprite_editor.dh`) — pixel art with frames, layers, selection mask, GIF, atlas export
 - **[Tilemap editor](tilemap-editor.md)** (`examples/187_tilemap_editor.dh`) — build levels, read and write Tiled JSON
+- **[Drachenhauch Studio](studio.md)** (`studio/studio.dh`) — the IDE for programs with a user interface in the style of Xojo; stage 1: design windows with library, alignment guides and inspector
 - **[Form designer](form-designer.md)** (`examples/197_form_designer.dh`) — click user interfaces together, Xojo style, F5 runs them
 - **[Particle editor](particle-editor.md)** (`examples/185_partikel_editor.dh`) — tune effects live
 - **[Animation editor](anim-editor.md)** (`examples/198_anim_fsm_editor.dh`) — state machine for sprite animations

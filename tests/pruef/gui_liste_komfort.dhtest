@@ -364,3 +364,54 @@ NEXT
 SAVESCREENSHOT("k.png")
 --- bild k.png
 250 80 #18222E +-8
+
+=== item rect nennt die lage einer zeile, ein klick dorthin waehlt sie
+' Die Lage folgt Zeilenhoehe (hier ueber den Abstand der Stildatei) und
+' Filter: ein weggefilterter Eintrag liefert (0, 0, 0, 0), die anderen
+' ruecken auf. Ein echter Klick auf die gemeldete Mitte waehlt den Eintrag.
+IMPORT "gui"
+SCREEN(360, 300, "K", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("K", 0, 0, 360, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 10, 10, 200, 260, ["Apfel", "Birne", "Kirsche", "Banane", "Pflaume"])
+GUI_ADD_CLASS(lb, "luftig")
+GUI_STYLESHEET("listbox.luftig { abstand: 10 }")
+GUI_UPDATE()
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM b AS INTEGER
+DIM h AS INTEGER
+DIM y0 AS INTEGER
+(x, y0, b, h) = GUI_LISTBOX_ITEM_RECT(lb, 0)
+(x, y, b, h) = GUI_LISTBOX_ITEM_RECT(lb, 3)
+PRINT "zeile 3 drei zeilen tiefer "; y - y0 = 3 * h; " hoehe nach stildatei "; h > 30
+GUI_LISTBOX_FILTER(lb, "B")
+GUI_UPDATE()
+DIM fy AS INTEGER
+(x, fy, b, h) = GUI_LISTBOX_ITEM_RECT(lb, 3)
+PRINT "banane rueckt auf "; fy - y0 = h
+(x, y, b, h) = GUI_LISTBOX_ITEM_RECT(lb, 0)
+PRINT "apfel weg "; x = 0 AND y = 0 AND b = 0 AND h = 0
+(x, y, b, h) = GUI_LISTBOX_ITEM_RECT(lb, 3)
+WRITEALL("ev.txt", "c 4" + CHR$(10) + "e 0 7 " + STR$(x + b \ 2) + " " + STR$(y + h \ 2) + " 0 0" + CHR$(10) + "e 1 7 " + STR$(x + b \ 2) + " " + STR$(y + h \ 2) + " 0 0" + CHR$(10) + "e 3 6 0 0 0 0" + CHR$(10) + "e 5 5 0 0 0 0" + CHR$(10))
+AUTOMATION_PLAY("ev.txt")
+DIM i AS INTEGER
+FOR i = 1 TO 12
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "gewaehlt "; GUI_LISTBOX_SELECTED(lb)
+TRY
+    (x, y, b, h) = GUI_LISTBOX_ITEM_RECT(lb, 9)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+zeile 3 drei zeilen tiefer TRUE hoehe nach stildatei TRUE
+banane rueckt auf TRUE
+apfel weg TRUE
+gewaehlt 3
+GUI_LISTBOX_ITEM_RECT: Eintrag 9 ausserhalb [0..4]

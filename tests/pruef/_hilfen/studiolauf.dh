@@ -1,0 +1,144 @@
+' Drachenhauch Studio aus einer Pruefung starten (werkzeug_studio.dhtest).
+'
+' Das Studio laeuft als Kind (dhrt run --bilder N): seine Fenstergroesse ist
+' fest (DH_STUDIO_GROESSE), es schreibt ein Protokoll (DH_STUDIO_LOG) mit den
+' Lagen von Bibliothekszeilen, Inspektorfeldern und Leistenknoepfen. Ein
+' erster Lauf misst, ein zweiter spielt eine Aufnahme ab (DH_STUDIO_AUFNAHME),
+' die aus den Lagen gebaut ist -- feste Pixel hingen an Schrift und Stildatei.
+'
+' Aufnahmeformat: "e BILD ART P0 P1 0 0"; Maus 7 = hin (x, y), 6 = Taste
+' runter, 5 = hoch; Tasten 2 = runter, 1 = hoch (P0 = Tastencode). Die
+' Wiedergabe setzt beim ERSTEN Ereignis an.
+DIM slZeilen AS ARRAY OF STRING : slZeilen = []
+DIM slBild AS INTEGER : slBild = 0
+DIM slStudio AS STRING : slStudio = ""
+
+SUB slHin(x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(slZeilen, "e " + STR$(slBild) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    slBild = slBild + 1
+END SUB
+
+SUB slRunter()
+    ARRAY_PUSH(slZeilen, "e " + STR$(slBild) + " 6 0 0 0 0")
+    slBild = slBild + 2
+END SUB
+
+SUB slHoch()
+    ARRAY_PUSH(slZeilen, "e " + STR$(slBild) + " 5 0 0 0 0")
+    slBild = slBild + 2
+END SUB
+
+SUB slKlick(x AS INTEGER, y AS INTEGER)
+    slHin(x, y)
+    slHin(x, y)
+    slRunter()
+    slHoch()
+    slBild = slBild + 2
+END SUB
+
+' Druecken, in `schritte` Bildern ziehen, und loslassen -- oder nicht.
+SUB slZug(x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, schritte AS INTEGER, loslassen AS BOOLEAN)
+    slHin(x0, y0)
+    slHin(x0, y0)
+    slRunter()
+    DIM k AS INTEGER
+    FOR k = 1 TO schritte
+        slHin(x0 + (x1 - x0) * k \ schritte, y0 + (y1 - y0) * k \ schritte)
+    NEXT
+    slHin(x1, y1)
+    slHin(x1, y1)
+    IF loslassen THEN slHoch()
+    slBild = slBild + 2
+END SUB
+
+SUB slTaste(code AS INTEGER)
+    ARRAY_PUSH(slZeilen, "e " + STR$(slBild) + " 2 " + STR$(code) + " 0 0 0")
+    ARRAY_PUSH(slZeilen, "e " + STR$(slBild + 2) + " 1 " + STR$(code) + " 0 0 0")
+    slBild = slBild + 5
+END SUB
+
+' Eine Taste mit gehaltenen Umschaltern (341 Strg, 340 Umschalt, 342 Alt).
+SUB slMit(halten AS ARRAY OF INTEGER, code AS INTEGER)
+    DIM h AS INTEGER
+    FOR EACH h IN halten
+        ARRAY_PUSH(slZeilen, "e " + STR$(slBild) + " 2 " + STR$(h) + " 0 0 0")
+    NEXT
+    ARRAY_PUSH(slZeilen, "e " + STR$(slBild + 2) + " 2 " + STR$(code) + " 0 0 0")
+    ARRAY_PUSH(slZeilen, "e " + STR$(slBild + 4) + " 1 " + STR$(code) + " 0 0 0")
+    FOR EACH h IN halten
+        ARRAY_PUSH(slZeilen, "e " + STR$(slBild + 6) + " 1 " + STR$(h) + " 0 0 0")
+    NEXT
+    slBild = slBild + 9
+END SUB
+
+SUB slWarten(bilder AS INTEGER)
+    slBild = slBild + bilder
+END SUB
+
+SUB slAufnahmeSchreiben(pfad AS STRING)
+    WRITEALL(pfad, "c " + STR$(LEN(slZeilen)) + CHR$(10) + JOIN$(slZeilen, CHR$(10)) + CHR$(10))
+END SUB
+
+' Das Studio laufen lassen. `aufnahme` "" = keine; `datei` "" = neues Fenster.
+FUNCTION slStarten(log AS STRING, aufnahme AS STRING, bilder AS INTEGER, datei AS STRING) AS STRING
+    IF FILEEXISTS(log) THEN DELETEFILE(log)
+    SETENV("DH_STUDIO_LOG", log)
+    SETENV("DH_STUDIO_GROESSE", "1440x900")
+    SETENV("DH_STUDIO_AUFNAHME", aufnahme)
+    DIM p AS INTEGER
+    IF datei = "" THEN
+        p = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), slStudio)
+    ELSE
+        p = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), slStudio, "--", datei)
+    END IF
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 90000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+
+FUNCTION slProtokoll(log AS STRING) AS ARRAY OF STRING
+    IF NOT FILEEXISTS(log) THEN RETURN []
+    RETURN READLINES(log)
+END FUNCTION
+
+' "lage <was> x y" -- die letzte Nennung. (-1, -1), wenn es sie nicht gibt.
+FUNCTION slLage(log AS STRING, was AS STRING) AS TUPLE
+    DIM x AS INTEGER : x = -1
+    DIM y AS INTEGER : y = -1
+    DIM z AS STRING
+    FOR EACH z IN slProtokoll(log)
+        IF LEFT$(z, LEN("lage " + was + " ")) = "lage " + was + " " THEN
+            DIM teile AS ARRAY OF STRING : teile = SPLIT(MID$(z, LEN("lage " + was + " "), 100), " ")
+            x = INT(VAL(teile[0])) : y = INT(VAL(teile[1]))
+        END IF
+    NEXT
+    RETURN (x, y)
+END FUNCTION
+
+FUNCTION slHat(log AS STRING, text AS STRING) AS BOOLEAN
+    DIM z AS STRING
+    FOR EACH z IN slProtokoll(log)
+        IF z = text THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION slAnfang(log AS STRING, text AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM z AS STRING
+    FOR EACH z IN slProtokoll(log)
+        IF LEFT$(z, LEN(text)) = text THEN ARRAY_PUSH(aus, z)
+    NEXT
+    RETURN aus
+END FUNCTION
