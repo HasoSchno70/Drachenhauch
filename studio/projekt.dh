@@ -519,9 +519,9 @@ FUNCTION ereignisseFuer(kind AS STRING) AS ARRAY OF STRING
             aus = ["Geaendert", "Enter", "FokusRein", "FokusRaus"]
         CASE "textarea"
             aus = ["Geaendert", "FokusRein", "FokusRaus"]
-        CASE "listbox", "tree"
+        CASE "listbox", "tree", "table"
             aus = ["Geaendert", "Doppelklick"]
-        CASE "slider", "spinner", "dropdown", "colorpicker", "datepicker", "timepicker", "tabcontrol", "table"
+        CASE "slider", "spinner", "dropdown", "colorpicker", "datepicker", "timepicker", "tabcontrol"
             aus = ["Geaendert"]
         CASE "canvas"
             aus = ["Zeichnen", "Maus", "Ziehen", "Rad"]

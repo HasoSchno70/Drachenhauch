@@ -192,7 +192,7 @@ Klammern schließen, Einrückung. `ide/ide.dh` wird nicht eingebunden: das sind
    * Menü-Editor, Timer, Dialoge und modale Fenster.
    * Bilder im Projekt.
    * Debugger über `dhrt debug`.
-5. **Ablösen.** (die drei Punkte zur Erreichbarkeit gebaut, das Beispielprojekt offen)
+5. **Ablösen.** (gebaut: die drei Punkte zur Erreichbarkeit und das Beispielprojekt `examples/studio/rechnungen/`)
    * Ein Beispielprojekt (etwa die Rechnungen aus `examples/196_rechnungen.dh`
      als Studio-Projekt).
    * Der Form-Designer 197 verweist auf das Studio.

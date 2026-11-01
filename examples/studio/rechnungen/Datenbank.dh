@@ -1,0 +1,67 @@
+' Die Datenbank: eine SQLite-Datei neben dem Programm. Geld steht ueberall
+' als INTEGER in Cent (19,99 EUR = 1999), die MwSt als ganzer Prozentsatz --
+' so rundet nichts beim Rechnen.
+IMPORT "db"
+CONST DB_DATEI = "rechnungen.db"
+DIM db AS DB_CONN
+
+' Oeffnet die Datei und legt beim ersten Start Tabellen und Beispieldaten an.
+SUB dbOeffnen()
+    db = DB_OPEN(DB_DATEI)
+    DB_EXEC(db, "CREATE TABLE IF NOT EXISTS kunden (id INTEGER PRIMARY KEY, name TEXT NOT NULL, strasse TEXT, plz TEXT, ort TEXT, email TEXT)")
+    DB_EXEC(db, "CREATE TABLE IF NOT EXISTS artikel (id INTEGER PRIMARY KEY, bezeichnung TEXT NOT NULL, preis INTEGER NOT NULL, mwst INTEGER NOT NULL)")
+    DB_EXEC(db, "CREATE TABLE IF NOT EXISTS rechnungen (id INTEGER PRIMARY KEY, nummer TEXT NOT NULL UNIQUE, kunde INTEGER NOT NULL, datum TEXT NOT NULL)")
+    ' Eine Position kopiert Text, Preis und Satz des Artikels: wird der
+    ' Artikel spaeter teurer, bleibt die alte Rechnung, wie sie war.
+    DB_EXEC(db, "CREATE TABLE IF NOT EXISTS positionen (id INTEGER PRIMARY KEY, rechnung INTEGER NOT NULL, bezeichnung TEXT NOT NULL, menge INTEGER NOT NULL, preis INTEGER NOT NULL, mwst INTEGER NOT NULL)")
+    IF dbZahl("SELECT COUNT(*) FROM kunden") = 0 THEN beispielDaten()
+END SUB
+
+' Ein paar Kunden, Artikel und eine Rechnung, damit es etwas zu sehen gibt.
+SUB beispielDaten()
+    DB_BEGIN(db)
+    DB_EXEC(db, "INSERT INTO kunden (name, strasse, plz, ort, email) VALUES (?, ?, ?, ?, ?)", "Bäckerei Sonnenschein", "Hauptstraße 12", "80331", "München", "info@sonnenschein.example")
+    DB_EXEC(db, "INSERT INTO kunden (name, strasse, plz, ort, email) VALUES (?, ?, ?, ?, ?)", "Tischlerei Holzwurm GmbH", "Am Sägewerk 3", "01067", "Dresden", "kontakt@holzwurm.example")
+    DB_EXEC(db, "INSERT INTO kunden (name, strasse, plz, ort, email) VALUES (?, ?, ?, ?, ?)", "Dr. Erika Mustermann", "Lindenweg 7", "50667", "Köln", "erika@mustermann.example")
+    DB_EXEC(db, "INSERT INTO artikel (bezeichnung, preis, mwst) VALUES (?, ?, ?)", "Beratung (Stunde)", 9500, 19)
+    DB_EXEC(db, "INSERT INTO artikel (bezeichnung, preis, mwst) VALUES (?, ?, ?)", "Webseite Grundpaket", 149000, 19)
+    DB_EXEC(db, "INSERT INTO artikel (bezeichnung, preis, mwst) VALUES (?, ?, ?)", "Fachbuch Drachenhauch", 2990, 7)
+    DB_EXEC(db, "INSERT INTO artikel (bezeichnung, preis, mwst) VALUES (?, ?, ?)", "Versand", 590, 19)
+    DB_COMMIT(db)
+    DIM r AS Rechnung : r = NEW Rechnung()
+    r.neu()
+    r.kunde = 1
+    r.artikelDazu(1, 3)
+    r.artikelDazu(3, 2)
+    r.artikelDazu(4, 1)
+    r.speichern()
+END SUB
+
+' Die erste Spalte der ersten Zeile als Zahl (0, wenn nichts kommt).
+FUNCTION dbZahl(sql AS STRING) AS INTEGER
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    IF DB_NEXT(r) THEN RETURN DB_GET_INT(r, 0)
+    RETURN 0
+END FUNCTION
+
+' Dasselbe mit einem Wert fuer das ? in der Abfrage.
+FUNCTION dbZahlMit(sql AS STRING, wert AS INTEGER) AS INTEGER
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql, wert)
+    IF DB_NEXT(r) THEN RETURN DB_GET_INT(r, 0)
+    RETURN 0
+END FUNCTION
+
+' Die naechste freie Rechnungsnummer im laufenden Jahr: 2026-0001, 2026-0002 ...
+FUNCTION naechsteNummer$() AS STRING
+    DIM jahr AS STRING : jahr = LEFT$(DATE$(), 4)
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT nummer FROM rechnungen WHERE nummer LIKE ? ORDER BY nummer DESC LIMIT 1", jahr + "-%")
+    DIM n AS INTEGER : n = 0
+    IF DB_NEXT(r) THEN n = INT(VAL(MID$(DB_GET_STRING(r, 0), 5)))
+    RETURN jahr + "-" + RIGHT$("000" + STR$(n + 1), 4)
+END FUNCTION
+
+FUNCTION kundeName$(kid AS INTEGER) AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT name FROM kunden WHERE id = ?", kid)
+    IF DB_NEXT(r) THEN RETURN DB_GET_STRING(r, 0)
+    RETURN "(unbekannt)"
+END FUNCTION

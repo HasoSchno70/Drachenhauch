@@ -1,0 +1,228 @@
+{
+  "title": "Rechnungen",
+  "x": 0,
+  "y": 0,
+  "w": 900,
+  "h": 600,
+  "movable": true,
+  "closable": false,
+  "visible": true,
+  "resizable": true,
+  "chrome": true,
+  "min_w": 0,
+  "min_h": 0,
+  "max_w": 0,
+  "max_h": 0,
+  "widgets": [
+    {
+      "kind": "label",
+      "x": 20,
+      "y": 14,
+      "w": 400,
+      "h": 26,
+      "text": "Rechnungen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "ueberschrift"
+    },
+    {
+      "kind": "table",
+      "x": 20,
+      "y": 48,
+      "w": 860,
+      "h": 436,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "anchor": "lrtb",
+      "table": {
+        "headers": [
+          "Nummer",
+          "Datum",
+          "Kunde",
+          "Brutto"
+        ],
+        "rows": [],
+        "col_widths": [
+          140,
+          120,
+          430,
+          150
+        ],
+        "selected": -1,
+        "col_align": [
+          0,
+          0,
+          0,
+          2
+        ],
+        "filter_row": true,
+        "leer_text": "Noch keine Rechnungen -- Datei > Neue Rechnung (Strg+N)."
+      },
+      "name": "tabelle"
+    },
+    {
+      "kind": "button",
+      "x": 20,
+      "y": 500,
+      "w": 150,
+      "h": 30,
+      "text": "Neue Rechnung",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "anchor": "lb",
+      "variant": "primaer",
+      "name": "knopfNeu"
+    },
+    {
+      "kind": "button",
+      "x": 180,
+      "y": 500,
+      "w": 120,
+      "h": 30,
+      "text": "Bearbeiten",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "anchor": "lb",
+      "name": "knopfBearbeiten"
+    },
+    {
+      "kind": "button",
+      "x": 310,
+      "y": 500,
+      "w": 110,
+      "h": 30,
+      "text": "Als PDF",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "anchor": "lb",
+      "name": "knopfPdf"
+    },
+    {
+      "kind": "button",
+      "x": 430,
+      "y": 500,
+      "w": 110,
+      "h": 30,
+      "text": "Löschen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "anchor": "lb",
+      "variant": "gefahr",
+      "name": "knopfLoeschen"
+    },
+    {
+      "kind": "label",
+      "x": 20,
+      "y": 544,
+      "w": 860,
+      "h": 20,
+      "text": "Bereit.",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "anchor": "lrb",
+      "name": "status"
+    }
+  ],
+  "menus": [
+    {
+      "label": "Datei",
+      "items": [
+        {
+          "label": "Neue Rechnung",
+          "name": "miNeu",
+          "shortcut": "Strg+N"
+        },
+        {
+          "label": "Rechnung bearbeiten",
+          "name": "miBearbeiten",
+          "shortcut": "Strg+E"
+        },
+        {
+          "label": "Als PDF schreiben",
+          "name": "miPdf",
+          "shortcut": "Strg+P"
+        },
+        {
+          "label": "Alle als CSV exportieren",
+          "name": "miCsv"
+        },
+        {
+          "label": "",
+          "separator": true
+        },
+        {
+          "label": "Beenden",
+          "name": "miBeenden",
+          "shortcut": "Strg+Q"
+        }
+      ]
+    },
+    {
+      "label": "Stammdaten",
+      "items": [
+        {
+          "label": "Kunden …",
+          "name": "miKunden",
+          "shortcut": "Strg+K"
+        },
+        {
+          "label": "Artikel …",
+          "name": "miArtikel",
+          "shortcut": "Strg+L"
+        }
+      ]
+    },
+    {
+      "label": "Hilfe",
+      "items": [
+        {
+          "label": "Über …",
+          "name": "miUeber"
+        }
+      ]
+    }
+  ],
+  "tabs": [],
+  "active_tab": 0,
+  "tabs_closable": false,
+  "default_button": -1,
+  "cancel_button": -1,
+  "name": "Hauptfenster"
+}

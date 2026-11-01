@@ -103,8 +103,8 @@ Die Ereignisse je Art:
 | Kästchen, Umschalter, Optionsfeld | Klick, Geaendert |
 | Textfeld | Geaendert, Enter, FokusRein, FokusRaus |
 | Textbereich | Geaendert, FokusRein, FokusRaus |
-| Liste, Baum | Geaendert, Doppelklick |
-| Regler, Zahlenfeld, Klappliste, Wähler, Reiterwerk, Tabelle | Geaendert |
+| Liste, Baum, Tabelle | Geaendert, Doppelklick (bei Liste und Tabelle auch Enter) |
+| Regler, Zahlenfeld, Klappliste, Wähler, Reiterwerk | Geaendert |
 | Zeichenfläche | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
 | jedes Control zusätzlich | MausRein, MausRaus |
 | Timer, Menüeintrag | Aktion |
@@ -275,6 +275,36 @@ Fenster bearbeitet wird, schreibt Sichern genau diese Datei. Kommt Code oder
 ein weiteres Element dazu, wird daraus ein Projekt, und Sichern fragt nach
 einem Ordner. Neu, Öffnen und Beenden fragen bei ungesicherten Änderungen
 nach.
+
+## Das Beispielprojekt
+
+`examples/studio/rechnungen/` ist eine kleine Rechnungsverwaltung (nach dem
+Piloten `examples/196_rechnungen.dh`) als Studio-Projekt: Datei → Öffnen, den
+Ordner wählen, F5.
+
+| Element | Art | Was es tut |
+|---|---|---|
+| App | App | öffnet die Datenbank, bevor das erste Fenster aufgeht |
+| Datenbank | Modul | SQLite-Datei `rechnungen.db`, beim ersten Start mit Beispieldaten; nächste Rechnungsnummer |
+| Ausgabe | Modul | Datum und Beträge für die Anzeige, CSV-Export |
+| Rechnung | Klasse | eine Rechnung samt Positionen: laden, rechnen, sichern (eine Transaktion), als PDF |
+| Hauptfenster | Fenster | alle Rechnungen mit Filterzeile, Menü mit Kürzeln, Neu/Bearbeiten/PDF/Löschen |
+| RechnungFenster | Fenster | eine Rechnung anlegen oder ändern, modal |
+| KundenFenster, ArtikelFenster | Fenster | Stammdaten über die Datenbindung (Inspektor: Bindung) |
+
+Was man daran sieht: Geld steht als INTEGER in Cent, die Steuer wird je
+Position gerundet; die Felder der Stammdaten sind an die Spalten gebunden,
+Laden und Sichern sind also je ein Aufruf (`GUI_FORM_LOAD`/`GUI_FORM_SAVE`),
+und die Regeln (Pflichtfeld, PLZ, E-Mail) prüft `GUI_VALIDATE`; ein
+Doppelklick auf eine Rechnung öffnet sie (`tabelle_Doppelklick`); ungesicherte
+Eingaben werden mit `Frage(..., "Sichern|Verwerfen|Abbrechen")` erfragt, und
+`ZeigenModal` wartet, bis das Fenster zu ist. Die Datenbank, PDFs und die CSV
+landen beim Starten aus dem Studio in `_studio/`.
+
+**Stolperstein beim Benennen:** Namen kennen keine Groß-/Kleinschreibung. Eine
+Methode `zeigen(id)` in einem Fenster überschreibt das geerbte `Zeigen()` --
+`dhrt --check` (und damit die Problemliste) warnt, wenn eine Methode eine
+geerbte mit einer anderen Zahl von Parametern überschreibt.
 
 ## Für Prüfungen
 

@@ -3598,7 +3598,30 @@ Tests `tests/pruef/werkzeug_studio5.dhtest` (3; das gestartete Studio
 erbt `DH_STUDIO_LOG`, der Fall wartet auf "projekt geladen" und beendet
 es), Zeilen in `werkzeug_paket.dhtest` (Linux-Ordner, macOS-Bundle,
 install.sh, `--studio` mit der echten Laufzeit). Der Installer baut mit
-ISCC (lokal nachgesehen). Offen: das Beispielprojekt.
+ISCC (lokal nachgesehen).
+
+**Stufe 5, Teil 4 = das Beispielprojekt** `examples/studio/rechnungen/`
+(nach dem Piloten 196): App, Module Datenbank (SQLite, Beispieldaten beim
+ersten Start, `naechsteNummer$`) und Ausgabe (CSV, `datumDeutsch$`),
+Klasse Rechnung (laden/rechnen/sichern in einer Transaktion/PDF; Steuer je
+Position gerundet), vier Fenster: Hauptfenster (Tabelle mit Filterzeile,
+Menue mit Kuerzeln, Doppelklick oeffnet), RechnungFenster (modal),
+Kunden-/ArtikelFenster (Datenbindung `GUI_FORM_LOAD/SAVE`, Regeln, Geldfeld,
+Klappliste mit Werten, Rueckfrage bei Ungesichertem). Die Layouts sind aus
+echten gui-Aufrufen ueber `GUI_TO_JSON` entstanden, die Namen danach in der
+JSON gesetzt (GUI_SET_NAME schreibt klein); alle Dateien stehen so da, wie
+`projektSchreiben` sie schreibt. Dazu im Studio: **Tabelle hat
+"Doppelklick"** (`ereignisseFuer`), und in der Laufzeit eine
+**`--check`-Warnung**, wenn eine Methode eine geerbte gleichen Namens mit
+anderer Parameterzahl ueberschreibt (gefunden am Beispiel: `SUB
+zeigen(kid)` verdeckte `StudioFenster.Zeigen()`; `Init` ausgenommen, Zeile
+= eine vor der ersten Anweisung des Rumpfs). Die Repo-Durchlaeufe in
+`dhrt_check.dhtest` lassen Ordner mit `projekt.dhstudio` aus. Tests
+`tests/pruef/werkzeug_studio_beispiel.dhtest` (2: Rundweg durch das Modell;
+F5 im Studio + `--check` + eine Probe, die statt `studioLauf` die Teile
+direkt aufruft -- Daten, Rundung, UNIQUE-Rollback, Liste, PDF, CSV,
+Bindung, Regeln, RechnungFenster), ein Fall in
+`compiler_warnungen.dhtest`.
 
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
