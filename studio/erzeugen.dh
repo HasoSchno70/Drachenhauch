@@ -442,6 +442,22 @@ SUB erzeugen()
     FOR i = 0 TO LEN(elemente) - 1
         WRITEALL(PATHJOIN(pk, codeDatei$(elemente[i])), codeSetzen$(elemente[i]))
     NEXT
+    ' Die Bilder des Projekts unter assets/bilder/ -- dorthin schaut Bild(),
+    ' und dhrt --export nimmt assets/ neben der Exe mit.
+    DIM ab AS STRING : ab = PATHJOIN(PATHJOIN(o, "assets"), "bilder")
+    IF DIREXISTS(ab) THEN
+        FOR EACH alt IN DIRLIST(ab)
+            DELETEFILE(PATHJOIN(ab, alt))
+        NEXT
+    END IF
+    DIM pb AS STRING : pb = bilderOrdner$()
+    IF DIREXISTS(pb) THEN
+        IF NOT DIREXISTS(PATHJOIN(o, "assets")) THEN MKDIR(PATHJOIN(o, "assets"))
+        IF NOT DIREXISTS(ab) THEN MKDIR(ab)
+        FOR EACH alt IN DIRLIST(pb)
+            COPYFILE(PATHJOIN(pb, alt), PATHJOIN(ab, alt))
+        NEXT
+    END IF
     WRITEALL(PATHJOIN(o, "main.dh"), mainCode$())
     protokoll("erzeugt " + STR$(LEN(elemente)))
 END SUB
@@ -663,6 +679,68 @@ SUB befundAnspringen(k AS INTEGER)
     feldBefunde(r)
     IF b.zeile > 0 AND r.feld >= 0 THEN GUI_TEXTAREA_GOTO(r.feld, b.zeile, b.spalte)
     protokoll("angesprungen " + befundOrt$(b))
+END SUB
+
+' --- Bilder des Projekts ------------------------------------------------------------
+FUNCTION bilderOrdner$() AS STRING
+    IF projOrdner = "" THEN RETURN ""
+    RETURN PATHJOIN(projOrdner, "bilder")
+END FUNCTION
+
+' Die Bilder im Ordner bilder/ des Projekts, sortiert.
+FUNCTION projektBilder() AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM o AS STRING : o = bilderOrdner$()
+    IF o = "" THEN RETURN aus
+    IF NOT DIREXISTS(o) THEN RETURN aus
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(o)
+        DIM e AS STRING : e = LOWER$(n)
+        IF RIGHT$(e, 4) = ".png" OR RIGHT$(e, 4) = ".jpg" OR RIGHT$(e, 5) = ".jpeg" OR RIGHT$(e, 4) = ".bmp" OR RIGHT$(e, 4) = ".gif" OR RIGHT$(e, 4) = ".tga" THEN ARRAY_PUSH(aus, n)
+    NEXT
+    SORT(aus)
+    RETURN aus
+END FUNCTION
+
+' Projekt -> Bild hinzufuegen: die Datei nach bilder/ kopieren; ist ein
+' Bild-Control gewaehlt, zeigt es sie gleich.
+SUB bildHinzufuegen()
+    IF projLose OR projOrdner = "" THEN
+        IF NOT sichern(FALSE) THEN
+            status("Bilder gehören zu einem Projekt -- erst sichern.")
+            RETURN
+        END IF
+    END IF
+    DIM q AS STRING : q = GETENV$("DH_STUDIO_DATEI")
+    IF q = "" THEN q = FILE_OPEN_DIALOG("Bild hinzufügen", "png,jpg,jpeg,bmp,gif,tga")
+    IF q = "" THEN RETURN
+    IF NOT FILEEXISTS(q) THEN
+        status("Die Datei gibt es nicht: " + q)
+        RETURN
+    END IF
+    DIM o AS STRING : o = bilderOrdner$()
+    IF NOT DIREXISTS(o) THEN MKDIR(o)
+    DIM name AS STRING : name = BASENAME(q)
+    COPYFILE(q, PATHJOIN(o, name))
+    IF auswahl >= 0 THEN
+        IF feldText$(auswahl, "kind") = "image" THEN JSON_SET_STRING(doc, wz$(auswahl, "studio_bild"), name)
+    END IF
+    nachAenderung(TRUE)
+    status("Bild hinzugefügt: bilder/" + name)
+    protokoll("bild " + name)
+END SUB
+
+' Im Entwurf: Bild-Controls zeigen ihr Bild aus dem Projekt.
+SUB entwurfBilder()
+    IF frm < 0 THEN RETURN
+    DIM i AS INTEGER
+    FOR i = 0 TO anzahl() - 1
+        IF feldText$(i, "kind") <> "image" THEN CONTINUE
+        DIM n AS STRING : n = feldText$(i, "studio_bild")
+        IF n = "" THEN CONTINUE
+        DIM pfad AS STRING : pfad = PATHJOIN(bilderOrdner$(), n)
+        IF bilderOrdner$() <> "" AND FILEEXISTS(pfad) THEN GUI_SET_IMAGE(GUI_WINDOW_WIDGET(frm, i), LOADIMAGE(pfad))
+    NEXT
 END SUB
 
 ' --- Starten, Anhalten, Bauen ---------------------------------------------------------

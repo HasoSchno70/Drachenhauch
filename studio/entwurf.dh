@@ -95,6 +95,7 @@ SUB entwurfBauen()
     GUI_WINDOW_MOVABLE(frm, FALSE)
     GUI_WINDOW_RESIZABLE(frm, FALSE)
     GUI_WINDOW_ZOOM(frm, zoomF)
+    entwurfBilder()
     entwurfLegen()
     ' Zu sehen nur, solange sein Reiter vorn ist.
     GUI_WINDOW_VISIBLE(frm, layoutVorn())

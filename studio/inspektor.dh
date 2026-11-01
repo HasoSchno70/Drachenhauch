@@ -95,6 +95,7 @@ SUB inspektorAnlegen()
     inspZeile("Inhalt", "items", "Einträge", "eintraege", LISTENARTEN, "")
     inspZeile("Inhalt", "table.headers", "Spalten", "eintraege", "table", "")
     inspZeile("Inhalt", "group", "Gruppe", "text", "radio", "")
+    inspZeile("Inhalt", "studio_bild", "Bild", "wahl", "image", "(keins)")
     inspZeile("Inhalt", "checked", "Gesetzt", "schalter", "checkbox,radio,toggle", "")
     inspZeile("Inhalt", "min", "Minimum", "komma", WERTARTEN, "")
     inspZeile("Inhalt", "max", "Maximum", "komma", WERTARTEN, "")
@@ -277,6 +278,16 @@ SUB inspektorFuellen()
                 END IF
                 GUI_SET_CHECKED(z.ed, an)
             CASE "wahl"
+                IF z.schluessel = "studio_bild" THEN
+                    ' Die Bilder des Projekts -- die Liste aendert sich mit ihm.
+                    DIM bl AS ARRAY OF STRING : bl = projektBilder()
+                    z.wahl = "(keins)" + IIF(LEN(bl) > 0, ";" + JOIN$(bl, ";"), "")
+                    GUI_LISTBOX_CLEAR(z.ed)
+                    DIM bn AS STRING
+                    FOR EACH bn IN SPLIT(z.wahl, ";")
+                        GUI_LISTBOX_ADD(z.ed, bn)
+                    NEXT
+                END IF
                 DIM eintraege AS ARRAY OF STRING : eintraege = SPLIT(z.wahl, ";")
                 DIM w AS STRING : w = wertText$(p)
                 DIM idx AS INTEGER : idx = ARRAY_INDEXOF(eintraege, w)
@@ -426,7 +437,7 @@ SUB zeileUebernehmen(zi AS INTEGER)
                 JSON_SET_BOOL(doc, p, GUI_CHECKED(z.ed))
             CASE "wahl"
                 DIM w AS STRING : w = GUI_DROPDOWN_TEXT(z.ed)
-                IF w = "normal" OR w = "standard" OR (z.schluessel = "align" AND w = "links") THEN
+                IF w = "normal" OR w = "standard" OR w = "(keins)" OR (z.schluessel = "align" AND w = "links") THEN
                     IF JSON_HAS(doc, p) THEN JSON_REMOVE(doc, p)
                 ELSE
                     JSON_SET_STRING(doc, p, w)

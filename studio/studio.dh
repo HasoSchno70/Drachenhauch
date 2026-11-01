@@ -341,6 +341,7 @@ SUB befehle()
     IF GUI_CLICKED(miAnhalten) OR t = tbStopp THEN anhalten()
     IF GUI_CLICKED(miBauen) OR t = tbBauen THEN bauen()
     IF GUI_CLICKED(miMenues) THEN menueEditor()
+    IF GUI_CLICKED(miBildNeu) THEN bildHinzufuegen()
     IF GUI_CLICKED(miPruefen) OR t = tbPruefen THEN
         DIM pf AS INTEGER : pf = projektPruefen()
         GUI_DOCK_ACTIVATE(win, "probleme")

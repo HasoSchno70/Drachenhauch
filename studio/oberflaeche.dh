@@ -59,6 +59,7 @@ DIM miVor AS INTEGER
 DIM miVerdoppeln AS INTEGER
 DIM miLoeschen AS INTEGER
 DIM miMenues AS INTEGER
+DIM miBildNeu AS INTEGER
 DIM miAlles AS INTEGER
 DIM miRaster AS INTEGER
 DIM miLinien AS INTEGER
@@ -142,6 +143,7 @@ SUB oberflaecheAnlegen()
     miFensterNeu = GUI_MENU_ITEM(m, "Fenster hinzufügen …", "Strg+N") : GUI_MENU_ICON(miFensterNeu, "plus")
     miModulNeu = GUI_MENU_ITEM(m, "Modul hinzufügen …")
     miKlasseNeu = GUI_MENU_ITEM(m, "Klasse hinzufügen …")
+    miBildNeu = GUI_MENU_ITEM(m, "Bild hinzufügen …")
     GUI_MENU_SEPARATOR(m)
     miMethodeNeu = GUI_MENU_ITEM(m, "Methode hinzufügen …", "Strg+Umschalt+M") : GUI_MENU_ICON(miMethodeNeu, "stift")
     miEreignisNeu = GUI_MENU_ITEM(m, "Ereignis hinzufügen …", "Strg+Umschalt+E") : GUI_MENU_ICON(miEreignisNeu, "einfuegen")
