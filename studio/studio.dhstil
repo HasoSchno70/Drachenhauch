@@ -21,3 +21,8 @@ button.farbfeld             { radius: 4; verlauf: 0; glanz: 0 }
 /* Die Werkzeugleiste ohne Rahmen. */
 toolbar                     { randbreite: 0 }
 statusbar                   { randbreite: 0 }
+
+/* Die Mitte: Kopfzeile ueber dem Code, Titel der Dialoge, Fehler. */
+label.codekopf              { fg: muted_fg }
+label.dialogtitel           { groesse: 19; stil: fett }
+label.fehler                { fg: #E06060 }

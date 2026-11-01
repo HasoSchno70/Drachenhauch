@@ -96,7 +96,8 @@ SUB entwurfBauen()
     GUI_WINDOW_RESIZABLE(frm, FALSE)
     GUI_WINDOW_ZOOM(frm, zoomF)
     entwurfLegen()
-    GUI_WINDOW_VISIBLE(frm, TRUE)
+    ' Zu sehen nur, solange sein Reiter vorn ist.
+    GUI_WINDOW_VISIBLE(frm, layoutVorn())
     IF fokus >= 0 THEN GUI_FOCUS(fokus) ELSE GUI_FOCUS(-1)
 END SUB
 
@@ -265,10 +266,12 @@ END FUNCTION
 
 ' --- Maus ---------------------------------------------------------------------
 FUNCTION imFenster(sx AS INTEGER, sy AS INTEGER) AS BOOLEAN
+    IF NOT layoutVorn() THEN RETURN FALSE
     RETURN sx >= formX AND sy >= formY AND sx < formX + zS(fensterB()) AND sy < formY + zS(fensterH())
 END FUNCTION
 
 FUNCTION inDerMitte(sx AS INTEGER, sy AS INTEGER) AS BOOLEAN
+    IF NOT layoutVorn() THEN RETURN FALSE
     RETURN sx >= mitteX AND sy >= mitteY AND sx < mitteX + mitteB AND sy < mitteY + mitteH
 END FUNCTION
 
@@ -320,6 +323,14 @@ SUB mausAufEntwurf()
         ELSE
             DIM i AS INTEGER : i = -1
             IF imFenster(smx, smy) THEN i = indexVonHandle(GUI_HIT_TEST(smx, smy))
+            ' Doppelklick auf ein Control oder das Fenster: Ereignis hinzufuegen.
+            IF imFenster(smx, smy) AND doppelKlick(i) THEN
+                IF i >= 0 THEN auswahlSetzen(i) ELSE auswahlSetzen(-1)
+                auswahlGeaendert()
+                modus = 0
+                ereignisDialog(aktFenster, i)
+                RETURN
+            END IF
             DIM dazu AS BOOLEAN : dazu = umschalt() OR strg()
             IF i >= 0 AND dazu THEN
                 auswahlUmschalten(i)
@@ -605,6 +616,7 @@ END SUB
 
 ' --- Zeichnen (nach GUI_DRAW, vor GUI_DRAW_TOP) -------------------------------
 SUB entwurfZeichnen()
+    IF NOT layoutVorn() THEN RETURN
     DIM b AS INTEGER : b = zS(fensterB())
     DIM h AS INTEGER : h = zS(fensterH())
     DIM x0 AS INTEGER : x0 = formX

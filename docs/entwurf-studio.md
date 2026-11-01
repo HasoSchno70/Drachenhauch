@@ -9,9 +9,13 @@ aber mit der Laufzeit `dhrt`. Sie ersetzt den Form-Designer
 * *Ein Projekt ist ein Ordner mit lesbaren Dateien.*
 * *Der Name ist „Drachenhauch Studio“.*
 
-**Stand:** Stufe 1 ist gebaut (2026-11-01, Ordner `studio/`, Handbuch
-[studio.md](studio.md), Prüfung `tests/pruef/werkzeug_studio.dhtest`). Die drei
-Messungen vorab ergaben:
+**Stand:** Stufe 1 und 2 sind gebaut (2026-11-01, Ordner `studio/`, Handbuch
+[studio.md](studio.md), Prüfungen `tests/pruef/werkzeug_studio.dhtest` und
+`tests/pruef/werkzeug_studio2.dhtest`). Für Stufe 2 kamen in die Laufzeit
+schließbare Reiter im Reiterwerk (`GUI_TABCONTROL_SET "schliessbar"`,
+`GUI_TABCONTROL_CLOSED`) und `GUI_TREE_ITEM_RECT`. Fehler am Code und die
+Vervollständigung folgen mit Stufe 3, weil sie die erzeugten Basisklassen
+brauchen. Die drei Messungen vor Stufe 1 ergaben:
 * Der Neuaufbau kostet bei 1000 Controls 2,7 ms.
 * Ein Klick ins Hauptfenster legt es über die Entwurfsfläche;
   `GUI_WINDOW_FRONT` je Bild holt sie zurück.

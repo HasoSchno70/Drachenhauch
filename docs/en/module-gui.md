@@ -197,6 +197,7 @@ IMPORT "gui"
 | `GUI_TREE_CLEAR(tree)` | — | delete all nodes |
 | `GUI_TREE_SELECTED(tree)` / `GUI_TREE_SET_SELECTED(tree, node)` | INT / — | read/set the selected node (-1 = none) |
 | `GUI_TREE_LABEL(tree, node)` | STRING | text of a node |
+| `GUI_TREE_ITEM_RECT(tree, node)` | TUPLE | (x, y, w, h) of a node on screen, x at the start of its label; under a collapsed one (0, 0, 0, 0) -- for tests with real clicks |
 | `GUI_TREE_EXPAND(tree, node, flag)` | — | expand/collapse a node |
 | `GUI_TREE_SET(tree, key$, wert)` | — | setting on the tree: `mehrfachauswahl` (multi-select), `kaestchen` (checkboxes), `bearbeitbar` (editable: F2 renames) |
 | `GUI_TREE_EDIT(tree, node)` | — | rename a node: input field over the name, everything selected (not for the file tree) |
@@ -233,6 +234,8 @@ IMPORT "gui"
 | `GUI_TABCONTROL_COUNT(tc)` | INTEGER | how many pages there are |
 | `GUI_TABCONTROL_TITLE$(tc, i)` / `GUI_TABCONTROL_SET_TITLE(tc, i, titel$)` | STRING / — | read and set the label of a page |
 | `GUI_TABCONTROL_REMOVE(tc, i)` | — | remove a page; its children remain as widgets |
+| `GUI_TABCONTROL_SET(tc, "schliessbar", an)` | — | every tab gets a cross; nothing is closed, it is reported through `GUI_TABCONTROL_CLOSED` |
+| `GUI_TABCONTROL_CLOSED(tc)` | INTEGER | which page is to close in this frame (cross or middle mouse button), -1 = none; the program removes it itself |
 | `GUI_RICHTEXT(win, x, y, w, h, text$ = "")` | GUI_WIDGET | **typeset text**: Markdown is typeset instead of merely displayed |
 | `GUI_RICHTEXT_SET_TEXT(rt, text$)` | — | set new Markdown source (`GUI_SET_TEXT` does the same) |
 | `GUI_RICHTEXT_SET(rt, key$, wert)` | — | `groesse` (base font size), `codeschrift` (FONT handle for code blocks) and the colours of the code blocks `farbe_kommentar`/`farbe_text`/`farbe_zahl`/`farbe_schluessel`/`farbe_name`/`farbe_operator` (-1 = default matching the background) |

@@ -1749,6 +1749,11 @@ struct PanelState {
 #[derive(Default)]
 struct TabCtlState {
     kinder: Vec<(usize, i32)>,   // (Widget-Index, Seite)
+    /// Reiter mit Kreuz (`GUI_TABCONTROL_SET "schliessbar"`). Wie bei den
+    /// Reitern des Fensters schliesst die Laufzeit NICHTS -- sie meldet nur
+    /// (`zu`, ein Bild lang), welcher Reiter zu soll.
+    schliessbar: bool,
+    zu: Option<usize>,
 }
 
 /// Akkordeon (Kind::Accordion): Abschnitte untereinander, jeder mit einem
@@ -7980,8 +7985,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     fn tc_koepfe(&self, ax: i32, wdg: &Widget) -> Vec<(usize, i32, i32)> {
         let mut x = ax;
         let mut out = Vec::new();
+        let kreuz = if Self::tc_schliessbar(wdg) { self.sk(16) } else { 0 };
         for (i, t) in wdg.items.iter().enumerate() {
-            let b = self.sk(8) * t.chars().count() as i32 + self.sk(20);
+            let b = self.sk(8) * t.chars().count() as i32 + self.sk(20) + kreuz;
             out.push((i, x, x + b));
             x += b + 2;
         }
@@ -8017,6 +8023,30 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
     }
     /// Je Bild: welches Kind auf welcher Seite liegt (wie panel_pass).
+    fn tc_schliessbar(wdg: &Widget) -> bool {
+        wdg.kind == Kind::TabControl && wdg.tabctl.as_ref().map(|s| s.schliessbar).unwrap_or(false)
+    }
+    /// Das Kreuz eines Kopfes, der bei `x1` endet: (x, y, kante). EINE Quelle
+    /// fuer Zeichnen und Treffertest, wie `tab_kreuz_rect` am Fenster.
+    fn tc_kreuz(&self, x1: i32, ay: i32) -> (i32, i32, i32) {
+        let k = self.sk(9);
+        (x1 - self.sk(8) - k, ay + 2 + (self.sk(TC_KOPF_H) - 2 - k) / 2, k)
+    }
+    /// GUI_TABCONTROL_SET(tc, schluessel$, wert): bisher nur "schliessbar".
+    pub fn tabcontrol_set(&mut self, h: i64, schluessel: &str, wert: bool) -> Result<(), String> {
+        let w = self.tc_mut(h, "GUI_TABCONTROL_SET")?;
+        let st = w.tabctl.get_or_insert_with(Default::default);
+        match schluessel.to_lowercase().as_str() {
+            "schliessbar" | "closable" => { st.schliessbar = wert; Ok(()) }
+            _ => Err(format!("GUI_TABCONTROL_SET: unbekannter Schluessel '{}' (bekannt: schliessbar)", schluessel)),
+        }
+    }
+    /// GUI_TABCONTROL_CLOSED(tc): welche Seite in diesem Bild zu soll
+    /// (-1 = keine). Kreuz oder mittlere Maustaste.
+    pub fn tabcontrol_closed(&self, h: i64) -> Result<i64, String> {
+        let w = self.tc_ref(h, "GUI_TABCONTROL_CLOSED")?;
+        Ok(w.tabctl.as_ref().and_then(|s| s.zu).map(|k| k as i64).unwrap_or(-1))
+    }
     fn tabctl_pass(&mut self) {
         for wi in 0..self.windows.len() {
             let n = self.windows[wi].widgets.len();
@@ -8102,6 +8132,25 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         t.hover = if row >= 0 && (row as usize) < vis.len() { vis[row as usize] as i32 } else { -1 };
     }
 
+    /// GUI_TREE_ITEM_RECT: wo ein Knoten auf dem Bildschirm steht (x, y, b, h),
+    /// in Bildschirmpunkten wie GUI_HIT_TEST -- x ist der Anfang seiner
+    /// Beschriftung (hinter Einzug und Dreieck). Aus derselben Rechnung wie
+    /// der Klick (`tree_press`). Ein Knoten unter einem zugeklappten liefert
+    /// (0, 0, 0, 0). Gebraucht fuer Pruefungen mit echten Klicks.
+    pub fn tree_item_rect(&self, h: i64, node: i64) -> Result<(i32, i32, i32, i32), String> {
+        let w = self.wdg(h, "GUI_TREE_ITEM_RECT")?;
+        let t = match w.tree.as_ref() { Some(t) if w.kind == Kind::Tree => t, _ => return Err("GUI_TREE_ITEM_RECT: Widget ist kein Baum".into()) };
+        if node < 0 || node as usize >= t.nodes.len() {
+            return Err(format!("GUI_TREE_ITEM_RECT: Knoten {} ausserhalb [0..{}]", node, t.nodes.len() as i64 - 1));
+        }
+        let (wi, _) = Self::dec_widget(h);
+        let vis = Self::tree_visible(t);
+        let row = match vis.iter().position(|&n| n == node as usize) { Some(r) => r as i32, None => return Ok((0, 0, 0, 0)) };
+        let (ax, ay, aw, _) = self.abs_rect(wi, w);
+        let rh = self.sk(TREE_ROW_H);
+        let x = ax + 4 + self.tree_kast_w(t) + t.nodes[node as usize].level * self.sk(TREE_INDENT) + self.sk(TREE_TOGGLE_W);
+        Ok((x, ay + 1 + row * rh - t.scroll, (aw - (x - ax)).max(0), rh))
+    }
     fn tree_press(&mut self, wi: usize, idx: usize, mx: i32, my: i32) {
         let (ax, ay, _w, _h) = self.abs_rect(wi, &self.windows[wi].widgets[idx]);
         let t = self.windows[wi].widgets[idx].tree.as_ref().unwrap();
@@ -11635,6 +11684,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 "kinder": st.kinder.iter().map(|&(k, s)| serde_json::json!([k, s])).collect::<Vec<_>>(),
                 "seite": w.sel,
             });
+            if st.schliessbar { o["tabctl"]["schliessbar"] = serde_json::json!(true); }
         }
         if w.tab_page != -1 { o["tab_page"] = serde_json::json!(w.tab_page); }
         o
@@ -12052,6 +12102,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     }).collect();
                 }
                 w.sel = tj["seite"].as_i64().unwrap_or(0) as i32;
+                st.schliessbar = tj["schliessbar"].as_bool().unwrap_or(false);
             }
             w.tabctl = Some(Box::new(st));
         }
@@ -12987,6 +13038,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 wdg.zeile_jetzt = -1;
                 if let Some(s) = wdg.status.as_mut() { s.hover = -1; s.geklickt = -1; }
                 if let Some(p) = wdg.pfad.as_mut() { p.hover = -1; p.geklickt = -1; }
+                if let Some(tc) = wdg.tabctl.as_mut() { tc.zu = None; }
                 wdg.farbfeld_klick = -1; wdg.hinweis_klick = 0; wdg.rand_klick = (0, -1); wdg.abk_treffer = -1; wdg.tab_treffer = false;
                 if let Some(l) = wdg.list.as_mut() { l.doppel = false; }
                 if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; t.doppel = false; }
@@ -13105,6 +13157,24 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 if let Some((ti, _, _)) = self.tab_slots(g, wi).into_iter().find(|(_, x0, x1)| mx >= *x0 && mx < *x1) {
                     self.windows[wi].tab_zu = ti as i32;
                     break;
+                }
+            }
+        }
+        // Mittlere Taste auf dem Kopf eines schliessbaren Reiterwerks: zu.
+        if mitte_just {
+            if let Some(top) = self.topmost_at(mx, my) {
+                let kopf = self.sk(TC_KOPF_H);
+                let mut treffer = None;
+                for (i, w) in self.windows[top].widgets.iter().enumerate() {
+                    if !Self::tc_schliessbar(w) || !self.widget_shown(top, w) { continue; }
+                    let (ax, ay, _, _) = self.abs_rect(top, w);
+                    if my < ay || my >= ay + kopf { continue; }
+                    if let Some((k, _, _)) = self.tc_koepfe(ax, w).into_iter().find(|&(_, x0, x1)| mx >= x0 && mx < x1) {
+                        treffer = Some((i, k));
+                    }
+                }
+                if let Some((i, k)) = treffer {
+                    if let Some(st) = self.windows[top].widgets[i].tabctl.as_mut() { st.zu = Some(k); }
                 }
             }
         }
@@ -17012,8 +17082,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let (ax, ay, _, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
                 if my >= ay + self.sk(TC_KOPF_H) { return; }   // unter den Koepfen gehoert die Flaeche den Kindern
                 let treffer = self.tc_koepfe(ax, &self.windows[win].widgets[i])
-                    .into_iter().find(|&(_, x0, x1)| mx >= x0 && mx < x1).map(|(k, _, _)| k as i32);
-                if let Some(k) = treffer {
+                    .into_iter().find(|&(_, x0, x1)| mx >= x0 && mx < x1).map(|(k, _, x1)| (k as i32, x1));
+                if let Some((k, x1)) = treffer {
+                    if Self::tc_schliessbar(&self.windows[win].widgets[i]) {
+                        let (kx, ky, kk) = self.tc_kreuz(x1, ay);
+                        if mx >= kx - 3 && mx < kx + kk + 3 && my >= ky - 3 && my < ky + kk + 3 {
+                            if let Some(st) = self.windows[win].widgets[i].tabctl.as_mut() { st.zu = Some(k as usize); }
+                            return;
+                        }
+                    }
                     let w = &mut self.windows[win].widgets[i];
                     if w.sel != k {
                         w.sel = k;
@@ -21021,6 +21098,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     let th = self.wsize(g, wdg);
                     self.wtext(g, wdg, x0 + self.sk(10), ay + 2 + (kopf - 2 - th).max(0) / 2,
                                wdg.items[i].clone(), fg);
+                    if Self::tc_schliessbar(wdg) {
+                        // Zwei Striche wie am Reiter des Fensters.
+                        let (kx, ky, k) = self.tc_kreuz(x1, ay);
+                        g.line(kx, ky, kx + k - 1, ky + k - 1, fg);
+                        g.line(kx + k - 1, ky, kx, ky + k - 1, fg);
+                    }
                 }
                 g.pop_clip();
             }

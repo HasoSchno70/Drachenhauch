@@ -3430,6 +3430,50 @@ misst in einem ersten Lauf und baut daraus die Aufnahme), je ein Fall in
 sechs Verfaelschungen des Studios fallen je in ihrem Fall (das Uebergehen
 gleicher Staende nicht -- seit dem Kippschalter-Fix entsteht keiner mehr).
 
+**Stufe 2 = Projekt und Code** (selber Tag, Zweig `thema/studio-stufe2`):
+`studio/projekt.dh` (Elemente app/fenster/modul/klasse, Methoden als
+eigene Objekte, `codeZerlegen`/`codeSetzen$` mit Rundweg Zeichen fuer
+Zeichen: Methoden einzeln, alles andere als "Eigenschaften" (`dekl`), der
+Kommentar direkt ueber einer Methode gehoert ihr, Vorspann vor CLASS und
+Nachspann hinter END CLASS woertlich; ein Modul nimmt seine Kommentarzeilen
+oben als Vorspann, ausser sie stehen direkt ueber einer Methode),
+`projekt.dhstudio` + je Element `.dh` (Fenster dazu `.dhform`) +
+`.gitignore` mit `_studio/`; ein umbenanntes Element loescht beim Sichern
+seine alten Dateien. `studio/code.dh`: die Mitte ist ein schliessbares
+Reiterwerk (Layout je Fenster, Code je Methode, Eigenschaften je Element;
+das Entwurfsfenster ist KEIN Kind, es wird gezeigt, solange sein Reiter
+vorn ist -- `layoutVorn()` sperrt dafuer Maus, Tasten und Zeichnen des
+Entwurfs). Das Layout, das vorn ist, steht in `doc`, die anderen als Text
+im Element samt ihren Rueckgaengig-Staenden (`fensterAktivieren`).
+Navigator aus Tabellen `navArt/navEl/navCtrl/navMeth`, Ereignisse unter
+ihrem Control (Methode `<control>_<Ereignis>`, `ereignisseFuer(kind)`).
+Doppelklick auf ein Control = Dialog "Ereignis hinzufuegen", dazu Methode,
+Fenster, Modul, Klasse hinzufuegen; ein umbenanntes Control nimmt seine
+Ereignis-Methoden und den Namen im Code (ganzes Wort) mit
+(`controlUmbenannt`). Ist ein Code-Reiter vorn, sind Rueckgaengig,
+Verdoppeln, Loeschen und Anordnen im Menue gesperrt -- ein gesperrter Punkt
+nimmt dem Code-Feld die Taste nicht weg. Eine `.dhform` als Argument
+bleibt ein einzelnes Fenster (Stufe-1-Verhalten), bis Code dazukommt.
+**Drei Fallen:** (1) das letzte Argument von `GUI_TEXTAREA` ist der
+PLATZHALTER -- der Rumpf stand nur grau da und ging beim Uebernehmen
+verloren (Text per `GUI_SET_TEXT`); (2) was das Studio nach `GUI_DRAW`
+zeichnet (Titelleiste, Griffe), lag ueber jedem Dialog -- offene Dialoge
+kommen per `GUI_DRAW_WINDOW` noch einmal obenauf (`dialogeObenauf`);
+(3) Python-Patches im Bash-Heredoc kamen zweimal nicht an -- Skripte per
+Write. **Zwei Laufzeit-Stuecke:** `GUI_TABCONTROL_SET(tc, "schliessbar", 1)`
++ `GUI_TABCONTROL_CLOSED(tc)` (Kreuz je Kopf, Kopf 16 breiter,
+`tc_kreuz` = eine Quelle fuer Zeichnen und Treffer, mittlere Maustaste,
+geschlossen wird nichts; `.dhform` `tabctl.schliessbar`) und
+`GUI_TREE_ITEM_RECT(tree, node)` (wie die Listenzeile, fuer echte Klicks
+in den Navigator). Fehler am Code und Vervollstaendigung kommen mit Stufe
+3 (brauchen die erzeugten Basisklassen). Tests
+`tests/pruef/werkzeug_studio2.dhtest` (8: drei ohne Fenster am
+Projektmodell, fuenf mit echten Klicks -- Navigator oeffnet Methode und
+getippter Code landet in der Datei, Doppelklick legt ein Ereignis an,
+Kreuz schliesst, Fenster und Methode hinzufuegen, Umbenennen im Inspektor),
+vier Faelle in `gui_reiterwerk.dhtest`; acht Verfaelschungen des Studios
+fallen je genau in ihrem Fall.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

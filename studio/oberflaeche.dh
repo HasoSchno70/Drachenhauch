@@ -23,6 +23,9 @@ DIM hell AS BOOLEAN : hell = FALSE
 ' Eintraege der Werkzeugleiste
 DIM tbNeu AS INTEGER
 DIM tbOeffnen AS INTEGER
+DIM tbFenster AS INTEGER
+DIM tbMethode AS INTEGER
+DIM tbEreignis AS INTEGER
 DIM tbSichern AS INTEGER
 DIM tbZurueck AS INTEGER
 DIM tbVor AS INTEGER
@@ -37,6 +40,14 @@ DIM tbGroesser AS INTEGER
 ' Menue
 DIM miNeu AS INTEGER
 DIM miOeffnen AS INTEGER
+DIM miFensterNeu AS INTEGER
+DIM miModulNeu AS INTEGER
+DIM miKlasseNeu AS INTEGER
+DIM miMethodeNeu AS INTEGER
+DIM miEreignisNeu AS INTEGER
+DIM miMethodeWeg AS INTEGER
+DIM miElementWeg AS INTEGER
+DIM miStartfenster AS INTEGER
 DIM miSichern AS INTEGER
 DIM miSichernUnter AS INTEGER
 DIM miBeenden AS INTEGER
@@ -102,7 +113,7 @@ SUB oberflaecheAnlegen()
     GUI_WINDOW_MOVABLE(win, FALSE)
 
     DIM m AS INTEGER : m = GUI_MENU(win, "Datei")
-    miNeu = GUI_MENU_ITEM(m, "Neues Fenster", "Strg+N") : GUI_MENU_ICON(miNeu, "neu")
+    miNeu = GUI_MENU_ITEM(m, "Neues Projekt", "Strg+Umschalt+N") : GUI_MENU_ICON(miNeu, "neu")
     miOeffnen = GUI_MENU_ITEM(m, "Öffnen …", "Strg+O") : GUI_MENU_ICON(miOeffnen, "oeffnen")
     GUI_MENU_SEPARATOR(m)
     miSichern = GUI_MENU_ITEM(m, "Sichern", "Strg+S") : GUI_MENU_ICON(miSichern, "sichern")
@@ -119,6 +130,17 @@ SUB oberflaecheAnlegen()
     ' Strg+A NICHT als Kuerzel: ein Kuerzel nimmt dem Feld mit Fokus die Taste
     ' weg, und im Inspektor soll Strg+A den Text waehlen (siehe tasten()).
     miAlles = GUI_MENU_ITEM(m, "Alles auswählen   Strg+A") : GUI_MENU_ICON(miAlles, "auswahl")
+    m = GUI_MENU(win, "Projekt")
+    miFensterNeu = GUI_MENU_ITEM(m, "Fenster hinzufügen …", "Strg+N") : GUI_MENU_ICON(miFensterNeu, "plus")
+    miModulNeu = GUI_MENU_ITEM(m, "Modul hinzufügen …")
+    miKlasseNeu = GUI_MENU_ITEM(m, "Klasse hinzufügen …")
+    GUI_MENU_SEPARATOR(m)
+    miMethodeNeu = GUI_MENU_ITEM(m, "Methode hinzufügen …", "Strg+Umschalt+M") : GUI_MENU_ICON(miMethodeNeu, "stift")
+    miEreignisNeu = GUI_MENU_ITEM(m, "Ereignis hinzufügen …", "Strg+Umschalt+E") : GUI_MENU_ICON(miEreignisNeu, "einfuegen")
+    miMethodeWeg = GUI_MENU_ITEM(m, "Methode entfernen")
+    GUI_MENU_SEPARATOR(m)
+    miStartfenster = GUI_MENU_ITEM(m, "Als Startfenster")
+    miElementWeg = GUI_MENU_ITEM(m, "Element löschen …")
     m = GUI_MENU(win, "Anordnen")
     anordnenPunkt(m, "Links ausrichten", "links", "Strg+Alt+Links")
     anordnenPunkt(m, "Rechts ausrichten", "rechts", "Strg+Alt+Rechts")
@@ -153,9 +175,13 @@ SUB oberflaecheAnlegen()
 
     tb = GUI_TOOLBAR(win, 0, 0, SCREENWIDTH(), LEISTE_H)
     GUI_TOOLBAR_SET(tb, "beschriftung", 1)
-    tbNeu = GUI_TOOLBAR_ADD(tb, "neu", "Neues Fenster (Strg+N)", "Neu")
-    tbOeffnen = GUI_TOOLBAR_ADD(tb, "oeffnen", "Öffnen (Strg+O)", "Öffnen")
+    tbNeu = GUI_TOOLBAR_ADD(tb, "neu", "Neues Projekt (Strg+Umschalt+N)", "Neu")
+    tbOeffnen = GUI_TOOLBAR_ADD(tb, "oeffnen", "Projekt oder Fenster öffnen (Strg+O)", "Öffnen")
     tbSichern = GUI_TOOLBAR_ADD(tb, "sichern", "Sichern (Strg+S)", "Sichern")
+    GUI_TOOLBAR_SEPARATOR(tb)
+    tbFenster = GUI_TOOLBAR_ADD(tb, "plus", "Fenster hinzufügen (Strg+N)", "Fenster")
+    tbMethode = GUI_TOOLBAR_ADD(tb, "stift", "Methode hinzufügen (Strg+Umschalt+M)", "Methode")
+    tbEreignis = GUI_TOOLBAR_ADD(tb, "einfuegen", "Ereignis hinzufügen (Strg+Umschalt+E, oder Doppelklick auf ein Control)", "Ereignis")
     GUI_TOOLBAR_SEPARATOR(tb)
     tbZurueck = GUI_TOOLBAR_ADD(tb, "rueckgaengig", "Rückgängig (Strg+Z)")
     tbVor = GUI_TOOLBAR_ADD(tb, "wiederholen", "Wiederholen (Strg+Y)")
@@ -199,6 +225,7 @@ SUB oberflaecheAnlegen()
     bibliothekFuellen()
 
     inspektorAnlegen()
+    mitteAnlegen()
     verteilen()
 END SUB
 
@@ -228,7 +255,7 @@ SUB verteilen()
     END IF
     inspektorLegen()
     (x, y, b, h) = GUI_DOCK_CENTER(win)
-    mitteX = x : mitteY = y + inhaltOben : mitteB = b : mitteH = h
+    mitteLegen(x, y, b, h)
     entwurfLegen()
 END SUB
 
@@ -368,37 +395,6 @@ FUNCTION bausteinVon(i AS INTEGER) AS INTEGER
     RETURN -1
 END FUNCTION
 
-' --- Navigator ------------------------------------------------------------------
-' Knoten 0 ist das Fenster, Knoten i + 1 das Control i.
-DIM navStumm AS BOOLEAN : navStumm = FALSE
-SUB navigatorFuellen()
-    navStumm = TRUE
-    GUI_TREE_CLEAR(baum)
-    DIM wurzel AS INTEGER : wurzel = GUI_TREE_ADD(baum, -1, fensterText$("name"))
-    DIM i AS INTEGER
-    FOR i = 0 TO anzahl() - 1
-        DIM n AS INTEGER : n = GUI_TREE_ADD(baum, wurzel, feldText$(i, "name"))
-        DIM p AS INTEGER : p = bausteinVon(i)
-        IF p >= 0 THEN GUI_TREE_ICON(baum, n, bausteine[p].symbol)
-    NEXT
-    GUI_TREE_EXPAND(baum, wurzel, TRUE)
-    navigatorAuswahl()
-    navStumm = FALSE
-END SUB
-
-SUB navigatorAuswahl()
-    GUI_TREE_SELECT(baum, auswahl + 1, TRUE)
-END SUB
-
-SUB navigatorPruefen()
-    IF navStumm THEN RETURN
-    IF NOT GUI_CHANGED(baum) THEN RETURN
-    DIM n AS INTEGER : n = GUI_TREE_SELECTED(baum)
-    IF n < 0 THEN RETURN
-    auswahlSetzen(n - 1)
-    auswahlGeaendert()
-END SUB
-
 ' --- Auswahl, Status, Werkzeuge --------------------------------------------------
 SUB auswahlGeaendert()
     inspektorFuellen()
@@ -427,18 +423,31 @@ SUB lageAnzeigen()
 END SUB
 
 SUB werkzeugeNachziehen()
-    GUI_TOOLBAR_ENABLE(tb, tbZurueck, kannZurueck())
-    GUI_TOOLBAR_ENABLE(tb, tbVor, kannVor())
-    GUI_MENU_ENABLE(miZurueck, kannZurueck())
-    GUI_MENU_ENABLE(miVor, kannVor())
-    DIM mehrere AS BOOLEAN : mehrere = LEN(gewaehlt) >= 2
+    ' Ist ein Code-Reiter vorn, gehoeren Strg+Z/Y, Entf und Strg+D dem
+    ' Code-Feld: ein gesperrter Menuepunkt nimmt ihm die Taste nicht weg.
+    DIM lay AS BOOLEAN : lay = layoutVorn()
+    GUI_TOOLBAR_ENABLE(tb, tbZurueck, lay AND kannZurueck())
+    GUI_TOOLBAR_ENABLE(tb, tbVor, lay AND kannVor())
+    GUI_MENU_ENABLE(miZurueck, lay AND kannZurueck())
+    GUI_MENU_ENABLE(miVor, lay AND kannVor())
+    DIM mehrere AS BOOLEAN : mehrere = lay AND LEN(gewaehlt) >= 2
     GUI_TOOLBAR_ENABLE(tb, tbLinks, mehrere)
     GUI_TOOLBAR_ENABLE(tb, tbOben, mehrere)
     GUI_TOOLBAR_ENABLE(tb, tbMitteW, mehrere)
-    GUI_TOOLBAR_ENABLE(tb, tbVerteilen, LEN(gewaehlt) >= 3)
-    GUI_MENU_ENABLE(miVerdoppeln, auswahl >= 0)
-    GUI_MENU_ENABLE(miLoeschen, auswahl >= 0)
-    DIM titel AS STRING : titel = "Drachenhauch Studio -- " + IIF(formPfad = "", fensterText$("name"), BASENAME(formPfad))
-    IF geaendert THEN titel = titel + " *"
+    GUI_TOOLBAR_ENABLE(tb, tbVerteilen, lay AND LEN(gewaehlt) >= 3)
+    GUI_MENU_ENABLE(miVerdoppeln, lay AND auswahl >= 0)
+    GUI_MENU_ENABLE(miLoeschen, lay AND auswahl >= 0)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(anordnenPunkte) - 1
+        GUI_MENU_ENABLE(anordnenPunkte[k], lay)
+    NEXT
+    GUI_MENU_ENABLE(miMethodeWeg, codeVorn())
+    DIM titel AS STRING
+    IF projLose THEN
+        titel = "Drachenhauch Studio -- " + IIF(formPfad = "", fensterText$("name"), BASENAME(formPfad))
+    ELSE
+        titel = "Drachenhauch Studio -- " + projName + IIF(projOrdner = "", " (nicht gesichert)", "")
+    END IF
+    IF projektGeaendert() THEN titel = titel + " *"
     SETWINDOWTITLE(titel)
 END SUB

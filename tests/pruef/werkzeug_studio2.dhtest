@@ -1,0 +1,416 @@
+' Drachenhauch Studio, Stufe 2 (studio/, docs/entwurf-studio.md): das
+' Projekt als Ordner, mehrere Fenster, Module und Klassen, Ereignisse und
+' ein Code-Feld je Methode.
+'
+' Die ersten Faelle pruefen das Projektmodell ohne Fenster (projekt.dh
+' zerlegt und setzt den Code, liest und schreibt den Ordner). Die uebrigen
+' starten das Studio als Kind (_hilfen/studiolauf.dh) und bedienen es mit
+' echten Klicks und Tasten; die Lagen von Navigatorknoten und Reitern stehen
+' im Protokoll (DH_STUDIO_LOG).
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== code zerlegen und wieder setzen gibt dieselbe datei
+' Methoden einzeln, PROPERTY und DIM als Eigenschaften, der Kommentar ueber
+' einer Methode gehoert zu ihr, ein EXIT SUB im Rumpf beendet nichts.
+IMPORT "modell_imp.dh"
+DIM e AS Element : e = elementNeu("klasse", "Kunde")
+DIM q AS STRING : q = JOIN$(READLINES("Kunde.dh"), CHR$(10))
+codeZerlegen(e, q)
+PRINT LEN(methoden); " "; methoden[0].name; " "; methoden[1].name; " "; methoden[1].kopf
+PRINT "vorspann ["; methoden[0].vorspann; "]"
+PRINT "basis "; e.basis
+PRINT "exit bleibt im rumpf "; INSTR(methoden[0].rumpf, "EXIT SUB") >= 0
+PRINT "property in den eigenschaften "; INSTR(e.dekl, "END PROPERTY") >= 0
+PRINT "gleich "; codeSetzen$(e) = q + CHR$(10)
+DIM w AS Element : w = elementNeu("modul", "Werkzeuge")
+DIM q2 AS STRING : q2 = JOIN$(READLINES("Werkzeuge.dh"), CHR$(10))
+codeZerlegen(w, q2)
+PRINT "modul "; LEN(methoden); " "; methoden[2].name; " gleich "; codeSetzen$(w) = q2 + CHR$(10)
+--- datei modell_imp.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "{sammlung}/../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../studio/modell.dh"
+IMPORT "{sammlung}/../../studio/projekt.dh"
+--- datei Kunde.dh
+' Ein Kunde mit Namen.
+CLASS Kunde EXTENDS Person
+    DIM n AS INTEGER
+    PROPERTY GET wert() AS INTEGER
+        RETURN n
+    END PROPERTY
+
+    ' zaehlt hoch, aber nie bei null
+    SUB zaehle(k AS INTEGER)
+        IF k > 0 THEN
+            EXIT SUB
+        END IF
+        n = n + k
+    END SUB
+
+    FUNCTION doppelt() AS INTEGER
+        RETURN n * 2
+    END FUNCTION
+END CLASS
+--- datei Werkzeuge.dh
+' Modul Werkzeuge: SUBs und FUNCTIONs fuer das ganze Projekt.
+CONST FAKTOR = 3
+
+FUNCTION mal(x AS INTEGER) AS INTEGER
+    RETURN x * FAKTOR
+END FUNCTION
+--- erwartet
+2 zaehle doppelt FUNCTION doppelt() AS INTEGER
+vorspann [' zaehlt hoch, aber nie bei null]
+basis Person
+exit bleibt im rumpf TRUE
+property in den eigenschaften TRUE
+gleich TRUE
+modul 3 mal gleich TRUE
+
+=== ein control umbenennen zieht seine ereignisse und den code mit
+' knopf10 ist ein anderes Wort und bleibt; der Kopf wird umbenannt.
+IMPORT "modell_imp.dh"
+DIM e AS Element : e = elementNeu("fenster", "Haupt")
+DIM a AS Methode : a = methodeNeu(e, "sub", "knopf1_Klick", "SUB knopf1_Klick()")
+a.rumpf = "knopf1.text = " + CHR$(34) + "ok" + CHR$(34) + CHR$(10) + "knopf10.text = " + CHR$(34) + "bleibt" + CHR$(34)
+DIM b AS Methode : b = methodeNeu(e, "sub", "knopf10_Klick", "SUB knopf10_Klick()")
+e.dekl = "DIM zuletzt AS STRING ' knopf1"
+controlUmbenannt(e, "knopf1", "start")
+PRINT a.name; " | "; a.kopf
+PRINT b.name
+PRINT a.rumpf
+PRINT e.dekl
+--- datei modell_imp.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "{sammlung}/../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../studio/modell.dh"
+IMPORT "{sammlung}/../../studio/projekt.dh"
+--- erwartet
+start_Klick | SUB start_Klick()
+knopf10_Klick
+start.text = "ok"
+knopf10.text = "bleibt"
+DIM zuletzt AS STRING ' start
+
+=== ein projekt wird geschrieben und wieder gelesen
+' Der Ordner traegt projekt.dhstudio, je Element eine .dh (Fenster dazu
+' eine .dhform) und eine .gitignore fuer _studio/. Ein umbenanntes Element
+' nimmt seine alten Dateien weg.
+IMPORT "modell_imp.dh"
+DIM ordner AS STRING : ordner = CWD$() + "/neu"
+projektNeu(ordner)
+DIM m AS Methode : m = methodeNeu(elemente[1], "sub", "Geoeffnet", "SUB Geoeffnet()")
+m.rumpf = "PRINT " + CHR$(34) + "da" + CHR$(34)
+DIM k AS Element : k = elementNeu("klasse", "Kunde")
+k.dekl = "DIM name AS STRING"
+projektSchreiben()
+PRINT "dateien "; FILEEXISTS(ordner + "/projekt.dhstudio"); FILEEXISTS(ordner + "/App.dh"); FILEEXISTS(ordner + "/Hauptfenster.dh"); FILEEXISTS(ordner + "/Hauptfenster.dhform"); FILEEXISTS(ordner + "/Kunde.dh")
+PRINT "gitignore "; READLINES(ordner + "/.gitignore")[0]
+DIM z AS STRING
+FOR EACH z IN READLINES(ordner + "/Hauptfenster.dh")
+    IF LEFT$(z, 1) <> "'" THEN PRINT "|"; z
+NEXT
+k.name = "Kundin"
+projektSchreiben()
+PRINT "alt weg "; NOT FILEEXISTS(ordner + "/Kunde.dh"); " neu da "; FILEEXISTS(ordner + "/Kundin.dh")
+PRINT "geladen ["; projektLaden$(ordner); "] "; projName; " "; projStart; " "; LEN(elemente); " "; LEN(methoden)
+PRINT elemente[0].art; " "; elemente[1].art; " "; elemente[2].name; " "; elemente[2].dekl
+PRINT methoden[0].el.name; "."; methoden[0].name; " "; methoden[0].rumpf
+PRINT "fehlt ["; projektLaden$(CWD$()); "]"
+--- datei modell_imp.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "{sammlung}/../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../studio/modell.dh"
+IMPORT "{sammlung}/../../studio/projekt.dh"
+--- erwartet
+dateien TRUETRUETRUETRUETRUE
+gitignore _studio/
+|CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+|
+|    SUB Geoeffnet()
+|        PRINT "da"
+|    END SUB
+|END CLASS
+alt weg TRUE neu da TRUE
+geladen [] neu Hauptfenster 3 1
+app fenster Kundin DIM name AS STRING
+Hauptfenster.Geoeffnet PRINT "da"
+fehlt [Im Ordner liegt keine projekt.dhstudio.]
+
+=== ein klick im navigator oeffnet die methode, und getippter code wird gesichert
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, p)
+DIM nx AS INTEGER
+DIM ny AS INTEGER
+(nx, ny) = slLage(m, "knoten Hauptfenster.knopf1_Klick")
+slHin(10, 10)
+slKlick(nx, ny)
+slWarten(6)
+slMit([341], 269)
+slMit([341], 86)
+slWarten(4)
+slMit([341], 83)
+slWarten(6)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_ABLAGE", CHR$(10) + "zaehler = zaehler + 1")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "knoten "; nx > 0
+PRINT "geladen "; slHat(log, "projekt geladen proj 2 1")
+PRINT "vorn "; slHat(log, "vorn code Hauptfenster.knopf1_Klick")
+DIM z AS STRING
+FOR EACH z IN READLINES(p + "/Hauptfenster.dh")
+    IF LEFT$(z, 1) <> "'" THEN PRINT "|"; z
+NEXT
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":520,"h":360,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}]}
+--- datei proj/Hauptfenster.dh
+' Hauptfenster
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM zaehler AS INTEGER
+
+    SUB knopf1_Klick()
+        PRINT "Klick"
+    END SUB
+END CLASS
+--- erwartet
+knoten TRUE
+geladen TRUE
+vorn TRUE
+|CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+|    DIM zaehler AS INTEGER
+|
+|    SUB knopf1_Klick()
+|        PRINT "Klick"
+|        zaehler = zaehler + 1
+|    END SUB
+|END CLASS
+
+=== ein doppelklick auf ein control fuegt ein ereignis hinzu
+' Der Dialog bietet die Ereignisse eines Knopfs an; Enter nimmt das erste
+' (Klick), die Methode entsteht und ihr Code-Reiter kommt nach vorn.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, p)
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(fx, fy) = slLage(m, "fenster")
+slHin(10, 10)
+slKlick(fx + 90, fy + 55)
+slKlick(fx + 90, fy + 55)
+slWarten(10)
+slTaste(257)
+slWarten(10)
+slMit([341], 83)
+slWarten(6)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "dialog "; slHat(log, "ereignisdialog knopf1 Klick,MausRein,MausRaus")
+PRINT "neu "; slHat(log, "ereignis neu Hauptfenster.knopf1_Klick")
+PRINT "vorn "; slHat(log, "vorn code Hauptfenster.knopf1_Klick")
+DIM z AS STRING
+FOR EACH z IN READLINES(p + "/Hauptfenster.dh")
+    IF LEFT$(z, 1) <> "'" THEN PRINT "|"; z
+NEXT
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":520,"h":360,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}]}
+--- erwartet
+dialog TRUE
+neu TRUE
+vorn TRUE
+|CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+|
+|    SUB knopf1_Klick()
+|    END SUB
+|END CLASS
+
+=== das kreuz schliesst einen reiter
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, p)
+DIM nx AS INTEGER
+DIM ny AS INTEGER
+(nx, ny) = slLage(m, "knoten Hauptfenster.knopf1_Klick")
+slHin(10, 10)
+slKlick(nx, ny)
+slWarten(6)
+slAufnahmeSchreiben(CWD$() + "/ev1.txt")
+slStarten(m, CWD$() + "/ev1.txt", slBild + 10, p)
+DIM kx AS INTEGER
+DIM ky AS INTEGER
+(kx, ky) = slLage(m, "kreuz 1")
+slWarten(2)
+slKlick(kx, ky)
+slWarten(6)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "kreuz "; kx > 0
+PRINT "offen "; slHat(log, "vorn code Hauptfenster.knopf1_Klick")
+PRINT "zu "; slHat(log, "reiter zu 1 1")
+DIM z AS ARRAY OF STRING : z = slAnfang(log, "vorn ")
+PRINT "danach "; z[LEN(z) - 1]
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":520,"h":360,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB knopf1_Klick()
+        PRINT "Klick"
+    END SUB
+END CLASS
+--- erwartet
+kreuz TRUE
+offen TRUE
+zu TRUE
+danach vorn layout Hauptfenster
+
+=== ein fenster und eine methode hinzufuegen
+' Strg+N fragt nach dem Namen (Vorschlag Fenster1, Enter nimmt ihn), das
+' neue Fenster kommt vorn. Strg+Umschalt+M: Name aus der Ablage, Enter.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slMit([341], 78)
+slWarten(10)
+slTaste(257)
+slWarten(10)
+slMit([341, 340], 77)
+slWarten(10)
+slMit([341], 86)
+slTaste(257)
+slWarten(10)
+slMit([341], 83)
+slWarten(6)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_ABLAGE", "rechne")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "neues projekt "; slHat(log, "neues projekt proj")
+PRINT "fenster "; slHat(log, "element neu fenster Fenster1"); " "; slHat(log, "vorn layout Fenster1")
+PRINT "methode "; slHat(log, "methode neu Fenster1.rechne | SUB rechne()")
+DIM j AS JSON_HANDLE : j = JSON_LOAD(p + "/projekt.dhstudio")
+PRINT "elemente "; JSON_LEN(j, "elemente"); " "; JSON_GET_STRING(j, "elemente.2.name"); " "; JSON_GET_STRING(j, "elemente.2.layout")
+DIM z AS STRING
+FOR EACH z IN READLINES(p + "/Fenster1.dh")
+    IF LEFT$(z, 1) <> "'" THEN PRINT "|"; z
+NEXT
+PRINT "layout "; FILEEXISTS(p + "/Fenster1.dhform")
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "json"
+slStudio = ARG$(0)
+--- erwartet
+neues projekt TRUE
+fenster TRUE TRUE
+methode TRUE
+elemente 3 Fenster1 Fenster1.dhform
+|CLASS Fenster1 EXTENDS Fenster1_Basis
+|
+|    SUB rechne()
+|    END SUB
+|END CLASS
+layout TRUE
+
+=== den knopf im inspektor umbenennen benennt sein ereignis mit um
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, p)
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(fx, fy) = slLage(m, "fenster")
+slHin(10, 10)
+slKlick(fx + 90, fy + 55)
+slWarten(4)
+slAufnahmeSchreiben(CWD$() + "/ev1.txt")
+slStarten(m, CWD$() + "/ev1.txt", slBild + 10, p)
+DIM nx AS INTEGER
+DIM ny AS INTEGER
+(nx, ny) = slLage(m, "feld name")
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slKlick(fx + 90, fy + 55)
+slWarten(4)
+slKlick(nx, ny)
+slMit([341], 65)
+slMit([341], 86)
+slTaste(257)
+slWarten(4)
+slMit([341], 83)
+slWarten(6)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_ABLAGE", "start")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "umbenannt "; slHat(log, "umbenannt knopf1 start")
+DIM z AS STRING
+FOR EACH z IN READLINES(p + "/Hauptfenster.dh")
+    IF LEFT$(z, 1) <> "'" THEN PRINT "|"; z
+NEXT
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":520,"h":360,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB knopf1_Klick()
+        knopf1.text = "gedrueckt"
+    END SUB
+END CLASS
+--- erwartet
+umbenannt TRUE
+|CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+|
+|    SUB start_Klick()
+|        start.text = "gedrueckt"
+|    END SUB
+|END CLASS

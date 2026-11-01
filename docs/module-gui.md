@@ -197,6 +197,7 @@ IMPORT "gui"
 | `GUI_TREE_CLEAR(tree)` | — | alle Knoten löschen |
 | `GUI_TREE_SELECTED(tree)` / `GUI_TREE_SET_SELECTED(tree, node)` | INT / — | gewählten Knoten lesen/setzen (-1 = keiner) |
 | `GUI_TREE_LABEL(tree, node)` | STRING | Text eines Knotens |
+| `GUI_TREE_ITEM_RECT(tree, node)` | TUPLE | (x, y, b, h) eines Knotens auf dem Bildschirm, x am Anfang der Beschriftung; unter einem zugeklappten (0, 0, 0, 0) -- für Prüfungen mit echten Klicks |
 | `GUI_TREE_EXPAND(tree, node, flag)` | — | Knoten auf-/zuklappen |
 | `GUI_TREE_SET(tree, key$, wert)` | — | Einstellung am Baum: `mehrfachauswahl`, `kaestchen`, `bearbeitbar` (F2 benennt um) |
 | `GUI_TREE_EDIT(tree, node)` | — | Knoten umbenennen: Eingabefeld über dem Namen, alles markiert (nicht beim Dateibaum) |
@@ -233,6 +234,8 @@ IMPORT "gui"
 | `GUI_TABCONTROL_COUNT(tc)` | INTEGER | wie viele Seiten es gibt |
 | `GUI_TABCONTROL_TITLE$(tc, i)` / `GUI_TABCONTROL_SET_TITLE(tc, i, titel$)` | STRING / — | Beschriftung einer Seite lesen und setzen |
 | `GUI_TABCONTROL_REMOVE(tc, i)` | — | eine Seite entfernen; ihre Kinder bleiben als Widgets bestehen |
+| `GUI_TABCONTROL_SET(tc, "schliessbar", an)` | — | jeder Reiter bekommt ein Kreuz; geschlossen wird nichts, gemeldet wird über `GUI_TABCONTROL_CLOSED` |
+| `GUI_TABCONTROL_CLOSED(tc)` | INTEGER | welche Seite in diesem Bild zu soll (Kreuz oder mittlere Maustaste), -1 = keine; das Programm entfernt sie selbst |
 | `GUI_RICHTEXT(win, x, y, w, h, text$ = "")` | GUI_WIDGET | **gesetzter Text**: Markdown wird gesetzt statt nur angezeigt |
 | `GUI_RICHTEXT_SET_TEXT(rt, text$)` | — | neuen Markdown-Quelltext setzen (`GUI_SET_TEXT` tut dasselbe) |
 | `GUI_RICHTEXT_SET(rt, key$, wert)` | — | `groesse` (Grundschrift), `codeschrift` (FONT-Handle für Codeblöcke) und die Farben der Codeblöcke `farbe_kommentar`/`farbe_text`/`farbe_zahl`/`farbe_schluessel`/`farbe_name`/`farbe_operator` (-1 = Vorgabe passend zum Grund) |

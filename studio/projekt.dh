@@ -1,0 +1,567 @@
+' ============================================================
+'  Drachenhauch Studio -- das Projekt
+' ============================================================
+'  Ein Projekt ist ein Ordner mit lesbaren Dateien:
+'
+'    projekt.dhstudio      Name, Startfenster, Elemente (JSON)
+'    App.dh                CLASS App EXTENDS StudioApp
+'    Hauptfenster.dhform   das Layout (wie GUI_SAVE es schreibt)
+'    Hauptfenster.dh       CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+'    Werkzeuge.dh          ein Modul: SUBs und FUNCTIONs
+'    Kunde.dh              eine Klasse
+'
+'  Im Speicher ist ein Element zerlegt: Methoden (SUB/FUNCTION) einzeln,
+'  alles andere (DIM, CONST, PROPERTY, Kommentare zwischen den Methoden) als
+'  "Eigenschaften". Beim Sichern wird die Datei daraus wieder gesetzt. Was
+'  vor CLASS und hinter END CLASS steht, bleibt wortwoertlich stehen.
+' ============================================================
+
+CONST PROJEKT_DATEI = "projekt.dhstudio"
+
+CLASS Element
+    DIM art AS STRING          ' app, fenster, modul, klasse
+    DIM name AS STRING
+    DIM basis AS STRING        ' EXTENDS einer Klasse (leer = keine)
+    DIM layout AS STRING       ' das Layout eines Fensters als JSON-Text
+    DIM verlauf AS STRING      ' seine Rueckgaengig-Staende, solange es nicht vorn ist
+    DIM verlaufPos AS INTEGER
+    DIM dekl AS STRING         ' Zeilen ausserhalb der Methoden
+    DIM vorspann AS STRING     ' was vor CLASS steht (bei Modulen: vor der ersten Zeile)
+    DIM nachspann AS STRING    ' was hinter END CLASS steht
+    DIM gesichertAls AS STRING ' unter welchem Namen die Dateien liegen (leer = noch nie)
+    DIM geaendert AS BOOLEAN
+END CLASS
+
+CLASS Methode
+    DIM el AS Element
+    DIM art AS STRING          ' sub, function
+    DIM name AS STRING
+    DIM kopf AS STRING         ' die Kopfzeile, z.B. "SUB knopf1_Klick()"
+    DIM rumpf AS STRING        ' die Zeilen dazwischen, ohne Einrueckung der Ebene
+    DIM vorspann AS STRING     ' Kommentarzeilen direkt darueber
+END CLASS
+
+DIM elemente AS ARRAY OF Element : elemente = []
+DIM methoden AS ARRAY OF Methode : methoden = []
+DIM projOrdner AS STRING : projOrdner = ""       ' leer = noch nie gesichert
+DIM projName AS STRING : projName = "Projekt"
+DIM projStart AS STRING : projStart = ""
+DIM projLose AS BOOLEAN : projLose = FALSE      ' ein einzelnes .dhform ohne Projekt
+DIM projGeaendert AS BOOLEAN : projGeaendert = FALSE
+DIM aktFenster AS INTEGER : aktFenster = -1     ' Element, dessen Layout in `doc` steht
+
+' --- Namen ---------------------------------------------------------------------
+FUNCTION elementIndex(name AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(elemente) - 1
+        IF LOWER$(elemente[i].name) = LOWER$(name) THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION methodeIndex(e AS Element, name AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(methoden) - 1
+        IF methoden[i].el = e AND LOWER$(methoden[i].name) = LOWER$(name) THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION elementNameFrei$(grund AS STRING) AS STRING
+    DIM n AS INTEGER : n = 1
+    WHILE elementIndex(grund + STR$(n)) >= 0
+        n = n + 1
+    WEND
+    RETURN grund + STR$(n)
+END FUNCTION
+
+FUNCTION artText$(art AS STRING) AS STRING
+    SELECT CASE art
+        CASE "app" : RETURN "Anwendung"
+        CASE "fenster" : RETURN "Fenster"
+        CASE "modul" : RETURN "Modul"
+        CASE "klasse" : RETURN "Klasse"
+    END SELECT
+    RETURN art
+END FUNCTION
+
+FUNCTION artSymbol$(art AS STRING) AS STRING
+    SELECT CASE art
+        CASE "app" : RETURN "start"
+        CASE "fenster" : RETURN "fenster"
+        CASE "modul" : RETURN "datei"
+        CASE "klasse" : RETURN "ordner"
+    END SELECT
+    RETURN "datei"
+END FUNCTION
+
+' Wovon die Klasse eines Elements ableitet. Ein Fenster leitet von seiner
+' Basisklasse ab, die Stufe 3 erzeugt; die App von StudioApp.
+FUNCTION basisVon$(e AS Element) AS STRING
+    SELECT CASE e.art
+        CASE "fenster" : RETURN e.name + "_Basis"
+        CASE "app" : RETURN "StudioApp"
+    END SELECT
+    RETURN e.basis
+END FUNCTION
+
+' --- Anlegen -------------------------------------------------------------------
+FUNCTION elementNeu(art AS STRING, name AS STRING) AS Element
+    DIM e AS Element : e = NEW Element()
+    e.art = art
+    e.name = name
+    e.verlaufPos = -1
+    e.geaendert = TRUE
+    IF art = "fenster" THEN
+        DIM d AS JSON_HANDLE : d = JSON_PARSE(leeresFenster$())
+        JSON_SET_STRING(d, "name", name)
+        JSON_SET_STRING(d, "title", name)
+        e.layout = JSON_STRINGIFY(d)
+    END IF
+    ARRAY_PUSH(elemente, e)
+    projGeaendert = TRUE
+    RETURN e
+END FUNCTION
+
+FUNCTION methodeNeu(e AS Element, art AS STRING, name AS STRING, kopf AS STRING) AS Methode
+    DIM m AS Methode : m = NEW Methode()
+    m.el = e
+    m.art = art
+    m.name = name
+    m.kopf = kopf
+    m.rumpf = ""
+    m.vorspann = ""
+    ARRAY_PUSH(methoden, m)
+    e.geaendert = TRUE
+    RETURN m
+END FUNCTION
+
+SUB methodeLoeschen(m AS Methode)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(methoden) - 1
+        IF methoden[i] = m THEN
+            m.el.geaendert = TRUE
+            ARRAY_REMOVE_AT(methoden, i)
+            RETURN
+        END IF
+    NEXT
+END SUB
+
+SUB projektLeeren()
+    elemente = []
+    methoden = []
+    projOrdner = ""
+    projName = "Projekt"
+    projStart = ""
+    projLose = FALSE
+    projGeaendert = FALSE
+    aktFenster = -1
+END SUB
+
+' Ein neues Projekt: die App und ein Fenster, wie in Xojo.
+SUB projektNeu(ordner AS STRING)
+    projektLeeren()
+    projOrdner = ordner
+    IF ordner <> "" THEN projName = BASENAME(ordner)
+    DIM a AS Element : a = elementNeu("app", "App")
+    DIM f AS Element : f = elementNeu("fenster", "Hauptfenster")
+    projStart = "Hauptfenster"
+    projGeaendert = TRUE
+END SUB
+
+' --- Code zerlegen ------------------------------------------------------------
+' Ob eine Zeile eine Methode beginnt: (art, name) oder ("", "").
+FUNCTION kopfArt$(zeile AS STRING) AS STRING
+    DIM z AS STRING : z = UPPER$(TRIM$(zeile))
+    IF LEFT$(z, 8) = "PRIVATE " THEN z = TRIM$(MID$(z, 8, LEN(z)))
+    IF LEFT$(z, 4) = "SUB " THEN RETURN "sub"
+    IF LEFT$(z, 9) = "FUNCTION " THEN RETURN "function"
+    RETURN ""
+END FUNCTION
+
+FUNCTION kopfName$(zeile AS STRING) AS STRING
+    DIM t AS STRING : t = TRIM$(zeile)
+    DIM tr AS ARRAY OF STRING : tr = REGEX_SPLIT(t, "[\s(]+")
+    DIM k AS INTEGER : k = 1
+    IF UPPER$(tr[0]) = "PRIVATE" THEN k = 2
+    IF k < LEN(tr) THEN RETURN tr[k]
+    RETURN ""
+END FUNCTION
+
+FUNCTION istEnde(zeile AS STRING, art AS STRING) AS BOOLEAN
+    RETURN REGEX_TEST(UPPER$(TRIM$(zeile)), "^END\s+" + UPPER$(art) + "\b")
+END FUNCTION
+
+' Die kleinste Einrueckung der nicht leeren Zeilen wegnehmen.
+FUNCTION ausruecken$(zeilen AS ARRAY OF STRING) AS STRING
+    DIM minE AS INTEGER : minE = 1000
+    DIM z AS STRING
+    FOR EACH z IN zeilen
+        IF TRIM$(z) = "" THEN CONTINUE
+        DIM e AS INTEGER : e = LEN(z) - LEN(LTRIM$(z))
+        IF e < minE THEN minE = e
+    NEXT
+    IF minE = 1000 THEN minE = 0
+    DIM aus AS ARRAY OF STRING : aus = []
+    FOR EACH z IN zeilen
+        IF TRIM$(z) = "" THEN ARRAY_PUSH(aus, "") ELSE ARRAY_PUSH(aus, MID$(z, minE, LEN(z)))
+    NEXT
+    ' Leerzeilen am Anfang und am Ende gehoeren zur Trennung, nicht zum Rumpf.
+    WHILE LEN(aus) > 0
+        IF aus[0] <> "" THEN BREAK
+        ARRAY_REMOVE_AT(aus, 0)
+    WEND
+    WHILE LEN(aus) > 0
+        IF aus[LEN(aus) - 1] <> "" THEN BREAK
+        ARRAY_REMOVE_AT(aus, LEN(aus) - 1)
+    WEND
+    RETURN JOIN$(aus, CHR$(10))
+END FUNCTION
+
+FUNCTION einruecken$(text AS STRING, tiefe AS INTEGER) AS STRING
+    IF text = "" THEN RETURN ""
+    DIM vor AS STRING : vor = SPACE$(tiefe)
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM z AS STRING
+    FOR EACH z IN SPLIT(text, CHR$(10))
+        IF TRIM$(z) = "" THEN ARRAY_PUSH(aus, "") ELSE ARRAY_PUSH(aus, vor + z)
+    NEXT
+    RETURN JOIN$(aus, CHR$(10))
+END FUNCTION
+
+' Den Quelltext eines Elements in Methoden und Eigenschaften zerlegen.
+SUB codeZerlegen(e AS Element, quelle AS STRING)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT(REPLACE$(quelle, CHR$(13), ""), CHR$(10))
+    DIM klasse AS BOOLEAN : klasse = e.art <> "modul"
+    DIM i AS INTEGER : i = 0
+    DIM n AS INTEGER : n = LEN(zeilen)
+    e.vorspann = "" : e.nachspann = "" : e.dekl = ""
+    IF klasse THEN
+        ' Bis zur CLASS-Zeile: Vorspann.
+        DIM vor AS ARRAY OF STRING : vor = []
+        WHILE i < n
+            IF REGEX_TEST(UPPER$(TRIM$(zeilen[i])), "^CLASS\s") THEN BREAK
+            ARRAY_PUSH(vor, zeilen[i])
+            i = i + 1
+        WEND
+        IF i >= n THEN
+            ' Keine Klasse in der Datei: alles als Eigenschaften.
+            e.dekl = ausruecken$(zeilen)
+            RETURN
+        END IF
+        e.vorspann = JOIN$(vor, CHR$(10))
+        DIM kz AS STRING : kz = TRIM$(zeilen[i])
+        DIM ext AS INTEGER : ext = INSTR(UPPER$(kz), " EXTENDS ")
+        IF ext >= 0 AND e.art = "klasse" THEN e.basis = TRIM$(MID$(kz, ext + 9, LEN(kz)))
+        i = i + 1
+    ELSE
+        ' Ein Modul: die Kommentarzeilen ganz oben sind sein Vorspann -- ausser
+        ' sie stehen direkt ueber einer Methode, dann gehoeren sie zu ihr.
+        DIM j AS INTEGER : j = 0
+        WHILE j < n
+            IF LEFT$(TRIM$(zeilen[j]), 1) <> "'" THEN BREAK
+            j = j + 1
+        WEND
+        IF j > 0 AND j < n THEN
+            IF kopfArt$(zeilen[j]) = "" THEN
+                DIM kv AS ARRAY OF STRING : kv = []
+                DIM q AS INTEGER
+                FOR q = 0 TO j - 1
+                    ARRAY_PUSH(kv, zeilen[q])
+                NEXT
+                e.vorspann = JOIN$(kv, CHR$(10))
+                i = j
+            END IF
+        END IF
+    END IF
+    DIM dekl AS ARRAY OF STRING : dekl = []
+    DIM kommentare AS ARRAY OF STRING : kommentare = []
+    WHILE i < n
+        DIM z AS STRING : z = zeilen[i]
+        DIM zt AS STRING : zt = UPPER$(TRIM$(z))
+        IF klasse AND REGEX_TEST(zt, "^END\s+CLASS\b") THEN
+            DIM nach AS ARRAY OF STRING : nach = []
+            DIM j AS INTEGER
+            FOR j = i + 1 TO n - 1
+                ARRAY_PUSH(nach, zeilen[j])
+            NEXT
+            e.nachspann = JOIN$(nach, CHR$(10))
+            BREAK
+        END IF
+        DIM art AS STRING : art = kopfArt$(z)
+        IF art <> "" THEN
+            DIM m AS Methode : m = NEW Methode()
+            m.el = e
+            m.art = art
+            m.name = kopfName$(z)
+            m.kopf = TRIM$(z)
+            m.vorspann = ausruecken$(kommentare)
+            kommentare = []
+            DIM rumpf AS ARRAY OF STRING : rumpf = []
+            i = i + 1
+            WHILE i < n
+                IF istEnde(zeilen[i], art) THEN BREAK
+                ARRAY_PUSH(rumpf, zeilen[i])
+                i = i + 1
+            WEND
+            m.rumpf = ausruecken$(rumpf)
+            ARRAY_PUSH(methoden, m)
+            i = i + 1
+            CONTINUE
+        END IF
+        ' Kommentarzeilen direkt vor einer Methode gehoeren zu ihr -- erst
+        ' sammeln, bei etwas anderem zu den Eigenschaften geben.
+        IF LEFT$(zt, 1) = "'" THEN
+            ARRAY_PUSH(kommentare, z)
+        ELSE
+            DIM k AS STRING
+            FOR EACH k IN kommentare
+                ARRAY_PUSH(dekl, k)
+            NEXT
+            kommentare = []
+            ARRAY_PUSH(dekl, z)
+        END IF
+        i = i + 1
+    WEND
+    DIM k2 AS STRING
+    FOR EACH k2 IN kommentare
+        ARRAY_PUSH(dekl, k2)
+    NEXT
+    e.dekl = ausruecken$(dekl)
+END SUB
+
+' Der Kopf, den eine neue Datei bekommt.
+FUNCTION standardVorspann$(e AS Element) AS STRING
+    SELECT CASE e.art
+        CASE "fenster"
+            RETURN "' " + e.name + " -- der Code des Fensters. Die Controls, ihr Aufbau und die" + CHR$(10) + _
+                   "' Verdrahtung der Ereignisse stehen in der Basisklasse, die das Studio" + CHR$(10) + _
+                   "' erzeugt (_studio/" + e.name + "_basis.dh)."
+        CASE "app"
+            RETURN "' Die Anwendung: was beim Start und beim Beenden geschieht."
+        CASE "modul"
+            RETURN "' Modul " + e.name + ": SUBs und FUNCTIONs fuer das ganze Projekt."
+    END SELECT
+    RETURN "' Klasse " + e.name + "."
+END FUNCTION
+
+' Den Quelltext eines Elements aus seinen Teilen setzen.
+FUNCTION codeSetzen$(e AS Element) AS STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM klasse AS BOOLEAN : klasse = e.art <> "modul"
+    DIM tiefe AS INTEGER : tiefe = IIF(klasse, 4, 0)
+    DIM vor AS STRING : vor = e.vorspann
+    IF TRIM$(vor) = "" THEN vor = standardVorspann$(e)
+    ARRAY_PUSH(aus, vor)
+    IF klasse THEN
+        DIM kz AS STRING : kz = "CLASS " + e.name
+        IF basisVon$(e) <> "" THEN kz = kz + " EXTENDS " + basisVon$(e)
+        ARRAY_PUSH(aus, kz)
+    END IF
+    IF e.dekl <> "" THEN
+        ARRAY_PUSH(aus, einruecken$(e.dekl, tiefe))
+    END IF
+    DIM m AS Methode
+    FOR EACH m IN methoden
+        IF NOT (m.el = e) THEN CONTINUE
+        ARRAY_PUSH(aus, "")
+        IF m.vorspann <> "" THEN ARRAY_PUSH(aus, einruecken$(m.vorspann, tiefe))
+        ARRAY_PUSH(aus, SPACE$(tiefe) + m.kopf)
+        IF m.rumpf <> "" THEN ARRAY_PUSH(aus, einruecken$(m.rumpf, tiefe + 4))
+        ARRAY_PUSH(aus, SPACE$(tiefe) + "END " + UPPER$(m.art))
+    NEXT
+    IF klasse THEN
+        ARRAY_PUSH(aus, "END CLASS")
+        IF e.nachspann <> "" THEN ARRAY_PUSH(aus, e.nachspann)
+    END IF
+    RETURN JOIN$(aus, CHR$(10)) + CHR$(10)
+END FUNCTION
+
+' --- Lesen und Schreiben -------------------------------------------------------
+FUNCTION codeDatei$(e AS Element) AS STRING
+    RETURN e.name + ".dh"
+END FUNCTION
+
+FUNCTION layoutDatei$(e AS Element) AS STRING
+    RETURN e.name + ".dhform"
+END FUNCTION
+
+' Liefert "" oder die Fehlermeldung.
+FUNCTION projektLaden$(ordner AS STRING) AS STRING
+    DIM pfad AS STRING : pfad = PATHJOIN(ordner, PROJEKT_DATEI)
+    IF NOT FILEEXISTS(pfad) THEN RETURN "Im Ordner liegt keine " + PROJEKT_DATEI + "."
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_LOAD(pfad)
+    CATCH fehler
+        RETURN PROJEKT_DATEI + " ist kein gültiges JSON: " + fehler
+    END TRY
+    projektLeeren()
+    projOrdner = ordner
+    projName = IIF(JSON_HAS(j, "name"), JSON_GET_STRING(j, "name"), BASENAME(ordner))
+    projStart = IIF(JSON_HAS(j, "start"), JSON_GET_STRING(j, "start"), "")
+    IF NOT JSON_HAS(j, "elemente") THEN RETURN ""
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(j, "elemente") - 1
+        DIM p AS STRING : p = "elemente." + STR$(k)
+        DIM e AS Element : e = NEW Element()
+        e.art = JSON_GET_STRING(j, p + ".art")
+        e.name = JSON_GET_STRING(j, p + ".name")
+        e.verlaufPos = -1
+        e.gesichertAls = e.name
+        DIM cd AS STRING : cd = PATHJOIN(ordner, codeDatei$(e))
+        IF e.art = "fenster" THEN
+            DIM lp AS STRING : lp = PATHJOIN(ordner, layoutDatei$(e))
+            IF FILEEXISTS(lp) THEN
+                DIM d AS JSON_HANDLE : d = JSON_LOAD(lp)
+                IF NOT JSON_HAS(d, "widgets") THEN JSON_SET_JSON(d, "widgets", JSON_NEW_ARRAY())
+                JSON_SET_STRING(d, "name", e.name)
+                e.layout = JSON_STRINGIFY(d)
+            ELSE
+                DIM d2 AS JSON_HANDLE : d2 = JSON_PARSE(leeresFenster$())
+                JSON_SET_STRING(d2, "name", e.name)
+                e.layout = JSON_STRINGIFY(d2)
+            END IF
+        END IF
+        ARRAY_PUSH(elemente, e)
+        IF FILEEXISTS(cd) THEN codeZerlegen(e, JOIN$(READLINES(cd), CHR$(10)))
+    NEXT
+    RETURN ""
+END FUNCTION
+
+FUNCTION projektJson$() AS STRING
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    JSON_SET_STRING(j, "format", "drachenhauch-studio")
+    JSON_SET_INT(j, "fassung", 1)
+    JSON_SET_STRING(j, "name", projName)
+    JSON_SET_STRING(j, "start", projStart)
+    JSON_SET_JSON(j, "elemente", JSON_NEW_ARRAY())
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(elemente) - 1
+        DIM e AS Element : e = elemente[k]
+        DIM o AS JSON_HANDLE : o = JSON_PARSE("{}")
+        JSON_SET_STRING(o, "art", e.art)
+        JSON_SET_STRING(o, "name", e.name)
+        JSON_SET_STRING(o, "code", codeDatei$(e))
+        IF e.art = "fenster" THEN JSON_SET_STRING(o, "layout", layoutDatei$(e))
+        JSON_APPEND_JSON(j, "elemente", o)
+    NEXT
+    RETURN JSON_PRETTY(j)
+END FUNCTION
+
+' Alles in den Ordner schreiben. Ein umbenanntes Element nimmt seine alten
+' Dateien weg, nachdem die neuen stehen.
+SUB projektSchreiben()
+    IF NOT DIREXISTS(projOrdner) THEN MKDIR(projOrdner)
+    WRITEALL(PATHJOIN(projOrdner, PROJEKT_DATEI), projektJson$())
+    DIM gi AS STRING : gi = PATHJOIN(projOrdner, ".gitignore")
+    IF NOT FILEEXISTS(gi) THEN WRITEALL(gi, "_studio/" + CHR$(10))
+    DIM e AS Element
+    FOR EACH e IN elemente
+        WRITEALL(PATHJOIN(projOrdner, codeDatei$(e)), codeSetzen$(e))
+        IF e.art = "fenster" THEN
+            WRITEALL(PATHJOIN(projOrdner, layoutDatei$(e)), JSON_PRETTY(JSON_PARSE(e.layout)))
+        END IF
+        IF e.gesichertAls <> "" AND LOWER$(e.gesichertAls) <> LOWER$(e.name) THEN
+            DIM alt AS STRING : alt = PATHJOIN(projOrdner, e.gesichertAls + ".dh")
+            IF FILEEXISTS(alt) THEN DELETEFILE(alt)
+            alt = PATHJOIN(projOrdner, e.gesichertAls + ".dhform")
+            IF FILEEXISTS(alt) THEN DELETEFILE(alt)
+        END IF
+        e.gesichertAls = e.name
+        e.geaendert = FALSE
+    NEXT
+    projGeaendert = FALSE
+END SUB
+
+' --- Ereignisse ------------------------------------------------------------------
+' Je Art die Ereignisse, die ein Control hat. Der Name der Methode ist
+' <Control>_<Ereignis>; die Basisklasse (Stufe 3) verdrahtet sie.
+FUNCTION ereignisseFuer(kind AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    SELECT CASE kind
+        CASE "button", "iconbutton", "card"
+            aus = ["Klick"]
+        CASE "checkbox", "toggle", "radio"
+            aus = ["Klick", "Geaendert"]
+        CASE "textinput"
+            aus = ["Geaendert", "Enter", "FokusRein", "FokusRaus"]
+        CASE "textarea"
+            aus = ["Geaendert", "FokusRein", "FokusRaus"]
+        CASE "listbox", "tree"
+            aus = ["Geaendert", "Doppelklick"]
+        CASE "slider", "spinner", "dropdown", "colorpicker", "datepicker", "timepicker", "tabcontrol", "table"
+            aus = ["Geaendert"]
+        CASE "canvas"
+            aus = ["Zeichnen", "Maus"]
+        CASE "fenster"
+            RETURN ["Geoeffnet", "Schliessen", "Groesse"]
+        CASE "app"
+            RETURN ["Geoeffnet", "Beenden"]
+    END SELECT
+    ARRAY_PUSH(aus, "MausRein")
+    ARRAY_PUSH(aus, "MausRaus")
+    RETURN aus
+END FUNCTION
+
+FUNCTION ereignisBeschreibung$(ereignis AS STRING) AS STRING
+    SELECT CASE ereignis
+        CASE "Klick" : RETURN "wenn es angeklickt wird"
+        CASE "Geaendert" : RETURN "wenn sich sein Wert durch die Bedienung ändert"
+        CASE "Enter" : RETURN "wenn im Feld Enter gedrückt wird"
+        CASE "FokusRein" : RETURN "wenn es den Tastaturfokus bekommt"
+        CASE "FokusRaus" : RETURN "wenn es den Tastaturfokus abgibt"
+        CASE "Doppelklick" : RETURN "bei einem Doppelklick auf einen Eintrag"
+        CASE "Zeichnen" : RETURN "in jedem Bild, um die Fläche zu bemalen"
+        CASE "Maus" : RETURN "wenn die Maus auf der Fläche gedrückt wird"
+        CASE "MausRein" : RETURN "wenn die Maus darüber kommt"
+        CASE "MausRaus" : RETURN "wenn die Maus es verlässt"
+        CASE "Geoeffnet" : RETURN "nachdem es aufgebaut ist"
+        CASE "Schliessen" : RETURN "wenn es geschlossen werden soll"
+        CASE "Groesse" : RETURN "wenn sich seine Größe ändert"
+        CASE "Beenden" : RETURN "bevor das Programm endet"
+    END SELECT
+    RETURN ""
+END FUNCTION
+
+' Gehoert eine Methode zu einem Control? (Name = <control>_<Ereignis>)
+FUNCTION ereignisVon$(mname AS STRING, control AS STRING) AS STRING
+    DIM p AS STRING : p = LOWER$(control) + "_"
+    IF LEFT$(LOWER$(mname), LEN(p)) <> p THEN RETURN ""
+    RETURN MID$(mname, LEN(p), LEN(mname))
+END FUNCTION
+
+' Die Namen und Arten der Controls eines Fensters -- aus `doc`, wenn es
+' vorn ist, sonst aus seinem gemerkten Layout.
+DIM ctrlNamen AS ARRAY OF STRING : ctrlNamen = []
+DIM ctrlArten AS ARRAY OF STRING : ctrlArten = []
+SUB controlsVon(ei AS INTEGER)
+    ctrlNamen = [] : ctrlArten = []
+    DIM d AS JSON_HANDLE
+    IF ei = aktFenster THEN d = doc ELSE d = JSON_PARSE(elemente[ei].layout)
+    IF NOT JSON_HAS(d, "widgets") THEN RETURN
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(d, "widgets") - 1
+        DIM p AS STRING : p = "widgets." + STR$(i)
+        ARRAY_PUSH(ctrlNamen, IIF(JSON_HAS(d, p + ".name"), JSON_GET_STRING(d, p + ".name"), ""))
+        ARRAY_PUSH(ctrlArten, JSON_GET_STRING(d, p + ".kind"))
+    NEXT
+END SUB
+
+' Benennt ein Control um: seine Ereignis-Methoden ziehen mit, und im Code
+' des Fensters wird jeder Name `alt` als ganzes Wort ersetzt.
+SUB controlUmbenannt(e AS Element, alt AS STRING, neu AS STRING)
+    IF alt = "" OR LOWER$(alt) = LOWER$(neu) THEN RETURN
+    DIM m AS Methode
+    FOR EACH m IN methoden
+        IF NOT (m.el = e) THEN CONTINUE
+        DIM ev AS STRING : ev = ereignisVon$(m.name, alt)
+        IF ev <> "" THEN
+            m.name = neu + "_" + ev
+            m.kopf = REGEX_REPLACE(m.kopf, "(?i)\b" + REGEX_ESCAPE$(alt) + "_", neu + "_")
+        END IF
+        m.rumpf = REGEX_REPLACE(m.rumpf, "(?i)\b" + REGEX_ESCAPE$(alt) + "\b", neu)
+    NEXT
+    e.dekl = REGEX_REPLACE(e.dekl, "(?i)\b" + REGEX_ESCAPE$(alt) + "\b", neu)
+    e.geaendert = TRUE
+END SUB

@@ -213,3 +213,123 @@ DHRT_FRAMES=22
 --- erwartet
 2
 1
+
+=== ein kreuz meldet den reiter, schliesst ihn aber nicht
+' Mit "schliessbar" ist jeder Kopf 16 breiter: der erste reicht von 31 bis 99,
+' sein Kreuz liegt bei 82..90. Ein Klick darauf meldet GENAU ein Bild lang
+' die Seite 0, die vordere Seite bleibt, und keine Seite verschwindet --
+' entfernen muss das Programm. Gegenprobe im naechsten Fall: ohne den
+' Schalter trifft derselbe Klick den zweiten Kopf.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM tc AS GUI_WIDGET : tc = GUI_TABCONTROL(w, 20, 20, 300, 200)
+GUI_TABCONTROL_SET(tc, "schliessbar", TRUE)
+GUI_TABCONTROL_ADD(tc, "eins")
+GUI_TABCONTROL_ADD(tc, "zwei")
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF GUI_TABCONTROL_CLOSED(tc) >= 0 THEN PRINT "zu "; GUI_TABCONTROL_CLOSED(tc)
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT GUI_TABCONTROL_PAGE(tc); " "; GUI_TABCONTROL_COUNT(tc)
+PRINT INSTR(GUI_TO_JSON(w), CHR$(34) + "schliessbar" + CHR$(34)) >= 0
+--- datei ev.txt
+c 4
+e 3 7 86 66 0 0
+e 4 7 86 66 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+zu 0
+0 2
+TRUE
+
+=== ohne kreuz trifft derselbe klick den zweiten kopf
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM tc AS GUI_WIDGET : tc = GUI_TABCONTROL(w, 20, 20, 300, 200)
+GUI_TABCONTROL_ADD(tc, "eins")
+GUI_TABCONTROL_ADD(tc, "zwei")
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF GUI_TABCONTROL_CLOSED(tc) >= 0 THEN PRINT "zu "; GUI_TABCONTROL_CLOSED(tc)
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT GUI_TABCONTROL_PAGE(tc)
+--- datei ev.txt
+c 4
+e 3 7 86 66 0 0
+e 4 7 86 66 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+1
+
+=== die mittlere taste schliesst den reiter unter der maus
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM tc AS GUI_WIDGET : tc = GUI_TABCONTROL(w, 20, 20, 300, 200)
+GUI_TABCONTROL_SET(tc, "schliessbar", 1)
+GUI_TABCONTROL_ADD(tc, "eins")
+GUI_TABCONTROL_ADD(tc, "zwei")
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF GUI_TABCONTROL_CLOSED(tc) >= 0 THEN
+        PRINT "zu "; GUI_TABCONTROL_CLOSED(tc)
+        GUI_TABCONTROL_REMOVE(tc, GUI_TABCONTROL_CLOSED(tc))
+    END IF
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT GUI_TABCONTROL_COUNT(tc); " "; GUI_TABCONTROL_TITLE$(tc, 0)
+--- datei ev.txt
+c 4
+e 3 7 120 66 0 0
+e 4 7 120 66 0 0
+e 4 6 2 0 0 0
+e 5 5 2 0 0 0
+
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+zu 1
+1 eins
+
+=== ein unbekannter schluessel nennt den bekannten
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tc AS GUI_WIDGET : tc = GUI_TABCONTROL(w, 20, 20, 300, 200)
+GUI_TABCONTROL_SET(tc, "farbe", 1)
+--- umgebung
+DHRT_FRAMES=1
+--- fehler
+bekannt: schliessbar

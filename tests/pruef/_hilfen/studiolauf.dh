@@ -104,7 +104,16 @@ FUNCTION slStarten(log AS STRING, aufnahme AS STRING, bilder AS INTEGER, datei A
         END IF
         SLEEP(20)
     WEND
-    RETURN REPLACE$(aus, CHR$(13), "")
+    aus = REPLACE$(aus, CHR$(13), "")
+    ' Ohne Protokoll ist das Studio gar nicht erst hochgekommen (auf einem
+    ' Rechner ohne Fenster etwa). Dann die Ausgabe zeigen und aufhoeren:
+    ' der Laeufer erkennt daran "kein Fenster" und uebergeht den Fall,
+    ' statt dass er spaeter an einer fehlenden Datei scheitert.
+    IF NOT FILEEXISTS(log) THEN
+        PRINT aus
+        EXIT(0)
+    END IF
+    RETURN aus
 END FUNCTION
 
 FUNCTION slProtokoll(log AS STRING) AS ARRAY OF STRING

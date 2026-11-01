@@ -5,9 +5,11 @@
 '  Laufzeit dhrt. Entwurf: docs/entwurf-studio.md. Stufe 1: das Fenster
 '  entwerfen -- Bibliothek mit Sinnbildern, Entwurfsflaeche mit Griffen,
 '  Ausrichtungslinien und Rueckgaengig, Inspektor mit Gruppen und echten
-'  Editoren, Navigator. Projekte, Code und Starten folgen in Stufe 2 und 3.
+'  Editoren, Navigator. Stufe 2: Projekte als Ordner, mehrere Fenster,
+'  Module und Klassen, Ereignisse und ein Code-Feld je Methode. Starten
+'  folgt in Stufe 3.
 '
-'  Aufruf:  dhrt run studio/studio.dh [-- fenster.dhform]
+'  Aufruf:  dhrt run studio/studio.dh [-- projektordner | fenster.dhform]
 '  Test:    DH_STUDIO_LOG=<datei> protokolliert die Ereignisse zeilenweise.
 ' ============================================================
 IMPORT "gui"
@@ -25,10 +27,12 @@ SUB protokoll(text AS STRING)
 END SUB
 
 IMPORT "modell.dh"
+IMPORT "projekt.dh"
 IMPORT "bibliothek.dh"
 IMPORT "entwurf.dh"
 IMPORT "inspektor.dh"
 IMPORT "oberflaeche.dh"
+IMPORT "code.dh"
 
 ' Fuer Pruefungen: DH_STUDIO_GROESSE=BxH haelt das Fenster fest (sonst haengen
 ' alle Lagen am Bildschirm), DH_STUDIO_AUFNAHME spielt eine Aufnahme ab,
@@ -95,57 +99,160 @@ SUB punkteRechnen()
 END SUB
 
 ' --- Datei ------------------------------------------------------------------
-SUB neuesFenster()
-    doc = JSON_PARSE(leeresFenster$())
-    formPfad = ""
-    auswahlSetzen(-1)
-    staende = [] : standPos = -1
-    merken()
-    geaendert = FALSE
-    nachAenderung(FALSE)
-    lageAnzeigen()
-    status("Neues Fenster. Bausteine aus der Bibliothek ins Fenster ziehen.")
+' Ein neues Projekt im Speicher; gesichert wird es in einen Ordner.
+SUB projektAnfangen(ordner AS STRING)
+    alleReiterZu()
+    projektNeu(ordner)
+    nachLaden()
+    status(IIF(ordner = "", "Neues Projekt. Bausteine aus der Bibliothek ins Fenster ziehen.", "Neues Projekt in " + ordner + "."))
     protokoll("neu-fenster")
+    protokoll("neues projekt " + projName)
 END SUB
 
+' Ein einzelnes .dhform ohne Projekt (so arbeitete Stufe 1). Sobald etwas
+' dazukommt, das nur ein Projekt kennt, fragt Sichern nach einem Ordner.
 SUB fensterLaden(pfad AS STRING)
-    IF NOT FILEEXISTS(pfad) THEN
-        neuesFenster()
-        formPfad = pfad
-        status("Neu: " + pfad)
-        RETURN
+    alleReiterZu()
+    projektLeeren()
+    projLose = TRUE
+    projOrdner = ""
+    DIM name AS STRING : name = REGEX_REPLACE(BASENAME(pfad), "(?i)\.dhform$", "")
+    IF NOT istBezeichner(name) THEN name = "Fenster1"
+    DIM e AS Element : e = elementNeu("fenster", name)
+    projName = name
+    formPfad = pfad
+    IF FILEEXISTS(pfad) THEN
+        DIM d AS JSON_HANDLE : d = JSON_LOAD(pfad)
+        IF NOT JSON_HAS(d, "widgets") THEN JSON_SET_JSON(d, "widgets", JSON_NEW_ARRAY())
+        IF NOT JSON_HAS(d, "name") THEN JSON_SET_STRING(d, "name", name)
+        IF istBezeichner(JSON_GET_STRING(d, "name")) THEN e.name = JSON_GET_STRING(d, "name") ELSE JSON_SET_STRING(d, "name", name)
+        e.layout = JSON_STRINGIFY(d)
+        DIM cp AS STRING : cp = REGEX_REPLACE(pfad, "(?i)\.dhform$", ".dh")
+        IF FILEEXISTS(cp) THEN codeZerlegen(e, JOIN$(READLINES(cp), CHR$(10)))
     END IF
-    doc = JSON_LOAD(pfad)
-    IF NOT JSON_HAS(doc, "widgets") THEN JSON_SET_JSON(doc, "widgets", JSON_NEW_ARRAY())
-    IF NOT JSON_HAS(doc, "name") THEN JSON_SET_STRING(doc, "name", REGEX_REPLACE(BASENAME(pfad), "\.dhform$", ""))
+    projStart = e.name
+    e.geaendert = FALSE
+    projGeaendert = FALSE
+    nachLaden()
     ' Controls ohne Namen bekommen einen -- er wird zum Feld der Klasse.
     DIM i AS INTEGER
+    DIM ohne AS BOOLEAN : ohne = FALSE
     FOR i = 0 TO anzahl() - 1
-        IF feldText$(i, "name") = "" THEN JSON_SET_STRING(doc, wz$(i, "name"), eindeutigerName$(feldText$(i, "kind")))
+        IF feldText$(i, "name") = "" THEN
+            JSON_SET_STRING(doc, wz$(i, "name"), eindeutigerName$(feldText$(i, "kind")))
+            ohne = TRUE
+        END IF
     NEXT
-    formPfad = pfad
-    auswahlSetzen(-1)
-    staende = [] : standPos = -1
-    merken()
-    geaendert = FALSE
-    nachAenderung(FALSE)
-    lageAnzeigen()
-    status("Geladen: " + BASENAME(pfad) + " (" + STR$(anzahl()) + " Controls)")
-    protokoll("geladen " + STR$(anzahl()))
+    IF ohne THEN
+        staende = [] : standPos = -1 : merken() : geaendert = FALSE
+        nachAenderung(FALSE)
+    END IF
+    IF FILEEXISTS(pfad) THEN
+        status("Geladen: " + BASENAME(pfad) + " (" + STR$(anzahl()) + " Controls)")
+        protokoll("geladen " + STR$(anzahl()))
+    ELSE
+        status("Neu: " + pfad)
+        protokoll("neu-fenster")
+    END IF
 END SUB
 
-FUNCTION sichern(alsNeu AS BOOLEAN) AS BOOLEAN
-    IF formPfad = "" OR alsNeu THEN
-        DIM p AS STRING : p = FILE_SAVE_DIALOG("Fenster sichern", fensterText$("name") + ".dhform", "dhform")
-        IF p = "" THEN RETURN FALSE
-        IF LOWER$(RIGHT$(p, 7)) <> ".dhform" THEN p = p + ".dhform"
-        formPfad = p
+SUB projektOeffnen(ordner AS STRING)
+    alleReiterZu()
+    DIM fehler AS STRING : fehler = projektLaden$(ordner)
+    IF fehler <> "" THEN
+        status(fehler)
+        protokoll("fehler " + fehler)
+        projektNeu(ordner)
     END IF
-    WRITEALL(formPfad, JSON_PRETTY(doc))
-    geaendert = FALSE
+    nachLaden()
+    status("Projekt " + projName + ": " + STR$(LEN(elemente)) + " Elemente, " + STR$(LEN(methoden)) + " Methoden.")
+    protokoll("projekt geladen " + projName + " " + STR$(LEN(elemente)) + " " + STR$(LEN(methoden)))
+END SUB
+
+' Nach Laden oder Anlegen: das Startfenster vorn.
+SUB nachLaden()
+    aktFenster = -1
+    staende = [] : standPos = -1
+    DIM s AS INTEGER : s = elementIndex(projStart)
+    IF s >= 0 THEN
+        IF elemente[s].art <> "fenster" THEN s = -1
+    END IF
+    IF s < 0 THEN
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(elemente) - 1
+            IF elemente[k].art = "fenster" THEN
+                s = k
+                BREAK
+            END IF
+        NEXT
+    END IF
+    navigatorFuellen()
+    IF s >= 0 THEN layoutOeffnen(s)
+    auswahlSetzen(-1)
+    auswahlGeaendert()
+    lageAnzeigen()
     werkzeugeNachziehen()
-    status("Gesichert: " + BASENAME(formPfad))
-    protokoll("gesichert " + formPfad)
+END SUB
+
+SUB alleReiterZu()
+    WHILE LEN(reiter) > 0
+        reiterSchliessen(LEN(reiter) - 1)
+    WEND
+    wegDateien = []
+END SUB
+
+' Ein lose geoeffnetes Fenster ohne Code bleibt eine .dhform -- alles andere
+' ist ein Projekt.
+FUNCTION nurDasFenster() AS BOOLEAN
+    IF NOT projLose OR LEN(elemente) <> 1 OR LEN(methoden) > 0 THEN RETURN FALSE
+    RETURN elemente[0].dekl = ""
+END FUNCTION
+
+FUNCTION sichern(alsNeu AS BOOLEAN) AS BOOLEAN
+    DIM r AS Reiter
+    FOR EACH r IN reiter
+        codeUebernehmen(r)
+    NEXT
+    layoutZurueck()
+    IF nurDasFenster() AND NOT alsNeu THEN
+        IF formPfad = "" THEN
+            DIM p AS STRING : p = FILE_SAVE_DIALOG("Fenster sichern", fensterText$("name") + ".dhform", "dhform")
+            IF p = "" THEN RETURN FALSE
+            IF LOWER$(RIGHT$(p, 7)) <> ".dhform" THEN p = p + ".dhform"
+            formPfad = p
+        END IF
+        WRITEALL(formPfad, JSON_PRETTY(doc))
+        geaendert = FALSE
+        elemente[0].geaendert = FALSE
+        projGeaendert = FALSE
+        werkzeugeNachziehen()
+        status("Gesichert: " + BASENAME(formPfad))
+        protokoll("gesichert " + formPfad)
+        RETURN TRUE
+    END IF
+    IF projOrdner = "" OR alsNeu THEN
+        DIM o AS STRING : o = FOLDER_DIALOG("Ordner für das Projekt")
+        IF o = "" THEN RETURN FALSE
+        projOrdner = o
+        projName = BASENAME(o)
+        DIM e AS Element
+        FOR EACH e IN elemente
+            e.gesichertAls = ""
+        NEXT
+    END IF
+    IF projLose THEN
+        projLose = FALSE
+        IF elementIndex("App") < 0 THEN
+            DIM a AS Element : a = elementNeu("app", "App")
+        END IF
+    END IF
+    wegDateienLoeschen()
+    projektSchreiben()
+    geaendert = FALSE
+    navigatorFuellen()
+    werkzeugeNachziehen()
+    status("Gesichert: " + projName + " (" + STR$(LEN(elemente)) + " Elemente)")
+    protokoll("gesichert " + projOrdner)
     RETURN TRUE
 END FUNCTION
 
@@ -157,22 +264,24 @@ DIM beenden AS BOOLEAN : beenden = FALSE
 
 SUB ausfuehren(was AS STRING)
     SELECT CASE was
-        CASE "neu" : neuesFenster()
+        CASE "neu" : projektAnfangen("")
         CASE "oeffnen"
-            DIM p AS STRING : p = FILE_OPEN_DIALOG("Fenster öffnen", "dhform")
-            IF p <> "" THEN fensterLaden(p)
+            DIM p AS STRING : p = FILE_OPEN_DIALOG("Projekt oder Fenster öffnen", "dhstudio,dhform")
+            IF p <> "" THEN
+                IF LOWER$(RIGHT$(p, 7)) = ".dhform" THEN fensterLaden(p) ELSE projektOeffnen(DIRNAME(p))
+            END IF
         CASE "beenden" : beenden = TRUE
     END SELECT
 END SUB
 
 SUB anfragen(was AS STRING)
     IF frage >= 0 OR GUI_MODAL() THEN RETURN
-    IF NOT geaendert THEN
+    IF NOT projektGeaendert() THEN
         ausfuehren(was)
         RETURN
     END IF
     wartet = was
-    frage = GUI_DIALOG("Ungesicherte Änderungen", "Das Fenster " + fensterText$("name") + " ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen")
+    frage = GUI_DIALOG("Ungesicherte Änderungen", IIF(projLose, "Das Fenster " + fensterText$("name"), "Das Projekt " + projName) + " ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen")
 END SUB
 
 SUB frageAuswerten()
@@ -193,7 +302,7 @@ END SUB
 DIM ueber AS GUI_WINDOW : ueber = -1
 SUB ueberZeigen()
     IF ueber >= 0 THEN GUI_WINDOW_DESTROY(ueber)
-    ueber = GUI_DIALOG("Drachenhauch Studio", "Eine IDE für Programme mit Oberfläche, mit der Laufzeit dhrt " + VERSION$() + "." + CHR$(10) + "Stufe 1: Fenster entwerfen.", "ok")
+    ueber = GUI_DIALOG("Drachenhauch Studio", "Eine IDE für Programme mit Oberfläche, mit der Laufzeit dhrt " + VERSION$() + "." + CHR$(10) + "Stufe 2: Projekte, Fenster, Module, Klassen und ihr Code.", "ok")
 END SUB
 
 ' --- Menue und Werkzeugleiste -------------------------------------------------
@@ -221,10 +330,21 @@ SUB befehle()
     IF GUI_CLICKED(miHell) THEN
         hell = GUI_MENU_CHECKED(miHell)
         themaSetzen()
+        codeFarbenNeu()
         mitteNachziehen()
         punkteFuer = ""
     END IF
     IF GUI_CLICKED(miUeber) THEN ueberZeigen()
+    IF GUI_CLICKED(miFensterNeu) OR t = tbFenster THEN elementFragen("fenster")
+    IF GUI_CLICKED(miModulNeu) THEN elementFragen("modul")
+    IF GUI_CLICKED(miKlasseNeu) THEN elementFragen("klasse")
+    IF GUI_CLICKED(miMethodeNeu) OR t = tbMethode THEN methodeDialog(elementJetzt())
+    IF GUI_CLICKED(miEreignisNeu) OR t = tbEreignis THEN
+        IF layoutVorn() THEN ereignisDialog(aktFenster, auswahl) ELSE ereignisDialog(elementJetzt(), -1)
+    END IF
+    IF GUI_CLICKED(miMethodeWeg) THEN methodeEntfernen()
+    IF GUI_CLICKED(miStartfenster) THEN alsStartSetzen(elementJetzt())
+    IF GUI_CLICKED(miElementWeg) THEN elementLoeschenFragen(elementJetzt())
     DIM k AS INTEGER
     FOR k = 0 TO LEN(anordnenPunkte) - 1
         IF GUI_CLICKED(anordnenPunkte[k]) THEN anordnen(anordnenWas[k])
@@ -269,7 +389,7 @@ SUB tasten()
         DIM art AS STRING : art = GUI_KIND(fokus)
         IF art = "textinput" OR art = "textarea" OR art = "spinner" OR art = "dropdown" THEN RETURN
     END IF
-    IF GUI_MODAL() THEN RETURN
+    IF GUI_MODAL() OR NOT layoutVorn() THEN RETURN
     DIM schritt AS INTEGER : schritt = IIF(umschalt(), RASTER, 1)
     IF NOT strg() THEN
         IF KEYREPEAT(KEY_LEFT) THEN schieben(-schritt, 0)
@@ -290,14 +410,18 @@ SUB tasten()
 END SUB
 
 ' --- Start ------------------------------------------------------------------
+' Ein Ordner (oder seine projekt.dhstudio) oeffnet das Projekt; ein Ordner
+' ohne Projekt bekommt ein neues; eine .dhform geht ohne Projekt auf.
 IF ARGC() >= 1 THEN
-    DIM startDatei AS STRING : startDatei = ARG$(0)
-    IF LEFT$(startDatei, 1) <> "/" AND LEFT$(startDatei, 1) <> "\" AND MID$(startDatei, 1, 1) <> ":" THEN
-        IF GETENV$("DHRT_START_DIR") <> "" THEN startDatei = PATHJOIN(GETENV$("DHRT_START_DIR"), startDatei)
+    DIM startDatei AS STRING : startDatei = ARGPATH$(0)
+    IF LOWER$(RIGHT$(startDatei, 7)) = ".dhform" THEN
+        fensterLaden(startDatei)
+    ELSE
+        IF LOWER$(BASENAME(startDatei)) = PROJEKT_DATEI THEN startDatei = DIRNAME(startDatei)
+        IF FILEEXISTS(PATHJOIN(startDatei, PROJEKT_DATEI)) THEN projektOeffnen(startDatei) ELSE projektAnfangen(startDatei)
     END IF
-    fensterLaden(startDatei)
 ELSE
-    neuesFenster()
+    projektAnfangen("")
 END IF
 mitteNachziehen()
 protokoll("bereit")
@@ -364,18 +488,23 @@ WHILE NOT beenden
     bibNachUpdate()
     navigatorPruefen()
     inspektorPruefen()
+    reiterPruefen()
     tasten()
     mausAufEntwurf()
     frageAuswerten()
+    dialogePruefen()
     ' Das Entwurfsfenster obenauf -- ein Klick ins Hauptfenster legte es
     ' sonst darunter. Dialoge, Menues und Popover liegen weiter oben.
-    IF frm >= 0 AND NOT GUI_MODAL() THEN GUI_WINDOW_FRONT(frm)
+    IF frm >= 0 AND NOT GUI_MODAL() AND layoutVorn() THEN GUI_WINDOW_FRONT(frm)
 
     CLS(farbe("mitte"))
     GUI_DRAW(FALSE)
-    punkteRechnen()
-    IF LEN(punkteX) > 0 THEN BOXES(punkteX, punkteY, punkteX2, punkteY2, farbe("punkte"))
+    IF layoutVorn() THEN
+        punkteRechnen()
+        IF LEN(punkteX) > 0 THEN BOXES(punkteX, punkteY, punkteX2, punkteY2, farbe("punkte"))
+    END IF
     entwurfZeichnen()
+    dialogeObenauf()
     GUI_DRAW_TOP()
     bibZugZeichnen()
     FLIP()
