@@ -247,11 +247,16 @@ order.
 controls themselves: side by side, one below the other or in rows and
 columns, with spacing and margin. In the design a layout has a dashed
 outline; an empty one says "Controls hierher ziehen". A building block that
-lands on a layout goes into it, and so does a single control dragged into
-it; a blue marker shows the place. A child is not moved but repositioned: it
-stays where it is, its outline follows the mouse, and when released it goes
-to the place of the marker -- released next to every layout it is free
-afterwards. The arrow keys move a child one place on. Duplicating a layout
+lands on a layout goes into it, and so do the controls dragged into it --
+several selected ones together, left to right or top to bottom; a blue
+marker shows the place. A child is not moved but repositioned: it stays
+where it is, its outline follows the mouse, and when released it goes to the
+place of the marker -- released next to every layout it is free afterwards.
+That also works for several selected children at once. The arrow keys move a
+child one place on. A **spacer** (also in the containers group) is free space
+in a layout: with weight 1 it takes the rest and pushes what follows to the
+end. In the design it is a spring between its neighbours; a click selects
+it, the inspector shows its weight, the arrow keys move it, Del deletes it. Duplicating a layout
 takes its children along, deleting leaves them standing free. In the
 navigator the children are listed under their layout. Anchoring the layout in
 the inspector (say left, right, top) lets it grow with the window, and it

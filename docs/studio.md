@@ -251,12 +251,18 @@ Verteilen setzt ab drei Controls gleiche Lücken. Nach vorn und nach hinten
 ihre Controls selbst: nebeneinander, untereinander oder in Zeilen und
 Spalten, mit Abstand und Rand. Im Entwurf ist ein Layout gestrichelt
 umrandet, ein leeres sagt „Controls hierher ziehen“. Ein Baustein, der auf
-einem Layout landet, kommt hinein, ebenso ein einzelnes Control, das man
-hineinzieht; eine blaue Marke zeigt die Stelle. Ein Kind wird nicht
+einem Layout landet, kommt hinein, ebenso die Controls, die man
+hineinzieht -- mehrere gewählte zusammen, von links nach rechts bzw. von
+oben nach unten; eine blaue Marke zeigt die Stelle. Ein Kind wird nicht
 verschoben, sondern umgesetzt: es bleibt stehen, sein Umriss folgt der Maus,
 und losgelassen kommt es an die Stelle der Marke -- neben jedem Layout
-losgelassen steht es danach frei. Die Pfeiltasten rücken ein Kind eine
-Stelle weiter. Verdoppeln nimmt bei einem Layout die Kinder mit, Löschen
+losgelassen steht es danach frei. Das gilt auch für mehrere gewählte Kinder
+auf einmal. Die Pfeiltasten rücken ein Kind eine Stelle weiter. Ein
+**Abstandhalter** (ebenfalls Gruppe Behälter) ist freier Platz in einem
+Layout: mit Gewicht 1 nimmt er den Rest und schiebt, was danach kommt, ans
+Ende. Im Entwurf ist er eine Feder zwischen den Nachbarn; ein Klick wählt
+ihn, der Inspektor zeigt sein Gewicht, die Pfeiltasten rücken ihn, Entf
+löscht ihn. Verdoppeln nimmt bei einem Layout die Kinder mit, Löschen
 lässt sie frei stehen. Im Navigator stehen die Kinder unter ihrem Layout.
 Wer das Layout im Inspektor verankert (etwa links, rechts, oben), lässt es
 mit dem Fenster wachsen, und es verteilt seine Kinder neu -- im erzeugten

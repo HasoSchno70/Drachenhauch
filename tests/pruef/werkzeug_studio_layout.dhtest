@@ -276,7 +276,11 @@ DIM leer AS INTEGER : leer = 0
 WHILE leer < 5
     DIM kt AS STRING : kt = PROCESS_READ$(k)
     IF kt <> "" THEN
-        IF LEFT$(kt, 8) <> "WARNING:" THEN PRINT "lauf "; TRIM$(REPLACE$(kt, CHR$(13), ""))
+        ' Unter Last kommen mehrere Zeilen in einem Stueck.
+        DIM kz AS STRING
+        FOR EACH kz IN SPLIT(REPLACE$(kt, CHR$(13), ""), CHR$(10))
+            IF TRIM$(kz) <> "" AND LEFT$(kz, 8) <> "WARNING:" THEN PRINT "lauf "; TRIM$(kz)
+        NEXT
         leer = 0
     ELSEIF NOT PROCESS_RUNNING(k) THEN
         leer = leer + 1
