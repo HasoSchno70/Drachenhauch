@@ -58,6 +58,7 @@ DIM miZurueck AS INTEGER
 DIM miVor AS INTEGER
 DIM miVerdoppeln AS INTEGER
 DIM miLoeschen AS INTEGER
+DIM miMenues AS INTEGER
 DIM miAlles AS INTEGER
 DIM miRaster AS INTEGER
 DIM miLinien AS INTEGER
@@ -145,6 +146,7 @@ SUB oberflaecheAnlegen()
     miMethodeNeu = GUI_MENU_ITEM(m, "Methode hinzufügen …", "Strg+Umschalt+M") : GUI_MENU_ICON(miMethodeNeu, "stift")
     miEreignisNeu = GUI_MENU_ITEM(m, "Ereignis hinzufügen …", "Strg+Umschalt+E") : GUI_MENU_ICON(miEreignisNeu, "einfuegen")
     miMethodeWeg = GUI_MENU_ITEM(m, "Methode entfernen")
+    miMenues = GUI_MENU_ITEM(m, "Menüs des Fensters …", "Strg+Umschalt+U") : GUI_MENU_ICON(miMenues, "menue")
     GUI_MENU_SEPARATOR(m)
     miStartfenster = GUI_MENU_ITEM(m, "Als Startfenster")
     miElementWeg = GUI_MENU_ITEM(m, "Element löschen …")
@@ -469,7 +471,7 @@ SUB werkzeugeNachziehen()
     GUI_TOOLBAR_ENABLE(tb, tbMitteW, mehrere)
     GUI_TOOLBAR_ENABLE(tb, tbVerteilen, lay AND LEN(gewaehlt) >= 3)
     GUI_MENU_ENABLE(miVerdoppeln, lay AND auswahl >= 0)
-    GUI_MENU_ENABLE(miLoeschen, lay AND auswahl >= 0)
+    GUI_MENU_ENABLE(miLoeschen, lay AND (auswahl >= 0 OR trayWahl >= 0))
     DIM k AS INTEGER
     FOR k = 0 TO LEN(anordnenPunkte) - 1
         GUI_MENU_ENABLE(anordnenPunkte[k], lay)

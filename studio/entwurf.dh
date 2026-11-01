@@ -317,6 +317,20 @@ SUB mausAufEntwurf()
             bibEntschaerfen()
             RETURN
         END IF
+        ' Ein Timer in der Leiste unter dem Fenster: waehlen, doppelt = Ereignis.
+        DIM tk AS INTEGER : tk = trayBei(smx, smy)
+        IF tk >= 0 THEN
+            auswahlSetzen(-1)
+            trayWahl = tk
+            auswahlGeaendert()
+            modus = 0
+            IF doppelKlick(TRAY + tk) THEN
+                controlsVon(aktFenster)
+                ereignisDialog(aktFenster, ctrlWidgets + tk)
+            END IF
+            GUI_FOCUS(-1)
+            RETURN
+        END IF
         griff = IIF(imFenster(smx, smy), griffBei(mausFx, mausFy), -1)
         IF griff >= 0 THEN
             modus = 2
@@ -511,6 +525,10 @@ END SUB
 SUB ablegen(p AS INTEGER, fx AS INTEGER, fy AS INTEGER, mittig AS BOOLEAN)
     IF p < 0 THEN RETURN
     DIM b AS Baustein : b = bausteine[p]
+    IF b.kind = "timer" THEN
+        timerAblegen()
+        RETURN
+    END IF
     DIM x AS INTEGER : x = fx
     DIM y AS INTEGER : y = fy
     IF mittig THEN x = fx - b.b \ 2 : y = fy - b.h \ 2
@@ -521,6 +539,56 @@ SUB ablegen(p AS INTEGER, fx AS INTEGER, fy AS INTEGER, mittig AS BOOLEAN)
     nachAenderung(TRUE)
     status(b.name + " abgelegt: " + feldText$(i, "name"))
     protokoll("neu " + b.kind + " " + feldText$(i, "name") + " " + STR$(x) + " " + STR$(y))
+END SUB
+
+' Einen Timer anlegen: er liegt nicht im Fenster, sondern in der Leiste
+' darunter (wie in Xojo).
+SUB timerAblegen()
+    DIM k AS INTEGER : k = timerAnlegen()
+    auswahlSetzen(-1)
+    trayWahl = k
+    nachAenderung(TRUE)
+    status("Timer angelegt: " + timerName$(k))
+    protokoll("neu timer " + timerName$(k))
+    trayProtokollieren()
+END SUB
+
+' Die Leiste der Timer unter dem Fenster: Lage eines Chips auf dem Schirm.
+FUNCTION trayRect(k AS INTEGER) AS TUPLE
+    DIM x AS INTEGER : x = formX
+    DIM y AS INTEGER : y = formY + zS(fensterH()) + 34
+    DIM i AS INTEGER
+    FOR i = 0 TO k - 1
+        x = x + TEXT_WIDTH(timerName$(i)) + 44
+    NEXT
+    RETURN (x, y, TEXT_WIDTH(timerName$(k)) + 36, 28)
+END FUNCTION
+
+FUNCTION trayBei(sx AS INTEGER, sy AS INTEGER) AS INTEGER
+    IF NOT layoutVorn() THEN RETURN -1
+    DIM k AS INTEGER
+    FOR k = 0 TO timerZahl() - 1
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        DIM b AS INTEGER
+        DIM h AS INTEGER
+        (x, y, b, h) = trayRect(k)
+        IF sx >= x AND sy >= y AND sx < x + b AND sy < y + h THEN RETURN k
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB trayProtokollieren()
+    IF logDatei = "" THEN RETURN
+    DIM k AS INTEGER
+    FOR k = 0 TO timerZahl() - 1
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        DIM b AS INTEGER
+        DIM h AS INTEGER
+        (x, y, b, h) = trayRect(k)
+        protokoll("lage timer " + timerName$(k) + " " + STR$(x + b \ 2) + " " + STR$(y + h \ 2))
+    NEXT
 END SUB
 
 ' Liegt an der Stelle das Entwurfsfenster oben (und kein Popover, Menue,
@@ -676,6 +744,23 @@ SUB entwurfZeichnen()
                 RECTROUND(gx[gi] - 4, gy[gi] - 4, gx[gi] + 4, gy[gi] + 4, 2, F_GRIFF_RAND)
             NEXT
         END IF
+    NEXT
+    ' Die Timer in einer Leiste darunter.
+    DIM tk AS INTEGER
+    FOR tk = 0 TO timerZahl() - 1
+        DIM tx AS INTEGER
+        DIM ty AS INTEGER
+        DIM tb2 AS INTEGER
+        DIM th AS INTEGER
+        (tx, ty, tb2, th) = trayRect(tk)
+        BOXROUND(tx, ty, tx + tb2 - 1, ty + th - 1, 6, farbe("titel"))
+        RECTROUND(tx, ty, tx + tb2 - 1, ty + th - 1, 6, IIF(tk = trayWahl, F_AUSWAHL, farbe("fensterrand")))
+        IF tk = trayWahl THEN RECTROUND(tx + 1, ty + 1, tx + tb2 - 2, ty + th - 2, 5, F_AUSWAHL)
+        CIRCLE(tx + 14, ty + th \ 2, 7, farbe("leise"))
+        CIRCLE(tx + 14, ty + th \ 2, 5, farbe("titel"))
+        LINE(tx + 14, ty + th \ 2, tx + 14, ty + th \ 2 - 4, farbe("titeltext"))
+        LINE(tx + 14, ty + th \ 2, tx + 17, ty + th \ 2 + 2, F_AUSWAHL)
+        TEXT(tx + 26, ty + (th - 15) \ 2, timerName$(tk), farbe("titeltext"))
     NEXT
     ' Zug aus der Bibliothek: das Control als Umriss, wo es landet.
     bibGeistZeichnen()

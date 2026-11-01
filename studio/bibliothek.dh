@@ -69,6 +69,7 @@ SUB bausteineAnlegen()
     baustein("Leisten", "statusbar", "Statusleiste", "Statusleiste", 400, 24, "Bereit.", "", "Meldungen unten im Fenster")
     baustein("Leisten", "breadcrumb", "Pfadleiste", "Pfad", 320, 26, "", "", "wo man gerade ist, zum Anklicken")
     baustein("Zeichnen", "canvas", "Zeichenfläche", "Zeichenflaeche", 240, 180, "", "", "eine Fläche, auf die das Programm selbst zeichnet")
+    baustein("Unsichtbar", "timer", "Timer", "Timer", 0, 0, "", "", "ruft sein Ereignis Aktion in festen Abständen")
     DIM i AS INTEGER
     FOR i = 0 TO LEN(bausteine) - 1
         bausteine[i].breit = symbolZeichnen(bausteine[i].name)
@@ -250,6 +251,11 @@ FUNCTION symbolZeichnen(name AS STRING) AS IMAGE
             symText(img, 18, 12, 25)
             IMAGE_POLYLINE(img, [28, 30, 28], [10, 13, 16], 1, S_RAND)
             IMAGE_FILL_ROUNDRECT(img, 32, 12, 37, 14, 1, S_HELL)
+        CASE "Timer"
+            IMAGE_RING(img, 20, 14, 9, 2, S_RAND)
+            IMAGE_FILL_RECT(img, 18, 2, 22, 3, S_RAND)
+            IMAGE_DRAW_LINE(img, 20, 14, 20, 8, S_HELL)
+            IMAGE_DRAW_LINE(img, 20, 14, 24, 17, S_AKZENT)
         CASE "Zeichenfläche"
             IMAGE_FILL_RECT(img, 3, 3, 36, 22, S_FLAECHE)
             IMAGE_POLYLINE(img, [6, 12, 18, 24, 30, 34], [19, 10, 15, 7, 13, 9], 2, S_AKZENT)
