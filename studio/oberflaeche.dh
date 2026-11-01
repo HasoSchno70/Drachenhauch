@@ -1,0 +1,444 @@
+' ============================================================
+'  Drachenhauch Studio -- das Hauptfenster
+' ============================================================
+'  Ein randloses Fenster ueber den ganzen Schirm: Menue, Werkzeugleiste,
+'  darunter ein Dock (links Navigator und Bibliothek, rechts der Inspektor),
+'  unten die Statusleiste. In der Mitte liegt das Entwurfsfenster -- ein
+'  eigenes GUI_WINDOW, das je Bild obenauf geholt wird (ein Klick ins
+'  Hauptfenster legte es sonst darunter; gemessen vor dem Bau).
+' ============================================================
+
+CONST LEISTE_H = 40
+CONST STATUS_H = 26
+
+DIM win AS GUI_WINDOW
+DIM tb AS GUI_WIDGET
+DIM sb AS GUI_WIDGET
+DIM baum AS GUI_WIDGET
+DIM lstBib AS GUI_WIDGET
+DIM tfSuche AS GUI_WIDGET
+DIM inhaltOben AS INTEGER     ' Hoehe der Menueleiste: Widget-Lagen zaehlen ab dort
+DIM hell AS BOOLEAN : hell = FALSE
+
+' Eintraege der Werkzeugleiste
+DIM tbNeu AS INTEGER
+DIM tbOeffnen AS INTEGER
+DIM tbSichern AS INTEGER
+DIM tbZurueck AS INTEGER
+DIM tbVor AS INTEGER
+DIM tbLinks AS INTEGER
+DIM tbMitteW AS INTEGER
+DIM tbOben AS INTEGER
+DIM tbVerteilen AS INTEGER
+DIM tbStart AS INTEGER
+DIM tbKleiner AS INTEGER
+DIM tbGroesser AS INTEGER
+
+' Menue
+DIM miNeu AS INTEGER
+DIM miOeffnen AS INTEGER
+DIM miSichern AS INTEGER
+DIM miSichernUnter AS INTEGER
+DIM miBeenden AS INTEGER
+DIM miZurueck AS INTEGER
+DIM miVor AS INTEGER
+DIM miVerdoppeln AS INTEGER
+DIM miLoeschen AS INTEGER
+DIM miAlles AS INTEGER
+DIM miRaster AS INTEGER
+DIM miLinien AS INTEGER
+DIM miGroesser AS INTEGER
+DIM miKleiner AS INTEGER
+DIM miNormal AS INTEGER
+DIM miHell AS INTEGER
+DIM miUeber AS INTEGER
+DIM anordnenPunkte AS ARRAY OF INTEGER : anordnenPunkte = []
+DIM anordnenWas AS ARRAY OF STRING : anordnenWas = []
+
+' Bibliothek: Zeile -> Baustein (-1 = Gruppenkopf)
+DIM bibZeile AS ARRAY OF INTEGER : bibZeile = []
+DIM bibScharfIdx AS INTEGER : bibScharfIdx = -1    ' Baustein, der beim naechsten Klick abgelegt wird
+DIM bibDruck AS BOOLEAN : bibDruck = FALSE         ' Taste in der Bibliothek gedrueckt
+DIM bibZug AS INTEGER : bibZug = -1                ' Baustein, der gerade gezogen wird
+DIM bibDruckX AS INTEGER
+DIM bibDruckY AS INTEGER
+
+' --- Farben, die das Studio selbst zeichnet ------------------------------------
+FUNCTION farbe(rolle AS STRING) AS INTEGER
+    IF hell THEN
+        SELECT CASE rolle
+            CASE "mitte" : RETURN &HDCE1E8
+            CASE "punkte" : RETURN &HC4CBD5
+            CASE "titel" : RETURN &HEEF1F5
+            CASE "titeltext" : RETURN &H30363F
+            CASE "fensterrand" : RETURN &HAAB3BF
+            CASE "leise" : RETURN &H6A7380
+        END SELECT
+    END IF
+    SELECT CASE rolle
+        CASE "mitte" : RETURN &H14191F
+        CASE "punkte" : RETURN &H2C3642
+        CASE "titel" : RETURN &H2C3440
+        CASE "titeltext" : RETURN &HD8E0EA
+        CASE "fensterrand" : RETURN &H0E1217
+        CASE "leise" : RETURN &H8793A2
+    END SELECT
+    RETURN 0
+END FUNCTION
+
+SUB themaSetzen()
+    IF hell THEN GUI_THEME_PRESET("modern_light") ELSE GUI_THEME_PRESET("modern_dark")
+    GUI_METRIC_SET("corner_radius", 6)
+    GUI_METRIC_SET("shadow", 0)
+    GUI_METRIC_SET("title_h", 0)
+    ' Die Stildatei folgt dem Thema ueber die Namen der Themenfarben.
+    GUI_STYLESHEET_LOAD("studio.dhstil")
+END SUB
+
+' --- Aufbau -------------------------------------------------------------------
+SUB oberflaecheAnlegen()
+    win = GUI_WINDOW("Drachenhauch Studio", 0, 0, SCREENWIDTH(), SCREENHEIGHT())
+    GUI_WINDOW_CHROME(win, FALSE)
+    GUI_WINDOW_MOVABLE(win, FALSE)
+
+    DIM m AS INTEGER : m = GUI_MENU(win, "Datei")
+    miNeu = GUI_MENU_ITEM(m, "Neues Fenster", "Strg+N") : GUI_MENU_ICON(miNeu, "neu")
+    miOeffnen = GUI_MENU_ITEM(m, "Öffnen …", "Strg+O") : GUI_MENU_ICON(miOeffnen, "oeffnen")
+    GUI_MENU_SEPARATOR(m)
+    miSichern = GUI_MENU_ITEM(m, "Sichern", "Strg+S") : GUI_MENU_ICON(miSichern, "sichern")
+    miSichernUnter = GUI_MENU_ITEM(m, "Sichern unter …", "Strg+Umschalt+S")
+    GUI_MENU_SEPARATOR(m)
+    miBeenden = GUI_MENU_ITEM(m, "Beenden", "Strg+Q")
+    m = GUI_MENU(win, "Bearbeiten")
+    miZurueck = GUI_MENU_ITEM(m, "Rückgängig", "Strg+Z") : GUI_MENU_ICON(miZurueck, "rueckgaengig")
+    miVor = GUI_MENU_ITEM(m, "Wiederholen", "Strg+Y") : GUI_MENU_ICON(miVor, "wiederholen")
+    GUI_MENU_SEPARATOR(m)
+    miVerdoppeln = GUI_MENU_ITEM(m, "Verdoppeln", "Strg+D") : GUI_MENU_ICON(miVerdoppeln, "kopieren")
+    miLoeschen = GUI_MENU_ITEM(m, "Löschen", "Entf")
+    GUI_MENU_SEPARATOR(m)
+    ' Strg+A NICHT als Kuerzel: ein Kuerzel nimmt dem Feld mit Fokus die Taste
+    ' weg, und im Inspektor soll Strg+A den Text waehlen (siehe tasten()).
+    miAlles = GUI_MENU_ITEM(m, "Alles auswählen   Strg+A") : GUI_MENU_ICON(miAlles, "auswahl")
+    m = GUI_MENU(win, "Anordnen")
+    anordnenPunkt(m, "Links ausrichten", "links", "Strg+Alt+Links")
+    anordnenPunkt(m, "Rechts ausrichten", "rechts", "Strg+Alt+Rechts")
+    anordnenPunkt(m, "Oben ausrichten", "oben", "Strg+Alt+Hoch")
+    anordnenPunkt(m, "Unten ausrichten", "unten", "Strg+Alt+Runter")
+    GUI_MENU_SEPARATOR(m)
+    anordnenPunkt(m, "Waagerecht mittig", "mitte_w", "")
+    anordnenPunkt(m, "Senkrecht mittig", "mitte_s", "")
+    GUI_MENU_SEPARATOR(m)
+    anordnenPunkt(m, "Gleiche Breite", "breite", "")
+    anordnenPunkt(m, "Gleiche Höhe", "hoehe", "")
+    anordnenPunkt(m, "Gleiche Größe", "groesse", "")
+    GUI_MENU_SEPARATOR(m)
+    anordnenPunkt(m, "Waagerecht verteilen", "vert_w", "")
+    anordnenPunkt(m, "Senkrecht verteilen", "vert_s", "")
+    GUI_MENU_SEPARATOR(m)
+    anordnenPunkt(m, "Nach vorn", "vorn", "Strg+Umschalt+Hoch")
+    anordnenPunkt(m, "Nach hinten", "hinten", "Strg+Umschalt+Runter")
+    m = GUI_MENU(win, "Ansicht")
+    miRaster = GUI_MENU_ITEM(m, "Am Raster einrasten") : GUI_MENU_CHECK(miRaster, rasterAn)
+    miLinien = GUI_MENU_ITEM(m, "Ausrichtungslinien") : GUI_MENU_CHECK(miLinien, linienAn)
+    GUI_MENU_SEPARATOR(m)
+    miGroesser = GUI_MENU_ITEM(m, "Vergrößern", "Strg+Plus") : GUI_MENU_ICON(miGroesser, "plus")
+    miKleiner = GUI_MENU_ITEM(m, "Verkleinern", "Strg+Minus") : GUI_MENU_ICON(miKleiner, "minus")
+    miNormal = GUI_MENU_ITEM(m, "Originalgröße", "Strg+0")
+    GUI_MENU_SEPARATOR(m)
+    miHell = GUI_MENU_ITEM(m, "Helles Erscheinungsbild") : GUI_MENU_CHECK(miHell, hell)
+    m = GUI_MENU(win, "Hilfe")
+    miUeber = GUI_MENU_ITEM(m, "Über Drachenhauch Studio") : GUI_MENU_ICON(miUeber, "info")
+
+    inhaltOben = GUI_WINDOW_GET_H(win) - GUI_WINDOW_CONTENT_H(win)
+
+    tb = GUI_TOOLBAR(win, 0, 0, SCREENWIDTH(), LEISTE_H)
+    GUI_TOOLBAR_SET(tb, "beschriftung", 1)
+    tbNeu = GUI_TOOLBAR_ADD(tb, "neu", "Neues Fenster (Strg+N)", "Neu")
+    tbOeffnen = GUI_TOOLBAR_ADD(tb, "oeffnen", "Öffnen (Strg+O)", "Öffnen")
+    tbSichern = GUI_TOOLBAR_ADD(tb, "sichern", "Sichern (Strg+S)", "Sichern")
+    GUI_TOOLBAR_SEPARATOR(tb)
+    tbZurueck = GUI_TOOLBAR_ADD(tb, "rueckgaengig", "Rückgängig (Strg+Z)")
+    tbVor = GUI_TOOLBAR_ADD(tb, "wiederholen", "Wiederholen (Strg+Y)")
+    GUI_TOOLBAR_SEPARATOR(tb)
+    tbLinks = GUI_TOOLBAR_ADD(tb, "links", "Links ausrichten")
+    tbOben = GUI_TOOLBAR_ADD(tb, "hoch", "Oben ausrichten")
+    tbMitteW = GUI_TOOLBAR_ADD(tb, "raster", "Waagerecht mittig ausrichten")
+    tbVerteilen = GUI_TOOLBAR_ADD(tb, "verschieben", "Waagerecht verteilen")
+    GUI_TOOLBAR_SPACER(tb)
+    tbKleiner = GUI_TOOLBAR_ADD(tb, "minus", "Verkleinern (Strg+Minus)")
+    tbGroesser = GUI_TOOLBAR_ADD(tb, "plus", "Vergrößern (Strg+Plus)")
+    GUI_TOOLBAR_SEPARATOR(tb)
+    tbStart = GUI_TOOLBAR_ADD(tb, "start", "Starten (kommt mit Stufe 3)", "Starten")
+    GUI_TOOLBAR_ENABLE(tb, tbStart, FALSE)
+
+    sb = GUI_STATUSBAR(win, 0, 0, SCREENWIDTH(), STATUS_H, "Bereit.")
+    GUI_STATUSBAR_ADD(sb, "", 220, "rechts")
+    GUI_STATUSBAR_ADD(sb, "100 %", 80, "rechts")
+    GUI_STATUSBAR_CLICKABLE(sb, 2, TRUE)
+    GUI_STATUSBAR_TIP(sb, 2, "Klick: Originalgröße")
+
+    dockGroesse()
+    GUI_DOCK_PANEL(win, "navigator", "Navigator", "links")
+    GUI_DOCK_PANEL(win, "bibliothek", "Bibliothek", "links")
+    GUI_DOCK_PANEL(win, "inspektor", "Inspektor", "rechts")
+    GUI_DOCK_SIZE(win, "links", 290)
+    GUI_DOCK_SIZE(win, "rechts", 340)
+    GUI_DOCK_SHARE(win, "navigator", 2)
+    GUI_DOCK_SHARE(win, "bibliothek", 3)
+
+    baum = GUI_TREE(win, 0, 0, 10, 10)
+    GUI_ADD_CLASS(baum, "navigator")
+    GUI_DOCK_ADD(win, "navigator", baum)
+
+    tfSuche = GUI_TEXTINPUT(win, 0, 0, 10, 24, "Suchen")
+    GUI_TEXTINPUT_SET(tfSuche, "suche", 1)
+    GUI_DOCK_ADD(win, "bibliothek", tfSuche)
+    lstBib = GUI_LISTBOX(win, 0, 0, 10, 10, [])
+    GUI_ADD_CLASS(lstBib, "bibliothek")
+    GUI_DOCK_ADD(win, "bibliothek", lstBib)
+    bibliothekFuellen()
+
+    inspektorAnlegen()
+    verteilen()
+END SUB
+
+SUB anordnenPunkt(m AS INTEGER, text AS STRING, was AS STRING, kuerzel AS STRING)
+    DIM mi AS INTEGER
+    IF kuerzel = "" THEN mi = GUI_MENU_ITEM(m, text) ELSE mi = GUI_MENU_ITEM(m, text, kuerzel)
+    ARRAY_PUSH(anordnenPunkte, mi)
+    ARRAY_PUSH(anordnenWas, was)
+END SUB
+
+' Alles an seinen Platz -- beim Start und wenn das Dock sich aendert.
+SUB verteilen()
+    DIM sw AS INTEGER : sw = GUI_WINDOW_CONTENT_W(win)
+    DIM shh AS INTEGER : shh = GUI_WINDOW_CONTENT_H(win)
+    GUI_SET_BOUNDS(tb, 0, 0, sw, LEISTE_H)
+    GUI_SET_BOUNDS(sb, 0, shh - STATUS_H, sw, STATUS_H)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM b AS INTEGER
+    DIM h AS INTEGER
+    (x, y, b, h) = GUI_DOCK_RECT(win, "navigator")
+    IF b > 0 THEN GUI_SET_BOUNDS(baum, x, y, b, h)
+    (x, y, b, h) = GUI_DOCK_RECT(win, "bibliothek")
+    IF b > 0 THEN
+        GUI_SET_BOUNDS(tfSuche, x + 4, y + 4, b - 8, 28)
+        GUI_SET_BOUNDS(lstBib, x, y + 38, b, h - 38)
+    END IF
+    inspektorLegen()
+    (x, y, b, h) = GUI_DOCK_CENTER(win)
+    mitteX = x : mitteY = y + inhaltOben : mitteB = b : mitteH = h
+    entwurfLegen()
+END SUB
+
+SUB dockGroesse()
+    ' Das Dock fuellt den Platz zwischen Werkzeugleiste und Statusleiste.
+    GUI_DOCK(win, 0, LEISTE_H, GUI_WINDOW_CONTENT_W(win), GUI_WINDOW_CONTENT_H(win) - LEISTE_H - STATUS_H)
+END SUB
+
+' --- Bibliothek ---------------------------------------------------------------
+SUB bibliothekFuellen()
+    GUI_SET_LISTBOX(lstBib, [])
+    bibZeile = []
+    DIM g AS STRING
+    FOR EACH g IN gruppen
+        DIM kopf AS INTEGER : kopf = GUI_LISTBOX_COUNT(lstBib)
+        GUI_LISTBOX_ADD(lstBib, g)
+        GUI_LISTBOX_HEADER(lstBib, kopf, TRUE)
+        ARRAY_PUSH(bibZeile, -1)
+        DIM p AS INTEGER
+        FOR p = 0 TO LEN(bausteine) - 1
+            IF bausteine[p].gruppe <> g THEN CONTINUE
+            DIM r AS INTEGER : r = GUI_LISTBOX_COUNT(lstBib)
+            GUI_LISTBOX_ADD(lstBib, bausteine[p].name)
+            GUI_LISTBOX_ICON(lstBib, r, bausteine[p].symbol)
+            GUI_LISTBOX_TIP(lstBib, r, bausteine[p].name + " -- " + bausteine[p].beschreibung + ". Ziehen oder anklicken und dann ins Fenster klicken.")
+            ARRAY_PUSH(bibZeile, p)
+        NEXT
+    NEXT
+END SUB
+
+FUNCTION bibScharf() AS BOOLEAN
+    RETURN bibScharfIdx >= 0
+END FUNCTION
+
+FUNCTION bibAusgewaehlt() AS INTEGER
+    RETURN bibScharfIdx
+END FUNCTION
+
+SUB bibEntschaerfen()
+    bibScharfIdx = -1
+    GUI_LISTBOX_CLEAR_SELECTION(lstBib)
+    MOUSE_CURSOR("auto")
+END SUB
+
+FUNCTION bibUnterMaus() AS BOOLEAN
+    RETURN GUI_HIT_TEST(MOUSEX(), MOUSEY()) = lstBib
+END FUNCTION
+
+' Drucken, Ziehen, Loslassen in der Bibliothek. Vor GUI_UPDATE gefragt, ob
+' der Druck dort beginnt; nach GUI_UPDATE steht die Zeile in der Auswahl.
+DIM bibDruckJetzt AS BOOLEAN
+SUB bibVorUpdate()
+    bibDruckJetzt = MOUSE_HIT(0) AND bibUnterMaus()
+END SUB
+
+SUB bibNachUpdate()
+    IF bibDruckJetzt THEN
+        bibDruck = TRUE
+        bibDruckX = MOUSEX() : bibDruckY = MOUSEY()
+        bibZug = -1
+    END IF
+    IF bibDruck AND MOUSEBUTTON(0) THEN
+        DIM r AS INTEGER : r = GUI_LISTBOX_SELECTED(lstBib)
+        IF bibZug < 0 AND r >= 0 AND r < LEN(bibZeile) AND (ABS(MOUSEX() - bibDruckX) > 6 OR ABS(MOUSEY() - bibDruckY) > 6) THEN
+            IF bibZeile[r] >= 0 THEN bibZug = bibZeile[r]
+        END IF
+    END IF
+    IF bibDruck AND NOT MOUSEBUTTON(0) THEN
+        bibDruck = FALSE
+        IF bibZug >= 0 THEN
+            ' Losgelassen: ueber dem Fenster ablegen, sonst nichts.
+            IF imFenster(MOUSEX(), MOUSEY()) THEN ablegen(bibZug, zF(MOUSEX() - formX), zF(MOUSEY() - formY), TRUE)
+            bibZug = -1
+            GUI_LISTBOX_CLEAR_SELECTION(lstBib)
+        ELSE
+            DIM rs AS INTEGER : rs = GUI_LISTBOX_SELECTED(lstBib)
+            IF rs >= 0 AND rs < LEN(bibZeile) THEN
+                IF bibZeile[rs] >= 0 THEN
+                    bibScharfIdx = bibZeile[rs]
+                    status(bausteine[bibScharfIdx].name + ": ins Fenster klicken, um abzulegen. Esc bricht ab.")
+                END IF
+            END IF
+        END IF
+    END IF
+    IF GUI_DOUBLE_CLICKED(lstBib) THEN
+        ' Doppelklick: mitten ins Fenster.
+        DIM rd AS INTEGER : rd = GUI_LISTBOX_SELECTED(lstBib)
+        IF rd >= 0 AND rd < LEN(bibZeile) THEN
+            IF bibZeile[rd] >= 0 THEN ablegen(bibZeile[rd], fensterB() \ 2, fensterH() \ 2, TRUE)
+        END IF
+        bibEntschaerfen()
+    END IF
+    IF GUI_SEARCH_CHANGED(tfSuche) THEN GUI_LISTBOX_FILTER(lstBib, GUI_TEXT(tfSuche))
+END SUB
+
+SUB bibGeistZeichnen()
+    IF bibZug < 0 THEN RETURN
+    DIM b AS Baustein : b = bausteine[bibZug]
+    DIM mx AS INTEGER : mx = MOUSEX()
+    DIM my AS INTEGER : my = MOUSEY()
+    IF imFenster(mx, my) THEN
+        DIM w AS INTEGER : w = zS(b.b)
+        DIM h AS INTEGER : h = zS(b.h)
+        BOXROUND(mx - w \ 2, my - h \ 2, mx + w \ 2, my + h \ 2, 4, RGBA(58, 168, 240, 50))
+        RECTROUND(mx - w \ 2, my - h \ 2, mx + w \ 2, my + h \ 2, 4, F_AUSWAHL)
+    END IF
+END SUB
+
+' Gezogen wird auch ueber die Bibliothek hinaus -- das Bild des Bausteins
+' folgt der Maus ueber allem.
+SUB bibZugZeichnen()
+    IF bibZug < 0 THEN RETURN
+    DIM b AS Baustein : b = bausteine[bibZug]
+    DRAWIMAGE(b.breit, MOUSEX() + 12, MOUSEY() + 8)
+    TEXT(MOUSEX() + 12 + SYM_B + 4, MOUSEY() + 12, b.name, farbe("titeltext"))
+END SUB
+
+FUNCTION bausteinName$(i AS INTEGER) AS STRING
+    DIM k AS STRING : k = feldText$(i, "kind")
+    IF k = "table" THEN
+        IF feldSchalter(i, "table.zellmodus", FALSE) THEN RETURN "Gitter"
+        IF feldSchalter(i, "table.baum", FALSE) THEN RETURN "Baumtabelle"
+    END IF
+    DIM p AS INTEGER
+    FOR p = 0 TO LEN(bausteine) - 1
+        IF bausteine[p].kind = k THEN RETURN bausteine[p].name
+    NEXT
+    RETURN k
+END FUNCTION
+
+FUNCTION bausteinVon(i AS INTEGER) AS INTEGER
+    DIM n AS STRING : n = bausteinName$(i)
+    DIM p AS INTEGER
+    FOR p = 0 TO LEN(bausteine) - 1
+        IF bausteine[p].name = n THEN RETURN p
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' --- Navigator ------------------------------------------------------------------
+' Knoten 0 ist das Fenster, Knoten i + 1 das Control i.
+DIM navStumm AS BOOLEAN : navStumm = FALSE
+SUB navigatorFuellen()
+    navStumm = TRUE
+    GUI_TREE_CLEAR(baum)
+    DIM wurzel AS INTEGER : wurzel = GUI_TREE_ADD(baum, -1, fensterText$("name"))
+    DIM i AS INTEGER
+    FOR i = 0 TO anzahl() - 1
+        DIM n AS INTEGER : n = GUI_TREE_ADD(baum, wurzel, feldText$(i, "name"))
+        DIM p AS INTEGER : p = bausteinVon(i)
+        IF p >= 0 THEN GUI_TREE_ICON(baum, n, bausteine[p].symbol)
+    NEXT
+    GUI_TREE_EXPAND(baum, wurzel, TRUE)
+    navigatorAuswahl()
+    navStumm = FALSE
+END SUB
+
+SUB navigatorAuswahl()
+    GUI_TREE_SELECT(baum, auswahl + 1, TRUE)
+END SUB
+
+SUB navigatorPruefen()
+    IF navStumm THEN RETURN
+    IF NOT GUI_CHANGED(baum) THEN RETURN
+    DIM n AS INTEGER : n = GUI_TREE_SELECTED(baum)
+    IF n < 0 THEN RETURN
+    auswahlSetzen(n - 1)
+    auswahlGeaendert()
+END SUB
+
+' --- Auswahl, Status, Werkzeuge --------------------------------------------------
+SUB auswahlGeaendert()
+    inspektorFuellen()
+    navStumm = TRUE
+    navigatorAuswahl()
+    navStumm = FALSE
+    lageAnzeigen()
+    werkzeugeNachziehen()
+    protokoll("gewaehlt " + STR$(auswahl) + " " + STR$(LEN(gewaehlt)))
+END SUB
+
+SUB status(text AS STRING)
+    GUI_STATUSBAR_SET(sb, 0, text)
+END SUB
+
+SUB statusZoom()
+    GUI_STATUSBAR_SET(sb, 2, STR$(INT(zoomF * 100 + 0.5)) + " %")
+END SUB
+
+SUB lageAnzeigen()
+    IF auswahl >= 0 THEN
+        GUI_STATUSBAR_SET(sb, 1, feldText$(auswahl, "name") + "   " + STR$(feldZahl(auswahl, "x")) + ", " + STR$(feldZahl(auswahl, "y")) + "   " + STR$(feldZahl(auswahl, "w")) + " × " + STR$(feldZahl(auswahl, "h")))
+    ELSE
+        GUI_STATUSBAR_SET(sb, 1, fensterText$("name") + "   " + STR$(fensterB()) + " × " + STR$(fensterH()))
+    END IF
+END SUB
+
+SUB werkzeugeNachziehen()
+    GUI_TOOLBAR_ENABLE(tb, tbZurueck, kannZurueck())
+    GUI_TOOLBAR_ENABLE(tb, tbVor, kannVor())
+    GUI_MENU_ENABLE(miZurueck, kannZurueck())
+    GUI_MENU_ENABLE(miVor, kannVor())
+    DIM mehrere AS BOOLEAN : mehrere = LEN(gewaehlt) >= 2
+    GUI_TOOLBAR_ENABLE(tb, tbLinks, mehrere)
+    GUI_TOOLBAR_ENABLE(tb, tbOben, mehrere)
+    GUI_TOOLBAR_ENABLE(tb, tbMitteW, mehrere)
+    GUI_TOOLBAR_ENABLE(tb, tbVerteilen, LEN(gewaehlt) >= 3)
+    GUI_MENU_ENABLE(miVerdoppeln, auswahl >= 0)
+    GUI_MENU_ENABLE(miLoeschen, auswahl >= 0)
+    DIM titel AS STRING : titel = "Drachenhauch Studio -- " + IIF(formPfad = "", fensterText$("name"), BASENAME(formPfad))
+    IF geaendert THEN titel = titel + " *"
+    SETWINDOWTITLE(titel)
+END SUB

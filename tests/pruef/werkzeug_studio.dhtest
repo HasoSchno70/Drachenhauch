@@ -1,0 +1,273 @@
+' Drachenhauch Studio, Stufe 1 (studio/, docs/entwurf-studio.md): Fenster
+' entwerfen mit Bibliothek, Entwurfsflaeche, Ausrichtungslinien, Inspektor.
+'
+' Jeder Fall startet das Studio als Kind (_hilfen/studiolauf.dh): ein erster
+' Lauf misst die Lagen, ein zweiter spielt echte Klicks und Tasten ab. Das
+' Studio protokolliert, was es tut (DH_STUDIO_LOG).
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== der start zeigt bibliothek, navigator und inspektor
+IMPORT "laeufer.dh"
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, "", 6, "")
+PRINT "bereit "; slHat(log, "bereit")
+PRINT "neues fenster "; slHat(log, "neu-fenster")
+PRINT "bibliothekszeilen "; LEN(slAnfang(log, "lage zeile ")) >= 6
+PRINT "fensterfelder "; LEN(slAnfang(log, "lage feld title ")) > 0
+PRINT "keine fehler "; INSTR(aus, "Laufzeitfehler") < 0
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+bereit TRUE
+neues fenster TRUE
+bibliothekszeilen TRUE
+fensterfelder TRUE
+keine fehler TRUE
+
+=== ein baustein wird angeklickt und ins fenster gelegt, ein anderer hineingezogen
+' Klick: die Mitte des neuen Controls liegt an der Klickstelle, am Raster.
+' Zug: dasselbe an der Stelle, wo losgelassen wird.
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, "")
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(fx, fy) = slLage(m, "fenster")
+DIM kx AS INTEGER
+DIM ky AS INTEGER
+(kx, ky) = slLage(m, "zeile button/Knopf")
+DIM tx AS INTEGER
+DIM ty AS INTEGER
+(tx, ty) = slLage(m, "zeile textinput/Textfeld")
+slHin(10, 10)
+slKlick(kx, ky)
+slKlick(fx + 160, fy + 100)
+slWarten(4)
+slZug(tx, ty, fx + 300, fy + 200, 12, TRUE)
+slWarten(6)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, "")
+PRINT "geklickt "; slHat(log, "neu button Knopf1 112 88")
+PRINT "gezogen "; slHat(log, "neu textinput Textfeld1 208 184")
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+geklickt TRUE
+gezogen TRUE
+
+=== verschieben rastet an der kante des nachbarn ein, nicht am raster
+' Knopf1 steht bei x = 45 (nicht am Raster). Knopf2 sechs Punkte nach rechts
+' gezogen landet auf 45 -- das Raster gaebe 48. Senkrecht gibt es dort keine
+' Linie (die Fenstermitte 180 liegt neun Punkte unter der Unterkante), also
+' das Raster: 120 + 21 = 141 -> 144.
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, CWD$() + "/f.dhform")
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(fx, fy) = slLage(m, "fenster")
+slHin(10, 10)
+slZug(fx + 90, fy + 135, fx + 96, fy + 156, 10, TRUE)
+slWarten(6)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "bewegt ")
+    PRINT z
+NEXT
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"F","name":"F","w":520,"h":360,"widgets":[
+{"kind":"button","name":"Knopf1","text":"Eins","x":45,"y":40,"w":100,"h":30},
+{"kind":"button","name":"Knopf2","text":"Zwei","x":40,"y":120,"w":100,"h":30}]}
+--- erwartet
+bewegt 1 45 144 100 30
+
+=== waehrend des zugs steht die ausrichtungslinie im bild
+' Derselbe Zug, aber die Taste bleibt unten: zwischen den beiden Knoepfen
+' (Fensterlage y = 90) steht die Linie bei x = 45 in Rosa.
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, CWD$() + "/f.dhform")
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(fx, fy) = slLage(m, "fenster")
+slHin(10, 10)
+slZug(fx + 90, fy + 135, fx + 96, fy + 156, 10, FALSE)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LOG", CWD$() + "/b.log")
+SETENV("DH_STUDIO_GROESSE", "1440x900")
+SETENV("DH_STUDIO_AUFNAHME", CWD$() + "/ev.txt")
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "bild", slStudio, CWD$() + "/bild.png", STR$(slBild + 2), "--", CWD$() + "/f.dhform")
+WHILE PROCESS_RUNNING(p)
+    SLEEP(20)
+WEND
+DIM img AS IMAGE : img = LOADIMAGE(CWD$() + "/bild.png")
+FUNCTION rosa(c AS INTEGER) AS BOOLEAN
+    RETURN ((c SHR 16) BAND 255) > 180 AND ((c SHR 8) BAND 255) < 110 AND (c BAND 255) > 110
+END FUNCTION
+PRINT "linie bei 45 "; rosa(GETPIXEL(img, fx + 45, fy + 95))
+PRINT "nicht bei 60 "; NOT rosa(GETPIXEL(img, fx + 60, fy + 95))
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"F","name":"F","w":520,"h":360,"widgets":[
+{"kind":"button","name":"Knopf1","text":"Eins","x":45,"y":40,"w":100,"h":30},
+{"kind":"button","name":"Knopf2","text":"Zwei","x":40,"y":120,"w":100,"h":30}]}
+--- erwartet
+linie bei 45 TRUE
+nicht bei 60 TRUE
+
+=== ein griff aendert die groesse, ein rahmen waehlt mehrere, anordnen richtet aus
+' Griff rechts mittig von 140 auf 203 gezogen: am Raster 200, Breite 160.
+' Danach ein Rahmen ueber alle drei und Strg+Alt+Links: alle bei x = 40.
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, CWD$() + "/f.dhform")
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(fx, fy) = slLage(m, "fenster")
+slHin(10, 10)
+slKlick(fx + 90, fy + 55)
+slZug(fx + 140, fy + 55, fx + 203, fy + 55, 10, TRUE)
+slWarten(4)
+slZug(fx + 8, fy + 8, fx + 400, fy + 300, 10, TRUE)
+slWarten(4)
+slMit([341, 342], 263)
+slWarten(6)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+DIM z AS STRING
+FOR EACH z IN slProtokoll(log)
+    IF LEFT$(z, 7) = "bewegt " OR LEFT$(z, 7) = "rahmen " OR LEFT$(z, 11) = "angeordnet " THEN PRINT z
+NEXT
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"F","name":"F","w":520,"h":360,"widgets":[
+{"kind":"button","name":"Knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30},
+{"kind":"button","name":"Knopf2","text":"Zwei","x":64,"y":120,"w":100,"h":30},
+{"kind":"button","name":"Knopf3","text":"Drei","x":90,"y":200,"w":100,"h":30}]}
+--- erwartet
+bewegt 0 40 40 160 30
+rahmen 3
+angeordnet links 3
+
+=== rueckgaengig und wiederholen
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, "")
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(fx, fy) = slLage(m, "fenster")
+DIM kx AS INTEGER
+DIM ky AS INTEGER
+(kx, ky) = slLage(m, "zeile button/Knopf")
+slHin(10, 10)
+slKlick(kx, ky)
+slKlick(fx + 160, fy + 100)
+slWarten(4)
+slMit([341], 90)
+slWarten(4)
+slMit([341], 89)
+slWarten(6)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, "")
+DIM z AS STRING
+FOR EACH z IN slProtokoll(log)
+    IF LEFT$(z, 4) = "neu " OR LEFT$(z, 13) = "rueckgaengig " OR LEFT$(z, 12) = "wiederholen " THEN PRINT z
+NEXT
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+neu button Knopf1 112 88
+rueckgaengig 0
+wiederholen 1
+
+=== der inspektor aendert den text, und sichern schreibt die datei
+' Den Knopf waehlen, ins Feld Text klicken, Strg+A, Strg+V (die Ablage sagt
+' "Speichern"), Enter, dann Strg+S -- in dieselbe Datei.
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+' Erster Lauf waehlt den Knopf, damit die Felder des Inspektors im Protokoll stehen.
+slStarten(m, "", 6, CWD$() + "/f.dhform")
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(fx, fy) = slLage(m, "fenster")
+slHin(10, 10)
+slKlick(fx + 90, fy + 55)
+slWarten(4)
+slAufnahmeSchreiben(CWD$() + "/ev1.txt")
+slStarten(m, CWD$() + "/ev1.txt", slBild + 10, CWD$() + "/f.dhform")
+DIM tx AS INTEGER
+DIM ty AS INTEGER
+(tx, ty) = slLage(m, "feld text")
+DIM nx AS INTEGER
+DIM ny AS INTEGER
+(nx, ny) = slLage(m, "feld name")
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slKlick(fx + 90, fy + 55)
+slWarten(4)
+slKlick(tx, ty)
+slMit([341], 65)
+slMit([341], 86)
+slTaste(257)
+slWarten(4)
+slMit([341], 83)
+slWarten(6)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_ABLAGE", "Speichern")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+PRINT "feld gefunden "; tx > 0 AND nx > 0
+PRINT "uebernommen "; slHat(log, "inspektor text")
+PRINT "gesichert "; LEN(slAnfang(log, "gesichert ")) = 1
+DIM d AS JSON_HANDLE : d = JSON_LOAD(CWD$() + "/f.dhform")
+PRINT "text in der datei "; JSON_GET_STRING(d, "widgets.0.text")
+PRINT "name bleibt "; JSON_GET_STRING(d, "widgets.0.name")
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "json"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"F","name":"F","w":520,"h":360,"widgets":[
+{"kind":"button","name":"Knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}]}
+--- erwartet
+feld gefunden TRUE
+uebernommen TRUE
+gesichert TRUE
+text in der datei Speichern
+name bleibt Knopf1

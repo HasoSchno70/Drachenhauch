@@ -1,0 +1,23 @@
+/* Drachenhauch Studio -- das Aussehen der IDE.
+   Farben ueber die Namen des Themas (win_bg, widget_bg, accent, muted_fg ...),
+   damit dieselbe Datei hell und dunkel traegt. */
+
+/* Die Kopfzeilen der Gruppen im Inspektor: flach, kraeftig, mit Pfeil. */
+button.gruppenkopf          { bg: win_bg; radius: 4; stil: fett; abstand: 4 8; schatten: 0 }
+button.gruppenkopf:hover    { bg: widget_bg }
+
+/* Name des Controls oben im Inspektor. */
+label.insptitel             { groesse: 19; stil: fett }
+label.leise                 { fg: muted_fg }
+label.feldname              { fg: muted_fg }
+
+/* Bibliothek und Navigator: luftige Zeilen fuer die Sinnbilder. */
+listbox.bibliothek          { abstand: 10 6 }
+
+
+/* Farbfelder im Inspektor: ein Feld, kein Knopf. */
+button.farbfeld             { radius: 4; verlauf: 0; glanz: 0 }
+
+/* Die Werkzeugleiste ohne Rahmen. */
+toolbar                     { randbreite: 0 }
+statusbar                   { randbreite: 0 }

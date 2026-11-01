@@ -1,0 +1,383 @@
+' ============================================================
+'  DRACHENHAUCH STUDIO
+' ============================================================
+'  Eine IDE fuer Programme mit Oberflaeche, im Stil von Xojo, mit der
+'  Laufzeit dhrt. Entwurf: docs/entwurf-studio.md. Stufe 1: das Fenster
+'  entwerfen -- Bibliothek mit Sinnbildern, Entwurfsflaeche mit Griffen,
+'  Ausrichtungslinien und Rueckgaengig, Inspektor mit Gruppen und echten
+'  Editoren, Navigator. Projekte, Code und Starten folgen in Stufe 2 und 3.
+'
+'  Aufruf:  dhrt run studio/studio.dh [-- fenster.dhform]
+'  Test:    DH_STUDIO_LOG=<datei> protokolliert die Ereignisse zeilenweise.
+' ============================================================
+IMPORT "gui"
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+
+DIM logDatei AS STRING : logDatei = GETENV$("DH_STUDIO_LOG")
+SUB protokoll(text AS STRING)
+    IF logDatei = "" THEN RETURN
+    DIM f AS FILE
+    f = OPENFILE(logDatei, "a")
+    WRITELINE(f, text)
+    CLOSEFILE(f)
+END SUB
+
+IMPORT "modell.dh"
+IMPORT "bibliothek.dh"
+IMPORT "entwurf.dh"
+IMPORT "inspektor.dh"
+IMPORT "oberflaeche.dh"
+
+' Fuer Pruefungen: DH_STUDIO_GROESSE=BxH haelt das Fenster fest (sonst haengen
+' alle Lagen am Bildschirm), DH_STUDIO_AUFNAHME spielt eine Aufnahme ab,
+' DH_STUDIO_ABLAGE legt Text in die Zwischenablage (zum Tippen per Strg+V).
+DIM festeGroesse AS STRING : festeGroesse = GETENV$("DH_STUDIO_GROESSE")
+DIM schirmB AS INTEGER : schirmB = 1440
+DIM schirmH AS INTEGER : schirmH = 900
+IF INSTR(festeGroesse, "x") > 0 THEN
+    schirmB = INT(VAL(LEFT$(festeGroesse, INSTR(festeGroesse, "x"))))
+    schirmH = INT(VAL(MID$(festeGroesse, INSTR(festeGroesse, "x") + 1, 10)))
+END IF
+SCREEN(schirmB, schirmH, "Drachenhauch Studio", 1)
+WINDOW_RESIZABLE(TRUE)
+WINDOW_MIN_SIZE(1100, 700)
+SETFPS(60)
+IF festeGroesse = "" THEN WINDOW_MAXIMIZE()
+
+' Eine Schrift fuer die Oberflaeche UND fuer das, was das Studio selbst
+' zeichnet (Titelleiste, Masse) -- TEXT bliebe sonst bei der Pixelschrift.
+DIM sans AS INTEGER : sans = LOADFONT("sans", 32, "×…–")
+GUI_FONT(sans, 15)
+SETFONT(sans, 14)
+themaSetzen()
+
+bausteineAnlegen()
+oberflaecheAnlegen()
+
+' Der Mittelgrund mit Punkten: ein Bereich im Hauptfenster (gezeichnet unter
+' dem Entwurfsfenster), die Punkte nur ausserhalb des Entwurfsfensters.
+DIM mittePanel AS GUI_WIDGET : mittePanel = GUI_PANEL(win, 0, 0, 10, 10)
+GUI_ADD_CLASS(mittePanel, "mitte")
+DIM punkteX AS ARRAY OF INTEGER : punkteX = []
+DIM punkteY AS ARRAY OF INTEGER : punkteY = []
+DIM punkteX2 AS ARRAY OF INTEGER : punkteX2 = []
+DIM punkteY2 AS ARRAY OF INTEGER : punkteY2 = []
+DIM punkteFuer AS STRING : punkteFuer = ""
+
+SUB mitteNachziehen()
+    GUI_SET_BOUNDS(mittePanel, mitteX, mitteY - inhaltOben, mitteB, mitteH)
+    GUI_SET_COLOR(mittePanel, "bg", farbe("mitte"))
+    GUI_SET_COLOR(mittePanel, "border", farbe("mitte"))
+END SUB
+
+' Die Punkte im Mittelgrund, nur neu gerechnet, wenn sich Lage oder Groesse
+' aendern -- je Bild waeren es einige tausend Rechnungen.
+SUB punkteRechnen()
+    DIM schluessel AS STRING : schluessel = STR$(mitteX) + "," + STR$(mitteY) + "," + STR$(mitteB) + "," + STR$(mitteH) + "," + STR$(formX) + "," + STR$(formY) + "," + STR$(zS(fensterB())) + "," + STR$(zS(fensterH()))
+    IF schluessel = punkteFuer THEN RETURN
+    punkteFuer = schluessel
+    punkteX = [] : punkteY = [] : punkteX2 = [] : punkteY2 = []
+    DIM x1 AS INTEGER : x1 = formX - 18
+    DIM y1 AS INTEGER : y1 = formY - TITEL_H - 18
+    DIM x2 AS INTEGER : x2 = formX + zS(fensterB()) + 18
+    DIM y2 AS INTEGER : y2 = formY + zS(fensterH()) + 28
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+    FOR y = mitteY + 12 TO mitteY + mitteH - 4 STEP 20
+        FOR x = mitteX + 12 TO mitteX + mitteB - 4 STEP 20
+            IF x >= x1 AND x <= x2 AND y >= y1 AND y <= y2 THEN CONTINUE
+            ARRAY_PUSH(punkteX, x) : ARRAY_PUSH(punkteY, y)
+            ARRAY_PUSH(punkteX2, x + 1) : ARRAY_PUSH(punkteY2, y + 1)
+        NEXT
+    NEXT
+END SUB
+
+' --- Datei ------------------------------------------------------------------
+SUB neuesFenster()
+    doc = JSON_PARSE(leeresFenster$())
+    formPfad = ""
+    auswahlSetzen(-1)
+    staende = [] : standPos = -1
+    merken()
+    geaendert = FALSE
+    nachAenderung(FALSE)
+    lageAnzeigen()
+    status("Neues Fenster. Bausteine aus der Bibliothek ins Fenster ziehen.")
+    protokoll("neu-fenster")
+END SUB
+
+SUB fensterLaden(pfad AS STRING)
+    IF NOT FILEEXISTS(pfad) THEN
+        neuesFenster()
+        formPfad = pfad
+        status("Neu: " + pfad)
+        RETURN
+    END IF
+    doc = JSON_LOAD(pfad)
+    IF NOT JSON_HAS(doc, "widgets") THEN JSON_SET_JSON(doc, "widgets", JSON_NEW_ARRAY())
+    IF NOT JSON_HAS(doc, "name") THEN JSON_SET_STRING(doc, "name", REGEX_REPLACE(BASENAME(pfad), "\.dhform$", ""))
+    ' Controls ohne Namen bekommen einen -- er wird zum Feld der Klasse.
+    DIM i AS INTEGER
+    FOR i = 0 TO anzahl() - 1
+        IF feldText$(i, "name") = "" THEN JSON_SET_STRING(doc, wz$(i, "name"), eindeutigerName$(feldText$(i, "kind")))
+    NEXT
+    formPfad = pfad
+    auswahlSetzen(-1)
+    staende = [] : standPos = -1
+    merken()
+    geaendert = FALSE
+    nachAenderung(FALSE)
+    lageAnzeigen()
+    status("Geladen: " + BASENAME(pfad) + " (" + STR$(anzahl()) + " Controls)")
+    protokoll("geladen " + STR$(anzahl()))
+END SUB
+
+FUNCTION sichern(alsNeu AS BOOLEAN) AS BOOLEAN
+    IF formPfad = "" OR alsNeu THEN
+        DIM p AS STRING : p = FILE_SAVE_DIALOG("Fenster sichern", fensterText$("name") + ".dhform", "dhform")
+        IF p = "" THEN RETURN FALSE
+        IF LOWER$(RIGHT$(p, 7)) <> ".dhform" THEN p = p + ".dhform"
+        formPfad = p
+    END IF
+    WRITEALL(formPfad, JSON_PRETTY(doc))
+    geaendert = FALSE
+    werkzeugeNachziehen()
+    status("Gesichert: " + BASENAME(formPfad))
+    protokoll("gesichert " + formPfad)
+    RETURN TRUE
+END FUNCTION
+
+' Neu, Oeffnen und Beenden fragen bei Ungesichertem; `wartet` merkt, was
+' nach der Antwort geschehen soll.
+DIM frage AS GUI_WINDOW : frage = -1
+DIM wartet AS STRING : wartet = ""
+DIM beenden AS BOOLEAN : beenden = FALSE
+
+SUB ausfuehren(was AS STRING)
+    SELECT CASE was
+        CASE "neu" : neuesFenster()
+        CASE "oeffnen"
+            DIM p AS STRING : p = FILE_OPEN_DIALOG("Fenster öffnen", "dhform")
+            IF p <> "" THEN fensterLaden(p)
+        CASE "beenden" : beenden = TRUE
+    END SELECT
+END SUB
+
+SUB anfragen(was AS STRING)
+    IF frage >= 0 OR GUI_MODAL() THEN RETURN
+    IF NOT geaendert THEN
+        ausfuehren(was)
+        RETURN
+    END IF
+    wartet = was
+    frage = GUI_DIALOG("Ungesicherte Änderungen", "Das Fenster " + fensterText$("name") + " ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen")
+END SUB
+
+SUB frageAuswerten()
+    IF frage < 0 THEN RETURN
+    DIM a AS INTEGER : a = GUI_ANSWER(frage)
+    IF a = 0 THEN RETURN
+    frage = -1
+    IF a = 1 THEN
+        IF NOT sichern(FALSE) THEN RETURN
+    ELSEIF a = 3 THEN
+        wartet = ""
+        RETURN
+    END IF
+    ausfuehren(wartet)
+    wartet = ""
+END SUB
+
+DIM ueber AS GUI_WINDOW : ueber = -1
+SUB ueberZeigen()
+    IF ueber >= 0 THEN GUI_WINDOW_DESTROY(ueber)
+    ueber = GUI_DIALOG("Drachenhauch Studio", "Eine IDE für Programme mit Oberfläche, mit der Laufzeit dhrt " + VERSION$() + "." + CHR$(10) + "Stufe 1: Fenster entwerfen.", "ok")
+END SUB
+
+' --- Menue und Werkzeugleiste -------------------------------------------------
+SUB befehle()
+    DIM t AS INTEGER : t = GUI_TOOLBAR_CLICKED(tb)
+    IF GUI_CLICKED(miNeu) OR t = tbNeu THEN anfragen("neu")
+    IF GUI_CLICKED(miOeffnen) OR t = tbOeffnen THEN anfragen("oeffnen")
+    IF GUI_CLICKED(miSichern) OR t = tbSichern THEN sichern(FALSE)
+    IF GUI_CLICKED(miSichernUnter) THEN sichern(TRUE)
+    IF GUI_CLICKED(miBeenden) THEN anfragen("beenden")
+    IF GUI_CLICKED(miZurueck) OR t = tbZurueck THEN zurueck()
+    IF GUI_CLICKED(miVor) OR t = tbVor THEN vor()
+    IF GUI_CLICKED(miVerdoppeln) AND auswahl >= 0 THEN controlsVerdoppeln() : nachAenderung(TRUE) : protokoll("verdoppelt")
+    IF GUI_CLICKED(miLoeschen) AND auswahl >= 0 THEN loeschen()
+    IF GUI_CLICKED(miAlles) THEN allesWaehlen() : auswahlGeaendert()
+    IF t = tbLinks THEN anordnen("links")
+    IF t = tbOben THEN anordnen("oben")
+    IF t = tbMitteW THEN anordnen("mitte_w")
+    IF t = tbVerteilen THEN anordnen("vert_w")
+    IF GUI_CLICKED(miGroesser) OR t = tbGroesser THEN zoomStufe(1)
+    IF GUI_CLICKED(miKleiner) OR t = tbKleiner THEN zoomStufe(-1)
+    IF GUI_CLICKED(miNormal) OR GUI_STATUSBAR_CLICKED(sb) = 2 THEN zoomStufe(0)
+    IF GUI_CLICKED(miRaster) THEN rasterAn = GUI_MENU_CHECKED(miRaster)
+    IF GUI_CLICKED(miLinien) THEN linienAn = GUI_MENU_CHECKED(miLinien)
+    IF GUI_CLICKED(miHell) THEN
+        hell = GUI_MENU_CHECKED(miHell)
+        themaSetzen()
+        mitteNachziehen()
+        punkteFuer = ""
+    END IF
+    IF GUI_CLICKED(miUeber) THEN ueberZeigen()
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(anordnenPunkte) - 1
+        IF GUI_CLICKED(anordnenPunkte[k]) THEN anordnen(anordnenWas[k])
+    NEXT
+END SUB
+
+SUB zurueck()
+    IF NOT kannZurueck() THEN RETURN
+    standPos = standPos - 1
+    doc = JSON_PARSE(staende[standPos])
+    auswahlBereinigen()
+    nachAenderung(FALSE)
+    geaendert = TRUE
+    werkzeugeNachziehen()
+    protokoll("rueckgaengig " + STR$(anzahl()))
+END SUB
+
+SUB vor()
+    IF NOT kannVor() THEN RETURN
+    standPos = standPos + 1
+    doc = JSON_PARSE(staende[standPos])
+    auswahlBereinigen()
+    nachAenderung(FALSE)
+    geaendert = TRUE
+    werkzeugeNachziehen()
+    protokoll("wiederholen " + STR$(anzahl()))
+END SUB
+
+SUB loeschen()
+    DIM n AS INTEGER : n = LEN(gewaehlt)
+    controlsLoeschen()
+    nachAenderung(TRUE)
+    status(STR$(n) + IIF(n = 1, " Control gelöscht.", " Controls gelöscht."))
+    protokoll("geloescht " + STR$(n))
+END SUB
+
+' Tasten, die das Entwurfsfenster meinen -- nur, wenn kein Eingabefeld den
+' Fokus hat (sonst gehoeren Pfeile und Esc dem Feld).
+SUB tasten()
+    DIM fokus AS GUI_WIDGET : fokus = GUI_FOCUSED()
+    IF fokus >= 0 THEN
+        DIM art AS STRING : art = GUI_KIND(fokus)
+        IF art = "textinput" OR art = "textarea" OR art = "spinner" OR art = "dropdown" THEN RETURN
+    END IF
+    IF GUI_MODAL() THEN RETURN
+    DIM schritt AS INTEGER : schritt = IIF(umschalt(), RASTER, 1)
+    IF NOT strg() THEN
+        IF KEYREPEAT(KEY_LEFT) THEN schieben(-schritt, 0)
+        IF KEYREPEAT(KEY_RIGHT) THEN schieben(schritt, 0)
+        IF KEYREPEAT(KEY_UP) THEN schieben(0, -schritt)
+        IF KEYREPEAT(KEY_DOWN) THEN schieben(0, schritt)
+    END IF
+    IF strg() AND KEYHIT(KEY_A) THEN allesWaehlen() : auswahlGeaendert()
+    IF KEYHIT(KEY_ESCAPE) THEN
+        IF bibScharf() THEN
+            bibEntschaerfen()
+            status("Abgebrochen.")
+        ELSE
+            auswahlSetzen(-1)
+            auswahlGeaendert()
+        END IF
+    END IF
+END SUB
+
+' --- Start ------------------------------------------------------------------
+IF ARGC() >= 1 THEN
+    DIM startDatei AS STRING : startDatei = ARG$(0)
+    IF LEFT$(startDatei, 1) <> "/" AND LEFT$(startDatei, 1) <> "\" AND MID$(startDatei, 1, 1) <> ":" THEN
+        IF GETENV$("DHRT_START_DIR") <> "" THEN startDatei = PATHJOIN(GETENV$("DHRT_START_DIR"), startDatei)
+    END IF
+    fensterLaden(startDatei)
+ELSE
+    neuesFenster()
+END IF
+mitteNachziehen()
+protokoll("bereit")
+IF GETENV$("DH_STUDIO_ABLAGE") <> "" THEN CLIPBOARD_SET(GETENV$("DH_STUDIO_ABLAGE"))
+IF GETENV$("DH_STUDIO_AUFNAHME") <> "" THEN
+    IF FILEEXISTS(GETENV$("DH_STUDIO_AUFNAHME")) THEN AUTOMATION_PLAY(GETENV$("DH_STUDIO_AUFNAHME"))
+END IF
+
+' Wo Bibliothekszeilen, Inspektorfelder, Leistenknoepfe und das Fenster auf
+' dem Schirm liegen -- eine Pruefung liest das aus einem ersten Lauf und
+' klickt im zweiten dorthin. Gemessen im dritten Bild: vor dem ersten
+' GUI_UPDATE gilt die Stildatei noch nicht, und die Zeilen der Bibliothek
+' waeren 22 statt 36 Punkte hoch.
+SUB lagenProtokollieren()
+    protokoll("lage fenster " + STR$(formX) + " " + STR$(formY))
+    DIM r AS INTEGER
+    FOR r = 0 TO LEN(bibZeile) - 1
+        IF bibZeile[r] < 0 THEN CONTINUE
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        DIM b AS INTEGER
+        DIM h AS INTEGER
+        (x, y, b, h) = GUI_LISTBOX_ITEM_RECT(lstBib, r)
+        IF h > 0 AND y >= GUI_GET_Y(lstBib) + inhaltOben AND y + h <= GUI_GET_Y(lstBib) + GUI_GET_H(lstBib) + inhaltOben THEN
+            protokoll("lage zeile " + bausteine[bibZeile[r]].kind + "/" + bausteine[bibZeile[r]].grundname + " " + STR$(x + b \ 2) + " " + STR$(y + h \ 2))
+        END IF
+    NEXT
+    DIM k AS INTEGER
+    FOR k = 0 TO GUI_TOOLBAR_COUNT(tb) - 1
+        protokoll("lage leiste " + STR$(k) + " " + STR$(GUI_TOOLBAR_ITEM_X(tb, k) + GUI_TOOLBAR_ITEM_W(tb, k) \ 2) + " " + STR$(inhaltOben + LEISTE_H \ 2))
+    NEXT
+    protokoll("lage suche " + STR$(GUI_GET_X(tfSuche) + 40) + " " + STR$(GUI_GET_Y(tfSuche) + inhaltOben + 12))
+END SUB
+
+' Die Lage der Inspektorfelder (nach jeder Auswahl neu, darum eine eigene SUB).
+SUB felderProtokollieren()
+    IF logDatei = "" THEN RETURN
+    DIM z AS InspZeile
+    FOR EACH z IN inspZeilen
+        IF NOT z.sichtbar OR NOT GUI_VISIBLE(z.ed) THEN CONTINUE
+        protokoll("lage feld " + z.schluessel + " " + STR$(GUI_GET_X(z.ed) + 30) + " " + STR$(GUI_GET_Y(z.ed) + inhaltOben + 12))
+    NEXT
+END SUB
+
+DIM bildNr AS INTEGER : bildNr = 0
+DIM warB AS INTEGER : warB = SCREENWIDTH()
+DIM warH AS INTEGER : warH = SCREENHEIGHT()
+WHILE NOT beenden
+    IF WINDOW_CLOSE_REQUESTED() THEN anfragen("beenden")
+    IF QUITREQUESTED() AND NOT WINDOW_CLOSE_REQUESTED() THEN BREAK
+    IF SCREENWIDTH() <> warB OR SCREENHEIGHT() <> warH THEN
+        warB = SCREENWIDTH() : warH = SCREENHEIGHT()
+        GUI_WINDOW_SET_BOUNDS(win, 0, 0, warB, warH)
+        dockGroesse()
+        verteilen()
+        mitteNachziehen()
+    END IF
+    bibVorUpdate()
+    GUI_UPDATE()
+    bildNr = bildNr + 1
+    IF bildNr = 3 AND logDatei <> "" THEN lagenProtokollieren() : felderProtokollieren()
+    IF GUI_DOCK_CHANGED(win) THEN verteilen() : mitteNachziehen()
+    befehle()
+    bibNachUpdate()
+    navigatorPruefen()
+    inspektorPruefen()
+    tasten()
+    mausAufEntwurf()
+    frageAuswerten()
+    ' Das Entwurfsfenster obenauf -- ein Klick ins Hauptfenster legte es
+    ' sonst darunter. Dialoge, Menues und Popover liegen weiter oben.
+    IF frm >= 0 AND NOT GUI_MODAL() THEN GUI_WINDOW_FRONT(frm)
+
+    CLS(farbe("mitte"))
+    GUI_DRAW(FALSE)
+    punkteRechnen()
+    IF LEN(punkteX) > 0 THEN BOXES(punkteX, punkteY, punkteX2, punkteY2, farbe("punkte"))
+    entwurfZeichnen()
+    GUI_DRAW_TOP()
+    bibZugZeichnen()
+    FLIP()
+WEND
+protokoll("ende")
