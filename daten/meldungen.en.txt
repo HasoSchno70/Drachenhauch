@@ -106,17 +106,16 @@ Erwartet Member-Name in ENUM	Expected a member name in ENUM
 Erwartet Membername nach '.'	Expected a member name after '.'
 Erwartet ENUM-Name	Expected an ENUM name
 END ENUM erwartet	Expected END ENUM
-Erwartet ENUM nach END	Expected ENUM after END
+END {} fehlt -- hier steht END {}, aber das {} davor ist noch offen	END {} is missing -- END {} stands here, but the {} before it is still open
+Erwartet END {}	Expected END {}
 ENUM: mindestens ein Member erforderlich	ENUM: at least one member required
 ENUM: Member doppelt deklariert	ENUM: member declared twice
 END WITH erwartet, Programmende erreicht	Expected END WITH, reached the end of the program
-Erwartet WITH nach END	Expected WITH after END
 Leeres `.` in WITH-Block (erwartet `.member`)	Empty `.` in WITH block (expected `.member`)
 CATCH, FINALLY oder END TRY erwartet	Expected CATCH, FINALLY or END TRY
 CATCH meldung -- ohne AS: die Meldung ist immer ein STRING, und es gibt nur EIN CATCH je TRY	CATCH message -- without AS: the message is always a STRING, and there is only ONE CATCH per TRY
 FINALLY oder END TRY erwartet	Expected FINALLY or END TRY
 END TRY erwartet	Expected END TRY
-Erwartet TRY nach END	Expected TRY after END
 Erwartet OF nach ARRAY	Expected OF after ARRAY
 Erwartet OF nach MAP	Expected OF after MAP
 MAP-Schluessel muessen STRING sein (Phase 5a)	MAP keys must be STRING (phase 5a)
@@ -134,13 +133,11 @@ ELSEIF geht nur im mehrzeiligen IF -- IF ... THEN, dann jeder Zweig auf eigenen 
 END IF erwartet, Programmende erreicht	Expected END IF, reached the end of the program
 ELSE IF: in Drachenhauch in EINEM Wort -- ELSEIF bedingung THEN	ELSE IF: in Drachenhauch it is ONE word -- ELSEIF condition THEN
 Erwartet END IF	Expected END IF
-Erwartet IF nach END	Expected IF after END
 Erwartet CASE nach SELECT	Expected CASE after SELECT
 END SELECT erwartet	Expected END SELECT
 Erwartet CASE oder END SELECT	Expected CASE or END SELECT
 CASE nach CASE ELSE - ELSE muss letzter Fall sein	CASE after CASE ELSE - ELSE must be the last case
 Erwartet END SELECT	Expected END SELECT
-Erwartet SELECT nach END	Expected SELECT after END
 CASE IS: Erwartet Vergleichsoperator (=, <>, <, >, <=, >=)	CASE IS: expected a comparison operator (=, <>, <, >, <=, >=)
 WEND erwartet, Programmende erreicht	Expected WEND, reached the end of the program
 WEND (oder END WHILE) erwartet -- hier endet noch die WHILE-Schleife	Expected WEND (or END WHILE) -- the WHILE loop still ends here
@@ -166,23 +163,19 @@ BYREF-Parameter koennen keinen Default-Wert haben	BYREF parameters cannot have a
 SUB New gibt es nicht -- der Konstruktor einer Klasse heisst SUB Init(...), NEW Klasse(...) ruft ihn	There is no SUB New -- the constructor of a class is called SUB Init(...), NEW Class(...) calls it
 Erwartet SUB-Name	Expected a SUB name
 END SUB erwartet, Programmende erreicht	Expected END SUB, reached the end of the program
-Erwartet SUB nach END	Expected SUB after END
 Erwartet FUNCTION-Name	Expected a FUNCTION name
 Erwartet AS <Rueckgabetyp> nach Parameterliste	Expected AS <return type> after the parameter list
 END FUNCTION erwartet, Programmende erreicht	Expected END FUNCTION, reached the end of the program
-Erwartet FUNCTION nach END	Expected FUNCTION after END
 OPERATOR: erwartet einen der Operatoren + - * / MOD = <> < > <= >=	OPERATOR: expected one of the operators + - * / MOD = <> < > <= >=
 OPERATOR: erwartet genau 1 Parameter (other)	OPERATOR: expected exactly 1 parameter (other)
 OPERATOR: Parameter darf nicht BYREF sein	OPERATOR: the parameter must not be BYREF
 OPERATOR: Parameter darf nicht variadic sein	OPERATOR: the parameter must not be variadic
 Erwartet AS <Rueckgabetyp> nach OPERATOR-Parameter	Expected AS <return type> after the OPERATOR parameter
 END OPERATOR erwartet, Programmende erreicht	Expected END OPERATOR, reached the end of the program
-Erwartet OPERATOR nach END	Expected OPERATOR after END
 Erwartet GET oder SET nach PROPERTY	Expected GET or SET after PROPERTY
 Erwartet Property-Name	Expected a property name
 Erwartet AS <Rueckgabetyp> nach PROPERTY GET-Parametern	Expected AS <return type> after the PROPERTY GET parameters
 END PROPERTY erwartet, Programmende erreicht	Expected END PROPERTY, reached the end of the program
-Erwartet PROPERTY nach END	Expected PROPERTY after END
 PROPERTY GET nimmt keine Parameter	PROPERTY GET takes no parameters
 PROPERTY SET muss genau einen Parameter haben (den neuen Wert)	PROPERTY SET must have exactly one parameter (the new value)
 Erwartet Klassenname nach CLASS	Expected a class name after CLASS
@@ -194,13 +187,11 @@ Erwartet CONST nach STATIC im CLASS-Body	Expected CONST after STATIC in the CLAS
 PRIVATE gibt es in einer Klasse nicht -- nur vor SUB/FUNCTION/DIM/CONST auf oberster Ebene einer Datei	There is no PRIVATE inside a class -- only before SUB/FUNCTION/DIM/CONST at the top level of a file
 Felder werden mit DIM angelegt: DIM {} AS ...	Fields are declared with DIM: DIM {} AS ...
 Unerwartet im CLASS-Body (erlaubt: DIM, SUB, FUNCTION, OPERATOR, STATIC CONST, PROPERTY)	Unexpected in the CLASS body (allowed: DIM, SUB, FUNCTION, OPERATOR, STATIC CONST, PROPERTY)
-Erwartet CLASS nach END	Expected CLASS after END
 Erwartet SUB-Name nach ABSTRACT	Expected a SUB name after ABSTRACT
 Erwartet FUNCTION-Name nach ABSTRACT	Expected a FUNCTION name after ABSTRACT
 Erwartet Name nach STRUCT	Expected a name after STRUCT
 END STRUCT erwartet, Programmende erreicht	Expected END STRUCT, reached the end of the program
 Im STRUCT-Body sind nur DIM-Felder erlaubt	Only DIM fields are allowed in the STRUCT body
-Erwartet STRUCT nach END	Expected STRUCT after END
 Erwartet Klassenname nach NEW	Expected a class name after NEW
 IS: Erwartet einen Typnamen, z.B. `x IS Gegner` oder `x IS NIL`	IS: expected a type name, e.g. `x IS Enemy` or `x IS NIL`
 Erwartet Membername nach '.' im WITH-Block	Expected a member name after '.' in the WITH block

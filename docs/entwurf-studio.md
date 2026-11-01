@@ -9,13 +9,15 @@ aber mit der Laufzeit `dhrt`. Sie ersetzt den Form-Designer
 * *Ein Projekt ist ein Ordner mit lesbaren Dateien.*
 * *Der Name ist „Drachenhauch Studio“.*
 
-**Stand:** Stufe 1 und 2 sind gebaut (2026-11-01, Ordner `studio/`, Handbuch
-[studio.md](studio.md), Prüfungen `tests/pruef/werkzeug_studio.dhtest` und
-`tests/pruef/werkzeug_studio2.dhtest`). Für Stufe 2 kamen in die Laufzeit
-schließbare Reiter im Reiterwerk (`GUI_TABCONTROL_SET "schliessbar"`,
-`GUI_TABCONTROL_CLOSED`) und `GUI_TREE_ITEM_RECT`. Fehler am Code und die
-Vervollständigung folgen mit Stufe 3, weil sie die erzeugten Basisklassen
-brauchen. Die drei Messungen vor Stufe 1 ergaben:
+**Stand:** Stufe 1 bis 3 sind gebaut (2026-11-01, Ordner `studio/`, Handbuch
+[studio.md](studio.md), Prüfungen `tests/pruef/werkzeug_studio.dhtest`,
+`tests/pruef/werkzeug_studio2.dhtest` und `tests/pruef/werkzeug_studio3.dhtest`).
+Für Stufe 2 kamen in die Laufzeit schließbare Reiter im Reiterwerk
+(`GUI_TABCONTROL_SET "schliessbar"`, `GUI_TABCONTROL_CLOSED`) und
+`GUI_TREE_ITEM_RECT`. Für Stufe 3 kopiert `dhrt --export` keine importierten
+Quellen mehr als Dateien neben die Exe (sie stecken im Bytecode). Die
+Vervollständigung im Code-Feld ist noch offen. Die drei Messungen vor Stufe 1
+ergaben:
 * Der Neuaufbau kostet bei 1000 Controls 2,7 ms.
 * Ein Klick ins Hauptfenster legt es über die Entwurfsfläche;
   `GUI_WINDOW_FRONT` je Bild holt sie zurück.
@@ -80,17 +82,23 @@ meinprojekt/
   bilder/                   ' Bilder des Projekts
   _studio/                  ' erzeugt, nie von Hand: nicht ins git
     main.dh                 ' Einstieg: IMPORTs, App anlegen, Startfenster, Bildschleife
+    studio_laufzeit.dh      ' StudioApp, StudioFenster, studioLauf
     Hauptfenster_basis.dh   ' CLASS Hauptfenster_Basis: Controls, Aufbau, Verdrahtung
+    projekt/                ' der Code des Projekts im Editorstand
 ```
 
 **Eine Klasse lässt sich in Drachenhauch nicht auf zwei Dateien verteilen.**
 Darum zwei Klassen je Fenster:
 
 * `Hauptfenster_Basis` ist erzeugt. Sie hat ein Feld je Control, baut das
-  Fenster Aufruf für Aufruf (der heutige DH-Code-Weg des Form-Designers, also
-  ohne `.dhform` zur Laufzeit) und verdrahtet jedes Ereignis mit
-  `GUI_ON_CLICK(knopf1, Self.knopf1_Klick)`. Für jedes verdrahtete Ereignis
-  steht dort eine leere Methode.
+  Fenster und verdrahtet jedes Ereignis mit
+  `GUI_ON_CLICK(Self.knopf1, Self.knopf1_Klick)`. Für jedes verdrahtete
+  Ereignis steht dort eine leere Methode. **Gebaut (Stufe 3) wird anders als
+  hier zuerst geplant:** nicht Aufruf für Aufruf, sondern aus dem Layout als
+  JSON, das in der Klasse steht (`GUI_FROM_JSON`, die Rückrufnamen
+  herausgenommen); die Felder holt `GUI_WINDOW_WIDGET`. So sieht das Fenster
+  genau so aus wie im Entwurf, auch für Eigenschaften, die der DH-Code-Weg
+  nicht kennt -- und eine `.dhform` braucht es zur Laufzeit trotzdem nicht.
 * `Hauptfenster` gehört dem Nutzer. Sie leitet ab und überschreibt die
   Methoden, die er gefüllt hat. Gebundene Methoden werden beim Aufruf
   aufgelöst, die Überschreibung gewinnt also.
@@ -98,6 +106,16 @@ Darum zwei Klassen je Fenster:
 So bleibt die Datei des Nutzers lesbar (nur sein Code), und das Projekt
 läuft ohne die IDE mit `dhrt run _studio/main.dh`. Eine Ausfuhr braucht keine
 `.dhform` neben der Exe.
+
+Den Code des Projekts schreibt das Studio beim Starten als Abbild des
+Editors nach `_studio/projekt/`, nicht aus dem Projektordner eingebunden.
+Dazu führt `codeSetzen$` eine Zeilenkarte (Methode, Zeile im Rumpf,
+Einrückung): eine Meldung `projekt/App.dh:7` wird damit zu
+`App.Geoeffnet, Zeile 3`, auch wenn die Datei im Projektordner von Hand
+anders geschrieben ist. Für die Prüfung vor dem Start setzt das Studio
+dieselben Teile im Speicher zusammen und fragt `CODE_CHECK$`; das END einer
+Methode zählt dabei als Zeile hinter dem Rumpf (dort meldet der Übersetzer
+ein offenes `IF`).
 
 ## Ereignisse
 
@@ -109,15 +127,15 @@ in der Bildschleife:
 * **Fenster:** `Geoeffnet` nach dem Aufbau, `Schliessen` über
   `GUI_WINDOW_CLOSED`, `Groesse` bei geänderter Fenstergröße.
 * **Listen und Bäume:** `Doppelklick` über `GUI_DOUBLE_CLICKED`.
-* **Zeichenfläche:** `Zeichnen` je Bild nach `GUI_DRAW`, mit Lage und Größe;
-  `Maus`, `Ziehen` und `Rad` über die Mausbefehle, umgerechnet auf die
-  Fläche.
-* **Timer:** über `TIMER_EVERY` mit einer gebundenen Methode.
-* **Tasten:** `Taste` im Fenster mit Fokus.
+* **Zeichenfläche:** `Zeichnen` je Bild nach `GUI_DRAW`, beschnitten auf die
+  Fläche; `Maus` bei einem Klick darauf. `Ziehen` und `Rad` sind noch offen.
+* **Timer:** über `TIMER_EVERY` mit einer gebundenen Methode (Stufe 4).
+* **Tasten:** `Taste` im Fenster mit Fokus (noch offen).
 
 Die Basisklasse `StudioFenster` in derselben Bibliothek trägt das Fenster,
-öffnet und schließt es und kennt ihre Controls auch beim Namen. Mehrere
-Exemplare desselben Fensters gehen, weil alles an `Self` hängt.
+öffnet (`Zeigen`) und schließt es (`Zumachen`). Mehrere Exemplare desselben
+Fensters gehen, weil alles an `Self` hängt. Beim Namen kennt sie ihre
+Controls nicht -- die Felder reichen.
 
 ## Die Oberfläche der IDE
 
@@ -155,7 +173,7 @@ Klammern schließen, Einrückung. `ide/ide.dh` wird nicht eingebunden: das sind
    * Das Projektformat und der Navigator.
    * „Ereignis hinzufügen“ und der Code-Editor je Methode.
    * App, mehrere Fenster, Module, Klassen.
-3. **Starten und Bauen.**
+3. **Starten und Bauen.** (gebaut)
    * Startcode und Basisklassen erzeugen, `dhrt run` mit Ausgabe.
    * Fehler an der Methode anzeigen.
    * Bauen über `dhrt --export`.

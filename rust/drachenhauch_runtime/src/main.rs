@@ -2692,7 +2692,16 @@ fn bundle_referenced_assets(source: &str, base: &std::path::Path, out: &std::pat
                             mit_daten: bool) -> AssetBericht {
     let mut seen = std::collections::HashSet::new();
     let mut bericht = AssetBericht { kopiert: Vec::new(), uebersprungen: Vec::new() };
-    for lit in string_literals(source) {
+    // Was eine IMPORT-Zeile nennt, ist Quelltext und steckt schon im
+    // Bytecode -- mitkopiert lag der ganze Code des Projekts neben der Exe.
+    let ohne_import: String = source.lines()
+        .filter(|z| {
+            let t = z.trim_start();
+            let kopf = t.get(..6).map(|k| k.eq_ignore_ascii_case("import")).unwrap_or(false);
+            !(kopf && t[6..].starts_with(|c: char| c == ' ' || c == '\t' || c == '"'))
+        })
+        .collect::<Vec<_>>().join("\n");
+    for lit in string_literals(&ohne_import) {
         if lit.is_empty() || lit.len() > 400 { continue; }
         // Review-Fund: "." bzw. ".." sind gaengige String-Literale in GANZ
         // GEWOEHNLICHEM Code (`IF ch = "."`, `JOIN(parts, ".")`, ...), keine
@@ -3036,6 +3045,20 @@ liest(h)
         assert!(b2.uebersprungen.is_empty());
         assert_eq!(b2.kopiert.len(), 2);
         assert!(out2.join("spiel.db").exists());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn export_kopiert_importierte_quellen_nicht() {
+        let d = temp_ordner("importe");
+        let out = d.join("dist");
+        std::fs::create_dir_all(&out).unwrap();
+        std::fs::write(d.join("helfer.dh"), b"SUB h()\nEND SUB\n").unwrap();
+        std::fs::write(d.join("text.txt"), b"hallo").unwrap();
+        let quelle = "IMPORT \"helfer.dh\"\n  import \"helfer.dh\"\nPRINT READLINES(\"text.txt\")\n";
+        let b = super::bundle_referenced_assets(quelle, &d, &out, false);
+        assert_eq!(b.kopiert, vec!["text.txt".to_string()]);
+        assert!(!out.join("helfer.dh").exists());
         let _ = std::fs::remove_dir_all(&d);
     }
 }

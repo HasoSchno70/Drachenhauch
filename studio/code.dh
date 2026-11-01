@@ -243,6 +243,7 @@ SUB reiterPruefen()
         navigatorAuswahl()
         IF k >= 0 THEN protokoll("vorn " + reiter[k].art + " " + reiterTitel$(reiter[k]))
         reiterProtokollieren()
+        IF k >= 0 THEN feldBefunde(reiter[k])
     END IF
     IF k >= 0 AND k < LEN(reiter) THEN
         IF reiter[k].art <> "layout" THEN

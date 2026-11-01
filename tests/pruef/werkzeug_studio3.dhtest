@@ -1,0 +1,332 @@
+' Drachenhauch Studio, Stufe 3 (studio/, docs/entwurf-studio.md): Starten
+' und Bauen. Das Studio erzeugt _studio/ (main.dh, je Fenster eine
+' Basisklasse, die Laufzeit studio_laufzeit.dh und den Code des Projekts so,
+' wie er im Editor steht), startet es mit dhrt run, zeigt die Ausgabe und
+' ordnet Fehler -- vom Uebersetzer wie zur Laufzeit -- der Methode zu, in
+' der sie stehen. Bauen ruft dhrt --export.
+'
+' Der erste Fall prueft die Zeilenkarte ohne Fenster, die uebrigen starten
+' das Studio als Kind (_hilfen/studiolauf.dh) und druecken F5 bzw. Strg+B.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== die zeilenkarte zeigt auf methode und zeile
+' Je Zeile der zusammengesetzten Datei: zu welcher Methode sie gehoert und
+' die wievielte Zeile ihres Rumpfs sie ist. Das END SUB zaehlt als Zeile
+' hinter dem Rumpf -- dort meldet der Uebersetzer ein offenes IF.
+IMPORT "modell_imp.dh"
+DIM e AS Element : e = elementNeu("fenster", "Haupt")
+codeZerlegen(e, JOIN$(READLINES("Haupt.dh"), CHR$(10)))
+DIM t AS ARRAY OF STRING : t = SPLIT(codeSetzen$(e), CHR$(10))
+DIM i AS INTEGER
+FOR i = 0 TO LEN(karteMeth) - 1
+    DIM wo AS STRING
+    IF karteMeth[i] >= 0 THEN
+        wo = methoden[karteMeth[i]].name
+    ELSEIF karteMeth[i] = KARTE_DEKL THEN
+        wo = "dekl"
+    ELSE
+        wo = "-"
+    END IF
+    PRINT wo; " "; karteZeile[i]; " |"; t[i]
+NEXT
+PRINT "zeilen "; LEN(karteMeth) = LEN(t) - 1
+--- datei modell_imp.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "{sammlung}/../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../studio/modell.dh"
+IMPORT "{sammlung}/../../studio/projekt.dh"
+--- datei Haupt.dh
+CLASS Haupt EXTENDS Haupt_Basis
+    DIM n AS INTEGER
+
+    SUB knopf1_Klick()
+        Self.n = Self.n + 1
+        PRINT Self.n
+    END SUB
+
+    FUNCTION doppelt(x AS INTEGER) AS INTEGER
+        RETURN x * 2
+    END FUNCTION
+END CLASS
+--- erwartet
+- 0 |' Haupt -- der Code des Fensters. Die Controls, ihr Aufbau und die
+- 0 |' Verdrahtung der Ereignisse stehen in der Basisklasse, die das Studio
+- 0 |' erzeugt (_studio/Haupt_basis.dh).
+- 0 |CLASS Haupt EXTENDS Haupt_Basis
+dekl 1 |    DIM n AS INTEGER
+- 0 |
+knopf1_Klick 0 |    SUB knopf1_Klick()
+knopf1_Klick 1 |        Self.n = Self.n + 1
+knopf1_Klick 2 |        PRINT Self.n
+knopf1_Klick 3 |    END SUB
+- 0 |
+doppelt 0 |    FUNCTION doppelt(x AS INTEGER) AS INTEGER
+doppelt 1 |        RETURN x * 2
+doppelt 2 |    END FUNCTION
+- 0 |END CLASS
+zeilen TRUE
+
+=== f5 erzeugt das programm, es laeuft, und ein klick ruft das ereignis
+' Das Studio startet das Programm mit 20 Bildern (DH_STUDIO_LAUF_BILDER),
+' die Ausgabe kommt in die Liste. Danach laeuft dasselbe main.dh noch einmal
+' mit einer Aufnahme, die den Knopf klickt -- die Verdrahtung in der
+' erzeugten Basisklasse ruft knopf1_Klick der Nutzerklasse.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "geprueft "; slHat(log, "geprueft 0 0")
+PRINT "erzeugt "; slHat(log, "erzeugt 2")
+PRINT "hallo "; slHat(log, "ausgabe Hallo aus der App")
+PRINT "beendet "; slHat(log, "beendet 0")
+DIM d AS STRING
+FOR EACH d IN ["main.dh", "studio_laufzeit.dh", "Hauptfenster_basis.dh", "projekt/App.dh", "projekt/Hauptfenster.dh"]
+    PRINT d; " "; FILEEXISTS(p + "/_studio/" + d)
+NEXT
+' Der erzeugte Code uebersetzt ohne einen Befund.
+DIM c AS INTEGER : c = PROCESS_START("dhrt", "--check", p + "/_studio/main.dh")
+DIM cz AS STRING : cz = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM ct AS STRING : ct = PROCESS_READ$(c)
+    IF ct <> "" THEN
+        cz = cz + TRIM$(ct)
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(c) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+PRINT "check "; cz
+' Und mit einem Klick auf den Knopf (40, 40, 100 x 30 im randlosen Fenster).
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN ARRAY_PUSH(neu, "AUTOMATION_PLAY(" + CHR$(34) + "klick.txt" + CHR$(34) + ")")
+    ARRAY_PUSH(neu, s)
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+WRITEALL(p + "/_studio/klick.txt", "c 6" + CHR$(10) + "e 0 7 90 55 0 0" + CHR$(10) + "e 5 7 90 55 0 0" + CHR$(10) + "e 10 6 0 0 0 0" + CHR$(10) + "e 12 5 0 0 0 0" + CHR$(10) + "e 20 6 0 0 0 0" + CHR$(10) + "e 22 5 0 0 0 0" + CHR$(10))
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "40", p + "/_studio/probe.dh")
+leer = 0
+WHILE leer < 5
+    DIM kt AS STRING : kt = PROCESS_READ$(k)
+    IF kt <> "" THEN
+        IF LEFT$(kt, 8) <> "WARNING:" THEN PRINT "lauf "; TRIM$(REPLACE$(kt, CHR$(13), ""))
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(k) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+PRINT "code "; PROCESS_CODE(k)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30},
+{"kind":"label","name":"anzeige","text":"Klicks: 0","x":160,"y":46,"w":160,"h":20}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM n AS INTEGER
+
+    SUB knopf1_Klick()
+        Self.n = Self.n + 1
+        GUI_SET_TEXT(Self.anzeige, "Klicks: " + STR$(Self.n))
+        PRINT GUI_TEXT(Self.anzeige)
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+    SUB Geoeffnet()
+        PRINT "Hallo aus der App"
+    END SUB
+END CLASS
+--- erwartet
+geprueft TRUE
+erzeugt TRUE
+hallo TRUE
+beendet TRUE
+main.dh TRUE
+studio_laufzeit.dh TRUE
+Hauptfenster_basis.dh TRUE
+projekt/App.dh TRUE
+projekt/Hauptfenster.dh TRUE
+check []
+lauf Hallo aus der App
+lauf Klicks: 1
+lauf Klicks: 2
+code 0
+
+=== ein laufzeitfehler landet an seiner methode und zeile
+' Die Datei im Projektordner ist von Hand geschrieben und anders aufgebaut
+' als das, was das Studio daraus setzt (kein Leerraum, eine Zeile mehr
+' oben) -- die Meldung muss trotzdem auf die richtige Zeile der Methode
+' zeigen, weil das Studio den Editorstand nach _studio/projekt/ schreibt.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "beendet "; slHat(log, "beendet 2")
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "laufzeitfehler ")
+    PRINT z
+NEXT
+FOR EACH z IN slAnfang(log, "ausgabe Laufzeitfehler")
+    PRINT z
+NEXT
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei proj/App.dh
+' Die App -- von Hand geschrieben.
+CLASS App EXTENDS StudioApp
+    SUB Geoeffnet()
+        PRINT "vorher"
+        DIM a[2] AS INTEGER
+        a[5] = 1
+    END SUB
+END CLASS
+--- erwartet
+beendet TRUE
+laufzeitfehler App.Geoeffnet, Zeile 3
+ausgabe Laufzeitfehler in projekt/App.dh:7: Index 5 ausserhalb [0..1] in Dimension 1
+
+=== ein uebersetzungsfehler haelt den start an, ein klick springt hin
+' Ein offenes IF bemerkt der Uebersetzer erst am END SUB -- der Befund
+' steht am Ende der Methode. F5 startet nichts; ein Klick auf die Zeile
+' der Problemliste oeffnet die Methode.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(20)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/a.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+DIM bx AS INTEGER
+DIM by AS INTEGER
+(bx, by) = slLage(log, "befund 0")
+PRINT "befund "; bx > 0
+PRINT "nicht starten "; slHat(log, "nicht starten 1")
+PRINT "kein _studio "; NOT DIREXISTS(p + "/_studio")
+slKlick(bx, by)
+slWarten(30)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+PRINT "vorn "; slHat(log, "vorn code Hauptfenster.knopf1_Klick")
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "angesprungen ")
+    PRINT z
+NEXT
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM n AS INTEGER
+
+    SUB knopf1_Klick()
+        Self.n = Self.n + 1
+        IF Self.n > 2 THEN
+            PRINT "viel"
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- erwartet
+befund TRUE
+nicht starten TRUE
+kein _studio TRUE
+vorn TRUE
+angesprungen Hauptfenster.knopf1_Klick, am Ende
+
+=== bauen schreibt eine exe ohne den quelltext daneben
+' Strg+B: dhrt --export nach bau/. Was main.dh importiert, steckt im
+' Bytecode und darf nicht als Datei neben der Exe liegen. Die Exe laeuft.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slMit([341], 66)
+slWarten(200)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM exe AS STRING : exe = "proj" + IIF(LOWER$(RIGHT$(EXEPATH$(), 4)) = ".exe", ".exe", "")
+PRINT "gebaut "; slHat(log, "gebaut " + PATHJOIN(p + "/bau", exe))
+DIM inhalt AS ARRAY OF STRING : inhalt = DIRLIST(p + "/bau")
+PRINT "im bau "; LEN(inhalt) = 1 AND inhalt[0] = exe
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "ausgabe ")
+    IF INSTR(z, "Warnung") >= 0 OR INSTR(z, "mitkopiert") >= 0 OR INSTR(z, "geraeumt") >= 0 THEN PRINT "zu viel: "; z
+NEXT
+SETENV("DHRT_FRAMES", "20")
+PRINT "lauf "; TRIM$(REPLACE$(SHELL_OUT$(PATHJOIN(p + "/bau", exe)), CHR$(13), ""))
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB knopf1_Klick()
+        zahl = 3
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+    SUB Geoeffnet()
+        PRINT "gebaut und gestartet"
+    END SUB
+END CLASS
+--- erwartet
+gebaut TRUE
+im bau TRUE
+lauf gebaut und gestartet

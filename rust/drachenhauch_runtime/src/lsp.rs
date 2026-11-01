@@ -444,13 +444,19 @@ pub fn korrekturen_mit(kx: &KorrKontext, z0: usize, von: usize, bis: usize, meld
     }
 
     // "END IF erwartet, Programmende erreicht" -- das Ende hinter den Rumpf.
-    // Drei Formen: am Programmende, mitten in einem anderen Block ("Erwartet
-    // IF nach END" -- ein END SUB kam, waehrend das IF noch offen war) und
-    // die WHILE-Schleife mit eigenem Satz.
+    // Drei Formen: am Programmende, mitten in einem anderen Block ("END IF
+    // fehlt -- hier steht END SUB, ..." bzw. "Erwartet END IF") und die
+    // WHILE-Schleife mit eigenem Satz.
+    let end_wort = |w: &str| -> Option<String> {
+        let w = w.trim();
+        if !w.is_empty() && w.chars().all(|c| c.is_ascii_uppercase()) { Some(format!("END {}", w)) } else { None }
+    };
     let schluss: Option<String> = if let Some(p) = meldung.find(" erwartet, Programmende erreicht") {
         Some(meldung[..p].trim().to_string())
-    } else if let Some(rest) = meldung.strip_prefix("Erwartet ") {
-        rest.strip_suffix(" nach END").map(|w| format!("END {}", w.trim()))
+    } else if let Some(rest) = meldung.strip_prefix("END ").and_then(|r| r.split_once(" fehlt -- hier steht END ")) {
+        end_wort(rest.0)
+    } else if let Some(rest) = meldung.strip_prefix("Erwartet END ") {
+        end_wort(rest)
     } else if meldung.starts_with("WEND (oder END WHILE) erwartet") {
         Some("WEND".to_string())
     } else { None };
@@ -1553,7 +1559,7 @@ WEND";
         let t = "SUB tu()\n    IF x > 1 THEN\n        PRINT(1)\n        PRINT(2)\n    PRINT(3)\nEND SUB";
         let k = korrekturen(t, 6, 0, 1, "END IF erwartet, Programmende erreicht");
         // Dieselbe Stelle, wenn ein END SUB kam, waehrend das IF offen war.
-        assert_eq!(korrekturen(t, 5, 4, 5, "Erwartet IF nach END")[0].1, vec![(3, 16, 16, "\n    END IF".to_string())]);
+        assert_eq!(korrekturen(t, 5, 4, 5, "END IF fehlt -- hier steht END SUB, aber das IF davor ist noch offen")[0].1, vec![(3, 16, 16, "\n    END IF".to_string())]);
         let tw = "SUB tu()\n    WHILE TRUE\n        PRINT(1)\nEND SUB";
         assert_eq!(korrekturen(tw, 3, 4, 5, "WEND (oder END WHILE) erwartet -- hier endet noch die WHILE-Schleife")[0].1,
                    vec![(2, 16, 16, "\n    WEND".to_string())]);

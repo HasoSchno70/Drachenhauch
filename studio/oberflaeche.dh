@@ -34,6 +34,9 @@ DIM tbMitteW AS INTEGER
 DIM tbOben AS INTEGER
 DIM tbVerteilen AS INTEGER
 DIM tbStart AS INTEGER
+DIM tbStopp AS INTEGER
+DIM tbBauen AS INTEGER
+DIM tbPruefen AS INTEGER
 DIM tbKleiner AS INTEGER
 DIM tbGroesser AS INTEGER
 
@@ -63,6 +66,10 @@ DIM miKleiner AS INTEGER
 DIM miNormal AS INTEGER
 DIM miHell AS INTEGER
 DIM miUeber AS INTEGER
+DIM miStarten AS INTEGER
+DIM miAnhalten AS INTEGER
+DIM miBauen AS INTEGER
+DIM miPruefen AS INTEGER
 DIM anordnenPunkte AS ARRAY OF INTEGER : anordnenPunkte = []
 DIM anordnenWas AS ARRAY OF STRING : anordnenWas = []
 
@@ -141,6 +148,12 @@ SUB oberflaecheAnlegen()
     GUI_MENU_SEPARATOR(m)
     miStartfenster = GUI_MENU_ITEM(m, "Als Startfenster")
     miElementWeg = GUI_MENU_ITEM(m, "Element löschen …")
+    m = GUI_MENU(win, "Ausführen")
+    miStarten = GUI_MENU_ITEM(m, "Starten", "F5") : GUI_MENU_ICON(miStarten, "start")
+    miAnhalten = GUI_MENU_ITEM(m, "Anhalten", "Umschalt+F5") : GUI_MENU_ICON(miAnhalten, "stopp")
+    GUI_MENU_SEPARATOR(m)
+    miPruefen = GUI_MENU_ITEM(m, "Prüfen", "Umschalt+F7") : GUI_MENU_ICON(miPruefen, "pruefen")
+    miBauen = GUI_MENU_ITEM(m, "Bauen", "Strg+B") : GUI_MENU_ICON(miBauen, "export")
     m = GUI_MENU(win, "Anordnen")
     anordnenPunkt(m, "Links ausrichten", "links", "Strg+Alt+Links")
     anordnenPunkt(m, "Rechts ausrichten", "rechts", "Strg+Alt+Rechts")
@@ -194,8 +207,10 @@ SUB oberflaecheAnlegen()
     tbKleiner = GUI_TOOLBAR_ADD(tb, "minus", "Verkleinern (Strg+Minus)")
     tbGroesser = GUI_TOOLBAR_ADD(tb, "plus", "Vergrößern (Strg+Plus)")
     GUI_TOOLBAR_SEPARATOR(tb)
-    tbStart = GUI_TOOLBAR_ADD(tb, "start", "Starten (kommt mit Stufe 3)", "Starten")
-    GUI_TOOLBAR_ENABLE(tb, tbStart, FALSE)
+    tbStart = GUI_TOOLBAR_ADD(tb, "start", "Starten (F5)", "Starten")
+    tbStopp = GUI_TOOLBAR_ADD(tb, "stopp", "Anhalten (Umschalt+F5)")
+    tbPruefen = GUI_TOOLBAR_ADD(tb, "pruefen", "Prüfen (Umschalt+F7)")
+    tbBauen = GUI_TOOLBAR_ADD(tb, "export", "Bauen: eine Programmdatei in bau/ (Strg+B)", "Bauen")
 
     sb = GUI_STATUSBAR(win, 0, 0, SCREENWIDTH(), STATUS_H, "Bereit.")
     GUI_STATUSBAR_ADD(sb, "", 220, "rechts")
@@ -207,8 +222,11 @@ SUB oberflaecheAnlegen()
     GUI_DOCK_PANEL(win, "navigator", "Navigator", "links")
     GUI_DOCK_PANEL(win, "bibliothek", "Bibliothek", "links")
     GUI_DOCK_PANEL(win, "inspektor", "Inspektor", "rechts")
+    GUI_DOCK_PANEL(win, "ausgabe", "Ausgabe", "unten")
+    GUI_DOCK_TAB(win, "probleme", "Probleme", "ausgabe")
     GUI_DOCK_SIZE(win, "links", 290)
     GUI_DOCK_SIZE(win, "rechts", 340)
+    GUI_DOCK_SIZE(win, "unten", 170)
     GUI_DOCK_SHARE(win, "navigator", 2)
     GUI_DOCK_SHARE(win, "bibliothek", 3)
 
@@ -224,8 +242,19 @@ SUB oberflaecheAnlegen()
     GUI_DOCK_ADD(win, "bibliothek", lstBib)
     bibliothekFuellen()
 
+    lstAusgabe = GUI_LISTBOX(win, 0, 0, 10, 10, [])
+    GUI_ADD_CLASS(lstAusgabe, "ausgabe")
+    GUI_LISTBOX_PLACEHOLDER(lstAusgabe, "Starten (F5) zeigt hier, was das Programm ausgibt.")
+    GUI_DOCK_ADD(win, "ausgabe", lstAusgabe)
+    lstProbleme = GUI_LISTBOX(win, 0, 0, 10, 10, [])
+    GUI_ADD_CLASS(lstProbleme, "probleme")
+    GUI_LISTBOX_PLACEHOLDER(lstProbleme, "Keine Probleme.")
+    GUI_DOCK_ADD(win, "probleme", lstProbleme)
+
     inspektorAnlegen()
     mitteAnlegen()
+    GUI_SET_FONT(lstAusgabe, codeSchrift)
+    GUI_SET_FONT_SIZE(lstAusgabe, 14)
     verteilen()
 END SUB
 
@@ -253,6 +282,10 @@ SUB verteilen()
         GUI_SET_BOUNDS(tfSuche, x + 4, y + 4, b - 8, 28)
         GUI_SET_BOUNDS(lstBib, x, y + 38, b, h - 38)
     END IF
+    (x, y, b, h) = GUI_DOCK_RECT(win, "ausgabe")
+    IF b > 0 THEN GUI_SET_BOUNDS(lstAusgabe, x, y, b, h)
+    (x, y, b, h) = GUI_DOCK_RECT(win, "probleme")
+    IF b > 0 THEN GUI_SET_BOUNDS(lstProbleme, x, y, b, h)
     inspektorLegen()
     (x, y, b, h) = GUI_DOCK_CENTER(win)
     mitteLegen(x, y, b, h)
@@ -442,6 +475,11 @@ SUB werkzeugeNachziehen()
         GUI_MENU_ENABLE(anordnenPunkte[k], lay)
     NEXT
     GUI_MENU_ENABLE(miMethodeWeg, codeVorn())
+    GUI_TOOLBAR_ENABLE(tb, tbStopp, lauf >= 0)
+    GUI_MENU_ENABLE(miAnhalten, lauf >= 0)
+    GUI_TOOLBAR_ENABLE(tb, tbBauen, bau < 0)
+    GUI_MENU_ENABLE(miBauen, bau < 0)
+    pruefenVormerken()
     DIM titel AS STRING
     IF projLose THEN
         titel = "Drachenhauch Studio -- " + IIF(formPfad = "", fensterText$("name"), BASENAME(formPfad))

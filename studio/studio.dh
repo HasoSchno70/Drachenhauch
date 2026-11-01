@@ -33,6 +33,7 @@ IMPORT "entwurf.dh"
 IMPORT "inspektor.dh"
 IMPORT "oberflaeche.dh"
 IMPORT "code.dh"
+IMPORT "erzeugen.dh"
 
 ' Fuer Pruefungen: DH_STUDIO_GROESSE=BxH haelt das Fenster fest (sonst haengen
 ' alle Lagen am Bildschirm), DH_STUDIO_AUFNAHME spielt eine Aufnahme ab,
@@ -302,7 +303,7 @@ END SUB
 DIM ueber AS GUI_WINDOW : ueber = -1
 SUB ueberZeigen()
     IF ueber >= 0 THEN GUI_WINDOW_DESTROY(ueber)
-    ueber = GUI_DIALOG("Drachenhauch Studio", "Eine IDE für Programme mit Oberfläche, mit der Laufzeit dhrt " + VERSION$() + "." + CHR$(10) + "Stufe 2: Projekte, Fenster, Module, Klassen und ihr Code.", "ok")
+    ueber = GUI_DIALOG("Drachenhauch Studio", "Eine IDE für Programme mit Oberfläche, mit der Laufzeit dhrt " + VERSION$() + "." + CHR$(10) + "Stufe 3: Projekte mit Fenstern, Modulen und Klassen -- prüfen, starten, bauen.", "ok")
 END SUB
 
 ' --- Menue und Werkzeugleiste -------------------------------------------------
@@ -335,6 +336,15 @@ SUB befehle()
         punkteFuer = ""
     END IF
     IF GUI_CLICKED(miUeber) THEN ueberZeigen()
+    IF GUI_CLICKED(miStarten) OR t = tbStart THEN starten()
+    IF GUI_CLICKED(miAnhalten) OR t = tbStopp THEN anhalten()
+    IF GUI_CLICKED(miBauen) OR t = tbBauen THEN bauen()
+    IF GUI_CLICKED(miPruefen) OR t = tbPruefen THEN
+        DIM pf AS INTEGER : pf = projektPruefen()
+        GUI_DOCK_ACTIVATE(win, "probleme")
+        status(IIF(LEN(befunde) = 0, "Keine Probleme.", STR$(pf) + " Fehler, " + STR$(LEN(befunde) - pf) + " Warnungen."))
+    END IF
+    IF GUI_CLICKED(lstProbleme) THEN befundAnspringen(GUI_LISTBOX_SELECTED(lstProbleme))
     IF GUI_CLICKED(miFensterNeu) OR t = tbFenster THEN elementFragen("fenster")
     IF GUI_CLICKED(miModulNeu) THEN elementFragen("modul")
     IF GUI_CLICKED(miKlasseNeu) THEN elementFragen("klasse")
@@ -493,6 +503,7 @@ WHILE NOT beenden
     mausAufEntwurf()
     frageAuswerten()
     dialogePruefen()
+    prozessePruefen()
     ' Das Entwurfsfenster obenauf -- ein Klick ins Hauptfenster legte es
     ' sonst darunter. Dialoge, Menues und Popover liegen weiter oben.
     IF frm >= 0 AND NOT GUI_MODAL() AND layoutVorn() THEN GUI_WINDOW_FRONT(frm)
@@ -509,4 +520,6 @@ WHILE NOT beenden
     bibZugZeichnen()
     FLIP()
 WEND
+IF lauf >= 0 THEN PROCESS_KILL(lauf)
+IF bau >= 0 THEN PROCESS_KILL(bau)
 protokoll("ende")

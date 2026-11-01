@@ -345,34 +345,65 @@ FUNCTION standardVorspann$(e AS Element) AS STRING
     RETURN "' Klasse " + e.name + "."
 END FUNCTION
 
-' Den Quelltext eines Elements aus seinen Teilen setzen.
+' Den Quelltext eines Elements aus seinen Teilen setzen. Nebenbei entsteht
+' die Karte: je Zeile der Datei, wohin sie im Studio gehoert -- die Methode
+' (Index in `methoden`, KARTE_DEKL = Eigenschaften, KARTE_SONST = Kopf und
+' Rahmen), die Zeile in deren Feld (ab 1) und ihr Einzug. Damit landet ein
+' Fehler aus der Datei an seiner Stelle im Code-Feld.
+CONST KARTE_SONST = -1
+CONST KARTE_DEKL = -2
+DIM karteMeth AS ARRAY OF INTEGER : karteMeth = []
+DIM karteZeile AS ARRAY OF INTEGER : karteZeile = []
+DIM karteEinzug AS ARRAY OF INTEGER : karteEinzug = []
+
+SUB karteDazu(aus AS ARRAY OF STRING, text AS STRING, meth AS INTEGER, einzug AS INTEGER, mitZeile AS BOOLEAN)
+    DIM teile AS ARRAY OF STRING : teile = SPLIT(text, CHR$(10))
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(teile) - 1
+        ARRAY_PUSH(aus, teile[k])
+        ARRAY_PUSH(karteMeth, meth)
+        ARRAY_PUSH(karteZeile, IIF(mitZeile, k + 1, 0))
+        ARRAY_PUSH(karteEinzug, einzug)
+    NEXT
+END SUB
+
 FUNCTION codeSetzen$(e AS Element) AS STRING
     DIM aus AS ARRAY OF STRING : aus = []
+    karteMeth = [] : karteZeile = [] : karteEinzug = []
     DIM klasse AS BOOLEAN : klasse = e.art <> "modul"
     DIM tiefe AS INTEGER : tiefe = IIF(klasse, 4, 0)
     DIM vor AS STRING : vor = e.vorspann
     IF TRIM$(vor) = "" THEN vor = standardVorspann$(e)
-    ARRAY_PUSH(aus, vor)
+    karteDazu(aus, vor, KARTE_SONST, 0, FALSE)
     IF klasse THEN
         DIM kz AS STRING : kz = "CLASS " + e.name
         IF basisVon$(e) <> "" THEN kz = kz + " EXTENDS " + basisVon$(e)
-        ARRAY_PUSH(aus, kz)
+        karteDazu(aus, kz, KARTE_SONST, 0, FALSE)
     END IF
     IF e.dekl <> "" THEN
-        ARRAY_PUSH(aus, einruecken$(e.dekl, tiefe))
+        karteDazu(aus, einruecken$(e.dekl, tiefe), KARTE_DEKL, tiefe, TRUE)
     END IF
-    DIM m AS Methode
-    FOR EACH m IN methoden
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(methoden) - 1
+        DIM m AS Methode : m = methoden[i]
         IF NOT (m.el = e) THEN CONTINUE
-        ARRAY_PUSH(aus, "")
-        IF m.vorspann <> "" THEN ARRAY_PUSH(aus, einruecken$(m.vorspann, tiefe))
-        ARRAY_PUSH(aus, SPACE$(tiefe) + m.kopf)
-        IF m.rumpf <> "" THEN ARRAY_PUSH(aus, einruecken$(m.rumpf, tiefe + 4))
-        ARRAY_PUSH(aus, SPACE$(tiefe) + "END " + UPPER$(m.art))
+        karteDazu(aus, "", KARTE_SONST, 0, FALSE)
+        IF m.vorspann <> "" THEN karteDazu(aus, einruecken$(m.vorspann, tiefe), i, tiefe, FALSE)
+        karteDazu(aus, SPACE$(tiefe) + m.kopf, i, tiefe, FALSE)
+        DIM rz AS INTEGER : rz = 0
+        IF m.rumpf <> "" THEN
+            karteDazu(aus, einruecken$(m.rumpf, tiefe + 4), i, tiefe + 4, TRUE)
+            rz = karteZeile[LEN(karteZeile) - 1]
+        END IF
+        karteDazu(aus, SPACE$(tiefe) + "END " + UPPER$(m.art), i, tiefe, FALSE)
+        ' Das END gehoert hinter die letzte Zeile des Rumpfs: ein Fehler, den
+        ' der Uebersetzer erst dort bemerkt (ein offenes IF), steht dann am
+        ' Ende der Methode statt nirgends.
+        karteZeile[LEN(karteZeile) - 1] = rz + 1
     NEXT
     IF klasse THEN
-        ARRAY_PUSH(aus, "END CLASS")
-        IF e.nachspann <> "" THEN ARRAY_PUSH(aus, e.nachspann)
+        karteDazu(aus, "END CLASS", KARTE_SONST, 0, FALSE)
+        IF e.nachspann <> "" THEN karteDazu(aus, e.nachspann, KARTE_SONST, 0, FALSE)
     END IF
     RETURN JOIN$(aus, CHR$(10)) + CHR$(10)
 END FUNCTION
