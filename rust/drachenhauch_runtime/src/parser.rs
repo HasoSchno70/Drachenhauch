@@ -106,6 +106,22 @@ impl Parser {
         }
     }
 
+    /// Das Wort hinter END, das einen Block schliesst (`END IF`, `END SUB` ...).
+    /// Steht dort ein anderes, ist das eigene noch offen -- und so sagt es die
+    /// Meldung. Frueher hiess es "Erwartet IF nach END", was sich las, als
+    /// fehle ein IF, waehrend in Wahrheit das END IF fehlte.
+    fn end_wort(&mut self, t: Tt, wort: &str) -> R<Token> {
+        if self.tt(0) == t { let tok = self.peek(0).clone(); self.pos += 1; return Ok(tok); }
+        let a = self.peek(0);
+        let anders = a.tt.name();
+        let msg = if anders.chars().all(|c| c.is_ascii_uppercase()) && !matches!(a.tt, Tt::Newline | Tt::Eof) {
+            format!("END {} fehlt -- hier steht END {}, aber das {} davor ist noch offen", wort, anders, wort)
+        } else {
+            format!("Erwartet END {}", wort)
+        };
+        Err(ParseError { msg, line: a.line, col: a.col })
+    }
+
     fn err<T>(&self, msg: &str) -> R<T> {
         let a = self.peek(0);
         Err(ParseError { msg: msg.to_string(), line: a.line, col: a.col })
@@ -746,7 +762,7 @@ impl Parser {
                 if !self.matches(Tt::Comma) { self.consume_terminator()?; }
             }
             self.expect(Tt::End, "")?;
-            self.expect(Tt::Enum, "Erwartet ENUM nach END")?;
+            self.end_wort(Tt::Enum, "ENUM")?;
             self.consume_terminator()?;
         }
         if members.is_empty() { return self.err("ENUM: mindestens ein Member erforderlich"); }
@@ -791,7 +807,7 @@ impl Parser {
         self.with_stack.pop();   // in jedem Fall abbauen (Erfolg UND Fehlerpfad)
         let body = body?;
         self.expect(Tt::End, "")?;
-        self.expect(Tt::With, "Erwartet WITH nach END")?;
+        self.end_wort(Tt::With, "WITH")?;
         self.consume_terminator()?;
         Ok(Node::With { var_name, target: Box::new(target), body })
     }
@@ -869,7 +885,7 @@ impl Parser {
             finally_block = self.block_until(&[Tt::End], "END TRY erwartet")?;
         }
         self.expect(Tt::End, "")?;
-        self.expect(Tt::Try, "Erwartet TRY nach END")?;
+        self.end_wort(Tt::Try, "TRY")?;
         self.consume_terminator()?;
         Ok(Node::Try { body, catch_var, catch_block, has_catch, finally_block })
     }
@@ -1130,7 +1146,7 @@ impl Parser {
             else_block = self.block_until(&[Tt::End], "END IF erwartet, Programmende erreicht")?;
         }
         self.expect(Tt::End, "Erwartet END IF")?;
-        self.expect(Tt::If, "Erwartet IF nach END")?;
+        self.end_wort(Tt::If, "IF")?;
         self.consume_terminator()?;
         Ok(Node::If { condition: Box::new(cond), then_block, elseif_branches, else_block })
     }
@@ -1167,7 +1183,7 @@ impl Parser {
             cases.push((matches, guard, block));
         }
         self.expect(Tt::End, "Erwartet END SELECT")?;
-        self.expect(Tt::Select, "Erwartet SELECT nach END")?;
+        self.end_wort(Tt::Select, "SELECT")?;
         self.consume_terminator()?;
         Ok(Node::Select { subject: Box::new(subject), cases, else_block })
     }
@@ -1589,7 +1605,7 @@ impl Parser {
         self.consume_terminator()?;
         let body = self.block_in("sub", &[Tt::End], "END SUB erwartet, Programmende erreicht")?;
         self.expect(Tt::End, "")?;
-        self.expect(Tt::Sub, "Erwartet SUB nach END")?;
+        self.end_wort(Tt::Sub, "SUB")?;
         self.consume_terminator()?;
         Ok(Node::SubDecl { name, params, body })
     }
@@ -1828,7 +1844,7 @@ impl Parser {
         self.consume_terminator()?;
         let body = self.block_in("function", &[Tt::End], "END FUNCTION erwartet, Programmende erreicht")?;
         self.expect(Tt::End, "")?;
-        self.expect(Tt::Function, "Erwartet FUNCTION nach END")?;
+        self.end_wort(Tt::Function, "FUNCTION")?;
         self.consume_terminator()?;
         Ok(Node::FunctionDecl { name, params, return_type, body })
     }
@@ -1849,7 +1865,7 @@ impl Parser {
         self.consume_terminator()?;
         let body = self.block_in("function", &[Tt::End], "END OPERATOR erwartet, Programmende erreicht")?;
         self.expect(Tt::End, "")?;
-        self.expect(Tt::Operator, "Erwartet OPERATOR nach END")?;
+        self.end_wort(Tt::Operator, "OPERATOR")?;
         self.consume_terminator()?;
         Ok(Node::FunctionDecl { name: op_name.into(), params, return_type, body })
     }
@@ -1885,7 +1901,7 @@ impl Parser {
             self.consume_terminator()?;
             let body = self.block_in("function", &[Tt::End], "END PROPERTY erwartet, Programmende erreicht")?;
             self.expect(Tt::End, "")?;
-            self.expect(Tt::Property, "Erwartet PROPERTY nach END")?;
+            self.end_wort(Tt::Property, "PROPERTY")?;
             self.consume_terminator()?;
             if !params.is_empty() { return self.err("PROPERTY GET nimmt keine Parameter"); }
             Node::FunctionDecl { name: internal, params, return_type, body }
@@ -1893,7 +1909,7 @@ impl Parser {
             self.consume_terminator()?;
             let body = self.block_in("sub", &[Tt::End], "END PROPERTY erwartet, Programmende erreicht")?;
             self.expect(Tt::End, "")?;
-            self.expect(Tt::Property, "Erwartet PROPERTY nach END")?;
+            self.end_wort(Tt::Property, "PROPERTY")?;
             self.consume_terminator()?;
             if params.len() != 1 {
                 return self.err("PROPERTY SET muss genau einen Parameter haben (den neuen Wert)");
@@ -1965,7 +1981,7 @@ impl Parser {
             }
         }
         self.expect(Tt::End, "")?;
-        self.expect(Tt::Class, "Erwartet CLASS nach END")?;
+        self.end_wort(Tt::Class, "CLASS")?;
         self.consume_terminator()?;
         Ok(Node::ClassDecl { name, parent, fields, methods, is_struct: false, statics,
                              properties, abstracts })
@@ -2011,7 +2027,7 @@ impl Parser {
             else { return self.err("Im STRUCT-Body sind nur DIM-Felder erlaubt"); }
         }
         self.expect(Tt::End, "")?;
-        self.expect(Tt::Struct, "Erwartet STRUCT nach END")?;
+        self.end_wort(Tt::Struct, "STRUCT")?;
         self.consume_terminator()?;
         Ok(Node::ClassDecl { name, parent: None, fields, methods: vec![],
                              is_struct: true, statics: vec![], properties: vec![],
@@ -2100,7 +2116,7 @@ impl Parser {
             self.consume_terminator()?;
         }
         self.expect(Tt::End, "")?;
-        self.expect(Tt::Struct, "Erwartet STRUCT nach END")?;
+        self.end_wort(Tt::Struct, "STRUCT")?;
         self.consume_terminator()?;
         if felder.is_empty() { return self.err("Ein STRUCT ... LAYOUT C braucht mindestens ein Feld"); }
         Ok(Node::StructLayout { name, pack, felder })
