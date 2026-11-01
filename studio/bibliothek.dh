@@ -172,7 +172,7 @@ FUNCTION symbolZeichnen(name AS STRING) AS IMAGE
             NEXT
             IMAGE_GRADIENT(img, 31, 3, 36, 22, &HE03030, &H3050E0, TRUE)
         CASE "Beschriftung"
-            IMAGE_DRAW_TEXT(img, 6, 6, "Abc", 13, S_HELL)
+            IMAGE_DRAW_TEXT(img, 6, 6, "Abc", 13, S_RAND)
         CASE "Bild"
             IMAGE_FILL_ROUNDRECT(img, 4, 3, 35, 22, 2, &H35617E)
             IMAGE_FILL_POLY(img, [6, 16, 24, 33, 33, 6], [21, 10, 16, 8, 21, 21], &H6FBF6F)

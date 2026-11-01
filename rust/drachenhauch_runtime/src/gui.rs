@@ -21665,7 +21665,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 if node.icon >= 0 { g.draw_image_rect(node.icon, lx, ry + 2, isz, isz); }
                 lx += isz + 3;
             }
-            let farbe = if node.color >= 0 { node.color } else { fg };
+            // Auf der Auswahl folgt die Schrift dem GRUND, wie in der Liste --
+            // im hellen Thema stand sonst dunkle Schrift auf dunkelblauer Zeile
+            // (gesehen im Navigator des Studios).
+            let farbe = if markiert { lesbar_auf(shade(acc, -110)) } else if node.color >= 0 { node.color } else { fg };
             self.wtext(g, wdg, lx, ry + (self.sk(TREE_ROW_H) - self.wsize(g, wdg)).max(0) / 2, node.label.clone(), farbe);
             if teil { g.pop_clip(); }
         }

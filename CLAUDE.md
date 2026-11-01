@@ -3392,6 +3392,44 @@ GUI_GET_Y(leinwand)` dazu (Nebenfenster nicht, die rechnen mit
 Anim-FSM-Aufnahmen sind um die Hoehe der neuen Leisten verschoben. Neue Faelle
 je Editor (Partikel 5, Anim-FSM 5, Tilemap 5, Sprite 4), je mit Gegenprobe.
 
+## Drachenhauch Studio, Stufe 1 (2026-11-01)
+
+Wunsch des Nutzers: der Form-Designer "wirkt billig", gewollt ist eine
+eigenstaendige IDE im Stil von Xojo mit der Laufzeit dhrt. Entschieden:
+eigene gui (nicht GTK), Fenster als Klasse mit Ereignis-Methoden, Projekt
+als Ordner, Name "Drachenhauch Studio". Entwurf `docs/entwurf-studio.md`
+(fuenf Stufen), Handbuch `docs/studio.md`. **Stufe 1 = ein Fenster
+entwerfen**, `studio/` (studio.dh + modell/bibliothek/entwurf/inspektor/
+oberflaeche.dh + studio.dhstil): Dock mit Navigator, Bibliothek (34
+Bausteine in 8 Gruppen, Vorschaubilder aus IMAGE_*, Suche) und Inspektor
+(Gruppen, Editor je Eigenschaft, Farben im Popover, Anker als vier
+Kaestchen; ein Rueckgaengig-Schritt erst, wenn das Feld den Fokus abgibt).
+**Das Modell ist das .dhform-JSON** (`doc`), das Entwurfsfenster
+(`GUI_WINDOW_DESIGN`) nur die Ansicht -- nach jeder Aenderung
+`GUI_FROM_JSON` neu; Undo = JSON-Text je Stand (`merken` uebergeht einen
+gleichen Stand). Ausrichtungslinien (Kanten/Mitten der Nachbarn,
+Fensterrand, 20 vom Rand, 12 neben dem Nachbarn; Alt = aus), acht Griffe,
+Rahmenwahl, Anordnen, Zoom. **Drei Fallen:** (1) Strg+A als Menue-Kuerzel
+nahm dem Textfeld mit Fokus die Taste -- es steht nur im Text des
+Menuepunkts und wird in `tasten()` abgefragt; (2) die Lagen der
+Bibliothekszeilen gelten erst NACH dem ersten GUI_UPDATE (die Stildatei
+greift dort) -- das Protokoll misst in Bild 3; (3) eine Funktion `raster`
+neben `CONST RASTER` (Namen schreibungsunabhaengig) -> `rasterWert`.
+**Drei Laufzeit-Stuecke dabei:** `GUI_LISTBOX_ITEM_RECT(lb, i)` (Lage
+einer Zeile auf dem Schirm, gefiltert = Nullen; fuer Pruefungen und
+Ablegen aus der Liste); **`GUI_CHANGED` meldete einen Kippschalter in
+jedem Bild seines Nachgleitens** (der Abdruck nahm `value`, das waehrend
+der Animation wandert -- jetzt zaehlt nur `checked`); **die gewaehlte
+Zeile eines Baums war im hellen Thema unlesbar** (dunkle Schrift auf der
+Auswahl -- jetzt `lesbar_auf` wie bei der Liste). Tests
+`tests/pruef/werkzeug_studio.dhtest` (7, echte Klicks: Ablegen per Klick
+und Zug, Einrasten samt rosa Linie im Bild, Griff, Anordnen,
+Rueckgaengig/Wiederholen, Inspektor; Helfer `_hilfen/studiolauf.dh`
+misst in einem ersten Lauf und baut daraus die Aufnahme), je ein Fall in
+`gui_liste_komfort`, `messdaten_bausteine`, `gui_baum_bedienung`; fuenf von
+sechs Verfaelschungen des Studios fallen je in ihrem Fall (das Uebergehen
+gleicher Staende nicht -- seit dem Kippschalter-Fix entsteht keiner mehr).
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

@@ -9,6 +9,15 @@ aber mit der Laufzeit `dhrt`. Sie ersetzt den Form-Designer
 * *Ein Projekt ist ein Ordner mit lesbaren Dateien.*
 * *Der Name ist „Drachenhauch Studio“.*
 
+**Stand:** Stufe 1 ist gebaut (2026-11-01, Ordner `studio/`, Handbuch
+[studio.md](studio.md), Prüfung `tests/pruef/werkzeug_studio.dhtest`). Die drei
+Messungen vorab ergaben:
+* Der Neuaufbau kostet bei 1000 Controls 2,7 ms.
+* Ein Klick ins Hauptfenster legt es über die Entwurfsfläche;
+  `GUI_WINDOW_FRONT` je Bild holt sie zurück.
+* Ein Widget beim Namen zu finden braucht es nicht, weil die Basisklasse ihre
+  Controls beim Anlegen in Feldern hält.
+
 ## Warum der heutige Form-Designer billig wirkt
 
 Das Bildschirmfoto zeigt es in einem Blick:
