@@ -458,6 +458,8 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_HAS_CLASS(wdg, klasse$)` | BOOLEAN | does the widget carry the class (the button variant counts too)? |
 | `GUI_SET_NAME(wdg, name$)` | — | the name that `#name` in the stylesheet refers to |
 | `GUI_GET_NAME$(wdg)` | STRING | the widget's name ("" = none) |
+| `GUI_WINDOW_SET_NAME(win, name$)` | — | a window's name, which `window#name` in the stylesheet means ("" = none; stored in the `.dhform`) |
+| `GUI_WINDOW_GET_NAME$(win)` | STRING | the window's name ("" = none) |
 | `GUI_GET_COLOR(wdg, rolle$)` | INTEGER | the colour that `GUI_SET_COLOR` or the stylesheet sets in the current state (`bg`, `fg`, `border`, `accent`); -1 = the theme decides |
 | `GUI_GET_Y(wdg)` / `GUI_GET_W(wdg)` / `GUI_GET_H(wdg)` | INTEGER | position and size of the widget in the window (counterpart to `GUI_SET_BOUNDS`) |
 | `GUI_WINDOW_GET_Y(win)` / `GUI_WINDOW_GET_W(win)` / `GUI_WINDOW_GET_H(win)` | INTEGER | position and size of the window on the screen |
@@ -2208,7 +2210,18 @@ checkbox:checked     { accent: #2E9E5B }
 class, so `.gefahr` also hits a danger button), a name `#name`
 (`GUI_SET_NAME`) and states: `:hover`, `:focus`, `:active` (pressed),
 `:disabled`, `:checked`. Several selectors for one rule are separated by a
-comma. Selectors for descendants (`panel button`) do not exist yet.
+comma.
+
+**Descendants:** containers may stand before the widget, separated by
+whitespace (anywhere above) or by `>` (directly above):
+`panel.leiste button`, `layout > button`, `groupbox#kopf label`. A container
+is the layout a widget stands in, otherwise the tab control, accordion or
+wizard with its page, otherwise the scrolling panel (`GUI_PANEL_ADD`) --
+and at the very top the window, which only occurs as an ancestor:
+`window#einstellungen button` (name via `GUI_WINDOW_SET_NAME`). A state
+goes only on the last part (`panel:hover button` is an error). Every part
+counts towards the weight like a selector of its own; if a class further up
+changes or a widget moves, the new rule applies from the next frame.
 
 **Properties:** `bg`, `fg`, `border`, `accent` (colour as `#RGB`, `#RRGGBB`,
 `#AARRGGBB` or as a name from the theme such as `accent`, `text_fg`,
@@ -2220,13 +2233,21 @@ underlined ...). German and English names work (`hintergrund`,
 
 **Shape per widget:** `abstand` (padding, one number or vertical and
 horizontal, 0..40 -- a button sized by content is then exactly text plus
-padding, in a text field the text is indented by the horizontal padding),
+padding, in a text field the text is indented by the horizontal padding; a
+label indents its text and measures larger, for checkbox, radio and toggle
+the horizontal padding is the gap before the text, a list or dropdown row
+is the font plus twice the vertical padding high, dropdown, spinner and
+card indent; tree, table and text area keep their own spacing),
 `randbreite` (border width 0..8, 0 = no border), `schatten` (shadow: one
 number = softness, or `dx dy weich [colour]`, without a colour a
 semi-transparent black), `verlauf` (gradient 0..64), `glanz` (gloss
 0..100) and `fase` (bevel, 0 or 1) instead of the metrics `gradient`,
 `gloss`, `bevel`, and `uebergang` (transition in ms, 0..2000) instead of
-the metric of the same name. English names work too (`padding`,
+the metric of the same name -- also per colour: `uebergang: 120, bg 400,
+border 0` (a bare number applies to everything, `bg`/`fg`/`border`/`accent`
+with a number only to that colour; this covers the state colours of the
+stylesheet and a button's base colour, the theme's hover brightening
+follows the widget's duration). English names work too (`padding`,
 `border-width`, `shadow`, `transition`). They only apply in rules without
 `:hover`, `:focus`, `:active` or `:disabled` -- a shape that jumps on hover
 would be a wobble; the stylesheet reports that as an error.

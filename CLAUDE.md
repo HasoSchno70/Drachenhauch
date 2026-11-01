@@ -680,8 +680,8 @@ folgen einem Themenwechsel. Die Knopfart zaehlt als Klasse. `GUI_GET_COLOR`
 liefert die Farbe des jetzigen Zustands ohne Ueberblenden (-1 = Thema).
 `.dhform` `name`/`klassen`. Tests `tests/pruef/gui_stildatei.dhtest` (12;
 sechs Verfaelschungen fallen je in ihrem Fall), Rust-Tests in
-`gui_stil.rs`. Bewusst NICHT: Nachfahren-Selektoren, Uebergang je
-Eigenschaft, `window`-Selektor. **Zweite Stufe (selber Tag): Form je
+`gui_stil.rs`. Nachfahren, Uebergang je Farbe und `window#name` kamen mit
+dem Rest (unten). **Zweite Stufe (selber Tag): Form je
 Widget** -- `abstand`, `randbreite`, `schatten`, `verlauf`, `glanz`,
 `fase`, `uebergang` (englisch padding/border-width/shadow/gradient/gloss/
 bevel/transition), NUR in Regeln ohne fluechtigen Zustand (sonst Fehler
@@ -695,6 +695,28 @@ Inhalt (Knopf exakt Text + 2 x Abstand, Feld-Hoehe) und im Textfeld ueber
 `ti_rand` (ersetzt die 5 Punkte Einzug -- ALLE Wege fragen ti_rand; die
 Sinnbilder selbst ueber `ti_symbole`). Tests sechs Faelle mehr in
 `gui_stildatei.dhtest` (18); sieben Verfaelschungen fallen je in ihrem Fall.
+**Rest von Paket 4 (2026-11-01):** Nachfahren (`panel.leiste button`,
+`layout > button`, `window#name button`): `Selektor::vorfahren` = Teile mit
+"direkt"-Merker, `vorfahren_passen` (direkt = erstes Glied, sonst jede
+Stelle). Die Kette (`ketten`, nur wenn `Stildatei::mit_vorfahren`): erst
+das Layout, das das Widget als Kind fuehrt, sonst `tc_von`
+(Reiterwerk/Akkordeon/Assistent), sonst `panel_von`, hoechstens 32 Stufen,
+zuletzt das Fenster (`art "window"`, nur als Vorfahre erlaubt; Name per
+`GUI_WINDOW_SET_NAME/GET_NAME$`, `.dhform` `name` am Fenster). Ihr Hash
+steht im Schluessel `stil_key` -- eine Klasse am Behaelter oder ein Umzug
+loest neu auf. Ein Zustand nur am letzten Teil. `abstand` jetzt auch fuer
+Beschriftung (Zeichnen, `label_stelle`, Umbruch, Mass), Kaestchen/Radio/
+Kippschalter (Luecke vor dem Text), Liste/Klappliste (`list_zeile_h` =
+Schrift + 2 x senkrecht, `list_text_x`), Klappliste/Drehfeld (`w_pad`
+statt Metrik `pad`) und Kachel; Baum/Tabelle/Textbereich nicht.
+`uebergang: 120, bg 400, border 0` (`uebergang_lesen`): `Widget::rollen_t`
+je Rolle (bg/fg/border/accent) x (hover/fokus/druck), nur wenn eine Regel
+Rollendauern nennt; angelegt mit dem Stand VOR dem Schritt (sonst ist eine
+lange Rolle im ersten Bild am Ziel -- vom Test gefunden), gelesen ueber
+`rolle_t` in `stil_misch` und in der Grundfarbe des Knopfs. **Falle:**
+`GUI_AUTOSIZE` misst SOFORT -- vor dem ersten GUI_UPDATE kennt ein Widget
+seinen Stil noch nicht. Tests sechs Faelle mehr in `gui_stildatei.dhtest`
+(24), zwei Rust-Tests; sechs Verfaelschungen fallen je in ihrem Fall.
 
 **Bausteine** (2026-10-31, Paket 2): `gui_bausteine.rs`, Zusaetze je
 Widget in `Widget::bau` (`Bauzusatz`, nur bei Bedarf). Fliesslayout = Art 3

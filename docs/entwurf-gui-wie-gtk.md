@@ -10,15 +10,15 @@ Barrierefreiheit über AccessKit, Drucken. Dieses Dokument vergleicht sie mit
 GTK 3 und sagt, was noch fehlt, in welcher Reihenfolge und wie es sich
 bauen ließe. **Paket 1 ist gebaut** (2026-10-31, `gui_ueber.rs`, Handbuch
 `docs/module-gui.md` Abschnitte „Popover, Toast und Infoleiste“ und
-„Suchfeld, Sinnbilder, Vorschläge“), **Paket 4 in der ersten Stufe** ebenso
-(2026-10-31, `gui_stil.rs`, Abschnitt „Stildatei“), **Paket 2** ebenso
+„Suchfeld, Sinnbilder, Vorschläge“), **Paket 4** ebenso (erste und zweite
+Stufe 2026-10-31, der Rest 2026-11-01, `gui_stil.rs`, Abschnitt
+„Stildatei“), **Paket 2** ebenso
 (2026-10-31, `gui_bausteine.rs`, Abschnitt „Bausteine“), von **Paket 3 die
 Rechtschreibung** (2026-10-31, `rechtschreibung.rs` und
 `gui_rechtschreibung.rs`, Abschnitt „Rechtschreibung“) und **Rechts nach
 links samt arabischen Formen** (2026-10-31, `schreibrichtung.rs` und
 `gui_richtung.rs`, Abschnitt „Rechts nach links“); die volle Textformung
-(Ligaturen anderer Schriften, indische Schriften) und die weiteren Stufen
-von Paket 4 noch nicht.
+(Ligaturen anderer Schriften, indische Schriften) noch nicht.
 
 ## Gemessen statt vermutet: große Tabellen sind keine Lücke
 
@@ -84,13 +84,13 @@ mit Wert.
 |---|---|---|
 | Textformung (Ligaturen, Arabisch, Indische Schriften) | Glyphe für Glyphe aus raylib; `rustybuzz` ist schon im Bau, aber nur fürs PDF | Formen über `rustybuzz` und die Glyphenatlanten von raylib zeichnen; nur für Läufe, die es brauchen (Schriftblock-Erkennung), damit das Messen der gewöhnlichen Fälle nicht langsamer wird. Schreibmarke, Auswahl und Klick müssen mit den geformten Glyphen rechnen -- der größte Teil der Arbeit. |
 | Rechts-nach-links, gemischte Richtung | **gebaut** (2026-10-31): Reihenfolge über `unicode-bidi`, Arabisch über die Präsentationsformen statt `rustybuzz` -- raylib zeichnet Zeichen für Zeichen aus dem Atlas, und die Formen sind dort Zeichen | Crate `unicode-bidi` für die Reihenfolge der Läufe, danach Formen wie oben. Betrifft Textfeld, Textbereich, Liste, Tabelle, Beschriftung. |
-| Rechtschreibung (gspell) | Wellenlinien gibt es (`GUI_TEXTAREA_SQUIGGLES`), ein Wörterbuch nicht | Hunspell-Wörterbücher (`.dic`/`.aff`) über eine reine Rust-Crate lesen, `SPELL_CHECK` (wort$)/`SPELL_SUGGEST`; das Feld unterstreicht über die vorhandenen Wellenlinien, Vorschläge im Kontextmenü. Das Plugin `schreibweise` der IDE wäre der erste Nutzer. |
+| Rechtschreibung (gspell) | **gebaut** (2026-10-31): `SPELL_*` über die Windows-Prüfung oder Hunspell-Wörterbücher, `GUI_SPELL` für Textfeld und Textbereich mit Wellen und Vorschlägen im Menü | Hunspell-Wörterbücher (`.dic`/`.aff`) über eine reine Rust-Crate lesen, `SPELL_CHECK` (wort$)/`SPELL_SUGGEST`; das Feld unterstreicht über die vorhandenen Wellenlinien, Vorschläge im Kontextmenü. Das Plugin `schreibweise` der IDE wäre der erste Nutzer. |
 
 **Warum zuletzt:** das ist der teuerste Teil, und solange niemand Arabisch
 oder Hebräisch schreibt, merkt es keiner. Rechtschreibung lässt sich davon
 getrennt vorziehen.
 
-### Paket 4: Styling wie GTK-CSS (erste Stufe gebaut)
+### Paket 4: Styling wie GTK-CSS (gebaut)
 
 Gebaut ist die erste Stufe: Stildatei mit Art, Klasse, Name und Zuständen,
 `bg`/`fg`/`border`/`accent`, `radius`, `groesse`, `stil`. **Die zweite
@@ -99,9 +99,15 @@ Stufe** (2026-10-31) bringt die Form je Widget: `abstand`, `randbreite`,
 Art: Verlauf, Glanz, Fase und Rand gehen über `flaeche` (wie die Rundung
 über `rad_jetzt`), der Schatten liegt unter jedem Widget, der Abstand
 wirkt im Mass nach Inhalt von Knopf und Feld und im Textfeld über
-`ti_rand`. Nur in Regeln ohne flüchtigen Zustand. Weiter offen:
-Nachfahren-Selektoren, Abstand für die übrigen Arten, Übergang je
-Eigenschaft; die Farben gehen über die vorhandenen Stellen
+`ti_rand`. Nur in Regeln ohne flüchtigen Zustand. **Der Rest**
+(2026-11-01): Nachfahren-Selektoren (`panel.leiste button`,
+`layout > button`, `window#name button`; die Kette kommt aus Layout,
+Reiterwerk/Akkordeon/Assistent, rollendem Panel und Fenster, ihr Hash steht
+im Auflöse-Schlüssel), der Abstand auch für Beschriftung, Kästchen/Radio/
+Kippschalter, Liste und Klappliste, Drehfeld und Kachel, und der Übergang
+je Farbe (`uebergang: 120, bg 400`, eigene Stände je Rolle nur bei Bedarf).
+Baum, Tabelle und Textbereich behalten ihre Abstände; `:nth-child`,
+Schlüsselbilder und `border-image` kommen bewusst nicht. Die Farben gehen über die vorhandenen Stellen
 (`wcol` und die eigenen Farben), das deckt alle Arten auf einmal. Neu dazu:
 `GUI_GET_COLOR`, damit sich die Auflösung ohne Bildlagen prüfen lässt.
 

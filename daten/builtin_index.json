@@ -6429,6 +6429,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_WINDOW_SET_NAME",
+   "kind": "core",
+   "signature": "GUI_WINDOW_SET_NAME(win, name$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_GET_NAME$",
+   "kind": "core",
+   "signature": "GUI_WINDOW_GET_NAME$(win)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_WINDOW_GLOW",
    "kind": "core",
    "signature": "GUI_WINDOW_GLOW(win [, farbe [, dauer_ms]])",

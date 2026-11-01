@@ -28,6 +28,14 @@
 //! Regeln ohne fluechtigen Zustand (eine Form, die beim Ueberfahren springt,
 //! waere ein Wackeln) und gehen beim Zeichnen ueber `form_jetzt` in
 //! `flaeche`, so wie die Rundung ueber `rad_jetzt`.
+//!
+//! Dritte Stufe: Nachfahren (`panel.leiste button`, `layout > button`,
+//! `window#name button`). Die Kette eines Widgets (`ketten`) kommt aus
+//! Layout, Reiterwerk/Akkordeon/Assistent, rollendem Panel und zuletzt dem
+//! Fenster; gebaut wird sie nur, wenn eine Regel nach Vorfahren fragt, und
+//! ihr Hash steht im Schluessel -- eine Klasse weiter oben oder ein Umzug
+//! loest neu auf, ohne dass jede Stelle daran denken muss. Dazu `uebergang`
+//! je Farbrolle (`Widget::rollen_t`, nur wenn eine Regel es verlangt).
 use super::*;
 
 /// Schichten der Aufloesung.
@@ -37,7 +45,7 @@ pub(super) const FOKUS: usize = 2;
 pub(super) const AKTIV: usize = 3;
 pub(super) const AUS: usize = 4;
 
-const EIGENSCHAFTEN: &str = "bg, fg, border, accent, radius, groesse, stil, abstand, randbreite, schatten, verlauf, glanz, fase, uebergang";
+const EIGENSCHAFTEN: &str = "bg, fg, border, accent, radius, groesse, stil, abstand, randbreite, schatten, verlauf, glanz, fase, uebergang (auch je Farbe: uebergang: 120, bg 400)";
 const ZUSTAENDE: &str = ":hover, :focus, :active, :disabled, :checked";
 
 /// Eine Farbe aus der Stildatei: fest oder ein Name des Themas (dann folgt
@@ -60,6 +68,44 @@ pub(super) struct StilWerte {
     glanz: Option<i32>,
     fase: Option<i32>,
     uebergang: Option<i32>,
+    /// Dauer je Farbrolle (`uebergang: bg 400, border 0`) -- die Rollen ohne
+    /// eigene Dauer nehmen `uebergang` bzw. die Metrik.
+    uebergang_je: Vec<(usize, i32)>,
+}
+
+/// Die Farbrollen, die eine eigene Dauer haben koennen -- ihre Stelle ist
+/// der Platz in `Widget::rollen_t`.
+pub(super) const ROLLEN: [&str; 4] = ["bg", "fg", "border", "accent"];
+
+fn rolle_von(s: &str) -> Option<usize> {
+    match s.to_lowercase().as_str() {
+        "bg" | "hintergrund" | "background" => Some(0),
+        "fg" | "farbe" | "text" | "color" => Some(1),
+        "border" | "rand" => Some(2),
+        "accent" | "akzent" => Some(3),
+        _ => None,
+    }
+}
+
+/// `uebergang: 200` (alles) oder eine Liste `uebergang: 120, bg 400, border 0`:
+/// eine nackte Zahl gilt fuer alles, eine Rolle mit Zahl nur fuer diese
+/// Farbe. `ms` hinter der Zahl darf stehen.
+fn uebergang_lesen(wert: &str, zeile: usize) -> Result<(Option<i32>, Vec<(usize, i32)>), String> {
+    let mut alle = None;
+    let mut je = Vec::new();
+    for stueck in wert.split(',') {
+        let teile: Vec<&str> = stueck.split_whitespace().collect();
+        let zahl = |s: &str| zahl_lesen_stil(s.trim_end_matches("ms"), zeile, "uebergang", 0, 2000);
+        match teile.as_slice() {
+            [n] => alle = Some(zahl(n)?),
+            [r, n] => match rolle_von(r) {
+                Some(k) => { je.retain(|(x, _): &(usize, i32)| *x != k); je.push((k, zahl(n)?)); }
+                None => return Err(format!("Zeile {}: uebergang fuer '{}' -- eine eigene Dauer haben bg, fg, border und accent", zeile, r)),
+            },
+            _ => return Err(format!("Zeile {}: uebergang erwartet eine Zahl oder eine Liste wie '120, bg 400, border 0', erhalten '{}'", zeile, wert.trim())),
+        }
+    }
+    Ok((alle, je))
 }
 
 /// Schlagschatten eines Widgets: Versatz, Weichheit, Farbe (ohne Farbe ein
@@ -97,6 +143,10 @@ impl StilWerte {
         if o.glanz.is_some() { self.glanz = o.glanz; }
         if o.fase.is_some() { self.fase = o.fase; }
         if o.uebergang.is_some() { self.uebergang = o.uebergang; }
+        for &(k, d) in &o.uebergang_je {
+            self.uebergang_je.retain(|(x, _)| *x != k);
+            self.uebergang_je.push((k, d));
+        }
     }
 }
 
@@ -108,6 +158,37 @@ struct Selektor {
     an: bool,
     schicht: usize,
     gewicht: u32,
+    /// Die Teile davor (`panel.leiste button`), das naechste zuerst; `true`
+    /// = direkt darueber (`>`), sonst irgendwo darueber.
+    vorfahren: Vec<(Teil, bool)>,
+}
+
+/// Ein Teil eines Selektors ohne Zustand: so wird ein Vorfahre beschrieben.
+#[derive(Clone, Debug, Default)]
+struct Teil { art: Option<String>, klassen: Vec<String>, name: Option<String> }
+
+/// Ein Glied der Kette ueber einem Widget: seine Behaelter (Layout,
+/// rollendes Panel, Reiterwerk, Akkordeon, Assistent), zuletzt das Fenster.
+#[derive(Clone, Debug, Default, Hash)]
+pub(super) struct Glied { pub art: String, pub klassen: Vec<String>, pub name: String }
+
+impl Teil {
+    fn passt(&self, g: &Glied) -> bool {
+        self.art.as_ref().map(|a| *a == g.art).unwrap_or(true)
+            && self.klassen.iter().all(|k| g.klassen.iter().any(|x| x == k))
+            && self.name.as_ref().map(|n| *n == g.name).unwrap_or(true)
+    }
+}
+
+/// Passen die Vorfahren auf die Kette (das naechste Glied zuerst)? Ein Teil
+/// ohne `>` darf ueber beliebig viele Glieder hinweg passen -- dann wird
+/// jede Lage probiert, wie in CSS.
+fn vorfahren_passen(vf: &[(Teil, bool)], kette: &[Glied]) -> bool {
+    let Some(((t, direkt), rest)) = vf.split_first() else { return true };
+    if *direkt {
+        return kette.first().map(|g| t.passt(g)).unwrap_or(false) && vorfahren_passen(rest, &kette[1..]);
+    }
+    (0..kette.len()).any(|k| t.passt(&kette[k]) && vorfahren_passen(rest, &kette[k + 1..]))
 }
 
 #[derive(Clone, Debug)]
@@ -115,7 +196,12 @@ struct Regel { sel: Selektor, werte: StilWerte }
 
 /// Eine gelesene Stildatei.
 #[derive(Clone, Debug, Default)]
-pub(super) struct Stildatei { regeln: Vec<Regel> }
+pub(super) struct Stildatei {
+    regeln: Vec<Regel>,
+    /// Hat irgendeine Regel Vorfahren? Nur dann muss `stil_pass` die Kette
+    /// ueber jedem Widget bauen.
+    pub(super) mit_vorfahren: bool,
+}
 
 /// Die Aufloesung eines Widgets: je Schicht, was gilt.
 pub(super) type StilAufgeloest = [StilWerte; 5];
@@ -155,12 +241,40 @@ fn ist_name(s: &str) -> bool {
     !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
+/// Ein Selektor: Teile, getrennt durch Leerraum (irgendwo darunter) oder
+/// `>` (direkt darunter). Nur der letzte Teil -- das Widget selbst -- darf
+/// Zustaende tragen; die Vorfahren beschreiben Behaelter und Fenster.
 fn selektor_lesen(s: &str, zeile: usize) -> Result<Selektor, String> {
     let s = s.trim();
     if s.is_empty() { return Err(format!("Zeile {}: leerer Selektor", zeile)); }
-    if s.contains(char::is_whitespace) || s.contains('>') {
-        return Err(format!("Zeile {}: '{}' -- Selektoren fuer Nachfahren gibt es (noch) nicht; erlaubt sind Art, .klasse, #name und Zustand", zeile, s));
+    let gesp = s.replace('>', " > ");
+    let mut teile: Vec<&str> = Vec::new();
+    let mut direkt: Vec<bool> = Vec::new();   // direkt[i]: zwischen teile[i] und teile[i + 1]
+    let mut offen = false;
+    for t in gesp.split_whitespace() {
+        if t == ">" {
+            if teile.is_empty() || offen { return Err(format!("Zeile {}: '{}' -- vor '>' fehlt ein Teil", zeile, s)); }
+            offen = true;
+            continue;
+        }
+        if !teile.is_empty() { direkt.push(offen); }
+        teile.push(t);
+        offen = false;
     }
+    if offen { return Err(format!("Zeile {}: '{}' -- hinter '>' fehlt ein Teil", zeile, s)); }
+    let mut sel = teil_lesen(teile[teile.len() - 1], zeile, true)?;
+    for i in (0..teile.len() - 1).rev() {
+        let v = teil_lesen(teile[i], zeile, false)?;
+        sel.gewicht += v.gewicht;
+        sel.vorfahren.push((Teil { art: v.art, klassen: v.klassen, name: v.name }, direkt[i]));
+    }
+    Ok(sel)
+}
+
+/// Ein Teil ohne Leerraum: vorn die Art, dann `.klasse`, `#name`, `:zustand`.
+/// `ziel` = der letzte Teil (das Widget); ein Vorfahre darf `window` sein,
+/// aber keinen Zustand tragen.
+fn teil_lesen(s: &str, zeile: usize, ziel: bool) -> Result<Selektor, String> {
     // In Teile zerlegen: vorn die Art, dann je ein Teil ab . # :
     let mut teile: Vec<(char, String)> = Vec::new();
     let mut akt = (' ', String::new());
@@ -172,13 +286,24 @@ fn selektor_lesen(s: &str, zeile: usize) -> Result<Selektor, String> {
         }
     }
     teile.push(akt);
-    let mut sel = Selektor { art: None, klassen: Vec::new(), name: None, an: false, schicht: BASIS, gewicht: 0 };
+    let mut sel = Selektor { art: None, klassen: Vec::new(), name: None, an: false, schicht: BASIS, gewicht: 0,
+                             vorfahren: Vec::new() };
     let mut fluechtig = 0;
     for (art, wort) in teile {
         let w = wort.to_lowercase();
+        if art == ':' && !ziel {
+            return Err(format!("Zeile {}: '{}' -- einen Zustand traegt nur der letzte Teil des Selektors, nicht ein Behaelter darueber", zeile, s));
+        }
         match art {
             ' ' => {
                 if w.is_empty() || w == "*" { continue; }
+                if w == "window" || w == "fenster" {
+                    if ziel {
+                        return Err(format!("Zeile {}: 'window' gibt es nur als Vorfahre (window#name button) -- das Fenster selbst ist kein Widget", zeile));
+                    }
+                    sel.art = Some("window".into()); sel.gewicht += 1;
+                    continue;
+                }
                 if Kind::from_str(&w).is_none() {
                     return Err(format!("Zeile {}: eine Widget-Art '{}' gibt es nicht -- die Namen sind die aus der .dhform (button, label, textinput, listbox, ...)", zeile, wort));
                 }
@@ -312,7 +437,11 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
                 "verlauf" | "gradient" => werte.verlauf = Some(zahl_lesen_stil(wert, zeile, "verlauf", 0, 64)?),
                 "glanz" | "gloss" => werte.glanz = Some(zahl_lesen_stil(wert, zeile, "glanz", 0, 100)?),
                 "fase" | "bevel" => werte.fase = Some(zahl_lesen_stil(wert, zeile, "fase", 0, 1)?),
-                "uebergang" | "transition" => werte.uebergang = Some(zahl_lesen_stil(wert, zeile, "uebergang", 0, 2000)?),
+                "uebergang" | "transition" => {
+                    let (alle, je) = uebergang_lesen(wert, zeile)?;
+                    if alle.is_some() { werte.uebergang = alle; }
+                    for (k, d) in je { werte.uebergang_je.retain(|(x, _)| *x != k); werte.uebergang_je.push((k, d)); }
+                }
                 _ => return Err(format!("Zeile {}: Eigenschaft '{}' gibt es nicht -- bekannt sind {}", zeile, name, EIGENSCHAFTEN)),
             }
         }
@@ -323,18 +452,21 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
         let rest = t[pos..].trim_start();
         return Err(format!("Zeile {}: '{}' -- eine Regel braucht einen Rumpf in {{ }}", zeile_von(&t, t.len() - rest.len()), rest.lines().next().unwrap_or("").trim()));
     }
-    Ok(Stildatei { regeln })
+    let mit_vorfahren = regeln.iter().any(|r: &Regel| !r.sel.vorfahren.is_empty());
+    Ok(Stildatei { regeln, mit_vorfahren })
 }
 
 impl Stildatei {
-    /// Aufloesen fuer ein Widget dieser Art mit diesen Klassen.
-    pub(super) fn aufloesen(&self, art: &str, klassen: &[String], name: &str, an: bool) -> StilAufgeloest {
+    /// Aufloesen fuer ein Widget dieser Art mit diesen Klassen; `kette` sind
+    /// seine Behaelter und das Fenster, das naechste zuerst.
+    pub(super) fn aufloesen(&self, art: &str, klassen: &[String], name: &str, an: bool, kette: &[Glied]) -> StilAufgeloest {
         let mut passend: Vec<(u32, usize, &Regel)> = self.regeln.iter().enumerate().filter(|(_, r)| {
             let s = &r.sel;
             s.art.as_ref().map(|a| a == art).unwrap_or(true)
                 && s.klassen.iter().all(|k| klassen.iter().any(|x| x == k))
                 && s.name.as_ref().map(|n| n == name).unwrap_or(true)
                 && (!s.an || an)
+                && vorfahren_passen(&s.vorfahren, kette)
         }).map(|(i, r)| (r.sel.gewicht, i, r)).collect();
         passend.sort_by_key(|(g, i, _)| (*g, *i));
         let mut o: StilAufgeloest = Default::default();
@@ -403,20 +535,81 @@ impl Gui {
             return;
         };
         let stand = self.stil_stand;
+        let mit_vorfahren = datei.mit_vorfahren;
         for win in self.windows.iter_mut() {
-            for w in win.widgets.iter_mut() {
+            // Die Ketten ueber den Widgets -- nur, wenn eine Regel danach
+            // fragt. Ein Hash der Kette steht im Schluessel: aendert sich
+            // eine Klasse weiter oben oder zieht ein Widget in einen anderen
+            // Behaelter, wird neu aufgeloest, ohne dass jede Stelle, die das
+            // tut, daran denken muss.
+            let ketten: Vec<Vec<Glied>> = if mit_vorfahren { Self::ketten(win) } else { Vec::new() };
+            for (i, w) in win.widgets.iter_mut().enumerate() {
                 if !w.alive { continue; }
-                let key = (stand, w.checked, w.enabled, w.variante);
+                let kette: &[Glied] = ketten.get(i).map(|k| k.as_slice()).unwrap_or(&[]);
+                let khash = if kette.is_empty() { 0 } else {
+                    use std::hash::{Hash, Hasher};
+                    let mut h = std::collections::hash_map::DefaultHasher::new();
+                    kette.hash(&mut h);
+                    h.finish()
+                };
+                let key = (stand, w.checked, w.enabled, w.variante, khash);
                 if w.stil_key == Some(key) { continue; }
                 let mut kl = w.klassen.clone();
                 if w.kind == Kind::Button {
                     if let Some(a) = KNOPF_ARTEN.get(w.variante as usize) { kl.push(a.to_string()); }
                 }
-                let auf = datei.aufloesen(w.kind.as_str(), &kl, &w.name, w.checked);
+                let auf = datei.aufloesen(w.kind.as_str(), &kl, &w.name, w.checked, kette);
                 w.stil_auf = if auf.iter().all(|s| *s == StilWerte::default()) { None } else { Some(Box::new(auf)) };
                 w.stil_key = Some(key);
             }
         }
+    }
+    /// Je Widget die Kette seiner Behaelter bis zum Fenster, das naechste
+    /// zuerst. Behaelter ist, wer Kinder fuehrt: ein Layout (seine Kinder-
+    /// liste), sonst Reiterwerk/Akkordeon/Assistent (`tc_von`) und das
+    /// rollende Panel (`panel_von`) -- beide je Bild nachgefuehrt.
+    fn ketten(win: &Window) -> Vec<Vec<Glied>> {
+        let n = win.widgets.len();
+        let mut eltern = vec![-1i32; n];
+        for (j, w) in win.widgets.iter().enumerate() {
+            if !w.alive { continue; }
+            if let Some(l) = w.layout.as_ref() {
+                for &(k, _) in &l.kinder { if k >= 0 && (k as usize) < n && k as usize != j { eltern[k as usize] = j as i32; } }
+            }
+        }
+        for (i, w) in win.widgets.iter().enumerate() {
+            if eltern[i] >= 0 { continue; }
+            if w.tc_von >= 0 && w.tc_von as usize != i { eltern[i] = w.tc_von; }
+            else if w.panel_von >= 0 && w.panel_von as usize != i { eltern[i] = w.panel_von; }
+        }
+        let glied = |w: &Widget| Glied { art: w.kind.as_str().to_string(), klassen: w.klassen.clone(), name: w.name.clone() };
+        let fenster = Glied { art: "window".into(), klassen: Vec::new(), name: win.name.clone() };
+        (0..n).map(|i| {
+            let mut k = Vec::new();
+            let mut p = eltern[i];
+            // Hoechstens 32 Stufen -- ein Kreis waere ein Fehler anderswo,
+            // darf hier aber nicht haengen.
+            while p >= 0 && k.len() < 32 {
+                k.push(glied(&win.widgets[p as usize]));
+                p = eltern[p as usize];
+            }
+            k.push(fenster.clone());
+            k
+        }).collect()
+    }
+    /// GUI_WINDOW_SET_NAME(win, name$): ein Name fuer `window#name` in der
+    /// Stildatei.
+    pub fn window_set_name(&mut self, h: i64, name: &str) -> Result<(), String> {
+        if !name.is_empty() && !ist_name(name) {
+            return Err(format!("GUI_WINDOW_SET_NAME: Name '{}' -- erlaubt sind Buchstaben, Ziffern, _ und -", name));
+        }
+        self.win_mut(h, "GUI_WINDOW_SET_NAME")?.name = name.to_lowercase();
+        self.stil_stand += 1;
+        Ok(())
+    }
+    pub fn window_get_name(&self, h: i64) -> Result<String, String> {
+        self.windows.get(h as usize).map(|w| w.name.clone())
+            .ok_or_else(|| "GUI_WINDOW_GET_NAME$: ungueltiges GUI_WINDOW-Handle".to_string())
     }
 
     // ================================================================ Zeichnen
@@ -442,9 +635,9 @@ impl Gui {
             return basis;
         }
         let mut c = basis;
-        if let Some(h) = self.stil_farbe(w, rolle, HOVER) { c = mischen(c, h, weich(w.ueber_t)); }
-        if let Some(f) = self.stil_farbe(w, rolle, FOKUS) { c = mischen(c, f, weich(w.fokus_t)); }
-        if let Some(a) = self.stil_farbe(w, rolle, AKTIV) { c = mischen(c, a, weich(w.druck_t)); }
+        if let Some(h) = self.stil_farbe(w, rolle, HOVER) { c = mischen(c, h, Self::rolle_t(w, rolle, 0)); }
+        if let Some(f) = self.stil_farbe(w, rolle, FOKUS) { c = mischen(c, f, Self::rolle_t(w, rolle, 1)); }
+        if let Some(a) = self.stil_farbe(w, rolle, AKTIV) { c = mischen(c, a, Self::rolle_t(w, rolle, 2)); }
         c
     }
     /// GUI_GET_COLOR(wdg, rolle$): die Farbe, die GUI_SET_COLOR oder die
@@ -507,6 +700,29 @@ impl Gui {
     pub(super) fn w_uebergang(w: &Widget) -> Option<i32> {
         w.stil_auf.as_ref().and_then(|s| s[BASIS].uebergang)
     }
+    /// Eigene Dauern je Farbrolle, None = keine (dann gilt `w_uebergang`
+    /// fuer alle Farben, und `rollen_t` wird nicht gefuehrt).
+    pub(super) fn w_uebergang_je(w: &Widget) -> Option<[Option<i32>; 4]> {
+        let je = &w.stil_auf.as_ref()?[BASIS].uebergang_je;
+        if je.is_empty() { return None; }
+        let mut d = [None; 4];
+        for &(k, v) in je { d[k] = Some(v); }
+        Some(d)
+    }
+    /// Wie weit eine Farbrolle eines Zustands eingeblendet ist (0..1, schon
+    /// weich): `zustand` 0 Ueberfahren, 1 Fokus, 2 Druck. Mit eigenen
+    /// Dauern je Rolle kommt der Wert aus `rollen_t`, sonst aus den drei
+    /// Uebergaengen des Widgets.
+    pub(super) fn rolle_t(w: &Widget, rolle: &str, zustand: usize) -> f64 {
+        let k = ROLLEN.iter().position(|r| *r == rolle);
+        if let (Some(k), Some(rt)) = (k, w.rollen_t.as_ref()) { return weich(rt[k][zustand]); }
+        weich(match zustand { 0 => w.ueber_t, 1 => w.fokus_t, _ => w.druck_t })
+    }
+    /// Der Innenabstand waagerecht in Bildpunkten: aus der Stildatei, sonst
+    /// die Metrik `pad` -- eine Stelle fuer Zeichnen und Treffer.
+    pub(super) fn w_pad(&self, w: &Widget) -> i32 {
+        self.w_abstand(w).map(|a| a.1).unwrap_or_else(|| self.m("pad"))
+    }
     /// Der Schlagschatten unter einem Widget: gestaffelte, nach aussen
     /// blasser werdende Lagen -- raylib hat keinen Weichzeichner fuer Formen.
     pub(super) fn schatten_zeichnen(&self, g: &mut Graphics, w: &Widget, x: i32, y: i32, b: i32, h: i32) {
@@ -541,7 +757,7 @@ mod tests {
                        button.gefahr:hover { bg: #E74C3C }\n\
                        #ok { fg: akzent; stil: fett }\n\
                        * { border: #333 }", &th).unwrap();
-        let a = d.aufloesen("button", &["gefahr".into()], "ok", false);
+        let a = d.aufloesen("button", &["gefahr".into()], "ok", false, &[]);
         assert_eq!(a[BASIS].farbe("bg"), Some(&StilFarbe::Fest(0xC0392B)));
         assert_eq!(a[BASIS].farbe("fg"), Some(&StilFarbe::Thema("accent".into())));
         assert_eq!(a[BASIS].farbe("border"), Some(&StilFarbe::Fest(0x333333)));
@@ -549,11 +765,11 @@ mod tests {
         assert_eq!(a[BASIS].stil, Some(crate::schnitt::FETT));
         assert_eq!(a[HOVER].farbe("bg"), Some(&StilFarbe::Fest(0xE74C3C)));
         // Ohne die Klasse greift nur die Grundregel.
-        let b = d.aufloesen("button", &[], "", false);
+        let b = d.aufloesen("button", &[], "", false, &[]);
         assert_eq!(b[BASIS].farbe("bg"), Some(&StilFarbe::Fest(0x102030)));
         assert_eq!(b[HOVER], StilWerte::default());
         // Eine andere Art bekommt nur den Stern.
-        let c = d.aufloesen("label", &[], "", false);
+        let c = d.aufloesen("label", &[], "", false, &[]);
         assert_eq!(c[BASIS].farbe("bg"), None);
         assert_eq!(c[BASIS].farbe("border"), Some(&StilFarbe::Fest(0x333333)));
     }
@@ -561,15 +777,15 @@ mod tests {
     #[test]
     fn gleiches_gewicht_spaetere_gewinnt_und_checked() {
         let d = lesen("checkbox { fg: #111111 } checkbox { fg: #222222 } checkbox:checked { fg: #333333 }", &th).unwrap();
-        assert_eq!(d.aufloesen("checkbox", &[], "", false)[BASIS].farbe("fg"), Some(&StilFarbe::Fest(0x222222)));
-        assert_eq!(d.aufloesen("checkbox", &[], "", true)[BASIS].farbe("fg"), Some(&StilFarbe::Fest(0x333333)));
+        assert_eq!(d.aufloesen("checkbox", &[], "", false, &[])[BASIS].farbe("fg"), Some(&StilFarbe::Fest(0x222222)));
+        assert_eq!(d.aufloesen("checkbox", &[], "", true, &[])[BASIS].farbe("fg"), Some(&StilFarbe::Fest(0x333333)));
     }
 
     #[test]
     fn kommentare_und_mehrere_selektoren() {
         let d = lesen("/* oben\n */ label, button { // dahinter\n fg: #ABC }\n", &th).unwrap();
-        assert_eq!(d.aufloesen("button", &[], "", false)[BASIS].farbe("fg"), Some(&StilFarbe::Fest(0xAABBCC)));
-        assert_eq!(d.aufloesen("label", &[], "", false)[BASIS].farbe("fg"), Some(&StilFarbe::Fest(0xAABBCC)));
+        assert_eq!(d.aufloesen("button", &[], "", false, &[])[BASIS].farbe("fg"), Some(&StilFarbe::Fest(0xAABBCC)));
+        assert_eq!(d.aufloesen("label", &[], "", false, &[])[BASIS].farbe("fg"), Some(&StilFarbe::Fest(0xAABBCC)));
     }
 
     #[test]
@@ -581,10 +797,63 @@ mod tests {
         assert!(f("button { fg: #12 }").contains("ist keine Farbe"));
         assert!(f("button { fg: rot }").contains("Name des Themas"));
         assert!(f("button { radius: 99 }").contains("0..64"));
-        assert!(f("panel button { fg: #fff }").contains("Nachfahren"));
+        assert!(f("panel:hover button { fg: #fff }").contains("nur der letzte Teil"));
+        assert!(f("> button { fg: #fff }").contains("vor '>' fehlt"));
+        assert!(f("panel > { fg: #fff }").contains("hinter '>' fehlt"));
+        assert!(f("window { fg: #fff }").contains("nur als Vorfahre"));
+        assert!(f("button { uebergang: knopf 30 }").contains("eigene Dauer haben bg"));
         assert!(f("button:hover:focus { fg: #fff }").contains("hoechstens einer"));
         assert!(f("button { fg: #fff").contains("'{' ohne '}'"));
         assert!(f("button fg: #fff").contains("braucht einen Rumpf"));
         assert!(f("/* offen").contains("Kommentar ohne */"));
+    }
+
+    fn glied(art: &str, kl: &[&str], name: &str) -> Glied {
+        Glied { art: art.into(), klassen: kl.iter().map(|s| s.to_string()).collect(), name: name.into() }
+    }
+
+    #[test]
+    fn nachfahren_irgendwo_und_direkt() {
+        let d = lesen("panel.leiste button { bg: #111111 }
+                       layout > button { fg: #222222 }
+                       window#einst button:hover { bg: #333333 }", &th).unwrap();
+        assert!(d.mit_vorfahren);
+        // Knopf in einem Layout, das im Panel .leiste liegt, im Fenster "einst".
+        let k = [glied("layout", &[], ""), glied("panel", &["leiste"], ""), glied("window", &[], "einst")];
+        let a = d.aufloesen("button", &[], "", false, &k);
+        assert_eq!(a[BASIS].farbe("bg"), Some(&StilFarbe::Fest(0x111111)));   // irgendwo darueber
+        assert_eq!(a[BASIS].farbe("fg"), Some(&StilFarbe::Fest(0x222222)));   // direkt darueber
+        assert_eq!(a[HOVER].farbe("bg"), Some(&StilFarbe::Fest(0x333333)));
+        // Direkt im Panel: kein Layout direkt darueber.
+        let k2 = [glied("panel", &["leiste"], ""), glied("window", &[], "einst")];
+        let b = d.aufloesen("button", &[], "", false, &k2);
+        assert_eq!(b[BASIS].farbe("fg"), None);
+        assert_eq!(b[BASIS].farbe("bg"), Some(&StilFarbe::Fest(0x111111)));
+        // Ein Layout zwischen Knopf und Layout: '>' traegt nicht weiter.
+        let k3 = [glied("panel", &[], ""), glied("layout", &[], ""), glied("window", &[], "")];
+        let c = d.aufloesen("button", &[], "", false, &k3);
+        assert_eq!(c[BASIS].farbe("fg"), None);
+        assert_eq!(c[BASIS].farbe("bg"), None);   // das Panel traegt die Klasse nicht
+        // Ein anderes Fenster: die Hover-Regel greift nicht.
+        assert_eq!(d.aufloesen("button", &[], "", false, &[glied("window", &[], "anders")])[HOVER], StilWerte::default());
+        // Vorrang: Vorfahren zaehlen mit (panel.leiste button = 1 + 10 + 1).
+        let e = lesen("button.x { bg: #AAAAAA }
+ panel.leiste button { bg: #BBBBBB }", &th).unwrap();
+        assert_eq!(e.aufloesen("button", &["x".into()], "", false, &k2)[BASIS].farbe("bg"), Some(&StilFarbe::Fest(0xBBBBBB)));
+    }
+
+    #[test]
+    fn uebergang_je_rolle() {
+        let d = lesen("button { uebergang: 120, bg 400ms, border 0 }", &th).unwrap();
+        let a = d.aufloesen("button", &[], "", false, &[]);
+        assert_eq!(a[BASIS].uebergang, Some(120));
+        let mut je = a[BASIS].uebergang_je.clone();
+        je.sort();
+        assert_eq!(je, vec![(0, 400), (2, 0)]);
+        // Eine spaetere Regel ersetzt nur die Rolle, die sie nennt.
+        let d2 = lesen("button { uebergang: bg 400, fg 50 } #k { uebergang: bg 10 }", &th).unwrap();
+        let mut je2 = d2.aufloesen("button", &[], "k", false, &[])[BASIS].uebergang_je.clone();
+        je2.sort();
+        assert_eq!(je2, vec![(0, 10), (1, 50)]);
     }
 }

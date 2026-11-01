@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2191,
+ "count": 2193,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -1058,6 +1058,7 @@
   "GUI_WINDOW_DESTROY": "remove a window + its contents",
   "GUI_WINDOW_FRONT": "bring the window to the front without giving it focus -- for a suggestion list or a tooltip that should lie over the text while typing. Shown via GUI_WINDOW_VISIBLE, a window otherwise lies behind the one clicked last",
   "GUI_WINDOW_GET_H": "INTEGER — position and size of the window on the screen",
+  "GUI_WINDOW_GET_NAME$": "STRING — the window's name (\"\" = none)",
   "GUI_WINDOW_GET_W": "INTEGER — position and size of the window on the screen",
   "GUI_WINDOW_GET_X": "move/resize/read a window",
   "GUI_WINDOW_GET_Y": "INTEGER — position and size of the window on the screen",
@@ -1073,6 +1074,7 @@
   "GUI_WINDOW_SET_BOUNDS": "move/resize/read a window",
   "GUI_WINDOW_SET_MAX_SIZE": "maximum size when resizing (0 = none)",
   "GUI_WINDOW_SET_MIN_SIZE": "minimum size when resizing (0 = none)",
+  "GUI_WINDOW_SET_NAME": "a window's name, which window#name in the stylesheet means (\"\" = none; stored in the .dhform)",
   "GUI_WINDOW_SHOWN": "BOOLEAN — is the window currently visible? The counterpart to the setter -- without the getter a program would have to remember what it set itself, and would be wrong as soon as the user closes the window with its cross",
   "GUI_WINDOW_TITLE": "change the title bar text later (name of the document, \"Commands\" / \"Open file\")",
   "GUI_WINDOW_VISIBLE": "set visibility",
