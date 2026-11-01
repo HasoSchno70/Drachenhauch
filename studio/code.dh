@@ -1057,6 +1057,7 @@ END SUB
 ' ueber GUI_DRAW -- ein offener Dialog kommt darum noch einmal obenauf.
 SUB dialogeObenauf()
     DIM d AS ARRAY OF INTEGER : d = [dlgEr, dlgMe, dlgEl, dlgWeg, dlgMn, frage, ueber]
+    IF vvOffen THEN ARRAY_PUSH(d, winVv)
     DIM w AS INTEGER
     FOR EACH w IN d
         IF w >= 0 THEN GUI_DRAW_WINDOW(w)

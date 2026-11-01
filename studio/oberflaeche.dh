@@ -271,6 +271,7 @@ SUB oberflaecheAnlegen()
     inspektorAnlegen()
     mitteAnlegen()
     GUI_SET_FONT(lstAusgabe, codeSchrift)
+    vervollAnlegen()
     GUI_SET_FONT_SIZE(lstAusgabe, 14)
     verteilen()
 END SUB

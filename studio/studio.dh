@@ -36,6 +36,7 @@ IMPORT "code.dh"
 IMPORT "erzeugen.dh"
 IMPORT "menue.dh"
 IMPORT "debug.dh"
+IMPORT "vervoll.dh"
 
 ' Fuer Pruefungen: DH_STUDIO_GROESSE=BxH haelt das Fenster fest (sonst haengen
 ' alle Lagen am Bildschirm), DH_STUDIO_AUFNAHME spielt eine Aufnahme ab,
@@ -528,6 +529,7 @@ WHILE NOT beenden
     dialogePruefen()
     prozessePruefen()
     debugPruefen()
+    vervollPruefen()
     ' Das Entwurfsfenster obenauf -- ein Klick ins Hauptfenster legte es
     ' sonst darunter. Dialoge, Menues und Popover liegen weiter oben.
     IF frm >= 0 AND NOT GUI_MODAL() AND layoutVorn() THEN GUI_WINDOW_FRONT(frm)

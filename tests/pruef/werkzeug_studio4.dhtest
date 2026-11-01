@@ -372,3 +372,194 @@ debug continue
 ausgabe x ist 42
 debug stop
 debug ende
+
+=== die vervollstaendigung kennt hinter self. die mitglieder des fensters
+' Im Code-Feld zeigt sich nur der Rumpf; gefragt wird der ganze Text samt
+' Basisklasse -- darum stehen Controls, Timer und Ereignisse in der Liste.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, p)
+DIM nx AS INTEGER
+DIM ny AS INTEGER
+(nx, ny) = slLage(m, "knoten Hauptfenster.knopf1_Klick")
+slHin(10, 10)
+slKlick(nx, ny)
+slWarten(10)
+slMit([341], 269)
+slWarten(4)
+slTaste(257)
+slWarten(4)
+slMit([341], 86)
+slWarten(20)
+slTaste(257)
+slWarten(10)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_ABLAGE", "Self.")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM v AS ARRAY OF STRING : v = slAnfang(log, "vorschlag ")
+PRINT "vorschlag "; LEN(v) = 1
+IF LEN(v) = 1 THEN
+    DIM w AS STRING
+    FOR EACH w IN ["knopf1", "takt", "takt_Aktion", "knopf1_Klick", "zaehler"]
+        PRINT w; " "; INSTR("," + MID$(v[0], INSTR(v[0], " ", 10) + 1, 10000) + ",", "," + w + ",") >= 0
+    NEXT
+END IF
+PRINT "eingesetzt "; slHat(log, "vervollstaendigt zaehler")
+DIM z AS STRING
+FOR EACH z IN READLINES(p + "/Hauptfenster.dh")
+    IF INSTR(z, "Self.") >= 0 THEN PRINT "|"; TRIM$(z)
+NEXT
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}],
+"timer":[{"name":"takt","intervall":500,"aktiv":true,"wiederholen":true}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM zaehler AS INTEGER
+
+    SUB knopf1_Klick()
+        PRINT "klick"
+    END SUB
+
+    SUB takt_Aktion()
+        PRINT "takt"
+    END SUB
+END CLASS
+--- erwartet
+vorschlag TRUE
+knopf1 TRUE
+takt TRUE
+takt_Aktion TRUE
+knopf1_Klick TRUE
+zaehler TRUE
+eingesetzt TRUE
+|Self.zaehler
+
+=== bild hinzufuegen kopiert nach bilder und gibt es dem gewaehlten bild-control
+' Strg+Umschalt+B mit DH_STUDIO_DATEI statt des Dialogs.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM bild AS IMAGE : bild = IMAGE_NEW(40, 30, &HC03030)
+IMAGE_SAVE(bild, CWD$() + "/rot.png")
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, p)
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(fx, fy) = slLage(m, "fenster")
+slHin(10, 10)
+slKlick(fx + 100, fy + 70)
+slWarten(6)
+slMit([341, 340], 66)
+slWarten(10)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_DATEI", CWD$() + "/rot.png")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "protokoll "; slHat(log, "bild rot.png")
+PRINT "kopiert "; FILEEXISTS(p + "/bilder/rot.png")
+DIM d AS JSON_HANDLE : d = JSON_PARSE(JOIN$(READLINES(p + "/Hauptfenster.dhform"), CHR$(10)))
+PRINT "control "; JSON_GET_STRING(d, "widgets.0.studio_bild")
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "json"
+IMPORT "imgfx"
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"image","name":"logo","x":40,"y":40,"w":120,"h":90}]}
+--- erwartet
+protokoll TRUE
+kopiert TRUE
+control rot.png
+
+=== ziehen und rad auf einer zeichenflaeche im erzeugten programm
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(100)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; slHat(log, "erzeugt 2")
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN ARRAY_PUSH(neu, "AUTOMATION_PLAY(" + CHR$(34) + "k.txt" + CHR$(34) + ")")
+    ARRAY_PUSH(neu, s)
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+' Druck bei (100,100), Zug nach (140,120), los; dann ein Radschritt.
+DIM e AS ARRAY OF STRING : e = ["e 0 7 100 100 0 0", "e 10 7 100 100 0 0", "e 12 6 0 0 0 0", "e 14 7 120 110 0 0", "e 16 7 140 120 0 0", "e 18 5 0 0 0 0", "e 20 7 300 300 0 0", "e 22 6 0 0 0 0", "e 24 5 0 0 0 0", "e 26 7 100 100 0 0", "e 28 8 0 1 0 0"]
+WRITEALL(p + "/_studio/k.txt", "c " + STR$(LEN(e)) + CHR$(10) + JOIN$(e, CHR$(10)) + CHR$(10))
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "45", p + "/_studio/probe.dh")
+DIM aus AS STRING : aus = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM kt AS STRING : kt = PROCESS_READ$(k)
+    IF kt <> "" THEN
+        aus = aus + REPLACE$(kt, CHR$(13), "")
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(k) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+DIM z AS STRING
+FOR EACH z IN SPLIT(aus, CHR$(10))
+    IF z <> "" AND LEFT$(z, 8) <> "WARNING:" THEN PRINT z
+NEXT
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"canvas","name":"flaeche","x":20,"y":20,"w":200,"h":150}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM zuege AS INTEGER
+    DIM letztX AS INTEGER
+    DIM letztY AS INTEGER
+
+    SUB flaeche_Ziehen(x AS INTEGER, y AS INTEGER)
+        IF Self.zuege = 0 THEN PRINT "zug ab " + STR$(x) + " " + STR$(y)
+        Self.zuege = Self.zuege + 1
+        Self.letztX = x : Self.letztY = y
+    END SUB
+
+    SUB flaeche_Rad(schritte AS FLOAT)
+        PRINT "zug bis " + STR$(Self.letztX) + " " + STR$(Self.letztY)
+        PRINT "rad " + STR$(schritte)
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- erwartet
+erzeugt TRUE
+zug ab 79 79
+zug bis 119 99
+rad 1.0
