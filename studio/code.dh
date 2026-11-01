@@ -548,7 +548,14 @@ SUB navControl(en AS INTEGER, ei AS INTEGER, e AS Element, ci AS INTEGER, d AS J
         DIM k AS INTEGER
         FOR k = 0 TO JSON_LEN(d, pfad + ".kinder") - 1
             DIM c AS INTEGER : c = JSON_GET_INT(d, pfad + ".kinder." + STR$(k) + ".0")
-            IF c < 0 OR c >= LEN(eltern) THEN CONTINUE
+            IF c < 0 THEN
+                ' Ein Abstandhalter: Layout in navCtrl, Stelle in navMeth.
+                DIM an AS INTEGER : an = navKnoten(cn, "Abstandhalter", "abstand", ei, ci, k, "")
+                DIM ap AS INTEGER : ap = bausteinNach("spacer")
+                IF ap >= 0 THEN GUI_TREE_ICON(baum, an, bausteine[ap].symbol)
+                CONTINUE
+            END IF
+            IF c >= LEN(eltern) THEN CONTINUE
             IF eltern[c] = ci THEN navControl(cn, ei, e, c, d, eltern)
         NEXT
     END IF
@@ -579,6 +586,9 @@ SUB knotenProtokollieren()
                 pfad = elemente[navEl[n]].name + "." + ctrlNamen[navCtrl[n]]
             CASE "methode" : pfad = elemente[navEl[n]].name + "." + methoden[navMeth[n]].name
             CASE "dekl" : pfad = elemente[navEl[n]].name + ".Eigenschaften"
+            CASE "abstand"
+                controlsVon(navEl[n])
+                pfad = elemente[navEl[n]].name + "." + ctrlNamen[navCtrl[n]] + ".abstand" + STR$(navMeth[n])
         END SELECT
         DIM x AS INTEGER
         DIM y AS INTEGER
@@ -628,7 +638,8 @@ SUB navigatorAuswahl()
                     controlsVon(ei)
                     IF navCtrl[n] = ctrlWidgets + trayWahl THEN ziel = n
                 END IF
-                IF auswahl < 0 AND trayWahl < 0 AND navArt[n] = "element" THEN ziel = n
+                IF abstandL >= 0 AND navArt[n] = "abstand" AND navCtrl[n] = abstandL AND navMeth[n] = abstandK THEN ziel = n
+                IF auswahl < 0 AND trayWahl < 0 AND abstandL < 0 AND navArt[n] = "element" THEN ziel = n
             ELSEIF r.art = "dekl" AND navArt[n] = "dekl" THEN
                 ziel = n
             ELSEIF r.art = "code" AND navArt[n] = "methode" THEN
@@ -668,6 +679,12 @@ SUB navigatorPruefen()
                 auswahlSetzen(-1)
                 menueEditor()
             END IF
+            auswahlGeaendert()
+        CASE "abstand"
+            layoutOeffnen(ei)
+            auswahlSetzen(-1)
+            abstandL = navCtrl[n]
+            abstandK = navMeth[n]
             auswahlGeaendert()
         CASE "methode"
             codeOeffnen(methoden[navMeth[n]])

@@ -69,6 +69,8 @@ SUB bausteineAnlegen()
     baustein("Behälter", "layout", "Zeile", "Zeile", 320, 44, "", "{'layout':{'art':'zeile','kinder':[],'abstand':6}}", "ordnet seine Controls nebeneinander")
     baustein("Behälter", "layout", "Spalte", "Spalte", 220, 180, "", "{'layout':{'art':'spalte','kinder':[],'abstand':6}}", "ordnet seine Controls untereinander")
     baustein("Behälter", "layout", "Raster", "Raster", 320, 140, "", "{'layout':{'art':'raster','spalten':2,'kinder':[],'abstand':6}}", "ordnet seine Controls in Zeilen und Spalten")
+    ' Kein Control: ein Eintrag in der Liste eines Layouts, der Platz nimmt.
+    baustein("Behälter", "spacer", "Abstandhalter", "Abstand", 40, 40, "", "", "freier Platz in einem Layout -- schiebt, was danach kommt, ans Ende")
     baustein("Leisten", "toolbar", "Werkzeugleiste", "Werkzeugleiste", 320, 36, "", "", "Knöpfe mit Sinnbildern oben im Fenster")
     baustein("Leisten", "statusbar", "Statusleiste", "Statusleiste", 400, 24, "Bereit.", "", "Meldungen unten im Fenster")
     baustein("Leisten", "breadcrumb", "Pfadleiste", "Pfad", 320, 26, "", "", "wo man gerade ist, zum Anklicken")
@@ -245,6 +247,10 @@ FUNCTION symbolZeichnen(name AS STRING) AS IMAGE
                 IMAGE_FILL_ROUNDRECT(img, 9, 2 + k * 8, 30, 7 + k * 8, 2, IIF(k = 0, S_AKZENT, S_FLAECHE))
                 IMAGE_FRAME(img, 9, 2 + k * 8, 30, 7 + k * 8, 1, S_RAND)
             NEXT
+        CASE "Abstandhalter"
+            IMAGE_FILL_ROUNDRECT(img, 3, 8, 8, 17, 2, S_FLAECHE)
+            IMAGE_FILL_ROUNDRECT(img, 31, 8, 36, 17, 2, S_AKZENT)
+            IMAGE_POLYLINE(img, [10, 13, 16, 19, 22, 25, 28], [12, 8, 16, 8, 16, 8, 12], 1, S_RAND)
         CASE "Raster"
             FOR k = 0 TO 3
                 DIM rx AS INTEGER : rx = 6 + (k MOD 2) * 15

@@ -467,7 +467,11 @@ SUB auswahlGeaendert()
     navStumm = FALSE
     lageAnzeigen()
     werkzeugeNachziehen()
-    protokoll("gewaehlt " + STR$(auswahl) + " " + STR$(LEN(gewaehlt)))
+    IF abstandL >= 0 THEN
+        protokoll("gewaehlt abstand " + feldText$(abstandL, "name") + " " + STR$(abstandK))
+    ELSE
+        protokoll("gewaehlt " + STR$(auswahl) + " " + STR$(LEN(gewaehlt)))
+    END IF
 END SUB
 
 SUB status(text AS STRING)
@@ -506,7 +510,7 @@ SUB werkzeugeNachziehen()
     GUI_TOOLBAR_ENABLE(tb, tbMitteW, mehrere)
     GUI_TOOLBAR_ENABLE(tb, tbVerteilen, lay AND LEN(gewaehlt) >= 3)
     GUI_MENU_ENABLE(miVerdoppeln, lay AND auswahl >= 0)
-    GUI_MENU_ENABLE(miLoeschen, lay AND (auswahl >= 0 OR trayWahl >= 0))
+    GUI_MENU_ENABLE(miLoeschen, lay AND (auswahl >= 0 OR trayWahl >= 0 OR abstandL >= 0))
     DIM k AS INTEGER
     FOR k = 0 TO LEN(anordnenPunkte) - 1
         GUI_MENU_ENABLE(anordnenPunkte[k], lay)

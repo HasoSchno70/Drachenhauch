@@ -46,6 +46,8 @@ DIM startW AS INTEGER
 DIM startH AS INTEGER
 DIM zugX AS ARRAY OF INTEGER : zugX = []
 DIM zugY AS ARRAY OF INTEGER : zugY = []
+DIM zugW AS ARRAY OF INTEGER : zugW = []        ' Groesse je gezogenem Control (fuer den Umriss)
+DIM zugH AS ARRAY OF INTEGER : zugH = []
 DIM bewegt AS BOOLEAN : bewegt = FALSE
 DIM rahmenDazu AS BOOLEAN : rahmenDazu = FALSE
 DIM mausFx AS INTEGER                 ' Maus in Fensterlage, je Bild
@@ -179,6 +181,67 @@ FUNCTION liegtIn(b AS INTEGER, a AS INTEGER) AS BOOLEAN
     RETURN FALSE
 END FUNCTION
 
+' Was bei einem Zug nicht Ziel sein darf: das gezogene Control -- bei
+' ausser = -2 die ganze Auswahl -- und alles, was darin steht.
+FUNCTION ausgenommen(l AS INTEGER, ausser AS INTEGER) AS BOOLEAN
+    IF ausser = -2 THEN
+        DIM g AS INTEGER
+        FOR EACH g IN gewaehlt
+            IF l = g OR liegtIn(l, g) THEN RETURN TRUE
+        NEXT
+        RETURN FALSE
+    END IF
+    IF ausser < 0 THEN RETURN FALSE
+    RETURN l = ausser OR liegtIn(l, ausser)
+END FUNCTION
+
+' Steht etwas aus der Auswahl in einem Layout? Dann wird umgesetzt statt
+' verschoben -- was ein Layout legt, legt es weiter.
+FUNCTION auswahlVerwaltet() AS BOOLEAN
+    DIM g AS INTEGER
+    FOR EACH g IN gewaehlt
+        IF verwaltet(g) THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Was ein Zug bewegt: die Auswahl ohne die, deren Layout selbst gewaehlt ist
+' (sie gehen mit ihm), sortiert, wie sie im Ziel stehen sollen.
+FUNCTION zugListe(art AS STRING) AS ARRAY OF INTEGER
+    DIM r AS ARRAY OF INTEGER : r = []
+    DIM g AS INTEGER
+    FOR EACH g IN gewaehlt
+        DIM mit AS BOOLEAN : mit = FALSE
+        DIM o AS INTEGER
+        FOR EACH o IN gewaehlt
+            IF o <> g AND liegtIn(g, o) THEN mit = TRUE
+        NEXT
+        IF NOT mit THEN ARRAY_PUSH(r, g)
+    NEXT
+    ' In eine Zeile von links nach rechts, sonst zeilenweise von oben.
+    SORT(r, FUNCTION(a, b) zugVergleich(a, b, art))
+    RETURN r
+END FUNCTION
+
+FUNCTION zugVergleich(a AS INTEGER, b AS INTEGER, art AS STRING) AS INTEGER
+    DIM ax AS INTEGER
+    DIM ay AS INTEGER
+    DIM aw AS INTEGER
+    DIM ah AS INTEGER
+    DIM bx AS INTEGER
+    DIM by AS INTEGER
+    DIM bw AS INTEGER
+    DIM bh AS INTEGER
+    (ax, ay, aw, ah) = lageVon(a)
+    (bx, by, bw, bh) = lageVon(b)
+    IF art = "zeile" THEN
+        IF ax <> bx THEN RETURN ax - bx
+        RETURN ay - by
+    END IF
+    IF ABS(ay - by) > MIN(ah, bh) \ 2 THEN RETURN ay - by
+    RETURN ax - bx
+END FUNCTION
+
 ' Das innerste Layout unter einem Punkt -- ohne `ausser` und alles, was darin
 ' steht (ein Layout laesst sich nicht in sich selbst legen).
 FUNCTION layoutBei(fx AS INTEGER, fy AS INTEGER, ausser AS INTEGER) AS INTEGER
@@ -186,8 +249,7 @@ FUNCTION layoutBei(fx AS INTEGER, fy AS INTEGER, ausser AS INTEGER) AS INTEGER
     DIM bestT AS INTEGER : bestT = -1
     DIM l AS INTEGER
     FOR l = 0 TO anzahl() - 1
-        IF NOT istLayout(l) OR l = ausser THEN CONTINUE
-        IF ausser >= 0 AND liegtIn(l, ausser) THEN CONTINUE
+        IF NOT istLayout(l) OR ausgenommen(l, ausser) THEN CONTINUE
         DIM h AS GUI_WIDGET : h = IIF(frm >= 0, GUI_WINDOW_WIDGET(frm, l), -1)
         IF h >= 0 THEN
             IF NOT GUI_VISIBLE(h) THEN CONTINUE
@@ -243,6 +305,9 @@ SUB stelleRechnen(l AS INTEGER, fx AS INTEGER, fy AS INTEGER, ausser AS INTEGER)
     FOR k = 0 TO LEN(kinder) - 1
         DIM c AS INTEGER : c = kinder[k]
         IF c < 0 OR c = ausser THEN CONTINUE
+        IF ausser = -2 THEN
+            IF istGewaehlt(c) THEN CONTINUE
+        END IF
         DIM x AS INTEGER
         DIM y AS INTEGER
         DIM w AS INTEGER
@@ -330,6 +395,17 @@ SUB controlsProtokollieren()
         DIM h AS INTEGER
         (x, y, w, h) = lageVon(i)
         protokoll("lage control " + feldText$(i, "name") + " " + STR$(formX + zS(x + w \ 2)) + " " + STR$(formY + zS(y + h \ 2)) + " " + STR$(w) + " " + STR$(h))
+    NEXT
+    ' und jeden Abstandhalter: "lage abstand LAYOUT STELLE x y"
+    FOR i = 0 TO anzahl() - 1
+        IF NOT istLayout(i) THEN CONTINUE
+        DIM kinder AS ARRAY OF INTEGER : kinder = kinderListe(i)
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(kinder) - 1
+            IF kinder[k] >= 0 THEN CONTINUE
+            (x, y, w, h) = abstandRect(i, k)
+            IF w > 0 THEN protokoll("lage abstand " + feldText$(i, "name") + " " + STR$(k) + " " + STR$(formX + zS(x + w \ 2)) + " " + STR$(formY + zS(y + h \ 2)))
+        NEXT
     NEXT
 END SUB
 
@@ -562,6 +638,18 @@ SUB mausAufEntwurf()
         ELSE
             DIM i AS INTEGER : i = -1
             IF imFenster(smx, smy) THEN i = trefferMitLayouts(indexVonHandle(GUI_HIT_TEST(smx, smy)), mausFx, mausFy)
+            ' Auf einem Abstandhalter (er gehoert zum Layout, ist kein Control).
+            IF imFenster(smx, smy) AND (i < 0 OR istLayout(i)) THEN
+                IF abstandBei(mausFx, mausFy) THEN
+                    auswahlSetzen(-1)
+                    abstandL = abstandTrefferL
+                    abstandK = abstandTrefferK
+                    auswahlGeaendert()
+                    modus = 0
+                    GUI_FOCUS(-1)
+                    RETURN
+                END IF
+            END IF
             ' Doppelklick auf ein Control oder das Fenster: Ereignis hinzufuegen.
             IF imFenster(smx, smy) AND doppelKlick(i) THEN
                 IF i >= 0 THEN auswahlSetzen(i) ELSE auswahlSetzen(-1)
@@ -577,9 +665,7 @@ SUB mausAufEntwurf()
                 modus = 0
                 RETURN
             ELSEIF i >= 0 THEN
-                ' Ein Kind eines Layouts wird umgesetzt, nicht verschoben --
-                ' das geht nur allein.
-                IF NOT istGewaehlt(i) OR verwaltet(i) THEN auswahlSetzen(i)
+                IF NOT istGewaehlt(i) THEN auswahlSetzen(i)
                 auswahl = i
                 auswahlGeaendert()
                 modus = 1
@@ -591,11 +677,11 @@ SUB mausAufEntwurf()
         END IF
         startMx = mausFx : startMy = mausFy
         bewegt = FALSE
-        kindZug = (modus = 1) AND verwaltet(auswahl)
+        kindZug = (modus = 1) AND auswahlVerwaltet()
         zielL = -1
         IF auswahl >= 0 THEN
             (startX, startY, startW, startH) = lageVon(auswahl)
-            zugX = [] : zugY = []
+            zugX = [] : zugY = [] : zugW = [] : zugH = []
             DIM gj AS INTEGER
             FOR EACH gj IN gewaehlt
                 DIM gx AS INTEGER
@@ -604,6 +690,7 @@ SUB mausAufEntwurf()
                 DIM gh AS INTEGER
                 (gx, gy, gw, gh) = lageVon(gj)
                 ARRAY_PUSH(zugX, gx) : ARRAY_PUSH(zugY, gy)
+                ARRAY_PUSH(zugW, gw) : ARRAY_PUSH(zugH, gh)
             NEXT
         END IF
         GUI_FOCUS(-1)
@@ -644,12 +731,12 @@ SUB mausAufEntwurf()
         bewegt = TRUE
         linienLeeren()
         IF modus = 1 AND kindZug THEN
-            ' Das Kind bleibt stehen; wohin es kommt, zeigt die Marke.
-            zielBestimmen(mausFx, mausFy, auswahl)
+            ' Die Kinder bleiben stehen; wohin sie kommen, zeigt die Marke.
+            zielBestimmen(mausFx, mausFy, -2)
         ELSEIF modus = 1 THEN
             ziehenRechnen(dx, dy)
-            ' Ein einzelnes freies Control laesst sich in ein Layout ziehen.
-            IF LEN(gewaehlt) = 1 THEN zielBestimmen(mausFx, mausFy, auswahl) ELSE zielL = -1
+            ' Freie Controls lassen sich in ein Layout ziehen.
+            zielBestimmen(mausFx, mausFy, -2)
         ELSE
             groesseRechnen(dx, dy)
         END IF
@@ -674,19 +761,43 @@ END SUB
 ' neben jedes Layout gezogen, dann heraus und frei an der Stelle des Umrisses.
 SUB zugAbschliessen()
     IF auswahl < 0 THEN RETURN
-    DIM name AS STRING : name = feldText$(auswahl, "name")
+    DIM dx AS INTEGER : dx = mausFx - startMx
+    DIM dy AS INTEGER : dy = mausFy - startMy
     IF zielL >= 0 THEN
-        kindEinfuegen(zielL, auswahl, zielPos, gewichtVon(auswahl))
-        protokoll("eingesetzt " + name + " " + feldText$(zielL, "name") + " " + STR$(stelleIn(zielL, auswahl)))
-        status(name + " steht in " + feldText$(zielL, "name") + " an Stelle " + STR$(stelleIn(zielL, auswahl) + 1) + ".")
+        DIM art AS STRING : art = feldText$(zielL, "layout.art")
+        DIM liste AS ARRAY OF INTEGER : liste = zugListe(art)
+        kinderEinfuegen(zielL, liste, zielPos)
+        DIM i AS INTEGER
+        FOR EACH i IN liste
+            protokoll("eingesetzt " + feldText$(i, "name") + " " + feldText$(zielL, "name") + " " + STR$(stelleIn(zielL, i)))
+        NEXT
+        IF LEN(liste) = 1 THEN
+            status(feldText$(liste[0], "name") + " steht in " + feldText$(zielL, "name") + " an Stelle " + STR$(stelleIn(zielL, liste[0]) + 1) + ".")
+        ELSE
+            status(STR$(LEN(liste)) + " Controls stehen jetzt in " + feldText$(zielL, "name") + ".")
+        END IF
     ELSEIF kindZug THEN
-        DIM x AS INTEGER : x = MAX(0, rasterWert(startX + mausFx - startMx))
-        DIM y AS INTEGER : y = MAX(0, rasterWert(startY + mausFy - startMy))
-        kindEntfernen(auswahl)
-        JSON_SET_INT(doc, wz$(auswahl, "x"), x)
-        JSON_SET_INT(doc, wz$(auswahl, "y"), y)
-        protokoll("herausgenommen " + name + " " + STR$(x) + " " + STR$(y))
-        status(name + " steht jetzt frei im Fenster.")
+        ' Neben jedes Layout: heraus, frei an der Stelle ihres Umrisses. Was
+        ' frei war, geht denselben Weg mit.
+        DIM los AS ARRAY OF INTEGER : los = zugListe("")
+        DIM z AS INTEGER
+        FOR z = 0 TO LEN(gewaehlt) - 1
+            DIM g AS INTEGER : g = gewaehlt[z]
+            IF ARRAY_INDEXOF(los, g) < 0 OR z >= LEN(zugX) THEN CONTINUE
+            DIM x AS INTEGER : x = MAX(0, rasterWert(zugX[z] + dx))
+            DIM y AS INTEGER : y = MAX(0, rasterWert(zugY[z] + dy))
+            IF verwaltet(g) THEN
+                kindEntfernen(g)
+                protokoll("herausgenommen " + feldText$(g, "name") + " " + STR$(x) + " " + STR$(y))
+            END IF
+            JSON_SET_INT(doc, wz$(g, "x"), x)
+            JSON_SET_INT(doc, wz$(g, "y"), y)
+        NEXT
+        IF LEN(los) = 1 THEN
+            status(feldText$(los[0], "name") + " steht jetzt frei im Fenster.")
+        ELSE
+            status(STR$(LEN(los)) + " Controls stehen jetzt frei im Fenster.")
+        END IF
     END IF
 END SUB
 
@@ -794,6 +905,10 @@ SUB ablegen(p AS INTEGER, fx AS INTEGER, fy AS INTEGER, mittig AS BOOLEAN)
         timerAblegen()
         RETURN
     END IF
+    IF b.kind = "spacer" THEN
+        abstandAblegen(fx, fy)
+        RETURN
+    END IF
     DIM x AS INTEGER : x = fx
     DIM y AS INTEGER : y = fy
     IF mittig THEN x = fx - b.b \ 2 : y = fy - b.h \ 2
@@ -812,6 +927,159 @@ SUB ablegen(p AS INTEGER, fx AS INTEGER, fy AS INTEGER, mittig AS BOOLEAN)
     nachAenderung(TRUE)
     status(b.name + " abgelegt: " + feldText$(i, "name"))
     protokoll("neu " + b.kind + " " + feldText$(i, "name") + " " + STR$(x) + " " + STR$(y))
+END SUB
+
+' Einen Abstandhalter in das Layout unter der Stelle -- per Doppelklick in
+' der Bibliothek (die Stelle ist dann die Fenstermitte) in das gewaehlte.
+SUB abstandAblegen(fx AS INTEGER, fy AS INTEGER)
+    DIM l AS INTEGER : l = layoutBei(fx, fy, -1)
+    DIM pos AS INTEGER
+    IF l >= 0 THEN
+        stelleRechnen(l, fx, fy, -1)
+        pos = zielPos
+    ELSEIF istLayout(auswahl) THEN
+        l = auswahl
+        pos = LEN(kinderListe(l))
+    ELSEIF verwaltet(auswahl) THEN
+        l = elternCache[auswahl]
+        pos = stelleIn(l, auswahl) + 1
+    ELSE
+        zielL = -1
+        status("Ein Abstandhalter gehört in ein Layout -- auf eine Zeile, Spalte oder ein Raster ziehen.")
+        protokoll("abstand ohne layout")
+        RETURN
+    END IF
+    zielL = -1
+    abstandEinfuegen(l, pos, 1)
+    auswahlSetzen(-1)
+    abstandL = l
+    abstandK = pos
+    nachAenderung(TRUE)
+    status("Abstandhalter in " + feldText$(l, "name") + " an Stelle " + STR$(pos + 1) + ".")
+    protokoll("neu abstand " + feldText$(l, "name") + " " + STR$(pos))
+END SUB
+
+' Wo ein Abstandhalter zu sehen ist (Fensterlage). Die Laufzeit legt ihn als
+' Luecke zwischen den Nachbarn -- also aus deren Lage gerechnet; einer ohne
+' Gewicht ist 0 breit und bekommt hier 10 Punkte, damit man ihn sieht und
+' anklicken kann. Im Fluss-Layout hat er keine Stelle (0 breit).
+FUNCTION abstandRect(l AS INTEGER, k AS INTEGER) AS TUPLE
+    DIM art AS STRING : art = feldText$(l, "layout.art")
+    IF art = "" THEN art = "spalte"
+    DIM lx AS INTEGER
+    DIM ly AS INTEGER
+    DIM lw AS INTEGER
+    DIM lh AS INTEGER
+    (lx, ly, lw, lh) = lageVon(l)
+    DIM rand AS INTEGER : rand = feldZahl(l, "layout.rand")
+    DIM ab AS INTEGER : ab = 6
+    IF JSON_HAS(doc, wz$(l, "layout.abstand")) THEN ab = feldZahl(l, "layout.abstand")
+    DIM ix AS INTEGER : ix = lx + rand
+    DIM iy AS INTEGER : iy = ly + rand
+    DIM iw AS INTEGER : iw = MAX(0, lw - 2 * rand)
+    DIM ih AS INTEGER : ih = MAX(0, lh - 2 * rand)
+    DIM kinder AS ARRAY OF INTEGER : kinder = kinderListe(l)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM w AS INTEGER
+    DIM h AS INTEGER
+    DIM x2 AS INTEGER
+    DIM y2 AS INTEGER
+    DIM w2 AS INTEGER
+    DIM h2 AS INTEGER
+    IF art = "fluss" THEN RETURN (ix, iy, 0, 0)
+    IF art = "raster" THEN
+        DIM sp AS INTEGER : sp = 2
+        IF JSON_HAS(doc, wz$(l, "layout.spalten")) THEN sp = MAX(1, feldZahl(l, "layout.spalten"))
+        DIM zw AS INTEGER : zw = MAX(1, (iw - ab * (sp - 1)) \ sp)
+        DIM zeile AS INTEGER : zeile = k \ sp
+        x = ix + (k MOD sp) * (zw + ab)
+        ' Die Hoehe der Zeile aus den Controls darin, sonst unter der vorigen.
+        y = iy : h = 0
+        DIM j AS INTEGER
+        FOR j = 0 TO LEN(kinder) - 1
+            IF kinder[j] < 0 THEN CONTINUE
+            (x2, y2, w2, h2) = lageVon(kinder[j])
+            IF j \ sp = zeile THEN
+                y = y2 : h = MAX(h, h2)
+            ELSEIF j \ sp < zeile THEN
+                y = MAX(y, y2 + h2 + ab)
+            END IF
+        NEXT
+        RETURN (x, y, zw, MAX(h, 20))
+    END IF
+    ' Zeile oder Spalte: vom Ende des Vorgaengers bis zum Anfang des Nachfolgers.
+    DIM zeileArt AS BOOLEAN : zeileArt = art = "zeile"
+    DIM von AS INTEGER : von = IIF(zeileArt, ix, iy)
+    DIM bis AS INTEGER : bis = IIF(zeileArt, ix + iw, iy + ih)
+    DIM v AS INTEGER
+    FOR v = k - 1 TO 0 STEP -1
+        IF kinder[v] >= 0 THEN
+            (x2, y2, w2, h2) = lageVon(kinder[v])
+            von = IIF(zeileArt, x2 + w2, y2 + h2) + ab
+            BREAK
+        END IF
+    NEXT
+    FOR v = k + 1 TO LEN(kinder) - 1
+        IF kinder[v] >= 0 THEN
+            (x2, y2, w2, h2) = lageVon(kinder[v])
+            bis = IIF(zeileArt, x2, y2) - ab
+            BREAK
+        END IF
+    NEXT
+    IF bis - von < 10 THEN
+        von = (von + bis) \ 2 - 5
+        bis = von + 10
+    END IF
+    IF zeileArt THEN RETURN (von, iy, bis - von, ih)
+    RETURN (ix, von, iw, bis - von)
+END FUNCTION
+
+' Ein Abstandhalter unter dem Punkt? Setzt abstandTrefferL/K.
+DIM abstandTrefferL AS INTEGER : abstandTrefferL = -1
+DIM abstandTrefferK AS INTEGER : abstandTrefferK = -1
+FUNCTION abstandBei(fx AS INTEGER, fy AS INTEGER) AS BOOLEAN
+    abstandTrefferL = -1
+    abstandTrefferK = -1
+    DIM l AS INTEGER
+    FOR l = 0 TO anzahl() - 1
+        IF NOT istLayout(l) THEN CONTINUE
+        DIM kinder AS ARRAY OF INTEGER : kinder = kinderListe(l)
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(kinder) - 1
+            IF kinder[k] >= 0 THEN CONTINUE
+            DIM x AS INTEGER
+            DIM y AS INTEGER
+            DIM w AS INTEGER
+            DIM h AS INTEGER
+            (x, y, w, h) = abstandRect(l, k)
+            IF w > 0 AND fx >= x AND fy >= y AND fx < x + w AND fy < y + h THEN
+                abstandTrefferL = l
+                abstandTrefferK = k
+            END IF
+        NEXT
+    NEXT
+    RETURN abstandTrefferL >= 0
+END FUNCTION
+
+' Einen Abstandhalter zeichnen: eine Feder zwischen zwei Strichen (Schirmlage).
+SUB abstandZeichnen(sx AS INTEGER, sy AS INTEGER, sw AS INTEGER, sh AS INTEGER, gewaehltJetzt AS BOOLEAN)
+    DIM f AS INTEGER : f = IIF(gewaehltJetzt, F_AUSWAHL, F_BEHAELTER)
+    BOX(sx, sy, sx + sw - 1, sy + sh - 1, RGBA(140, 123, 216, IIF(gewaehltJetzt, 70, 34)))
+    IF gewaehltJetzt THEN RECT(sx, sy, sx + sw - 1, sy + sh - 1, F_AUSWAHL)
+    DIM quer AS BOOLEAN : quer = sw >= sh
+    DIM n AS INTEGER : n = MAX(2, IIF(quer, sw, sh) \ 8)
+    DIM k AS INTEGER
+    DIM px AS INTEGER : px = IIF(quer, sx, sx + sw \ 2)
+    DIM py AS INTEGER : py = IIF(quer, sy + sh \ 2, sy)
+    FOR k = 1 TO n
+        DIM t AS INTEGER : t = IIF(k MOD 2 = 1, -1, 1) * MIN(5, IIF(quer, sh, sw) \ 3)
+        DIM qx AS INTEGER : qx = IIF(quer, sx + sw * k \ (n + 1), sx + sw \ 2 + t)
+        DIM qy AS INTEGER : qy = IIF(quer, sy + sh \ 2 + t, sy + sh * k \ (n + 1))
+        LINE(px, py, qx, qy, f)
+        px = qx : py = qy
+    NEXT
+    LINE(px, py, IIF(quer, sx + sw - 1, sx + sw \ 2), IIF(quer, sy + sh \ 2, sy + sh - 1), f)
 END SUB
 
 ' Einen Timer anlegen: er liegt nicht im Fenster, sondern in der Leiste
@@ -874,6 +1142,12 @@ END FUNCTION
 
 ' --- Tastatur -----------------------------------------------------------------
 SUB schieben(dx AS INTEGER, dy AS INTEGER)
+    IF abstandL >= 0 THEN
+        abstandK = eintragRuecken(abstandL, abstandK, IIF(dx + dy < 0, -1, 1))
+        nachAenderung(TRUE)
+        protokoll("umgesetzt abstand " + STR$(abstandK))
+        RETURN
+    END IF
     IF auswahl < 0 THEN RETURN
     ' Ein Kind eines Layouts rueckt mit den Pfeilen eine Stelle weiter.
     IF LEN(gewaehlt) = 1 AND verwaltet(auswahl) THEN
@@ -1042,13 +1316,31 @@ SUB entwurfZeichnen()
             IF tw < sx2 - sx1 - 8 AND sy2 - sy1 > 18 THEN TEXT((sx1 + sx2 - tw) \ 2, (sy1 + sy2 - 15) \ 2, leer, farbe("leise"))
         END IF
     NEXT
+    ' Die Abstandhalter jedes Layouts.
+    FOR li = 0 TO anzahl() - 1
+        IF NOT istLayout(li) THEN CONTINUE
+        DIM ak AS ARRAY OF INTEGER : ak = kinderListe(li)
+        DIM ai AS INTEGER
+        FOR ai = 0 TO LEN(ak) - 1
+            IF ak[ai] >= 0 THEN CONTINUE
+            DIM rx AS INTEGER
+            DIM ry AS INTEGER
+            DIM rw AS INTEGER
+            DIM rh AS INTEGER
+            (rx, ry, rw, rh) = abstandRect(li, ai)
+            IF rw > 0 AND rh > 0 THEN abstandZeichnen(formX + zS(rx), formY + zS(ry), MAX(1, zS(rw)), MAX(1, zS(rh)), li = abstandL AND ai = abstandK)
+        NEXT
+    NEXT
     IF zielL >= 0 THEN BOX(formX + zS(markeX), formY + zS(markeY), formX + zS(markeX + markeB) - 1, formY + zS(markeY + markeH) - 1, F_AUSWAHL)
-    ' Ein Kind, das umgesetzt wird: sein Umriss folgt der Maus.
+    ' Was umgesetzt wird: die Umrisse folgen der Maus.
     IF modus = 1 AND kindZug AND bewegt THEN
-        DIM ux AS INTEGER : ux = formX + zS(startX + mausFx - startMx)
-        DIM uy AS INTEGER : uy = formY + zS(startY + mausFy - startMy)
-        BOXROUND(ux, uy, ux + zS(startW), uy + zS(startH), 4, RGBA(58, 168, 240, 50))
-        RECTROUND(ux, uy, ux + zS(startW), uy + zS(startH), 4, F_AUSWAHL)
+        DIM uz AS INTEGER
+        FOR uz = 0 TO MIN(LEN(zugX), LEN(zugW)) - 1
+            DIM ux AS INTEGER : ux = formX + zS(zugX[uz] + mausFx - startMx)
+            DIM uy AS INTEGER : uy = formY + zS(zugY[uz] + mausFy - startMy)
+            BOXROUND(ux, uy, ux + zS(zugW[uz]), uy + zS(zugH[uz]), 4, RGBA(58, 168, 240, 50))
+            RECTROUND(ux, uy, ux + zS(zugW[uz]), uy + zS(zugH[uz]), 4, F_AUSWAHL)
+        NEXT
     END IF
 
     ' Auswahl

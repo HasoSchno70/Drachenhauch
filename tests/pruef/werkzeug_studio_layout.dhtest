@@ -314,3 +314,225 @@ kinder in der basis TRUE
 lauf knopf 40 40 200
 lauf anzeige 40 76
 code 0
+
+=== zwei gewaehlte controls kommen zusammen in die spalte
+' knopfX und knopfY frei gewaehlt (Umschalt+Klick), knopfY auf die Spalte
+' gezogen: beide kommen hinein, von oben nach unten -- knopfX steht hoeher.
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 8, CWD$() + "/f.dhform")
+DIM xx AS INTEGER
+DIM xy AS INTEGER
+DIM yx AS INTEGER
+DIM yy AS INTEGER
+DIM px AS INTEGER
+DIM py AS INTEGER
+(xx, xy) = slLage(m, "control knopfX")
+(yx, yy) = slLage(m, "control knopfY")
+(px, py) = slLage(m, "control Spalte1")
+slHin(10, 10)
+slKlick(xx, xy)
+slWarten(4)
+umschaltKlick(yx, yy)
+' sonst zaehlt der Druck zum Ziehen als Doppelklick (0,4 s)
+slWarten(40)
+slZug(yx, yy, px, py, 12, TRUE)
+slWarten(8)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "eingesetzt ")
+    PRINT z
+NEXT
+DIM b AS ARRAY OF STRING : b = slAnfang(log, "behaelter Spalte1")
+PRINT b[LEN(b) - 1]
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+' Ein Klick mit gehaltener Umschalttaste.
+SUB umschaltKlick(x AS INTEGER, y AS INTEGER)
+    slHin(x, y)
+    ARRAY_PUSH(slZeilen, "e " + STR$(slBild) + " 2 340 0 0 0")
+    slBild = slBild + 2
+    slRunter()
+    slHoch()
+    ARRAY_PUSH(slZeilen, "e " + STR$(slBild) + " 1 340 0 0 0")
+    slBild = slBild + 2
+END SUB
+--- datei f.dhform
+{"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfX","text":"X","x":320,"y":100,"w":90,"h":30},{"kind":"button","name":"knopfY","text":"Y","x":440,"y":160,"w":90,"h":30},{"kind":"layout","name":"Spalte1","x":20,"y":90,"w":240,"h":200,"layout":{"art":"spalte","kinder":[],"abstand":6}}]}
+
+--- erwartet
+eingesetzt knopfX Spalte1 0
+eingesetzt knopfY Spalte1 1
+behaelter Spalte1 knopfX:0,knopfY:0
+
+=== zwei gewaehlte kinder kommen zusammen heraus
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 8, CWD$() + "/f.dhform")
+DIM ax AS INTEGER
+DIM ay AS INTEGER
+DIM bx AS INTEGER
+DIM by AS INTEGER
+(ax, ay) = slLage(m, "control knopfA")
+(bx, by) = slLage(m, "control knopfB")
+slHin(10, 10)
+slKlick(ax, ay)
+slWarten(4)
+umschaltKlick(bx, by)
+slWarten(40)
+slZug(bx, by, bx, by + 280, 12, TRUE)
+slWarten(8)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+PRINT "heraus "; LEN(slAnfang(log, "herausgenommen "))
+DIM b AS ARRAY OF STRING : b = slAnfang(log, "behaelter Zeile1")
+PRINT b[LEN(b) - 1]
+DIM ka AS INTEGER
+DIM kay AS INTEGER
+DIM kb AS INTEGER
+DIM kby AS INTEGER
+(ka, kay) = slLage(log, "control knopfA")
+(kb, kby) = slLage(log, "control knopfB")
+PRINT "nebeneinander wie vorher "; kay = kby AND kb - ka = bx - ax
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+SUB umschaltKlick(x AS INTEGER, y AS INTEGER)
+    slHin(x, y)
+    ARRAY_PUSH(slZeilen, "e " + STR$(slBild) + " 2 340 0 0 0")
+    slBild = slBild + 2
+    slRunter()
+    slHoch()
+    ARRAY_PUSH(slZeilen, "e " + STR$(slBild) + " 1 340 0 0 0")
+    slBild = slBild + 2
+END SUB
+--- datei f.dhform
+{"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfA","text":"Neu","x":0,"y":0,"w":96,"h":30},{"kind":"button","name":"knopfB","text":"Oeffnen","x":0,"y":0,"w":96,"h":30},{"kind":"textinput","name":"feldSuche","text":"","x":0,"y":0,"w":120,"h":30},{"kind":"layout","name":"Zeile1","x":24,"y":24,"w":560,"h":40,"layout":{"art":"zeile","kinder":[[0,0],[1,0],[2,1]],"abstand":8}}]}
+
+--- erwartet
+heraus 2
+behaelter Zeile1 feldSuche:1
+nebeneinander wie vorher TRUE
+
+=== ein abstandhalter aus der bibliothek kommt zwischen zwei kinder
+' Gesucht wird "Abstand" (die Zeile steht sonst weit unten in der Liste),
+' dann in die Zeile gezogen und einmal daneben, wo kein Layout ist.
+IMPORT "laeufer.dh"
+SETENV("DH_STUDIO_ABLAGE", "Abstand")
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 8, CWD$() + "/f.dhform")
+DIM qx AS INTEGER
+DIM qy AS INTEGER
+DIM ax AS INTEGER
+DIM ay AS INTEGER
+DIM bx AS INTEGER
+DIM by AS INTEGER
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(qx, qy) = slLage(m, "suche")
+(ax, ay) = slLage(m, "control knopfA")
+(bx, by) = slLage(m, "control knopfB")
+(fx, fy) = slLage(m, "fenster")
+slHin(10, 10)
+slKlick(qx, qy)
+slMit([341], 86)
+slWarten(30)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(m, CWD$() + "/ev.txt", slBild + 10, CWD$() + "/f.dhform")
+DIM kx AS INTEGER
+DIM ky AS INTEGER
+(kx, ky) = slLage(m, "zeile spacer/Abstand")
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slKlick(qx, qy)
+slMit([341], 86)
+slWarten(30)
+slZug(kx, ky, (ax + bx) \ 2 + 2, ay, 12, TRUE)
+slWarten(8)
+slZug(kx, ky, fx + 300, fy + 300, 12, TRUE)
+slWarten(8)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+PRINT "neu "; slHat(log, "neu abstand Zeile1 1")
+PRINT "ohne layout "; slHat(log, "abstand ohne layout")
+DIM b AS ARRAY OF STRING : b = slAnfang(log, "behaelter Zeile1")
+PRINT b[LEN(b) - 1]
+DIM nx AS INTEGER
+DIM ny AS INTEGER
+DIM sx AS INTEGER
+DIM sy AS INTEGER
+(nx, ny) = slLage(log, "control knopfB")
+(sx, sy) = slLage(log, "control feldSuche")
+' Gewicht 1 nimmt den Rest: knopfB rueckt bis vor das Suchfeld.
+PRINT "nach rechts geschoben "; nx > bx + 100
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfA","text":"Neu","x":0,"y":0,"w":96,"h":30},{"kind":"button","name":"knopfB","text":"Oeffnen","x":0,"y":0,"w":96,"h":30},{"kind":"textinput","name":"feldSuche","text":"","x":0,"y":0,"w":120,"h":30},{"kind":"layout","name":"Zeile1","x":24,"y":24,"w":560,"h":40,"layout":{"art":"zeile","kinder":[[0,0],[1,0],[2,0]],"abstand":8}}]}
+
+--- erwartet
+neu TRUE
+ohne layout TRUE
+behaelter Zeile1 knopfA:0,-:1,knopfB:0,feldSuche:0
+nach rechts geschoben TRUE
+
+=== ein abstandhalter wird gewaehlt, rueckt mit dem pfeil und geht mit entf
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 8, CWD$() + "/f.dhform")
+DIM sx AS INTEGER
+DIM sy AS INTEGER
+(sx, sy) = slLage(m, "abstand Zeile1 1")
+slHin(10, 10)
+slKlick(sx, sy)
+slWarten(6)
+slTaste(262)
+slWarten(6)
+slTaste(261)
+slWarten(8)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+PRINT "gewaehlt "; slHat(log, "gewaehlt abstand Zeile1 1")
+PRINT "gewicht im inspektor "; LEN(slAnfang(log, "lage feld studio_gewicht ")) > 0
+PRINT "umgesetzt "; slHat(log, "umgesetzt abstand 2")
+PRINT "geloescht "; slHat(log, "geloescht abstand Zeile1")
+DIM staende AS ARRAY OF STRING : staende = slAnfang(log, "behaelter Zeile1")
+DIM vorher AS STRING : vorher = ""
+DIM z AS STRING
+FOR EACH z IN staende
+    IF z <> vorher THEN PRINT z
+    vorher = z
+NEXT
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfA","text":"Neu","x":0,"y":0,"w":96,"h":30},{"kind":"button","name":"knopfB","text":"Oeffnen","x":0,"y":0,"w":96,"h":30},{"kind":"textinput","name":"feldSuche","text":"","x":0,"y":0,"w":120,"h":30},{"kind":"layout","name":"Zeile1","x":24,"y":24,"w":560,"h":40,"layout":{"art":"zeile","kinder":[[0,0],[-1,1],[1,0],[2,0]],"abstand":8}}]}
+
+--- erwartet
+gewaehlt TRUE
+gewicht im inspektor TRUE
+umgesetzt TRUE
+geloescht TRUE
+behaelter Zeile1 knopfA:0,-:1,knopfB:0,feldSuche:0
+behaelter Zeile1 knopfA:0,knopfB:0,-:1,feldSuche:0
+behaelter Zeile1 knopfA:0,knopfB:0,feldSuche:0

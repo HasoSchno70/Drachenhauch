@@ -93,6 +93,8 @@ END SUB
 SUB auswahlSetzen(i AS INTEGER)
     auswahl = i
     trayWahl = -1
+    abstandL = -1
+    abstandK = -1
     IF i >= 0 THEN gewaehlt = [i] ELSE gewaehlt = []
 END SUB
 
@@ -117,6 +119,12 @@ SUB auswahlBereinigen()
     gewaehlt = ARRAY_FILTER(gewaehlt, FUNCTION(j) j >= 0 AND j < n)
     IF auswahl >= n OR NOT istGewaehlt(auswahl) THEN
         IF LEN(gewaehlt) > 0 THEN auswahl = gewaehlt[LEN(gewaehlt) - 1] ELSE auswahl = -1
+    END IF
+    IF abstandL >= 0 THEN
+        DIM ok AS BOOLEAN : ok = istLayout(abstandL)
+        IF ok THEN ok = abstandK < LEN(kinderListe(abstandL))
+        IF ok THEN ok = kinderListe(abstandL)[abstandK] < 0
+        IF NOT ok THEN abstandL = -1 : abstandK = -1
     END IF
 END SUB
 
@@ -155,6 +163,9 @@ END FUNCTION
 CONST TRAY = 100000                 ' Timer k heisst in nameVergeben TRAY + k
 CONST MENUE_NAME = -7               ' nameVergeben aus dem Menue-Editor (prueft dort selbst)
 DIM trayWahl AS INTEGER : trayWahl = -1     ' gewaehlter Timer, -1 = keiner
+' Ein gewaehlter Abstandhalter: Layout und Stelle in seiner Liste (-1 = keiner).
+DIM abstandL AS INTEGER : abstandL = -1
+DIM abstandK AS INTEGER : abstandK = -1
 
 FUNCTION timerZahl() AS INTEGER
     IF NOT JSON_HAS(doc, "timer") THEN RETURN 0
@@ -507,6 +518,76 @@ SUB kindEinfuegen(l AS INTEGER, i AS INTEGER, pos AS INTEGER, gewicht AS INTEGER
     ARRAY_INSERT(kinder, pos, i)
     ARRAY_INSERT(gew, pos, gewicht)
     kinderSetzen(l, kinder, gew)
+END SUB
+
+' Mehrere Controls an Stelle `pos` (gezaehlt in der Liste, wie sie VOR dem
+' Herausnehmen ist), in dieser Reihenfolge. Wer aus einem anderen Layout
+' kommt, behaelt sein Gewicht; ein Layout kommt nicht in sich selbst.
+SUB kinderEinfuegen(l AS INTEGER, liste AS ARRAY OF INTEGER, pos AS INTEGER)
+    DIM mit AS ARRAY OF INTEGER : mit = []
+    DIM gewichte AS ARRAY OF INTEGER : gewichte = []
+    DIM i AS INTEGER
+    FOR EACH i IN liste
+        IF i = l OR istVorfahr(i, l) THEN CONTINUE
+        ARRAY_PUSH(mit, i)
+        ARRAY_PUSH(gewichte, gewichtVon(i))
+    NEXT
+    ' Die Stelle nach dem Herausnehmen: was davor steht und bleibt.
+    DIM alt AS ARRAY OF INTEGER : alt = kinderListe(l)
+    DIM neu AS INTEGER : neu = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO MIN(pos, LEN(alt)) - 1
+        IF alt[k] < 0 OR ARRAY_INDEXOF(mit, alt[k]) < 0 THEN neu = neu + 1
+    NEXT
+    FOR EACH i IN mit
+        kindEntfernen(i)
+    NEXT
+    DIM kinder AS ARRAY OF INTEGER : kinder = kinderListe(l)
+    DIM gew AS ARRAY OF INTEGER : gew = gewichtListe(l)
+    neu = MIN(neu, LEN(kinder))
+    FOR k = 0 TO LEN(mit) - 1
+        ARRAY_INSERT(kinder, neu + k, mit[k])
+        ARRAY_INSERT(gew, neu + k, gewichte[k])
+    NEXT
+    kinderSetzen(l, kinder, gew)
+END SUB
+
+' --- Abstandhalter: ein Eintrag -1 in der Liste, Gewicht = Anteil am Rest ---
+SUB abstandEinfuegen(l AS INTEGER, pos AS INTEGER, gewicht AS INTEGER)
+    DIM kinder AS ARRAY OF INTEGER : kinder = kinderListe(l)
+    DIM gew AS ARRAY OF INTEGER : gew = gewichtListe(l)
+    pos = MAX(0, MIN(pos, LEN(kinder)))
+    ARRAY_INSERT(kinder, pos, -1)
+    ARRAY_INSERT(gew, pos, gewicht)
+    kinderSetzen(l, kinder, gew)
+END SUB
+
+SUB abstandEntfernen(l AS INTEGER, k AS INTEGER)
+    DIM kinder AS ARRAY OF INTEGER : kinder = kinderListe(l)
+    DIM gew AS ARRAY OF INTEGER : gew = gewichtListe(l)
+    IF k < 0 OR k >= LEN(kinder) THEN RETURN
+    ARRAY_REMOVE_AT(kinder, k)
+    ARRAY_REMOVE_AT(gew, k)
+    kinderSetzen(l, kinder, gew)
+END SUB
+
+' Einen Eintrag eine Stelle weiter (richtung -1/+1); liefert die neue Stelle.
+FUNCTION eintragRuecken(l AS INTEGER, k AS INTEGER, richtung AS INTEGER) AS INTEGER
+    DIM kinder AS ARRAY OF INTEGER : kinder = kinderListe(l)
+    DIM gew AS ARRAY OF INTEGER : gew = gewichtListe(l)
+    DIM z AS INTEGER : z = k + richtung
+    IF z < 0 OR z >= LEN(kinder) THEN RETURN k
+    DIM t AS INTEGER : t = kinder[k] : kinder[k] = kinder[z] : kinder[z] = t
+    t = gew[k] : gew[k] = gew[z] : gew[z] = t
+    kinderSetzen(l, kinder, gew)
+    RETURN z
+END FUNCTION
+
+SUB eintragGewichtSetzen(l AS INTEGER, k AS INTEGER, g AS INTEGER)
+    DIM gew AS ARRAY OF INTEGER : gew = gewichtListe(l)
+    IF k < 0 OR k >= LEN(gew) THEN RETURN
+    gew[k] = MAX(0, g)
+    kinderSetzen(l, kinderListe(l), gew)
 END SUB
 
 ' Nach Loeschen oder Ordnen: abb[alt] = neuer Index, -1 = weg. Abstandhalter
