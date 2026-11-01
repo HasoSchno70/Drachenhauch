@@ -12,6 +12,9 @@
 # installierter Ordner gehoert oft nicht dem Nutzer.
 #
 # DH_IDE_BEISPIELE setzt den Ordner fest; sonst Dokumente/Drachenhauch/examples.
+#
+# `drachenhauch --studio [projekt]` startet stattdessen das Drachenhauch
+# Studio; eine .dhstudio als Argument ebenso.
 
 HIER="$(cd "$(dirname "$0")" && pwd)"
 if [ -d "$HIER/../Resources/ide" ]; then
@@ -37,4 +40,11 @@ export DH_IDE_WURZEL="$RES"
 # Aus dem Beispielordner starten: dhrt merkt sich den Ort als DHRT_START_DIR,
 # und der Projektbaum zeigt beim ersten Start etwas.
 cd "$DH_IDE_BEISPIELE" || exit 1
+if [ "$1" = "--studio" ]; then
+    shift
+    exec "$HIER/dhrt" run "$RES/studio/studio.dh" ${1:+--} "$@"
+fi
+case "$1" in
+    *.dhstudio) exec "$HIER/dhrt" run "$RES/studio/studio.dh" -- "$@" ;;
+esac
 exec "$HIER/dhrt" run "$RES/ide/ide.dh" ${1:+--} "$@"

@@ -15,6 +15,15 @@ dhrt run studio/studio.dh -- fenster.dhform
 A folder with `projekt.dhstudio` opens as a project, a folder without one
 gets a new project, a `.dhform` opens as a single window.
 
+When installed, "Drachenhauch Studio" is in the start menu or application
+menu, and a `.dhstudio` opens in the studio with a double-click (on Windows,
+if the association was chosen during installation). On macOS and Linux
+`drachenhauch --studio [project]` starts it from the terminal. In the IDE:
+Werkzeuge → Drachenhauch Studio (with the project folder if it is a studio
+project), and a `.dhstudio` in the project tree opens in the studio. The form
+designer opens its form with Datei → Im Drachenhauch Studio öffnen
+(Ctrl+Shift+O).
+
 **Status: stage 4.** Projects with several windows, modules and classes,
 events and a code field per method; starting, building and errors shown at
 the method they belong to; timers, menus, dialogs that wait, images and a

@@ -8,6 +8,11 @@ ein Drachenhauch-Programm:
 (1 342 Zeilen). Die frühere Qt-Fassung (PySide6) ist mit dem Python-Teil des
 Projekts entfernt.
 
+**Der Nachfolger ist das [Drachenhauch Studio](studio.md):** dasselbe
+`.dhform`-Format, dazu ein Projekt mit Code je Ereignis, Starten, Bauen und
+Debugger. Datei → Im Drachenhauch Studio öffnen (Strg+Umschalt+O) öffnet das
+gesicherte Formular dort; der Designer bleibt für einzelne Formulare.
+
 ## Starten
 
 - **Aus der IDE:** Menü *Werkzeuge → Form-Designer* (oder in der

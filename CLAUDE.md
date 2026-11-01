@@ -3576,6 +3576,30 @@ Strg+Umschalt+B und ist mit `DH_STUDIO_DATEI` geprueft. Vier Faelle mehr in
 `werkzeug_studio4.dhtest` (8) plus die Taste-Sammlung; fuenf Verfaelschungen
 fallen je in ihrem Fall.
 
+**Stufe 5, erster Teil = erreichbar** (Zweig `thema/studio-stufe5`, auf
+Stufe 4): **Installer** `Drachenhauch-IDE.iss` nimmt `studio\*.dh` und
+`*.dhstil` nach `{app}\studio`, Verknuepfung "Drachenhauch Studio"
+(eigene AppUserModelID `Drachenhauch.Studio` -- der Installer-Fall zaehlt
+jetzt 11), Task `assocstudio` fuer `.dhstudio` -> `dhrt run studio.dh --
+"%1"`. **Pakete**: `paket.dh` kopiert `studio/` (nur wenn es die Wurzel
+hat -- die Faelle mit einer Attrappen-Wurzel haben keins), der Starter
+`drachenhauch --studio [projekt]` (und eine `.dhstudio` als Argument)
+startet das Studio, `install.sh` legt `drachenhauch-studio.desktop` und
+den MIME-Typ `application/x-drachenhauch-studio` an und raeumt beides ab,
+`Info.plist` meldet `.dhstudio` an (macOS gibt die Datei an die App, also
+an die IDE, die sie ans Studio weiterreicht). **IDE**: Werkzeuge ->
+Drachenhauch Studio (`studioStarten`, studio/studio.dh neben ide/; ohne
+Argument mit dem Projektordner, wenn dort `projekt.dhstudio` liegt),
+`dateiOeffnen` gibt eine `.dhstudio` ans Studio, `BAUM_MUSTER` zeigt sie.
+**Form-Designer 197**: Datei -> Im Drachenhauch Studio oeffnen
+(Strg+Umschalt+O, `studioPfad$`: DH_IDE_WURZEL, neben der Laufzeit,
+macOS-Resources, `../studio`), ohne Datei ein Hinweis in der Statuszeile.
+Tests `tests/pruef/werkzeug_studio5.dhtest` (3; das gestartete Studio
+erbt `DH_STUDIO_LOG`, der Fall wartet auf "projekt geladen" und beendet
+es), Zeilen in `werkzeug_paket.dhtest` (Linux-Ordner, macOS-Bundle,
+install.sh, `--studio` mit der echten Laufzeit). Der Installer baut mit
+ISCC (lokal nachgesehen). Offen: das Beispielprojekt.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

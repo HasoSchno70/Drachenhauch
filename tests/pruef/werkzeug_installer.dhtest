@@ -453,7 +453,7 @@ PRINT "schreibtisch wie die ide "; desktop = ide AND ide <> ""
 --- argumente
 {sammlung}/../../installer/Drachenhauch-IDE.iss
 --- erwartet
-verknuepfungen 10
+verknuepfungen 11
 ohne kennung 0
 doppelt 0
 schreibtisch wie die ide TRUE

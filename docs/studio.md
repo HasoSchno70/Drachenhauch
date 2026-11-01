@@ -15,6 +15,15 @@ dhrt run studio/studio.dh -- fenster.dhform
 Ein Ordner mit `projekt.dhstudio` geht als Projekt auf, ein Ordner ohne
 bekommt ein neues Projekt, eine `.dhform` geht als einzelnes Fenster auf.
 
+Installiert steht „Drachenhauch Studio“ im Startmenü bzw. im
+Anwendungsmenü, und eine `.dhstudio` öffnet per Doppelklick im Studio (unter
+Windows, wenn die Verknüpfung beim Installieren gewählt war). Unter macOS und
+Linux startet `drachenhauch --studio [projekt]` es aus dem Terminal. In der
+IDE: Werkzeuge → Drachenhauch Studio (mit dem Projektordner, wenn er ein
+Studio-Projekt ist), und eine `.dhstudio` im Projektbaum geht im Studio auf.
+Der Form-Designer öffnet sein Formular mit Datei → Im Drachenhauch Studio
+öffnen (Strg+Umschalt+O).
+
 **Stand: Stufe 4.** Projekte mit mehreren Fenstern, Modulen und Klassen,
 Ereignisse und ein Code-Feld je Methode; Starten, Bauen und Fehler an der
 Methode, in der sie stehen; Timer, Menüs, Dialoge, die warten, Bilder und
