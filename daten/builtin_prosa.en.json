@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2196,
+ "count": 2197,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -1032,6 +1032,7 @@
   "GUI_TREE_EXPAND": "expand/collapse a node",
   "GUI_TREE_ICON": "icon and text colour per tree node",
   "GUI_TREE_IS_SELECTED": "BOOLEAN — is this node selected?",
+  "GUI_TREE_ITEM_RECT": "TUPLE — (x, y, w, h) of a node on screen, x at the start of its label; under a collapsed one (0, 0, 0, 0) -- for tests with real clicks",
   "GUI_TREE_LABEL": "STRING — text of a node",
   "GUI_TREE_PLACEHOLDER": "hint shown when the tree is empty",
   "GUI_TREE_SELECT": "add a node to the selection or take it out",

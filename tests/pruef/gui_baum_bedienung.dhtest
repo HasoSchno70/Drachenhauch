@@ -516,3 +516,59 @@ NEXT
 PRINT "schrift hell auf der auswahl "; hell > 20
 --- erwartet
 schrift hell auf der auswahl TRUE
+
+=== die lage eines knotens auf dem schirm
+' Zeilen untereinander im Abstand der Zeilenhoehe, ein Kind weiter rechts,
+' unter einem zugeklappten Knoten Nullen; ein Klick auf die gemeldete Lage
+' waehlt genau diesen Knoten.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 20, 20, 300, 200)
+DIM a AS INTEGER : a = GUI_TREE_ADD(t, -1, "Obst")
+DIM b AS INTEGER : b = GUI_TREE_ADD(t, a, "Apfel")
+DIM c AS INTEGER : c = GUI_TREE_ADD(t, -1, "Gemuese")
+DIM d AS INTEGER : d = GUI_TREE_ADD(t, c, "Lauch")
+GUI_TREE_EXPAND(t, a, TRUE)
+DIM x1 AS INTEGER
+DIM y1 AS INTEGER
+DIM b1 AS INTEGER
+DIM h1 AS INTEGER
+DIM x2 AS INTEGER
+DIM y2 AS INTEGER
+DIM b2 AS INTEGER
+DIM h2 AS INTEGER
+(x1, y1, b1, h1) = GUI_TREE_ITEM_RECT(t, a)
+(x2, y2, b2, h2) = GUI_TREE_ITEM_RECT(t, b)
+PRINT "untereinander "; y2 - y1 = h1; " eingerueckt "; x2 > x1
+PRINT "zugeklappt "; GUI_TREE_ITEM_RECT(t, d)
+DIM ok AS BOOLEAN : ok = FALSE
+TRY
+    GUI_TREE_ITEM_RECT(t, 9)
+CATCH f
+    ok = INSTR(f, "ausserhalb") >= 0
+END TRY
+PRINT "falscher knoten "; ok
+DIM x3 AS INTEGER
+DIM y3 AS INTEGER
+DIM b3 AS INTEGER
+DIM h3 AS INTEGER
+(x3, y3, b3, h3) = GUI_TREE_ITEM_RECT(t, c)
+WRITEALL("ev.txt", "c 4" + CHR$(10) + "e 2 7 " + STR$(x3 + 10) + " " + STR$(y3 + h3 \ 2) + " 0 0" + CHR$(10) + "e 3 7 " + STR$(x3 + 10) + " " + STR$(y3 + h3 \ 2) + " 0 0" + CHR$(10) + "e 3 6 0 0 0 0" + CHR$(10) + "e 5 5 0 0 0 0" + CHR$(10))
+AUTOMATION_PLAY("ev.txt")
+DIM f2 AS INTEGER
+FOR f2 = 1 TO 12
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "geklickt "; GUI_TREE_LABEL(t, GUI_TREE_SELECTED(t))
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+untereinander TRUE eingerueckt TRUE
+zugeklappt (0, 0, 0, 0)
+falscher knoten TRUE
+geklickt Gemuese

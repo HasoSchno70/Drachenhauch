@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2201,
+ "count": 2202,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1032,6 +1032,7 @@
   "GUI_TREE_EXPAND": "Knoten auf-/zuklappen",
   "GUI_TREE_ICON": "Sinnbild und Textfarbe je Baumknoten",
   "GUI_TREE_IS_SELECTED": "BOOLEAN — ist dieser Knoten ausgewählt?",
+  "GUI_TREE_ITEM_RECT": "TUPLE — (x, y, b, h) eines Knotens auf dem Bildschirm, x am Anfang der Beschriftung; unter einem zugeklappten (0, 0, 0, 0) -- für Prüfungen mit echten Klicks",
   "GUI_TREE_LABEL": "STRING — Text eines Knotens",
   "GUI_TREE_PLACEHOLDER": "Hinweis, wenn der Baum leer ist",
   "GUI_TREE_SELECT": "einen Knoten dazunehmen oder herausnehmen",
