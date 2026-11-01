@@ -83,6 +83,11 @@ CLASS StudioFenster
     SUB Groesse()
     END SUB
 
+    ' Eine Taste, solange das Fenster vorn ist und kein Eingabefeld sie
+    ' nimmt -- `taste` ist der Code (KEY_A, KEY_SPACE ...).
+    SUB Taste(taste AS INTEGER)
+    END SUB
+
     ' Zeigt das Fenster; beim ersten Mal wird es aufgebaut.
     SUB Zeigen()
         IF Self.studioOffen THEN
@@ -143,6 +148,7 @@ DIM studioSchirmH AS INTEGER : studioSchirmH = 0
 ' FokusRein und FokusRaus.
 DIM studioFokusAlt AS INTEGER : studioFokusAlt = -1
 DIM studioFokusJetzt AS INTEGER : studioFokusJetzt = -1
+DIM studioTaste AS INTEGER : studioTaste = -1
 
 SUB studioAnmelden(f AS StudioFenster)
     ARRAY_PUSH(studioFenster, f)
@@ -173,6 +179,7 @@ FUNCTION studioBild() AS BOOLEAN
     GUI_UPDATE()
     studioFokusAlt = studioFokusJetzt
     studioFokusJetzt = GUI_FOCUSED()
+    studioTaste = KEY_ANY_HIT()
     ' Eine Kopie der Liste: ein Ereignis kann Fenster oeffnen und schliessen.
     DIM jetzt AS ARRAY OF StudioFenster : jetzt = ARRAY_COPY(studioFenster)
     DIM f AS StudioFenster
@@ -192,6 +199,22 @@ FUNCTION studioBild() AS BOOLEAN
             END IF
         END IF
     NEXT
+    ' Eine Taste gehoert dem obersten Fenster -- ausser ein Eingabefeld hat
+    ' den Fokus, dann tippt man dort.
+    IF studioTaste >= 0 AND NOT studioEnde THEN
+        DIM feld AS BOOLEAN : feld = FALSE
+        IF studioFokusJetzt >= 0 THEN
+            DIM art AS STRING : art = GUI_KIND(studioFokusJetzt)
+            feld = art = "textinput" OR art = "textarea" OR art = "spinner" OR art = "dropdown"
+        END IF
+        IF NOT feld AND GUI_MODAL() = FALSE THEN
+            DIM oben AS StudioFenster
+            FOR EACH f IN studioFenster
+                IF f.studioOffen THEN oben = f
+            NEXT
+            IF oben IS NOT NIL THEN oben.Taste(studioTaste)
+        END IF
+    END IF
     ' Geschlossene Fenster aus der Liste nehmen.
     DIM noch AS ARRAY OF StudioFenster : noch = []
     FOR EACH f IN studioFenster

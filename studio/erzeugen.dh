@@ -197,6 +197,7 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
         IF MAPHAS(evMeth, STR$(i) + "|mausrein") OR MAPHAS(evMeth, STR$(i) + "|mausraus") THEN
             ARRAY_PUSH(z, "    DIM studioUeber_" + namen[i] + " AS BOOLEAN")
         END IF
+        IF MAPHAS(evMeth, STR$(i) + "|ziehen") THEN ARRAY_PUSH(z, "    DIM studioZug_" + namen[i] + " AS BOOLEAN")
     NEXT
     ARRAY_PUSH(z, "")
     ARRAY_PUSH(z, "    SUB studioAufbauen()")
@@ -278,6 +279,22 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
                     bed = "GUI_DOUBLE_CLICKED(" + ctl + ")"
                 CASE "maus"
                     bed = "MOUSE_HIT(0) AND GUI_HIT_TEST(MOUSEX(), MOUSEY()) = " + ctl
+                CASE "rad"
+                    ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
+                    ARRAY_PUSH(takt, "        IF MOUSEWHEEL_Y() <> 0.0 AND GUI_HIT_TEST(MOUSEX(), MOUSEY()) = " + ctl + " THEN Self." + MAPGET(evMeth, schl) + "(MOUSEWHEEL_Y())")
+                CASE "ziehen"
+                    ' Ab dem Druck auf die Flaeche, solange die Taste haengt --
+                    ' auch wenn die Maus die Flaeche dabei verlaesst.
+                    DIM zf AS STRING : zf = "Self.studioZug_" + namen[i]
+                    ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
+                    ARRAY_PUSH(takt, "        IF MOUSE_HIT(0) AND GUI_HIT_TEST(MOUSEX(), MOUSEY()) = " + ctl + " THEN " + zf + " = TRUE")
+                    ARRAY_PUSH(takt, "        IF " + zf + " THEN")
+                    ARRAY_PUSH(takt, "            IF MOUSEBUTTON(0) THEN")
+                    ARRAY_PUSH(takt, "                Self." + MAPGET(evMeth, schl) + "(MOUSEX() - GUI_CANVAS_X(" + ctl + "), MOUSEY() - GUI_CANVAS_Y(" + ctl + "))")
+                    ARRAY_PUSH(takt, "            ELSE")
+                    ARRAY_PUSH(takt, "                " + zf + " = FALSE")
+                    ARRAY_PUSH(takt, "            END IF")
+                    ARRAY_PUSH(takt, "        END IF")
                 CASE "zeichnen"
                     ARRAY_PUSH(zeichnen, "        SCISSOR(GUI_CANVAS_X(" + ctl + "), GUI_CANVAS_Y(" + ctl + "), GUI_CANVAS_W(" + ctl + "), GUI_CANVAS_H(" + ctl + "))")
                     ARRAY_PUSH(zeichnen, "        " + mn)

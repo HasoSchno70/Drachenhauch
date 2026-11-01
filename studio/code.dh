@@ -792,7 +792,7 @@ SUB ereignisAnlegen(ei AS INTEGER, control AS STRING, ev AS STRING)
     IF mi >= 0 THEN
         m = methoden[mi]
     ELSE
-        m = methodeNeu(e, "sub", n, "SUB " + n + "()")
+        m = methodeNeu(e, "sub", n, "SUB " + n + "(" + ereignisParameter$(ev) + ")")
         navigatorFuellen()
         protokoll("ereignis neu " + e.name + "." + n)
     END IF
