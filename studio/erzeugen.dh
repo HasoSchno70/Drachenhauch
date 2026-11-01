@@ -658,6 +658,20 @@ SUB feldBefunde(r AS Reiter)
         ARRAY_PUSH(hz, z)
         ARRAY_PUSH(ht, IIF(LEN(b.meldung) > 80, LEFT$(b.meldung, 77) + "...", b.meldung))
     NEXT
+    IF r.art = "code" THEN
+        DIM hp AS Haltepunkt
+        FOR EACH hp IN haltepunkte
+            IF hp.m = r.meth THEN
+                ARRAY_PUSH(mz, hp.zeile)
+                ARRAY_PUSH(mf, &HE03C3C)
+            END IF
+        NEXT
+        IF dbgMeth IS NOT NIL AND r.meth = dbgMeth AND dbgZeile > 0 THEN
+            GUI_TEXTAREA_LINE_COLORS(r.feld, [dbgZeile], [&H60E8C040])
+        ELSE
+            GUI_TEXTAREA_LINE_COLORS(r.feld, [], [])
+        END IF
+    END IF
     GUI_TEXTAREA_SQUIGGLES(r.feld, ws, wl, wf)
     GUI_TEXTAREA_MARKS(r.feld, mz, mf)
     GUI_TEXTAREA_HINTS(r.feld, hz, ht, &HC07070)
@@ -783,6 +797,10 @@ FUNCTION vorbereiten(wozu AS STRING) AS BOOLEAN
 END FUNCTION
 
 SUB starten()
+    IF dbgProz >= 0 THEN
+        IF dbgHaelt THEN dbgKommando("continue")
+        RETURN
+    END IF
     IF lauf >= 0 THEN anhalten()
     IF NOT vorbereiten("Starten") THEN RETURN
     GUI_LISTBOX_CLEAR(lstAusgabe)
@@ -802,6 +820,10 @@ SUB starten()
 END SUB
 
 SUB anhalten()
+    IF dbgProz >= 0 THEN
+        debugBeenden()
+        RETURN
+    END IF
     IF lauf < 0 THEN RETURN
     PROCESS_KILL(lauf)
     lauf = -1

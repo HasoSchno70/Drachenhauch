@@ -17,6 +17,7 @@ DIM sb AS GUI_WIDGET
 DIM baum AS GUI_WIDGET
 DIM lstBib AS GUI_WIDGET
 DIM tfSuche AS GUI_WIDGET
+DIM lagenNachSuche AS INTEGER : lagenNachSuche = 0
 DIM inhaltOben AS INTEGER     ' Hoehe der Menueleiste: Widget-Lagen zaehlen ab dort
 DIM hell AS BOOLEAN : hell = FALSE
 
@@ -59,6 +60,11 @@ DIM miVor AS INTEGER
 DIM miVerdoppeln AS INTEGER
 DIM miLoeschen AS INTEGER
 DIM miMenues AS INTEGER
+DIM miDebug AS INTEGER
+DIM miSchritt AS INTEGER
+DIM miHinein AS INTEGER
+DIM miHeraus AS INTEGER
+DIM miHaltepunkt AS INTEGER
 DIM miBildNeu AS INTEGER
 DIM miAlles AS INTEGER
 DIM miRaster AS INTEGER
@@ -155,6 +161,12 @@ SUB oberflaecheAnlegen()
     m = GUI_MENU(win, "Ausführen")
     miStarten = GUI_MENU_ITEM(m, "Starten", "F5") : GUI_MENU_ICON(miStarten, "start")
     miAnhalten = GUI_MENU_ITEM(m, "Anhalten", "Umschalt+F5") : GUI_MENU_ICON(miAnhalten, "stopp")
+    GUI_MENU_SEPARATOR(m)
+    miDebug = GUI_MENU_ITEM(m, "Debuggen", "F7") : GUI_MENU_ICON(miDebug, "debug")
+    miSchritt = GUI_MENU_ITEM(m, "Schritt", "F10")
+    miHinein = GUI_MENU_ITEM(m, "Schritt hinein", "F11")
+    miHeraus = GUI_MENU_ITEM(m, "Schritt heraus", "Umschalt+F11")
+    miHaltepunkt = GUI_MENU_ITEM(m, "Haltepunkt an/aus", "F9") : GUI_MENU_ICON(miHaltepunkt, "haltepunkt")
     GUI_MENU_SEPARATOR(m)
     miPruefen = GUI_MENU_ITEM(m, "Prüfen", "Umschalt+F7") : GUI_MENU_ICON(miPruefen, "pruefen")
     miBauen = GUI_MENU_ITEM(m, "Bauen", "Strg+B") : GUI_MENU_ICON(miBauen, "export")
@@ -254,6 +266,7 @@ SUB oberflaecheAnlegen()
     GUI_ADD_CLASS(lstProbleme, "probleme")
     GUI_LISTBOX_PLACEHOLDER(lstProbleme, "Keine Probleme.")
     GUI_DOCK_ADD(win, "probleme", lstProbleme)
+    debugLeisteAnlegen()
 
     inspektorAnlegen()
     mitteAnlegen()
@@ -290,6 +303,7 @@ SUB verteilen()
     IF b > 0 THEN GUI_SET_BOUNDS(lstAusgabe, x, y, b, h)
     (x, y, b, h) = GUI_DOCK_RECT(win, "probleme")
     IF b > 0 THEN GUI_SET_BOUNDS(lstProbleme, x, y, b, h)
+    debugVerteilen()
     inspektorLegen()
     (x, y, b, h) = GUI_DOCK_CENTER(win)
     mitteLegen(x, y, b, h)
@@ -385,7 +399,10 @@ SUB bibNachUpdate()
         END IF
         bibEntschaerfen()
     END IF
-    IF GUI_SEARCH_CHANGED(tfSuche) THEN GUI_LISTBOX_FILTER(lstBib, GUI_TEXT(tfSuche))
+    IF GUI_SEARCH_CHANGED(tfSuche) THEN
+        GUI_LISTBOX_FILTER(lstBib, GUI_TEXT(tfSuche))
+        lagenNachSuche = 2       ' fuer Pruefungen: die Zeilen stehen erst nach dem naechsten GUI_UPDATE
+    END IF
 END SUB
 
 SUB bibGeistZeichnen()
@@ -479,8 +496,12 @@ SUB werkzeugeNachziehen()
         GUI_MENU_ENABLE(anordnenPunkte[k], lay)
     NEXT
     GUI_MENU_ENABLE(miMethodeWeg, codeVorn())
-    GUI_TOOLBAR_ENABLE(tb, tbStopp, lauf >= 0)
-    GUI_MENU_ENABLE(miAnhalten, lauf >= 0)
+    GUI_TOOLBAR_ENABLE(tb, tbStopp, lauf >= 0 OR dbgProz >= 0)
+    GUI_MENU_ENABLE(miAnhalten, lauf >= 0 OR dbgProz >= 0)
+    GUI_MENU_ENABLE(miSchritt, dbgHaelt)
+    GUI_MENU_ENABLE(miHinein, dbgHaelt)
+    GUI_MENU_ENABLE(miHeraus, dbgHaelt)
+    GUI_MENU_ENABLE(miHaltepunkt, codeVorn())
     GUI_TOOLBAR_ENABLE(tb, tbBauen, bau < 0)
     GUI_MENU_ENABLE(miBauen, bau < 0)
     pruefenVormerken()
