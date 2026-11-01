@@ -7676,6 +7676,18 @@ wird eine KOPIE der Laufzeit (`<ausgabe>/stufe/dhrt.exe`, an ISCC als
 der Installer; ein Fehlschlag bricht VOR ISCC ab statt nur zu warnen. Tests mit
 Attrappen fuer ISCC/signtool (`.cmd`, die `PROCESS_START` direkt startet) in
 `tests/pruef/werkzeug_installer.dhtest`; vier Verfaelschungen fallen.
+**Nur was git kennt (2026-11-01):** examples/ und esp32/ gehen mit allen
+Unterordnern ins Paket -- im Arbeitsordner lagen dort 21,7 MB gitignorierter
+Downloads (Installer 2026.39 zuerst 80 statt 60 MB; fruehere Fassungen
+liefen in sauberen Worktrees). `paket.dh::gitFremdSammeln` fragt EINMAL
+`git ls-files --others` (ignoriert UND nicht eingecheckt,
+`core.quotepath=off`), `ordnerKopieren` uebergeht sie; ohne git oder wenn
+die Wurzel nicht die Spitze ihres Repositorys ist (`rev-parse
+--show-toplevel` + SAMEFILE), alles wie frueher, mit Hinweis. Windows: die
+Beispiele kommen ueber eine Bereitstellung `stufe/examples` (je Bau neu) als
+`/DBeispiele`/`/DEsp32` an die .iss. Tests drei Faelle in
+`werkzeug_paket.dhtest`, einer in `werkzeug_installer.dhtest`; sechs
+Verfaelschungen fallen je in ihrem Fall.
 **Logo und Schriftzug (2026-09-21):** `dhrt.exe` traegt kein Symbol (ein
 exportiertes Spiel ist eine Kopie davon) -- Verknuepfungen, `.dh`-Dateien und
 die Deinstallation zeigten darum das nackte Programm. Der Installer legt jetzt
