@@ -17,7 +17,8 @@ Für Stufe 2 kamen in die Laufzeit schließbare Reiter im Reiterwerk
 (`GUI_TABCONTROL_SET "schliessbar"`, `GUI_TABCONTROL_CLOSED`) und
 `GUI_TREE_ITEM_RECT`. Für Stufe 3 kopiert `dhrt --export` keine importierten
 Quellen mehr als Dateien neben die Exe (sie stecken im Bytecode). Die
-Vervollständigung im Code-Feld ist noch offen. Die drei Messungen vor Stufe 1
+Vervollständigung im Code-Feld kam mit Stufe 4 (Strg+Leertaste, hinter
+`objekt.`). Die drei Messungen vor Stufe 1
 ergaben:
 * Der Neuaufbau kostet bei 1000 Controls 2,7 ms.
 * Ein Klick ins Hauptfenster legt es über die Entwurfsfläche;
@@ -135,13 +136,16 @@ aufmachen und auf seine Antwort warten. Abgefragt läuft sie danach, und
 
 * **Fenster:** `Geoeffnet` nach dem Aufbau, `Schliessen` über
   `GUI_WINDOW_CLOSED`, `Groesse` bei geänderter Fenstergröße.
-* **Listen und Bäume:** `Doppelklick` über `GUI_DOUBLE_CLICKED`.
+* **Listen, Bäume und Tabellen:** `Doppelklick` über `GUI_DOUBLE_CLICKED`
+  (bei Liste und Tabelle auch Enter).
 * **Zeichenfläche:** `Zeichnen` je Bild nach `GUI_DRAW`, beschnitten auf die
-  Fläche; `Maus` bei einem Klick darauf. `Ziehen` und `Rad` sind noch offen.
+  Fläche; `Maus` bei einem Klick darauf; `Ziehen(x, y)` ab dem Druck auf die
+  Fläche, solange die Taste hängt; `Rad(schritte)` über der Fläche.
 * **Timer:** ein Feld vom Typ `StudioTimer` (Intervall, Aktiv,
   Wiederholen), je Bild gefragt (`studioFaellig`), nicht über `TIMER_EVERY`
   -- ein Rückruf liefe wieder innerhalb einer Aktualisierung.
-* **Tasten:** `Taste` im Fenster mit Fokus (noch offen).
+* **Tasten:** `Taste(taste)` im obersten Fenster, solange kein Eingabefeld
+  den Fokus hat (`KEY_ANY_HIT`).
 
 Die Basisklasse `StudioFenster` in derselben Bibliothek trägt das Fenster,
 öffnet (`Zeigen`) und schließt es (`Zumachen`). Mehrere Exemplare desselben

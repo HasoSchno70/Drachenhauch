@@ -6,7 +6,7 @@
 
 <p align="center"><em>English · <a href="README.de.md">Deutsch</a></em></p>
 
-**Drachenhauch** (German for *dragon's breath*) is a modern BASIC programming language for writing **2D and 3D games and desktop applications with a GUI** — and the command-line tools and small services that go with them. It comes with its own IDE, form designer, sprite, tilemap and sound editors, and turns a program into a standalone `.exe` with one command. Runs on Windows, macOS and Linux, and in the browser via WebAssembly.
+**Drachenhauch** (German for *dragon's breath*) is a modern BASIC programming language for writing **2D and 3D games and desktop applications with a GUI** — and the command-line tools and small services that go with them. It comes with its own IDE, **Drachenhauch Studio** for GUI applications in the style of Xojo, a form designer, sprite, tilemap and sound editors, and turns a program into a standalone `.exe` with one command. Runs on Windows, macOS and Linux, and in the browser via WebAssembly.
 
 Think of it as a BASIC in the spirit of QB64, FreeBASIC or Blitz Basic, with the batteries of PICO-8 or LÖVE for games and the forms and tables of Visual Basic for applications — easy to start with, strict enough to grow up with.
 
@@ -69,6 +69,7 @@ happen *next to* a game — tools, reports, small services:
 | **Larger programs** | namespaces (`IMPORT "math.dh" AS math`), `PRIVATE`, `TRY`/`CATCH`/`FINALLY` with error codes, inheritance with `SUPER` and `ABSTRACT`, `ASSERT_EQ` |
 | **Foreign libraries** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — call the Windows API, the C library or device drivers directly, with pointers, structs and callbacks; even embed Python with numpy ([more, in German](docs/en/ffi.md)) |
 | **In the background** | HTTP, database, external programs and **your own functions** (`TASK_START`) — the main loop keeps running |
+| **Applications like Xojo** | Drachenhauch Studio: draw windows from a library of controls, set properties in the inspector, double-click a control and write the code for its event; a window is a class, the project a folder; F5 starts, Ctrl+B builds an `.exe`, F7 debugs ([more](docs/en/studio.md)) |
 | **Panels and plugins** | `GUI_DOCK` arranges panels on the left, right and bottom, as tabs or floating; the IDE and Glutfaden load your own Drachenhauch programs as plugins; the IDE also fetches them from GitHub or a ZIP, ships three and tests them without a window ([more](docs/en/ide-plugins.md)) |
 | **Feedback without dialogs** | popovers on a widget (`GUI_POPOVER`), toasts that fade out by themselves, an info bar with buttons, search fields with magnifier and clear button, suggestions while typing ([more](docs/en/module-gui.md#popover-toast-and-info-bar)) |
 | **Look by rules** | a stylesheet like CSS: `button.gefahr:hover { bg: #E74C3C }`, rules by kind, class, name and state, live classes, colours from the theme ([more](docs/en/module-gui.md#7-stylesheet-rules-by-kind-class-name-and-state)) |
@@ -84,7 +85,7 @@ Details in the [manual](docs/en/README.md); how it got there is in the
 
 ## Download
 
-**[Download Drachenhauch](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — for Windows a single installer (about 56 MB), for macOS a `.dmg`, for Linux a `.tar.gz`; currently version 2026.39.
+**[Download Drachenhauch](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — for Windows a single installer (about 56 MB), for macOS a `.dmg`, for Linux a `.tar.gz`; currently version 2026.40.
 
 You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 226 examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. The Windows installer is unsigned, so SmartScreen will speak up on first launch; the macOS app is not notarised yet.
 
@@ -130,6 +131,7 @@ Full documentation lives in [docs/en/](docs/en/README.md) — the English transl
 - **[Performance](docs/PERFORMANCE.md)** (German) — benchmark numbers + optimizations shipped (spec ops, inline caches, typed arrays, ECS bulk ops, …)
 - **Modules** — 48 of them, [table below](#modules)
 - **[IDE](docs/en/ide.md)** — the development environment, written in Drachenhauch itself: tabs, project tree, completion, help on the word, snippets, multi-cursor, folding, split view, project-wide refactorings, **debugger** (incl. conditional breakpoints), **profiler**, git blame/diff, manual in a window, welcome page with an example gallery
+- **[Drachenhauch Studio](docs/en/studio.md)** (`studio/studio.dh`) — GUI applications in the style of Xojo: window designer with alignment guides, inspector, navigator, code per event, menus, timers, images, dialogs, start/build/debug; example project `examples/studio/rechnungen/`
 - **Tools** — all written in Drachenhauch, in the IDE under *Tools* or directly with `dhrt run examples/<file>`:
   - **[Sprite editor](docs/en/sprite-editor.md)** (`189_sprite_editor.dh`) — pixel art with frames, layers, lasso/magic wand/move, GIF with a duration per frame, atlas export for `ATLAS_LOAD`, DH code, `.dhanim` template
   - **[Particle editor](docs/en/particle-editor.md)** (`185_partikel_editor.dh`) — emitter sliders with a live preview, factory presets, your own settings as `.ini`, DH code
