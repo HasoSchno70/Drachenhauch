@@ -49,6 +49,7 @@ DECLARE FUNCTION gtk_menu_button_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_menu_button_set_popover LIB GTK (mb AS ZEIGER, popover AS ZEIGER)
 DECLARE FUNCTION gtk_popover_new LIB GTK (bezug AS ZEIGER) AS ZEIGER
 DECLARE SUB gtk_popover_popdown LIB GTK (p AS ZEIGER)
+DECLARE SUB gtk_popover_popup LIB GTK (p AS ZEIGER)
 DECLARE FUNCTION gtk_radio_button_new_with_label_from_widget LIB GTK (gruppe AS ZEIGER, text AS TEXT) AS ZEIGER
 DECLARE FUNCTION gtk_image_new_from_icon_name LIB GTK (name AS TEXT, groesse AS LONG) AS ZEIGER
 DECLARE SUB gtk_spin_button_set_digits LIB GTK (s AS ZEIGER, stellen AS ULONG)
@@ -290,6 +291,7 @@ DECLARE FUNCTION gtk_separator_menu_item_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_menu_item_set_submenu LIB GTK (eintrag AS ZEIGER, menue AS ZEIGER)
 DECLARE SUB gtk_menu_shell_append LIB GTK (menue AS ZEIGER, eintrag AS ZEIGER)
 DECLARE SUB gtk_menu_popup_at_pointer LIB GTK (menue AS ZEIGER, ereignis AS ZEIGER)
+DECLARE SUB gtk_menu_popdown LIB GTK (menue AS ZEIGER)
 DECLARE FUNCTION gtk_image_new_from_pixbuf LIB GTK (bild AS ZEIGER) AS ZEIGER
 DECLARE SUB gtk_file_chooser_set_do_overwrite_confirmation LIB GTK (wahl AS ZEIGER, an AS BOOLEAN)
 DECLARE SUB gtk_file_chooser_set_current_name LIB GTK (wahl AS ZEIGER, name AS TEXT)
