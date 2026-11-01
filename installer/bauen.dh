@@ -127,6 +127,11 @@ IF NOT FILEEXISTS(runtime) THEN
     EXIT(1)
 END IF
 PRINT "Laufzeit: "; runtime; " ("; FILESIZE(runtime) \ 1048576; " MB)"
+IF gitFremdSammeln(wurzel) THEN
+    PRINT "Beispiele: nur was git kennt ("; MAPSIZE(gitFremd); " Dateien unter examples/ und esp32/ bleiben draussen)"
+ELSE
+    PRINT "Hinweis: kein git-Stand fuer "; wurzel; " -- examples/ und esp32/ kommen ganz mit."
+END IF
 
 ' --- Lizenzen der Drittkomponenten -------------------------------------
 DIM lz AS INTEGER
@@ -263,6 +268,23 @@ IF DIREXISTS(lzQuelle) THEN
 END IF
 IF lzStufe = "" THEN PRINT "Hinweis: keine kleinen Laufzeiten (rust/build_runtime.py --laufzeiten) -- `dhrt --export --schlank` nimmt dann die volle."
 
+' Beispiele und ESP32-Sketche gehen ueber eine Bereitstellung an ISCC: Inno
+' Setup nimmt einen Ordner von der Platte, mit allem, was darin liegt -- hier
+' liegt nur, was git kennt (paket.dh, gitFremdSammeln). Jedes Mal neu, sonst
+' blieben Dateien eines frueheren Baus liegen.
+DIM bspStufe AS STRING : bspStufe = ""
+DIM espStufe AS STRING : espStufe = ""
+IF DIREXISTS(wurzel + "/examples") THEN
+    bspStufe = stufe + "/examples"
+    IF DIREXISTS(bspStufe) THEN RMDIR(bspStufe, TRUE)
+    PRINT "Beispiele: "; ordnerKopieren(wurzel + "/examples", bspStufe, "*", TRUE); " Dateien"
+END IF
+IF DIREXISTS(wurzel + "/esp32") THEN
+    espStufe = stufe + "/esp32"
+    IF DIREXISTS(espStufe) THEN RMDIR(espStufe, TRUE)
+    ordnerKopieren(wurzel + "/esp32", espStufe, "*", TRUE)
+END IF
+
 DIM iscc AS STRING : iscc = isccFinden$()
 IF iscc = "" THEN
     PRINT "Inno Setup (ISCC.exe) nicht gefunden -- die Lizenzdatei ist trotzdem fertig."
@@ -271,12 +293,14 @@ IF iscc = "" THEN
 END IF
 PRINT "Inno Setup: "; iscc
 CHDIR(installer)
-DIM ic AS INTEGER
-IF lzStufe <> "" THEN
-    ic = PROCESS_START(iscc, "/DAppVersion=" + fassung, "/DDhrtQuelle=" + REPLACE$(dhrtKopie, "/", CHR$(92)), "/DLaufzeiten=" + REPLACE$(lzStufe, "/", CHR$(92)), "/O" + REPLACE$(ausgabeOrdner, "/", CHR$(92)), installer + "/Drachenhauch-IDE.iss")
-ELSE
-    ic = PROCESS_START(iscc, "/DAppVersion=" + fassung, "/DDhrtQuelle=" + REPLACE$(dhrtKopie, "/", CHR$(92)), "/O" + REPLACE$(ausgabeOrdner, "/", CHR$(92)), installer + "/Drachenhauch-IDE.iss")
-END IF
+DIM ia AS ARRAY OF STRING
+ia = ["/DAppVersion=" + fassung, "/DDhrtQuelle=" + REPLACE$(dhrtKopie, "/", CHR$(92))]
+IF lzStufe <> "" THEN ARRAY_PUSH(ia, "/DLaufzeiten=" + REPLACE$(lzStufe, "/", CHR$(92)))
+IF bspStufe <> "" THEN ARRAY_PUSH(ia, "/DBeispiele=" + REPLACE$(bspStufe, "/", CHR$(92)))
+IF espStufe <> "" THEN ARRAY_PUSH(ia, "/DEsp32=" + REPLACE$(espStufe, "/", CHR$(92)))
+ARRAY_PUSH(ia, "/O" + REPLACE$(ausgabeOrdner, "/", CHR$(92)))
+ARRAY_PUSH(ia, installer + "/Drachenhauch-IDE.iss")
+DIM ic AS INTEGER : ic = PROCESS_START(iscc, ia)
 IF lauf(ic, FALSE) <> 0 THEN
     PRINT "ISCC ist fehlgeschlagen."
     EXIT(1)

@@ -457,3 +457,86 @@ verknuepfungen 10
 ohne kennung 0
 doppelt 0
 schreibtisch wie die ide TRUE
+
+=== der installer nimmt nur die beispiele, die git kennt
+' Inno Setup nimmt einen Ordner von der Platte. bauen.dh legt darum die
+' Beispiele in eine Bereitstellung, in der nur liegt, was git kennt, und
+' gibt sie ISCC als /DBeispiele.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 60000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+FUNCTION win$(s AS STRING) AS STRING
+    RETURN REPLACE$(s, "/", CHR$(92))
+END FUNCTION
+DIM aus AS STRING : aus = CWD$() + "/aus"
+SETENV("ISCC", CWD$() + "/iscc.cmd")
+SETENV("ATTRAPPE_ZIEL", win$(aus + "/Drachenhauch-IDE-Setup-" + VERSION$() + ".exe"))
+SETENV("DH_SIGN_CERT", "")
+' Eine Datei aus einem frueheren Bau darf nicht stehen bleiben.
+MKDIR(aus + "/stufe/examples")
+WRITEALL(aus + "/stufe/examples/alt.dh", "PRINT 0")
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", _
+    "--ohne-lizenzen", "--wurzel", CWD$() + "/wurzel", "--ausgabe", aus)
+DIM text AS STRING : text = lauf$(p)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM iscc AS STRING : iscc = READLINES("iscc.txt")[0]
+PRINT "iscc bekam die beispiele "; INSTR(iscc, "/DBeispiele=" + win$(aus + "/stufe/examples")) >= 0
+PRINT "iscc bekam esp32 "; INSTR(iscc, "/DEsp32=" + win$(aus + "/stufe/esp32")) >= 0
+DIM b AS STRING : b = aus + "/stufe/examples"
+PRINT "eingecheckt "; FILEEXISTS(b + "/01_hallo.dh"); " "; FILEEXISTS(aus + "/stufe/esp32/bruecke.ino")
+PRINT "draussen "; FILEEXISTS(b + "/assets/musik.ogg"); " "; FILEEXISTS(b + "/entwurf.dh"); " "; FILEEXISTS(b + "/alt.dh")
+IF PROCESS_CODE(p) <> 0 THEN PRINT text
+--- system windows
+--- vorher
+SUB git(args AS ARRAY OF STRING)
+    DIM p AS INTEGER : p = PROCESS_START("git", args)
+    WHILE PROCESS_RUNNING(p)
+        DIM s AS STRING : s = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        SLEEP(10)
+    WEND
+    IF PROCESS_CODE(p) <> 0 THEN PRINT "git scheitert: "; JOIN$(args, " ")
+END SUB
+git(["-C", "wurzel", "init", "-q"])
+git(["-C", "wurzel", "add", "-A"])
+git(["-C", "wurzel", "reset", "-q", "--", "examples/entwurf.dh"])
+git(["-C", "wurzel", "-c", "user.email=p@p", "-c", "user.name=p", "commit", "-q", "-m", "x"])
+--- argumente
+{sammlung}/../../installer/bauen.dh
+--- datei wurzel/rust/drachenhauch_runtime/target/release/dhrt.exe
+keine echte Laufzeit
+--- datei wurzel/installer/platzhalter.txt
+damit es den Ordner gibt
+--- datei wurzel/.gitignore
+examples/assets/*.ogg
+--- datei wurzel/examples/01_hallo.dh
+PRINT "hallo"
+--- datei wurzel/examples/assets/musik.ogg
+nachgeladen
+--- datei wurzel/examples/entwurf.dh
+PRINT "in arbeit"
+--- datei wurzel/esp32/bruecke.ino
+void setup() {}
+--- datei iscc.cmd
+@echo off
+echo %* >> "%~dp0iscc.txt"
+echo setup> "%ATTRAPPE_ZIEL%"
+
+--- erwartet
+rueckgabe 0
+iscc bekam die beispiele TRUE
+iscc bekam esp32 TRUE
+eingecheckt TRUE TRUE
+draussen FALSE FALSE FALSE
