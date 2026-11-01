@@ -18,6 +18,15 @@
 ; Welche dhrt.exe hineinkommt. bauen.dh gibt eine KOPIE an -- dort ist sie
 ; schon signiert, und die gebaute Datei bleibt unberuehrt (eine laufende
 ; .exe laesst sich unter Windows ohnehin nicht signieren).
+; Beispiele und ESP32-Sketche: bauen.dh gibt eine Bereitstellung an, in der
+; nur liegt, was git kennt (ohne nachgeladene Musik, Spielstaende ...). Ohne
+; die Angabe die Ordner im Repository, wie bisher.
+#ifndef Beispiele
+  #define Beispiele "..\examples"
+#endif
+#ifndef Esp32
+  #define Esp32 "..\esp32"
+#endif
 #ifndef DhrtQuelle
   #define DhrtQuelle "..\rust\drachenhauch_runtime\target\release\dhrt.exe"
 #endif
@@ -91,11 +100,11 @@ Source: "..\docs\*.md"; DestDir: "{app}\docs"; Flags: ignoreversion
 ; Beispiele und Begleit-Editoren in die oeffentlichen Dokumente -- dort sind
 ; sie beschreibbar, und die IDE findet sie ueber %PUBLIC%, wenn neben ide\
 ; keine liegen. `uninsneveruninstall`: bearbeitete Beispiele ueberleben.
-Source: "..\examples\*"; DestDir: "{commondocs}\Drachenhauch\examples"; \
+Source: "{#Beispiele}\*"; DestDir: "{commondocs}\Drachenhauch\examples"; \
     Flags: recursesubdirs createallsubdirs uninsneveruninstall
 ; Sketch-Grundgeruest fuer ESP32/ESP8266 -- neben die Beispiele, weil
 ; examples\159_esp32_bruecke.dh im Kopfkommentar darauf verweist.
-Source: "..\esp32\*"; DestDir: "{commondocs}\Drachenhauch\esp32"; \
+Source: "{#Esp32}\*"; DestDir: "{commondocs}\Drachenhauch\esp32"; \
     Flags: recursesubdirs createallsubdirs uninsneveruninstall skipifsourcedoesntexist
 ; Die Buecher, falls gebaut (tools/buch_bauen.dh) -- .docx zum Drucken,
 ; .epub zum Lesen am Geraet; der Einstieg ist der Band fuer Anfaenger.

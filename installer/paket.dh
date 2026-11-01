@@ -68,10 +68,73 @@ SUB dateiKopieren(von AS STRING, nach AS STRING)
     COPYFILE(von, nach)
 END SUB
 
+' --- Was git nicht kennt, kommt nicht ins Paket ------------------------
+' examples/ und esp32/ werden mit allen Unterordnern kopiert -- und dort
+' landen Dinge, die nicht zur Fassung gehoeren: nachgeladene Musik und
+' Modelle (examples/assets/download_*.dh, gitignoriert, zusammen ueber 20
+' MB), Spielstaende, ein Beispiel, an dem gerade gearbeitet wird. In einer
+' frischen Arbeitskopie gibt es sie nicht, im Arbeitsordner des Entwicklers
+' schon; der Installer von 2026.39 wurde dort zuerst 80 statt 60 MB gross.
+' Gefragt wird git EINMAL nach allem, was es unter diesen Ordnern nicht
+' kennt (ignoriert ODER noch nicht eingecheckt); ordnerKopieren uebergeht es.
+' Ohne git, oder wenn die Wurzel nicht die Spitze eines Repositorys ist
+' (ein entpacktes Archiv), wird wie frueher alles genommen -- sonst fiele in
+' einem Archiv, das zufaellig in einem fremden Repository liegt, alles weg.
+DIM gitFremd AS MAP OF BOOLEAN
+DIM gitFremdUebergangen AS INTEGER : gitFremdUebergangen = 0
+
+FUNCTION gitAusgabe$(args AS ARRAY OF STRING) AS STRING
+    DIM p AS INTEGER
+    TRY
+        p = PROCESS_START("git", args)
+    CATCH e
+        RETURN CHR$(0)
+    END TRY
+    DIM t AS STRING : t = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM s AS STRING : s = PROCESS_READ$(p)
+        IF s <> "" THEN
+            t = t + s
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    DIM code AS INTEGER : code = PROCESS_CODE(p)
+    PROCESS_CLOSE(p)
+    IF code <> 0 THEN RETURN CHR$(0)
+    RETURN REPLACE$(t, CHR$(13), "")
+END FUNCTION
+
+FUNCTION gitSchluessel$(pfad AS STRING) AS STRING
+    RETURN REPLACE$(pfad, CHR$(92), "/")
+END FUNCTION
+
+' Liefert, ob git gefragt werden konnte.
+FUNCTION gitFremdSammeln(wurzel AS STRING) AS BOOLEAN
+    gitFremd = {}
+    gitFremdUebergangen = 0
+    DIM top AS STRING : top = gitAusgabe$(["-C", wurzel, "rev-parse", "--show-toplevel"])
+    IF top = CHR$(0) THEN RETURN FALSE
+    top = TRIM$(REPLACE$(top, CHR$(10), ""))
+    IF top = "" OR NOT SAMEFILE(top, wurzel) THEN RETURN FALSE
+    ' core.quotepath=off: Namen mit Umlauten kommen als Text, nicht als
+    ' "\303\244".
+    DIM liste AS STRING : liste = gitAusgabe$(["-C", wurzel, "-c", "core.quotepath=off", "ls-files", "--others", "--", "examples", "esp32"])
+    IF liste = CHR$(0) THEN RETURN FALSE
+    DIM z AS STRING
+    FOR EACH z IN SPLIT(liste, CHR$(10))
+        IF z <> "" THEN MAPPUT(gitFremd, gitSchluessel$(PATHJOIN(wurzel, z)), TRUE)
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
 ' Einen Ordner kopieren. `tief` = mit Unterordnern; ohne nur die oberste
 ' Ebene (ide/ und docs/ -- wie im Windows-Installer). Liefert die Zahl.
-' Uebergangen werden die Temp-Dateien der IDE (_dhtmp_*, siehe
-' editor_qt/tempdateien.py) und __pycache__.
+' Uebergangen werden die Temp-Dateien der IDE (_dhtmp_*), __pycache__ und
+' was git nicht kennt (gitFremdSammeln).
 FUNCTION ordnerKopieren(von AS STRING, nach AS STRING, muster AS STRING, tief AS BOOLEAN) AS INTEGER
     DIM l AS ARRAY OF STRING : l = DIRLIST_REC(von, muster)
     DIM n AS INTEGER : n = 0
@@ -81,6 +144,10 @@ FUNCTION ordnerKopieren(von AS STRING, nach AS STRING, muster AS STRING, tief AS
         IF NOT tief AND INSTR(rel, "/") >= 0 THEN CONTINUE
         IF LEFT$(BASENAME(rel), 7) = "_dhtmp_" THEN CONTINUE
         IF INSTR(rel, "__pycache__") >= 0 THEN CONTINUE
+        IF MAPHAS(gitFremd, gitSchluessel$(PATHJOIN(von, rel))) THEN
+            gitFremdUebergangen = gitFremdUebergangen + 1
+            CONTINUE
+        END IF
         dateiKopieren(PATHJOIN(von, rel), PATHJOIN(nach, rel))
         n = n + 1
     NEXT

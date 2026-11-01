@@ -543,3 +543,186 @@ NEXT
 PRINT "projekt endet auf examples "; (RIGHT$(z, 9) = "/examples")
 --- erwartet
 projekt endet auf examples TRUE
+
+=== nur was git kennt kommt ins paket
+' examples/ wird mit allen Unterordnern kopiert -- im Arbeitsordner liegen
+' dort auch nachgeladene Musik (gitignoriert) und ein Beispiel, an dem
+' gerade gearbeitet wird. Beides gehoert nicht in eine Fassung; der
+' Installer von 2026.39 war deshalb zuerst 80 statt 60 MB gross.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 120000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", "--wurzel", CWD$() + "/w", _
+    "--system", "linux", "--arch", "x86_64", "--laufzeit", CWD$() + "/dhrt-attrappe", _
+    "--ausgabe", CWD$() + "/raus", "--ohne-archiv", "--ohne-lizenzen")
+DIM aus AS STRING : aus = lauf$(p)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM d AS STRING : d = "raus/paket/Drachenhauch-IDE-" + VERSION$() + "-linux-x86_64/examples"
+PRINT "eingecheckt "; FILEEXISTS(d + "/01_hallo.dh"); " "; FILEEXISTS(d + "/assets/bild.txt"); " "; FILEEXISTS(d + "/ümlaut.dh")
+PRINT "ignoriert "; FILEEXISTS(d + "/assets/musik.ogg")
+PRINT "nicht eingecheckt "; FILEEXISTS(d + "/entwurf.dh"); " "; FILEEXISTS(d + "/entwurf_ä.dh")
+PRINT "gesagt "; (INSTR(aus, "3 Dateien unter examples/ und esp32/ bleiben draussen") >= 0)
+IF PROCESS_CODE(p) <> 0 THEN PRINT aus
+--- vorher
+SUB git(args AS ARRAY OF STRING)
+    DIM p AS INTEGER : p = PROCESS_START("git", args)
+    WHILE PROCESS_RUNNING(p)
+        DIM s AS STRING : s = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        SLEEP(10)
+    WEND
+    IF PROCESS_CODE(p) <> 0 THEN PRINT "git scheitert: "; JOIN$(args, " ")
+END SUB
+git(["-C", "w", "init", "-q"])
+git(["-C", "w", "add", "-A"])
+git(["-C", "w", "reset", "-q", "--", "examples/entwurf.dh", "examples/entwurf_ä.dh"])
+git(["-C", "w", "-c", "user.email=p@p", "-c", "user.name=p", "commit", "-q", "-m", "x"])
+--- argumente
+{sammlung}/../../installer/bauen.dh
+--- datei dhrt-attrappe
+ATTRAPPE
+--- datei w/.gitignore
+examples/assets/*.ogg
+--- datei w/ide/ide.dh
+PRINT 1
+--- datei w/ide/sprache/en.txt
+x
+--- datei w/docs/a.md
+# a
+--- datei w/daten/bilder/logo.png
+kein bild
+--- datei w/examples/01_hallo.dh
+PRINT "hallo"
+--- datei w/examples/ümlaut.dh
+PRINT "ü"
+--- datei w/examples/assets/bild.txt
+eingecheckt
+--- datei w/examples/assets/musik.ogg
+nachgeladen
+--- datei w/examples/entwurf.dh
+PRINT "in arbeit"
+--- datei w/examples/entwurf_ä.dh
+PRINT "in arbeit"
+--- erwartet
+rueckgabe 0
+eingecheckt TRUE TRUE TRUE
+ignoriert FALSE
+nicht eingecheckt FALSE FALSE
+gesagt TRUE
+
+=== ohne git kommt der ganze ordner mit
+' Ein entpacktes Archiv hat keinen git-Stand -- dann wie frueher alles,
+' und der Bau sagt es.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 120000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", "--wurzel", CWD$() + "/w", _
+    "--system", "linux", "--arch", "x86_64", "--laufzeit", CWD$() + "/dhrt-attrappe", _
+    "--ausgabe", CWD$() + "/raus", "--ohne-archiv", "--ohne-lizenzen")
+DIM aus AS STRING : aus = lauf$(p)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM d AS STRING : d = "raus/paket/Drachenhauch-IDE-" + VERSION$() + "-linux-x86_64/examples"
+PRINT "alles da "; FILEEXISTS(d + "/01_hallo.dh"); " "; FILEEXISTS(d + "/assets/musik.ogg")
+PRINT "gesagt "; (INSTR(aus, "kein git-Stand") >= 0)
+IF PROCESS_CODE(p) <> 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../installer/bauen.dh
+--- datei dhrt-attrappe
+ATTRAPPE
+--- datei w/ide/ide.dh
+PRINT 1
+--- datei w/ide/sprache/en.txt
+x
+--- datei w/docs/a.md
+# a
+--- datei w/daten/bilder/logo.png
+kein bild
+--- datei w/examples/01_hallo.dh
+PRINT "hallo"
+--- datei w/examples/assets/musik.ogg
+nachgeladen
+--- erwartet
+rueckgabe 0
+alles da TRUE TRUE
+gesagt TRUE
+
+=== eine wurzel in einem fremden repository nimmt den ganzen ordner
+' Liegt ein entpacktes Archiv zufaellig in einem fremden Repository, kennt
+' git keine seiner Dateien -- ohne den Blick auf die Spitze des Repositorys
+' fielen alle Beispiele weg.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 120000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", "--wurzel", CWD$() + "/w", _
+    "--system", "linux", "--arch", "x86_64", "--laufzeit", CWD$() + "/dhrt-attrappe", _
+    "--ausgabe", CWD$() + "/raus", "--ohne-archiv", "--ohne-lizenzen")
+DIM aus AS STRING : aus = lauf$(p)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM d AS STRING : d = "raus/paket/Drachenhauch-IDE-" + VERSION$() + "-linux-x86_64/examples"
+PRINT "alles da "; FILEEXISTS(d + "/01_hallo.dh"); " "; FILEEXISTS(d + "/assets/musik.ogg")
+PRINT "gesagt "; (INSTR(aus, "kein git-Stand") >= 0)
+IF PROCESS_CODE(p) <> 0 THEN PRINT aus
+--- vorher
+DIM p AS INTEGER : p = PROCESS_START("git", "init", "-q")
+WHILE PROCESS_RUNNING(p)
+    SLEEP(10)
+WEND
+IF PROCESS_CODE(p) <> 0 THEN PRINT "git init scheitert"
+--- argumente
+{sammlung}/../../installer/bauen.dh
+--- datei dhrt-attrappe
+ATTRAPPE
+--- datei w/ide/ide.dh
+PRINT 1
+--- datei w/ide/sprache/en.txt
+x
+--- datei w/docs/a.md
+# a
+--- datei w/daten/bilder/logo.png
+kein bild
+--- datei w/examples/01_hallo.dh
+PRINT "hallo"
+--- datei w/examples/assets/musik.ogg
+nachgeladen
+--- erwartet
+rueckgabe 0
+alles da TRUE TRUE
+gesagt TRUE
