@@ -512,7 +512,11 @@ WHILE NOT beenden
     bibVorUpdate()
     GUI_UPDATE()
     bildNr = bildNr + 1
-    IF bildNr = 3 AND logDatei <> "" THEN lagenProtokollieren() : felderProtokollieren()
+    IF bildNr = 3 AND logDatei <> "" THEN lagenProtokollieren() : felderProtokollieren() : controlsProtokollieren()
+    IF controlsNachBild > 0 THEN
+        controlsNachBild = controlsNachBild - 1
+        IF controlsNachBild = 0 THEN controlsProtokollieren()
+    END IF
     IF lagenNachSuche > 0 THEN
         lagenNachSuche = lagenNachSuche - 1
         IF lagenNachSuche = 0 AND logDatei <> "" THEN lagenProtokollieren()

@@ -247,49 +247,290 @@ SUB controlsLoeschen()
     ' Von hinten nach vorn -- sonst rueckten die Nummern der uebrigen auf.
     DIM weg AS ARRAY OF INTEGER : weg = gewaehlt
     SORT(weg)
+    ' Die Kinder eines geloeschten Layouts bleiben, frei an der Stelle, an
+    ' der man sie gesehen hat.
+    DIM l AS INTEGER
+    FOR EACH l IN weg
+        IF NOT istLayout(l) THEN CONTINUE
+        DIM c AS INTEGER
+        FOR EACH c IN kinderListe(l)
+            IF c < 0 OR ARRAY_INDEXOF(weg, c) >= 0 THEN CONTINUE
+            DIM cx AS INTEGER
+            DIM cy AS INTEGER
+            DIM cb AS INTEGER
+            DIM ch AS INTEGER
+            (cx, cy, cb, ch) = lageVon(c)
+            JSON_SET_INT(doc, wz$(c, "x"), cx) : JSON_SET_INT(doc, wz$(c, "y"), cy)
+        NEXT
+    NEXT
+    DIM abb AS ARRAY OF INTEGER : abb = []
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO anzahl() - 1
+        IF ARRAY_INDEXOF(weg, i) >= 0 THEN
+            ARRAY_PUSH(abb, -1)
+        ELSE
+            ARRAY_PUSH(abb, n)
+            n = n + 1
+        END IF
+    NEXT
     DIM k AS INTEGER
     FOR k = LEN(weg) - 1 TO 0 STEP -1
         JSON_REMOVE(doc, "widgets." + STR$(weg[k]))
     NEXT
+    indizesUmbauen(abb)
     auswahlSetzen(-1)
 END SUB
 
 SUB controlsVerdoppeln()
     DIM neue AS ARRAY OF INTEGER : neue = []
     DIM neuHaupt AS INTEGER : neuHaupt = -1
+    DIM quellen AS ARRAY OF INTEGER : quellen = gewaehlt
     DIM q AS INTEGER
-    FOR EACH q IN gewaehlt
-        DIM neu AS JSON_HANDLE : neu = JSON_GET_JSON(doc, "widgets." + STR$(q))
-        JSON_SET_INT(neu, "x", feldZahl(q, "x") + 2 * RASTER)
-        JSON_SET_INT(neu, "y", feldZahl(q, "y") + 2 * RASTER)
-        DIM grund AS STRING : grund = REGEX_REPLACE(feldText$(q, "name"), "[0-9]+$", "")
-        IF grund = "" THEN grund = feldText$(q, "kind")
-        JSON_SET_STRING(neu, "name", eindeutigerName$(grund))
-        JSON_APPEND_JSON(doc, "widgets", neu)
-        ARRAY_PUSH(neue, anzahl() - 1)
-        IF q = auswahl THEN neuHaupt = anzahl() - 1
+    FOR EACH q IN quellen
+        ' Liegt ein gewaehltes Layout darueber, kommt die Kopie mit ihm.
+        DIM mit AS BOOLEAN : mit = FALSE
+        DIM o AS INTEGER
+        FOR EACH o IN quellen
+            IF o <> q AND istVorfahr(o, q) THEN mit = TRUE
+        NEXT
+        IF mit THEN CONTINUE
+        DIM c AS INTEGER : c = kopieAnlegen(q, 2 * RASTER, 2 * RASTER)
+        ' Die Kopie eines Kindes steht im selben Layout gleich dahinter.
+        DIM l AS INTEGER : l = elternVon(q)
+        IF l >= 0 THEN kindEinfuegen(l, c, stelleIn(l, q) + 1, gewichtVon(q))
+        ARRAY_PUSH(neue, c)
+        IF q = auswahl THEN neuHaupt = c
     NEXT
     gewaehlt = neue
     auswahl = neuHaupt
+    IF auswahl < 0 AND LEN(neue) > 0 THEN auswahl = neue[LEN(neue) - 1]
 END SUB
+
+' Ein Control kopieren, ein Layout samt seinen Kindern. Liefert den neuen Index.
+FUNCTION kopieAnlegen(q AS INTEGER, dx AS INTEGER, dy AS INTEGER) AS INTEGER
+    DIM neu AS JSON_HANDLE : neu = JSON_GET_JSON(doc, "widgets." + STR$(q))
+    JSON_SET_INT(neu, "x", feldZahl(q, "x") + dx)
+    JSON_SET_INT(neu, "y", feldZahl(q, "y") + dy)
+    DIM grund AS STRING : grund = REGEX_REPLACE(feldText$(q, "name"), "[0-9]+$", "")
+    IF grund = "" THEN grund = feldText$(q, "kind")
+    JSON_SET_STRING(neu, "name", eindeutigerName$(grund))
+    IF istLayout(q) THEN JSON_SET_JSON(neu, "layout.kinder", JSON_NEW_ARRAY())
+    JSON_APPEND_JSON(doc, "widgets", neu)
+    DIM n AS INTEGER : n = anzahl() - 1
+    IF istLayout(q) THEN
+        DIM alt AS ARRAY OF INTEGER : alt = kinderListe(q)
+        DIM gew AS ARRAY OF INTEGER : gew = gewichtListe(q)
+        DIM kopien AS ARRAY OF INTEGER : kopien = []
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(alt) - 1
+            IF alt[k] < 0 THEN
+                ARRAY_PUSH(kopien, -1)
+            ELSE
+                ARRAY_PUSH(kopien, kopieAnlegen(alt[k], dx, dy))
+            END IF
+        NEXT
+        kinderSetzen(n, kopien, gew)
+    END IF
+    RETURN n
+END FUNCTION
 
 ' Reihenfolge = Zeichenreihenfolge: das letzte liegt vorn.
 SUB controlOrdnen(nachVorn AS BOOLEAN)
     IF auswahl < 0 THEN RETURN
     DIM n AS INTEGER : n = anzahl()
+    DIM abb AS ARRAY OF INTEGER : abb = []
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        IF i = auswahl THEN
+            ARRAY_PUSH(abb, IIF(nachVorn, n - 1, 0))
+        ELSEIF nachVorn THEN
+            ARRAY_PUSH(abb, IIF(i > auswahl, i - 1, i))
+        ELSE
+            ARRAY_PUSH(abb, IIF(i < auswahl, i + 1, i))
+        END IF
+    NEXT
     DIM kopie AS JSON_HANDLE : kopie = JSON_GET_JSON(doc, "widgets." + STR$(auswahl))
     JSON_REMOVE(doc, "widgets." + STR$(auswahl))
     IF nachVorn THEN
         JSON_APPEND_JSON(doc, "widgets", kopie)
+        indizesUmbauen(abb)
         auswahlSetzen(n - 1)
     ELSE
         DIM neu AS JSON_HANDLE : neu = JSON_NEW_ARRAY()
         JSON_APPEND_JSON(neu, "", kopie)
-        DIM i AS INTEGER
         FOR i = 0 TO n - 2
             JSON_APPEND_JSON(neu, "", JSON_GET_JSON(doc, "widgets." + STR$(i)))
         NEXT
         JSON_SET_JSON(doc, "widgets", neu)
+        indizesUmbauen(abb)
         auswahlSetzen(0)
     END IF
+END SUB
+
+' --- Layout-Behaelter -----------------------------------------------------------
+'  Ein Layout (Zeile, Spalte, Raster) fuehrt seine Kinder so, wie GUI_SAVE es
+'  schreibt: widgets.N.layout.kinder = [[Index, Gewicht], ...], -1 = ein
+'  Abstandhalter. Die Laufzeit legt die Kinder selbst -- auch im
+'  Entwurfsfenster --, ihr x/y im Modell zaehlt nicht, w/h ist ihre eigene
+'  Groesse. Alles, was Indizes verschiebt (Loeschen, Ordnen), zieht die
+'  Listen ueber indizesUmbauen nach; ein Widget steht in hoechstens EINEM
+'  Layout.
+FUNCTION istLayout(i AS INTEGER) AS BOOLEAN
+    IF i < 0 OR i >= anzahl() THEN RETURN FALSE
+    RETURN feldText$(i, "kind") = "layout"
+END FUNCTION
+
+FUNCTION kinderListe(l AS INTEGER) AS ARRAY OF INTEGER
+    DIM r AS ARRAY OF INTEGER : r = []
+    IF NOT JSON_HAS(doc, wz$(l, "layout.kinder")) THEN RETURN r
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(doc, wz$(l, "layout.kinder")) - 1
+        ARRAY_PUSH(r, JSON_GET_INT(doc, wz$(l, "layout.kinder." + STR$(k) + ".0")))
+    NEXT
+    RETURN r
+END FUNCTION
+
+FUNCTION gewichtListe(l AS INTEGER) AS ARRAY OF INTEGER
+    DIM r AS ARRAY OF INTEGER : r = []
+    IF NOT JSON_HAS(doc, wz$(l, "layout.kinder")) THEN RETURN r
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(doc, wz$(l, "layout.kinder")) - 1
+        DIM p AS STRING : p = wz$(l, "layout.kinder." + STR$(k) + ".1")
+        IF JSON_HAS(doc, p) THEN
+            ARRAY_PUSH(r, JSON_GET_INT(doc, p))
+        ELSE
+            ARRAY_PUSH(r, 0)
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+
+SUB kinderSetzen(l AS INTEGER, kinder AS ARRAY OF INTEGER, gewichte AS ARRAY OF INTEGER)
+    DIM a AS JSON_HANDLE : a = JSON_NEW_ARRAY()
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(kinder) - 1
+        DIM paar AS JSON_HANDLE : paar = JSON_NEW_ARRAY()
+        JSON_APPEND_INT(paar, "", kinder[k])
+        JSON_APPEND_INT(paar, "", IIF(k < LEN(gewichte), gewichte[k], 0))
+        JSON_APPEND_JSON(a, "", paar)
+    NEXT
+    JSON_SET_JSON(doc, wz$(l, "layout.kinder"), a)
+END SUB
+
+' Fuer ein Fenster, auch eines, das nicht vorn ist: je Widget das Layout,
+' in dem es steht, -1 = frei.
+FUNCTION elternAus(d AS JSON_HANDLE) AS ARRAY OF INTEGER
+    DIM r AS ARRAY OF INTEGER : r = []
+    IF NOT JSON_HAS(d, "widgets") THEN RETURN r
+    DIM n AS INTEGER : n = JSON_LEN(d, "widgets")
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        ARRAY_PUSH(r, -1)
+    NEXT
+    FOR i = 0 TO n - 1
+        DIM p AS STRING : p = "widgets." + STR$(i) + ".layout.kinder"
+        IF NOT JSON_HAS(d, p) THEN CONTINUE
+        DIM k AS INTEGER
+        FOR k = 0 TO JSON_LEN(d, p) - 1
+            DIM c AS INTEGER : c = JSON_GET_INT(d, p + "." + STR$(k) + ".0")
+            IF c >= 0 AND c < n THEN r[c] = i
+        NEXT
+    NEXT
+    RETURN r
+END FUNCTION
+
+' Das Layout, in dem i steht (-1 = frei).
+FUNCTION elternVon(i AS INTEGER) AS INTEGER
+    IF i < 0 THEN RETURN -1
+    DIM l AS INTEGER
+    FOR l = 0 TO anzahl() - 1
+        IF NOT istLayout(l) THEN CONTINUE
+        IF ARRAY_INDEXOF(kinderListe(l), i) >= 0 THEN RETURN l
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION stelleIn(l AS INTEGER, i AS INTEGER) AS INTEGER
+    RETURN ARRAY_INDEXOF(kinderListe(l), i)
+END FUNCTION
+
+' Steht b (mittelbar) in a?
+FUNCTION istVorfahr(a AS INTEGER, b AS INTEGER) AS BOOLEAN
+    IF a < 0 OR b < 0 THEN RETURN FALSE
+    DIM e AS INTEGER : e = elternVon(b)
+    DIM stufe AS INTEGER : stufe = 0
+    WHILE e >= 0 AND stufe < 64
+        IF e = a THEN RETURN TRUE
+        e = elternVon(e)
+        stufe = stufe + 1
+    WEND
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION gewichtVon(i AS INTEGER) AS INTEGER
+    DIM l AS INTEGER : l = elternVon(i)
+    IF l < 0 THEN RETURN 0
+    DIM gew AS ARRAY OF INTEGER : gew = gewichtListe(l)
+    RETURN gew[stelleIn(l, i)]
+END FUNCTION
+
+SUB gewichtSetzen(i AS INTEGER, g AS INTEGER)
+    DIM l AS INTEGER : l = elternVon(i)
+    IF l < 0 THEN RETURN
+    DIM gew AS ARRAY OF INTEGER : gew = gewichtListe(l)
+    gew[stelleIn(l, i)] = MAX(0, g)
+    kinderSetzen(l, kinderListe(l), gew)
+END SUB
+
+SUB kindEntfernen(i AS INTEGER)
+    DIM l AS INTEGER : l = elternVon(i)
+    IF l < 0 THEN RETURN
+    DIM kinder AS ARRAY OF INTEGER : kinder = kinderListe(l)
+    DIM gew AS ARRAY OF INTEGER : gew = gewichtListe(l)
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(kinder, i)
+    ARRAY_REMOVE_AT(kinder, k)
+    ARRAY_REMOVE_AT(gew, k)
+    kinderSetzen(l, kinder, gew)
+END SUB
+
+' i an Stelle `pos` in Layout l -- gezaehlt in der Liste, wie sie VOR dem
+' Herausnehmen ist: stand i dort schon weiter vorn, rueckt die Stelle um eins.
+SUB kindEinfuegen(l AS INTEGER, i AS INTEGER, pos AS INTEGER, gewicht AS INTEGER)
+    IF l = i OR istVorfahr(i, l) THEN RETURN
+    DIM vorher AS INTEGER : vorher = stelleIn(l, i)
+    IF vorher >= 0 AND vorher < pos THEN pos = pos - 1
+    kindEntfernen(i)
+    DIM kinder AS ARRAY OF INTEGER : kinder = kinderListe(l)
+    DIM gew AS ARRAY OF INTEGER : gew = gewichtListe(l)
+    pos = MAX(0, MIN(pos, LEN(kinder)))
+    ARRAY_INSERT(kinder, pos, i)
+    ARRAY_INSERT(gew, pos, gewicht)
+    kinderSetzen(l, kinder, gew)
+END SUB
+
+' Nach Loeschen oder Ordnen: abb[alt] = neuer Index, -1 = weg. Abstandhalter
+' (-1 in der Liste) bleiben, wie sie sind.
+SUB indizesUmbauen(abb AS ARRAY OF INTEGER)
+    DIM l AS INTEGER
+    FOR l = 0 TO anzahl() - 1
+        IF NOT istLayout(l) THEN CONTINUE
+        DIM alt AS ARRAY OF INTEGER : alt = kinderListe(l)
+        DIM altG AS ARRAY OF INTEGER : altG = gewichtListe(l)
+        DIM kinder AS ARRAY OF INTEGER : kinder = []
+        DIM gew AS ARRAY OF INTEGER : gew = []
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(alt) - 1
+            IF alt[k] < 0 THEN
+                ARRAY_PUSH(kinder, -1)
+                ARRAY_PUSH(gew, altG[k])
+            ELSEIF alt[k] < LEN(abb) THEN
+                IF abb[alt[k]] >= 0 THEN
+                    ARRAY_PUSH(kinder, abb[alt[k]])
+                    ARRAY_PUSH(gew, altG[k])
+                END IF
+            END IF
+        NEXT
+        kinderSetzen(l, kinder, gew)
+    NEXT
 END SUB

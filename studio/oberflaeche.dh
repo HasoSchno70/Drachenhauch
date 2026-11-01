@@ -430,6 +430,14 @@ END SUB
 
 FUNCTION bausteinName$(i AS INTEGER) AS STRING
     DIM k AS STRING : k = feldText$(i, "kind")
+    IF k = "layout" THEN
+        SELECT CASE feldText$(i, "layout.art")
+            CASE "zeile" : RETURN "Zeile"
+            CASE "raster" : RETURN "Raster"
+            CASE "fluss" : RETURN "Fluss"
+        END SELECT
+        RETURN "Spalte"
+    END IF
     IF k = "table" THEN
         IF feldSchalter(i, "table.zellmodus", FALSE) THEN RETURN "Gitter"
         IF feldSchalter(i, "table.baum", FALSE) THEN RETURN "Baumtabelle"

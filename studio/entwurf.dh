@@ -57,6 +57,25 @@ DIM linY1 AS ARRAY OF INTEGER : linY1 = []
 DIM linX2 AS ARRAY OF INTEGER : linX2 = []
 DIM linY2 AS ARRAY OF INTEGER : linY2 = []
 
+' Layout-Behaelter (modell.dh): je Widget das Layout, in dem es steht --
+' gerechnet bei jedem Neuaufbau, damit die Maus nicht je Bild suchen muss.
+DIM elternCache AS ARRAY OF INTEGER : elternCache = []
+' Ziel eines Zugs oder Ablegens: das Layout, die Stelle in seiner Liste und
+' die Marke, die zeigt, wo das Control landet (Fensterlage).
+DIM zielL AS INTEGER : zielL = -1
+DIM zielPos AS INTEGER : zielPos = 0
+DIM markeX AS INTEGER
+DIM markeY AS INTEGER
+DIM markeB AS INTEGER
+DIM markeH AS INTEGER
+' Ein Kind eines Layouts wird nicht verschoben, sondern umgesetzt: es bleibt
+' stehen, ein Umriss folgt der Maus.
+DIM kindZug AS BOOLEAN : kindZug = FALSE
+' Nach einer Aenderung die Lagen der Controls ins Protokoll -- erst nach dem
+' naechsten GUI_UPDATE, vorher hat die Laufzeit die Kinder noch nicht gelegt.
+DIM controlsNachBild AS INTEGER : controlsNachBild = 0
+CONST F_BEHAELTER = &H8C7BD8
+
 FUNCTION zS(v AS INTEGER) AS INTEGER
     RETURN INT(v * zoomF + 0.5)
 END FUNCTION
@@ -88,6 +107,7 @@ SUB entwurfBauen()
     ' Ein neues Fenster nimmt den Fokus -- und Kuerzel gelten im Fenster mit
     ' Fokus. Also merken und zurueckgeben.
     DIM fokus AS GUI_WIDGET : fokus = GUI_FOCUSED()
+    elternCache = elternAus(doc)
     IF frm >= 0 THEN GUI_WINDOW_DESTROY(frm)
     frm = GUI_FROM_JSON(JSON_STRINGIFY(doc))
     GUI_WINDOW_DESIGN(frm, TRUE)
@@ -106,6 +126,8 @@ END SUB
 SUB nachAenderung(festhalten AS BOOLEAN)
     entwurfBauen()
     IF festhalten THEN merken()
+    behaelterProtokollieren()
+    controlsNachBild = 2
     navigatorFuellen()
     inspektorFuellen()
     werkzeugeNachziehen()
@@ -119,6 +141,195 @@ FUNCTION indexVonHandle(h AS GUI_WIDGET) AS INTEGER
     NEXT
     RETURN -1
 END FUNCTION
+
+' --- Layout-Behaelter im Entwurf ----------------------------------------------
+FUNCTION verwaltet(i AS INTEGER) AS BOOLEAN
+    IF i < 0 OR i >= LEN(elternCache) THEN RETURN FALSE
+    RETURN elternCache[i] >= 0
+END FUNCTION
+
+' Wo ein Control zu sehen ist (Fensterlage). Ein Kind eines Layouts legt die
+' Laufzeit selbst -- sein x/y im Modell zaehlt nicht, also das Widget fragen.
+FUNCTION lageVon(i AS INTEGER) AS TUPLE
+    IF verwaltet(i) AND frm >= 0 THEN
+        DIM h AS GUI_WIDGET : h = GUI_WINDOW_WIDGET(frm, i)
+        IF h >= 0 THEN RETURN (GUI_GET_X(h), GUI_GET_Y(h), GUI_GET_W(h), GUI_GET_H(h))
+    END IF
+    RETURN (feldZahl(i, "x"), feldZahl(i, "y"), feldZahl(i, "w"), feldZahl(i, "h"))
+END FUNCTION
+
+FUNCTION tiefe(i AS INTEGER) AS INTEGER
+    DIM t AS INTEGER : t = 0
+    WHILE verwaltet(i) AND t < 64
+        i = elternCache[i]
+        t = t + 1
+    WEND
+    RETURN t
+END FUNCTION
+
+' Steht b (mittelbar) in a? -- wie istVorfahr, aber ueber den Zwischenspeicher.
+FUNCTION liegtIn(b AS INTEGER, a AS INTEGER) AS BOOLEAN
+    IF a < 0 THEN RETURN FALSE
+    DIM t AS INTEGER : t = 0
+    WHILE verwaltet(b) AND t < 64
+        b = elternCache[b]
+        IF b = a THEN RETURN TRUE
+        t = t + 1
+    WEND
+    RETURN FALSE
+END FUNCTION
+
+' Das innerste Layout unter einem Punkt -- ohne `ausser` und alles, was darin
+' steht (ein Layout laesst sich nicht in sich selbst legen).
+FUNCTION layoutBei(fx AS INTEGER, fy AS INTEGER, ausser AS INTEGER) AS INTEGER
+    DIM best AS INTEGER : best = -1
+    DIM bestT AS INTEGER : bestT = -1
+    DIM l AS INTEGER
+    FOR l = 0 TO anzahl() - 1
+        IF NOT istLayout(l) OR l = ausser THEN CONTINUE
+        IF ausser >= 0 AND liegtIn(l, ausser) THEN CONTINUE
+        DIM h AS GUI_WIDGET : h = IIF(frm >= 0, GUI_WINDOW_WIDGET(frm, l), -1)
+        IF h >= 0 THEN
+            IF NOT GUI_VISIBLE(h) THEN CONTINUE
+        END IF
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        DIM w AS INTEGER
+        DIM hh AS INTEGER
+        (x, y, w, hh) = lageVon(l)
+        IF fx < x OR fy < y OR fx >= x + w OR fy >= y + hh THEN CONTINUE
+        DIM t AS INTEGER : t = tiefe(l)
+        IF t >= bestT THEN
+            best = l
+            bestT = t
+        END IF
+    NEXT
+    RETURN best
+END FUNCTION
+
+' Was ein Klick trifft: die Laufzeit nimmt Layouts aus ihrem Treffertest
+' (fuer Klicks sind sie Luft). Im Entwurf will man sie aber anklicken --
+' zwischen den Kindern, auf dem Rand. Ein Kind gewinnt vor seinem Layout,
+' ein Control, das vorn darueber liegt, ebenso.
+FUNCTION trefferMitLayouts(i AS INTEGER, fx AS INTEGER, fy AS INTEGER) AS INTEGER
+    DIM l AS INTEGER : l = layoutBei(fx, fy, -1)
+    IF l < 0 THEN RETURN i
+    IF i < 0 THEN RETURN l
+    IF liegtIn(i, l) OR i > l THEN RETURN i
+    RETURN l
+END FUNCTION
+
+' Wohin ein Control in Layout l kommt, wenn man es bei (fx, fy) loslaesst:
+' die Stelle in der Liste (zielPos) und die Marke dafuer. `ausser` = das
+' gezogene Control, es zaehlt beim Vergleichen nicht mit.
+SUB stelleRechnen(l AS INTEGER, fx AS INTEGER, fy AS INTEGER, ausser AS INTEGER)
+    DIM art AS STRING : art = feldText$(l, "layout.art")
+    IF art = "" THEN art = "spalte"
+    DIM lx AS INTEGER
+    DIM ly AS INTEGER
+    DIM lw AS INTEGER
+    DIM lh AS INTEGER
+    (lx, ly, lw, lh) = lageVon(l)
+    DIM kinder AS ARRAY OF INTEGER : kinder = kinderListe(l)
+    zielPos = LEN(kinder)
+    ' Ohne Kinder: am Anfang des Layouts.
+    IF art = "spalte" THEN
+        markeX = lx + 2 : markeY = ly + 2 : markeB = lw - 4 : markeH = 3
+    ELSE
+        markeX = lx + 2 : markeY = ly + 2 : markeB = 3 : markeH = lh - 4
+    END IF
+    DIM letzte AS INTEGER : letzte = -1
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(kinder) - 1
+        DIM c AS INTEGER : c = kinder[k]
+        IF c < 0 OR c = ausser THEN CONTINUE
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        DIM w AS INTEGER
+        DIM h AS INTEGER
+        (x, y, w, h) = lageVon(c)
+        DIM davor AS BOOLEAN
+        SELECT CASE art
+            CASE "zeile" : davor = fx < x + w \ 2
+            CASE "spalte" : davor = fy < y + h \ 2
+            CASE ELSE : davor = fy < y OR (fy < y + h AND fx < x + w \ 2)
+        END SELECT
+        IF davor THEN
+            zielPos = k
+            IF art = "spalte" THEN
+                markeX = x : markeY = y - 4 : markeB = w : markeH = 3
+            ELSE
+                markeX = x - 4 : markeY = y : markeB = 3 : markeH = h
+            END IF
+            RETURN
+        END IF
+        letzte = c
+    NEXT
+    IF letzte >= 0 THEN
+        DIM ex AS INTEGER
+        DIM ey AS INTEGER
+        DIM ew AS INTEGER
+        DIM eh AS INTEGER
+        (ex, ey, ew, eh) = lageVon(letzte)
+        IF art = "spalte" THEN
+            markeX = ex : markeY = ey + eh + 1 : markeB = ew : markeH = 3
+        ELSE
+            markeX = ex + ew + 1 : markeY = ey : markeB = 3 : markeH = eh
+        END IF
+    END IF
+END SUB
+
+' Das Ziel unter der Maus bestimmen (zielL = -1: frei ablegen).
+SUB zielBestimmen(fx AS INTEGER, fy AS INTEGER, ausser AS INTEGER)
+    zielL = layoutBei(fx, fy, ausser)
+    IF zielL >= 0 THEN stelleRechnen(zielL, fx, fy, ausser)
+END SUB
+
+' Ein gestrichelter Rahmen (Bildschirmlage) -- so zeigt der Entwurf Layouts,
+' die selbst nichts zeichnen.
+SUB gestrichelt(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, f AS INTEGER)
+    DIM p AS INTEGER
+    FOR p = x1 TO x2 STEP 8
+        BOX(p, y1, MIN(p + 3, x2), y1, f)
+        BOX(p, y2, MIN(p + 3, x2), y2, f)
+    NEXT
+    FOR p = y1 TO y2 STEP 8
+        BOX(x1, p, x1, MIN(p + 3, y2), f)
+        BOX(x2, p, x2, MIN(p + 3, y2), f)
+    NEXT
+END SUB
+
+' Fuer Pruefungen: die Kinderliste jedes Layouts, "behaelter L a:0,b:1".
+SUB behaelterProtokollieren()
+    IF logDatei = "" THEN RETURN
+    DIM l AS INTEGER
+    FOR l = 0 TO anzahl() - 1
+        IF NOT istLayout(l) THEN CONTINUE
+        DIM teile AS ARRAY OF STRING : teile = []
+        DIM kinder AS ARRAY OF INTEGER : kinder = kinderListe(l)
+        DIM gew AS ARRAY OF INTEGER : gew = gewichtListe(l)
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(kinder) - 1
+            DIM n AS STRING : n = IIF(kinder[k] < 0, "-", feldText$(kinder[k], "name"))
+            ARRAY_PUSH(teile, n + ":" + STR$(gew[k]))
+        NEXT
+        protokoll("behaelter " + feldText$(l, "name") + " " + JOIN$(teile, ","))
+    NEXT
+END SUB
+
+' Fuer Pruefungen: die Mitte jedes Controls auf dem Schirm, wie man es sieht.
+SUB controlsProtokollieren()
+    IF logDatei = "" OR frm < 0 THEN RETURN
+    DIM i AS INTEGER
+    FOR i = 0 TO anzahl() - 1
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        DIM w AS INTEGER
+        DIM h AS INTEGER
+        (x, y, w, h) = lageVon(i)
+        protokoll("lage control " + feldText$(i, "name") + " " + STR$(formX + zS(x + w \ 2)) + " " + STR$(formY + zS(y + h \ 2)) + " " + STR$(w) + " " + STR$(h))
+    NEXT
+END SUB
 
 ' Lage waehrend eines Zugs: ins Modell UND live ins Widget (kein Neuaufbau).
 SUB lageSetzenVon(i AS INTEGER, x AS INTEGER, y AS INTEGER, w AS INTEGER, h AS INTEGER)
@@ -181,8 +392,13 @@ SUB zieleSammeln(senkrecht AS BOOLEAN)
     DIM i AS INTEGER
     FOR i = 0 TO anzahl() - 1
         IF istGewaehlt(i) THEN CONTINUE
-        DIM a AS INTEGER : a = feldZahl(i, IIF(senkrecht, "y", "x"))
-        DIM l AS INTEGER : l = feldZahl(i, IIF(senkrecht, "h", "w"))
+        DIM ix AS INTEGER
+        DIM iy AS INTEGER
+        DIM iw AS INTEGER
+        DIM ih AS INTEGER
+        (ix, iy, iw, ih) = lageVon(i)
+        DIM a AS INTEGER : a = IIF(senkrecht, iy, ix)
+        DIM l AS INTEGER : l = IIF(senkrecht, ih, iw)
         FOR EACH v IN [a, a + l, a + l \ 2]
             ARRAY_PUSH(zielWert, v) : ARRAY_PUSH(zielArt, 0) : ARRAY_PUSH(zielVon, i)
         NEXT
@@ -229,8 +445,13 @@ SUB linieZuTreffer(senkrecht AS BOOLEAN, wert AS INTEGER, a1 AS INTEGER, a2 AS I
     DIM bis AS INTEGER : bis = a2
     DIM c AS INTEGER : c = zielVon[treffer]
     IF c >= 0 THEN
-        DIM ca AS INTEGER : ca = feldZahl(c, IIF(senkrecht, "x", "y"))
-        DIM cl AS INTEGER : cl = feldZahl(c, IIF(senkrecht, "w", "h"))
+        DIM cx AS INTEGER
+        DIM cy AS INTEGER
+        DIM cw AS INTEGER
+        DIM ch AS INTEGER
+        (cx, cy, cw, ch) = lageVon(c)
+        DIM ca AS INTEGER : ca = IIF(senkrecht, cx, cy)
+        DIM cl AS INTEGER : cl = IIF(senkrecht, cw, ch)
         von = MIN(von, ca) : bis = MAX(bis, ca + cl)
     ELSE
         von = 0 : bis = IIF(senkrecht, fensterB(), fensterH())
@@ -241,10 +462,11 @@ END SUB
 ' --- Griffe -----------------------------------------------------------------
 FUNCTION griffBei(mx AS INTEGER, my AS INTEGER) AS INTEGER
     IF auswahl < 0 OR LEN(gewaehlt) <> 1 THEN RETURN -1
-    DIM x AS INTEGER : x = feldZahl(auswahl, "x")
-    DIM y AS INTEGER : y = feldZahl(auswahl, "y")
-    DIM w AS INTEGER : w = feldZahl(auswahl, "w")
-    DIM h AS INTEGER : h = feldZahl(auswahl, "h")
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM w AS INTEGER
+    DIM h AS INTEGER
+    (x, y, w, h) = lageVon(auswahl)
     DIM gx AS ARRAY OF INTEGER : gx = [x, x + w \ 2, x + w, x + w, x + w, x + w \ 2, x, x]
     DIM gy AS ARRAY OF INTEGER : gy = [y, y, y, y + h \ 2, y + h, y + h, y + h, y + h \ 2]
     DIM weite AS INTEGER : weite = MAX(3, zF(6))
@@ -337,7 +559,7 @@ SUB mausAufEntwurf()
             modus = 2
         ELSE
             DIM i AS INTEGER : i = -1
-            IF imFenster(smx, smy) THEN i = indexVonHandle(GUI_HIT_TEST(smx, smy))
+            IF imFenster(smx, smy) THEN i = trefferMitLayouts(indexVonHandle(GUI_HIT_TEST(smx, smy)), mausFx, mausFy)
             ' Doppelklick auf ein Control oder das Fenster: Ereignis hinzufuegen.
             IF imFenster(smx, smy) AND doppelKlick(i) THEN
                 IF i >= 0 THEN auswahlSetzen(i) ELSE auswahlSetzen(-1)
@@ -353,7 +575,9 @@ SUB mausAufEntwurf()
                 modus = 0
                 RETURN
             ELSEIF i >= 0 THEN
-                IF NOT istGewaehlt(i) THEN auswahlSetzen(i)
+                ' Ein Kind eines Layouts wird umgesetzt, nicht verschoben --
+                ' das geht nur allein.
+                IF NOT istGewaehlt(i) OR verwaltet(i) THEN auswahlSetzen(i)
                 auswahl = i
                 auswahlGeaendert()
                 modus = 1
@@ -365,13 +589,19 @@ SUB mausAufEntwurf()
         END IF
         startMx = mausFx : startMy = mausFy
         bewegt = FALSE
+        kindZug = (modus = 1) AND verwaltet(auswahl)
+        zielL = -1
         IF auswahl >= 0 THEN
-            startX = feldZahl(auswahl, "x") : startY = feldZahl(auswahl, "y")
-            startW = feldZahl(auswahl, "w") : startH = feldZahl(auswahl, "h")
+            (startX, startY, startW, startH) = lageVon(auswahl)
             zugX = [] : zugY = []
             DIM gj AS INTEGER
             FOR EACH gj IN gewaehlt
-                ARRAY_PUSH(zugX, feldZahl(gj, "x")) : ARRAY_PUSH(zugY, feldZahl(gj, "y"))
+                DIM gx AS INTEGER
+                DIM gy AS INTEGER
+                DIM gw AS INTEGER
+                DIM gh AS INTEGER
+                (gx, gy, gw, gh) = lageVon(gj)
+                ARRAY_PUSH(zugX, gx) : ARRAY_PUSH(zugY, gy)
             NEXT
         END IF
         GUI_FOCUS(-1)
@@ -389,9 +619,12 @@ SUB mausAufEntwurf()
         IF NOT rahmenDazu THEN gewaehlt = []
         DIM k AS INTEGER
         FOR k = 0 TO anzahl() - 1
-            DIM kx AS INTEGER : kx = feldZahl(k, "x")
-            DIM ky AS INTEGER : ky = feldZahl(k, "y")
-            IF kx >= rx1 AND ky >= ry1 AND kx + feldZahl(k, "w") <= rx2 AND ky + feldZahl(k, "h") <= ry2 AND NOT istGewaehlt(k) THEN
+            DIM kx AS INTEGER
+            DIM ky AS INTEGER
+            DIM kw AS INTEGER
+            DIM kh2 AS INTEGER
+            (kx, ky, kw, kh2) = lageVon(k)
+            IF kx >= rx1 AND ky >= ry1 AND kx + kw <= rx2 AND ky + kh2 <= ry2 AND NOT istGewaehlt(k) THEN
                 DIM kh AS GUI_WIDGET : kh = GUI_WINDOW_WIDGET(frm, k)
                 IF kh >= 0 AND GUI_VISIBLE(kh) THEN ARRAY_PUSH(gewaehlt, k)
             END IF
@@ -408,8 +641,13 @@ SUB mausAufEntwurf()
         IF NOT bewegt AND ABS(dx) < 2 AND ABS(dy) < 2 THEN RETURN
         bewegt = TRUE
         linienLeeren()
-        IF modus = 1 THEN
+        IF modus = 1 AND kindZug THEN
+            ' Das Kind bleibt stehen; wohin es kommt, zeigt die Marke.
+            zielBestimmen(mausFx, mausFy, auswahl)
+        ELSEIF modus = 1 THEN
             ziehenRechnen(dx, dy)
+            ' Ein einzelnes freies Control laesst sich in ein Layout ziehen.
+            IF LEN(gewaehlt) = 1 THEN zielBestimmen(mausFx, mausFy, auswahl) ELSE zielL = -1
         ELSE
             groesseRechnen(dx, dy)
         END IF
@@ -419,11 +657,34 @@ SUB mausAufEntwurf()
 
     IF modus > 0 AND NOT MOUSEBUTTON(0) THEN
         linienLeeren()
+        IF bewegt AND modus = 1 THEN zugAbschliessen()
+        zielL = -1
+        kindZug = FALSE
         IF bewegt THEN
             nachAenderung(TRUE)
             protokoll("bewegt " + STR$(auswahl) + " " + STR$(feldZahl(auswahl, "x")) + " " + STR$(feldZahl(auswahl, "y")) + " " + STR$(feldZahl(auswahl, "w")) + " " + STR$(feldZahl(auswahl, "h")))
         END IF
         modus = 0
+    END IF
+END SUB
+
+' Losgelassen nach einem Zug: in ein Layout hinein, darin umgesetzt -- oder
+' neben jedes Layout gezogen, dann heraus und frei an der Stelle des Umrisses.
+SUB zugAbschliessen()
+    IF auswahl < 0 THEN RETURN
+    DIM name AS STRING : name = feldText$(auswahl, "name")
+    IF zielL >= 0 THEN
+        kindEinfuegen(zielL, auswahl, zielPos, gewichtVon(auswahl))
+        protokoll("eingesetzt " + name + " " + feldText$(zielL, "name") + " " + STR$(stelleIn(zielL, auswahl)))
+        status(name + " steht in " + feldText$(zielL, "name") + " an Stelle " + STR$(stelleIn(zielL, auswahl) + 1) + ".")
+    ELSEIF kindZug THEN
+        DIM x AS INTEGER : x = MAX(0, rasterWert(startX + mausFx - startMx))
+        DIM y AS INTEGER : y = MAX(0, rasterWert(startY + mausFy - startMy))
+        kindEntfernen(auswahl)
+        JSON_SET_INT(doc, wz$(auswahl, "x"), x)
+        JSON_SET_INT(doc, wz$(auswahl, "y"), y)
+        protokoll("herausgenommen " + name + " " + STR$(x) + " " + STR$(y))
+        status(name + " steht jetzt frei im Fenster.")
     END IF
 END SUB
 
@@ -469,7 +730,8 @@ SUB ziehenRechnen(dx AS INTEGER, dy AS INTEGER)
     FOR z = 0 TO LEN(gewaehlt) - 1
         IF z < LEN(zugX) THEN
             DIM gz AS INTEGER : gz = gewaehlt[z]
-            lageSetzenVon(gz, zugX[z] + wx, zugY[z] + wy, feldZahl(gz, "w"), feldZahl(gz, "h"))
+            ' Was ein Layout legt, legt es auch weiter.
+            IF NOT verwaltet(gz) THEN lageSetzenVon(gz, zugX[z] + wx, zugY[z] + wy, feldZahl(gz, "w"), feldZahl(gz, "h"))
         END IF
     NEXT
 END SUB
@@ -536,6 +798,14 @@ SUB ablegen(p AS INTEGER, fx AS INTEGER, fy AS INTEGER, mittig AS BOOLEAN)
     x = MAX(0, MIN(rasterWert(x), fensterB() - MIN(b.b, fensterB())))
     y = MAX(0, MIN(rasterWert(y), fensterH() - MIN(b.h, fensterH())))
     DIM i AS INTEGER : i = controlAnlegen(p, x, y)
+    ' Auf ein Layout gelegt: hinein, an die Stelle unter der Maus.
+    DIM l AS INTEGER : l = layoutBei(fx, fy, -1)
+    IF l >= 0 THEN
+        stelleRechnen(l, fx, fy, -1)
+        kindEinfuegen(l, i, zielPos, 0)
+        protokoll("eingesetzt " + feldText$(i, "name") + " " + feldText$(l, "name") + " " + STR$(stelleIn(l, i)))
+    END IF
+    zielL = -1
     auswahlSetzen(i)
     nachAenderung(TRUE)
     status(b.name + " abgelegt: " + feldText$(i, "name"))
@@ -603,8 +873,18 @@ END FUNCTION
 ' --- Tastatur -----------------------------------------------------------------
 SUB schieben(dx AS INTEGER, dy AS INTEGER)
     IF auswahl < 0 THEN RETURN
+    ' Ein Kind eines Layouts rueckt mit den Pfeilen eine Stelle weiter.
+    IF LEN(gewaehlt) = 1 AND verwaltet(auswahl) THEN
+        DIM l AS INTEGER : l = elternCache[auswahl]
+        DIM k AS INTEGER : k = stelleIn(l, auswahl)
+        kindEinfuegen(l, auswahl, IIF(dx + dy < 0, k - 1, k + 2), gewichtVon(auswahl))
+        nachAenderung(TRUE)
+        protokoll("umgesetzt " + feldText$(auswahl, "name") + " " + STR$(stelleIn(l, auswahl)))
+        RETURN
+    END IF
     DIM j AS INTEGER
     FOR EACH j IN gewaehlt
+        IF verwaltet(j) THEN CONTINUE
         lageSetzenVon(j, feldZahl(j, "x") + dx, feldZahl(j, "y") + dy, feldZahl(j, "w"), feldZahl(j, "h"))
     NEXT
     nachAenderung(TRUE)
@@ -618,6 +898,13 @@ SUB anordnen(was AS STRING)
         nachAenderung(TRUE)
         RETURN
     END IF
+    DIM j0 AS INTEGER
+    FOR EACH j0 IN gewaehlt
+        IF verwaltet(j0) THEN
+            status("Was in einem Layout steht, legt das Layout -- zum Anordnen erst herausziehen.")
+            RETURN
+        END IF
+    NEXT
     IF auswahl < 0 OR LEN(gewaehlt) < 2 THEN
         status("Anordnen braucht mindestens zwei gewählte Controls (Umschalt+Klick oder ein Rahmen).")
         RETURN
@@ -719,6 +1006,49 @@ SUB entwurfZeichnen()
         ' Linie scharf; eine LINEW von einem Punkt Breite kam halb durchsichtig.
         BOX(formX + zS(linX1[l]), formY + zS(linY1[l]), formX + zS(linX2[l]), formY + zS(linY2[l]), F_LINIE)
     NEXT
+    ' Layouts: gestrichelt, das Ziel eines Zugs kraeftig, leere mit Hinweis.
+    IF bibZug >= 0 AND modus = 0 THEN
+        IF imFenster(MOUSEX(), MOUSEY()) THEN zielBestimmen(mausFx, mausFy, -1) ELSE zielL = -1
+    ELSEIF modus <> 1 THEN
+        zielL = -1
+    END IF
+    DIM li AS INTEGER
+    FOR li = 0 TO anzahl() - 1
+        IF NOT istLayout(li) THEN CONTINUE
+        DIM lw AS GUI_WIDGET : lw = IIF(frm >= 0, GUI_WINDOW_WIDGET(frm, li), -1)
+        DIM zeigen AS BOOLEAN : zeigen = TRUE
+        IF lw >= 0 THEN zeigen = GUI_VISIBLE(lw)
+        IF NOT zeigen THEN CONTINUE
+        DIM lx AS INTEGER
+        DIM ly AS INTEGER
+        DIM lb AS INTEGER
+        DIM lhh AS INTEGER
+        (lx, ly, lb, lhh) = lageVon(li)
+        DIM sx1 AS INTEGER : sx1 = formX + zS(lx)
+        DIM sy1 AS INTEGER : sy1 = formY + zS(ly)
+        DIM sx2 AS INTEGER : sx2 = formX + zS(lx + lb) - 1
+        DIM sy2 AS INTEGER : sy2 = formY + zS(ly + lhh) - 1
+        IF li = zielL THEN
+            RECT(sx1, sy1, sx2, sy2, F_AUSWAHL)
+            RECT(sx1 + 1, sy1 + 1, sx2 - 1, sy2 - 1, F_AUSWAHL)
+        ELSE
+            gestrichelt(sx1, sy1, sx2, sy2, F_BEHAELTER)
+        END IF
+        IF LEN(kinderListe(li)) = 0 THEN
+            DIM leer AS STRING : leer = "Controls hierher ziehen"
+            DIM tw AS INTEGER : tw = TEXT_WIDTH(leer)
+            IF tw < sx2 - sx1 - 8 AND sy2 - sy1 > 18 THEN TEXT((sx1 + sx2 - tw) \ 2, (sy1 + sy2 - 15) \ 2, leer, farbe("leise"))
+        END IF
+    NEXT
+    IF zielL >= 0 THEN BOX(formX + zS(markeX), formY + zS(markeY), formX + zS(markeX + markeB) - 1, formY + zS(markeY + markeH) - 1, F_AUSWAHL)
+    ' Ein Kind, das umgesetzt wird: sein Umriss folgt der Maus.
+    IF modus = 1 AND kindZug AND bewegt THEN
+        DIM ux AS INTEGER : ux = formX + zS(startX + mausFx - startMx)
+        DIM uy AS INTEGER : uy = formY + zS(startY + mausFy - startMy)
+        BOXROUND(ux, uy, ux + zS(startW), uy + zS(startH), 4, RGBA(58, 168, 240, 50))
+        RECTROUND(ux, uy, ux + zS(startW), uy + zS(startH), 4, F_AUSWAHL)
+    END IF
+
     ' Auswahl
     IF modus = 3 AND MOUSEBUTTON(0) THEN
         DIM rx1 AS INTEGER : rx1 = formX + zS(MIN(startMx, mausFx))
@@ -731,10 +1061,15 @@ SUB entwurfZeichnen()
     DIM j AS INTEGER
     FOR EACH j IN gewaehlt
         IF j < 0 OR j >= anzahl() THEN CONTINUE
-        DIM jx AS INTEGER : jx = formX + zS(feldZahl(j, "x"))
-        DIM jy AS INTEGER : jy = formY + zS(feldZahl(j, "y"))
-        DIM jw AS INTEGER : jw = zS(feldZahl(j, "w"))
-        DIM jh AS INTEGER : jh = zS(feldZahl(j, "h"))
+        DIM ax AS INTEGER
+        DIM ay AS INTEGER
+        DIM aw AS INTEGER
+        DIM ah AS INTEGER
+        (ax, ay, aw, ah) = lageVon(j)
+        DIM jx AS INTEGER : jx = formX + zS(ax)
+        DIM jy AS INTEGER : jy = formY + zS(ay)
+        DIM jw AS INTEGER : jw = zS(aw)
+        DIM jh AS INTEGER : jh = zS(ah)
         RECT(jx - 1, jy - 1, jx + jw, jy + jh, IIF(j = auswahl, F_AUSWAHL, &H6F9FC0))
         IF LEN(gewaehlt) = 1 THEN
             DIM gx AS ARRAY OF INTEGER : gx = [jx, jx + jw \ 2, jx + jw, jx + jw, jx + jw, jx + jw \ 2, jx, jx]
