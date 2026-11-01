@@ -15,6 +15,15 @@ dhrt run studio/studio.dh -- fenster.dhform
 A folder with `projekt.dhstudio` opens as a project, a folder without one
 gets a new project, a `.dhform` opens as a single window.
 
+When installed, "Drachenhauch Studio" is in the start menu or application
+menu, and a `.dhstudio` opens in the studio with a double-click (on Windows,
+if the association was chosen during installation). On macOS and Linux
+`drachenhauch --studio [project]` starts it from the terminal. In the IDE:
+Werkzeuge → Drachenhauch Studio (with the project folder if it is a studio
+project), and a `.dhstudio` in the project tree opens in the studio. The form
+designer opens its form with Datei → Im Drachenhauch Studio öffnen
+(Ctrl+Shift+O).
+
 **Status: stage 4.** Projects with several windows, modules and classes,
 events and a code field per method; starting, building and errors shown at
 the method they belong to; timers, menus, dialogs that wait, images and a
@@ -92,8 +101,8 @@ The events per kind:
 | checkbox, toggle, radio button | Klick, Geaendert |
 | text field | Geaendert, Enter, FokusRein, FokusRaus |
 | text area | Geaendert, FokusRein, FokusRaus |
-| list, tree | Geaendert, Doppelklick |
-| slider, number field, dropdown, pickers, tab control, table | Geaendert |
+| list, tree, table | Geaendert, Doppelklick (for list and table also Enter) |
+| slider, number field, dropdown, pickers, tab control | Geaendert |
 | canvas | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
 | every control in addition | MausRein, MausRaus |
 | timer, menu entry | Aktion |
@@ -261,6 +270,36 @@ controls without a name get one when opened. As long as only the window is
 edited, Save writes exactly this file. When code or another element is
 added, it becomes a project and Save asks for a folder. New, Open and Quit
 ask when there are unsaved changes.
+
+## The example project
+
+`examples/studio/rechnungen/` is a small invoicing program (after the pilot
+`examples/196_rechnungen.dh`) as a studio project: Datei → Öffnen, choose the
+folder, F5.
+
+| Element | Kind | What it does |
+|---|---|---|
+| App | App | opens the database before the first window appears |
+| Datenbank | module | SQLite file `rechnungen.db`, with sample data on the first start; next invoice number |
+| Ausgabe | module | date and amounts for display, CSV export |
+| Rechnung | class | an invoice with its items: load, calculate, save (one transaction), as PDF |
+| Hauptfenster | window | all invoices with a filter row, menu with shortcuts, new/edit/PDF/delete |
+| RechnungFenster | window | create or change an invoice, modal |
+| KundenFenster, ArtikelFenster | window | master data through data binding (inspector: Bindung) |
+
+What it shows: money is an INTEGER in cents, the tax is rounded per item; the
+master data fields are bound to the columns, so loading and saving are one
+call each (`GUI_FORM_LOAD`/`GUI_FORM_SAVE`), and `GUI_VALIDATE` checks the
+rules (required, postcode, e-mail); a double-click on an invoice opens it
+(`tabelle_Doppelklick`); unsaved input is asked about with
+`Frage(..., "Sichern|Verwerfen|Abbrechen")`, and `ZeigenModal` waits until
+the window is closed. When started from the studio, the database, PDFs and
+the CSV end up in `_studio/`.
+
+**A pitfall when naming:** names are not case-sensitive. A method
+`zeigen(id)` in a window overrides the inherited `Zeigen()` -- `dhrt --check`
+(and so the problem list) warns when a method overrides an inherited one with
+a different number of parameters.
 
 ## For tests
 

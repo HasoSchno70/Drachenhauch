@@ -364,6 +364,7 @@ DIM miSichernAls AS INTEGER : miSichernAls = GUI_MENU_ITEM(mDatei, "Sichern unte
 GUI_MENU_SEPARATOR(mDatei)
 DIM miLauf AS INTEGER : miLauf = GUI_MENU_ITEM(mDatei, "Formular ausfuehren", "F5")
 DIM miDhCode AS INTEGER : miDhCode = GUI_MENU_ITEM(mDatei, "DH-Code schreiben", "Strg+G")
+DIM miStudio AS INTEGER : miStudio = GUI_MENU_ITEM(mDatei, "Im Drachenhauch Studio oeffnen", "Strg+Umschalt+O")
 GUI_MENU_SEPARATOR(mDatei)
 DIM miBeenden AS INTEGER : miBeenden = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
 DIM mBearb AS INTEGER : mBearb = GUI_MENU(winPal, "Bearbeiten")
@@ -1802,6 +1803,45 @@ SUB schieben(dx AS INTEGER, dy AS INTEGER)
     inspektorFuellen()
 END SUB
 
+' --- Das Drachenhauch Studio ------------------------------------------------
+' Der Nachfolger dieses Designers: dasselbe .dhform-Format, dazu Projekt,
+' Code je Ereignis, Starten, Bauen und Debugger (docs/studio.md). Gesucht
+' wird es neben der Laufzeit (Installation: {app}\studio, macOS:
+' Contents/Resources/studio) und neben examples/ (Repository).
+FUNCTION studioPfad$() AS STRING
+    DIM orte AS ARRAY OF STRING : orte = []
+    IF GETENV$("DH_IDE_WURZEL") <> "" THEN ARRAY_PUSH(orte, PATHJOIN(GETENV$("DH_IDE_WURZEL"), "studio/studio.dh"))
+    DIM exe AS STRING : exe = DIRNAME(EXEPATH$())
+    ARRAY_PUSH(orte, PATHJOIN(exe, "studio/studio.dh"))
+    ARRAY_PUSH(orte, PATHJOIN(exe, "../Resources/studio/studio.dh"))
+    ARRAY_PUSH(orte, PATHJOIN(CWD$(), "../studio/studio.dh"))
+    DIM o AS STRING
+    FOR EACH o IN orte
+        IF FILEEXISTS(o) THEN RETURN o
+    NEXT
+    RETURN ""
+END FUNCTION
+
+' Datei -> Im Drachenhauch Studio oeffnen: das gesicherte Formular dort.
+DIM studioProz AS INTEGER : studioProz = -1
+SUB imStudioOeffnen()
+    DIM s AS STRING : s = studioPfad$()
+    IF s = "" THEN
+        GUI_SET_TEXT(lblStatus, "Das Drachenhauch Studio ist nicht zu finden (studio/studio.dh).")
+        protokoll("studio fehlt")
+        RETURN
+    END IF
+    IF formPfad = "" THEN
+        studioProz = PROCESS_START("dhrt", "run", s)
+        GUI_SET_TEXT(lblStatus, "Drachenhauch Studio gestartet -- dieses Formular erst sichern, dann kann es dort aufgehen.")
+        protokoll("studio")
+        RETURN
+    END IF
+    studioProz = PROCESS_START("dhrt", "run", s, "--", formPfad)
+    GUI_SET_TEXT(lblStatus, "Im Drachenhauch Studio geoeffnet: " + BASENAME(formPfad) + IIF(geaendert, " (der ungesicherte Stand bleibt hier)", ""))
+    protokoll("studio " + BASENAME(formPfad))
+END SUB
+
 ' --- Start ------------------------------------------------------------------
 IF ARGC() >= 1 THEN
     DIM startDatei AS STRING : startDatei = ARG$(0)
@@ -1812,6 +1852,7 @@ IF ARGC() >= 1 THEN
     formularLaden(startDatei)
 ELSE
     neuesFormular()
+    GUI_SET_TEXT(lblStatus, "Neu: das Drachenhauch Studio entwirft ganze Programme mit Code, Starten und Bauen -- Datei -> Im Drachenhauch Studio oeffnen.")
 END IF
 GUI_FOCUS(lstPalette)      ' Kuerzel gelten im Fenster mit Fokus -- vor dem ersten Klick gaebe es keins
 protokoll("bereit")
@@ -1889,6 +1930,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(miSichernAls) THEN sichern(TRUE)
     IF GUI_CLICKED(miLauf) THEN ausfuehren()
     IF GUI_CLICKED(miDhCode) THEN dhCodeSchreiben()
+    IF GUI_CLICKED(miStudio) THEN imStudioOeffnen()
     IF GUI_CLICKED(miBeenden) THEN endeAnfragen()
     IF GUI_CLICKED(miRueck) THEN rueckgaengig()
     IF GUI_CLICKED(miWieder) THEN wiederholen()

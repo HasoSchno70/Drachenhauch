@@ -192,11 +192,15 @@ Klammern schließen, Einrückung. `ide/ide.dh` wird nicht eingebunden: das sind
    * Menü-Editor, Timer, Dialoge und modale Fenster.
    * Bilder im Projekt.
    * Debugger über `dhrt debug`.
-5. **Ablösen.**
+5. **Ablösen.** (gebaut: die drei Punkte zur Erreichbarkeit und das Beispielprojekt `examples/studio/rechnungen/`)
    * Ein Beispielprojekt (etwa die Rechnungen aus `examples/196_rechnungen.dh`
      als Studio-Projekt).
    * Der Form-Designer 197 verweist auf das Studio.
    * Die IDE öffnet `.dhstudio` im Studio.
+   * Installer und Pakete nehmen `studio/` mit: Verknüpfung „Drachenhauch
+     Studio“, `.dhstudio` als Dateityp (Windows-Registrierung, Linux
+     MIME/.desktop, macOS Info.plist -- dort geht die Datei an die IDE und von
+     ihr ans Studio), `drachenhauch --studio`.
 
 **Geprüft wird je Stufe** mit einer Prüfsammlung `werkzeug_studio*.dhtest`.
 Die Klicks sind echt, über Aufnahmen und Fensternachrichten. Erzeugtes läuft

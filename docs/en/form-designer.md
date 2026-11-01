@@ -8,6 +8,11 @@ Drachenhauch program:
 (1,342 lines). The former Qt version (PySide6) was removed together with the
 Python part of the project.
 
+**Its successor is [Drachenhauch Studio](studio.md):** the same `.dhform`
+format, plus a project with code per event, starting, building and a
+debugger. Datei → Im Drachenhauch Studio öffnen (Ctrl+Shift+O) opens the
+saved form there; the designer stays for single forms.
+
 ## Starting
 
 - **From the IDE:** menu *Tools → Form designer* (or "Tool: form designer"

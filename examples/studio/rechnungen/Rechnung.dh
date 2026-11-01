@@ -1,0 +1,230 @@
+' Eine Rechnung samt Positionen, wie sie in der Datenbank steht -- laden,
+' rechnen, sichern und als PDF ausgeben. Die Fenster kennen nur diese Klasse,
+' nicht die Tabellen dahinter.
+CLASS Rechnung
+    ' -1, solange die Rechnung noch nicht gesichert ist.
+    DIM id AS INTEGER
+    DIM nummer AS STRING
+    DIM kunde AS INTEGER
+    DIM datum AS STRING
+    DIM texte AS ARRAY OF STRING
+    DIM mengen AS ARRAY OF INTEGER
+    DIM preise AS ARRAY OF INTEGER
+    DIM saetze AS ARRAY OF INTEGER
+    ' Warum das letzte Sichern nicht ging.
+    DIM fehler AS STRING
+
+    ' Eine neue, leere Rechnung mit der naechsten Nummer und dem Datum von heute.
+    SUB neu()
+        Self.leeren()
+        Self.id = -1
+        Self.nummer = naechsteNummer$()
+        Self.kunde = -1
+        Self.datum = DATE$()
+    END SUB
+
+    SUB leeren()
+        Self.texte = []
+        Self.mengen = []
+        Self.preise = []
+        Self.saetze = []
+    END SUB
+
+    FUNCTION laden(rid AS INTEGER) AS BOOLEAN
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT nummer, kunde, datum FROM rechnungen WHERE id = ?", rid)
+        IF NOT DB_NEXT(r) THEN RETURN FALSE
+        Self.leeren()
+        Self.id = rid
+        Self.nummer = DB_GET_STRING(r, 0)
+        Self.kunde = DB_GET_INT(r, 1)
+        Self.datum = DB_GET_STRING(r, 2)
+        DIM q AS DB_RESULT : q = DB_QUERY(db, "SELECT bezeichnung, menge, preis, mwst FROM positionen WHERE rechnung = ? ORDER BY id", rid)
+        WHILE DB_NEXT(q)
+            Self.anhaengen(DB_GET_STRING(q, 0), DB_GET_INT(q, 1), DB_GET_INT(q, 2), DB_GET_INT(q, 3))
+        WEND
+        RETURN TRUE
+    END FUNCTION
+
+    SUB anhaengen(text AS STRING, menge AS INTEGER, preis AS INTEGER, satz AS INTEGER)
+        ARRAY_PUSH(Self.texte, text)
+        ARRAY_PUSH(Self.mengen, menge)
+        ARRAY_PUSH(Self.preise, preis)
+        ARRAY_PUSH(Self.saetze, satz)
+    END SUB
+
+    ' Eine Position dazu; steht dieselbe zum selben Preis schon da, waechst
+    ' ihre Menge, statt dass sie zweimal auf der Rechnung steht.
+    SUB dazu(text AS STRING, menge AS INTEGER, preis AS INTEGER, satz AS INTEGER)
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(Self.texte) - 1
+            IF Self.texte[i] = text AND Self.preise[i] = preis AND Self.saetze[i] = satz THEN
+                Self.mengen[i] = Self.mengen[i] + menge
+                RETURN
+            END IF
+        NEXT
+        Self.anhaengen(text, menge, preis, satz)
+    END SUB
+
+    ' Einen Artikel aus der Datenbank als Position dazu.
+    FUNCTION artikelDazu(aid AS INTEGER, menge AS INTEGER) AS BOOLEAN
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT bezeichnung, preis, mwst FROM artikel WHERE id = ?", aid)
+        IF NOT DB_NEXT(r) THEN RETURN FALSE
+        Self.dazu(DB_GET_STRING(r, 0), menge, DB_GET_INT(r, 1), DB_GET_INT(r, 2))
+        RETURN TRUE
+    END FUNCTION
+
+    SUB entfernen(i AS INTEGER)
+        IF i < 0 OR i >= LEN(Self.texte) THEN RETURN
+        ARRAY_REMOVE_AT(Self.texte, i)
+        ARRAY_REMOVE_AT(Self.mengen, i)
+        ARRAY_REMOVE_AT(Self.preise, i)
+        ARRAY_REMOVE_AT(Self.saetze, i)
+    END SUB
+
+    FUNCTION anzahl() AS INTEGER
+        RETURN LEN(Self.texte)
+    END FUNCTION
+
+    ' Netto einer Position in Cent.
+    FUNCTION summe(i AS INTEGER) AS INTEGER
+        RETURN Self.mengen[i] * Self.preise[i]
+    END FUNCTION
+
+    ' Die Steuer einer Position, auf den Cent gerundet. Gerundet wird je
+    ' Position, nicht erst die Summe -- so steht es auf jeder Zeile richtig.
+    FUNCTION steuerVon(i AS INTEGER) AS INTEGER
+        RETURN (Self.summe(i) * Self.saetze[i] + 50) \ 100
+    END FUNCTION
+
+    FUNCTION netto() AS INTEGER
+        DIM s AS INTEGER : s = 0
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(Self.texte) - 1
+            s = s + Self.summe(i)
+        NEXT
+        RETURN s
+    END FUNCTION
+
+    FUNCTION steuer() AS INTEGER
+        DIM s AS INTEGER : s = 0
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(Self.texte) - 1
+            s = s + Self.steuerVon(i)
+        NEXT
+        RETURN s
+    END FUNCTION
+
+    FUNCTION brutto() AS INTEGER
+        RETURN Self.netto() + Self.steuer()
+    END FUNCTION
+
+    ' Schreibt Kopf und Positionen in EINER Transaktion: entweder steht die
+    ' ganze Rechnung in der Datenbank oder gar nichts von ihr.
+    FUNCTION speichern() AS BOOLEAN
+        DIM warNeu AS BOOLEAN : warNeu = Self.id < 0
+        DIM ok AS BOOLEAN : ok = TRUE
+        Self.fehler = ""
+        DB_BEGIN(db)
+        TRY
+            IF warNeu THEN
+                DB_EXEC(db, "INSERT INTO rechnungen (nummer, kunde, datum) VALUES (?, ?, ?)", Self.nummer, Self.kunde, Self.datum)
+                Self.id = DB_LAST_ROWID(db)
+            ELSE
+                DB_EXEC(db, "UPDATE rechnungen SET kunde = ?, datum = ? WHERE id = ?", Self.kunde, Self.datum, Self.id)
+                DB_EXEC(db, "DELETE FROM positionen WHERE rechnung = ?", Self.id)
+            END IF
+            DIM i AS INTEGER
+            FOR i = 0 TO LEN(Self.texte) - 1
+                DB_EXEC(db, "INSERT INTO positionen (rechnung, bezeichnung, menge, preis, mwst) VALUES (?, ?, ?, ?, ?)", Self.id, Self.texte[i], Self.mengen[i], Self.preise[i], Self.saetze[i])
+            NEXT
+            DB_COMMIT(db)
+        CATCH grund
+            DB_ROLLBACK(db)
+            IF warNeu THEN Self.id = -1
+            Self.fehler = grund
+            ok = FALSE
+        END TRY
+        RETURN ok
+    END FUNCTION
+
+    ' Die Rechnung als PDF auf A4.
+    SUB alsPdf(pfad AS STRING)
+        DIM p AS PDF : p = PDF_NEW("A4")
+        PDF_FONT(p, "sans", 8)
+        PDF_TEXT(p, 20, 20, "Beispiel GmbH · Musterweg 1 · 12345 Musterstadt")
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT name, strasse, plz, ort FROM kunden WHERE id = ?", Self.kunde)
+        PDF_FONT(p, "sans", 11)
+        IF DB_NEXT(r) THEN
+            PDF_TEXT(p, 20, 28, DB_GET_STRING(r, 0))
+            PDF_TEXT(p, 20, 34, DB_GET_STRING(r, 1))
+            PDF_TEXT(p, 20, 40, DB_GET_STRING(r, 2) + " " + DB_GET_STRING(r, 3))
+        END IF
+        PDF_FONT(p, "sans", 10)
+        pdfRechts(p, 190, 28, "Datum: " + datumDeutsch$(Self.datum))
+        pdfRechts(p, 190, 34, "Nummer: " + Self.nummer)
+        PDF_FONT(p, "sans-fett", 18)
+        PDF_TEXT(p, 20, 60, "Rechnung " + Self.nummer)
+        DIM y AS FLOAT : y = 78
+        Self.pdfKopf(p, y)
+        y = y + 8
+        PDF_FONT(p, "sans", 10)
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(Self.texte) - 1
+            IF y > 260 THEN
+                PDF_PAGE(p)
+                y = 20
+                Self.pdfKopf(p, y)
+                y = y + 8
+                PDF_FONT(p, "sans", 10)
+            END IF
+            PDF_TEXT(p, 20, y, STR$(i + 1))
+            PDF_TEXT(p, 30, y, Self.texte[i])
+            pdfRechts(p, 125, y, STR$(Self.mengen[i]))
+            pdfRechts(p, 152, y, EURO$(Self.preise[i]))
+            pdfRechts(p, 165, y, STR$(Self.saetze[i]) + " %")
+            pdfRechts(p, 190, y, EURO$(Self.summe(i)))
+            y = y + 7
+        NEXT
+        PDF_LINE(p, 120, y, 190, y)
+        y = y + 4
+        pdfRechts(p, 160, y, "Netto")
+        pdfRechts(p, 190, y, EURO$(Self.netto()))
+        ' Die Steuer je Satz -- so verlangt es eine Rechnung mit zwei Saetzen.
+        DIM gesehen AS ARRAY OF INTEGER : gesehen = []
+        FOR i = 0 TO LEN(Self.saetze) - 1
+            IF ARRAY_INDEXOF(gesehen, Self.saetze[i]) >= 0 THEN CONTINUE
+            ARRAY_PUSH(gesehen, Self.saetze[i])
+            y = y + 6
+            pdfRechts(p, 160, y, "MwSt " + STR$(Self.saetze[i]) + " %")
+            pdfRechts(p, 190, y, EURO$(Self.steuerSatz(Self.saetze[i])))
+        NEXT
+        y = y + 8
+        PDF_FONT(p, "sans-fett", 11)
+        pdfRechts(p, 160, y, "Gesamt")
+        pdfRechts(p, 190, y, EURO$(Self.brutto()))
+        PDF_FONT(p, "sans", 9)
+        PDF_TEXT(p, 20, y + 20, "Zahlbar innerhalb von 14 Tagen ohne Abzug. Vielen Dank für Ihren Auftrag.")
+        PDF_SAVE(p, pfad)
+    END SUB
+
+    SUB pdfKopf(p AS PDF, y AS FLOAT)
+        PDF_FONT(p, "sans-fett", 10)
+        PDF_TEXT(p, 20, y, "Pos.")
+        PDF_TEXT(p, 30, y, "Bezeichnung")
+        pdfRechts(p, 125, y, "Menge")
+        pdfRechts(p, 152, y, "Einzelpreis")
+        pdfRechts(p, 165, y, "MwSt")
+        pdfRechts(p, 190, y, "Summe")
+        PDF_LINE(p, 20, y + 6, 190, y + 6)
+    END SUB
+
+    ' Die Steuer aller Positionen mit diesem Satz.
+    FUNCTION steuerSatz(satz AS INTEGER) AS INTEGER
+        DIM s AS INTEGER : s = 0
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(Self.saetze) - 1
+            IF Self.saetze[i] = satz THEN s = s + Self.steuerVon(i)
+        NEXT
+        RETURN s
+    END FUNCTION
+END CLASS

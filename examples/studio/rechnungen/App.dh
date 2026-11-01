@@ -1,0 +1,13 @@
+' Das Programm als Ganzes: es oeffnet die Datenbank, bevor das erste Fenster
+' aufgeht, und schliesst sie am Ende.
+CLASS App EXTENDS StudioApp
+
+    SUB Geoeffnet()
+        GUI_THEME_PRESET("glas_hell")
+        dbOeffnen()
+    END SUB
+
+    SUB Beenden()
+        DB_CLOSE(db)
+    END SUB
+END CLASS

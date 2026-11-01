@@ -1,0 +1,103 @@
+' Die Kunden: links die Liste, rechts der gewaehlte. Die Felder sind an die
+' Spalten der Tabelle kunden gebunden (Inspektor: Bindung) -- Laden und
+' Sichern sind darum je EIN Aufruf.
+CLASS KundenFenster EXTENDS KundenFenster_Basis
+    DIM ids AS ARRAY OF INTEGER
+    ' Der Kunde in den Feldern, -1 = ein neuer.
+    DIM aktId AS INTEGER
+
+    SUB Geoeffnet()
+        Self.liste()
+        Self.neu()
+    END SUB
+
+    SUB liste()
+        GUI_TABLE_CLEAR(Self.tabelle)
+        Self.ids = []
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT id, name, ort FROM kunden ORDER BY name")
+        WHILE DB_NEXT(r)
+            ARRAY_PUSH(Self.ids, DB_GET_INT(r, 0))
+            GUI_TABLE_ADD_ROW(Self.tabelle, [DB_GET_STRING(r, 1), DB_GET_STRING(r, 2)])
+        WEND
+    END SUB
+
+    SUB datensatzZeigen(kid AS INTEGER)
+        IF GUI_FORM_LOAD(Self.Fenster(), db, "kunden", kid) THEN Self.aktId = kid
+        GUI_CLEAR_ERRORS(Self.Fenster())
+        GUI_SET_TEXT(Self.hinweis, "")
+        Self.markieren()
+    END SUB
+
+    SUB neu()
+        GUI_FORM_CLEAR(Self.Fenster())
+        GUI_CLEAR_ERRORS(Self.Fenster())
+        Self.aktId = -1
+        GUI_TABLE_CLEAR_SELECTION(Self.tabelle)
+        GUI_SET_TEXT(Self.hinweis, "Neuer Kunde.")
+        GUI_FOCUS(Self.feldName)
+    END SUB
+
+    ' Die Zeile des Kunden in den Feldern waehlen.
+    SUB markieren()
+        DIM z AS INTEGER : z = ARRAY_INDEXOF(Self.ids, Self.aktId)
+        IF z >= 0 THEN GUI_TABLE_SET_SELECTED(Self.tabelle, z) ELSE GUI_TABLE_CLEAR_SELECTION(Self.tabelle)
+    END SUB
+
+    FUNCTION sichern() AS BOOLEAN
+        IF GUI_VALIDATE(Self.Fenster()) > 0 THEN RETURN FALSE
+        DIM kid AS INTEGER : kid = GUI_FORM_SAVE(Self.Fenster(), db, "kunden", Self.aktId)
+        IF kid = 0 THEN
+            GUI_SET_TEXT(Self.hinweis, "Nicht gesichert.")
+            RETURN FALSE
+        END IF
+        Self.aktId = kid
+        Self.liste()
+        Self.markieren()
+        GUI_SET_TEXT(Self.hinweis, "Gesichert.")
+        RETURN TRUE
+    END FUNCTION
+
+    ' Ungesicherte Eingaben: fragen, statt sie wegzuwerfen.
+    FUNCTION darfWechseln() AS BOOLEAN
+        IF NOT GUI_FORM_CHANGED(Self.Fenster()) THEN RETURN TRUE
+        DIM a AS INTEGER : a = Frage("Die Änderungen am Kunden sind nicht gesichert.", "Sichern|Verwerfen|Abbrechen", "Kunde")
+        IF a = 1 THEN RETURN Self.sichern()
+        RETURN a = 2
+    END FUNCTION
+
+    SUB tabelle_Geaendert()
+        DIM z AS INTEGER : z = GUI_TABLE_SELECTED(Self.tabelle)
+        IF z < 0 OR z >= LEN(Self.ids) THEN RETURN
+        DIM ziel AS INTEGER : ziel = Self.ids[z]
+        IF ziel = Self.aktId THEN RETURN
+        IF Self.darfWechseln() THEN
+            Self.datensatzZeigen(ziel)
+        ELSE
+            Self.markieren()
+        END IF
+    END SUB
+
+    SUB knopfNeu_Klick()
+        IF Self.darfWechseln() THEN Self.neu()
+    END SUB
+
+    SUB knopfSichern_Klick()
+        Self.sichern()
+    END SUB
+
+    SUB knopfLoeschen_Klick()
+        IF Self.aktId < 0 THEN RETURN
+        IF dbZahlMit("SELECT COUNT(*) FROM rechnungen WHERE kunde = ?", Self.aktId) > 0 THEN
+            GUI_SET_TEXT(Self.hinweis, "Der Kunde hat Rechnungen und bleibt.")
+            RETURN
+        END IF
+        IF Frage("Den Kunden löschen?", "Löschen|Abbrechen", "Kunde") <> 1 THEN RETURN
+        DB_EXEC(db, "DELETE FROM kunden WHERE id = ?", Self.aktId)
+        Self.liste()
+        Self.neu()
+    END SUB
+
+    SUB knopfSchliessen_Klick()
+        IF Self.darfWechseln() THEN Self.Zumachen()
+    END SUB
+END CLASS

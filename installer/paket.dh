@@ -175,6 +175,12 @@ SUB inhaltKopieren(wurzel AS STRING, laufzeit AS STRING, bin AS STRING, res AS S
     ' Die englische Oberflaeche (ide/sprache/en.txt).
     PRINT "  sprache/  "; ordnerKopieren(PATHJOIN(wurzel, "ide/sprache"), PATHJOIN(res, "ide/sprache"), "*.txt", FALSE); " Dateien"
     PRINT "  docs/     "; ordnerKopieren(PATHJOIN(wurzel, "docs"), PATHJOIN(res, "docs"), "*.md", FALSE); " Dateien"
+    ' Das Drachenhauch Studio samt Stildatei (`drachenhauch --studio`).
+    IF DIREXISTS(PATHJOIN(wurzel, "studio")) THEN
+        DIM studioZahl AS INTEGER : studioZahl = ordnerKopieren(PATHJOIN(wurzel, "studio"), PATHJOIN(res, "studio"), "*.dh", FALSE)
+        studioZahl = studioZahl + ordnerKopieren(PATHJOIN(wurzel, "studio"), PATHJOIN(res, "studio"), "*.dhstil", FALSE)
+        PRINT "  studio/   "; studioZahl; " Dateien"
+    END IF
     PRINT "  examples/ "; ordnerKopieren(PATHJOIN(wurzel, "examples"), PATHJOIN(res, "examples"), "*", TRUE); " Dateien"
     ' Logo und Schriftzug -- die IDE sucht sie unter daten/bilder neben ide/.
     PRINT "  bilder/   "; ordnerKopieren(PATHJOIN(wurzel, "daten/bilder"), PATHJOIN(res, "daten/bilder"), "*.png", FALSE); " Dateien"

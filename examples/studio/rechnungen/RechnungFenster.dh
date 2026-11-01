@@ -1,0 +1,113 @@
+' Eine Rechnung anlegen oder aendern. Gerechnet wird in der Klasse Rechnung,
+' das Fenster zeigt nur und reicht die Eingaben weiter.
+CLASS RechnungFenster EXTENDS RechnungFenster_Basis
+    ' -1 = eine neue Rechnung; das Hauptfenster setzt es vor dem Zeigen.
+    DIM rechnungId AS INTEGER
+    ' TRUE, wenn das Fenster mit Sichern zuging.
+    DIM gespeichert AS BOOLEAN
+    DIM beleg AS Rechnung
+    DIM geaendert AS BOOLEAN
+    ' Je Eintrag der Klapplisten die id dahinter.
+    DIM kundenIds AS ARRAY OF INTEGER
+    DIM artikelIds AS ARRAY OF INTEGER
+
+    SUB Geoeffnet()
+        Self.beleg = NEW Rechnung()
+        IF Self.rechnungId < 0 OR NOT Self.beleg.laden(Self.rechnungId) THEN Self.beleg.neu()
+        GUI_WINDOW_TITLE(Self.Fenster(), "Rechnung " + Self.beleg.nummer)
+        Self.auswahlFuellen()
+        GUI_SET_TEXT(Self.anzeigeNummer, Self.beleg.nummer)
+        GUI_SET_TEXT(Self.feldDatum, Self.beleg.datum)
+        DIM k AS INTEGER : k = ARRAY_INDEXOF(Self.kundenIds, Self.beleg.kunde)
+        IF k >= 0 THEN GUI_DROPDOWN_SET_SELECTED(Self.auswahlKunde, k)
+        Self.anzeigen()
+        Self.geaendert = FALSE
+    END SUB
+
+    SUB auswahlFuellen()
+        DIM namen AS ARRAY OF STRING : namen = []
+        Self.kundenIds = []
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT id, name FROM kunden ORDER BY name")
+        WHILE DB_NEXT(r)
+            ARRAY_PUSH(Self.kundenIds, DB_GET_INT(r, 0))
+            ARRAY_PUSH(namen, DB_GET_STRING(r, 1))
+        WEND
+        GUI_SET_DROPDOWN(Self.auswahlKunde, namen)
+        DIM artikel AS ARRAY OF STRING : artikel = []
+        Self.artikelIds = []
+        DIM q AS DB_RESULT : q = DB_QUERY(db, "SELECT id, bezeichnung, preis FROM artikel ORDER BY bezeichnung")
+        WHILE DB_NEXT(q)
+            ARRAY_PUSH(Self.artikelIds, DB_GET_INT(q, 0))
+            ARRAY_PUSH(artikel, DB_GET_STRING(q, 1) + " -- " + EURO$(DB_GET_INT(q, 2)))
+        WEND
+        GUI_SET_DROPDOWN(Self.auswahlArtikel, artikel)
+        IF LEN(artikel) > 0 THEN GUI_DROPDOWN_SET_SELECTED(Self.auswahlArtikel, 0)
+    END SUB
+
+    ' Positionen und Summen neu zeigen.
+    SUB anzeigen()
+        GUI_TABLE_CLEAR(Self.tabellePositionen)
+        DIM i AS INTEGER
+        FOR i = 0 TO Self.beleg.anzahl() - 1
+            GUI_TABLE_ADD_ROW(Self.tabellePositionen, [Self.beleg.texte[i], STR$(Self.beleg.mengen[i]), EURO$(Self.beleg.preise[i]), STR$(Self.beleg.saetze[i]) + " %", EURO$(Self.beleg.summe(i))])
+        NEXT
+        GUI_SET_TEXT(Self.anzeigeNetto, EURO$(Self.beleg.netto()))
+        GUI_SET_TEXT(Self.anzeigeSteuer, EURO$(Self.beleg.steuer()))
+        GUI_SET_TEXT(Self.anzeigeBrutto, EURO$(Self.beleg.brutto()))
+        GUI_SET_ENABLED(Self.knopfEntfernen, Self.beleg.anzahl() > 0)
+    END SUB
+
+    SUB knopfDazu_Klick()
+        DIM k AS INTEGER : k = GUI_DROPDOWN_SELECTED(Self.auswahlArtikel)
+        IF k < 0 THEN
+            GUI_SET_TEXT(Self.hinweis, "Erst einen Artikel wählen.")
+            RETURN
+        END IF
+        Self.beleg.artikelDazu(Self.artikelIds[k], INT(GUI_VALUE(Self.feldMenge)))
+        GUI_SET_TEXT(Self.hinweis, "")
+        Self.geaendert = TRUE
+        Self.anzeigen()
+    END SUB
+
+    SUB knopfEntfernen_Klick()
+        DIM z AS INTEGER : z = GUI_TABLE_SELECTED(Self.tabellePositionen)
+        IF z < 0 THEN
+            GUI_SET_TEXT(Self.hinweis, "Erst eine Position in der Tabelle wählen.")
+            RETURN
+        END IF
+        Self.beleg.entfernen(z)
+        Self.geaendert = TRUE
+        Self.anzeigen()
+    END SUB
+
+    SUB auswahlKunde_Geaendert()
+        Self.geaendert = TRUE
+    END SUB
+
+    SUB feldDatum_Geaendert()
+        Self.geaendert = TRUE
+    END SUB
+
+    SUB knopfSichern_Klick()
+        IF GUI_VALIDATE(Self.Fenster()) > 0 THEN RETURN
+        IF Self.beleg.anzahl() = 0 THEN
+            GUI_SET_TEXT(Self.hinweis, "Eine Rechnung braucht mindestens eine Position.")
+            RETURN
+        END IF
+        Self.beleg.kunde = Self.kundenIds[GUI_DROPDOWN_SELECTED(Self.auswahlKunde)]
+        Self.beleg.datum = GUI_TEXT(Self.feldDatum)
+        IF NOT Self.beleg.speichern() THEN
+            GUI_SET_TEXT(Self.hinweis, "Nicht gesichert: " + Self.beleg.fehler)
+            RETURN
+        END IF
+        Self.gespeichert = TRUE
+        Self.Zumachen()
+    END SUB
+
+    SUB knopfAbbrechen_Klick()
+        IF Self.geaendert THEN
+            IF Frage("Die Rechnung ist nicht gesichert.", "Verwerfen|Zurück", "Abbrechen") <> 1 THEN RETURN
+        END IF
+        Self.Zumachen()
+    END SUB
+END CLASS

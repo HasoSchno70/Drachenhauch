@@ -1,0 +1,146 @@
+' Die Liste aller Rechnungen. Von hier gehen Neu/Bearbeiten (RechnungFenster)
+' und die Stammdaten (KundenFenster, ArtikelFenster) auf.
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    ' Je Tabellenzeile die id der Rechnung. Sortieren und Filtern stellen nur
+    ' die Ansicht um, die Datenzeilen bleiben, wie sie kamen.
+    DIM ids AS ARRAY OF INTEGER
+
+    SUB Geoeffnet()
+        Self.liste()
+    END SUB
+
+    SUB liste()
+        GUI_TABLE_CLEAR(Self.tabelle)
+        Self.ids = []
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT id FROM rechnungen ORDER BY nummer DESC")
+        WHILE DB_NEXT(r)
+            ARRAY_PUSH(Self.ids, DB_GET_INT(r, 0))
+        WEND
+        DIM beleg AS Rechnung : beleg = NEW Rechnung()
+        DIM gesamt AS INTEGER : gesamt = 0
+        DIM rid AS INTEGER
+        FOR EACH rid IN Self.ids
+            beleg.laden(rid)
+            GUI_TABLE_ADD_ROW(Self.tabelle, [beleg.nummer, datumDeutsch$(beleg.datum), kundeName$(beleg.kunde), EURO$(beleg.brutto())])
+            gesamt = gesamt + beleg.brutto()
+        NEXT
+        DIM wort AS STRING : wort = IIF(LEN(Self.ids) = 1, " Rechnung", " Rechnungen")
+        GUI_SET_TEXT(Self.status, STR$(LEN(Self.ids)) + wort + ", zusammen " + EURO$(gesamt) + " brutto.")
+        Self.knoepfe()
+    END SUB
+
+    ' Die id der gewaehlten Rechnung, -1 = keine.
+    FUNCTION gewaehlt() AS INTEGER
+        DIM z AS INTEGER : z = GUI_TABLE_SELECTED(Self.tabelle)
+        IF z < 0 OR z >= LEN(Self.ids) THEN RETURN -1
+        RETURN Self.ids[z]
+    END FUNCTION
+
+    ' Was eine gewaehlte Rechnung braucht, geht nur mit einer.
+    SUB knoepfe()
+        DIM da AS BOOLEAN : da = Self.gewaehlt() >= 0
+        GUI_SET_ENABLED(Self.knopfBearbeiten, da)
+        GUI_SET_ENABLED(Self.knopfPdf, da)
+        GUI_SET_ENABLED(Self.knopfLoeschen, da)
+    END SUB
+
+    ' Oeffnet die Rechnung (-1 = eine neue) und wartet, bis das Fenster zu ist.
+    SUB bearbeiten(rid AS INTEGER)
+        DIM f AS RechnungFenster : f = NEW RechnungFenster()
+        f.rechnungId = rid
+        f.ZeigenModal()
+        IF NOT f.gespeichert THEN RETURN
+        Self.liste()
+        DIM z AS INTEGER : z = ARRAY_INDEXOF(Self.ids, f.beleg.id)
+        IF z >= 0 THEN GUI_TABLE_SET_SELECTED(Self.tabelle, z)
+        Self.knoepfe()
+        GUI_SET_TEXT(Self.status, "Rechnung " + f.beleg.nummer + " gesichert.")
+    END SUB
+
+    SUB loeschen()
+        DIM rid AS INTEGER : rid = Self.gewaehlt()
+        IF rid < 0 THEN RETURN
+        DIM beleg AS Rechnung : beleg = NEW Rechnung()
+        IF NOT beleg.laden(rid) THEN RETURN
+        IF Frage("Rechnung " + beleg.nummer + " (" + EURO$(beleg.brutto()) + ") löschen?", "Löschen|Abbrechen", "Löschen") <> 1 THEN RETURN
+        DB_BEGIN(db)
+        DB_EXEC(db, "DELETE FROM positionen WHERE rechnung = ?", rid)
+        DB_EXEC(db, "DELETE FROM rechnungen WHERE id = ?", rid)
+        DB_COMMIT(db)
+        Self.liste()
+        GUI_SET_TEXT(Self.status, "Rechnung " + beleg.nummer + " gelöscht.")
+    END SUB
+
+    SUB pdfAusgeben()
+        DIM rid AS INTEGER : rid = Self.gewaehlt()
+        IF rid < 0 THEN RETURN
+        DIM beleg AS Rechnung : beleg = NEW Rechnung()
+        IF NOT beleg.laden(rid) THEN RETURN
+        DIM pfad AS STRING : pfad = PATHJOIN(CWD$(), "Rechnung-" + beleg.nummer + ".pdf")
+        beleg.alsPdf(pfad)
+        GUI_SET_TEXT(Self.status, pfad + " geschrieben.")
+        IF Frage(pfad + " ist geschrieben.", "Öffnen|Schließen", "PDF") = 1 THEN OPENDOC(pfad)
+    END SUB
+
+    SUB knopfNeu_Klick()
+        Self.bearbeiten(-1)
+    END SUB
+
+    SUB knopfBearbeiten_Klick()
+        IF Self.gewaehlt() >= 0 THEN Self.bearbeiten(Self.gewaehlt())
+    END SUB
+
+    SUB knopfPdf_Klick()
+        Self.pdfAusgeben()
+    END SUB
+
+    SUB knopfLoeschen_Klick()
+        Self.loeschen()
+    END SUB
+
+    SUB tabelle_Geaendert()
+        Self.knoepfe()
+    END SUB
+
+    ' Doppelklick oder Enter auf eine Zeile oeffnet sie.
+    SUB tabelle_Doppelklick()
+        Self.knopfBearbeiten_Klick()
+    END SUB
+
+    SUB miNeu_Aktion()
+        Self.bearbeiten(-1)
+    END SUB
+
+    SUB miBearbeiten_Aktion()
+        Self.knopfBearbeiten_Klick()
+    END SUB
+
+    SUB miPdf_Aktion()
+        Self.pdfAusgeben()
+    END SUB
+
+    SUB miCsv_Aktion()
+        DIM pfad AS STRING : pfad = PATHJOIN(CWD$(), "rechnungen.csv")
+        DIM n AS INTEGER : n = csvExport(pfad)
+        Meldung(STR$(n) + " Rechnungen nach " + pfad + " geschrieben.", "CSV")
+    END SUB
+
+    SUB miBeenden_Aktion()
+        Self.Zumachen()
+    END SUB
+
+    SUB miKunden_Aktion()
+        DIM f AS KundenFenster : f = NEW KundenFenster()
+        f.ZeigenModal()
+        Self.liste()
+    END SUB
+
+    SUB miArtikel_Aktion()
+        DIM f AS ArtikelFenster : f = NEW ArtikelFenster()
+        f.ZeigenModal()
+    END SUB
+
+    SUB miUeber_Aktion()
+        Meldung("Rechnungen -- ein Beispielprojekt für das Drachenhauch Studio: vier Fenster, eine Klasse, zwei Module, SQLite, PDF und CSV.", "Über")
+    END SUB
+END CLASS
