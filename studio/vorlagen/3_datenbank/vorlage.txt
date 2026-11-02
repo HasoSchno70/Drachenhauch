@@ -1,0 +1,2 @@
+Adressbuch mit Datenbank
+Eine SQLite-Datei neben dem Programm, links die Tabelle mit Filterzeile, rechts die Felder -- an die Spalten gebunden, Laden und Sichern sind je ein Aufruf.

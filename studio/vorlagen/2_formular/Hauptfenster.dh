@@ -1,0 +1,26 @@
+' Ein Formular: die Felder stehen untereinander in einer Spalte (Layout), OK
+' und Abbrechen in einer Zeile mit einem Abstandhalter davor -- so bleiben
+' die Knoepfe rechts, wenn das Fenster waechst. Die Pruefregeln (Pflichtfeld,
+' E-Mail) stehen in Hauptfenster.dhform unter "rules".
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+
+    SUB Geoeffnet()
+        GUI_FOCUS(Self.feldName)
+    END SUB
+
+    SUB knopfOk_Klick()
+        ' Erst pruefen: ein falsches Feld bekommt einen roten Rahmen und den Fokus.
+        IF GUI_VALIDATE(Self.Fenster()) > 0 THEN
+            GUI_SET_TEXT(Self.hinweis, "Bitte die markierten Felder ansehen.")
+            RETURN
+        END IF
+        GUI_SET_TEXT(Self.hinweis, "")
+        DIM text AS STRING : text = "Hallo " + GUI_TEXT(Self.feldName) + ", " + STR$(INT(GUI_VALUE(Self.feldAlter))) + " Jahre"
+        IF GUI_CHECKED(Self.kaestchenNews) THEN text = text + " -- der Newsletter geht an " + GUI_TEXT(Self.feldMail)
+        Meldung(text + ".", "Eingaben")
+    END SUB
+
+    SUB knopfAbbrechen_Klick()
+        Self.Zumachen()
+    END SUB
+END CLASS

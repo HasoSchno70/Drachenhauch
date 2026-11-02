@@ -108,9 +108,45 @@ SUB projektAnfangen(ordner AS STRING)
     alleReiterZu()
     projektNeu(ordner)
     nachLaden()
+    unberuehrt()
     status(IIF(ordner = "", "Neues Projekt. Bausteine aus der Bibliothek ins Fenster ziehen.", "Neues Projekt in " + ordner + "."))
     protokoll("neu-fenster")
     protokoll("neues projekt " + projName)
+END SUB
+
+' Ein neues Projekt, an dem noch niemand etwas getan hat, ist nicht
+' "geaendert": Neu, Oeffnen und Beenden fragen dann nicht -- es geht nichts
+' verloren. Gesichert wird trotzdem alles (projektSchreiben schreibt jedes
+' Element), und F5 sichert, solange es keinen Ordner hat.
+SUB unberuehrt()
+    projGeaendert = FALSE
+    geaendert = FALSE
+    DIM e AS Element
+    FOR EACH e IN elemente
+        e.geaendert = FALSE
+    NEXT
+    werkzeugeNachziehen()
+END SUB
+
+' Ein neues Projekt aus einer Vorlage: geladen wie ein Projekt, aber ohne
+' Ordner -- die Vorlage selbst wird nie ueberschrieben, Sichern fragt.
+SUB projektAusVorlage(ordner AS STRING, titel AS STRING)
+    alleReiterZu()
+    DIM fehler AS STRING : fehler = projektLaden$(ordner)
+    IF fehler <> "" THEN
+        status("Die Vorlage geht nicht auf: " + fehler)
+        projektAnfangen("")
+        RETURN
+    END IF
+    projOrdner = ""
+    DIM e AS Element
+    FOR EACH e IN elemente
+        e.gesichertAls = ""
+    NEXT
+    nachLaden()
+    unberuehrt()
+    status("Neues Projekt aus der Vorlage " + CHR$(34) + titel + CHR$(34) + ". F5 startet es; Sichern fragt nach einem Ordner.")
+    protokoll("neues projekt aus vorlage " + BASENAME(ordner))
 END SUB
 
 ' Ein einzelnes .dhform ohne Projekt (so arbeitete Stufe 1). Sobald etwas
@@ -235,7 +271,9 @@ FUNCTION sichern(alsNeu AS BOOLEAN) AS BOOLEAN
         RETURN TRUE
     END IF
     IF projOrdner = "" OR alsNeu THEN
-        DIM o AS STRING : o = FOLDER_DIALOG("Ordner für das Projekt")
+        ' Fuer Pruefungen: DH_STUDIO_ORDNER statt des Dialogs.
+        DIM o AS STRING : o = GETENV$("DH_STUDIO_ORDNER")
+        IF o = "" THEN o = FOLDER_DIALOG("Ordner für das Projekt")
         IF o = "" THEN RETURN FALSE
         projOrdner = o
         projName = BASENAME(o)
@@ -268,7 +306,7 @@ DIM beenden AS BOOLEAN : beenden = FALSE
 
 SUB ausfuehren(was AS STRING)
     SELECT CASE was
-        CASE "neu" : projektAnfangen("")
+        CASE "neu" : vorlageDialog()
         CASE "oeffnen"
             DIM p AS STRING : p = FILE_OPEN_DIALOG("Projekt oder Fenster öffnen", "dhstudio,dhform")
             IF p <> "" THEN

@@ -1,0 +1,60 @@
+' Eine Zeichenflaeche und ein Timer: der Timer bewegt den Ball, das Ereignis
+' Zeichnen malt ihn (jedes Bild), Ziehen auf der Flaeche setzt ihn dorthin.
+' Gezeichnet wird in Bildschirmlage -- GUI_CANVAS_X/Y sagen, wo die Flaeche
+' liegt, und sie waechst mit dem Fenster.
+CONST RADIUS = 12
+
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    DIM vx AS FLOAT
+    DIM vy AS FLOAT
+    DIM abpraller AS INTEGER
+
+    SUB Geoeffnet()
+        Self.x = 100.0
+        Self.y = 80.0
+        Self.vx = 3.0
+        Self.vy = 2.2
+    END SUB
+
+    SUB takt_Aktion()
+        DIM b AS INTEGER : b = GUI_CANVAS_W(Self.flaeche)
+        DIM h AS INTEGER : h = GUI_CANVAS_H(Self.flaeche)
+        Self.x = Self.x + Self.vx
+        Self.y = Self.y + Self.vy
+        IF Self.x < RADIUS OR Self.x > b - RADIUS THEN
+            Self.vx = -Self.vx
+            Self.abpraller = Self.abpraller + 1
+        END IF
+        IF Self.y < RADIUS OR Self.y > h - RADIUS THEN
+            Self.vy = -Self.vy
+            Self.abpraller = Self.abpraller + 1
+        END IF
+        Self.x = CLAMP(Self.x, RADIUS, MAX(RADIUS, b - RADIUS))
+        Self.y = CLAMP(Self.y, RADIUS, MAX(RADIUS, h - RADIUS))
+        GUI_SET_TEXT(Self.anzeige, "Abpraller: " + STR$(Self.abpraller))
+    END SUB
+
+    SUB flaeche_Zeichnen()
+        DIM ox AS INTEGER : ox = GUI_CANVAS_X(Self.flaeche)
+        DIM oy AS INTEGER : oy = GUI_CANVAS_Y(Self.flaeche)
+        BOX(ox, oy, ox + GUI_CANVAS_W(Self.flaeche) - 1, oy + GUI_CANVAS_H(Self.flaeche) - 1, RGB(22, 28, 42))
+        CIRCLE(ox + INT(Self.x), oy + INT(Self.y), RADIUS, RGB(255, 170, 40))
+    END SUB
+
+    SUB flaeche_Ziehen(x AS INTEGER, y AS INTEGER)
+        Self.x = x
+        Self.y = y
+    END SUB
+
+    SUB knopfStart_Klick()
+        IF Self.takt.Aktiv THEN
+            Self.takt.Stoppen()
+            GUI_SET_TEXT(Self.knopfStart, "Weiter")
+        ELSE
+            Self.takt.Starten()
+            GUI_SET_TEXT(Self.knopfStart, "Anhalten")
+        END IF
+    END SUB
+END CLASS

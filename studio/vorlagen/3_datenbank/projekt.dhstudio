@@ -1,0 +1,24 @@
+{
+  "format": "drachenhauch-studio",
+  "fassung": 1,
+  "name": "Adressbuch",
+  "start": "Hauptfenster",
+  "elemente": [
+    {
+      "art": "app",
+      "name": "App",
+      "code": "App.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Datenbank",
+      "code": "Datenbank.dh"
+    },
+    {
+      "art": "fenster",
+      "name": "Hauptfenster",
+      "code": "Hauptfenster.dh",
+      "layout": "Hauptfenster.dhform"
+    }
+  ]
+}
