@@ -85,7 +85,7 @@ Details in the [manual](docs/en/README.md); how it got there is in the
 
 ## Download
 
-**[Download Drachenhauch](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — for Windows a single installer (about 58 MB), for macOS a `.dmg`, for Linux a `.tar.gz`; currently version 2026.40.
+**[Download Drachenhauch](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — for Windows a single installer (about 58 MB), for macOS a `.dmg`, for Linux a `.tar.gz`; currently version 2026.41.
 
 You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 226 examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. The Windows installer is unsigned, so SmartScreen will speak up on first launch; the macOS app is not notarised yet.
 
@@ -131,7 +131,7 @@ Full documentation lives in [docs/en/](docs/en/README.md) — the English transl
 - **[Performance](docs/PERFORMANCE.md)** (German) — benchmark numbers + optimizations shipped (spec ops, inline caches, typed arrays, ECS bulk ops, …)
 - **Modules** — 48 of them, [table below](#modules)
 - **[IDE](docs/en/ide.md)** — the development environment, written in Drachenhauch itself: tabs, project tree, completion, help on the word, snippets, multi-cursor, folding, split view, project-wide refactorings, **debugger** (incl. conditional breakpoints), **profiler**, git blame/diff, manual in a window, welcome page with an example gallery
-- **[Drachenhauch Studio](docs/en/studio.md)** (`studio/studio.dh`) — GUI applications in the style of Xojo: window designer with alignment guides, inspector, navigator, code per event, menus, timers, images, dialogs, start/build/debug; example project `examples/studio/rechnungen/`
+- **[Drachenhauch Studio](docs/en/studio.md)** (`studio/studio.dh`) — GUI applications in the style of Xojo: window designer with alignment guides, inspector, navigator, code per event, layout containers, menus, timers, images, dialogs, project templates, start/build/debug; example project `examples/studio/rechnungen/`
 - **Tools** — all written in Drachenhauch, in the IDE under *Tools* or directly with `dhrt run examples/<file>`:
   - **[Sprite editor](docs/en/sprite-editor.md)** (`189_sprite_editor.dh`) — pixel art with frames, layers, lasso/magic wand/move, GIF with a duration per frame, atlas export for `ATLAS_LOAD`, DH code, `.dhanim` template
   - **[Particle editor](docs/en/particle-editor.md)** (`185_partikel_editor.dh`) — emitter sliders with a live preview, factory presets, your own settings as `.ini`, DH code
