@@ -1,0 +1,194 @@
+' Ein Drehfeld (GUI_SPINNER) nimmt getippte Zahlen -- bis 2026.40 kannte es
+' nur die Pfeile und seine zwei Knoepfe. Mit dem Fokus ist sein Text ganz
+' markiert, das erste Getippte ersetzt ihn. Eine Zahl im Bereich gilt schon
+' beim Tippen; beim Verlassen (Enter, Fokus weg) wird geklemmt, ESC holt den
+' Wert von vorher zurueck. Getippt wird ueber die Zwischenablage (Strg+V):
+' eine Aufnahme liefert Tasten, aber keine Zeichen. Format: docs/werkzeuge.md.
+
+--- langsam
+=== getippt ersetzt den wert, schon vor dem enter
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM sp AS GUI_WIDGET
+sp = GUI_SPINNER(w, 10, 10, 120, 0, 100, 5, 1)
+GUI_FOCUS(sp)
+CLIPBOARD_SET("42")
+DIM f AS INTEGER
+FOR f = 1 TO 14
+    GUI_UPDATE()
+    ' GUI_CHANGED beobachtet ab dem ersten Aufruf -- darum in jedem Bild.
+    IF GUI_CHANGED(sp) THEN PRINT f; " geaendert "; GUI_VALUE(sp)
+    IF f = 12 THEN PRINT f; " "; GUI_VALUE(sp)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 6
+e 3 2 341 0 0 0
+e 3 2 86 0 0 0
+e 4 1 86 0 0 0
+e 4 1 341 0 0 0
+e 8 2 257 0 0 0
+e 9 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+2 geaendert 42.0
+12 42.0
+
+=== zu gross wird beim enter auf den rand geklemmt
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM sp AS GUI_WIDGET
+sp = GUI_SPINNER(w, 10, 10, 120, 0, 100, 5, 1)
+GUI_FOCUS(sp)
+CLIPBOARD_SET("250")
+DIM f AS INTEGER
+FOR f = 1 TO 14
+    GUI_UPDATE()
+    IF f = 6 OR f = 12 THEN PRINT f; " "; GUI_VALUE(sp)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 6
+e 3 2 341 0 0 0
+e 3 2 86 0 0 0
+e 4 1 86 0 0 0
+e 4 1 341 0 0 0
+e 8 2 257 0 0 0
+e 9 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+6 5.0
+12 100.0
+
+=== buchstaben fallen weg, der fokus woanders uebernimmt
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM sp AS GUI_WIDGET
+sp = GUI_SPINNER(w, 10, 10, 120, -50, 50, 5, 1)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 60, 200, 26)
+GUI_FOCUS(sp)
+CLIPBOARD_SET("ab-70x")
+DIM f AS INTEGER
+FOR f = 1 TO 14
+    GUI_UPDATE()
+    IF f = 6 THEN PRINT f; " "; GUI_VALUE(sp)
+    IF f = 8 THEN GUI_FOCUS(tf)
+    IF f = 12 THEN PRINT f; " "; GUI_VALUE(sp)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 3 2 341 0 0 0
+e 3 2 86 0 0 0
+e 4 1 86 0 0 0
+e 4 1 341 0 0 0
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+6 5.0
+12 -50.0
+
+=== esc holt den wert von vorher zurueck
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM sp AS GUI_WIDGET
+sp = GUI_SPINNER(w, 10, 10, 120, 0, 100, 5, 1)
+DIM ab AS GUI_WIDGET
+ab = GUI_BUTTON(w, "Abbrechen", 10, 60, 100, 26)
+GUI_WINDOW_CANCEL(w, ab)
+GUI_FOCUS(sp)
+CLIPBOARD_SET("33")
+DIM f AS INTEGER
+FOR f = 1 TO 14
+    GUI_UPDATE()
+    IF GUI_CLICKED(ab) THEN PRINT f; " abbrechen gedrueckt"
+    IF f = 6 OR f = 12 THEN PRINT f; " "; GUI_VALUE(sp)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 6
+e 3 2 341 0 0 0
+e 3 2 86 0 0 0
+e 4 1 86 0 0 0
+e 4 1 341 0 0 0
+e 8 2 256 0 0 0
+e 9 1 256 0 0 0
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+6 33.0
+12 5.0
+
+=== komma wie punkt, ganzzahlig bleibt ganz
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM komma AS GUI_WIDGET
+komma = GUI_SPINNER(w, 10, 10, 120, 0, 10, 1, 0.5)
+DIM ganz AS GUI_WIDGET
+ganz = GUI_SPINNER(w, 10, 50, 120, 0, 10, 1, 1)
+GUI_FOCUS(komma)
+CLIPBOARD_SET("2,5")
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF f = 7 THEN
+        PRINT GUI_VALUE(komma)
+        GUI_FOCUS(ganz)
+        CLIPBOARD_SET("7,6")
+    END IF
+    IF f = 16 THEN PRINT GUI_VALUE(ganz)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 8
+e 3 2 341 0 0 0
+e 3 2 86 0 0 0
+e 4 1 86 0 0 0
+e 4 1 341 0 0 0
+e 10 2 341 0 0 0
+e 10 2 86 0 0 0
+e 11 1 86 0 0 0
+e 11 1 341 0 0 0
+
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+2.5
+8.0

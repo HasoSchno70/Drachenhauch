@@ -3508,6 +3508,13 @@ pub struct Gui {
     /// gehoert die Taste nicht mehr dem Standard-/Abbrechen-Knopf, obwohl
     /// die Liste danach nicht mehr bearbeitet wird.
     liste_taste: bool,
+    /// Ein Drehfeld, in das gerade getippt wird: (Fenster, Widget, Zeichen,
+    /// Schreibmarke, Anker, der Wert, zu dem der Text zuletzt passte, der Wert
+    /// vor dem Tippen). Der Wert gilt schon, wenn der Text eine Zahl im Bereich
+    /// ist; ganz uebernommen (geklemmt) wird beim Verlassen, ESC holt den Wert
+    /// von vorher zurueck. Weicht der Wert ab -- Pfeil, Rad, GUI_SET_VALUE --,
+    /// wird der Text neu aus ihm gebaut.
+    spin_edit: Option<(usize, usize, Vec<char>, i32, i32, f64, f64)>,
     open_menu: Option<(usize, usize)>,       // offenes Menueleisten-Dropdown (win, menu)
     context_open: Option<(usize, usize, i32, i32)>,  // Kontextmenue (win, menu, x, y)
     /// Das Widget (Fenster, Index), dessen gebundenes Kontextmenue IN
@@ -3662,7 +3669,7 @@ impl Gui {
             skins: HashMap::new(),
             active_slider: None,
             active_knob: None, active_split: None, split_off: 0,
-            open_dropdown: None, dd_auf_t: 0.0, dd_auf_von: None, dd_mark: -1, dd_pfeil: false, dd_scroll: 0, dd_tipp: String::new(), dd_tipp_zeit: 0.0, schirm_h: 0, schirm_b: 0, listbar_zug: None, tabar_zug: None, liste_taste: false, active_table: None, table_press: None, press_origin: None,
+            open_dropdown: None, dd_auf_t: 0.0, dd_auf_von: None, dd_mark: -1, dd_pfeil: false, dd_scroll: 0, dd_tipp: String::new(), dd_tipp_zeit: 0.0, schirm_h: 0, schirm_b: 0, listbar_zug: None, tabar_zug: None, liste_taste: false, spin_edit: None, active_table: None, table_press: None, press_origin: None,
             drag: None, drop: None, cursors: true,
             editing_table: None, last_click: None, dbl_click: false,
             open_menu: None, context_open: None, kontext_neu: None, rs_menue: None, sub_chain: Vec::new(), tasten_mod: (false, false),
@@ -13607,6 +13614,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // tippte man in ein Textfeld, waehrend das Menue aufsteht.
         let menue_hat_tasten = self.menue_tasten(g) || self.rs_tasten(g);
         if !menue_hat_tasten {
+        // Ein Drehfeld, in das getippt wurde, gibt den Fokus ab: der Text gilt.
+        if let Some((ewi, ei, ..)) = self.spin_edit {
+            if self.focus_widget != Some((ewi, ei)) { self.spin_fertig(); }
+        }
         // Tastatur + Maus fuer das fokussierte Textfeld (Caret/Selektion/Editieren).
         if let Some((wi, i)) = self.focus_widget {
             let frei_dd = self.windows[wi].widgets[i].frei;
@@ -15980,8 +15991,111 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
     /// Tastatur am fokussierten Spinner: Pfeil hoch/runter aendert den Wert.
     fn spinner_keys(&mut self, wi: usize, i: usize, g: &mut Graphics) {
-        if g.key_pressed(KEY_UP) { self.spinner_step(wi, i, 1); }
-        if g.key_pressed(KEY_DOWN) { self.spinner_step(wi, i, -1); }
+        if !self.windows[wi].widgets[i].enabled { return; }
+        let wert = self.windows[wi].widgets[i].value;
+        // Neu oder von aussen geaendert: der Text aus dem Wert, ganz markiert --
+        // das erste Getippte ersetzt ihn.
+        let neu = match &self.spin_edit {
+            Some((ewi, ei, _, _, _, w, _)) => (*ewi, *ei) != (wi, i) || *w != wert,
+            None => true,
+        };
+        if neu {
+            if let Some((ewi, ei, ..)) = self.spin_edit { if (ewi, ei) != (wi, i) { self.spin_fertig(); } }
+            let chars: Vec<char> = Self::fmt_num(wert).chars().collect();
+            let n = chars.len() as i32;
+            self.spin_edit = Some((wi, i, chars, n, 0, wert, wert));
+        }
+        if g.key_pressed(KEY_UP) || g.key_pressed(KEY_DOWN) {
+            self.spin_fertig();
+            self.spinner_step(wi, i, if g.key_pressed(KEY_UP) { 1 } else { -1 });
+            return;
+        }
+        if g.key_pressed(KEY_ENTER) {
+            // Uebernehmen und weiter markiert; Enter darf danach noch den
+            // Standard-Knopf druecken, wie aus einem Textfeld.
+            self.spin_fertig();
+            return;
+        }
+        let (mut chars, mut caret, mut anker, vorher_wert) = {
+            let e = self.spin_edit.as_ref().unwrap();
+            (e.2.clone(), e.3, e.4, e.6)
+        };
+        if g.key_pressed(KEY_ESC) {
+            // Getipptes verwerfen, der Wert von vorher gilt wieder -- dann
+            // gehoert ESC nicht dem Abbrechen-Knopf.
+            let alt: Vec<char> = Self::fmt_num(vorher_wert).chars().collect();
+            if alt != chars || wert != vorher_wert { self.liste_taste = true; }
+            if wert != vorher_wert {
+                let w = &mut self.windows[wi].widgets[i];
+                w.value = vorher_wert;
+                let f = w.on_change.clone();
+                if let Some(f) = f { self.pending.push(f); }
+            }
+            let n = alt.len() as i32;
+            self.spin_edit = Some((wi, i, alt, n, 0, vorher_wert, vorher_wert));
+            return;
+        }
+        let vorher = chars.clone();
+        Self::einzeiler_tasten(g, &mut chars, &mut caret, &mut anker, g.key_ctrl(), g.key_shift(), self.kuerzel_gefeuert);
+        // Nur was in eine Zahl gehoert; die Marken rutschen mit.
+        let erlaubt = |c: char| c.is_ascii_digit() || matches!(c, '-' | '+' | '.' | ',');
+        let mut sauber = Vec::with_capacity(chars.len());
+        let (mut nc, mut na) = (caret, anker);
+        for (k, c) in chars.iter().enumerate() {
+            if erlaubt(*c) { sauber.push(*c); }
+            else {
+                if (k as i32) < caret { nc -= 1; }
+                if (k as i32) < anker { na -= 1; }
+            }
+        }
+        let n = sauber.len() as i32;
+        let (caret, anker) = (nc.clamp(0, n), na.clamp(0, n));
+        let mut neu_wert = wert;
+        if sauber != vorher {
+            // Gilt schon beim Tippen, wenn es eine Zahl im Bereich ist -- so
+            // folgt das Programm (GUI_CHANGED, on_change) jedem Anschlag.
+            if let Some(v) = Self::spin_zahl(&sauber) {
+                let w = &self.windows[wi].widgets[i];
+                let v = Self::spin_runden(w, v);
+                if v >= w.min && v <= w.max && v != w.value {
+                    let w = &mut self.windows[wi].widgets[i];
+                    w.value = v;
+                    neu_wert = v;
+                    let f = w.on_change.clone();
+                    if let Some(f) = f { self.pending.push(f); }
+                }
+            }
+        }
+        self.spin_edit = Some((wi, i, sauber, caret, anker, neu_wert, vorher_wert));
+    }
+
+    /// Der getippte Text als Zahl (Komma wie Punkt), sonst nichts.
+    fn spin_zahl(chars: &[char]) -> Option<f64> {
+        let t: String = chars.iter().collect::<String>().replace(',', ".");
+        let t = t.trim();
+        if t.is_empty() || t == "-" || t == "+" || t == "." { return None; }
+        t.parse::<f64>().ok().filter(|v| v.is_finite())
+    }
+
+    /// Ein ganzzahliges Drehfeld (Schritt und Untergrenze ganz) bleibt ganz.
+    fn spin_runden(w: &Widget, v: f64) -> f64 {
+        if w.step.fract() == 0.0 && w.min.fract() == 0.0 { v.round() } else { v }
+    }
+
+    /// Das Tippen beenden: eine Zahl gilt, geklemmt auf den Bereich; was keine
+    /// ist, faellt weg und der alte Wert bleibt.
+    fn spin_fertig(&mut self) {
+        let Some((wi, i, chars, ..)) = self.spin_edit.take() else { return };
+        if wi >= self.windows.len() || i >= self.windows[wi].widgets.len() { return; }
+        let Some(v) = Self::spin_zahl(&chars) else { return };
+        let w = &mut self.windows[wi].widgets[i];
+        if w.kind != Kind::Spinner { return; }
+        let v = Self::spin_runden(w, v.clamp(w.min, w.max));
+        if v != w.value {
+            w.value = v;
+            let f = w.on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+        }
     }
 
     /// Farbe aus einer Mausposition setzen. `cp_drag` merkt, ob die Geste im
@@ -20592,9 +20706,29 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 // Trennlinien vor und in der Buttonspalte.
                 g.line(bx, ay + 1, bx, ay + h - 2, bordc);
                 g.line(bx, ay + h / 2, ax + w - 1, ay + h / 2, bordc);
-                // Zahlenwert links (auf das Feldinnere geclippt).
+                // Zahlenwert links (auf das Feldinnere geclippt) -- oder, solange
+                // getippt wird, der Text samt Auswahl und Schreibmarke.
                 g.push_clip(ax + 2, ay + 1, (bx - ax - 3).max(0), (h - 2).max(0));
-                self.wtext(g, wdg, ax + pad, ay + (h - self.wsize(g, wdg)).max(0) / 2, Self::fmt_num(wdg.value), self.txt_col(wdg));
+                let ty = ay + (h - self.wsize(g, wdg)).max(0) / 2;
+                let tipp = match &self.spin_edit {
+                    Some((ewi, ei, chars, c, a, _, _)) if (*ewi, *ei) == (wi, idx) && focused => Some((chars.clone(), *c, *a)),
+                    _ => None,
+                };
+                if let Some((chars, c, a)) = tipp {
+                    let text: String = chars.iter().collect();
+                    let (lo, hi) = (c.min(a), c.max(a));
+                    let bis = |n: i32| -> String { chars.iter().take(n.max(0) as usize).collect() };
+                    let (x_lo, x_hi) = (self.wtext_width(g, wdg, &bis(lo)), self.wtext_width(g, wdg, &bis(hi)));
+                    if lo != hi {
+                        g.box_fill(ax + pad + x_lo, ay + 3, ax + pad + x_hi, ay + h - 4, self.selection_bg(wdg));
+                    }
+                    self.wtext(g, wdg, ax + pad, ty, text, self.txt_col(wdg));
+                    if lo == hi && self.caret_blink_on() {
+                        g.line(ax + pad + x_lo, ay + 4, ax + pad + x_lo, ay + h - 5, self.txt_col(wdg));
+                    }
+                } else {
+                    self.wtext(g, wdg, ax + pad, ty, Self::fmt_num(wdg.value), self.txt_col(wdg));
+                }
                 g.pop_clip();
                 // Hover-Highlight + Pfeil-Dreiecke der beiden Schaltflaechen.
                 let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
