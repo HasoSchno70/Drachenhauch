@@ -177,7 +177,7 @@ IMPORT "gui"
 | `GUI_WINDOW_CANCEL(win, knopf)` | — | Abbrechen-Knopf: ESC löst ihn aus (-1 = keiner) |
 | `GUI_CHECKBOX(win, label$, x, y[, default])` | GUI_WIDGET | Toggle |
 | `GUI_SLIDER(win, x, y, w, min, max[, default])` | GUI_WIDGET | Wert-Schieber |
-| `GUI_SPINNER(win, x, y, w, min, max[, default[, step]])` | GUI_WIDGET | Zahlenfeld mit +/- (Klick/Mausrad/Pfeiltasten; Wert via `GUI_VALUE`) |
+| `GUI_SPINNER(win, x, y, w, min, max[, default[, step]])` | GUI_WIDGET | Zahlenfeld mit +/- (Klick/Mausrad/Pfeiltasten; Wert via `GUI_VALUE`). Mit dem Fokus nimmt es auch getippte Zahlen (Komma wie Punkt): das erste Getippte ersetzt den markierten Wert, eine Zahl im Bereich gilt schon beim Tippen, Enter oder Fokus woanders klemmt auf min/max (meldet `GUI_ENTERED`), ESC holt den Wert von vorher zurück; ganzzahlig bleibt ganz |
 | `GUI_SPLITTER(win, x, y, length, orient$, min, max)` | GUI_WIDGET | verschiebbare Trennlinie (`"v"`/`"h"`); Position via `GUI_VALUE` |
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | Container (Deko) |
 | `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | einzeiliges Eingabefeld (Caret + Selektion, Strg+Z/Y); der Platzhalter steht gedaempft da, bis getippt wird -- auch mit Fokus |

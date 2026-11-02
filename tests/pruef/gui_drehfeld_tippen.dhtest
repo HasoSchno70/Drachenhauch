@@ -22,6 +22,8 @@ FOR f = 1 TO 14
     GUI_UPDATE()
     ' GUI_CHANGED beobachtet ab dem ersten Aufruf -- darum in jedem Bild.
     IF GUI_CHANGED(sp) THEN PRINT f; " geaendert "; GUI_VALUE(sp)
+    ' Enter meldet sich wie beim Textfeld.
+    IF GUI_ENTERED(sp) THEN PRINT f; " enter"
     IF f = 12 THEN PRINT f; " "; GUI_VALUE(sp)
     GUI_DRAW()
     FLIP()
@@ -40,6 +42,7 @@ e 9 1 257 0 0 0
 DHRT_FRAMES=16
 --- erwartet
 2 geaendert 42.0
+7 enter
 12 42.0
 
 === zu gross wird beim enter auf den rand geklemmt

@@ -846,7 +846,7 @@
   "GUI_SLIDER_SET": "marken (so viele gleichmäßig verteilte, 0 oder 2..101), wert_zeigen, einrasten (an den Marken), stellen (Nachkommastellen der Anzeige)",
   "GUI_SPELL": "Textfeld oder Textbereich mit diesem Wörterbuch prüfen, -1 schaltet ab",
   "GUI_SPELL_COUNT": "Wie viele Wörter gerade als falsch markiert sind",
-  "GUI_SPINNER": "GUI_WIDGET — Zahlenfeld mit +/- (Klick/Mausrad/Pfeiltasten; Wert via GUI_VALUE)",
+  "GUI_SPINNER": "GUI_WIDGET — Zahlenfeld mit +/- (Klick/Mausrad/Pfeiltasten; Wert via GUI_VALUE). Mit dem Fokus nimmt es auch getippte Zahlen (Komma wie Punkt): das erste Getippte ersetzt den markierten Wert, eine Zahl im Bereich gilt schon beim Tippen, Enter oder Fokus woanders klemmt auf min/max (meldet GUI_ENTERED), ESC holt den Wert von vorher zurück; ganzzahlig bleibt ganz",
   "GUI_SPLITTER": "GUI_WIDGET — verschiebbare Trennlinie (\"v\"/\"h\"); Position via GUI_VALUE",
   "GUI_STATUSBAR": "GUI_WIDGET — Statusleiste; text$ ist das erste Feld",
   "GUI_STATUSBAR_ADD": "INTEGER — Feld anhängen: breite in Punkten, 0 = teilt sich den Rest; links/mitte/rechts. Passt ein Text nicht, endet er mit ...",

@@ -846,7 +846,7 @@
   "GUI_SLIDER_SET": "marken (that many evenly spaced marks, 0 or 2..101), wert_zeigen (show value), einrasten (snap to the marks), stellen (decimal places of the display)",
   "GUI_SPELL": "Check a text field or text area with this dictionary, -1 turns it off",
   "GUI_SPELL_COUNT": "How many words are currently marked as misspelled",
-  "GUI_SPINNER": "GUI_WIDGET — number field with +/- (click/mouse wheel/arrow keys; value via GUI_VALUE)",
+  "GUI_SPINNER": "GUI_WIDGET — number field with +/- (click/mouse wheel/arrow keys; value via GUI_VALUE). With the focus it also takes typed numbers (comma like point): the first keystroke replaces the selected value, a number within the range applies while typing, Enter or moving the focus clamps to min/max (Enter reports GUI_ENTERED), Esc brings back the earlier value; an integer field stays integer",
   "GUI_SPLITTER": "GUI_WIDGET — movable divider (\"v\"/\"h\"); position via GUI_VALUE",
   "GUI_STATUSBAR": "GUI_WIDGET — status bar; text$ is the first field",
   "GUI_STATUSBAR_ADD": "INTEGER — append a field: breite (width) in points, 0 = shares the rest; links/mitte/rechts (left/centre/right). A text that does not fit ends in ...",

@@ -16012,8 +16012,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         if g.key_pressed(KEY_ENTER) {
             // Uebernehmen und weiter markiert; Enter darf danach noch den
-            // Standard-Knopf druecken, wie aus einem Textfeld.
+            // Standard-Knopf druecken, und GUI_ENTERED meldet es wie beim
+            // Textfeld.
             self.spin_fertig();
+            self.windows[wi].widgets[i].entered = true;
             return;
         }
         let (mut chars, mut caret, mut anker, vorher_wert) = {

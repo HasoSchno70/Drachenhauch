@@ -224,6 +224,7 @@ line map that brings errors to their method.
 | drag a frame over empty space | selects everything entirely inside |
 | drag a control | moves the whole selection |
 | drag one of the eight handles | changes the size |
+| drag the right or bottom edge or the corner of the window | changes the size of the window; anchored controls move along (likewise when you type the width or height in the inspector) |
 | arrow keys | move by one pixel, with Shift by the grid (8) |
 | Del | deletes the selection |
 | Ctrl+D | duplicates |
