@@ -47,7 +47,8 @@ FOR EACH d IN ["projekt.dhstudio", "App.dh", "Datenbank.dh", "Hauptfenster.dh", 
     PRINT d; " "; FILEEXISTS(CWD$() + "/neu/" + d)
 NEXT
 ' Die Vorlage bleibt, wie sie ist: kein _studio, keine Datenbank darin.
-PRINT "vorlage unberuehrt "; NOT DIREXISTS(ARG$(0) + "/../vorlagen/3_datenbank/_studio")
+DIM vlDb AS STRING : vlDb = PATHJOIN(DIRNAME(ARG$(0)), "vorlagen/3_datenbank")
+PRINT "vorlage unberuehrt "; FILEEXISTS(PATHJOIN(vlDb, "projekt.dhstudio")) AND NOT DIREXISTS(PATHJOIN(vlDb, "_studio"))
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
 {sammlung}/../../studio/studio.dh
@@ -72,7 +73,7 @@ vorlage unberuehrt TRUE
 ' Programm endet sauber, der erzeugte Code meldet nichts.
 IMPORT "laeufer.dh"
 SETENV("DH_STUDIO_LAUF_BILDER", "30")
-DIM quelle AS STRING : quelle = ARG$(0) + "/../vorlagen"
+DIM quelle AS STRING : quelle = PATHJOIN(DIRNAME(ARG$(0)), "vorlagen")
 slHin(10, 10)
 slWarten(10)
 slTaste(294)
