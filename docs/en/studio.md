@@ -58,8 +58,16 @@ meinprojekt/
   .gitignore            _studio/ (dort erzeugt Stufe 3 den Startcode)
 ```
 
-A new project has the App and a window `Hauptfenster`. Save (Ctrl+S) writes
-all files; a project never saved asks for a folder. A renamed element takes
+A new project has the App and a window `Hauptfenster`. New project
+(Ctrl+Shift+N) asks what to start with: **Leer** (empty), **Formular mit
+Eingaben** (form: fields in a column, OK and Cancel at the bottom right,
+validation rules), **Adressbuch mit Datenbank** (address book: SQLite, table
+with filter row, fields bound to the columns) or **Zeichenfläche mit Timer**
+(canvas with a bouncing ball). Every template is a finished project that runs
+straight away with F5; the templates are project folders under
+`studio/vorlagen/` and are never overwritten. A project nobody has touched yet
+does not ask again on the next New or Open. Save (Ctrl+S) writes all files; a
+project never saved asks for a folder. A renamed element takes
 its old files along, a deleted one disappears with the next save.
 
 | Action | effect |

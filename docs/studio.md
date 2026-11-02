@@ -59,9 +59,16 @@ meinprojekt/
   .gitignore            _studio/ (dort erzeugt Stufe 3 den Startcode)
 ```
 
-Ein neues Projekt hat die App und ein Fenster `Hauptfenster`. Sichern
-(Strg+S) schreibt alle Dateien; ein noch nie gesichertes Projekt fragt nach
-einem Ordner. Ein umbenanntes Element nimmt seine alten Dateien mit, ein
+Ein neues Projekt hat die App und ein Fenster `Hauptfenster`. Neues Projekt
+(Strg+Umschalt+N) fragt, womit es anfangen soll: **Leer**, **Formular mit
+Eingaben** (Felder in einer Spalte, OK und Abbrechen rechts unten,
+Prüfregeln), **Adressbuch mit Datenbank** (SQLite, Tabelle mit Filterzeile,
+an die Spalten gebundene Felder) oder **Zeichenfläche mit Timer** (ein Ball,
+der abprallt). Jede Vorlage ist ein fertiges Projekt, das gleich mit F5
+läuft; die Vorlagen liegen als Projektordner unter `studio/vorlagen/` und
+werden nie überschrieben. Ein Projekt, an dem noch nichts getan ist, fragt
+beim nächsten Neu oder Öffnen nicht nach. Sichern (Strg+S) schreibt alle
+Dateien; ein noch nie gesichertes Projekt fragt nach einem Ordner. Ein umbenanntes Element nimmt seine alten Dateien mit, ein
 gelöschtes verschwindet beim nächsten Sichern.
 
 | Handgriff | wirkt so |
