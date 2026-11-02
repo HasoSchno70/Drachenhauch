@@ -21,7 +21,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 # ZIP (ZIP_*). Pure-Rust (Deflate ueber flate2/miniz_oxide, das ueber ureq
 # ohnehin schon in der Lockfile steht) -- keine C-Toolchain. default-features
 # aus: sonst kaemen bzip2/zstd/AES mit, die niemand angefragt hat.
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }
 # regex-Modul (REGEX_*). Pure-Rust, klein -> immer dabei (kein Feature-Gate).
 regex = "1"
 # Rechtschreibung (SPELL_*): Hunspell-Woerterbuecher, reines Rust.

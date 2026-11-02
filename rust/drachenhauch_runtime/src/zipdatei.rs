@@ -64,7 +64,8 @@ pub fn liste(archiv: &Path) -> Result<Vec<String>, String> {
     let mut raus = Vec::with_capacity(zip.len());
     for i in 0..zip.len() {
         let e = zip.by_index(i).map_err(|e| format!("Eintrag {}: {}", i, e))?;
-        raus.push(e.name().to_string());
+        let name = e.name().map_err(|x| format!("Eintrag {}: kein lesbarer Name: {}", i, x))?;
+        raus.push(name.to_string());
     }
     Ok(raus)
 }
@@ -94,7 +95,12 @@ pub fn entpacke(archiv: &Path, ziel: &Path) -> Result<i64, String> {
     let mut anzahl = 0i64;
     for i in 0..zip.len() {
         let mut e = zip.by_index(i).map_err(|e| format!("Eintrag {}: {}", i, e))?;
-        let name = e.name().to_string();
+        // Ein Name, den zip nicht lesen kann, wird wie ein unsicherer
+        // behandelt: uebersprungen, nicht geraten.
+        let name = match e.name() {
+            Ok(n) => n.to_string(),
+            Err(_) => continue,
+        };
         let pfad = match sicherer_name(&ziel, &name) {
             Some(p) => p,
             None => continue,        // Zip-Slip: ueberspringen, nicht schreiben
