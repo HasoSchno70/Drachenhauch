@@ -1,0 +1,2 @@
+Formular mit Eingaben
+Felder untereinander in einer Spalte, OK und Abbrechen rechts unten, Prüfregeln für Pflichtfeld und E-Mail. Wächst mit dem Fenster.

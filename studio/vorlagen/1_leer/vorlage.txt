@@ -1,0 +1,2 @@
+Leer
+Die App und ein leeres Fenster -- Bausteine aus der Bibliothek hineinziehen.

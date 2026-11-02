@@ -1,0 +1,17 @@
+' Die Datenbank: eine SQLite-Datei neben dem Programm. Werte gehen immer
+' ueber ? an die Abfrage, nie in den SQL-Text -- so kann eine Eingabe nie
+' zum Befehl werden.
+IMPORT "db"
+CONST DB_DATEI = "adressen.db"
+DIM db AS DB_CONN
+
+' Oeffnet die Datei und legt beim ersten Start die Tabelle und zwei Eintraege an.
+SUB dbOeffnen()
+    db = DB_OPEN(DB_DATEI)
+    DB_EXEC(db, "CREATE TABLE IF NOT EXISTS adressen (id INTEGER PRIMARY KEY, name TEXT NOT NULL, telefon TEXT, email TEXT)")
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT COUNT(*) FROM adressen")
+    IF NOT DB_NEXT(r) THEN RETURN
+    IF DB_GET_INT(r, 0) > 0 THEN RETURN
+    DB_EXEC(db, "INSERT INTO adressen (name, telefon, email) VALUES (?, ?, ?)", "Erika Mustermann", "0221 123456", "erika@beispiel.de")
+    DB_EXEC(db, "INSERT INTO adressen (name, telefon, email) VALUES (?, ?, ?)", "Max Muster", "089 987654", "max@beispiel.de")
+END SUB

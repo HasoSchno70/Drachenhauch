@@ -1,0 +1,116 @@
+' Drachenhauch Studio: neues Projekt aus einer Vorlage (studio/vorlagen/).
+' Strg+Umschalt+N oeffnet die Auswahl; das Projekt daraus ist nicht gesichert,
+' Sichern (und F5) fragt nach einem Ordner -- in Pruefungen DH_STUDIO_ORDNER.
+' Die Vorlage selbst wird nie beschrieben.
+
+--- langsam
+=== aus der vorlage adressbuch: anlegen, starten, sichern
+IMPORT "laeufer.dh"
+SETENV("DH_STUDIO_ORDNER", CWD$() + "/neu")
+SETENV("DH_STUDIO_LAUF_BILDER", "30")
+MKDIR(CWD$() + "/neu")
+' Erster Lauf: nur die Auswahl oeffnen und die Lagen der Zeilen messen.
+DIM m AS STRING : m = CWD$() + "/m.log"
+slHin(10, 10)
+slWarten(6)
+slMit([341, 340], 78)
+slWarten(12)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(m, CWD$() + "/ev.txt", slBild + 10, "")
+DIM vx AS INTEGER
+DIM vy AS INTEGER
+(vx, vy) = slLage(m, "vorlage Adressbuch mit Datenbank")
+PRINT "vier vorlagen "; slHat(m, "vorlagendialog Leer,Formular mit Eingaben,Adressbuch mit Datenbank,Zeichenfläche mit Timer")
+' Zweiter Lauf: Zeile doppelt anklicken, dann F5.
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(6)
+slMit([341, 340], 78)
+slWarten(12)
+slHin(vx, vy)
+slHin(vx, vy)
+slRunter()
+slHoch()
+slRunter()
+slHoch()
+slWarten(10)
+slTaste(294)
+slWarten(160)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, "")
+PRINT "aus vorlage "; slHat(log, "neues projekt aus vorlage 3_datenbank")
+PRINT "gesichert "; LEN(slAnfang(log, "gesichert ")) > 0
+PRINT "beendet "; slHat(log, "beendet 0")
+DIM d AS STRING
+FOR EACH d IN ["projekt.dhstudio", "App.dh", "Datenbank.dh", "Hauptfenster.dh", "Hauptfenster.dhform", "_studio/main.dh"]
+    PRINT d; " "; FILEEXISTS(CWD$() + "/neu/" + d)
+NEXT
+' Die Vorlage bleibt, wie sie ist: kein _studio, keine Datenbank darin.
+PRINT "vorlage unberuehrt "; NOT DIREXISTS(ARG$(0) + "/../vorlagen/3_datenbank/_studio")
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+vier vorlagen TRUE
+aus vorlage TRUE
+gesichert TRUE
+beendet TRUE
+projekt.dhstudio TRUE
+App.dh TRUE
+Datenbank.dh TRUE
+Hauptfenster.dh TRUE
+Hauptfenster.dhform TRUE
+_studio/main.dh TRUE
+vorlage unberuehrt TRUE
+
+=== jede vorlage uebersetzt und laeuft
+' Jede Vorlage kopiert, im Studio geoeffnet, F5: geprueft ohne Fehler, das
+' Programm endet sauber, der erzeugte Code meldet nichts.
+IMPORT "laeufer.dh"
+SETENV("DH_STUDIO_LAUF_BILDER", "30")
+DIM quelle AS STRING : quelle = ARG$(0) + "/../vorlagen"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(160)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM v AS STRING
+FOR EACH v IN ["1_leer", "2_formular", "3_datenbank", "4_zeichnen"]
+    DIM ziel AS STRING : ziel = CWD$() + "/" + v
+    MKDIR(ziel)
+    DIM f AS STRING
+    FOR EACH f IN DIRLIST(quelle + "/" + v)
+        COPYFILE(quelle + "/" + v + "/" + f, ziel + "/" + f)
+    NEXT
+    DIM log AS STRING : log = CWD$() + "/" + v + ".log"
+    DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, ziel)
+    DIM c AS INTEGER : c = PROCESS_START("dhrt", "--check", ziel + "/_studio/main.dh")
+    DIM cz AS STRING : cz = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM ct AS STRING : ct = PROCESS_READ$(c)
+        IF ct <> "" THEN
+            cz = cz + TRIM$(REPLACE$(ct, CHR$(13), ""))
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(c) THEN
+            leer = leer + 1
+            SLEEP(30)
+        END IF
+    WEND
+    PRINT v; " geprueft "; slHat(log, "geprueft 0 0"); " beendet "; slHat(log, "beendet 0"); " check "; cz
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+NEXT
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+1_leer geprueft TRUE beendet TRUE check []
+2_formular geprueft TRUE beendet TRUE check []
+3_datenbank geprueft TRUE beendet TRUE check []
+4_zeichnen geprueft TRUE beendet TRUE check []

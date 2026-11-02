@@ -1,0 +1,2 @@
+Zeichenfläche mit Timer
+Ein Timer bewegt einen Ball, das Ereignis Zeichnen malt ihn, ein Klick auf die Fläche setzt ihn um. Der Anfang für kleine Spiele und Animationen.

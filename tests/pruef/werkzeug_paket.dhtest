@@ -43,6 +43,7 @@ PRINT "ordner "; DIREXISTS(d)
 PRINT "dhrt ist die genannte laufzeit "; (BUFFER_TO_STRING$(READALL_BYTES(d + "/dhrt")) = "ATTRAPPE")
 PRINT "ide "; FILEEXISTS(d + "/ide/ide.dh")
 PRINT "studio "; FILEEXISTS(d + "/studio/studio.dh"); " "; FILEEXISTS(d + "/studio/laufzeit.dh"); " "; FILEEXISTS(d + "/studio/studio.dhstil")
+PRINT "vorlagen "; FILEEXISTS(d + "/studio/vorlagen/3_datenbank/projekt.dhstudio"); " "; FILEEXISTS(d + "/studio/vorlagen/4_zeichnen/Hauptfenster.dhform")
 PRINT "handbuch "; (LEN(DIRLIST(d + "/docs", "*.md")) > 50)
 PRINT "beispiele "; FILEEXISTS(d + "/examples/183_sfx_generator.dh"); " "; FILEEXISTS(d + "/examples/01_hello.dh")
 PRINT "unterordner der beispiele "; FILEEXISTS(d + "/examples/assets/editor_tileset.png")
@@ -66,6 +67,7 @@ ordner TRUE
 dhrt ist die genannte laufzeit TRUE
 ide TRUE
 studio TRUE TRUE TRUE
+vorlagen TRUE TRUE
 handbuch TRUE
 beispiele TRUE TRUE
 unterordner der beispiele TRUE
