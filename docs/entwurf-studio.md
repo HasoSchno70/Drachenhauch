@@ -206,6 +206,12 @@ Klammern schließen, Einrückung. `ide/ide.dh` wird nicht eingebunden: das sind
      MIME/.desktop, macOS Info.plist -- dort geht die Datei an die IDE und von
      ihr ans Studio), `drachenhauch --studio`.
 
+Nach den fünf Stufen kamen mit 2026.41 dazu: Layout-Behälter im Entwurf
+(Zeile, Spalte, Raster; Kinder hineinlegen, umsetzen, herausnehmen, auch
+mehrere auf einmal), der Abstandhalter, das entworfene Fenster am Griff
+größer ziehen (Anker gehen mit) und Projektvorlagen unter
+`studio/vorlagen/`. Offen ist die englische Oberfläche.
+
 **Geprüft wird je Stufe** mit einer Prüfsammlung `werkzeug_studio*.dhtest`.
 Die Klicks sind echt, über Aufnahmen und Fensternachrichten. Erzeugtes läuft
 durch `dhrt --check` und wird gestartet. Gegenproben mit gezielten
