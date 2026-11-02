@@ -3319,8 +3319,9 @@ FUNCTION vfaKontrast(f AS INTEGER, grund AS INTEGER) AS FLOAT
     RETURN (hi + 0.05) / (lo + 0.05)
 END FUNCTION
 
-' Die haeufigste deckende Farbe eines Widgets -- sein Grund
-SUB vfaGrund(name AS STRING, w AS INTEGER, rolle AS STRING)
+' Die haeufigste deckende Farbe eines Widgets -- sein Grund ("" = noch
+' nichts gezeichnet).
+FUNCTION vfaGrundFarbe$(w AS INTEGER) AS STRING
     DIM f AS INTEGER : f = vfaBild(w)
     DIM d AS BUFFER : d = v20Daten(f)
     DIM zahl AS MAP OF INTEGER
@@ -3336,6 +3337,11 @@ SUB vfaGrund(name AS STRING, w AS INTEGER, rolle AS STRING)
         END IF
     NEXT
     cairo_surface_destroy(f)
+    RETURN best
+END FUNCTION
+
+SUB vfaGrund(name AS STRING, w AS INTEGER, rolle AS STRING)
+    DIM best AS STRING : best = vfaGrundFarbe$(w)
     DIM soll AS STRING : soll = LOWER$(RIGHT$("00000" + HEX$(vfaRolle(rolle)), 6))
     PRINT "  "; name; ": "; best; " "; IIF(best = soll, "wie " + rolle, "NICHT " + rolle + " (" + soll + ")")
 END SUB
@@ -3379,7 +3385,10 @@ FUNCTION vorfuehrenFarben(daten AS INTEGER) AS BOOLEAN
             gtk_menu_popup_at_widget(vfaMenue, fenster, GDK_SCHWERE_OBEN_LINKS, GDK_SCHWERE_OBEN_LINKS, 0)
         CASE 3, 7
             ' unter Last ist das Menue einen Takt spaeter noch nicht ausgelegt
-            IF gtk_widget_get_allocated_width(vfaMenue) <= 1 AND vfaWarte < 30 THEN
+            ' oder ausgelegt, aber noch ohne Bild
+            DIM fertig AS BOOLEAN : fertig = gtk_widget_get_allocated_width(vfaMenue) > 1
+            IF fertig THEN fertig = vfaGrundFarbe$(vfaMenue) <> ""
+            IF NOT fertig AND vfaWarte < 30 THEN
                 vfaWarte = vfaWarte + 1
                 schritt = schritt - 1
                 RETURN TRUE
@@ -3391,7 +3400,9 @@ FUNCTION vorfuehrenFarben(daten AS INTEGER) AS BOOLEAN
             gtk_widget_destroy(vfaMenue)
             gtk_popover_popup(musterPopover)
         CASE 4, 8
-            IF gtk_widget_get_allocated_width(musterPopover) <= 1 AND vfaWarte < 30 THEN
+            DIM pfertig AS BOOLEAN : pfertig = gtk_widget_get_allocated_width(musterPopover) > 1
+            IF pfertig THEN pfertig = vfaGrundFarbe$(musterPopover) <> ""
+            IF NOT pfertig AND vfaWarte < 30 THEN
                 vfaWarte = vfaWarte + 1
                 schritt = schritt - 1
                 RETURN TRUE
