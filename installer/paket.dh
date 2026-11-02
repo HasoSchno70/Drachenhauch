@@ -179,6 +179,8 @@ SUB inhaltKopieren(wurzel AS STRING, laufzeit AS STRING, bin AS STRING, res AS S
     IF DIREXISTS(PATHJOIN(wurzel, "studio")) THEN
         DIM studioZahl AS INTEGER : studioZahl = ordnerKopieren(PATHJOIN(wurzel, "studio"), PATHJOIN(res, "studio"), "*.dh", FALSE)
         studioZahl = studioZahl + ordnerKopieren(PATHJOIN(wurzel, "studio"), PATHJOIN(res, "studio"), "*.dhstil", FALSE)
+        ' die Projektvorlagen (Neues Projekt), samt Unterordnern
+        IF DIREXISTS(PATHJOIN(wurzel, "studio/vorlagen")) THEN studioZahl = studioZahl + ordnerKopieren(PATHJOIN(wurzel, "studio/vorlagen"), PATHJOIN(res, "studio/vorlagen"), "*", TRUE)
         PRINT "  studio/   "; studioZahl; " Dateien"
     END IF
     PRINT "  examples/ "; ordnerKopieren(PATHJOIN(wurzel, "examples"), PATHJOIN(res, "examples"), "*", TRUE); " Dateien"

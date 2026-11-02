@@ -1,0 +1,196 @@
+{
+  "title": "Formular",
+  "name": "Hauptfenster",
+  "x": 0,
+  "y": 0,
+  "w": 460,
+  "h": 330,
+  "movable": true,
+  "closable": true,
+  "visible": true,
+  "resizable": true,
+  "min_w": 360,
+  "min_h": 330,
+  "default_button": 9,
+  "cancel_button": 10,
+  "widgets": [
+    {
+      "kind": "label",
+      "name": "beschriftungName",
+      "text": "Name",
+      "x": 0,
+      "y": 0,
+      "w": 100,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "feldName",
+      "text": "",
+      "placeholder": "Vor- und Nachname",
+      "x": 0,
+      "y": 0,
+      "w": 200,
+      "h": 28,
+      "rules": [
+        {
+          "art": "pflicht",
+          "meldung": "Bitte einen Namen eintragen."
+        }
+      ]
+    },
+    {
+      "kind": "label",
+      "name": "beschriftungMail",
+      "text": "E-Mail",
+      "x": 0,
+      "y": 0,
+      "w": 100,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "feldMail",
+      "text": "",
+      "placeholder": "name@beispiel.de",
+      "x": 0,
+      "y": 0,
+      "w": 200,
+      "h": 28,
+      "rules": [
+        {
+          "art": "email",
+          "meldung": "Das ist keine E-Mail-Adresse."
+        }
+      ]
+    },
+    {
+      "kind": "label",
+      "name": "beschriftungAlter",
+      "text": "Alter",
+      "x": 0,
+      "y": 0,
+      "w": 100,
+      "h": 16
+    },
+    {
+      "kind": "spinner",
+      "name": "feldAlter",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 28,
+      "min": 0,
+      "max": 130,
+      "value": 30
+    },
+    {
+      "kind": "checkbox",
+      "name": "kaestchenNews",
+      "text": "Newsletter abonnieren",
+      "x": 0,
+      "y": 0,
+      "w": 200,
+      "h": 20
+    },
+    {
+      "kind": "layout",
+      "name": "spalteFelder",
+      "x": 20,
+      "y": 20,
+      "w": 420,
+      "h": 200,
+      "layout": {
+        "art": "spalte",
+        "kinder": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            0
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            5,
+            0
+          ],
+          [
+            6,
+            0
+          ]
+        ],
+        "abstand": 6
+      },
+      "anchor": "lrt"
+    },
+    {
+      "kind": "label",
+      "name": "hinweis",
+      "text": "",
+      "x": 20,
+      "y": 232,
+      "w": 420,
+      "h": 20,
+      "anchor": "lrt"
+    },
+    {
+      "kind": "button",
+      "name": "knopfOk",
+      "text": "OK",
+      "x": 0,
+      "y": 0,
+      "w": 112,
+      "h": 30,
+      "variant": "primaer"
+    },
+    {
+      "kind": "button",
+      "name": "knopfAbbrechen",
+      "text": "Abbrechen",
+      "x": 0,
+      "y": 0,
+      "w": 112,
+      "h": 30
+    },
+    {
+      "kind": "layout",
+      "name": "zeileKnoepfe",
+      "x": 20,
+      "y": 278,
+      "w": 420,
+      "h": 32,
+      "layout": {
+        "art": "zeile",
+        "kinder": [
+          [
+            -1,
+            1
+          ],
+          [
+            9,
+            0
+          ],
+          [
+            10,
+            0
+          ]
+        ],
+        "abstand": 6
+      },
+      "anchor": "lrb"
+    }
+  ]
+}

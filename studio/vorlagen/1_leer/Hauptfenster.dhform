@@ -1,0 +1,13 @@
+{
+  "title": "Hauptfenster",
+  "name": "Hauptfenster",
+  "x": 0,
+  "y": 0,
+  "w": 600,
+  "h": 400,
+  "movable": true,
+  "closable": true,
+  "visible": true,
+  "resizable": true,
+  "widgets": []
+}

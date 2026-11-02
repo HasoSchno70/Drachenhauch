@@ -1,0 +1,241 @@
+{
+  "title": "Adressbuch",
+  "name": "Hauptfenster",
+  "x": 0,
+  "y": 0,
+  "w": 760,
+  "h": 440,
+  "movable": true,
+  "closable": true,
+  "visible": true,
+  "resizable": true,
+  "min_w": 600,
+  "min_h": 360,
+  "widgets": [
+    {
+      "kind": "table",
+      "name": "tabelle",
+      "x": 0,
+      "y": 0,
+      "w": 400,
+      "h": 400,
+      "table": {
+        "headers": [
+          "Name",
+          "Telefon"
+        ],
+        "rows": [],
+        "filter_row": true
+      }
+    },
+    {
+      "kind": "label",
+      "name": "beschriftungName",
+      "text": "Name",
+      "x": 0,
+      "y": 0,
+      "w": 100,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "feldName",
+      "text": "",
+      "placeholder": "Vor- und Nachname",
+      "x": 0,
+      "y": 0,
+      "w": 200,
+      "h": 28,
+      "bind": "name",
+      "rules": [
+        {
+          "art": "pflicht",
+          "meldung": "Bitte einen Namen eintragen."
+        }
+      ]
+    },
+    {
+      "kind": "label",
+      "name": "beschriftungTelefon",
+      "text": "Telefon",
+      "x": 0,
+      "y": 0,
+      "w": 100,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "feldTelefon",
+      "text": "",
+      "placeholder": "",
+      "x": 0,
+      "y": 0,
+      "w": 200,
+      "h": 28,
+      "bind": "telefon"
+    },
+    {
+      "kind": "label",
+      "name": "beschriftungMail",
+      "text": "E-Mail",
+      "x": 0,
+      "y": 0,
+      "w": 100,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "feldMail",
+      "text": "",
+      "placeholder": "name@beispiel.de",
+      "x": 0,
+      "y": 0,
+      "w": 200,
+      "h": 28,
+      "bind": "email",
+      "rules": [
+        {
+          "art": "email",
+          "meldung": "Das ist keine E-Mail-Adresse."
+        }
+      ]
+    },
+    {
+      "kind": "label",
+      "name": "hinweis",
+      "text": " ",
+      "x": 0,
+      "y": 0,
+      "w": 300,
+      "h": 20
+    },
+    {
+      "kind": "button",
+      "name": "knopfNeu",
+      "text": "Neu",
+      "x": 0,
+      "y": 0,
+      "w": 100,
+      "h": 30
+    },
+    {
+      "kind": "button",
+      "name": "knopfSichern",
+      "text": "Sichern",
+      "x": 0,
+      "y": 0,
+      "w": 100,
+      "h": 30,
+      "variant": "primaer"
+    },
+    {
+      "kind": "button",
+      "name": "knopfLoeschen",
+      "text": "Löschen",
+      "x": 0,
+      "y": 0,
+      "w": 100,
+      "h": 30,
+      "variant": "gefahr"
+    },
+    {
+      "kind": "layout",
+      "name": "zeileKnoepfe",
+      "x": 0,
+      "y": 0,
+      "w": 300,
+      "h": 32,
+      "layout": {
+        "art": "zeile",
+        "kinder": [
+          [
+            8,
+            1
+          ],
+          [
+            9,
+            1
+          ],
+          [
+            10,
+            1
+          ]
+        ],
+        "abstand": 6
+      }
+    },
+    {
+      "kind": "layout",
+      "name": "spalteRechts",
+      "x": 0,
+      "y": 0,
+      "w": 300,
+      "h": 400,
+      "layout": {
+        "art": "spalte",
+        "kinder": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            0
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            5,
+            0
+          ],
+          [
+            6,
+            0
+          ],
+          [
+            7,
+            0
+          ],
+          [
+            -1,
+            1
+          ],
+          [
+            11,
+            0
+          ]
+        ],
+        "abstand": 6
+      }
+    },
+    {
+      "kind": "layout",
+      "name": "zeileHaupt",
+      "x": 16,
+      "y": 16,
+      "w": 728,
+      "h": 408,
+      "layout": {
+        "art": "zeile",
+        "kinder": [
+          [
+            0,
+            1
+          ],
+          [
+            12,
+            0
+          ]
+        ],
+        "abstand": 16
+      },
+      "anchor": "lrtb"
+    }
+  ]
+}

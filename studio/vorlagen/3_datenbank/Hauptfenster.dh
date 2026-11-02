@@ -1,0 +1,68 @@
+' Links die Eintraege, rechts der gewaehlte. Die Felder sind an die Spalten
+' der Tabelle adressen gebunden ("bind" in der .dhform): GUI_FORM_LOAD und
+' GUI_FORM_SAVE laden und sichern sie in einem Aufruf.
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM ids AS ARRAY OF INTEGER
+    ' Der Eintrag in den Feldern, -1 = ein neuer.
+    DIM aktId AS INTEGER
+
+    SUB Geoeffnet()
+        Self.liste()
+        Self.leeren()
+    END SUB
+
+    ' Je Zeile der Tabelle die id merken -- Sortieren und Filtern stellen die
+    ' Zeilen nicht um, die Nummer bleibt gueltig.
+    SUB liste()
+        GUI_TABLE_CLEAR(Self.tabelle)
+        Self.ids = []
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT id, name, telefon FROM adressen ORDER BY name")
+        WHILE DB_NEXT(r)
+            ARRAY_PUSH(Self.ids, DB_GET_INT(r, 0))
+            GUI_TABLE_ADD_ROW(Self.tabelle, [DB_GET_STRING(r, 1), DB_GET_STRING(r, 2)])
+        WEND
+    END SUB
+
+    SUB leeren()
+        GUI_FORM_CLEAR(Self.Fenster())
+        GUI_CLEAR_ERRORS(Self.Fenster())
+        Self.aktId = -1
+        GUI_TABLE_CLEAR_SELECTION(Self.tabelle)
+        GUI_SET_TEXT(Self.hinweis, "Neuer Eintrag.")
+    END SUB
+
+    SUB tabelle_Geaendert()
+        DIM z AS INTEGER : z = GUI_TABLE_SELECTED(Self.tabelle)
+        IF z < 0 OR z >= LEN(Self.ids) THEN RETURN
+        IF GUI_FORM_LOAD(Self.Fenster(), db, "adressen", Self.ids[z]) THEN Self.aktId = Self.ids[z]
+        GUI_CLEAR_ERRORS(Self.Fenster())
+        GUI_SET_TEXT(Self.hinweis, " ")
+    END SUB
+
+    SUB knopfNeu_Klick()
+        Self.leeren()
+        GUI_FOCUS(Self.feldName)
+    END SUB
+
+    SUB knopfSichern_Klick()
+        IF GUI_VALIDATE(Self.Fenster()) > 0 THEN RETURN
+        DIM nr AS INTEGER : nr = GUI_FORM_SAVE(Self.Fenster(), db, "adressen", Self.aktId)
+        IF nr = 0 THEN
+            GUI_SET_TEXT(Self.hinweis, "Nicht gesichert.")
+            RETURN
+        END IF
+        Self.aktId = nr
+        Self.liste()
+        DIM z AS INTEGER : z = ARRAY_INDEXOF(Self.ids, nr)
+        IF z >= 0 THEN GUI_TABLE_SET_SELECTED(Self.tabelle, z)
+        GUI_SET_TEXT(Self.hinweis, "Gesichert.")
+    END SUB
+
+    SUB knopfLoeschen_Klick()
+        IF Self.aktId < 0 THEN RETURN
+        IF Frage("Diesen Eintrag löschen?", "Löschen|Abbrechen", "Adressbuch") <> 1 THEN RETURN
+        DB_EXEC(db, "DELETE FROM adressen WHERE id = ?", Self.aktId)
+        Self.liste()
+        Self.leeren()
+    END SUB
+END CLASS

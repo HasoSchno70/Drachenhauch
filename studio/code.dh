@@ -1100,7 +1100,130 @@ SUB methodeEntfernen()
     protokoll("methode weg " + m.el.name + "." + m.name)
 END SUB
 
+' --- Neues Projekt aus einer Vorlage --------------------------------------------
+' Die Vorlagen sind fertige Projektordner unter studio/vorlagen/ (vorlage.txt:
+' erste Zeile der Titel, dann die Beschreibung). Ein Projekt daraus ist noch
+' nicht gesichert -- Sichern fragt nach einem Ordner.
+DIM dlgVl AS GUI_WINDOW : dlgVl = -1
+DIM vlListe AS GUI_WIDGET
+DIM vlText AS GUI_WIDGET
+DIM vlOk AS GUI_WIDGET
+DIM vlAbbr AS GUI_WIDGET
+DIM vlOrdner AS ARRAY OF STRING : vlOrdner = []
+DIM vlTitel AS ARRAY OF STRING : vlTitel = []
+DIM vlBeschreibung AS ARRAY OF STRING : vlBeschreibung = []
+' Die Lagen der Zeilen stehen erst nach dem naechsten GUI_UPDATE fest.
+DIM vlLagenBald AS INTEGER : vlLagenBald = 0
+
+FUNCTION vorlagenOrdner$() AS STRING
+    RETURN PATHJOIN(studioQuelle, "vorlagen")
+END FUNCTION
+
+SUB vorlagenLesen()
+    vlOrdner = [] : vlTitel = [] : vlBeschreibung = []
+    IF NOT DIREXISTS(vorlagenOrdner$()) THEN RETURN
+    DIM namen AS ARRAY OF STRING : namen = DIRLIST(vorlagenOrdner$())
+    SORT(namen)
+    DIM n AS STRING
+    FOR EACH n IN namen
+        DIM o AS STRING : o = PATHJOIN(vorlagenOrdner$(), n)
+        IF NOT FILEEXISTS(PATHJOIN(o, PROJEKT_DATEI)) THEN CONTINUE
+        DIM t AS STRING : t = n
+        DIM b AS STRING : b = ""
+        IF FILEEXISTS(PATHJOIN(o, "vorlage.txt")) THEN
+            DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(PATHJOIN(o, "vorlage.txt"))
+            IF LEN(zeilen) > 0 THEN t = TRIM$(zeilen[0])
+            DIM k AS INTEGER
+            FOR k = 1 TO LEN(zeilen) - 1
+                b = TRIM$(b + " " + zeilen[k])
+            NEXT
+        END IF
+        ARRAY_PUSH(vlOrdner, o) : ARRAY_PUSH(vlTitel, t) : ARRAY_PUSH(vlBeschreibung, b)
+    NEXT
+END SUB
+
+SUB vorlageDialog()
+    vorlagenLesen()
+    IF LEN(vlOrdner) = 0 THEN
+        projektAnfangen("")
+        RETURN
+    END IF
+    IF dlgVl >= 0 THEN GUI_WINDOW_DESTROY(dlgVl)
+    DIM b AS INTEGER : b = 520
+    DIM h AS INTEGER : h = 400
+    dlgVl = GUI_WINDOW("Neues Projekt", (SCREENWIDTH() - b) \ 2, (SCREENHEIGHT() - h) \ 2, b, h)
+    GUI_WINDOW_MOVABLE(dlgVl, FALSE)
+    GUI_WINDOW_CHROME(dlgVl, FALSE)
+    DIM t AS GUI_WIDGET : t = GUI_LABEL(dlgVl, "Neues Projekt", 20, 16)
+    GUI_ADD_CLASS(t, "dialogtitel")
+    GUI_LABEL(dlgVl, "Womit soll es anfangen?", 20, 46)
+    vlListe = GUI_LISTBOX(dlgVl, 20, 72, b - 40, h - 200, vlTitel)
+    GUI_LISTBOX_SELECT(vlListe, 0, TRUE)
+    vlText = GUI_LABEL(dlgVl, "", 20, h - 118)
+    GUI_SET_WRAP(vlText, b - 40)
+    GUI_ADD_CLASS(vlText, "leise")
+    vlOk = GUI_BUTTON(dlgVl, "Anlegen", b - 236, h - 52, 110, 32)
+    GUI_BUTTON_VARIANT(vlOk, "primaer")
+    vlAbbr = GUI_BUTTON(dlgVl, "Abbrechen", b - 116, h - 52, 96, 32)
+    GUI_WINDOW_DEFAULT(dlgVl, vlOk)
+    GUI_WINDOW_CANCEL(dlgVl, vlAbbr)
+    GUI_WINDOW_MODAL(dlgVl, TRUE)
+    GUI_FOCUS(vlListe)
+    vlTextNachziehen()
+    protokoll("vorlagendialog " + JOIN$(vlTitel, ","))
+    vlLagenBald = 2
+END SUB
+
+SUB vlTextNachziehen()
+    DIM k AS INTEGER : k = GUI_LISTBOX_SELECTED(vlListe)
+    IF k < 0 OR k >= LEN(vlBeschreibung) THEN
+        GUI_SET_TEXT(vlText, "")
+    ELSE
+        GUI_SET_TEXT(vlText, vlBeschreibung[k])
+    END IF
+END SUB
+
+' Fuer Pruefungen: wo jede Zeile der Liste steht ("lage vorlage TITEL x y").
+SUB vorlagenProtokollieren()
+    IF logDatei = "" THEN RETURN
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(vlTitel) - 1
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        DIM bb AS INTEGER
+        DIM hh AS INTEGER
+        (x, y, bb, hh) = GUI_LISTBOX_ITEM_RECT(vlListe, k)
+        IF hh > 0 THEN protokoll("lage vorlage " + vlTitel[k] + " " + STR$(x + bb \ 2) + " " + STR$(y + hh \ 2))
+    NEXT
+END SUB
+
+SUB vorlageDialogPruefen()
+    IF dlgVl < 0 THEN RETURN
+    IF NOT GUI_WINDOW_SHOWN(dlgVl) THEN
+        dlgVl = -1
+        RETURN
+    END IF
+    IF vlLagenBald > 0 THEN
+        vlLagenBald = vlLagenBald - 1
+        IF vlLagenBald = 0 THEN vorlagenProtokollieren()
+    END IF
+    IF GUI_CHANGED(vlListe) THEN vlTextNachziehen()
+    IF GUI_CLICKED(vlAbbr) THEN
+        GUI_WINDOW_DESTROY(dlgVl)
+        dlgVl = -1
+        RETURN
+    END IF
+    IF GUI_CLICKED(vlOk) OR GUI_DOUBLE_CLICKED(vlListe) THEN
+        DIM k AS INTEGER : k = GUI_LISTBOX_SELECTED(vlListe)
+        IF k < 0 THEN RETURN
+        GUI_WINDOW_DESTROY(dlgVl)
+        dlgVl = -1
+        projektAusVorlage(vlOrdner[k], vlTitel[k])
+    END IF
+END SUB
+
 SUB dialogePruefen()
+    vorlageDialogPruefen()
     ereignisDialogPruefen()
     methodeDialogPruefen()
     elementDialogPruefen()
@@ -1110,7 +1233,7 @@ END SUB
 ' Was das Studio selbst zeichnet (Titelleiste, Griffe des Entwurfs), liegt
 ' ueber GUI_DRAW -- ein offener Dialog kommt darum noch einmal obenauf.
 SUB dialogeObenauf()
-    DIM d AS ARRAY OF INTEGER : d = [dlgEr, dlgMe, dlgEl, dlgWeg, dlgMn, frage, ueber]
+    DIM d AS ARRAY OF INTEGER : d = [dlgEr, dlgMe, dlgEl, dlgWeg, dlgMn, dlgVl, frage, ueber]
     IF vvOffen THEN ARRAY_PUSH(d, winVv)
     DIM w AS INTEGER
     FOR EACH w IN d
