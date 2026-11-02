@@ -475,6 +475,7 @@ END IF
 ' waeren 22 statt 36 Punkte hoch.
 SUB lagenProtokollieren()
     protokoll("lage fenster " + STR$(formX) + " " + STR$(formY))
+    protokoll("lage fenstergriff " + STR$(formX + zS(fensterB())) + " " + STR$(formY + zS(fensterH())))
     DIM r AS INTEGER
     FOR r = 0 TO LEN(bibZeile) - 1
         IF bibZeile[r] < 0 THEN CONTINUE

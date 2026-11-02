@@ -539,6 +539,13 @@ SUB inspektorPruefen()
         DIM za AS InspZeile : za = inspZeilen[inspAnhaengig]
         IF GUI_FOCUSED() <> za.ed OR GUI_ENTERED(za.ed) THEN
             inspAnhaengig = -1
+            ' Breite oder Hoehe des Fensters: verankerte Controls ruecken mit,
+            ' wie beim Ziehen am Griff (gemessen am Stand vor dem Tippen).
+            IF (za.schluessel = "w" OR za.schluessel = "h") AND za.fuer = "fenster" AND standPos >= 0 THEN
+                DIM vorher AS JSON_HANDLE : vorher = JSON_PARSE(staende[standPos])
+                ankerNachMass(fensterZahl("w") - JSON_GET_INT(vorher, "w"), fensterZahl("h") - JSON_GET_INT(vorher, "h"))
+                entwurfBauen()
+            END IF
             merken()
             werkzeugeNachziehen()
             protokoll("inspektor " + za.schluessel)

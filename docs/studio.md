@@ -227,6 +227,7 @@ die auch Fehler an ihre Methode bringt.
 | Rahmen über leere Fläche ziehen | wählt alles, was ganz darin liegt |
 | Control ziehen | verschiebt die ganze Auswahl |
 | an einem der acht Griffe ziehen | ändert die Größe |
+| an der rechten oder unteren Kante oder der Ecke des Fensters ziehen | ändert die Größe des Fensters; verankerte Controls gehen mit (ebenso, wenn man Breite oder Höhe im Inspektor tippt) |
 | Pfeiltasten | schieben um einen Punkt, mit Umschalt um das Raster (8) |
 | Entf | löscht die Auswahl |
 | Strg+D | verdoppelt |

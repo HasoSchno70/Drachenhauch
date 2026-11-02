@@ -177,7 +177,7 @@ IMPORT "gui"
 | `GUI_WINDOW_CANCEL(win, knopf)` | — | cancel button: ESC triggers it (-1 = none) |
 | `GUI_CHECKBOX(win, label$, x, y[, default])` | GUI_WIDGET | toggle |
 | `GUI_SLIDER(win, x, y, w, min, max[, default])` | GUI_WIDGET | value slider |
-| `GUI_SPINNER(win, x, y, w, min, max[, default[, step]])` | GUI_WIDGET | number field with +/- (click/mouse wheel/arrow keys; value via `GUI_VALUE`) |
+| `GUI_SPINNER(win, x, y, w, min, max[, default[, step]])` | GUI_WIDGET | number field with +/- (click/mouse wheel/arrow keys; value via `GUI_VALUE`). With the focus it also takes typed numbers (comma like point): the first keystroke replaces the selected value, a number within the range applies while typing, Enter or moving the focus clamps to min/max (Enter reports `GUI_ENTERED`), Esc brings back the earlier value; an integer field stays integer |
 | `GUI_SPLITTER(win, x, y, length, orient$, min, max)` | GUI_WIDGET | movable divider (`"v"`/`"h"`); position via `GUI_VALUE` |
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | container (decoration) |
 | `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | single-line input field (cursor + selection, Ctrl+Z/Y); the placeholder stays, dimmed, until something is typed -- also with focus |

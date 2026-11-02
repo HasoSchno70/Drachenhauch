@@ -36,7 +36,8 @@ DIM mitteB AS INTEGER
 DIM mitteH AS INTEGER
 
 ' Zug
-DIM modus AS INTEGER : modus = 0      ' 1 ziehen, 2 Griff, 3 Rahmen
+DIM modus AS INTEGER : modus = 0      ' 1 ziehen, 2 Griff, 3 Rahmen, 4 Fenstergroesse
+DIM fensterGriff AS INTEGER : fensterGriff = 0   ' 1 rechts, 2 unten, 3 Ecke
 DIM griff AS INTEGER : griff = -1
 DIM startMx AS INTEGER
 DIM startMy AS INTEGER
@@ -555,6 +556,68 @@ FUNCTION griffBei(mx AS INTEGER, my AS INTEGER) AS INTEGER
     RETURN -1
 END FUNCTION
 
+' Die Griffe des Fensters selbst: die rechte und die untere Kante und die
+' Ecke unten rechts (Schirmlage). 0 = keiner, 1 rechts, 2 unten, 3 Ecke.
+FUNCTION fensterGriffBei(sx AS INTEGER, sy AS INTEGER) AS INTEGER
+    IF NOT layoutVorn() THEN RETURN 0
+    DIM rx AS INTEGER : rx = formX + zS(fensterB())
+    DIM uy AS INTEGER : uy = formY + zS(fensterH())
+    IF ABS(sx - rx) <= 6 AND ABS(sy - uy) <= 6 THEN RETURN 3
+    IF ABS(sx - rx) <= 4 AND sy >= formY AND sy < uy THEN RETURN 1
+    IF ABS(sy - uy) <= 4 AND sx >= formX AND sx < rx THEN RETURN 2
+    RETURN 0
+END FUNCTION
+
+FUNCTION fensterGriffZeiger$(g AS INTEGER) AS STRING
+    SELECT CASE g
+        CASE 1 : RETURN "resize_ew"
+        CASE 2 : RETURN "resize_ns"
+    END SELECT
+    RETURN "resize_nwse"
+END FUNCTION
+
+' Nach dem Ziehen am Fenster: die Laufzeit hat verankerte Controls schon
+' mitgenommen (wie spaeter im Programm) -- ihre Lage ins Modell.
+SUB ankerUebernehmen()
+    IF frm < 0 THEN RETURN
+    DIM i AS INTEGER
+    FOR i = 0 TO anzahl() - 1
+        IF verwaltet(i) THEN CONTINUE
+        DIM a AS STRING : a = feldText$(i, "anchor")
+        IF INSTR(a, "r") < 0 AND INSTR(a, "b") < 0 THEN CONTINUE
+        DIM h AS GUI_WIDGET : h = GUI_WINDOW_WIDGET(frm, i)
+        IF h < 0 THEN CONTINUE
+        JSON_SET_INT(doc, wz$(i, "x"), GUI_GET_X(h)) : JSON_SET_INT(doc, wz$(i, "y"), GUI_GET_Y(h))
+        JSON_SET_INT(doc, wz$(i, "w"), GUI_GET_W(h)) : JSON_SET_INT(doc, wz$(i, "h"), GUI_GET_H(h))
+    NEXT
+END SUB
+
+' Das Fenster ist im Inspektor um dw/dh gewachsen: verankerte Controls
+' ruecken wie beim Ziehen am Griff -- rechts verankert ruecken sie, links
+' und rechts verankert werden sie breiter (ebenso oben/unten).
+SUB ankerNachMass(dw AS INTEGER, dh AS INTEGER)
+    IF dw = 0 AND dh = 0 THEN RETURN
+    DIM i AS INTEGER
+    FOR i = 0 TO anzahl() - 1
+        IF verwaltet(i) THEN CONTINUE
+        DIM a AS STRING : a = feldText$(i, "anchor")
+        IF INSTR(a, "r") >= 0 THEN
+            IF INSTR(a, "l") >= 0 THEN
+                JSON_SET_INT(doc, wz$(i, "w"), MAX(1, feldZahl(i, "w") + dw))
+            ELSE
+                JSON_SET_INT(doc, wz$(i, "x"), feldZahl(i, "x") + dw)
+            END IF
+        END IF
+        IF INSTR(a, "b") >= 0 THEN
+            IF INSTR(a, "t") >= 0 THEN
+                JSON_SET_INT(doc, wz$(i, "h"), MAX(1, feldZahl(i, "h") + dh))
+            ELSE
+                JSON_SET_INT(doc, wz$(i, "y"), feldZahl(i, "y") + dh)
+            END IF
+        END IF
+    NEXT
+END SUB
+
 FUNCTION griffZeiger$(g AS INTEGER) AS STRING
     SELECT CASE g
         CASE 0, 4 : RETURN "resize_nwse"
@@ -602,7 +665,12 @@ SUB mausAufEntwurf()
     IF strg() AND MOUSEWHEEL_Y() <> 0.0 AND inDerMitte(smx, smy) THEN zoomStufe(IIF(MOUSEWHEEL_Y() > 0.0, 1, -1))
 
     ' Zeiger: ueber einem Griff die passende Form.
-    IF modus = 0 AND imFenster(smx, smy) AND NOT bibScharf() THEN
+    DIM fgz AS INTEGER : fgz = IIF(modus = 0 AND NOT bibScharf() AND fensterOben(smx, smy), fensterGriffBei(smx, smy), 0)
+    IF modus = 4 THEN
+        MOUSE_CURSOR(fensterGriffZeiger$(fensterGriff))
+    ELSEIF fgz > 0 AND griffBei(mausFx, mausFy) < 0 THEN
+        MOUSE_CURSOR(fensterGriffZeiger$(fgz))
+    ELSEIF modus = 0 AND imFenster(smx, smy) AND NOT bibScharf() THEN
         DIM gz AS INTEGER : gz = griffBei(mausFx, mausFy)
         IF gz >= 0 THEN MOUSE_CURSOR(griffZeiger$(gz)) ELSE MOUSE_CURSOR("auto")
     ELSEIF modus = 0 AND bibScharf() AND imFenster(smx, smy) THEN
@@ -633,6 +701,19 @@ SUB mausAufEntwurf()
             RETURN
         END IF
         griff = IIF(imFenster(smx, smy), griffBei(mausFx, mausFy), -1)
+        DIM fgd AS INTEGER : fgd = fensterGriffBei(smx, smy)
+        IF griff < 0 AND fgd > 0 THEN
+            ' Am Rand des Fensters: es wird groesser oder kleiner.
+            auswahlSetzen(-1)
+            auswahlGeaendert()
+            modus = 4
+            fensterGriff = fgd
+            startMx = mausFx : startMy = mausFy
+            startW = fensterB() : startH = fensterH()
+            bewegt = FALSE
+            GUI_FOCUS(-1)
+            RETURN
+        END IF
         IF griff >= 0 THEN
             modus = 2
         ELSE
@@ -694,6 +775,33 @@ SUB mausAufEntwurf()
             NEXT
         END IF
         GUI_FOCUS(-1)
+        RETURN
+    END IF
+
+    IF modus = 4 THEN
+        IF MOUSEBUTTON(0) THEN
+            ' Die Lage des Fensters bleibt beim Ziehen stehen (sonst rueckte
+            ' es mittig und die Maus liefe davon); erst danach neu gelegt.
+            DIM nw AS INTEGER : nw = startW
+            DIM nh AS INTEGER : nh = startH
+            IF fensterGriff <> 2 THEN nw = MAX(80, rasterWert(startW + mausFx - startMx))
+            IF fensterGriff <> 1 THEN nh = MAX(60, rasterWert(startH + mausFy - startMy))
+            IF nw <> fensterB() OR nh <> fensterH() THEN
+                bewegt = TRUE
+                JSON_SET_INT(doc, "w", nw)
+                JSON_SET_INT(doc, "h", nh)
+                IF frm >= 0 THEN GUI_WINDOW_SET_BOUNDS(frm, formX, formY, nw, nh)
+                lageAnzeigen()
+            END IF
+            RETURN
+        END IF
+        modus = 0
+        IF bewegt THEN
+            ankerUebernehmen()
+            nachAenderung(TRUE)
+            status("Fenster: " + STR$(fensterB()) + " × " + STR$(fensterH()))
+            protokoll("fenstergroesse " + STR$(fensterB()) + " " + STR$(fensterH()))
+        END IF
         RETURN
     END IF
 
@@ -1273,7 +1381,15 @@ SUB entwurfZeichnen()
     TEXT(x0 + MAX(80, (b - tb) \ 2), y0 + (TITEL_H - 15) \ 2, titel, farbe("titeltext"))
     RECT(x0 - 1, y0 - 1, x0 + b, formY + h, farbe("fensterrand"))
     ' Groesse des Fensters unten rechts, und ein Griff, der sie aendert.
-    TEXT(x0 + b - TEXT_WIDTH(STR$(fensterB()) + " × " + STR$(fensterH())), formY + h + 8, STR$(fensterB()) + " × " + STR$(fensterH()), farbe("leise"))
+    TEXT(x0 + b - TEXT_WIDTH(STR$(fensterB()) + " × " + STR$(fensterH())) - 12, formY + h + 8, STR$(fensterB()) + " × " + STR$(fensterH()), farbe("leise"))
+    DIM fgx AS ARRAY OF INTEGER : fgx = [x0 + b, x0 + b \ 2, x0 + b]
+    DIM fgy AS ARRAY OF INTEGER : fgy = [formY + h \ 2, formY + h, formY + h]
+    DIM fk AS INTEGER
+    FOR fk = 0 TO 2
+        DIM an AS BOOLEAN : an = (modus = 4 AND fensterGriff = fk + 1) OR fensterGriffBei(MOUSEX(), MOUSEY()) = fk + 1
+        BOXROUND(fgx[fk] - 4, fgy[fk] - 4, fgx[fk] + 4, fgy[fk] + 4, 2, IIF(an, F_AUSWAHL, &HFFFFFF))
+        RECTROUND(fgx[fk] - 4, fgy[fk] - 4, fgx[fk] + 4, fgy[fk] + 4, 2, IIF(an, &HFFFFFF, F_GRIFF_RAND))
+    NEXT
 
     ' Ausrichtungslinien
     DIM l AS INTEGER
