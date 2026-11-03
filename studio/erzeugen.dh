@@ -279,6 +279,8 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
         END IF
         IF MAPHAS(evMeth, STR$(i) + "|ziehen") THEN ARRAY_PUSH(z, "    DIM studioZug_" + namen[i] + " AS BOOLEAN")
     NEXT
+    ' Ein Fenster an einer Tabelle, Listen mit Datenquelle (datenbank.dh).
+    IF NOT istControl THEN dbBasisFelder(z, d, namen, arten)
     ' Die Eigenschaften eines Controls: ein Feld je Eigenschaft, die Vorgabe
     ' setzt studioEinbauen, eine Instanz ueberschreibt sie danach.
     DIM eigN AS ARRAY OF STRING : eigN = []
@@ -370,12 +372,14 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
     ' Die eigenen Controls melden sich fertig, bevor das Fenster es tut (ein
     ' Control im Control vor seinem aeusseren, das macht studioGeoeffnet).
     DIM qq AS INTEGER
+    IF NOT istControl THEN dbBasisAufbau(z, d, namen, arten)
     IF NOT istControl THEN
         FOR qq = 0 TO LEN(instName) - 1
             ARRAY_PUSH(z, "        Self." + instName[qq] + ".studioGeoeffnet()")
         NEXT
     END IF
     ARRAY_PUSH(z, "    END SUB")
+    IF NOT istControl THEN dbBasisMethoden(z, d, namen, arten)
     ' Die Abfragen je Bild, die leeren Ereignis-Methoden fuer die Basis.
     DIM takt AS ARRAY OF STRING : takt = []
     DIM zeichnen AS ARRAY OF STRING : zeichnen = []
@@ -463,6 +467,7 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
             ARRAY_PUSH(takt, "        END IF")
         END IF
     NEXT
+    IF NOT istControl THEN dbBasisTakt(takt, d, namen, arten)
     ' Was die eigenen Controls gemeldet haben, gilt ein Bild lang.
     FOR qq = 0 TO LEN(instName) - 1
         ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")

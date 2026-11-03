@@ -634,6 +634,7 @@ WHILE NOT beenden
         mitteNachziehen()
     END IF
     bibVorUpdate()
+    navVorUpdate()
     GUI_UPDATE()
     bildNr = bildNr + 1
     IF bildNr = 3 AND logDatei <> "" THEN lagenProtokollieren() : felderProtokollieren() : controlsProtokollieren()
@@ -653,6 +654,7 @@ WHILE NOT beenden
     IF GUI_DOCK_CHANGED(win) THEN verteilen() : mitteNachziehen()
     befehle()
     bibNachUpdate()
+    navNachUpdate()
     navigatorPruefen()
     inspektorPruefen()
     reiterPruefen()
@@ -678,6 +680,7 @@ WHILE NOT beenden
     dialogeObenauf()
     GUI_DRAW_TOP()
     bibZugZeichnen()
+    navZugZeichnen()
     FLIP()
 WEND
 IF lauf >= 0 THEN PROCESS_KILL(lauf)

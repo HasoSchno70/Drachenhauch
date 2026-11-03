@@ -593,3 +593,171 @@ SUB dbAktion(e AS Element, was AS STRING, name AS STRING, text AS STRING)
     navigatorFuellen()
     werkzeugeNachziehen()
 END SUB
+
+' --- Spalten ins Fenster ziehen (Stufe 2) --------------------------------------
+'  Im Navigator stehen unter einer Tabelle ihre Spalten. Eine Spalte oder die
+'  ganze Tabelle ins offene Fenster gezogen legt je Spalte eine Beschriftung
+'  und ein passendes Feld an, an die Spalte gebunden (bind); ein Doppelklick
+'  auf eine Spalte legt sie unter das letzte Control. Hat das Fenster noch
+'  keine Tabelle, bekommt es diese. Ein Klick ohne Zug auf eine Tabelle
+'  oeffnet ihren Reiter -- erst beim Loslassen, sonst waere das Layout weg,
+'  bevor der Zug beginnt.
+DIM nvDruckJetzt AS BOOLEAN : nvDruckJetzt = FALSE
+DIM nvDruck AS BOOLEAN : nvDruck = FALSE
+DIM nvDruckX AS INTEGER
+DIM nvDruckY AS INTEGER
+DIM nvKnoten AS INTEGER : nvKnoten = -1
+DIM nvZug AS INTEGER : nvZug = -1
+
+FUNCTION nvDatenKnoten(n AS INTEGER) AS BOOLEAN
+    IF n < 0 OR n >= LEN(navArt) THEN RETURN FALSE
+    RETURN navArt[n] = "tabelle" OR navArt[n] = "spalte"
+END FUNCTION
+
+SUB navVorUpdate()
+    nvDruckJetzt = MOUSE_HIT(0) AND GUI_HIT_TEST(MOUSEX(), MOUSEY()) = baum
+END SUB
+
+SUB navNachUpdate()
+    IF nvDruckJetzt THEN
+        nvDruck = TRUE
+        nvDruckX = MOUSEX() : nvDruckY = MOUSEY()
+        nvZug = -1
+        nvKnoten = GUI_TREE_SELECTED(baum)
+    END IF
+    IF nvDruck AND MOUSEBUTTON(0) THEN
+        IF nvZug < 0 AND nvDatenKnoten(nvKnoten) AND (ABS(MOUSEX() - nvDruckX) > 6 OR ABS(MOUSEY() - nvDruckY) > 6) THEN nvZug = nvKnoten
+    END IF
+    IF nvDruck AND NOT MOUSEBUTTON(0) THEN
+        nvDruck = FALSE
+        IF nvZug >= 0 THEN
+            IF layoutVorn() AND imFenster(MOUSEX(), MOUSEY()) THEN
+                felderAblegen(nvZug, zF(MOUSEX() - formX), zF(MOUSEY() - formY))
+            ELSE
+                status(tr$("Felder gehören in ein Fenster -- erst sein Layout öffnen und dann hineinziehen."))
+            END IF
+            nvZug = -1
+        ELSEIF nvDatenKnoten(nvKnoten) AND GUI_TREE_SELECTED(baum) = nvKnoten THEN
+            nvKlick(nvKnoten)
+        END IF
+    END IF
+    IF GUI_DOUBLE_CLICKED(baum) THEN
+        DIM n AS INTEGER : n = GUI_TREE_SELECTED(baum)
+        IF n >= 0 AND n < LEN(navArt) THEN
+            IF navArt[n] = "spalte" AND layoutVorn() THEN felderAblegen(n, -1, -1)
+        END IF
+    END IF
+END SUB
+
+' Ein Klick ohne Zug: eine Tabelle oeffnet ihren Reiter, eine Spalte auch --
+' ausser ein Layout ist vorn, dann wartet sie aufs Ziehen.
+SUB nvKlick(n AS INTEGER)
+    DIM e AS Element : e = elemente[navEl[n]]
+    DIM tab AS STRING : tab = dbTabellenNamen(e)[navCtrl[n]]
+    IF navArt[n] = "spalte" AND layoutVorn() THEN
+        status(tr$("Die Spalte ins Fenster ziehen oder doppelklicken -- dann steht dort ein Feld, das an sie gebunden ist."))
+        RETURN
+    END IF
+    dbOeffnen(e, tab)
+END SUB
+
+SUB navZugZeichnen()
+    IF nvZug < 0 OR nvZug >= LEN(navArt) THEN RETURN
+    DIM text AS STRING : text = GUI_TREE_LABEL(baum, nvZug)
+    IF navArt[nvZug] = "tabelle" THEN text = trf$("{0} (alle Spalten)", [text])
+    BOXROUND(MOUSEX() + 10, MOUSEY() + 6, MOUSEX() + 26 + LEN(text) * 8, MOUSEY() + 30, 4, RGBA(58, 168, 240, 200))
+    TEXT(MOUSEX() + 18, MOUSEY() + 11, text, farbe("titeltext"))
+END SUB
+
+' Je Spalte eine Beschriftung und ein Feld; fx/fy = linke obere Ecke im
+' Fenster (-1 = unter das letzte Control).
+SUB felderAblegen(n AS INTEGER, fx AS INTEGER, fy AS INTEGER)
+    DIM e AS Element : e = elemente[navEl[n]]
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM t AS INTEGER : t = navCtrl[n]
+    DIM tab AS STRING : tab = dbTabName$(s, t)
+    DIM ref AS STRING : ref = e.name + "." + tab
+    DIM spalten AS ARRAY OF INTEGER : spalten = []
+    IF navArt[n] = "spalte" THEN
+        ARRAY_PUSH(spalten, navMeth[n])
+    ELSE
+        DIM k AS INTEGER
+        FOR k = 0 TO dbSpZahl(s, t) - 1
+            ARRAY_PUSH(spalten, k)
+        NEXT
+    END IF
+    IF LEN(spalten) = 0 THEN
+        status(trf$("{0} hat noch keine Spalten.", [ref]))
+        RETURN
+    END IF
+    DIM x AS INTEGER : x = fx
+    DIM y AS INTEGER : y = fy
+    IF fx < 0 THEN
+        ' Unter das letzte Control, am linken Rand.
+        x = 20 : y = 20
+        DIM i AS INTEGER
+        FOR i = 0 TO anzahl() - 1
+            DIM lx AS INTEGER
+            DIM ly AS INTEGER
+            DIM lw AS INTEGER
+            DIM lh AS INTEGER
+            (lx, ly, lw, lh) = lageVon(i)
+            y = MAX(y, ly + lh + 12)
+        NEXT
+    END IF
+    x = MAX(0, rasterWert(x))
+    y = MAX(0, rasterWert(y))
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM letztes AS INTEGER : letztes = -1
+    DIM sp AS INTEGER
+    FOR EACH sp IN spalten
+        letztes = feldAnlegen(s, t, sp, x, y)
+        ARRAY_PUSH(namen, feldText$(letztes, "name"))
+        y = y + MAX(28, feldZahl(letztes, "h")) + 10
+    NEXT
+    ' Ein Fenster ohne Tabelle bekommt diese; eines mit einer anderen behaelt
+    ' seine -- dann sagt es die Statuszeile.
+    DIM ft AS STRING : ft = fensterText$("studio_tabelle")
+    IF ft = "" AND NOT entwurfIstControl() THEN JSON_SET_STRING(doc, "studio_tabelle", ref)
+    auswahlSetzen(letztes)
+    nachAenderung(TRUE)
+    IF ft <> "" AND ft <> ref THEN
+        status(trf$("Felder für {0} angelegt -- das Fenster gehört aber zu {1} (Inspektor: Tabelle).", [ref, ft]))
+    ELSE
+        status(trf$("Felder für {0} angelegt: {1}", [ref, JOIN$(namen, ", ")]))
+    END IF
+    protokoll("felder " + ref + " " + JOIN$(namen, ","))
+END SUB
+
+' Ein Feld fuer eine Spalte, dazu links die Beschriftung (ausser bei Ja/Nein:
+' das Kaestchen traegt den Namen selbst). Liefert die Nummer des Feldes.
+FUNCTION feldAnlegen(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM sn AS STRING : sn = dbSp$(s, t, k, "name")
+    DIM typ AS STRING : typ = dbSp$(s, t, k, "typ")
+    DIM i AS INTEGER
+    IF typ = "wahr" THEN
+        i = controlAnlegen(bausteinNach("checkbox"), x + 120, y + 4)
+        JSON_SET_STRING(doc, wz$(i, "text"), sn)
+        JSON_SET_INT(doc, wz$(i, "w"), 200)
+    ELSE
+        DIM l AS INTEGER : l = controlAnlegen(bausteinNach("label"), x, y + 4)
+        JSON_SET_STRING(doc, wz$(l, "text"), sn + ":")
+        JSON_SET_INT(doc, wz$(l, "w"), 110)
+        DIM ln AS STRING : ln = sn + "Text"
+        IF nameVergeben(ln, l) OR NOT istBezeichner(ln) THEN ln = eindeutigerName$(ln)
+        JSON_SET_STRING(doc, wz$(l, "name"), ln)
+        i = controlAnlegen(bausteinNach("textinput"), x + 120, y)
+        JSON_SET_INT(doc, wz$(i, "w"), IIF(typ = "text", 240, 140))
+        SELECT CASE typ
+            CASE "ganz" : JSON_SET_INT(doc, wz$(i, "zahlen"), 1)
+            CASE "zahl" : JSON_SET_INT(doc, wz$(i, "zahlen"), 2)
+            CASE "geld" : JSON_SET_INT(doc, wz$(i, "zahlen"), 3)
+            CASE "datum" : JSON_SET_STRING(doc, wz$(i, "placeholder"), tr$("JJJJ-MM-TT"))
+        END SELECT
+    END IF
+    DIM n AS STRING : n = sn + "Feld"
+    IF nameVergeben(n, i) OR NOT istBezeichner(n) THEN n = eindeutigerName$(n)
+    JSON_SET_STRING(doc, wz$(i, "name"), n)
+    JSON_SET_STRING(doc, wz$(i, "bind"), sn)
+    RETURN i
+END FUNCTION

@@ -478,6 +478,11 @@ FUNCTION navBild(was AS STRING) AS IMAGE
             IMAGE_FILL_ELLIPSE(b, 10, 15, 6, 2, &H3A9A70)
             IMAGE_FILL_ELLIPSE(b, 10, 5, 6, 2, &H8ADCB4)
             IMAGE_FILL_RECT(b, 4, 9, 16, 10, &H2A7A55)
+        CASE "spalte"
+            IMAGE_FILL_RECT(b, 7, 3, 13, 17, &HE4EAF2)
+            IMAGE_FILL_RECT(b, 7, 3, 13, 6, &H3A9A70)
+            IMAGE_FILL_RECT(b, 7, 9, 13, 10, &H8D9AAB)
+            IMAGE_FILL_RECT(b, 7, 13, 13, 14, &H8D9AAB)
         CASE "tabelle"
             IMAGE_FILL_RECT(b, 3, 4, 17, 16, &HE4EAF2)
             IMAGE_FILL_RECT(b, 3, 4, 17, 7, &H3A9A70)
@@ -533,8 +538,15 @@ SUB navigatorFuellen()
         IF e.art = "datenbank" THEN
             DIM tns AS ARRAY OF STRING : tns = dbTabellenNamen(e)
             DIM ti AS INTEGER
+            DIM ds AS JSON_HANDLE : ds = dbSchema(e)
             FOR ti = 0 TO LEN(tns) - 1
-                navKnoten(en, tns[ti], "tabelle", ei, ti, -1, "tabelle")
+                DIM tk AS INTEGER : tk = navKnoten(en, tns[ti], "tabelle", ei, ti, -1, "tabelle")
+                ' Die Spalten -- ins Fenster gezogen werden sie zu Feldern.
+                DIM sk AS INTEGER
+                FOR sk = 0 TO dbSpZahl(ds, ti) - 1
+                    navKnoten(tk, dbSp$(ds, ti, sk, "name"), "spalte", ei, ti, sk, "spalte")
+                NEXT
+                GUI_TREE_EXPAND(baum, tk, TRUE)
             NEXT
             GUI_TREE_EXPAND(baum, en, TRUE)
             CONTINUE
@@ -627,6 +639,7 @@ SUB knotenProtokollieren()
             CASE "methode" : pfad = elemente[navEl[n]].name + "." + methoden[navMeth[n]].name
             CASE "dekl" : pfad = elemente[navEl[n]].name + ".Eigenschaften"
             CASE "tabelle" : pfad = elemente[navEl[n]].name + "." + dbTabellenNamen(elemente[navEl[n]])[navCtrl[n]]
+            CASE "spalte" : pfad = elemente[navEl[n]].name + "." + dbTabellenNamen(elemente[navEl[n]])[navCtrl[n]] + "." + dbSp$(dbSchema(elemente[navEl[n]]), navCtrl[n], navMeth[n], "name")
             CASE "abstand"
                 controlsVon(navEl[n])
                 pfad = elemente[navEl[n]].name + "." + ctrlNamen[navCtrl[n]] + ".abstand" + STR$(navMeth[n])
@@ -738,8 +751,8 @@ SUB navigatorPruefen()
             codeOeffnen(methoden[navMeth[n]])
         CASE "dekl"
             deklOeffnen(elemente[ei])
-        CASE "tabelle"
-            dbOeffnen(elemente[ei], dbTabellenNamen(elemente[ei])[navCtrl[n]])
+        CASE "tabelle", "spalte"
+            IF NOT nvDruck THEN nvKlick(n)
     END SELECT
 END SUB
 

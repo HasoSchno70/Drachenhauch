@@ -238,8 +238,14 @@ wenn sich eine Spalte ändert). Im erzeugten Programm eine globale
 Verbindung unter dem Namen der Datenbank (erzeugt in studio_datenbanken.dh),
 die fehlende Tabellen und Spalten selbst anlegt; F5 arbeitet über
 `DH_STUDIO_DATEN` auf der Datei im Projektordner, Bauen legt sie neben das
-Programm. Offen (Stufe 2): Felder per Ziehen an Spalten binden, Fenster mit
-Laden/Sichern einer Tabelle, Liste/Tabelle an eine Tabelle binden.
+Programm. Stufe 2: Spalten im Navigator, ins Fenster gezogen (oder
+doppelgeklickt) werden sie zu gebundenen Feldern; ein Fenster an einer
+Tabelle (`studio_tabelle`) bekommt in seiner Basis Laden/Sichern/Neu/
+Loeschen/Ungesichert, eine Liste, Tabelle oder Klappliste mit Datenquelle
+(`studio_quelle`, `studio_spalten`) Neuladen/IdVon; zeigt sie die Tabelle des
+Fensters, laedt ein Klick auf eine Zeile den Datensatz. Inspektor-Gruppe
+Daten. Offen: Fremdschluessel (eine Klappliste, die die id einer anderen
+Tabelle bindet), Filter und Sortierung der Datenquelle, Verbunde.
 
 **Geprüft wird je Stufe** mit einer Prüfsammlung `werkzeug_studio*.dhtest`.
 Die Klicks sind echt, über Aufnahmen und Fensternachrichten. Erzeugtes läuft

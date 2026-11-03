@@ -1,0 +1,291 @@
+' Drachenhauch Studio: Datenbanken im Projekt, Stufe 2 -- Fenster und Listen
+' an Tabellen binden (studio/datenbank.dh, studio/dbeditor.dh,
+' studio/inspektor.dh, docs/studio.md). Ein Fenster nennt seine Tabelle
+' (studio_tabelle), ein Feld seine Spalte (bind), eine Liste, Tabelle oder
+' Klappliste ihre Datenquelle (studio_quelle). Die erzeugte Basisklasse
+' bekommt Laden/Sichern/Neu/Loeschen/Ungesichert und Neuladen/IdVon.
+'
+' Alle Faelle starten das Studio als Kind (_hilfen/studiolauf.dh); wo
+' geklickt wird, misst ein erster Lauf die Lagen.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== das erzeugte fenster laedt, sichert, loescht und fuellt seine listen
+' Neu setzt die Vorgabe (aktiv = ja), Sichern legt eine Zeile an und waehlt
+' sie in der Liste, Laden zeigt Geld als 12,50, die Klappliste zeigt die
+' genannte Spalte (umsatz), IdVon kennt die gewaehlte Zeile. Danach klickt das Programm selbst
+' (eine Aufnahme) auf die zweite Zeile der Tabelle -- sie zeigt die Tabelle
+' des Fensters, also laedt das Fenster Bert; ein Timer schreibt es hin.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(200)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "90")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "ausgabe ")
+    IF INSTR(z, "▶") < 0 AND INSTR(z, "■") < 0 AND INSTR(z, "WARNING") < 0 THEN PRINT z
+NEXT
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT NOT NULL DEFAULT '', umsatz INTEGER, aktiv INTEGER NOT NULL DEFAULT 1)")
+DB_EXEC(db, "INSERT INTO kunden (name, umsatz, aktiv) VALUES ('Anna', 1250, 1)")
+DB_EXEC(db, "INSERT INTO kunden (name, umsatz, aktiv) VALUES ('Bert', NULL, 0)")
+DB_CLOSE(db)
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":600,"h":400,"studio_tabelle":"Daten.kunden","timer":[{"name":"spaeter","intervall":700,"aktiv":true,"wiederholen":false}],"widgets":[{"kind":"table","name":"liste","x":10,"y":10,"w":300,"h":200,"table":{"headers":["a"]},"studio_quelle":"Daten.kunden"},{"kind":"textinput","name":"nameFeld","x":320,"y":10,"w":200,"h":28,"bind":"name"},{"kind":"textinput","name":"umsatzFeld","x":320,"y":50,"w":200,"h":28,"bind":"umsatz","zahlen":3},{"kind":"checkbox","name":"aktivFeld","text":"aktiv","x":320,"y":90,"w":100,"h":24,"bind":"aktiv"},{"kind":"dropdown","name":"wahl","x":320,"y":130,"w":200,"h":28,"items":[],"studio_quelle":"Daten.kunden","studio_spalten":"umsatz"}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB Geoeffnet()
+        PRINT "neu "; Self.DatensatzId; " ["; GUI_TEXT(Self.nameFeld); "] "; GUI_CHECKED(Self.aktivFeld)
+        GUI_SET_TEXT(Self.nameFeld, "Clara")
+        GUI_SET_TEXT(Self.umsatzFeld, "7,25")
+        PRINT "sichern "; Self.Sichern(); " "; Self.DatensatzId
+        PRINT "zeilen "; GUI_TABLE_ROW_COUNT(Self.liste); " "; GUI_TABLE_GET_CELL(Self.liste, 2, 0); " "; GUI_TABLE_GET_CELL(Self.liste, 2, 1); " gewaehlt "; GUI_TABLE_SELECTED(Self.liste)
+        PRINT "laden "; Self.Laden(1); " "; GUI_TEXT(Self.nameFeld); " "; GUI_TEXT(Self.umsatzFeld); " "; Self.Ungesichert()
+        GUI_SET_TEXT(Self.nameFeld, "Anja")
+        PRINT "ungesichert "; Self.Ungesichert()
+        PRINT "klapp "; GUI_LISTBOX_COUNT(Self.wahl); " "; GUI_LISTBOX_ITEM(Self.wahl, 2)
+        GUI_DROPDOWN_SET_SELECTED(Self.wahl, 2)
+        PRINT "id "; Self.IdVon(Self.wahl)
+        Self.Laden(3)
+        PRINT "loeschen "; Self.Loeschen(); " "; GUI_TABLE_ROW_COUNT(Self.liste); " "; Self.DatensatzId
+        WRITEALL("klick.txt", "c 4" + CHR$(10) + "e 0 7 60 62 0 0" + CHR$(10) + "e 1 7 60 62 0 0" + CHR$(10) + "e 3 6 0 0 0 0" + CHR$(10) + "e 5 5 0 0 0 0" + CHR$(10))
+        AUTOMATION_PLAY("klick.txt")
+    END SUB
+    SUB spaeter_Aktion()
+        PRINT "geklickt "; Self.DatensatzId; " "; GUI_TEXT(Self.nameFeld); " "; GUI_CHECKED(Self.aktivFeld)
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":true,"eindeutig":false,"vorgabe":""},{"name":"umsatz","typ":"geld","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"aktiv","typ":"wahr","pflicht":true,"eindeutig":false,"vorgabe":"ja"}]}]}
+--- erwartet
+ausgabe neu 0 [] TRUE
+ausgabe sichern TRUE 3
+ausgabe zeilen 3 Clara 7,25 gewaehlt 2
+ausgabe laden TRUE Anna 12,50 FALSE
+ausgabe ungesichert TRUE
+ausgabe klapp 3 7,25
+ausgabe id 3
+ausgabe loeschen TRUE 2 0
+ausgabe geklickt 2 Bert FALSE
+
+=== eine tabelle ins fenster ziehen legt gebundene felder an
+' Aus dem Navigator: die Tabelle kunden ins leere Fenster. Je Spalte eine
+' Beschriftung und ein Feld (Geld als Geldfeld, Ja/Nein als Kaestchen), das
+' Fenster bekommt die Tabelle. F5 sichert und startet: Laden(1) fuellt die
+' neuen Felder.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, "", 8, p)
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(x, y) = slLage(log, "knoten Daten.kunden")
+(fx, fy) = slLage(log, "fenster")
+slHin(10, 10)
+slWarten(10)
+slZug(x, y, fx + 40, fy + 40, 12, TRUE)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "felder ")
+    PRINT z
+NEXT
+FOR EACH z IN slAnfang(log, "ausgabe laden")
+    PRINT z
+NEXT
+DIM j AS JSON_HANDLE : j = JSON_LOAD(p + "/Hauptfenster.dhform")
+PRINT "tabelle "; JSON_GET_STRING(j, "studio_tabelle")
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(j, "widgets") - 1
+    DIM w AS STRING : w = "widgets." + STR$(i)
+    PRINT "  "; JSON_GET_STRING(j, w + ".kind"); " "; JSON_GET_STRING(j, w + ".name"); IIF(JSON_HAS(j, w + ".bind"), " bind=" + JSON_GET_STRING(j, w + ".bind"), ""); IIF(JSON_HAS(j, w + ".zahlen"), " zahlen=" + STR$(JSON_GET_INT(j, w + ".zahlen")), "")
+NEXT
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT NOT NULL DEFAULT '', umsatz INTEGER, aktiv INTEGER NOT NULL DEFAULT 1)")
+DB_EXEC(db, "INSERT INTO kunden (name, umsatz, aktiv) VALUES ('Anna', 1250, 1)")
+DB_CLOSE(db)
+--- datei laeufer.dh
+IMPORT "json"
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":600,"h":400,"widgets":[]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB Geoeffnet()
+        PRINT "laden "; Self.Laden(1); " "; GUI_TEXT(Self.nameFeld); " "; GUI_TEXT(Self.umsatzFeld); " "; GUI_CHECKED(Self.aktivFeld)
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":true,"eindeutig":false,"vorgabe":""},{"name":"umsatz","typ":"geld","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"aktiv","typ":"wahr","pflicht":true,"eindeutig":false,"vorgabe":"ja"}]}]}
+--- erwartet
+felder Daten.kunden nameFeld,umsatzFeld,aktivFeld
+ausgabe laden TRUE Anna 12,50 TRUE
+tabelle Daten.kunden
+  label nameText
+  textinput nameFeld bind=name
+  label umsatzText
+  textinput umsatzFeld bind=umsatz zahlen=3
+  checkbox aktivFeld bind=aktiv
+
+=== ein doppelklick auf eine spalte legt ihr feld unter das letzte control
+' Das Fenster hat schon einen Knopf und eine andere Tabelle: das Feld kommt
+' darunter, das Fenster behaelt seine Tabelle, und die Statuszeile sagt es.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, "", 8, p)
+DIM x AS INTEGER
+DIM y AS INTEGER
+(x, y) = slLage(log, "knoten Daten.kunden.ort")
+slHin(10, 10)
+slWarten(10)
+slKlick(x, y)
+slWarten(3)
+slKlick(x, y)
+slWarten(10)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "felder ")
+    PRINT z
+NEXT
+DIM j AS JSON_HANDLE : j = JSON_LOAD(p + "/Hauptfenster.dhform")
+PRINT "tabelle "; JSON_GET_STRING(j, "studio_tabelle")
+PRINT "feld "; JSON_GET_STRING(j, "widgets.2.name"); " "; JSON_GET_STRING(j, "widgets.2.bind"); " y="; JSON_GET_INT(j, "widgets.2.y"); " text "; JSON_GET_STRING(j, "widgets.1.text")
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "json"
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":600,"h":400,"studio_tabelle":"Daten.artikel","widgets":[{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"ort","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""}]},{"name":"artikel","spalten":[]}]}
+--- erwartet
+felder Daten.kunden ortFeld
+tabelle Daten.artikel
+feld ortFeld ort y=80 text ort:
+
+=== tabelle und datenquelle im inspektor waehlen
+' Fenster gewaehlt: die Auswahl Tabelle aufklappen, eins nach unten, Enter
+' (der erste Eintrag ist "(keine)"). Dann die Tabelle liste im Navigator
+' waehlen und ihre Datenquelle genauso -- ihr Kopf zeigt danach die Spalten.
+' Strg+S sichert.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM x AS INTEGER
+DIM y AS INTEGER
+' Erster Lauf: messen, mit einem Klick auf die Liste, damit auch ihre Felder
+' im Protokoll stehen.
+slStarten(log, "", 8, p)
+(x, y) = slLage(log, "knoten Hauptfenster.liste")
+slHin(10, 10)
+slWarten(10)
+slKlick(x, y)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+DIM tx AS INTEGER
+DIM ty AS INTEGER
+DIM qx AS INTEGER
+DIM qy AS INTEGER
+DIM lx AS INTEGER
+DIM ly AS INTEGER
+(tx, ty) = slLage(log, "feld studio_tabelle")
+(qx, qy) = slLage(log, "feld studio_quelle")
+(lx, ly) = slLage(log, "knoten Hauptfenster.liste")
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(10)
+slKlick(tx, ty)
+slWarten(6)
+slTaste(264)
+slTaste(257)
+slWarten(10)
+slKlick(lx, ly)
+slWarten(10)
+slKlick(qx, qy)
+slWarten(6)
+slTaste(264)
+slTaste(257)
+slWarten(10)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "fenster tabelle")
+    PRINT z
+NEXT
+DIM j AS JSON_HANDLE : j = JSON_LOAD(p + "/Hauptfenster.dhform")
+PRINT "tabelle "; JSON_GET_STRING(j, "studio_tabelle")
+PRINT "quelle "; JSON_GET_STRING(j, "widgets.0.studio_quelle")
+PRINT "kopf "; JSON_GET_STRING(j, "widgets.0.table.headers.0"); " "; JSON_GET_STRING(j, "widgets.0.table.headers.1")
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "json"
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":600,"h":400,"widgets":[{"kind":"table","name":"liste","x":20,"y":20,"w":300,"h":200,"table":{"headers":["a"]}}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":true,"eindeutig":false,"vorgabe":""},{"name":"ort","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""}]}]}
+--- erwartet
+fenster tabelle Daten.kunden
+tabelle Daten.kunden
+quelle Daten.kunden
+kopf name ort

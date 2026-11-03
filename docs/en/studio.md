@@ -437,6 +437,41 @@ columns and indexes itself; it does not rename or delete there. Deleting
 the element only removes the structure from the project; the file with the
 data stays.
 
+**Binding a window to a table.** The navigator lists the columns under each
+table. Dragging a column or the whole table into the open window adds a
+label and a matching field per column, bound to the column: text, numbers
+and money as a text field (money with a decimal comma), a date as a text
+field for `YYYY-MM-DD`, yes/no as a check box. Double-clicking a column puts
+its field below the last control. If the window has no table yet, it gets
+this one; the inspector shows it in the **Data** group (Table on the window,
+Column on each field).
+
+| Method | does |
+|---|---|
+| `Laden(id)` | loads the row into the fields, `DatensatzId` is then `id` |
+| `Sichern()` | checks the fields' rules and writes (a new row when `DatensatzId` is 0) |
+| `Neu()` | empties the fields and sets the columns' defaults |
+| `Loeschen()` | deletes the row that is shown |
+| `Ungesichert()` | has anything changed since loading or saving? |
+
+A list, a table or a drop-down list shows the rows of a table when its
+**Data source** is chosen in the inspector; **Shown columns** says which
+(separated by semicolons; empty: all for a table, otherwise the first). The
+window fills it when it opens; `Neuladen()` fetches it again, and
+`IdVon(list)` returns the id of the selected row. If a list shows the
+window's own table, clicking a row loads it into the fields, and after
+saving and deleting the list is already up to date.
+
+```text
+SUB knopfNeu_Klick()
+    Self.Neu()
+END SUB
+
+SUB knopfSichern_Klick()
+    IF NOT Self.Sichern() THEN Meldung("Bitte die Eingaben prüfen.")
+END SUB
+```
+
 ## A single window
 
 A `.dhform` (the same format that `GUI_SAVE` writes and `GUI_LOAD` reads)
@@ -504,4 +539,7 @@ timers, a menu shortcut and an image, and halts in the debugger.
 `tests/pruef/werkzeug_studio_datenbank.dhtest` tests the databases: the core
 without a window (on the file, as SQLite sees it), the generated program on
 an older file, and the studio with real clicks into both grids, F5 and
-building.
+building; `tests/pruef/werkzeug_studio_datenbank2.dhtest` tests binding:
+methods and lists in the generated window including a click on a row,
+dragging and double-clicking columns into the window, and the choices in the
+inspector.

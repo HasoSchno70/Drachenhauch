@@ -740,6 +740,22 @@ FUNCTION datenbankCode$() AS STRING
             ARRAY_PUSH(z, "    WEND")
             ARRAY_PUSH(z, "    DB_EXEC(db, " + dbText$("ALTER TABLE " + CHR$(34)) + " + tabelle + " + dbText$(CHR$(34) + " ADD COLUMN ") + " + def)")
             ARRAY_PUSH(z, "END SUB")
+            ARRAY_PUSH(z, "")
+            ARRAY_PUSH(z, "' Ein Wert zum Anzeigen: Geld 12,34, Ja/Nein, Kommazahl mit Komma.")
+            ARRAY_PUSH(z, "FUNCTION studioDbText$(r AS DB_RESULT, i AS INTEGER, art AS STRING) AS STRING")
+            ARRAY_PUSH(z, "    IF DB_IS_NULL(r, i) THEN RETURN " + CHR$(34) + CHR$(34))
+            ARRAY_PUSH(z, "    IF art = " + dbText$("geld") + " THEN")
+            ARRAY_PUSH(z, "        DIM c AS INTEGER : c = DB_GET_INT(r, i)")
+            ARRAY_PUSH(z, "        RETURN IIF(c < 0, " + dbText$("-") + ", " + dbText$("") + ") + STR$(ABS(c) \ 100) + " + dbText$(",") + " + RIGHT$(" + dbText$("0") + " + STR$(ABS(c) MOD 100), 2)")
+            ARRAY_PUSH(z, "    END IF")
+            ARRAY_PUSH(z, "    IF art = " + dbText$("wahr") + " THEN RETURN IIF(DB_GET_INT(r, i) <> 0, " + dbText$("ja") + ", " + dbText$("nein") + ")")
+            ARRAY_PUSH(z, "    IF art = " + dbText$("zahl") + " THEN")
+            ARRAY_PUSH(z, "        DIM t AS STRING : t = DB_GET_STRING(r, i)")
+            ARRAY_PUSH(z, "        IF RIGHT$(t, 2) = " + dbText$(".0") + " THEN t = LEFT$(t, LEN(t) - 2)")
+            ARRAY_PUSH(z, "        RETURN REPLACE$(t, " + dbText$(".") + ", " + dbText$(",") + ")")
+            ARRAY_PUSH(z, "    END IF")
+            ARRAY_PUSH(z, "    RETURN DB_GET_STRING(r, i)")
+            ARRAY_PUSH(z, "END FUNCTION")
         END IF
         DIM s AS JSON_HANDLE : s = dbSchema(e)
         ARRAY_PUSH(z, "")
@@ -781,3 +797,247 @@ FUNCTION datenbankenAbgleichen$() AS STRING
     NEXT
     RETURN ""
 END FUNCTION
+
+' --- Bindung: Fenster und Listen an Tabellen (Stufe 2) ---------------------------
+'  Ein Fenster nennt seine Tabelle in "studio_tabelle" (Datenbank.tabelle),
+'  ein Feld seine Spalte in "bind" (GUI_BIND der Laufzeit). Eine Liste, eine
+'  Tabelle oder eine Klappliste nennt in "studio_quelle" die Tabelle, deren
+'  Zeilen sie zeigt, und in "studio_spalten" welche Spalten (leer = alle bzw.
+'  die erste). Die Basisklasse des Fensters bekommt daraus Laden/Sichern/Neu/
+'  Loeschen/Ungesichert und Neuladen/IdVon (erzeugen.dh ruft die SUBs hier).
+DIM dbRefEl AS Element
+DIM dbRefT AS INTEGER : dbRefT = -1
+
+' "Daten.kunden" aufloesen: TRUE, wenn es Datenbank und Tabelle gibt.
+FUNCTION dbRef(ref AS STRING) AS BOOLEAN
+    dbRefT = -1
+    DIM k AS INTEGER : k = INSTR(ref, ".")
+    IF k <= 0 THEN RETURN FALSE
+    DIM ei AS INTEGER : ei = elementIndex(LEFT$(ref, k))
+    IF ei < 0 THEN RETURN FALSE
+    IF elemente[ei].art <> "datenbank" THEN RETURN FALSE
+    dbRefEl = elemente[ei]
+    dbRefT = dbTabIndex(dbSchema(dbRefEl), MID$(ref, k + 1, LEN(ref)))
+    RETURN dbRefT >= 0
+END FUNCTION
+
+' Alle Tabellen des Projekts als "Datenbank.tabelle".
+FUNCTION dbAlleTabellen() AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM e AS Element
+    FOR EACH e IN elemente
+        IF e.art <> "datenbank" THEN CONTINUE
+        DIM tn AS STRING
+        FOR EACH tn IN dbTabellenNamen(e)
+            ARRAY_PUSH(aus, e.name + "." + tn)
+        NEXT
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Die Spalten einer Tabelle (ohne id), "" = gibt es nicht.
+FUNCTION dbSpaltenVon(ref AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    IF NOT dbRef(ref) THEN RETURN aus
+    DIM s AS JSON_HANDLE : s = dbSchema(dbRefEl)
+    DIM k AS INTEGER
+    FOR k = 0 TO dbSpZahl(s, dbRefT) - 1
+        ARRAY_PUSH(aus, dbSp$(s, dbRefT, k, "name"))
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Welche Spalten eine Liste zeigt: die genannten, soweit es sie gibt; ohne
+' Angabe bei einer Tabelle alle, sonst die erste. Nummern im Schema.
+FUNCTION dbListSpalten(s AS JSON_HANDLE, t AS INTEGER, angabe AS STRING, art AS STRING) AS ARRAY OF INTEGER
+    DIM aus AS ARRAY OF INTEGER : aus = []
+    DIM w AS STRING
+    FOR EACH w IN SPLIT(angabe, ";")
+        DIM k AS INTEGER : k = dbSpIndex(s, t, TRIM$(w))
+        IF k >= 0 THEN ARRAY_PUSH(aus, k)
+    NEXT
+    IF LEN(aus) = 0 THEN
+        FOR k = 0 TO dbSpZahl(s, t) - 1
+            ARRAY_PUSH(aus, k)
+            IF art <> "table" THEN BREAK
+        NEXT
+    END IF
+    RETURN aus
+END FUNCTION
+
+FUNCTION dbBindText$(d AS JSON_HANDLE, pfad AS STRING) AS STRING
+    IF NOT JSON_HAS(d, pfad) THEN RETURN ""
+    IF JSON_TYPE(d, pfad) <> "string" THEN RETURN ""
+    RETURN JSON_GET_STRING(d, pfad)
+END FUNCTION
+
+' Die Tabelle eines Fensters, "" = keine (oder es gibt sie nicht mehr).
+FUNCTION dbFensterTabelle$(d AS JSON_HANDLE) AS STRING
+    DIM ref AS STRING : ref = dbBindText$(d, "studio_tabelle")
+    IF ref = "" OR NOT dbRef(ref) THEN RETURN ""
+    RETURN ref
+END FUNCTION
+
+' Die Listen eines Fensters mit Datenquelle: ihre Nummern im Layout.
+FUNCTION dbQuellListen(d AS JSON_HANDLE, namen AS ARRAY OF STRING, arten AS ARRAY OF STRING) AS ARRAY OF INTEGER
+    DIM aus AS ARRAY OF INTEGER : aus = []
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(d, "widgets") - 1
+        IF i >= LEN(namen) THEN BREAK
+        IF NOT istBezeichner(namen[i]) THEN CONTINUE
+        IF arten[i] <> "table" AND arten[i] <> "listbox" AND arten[i] <> "dropdown" THEN CONTINUE
+        IF dbRef(dbBindText$(d, "widgets." + STR$(i) + ".studio_quelle")) THEN ARRAY_PUSH(aus, i)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+SUB dbBasisFelder(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF STRING, arten AS ARRAY OF STRING)
+    IF dbFensterTabelle$(d) <> "" THEN ARRAY_PUSH(z, "    DIM DatensatzId AS INTEGER")
+    DIM i AS INTEGER
+    FOR EACH i IN dbQuellListen(d, namen, arten)
+        ARRAY_PUSH(z, "    DIM studioIds_" + namen[i] + " AS ARRAY OF INTEGER")
+    NEXT
+END SUB
+
+' Am Ende von studioAufbauen: ein leerer Datensatz mit den Vorgaben, die
+' Listen gefuellt.
+SUB dbBasisAufbau(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF STRING, arten AS ARRAY OF STRING)
+    IF dbFensterTabelle$(d) <> "" THEN ARRAY_PUSH(z, "        Self.Neu()")
+    IF LEN(dbQuellListen(d, namen, arten)) > 0 THEN ARRAY_PUSH(z, "        Self.Neuladen()")
+END SUB
+
+SUB dbBasisMethoden(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF STRING, arten AS ARRAY OF STRING)
+    DIM ft AS STRING : ft = dbFensterTabelle$(d)
+    DIM listen AS ARRAY OF INTEGER : listen = dbQuellListen(d, namen, arten)
+    DIM neuladen AS STRING : neuladen = IIF(LEN(listen) > 0, "        Self.Neuladen()", "")
+    IF ft <> "" THEN
+        dbRef(ft)
+        DIM con AS STRING : con = dbRefEl.name
+        DIM tab AS STRING : tab = dbTabName$(dbSchema(dbRefEl), dbRefT)
+        DIM s AS JSON_HANDLE : s = dbSchema(dbRefEl)
+        ARRAY_PUSH(z, "")
+        ARRAY_PUSH(z, "    ' Das Fenster gehoert zur Tabelle " + ft + ": DatensatzId ist die Zeile,")
+        ARRAY_PUSH(z, "    ' die gerade dasteht (0 = eine neue, noch nicht gesichert).")
+        ARRAY_PUSH(z, "    FUNCTION Laden(id AS INTEGER) AS BOOLEAN")
+        ARRAY_PUSH(z, "        IF NOT GUI_FORM_LOAD(Self.studioWin, " + con + ", " + dbText$(tab) + ", id) THEN RETURN FALSE")
+        ARRAY_PUSH(z, "        Self.DatensatzId = id")
+        ARRAY_PUSH(z, "        RETURN TRUE")
+        ARRAY_PUSH(z, "    END FUNCTION")
+        ARRAY_PUSH(z, "")
+        ARRAY_PUSH(z, "    FUNCTION Sichern() AS BOOLEAN")
+        ARRAY_PUSH(z, "        IF GUI_VALIDATE(Self.studioWin) > 0 THEN RETURN FALSE")
+        ARRAY_PUSH(z, "        DIM id AS INTEGER : id = GUI_FORM_SAVE(Self.studioWin, " + con + ", " + dbText$(tab) + ", IIF(Self.DatensatzId > 0, Self.DatensatzId, -1))")
+        ARRAY_PUSH(z, "        IF id = 0 THEN RETURN FALSE")
+        ARRAY_PUSH(z, "        Self.DatensatzId = id")
+        IF neuladen <> "" THEN ARRAY_PUSH(z, neuladen)
+        ARRAY_PUSH(z, "        RETURN TRUE")
+        ARRAY_PUSH(z, "    END FUNCTION")
+        ARRAY_PUSH(z, "")
+        ' Neu: die Felder leer, dann die Vorgaben der gebundenen Spalten.
+        DIM vor AS ARRAY OF STRING : vor = []
+        DIM i AS INTEGER
+        FOR i = 0 TO JSON_LEN(d, "widgets") - 1
+            DIM sp AS STRING : sp = dbBindText$(d, "widgets." + STR$(i) + ".bind")
+            IF sp = "" THEN CONTINUE
+            DIM k AS INTEGER : k = dbSpIndex(s, dbRefT, sp)
+            IF k < 0 THEN CONTINUE
+            IF dbSp$(s, dbRefT, k, "vorgabe") = "" THEN CONTINUE
+            ARRAY_PUSH(vor, dbText$(sp) + ": " + dbText$(dbSp$(s, dbRefT, k, "vorgabe")))
+        NEXT
+        ARRAY_PUSH(z, "    SUB Neu()")
+        ARRAY_PUSH(z, "        GUI_FORM_CLEAR(Self.studioWin)")
+        IF LEN(vor) > 0 THEN ARRAY_PUSH(z, "        GUI_FORM_SET(Self.studioWin, {" + JOIN$(vor, ", ") + "})")
+        ARRAY_PUSH(z, "        GUI_FORM_CLEAN(Self.studioWin)")
+        ARRAY_PUSH(z, "        Self.DatensatzId = 0")
+        ARRAY_PUSH(z, "    END SUB")
+        ARRAY_PUSH(z, "")
+        ARRAY_PUSH(z, "    FUNCTION Loeschen() AS BOOLEAN")
+        ARRAY_PUSH(z, "        IF Self.DatensatzId <= 0 THEN RETURN FALSE")
+        ARRAY_PUSH(z, "        DB_EXEC(" + con + ", " + dbText$("DELETE FROM " + dbQ$(tab) + " WHERE id = ?") + ", Self.DatensatzId)")
+        ARRAY_PUSH(z, "        Self.Neu()")
+        IF neuladen <> "" THEN ARRAY_PUSH(z, neuladen)
+        ARRAY_PUSH(z, "        RETURN TRUE")
+        ARRAY_PUSH(z, "    END FUNCTION")
+        ARRAY_PUSH(z, "")
+        ARRAY_PUSH(z, "    FUNCTION Ungesichert() AS BOOLEAN")
+        ARRAY_PUSH(z, "        RETURN GUI_FORM_CHANGED(Self.studioWin)")
+        ARRAY_PUSH(z, "    END FUNCTION")
+    END IF
+    IF LEN(listen) = 0 THEN RETURN
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "    ' Die Listen mit Datenquelle neu aus der Datenbank fuellen.")
+    ARRAY_PUSH(z, "    SUB Neuladen()")
+    ARRAY_PUSH(z, "        DIM r AS DB_RESULT")
+    DIM li AS INTEGER
+    FOR EACH li IN listen
+        DIM ref AS STRING : ref = dbBindText$(d, "widgets." + STR$(li) + ".studio_quelle")
+        dbRef(ref)
+        DIM ls AS JSON_HANDLE : ls = dbSchema(dbRefEl)
+        DIM ltab AS STRING : ltab = dbTabName$(ls, dbRefT)
+        DIM spalten AS ARRAY OF INTEGER : spalten = dbListSpalten(ls, dbRefT, dbBindText$(d, "widgets." + STR$(li) + ".studio_spalten"), arten[li])
+        DIM w AS STRING : w = "Self." + namen[li]
+        DIM ids AS STRING : ids = "Self.studioIds_" + namen[li]
+        DIM sel AS ARRAY OF STRING : sel = ["id"]
+        DIM kopf AS ARRAY OF STRING : kopf = []
+        DIM zellen AS ARRAY OF STRING : zellen = []
+        DIM q AS INTEGER
+        FOR q = 0 TO LEN(spalten) - 1
+            ARRAY_PUSH(sel, dbQ$(dbSp$(ls, dbRefT, spalten[q], "name")))
+            ARRAY_PUSH(kopf, dbText$(dbSp$(ls, dbRefT, spalten[q], "name")))
+            ARRAY_PUSH(zellen, "studioDbText$(r, " + STR$(q + 1) + ", " + dbText$(dbSp$(ls, dbRefT, spalten[q], "typ")) + ")")
+        NEXT
+        ARRAY_PUSH(z, "        ' " + namen[li] + ": " + ref)
+        ARRAY_PUSH(z, "        " + ids + " = []")
+        IF arten[li] = "table" THEN
+            ARRAY_PUSH(z, "        GUI_TABLE_CLEAR(" + w + ")")
+            IF LEN(kopf) > 0 THEN ARRAY_PUSH(z, "        GUI_TABLE_HEADERS(" + w + ", [" + JOIN$(kopf, ", ") + "])")
+        ELSE
+            ARRAY_PUSH(z, "        GUI_LISTBOX_CLEAR(" + w + ")")
+        END IF
+        ARRAY_PUSH(z, "        r = DB_QUERY(" + dbRefEl.name + ", " + dbText$("SELECT " + JOIN$(sel, ", ") + " FROM " + dbQ$(ltab) + " ORDER BY id") + ")")
+        ARRAY_PUSH(z, "        WHILE DB_NEXT(r)")
+        ARRAY_PUSH(z, "            ARRAY_PUSH(" + ids + ", DB_GET_INT(r, 0))")
+        IF arten[li] = "table" THEN
+            ARRAY_PUSH(z, "            GUI_TABLE_ADD_ROW(" + w + ", [" + JOIN$(zellen, ", ") + "])")
+        ELSE
+            ARRAY_PUSH(z, "            GUI_LISTBOX_ADD(" + w + ", " + IIF(LEN(zellen) > 0, zellen[0], "STR$(DB_GET_INT(r, 0))") + ")")
+        END IF
+        ARRAY_PUSH(z, "        WEND")
+        ' Zeigt die Liste die Tabelle des Fensters, bleibt der Datensatz gewaehlt.
+        IF ref = ft THEN
+            DIM setzen AS STRING : setzen = IIF(arten[li] = "table", "GUI_TABLE_SET_SELECTED", IIF(arten[li] = "dropdown", "GUI_DROPDOWN_SET_SELECTED", "GUI_LISTBOX_SET_SELECTED"))
+            ARRAY_PUSH(z, "        IF Self.DatensatzId > 0 AND ARRAY_INDEXOF(" + ids + ", Self.DatensatzId) >= 0 THEN " + setzen + "(" + w + ", ARRAY_INDEXOF(" + ids + ", Self.DatensatzId))")
+        END IF
+    NEXT
+    ARRAY_PUSH(z, "    END SUB")
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "    ' Die id der gewaehlten Zeile einer Liste mit Datenquelle (0 = keine).")
+    ARRAY_PUSH(z, "    FUNCTION IdVon(w AS GUI_WIDGET) AS INTEGER")
+    ARRAY_PUSH(z, "        DIM i AS INTEGER : i = -1")
+    FOR EACH li IN listen
+        DIM wahl AS STRING : wahl = IIF(arten[li] = "table", "GUI_TABLE_SELECTED", IIF(arten[li] = "dropdown", "GUI_DROPDOWN_SELECTED", "GUI_LISTBOX_SELECTED"))
+        ARRAY_PUSH(z, "        IF w = Self." + namen[li] + " THEN")
+        ARRAY_PUSH(z, "            i = " + wahl + "(w)")
+        ARRAY_PUSH(z, "            IF i >= 0 AND i < LEN(Self.studioIds_" + namen[li] + ") THEN RETURN Self.studioIds_" + namen[li] + "[i]")
+        ARRAY_PUSH(z, "        END IF")
+    NEXT
+    ARRAY_PUSH(z, "        RETURN 0")
+    ARRAY_PUSH(z, "    END FUNCTION")
+END SUB
+
+' Je Bild: waehlt man in einer Liste der eigenen Tabelle eine Zeile, laedt
+' das Fenster sie.
+SUB dbBasisTakt(takt AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF STRING, arten AS ARRAY OF STRING)
+    DIM ft AS STRING : ft = dbFensterTabelle$(d)
+    IF ft = "" THEN RETURN
+    DIM li AS INTEGER
+    FOR EACH li IN dbQuellListen(d, namen, arten)
+        IF dbBindText$(d, "widgets." + STR$(li) + ".studio_quelle") <> ft THEN CONTINUE
+        ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
+        ARRAY_PUSH(takt, "        IF GUI_CHANGED(Self." + namen[li] + ") THEN")
+        ARRAY_PUSH(takt, "            IF Self.IdVon(Self." + namen[li] + ") > 0 THEN")
+        ARRAY_PUSH(takt, "                DIM studioGel_" + namen[li] + " AS BOOLEAN : studioGel_" + namen[li] + " = Self.Laden(Self.IdVon(Self." + namen[li] + "))")
+        ARRAY_PUSH(takt, "            END IF")
+        ARRAY_PUSH(takt, "        END IF")
+    NEXT
+END SUB

@@ -445,6 +445,41 @@ Tabellen, Spalten und Indexe selbst an, umbenennen und löschen tut es dort
 nicht. Das Element zu löschen nimmt nur den Aufbau aus dem Projekt; die
 Datei mit den Daten bleibt liegen.
 
+**Fenster an eine Tabelle binden.** Im Navigator stehen unter jeder Tabelle
+ihre Spalten. Eine Spalte oder die ganze Tabelle ins offene Fenster gezogen
+legt je Spalte eine Beschriftung und ein passendes Feld an, an die Spalte
+gebunden: Text, Zahl und Geld als Textfeld (Geld mit Komma), Datum als
+Textfeld für `JJJJ-MM-TT`, Ja/Nein als Kästchen. Ein Doppelklick auf eine
+Spalte legt ihr Feld unter das letzte Control. Hat das Fenster noch keine
+Tabelle, bekommt es diese; im Inspektor steht sie in der Gruppe **Daten**
+(Tabelle am Fenster, Spalte an jedem Feld).
+
+| Methode | tut |
+|---|---|
+| `Laden(id)` | holt die Zeile in die Felder, `DatensatzId` ist dann `id` |
+| `Sichern()` | prüft die Regeln der Felder und schreibt (neue Zeile bei `DatensatzId` 0) |
+| `Neu()` | leert die Felder und setzt die Vorgaben der Spalten |
+| `Loeschen()` | löscht die Zeile, die gerade dasteht |
+| `Ungesichert()` | hat sich seit Laden oder Sichern etwas geändert? |
+
+Eine Liste, eine Tabelle oder eine Klappliste zeigt die Zeilen einer Tabelle,
+wenn im Inspektor ihre **Datenquelle** gewählt ist; **Angezeigte Spalten**
+nennt welche (durch Semikolon; leer: bei einer Tabelle alle, sonst die
+erste). Das Fenster füllt sie beim Öffnen; `Neuladen()` holt sie neu, und
+`IdVon(liste)` liefert die id der gewählten Zeile. Zeigt eine Liste die
+Tabelle des Fensters, lädt ein Klick auf eine Zeile sie in die Felder, und
+nach Sichern und Löschen steht die Liste schon richtig.
+
+```text
+SUB knopfNeu_Klick()
+    Self.Neu()
+END SUB
+
+SUB knopfSichern_Klick()
+    IF NOT Self.Sichern() THEN Meldung("Bitte die Eingaben prüfen.")
+END SUB
+```
+
 ## Ein einzelnes Fenster
 
 Eine `.dhform` (dasselbe Format, das `GUI_SAVE` schreibt und `GUI_LOAD`
@@ -513,4 +548,6 @@ Fenster, Timer, Menükürzel und ein Bild durchlaufen und hält im Debugger.
 `tests/pruef/werkzeug_studio_datenbank.dhtest` prüft die Datenbanken: den
 Kern ohne Fenster (an der Datei, wie SQLite sie sieht), das erzeugte
 Programm an einer älteren Datei und das Studio mit echten Klicks in beide
-Gitter, F5 und Bauen.
+Gitter, F5 und Bauen; `tests/pruef/werkzeug_studio_datenbank2.dhtest` die
+Bindung: Methoden und Listen im erzeugten Fenster samt Klick auf eine Zeile,
+Spalten ins Fenster ziehen und doppelklicken, die Auswahlen im Inspektor.
