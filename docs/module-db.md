@@ -19,6 +19,7 @@ IMPORT "db"
 | `DB_GET_INT(r, idx)` | INTEGER | Spalte der aktuellen Zeile als ganze Zahl lesen |
 | `DB_GET_FLOAT(r, idx)` | FLOAT | Spalte der aktuellen Zeile als Kommazahl lesen |
 | `DB_GET_BOOL(r, idx)` | BOOLEAN | Spalte der aktuellen Zeile als Wahrheitswert lesen (0/1 in SQLite) |
+| `DB_GET_BUFFER(r, idx)` | BUFFER | Spalte der aktuellen Zeile als Bytes lesen (BLOB wie gespeichert, Text als UTF-8, NULL leer) |
 | `DB_IS_NULL(r, idx)` | BOOLEAN | steht in dieser Spalte NULL? |
 | `DB_COL_COUNT(r)` | INTEGER | Anzahl der Spalten im Ergebnis |
 | `DB_COL_NAME(r, idx)` | STRING | Name der Spalte (Index ab 0) |
@@ -74,7 +75,8 @@ DB_CLOSE(c)
 * **Andere Typen:** `BOOLEAN` kommt als 1/0 (für `DB_GET_BOOL` wie bei
   SQLite), Datum und Zeit als Text (`2024-02-29`, `2026-10-06 13:05:09`;
   PostgreSQLs `timestamptz` in UTC mit `+00`); Bytes (`BYTEA`, `BLOB`) liest
-  `DB_GET_STRING` als Text, gebunden werden sie als `BUFFER`. Bei
+  `DB_GET_BUFFER` als `BUFFER` (`DB_GET_STRING` als Text), gebunden werden
+  sie als `BUFFER`. Bei
   PostgreSQL auch `uuid`, `json`/`jsonb`, `interval` und `money` als Text.
   Was Drachenhauch nicht liest (etwa ein Feld `int[]`), sagt die Meldung,
   samt dem Ausweg `::text` in der Abfrage.

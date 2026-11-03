@@ -2217,6 +2217,12 @@
    "module": "db"
   },
   {
+   "name": "DB_GET_BUFFER",
+   "kind": "core",
+   "signature": "DB_GET_BUFFER(r, idx) AS BUFFER",
+   "module": "db"
+  },
+  {
    "name": "DB_GET_INT",
    "kind": "core",
    "signature": "DB_GET_INT(r, idx)",

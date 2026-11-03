@@ -5054,6 +5054,7 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "db_is_null" => { let i1 = bi_int(a, 1, "DB_IS_NULL")?; Value::Bool(self.db_res(bi_int(a, 0, "DB_IS_NULL")?)?.is_null(i1)?) }
+            "db_get_buffer" => { let i1 = bi_int(a, 1, "DB_GET_BUFFER")?; Value::Buffer(Rc::new(RefCell::new(self.db_res(bi_int(a, 0, "DB_GET_BUFFER")?)?.get_buffer(i1)?))) }
             "db_get_string" => { let i1 = bi_int(a, 1, "DB_GET_STRING")?; Value::str_rc(&self.db_res(bi_int(a, 0, "DB_GET_STRING")?)?.get_string(i1)?) }
             "db_get_int" => { let i1 = bi_int(a, 1, "DB_GET_INT")?; Value::Int(self.db_res(bi_int(a, 0, "DB_GET_INT")?)?.get_int(i1)?) }
             "db_get_float" => { let i1 = bi_int(a, 1, "DB_GET_FLOAT")?; Value::Float(self.db_res(bi_int(a, 0, "DB_GET_FLOAT")?)?.get_float(i1)?) }
