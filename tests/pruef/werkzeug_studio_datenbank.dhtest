@@ -320,3 +320,215 @@ umbenannt TRUE FALSE
 geladen 3 datenbank Lager
 tabellen kunden datei daten.sqlite
 abgleich [] TRUE
+
+=== eine zelle tippen und eine zeile anlegen landet in der datei
+' Erster Lauf misst (DH_STUDIO_OEFFNEN oeffnet die Tabelle wie ein Klick im
+' Navigator), der zweite klickt auf [Daten], in die Zelle ort der ersten
+' Zeile, fuegt "Bremen" ein (Strg+V schreibt im Gitter direkt in die Zelle)
+' und legt eine Zeile an -- sie bekommt die Vorgaben.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+SETENV("DH_STUDIO_OEFFNEN", "Daten.kunden")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, "", 12, p)
+DIM x AS INTEGER
+DIM y AS INTEGER
+slHin(10, 10)
+slWarten(10)
+(x, y) = slLage(log, "db daten")
+slKlick(x, y)
+slWarten(6)
+(x, y) = slLage(log, "dbzelle da 0 2")
+slKlick(x, y)
+slWarten(4)
+slMit([341], 86)
+slWarten(10)
+(x, y) = slLage(log, "db zeneu")
+slKlick(x, y)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_ABLAGE", "Bremen")
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "db ")
+    PRINT z
+NEXT
+DIM db AS DB_CONN : db = DB_OPEN(p + "/daten.sqlite")
+DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT id, name, ort, aktiv FROM kunden ORDER BY id")
+WHILE DB_NEXT(r)
+    PRINT DB_GET_INT(r, 0); " ["; DB_GET_STRING(r, 1); "] "; DB_GET_STRING(r, 2); " "; DB_GET_INT(r, 3)
+WEND
+DB_CLOSE(db)
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT NOT NULL DEFAULT '', ort TEXT DEFAULT 'Berlin', aktiv INTEGER NOT NULL DEFAULT 1)")
+DB_EXEC(db, "INSERT INTO kunden (name, ort) VALUES ('Anna', NULL)")
+DB_CLOSE(db)
+--- datei laeufer.dh
+IMPORT "db"
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":true,"eindeutig":false,"vorgabe":""},{"name":"ort","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":"Berlin"},{"name":"aktiv","typ":"wahr","pflicht":true,"eindeutig":false,"vorgabe":"ja"}]}]}
+--- erwartet
+db zelle kunden 1 ort [Bremen]
+db zeile neu kunden 2
+1 [Anna] Bremen 1
+2 [] Berlin 1
+
+=== im spalten-gitter umbenennen, pflicht ankreuzen und eine tabelle anlegen
+' In die Namenszelle von ort "stadt" einfuegen (umbenennen), das Kaestchen
+' Pflicht derselben Zeile anklicken (die Tabelle wird neu aufgebaut), dann
+' [Neu ...] mit demselben Text in der Zwischenablage: eine Tabelle stadt.
+' Strg+S sichert den Aufbau in Daten.dhdb.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+SETENV("DH_STUDIO_OEFFNEN", "Daten.kunden")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, "", 12, p)
+DIM x AS INTEGER
+DIM y AS INTEGER
+slHin(10, 10)
+slWarten(10)
+(x, y) = slLage(log, "dbzelle sp 1 0")
+slKlick(x, y)
+slWarten(4)
+slMit([341], 86)
+slWarten(10)
+(x, y) = slLage(log, "dbzelle sp 1 2")
+slKlick(x, y)
+slWarten(10)
+(x, y) = slLage(log, "db tabneu")
+slKlick(x, y)
+slWarten(10)
+slMit([341], 86)
+slWarten(6)
+slTaste(257)
+slWarten(10)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_ABLAGE", "stadt")
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "db ")
+    PRINT z
+NEXT
+DIM db AS DB_CONN : db = DB_OPEN(p + "/daten.sqlite")
+DIM r AS DB_RESULT : r = DB_QUERY(db, "PRAGMA table_info(kunden)")
+WHILE DB_NEXT(r)
+    PRINT "  "; DB_GET_STRING(r, 1); " nn="; DB_GET_INT(r, 3); " df="; IIF(DB_IS_NULL(r, 4), "-", DB_GET_STRING(r, 4))
+WEND
+r = DB_QUERY(db, "SELECT stadt FROM kunden")
+IF DB_NEXT(r) THEN PRINT "wert "; DB_GET_STRING(r, 0)
+DB_CLOSE(db)
+DIM j AS JSON_HANDLE : j = JSON_LOAD(p + "/Daten.dhdb")
+PRINT "dhdb "; JSON_GET_STRING(j, "tabellen.0.spalten.1.name"); " "; JSON_GET_BOOL(j, "tabellen.0.spalten.1.pflicht"); " "; JSON_GET_STRING(j, "tabellen.1.name")
+DIM kx AS INTEGER
+DIM ky AS INTEGER
+(kx, ky) = slLage(log, "knoten Daten.stadt")
+PRINT "navigator "; kx > 0
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT NOT NULL DEFAULT '', ort TEXT DEFAULT 'Berlin')")
+DB_EXEC(db, "INSERT INTO kunden (name, ort) VALUES ('Anna', 'Köln')")
+DB_CLOSE(db)
+--- datei laeufer.dh
+IMPORT "db"
+IMPORT "json"
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":true,"eindeutig":false,"vorgabe":""},{"name":"ort","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":"Berlin"}]}]}
+--- erwartet
+db spalte umbenannt kunden.ort stadt
+db spalte geaendert kunden.stadt text 10 [Berlin]
+db tabelle_neu  stadt
+  id nn=0 df=-
+  name nn=1 df=''
+  stadt nn=1 df='Berlin'
+wert Köln
+dhdb stadt TRUE stadt
+navigator TRUE
+
+=== f5 arbeitet auf den entwicklungsdaten, bauen nimmt sie mit
+' Das Programm zaehlt die Kunden ueber die Verbindung Daten: aus dem Studio
+' gestartet die zwei im Projektordner. Strg+B legt die Datei neben die Exe,
+' und die Exe findet sie dort.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slMit([341], 66)
+slWarten(200)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "lauf "; slHat(log, "ausgabe kunden 2")
+DIM exe AS STRING : exe = "proj" + IIF(LOWER$(RIGHT$(EXEPATH$(), 4)) = ".exe", ".exe", "")
+PRINT "gebaut "; slHat(log, "gebaut " + PATHJOIN(p + "/bau", exe))
+PRINT "daten mit "; slHat(log, "daten mit " + PATHJOIN(p + "/bau", "daten.sqlite"))
+SETENV("DHRT_FRAMES", "20")
+PRINT "exe "; TRIM$(REPLACE$(SHELL_OUT$(PATHJOIN(p + "/bau", exe)), CHR$(13), ""))
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT NOT NULL DEFAULT '')")
+DB_EXEC(db, "INSERT INTO kunden (name) VALUES ('Anna')")
+DB_EXEC(db, "INSERT INTO kunden (name) VALUES ('Bert')")
+DB_CLOSE(db)
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+    SUB Geoeffnet()
+        DIM r AS DB_RESULT : r = DB_QUERY(Daten, "SELECT COUNT(*) FROM kunden")
+        IF DB_NEXT(r) THEN PRINT "kunden "; DB_GET_INT(r, 0)
+    END SUB
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":true,"eindeutig":false,"vorgabe":""}]}]}
+--- erwartet
+lauf TRUE
+gebaut TRUE
+daten mit TRUE
+exe kunden 2

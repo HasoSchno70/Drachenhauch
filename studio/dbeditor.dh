@@ -116,12 +116,12 @@ SUB dbLegen(r AS Reiter)
     GUI_SET_BOUNDS(a.tfDatei, x0 + b - 270, y0, 270, 26)
     DIM y1 AS INTEGER : y1 = y0 + 36
     DIM unten AS INTEGER : unten = y0 + h - 28
-    GUI_SET_BOUNDS(a.lstTab, x0, y1, 260, unten - y1 - 8)
-    GUI_SET_BOUNDS(a.btTabNeu, x0, unten, 64, 28)
-    GUI_SET_BOUNDS(a.btTabUm, x0 + 68, unten, 110, 28)
-    GUI_SET_BOUNDS(a.btTabWeg, x0 + 182, unten, 78, 28)
-    DIM rx AS INTEGER : rx = x0 + 272
-    DIM rb AS INTEGER : rb = b - 272
+    GUI_SET_BOUNDS(a.lstTab, x0, y1, 290, unten - y1 - 8)
+    GUI_SET_BOUNDS(a.btTabNeu, x0, unten, 66, 28)
+    GUI_SET_BOUNDS(a.btTabUm, x0 + 70, unten, 130, 28)
+    GUI_SET_BOUNDS(a.btTabWeg, x0 + 204, unten, 86, 28)
+    DIM rx AS INTEGER : rx = x0 + 302
+    DIM rb AS INTEGER : rb = b - 302
     GUI_SET_BOUNDS(a.btSpalten, rx, y1, 96, 28)
     GUI_SET_BOUNDS(a.btDaten, rx + 100, y1, 96, 28)
     GUI_SET_BOUNDS(a.hinweis, rx + 210, y1 + 5, rb - 210, 20)
@@ -428,7 +428,6 @@ END SUB
 ' --- Je Bild ------------------------------------------------------------------------
 SUB dbAnsichtPruefen(r AS Reiter)
     DIM a AS DbAnsicht : a = r.db
-    IF MOUSE_HIT(0) OR MOUSE_RELEASED(0) THEN protokoll("DBG " + STR$(MOUSEX()) + " " + STR$(MOUSEY()) + " hit " + STR$(GUI_HIT_TEST(MOUSEX(), MOUSEY())) + " daten " + STR$(a.btDaten) + " " + GUI_KIND(GUI_HIT_TEST(MOUSEX(), MOUSEY())))
     IF GUI_CHANGED(a.lstTab) THEN
         DIM i AS INTEGER : i = GUI_LISTBOX_SELECTED(a.lstTab)
         IF i >= 0 THEN dbTabelleWaehlen(r, GUI_LISTBOX_ITEM(a.lstTab, i))

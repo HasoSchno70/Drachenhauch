@@ -476,3 +476,73 @@ Name = Vorgabe; Zahl AS INTEGER = 3 -- ohne AS ein STRING; dazu FLOAT und BOOLEA
 Namen durch Semikolon; im Code des Controls meldet Self.Ausloesen(...) eines davon	Names separated by semicolons; in the control's code Self.Ausloesen(...) reports one of them
 wenn das eigene Control es mit Ausloesen meldet	when the custom control reports it with Ausloesen
 {0} steht noch in {1} -- erst dort die Instanzen löschen.	{0} is still used in {1} -- delete the instances there first.
+# Datenbanken im Projekt (datenbank.dh, dbeditor.dh)
+Name (unter ihm ist die Verbindung im Programm erreichbar):	Name (the program reaches the connection under it):
+{0} aus dem Projekt nehmen? Der Aufbau verschwindet beim nächsten Sichern, die Datei mit den Daten bleibt liegen.	Remove {0} from the project? The structure disappears when you next save; the file with the data stays.
+Ganze Zahl	Whole number
+Kommazahl	Decimal
+Geld	Money
+Ja/Nein	Yes/No
+Namen mit {0} vorn sind vergeben.	Names starting with {0} are reserved.
+Die Spalte id hat jede Tabelle schon.	Every table already has the column id.
+In {0} gibt es einen Wert doppelt -- die Spalte ist eindeutig.	{0} has a value twice -- the column is unique.
+ja	yes
+nein	no
+Eine Tabelle {0} gibt es schon.	There already is a table {0}.
+Die Tabelle {0} gibt es nicht.	There is no table {0}.
+Eine Spalte {0} gibt es in {1} schon.	{1} already has a column {0}.
+Die Spalte {0} gibt es nicht.	There is no column {0}.
+'{0}' ist keine Art.	'{0}' is not a type.
+Die Vorgabe '{0}' passt nicht zu {1}.	The default '{0}' does not fit {1}.
+Die Datei braucht einen Namen.	The file needs a name.
+Erst das Projekt sichern -- dann gibt es eine Datei für die Daten.	Save the project first -- then there is a file for the data.
+{0} ist ein Pflichtfeld.	{0} is required.
+'{0}' passt nicht zu {1} ({2}).	'{0}' does not fit {1} ({2}).
+Datenbank {0}	Database {0}
+Datei:	File:
+Die SQLite-Datei mit den Daten -- im Projektordner, und neben dem gebauten Programm.	The SQLite file with the data -- in the project folder, and next to the built program.
+Noch keine Tabelle -- „Neu …“ legt eine an.	No table yet -- "New …" creates one.
+Neu …	New …
+Umbenennen …	Rename …
+Löschen …	Delete …
+Pflicht	Required
+Eindeutig	Unique
+Noch keine Spalte. Die Spalte id hat jede Tabelle von selbst.	No column yet. Every table has the column id by itself.
+Spalte hinzufügen …	Add column …
+Spalte löschen …	Delete column …
+Zeile hinzufügen	Add row
+Zeile löschen	Delete row
+Neu laden	Reload
+Spalte {0} heißt jetzt {1}.	Column {0} is now called {1}.
+Spalte {0} geändert.	Column {0} changed.
+Noch keine Zeile -- „Zeile hinzufügen“ legt eine an.	No row yet -- "Add row" creates one.
+Die ersten {0} von {1} Zeilen.	The first {0} of {1} rows.
+1 Zeile.	1 row.
+{0} Zeilen.	{0} rows.
+1 Wert gesichert.	1 value saved.
+{0} Werte gesichert.	{0} values saved.
+Erst die Spalte wählen, die weg soll.	First select the column to delete.
+Zeile {0} angelegt.	Row {0} added.
+Zeile {0} gelöscht.	Row {0} deleted.
+Erst die Zeile wählen, die weg soll.	First select the row to delete.
+Datei der Datenbank: {0}	Database file: {0}
+Tabelle hinzufügen	Add table
+Name der Tabelle:	Name of the table:
+Tabelle umbenennen	Rename table
+Neuer Name für {0}:	New name for {0}:
+Umbenennen|Abbrechen	Rename|Cancel
+Tabelle löschen	Delete table
+Die Tabelle {0} mit allen Zeilen löschen? Das lässt sich nicht zurücknehmen.	Delete the table {0} with all its rows? This cannot be undone.
+Spalte hinzufügen	Add column
+Name der neuen Spalte in {0}:	Name of the new column in {0}:
+Spalte löschen	Delete column
+Die Spalte {0} samt ihren Werten löschen? Das lässt sich nicht zurücknehmen.	Delete the column {0} with its values? This cannot be undone.
+tabelle	table
+spalte	column
+Tabelle {0} angelegt.	Table {0} added.
+Tabelle {0} heißt jetzt {1}.	Table {0} is now called {1}.
+Tabelle {0} gelöscht.	Table {0} deleted.
+Spalte {0} angelegt.	Column {0} added.
+Spalte {0} gelöscht.	Column {0} deleted.
+Datenbank hinzufügen …	Add database …
+Datenbank	Database
