@@ -523,23 +523,9 @@ FUNCTION reihenfolge() AS ARRAY OF INTEGER
             END IF
         NEXT
     NEXT
-    ' Eigene Controls vor den Fenstern: deren Basis nennt ihre Klassen. Und
-    ' ein Control nach denen, die in ihm stehen.
-    DIM cdrin AS ARRAY OF STRING : cdrin = []
-    FOR runde = 0 TO LEN(elemente)
-        FOR i = 0 TO LEN(elemente) - 1
-            DIM ec AS Element : ec = elemente[i]
-            IF ec.art <> "control" OR enthaelt(cdrin, LOWER$(ec.name)) THEN CONTINUE
-            DIM cbereit AS BOOLEAN : cbereit = TRUE
-            DIM kn AS STRING
-            FOR EACH kn IN controlKinder(ec.name)
-                IF elementIndex(kn) >= 0 AND LOWER$(kn) <> LOWER$(ec.name) AND NOT enthaelt(cdrin, LOWER$(kn)) THEN cbereit = FALSE
-            NEXT
-            IF cbereit OR runde = LEN(elemente) THEN
-                ARRAY_PUSH(aus, i)
-                ARRAY_PUSH(cdrin, LOWER$(ec.name))
-            END IF
-        NEXT
+    ' Eigene Controls vor den Fenstern: deren Basis nennt ihre Klassen.
+    FOR i = 0 TO LEN(elemente) - 1
+        IF elemente[i].art = "control" THEN ARRAY_PUSH(aus, i)
     NEXT
     FOR i = 0 TO LEN(elemente) - 1
         IF elemente[i].art = "app" THEN ARRAY_PUSH(aus, i)

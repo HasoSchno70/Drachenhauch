@@ -417,7 +417,8 @@ ereignisdialog zaehler1 Erreicht,Geleert
 ' Im Fenster steht zwei1 400 statt 240 breit: z2 waechst um 160, seine
 ' Anzeige mit. Erreicht von z1 kommt in Zwei an, Zwei meldet Voll ans
 ' Fenster. Schleife enthaelt sich selbst und bleibt ein leerer Platz.
-' Zwei steht in der Projektdatei vor Zaehler -- main.dh ordnet trotzdem.
+' Zwei steht in der Projektdatei vor Zaehler (Klassen duerfen vorwaerts
+' aufeinander verweisen).
 IMPORT "laeufer.dh"
 DIM p AS STRING : p = CWD$() + "/proj"
 slHin(10, 10)
