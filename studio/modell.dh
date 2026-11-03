@@ -575,6 +575,119 @@ FUNCTION teilLage(lage AS INTEGER, mass AS INTEGER, anfang AS BOOLEAN, ende AS B
     RETURN (lage, mass)
 END FUNCTION
 
+' --- Eigene Controls: Ereignisse und Eigenschaften -------------------------------
+' Ein Control legt in seinem Layout fest, welche Ereignisse es meldet
+' ("studio_ereignisse": "Gesucht; Geleert") und welche Eigenschaften eine
+' Instanz bekommt ("studio_eigenschaften": "Titel = Suche; Zeilen AS INTEGER
+' = 3" -- ohne AS ist es ein STRING). Eine Instanz traegt ihre Werte
+' ("studio_werte": "Titel = Kunden"). Alles Text: so passt es in die Felder
+' des Inspektors und in Rueckgaengig. Was nicht zu lesen ist (kein Name,
+' falscher Typ, kein passender Wert), faellt weg.
+DIM eigName AS ARRAY OF STRING : eigName = []
+DIM eigTyp AS ARRAY OF STRING : eigTyp = []
+DIM eigWert AS ARRAY OF STRING : eigWert = []
+
+' Das Layout eines eigenen Controls -- das im Entwurf, wenn es vorn ist.
+FUNCTION controlLayout(cn AS STRING) AS JSON_HANDLE
+    DIM ce AS INTEGER : ce = elementIndex(cn)
+    IF ce < 0 THEN RETURN JSON_PARSE("{}")
+    IF elemente[ce].art <> "control" THEN RETURN JSON_PARSE("{}")
+    IF ce = aktFenster THEN RETURN JSON_PARSE(JSON_STRINGIFY(doc))
+    RETURN JSON_PARSE(elemente[ce].layout)
+END FUNCTION
+
+FUNCTION jsonText$(d AS JSON_HANDLE, pfad AS STRING) AS STRING
+    IF NOT JSON_HAS(d, pfad) THEN RETURN ""
+    IF JSON_TYPE(d, pfad) <> "string" THEN RETURN ""
+    RETURN JSON_GET_STRING(d, pfad)
+END FUNCTION
+
+FUNCTION ereignisseLesen(text AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM t AS STRING
+    FOR EACH t IN SPLIT(text, ";")
+        t = TRIM$(t)
+        IF istBezeichner(t) AND ARRAY_INDEXOF(aus, t) < 0 THEN ARRAY_PUSH(aus, t)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Die Ereignisse, die ein eigenes Control meldet.
+FUNCTION controlEreignisse(cn AS STRING) AS ARRAY OF STRING
+    RETURN ereignisseLesen(jsonText$(controlLayout(cn), "studio_ereignisse"))
+END FUNCTION
+
+' Fuellt eigName/eigTyp/eigWert.
+SUB eigenschaftenLesen(text AS STRING)
+    eigName = [] : eigTyp = [] : eigWert = []
+    DIM t AS STRING
+    FOR EACH t IN SPLIT(text, ";")
+        t = TRIM$(t)
+        IF t = "" THEN CONTINUE
+        DIM links AS STRING : links = t
+        DIM wert AS STRING : wert = ""
+        DIM gl AS INTEGER : gl = INSTR(t, "=")
+        IF gl >= 0 THEN
+            links = TRIM$(LEFT$(t, gl))
+            wert = TRIM$(MID$(t, gl + 1, LEN(t)))
+        END IF
+        DIM typ AS STRING : typ = "STRING"
+        DIM als AS INTEGER : als = INSTR(UPPER$(links), " AS ")
+        IF als >= 0 THEN
+            typ = UPPER$(TRIM$(MID$(links, als + 4, LEN(links))))
+            links = TRIM$(LEFT$(links, als))
+        END IF
+        IF NOT istBezeichner(links) THEN CONTINUE
+        IF typ <> "STRING" AND typ <> "INTEGER" AND typ <> "FLOAT" AND typ <> "BOOLEAN" THEN CONTINUE
+        IF ARRAY_INDEXOF(eigName, links) >= 0 THEN CONTINUE
+        wert = wertOhneZeichen$(wert)
+        IF wert = "" AND typ <> "STRING" THEN wert = IIF(typ = "BOOLEAN", "FALSE", "0")
+        IF wertLiteral$(typ, wert) = "" THEN CONTINUE
+        ARRAY_PUSH(eigName, links) : ARRAY_PUSH(eigTyp, typ) : ARRAY_PUSH(eigWert, wert)
+    NEXT
+END SUB
+
+' Ein Wert in Anfuehrungszeichen behaelt seinen Leerraum am Rand
+' (Vorsatz = "Anzahl: "); die Zeichen selbst gehoeren nicht dazu.
+FUNCTION wertOhneZeichen$(w AS STRING) AS STRING
+    IF LEN(w) >= 2 AND LEFT$(w, 1) = CHR$(34) AND RIGHT$(w, 1) = CHR$(34) THEN RETURN MID$(w, 1, LEN(w) - 2)
+    RETURN w
+END FUNCTION
+
+' Ein Wert als Drachenhauch-Literal; "" = passt nicht zum Typ.
+FUNCTION wertLiteral$(typ AS STRING, wert AS STRING) AS STRING
+    DIM w AS STRING : w = TRIM$(wert)
+    SELECT CASE typ
+        CASE "STRING"
+            RETURN "!" + CHR$(34) + REPLACE$(REPLACE$(wert, "\", "\\"), CHR$(34), "\" + CHR$(34)) + CHR$(34)
+        CASE "INTEGER"
+            IF REGEX_TEST(w, "^-?[0-9]+$") THEN RETURN w
+        CASE "FLOAT"
+            w = REPLACE$(w, ",", ".")
+            IF REGEX_TEST(w, "^-?[0-9]+$") THEN RETURN w + ".0"
+            IF REGEX_TEST(w, "^-?[0-9]*\.[0-9]+$") THEN RETURN w
+        CASE "BOOLEAN"
+            SELECT CASE LOWER$(w)
+                CASE "true", "wahr", "ja", "1" : RETURN "TRUE"
+                CASE "false", "falsch", "nein", "0" : RETURN "FALSE"
+            END SELECT
+    END SELECT
+    RETURN ""
+END FUNCTION
+
+' Die Werte einer Instanz: Name (klein) -> Text.
+FUNCTION werteLesen(text AS STRING) AS MAP OF STRING
+    DIM m AS MAP OF STRING : m = {}
+    DIM t AS STRING
+    FOR EACH t IN SPLIT(text, ";")
+        DIM gl AS INTEGER : gl = INSTR(t, "=")
+        IF gl < 0 THEN CONTINUE
+        DIM n AS STRING : n = TRIM$(LEFT$(t, gl))
+        IF istBezeichner(n) THEN MAPPUT(m, LOWER$(n), wertOhneZeichen$(TRIM$(MID$(t, gl + 1, LEN(t)))))
+    NEXT
+    RETURN m
+END FUNCTION
+
 ' Das Layout, in dem i steht (-1 = frei).
 FUNCTION elternVon(i AS INTEGER) AS INTEGER
     IF i < 0 THEN RETURN -1

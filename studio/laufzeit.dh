@@ -87,6 +87,9 @@ CLASS StudioControl
     DIM studioWar AS STRING
     DIM studioWarB AS INTEGER
     DIM studioWarH AS INTEGER
+    ' Was das Control in diesem Bild mit Ausloesen gemeldet hat; das Fenster
+    ' fragt es nach seinem Takt ab und leert es dann.
+    DIM studioMeldungen AS ARRAY OF STRING
 
     ' Von der erzeugten Basis zuerst gerufen.
     SUB studioAnfangen(win AS GUI_WINDOW, behaelter AS GUI_WIDGET, b AS INTEGER, h AS INTEGER)
@@ -95,7 +98,7 @@ CLASS StudioControl
         Self.studioEntwurfB = b
         Self.studioEntwurfH = h
         Self.studioTeile = [] : Self.studioTx = [] : Self.studioTy = [] : Self.studioTb = [] : Self.studioTh = []
-        Self.studioTa = [] : Self.studioAlle = []
+        Self.studioTa = [] : Self.studioAlle = [] : Self.studioMeldungen = []
         Self.studioWar = ""
         Self.studioWarB = -1
         Self.studioWarH = -1
@@ -157,6 +160,21 @@ CLASS StudioControl
         Self.studioWarB = hb
         Self.studioWarH = hh
         IF anders AND NOT erstes THEN Self.Groesse()
+    END SUB
+
+    ' Meldet eines der Ereignisse, die das Control festlegt: das Fenster ruft
+    ' dann seine Methode <Instanz>_<Ereignis> -- nach dem Takt des Controls,
+    ' also auch, wenn es aus einem Ereignis eines Teils kommt.
+    SUB Ausloesen(ereignis AS STRING)
+        IF ARRAY_INDEXOF(Self.studioMeldungen, ereignis) < 0 THEN ARRAY_PUSH(Self.studioMeldungen, ereignis)
+    END SUB
+
+    FUNCTION studioGemeldet(ereignis AS STRING) AS BOOLEAN
+        RETURN ARRAY_INDEXOF(Self.studioMeldungen, ereignis) >= 0
+    END FUNCTION
+
+    SUB studioMeldungenLeeren()
+        Self.studioMeldungen = []
     END SUB
 
     ' Das Fenster, in dem das Control steht.

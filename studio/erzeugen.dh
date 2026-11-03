@@ -162,7 +162,11 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
     FOR i = 0 TO nW - 1
         DIM p AS STRING : p = "widgets." + STR$(i)
         ARRAY_PUSH(namen, IIF(JSON_HAS(d, p + ".name"), JSON_GET_STRING(d, p + ".name"), ""))
-        ARRAY_PUSH(arten, JSON_GET_STRING(d, p + ".kind"))
+        ' Eine Instanz traegt den Namen ihres Controls mit -- daran haengen
+        ' ihre Ereignisse (ereignisseFuer).
+        DIM wa AS STRING : wa = JSON_GET_STRING(d, p + ".kind")
+        IF wa = "studio_control" THEN wa = "studio_control:" + jsonText$(d, p + ".studio_control")
+        ARRAY_PUSH(arten, wa)
     NEXT
     DIM nT AS INTEGER : nT = 0
     IF JSON_HAS(d, "timer") THEN nT = JSON_LEN(d, "timer")
@@ -215,7 +219,7 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
         DIM typ AS STRING : typ = "GUI_WIDGET"
         IF arten[i] = "timer" THEN typ = "StudioTimer"
         IF arten[i] = "menue" THEN typ = "INTEGER"
-        IF arten[i] = "studio_control" THEN
+        IF LEFT$(arten[i], 15) = "studio_control:" THEN
             DIM ik AS INTEGER : ik = ARRAY_INDEXOF(instIndex, i)
             IF ik >= 0 THEN typ = instKlasse[ik]
         END IF
@@ -225,6 +229,20 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
         END IF
         IF MAPHAS(evMeth, STR$(i) + "|ziehen") THEN ARRAY_PUSH(z, "    DIM studioZug_" + namen[i] + " AS BOOLEAN")
     NEXT
+    ' Die Eigenschaften eines Controls: ein Feld je Eigenschaft, die Vorgabe
+    ' setzt studioEinbauen, eine Instanz ueberschreibt sie danach.
+    DIM eigN AS ARRAY OF STRING : eigN = []
+    DIM eigL AS ARRAY OF STRING : eigL = []
+    IF istControl THEN
+        eigenschaftenLesen(jsonText$(d, "studio_eigenschaften"))
+        DIM ek AS INTEGER
+        FOR ek = 0 TO LEN(eigName) - 1
+            IF enthaelt(namen, eigName[ek]) THEN CONTINUE
+            ARRAY_PUSH(z, "    DIM " + eigName[ek] + " AS " + eigTyp[ek])
+            ARRAY_PUSH(eigN, eigName[ek])
+            ARRAY_PUSH(eigL, wertLiteral$(eigTyp[ek], eigWert[ek]))
+        NEXT
+    END IF
     ARRAY_PUSH(z, "")
     IF istControl THEN
         ' Ein Control: Felder auf seine Teile ab dem ersten im Fenster, dazu
@@ -240,6 +258,9 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
             IF NOT frei THEN frei = eltern[i] < 0
             DIM an AS STRING : an = IIF(JSON_HAS(d, tp + ".anchor"), JSON_GET_STRING(d, tp + ".anchor"), "")
             ARRAY_PUSH(z, "        Self.studioTeil(" + tw + ", " + IIF(frei, "TRUE", "FALSE") + ", " + STR$(jsonZahl(d, tp + ".x", 0)) + ", " + STR$(jsonZahl(d, tp + ".y", 0)) + ", " + STR$(jsonZahl(d, tp + ".w", 0)) + ", " + STR$(jsonZahl(d, tp + ".h", 0)) + ", " + dhText$(an) + ")")
+        NEXT
+        FOR i = 0 TO LEN(eigN) - 1
+            ARRAY_PUSH(z, "        Self." + eigN[i] + " = " + eigL[i])
         NEXT
     ELSE
         ARRAY_PUSH(z, "    SUB studioAufbauen()")
@@ -258,7 +279,7 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
         ARRAY_PUSH(z, "        Self.studioControls = []")
         FOR i = 0 TO nW - 1
             IF NOT istBezeichner(namen[i]) THEN CONTINUE
-            IF arten[i] = "studio_control" THEN CONTINUE
+            IF LEFT$(arten[i], 15) = "studio_control:" THEN CONTINUE
             ARRAY_PUSH(z, "        Self." + namen[i] + " = GUI_WINDOW_WIDGET(Self.studioWin, " + STR$(i) + ")")
         NEXT
         ' Die eigenen Controls: ein Objekt je Instanz, das seine Teile kennt.
@@ -267,6 +288,16 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
             ARRAY_PUSH(z, "        Self." + instName[q] + " = NEW " + instKlasse[q] + "()")
             ARRAY_PUSH(z, "        Self." + instName[q] + ".studioEinbauen(Self.studioWin, GUI_WINDOW_WIDGET(Self.studioWin, " + STR$(instIndex[q]) + "), " + STR$(instErster[q]) + ")")
             ARRAY_PUSH(z, "        ARRAY_PUSH(Self.studioControls, Self." + instName[q] + ")")
+            ' Die Werte dieser Instanz -- nur fuer Eigenschaften, die ihr
+            ' Control festlegt, und nur, wenn sie zum Typ passen.
+            DIM werte AS MAP OF STRING : werte = werteLesen(jsonText$(d, "widgets." + STR$(instIndex[q]) + ".studio_werte"))
+            eigenschaftenLesen(jsonText$(controlLayout(instKlasse[q]), "studio_eigenschaften"))
+            DIM ew AS INTEGER
+            FOR ew = 0 TO LEN(eigName) - 1
+                IF NOT MAPHAS(werte, LOWER$(eigName[ew])) THEN CONTINUE
+                DIM lit AS STRING : lit = wertLiteral$(eigTyp[ew], MAPGET(werte, LOWER$(eigName[ew])))
+                IF lit <> "" THEN ARRAY_PUSH(z, "        Self." + instName[q] + "." + eigName[ew] + " = " + lit)
+            NEXT
         NEXT
         ' Bilder aus dem Projekt -- auch die in den Teilen eigener Controls.
         FOR i = 0 TO nAus - 1
@@ -365,6 +396,8 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
                     ARRAY_PUSH(zeichnen, "        " + mn)
                     ARRAY_PUSH(zeichnen, "        SCISSOR_END()")
             END SELECT
+            ' Ein Ereignis, das ein eigenes Control mit Ausloesen meldet.
+            IF LEFT$(arten[i], 15) = "studio_control:" THEN bed = ctl + ".studioGemeldet(" + dhText$(ereig) + ")"
             IF bed <> "" THEN
                 ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
                 ARRAY_PUSH(takt, "        IF " + bed + " THEN " + mn)
@@ -390,6 +423,11 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
             IF MAPHAS(evMeth, raus) THEN ARRAY_PUSH(takt, "            IF NOT " + uf + " THEN Self." + MAPGET(evMeth, raus) + "()")
             ARRAY_PUSH(takt, "        END IF")
         END IF
+    NEXT
+    ' Was die eigenen Controls gemeldet haben, gilt ein Bild lang.
+    FOR qq = 0 TO LEN(instName) - 1
+        ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
+        ARRAY_PUSH(takt, "        Self." + instName[qq] + ".studioMeldungenLeeren()")
     NEXT
     DIM zl AS STRING
     IF LEN(takt) > 0 THEN

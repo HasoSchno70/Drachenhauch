@@ -272,3 +272,142 @@ slStudio = ARG$(0)
 --- erwartet
 gewaehlt TRUE
 nie ein teil TRUE
+
+=== eigene ereignisse und eigenschaften je instanz
+' Zaehler legt "Erreicht" als Ereignis und Ziel/Vorsatz als Eigenschaften
+' fest; zaehler1 hat eigene Werte, zaehler2 die Vorgaben. Erreicht kommt
+' nur bei zaehler1 an -- nach zwei Klicks, nicht nach einem bei zaehler2.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "geprueft "; slHat(log, "geprueft 0 0")
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN ARRAY_PUSH(neu, "AUTOMATION_PLAY(" + CHR$(34) + "klick.txt" + CHR$(34) + ")")
+    ARRAY_PUSH(neu, s)
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+DIM kz AS ARRAY OF STRING : kz = ["e 0 7 1 1 0 0"]
+DIM ziele AS ARRAY OF INTEGER : ziele = [80, 145, 80, 65, 80, 65]
+DIM q AS INTEGER
+FOR q = 0 TO 2
+    DIM bb AS INTEGER : bb = 5 + q * 10
+    ARRAY_PUSH(kz, "e " + STR$(bb) + " 7 " + STR$(ziele[q * 2]) + " " + STR$(ziele[q * 2 + 1]) + " 0 0")
+    ARRAY_PUSH(kz, "e " + STR$(bb + 3) + " 6 0 0 0 0")
+    ARRAY_PUSH(kz, "e " + STR$(bb + 5) + " 5 0 0 0 0")
+NEXT
+WRITEALL(p + "/_studio/klick.txt", "c " + STR$(LEN(kz)) + CHR$(10) + JOIN$(kz, CHR$(10)) + CHR$(10))
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "50", p + "/_studio/probe.dh")
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM kt AS STRING : kt = PROCESS_READ$(k)
+    IF kt <> "" THEN
+        DIM kzeile AS STRING
+        FOR EACH kzeile IN SPLIT(REPLACE$(kt, CHR$(13), ""), CHR$(10))
+            IF TRIM$(kzeile) <> "" AND LEFT$(kzeile, 8) <> "WARNING:" THEN PRINT "lauf "; kzeile
+        NEXT
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(k) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+PRINT "code "; PROCESS_CODE(k)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Zaehler"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Zaehler.dhform
+{"title":"Zaehler","name":"Zaehler","w":240,"h":50,"studio_ereignisse":"Erreicht","studio_eigenschaften":"Ziel AS INTEGER = 3; Vorsatz = \"Anzahl: \"; Kaputt AS FARBE = 1","widgets":[
+{"kind":"button","name":"knopf","text":"+1","x":10,"y":10,"w":60,"h":30},
+{"kind":"label","name":"anzeige","text":"?","x":80,"y":16,"w":150,"h":20,"anchor":"lrt"}]}
+--- datei proj/Zaehler.dh
+CLASS Zaehler EXTENDS Zaehler_Basis
+    DIM n AS INTEGER
+
+    SUB Geoeffnet()
+        GUI_SET_TEXT(Self.anzeige, Self.Vorsatz + "0")
+        PRINT "geoeffnet [" + GUI_TEXT(Self.anzeige) + "] ziel " + STR$(Self.Ziel)
+    END SUB
+
+    SUB knopf_Klick()
+        Self.n = Self.n + 1
+        GUI_SET_TEXT(Self.anzeige, Self.Vorsatz + STR$(Self.n))
+        IF Self.n = Self.Ziel THEN Self.Ausloesen("Erreicht")
+    END SUB
+END CLASS
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"studio_control","studio_control":"Zaehler","name":"zaehler1","x":40,"y":40,"w":240,"h":50,"studio_werte":"Ziel = 2; Vorsatz = \"Erste: \"; Unbekannt = 7"},
+{"kind":"studio_control","studio_control":"Zaehler","name":"zaehler2","x":40,"y":120,"w":240,"h":50,"studio_werte":"Ziel = drei"}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB zaehler1_Erreicht()
+        PRINT "erreicht 1 " + GUI_TEXT(Self.zaehler1.anzeige)
+    END SUB
+
+    SUB zaehler2_Erreicht()
+        PRINT "erreicht 2"
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- erwartet
+geprueft TRUE
+lauf geoeffnet [Erste: 0] ziel 2
+lauf geoeffnet [Anzahl: 0] ziel 3
+lauf erreicht 1 Erste: 2
+code 0
+
+=== ein doppelklick auf eine instanz bietet ihre ereignisse an
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, p)
+DIM cx AS INTEGER
+DIM cy AS INTEGER
+(cx, cy) = slLage(m, "control zaehler1")
+slHin(10, 10)
+slWarten(6)
+slHin(cx, cy)
+slHin(cx, cy)
+slRunter()
+slHoch()
+slRunter()
+slHoch()
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "ereignisdialog ")
+    PRINT z
+NEXT
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Zaehler"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Zaehler.dhform
+{"title":"Zaehler","name":"Zaehler","w":240,"h":50,"studio_ereignisse":"Erreicht; Geleert; 3falsch","widgets":[
+{"kind":"button","name":"knopf","text":"+1","x":10,"y":10,"w":60,"h":30}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"studio_control","studio_control":"Zaehler","name":"zaehler1","x":40,"y":40,"w":240,"h":50}]}
+--- erwartet
+ereignisdialog zaehler1 Erreicht,Geleert

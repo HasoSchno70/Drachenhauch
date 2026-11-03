@@ -534,6 +534,9 @@ END SUB
 ' <Control>_<Ereignis>; die Basisklasse (Stufe 3) verdrahtet sie.
 FUNCTION ereignisseFuer(kind AS STRING) AS ARRAY OF STRING
     DIM aus AS ARRAY OF STRING : aus = []
+    ' Eine Instanz eines eigenen Controls ("studio_control:Name"): die
+    ' Ereignisse, die ihr Control festlegt.
+    IF LEFT$(kind, 15) = "studio_control:" THEN RETURN controlEreignisse(MID$(kind, 15, LEN(kind)))
     SELECT CASE kind
         CASE "button", "iconbutton", "card"
             aus = ["Klick"]
@@ -556,7 +559,6 @@ FUNCTION ereignisseFuer(kind AS STRING) AS ARRAY OF STRING
         CASE "control"
             RETURN ["Geoeffnet", "Groesse"]
         CASE "studio_control"
-            ' Eine Instanz eines eigenen Controls: seine Ereignisse (Stufe 2).
             RETURN []
         CASE "app"
             RETURN ["Geoeffnet", "Beenden"]
@@ -587,7 +589,8 @@ FUNCTION ereignisBeschreibung$(ereignis AS STRING) AS STRING
         CASE "Groesse" : RETURN tr$("wenn sich seine Größe ändert")
         CASE "Beenden" : RETURN tr$("bevor das Programm endet")
     END SELECT
-    RETURN ""
+    ' Sonst ein Ereignis eines eigenen Controls.
+    RETURN tr$("wenn das eigene Control es mit Ausloesen meldet")
 END FUNCTION
 
 ' Die Parameter, mit denen ein Ereignis seine Methode ruft ("" = keine).
@@ -621,7 +624,9 @@ SUB controlsVon(ei AS INTEGER)
     FOR i = 0 TO JSON_LEN(d, "widgets") - 1
         DIM p AS STRING : p = "widgets." + STR$(i)
         ARRAY_PUSH(ctrlNamen, IIF(JSON_HAS(d, p + ".name"), JSON_GET_STRING(d, p + ".name"), ""))
-        ARRAY_PUSH(ctrlArten, JSON_GET_STRING(d, p + ".kind"))
+        DIM ka AS STRING : ka = JSON_GET_STRING(d, p + ".kind")
+        IF ka = "studio_control" THEN ka = "studio_control:" + jsonText$(d, p + ".studio_control")
+        ARRAY_PUSH(ctrlArten, ka)
     NEXT
     ctrlWidgets = LEN(ctrlNamen)
     IF JSON_HAS(d, "timer") THEN

@@ -304,6 +304,25 @@ END FUNCTION
 
 ' Das innerste Layout unter einem Punkt -- ohne `ausser` und alles, was darin
 ' steht (ein Layout laesst sich nicht in sich selbst legen).
+FUNCTION instanzBei(fx AS INTEGER, fy AS INTEGER) AS INTEGER
+    DIM best AS INTEGER : best = -1
+    DIM l AS INTEGER
+    FOR l = 0 TO anzahl() - 1
+        IF feldText$(l, "kind") <> "studio_control" THEN CONTINUE
+        DIM h AS GUI_WIDGET : h = IIF(frm >= 0, GUI_WINDOW_WIDGET(frm, l), -1)
+        IF h >= 0 THEN
+            IF NOT GUI_VISIBLE(h) THEN CONTINUE
+        END IF
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        DIM w AS INTEGER
+        DIM hh AS INTEGER
+        (x, y, w, hh) = lageVon(l)
+        IF fx >= x AND fy >= y AND fx < x + w AND fy < y + hh THEN best = l
+    NEXT
+    RETURN best
+END FUNCTION
+
 FUNCTION layoutBei(fx AS INTEGER, fy AS INTEGER, ausser AS INTEGER) AS INTEGER
     DIM best AS INTEGER : best = -1
     DIM bestT AS INTEGER : bestT = -1
@@ -334,6 +353,10 @@ END FUNCTION
 ' zwischen den Kindern, auf dem Rand. Ein Kind gewinnt vor seinem Layout,
 ' ein Control, das vorn darueber liegt, ebenso.
 FUNCTION trefferMitLayouts(i AS INTEGER, fx AS INTEGER, fy AS INTEGER) AS INTEGER
+    ' Eine Instanz eines eigenen Controls ist im Entwurf ein leerer
+    ' Behaelter -- Luft fuer Klicks. Wo keiner ihrer Teile liegt, trifft der
+    ' Klick sie trotzdem.
+    IF i < 0 THEN i = instanzBei(fx, fy)
     DIM l AS INTEGER : l = layoutBei(fx, fy, -1)
     IF l < 0 THEN RETURN i
     IF i < 0 THEN RETURN l

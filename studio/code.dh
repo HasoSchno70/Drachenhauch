@@ -536,7 +536,7 @@ END SUB
 ' -- seine Kinder in ihrer Reihenfolge.
 SUB navControl(en AS INTEGER, ei AS INTEGER, e AS Element, ci AS INTEGER, d AS JSON_HANDLE, eltern AS ARRAY OF INTEGER)
     DIM cn AS INTEGER : cn = navKnoten(en, ctrlNamen[ci], "control", ei, ci, -1, "")
-    DIM p AS INTEGER : p = bausteinNach(ctrlArten[ci])
+    DIM p AS INTEGER : p = bausteinNach(IIF(LEFT$(ctrlArten[ci], 15) = "studio_control:", "studio_control", ctrlArten[ci]))
     DIM pfad AS STRING : pfad = "widgets." + STR$(ci) + ".layout"
     IF ctrlArten[ci] = "layout" THEN
         DIM art AS STRING : art = "spalte"
