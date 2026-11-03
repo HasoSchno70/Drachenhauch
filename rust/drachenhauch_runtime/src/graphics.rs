@@ -1322,6 +1322,10 @@ pub struct Graphics {
     /// Die Bytes je Font fuer FONT_GLYPH_BOX/FONT_BASELINE (beim ersten
     /// Fragen gelesen).
     font_bytes: std::cell::RefCell<HashMap<i64, std::rc::Rc<Vec<u8>>>>,
+    /// Schriften der PDF-Vorschau je (Schrift, Pixelgroesse), mit den Zeichen,
+    /// die geladen sind.
+    #[cfg(feature = "pdf")]
+    vorschau_schriften: HashMap<(String, i32), (Font, String)>,
     /// Groesse, in der die Ausweich-Schriften gebacken werden.
     ausweich_groesse: i32,
     /// Zuletzt gemeldete Lage des IME-Umwandlungsfensters (Client-Pixel).
@@ -2035,6 +2039,8 @@ impl Graphics {
             eigen_fehlt: std::cell::RefCell::new(std::collections::HashMap::new()),
             eigen_nie: std::collections::HashSet::new(),
             font_bytes: std::cell::RefCell::new(HashMap::new()),
+            #[cfg(feature = "pdf")]
+            vorschau_schriften: HashMap::new(),
             ausweich_groesse: 32, ime_zuletzt: None,
             text_spacing: 0.0,
             textures: Vec::new(),
@@ -5270,15 +5276,62 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             }
         }
     }
-    /// PDF_PREVIEW: eine aufgezeichnete Seite als Bild -- weisses Papier,
-    /// `breite_px` breit, Hoehe nach Seitenverhaeltnis. Text in raylibs
-    /// Standardschrift: eine Vorschau, kein Belichter. Die Lage stimmt, die
-    /// Buchstaben sind nicht Helvetica.
+    /// Eine Schrift des pdf-Moduls fuer die Vorschau, in der Pixelgroesse, in
+    /// der das Geviert `geviert_px` hoch ist -- mit allen Zeichen von
+    /// `zeichen`. Gemerkt je (Schrift, Groesse); fehlt ein Zeichen, wird mit
+    /// der Vereinigung neu geladen. Liefert (raylib-Groesse, Abstand der
+    /// Oberkante ueber der Grundlinie) in Pixeln.
     #[cfg(feature = "pdf")]
-    pub fn pdf_vorschau(&mut self, ops: &[crate::pdf::Op], breite_mm: f64, hoehe_mm: f64, breite_px: i32) -> Result<i64, String> {
+    fn vorschau_schrift(&mut self, name: &str, daten: &[u8], geviert_px: f64, zeichen: &str) -> Option<(i32, f64)> {
+        let face = ttf_parser::Face::parse(daten, 0).ok()?;
+        let hhea = face.tables().hhea;
+        let hoehe = (hhea.ascender as f64 - hhea.descender as f64).max(1.0);
+        let em = face.units_per_em().max(1) as f64;
+        let groesse = ((geviert_px * hoehe / em).round() as i32).max(4);
+        let oben = hhea.ascender as f64 * geviert_px / em;
+        let schluessel = (name.to_string(), groesse);
+        let fehlt = match self.vorschau_schriften.get(&schluessel) {
+            Some((_, da)) => zeichen.chars().any(|c| !da.contains(c)),
+            None => true,
+        };
+        if fehlt {
+            let mut alle: String = self.vorschau_schriften.get(&schluessel).map(|(_, d)| d.clone()).unwrap_or_else(|| {
+                (32u8..127).map(|b| b as char).collect::<String>() + "äöüÄÖÜß€§°²³µ½–—„“”‚‘’…·×÷"
+            });
+            for c in zeichen.chars() { if !alle.contains(c) { alle.push(c); } }
+            let font = ohne_warnungen(|| self.rl.load_font_from_memory(&self.thread, ".ttf", daten, groesse, Some(&alle))).ok()?;
+            self.vorschau_schriften.insert(schluessel, (font, alle));
+        }
+        Some((groesse, oben))
+    }
+
+    /// PDF_PREVIEW: eine aufgezeichnete Seite als Bild -- weisses Papier,
+    /// `breite_px` breit, Hoehe nach Seitenverhaeltnis. Text in DERSELBEN
+    /// Schrift wie im PDF (eingebaut oder mit PDF_FONT_LOAD geladen), die
+    /// Grundlinie wie dort bei y + Schriftgroesse -- bis 2026.41 in raylibs
+    /// Pixelschrift, und ein rechtsbuendiger Betrag stand in der Vorschau
+    /// anders als auf dem Papier. Ohne Schriftdaten bleibt es die Pixelschrift.
+    #[cfg(feature = "pdf")]
+    pub fn pdf_vorschau(&mut self, ops: &[crate::pdf::Op], breite_mm: f64, hoehe_mm: f64, breite_px: i32, schriften: &[Option<(String, crate::pdf::SchriftDaten)>]) -> Result<i64, String> {
         use crate::pdf::Op;
         let breite_px = breite_px.clamp(32, 4096);
         let f = breite_px as f64 / breite_mm.max(1.0);
+        // Erst die Schriften laden (das braucht &mut self), dann zeichnen.
+        let mut je_op: Vec<Option<(String, i32, f64)>> = Vec::with_capacity(ops.len());
+        for op in ops {
+            let mut e = None;
+            if let Op::Text { text, schrift, groesse_pt, winkel, .. } = op {
+                if *winkel == 0.0 {
+                    if let Some(Some((name, daten))) = schriften.get(*schrift) {
+                        let geviert = groesse_pt * 25.4 / 72.0 * f;
+                        if let Some((g, oben)) = self.vorschau_schrift(name, daten.bytes(), geviert, text) {
+                            e = Some((name.clone(), g, geviert - oben));
+                        }
+                    }
+                }
+            }
+            je_op.push(e);
+        }
         let hoehe_px = ((hoehe_mm * f).round() as i32).max(1);
         let mut img = Image::gen_image_color(breite_px, hoehe_px, Color::WHITE);
         // Durchsicht kennt die Vorschau nicht -- die Farbe wird gegen das
@@ -5289,10 +5342,44 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         };
         let px = |mm: f64| (mm * f).round() as i32;
         let (bw, bh) = (img.width, img.height);
-        for op in ops {
+        for (oi, op) in ops.iter().enumerate() {
             match op {
                 Op::Text { x, y, text, groesse_pt, farbe: c, winkel, deck, .. } => {
                     let groesse = (((groesse_pt * 25.4 / 72.0) * f).round() as i32).max(4);
+                    if let Some((name, g, versatz)) = &je_op[oi] {
+                        // Oberkante = Grundlinie (y + Groesse) minus Oberlaenge.
+                        // Gesetzt wird Zeichen fuer Zeichen an der Stelle, die
+                        // rustybuzz formt -- wie PDF_TEXT_WIDTH und das PDF.
+                        // raylib selbst rundet jeden Vorschub auf ganze Pixel
+                        // ab; ein rechtsbuendiger Betrag endete so 12 Punkte
+                        // zu frueh.
+                        let daten = match op { Op::Text { schrift, .. } => schriften.get(*schrift).and_then(|s| s.as_ref()), _ => None };
+                        if let (Some((font, _)), Some((_, d))) = (self.vorschau_schriften.get(&(name.clone(), *g)), daten) {
+                            let ytop = (*y * f + *versatz) as f32;
+                            let col = farbe(*c, *deck);
+                            match rustybuzz::Face::from_slice(d.bytes(), 0) {
+                                Some(face) => {
+                                    let mass = groesse_pt * 25.4 / 72.0 * f / face.units_per_em().max(1) as f64;
+                                    let mut puffer = rustybuzz::UnicodeBuffer::new();
+                                    puffer.push_str(text);
+                                    let geformt = rustybuzz::shape(&face, &[], puffer);
+                                    let mut stift = 0.0f64;
+                                    for (info, lage) in geformt.glyph_infos().iter().zip(geformt.glyph_positions()) {
+                                        if let Some(ch) = text.get(info.cluster as usize..).and_then(|r| r.chars().next()) {
+                                            if !ch.is_whitespace() {
+                                                let gx = *x * f + (stift + lage.x_offset as f64) * mass;
+                                                let mut z = [0u8; 4];
+                                                img.draw_text_ex(font, ch.encode_utf8(&mut z), Vector2::new(gx as f32, ytop - (lage.y_offset as f64 * mass) as f32), *g as f32, 0.0, col);
+                                            }
+                                        }
+                                        stift += lage.x_advance as f64;
+                                    }
+                                }
+                                None => img.draw_text_ex(font, text, Vector2::new((*x * f) as f32, ytop), *g as f32, 0.0, col),
+                            }
+                            continue;
+                        }
+                    }
                     if *winkel == 0.0 {
                         img.draw_text(text, px(*x), px(*y), groesse, farbe(*c, *deck));
                         continue;

@@ -95,6 +95,14 @@ pub struct Dokument {
 // benutzt sie auch ohne das pdf-Modul (Web-Bau).
 use crate::schriften::{normalisieren, EINGEBAUT};
 
+/// Die Bytes einer Schrift ohne Kopie: eingebaut (statisch) oder geladen.
+pub enum SchriftDaten { Fest(&'static [u8]), Geladen(Arc<Vec<u8>>) }
+impl SchriftDaten {
+    pub fn bytes(&self) -> &[u8] {
+        match self { SchriftDaten::Fest(b) => b, SchriftDaten::Geladen(d) => d }
+    }
+}
+
 /// Seitengroesse aus einem Namen -- in Millimetern.
 pub fn seitenmass(name: &str, quer: bool) -> Option<(f64, f64)> {
     let (b, h) = match name.to_lowercase().as_str() {
@@ -194,6 +202,17 @@ impl Dokument {
         }
         Err(format!("Schrift '{}' gibt es nicht. Eingebaut sind {} (helvetica, times und courier \
                      meinen sans, serif und mono); eine eigene laedt PDF_FONT_LOAD", name, self.schriftliste()))
+    }
+
+    /// Die Datei hinter einer Schrift-Nummer, fuer PDF_PREVIEW -- damit die
+    /// Vorschau mit derselben Schrift setzt wie das PDF. Der Name dient als
+    /// Schluessel fuer den Zwischenspeicher der Vorschau.
+    pub fn schrift_quelle(&self, i: usize) -> Option<(String, SchriftDaten)> {
+        if i < EINGEBAUT.len() {
+            return Some((format!("eingebaut:{}", EINGEBAUT[i].0), SchriftDaten::Fest((EINGEBAUT[i].1)())));
+        }
+        self.geladen.get(i - EINGEBAUT.len())
+            .map(|(n, d)| (format!("geladen:{}:{}", n, d.len()), SchriftDaten::Geladen(d.clone())))
     }
 
     /// Eine eigene TrueType-/OpenType-Schrift unter einem Namen.
