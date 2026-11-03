@@ -89,25 +89,25 @@ END FUNCTION
 
 ' --- Die Leiste -------------------------------------------------------------------
 SUB debugLeisteAnlegen()
-    GUI_DOCK_TAB(win, "debugger", "Debugger", "ausgabe")
-    lblDbg = GUI_LABEL(win, "Debuggen (F7) startet das Programm und hält an Haltepunkten.", 0, 0)
+    GUI_DOCK_TAB(win, "debugger", tr$("Debugger"), "ausgabe")
+    lblDbg = GUI_LABEL(win, tr$("Debuggen (F7) startet das Programm und hält an Haltepunkten."), 0, 0)
     GUI_ADD_CLASS(lblDbg, "leise")
     GUI_DOCK_ADD(win, "debugger", lblDbg)
-    btDbgWeiter = GUI_BUTTON(win, "Weiter (F5)", 0, 0, 110, 28)
-    btDbgSchritt = GUI_BUTTON(win, "Schritt (F10)", 0, 0, 120, 28)
-    btDbgHinein = GUI_BUTTON(win, "Hinein (F11)", 0, 0, 116, 28)
-    btDbgHeraus = GUI_BUTTON(win, "Heraus", 0, 0, 90, 28)
-    btDbgStopp = GUI_BUTTON(win, "Beenden", 0, 0, 96, 28)
+    btDbgWeiter = GUI_BUTTON(win, tr$("Weiter (F5)"), 0, 0, 110, 28)
+    btDbgSchritt = GUI_BUTTON(win, tr$("Schritt (F10)"), 0, 0, 120, 28)
+    btDbgHinein = GUI_BUTTON(win, tr$("Hinein (F11)"), 0, 0, 116, 28)
+    btDbgHeraus = GUI_BUTTON(win, tr$("Heraus"), 0, 0, 90, 28)
+    btDbgStopp = GUI_BUTTON(win, tr$("Anhalten"), 0, 0, 96, 28)
     GUI_BUTTON_VARIANT(btDbgStopp, "gefahr")
     DIM b AS INTEGER
     FOR EACH b IN [btDbgWeiter, btDbgSchritt, btDbgHinein, btDbgHeraus, btDbgStopp]
         GUI_DOCK_ADD(win, "debugger", b)
     NEXT
     lstVariablen = GUI_LISTBOX(win, 0, 0, 10, 10, [])
-    GUI_LISTBOX_PLACEHOLDER(lstVariablen, "Variablen erscheinen, wenn das Programm hält.")
+    GUI_LISTBOX_PLACEHOLDER(lstVariablen, tr$("Variablen erscheinen, wenn das Programm hält."))
     GUI_DOCK_ADD(win, "debugger", lstVariablen)
     lstStapel = GUI_LISTBOX(win, 0, 0, 10, 10, [])
-    GUI_LISTBOX_PLACEHOLDER(lstStapel, "Aufrufstapel")
+    GUI_LISTBOX_PLACEHOLDER(lstStapel, tr$("Aufrufstapel"))
     GUI_DOCK_ADD(win, "debugger", lstStapel)
     debugKnoepfe()
 END SUB
@@ -160,15 +160,15 @@ SUB debuggen()
     GUI_LISTBOX_CLEAR(lstStapel)
     GUI_DOCK_ACTIVATE(win, "debugger")
     DIM main AS STRING : main = PATHJOIN(studioOrdner$(), "main.dh")
-    ausgabe("▶ " + projName + " startet im Debugger …", &H70C070)
+    ausgabe(trf$("▶ {0} startet im Debugger …", [projName]), &H70C070)
     dbgProz = PROCESS_START("dhrt", "debug", main)
     dbgRest = ""
     dbgErst = TRUE
     dbgHaelt = FALSE
-    GUI_SET_TEXT(lblDbg, "Läuft …")
+    GUI_SET_TEXT(lblDbg, tr$("Läuft …"))
     debugKnoepfe()
     werkzeugeNachziehen()
-    status("Debuggen: " + projName)
+    status(trf$("Debuggen: {0}", [projName]))
     protokoll("debug gestartet")
 END SUB
 
@@ -180,7 +180,7 @@ SUB dbgKommando(cmd AS STRING)
     IF cmd <> "stop" THEN
         dbgHaelt = FALSE
         dbgHaltWeg()
-        GUI_SET_TEXT(lblDbg, "Läuft …")
+        GUI_SET_TEXT(lblDbg, tr$("Läuft …"))
         debugKnoepfe()
     END IF
     protokoll("debug " + cmd)
@@ -209,7 +209,7 @@ SUB debugBeenden()
     IF dbgProz < 0 THEN RETURN
     dbgKommando("stop")
     PROCESS_KILL(dbgProz)
-    dbgEnde("■ Debuggen beendet.")
+    dbgEnde(tr$("■ Debuggen beendet."))
 END SUB
 
 SUB dbgEnde(text AS STRING)
@@ -217,10 +217,10 @@ SUB dbgEnde(text AS STRING)
     dbgHaelt = FALSE
     dbgHaltWeg()
     ausgabe(text, &HB0B0B0)
-    GUI_SET_TEXT(lblDbg, "Debuggen (F7) startet das Programm und hält an Haltepunkten.")
+    GUI_SET_TEXT(lblDbg, tr$("Debuggen (F7) startet das Programm und hält an Haltepunkten."))
     debugKnoepfe()
     werkzeugeNachziehen()
-    status("Debuggen beendet.")
+    status(tr$("Debuggen beendet."))
     protokoll("debug ende")
 END SUB
 
@@ -275,7 +275,7 @@ SUB debugPruefen()
             IF bauZeileZeigen(fz) THEN ausgabe(fz, &HE86060)
         NEXT
     END IF
-    IF NOT PROCESS_RUNNING(dbgProz) AND PROCESS_READ$(dbgProz) = "" THEN dbgEnde("■ Beendet.")
+    IF NOT PROCESS_RUNNING(dbgProz) AND PROCESS_READ$(dbgProz) = "" THEN dbgEnde(tr$("■ Beendet."))
 END SUB
 
 SUB dbgEreignis(zeile AS STRING)
@@ -310,7 +310,7 @@ SUB dbgEreignis(zeile AS STRING)
             END IF
             dbgHalt(j)
         CASE "finished"
-            dbgEnde("■ Beendet.")
+            dbgEnde(tr$("■ Beendet."))
     END SELECT
 END SUB
 
@@ -335,7 +335,7 @@ SUB dbgHalt(j AS JSON_HANDLE)
             IF mi >= 0 AND mi < LEN(methoden) THEN
                 dbgMeth = methoden[mi]
                 dbgZeile = MAX(1, MIN(karteZeile[zeile - 1], LEN(SPLIT(dbgMeth.rumpf, CHR$(10)))))
-                wo = elemente[ei].name + "." + dbgMeth.name + ", Zeile " + STR$(dbgZeile)
+                wo = elemente[ei].name + "." + dbgMeth.name + trf$(", Zeile {0}", [STR$(dbgZeile)])
                 codeOeffnen(dbgMeth)
                 DIM r AS Reiter : r = reiter[reiterVorn()]
                 feldBefunde(r)
@@ -345,17 +345,17 @@ SUB dbgHalt(j AS JSON_HANDLE)
     END IF
     DIM grund AS STRING : grund = IIF(JSON_HAS(j, "reason"), JSON_GET_STRING(j, "reason"), "")
     IF grund = "error" THEN
-        DIM msg AS STRING : msg = IIF(JSON_HAS(j, "message"), JSON_GET_STRING(j, "message"), "Fehler")
-        GUI_SET_TEXT(lblDbg, "Fehler in " + wo + ": " + msg)
-        ausgabe("Laufzeitfehler in " + wo + ": " + msg, &HE86060)
+        DIM msg AS STRING : msg = IIF(JSON_HAS(j, "message"), JSON_GET_STRING(j, "message"), tr$("Fehler"))
+        GUI_SET_TEXT(lblDbg, trf$("Fehler in {0}: {1}", [wo, msg]))
+        ausgabe(trf$("Laufzeitfehler in {0}: {1}", [wo, msg]), &HE86060)
     ELSE
-        GUI_SET_TEXT(lblDbg, "Hält in " + wo)
+        GUI_SET_TEXT(lblDbg, trf$("Hält in {0}", [wo]))
     END IF
     dbgVariablen(j)
     dbgStapel(j)
     GUI_DOCK_ACTIVATE(win, "debugger")
     debugKnoepfe()
-    status("Angehalten: " + wo)
+    status(trf$("Angehalten: {0}", [wo]))
     protokoll("angehalten " + wo)
 END SUB
 
@@ -407,7 +407,7 @@ END SUB
 SUB dbgStapelOeffnen(k AS INTEGER)
     ' Bewusst schlicht: ein Doppelklick zeigt, wohin der Eintrag gehoert.
     IF k < 0 THEN RETURN
-    status("Aufruf: " + GUI_LISTBOX_ITEM(lstStapel, k))
+    status(trf$("Aufruf: {0}", [GUI_LISTBOX_ITEM(lstStapel, k)]))
 END SUB
 
 ' F9: Haltepunkt an der Zeile der Schreibmarke im vorderen Code-Reiter.

@@ -560,6 +560,10 @@ pub const KEIN_FENSTER: &[&str] = &[
     // schneidet, verliert den ANFANG -- so kam sie aus `shoot.dh` als
     // "FEHLER mini  t). Ein Fenster brauchen SCREEN und ..." zurueck.
     "Ein Fenster brauchen SCREEN",
+    // Dieselben auf Englisch: ein Programm, das DHRT_LANG=en setzt (das
+    // englische Studio tut es fuer seine Meldungen), bekommt sie so.
+    "No window possible",
+    "need a window; PRINT, files",
     "Attempting to create window failed",
     "does not appear to support OpenGL",
     "Failed to initialize Window",
@@ -974,7 +978,9 @@ fn bewerten_roh(fall: &Fall, code: i32, stdout: &str, stderr: &str, ohne_grafik:
     // Ein Bau ohne Grafik/Audio meldet den fehlenden Befehl im Klartext -- auch
     // dann, wenn das Programm die Meldung selbst faengt und AUSGIBT (`TRY ...
     // CATCH e : PRINT e`) und mit 0 endet. Die Zeile ist unverwechselbar.
-    if ohne_grafik && (stderr.contains("im Rust-Kern noch nicht verfuegbar") || stdout.contains("im Rust-Kern noch nicht verfuegbar")) {
+    // Englisch heisst sie "... is not available in this build" (DHRT_LANG=en).
+    let fehlt = |t: &str| t.contains("im Rust-Kern noch nicht verfuegbar") || t.contains("is not available in this build");
+    if ohne_grafik && (fehlt(stderr) || fehlt(stdout)) {
         return Ergebnis::Uebersprungen("Build ohne Grafik".into());
     }
     let out = glatt(&ohne_logzeilen(stdout));
@@ -1409,5 +1415,9 @@ PRINT 1
         assert!(matches!(bewerten(f, 1, "", "Attempting to create window failed", false), Ergebnis::Uebersprungen(_)));
         assert!(matches!(bewerten(f, 1, "", "SCREEN im Rust-Kern noch nicht verfuegbar", true), Ergebnis::Uebersprungen(_)));
         assert!(matches!(bewerten(f, 1, "", "SCREEN im Rust-Kern noch nicht verfuegbar", false), Ergebnis::Fehl(_)));
+        // dieselben Meldungen auf Englisch (DHRT_LANG=en), auch auf stdout
+        assert!(matches!(bewerten(f, 0, "Runtime error in x.dh:3: Graphics builtin 'SCREEN' is not available in this build", "", true), Ergebnis::Uebersprungen(_)));
+        assert!(matches!(bewerten(f, 1, "", "Graphics builtin 'SCREEN' is not available in this build", false), Ergebnis::Fehl(_)));
+        assert!(matches!(bewerten(f, 1, "", "SCREEN: No window possible -- there is no display", false), Ergebnis::Uebersprungen(_)));
     }
 }

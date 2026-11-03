@@ -79,7 +79,7 @@ SUB inspektorAnlegen()
     inspZeile("Timer", "name", "Name", "text", "timer", "")
     inspZeile("Timer", "intervall", "Intervall (ms)", "zahl", "timer", "")
     inspZeile("Timer", "aktiv", "Läuft beim Start", "schalter", "timer", "")
-    inspZeile("Timer", "wiederholen", "Wiederholen", "schalter", "timer", "")
+    inspZeile("Timer", "wiederholen", "Wiederholt sich", "schalter", "timer", "")
     inspGruppe("Kennung")
     inspZeile("Kennung", "name", "Name", "text", "*", "")
     inspZeile("Kennung", "kind", "Art", "info", "*", "")
@@ -126,7 +126,7 @@ SUB inspektorAnlegen()
 
     DIM g AS INTEGER
     FOR g = 0 TO LEN(inspGruppen) - 1
-        DIM kopf AS GUI_WIDGET : kopf = GUI_BUTTON(win, inspGruppen[g], 0, 0, 10, 26)
+        DIM kopf AS GUI_WIDGET : kopf = GUI_BUTTON(win, tr$(inspGruppen[g]), 0, 0, 10, 26)
         GUI_ADD_CLASS(kopf, "gruppenkopf")
         GUI_SET_ALIGN(kopf, "links")
         GUI_SET_ICON(kopf, "runter")
@@ -135,13 +135,13 @@ SUB inspektorAnlegen()
     NEXT
     DIM z AS InspZeile
     FOR EACH z IN inspZeilen
-        z.lbl = GUI_LABEL(win, z.titel, 0, 0)
+        z.lbl = GUI_LABEL(win, tr$(z.titel), 0, 0)
         GUI_ADD_CLASS(z.lbl, "feldname")
         inspDazu(z.lbl)
         SELECT CASE z.art
             CASE "text", "eintraege"
                 z.ed = GUI_TEXTINPUT(win, 0, 0, 10, 26)
-                IF z.art = "eintraege" THEN GUI_TOOLTIP(z.ed, "Einträge durch Semikolon getrennt")
+                IF z.art = "eintraege" THEN GUI_TOOLTIP(z.ed, tr$("Einträge durch Semikolon getrennt"))
             CASE "komma"
                 z.ed = GUI_TEXTINPUT(win, 0, 0, 10, 26)
                 GUI_TEXTINPUT_SET(z.ed, "zahlen", 2)
@@ -156,9 +156,11 @@ SUB inspektorAnlegen()
             CASE "schalter"
                 z.ed = GUI_TOGGLE(win, "", 0, 0, FALSE)
             CASE "wahl", "wahlindex"
-                z.ed = GUI_DROPDOWN(win, 0, 0, 10, 26, SPLIT(z.wahl, ";"))
+                ' Die Werte einer "wahl" sind Woerter der Laufzeit und bleiben, wie sie
+                ' sind; bei "wahlindex" zaehlt nur die Stelle.
+                z.ed = GUI_DROPDOWN(win, 0, 0, 10, 26, SPLIT(IIF(z.art = "wahlindex", tr$(z.wahl), z.wahl), ";"))
             CASE "farbe"
-                z.ed = GUI_BUTTON(win, "Vorgabe", 0, 0, 10, 26)
+                z.ed = GUI_BUTTON(win, tr$("Vorgabe"), 0, 0, 10, 26)
                 GUI_ADD_CLASS(z.ed, "farbfeld")
             CASE "info"
                 z.ed = GUI_LABEL(win, "", 0, 0)
@@ -168,7 +170,7 @@ SUB inspektorAnlegen()
                 DIM namen AS ARRAY OF STRING : namen = ["links", "oben", "rechts", "unten"]
                 FOR k = 0 TO 3
                     DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(win, LEFT$(UPPER$(namen[k]), 1), 0, 0)
-                    GUI_TOOLTIP(cb, "klebt am " + IIF(k = 0, "linken", IIF(k = 1, "oberen", IIF(k = 2, "rechten", "unteren"))) + " Rand, wenn das Fenster wächst")
+                    GUI_TOOLTIP(cb, trf$("klebt am {0} Rand, wenn das Fenster wächst", [IIF(k = 0, tr$("linken"), IIF(k = 1, tr$("oberen"), IIF(k = 2, tr$("rechten"), tr$("unteren"))))]))
                     ARRAY_PUSH(z.anker, cb)
                     inspDazu(cb)
                 NEXT
@@ -180,7 +182,7 @@ SUB inspektorAnlegen()
     ' Das Popover fuer Farben.
     farbPop = GUI_POPOVER(inspPanel, 236, 236, "links")
     farbWahl = GUI_COLORPICKER(farbPop, 8, 8, 220, 180)
-    farbVorgabe = GUI_BUTTON(farbPop, "Vorgabe des Themas", 8, 196, 220, 30)
+    farbVorgabe = GUI_BUTTON(farbPop, tr$("Vorgabe des Themas"), 8, 196, 220, 30)
 END SUB
 
 ' Ein Widget gehoert zum Inspektor: zur Leiste (ein- und ausgeblendet mit
@@ -250,7 +252,7 @@ SUB farbfeldZeigen(z AS InspZeile, pfad AS STRING)
         DIM hell AS BOOLEAN : hell = ((c SHR 16) BAND 255) * 3 + ((c SHR 8) BAND 255) * 6 + (c BAND 255) > 1400
         GUI_SET_COLOR(z.ed, "fg", IIF(hell, &H101010, &HFFFFFF))
     ELSE
-        GUI_SET_TEXT(z.ed, "Vorgabe")
+        GUI_SET_TEXT(z.ed, tr$("Vorgabe"))
         GUI_SET_COLOR(z.ed, "bg", -1)
         GUI_SET_COLOR(z.ed, "fg", -1)
     END IF
@@ -263,21 +265,21 @@ SUB inspektorFuellen()
     DIM art AS STRING : art = ""
     IF abstandL >= 0 THEN
         art = "abstand"
-        GUI_SET_TEXT(inspTitel, "Abstandhalter")
-        GUI_SET_TEXT(inspArt, "in " + feldText$(abstandL, "name") + ", Stelle " + STR$(abstandK + 1))
+        GUI_SET_TEXT(inspTitel, tr$("Abstandhalter"))
+        GUI_SET_TEXT(inspArt, trf$("in {0}, Stelle {1}", [feldText$(abstandL, "name"), STR$(abstandK + 1)]))
     ELSEIF trayWahl >= 0 THEN
         art = "timer"
         GUI_SET_TEXT(inspTitel, timerName$(trayWahl))
-        GUI_SET_TEXT(inspArt, "Timer")
+        GUI_SET_TEXT(inspArt, tr$("Timer"))
     ELSEIF auswahl >= 0 THEN
         art = feldText$(auswahl, "kind")
         GUI_SET_TEXT(inspTitel, feldText$(auswahl, "name"))
-        DIM text AS STRING : text = bausteinName$(auswahl)
-        IF LEN(gewaehlt) > 1 THEN text = text + " -- " + STR$(LEN(gewaehlt)) + " gewählt"
+        DIM text AS STRING : text = tr$(bausteinName$(auswahl))
+        IF LEN(gewaehlt) > 1 THEN text = text + trf$(" -- {0} gewählt", [STR$(LEN(gewaehlt))])
         GUI_SET_TEXT(inspArt, text)
     ELSE
         GUI_SET_TEXT(inspTitel, fensterText$("name"))
-        GUI_SET_TEXT(inspArt, "Fenster")
+        GUI_SET_TEXT(inspArt, tr$("Fenster"))
     END IF
     DIM z AS InspZeile
     FOR EACH z IN inspZeilen
@@ -332,7 +334,7 @@ SUB inspektorFuellen()
             CASE "farbe"
                 farbfeldZeigen(z, p)
             CASE "info"
-                GUI_SET_TEXT(z.ed, bausteinName$(auswahl) + "  (" + wertText$(p) + ")")
+                GUI_SET_TEXT(z.ed, tr$(bausteinName$(auswahl)) + "  (" + wertText$(p) + ")")
             CASE "anker"
                 DIM a AS STRING : a = wertText$(p)
                 IF a = "" THEN a = "lt"
@@ -419,22 +421,22 @@ SUB zeileUebernehmen(zi AS INTEGER)
     IF z.schluessel = "name" THEN
         DIM n AS STRING : n = TRIM$(GUI_TEXT(z.ed))
         IF NOT istBezeichner(n) THEN
-            GUI_SET_ERROR(z.ed, "Ein Name beginnt mit einem Buchstaben und hat nur Buchstaben, Ziffern und _.")
+            GUI_SET_ERROR(z.ed, tr$("Ein Name beginnt mit einem Buchstaben und hat nur Buchstaben, Ziffern und _."))
             RETURN
         END IF
         IF trayWahl >= 0 AND nameVergeben(n, TRAY + trayWahl) THEN
-            GUI_SET_ERROR(z.ed, "Den Namen '" + n + "' gibt es in diesem Fenster schon.")
+            GUI_SET_ERROR(z.ed, trf$("Den Namen '{0}' gibt es in diesem Fenster schon.", [n]))
             RETURN
         END IF
         IF trayWahl < 0 AND auswahl >= 0 AND nameVergeben(n, auswahl) THEN
-            GUI_SET_ERROR(z.ed, "Den Namen '" + n + "' gibt es in diesem Fenster schon.")
+            GUI_SET_ERROR(z.ed, trf$("Den Namen '{0}' gibt es in diesem Fenster schon.", [n]))
             RETURN
         END IF
         ' Der Name des Fensters ist der Name seiner Klasse -- eindeutig im Projekt.
         IF trayWahl < 0 AND auswahl < 0 AND aktFenster >= 0 THEN
             DIM schon AS INTEGER : schon = elementIndex(n)
             IF schon >= 0 AND schon <> aktFenster THEN
-                GUI_SET_ERROR(z.ed, "Ein Element '" + n + "' gibt es im Projekt schon.")
+                GUI_SET_ERROR(z.ed, trf$("Ein Element '{0}' gibt es im Projekt schon.", [n]))
                 RETURN
             END IF
         END IF
@@ -590,7 +592,7 @@ SUB farbeOeffnen(zi AS INTEGER)
     GUI_WINDOW_DESTROY(farbPop)
     farbPop = GUI_POPOVER(z.ed, 236, 236, "links")
     farbWahl = GUI_COLORPICKER(farbPop, 8, 8, 220, 180)
-    farbVorgabe = GUI_BUTTON(farbPop, "Vorgabe des Themas", 8, 196, 220, 30)
+    farbVorgabe = GUI_BUTTON(farbPop, tr$("Vorgabe des Themas"), 8, 196, 220, 30)
     IF JSON_HAS(doc, p) THEN GUI_SET_PICKED_COLOR(farbWahl, INT(JSON_GET_FLOAT(doc, p)))
     GUI_POPOVER_SHOW(farbPop)
 END SUB

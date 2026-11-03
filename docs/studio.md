@@ -44,6 +44,17 @@ Die Leisten lassen sich wie in der IDE verschieben, als Reiter stapeln und
 abtrennen. Unter Ansicht gibt es ein helles und ein dunkles
 Erscheinungsbild.
 
+**Die Oberfläche gibt es auf Deutsch und auf Englisch.** Ansicht ->
+„English interface“ schaltet um; die Wahl steht in `studio.json` neben der
+`ide.json` und gilt beim nächsten Start. Ohne eigene Wahl folgt das Studio
+der Sprache der IDE. Auf Englisch heißen auch die neuen Namen englisch
+(`MainWindow`, `Button1`), die Vorlagen haben englische Titel, und die
+Meldungen der Laufzeit (Probleme, Ausgabe) kommen englisch. **Die Namen der
+Ereignisse bleiben, wie sie sind** (`Klick`, `Geaendert`, `Aktion` ...): sie
+sind Teil der Methodennamen (`Knopf1_Klick`), und ein Projekt muss in beiden
+Sprachen dasselbe bleiben. Der Inhalt der Vorlagen (Beschriftungen,
+Kommentare) ist deutsch.
+
 ## Das Projekt
 
 Ein Projekt ist ein Ordner mit lesbaren Dateien:
@@ -349,6 +360,9 @@ geerbte mit einer anderen Zahl von Parametern überschreibt.
 | `DH_STUDIO_ABLAGE=text` | legt Text in die Zwischenablage, zum Tippen per Strg+V |
 | `DH_STUDIO_LAUF_BILDER=n` | Starten lässt das Programm nur n Bilder laufen (`dhrt run --bilder n`) |
 | `DH_STUDIO_DATEI=pfad` | Bild hinzufügen nimmt diese Datei statt eines Dialogs |
+| `DH_STUDIO_SPRACHE=en` | die Sprache der Oberfläche, vor jeder Einstellung (`de` oder `en`) |
+| `DH_STUDIO_KONFIG=datei` | `studio.json` an diesem Ort; die `ide.json` wird dann nicht gefragt |
+| `DH_STUDIO_SPRACHPROBE=1` | öffnet jeden Dialog einmal, schreibt seine Texte und die Zahl fehlender Übersetzungen ins Protokoll und endet |
 
 Die Prüfsammlungen `tests/pruef/werkzeug_studio.dhtest` (Stufe 1) und
 `tests/pruef/werkzeug_studio2.dhtest` (Stufe 2) starten das Studio zweimal:

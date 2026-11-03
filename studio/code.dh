@@ -76,7 +76,7 @@ END FUNCTION
 FUNCTION reiterTitel$(r AS Reiter) AS STRING
     SELECT CASE r.art
         CASE "layout" : RETURN r.el.name
-        CASE "dekl" : RETURN r.el.name + " · Eigenschaften"
+        CASE "dekl" : RETURN r.el.name + tr$(" · Eigenschaften")
     END SELECT
     RETURN r.el.name + "." + r.meth.name
 END FUNCTION
@@ -118,8 +118,8 @@ FUNCTION codeReiterNeu(art AS STRING, e AS Element, m AS Methode) AS INTEGER
         infoText = methodeInfo$(m)
         text = m.rumpf
     ELSE
-        kopfText = "' Eigenschaften von " + e.name
-        infoText = "DIM, CONST und was sonst ausserhalb der Methoden steht"
+        kopfText = trf$("' Eigenschaften von {0}", [e.name])
+        infoText = tr$("DIM, CONST und was sonst außerhalb der Methoden steht")
         text = e.dekl
     END IF
     r.kopf = GUI_LABEL(win, kopfText, 0, 0)
@@ -130,7 +130,7 @@ FUNCTION codeReiterNeu(art AS STRING, e AS Element, m AS Methode) AS INTEGER
     GUI_ADD_CLASS(r.info, "leise")
     GUI_SET_ALIGN(r.info, "rechts")
     ' Das letzte Argument von GUI_TEXTAREA ist der Platzhalter, nicht der Text.
-    r.feld = GUI_TEXTAREA(win, 0, 0, 100, 100, IIF(art = "code", "Code der Methode", "DIM, CONST ..."))
+    r.feld = GUI_TEXTAREA(win, 0, 0, 100, 100, IIF(art = "code", tr$("Code der Methode"), "DIM, CONST ..."))
     GUI_SET_TEXT(r.feld, text)
     feldEinrichten(r.feld)
     r.faerbSchl = ""
@@ -394,15 +394,15 @@ FUNCTION methodeInfo$(m AS Methode) AS STRING
         FOR i = 0 TO LEN(ctrlNamen) - 1
             DIM ev AS STRING : ev = ereignisVon$(m.name, ctrlNamen[i])
             IF ev <> "" AND ARRAY_INDEXOF(ereignisseFuer(ctrlArten[i]), ev) >= 0 THEN
-                RETURN "Ereignis " + ev + " von " + ctrlNamen[i] + ": " + ereignisBeschreibung$(ev)
+                RETURN trf$("Ereignis {0} von {1}: {2}", [ev, ctrlNamen[i], ereignisBeschreibung$(ev)])
             END IF
         NEXT
     END IF
     IF m.el.art = "fenster" OR m.el.art = "app" THEN
         DIM art AS STRING : art = IIF(m.el.art = "app", "app", "fenster")
-        IF ARRAY_INDEXOF(ereignisseFuer(art), m.name) >= 0 THEN RETURN "Ereignis " + m.name + ": " + ereignisBeschreibung$(m.name)
+        IF ARRAY_INDEXOF(ereignisseFuer(art), m.name) >= 0 THEN RETURN trf$("Ereignis {0}: {1}", [m.name, ereignisBeschreibung$(m.name)])
     END IF
-    RETURN "Methode von " + m.el.name
+    RETURN trf$("Methode von {0}", [m.el.name])
 END FUNCTION
 
 ' --- Navigator ---------------------------------------------------------------------
@@ -483,7 +483,7 @@ SUB navigatorFuellen()
     FOR ei = 0 TO LEN(elemente) - 1
         DIM e AS Element : e = elemente[ei]
         DIM text AS STRING : text = e.name
-        IF e.art = "fenster" AND LOWER$(e.name) = LOWER$(projStart) THEN text = text + "  (Start)"
+        IF e.art = "fenster" AND LOWER$(e.name) = LOWER$(projStart) THEN text = text + tr$("  (Start)")
         DIM en AS INTEGER : en = navKnoten(wurzel, text, "element", ei, -1, -1, e.art)
         IF e.art = "fenster" THEN
             controlsVon(ei)
@@ -516,7 +516,7 @@ SUB navigatorFuellen()
             END IF
             navKnoten(en, m.name, "methode", ei, -1, mj, IIF(methodeIstEreignis(m), "ereignis", "methode"))
         NEXT
-        navKnoten(en, "Eigenschaften", "dekl", ei, -1, -1, "dekl")
+        navKnoten(en, tr$("Eigenschaften"), "dekl", ei, -1, -1, "dekl")
         GUI_TREE_EXPAND(baum, en, TRUE)
     NEXT
     GUI_TREE_EXPAND(baum, wurzel, TRUE)
@@ -550,7 +550,7 @@ SUB navControl(en AS INTEGER, ei AS INTEGER, e AS Element, ci AS INTEGER, d AS J
             DIM c AS INTEGER : c = JSON_GET_INT(d, pfad + ".kinder." + STR$(k) + ".0")
             IF c < 0 THEN
                 ' Ein Abstandhalter: Layout in navCtrl, Stelle in navMeth.
-                DIM an AS INTEGER : an = navKnoten(cn, "Abstandhalter", "abstand", ei, ci, k, "")
+                DIM an AS INTEGER : an = navKnoten(cn, tr$("Abstandhalter"), "abstand", ei, ci, k, "")
                 DIM ap AS INTEGER : ap = bausteinNach("spacer")
                 IF ap >= 0 THEN GUI_TREE_ICON(baum, an, bausteine[ap].symbol)
                 CONTINUE
@@ -749,7 +749,7 @@ SUB ereignisDialog(ei AS INTEGER, ci AS INTEGER)
     IF ei < 0 THEN RETURN
     DIM e AS Element : e = elemente[ei]
     IF e.art <> "fenster" AND e.art <> "app" THEN
-        status("Ereignisse haben nur Fenster, ihre Controls und die App.")
+        status(tr$("Ereignisse haben nur Fenster, ihre Controls und die App."))
         RETURN
     END IF
     erEl = ei
@@ -766,30 +766,30 @@ SUB ereignisDialog(ei AS INTEGER, ci AS INTEGER)
     IF dlgEr >= 0 THEN GUI_WINDOW_DESTROY(dlgEr)
     DIM b AS INTEGER : b = 460
     DIM h AS INTEGER : h = 400
-    dlgEr = GUI_WINDOW("Ereignis hinzufügen", (SCREENWIDTH() - b) \ 2, (SCREENHEIGHT() - h) \ 2, b, h)
+    dlgEr = GUI_WINDOW(tr$("Ereignis hinzufügen"), (SCREENWIDTH() - b) \ 2, (SCREENHEIGHT() - h) \ 2, b, h)
     GUI_WINDOW_MOVABLE(dlgEr, FALSE)
     GUI_WINDOW_CHROME(dlgEr, FALSE)
-    DIM t AS GUI_WIDGET : t = GUI_LABEL(dlgEr, "Ereignis hinzufügen", 20, 16)
+    DIM t AS GUI_WIDGET : t = GUI_LABEL(dlgEr, tr$("Ereignis hinzufügen"), 20, 16)
     GUI_ADD_CLASS(t, "dialogtitel")
     DIM wofuer AS STRING : wofuer = e.name
-    IF ci >= 0 AND ci < ctrlWidgets THEN wofuer = erZiel + " (" + bausteinName$(ci) + ")"
-    IF ci >= ctrlWidgets AND art = "timer" THEN wofuer = erZiel + " (Timer)"
-    IF ci >= ctrlWidgets AND art = "menue" THEN wofuer = erZiel + " (Menüeintrag)"
-    GUI_LABEL(dlgEr, "Was soll " + wofuer + " tun? Wähle das Ereignis:", 20, 46)
+    IF ci >= 0 AND ci < ctrlWidgets THEN wofuer = erZiel + " (" + tr$(bausteinName$(ci)) + ")"
+    IF ci >= ctrlWidgets AND art = "timer" THEN wofuer = erZiel + tr$(" (Timer)")
+    IF ci >= ctrlWidgets AND art = "menue" THEN wofuer = erZiel + tr$(" (Menüeintrag)")
+    GUI_LABEL(dlgEr, trf$("Was soll {0} tun? Wähle das Ereignis:", [wofuer]), 20, 46)
     erListe = GUI_LISTBOX(dlgEr, 20, 72, b - 40, h - 190, [])
     DIM k AS INTEGER
     FOR k = 0 TO LEN(erEreignisse) - 1
         GUI_LISTBOX_ADD(erListe, erEreignisse[k])
         GUI_LISTBOX_ICON(erListe, k, navBild("ereignis"))
-        IF methodeIndex(e, ereignisMethode$(erEreignisse[k])) >= 0 THEN GUI_LISTBOX_DETAIL(erListe, k, "schon da")
+        IF methodeIndex(e, ereignisMethode$(erEreignisse[k])) >= 0 THEN GUI_LISTBOX_DETAIL(erListe, k, tr$("schon da"))
     NEXT
     GUI_LISTBOX_SELECT(erListe, 0, TRUE)
     erText = GUI_LABEL(dlgEr, "", 20, h - 108)
     GUI_SET_WRAP(erText, b - 40)
     GUI_ADD_CLASS(erText, "leise")
-    erOk = GUI_BUTTON(dlgEr, "Hinzufügen", b - 236, h - 52, 110, 32)
+    erOk = GUI_BUTTON(dlgEr, tr$("Hinzufügen"), b - 236, h - 52, 110, 32)
     GUI_BUTTON_VARIANT(erOk, "primaer")
-    erAbbr = GUI_BUTTON(dlgEr, "Abbrechen", b - 116, h - 52, 96, 32)
+    erAbbr = GUI_BUTTON(dlgEr, tr$("Abbrechen"), b - 116, h - 52, 96, 32)
     GUI_WINDOW_DEFAULT(dlgEr, erOk)
     GUI_WINDOW_CANCEL(dlgEr, erAbbr)
     GUI_WINDOW_MODAL(dlgEr, TRUE)
@@ -811,8 +811,8 @@ SUB erTextNachziehen()
     END IF
     DIM n AS STRING : n = ereignisMethode$(erEreignisse[k])
     DIM da AS BOOLEAN : da = methodeIndex(elemente[erEl], n) >= 0
-    GUI_SET_TEXT(erText, "Läuft " + ereignisBeschreibung$(erEreignisse[k]) + ". Die Methode heißt " + n + IIF(da, " und ist schon da -- sie wird geöffnet.", "."))
-    GUI_SET_TEXT(erOk, IIF(da, "Öffnen", "Hinzufügen"))
+    GUI_SET_TEXT(erText, trf$("Läuft {0}. Die Methode heißt {1}{2}", [ereignisBeschreibung$(erEreignisse[k]), n, IIF(da, tr$(" und ist schon da -- sie wird geöffnet."), ".")]))
+    GUI_SET_TEXT(erOk, IIF(da, tr$("Öffnen"), tr$("Hinzufügen")))
 END SUB
 
 SUB ereignisDialogPruefen()
@@ -866,32 +866,32 @@ DIM meEl AS INTEGER : meEl = -1
 
 SUB methodeDialog(ei AS INTEGER)
     IF ei < 0 THEN
-        status("Erst ein Fenster, ein Modul oder eine Klasse wählen.")
+        status(tr$("Erst ein Fenster, ein Modul oder eine Klasse wählen."))
         RETURN
     END IF
     meEl = ei
     IF dlgMe >= 0 THEN GUI_WINDOW_DESTROY(dlgMe)
     DIM b AS INTEGER : b = 480
     DIM h AS INTEGER : h = 300
-    dlgMe = GUI_WINDOW("Methode hinzufügen", (SCREENWIDTH() - b) \ 2, (SCREENHEIGHT() - h) \ 2, b, h)
+    dlgMe = GUI_WINDOW(tr$("Methode hinzufügen"), (SCREENWIDTH() - b) \ 2, (SCREENHEIGHT() - h) \ 2, b, h)
     GUI_WINDOW_MOVABLE(dlgMe, FALSE)
     GUI_WINDOW_CHROME(dlgMe, FALSE)
-    DIM t AS GUI_WIDGET : t = GUI_LABEL(dlgMe, "Methode hinzufügen zu " + elemente[ei].name, 20, 16)
+    DIM t AS GUI_WIDGET : t = GUI_LABEL(dlgMe, trf$("Methode hinzufügen zu {0}", [elemente[ei].name]), 20, 16)
     GUI_ADD_CLASS(t, "dialogtitel")
-    GUI_LABEL(dlgMe, "Name", 20, 58)
+    GUI_LABEL(dlgMe, tr$("Name"), 20, 58)
     meName = GUI_TEXTINPUT(dlgMe, 130, 54, b - 150, 28, "")
-    GUI_LABEL(dlgMe, "Parameter", 20, 98)
+    GUI_LABEL(dlgMe, tr$("Parameter"), 20, 98)
     meParam = GUI_TEXTINPUT(dlgMe, 130, 94, b - 150, 28, "")
-    GUI_LABEL(dlgMe, "Rückgabe", 20, 138)
+    GUI_LABEL(dlgMe, tr$("Rückgabe"), 20, 138)
     meTyp = GUI_TEXTINPUT(dlgMe, 130, 134, b - 150, 28, "")
-    DIM hinweis AS GUI_WIDGET : hinweis = GUI_LABEL(dlgMe, "Parameter wie in Drachenhauch: a AS INTEGER, b AS STRING. Ohne Rückgabe wird es eine SUB.", 20, 172)
+    DIM hinweis AS GUI_WIDGET : hinweis = GUI_LABEL(dlgMe, tr$("Parameter wie in Drachenhauch: a AS INTEGER, b AS STRING. Ohne Rückgabe wird es eine SUB."), 20, 172)
     GUI_SET_WRAP(hinweis, b - 40)
     GUI_ADD_CLASS(hinweis, "leise")
     meFehler = GUI_LABEL(dlgMe, "", 20, 214)
     GUI_ADD_CLASS(meFehler, "fehler")
-    meOk = GUI_BUTTON(dlgMe, "Hinzufügen", b - 236, h - 52, 110, 32)
+    meOk = GUI_BUTTON(dlgMe, tr$("Hinzufügen"), b - 236, h - 52, 110, 32)
     GUI_BUTTON_VARIANT(meOk, "primaer")
-    meAbbr = GUI_BUTTON(dlgMe, "Abbrechen", b - 116, h - 52, 96, 32)
+    meAbbr = GUI_BUTTON(dlgMe, tr$("Abbrechen"), b - 116, h - 52, 96, 32)
     GUI_WINDOW_DEFAULT(dlgMe, meOk)
     GUI_WINDOW_CANCEL(dlgMe, meAbbr)
     GUI_WINDOW_MODAL(dlgMe, TRUE)
@@ -905,16 +905,16 @@ FUNCTION methodeKopf$() AS STRING
     DIM p AS STRING : p = TRIM$(GUI_TEXT(meParam))
     DIM t AS STRING : t = TRIM$(GUI_TEXT(meTyp))
     IF NOT istBezeichner(n) THEN
-        GUI_SET_TEXT(meFehler, "Ein Name beginnt mit einem Buchstaben und hat nur Buchstaben, Ziffern und _.")
+        GUI_SET_TEXT(meFehler, tr$("Ein Name beginnt mit einem Buchstaben und hat nur Buchstaben, Ziffern und _."))
         RETURN ""
     END IF
     IF methodeIndex(elemente[meEl], n) >= 0 THEN
-        GUI_SET_TEXT(meFehler, "Eine Methode " + n + " gibt es in " + elemente[meEl].name + " schon.")
+        GUI_SET_TEXT(meFehler, trf$("Eine Methode {0} gibt es in {1} schon.", [n, elemente[meEl].name]))
         RETURN ""
     END IF
     IF LEFT$(p, 1) = "(" AND RIGHT$(p, 1) = ")" THEN p = MID$(p, 1, LEN(p) - 2)
     IF t <> "" AND NOT REGEX_TEST(t, "^[A-Za-z][A-Za-z0-9_]*(\s+OF\s+[A-Za-z][A-Za-z0-9_]*)?$") THEN
-        GUI_SET_TEXT(meFehler, "Die Rückgabe ist ein Typ, etwa INTEGER, STRING oder ARRAY OF FLOAT.")
+        GUI_SET_TEXT(meFehler, tr$("Die Rückgabe ist ein Typ, etwa INTEGER, STRING oder ARRAY OF FLOAT."))
         RETURN ""
     END IF
     IF t = "" THEN RETURN "SUB " + n + "(" + p + ")"
@@ -955,8 +955,8 @@ DIM wegEl AS INTEGER : wegEl = -1
 SUB elementFragen(art AS STRING)
     IF GUI_MODAL() THEN RETURN
     elWas = art
-    DIM grund AS STRING : grund = IIF(art = "fenster", "Fenster", IIF(art = "modul", "Modul", "Klasse"))
-    dlgEl = GUI_PROMPT(artText$(art) + " hinzufügen", "Name (wird zum Namen der Klasse bzw. des Moduls):", elementNameFrei$(grund), "Hinzufügen|Abbrechen")
+    DIM grund AS STRING : grund = IIF(art = "fenster", tr$("Fenster"), IIF(art = "modul", tr$("Modul"), tr$("Klasse")))
+    dlgEl = GUI_PROMPT(trf$("{0} hinzufügen", [artText$(art)]), tr$("Name (wird zum Namen der Klasse bzw. des Moduls):"), elementNameFrei$(grund), tr$("Hinzufügen|Abbrechen"))
 END SUB
 
 SUB elementDialogPruefen()
@@ -983,11 +983,11 @@ END SUB
 
 FUNCTION elementAnlegen(art AS STRING, n AS STRING) AS BOOLEAN
     IF NOT istBezeichner(n) THEN
-        status("'" + n + "' ist kein Name: ein Buchstabe vorn, dann Buchstaben, Ziffern und _.")
+        status(trf$("'{0}' ist kein Name: ein Buchstabe vorn, dann Buchstaben, Ziffern und _.", [n]))
         RETURN FALSE
     END IF
     IF elementIndex(n) >= 0 THEN
-        status("Ein Element " + n + " gibt es schon.")
+        status(trf$("Ein Element {0} gibt es schon.", [n]))
         RETURN FALSE
     END IF
     DIM e AS Element : e = elementNeu(art, n)
@@ -996,7 +996,7 @@ FUNCTION elementAnlegen(art AS STRING, n AS STRING) AS BOOLEAN
     navigatorFuellen()
     IF art = "fenster" THEN layoutOeffnen(LEN(elemente) - 1) ELSE deklOeffnen(e)
     werkzeugeNachziehen()
-    status(artText$(art) + " " + n + " hinzugefügt.")
+    status(trf$("{0} {1} hinzugefügt.", [artText$(art), n]))
     protokoll("element neu " + art + " " + n)
     RETURN TRUE
 END FUNCTION
@@ -1005,11 +1005,11 @@ SUB elementLoeschenFragen(ei AS INTEGER)
     IF ei < 0 OR GUI_MODAL() THEN RETURN
     DIM e AS Element : e = elemente[ei]
     IF e.art = "app" THEN
-        status("Die App gehört zu jedem Projekt.")
+        status(tr$("Die App gehört zu jedem Projekt."))
         RETURN
     END IF
     wegEl = ei
-    dlgWeg = GUI_DIALOG(artText$(e.art) + " löschen", e.name + " mit seinem Code aus dem Projekt nehmen? Die Dateien verschwinden beim nächsten Sichern.", "Löschen|Abbrechen")
+    dlgWeg = GUI_DIALOG(trf$("{0} löschen", [artText$(e.art)]), trf$("{0} mit seinem Code aus dem Projekt nehmen? Die Dateien verschwinden beim nächsten Sichern.", [e.name]), tr$("Löschen|Abbrechen"))
 END SUB
 
 SUB elementLoeschen(ei AS INTEGER)
@@ -1052,7 +1052,7 @@ SUB elementLoeschen(ei AS INTEGER)
     reiterWar = -2
     reiterPruefen()
     werkzeugeNachziehen()
-    status(e.name + " gelöscht.")
+    status(trf$("{0} gelöscht.", [e.name]))
     protokoll("element weg " + e.name)
 END SUB
 
@@ -1073,14 +1073,14 @@ END SUB
 SUB alsStartSetzen(ei AS INTEGER)
     IF ei < 0 THEN RETURN
     IF elemente[ei].art <> "fenster" THEN
-        status("Starten kann nur ein Fenster.")
+        status(tr$("Starten kann nur ein Fenster."))
         RETURN
     END IF
     projStart = elemente[ei].name
     projGeaendert = TRUE
     navigatorFuellen()
     werkzeugeNachziehen()
-    status(projStart + " ist jetzt das Startfenster.")
+    status(trf$("{0} ist jetzt das Startfenster.", [projStart]))
 END SUB
 
 ' --- Methode loeschen ---------------------------------------------------------------
@@ -1088,7 +1088,7 @@ SUB methodeEntfernen()
     DIM k AS INTEGER : k = reiterVorn()
     IF k < 0 OR k >= LEN(reiter) THEN RETURN
     IF reiter[k].art <> "code" THEN
-        status("Erst die Methode öffnen, die weg soll.")
+        status(tr$("Erst die Methode öffnen, die weg soll."))
         RETURN
     END IF
     DIM m AS Methode : m = reiter[k].meth
@@ -1096,7 +1096,7 @@ SUB methodeEntfernen()
     methodeLoeschen(m)
     navigatorFuellen()
     werkzeugeNachziehen()
-    status("Methode " + m.name + " entfernt.")
+    status(trf$("Methode {0} entfernt.", [m.name]))
     protokoll("methode weg " + m.el.name + "." + m.name)
 END SUB
 
@@ -1130,8 +1130,11 @@ SUB vorlagenLesen()
         IF NOT FILEEXISTS(PATHJOIN(o, PROJEKT_DATEI)) THEN CONTINUE
         DIM t AS STRING : t = n
         DIM b AS STRING : b = ""
-        IF FILEEXISTS(PATHJOIN(o, "vorlage.txt")) THEN
-            DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(PATHJOIN(o, "vorlage.txt"))
+        ' Auf Englisch Titel und Beschreibung aus vorlage.en.txt, wenn es sie gibt.
+        DIM vt AS STRING : vt = PATHJOIN(o, "vorlage.txt")
+        IF englisch AND FILEEXISTS(PATHJOIN(o, "vorlage.en.txt")) THEN vt = PATHJOIN(o, "vorlage.en.txt")
+        IF FILEEXISTS(vt) THEN
+            DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(vt)
             IF LEN(zeilen) > 0 THEN t = TRIM$(zeilen[0])
             DIM k AS INTEGER
             FOR k = 1 TO LEN(zeilen) - 1
@@ -1151,20 +1154,20 @@ SUB vorlageDialog()
     IF dlgVl >= 0 THEN GUI_WINDOW_DESTROY(dlgVl)
     DIM b AS INTEGER : b = 520
     DIM h AS INTEGER : h = 400
-    dlgVl = GUI_WINDOW("Neues Projekt", (SCREENWIDTH() - b) \ 2, (SCREENHEIGHT() - h) \ 2, b, h)
+    dlgVl = GUI_WINDOW(tr$("Neues Projekt"), (SCREENWIDTH() - b) \ 2, (SCREENHEIGHT() - h) \ 2, b, h)
     GUI_WINDOW_MOVABLE(dlgVl, FALSE)
     GUI_WINDOW_CHROME(dlgVl, FALSE)
-    DIM t AS GUI_WIDGET : t = GUI_LABEL(dlgVl, "Neues Projekt", 20, 16)
+    DIM t AS GUI_WIDGET : t = GUI_LABEL(dlgVl, tr$("Neues Projekt"), 20, 16)
     GUI_ADD_CLASS(t, "dialogtitel")
-    GUI_LABEL(dlgVl, "Womit soll es anfangen?", 20, 46)
+    GUI_LABEL(dlgVl, tr$("Womit soll es anfangen?"), 20, 46)
     vlListe = GUI_LISTBOX(dlgVl, 20, 72, b - 40, h - 200, vlTitel)
     GUI_LISTBOX_SELECT(vlListe, 0, TRUE)
     vlText = GUI_LABEL(dlgVl, "", 20, h - 118)
     GUI_SET_WRAP(vlText, b - 40)
     GUI_ADD_CLASS(vlText, "leise")
-    vlOk = GUI_BUTTON(dlgVl, "Anlegen", b - 236, h - 52, 110, 32)
+    vlOk = GUI_BUTTON(dlgVl, tr$("Anlegen"), b - 236, h - 52, 110, 32)
     GUI_BUTTON_VARIANT(vlOk, "primaer")
-    vlAbbr = GUI_BUTTON(dlgVl, "Abbrechen", b - 116, h - 52, 96, 32)
+    vlAbbr = GUI_BUTTON(dlgVl, tr$("Abbrechen"), b - 116, h - 52, 96, 32)
     GUI_WINDOW_DEFAULT(dlgVl, vlOk)
     GUI_WINDOW_CANCEL(dlgVl, vlAbbr)
     GUI_WINDOW_MODAL(dlgVl, TRUE)

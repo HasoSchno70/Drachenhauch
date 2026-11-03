@@ -1,0 +1,2 @@
+Form with fields
+Fields one below the other in a column, OK and Cancel at the bottom right, validation rules for a required field and an e-mail address. Grows with the window.

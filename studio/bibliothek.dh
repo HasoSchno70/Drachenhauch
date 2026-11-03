@@ -28,8 +28,13 @@ DIM gruppen AS ARRAY OF STRING : gruppen = []
 
 SUB baustein(gruppe AS STRING, kind AS STRING, name AS STRING, grund AS STRING, b AS INTEGER, h AS INTEGER, text AS STRING, vorlage AS STRING, beschreibung AS STRING)
     DIM s AS Baustein : s = NEW Baustein()
-    s.kind = kind : s.name = name : s.grundname = grund : s.gruppe = gruppe
-    s.b = b : s.h = h : s.text = text : s.vorlage = vorlage : s.beschreibung = beschreibung
+    ' Name und Gruppe sind Schluessel (Sinnbild, Suche nach der Art) und werden
+    ' erst beim Anzeigen uebersetzt; was ins Fenster kommt -- der Grundname
+    ' der Controls, ihr Text, Eintraege und Spaltenkoepfe --, gleich hier.
+    s.kind = kind : s.name = name : s.grundname = tr$(grund) : s.gruppe = gruppe
+    s.b = b : s.h = h : s.text = IIF(text = "", "", tr$(text)) : s.beschreibung = beschreibung
+    s.vorlage = vorlage
+    IF INSTR(vorlage, "'items'") >= 0 OR INSTR(vorlage, "'headers'") >= 0 THEN s.vorlage = tr$(vorlage)
     ARRAY_PUSH(bausteine, s)
     IF ARRAY_INDEXOF(gruppen, gruppe) < 0 THEN ARRAY_PUSH(gruppen, gruppe)
 END SUB

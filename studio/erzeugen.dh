@@ -582,20 +582,20 @@ END FUNCTION
 
 ' Wo ein Befund hingehoert, als Text fuer die Liste.
 FUNCTION befundOrt$(b AS Befund) AS STRING
-    IF b.el < 0 THEN RETURN "Programm"
+    IF b.el < 0 THEN RETURN tr$("Programm")
     DIM e AS Element : e = elemente[b.el]
-    IF b.erzeugt THEN RETURN e.name + " (erzeugt)"
+    IF b.erzeugt THEN RETURN e.name + tr$(" (erzeugt)")
     IF b.meth >= 0 AND b.meth < LEN(methoden) THEN
         DIM s AS STRING : s = e.name + "." + methoden[b.meth].name
         DIM rz AS INTEGER : rz = LEN(SPLIT(methoden[b.meth].rumpf, CHR$(10)))
         IF b.zeile > rz THEN
-            s = s + ", am Ende"
+            s = s + tr$(", am Ende")
         ELSEIF b.zeile > 0 THEN
-            s = s + ", Zeile " + STR$(b.zeile)
+            s = s + trf$(", Zeile {0}", [STR$(b.zeile)])
         END IF
         RETURN s
     END IF
-    IF b.meth = KARTE_DEKL THEN RETURN e.name + ".Eigenschaften, Zeile " + STR$(b.zeile)
+    IF b.meth = KARTE_DEKL THEN RETURN e.name + trf$(" · Eigenschaften, Zeile {0}", [STR$(b.zeile)])
     RETURN e.name
 END FUNCTION
 
@@ -628,8 +628,8 @@ SUB befundeAnzeigen()
         GUI_LISTBOX_COLOR(lstProbleme, GUI_LISTBOX_COUNT(lstProbleme) - 1, IIF(b.fehler, &HE86060, &HE0B040))
         IF b.fehler THEN fehler = fehler + 1
     NEXT
-    IF LEN(befunde) = 0 THEN GUI_LISTBOX_PLACEHOLDER(lstProbleme, "Keine Probleme.")
-    GUI_DOCK_TITLE(win, "probleme", IIF(LEN(befunde) = 0, "Probleme", "Probleme (" + STR$(LEN(befunde)) + ")"))
+    IF LEN(befunde) = 0 THEN GUI_LISTBOX_PLACEHOLDER(lstProbleme, tr$("Keine Probleme."))
+    GUI_DOCK_TITLE(win, "probleme", IIF(LEN(befunde) = 0, tr$("Probleme"), trf$("Probleme ({0})", [STR$(LEN(befunde))])))
     befundLagen = 2
     DIM r AS Reiter
     FOR EACH r IN reiter
@@ -738,15 +738,15 @@ END FUNCTION
 SUB bildHinzufuegen()
     IF projLose OR projOrdner = "" THEN
         IF NOT sichern(FALSE) THEN
-            status("Bilder gehören zu einem Projekt -- erst sichern.")
+            status(tr$("Bilder gehören zu einem Projekt -- erst sichern."))
             RETURN
         END IF
     END IF
     DIM q AS STRING : q = GETENV$("DH_STUDIO_DATEI")
-    IF q = "" THEN q = FILE_OPEN_DIALOG("Bild hinzufügen", "png,jpg,jpeg,bmp,gif,tga")
+    IF q = "" THEN q = FILE_OPEN_DIALOG(tr$("Bild hinzufügen"), "png,jpg,jpeg,bmp,gif,tga")
     IF q = "" THEN RETURN
     IF NOT FILEEXISTS(q) THEN
-        status("Die Datei gibt es nicht: " + q)
+        status(trf$("Die Datei gibt es nicht: {0}", [q]))
         RETURN
     END IF
     DIM o AS STRING : o = bilderOrdner$()
@@ -757,7 +757,7 @@ SUB bildHinzufuegen()
         IF feldText$(auswahl, "kind") = "image" THEN JSON_SET_STRING(doc, wz$(auswahl, "studio_bild"), name)
     END IF
     nachAenderung(TRUE)
-    status("Bild hinzugefügt: bilder/" + name)
+    status(trf$("Bild hinzugefügt: bilder/{0}", [name]))
     protokoll("bild " + name)
 END SUB
 
@@ -794,18 +794,18 @@ END SUB
 FUNCTION vorbereiten(wozu AS STRING) AS BOOLEAN
     IF projLose OR projOrdner = "" OR projektGeaendert() THEN
         IF NOT sichern(FALSE) THEN
-            status(wozu + " braucht ein gesichertes Projekt.")
+            status(trf$("{0} braucht ein gesichertes Projekt.", [tr$(wozu)]))
             RETURN FALSE
         END IF
     END IF
     IF startIndex() < 0 THEN
-        status("Das Projekt hat kein Fenster.")
+        status(tr$("Das Projekt hat kein Fenster."))
         RETURN FALSE
     END IF
     DIM f AS INTEGER : f = projektPruefen()
     IF f > 0 THEN
         GUI_DOCK_ACTIVATE(win, "probleme")
-        status(STR$(f) + IIF(f = 1, " Fehler", " Fehler") + " -- erst beheben, dann " + LOWER$(wozu) + ".")
+        status(IIF(f = 1, trf$("1 Fehler -- erst beheben, dann {0}.", [LOWER$(tr$(wozu))]), trf$("{0} Fehler -- erst beheben, dann {1}.", [STR$(f), LOWER$(tr$(wozu))])))
         protokoll("nicht " + LOWER$(wozu) + " " + STR$(f))
         RETURN FALSE
     END IF
@@ -823,7 +823,7 @@ SUB starten()
     GUI_LISTBOX_CLEAR(lstAusgabe)
     GUI_DOCK_ACTIVATE(win, "ausgabe")
     DIM main AS STRING : main = PATHJOIN(studioOrdner$(), "main.dh")
-    ausgabe("▶ " + projName + " startet …", &H70C070)
+    ausgabe(trf$("▶ {0} startet …", [projName]), &H70C070)
     DIM bilder AS STRING : bilder = GETENV$("DH_STUDIO_LAUF_BILDER")
     IF bilder <> "" THEN
         lauf = PROCESS_START("dhrt", "run", "--bilder", bilder, main)
@@ -832,7 +832,7 @@ SUB starten()
     END IF
     ausgabeRest = ""
     werkzeugeNachziehen()
-    status("Läuft: " + projName)
+    status(trf$("Läuft: {0}", [projName]))
     protokoll("gestartet " + main)
 END SUB
 
@@ -844,9 +844,9 @@ SUB anhalten()
     IF lauf < 0 THEN RETURN
     PROCESS_KILL(lauf)
     lauf = -1
-    ausgabe("■ Angehalten.", &HB0B0B0)
+    ausgabe(tr$("■ Angehalten."), &HB0B0B0)
     werkzeugeNachziehen()
-    status("Angehalten.")
+    status(tr$("Angehalten."))
     protokoll("angehalten")
 END SUB
 
@@ -862,10 +862,10 @@ SUB bauen()
     DIM o AS STRING : o = PATHJOIN(projOrdner, "bau")
     IF NOT DIREXISTS(o) THEN MKDIR(o)
     bauZiel = PATHJOIN(o, projName + IIF(unterWindows(), ".exe", ""))
-    ausgabe("⚙ Baue " + bauZiel + " …", &H70A0E0)
+    ausgabe(trf$("⚙ Baue {0} …", [bauZiel]), &H70A0E0)
     bau = PROCESS_START("dhrt", "--export", PATHJOIN(studioOrdner$(), "main.dh"), bauZiel)
     werkzeugeNachziehen()
-    status("Baue …")
+    status(tr$("Baue …"))
     protokoll("bauen " + bauZiel)
 END SUB
 
@@ -920,11 +920,11 @@ SUB prozessePruefen()
         IF NOT PROCESS_RUNNING(lauf) AND PROCESS_READ$(lauf) = "" THEN
             IF ausgabeRest <> "" THEN ausgabeZeile(ausgabeRest) : ausgabeRest = ""
             DIM code AS INTEGER : code = PROCESS_CODE(lauf)
-            ausgabe(IIF(code = 0, "■ Beendet.", "■ Beendet mit Rückgabe " + STR$(code) + "."), &HB0B0B0)
+            ausgabe(IIF(code = 0, tr$("■ Beendet."), trf$("■ Beendet mit Rückgabe {0}.", [STR$(code)])), &HB0B0B0)
             protokoll("beendet " + STR$(code))
             lauf = -1
             werkzeugeNachziehen()
-            status("Beendet.")
+            status(tr$("Beendet."))
         END IF
     END IF
     IF bau >= 0 THEN
@@ -937,12 +937,12 @@ SUB prozessePruefen()
         ELSEIF NOT PROCESS_RUNNING(bau) THEN
             DIM bc AS INTEGER : bc = PROCESS_CODE(bau)
             IF bc = 0 AND FILEEXISTS(bauZiel) THEN
-                ausgabe("✓ Gebaut: " + bauZiel, &H70C070)
-                status("Gebaut: " + BASENAME(bauZiel))
+                ausgabe(trf$("✓ Gebaut: {0}", [bauZiel]), &H70C070)
+                status(trf$("Gebaut: {0}", [BASENAME(bauZiel)]))
                 protokoll("gebaut " + bauZiel)
             ELSE
-                ausgabe("✕ Bauen fehlgeschlagen (Rückgabe " + STR$(bc) + ").", &HE86060)
-                status("Bauen fehlgeschlagen.")
+                ausgabe(trf$("✕ Bauen fehlgeschlagen (Rückgabe {0}).", [STR$(bc)]), &HE86060)
+                status(tr$("Bauen fehlgeschlagen."))
                 protokoll("bau fehlgeschlagen " + STR$(bc))
             END IF
             bau = -1

@@ -181,6 +181,8 @@ SUB inhaltKopieren(wurzel AS STRING, laufzeit AS STRING, bin AS STRING, res AS S
         studioZahl = studioZahl + ordnerKopieren(PATHJOIN(wurzel, "studio"), PATHJOIN(res, "studio"), "*.dhstil", FALSE)
         ' die Projektvorlagen (Neues Projekt), samt Unterordnern
         IF DIREXISTS(PATHJOIN(wurzel, "studio/vorlagen")) THEN studioZahl = studioZahl + ordnerKopieren(PATHJOIN(wurzel, "studio/vorlagen"), PATHJOIN(res, "studio/vorlagen"), "*", TRUE)
+        ' die englische Oberflaeche (studio/sprache/en.txt)
+        IF DIREXISTS(PATHJOIN(wurzel, "studio/sprache")) THEN studioZahl = studioZahl + ordnerKopieren(PATHJOIN(wurzel, "studio/sprache"), PATHJOIN(res, "studio/sprache"), "*.txt", FALSE)
         PRINT "  studio/   "; studioZahl; " Dateien"
     END IF
     PRINT "  examples/ "; ordnerKopieren(PATHJOIN(wurzel, "examples"), PATHJOIN(res, "examples"), "*", TRUE); " Dateien"

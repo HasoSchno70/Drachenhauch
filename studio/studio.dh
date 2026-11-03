@@ -26,6 +26,7 @@ SUB protokoll(text AS STRING)
     CLOSEFILE(f)
 END SUB
 
+IMPORT "sprache.dh"
 IMPORT "modell.dh"
 IMPORT "projekt.dh"
 IMPORT "bibliothek.dh"
@@ -48,7 +49,7 @@ IF INSTR(festeGroesse, "x") > 0 THEN
     schirmB = INT(VAL(LEFT$(festeGroesse, INSTR(festeGroesse, "x"))))
     schirmH = INT(VAL(MID$(festeGroesse, INSTR(festeGroesse, "x") + 1, 10)))
 END IF
-SCREEN(schirmB, schirmH, "Drachenhauch Studio", 1)
+SCREEN(schirmB, schirmH, tr$("Drachenhauch Studio"), 1)
 WINDOW_RESIZABLE(TRUE)
 WINDOW_MIN_SIZE(1100, 700)
 SETFPS(60)
@@ -109,7 +110,7 @@ SUB projektAnfangen(ordner AS STRING)
     projektNeu(ordner)
     nachLaden()
     unberuehrt()
-    status(IIF(ordner = "", "Neues Projekt. Bausteine aus der Bibliothek ins Fenster ziehen.", "Neues Projekt in " + ordner + "."))
+    status(IIF(ordner = "", tr$("Neues Projekt. Bausteine aus der Bibliothek ins Fenster ziehen."), trf$("Neues Projekt in {0}.", [ordner])))
     protokoll("neu-fenster")
     protokoll("neues projekt " + projName)
 END SUB
@@ -134,7 +135,7 @@ SUB projektAusVorlage(ordner AS STRING, titel AS STRING)
     alleReiterZu()
     DIM fehler AS STRING : fehler = projektLaden$(ordner)
     IF fehler <> "" THEN
-        status("Die Vorlage geht nicht auf: " + fehler)
+        status(trf$("Die Vorlage geht nicht auf: {0}", [fehler]))
         projektAnfangen("")
         RETURN
     END IF
@@ -145,7 +146,7 @@ SUB projektAusVorlage(ordner AS STRING, titel AS STRING)
     NEXT
     nachLaden()
     unberuehrt()
-    status("Neues Projekt aus der Vorlage " + CHR$(34) + titel + CHR$(34) + ". F5 startet es; Sichern fragt nach einem Ordner.")
+    status(trf$("Neues Projekt aus der Vorlage {0}. F5 startet es; Sichern fragt nach einem Ordner.", [CHR$(34) + titel + CHR$(34)]))
     protokoll("neues projekt aus vorlage " + BASENAME(ordner))
 END SUB
 
@@ -157,7 +158,7 @@ SUB fensterLaden(pfad AS STRING)
     projLose = TRUE
     projOrdner = ""
     DIM name AS STRING : name = REGEX_REPLACE(BASENAME(pfad), "(?i)\.dhform$", "")
-    IF NOT istBezeichner(name) THEN name = "Fenster1"
+    IF NOT istBezeichner(name) THEN name = tr$("Fenster1")
     DIM e AS Element : e = elementNeu("fenster", name)
     projName = name
     formPfad = pfad
@@ -188,10 +189,10 @@ SUB fensterLaden(pfad AS STRING)
         nachAenderung(FALSE)
     END IF
     IF FILEEXISTS(pfad) THEN
-        status("Geladen: " + BASENAME(pfad) + " (" + STR$(anzahl()) + " Controls)")
+        status(trf$("Geladen: {0} ({1} Controls)", [BASENAME(pfad), STR$(anzahl())]))
         protokoll("geladen " + STR$(anzahl()))
     ELSE
-        status("Neu: " + pfad)
+        status(trf$("Neu: {0}", [pfad]))
         protokoll("neu-fenster")
     END IF
 END SUB
@@ -205,7 +206,7 @@ SUB projektOeffnen(ordner AS STRING)
         projektNeu(ordner)
     END IF
     nachLaden()
-    status("Projekt " + projName + ": " + STR$(LEN(elemente)) + " Elemente, " + STR$(LEN(methoden)) + " Methoden.")
+    status(trf$("Projekt {0}: {1} Elemente, {2} Methoden.", [projName, STR$(LEN(elemente)), STR$(LEN(methoden))]))
     protokoll("projekt geladen " + projName + " " + STR$(LEN(elemente)) + " " + STR$(LEN(methoden)))
 END SUB
 
@@ -256,7 +257,7 @@ FUNCTION sichern(alsNeu AS BOOLEAN) AS BOOLEAN
     layoutZurueck()
     IF nurDasFenster() AND NOT alsNeu THEN
         IF formPfad = "" THEN
-            DIM p AS STRING : p = FILE_SAVE_DIALOG("Fenster sichern", fensterText$("name") + ".dhform", "dhform")
+            DIM p AS STRING : p = FILE_SAVE_DIALOG(tr$("Fenster sichern"), fensterText$("name") + ".dhform", "dhform")
             IF p = "" THEN RETURN FALSE
             IF LOWER$(RIGHT$(p, 7)) <> ".dhform" THEN p = p + ".dhform"
             formPfad = p
@@ -266,14 +267,14 @@ FUNCTION sichern(alsNeu AS BOOLEAN) AS BOOLEAN
         elemente[0].geaendert = FALSE
         projGeaendert = FALSE
         werkzeugeNachziehen()
-        status("Gesichert: " + BASENAME(formPfad))
+        status(trf$("Gesichert: {0}", [BASENAME(formPfad)]))
         protokoll("gesichert " + formPfad)
         RETURN TRUE
     END IF
     IF projOrdner = "" OR alsNeu THEN
         ' Fuer Pruefungen: DH_STUDIO_ORDNER statt des Dialogs.
         DIM o AS STRING : o = GETENV$("DH_STUDIO_ORDNER")
-        IF o = "" THEN o = FOLDER_DIALOG("Ordner für das Projekt")
+        IF o = "" THEN o = FOLDER_DIALOG(tr$("Ordner für das Projekt"))
         IF o = "" THEN RETURN FALSE
         projOrdner = o
         projName = BASENAME(o)
@@ -293,7 +294,7 @@ FUNCTION sichern(alsNeu AS BOOLEAN) AS BOOLEAN
     geaendert = FALSE
     navigatorFuellen()
     werkzeugeNachziehen()
-    status("Gesichert: " + projName + " (" + STR$(LEN(elemente)) + " Elemente)")
+    status(trf$("Gesichert: {0} ({1} Elemente)", [projName, STR$(LEN(elemente))]))
     protokoll("gesichert " + projOrdner)
     RETURN TRUE
 END FUNCTION
@@ -308,7 +309,7 @@ SUB ausfuehren(was AS STRING)
     SELECT CASE was
         CASE "neu" : vorlageDialog()
         CASE "oeffnen"
-            DIM p AS STRING : p = FILE_OPEN_DIALOG("Projekt oder Fenster öffnen", "dhstudio,dhform")
+            DIM p AS STRING : p = FILE_OPEN_DIALOG(tr$("Projekt oder Fenster öffnen"), "dhstudio,dhform")
             IF p <> "" THEN
                 IF LOWER$(RIGHT$(p, 7)) = ".dhform" THEN fensterLaden(p) ELSE projektOeffnen(DIRNAME(p))
             END IF
@@ -323,7 +324,7 @@ SUB anfragen(was AS STRING)
         RETURN
     END IF
     wartet = was
-    frage = GUI_DIALOG("Ungesicherte Änderungen", IIF(projLose, "Das Fenster " + fensterText$("name"), "Das Projekt " + projName) + " ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen")
+    frage = GUI_DIALOG(tr$("Ungesicherte Änderungen"), trf$("{0} ist nicht gesichert.", [IIF(projLose, trf$("Das Fenster {0}", [fensterText$("name")]), trf$("Das Projekt {0}", [projName]))]), tr$("Sichern|Verwerfen|Abbrechen"))
 END SUB
 
 SUB frageAuswerten()
@@ -344,7 +345,7 @@ END SUB
 DIM ueber AS GUI_WINDOW : ueber = -1
 SUB ueberZeigen()
     IF ueber >= 0 THEN GUI_WINDOW_DESTROY(ueber)
-    ueber = GUI_DIALOG("Drachenhauch Studio", "Eine IDE für Programme mit Oberfläche, mit der Laufzeit dhrt " + VERSION$() + "." + CHR$(10) + "Stufe 3: Projekte mit Fenstern, Modulen und Klassen -- prüfen, starten, bauen.", "ok")
+    ueber = GUI_DIALOG(tr$("Drachenhauch Studio"), trf$("Eine IDE für Programme mit Oberfläche, mit der Laufzeit dhrt {0}.{1}Fenster entwerfen, Ereignisse und Code je Methode, prüfen, starten, debuggen und bauen.", [VERSION$(), CHR$(10)]), "ok")
 END SUB
 
 ' --- Menue und Werkzeugleiste -------------------------------------------------
@@ -376,6 +377,7 @@ SUB befehle()
         mitteNachziehen()
         punkteFuer = ""
     END IF
+    IF GUI_CLICKED(miSprache) THEN spracheWechseln()
     IF GUI_CLICKED(miUeber) THEN ueberZeigen()
     IF GUI_CLICKED(miStarten) OR t = tbStart THEN starten()
     IF GUI_CLICKED(miAnhalten) OR t = tbStopp THEN anhalten()
@@ -390,7 +392,7 @@ SUB befehle()
     IF GUI_CLICKED(miPruefen) OR t = tbPruefen THEN
         DIM pf AS INTEGER : pf = projektPruefen()
         GUI_DOCK_ACTIVATE(win, "probleme")
-        status(IIF(LEN(befunde) = 0, "Keine Probleme.", STR$(pf) + " Fehler, " + STR$(LEN(befunde) - pf) + " Warnungen."))
+        status(IIF(LEN(befunde) = 0, tr$("Keine Probleme."), trf$("{0} Fehler, {1} Warnungen.", [STR$(pf), STR$(LEN(befunde) - pf)])))
     END IF
     IF GUI_CLICKED(lstProbleme) THEN befundAnspringen(GUI_LISTBOX_SELECTED(lstProbleme))
     IF GUI_CLICKED(miFensterNeu) OR t = tbFenster THEN elementFragen("fenster")
@@ -437,7 +439,7 @@ SUB loeschen()
         abstandEntfernen(abstandL, abstandK)
         auswahlSetzen(-1)
         nachAenderung(TRUE)
-        status("Abstandhalter aus " + ln + " gelöscht.")
+        status(trf$("Abstandhalter aus {0} gelöscht.", [ln]))
         protokoll("geloescht abstand " + ln)
         RETURN
     END IF
@@ -446,14 +448,14 @@ SUB loeschen()
         JSON_REMOVE(doc, "timer." + STR$(trayWahl))
         trayWahl = -1
         nachAenderung(TRUE)
-        status("Timer gelöscht: " + tn)
+        status(trf$("Timer gelöscht: {0}", [tn]))
         protokoll("geloescht timer " + tn)
         RETURN
     END IF
     DIM n AS INTEGER : n = LEN(gewaehlt)
     controlsLoeschen()
     nachAenderung(TRUE)
-    status(STR$(n) + IIF(n = 1, " Control gelöscht.", " Controls gelöscht."))
+    status(IIF(n = 1, tr$("1 Control gelöscht."), trf$("{0} Controls gelöscht.", [STR$(n)])))
     protokoll("geloescht " + STR$(n))
 END SUB
 
@@ -477,7 +479,7 @@ SUB tasten()
     IF KEYHIT(KEY_ESCAPE) THEN
         IF bibScharf() THEN
             bibEntschaerfen()
-            status("Abgebrochen.")
+            status(tr$("Abgebrochen."))
         ELSE
             auswahlSetzen(-1)
             auswahlGeaendert()
@@ -544,6 +546,53 @@ SUB felderProtokollieren()
     NEXT
 END SUB
 
+' Fuer Pruefungen der Sprache (DH_STUDIO_SPRACHPROBE): Texte der Oberflaeche
+' und jedes Dialogs ins Protokoll, dazu die Zahl der Texte ohne Uebersetzung.
+' Die Dialoge gehen einer nach dem anderen auf und gleich wieder zu -- jeder
+' uebersetzt seine Texte beim Aufbau. "wechseln" schaltet die Sprache um.
+' Ein Dialog der Probe wieder zu -- erst nicht mehr modal, sonst nimmt der
+' naechste keine Eingabe an.
+SUB probeZu(w AS GUI_WINDOW)
+    IF w < 0 THEN RETURN
+    GUI_WINDOW_MODAL(w, FALSE)
+    GUI_WINDOW_DESTROY(w)
+END SUB
+
+SUB spracheProbe(was AS STRING)
+    IF was = "wechseln" THEN
+        spracheWechseln()
+        beenden = TRUE
+        RETURN
+    END IF
+    protokoll("probe sprache " + sprache)
+    protokoll("probe dhrt_lang [" + GETENV$("DHRT_LANG") + "]")
+    protokoll("probe status " + GUI_TEXT(sb))
+    protokoll("probe bibliothek " + GUI_LISTBOX_ITEM(lstBib, 0) + " | " + GUI_LISTBOX_ITEM(lstBib, 1))
+    protokoll("probe inspektor " + GUI_TEXT(inspKoepfe[0]))
+    protokoll("probe name " + elemente[startIndex()].name)
+    DIM pj AS JSON_HANDLE : pj = JSON_PARSE(CODE_CHECK$("IF x THEN" + CHR$(10)))
+    protokoll("probe pruefen " + JSON_GET_STRING(pj, "0.meldung"))
+    ereignisDialog(startIndex(), -1)
+    protokoll("probe ereignis " + GUI_TEXT(erText))
+    probeZu(dlgEr) : dlgEr = -1
+    methodeDialog(startIndex())
+    probeZu(dlgMe) : dlgMe = -1
+    elementFragen("klasse")
+    protokoll("probe element " + STR$(dlgEl >= 0))
+    probeZu(dlgEl) : dlgEl = -1
+    menueEditor()
+    protokoll("probe menue " + GUI_TEXT(mnHinweis))
+    probeZu(dlgMn) : dlgMn = -1
+    vorlageDialog()
+    protokoll("probe vorlagen " + JOIN$(vlTitel, ","))
+    protokoll("probe vorlage " + GUI_TEXT(vlText))
+    probeZu(dlgVl) : dlgVl = -1
+    ueberZeigen()
+    probeZu(ueber) : ueber = -1
+    protokoll(TRIM$("probe fehlt " + STR$(sprachFehlt) + " " + JOIN$(sprachLuecken, " | ")))
+    beenden = TRUE
+END SUB
+
 DIM bildNr AS INTEGER : bildNr = 0
 DIM warB AS INTEGER : warB = SCREENWIDTH()
 DIM warH AS INTEGER : warH = SCREENHEIGHT()
@@ -561,6 +610,7 @@ WHILE NOT beenden
     GUI_UPDATE()
     bildNr = bildNr + 1
     IF bildNr = 3 AND logDatei <> "" THEN lagenProtokollieren() : felderProtokollieren() : controlsProtokollieren()
+    IF bildNr = 4 AND GETENV$("DH_STUDIO_SPRACHPROBE") <> "" THEN spracheProbe(GETENV$("DH_STUDIO_SPRACHPROBE"))
     IF controlsNachBild > 0 THEN
         controlsNachBild = controlsNachBild - 1
         IF controlsNachBild = 0 THEN controlsProtokollieren()

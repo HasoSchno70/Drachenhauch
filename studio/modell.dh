@@ -23,7 +23,7 @@ DIM staende AS ARRAY OF STRING : staende = []
 DIM standPos AS INTEGER : standPos = -1
 
 FUNCTION leeresFenster$() AS STRING
-    RETURN REPLACE$("{'title':'Fenster1','name':'Fenster1','x':0,'y':0,'w':600,'h':400,'movable':true,'closable':true,'visible':true,'resizable':false,'widgets':[]}", "'", CHR$(34))
+    RETURN REPLACE$(REPLACE$("{'title':'Fenster1','name':'Fenster1','x':0,'y':0,'w':600,'h':400,'movable':true,'closable':true,'visible':true,'resizable':false,'widgets':[]}", "Fenster1", tr$("Fenster1")), "'", CHR$(34))
 END FUNCTION
 
 FUNCTION anzahl() AS INTEGER
