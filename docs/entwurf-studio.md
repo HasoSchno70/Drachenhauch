@@ -249,7 +249,9 @@ Klappliste mit der Anzeigespalte der Zieltabelle, die die id bindet),
 Bedingung/Sortierung/Suchfeld einer Datenquelle (`studio_filter`,
 `studio_sortieren`, `studio_absteigend`, `studio_suchfeld`) und benannte
 Abfragen (`abfragen` im Schema, im Reiter mit SQL und Ergebnis, im Navigator,
-als Datenquelle und im Code als `Abfrage("name")`). Offen: Verbunde im
+als Datenquelle und im Code als `Abfrage("name")`). Umbenennungen stehen
+im Schema unter `umbenannt` und werden vom gebauten Programm nachgezogen.
+Offen: Verbunde im
 Entwurf (eine Abfrage kann sie schon), Bilder in Spalten.
 
 **Geprüft wird je Stufe** mit einer Prüfsammlung `werkzeug_studio*.dhtest`.

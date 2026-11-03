@@ -3809,7 +3809,18 @@ Fensters). **Testfalle:** Knoten unter dem sichtbaren Navigator haben eine
 Lage im Protokoll, nehmen aber keinen Klick an -- Projekte in Tests klein
 halten. Tests `tests/pruef/werkzeug_studio_datenbank3.dhtest` (7); 16
 Verfaelschungen fallen je in ihrem Fall (Sortieren erst mit Testdaten, bei
-denen Name und id verschieden ordnen).
+denen Name und id verschieden ordnen). **Umbenennen im gebauten Programm:**
+`dbUmbenennungMerken` haengt je Umbenennung `{art, tabelle, alt, neu}` an
+`umbenannt` (nicht bei reinem Gross/klein); das erzeugte
+studio_datenbanken.dh ruft nach DB_OPEN der Reihe nach `studioDbTabUm`/
+`studioDbSpUm` (nur wenn alt da und neu nicht). Indexe heissen nach Tabelle
+und Spalte: beim Spaltenumbenennen faellt `studio_u_<t>_<alt>` vorher weg,
+beim Tabellenumbenennen jeder `studio_u_`-Index, der nicht mit dem neuen
+Tabellennamen beginnt -- `CREATE UNIQUE INDEX IF NOT EXISTS` legt sie neu
+an. **Inspektor:** ist ein Reiter eines anderen Elements vorn
+(`inspFremdesElement`), zeigt er nur Name und Art; `reiterPruefen` fuellt
+ihn bei jedem Reiterwechsel neu. Zwei Faelle in
+`werkzeug_studio_datenbank.dhtest`, sechs Verfaelschungen fallen.
 
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 

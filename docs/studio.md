@@ -37,7 +37,7 @@ ein Debugger. Dazu eigene Controls und Datenbanken im Projekt.
 | Navigator (links oben) | das Projekt als Baum: App, Fenster mit ihren Controls und Ereignissen, Module, Klassen, ihre Methoden und Eigenschaften; ein Klick öffnet |
 | Bibliothek (links unten) | alle Bausteine der gui in Gruppen, mit Vorschau; Suchfeld darüber |
 | Mitte | Reiter mit Kreuz: je Fenster das Layout, je Methode ihr Code, je Element seine Eigenschaften |
-| Inspektor (rechts) | die Eigenschaften des gewählten Controls, ohne Auswahl die des Fensters |
+| Inspektor (rechts) | die Eigenschaften des gewählten Controls, ohne Auswahl die des Fensters; ist der Reiter eines anderen Elements vorn (Datenbank, Modul), nur dessen Name und Art |
 | Statusleiste | Meldung, Name, Lage und Größe des gewählten Controls, Zoom (Klick: 100 %) |
 
 Die Leisten lassen sich wie in der IDE verschieben, als Reiter stapeln und
@@ -441,9 +441,12 @@ Aus dem Studio gestartet (F5) arbeitet das Programm auf der Datei im
 Projektordner -- was es schreibt, steht danach im Daten-Gitter. Bauen legt
 die Datei neben das gebaute Programm, wenn dort noch keine liegt; eine, in
 der schon gearbeitet wurde, bleibt. Das gebaute Programm legt fehlende
-Tabellen, Spalten und Indexe selbst an, umbenennen und löschen tut es dort
-nicht. Das Element zu löschen nimmt nur den Aufbau aus dem Projekt; die
-Datei mit den Daten bleibt liegen.
+Tabellen, Spalten und Indexe selbst an und benennt um, was im Studio
+umbenannt wurde -- der Reihe nach, solange es dort den alten Namen noch
+gibt und den neuen nicht (eine Umbenennung nur in Groß/klein zählt nicht,
+SQLite sieht darin denselben Namen). Gelöschtes lässt es stehen. Das
+Element zu löschen nimmt nur den Aufbau aus dem Projekt; die Datei mit den
+Daten bleibt liegen.
 
 **Fenster an eine Tabelle binden.** Im Navigator stehen unter jeder Tabelle
 ihre Spalten. Eine Spalte oder die ganze Tabelle ins offene Fenster gezogen

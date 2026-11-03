@@ -37,7 +37,7 @@ debugger. On top of that custom controls and databases in the project.
 | Navigator (top left) | the project as a tree: App, windows with their controls and events, modules, classes, their methods and properties; a click opens |
 | Library (bottom left) | all building blocks of the gui in groups, with a preview; search field above |
 | Middle | tabs with a cross: per window the layout, per method its code, per element its properties |
-| Inspector (right) | the properties of the selected control, without a selection those of the window |
+| Inspector (right) | the properties of the selected control, without a selection those of the window; when the tab of another element is in front (database, module), only its name and kind |
 | Status bar | message, name, position and size of the selected control, zoom (click: 100 %) |
 
 The panels can be moved, stacked as tabs and detached, as in the IDE. The View
@@ -433,9 +433,11 @@ Started from the studio (F5), the program works on the file in the project
 folder -- what it writes shows up in the data grid afterwards. Building puts
 the file next to the built program if there is none yet; one that has
 already been worked in stays. The built program creates missing tables,
-columns and indexes itself; it does not rename or delete there. Deleting
-the element only removes the structure from the project; the file with the
-data stays.
+columns and indexes itself and renames what was renamed in the studio --
+in order, as long as the old name still exists there and the new one does
+not (a rename that only changes case does not count, SQLite sees the same
+name). It leaves deleted things in place. Deleting the element only removes
+the structure from the project; the file with the data stays.
 
 **Binding a window to a table.** The navigator lists the columns under each
 table. Dragging a column or the whole table into the open window adds a
