@@ -1,0 +1,53 @@
+{
+  "title": "Drawing",
+  "name": "MainWindow",
+  "x": 0,
+  "y": 0,
+  "w": 600,
+  "h": 392,
+  "movable": true,
+  "closable": true,
+  "visible": true,
+  "resizable": true,
+  "min_w": 300,
+  "min_h": 220,
+  "timer": [
+    {
+      "name": "ticker",
+      "intervall": 16,
+      "aktiv": true,
+      "wiederholen": true
+    }
+  ],
+  "widgets": [
+    {
+      "kind": "canvas",
+      "name": "canvas",
+      "x": 16,
+      "y": 16,
+      "w": 568,
+      "h": 320,
+      "anchor": "lrtb"
+    },
+    {
+      "kind": "label",
+      "name": "bounceLabel",
+      "text": "Bounces: 0",
+      "x": 16,
+      "y": 352,
+      "w": 300,
+      "h": 20,
+      "anchor": "lb"
+    },
+    {
+      "kind": "button",
+      "name": "buttonStart",
+      "text": "Pause",
+      "x": 484,
+      "y": 346,
+      "w": 100,
+      "h": 30,
+      "anchor": "rb"
+    }
+  ]
+}

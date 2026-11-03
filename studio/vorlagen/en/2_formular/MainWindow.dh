@@ -1,0 +1,26 @@
+' A form: the fields stand one below the other in a column (layout), OK and
+' Cancel in a row with a spacer in front -- that keeps the buttons on the
+' right when the window grows. The validation rules (required field, e-mail)
+' are in MainWindow.dhform under "rules".
+CLASS MainWindow EXTENDS MainWindow_Basis
+
+    SUB Geoeffnet()
+        GUI_FOCUS(Self.fieldName)
+    END SUB
+
+    SUB buttonOk_Klick()
+        ' Check first: a wrong field gets a red frame and the focus.
+        IF GUI_VALIDATE(Self.Fenster()) > 0 THEN
+            GUI_SET_TEXT(Self.hint, "Please look at the marked fields.")
+            RETURN
+        END IF
+        GUI_SET_TEXT(Self.hint, "")
+        DIM text AS STRING : text = "Hello " + GUI_TEXT(Self.fieldName) + ", " + STR$(INT(GUI_VALUE(Self.fieldAge))) + " years"
+        IF GUI_CHECKED(Self.checkNewsletter) THEN text = text + " -- the newsletter goes to " + GUI_TEXT(Self.fieldMail)
+        Meldung(text + ".", "Input")
+    END SUB
+
+    SUB buttonCancel_Klick()
+        Self.Zumachen()
+    END SUB
+END CLASS

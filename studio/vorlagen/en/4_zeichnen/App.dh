@@ -1,0 +1,2 @@
+CLASS App EXTENDS StudioApp
+END CLASS

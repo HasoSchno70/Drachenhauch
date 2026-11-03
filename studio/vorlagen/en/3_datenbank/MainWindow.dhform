@@ -1,0 +1,241 @@
+{
+  "title": "Address book",
+  "name": "MainWindow",
+  "x": 0,
+  "y": 0,
+  "w": 760,
+  "h": 440,
+  "movable": true,
+  "closable": true,
+  "visible": true,
+  "resizable": true,
+  "min_w": 600,
+  "min_h": 360,
+  "widgets": [
+    {
+      "kind": "table",
+      "name": "table",
+      "x": 0,
+      "y": 0,
+      "w": 400,
+      "h": 400,
+      "table": {
+        "headers": [
+          "Name",
+          "Phone"
+        ],
+        "rows": [],
+        "filter_row": true
+      }
+    },
+    {
+      "kind": "label",
+      "name": "labelName",
+      "text": "Name",
+      "x": 0,
+      "y": 0,
+      "w": 100,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "fieldName",
+      "text": "",
+      "placeholder": "First and last name",
+      "x": 0,
+      "y": 0,
+      "w": 200,
+      "h": 28,
+      "bind": "name",
+      "rules": [
+        {
+          "art": "pflicht",
+          "meldung": "Please enter a name."
+        }
+      ]
+    },
+    {
+      "kind": "label",
+      "name": "labelPhone",
+      "text": "Phone",
+      "x": 0,
+      "y": 0,
+      "w": 100,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "fieldPhone",
+      "text": "",
+      "placeholder": "",
+      "x": 0,
+      "y": 0,
+      "w": 200,
+      "h": 28,
+      "bind": "phone"
+    },
+    {
+      "kind": "label",
+      "name": "labelMail",
+      "text": "E-mail",
+      "x": 0,
+      "y": 0,
+      "w": 100,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "fieldMail",
+      "text": "",
+      "placeholder": "name@example.com",
+      "x": 0,
+      "y": 0,
+      "w": 200,
+      "h": 28,
+      "bind": "email",
+      "rules": [
+        {
+          "art": "email",
+          "meldung": "That is not an e-mail address."
+        }
+      ]
+    },
+    {
+      "kind": "label",
+      "name": "hint",
+      "text": " ",
+      "x": 0,
+      "y": 0,
+      "w": 300,
+      "h": 20
+    },
+    {
+      "kind": "button",
+      "name": "buttonNew",
+      "text": "New",
+      "x": 0,
+      "y": 0,
+      "w": 100,
+      "h": 30
+    },
+    {
+      "kind": "button",
+      "name": "buttonSave",
+      "text": "Save",
+      "x": 0,
+      "y": 0,
+      "w": 100,
+      "h": 30,
+      "variant": "primaer"
+    },
+    {
+      "kind": "button",
+      "name": "buttonDelete",
+      "text": "Delete",
+      "x": 0,
+      "y": 0,
+      "w": 100,
+      "h": 30,
+      "variant": "gefahr"
+    },
+    {
+      "kind": "layout",
+      "name": "rowButtons",
+      "x": 0,
+      "y": 0,
+      "w": 300,
+      "h": 32,
+      "layout": {
+        "art": "zeile",
+        "kinder": [
+          [
+            8,
+            1
+          ],
+          [
+            9,
+            1
+          ],
+          [
+            10,
+            1
+          ]
+        ],
+        "abstand": 6
+      }
+    },
+    {
+      "kind": "layout",
+      "name": "columnRight",
+      "x": 0,
+      "y": 0,
+      "w": 300,
+      "h": 400,
+      "layout": {
+        "art": "spalte",
+        "kinder": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            0
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            5,
+            0
+          ],
+          [
+            6,
+            0
+          ],
+          [
+            7,
+            0
+          ],
+          [
+            -1,
+            1
+          ],
+          [
+            11,
+            0
+          ]
+        ],
+        "abstand": 6
+      }
+    },
+    {
+      "kind": "layout",
+      "name": "rowMain",
+      "x": 16,
+      "y": 16,
+      "w": 728,
+      "h": 408,
+      "layout": {
+        "art": "zeile",
+        "kinder": [
+          [
+            0,
+            1
+          ],
+          [
+            12,
+            0
+          ]
+        ],
+        "abstand": 16
+      },
+      "anchor": "lrtb"
+    }
+  ]
+}
