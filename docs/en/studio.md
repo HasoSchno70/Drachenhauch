@@ -406,6 +406,7 @@ on the right either their **columns** or their **data**.
 | Money | INTEGER in cents | `19,99` (stored as 1999) |
 | Date | TEXT | `2026-11-03` |
 | Yes/No | INTEGER 0/1 | `yes`/`no` |
+| Image | BLOB (the bytes of the image file) | with **Image …** from a file |
 
 Every table has the column `id INTEGER PRIMARY KEY` by itself -- data
 binding (`GUI_FORM_LOAD`/`GUI_FORM_SAVE`) needs exactly that. In the column
@@ -477,12 +478,29 @@ END SUB
 **References.** In the column grid, **Refers to** names another table of the
 same database: the column then holds the id of one of its rows (it becomes a
 whole number). Dragged into a window, such a column becomes a drop-down list
-that shows the first text column of the target table and binds the id.
+that shows the first text column of the target table and binds the id. The
+**Shown columns** of a list may also name a column of the target table:
+`nr;kunde.name` shows the customer's name next to the number, for the
+customer whose id is in `kunde`. The studio puts a LEFT JOIN around the table
+for this (a row without a customer stays, with an empty name); in the result
+the column is called `kunde.name`, and under that name **Sort by**, the
+**Condition** (`"kunde.ort" = 'Köln'`) and the search field know it as well.
+
+**Images.** A column of the type **Image** holds the bytes of an image file
+(PNG, JPG, BMP or GIF). The data grid shows its size; **Image …** sets the
+image of the selected cell from a file, Del empties it. Dragged into a
+window, an image column becomes an image control on that column (inspector:
+**Image column**; it is not part of the form binding). It shows the image
+with `Laden(id)`; `BildSetzen(control, path)` and `BildLeeren(control)` change
+it, and `Sichern()` writes it to the file. A table with a data source shows
+an image column as a picture in the cell.
 
 **Condition, sorting, search.** A list with a data source also has **Sort
 by** (a column of the source) and **Descending** in the inspector, a
 **Condition** (SQL as after WHERE, for example `ort <> 'Bonn'`; the studio
-tries it on the file in the project folder and shows an error at the field)
+tries it on the file in the project folder and shows an error at the field --
+also for a name in double quotes that the source does not have: SQLite would
+otherwise silently take it as text, and the list would stay empty)
 and a **Search field** (a text field of the window: as soon as something is
 typed into it, the list shows only rows whose shown columns contain the
 text).
@@ -574,4 +592,8 @@ methods and lists in the generated window including a click on a row,
 dragging and double-clicking columns into the window, and the choices in the
 inspector; `tests/pruef/werkzeug_studio_datenbank3.dhtest` tests references,
 condition, sorting, search field and queries: the core, the generated window
-and the studio with real clicks in the tab, the navigator and the inspector.
+and the studio with real clicks in the tab, the navigator and the inspector;
+`tests/pruef/werkzeug_studio_datenbank4.dhtest` tests image columns (core,
+generated window including the picture in the table cell, "Image …" and
+dragging in the studio) and `tests/pruef/werkzeug_studio_verbunde.dhtest`
+joins through references.

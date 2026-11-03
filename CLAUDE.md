@@ -3821,6 +3821,34 @@ an. **Inspektor:** ist ein Reiter eines anderen Elements vorn
 (`inspFremdesElement`), zeigt er nur Name und Art; `reiterPruefen` fuellt
 ihn bei jedem Reiterwechsel neu. Zwei Faelle in
 `werkzeug_studio_datenbank.dhtest`, sechs Verfaelschungen fallen.
+**Stufe 4 (2026-11-03): Bildspalten und Verbunde ueber Verweise.** Neu in
+der Laufzeit `DB_GET_BUFFER(r, idx)` (BLOB wie gespeichert, Text als UTF-8,
+NULL leer, Zahl = Fehler) -- ein BLOB kam vorher nur als Text heraus. Art
+`bild` = SQL `BLOB` (Pflicht-Leerwert `X''`, keine Vorgabe); `dbIstBild`
+prueft die Kennung (PNG/JPG/BMP/GIF) ohne Fenster. Daten-Gitter: Bildspalte
+schreibgeschuetzt, Zelle "Bild (n KB)", Knopf **Bild …** (`dbBildWaehlen`,
+`DH_STUDIO_DATEI` fuer Pruefungen), Entf = NULL. Ein Bild-Control haengt an
+`studio_bildspalte`, NICHT an `bind` -- GUI_FORM_SAVE schriebe ihm einen
+leeren Wert; Inspektor-Zeile "Bildspalte" (`dbSpaltenBild`, die Bindung
+bietet keine Bildspalten mehr an). Erzeugt (`dbBildFelder`): je Control
+`studioBild_/studioBildNeu_/studioBildGeaendert_`, Laden zeigt
+(`studioDbBildLesen`), `BildSetzen(w, pfad)`/`BildLeeren(w)`, Sichern
+schreibt, Ungesichert zaehlt mit; eine Tabelle zeigt Bildspalten per
+`GUI_TABLE_CELL_KIND "bild"` (Bilder in `studioBilder_<liste>`, beim
+Neuladen freigegeben). **Fund:** ein Fenster, das nur ein Bild bindet,
+brach mit "kein Widget gebunden" ab -- ohne `bind` gehen Laden/Sichern/Neu
+jetzt ueber `studioDbZeileDa`/`studioDbZeileNeu` statt GUI_FORM_*.
+**Verbunde:** in `studio_spalten` auch `verweis.spalte`; `dbVerweisJoin$`
+legt `(SELECT q.*, j0."name" AS "kunde.name" ... LEFT JOIN ...)` um die
+Tabelle, wenn Spalten, Sortierung oder Bedingung `verweis.` nennen
+(`dbQuellSql$` mit `bedarf`); `dbListSpaltenMit` (Schreibweise des Schemas),
+`dbQuellSpaltenMit` fuer Sortieren und Entwurfskopf. **SQLite-Falle:** ein
+unbekannter Name in doppelten Anfuehrungszeichen ist dort still ein Text --
+`dbFilterFehler$` prueft solche Namen jetzt gegen die Spalten der Quelle
+(`dbFilterNamePruefen$`). Tests `werkzeug_studio_datenbank4.dhtest` (3; das
+Bild in der Zelle am Bildschirmfoto) und `werkzeug_studio_verbunde.dhtest`
+(3); 15 Verfaelschungen fallen, eine ist gleichwertig (Bedingungspruefung
+ohne Verbund -- wegen der Falle oben).
 
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 

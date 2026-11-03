@@ -251,8 +251,10 @@ Bedingung/Sortierung/Suchfeld einer Datenquelle (`studio_filter`,
 Abfragen (`abfragen` im Schema, im Reiter mit SQL und Ergebnis, im Navigator,
 als Datenquelle und im Code als `Abfrage("name")`). Umbenennungen stehen
 im Schema unter `umbenannt` und werden vom gebauten Programm nachgezogen.
-Offen: Verbunde im
-Entwurf (eine Abfrage kann sie schon), Bilder in Spalten.
+Stufe 4: Bildspalten (Art `bild` = BLOB, `DB_GET_BUFFER` in der Laufzeit,
+im Fenster ein Bild-Control an `studio_bildspalte`, in der Tabelle ein Bild
+je Zelle) und Verbunde ueber Verweise (`verweis.spalte` in den angezeigten
+Spalten, LEFT JOIN vom Studio).
 
 **Geprüft wird je Stufe** mit einer Prüfsammlung `werkzeug_studio*.dhtest`.
 Die Klicks sind echt, über Aufnahmen und Fensternachrichten. Erzeugtes läuft

@@ -412,6 +412,7 @@ Umbenennen und Löschen, rechts entweder ihre **Spalten** oder ihre
 | Geld | INTEGER in Cent | `19,99` (steht als 1999 in der Datei) |
 | Datum | TEXT | `2026-11-03` |
 | Ja/Nein | INTEGER 0/1 | `ja`/`nein` |
+| Bild | BLOB (die Bytes der Bilddatei) | mit **Bild …** aus einer Datei |
 
 Jede Tabelle hat die Spalte `id INTEGER PRIMARY KEY` von selbst -- die
 Datenbindung (`GUI_FORM_LOAD`/`GUI_FORM_SAVE`) braucht genau sie. Im
@@ -487,13 +488,30 @@ END SUB
 derselben Datenbank: die Spalte hält dann die id einer ihrer Zeilen (sie
 wird eine ganze Zahl). Ins Fenster gezogen wird eine solche Spalte eine
 Klappliste, die die erste Textspalte der Zieltabelle zeigt und die id
-bindet.
+bindet. In den **Angezeigten Spalten** einer Liste darf auch eine Spalte der
+Zieltabelle stehen: `nr;kunde.name` zeigt neben der Nummer den Namen des
+Kunden, dessen id in `kunde` steht. Das Studio legt dafür einen LEFT JOIN um
+die Tabelle (eine Zeile ohne Kunden bleibt, mit leerem Namen); die Spalte
+heißt im Ergebnis `kunde.name`, und unter diesem Namen kennen sie auch
+**Sortieren nach**, die **Bedingung** (`"kunde.ort" = 'Köln'`) und das
+Suchfeld.
+
+**Bilder.** Eine Spalte der Art **Bild** hält die Bytes einer Bilddatei
+(PNG, JPG, BMP oder GIF). Im Daten-Gitter steht ihre Größe; **Bild …** setzt
+das Bild der gewählten Zelle aus einer Datei, Entf macht sie leer. Ins
+Fenster gezogen wird eine Bildspalte ein Bild-Control an dieser Spalte
+(Inspektor: **Bildspalte**; sie hängt nicht an der Bindung des Formulars).
+Es zeigt das Bild mit `Laden(id)`; `BildSetzen(control, pfad)` und
+`BildLeeren(control)` ändern es, und mit `Sichern()` kommt es in die Datei.
+Eine Tabelle mit Datenquelle zeigt eine Bildspalte als Bild in der Zelle.
 
 **Bedingung, Sortierung, Suche.** Eine Liste mit Datenquelle hat im
 Inspektor dazu **Sortieren nach** (eine Spalte der Quelle) samt
 **Absteigend**, eine **Bedingung** (SQL wie hinter WHERE, etwa
 `ort <> 'Bonn'`; das Studio probiert sie an der Datei im Projektordner und
-zeigt einen Fehler am Feld) und ein **Suchfeld** (ein Textfeld des Fensters:
+zeigt einen Fehler am Feld -- auch einen Namen in doppelten
+Anführungszeichen, den es in der Quelle nicht gibt: SQLite nähme ihn sonst
+still als Text, und die Liste bliebe leer) und ein **Suchfeld** (ein Textfeld des Fensters:
 sobald darin getippt wird, zeigt die Liste nur Zeilen, in deren angezeigten
 Spalten der Text vorkommt).
 
@@ -585,4 +603,7 @@ Bindung: Methoden und Listen im erzeugten Fenster samt Klick auf eine Zeile,
 Spalten ins Fenster ziehen und doppelklicken, die Auswahlen im Inspektor;
 `tests/pruef/werkzeug_studio_datenbank3.dhtest` Verweise, Bedingung,
 Sortierung, Suchfeld und Abfragen: den Kern, das erzeugte Fenster und das
-Studio mit echten Klicks im Reiter, im Navigator und im Inspektor.
+Studio mit echten Klicks im Reiter, im Navigator und im Inspektor;
+`tests/pruef/werkzeug_studio_datenbank4.dhtest` Bildspalten (Kern, erzeugtes
+Fenster samt Bild in der Tabellenzelle, „Bild …“ und Ziehen im Studio) und
+`tests/pruef/werkzeug_studio_verbunde.dhtest` Verbunde über Verweise.
