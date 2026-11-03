@@ -7978,6 +7978,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let gm = self.wz_geom(w, ax, ay);
                 my >= ay + gm.kopf_h && my < gm.fuss_y
             }
+            // Unter den Koepfen gehoert die Flaeche den Kindern der Seite --
+            // das Reiterwerk liegt in der Reihenfolge VOR ihnen und schluckte
+            // sonst jeden Klick auf einen Knopf oder ein Feld darauf.
+            Kind::TabControl => my >= ay + self.sk(TC_KOPF_H),
             _ => false,
         }
     }

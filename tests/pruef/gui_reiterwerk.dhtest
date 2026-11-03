@@ -126,6 +126,48 @@ DHRT_FRAMES=22
 --- erwartet
 0
 
+=== ein knopf und ein feld auf einer seite nehmen den klick an
+' Das Reiterwerk liegt in der Reihenfolge VOR seinen Kindern, und der erste
+' Treffer gewinnt -- bis 2026.41 schluckte es den Klick: der Knopf meldete nie
+' GUI_CLICKED, der Textbereich bekam keinen Fokus (gefunden am Datenbank-
+' Reiter des Studios). Fenster ohne Rahmen bei 0,0: die Lagen sind die der
+' Widgets.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tc AS GUI_WIDGET : tc = GUI_TABCONTROL(w, 10, 10, 380, 280)
+DIM s0 AS INTEGER : s0 = GUI_TABCONTROL_ADD(tc, "Eins")
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Knopf", 50, 80, 100, 30)
+GUI_TABCONTROL_ADD_WIDGET(tc, b, s0)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 50, 140, 200, 80, "")
+GUI_TABCONTROL_ADD_WIDGET(tc, ta, s0)
+DIM f AS INTEGER
+FOR f = 1 TO 24
+    GUI_UPDATE()
+    IF GUI_CLICKED(b) THEN PRINT "knopf"
+    IF f = 22 THEN PRINT "fokus "; GUI_FOCUSED() = ta; " seite "; GUI_TABCONTROL_PAGE(tc)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+c 7
+e 0 7 10 10 0 0
+e 5 7 100 95 0 0
+e 6 6 0 0 0 0
+e 8 5 0 0 0 0
+e 12 7 100 170 0 0
+e 13 6 0 0 0 0
+e 15 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=26
+--- erwartet
+knopf
+fokus TRUE seite 0
+
 === eine seite entfernen laesst die kinder zurueck
 ' Zerstoert werden sie NICHT -- das waere eine Entscheidung des Programms.
 IMPORT "gui"

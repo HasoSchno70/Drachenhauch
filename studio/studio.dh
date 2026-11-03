@@ -16,6 +16,7 @@ IMPORT "gui"
 IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
+IMPORT "db"
 
 DIM logDatei AS STRING : logDatei = GETENV$("DH_STUDIO_LOG")
 SUB protokoll(text AS STRING)
@@ -29,11 +30,13 @@ END SUB
 IMPORT "sprache.dh"
 IMPORT "modell.dh"
 IMPORT "projekt.dh"
+IMPORT "datenbank.dh"
 IMPORT "bibliothek.dh"
 IMPORT "entwurf.dh"
 IMPORT "inspektor.dh"
 IMPORT "oberflaeche.dh"
 IMPORT "code.dh"
+IMPORT "dbeditor.dh"
 IMPORT "erzeugen.dh"
 IMPORT "menue.dh"
 IMPORT "debug.dh"
@@ -207,6 +210,11 @@ SUB projektOeffnen(ordner AS STRING)
     END IF
     nachLaden()
     status(trf$("Projekt {0}: {1} Elemente, {2} Methoden.", [projName, STR$(LEN(elemente)), STR$(LEN(methoden))]))
+    DIM dbf AS STRING : dbf = datenbankenAbgleichen$()
+    IF dbf <> "" THEN
+        status(dbf)
+        protokoll("db fehler " + dbf)
+    END IF
     protokoll("projekt geladen " + projName + " " + STR$(LEN(elemente)) + " " + STR$(LEN(methoden)))
 END SUB
 
@@ -291,6 +299,9 @@ FUNCTION sichern(alsNeu AS BOOLEAN) AS BOOLEAN
     END IF
     wegDateienLoeschen()
     projektSchreiben()
+    ' Die Entwicklungsdaten gibt es erst mit einem Ordner.
+    DIM dbf AS STRING : dbf = datenbankenAbgleichen$()
+    IF dbf <> "" THEN protokoll("db fehler " + dbf)
     geaendert = FALSE
     navigatorFuellen()
     werkzeugeNachziehen()
@@ -399,6 +410,7 @@ SUB befehle()
     IF GUI_CLICKED(miControlNeu) THEN elementFragen("control")
     IF GUI_CLICKED(miModulNeu) THEN elementFragen("modul")
     IF GUI_CLICKED(miKlasseNeu) THEN elementFragen("klasse")
+    IF GUI_CLICKED(miDatenbankNeu) THEN elementFragen("datenbank")
     IF GUI_CLICKED(miMethodeNeu) OR t = tbMethode THEN methodeDialog(elementJetzt())
     IF GUI_CLICKED(miEreignisNeu) OR t = tbEreignis THEN
         IF layoutVorn() THEN ereignisDialog(aktFenster, auswahl) ELSE ereignisDialog(elementJetzt(), -1)
@@ -594,6 +606,20 @@ SUB spracheProbe(was AS STRING)
     beenden = TRUE
 END SUB
 
+SUB elementOeffnenNach(was AS STRING)
+    DIM teile AS ARRAY OF STRING : teile = SPLIT(was, ".")
+    DIM ei AS INTEGER : ei = elementIndex(teile[0])
+    IF ei < 0 THEN RETURN
+    DIM e AS Element : e = elemente[ei]
+    IF e.art = "datenbank" THEN
+        dbOeffnen(e, IIF(LEN(teile) > 1, teile[LEN(teile) - 1], ""))
+    ELSEIF hatLayout(e) THEN
+        layoutOeffnen(ei)
+    ELSE
+        deklOeffnen(e)
+    END IF
+END SUB
+
 DIM bildNr AS INTEGER : bildNr = 0
 DIM warB AS INTEGER : warB = SCREENWIDTH()
 DIM warH AS INTEGER : warH = SCREENHEIGHT()
@@ -614,6 +640,8 @@ WHILE NOT beenden
     IF bildNr = 4 AND GETENV$("DH_STUDIO_SPRACHPROBE") <> "" THEN spracheProbe(GETENV$("DH_STUDIO_SPRACHPROBE"))
     ' Fuer Pruefungen: DH_STUDIO_LOESCHEN=<Element> fragt wie "Element loeschen".
     IF bildNr = 4 AND GETENV$("DH_STUDIO_LOESCHEN") <> "" THEN elementLoeschenFragen(elementIndex(GETENV$("DH_STUDIO_LOESCHEN")))
+    ' Fuer Pruefungen: DH_STUDIO_OEFFNEN=<Element>[.<Tabelle>] wie ein Klick im Navigator.
+    IF bildNr = 4 AND GETENV$("DH_STUDIO_OEFFNEN") <> "" THEN elementOeffnenNach(GETENV$("DH_STUDIO_OEFFNEN"))
     IF controlsNachBild > 0 THEN
         controlsNachBild = controlsNachBild - 1
         IF controlsNachBild = 0 THEN controlsProtokollieren()
