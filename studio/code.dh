@@ -1115,7 +1115,10 @@ DIM vlBeschreibung AS ARRAY OF STRING : vlBeschreibung = []
 ' Die Lagen der Zeilen stehen erst nach dem naechsten GUI_UPDATE fest.
 DIM vlLagenBald AS INTEGER : vlLagenBald = 0
 
+' Auf Englisch die englischen Vorlagen (vorlagen/en: dieselben Projekte mit
+' englischen Namen, Texten und Kommentaren), wenn es sie gibt.
 FUNCTION vorlagenOrdner$() AS STRING
+    IF englisch AND DIREXISTS(PATHJOIN(studioQuelle, "vorlagen/en")) THEN RETURN PATHJOIN(studioQuelle, "vorlagen/en")
     RETURN PATHJOIN(studioQuelle, "vorlagen")
 END FUNCTION
 
@@ -1130,9 +1133,7 @@ SUB vorlagenLesen()
         IF NOT FILEEXISTS(PATHJOIN(o, PROJEKT_DATEI)) THEN CONTINUE
         DIM t AS STRING : t = n
         DIM b AS STRING : b = ""
-        ' Auf Englisch Titel und Beschreibung aus vorlage.en.txt, wenn es sie gibt.
         DIM vt AS STRING : vt = PATHJOIN(o, "vorlage.txt")
-        IF englisch AND FILEEXISTS(PATHJOIN(o, "vorlage.en.txt")) THEN vt = PATHJOIN(o, "vorlage.en.txt")
         IF FILEEXISTS(vt) THEN
             DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(vt)
             IF LEN(zeilen) > 0 THEN t = TRIM$(zeilen[0])

@@ -1,0 +1,68 @@
+' The entries on the left, the chosen one on the right. The fields are bound
+' to the columns of the table addresses ("bind" in the .dhform): GUI_FORM_LOAD
+' and GUI_FORM_SAVE load and save them in one call.
+CLASS MainWindow EXTENDS MainWindow_Basis
+    DIM ids AS ARRAY OF INTEGER
+    ' The entry in the fields, -1 = a new one.
+    DIM currentId AS INTEGER
+
+    SUB Geoeffnet()
+        Self.fillList()
+        Self.clearFields()
+    END SUB
+
+    ' Remember the id of every table row -- sorting and filtering do not
+    ' rearrange the rows, so the number stays valid.
+    SUB fillList()
+        GUI_TABLE_CLEAR(Self.table)
+        Self.ids = []
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT id, name, phone FROM addresses ORDER BY name")
+        WHILE DB_NEXT(r)
+            ARRAY_PUSH(Self.ids, DB_GET_INT(r, 0))
+            GUI_TABLE_ADD_ROW(Self.table, [DB_GET_STRING(r, 1), DB_GET_STRING(r, 2)])
+        WEND
+    END SUB
+
+    SUB clearFields()
+        GUI_FORM_CLEAR(Self.Fenster())
+        GUI_CLEAR_ERRORS(Self.Fenster())
+        Self.currentId = -1
+        GUI_TABLE_CLEAR_SELECTION(Self.table)
+        GUI_SET_TEXT(Self.hint, "New entry.")
+    END SUB
+
+    SUB table_Geaendert()
+        DIM z AS INTEGER : z = GUI_TABLE_SELECTED(Self.table)
+        IF z < 0 OR z >= LEN(Self.ids) THEN RETURN
+        IF GUI_FORM_LOAD(Self.Fenster(), db, "addresses", Self.ids[z]) THEN Self.currentId = Self.ids[z]
+        GUI_CLEAR_ERRORS(Self.Fenster())
+        GUI_SET_TEXT(Self.hint, " ")
+    END SUB
+
+    SUB buttonNew_Klick()
+        Self.clearFields()
+        GUI_FOCUS(Self.fieldName)
+    END SUB
+
+    SUB buttonSave_Klick()
+        IF GUI_VALIDATE(Self.Fenster()) > 0 THEN RETURN
+        DIM nr AS INTEGER : nr = GUI_FORM_SAVE(Self.Fenster(), db, "addresses", Self.currentId)
+        IF nr = 0 THEN
+            GUI_SET_TEXT(Self.hint, "Not saved.")
+            RETURN
+        END IF
+        Self.currentId = nr
+        Self.fillList()
+        DIM z AS INTEGER : z = ARRAY_INDEXOF(Self.ids, nr)
+        IF z >= 0 THEN GUI_TABLE_SET_SELECTED(Self.table, z)
+        GUI_SET_TEXT(Self.hint, "Saved.")
+    END SUB
+
+    SUB buttonDelete_Klick()
+        IF Self.currentId < 0 THEN RETURN
+        IF Frage("Delete this entry?", "Delete|Cancel", "Address book") <> 1 THEN RETURN
+        DB_EXEC(db, "DELETE FROM addresses WHERE id = ?", Self.currentId)
+        Self.fillList()
+        Self.clearFields()
+    END SUB
+END CLASS

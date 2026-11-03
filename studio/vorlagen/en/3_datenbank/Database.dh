@@ -1,0 +1,17 @@
+' The database: an SQLite file next to the program. Values always go to the
+' query through ?, never into the SQL text -- that way an input can never
+' become a command.
+IMPORT "db"
+CONST DB_FILE = "addresses.db"
+DIM db AS DB_CONN
+
+' Opens the file and, at the first start, creates the table and two entries.
+SUB dbOpen()
+    db = DB_OPEN(DB_FILE)
+    DB_EXEC(db, "CREATE TABLE IF NOT EXISTS addresses (id INTEGER PRIMARY KEY, name TEXT NOT NULL, phone TEXT, email TEXT)")
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT COUNT(*) FROM addresses")
+    IF NOT DB_NEXT(r) THEN RETURN
+    IF DB_GET_INT(r, 0) > 0 THEN RETURN
+    DB_EXEC(db, "INSERT INTO addresses (name, phone, email) VALUES (?, ?, ?)", "Jane Doe", "555 0123", "jane@example.com")
+    DB_EXEC(db, "INSERT INTO addresses (name, phone, email) VALUES (?, ?, ?)", "John Smith", "555 0199", "john@example.com")
+END SUB

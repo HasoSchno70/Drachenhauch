@@ -48,12 +48,14 @@ Erscheinungsbild.
 „English interface“ schaltet um; die Wahl steht in `studio.json` neben der
 `ide.json` und gilt beim nächsten Start. Ohne eigene Wahl folgt das Studio
 der Sprache der IDE. Auf Englisch heißen auch die neuen Namen englisch
-(`MainWindow`, `Button1`), die Vorlagen haben englische Titel, und die
-Meldungen der Laufzeit (Probleme, Ausgabe) kommen englisch. **Die Namen der
-Ereignisse bleiben, wie sie sind** (`Klick`, `Geaendert`, `Aktion` ...): sie
-sind Teil der Methodennamen (`Knopf1_Klick`), und ein Projekt muss in beiden
-Sprachen dasselbe bleiben. Der Inhalt der Vorlagen (Beschriftungen,
-Kommentare) ist deutsch.
+(`MainWindow`, `Button1`), „Neues Projekt“ bietet englische Vorlagen an
+(`studio/vorlagen/en`: dieselben Projekte mit englischen Namen, Texten und
+Kommentaren), und die Meldungen der Laufzeit (Probleme, Ausgabe) kommen
+englisch. **Die Namen der Ereignisse bleiben, wie sie sind** (`Klick`,
+`Geaendert`, `Aktion` ...): sie sind Teil der Methodennamen
+(`Knopf1_Klick`), und ein Projekt muss in beiden Sprachen dasselbe bleiben.
+Ebenso die Befehle, die das Studio einem Programm mitgibt (`Meldung`,
+`Frage`, `Zumachen`).
 
 ## Das Projekt
 

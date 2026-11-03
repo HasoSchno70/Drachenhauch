@@ -1,0 +1,19 @@
+{
+  "format": "drachenhauch-studio",
+  "fassung": 1,
+  "name": "Drawing",
+  "start": "MainWindow",
+  "elemente": [
+    {
+      "art": "app",
+      "name": "App",
+      "code": "App.dh"
+    },
+    {
+      "art": "fenster",
+      "name": "MainWindow",
+      "code": "MainWindow.dh",
+      "layout": "MainWindow.dhform"
+    }
+  ]
+}
