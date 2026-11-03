@@ -17,6 +17,7 @@ IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
 IMPORT "db"
+IMPORT "pdf"
 
 DIM logDatei AS STRING : logDatei = GETENV$("DH_STUDIO_LOG")
 ' Gesammelt und einmal je Bild geschrieben: die Lagen aller Controls sind bei
@@ -38,12 +39,15 @@ IMPORT "sprache.dh"
 IMPORT "modell.dh"
 IMPORT "projekt.dh"
 IMPORT "datenbank.dh"
+IMPORT "berichte_laufzeit.dh"
+IMPORT "berichte.dh"
 IMPORT "bibliothek.dh"
 IMPORT "entwurf.dh"
 IMPORT "inspektor.dh"
 IMPORT "oberflaeche.dh"
 IMPORT "code.dh"
 IMPORT "dbeditor.dh"
+IMPORT "berichte_reiter.dh"
 IMPORT "erzeugen.dh"
 IMPORT "menue.dh"
 IMPORT "debug.dh"
@@ -418,6 +422,7 @@ SUB befehle()
     IF GUI_CLICKED(miModulNeu) THEN elementFragen("modul")
     IF GUI_CLICKED(miKlasseNeu) THEN elementFragen("klasse")
     IF GUI_CLICKED(miDatenbankNeu) THEN elementFragen("datenbank")
+    IF GUI_CLICKED(miBerichtNeu) THEN elementFragen("bericht")
     IF GUI_CLICKED(miMethodeNeu) OR t = tbMethode THEN methodeDialog(elementJetzt())
     IF GUI_CLICKED(miEreignisNeu) OR t = tbEreignis THEN
         IF layoutVorn() THEN ereignisDialog(aktFenster, auswahl) ELSE ereignisDialog(elementJetzt(), -1)
@@ -620,6 +625,8 @@ SUB elementOeffnenNach(was AS STRING)
     DIM e AS Element : e = elemente[ei]
     IF e.art = "datenbank" THEN
         dbOeffnen(e, IIF(LEN(teile) > 1, teile[LEN(teile) - 1], ""))
+    ELSEIF e.art = "bericht" THEN
+        berichtOeffnen(e)
     ELSEIF hatLayout(e) THEN
         layoutOeffnen(ei)
     ELSE
@@ -677,6 +684,7 @@ WHILE NOT beenden
     prozessePruefen()
     debugPruefen()
     vervollPruefen()
+    berichtVorschauPruefen()
     ' Das Entwurfsfenster obenauf -- ein Klick ins Hauptfenster legte es
     ' sonst darunter. Dialoge, Menues und Popover liegen weiter oben.
     IF frm >= 0 AND NOT GUI_MODAL() AND layoutVorn() THEN GUI_WINDOW_FRONT(frm)
@@ -689,6 +697,9 @@ WHILE NOT beenden
         IF LEN(punkteX) > 0 THEN BOXES(punkteX, punkteY, punkteX2, punkteY2, farbe("punkte"))
     END IF
     entwurfZeichnen()
+    IF reiterVorn() >= 0 AND reiterVorn() < LEN(reiter) THEN
+        IF reiter[reiterVorn()].art = "bericht" THEN berichtZeichnen(reiter[reiterVorn()])
+    END IF
     dialogeObenauf()
     GUI_DRAW_TOP()
     bibZugZeichnen()

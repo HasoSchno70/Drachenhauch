@@ -1,0 +1,260 @@
+' Drachenhauch Studio: Berichte, Stufe 1 -- auslegen und drucken
+' (studio/berichte_laufzeit.dh, studio/berichte.dh, studio/laufzeit.dh,
+' docs/entwurf-berichte.md). Ein Bericht (Element "bericht", Datei
+' .dhreport) hat Baender mit Gruppen und Summen, eine Quelle mit :parametern
+' und wird im Programm zu Pdf/Drucken/Vorschau; im Studio zeigt ihn ein
+' Reiter, [Vorschau …] setzt ihn mit den Entwicklungsdaten.
+' Die PDFs liest _hilfen/pdftext.dh.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== die auslegung setzt baender, gruppen, summen und seiten
+' 70 Positionen in zwei Rechnungen (39 und 31), je Detail 6 mm: zwei Seiten.
+' Der Seitenkopf steht auf beiden, der Gruppenkopf nennt den Kunden ueber den
+' Verweis, die Gruppenfuesse die Zwischensummen, der Berichtsfuss Summe und
+' Anzahl, "Seite n von m" kennt m. Ein fehlender Parameter ist ein Fehler.
+IMPORT "kern.dh"
+projOrdner = CWD$() + "/proj"
+DIM e AS Element : e = elementNeu("datenbank", "Daten")
+e.schema = READLINES("proj/Daten.dhdb")[0]
+DIM b AS Element : b = elementNeu("bericht", "Liste")
+b.schema = READLINES("proj/Liste.dhreport")[0]
+PRINT "parameter "; JOIN$(berichtParameter(b), ",")
+PRINT "db "; berichtDb$(b)
+DIM sql AS STRING : sql = berichtSql$(b)
+PRINT "verbund "; INSTR(sql, "LEFT JOIN " + CHR$(34) + "kunden" + CHR$(34)) >= 0; " ordnung "; INSTR(sql, "ORDER BY " + CHR$(34) + "rechnung" + CHR$(34) + ", " + CHR$(34) + "id" + CHR$(34)) >= 0
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DIM p AS PDF : p = studioBerichtPdf(berichtNeu$("Leer"), db, "", {})
+PRINT "ohne quelle "; PDF_PAGE_COUNT(p)
+p = studioBerichtPdf(b.schema, db, sql, {"ab": 1})
+PRINT "seiten "; PDF_PAGE_COUNT(p)
+PDF_SAVE(p, "b.pdf")
+DIM s AS ARRAY OF STRING : s = pdfSeiten("b.pdf")
+DIM k AS INTEGER
+FOR k = 0 TO LEN(s) - 1
+    DIM t AS STRING : t = s[k]
+    PRINT "seite "; k + 1; ": kopf "; INSTR(t, "Artikel" + CHR$(10) + "Betrag") >= 0; " fuss "; INSTR(t, "Seite " + STR$(k + 1) + " von 2") >= 0
+NEXT
+DIM alles AS STRING : alles = JOIN$(s, CHR$(10))
+PRINT "kunden "; INSTR(alles, "Anna Berger") >= 0; " "; INSTR(alles, "Bert Koch") >= 0
+PRINT "summen "; INSTR(alles, "975,00") >= 0; " "; INSTR(alles, "2.131,25") >= 0; " "; INSTR(alles, "3.106,25") >= 0; " anzahl "; INSTR(alles, CHR$(10) + "70" + CHR$(10)) >= 0
+PRINT "titel nur vorn "; INSTR(s[0], "Positionen") >= 0; " "; INSTR(s[1], "Positionen") < 0
+p = studioBerichtPdf(b.schema, db, sql, {"ab": 2})
+PRINT "nur rechnung 2: "; PDF_PAGE_COUNT(p)
+PDF_SAVE(p, "c.pdf")
+alles = JOIN$(pdfSeiten("c.pdf"), CHR$(10))
+PRINT "  "; INSTR(alles, "975,00") < 0; " "; INSTR(alles, "2.131,25") >= 0
+TRY
+    p = studioBerichtPdf(b.schema, db, sql, {})
+CATCH fehler
+    PRINT fehler
+END TRY
+PRINT "text "; studioBParameter$("a = :x AND b = ':x' AND c = :y", {"x": "O'Neil", "Y": 2.5})
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT)")
+DB_EXEC(db, "CREATE TABLE pos (id INTEGER PRIMARY KEY, rechnung INTEGER, kunde INTEGER, text TEXT, betrag INTEGER)")
+DB_EXEC(db, "INSERT INTO kunden (name) VALUES ('Anna Berger'), ('Bert Koch')")
+DIM i AS INTEGER
+FOR i = 1 TO 70
+    DB_EXEC(db, "INSERT INTO pos (rechnung, kunde, text, betrag) VALUES (?, ?, ?, ?)", 1 + i \ 40, 1 + i \ 40, "Artikel " + STR$(i), i * 125)
+NEXT
+DB_CLOSE(db)
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""}]},{"name":"pos","spalten":[{"name":"rechnung","typ":"ganz","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"kunde","typ":"ganz","pflicht":false,"eindeutig":false,"vorgabe":"","verweis":"kunden"},{"name":"text","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"betrag","typ":"geld","pflicht":false,"eindeutig":false,"vorgabe":""}]}]}
+--- datei proj/Liste.dhreport
+{"titel":"Probe","seite":{"format":"A4","hoch":true,"rand":[15,15,15,15]},"quelle":"Daten.pos","bedingung":"rechnung >= :ab","sortieren":["id"],"gruppen":[{"spalte":"rechnung"}],"baender":[{"art":"berichtskopf","hoehe":20,"elemente":[{"art":"text","x":0,"y":0,"b":180,"h":10,"text":"Positionen","groesse":18,"fett":true}]},{"art":"seitenkopf","hoehe":8,"elemente":[{"art":"text","x":0,"y":0,"b":60,"h":6,"text":"Artikel","fett":true},{"art":"text","x":140,"y":0,"b":40,"h":6,"text":"Betrag","fett":true,"ausrichtung":"rechts"}]},{"art":"gruppenkopf","gruppe":0,"hoehe":10,"elemente":[{"art":"text","x":0,"y":2,"b":25,"h":6,"text":"Rechnung"},{"art":"feld","spalte":"rechnung","x":25,"y":2,"b":20,"h":6},{"art":"feld","spalte":"kunde.name","x":60,"y":2,"b":60,"h":6,"fett":true}]},{"art":"detail","hoehe":6,"elemente":[{"art":"feld","spalte":"text","x":5,"y":0,"b":100,"h":5},{"art":"feld","spalte":"betrag","format":"geld","x":140,"y":0,"b":40,"h":5,"ausrichtung":"rechts"}]},{"art":"gruppenfuss","gruppe":0,"hoehe":10,"elemente":[{"art":"text","x":100,"y":1,"b":30,"h":6,"text":"Summe"},{"art":"summe","spalte":"betrag","funktion":"summe","format":"geld","x":140,"y":1,"b":40,"h":6,"ausrichtung":"rechts","fett":true},{"art":"linie","x":100,"y":0,"b":80,"h":0}]},{"art":"seitenfuss","hoehe":8,"elemente":[{"art":"seitenzahl","x":0,"y":2,"b":180,"h":5,"ausrichtung":"mitte"}]},{"art":"berichtsfuss","hoehe":10,"elemente":[{"art":"text","x":100,"y":2,"b":30,"h":6,"text":"Gesamt"},{"art":"summe","spalte":"betrag","funktion":"summe","format":"geld","x":140,"y":2,"b":40,"h":6,"ausrichtung":"rechts","fett":true},{"art":"summe","spalte":"betrag","funktion":"anzahl","x":0,"y":2,"b":40,"h":6}]}]}
+--- datei kern.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "db"
+IMPORT "pdf"
+IMPORT "{sammlung}/../../studio/sprache.dh"
+IMPORT "{sammlung}/../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../studio/modell.dh"
+IMPORT "{sammlung}/../../studio/projekt.dh"
+IMPORT "{sammlung}/../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../studio/berichte_laufzeit.dh"
+IMPORT "{sammlung}/../../studio/berichte.dh"
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+--- erwartet
+parameter ab
+db Daten
+verbund TRUE ordnung TRUE
+ohne quelle 1
+seiten 2
+seite 1: kopf TRUE fuss TRUE
+seite 2: kopf TRUE fuss TRUE
+kunden TRUE TRUE
+summen TRUE TRUE TRUE anzahl TRUE
+titel nur vorn TRUE TRUE
+nur rechnung 2: 1
+  TRUE TRUE
+Bericht: Parameter :ab fehlt
+text a = 'O''Neil' AND b = ':x' AND c = 2.5
+
+=== f5 erzeugt eine klasse je bericht, pdf mit parametern
+' Das Programm sichert Liste mit ab = 2 als PDF (nur die zweite Rechnung)
+' und meldet einen fehlenden Parameter als Fehler; der erzeugte Code
+' uebersetzt ohne Befund.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(200)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "30")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "ausgabe ")
+    IF INSTR(z, "▶") < 0 AND INSTR(z, "■") < 0 AND INSTR(z, "WARNING") < 0 THEN PRINT z
+NEXT
+DIM s AS ARRAY OF STRING : s = pdfSeiten(p + "/liste.pdf")
+DIM alles AS STRING : alles = JOIN$(s, CHR$(10))
+PRINT "seiten "; LEN(s); " summe "; INSTR(alles, "2.131,25") >= 0; " ohne r1 "; INSTR(alles, "975,00") < 0; " kunde "; INSTR(alles, "Bert Koch") >= 0
+DIM c AS INTEGER : c = PROCESS_START("dhrt", "--check", p + "/_studio/main.dh")
+DIM aus AS STRING : aus = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM t AS STRING : t = PROCESS_READ$(c)
+    IF t <> "" THEN
+        aus = aus + t
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(c) THEN
+        leer = leer + 1
+    END IF
+    SLEEP(30)
+WEND
+PRINT "check "; TRIM$(aus)
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT)")
+DB_EXEC(db, "CREATE TABLE pos (id INTEGER PRIMARY KEY, rechnung INTEGER, kunde INTEGER, text TEXT, betrag INTEGER)")
+DB_EXEC(db, "INSERT INTO kunden (name) VALUES ('Anna Berger'), ('Bert Koch')")
+DIM i AS INTEGER
+FOR i = 1 TO 70
+    DB_EXEC(db, "INSERT INTO pos (rechnung, kunde, text, betrag) VALUES (?, ?, ?, ?)", 1 + i \ 40, 1 + i \ 40, "Artikel " + STR$(i), i * 125)
+NEXT
+DB_CLOSE(db)
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""}]},{"name":"pos","spalten":[{"name":"rechnung","typ":"ganz","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"kunde","typ":"ganz","pflicht":false,"eindeutig":false,"vorgabe":"","verweis":"kunden"},{"name":"text","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"betrag","typ":"geld","pflicht":false,"eindeutig":false,"vorgabe":""}]}]}
+--- datei proj/Liste.dhreport
+{"titel":"Probe","seite":{"format":"A4","hoch":true,"rand":[15,15,15,15]},"quelle":"Daten.pos","bedingung":"rechnung >= :ab","sortieren":["id"],"gruppen":[{"spalte":"rechnung"}],"baender":[{"art":"berichtskopf","hoehe":20,"elemente":[{"art":"text","x":0,"y":0,"b":180,"h":10,"text":"Positionen","groesse":18,"fett":true}]},{"art":"seitenkopf","hoehe":8,"elemente":[{"art":"text","x":0,"y":0,"b":60,"h":6,"text":"Artikel","fett":true},{"art":"text","x":140,"y":0,"b":40,"h":6,"text":"Betrag","fett":true,"ausrichtung":"rechts"}]},{"art":"gruppenkopf","gruppe":0,"hoehe":10,"elemente":[{"art":"text","x":0,"y":2,"b":25,"h":6,"text":"Rechnung"},{"art":"feld","spalte":"rechnung","x":25,"y":2,"b":20,"h":6},{"art":"feld","spalte":"kunde.name","x":60,"y":2,"b":60,"h":6,"fett":true}]},{"art":"detail","hoehe":6,"elemente":[{"art":"feld","spalte":"text","x":5,"y":0,"b":100,"h":5},{"art":"feld","spalte":"betrag","format":"geld","x":140,"y":0,"b":40,"h":5,"ausrichtung":"rechts"}]},{"art":"gruppenfuss","gruppe":0,"hoehe":10,"elemente":[{"art":"text","x":100,"y":1,"b":30,"h":6,"text":"Summe"},{"art":"summe","spalte":"betrag","funktion":"summe","format":"geld","x":140,"y":1,"b":40,"h":6,"ausrichtung":"rechts","fett":true},{"art":"linie","x":100,"y":0,"b":80,"h":0}]},{"art":"seitenfuss","hoehe":8,"elemente":[{"art":"seitenzahl","x":0,"y":2,"b":180,"h":5,"ausrichtung":"mitte"}]},{"art":"berichtsfuss","hoehe":10,"elemente":[{"art":"text","x":100,"y":2,"b":30,"h":6,"text":"Gesamt"},{"art":"summe","spalte":"betrag","funktion":"summe","format":"geld","x":140,"y":2,"b":40,"h":6,"ausrichtung":"rechts","fett":true},{"art":"summe","spalte":"betrag","funktion":"anzahl","x":0,"y":2,"b":40,"h":6}]}]}
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"},{"art":"bericht","name":"Liste","bericht":"Liste.dhreport"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":400,"h":300,"widgets":[]}
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Liste.dhreport
+{"titel":"Probe","seite":{"format":"A4","hoch":true,"rand":[15,15,15,15]},"quelle":"Daten.pos","bedingung":"rechnung >= :ab","sortieren":["id"],"gruppen":[{"spalte":"rechnung"}],"baender":[{"art":"berichtskopf","hoehe":20,"elemente":[{"art":"text","x":0,"y":0,"b":180,"h":10,"text":"Positionen","groesse":18,"fett":true}]},{"art":"seitenkopf","hoehe":8,"elemente":[{"art":"text","x":0,"y":0,"b":60,"h":6,"text":"Artikel","fett":true},{"art":"text","x":140,"y":0,"b":40,"h":6,"text":"Betrag","fett":true,"ausrichtung":"rechts"}]},{"art":"gruppenkopf","gruppe":0,"hoehe":10,"elemente":[{"art":"text","x":0,"y":2,"b":25,"h":6,"text":"Rechnung"},{"art":"feld","spalte":"rechnung","x":25,"y":2,"b":20,"h":6},{"art":"feld","spalte":"kunde.name","x":60,"y":2,"b":60,"h":6,"fett":true}]},{"art":"detail","hoehe":6,"elemente":[{"art":"feld","spalte":"text","x":5,"y":0,"b":100,"h":5},{"art":"feld","spalte":"betrag","format":"geld","x":140,"y":0,"b":40,"h":5,"ausrichtung":"rechts"}]},{"art":"gruppenfuss","gruppe":0,"hoehe":10,"elemente":[{"art":"text","x":100,"y":1,"b":30,"h":6,"text":"Summe"},{"art":"summe","spalte":"betrag","funktion":"summe","format":"geld","x":140,"y":1,"b":40,"h":6,"ausrichtung":"rechts","fett":true},{"art":"linie","x":100,"y":0,"b":80,"h":0}]},{"art":"seitenfuss","hoehe":8,"elemente":[{"art":"seitenzahl","x":0,"y":2,"b":180,"h":5,"ausrichtung":"mitte"}]},{"art":"berichtsfuss","hoehe":10,"elemente":[{"art":"text","x":100,"y":2,"b":30,"h":6,"text":"Gesamt"},{"art":"summe","spalte":"betrag","funktion":"summe","format":"geld","x":140,"y":2,"b":40,"h":6,"ausrichtung":"rechts","fett":true},{"art":"summe","spalte":"betrag","funktion":"anzahl","x":0,"y":2,"b":40,"h":6}]}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB Geoeffnet()
+        Liste.Pdf(PATHJOIN(GETENV$("DH_STUDIO_DATEN"), "liste.pdf"), {"ab": 2})
+        PRINT "pdf gesichert"
+        TRY
+            Liste.Pdf(PATHJOIN(GETENV$("DH_STUDIO_DATEN"), "x.pdf"), {})
+        CATCH fehler
+            PRINT fehler
+        END TRY
+    END SUB
+END CLASS
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+slStudio = ARG$(0)
+--- erwartet
+ausgabe pdf gesichert
+ausgabe Bericht: Parameter :ab fehlt
+seiten 1 summe TRUE ohne r1 TRUE kunde TRUE
+check []
+
+=== der reiter zeigt den bericht, die vorschau blaettert
+' Der Reiter des Berichts zeigt die Seite; [Vorschau …]
+' setzt ihn mit den Entwicklungsdaten (Parameter ab = 1, zwei Seiten), [>]
+' blaettert auf Seite 2, [Schliessen] macht zu.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM log AS STRING : log = CWD$() + "/s.log"
+SETENV("DH_STUDIO_OEFFNEN", "Liste")
+slStarten(log, "", 10, p)
+DIM x AS INTEGER
+DIM y AS INTEGER
+(x, y) = slLage(log, "bericht vorschau")
+slHin(10, 10)
+slWarten(14)
+slKlick(x, y)
+slWarten(14)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+DIM wx AS INTEGER
+DIM wy AS INTEGER
+DIM zx AS INTEGER
+DIM zy AS INTEGER
+(wx, wy) = slLage(log, "bvweiter")
+(zx, zy) = slLage(log, "bvzu")
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(14)
+slKlick(x, y)
+slWarten(14)
+slKlick(wx, wy)
+slWarten(10)
+slKlick(zx, zy)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+DIM z AS STRING
+FOR EACH z IN slProtokoll(log)
+    IF LEFT$(z, 8) = "bericht " OR LEFT$(z, 13) = "vorn bericht " OR INSTR(z, "knoten Liste") > 0 THEN
+        IF INSTR(z, "lage ") <> 0 THEN PRINT z
+    END IF
+NEXT
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT)")
+DB_EXEC(db, "CREATE TABLE pos (id INTEGER PRIMARY KEY, rechnung INTEGER, kunde INTEGER, text TEXT, betrag INTEGER)")
+DB_EXEC(db, "INSERT INTO kunden (name) VALUES ('Anna Berger'), ('Bert Koch')")
+DIM i AS INTEGER
+FOR i = 1 TO 70
+    DB_EXEC(db, "INSERT INTO pos (rechnung, kunde, text, betrag) VALUES (?, ?, ?, ?)", 1 + i \ 40, 1 + i \ 40, "Artikel " + STR$(i), i * 125)
+NEXT
+DB_CLOSE(db)
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""}]},{"name":"pos","spalten":[{"name":"rechnung","typ":"ganz","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"kunde","typ":"ganz","pflicht":false,"eindeutig":false,"vorgabe":"","verweis":"kunden"},{"name":"text","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"betrag","typ":"geld","pflicht":false,"eindeutig":false,"vorgabe":""}]}]}
+--- datei proj/Liste.dhreport
+{"titel":"Probe","seite":{"format":"A4","hoch":true,"rand":[15,15,15,15]},"quelle":"Daten.pos","bedingung":"rechnung >= :ab","sortieren":["id"],"gruppen":[{"spalte":"rechnung"}],"baender":[{"art":"berichtskopf","hoehe":20,"elemente":[{"art":"text","x":0,"y":0,"b":180,"h":10,"text":"Positionen","groesse":18,"fett":true}]},{"art":"seitenkopf","hoehe":8,"elemente":[{"art":"text","x":0,"y":0,"b":60,"h":6,"text":"Artikel","fett":true},{"art":"text","x":140,"y":0,"b":40,"h":6,"text":"Betrag","fett":true,"ausrichtung":"rechts"}]},{"art":"gruppenkopf","gruppe":0,"hoehe":10,"elemente":[{"art":"text","x":0,"y":2,"b":25,"h":6,"text":"Rechnung"},{"art":"feld","spalte":"rechnung","x":25,"y":2,"b":20,"h":6},{"art":"feld","spalte":"kunde.name","x":60,"y":2,"b":60,"h":6,"fett":true}]},{"art":"detail","hoehe":6,"elemente":[{"art":"feld","spalte":"text","x":5,"y":0,"b":100,"h":5},{"art":"feld","spalte":"betrag","format":"geld","x":140,"y":0,"b":40,"h":5,"ausrichtung":"rechts"}]},{"art":"gruppenfuss","gruppe":0,"hoehe":10,"elemente":[{"art":"text","x":100,"y":1,"b":30,"h":6,"text":"Summe"},{"art":"summe","spalte":"betrag","funktion":"summe","format":"geld","x":140,"y":1,"b":40,"h":6,"ausrichtung":"rechts","fett":true},{"art":"linie","x":100,"y":0,"b":80,"h":0}]},{"art":"seitenfuss","hoehe":8,"elemente":[{"art":"seitenzahl","x":0,"y":2,"b":180,"h":5,"ausrichtung":"mitte"}]},{"art":"berichtsfuss","hoehe":10,"elemente":[{"art":"text","x":100,"y":2,"b":30,"h":6,"text":"Gesamt"},{"art":"summe","spalte":"betrag","funktion":"summe","format":"geld","x":140,"y":2,"b":40,"h":6,"ausrichtung":"rechts","fett":true},{"art":"summe","spalte":"betrag","funktion":"anzahl","x":0,"y":2,"b":40,"h":6}]}]}
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"},{"art":"bericht","name":"Liste","bericht":"Liste.dhreport"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":400,"h":300,"widgets":[]}
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Liste.dhreport
+{"titel":"Probe","seite":{"format":"A4","hoch":true,"rand":[15,15,15,15]},"quelle":"Daten.pos","bedingung":"rechnung >= :ab","sortieren":["id"],"gruppen":[{"spalte":"rechnung"}],"baender":[{"art":"berichtskopf","hoehe":20,"elemente":[{"art":"text","x":0,"y":0,"b":180,"h":10,"text":"Positionen","groesse":18,"fett":true}]},{"art":"seitenkopf","hoehe":8,"elemente":[{"art":"text","x":0,"y":0,"b":60,"h":6,"text":"Artikel","fett":true},{"art":"text","x":140,"y":0,"b":40,"h":6,"text":"Betrag","fett":true,"ausrichtung":"rechts"}]},{"art":"gruppenkopf","gruppe":0,"hoehe":10,"elemente":[{"art":"text","x":0,"y":2,"b":25,"h":6,"text":"Rechnung"},{"art":"feld","spalte":"rechnung","x":25,"y":2,"b":20,"h":6},{"art":"feld","spalte":"kunde.name","x":60,"y":2,"b":60,"h":6,"fett":true}]},{"art":"detail","hoehe":6,"elemente":[{"art":"feld","spalte":"text","x":5,"y":0,"b":100,"h":5},{"art":"feld","spalte":"betrag","format":"geld","x":140,"y":0,"b":40,"h":5,"ausrichtung":"rechts"}]},{"art":"gruppenfuss","gruppe":0,"hoehe":10,"elemente":[{"art":"text","x":100,"y":1,"b":30,"h":6,"text":"Summe"},{"art":"summe","spalte":"betrag","funktion":"summe","format":"geld","x":140,"y":1,"b":40,"h":6,"ausrichtung":"rechts","fett":true},{"art":"linie","x":100,"y":0,"b":80,"h":0}]},{"art":"seitenfuss","hoehe":8,"elemente":[{"art":"seitenzahl","x":0,"y":2,"b":180,"h":5,"ausrichtung":"mitte"}]},{"art":"berichtsfuss","hoehe":10,"elemente":[{"art":"text","x":100,"y":2,"b":30,"h":6,"text":"Gesamt"},{"art":"summe","spalte":"betrag","funktion":"summe","format":"geld","x":140,"y":2,"b":40,"h":6,"ausrichtung":"rechts","fett":true},{"art":"summe","spalte":"betrag","funktion":"anzahl","x":0,"y":2,"b":40,"h":6}]}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+vorn bericht Liste
+bericht Liste
+bericht seite 1
+bericht vorschau Liste 2
+bericht seite 2
+

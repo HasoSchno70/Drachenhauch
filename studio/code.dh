@@ -12,7 +12,7 @@ CONST KOPF_H = 26        ' Hoehe der Reiterkoepfe (TC_KOPF_H der Laufzeit)
 CONST CODE_KOPF = 34     ' Platz fuer die Kopfzeile ueber dem Code
 
 CLASS Reiter
-    DIM art AS STRING          ' layout, code, dekl, datenbank
+    DIM art AS STRING          ' layout, code, dekl, datenbank, bericht
     DIM el AS Element
     DIM meth AS Methode
     DIM feld AS GUI_WIDGET     ' das Code-Feld (-1 beim Layout)
@@ -20,6 +20,7 @@ CLASS Reiter
     DIM info AS GUI_WIDGET     ' wozu die Methode da ist
     DIM faerbSchl AS STRING
     DIM db AS DbAnsicht        ' nur bei einer Datenbank (dbeditor.dh)
+    DIM ber AS BerichtAnsicht  ' nur bei einem Bericht (berichte.dh)
 END CLASS
 
 DIM tcMitte AS GUI_WIDGET
@@ -49,6 +50,10 @@ SUB mitteLegen(x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER)
         IF r.art = "layout" THEN CONTINUE
         IF r.art = "datenbank" THEN
             dbLegen(r)
+            CONTINUE
+        END IF
+        IF r.art = "bericht" THEN
+            berichtLegen(r)
             CONTINUE
         END IF
         codeLegen(r)
@@ -83,6 +88,7 @@ FUNCTION reiterTitel$(r AS Reiter) AS STRING
         CASE "layout" : RETURN r.el.name
         CASE "dekl" : RETURN r.el.name + tr$(" · Eigenschaften")
         CASE "datenbank" : RETURN r.el.name
+        CASE "bericht" : RETURN r.el.name
     END SELECT
     RETURN r.el.name + "." + r.meth.name
 END FUNCTION
@@ -172,6 +178,8 @@ SUB reiterSchliessen(k AS INTEGER)
     DIM r AS Reiter : r = reiter[k]
     IF r.art = "datenbank" THEN
         dbWidgetsWeg(r)
+    ELSEIF r.art = "bericht" THEN
+        berichtWidgetsWeg(r)
     ELSEIF r.art <> "layout" THEN
         codeUebernehmen(r)
         GUI_DESTROY(r.feld)
@@ -205,7 +213,7 @@ END SUB
 ' Den Text eines Code-Reiters ins Modell -- je Bild fuer den vorderen, und
 ' bevor ein Reiter zugeht.
 SUB codeUebernehmen(r AS Reiter)
-    IF r.art = "layout" OR r.art = "datenbank" THEN RETURN
+    IF r.art = "layout" OR r.art = "datenbank" OR r.art = "bericht" THEN RETURN
     DIM t AS STRING : t = GUI_TEXT(r.feld)
     IF r.art = "code" THEN
         IF t <> r.meth.rumpf THEN
@@ -224,7 +232,7 @@ END SUB
 SUB codeFelderNeu(e AS Element)
     DIM r AS Reiter
     FOR EACH r IN reiter
-        IF NOT (r.el = e) OR r.art = "layout" OR r.art = "datenbank" THEN CONTINUE
+        IF NOT (r.el = e) OR r.art = "layout" OR r.art = "datenbank" OR r.art = "bericht" THEN CONTINUE
         IF r.art = "code" THEN GUI_SET_TEXT(r.feld, r.meth.rumpf) ELSE GUI_SET_TEXT(r.feld, e.dekl)
         r.faerbSchl = ""
     NEXT
@@ -259,6 +267,8 @@ SUB reiterPruefen()
     IF k >= 0 AND k < LEN(reiter) THEN
         IF reiter[k].art = "datenbank" THEN
             dbAnsichtPruefen(reiter[k])
+        ELSEIF reiter[k].art = "bericht" THEN
+            berichtAnsichtPruefen(reiter[k])
         ELSEIF reiter[k].art <> "layout" THEN
             codeUebernehmen(reiter[k])
             faerben(reiter[k])
@@ -473,6 +483,13 @@ FUNCTION navBild(was AS STRING) AS IMAGE
             IMAGE_FILL_RECT(b, 8, 7, 12, 13, &HFFFFFF)
         CASE "ereignis"
             IMAGE_FILL_POLY(b, [11, 5, 9, 7, 14, 11], [2, 11, 11, 18, 8, 8], &HF0B030)
+        CASE "bericht"
+            ' ein Blatt mit Zeilen
+            IMAGE_FILL_ROUNDRECT(b, 4, 2, 15, 17, 1, &HFFFFFF)
+            IMAGE_FILL_RECT(b, 4, 2, 15, 5, &HD06A3A)
+            IMAGE_FILL_RECT(b, 6, 8, 13, 9, &H6A7380)
+            IMAGE_FILL_RECT(b, 6, 11, 13, 12, &H6A7380)
+            IMAGE_FILL_RECT(b, 6, 14, 10, 15, &H6A7380)
         CASE "datenbank"
             ' ein Zylinder
             IMAGE_FILL_RECT(b, 4, 5, 16, 15, &H3A9A70)
@@ -713,6 +730,8 @@ SUB navigatorAuswahl()
                 IF auswahl < 0 AND trayWahl < 0 AND abstandL < 0 AND navArt[n] = "element" THEN ziel = n
             ELSEIF r.art = "dekl" AND navArt[n] = "dekl" THEN
                 ziel = n
+            ELSEIF r.art = "bericht" THEN
+                IF navArt[n] = "element" THEN ziel = n
             ELSEIF r.art = "datenbank" THEN
                 IF navArt[n] = "element" AND r.db.tabelle = "" AND r.db.abfrage = "" THEN ziel = n
                 IF navArt[n] = "abfrage" AND r.db.abfrage <> "" THEN
@@ -745,6 +764,8 @@ SUB navigatorPruefen()
                 auswahlGeaendert()
             ELSEIF elemente[ei].art = "datenbank" THEN
                 dbOeffnen(elemente[ei], "")
+            ELSEIF elemente[ei].art = "bericht" THEN
+                berichtOeffnen(elemente[ei])
             ELSE
                 deklOeffnen(elemente[ei])
             END IF
@@ -1116,8 +1137,8 @@ DIM wegEl AS INTEGER : wegEl = -1
 SUB elementFragen(art AS STRING)
     IF GUI_MODAL() THEN RETURN
     elWas = art
-    DIM grund AS STRING : grund = IIF(art = "fenster", tr$("Fenster"), IIF(art = "control", tr$("Control"), IIF(art = "modul", tr$("Modul"), IIF(art = "datenbank", tr$("Daten"), tr$("Klasse")))))
-    DIM frage AS STRING : frage = IIF(art = "datenbank", tr$("Name (unter ihm ist die Verbindung im Programm erreichbar):"), tr$("Name (wird zum Namen der Klasse bzw. des Moduls):"))
+    DIM grund AS STRING : grund = IIF(art = "fenster", tr$("Fenster"), IIF(art = "control", tr$("Control"), IIF(art = "modul", tr$("Modul"), IIF(art = "datenbank", tr$("Daten"), IIF(art = "bericht", tr$("Bericht"), tr$("Klasse"))))))
+    DIM frage AS STRING : frage = IIF(art = "datenbank", tr$("Name (unter ihm ist die Verbindung im Programm erreichbar):"), IIF(art = "bericht", tr$("Name (unter ihm ist der Bericht im Programm erreichbar):"), tr$("Name (wird zum Namen der Klasse bzw. des Moduls):")))
     dlgEl = GUI_PROMPT(trf$("{0} hinzufügen", [artText$(art)]), frage, elementNameFrei$(grund), tr$("Hinzufügen|Abbrechen"))
 END SUB
 
@@ -1161,6 +1182,8 @@ FUNCTION elementAnlegen(art AS STRING, n AS STRING) AS BOOLEAN
     ELSEIF art = "datenbank" THEN
         dbFehler(dbAbgleichen$(e))
         dbOeffnen(e, "")
+    ELSEIF art = "bericht" THEN
+        berichtOeffnen(e)
     ELSE
         deklOeffnen(e)
     END IF
@@ -1423,7 +1446,7 @@ END SUB
 ' Was das Studio selbst zeichnet (Titelleiste, Griffe des Entwurfs), liegt
 ' ueber GUI_DRAW -- ein offener Dialog kommt darum noch einmal obenauf.
 SUB dialogeObenauf()
-    DIM d AS ARRAY OF INTEGER : d = [dlgEr, dlgMe, dlgEl, dlgWeg, dlgMn, dlgVl, frage, ueber, dbDlg]
+    DIM d AS ARRAY OF INTEGER : d = [dlgEr, dlgMe, dlgEl, dlgWeg, dlgMn, dlgVl, frage, ueber, dbDlg, bvWin]
     IF vvOffen THEN ARRAY_PUSH(d, winVv)
     DIM w AS INTEGER
     FOR EACH w IN d

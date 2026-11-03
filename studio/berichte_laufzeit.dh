@@ -437,7 +437,11 @@ END SUB
 ' mit :parametern und ihre Werte -- das Ergebnis ist ein PDF-Handle.
 FUNCTION studioBerichtPdf(beschreibung AS STRING, db AS DB_CONN, sql AS STRING, werte AS MAP OF ANY) AS PDF
     DIM j AS JSON_HANDLE : j = JSON_PARSE(beschreibung)
-    studioBLesen(db, studioBParameter$(sql, werte))
+    IF sql <> "" THEN
+        studioBLesen(db, studioBParameter$(sql, werte))
+    ELSE
+        studioBSpalten = [] : studioBWerte = [] : studioBNull = [] : studioBZeilen = 0
+    END IF
     studioBAuslegen(j)
     DIM format AS STRING : format = "a4"
     IF JSON_HAS(j, "seite.format") THEN format = LOWER$(JSON_GET_STRING(j, "seite.format"))

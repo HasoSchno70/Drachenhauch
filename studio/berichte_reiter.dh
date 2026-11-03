@@ -1,0 +1,302 @@
+' ============================================================
+'  Drachenhauch Studio -- der Reiter eines Berichts
+' ============================================================
+'  Stufe 1: der Reiter zeigt die Seite mit ihren Baendern (noch ohne
+'  Bearbeiten), [Vorschau …] setzt den Bericht mit den Daten der
+'  Entwicklungsdatei (berichte_laufzeit.dh) und zeigt ihn mit PDF_PREVIEW.
+' ============================================================
+
+' --- Der Reiter --------------------------------------------------------------------------
+CLASS BerichtAnsicht
+    DIM kopf AS GUI_WIDGET
+    DIM info AS GUI_WIDGET
+    DIM btVorschau AS GUI_WIDGET
+END CLASS
+
+FUNCTION berichtReiterNeu(e AS Element) AS INTEGER
+    DIM r AS Reiter : r = NEW Reiter()
+    r.art = "bericht" : r.el = e : r.feld = -1 : r.kopf = -1 : r.info = -1
+    r.ber = NEW BerichtAnsicht()
+    ARRAY_PUSH(reiter, r)
+    DIM k AS INTEGER : k = GUI_TABCONTROL_ADD(tcMitte, reiterTitel$(r))
+    r.ber.kopf = GUI_LABEL(win, trf$("Bericht {0}", [e.name]), 0, 0)
+    GUI_ADD_CLASS(r.ber.kopf, "codekopf")
+    GUI_TABCONTROL_ADD_WIDGET(tcMitte, r.ber.kopf, k)
+    r.ber.info = GUI_LABEL(win, "", 0, 0)
+    GUI_ADD_CLASS(r.ber.info, "leise")
+    GUI_TABCONTROL_ADD_WIDGET(tcMitte, r.ber.info, k)
+    r.ber.btVorschau = GUI_BUTTON(win, tr$("Vorschau …"), 0, 0, 120, 28)
+    GUI_BUTTON_VARIANT(r.ber.btVorschau, "primaer")
+    GUI_TABCONTROL_ADD_WIDGET(tcMitte, r.ber.btVorschau, k)
+    berichtInfo(r)
+    berichtLegen(r)
+    RETURN k
+END FUNCTION
+
+SUB berichtInfo(r AS Reiter)
+    DIM j AS JSON_HANDLE : j = berichtJ(r.el)
+    DIM q AS STRING : q = berichtText$(j, "quelle")
+    DIM t AS STRING : t = IIF(q = "", tr$("ohne Quelle"), trf$("Quelle {0}", [q]))
+    DIM bed AS STRING : bed = berichtText$(j, "bedingung")
+    IF bed <> "" THEN t = t + " · " + bed
+    GUI_SET_TEXT(r.ber.info, t)
+END SUB
+
+SUB berichtLegen(r AS Reiter)
+    DIM x0 AS INTEGER : x0 = mitteKx + 8
+    DIM y0 AS INTEGER : y0 = mitteKy + KOPF_H + 8
+    DIM b AS INTEGER : b = mitteKb - 16
+    GUI_SET_BOUNDS(r.ber.kopf, x0 + 6, y0 + 3, b \ 3, 20)
+    GUI_SET_BOUNDS(r.ber.info, x0 + 6 + b \ 3, y0 + 4, b - b \ 3 - 140, 20)
+    GUI_SET_BOUNDS(r.ber.btVorschau, x0 + b - 124, y0, 120, 28)
+    protokoll("lage bericht vorschau " + STR$(x0 + b - 64) + " " + STR$(y0 + inhaltOben + 14))
+END SUB
+
+SUB berichtWidgetsWeg(r AS Reiter)
+    GUI_DESTROY(r.ber.kopf)
+    GUI_DESTROY(r.ber.info)
+    GUI_DESTROY(r.ber.btVorschau)
+END SUB
+
+SUB berichtOeffnen(e AS Element)
+    DIM k AS INTEGER : k = reiterFinden("bericht", e, NIL)
+    IF k < 0 THEN k = berichtReiterNeu(e)
+    GUI_TABCONTROL_SET_PAGE(tcMitte, k)
+    reiterPruefen()
+    protokoll("bericht " + e.name)
+END SUB
+
+SUB berichtAnsichtPruefen(r AS Reiter)
+    IF GUI_CLICKED(r.ber.btVorschau) THEN berichtVorschauOeffnen(r.el)
+END SUB
+
+' Die Flaeche unter der Kopfzeile, in die die Seite gezeichnet wird.
+DIM berSx AS INTEGER
+DIM berSy AS INTEGER
+DIM berMass AS FLOAT
+
+FUNCTION berichtBandName$(art AS STRING) AS STRING
+    SELECT CASE art
+        CASE "berichtskopf" : RETURN tr$("Berichtskopf")
+        CASE "seitenkopf" : RETURN tr$("Seitenkopf")
+        CASE "gruppenkopf" : RETURN tr$("Gruppenkopf")
+        CASE "detail" : RETURN tr$("Detail")
+        CASE "gruppenfuss" : RETURN tr$("Gruppenfuß")
+        CASE "seitenfuss" : RETURN tr$("Seitenfuß")
+        CASE "berichtsfuss" : RETURN tr$("Berichtsfuß")
+    END SELECT
+    RETURN art
+END FUNCTION
+
+' Die Seite: Papier, Raender gestrichelt, die Baender untereinander mit ihrem
+' Namen links daneben, darin die Elemente -- Felder als [spalte].
+SUB berichtZeichnen(r AS Reiter)
+    DIM j AS JSON_HANDLE : j = berichtJ(r.el)
+    studioBSeite(j)
+    DIM fx AS INTEGER : fx = mitteKx + 8
+    DIM fy AS INTEGER : fy = mitteKy + KOPF_H + inhaltOben + 44
+    DIM fb AS INTEGER : fb = mitteKb - 16
+    DIM fh AS INTEGER : fh = mitteKh - KOPF_H - 52
+    DIM rand AS INTEGER : rand = 110
+    ' Die Breite fuellen (hoechstens 4 Punkte je mm); gezeigt wird das Papier
+    ' nur so weit, wie die Baender reichen -- der Rest der Seite ist leer.
+    DIM s AS FLOAT : s = MIN((fb - rand - 20) / studioBSeiteB, 4.0)
+    IF s <= 0.0 THEN RETURN
+    berMass = s
+    berSx = fx + rand + INT((fb - rand - 20 - studioBSeiteB * s) / 2.0)
+    berSy = fy + 10
+    DIM summe AS FLOAT : summe = studioBRand[0]
+    DIM bb AS INTEGER
+    FOR bb = 0 TO JSON_LEN(j, "baender") - 1
+        summe = summe + studioBHoehe(j, bb)
+    NEXT
+    DIM ph AS INTEGER : ph = MIN(INT(MIN(studioBSeiteH, summe + 12.0) * s), fh - 20)
+    SCISSOR(fx, fy, fb, fh)
+    BOX(berSx + 4, berSy + 4, berSx + INT(studioBSeiteB * s) + 4, berSy + ph + 4, RGB(150, 150, 150))
+    BOX(berSx, berSy, berSx + INT(studioBSeiteB * s), berSy + ph, RGB(255, 255, 255))
+    DIM lx AS INTEGER : lx = berSx + INT(studioBRand[3] * s)
+    DIM rx AS INTEGER : rx = berSx + INT((studioBSeiteB - studioBRand[1]) * s)
+    DIM y AS FLOAT : y = studioBRand[0]
+    DIM b AS INTEGER
+    FOR b = 0 TO JSON_LEN(j, "baender") - 1
+        DIM bp AS STRING : bp = "baender." + STR$(b)
+        DIM h AS FLOAT : h = studioBHoehe(j, b)
+        DIM y1 AS INTEGER : y1 = berSy + INT(y * s)
+        DIM y2 AS INTEGER : y2 = berSy + INT((y + h) * s)
+        BOX(lx, y1, rx, y2, IIF(b MOD 2 = 0, RGB(246, 248, 252), RGB(238, 242, 249)))
+        LINE(lx, y2, rx, y2, RGB(180, 190, 210))
+        DIM name AS STRING : name = berichtBandName$(berichtText$(j, bp + ".art"))
+        IF JSON_TYPE(j, bp + ".gruppe") = "number" THEN name = name + " " + STR$(JSON_GET_INT(j, bp + ".gruppe") + 1)
+        TEXT(berSx - rand + 4, y1 + 2, name, farbe("leise"))
+        IF JSON_HAS(j, bp + ".elemente") THEN
+            DIM k AS INTEGER
+            FOR k = 0 TO JSON_LEN(j, bp + ".elemente") - 1
+                berichtElementZeichnen(j, bp + ".elemente." + STR$(k), studioBRand[3], y, s)
+            NEXT
+        END IF
+        y = y + h
+    NEXT
+    SCISSOR_END()
+END SUB
+
+SUB berichtElementZeichnen(j AS JSON_HANDLE, p AS STRING, ox AS FLOAT, oy AS FLOAT, s AS FLOAT)
+    DIM art AS STRING : art = berichtText$(j, p + ".art")
+    DIM x1 AS INTEGER : x1 = berSx + INT((ox + studioBZahl(j, p, "x", 0.0)) * s)
+    DIM y1 AS INTEGER : y1 = berSy + INT((oy + studioBZahl(j, p, "y", 0.0)) * s)
+    DIM x2 AS INTEGER : x2 = x1 + INT(studioBZahl(j, p, "b", 0.0) * s)
+    DIM y2 AS INTEGER : y2 = y1 + INT(studioBZahl(j, p, "h", 0.0) * s)
+    DIM t AS STRING : t = ""
+    SELECT CASE art
+        CASE "text" : t = berichtText$(j, p + ".text")
+        CASE "feld" : t = "[" + berichtText$(j, p + ".spalte") + "]"
+        CASE "summe" : t = "Σ " + berichtText$(j, p + ".funktion") + "(" + berichtText$(j, p + ".spalte") + ")"
+        CASE "seitenzahl" : t = REPLACE$(REPLACE$(IIF(berichtText$(j, p + ".text") = "", tr$("Seite {n} von {m}"), berichtText$(j, p + ".text")), "{n}", "1"), "{m}", "1")
+        CASE "datum" : t = tr$("TT.MM.JJJJ")
+        CASE "linie"
+            LINE(x1, y1, x2, y2, RGB(40, 40, 40))
+            RETURN
+        CASE "rechteck"
+            RECT(x1, y1, x2, y2, RGB(40, 40, 40))
+            RETURN
+        CASE "bild"
+            RECT(x1, y1, x2, y2, RGB(120, 140, 180))
+            TEXT(x1 + 3, y1 + 2, tr$("Bild"), RGB(120, 140, 180))
+            RETURN
+    END SELECT
+    RECT(x1, y1, x2, y2, RGB(200, 210, 230))
+    IF t = "" THEN RETURN
+    DIM gr AS INTEGER : gr = MAX(8, INT(studioBZahl(j, p, "groesse", 10.0) * 0.3528 * s))
+    TEXT_SIZE(gr)
+    DIM w AS INTEGER : w = TEXT_WIDTH(t)
+    DIM tx AS INTEGER : tx = x1
+    SELECT CASE berichtText$(j, p + ".ausrichtung")
+        CASE "mitte" : tx = x1 + (x2 - x1 - w) \ 2
+        CASE "rechts" : tx = x2 - w
+    END SELECT
+    SCISSOR(x1, y1, MAX(1, x2 - x1), MAX(1, y2 - y1 + 2))
+    TEXT(tx, y1, t, IIF(art = "text", RGB(20, 20, 30), RGB(40, 90, 170)))
+    SCISSOR_END()
+    TEXT_SIZE(14)   ' die Groesse des Studios (SETFONT(sans, 14))
+END SUB
+
+' --- Vorschau im Studio --------------------------------------------------------------------
+'  Ein Fenster mit der gesetzten Seite (PDF_PREVIEW), Blaettern, und je
+'  Parameter einem Feld (Vorgabe 1); [Setzen] rechnet neu.
+DIM bvWin AS GUI_WINDOW : bvWin = -1
+DIM bvBild AS GUI_WIDGET
+DIM bvSeite AS GUI_WIDGET
+DIM bvZurueck AS GUI_WIDGET
+DIM bvWeiter AS GUI_WIDGET
+DIM bvSetzen AS GUI_WIDGET
+DIM bvZu AS GUI_WIDGET
+DIM bvFelder AS ARRAY OF GUI_WIDGET : bvFelder = []
+DIM bvNamen AS ARRAY OF STRING : bvNamen = []
+DIM bvPdf AS PDF
+DIM bvHat AS BOOLEAN : bvHat = FALSE
+DIM bvNr AS INTEGER : bvNr = 1
+DIM bvEl AS Element
+DIM bvBildHandle AS IMAGE : bvBildHandle = -1
+
+SUB berichtVorschauOeffnen(e AS Element)
+    IF bvWin >= 0 THEN GUI_WINDOW_DESTROY(bvWin)
+    bvEl = e
+    bvWin = GUI_WINDOW(trf$("Vorschau: {0}", [e.name]), 120, 60, 760, 780)
+    bvNamen = berichtParameter(e)
+    bvFelder = []
+    DIM x AS INTEGER : x = 12
+    DIM n AS STRING
+    FOR EACH n IN bvNamen
+        GUI_LABEL(bvWin, n + ":", x, 12)
+        DIM f AS GUI_WIDGET : f = GUI_TEXTINPUT(bvWin, x + 8 + LEN(n) * 8 + 8, 8, 70, 26, "")
+        GUI_SET_TEXT(f, "1")
+        ARRAY_PUSH(bvFelder, f)
+        x = x + LEN(n) * 8 + 100
+    NEXT
+    bvSetzen = GUI_BUTTON(bvWin, tr$("Setzen"), x, 8, 80, 26)
+    bvZurueck = GUI_BUTTON(bvWin, "<", 470, 8, 40, 26)
+    bvSeite = GUI_LABEL(bvWin, "", 516, 12)
+    bvWeiter = GUI_BUTTON(bvWin, ">", 610, 8, 40, 26)
+    bvZu = GUI_BUTTON(bvWin, tr$("Schließen"), 660, 8, 86, 26)
+    bvBild = GUI_IMAGE(bvWin, 12, 44, 734, 700, -1)
+    GUI_IMAGE_MODE(bvBild, "einpassen")
+    GUI_WINDOW_MODAL(bvWin, TRUE)
+    GUI_FOCUS(bvSetzen)
+    berichtVorschauSetzen()
+    DIM wx AS INTEGER : wx = GUI_WINDOW_GET_X(bvWin)
+    DIM wy AS INTEGER : wy = GUI_WINDOW_GET_Y(bvWin) + GUI_WINDOW_GET_H(bvWin) - GUI_WINDOW_CONTENT_H(bvWin)
+    protokoll("lage bvweiter " + STR$(wx + 630) + " " + STR$(wy + 21))
+    protokoll("lage bvzu " + STR$(wx + 703) + " " + STR$(wy + 21))
+END SUB
+
+SUB berichtVorschauSetzen()
+    IF bvHat THEN PDF_CLOSE(bvPdf)
+    bvHat = FALSE
+    DIM werte AS MAP OF ANY : werte = {}
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bvNamen) - 1
+        DIM t AS STRING : t = TRIM$(GUI_TEXT(bvFelder[i]))
+        IF REGEX_TEST(t, "^-?[0-9]+$") THEN
+            MAPPUT(werte, bvNamen[i], INT(VAL(t)))
+        ELSE
+            MAPPUT(werte, bvNamen[i], t)
+        END IF
+    NEXT
+    DIM fehler AS STRING : fehler = ""
+    DIM sql AS STRING : sql = berichtSql$(bvEl)
+    DIM dbn AS STRING : dbn = berichtDb$(bvEl)
+    DIM db AS DB_CONN
+    DIM offen AS BOOLEAN : offen = FALSE
+    TRY
+        IF dbn <> "" THEN
+            DIM p AS STRING : p = dbPfad$(elemente[elementIndex(dbn)])
+            IF p = "" THEN THROW tr$("Erst das Projekt sichern -- dann gibt es eine Datei für die Daten.")
+            db = DB_OPEN(p)
+            offen = TRUE
+        END IF
+        studioBBilder = PATHJOIN(projOrdner, "bilder")
+        bvPdf = studioBerichtPdf(JSON_STRINGIFY(berichtJ(bvEl)), db, sql, werte)
+        bvHat = TRUE
+    CATCH vfehler
+        fehler = vfehler
+    END TRY
+    IF offen THEN DB_CLOSE(db)
+    IF fehler <> "" THEN
+        status(trf$("Vorschau: {0}", [fehler]))
+        protokoll("bericht vorschau fehler " + fehler)
+        GUI_SET_TEXT(bvSeite, "")
+        RETURN
+    END IF
+    bvNr = 1
+    berichtVorschauZeigen()
+    protokoll("bericht vorschau " + bvEl.name + " " + STR$(PDF_PAGE_COUNT(bvPdf)))
+END SUB
+
+SUB berichtVorschauZeigen()
+    IF NOT bvHat THEN RETURN
+    IF bvBildHandle >= 0 THEN IMAGE_FREE(bvBildHandle)
+    bvBildHandle = PDF_PREVIEW(bvPdf, bvNr, 734)
+    GUI_SET_IMAGE(bvBild, bvBildHandle)
+    GUI_SET_TEXT(bvSeite, trf$("{0} / {1}", [STR$(bvNr), STR$(PDF_PAGE_COUNT(bvPdf))]))
+    protokoll("bericht seite " + STR$(bvNr))
+END SUB
+
+SUB berichtVorschauPruefen()
+    IF bvWin < 0 THEN RETURN
+    IF GUI_CLICKED(bvZu) OR GUI_WINDOW_CLOSED(bvWin) THEN
+        GUI_WINDOW_DESTROY(bvWin)
+        bvWin = -1
+        IF bvHat THEN PDF_CLOSE(bvPdf)
+        bvHat = FALSE
+        RETURN
+    END IF
+    IF GUI_CLICKED(bvSetzen) THEN berichtVorschauSetzen()
+    IF NOT bvHat THEN RETURN
+    IF GUI_CLICKED(bvWeiter) AND bvNr < PDF_PAGE_COUNT(bvPdf) THEN
+        bvNr = bvNr + 1
+        berichtVorschauZeigen()
+    END IF
+    IF GUI_CLICKED(bvZurueck) AND bvNr > 1 THEN
+        bvNr = bvNr - 1
+        berichtVorschauZeigen()
+    END IF
+END SUB
