@@ -501,8 +501,6 @@ Erst das Projekt sichern -- dann gibt es eine Datei für die Daten.	Save the pro
 Datenbank {0}	Database {0}
 Datei:	File:
 Die SQLite-Datei mit den Daten -- im Projektordner, und neben dem gebauten Programm.	The SQLite file with the data -- in the project folder, and next to the built program.
-Noch keine Tabelle -- „Neu …“ legt eine an.	No table yet -- "New …" creates one.
-Neu …	New …
 Umbenennen …	Rename …
 Löschen …	Delete …
 Pflicht	Required
@@ -558,3 +556,34 @@ Datenquelle	Data source
 Angezeigte Spalten	Shown columns
 Spalten durch Semikolon -- leer: bei einer Tabelle alle, sonst die erste	Columns separated by semicolons -- empty: all for a table, otherwise the first
 (keine)	(none)
+Den Namen {0} gibt es in {1} schon.	{1} already has the name {0}.
+Eine Abfrage beginnt mit SELECT (oder WITH).	A query starts with SELECT (or WITH).
+Die Abfrage {0} gibt es nicht.	There is no query {0}.
+Noch keine Tabelle -- „Tabelle …“ legt eine an.	No table yet -- “Table …” adds one.
+Tabelle …	Table …
+Abfrage …	Query …
+Verweis auf	Refers to
+Abfragen	Queries
+Nicht ausführbar -- gesichert ist der Stand davor.	Cannot run -- the previous version is kept.
+Die Abfrage liefert keine Zeile.	The query returns no rows.
+Ohne Spalte id liefert IdVon für diese Abfrage 0.	Without an id column, IdVon returns 0 for this query.
+Abfrage {0} gesichert.	Query {0} saved.
+Spalte {0} verweist auf nichts mehr.	Column {0} no longer refers to anything.
+Spalte {0} verweist auf {1}.	Column {0} refers to {1}.
+Abfrage hinzufügen	Add query
+Name der Abfrage:	Name of the query:
+Abfrage umbenennen	Rename query
+Abfrage löschen	Delete query
+Die Abfrage {0} löschen? Die Daten bleiben, wie sie sind.	Delete the query {0}? The data stays as it is.
+abfrage	query
+Abfrage {0} angelegt.	Query {0} added.
+Abfrage {0} heißt jetzt {1}.	Query {0} is now called {1}.
+Abfrage {0} gelöscht.	Query {0} deleted.
+{0} (als Tabelle)	{0} (as a table)
+Tabelle für die Abfrage {0} angelegt.	Table for the query {0} added.
+Sortieren nach	Sort by
+Absteigend	Descending
+Bedingung	Condition
+Suchfeld	Search field
+Eine SQL-Bedingung wie im WHERE, etwa: ort = 'Köln' AND umsatz > 100	An SQL condition as in WHERE, for example: ort = 'Köln' AND umsatz > 100
+Die Bedingung geht so nicht: {0}	The condition does not work like this: {0}

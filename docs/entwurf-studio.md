@@ -244,8 +244,13 @@ Tabelle (`studio_tabelle`) bekommt in seiner Basis Laden/Sichern/Neu/
 Loeschen/Ungesichert, eine Liste, Tabelle oder Klappliste mit Datenquelle
 (`studio_quelle`, `studio_spalten`) Neuladen/IdVon; zeigt sie die Tabelle des
 Fensters, laedt ein Klick auf eine Zeile den Datensatz. Inspektor-Gruppe
-Daten. Offen: Fremdschluessel (eine Klappliste, die die id einer anderen
-Tabelle bindet), Filter und Sortierung der Datenquelle, Verbunde.
+Daten. Stufe 3: Verweise (`verweis` an einer Spalte, im Fenster eine
+Klappliste mit der Anzeigespalte der Zieltabelle, die die id bindet),
+Bedingung/Sortierung/Suchfeld einer Datenquelle (`studio_filter`,
+`studio_sortieren`, `studio_absteigend`, `studio_suchfeld`) und benannte
+Abfragen (`abfragen` im Schema, im Reiter mit SQL und Ergebnis, im Navigator,
+als Datenquelle und im Code als `Abfrage("name")`). Offen: Verbunde im
+Entwurf (eine Abfrage kann sie schon), Bilder in Spalten.
 
 **Geprüft wird je Stufe** mit einer Prüfsammlung `werkzeug_studio*.dhtest`.
 Die Klicks sind echt, über Aufnahmen und Fensternachrichten. Erzeugtes läuft

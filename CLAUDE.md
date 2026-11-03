@@ -3780,6 +3780,36 @@ Entwurf (`quellKopfSetzen`). Tests `tests/pruef/werkzeug_studio_datenbank2.dhtes
 Aufnahme macht; Tabelle ziehen + F5; Doppelklick neben einer fremden
 Tabelle; Auswahlen im Inspektor per Tastatur); zwoelf Verfaelschungen fallen
 je in ihrem Fall.
+**Stufe 3 (selber Tag): Verweise, Bedingung/Sortierung/Suche, Abfragen.**
+Spalte `verweis` (Zieltabelle; `dbSpalteVerweis$` macht die Spalte `ganz`),
+im Spalten-Gitter die sechste Spalte "Verweis auf"; `feldAnlegen` macht aus
+ihr eine Klappliste mit `studio_quelle` = Ziel und `studio_spalten` =
+`dbAnzeigeSpalte$` (erste Textspalte). Schema `abfragen[]` (name, sql),
+Namen mit den Tabellen geteilt (`dbNameBelegt`); `dbAbfrageTesten$` laeuft
+das SQL als `SELECT * FROM (sql) AS studio_q LIMIT n` (nur SELECT/WITH,
+eine Anweisung) und schneidet die Stelle im Huell-SQL aus der Meldung
+(`dbOhneHuelle$`); `dbAbfrageSetzen$` sichert nur, was geht. Eine
+Datenquelle ist Tabelle ODER Abfrage (`dbQuelle` setzt `dbRefT`/`dbRefA`,
+`dbRef` nur Tabellen); im Programm liest `studioQuelle(con, quelle,
+spalten, filter, sort, desc, such)` (id oder `0 AS id` vorn, LIKE ueber die
+gezeigten Spalten, ORDER BY), `studioZeile` zeigt; Klapplisten tragen die id
+als Eintragswert (`GUI_LISTBOX_SET_DATA`) und behalten ihre Auswahl beim
+Neuladen; der Takt laedt bei `GUI_CHANGED(suchfeld)` neu. `Abfrage(name)`
+mit SELECT CASE ueber "name" und "datenbank.name", Gross/klein egal. Reiter:
+Liste links = Tabellen, Kopf "Abfragen", Abfragen (`eintraege`/`eintragAbf`);
+eine Abfrage zeigt SQL-Feld, [Ausfuehren] und ein Ergebnis-Gitter
+(`GUI_TABLE_CLEAR` + `GUI_TABLE_HEADERS` -- `GUI_TABLE` mit Kopf ohne Zellen
+ist ein Fehler); uebernommen wird beim Ausfuehren oder wenn das Feld den
+Fokus abgibt. Navigator: Abfragen als Knoten `abfrage` (Pfad
+`Daten.?name`), Klick oeffnet, Ziehen ins Fenster legt eine Tabelle mit
+Datenquelle an (`abfrageAblegen`). Inspektor: `studio_sortieren` (Spalten
+der Quelle), `studio_absteigend`, `studio_filter` (an der Datei geprueft,
+`filterPruefen` -> GUI_SET_ERROR), `studio_suchfeld` (Textfelder des
+Fensters). **Testfalle:** Knoten unter dem sichtbaren Navigator haben eine
+Lage im Protokoll, nehmen aber keinen Klick an -- Projekte in Tests klein
+halten. Tests `tests/pruef/werkzeug_studio_datenbank3.dhtest` (7); 16
+Verfaelschungen fallen je in ihrem Fall (Sortieren erst mit Testdaten, bei
+denen Name und id verschieden ordnen).
 
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 

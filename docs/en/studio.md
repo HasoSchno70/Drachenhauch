@@ -472,6 +472,34 @@ SUB knopfSichern_Klick()
 END SUB
 ```
 
+**References.** In the column grid, **Refers to** names another table of the
+same database: the column then holds the id of one of its rows (it becomes a
+whole number). Dragged into a window, such a column becomes a drop-down list
+that shows the first text column of the target table and binds the id.
+
+**Condition, sorting, search.** A list with a data source also has **Sort
+by** (a column of the source) and **Descending** in the inspector, a
+**Condition** (SQL as after WHERE, for example `ort <> 'Bonn'`; the studio
+tries it on the file in the project folder and shows an error at the field)
+and a **Search field** (a text field of the window: as soon as something is
+typed into it, the list shows only rows whose shown columns contain the
+text).
+
+**Queries.** [Query …] in the database tab adds a named SELECT; the queries
+are listed below the tables on the left, their SQL and the result (the first
+1000 rows) on the right. An SQL is only saved once it runs on the file --
+otherwise the previous version stays. A query is a data source like a table
+(with an `id` column, `IdVon` returns it, otherwise 0); dragged from the
+navigator into a window it becomes a table. In code it runs by its name, also
+with the database's name in front:
+
+```text
+DIM r AS DB_RESULT : r = Abfrage("koelner")
+WHILE DB_NEXT(r)
+    PRINT DB_GET_STRING(r, 1)
+WEND
+```
+
 ## A single window
 
 A `.dhform` (the same format that `GUI_SAVE` writes and `GUI_LOAD` reads)
@@ -542,4 +570,6 @@ an older file, and the studio with real clicks into both grids, F5 and
 building; `tests/pruef/werkzeug_studio_datenbank2.dhtest` tests binding:
 methods and lists in the generated window including a click on a row,
 dragging and double-clicking columns into the window, and the choices in the
-inspector.
+inspector; `tests/pruef/werkzeug_studio_datenbank3.dhtest` tests references,
+condition, sorting, search field and queries: the core, the generated window
+and the studio with real clicks in the tab, the navigator and the inspector.

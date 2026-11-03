@@ -480,6 +480,35 @@ SUB knopfSichern_Klick()
 END SUB
 ```
 
+**Verweise.** Im Spalten-Gitter nennt **Verweis auf** eine andere Tabelle
+derselben Datenbank: die Spalte hält dann die id einer ihrer Zeilen (sie
+wird eine ganze Zahl). Ins Fenster gezogen wird eine solche Spalte eine
+Klappliste, die die erste Textspalte der Zieltabelle zeigt und die id
+bindet.
+
+**Bedingung, Sortierung, Suche.** Eine Liste mit Datenquelle hat im
+Inspektor dazu **Sortieren nach** (eine Spalte der Quelle) samt
+**Absteigend**, eine **Bedingung** (SQL wie hinter WHERE, etwa
+`ort <> 'Bonn'`; das Studio probiert sie an der Datei im Projektordner und
+zeigt einen Fehler am Feld) und ein **Suchfeld** (ein Textfeld des Fensters:
+sobald darin getippt wird, zeigt die Liste nur Zeilen, in deren angezeigten
+Spalten der Text vorkommt).
+
+**Abfragen.** [Abfrage …] im Reiter der Datenbank legt ein benanntes SELECT
+an; links stehen die Abfragen unter den Tabellen, rechts ihr SQL und das
+Ergebnis (die ersten 1000 Zeilen). Gesichert wird ein SQL erst, wenn es an
+der Datei geht -- sonst bleibt der Stand davor. Eine Abfrage ist eine
+Datenquelle wie eine Tabelle (mit einer Spalte `id` liefert `IdVon` sie, sonst
+0); aus dem Navigator ins Fenster gezogen wird sie eine Tabelle. Im Code läuft
+sie über ihren Namen, auch mit dem der Datenbank davor:
+
+```text
+DIM r AS DB_RESULT : r = Abfrage("koelner")
+WHILE DB_NEXT(r)
+    PRINT DB_GET_STRING(r, 1)
+WEND
+```
+
 ## Ein einzelnes Fenster
 
 Eine `.dhform` (dasselbe Format, das `GUI_SAVE` schreibt und `GUI_LOAD`
@@ -550,4 +579,7 @@ Kern ohne Fenster (an der Datei, wie SQLite sie sieht), das erzeugte
 Programm an einer älteren Datei und das Studio mit echten Klicks in beide
 Gitter, F5 und Bauen; `tests/pruef/werkzeug_studio_datenbank2.dhtest` die
 Bindung: Methoden und Listen im erzeugten Fenster samt Klick auf eine Zeile,
-Spalten ins Fenster ziehen und doppelklicken, die Auswahlen im Inspektor.
+Spalten ins Fenster ziehen und doppelklicken, die Auswahlen im Inspektor;
+`tests/pruef/werkzeug_studio_datenbank3.dhtest` Verweise, Bedingung,
+Sortierung, Suchfeld und Abfragen: den Kern, das erzeugte Fenster und das
+Studio mit echten Klicks im Reiter, im Navigator und im Inspektor.
