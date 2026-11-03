@@ -73,6 +73,7 @@ spalten foto,muss / name
 ' ungesichert, Sichern schreibt die Bytes, BildLeeren + Sichern macht die
 ' Spalte NULL; eine Datei, die kein Bild ist, nimmt BildSetzen nicht.
 IMPORT "laeufer.dh"
+IMPORT "imgfx"
 DIM p AS STRING : p = CWD$() + "/proj"
 slHin(10, 10)
 slWarten(10)
@@ -86,6 +87,17 @@ DIM z AS STRING
 FOR EACH z IN slAnfang(log, "ausgabe ")
     IF INSTR(z, "▶") < 0 AND INSTR(z, "■") < 0 AND INSTR(z, "WARNING") < 0 THEN PRINT z
 NEXT
+' Rote Punkte im Bild des Programms: das Bild der Zelle.
+DIM bild AS IMAGE : bild = LOADIMAGE(p + "/schirm.png")
+DIM rot AS INTEGER : rot = 0
+DIM bx AS INTEGER
+DIM by AS INTEGER
+FOR by = 0 TO IMAGE_HEIGHT(bild) - 1 STEP 2
+    FOR bx = 0 TO IMAGE_WIDTH(bild) - 1 STEP 2
+        IF GETPIXEL(bild, bx, by) = RGB(255, 0, 0) THEN rot = rot + 1
+    NEXT
+NEXT
+PRINT "rot im bild "; rot > 0
 --- argumente
 {sammlung}/../../studio/studio.dh
 --- vorher
@@ -107,7 +119,7 @@ kein Bild
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
 --- datei proj/Hauptfenster.dhform
-{"title":"Haupt","name":"Hauptfenster","w":600,"h":400,"studio_tabelle":"Daten.produkte","widgets":[{"kind":"table","name":"liste","x":10,"y":10,"w":300,"h":200,"table":{"headers":["a"]},"studio_quelle":"Daten.produkte"},{"kind":"image","name":"fotoFeld","x":320,"y":10,"w":160,"h":120,"studio_bildspalte":"foto"}]}
+{"title":"Haupt","name":"Hauptfenster","w":600,"h":400,"studio_tabelle":"Daten.produkte","timer":[{"name":"foto","intervall":300,"aktiv":true,"wiederholen":false}],"widgets":[{"kind":"table","name":"liste","x":10,"y":10,"w":300,"h":200,"table":{"headers":["a"]},"studio_quelle":"Daten.produkte"},{"kind":"image","name":"fotoFeld","x":320,"y":10,"w":160,"h":120,"studio_bildspalte":"foto"}]}
 --- datei proj/Hauptfenster.dh
 CLASS Hauptfenster EXTENDS Hauptfenster_Basis
     SUB Geoeffnet()
@@ -129,6 +141,10 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
         Self.Neu()
         PRINT "neu "; Self.studioBild_fotoFeld; " "; Self.Ungesichert()
     END SUB
+    ' Danach steht nur noch in der Zeile Tasse ein Bild (rot) -- in der Zelle.
+    SUB foto_Aktion()
+        SAVESCREENSHOT(PATHJOIN(GETENV$("DH_STUDIO_DATEN"), "schirm.png"))
+    END SUB
 END CLASS
 --- datei proj/App.dh
 CLASS App EXTENDS StudioApp
@@ -146,6 +162,7 @@ ausgabe datei 70
 ausgabe leeren TRUE TRUE
 ausgabe null 1 bilder 1
 ausgabe neu -1 FALSE
+rot im bild TRUE
 
 === bild im daten-gitter setzen und eine bildspalte ins fenster legen
 ' Im Reiter der Datenbank: Daten, die Zelle foto der ersten Zeile, „Bild …“

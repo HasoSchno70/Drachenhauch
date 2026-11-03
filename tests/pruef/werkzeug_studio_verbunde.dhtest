@@ -31,6 +31,10 @@ WEND
 DB_CLOSE(db)
 PRINT "filter ["; dbFilterFehler$("Daten.rechnungen", CHR$(34) + "kunde.ort" + CHR$(34) + " = 'Bonn'"); "]"
 PRINT "falsch "; INSTR(dbFilterFehler$("Daten.rechnungen", "kunde.plz = 1"), "kunde.plz") >= 0
+' In doppelten Anfuehrungszeichen nimmt SQLite einen unbekannten Namen still
+' als Text; das Studio sagt es -- ein Text in einfachen zaehlt nicht.
+PRINT "tippfehler ["; dbFilterFehler$("Daten.rechnungen", CHR$(34) + "kunde.ortt" + CHR$(34) + " = 'x'"); "]"
+PRINT "text ["; dbFilterFehler$("Daten.rechnungen", "nr = '" + CHR$(34) + "gibts" + CHR$(34) + "' AND " + CHR$(34) + "ID" + CHR$(34) + " > 0"); "]"
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -63,6 +67,8 @@ liste nr,kunde.name / text,text
   4 R4 [Anna] [Bonn]
 filter []
 falsch TRUE
+tippfehler [Die Spalte kunde.ortt gibt es in der Quelle nicht.]
+text []
 
 === das erzeugte fenster zeigt, sortiert und sucht ueber den verweis
 ' Die Tabelle zeigt nr, kunde.name und betrag (Geld), sortiert absteigend

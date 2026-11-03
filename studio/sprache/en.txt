@@ -597,3 +597,4 @@ Bild in {0}, Zeile {1} gesichert.	Image saved in {0}, row {1}.
 {0} ist eine Bildspalte -- ein Bild setzt „Bild …“.	{0} is an image column -- "Image …" sets an image.
 {0} ist kein Bild (PNG, JPG, BMP oder GIF).	{0} is not an image (PNG, JPG, BMP or GIF).
 {0} ist keine Bildspalte.	{0} is not an image column.
+Die Spalte {0} gibt es in der Quelle nicht.	The source has no column {0}.

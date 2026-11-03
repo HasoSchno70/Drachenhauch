@@ -1227,6 +1227,17 @@ END FUNCTION
 ' noch keine Datei), sonst die Meldung.
 FUNCTION dbFilterFehler$(ref AS STRING, filter AS STRING) AS STRING
     IF TRIM$(filter) = "" OR NOT dbQuelle(ref) THEN RETURN ""
+    ' Einen Namen in doppelten Anfuehrungszeichen, den es nicht gibt, nimmt
+    ' SQLite still als Text -- die Liste waere leer, ohne Fehler. Darum
+    ' vorher: jeder solche Name muss eine Spalte der Quelle sein.
+    DIM bekannt AS ARRAY OF STRING : bekannt = ["id"]
+    DIM bn AS STRING
+    FOR EACH bn IN dbQuellSpaltenMit(ref)
+        ARRAY_PUSH(bekannt, LOWER$(bn))
+    NEXT
+    DIM fname AS STRING : fname = dbFilterNamePruefen$(filter, bekannt)
+    IF fname <> "" THEN RETURN trf$("Die Spalte {0} gibt es in der Quelle nicht.", [fname])
+    dbQuelle(ref)
     DIM p AS STRING : p = dbPfad$(dbRefEl)
     IF p = "" THEN RETURN ""
     IF NOT FILEEXISTS(p) THEN RETURN ""
@@ -1245,6 +1256,30 @@ FUNCTION dbFilterFehler$(ref AS STRING, filter AS STRING) AS STRING
     CATCH zfehler
     END TRY
     RETURN fehler
+END FUNCTION
+
+' Der erste Name in doppelten Anfuehrungszeichen, der nicht bekannt ist ("" =
+' alle bekannt); in einfachen Anfuehrungszeichen steht Text und zaehlt nicht.
+FUNCTION dbFilterNamePruefen$(filter AS STRING, bekannt AS ARRAY OF STRING) AS STRING
+    DIM i AS INTEGER : i = 0
+    DIM n AS INTEGER : n = LEN(filter)
+    WHILE i < n
+        DIM c AS STRING : c = MID$(filter, i, 1)
+        IF c = "'" THEN
+            DIM e AS INTEGER : e = INSTR(filter, "'", i + 1)
+            IF e < 0 THEN RETURN ""
+            i = e + 1
+        ELSEIF c = CHR$(34) THEN
+            DIM ende AS INTEGER : ende = INSTR(filter, CHR$(34), i + 1)
+            IF ende < 0 THEN RETURN ""
+            DIM name AS STRING : name = MID$(filter, i + 1, ende - i - 1)
+            IF ARRAY_INDEXOF(bekannt, LOWER$(name)) < 0 THEN RETURN name
+            i = ende + 1
+        ELSE
+            i = i + 1
+        END IF
+    WEND
+    RETURN ""
 END FUNCTION
 
 ' Was im FROM steht: der Name der Tabelle oder die Abfrage in Klammern.
