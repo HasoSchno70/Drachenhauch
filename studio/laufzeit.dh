@@ -90,6 +90,8 @@ CLASS StudioControl
     ' Was das Control in diesem Bild mit Ausloesen gemeldet hat; das Fenster
     ' fragt es nach seinem Takt ab und leert es dann.
     DIM studioMeldungen AS ARRAY OF STRING
+    ' Die eigenen Controls in diesem Control (Controls in Controls).
+    DIM studioKinder AS ARRAY OF StudioControl
 
     ' Von der erzeugten Basis zuerst gerufen.
     SUB studioAnfangen(win AS GUI_WINDOW, behaelter AS GUI_WIDGET, b AS INTEGER, h AS INTEGER)
@@ -99,6 +101,7 @@ CLASS StudioControl
         Self.studioEntwurfH = h
         Self.studioTeile = [] : Self.studioTx = [] : Self.studioTy = [] : Self.studioTb = [] : Self.studioTh = []
         Self.studioTa = [] : Self.studioAlle = [] : Self.studioMeldungen = []
+        Self.studioKinder = []
         Self.studioWar = ""
         Self.studioWarB = -1
         Self.studioWarH = -1
@@ -128,6 +131,24 @@ CLASS StudioControl
 
     ' Nachdem das Fenster mit dem Control aufgebaut ist.
     SUB Geoeffnet()
+    END SUB
+
+    ' Die inneren Controls zuerst, dann dieses -- wie das Fenster nach seinen.
+    SUB studioGeoeffnet()
+        DIM c AS StudioControl
+        FOR EACH c IN Self.studioKinder
+            c.studioGeoeffnet()
+        NEXT
+        Self.Geoeffnet()
+    END SUB
+
+    ' Das Fenster geht zu: dieses Control und seine inneren tun nichts mehr.
+    SUB studioSchliessen()
+        Self.studioOffen = FALSE
+        DIM c AS StudioControl
+        FOR EACH c IN Self.studioKinder
+            c.studioSchliessen()
+        NEXT
     END SUB
 
     ' Wenn sich die Groesse des Controls geaendert hat.
@@ -201,6 +222,10 @@ CLASS StudioControl
         DIM w AS GUI_WIDGET
         FOR EACH w IN Self.studioAlle
             GUI_SET_VISIBLE(w, an)
+        NEXT
+        DIM c AS StudioControl
+        FOR EACH c IN Self.studioKinder
+            c.Sichtbar(an)
         NEXT
     END SUB
 END CLASS
@@ -285,7 +310,7 @@ CLASS StudioFenster
         Self.studioOffen = FALSE
         DIM c AS StudioControl
         FOR EACH c IN Self.studioControls
-            c.studioOffen = FALSE
+            c.studioSchliessen()
         NEXT
         GUI_WINDOW_DESTROY(Self.studioWin)
         IF Self.studioHaupt THEN studioBeenden()

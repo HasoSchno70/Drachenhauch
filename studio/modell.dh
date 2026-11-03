@@ -459,11 +459,20 @@ END FUNCTION
 ' die Nummern der Controls des Fensters dieselben (Layouts, Standard-Knopf,
 ' Entwurf). Wohin ein Teil geht, wenn die Instanz anders liegt oder waechst,
 ' rechnet teilLage -- im Entwurf vorschauLegen, im Programm StudioControl.
+'
+' Controls in Controls: steht unter den Teilen eine Instanz eines weiteren
+' Controls, kommen dessen Teile gleich hinter die Teile des aeusseren (und so
+' fort). Der Block einer Instanz ist damit zusammenhaengend und gleich lang,
+' wo sie auch steht (controlFuss) -- das erzeugte aeussere Control kennt so
+' die Stelle seiner inneren, ohne das Fenster zu kennen. Ein Control, das sich
+' selbst enthaelt (auch ueber andere), bleibt ueberall ein leerer Platz.
 DIM akFensterN AS INTEGER : akFensterN = 0                    ' Controls vor dem Ausklappen
-DIM akInstanz AS ARRAY OF INTEGER : akInstanz = []            ' je Instanz: ihr Index
+DIM akInstanz AS ARRAY OF INTEGER : akInstanz = []            ' je Instanz: Index ihres Behaelters
 DIM akControl AS ARRAY OF STRING : akControl = []             ' ihr Control
+DIM akWurzel AS ARRAY OF INTEGER : akWurzel = []              ' die Instanz im Fenster, zu der sie gehoert
+DIM akName AS ARRAY OF STRING : akName = []                   ' ihr Name im Fenster (aussen_innen)
 DIM akErster AS ARRAY OF INTEGER : akErster = []              ' ihr erster Teil
-DIM akAnzahl AS ARRAY OF INTEGER : akAnzahl = []              ' wie viele Teile
+DIM akAnzahl AS ARRAY OF INTEGER : akAnzahl = []              ' wie viele eigene Teile
 DIM akB AS ARRAY OF INTEGER : akB = []                        ' Groesse des Controls im Entwurf
 DIM akH AS ARRAY OF INTEGER : akH = []
 ' je Teil (Index im ausgeklappten Fenster minus akFensterN):
@@ -491,8 +500,68 @@ SUB zumBehaelter(d AS JSON_HANDLE, p AS STRING)
     JSON_SET_JSON(d, vor + "layout", lay)
 END SUB
 
+' Die Controls, deren Instanzen direkt im Layout eines Controls stehen.
+FUNCTION controlKinder(cn AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM ce AS INTEGER : ce = elementIndex(cn)
+    IF ce < 0 THEN RETURN aus
+    IF elemente[ce].art <> "control" THEN RETURN aus
+    DIM cd AS JSON_HANDLE : cd = controlLayout(cn)
+    IF NOT JSON_HAS(cd, "widgets") THEN RETURN aus
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(cd, "widgets") - 1
+        DIM p AS STRING : p = "widgets." + STR$(k)
+        IF jsonText$(cd, p + ".kind") <> "studio_control" THEN CONTINUE
+        DIM n AS STRING : n = jsonText$(cd, p + ".studio_control")
+        IF n <> "" THEN ARRAY_PUSH(aus, n)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Steckt ziel (direkt oder ueber andere) in von? gesehen haelt fest, was
+' schon durchsucht ist -- sonst liefe ein Kreis, der ziel nicht enthaelt, ewig.
+FUNCTION controlErreicht(von AS STRING, ziel AS STRING, gesehen AS ARRAY OF STRING) AS BOOLEAN
+    DIM k AS STRING
+    FOR EACH k IN controlKinder(von)
+        IF LOWER$(k) = LOWER$(ziel) THEN RETURN TRUE
+        IF ARRAY_INDEXOF(gesehen, LOWER$(k)) >= 0 THEN CONTINUE
+        ARRAY_PUSH(gesehen, LOWER$(k))
+        IF controlErreicht(k, ziel, gesehen) THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION controlEnthaelt(von AS STRING, ziel AS STRING) AS BOOLEAN
+    DIM gesehen AS ARRAY OF STRING : gesehen = []
+    RETURN controlErreicht(von, ziel, gesehen)
+END FUNCTION
+
+' Ein Control, das man ausklappen kann: es gibt es, und es steckt nicht in sich.
+FUNCTION controlBrauchbar(cn AS STRING) AS BOOLEAN
+    DIM ce AS INTEGER : ce = elementIndex(cn)
+    IF ce < 0 THEN RETURN FALSE
+    IF elemente[ce].art <> "control" THEN RETURN FALSE
+    RETURN NOT controlEnthaelt(cn, cn)
+END FUNCTION
+
+' Wie viele Widgets eine Instanz beim Ausklappen anhaengt: ihre Teile und die
+' Bloecke ihrer inneren Instanzen.
+FUNCTION controlFuss(cn AS STRING) AS INTEGER
+    IF NOT controlBrauchbar(cn) THEN RETURN 0
+    DIM cd AS JSON_HANDLE : cd = controlLayout(cn)
+    IF NOT JSON_HAS(cd, "widgets") THEN RETURN 0
+    DIM n AS INTEGER : n = JSON_LEN(cd, "widgets")
+    DIM summe AS INTEGER : summe = n
+    DIM k AS INTEGER
+    FOR k = 0 TO n - 1
+        DIM p AS STRING : p = "widgets." + STR$(k)
+        IF jsonText$(cd, p + ".kind") = "studio_control" THEN summe = summe + controlFuss(jsonText$(cd, p + ".studio_control"))
+    NEXT
+    RETURN summe
+END FUNCTION
+
 FUNCTION ausgeklappt(d AS JSON_HANDLE) AS JSON_HANDLE
-    akInstanz = [] : akControl = [] : akErster = [] : akAnzahl = [] : akB = [] : akH = []
+    akInstanz = [] : akControl = [] : akWurzel = [] : akName = [] : akErster = [] : akAnzahl = [] : akB = [] : akH = []
     akTeilInst = [] : akTeilFrei = [] : akTeilX = [] : akTeilY = [] : akTeilW = [] : akTeilH = [] : akTeilAnker = []
     DIM aus AS JSON_HANDLE : aus = JSON_PARSE(JSON_STRINGIFY(d))
     akFensterN = 0
@@ -501,70 +570,82 @@ FUNCTION ausgeklappt(d AS JSON_HANDLE) AS JSON_HANDLE
     DIM i AS INTEGER
     FOR i = 0 TO akFensterN - 1
         DIM p AS STRING : p = "widgets." + STR$(i)
-        IF NOT JSON_HAS(aus, p + ".kind") THEN CONTINUE
-        IF JSON_GET_STRING(aus, p + ".kind") <> "studio_control" THEN CONTINUE
-        DIM cn AS STRING : cn = ""
-        IF JSON_HAS(aus, p + ".studio_control") THEN cn = JSON_GET_STRING(aus, p + ".studio_control")
-        DIM inst AS STRING : inst = ""
-        IF JSON_HAS(aus, p + ".name") THEN inst = JSON_GET_STRING(aus, p + ".name")
+        IF jsonText$(aus, p + ".kind") <> "studio_control" THEN CONTINUE
+        DIM cn AS STRING : cn = jsonText$(aus, p + ".studio_control")
+        DIM inst AS STRING : inst = jsonText$(aus, p + ".name")
         zumBehaelter(aus, p)
-        DIM slot AS INTEGER : slot = LEN(akInstanz)
-        ARRAY_PUSH(akInstanz, i)
-        ARRAY_PUSH(akControl, cn)
-        DIM erster AS INTEGER : erster = JSON_LEN(aus, "widgets")
-        ARRAY_PUSH(akErster, erster)
-        DIM ce AS INTEGER : ce = elementIndex(cn)
-        DIM gibt AS BOOLEAN : gibt = ce >= 0
-        IF gibt THEN gibt = elemente[ce].art = "control"
-        IF NOT gibt THEN
-            ARRAY_PUSH(akAnzahl, 0) : ARRAY_PUSH(akB, 0) : ARRAY_PUSH(akH, 0)
-            CONTINUE
-        END IF
-        DIM cd AS JSON_HANDLE
-        IF ce = aktFenster THEN cd = JSON_PARSE(JSON_STRINGIFY(doc)) ELSE cd = JSON_PARSE(elemente[ce].layout)
-        DIM nt AS INTEGER : nt = 0
-        IF JSON_HAS(cd, "widgets") THEN nt = JSON_LEN(cd, "widgets")
-        ARRAY_PUSH(akAnzahl, nt)
-        ARRAY_PUSH(akB, jsonZahl(cd, "w", 300))
-        ARRAY_PUSH(akH, jsonZahl(cd, "h", 120))
-        DIM ix AS INTEGER : ix = jsonZahl(aus, p + ".x", 0)
-        DIM iy AS INTEGER : iy = jsonZahl(aus, p + ".y", 0)
-        DIM eltern AS ARRAY OF INTEGER : eltern = elternAus(cd)
-        DIM k AS INTEGER
-        FOR k = 0 TO nt - 1
-            DIM t AS JSON_HANDLE : t = JSON_GET_JSON(cd, "widgets." + STR$(k))
-            DIM tx AS INTEGER : tx = jsonZahl(t, "x", 0)
-            DIM ty AS INTEGER : ty = jsonZahl(t, "y", 0)
-            DIM anker AS STRING : anker = ""
-            IF JSON_HAS(t, "anchor") THEN
-                anker = JSON_GET_STRING(t, "anchor")
-                JSON_REMOVE(t, "anchor")
-            END IF
-            JSON_SET_INT(t, "x", ix + tx)
-            JSON_SET_INT(t, "y", iy + ty)
-            IF JSON_HAS(t, "name") THEN JSON_SET_STRING(t, "name", inst + "_" + JSON_GET_STRING(t, "name"))
-            ' Die Kinder eines Layouts im Control: ihre Nummern verschieben.
-            IF JSON_HAS(t, "layout.kinder") THEN
-                DIM m AS INTEGER
-                FOR m = 0 TO JSON_LEN(t, "layout.kinder") - 1
-                    DIM c AS INTEGER : c = JSON_GET_INT(t, "layout.kinder." + STR$(m) + ".0")
-                    IF c >= 0 THEN JSON_SET_INT(t, "layout.kinder." + STR$(m) + ".0", c + erster)
-                NEXT
-            END IF
-            ' Ein Control im Control gibt es noch nicht: ein leerer Platz.
-            IF JSON_HAS(t, "kind") THEN
-                IF JSON_GET_STRING(t, "kind") = "studio_control" THEN zumBehaelter(t, "")
-            END IF
-            JSON_APPEND_JSON(aus, "widgets", t)
-            ARRAY_PUSH(akTeilInst, slot)
-            ARRAY_PUSH(akTeilFrei, k >= LEN(eltern) OR eltern[k] < 0)
-            ARRAY_PUSH(akTeilX, tx) : ARRAY_PUSH(akTeilY, ty)
-            ARRAY_PUSH(akTeilW, jsonZahl(t, "w", 0)) : ARRAY_PUSH(akTeilH, jsonZahl(t, "h", 0))
-            ARRAY_PUSH(akTeilAnker, anker)
-        NEXT
+        instanzAusklappen(aus, i, cn, inst, i)
     NEXT
     RETURN aus
 END FUNCTION
+
+' Haengt die Teile einer Instanz an, deren Behaelter an Stelle wi steht, dann
+' die Bloecke ihrer inneren Instanzen.
+SUB instanzAusklappen(aus AS JSON_HANDLE, wi AS INTEGER, cn AS STRING, inst AS STRING, wurzel AS INTEGER)
+    DIM slot AS INTEGER : slot = LEN(akInstanz)
+    ARRAY_PUSH(akInstanz, wi)
+    ARRAY_PUSH(akControl, cn)
+    ARRAY_PUSH(akWurzel, wurzel)
+    ARRAY_PUSH(akName, inst)
+    DIM erster AS INTEGER : erster = JSON_LEN(aus, "widgets")
+    ARRAY_PUSH(akErster, erster)
+    IF NOT controlBrauchbar(cn) THEN
+        ARRAY_PUSH(akAnzahl, 0) : ARRAY_PUSH(akB, 0) : ARRAY_PUSH(akH, 0)
+        RETURN
+    END IF
+    DIM cd AS JSON_HANDLE : cd = controlLayout(cn)
+    DIM nt AS INTEGER : nt = 0
+    IF JSON_HAS(cd, "widgets") THEN nt = JSON_LEN(cd, "widgets")
+    ARRAY_PUSH(akAnzahl, nt)
+    ARRAY_PUSH(akB, jsonZahl(cd, "w", 300))
+    ARRAY_PUSH(akH, jsonZahl(cd, "h", 120))
+    DIM wp AS STRING : wp = "widgets." + STR$(wi)
+    DIM ix AS INTEGER : ix = jsonZahl(aus, wp + ".x", 0)
+    DIM iy AS INTEGER : iy = jsonZahl(aus, wp + ".y", 0)
+    DIM eltern AS ARRAY OF INTEGER : eltern = elternAus(cd)
+    DIM innenStelle AS ARRAY OF INTEGER : innenStelle = []
+    DIM innenControl AS ARRAY OF STRING : innenControl = []
+    DIM innenName AS ARRAY OF STRING : innenName = []
+    DIM k AS INTEGER
+    FOR k = 0 TO nt - 1
+        DIM t AS JSON_HANDLE : t = JSON_GET_JSON(cd, "widgets." + STR$(k))
+        DIM tx AS INTEGER : tx = jsonZahl(t, "x", 0)
+        DIM ty AS INTEGER : ty = jsonZahl(t, "y", 0)
+        DIM anker AS STRING : anker = ""
+        IF JSON_HAS(t, "anchor") THEN
+            anker = JSON_GET_STRING(t, "anchor")
+            JSON_REMOVE(t, "anchor")
+        END IF
+        JSON_SET_INT(t, "x", ix + tx)
+        JSON_SET_INT(t, "y", iy + ty)
+        DIM tn AS STRING : tn = jsonText$(t, "name")
+        IF JSON_HAS(t, "name") THEN JSON_SET_STRING(t, "name", inst + "_" + tn)
+        ' Die Kinder eines Layouts im Control: ihre Nummern verschieben.
+        IF JSON_HAS(t, "layout.kinder") THEN
+            DIM m AS INTEGER
+            FOR m = 0 TO JSON_LEN(t, "layout.kinder") - 1
+                DIM c AS INTEGER : c = JSON_GET_INT(t, "layout.kinder." + STR$(m) + ".0")
+                IF c >= 0 THEN JSON_SET_INT(t, "layout.kinder." + STR$(m) + ".0", c + erster)
+            NEXT
+        END IF
+        ' Ein Control im Control: ein Behaelter, ausgeklappt hinter den Teilen.
+        IF jsonText$(t, "kind") = "studio_control" THEN
+            ARRAY_PUSH(innenStelle, erster + k)
+            ARRAY_PUSH(innenControl, jsonText$(t, "studio_control"))
+            ARRAY_PUSH(innenName, inst + "_" + tn)
+            zumBehaelter(t, "")
+        END IF
+        JSON_APPEND_JSON(aus, "widgets", t)
+        ARRAY_PUSH(akTeilInst, slot)
+        ARRAY_PUSH(akTeilFrei, k >= LEN(eltern) OR eltern[k] < 0)
+        ARRAY_PUSH(akTeilX, tx) : ARRAY_PUSH(akTeilY, ty)
+        ARRAY_PUSH(akTeilW, jsonZahl(t, "w", 0)) : ARRAY_PUSH(akTeilH, jsonZahl(t, "h", 0))
+        ARRAY_PUSH(akTeilAnker, anker)
+    NEXT
+    FOR k = 0 TO LEN(innenStelle) - 1
+        instanzAusklappen(aus, innenStelle[k], innenControl[k], innenName[k], wurzel)
+    NEXT
+END SUB
 
 ' Wo ein Teil auf einer Achse liegt, wenn sein Control um `mehr` groesser ist
 ' als entworfen -- wie ein verankertes Widget im Fenster: am Anfang fest

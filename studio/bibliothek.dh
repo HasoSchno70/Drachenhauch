@@ -94,13 +94,13 @@ END SUB
 ' --- Die eigenen Controls des Projekts -------------------------------------
 ' Je eigenes Control ein Baustein der Art studio_control in der Gruppe
 ' "Projekt", hinter den eingebauten. Nachgezogen, sobald sich die Controls
-' oder das Layout im Entwurf aendern; solange ein eigenes Control selbst im
-' Entwurf steht, fehlt die Gruppe -- Controls in Controls kommen spaeter.
+' oder das Layout im Entwurf aendern. Steht ein eigenes Control selbst im
+' Entwurf, fehlen es und jedes, das es schon enthaelt -- sonst steckte es in
+' sich selbst.
 DIM bibEingebaut AS INTEGER : bibEingebaut = -1     ' Zahl der eingebauten Bausteine
 DIM bibProjektSchl AS STRING : bibProjektSchl = "?"
 
 FUNCTION projektBausteinSchluessel$() AS STRING
-    IF entwurfIstControl() THEN RETURN "-"
     DIM s AS STRING : s = STR$(aktFenster)
     DIM e AS Element
     FOR EACH e IN elemente
@@ -119,10 +119,15 @@ FUNCTION projektBausteineNachziehen() AS BOOLEAN
         ARRAY_REMOVE_AT(bausteine, LEN(bausteine) - 1)
     WEND
     IF ARRAY_INDEXOF(gruppen, "Projekt") >= 0 THEN ARRAY_REMOVE_AT(gruppen, ARRAY_INDEXOF(gruppen, "Projekt"))
-    IF schl = "-" THEN RETURN TRUE
+    DIM selbst AS STRING : selbst = ""
+    IF entwurfIstControl() THEN selbst = elemente[aktFenster].name
+    DIM angeboten AS ARRAY OF STRING : angeboten = []
     DIM e AS Element
     FOR EACH e IN elemente
         IF e.art <> "control" THEN CONTINUE
+        IF selbst <> "" THEN
+            IF LOWER$(e.name) = LOWER$(selbst) OR controlEnthaelt(e.name, selbst) THEN CONTINUE
+        END IF
         DIM d AS JSON_HANDLE : d = JSON_PARSE(e.layout)
         DIM s AS Baustein : s = NEW Baustein()
         s.kind = "studio_control" : s.name = e.name : s.gruppe = "Projekt"
@@ -138,8 +143,10 @@ FUNCTION projektBausteineNachziehen() AS BOOLEAN
         IMAGE_DRAW_IMAGE(q, s.breit, 0, (SYM_B - SYM_H) \ 2)
         s.symbol = q
         ARRAY_PUSH(bausteine, s)
+        ARRAY_PUSH(angeboten, e.name)
         IF ARRAY_INDEXOF(gruppen, "Projekt") < 0 THEN ARRAY_PUSH(gruppen, "Projekt")
     NEXT
+    protokoll("projektbausteine " + IIF(selbst = "", "-", selbst) + " " + JOIN$(angeboten, ","))
     RETURN TRUE
 END FUNCTION
 

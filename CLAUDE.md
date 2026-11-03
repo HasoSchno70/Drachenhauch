@@ -3691,6 +3691,26 @@ Klicks -- ein Klick auf eine Stelle ohne Teil traf nichts (`instanzBei` in
 `trefferMitLayouts`). Tests zwei Faelle mehr in
 `werkzeug_studio_controls.dhtest` (6); sechs Verfaelschungen fallen je in
 ihrem Fall.
+**Stufe 3 (selber Tag): Controls in Controls, Umbenennen, Loeschen.**
+Ausgeklappt wird tiefenweise und zusammenhaengend (`instanzAusklappen`
+rekursiv, `akWurzel` = die Fenster-Instanz eines Platzes, `akName` =
+"zwei1_z2"): ein Block = die eigenen Teile, dahinter die Bloecke der inneren
+Instanzen; seine Groesse ist fest (`controlFuss`). Darum gilt ein Control,
+das sich selbst enthaelt (auch ueber andere, `controlEnthaelt`), UEBERALL als
+nicht brauchbar (0 Teile, leerer Platz, Entwurf "{0} enthaelt sich selbst")
+-- nur im Zusammenhang abzuschneiden machte die festen Versaetze
+widerspruechlich. Erzeugt: ein Control baut seine inneren Instanzen in
+`studioEinbauen` mit `"erster + versatz"` (`instanzenBauen`, gemeinsam mit
+dem Fenster), Liste `studioKinder`; `studioGeoeffnet` (Kinder zuerst),
+`studioSchliessen` und `Sichtbar` gehen rekursiv. Eine Reihenfolge der
+Controls in main.dh braucht es nicht (Klassen verweisen vorwaerts -- die
+Gegenprobe blieb gruen, die Ordnung ist wieder draussen). Bibliothek: im
+Control weder es selbst noch eins, das es enthaelt. Umbenennen
+(`instanzenUmbenennen` in code.dh) schreibt `studio_control` in den anderen
+Layouts UND in deren `verlauf`; Loeschen verweigert mit Statuszeile, solange
+`instanzenVon` etwas findet. Pruefhilfen: Protokoll `projektbausteine`,
+`DH_STUDIO_LOESCHEN`. Tests fuenf Faelle mehr (11); sieben Verfaelschungen
+fallen je in ihrem Fall.
 
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 

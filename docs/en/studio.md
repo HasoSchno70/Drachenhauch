@@ -375,8 +375,19 @@ END SUB
 `Self.Ausloesen("Name")` reports one of the events; the window then calls
 its method `<instance>_<event>` -- after the control's tick, in the same
 frame. A double click on the instance offers its events like on any other
-control. Not yet: controls inside controls, and renaming together with the
-instances.
+control.
+
+**Controls inside controls.** A control may contain instances of other
+controls, just like a window. Their events arrive in the outer control
+(`z1_Erreicht` in the code of `Zwei`), which can pass them on to the window
+with `Ausloesen`; in the window it is then `Self.zwei1.z1.Wert()`. The
+library offers the other controls inside a control, but not the control
+itself and none that already contains it -- that would be a cycle. If one
+is in the file anyway (written by hand), the instance stays an empty
+placeholder and the design view says "… contains itself". When a control is
+renamed, every instance in the other windows and controls takes the new
+name along, in their undo states too. Deleting only works once no instance
+points at it any more; otherwise the status bar says where one still is.
 
 ## A single window
 
@@ -430,6 +441,7 @@ a different number of parameters.
 | `DH_STUDIO_SPRACHE=en` | the language of the interface, before any setting (`de` or `en`) |
 | `DH_STUDIO_KONFIG=file` | `studio.json` in this place; the `ide.json` is then not consulted |
 | `DH_STUDIO_SPRACHPROBE=1` | opens every dialog once, writes its texts and the number of missing translations to the log, and quits |
+| `DH_STUDIO_LOESCHEN=element` | asks at start like "Delete element …" for this element |
 
 The test collections `tests/pruef/werkzeug_studio.dhtest` (stage 1) and
 `tests/pruef/werkzeug_studio2.dhtest` (stage 2) start the studio twice: once
