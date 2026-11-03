@@ -3647,6 +3647,32 @@ fehlende Uebersetzungen. Tests `tests/pruef/werkzeug_studio_englisch.dhtest`
 (5: Tafel gegen den Quelltext, Probe englisch/deutsch, Umschalten, Herkunft
 der Sprache); acht Verfaelschungen fallen je in ihrem Fall.
 
+**Eigene Controls, Stufe 1** (2026-11-03, Vorbild Xojos ContainerControl):
+Elementart `control` (`hatLayout(e)` = fenster ODER control -- alles, was
+Entwurf, .dhform und Basisklasse betrifft, fragt dort; "fenster" allein
+meint Startfenster und Menues). Bibliothek: je Control ein Baustein der Art
+`studio_control` in der Gruppe "Projekt" (`projektBausteineNachziehen`,
+hinter den eingebauten -- `bibEingebaut`; fehlt, solange ein Control selbst
+im Entwurf steht). Im Layout des Fensters ist eine Instanz
+`{"kind":"studio_control","studio_control":"Zaehler",...}`. **Ausgeklappt**
+(`ausgeklappt` in modell.dh, fuer Entwurf UND Erzeugen): die Instanz wird
+ein leerer Layout-Behaelter an ihrem Index (Anker, Gewicht, Layout-Platz
+bleiben; zeichnet nichts, ist Luft fuer Klicks), die Teile kommen HINTER
+alle Controls des Fensters (Nummern bis anzahl() bleiben die des Modells),
+Lage verschoben, Anker entfernt und gemerkt, Layout-Kinder umnummeriert.
+Der Entwurf haelt eine eigene Kopie der Zuordnung (`vk*` -- das Pruefen
+klappt beim Erzeugen auch aus und ueberschriebe `ak*`), `vorschauLegen` je
+Bild vor dem Zeichnen, `indexVonHandle` macht aus einem Teil die Instanz.
+Erzeugt: `<C>_Basis EXTENDS StudioControl` mit `studioEinbauen(win,
+behaelter, erster)`; das Fenster legt je Instanz ein Objekt an, ruft je Bild
+`studioLegen` (Teile nach Ankern, `studioAchse` = `teilLage`) und
+`studioTakt`, `Geoeffnet` der Controls vor dem des Fensters, `Zumachen`
+setzt `studioOffen` der Controls zurueck. Reihenfolge: Controls vor App und
+Fenstern. Tests `tests/pruef/werkzeug_studio_controls.dhtest` (4: zwei
+Instanzen im erzeugten Programm, eine in einer Zeile gestreckt; Vorschau
+nach Ankern; Ablegen aus der Bibliothek; Klick auf einen Teil waehlt die
+Instanz); sieben Verfaelschungen fallen je in ihrem Fall.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

@@ -215,6 +215,15 @@ Tafel `studio/sprache/en.txt`) und die englischen Vorlagen unter
 `studio/vorlagen/en`; die Namen der Ereignisse bleiben deutsch, weil sie
 Teil des Projektcodes sind.
 
+**Eigene Controls** (danach, Stufe 1 von dreien): Elementart `control`,
+entworfen wie ein Fenster, mit Code und Ereignissen seiner Teile, in der
+Bibliothek unter „Projekt“. Eine Instanz ist im Fenster ein leerer
+Layout-Behälter; ihre Teile werden beim Erzeugen und in der Vorschau
+dahinter ausgeklappt (`ausgeklappt` in `studio/modell.dh`), und
+`StudioControl` in der Laufzeit legt sie je Bild nach ihren Ankern. Offen:
+eigene Ereignisse des Controls für das Fenster und Eigenschaften je Instanz
+(Stufe 2), Controls in Controls, Umbenennen samt Instanzen (Stufe 3).
+
 **Geprüft wird je Stufe** mit einer Prüfsammlung `werkzeug_studio*.dhtest`.
 Die Klicks sind echt, über Aufnahmen und Fensternachrichten. Erzeugtes läuft
 durch `dhrt --check` und wird gestartet. Gegenproben mit gezielten
