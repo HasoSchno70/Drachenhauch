@@ -123,7 +123,7 @@ DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT NOT NULL DEF
 DB_EXEC(db, "INSERT INTO kunden (name, ort) VALUES ('Anna', 'Köln')")
 DB_EXEC(db, "INSERT INTO kunden (name, ort) VALUES ('Bert', 'Bonn')")
 DB_EXEC(db, "INSERT INTO kunden (name, ort) VALUES ('Cora', 'Köln')")
-DB_EXEC(db, "INSERT INTO kunden (name, ort) VALUES ('Dana', 'Aachen')")
+DB_EXEC(db, "INSERT INTO kunden (name, ort) VALUES ('Ada', 'Aachen')")
 DB_EXEC(db, "CREATE TABLE rechnungen (id INTEGER PRIMARY KEY, betrag INTEGER, kunde INTEGER)")
 DB_EXEC(db, "INSERT INTO rechnungen (betrag, kunde) VALUES (1000, 3)")
 DB_CLOSE(db)
@@ -187,12 +187,12 @@ END CLASS
 --- datei proj/Daten.dhdb
 {"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":true,"eindeutig":false,"vorgabe":""},{"name":"ort","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""}]},{"name":"rechnungen","spalten":[{"name":"betrag","typ":"geld","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"kunde","typ":"ganz","pflicht":false,"eindeutig":false,"vorgabe":"","verweis":"kunden"}]}],"abfragen":[{"name":"koelner","sql":"SELECT id, name FROM kunden WHERE ort = 'Köln' ORDER BY name"}]}
 --- erwartet
-ausgabe klapp 4 Anna Dana
+ausgabe klapp 4 Anna Ada
 ausgabe laden TRUE 10,00 Cora
 ausgabe sichern TRUE 2
 ausgabe neu -1
 ausgabe zweite TRUE 2
-ausgabe liste Dana/Aachen Cora/Köln Anna/Köln
+ausgabe liste Cora/Köln Anna/Köln Ada/Aachen
 ausgabe gesucht Cora
 ausgabe abfrage Anna Cora
 ausgabe idvon 3
