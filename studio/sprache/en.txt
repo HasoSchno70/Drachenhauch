@@ -598,3 +598,23 @@ Bild in {0}, Zeile {1} gesichert.	Image saved in {0}, row {1}.
 {0} ist kein Bild (PNG, JPG, BMP oder GIF).	{0} is not an image (PNG, JPG, BMP or GIF).
 {0} ist keine Bildspalte.	{0} is not an image column.
 Die Spalte {0} gibt es in der Quelle nicht.	The source has no column {0}.
+Bericht {0}	Report {0}
+Vorschau …	Preview …
+ohne Quelle	no source
+Quelle {0}	Source {0}
+Berichtskopf	Report header
+Seitenkopf	Page header
+Gruppenkopf	Group header
+Detail	Detail
+Gruppenfuß	Group footer
+Seitenfuß	Page footer
+Berichtsfuß	Report footer
+Seite {n} von {m}	Page {n} of {m}
+TT.MM.JJJJ	DD.MM.YYYY
+Vorschau: {0}	Preview: {0}
+Setzen	Typeset
+Schließen	Close
+{0} / {1}	{0} / {1}
+Bericht	Report
+Name (unter ihm ist der Bericht im Programm erreichbar):	Name (the report is reachable under it in the program):
+Bericht hinzufügen …	Add report …
