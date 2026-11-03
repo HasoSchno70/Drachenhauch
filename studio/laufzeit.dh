@@ -16,6 +16,7 @@
 
 IMPORT "gui"
 IMPORT "pdf"
+IMPORT "imgfx"
 
 CLASS StudioApp
     ' Nach dem Start, bevor das Startfenster aufgeht.

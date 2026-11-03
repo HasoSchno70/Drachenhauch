@@ -3874,7 +3874,7 @@ von m". `:parameter` setzt `studioBParameter$` als SQL-Literal ein
 = Modell + erzeugter Code (`berichtSql$` mit `dbQuellSql$` und `bedarf`, also
 `kunde.name` ueber Verweise; je Bericht `CLASS StudioBericht_<Name>` mit
 `Erzeugen/Pdf/Drucken/Vorschau` und eine globale Variable unter dem Namen,
-in `_studio/studio_berichte.dh`); `studio/berichte_reiter.dh` = Reiter
+in studio_berichte.dh unter _studio/); `studio/berichte_reiter.dh` = Reiter
 (Seite mit Baendern, gezeichnet in der Hauptschleife) und Vorschau
 (PDF_PREVIEW, ein Feld je Parameter). Die Vorschau im Programm steht in
 `laufzeit.dh` (`studioBerichtVorschau`, braucht die Bildschleife). **Falle:**
