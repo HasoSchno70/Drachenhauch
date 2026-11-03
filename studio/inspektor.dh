@@ -44,6 +44,9 @@ DIM farbZeile AS INTEGER : farbZeile = -1
 CONST TEXTARTEN = "button,label,checkbox,radio,toggle,groupbox,card,richtext,statusbar,textinput,textarea"
 CONST WERTARTEN = "slider,spinner,knob,progress"
 CONST LISTENARTEN = "dropdown,listbox,tabcontrol,accordion,wizard"
+' Was an eine Spalte gebunden werden kann (GUI_BIND), und was Zeilen zeigt.
+CONST BINDARTEN = "textinput,textarea,checkbox,toggle,dropdown,spinner,slider,datepicker"
+CONST QUELLARTEN = "table,listbox,dropdown"
 
 SUB inspGruppe(name AS STRING)
     ARRAY_PUSH(inspGruppen, name)
@@ -81,6 +84,14 @@ SUB inspektorAnlegen()
     inspZeile("Eigenes Control", "studio_ereignisse", "Ereignisse", "text", "fenster", "")
     inspZeile("Eigenes Control", "studio_eigenschaften", "Eigenschaften", "text", "fenster", "")
     inspZeile("Eigenes Control", "studio_werte", "Werte", "text", "studio_control", "")
+    ' Daten (datenbank.dh): das Fenster an eine Tabelle, ein Feld an eine
+    ' Spalte, eine Liste an die Zeilen einer Tabelle. Die Auswahlen fuellt
+    ' inspektorFuellen aus dem Projekt.
+    inspGruppe("Daten")
+    inspZeile("Daten", "studio_tabelle", "Tabelle", "wahl", "fenster", "")
+    inspZeile("Daten", "bind", "Spalte", "wahl", BINDARTEN, "")
+    inspZeile("Daten", "studio_quelle", "Datenquelle", "wahl", QUELLARTEN, "")
+    inspZeile("Daten", "studio_spalten", "Angezeigte Spalten", "text", QUELLARTEN, "")
     inspGruppe("Timer")
     inspZeile("Timer", "name", "Name", "text", "timer", "")
     inspZeile("Timer", "intervall", "Intervall (ms)", "zahl", "timer", "")
@@ -203,7 +214,7 @@ FUNCTION giltFuer(z AS InspZeile, art AS STRING) AS BOOLEAN
     IF trayWahl >= 0 THEN RETURN z.fuer = "timer"
     IF auswahl < 0 THEN
         ' Ein eigenes Control hat keinen Titel und waechst mit seiner Instanz.
-        IF z.fuer = "fenster" AND entwurfIstControl() THEN RETURN z.schluessel <> "title" AND z.schluessel <> "resizable"
+        IF z.fuer = "fenster" AND entwurfIstControl() THEN RETURN z.schluessel <> "title" AND z.schluessel <> "resizable" AND z.schluessel <> "studio_tabelle"
         IF z.schluessel = "studio_ereignisse" OR z.schluessel = "studio_eigenschaften" THEN RETURN FALSE
         RETURN z.fuer = "fenster"
     END IF
@@ -316,6 +327,7 @@ SUB inspektorFuellen()
                 END IF
                 IF z.schluessel = "studio_eigenschaften" THEN GUI_TOOLTIP(z.ed, tr$("Name = Vorgabe; Zahl AS INTEGER = 3 -- ohne AS ein STRING; dazu FLOAT und BOOLEAN"))
                 IF z.schluessel = "studio_ereignisse" THEN GUI_TOOLTIP(z.ed, tr$("Namen durch Semikolon; im Code des Controls meldet Self.Ausloesen(...) eines davon"))
+                IF z.schluessel = "studio_spalten" THEN GUI_TOOLTIP(z.ed, tr$("Spalten durch Semikolon -- leer: bei einer Tabelle alle, sonst die erste"))
             CASE "eintraege"
                 GUI_SET_TEXT(z.ed, listeText$(p))
             CASE "zahl"
@@ -352,6 +364,7 @@ SUB inspektorFuellen()
                         GUI_LISTBOX_ADD(z.ed, bn)
                     NEXT
                 END IF
+                IF istDatenWahl(z.schluessel) THEN datenWahlFuellen(z, wertText$(p))
                 DIM eintraege AS ARRAY OF STRING : eintraege = SPLIT(z.wahl, ";")
                 DIM w AS STRING : w = wertText$(p)
                 IF w = "" AND z.schluessel = "layout.art" THEN w = "spalte"
@@ -517,7 +530,9 @@ SUB zeileUebernehmen(zi AS INTEGER)
                 JSON_SET_INT(doc, p, MAX(0, GUI_DROPDOWN_SELECTED(z.ed)))
             CASE "wahl"
                 DIM w AS STRING : w = GUI_DROPDOWN_TEXT(z.ed)
-                IF w = "normal" OR w = "standard" OR w = "(keins)" OR (z.schluessel = "align" AND w = "links") THEN
+                IF istDatenWahl(z.schluessel) AND GUI_DROPDOWN_SELECTED(z.ed) <= 0 THEN
+                    IF JSON_HAS(doc, p) THEN JSON_REMOVE(doc, p)
+                ELSEIF w = "normal" OR w = "standard" OR w = "(keins)" OR (z.schluessel = "align" AND w = "links") THEN
                     IF JSON_HAS(doc, p) THEN JSON_REMOVE(doc, p)
                 ELSE
                     JSON_SET_STRING(doc, p, w)
@@ -542,6 +557,15 @@ SUB zeileUebernehmen(zi AS INTEGER)
         GUI_SET_TEXT(inspTitel, TRIM$(GUI_TEXT(z.ed)))
     END IF
     IF z.schluessel = "w" OR z.schluessel = "h" THEN lageAnzeigen()
+    ' Eine Tabelle mit Datenquelle zeigt im Entwurf schon ihre Spalten; die
+    ' Spalten eines Feldes haengen an der Tabelle des Fensters.
+    IF z.schluessel = "studio_quelle" OR z.schluessel = "studio_spalten" THEN
+        FOR EACH i IN ziele
+            IF i >= 0 THEN quellKopfSetzen(i)
+        NEXT
+        entwurfBauen()
+    END IF
+    IF z.schluessel = "studio_tabelle" THEN protokoll("fenster tabelle " + fensterText$("studio_tabelle"))
     ' Die Anordnung entscheidet, ob es Spalten gibt -- und wie das Control im
     ' Navigator heisst.
     IF z.schluessel = "layout.art" THEN
@@ -653,4 +677,44 @@ SUB farbePruefen()
         END IF
         farbZeile = -1
     END IF
+END SUB
+
+' --- Auswahlen aus dem Projekt (Daten) ------------------------------------------
+FUNCTION istDatenWahl(schluessel AS STRING) AS BOOLEAN
+    RETURN schluessel = "studio_tabelle" OR schluessel = "studio_quelle" OR schluessel = "bind"
+END FUNCTION
+
+' Die Eintraege einer Daten-Auswahl: zuerst "(keine)", dann die Tabellen des
+' Projekts bzw. die Spalten der Tabelle des Fensters -- und der jetzige Wert,
+' auch wenn es ihn dort nicht (mehr) gibt, sonst sprang die Auswahl still um.
+SUB datenWahlFuellen(z AS InspZeile, jetzt AS STRING)
+    DIM liste AS ARRAY OF STRING
+    IF z.schluessel = "bind" THEN
+        liste = dbSpaltenVon(fensterText$("studio_tabelle"))
+    ELSE
+        liste = dbAlleTabellen()
+    END IF
+    IF jetzt <> "" AND ARRAY_INDEXOF(liste, jetzt) < 0 THEN ARRAY_PUSH(liste, jetzt)
+    z.wahl = tr$("(keine)") + IIF(LEN(liste) > 0, ";" + JOIN$(liste, ";"), "")
+    GUI_LISTBOX_CLEAR(z.ed)
+    DIM t AS STRING
+    FOR EACH t IN SPLIT(z.wahl, ";")
+        GUI_LISTBOX_ADD(z.ed, t)
+    NEXT
+END SUB
+
+' Die Kopfzeile einer Tabelle nach ihrer Datenquelle (die Laufzeit setzt sie
+' beim Fuellen ohnehin so -- im Entwurf sieht man sie dann schon).
+SUB quellKopfSetzen(i AS INTEGER)
+    IF feldText$(i, "kind") <> "table" THEN RETURN
+    DIM ref AS STRING : ref = feldText$(i, "studio_quelle")
+    IF NOT dbRef(ref) THEN RETURN
+    DIM s AS JSON_HANDLE : s = dbSchema(dbRefEl)
+    DIM spalten AS ARRAY OF INTEGER : spalten = dbListSpalten(s, dbRefT, feldText$(i, "studio_spalten"), "table")
+    DIM kopf AS JSON_HANDLE : kopf = JSON_NEW_ARRAY()
+    DIM k AS INTEGER
+    FOR EACH k IN spalten
+        JSON_APPEND_STRING(kopf, "", dbSp$(s, dbRefT, k, "name"))
+    NEXT
+    JSON_SET_JSON(doc, wz$(i, "table.headers"), kopf)
 END SUB
