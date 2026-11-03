@@ -210,7 +210,9 @@ Nach den fünf Stufen kamen mit 2026.41 dazu: Layout-Behälter im Entwurf
 (Zeile, Spalte, Raster; Kinder hineinlegen, umsetzen, herausnehmen, auch
 mehrere auf einmal), der Abstandhalter, das entworfene Fenster am Griff
 größer ziehen (Anker gehen mit) und Projektvorlagen unter
-`studio/vorlagen/`. Offen ist die englische Oberfläche.
+`studio/vorlagen/`. Danach die englische Oberfläche (`studio/sprache.dh`,
+Tafel `studio/sprache/en.txt`, Vorlagentitel in `vorlage.en.txt`); die
+Namen der Ereignisse bleiben deutsch, weil sie Teil des Projektcodes sind.
 
 **Geprüft wird je Stufe** mit einer Prüfsammlung `werkzeug_studio*.dhtest`.
 Die Klicks sind echt, über Aufnahmen und Fensternachrichten. Erzeugtes läuft

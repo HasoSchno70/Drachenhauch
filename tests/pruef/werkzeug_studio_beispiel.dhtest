@@ -32,6 +32,7 @@ PRINT "projektdatei "; projektJson$() = JOIN$(READLINES(PATHJOIN(o, PROJEKT_DATE
 IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
+IMPORT "{sammlung}/../../studio/sprache.dh"
 IMPORT "{sammlung}/../../studio/bibliothek.dh"
 IMPORT "{sammlung}/../../studio/modell.dh"
 IMPORT "{sammlung}/../../studio/projekt.dh"

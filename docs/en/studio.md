@@ -43,6 +43,17 @@ debugger.
 The panels can be moved, stacked as tabs and detached, as in the IDE. The View
 menu offers a light and a dark appearance.
 
+**The interface comes in German and in English.** View -> "English
+interface" switches; the choice is stored in `studio.json` next to the
+`ide.json` and takes effect at the next start. Without a choice of its own
+the Studio follows the language of the IDE. In English the new names are
+English too (`MainWindow`, `Button1`), the templates have English titles,
+and the messages of the runtime (Problems, Output) come in English. **The
+names of the events stay as they are** (`Klick`, `Geaendert`, `Aktion` ...):
+they are part of the method names (`Knopf1_Klick`), and a project has to stay
+the same in both languages. The content of the templates (labels, comments)
+is German.
+
 ## The project
 
 A project is a folder with readable files:
@@ -344,6 +355,9 @@ a different number of parameters.
 | `DH_STUDIO_ABLAGE=text` | puts text on the clipboard, for typing with Ctrl+V |
 | `DH_STUDIO_LAUF_BILDER=n` | Start runs the program for only n frames (`dhrt run --bilder n`) |
 | `DH_STUDIO_DATEI=path` | Bild hinzufügen takes this file instead of a dialog |
+| `DH_STUDIO_SPRACHE=en` | the language of the interface, before any setting (`de` or `en`) |
+| `DH_STUDIO_KONFIG=file` | `studio.json` in this place; the `ide.json` is then not consulted |
+| `DH_STUDIO_SPRACHPROBE=1` | opens every dialog once, writes its texts and the number of missing translations to the log, and quits |
 
 The test collections `tests/pruef/werkzeug_studio.dhtest` (stage 1) and
 `tests/pruef/werkzeug_studio2.dhtest` (stage 2) start the studio twice: once

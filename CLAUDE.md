@@ -3623,6 +3623,27 @@ direkt aufruft -- Daten, Rundung, UNIQUE-Rollback, Liste, PDF, CSV,
 Bindung, Regeln, RechnungFenster), ein Fall in
 `compiler_warnungen.dhtest`.
 
+**Englische Oberflaeche** (2026-11-03): `studio/sprache.dh` (`tr$`,
+`trf$("... {0} ...", [werte])` -- erst uebersetzen, dann einsetzen --,
+`kz$`), Tafel `studio/sprache/en.txt` (TSV wie die IDE), Vorlagentitel in
+`vorlage.en.txt`. Sprache: `DH_STUDIO_SPRACHE` > `studio.json` (Ansicht ->
+English interface, gilt beim naechsten Start) > `ide.json` daneben (nur
+ohne `DH_STUDIO_KONFIG`) > `DHRT_LANG` > de; englisch setzt es
+`DHRT_LANG=en` (CODE_CHECK$, gestartete Programme). **Schluessel bleiben
+deutsch, uebersetzt wird beim ANZEIGEN:** Bausteinname und -gruppe (Sinnbild,
+`bausteinName$`), Gruppen und Feldnamen des Inspektors, Werte einer "wahl"
+(Woerter der Laufzeit) und **die Namen der Ereignisse** -- sie sind Teil der
+Methodennamen (`Knopf1_Klick`), ein Projekt muss in beiden Sprachen gleich
+bleiben. Was ins Fenster kommt (Grundname -> `Button1`, Text, Eintraege,
+`MainWindow`), wird beim Anlegen uebersetzt. Zwei deutsche Texte mussten
+dafuer eindeutig werden ("Wiederholt sich" fuer den Timer, "Anhalten" am
+Debugger -- sonst hiessen Redo/Repeat bzw. Quit/Stop gleich). Der Testhelfer
+`studiolauf.dh` setzt `DH_STUDIO_KONFIG` in den Fallordner ("-" = keine).
+`DH_STUDIO_SPRACHPROBE=1` oeffnet jeden Dialog und protokolliert Texte und
+fehlende Uebersetzungen. Tests `tests/pruef/werkzeug_studio_englisch.dhtest`
+(5: Tafel gegen den Quelltext, Probe englisch/deutsch, Umschalten, Herkunft
+der Sprache); acht Verfaelschungen fallen je in ihrem Fall.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als
