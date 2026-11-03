@@ -3753,6 +3753,33 @@ fremden Spalten, Werte je Art, erzeugtes Programm an aelterer Datei,
 Projekt lesen/schreiben, Klicks ins Daten- und Spalten-Gitter, F5 + Bauen;
 elf Verfaelschungen fallen je in ihrem Fall), ein Fall in
 `gui_reiterwerk.dhtest` (faellt mit 2026.41).
+**Stufe 2 (selber Tag): binden.** Fenster-Schluessel `studio_tabelle`
+("Datenbank.tabelle"), Feld `bind` (GUI_BIND), Liste/Tabelle/Klappliste
+`studio_quelle` + `studio_spalten` (";", leer = bei einer Tabelle alle,
+sonst die erste); aufgeloest ueber `dbRef` (setzt `dbRefEl`/`dbRefT`). Die
+Basis eines Fensters bekommt aus `dbBasisFelder/Aufbau/Methoden/Takt`
+(datenbank.dh, von basisCode$ gerufen) `DatensatzId`, `Laden(id)`,
+`Sichern()` (GUI_VALIDATE, dann GUI_FORM_SAVE mit -1 fuer neu), `Neu()`
+(GUI_FORM_CLEAR + GUI_FORM_SET mit den Vorgaben der gebundenen Spalten +
+GUI_FORM_CLEAN, am Ende von studioAufbauen gerufen), `Loeschen()`,
+`Ungesichert()`, `Neuladen()` (je Liste ein SELECT, ids in
+`studioIds_<name>`, Werte ueber `studioDbText$` aus studio_datenbanken.dh)
+und `IdVon(w)`. Zeigt eine Liste die Tabelle des Fensters, laedt
+`GUI_CHANGED` darauf den Datensatz (im Takt), und Neuladen waehlt die Zeile
+von DatensatzId wieder. Navigator: Spalten unter jeder Tabelle (aufgeklappt);
+`navVorUpdate/navNachUpdate` (dbeditor.dh) ziehen eine Spalte oder Tabelle
+ins Fenster (`felderAblegen` -> `feldAnlegen`: Beschriftung `<spalte>Text`
++ Feld `<spalte>Feld`, Geld `zahlen` 3, Ja/Nein als Kaestchen), Doppelklick
+auf eine Spalte legt sie unter das letzte Control; ein Klick auf Tabelle
+oder Spalte oeffnet erst beim LOSLASSEN den Reiter (sonst waere das Layout
+weg, bevor der Zug beginnt), mit Tasten gewaehlt sofort. Inspektor-Gruppe
+Daten mit Auswahlen aus dem Projekt (`datenWahlFuellen`, Eintrag 0 =
+"(keine)" = Schluessel weg); eine Datenquelle setzt den Tabellenkopf im
+Entwurf (`quellKopfSetzen`). Tests `tests/pruef/werkzeug_studio_datenbank2.dhtest`
+(4: Methoden + Listen + ein Klick, den das erzeugte Programm selbst per
+Aufnahme macht; Tabelle ziehen + F5; Doppelklick neben einer fremden
+Tabelle; Auswahlen im Inspektor per Tastatur); zwoelf Verfaelschungen fallen
+je in ihrem Fall.
 
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
