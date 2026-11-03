@@ -456,6 +456,7 @@ FUNCTION dbTabelleNeu$(e AS Element, name AS STRING) AS STRING
     IF f <> "" THEN RETURN f
     DIM s AS JSON_HANDLE : s = dbSchema(e)
     IF dbTabIndex(s, name) >= 0 THEN RETURN trf$("Eine Tabelle {0} gibt es schon.", [name])
+    IF dbAbfIndex(s, name) >= 0 THEN RETURN trf$("Den Namen {0} gibt es in {1} schon.", [name, e.name])
     DIM o AS JSON_HANDLE : o = JSON_PARSE("{}")
     JSON_SET_STRING(o, "name", name)
     JSON_SET_JSON(o, "spalten", JSON_NEW_ARRAY())
@@ -472,6 +473,7 @@ FUNCTION dbTabelleUmbenennen$(e AS Element, alt AS STRING, neu AS STRING) AS STR
     IF f <> "" THEN RETURN f
     DIM t2 AS INTEGER : t2 = dbTabIndex(s, neu)
     IF t2 >= 0 AND t2 <> t THEN RETURN trf$("Eine Tabelle {0} gibt es schon.", [neu])
+    IF dbAbfIndex(s, neu) >= 0 THEN RETURN trf$("Den Namen {0} gibt es in {1} schon.", [neu, e.name])
     JSON_SET_STRING(s, "tabellen." + STR$(t) + ".name", neu)
     DIM vorher AS ARRAY OF STRING : vorher = []
     IF dbInDatei(e, alt, "") AND LOWER$(alt) <> LOWER$(neu) THEN ARRAY_PUSH(vorher, "ALTER TABLE " + dbQ$(alt) + " RENAME TO " + dbQ$(neu))
@@ -756,6 +758,63 @@ FUNCTION datenbankCode$() AS STRING
             ARRAY_PUSH(z, "    END IF")
             ARRAY_PUSH(z, "    RETURN DB_GET_STRING(r, i)")
             ARRAY_PUSH(z, "END FUNCTION")
+            ARRAY_PUSH(z, "")
+            ARRAY_PUSH(z, "' Die Zeilen einer Datenquelle (Tabelle oder Abfrage in Klammern): id zuerst,")
+            ARRAY_PUSH(z, "' dann die genannten Spalten (leer = alle ausser id), mit Bedingung, Suche")
+            ARRAY_PUSH(z, "' ueber die gezeigten Spalten und Sortierung. Die Namen der Spalten stehen")
+            ARRAY_PUSH(z, "' danach in studioQuelleSpalten.")
+            ARRAY_PUSH(z, "DIM studioQuelleSpalten AS ARRAY OF STRING : studioQuelleSpalten = []")
+            ARRAY_PUSH(z, "FUNCTION studioQuelle(db AS DB_CONN, quelle AS STRING, spalten AS STRING, filter AS STRING, sortieren AS STRING, absteigend AS BOOLEAN, such AS STRING) AS DB_RESULT")
+            ARRAY_PUSH(z, "    DIM namen AS ARRAY OF STRING : namen = []")
+            ARRAY_PUSH(z, "    DIM hatId AS BOOLEAN : hatId = FALSE")
+            ARRAY_PUSH(z, "    DIM r AS DB_RESULT : r = DB_QUERY(db, " + dbText$("SELECT * FROM ") + " + quelle + " + dbText$(" AS studio_q LIMIT 0") + ")")
+            ARRAY_PUSH(z, "    DIM i AS INTEGER")
+            ARRAY_PUSH(z, "    FOR i = 0 TO DB_COL_COUNT(r) - 1")
+            ARRAY_PUSH(z, "        IF LOWER$(DB_COL_NAME(r, i)) = " + dbText$("id") + " THEN hatId = TRUE ELSE ARRAY_PUSH(namen, DB_COL_NAME(r, i))")
+            ARRAY_PUSH(z, "    NEXT")
+            ARRAY_PUSH(z, "    DIM w AS STRING")
+            ARRAY_PUSH(z, "    IF spalten <> " + dbText$("") + " THEN")
+            ARRAY_PUSH(z, "        DIM gewaehlt AS ARRAY OF STRING : gewaehlt = []")
+            ARRAY_PUSH(z, "        FOR EACH w IN SPLIT(spalten, " + dbText$(";") + ")")
+            ARRAY_PUSH(z, "            IF ARRAY_INDEXOF(namen, TRIM$(w)) >= 0 THEN ARRAY_PUSH(gewaehlt, TRIM$(w))")
+            ARRAY_PUSH(z, "        NEXT")
+            ARRAY_PUSH(z, "        IF LEN(gewaehlt) > 0 THEN namen = gewaehlt")
+            ARRAY_PUSH(z, "    END IF")
+            ARRAY_PUSH(z, "    studioQuelleSpalten = namen")
+            ARRAY_PUSH(z, "    DIM teile AS ARRAY OF STRING : teile = [IIF(hatId, " + dbText$("id") + ", " + dbText$("0 AS id") + ")]")
+            ARRAY_PUSH(z, "    FOR EACH w IN namen")
+            ARRAY_PUSH(z, "        ARRAY_PUSH(teile, CHR$(34) + w + CHR$(34))")
+            ARRAY_PUSH(z, "    NEXT")
+            ARRAY_PUSH(z, "    DIM sql AS STRING : sql = " + dbText$("SELECT ") + " + JOIN$(teile, " + dbText$(", ") + ") + " + dbText$(" FROM ") + " + quelle + " + dbText$(" AS studio_q") + "")
+            ARRAY_PUSH(z, "    DIM wo AS ARRAY OF STRING : wo = []")
+            ARRAY_PUSH(z, "    IF filter <> " + dbText$("") + " THEN ARRAY_PUSH(wo, " + dbText$("(") + " + filter + " + dbText$(")") + ")")
+            ARRAY_PUSH(z, "    IF such <> " + dbText$("") + " AND LEN(namen) > 0 THEN")
+            ARRAY_PUSH(z, "        DIM oder AS ARRAY OF STRING : oder = []")
+            ARRAY_PUSH(z, "        FOR EACH w IN namen")
+            ARRAY_PUSH(z, "            ARRAY_PUSH(oder, CHR$(34) + w + CHR$(34) + " + dbText$(" LIKE '%") + " + REPLACE$(such, " + dbText$("'") + ", " + dbText$("''") + ") + " + dbText$("%'") + ")")
+            ARRAY_PUSH(z, "        NEXT")
+            ARRAY_PUSH(z, "        ARRAY_PUSH(wo, " + dbText$("(") + " + JOIN$(oder, " + dbText$(" OR ") + ") + " + dbText$(")") + ")")
+            ARRAY_PUSH(z, "    END IF")
+            ARRAY_PUSH(z, "    IF LEN(wo) > 0 THEN sql = sql + " + dbText$(" WHERE ") + " + JOIN$(wo, " + dbText$(" AND ") + ")")
+            ARRAY_PUSH(z, "    IF sortieren <> " + dbText$("") + " THEN")
+            ARRAY_PUSH(z, "        sql = sql + " + dbText$(" ORDER BY ") + " + CHR$(34) + sortieren + CHR$(34) + IIF(absteigend, " + dbText$(" DESC") + ", " + dbText$("") + ")")
+            ARRAY_PUSH(z, "    ELSEIF hatId THEN")
+            ARRAY_PUSH(z, "        sql = sql + " + dbText$(" ORDER BY id") + " + IIF(absteigend, " + dbText$(" DESC") + ", " + dbText$("") + ")")
+            ARRAY_PUSH(z, "    END IF")
+            ARRAY_PUSH(z, "    RETURN DB_QUERY(db, sql)")
+            ARRAY_PUSH(z, "END FUNCTION")
+            ARRAY_PUSH(z, "")
+            ARRAY_PUSH(z, "' Eine Zeile aus studioQuelle zum Anzeigen (ohne die id vorn).")
+            ARRAY_PUSH(z, "FUNCTION studioZeile(r AS DB_RESULT, typen AS STRING) AS ARRAY OF STRING")
+            ARRAY_PUSH(z, "    DIM t AS ARRAY OF STRING : t = SPLIT(typen, " + dbText$(";") + ")")
+            ARRAY_PUSH(z, "    DIM aus AS ARRAY OF STRING : aus = []")
+            ARRAY_PUSH(z, "    DIM i AS INTEGER")
+            ARRAY_PUSH(z, "    FOR i = 1 TO DB_COL_COUNT(r) - 1")
+            ARRAY_PUSH(z, "        ARRAY_PUSH(aus, studioDbText$(r, i, IIF(i - 1 < LEN(t), t[i - 1], " + dbText$("") + ")))")
+            ARRAY_PUSH(z, "    NEXT")
+            ARRAY_PUSH(z, "    IF LEN(aus) = 0 THEN ARRAY_PUSH(aus, STR$(DB_GET_INT(r, 0)))")
+            ARRAY_PUSH(z, "    RETURN aus")
+            ARRAY_PUSH(z, "END FUNCTION")
         END IF
         DIM s AS JSON_HANDLE : s = dbSchema(e)
         ARRAY_PUSH(z, "")
@@ -775,6 +834,30 @@ FUNCTION datenbankCode$() AS STRING
         NEXT
     NEXT
     IF LEN(z) = 0 THEN RETURN ""
+    ' Die Abfragen der Datenbanken: Abfrage("name") bzw. Abfrage("Daten.name").
+    DIM fall AS ARRAY OF STRING : fall = []
+    FOR EACH e IN elemente
+        IF e.art <> "datenbank" THEN CONTINUE
+        DIM sa AS JSON_HANDLE : sa = dbSchema(e)
+        DIM a AS INTEGER
+        FOR a = 0 TO dbAbfZahl(sa) - 1
+            DIM an AS STRING : an = LOWER$(dbAbfName$(sa, a))
+            ARRAY_PUSH(fall, "        CASE " + dbText$(an) + ", " + dbText$(LOWER$(e.name) + "." + an) + " : RETURN DB_QUERY(" + e.name + ", " + dbText$(dbAbfSql$(sa, a)) + ")")
+        NEXT
+    NEXT
+    IF LEN(fall) > 0 THEN
+        ARRAY_PUSH(z, "")
+        ARRAY_PUSH(z, "' Eine Abfrage der Datenbanken nach ihrem Namen ausfuehren.")
+        ARRAY_PUSH(z, "FUNCTION Abfrage(name AS STRING) AS DB_RESULT")
+        ARRAY_PUSH(z, "    SELECT CASE LOWER$(name)")
+        DIM fz AS STRING
+        FOR EACH fz IN fall
+            ARRAY_PUSH(z, fz)
+        NEXT
+        ARRAY_PUSH(z, "    END SELECT")
+        ARRAY_PUSH(z, "    THROW " + dbText$("Abfrage: eine Abfrage ") + " + name + " + dbText$(" gibt es nicht."))
+        ARRAY_PUSH(z, "END FUNCTION")
+    END IF
     RETURN JOIN$(z, CHR$(10)) + CHR$(10)
 END FUNCTION
 
@@ -798,27 +881,40 @@ FUNCTION datenbankenAbgleichen$() AS STRING
     RETURN ""
 END FUNCTION
 
-' --- Bindung: Fenster und Listen an Tabellen (Stufe 2) ---------------------------
+' --- Bindung: Fenster und Listen an Tabellen (Stufe 2 und 3) ---------------------
 '  Ein Fenster nennt seine Tabelle in "studio_tabelle" (Datenbank.tabelle),
 '  ein Feld seine Spalte in "bind" (GUI_BIND der Laufzeit). Eine Liste, eine
-'  Tabelle oder eine Klappliste nennt in "studio_quelle" die Tabelle, deren
-'  Zeilen sie zeigt, und in "studio_spalten" welche Spalten (leer = alle bzw.
-'  die erste). Die Basisklasse des Fensters bekommt daraus Laden/Sichern/Neu/
-'  Loeschen/Ungesichert und Neuladen/IdVon (erzeugen.dh ruft die SUBs hier).
+'  Tabelle oder eine Klappliste nennt in "studio_quelle" eine Tabelle oder
+'  Abfrage, deren Zeilen sie zeigt, in "studio_spalten" welche Spalten (leer
+'  = alle bzw. die erste), dazu "studio_sortieren", "studio_absteigend",
+'  "studio_filter" (eine Bedingung wie in WHERE) und "studio_suchfeld" (ein
+'  Textfeld im Fenster, das beim Tippen filtert). Die Basisklasse des
+'  Fensters bekommt daraus Laden/Sichern/Neu/Loeschen/Ungesichert und
+'  Neuladen/IdVon (erzeugen.dh ruft die SUBs hier); gelesen wird im Programm
+'  ueber studioQuelle (datenbankCode$).
 DIM dbRefEl AS Element
 DIM dbRefT AS INTEGER : dbRefT = -1
+DIM dbRefA AS INTEGER : dbRefA = -1
 
 ' "Daten.kunden" aufloesen: TRUE, wenn es Datenbank und Tabelle gibt.
 FUNCTION dbRef(ref AS STRING) AS BOOLEAN
-    dbRefT = -1
+    RETURN dbQuelle(ref) AND dbRefT >= 0
+END FUNCTION
+
+' Wie dbRef, aber auch eine Abfrage (dbRefA) zaehlt.
+FUNCTION dbQuelle(ref AS STRING) AS BOOLEAN
+    dbRefT = -1 : dbRefA = -1
     DIM k AS INTEGER : k = INSTR(ref, ".")
     IF k <= 0 THEN RETURN FALSE
     DIM ei AS INTEGER : ei = elementIndex(LEFT$(ref, k))
     IF ei < 0 THEN RETURN FALSE
     IF elemente[ei].art <> "datenbank" THEN RETURN FALSE
     dbRefEl = elemente[ei]
-    dbRefT = dbTabIndex(dbSchema(dbRefEl), MID$(ref, k + 1, LEN(ref)))
-    RETURN dbRefT >= 0
+    DIM s AS JSON_HANDLE : s = dbSchema(dbRefEl)
+    DIM n AS STRING : n = MID$(ref, k + 1, LEN(ref))
+    dbRefT = dbTabIndex(s, n)
+    IF dbRefT < 0 THEN dbRefA = dbAbfIndex(s, n)
+    RETURN dbRefT >= 0 OR dbRefA >= 0
 END FUNCTION
 
 ' Alle Tabellen des Projekts als "Datenbank.tabelle".
@@ -835,7 +931,21 @@ FUNCTION dbAlleTabellen() AS ARRAY OF STRING
     RETURN aus
 END FUNCTION
 
-' Die Spalten einer Tabelle (ohne id), "" = gibt es nicht.
+' Tabellen und Abfragen -- was eine Liste zeigen kann.
+FUNCTION dbAlleQuellen() AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = dbAlleTabellen()
+    DIM e AS Element
+    FOR EACH e IN elemente
+        IF e.art <> "datenbank" THEN CONTINUE
+        DIM an AS STRING
+        FOR EACH an IN dbAbfrageNamen(e)
+            ARRAY_PUSH(aus, e.name + "." + an)
+        NEXT
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Die Spalten einer Tabelle (ohne id), leer = gibt es nicht.
 FUNCTION dbSpaltenVon(ref AS STRING) AS ARRAY OF STRING
     DIM aus AS ARRAY OF STRING : aus = []
     IF NOT dbRef(ref) THEN RETURN aus
@@ -843,6 +953,22 @@ FUNCTION dbSpaltenVon(ref AS STRING) AS ARRAY OF STRING
     DIM k AS INTEGER
     FOR k = 0 TO dbSpZahl(s, dbRefT) - 1
         ARRAY_PUSH(aus, dbSp$(s, dbRefT, k, "name"))
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Die Spalten einer Datenquelle (ohne id): einer Tabelle aus dem Schema,
+' einer Abfrage aus ihrem Ergebnis in der Entwicklungsdatei.
+FUNCTION dbQuellSpalten(ref AS STRING) AS ARRAY OF STRING
+    IF NOT dbQuelle(ref) THEN RETURN []
+    IF dbRefT >= 0 THEN RETURN dbSpaltenVon(ref)
+    DIM e AS Element : e = dbRefEl
+    DIM sql AS STRING : sql = dbAbfSql$(dbSchema(e), dbRefA)
+    IF dbAbfrageTesten$(e, sql, 0) <> "" THEN RETURN []
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM n AS STRING
+    FOR EACH n IN dbErgSpalten
+        IF LOWER$(n) <> "id" THEN ARRAY_PUSH(aus, n)
     NEXT
     RETURN aus
 END FUNCTION
@@ -871,6 +997,12 @@ FUNCTION dbBindText$(d AS JSON_HANDLE, pfad AS STRING) AS STRING
     RETURN JSON_GET_STRING(d, pfad)
 END FUNCTION
 
+FUNCTION dbBindAn(d AS JSON_HANDLE, pfad AS STRING) AS BOOLEAN
+    IF NOT JSON_HAS(d, pfad) THEN RETURN FALSE
+    IF JSON_TYPE(d, pfad) <> "boolean" THEN RETURN FALSE
+    RETURN JSON_GET_BOOL(d, pfad)
+END FUNCTION
+
 ' Die Tabelle eines Fensters, "" = keine (oder es gibt sie nicht mehr).
 FUNCTION dbFensterTabelle$(d AS JSON_HANDLE) AS STRING
     DIM ref AS STRING : ref = dbBindText$(d, "studio_tabelle")
@@ -886,9 +1018,51 @@ FUNCTION dbQuellListen(d AS JSON_HANDLE, namen AS ARRAY OF STRING, arten AS ARRA
         IF i >= LEN(namen) THEN BREAK
         IF NOT istBezeichner(namen[i]) THEN CONTINUE
         IF arten[i] <> "table" AND arten[i] <> "listbox" AND arten[i] <> "dropdown" THEN CONTINUE
-        IF dbRef(dbBindText$(d, "widgets." + STR$(i) + ".studio_quelle")) THEN ARRAY_PUSH(aus, i)
+        IF dbQuelle(dbBindText$(d, "widgets." + STR$(i) + ".studio_quelle")) THEN ARRAY_PUSH(aus, i)
     NEXT
     RETURN aus
+END FUNCTION
+
+' Das Suchfeld einer Liste, "" = keins (oder kein Textfeld dieses Namens).
+FUNCTION dbSuchfeld$(d AS JSON_HANDLE, i AS INTEGER, namen AS ARRAY OF STRING, arten AS ARRAY OF STRING) AS STRING
+    DIM n AS STRING : n = dbBindText$(d, "widgets." + STR$(i) + ".studio_suchfeld")
+    IF n = "" THEN RETURN ""
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(namen) - 1
+        IF LOWER$(namen[k]) = LOWER$(n) AND (arten[k] = "textinput" OR arten[k] = "textarea") THEN RETURN namen[k]
+    NEXT
+    RETURN ""
+END FUNCTION
+
+' Prueft eine Bedingung an der Entwicklungsdatei: "" = geht (oder es gibt
+' noch keine Datei), sonst die Meldung.
+FUNCTION dbFilterFehler$(ref AS STRING, filter AS STRING) AS STRING
+    IF TRIM$(filter) = "" OR NOT dbQuelle(ref) THEN RETURN ""
+    DIM p AS STRING : p = dbPfad$(dbRefEl)
+    IF p = "" THEN RETURN ""
+    IF NOT FILEEXISTS(p) THEN RETURN ""
+    DIM q AS STRING : q = dbQuellSql$(dbRefEl, dbRefT, dbRefA)
+    DIM fehler AS STRING : fehler = ""
+    DIM db AS DB_CONN
+    TRY
+        db = DB_OPEN(p)
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT COUNT(*) FROM " + q + " AS studio_q WHERE (" + filter + ")")
+        DB_CLOSE_RESULT(r)
+    CATCH ffehler
+        fehler = dbMeldung$(ffehler)
+    END TRY
+    TRY
+        DB_CLOSE(db)
+    CATCH zfehler
+    END TRY
+    RETURN fehler
+END FUNCTION
+
+' Was im FROM steht: der Name der Tabelle oder die Abfrage in Klammern.
+FUNCTION dbQuellSql$(e AS Element, t AS INTEGER, a AS INTEGER) AS STRING
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    IF t >= 0 THEN RETURN dbQ$(dbTabName$(s, t))
+    RETURN "(" + dbAbfSql$(s, a) + ")"
 END FUNCTION
 
 SUB dbBasisFelder(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF STRING, arten AS ARRAY OF STRING)
@@ -899,11 +1073,12 @@ SUB dbBasisFelder(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF STRI
     NEXT
 END SUB
 
-' Am Ende von studioAufbauen: ein leerer Datensatz mit den Vorgaben, die
-' Listen gefuellt.
+' Am Ende von studioAufbauen: erst die Listen (eine Klappliste mit Verweis
+' muss ihre Eintraege haben, bevor eine Vorgabe sie waehlen kann), dann ein
+' leerer Datensatz mit den Vorgaben.
 SUB dbBasisAufbau(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF STRING, arten AS ARRAY OF STRING)
-    IF dbFensterTabelle$(d) <> "" THEN ARRAY_PUSH(z, "        Self.Neu()")
     IF LEN(dbQuellListen(d, namen, arten)) > 0 THEN ARRAY_PUSH(z, "        Self.Neuladen()")
+    IF dbFensterTabelle$(d) <> "" THEN ARRAY_PUSH(z, "        Self.Neu()")
 END SUB
 
 SUB dbBasisMethoden(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF STRING, arten AS ARRAY OF STRING)
@@ -970,39 +1145,58 @@ SUB dbBasisMethoden(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF ST
     ARRAY_PUSH(z, "        DIM r AS DB_RESULT")
     DIM li AS INTEGER
     FOR EACH li IN listen
-        DIM ref AS STRING : ref = dbBindText$(d, "widgets." + STR$(li) + ".studio_quelle")
-        dbRef(ref)
-        DIM ls AS JSON_HANDLE : ls = dbSchema(dbRefEl)
-        DIM ltab AS STRING : ltab = dbTabName$(ls, dbRefT)
-        DIM spalten AS ARRAY OF INTEGER : spalten = dbListSpalten(ls, dbRefT, dbBindText$(d, "widgets." + STR$(li) + ".studio_spalten"), arten[li])
+        DIM wp AS STRING : wp = "widgets." + STR$(li) + "."
+        DIM ref AS STRING : ref = dbBindText$(d, wp + "studio_quelle")
+        dbQuelle(ref)
+        DIM le AS Element : le = dbRefEl
+        DIM ls AS JSON_HANDLE : ls = dbSchema(le)
+        DIM quelle AS STRING : quelle = dbQuellSql$(le, dbRefT, dbRefA)
+        ' Bei einer Tabelle sind Spalten und Arten bekannt; eine Abfrage
+        ' nennt ihre Spalten erst im Programm.
+        DIM spalten AS STRING : spalten = dbBindText$(d, wp + "studio_spalten")
+        DIM typen AS STRING : typen = ""
+        IF dbRefT >= 0 THEN
+            DIM sn AS ARRAY OF STRING : sn = []
+            DIM st AS ARRAY OF STRING : st = []
+            DIM q AS INTEGER
+            FOR EACH q IN dbListSpalten(ls, dbRefT, spalten, arten[li])
+                ARRAY_PUSH(sn, dbSp$(ls, dbRefT, q, "name"))
+                ARRAY_PUSH(st, dbSp$(ls, dbRefT, q, "typ"))
+            NEXT
+            spalten = JOIN$(sn, ";")
+            typen = JOIN$(st, ";")
+        END IF
+        DIM such AS STRING : such = dbSuchfeld$(d, li, namen, arten)
         DIM w AS STRING : w = "Self." + namen[li]
         DIM ids AS STRING : ids = "Self.studioIds_" + namen[li]
-        DIM sel AS ARRAY OF STRING : sel = ["id"]
-        DIM kopf AS ARRAY OF STRING : kopf = []
-        DIM zellen AS ARRAY OF STRING : zellen = []
-        DIM q AS INTEGER
-        FOR q = 0 TO LEN(spalten) - 1
-            ARRAY_PUSH(sel, dbQ$(dbSp$(ls, dbRefT, spalten[q], "name")))
-            ARRAY_PUSH(kopf, dbText$(dbSp$(ls, dbRefT, spalten[q], "name")))
-            ARRAY_PUSH(zellen, "studioDbText$(r, " + STR$(q + 1) + ", " + dbText$(dbSp$(ls, dbRefT, spalten[q], "typ")) + ")")
-        NEXT
+        DIM war AS STRING : war = "studioWar_" + namen[li]
         ARRAY_PUSH(z, "        ' " + namen[li] + ": " + ref)
+        IF arten[li] = "dropdown" THEN
+            ' Eine Klappliste traegt je Eintrag die id als Wert (gebunden wird
+            ' der Wert) und behaelt ihre Wahl ueber das Neuladen.
+            ARRAY_PUSH(z, "        DIM " + war + " AS STRING : " + war + " = " + CHR$(34) + CHR$(34))
+            ARRAY_PUSH(z, "        IF GUI_DROPDOWN_SELECTED(" + w + ") >= 0 THEN " + war + " = GUI_LISTBOX_DATA$(" + w + ", GUI_DROPDOWN_SELECTED(" + w + "))")
+        END IF
         ARRAY_PUSH(z, "        " + ids + " = []")
+        ARRAY_PUSH(z, "        r = studioQuelle(" + le.name + ", " + dbText$(quelle) + ", " + dbText$(spalten) + ", " + dbText$(dbBindText$(d, wp + "studio_filter")) + ", " + dbText$(dbBindText$(d, wp + "studio_sortieren")) + ", " + IIF(dbBindAn(d, wp + "studio_absteigend"), "TRUE", "FALSE") + ", " + IIF(such = "", dbText$(""), "GUI_TEXT(Self." + such + ")") + ")")
         IF arten[li] = "table" THEN
             ARRAY_PUSH(z, "        GUI_TABLE_CLEAR(" + w + ")")
-            IF LEN(kopf) > 0 THEN ARRAY_PUSH(z, "        GUI_TABLE_HEADERS(" + w + ", [" + JOIN$(kopf, ", ") + "])")
+            ARRAY_PUSH(z, "        GUI_TABLE_HEADERS(" + w + ", studioQuelleSpalten)")
         ELSE
             ARRAY_PUSH(z, "        GUI_LISTBOX_CLEAR(" + w + ")")
         END IF
-        ARRAY_PUSH(z, "        r = DB_QUERY(" + dbRefEl.name + ", " + dbText$("SELECT " + JOIN$(sel, ", ") + " FROM " + dbQ$(ltab) + " ORDER BY id") + ")")
         ARRAY_PUSH(z, "        WHILE DB_NEXT(r)")
         ARRAY_PUSH(z, "            ARRAY_PUSH(" + ids + ", DB_GET_INT(r, 0))")
         IF arten[li] = "table" THEN
-            ARRAY_PUSH(z, "            GUI_TABLE_ADD_ROW(" + w + ", [" + JOIN$(zellen, ", ") + "])")
+            ARRAY_PUSH(z, "            GUI_TABLE_ADD_ROW(" + w + ", studioZeile(r, " + dbText$(typen) + "))")
         ELSE
-            ARRAY_PUSH(z, "            GUI_LISTBOX_ADD(" + w + ", " + IIF(LEN(zellen) > 0, zellen[0], "STR$(DB_GET_INT(r, 0))") + ")")
+            ARRAY_PUSH(z, "            GUI_LISTBOX_ADD(" + w + ", studioZeile(r, " + dbText$(typen) + ")[0])")
+            IF arten[li] = "dropdown" THEN ARRAY_PUSH(z, "            GUI_LISTBOX_SET_DATA(" + w + ", GUI_LISTBOX_COUNT(" + w + ") - 1, STR$(DB_GET_INT(r, 0)))")
         END IF
         ARRAY_PUSH(z, "        WEND")
+        IF arten[li] = "dropdown" THEN
+            ARRAY_PUSH(z, "        IF " + war + " <> " + CHR$(34) + CHR$(34) + " AND GUI_LISTBOX_FIND_DATA(" + w + ", " + war + ") >= 0 THEN GUI_DROPDOWN_SET_SELECTED(" + w + ", GUI_LISTBOX_FIND_DATA(" + w + ", " + war + "))")
+        END IF
         ' Zeigt die Liste die Tabelle des Fensters, bleibt der Datensatz gewaehlt.
         IF ref = ft THEN
             DIM setzen AS STRING : setzen = IIF(arten[li] = "table", "GUI_TABLE_SET_SELECTED", IIF(arten[li] = "dropdown", "GUI_DROPDOWN_SET_SELECTED", "GUI_LISTBOX_SET_SELECTED"))
@@ -1026,12 +1220,19 @@ SUB dbBasisMethoden(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF ST
 END SUB
 
 ' Je Bild: waehlt man in einer Liste der eigenen Tabelle eine Zeile, laedt
-' das Fenster sie.
+' das Fenster sie; tippt man in ein Suchfeld, laden die Listen neu.
 SUB dbBasisTakt(takt AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF STRING, arten AS ARRAY OF STRING)
     DIM ft AS STRING : ft = dbFensterTabelle$(d)
-    IF ft = "" THEN RETURN
     DIM li AS INTEGER
+    DIM gesehen AS ARRAY OF STRING : gesehen = []
     FOR EACH li IN dbQuellListen(d, namen, arten)
+        DIM such AS STRING : such = dbSuchfeld$(d, li, namen, arten)
+        IF such <> "" AND ARRAY_INDEXOF(gesehen, such) < 0 THEN
+            ARRAY_PUSH(gesehen, such)
+            ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
+            ARRAY_PUSH(takt, "        IF GUI_CHANGED(Self." + such + ") THEN Self.Neuladen()")
+        END IF
+        IF ft = "" THEN CONTINUE
         IF dbBindText$(d, "widgets." + STR$(li) + ".studio_quelle") <> ft THEN CONTINUE
         ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
         ARRAY_PUSH(takt, "        IF GUI_CHANGED(Self." + namen[li] + ") THEN")
@@ -1041,3 +1242,169 @@ SUB dbBasisTakt(takt AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF STR
         ARRAY_PUSH(takt, "        END IF")
     NEXT
 END SUB
+
+' --- Verweise (Fremdschluessel) ----------------------------------------------------
+'  Eine Spalte kann auf eine andere Tabelle derselben Datenbank zeigen
+'  ("verweis"): sie haelt deren id. Gezogen wird sie zu einer Klappliste mit
+'  der Anzeigespalte der Zieltabelle; gebunden ist der Wert, also die id.
+FUNCTION dbSpalteVerweis$(e AS Element, tabelle AS STRING, name AS STRING, ziel AS STRING) AS STRING
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM t AS INTEGER : t = dbTabIndex(s, tabelle)
+    IF t < 0 THEN RETURN trf$("Die Tabelle {0} gibt es nicht.", [tabelle])
+    DIM k AS INTEGER : k = dbSpIndex(s, t, name)
+    IF k < 0 THEN RETURN trf$("Die Spalte {0} gibt es nicht.", [name])
+    DIM p AS STRING : p = dbSpPfad$(t, k)
+    IF ziel = "" THEN
+        IF JSON_HAS(s, p + ".verweis") THEN JSON_REMOVE(s, p + ".verweis")
+    ELSE
+        DIM zt AS INTEGER : zt = dbTabIndex(s, ziel)
+        IF zt < 0 THEN RETURN trf$("Die Tabelle {0} gibt es nicht.", [ziel])
+        JSON_SET_STRING(s, p + ".verweis", dbTabName$(s, zt))
+        ' Ein Verweis haelt eine id -- eine ganze Zahl.
+        JSON_SET_STRING(s, p + ".typ", "ganz")
+    END IF
+    RETURN dbAusfuehren$(e, JSON_STRINGIFY(s), [])
+END FUNCTION
+
+' Was eine Klappliste mit Verweis zeigt: die erste Textspalte der
+' Zieltabelle, sonst ihre erste Spalte, sonst nichts (dann die id).
+FUNCTION dbAnzeigeSpalte$(s AS JSON_HANDLE, t AS INTEGER) AS STRING
+    DIM k AS INTEGER
+    FOR k = 0 TO dbSpZahl(s, t) - 1
+        IF dbSp$(s, t, k, "typ") = "text" THEN RETURN dbSp$(s, t, k, "name")
+    NEXT
+    IF dbSpZahl(s, t) > 0 THEN RETURN dbSp$(s, t, 0, "name")
+    RETURN ""
+END FUNCTION
+
+' --- Abfragen ------------------------------------------------------------------------
+'  Eine Abfrage ist ein benanntes SELECT (oder WITH ... SELECT) in der
+'  Datenbank -- als Datenquelle einer Liste (traegt sie eine Spalte id, liefert
+'  IdVon sie) oder im Code ueber Abfrage("name"). Namen teilen sich Tabellen
+'  und Abfragen.
+DIM dbErgSpalten AS ARRAY OF STRING : dbErgSpalten = []
+DIM dbErgZellen AS ARRAY OF STRING : dbErgZellen = []
+DIM dbErgZeilen AS INTEGER : dbErgZeilen = 0
+
+FUNCTION dbAbfZahl(s AS JSON_HANDLE) AS INTEGER
+    IF NOT JSON_HAS(s, "abfragen") THEN RETURN 0
+    RETURN JSON_LEN(s, "abfragen")
+END FUNCTION
+
+FUNCTION dbAbfName$(s AS JSON_HANDLE, a AS INTEGER) AS STRING
+    RETURN JSON_GET_STRING(s, "abfragen." + STR$(a) + ".name")
+END FUNCTION
+
+FUNCTION dbAbfSql$(s AS JSON_HANDLE, a AS INTEGER) AS STRING
+    RETURN JSON_GET_STRING(s, "abfragen." + STR$(a) + ".sql")
+END FUNCTION
+
+FUNCTION dbAbfIndex(s AS JSON_HANDLE, name AS STRING) AS INTEGER
+    DIM a AS INTEGER
+    FOR a = 0 TO dbAbfZahl(s) - 1
+        IF LOWER$(dbAbfName$(s, a)) = LOWER$(name) THEN RETURN a
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION dbAbfrageNamen(e AS Element) AS ARRAY OF STRING
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM a AS INTEGER
+    FOR a = 0 TO dbAbfZahl(s) - 1
+        ARRAY_PUSH(aus, dbAbfName$(s, a))
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Ein Name ist frei, wenn ihn weder eine Tabelle noch eine Abfrage traegt.
+FUNCTION dbNameBelegt(s AS JSON_HANDLE, name AS STRING) AS BOOLEAN
+    RETURN dbTabIndex(s, name) >= 0 OR dbAbfIndex(s, name) >= 0
+END FUNCTION
+
+' Fuehrt eine Abfrage auf der Entwicklungsdatei aus: "" = geht, sonst die
+' Meldung. Fuellt dbErgSpalten und hoechstens `grenze` Zeilen in dbErgZellen.
+FUNCTION dbAbfrageTesten$(e AS Element, sql AS STRING, grenze AS INTEGER) AS STRING
+    dbErgSpalten = [] : dbErgZellen = [] : dbErgZeilen = 0
+    DIM a AS STRING : a = UPPER$(LTRIM$(sql))
+    IF LEFT$(a, 6) <> "SELECT" AND LEFT$(a, 4) <> "WITH" THEN RETURN tr$("Eine Abfrage beginnt mit SELECT (oder WITH).")
+    DIM p AS STRING : p = dbPfad$(e)
+    IF p = "" THEN RETURN ""
+    DIM fehler AS STRING : fehler = ""
+    DIM db AS DB_CONN
+    TRY
+        db = DB_OPEN(p)
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT * FROM (" + sql + ") AS studio_q LIMIT " + STR$(grenze))
+        DIM i AS INTEGER
+        FOR i = 0 TO DB_COL_COUNT(r) - 1
+            ARRAY_PUSH(dbErgSpalten, DB_COL_NAME(r, i))
+        NEXT
+        WHILE DB_NEXT(r)
+            dbErgZeilen = dbErgZeilen + 1
+            FOR i = 0 TO LEN(dbErgSpalten) - 1
+                ARRAY_PUSH(dbErgZellen, IIF(DB_IS_NULL(r, i), "", DB_GET_STRING(r, i)))
+            NEXT
+        WEND
+    CATCH qfehler
+        fehler = dbMeldung$(qfehler)
+    END TRY
+    TRY
+        DB_CLOSE(db)
+    CATCH zfehler
+    END TRY
+    RETURN fehler
+END FUNCTION
+
+FUNCTION dbAbfrageNeu$(e AS Element, name AS STRING, sql AS STRING) AS STRING
+    DIM f AS STRING : f = dbNameFehler$(name, "tabelle")
+    IF f <> "" THEN RETURN f
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    IF dbNameBelegt(s, name) THEN RETURN trf$("Den Namen {0} gibt es in {1} schon.", [name, e.name])
+    f = dbAbfrageTesten$(e, sql, 0)
+    IF f <> "" THEN RETURN f
+    IF NOT JSON_HAS(s, "abfragen") THEN JSON_SET_JSON(s, "abfragen", JSON_NEW_ARRAY())
+    DIM o AS JSON_HANDLE : o = JSON_PARSE("{}")
+    JSON_SET_STRING(o, "name", name)
+    JSON_SET_STRING(o, "sql", sql)
+    JSON_APPEND_JSON(s, "abfragen", o)
+    e.schema = JSON_STRINGIFY(s)
+    e.geaendert = TRUE
+    RETURN ""
+END FUNCTION
+
+' Eine Abfrage aendern: nur, wenn sie an der Entwicklungsdatei geht.
+FUNCTION dbAbfrageSetzen$(e AS Element, name AS STRING, sql AS STRING) AS STRING
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM a AS INTEGER : a = dbAbfIndex(s, name)
+    IF a < 0 THEN RETURN trf$("Die Abfrage {0} gibt es nicht.", [name])
+    DIM f AS STRING : f = dbAbfrageTesten$(e, sql, 0)
+    IF f <> "" THEN RETURN f
+    JSON_SET_STRING(s, "abfragen." + STR$(a) + ".sql", sql)
+    e.schema = JSON_STRINGIFY(s)
+    e.geaendert = TRUE
+    RETURN ""
+END FUNCTION
+
+FUNCTION dbAbfrageUmbenennen$(e AS Element, alt AS STRING, neu AS STRING) AS STRING
+    IF alt = neu THEN RETURN ""
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM a AS INTEGER : a = dbAbfIndex(s, alt)
+    IF a < 0 THEN RETURN trf$("Die Abfrage {0} gibt es nicht.", [alt])
+    DIM f AS STRING : f = dbNameFehler$(neu, "tabelle")
+    IF f <> "" THEN RETURN f
+    IF LOWER$(alt) <> LOWER$(neu) AND dbNameBelegt(s, neu) THEN RETURN trf$("Den Namen {0} gibt es in {1} schon.", [neu, e.name])
+    JSON_SET_STRING(s, "abfragen." + STR$(a) + ".name", neu)
+    e.schema = JSON_STRINGIFY(s)
+    e.geaendert = TRUE
+    RETURN ""
+END FUNCTION
+
+FUNCTION dbAbfrageLoeschen$(e AS Element, name AS STRING) AS STRING
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM a AS INTEGER : a = dbAbfIndex(s, name)
+    IF a < 0 THEN RETURN trf$("Die Abfrage {0} gibt es nicht.", [name])
+    JSON_REMOVE(s, "abfragen." + STR$(a))
+    e.schema = JSON_STRINGIFY(s)
+    e.geaendert = TRUE
+    RETURN ""
+END FUNCTION

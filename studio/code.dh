@@ -483,6 +483,12 @@ FUNCTION navBild(was AS STRING) AS IMAGE
             IMAGE_FILL_RECT(b, 7, 3, 13, 6, &H3A9A70)
             IMAGE_FILL_RECT(b, 7, 9, 13, 10, &H8D9AAB)
             IMAGE_FILL_RECT(b, 7, 13, 13, 14, &H8D9AAB)
+        CASE "abfrage"
+            ' eine Lupe ueber einer Zeile
+            IMAGE_FILL_RECT(b, 3, 13, 17, 16, &H8D9AAB)
+            IMAGE_FILL_ELLIPSE(b, 9, 8, 5, 5, &H3A9A70)
+            IMAGE_FILL_ELLIPSE(b, 9, 8, 3, 3, &HE4EAF2)
+            IMAGE_FILL_POLY(b, [12, 14, 18, 16], [10, 9, 14, 15], &H3A9A70)
         CASE "tabelle"
             IMAGE_FILL_RECT(b, 3, 4, 17, 16, &HE4EAF2)
             IMAGE_FILL_RECT(b, 3, 4, 17, 7, &H3A9A70)
@@ -547,6 +553,11 @@ SUB navigatorFuellen()
                     navKnoten(tk, dbSp$(ds, ti, sk, "name"), "spalte", ei, ti, sk, "spalte")
                 NEXT
                 GUI_TREE_EXPAND(baum, tk, TRUE)
+            NEXT
+            ' Die Abfragen -- ins Fenster gezogen werden sie zu einer Tabelle.
+            DIM qi AS INTEGER
+            FOR qi = 0 TO dbAbfZahl(ds) - 1
+                navKnoten(en, dbAbfName$(ds, qi), "abfrage", ei, qi, -1, "abfrage")
             NEXT
             GUI_TREE_EXPAND(baum, en, TRUE)
             CONTINUE
@@ -639,6 +650,7 @@ SUB knotenProtokollieren()
             CASE "methode" : pfad = elemente[navEl[n]].name + "." + methoden[navMeth[n]].name
             CASE "dekl" : pfad = elemente[navEl[n]].name + ".Eigenschaften"
             CASE "tabelle" : pfad = elemente[navEl[n]].name + "." + dbTabellenNamen(elemente[navEl[n]])[navCtrl[n]]
+            CASE "abfrage" : pfad = elemente[navEl[n]].name + ".?" + dbAbfName$(dbSchema(elemente[navEl[n]]), navCtrl[n])
             CASE "spalte" : pfad = elemente[navEl[n]].name + "." + dbTabellenNamen(elemente[navEl[n]])[navCtrl[n]] + "." + dbSp$(dbSchema(elemente[navEl[n]]), navCtrl[n], navMeth[n], "name")
             CASE "abstand"
                 controlsVon(navEl[n])
@@ -697,7 +709,10 @@ SUB navigatorAuswahl()
             ELSEIF r.art = "dekl" AND navArt[n] = "dekl" THEN
                 ziel = n
             ELSEIF r.art = "datenbank" THEN
-                IF navArt[n] = "element" AND r.db.tabelle = "" THEN ziel = n
+                IF navArt[n] = "element" AND r.db.tabelle = "" AND r.db.abfrage = "" THEN ziel = n
+                IF navArt[n] = "abfrage" AND r.db.abfrage <> "" THEN
+                    IF LOWER$(dbAbfName$(dbSchema(r.el), navCtrl[n])) = LOWER$(r.db.abfrage) THEN ziel = n
+                END IF
                 IF navArt[n] = "tabelle" THEN
                     IF LOWER$(dbTabellenNamen(r.el)[navCtrl[n]]) = LOWER$(r.db.tabelle) THEN ziel = n
                 END IF
@@ -751,7 +766,7 @@ SUB navigatorPruefen()
             codeOeffnen(methoden[navMeth[n]])
         CASE "dekl"
             deklOeffnen(elemente[ei])
-        CASE "tabelle", "spalte"
+        CASE "tabelle", "spalte", "abfrage"
             IF NOT nvDruck THEN nvKlick(n)
     END SELECT
 END SUB
