@@ -1034,6 +1034,14 @@ FUNCTION dbSuchfeld$(d AS JSON_HANDLE, i AS INTEGER, namen AS ARRAY OF STRING, a
     RETURN ""
 END FUNCTION
 
+' SQLite nennt die Stelle im SQL, das das Studio um die Angabe legt -- die
+' meint niemand; die Meldung endet davor.
+FUNCTION dbOhneHuelle$(fehler AS STRING) AS STRING
+    DIM k AS INTEGER : k = INSTR(fehler, " in SELECT ")
+    IF k > 0 THEN RETURN LEFT$(fehler, k)
+    RETURN fehler
+END FUNCTION
+
 ' Prueft eine Bedingung an der Entwicklungsdatei: "" = geht (oder es gibt
 ' noch keine Datei), sonst die Meldung.
 FUNCTION dbFilterFehler$(ref AS STRING, filter AS STRING) AS STRING
@@ -1049,7 +1057,7 @@ FUNCTION dbFilterFehler$(ref AS STRING, filter AS STRING) AS STRING
         DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT COUNT(*) FROM " + q + " AS studio_q WHERE (" + filter + ")")
         DB_CLOSE_RESULT(r)
     CATCH ffehler
-        fehler = dbMeldung$(ffehler)
+        fehler = dbOhneHuelle$(dbMeldung$(ffehler))
     END TRY
     TRY
         DB_CLOSE(db)
@@ -1347,6 +1355,7 @@ FUNCTION dbAbfrageTesten$(e AS Element, sql AS STRING, grenze AS INTEGER) AS STR
         WEND
     CATCH qfehler
         fehler = dbMeldung$(qfehler)
+        fehler = dbOhneHuelle$(fehler)
     END TRY
     TRY
         DB_CLOSE(db)

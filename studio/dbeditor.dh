@@ -588,7 +588,9 @@ SUB dbAnsichtPruefen(r AS Reiter)
     IF a.abfrage <> "" THEN
         ' Ausfuehren -- oder das Feld verlassen, nachdem sich etwas geaendert hat.
         IF GUI_CLICKED(a.btAusfuehren) THEN
-            dbAbfrageUebernehmen(r)
+            ' Schon uebernommen (das Feld hat beim Druecken den Fokus abgegeben):
+            ' dann nur noch einmal ausfuehren.
+            IF GUI_TEXT(a.taSql) <> a.sqlVersucht THEN dbAbfrageUebernehmen(r) ELSE dbErgebnisZeigen(r, a.sqlVersucht)
         ELSEIF GUI_FOCUSED() <> a.taSql AND GUI_TEXT(a.taSql) <> a.sqlVersucht THEN
             dbAbfrageUebernehmen(r)
         END IF
