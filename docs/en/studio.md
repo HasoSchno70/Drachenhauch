@@ -537,10 +537,39 @@ The **source** is a table or query of a database of the project; the
 on the page, it goes onto the next one, with the page footer before it and the
 page header after it.
 
-The tab of a report shows its bands on the paper; **Preview …** typesets it
-with the data of the development file, asks for the parameters and pages
-through the result. Editing comes with the next stage -- until then you edit
-the `.dhreport`.
+The tab of a report is its **design**: the page in millimetres, every band
+with a bar carrying its name, the elements inside.
+
+* **Placing:** at the top the bar of elements (text, field, sum, page number,
+  date, line, rectangle, image) -- choose a kind, then click into a band
+  (default size) or drag a rectangle. Esc cancels.
+* **Columns of the source** are at the top right; dragging a column into a
+  band makes a sum in a group or report footer, a heading in the page header,
+  otherwise a field (money and numbers right-aligned). A double-click puts it
+  into the detail.
+* **Dragging** moves what is selected (grid 1 mm, Alt without); edges and
+  centres snap to other elements and to the margins, a pink line shows it. A
+  single element may change its band. Eight handles change the size, the
+  bottom edge of a band its height.
+* **Selecting:** click, with Shift or Ctrl to add, a frame over empty space
+  selects everything it touches; a click on the bar of a band selects the
+  band, a click beside all bands the report. Arrow keys move by 1 mm (with
+  Shift 5 mm), Del deletes, Ctrl+D duplicates, Ctrl+A selects all elements,
+  Ctrl+Z/Ctrl+Y undo and redo.
+* **Properties** below belong to what is selected: for an element position
+  and size in mm, text, column, format, function and range of a sum, font,
+  size, bold, italic, colour (`#RRGGBB`), alignment, stroke, fill, image; for
+  a band its height and for a group its column, plus "Remove band" or
+  "Remove group"; for the report title, source, condition, sorting (`a; b`),
+  paper, portrait and margins (`t; r; b; l` or one number for all), plus "Add
+  band" (what is missing) and "Add group" (inside, with header and footer).
+  Text is taken over by Enter or leaving the field, a choice applies at once;
+  with several elements selected the value applies to all it fits.
+
+Ctrl+wheel zooms, the wheel scrolls (with Shift sideways). **Preview …**
+typesets the report with the data of the development file, asks for the
+parameters and pages through the result. A report does not typeset image
+columns yet.
 
 In the program a report is an object under its name:
 
@@ -632,4 +661,6 @@ and the studio with real clicks in the tab, the navigator and the inspector;
 generated window including the picture in the table cell, "Image …" and
 dragging in the studio) and `tests/pruef/werkzeug_studio_verbunde.dhtest`
 joins through references; `tests/pruef/werkzeug_studio_berichte.dhtest` tests
-reports (layout with sums and pages, F5 with parameters, tab and preview).
+reports (layout with sums and pages, F5 with parameters, tab and preview),
+`tests/pruef/werkzeug_studio_berichte2.dhtest` their design (placing,
+dragging, handles, columns, properties, bands and groups, undo).

@@ -618,3 +618,56 @@ Schließen	Close
 Bericht	Report
 Name (unter ihm ist der Bericht im Programm erreichbar):	Name (the report is reachable under it in the program):
 Bericht hinzufügen …	Add report …
+{0} in ein Band legen	Place {0} in a band
+Spalten der Quelle	Columns of the source
+Erst eine Quelle wählen (Eigenschaften des Berichts).	Choose a source first (properties of the report).
+Eine Spalte in ein Band ziehen: im Fuß wird sie eine Summe, im Seitenkopf eine Überschrift, sonst ein Feld. Doppelklick legt sie ins Detail.	Drag a column into a band: in a footer it becomes a sum, in the page header a heading, otherwise a field. Double-click puts it into the detail.
+Band entfernen	Remove band
+Gruppe entfernen	Remove group
+Band dazu	Add band
+Gruppe dazu	Add group
+Feld	Field
+Summe	Sum
+Seitenzahl	Page number
+Rechteck	Rectangle
+Links (mm)	Left (mm)
+Oben (mm)	Top (mm)
+Breite (mm)	Width (mm)
+Höhe (mm)	Height (mm)
+Format	Format
+Funktion	Function
+Schrift	Font
+Größe (pt)	Size (pt)
+Fett	Bold
+Kursiv	Italic
+Strich (mm)	Stroke (mm)
+Füllung	Fill
+Gruppe nach	Group by
+Quelle	Source
+Sortieren	Sort
+Papier	Paper
+Hochformat	Portrait
+Ränder (mm)	Margins (mm)
+1 Element gelöscht.	1 element deleted.
+{0} Elemente gelöscht.	{0} elements deleted.
+Das Detail bleibt -- ohne es gäbe es keine Zeilen.	The detail stays -- without it there would be no rows.
+Gruppe {0} entfernt.	Group {0} removed.
+{0} entfernt.	{0} removed.
+Ganzzahl	Integer
+Zahl	Number
+Anzahl	Count
+Mittel	Average
+Kleinster	Smallest
+Größter	Largest
+Mitte	Center
+Rechts	Right
+Eigenschaften: {0}	Properties: {0}
+Eigenschaften: {0} Elemente	Properties: {0} elements
+Eigenschaften des Berichts	Properties of the report
+(alle da)	(all there)
+(keine Spalten)	(no columns)
+{0}: dieser Wert passt nicht.	{0}: this value does not fit.
+{0}: in ein Band klicken oder ein Rechteck ziehen.	{0}: click into a band or drag a rectangle.
+Spalten gehören in ein Band der Seite.	Columns belong in a band of the page.
+Elemente gehören in ein Band.	Elements belong in a band.
+Bildspalten zeigt ein Bericht noch nicht.	A report does not show image columns yet.

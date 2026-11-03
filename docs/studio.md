@@ -548,10 +548,39 @@ die **Bedingung** darf Parameter haben (`rechnung = :id`). Passt ein Band
 nicht mehr auf die Seite, kommt es auf die nächste, mit Seitenfuß davor und
 Seitenkopf danach.
 
-Der Reiter eines Berichts zeigt seine Bänder auf dem Papier; **Vorschau …**
-setzt ihn mit den Daten der Entwicklungsdatei, fragt nach den Parametern und
-blättert durch die Seiten. Bearbeiten kommt mit der nächsten Stufe -- bis
-dahin bearbeitet man die `.dhreport`.
+Der Reiter eines Berichts ist sein **Entwurf**: die Seite in Millimetern,
+jedes Band mit einer Leiste, die seinen Namen trägt, darin die Elemente.
+
+* **Ablegen:** oben die Leiste der Elemente (Text, Feld, Summe, Seitenzahl,
+  Datum, Linie, Rechteck, Bild) -- eine Art wählen, dann in ein Band klicken
+  (Vorgabegröße) oder ein Rechteck ziehen. Esc bricht ab.
+* **Spalten der Quelle** stehen rechts oben; eine Spalte in ein Band ziehen
+  macht im Gruppen- oder Berichtsfuß eine Summe, im Seitenkopf eine
+  Überschrift, sonst ein Feld (Geld und Zahlen rechtsbündig). Ein Doppelklick
+  legt sie ins Detail.
+* **Ziehen** verschiebt, was gewählt ist (Raster 1 mm, Alt ohne); dabei rasten
+  die Kanten und Mitten an anderen Elementen und an den Rändern ein, eine
+  rosa Linie zeigt es. Ein einzelnes Element darf das Band wechseln. Acht
+  Griffe ändern die Größe, die Unterkante eines Bandes seine Höhe.
+* **Wählen:** Klick, mit Umschalt oder Strg dazu, ein Rahmen über leere
+  Fläche wählt alles, was er berührt; ein Klick auf die Leiste eines Bandes
+  wählt das Band, ein Klick neben alle Bänder den Bericht. Pfeiltasten
+  schieben um 1 mm (mit Umschalt 5 mm), Entf löscht, Strg+D verdoppelt,
+  Strg+A wählt alle Elemente, Strg+Z/Strg+Y nehmen zurück und wiederholen.
+* **Eigenschaften** darunter gehören dem, was gewählt ist: beim Element Lage
+  und Maße in mm, Text, Spalte, Format, Funktion und Bereich einer Summe,
+  Schrift, Größe, fett, kursiv, Farbe (`#RRGGBB`), Ausrichtung, Strich,
+  Füllung, Bild; beim Band die Höhe und bei einer Gruppe ihre Spalte, dazu
+  „Band entfernen“ bzw. „Gruppe entfernen“; beim Bericht Titel, Quelle,
+  Bedingung, Sortierung (`a; b`), Papier, Hochformat und Ränder (`o; r; u; l`
+  oder eine Zahl für alle), dazu „Band dazu“ (was fehlt) und „Gruppe dazu“
+  (innen, mit Kopf und Fuß). Text übernimmt Enter oder das Verlassen des
+  Feldes, eine Auswahl gilt sofort; sind mehrere Elemente gewählt, gilt der
+  Wert für alle, zu denen er passt.
+
+Strg+Rad zoomt, das Rad rollt (mit Umschalt seitwärts). **Vorschau …** setzt
+den Bericht mit den Daten der Entwicklungsdatei, fragt nach den Parametern und
+blättert durch die Seiten. Bildspalten setzt ein Bericht noch nicht.
 
 Im Programm ist ein Bericht ein Objekt unter seinem Namen:
 
@@ -645,4 +674,6 @@ Studio mit echten Klicks im Reiter, im Navigator und im Inspektor;
 Fenster samt Bild in der Tabellenzelle, „Bild …“ und Ziehen im Studio) und
 `tests/pruef/werkzeug_studio_verbunde.dhtest` Verbunde über Verweise;
 `tests/pruef/werkzeug_studio_berichte.dhtest` Berichte (Auslegung samt
-Summen und Seiten, F5 mit Parametern, Reiter und Vorschau).
+Summen und Seiten, F5 mit Parametern, Reiter und Vorschau),
+`tests/pruef/werkzeug_studio_berichte2.dhtest` ihren Entwurf (ablegen,
+ziehen, Griffe, Spalten, Eigenschaften, Bänder und Gruppen, Rückgängig).

@@ -20,7 +20,14 @@ Entschieden am 2026-11-03:*
 (Auslegung), `studio/berichte.dh` (Modell, erzeugter Code),
 `studio/berichte_reiter.dh` (Reiter, Vorschau), `PDF_PREVIEW` mit den echten
 Schriften; Prüfung `tests/pruef/werkzeug_studio_berichte.dhtest`, Handbuch
-[studio.md](studio.md#berichte).
+[studio.md](studio.md#berichte). Stufe 2 ist gebaut (selber Tag): der Reiter
+ist ein Entwurf (Leiste der Elemente, Spalten der Quelle, Eigenschaften,
+Ziehen mit Raster und Ausrichtungslinien, Griffe, Bandhöhe, Rahmen,
+Rückgängig je Reiter); jedes Band trägt eine Leiste mit seinem Namen statt
+einer Namensspalte neben dem Papier -- die Seite wird so breiter, und die
+Leiste ist die Stelle, an der man das Band wählt. Prüfung
+`tests/pruef/werkzeug_studio_berichte2.dhtest`. Bildspalten setzt die
+Auslegung noch nicht (der Entwurf lehnt sie ab).
 
 ## Gemessen vor Stufe 1
 

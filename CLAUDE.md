@@ -3885,6 +3885,30 @@ und Zeichen fuer Zeichen an die Stelle, die rustybuzz formt -- raylib rundet
 jeden Vorschub ab, ein rechtsbuendiger Betrag endete 12 Punkte zu frueh.
 Tests `werkzeug_studio_berichte.dhtest` (3), ein Fall in `drucken.dhtest`;
 neun Verfaelschungen fallen.
+**Stufe 2 (selber Tag): entwerfen.** Gearbeitet wird auf `r.ber.j` (JSON-
+Handle im `BerichtAnsicht` des Reiters); `berichtMerken` legt nach jedem
+fertigen Schritt den Text in `staende` (Rueckgaengig je Reiter) und in
+`e.schema`. Modell in berichte.dh (`berichtBandEinfuegen` nach
+`berichtBandSchluessel` -- Gruppenkoepfe aussen zuerst, Fuesse innen zuerst;
+`berichtGruppeDazu/Weg` mit Nachruecken; `berichtElementNeu`,
+`berichtSpalteElement`: Fuss = Summe, Seitenkopf = Ueberschrift, sonst Feld;
+`berichtSpaltenTyp$`). Jedes Band hat eine Leiste mit Namen (`BER_STRIP`)
+statt einer Namensspalte -- eine Quelle fuer Lagen ist `berBandY/Y2`,
+`berBandBeiY`, `berMmImBand`, `berElRect`. Maus in `berichtMaus` (nach
+`mausAufEntwurf`, setzt den Zeiger darueber), Spaltenzug ueber
+`berichtVorUpdate` vor GUI_UPDATE; Treffer: Griff, Element ohne Rand,
+Bandkante, Element mit 3 Punkten Rand (sonst gewann an der Kante das
+Element darueber -- vom Test gefunden). Raster 1 mm (`berRaster`),
+Ausrichtungslinien (`berEinrasten`, waagerecht gegen die ganze Seite,
+senkrecht im Band). Eigenschaften = feste Zeilen je Name
+(`BER_EIGENSCHAFTEN`), sichtbar je Auswahl (Element/Band/Bericht).
+Menue: `zurueck/vor` und Verdoppeln/Loeschen/Alles gehen bei
+`berichtVorn()` an den Bericht, `werkzeugeNachziehen` gibt sie frei.
+**Falle (zweimal):** das Feld `band` einer Klasse ist das Schluesselwort
+BAND -- `bandNr`. Und ein Feld-Literal aus Widget-Handles ist ARRAY OF
+INTEGER. Bildspalten setzt die Auslegung noch nicht (abgelehnt). Tests
+`werkzeug_studio_berichte2.dhtest` (6, Projekt aus
+`_hilfen/berichtprojekt.dh`); 15 Verfaelschungen fallen je in ihrem Fall.
 
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
