@@ -379,8 +379,20 @@ END SUB
 `Self.Ausloesen("Name")` meldet eines der Ereignisse; das Fenster ruft dann
 seine Methode `<Instanz>_<Ereignis>` -- nach dem Takt des Controls im selben
 Bild. Ein Doppelklick auf die Instanz bietet ihre Ereignisse an wie bei
-jedem anderen Control. Noch nicht: Controls in Controls und Umbenennen samt
-Instanzen.
+jedem anderen Control.
+
+**Controls in Controls.** Ein Control darf Instanzen anderer Controls
+enthalten, wie ein Fenster. Ihre Ereignisse kommen im äußeren Control an
+(`z1_Erreicht` im Code von `Zwei`), und das kann sie mit `Ausloesen` weiter
+ans Fenster melden; im Fenster heißt es dann `Self.zwei1.z1.Wert()`. Die
+Bibliothek bietet in einem Control die anderen an, aber nicht das Control
+selbst und keines, das es schon enthält -- das wäre ein Kreis. Steht doch
+einer in der Datei (von Hand geschrieben), bleibt die Instanz ein leerer
+Platz, und der Entwurf sagt „… enthält sich selbst“. Wird ein Control
+umbenannt, nehmen alle Instanzen in den anderen Fenstern und Controls den
+neuen Namen mit, auch in deren Rückgängig-Ständen. Löschen geht erst, wenn
+keine Instanz mehr darauf zeigt; sonst nennt die Statuszeile, wo noch eine
+steht.
 
 ## Ein einzelnes Fenster
 
@@ -435,6 +447,7 @@ geerbte mit einer anderen Zahl von Parametern überschreibt.
 | `DH_STUDIO_SPRACHE=en` | die Sprache der Oberfläche, vor jeder Einstellung (`de` oder `en`) |
 | `DH_STUDIO_KONFIG=datei` | `studio.json` an diesem Ort; die `ide.json` wird dann nicht gefragt |
 | `DH_STUDIO_SPRACHPROBE=1` | öffnet jeden Dialog einmal, schreibt seine Texte und die Zahl fehlender Übersetzungen ins Protokoll und endet |
+| `DH_STUDIO_LOESCHEN=element` | fragt beim Start wie „Element löschen …“ für dieses Element |
 
 Die Prüfsammlungen `tests/pruef/werkzeug_studio.dhtest` (Stufe 1) und
 `tests/pruef/werkzeug_studio2.dhtest` (Stufe 2) starten das Studio zweimal:

@@ -223,8 +223,11 @@ dahinter ausgeklappt (`ausgeklappt` in `studio/modell.dh`), und
 `StudioControl` in der Laufzeit legt sie je Bild nach ihren Ankern. Stufe 2:
 eigene Ereignisse (`studio_ereignisse`, `Self.Ausloesen`) und Eigenschaften
 mit Vorgaben (`studio_eigenschaften`) am Control, Werte je Instanz
-(`studio_werte`), alles Text im Inspektor. Offen (Stufe 3): Controls in
-Controls, Umbenennen samt Instanzen, Löschen nur ohne Instanzen.
+(`studio_werte`), alles Text im Inspektor. Stufe 3: Controls in Controls
+(tiefenweise ausgeklappt, ein Block = eigene Teile + Blöcke der inneren
+Instanzen; ein Control, das sich selbst enthält, ist überall leer),
+Umbenennen samt Instanzen und Rückgängig-Ständen, Löschen nur ohne
+Instanzen.
 
 **Geprüft wird je Stufe** mit einer Prüfsammlung `werkzeug_studio*.dhtest`.
 Die Klicks sind echt, über Aufnahmen und Fensternachrichten. Erzeugtes läuft
