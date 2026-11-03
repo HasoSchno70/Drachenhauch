@@ -1230,7 +1230,7 @@ FUNCTION dbFilterFehler$(ref AS STRING, filter AS STRING) AS STRING
     DIM p AS STRING : p = dbPfad$(dbRefEl)
     IF p = "" THEN RETURN ""
     IF NOT FILEEXISTS(p) THEN RETURN ""
-    DIM q AS STRING : q = dbQuellSql$(dbRefEl, dbRefT, dbRefA)
+    DIM q AS STRING : q = dbQuellSql$(dbRefEl, dbRefT, dbRefA, filter)
     DIM fehler AS STRING : fehler = ""
     DIM db AS DB_CONN
     TRY
@@ -1248,10 +1248,122 @@ FUNCTION dbFilterFehler$(ref AS STRING, filter AS STRING) AS STRING
 END FUNCTION
 
 ' Was im FROM steht: der Name der Tabelle oder die Abfrage in Klammern.
-FUNCTION dbQuellSql$(e AS Element, t AS INTEGER, a AS INTEGER) AS STRING
+FUNCTION dbQuellSql$(e AS Element, t AS INTEGER, a AS INTEGER, bedarf AS STRING = "") AS STRING
     DIM s AS JSON_HANDLE : s = dbSchema(e)
-    IF t >= 0 THEN RETURN dbQ$(dbTabName$(s, t))
+    IF t >= 0 THEN
+        DIM j AS STRING : j = dbVerweisJoin$(s, t, bedarf)
+        IF j <> "" THEN RETURN j
+        RETURN dbQ$(dbTabName$(s, t))
+    END IF
     RETURN "(" + dbAbfSql$(s, a) + ")"
+END FUNCTION
+
+' --- Verbunde ueber Verweise -----------------------------------------------------------
+'  Eine Liste an einer Tabelle zeigt auch Spalten der Tabellen, auf die eine
+'  ihrer Spalten verweist: "kunde.name" ist die Spalte name der Zeile, deren id
+'  in kunde steht. Das Studio legt dafuer einen LEFT JOIN um die Tabelle (eine
+'  Zeile ohne Verweis bleibt, mit leerem Wert); die Spalte heisst im Ergebnis
+'  "kunde.name", Sortierung, Bedingung und Suche nennen sie genauso.
+
+' Was "verweis.spalte" meint: die Art der Zielspalte ("" = kein solcher
+' Verweis) -- dbVwName haelt danach den Namen in der Schreibweise des Schemas.
+DIM dbVwName AS STRING : dbVwName = ""
+FUNCTION dbVerweisTyp$(s AS JSON_HANDLE, t AS INTEGER, angabe AS STRING) AS STRING
+    dbVwName = ""
+    DIM k AS INTEGER : k = INSTR(angabe, ".")
+    IF k <= 0 THEN RETURN ""
+    DIM vk AS INTEGER : vk = dbSpIndex(s, t, LEFT$(angabe, k))
+    IF vk < 0 THEN RETURN ""
+    DIM zt AS INTEGER : zt = dbTabIndex(s, dbSp$(s, t, vk, "verweis"))
+    IF zt < 0 OR dbSp$(s, t, vk, "verweis") = "" THEN RETURN ""
+    DIM zk AS INTEGER : zk = dbSpIndex(s, zt, MID$(angabe, k + 1))
+    IF zk < 0 THEN RETURN ""
+    dbVwName = dbSp$(s, t, vk, "name") + "." + dbSp$(s, zt, zk, "name")
+    RETURN dbSp$(s, zt, zk, "typ")
+END FUNCTION
+
+' Alle "verweis.spalte" einer Tabelle (fuer die Auswahlen im Inspektor).
+FUNCTION dbVerweisSpalten(s AS JSON_HANDLE, t AS INTEGER) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM k AS INTEGER
+    FOR k = 0 TO dbSpZahl(s, t) - 1
+        DIM zt AS INTEGER : zt = dbTabIndex(s, dbSp$(s, t, k, "verweis"))
+        IF zt < 0 OR dbSp$(s, t, k, "verweis") = "" THEN CONTINUE
+        DIM zk AS INTEGER
+        FOR zk = 0 TO dbSpZahl(s, zt) - 1
+            ARRAY_PUSH(aus, dbSp$(s, t, k, "name") + "." + dbSp$(s, zt, zk, "name"))
+        NEXT
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Die Tabelle samt den Verbunden, die "bedarf" (angezeigte Spalten, Sortierung,
+' Bedingung) nennt; "" = keiner noetig, dann bleibt es beim Namen der Tabelle.
+FUNCTION dbVerweisJoin$(s AS JSON_HANDLE, t AS INTEGER, bedarf AS STRING) AS STRING
+    IF bedarf = "" THEN RETURN ""
+    DIM klein AS STRING : klein = LOWER$(bedarf)
+    DIM sel AS ARRAY OF STRING : sel = ["q.*"]
+    DIM joins AS STRING : joins = ""
+    DIM n AS INTEGER : n = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO dbSpZahl(s, t) - 1
+        DIM ziel AS STRING : ziel = dbSp$(s, t, k, "verweis")
+        DIM zt AS INTEGER : zt = dbTabIndex(s, ziel)
+        IF ziel = "" OR zt < 0 THEN CONTINUE
+        DIM v AS STRING : v = dbSp$(s, t, k, "name")
+        IF INSTR(klein, LOWER$(v) + ".") < 0 THEN CONTINUE
+        DIM al AS STRING : al = "j" + STR$(n)
+        n = n + 1
+        joins = joins + " LEFT JOIN " + dbQ$(dbTabName$(s, zt)) + " AS " + al + " ON " + al + ".id = q." + dbQ$(v)
+        DIM zk AS INTEGER
+        FOR zk = 0 TO dbSpZahl(s, zt) - 1
+            ARRAY_PUSH(sel, al + "." + dbQ$(dbSp$(s, zt, zk, "name")) + " AS " + dbQ$(v + "." + dbSp$(s, zt, zk, "name")))
+        NEXT
+    NEXT
+    IF n = 0 THEN RETURN ""
+    RETURN "(SELECT " + JOIN$(sel, ", ") + " FROM " + dbQ$(dbTabName$(s, t)) + " AS q" + joins + ")"
+END FUNCTION
+
+' Welche Spalten eine Liste zeigt, samt Art -- eigene und "verweis.spalte"
+' in der Schreibweise des Schemas; ohne Angabe wie dbListSpalten.
+DIM dbLsNamen AS ARRAY OF STRING : dbLsNamen = []
+DIM dbLsTypen AS ARRAY OF STRING : dbLsTypen = []
+SUB dbListSpaltenMit(s AS JSON_HANDLE, t AS INTEGER, angabe AS STRING, art AS STRING)
+    dbLsNamen = [] : dbLsTypen = []
+    DIM w AS STRING
+    FOR EACH w IN SPLIT(angabe, ";")
+        DIM n AS STRING : n = TRIM$(w)
+        IF n = "" THEN CONTINUE
+        DIM k AS INTEGER : k = dbSpIndex(s, t, n)
+        IF k >= 0 THEN
+            ARRAY_PUSH(dbLsNamen, dbSp$(s, t, k, "name"))
+            ARRAY_PUSH(dbLsTypen, dbSp$(s, t, k, "typ"))
+        ELSE
+            DIM vt AS STRING : vt = dbVerweisTyp$(s, t, n)
+            IF dbVwName <> "" THEN
+                ARRAY_PUSH(dbLsNamen, dbVwName)
+                ARRAY_PUSH(dbLsTypen, vt)
+            END IF
+        END IF
+    NEXT
+    IF LEN(dbLsNamen) > 0 THEN RETURN
+    DIM q AS INTEGER
+    FOR EACH q IN dbListSpalten(s, t, "", art)
+        ARRAY_PUSH(dbLsNamen, dbSp$(s, t, q, "name"))
+        ARRAY_PUSH(dbLsTypen, dbSp$(s, t, q, "typ"))
+    NEXT
+END SUB
+
+' Die Spalten einer Datenquelle samt "verweis.spalte" (bei einer Tabelle).
+FUNCTION dbQuellSpaltenMit(ref AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = dbQuellSpalten(ref)
+    IF NOT dbQuelle(ref) THEN RETURN aus
+    IF dbRefT < 0 THEN RETURN aus
+    DIM v AS STRING
+    FOR EACH v IN dbVerweisSpalten(dbSchema(dbRefEl), dbRefT)
+        ARRAY_PUSH(aus, v)
+    NEXT
+    RETURN aus
 END FUNCTION
 
 SUB dbBasisFelder(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF STRING, arten AS ARRAY OF STRING)
@@ -1462,17 +1574,15 @@ SUB dbBasisMethoden(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF ST
         DIM typen AS STRING : typen = ""
         DIM bildSp AS ARRAY OF INTEGER : bildSp = []
         IF dbRefT >= 0 THEN
-            DIM sn AS ARRAY OF STRING : sn = []
-            DIM st AS ARRAY OF STRING : st = []
+            ' Nennen Spalten, Sortierung oder Bedingung "verweis.spalte", liest
+            ' die Liste aus der Tabelle samt Verbund.
+            quelle = dbQuellSql$(le, dbRefT, -1, spalten + ";" + dbBindText$(d, wp + "studio_sortieren") + ";" + dbBindText$(d, wp + "studio_filter"))
+            dbListSpaltenMit(ls, dbRefT, spalten, arten[li])
+            spalten = JOIN$(dbLsNamen, ";")
+            typen = JOIN$(dbLsTypen, ";")
             DIM q AS INTEGER
-            FOR EACH q IN dbListSpalten(ls, dbRefT, spalten, arten[li])
-                ARRAY_PUSH(sn, dbSp$(ls, dbRefT, q, "name"))
-                ARRAY_PUSH(st, dbSp$(ls, dbRefT, q, "typ"))
-            NEXT
-            spalten = JOIN$(sn, ";")
-            typen = JOIN$(st, ";")
-            FOR q = 0 TO LEN(st) - 1
-                IF st[q] = "bild" THEN ARRAY_PUSH(bildSp, q)
+            FOR q = 0 TO LEN(dbLsTypen) - 1
+                IF dbLsTypen[q] = "bild" THEN ARRAY_PUSH(bildSp, q)
             NEXT
         END IF
         DIM such AS STRING : such = dbSuchfeld$(d, li, namen, arten)

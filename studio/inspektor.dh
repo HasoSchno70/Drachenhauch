@@ -360,7 +360,7 @@ SUB inspektorFuellen()
                 END IF
                 IF z.schluessel = "studio_eigenschaften" THEN GUI_TOOLTIP(z.ed, tr$("Name = Vorgabe; Zahl AS INTEGER = 3 -- ohne AS ein STRING; dazu FLOAT und BOOLEAN"))
                 IF z.schluessel = "studio_ereignisse" THEN GUI_TOOLTIP(z.ed, tr$("Namen durch Semikolon; im Code des Controls meldet Self.Ausloesen(...) eines davon"))
-                IF z.schluessel = "studio_spalten" THEN GUI_TOOLTIP(z.ed, tr$("Spalten durch Semikolon -- leer: bei einer Tabelle alle, sonst die erste"))
+                IF z.schluessel = "studio_spalten" THEN GUI_TOOLTIP(z.ed, tr$("Spalten durch Semikolon, auch über einen Verweis (kunde.name) -- leer: bei einer Tabelle alle, sonst die erste"))
                 IF z.schluessel = "studio_filter" THEN
                     GUI_TOOLTIP(z.ed, tr$("Eine SQL-Bedingung wie im WHERE, etwa: ort = 'Köln' AND umsatz > 100"))
                     filterPruefen(z)
@@ -738,7 +738,7 @@ SUB datenWahlFuellen(z AS InspZeile, jetzt AS STRING)
             liste = dbAlleQuellen()
         CASE "studio_sortieren"
             liste = []
-            IF auswahl >= 0 THEN liste = dbQuellSpalten(feldText$(auswahl, "studio_quelle"))
+            IF auswahl >= 0 THEN liste = dbQuellSpaltenMit(feldText$(auswahl, "studio_quelle"))
         CASE "studio_suchfeld"
             ' Die Textfelder des Fensters.
             liste = []
@@ -766,10 +766,17 @@ SUB quellKopfSetzen(i AS INTEGER)
     ' Die Spalten der Quelle; genannte, soweit es sie gibt -- wie im Programm.
     DIM alle AS ARRAY OF STRING : alle = dbQuellSpalten(ref)
     IF LEN(alle) = 0 THEN RETURN
-    DIM namen AS ARRAY OF STRING : namen = []
+    ' Auch "verweis.spalte" -- in der Schreibweise des Schemas.
+    DIM gueltig AS ARRAY OF STRING : gueltig = dbQuellSpaltenMit(ref)
+    DIM klein AS ARRAY OF STRING : klein = []
     DIM w AS STRING
+    FOR EACH w IN gueltig
+        ARRAY_PUSH(klein, LOWER$(w))
+    NEXT
+    DIM namen AS ARRAY OF STRING : namen = []
     FOR EACH w IN SPLIT(feldText$(i, "studio_spalten"), ";")
-        IF ARRAY_INDEXOF(alle, TRIM$(w)) >= 0 THEN ARRAY_PUSH(namen, TRIM$(w))
+        DIM gi AS INTEGER : gi = ARRAY_INDEXOF(klein, LOWER$(TRIM$(w)))
+        IF gi >= 0 THEN ARRAY_PUSH(namen, gueltig[gi])
     NEXT
     IF LEN(namen) = 0 THEN namen = alle
     DIM kopf AS JSON_HANDLE : kopf = JSON_NEW_ARRAY()

@@ -554,7 +554,7 @@ Felder für {0} angelegt: {1}	Fields for {0} added: {1}
 JJJJ-MM-TT	YYYY-MM-DD
 Datenquelle	Data source
 Angezeigte Spalten	Shown columns
-Spalten durch Semikolon -- leer: bei einer Tabelle alle, sonst die erste	Columns separated by semicolons -- empty: all for a table, otherwise the first
+Spalten durch Semikolon, auch über einen Verweis (kunde.name) -- leer: bei einer Tabelle alle, sonst die erste	Columns separated by semicolons, also through a reference (kunde.name) -- empty: all for a table, otherwise the first
 (keine)	(none)
 Den Namen {0} gibt es in {1} schon.	{1} already has the name {0}.
 Eine Abfrage beginnt mit SELECT (oder WITH).	A query starts with SELECT (or WITH).
