@@ -30,6 +30,7 @@ CLASS DbAnsicht
     DIM btZeNeu AS GUI_WIDGET
     DIM btZeWeg AS GUI_WIDGET
     DIM btNeuLaden AS GUI_WIDGET
+    DIM btBild AS GUI_WIDGET
     DIM btAbfNeu AS GUI_WIDGET
     DIM taSql AS GUI_WIDGET
     DIM btAusfuehren AS GUI_WIDGET
@@ -112,6 +113,8 @@ FUNCTION dbReiterNeu(e AS Element) AS INTEGER
     a.btZeNeu = dbKnopf(r, tr$("Zeile hinzufügen"))
     a.btZeWeg = dbKnopf(r, tr$("Zeile löschen"))
     a.btNeuLaden = dbKnopf(r, tr$("Neu laden"))
+    a.btBild = dbKnopf(r, tr$("Bild …"))
+    GUI_TOOLTIP(a.btBild, tr$("Ein Bild aus einer Datei in die gewählte Zelle einer Bildspalte"))
     a.taSql = dbDazu(r, GUI_TEXTAREA(win, 0, 0, 300, 120, "SELECT ..."))
     feldEinrichten(a.taSql)
     a.btAusfuehren = dbKnopf(r, tr$("Ausführen"))
@@ -153,6 +156,7 @@ SUB dbLegen(r AS Reiter)
     GUI_SET_BOUNDS(a.btZeNeu, rx, unten, 140, 28)
     GUI_SET_BOUNDS(a.btZeWeg, rx + 144, unten, 120, 28)
     GUI_SET_BOUNDS(a.btNeuLaden, rx + 268, unten, 100, 28)
+    GUI_SET_BOUNDS(a.btBild, rx + 372, unten, 90, 28)
     ' Eine Abfrage: oben das SQL, darunter Ausfuehren und das Ergebnis.
     GUI_SET_BOUNDS(a.taSql, rx, y1, rb, 150)
     GUI_SET_BOUNDS(a.btAusfuehren, rx, y1 + 158, 130, 28)
@@ -190,6 +194,7 @@ SUB dbLagen(r AS Reiter)
     dbLage("spalten", a.btSpalten) : dbLage("daten", a.btDaten)
     dbLage("spneu", a.btSpNeu) : dbLage("spweg", a.btSpWeg)
     dbLage("zeneu", a.btZeNeu) : dbLage("zeweg", a.btZeWeg) : dbLage("neuladen", a.btNeuLaden)
+    dbLage("bild", a.btBild)
     dbLage("datei", a.tfDatei)
     dbLage("abfneu", a.btAbfNeu) : dbLage("ausfuehren", a.btAusfuehren) : dbLage("sql", a.taSql)
     DIM i AS INTEGER
@@ -236,6 +241,7 @@ SUB dbModusZeigen(r AS Reiter)
     GUI_SET_VISIBLE(a.btZeNeu, da)
     GUI_SET_VISIBLE(a.btZeWeg, da)
     GUI_SET_VISIBLE(a.btNeuLaden, da)
+    GUI_SET_VISIBLE(a.btBild, da AND dbHatBildspalte(r))
     GUI_SET_VISIBLE(a.btSpalten, NOT abf)
     GUI_SET_VISIBLE(a.btDaten, NOT abf)
     GUI_SET_VISIBLE(a.taSql, abf)
@@ -504,6 +510,7 @@ SUB dbDatenFuellen(r AS Reiter)
         SELECT CASE dbSp$(s, t, k, "typ")
             CASE "ganz" : GUI_TABLE_COL_TYPE(a.gitDa, k + 1, "ganz")
             CASE "wahr" : GUI_TABLE_COL_CHOICES(a.gitDa, k + 1, ["", tr$("ja"), tr$("nein")])
+            CASE "bild" : GUI_TABLE_COL_EDIT(a.gitDa, k + 1, FALSE)
         END SELECT
     NEXT
     DIM fehler AS STRING : fehler = dbZeilenLesen$(r.el, a.tabelle, DB_ZEILEN_GRENZE)
@@ -531,7 +538,47 @@ SUB dbDatenFuellen(r AS Reiter)
         END IF
     END IF
     dbLegenNurDaten(r)
+    GUI_SET_VISIBLE(a.btBild, a.modus <> "spalten" AND a.abfrage = "" AND dbHatBildspalte(r))
     dbLagen(r)
+END SUB
+
+' Hat die gewaehlte Tabelle eine Bildspalte? (Dann gibt es den Knopf „Bild …“.)
+FUNCTION dbHatBildspalte(r AS Reiter) AS BOOLEAN
+    IF r.db.tabelle = "" THEN RETURN FALSE
+    RETURN LEN(dbSpaltenBild(r.el.name + "." + r.db.tabelle, TRUE)) > 0
+END FUNCTION
+
+' „Bild …“: ein Bild aus einer Datei in die gewaehlte Zelle einer Bildspalte;
+' ist die Zelle schon voll, fragt die Statuszeile nicht nach -- Strg+Z gibt es
+' in den Daten ohnehin nicht, und Entf macht sie wieder leer.
+SUB dbBildWaehlen(r AS Reiter)
+    DIM a AS DbAnsicht : a = r.db
+    IF a.gitDa < 0 THEN RETURN
+    DIM z AS INTEGER : z = GUI_TABLE_CURRENT_ROW(a.gitDa)
+    DIM c AS INTEGER : c = GUI_TABLE_CURRENT_COL(a.gitDa) - 1
+    DIM s AS JSON_HANDLE : s = dbSchema(r.el)
+    DIM t AS INTEGER : t = dbTabIndex(s, a.tabelle)
+    IF z < 0 OR z >= LEN(a.daIds) OR c < 0 OR c >= LEN(a.daSpalten) OR t < 0 THEN
+        status(tr$("Erst eine Zelle einer Bildspalte wählen."))
+        RETURN
+    END IF
+    IF dbSp$(s, t, dbSpIndex(s, t, a.daSpalten[c]), "typ") <> "bild" THEN
+        status(tr$("Erst eine Zelle einer Bildspalte wählen."))
+        RETURN
+    END IF
+    DIM q AS STRING : q = GETENV$("DH_STUDIO_DATEI")
+    IF q = "" THEN q = FILE_OPEN_DIALOG(tr$("Bild wählen"), "png,jpg,jpeg,bmp,gif")
+    IF q = "" THEN RETURN
+    DIM id AS INTEGER : id = a.daIds[z]
+    DIM f AS STRING : f = dbBildSetzen$(r.el, a.tabelle, id, a.daSpalten[c], q)
+    IF f <> "" THEN
+        dbFehler(f)
+        RETURN
+    END IF
+    dbDatenFuellen(r)
+    IF z < GUI_TABLE_ROW_COUNT(a.gitDa) THEN GUI_TABLE_SET_CURRENT(a.gitDa, z, c + 1)
+    status(trf$("Bild in {0}, Zeile {1} gesichert.", [a.daSpalten[c], STR$(id)]))
+    protokoll("db bild " + a.tabelle + " " + STR$(id) + " " + a.daSpalten[c] + " " + BASENAME(q))
 END SUB
 
 SUB dbLegenNurDaten(r AS Reiter)
@@ -647,6 +694,7 @@ SUB dbAnsichtPruefen(r AS Reiter)
         END IF
     END IF
     IF GUI_CLICKED(a.btNeuLaden) THEN dbDatenFuellen(r)
+    IF GUI_CLICKED(a.btBild) THEN dbBildWaehlen(r)
     ' Die Datei: uebernommen mit Enter oder wenn das Feld den Fokus abgibt.
     IF GUI_TEXT(a.tfDatei) <> a.dateiStand AND (GUI_ENTERED(a.tfDatei) OR GUI_FOCUSED() <> a.tfDatei) THEN
         DIM fd AS STRING : fd = dbDateiSetzen$(r.el, GUI_TEXT(a.tfDatei))
@@ -960,6 +1008,16 @@ FUNCTION feldAnlegen(dbName AS STRING, s AS JSON_HANDLE, t AS INTEGER, k AS INTE
         JSON_SET_STRING(doc, wz$(i, "studio_quelle"), dbName + "." + dbTabName$(s, dbTabIndex(s, ziel)))
         DIM anz AS STRING : anz = dbAnzeigeSpalte$(s, dbTabIndex(s, ziel))
         IF anz <> "" THEN JSON_SET_STRING(doc, wz$(i, "studio_spalten"), anz)
+    ELSEIF typ = "bild" THEN
+        DIM lb AS INTEGER : lb = controlAnlegen(bausteinNach("label"), x, y + 4)
+        JSON_SET_STRING(doc, wz$(lb, "text"), sn + ":")
+        JSON_SET_INT(doc, wz$(lb, "w"), 110)
+        DIM lbn AS STRING : lbn = sn + "Text"
+        IF nameVergeben(lbn, lb) OR NOT istBezeichner(lbn) THEN lbn = eindeutigerName$(lbn)
+        JSON_SET_STRING(doc, wz$(lb, "name"), lbn)
+        i = controlAnlegen(bausteinNach("image"), x + 120, y)
+        JSON_SET_INT(doc, wz$(i, "w"), 160)
+        JSON_SET_INT(doc, wz$(i, "h"), 120)
     ELSEIF typ = "wahr" THEN
         i = controlAnlegen(bausteinNach("checkbox"), x + 120, y + 4)
         JSON_SET_STRING(doc, wz$(i, "text"), sn)
@@ -983,6 +1041,12 @@ FUNCTION feldAnlegen(dbName AS STRING, s AS JSON_HANDLE, t AS INTEGER, k AS INTE
     DIM n AS STRING : n = sn + "Feld"
     IF nameVergeben(n, i) OR NOT istBezeichner(n) THEN n = eindeutigerName$(n)
     JSON_SET_STRING(doc, wz$(i, "name"), n)
-    JSON_SET_STRING(doc, wz$(i, "bind"), sn)
+    ' Ein Bild haengt nicht an der Bindung des Formulars (GUI_FORM_SAVE schriebe
+    ' ihm einen leeren Wert), sondern an seiner Bildspalte.
+    IF typ = "bild" THEN
+        JSON_SET_STRING(doc, wz$(i, "studio_bildspalte"), sn)
+    ELSE
+        JSON_SET_STRING(doc, wz$(i, "bind"), sn)
+    END IF
     RETURN i
 END FUNCTION

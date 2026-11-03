@@ -1,0 +1,245 @@
+' Drachenhauch Studio: Datenbanken im Projekt, Stufe 4 -- Bildspalten
+' (studio/datenbank.dh, studio/dbeditor.dh, studio/inspektor.dh,
+' docs/studio.md). Eine Spalte der Art "bild" ist ein BLOB mit den Bytes
+' einer Bilddatei; im Daten-Gitter steht ihre Groesse, „Bild …“ setzt eines.
+' Im erzeugten Fenster zeigt eine Tabelle das Bild in der Zelle, und ein
+' Bild-Control an einer Bildspalte (studio_bildspalte) laedt und sichert es
+' mit dem Datensatz.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== der kern legt bildspalten an, setzt und zeigt bilder
+' BLOB in der Datei, Groesse im Gitter, ein Text in die Zelle ist ein Fehler,
+' eine Datei, die kein Bild ist, auch; leer macht die Zelle wieder NULL.
+IMPORT "kern.dh"
+projOrdner = CWD$() + "/proj"
+DIM e AS Element : e = elementNeu("datenbank", "Daten")
+e.schema = READLINES("proj/Daten.dhdb")[0]
+PRINT "abgleich ["; dbAbgleichen$(e); "]"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DIM r AS DB_RESULT : r = DB_QUERY(db, "PRAGMA table_info(produkte)")
+WHILE DB_NEXT(r)
+    PRINT "  "; DB_GET_STRING(r, 1); " "; DB_GET_STRING(r, 2); " ["; DB_GET_STRING(r, 4); "]"
+WEND
+DB_CLOSE(db)
+PRINT "art "; dbTypName$("bild"); " "; dbTypSql$("bild"); " vorgabe ["; dbLiteral$("bild", "x"); "]"
+PRINT "neu ["; dbZeileNeu$(e, "produkte"); "] "; dbNeueId
+PRINT "setzen ["; dbBildSetzen$(e, "produkte", 1, "foto", "bild.png"); "]"
+PRINT "lesen ["; dbZeilenLesen$(e, "produkte", 10); "] "; dbZellen[1]
+PRINT "text ["; dbZelleSetzen$(e, "produkte", 1, "foto", "abc"); "]"
+PRINT "kein bild ["; dbBildSetzen$(e, "produkte", 1, "foto", "text.txt"); "]"
+PRINT "keine bildspalte ["; dbBildSetzen$(e, "produkte", 1, "name", "bild.png"); "]"
+PRINT "pflicht ["; dbBildSetzen$(e, "produkte", 1, "muss", ""); "] "; dbDefault$("bild", TRUE, "")
+PRINT "leer ["; dbBildSetzen$(e, "produkte", 1, "foto", ""); "]"
+PRINT "lesen ["; dbZeilenLesen$(e, "produkte", 10); "] ["; dbZellen[1]; "] ["; dbZellen[2]; "]"
+PRINT "spalten "; JOIN$(dbSpaltenBild("Daten.produkte", TRUE), ","); " / "; JOIN$(dbSpaltenBild("Daten.produkte", FALSE), ",")
+--- datei bild.png base64
+iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAE0lEQVR4nGP4z8DwnwGM/zMwAAAf7gP9NRsAMwAAAABJRU5ErkJggg==
+--- datei text.txt
+kein Bild
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"produkte","spalten":[{"name":"name","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"foto","typ":"bild","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"muss","typ":"bild","pflicht":true,"eindeutig":false,"vorgabe":""}]}]}
+--- datei kern.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "db"
+IMPORT "{sammlung}/../../studio/sprache.dh"
+IMPORT "{sammlung}/../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../studio/modell.dh"
+IMPORT "{sammlung}/../../studio/projekt.dh"
+IMPORT "{sammlung}/../../studio/datenbank.dh"
+--- erwartet
+abgleich []
+  id INTEGER []
+  name TEXT []
+  foto BLOB []
+  muss BLOB [X'']
+art Bild BLOB vorgabe []
+neu [] 1
+setzen []
+lesen [] Bild (1 KB)
+text [foto ist eine Bildspalte -- ein Bild setzt „Bild …“.]
+kein bild [text.txt ist kein Bild (PNG, JPG, BMP oder GIF).]
+keine bildspalte [name ist keine Bildspalte.]
+pflicht [muss ist ein Pflichtfeld.] X''
+leer []
+lesen [] [] []
+spalten foto,muss / name
+
+=== das erzeugte fenster zeigt, setzt und leert bilder
+' Die Tabelle zeigt das Bild der ersten Zeile in der Zelle (die zweite hat
+' keins), Laden zeigt es im Bild-Control. BildSetzen macht den Datensatz
+' ungesichert, Sichern schreibt die Bytes, BildLeeren + Sichern macht die
+' Spalte NULL; eine Datei, die kein Bild ist, nimmt BildSetzen nicht.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(200)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "60")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "ausgabe ")
+    IF INSTR(z, "▶") < 0 AND INSTR(z, "■") < 0 AND INSTR(z, "WARNING") < 0 THEN PRINT z
+NEXT
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE produkte (id INTEGER PRIMARY KEY, name TEXT, foto BLOB)")
+DB_EXEC(db, "INSERT INTO produkte (name, foto) VALUES (?, ?)", "Tasse", READALL_BYTES("proj/rot.png"))
+DB_EXEC(db, "INSERT INTO produkte (name, foto) VALUES ('Teller', NULL)")
+DB_CLOSE(db)
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/rot.png base64
+iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAE0lEQVR4nGP4z8DwnwGM/zMwAAAf7gP9NRsAMwAAAABJRU5ErkJggg==
+--- datei proj/blau.png base64
+iVBORw0KGgoAAAANSUhEUgAAAAMAAAABCAIAAACUgoPjAAAADUlEQVR4nGNgYPgPQQAL/gL+kc2Z/gAAAABJRU5ErkJggg==
+--- datei proj/notiz.txt
+kein Bild
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":600,"h":400,"studio_tabelle":"Daten.produkte","widgets":[{"kind":"table","name":"liste","x":10,"y":10,"w":300,"h":200,"table":{"headers":["a"]},"studio_quelle":"Daten.produkte"},{"kind":"image","name":"fotoFeld","x":320,"y":10,"w":160,"h":120,"studio_bildspalte":"foto"}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB Geoeffnet()
+        DIM ordner AS STRING : ordner = GETENV$("DH_STUDIO_DATEN")
+        PRINT "zellen "; GUI_TABLE_ROW_COUNT(Self.liste); " "; GUI_TABLE_GET_CELL(Self.liste, 0, 0); " bilder "; LEN(Self.studioBilder_liste)
+        PRINT "laden "; Self.Laden(1); " "; IMAGE_WIDTH(Self.studioBild_fotoFeld); " "; Self.Ungesichert()
+        PRINT "laden "; Self.Laden(2); " "; Self.studioBild_fotoFeld
+        PRINT "kein bild "; Self.BildSetzen(Self.fotoFeld, PATHJOIN(ordner, "notiz.txt")); " "; Self.Ungesichert()
+        PRINT "setzen "; Self.BildSetzen(Self.fotoFeld, PATHJOIN(ordner, "blau.png")); " "; IMAGE_WIDTH(Self.studioBild_fotoFeld); " "; Self.Ungesichert()
+        PRINT "sichern "; Self.Sichern(); " "; Self.Ungesichert(); " bilder "; LEN(Self.studioBilder_liste)
+        DIM r AS DB_RESULT : r = DB_QUERY(Daten, "SELECT length(foto) FROM produkte WHERE id = 2")
+        DB_NEXT(r)
+        PRINT "datei "; DB_GET_INT(r, 0)
+        Self.BildLeeren(Self.fotoFeld)
+        PRINT "leeren "; Self.Ungesichert(); " "; Self.Sichern()
+        r = DB_QUERY(Daten, "SELECT foto IS NULL FROM produkte WHERE id = 2")
+        DB_NEXT(r)
+        PRINT "null "; DB_GET_INT(r, 0); " bilder "; LEN(Self.studioBilder_liste)
+        Self.Neu()
+        PRINT "neu "; Self.studioBild_fotoFeld; " "; Self.Ungesichert()
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"produkte","spalten":[{"name":"name","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"foto","typ":"bild","pflicht":false,"eindeutig":false,"vorgabe":""}]}]}
+--- erwartet
+ausgabe zellen 2 Tasse bilder 1
+ausgabe laden TRUE 2 FALSE
+ausgabe laden TRUE -1
+ausgabe kein bild FALSE FALSE
+ausgabe setzen TRUE 3 TRUE
+ausgabe sichern TRUE FALSE bilder 2
+ausgabe datei 70
+ausgabe leeren TRUE TRUE
+ausgabe null 1 bilder 1
+ausgabe neu -1 FALSE
+
+=== bild im daten-gitter setzen und eine bildspalte ins fenster legen
+' Im Reiter der Datenbank: Daten, die Zelle foto der ersten Zeile, „Bild …“
+' (die Datei kommt aus DH_STUDIO_DATEI). Danach ein Doppelklick auf die
+' Spalte foto im Navigator (mit dem Fenster vorn): ein Bild-Control an der Bildspalte, ohne Bindung.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM log AS STRING : log = CWD$() + "/s.log"
+SETENV("DH_STUDIO_OEFFNEN", "Daten.produkte")
+SETENV("DH_STUDIO_DATEI", CWD$() + "/blau.png")
+slStarten(log, "", 12, p)
+DIM x AS INTEGER
+DIM y AS INTEGER
+(x, y) = slLage(log, "db daten")
+slHin(10, 10)
+slWarten(14)
+slKlick(x, y)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+DIM cx AS INTEGER
+DIM cy AS INTEGER
+DIM bx AS INTEGER
+DIM by AS INTEGER
+DIM nx AS INTEGER
+DIM ny AS INTEGER
+(cx, cy) = slLage(log, "dbzelle da 0 2")
+(bx, by) = slLage(log, "db bild")
+(nx, ny) = slLage(log, "knoten Daten.produkte.foto")
+DIM rx AS INTEGER
+DIM ry AS INTEGER
+(rx, ry) = slLage(log, "reiter 0")
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(14)
+slKlick(x, y)
+slWarten(10)
+slKlick(cx, cy)
+slWarten(10)
+slKlick(bx, by)
+slWarten(10)
+slKlick(rx, ry)
+slWarten(10)
+slKlick(nx, ny)
+slWarten(3)
+slKlick(nx, ny)
+slWarten(10)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "db bild ")
+    PRINT z
+NEXT
+FOR EACH z IN slAnfang(log, "felder ")
+    PRINT z
+NEXT
+DIM db AS DB_CONN : db = DB_OPEN(p + "/daten.sqlite")
+DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT length(foto) FROM produkte WHERE id = 1")
+DB_NEXT(r)
+PRINT "datei "; DB_GET_INT(r, 0)
+DB_CLOSE(db)
+DIM j AS JSON_HANDLE : j = JSON_LOAD(p + "/Hauptfenster.dhform")
+PRINT "feld "; JSON_GET_STRING(j, "widgets.1.kind"); " "; JSON_GET_STRING(j, "widgets.1.name"); " "; JSON_GET_STRING(j, "widgets.1.studio_bildspalte"); " bind "; JSON_HAS(j, "widgets.1.bind")
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE produkte (id INTEGER PRIMARY KEY, name TEXT, foto BLOB)")
+DB_EXEC(db, "INSERT INTO produkte (name) VALUES ('Tasse')")
+DB_CLOSE(db)
+--- datei laeufer.dh
+IMPORT "json"
+IMPORT "db"
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei blau.png base64
+iVBORw0KGgoAAAANSUhEUgAAAAMAAAABCAIAAACUgoPjAAAADUlEQVR4nGNgYPgPQQAL/gL+kc2Z/gAAAABJRU5ErkJggg==
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":600,"h":400,"studio_tabelle":"Daten.produkte","widgets":[]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"produkte","spalten":[{"name":"name","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"foto","typ":"bild","pflicht":false,"eindeutig":false,"vorgabe":""}]}]}
+--- erwartet
+db bild produkte 1 foto blau.png
+felder Daten.produkte fotoFeld
+datei 70
+feld image fotoFeld foto bind FALSE

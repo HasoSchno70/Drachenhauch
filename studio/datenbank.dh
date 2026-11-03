@@ -30,9 +30,10 @@
 CONST DB_INDEX_VOR = "studio_u_"
 
 ' Die Arten einer Spalte und wie SQLite sie speichert. Geld steht in Cent
-' (19,99 = 1999), Datum als JJJJ-MM-TT, Ja/Nein als 0/1.
+' (19,99 = 1999), Datum als JJJJ-MM-TT, Ja/Nein als 0/1, ein Bild als BLOB
+' mit den Bytes der Bilddatei (PNG, JPG, BMP, GIF).
 FUNCTION dbTypen() AS ARRAY OF STRING
-    RETURN ["text", "ganz", "zahl", "geld", "datum", "wahr"]
+    RETURN ["text", "ganz", "zahl", "geld", "datum", "wahr", "bild"]
 END FUNCTION
 
 FUNCTION dbTypName$(typ AS STRING) AS STRING
@@ -42,6 +43,7 @@ FUNCTION dbTypName$(typ AS STRING) AS STRING
         CASE "geld" : RETURN tr$("Geld")
         CASE "datum" : RETURN tr$("Datum")
         CASE "wahr" : RETURN tr$("Ja/Nein")
+        CASE "bild" : RETURN tr$("Bild")
     END SELECT
     RETURN tr$("Text")
 END FUNCTION
@@ -59,6 +61,7 @@ FUNCTION dbTypSql$(typ AS STRING) AS STRING
     SELECT CASE typ
         CASE "ganz", "geld", "wahr" : RETURN "INTEGER"
         CASE "zahl" : RETURN "REAL"
+        CASE "bild" : RETURN "BLOB"
     END SELECT
     RETURN "TEXT"
 END FUNCTION
@@ -236,6 +239,7 @@ FUNCTION dbLiteral$(typ AS STRING, wert AS STRING) AS STRING
         CASE "datum"
             IF dbIstDatum(w) THEN RETURN "'" + w + "'"
             RETURN ""
+        CASE "bild" : RETURN ""
     END SELECT
     RETURN "'" + REPLACE$(wert, "'", "''") + "'"
 END FUNCTION
@@ -244,7 +248,7 @@ END FUNCTION
 ' leere Wert ihrer Art (ADD COLUMN ... NOT NULL braucht einen), sonst nichts.
 FUNCTION dbDefault$(typ AS STRING, pflicht AS BOOLEAN, vorgabe AS STRING) AS STRING
     IF vorgabe <> "" THEN RETURN dbLiteral$(typ, vorgabe)
-    IF pflicht THEN RETURN IIF(dbTypSql$(typ) = "TEXT", "''", "0")
+    IF pflicht THEN RETURN IIF(dbTypSql$(typ) = "TEXT", "''", IIF(dbTypSql$(typ) = "BLOB", "X''", "0"))
     RETURN ""
 END FUNCTION
 
@@ -601,6 +605,11 @@ FUNCTION dbAnzeige$(typ AS STRING, r AS DB_RESULT, i AS INTEGER) AS STRING
     SELECT CASE typ
         CASE "geld" : RETURN dbGeldText$(DB_GET_INT(r, i))
         CASE "wahr" : RETURN IIF(DB_GET_INT(r, i) <> 0, tr$("ja"), tr$("nein"))
+        CASE "bild"
+            ' Ein Bild als Zeile Text: seine Groesse (leer = keins).
+            DIM bn AS INTEGER : bn = BUFFER_LEN(DB_GET_BUFFER(r, i))
+            IF bn = 0 THEN RETURN ""
+            RETURN trf$("Bild ({0} KB)", [STR$((bn + 1023) \ 1024)])
         CASE "zahl"
             ' 1250.0 steht als 1250 da -- die Null hinter dem Komma sagt nichts.
             DIM z AS STRING : z = DB_GET_STRING(r, i)
@@ -658,6 +667,7 @@ FUNCTION dbZelleSetzen$(e AS Element, tabelle AS STRING, id AS INTEGER, spalte A
     IF p = "" THEN RETURN tr$("Erst das Projekt sichern -- dann gibt es eine Datei für die Daten.")
     DIM leer AS BOOLEAN : leer = TRIM$(text) = ""
     IF leer AND dbSpAn(s, t, k, "pflicht") THEN RETURN trf$("{0} ist ein Pflichtfeld.", [spalte])
+    IF typ = "bild" AND NOT leer THEN RETURN trf$("{0} ist eine Bildspalte -- ein Bild setzt „Bild …“.", [spalte])
     DIM lit AS STRING : lit = ""
     IF NOT leer THEN
         lit = dbLiteral$(typ, text)
@@ -687,6 +697,66 @@ FUNCTION dbZelleSetzen$(e AS Element, tabelle AS STRING, id AS INTEGER, spalte A
     CATCH zfehler
     END TRY
     RETURN fehler
+END FUNCTION
+
+' Sind das die Bytes eines Bildes, das die Laufzeit lesen kann? Gefragt wird
+' am Anfang der Datei -- ohne Fenster, also auch beim Pruefen.
+FUNCTION dbIstBild(b AS BUFFER) AS BOOLEAN
+    IF BUFFER_LEN(b) < 4 THEN RETURN FALSE
+    DIM b0 AS INTEGER : b0 = BUFFER_GET(b, 0)
+    DIM b1 AS INTEGER : b1 = BUFFER_GET(b, 1)
+    IF b0 = 137 AND b1 = 80 AND BUFFER_GET(b, 2) = 78 AND BUFFER_GET(b, 3) = 71 THEN RETURN TRUE
+    IF b0 = 255 AND b1 = 216 THEN RETURN TRUE
+    IF b0 = 66 AND b1 = 77 THEN RETURN TRUE
+    IF b0 = 71 AND b1 = 73 AND BUFFER_GET(b, 2) = 70 THEN RETURN TRUE
+    RETURN FALSE
+END FUNCTION
+
+' Ein Bild aus einer Datei in eine Zelle einer Bildspalte ("" = leer machen).
+FUNCTION dbBildSetzen$(e AS Element, tabelle AS STRING, id AS INTEGER, spalte AS STRING, pfad AS STRING) AS STRING
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM t AS INTEGER : t = dbTabIndex(s, tabelle)
+    IF t < 0 THEN RETURN trf$("Die Tabelle {0} gibt es nicht.", [tabelle])
+    DIM k AS INTEGER : k = dbSpIndex(s, t, spalte)
+    IF k < 0 THEN RETURN trf$("Die Spalte {0} gibt es nicht.", [spalte])
+    IF dbSp$(s, t, k, "typ") <> "bild" THEN RETURN trf$("{0} ist keine Bildspalte.", [spalte])
+    DIM p AS STRING : p = dbPfad$(e)
+    IF p = "" THEN RETURN tr$("Erst das Projekt sichern -- dann gibt es eine Datei für die Daten.")
+    DIM b AS BUFFER : b = BUFFER_NEW(0)
+    IF pfad <> "" THEN
+        IF NOT FILEEXISTS(pfad) THEN RETURN trf$("Die Datei gibt es nicht: {0}", [pfad])
+        b = READALL_BYTES(pfad)
+        IF NOT dbIstBild(b) THEN RETURN trf$("{0} ist kein Bild (PNG, JPG, BMP oder GIF).", [BASENAME(pfad)])
+    ELSEIF dbSpAn(s, t, k, "pflicht") THEN
+        RETURN trf$("{0} ist ein Pflichtfeld.", [spalte])
+    END IF
+    DIM sql AS STRING : sql = "UPDATE " + dbQ$(tabelle) + " SET " + dbQ$(spalte) + " = ? WHERE id = ?"
+    DIM fehler AS STRING : fehler = ""
+    DIM db AS DB_CONN
+    TRY
+        db = DB_OPEN(p)
+        IF pfad = "" THEN DB_EXEC(db, sql, NIL, id) ELSE DB_EXEC(db, sql, b, id)
+    CATCH bfehler
+        fehler = dbMeldung$(bfehler)
+    END TRY
+    TRY
+        DB_CLOSE(db)
+    CATCH zfehler
+    END TRY
+    RETURN fehler
+END FUNCTION
+
+' Die Spalten einer Tabelle einer Art: nur Bilder oder alles ausser Bildern
+' (ein Feld bindet keinen BLOB, ein Bild-Control nur einen).
+FUNCTION dbSpaltenBild(ref AS STRING, bilder AS BOOLEAN) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    IF NOT dbRef(ref) THEN RETURN aus
+    DIM s AS JSON_HANDLE : s = dbSchema(dbRefEl)
+    DIM k AS INTEGER
+    FOR k = 0 TO dbSpZahl(s, dbRefT) - 1
+        IF (dbSp$(s, dbRefT, k, "typ") = "bild") = bilder THEN ARRAY_PUSH(aus, dbSp$(s, dbRefT, k, "name"))
+    NEXT
+    RETURN aus
 END FUNCTION
 
 FUNCTION dbZeileNeu$(e AS Element, tabelle AS STRING) AS STRING
@@ -742,6 +812,7 @@ FUNCTION datenbankCode$() AS STRING
         IF LEN(z) = 0 THEN
             ARRAY_PUSH(z, "' Erzeugt vom Drachenhauch Studio -- die Datenbanken des Projekts.")
             ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "db" + CHR$(34))
+            ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "imgfx" + CHR$(34))
             ARRAY_PUSH(z, "")
             ARRAY_PUSH(z, "' Aus dem Studio gestartet: die Entwicklungsdaten im Projektordner.")
             ARRAY_PUSH(z, "FUNCTION studioDbPfad$(datei AS STRING) AS STRING")
@@ -813,6 +884,7 @@ FUNCTION datenbankCode$() AS STRING
             ARRAY_PUSH(z, "        RETURN IIF(c < 0, " + dbText$("-") + ", " + dbText$("") + ") + STR$(ABS(c) \ 100) + " + dbText$(",") + " + RIGHT$(" + dbText$("0") + " + STR$(ABS(c) MOD 100), 2)")
             ARRAY_PUSH(z, "    END IF")
             ARRAY_PUSH(z, "    IF art = " + dbText$("wahr") + " THEN RETURN IIF(DB_GET_INT(r, i) <> 0, " + dbText$("ja") + ", " + dbText$("nein") + ")")
+            ARRAY_PUSH(z, "    IF art = " + dbText$("bild") + " THEN RETURN " + dbText$(""))
             ARRAY_PUSH(z, "    IF art = " + dbText$("zahl") + " THEN")
             ARRAY_PUSH(z, "        DIM t AS STRING : t = DB_GET_STRING(r, i)")
             ARRAY_PUSH(z, "        IF RIGHT$(t, 2) = " + dbText$(".0") + " THEN t = LEFT$(t, LEN(t) - 2)")
@@ -864,6 +936,40 @@ FUNCTION datenbankCode$() AS STRING
             ARRAY_PUSH(z, "        sql = sql + " + dbText$(" ORDER BY id") + " + IIF(absteigend, " + dbText$(" DESC") + ", " + dbText$("") + ")")
             ARRAY_PUSH(z, "    END IF")
             ARRAY_PUSH(z, "    RETURN DB_QUERY(db, sql)")
+            ARRAY_PUSH(z, "END FUNCTION")
+            ARRAY_PUSH(z, "")
+            ARRAY_PUSH(z, "' Ein Bild aus einer Spalte (-1 = keins oder keins, das sich lesen laesst).")
+            ARRAY_PUSH(z, "FUNCTION studioDbBild(r AS DB_RESULT, i AS INTEGER) AS IMAGE")
+            ARRAY_PUSH(z, "    IF DB_IS_NULL(r, i) THEN RETURN -1")
+            ARRAY_PUSH(z, "    DIM b AS BUFFER : b = DB_GET_BUFFER(r, i)")
+            ARRAY_PUSH(z, "    IF BUFFER_LEN(b) = 0 THEN RETURN -1")
+            ARRAY_PUSH(z, "    TRY")
+            ARRAY_PUSH(z, "        RETURN IMAGE_FROM_BUFFER(b)")
+            ARRAY_PUSH(z, "    CATCH studioFehler")
+            ARRAY_PUSH(z, "    END TRY")
+            ARRAY_PUSH(z, "    RETURN -1")
+            ARRAY_PUSH(z, "END FUNCTION")
+            ARRAY_PUSH(z, "")
+            ARRAY_PUSH(z, "' Ohne gebundenes Feld: gibt es die Zeile, und eine neue anlegen.")
+            ARRAY_PUSH(z, "FUNCTION studioDbZeileDa(db AS DB_CONN, tabelle AS STRING, id AS INTEGER) AS BOOLEAN")
+            ARRAY_PUSH(z, "    DIM r AS DB_RESULT : r = DB_QUERY(db, " + dbText$("SELECT id FROM " + CHR$(34)) + " + tabelle + " + dbText$(CHR$(34) + " WHERE id = ?") + ", id)")
+            ARRAY_PUSH(z, "    DIM da AS BOOLEAN : da = DB_NEXT(r)")
+            ARRAY_PUSH(z, "    IF da THEN DB_CLOSE_RESULT(r)")
+            ARRAY_PUSH(z, "    RETURN da")
+            ARRAY_PUSH(z, "END FUNCTION")
+            ARRAY_PUSH(z, "")
+            ARRAY_PUSH(z, "FUNCTION studioDbZeileNeu(db AS DB_CONN, tabelle AS STRING) AS INTEGER")
+            ARRAY_PUSH(z, "    DB_EXEC(db, " + dbText$("INSERT INTO " + CHR$(34)) + " + tabelle + " + dbText$(CHR$(34) + " DEFAULT VALUES") + ")")
+            ARRAY_PUSH(z, "    RETURN DB_LAST_ROWID(db)")
+            ARRAY_PUSH(z, "END FUNCTION")
+            ARRAY_PUSH(z, "")
+            ARRAY_PUSH(z, "' Das Bild einer Zeile aus einer Bildspalte (-1 = keins).")
+            ARRAY_PUSH(z, "FUNCTION studioDbBildLesen(db AS DB_CONN, tabelle AS STRING, spalte AS STRING, id AS INTEGER) AS IMAGE")
+            ARRAY_PUSH(z, "    DIM r AS DB_RESULT : r = DB_QUERY(db, " + dbText$("SELECT " + CHR$(34)) + " + spalte + " + dbText$(CHR$(34) + " FROM " + CHR$(34)) + " + tabelle + " + dbText$(CHR$(34) + " WHERE id = ?") + ", id)")
+            ARRAY_PUSH(z, "    IF NOT DB_NEXT(r) THEN RETURN -1")
+            ARRAY_PUSH(z, "    DIM bild AS IMAGE : bild = studioDbBild(r, 0)")
+            ARRAY_PUSH(z, "    DB_CLOSE_RESULT(r)")
+            ARRAY_PUSH(z, "    RETURN bild")
             ARRAY_PUSH(z, "END FUNCTION")
             ARRAY_PUSH(z, "")
             ARRAY_PUSH(z, "' Eine Zeile aus studioQuelle zum Anzeigen (ohne die id vorn).")
@@ -1153,13 +1259,53 @@ SUB dbBasisFelder(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF STRI
     DIM i AS INTEGER
     FOR EACH i IN dbQuellListen(d, namen, arten)
         ARRAY_PUSH(z, "    DIM studioIds_" + namen[i] + " AS ARRAY OF INTEGER")
+        IF arten[i] = "table" THEN ARRAY_PUSH(z, "    DIM studioBilder_" + namen[i] + " AS ARRAY OF IMAGE")
     NEXT
+    ' Ein Bild-Control an einer Bildspalte: das gezeigte Bild und, bis zum
+    ' Sichern, die neuen Bytes.
+    FOR EACH i IN dbBildFelder(d, namen, arten)
+        ARRAY_PUSH(z, "    DIM studioBild_" + namen[i] + " AS IMAGE")
+        ARRAY_PUSH(z, "    DIM studioBildNeu_" + namen[i] + " AS BUFFER")
+        ARRAY_PUSH(z, "    DIM studioBildGeaendert_" + namen[i] + " AS BOOLEAN")
+    NEXT
+END SUB
+
+' Die Bild-Controls des Fensters an einer Bildspalte seiner Tabelle.
+FUNCTION dbBildFelder(d AS JSON_HANDLE, namen AS ARRAY OF STRING, arten AS ARRAY OF STRING) AS ARRAY OF INTEGER
+    DIM aus AS ARRAY OF INTEGER : aus = []
+    DIM ft AS STRING : ft = dbFensterTabelle$(d)
+    IF ft = "" THEN RETURN aus
+    IF NOT dbRef(ft) THEN RETURN aus
+    DIM s AS JSON_HANDLE : s = dbSchema(dbRefEl)
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(d, "widgets") - 1
+        IF i >= LEN(namen) THEN BREAK
+        IF arten[i] <> "image" OR NOT istBezeichner(namen[i]) THEN CONTINUE
+        DIM sp AS STRING : sp = dbBindText$(d, "widgets." + STR$(i) + ".studio_bildspalte")
+        IF sp = "" THEN CONTINUE
+        DIM k AS INTEGER : k = dbSpIndex(s, dbRefT, sp)
+        IF k < 0 THEN CONTINUE
+        IF dbSp$(s, dbRefT, k, "typ") = "bild" THEN ARRAY_PUSH(aus, i)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Das Bild eines Bild-Controls tauschen (das alte geben wir frei).
+SUB dbBildZeile(z AS ARRAY OF STRING, n AS STRING, neu AS STRING)
+    ARRAY_PUSH(z, "        IF Self.studioBild_" + n + " >= 0 THEN IMAGE_FREE(Self.studioBild_" + n + ")")
+    ARRAY_PUSH(z, "        Self.studioBild_" + n + " = " + neu)
+    ARRAY_PUSH(z, "        GUI_SET_IMAGE(Self." + n + ", Self.studioBild_" + n + ")")
 END SUB
 
 ' Am Ende von studioAufbauen: erst die Listen (eine Klappliste mit Verweis
 ' muss ihre Eintraege haben, bevor eine Vorgabe sie waehlen kann), dann ein
 ' leerer Datensatz mit den Vorgaben.
 SUB dbBasisAufbau(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF STRING, arten AS ARRAY OF STRING)
+    DIM bi AS INTEGER
+    FOR EACH bi IN dbBildFelder(d, namen, arten)
+        ARRAY_PUSH(z, "        Self.studioBild_" + namen[bi] + " = -1")
+        ARRAY_PUSH(z, "        Self.studioBildNeu_" + namen[bi] + " = BUFFER_NEW(0)")
+    NEXT
     IF LEN(dbQuellListen(d, namen, arten)) > 0 THEN ARRAY_PUSH(z, "        Self.Neuladen()")
     IF dbFensterTabelle$(d) <> "" THEN ARRAY_PUSH(z, "        Self.Neu()")
 END SUB
@@ -1168,6 +1314,13 @@ SUB dbBasisMethoden(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF ST
     DIM ft AS STRING : ft = dbFensterTabelle$(d)
     DIM listen AS ARRAY OF INTEGER : listen = dbQuellListen(d, namen, arten)
     DIM neuladen AS STRING : neuladen = IIF(LEN(listen) > 0, "        Self.Neuladen()", "")
+    DIM bilder AS ARRAY OF INTEGER : bilder = dbBildFelder(d, namen, arten)
+    DIM bi AS INTEGER
+    ' Ohne gebundenes Feld (etwa nur ein Bild) kennt GUI_FORM_* kein Formular.
+    DIM gebunden AS BOOLEAN : gebunden = FALSE
+    FOR bi = 0 TO JSON_LEN(d, "widgets") - 1
+        IF dbBindText$(d, "widgets." + STR$(bi) + ".bind") <> "" THEN gebunden = TRUE
+    NEXT
     IF ft <> "" THEN
         dbRef(ft)
         DIM con AS STRING : con = dbRefEl.name
@@ -1177,16 +1330,40 @@ SUB dbBasisMethoden(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF ST
         ARRAY_PUSH(z, "    ' Das Fenster gehoert zur Tabelle " + ft + ": DatensatzId ist die Zeile,")
         ARRAY_PUSH(z, "    ' die gerade dasteht (0 = eine neue, noch nicht gesichert).")
         ARRAY_PUSH(z, "    FUNCTION Laden(id AS INTEGER) AS BOOLEAN")
-        ARRAY_PUSH(z, "        IF NOT GUI_FORM_LOAD(Self.studioWin, " + con + ", " + dbText$(tab) + ", id) THEN RETURN FALSE")
+        IF gebunden THEN
+            ARRAY_PUSH(z, "        IF NOT GUI_FORM_LOAD(Self.studioWin, " + con + ", " + dbText$(tab) + ", id) THEN RETURN FALSE")
+        ELSE
+            ARRAY_PUSH(z, "        IF NOT studioDbZeileDa(" + con + ", " + dbText$(tab) + ", id) THEN RETURN FALSE")
+        END IF
         ARRAY_PUSH(z, "        Self.DatensatzId = id")
+        FOR EACH bi IN bilder
+            dbBildZeile(z, namen[bi], "studioDbBildLesen(" + con + ", " + dbText$(tab) + ", " + dbText$(dbBindText$(d, "widgets." + STR$(bi) + ".studio_bildspalte")) + ", id)")
+            ARRAY_PUSH(z, "        Self.studioBildGeaendert_" + namen[bi] + " = FALSE")
+        NEXT
         ARRAY_PUSH(z, "        RETURN TRUE")
         ARRAY_PUSH(z, "    END FUNCTION")
         ARRAY_PUSH(z, "")
         ARRAY_PUSH(z, "    FUNCTION Sichern() AS BOOLEAN")
         ARRAY_PUSH(z, "        IF GUI_VALIDATE(Self.studioWin) > 0 THEN RETURN FALSE")
-        ARRAY_PUSH(z, "        DIM id AS INTEGER : id = GUI_FORM_SAVE(Self.studioWin, " + con + ", " + dbText$(tab) + ", IIF(Self.DatensatzId > 0, Self.DatensatzId, -1))")
+        IF gebunden THEN
+            ARRAY_PUSH(z, "        DIM id AS INTEGER : id = GUI_FORM_SAVE(Self.studioWin, " + con + ", " + dbText$(tab) + ", IIF(Self.DatensatzId > 0, Self.DatensatzId, -1))")
+        ELSE
+            ARRAY_PUSH(z, "        DIM id AS INTEGER : id = Self.DatensatzId")
+            ARRAY_PUSH(z, "        IF id <= 0 THEN id = studioDbZeileNeu(" + con + ", " + dbText$(tab) + ")")
+        END IF
         ARRAY_PUSH(z, "        IF id = 0 THEN RETURN FALSE")
         ARRAY_PUSH(z, "        Self.DatensatzId = id")
+        FOR EACH bi IN bilder
+            DIM bsp AS STRING : bsp = dbQ$(dbBindText$(d, "widgets." + STR$(bi) + ".studio_bildspalte"))
+            ARRAY_PUSH(z, "        IF Self.studioBildGeaendert_" + namen[bi] + " THEN")
+            ARRAY_PUSH(z, "            IF BUFFER_LEN(Self.studioBildNeu_" + namen[bi] + ") > 0 THEN")
+            ARRAY_PUSH(z, "                DB_EXEC(" + con + ", " + dbText$("UPDATE " + dbQ$(tab) + " SET " + bsp + " = ? WHERE id = ?") + ", Self.studioBildNeu_" + namen[bi] + ", id)")
+            ARRAY_PUSH(z, "            ELSE")
+            ARRAY_PUSH(z, "                DB_EXEC(" + con + ", " + dbText$("UPDATE " + dbQ$(tab) + " SET " + bsp + " = NULL WHERE id = ?") + ", id)")
+            ARRAY_PUSH(z, "            END IF")
+            ARRAY_PUSH(z, "            Self.studioBildGeaendert_" + namen[bi] + " = FALSE")
+            ARRAY_PUSH(z, "        END IF")
+        NEXT
         IF neuladen <> "" THEN ARRAY_PUSH(z, neuladen)
         ARRAY_PUSH(z, "        RETURN TRUE")
         ARRAY_PUSH(z, "    END FUNCTION")
@@ -1203,10 +1380,17 @@ SUB dbBasisMethoden(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF ST
             ARRAY_PUSH(vor, dbText$(sp) + ": " + dbText$(dbSp$(s, dbRefT, k, "vorgabe")))
         NEXT
         ARRAY_PUSH(z, "    SUB Neu()")
-        ARRAY_PUSH(z, "        GUI_FORM_CLEAR(Self.studioWin)")
-        IF LEN(vor) > 0 THEN ARRAY_PUSH(z, "        GUI_FORM_SET(Self.studioWin, {" + JOIN$(vor, ", ") + "})")
-        ARRAY_PUSH(z, "        GUI_FORM_CLEAN(Self.studioWin)")
+        IF gebunden THEN
+            ARRAY_PUSH(z, "        GUI_FORM_CLEAR(Self.studioWin)")
+            IF LEN(vor) > 0 THEN ARRAY_PUSH(z, "        GUI_FORM_SET(Self.studioWin, {" + JOIN$(vor, ", ") + "})")
+            ARRAY_PUSH(z, "        GUI_FORM_CLEAN(Self.studioWin)")
+        END IF
         ARRAY_PUSH(z, "        Self.DatensatzId = 0")
+        FOR EACH bi IN bilder
+            dbBildZeile(z, namen[bi], "-1")
+            ARRAY_PUSH(z, "        Self.studioBildNeu_" + namen[bi] + " = BUFFER_NEW(0)")
+            ARRAY_PUSH(z, "        Self.studioBildGeaendert_" + namen[bi] + " = FALSE")
+        NEXT
         ARRAY_PUSH(z, "    END SUB")
         ARRAY_PUSH(z, "")
         ARRAY_PUSH(z, "    FUNCTION Loeschen() AS BOOLEAN")
@@ -1218,8 +1402,46 @@ SUB dbBasisMethoden(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF ST
         ARRAY_PUSH(z, "    END FUNCTION")
         ARRAY_PUSH(z, "")
         ARRAY_PUSH(z, "    FUNCTION Ungesichert() AS BOOLEAN")
-        ARRAY_PUSH(z, "        RETURN GUI_FORM_CHANGED(Self.studioWin)")
+        FOR EACH bi IN bilder
+            ARRAY_PUSH(z, "        IF Self.studioBildGeaendert_" + namen[bi] + " THEN RETURN TRUE")
+        NEXT
+        ARRAY_PUSH(z, "        RETURN " + IIF(gebunden, "GUI_FORM_CHANGED(Self.studioWin)", "FALSE"))
         ARRAY_PUSH(z, "    END FUNCTION")
+        IF LEN(bilder) > 0 THEN
+            ARRAY_PUSH(z, "")
+            ARRAY_PUSH(z, "    ' Ein Bild aus einer Datei in ein Bild-Control an einer Bildspalte;")
+            ARRAY_PUSH(z, "    ' in die Datenbank kommt es mit Sichern().")
+            ARRAY_PUSH(z, "    FUNCTION BildSetzen(w AS GUI_WIDGET, pfad AS STRING) AS BOOLEAN")
+            ARRAY_PUSH(z, "        IF NOT FILEEXISTS(pfad) THEN RETURN FALSE")
+            ARRAY_PUSH(z, "        DIM b AS BUFFER : b = READALL_BYTES(pfad)")
+            ARRAY_PUSH(z, "        DIM bild AS IMAGE")
+            ARRAY_PUSH(z, "        TRY")
+            ARRAY_PUSH(z, "            bild = IMAGE_FROM_BUFFER(b)")
+            ARRAY_PUSH(z, "        CATCH studioFehler")
+            ARRAY_PUSH(z, "            RETURN FALSE")
+            ARRAY_PUSH(z, "        END TRY")
+            FOR EACH bi IN bilder
+                ARRAY_PUSH(z, "        IF w = Self." + namen[bi] + " THEN")
+                dbBildZeile(z, namen[bi], "bild")
+                ARRAY_PUSH(z, "            Self.studioBildNeu_" + namen[bi] + " = b")
+                ARRAY_PUSH(z, "            Self.studioBildGeaendert_" + namen[bi] + " = TRUE")
+                ARRAY_PUSH(z, "            RETURN TRUE")
+                ARRAY_PUSH(z, "        END IF")
+            NEXT
+            ARRAY_PUSH(z, "        IMAGE_FREE(bild)")
+            ARRAY_PUSH(z, "        RETURN FALSE")
+            ARRAY_PUSH(z, "    END FUNCTION")
+            ARRAY_PUSH(z, "")
+            ARRAY_PUSH(z, "    SUB BildLeeren(w AS GUI_WIDGET)")
+            FOR EACH bi IN bilder
+                ARRAY_PUSH(z, "        IF w = Self." + namen[bi] + " THEN")
+                dbBildZeile(z, namen[bi], "-1")
+                ARRAY_PUSH(z, "            Self.studioBildNeu_" + namen[bi] + " = BUFFER_NEW(0)")
+                ARRAY_PUSH(z, "            Self.studioBildGeaendert_" + namen[bi] + " = TRUE")
+                ARRAY_PUSH(z, "        END IF")
+            NEXT
+            ARRAY_PUSH(z, "    END SUB")
+        END IF
     END IF
     IF LEN(listen) = 0 THEN RETURN
     ARRAY_PUSH(z, "")
@@ -1238,6 +1460,7 @@ SUB dbBasisMethoden(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF ST
         ' nennt ihre Spalten erst im Programm.
         DIM spalten AS STRING : spalten = dbBindText$(d, wp + "studio_spalten")
         DIM typen AS STRING : typen = ""
+        DIM bildSp AS ARRAY OF INTEGER : bildSp = []
         IF dbRefT >= 0 THEN
             DIM sn AS ARRAY OF STRING : sn = []
             DIM st AS ARRAY OF STRING : st = []
@@ -1248,6 +1471,9 @@ SUB dbBasisMethoden(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF ST
             NEXT
             spalten = JOIN$(sn, ";")
             typen = JOIN$(st, ";")
+            FOR q = 0 TO LEN(st) - 1
+                IF st[q] = "bild" THEN ARRAY_PUSH(bildSp, q)
+            NEXT
         END IF
         DIM such AS STRING : such = dbSuchfeld$(d, li, namen, arten)
         DIM w AS STRING : w = "Self." + namen[li]
@@ -1263,6 +1489,11 @@ SUB dbBasisMethoden(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF ST
         ARRAY_PUSH(z, "        " + ids + " = []")
         ARRAY_PUSH(z, "        r = studioQuelle(" + le.name + ", " + dbText$(quelle) + ", " + dbText$(spalten) + ", " + dbText$(dbBindText$(d, wp + "studio_filter")) + ", " + dbText$(dbBindText$(d, wp + "studio_sortieren")) + ", " + IIF(dbBindAn(d, wp + "studio_absteigend"), "TRUE", "FALSE") + ", " + IIF(such = "", dbText$(""), "GUI_TEXT(Self." + such + ")") + ")")
         IF arten[li] = "table" THEN
+            ARRAY_PUSH(z, "        DIM studioAlt_" + namen[li] + " AS IMAGE")
+            ARRAY_PUSH(z, "        FOR EACH studioAlt_" + namen[li] + " IN Self.studioBilder_" + namen[li])
+            ARRAY_PUSH(z, "            IMAGE_FREE(studioAlt_" + namen[li] + ")")
+            ARRAY_PUSH(z, "        NEXT")
+            ARRAY_PUSH(z, "        Self.studioBilder_" + namen[li] + " = []")
             ARRAY_PUSH(z, "        GUI_TABLE_CLEAR(" + w + ")")
             ARRAY_PUSH(z, "        GUI_TABLE_HEADERS(" + w + ", studioQuelleSpalten)")
         ELSE
@@ -1272,6 +1503,16 @@ SUB dbBasisMethoden(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF ST
         ARRAY_PUSH(z, "            ARRAY_PUSH(" + ids + ", DB_GET_INT(r, 0))")
         IF arten[li] = "table" THEN
             ARRAY_PUSH(z, "            GUI_TABLE_ADD_ROW(" + w + ", studioZeile(r, " + dbText$(typen) + "))")
+            DIM bq AS INTEGER
+            FOR EACH bq IN bildSp
+                DIM bv AS STRING : bv = "studioB_" + namen[li] + "_" + STR$(bq)
+                ARRAY_PUSH(z, "            DIM " + bv + " AS IMAGE : " + bv + " = studioDbBild(r, " + STR$(bq + 1) + ")")
+                ARRAY_PUSH(z, "            IF " + bv + " >= 0 THEN")
+                ARRAY_PUSH(z, "                ARRAY_PUSH(Self.studioBilder_" + namen[li] + ", " + bv + ")")
+                ARRAY_PUSH(z, "                GUI_TABLE_CELL_KIND(" + w + ", GUI_TABLE_ROW_COUNT(" + w + ") - 1, " + STR$(bq) + ", " + dbText$("bild") + ")")
+                ARRAY_PUSH(z, "                GUI_TABLE_CELL_IMAGE(" + w + ", GUI_TABLE_ROW_COUNT(" + w + ") - 1, " + STR$(bq) + ", " + bv + ")")
+                ARRAY_PUSH(z, "            END IF")
+            NEXT
         ELSE
             ARRAY_PUSH(z, "            GUI_LISTBOX_ADD(" + w + ", studioZeile(r, " + dbText$(typen) + ")[0])")
             IF arten[li] = "dropdown" THEN ARRAY_PUSH(z, "            GUI_LISTBOX_SET_DATA(" + w + ", GUI_LISTBOX_COUNT(" + w + ") - 1, STR$(DB_GET_INT(r, 0)))")

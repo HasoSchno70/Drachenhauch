@@ -90,6 +90,7 @@ SUB inspektorAnlegen()
     inspGruppe("Daten")
     inspZeile("Daten", "studio_tabelle", "Tabelle", "wahl", "fenster", "")
     inspZeile("Daten", "bind", "Spalte", "wahl", BINDARTEN, "")
+    inspZeile("Daten", "studio_bildspalte", "Bildspalte", "wahl", "image", "")
     inspZeile("Daten", "studio_quelle", "Datenquelle", "wahl", QUELLARTEN, "")
     inspZeile("Daten", "studio_spalten", "Angezeigte Spalten", "text", QUELLARTEN, "")
     inspZeile("Daten", "studio_sortieren", "Sortieren nach", "wahl", QUELLARTEN, "")
@@ -720,7 +721,7 @@ END SUB
 
 ' --- Auswahlen aus dem Projekt (Daten) ------------------------------------------
 FUNCTION istDatenWahl(schluessel AS STRING) AS BOOLEAN
-    RETURN schluessel = "studio_tabelle" OR schluessel = "studio_quelle" OR schluessel = "bind" OR schluessel = "studio_sortieren" OR schluessel = "studio_suchfeld"
+    RETURN schluessel = "studio_tabelle" OR schluessel = "studio_quelle" OR schluessel = "bind" OR schluessel = "studio_sortieren" OR schluessel = "studio_suchfeld" OR schluessel = "studio_bildspalte"
 END FUNCTION
 
 ' Die Eintraege einer Daten-Auswahl: zuerst "(keine)", dann die Tabellen des
@@ -730,7 +731,9 @@ SUB datenWahlFuellen(z AS InspZeile, jetzt AS STRING)
     DIM liste AS ARRAY OF STRING
     SELECT CASE z.schluessel
         CASE "bind"
-            liste = dbSpaltenVon(fensterText$("studio_tabelle"))
+            liste = dbSpaltenBild(fensterText$("studio_tabelle"), FALSE)
+        CASE "studio_bildspalte"
+            liste = dbSpaltenBild(fensterText$("studio_tabelle"), TRUE)
         CASE "studio_quelle"
             liste = dbAlleQuellen()
         CASE "studio_sortieren"

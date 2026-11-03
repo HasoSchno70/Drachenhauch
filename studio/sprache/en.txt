@@ -587,3 +587,13 @@ Bedingung	Condition
 Suchfeld	Search field
 Eine SQL-Bedingung wie im WHERE, etwa: ort = 'Köln' AND umsatz > 100	An SQL condition as in WHERE, for example: ort = 'Köln' AND umsatz > 100
 Die Bedingung geht so nicht: {0}	The condition does not work like this: {0}
+Bild ({0} KB)	Image ({0} KB)
+Bildspalte	Image column
+Bild …	Image …
+Bild wählen	Choose image
+Ein Bild aus einer Datei in die gewählte Zelle einer Bildspalte	An image from a file into the selected cell of an image column
+Erst eine Zelle einer Bildspalte wählen.	Select a cell of an image column first.
+Bild in {0}, Zeile {1} gesichert.	Image saved in {0}, row {1}.
+{0} ist eine Bildspalte -- ein Bild setzt „Bild …“.	{0} is an image column -- "Image …" sets an image.
+{0} ist kein Bild (PNG, JPG, BMP oder GIF).	{0} is not an image (PNG, JPG, BMP or GIF).
+{0} ist keine Bildspalte.	{0} is not an image column.
