@@ -216,6 +216,7 @@ Eigenes Control hinzufügen …	Add custom control …
 Menüs hat nur ein Fenster, kein eigenes Control.	Only a window has menus, not a custom control.
 ein eigenes Control dieses Projekts	a custom control of this project
 {0} gibt es nicht im Projekt	{0} does not exist in the project
+{0} enthält sich selbst	{0} contains itself
 ' {0} -- ein eigenes Control. Seine Teile und die Verdrahtung ihrer	' {0} -- a custom control. Its parts and the wiring of their
 ' Ereignisse stehen in der Basisklasse (_studio/{0}_basis.dh); im Fenster	' events are in the base class (_studio/{0}_basis.dh); in a window
 ' ist jede Instanz ein Objekt dieser Klasse.	' every instance is an object of this class.
@@ -474,3 +475,4 @@ Name = Wert; ... -- {0} hat: {1}	Name = value; ... -- {0} has: {1}
 Name = Vorgabe; Zahl AS INTEGER = 3 -- ohne AS ein STRING; dazu FLOAT und BOOLEAN	Name = default; Count AS INTEGER = 3 -- without AS a STRING; also FLOAT and BOOLEAN
 Namen durch Semikolon; im Code des Controls meldet Self.Ausloesen(...) eines davon	Names separated by semicolons; in the control's code Self.Ausloesen(...) reports one of them
 wenn das eigene Control es mit Ausloesen meldet	when the custom control reports it with Ausloesen
+{0} steht noch in {1} -- erst dort die Instanzen löschen.	{0} is still used in {1} -- delete the instances there first.

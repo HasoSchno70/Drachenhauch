@@ -612,6 +612,8 @@ WHILE NOT beenden
     bildNr = bildNr + 1
     IF bildNr = 3 AND logDatei <> "" THEN lagenProtokollieren() : felderProtokollieren() : controlsProtokollieren()
     IF bildNr = 4 AND GETENV$("DH_STUDIO_SPRACHPROBE") <> "" THEN spracheProbe(GETENV$("DH_STUDIO_SPRACHPROBE"))
+    ' Fuer Pruefungen: DH_STUDIO_LOESCHEN=<Element> fragt wie "Element loeschen".
+    IF bildNr = 4 AND GETENV$("DH_STUDIO_LOESCHEN") <> "" THEN elementLoeschenFragen(elementIndex(GETENV$("DH_STUDIO_LOESCHEN")))
     IF controlsNachBild > 0 THEN
         controlsNachBild = controlsNachBild - 1
         IF controlsNachBild = 0 THEN controlsProtokollieren()

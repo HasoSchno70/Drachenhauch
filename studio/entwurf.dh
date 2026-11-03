@@ -118,6 +118,7 @@ SUB entwurfBauen()
     ' Eine eigene Kopie der Zuordnung -- das Pruefen klappt beim Erzeugen
     ' ebenfalls aus und ueberschriebe sonst die des Entwurfs.
     vkFensterN = akFensterN : vkInstanz = akInstanz : vkErster = akErster : vkAnzahl = akAnzahl
+    vkWurzel = akWurzel : vkName = akName
     vkB = akB : vkH = akH : vkTeilInst = akTeilInst : vkTeilFrei = akTeilFrei
     vkTeilX = akTeilX : vkTeilY = akTeilY : vkTeilW = akTeilW : vkTeilH = akTeilH : vkTeilAnker = akTeilAnker
     vorschauWar = []
@@ -149,8 +150,9 @@ FUNCTION indexVonHandle(h AS GUI_WIDGET) AS INTEGER
     DIM i AS INTEGER
     FOR i = 0 TO GUI_WINDOW_WIDGET_COUNT(frm) - 1
         IF GUI_WINDOW_WIDGET(frm, i) = h THEN
-            ' Ein Teil eines eigenen Controls meint seine Instanz.
-            IF i >= vkFensterN AND i - vkFensterN < LEN(vkTeilInst) THEN RETURN vkInstanz[vkTeilInst[i - vkFensterN]]
+            ' Ein Teil eines eigenen Controls meint seine Instanz im Fenster --
+            ' auch der Teil eines Controls im Control.
+            IF i >= vkFensterN AND i - vkFensterN < LEN(vkTeilInst) THEN RETURN vkWurzel[vkTeilInst[i - vkFensterN]]
             RETURN i
         END IF
     NEXT
@@ -162,6 +164,8 @@ END FUNCTION
 DIM vorschauWar AS ARRAY OF STRING : vorschauWar = []
 DIM vkFensterN AS INTEGER : vkFensterN = 0
 DIM vkInstanz AS ARRAY OF INTEGER : vkInstanz = []
+DIM vkWurzel AS ARRAY OF INTEGER : vkWurzel = []
+DIM vkName AS ARRAY OF STRING : vkName = []
 DIM vkErster AS ARRAY OF INTEGER : vkErster = []
 DIM vkAnzahl AS ARRAY OF INTEGER : vkAnzahl = []
 DIM vkB AS ARRAY OF INTEGER : vkB = []
@@ -483,7 +487,7 @@ SUB controlsProtokollieren()
     ' (Lage im Fenster, nicht auf dem Schirm -- so wie ein Programm sie sieht).
     FOR i = 0 TO LEN(vkTeilInst) - 1
         DIM th AS GUI_WIDGET : th = GUI_WINDOW_WIDGET(frm, vkFensterN + i)
-        DIM tn AS STRING : tn = feldText$(vkInstanz[vkTeilInst[i]], "name") + "_" + STR$(i - (vkErster[vkTeilInst[i]] - vkFensterN))
+        DIM tn AS STRING : tn = vkName[vkTeilInst[i]] + "_" + STR$(i - (vkErster[vkTeilInst[i]] - vkFensterN))
         protokoll("lage teil " + tn + " " + STR$(GUI_GET_X(th)) + " " + STR$(GUI_GET_Y(th)) + " " + STR$(GUI_GET_W(th)) + " " + STR$(GUI_GET_H(th)))
     NEXT
     ' und jeden Abstandhalter: "lage abstand LAYOUT STELLE x y"
@@ -1539,7 +1543,11 @@ SUB entwurfZeichnen()
         DIM ce AS INTEGER : ce = elementIndex(cn)
         DIM da AS BOOLEAN : da = ce >= 0
         IF da THEN da = elemente[ce].art = "control"
-        IF NOT da THEN TEXT(cx1 + 6, cy1 + 4, trf$("{0} gibt es nicht im Projekt", [cn]), farbe("leise"))
+        IF NOT da THEN
+            TEXT(cx1 + 6, cy1 + 4, trf$("{0} gibt es nicht im Projekt", [cn]), farbe("leise"))
+        ELSEIF NOT controlBrauchbar(cn) THEN
+            TEXT(cx1 + 6, cy1 + 4, trf$("{0} enthält sich selbst", [cn]), farbe("leise"))
+        END IF
     NEXT
     ' Die Abstandhalter jedes Layouts.
     FOR li = 0 TO anzahl() - 1
