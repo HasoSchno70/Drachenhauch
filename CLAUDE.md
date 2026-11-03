@@ -3672,6 +3672,25 @@ Fenstern. Tests `tests/pruef/werkzeug_studio_controls.dhtest` (4: zwei
 Instanzen im erzeugten Programm, eine in einer Zeile gestreckt; Vorschau
 nach Ankern; Ablegen aus der Bibliothek; Klick auf einen Teil waehlt die
 Instanz); sieben Verfaelschungen fallen je in ihrem Fall.
+**Stufe 2 (selber Tag): eigene Ereignisse und Eigenschaften.** Alles Text in
+der .dhform, damit es in die Felder des Inspektors und in Rueckgaengig passt:
+am Control `studio_ereignisse` ("Erreicht; Geleert") und
+`studio_eigenschaften` ("Ziel AS INTEGER = 3; Vorsatz = \"Anzahl: \"",
+STRING/INTEGER/FLOAT/BOOLEAN, ohne AS STRING, Anfuehrungszeichen halten
+Randleerzeichen), an der Instanz `studio_werte` ("Ziel = 2"). Gelesen in
+modell.dh (`controlEreignisse`, `eigenschaftenLesen` -> `eigName/Typ/Wert`,
+`werteLesen`, `wertLiteral$` = Literal oder "" wenn es nicht passt --
+Unpassendes faellt still weg). Die Arten in `ctrlArten`/`arten` heissen fuer
+eine Instanz `studio_control:<Name>`, `ereignisseFuer` loest daraus die
+Ereignisse des Controls. Erzeugt: je Eigenschaft ein Feld, die Vorgabe am
+Ende von `studioEinbauen`, die Werte der Instanz danach im Fenster;
+`Self.Ausloesen` sammelt in `studioMeldungen`, das Fenster fragt nach dem
+Takt des Controls `studioGemeldet` und leert am Ende seines Takts.
+**Fund:** eine Instanz ist im Entwurf ein leerer Behaelter, Luft fuer
+Klicks -- ein Klick auf eine Stelle ohne Teil traf nichts (`instanzBei` in
+`trefferMitLayouts`). Tests zwei Faelle mehr in
+`werkzeug_studio_controls.dhtest` (6); sechs Verfaelschungen fallen je in
+ihrem Fall.
 
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 

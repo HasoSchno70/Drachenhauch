@@ -349,8 +349,34 @@ it takes the anchors, the weight in a layout and the position --, and the
 parts of the control stand behind it in the same window. Every frame the
 runtime puts them where the container currently is, following their anchors
 inside the control: a part anchored left and right grows with the instance.
-Not yet: controls inside controls, and events of the control that the window
-receives.
+
+**Own events and properties.** The inspector of the control has two fields
+under "Custom control": **Events** (names separated by semicolons,
+`Erreicht; Geleert`) and **Properties** (`Ziel AS INTEGER = 3; Vorsatz =
+"Anzahl: "` -- without `AS` a STRING, also FLOAT and BOOLEAN; quotes keep
+spaces at the edges). Every property is a field of the control's class with
+this default. An instance has the field **Values** in the inspector (`Ziel =
+2; Vorsatz = "Erste: "`); a name the control doesn't know, or a value that
+doesn't fit the type, is dropped.
+
+```basic
+' in the code of the control Zaehler
+SUB knopf_Klick()
+    Self.n = Self.n + 1
+    IF Self.n = Self.Ziel THEN Self.Ausloesen("Erreicht")
+END SUB
+
+' in the code of the window
+SUB zaehler1_Erreicht()
+    Meldung("Ziel erreicht")
+END SUB
+```
+
+`Self.Ausloesen("Name")` reports one of the events; the window then calls
+its method `<instance>_<event>` -- after the control's tick, in the same
+frame. A double click on the instance offers its events like on any other
+control. Not yet: controls inside controls, and renaming together with the
+instances.
 
 ## A single window
 
