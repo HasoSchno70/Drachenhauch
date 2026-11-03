@@ -289,8 +289,9 @@ check []
 ' Im Studio werden ort -> stadt, kunden -> kundschaft und name -> vorname
 ' umbenannt (artikel -> Artikel ist nur Gross/klein: SQLite sieht denselben
 ' Namen, gemerkt wird es nicht, die Datei behaelt artikel).
-' Das Programm benennt der Reihe nach um, die Zeile behaelt ihre Werte, der
-' Index heisst danach nach Tabelle und Spalte; ein zweiter Lauf aendert nichts.
+' Das Programm benennt der Reihe nach um, die Zeile behaelt ihre Werte, die
+' Indexe heissen danach nach Tabelle und Spalte (auch der von nr, die selbst
+' nicht umbenannt wurde); ein zweiter Lauf aendert nichts.
 IMPORT "kern.dh"
 projOrdner = CWD$() + "/proj"
 DIM e AS Element : e = elementNeu("datenbank", "Daten")
@@ -305,10 +306,11 @@ NEXT
 MKDIR("prog")
 WRITEALL("prog/studio_datenbanken.dh", datenbankCode$())
 DIM db AS DB_CONN : db = DB_OPEN("prog/daten.sqlite")
-DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT NOT NULL DEFAULT '', ort TEXT)")
+DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT NOT NULL DEFAULT '', ort TEXT, nr TEXT)")
+DB_EXEC(db, "CREATE UNIQUE INDEX studio_u_kunden_nr ON kunden (nr)")
 DB_EXEC(db, "CREATE UNIQUE INDEX studio_u_kunden_ort ON kunden (ort)")
 DB_EXEC(db, "CREATE TABLE artikel (id INTEGER PRIMARY KEY, preis INTEGER NOT NULL DEFAULT 0)")
-DB_EXEC(db, "INSERT INTO kunden (name, ort) VALUES ('Anna', 'Bremen')")
+DB_EXEC(db, "INSERT INTO kunden (name, ort, nr) VALUES ('Anna', 'Bremen', 'K1')")
 DB_CLOSE(db)
 DIM lauf AS INTEGER
 FOR lauf = 1 TO 2
@@ -340,7 +342,7 @@ WEND
 PRINT "spalten "; JOIN$(sp, ",")
 DB_CLOSE(db)
 --- datei Daten.dhdb
-{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":true,"eindeutig":false,"vorgabe":""},{"name":"ort","typ":"text","pflicht":false,"eindeutig":true,"vorgabe":""}]},{"name":"artikel","spalten":[{"name":"preis","typ":"geld","pflicht":true,"eindeutig":false,"vorgabe":"0"}]}]}
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":true,"eindeutig":false,"vorgabe":""},{"name":"ort","typ":"text","pflicht":false,"eindeutig":true,"vorgabe":""},{"name":"nr","typ":"text","pflicht":false,"eindeutig":true,"vorgabe":""}]},{"name":"artikel","spalten":[{"name":"preis","typ":"geld","pflicht":true,"eindeutig":false,"vorgabe":"0"}]}]}
 --- datei prog/main.dh
 IMPORT "studio_datenbanken.dh"
 DIM r AS DB_RESULT : r = DB_QUERY(Daten, "SELECT vorname, stadt FROM kundschaft")
@@ -366,8 +368,9 @@ lauf 1: Anna Bremen
 lauf 2: Anna Bremen
   artikel
   kundschaft
+  studio_u_kundschaft_nr
   studio_u_kundschaft_stadt
-spalten id,vorname,stadt
+spalten id,vorname,stadt,nr
 
 === das projekt schreibt den aufbau als dhdb und liest ihn wieder
 ' Eine Datenbank hat keine .dh. Beim Umbenennen geht die alte .dhdb weg; die
