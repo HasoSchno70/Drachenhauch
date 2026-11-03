@@ -46,6 +46,7 @@ DIM miNeu AS INTEGER
 DIM miOeffnen AS INTEGER
 DIM miFensterNeu AS INTEGER
 DIM miModulNeu AS INTEGER
+DIM miControlNeu AS INTEGER
 DIM miKlasseNeu AS INTEGER
 DIM miMethodeNeu AS INTEGER
 DIM miEreignisNeu AS INTEGER
@@ -148,6 +149,7 @@ SUB oberflaecheAnlegen()
     miAlles = GUI_MENU_ITEM(m, tr$("Alles auswählen   Strg+A")) : GUI_MENU_ICON(miAlles, "auswahl")
     m = GUI_MENU(win, tr$("Projekt"))
     miFensterNeu = GUI_MENU_ITEM(m, tr$("Fenster hinzufügen …"), kz$("Strg+N")) : GUI_MENU_ICON(miFensterNeu, "plus")
+    miControlNeu = GUI_MENU_ITEM(m, tr$("Eigenes Control hinzufügen …"))
     miModulNeu = GUI_MENU_ITEM(m, tr$("Modul hinzufügen …"))
     miKlasseNeu = GUI_MENU_ITEM(m, tr$("Klasse hinzufügen …"))
     miBildNeu = GUI_MENU_ITEM(m, tr$("Bild hinzufügen …"), kz$("Strg+Umschalt+B"))
@@ -334,9 +336,9 @@ SUB bibliothekFuellen()
         FOR p = 0 TO LEN(bausteine) - 1
             IF bausteine[p].gruppe <> g THEN CONTINUE
             DIM r AS INTEGER : r = GUI_LISTBOX_COUNT(lstBib)
-            GUI_LISTBOX_ADD(lstBib, tr$(bausteine[p].name))
+            GUI_LISTBOX_ADD(lstBib, bausteinAnzeige$(bausteine[p]))
             GUI_LISTBOX_ICON(lstBib, r, bausteine[p].symbol)
-            GUI_LISTBOX_TIP(lstBib, r, trf$("{0} -- {1}. Ziehen oder anklicken und dann ins Fenster klicken.", [tr$(bausteine[p].name), tr$(bausteine[p].beschreibung)]))
+            GUI_LISTBOX_TIP(lstBib, r, trf$("{0} -- {1}. Ziehen oder anklicken und dann ins Fenster klicken.", [bausteinAnzeige$(bausteine[p]), tr$(bausteine[p].beschreibung)]))
             ARRAY_PUSH(bibZeile, p)
         NEXT
     NEXT
@@ -364,6 +366,12 @@ END FUNCTION
 ' der Druck dort beginnt; nach GUI_UPDATE steht die Zeile in der Auswahl.
 DIM bibDruckJetzt AS BOOLEAN
 SUB bibVorUpdate()
+    IF projektBausteineNachziehen() THEN
+        ' Die Nummern der eigenen Controls gelten nicht mehr.
+        IF bibScharfIdx >= bibEingebaut THEN bibEntschaerfen()
+        IF bibZug >= bibEingebaut THEN bibZug = -1
+        bibliothekFuellen()
+    END IF
     bibDruckJetzt = MOUSE_HIT(0) AND bibUnterMaus()
 END SUB
 
@@ -391,7 +399,7 @@ SUB bibNachUpdate()
             IF rs >= 0 AND rs < LEN(bibZeile) THEN
                 IF bibZeile[rs] >= 0 THEN
                     bibScharfIdx = bibZeile[rs]
-                    status(trf$("{0}: ins Fenster klicken, um abzulegen. Esc bricht ab.", [tr$(bausteine[bibScharfIdx].name)]))
+                    status(trf$("{0}: ins Fenster klicken, um abzulegen. Esc bricht ab.", [bausteinAnzeige$(bausteine[bibScharfIdx])]))
                 END IF
             END IF
         END IF
@@ -430,11 +438,18 @@ SUB bibZugZeichnen()
     IF bibZug < 0 THEN RETURN
     DIM b AS Baustein : b = bausteine[bibZug]
     DRAWIMAGE(b.breit, MOUSEX() + 12, MOUSEY() + 8)
-    TEXT(MOUSEX() + 12 + SYM_B + 4, MOUSEY() + 12, tr$(b.name), farbe("titeltext"))
+    TEXT(MOUSEX() + 12 + SYM_B + 4, MOUSEY() + 12, bausteinAnzeige$(b), farbe("titeltext"))
 END SUB
+
+' Der Name der Art, wie er dasteht -- eine Instanz heisst wie ihr Control.
+FUNCTION bausteinNameAnzeige$(i AS INTEGER) AS STRING
+    IF feldText$(i, "kind") = "studio_control" THEN RETURN bausteinName$(i)
+    RETURN tr$(bausteinName$(i))
+END FUNCTION
 
 FUNCTION bausteinName$(i AS INTEGER) AS STRING
     DIM k AS STRING : k = feldText$(i, "kind")
+    IF k = "studio_control" THEN RETURN feldText$(i, "studio_control")
     IF k = "layout" THEN
         SELECT CASE feldText$(i, "layout.art")
             CASE "zeile" : RETURN "Zeile"

@@ -153,6 +153,7 @@ END FUNCTION
 ' von GUI_UPDATE und darf selbst Bilder drehen (Frage, ZeigenModal).
 FUNCTION basisCode$(ei AS INTEGER) AS STRING
     DIM e AS Element : e = elemente[ei]
+    DIM istControl AS BOOLEAN : istControl = e.art = "control"
     DIM d AS JSON_HANDLE : d = layoutFuerBasis(ei)
     DIM nW AS INTEGER : nW = JSON_LEN(d, "widgets")
     DIM namen AS ARRAY OF STRING : namen = []
@@ -169,7 +170,7 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
         ARRAY_PUSH(namen, JSON_GET_STRING(d, "timer." + STR$(i) + ".name"))
         ARRAY_PUSH(arten, "timer")
     NEXT
-    menueNamenSammeln(d, "menus", namen, arten)
+    IF NOT istControl THEN menueNamenSammeln(d, "menus", namen, arten)
     ' Je Control: welche Ereignisse der Nutzer geschrieben hat ("" = keins).
     DIM evMeth AS MAP OF STRING
     DIM m AS Methode
@@ -183,16 +184,41 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
             BREAK
         NEXT
     NEXT
+    ' Ein Fenster klappt seine eigenen Controls aus (modell.dh, ausgeklappt);
+    ' ein Control baut nur Felder auf Teile, die das Fenster schon hat.
+    DIM aus AS JSON_HANDLE : aus = d
+    DIM instName AS ARRAY OF STRING : instName = []
+    DIM instKlasse AS ARRAY OF STRING : instKlasse = []
+    DIM instIndex AS ARRAY OF INTEGER : instIndex = []
+    DIM instErster AS ARRAY OF INTEGER : instErster = []
+    DIM nAus AS INTEGER : nAus = nW
+    IF NOT istControl THEN
+        aus = ausgeklappt(d)
+        nAus = JSON_LEN(aus, "widgets")
+        DIM s AS INTEGER
+        FOR s = 0 TO LEN(akInstanz) - 1
+            IF akAnzahl[s] = 0 THEN CONTINUE
+            IF NOT istBezeichner(namen[akInstanz[s]]) THEN CONTINUE
+            ARRAY_PUSH(instName, namen[akInstanz[s]])
+            ARRAY_PUSH(instKlasse, akControl[s])
+            ARRAY_PUSH(instIndex, akInstanz[s])
+            ARRAY_PUSH(instErster, akErster[s])
+        NEXT
+    END IF
     DIM z AS ARRAY OF STRING : z = []
     ARRAY_PUSH(z, "' Erzeugt vom Drachenhauch Studio aus " + layoutDatei$(e) + " -- nicht von Hand aendern,")
-    ARRAY_PUSH(z, "' beim naechsten Starten wird die Datei neu geschrieben. Der Code des Fensters")
+    ARRAY_PUSH(z, "' beim naechsten Starten wird die Datei neu geschrieben. Der Code des " + IIF(istControl, "Controls", "Fensters"))
     ARRAY_PUSH(z, "' steht in " + codeDatei$(e) + " (CLASS " + e.name + " EXTENDS " + e.name + "_Basis).")
-    ARRAY_PUSH(z, "CLASS " + e.name + "_Basis EXTENDS StudioFenster")
+    ARRAY_PUSH(z, "CLASS " + e.name + "_Basis EXTENDS " + IIF(istControl, "StudioControl", "StudioFenster"))
     FOR i = 0 TO LEN(namen) - 1
         IF NOT istBezeichner(namen[i]) THEN CONTINUE
         DIM typ AS STRING : typ = "GUI_WIDGET"
         IF arten[i] = "timer" THEN typ = "StudioTimer"
         IF arten[i] = "menue" THEN typ = "INTEGER"
+        IF arten[i] = "studio_control" THEN
+            DIM ik AS INTEGER : ik = ARRAY_INDEXOF(instIndex, i)
+            IF ik >= 0 THEN typ = instKlasse[ik]
+        END IF
         ARRAY_PUSH(z, "    DIM " + namen[i] + " AS " + typ)
         IF MAPHAS(evMeth, STR$(i) + "|mausrein") OR MAPHAS(evMeth, STR$(i) + "|mausraus") THEN
             ARRAY_PUSH(z, "    DIM studioUeber_" + namen[i] + " AS BOOLEAN")
@@ -200,42 +226,69 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
         IF MAPHAS(evMeth, STR$(i) + "|ziehen") THEN ARRAY_PUSH(z, "    DIM studioZug_" + namen[i] + " AS BOOLEAN")
     NEXT
     ARRAY_PUSH(z, "")
-    ARRAY_PUSH(z, "    SUB studioAufbauen()")
-    ' Das Fenster aus dem Layout -- ohne Timer und Menues, die baut der Code.
-    DIM rumpf AS JSON_HANDLE : rumpf = JSON_PARSE(JSON_STRINGIFY(d))
-    IF JSON_HAS(rumpf, "timer") THEN JSON_REMOVE(rumpf, "timer")
-    IF JSON_HAS(rumpf, "menus") THEN JSON_REMOVE(rumpf, "menus")
-    ARRAY_PUSH(z, "        DIM j AS STRING : j = " + CHR$(34) + CHR$(34))
-    DIM json AS STRING : json = JSON_STRINGIFY(rumpf)
-    DIM pos AS INTEGER : pos = 0
-    WHILE pos < LEN(json)
-        ARRAY_PUSH(z, "        j = j + " + dhText$(MID$(json, pos, 96)))
-        pos = pos + 96
-    WEND
-    ARRAY_PUSH(z, "        Self.studioWin = GUI_FROM_JSON(j)")
-    FOR i = 0 TO nW - 1
-        IF istBezeichner(namen[i]) THEN ARRAY_PUSH(z, "        Self." + namen[i] + " = GUI_WINDOW_WIDGET(Self.studioWin, " + STR$(i) + ")")
-    NEXT
-    ' Bilder aus dem Projekt.
-    FOR i = 0 TO nW - 1
-        DIM bp AS STRING : bp = "widgets." + STR$(i) + ".studio_bild"
-        IF JSON_HAS(d, bp) THEN
-            IF JSON_GET_STRING(d, bp) <> "" THEN ARRAY_PUSH(z, "        GUI_SET_IMAGE(GUI_WINDOW_WIDGET(Self.studioWin, " + STR$(i) + "), Bild(" + dhText$(JSON_GET_STRING(d, bp)) + "))")
-        END IF
-    NEXT
+    IF istControl THEN
+        ' Ein Control: Felder auf seine Teile ab dem ersten im Fenster, dazu
+        ' Lage und Anker jedes frei liegenden Teils fuer studioLegen.
+        ARRAY_PUSH(z, "    SUB studioEinbauen(win AS GUI_WINDOW, behaelter AS GUI_WIDGET, erster AS INTEGER)")
+        ARRAY_PUSH(z, "        Self.studioAnfangen(win, behaelter, " + STR$(jsonZahl(d, "w", 300)) + ", " + STR$(jsonZahl(d, "h", 120)) + ")")
+        DIM eltern AS ARRAY OF INTEGER : eltern = elternAus(d)
+        FOR i = 0 TO nW - 1
+            DIM tp AS STRING : tp = "widgets." + STR$(i)
+            DIM tw AS STRING : tw = "GUI_WINDOW_WIDGET(win, erster + " + STR$(i) + ")"
+            IF istBezeichner(namen[i]) THEN ARRAY_PUSH(z, "        Self." + namen[i] + " = " + tw)
+            DIM frei AS BOOLEAN : frei = i >= LEN(eltern)
+            IF NOT frei THEN frei = eltern[i] < 0
+            DIM an AS STRING : an = IIF(JSON_HAS(d, tp + ".anchor"), JSON_GET_STRING(d, tp + ".anchor"), "")
+            ARRAY_PUSH(z, "        Self.studioTeil(" + tw + ", " + IIF(frei, "TRUE", "FALSE") + ", " + STR$(jsonZahl(d, tp + ".x", 0)) + ", " + STR$(jsonZahl(d, tp + ".y", 0)) + ", " + STR$(jsonZahl(d, tp + ".w", 0)) + ", " + STR$(jsonZahl(d, tp + ".h", 0)) + ", " + dhText$(an) + ")")
+        NEXT
+    ELSE
+        ARRAY_PUSH(z, "    SUB studioAufbauen()")
+        ' Das Fenster aus dem Layout -- ohne Timer und Menues, die baut der Code.
+        DIM rumpf AS JSON_HANDLE : rumpf = JSON_PARSE(JSON_STRINGIFY(aus))
+        IF JSON_HAS(rumpf, "timer") THEN JSON_REMOVE(rumpf, "timer")
+        IF JSON_HAS(rumpf, "menus") THEN JSON_REMOVE(rumpf, "menus")
+        ARRAY_PUSH(z, "        DIM j AS STRING : j = " + CHR$(34) + CHR$(34))
+        DIM json AS STRING : json = JSON_STRINGIFY(rumpf)
+        DIM pos AS INTEGER : pos = 0
+        WHILE pos < LEN(json)
+            ARRAY_PUSH(z, "        j = j + " + dhText$(MID$(json, pos, 96)))
+            pos = pos + 96
+        WEND
+        ARRAY_PUSH(z, "        Self.studioWin = GUI_FROM_JSON(j)")
+        ARRAY_PUSH(z, "        Self.studioControls = []")
+        FOR i = 0 TO nW - 1
+            IF NOT istBezeichner(namen[i]) THEN CONTINUE
+            IF arten[i] = "studio_control" THEN CONTINUE
+            ARRAY_PUSH(z, "        Self." + namen[i] + " = GUI_WINDOW_WIDGET(Self.studioWin, " + STR$(i) + ")")
+        NEXT
+        ' Die eigenen Controls: ein Objekt je Instanz, das seine Teile kennt.
+        DIM q AS INTEGER
+        FOR q = 0 TO LEN(instName) - 1
+            ARRAY_PUSH(z, "        Self." + instName[q] + " = NEW " + instKlasse[q] + "()")
+            ARRAY_PUSH(z, "        Self." + instName[q] + ".studioEinbauen(Self.studioWin, GUI_WINDOW_WIDGET(Self.studioWin, " + STR$(instIndex[q]) + "), " + STR$(instErster[q]) + ")")
+            ARRAY_PUSH(z, "        ARRAY_PUSH(Self.studioControls, Self." + instName[q] + ")")
+        NEXT
+        ' Bilder aus dem Projekt -- auch die in den Teilen eigener Controls.
+        FOR i = 0 TO nAus - 1
+            DIM bp AS STRING : bp = "widgets." + STR$(i) + ".studio_bild"
+            IF JSON_HAS(aus, bp) THEN
+                IF JSON_GET_STRING(aus, bp) <> "" THEN ARRAY_PUSH(z, "        GUI_SET_IMAGE(GUI_WINDOW_WIDGET(Self.studioWin, " + STR$(i) + "), Bild(" + dhText$(JSON_GET_STRING(aus, bp)) + "))")
+            END IF
+        NEXT
+    END IF
     ' Timer.
     FOR i = 0 TO nT - 1
-        DIM tp AS STRING : tp = "timer." + STR$(i)
-        DIM tn AS STRING : tn = "Self." + JSON_GET_STRING(d, tp + ".name")
+        DIM tmp AS STRING : tmp = "timer." + STR$(i)
+        DIM tn AS STRING : tn = "Self." + JSON_GET_STRING(d, tmp + ".name")
         DIM iv AS INTEGER : iv = 1000
-        IF JSON_HAS(d, tp + ".intervall") THEN iv = INT(JSON_GET_FLOAT(d, tp + ".intervall"))
+        IF JSON_HAS(d, tmp + ".intervall") THEN iv = INT(JSON_GET_FLOAT(d, tmp + ".intervall"))
         ARRAY_PUSH(z, "        " + tn + " = NEW StudioTimer()")
         ARRAY_PUSH(z, "        " + tn + ".Intervall = " + STR$(iv))
-        ARRAY_PUSH(z, "        " + tn + ".Wiederholen = " + IIF(jsonSchalter(d, tp + ".wiederholen", TRUE), "TRUE", "FALSE"))
-        IF jsonSchalter(d, tp + ".aktiv", TRUE) THEN ARRAY_PUSH(z, "        " + tn + ".Starten()")
+        ARRAY_PUSH(z, "        " + tn + ".Wiederholen = " + IIF(jsonSchalter(d, tmp + ".wiederholen", TRUE), "TRUE", "FALSE"))
+        IF jsonSchalter(d, tmp + ".aktiv", TRUE) THEN ARRAY_PUSH(z, "        " + tn + ".Starten()")
     NEXT
     ' Menues.
-    IF JSON_HAS(d, "menus") THEN
+    IF NOT istControl AND JSON_HAS(d, "menus") THEN
         DIM zaehler AS INTEGER : zaehler = 0
         DIM k AS INTEGER
         FOR k = 0 TO JSON_LEN(d, "menus") - 1
@@ -247,11 +300,23 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
             IF JSON_HAS(d, mp + ".items") THEN menueCode(z, d, mp + ".items", mv, zaehler)
         NEXT
     END IF
+    ' Die eigenen Controls melden sich fertig, bevor das Fenster es tut.
+    DIM qq AS INTEGER
+    FOR qq = 0 TO LEN(instName) - 1
+        ARRAY_PUSH(z, "        Self." + instName[qq] + ".Geoeffnet()")
+    NEXT
     ARRAY_PUSH(z, "    END SUB")
     ' Die Abfragen je Bild, die leeren Ereignis-Methoden fuer die Basis.
     DIM takt AS ARRAY OF STRING : takt = []
     DIM zeichnen AS ARRAY OF STRING : zeichnen = []
     DIM leer AS ARRAY OF STRING : leer = []
+    ' Zuerst die eigenen Controls: Teile legen, ihre Ereignisse.
+    FOR qq = 0 TO LEN(instName) - 1
+        ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
+        ARRAY_PUSH(takt, "        Self." + instName[qq] + ".studioLegen()")
+        ARRAY_PUSH(takt, "        Self." + instName[qq] + ".studioTakt()")
+        ARRAY_PUSH(zeichnen, "        Self." + instName[qq] + ".studioZeichnen()")
+    NEXT
     FOR i = 0 TO LEN(namen) - 1
         IF NOT istBezeichner(namen[i]) THEN CONTINUE
         DIM ctl AS STRING : ctl = "Self." + namen[i]
@@ -338,7 +403,11 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
     IF LEN(zeichnen) > 0 THEN
         ARRAY_PUSH(z, "")
         ARRAY_PUSH(z, "    SUB studioZeichnen()")
-        ARRAY_PUSH(z, "        IF NOT GUI_WINDOW_SHOWN(Self.studioWin) THEN RETURN")
+        IF istControl THEN
+            ARRAY_PUSH(z, "        IF NOT Self.studioOffen THEN RETURN")
+        ELSE
+            ARRAY_PUSH(z, "        IF NOT GUI_WINDOW_SHOWN(Self.studioWin) THEN RETURN")
+        END IF
         FOR EACH zl IN zeichnen
             ARRAY_PUSH(z, zl)
         NEXT
@@ -376,6 +445,10 @@ FUNCTION reihenfolge() AS ARRAY OF INTEGER
                 ARRAY_PUSH(drin, e.name)
             END IF
         NEXT
+    NEXT
+    ' Eigene Controls vor den Fenstern: deren Basis nennt ihre Klassen.
+    FOR i = 0 TO LEN(elemente) - 1
+        IF elemente[i].art = "control" THEN ARRAY_PUSH(aus, i)
     NEXT
     FOR i = 0 TO LEN(elemente) - 1
         IF elemente[i].art = "app" THEN ARRAY_PUSH(aus, i)
@@ -427,7 +500,7 @@ FUNCTION mainCode$() AS STRING
     DIM i AS INTEGER
     FOR EACH i IN reihenfolge()
         DIM e AS Element : e = elemente[i]
-        IF e.art = "fenster" THEN ARRAY_PUSH(z, "IMPORT " + CHR$(34) + e.name + "_basis.dh" + CHR$(34))
+        IF hatLayout(e) THEN ARRAY_PUSH(z, "IMPORT " + CHR$(34) + e.name + "_basis.dh" + CHR$(34))
         ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "projekt/" + codeDatei$(e) + CHR$(34))
     NEXT
     ARRAY_PUSH(z, "")
@@ -445,7 +518,7 @@ SUB erzeugen()
     WRITEALL(PATHJOIN(o, "studio_laufzeit.dh"), laufzeitQuelle$())
     DIM i AS INTEGER
     FOR i = 0 TO LEN(elemente) - 1
-        IF elemente[i].art = "fenster" THEN WRITEALL(PATHJOIN(o, elemente[i].name + "_basis.dh"), basisCode$(i))
+        IF hatLayout(elemente[i]) THEN WRITEALL(PATHJOIN(o, elemente[i].name + "_basis.dh"), basisCode$(i))
     NEXT
     ' Der Code des Projekts so, wie er im Editor steht -- dann passen die
     ' Zeilen einer Meldung genau auf die Karte aus codeSetzen$, auch wenn die
@@ -530,7 +603,7 @@ FUNCTION ganzerText$() AS STRING
     gzDazu(teile, laufzeitQuelle$(), -1, TRUE, FALSE)
     DIM i AS INTEGER
     FOR EACH i IN reihenfolge()
-        IF elemente[i].art = "fenster" THEN gzDazu(teile, basisCode$(i), i, TRUE, FALSE)
+        IF hatLayout(elemente[i]) THEN gzDazu(teile, basisCode$(i), i, TRUE, FALSE)
         DIM c AS STRING : c = codeSetzen$(elemente[i])
         gzDazu(teile, c, i, FALSE, TRUE)
     NEXT

@@ -210,6 +210,15 @@ Keine Probleme.	No problems.
 #
 # --- Projekt, Elemente, Code ------------------------------------------------
 Anwendung	Application
+Control	Control
+Eigenes Control	Custom control
+Eigenes Control hinzufügen …	Add custom control …
+Menüs hat nur ein Fenster, kein eigenes Control.	Only a window has menus, not a custom control.
+ein eigenes Control dieses Projekts	a custom control of this project
+{0} gibt es nicht im Projekt	{0} does not exist in the project
+' {0} -- ein eigenes Control. Seine Teile und die Verdrahtung ihrer	' {0} -- a custom control. Its parts and the wiring of their
+' Ereignisse stehen in der Basisklasse (_studio/{0}_basis.dh); im Fenster	' events are in the base class (_studio/{0}_basis.dh); in a window
+' ist jede Instanz ein Objekt dieser Klasse.	' every instance is an object of this class.
 Modul	Module
 Klasse	Class
 Hauptfenster	MainWindow

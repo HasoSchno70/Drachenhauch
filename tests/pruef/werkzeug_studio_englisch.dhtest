@@ -65,7 +65,7 @@ FOR EACH datei IN DIRLIST(studio)
     NEXT
 NEXT
 ' Die Auswahl "wahlindex" und die Anordnung "fluss" stehen nicht als Literal da.
-pruefe("Anfang;Mitte;Ende") : pruefe("Fluss")
+pruefe("Anfang;Mitte;Ende") : pruefe("Fluss") : pruefe("ein eigenes Control dieses Projekts")
 ' Gleiche Platzhalter auf beiden Seiten, und nichts in der Tafel, das niemand fragt.
 DIM k AS STRING
 DIM verwaist AS INTEGER : verwaist = 0

@@ -451,6 +451,130 @@ FUNCTION elternAus(d AS JSON_HANDLE) AS ARRAY OF INTEGER
     RETURN r
 END FUNCTION
 
+' --- Eigene Controls ausklappen ---------------------------------------------------
+' Eine Instanz (kind studio_control) wird zu einem leeren Layout-Behaelter an
+' ihrer Stelle -- der laesst sich verankern und in Layouts legen, nimmt keine
+' Klicks und zeichnet nichts --, und die Teile ihres Controls kommen HINTER
+' alle Controls des Fensters, um die Lage der Instanz verschoben. So bleiben
+' die Nummern der Controls des Fensters dieselben (Layouts, Standard-Knopf,
+' Entwurf). Wohin ein Teil geht, wenn die Instanz anders liegt oder waechst,
+' rechnet teilLage -- im Entwurf vorschauLegen, im Programm StudioControl.
+DIM akFensterN AS INTEGER : akFensterN = 0                    ' Controls vor dem Ausklappen
+DIM akInstanz AS ARRAY OF INTEGER : akInstanz = []            ' je Instanz: ihr Index
+DIM akControl AS ARRAY OF STRING : akControl = []             ' ihr Control
+DIM akErster AS ARRAY OF INTEGER : akErster = []              ' ihr erster Teil
+DIM akAnzahl AS ARRAY OF INTEGER : akAnzahl = []              ' wie viele Teile
+DIM akB AS ARRAY OF INTEGER : akB = []                        ' Groesse des Controls im Entwurf
+DIM akH AS ARRAY OF INTEGER : akH = []
+' je Teil (Index im ausgeklappten Fenster minus akFensterN):
+DIM akTeilInst AS ARRAY OF INTEGER : akTeilInst = []          ' Nummer seiner Instanz in akInstanz
+DIM akTeilFrei AS ARRAY OF BOOLEAN : akTeilFrei = []          ' steht in keinem Layout des Controls
+DIM akTeilX AS ARRAY OF INTEGER : akTeilX = []                ' Lage im Control
+DIM akTeilY AS ARRAY OF INTEGER : akTeilY = []
+DIM akTeilW AS ARRAY OF INTEGER : akTeilW = []
+DIM akTeilH AS ARRAY OF INTEGER : akTeilH = []
+DIM akTeilAnker AS ARRAY OF STRING : akTeilAnker = []
+
+FUNCTION jsonZahl(d AS JSON_HANDLE, pfad AS STRING, vorgabe AS INTEGER) AS INTEGER
+    IF NOT JSON_HAS(d, pfad) THEN RETURN vorgabe
+    IF JSON_TYPE(d, pfad) <> "number" THEN RETURN vorgabe
+    RETURN INT(JSON_GET_FLOAT(d, pfad))
+END FUNCTION
+
+' Aus einem Eintrag ein leerer Layout-Behaelter (Lage, Anker, Gewicht bleiben).
+SUB zumBehaelter(d AS JSON_HANDLE, p AS STRING)
+    DIM vor AS STRING : vor = IIF(p = "", "", p + ".")
+    JSON_SET_STRING(d, vor + "kind", "layout")
+    DIM lay AS JSON_HANDLE : lay = JSON_NEW_OBJECT()
+    JSON_SET_STRING(lay, "art", "zeile")
+    JSON_SET_JSON(lay, "kinder", JSON_NEW_ARRAY())
+    JSON_SET_JSON(d, vor + "layout", lay)
+END SUB
+
+FUNCTION ausgeklappt(d AS JSON_HANDLE) AS JSON_HANDLE
+    akInstanz = [] : akControl = [] : akErster = [] : akAnzahl = [] : akB = [] : akH = []
+    akTeilInst = [] : akTeilFrei = [] : akTeilX = [] : akTeilY = [] : akTeilW = [] : akTeilH = [] : akTeilAnker = []
+    DIM aus AS JSON_HANDLE : aus = JSON_PARSE(JSON_STRINGIFY(d))
+    akFensterN = 0
+    IF NOT JSON_HAS(aus, "widgets") THEN RETURN aus
+    akFensterN = JSON_LEN(aus, "widgets")
+    DIM i AS INTEGER
+    FOR i = 0 TO akFensterN - 1
+        DIM p AS STRING : p = "widgets." + STR$(i)
+        IF NOT JSON_HAS(aus, p + ".kind") THEN CONTINUE
+        IF JSON_GET_STRING(aus, p + ".kind") <> "studio_control" THEN CONTINUE
+        DIM cn AS STRING : cn = ""
+        IF JSON_HAS(aus, p + ".studio_control") THEN cn = JSON_GET_STRING(aus, p + ".studio_control")
+        DIM inst AS STRING : inst = ""
+        IF JSON_HAS(aus, p + ".name") THEN inst = JSON_GET_STRING(aus, p + ".name")
+        zumBehaelter(aus, p)
+        DIM slot AS INTEGER : slot = LEN(akInstanz)
+        ARRAY_PUSH(akInstanz, i)
+        ARRAY_PUSH(akControl, cn)
+        DIM erster AS INTEGER : erster = JSON_LEN(aus, "widgets")
+        ARRAY_PUSH(akErster, erster)
+        DIM ce AS INTEGER : ce = elementIndex(cn)
+        DIM gibt AS BOOLEAN : gibt = ce >= 0
+        IF gibt THEN gibt = elemente[ce].art = "control"
+        IF NOT gibt THEN
+            ARRAY_PUSH(akAnzahl, 0) : ARRAY_PUSH(akB, 0) : ARRAY_PUSH(akH, 0)
+            CONTINUE
+        END IF
+        DIM cd AS JSON_HANDLE
+        IF ce = aktFenster THEN cd = JSON_PARSE(JSON_STRINGIFY(doc)) ELSE cd = JSON_PARSE(elemente[ce].layout)
+        DIM nt AS INTEGER : nt = 0
+        IF JSON_HAS(cd, "widgets") THEN nt = JSON_LEN(cd, "widgets")
+        ARRAY_PUSH(akAnzahl, nt)
+        ARRAY_PUSH(akB, jsonZahl(cd, "w", 300))
+        ARRAY_PUSH(akH, jsonZahl(cd, "h", 120))
+        DIM ix AS INTEGER : ix = jsonZahl(aus, p + ".x", 0)
+        DIM iy AS INTEGER : iy = jsonZahl(aus, p + ".y", 0)
+        DIM eltern AS ARRAY OF INTEGER : eltern = elternAus(cd)
+        DIM k AS INTEGER
+        FOR k = 0 TO nt - 1
+            DIM t AS JSON_HANDLE : t = JSON_GET_JSON(cd, "widgets." + STR$(k))
+            DIM tx AS INTEGER : tx = jsonZahl(t, "x", 0)
+            DIM ty AS INTEGER : ty = jsonZahl(t, "y", 0)
+            DIM anker AS STRING : anker = ""
+            IF JSON_HAS(t, "anchor") THEN
+                anker = JSON_GET_STRING(t, "anchor")
+                JSON_REMOVE(t, "anchor")
+            END IF
+            JSON_SET_INT(t, "x", ix + tx)
+            JSON_SET_INT(t, "y", iy + ty)
+            IF JSON_HAS(t, "name") THEN JSON_SET_STRING(t, "name", inst + "_" + JSON_GET_STRING(t, "name"))
+            ' Die Kinder eines Layouts im Control: ihre Nummern verschieben.
+            IF JSON_HAS(t, "layout.kinder") THEN
+                DIM m AS INTEGER
+                FOR m = 0 TO JSON_LEN(t, "layout.kinder") - 1
+                    DIM c AS INTEGER : c = JSON_GET_INT(t, "layout.kinder." + STR$(m) + ".0")
+                    IF c >= 0 THEN JSON_SET_INT(t, "layout.kinder." + STR$(m) + ".0", c + erster)
+                NEXT
+            END IF
+            ' Ein Control im Control gibt es noch nicht: ein leerer Platz.
+            IF JSON_HAS(t, "kind") THEN
+                IF JSON_GET_STRING(t, "kind") = "studio_control" THEN zumBehaelter(t, "")
+            END IF
+            JSON_APPEND_JSON(aus, "widgets", t)
+            ARRAY_PUSH(akTeilInst, slot)
+            ARRAY_PUSH(akTeilFrei, k >= LEN(eltern) OR eltern[k] < 0)
+            ARRAY_PUSH(akTeilX, tx) : ARRAY_PUSH(akTeilY, ty)
+            ARRAY_PUSH(akTeilW, jsonZahl(t, "w", 0)) : ARRAY_PUSH(akTeilH, jsonZahl(t, "h", 0))
+            ARRAY_PUSH(akTeilAnker, anker)
+        NEXT
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Wo ein Teil auf einer Achse liegt, wenn sein Control um `mehr` groesser ist
+' als entworfen -- wie ein verankertes Widget im Fenster: am Anfang fest
+' (Vorgabe), am Ende mitwandernd, an beiden mitwachsend. Liefert (Lage, Mass).
+FUNCTION teilLage(lage AS INTEGER, mass AS INTEGER, anfang AS BOOLEAN, ende AS BOOLEAN, mehr AS INTEGER) AS TUPLE
+    IF anfang AND ende THEN RETURN (lage, MAX(1, mass + mehr))
+    IF ende THEN RETURN (lage + mehr, mass)
+    RETURN (lage, mass)
+END FUNCTION
+
 ' Das Layout, in dem i steht (-1 = frei).
 FUNCTION elternVon(i AS INTEGER) AS INTEGER
     IF i < 0 THEN RETURN -1

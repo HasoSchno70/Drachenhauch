@@ -112,7 +112,15 @@ SUB entwurfBauen()
     DIM fokus AS GUI_WIDGET : fokus = GUI_FOCUSED()
     elternCache = elternAus(doc)
     IF frm >= 0 THEN GUI_WINDOW_DESTROY(frm)
-    frm = GUI_FROM_JSON(JSON_STRINGIFY(doc))
+    ' Eigene Controls ausgeklappt: ihre Teile stehen hinter den Controls des
+    ' Fensters, die Nummern bis anzahl() bleiben die des Modells.
+    frm = GUI_FROM_JSON(JSON_STRINGIFY(ausgeklappt(doc)))
+    ' Eine eigene Kopie der Zuordnung -- das Pruefen klappt beim Erzeugen
+    ' ebenfalls aus und ueberschriebe sonst die des Entwurfs.
+    vkFensterN = akFensterN : vkInstanz = akInstanz : vkErster = akErster : vkAnzahl = akAnzahl
+    vkB = akB : vkH = akH : vkTeilInst = akTeilInst : vkTeilFrei = akTeilFrei
+    vkTeilX = akTeilX : vkTeilY = akTeilY : vkTeilW = akTeilW : vkTeilH = akTeilH : vkTeilAnker = akTeilAnker
+    vorschauWar = []
     GUI_WINDOW_DESIGN(frm, TRUE)
     GUI_WINDOW_CHROME(frm, FALSE)
     GUI_WINDOW_MOVABLE(frm, FALSE)
@@ -140,10 +148,61 @@ FUNCTION indexVonHandle(h AS GUI_WIDGET) AS INTEGER
     IF h < 0 OR frm < 0 THEN RETURN -1
     DIM i AS INTEGER
     FOR i = 0 TO GUI_WINDOW_WIDGET_COUNT(frm) - 1
-        IF GUI_WINDOW_WIDGET(frm, i) = h THEN RETURN i
+        IF GUI_WINDOW_WIDGET(frm, i) = h THEN
+            ' Ein Teil eines eigenen Controls meint seine Instanz.
+            IF i >= vkFensterN AND i - vkFensterN < LEN(vkTeilInst) THEN RETURN vkInstanz[vkTeilInst[i - vkFensterN]]
+            RETURN i
+        END IF
     NEXT
     RETURN -1
 END FUNCTION
+
+' Je Bild: die Teile jeder Instanz dorthin, wo ihr Behaelter gerade liegt --
+' beim Ziehen, beim Groesserziehen und wenn ein Layout ihn legt.
+DIM vorschauWar AS ARRAY OF STRING : vorschauWar = []
+DIM vkFensterN AS INTEGER : vkFensterN = 0
+DIM vkInstanz AS ARRAY OF INTEGER : vkInstanz = []
+DIM vkErster AS ARRAY OF INTEGER : vkErster = []
+DIM vkAnzahl AS ARRAY OF INTEGER : vkAnzahl = []
+DIM vkB AS ARRAY OF INTEGER : vkB = []
+DIM vkH AS ARRAY OF INTEGER : vkH = []
+DIM vkTeilInst AS ARRAY OF INTEGER : vkTeilInst = []
+DIM vkTeilFrei AS ARRAY OF BOOLEAN : vkTeilFrei = []
+DIM vkTeilX AS ARRAY OF INTEGER : vkTeilX = []
+DIM vkTeilY AS ARRAY OF INTEGER : vkTeilY = []
+DIM vkTeilW AS ARRAY OF INTEGER : vkTeilW = []
+DIM vkTeilH AS ARRAY OF INTEGER : vkTeilH = []
+DIM vkTeilAnker AS ARRAY OF STRING : vkTeilAnker = []
+SUB vorschauLegen()
+    IF frm < 0 THEN RETURN
+    WHILE LEN(vorschauWar) < LEN(vkInstanz)
+        ARRAY_PUSH(vorschauWar, "")
+    WEND
+    DIM s AS INTEGER
+    FOR s = 0 TO LEN(vkInstanz) - 1
+        IF vkAnzahl[s] = 0 THEN CONTINUE
+        DIM h AS GUI_WIDGET : h = GUI_WINDOW_WIDGET(frm, vkInstanz[s])
+        DIM hx AS INTEGER : hx = GUI_GET_X(h)
+        DIM hy AS INTEGER : hy = GUI_GET_Y(h)
+        DIM hb AS INTEGER : hb = GUI_GET_W(h)
+        DIM hh AS INTEGER : hh = GUI_GET_H(h)
+        DIM schl AS STRING : schl = STR$(hx) + "," + STR$(hy) + "," + STR$(hb) + "," + STR$(hh)
+        IF schl = vorschauWar[s] THEN CONTINUE
+        vorschauWar[s] = schl
+        DIM t AS INTEGER
+        FOR t = vkErster[s] - vkFensterN TO vkErster[s] - vkFensterN + vkAnzahl[s] - 1
+            IF NOT vkTeilFrei[t] THEN CONTINUE
+            DIM a AS STRING : a = LOWER$(vkTeilAnker[t])
+            DIM x AS INTEGER
+            DIM w AS INTEGER
+            DIM y AS INTEGER
+            DIM hoehe AS INTEGER
+            (x, w) = teilLage(vkTeilX[t], vkTeilW[t], INSTR(a, "l") >= 0, INSTR(a, "r") >= 0, hb - vkB[s])
+            (y, hoehe) = teilLage(vkTeilY[t], vkTeilH[t], INSTR(a, "t") >= 0, INSTR(a, "b") >= 0, hh - vkH[s])
+            GUI_SET_BOUNDS(GUI_WINDOW_WIDGET(frm, vkFensterN + t), hx + x, hy + y, w, hoehe)
+        NEXT
+    NEXT
+END SUB
 
 ' --- Layout-Behaelter im Entwurf ----------------------------------------------
 FUNCTION verwaltet(i AS INTEGER) AS BOOLEAN
@@ -396,6 +455,13 @@ SUB controlsProtokollieren()
         DIM h AS INTEGER
         (x, y, w, h) = lageVon(i)
         protokoll("lage control " + feldText$(i, "name") + " " + STR$(formX + zS(x + w \ 2)) + " " + STR$(formY + zS(y + h \ 2)) + " " + STR$(w) + " " + STR$(h))
+    NEXT
+    ' die Teile eigener Controls in der Vorschau: "lage teil INSTANZ_TEIL x y b h"
+    ' (Lage im Fenster, nicht auf dem Schirm -- so wie ein Programm sie sieht).
+    FOR i = 0 TO LEN(vkTeilInst) - 1
+        DIM th AS GUI_WIDGET : th = GUI_WINDOW_WIDGET(frm, vkFensterN + i)
+        DIM tn AS STRING : tn = feldText$(vkInstanz[vkTeilInst[i]], "name") + "_" + STR$(i - (vkErster[vkTeilInst[i]] - vkFensterN))
+        protokoll("lage teil " + tn + " " + STR$(GUI_GET_X(th)) + " " + STR$(GUI_GET_Y(th)) + " " + STR$(GUI_GET_W(th)) + " " + STR$(GUI_GET_H(th)))
     NEXT
     ' und jeden Abstandhalter: "lage abstand LAYOUT STELLE x y"
     FOR i = 0 TO anzahl() - 1
@@ -1033,7 +1099,7 @@ SUB ablegen(p AS INTEGER, fx AS INTEGER, fy AS INTEGER, mittig AS BOOLEAN)
     zielL = -1
     auswahlSetzen(i)
     nachAenderung(TRUE)
-    status(trf$("{0} abgelegt: {1}", [tr$(b.name), feldText$(i, "name")]))
+    status(trf$("{0} abgelegt: {1}", [bausteinAnzeige$(b), feldText$(i, "name")]))
     protokoll("neu " + b.kind + " " + feldText$(i, "name") + " " + STR$(x) + " " + STR$(y))
 END SUB
 
@@ -1431,6 +1497,26 @@ SUB entwurfZeichnen()
             DIM tw AS INTEGER : tw = TEXT_WIDTH(leer)
             IF tw < sx2 - sx1 - 8 AND sy2 - sy1 > 18 THEN TEXT((sx1 + sx2 - tw) \ 2, (sy1 + sy2 - 15) \ 2, leer, farbe("leise"))
         END IF
+    NEXT
+    ' Die eigenen Controls: wie weit eine Instanz reicht -- ihr Behaelter
+    ' zeichnet nichts. Fehlt ihr Control im Projekt, steht das darin.
+    FOR li = 0 TO anzahl() - 1
+        IF feldText$(li, "kind") <> "studio_control" THEN CONTINUE
+        DIM cx AS INTEGER
+        DIM cy AS INTEGER
+        DIM cb AS INTEGER
+        DIM ch AS INTEGER
+        (cx, cy, cb, ch) = lageVon(li)
+        DIM cx1 AS INTEGER : cx1 = formX + zS(cx)
+        DIM cy1 AS INTEGER : cy1 = formY + zS(cy)
+        DIM cx2 AS INTEGER : cx2 = formX + zS(cx + cb) - 1
+        DIM cy2 AS INTEGER : cy2 = formY + zS(cy + ch) - 1
+        gestrichelt(cx1, cy1, cx2, cy2, farbe("leise"))
+        DIM cn AS STRING : cn = feldText$(li, "studio_control")
+        DIM ce AS INTEGER : ce = elementIndex(cn)
+        DIM da AS BOOLEAN : da = ce >= 0
+        IF da THEN da = elemente[ce].art = "control"
+        IF NOT da THEN TEXT(cx1 + 6, cy1 + 4, trf$("{0} gibt es nicht im Projekt", [cn]), farbe("leise"))
     NEXT
     ' Die Abstandhalter jedes Layouts.
     FOR li = 0 TO anzahl() - 1

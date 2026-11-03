@@ -195,8 +195,19 @@ END SUB
 FUNCTION giltFuer(z AS InspZeile, art AS STRING) AS BOOLEAN
     IF abstandL >= 0 THEN RETURN z.art = "gewicht"
     IF trayWahl >= 0 THEN RETURN z.fuer = "timer"
-    IF auswahl < 0 THEN RETURN z.fuer = "fenster"
+    IF auswahl < 0 THEN
+        ' Ein eigenes Control hat keinen Titel und waechst mit seiner Instanz.
+        IF z.fuer = "fenster" AND entwurfIstControl() THEN RETURN z.schluessel <> "title" AND z.schluessel <> "resizable"
+        RETURN z.fuer = "fenster"
+    END IF
     IF z.fuer = "fenster" THEN RETURN FALSE
+    ' Eine Instanz eines eigenen Controls: Name, Lage und Sichtbarkeit -- das
+    ' Aussehen legen seine Teile fest.
+    IF art = "studio_control" THEN
+        IF z.art = "gewicht" THEN RETURN verwaltet(auswahl)
+        IF verwaltet(auswahl) AND (z.schluessel = "x" OR z.schluessel = "y" OR z.schluessel = "anchor") THEN RETURN FALSE
+        RETURN INSTR(",name,kind,x,y,w,h,anchor,visible,", "," + z.schluessel + ",") >= 0
+    END IF
     ' In einem Layout: kein Links/Oben/Anker, dafuer das Gewicht.
     DIM imLayout AS BOOLEAN : imLayout = verwaltet(auswahl)
     IF z.art = "gewicht" THEN RETURN imLayout
@@ -274,12 +285,12 @@ SUB inspektorFuellen()
     ELSEIF auswahl >= 0 THEN
         art = feldText$(auswahl, "kind")
         GUI_SET_TEXT(inspTitel, feldText$(auswahl, "name"))
-        DIM text AS STRING : text = tr$(bausteinName$(auswahl))
+        DIM text AS STRING : text = bausteinNameAnzeige$(auswahl)
         IF LEN(gewaehlt) > 1 THEN text = text + trf$(" -- {0} gewählt", [STR$(LEN(gewaehlt))])
         GUI_SET_TEXT(inspArt, text)
     ELSE
         GUI_SET_TEXT(inspTitel, fensterText$("name"))
-        GUI_SET_TEXT(inspArt, tr$("Fenster"))
+        GUI_SET_TEXT(inspArt, IIF(entwurfIstControl(), tr$("Eigenes Control"), tr$("Fenster")))
     END IF
     DIM z AS InspZeile
     FOR EACH z IN inspZeilen
@@ -334,7 +345,7 @@ SUB inspektorFuellen()
             CASE "farbe"
                 farbfeldZeigen(z, p)
             CASE "info"
-                GUI_SET_TEXT(z.ed, tr$(bausteinName$(auswahl)) + "  (" + wertText$(p) + ")")
+                GUI_SET_TEXT(z.ed, bausteinNameAnzeige$(auswahl) + "  (" + wertText$(p) + ")")
             CASE "anker"
                 DIM a AS STRING : a = wertText$(p)
                 IF a = "" THEN a = "lt"

@@ -1,0 +1,274 @@
+' Drachenhauch Studio: eigene Controls (Elementart "control"). Ein Control
+' wird wie ein Fenster entworfen, hat eigenen Code und eigene Ereignisse und
+' steht in der Bibliothek unter "Projekt". Im Fenster ist eine Instanz ein
+' leerer Layout-Behaelter, die Teile liegen dahinter (modell.dh, ausgeklappt);
+' im Programm legt StudioControl sie je Bild nach ihren Ankern.
+--- langsam
+
+=== f5: zwei instanzen zaehlen getrennt, die teile folgen anker und layout
+' zaehler1 steht frei, zaehler2 in einer Zeile, die ihn auf 380 Punkte
+' streckt -- seine Anzeige (Anker links und rechts) waechst um 140 mit.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "geprueft "; slHat(log, "geprueft 0 0")
+PRINT "beendet "; slHat(log, "beendet 0")
+PRINT "basis "; FILEEXISTS(p + "/_studio/Zaehler_basis.dh")
+' Der erzeugte Code uebersetzt ohne einen Befund.
+DIM c AS INTEGER : c = PROCESS_START("dhrt", "--check", p + "/_studio/main.dh")
+DIM cz AS STRING : cz = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM ct AS STRING : ct = PROCESS_READ$(c)
+    IF ct <> "" THEN
+        cz = cz + TRIM$(ct)
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(c) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+PRINT "check "; cz
+' Klicks im randlosen Fenster: zweimal +1 in zaehler1, einmal in zaehler2,
+' dann Summe.
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN ARRAY_PUSH(neu, "AUTOMATION_PLAY(" + CHR$(34) + "klick.txt" + CHR$(34) + ")")
+    ARRAY_PUSH(neu, s)
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+DIM kz AS ARRAY OF STRING : kz = ["e 0 7 1 1 0 0"]
+DIM ziele AS ARRAY OF INTEGER : ziele = [80, 65, 80, 65, 80, 145, 90, 215]
+DIM q AS INTEGER
+FOR q = 0 TO 3
+    DIM bb AS INTEGER : bb = 5 + q * 10
+    ARRAY_PUSH(kz, "e " + STR$(bb) + " 7 " + STR$(ziele[q * 2]) + " " + STR$(ziele[q * 2 + 1]) + " 0 0")
+    ARRAY_PUSH(kz, "e " + STR$(bb + 3) + " 6 0 0 0 0")
+    ARRAY_PUSH(kz, "e " + STR$(bb + 5) + " 5 0 0 0 0")
+NEXT
+WRITEALL(p + "/_studio/klick.txt", "c " + STR$(LEN(kz)) + CHR$(10) + JOIN$(kz, CHR$(10)) + CHR$(10))
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "60", p + "/_studio/probe.dh")
+leer = 0
+WHILE leer < 5
+    DIM kt AS STRING : kt = PROCESS_READ$(k)
+    IF kt <> "" THEN
+        DIM kzeile AS STRING
+        FOR EACH kzeile IN SPLIT(REPLACE$(kt, CHR$(13), ""), CHR$(10))
+            IF TRIM$(kzeile) <> "" AND LEFT$(kzeile, 8) <> "WARNING:" THEN PRINT "lauf "; TRIM$(kzeile)
+        NEXT
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(k) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+PRINT "code "; PROCESS_CODE(k)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Zaehler"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Zaehler.dhform
+{"title":"Zaehler","name":"Zaehler","w":240,"h":50,"widgets":[
+{"kind":"button","name":"knopf","text":"+1","x":10,"y":10,"w":60,"h":30},
+{"kind":"label","name":"anzeige","text":"?","x":80,"y":16,"w":150,"h":20,"anchor":"lrt"}]}
+--- datei proj/Zaehler.dh
+CLASS Zaehler EXTENDS Zaehler_Basis
+    DIM n AS INTEGER
+
+    SUB Geoeffnet()
+        GUI_SET_TEXT(Self.anzeige, "0")
+        PRINT "geoeffnet " + GUI_TEXT(Self.anzeige)
+    END SUB
+
+    SUB knopf_Klick()
+        Self.n = Self.n + 1
+        GUI_SET_TEXT(Self.anzeige, STR$(Self.n))
+        PRINT "zaehler " + STR$(Self.n)
+    END SUB
+
+    FUNCTION Wert() AS INTEGER
+        RETURN Self.n
+    END FUNCTION
+END CLASS
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":440,"h":300,"widgets":[
+{"kind":"studio_control","studio_control":"Zaehler","name":"zaehler1","x":40,"y":40,"w":240,"h":50},
+{"kind":"studio_control","studio_control":"Zaehler","name":"zaehler2","x":40,"y":120,"w":240,"h":50},
+{"kind":"button","name":"knopfSumme","text":"Summe","x":40,"y":200,"w":100,"h":30},
+{"kind":"layout","name":"zeile1","x":40,"y":120,"w":380,"h":50,"layout":{"art":"zeile","kinder":[[1,1]],"abstand":0}}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB knopfSumme_Klick()
+        PRINT "summe " + STR$(Self.zaehler1.Wert() + Self.zaehler2.Wert())
+        PRINT "anzeige1 " + STR$(GUI_GET_X(Self.zaehler1.anzeige)) + " " + STR$(GUI_GET_Y(Self.zaehler1.anzeige)) + " " + STR$(GUI_GET_W(Self.zaehler1.anzeige))
+        PRINT "anzeige2 " + STR$(GUI_GET_X(Self.zaehler2.anzeige)) + " " + STR$(GUI_GET_Y(Self.zaehler2.anzeige)) + " " + STR$(GUI_GET_W(Self.zaehler2.anzeige))
+        PRINT "breite2 " + STR$(Self.zaehler2.Breite())
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- erwartet
+geprueft TRUE
+beendet TRUE
+basis TRUE
+check []
+lauf geoeffnet 0
+lauf geoeffnet 0
+lauf zaehler 1
+lauf zaehler 2
+lauf zaehler 1
+lauf summe 3
+lauf anzeige1 120 56 150
+lauf anzeige2 120 136 290
+lauf breite2 380
+code 0
+
+=== im entwurf zeigt eine instanz ihre teile, sie folgen der instanz
+' Die Teile stehen hinter den Controls des Fensters und werden je Bild zum
+' Behaelter gelegt: die breitere Instanz streckt ihre Anzeige mit.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, "", 8, p)
+' Das Studio protokolliert die Lagen mehrmals -- jede Zeile einmal.
+DIM gesehen AS MAP OF INTEGER : gesehen = {}
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "lage teil ")
+    IF MAPHAS(gesehen, z) THEN CONTINUE
+    MAPPUT(gesehen, z, 1)
+    PRINT z
+NEXT
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Zaehler"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Zaehler.dhform
+{"title":"Zaehler","name":"Zaehler","w":240,"h":50,"widgets":[
+{"kind":"button","name":"knopf","text":"+1","x":10,"y":10,"w":60,"h":30},
+{"kind":"label","name":"anzeige","text":"?","x":80,"y":16,"w":150,"h":20,"anchor":"lrt"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"studio_control","studio_control":"Zaehler","name":"zaehler1","x":40,"y":40,"w":240,"h":50},
+{"kind":"studio_control","studio_control":"Zaehler","name":"zaehler2","x":40,"y":120,"w":320,"h":50}]}
+--- erwartet
+lage teil zaehler1_0 50 50 60 30
+lage teil zaehler1_1 120 56 150 20
+lage teil zaehler2_0 50 130 60 30
+lage teil zaehler2_1 120 136 230 20
+
+=== aus der bibliothek: die gruppe projekt legt eine instanz an
+' Suchen nach "Zaehler", Doppelklick auf die Zeile der Gruppe Projekt, dann
+' Strg+S: im Layout steht eine Instanz mit dem Namen des Controls und
+' seiner Groesse.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+SETENV("DH_STUDIO_ABLAGE", "Zaehler")
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, p)
+DIM sx AS INTEGER
+DIM sy AS INTEGER
+(sx, sy) = slLage(m, "suche")
+slHin(10, 10)
+slKlick(sx, sy)
+slMit([341], 86)
+slWarten(30)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(m, CWD$() + "/ev.txt", slBild + 10, p)
+DIM zx AS INTEGER
+DIM zy AS INTEGER
+(zx, zy) = slLage(m, "zeile studio_control/zaehler")
+PRINT "zeile "; zx > 0
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slKlick(sx, sy)
+slMit([341], 86)
+slWarten(30)
+slHin(zx, zy)
+slHin(zx, zy)
+slRunter()
+slHoch()
+slRunter()
+slHoch()
+slWarten(10)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "neu "; LEN(slAnfang(log, "neu studio_control zaehler1 ")) = 1
+DIM d AS JSON_HANDLE : d = JSON_PARSE(JOIN$(READLINES(p + "/Hauptfenster.dhform"), CHR$(10)))
+PRINT "widgets "; JSON_LEN(d, "widgets")
+PRINT "instanz "; JSON_GET_STRING(d, "widgets.1.kind"); " "; JSON_GET_STRING(d, "widgets.1.studio_control"); " "; JSON_GET_STRING(d, "widgets.1.name"); " "; JSON_GET_INT(d, "widgets.1.w"); " "; JSON_GET_INT(d, "widgets.1.h")
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "json"
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Zaehler"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Zaehler.dhform
+{"title":"Zaehler","name":"Zaehler","w":240,"h":50,"widgets":[
+{"kind":"button","name":"knopf","text":"+1","x":10,"y":10,"w":60,"h":30}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}]}
+--- erwartet
+zeile TRUE
+neu TRUE
+widgets 2
+instanz studio_control Zaehler zaehler1 240 50
+
+=== ein klick auf einen teil waehlt die instanz
+' Die Teile sind Widgets des Entwurfsfensters; getroffen wird aber die
+' Instanz, nicht der Knopf in ihr.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, p)
+DIM cx AS INTEGER
+DIM cy AS INTEGER
+(cx, cy) = slLage(m, "control zaehler2")
+slHin(10, 10)
+slWarten(6)
+slKlick(cx - 120, cy)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+PRINT "gewaehlt "; slHat(log, "gewaehlt 1 1")
+PRINT "nie ein teil "; LEN(slAnfang(log, "gewaehlt 2")) + LEN(slAnfang(log, "gewaehlt 3")) + LEN(slAnfang(log, "gewaehlt 4")) = 0
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Zaehler"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Zaehler.dhform
+{"title":"Zaehler","name":"Zaehler","w":240,"h":50,"widgets":[
+{"kind":"button","name":"knopf","text":"+1","x":10,"y":10,"w":60,"h":30},
+{"kind":"label","name":"anzeige","text":"?","x":80,"y":16,"w":150,"h":20,"anchor":"lrt"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"studio_control","studio_control":"Zaehler","name":"zaehler1","x":40,"y":40,"w":240,"h":50},
+{"kind":"studio_control","studio_control":"Zaehler","name":"zaehler2","x":40,"y":120,"w":320,"h":50}]}
+--- erwartet
+gewaehlt TRUE
+nie ein teil TRUE

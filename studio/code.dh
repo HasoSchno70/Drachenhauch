@@ -388,7 +388,7 @@ END SUB
 
 ' Wozu eine Methode da ist -- bei einem Ereignis sein Control und was es meldet.
 FUNCTION methodeInfo$(m AS Methode) AS STRING
-    IF m.el.art = "fenster" THEN
+    IF hatLayout(m.el) THEN
         controlsVon(elementVon(m.el))
         DIM i AS INTEGER
         FOR i = 0 TO LEN(ctrlNamen) - 1
@@ -398,8 +398,8 @@ FUNCTION methodeInfo$(m AS Methode) AS STRING
             END IF
         NEXT
     END IF
-    IF m.el.art = "fenster" OR m.el.art = "app" THEN
-        DIM art AS STRING : art = IIF(m.el.art = "app", "app", "fenster")
+    IF hatLayout(m.el) OR m.el.art = "app" THEN
+        DIM art AS STRING : art = m.el.art
         IF ARRAY_INDEXOF(ereignisseFuer(art), m.name) >= 0 THEN RETURN trf$("Ereignis {0}: {1}", [m.name, ereignisBeschreibung$(m.name)])
     END IF
     RETURN trf$("Methode von {0}", [m.el.name])
@@ -439,6 +439,13 @@ FUNCTION navBild(was AS STRING) AS IMAGE
             IMAGE_FILL_ROUNDRECT(b, 2, 3, 17, 16, 2, &H8D9AAB)
             IMAGE_FILL_RECT(b, 3, 7, 16, 15, &HE4EAF2)
             IMAGE_FILL_RECT(b, 3, 4, 16, 6, &H3A8FE0)
+        CASE "control"
+            ' vier Bausteine in einem Rahmen
+            IMAGE_FILL_ROUNDRECT(b, 2, 2, 17, 17, 3, &H8D9AAB)
+            IMAGE_FILL_RECT(b, 4, 4, 9, 9, &H3A8FE0)
+            IMAGE_FILL_RECT(b, 11, 4, 15, 9, &HE4EAF2)
+            IMAGE_FILL_RECT(b, 4, 11, 9, 15, &HE4EAF2)
+            IMAGE_FILL_RECT(b, 11, 11, 15, 15, &H3A8FE0)
         CASE "modul"
             IMAGE_FILL_ROUNDRECT(b, 4, 2, 15, 17, 2, &HE4EAF2)
             IMAGE_FILL_RECT(b, 6, 6, 13, 7, &H6A7380)
@@ -464,8 +471,8 @@ END FUNCTION
 
 FUNCTION methodeIstEreignis(m AS Methode) AS BOOLEAN
     IF m.el.art = "app" THEN RETURN ARRAY_INDEXOF(ereignisseFuer("app"), m.name) >= 0
-    IF m.el.art = "fenster" THEN
-        IF ARRAY_INDEXOF(ereignisseFuer("fenster"), m.name) >= 0 THEN RETURN TRUE
+    IF hatLayout(m.el) THEN
+        IF ARRAY_INDEXOF(ereignisseFuer(m.el.art), m.name) >= 0 THEN RETURN TRUE
         DIM i AS INTEGER
         FOR i = 0 TO LEN(ctrlNamen) - 1
             IF ctrlNamen[i] <> "" AND ereignisVon$(m.name, ctrlNamen[i]) <> "" THEN RETURN TRUE
@@ -485,7 +492,7 @@ SUB navigatorFuellen()
         DIM text AS STRING : text = e.name
         IF e.art = "fenster" AND LOWER$(e.name) = LOWER$(projStart) THEN text = text + tr$("  (Start)")
         DIM en AS INTEGER : en = navKnoten(wurzel, text, "element", ei, -1, -1, e.art)
-        IF e.art = "fenster" THEN
+        IF hatLayout(e) THEN
             controlsVon(ei)
             DIM d AS JSON_HANDLE
             IF ei = aktFenster THEN d = doc ELSE d = JSON_PARSE(e.layout)
@@ -503,9 +510,9 @@ SUB navigatorFuellen()
         FOR mj = 0 TO LEN(methoden) - 1
             DIM m AS Methode : m = methoden[mj]
             IF NOT (m.el = e) THEN CONTINUE
-            IF e.art = "fenster" THEN
+            IF hatLayout(e) THEN
                 ' Ereignisse von Controls stehen schon unter ihrem Control.
-                IF ARRAY_INDEXOF(ereignisseFuer("fenster"), m.name) < 0 THEN
+                IF ARRAY_INDEXOF(ereignisseFuer(e.art), m.name) < 0 THEN
                     DIM eigen AS BOOLEAN : eigen = FALSE
                     DIM ck AS INTEGER
                     FOR ck = 0 TO LEN(ctrlNamen) - 1
@@ -660,7 +667,7 @@ SUB navigatorPruefen()
     DIM ei AS INTEGER : ei = navEl[n]
     SELECT CASE navArt[n]
         CASE "element"
-            IF elemente[ei].art = "fenster" THEN
+            IF hatLayout(elemente[ei]) THEN
                 layoutOeffnen(ei)
                 auswahlSetzen(-1)
                 auswahlGeaendert()
@@ -748,7 +755,7 @@ DIM erEl AS INTEGER : erEl = -1
 SUB ereignisDialog(ei AS INTEGER, ci AS INTEGER)
     IF ei < 0 THEN RETURN
     DIM e AS Element : e = elemente[ei]
-    IF e.art <> "fenster" AND e.art <> "app" THEN
+    IF NOT hatLayout(e) AND e.art <> "app" THEN
         status(tr$("Ereignisse haben nur Fenster, ihre Controls und die App."))
         RETURN
     END IF
@@ -772,7 +779,7 @@ SUB ereignisDialog(ei AS INTEGER, ci AS INTEGER)
     DIM t AS GUI_WIDGET : t = GUI_LABEL(dlgEr, tr$("Ereignis hinzufügen"), 20, 16)
     GUI_ADD_CLASS(t, "dialogtitel")
     DIM wofuer AS STRING : wofuer = e.name
-    IF ci >= 0 AND ci < ctrlWidgets THEN wofuer = erZiel + " (" + tr$(bausteinName$(ci)) + ")"
+    IF ci >= 0 AND ci < ctrlWidgets THEN wofuer = erZiel + " (" + bausteinNameAnzeige$(ci) + ")"
     IF ci >= ctrlWidgets AND art = "timer" THEN wofuer = erZiel + tr$(" (Timer)")
     IF ci >= ctrlWidgets AND art = "menue" THEN wofuer = erZiel + tr$(" (Menüeintrag)")
     GUI_LABEL(dlgEr, trf$("Was soll {0} tun? Wähle das Ereignis:", [wofuer]), 20, 46)
@@ -955,7 +962,7 @@ DIM wegEl AS INTEGER : wegEl = -1
 SUB elementFragen(art AS STRING)
     IF GUI_MODAL() THEN RETURN
     elWas = art
-    DIM grund AS STRING : grund = IIF(art = "fenster", tr$("Fenster"), IIF(art = "modul", tr$("Modul"), tr$("Klasse")))
+    DIM grund AS STRING : grund = IIF(art = "fenster", tr$("Fenster"), IIF(art = "control", tr$("Control"), IIF(art = "modul", tr$("Modul"), tr$("Klasse"))))
     dlgEl = GUI_PROMPT(trf$("{0} hinzufügen", [artText$(art)]), tr$("Name (wird zum Namen der Klasse bzw. des Moduls):"), elementNameFrei$(grund), tr$("Hinzufügen|Abbrechen"))
 END SUB
 
@@ -994,7 +1001,7 @@ FUNCTION elementAnlegen(art AS STRING, n AS STRING) AS BOOLEAN
     IF art = "fenster" AND projStart = "" THEN projStart = n
     projLose = FALSE
     navigatorFuellen()
-    IF art = "fenster" THEN layoutOeffnen(LEN(elemente) - 1) ELSE deklOeffnen(e)
+    IF hatLayout(e) THEN layoutOeffnen(LEN(elemente) - 1) ELSE deklOeffnen(e)
     werkzeugeNachziehen()
     status(trf$("{0} {1} hinzugefügt.", [artText$(art), n]))
     protokoll("element neu " + art + " " + n)

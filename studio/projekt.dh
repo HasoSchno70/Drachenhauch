@@ -75,10 +75,24 @@ FUNCTION elementNameFrei$(grund AS STRING) AS STRING
     RETURN grund + STR$(n)
 END FUNCTION
 
+' Hat das Element ein Layout (Fenster und eigene Controls)? Alles, was den
+' Entwurf, die .dhform und die erzeugte Basisklasse betrifft, fragt hier --
+' "fenster" allein meint das, was nur ein Fenster kann (Startfenster, Menues).
+FUNCTION hatLayout(e AS Element) AS BOOLEAN
+    RETURN e.art = "fenster" OR e.art = "control"
+END FUNCTION
+
+' Ist das Layout, das gerade im Entwurf steht, ein eigenes Control?
+FUNCTION entwurfIstControl() AS BOOLEAN
+    IF aktFenster < 0 OR aktFenster >= LEN(elemente) THEN RETURN FALSE
+    RETURN elemente[aktFenster].art = "control"
+END FUNCTION
+
 FUNCTION artText$(art AS STRING) AS STRING
     SELECT CASE art
         CASE "app" : RETURN tr$("Anwendung")
         CASE "fenster" : RETURN tr$("Fenster")
+        CASE "control" : RETURN tr$("Control")
         CASE "modul" : RETURN tr$("Modul")
         CASE "klasse" : RETURN tr$("Klasse")
     END SELECT
@@ -89,6 +103,7 @@ FUNCTION artSymbol$(art AS STRING) AS STRING
     SELECT CASE art
         CASE "app" : RETURN "start"
         CASE "fenster" : RETURN "fenster"
+        CASE "control" : RETURN "raster"
         CASE "modul" : RETURN "datei"
         CASE "klasse" : RETURN "ordner"
     END SELECT
@@ -99,7 +114,7 @@ END FUNCTION
 ' Basisklasse ab, die Stufe 3 erzeugt; die App von StudioApp.
 FUNCTION basisVon$(e AS Element) AS STRING
     SELECT CASE e.art
-        CASE "fenster" : RETURN e.name + "_Basis"
+        CASE "fenster", "control" : RETURN e.name + "_Basis"
         CASE "app" : RETURN "StudioApp"
     END SELECT
     RETURN e.basis
@@ -112,10 +127,15 @@ FUNCTION elementNeu(art AS STRING, name AS STRING) AS Element
     e.name = name
     e.verlaufPos = -1
     e.geaendert = TRUE
-    IF art = "fenster" THEN
+    IF art = "fenster" OR art = "control" THEN
         DIM d AS JSON_HANDLE : d = JSON_PARSE(leeresFenster$())
         JSON_SET_STRING(d, "name", name)
         JSON_SET_STRING(d, "title", name)
+        ' Ein eigenes Control faengt kleiner an als ein Fenster.
+        IF art = "control" THEN
+            JSON_SET_INT(d, "w", 300)
+            JSON_SET_INT(d, "h", 120)
+        END IF
         e.layout = JSON_STRINGIFY(d)
     END IF
     ARRAY_PUSH(elemente, e)
@@ -337,6 +357,10 @@ FUNCTION standardVorspann$(e AS Element) AS STRING
             RETURN trf$("' {0} -- der Code des Fensters. Die Controls, ihr Aufbau und die", [e.name]) + CHR$(10) + _
                    tr$("' Verdrahtung der Ereignisse stehen in der Basisklasse, die das Studio") + CHR$(10) + _
                    trf$("' erzeugt (_studio/{0}_basis.dh).", [e.name])
+        CASE "control"
+            RETURN trf$("' {0} -- ein eigenes Control. Seine Teile und die Verdrahtung ihrer", [e.name]) + CHR$(10) + _
+                   trf$("' Ereignisse stehen in der Basisklasse (_studio/{0}_basis.dh); im Fenster", [e.name]) + CHR$(10) + _
+                   tr$("' ist jede Instanz ein Objekt dieser Klasse.")
         CASE "app"
             RETURN tr$("' Die Anwendung: was beim Start und beim Beenden geschieht.")
         CASE "modul"
@@ -441,7 +465,7 @@ FUNCTION projektLaden$(ordner AS STRING) AS STRING
         e.verlaufPos = -1
         e.gesichertAls = e.name
         DIM cd AS STRING : cd = PATHJOIN(ordner, codeDatei$(e))
-        IF e.art = "fenster" THEN
+        IF hatLayout(e) THEN
             DIM lp AS STRING : lp = PATHJOIN(ordner, layoutDatei$(e))
             IF FILEEXISTS(lp) THEN
                 DIM d AS JSON_HANDLE : d = JSON_LOAD(lp)
@@ -474,7 +498,7 @@ FUNCTION projektJson$() AS STRING
         JSON_SET_STRING(o, "art", e.art)
         JSON_SET_STRING(o, "name", e.name)
         JSON_SET_STRING(o, "code", codeDatei$(e))
-        IF e.art = "fenster" THEN JSON_SET_STRING(o, "layout", layoutDatei$(e))
+        IF hatLayout(e) THEN JSON_SET_STRING(o, "layout", layoutDatei$(e))
         JSON_APPEND_JSON(j, "elemente", o)
     NEXT
     RETURN JSON_PRETTY(j)
@@ -490,7 +514,7 @@ SUB projektSchreiben()
     DIM e AS Element
     FOR EACH e IN elemente
         WRITEALL(PATHJOIN(projOrdner, codeDatei$(e)), codeSetzen$(e))
-        IF e.art = "fenster" THEN
+        IF hatLayout(e) THEN
             WRITEALL(PATHJOIN(projOrdner, layoutDatei$(e)), JSON_PRETTY(JSON_PARSE(e.layout)))
         END IF
         IF e.gesichertAls <> "" AND LOWER$(e.gesichertAls) <> LOWER$(e.name) THEN
@@ -529,6 +553,11 @@ FUNCTION ereignisseFuer(kind AS STRING) AS ARRAY OF STRING
             RETURN ["Aktion"]
         CASE "fenster"
             RETURN ["Geoeffnet", "Schliessen", "Groesse", "Taste"]
+        CASE "control"
+            RETURN ["Geoeffnet", "Groesse"]
+        CASE "studio_control"
+            ' Eine Instanz eines eigenen Controls: seine Ereignisse (Stufe 2).
+            RETURN []
         CASE "app"
             RETURN ["Geoeffnet", "Beenden"]
     END SELECT
