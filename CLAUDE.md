@@ -3849,6 +3849,19 @@ unbekannter Name in doppelten Anfuehrungszeichen ist dort still ein Text --
 Bild in der Zelle am Bildschirmfoto) und `werkzeug_studio_verbunde.dhtest`
 (3); 15 Verfaelschungen fallen, eine ist gleichwertig (Bedingungspruefung
 ohne Verbund -- wegen der Falle oben).
+**Tempo des Designers (selber Tag):** gemessen mit `DH_STUDIO_TEMPO=1`
+(je Bild `tempo <ms>` ins Protokoll, Rechenzeit vor FLIP) an einem Fenster
+mit 300 Controls, Median ruhig/ziehen/Pfeile 1,7/6,3/2,4 -> 1,0/1,2/1,6 ms.
+Die Einrast-Ziele sammelt `zieleSammeln` je Zug und Achse einmal (Schluessel
+`zielZug` + Groesse + Auswahl; gesammelt wird nur bei gedrueckter Taste, und
+dabei bewegt sich nur die Auswahl, die selbst kein Ziel ist), `feldText$`/
+`feldZahl` fragen nur `JSON_TYPE` (liefert "missing") + Wert, und
+`entwurfZeichnen` liest die Arten einmal je Bild. **Messfalle:** `dhrt
+profile` schaltet den Maschinencode ab -- reine Zahlenschleifen (`einrasten`)
+sehen dort teuer aus und kosten im echten Lauf fast nichts; gemessen wird
+darum ohne Profiler. Test-only: `protokoll` sammelt und schreibt je Bild
+einmal (`protokollSchreiben` vor FLIP und am Ende) -- vorher oeffnete jede
+der Tausenden Lage-Zeilen die Datei.
 
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
