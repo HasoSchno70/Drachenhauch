@@ -202,7 +202,8 @@ feld x=140 y=0 b=40 h=5 spalte=kunde.name
 === bandhoehe ziehen und ein element am griff groesser ziehen
 ' Die Unterkante des Details 4 mm tiefer: 10 mm. Dann "betrag" im Detail
 ' (140/0, 40 x 5) waehlen und den Griff rechts unten um 10 mm nach links und
-' 3 mm nach unten ziehen: 30 x 8.
+' 3 mm nach unten ziehen: 30 x 8. Zuletzt das Feld "text" waehlen und mit Entf
+' loeschen.
 IMPORT "laeufer.dh"
 brProjekt()
 DIM p AS STRING : p = CWD$() + "/proj"
@@ -227,15 +228,22 @@ slKlick(ex, ey)
 slWarten(6)
 slZug(gx, gy, gx - INT(10.2 * brS + 0.5), gy + INT(3.2 * brS + 0.5), 8, TRUE)
 slWarten(6)
+DIM tx AS INTEGER
+DIM ty AS INTEGER
+(tx, ty) = brPunkt(m, 3, 50.0, 2.5)
+slKlick(tx, ty)
+slWarten(6)
+slTaste(261)
+slWarten(6)
 slMit([341], 83)
 slWarten(10)
 slAufnahmeSchreiben(CWD$() + "/ev.txt")
 DIM log AS STRING : log = CWD$() + "/s.log"
 DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
-PRINT "hoehe "; slHat(log, "bericht bandhoehe 3 10"); " groesse "; slHat(log, "bericht groesse")
+PRINT "hoehe "; slHat(log, "bericht bandhoehe 3 10"); " groesse "; slHat(log, "bericht groesse"); " entf "; slHat(log, "bericht geloescht 1")
 DIM j AS JSON_HANDLE : j = brBericht()
 PRINT brBaender$(j)
-PRINT brEl$(j, 3, 1)
+PRINT brEl$(j, 3, 0)
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
 {sammlung}/../../studio/studio.dh
@@ -245,8 +253,8 @@ IMPORT "{sammlung}/_hilfen/berichtprojekt.dh"
 IMPORT "json"
 slStudio = ARG$(0)
 --- erwartet
-hoehe TRUE groesse TRUE
-berichtskopf 20 (1), seitenkopf 8 (2), gruppenkopf0 10 (3), detail 10 (2), gruppenfuss0 10 (3), seitenfuss 8 (1), berichtsfuss 10 (2)
+hoehe TRUE groesse TRUE entf TRUE
+berichtskopf 20 (1), seitenkopf 8 (2), gruppenkopf0 10 (3), detail 10 (1), gruppenfuss0 10 (3), seitenfuss 8 (1), berichtsfuss 10 (2)
 feld x=140 y=0 b=30 h=8 spalte=betrag format=geld ausrichtung=rechts
 
 === eigenschaften setzen, rahmen waehlt mehrere, pfeile schieben
