@@ -308,6 +308,76 @@ or Enter comes, not per keystroke. A name must be an identifier and unique in
 the window, because it later becomes a field of the window class; an invalid
 name is marked red and not applied.
 
+## Custom controls
+
+Several controls become a building block of their own, like a
+ContainerControl in Xojo: Project -> "Add custom control …" creates an element
+that is designed like a window -- only without a title and menus (timers
+work). It has its own code and events for its parts (`knopf_Klick`), plus the
+events `Geoeffnet` and `Groesse` of the control itself.
+
+The library lists all custom controls under **Project**. You place one into
+a window like a button and get an instance (`zaehler1`). It can be moved,
+resized, anchored and put into rows, columns and grid layouts; in the design
+it shows its real content, outlined with a dashed line, and a click on one
+of its parts selects the whole instance.
+
+```basic
+' in the code of the control Zaehler
+SUB knopf_Klick()
+    Self.n = Self.n + 1
+    GUI_SET_TEXT(Self.anzeige, STR$(Self.n))
+END SUB
+
+FUNCTION Wert() AS INTEGER
+    RETURN Self.n
+END FUNCTION
+
+' in the code of the window
+SUB knopfSumme_Klick()
+    Meldung(STR$(Self.zaehler1.Wert() + Self.zaehler2.Wert()))
+END SUB
+```
+
+In the code of the window an instance is an object of the control's class:
+its methods and fields can be reached (`Self.zaehler1.Wert()`,
+`Self.zaehler1.anzeige`). Every control also brings `Fenster()`,
+`Behaelter()`, `Breite()`, `Hoehe()` and `Sichtbar(an)`.
+
+**How it runs:** in the program an instance is an empty layout container --
+it takes the anchors, the weight in a layout and the position --, and the
+parts of the control stand behind it in the same window. Every frame the
+runtime puts them where the container currently is, following their anchors
+inside the control: a part anchored left and right grows with the instance.
+
+**Own events and properties.** The inspector of the control has two fields
+under "Custom control": **Events** (names separated by semicolons,
+`Erreicht; Geleert`) and **Properties** (`Ziel AS INTEGER = 3; Vorsatz =
+"Anzahl: "` -- without `AS` a STRING, also FLOAT and BOOLEAN; quotes keep
+spaces at the edges). Every property is a field of the control's class with
+this default. An instance has the field **Values** in the inspector (`Ziel =
+2; Vorsatz = "Erste: "`); a name the control doesn't know, or a value that
+doesn't fit the type, is dropped.
+
+```basic
+' in the code of the control Zaehler
+SUB knopf_Klick()
+    Self.n = Self.n + 1
+    IF Self.n = Self.Ziel THEN Self.Ausloesen("Erreicht")
+END SUB
+
+' in the code of the window
+SUB zaehler1_Erreicht()
+    Meldung("Ziel erreicht")
+END SUB
+```
+
+`Self.Ausloesen("Name")` reports one of the events; the window then calls
+its method `<instance>_<event>` -- after the control's tick, in the same
+frame. A double click on the instance offers its events like on any other
+control. Not yet: controls inside controls, and renaming together with the
+instances.
+
 ## A single window
 
 A `.dhform` (the same format that `GUI_SAVE` writes and `GUI_LOAD` reads)

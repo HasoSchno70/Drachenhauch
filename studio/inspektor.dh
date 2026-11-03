@@ -75,6 +75,12 @@ SUB inspektorAnlegen()
     inspZeile("Fenster", "w", "Breite", "zahl", "fenster", "")
     inspZeile("Fenster", "h", "Höhe", "zahl", "fenster", "")
     inspZeile("Fenster", "resizable", "Größe änderbar", "schalter", "fenster", "")
+    ' Ein eigenes Control legt fest, was es meldet und was eine Instanz
+    ' einstellen kann; eine Instanz traegt ihre Werte (modell.dh).
+    inspGruppe("Eigenes Control")
+    inspZeile("Eigenes Control", "studio_ereignisse", "Ereignisse", "text", "fenster", "")
+    inspZeile("Eigenes Control", "studio_eigenschaften", "Eigenschaften", "text", "fenster", "")
+    inspZeile("Eigenes Control", "studio_werte", "Werte", "text", "studio_control", "")
     inspGruppe("Timer")
     inspZeile("Timer", "name", "Name", "text", "timer", "")
     inspZeile("Timer", "intervall", "Intervall (ms)", "zahl", "timer", "")
@@ -195,8 +201,20 @@ END SUB
 FUNCTION giltFuer(z AS InspZeile, art AS STRING) AS BOOLEAN
     IF abstandL >= 0 THEN RETURN z.art = "gewicht"
     IF trayWahl >= 0 THEN RETURN z.fuer = "timer"
-    IF auswahl < 0 THEN RETURN z.fuer = "fenster"
+    IF auswahl < 0 THEN
+        ' Ein eigenes Control hat keinen Titel und waechst mit seiner Instanz.
+        IF z.fuer = "fenster" AND entwurfIstControl() THEN RETURN z.schluessel <> "title" AND z.schluessel <> "resizable"
+        IF z.schluessel = "studio_ereignisse" OR z.schluessel = "studio_eigenschaften" THEN RETURN FALSE
+        RETURN z.fuer = "fenster"
+    END IF
     IF z.fuer = "fenster" THEN RETURN FALSE
+    ' Eine Instanz eines eigenen Controls: Name, Lage und Sichtbarkeit -- das
+    ' Aussehen legen seine Teile fest.
+    IF art = "studio_control" THEN
+        IF z.art = "gewicht" THEN RETURN verwaltet(auswahl)
+        IF verwaltet(auswahl) AND (z.schluessel = "x" OR z.schluessel = "y" OR z.schluessel = "anchor") THEN RETURN FALSE
+        RETURN INSTR(",name,kind,x,y,w,h,anchor,visible,studio_werte,", "," + z.schluessel + ",") >= 0
+    END IF
     ' In einem Layout: kein Links/Oben/Anker, dafuer das Gewicht.
     DIM imLayout AS BOOLEAN : imLayout = verwaltet(auswahl)
     IF z.art = "gewicht" THEN RETURN imLayout
@@ -274,12 +292,12 @@ SUB inspektorFuellen()
     ELSEIF auswahl >= 0 THEN
         art = feldText$(auswahl, "kind")
         GUI_SET_TEXT(inspTitel, feldText$(auswahl, "name"))
-        DIM text AS STRING : text = tr$(bausteinName$(auswahl))
+        DIM text AS STRING : text = bausteinNameAnzeige$(auswahl)
         IF LEN(gewaehlt) > 1 THEN text = text + trf$(" -- {0} gewählt", [STR$(LEN(gewaehlt))])
         GUI_SET_TEXT(inspArt, text)
     ELSE
         GUI_SET_TEXT(inspTitel, fensterText$("name"))
-        GUI_SET_TEXT(inspArt, tr$("Fenster"))
+        GUI_SET_TEXT(inspArt, IIF(entwurfIstControl(), tr$("Eigenes Control"), tr$("Fenster")))
     END IF
     DIM z AS InspZeile
     FOR EACH z IN inspZeilen
@@ -290,6 +308,14 @@ SUB inspektorFuellen()
             CASE "text", "komma"
                 GUI_SET_TEXT(z.ed, wertText$(p))
                 GUI_SET_ERROR(z.ed, "")
+                IF z.schluessel = "studio_werte" AND auswahl >= 0 THEN
+                    ' Was das Control anbietet, mit seinen Vorgaben.
+                    DIM cn AS STRING : cn = feldText$(auswahl, "studio_control")
+                    DIM angebot AS STRING : angebot = jsonText$(controlLayout(cn), "studio_eigenschaften")
+                    GUI_TOOLTIP(z.ed, IIF(angebot = "", trf$("{0} hat keine Eigenschaften.", [cn]), trf$("Name = Wert; ... -- {0} hat: {1}", [cn, angebot])))
+                END IF
+                IF z.schluessel = "studio_eigenschaften" THEN GUI_TOOLTIP(z.ed, tr$("Name = Vorgabe; Zahl AS INTEGER = 3 -- ohne AS ein STRING; dazu FLOAT und BOOLEAN"))
+                IF z.schluessel = "studio_ereignisse" THEN GUI_TOOLTIP(z.ed, tr$("Namen durch Semikolon; im Code des Controls meldet Self.Ausloesen(...) eines davon"))
             CASE "eintraege"
                 GUI_SET_TEXT(z.ed, listeText$(p))
             CASE "zahl"
@@ -334,7 +360,7 @@ SUB inspektorFuellen()
             CASE "farbe"
                 farbfeldZeigen(z, p)
             CASE "info"
-                GUI_SET_TEXT(z.ed, tr$(bausteinName$(auswahl)) + "  (" + wertText$(p) + ")")
+                GUI_SET_TEXT(z.ed, bausteinNameAnzeige$(auswahl) + "  (" + wertText$(p) + ")")
             CASE "anker"
                 DIM a AS STRING : a = wertText$(p)
                 IF a = "" THEN a = "lt"

@@ -4,7 +4,8 @@
 ' Geaendert wird sie in studio/laufzeit.dh, nicht in der Kopie.
 '
 ' StudioApp ist die Basis der App, StudioFenster die Basis jeder erzeugten
-' Fensterklasse (<Fenster>_Basis), StudioTimer ein Timer im Fenster.
+' Fensterklasse (<Fenster>_Basis), StudioControl die jedes eigenen Controls
+' (<Control>_Basis), StudioTimer ein Timer im Fenster oder Control.
 ' studioLauf() dreht die Bildschleife; ein Bild ist studioBild().
 '
 ' Die Ereignisse fragt jedes Fenster NACH dem GUI_UPDATE ab (studioTakt),
@@ -52,8 +53,162 @@ CLASS StudioTimer
     END FUNCTION
 END CLASS
 
+' Wo ein Teil eines eigenen Controls auf einer Achse liegt, wenn das Control
+' um `mehr` groesser ist als entworfen -- wie ein verankertes Widget: am
+' Anfang fest (Vorgabe), am Ende mitwandernd, an beiden mitwachsend.
+' Dieselbe Rechnung wie teilLage im Studio (Vorschau im Entwurf).
+FUNCTION studioAchse(lage AS INTEGER, mass AS INTEGER, anfang AS BOOLEAN, ende AS BOOLEAN, mehr AS INTEGER) AS TUPLE
+    IF anfang AND ende THEN RETURN (lage, MAX(1, mass + mehr))
+    IF ende THEN RETURN (lage + mehr, mass)
+    RETURN (lage, mass)
+END FUNCTION
+
+' Ein eigenes Control. Im Fenster ist eine Instanz ein leerer
+' Layout-Behaelter -- er laesst sich verankern und in Layouts legen, nimmt
+' keine Klicks und zeichnet nichts --; die Teile liegen dahinter im selben
+' Fenster. studioLegen setzt sie je Bild dorthin, wo der Behaelter gerade
+' liegt, nach ihren Ankern im Control. Die Ereignisse seiner Teile fragt das
+' Control selbst ab (studioTakt), das Fenster ruft es dazu je Bild.
+CLASS StudioControl
+    DIM studioWin AS GUI_WINDOW
+    DIM studioHost AS GUI_WIDGET
+    DIM studioOffen AS BOOLEAN
+    DIM studioEntwurfB AS INTEGER
+    DIM studioEntwurfH AS INTEGER
+    ' Teile, die frei im Control liegen (nicht in einem seiner Layouts),
+    ' mit Lage und Anker im Control; dazu alle Teile fuer Sichtbar().
+    DIM studioTeile AS ARRAY OF GUI_WIDGET
+    DIM studioTx AS ARRAY OF INTEGER
+    DIM studioTy AS ARRAY OF INTEGER
+    DIM studioTb AS ARRAY OF INTEGER
+    DIM studioTh AS ARRAY OF INTEGER
+    DIM studioTa AS ARRAY OF STRING
+    DIM studioAlle AS ARRAY OF GUI_WIDGET
+    DIM studioWar AS STRING
+    DIM studioWarB AS INTEGER
+    DIM studioWarH AS INTEGER
+    ' Was das Control in diesem Bild mit Ausloesen gemeldet hat; das Fenster
+    ' fragt es nach seinem Takt ab und leert es dann.
+    DIM studioMeldungen AS ARRAY OF STRING
+
+    ' Von der erzeugten Basis zuerst gerufen.
+    SUB studioAnfangen(win AS GUI_WINDOW, behaelter AS GUI_WIDGET, b AS INTEGER, h AS INTEGER)
+        Self.studioWin = win
+        Self.studioHost = behaelter
+        Self.studioEntwurfB = b
+        Self.studioEntwurfH = h
+        Self.studioTeile = [] : Self.studioTx = [] : Self.studioTy = [] : Self.studioTb = [] : Self.studioTh = []
+        Self.studioTa = [] : Self.studioAlle = [] : Self.studioMeldungen = []
+        Self.studioWar = ""
+        Self.studioWarB = -1
+        Self.studioWarH = -1
+        Self.studioOffen = TRUE
+    END SUB
+
+    SUB studioTeil(w AS GUI_WIDGET, frei AS BOOLEAN, x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER, anker AS STRING)
+        ARRAY_PUSH(Self.studioAlle, w)
+        IF NOT frei THEN RETURN
+        ARRAY_PUSH(Self.studioTeile, w)
+        ARRAY_PUSH(Self.studioTx, x) : ARRAY_PUSH(Self.studioTy, y)
+        ARRAY_PUSH(Self.studioTb, b) : ARRAY_PUSH(Self.studioTh, h)
+        ARRAY_PUSH(Self.studioTa, LOWER$(anker))
+    END SUB
+
+    ' Die erzeugte Basis baut hier ihre Felder (Teile, Timer).
+    SUB studioEinbauen(win AS GUI_WINDOW, behaelter AS GUI_WIDGET, erster AS INTEGER)
+    END SUB
+
+    ' Je Bild nach GUI_UPDATE: die Ereignisse der Teile.
+    SUB studioTakt()
+    END SUB
+
+    ' Je Bild nach GUI_DRAW: die Zeichenflaechen.
+    SUB studioZeichnen()
+    END SUB
+
+    ' Nachdem das Fenster mit dem Control aufgebaut ist.
+    SUB Geoeffnet()
+    END SUB
+
+    ' Wenn sich die Groesse des Controls geaendert hat.
+    SUB Groesse()
+    END SUB
+
+    ' Je Bild: die Teile zum Behaelter.
+    SUB studioLegen()
+        IF NOT Self.studioOffen THEN RETURN
+        DIM hx AS INTEGER : hx = GUI_GET_X(Self.studioHost)
+        DIM hy AS INTEGER : hy = GUI_GET_Y(Self.studioHost)
+        DIM hb AS INTEGER : hb = GUI_GET_W(Self.studioHost)
+        DIM hh AS INTEGER : hh = GUI_GET_H(Self.studioHost)
+        DIM schl AS STRING : schl = STR$(hx) + "," + STR$(hy) + "," + STR$(hb) + "," + STR$(hh)
+        IF schl = Self.studioWar THEN RETURN
+        Self.studioWar = schl
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(Self.studioTeile) - 1
+            DIM a AS STRING : a = Self.studioTa[k]
+            DIM x AS INTEGER
+            DIM w AS INTEGER
+            DIM y AS INTEGER
+            DIM h AS INTEGER
+            (x, w) = studioAchse(Self.studioTx[k], Self.studioTb[k], INSTR(a, "l") >= 0, INSTR(a, "r") >= 0, hb - Self.studioEntwurfB)
+            (y, h) = studioAchse(Self.studioTy[k], Self.studioTh[k], INSTR(a, "t") >= 0, INSTR(a, "b") >= 0, hh - Self.studioEntwurfH)
+            GUI_SET_BOUNDS(Self.studioTeile[k], hx + x, hy + y, w, h)
+        NEXT
+        DIM erstes AS BOOLEAN : erstes = Self.studioWarB < 0
+        DIM anders AS BOOLEAN : anders = hb <> Self.studioWarB OR hh <> Self.studioWarH
+        Self.studioWarB = hb
+        Self.studioWarH = hh
+        IF anders AND NOT erstes THEN Self.Groesse()
+    END SUB
+
+    ' Meldet eines der Ereignisse, die das Control festlegt: das Fenster ruft
+    ' dann seine Methode <Instanz>_<Ereignis> -- nach dem Takt des Controls,
+    ' also auch, wenn es aus einem Ereignis eines Teils kommt.
+    SUB Ausloesen(ereignis AS STRING)
+        IF ARRAY_INDEXOF(Self.studioMeldungen, ereignis) < 0 THEN ARRAY_PUSH(Self.studioMeldungen, ereignis)
+    END SUB
+
+    FUNCTION studioGemeldet(ereignis AS STRING) AS BOOLEAN
+        RETURN ARRAY_INDEXOF(Self.studioMeldungen, ereignis) >= 0
+    END FUNCTION
+
+    SUB studioMeldungenLeeren()
+        Self.studioMeldungen = []
+    END SUB
+
+    ' Das Fenster, in dem das Control steht.
+    FUNCTION Fenster() AS GUI_WINDOW
+        RETURN Self.studioWin
+    END FUNCTION
+
+    ' Der Behaelter im Fenster (fuer GUI_GET_X/Y/W/H, GUI_SET_BOUNDS ...).
+    FUNCTION Behaelter() AS GUI_WIDGET
+        RETURN Self.studioHost
+    END FUNCTION
+
+    FUNCTION Breite() AS INTEGER
+        RETURN GUI_GET_W(Self.studioHost)
+    END FUNCTION
+
+    FUNCTION Hoehe() AS INTEGER
+        RETURN GUI_GET_H(Self.studioHost)
+    END FUNCTION
+
+    ' Das ganze Control zeigen oder verbergen.
+    SUB Sichtbar(an AS BOOLEAN)
+        GUI_SET_VISIBLE(Self.studioHost, an)
+        DIM w AS GUI_WIDGET
+        FOR EACH w IN Self.studioAlle
+            GUI_SET_VISIBLE(w, an)
+        NEXT
+    END SUB
+END CLASS
+
 CLASS StudioFenster
     DIM studioWin AS GUI_WINDOW
+    ' Die eigenen Controls im Fenster: sie gehen mit dem Fenster zu.
+    DIM studioControls AS ARRAY OF StudioControl
     DIM studioOffen AS BOOLEAN
     DIM studioHaupt AS BOOLEAN
     DIM studioWarB AS INTEGER
@@ -128,6 +283,10 @@ CLASS StudioFenster
         IF NOT Self.studioOffen THEN RETURN
         Self.Schliessen()
         Self.studioOffen = FALSE
+        DIM c AS StudioControl
+        FOR EACH c IN Self.studioControls
+            c.studioOffen = FALSE
+        NEXT
         GUI_WINDOW_DESTROY(Self.studioWin)
         IF Self.studioHaupt THEN studioBeenden()
     END SUB

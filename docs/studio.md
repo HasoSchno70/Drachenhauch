@@ -312,6 +312,76 @@ Fokus abgibt oder Enter kommt, nicht je Anschlag. Ein Name muss ein
 Bezeichner sein und im Fenster eindeutig, denn er wird später zum Feld der
 Fensterklasse; ein ungültiger Name wird rot markiert und nicht übernommen.
 
+## Eigene Controls
+
+Aus mehreren Controls wird ein eigener Baustein, wie ein ContainerControl in
+Xojo: Projekt -> „Eigenes Control hinzufügen …“ legt ein Element an, das wie
+ein Fenster entworfen wird -- nur ohne Titel und Menüs (Timer gehen). Es hat
+eigenen Code und Ereignisse für seine Teile (`knopf_Klick`), dazu die
+Ereignisse `Geoeffnet` und `Groesse` des Controls selbst.
+
+In der Bibliothek stehen alle eigenen Controls unter **Projekt**. Man legt
+sie ins Fenster wie einen Knopf und bekommt eine Instanz (`zaehler1`). Sie
+lässt sich verschieben, größer ziehen, verankern und in Zeilen, Spalten und
+Raster legen; im Entwurf zeigt sie ihren echten Inhalt, gestrichelt
+umrandet, und ein Klick auf einen ihrer Teile wählt die ganze Instanz.
+
+```basic
+' im Code des Controls Zaehler
+SUB knopf_Klick()
+    Self.n = Self.n + 1
+    GUI_SET_TEXT(Self.anzeige, STR$(Self.n))
+END SUB
+
+FUNCTION Wert() AS INTEGER
+    RETURN Self.n
+END FUNCTION
+
+' im Code des Fensters
+SUB knopfSumme_Klick()
+    Meldung(STR$(Self.zaehler1.Wert() + Self.zaehler2.Wert()))
+END SUB
+```
+
+Im Code des Fensters ist eine Instanz ein Objekt der Klasse des Controls:
+ihre Methoden und Felder sind erreichbar (`Self.zaehler1.Wert()`,
+`Self.zaehler1.anzeige`). Dazu bringt jedes Control `Fenster()`,
+`Behaelter()`, `Breite()`, `Hoehe()` und `Sichtbar(an)` mit.
+
+**Wie es läuft:** eine Instanz ist im Programm ein leerer Layout-Behälter --
+er nimmt die Anker, das Gewicht im Layout und die Lage --, und die Teile des
+Controls stehen im selben Fenster dahinter. Je Bild legt die Laufzeit sie
+dorthin, wo der Behälter gerade liegt, nach ihren Ankern im Control: ein
+Teil mit Anker links und rechts wächst mit der Instanz.
+
+**Eigene Ereignisse und Eigenschaften.** Im Inspektor des Controls stehen
+unter „Eigenes Control“ zwei Felder: **Ereignisse** (Namen durch Semikolon,
+`Erreicht; Geleert`) und **Eigenschaften** (`Ziel AS INTEGER = 3; Vorsatz =
+"Anzahl: "` -- ohne `AS` ein STRING, dazu FLOAT und BOOLEAN; Anführungszeichen
+halten Leerzeichen am Rand). Jede Eigenschaft ist ein Feld der Klasse des
+Controls mit dieser Vorgabe. Eine Instanz hat im Inspektor das Feld
+**Werte** (`Ziel = 2; Vorsatz = "Erste: "`); ein Name, den das Control nicht
+kennt, oder ein Wert, der nicht zum Typ passt, fällt weg.
+
+```basic
+' im Code des Controls Zaehler
+SUB knopf_Klick()
+    Self.n = Self.n + 1
+    IF Self.n = Self.Ziel THEN Self.Ausloesen("Erreicht")
+END SUB
+
+' im Code des Fensters
+SUB zaehler1_Erreicht()
+    Meldung("Ziel erreicht")
+END SUB
+```
+
+`Self.Ausloesen("Name")` meldet eines der Ereignisse; das Fenster ruft dann
+seine Methode `<Instanz>_<Ereignis>` -- nach dem Takt des Controls im selben
+Bild. Ein Doppelklick auf die Instanz bietet ihre Ereignisse an wie bei
+jedem anderen Control. Noch nicht: Controls in Controls und Umbenennen samt
+Instanzen.
+
 ## Ein einzelnes Fenster
 
 Eine `.dhform` (dasselbe Format, das `GUI_SAVE` schreibt und `GUI_LOAD`

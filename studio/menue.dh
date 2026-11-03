@@ -37,6 +37,10 @@ SUB menueEditor()
         status(tr$("Menüs hat ein Fenster -- erst ein Layout öffnen."))
         RETURN
     END IF
+    IF elemente[aktFenster].art <> "fenster" THEN
+        status(tr$("Menüs hat nur ein Fenster, kein eigenes Control."))
+        RETURN
+    END IF
     mnDoc = JSON_NEW_OBJECT()
     IF JSON_HAS(doc, "menus") THEN
         JSON_SET_JSON(mnDoc, "menus", JSON_GET_JSON(doc, "menus"))
