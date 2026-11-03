@@ -1,0 +1,421 @@
+' Drachenhauch Studio: Berichte, Stufe 2 -- entwerfen
+' (studio/berichte_reiter.dh, studio/berichte.dh, docs/entwurf-berichte.md).
+' Elemente aus der Leiste ablegen, ziehen (mit Raster und
+' Ausrichtungslinien), am Griff groesser ziehen, die Bandhoehe ziehen,
+' Spalten der Quelle in ein Band ziehen, Eigenschaften setzen, Rahmen fuer
+' mehrere, Pfeiltasten, Baender und Gruppen, Rueckgaengig.
+' Das Projekt baut _hilfen/berichtprojekt.dh; die Faelle mit echten Klicks
+' messen erst (_hilfen/studiolauf.dh) und lesen dann die gesicherte
+' .dhreport.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== das modell legt baender, gruppen und spalten an ihre stelle
+' Ohne Fenster: eine zweite Gruppe kommt innen (Kopf nach dem aeusseren,
+' Fuss davor), eine entfernte nimmt Kopf und Fuss mit und die innere rueckt
+' nach. Das Detail bleibt, ein Band gibt es nur einmal. Eine Spalte wird im
+' Fuss eine Summe, im Seitenkopf eine Ueberschrift, sonst ein Feld.
+IMPORT "kern.dh"
+brProjekt()
+projOrdner = CWD$() + "/proj"
+DIM e AS Element : e = elementNeu("datenbank", "Daten")
+e.schema = READLINES("proj/Daten.dhdb")[0]
+DIM j AS JSON_HANDLE : j = JSON_PARSE(READLINES("proj/Liste.dhreport")[0])
+PRINT "gruppe "; berichtGruppeDazu(j, "kunde")
+PRINT brBaender$(j)
+PRINT "gruppen "; JSON_STRINGIFY(JSON_GET_JSON(j, "gruppen"))
+berichtGruppeWeg(j, 0)
+PRINT brBaender$(j)
+PRINT "gruppen "; JSON_STRINGIFY(JSON_GET_JSON(j, "gruppen"))
+PRINT "detail weg "; berichtBandWeg(j, studioBBand(j, "detail", 0))
+PRINT "seitenkopf weg "; berichtBandWeg(j, studioBBand(j, "seitenkopf", 0))
+PRINT "wieder "; berichtBandEinfuegen(j, "seitenkopf", 0, 8.0); " doppelt "; berichtBandEinfuegen(j, "seitenkopf", 0, 8.0)
+PRINT brBaender$(j)
+PRINT "typen "; berichtSpaltenTyp$(j, "betrag"); " "; berichtSpaltenTyp$(j, "kunde"); " "; berichtSpaltenTyp$(j, "kunde.name"); " "; berichtSpaltenTyp$(j, "id"); " ["; berichtSpaltenTyp$(j, "gibtsnicht"); "]"
+DIM d AS INTEGER : d = studioBBand(j, "detail", 0)
+DIM t AS JSON_HANDLE
+t = berichtSpalteElement(j, d, "betrag", 140.0, 0.0)
+PRINT "detail betrag: "; JSON_STRINGIFY(t)
+t = berichtSpalteElement(j, d, "kunde.name", 0.0, 3.0)
+PRINT "detail name: "; JSON_STRINGIFY(t)
+t = berichtSpalteElement(j, studioBBand(j, "gruppenfuss", 0), "betrag", 140.0, 1.0)
+PRINT "gruppenfuss: "; JSON_STRINGIFY(t)
+t = berichtSpalteElement(j, studioBBand(j, "berichtsfuss", 0), "text", 0.0, 1.0)
+PRINT "berichtsfuss: "; JSON_STRINGIFY(t)
+t = berichtSpalteElement(j, studioBBand(j, "seitenkopf", 0), "betrag", 140.0, 0.0)
+PRINT "seitenkopf: "; JSON_STRINGIFY(t)
+--- datei kern.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "db"
+IMPORT "pdf"
+IMPORT "{sammlung}/../../studio/sprache.dh"
+IMPORT "{sammlung}/../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../studio/modell.dh"
+IMPORT "{sammlung}/../../studio/projekt.dh"
+IMPORT "{sammlung}/../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../studio/berichte_laufzeit.dh"
+IMPORT "{sammlung}/../../studio/berichte.dh"
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/_hilfen/berichtprojekt.dh"
+--- erwartet
+gruppe 1
+berichtskopf 20 (1), seitenkopf 8 (2), gruppenkopf0 10 (3), gruppenkopf1 8 (0), detail 6 (2), gruppenfuss1 8 (0), gruppenfuss0 10 (3), seitenfuss 8 (1), berichtsfuss 10 (2)
+gruppen [{"spalte":"rechnung"},{"spalte":"kunde"}]
+berichtskopf 20 (1), seitenkopf 8 (2), gruppenkopf0 8 (0), detail 6 (2), gruppenfuss0 8 (0), seitenfuss 8 (1), berichtsfuss 10 (2)
+gruppen [{"spalte":"kunde"}]
+detail weg FALSE
+seitenkopf weg TRUE
+wieder 1 doppelt -1
+berichtskopf 20 (1), seitenkopf 8 (0), gruppenkopf0 8 (0), detail 6 (2), gruppenfuss0 8 (0), seitenfuss 8 (1), berichtsfuss 10 (2)
+typen geld ganz text ganz []
+detail betrag: {"art":"feld","spalte":"betrag","format":"geld","ausrichtung":"rechts","x":140.0,"y":0.0,"b":25.0,"h":5.0,"groesse":10.0}
+detail name: {"art":"feld","spalte":"kunde.name","x":0.0,"y":1.0,"b":40.0,"h":5.0,"groesse":10.0}
+gruppenfuss: {"art":"summe","spalte":"betrag","format":"geld","ausrichtung":"rechts","funktion":"summe","bereich":"gruppe","fett":true,"x":140.0,"y":1.0,"b":25.0,"h":5.0,"groesse":10.0}
+berichtsfuss: {"art":"summe","spalte":"text","ausrichtung":"rechts","funktion":"anzahl","bereich":"bericht","format":"ganz","fett":true,"x":0.0,"y":1.0,"b":40.0,"h":5.0,"groesse":10.0}
+seitenkopf: {"art":"text","text":"betrag","x":140.0,"y":0.0,"b":25.0,"h":5.0,"groesse":10.0,"fett":true,"ausrichtung":"rechts"}
+
+=== aus der leiste ablegen, ein feld an die linie ziehen, rueckgaengig und wiederholen
+' [Text] in der Leiste, ein Klick bei 110/1 mm ins Detail legt einen Text ab
+' (Raster 1 mm). Dann das Feld "text" (5..105) um 14,4 mm nach rechts: das
+' Raster gaebe 19, aber seine rechte Kante (119) rastet an der des Feldes
+' kunde.name im Gruppenkopf (120) ein -- es steht bei 20. Strg+Z nimmt das
+' Ziehen zurueck, Strg+Y bringt es wieder; Strg+S sichert.
+IMPORT "laeufer.dh"
+brProjekt()
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM m AS STRING : m = CWD$() + "/m.log"
+SETENV("DH_STUDIO_OEFFNEN", "Liste")
+slStarten(m, "", 12, p)
+brMessen(m)
+DIM kx AS INTEGER
+DIM ky AS INTEGER
+(kx, ky) = slLage(m, "berknopf text")
+DIM ax AS INTEGER
+DIM ay AS INTEGER
+(ax, ay) = brPunkt(m, 3, 110.2, 1.2)
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(fx, fy) = brPunkt(m, 3, 50.0, 2.5)
+slHin(10, 10)
+slWarten(14)
+slKlick(kx, ky)
+slWarten(4)
+slKlick(ax, ay)
+slWarten(6)
+slZug(fx, fy, fx + INT(14.4 * brS + 0.5), fy, 10, TRUE)
+slWarten(6)
+slMit([341], 90)
+slWarten(6)
+slMit([341], 89)
+slWarten(6)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM z AS STRING
+FOR EACH z IN slProtokoll(log)
+    IF LEFT$(z, 16) = "bericht abgelegt" OR LEFT$(z, 16) = "bericht verschob" OR LEFT$(z, 20) = "bericht rueckgaengig" OR LEFT$(z, 19) = "bericht wiederholen" THEN PRINT z
+NEXT
+DIM j AS JSON_HANDLE : j = brBericht()
+PRINT brBaender$(j)
+PRINT brEl$(j, 3, 0)
+PRINT brEl$(j, 3, 2)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/_hilfen/berichtprojekt.dh"
+IMPORT "json"
+slStudio = ARG$(0)
+--- erwartet
+bericht abgelegt text detail
+bericht verschoben 1
+bericht rueckgaengig 1
+bericht wiederholen 2
+berichtskopf 20 (1), seitenkopf 8 (2), gruppenkopf0 10 (3), detail 6 (3), gruppenfuss0 10 (3), seitenfuss 8 (1), berichtsfuss 10 (2)
+feld x=20 y=0 b=100 h=5 spalte=text
+text x=110 y=1 b=30 h=5 text=Text
+
+=== spalten ziehen: im fuss eine summe, doppelklick ins detail
+' "betrag" aus der Liste in den Berichtsfuss gezogen wird eine Summe ueber
+' den ganzen Bericht (Geld, rechts); ein Doppelklick auf "kunde.name" legt ein
+' Feld ins Detail -- rechts neben das letzte, aber nicht ueber den Rand.
+IMPORT "laeufer.dh"
+brProjekt()
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM m AS STRING : m = CWD$() + "/m.log"
+SETENV("DH_STUDIO_OEFFNEN", "Liste")
+slStarten(m, "", 12, p)
+brMessen(m)
+DIM sx AS INTEGER
+DIM sy AS INTEGER
+(sx, sy) = slLage(m, "berspalte betrag")
+DIM nx AS INTEGER
+DIM ny AS INTEGER
+(nx, ny) = slLage(m, "berspalte kunde.name")
+DIM zx AS INTEGER
+DIM zy AS INTEGER
+(zx, zy) = brPunkt(m, 6, 40.3, 2.3)
+slHin(10, 10)
+slWarten(14)
+slZug(sx, sy, zx, zy, 12, TRUE)
+slWarten(6)
+slHin(nx, ny)
+slHin(nx, ny)
+slRunter()
+slHoch()
+slRunter()
+slHoch()
+slWarten(8)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM z AS STRING
+FOR EACH z IN slProtokoll(log)
+    IF LEFT$(z, 15) = "bericht spalte " THEN PRINT z
+NEXT
+DIM j AS JSON_HANDLE : j = brBericht()
+PRINT brBaender$(j)
+PRINT brEl$(j, 6, 2)
+PRINT brEl$(j, 3, 2)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/_hilfen/berichtprojekt.dh"
+IMPORT "json"
+slStudio = ARG$(0)
+--- erwartet
+bericht spalte betrag summe berichtsfuss
+bericht spalte kunde.name feld detail
+berichtskopf 20 (1), seitenkopf 8 (2), gruppenkopf0 10 (3), detail 6 (3), gruppenfuss0 10 (3), seitenfuss 8 (1), berichtsfuss 10 (3)
+summe x=40 y=2 b=25 h=5 spalte=betrag format=geld funktion=summe bereich=bericht ausrichtung=rechts fett=TRUE
+feld x=140 y=0 b=40 h=5 spalte=kunde.name
+
+=== bandhoehe ziehen und ein element am griff groesser ziehen
+' Die Unterkante des Details 4 mm tiefer: 10 mm. Dann "betrag" im Detail
+' (140/0, 40 x 5) waehlen und den Griff rechts unten um 10 mm nach links und
+' 3 mm nach unten ziehen: 30 x 8.
+IMPORT "laeufer.dh"
+brProjekt()
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM m AS STRING : m = CWD$() + "/m.log"
+SETENV("DH_STUDIO_OEFFNEN", "Liste")
+slStarten(m, "", 12, p)
+brMessen(m)
+DIM kx AS INTEGER
+DIM ky AS INTEGER
+(kx, ky) = slLage(m, "berkante3")
+DIM ex AS INTEGER
+DIM ey AS INTEGER
+(ex, ey) = brPunkt(m, 3, 160.0, 2.5)
+DIM gx AS INTEGER
+DIM gy AS INTEGER
+(gx, gy) = brPunkt(m, 3, 180.0, 5.0)
+slHin(10, 10)
+slWarten(14)
+slZug(kx, ky, kx, ky + INT(4.2 * brS + 0.5), 8, TRUE)
+slWarten(6)
+slKlick(ex, ey)
+slWarten(6)
+slZug(gx, gy, gx - INT(10.2 * brS + 0.5), gy + INT(3.2 * brS + 0.5), 8, TRUE)
+slWarten(6)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "hoehe "; slHat(log, "bericht bandhoehe 3 10"); " groesse "; slHat(log, "bericht groesse")
+DIM j AS JSON_HANDLE : j = brBericht()
+PRINT brBaender$(j)
+PRINT brEl$(j, 3, 1)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/_hilfen/berichtprojekt.dh"
+IMPORT "json"
+slStudio = ARG$(0)
+--- erwartet
+hoehe TRUE groesse TRUE
+berichtskopf 20 (1), seitenkopf 8 (2), gruppenkopf0 10 (3), detail 10 (2), gruppenfuss0 10 (3), seitenfuss 8 (1), berichtsfuss 10 (2)
+feld x=140 y=0 b=30 h=8 spalte=betrag format=geld ausrichtung=rechts
+
+=== eigenschaften setzen, rahmen waehlt mehrere, pfeile schieben
+' Den Text "Gesamt" im Berichtsfuss waehlen, ins Feld Text klicken, Strg+A,
+' Strg+V ("Summe gesamt"), Enter; Fett ankreuzen. Dann ein Rahmen im
+' Gruppenkopf von rechts (150 mm, frei) nach links waehlt seine drei
+' Elemente, zweimal Pfeil rechts schiebt alle drei um 2 mm.
+IMPORT "laeufer.dh"
+brProjekt()
+SETENV("DH_STUDIO_ABLAGE", "Summe gesamt")
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM m AS STRING : m = CWD$() + "/m.log"
+SETENV("DH_STUDIO_OEFFNEN", "Liste")
+slStarten(m, "", 12, p)
+brMessen(m)
+DIM ex AS INTEGER
+DIM ey AS INTEGER
+(ex, ey) = brPunkt(m, 6, 115.0, 5.0)
+slHin(10, 10)
+slWarten(14)
+slKlick(ex, ey)
+slWarten(8)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(m, CWD$() + "/ev.txt", slBild + 10, p)
+DIM tx AS INTEGER
+DIM ty AS INTEGER
+(tx, ty) = slLage(m, "berfeld text")
+DIM bx AS INTEGER
+DIM by AS INTEGER
+(bx, by) = slLage(m, "berfeld fett")
+DIM r1x AS INTEGER
+DIM r1y AS INTEGER
+(r1x, r1y) = brPunkt(m, 2, 150.0, 0.6)
+DIM r2x AS INTEGER
+DIM r2y AS INTEGER
+(r2x, r2y) = brPunkt(m, 2, 20.0, 9.4)
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(14)
+slKlick(ex, ey)
+slWarten(8)
+slKlick(tx, ty)
+slWarten(4)
+slMit([341], 65)
+slWarten(4)
+slMit([341], 86)
+slWarten(4)
+slTaste(257)
+slWarten(6)
+slKlick(bx, by)
+slWarten(6)
+slZug(r1x, r1y, r2x, r2y, 10, TRUE)
+slWarten(6)
+slTaste(262)
+slWarten(4)
+slTaste(262)
+slWarten(6)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "felder "; tx > 0; " "; bx > 0
+PRINT "auswahl "; slHat(log, "bericht auswahl 3 band -1")
+DIM j AS JSON_HANDLE : j = brBericht()
+PRINT brEl$(j, 6, 0)
+PRINT brEl$(j, 2, 0)
+PRINT brEl$(j, 2, 1)
+PRINT brEl$(j, 2, 2)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/_hilfen/berichtprojekt.dh"
+IMPORT "json"
+slStudio = ARG$(0)
+--- erwartet
+felder TRUE TRUE
+auswahl TRUE
+text x=100 y=2 b=30 h=6 text=Summe gesamt fett=TRUE
+text x=2 y=2 b=25 h=6 text=Rechnung
+feld x=27 y=2 b=20 h=6 spalte=rechnung
+feld x=62 y=2 b=60 h=6 spalte=kunde.name fett=TRUE
+
+=== baender und gruppen ueber die leiste rechts
+' Die Leiste des Seitenkopfs anklicken waehlt das Band, [Band entfernen]
+' nimmt es weg. Danach (nichts gewaehlt) bringt [Band dazu] den Seitenkopf
+' leer zurueck, [Gruppe dazu] legt eine zweite Gruppe nach "rechnung" an --
+' innen, mit Kopf und Fuss. Eine dritte nimmt Strg+Z wieder weg.
+IMPORT "laeufer.dh"
+brProjekt()
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM m AS STRING : m = CWD$() + "/m.log"
+SETENV("DH_STUDIO_OEFFNEN", "Liste")
+slStarten(m, "", 12, p)
+brMessen(m)
+DIM lx AS INTEGER
+DIM ly AS INTEGER
+(lx, ly) = slLage(m, "berleiste1")
+DIM nx AS INTEGER
+DIM ny AS INTEGER
+(nx, ny) = slLage(m, "berknopf bandneu")
+DIM gx AS INTEGER
+DIM gy AS INTEGER
+(gx, gy) = slLage(m, "berknopf gruppeneu")
+slHin(10, 10)
+slWarten(14)
+slKlick(lx, ly)
+slWarten(8)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(m, CWD$() + "/ev.txt", slBild + 10, p)
+DIM wx AS INTEGER
+DIM wy AS INTEGER
+(wx, wy) = slLage(m, "berknopf bandweg")
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(14)
+slKlick(lx, ly)
+slWarten(8)
+slKlick(wx, wy)
+slWarten(8)
+slKlick(nx, ny)
+slWarten(8)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "band "; slHat(log, "bericht auswahl 0 band 1"); " "; slHat(log, "bericht band weg seitenkopf"); " "; slHat(log, "bericht band dazu seitenkopf")
+DIM j AS JSON_HANDLE : j = brBericht()
+PRINT brBaender$(j)
+' Zweiter Teil: Gruppe dazu, dann Strg+Z.
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(14)
+slKlick(gx, gy)
+slWarten(8)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+aus = aus + slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+j = brBericht()
+PRINT brBaender$(j)
+PRINT "gruppen "; JSON_STRINGIFY(JSON_GET_JSON(j, "gruppen"))
+' Dritter: noch eine Gruppe, Strg+Z nimmt sie zurueck, Strg+S -- es bleiben zwei.
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(14)
+slKlick(gx, gy)
+slWarten(8)
+slMit([341], 90)
+slWarten(6)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+aus = aus + slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "nach strg+z "; slHat(log, "bericht gruppe dazu rechnung"); " "; slHat(log, "bericht rueckgaengig 0"); " "; JSON_LEN(brBericht(), "gruppen")
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/_hilfen/berichtprojekt.dh"
+IMPORT "json"
+slStudio = ARG$(0)
+--- erwartet
+band TRUE TRUE TRUE
+berichtskopf 20 (1), seitenkopf 10 (0), gruppenkopf0 10 (3), detail 6 (2), gruppenfuss0 10 (3), seitenfuss 8 (1), berichtsfuss 10 (2)
+berichtskopf 20 (1), seitenkopf 10 (0), gruppenkopf0 10 (3), gruppenkopf1 8 (0), detail 6 (2), gruppenfuss1 8 (0), gruppenfuss0 10 (3), seitenfuss 8 (1), berichtsfuss 10 (2)
+gruppen [{"spalte":"rechnung"},{"spalte":"rechnung"}]
+nach strg+z TRUE TRUE 2

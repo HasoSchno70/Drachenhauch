@@ -1,0 +1,96 @@
+' Ein kleines Projekt mit einem Bericht fuer die Pruefungen des
+' Berichts-Designers (werkzeug_studio_berichte2.dhtest): Datenbank "Daten"
+' (kunden, pos mit Verweis pos.kunde -> kunden und Geldspalte betrag) und
+' Bericht "Liste" mit allen sieben Baendern und einer Gruppe.
+'
+' Die Baender der "Liste": 0 Berichtskopf (20 mm), 1 Seitenkopf (8),
+' 2 Gruppenkopf (10), 3 Detail (6), 4 Gruppenfuss (10), 5 Seitenfuss (8),
+' 6 Berichtsfuss (10). Rand 15 mm, also 180 mm Breite.
+IMPORT "db"
+IMPORT "json"
+
+SUB brProjekt()
+    MKDIR(CWD$() + "/proj")
+    DIM q AS STRING : q = CHR$(34)
+    WRITEALL(CWD$() + "/proj/projekt.dhstudio", REPLACE$("{'format':'drachenhauch-studio','fassung':1,'name':'proj','start':'Hauptfenster','elemente':[{'art':'app','name':'App'},{'art':'fenster','name':'Hauptfenster'},{'art':'datenbank','name':'Daten','schema':'Daten.dhdb'},{'art':'bericht','name':'Liste','bericht':'Liste.dhreport'}]}", "'", q) + CHR$(10))
+    WRITEALL(CWD$() + "/proj/Daten.dhdb", REPLACE$("{'datei':'daten.sqlite','tabellen':[{'name':'kunden','spalten':[{'name':'name','typ':'text','pflicht':false,'eindeutig':false,'vorgabe':''}]},{'name':'pos','spalten':[{'name':'rechnung','typ':'ganz','pflicht':false,'eindeutig':false,'vorgabe':''},{'name':'kunde','typ':'ganz','pflicht':false,'eindeutig':false,'vorgabe':'','verweis':'kunden'},{'name':'text','typ':'text','pflicht':false,'eindeutig':false,'vorgabe':''},{'name':'betrag','typ':'geld','pflicht':false,'eindeutig':false,'vorgabe':''}]}]}", "'", q) + CHR$(10))
+    WRITEALL(CWD$() + "/proj/Liste.dhreport", REPLACE$("{'titel':'Probe','seite':{'format':'A4','hoch':true,'rand':[15,15,15,15]},'quelle':'Daten.pos','bedingung':'rechnung >= :ab','sortieren':['id'],'gruppen':[{'spalte':'rechnung'}],'baender':[" + _
+        "{'art':'berichtskopf','hoehe':20,'elemente':[{'art':'text','x':0,'y':0,'b':180,'h':10,'text':'Positionen','groesse':18,'fett':true}]}," + _
+        "{'art':'seitenkopf','hoehe':8,'elemente':[{'art':'text','x':0,'y':0,'b':60,'h':6,'text':'Artikel','fett':true},{'art':'text','x':140,'y':0,'b':40,'h':6,'text':'Betrag','fett':true,'ausrichtung':'rechts'}]}," + _
+        "{'art':'gruppenkopf','gruppe':0,'hoehe':10,'elemente':[{'art':'text','x':0,'y':2,'b':25,'h':6,'text':'Rechnung'},{'art':'feld','spalte':'rechnung','x':25,'y':2,'b':20,'h':6},{'art':'feld','spalte':'kunde.name','x':60,'y':2,'b':60,'h':6,'fett':true}]}," + _
+        "{'art':'detail','hoehe':6,'elemente':[{'art':'feld','spalte':'text','x':5,'y':0,'b':100,'h':5},{'art':'feld','spalte':'betrag','format':'geld','x':140,'y':0,'b':40,'h':5,'ausrichtung':'rechts'}]}," + _
+        "{'art':'gruppenfuss','gruppe':0,'hoehe':10,'elemente':[{'art':'text','x':100,'y':1,'b':30,'h':6,'text':'Summe'},{'art':'summe','spalte':'betrag','funktion':'summe','format':'geld','x':140,'y':1,'b':40,'h':6,'ausrichtung':'rechts','fett':true},{'art':'linie','x':100,'y':0,'b':80,'h':0}]}," + _
+        "{'art':'seitenfuss','hoehe':8,'elemente':[{'art':'seitenzahl','x':0,'y':2,'b':180,'h':5,'ausrichtung':'mitte'}]}," + _
+        "{'art':'berichtsfuss','hoehe':10,'elemente':[{'art':'text','x':100,'y':2,'b':30,'h':6,'text':'Gesamt'},{'art':'summe','spalte':'betrag','funktion':'summe','format':'geld','x':140,'y':2,'b':40,'h':6,'ausrichtung':'rechts','fett':true}]}]}", "'", q) + CHR$(10))
+    DIM db AS DB_CONN : db = DB_OPEN(CWD$() + "/proj/daten.sqlite")
+    DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT)")
+    DB_EXEC(db, "CREATE TABLE pos (id INTEGER PRIMARY KEY, rechnung INTEGER, kunde INTEGER, text TEXT, betrag INTEGER)")
+    DB_EXEC(db, "INSERT INTO kunden (name) VALUES ('Anna Berger'), ('Bert Koch')")
+    DIM i AS INTEGER
+    FOR i = 1 TO 12
+        DB_EXEC(db, "INSERT INTO pos (rechnung, kunde, text, betrag) VALUES (?, ?, ?, ?)", 1 + i \ 7, 1 + i \ 7, "Artikel " + STR$(i), i * 125)
+    NEXT
+    DB_CLOSE(db)
+END SUB
+
+' Der Massstab der Seite (Punkte je mm) aus dem Protokoll ("bermass s").
+DIM brS AS FLOAT : brS = 0.0
+SUB brMessen(log AS STRING)
+    DIM z AS STRING
+    FOR EACH z IN slProtokoll(log)
+        IF LEFT$(z, 8) = "bermass " THEN brS = VAL(MID$(z, 8))
+    NEXT
+END SUB
+
+' Ein Punkt in Band b, x/y in mm ab seiner linken oberen Ecke.
+FUNCTION brPunkt(log AS STRING, b AS INTEGER, x AS FLOAT, y AS FLOAT) AS TUPLE
+    DIM bx AS INTEGER
+    DIM by AS INTEGER
+    (bx, by) = slLage(log, "berband" + STR$(b))
+    RETURN (bx + INT(x * brS + 0.5), by + INT(y * brS + 0.5))
+END FUNCTION
+
+FUNCTION brBericht() AS JSON_HANDLE
+    RETURN JSON_PARSE(JOIN$(READLINES(CWD$() + "/proj/Liste.dhreport"), CHR$(10)))
+END FUNCTION
+
+' Ein Element kurz: art, x, y, b, h und was es zeigt.
+FUNCTION brEl$(j AS JSON_HANDLE, b AS INTEGER, k AS INTEGER) AS STRING
+    DIM p AS STRING : p = "baender." + STR$(b) + ".elemente." + STR$(k)
+    DIM t AS STRING : t = JSON_GET_STRING(j, p + ".art")
+    DIM f AS STRING
+    FOR EACH f IN ["x", "y", "b", "h"]
+        DIM v AS FLOAT : v = 0.0
+        IF JSON_HAS(j, p + "." + f) THEN v = JSON_GET_FLOAT(j, p + "." + f)
+        t = t + " " + f + "=" + brZ$(v)
+    NEXT
+    FOR EACH f IN ["text", "spalte", "format", "funktion", "bereich", "ausrichtung"]
+        IF JSON_TYPE(j, p + "." + f) = "string" THEN t = t + " " + f + "=" + JSON_GET_STRING(j, p + "." + f)
+    NEXT
+    IF JSON_TYPE(j, p + ".fett") = "boolean" THEN t = t + " fett=" + STR$(JSON_GET_BOOL(j, p + ".fett"))
+    RETURN t
+END FUNCTION
+
+' Die Baender kurz: art[gruppe] hoehe (anzahl Elemente).
+FUNCTION brBaender$(j AS JSON_HANDLE) AS STRING
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM b AS INTEGER
+    FOR b = 0 TO JSON_LEN(j, "baender") - 1
+        DIM p AS STRING : p = "baender." + STR$(b)
+        DIM t AS STRING : t = JSON_GET_STRING(j, p + ".art")
+        IF JSON_HAS(j, p + ".gruppe") THEN t = t + STR$(JSON_GET_INT(j, p + ".gruppe"))
+        t = t + " " + brZ$(JSON_GET_FLOAT(j, p + ".hoehe")) + " (" + STR$(JSON_LEN(j, p + ".elemente")) + ")"
+        ARRAY_PUSH(teile, t)
+    NEXT
+    RETURN JOIN$(teile, ", ")
+END FUNCTION
+
+' Eine Zahl kurz: 12, 12.5.
+FUNCTION brZ$(v AS FLOAT) AS STRING
+    IF ABS(v - ROUND(v)) < 0.0005 THEN RETURN STR$(INT(ROUND(v)))
+    DIM t AS STRING : t = FORMAT$(v, "%.2f")
+    WHILE RIGHT$(t, 1) = "0"
+        t = LEFT$(t, LEN(t) - 1)
+    WEND
+    RETURN t
+END FUNCTION

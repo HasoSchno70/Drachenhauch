@@ -974,8 +974,9 @@ FUNCTION berElRect(j AS JSON_HANDLE, b AS INTEGER, k AS INTEGER) AS TUPLE
     RETURN (MIN(x1, x2), MIN(y1, y2), MAX(x1, x2), MAX(y1, y2))
 END FUNCTION
 
-' Das oberste Element unter der Maus: (band, nr) oder (-1, -1).
-FUNCTION berElementBei(j AS JSON_HANDLE, sx AS INTEGER, sy AS INTEGER) AS TUPLE
+' Das oberste Element unter der Maus: (band, nr) oder (-1, -1). rand =
+' wie viele Punkte daneben noch zaehlen (eine Linie ist sonst kaum zu treffen).
+FUNCTION berElementBei(j AS JSON_HANDLE, sx AS INTEGER, sy AS INTEGER, rand AS INTEGER) AS TUPLE
     DIM b AS INTEGER
     FOR b = JSON_LEN(j, "baender") - 1 TO 0 STEP -1
         DIM k AS INTEGER
@@ -985,7 +986,7 @@ FUNCTION berElementBei(j AS JSON_HANDLE, sx AS INTEGER, sy AS INTEGER) AS TUPLE
             DIM x2 AS INTEGER
             DIM y2 AS INTEGER
             (x1, y1, x2, y2) = berElRect(j, b, k)
-            IF sx >= x1 - 3 AND sx <= x2 + 3 AND sy >= y1 - 3 AND sy <= y2 + 3 THEN RETURN (b, k)
+            IF sx >= x1 - rand AND sx <= x2 + rand AND sy >= y1 - rand AND sy <= y2 + rand THEN RETURN (b, k)
         NEXT
     NEXT
     RETURN (-1, -1)
@@ -1126,7 +1127,7 @@ SUB berichtMaus()
         ELSE
             DIM hb AS INTEGER
             DIM hk AS INTEGER
-            (hb, hk) = berElementBei(j, mx, my)
+            (hb, hk) = berElementBei(j, mx, my, 0)
             IF hb < 0 AND berKanteBei(j, mx, my) >= 0 THEN MOUSE_CURSOR("resize_ns") ELSE MOUSE_CURSOR("auto")
         END IF
         DIM rad AS FLOAT : rad = MOUSEWHEEL_Y()
@@ -1169,9 +1170,11 @@ SUB berDruck(r AS Reiter, mx AS INTEGER, my AS INTEGER)
         berModus = 2
         RETURN
     END IF
+    ' Erst was die Maus wirklich trifft, dann die Unterkante eines Bandes,
+    ' dann mit etwas Rand (fuer duenne Linien).
     DIM b AS INTEGER
     DIM k AS INTEGER
-    (b, k) = berElementBei(j, mx, my)
+    (b, k) = berElementBei(j, mx, my, 0)
     IF b < 0 THEN
         DIM kante AS INTEGER : kante = berKanteBei(j, mx, my)
         IF kante >= 0 THEN
@@ -1180,6 +1183,9 @@ SUB berDruck(r AS Reiter, mx AS INTEGER, my AS INTEGER)
             berModus = 3
             RETURN
         END IF
+        (b, k) = berElementBei(j, mx, my, 3)
+    END IF
+    IF b < 0 THEN
         ' Leere Flaeche: ein Band waehlen (oder den Bericht), ziehen = Rahmen.
         IF NOT (umschalt() OR strg()) THEN
             berAuswahlLeeren(r)
@@ -1499,6 +1505,9 @@ SUB berSpalteInsDetail(r AS Reiter, spalte AS STRING)
         x = MAX(x, studioBZahl(j, p, "x", 0.0) + studioBZahl(j, p, "b", 0.0) + 2.0)
     NEXT
     DIM t AS JSON_HANDLE : t = berichtSpalteElement(j, b, spalte, x, 0.0)
+    ' Nicht rechts ueber den Rand hinaus.
+    studioBSeite(j)
+    IF x + JSON_GET_FLOAT(t, "b") > berInhaltB() THEN JSON_SET_FLOAT(t, "x", MAX(0.0, berInhaltB() - JSON_GET_FLOAT(t, "b")))
     k = berElemente(j, b)
     JSON_APPEND_JSON(j, "baender." + STR$(b) + ".elemente", t)
     berAuswahlLeeren(r)
