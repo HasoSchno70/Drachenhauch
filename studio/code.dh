@@ -639,14 +639,19 @@ END FUNCTION
 ' Fuer Pruefungen: wo jeder Knoten steht, als "lage knoten <Pfad> x y".
 SUB knotenProtokollieren()
     IF logDatei = "" THEN RETURN
+    ' Die Controls je Element einmal lesen, nicht je Knoten.
+    DIM gelesen AS INTEGER : gelesen = -1
     DIM n AS INTEGER
     FOR n = 0 TO LEN(navArt) - 1
+        IF (navArt[n] = "control" OR navArt[n] = "abstand") AND navEl[n] <> gelesen THEN
+            controlsVon(navEl[n])
+            gelesen = navEl[n]
+        END IF
         DIM pfad AS STRING : pfad = ""
         SELECT CASE navArt[n]
             CASE "projekt" : pfad = "(projekt)"
             CASE "element" : pfad = elemente[navEl[n]].name
             CASE "control"
-                controlsVon(navEl[n])
                 pfad = elemente[navEl[n]].name + "." + ctrlNamen[navCtrl[n]]
             CASE "methode" : pfad = elemente[navEl[n]].name + "." + methoden[navMeth[n]].name
             CASE "dekl" : pfad = elemente[navEl[n]].name + ".Eigenschaften"
@@ -654,7 +659,6 @@ SUB knotenProtokollieren()
             CASE "abfrage" : pfad = elemente[navEl[n]].name + ".?" + dbAbfName$(dbSchema(elemente[navEl[n]]), navCtrl[n])
             CASE "spalte" : pfad = elemente[navEl[n]].name + "." + dbTabellenNamen(elemente[navEl[n]])[navCtrl[n]] + "." + dbSp$(dbSchema(elemente[navEl[n]]), navCtrl[n], navMeth[n], "name")
             CASE "abstand"
-                controlsVon(navEl[n])
                 pfad = elemente[navEl[n]].name + "." + ctrlNamen[navCtrl[n]] + ".abstand" + STR$(navMeth[n])
         END SELECT
         DIM x AS INTEGER

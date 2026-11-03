@@ -19,12 +19,19 @@ IMPORT "imgfx"
 IMPORT "db"
 
 DIM logDatei AS STRING : logDatei = GETENV$("DH_STUDIO_LOG")
+' Gesammelt und einmal je Bild geschrieben: die Lagen aller Controls sind bei
+' einem grossen Fenster Tausende Zeilen je Aenderung, und jede einzeln die
+' Datei oeffnen kostete mehr als das Studio selbst.
+DIM logPuffer AS ARRAY OF STRING : logPuffer = []
 SUB protokoll(text AS STRING)
     IF logDatei = "" THEN RETURN
-    DIM f AS FILE
-    f = OPENFILE(logDatei, "a")
-    WRITELINE(f, text)
-    CLOSEFILE(f)
+    ARRAY_PUSH(logPuffer, text)
+END SUB
+
+SUB protokollSchreiben()
+    IF LEN(logPuffer) = 0 THEN RETURN
+    APPENDFILE(logDatei, JOIN$(logPuffer, CHR$(10)) + CHR$(10))
+    logPuffer = []
 END SUB
 
 IMPORT "sprache.dh"
@@ -623,7 +630,12 @@ END SUB
 DIM bildNr AS INTEGER : bildNr = 0
 DIM warB AS INTEGER : warB = SCREENWIDTH()
 DIM warH AS INTEGER : warH = SCREENHEIGHT()
+' Fuer Messungen: DH_STUDIO_TEMPO=1 schreibt je Bild, wie lange es gerechnet
+' hat (ohne das Warten auf das naechste Bild), als "tempo <ms>" ins Protokoll.
+DIM tempoMessen AS BOOLEAN : tempoMessen = GETENV$("DH_STUDIO_TEMPO") <> "" AND logDatei <> ""
+DIM tempoAb AS FLOAT : tempoAb = 0.0
 WHILE NOT beenden
+    IF tempoMessen THEN tempoAb = GET_TIME()
     IF WINDOW_CLOSE_REQUESTED() THEN anfragen("beenden")
     IF QUITREQUESTED() AND NOT WINDOW_CLOSE_REQUESTED() THEN BREAK
     IF SCREENWIDTH() <> warB OR SCREENHEIGHT() <> warH THEN
@@ -681,9 +693,12 @@ WHILE NOT beenden
     GUI_DRAW_TOP()
     bibZugZeichnen()
     navZugZeichnen()
+    IF tempoMessen THEN protokoll("tempo " + FORMAT$((GET_TIME() - tempoAb) * 1000.0, "%.2f"))
+    protokollSchreiben()
     FLIP()
 WEND
 IF lauf >= 0 THEN PROCESS_KILL(lauf)
 IF dbgProz >= 0 THEN PROCESS_KILL(dbgProz)
 IF bau >= 0 THEN PROCESS_KILL(bau)
 protokoll("ende")
+protokollSchreiben()

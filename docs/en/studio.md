@@ -573,6 +573,7 @@ a different number of parameters.
 | `DH_STUDIO_KONFIG=file` | `studio.json` in this place; the `ide.json` is then not consulted |
 | `DH_STUDIO_SPRACHPROBE=1` | opens every dialog once, writes its texts and the number of missing translations to the log, and quits |
 | `DH_STUDIO_LOESCHEN=element` | asks at start like "Delete element …" for this element |
+| `DH_STUDIO_TEMPO=1` | writes (with `DH_STUDIO_LOG`) `tempo <ms>` per frame: how long the studio computed, without waiting for the next frame |
 | `DH_STUDIO_OEFFNEN=element[.table]` | opens an element at start like a click in the navigator (for a database optionally a table) |
 
 The test collections `tests/pruef/werkzeug_studio.dhtest` (stage 1) and

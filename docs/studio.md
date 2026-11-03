@@ -584,6 +584,7 @@ geerbte mit einer anderen Zahl von Parametern überschreibt.
 | `DH_STUDIO_KONFIG=datei` | `studio.json` an diesem Ort; die `ide.json` wird dann nicht gefragt |
 | `DH_STUDIO_SPRACHPROBE=1` | öffnet jeden Dialog einmal, schreibt seine Texte und die Zahl fehlender Übersetzungen ins Protokoll und endet |
 | `DH_STUDIO_LOESCHEN=element` | fragt beim Start wie „Element löschen …“ für dieses Element |
+| `DH_STUDIO_TEMPO=1` | schreibt (mit `DH_STUDIO_LOG`) je Bild `tempo <ms>`: wie lange das Studio gerechnet hat, ohne das Warten auf das nächste Bild |
 | `DH_STUDIO_OEFFNEN=element[.tabelle]` | öffnet beim Start ein Element wie ein Klick im Navigator (bei einer Datenbank auf Wunsch eine Tabelle) |
 
 Die Prüfsammlungen `tests/pruef/werkzeug_studio.dhtest` (Stufe 1) und
