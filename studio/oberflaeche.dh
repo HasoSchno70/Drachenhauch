@@ -523,17 +523,20 @@ SUB werkzeugeNachziehen()
     ' Ist ein Code-Reiter vorn, gehoeren Strg+Z/Y, Entf und Strg+D dem
     ' Code-Feld: ein gesperrter Menuepunkt nimmt ihm die Taste nicht weg.
     DIM lay AS BOOLEAN : lay = layoutVorn()
-    GUI_TOOLBAR_ENABLE(tb, tbZurueck, lay AND kannZurueck())
-    GUI_TOOLBAR_ENABLE(tb, tbVor, lay AND kannVor())
-    GUI_MENU_ENABLE(miZurueck, lay AND kannZurueck())
-    GUI_MENU_ENABLE(miVor, lay AND kannVor())
+    ' Ein Bericht vorn hat sein eigenes Rueckgaengig und seine Auswahl.
+    DIM zr AS BOOLEAN : zr = (lay AND kannZurueck()) OR berichtKannZurueck()
+    DIM vr AS BOOLEAN : vr = (lay AND kannVor()) OR berichtKannVor()
+    GUI_TOOLBAR_ENABLE(tb, tbZurueck, zr)
+    GUI_TOOLBAR_ENABLE(tb, tbVor, vr)
+    GUI_MENU_ENABLE(miZurueck, zr)
+    GUI_MENU_ENABLE(miVor, vr)
     DIM mehrere AS BOOLEAN : mehrere = lay AND LEN(gewaehlt) >= 2
     GUI_TOOLBAR_ENABLE(tb, tbLinks, mehrere)
     GUI_TOOLBAR_ENABLE(tb, tbOben, mehrere)
     GUI_TOOLBAR_ENABLE(tb, tbMitteW, mehrere)
     GUI_TOOLBAR_ENABLE(tb, tbVerteilen, lay AND LEN(gewaehlt) >= 3)
-    GUI_MENU_ENABLE(miVerdoppeln, lay AND auswahl >= 0)
-    GUI_MENU_ENABLE(miLoeschen, lay AND (auswahl >= 0 OR trayWahl >= 0 OR abstandL >= 0))
+    GUI_MENU_ENABLE(miVerdoppeln, (lay AND auswahl >= 0) OR (berichtVorn() AND berichtHatAuswahl()))
+    GUI_MENU_ENABLE(miLoeschen, (lay AND (auswahl >= 0 OR trayWahl >= 0 OR abstandL >= 0)) OR berichtHatAuswahl())
     DIM k AS INTEGER
     FOR k = 0 TO LEN(anordnenPunkte) - 1
         GUI_MENU_ENABLE(anordnenPunkte[k], lay)

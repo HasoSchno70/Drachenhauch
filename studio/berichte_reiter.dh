@@ -1,45 +1,206 @@
 ' ============================================================
 '  Drachenhauch Studio -- der Reiter eines Berichts
 ' ============================================================
-'  Stufe 1: der Reiter zeigt die Seite mit ihren Baendern (noch ohne
-'  Bearbeiten), [Vorschau …] setzt den Bericht mit den Daten der
-'  Entwicklungsdatei (berichte_laufzeit.dh) und zeigt ihn mit PDF_PREVIEW.
+'  Die Seite mit ihren Baendern, darauf die Elemente. Oben die Leiste der
+'  Elemente (gewaehlt = beim naechsten Klick ins Band abgelegt), rechts die
+'  Spalten der Quelle (in ein Band ziehen) und die Eigenschaften dessen, was
+'  gewaehlt ist -- Element(e), Band oder, wenn nichts, der ganze Bericht.
+'  [Vorschau …] setzt den Bericht mit den Daten der Entwicklungsdatei
+'  (berichte_laufzeit.dh) und zeigt ihn mit PDF_PREVIEW.
+'
+'  Gearbeitet wird auf r.ber.j (dem JSON des Berichts); nach jedem fertigen
+'  Schritt merkt berichtMerken den Text fuers Rueckgaengig und legt ihn in
+'  e.schema (daraus schreibt projektSchreiben die .dhreport).
 ' ============================================================
+
+CONST BER_PW = 270       ' Breite der Leiste rechts (Spalten, Eigenschaften)
+CONST BER_STRIP = 18     ' die Leiste ueber jedem Band mit seinem Namen (Punkte)
+CONST BER_ZEILE = 28     ' Abstand der Zeilen in den Eigenschaften
+CONST BER_EIGENSCHAFTEN = "x:zahl,y:zahl,b:zahl,h:zahl,text:text,spalte:wahl,format:wahl,funktion:wahl,bereich:wahl,schrift:wahl,groesse:zahl,fett:kasten,kursiv:kasten,farbe:text,ausrichtung:wahl,staerke:zahl,fuellung:text,bild:wahl,hoehe:zahl,gspalte:wahl,titel:text,quelle:wahl,bedingung:text,sortieren:text,papier:wahl,hoch:kasten,rand:text"
 
 ' --- Der Reiter --------------------------------------------------------------------------
 CLASS BerichtAnsicht
     DIM kopf AS GUI_WIDGET
     DIM info AS GUI_WIDGET
     DIM btVorschau AS GUI_WIDGET
+    DIM leiste AS GUI_WIDGET
+    DIM leisteArt AS ARRAY OF STRING
+    DIM scharf AS STRING
+    DIM spKopf AS GUI_WIDGET
+    DIM lbSpalten AS GUI_WIDGET
+    DIM spalten AS ARRAY OF STRING
+    DIM eigKopf AS GUI_WIDGET
+    DIM eigName AS ARRAY OF STRING
+    DIM eigTyp AS ARRAY OF STRING
+    DIM eigLabel AS ARRAY OF GUI_WIDGET
+    DIM eigFeld AS ARRAY OF GUI_WIDGET
+    DIM eigWahl AS ARRAY OF STRING      ' die Schluessel einer Wahl, mit | getrennt
+    DIM eigStand AS ARRAY OF STRING     ' was eingefuellt wurde
+    DIM eigSicht AS ARRAY OF BOOLEAN
+    DIM btBandWeg AS GUI_WIDGET
+    DIM btGruppeWeg AS GUI_WIDGET
+    DIM ddBandNeu AS GUI_WIDGET
+    DIM btBandNeu AS GUI_WIDGET
+    DIM ddGruppeNeu AS GUI_WIDGET
+    DIM btGruppeNeu AS GUI_WIDGET
+    DIM bandNeuArten AS ARRAY OF STRING
+    DIM j AS JSON_HANDLE
+    DIM staende AS ARRAY OF STRING
+    DIM pos AS INTEGER
+    DIM selB AS ARRAY OF INTEGER
+    DIM selK AS ARRAY OF INTEGER
+    DIM bandNr AS INTEGER               ' das gewaehlte Band (-1 = keins)
+    DIM zoom AS FLOAT
+    DIM roll AS FLOAT                   ' senkrecht, in mm
+    DIM rollX AS INTEGER                ' waagerecht, in Punkten (nur gezoomt)
+    DIM lagen AS BOOLEAN
+    DIM fokus AS GUI_WIDGET
 END CLASS
 
 FUNCTION berichtReiterNeu(e AS Element) AS INTEGER
     DIM r AS Reiter : r = NEW Reiter()
     r.art = "bericht" : r.el = e : r.feld = -1 : r.kopf = -1 : r.info = -1
     r.ber = NEW BerichtAnsicht()
+    r.ber.j = berichtJ(e)
+    r.ber.staende = [JSON_STRINGIFY(r.ber.j)]
+    r.ber.pos = 0
+    r.ber.selB = [] : r.ber.selK = []
+    r.ber.bandNr = -1
+    r.ber.zoom = 1.0 : r.ber.roll = 0.0 : r.ber.rollX = 0
+    r.ber.scharf = ""
+    r.ber.fokus = -1
+    r.ber.lagen = TRUE
     ARRAY_PUSH(reiter, r)
     DIM k AS INTEGER : k = GUI_TABCONTROL_ADD(tcMitte, reiterTitel$(r))
-    r.ber.kopf = GUI_LABEL(win, trf$("Bericht {0}", [e.name]), 0, 0)
+    r.ber.kopf = berWidget(GUI_LABEL(win, trf$("Bericht {0}", [e.name]), 0, 0), k)
     GUI_ADD_CLASS(r.ber.kopf, "codekopf")
-    GUI_TABCONTROL_ADD_WIDGET(tcMitte, r.ber.kopf, k)
-    r.ber.info = GUI_LABEL(win, "", 0, 0)
+    r.ber.info = berWidget(GUI_LABEL(win, "", 0, 0), k)
     GUI_ADD_CLASS(r.ber.info, "leise")
-    GUI_TABCONTROL_ADD_WIDGET(tcMitte, r.ber.info, k)
-    r.ber.btVorschau = GUI_BUTTON(win, tr$("Vorschau …"), 0, 0, 120, 28)
+    r.ber.btVorschau = berWidget(GUI_BUTTON(win, tr$("Vorschau …"), 0, 0, 120, 28), k)
     GUI_BUTTON_VARIANT(r.ber.btVorschau, "primaer")
-    GUI_TABCONTROL_ADD_WIDGET(tcMitte, r.ber.btVorschau, k)
+    ' Die Leiste der Elemente: eine gewaehlte Art wird beim naechsten Klick
+    ' (oder Zug) in ein Band abgelegt.
+    r.ber.leiste = berWidget(GUI_TOOLBAR(win, 0, 0, 100, 30), k)
+    r.ber.leisteArt = []
+    DIM a AS STRING
+    FOR EACH a IN SPLIT(BERICHT_ELEMENTARTEN, ",")
+        DIM nr AS INTEGER : nr = GUI_TOOLBAR_ADD(r.ber.leiste, "", trf$("{0} in ein Band legen", [berElementName$(a)]), berElementName$(a))
+        GUI_TOOLBAR_CHECKABLE(r.ber.leiste, nr, TRUE)
+        ARRAY_PUSH(r.ber.leisteArt, a)
+    NEXT
+    r.ber.spKopf = berWidget(GUI_LABEL(win, tr$("Spalten der Quelle"), 0, 0), k)
+    GUI_ADD_CLASS(r.ber.spKopf, "leise")
+    r.ber.lbSpalten = berWidget(GUI_LISTBOX(win, 0, 0, 100, 100, []), k)
+    GUI_LISTBOX_PLACEHOLDER(r.ber.lbSpalten, tr$("Erst eine Quelle wählen (Eigenschaften des Berichts)."))
+    GUI_TOOLTIP(r.ber.lbSpalten, tr$("Eine Spalte in ein Band ziehen: im Fuß wird sie eine Summe, im Seitenkopf eine Überschrift, sonst ein Feld. Doppelklick legt sie ins Detail."))
+    r.ber.eigKopf = berWidget(GUI_LABEL(win, tr$("Eigenschaften"), 0, 0), k)
+    GUI_ADD_CLASS(r.ber.eigKopf, "leise")
+    r.ber.eigName = [] : r.ber.eigTyp = [] : r.ber.eigLabel = [] : r.ber.eigFeld = []
+    r.ber.eigWahl = [] : r.ber.eigStand = [] : r.ber.eigSicht = []
+    DIM d AS STRING
+    FOR EACH d IN SPLIT(BER_EIGENSCHAFTEN, ",")
+        DIM teil AS ARRAY OF STRING : teil = SPLIT(d, ":")
+        ARRAY_PUSH(r.ber.eigName, teil[0])
+        ARRAY_PUSH(r.ber.eigTyp, teil[1])
+        DIM lb AS GUI_WIDGET : lb = berWidget(GUI_LABEL(win, berEigLabel$(teil[0]), 0, 0), k)
+        DIM f AS GUI_WIDGET
+        SELECT CASE teil[1]
+            CASE "wahl" : f = GUI_DROPDOWN(win, 0, 0, 100, 26, [""])
+            CASE "kasten" : f = GUI_CHECKBOX(win, berEigLabel$(teil[0]), 0, 0)
+            CASE ELSE : f = GUI_TEXTINPUT(win, 0, 0, 100, 26, "")
+        END SELECT
+        berWidget(f, k)
+        IF teil[1] = "zahl" THEN GUI_TEXTINPUT_SET(f, "zahlen", 2)
+        ARRAY_PUSH(r.ber.eigLabel, lb)
+        ARRAY_PUSH(r.ber.eigFeld, f)
+        ARRAY_PUSH(r.ber.eigWahl, "")
+        ARRAY_PUSH(r.ber.eigStand, "")
+        ARRAY_PUSH(r.ber.eigSicht, FALSE)
+    NEXT
+    r.ber.btBandWeg = berWidget(GUI_BUTTON(win, tr$("Band entfernen"), 0, 0, 120, 26), k)
+    r.ber.btGruppeWeg = berWidget(GUI_BUTTON(win, tr$("Gruppe entfernen"), 0, 0, 120, 26), k)
+    GUI_BUTTON_VARIANT(r.ber.btBandWeg, "gefahr")
+    GUI_BUTTON_VARIANT(r.ber.btGruppeWeg, "gefahr")
+    r.ber.ddBandNeu = berWidget(GUI_DROPDOWN(win, 0, 0, 100, 26, [""]), k)
+    r.ber.btBandNeu = berWidget(GUI_BUTTON(win, tr$("Band dazu"), 0, 0, 100, 26), k)
+    r.ber.ddGruppeNeu = berWidget(GUI_DROPDOWN(win, 0, 0, 100, 26, [""]), k)
+    r.ber.btGruppeNeu = berWidget(GUI_BUTTON(win, tr$("Gruppe dazu"), 0, 0, 100, 26), k)
     berichtInfo(r)
+    berSpaltenFuellen(r)
     berichtLegen(r)
+    berEigFuellen(r)
     RETURN k
 END FUNCTION
 
+FUNCTION berWidget(w AS GUI_WIDGET, k AS INTEGER) AS GUI_WIDGET
+    GUI_TABCONTROL_ADD_WIDGET(tcMitte, w, k)
+    RETURN w
+END FUNCTION
+
+FUNCTION berElementName$(art AS STRING) AS STRING
+    SELECT CASE art
+        CASE "text" : RETURN tr$("Text")
+        CASE "feld" : RETURN tr$("Feld")
+        CASE "summe" : RETURN tr$("Summe")
+        CASE "seitenzahl" : RETURN tr$("Seitenzahl")
+        CASE "datum" : RETURN tr$("Datum")
+        CASE "linie" : RETURN tr$("Linie")
+        CASE "rechteck" : RETURN tr$("Rechteck")
+        CASE "bild" : RETURN tr$("Bild")
+    END SELECT
+    RETURN art
+END FUNCTION
+
+FUNCTION berEigLabel$(name AS STRING) AS STRING
+    SELECT CASE name
+        CASE "x" : RETURN tr$("Links (mm)")
+        CASE "y" : RETURN tr$("Oben (mm)")
+        CASE "b" : RETURN tr$("Breite (mm)")
+        CASE "h" : RETURN tr$("Höhe (mm)")
+        CASE "text" : RETURN tr$("Text")
+        CASE "spalte" : RETURN tr$("Spalte")
+        CASE "format" : RETURN tr$("Format")
+        CASE "funktion" : RETURN tr$("Funktion")
+        CASE "bereich" : RETURN tr$("Bereich")
+        CASE "schrift" : RETURN tr$("Schrift")
+        CASE "groesse" : RETURN tr$("Größe (pt)")
+        CASE "fett" : RETURN tr$("Fett")
+        CASE "kursiv" : RETURN tr$("Kursiv")
+        CASE "farbe" : RETURN tr$("Farbe")
+        CASE "ausrichtung" : RETURN tr$("Ausrichtung")
+        CASE "staerke" : RETURN tr$("Strich (mm)")
+        CASE "fuellung" : RETURN tr$("Füllung")
+        CASE "bild" : RETURN tr$("Bild")
+        CASE "hoehe" : RETURN tr$("Höhe (mm)")
+        CASE "gspalte" : RETURN tr$("Gruppe nach")
+        CASE "titel" : RETURN tr$("Titel")
+        CASE "quelle" : RETURN tr$("Quelle")
+        CASE "bedingung" : RETURN tr$("Bedingung")
+        CASE "sortieren" : RETURN tr$("Sortieren")
+        CASE "papier" : RETURN tr$("Papier")
+        CASE "hoch" : RETURN tr$("Hochformat")
+        CASE "rand" : RETURN tr$("Ränder (mm)")
+    END SELECT
+    RETURN name
+END FUNCTION
+
 SUB berichtInfo(r AS Reiter)
-    DIM j AS JSON_HANDLE : j = berichtJ(r.el)
+    DIM j AS JSON_HANDLE : j = r.ber.j
     DIM q AS STRING : q = berichtText$(j, "quelle")
     DIM t AS STRING : t = IIF(q = "", tr$("ohne Quelle"), trf$("Quelle {0}", [q]))
     DIM bed AS STRING : bed = berichtText$(j, "bedingung")
     IF bed <> "" THEN t = t + " · " + bed
     GUI_SET_TEXT(r.ber.info, t)
+END SUB
+
+SUB berSpaltenFuellen(r AS Reiter)
+    DIM q AS STRING : q = berichtText$(r.ber.j, "quelle")
+    r.ber.spalten = []
+    IF q <> "" THEN
+        IF dbQuelle(q) THEN r.ber.spalten = dbQuellSpaltenMit(q)
+    END IF
+    GUI_SET_LISTBOX(r.ber.lbSpalten, r.ber.spalten)
+    r.ber.lagen = TRUE
 END SUB
 
 SUB berichtLegen(r AS Reiter)
@@ -49,13 +210,68 @@ SUB berichtLegen(r AS Reiter)
     GUI_SET_BOUNDS(r.ber.kopf, x0 + 6, y0 + 3, b \ 3, 20)
     GUI_SET_BOUNDS(r.ber.info, x0 + 6 + b \ 3, y0 + 4, b - b \ 3 - 140, 20)
     GUI_SET_BOUNDS(r.ber.btVorschau, x0 + b - 124, y0, 120, 28)
+    GUI_SET_BOUNDS(r.ber.leiste, x0, y0 + 34, b - BER_PW - 12, 30)
+    DIM px AS INTEGER : px = x0 + b - BER_PW
+    GUI_SET_BOUNDS(r.ber.spKopf, px, y0 + 38, BER_PW, 20)
+    GUI_SET_BOUNDS(r.ber.lbSpalten, px, y0 + 60, BER_PW, 150)
+    GUI_SET_BOUNDS(r.ber.eigKopf, px, y0 + 220, BER_PW, 20)
     protokoll("lage bericht vorschau " + STR$(x0 + b - 64) + " " + STR$(y0 + inhaltOben + 14))
+    berEigLegen(r)
+    r.ber.lagen = TRUE
+END SUB
+
+' Die sichtbaren Zeilen der Eigenschaften untereinander -- je nach Auswahl
+' andere (berEigFuellen entscheidet, welche sichtbar sind).
+SUB berEigLegen(r AS Reiter)
+    DIM x0 AS INTEGER : x0 = mitteKx + 8
+    DIM y0 AS INTEGER : y0 = mitteKy + KOPF_H + 8
+    DIM b AS INTEGER : b = mitteKb - 16
+    DIM px AS INTEGER : px = x0 + b - BER_PW
+    DIM y AS INTEGER : y = y0 + 244
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.ber.eigName) - 1
+        DIM an AS BOOLEAN : an = r.ber.eigSicht[i]
+        GUI_SET_VISIBLE(r.ber.eigLabel[i], an AND r.ber.eigTyp[i] <> "kasten")
+        GUI_SET_VISIBLE(r.ber.eigFeld[i], an)
+        IF NOT an THEN CONTINUE
+        IF r.ber.eigTyp[i] = "kasten" THEN
+            GUI_SET_BOUNDS(r.ber.eigFeld[i], px + 104, y + 3, BER_PW - 104, 22)
+        ELSE
+            GUI_SET_BOUNDS(r.ber.eigLabel[i], px, y + 4, 100, 20)
+            GUI_SET_BOUNDS(r.ber.eigFeld[i], px + 104, y, BER_PW - 104, 26)
+        END IF
+        y = y + BER_ZEILE
+    NEXT
+    ' Die Knoepfe darunter, je nachdem was gewaehlt ist.
+    y = y + 6
+    IF GUI_VISIBLE(r.ber.btBandWeg) THEN
+        GUI_SET_BOUNDS(r.ber.btBandWeg, px + 104, y, BER_PW - 104, 26)
+        y = y + BER_ZEILE + 2
+    END IF
+    IF GUI_VISIBLE(r.ber.btGruppeWeg) THEN
+        GUI_SET_BOUNDS(r.ber.btGruppeWeg, px + 104, y, BER_PW - 104, 26)
+        y = y + BER_ZEILE + 2
+    END IF
+    IF GUI_VISIBLE(r.ber.ddBandNeu) THEN
+        GUI_SET_BOUNDS(r.ber.ddBandNeu, px, y, 160, 26)
+        GUI_SET_BOUNDS(r.ber.btBandNeu, px + 166, y, BER_PW - 166, 26)
+        y = y + BER_ZEILE + 2
+        GUI_SET_BOUNDS(r.ber.ddGruppeNeu, px, y, 160, 26)
+        GUI_SET_BOUNDS(r.ber.btGruppeNeu, px + 166, y, BER_PW - 166, 26)
+    END IF
+    r.ber.lagen = TRUE
 END SUB
 
 SUB berichtWidgetsWeg(r AS Reiter)
-    GUI_DESTROY(r.ber.kopf)
-    GUI_DESTROY(r.ber.info)
-    GUI_DESTROY(r.ber.btVorschau)
+    DIM w AS INTEGER
+    FOR EACH w IN [r.ber.kopf, r.ber.info, r.ber.btVorschau, r.ber.leiste, r.ber.spKopf, r.ber.lbSpalten, r.ber.eigKopf, r.ber.btBandWeg, r.ber.btGruppeWeg, r.ber.ddBandNeu, r.ber.btBandNeu, r.ber.ddGruppeNeu, r.ber.btGruppeNeu]
+        GUI_DESTROY(w)
+    NEXT
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.ber.eigFeld) - 1
+        GUI_DESTROY(r.ber.eigLabel[i])
+        GUI_DESTROY(r.ber.eigFeld[i])
+    NEXT
 END SUB
 
 SUB berichtOeffnen(e AS Element)
@@ -66,15 +282,1269 @@ SUB berichtOeffnen(e AS Element)
     protokoll("bericht " + e.name)
 END SUB
 
-SUB berichtAnsichtPruefen(r AS Reiter)
-    IF GUI_CLICKED(r.ber.btVorschau) THEN berichtVorschauOeffnen(r.el)
+' --- Auswahl ------------------------------------------------------------------------------
+FUNCTION berP$(b AS INTEGER, k AS INTEGER) AS STRING
+    RETURN "baender." + STR$(b) + ".elemente." + STR$(k)
+END FUNCTION
+
+FUNCTION berElemente(j AS JSON_HANDLE, b AS INTEGER) AS INTEGER
+    DIM p AS STRING : p = "baender." + STR$(b) + ".elemente"
+    IF NOT JSON_HAS(j, p) THEN RETURN 0
+    RETURN JSON_LEN(j, p)
+END FUNCTION
+
+FUNCTION berGewaehlt(r AS Reiter, b AS INTEGER, k AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.ber.selB) - 1
+        IF r.ber.selB[i] = b AND r.ber.selK[i] = k THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB berAuswahlLeeren(r AS Reiter)
+    r.ber.selB = [] : r.ber.selK = []
+    r.ber.bandNr = -1
 END SUB
 
-' Die Flaeche unter der Kopfzeile, in die die Seite gezeichnet wird.
+SUB berWaehlen(r AS Reiter, b AS INTEGER, k AS INTEGER)
+    IF berGewaehlt(r, b, k) >= 0 THEN RETURN
+    ARRAY_PUSH(r.ber.selB, b)
+    ARRAY_PUSH(r.ber.selK, k)
+    r.ber.bandNr = -1
+END SUB
+
+SUB berAbwaehlen(r AS Reiter, b AS INTEGER, k AS INTEGER)
+    DIM i AS INTEGER : i = berGewaehlt(r, b, k)
+    IF i < 0 THEN RETURN
+    ARRAY_REMOVE_AT(r.ber.selB, i)
+    ARRAY_REMOVE_AT(r.ber.selK, i)
+END SUB
+
+' Nach einer neuen Auswahl: Eigenschaften, Menue, Protokoll.
+SUB berNachAuswahl(r AS Reiter)
+    berEigFuellen(r)
+    werkzeugeNachziehen()
+    r.ber.lagen = TRUE
+    protokoll("bericht auswahl " + STR$(LEN(r.ber.selB)) + " band " + STR$(r.ber.bandNr))
+END SUB
+
+' --- Rueckgaengig -------------------------------------------------------------------------
+SUB berichtMerken(r AS Reiter)
+    DIM t AS STRING : t = JSON_STRINGIFY(r.ber.j)
+    IF t = r.ber.staende[r.ber.pos] THEN RETURN
+    WHILE LEN(r.ber.staende) > r.ber.pos + 1
+        ARRAY_REMOVE_AT(r.ber.staende, LEN(r.ber.staende) - 1)
+    WEND
+    ARRAY_PUSH(r.ber.staende, t)
+    r.ber.pos = r.ber.pos + 1
+    r.el.schema = t
+    r.el.geaendert = TRUE
+    berichtInfo(r)
+    berEigFuellen(r)
+    werkzeugeNachziehen()
+    r.ber.lagen = TRUE
+    protokoll("bericht stand " + STR$(r.ber.pos))
+END SUB
+
+SUB berStandLaden(r AS Reiter)
+    r.ber.j = JSON_PARSE(r.ber.staende[r.ber.pos])
+    r.el.schema = r.ber.staende[r.ber.pos]
+    r.el.geaendert = TRUE
+    berAuswahlLeeren(r)
+    berichtInfo(r)
+    berSpaltenFuellen(r)
+    berEigFuellen(r)
+    werkzeugeNachziehen()
+    r.ber.lagen = TRUE
+END SUB
+
+' Fuer das Menue (studio.dh): ist ein Bericht vorn?
+FUNCTION berichtVorn() AS BOOLEAN
+    DIM k AS INTEGER : k = reiterVorn()
+    IF k < 0 OR k >= LEN(reiter) THEN RETURN FALSE
+    RETURN reiter[k].art = "bericht"
+END FUNCTION
+
+FUNCTION berichtKannZurueck() AS BOOLEAN
+    IF NOT berichtVorn() THEN RETURN FALSE
+    RETURN reiter[reiterVorn()].ber.pos > 0
+END FUNCTION
+
+FUNCTION berichtKannVor() AS BOOLEAN
+    IF NOT berichtVorn() THEN RETURN FALSE
+    DIM r AS Reiter : r = reiter[reiterVorn()]
+    RETURN r.ber.pos < LEN(r.ber.staende) - 1
+END FUNCTION
+
+FUNCTION berichtHatAuswahl() AS BOOLEAN
+    IF NOT berichtVorn() THEN RETURN FALSE
+    DIM r AS Reiter : r = reiter[reiterVorn()]
+    RETURN LEN(r.ber.selB) > 0 OR r.ber.bandNr >= 0
+END FUNCTION
+
+SUB berichtZurueck()
+    IF NOT berichtKannZurueck() THEN RETURN
+    DIM r AS Reiter : r = reiter[reiterVorn()]
+    r.ber.pos = r.ber.pos - 1
+    berStandLaden(r)
+    protokoll("bericht rueckgaengig " + STR$(r.ber.pos))
+END SUB
+
+SUB berichtVor()
+    IF NOT berichtKannVor() THEN RETURN
+    DIM r AS Reiter : r = reiter[reiterVorn()]
+    r.ber.pos = r.ber.pos + 1
+    berStandLaden(r)
+    protokoll("bericht wiederholen " + STR$(r.ber.pos))
+END SUB
+
+' Entf: die gewaehlten Elemente; ist ein Band gewaehlt, das Band (bei einem
+' Gruppenband die Gruppe mit Kopf und Fuss; das Detail nie).
+SUB berichtLoeschen()
+    IF NOT berichtVorn() THEN RETURN
+    DIM r AS Reiter : r = reiter[reiterVorn()]
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    IF LEN(r.ber.selB) > 0 THEN
+        ' Von hinten nach vorn, damit die Nummern davor gueltig bleiben.
+        DIM n AS INTEGER : n = LEN(r.ber.selB)
+        WHILE LEN(r.ber.selB) > 0
+            DIM best AS INTEGER : best = 0
+            DIM i AS INTEGER
+            FOR i = 1 TO LEN(r.ber.selB) - 1
+                IF r.ber.selB[i] > r.ber.selB[best] OR (r.ber.selB[i] = r.ber.selB[best] AND r.ber.selK[i] > r.ber.selK[best]) THEN best = i
+            NEXT
+            JSON_REMOVE(j, berP$(r.ber.selB[best], r.ber.selK[best]))
+            ARRAY_REMOVE_AT(r.ber.selB, best)
+            ARRAY_REMOVE_AT(r.ber.selK, best)
+        WEND
+        berAuswahlLeeren(r)
+        berichtMerken(r)
+        status(IIF(n = 1, tr$("1 Element gelöscht."), trf$("{0} Elemente gelöscht.", [STR$(n)])))
+        protokoll("bericht geloescht " + STR$(n))
+        RETURN
+    END IF
+    IF r.ber.bandNr >= 0 THEN berBandEntfernen(r, r.ber.bandNr)
+END SUB
+
+SUB berBandEntfernen(r AS Reiter, b AS INTEGER)
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    DIM art AS STRING : art = berichtBandArt$(j, b)
+    IF art = "detail" THEN
+        status(tr$("Das Detail bleibt -- ohne es gäbe es keine Zeilen."))
+        RETURN
+    END IF
+    IF art = "gruppenkopf" OR art = "gruppenfuss" THEN
+        DIM g AS INTEGER : g = berichtBandGruppe(j, b)
+        berichtGruppeWeg(j, g)
+        status(trf$("Gruppe {0} entfernt.", [STR$(g + 1)]))
+        protokoll("bericht gruppe weg " + STR$(g))
+    ELSE
+        berichtBandWeg(j, b)
+        status(trf$("{0} entfernt.", [berichtBandName$(art)]))
+        protokoll("bericht band weg " + art)
+    END IF
+    berAuswahlLeeren(r)
+    berichtMerken(r)
+END SUB
+
+SUB berichtVerdoppeln()
+    IF NOT berichtVorn() THEN RETURN
+    DIM r AS Reiter : r = reiter[reiterVorn()]
+    IF LEN(r.ber.selB) = 0 THEN RETURN
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    DIM nb AS ARRAY OF INTEGER : nb = []
+    DIM nk AS ARRAY OF INTEGER : nk = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.ber.selB) - 1
+        DIM t AS JSON_HANDLE : t = JSON_GET_JSON(j, berP$(r.ber.selB[i], r.ber.selK[i]))
+        JSON_SET_FLOAT(t, "x", JSON_GET_FLOAT(t, "x") + 2.0)
+        JSON_SET_FLOAT(t, "y", JSON_GET_FLOAT(t, "y") + 2.0)
+        ARRAY_PUSH(nk, berElemente(j, r.ber.selB[i]))
+        ARRAY_PUSH(nb, r.ber.selB[i])
+        JSON_APPEND_JSON(j, "baender." + STR$(r.ber.selB[i]) + ".elemente", t)
+    NEXT
+    r.ber.selB = nb : r.ber.selK = nk
+    berichtMerken(r)
+    protokoll("bericht verdoppelt " + STR$(LEN(nb)))
+END SUB
+
+SUB berichtAllesWaehlen()
+    IF NOT berichtVorn() THEN RETURN
+    DIM r AS Reiter : r = reiter[reiterVorn()]
+    berAuswahlLeeren(r)
+    DIM b AS INTEGER
+    FOR b = 0 TO JSON_LEN(r.ber.j, "baender") - 1
+        DIM k AS INTEGER
+        FOR k = 0 TO berElemente(r.ber.j, b) - 1
+            berWaehlen(r, b, k)
+        NEXT
+    NEXT
+    berNachAuswahl(r)
+END SUB
+
+' --- Eigenschaften ------------------------------------------------------------------------
+FUNCTION berIstTextArt(art AS STRING) AS BOOLEAN
+    RETURN INSTR("," + BERICHT_TEXTARTEN + ",", "," + art + ",") >= 0
+END FUNCTION
+
+' Gilt eine Eigenschaft fuer ein Element dieser Art?
+FUNCTION berEigGilt(name AS STRING, art AS STRING) AS BOOLEAN
+    SELECT CASE name
+        CASE "x", "y", "b", "h" : RETURN TRUE
+        CASE "text" : RETURN art = "text" OR art = "seitenzahl"
+        CASE "spalte", "format" : RETURN art = "feld" OR art = "summe"
+        CASE "funktion", "bereich" : RETURN art = "summe"
+        CASE "schrift", "groesse", "fett", "kursiv", "ausrichtung" : RETURN berIstTextArt(art)
+        CASE "farbe" : RETURN berIstTextArt(art) OR art = "linie" OR art = "rechteck"
+        CASE "staerke" : RETURN art = "linie" OR art = "rechteck"
+        CASE "fuellung" : RETURN art = "rechteck"
+        CASE "bild" : RETURN art = "bild"
+    END SELECT
+    RETURN FALSE
+END FUNCTION
+
+' Wem gehoert die Eigenschaft: E(lement), B(and) oder R (der Bericht)?
+FUNCTION berEigBereich$(name AS STRING) AS STRING
+    SELECT CASE name
+        CASE "hoehe", "gspalte" : RETURN "B"
+        CASE "titel", "quelle", "bedingung", "sortieren", "papier", "hoch", "rand" : RETURN "R"
+    END SELECT
+    RETURN "E"
+END FUNCTION
+
+' Die Schluessel einer Wahl.
+FUNCTION berEigWahl(r AS Reiter, name AS STRING) AS ARRAY OF STRING
+    SELECT CASE name
+        CASE "spalte", "gspalte" : RETURN r.ber.spalten
+        CASE "format" : RETURN ["text", "ganz", "zahl", "geld", "datum", "wahr"]
+        CASE "funktion" : RETURN ["summe", "anzahl", "mittel", "min", "max"]
+        CASE "bereich" : RETURN ["gruppe", "bericht"]
+        CASE "schrift" : RETURN ["sans", "serif", "mono"]
+        CASE "ausrichtung" : RETURN ["links", "mitte", "rechts"]
+        CASE "papier" : RETURN ["A4", "A5", "A3", "Letter", "Legal"]
+        CASE "bild"
+            DIM b AS ARRAY OF STRING : b = [""]
+            DIM n AS STRING
+            FOR EACH n IN projektBilder()
+                ARRAY_PUSH(b, n)
+            NEXT
+            RETURN b
+        CASE "quelle"
+            DIM q AS ARRAY OF STRING : q = [""]
+            DIM s AS STRING
+            FOR EACH s IN dbAlleQuellen()
+                ARRAY_PUSH(q, s)
+            NEXT
+            RETURN q
+    END SELECT
+    RETURN []
+END FUNCTION
+
+' Wie ein Schluessel der Wahl dasteht: Woerter des Formats uebersetzt,
+' Namen (Spalten, Quellen, Bilder) wie sie sind.
+FUNCTION berWahlText$(name AS STRING, k AS STRING) AS STRING
+    IF k = "" THEN RETURN tr$("(keine)")
+    SELECT CASE name
+        CASE "format", "funktion", "bereich", "ausrichtung"
+            SELECT CASE k
+                CASE "text" : RETURN tr$("Text")
+                CASE "ganz" : RETURN tr$("Ganzzahl")
+                CASE "zahl" : RETURN tr$("Zahl")
+                CASE "geld" : RETURN tr$("Geld")
+                CASE "datum" : RETURN tr$("Datum")
+                CASE "wahr" : RETURN tr$("Ja/Nein")
+                CASE "summe" : RETURN tr$("Summe")
+                CASE "anzahl" : RETURN tr$("Anzahl")
+                CASE "mittel" : RETURN tr$("Mittel")
+                CASE "min" : RETURN tr$("Kleinster")
+                CASE "max" : RETURN tr$("Größter")
+                CASE "gruppe" : RETURN tr$("Gruppe")
+                CASE "bericht" : RETURN tr$("Bericht")
+                CASE "links" : RETURN tr$("Links")
+                CASE "mitte" : RETURN tr$("Mitte")
+                CASE "rechts" : RETURN tr$("Rechts")
+            END SELECT
+    END SELECT
+    RETURN k
+END FUNCTION
+
+' Eine Zahl so kurz wie moeglich (12, 12.5, 0.3).
+FUNCTION berZahl$(v AS FLOAT) AS STRING
+    IF ABS(v - ROUND(v)) < 0.0005 THEN RETURN STR$(INT(ROUND(v)))
+    DIM t AS STRING : t = FORMAT$(v, "%.2f")
+    WHILE RIGHT$(t, 1) = "0"
+        t = LEFT$(t, LEN(t) - 1)
+    WEND
+    RETURN t
+END FUNCTION
+
+FUNCTION berZahlGut(t AS STRING) AS BOOLEAN
+    RETURN REGEX_TEST(REPLACE$(TRIM$(t), ",", "."), "^-?[0-9]+([.][0-9]*)?$")
+END FUNCTION
+
+FUNCTION berZahlLesen(t AS STRING) AS FLOAT
+    RETURN VAL(REPLACE$(TRIM$(t), ",", "."))
+END FUNCTION
+
+' Der Wert einer Eigenschaft (als Text) -- beim ersten gewaehlten Element,
+' dem gewaehlten Band oder dem Bericht.
+FUNCTION berEigWert$(r AS Reiter, name AS STRING) AS STRING
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    SELECT CASE berEigBereich$(name)
+        CASE "E"
+            IF LEN(r.ber.selB) = 0 THEN RETURN ""
+            DIM p AS STRING : p = berP$(r.ber.selB[0], r.ber.selK[0])
+            SELECT CASE name
+                CASE "x", "y", "b", "h" : RETURN berZahl$(studioBZahl(j, p, name, 0.0))
+                CASE "groesse" : RETURN berZahl$(studioBZahl(j, p, name, 10.0))
+                CASE "staerke" : RETURN berZahl$(studioBZahl(j, p, name, 0.3))
+                CASE "fett", "kursiv" : RETURN IIF(studioBAn(j, p, name), "1", "0")
+                CASE "format" : RETURN studioBText$(j, p, name, "text")
+                CASE "funktion" : RETURN studioBText$(j, p, name, "summe")
+                CASE "bereich" : RETURN studioBText$(j, p, name, "gruppe")
+                CASE "schrift" : RETURN LOWER$(studioBText$(j, p, name, "sans"))
+                CASE "ausrichtung" : RETURN studioBText$(j, p, name, "links")
+            END SELECT
+            RETURN studioBText$(j, p, name, "")
+        CASE "B"
+            IF r.ber.bandNr < 0 THEN RETURN ""
+            IF name = "hoehe" THEN RETURN berZahl$(studioBHoehe(j, r.ber.bandNr))
+            RETURN berichtText$(j, "gruppen." + STR$(berichtBandGruppe(j, r.ber.bandNr)) + ".spalte")
+    END SELECT
+    SELECT CASE name
+        CASE "sortieren"
+            DIM teile AS ARRAY OF STRING : teile = []
+            IF JSON_HAS(j, "sortieren") THEN
+                DIM k AS INTEGER
+                FOR k = 0 TO JSON_LEN(j, "sortieren") - 1
+                    ARRAY_PUSH(teile, berichtText$(j, "sortieren." + STR$(k)))
+                NEXT
+            END IF
+            RETURN JOIN$(teile, "; ")
+        CASE "papier"
+            DIM f AS STRING : f = berichtText$(j, "seite.format")
+            RETURN IIF(f = "", "A4", f)
+        CASE "hoch"
+            IF JSON_TYPE(j, "seite.hoch") = "boolean" THEN RETURN IIF(JSON_GET_BOOL(j, "seite.hoch"), "1", "0")
+            RETURN "1"
+        CASE "rand"
+            studioBSeite(j)
+            RETURN berZahl$(studioBRand[0]) + "; " + berZahl$(studioBRand[1]) + "; " + berZahl$(studioBRand[2]) + "; " + berZahl$(studioBRand[3])
+    END SELECT
+    RETURN berichtText$(j, name)
+END FUNCTION
+
+' Welche Zeilen sichtbar sind, und ihre Werte.
+SUB berEigFuellen(r AS Reiter)
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    DIM art AS STRING : art = ""
+    IF LEN(r.ber.selB) > 0 THEN art = berichtText$(j, berP$(r.ber.selB[0], r.ber.selK[0]) + ".art")
+    DIM bandArt AS STRING : bandArt = ""
+    IF r.ber.bandNr >= 0 THEN bandArt = berichtBandArt$(j, r.ber.bandNr)
+    DIM kopf AS STRING
+    IF LEN(r.ber.selB) = 1 THEN
+        kopf = trf$("Eigenschaften: {0}", [berElementName$(art)])
+    ELSEIF LEN(r.ber.selB) > 1 THEN
+        kopf = trf$("Eigenschaften: {0} Elemente", [STR$(LEN(r.ber.selB))])
+    ELSEIF r.ber.bandNr >= 0 THEN
+        kopf = trf$("Eigenschaften: {0}", [berichtBandName$(bandArt)])
+    ELSE
+        kopf = tr$("Eigenschaften des Berichts")
+    END IF
+    GUI_SET_TEXT(r.ber.eigKopf, kopf)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.ber.eigName) - 1
+        DIM n AS STRING : n = r.ber.eigName[i]
+        DIM an AS BOOLEAN
+        SELECT CASE berEigBereich$(n)
+            CASE "E" : an = LEN(r.ber.selB) > 0 AND berEigGilt(n, art)
+            CASE "B" : an = LEN(r.ber.selB) = 0 AND r.ber.bandNr >= 0 AND (n = "hoehe" OR bandArt = "gruppenkopf" OR bandArt = "gruppenfuss")
+            CASE ELSE : an = LEN(r.ber.selB) = 0 AND r.ber.bandNr < 0
+        END SELECT
+        r.ber.eigSicht[i] = an
+        IF NOT an THEN CONTINUE
+        DIM w AS STRING : w = berEigWert$(r, n)
+        DIM f AS GUI_WIDGET : f = r.ber.eigFeld[i]
+        SELECT CASE r.ber.eigTyp[i]
+            CASE "wahl"
+                DIM keys AS ARRAY OF STRING : keys = berEigWahl(r, n)
+                IF ARRAY_INDEXOF(keys, w) < 0 THEN
+                    DIM mit AS ARRAY OF STRING : mit = []
+                    DIM kk AS STRING
+                    FOR EACH kk IN keys
+                        ARRAY_PUSH(mit, kk)
+                    NEXT
+                    ARRAY_PUSH(mit, w)
+                    keys = mit
+                END IF
+                DIM texte AS ARRAY OF STRING : texte = []
+                DIM kt AS STRING
+                FOR EACH kt IN keys
+                    ARRAY_PUSH(texte, berWahlText$(n, kt))
+                NEXT
+                GUI_SET_DROPDOWN(f, texte)
+                GUI_DROPDOWN_SET_SELECTED(f, ARRAY_INDEXOF(keys, w))
+                r.ber.eigWahl[i] = JOIN$(keys, "|")
+            CASE "kasten"
+                GUI_SET_CHECKED(f, w = "1")
+            CASE ELSE
+                GUI_SET_TEXT(f, w)
+        END SELECT
+        r.ber.eigStand[i] = w
+    NEXT
+    ' Knoepfe: Band/Gruppe entfernen beim Band, Band/Gruppe dazu beim Bericht.
+    GUI_SET_VISIBLE(r.ber.btBandWeg, LEN(r.ber.selB) = 0 AND r.ber.bandNr >= 0 AND bandArt <> "detail" AND bandArt <> "gruppenkopf" AND bandArt <> "gruppenfuss")
+    GUI_SET_VISIBLE(r.ber.btGruppeWeg, LEN(r.ber.selB) = 0 AND (bandArt = "gruppenkopf" OR bandArt = "gruppenfuss"))
+    DIM bericht AS BOOLEAN : bericht = LEN(r.ber.selB) = 0 AND r.ber.bandNr < 0
+    GUI_SET_VISIBLE(r.ber.ddBandNeu, bericht)
+    GUI_SET_VISIBLE(r.ber.btBandNeu, bericht)
+    GUI_SET_VISIBLE(r.ber.ddGruppeNeu, bericht)
+    GUI_SET_VISIBLE(r.ber.btGruppeNeu, bericht)
+    IF bericht THEN
+        r.ber.bandNeuArten = []
+        DIM bt AS ARRAY OF STRING : bt = []
+        DIM a AS STRING
+        FOR EACH a IN ["berichtskopf", "seitenkopf", "seitenfuss", "berichtsfuss"]
+            IF studioBBand(j, a, 0) < 0 THEN
+                ARRAY_PUSH(r.ber.bandNeuArten, a)
+                ARRAY_PUSH(bt, berichtBandName$(a))
+            END IF
+        NEXT
+        IF LEN(bt) = 0 THEN bt = [tr$("(alle da)")]
+        GUI_SET_DROPDOWN(r.ber.ddBandNeu, bt)
+        GUI_DROPDOWN_SET_SELECTED(r.ber.ddBandNeu, 0)
+        GUI_SET_ENABLED(r.ber.btBandNeu, LEN(r.ber.bandNeuArten) > 0)
+        IF LEN(r.ber.spalten) = 0 THEN GUI_SET_DROPDOWN(r.ber.ddGruppeNeu, [tr$("(keine Spalten)")]) ELSE GUI_SET_DROPDOWN(r.ber.ddGruppeNeu, r.ber.spalten)
+        GUI_DROPDOWN_SET_SELECTED(r.ber.ddGruppeNeu, 0)
+        GUI_SET_ENABLED(r.ber.btGruppeNeu, LEN(r.ber.spalten) > 0)
+    END IF
+    berEigLegen(r)
+END SUB
+
+' Eine geaenderte Eigenschaft uebernehmen; FALSE = der Wert taugt nicht.
+FUNCTION berEigSetzen(r AS Reiter, i AS INTEGER, wert AS STRING) AS BOOLEAN
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    DIM n AS STRING : n = r.ber.eigName[i]
+    DIM typ AS STRING : typ = r.ber.eigTyp[i]
+    IF typ = "zahl" AND NOT berZahlGut(wert) THEN RETURN FALSE
+    IF (n = "farbe" OR n = "fuellung") AND wert <> "" THEN
+        DIM hx AS STRING : hx = IIF(LEFT$(TRIM$(wert), 1) = "#", MID$(TRIM$(wert), 1), TRIM$(wert))
+        IF NOT REGEX_TEST(hx, "^([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$") THEN RETURN FALSE
+        wert = "#" + UPPER$(hx)
+    END IF
+    SELECT CASE berEigBereich$(n)
+        CASE "E"
+            DIM s AS INTEGER
+            FOR s = 0 TO LEN(r.ber.selB) - 1
+                DIM p AS STRING : p = berP$(r.ber.selB[s], r.ber.selK[s])
+                IF NOT berEigGilt(n, berichtText$(j, p + ".art")) THEN CONTINUE
+                IF typ = "zahl" THEN
+                    DIM v AS FLOAT : v = berZahlLesen(wert)
+                    IF n = "b" OR n = "h" OR n = "groesse" OR n = "staerke" THEN v = MAX(0.0, v)
+                    JSON_SET_FLOAT(j, p + "." + n, v)
+                ELSEIF typ = "kasten" THEN
+                    JSON_SET_BOOL(j, p + "." + n, wert = "1")
+                ELSEIF wert = "" AND n <> "text" THEN
+                    IF JSON_HAS(j, p + "." + n) THEN JSON_REMOVE(j, p + "." + n)
+                ELSE
+                    JSON_SET_STRING(j, p + "." + n, wert)
+                END IF
+            NEXT
+        CASE "B"
+            IF r.ber.bandNr < 0 THEN RETURN FALSE
+            IF n = "hoehe" THEN
+                JSON_SET_FLOAT(j, "baender." + STR$(r.ber.bandNr) + ".hoehe", MAX(1.0, berZahlLesen(wert)))
+            ELSE
+                DIM g AS INTEGER : g = berichtBandGruppe(j, r.ber.bandNr)
+                IF g < JSON_LEN(j, "gruppen") THEN JSON_SET_STRING(j, "gruppen." + STR$(g) + ".spalte", wert)
+            END IF
+        CASE ELSE
+            SELECT CASE n
+                CASE "sortieren"
+                    DIM a AS JSON_HANDLE : a = JSON_NEW_ARRAY()
+                    DIM t AS STRING
+                    FOR EACH t IN SPLIT(wert, ";")
+                        IF TRIM$(t) <> "" THEN JSON_APPEND_STRING(a, "", TRIM$(t))
+                    NEXT
+                    JSON_SET_JSON(j, "sortieren", a)
+                CASE "papier"
+                    JSON_SET_STRING(j, "seite.format", wert)
+                CASE "hoch"
+                    JSON_SET_BOOL(j, "seite.hoch", wert = "1")
+                CASE "rand"
+                    DIM zahlen AS ARRAY OF FLOAT : zahlen = []
+                    DIM z AS STRING
+                    FOR EACH z IN SPLIT(REPLACE$(wert, ",", ";"), ";")
+                        IF TRIM$(z) = "" THEN CONTINUE
+                        IF NOT berZahlGut(z) THEN RETURN FALSE
+                        ARRAY_PUSH(zahlen, MAX(0.0, berZahlLesen(z)))
+                    NEXT
+                    IF LEN(zahlen) = 1 THEN zahlen = [zahlen[0], zahlen[0], zahlen[0], zahlen[0]]
+                    IF LEN(zahlen) <> 4 THEN RETURN FALSE
+                    DIM ra AS JSON_HANDLE : ra = JSON_NEW_ARRAY()
+                    DIM zz AS FLOAT
+                    FOR EACH zz IN zahlen
+                        JSON_APPEND_FLOAT(ra, "", zz)
+                    NEXT
+                    JSON_SET_JSON(j, "seite.rand", ra)
+                CASE ELSE
+                    JSON_SET_STRING(j, n, wert)
+            END SELECT
+            IF n = "quelle" THEN berSpaltenFuellen(r)
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+SUB berEigUebernehmen(r AS Reiter, i AS INTEGER, wert AS STRING)
+    IF wert = r.ber.eigStand[i] THEN RETURN
+    IF NOT berEigSetzen(r, i, wert) THEN
+        status(trf$("{0}: dieser Wert passt nicht.", [berEigLabel$(r.ber.eigName[i])]))
+        berEigFuellen(r)
+        RETURN
+    END IF
+    protokoll("bericht eigenschaft " + r.ber.eigName[i] + " " + wert)
+    berichtMerken(r)
+END SUB
+
+' Je Bild: Leiste, Knoepfe, Felder (Enter oder Fokus weg uebernimmt Text,
+' eine Wahl und ein Kaestchen gleich), Spaltenliste.
+SUB berichtAnsichtPruefen(r AS Reiter)
+    IF GUI_CLICKED(r.ber.btVorschau) THEN berichtVorschauOeffnen(r.el)
+    DIM t AS INTEGER : t = GUI_TOOLBAR_CLICKED(r.ber.leiste)
+    IF t >= 0 AND t < LEN(r.ber.leisteArt) THEN
+        IF r.ber.scharf = r.ber.leisteArt[t] THEN berScharf(r, "") ELSE berScharf(r, r.ber.leisteArt[t])
+    END IF
+    DIM fokus AS GUI_WIDGET : fokus = GUI_FOCUSED()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.ber.eigName) - 1
+        DIM f AS GUI_WIDGET : f = r.ber.eigFeld[i]
+        SELECT CASE r.ber.eigTyp[i]
+            CASE "wahl"
+                IF GUI_CHANGED(f) AND r.ber.eigSicht[i] THEN
+                    DIM keys AS ARRAY OF STRING : keys = SPLIT(r.ber.eigWahl[i], "|")
+                    DIM s AS INTEGER : s = GUI_DROPDOWN_SELECTED(f)
+                    IF s >= 0 AND s < LEN(keys) THEN berEigUebernehmen(r, i, keys[s])
+                END IF
+            CASE "kasten"
+                IF GUI_CHANGED(f) AND r.ber.eigSicht[i] THEN berEigUebernehmen(r, i, IIF(GUI_CHECKED(f), "1", "0"))
+            CASE ELSE
+                IF r.ber.eigSicht[i] AND (GUI_ENTERED(f) OR (r.ber.fokus = f AND fokus <> f)) THEN berEigUebernehmen(r, i, GUI_TEXT(f))
+        END SELECT
+    NEXT
+    r.ber.fokus = fokus
+    IF GUI_CLICKED(r.ber.btBandWeg) AND r.ber.bandNr >= 0 THEN berBandEntfernen(r, r.ber.bandNr)
+    IF GUI_CLICKED(r.ber.btGruppeWeg) AND r.ber.bandNr >= 0 THEN berBandEntfernen(r, r.ber.bandNr)
+    IF GUI_CLICKED(r.ber.btBandNeu) THEN
+        DIM bs AS INTEGER : bs = GUI_DROPDOWN_SELECTED(r.ber.ddBandNeu)
+        IF bs >= 0 AND bs < LEN(r.ber.bandNeuArten) THEN
+            DIM art AS STRING : art = r.ber.bandNeuArten[bs]
+            r.ber.bandNr = berichtBandEinfuegen(r.ber.j, art, 0, 10.0)
+            protokoll("bericht band dazu " + art)
+            berichtMerken(r)
+            berNachAuswahl(r)
+        END IF
+    END IF
+    IF GUI_CLICKED(r.ber.btGruppeNeu) AND LEN(r.ber.spalten) > 0 THEN
+        DIM gs AS INTEGER : gs = GUI_DROPDOWN_SELECTED(r.ber.ddGruppeNeu)
+        IF gs >= 0 AND gs < LEN(r.ber.spalten) THEN
+            DIM g AS INTEGER : g = berichtGruppeDazu(r.ber.j, r.ber.spalten[gs])
+            r.ber.bandNr = studioBBand(r.ber.j, "gruppenkopf", g)
+            protokoll("bericht gruppe dazu " + r.ber.spalten[gs])
+            berichtMerken(r)
+            berNachAuswahl(r)
+        END IF
+    END IF
+    IF GUI_DOUBLE_CLICKED(r.ber.lbSpalten) THEN
+        DIM sp AS INTEGER : sp = GUI_LISTBOX_SELECTED(r.ber.lbSpalten)
+        IF sp >= 0 AND sp < LEN(r.ber.spalten) THEN berSpalteInsDetail(r, r.ber.spalten[sp])
+    END IF
+END SUB
+
+SUB berScharf(r AS Reiter, art AS STRING)
+    r.ber.scharf = art
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.ber.leisteArt) - 1
+        GUI_TOOLBAR_SET_CHECKED(r.ber.leiste, i, r.ber.leisteArt[i] = art)
+    NEXT
+    IF art <> "" THEN status(trf$("{0}: in ein Band klicken oder ein Rechteck ziehen.", [berElementName$(art)]))
+    protokoll("bericht scharf " + art)
+END SUB
+
+' --- Geometrie ----------------------------------------------------------------------------
+'  Eine Rechnung fuer Zeichnen und Maus: die Flaeche der Seite (berFx..),
+'  der Massstab berMass (Punkte je mm) und wo die Seite steht (berSx/berSy,
+'  der Rollstand ist eingerechnet).
 DIM berSx AS INTEGER
 DIM berSy AS INTEGER
 DIM berMass AS FLOAT
+DIM berFx AS INTEGER
+DIM berFy AS INTEGER
+DIM berFb AS INTEGER
+DIM berFh AS INTEGER
 
+SUB berichtGeometrie(r AS Reiter)
+    studioBSeite(r.ber.j)
+    DIM y0 AS INTEGER : y0 = mitteKy + KOPF_H + 8
+    berFx = mitteKx + 8
+    berFy = y0 + 70 + inhaltOben
+    berFb = mitteKb - 16 - BER_PW - 12
+    berFh = mitteKh - KOPF_H - 86
+    DIM passend AS FLOAT : passend = MAX(0.5, (berFb - 28) / studioBSeiteB)
+    berMass = passend * r.ber.zoom
+    DIM pb AS INTEGER : pb = INT(studioBSeiteB * berMass)
+    DIM frei AS INTEGER : frei = berFb - 28 - pb
+    IF frei >= 0 THEN
+        r.ber.rollX = 0
+        berSx = berFx + 10 + frei \ 2
+    ELSE
+        r.ber.rollX = MAX(0, MIN(r.ber.rollX, -frei))
+        berSx = berFx + 10 - r.ber.rollX
+    END IF
+    ' Senkrecht in Punkten: die Baender samt ihrer Leisten.
+    DIM hoch AS INTEGER : hoch = INT((berGesamt(r.ber.j) + 12.0) * berMass) + JSON_LEN(r.ber.j, "baender") * BER_STRIP
+    DIM maxRoll AS FLOAT : maxRoll = MAX(0.0, (hoch - berFh + 20) / berMass)
+    r.ber.roll = MAX(0.0, MIN(r.ber.roll, maxRoll))
+    berSy = berFy + 10 - INT(r.ber.roll * berMass)
+END SUB
+
+FUNCTION berGesamt(j AS JSON_HANDLE) AS FLOAT
+    DIM s AS FLOAT : s = studioBRand[0]
+    DIM b AS INTEGER
+    FOR b = 0 TO JSON_LEN(j, "baender") - 1
+        s = s + studioBHoehe(j, b)
+    NEXT
+    RETURN s
+END FUNCTION
+
+FUNCTION berBandOben(j AS JSON_HANDLE, b AS INTEGER) AS FLOAT
+    DIM s AS FLOAT : s = studioBRand[0]
+    DIM k AS INTEGER
+    FOR k = 0 TO b - 1
+        s = s + studioBHoehe(j, k)
+    NEXT
+    RETURN s
+END FUNCTION
+
+' mm (relativ zum linken Rand bzw. zum Seitenanfang) <-> Punkte.
+FUNCTION berSchirmX(mm AS FLOAT) AS INTEGER
+    RETURN berSx + INT((studioBRand[3] + mm) * berMass)
+END FUNCTION
+
+' Wo der Inhalt eines Bandes beginnt (unter seiner Leiste) und endet.
+FUNCTION berBandY(j AS JSON_HANDLE, b AS INTEGER) AS INTEGER
+    RETURN berSy + INT(berBandOben(j, b) * berMass) + (b + 1) * BER_STRIP
+END FUNCTION
+
+FUNCTION berBandY2(j AS JSON_HANDLE, b AS INTEGER) AS INTEGER
+    RETURN berBandY(j, b) + INT(studioBHoehe(j, b) * berMass)
+END FUNCTION
+
+' Das Band unter einer Bildschirmhoehe, seine Leiste eingeschlossen; -1 = keins.
+FUNCTION berBandBeiY(j AS JSON_HANDLE, sy AS INTEGER) AS INTEGER
+    DIM b AS INTEGER
+    FOR b = 0 TO JSON_LEN(j, "baender") - 1
+        IF sy >= berBandY(j, b) - BER_STRIP AND sy < berBandY2(j, b) THEN RETURN b
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Eine Bildschirmhoehe in mm ab dem Anfang des Bandes b.
+FUNCTION berMmImBand(j AS JSON_HANDLE, b AS INTEGER, sy AS INTEGER) AS FLOAT
+    RETURN (sy - berBandY(j, b)) / berMass
+END FUNCTION
+
+FUNCTION berMmX(sx AS INTEGER) AS FLOAT
+    RETURN (sx - berSx) / berMass - studioBRand[3]
+END FUNCTION
+
+FUNCTION berInhaltB() AS FLOAT
+    RETURN studioBSeiteB - studioBRand[1] - studioBRand[3]
+END FUNCTION
+
+' Das Rechteck eines Elements in Punkten (x1, y1, x2, y2), aufsteigend.
+FUNCTION berElRect(j AS JSON_HANDLE, b AS INTEGER, k AS INTEGER) AS TUPLE
+    DIM p AS STRING : p = berP$(b, k)
+    DIM oy AS INTEGER : oy = berBandY(j, b)
+    DIM x AS FLOAT : x = studioBZahl(j, p, "x", 0.0)
+    DIM y AS FLOAT : y = studioBZahl(j, p, "y", 0.0)
+    DIM x1 AS INTEGER : x1 = berSchirmX(x)
+    DIM y1 AS INTEGER : y1 = oy + INT(y * berMass)
+    DIM x2 AS INTEGER : x2 = berSchirmX(x + studioBZahl(j, p, "b", 0.0))
+    DIM y2 AS INTEGER : y2 = oy + INT((y + studioBZahl(j, p, "h", 0.0)) * berMass)
+    RETURN (MIN(x1, x2), MIN(y1, y2), MAX(x1, x2), MAX(y1, y2))
+END FUNCTION
+
+' Das oberste Element unter der Maus: (band, nr) oder (-1, -1).
+FUNCTION berElementBei(j AS JSON_HANDLE, sx AS INTEGER, sy AS INTEGER) AS TUPLE
+    DIM b AS INTEGER
+    FOR b = JSON_LEN(j, "baender") - 1 TO 0 STEP -1
+        DIM k AS INTEGER
+        FOR k = berElemente(j, b) - 1 TO 0 STEP -1
+            DIM x1 AS INTEGER
+            DIM y1 AS INTEGER
+            DIM x2 AS INTEGER
+            DIM y2 AS INTEGER
+            (x1, y1, x2, y2) = berElRect(j, b, k)
+            IF sx >= x1 - 3 AND sx <= x2 + 3 AND sy >= y1 - 3 AND sy <= y2 + 3 THEN RETURN (b, k)
+        NEXT
+    NEXT
+    RETURN (-1, -1)
+END FUNCTION
+
+' Die acht Griffe des einen gewaehlten Elements: 0 links oben, im
+' Uhrzeigersinn bis 7 links Mitte (wie im Fenster-Entwurf).
+FUNCTION berGriffLage(r AS Reiter, g AS INTEGER) AS TUPLE
+    DIM x1 AS INTEGER
+    DIM y1 AS INTEGER
+    DIM x2 AS INTEGER
+    DIM y2 AS INTEGER
+    (x1, y1, x2, y2) = berElRect(r.ber.j, r.ber.selB[0], r.ber.selK[0])
+    DIM mx AS INTEGER : mx = (x1 + x2) \ 2
+    DIM my AS INTEGER : my = (y1 + y2) \ 2
+    SELECT CASE g
+        CASE 0 : RETURN (x1, y1)
+        CASE 1 : RETURN (mx, y1)
+        CASE 2 : RETURN (x2, y1)
+        CASE 3 : RETURN (x2, my)
+        CASE 4 : RETURN (x2, y2)
+        CASE 5 : RETURN (mx, y2)
+        CASE 6 : RETURN (x1, y2)
+    END SELECT
+    RETURN (x1, my)
+END FUNCTION
+
+FUNCTION berGriffBei(r AS Reiter, sx AS INTEGER, sy AS INTEGER) AS INTEGER
+    IF LEN(r.ber.selB) <> 1 THEN RETURN -1
+    DIM g AS INTEGER
+    FOR g = 0 TO 7
+        DIM gx AS INTEGER
+        DIM gy AS INTEGER
+        (gx, gy) = berGriffLage(r, g)
+        IF ABS(sx - gx) <= 4 AND ABS(sy - gy) <= 4 THEN RETURN g
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Die Unterkante eines Bandes unter der Maus (Hoehe ziehen); -1 = keine.
+FUNCTION berKanteBei(j AS JSON_HANDLE, sx AS INTEGER, sy AS INTEGER) AS INTEGER
+    IF sx < berSx OR sx > berSx + INT(studioBSeiteB * berMass) THEN RETURN -1
+    DIM b AS INTEGER
+    FOR b = 0 TO JSON_LEN(j, "baender") - 1
+        IF ABS(sy - berBandY2(j, b)) <= 3 THEN RETURN b
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' --- Maus ---------------------------------------------------------------------------------
+'  berModus: 0 nichts, 1 verschieben, 2 Griff, 3 Bandhoehe, 4 Rahmen,
+'  5 ablegen (Art aus der Leiste), 6 Spalte aus der Liste.
+DIM berModus AS INTEGER : berModus = 0
+DIM berDruckX AS INTEGER
+DIM berDruckY AS INTEGER
+DIM berGriff AS INTEGER
+DIM berZugBand AS INTEGER
+DIM berBewegt AS BOOLEAN
+DIM berNurDieses AS INTEGER : berNurDieses = -1   ' Klick ohne Zug waehlt nur dieses
+DIM berOx AS ARRAY OF FLOAT : berOx = []
+DIM berOy AS ARRAY OF FLOAT : berOy = []
+DIM berOb AS ARRAY OF FLOAT : berOb = []
+DIM berOh AS ARRAY OF FLOAT : berOh = []
+DIM berH0 AS FLOAT
+DIM berLinX AS ARRAY OF FLOAT : berLinX = []     ' Ausrichtungslinien, mm (wie x)
+DIM berLinY AS ARRAY OF INTEGER : berLinY = []   ' Punkte (Bildschirm)
+DIM berSpDruck AS BOOLEAN : berSpDruck = FALSE
+DIM berSpDruckJetzt AS BOOLEAN : berSpDruckJetzt = FALSE
+DIM berSpZug AS STRING : berSpZug = ""
+DIM berSpNr AS INTEGER : berSpNr = -1
+
+FUNCTION berRaster(v AS FLOAT) AS FLOAT
+    IF NOT rasterAn OR alt() THEN RETURN v
+    RETURN ROUND(v)
+END FUNCTION
+
+' Vor GUI_UPDATE (die Liste waehlt beim Druck): beginnt ein Druck auf der
+' Spaltenliste?
+SUB berichtVorUpdate()
+    berSpDruckJetzt = FALSE
+    IF NOT berichtVorn() THEN RETURN
+    DIM r AS Reiter : r = reiter[reiterVorn()]
+    berSpDruckJetzt = MOUSE_HIT(0) AND GUI_HIT_TEST(MOUSEX(), MOUSEY()) = r.ber.lbSpalten
+END SUB
+
+FUNCTION berAufDerSeite(sx AS INTEGER, sy AS INTEGER) AS BOOLEAN
+    IF GUI_MODAL() THEN RETURN FALSE
+    IF GUI_WINDOW_AT(sx, sy) <> win THEN RETURN FALSE
+    IF sx < berFx OR sy < berFy OR sx >= berFx + berFb OR sy >= berFy + berFh THEN RETURN FALSE
+    DIM h AS GUI_WIDGET : h = GUI_HIT_TEST(sx, sy)
+    RETURN h < 0 OR h = tcMitte
+END FUNCTION
+
+SUB berichtMaus()
+    IF NOT berichtVorn() THEN
+        berModus = 0
+        RETURN
+    END IF
+    DIM r AS Reiter : r = reiter[reiterVorn()]
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    berichtGeometrie(r)
+    DIM mx AS INTEGER : mx = MOUSEX()
+    DIM my AS INTEGER : my = MOUSEY()
+    DIM frei AS BOOLEAN : frei = berAufDerSeite(mx, my)
+
+    ' Eine Spalte aus der Liste ziehen.
+    IF berSpDruckJetzt THEN
+        berSpDruck = TRUE
+        berDruckX = mx : berDruckY = my
+        berSpNr = GUI_LISTBOX_SELECTED(r.ber.lbSpalten)
+        berSpZug = ""
+    END IF
+    IF berSpDruck AND MOUSEBUTTON(0) THEN
+        IF berSpZug = "" AND berSpNr >= 0 AND berSpNr < LEN(r.ber.spalten) AND (ABS(mx - berDruckX) > 6 OR ABS(my - berDruckY) > 6) THEN
+            berSpZug = r.ber.spalten[berSpNr]
+            berModus = 6
+        END IF
+    END IF
+    IF berSpDruck AND NOT MOUSEBUTTON(0) THEN
+        berSpDruck = FALSE
+        IF berSpZug <> "" THEN
+            IF frei THEN berSpalteAblegen(r, berSpZug, mx, my) ELSE status(tr$("Spalten gehören in ein Band der Seite."))
+            berSpZug = ""
+            berModus = 0
+        END IF
+    END IF
+    IF berModus = 6 THEN
+        MOUSE_CURSOR("hand")
+        RETURN
+    END IF
+
+    ' Zeiger, Rad.
+    IF berModus = 0 AND frei THEN
+        IF r.ber.scharf <> "" THEN
+            MOUSE_CURSOR("crosshair")
+        ELSEIF berGriffBei(r, mx, my) >= 0 THEN
+            MOUSE_CURSOR(griffZeiger$(berGriffBei(r, mx, my)))
+        ELSE
+            DIM hb AS INTEGER
+            DIM hk AS INTEGER
+            (hb, hk) = berElementBei(j, mx, my)
+            IF hb < 0 AND berKanteBei(j, mx, my) >= 0 THEN MOUSE_CURSOR("resize_ns") ELSE MOUSE_CURSOR("auto")
+        END IF
+        DIM rad AS FLOAT : rad = MOUSEWHEEL_Y()
+        IF rad <> 0.0 THEN
+            IF strg() THEN
+                r.ber.zoom = MAX(0.5, MIN(4.0, r.ber.zoom * IIF(rad > 0.0, 1.25, 0.8)))
+                protokoll("bericht zoom " + FORMAT$(r.ber.zoom, "%.2f"))
+            ELSEIF umschalt() THEN
+                r.ber.rollX = r.ber.rollX - INT(rad * 40.0)
+            ELSE
+                r.ber.roll = r.ber.roll - rad * 40.0 / berMass
+            END IF
+            berichtGeometrie(r)
+            r.ber.lagen = TRUE
+        END IF
+    END IF
+
+    IF MOUSE_HIT(0) AND frei AND berModus = 0 THEN berDruck(r, mx, my)
+    IF berModus <> 0 AND MOUSEBUTTON(0) THEN
+        IF ABS(mx - berDruckX) > 3 OR ABS(my - berDruckY) > 3 THEN berBewegt = TRUE
+        IF berBewegt THEN berZiehen(r, mx, my)
+    END IF
+    IF berModus <> 0 AND NOT MOUSEBUTTON(0) THEN berLoslassen(r, mx, my)
+END SUB
+
+SUB berDruck(r AS Reiter, mx AS INTEGER, my AS INTEGER)
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    berDruckX = mx : berDruckY = my
+    berBewegt = FALSE
+    berNurDieses = -1
+    berLinX = [] : berLinY = []
+    IF r.ber.scharf <> "" THEN
+        berModus = 5
+        RETURN
+    END IF
+    DIM g AS INTEGER : g = berGriffBei(r, mx, my)
+    IF g >= 0 THEN
+        berGriff = g
+        berMerkeOrte(r)
+        berModus = 2
+        RETURN
+    END IF
+    DIM b AS INTEGER
+    DIM k AS INTEGER
+    (b, k) = berElementBei(j, mx, my)
+    IF b < 0 THEN
+        DIM kante AS INTEGER : kante = berKanteBei(j, mx, my)
+        IF kante >= 0 THEN
+            berZugBand = kante
+            berH0 = studioBHoehe(j, kante)
+            berModus = 3
+            RETURN
+        END IF
+        ' Leere Flaeche: ein Band waehlen (oder den Bericht), ziehen = Rahmen.
+        IF NOT (umschalt() OR strg()) THEN
+            berAuswahlLeeren(r)
+            r.ber.bandNr = berBandBeiY(j, my)
+            berNachAuswahl(r)
+        END IF
+        berModus = 4
+        RETURN
+    END IF
+    IF umschalt() OR strg() THEN
+        IF berGewaehlt(r, b, k) >= 0 THEN berAbwaehlen(r, b, k) ELSE berWaehlen(r, b, k)
+        r.ber.bandNr = -1
+        berNachAuswahl(r)
+        RETURN
+    END IF
+    IF berGewaehlt(r, b, k) < 0 THEN
+        berAuswahlLeeren(r)
+        berWaehlen(r, b, k)
+        berNachAuswahl(r)
+    ELSE
+        berNurDieses = berGewaehlt(r, b, k)
+    END IF
+    berMerkeOrte(r)
+    berModus = 1
+END SUB
+
+SUB berMerkeOrte(r AS Reiter)
+    berOx = [] : berOy = [] : berOb = [] : berOh = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.ber.selB) - 1
+        DIM p AS STRING : p = berP$(r.ber.selB[i], r.ber.selK[i])
+        ARRAY_PUSH(berOx, studioBZahl(r.ber.j, p, "x", 0.0))
+        ARRAY_PUSH(berOy, studioBZahl(r.ber.j, p, "y", 0.0))
+        ARRAY_PUSH(berOb, studioBZahl(r.ber.j, p, "b", 0.0))
+        ARRAY_PUSH(berOh, studioBZahl(r.ber.j, p, "h", 0.0))
+    NEXT
+END SUB
+
+' Ausrichtungslinien: der naechste Wert in ziele zu einer der Kanten
+' (kanten = Lage der Kante relativ zu v). Liefert den neuen Wert v; die Linie
+' (in mm) kommt nach linie, -1e9 = keine.
+DIM berLinie AS FLOAT
+FUNCTION berEinrasten(v AS FLOAT, kanten AS ARRAY OF FLOAT, ziele AS ARRAY OF FLOAT) AS FLOAT
+    berLinie = -1000000000.0
+    IF NOT linienAn OR alt() THEN RETURN v
+    DIM best AS FLOAT : best = 4.0 / berMass + 0.01
+    DIM neu AS FLOAT : neu = v
+    DIM k AS FLOAT
+    DIM z AS FLOAT
+    FOR EACH k IN kanten
+        FOR EACH z IN ziele
+            IF ABS(v + k - z) < best THEN
+                best = ABS(v + k - z)
+                neu = z - k
+                berLinie = z
+            END IF
+        NEXT
+    NEXT
+    RETURN neu
+END FUNCTION
+
+' Die Ziele zum Einrasten: waagerecht die Raender und alle nicht gewaehlten
+' Elemente der Seite, senkrecht das Band selbst und seine Elemente.
+FUNCTION berZieleX(r AS Reiter) AS ARRAY OF FLOAT
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    DIM z AS ARRAY OF FLOAT : z = [0.0, berInhaltB(), berInhaltB() / 2.0]
+    DIM b AS INTEGER
+    FOR b = 0 TO JSON_LEN(j, "baender") - 1
+        DIM k AS INTEGER
+        FOR k = 0 TO berElemente(j, b) - 1
+            IF berGewaehlt(r, b, k) >= 0 THEN CONTINUE
+            DIM p AS STRING : p = berP$(b, k)
+            DIM x AS FLOAT : x = studioBZahl(j, p, "x", 0.0)
+            DIM w AS FLOAT : w = studioBZahl(j, p, "b", 0.0)
+            ARRAY_PUSH(z, x)
+            ARRAY_PUSH(z, x + w)
+            ARRAY_PUSH(z, x + w / 2.0)
+        NEXT
+    NEXT
+    RETURN z
+END FUNCTION
+
+FUNCTION berZieleY(r AS Reiter, b AS INTEGER) AS ARRAY OF FLOAT
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    DIM z AS ARRAY OF FLOAT : z = [0.0, studioBHoehe(j, b)]
+    DIM k AS INTEGER
+    FOR k = 0 TO berElemente(j, b) - 1
+        IF berGewaehlt(r, b, k) >= 0 THEN CONTINUE
+        DIM p AS STRING : p = berP$(b, k)
+        DIM y AS FLOAT : y = studioBZahl(j, p, "y", 0.0)
+        DIM h AS FLOAT : h = studioBZahl(j, p, "h", 0.0)
+        ARRAY_PUSH(z, y)
+        ARRAY_PUSH(z, y + h)
+        ARRAY_PUSH(z, y + h / 2.0)
+    NEXT
+    RETURN z
+END FUNCTION
+
+SUB berZiehen(r AS Reiter, mx AS INTEGER, my AS INTEGER)
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    DIM dx AS FLOAT : dx = (mx - berDruckX) / berMass
+    DIM dy AS FLOAT : dy = (my - berDruckY) / berMass
+    berLinX = [] : berLinY = []
+    SELECT CASE berModus
+        CASE 1
+            IF LEN(r.ber.selB) = 0 THEN RETURN
+            ' Das erste gewaehlte Element fuehrt: Raster, dann Linien.
+            DIM b0 AS INTEGER : b0 = r.ber.selB[0]
+            DIM nx AS FLOAT : nx = berRaster(berOx[0] + dx)
+            DIM ny AS FLOAT : ny = berRaster(berOy[0] + dy)
+            nx = berEinrasten(nx, [0.0, berOb[0], berOb[0] / 2.0], berZieleX(r))
+            IF berLinie > -1000.0 THEN ARRAY_PUSH(berLinX, berLinie)
+            ny = berEinrasten(ny, [0.0, berOh[0], berOh[0] / 2.0], berZieleY(r, b0))
+            IF berLinie > -1000.0 THEN ARRAY_PUSH(berLinY, berBandY(j, b0) + INT(berLinie * berMass))
+            DIM i AS INTEGER
+            FOR i = 0 TO LEN(r.ber.selB) - 1
+                DIM p AS STRING : p = berP$(r.ber.selB[i], r.ber.selK[i])
+                JSON_SET_FLOAT(j, p + ".x", berOx[i] + nx - berOx[0])
+                JSON_SET_FLOAT(j, p + ".y", berOy[i] + ny - berOy[0])
+            NEXT
+        CASE 2
+            DIM pg AS STRING : pg = berP$(r.ber.selB[0], r.ber.selK[0])
+            DIM bg AS INTEGER : bg = r.ber.selB[0]
+            DIM minw AS FLOAT : minw = IIF(berichtText$(j, pg + ".art") = "linie", 0.0, 1.0)
+            DIM x1 AS FLOAT : x1 = berOx[0]
+            DIM y1 AS FLOAT : y1 = berOy[0]
+            DIM x2 AS FLOAT : x2 = berOx[0] + berOb[0]
+            DIM y2 AS FLOAT : y2 = berOy[0] + berOh[0]
+            DIM zx AS ARRAY OF FLOAT : zx = berZieleX(r)
+            DIM zy AS ARRAY OF FLOAT : zy = berZieleY(r, bg)
+            IF berGriff = 0 OR berGriff = 6 OR berGriff = 7 THEN
+                x1 = MIN(berEinrasten(berRaster(berOx[0] + dx), [0.0], zx), x2 - minw)
+                IF berLinie > -1000.0 THEN ARRAY_PUSH(berLinX, berLinie)
+            END IF
+            IF berGriff = 2 OR berGriff = 3 OR berGriff = 4 THEN
+                x2 = MAX(berEinrasten(berRaster(berOx[0] + berOb[0] + dx), [0.0], zx), x1 + minw)
+                IF berLinie > -1000.0 THEN ARRAY_PUSH(berLinX, berLinie)
+            END IF
+            IF berGriff = 0 OR berGriff = 1 OR berGriff = 2 THEN
+                y1 = MIN(berEinrasten(berRaster(berOy[0] + dy), [0.0], zy), y2 - minw)
+                IF berLinie > -1000.0 THEN ARRAY_PUSH(berLinY, berBandY(j, bg) + INT(berLinie * berMass))
+            END IF
+            IF berGriff = 4 OR berGriff = 5 OR berGriff = 6 THEN
+                y2 = MAX(berEinrasten(berRaster(berOy[0] + berOh[0] + dy), [0.0], zy), y1 + minw)
+                IF berLinie > -1000.0 THEN ARRAY_PUSH(berLinY, berBandY(j, bg) + INT(berLinie * berMass))
+            END IF
+            JSON_SET_FLOAT(j, pg + ".x", x1)
+            JSON_SET_FLOAT(j, pg + ".y", y1)
+            JSON_SET_FLOAT(j, pg + ".b", x2 - x1)
+            JSON_SET_FLOAT(j, pg + ".h", y2 - y1)
+        CASE 3
+            JSON_SET_FLOAT(j, "baender." + STR$(berZugBand) + ".hoehe", MAX(1.0, berRaster(berH0 + dy)))
+    END SELECT
+END SUB
+
+SUB berLoslassen(r AS Reiter, mx AS INTEGER, my AS INTEGER)
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    DIM m AS INTEGER : m = berModus
+    berModus = 0
+    berLinX = [] : berLinY = []
+    SELECT CASE m
+        CASE 1
+            IF NOT berBewegt THEN
+                IF berNurDieses >= 0 AND LEN(r.ber.selB) > 1 THEN
+                    DIM nb AS INTEGER : nb = r.ber.selB[berNurDieses]
+                    DIM nk AS INTEGER : nk = r.ber.selK[berNurDieses]
+                    berAuswahlLeeren(r)
+                    berWaehlen(r, nb, nk)
+                    berNachAuswahl(r)
+                END IF
+                RETURN
+            END IF
+            ' Ein einzelnes Element darf das Band wechseln: es kommt in das
+            ' Band unter der Maus, an dieselbe Stelle der Seite.
+            IF LEN(r.ber.selB) = 1 THEN
+                DIM von AS INTEGER : von = r.ber.selB[0]
+                DIM nach AS INTEGER : nach = berBandBeiY(j, my)
+                IF nach >= 0 AND nach <> von THEN
+                    DIM p AS STRING : p = berP$(von, r.ber.selK[0])
+                    DIM t AS JSON_HANDLE : t = JSON_GET_JSON(j, p)
+                    DIM sy0 AS INTEGER : sy0 = berBandY(j, von) + INT(JSON_GET_FLOAT(t, "y") * berMass)
+                    DIM ny AS FLOAT : ny = berRaster(berMmImBand(j, nach, sy0))
+                    ny = MAX(0.0, MIN(ny, studioBHoehe(j, nach) - JSON_GET_FLOAT(t, "h")))
+                    JSON_SET_FLOAT(t, "y", ny)
+                    JSON_REMOVE(j, p)
+                    DIM k AS INTEGER : k = berElemente(j, nach)
+                    JSON_APPEND_JSON(j, "baender." + STR$(nach) + ".elemente", t)
+                    r.ber.selB = [nach] : r.ber.selK = [k]
+                    protokoll("bericht bandwechsel " + berichtBandArt$(j, nach))
+                END IF
+            END IF
+            berInsBand(r)
+            protokoll("bericht verschoben " + STR$(LEN(r.ber.selB)))
+            berichtMerken(r)
+        CASE 2
+            IF berBewegt THEN
+                protokoll("bericht groesse")
+                berichtMerken(r)
+            END IF
+        CASE 3
+            IF berBewegt THEN
+                protokoll("bericht bandhoehe " + STR$(berZugBand) + " " + berZahl$(studioBHoehe(j, berZugBand)))
+                r.ber.bandNr = berZugBand
+                berichtMerken(r)
+                berNachAuswahl(r)
+            END IF
+        CASE 4
+            IF NOT berBewegt THEN RETURN
+            ' Rahmen: alles, was er beruehrt.
+            DIM rx1 AS INTEGER : rx1 = MIN(mx, berDruckX)
+            DIM ry1 AS INTEGER : ry1 = MIN(my, berDruckY)
+            DIM rx2 AS INTEGER : rx2 = MAX(mx, berDruckX)
+            DIM ry2 AS INTEGER : ry2 = MAX(my, berDruckY)
+            IF NOT (umschalt() OR strg()) THEN berAuswahlLeeren(r)
+            DIM b AS INTEGER
+            FOR b = 0 TO JSON_LEN(j, "baender") - 1
+                DIM e AS INTEGER
+                FOR e = 0 TO berElemente(j, b) - 1
+                    DIM x1 AS INTEGER
+                    DIM y1 AS INTEGER
+                    DIM x2 AS INTEGER
+                    DIM y2 AS INTEGER
+                    (x1, y1, x2, y2) = berElRect(j, b, e)
+                    IF x2 >= rx1 AND x1 <= rx2 AND y2 >= ry1 AND y1 <= ry2 THEN berWaehlen(r, b, e)
+                NEXT
+            NEXT
+            r.ber.bandNr = -1
+            berNachAuswahl(r)
+        CASE 5
+            berAblegen(r, mx, my)
+    END SELECT
+END SUB
+
+' Nach dem Verschieben: nichts links oder oben aus seinem Band hinaus, und
+' nicht unten hinaus, wenn es hineinpasst.
+SUB berInsBand(r AS Reiter)
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.ber.selB) - 1
+        DIM p AS STRING : p = berP$(r.ber.selB[i], r.ber.selK[i])
+        DIM bh AS FLOAT : bh = studioBHoehe(j, r.ber.selB[i])
+        DIM h AS FLOAT : h = studioBZahl(j, p, "h", 0.0)
+        DIM y AS FLOAT : y = studioBZahl(j, p, "y", 0.0)
+        IF h <= bh THEN y = MIN(y, bh - h)
+        JSON_SET_FLOAT(j, p + ".y", MAX(0.0, y))
+        JSON_SET_FLOAT(j, p + ".x", MAX(0.0, studioBZahl(j, p, "x", 0.0)))
+    NEXT
+END SUB
+
+' Ein Element der gewaehlten Art ablegen: Klick = Vorgabegroesse, Zug =
+' das gezogene Rechteck.
+SUB berAblegen(r AS Reiter, mx AS INTEGER, my AS INTEGER)
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    DIM b AS INTEGER : b = berBandBeiY(j, berDruckY)
+    IF b < 0 THEN
+        status(tr$("Elemente gehören in ein Band."))
+        RETURN
+    END IF
+    DIM x1 AS FLOAT : x1 = berRaster(berMmX(MIN(mx, berDruckX)))
+    DIM y1 AS FLOAT : y1 = berRaster(berMmImBand(j, b, MIN(my, berDruckY)))
+    IF NOT berBewegt THEN
+        x1 = berRaster(berMmX(berDruckX))
+        y1 = berRaster(berMmImBand(j, b, berDruckY))
+    END IF
+    DIM art AS STRING : art = r.ber.scharf
+    DIM t AS JSON_HANDLE : t = berichtElementNeu(art, MAX(0.0, x1), MAX(0.0, y1), "", "")
+    IF art = "summe" THEN JSON_SET_STRING(t, "bereich", IIF(berichtBandArt$(j, b) = "gruppenfuss", "gruppe", "bericht"))
+    IF berBewegt THEN
+        JSON_SET_FLOAT(t, "b", MAX(1.0, berRaster(ABS(mx - berDruckX) / berMass)))
+        JSON_SET_FLOAT(t, "h", IIF(art = "linie", 0.0, MAX(1.0, berRaster(ABS(my - berDruckY) / berMass))))
+    END IF
+    DIM bh AS FLOAT : bh = studioBHoehe(j, b)
+    IF JSON_GET_FLOAT(t, "h") > bh THEN JSON_SET_FLOAT(t, "h", MAX(1.0, bh))
+    IF JSON_GET_FLOAT(t, "y") + JSON_GET_FLOAT(t, "h") > bh THEN JSON_SET_FLOAT(t, "y", MAX(0.0, bh - JSON_GET_FLOAT(t, "h")))
+    DIM k AS INTEGER : k = berElemente(j, b)
+    JSON_APPEND_JSON(j, "baender." + STR$(b) + ".elemente", t)
+    berAuswahlLeeren(r)
+    berWaehlen(r, b, k)
+    berScharf(r, "")
+    protokoll("bericht abgelegt " + art + " " + berichtBandArt$(j, b))
+    berichtMerken(r)
+END SUB
+
+SUB berSpalteAblegen(r AS Reiter, spalte AS STRING, mx AS INTEGER, my AS INTEGER)
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    DIM b AS INTEGER : b = berBandBeiY(j, my)
+    IF b < 0 THEN
+        status(tr$("Spalten gehören in ein Band der Seite."))
+        RETURN
+    END IF
+    IF berichtSpaltenTyp$(j, spalte) = "bild" THEN
+        status(tr$("Bildspalten zeigt ein Bericht noch nicht."))
+        RETURN
+    END IF
+    DIM t AS JSON_HANDLE : t = berichtSpalteElement(j, b, spalte, MAX(0.0, berRaster(berMmX(mx))), MAX(0.0, berRaster(berMmImBand(j, b, my))))
+    DIM k AS INTEGER : k = berElemente(j, b)
+    JSON_APPEND_JSON(j, "baender." + STR$(b) + ".elemente", t)
+    berAuswahlLeeren(r)
+    berWaehlen(r, b, k)
+    protokoll("bericht spalte " + spalte + " " + berichtText$(t, "art") + " " + berichtBandArt$(j, b))
+    berichtMerken(r)
+END SUB
+
+' Doppelklick auf eine Spalte: ins Detail, rechts neben das Letzte.
+SUB berSpalteInsDetail(r AS Reiter, spalte AS STRING)
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    DIM b AS INTEGER : b = studioBBand(j, "detail", 0)
+    IF b < 0 THEN RETURN
+    IF berichtSpaltenTyp$(j, spalte) = "bild" THEN
+        status(tr$("Bildspalten zeigt ein Bericht noch nicht."))
+        RETURN
+    END IF
+    DIM x AS FLOAT : x = 0.0
+    DIM k AS INTEGER
+    FOR k = 0 TO berElemente(j, b) - 1
+        DIM p AS STRING : p = berP$(b, k)
+        x = MAX(x, studioBZahl(j, p, "x", 0.0) + studioBZahl(j, p, "b", 0.0) + 2.0)
+    NEXT
+    DIM t AS JSON_HANDLE : t = berichtSpalteElement(j, b, spalte, x, 0.0)
+    k = berElemente(j, b)
+    JSON_APPEND_JSON(j, "baender." + STR$(b) + ".elemente", t)
+    berAuswahlLeeren(r)
+    berWaehlen(r, b, k)
+    protokoll("bericht spalte " + spalte + " " + berichtText$(t, "art") + " detail")
+    berichtMerken(r)
+END SUB
+
+' --- Tasten -------------------------------------------------------------------------------
+SUB berichtTasten()
+    IF NOT berichtVorn() OR GUI_MODAL() THEN RETURN
+    DIM fokus AS GUI_WIDGET : fokus = GUI_FOCUSED()
+    IF fokus >= 0 THEN
+        DIM art AS STRING : art = GUI_KIND(fokus)
+        IF art = "textinput" OR art = "textarea" OR art = "spinner" OR art = "dropdown" THEN RETURN
+    END IF
+    DIM r AS Reiter : r = reiter[reiterVorn()]
+    IF KEYHIT(KEY_ESCAPE) THEN
+        IF r.ber.scharf <> "" THEN
+            berScharf(r, "")
+            status(tr$("Abgebrochen."))
+        ELSE
+            berAuswahlLeeren(r)
+            berNachAuswahl(r)
+        END IF
+    END IF
+    IF strg() AND KEYHIT(KEY_A) THEN berichtAllesWaehlen()
+    IF LEN(r.ber.selB) = 0 OR strg() THEN RETURN
+    DIM s AS FLOAT : s = IIF(umschalt(), 5.0, 1.0)
+    DIM dx AS FLOAT : dx = 0.0
+    DIM dy AS FLOAT : dy = 0.0
+    IF KEYREPEAT(KEY_LEFT) THEN dx = -s
+    IF KEYREPEAT(KEY_RIGHT) THEN dx = s
+    IF KEYREPEAT(KEY_UP) THEN dy = -s
+    IF KEYREPEAT(KEY_DOWN) THEN dy = s
+    IF dx = 0.0 AND dy = 0.0 THEN RETURN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.ber.selB) - 1
+        DIM p AS STRING : p = berP$(r.ber.selB[i], r.ber.selK[i])
+        JSON_SET_FLOAT(r.ber.j, p + ".x", MAX(0.0, studioBZahl(r.ber.j, p, "x", 0.0) + dx))
+        JSON_SET_FLOAT(r.ber.j, p + ".y", MAX(0.0, studioBZahl(r.ber.j, p, "y", 0.0) + dy))
+    NEXT
+    berichtMerken(r)
+END SUB
+
+' --- Zeichnen -----------------------------------------------------------------------------
 FUNCTION berichtBandName$(art AS STRING) AS STRING
     SELECT CASE art
         CASE "berichtskopf" : RETURN tr$("Berichtskopf")
@@ -88,64 +1558,97 @@ FUNCTION berichtBandName$(art AS STRING) AS STRING
     RETURN art
 END FUNCTION
 
-' Die Seite: Papier, Raender gestrichelt, die Baender untereinander mit ihrem
-' Namen links daneben, darin die Elemente -- Felder als [spalte].
+' Die Seite: Papier, Raender, die Baender untereinander mit ihrem Namen links
+' daneben, darin die Elemente -- Felder als [spalte]; dazu Auswahl, Griffe,
+' Ausrichtungslinien und was gerade gezogen wird.
 SUB berichtZeichnen(r AS Reiter)
-    DIM j AS JSON_HANDLE : j = berichtJ(r.el)
-    studioBSeite(j)
-    DIM fx AS INTEGER : fx = mitteKx + 8
-    DIM fy AS INTEGER : fy = mitteKy + KOPF_H + inhaltOben + 44
-    DIM fb AS INTEGER : fb = mitteKb - 16
-    DIM fh AS INTEGER : fh = mitteKh - KOPF_H - 52
-    DIM rand AS INTEGER : rand = 110
-    ' Die Breite fuellen (hoechstens 4 Punkte je mm); gezeigt wird das Papier
-    ' nur so weit, wie die Baender reichen -- der Rest der Seite ist leer.
-    DIM s AS FLOAT : s = MIN((fb - rand - 20) / studioBSeiteB, 4.0)
-    IF s <= 0.0 THEN RETURN
-    berMass = s
-    berSx = fx + rand + INT((fb - rand - 20 - studioBSeiteB * s) / 2.0)
-    berSy = fy + 10
-    DIM summe AS FLOAT : summe = studioBRand[0]
-    DIM bb AS INTEGER
-    FOR bb = 0 TO JSON_LEN(j, "baender") - 1
-        summe = summe + studioBHoehe(j, bb)
-    NEXT
-    DIM ph AS INTEGER : ph = MIN(INT(MIN(studioBSeiteH, summe + 12.0) * s), fh - 20)
-    SCISSOR(fx, fy, fb, fh)
-    BOX(berSx + 4, berSy + 4, berSx + INT(studioBSeiteB * s) + 4, berSy + ph + 4, RGB(150, 150, 150))
-    BOX(berSx, berSy, berSx + INT(studioBSeiteB * s), berSy + ph, RGB(255, 255, 255))
-    DIM lx AS INTEGER : lx = berSx + INT(studioBRand[3] * s)
-    DIM rx AS INTEGER : rx = berSx + INT((studioBSeiteB - studioBRand[1]) * s)
-    DIM y AS FLOAT : y = studioBRand[0]
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    berichtGeometrie(r)
+    DIM s AS FLOAT : s = berMass
+    DIM nb AS INTEGER : nb = JSON_LEN(j, "baender")
+    DIM pb AS INTEGER : pb = INT(studioBSeiteB * s)
+    DIM unten AS INTEGER : unten = berSy + INT(studioBRand[0] * s)
+    IF nb > 0 THEN unten = berBandY2(j, nb - 1)
+    DIM ph AS INTEGER : ph = unten - berSy + INT(12.0 * s)
+    SCISSOR(berFx, berFy, berFb, berFh)
+    BOX(berSx + 4, berSy + 4, berSx + pb + 4, berSy + ph + 4, RGB(150, 150, 150))
+    BOX(berSx, berSy, berSx + pb, berSy + ph, RGB(255, 255, 255))
+    DIM lx AS INTEGER : lx = berSchirmX(0.0)
+    DIM rx AS INTEGER : rx = berSchirmX(berInhaltB())
     DIM b AS INTEGER
-    FOR b = 0 TO JSON_LEN(j, "baender") - 1
+    FOR b = 0 TO nb - 1
         DIM bp AS STRING : bp = "baender." + STR$(b)
-        DIM h AS FLOAT : h = studioBHoehe(j, b)
-        DIM y1 AS INTEGER : y1 = berSy + INT(y * s)
-        DIM y2 AS INTEGER : y2 = berSy + INT((y + h) * s)
-        BOX(lx, y1, rx, y2, IIF(b MOD 2 = 0, RGB(246, 248, 252), RGB(238, 242, 249)))
-        LINE(lx, y2, rx, y2, RGB(180, 190, 210))
+        DIM y1 AS INTEGER : y1 = berBandY(j, b)
+        DIM y2 AS INTEGER : y2 = berBandY2(j, b)
+        ' Die Leiste des Bandes ueber die ganze Breite, mit seinem Namen.
         DIM name AS STRING : name = berichtBandName$(berichtText$(j, bp + ".art"))
-        IF JSON_TYPE(j, bp + ".gruppe") = "number" THEN name = name + " " + STR$(JSON_GET_INT(j, bp + ".gruppe") + 1)
-        TEXT(berSx - rand + 4, y1 + 2, name, farbe("leise"))
-        IF JSON_HAS(j, bp + ".elemente") THEN
-            DIM k AS INTEGER
-            FOR k = 0 TO JSON_LEN(j, bp + ".elemente") - 1
-                berichtElementZeichnen(j, bp + ".elemente." + STR$(k), studioBRand[3], y, s)
-            NEXT
+        IF JSON_TYPE(j, bp + ".gruppe") = "number" THEN
+            DIM gsp AS STRING : gsp = berichtText$(j, "gruppen." + STR$(JSON_GET_INT(j, bp + ".gruppe")) + ".spalte")
+            name = name + " " + STR$(JSON_GET_INT(j, bp + ".gruppe") + 1) + IIF(gsp = "", "", " · " + gsp)
         END IF
-        y = y + h
+        DIM gew AS BOOLEAN : gew = b = r.ber.bandNr
+        BOX(berSx, y1 - BER_STRIP, berSx + pb, y1 - 1, IIF(gew, F_AUSWAHL, RGB(214, 221, 232)))
+        TEXT_SIZE(12)
+        TEXT(berSx + 6, y1 - BER_STRIP + 3, "▾ " + name, IIF(gew, RGB(255, 255, 255), RGB(70, 80, 100)))
+        TEXT_SIZE(14)
+        BOX(lx, y1, rx, y2, RGB(250, 251, 253))
+        LINE(berSx, y2, berSx + pb, y2, RGB(200, 208, 222))
+        IF gew THEN RECT(lx - 1, y1, rx + 1, y2, F_AUSWAHL)
+        DIM k AS INTEGER
+        FOR k = 0 TO berElemente(j, b) - 1
+            berichtElementZeichnen(j, berP$(b, k), studioBRand[3], y1, s)
+        NEXT
     NEXT
+    ' Auswahl und Griffe.
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.ber.selB) - 1
+        DIM x1 AS INTEGER
+        DIM sy1 AS INTEGER
+        DIM x2 AS INTEGER
+        DIM sy2 AS INTEGER
+        (x1, sy1, x2, sy2) = berElRect(j, r.ber.selB[i], r.ber.selK[i])
+        RECT(x1 - 2, sy1 - 2, x2 + 2, sy2 + 2, F_AUSWAHL)
+    NEXT
+    IF LEN(r.ber.selB) = 1 AND berModus <> 1 THEN
+        DIM g AS INTEGER
+        FOR g = 0 TO 7
+            DIM gx AS INTEGER
+            DIM gy AS INTEGER
+            (gx, gy) = berGriffLage(r, g)
+            BOX(gx - 3, gy - 3, gx + 3, gy + 3, &HFFFFFF)
+            RECT(gx - 3, gy - 3, gx + 3, gy + 3, F_GRIFF_RAND)
+        NEXT
+    END IF
+    ' Ausrichtungslinien.
+    DIM lmm AS FLOAT
+    FOR EACH lmm IN berLinX
+        BOX(berSchirmX(lmm), berSy + INT(studioBRand[0] * s), berSchirmX(lmm), unten, F_LINIE)
+    NEXT
+    DIM ly AS INTEGER
+    FOR EACH ly IN berLinY
+        BOX(lx, ly, rx, ly, F_LINIE)
+    NEXT
+    ' Was gerade gezogen wird.
+    IF berModus = 4 AND berBewegt THEN RECT(MIN(MOUSEX(), berDruckX), MIN(MOUSEY(), berDruckY), MAX(MOUSEX(), berDruckX), MAX(MOUSEY(), berDruckY), F_AUSWAHL)
+    IF berModus = 5 AND berBewegt THEN RECT(MIN(MOUSEX(), berDruckX), MIN(MOUSEY(), berDruckY), MAX(MOUSEX(), berDruckX), MAX(MOUSEY(), berDruckY), F_LINIE)
     SCISSOR_END()
+    IF berModus = 6 THEN
+        DIM tw AS INTEGER : tw = TEXT_WIDTH(berSpZug)
+        BOXROUND(MOUSEX() + 12, MOUSEY() + 4, MOUSEX() + 24 + tw, MOUSEY() + 26, 4, F_AUSWAHL)
+        TEXT(MOUSEX() + 18, MOUSEY() + 7, berSpZug, RGB(255, 255, 255))
+    END IF
+    IF r.ber.lagen THEN berichtLagen(r)
 END SUB
 
-SUB berichtElementZeichnen(j AS JSON_HANDLE, p AS STRING, ox AS FLOAT, oy AS FLOAT, s AS FLOAT)
+' ox = linker Rand (mm), oy = wo das Band auf dem Schirm beginnt.
+SUB berichtElementZeichnen(j AS JSON_HANDLE, p AS STRING, ox AS FLOAT, oy AS INTEGER, s AS FLOAT)
     DIM art AS STRING : art = berichtText$(j, p + ".art")
     DIM x1 AS INTEGER : x1 = berSx + INT((ox + studioBZahl(j, p, "x", 0.0)) * s)
-    DIM y1 AS INTEGER : y1 = berSy + INT((oy + studioBZahl(j, p, "y", 0.0)) * s)
+    DIM y1 AS INTEGER : y1 = oy + INT(studioBZahl(j, p, "y", 0.0) * s)
     DIM x2 AS INTEGER : x2 = x1 + INT(studioBZahl(j, p, "b", 0.0) * s)
     DIM y2 AS INTEGER : y2 = y1 + INT(studioBZahl(j, p, "h", 0.0) * s)
     DIM t AS STRING : t = ""
+    DIM farbeT AS INTEGER : farbeT = studioBFarbe(j, p, "farbe", RGB(20, 20, 30))
     SELECT CASE art
         CASE "text" : t = berichtText$(j, p + ".text")
         CASE "feld" : t = "[" + berichtText$(j, p + ".spalte") + "]"
@@ -153,14 +1656,16 @@ SUB berichtElementZeichnen(j AS JSON_HANDLE, p AS STRING, ox AS FLOAT, oy AS FLO
         CASE "seitenzahl" : t = REPLACE$(REPLACE$(IIF(berichtText$(j, p + ".text") = "", tr$("Seite {n} von {m}"), berichtText$(j, p + ".text")), "{n}", "1"), "{m}", "1")
         CASE "datum" : t = tr$("TT.MM.JJJJ")
         CASE "linie"
-            LINE(x1, y1, x2, y2, RGB(40, 40, 40))
+            LINEW(x1, y1, x2, y2, MAX(1, INT(studioBZahl(j, p, "staerke", 0.3) * s)), studioBFarbe(j, p, "farbe", RGB(40, 40, 40)))
             RETURN
         CASE "rechteck"
-            RECT(x1, y1, x2, y2, RGB(40, 40, 40))
+            IF berichtText$(j, p + ".fuellung") <> "" THEN BOX(x1, y1, x2, y2, studioBFarbe(j, p, "fuellung", RGB(255, 255, 255)))
+            RECT(x1, y1, x2, y2, studioBFarbe(j, p, "farbe", RGB(40, 40, 40)))
             RETURN
         CASE "bild"
             RECT(x1, y1, x2, y2, RGB(120, 140, 180))
-            TEXT(x1 + 3, y1 + 2, tr$("Bild"), RGB(120, 140, 180))
+            DIM bn AS STRING : bn = berichtText$(j, p + ".bild")
+            TEXT(x1 + 3, y1 + 2, IIF(bn = "", tr$("Bild"), bn), RGB(120, 140, 180))
             RETURN
     END SELECT
     RECT(x1, y1, x2, y2, RGB(200, 210, 230))
@@ -174,9 +1679,48 @@ SUB berichtElementZeichnen(j AS JSON_HANDLE, p AS STRING, ox AS FLOAT, oy AS FLO
         CASE "rechts" : tx = x2 - w
     END SELECT
     SCISSOR(x1, y1, MAX(1, x2 - x1), MAX(1, y2 - y1 + 2))
-    TEXT(tx, y1, t, IIF(art = "text", RGB(20, 20, 30), RGB(40, 90, 170)))
+    TEXT(tx, y1, t, IIF(art = "text", farbeT, RGB(40, 90, 170)))
     SCISSOR_END()
     TEXT_SIZE(14)   ' die Groesse des Studios (SETFONT(sans, 14))
+END SUB
+
+' Fuer Pruefungen: wo was auf dem Schirm steht.
+SUB berichtLagen(r AS Reiter)
+    r.ber.lagen = FALSE
+    IF logDatei = "" THEN RETURN
+    DIM j AS JSON_HANDLE : j = r.ber.j
+    protokoll("bermass " + FORMAT$(berMass, "%.5f"))
+    DIM b AS INTEGER
+    FOR b = 0 TO JSON_LEN(j, "baender") - 1
+        ' Linke obere Ecke des Inhalts (0/0 mm im Band) und die Unterkante.
+        protokoll("lage berband" + STR$(b) + " " + STR$(berSchirmX(0.0)) + " " + STR$(berBandY(j, b)))
+        protokoll("lage berkante" + STR$(b) + " " + STR$(berSchirmX(berInhaltB() / 2.0)) + " " + STR$(berBandY2(j, b)))
+        protokoll("lage berleiste" + STR$(b) + " " + STR$(berSchirmX(berInhaltB() - 10.0)) + " " + STR$(berBandY(j, b) - BER_STRIP \ 2))
+    NEXT
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.ber.leisteArt) - 1
+        protokoll("lage berknopf " + r.ber.leisteArt[i] + " " + STR$(GUI_TOOLBAR_ITEM_X(r.ber.leiste, i) + GUI_TOOLBAR_ITEM_W(r.ber.leiste, i) \ 2) + " " + STR$(GUI_GET_Y(r.ber.leiste) + inhaltOben + 15))
+    NEXT
+    FOR i = 0 TO LEN(r.ber.spalten) - 1
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        DIM bb AS INTEGER
+        DIM hh AS INTEGER
+        (x, y, bb, hh) = GUI_LISTBOX_ITEM_RECT(r.ber.lbSpalten, i)
+        protokoll("lage berspalte " + r.ber.spalten[i] + " " + STR$(x + bb \ 2) + " " + STR$(y + hh \ 2))
+    NEXT
+    FOR i = 0 TO LEN(r.ber.eigName) - 1
+        IF NOT r.ber.eigSicht[i] THEN CONTINUE
+        DIM f AS GUI_WIDGET : f = r.ber.eigFeld[i]
+        protokoll("lage berfeld " + r.ber.eigName[i] + " " + STR$(GUI_GET_X(f) + 20) + " " + STR$(GUI_GET_Y(f) + inhaltOben + GUI_GET_H(f) \ 2))
+    NEXT
+    DIM w AS INTEGER
+    DIM namen AS ARRAY OF STRING : namen = ["bandweg", "gruppeweg", "bandneu", "gruppeneu", "bandneuwahl", "gruppeneuwahl"]
+    DIM ws AS ARRAY OF INTEGER : ws = [r.ber.btBandWeg, r.ber.btGruppeWeg, r.ber.btBandNeu, r.ber.btGruppeNeu, r.ber.ddBandNeu, r.ber.ddGruppeNeu]
+    FOR i = 0 TO LEN(ws) - 1
+        w = ws[i]
+        IF GUI_VISIBLE(w) THEN protokoll("lage berknopf " + namen[i] + " " + STR$(GUI_GET_X(w) + GUI_GET_W(w) \ 2) + " " + STR$(GUI_GET_Y(w) + inhaltOben + 13))
+    NEXT
 END SUB
 
 ' --- Vorschau im Studio --------------------------------------------------------------------
