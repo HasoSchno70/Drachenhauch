@@ -37,7 +37,7 @@ debugger. On top of that custom controls and databases in the project.
 | Navigator (top left) | the project as a tree: App, windows with their controls and events, modules, classes, their methods and properties; a click opens |
 | Library (bottom left) | all building blocks of the gui in groups, with a preview; search field above |
 | Middle | tabs with a cross: per window the layout, per method its code, per element its properties |
-| Inspector (right) | the properties of the selected control, without a selection those of the window |
+| Inspector (right) | the properties of the selected control, without a selection those of the window; when the tab of another element is in front (database, module), only its name and kind |
 | Status bar | message, name, position and size of the selected control, zoom (click: 100 %) |
 
 The panels can be moved, stacked as tabs and detached, as in the IDE. The View
@@ -406,6 +406,7 @@ on the right either their **columns** or their **data**.
 | Money | INTEGER in cents | `19,99` (stored as 1999) |
 | Date | TEXT | `2026-11-03` |
 | Yes/No | INTEGER 0/1 | `yes`/`no` |
+| Image | BLOB (the bytes of the image file) | with **Image …** from a file |
 
 Every table has the column `id INTEGER PRIMARY KEY` by itself -- data
 binding (`GUI_FORM_LOAD`/`GUI_FORM_SAVE`) needs exactly that. In the column
@@ -433,9 +434,11 @@ Started from the studio (F5), the program works on the file in the project
 folder -- what it writes shows up in the data grid afterwards. Building puts
 the file next to the built program if there is none yet; one that has
 already been worked in stays. The built program creates missing tables,
-columns and indexes itself; it does not rename or delete there. Deleting
-the element only removes the structure from the project; the file with the
-data stays.
+columns and indexes itself and renames what was renamed in the studio --
+in order, as long as the old name still exists there and the new one does
+not (a rename that only changes case does not count, SQLite sees the same
+name). It leaves deleted things in place. Deleting the element only removes
+the structure from the project; the file with the data stays.
 
 **Binding a window to a table.** The navigator lists the columns under each
 table. Dragging a column or the whole table into the open window adds a
@@ -470,6 +473,51 @@ END SUB
 SUB knopfSichern_Klick()
     IF NOT Self.Sichern() THEN Meldung("Bitte die Eingaben prüfen.")
 END SUB
+```
+
+**References.** In the column grid, **Refers to** names another table of the
+same database: the column then holds the id of one of its rows (it becomes a
+whole number). Dragged into a window, such a column becomes a drop-down list
+that shows the first text column of the target table and binds the id. The
+**Shown columns** of a list may also name a column of the target table:
+`nr;kunde.name` shows the customer's name next to the number, for the
+customer whose id is in `kunde`. The studio puts a LEFT JOIN around the table
+for this (a row without a customer stays, with an empty name); in the result
+the column is called `kunde.name`, and under that name **Sort by**, the
+**Condition** (`"kunde.ort" = 'Köln'`) and the search field know it as well.
+
+**Images.** A column of the type **Image** holds the bytes of an image file
+(PNG, JPG, BMP or GIF). The data grid shows its size; **Image …** sets the
+image of the selected cell from a file, Del empties it. Dragged into a
+window, an image column becomes an image control on that column (inspector:
+**Image column**; it is not part of the form binding). It shows the image
+with `Laden(id)`; `BildSetzen(control, path)` and `BildLeeren(control)` change
+it, and `Sichern()` writes it to the file. A table with a data source shows
+an image column as a picture in the cell.
+
+**Condition, sorting, search.** A list with a data source also has **Sort
+by** (a column of the source) and **Descending** in the inspector, a
+**Condition** (SQL as after WHERE, for example `ort <> 'Bonn'`; the studio
+tries it on the file in the project folder and shows an error at the field --
+also for a name in double quotes that the source does not have: SQLite would
+otherwise silently take it as text, and the list would stay empty)
+and a **Search field** (a text field of the window: as soon as something is
+typed into it, the list shows only rows whose shown columns contain the
+text).
+
+**Queries.** [Query …] in the database tab adds a named SELECT; the queries
+are listed below the tables on the left, their SQL and the result (the first
+1000 rows) on the right. An SQL is only saved once it runs on the file --
+otherwise the previous version stays. A query is a data source like a table
+(with an `id` column, `IdVon` returns it, otherwise 0); dragged from the
+navigator into a window it becomes a table. In code it runs by its name, also
+with the database's name in front:
+
+```text
+DIM r AS DB_RESULT : r = Abfrage("koelner")
+WHILE DB_NEXT(r)
+    PRINT DB_GET_STRING(r, 1)
+WEND
 ```
 
 ## A single window
@@ -525,6 +573,7 @@ a different number of parameters.
 | `DH_STUDIO_KONFIG=file` | `studio.json` in this place; the `ide.json` is then not consulted |
 | `DH_STUDIO_SPRACHPROBE=1` | opens every dialog once, writes its texts and the number of missing translations to the log, and quits |
 | `DH_STUDIO_LOESCHEN=element` | asks at start like "Delete element …" for this element |
+| `DH_STUDIO_TEMPO=1` | writes (with `DH_STUDIO_LOG`) `tempo <ms>` per frame: how long the studio computed, without waiting for the next frame |
 | `DH_STUDIO_OEFFNEN=element[.table]` | opens an element at start like a click in the navigator (for a database optionally a table) |
 
 The test collections `tests/pruef/werkzeug_studio.dhtest` (stage 1) and
@@ -542,4 +591,10 @@ an older file, and the studio with real clicks into both grids, F5 and
 building; `tests/pruef/werkzeug_studio_datenbank2.dhtest` tests binding:
 methods and lists in the generated window including a click on a row,
 dragging and double-clicking columns into the window, and the choices in the
-inspector.
+inspector; `tests/pruef/werkzeug_studio_datenbank3.dhtest` tests references,
+condition, sorting, search field and queries: the core, the generated window
+and the studio with real clicks in the tab, the navigator and the inspector;
+`tests/pruef/werkzeug_studio_datenbank4.dhtest` tests image columns (core,
+generated window including the picture in the table cell, "Image …" and
+dragging in the studio) and `tests/pruef/werkzeug_studio_verbunde.dhtest`
+joins through references.

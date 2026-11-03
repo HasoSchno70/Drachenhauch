@@ -90,8 +90,13 @@ SUB inspektorAnlegen()
     inspGruppe("Daten")
     inspZeile("Daten", "studio_tabelle", "Tabelle", "wahl", "fenster", "")
     inspZeile("Daten", "bind", "Spalte", "wahl", BINDARTEN, "")
+    inspZeile("Daten", "studio_bildspalte", "Bildspalte", "wahl", "image", "")
     inspZeile("Daten", "studio_quelle", "Datenquelle", "wahl", QUELLARTEN, "")
     inspZeile("Daten", "studio_spalten", "Angezeigte Spalten", "text", QUELLARTEN, "")
+    inspZeile("Daten", "studio_sortieren", "Sortieren nach", "wahl", QUELLARTEN, "")
+    inspZeile("Daten", "studio_absteigend", "Absteigend", "schalter", QUELLARTEN, "")
+    inspZeile("Daten", "studio_filter", "Bedingung", "text", QUELLARTEN, "")
+    inspZeile("Daten", "studio_suchfeld", "Suchfeld", "wahl", QUELLARTEN, "")
     inspGruppe("Timer")
     inspZeile("Timer", "name", "Name", "text", "timer", "")
     inspZeile("Timer", "intervall", "Intervall (ms)", "zahl", "timer", "")
@@ -287,11 +292,39 @@ SUB farbfeldZeigen(z AS InspZeile, pfad AS STRING)
     END IF
 END SUB
 
+' Das Element des vorderen Reiters, wenn es nicht das Fenster in `doc` ist
+' (Datenbank, Modul, Klasse, Code eines anderen Fensters) -- sonst -1. Dann
+' zeigt der Inspektor dieses Element statt des zuletzt offenen Fensters.
+FUNCTION inspFremdesElement() AS INTEGER
+    DIM k AS INTEGER : k = reiterVorn()
+    IF k < 0 OR k >= LEN(reiter) THEN RETURN -1
+    IF reiter[k].art = "layout" THEN RETURN -1
+    DIM ei AS INTEGER : ei = elementVon(reiter[k].el)
+    IF ei = aktFenster THEN RETURN -1
+    RETURN ei
+END FUNCTION
+
 ' Die Editoren auf den Stand des Modells.
 SUB inspektorFuellen()
+    DIM fremd AS INTEGER : fremd = inspFremdesElement()
+    ' Eine Eingabe ohne Rueckgaengig-Schritt gehoert noch zum Fenster in `doc`.
+    IF fremd >= 0 AND inspAnhaengig >= 0 THEN merken()
     inspStumm = TRUE
     inspAnhaengig = -1
     DIM art AS STRING : art = ""
+    IF fremd >= 0 THEN
+        ' Nichts, was in `doc` steht, gehoert zu diesem Element.
+        GUI_SET_TEXT(inspTitel, elemente[fremd].name)
+        GUI_SET_TEXT(inspArt, artText$(elemente[fremd].art))
+        DIM zf AS InspZeile
+        FOR EACH zf IN inspZeilen
+            zf.sichtbar = FALSE
+        NEXT
+        inspektorLegen()
+        inspStumm = FALSE
+        protokoll("inspektor element " + elemente[fremd].art + " " + elemente[fremd].name)
+        RETURN
+    END IF
     IF abstandL >= 0 THEN
         art = "abstand"
         GUI_SET_TEXT(inspTitel, tr$("Abstandhalter"))
@@ -327,7 +360,11 @@ SUB inspektorFuellen()
                 END IF
                 IF z.schluessel = "studio_eigenschaften" THEN GUI_TOOLTIP(z.ed, tr$("Name = Vorgabe; Zahl AS INTEGER = 3 -- ohne AS ein STRING; dazu FLOAT und BOOLEAN"))
                 IF z.schluessel = "studio_ereignisse" THEN GUI_TOOLTIP(z.ed, tr$("Namen durch Semikolon; im Code des Controls meldet Self.Ausloesen(...) eines davon"))
-                IF z.schluessel = "studio_spalten" THEN GUI_TOOLTIP(z.ed, tr$("Spalten durch Semikolon -- leer: bei einer Tabelle alle, sonst die erste"))
+                IF z.schluessel = "studio_spalten" THEN GUI_TOOLTIP(z.ed, tr$("Spalten durch Semikolon, auch über einen Verweis (kunde.name) -- leer: bei einer Tabelle alle, sonst die erste"))
+                IF z.schluessel = "studio_filter" THEN
+                    GUI_TOOLTIP(z.ed, tr$("Eine SQL-Bedingung wie im WHERE, etwa: ort = 'Köln' AND umsatz > 100"))
+                    filterPruefen(z)
+                END IF
             CASE "eintraege"
                 GUI_SET_TEXT(z.ed, listeText$(p))
             CASE "zahl"
@@ -564,7 +601,10 @@ SUB zeileUebernehmen(zi AS INTEGER)
             IF i >= 0 THEN quellKopfSetzen(i)
         NEXT
         entwurfBauen()
+        ' Nach welcher Spalte sortiert werden kann, haengt an der Quelle.
+        IF z.schluessel = "studio_quelle" THEN inspektorFuellen()
     END IF
+    IF z.schluessel = "studio_filter" THEN filterPruefen(z)
     IF z.schluessel = "studio_tabelle" THEN protokoll("fenster tabelle " + fensterText$("studio_tabelle"))
     ' Die Anordnung entscheidet, ob es Spalten gibt -- und wie das Control im
     ' Navigator heisst.
@@ -681,7 +721,7 @@ END SUB
 
 ' --- Auswahlen aus dem Projekt (Daten) ------------------------------------------
 FUNCTION istDatenWahl(schluessel AS STRING) AS BOOLEAN
-    RETURN schluessel = "studio_tabelle" OR schluessel = "studio_quelle" OR schluessel = "bind"
+    RETURN schluessel = "studio_tabelle" OR schluessel = "studio_quelle" OR schluessel = "bind" OR schluessel = "studio_sortieren" OR schluessel = "studio_suchfeld" OR schluessel = "studio_bildspalte"
 END FUNCTION
 
 ' Die Eintraege einer Daten-Auswahl: zuerst "(keine)", dann die Tabellen des
@@ -689,11 +729,26 @@ END FUNCTION
 ' auch wenn es ihn dort nicht (mehr) gibt, sonst sprang die Auswahl still um.
 SUB datenWahlFuellen(z AS InspZeile, jetzt AS STRING)
     DIM liste AS ARRAY OF STRING
-    IF z.schluessel = "bind" THEN
-        liste = dbSpaltenVon(fensterText$("studio_tabelle"))
-    ELSE
-        liste = dbAlleTabellen()
-    END IF
+    SELECT CASE z.schluessel
+        CASE "bind"
+            liste = dbSpaltenBild(fensterText$("studio_tabelle"), FALSE)
+        CASE "studio_bildspalte"
+            liste = dbSpaltenBild(fensterText$("studio_tabelle"), TRUE)
+        CASE "studio_quelle"
+            liste = dbAlleQuellen()
+        CASE "studio_sortieren"
+            liste = []
+            IF auswahl >= 0 THEN liste = dbQuellSpaltenMit(feldText$(auswahl, "studio_quelle"))
+        CASE "studio_suchfeld"
+            ' Die Textfelder des Fensters.
+            liste = []
+            DIM i AS INTEGER
+            FOR i = 0 TO anzahl() - 1
+                IF feldText$(i, "kind") = "textinput" AND feldText$(i, "name") <> "" THEN ARRAY_PUSH(liste, feldText$(i, "name"))
+            NEXT
+        CASE ELSE
+            liste = dbAlleTabellen()
+    END SELECT
     IF jetzt <> "" AND ARRAY_INDEXOF(liste, jetzt) < 0 THEN ARRAY_PUSH(liste, jetzt)
     z.wahl = tr$("(keine)") + IIF(LEN(liste) > 0, ";" + JOIN$(liste, ";"), "")
     GUI_LISTBOX_CLEAR(z.ed)
@@ -708,13 +763,33 @@ END SUB
 SUB quellKopfSetzen(i AS INTEGER)
     IF feldText$(i, "kind") <> "table" THEN RETURN
     DIM ref AS STRING : ref = feldText$(i, "studio_quelle")
-    IF NOT dbRef(ref) THEN RETURN
-    DIM s AS JSON_HANDLE : s = dbSchema(dbRefEl)
-    DIM spalten AS ARRAY OF INTEGER : spalten = dbListSpalten(s, dbRefT, feldText$(i, "studio_spalten"), "table")
+    ' Die Spalten der Quelle; genannte, soweit es sie gibt -- wie im Programm.
+    DIM alle AS ARRAY OF STRING : alle = dbQuellSpalten(ref)
+    IF LEN(alle) = 0 THEN RETURN
+    ' Auch "verweis.spalte" -- in der Schreibweise des Schemas.
+    DIM gueltig AS ARRAY OF STRING : gueltig = dbQuellSpaltenMit(ref)
+    DIM klein AS ARRAY OF STRING : klein = []
+    DIM w AS STRING
+    FOR EACH w IN gueltig
+        ARRAY_PUSH(klein, LOWER$(w))
+    NEXT
+    DIM namen AS ARRAY OF STRING : namen = []
+    FOR EACH w IN SPLIT(feldText$(i, "studio_spalten"), ";")
+        DIM gi AS INTEGER : gi = ARRAY_INDEXOF(klein, LOWER$(TRIM$(w)))
+        IF gi >= 0 THEN ARRAY_PUSH(namen, gueltig[gi])
+    NEXT
+    IF LEN(namen) = 0 THEN namen = alle
     DIM kopf AS JSON_HANDLE : kopf = JSON_NEW_ARRAY()
-    DIM k AS INTEGER
-    FOR EACH k IN spalten
-        JSON_APPEND_STRING(kopf, "", dbSp$(s, dbRefT, k, "name"))
+    FOR EACH w IN namen
+        JSON_APPEND_STRING(kopf, "", w)
     NEXT
     JSON_SET_JSON(doc, wz$(i, "table.headers"), kopf)
+END SUB
+
+' Die Bedingung einer Liste an der Entwicklungsdatei pruefen und am Feld zeigen.
+SUB filterPruefen(z AS InspZeile)
+    IF auswahl < 0 THEN RETURN
+    DIM f AS STRING : f = dbFilterFehler$(feldText$(auswahl, "studio_quelle"), feldText$(auswahl, "studio_filter"))
+    GUI_SET_ERROR(z.ed, IIF(f = "", "", trf$("Die Bedingung geht so nicht: {0}", [f])))
+    IF f <> "" THEN protokoll("filter fehler " + f)
 END SUB

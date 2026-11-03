@@ -19,6 +19,7 @@ IMPORT "db"
 | `DB_GET_INT(r, idx)` | INTEGER | read a column of the current row as an integer |
 | `DB_GET_FLOAT(r, idx)` | FLOAT | read a column of the current row as a floating-point number |
 | `DB_GET_BOOL(r, idx)` | BOOLEAN | read a column of the current row as a truth value (0/1 in SQLite) |
+| `DB_GET_BUFFER(r, idx)` | BUFFER | read a column of the current row as bytes (a BLOB as stored, text as UTF-8, NULL empty) |
 | `DB_IS_NULL(r, idx)` | BOOLEAN | is this column NULL? |
 | `DB_COL_COUNT(r)` | INTEGER | number of columns in the result |
 | `DB_COL_NAME(r, idx)` | STRING | name of the column (index from 0) |
@@ -74,7 +75,8 @@ DB_CLOSE(c)
 * **Other types:** `BOOLEAN` arrives as 1/0 (for `DB_GET_BOOL`, as with
   SQLite), date and time as text (`2024-02-29`, `2026-10-06 13:05:09`;
   PostgreSQL's `timestamptz` in UTC with `+00`); bytes (`BYTEA`, `BLOB`) are
-  read by `DB_GET_STRING` as text and bound as a `BUFFER`. With PostgreSQL,
+  read by `DB_GET_BUFFER` as a `BUFFER` (by `DB_GET_STRING` as text) and
+  bound as a `BUFFER`. With PostgreSQL,
   `uuid`, `json`/`jsonb`, `interval` and `money` also come as text.
   Whatever Drachenhauch cannot read (a field `int[]`, for example) is named in
   the message, together with the way out: `::text` in the query.

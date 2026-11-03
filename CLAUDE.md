@@ -3780,6 +3780,88 @@ Entwurf (`quellKopfSetzen`). Tests `tests/pruef/werkzeug_studio_datenbank2.dhtes
 Aufnahme macht; Tabelle ziehen + F5; Doppelklick neben einer fremden
 Tabelle; Auswahlen im Inspektor per Tastatur); zwoelf Verfaelschungen fallen
 je in ihrem Fall.
+**Stufe 3 (selber Tag): Verweise, Bedingung/Sortierung/Suche, Abfragen.**
+Spalte `verweis` (Zieltabelle; `dbSpalteVerweis$` macht die Spalte `ganz`),
+im Spalten-Gitter die sechste Spalte "Verweis auf"; `feldAnlegen` macht aus
+ihr eine Klappliste mit `studio_quelle` = Ziel und `studio_spalten` =
+`dbAnzeigeSpalte$` (erste Textspalte). Schema `abfragen[]` (name, sql),
+Namen mit den Tabellen geteilt (`dbNameBelegt`); `dbAbfrageTesten$` laeuft
+das SQL als `SELECT * FROM (sql) AS studio_q LIMIT n` (nur SELECT/WITH,
+eine Anweisung) und schneidet die Stelle im Huell-SQL aus der Meldung
+(`dbOhneHuelle$`); `dbAbfrageSetzen$` sichert nur, was geht. Eine
+Datenquelle ist Tabelle ODER Abfrage (`dbQuelle` setzt `dbRefT`/`dbRefA`,
+`dbRef` nur Tabellen); im Programm liest `studioQuelle(con, quelle,
+spalten, filter, sort, desc, such)` (id oder `0 AS id` vorn, LIKE ueber die
+gezeigten Spalten, ORDER BY), `studioZeile` zeigt; Klapplisten tragen die id
+als Eintragswert (`GUI_LISTBOX_SET_DATA`) und behalten ihre Auswahl beim
+Neuladen; der Takt laedt bei `GUI_CHANGED(suchfeld)` neu. `Abfrage(name)`
+mit SELECT CASE ueber "name" und "datenbank.name", Gross/klein egal. Reiter:
+Liste links = Tabellen, Kopf "Abfragen", Abfragen (`eintraege`/`eintragAbf`);
+eine Abfrage zeigt SQL-Feld, [Ausfuehren] und ein Ergebnis-Gitter
+(`GUI_TABLE_CLEAR` + `GUI_TABLE_HEADERS` -- `GUI_TABLE` mit Kopf ohne Zellen
+ist ein Fehler); uebernommen wird beim Ausfuehren oder wenn das Feld den
+Fokus abgibt. Navigator: Abfragen als Knoten `abfrage` (Pfad
+`Daten.?name`), Klick oeffnet, Ziehen ins Fenster legt eine Tabelle mit
+Datenquelle an (`abfrageAblegen`). Inspektor: `studio_sortieren` (Spalten
+der Quelle), `studio_absteigend`, `studio_filter` (an der Datei geprueft,
+`filterPruefen` -> GUI_SET_ERROR), `studio_suchfeld` (Textfelder des
+Fensters). **Testfalle:** Knoten unter dem sichtbaren Navigator haben eine
+Lage im Protokoll, nehmen aber keinen Klick an -- Projekte in Tests klein
+halten. Tests `tests/pruef/werkzeug_studio_datenbank3.dhtest` (7); 16
+Verfaelschungen fallen je in ihrem Fall (Sortieren erst mit Testdaten, bei
+denen Name und id verschieden ordnen). **Umbenennen im gebauten Programm:**
+`dbUmbenennungMerken` haengt je Umbenennung `{art, tabelle, alt, neu}` an
+`umbenannt` (nicht bei reinem Gross/klein); das erzeugte
+studio_datenbanken.dh ruft nach DB_OPEN der Reihe nach `studioDbTabUm`/
+`studioDbSpUm` (nur wenn alt da und neu nicht). Indexe heissen nach Tabelle
+und Spalte: beim Spaltenumbenennen faellt `studio_u_<t>_<alt>` vorher weg,
+beim Tabellenumbenennen jeder `studio_u_`-Index, der nicht mit dem neuen
+Tabellennamen beginnt -- `CREATE UNIQUE INDEX IF NOT EXISTS` legt sie neu
+an. **Inspektor:** ist ein Reiter eines anderen Elements vorn
+(`inspFremdesElement`), zeigt er nur Name und Art; `reiterPruefen` fuellt
+ihn bei jedem Reiterwechsel neu. Zwei Faelle in
+`werkzeug_studio_datenbank.dhtest`, sechs Verfaelschungen fallen.
+**Stufe 4 (2026-11-03): Bildspalten und Verbunde ueber Verweise.** Neu in
+der Laufzeit `DB_GET_BUFFER(r, idx)` (BLOB wie gespeichert, Text als UTF-8,
+NULL leer, Zahl = Fehler) -- ein BLOB kam vorher nur als Text heraus. Art
+`bild` = SQL `BLOB` (Pflicht-Leerwert `X''`, keine Vorgabe); `dbIstBild`
+prueft die Kennung (PNG/JPG/BMP/GIF) ohne Fenster. Daten-Gitter: Bildspalte
+schreibgeschuetzt, Zelle "Bild (n KB)", Knopf **Bild …** (`dbBildWaehlen`,
+`DH_STUDIO_DATEI` fuer Pruefungen), Entf = NULL. Ein Bild-Control haengt an
+`studio_bildspalte`, NICHT an `bind` -- GUI_FORM_SAVE schriebe ihm einen
+leeren Wert; Inspektor-Zeile "Bildspalte" (`dbSpaltenBild`, die Bindung
+bietet keine Bildspalten mehr an). Erzeugt (`dbBildFelder`): je Control
+`studioBild_/studioBildNeu_/studioBildGeaendert_`, Laden zeigt
+(`studioDbBildLesen`), `BildSetzen(w, pfad)`/`BildLeeren(w)`, Sichern
+schreibt, Ungesichert zaehlt mit; eine Tabelle zeigt Bildspalten per
+`GUI_TABLE_CELL_KIND "bild"` (Bilder in `studioBilder_<liste>`, beim
+Neuladen freigegeben). **Fund:** ein Fenster, das nur ein Bild bindet,
+brach mit "kein Widget gebunden" ab -- ohne `bind` gehen Laden/Sichern/Neu
+jetzt ueber `studioDbZeileDa`/`studioDbZeileNeu` statt GUI_FORM_*.
+**Verbunde:** in `studio_spalten` auch `verweis.spalte`; `dbVerweisJoin$`
+legt `(SELECT q.*, j0."name" AS "kunde.name" ... LEFT JOIN ...)` um die
+Tabelle, wenn Spalten, Sortierung oder Bedingung `verweis.` nennen
+(`dbQuellSql$` mit `bedarf`); `dbListSpaltenMit` (Schreibweise des Schemas),
+`dbQuellSpaltenMit` fuer Sortieren und Entwurfskopf. **SQLite-Falle:** ein
+unbekannter Name in doppelten Anfuehrungszeichen ist dort still ein Text --
+`dbFilterFehler$` prueft solche Namen jetzt gegen die Spalten der Quelle
+(`dbFilterNamePruefen$`). Tests `werkzeug_studio_datenbank4.dhtest` (3; das
+Bild in der Zelle am Bildschirmfoto) und `werkzeug_studio_verbunde.dhtest`
+(3); 15 Verfaelschungen fallen, eine ist gleichwertig (Bedingungspruefung
+ohne Verbund -- wegen der Falle oben).
+**Tempo des Designers (selber Tag):** gemessen mit `DH_STUDIO_TEMPO=1`
+(je Bild `tempo <ms>` ins Protokoll, Rechenzeit vor FLIP) an einem Fenster
+mit 300 Controls, Median ruhig/ziehen/Pfeile 1,7/6,3/2,4 -> 1,0/1,2/1,6 ms.
+Die Einrast-Ziele sammelt `zieleSammeln` je Zug und Achse einmal (Schluessel
+`zielZug` + Groesse + Auswahl; gesammelt wird nur bei gedrueckter Taste, und
+dabei bewegt sich nur die Auswahl, die selbst kein Ziel ist), `feldText$`/
+`feldZahl` fragen nur `JSON_TYPE` (liefert "missing") + Wert, und
+`entwurfZeichnen` liest die Arten einmal je Bild. **Messfalle:** `dhrt
+profile` schaltet den Maschinencode ab -- reine Zahlenschleifen (`einrasten`)
+sehen dort teuer aus und kosten im echten Lauf fast nichts; gemessen wird
+darum ohne Profiler. Test-only: `protokoll` sammelt und schreibt je Bild
+einmal (`protokollSchreiben` vor FLIP und am Ende) -- vorher oeffnete jede
+der Tausenden Lage-Zeilen die Datei.
 
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 

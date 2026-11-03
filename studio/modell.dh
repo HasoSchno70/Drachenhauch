@@ -35,16 +35,18 @@ FUNCTION wz$(i AS INTEGER, feld AS STRING) AS STRING
     RETURN "widgets." + STR$(i) + "." + feld
 END FUNCTION
 
+' Diese beiden laufen je Bild hunderte Male (Zeichnen, Einrasten): ein Pfad,
+' zwei Fragen -- JSON_TYPE sagt "missing", wo es nichts gibt.
 FUNCTION feldText$(i AS INTEGER, feld AS STRING) AS STRING
-    IF NOT JSON_HAS(doc, wz$(i, feld)) THEN RETURN ""
-    IF JSON_TYPE(doc, wz$(i, feld)) <> "string" THEN RETURN ""
-    RETURN JSON_GET_STRING(doc, wz$(i, feld))
+    DIM p AS STRING : p = "widgets." + STR$(i) + "." + feld
+    IF JSON_TYPE(doc, p) <> "string" THEN RETURN ""
+    RETURN JSON_GET_STRING(doc, p)
 END FUNCTION
 
 FUNCTION feldZahl(i AS INTEGER, feld AS STRING) AS INTEGER
-    IF NOT JSON_HAS(doc, wz$(i, feld)) THEN RETURN 0
-    IF JSON_TYPE(doc, wz$(i, feld)) <> "number" THEN RETURN 0
-    RETURN INT(JSON_GET_FLOAT(doc, wz$(i, feld)))
+    DIM p AS STRING : p = "widgets." + STR$(i) + "." + feld
+    IF JSON_TYPE(doc, p) <> "number" THEN RETURN 0
+    RETURN INT(JSON_GET_FLOAT(doc, p))
 END FUNCTION
 
 FUNCTION feldKomma(i AS INTEGER, feld AS STRING, vorgabe AS FLOAT) AS FLOAT

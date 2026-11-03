@@ -1,0 +1,210 @@
+' Drachenhauch Studio: Datenbanken im Projekt -- Verbunde ueber Verweise
+' (studio/datenbank.dh, studio/inspektor.dh, docs/studio.md). Eine Liste an
+' einer Tabelle zeigt auch "verweis.spalte" (kunde.name = die Spalte name der
+' Zeile, deren id in kunde steht); das Studio legt den LEFT JOIN selbst, und
+' Sortierung, Bedingung und Suche kennen die Spalte unter demselben Namen.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== der kern baut den verbund und kennt seine spalten
+' Eine Rechnung ohne Kunde (NULL) und eine mit einem Kunden, den es nicht
+' mehr gibt, bleiben (LEFT JOIN) -- mit leerem Namen. Gross/klein in der
+' Angabe zaehlt nicht, eine unbekannte Angabe faellt weg.
+IMPORT "kern.dh"
+projOrdner = CWD$() + "/proj"
+DIM e AS Element : e = elementNeu("datenbank", "Daten")
+e.schema = READLINES("proj/Daten.dhdb")[0]
+DIM s AS JSON_HANDLE : s = dbSchema(e)
+DIM t AS INTEGER : t = dbTabIndex(s, "rechnungen")
+PRINT "verweise "; JOIN$(dbVerweisSpalten(s, t), ",")
+PRINT "mit "; JOIN$(dbQuellSpaltenMit("Daten.rechnungen"), ",")
+PRINT "ohne bedarf ["; dbVerweisJoin$(s, t, "nr;betrag"); "]"
+dbListSpaltenMit(s, t, "nr;Kunde.Name;quatsch.x;kunde.gibtsnicht", "table")
+PRINT "liste "; JOIN$(dbLsNamen, ","); " / "; JOIN$(dbLsTypen, ",")
+DIM q AS STRING : q = dbQuellSql$(e, t, -1, "kunde.name")
+PRINT q
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT id, nr, " + dbQ$("kunde.name") + ", " + dbQ$("kunde.ort") + " FROM " + q + " AS studio_q ORDER BY id")
+WHILE DB_NEXT(r)
+    PRINT "  "; DB_GET_INT(r, 0); " "; DB_GET_STRING(r, 1); " ["; DB_GET_STRING(r, 2); "] ["; DB_GET_STRING(r, 3); "]"
+WEND
+DB_CLOSE(db)
+PRINT "filter ["; dbFilterFehler$("Daten.rechnungen", CHR$(34) + "kunde.ort" + CHR$(34) + " = 'Bonn'"); "]"
+PRINT "falsch "; INSTR(dbFilterFehler$("Daten.rechnungen", "kunde.plz = 1"), "kunde.plz") >= 0
+' In doppelten Anfuehrungszeichen nimmt SQLite einen unbekannten Namen still
+' als Text; das Studio sagt es -- ein Text in einfachen zaehlt nicht.
+PRINT "tippfehler ["; dbFilterFehler$("Daten.rechnungen", CHR$(34) + "kunde.ortt" + CHR$(34) + " = 'x'"); "]"
+PRINT "text ["; dbFilterFehler$("Daten.rechnungen", "nr = '" + CHR$(34) + "gibts" + CHR$(34) + "' AND " + CHR$(34) + "ID" + CHR$(34) + " > 0"); "]"
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT, ort TEXT)")
+DB_EXEC(db, "CREATE TABLE rechnungen (id INTEGER PRIMARY KEY, nr TEXT, kunde INTEGER, betrag INTEGER)")
+DB_EXEC(db, "INSERT INTO kunden (name, ort) VALUES ('Anna', 'Bonn'), ('Bert', 'Köln')")
+DB_EXEC(db, "INSERT INTO rechnungen (nr, kunde, betrag) VALUES ('R1', 2, 100), ('R2', NULL, 200), ('R3', 9, 300), ('R4', 1, 400)")
+DB_CLOSE(db)
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"ort","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""}]},{"name":"rechnungen","spalten":[{"name":"nr","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"kunde","typ":"ganz","pflicht":false,"eindeutig":false,"vorgabe":"","verweis":"kunden"},{"name":"betrag","typ":"geld","pflicht":false,"eindeutig":false,"vorgabe":""}]}]}
+--- datei kern.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "db"
+IMPORT "{sammlung}/../../studio/sprache.dh"
+IMPORT "{sammlung}/../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../studio/modell.dh"
+IMPORT "{sammlung}/../../studio/projekt.dh"
+IMPORT "{sammlung}/../../studio/datenbank.dh"
+--- erwartet
+verweise kunde.name,kunde.ort
+mit nr,kunde,betrag,kunde.name,kunde.ort
+ohne bedarf []
+liste nr,kunde.name / text,text
+(SELECT q.*, j0."name" AS "kunde.name", j0."ort" AS "kunde.ort" FROM "rechnungen" AS q LEFT JOIN "kunden" AS j0 ON j0.id = q."kunde")
+  1 R1 [Bert] [Köln]
+  2 R2 [] []
+  3 R3 [] []
+  4 R4 [Anna] [Bonn]
+filter []
+falsch TRUE
+tippfehler [Die Spalte kunde.ortt gibt es in der Quelle nicht.]
+text []
+
+=== das erzeugte fenster zeigt, sortiert und sucht ueber den verweis
+' Die Tabelle zeigt nr, kunde.name und betrag (Geld), sortiert absteigend
+' nach dem Namen des Kunden; die Bedingung nennt den Ort des Kunden. Tippt
+' man in das Suchfeld, sucht die Liste auch im Namen des Kunden.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(200)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "40")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "ausgabe ")
+    IF INSTR(z, "▶") < 0 AND INSTR(z, "■") < 0 AND INSTR(z, "WARNING") < 0 THEN PRINT z
+NEXT
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT, ort TEXT)")
+DB_EXEC(db, "CREATE TABLE rechnungen (id INTEGER PRIMARY KEY, nr TEXT, kunde INTEGER, betrag INTEGER)")
+DB_EXEC(db, "INSERT INTO kunden (name, ort) VALUES ('Anna', 'Bonn'), ('Bert', 'Köln'), ('Cora', 'Köln')")
+DB_EXEC(db, "INSERT INTO rechnungen (nr, kunde, betrag) VALUES ('R1', 2, 1250), ('R2', 1, 200), ('R3', 3, 300), ('R4', NULL, 400)")
+DB_CLOSE(db)
+--- datei laeufer.dh
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":600,"h":400,"widgets":[{"kind":"textinput","name":"suche","x":10,"y":10,"w":200,"h":28},{"kind":"table","name":"liste","x":10,"y":50,"w":400,"h":200,"table":{"headers":["a"]},"studio_quelle":"Daten.rechnungen","studio_spalten":"nr;Kunde.Name;betrag","studio_sortieren":"kunde.name","studio_absteigend":true,"studio_filter":"\"kunde.ort\" = 'Köln' OR kunde IS NULL","studio_suchfeld":"suche"}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB ausgeben(was AS STRING)
+        DIM t AS STRING : t = was + " " + JOIN$(studioQuelleSpalten, ",") + ":"
+        DIM i AS INTEGER
+        FOR i = 0 TO GUI_TABLE_ROW_COUNT(Self.liste) - 1
+            t = t + " " + GUI_TABLE_GET_CELL(Self.liste, i, 0) + "/" + GUI_TABLE_GET_CELL(Self.liste, i, 1) + "/" + GUI_TABLE_GET_CELL(Self.liste, i, 2) + "=" + STR$(Self.studioIds_liste[i])
+        NEXT
+        PRINT t
+    END SUB
+    SUB Geoeffnet()
+        Self.ausgeben("start")
+        GUI_SET_TEXT(Self.suche, "cor")
+        Self.Neuladen()
+        Self.ausgeben("suche")
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"ort","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""}]},{"name":"rechnungen","spalten":[{"name":"nr","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"kunde","typ":"ganz","pflicht":false,"eindeutig":false,"vorgabe":"","verweis":"kunden"},{"name":"betrag","typ":"geld","pflicht":false,"eindeutig":false,"vorgabe":""}]}]}
+--- erwartet
+ausgabe start nr,kunde.name,betrag: R3/Cora/3,00=3 R1/Bert/12,50=1 R4//4,00=4
+ausgabe suche nr,kunde.name,betrag: R3/Cora/3,00=3
+
+=== verweis-spalten im inspektor waehlen
+' Angezeigte Spalten "nr;Kunde.Name" (aus der Zwischenablage), dann
+' "Sortieren nach": die Auswahl bietet nach den eigenen Spalten auch
+' kunde.name und kunde.ort an (viermal nach unten = kunde.name). Der Kopf
+' der Tabelle im Entwurf zeigt die Spalten in der Schreibweise des Schemas.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM x AS INTEGER
+DIM y AS INTEGER
+slStarten(log, "", 8, p)
+(x, y) = slLage(log, "knoten Hauptfenster.liste")
+slHin(10, 10)
+slWarten(10)
+slKlick(x, y)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+DIM ax AS INTEGER
+DIM ay AS INTEGER
+DIM sx AS INTEGER
+DIM sy AS INTEGER
+DIM lx AS INTEGER
+DIM ly AS INTEGER
+(ax, ay) = slLage(log, "feld studio_spalten")
+(sx, sy) = slLage(log, "feld studio_sortieren")
+(lx, ly) = slLage(log, "knoten Hauptfenster.liste")
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(10)
+slKlick(lx, ly)
+slWarten(10)
+slKlick(ax, ay)
+slWarten(4)
+slMit([341], 86)
+slWarten(4)
+slKlick(lx, ly)
+slWarten(10)
+slKlick(sx, sy)
+slWarten(6)
+slTaste(264)
+slTaste(264)
+slTaste(264)
+slTaste(264)
+slTaste(257)
+slWarten(10)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_ABLAGE", "nr;Kunde.Name")
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+DIM j AS JSON_HANDLE : j = JSON_LOAD(p + "/Hauptfenster.dhform")
+PRINT "spalten "; JSON_GET_STRING(j, "widgets.0.studio_spalten")
+PRINT "kopf "; JSON_GET_STRING(j, "widgets.0.table.headers.0"); " "; JSON_GET_STRING(j, "widgets.0.table.headers.1"); " "; JSON_LEN(j, "widgets.0.table.headers")
+PRINT "sortieren "; JSON_GET_STRING(j, "widgets.0.studio_sortieren")
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "json"
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":600,"h":400,"widgets":[{"kind":"table","name":"liste","x":20,"y":20,"w":300,"h":200,"table":{"headers":["nr","kunde","betrag"]},"studio_quelle":"Daten.rechnungen"}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"ort","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""}]},{"name":"rechnungen","spalten":[{"name":"nr","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"kunde","typ":"ganz","pflicht":false,"eindeutig":false,"vorgabe":"","verweis":"kunden"},{"name":"betrag","typ":"geld","pflicht":false,"eindeutig":false,"vorgabe":""}]}]}
+--- erwartet
+spalten nr;Kunde.Name
+kopf nr kunde.name 2
+sortieren kunde.name

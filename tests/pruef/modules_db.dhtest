@@ -187,3 +187,33 @@ PRINT DB_NEXT(r)
 --- fehler
 DB: Result wurde bereits geschlossen
 
+
+=== get buffer reads a blob byte for byte
+' Bytes mit 00 und FF gehen als BUFFER hinein und kommen gleich heraus; Text
+' kommt als UTF-8, NULL leer, eine Zahl ist ein Fehler.
+IMPORT "db"
+DIM c AS DB_CONN
+c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, b BLOB, s TEXT, n INTEGER)")
+DIM b AS BUFFER : b = BUFFER_NEW(4)
+BUFFER_SET(b, 0, 0) : BUFFER_SET(b, 1, 255) : BUFFER_SET(b, 2, 7) : BUFFER_SET(b, 3, 0)
+DB_EXEC(c, "INSERT INTO t (b, s, n) VALUES (?, ?, ?)", b, "ä", 5)
+DB_EXEC(c, "INSERT INTO t (b, s, n) VALUES (NULL, NULL, 1)")
+DIM r AS DB_RESULT
+r = DB_QUERY(c, "SELECT b, s, n FROM t ORDER BY id")
+DB_NEXT(r)
+DIM g AS BUFFER : g = DB_GET_BUFFER(r, 0)
+PRINT BUFFER_LEN(g); " "; BUFFER_GET(g, 0); " "; BUFFER_GET(g, 1); " "; BUFFER_GET(g, 2); " "; BUFFER_GET(g, 3)
+PRINT BUFFER_LEN(DB_GET_BUFFER(r, 1))
+TRY
+    g = DB_GET_BUFFER(r, 2)
+CATCH e
+    PRINT e
+END TRY
+DB_NEXT(r)
+PRINT BUFFER_LEN(DB_GET_BUFFER(r, 0)); " "; BUFFER_LEN(DB_GET_BUFFER(r, 1))
+--- erwartet
+4 0 255 7 0
+2
+DB_GET_BUFFER: Spalte 2 ist eine Zahl, keine Bytes
+0 0

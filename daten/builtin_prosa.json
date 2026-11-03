@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2202,
+ "count": 2203,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -378,6 +378,7 @@
   "DB_COMMIT": "Transaktion beginnen, festschreiben, verwerfen",
   "DB_EXEC": "INTEGER (rowcount) SQL ohne Ergebnismenge (INSERT/UPDATE/DELETE/CREATE); Werte mit ? binden, liefert die Zahl betroffener Zeilen",
   "DB_GET_BOOL": "BOOLEAN — Spalte der aktuellen Zeile als Wahrheitswert lesen (0/1 in SQLite)",
+  "DB_GET_BUFFER": "BUFFER — Spalte der aktuellen Zeile als Bytes lesen (BLOB wie gespeichert, Text als UTF-8, NULL leer)",
   "DB_GET_FLOAT": "FLOAT — Spalte der aktuellen Zeile als Kommazahl lesen",
   "DB_GET_INT": "INTEGER — Spalte der aktuellen Zeile als ganze Zahl lesen",
   "DB_GET_STRING": "STRING — Spalte der aktuellen Zeile als Text lesen (Index ab 0)",

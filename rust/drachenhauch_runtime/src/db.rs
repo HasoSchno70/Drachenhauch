@@ -73,6 +73,17 @@ impl DbResult {
             DbVal::Blob(b) => String::from_utf8_lossy(b).into_owned(),
         })
     }
+    /// Die Spalte als Bytes: ein BLOB wie gespeichert, Text als UTF-8, NULL
+    /// leer. Eine Zahl ist hier ein Fehler -- wer sie als Bytes will, hat
+    /// sich in der Spalte vertan.
+    pub fn get_buffer(&self, idx: i64) -> Result<Vec<u8>, String> {
+        match self.cur_value(idx, "DB_GET_BUFFER")? {
+            DbVal::Null => Ok(Vec::new()),
+            DbVal::Blob(b) => Ok(b.clone()),
+            DbVal::Text(s) | DbVal::Zahl(s) => Ok(s.as_bytes().to_vec()),
+            DbVal::Int(_) | DbVal::Real(_) => Err(format!("DB_GET_BUFFER: Spalte {} ist eine Zahl, keine Bytes", idx)),
+        }
+    }
     pub fn get_int(&self, idx: i64) -> Result<i64, String> {
         match self.cur_value(idx, "DB_GET_INT")? {
             DbVal::Null => Ok(0),

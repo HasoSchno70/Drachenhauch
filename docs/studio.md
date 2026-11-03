@@ -37,7 +37,7 @@ ein Debugger. Dazu eigene Controls und Datenbanken im Projekt.
 | Navigator (links oben) | das Projekt als Baum: App, Fenster mit ihren Controls und Ereignissen, Module, Klassen, ihre Methoden und Eigenschaften; ein Klick öffnet |
 | Bibliothek (links unten) | alle Bausteine der gui in Gruppen, mit Vorschau; Suchfeld darüber |
 | Mitte | Reiter mit Kreuz: je Fenster das Layout, je Methode ihr Code, je Element seine Eigenschaften |
-| Inspektor (rechts) | die Eigenschaften des gewählten Controls, ohne Auswahl die des Fensters |
+| Inspektor (rechts) | die Eigenschaften des gewählten Controls, ohne Auswahl die des Fensters; ist der Reiter eines anderen Elements vorn (Datenbank, Modul), nur dessen Name und Art |
 | Statusleiste | Meldung, Name, Lage und Größe des gewählten Controls, Zoom (Klick: 100 %) |
 
 Die Leisten lassen sich wie in der IDE verschieben, als Reiter stapeln und
@@ -412,6 +412,7 @@ Umbenennen und Löschen, rechts entweder ihre **Spalten** oder ihre
 | Geld | INTEGER in Cent | `19,99` (steht als 1999 in der Datei) |
 | Datum | TEXT | `2026-11-03` |
 | Ja/Nein | INTEGER 0/1 | `ja`/`nein` |
+| Bild | BLOB (die Bytes der Bilddatei) | mit **Bild …** aus einer Datei |
 
 Jede Tabelle hat die Spalte `id INTEGER PRIMARY KEY` von selbst -- die
 Datenbindung (`GUI_FORM_LOAD`/`GUI_FORM_SAVE`) braucht genau sie. Im
@@ -441,9 +442,12 @@ Aus dem Studio gestartet (F5) arbeitet das Programm auf der Datei im
 Projektordner -- was es schreibt, steht danach im Daten-Gitter. Bauen legt
 die Datei neben das gebaute Programm, wenn dort noch keine liegt; eine, in
 der schon gearbeitet wurde, bleibt. Das gebaute Programm legt fehlende
-Tabellen, Spalten und Indexe selbst an, umbenennen und löschen tut es dort
-nicht. Das Element zu löschen nimmt nur den Aufbau aus dem Projekt; die
-Datei mit den Daten bleibt liegen.
+Tabellen, Spalten und Indexe selbst an und benennt um, was im Studio
+umbenannt wurde -- der Reihe nach, solange es dort den alten Namen noch
+gibt und den neuen nicht (eine Umbenennung nur in Groß/klein zählt nicht,
+SQLite sieht darin denselben Namen). Gelöschtes lässt es stehen. Das
+Element zu löschen nimmt nur den Aufbau aus dem Projekt; die Datei mit den
+Daten bleibt liegen.
 
 **Fenster an eine Tabelle binden.** Im Navigator stehen unter jeder Tabelle
 ihre Spalten. Eine Spalte oder die ganze Tabelle ins offene Fenster gezogen
@@ -478,6 +482,52 @@ END SUB
 SUB knopfSichern_Klick()
     IF NOT Self.Sichern() THEN Meldung("Bitte die Eingaben prüfen.")
 END SUB
+```
+
+**Verweise.** Im Spalten-Gitter nennt **Verweis auf** eine andere Tabelle
+derselben Datenbank: die Spalte hält dann die id einer ihrer Zeilen (sie
+wird eine ganze Zahl). Ins Fenster gezogen wird eine solche Spalte eine
+Klappliste, die die erste Textspalte der Zieltabelle zeigt und die id
+bindet. In den **Angezeigten Spalten** einer Liste darf auch eine Spalte der
+Zieltabelle stehen: `nr;kunde.name` zeigt neben der Nummer den Namen des
+Kunden, dessen id in `kunde` steht. Das Studio legt dafür einen LEFT JOIN um
+die Tabelle (eine Zeile ohne Kunden bleibt, mit leerem Namen); die Spalte
+heißt im Ergebnis `kunde.name`, und unter diesem Namen kennen sie auch
+**Sortieren nach**, die **Bedingung** (`"kunde.ort" = 'Köln'`) und das
+Suchfeld.
+
+**Bilder.** Eine Spalte der Art **Bild** hält die Bytes einer Bilddatei
+(PNG, JPG, BMP oder GIF). Im Daten-Gitter steht ihre Größe; **Bild …** setzt
+das Bild der gewählten Zelle aus einer Datei, Entf macht sie leer. Ins
+Fenster gezogen wird eine Bildspalte ein Bild-Control an dieser Spalte
+(Inspektor: **Bildspalte**; sie hängt nicht an der Bindung des Formulars).
+Es zeigt das Bild mit `Laden(id)`; `BildSetzen(control, pfad)` und
+`BildLeeren(control)` ändern es, und mit `Sichern()` kommt es in die Datei.
+Eine Tabelle mit Datenquelle zeigt eine Bildspalte als Bild in der Zelle.
+
+**Bedingung, Sortierung, Suche.** Eine Liste mit Datenquelle hat im
+Inspektor dazu **Sortieren nach** (eine Spalte der Quelle) samt
+**Absteigend**, eine **Bedingung** (SQL wie hinter WHERE, etwa
+`ort <> 'Bonn'`; das Studio probiert sie an der Datei im Projektordner und
+zeigt einen Fehler am Feld -- auch einen Namen in doppelten
+Anführungszeichen, den es in der Quelle nicht gibt: SQLite nähme ihn sonst
+still als Text, und die Liste bliebe leer) und ein **Suchfeld** (ein Textfeld des Fensters:
+sobald darin getippt wird, zeigt die Liste nur Zeilen, in deren angezeigten
+Spalten der Text vorkommt).
+
+**Abfragen.** [Abfrage …] im Reiter der Datenbank legt ein benanntes SELECT
+an; links stehen die Abfragen unter den Tabellen, rechts ihr SQL und das
+Ergebnis (die ersten 1000 Zeilen). Gesichert wird ein SQL erst, wenn es an
+der Datei geht -- sonst bleibt der Stand davor. Eine Abfrage ist eine
+Datenquelle wie eine Tabelle (mit einer Spalte `id` liefert `IdVon` sie, sonst
+0); aus dem Navigator ins Fenster gezogen wird sie eine Tabelle. Im Code läuft
+sie über ihren Namen, auch mit dem der Datenbank davor:
+
+```text
+DIM r AS DB_RESULT : r = Abfrage("koelner")
+WHILE DB_NEXT(r)
+    PRINT DB_GET_STRING(r, 1)
+WEND
 ```
 
 ## Ein einzelnes Fenster
@@ -534,6 +584,7 @@ geerbte mit einer anderen Zahl von Parametern überschreibt.
 | `DH_STUDIO_KONFIG=datei` | `studio.json` an diesem Ort; die `ide.json` wird dann nicht gefragt |
 | `DH_STUDIO_SPRACHPROBE=1` | öffnet jeden Dialog einmal, schreibt seine Texte und die Zahl fehlender Übersetzungen ins Protokoll und endet |
 | `DH_STUDIO_LOESCHEN=element` | fragt beim Start wie „Element löschen …“ für dieses Element |
+| `DH_STUDIO_TEMPO=1` | schreibt (mit `DH_STUDIO_LOG`) je Bild `tempo <ms>`: wie lange das Studio gerechnet hat, ohne das Warten auf das nächste Bild |
 | `DH_STUDIO_OEFFNEN=element[.tabelle]` | öffnet beim Start ein Element wie ein Klick im Navigator (bei einer Datenbank auf Wunsch eine Tabelle) |
 
 Die Prüfsammlungen `tests/pruef/werkzeug_studio.dhtest` (Stufe 1) und
@@ -550,4 +601,10 @@ Kern ohne Fenster (an der Datei, wie SQLite sie sieht), das erzeugte
 Programm an einer älteren Datei und das Studio mit echten Klicks in beide
 Gitter, F5 und Bauen; `tests/pruef/werkzeug_studio_datenbank2.dhtest` die
 Bindung: Methoden und Listen im erzeugten Fenster samt Klick auf eine Zeile,
-Spalten ins Fenster ziehen und doppelklicken, die Auswahlen im Inspektor.
+Spalten ins Fenster ziehen und doppelklicken, die Auswahlen im Inspektor;
+`tests/pruef/werkzeug_studio_datenbank3.dhtest` Verweise, Bedingung,
+Sortierung, Suchfeld und Abfragen: den Kern, das erzeugte Fenster und das
+Studio mit echten Klicks im Reiter, im Navigator und im Inspektor;
+`tests/pruef/werkzeug_studio_datenbank4.dhtest` Bildspalten (Kern, erzeugtes
+Fenster samt Bild in der Tabellenzelle, „Bild …“ und Ziehen im Studio) und
+`tests/pruef/werkzeug_studio_verbunde.dhtest` Verbunde über Verweise.

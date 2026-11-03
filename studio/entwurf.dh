@@ -551,10 +551,31 @@ END SUB
 DIM zielWert AS ARRAY OF INTEGER : zielWert = []
 DIM zielArt AS ARRAY OF INTEGER : zielArt = []
 DIM zielVon AS ARRAY OF INTEGER : zielVon = []     ' Control oder -1 (Fenster)
+' Gesammelt wird nur waehrend eines Zugs (Maustaste unten), und dabei bewegt
+' sich nur die Auswahl, die selbst kein Ziel ist -- also je Zug und Achse
+' einmal. Ein grosses Fenster las sonst in jedem Bild alle Lagen aus dem JSON.
+DIM zielZug AS INTEGER : zielZug = 0
+DIM zielStandX AS STRING : zielStandX = ""
+DIM zielStandY AS STRING : zielStandY = ""
+DIM zielWx AS ARRAY OF INTEGER : zielWx = []
+DIM zielAx AS ARRAY OF INTEGER : zielAx = []
+DIM zielVx AS ARRAY OF INTEGER : zielVx = []
+DIM zielWy AS ARRAY OF INTEGER : zielWy = []
+DIM zielAy AS ARRAY OF INTEGER : zielAy = []
+DIM zielVy AS ARRAY OF INTEGER : zielVy = []
 
 SUB zieleSammeln(senkrecht AS BOOLEAN)
-    zielWert = [] : zielArt = [] : zielVon = []
     DIM groesse AS INTEGER : groesse = IIF(senkrecht, fensterH(), fensterB())
+    DIM stand AS STRING : stand = STR$(zielZug) + ":" + STR$(groesse) + ":" + STR$(anzahl()) + ":" + JOIN$(gewaehlt, ",")
+    IF senkrecht AND stand = zielStandY THEN
+        zielWert = zielWy : zielArt = zielAy : zielVon = zielVy
+        RETURN
+    END IF
+    IF NOT senkrecht AND stand = zielStandX THEN
+        zielWert = zielWx : zielArt = zielAx : zielVon = zielVx
+        RETURN
+    END IF
+    zielWert = [] : zielArt = [] : zielVon = []
     DIM v AS INTEGER
     FOR EACH v IN [0, groesse, groesse \ 2]
         ARRAY_PUSH(zielWert, v) : ARRAY_PUSH(zielArt, 0) : ARRAY_PUSH(zielVon, -1)
@@ -577,6 +598,11 @@ SUB zieleSammeln(senkrecht AS BOOLEAN)
         ARRAY_PUSH(zielWert, a + l + ABSTAND_NACHBAR) : ARRAY_PUSH(zielArt, 1) : ARRAY_PUSH(zielVon, i)
         ARRAY_PUSH(zielWert, a - ABSTAND_NACHBAR) : ARRAY_PUSH(zielArt, 2) : ARRAY_PUSH(zielVon, i)
     NEXT
+    IF senkrecht THEN
+        zielWy = zielWert : zielAy = zielArt : zielVy = zielVon : zielStandY = stand
+    ELSE
+        zielWx = zielWert : zielAx = zielArt : zielVx = zielVon : zielStandX = stand
+    END IF
 END SUB
 
 ' Die beste Verschiebung, damit eine der Kanten (anfang, mitte, ende) eines
@@ -850,6 +876,7 @@ SUB mausAufEntwurf()
             END IF
         END IF
         startMx = mausFx : startMy = mausFy
+        zielZug = zielZug + 1
         bewegt = FALSE
         kindZug = (modus = 1) AND auswahlVerwaltet()
         zielL = -1
@@ -1497,9 +1524,15 @@ SUB entwurfZeichnen()
     ELSEIF modus <> 1 THEN
         zielL = -1
     END IF
+    ' Die Arten einmal je Bild -- die drei Schleifen unten fragten sie sonst
+    ' je Control dreimal aus dem JSON.
+    DIM arten AS ARRAY OF STRING : arten = []
     DIM li AS INTEGER
     FOR li = 0 TO anzahl() - 1
-        IF NOT istLayout(li) THEN CONTINUE
+        ARRAY_PUSH(arten, feldText$(li, "kind"))
+    NEXT
+    FOR li = 0 TO LEN(arten) - 1
+        IF arten[li] <> "layout" THEN CONTINUE
         DIM lw AS GUI_WIDGET : lw = IIF(frm >= 0, GUI_WINDOW_WIDGET(frm, li), -1)
         DIM zeigen AS BOOLEAN : zeigen = TRUE
         IF lw >= 0 THEN zeigen = GUI_VISIBLE(lw)
@@ -1527,8 +1560,8 @@ SUB entwurfZeichnen()
     NEXT
     ' Die eigenen Controls: wie weit eine Instanz reicht -- ihr Behaelter
     ' zeichnet nichts. Fehlt ihr Control im Projekt, steht das darin.
-    FOR li = 0 TO anzahl() - 1
-        IF feldText$(li, "kind") <> "studio_control" THEN CONTINUE
+    FOR li = 0 TO LEN(arten) - 1
+        IF arten[li] <> "studio_control" THEN CONTINUE
         DIM cx AS INTEGER
         DIM cy AS INTEGER
         DIM cb AS INTEGER
@@ -1550,8 +1583,8 @@ SUB entwurfZeichnen()
         END IF
     NEXT
     ' Die Abstandhalter jedes Layouts.
-    FOR li = 0 TO anzahl() - 1
-        IF NOT istLayout(li) THEN CONTINUE
+    FOR li = 0 TO LEN(arten) - 1
+        IF arten[li] <> "layout" THEN CONTINUE
         DIM ak AS ARRAY OF INTEGER : ak = kinderListe(li)
         DIM ai AS INTEGER
         FOR ai = 0 TO LEN(ak) - 1

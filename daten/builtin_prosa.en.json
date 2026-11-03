@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2197,
+ "count": 2198,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -378,6 +378,7 @@
   "DB_COMMIT": "begin, commit, roll back a transaction",
   "DB_EXEC": "INTEGER (rowcount) SQL without a result set (INSERT/UPDATE/DELETE/CREATE); bind values with ?, returns the number of affected rows",
   "DB_GET_BOOL": "BOOLEAN — read a column of the current row as a truth value (0/1 in SQLite)",
+  "DB_GET_BUFFER": "BUFFER — read a column of the current row as bytes (a BLOB as stored, text as UTF-8, NULL empty)",
   "DB_GET_FLOAT": "FLOAT — read a column of the current row as a floating-point number",
   "DB_GET_INT": "INTEGER — read a column of the current row as an integer",
   "DB_GET_STRING": "STRING — read a column of the current row as text (index from 0)",

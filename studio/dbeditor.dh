@@ -30,6 +30,15 @@ CLASS DbAnsicht
     DIM btZeNeu AS GUI_WIDGET
     DIM btZeWeg AS GUI_WIDGET
     DIM btNeuLaden AS GUI_WIDGET
+    DIM btBild AS GUI_WIDGET
+    DIM btAbfNeu AS GUI_WIDGET
+    DIM taSql AS GUI_WIDGET
+    DIM btAusfuehren AS GUI_WIDGET
+    DIM gitErg AS GUI_WIDGET
+    DIM eintraege AS ARRAY OF STRING   ' je Zeile der Liste links: der Name ("" = Kopf)
+    DIM eintragAbf AS ARRAY OF BOOLEAN
+    DIM abfrage AS STRING              ' gewaehlte Abfrage ("" = eine Tabelle ist gewaehlt)
+    DIM sqlVersucht AS STRING
     DIM seite AS INTEGER
     DIM tabelle AS STRING
     DIM modus AS STRING            ' spalten, daten
@@ -66,7 +75,10 @@ FUNCTION dbReiterNeu(e AS Element) AS INTEGER
     a.seite = k
     a.modus = "spalten"
     a.tabelle = ""
+    a.abfrage = ""
+    a.sqlVersucht = ""
     a.spStand = [] : a.daStand = [] : a.daIds = [] : a.daSpalten = []
+    a.eintraege = [] : a.eintragAbf = []
     a.kopf = dbDazu(r, GUI_LABEL(win, trf$("Datenbank {0}", [e.name]), 0, 0))
     GUI_ADD_CLASS(a.kopf, "codekopf")
     a.dateiText = dbDazu(r, GUI_LABEL(win, tr$("Datei:"), 0, 0))
@@ -76,15 +88,16 @@ FUNCTION dbReiterNeu(e AS Element) AS INTEGER
     GUI_SET_TEXT(a.tfDatei, a.dateiStand)
     GUI_TOOLTIP(a.tfDatei, tr$("Die SQLite-Datei mit den Daten -- im Projektordner, und neben dem gebauten Programm."))
     a.lstTab = dbDazu(r, GUI_LISTBOX(win, 0, 0, 200, 200, []))
-    GUI_LISTBOX_PLACEHOLDER(a.lstTab, tr$("Noch keine Tabelle -- „Neu …“ legt eine an."))
-    a.btTabNeu = dbKnopf(r, tr$("Neu …"))
+    GUI_LISTBOX_PLACEHOLDER(a.lstTab, tr$("Noch keine Tabelle -- „Tabelle …“ legt eine an."))
+    a.btTabNeu = dbKnopf(r, tr$("Tabelle …"))
+    a.btAbfNeu = dbKnopf(r, tr$("Abfrage …"))
     a.btTabUm = dbKnopf(r, tr$("Umbenennen …"))
     a.btTabWeg = dbKnopf(r, tr$("Löschen …"))
     a.btSpalten = dbKnopf(r, tr$("Spalten"))
     a.btDaten = dbKnopf(r, tr$("Daten"))
     a.hinweis = dbDazu(r, GUI_LABEL(win, "", 0, 0))
     GUI_ADD_CLASS(a.hinweis, "leise")
-    a.gitSp = dbDazu(r, GUI_GRID(win, 0, 0, 300, 200, [tr$("Name"), tr$("Art"), tr$("Pflicht"), tr$("Eindeutig"), tr$("Vorgabe")]))
+    a.gitSp = dbDazu(r, GUI_GRID(win, 0, 0, 300, 200, [tr$("Name"), tr$("Art"), tr$("Pflicht"), tr$("Eindeutig"), tr$("Vorgabe"), tr$("Verweis auf")]))
     DIM namen AS ARRAY OF STRING : namen = []
     DIM t AS STRING
     FOR EACH t IN dbTypen()
@@ -100,6 +113,13 @@ FUNCTION dbReiterNeu(e AS Element) AS INTEGER
     a.btZeNeu = dbKnopf(r, tr$("Zeile hinzufügen"))
     a.btZeWeg = dbKnopf(r, tr$("Zeile löschen"))
     a.btNeuLaden = dbKnopf(r, tr$("Neu laden"))
+    a.btBild = dbKnopf(r, tr$("Bild …"))
+    GUI_TOOLTIP(a.btBild, tr$("Ein Bild aus einer Datei in die gewählte Zelle einer Bildspalte"))
+    a.taSql = dbDazu(r, GUI_TEXTAREA(win, 0, 0, 300, 120, "SELECT ..."))
+    feldEinrichten(a.taSql)
+    a.btAusfuehren = dbKnopf(r, tr$("Ausführen"))
+    GUI_BUTTON_VARIANT(a.btAusfuehren, "primaer")
+    a.gitErg = dbDazu(r, GUI_TABLE(win, 0, 0, 300, 200))
     dbTabellenFuellen(r)
     dbLegen(r)
     RETURN k
@@ -116,10 +136,13 @@ SUB dbLegen(r AS Reiter)
     GUI_SET_BOUNDS(a.tfDatei, x0 + b - 270, y0, 270, 26)
     DIM y1 AS INTEGER : y1 = y0 + 36
     DIM unten AS INTEGER : unten = y0 + h - 28
-    GUI_SET_BOUNDS(a.lstTab, x0, y1, 290, unten - y1 - 8)
-    GUI_SET_BOUNDS(a.btTabNeu, x0, unten, 66, 28)
-    GUI_SET_BOUNDS(a.btTabUm, x0 + 70, unten, 130, 28)
-    GUI_SET_BOUNDS(a.btTabWeg, x0 + 204, unten, 86, 28)
+    ' Links zwei Reihen Knoepfe: anlegen (Tabelle, Abfrage), dann umbenennen
+    ' und loeschen -- fuer das, was gewaehlt ist.
+    GUI_SET_BOUNDS(a.lstTab, x0, y1, 290, unten - y1 - 42)
+    GUI_SET_BOUNDS(a.btTabNeu, x0, unten - 34, 143, 28)
+    GUI_SET_BOUNDS(a.btAbfNeu, x0 + 147, unten - 34, 143, 28)
+    GUI_SET_BOUNDS(a.btTabUm, x0, unten, 143, 28)
+    GUI_SET_BOUNDS(a.btTabWeg, x0 + 147, unten, 143, 28)
     DIM rx AS INTEGER : rx = x0 + 302
     DIM rb AS INTEGER : rb = b - 302
     GUI_SET_BOUNDS(a.btSpalten, rx, y1, 96, 28)
@@ -133,17 +156,23 @@ SUB dbLegen(r AS Reiter)
     GUI_SET_BOUNDS(a.btZeNeu, rx, unten, 140, 28)
     GUI_SET_BOUNDS(a.btZeWeg, rx + 144, unten, 120, 28)
     GUI_SET_BOUNDS(a.btNeuLaden, rx + 268, unten, 100, 28)
+    GUI_SET_BOUNDS(a.btBild, rx + 372, unten, 90, 28)
+    ' Eine Abfrage: oben das SQL, darunter Ausfuehren und das Ergebnis.
+    GUI_SET_BOUNDS(a.taSql, rx, y1, rb, 150)
+    GUI_SET_BOUNDS(a.btAusfuehren, rx, y1 + 158, 130, 28)
+    GUI_SET_BOUNDS(a.gitErg, rx, y1 + 194, rb, unten + 28 - y1 - 194)
     dbModusZeigen(r)
 END SUB
 
 ' Die Spalten des Spalten-Gitters: fest bis auf die Vorgabe, die den Rest nimmt.
 FUNCTION dbSpBreiten(rb AS INTEGER) AS ARRAY OF INTEGER
-    DIM v AS INTEGER : v = MAX(400, rb - 2 - 12)
-    DIM n AS INTEGER : n = v * 28 \ 100
-    DIM t AS INTEGER : t = v * 22 \ 100
-    DIM p AS INTEGER : p = v * 13 \ 100
-    DIM e AS INTEGER : e = v * 15 \ 100
-    RETURN [n, t, p, e, v - n - t - p - e]
+    DIM v AS INTEGER : v = MAX(460, rb - 2 - 12)
+    DIM n AS INTEGER : n = v * 22 \ 100
+    DIM t AS INTEGER : t = v * 17 \ 100
+    DIM p AS INTEGER : p = v * 11 \ 100
+    DIM e AS INTEGER : e = v * 13 \ 100
+    DIM g AS INTEGER : g = v * 17 \ 100
+    RETURN [n, t, p, e, g, v - n - t - p - e - g]
 END FUNCTION
 
 ' Die Spalten des Daten-Gitters: id schmal, der Rest zu gleichen Teilen.
@@ -165,7 +194,9 @@ SUB dbLagen(r AS Reiter)
     dbLage("spalten", a.btSpalten) : dbLage("daten", a.btDaten)
     dbLage("spneu", a.btSpNeu) : dbLage("spweg", a.btSpWeg)
     dbLage("zeneu", a.btZeNeu) : dbLage("zeweg", a.btZeWeg) : dbLage("neuladen", a.btNeuLaden)
+    dbLage("bild", a.btBild)
     dbLage("datei", a.tfDatei)
+    dbLage("abfneu", a.btAbfNeu) : dbLage("ausfuehren", a.btAusfuehren) : dbLage("sql", a.taSql)
     DIM i AS INTEGER
     FOR i = 0 TO GUI_LISTBOX_COUNT(a.lstTab) - 1
         DIM x AS INTEGER
@@ -199,19 +230,27 @@ END SUB
 
 SUB dbModusZeigen(r AS Reiter)
     DIM a AS DbAnsicht : a = r.db
-    DIM sp AS BOOLEAN : sp = a.modus = "spalten"
+    DIM abf AS BOOLEAN : abf = a.abfrage <> ""
+    DIM sp AS BOOLEAN : sp = a.modus = "spalten" AND NOT abf
+    DIM da AS BOOLEAN : da = a.modus <> "spalten" AND NOT abf
     DIM hat AS BOOLEAN : hat = a.tabelle <> ""
     GUI_SET_VISIBLE(a.gitSp, sp)
-    IF a.gitDa >= 0 THEN GUI_SET_VISIBLE(a.gitDa, NOT sp)
+    IF a.gitDa >= 0 THEN GUI_SET_VISIBLE(a.gitDa, da)
     GUI_SET_VISIBLE(a.btSpNeu, sp)
     GUI_SET_VISIBLE(a.btSpWeg, sp)
-    GUI_SET_VISIBLE(a.btZeNeu, NOT sp)
-    GUI_SET_VISIBLE(a.btZeWeg, NOT sp)
-    GUI_SET_VISIBLE(a.btNeuLaden, NOT sp)
+    GUI_SET_VISIBLE(a.btZeNeu, da)
+    GUI_SET_VISIBLE(a.btZeWeg, da)
+    GUI_SET_VISIBLE(a.btNeuLaden, da)
+    GUI_SET_VISIBLE(a.btBild, da AND dbHatBildspalte(r))
+    GUI_SET_VISIBLE(a.btSpalten, NOT abf)
+    GUI_SET_VISIBLE(a.btDaten, NOT abf)
+    GUI_SET_VISIBLE(a.taSql, abf)
+    GUI_SET_VISIBLE(a.btAusfuehren, abf)
+    GUI_SET_VISIBLE(a.gitErg, abf)
     GUI_BUTTON_VARIANT(a.btSpalten, IIF(sp, "primaer", "standard"))
     GUI_BUTTON_VARIANT(a.btDaten, IIF(sp, "standard", "primaer"))
-    GUI_SET_ENABLED(a.btTabUm, hat)
-    GUI_SET_ENABLED(a.btTabWeg, hat)
+    GUI_SET_ENABLED(a.btTabUm, hat OR abf)
+    GUI_SET_ENABLED(a.btTabWeg, hat OR abf)
     GUI_SET_ENABLED(a.btSpNeu, hat)
     GUI_SET_ENABLED(a.btSpWeg, hat)
     GUI_SET_ENABLED(a.btZeNeu, hat AND projOrdner <> "")
@@ -226,7 +265,8 @@ SUB dbWidgetsWeg(r AS Reiter)
     GUI_DESTROY(a.btTabWeg) : GUI_DESTROY(a.btSpalten) : GUI_DESTROY(a.btDaten)
     GUI_DESTROY(a.hinweis) : GUI_DESTROY(a.gitSp) : GUI_DESTROY(a.btSpNeu)
     GUI_DESTROY(a.btSpWeg) : GUI_DESTROY(a.btZeNeu) : GUI_DESTROY(a.btZeWeg)
-    GUI_DESTROY(a.btNeuLaden)
+    GUI_DESTROY(a.btNeuLaden) : GUI_DESTROY(a.btAbfNeu) : GUI_DESTROY(a.taSql)
+    GUI_DESTROY(a.btAusfuehren) : GUI_DESTROY(a.gitErg)
     IF a.gitDa >= 0 THEN GUI_DESTROY(a.gitDa)
 END SUB
 
@@ -240,31 +280,134 @@ SUB dbOeffnen(e AS Element, tabelle AS STRING)
     protokoll("datenbank " + e.name + IIF(tabelle <> "", " " + tabelle, ""))
 END SUB
 
+' Die Liste links: die Tabellen, darunter (unter einem Kopf) die Abfragen.
 SUB dbTabellenFuellen(r AS Reiter)
     DIM a AS DbAnsicht : a = r.db
-    DIM namen AS ARRAY OF STRING : namen = dbTabellenNamen(r.el)
-    GUI_SET_LISTBOX(a.lstTab, namen)
-    IF dbListenIndex(namen, a.tabelle) < 0 THEN a.tabelle = IIF(LEN(namen) > 0, namen[0], "")
-    IF a.tabelle <> "" THEN GUI_LISTBOX_SET_SELECTED(a.lstTab, dbListenIndex(namen, a.tabelle))
+    DIM tn AS ARRAY OF STRING : tn = dbTabellenNamen(r.el)
+    DIM an AS ARRAY OF STRING : an = dbAbfrageNamen(r.el)
+    a.eintraege = [] : a.eintragAbf = []
+    GUI_LISTBOX_CLEAR(a.lstTab)
+    DIM n AS STRING
+    FOR EACH n IN tn
+        GUI_LISTBOX_ADD(a.lstTab, n)
+        ARRAY_PUSH(a.eintraege, n) : ARRAY_PUSH(a.eintragAbf, FALSE)
+    NEXT
+    IF LEN(an) > 0 THEN
+        GUI_LISTBOX_ADD(a.lstTab, tr$("Abfragen"))
+        GUI_LISTBOX_HEADER(a.lstTab, LEN(a.eintraege), TRUE)
+        ARRAY_PUSH(a.eintraege, "") : ARRAY_PUSH(a.eintragAbf, FALSE)
+        FOR EACH n IN an
+            GUI_LISTBOX_ADD(a.lstTab, n)
+            ARRAY_PUSH(a.eintraege, n) : ARRAY_PUSH(a.eintragAbf, TRUE)
+        NEXT
+    END IF
+    IF a.abfrage <> "" AND dbListenIndex(an, a.abfrage) < 0 THEN a.abfrage = ""
+    IF a.abfrage = "" AND dbListenIndex(tn, a.tabelle) < 0 THEN a.tabelle = IIF(LEN(tn) > 0, tn[0], "")
+    IF a.abfrage <> "" THEN a.tabelle = ""
+    DIM w AS INTEGER : w = dbEintragZeile(a, IIF(a.abfrage <> "", a.abfrage, a.tabelle), a.abfrage <> "")
+    IF w >= 0 THEN GUI_LISTBOX_SET_SELECTED(a.lstTab, w)
     dbSpaltenFuellen(r)
     dbDatenFuellen(r)
+    dbAbfrageZeigen(r)
     dbModusZeigen(r)
 END SUB
 
-SUB dbTabelleWaehlen(r AS Reiter, tabelle AS STRING)
-    DIM namen AS ARRAY OF STRING : namen = dbTabellenNamen(r.el)
-    DIM i AS INTEGER : i = dbListenIndex(namen, tabelle)
-    IF i < 0 THEN RETURN
-    r.db.tabelle = namen[i]
-    GUI_LISTBOX_SET_SELECTED(r.db.lstTab, i)
+FUNCTION dbEintragZeile(a AS DbAnsicht, name AS STRING, abf AS BOOLEAN) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(a.eintraege) - 1
+        IF a.eintragAbf[i] = abf AND LOWER$(a.eintraege[i]) = LOWER$(name) AND name <> "" THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Eine Tabelle oder Abfrage nach ihrem Namen waehlen.
+SUB dbTabelleWaehlen(r AS Reiter, name AS STRING)
+    DIM a AS DbAnsicht : a = r.db
+    DIM s AS JSON_HANDLE : s = dbSchema(r.el)
+    DIM t AS INTEGER : t = dbTabIndex(s, name)
+    DIM q AS INTEGER : q = dbAbfIndex(s, name)
+    IF t < 0 AND q < 0 THEN RETURN
+    IF t >= 0 THEN
+        a.tabelle = dbTabName$(s, t) : a.abfrage = ""
+    ELSE
+        a.abfrage = dbAbfName$(s, q) : a.tabelle = ""
+    END IF
+    DIM w AS INTEGER : w = dbEintragZeile(a, IIF(t >= 0, a.tabelle, a.abfrage), t < 0)
+    IF w >= 0 THEN GUI_LISTBOX_SET_SELECTED(a.lstTab, w)
     dbSpaltenFuellen(r)
     dbDatenFuellen(r)
+    dbAbfrageZeigen(r)
     dbModusZeigen(r)
+END SUB
+
+' --- Abfragen --------------------------------------------------------------------
+' Das SQL der gewaehlten Abfrage ins Feld, ihr Ergebnis ins Gitter.
+SUB dbAbfrageZeigen(r AS Reiter)
+    DIM a AS DbAnsicht : a = r.db
+    IF a.abfrage = "" THEN RETURN
+    DIM s AS JSON_HANDLE : s = dbSchema(r.el)
+    DIM q AS INTEGER : q = dbAbfIndex(s, a.abfrage)
+    IF q < 0 THEN RETURN
+    GUI_SET_TEXT(a.taSql, dbAbfSql$(s, q))
+    a.sqlVersucht = dbAbfSql$(s, q)
+    dbErgebnisZeigen(r, dbAbfSql$(s, q))
+END SUB
+
+SUB dbErgebnisZeigen(r AS Reiter, sql AS STRING)
+    DIM a AS DbAnsicht : a = r.db
+    DIM fehler AS STRING : fehler = dbAbfrageTesten$(r.el, sql, DB_ZEILEN_GRENZE)
+    GUI_TABLE_CLEAR(a.gitErg)
+    DIM kopf AS ARRAY OF STRING : kopf = dbErgSpalten
+    IF LEN(kopf) = 0 THEN kopf = [""]
+    GUI_TABLE_HEADERS(a.gitErg, kopf)
+    DIM n AS INTEGER : n = LEN(dbErgSpalten)
+    DIM z AS INTEGER
+    FOR z = 0 TO dbErgZeilen - 1
+        DIM zellen AS ARRAY OF STRING : zellen = []
+        DIM k AS INTEGER
+        FOR k = 0 TO n - 1
+            ARRAY_PUSH(zellen, dbErgZellen[z * n + k])
+        NEXT
+        GUI_TABLE_ADD_ROW(a.gitErg, zellen)
+    NEXT
+    IF fehler <> "" THEN
+        GUI_TABLE_PLACEHOLDER(a.gitErg, fehler)
+        GUI_SET_TEXT(a.hinweis, tr$("Nicht ausführbar -- gesichert ist der Stand davor."))
+    ELSEIF projOrdner = "" THEN
+        GUI_TABLE_PLACEHOLDER(a.gitErg, tr$("Erst das Projekt sichern -- dann gibt es eine Datei für die Daten."))
+        GUI_SET_TEXT(a.hinweis, "")
+    ELSE
+        GUI_TABLE_PLACEHOLDER(a.gitErg, tr$("Die Abfrage liefert keine Zeile."))
+        GUI_SET_TEXT(a.hinweis, IIF(dbListenIndexKlein(dbErgSpalten, "id") < 0, tr$("Ohne Spalte id liefert IdVon für diese Abfrage 0."), IIF(dbErgZeilen = 1, tr$("1 Zeile."), trf$("{0} Zeilen.", [STR$(dbErgZeilen)]))))
+    END IF
+    dbLegen(r)
+    protokoll("db ergebnis " + a.abfrage + " " + STR$(dbErgZeilen) + " " + JOIN$(dbErgSpalten, ",") + IIF(fehler <> "", " fehler", ""))
+END SUB
+
+FUNCTION dbListenIndexKlein(liste AS ARRAY OF STRING, name AS STRING) AS INTEGER
+    RETURN dbListenIndex(liste, name)
+END FUNCTION
+
+' Das SQL uebernehmen: nur, wenn es an der Entwicklungsdatei geht.
+SUB dbAbfrageUebernehmen(r AS Reiter)
+    DIM a AS DbAnsicht : a = r.db
+    DIM sql AS STRING : sql = GUI_TEXT(a.taSql)
+    a.sqlVersucht = sql
+    DIM f AS STRING : f = dbAbfrageSetzen$(r.el, a.abfrage, sql)
+    IF f = "" THEN
+        status(trf$("Abfrage {0} gesichert.", [a.abfrage]))
+        protokoll("db abfrage " + a.abfrage + " " + sql)
+        werkzeugeNachziehen()
+    ELSE
+        dbFehler(f)
+    END IF
+    dbErgebnisZeigen(r, sql)
+    GUI_SET_TEXT(a.taSql, sql)
 END SUB
 
 ' --- Spalten -----------------------------------------------------------------------
-FUNCTION dbSpZeile$(name AS STRING, typname AS STRING, pflicht AS BOOLEAN, eindeutig AS BOOLEAN, vorgabe AS STRING) AS STRING
-    RETURN name + CHR$(9) + typname + CHR$(9) + IIF(pflicht, "1", "0") + CHR$(9) + IIF(eindeutig, "1", "0") + CHR$(9) + vorgabe
+FUNCTION dbSpZeile$(name AS STRING, typname AS STRING, pflicht AS BOOLEAN, eindeutig AS BOOLEAN, vorgabe AS STRING, verweis AS STRING) AS STRING
+    RETURN name + CHR$(9) + typname + CHR$(9) + IIF(pflicht, "1", "0") + CHR$(9) + IIF(eindeutig, "1", "0") + CHR$(9) + vorgabe + CHR$(9) + verweis
 END FUNCTION
 
 SUB dbSpaltenFuellen(r AS Reiter)
@@ -275,20 +418,27 @@ SUB dbSpaltenFuellen(r AS Reiter)
     DIM s AS JSON_HANDLE : s = dbSchema(r.el)
     DIM t AS INTEGER : t = dbTabIndex(s, a.tabelle)
     IF t < 0 THEN RETURN
+    ' Verweisen kann eine Spalte auf jede Tabelle derselben Datenbank.
+    DIM ziele AS ARRAY OF STRING : ziele = [""]
+    DIM zn AS STRING
+    FOR EACH zn IN dbTabellenNamen(r.el)
+        ARRAY_PUSH(ziele, zn)
+    NEXT
+    GUI_TABLE_COL_CHOICES(a.gitSp, 5, ziele)
     DIM k AS INTEGER
     FOR k = 0 TO dbSpZahl(s, t) - 1
         DIM tn AS STRING : tn = dbTypName$(dbSp$(s, t, k, "typ"))
-        DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(a.gitSp, [dbSp$(s, t, k, "name"), tn, "", "", dbSp$(s, t, k, "vorgabe")])
+        DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(a.gitSp, [dbSp$(s, t, k, "name"), tn, "", "", dbSp$(s, t, k, "vorgabe"), dbSp$(s, t, k, "verweis")])
         GUI_TABLE_CELL_KIND(a.gitSp, z, 2, "haken")
         GUI_TABLE_CELL_KIND(a.gitSp, z, 3, "haken")
         GUI_TABLE_CELL_VALUE(a.gitSp, z, 2, IIF(dbSpAn(s, t, k, "pflicht"), 1.0, 0.0))
         GUI_TABLE_CELL_VALUE(a.gitSp, z, 3, IIF(dbSpAn(s, t, k, "eindeutig"), 1.0, 0.0))
-        ARRAY_PUSH(a.spStand, dbSpZeile$(dbSp$(s, t, k, "name"), tn, dbSpAn(s, t, k, "pflicht"), dbSpAn(s, t, k, "eindeutig"), dbSp$(s, t, k, "vorgabe")))
+        ARRAY_PUSH(a.spStand, dbSpZeile$(dbSp$(s, t, k, "name"), tn, dbSpAn(s, t, k, "pflicht"), dbSpAn(s, t, k, "eindeutig"), dbSp$(s, t, k, "vorgabe"), dbSp$(s, t, k, "verweis")))
     NEXT
 END SUB
 
 FUNCTION dbSpAusGitter$(a AS DbAnsicht, z AS INTEGER) AS STRING
-    RETURN dbSpZeile$(TRIM$(GUI_TABLE_GET_CELL(a.gitSp, z, 0)), GUI_TABLE_GET_CELL(a.gitSp, z, 1), GUI_TABLE_GET_VALUE(a.gitSp, z, 2) >= 0.5, GUI_TABLE_GET_VALUE(a.gitSp, z, 3) >= 0.5, TRIM$(GUI_TABLE_GET_CELL(a.gitSp, z, 4)))
+    RETURN dbSpZeile$(TRIM$(GUI_TABLE_GET_CELL(a.gitSp, z, 0)), GUI_TABLE_GET_CELL(a.gitSp, z, 1), GUI_TABLE_GET_VALUE(a.gitSp, z, 2) >= 0.5, GUI_TABLE_GET_VALUE(a.gitSp, z, 3) >= 0.5, TRIM$(GUI_TABLE_GET_CELL(a.gitSp, z, 4)), TRIM$(GUI_TABLE_GET_CELL(a.gitSp, z, 5)))
 END FUNCTION
 
 ' Eine Zeile im Spalten-Gitter hat sich geaendert: umbenennen oder aendern.
@@ -302,7 +452,13 @@ SUB dbSpaltenPruefen(r AS Reiter)
         DIM alt AS ARRAY OF STRING : alt = SPLIT(a.spStand[z], CHR$(9))
         DIM neu AS ARRAY OF STRING : neu = SPLIT(jetzt, CHR$(9))
         DIM fehler AS STRING
-        IF neu[0] <> alt[0] THEN
+        IF neu[5] <> alt[5] THEN
+            fehler = dbSpalteVerweis$(r.el, a.tabelle, alt[0], neu[5])
+            IF fehler = "" THEN
+                status(IIF(neu[5] = "", trf$("Spalte {0} verweist auf nichts mehr.", [alt[0]]), trf$("Spalte {0} verweist auf {1}.", [alt[0], neu[5]])))
+                protokoll("db spalte verweis " + a.tabelle + "." + alt[0] + " [" + neu[5] + "]")
+            END IF
+        ELSEIF neu[0] <> alt[0] THEN
             fehler = dbSpalteUmbenennen$(r.el, a.tabelle, alt[0], neu[0])
             IF fehler = "" THEN
                 status(trf$("Spalte {0} heißt jetzt {1}.", [alt[0], neu[0]]))
@@ -354,6 +510,7 @@ SUB dbDatenFuellen(r AS Reiter)
         SELECT CASE dbSp$(s, t, k, "typ")
             CASE "ganz" : GUI_TABLE_COL_TYPE(a.gitDa, k + 1, "ganz")
             CASE "wahr" : GUI_TABLE_COL_CHOICES(a.gitDa, k + 1, ["", tr$("ja"), tr$("nein")])
+            CASE "bild" : GUI_TABLE_COL_EDIT(a.gitDa, k + 1, FALSE)
         END SELECT
     NEXT
     DIM fehler AS STRING : fehler = dbZeilenLesen$(r.el, a.tabelle, DB_ZEILEN_GRENZE)
@@ -381,7 +538,47 @@ SUB dbDatenFuellen(r AS Reiter)
         END IF
     END IF
     dbLegenNurDaten(r)
+    GUI_SET_VISIBLE(a.btBild, a.modus <> "spalten" AND a.abfrage = "" AND dbHatBildspalte(r))
     dbLagen(r)
+END SUB
+
+' Hat die gewaehlte Tabelle eine Bildspalte? (Dann gibt es den Knopf „Bild …“.)
+FUNCTION dbHatBildspalte(r AS Reiter) AS BOOLEAN
+    IF r.db.tabelle = "" THEN RETURN FALSE
+    RETURN LEN(dbSpaltenBild(r.el.name + "." + r.db.tabelle, TRUE)) > 0
+END FUNCTION
+
+' „Bild …“: ein Bild aus einer Datei in die gewaehlte Zelle einer Bildspalte;
+' ist die Zelle schon voll, fragt die Statuszeile nicht nach -- Strg+Z gibt es
+' in den Daten ohnehin nicht, und Entf macht sie wieder leer.
+SUB dbBildWaehlen(r AS Reiter)
+    DIM a AS DbAnsicht : a = r.db
+    IF a.gitDa < 0 THEN RETURN
+    DIM z AS INTEGER : z = GUI_TABLE_CURRENT_ROW(a.gitDa)
+    DIM c AS INTEGER : c = GUI_TABLE_CURRENT_COL(a.gitDa) - 1
+    DIM s AS JSON_HANDLE : s = dbSchema(r.el)
+    DIM t AS INTEGER : t = dbTabIndex(s, a.tabelle)
+    IF z < 0 OR z >= LEN(a.daIds) OR c < 0 OR c >= LEN(a.daSpalten) OR t < 0 THEN
+        status(tr$("Erst eine Zelle einer Bildspalte wählen."))
+        RETURN
+    END IF
+    IF dbSp$(s, t, dbSpIndex(s, t, a.daSpalten[c]), "typ") <> "bild" THEN
+        status(tr$("Erst eine Zelle einer Bildspalte wählen."))
+        RETURN
+    END IF
+    DIM q AS STRING : q = GETENV$("DH_STUDIO_DATEI")
+    IF q = "" THEN q = FILE_OPEN_DIALOG(tr$("Bild wählen"), "png,jpg,jpeg,bmp,gif")
+    IF q = "" THEN RETURN
+    DIM id AS INTEGER : id = a.daIds[z]
+    DIM f AS STRING : f = dbBildSetzen$(r.el, a.tabelle, id, a.daSpalten[c], q)
+    IF f <> "" THEN
+        dbFehler(f)
+        RETURN
+    END IF
+    dbDatenFuellen(r)
+    IF z < GUI_TABLE_ROW_COUNT(a.gitDa) THEN GUI_TABLE_SET_CURRENT(a.gitDa, z, c + 1)
+    status(trf$("Bild in {0}, Zeile {1} gesichert.", [a.daSpalten[c], STR$(id)]))
+    protokoll("db bild " + a.tabelle + " " + STR$(id) + " " + a.daSpalten[c] + " " + BASENAME(q))
 END SUB
 
 SUB dbLegenNurDaten(r AS Reiter)
@@ -430,7 +627,20 @@ SUB dbAnsichtPruefen(r AS Reiter)
     DIM a AS DbAnsicht : a = r.db
     IF GUI_CHANGED(a.lstTab) THEN
         DIM i AS INTEGER : i = GUI_LISTBOX_SELECTED(a.lstTab)
-        IF i >= 0 THEN dbTabelleWaehlen(r, GUI_LISTBOX_ITEM(a.lstTab, i))
+        IF i >= 0 AND i < LEN(a.eintraege) THEN
+            IF a.eintraege[i] <> "" THEN dbTabelleWaehlen(r, a.eintraege[i])
+        END IF
+    END IF
+    IF GUI_CLICKED(a.btAbfNeu) THEN dbFragen(r.el, "abfrage_neu", "")
+    IF a.abfrage <> "" THEN
+        ' Ausfuehren -- oder das Feld verlassen, nachdem sich etwas geaendert hat.
+        IF GUI_CLICKED(a.btAusfuehren) THEN
+            ' Schon uebernommen (das Feld hat beim Druecken den Fokus abgegeben):
+            ' dann nur noch einmal ausfuehren.
+            IF GUI_TEXT(a.taSql) <> a.sqlVersucht THEN dbAbfrageUebernehmen(r) ELSE dbErgebnisZeigen(r, a.sqlVersucht)
+        ELSEIF GUI_FOCUSED() <> a.taSql AND GUI_TEXT(a.taSql) <> a.sqlVersucht THEN
+            dbAbfrageUebernehmen(r)
+        END IF
     END IF
     IF GUI_CLICKED(a.btSpalten) THEN
         a.modus = "spalten"
@@ -444,6 +654,8 @@ SUB dbAnsichtPruefen(r AS Reiter)
     IF GUI_CLICKED(a.btTabNeu) THEN dbFragen(r.el, "tabelle_neu", "")
     IF GUI_CLICKED(a.btTabUm) AND a.tabelle <> "" THEN dbFragen(r.el, "tabelle_um", a.tabelle)
     IF GUI_CLICKED(a.btTabWeg) AND a.tabelle <> "" THEN dbFragen(r.el, "tabelle_weg", a.tabelle)
+    IF GUI_CLICKED(a.btTabUm) AND a.abfrage <> "" THEN dbFragen(r.el, "abfrage_um", a.abfrage)
+    IF GUI_CLICKED(a.btTabWeg) AND a.abfrage <> "" THEN dbFragen(r.el, "abfrage_weg", a.abfrage)
     IF GUI_CLICKED(a.btSpNeu) AND a.tabelle <> "" THEN dbFragen(r.el, "spalte_neu", a.tabelle)
     IF GUI_CLICKED(a.btSpWeg) AND a.tabelle <> "" THEN
         DIM sz AS INTEGER : sz = GUI_TABLE_CURRENT_ROW(a.gitSp)
@@ -482,6 +694,7 @@ SUB dbAnsichtPruefen(r AS Reiter)
         END IF
     END IF
     IF GUI_CLICKED(a.btNeuLaden) THEN dbDatenFuellen(r)
+    IF GUI_CLICKED(a.btBild) THEN dbBildWaehlen(r)
     ' Die Datei: uebernommen mit Enter oder wenn das Feld den Fokus abgibt.
     IF GUI_TEXT(a.tfDatei) <> a.dateiStand AND (GUI_ENTERED(a.tfDatei) OR GUI_FOCUSED() <> a.tfDatei) THEN
         DIM fd AS STRING : fd = dbDateiSetzen$(r.el, GUI_TEXT(a.tfDatei))
@@ -496,6 +709,7 @@ SUB dbAnsichtPruefen(r AS Reiter)
         dbDatenFuellen(r)
         werkzeugeNachziehen()
     END IF
+    IF a.abfrage <> "" THEN RETURN
     IF a.modus = "spalten" THEN dbSpaltenPruefen(r) ELSE dbDatenPruefen(r)
 END SUB
 
@@ -522,15 +736,21 @@ SUB dbFragen(e AS Element, was AS STRING, name AS STRING)
             dbDlg = GUI_PROMPT(tr$("Spalte hinzufügen"), trf$("Name der neuen Spalte in {0}:", [name]), dbNameFrei$(e, name, "spalte"), tr$("Hinzufügen|Abbrechen"))
         CASE "spalte_weg"
             dbDlg = GUI_DIALOG(tr$("Spalte löschen"), trf$("Die Spalte {0} samt ihren Werten löschen? Das lässt sich nicht zurücknehmen.", [name]), tr$("Löschen|Abbrechen"))
+        CASE "abfrage_neu"
+            dbDlg = GUI_PROMPT(tr$("Abfrage hinzufügen"), tr$("Name der Abfrage:"), dbNameFrei$(e, "", "abfrage"), tr$("Hinzufügen|Abbrechen"))
+        CASE "abfrage_um"
+            dbDlg = GUI_PROMPT(tr$("Abfrage umbenennen"), trf$("Neuer Name für {0}:", [name]), name, tr$("Umbenennen|Abbrechen"))
+        CASE "abfrage_weg"
+            dbDlg = GUI_DIALOG(tr$("Abfrage löschen"), trf$("Die Abfrage {0} löschen? Die Daten bleiben, wie sie sind.", [name]), tr$("Löschen|Abbrechen"))
     END SELECT
 END SUB
 
 FUNCTION dbNameFrei$(e AS Element, tabelle AS STRING, wofuer AS STRING) AS STRING
     DIM s AS JSON_HANDLE : s = dbSchema(e)
-    DIM grund AS STRING : grund = IIF(wofuer = "tabelle", tr$("tabelle"), tr$("spalte"))
+    DIM grund AS STRING : grund = IIF(wofuer = "tabelle", tr$("tabelle"), IIF(wofuer = "abfrage", tr$("abfrage"), tr$("spalte")))
     DIM n AS INTEGER : n = 1
-    IF wofuer = "tabelle" THEN
-        WHILE dbTabIndex(s, grund + STR$(n)) >= 0
+    IF wofuer = "tabelle" OR wofuer = "abfrage" THEN
+        WHILE dbNameBelegt(s, grund + STR$(n))
             n = n + 1
         WEND
     ELSE
@@ -549,7 +769,7 @@ SUB dbDialogPruefen()
     DIM a AS INTEGER : a = GUI_ANSWER(dbDlg)
     IF a = 0 THEN RETURN
     DIM text AS STRING : text = ""
-    IF dbDlgWas = "tabelle_neu" OR dbDlgWas = "tabelle_um" OR dbDlgWas = "spalte_neu" THEN text = TRIM$(GUI_DIALOG_TEXT(dbDlg))
+    IF dbDlgWas = "tabelle_neu" OR dbDlgWas = "tabelle_um" OR dbDlgWas = "spalte_neu" OR dbDlgWas = "abfrage_neu" OR dbDlgWas = "abfrage_um" THEN text = TRIM$(GUI_DIALOG_TEXT(dbDlg))
     dbDlg = -1
     IF a <> 1 THEN RETURN
     dbAktion(dbDlgEl, dbDlgWas, dbDlgName, text)
@@ -582,11 +802,26 @@ SUB dbAktion(e AS Element, was AS STRING, name AS STRING, text AS STRING)
             fehler = dbSpalteLoeschen$(e, tab, name)
             waehlen = tab
             IF fehler = "" THEN status(trf$("Spalte {0} gelöscht.", [name]))
+        CASE "abfrage_neu"
+            ' Zum Anfangen: alle Zeilen der ersten Tabelle.
+            DIM tns AS ARRAY OF STRING : tns = dbTabellenNamen(e)
+            DIM sql AS STRING : sql = IIF(LEN(tns) > 0, "SELECT * FROM " + dbQ$(IIF(LEN(tns) > 0, tns[0], "")), "SELECT 1 AS id")
+            fehler = dbAbfrageNeu$(e, text, sql)
+            waehlen = text
+            IF fehler = "" THEN status(trf$("Abfrage {0} angelegt.", [text]))
+        CASE "abfrage_um"
+            fehler = dbAbfrageUmbenennen$(e, name, text)
+            waehlen = text
+            IF fehler = "" THEN status(trf$("Abfrage {0} heißt jetzt {1}.", [name, text]))
+        CASE "abfrage_weg"
+            fehler = dbAbfrageLoeschen$(e, name)
+            IF fehler = "" THEN status(trf$("Abfrage {0} gelöscht.", [name]))
     END SELECT
     dbFehler(fehler)
     IF fehler = "" THEN protokoll("db " + was + " " + name + IIF(text <> "", " " + text, ""))
     DIM r2 AS INTEGER : r2 = reiterFinden("datenbank", e, NIL)
     IF r2 >= 0 THEN
+        IF was = "abfrage_weg" AND fehler = "" THEN reiter[r2].db.abfrage = ""
         dbTabellenFuellen(reiter[r2])
         IF waehlen <> "" AND fehler = "" THEN dbTabelleWaehlen(reiter[r2], waehlen)
     END IF
@@ -611,7 +846,7 @@ DIM nvZug AS INTEGER : nvZug = -1
 
 FUNCTION nvDatenKnoten(n AS INTEGER) AS BOOLEAN
     IF n < 0 OR n >= LEN(navArt) THEN RETURN FALSE
-    RETURN navArt[n] = "tabelle" OR navArt[n] = "spalte"
+    RETURN navArt[n] = "tabelle" OR navArt[n] = "spalte" OR navArt[n] = "abfrage"
 END FUNCTION
 
 SUB navVorUpdate()
@@ -631,7 +866,9 @@ SUB navNachUpdate()
     IF nvDruck AND NOT MOUSEBUTTON(0) THEN
         nvDruck = FALSE
         IF nvZug >= 0 THEN
-            IF layoutVorn() AND imFenster(MOUSEX(), MOUSEY()) THEN
+            IF layoutVorn() AND imFenster(MOUSEX(), MOUSEY()) AND navArt[nvZug] = "abfrage" THEN
+                abfrageAblegen(nvZug, zF(MOUSEX() - formX), zF(MOUSEY() - formY))
+            ELSEIF layoutVorn() AND imFenster(MOUSEX(), MOUSEY()) THEN
                 felderAblegen(nvZug, zF(MOUSEX() - formX), zF(MOUSEY() - formY))
             ELSE
                 status(tr$("Felder gehören in ein Fenster -- erst sein Layout öffnen und dann hineinziehen."))
@@ -653,6 +890,10 @@ END SUB
 ' ausser ein Layout ist vorn, dann wartet sie aufs Ziehen.
 SUB nvKlick(n AS INTEGER)
     DIM e AS Element : e = elemente[navEl[n]]
+    IF navArt[n] = "abfrage" THEN
+        dbOeffnen(e, dbAbfName$(dbSchema(e), navCtrl[n]))
+        RETURN
+    END IF
     DIM tab AS STRING : tab = dbTabellenNamen(e)[navCtrl[n]]
     IF navArt[n] = "spalte" AND layoutVorn() THEN
         status(tr$("Die Spalte ins Fenster ziehen oder doppelklicken -- dann steht dort ein Feld, das an sie gebunden ist."))
@@ -665,6 +906,7 @@ SUB navZugZeichnen()
     IF nvZug < 0 OR nvZug >= LEN(navArt) THEN RETURN
     DIM text AS STRING : text = GUI_TREE_LABEL(baum, nvZug)
     IF navArt[nvZug] = "tabelle" THEN text = trf$("{0} (alle Spalten)", [text])
+    IF navArt[nvZug] = "abfrage" THEN text = trf$("{0} (als Tabelle)", [text])
     BOXROUND(MOUSEX() + 10, MOUSEY() + 6, MOUSEX() + 26 + LEN(text) * 8, MOUSEY() + 30, 4, RGBA(58, 168, 240, 200))
     TEXT(MOUSEX() + 18, MOUSEY() + 11, text, farbe("titeltext"))
 END SUB
@@ -711,7 +953,7 @@ SUB felderAblegen(n AS INTEGER, fx AS INTEGER, fy AS INTEGER)
     DIM letztes AS INTEGER : letztes = -1
     DIM sp AS INTEGER
     FOR EACH sp IN spalten
-        letztes = feldAnlegen(s, t, sp, x, y)
+        letztes = feldAnlegen(e.name, s, t, sp, x, y)
         ARRAY_PUSH(namen, feldText$(letztes, "name"))
         y = y + MAX(28, feldZahl(letztes, "h")) + 10
     NEXT
@@ -729,13 +971,54 @@ SUB felderAblegen(n AS INTEGER, fx AS INTEGER, fy AS INTEGER)
     protokoll("felder " + ref + " " + JOIN$(namen, ","))
 END SUB
 
+' Eine Abfrage im Fenster: eine Tabelle, die ihre Zeilen zeigt.
+SUB abfrageAblegen(n AS INTEGER, fx AS INTEGER, fy AS INTEGER)
+    DIM e AS Element : e = elemente[navEl[n]]
+    DIM ref AS STRING : ref = e.name + "." + dbAbfName$(dbSchema(e), navCtrl[n])
+    DIM i AS INTEGER : i = controlAnlegen(bausteinNach("table"), MAX(0, rasterWert(fx)), MAX(0, rasterWert(fy)))
+    JSON_SET_INT(doc, wz$(i, "w"), 420)
+    JSON_SET_INT(doc, wz$(i, "h"), 220)
+    JSON_SET_STRING(doc, wz$(i, "studio_quelle"), ref)
+    quellKopfSetzen(i)
+    auswahlSetzen(i)
+    nachAenderung(TRUE)
+    status(trf$("Tabelle für die Abfrage {0} angelegt.", [ref]))
+    protokoll("abfrage abgelegt " + ref + " " + feldText$(i, "name"))
+END SUB
+
 ' Ein Feld fuer eine Spalte, dazu links die Beschriftung (ausser bei Ja/Nein:
 ' das Kaestchen traegt den Namen selbst). Liefert die Nummer des Feldes.
-FUNCTION feldAnlegen(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+FUNCTION feldAnlegen(dbName AS STRING, s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
     DIM sn AS STRING : sn = dbSp$(s, t, k, "name")
     DIM typ AS STRING : typ = dbSp$(s, t, k, "typ")
+    DIM ziel AS STRING : ziel = dbSp$(s, t, k, "verweis")
     DIM i AS INTEGER
-    IF typ = "wahr" THEN
+    IF ziel <> "" AND dbTabIndex(s, ziel) >= 0 THEN
+        ' Ein Verweis: eine Klappliste mit der Anzeigespalte der Zieltabelle,
+        ' gebunden ist die id (der Wert der Eintraege).
+        DIM lv AS INTEGER : lv = controlAnlegen(bausteinNach("label"), x, y + 4)
+        JSON_SET_STRING(doc, wz$(lv, "text"), sn + ":")
+        JSON_SET_INT(doc, wz$(lv, "w"), 110)
+        DIM lvn AS STRING : lvn = sn + "Text"
+        IF nameVergeben(lvn, lv) OR NOT istBezeichner(lvn) THEN lvn = eindeutigerName$(lvn)
+        JSON_SET_STRING(doc, wz$(lv, "name"), lvn)
+        i = controlAnlegen(bausteinNach("dropdown"), x + 120, y)
+        JSON_SET_INT(doc, wz$(i, "w"), 240)
+        JSON_SET_JSON(doc, wz$(i, "items"), JSON_NEW_ARRAY())
+        JSON_SET_STRING(doc, wz$(i, "studio_quelle"), dbName + "." + dbTabName$(s, dbTabIndex(s, ziel)))
+        DIM anz AS STRING : anz = dbAnzeigeSpalte$(s, dbTabIndex(s, ziel))
+        IF anz <> "" THEN JSON_SET_STRING(doc, wz$(i, "studio_spalten"), anz)
+    ELSEIF typ = "bild" THEN
+        DIM lb AS INTEGER : lb = controlAnlegen(bausteinNach("label"), x, y + 4)
+        JSON_SET_STRING(doc, wz$(lb, "text"), sn + ":")
+        JSON_SET_INT(doc, wz$(lb, "w"), 110)
+        DIM lbn AS STRING : lbn = sn + "Text"
+        IF nameVergeben(lbn, lb) OR NOT istBezeichner(lbn) THEN lbn = eindeutigerName$(lbn)
+        JSON_SET_STRING(doc, wz$(lb, "name"), lbn)
+        i = controlAnlegen(bausteinNach("image"), x + 120, y)
+        JSON_SET_INT(doc, wz$(i, "w"), 160)
+        JSON_SET_INT(doc, wz$(i, "h"), 120)
+    ELSEIF typ = "wahr" THEN
         i = controlAnlegen(bausteinNach("checkbox"), x + 120, y + 4)
         JSON_SET_STRING(doc, wz$(i, "text"), sn)
         JSON_SET_INT(doc, wz$(i, "w"), 200)
@@ -758,6 +1041,12 @@ FUNCTION feldAnlegen(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER, x AS INTEGER,
     DIM n AS STRING : n = sn + "Feld"
     IF nameVergeben(n, i) OR NOT istBezeichner(n) THEN n = eindeutigerName$(n)
     JSON_SET_STRING(doc, wz$(i, "name"), n)
-    JSON_SET_STRING(doc, wz$(i, "bind"), sn)
+    ' Ein Bild haengt nicht an der Bindung des Formulars (GUI_FORM_SAVE schriebe
+    ' ihm einen leeren Wert), sondern an seiner Bildspalte.
+    IF typ = "bild" THEN
+        JSON_SET_STRING(doc, wz$(i, "studio_bildspalte"), sn)
+    ELSE
+        JSON_SET_STRING(doc, wz$(i, "bind"), sn)
+    END IF
     RETURN i
 END FUNCTION
