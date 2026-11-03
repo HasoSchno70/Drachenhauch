@@ -546,3 +546,15 @@ Spalte {0} angelegt.	Column {0} added.
 Spalte {0} gelöscht.	Column {0} deleted.
 Datenbank hinzufügen …	Add database …
 Datenbank	Database
+# Datenbanken, Stufe 2 (Bindung, Spalten ziehen)
+Felder gehören in ein Fenster -- erst sein Layout öffnen und dann hineinziehen.	Fields belong in a window -- open its layout first and drag them in.
+Die Spalte ins Fenster ziehen oder doppelklicken -- dann steht dort ein Feld, das an sie gebunden ist.	Drag the column into the window or double-click it -- then a field bound to it appears there.
+{0} (alle Spalten)	{0} (all columns)
+{0} hat noch keine Spalten.	{0} has no columns yet.
+Felder für {0} angelegt -- das Fenster gehört aber zu {1} (Inspektor: Tabelle).	Fields for {0} added -- but the window belongs to {1} (inspector: Table).
+Felder für {0} angelegt: {1}	Fields for {0} added: {1}
+JJJJ-MM-TT	YYYY-MM-DD
+Datenquelle	Data source
+Angezeigte Spalten	Shown columns
+Spalten durch Semikolon -- leer: bei einer Tabelle alle, sonst die erste	Columns separated by semicolons -- empty: all for a table, otherwise the first
+(keine)	(none)

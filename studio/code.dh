@@ -546,6 +546,7 @@ SUB navigatorFuellen()
                 FOR sk = 0 TO dbSpZahl(ds, ti) - 1
                     navKnoten(tk, dbSp$(ds, ti, sk, "name"), "spalte", ei, ti, sk, "spalte")
                 NEXT
+                GUI_TREE_EXPAND(baum, tk, TRUE)
             NEXT
             GUI_TREE_EXPAND(baum, en, TRUE)
             CONTINUE
