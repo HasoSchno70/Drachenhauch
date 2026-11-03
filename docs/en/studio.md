@@ -520,6 +520,40 @@ WHILE DB_NEXT(r)
 WEND
 ```
 
+## Reports
+
+A **report** is a printed page from the project's data, for example an
+invoice or a list (Project → Add report …). Its description is in
+`<Name>.dhreport` (JSON); how it is built and what is still to come is in the
+[design](../entwurf-berichte.md) (German). A report has **bands** one below the
+other: report header, page header, group header, detail (per row of the
+source), group footer, page footer, report footer. They hold elements in mm:
+fixed text, fields (a column of the source, also `kunde.name` through a
+reference), sums (sum, count, average, min, max per group or report), page
+number ("Seite {n} von {m}"), date, lines, rectangles and images.
+
+The **source** is a table or query of a database of the project; the
+**condition** may have parameters (`rechnung = :id`). If a band no longer fits
+on the page, it goes onto the next one, with the page footer before it and the
+page header after it.
+
+The tab of a report shows its bands on the paper; **Preview …** typesets it
+with the data of the development file, asks for the parameters and pages
+through the result. Editing comes with the next stage -- until then you edit
+the `.dhreport`.
+
+In the program a report is an object under its name:
+
+```text
+Rechnungsbericht.Pdf("rechnung.pdf", {"id": 5})
+Rechnungsbericht.Drucken({"id": 5})
+Rechnungsbericht.Vorschau({"id": 5})
+DIM p AS PDF : p = Rechnungsbericht.Erzeugen({"id": 5})
+```
+
+`Vorschau` shows a window with the pages, Print, "Als PDF …" and Close and
+returns when it is closed. A missing parameter is an error naming it.
+
 ## A single window
 
 A `.dhform` (the same format that `GUI_SAVE` writes and `GUI_LOAD` reads)
@@ -597,4 +631,5 @@ and the studio with real clicks in the tab, the navigator and the inspector;
 `tests/pruef/werkzeug_studio_datenbank4.dhtest` tests image columns (core,
 generated window including the picture in the table cell, "Image …" and
 dragging in the studio) and `tests/pruef/werkzeug_studio_verbunde.dhtest`
-joins through references.
+joins through references; `tests/pruef/werkzeug_studio_berichte.dhtest` tests
+reports (layout with sums and pages, F5 with parameters, tab and preview).

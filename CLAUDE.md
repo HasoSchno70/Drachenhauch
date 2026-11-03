@@ -3863,6 +3863,29 @@ darum ohne Profiler. Test-only: `protokoll` sammelt und schreibt je Bild
 einmal (`protokollSchreiben` vor FLIP und am Ende) -- vorher oeffnete jede
 der Tausenden Lage-Zeilen die Datei.
 
+**Berichte, Stufe 1 (2026-11-03, Entwurf `docs/entwurf-berichte.md`):**
+Element `bericht` (Beschreibung in `e.schema`, Datei `<Name>.dhreport`,
+`hatCode` FALSE). `studio/berichte_laufzeit.dh` legt aus und setzt (Prefix
+`studioB`, kein Fenster): erst alle Zeilen lesen (`studioBLesen`), dann
+auslegen (`studioBAuslegen`: Baender, Gruppen ueber Wertwechsel, Umbruch mit
+Seitenfuss/Seitenkopf), dann zeichnen -- erst danach steht m fuer "Seite n
+von m". `:parameter` setzt `studioBParameter$` als SQL-Literal ein
+(ausserhalb von Text, Gross/klein egal, fehlend = Fehler). `studio/berichte.dh`
+= Modell + erzeugter Code (`berichtSql$` mit `dbQuellSql$` und `bedarf`, also
+`kunde.name` ueber Verweise; je Bericht `CLASS StudioBericht_<Name>` mit
+`Erzeugen/Pdf/Drucken/Vorschau` und eine globale Variable unter dem Namen,
+in `_studio/studio_berichte.dh`); `studio/berichte_reiter.dh` = Reiter
+(Seite mit Baendern, gezeichnet in der Hauptschleife) und Vorschau
+(PDF_PREVIEW, ein Feld je Parameter). Die Vorschau im Programm steht in
+`laufzeit.dh` (`studioBerichtVorschau`, braucht die Bildschleife). **Falle:**
+`band` ist das Schluesselwort BAND. **Laufzeit:** `PDF_PREVIEW` setzt Text in
+der Schrift des PDFs (Schriftdaten ueber `Dokument::schrift_quelle`, je
+Schrift und Pixelgroesse ein raylib-Font in `Graphics::vorschau_schriften`)
+und Zeichen fuer Zeichen an die Stelle, die rustybuzz formt -- raylib rundet
+jeden Vorschub ab, ein rechtsbuendiger Betrag endete 12 Punkte zu frueh.
+Tests `werkzeug_studio_berichte.dhtest` (3), ein Fall in `drucken.dhtest`;
+neun Verfaelschungen fallen.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

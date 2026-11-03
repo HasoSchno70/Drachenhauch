@@ -16,7 +16,11 @@ Entschieden am 2026-11-03:*
 * *Entworfen wird auf einer Seite in Millimetern, mit Linealen. Die Bänder
   stehen untereinander, ihre Höhe lässt sich ziehen.*
 
-**Stand:** Entwurf, noch nichts gebaut.
+**Stand:** Stufe 1 ist gebaut (2026-11-03): `studio/berichte_laufzeit.dh`
+(Auslegung), `studio/berichte.dh` (Modell, erzeugter Code),
+`studio/berichte_reiter.dh` (Reiter, Vorschau), `PDF_PREVIEW` mit den echten
+Schriften; Prüfung `tests/pruef/werkzeug_studio_berichte.dhtest`, Handbuch
+[studio.md](studio.md#berichte).
 
 ## Gemessen vor Stufe 1
 

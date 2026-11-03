@@ -530,6 +530,42 @@ WHILE DB_NEXT(r)
 WEND
 ```
 
+## Berichte
+
+Ein **Bericht** ist eine gedruckte Seite aus den Daten des Projekts, etwa
+eine Rechnung oder eine Liste (Projekt → Bericht hinzufügen …). Seine
+Beschreibung steht in `<Name>.dhreport` (JSON); wie sie aufgebaut ist und
+was noch kommt, steht im [Entwurf](entwurf-berichte.md). Ein Bericht hat
+**Bänder** untereinander: Berichtskopf, Seitenkopf, Gruppenkopf, Detail (je
+Zeile der Quelle), Gruppenfuß, Seitenfuß, Berichtsfuß. Darin stehen
+Elemente in mm: fester Text, Felder (eine Spalte der Quelle, auch
+`kunde.name` über einen Verweis), Summen (Summe, Anzahl, Mittel, Min, Max je
+Gruppe oder Bericht), Seitenzahl („Seite {n} von {m}“), Datum, Linien,
+Rechtecke und Bilder.
+
+Die **Quelle** ist eine Tabelle oder Abfrage einer Datenbank des Projekts;
+die **Bedingung** darf Parameter haben (`rechnung = :id`). Passt ein Band
+nicht mehr auf die Seite, kommt es auf die nächste, mit Seitenfuß davor und
+Seitenkopf danach.
+
+Der Reiter eines Berichts zeigt seine Bänder auf dem Papier; **Vorschau …**
+setzt ihn mit den Daten der Entwicklungsdatei, fragt nach den Parametern und
+blättert durch die Seiten. Bearbeiten kommt mit der nächsten Stufe -- bis
+dahin bearbeitet man die `.dhreport`.
+
+Im Programm ist ein Bericht ein Objekt unter seinem Namen:
+
+```text
+Rechnungsbericht.Pdf("rechnung.pdf", {"id": 5})
+Rechnungsbericht.Drucken({"id": 5})
+Rechnungsbericht.Vorschau({"id": 5})
+DIM p AS PDF : p = Rechnungsbericht.Erzeugen({"id": 5})
+```
+
+`Vorschau` zeigt ein Fenster mit den Seiten, Drucken, „Als PDF …“ und
+Schließen und kehrt zurück, wenn es zu ist. Fehlt ein Parameter, ist das ein
+Fehler mit seinem Namen.
+
 ## Ein einzelnes Fenster
 
 Eine `.dhform` (dasselbe Format, das `GUI_SAVE` schreibt und `GUI_LOAD`
@@ -607,4 +643,6 @@ Sortierung, Suchfeld und Abfragen: den Kern, das erzeugte Fenster und das
 Studio mit echten Klicks im Reiter, im Navigator und im Inspektor;
 `tests/pruef/werkzeug_studio_datenbank4.dhtest` Bildspalten (Kern, erzeugtes
 Fenster samt Bild in der Tabellenzelle, „Bild …“ und Ziehen im Studio) und
-`tests/pruef/werkzeug_studio_verbunde.dhtest` Verbunde über Verweise.
+`tests/pruef/werkzeug_studio_verbunde.dhtest` Verbunde über Verweise;
+`tests/pruef/werkzeug_studio_berichte.dhtest` Berichte (Auslegung samt
+Summen und Seiten, F5 mit Parametern, Reiter und Vorschau).
