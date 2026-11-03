@@ -3625,8 +3625,11 @@ Bindung, Regeln, RechnungFenster), ein Fall in
 
 **Englische Oberflaeche** (2026-11-03): `studio/sprache.dh` (`tr$`,
 `trf$("... {0} ...", [werte])` -- erst uebersetzen, dann einsetzen --,
-`kz$`), Tafel `studio/sprache/en.txt` (TSV wie die IDE), Vorlagentitel in
-`vorlage.en.txt`. Sprache: `DH_STUDIO_SPRACHE` > `studio.json` (Ansicht ->
+`kz$`), Tafel `studio/sprache/en.txt` (TSV wie die IDE), englische Vorlagen
+unter `studio/vorlagen/en` (dieselben Projekte mit englischen Namen, Texten,
+Kommentaren und Daten; Layouts aus den deutschen erzeugt, ein Fall in
+`werkzeug_studio_vorlagen.dhtest` vergleicht den Aufbau -- wer eine Vorlage
+aendert, zieht die andere mit). Sprache: `DH_STUDIO_SPRACHE` > `studio.json` (Ansicht ->
 English interface, gilt beim naechsten Start) > `ide.json` daneben (nur
 ohne `DH_STUDIO_KONFIG`) > `DHRT_LANG` > de; englisch setzt es
 `DHRT_LANG=en` (CODE_CHECK$, gestartete Programme). **Schluessel bleiben

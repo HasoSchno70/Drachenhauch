@@ -47,12 +47,14 @@ menu offers a light and a dark appearance.
 interface" switches; the choice is stored in `studio.json` next to the
 `ide.json` and takes effect at the next start. Without a choice of its own
 the Studio follows the language of the IDE. In English the new names are
-English too (`MainWindow`, `Button1`), the templates have English titles,
-and the messages of the runtime (Problems, Output) come in English. **The
-names of the events stay as they are** (`Klick`, `Geaendert`, `Aktion` ...):
-they are part of the method names (`Knopf1_Klick`), and a project has to stay
-the same in both languages. The content of the templates (labels, comments)
-is German.
+English too (`MainWindow`, `Button1`), "New project" offers English
+templates (`studio/vorlagen/en`: the same projects with English names, texts
+and comments), and the messages of the runtime (Problems, Output) come in
+English. **The names of the events stay as they are** (`Klick`,
+`Geaendert`, `Aktion` ...): they are part of the method names
+(`Knopf1_Klick`), and a project has to stay the same in both languages. So
+do the commands the Studio gives a program (`Meldung`, `Frage`,
+`Zumachen`).
 
 ## The project
 
