@@ -3712,6 +3712,48 @@ Layouts UND in deren `verlauf`; Loeschen verweigert mit Statuszeile, solange
 `DH_STUDIO_LOESCHEN`. Tests fuenf Faelle mehr (11); sieben Verfaelschungen
 fallen je in ihrem Fall.
 
+**Datenbanken im Projekt, Stufe 1** (2026-11-03, Wunsch des Nutzers nach dem
+Vergleich mit Xojo): Elementart `datenbank` (`hatCode(e)` = FALSE -- jede
+Stelle, die Code schreibt oder zerlegt, fragt dort), Aufbau in
+`<Name>.dhdb` (`e.schema`, JSON: `datei` + `tabellen[].spalten[]` mit `typ`
+text/ganz/zahl/geld/datum/wahr, `pflicht`, `eindeutig`, `vorgabe`), `id
+INTEGER PRIMARY KEY` steht nie im Schema. `studio/datenbank.dh` (ohne gui,
+ohne Fenster pruefbar): jede Aenderung geht durch `dbAusfuehren$` = EINE
+Transaktion auf die Entwicklungsdatei im Projektordner (Befehle davor fuer
+RENAME/DROP, dann `dbAbgleichenMit`); bei einem Fehler bleiben Datei UND
+Schema. Der Abgleich legt Fehlendes an, baut eine Tabelle neu auf, wenn
+sich Art/Pflicht/Vorgabe einer Spalte geaendert haben (verglichen ueber
+PRAGMA table_info samt dflt_value-Text; COALESCE in den Leerwert fuer
+Pflichtspalten), laesst fremde Spalten und Tabellen stehen. Eindeutig ist
+IMMER ein eigener Index `studio_u_<tabelle>_<spalte>` -- ALTER TABLE ADD
+COLUMN kann kein UNIQUE. Ohne Ordner (oder solange er nicht existiert)
+liefert `dbPfad$` "" und nur das Schema aendert sich; `sichern` und
+`projektOeffnen` gleichen danach ab. `dbMeldung$` macht aus "UNIQUE
+constraint failed" einen Satz. Erzeugt: studio_datenbanken.dh in _studio/
+(vor allen Elementen importiert, auch in `ganzerText$`): je Datenbank `DIM
+<Name> AS DB_CONN` als oberste Anweisung (offen, bevor irgendetwas laeuft),
+CREATE TABLE IF NOT EXISTS, `studioDbSpalte` je Spalte, Indexe; der Pfad
+ueber `DH_STUDIO_DATEN` (setzt `vorbereiten`), sonst neben dem Programm.
+Bauen kopiert die Datei nach bau/, wenn dort keine liegt. Reiter
+`studio/dbeditor.dh` (Reiter-Art `datenbank`, `Reiter.db` = `DbAnsicht`,
+`r.feld` = -1): Tabellenliste, Spalten-Gitter (Art als Auswahlspalte,
+Pflicht/Eindeutig als Hakenzellen) und Daten-Gitter (je Tabelle neu
+angelegt, wahr als Auswahl); Aenderungen erkennt der Vergleich mit
+`spStand`/`daStand`, nur wenn keine Zelle bearbeitet wird. Feste
+Spaltenbreiten, damit `dbLagen` die Zellmitten protokollieren kann (Kopf
+22, Zeile 20). Pruefhilfe `DH_STUDIO_OEFFNEN=Element[.Tabelle]`. **Fund in
+der Laufzeit:** ein `GUI_TABCONTROL` schluckte JEDEN Klick auf die Kinder
+seiner Seiten (handle_press nimmt den ersten Treffer, das Reiterwerk liegt
+vor ihnen) -- kein Knopf auf einer Seite meldete GUI_CLICKED, kein Feld
+bekam per Klick den Fokus; der Kommentar "unter den Koepfen gehoert die
+Flaeche den Kindern" stand im Press-Zweig, der erst nach dem Treffer kam.
+Jetzt in `luft_fuer_kinder`. Tests
+`tests/pruef/werkzeug_studio_datenbank.dhtest` (8: Kern, Neuaufbau mit
+fremden Spalten, Werte je Art, erzeugtes Programm an aelterer Datei,
+Projekt lesen/schreiben, Klicks ins Daten- und Spalten-Gitter, F5 + Bauen;
+elf Verfaelschungen fallen je in ihrem Fall), ein Fall in
+`gui_reiterwerk.dhtest` (faellt mit 2026.41).
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

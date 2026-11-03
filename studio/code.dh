@@ -12,13 +12,14 @@ CONST KOPF_H = 26        ' Hoehe der Reiterkoepfe (TC_KOPF_H der Laufzeit)
 CONST CODE_KOPF = 34     ' Platz fuer die Kopfzeile ueber dem Code
 
 CLASS Reiter
-    DIM art AS STRING          ' layout, code, dekl
+    DIM art AS STRING          ' layout, code, dekl, datenbank
     DIM el AS Element
     DIM meth AS Methode
     DIM feld AS GUI_WIDGET     ' das Code-Feld (-1 beim Layout)
     DIM kopf AS GUI_WIDGET     ' die Kopfzeile
     DIM info AS GUI_WIDGET     ' wozu die Methode da ist
     DIM faerbSchl AS STRING
+    DIM db AS DbAnsicht        ' nur bei einer Datenbank (dbeditor.dh)
 END CLASS
 
 DIM tcMitte AS GUI_WIDGET
@@ -46,6 +47,10 @@ SUB mitteLegen(x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER)
     DIM r AS Reiter
     FOR EACH r IN reiter
         IF r.art = "layout" THEN CONTINUE
+        IF r.art = "datenbank" THEN
+            dbLegen(r)
+            CONTINUE
+        END IF
         codeLegen(r)
     NEXT
 END SUB
@@ -70,13 +75,14 @@ END FUNCTION
 FUNCTION codeVorn() AS BOOLEAN
     DIM k AS INTEGER : k = reiterVorn()
     IF k < 0 OR k >= LEN(reiter) THEN RETURN FALSE
-    RETURN reiter[k].art <> "layout"
+    RETURN reiter[k].art = "code" OR reiter[k].art = "dekl"
 END FUNCTION
 
 FUNCTION reiterTitel$(r AS Reiter) AS STRING
     SELECT CASE r.art
         CASE "layout" : RETURN r.el.name
         CASE "dekl" : RETURN r.el.name + tr$(" · Eigenschaften")
+        CASE "datenbank" : RETURN r.el.name
     END SELECT
     RETURN r.el.name + "." + r.meth.name
 END FUNCTION
@@ -164,7 +170,9 @@ END SUB
 SUB reiterSchliessen(k AS INTEGER)
     IF k < 0 OR k >= LEN(reiter) THEN RETURN
     DIM r AS Reiter : r = reiter[k]
-    IF r.art <> "layout" THEN
+    IF r.art = "datenbank" THEN
+        dbWidgetsWeg(r)
+    ELSEIF r.art <> "layout" THEN
         codeUebernehmen(r)
         GUI_DESTROY(r.feld)
         GUI_DESTROY(r.kopf)
@@ -197,7 +205,7 @@ END SUB
 ' Den Text eines Code-Reiters ins Modell -- je Bild fuer den vorderen, und
 ' bevor ein Reiter zugeht.
 SUB codeUebernehmen(r AS Reiter)
-    IF r.art = "layout" THEN RETURN
+    IF r.art = "layout" OR r.art = "datenbank" THEN RETURN
     DIM t AS STRING : t = GUI_TEXT(r.feld)
     IF r.art = "code" THEN
         IF t <> r.meth.rumpf THEN
@@ -216,7 +224,7 @@ END SUB
 SUB codeFelderNeu(e AS Element)
     DIM r AS Reiter
     FOR EACH r IN reiter
-        IF NOT (r.el = e) OR r.art = "layout" THEN CONTINUE
+        IF NOT (r.el = e) OR r.art = "layout" OR r.art = "datenbank" THEN CONTINUE
         IF r.art = "code" THEN GUI_SET_TEXT(r.feld, r.meth.rumpf) ELSE GUI_SET_TEXT(r.feld, e.dekl)
         r.faerbSchl = ""
     NEXT
@@ -237,7 +245,9 @@ SUB reiterPruefen()
         IF lay THEN fensterAktivieren(elementVon(reiter[k].el))
         IF frm >= 0 THEN GUI_WINDOW_VISIBLE(frm, lay)
         GUI_SET_VISIBLE(mittePanel, lay)
-        IF NOT lay AND k >= 0 THEN GUI_FOCUS(reiter[k].feld)
+        IF NOT lay AND k >= 0 THEN
+            IF reiter[k].feld >= 0 THEN GUI_FOCUS(reiter[k].feld)
+        END IF
         punkteFuer = ""
         werkzeugeNachziehen()
         navigatorAuswahl()
@@ -246,7 +256,9 @@ SUB reiterPruefen()
         IF k >= 0 THEN feldBefunde(reiter[k])
     END IF
     IF k >= 0 AND k < LEN(reiter) THEN
-        IF reiter[k].art <> "layout" THEN
+        IF reiter[k].art = "datenbank" THEN
+            dbAnsichtPruefen(reiter[k])
+        ELSEIF reiter[k].art <> "layout" THEN
             codeUebernehmen(reiter[k])
             faerben(reiter[k])
         END IF
@@ -460,6 +472,17 @@ FUNCTION navBild(was AS STRING) AS IMAGE
             IMAGE_FILL_RECT(b, 8, 7, 12, 13, &HFFFFFF)
         CASE "ereignis"
             IMAGE_FILL_POLY(b, [11, 5, 9, 7, 14, 11], [2, 11, 11, 18, 8, 8], &HF0B030)
+        CASE "datenbank"
+            ' ein Zylinder
+            IMAGE_FILL_RECT(b, 4, 5, 16, 15, &H3A9A70)
+            IMAGE_FILL_ELLIPSE(b, 10, 15, 6, 2, &H3A9A70)
+            IMAGE_FILL_ELLIPSE(b, 10, 5, 6, 2, &H8ADCB4)
+            IMAGE_FILL_RECT(b, 4, 9, 16, 10, &H2A7A55)
+        CASE "tabelle"
+            IMAGE_FILL_RECT(b, 3, 4, 17, 16, &HE4EAF2)
+            IMAGE_FILL_RECT(b, 3, 4, 17, 7, &H3A9A70)
+            IMAGE_FILL_RECT(b, 9, 7, 10, 16, &H8D9AAB)
+            IMAGE_FILL_RECT(b, 3, 11, 17, 12, &H8D9AAB)
         CASE "dekl"
             IMAGE_FILL_RECT(b, 4, 5, 15, 6, &H6AA0D0)
             IMAGE_FILL_RECT(b, 4, 9, 15, 10, &H6AA0D0)
@@ -505,6 +528,16 @@ SUB navigatorFuellen()
                 END IF
                 navControl(en, ei, e, ci, d, eltern)
             NEXT
+        END IF
+        ' Eine Datenbank: ihre Tabellen statt Methoden.
+        IF e.art = "datenbank" THEN
+            DIM tns AS ARRAY OF STRING : tns = dbTabellenNamen(e)
+            DIM ti AS INTEGER
+            FOR ti = 0 TO LEN(tns) - 1
+                navKnoten(en, tns[ti], "tabelle", ei, ti, -1, "tabelle")
+            NEXT
+            GUI_TREE_EXPAND(baum, en, TRUE)
+            CONTINUE
         END IF
         DIM mj AS INTEGER
         FOR mj = 0 TO LEN(methoden) - 1
@@ -593,6 +626,7 @@ SUB knotenProtokollieren()
                 pfad = elemente[navEl[n]].name + "." + ctrlNamen[navCtrl[n]]
             CASE "methode" : pfad = elemente[navEl[n]].name + "." + methoden[navMeth[n]].name
             CASE "dekl" : pfad = elemente[navEl[n]].name + ".Eigenschaften"
+            CASE "tabelle" : pfad = elemente[navEl[n]].name + "." + dbTabellenNamen(elemente[navEl[n]])[navCtrl[n]]
             CASE "abstand"
                 controlsVon(navEl[n])
                 pfad = elemente[navEl[n]].name + "." + ctrlNamen[navCtrl[n]] + ".abstand" + STR$(navMeth[n])
@@ -649,6 +683,11 @@ SUB navigatorAuswahl()
                 IF auswahl < 0 AND trayWahl < 0 AND abstandL < 0 AND navArt[n] = "element" THEN ziel = n
             ELSEIF r.art = "dekl" AND navArt[n] = "dekl" THEN
                 ziel = n
+            ELSEIF r.art = "datenbank" THEN
+                IF navArt[n] = "element" AND r.db.tabelle = "" THEN ziel = n
+                IF navArt[n] = "tabelle" THEN
+                    IF LOWER$(dbTabellenNamen(r.el)[navCtrl[n]]) = LOWER$(r.db.tabelle) THEN ziel = n
+                END IF
             ELSEIF r.art = "code" AND navArt[n] = "methode" THEN
                 IF methoden[navMeth[n]] = r.meth THEN ziel = n
             END IF
@@ -671,6 +710,8 @@ SUB navigatorPruefen()
                 layoutOeffnen(ei)
                 auswahlSetzen(-1)
                 auswahlGeaendert()
+            ELSEIF elemente[ei].art = "datenbank" THEN
+                dbOeffnen(elemente[ei], "")
             ELSE
                 deklOeffnen(elemente[ei])
             END IF
@@ -697,6 +738,8 @@ SUB navigatorPruefen()
             codeOeffnen(methoden[navMeth[n]])
         CASE "dekl"
             deklOeffnen(elemente[ei])
+        CASE "tabelle"
+            dbOeffnen(elemente[ei], dbTabellenNamen(elemente[ei])[navCtrl[n]])
     END SELECT
 END SUB
 
@@ -1040,8 +1083,9 @@ DIM wegEl AS INTEGER : wegEl = -1
 SUB elementFragen(art AS STRING)
     IF GUI_MODAL() THEN RETURN
     elWas = art
-    DIM grund AS STRING : grund = IIF(art = "fenster", tr$("Fenster"), IIF(art = "control", tr$("Control"), IIF(art = "modul", tr$("Modul"), tr$("Klasse"))))
-    dlgEl = GUI_PROMPT(trf$("{0} hinzufügen", [artText$(art)]), tr$("Name (wird zum Namen der Klasse bzw. des Moduls):"), elementNameFrei$(grund), tr$("Hinzufügen|Abbrechen"))
+    DIM grund AS STRING : grund = IIF(art = "fenster", tr$("Fenster"), IIF(art = "control", tr$("Control"), IIF(art = "modul", tr$("Modul"), IIF(art = "datenbank", tr$("Daten"), tr$("Klasse")))))
+    DIM frage AS STRING : frage = IIF(art = "datenbank", tr$("Name (unter ihm ist die Verbindung im Programm erreichbar):"), tr$("Name (wird zum Namen der Klasse bzw. des Moduls):"))
+    dlgEl = GUI_PROMPT(trf$("{0} hinzufügen", [artText$(art)]), frage, elementNameFrei$(grund), tr$("Hinzufügen|Abbrechen"))
 END SUB
 
 SUB elementDialogPruefen()
@@ -1079,7 +1123,14 @@ FUNCTION elementAnlegen(art AS STRING, n AS STRING) AS BOOLEAN
     IF art = "fenster" AND projStart = "" THEN projStart = n
     projLose = FALSE
     navigatorFuellen()
-    IF hatLayout(e) THEN layoutOeffnen(LEN(elemente) - 1) ELSE deklOeffnen(e)
+    IF hatLayout(e) THEN
+        layoutOeffnen(LEN(elemente) - 1)
+    ELSEIF art = "datenbank" THEN
+        dbFehler(dbAbgleichen$(e))
+        dbOeffnen(e, "")
+    ELSE
+        deklOeffnen(e)
+    END IF
     werkzeugeNachziehen()
     status(trf$("{0} {1} hinzugefügt.", [artText$(art), n]))
     protokoll("element neu " + art + " " + n)
@@ -1104,7 +1155,11 @@ SUB elementLoeschenFragen(ei AS INTEGER)
         END IF
     END IF
     wegEl = ei
-    dlgWeg = GUI_DIALOG(trf$("{0} löschen", [artText$(e.art)]), trf$("{0} mit seinem Code aus dem Projekt nehmen? Die Dateien verschwinden beim nächsten Sichern.", [e.name]), tr$("Löschen|Abbrechen"))
+    IF e.art = "datenbank" THEN
+        dlgWeg = GUI_DIALOG(trf$("{0} löschen", [artText$(e.art)]), trf$("{0} aus dem Projekt nehmen? Der Aufbau verschwindet beim nächsten Sichern, die Datei mit den Daten bleibt liegen.", [e.name]), tr$("Löschen|Abbrechen"))
+    ELSE
+        dlgWeg = GUI_DIALOG(trf$("{0} löschen", [artText$(e.art)]), trf$("{0} mit seinem Code aus dem Projekt nehmen? Die Dateien verschwinden beim nächsten Sichern.", [e.name]), tr$("Löschen|Abbrechen"))
+    END IF
 END SUB
 
 SUB elementLoeschen(ei AS INTEGER)
@@ -1160,6 +1215,8 @@ SUB wegDateienLoeschen()
         DIM p AS STRING : p = PATHJOIN(projOrdner, n + ".dh")
         IF FILEEXISTS(p) THEN DELETEFILE(p)
         p = PATHJOIN(projOrdner, n + ".dhform")
+        IF FILEEXISTS(p) THEN DELETEFILE(p)
+        p = PATHJOIN(projOrdner, n + ".dhdb")
         IF FILEEXISTS(p) THEN DELETEFILE(p)
     NEXT
     wegDateien = []
@@ -1322,6 +1379,7 @@ SUB vorlageDialogPruefen()
 END SUB
 
 SUB dialogePruefen()
+    dbDialogPruefen()
     vorlageDialogPruefen()
     ereignisDialogPruefen()
     methodeDialogPruefen()
@@ -1332,7 +1390,7 @@ END SUB
 ' Was das Studio selbst zeichnet (Titelleiste, Griffe des Entwurfs), liegt
 ' ueber GUI_DRAW -- ein offener Dialog kommt darum noch einmal obenauf.
 SUB dialogeObenauf()
-    DIM d AS ARRAY OF INTEGER : d = [dlgEr, dlgMe, dlgEl, dlgWeg, dlgMn, dlgVl, frage, ueber]
+    DIM d AS ARRAY OF INTEGER : d = [dlgEr, dlgMe, dlgEl, dlgWeg, dlgMn, dlgVl, frage, ueber, dbDlg]
     IF vvOffen THEN ARRAY_PUSH(d, winVv)
     DIM w AS INTEGER
     FOR EACH w IN d

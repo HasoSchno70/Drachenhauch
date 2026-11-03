@@ -229,6 +229,18 @@ Instanzen; ein Control, das sich selbst enthält, ist überall leer),
 Umbenennen samt Instanzen und Rückgängig-Ständen, Löschen nur ohne
 Instanzen.
 
+**Datenbanken im Projekt** (danach, Stufe 1): Elementart `datenbank`, ihr
+Aufbau in `<Name>.dhdb`, die Entwicklungsdaten in einer SQLite-Datei im
+Projektordner. Ein Reiter mit Tabellen, Spalten-Gitter (Name, Art, Pflicht,
+Eindeutig, Vorgabe) und Daten-Gitter; jede Änderung gilt sofort in einer
+Transaktion für die Datei (`studio/datenbank.dh`, Abgleich mit Neuaufbau,
+wenn sich eine Spalte ändert). Im erzeugten Programm eine globale
+Verbindung unter dem Namen der Datenbank (erzeugt in studio_datenbanken.dh),
+die fehlende Tabellen und Spalten selbst anlegt; F5 arbeitet über
+`DH_STUDIO_DATEN` auf der Datei im Projektordner, Bauen legt sie neben das
+Programm. Offen (Stufe 2): Felder per Ziehen an Spalten binden, Fenster mit
+Laden/Sichern einer Tabelle, Liste/Tabelle an eine Tabelle binden.
+
 **Geprüft wird je Stufe** mit einer Prüfsammlung `werkzeug_studio*.dhtest`.
 Die Klicks sind echt, über Aufnahmen und Fensternachrichten. Erzeugtes läuft
 durch `dhrt --check` und wird gestartet. Gegenproben mit gezielten

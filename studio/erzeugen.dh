@@ -574,6 +574,7 @@ FUNCTION mainCode$() AS STRING
     ARRAY_PUSH(z, "' Erzeugt vom Drachenhauch Studio -- der Einstieg des Projekts " + projName + ".")
     ARRAY_PUSH(z, "' Ohne das Studio starten: dhrt run _studio/main.dh")
     ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "studio_laufzeit.dh" + CHR$(34))
+    IF hatDatenbank() THEN ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "studio_datenbanken.dh" + CHR$(34))
     DIM i AS INTEGER
     FOR EACH i IN reihenfolge()
         DIM e AS Element : e = elemente[i]
@@ -593,6 +594,13 @@ SUB erzeugen()
     DIM o AS STRING : o = studioOrdner$()
     IF NOT DIREXISTS(o) THEN MKDIR(o)
     WRITEALL(PATHJOIN(o, "studio_laufzeit.dh"), laufzeitQuelle$())
+    ' Die Datenbanken: je eine globale Verbindung, vor allem anderen offen.
+    DIM dbp AS STRING : dbp = PATHJOIN(o, "studio_datenbanken.dh")
+    IF hatDatenbank() THEN
+        WRITEALL(dbp, datenbankCode$())
+    ELSEIF FILEEXISTS(dbp) THEN
+        DELETEFILE(dbp)
+    END IF
     DIM i AS INTEGER
     FOR i = 0 TO LEN(elemente) - 1
         IF hatLayout(elemente[i]) THEN WRITEALL(PATHJOIN(o, elemente[i].name + "_basis.dh"), basisCode$(i))
@@ -607,7 +615,7 @@ SUB erzeugen()
         DELETEFILE(PATHJOIN(pk, alt))
     NEXT
     FOR i = 0 TO LEN(elemente) - 1
-        WRITEALL(PATHJOIN(pk, codeDatei$(elemente[i])), codeSetzen$(elemente[i]))
+        IF hatCode(elemente[i]) THEN WRITEALL(PATHJOIN(pk, codeDatei$(elemente[i])), codeSetzen$(elemente[i]))
     NEXT
     ' Die Bilder des Projekts unter assets/bilder/ -- dorthin schaut Bild(),
     ' und dhrt --export nimmt assets/ neben der Exe mit.
@@ -678,6 +686,8 @@ FUNCTION ganzerText$() AS STRING
     gzEl = [] : gzMeth = [] : gzZeile = [] : gzEinzug = [] : gzErzeugt = []
     DIM teile AS ARRAY OF STRING : teile = []
     gzDazu(teile, laufzeitQuelle$(), -1, TRUE, FALSE)
+    DIM dbc AS STRING : dbc = datenbankCode$()
+    IF dbc <> "" THEN gzDazu(teile, dbc, -1, TRUE, FALSE)
     DIM i AS INTEGER
     FOR EACH i IN reihenfolge()
         IF hatLayout(elemente[i]) THEN gzDazu(teile, basisCode$(i), i, TRUE, FALSE)
@@ -953,6 +963,8 @@ FUNCTION vorbereiten(wozu AS STRING) AS BOOLEAN
         RETURN FALSE
     END IF
     DIM f AS INTEGER : f = projektPruefen()
+    ' Ein Programm aus dem Studio arbeitet auf den Entwicklungsdaten.
+    SETENV("DH_STUDIO_DATEN", projOrdner)
     IF f > 0 THEN
         GUI_DOCK_ACTIVATE(win, "probleme")
         status(IIF(f = 1, trf$("1 Fehler -- erst beheben, dann {0}.", [LOWER$(tr$(wozu))]), trf$("{0} Fehler -- erst beheben, dann {1}.", [STR$(f), LOWER$(tr$(wozu))])))
@@ -1012,6 +1024,18 @@ SUB bauen()
     DIM o AS STRING : o = PATHJOIN(projOrdner, "bau")
     IF NOT DIREXISTS(o) THEN MKDIR(o)
     bauZiel = PATHJOIN(o, projName + IIF(unterWindows(), ".exe", ""))
+    ' Die Entwicklungsdaten kommen mit, wenn neben dem Programm noch keine
+    ' Datei liegt -- eine, in der schon gearbeitet wurde, bleibt.
+    DIM e AS Element
+    FOR EACH e IN elemente
+        IF e.art <> "datenbank" THEN CONTINUE
+        DIM dq AS STRING : dq = dbPfad$(e)
+        DIM dz AS STRING : dz = PATHJOIN(o, dbDateiVon$(dbSchema(e)))
+        IF FILEEXISTS(dq) AND NOT FILEEXISTS(dz) THEN
+            COPYFILE(dq, dz)
+            protokoll("daten mit " + dz)
+        END IF
+    NEXT
     ausgabe(trf$("⚙ Baue {0} …", [bauZiel]), &H70A0E0)
     bau = PROCESS_START("dhrt", "--export", PATHJOIN(studioOrdner$(), "main.dh"), bauZiel)
     werkzeugeNachziehen()
@@ -1034,6 +1058,7 @@ SUB ausgabeZeile(z AS STRING)
     DIM zeile AS INTEGER : zeile = INT(VAL(MID$(fund, pk + 4, 20)))
     DIM ei AS INTEGER : ei = elementIndex(name)
     IF ei < 0 THEN RETURN
+    IF NOT hatCode(elemente[ei]) THEN RETURN
     DIM gesetzt AS STRING : gesetzt = codeSetzen$(elemente[ei])
     IF zeile < 1 OR zeile > LEN(karteMeth) THEN RETURN
     DIM b AS Befund : b = NEW Befund()

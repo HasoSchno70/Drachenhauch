@@ -1,0 +1,783 @@
+' ============================================================
+'  Drachenhauch Studio -- Datenbanken im Projekt
+' ============================================================
+'  Ein Element der Art "datenbank" ist eine SQLite-Datenbank. Ihr Aufbau
+'  steht als JSON in <Name>.dhdb und im Speicher in e.schema:
+'
+'    {"datei": "daten.sqlite",
+'     "tabellen": [{"name": "kunden",
+'                   "spalten": [{"name": "name", "typ": "text",
+'                                "pflicht": true, "eindeutig": false,
+'                                "vorgabe": ""}]}]}
+'
+'  Jede Tabelle hat zusaetzlich die Spalte id INTEGER PRIMARY KEY -- sie
+'  steht nicht im Schema, GUI_FORM_LOAD/SAVE brauchen genau sie.
+'
+'  Die Datei im Projektordner haelt die Entwicklungsdaten: das Studio zeigt
+'  und bearbeitet sie, ein Programm, das aus dem Studio startet, arbeitet
+'  auf ihr (DH_STUDIO_DATEN). Eine Aenderung am Aufbau gilt sofort fuer
+'  diese Datei (dbAusfuehren$). Das gebaute Programm legt seine eigene
+'  Datei neben sich an und ergaenzt fehlende Tabellen und Spalten selbst
+'  (datenbankCode$); umbenennen und loeschen tut es dort nicht.
+'
+'  Eindeutig ist immer ein eigener Index (studio_u_<tabelle>_<spalte>):
+'  ALTER TABLE ADD COLUMN kann keine UNIQUE-Spalte anlegen.
+' ============================================================
+
+CONST DB_INDEX_VOR = "studio_u_"
+
+' Die Arten einer Spalte und wie SQLite sie speichert. Geld steht in Cent
+' (19,99 = 1999), Datum als JJJJ-MM-TT, Ja/Nein als 0/1.
+FUNCTION dbTypen() AS ARRAY OF STRING
+    RETURN ["text", "ganz", "zahl", "geld", "datum", "wahr"]
+END FUNCTION
+
+FUNCTION dbTypName$(typ AS STRING) AS STRING
+    SELECT CASE typ
+        CASE "ganz" : RETURN tr$("Ganze Zahl")
+        CASE "zahl" : RETURN tr$("Kommazahl")
+        CASE "geld" : RETURN tr$("Geld")
+        CASE "datum" : RETURN tr$("Datum")
+        CASE "wahr" : RETURN tr$("Ja/Nein")
+    END SELECT
+    RETURN tr$("Text")
+END FUNCTION
+
+' Aus dem angezeigten Namen die Art (fuer die Auswahlspalte).
+FUNCTION dbTypAusName$(name AS STRING) AS STRING
+    DIM t AS STRING
+    FOR EACH t IN dbTypen()
+        IF dbTypName$(t) = name OR t = name THEN RETURN t
+    NEXT
+    RETURN ""
+END FUNCTION
+
+FUNCTION dbTypSql$(typ AS STRING) AS STRING
+    SELECT CASE typ
+        CASE "ganz", "geld", "wahr" : RETURN "INTEGER"
+        CASE "zahl" : RETURN "REAL"
+    END SELECT
+    RETURN "TEXT"
+END FUNCTION
+
+' --- Schema ---------------------------------------------------------------------
+FUNCTION dbSchemaNeu$(name AS STRING) AS STRING
+    DIM s AS JSON_HANDLE : s = JSON_PARSE("{}")
+    JSON_SET_STRING(s, "datei", LOWER$(name) + ".sqlite")
+    JSON_SET_JSON(s, "tabellen", JSON_NEW_ARRAY())
+    RETURN JSON_STRINGIFY(s)
+END FUNCTION
+
+FUNCTION dbSchema(e AS Element) AS JSON_HANDLE
+    DIM s AS JSON_HANDLE : s = JSON_PARSE(IIF(e.schema = "", dbSchemaNeu$(e.name), e.schema))
+    IF NOT JSON_HAS(s, "tabellen") THEN JSON_SET_JSON(s, "tabellen", JSON_NEW_ARRAY())
+    IF NOT JSON_HAS(s, "datei") THEN JSON_SET_STRING(s, "datei", LOWER$(e.name) + ".sqlite")
+    RETURN s
+END FUNCTION
+
+FUNCTION dbDateiVon$(s AS JSON_HANDLE) AS STRING
+    RETURN JSON_GET_STRING(s, "datei")
+END FUNCTION
+
+' Die Entwicklungsdatei; leer, solange das Projekt keinen Ordner hat (oder
+' der Ordner erst beim Sichern entsteht).
+FUNCTION dbPfad$(e AS Element) AS STRING
+    IF projOrdner = "" THEN RETURN ""
+    IF NOT DIREXISTS(projOrdner) THEN RETURN ""
+    RETURN PATHJOIN(projOrdner, dbDateiVon$(dbSchema(e)))
+END FUNCTION
+
+FUNCTION dbTabZahl(s AS JSON_HANDLE) AS INTEGER
+    RETURN JSON_LEN(s, "tabellen")
+END FUNCTION
+
+FUNCTION dbTabName$(s AS JSON_HANDLE, t AS INTEGER) AS STRING
+    RETURN JSON_GET_STRING(s, "tabellen." + STR$(t) + ".name")
+END FUNCTION
+
+FUNCTION dbTabIndex(s AS JSON_HANDLE, name AS STRING) AS INTEGER
+    DIM t AS INTEGER
+    FOR t = 0 TO dbTabZahl(s) - 1
+        IF LOWER$(dbTabName$(s, t)) = LOWER$(name) THEN RETURN t
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION dbTabellenNamen(e AS Element) AS ARRAY OF STRING
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM t AS INTEGER
+    FOR t = 0 TO dbTabZahl(s) - 1
+        ARRAY_PUSH(aus, dbTabName$(s, t))
+    NEXT
+    RETURN aus
+END FUNCTION
+
+FUNCTION dbSpZahl(s AS JSON_HANDLE, t AS INTEGER) AS INTEGER
+    RETURN JSON_LEN(s, "tabellen." + STR$(t) + ".spalten")
+END FUNCTION
+
+FUNCTION dbSpPfad$(t AS INTEGER, k AS INTEGER) AS STRING
+    RETURN "tabellen." + STR$(t) + ".spalten." + STR$(k)
+END FUNCTION
+
+FUNCTION dbSp$(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER, feld AS STRING) AS STRING
+    DIM p AS STRING : p = dbSpPfad$(t, k) + "." + feld
+    IF NOT JSON_HAS(s, p) THEN RETURN IIF(feld = "typ", "text", "")
+    RETURN JSON_GET_STRING(s, p)
+END FUNCTION
+
+FUNCTION dbSpAn(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER, feld AS STRING) AS BOOLEAN
+    DIM p AS STRING : p = dbSpPfad$(t, k) + "." + feld
+    IF NOT JSON_HAS(s, p) THEN RETURN FALSE
+    RETURN JSON_GET_BOOL(s, p)
+END FUNCTION
+
+FUNCTION dbSpIndex(s AS JSON_HANDLE, t AS INTEGER, name AS STRING) AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO dbSpZahl(s, t) - 1
+        IF LOWER$(dbSp$(s, t, k, "name")) = LOWER$(name) THEN RETURN k
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Ein Name fuer Tabelle oder Spalte: wie ein Bezeichner, und keiner, den
+' SQLite oder das Studio selbst braucht.
+FUNCTION dbNameFehler$(name AS STRING, wofuer AS STRING) AS STRING
+    IF NOT istBezeichner(name) THEN RETURN trf$("'{0}' ist kein Name: ein Buchstabe vorn, dann Buchstaben, Ziffern und _.", [name])
+    DIM kl AS STRING : kl = LOWER$(name)
+    IF LEFT$(kl, 7) = "sqlite_" OR LEFT$(kl, 7) = "studio_" THEN RETURN trf$("Namen mit {0} vorn sind vergeben.", [LEFT$(name, 7)])
+    IF wofuer = "spalte" AND (kl = "id" OR kl = "rowid") THEN RETURN tr$("Die Spalte id hat jede Tabelle schon.")
+    RETURN ""
+END FUNCTION
+
+' Eine Meldung der Datenbank so, dass man weiss, was zu tun ist.
+FUNCTION dbMeldung$(f AS STRING) AS STRING
+    DIM m AS STRING : m = f
+    DIM k AS INTEGER : k = INSTR(m, ": ")
+    IF k >= 0 AND LEFT$(m, 3) = "DB_" THEN m = MID$(m, k + 2, LEN(m))
+    DIM u AS STRING : u = "UNIQUE constraint failed: "
+    IF LEFT$(m, LEN(u)) = u THEN RETURN trf$("In {0} gibt es einen Wert doppelt -- die Spalte ist eindeutig.", [MID$(m, LEN(u), LEN(m))])
+    RETURN m
+END FUNCTION
+
+' --- Werte -------------------------------------------------------------------
+FUNCTION dbQ$(name AS STRING) AS STRING
+    RETURN CHR$(34) + name + CHR$(34)
+END FUNCTION
+
+' "12,34" -> "1234"; "" = kein Geldbetrag.
+FUNCTION dbGeldCent$(text AS STRING) AS STRING
+    DIM t AS STRING : t = REPLACE$(REPLACE$(TRIM$(text), " ", ""), ".", ",")
+    IF NOT REGEX_TEST(t, "^-?[0-9]+(,[0-9]{1,2})?$") THEN RETURN ""
+    DIM minus AS BOOLEAN : minus = LEFT$(t, 1) = "-"
+    IF minus THEN t = MID$(t, 1, LEN(t))
+    DIM k AS INTEGER : k = INSTR(t, ",")
+    DIM euro AS STRING : euro = t
+    DIM cent AS STRING : cent = "00"
+    IF k >= 0 THEN
+        euro = LEFT$(t, k)
+        cent = LEFT$(MID$(t, k + 1, LEN(t)) + "0", 2)
+    END IF
+    DIM n AS INTEGER : n = INT(VAL(euro)) * 100 + INT(VAL(cent))
+    IF minus THEN n = -n
+    RETURN STR$(n)
+END FUNCTION
+
+FUNCTION dbGeldText$(cent AS INTEGER) AS STRING
+    DIM a AS INTEGER : a = ABS(cent)
+    RETURN IIF(cent < 0, "-", "") + STR$(a \ 100) + "," + RIGHT$("0" + STR$(a MOD 100), 2)
+END FUNCTION
+
+' "ja"/"nein" (auch englisch, 1/0) -> "1"/"0"; "" = kein Wahrheitswert.
+FUNCTION dbWahr$(text AS STRING) AS STRING
+    DIM t AS STRING : t = LOWER$(TRIM$(text))
+    IF t = "ja" OR t = "yes" OR t = "1" OR t = "true" OR t = "wahr" OR t = LOWER$(tr$("ja")) THEN RETURN "1"
+    IF t = "nein" OR t = "no" OR t = "0" OR t = "false" OR t = "falsch" OR t = LOWER$(tr$("nein")) THEN RETURN "0"
+    RETURN ""
+END FUNCTION
+
+FUNCTION dbIstDatum(text AS STRING) AS BOOLEAN
+    IF NOT REGEX_TEST(text, "^[0-9]{4}-[0-9]{2}-[0-9]{2}$") THEN RETURN FALSE
+    DIM m AS INTEGER : m = INT(VAL(MID$(text, 5, 2)))
+    DIM d AS INTEGER : d = INT(VAL(MID$(text, 8, 2)))
+    RETURN m >= 1 AND m <= 12 AND d >= 1 AND d <= 31
+END FUNCTION
+
+' Ein Wert, wie man ihn tippt, als SQL-Literal; "" = passt nicht zur Art.
+FUNCTION dbLiteral$(typ AS STRING, wert AS STRING) AS STRING
+    DIM w AS STRING : w = TRIM$(wert)
+    SELECT CASE typ
+        CASE "ganz"
+            IF REGEX_TEST(w, "^-?[0-9]+$") THEN RETURN STR$(INT(VAL(w)))
+            RETURN ""
+        CASE "zahl"
+            w = REPLACE$(w, ",", ".")
+            IF REGEX_TEST(w, "^-?[0-9]+(\.[0-9]+)?$") THEN RETURN w
+            RETURN ""
+        CASE "geld" : RETURN dbGeldCent$(w)
+        CASE "wahr" : RETURN dbWahr$(w)
+        CASE "datum"
+            IF dbIstDatum(w) THEN RETURN "'" + w + "'"
+            RETURN ""
+    END SELECT
+    RETURN "'" + REPLACE$(wert, "'", "''") + "'"
+END FUNCTION
+
+' Was in DEFAULT steht: die Vorgabe, sonst bei einer Pflichtspalte der
+' leere Wert ihrer Art (ADD COLUMN ... NOT NULL braucht einen), sonst nichts.
+FUNCTION dbDefault$(typ AS STRING, pflicht AS BOOLEAN, vorgabe AS STRING) AS STRING
+    IF vorgabe <> "" THEN RETURN dbLiteral$(typ, vorgabe)
+    IF pflicht THEN RETURN IIF(dbTypSql$(typ) = "TEXT", "''", "0")
+    RETURN ""
+END FUNCTION
+
+FUNCTION dbSpDefault$(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER) AS STRING
+    RETURN dbDefault$(dbSp$(s, t, k, "typ"), dbSpAn(s, t, k, "pflicht"), dbSp$(s, t, k, "vorgabe"))
+END FUNCTION
+
+FUNCTION dbSpalteSql$(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER) AS STRING
+    DIM z AS STRING : z = dbQ$(dbSp$(s, t, k, "name")) + " " + dbTypSql$(dbSp$(s, t, k, "typ"))
+    IF dbSpAn(s, t, k, "pflicht") THEN z = z + " NOT NULL"
+    DIM d AS STRING : d = dbSpDefault$(s, t, k)
+    IF d <> "" THEN z = z + " DEFAULT " + d
+    RETURN z
+END FUNCTION
+
+FUNCTION dbTabelleSql$(s AS JSON_HANDLE, t AS INTEGER, name AS STRING) AS STRING
+    DIM teile AS ARRAY OF STRING : teile = ["id INTEGER PRIMARY KEY"]
+    DIM k AS INTEGER
+    FOR k = 0 TO dbSpZahl(s, t) - 1
+        ARRAY_PUSH(teile, dbSpalteSql$(s, t, k))
+    NEXT
+    RETURN "CREATE TABLE IF NOT EXISTS " + dbQ$(name) + " (" + JOIN$(teile, ", ") + ")"
+END FUNCTION
+
+FUNCTION dbIndexName$(tabelle AS STRING, spalte AS STRING) AS STRING
+    RETURN DB_INDEX_VOR + LOWER$(tabelle) + "_" + LOWER$(spalte)
+END FUNCTION
+
+FUNCTION dbIndexSql$(tabelle AS STRING, spalte AS STRING) AS STRING
+    RETURN "CREATE UNIQUE INDEX IF NOT EXISTS " + dbQ$(dbIndexName$(tabelle, spalte)) + " ON " + dbQ$(tabelle) + " (" + dbQ$(spalte) + ")"
+END FUNCTION
+
+' --- Die Entwicklungsdatei an das Schema angleichen ----------------------------
+'  Fehlt eine Tabelle, entsteht sie; fehlt eine Spalte, kommt sie dazu. Hat
+'  sich eine Spalte geaendert (Art, Pflicht, Vorgabe), wird die Tabelle neu
+'  aufgebaut und ihre Zeilen umkopiert -- SQLite kann eine Spalte nicht
+'  aendern. Spalten und Tabellen, die nicht im Schema stehen (vom Programm
+'  selbst angelegt), bleiben. Laeuft in der Transaktion des Aufrufers.
+FUNCTION dbTabelleDa(db AS DB_CONN, name AS STRING) AS BOOLEAN
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT name FROM sqlite_master WHERE type = 'table' AND lower(name) = lower(?)", name)
+    DIM da AS BOOLEAN : da = DB_NEXT(r)
+    IF da THEN DB_CLOSE_RESULT(r)
+    RETURN da
+END FUNCTION
+
+FUNCTION dbSpalteDa(db AS DB_CONN, tabelle AS STRING, spalte AS STRING) AS BOOLEAN
+    IF NOT dbTabelleDa(db, tabelle) THEN RETURN FALSE
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "PRAGMA table_info(" + dbQ$(tabelle) + ")")
+    WHILE DB_NEXT(r)
+        IF LOWER$(DB_GET_STRING(r, 1)) = LOWER$(spalte) THEN
+            DB_CLOSE_RESULT(r)
+            RETURN TRUE
+        END IF
+    WEND
+    RETURN FALSE
+END FUNCTION
+
+SUB dbAbgleichenMit(db AS DB_CONN, s AS JSON_HANDLE)
+    DIM t AS INTEGER
+    FOR t = 0 TO dbTabZahl(s) - 1
+        DIM name AS STRING : name = dbTabName$(s, t)
+        IF NOT dbTabelleDa(db, name) THEN
+            DB_EXEC(db, dbTabelleSql$(s, t, name))
+        ELSE
+            DIM inamen AS ARRAY OF STRING : inamen = []
+            DIM ityp AS ARRAY OF STRING : ityp = []
+            DIM inn AS ARRAY OF BOOLEAN : inn = []
+            DIM idf AS ARRAY OF STRING : idf = []
+            DIM r AS DB_RESULT : r = DB_QUERY(db, "PRAGMA table_info(" + dbQ$(name) + ")")
+            WHILE DB_NEXT(r)
+                ARRAY_PUSH(inamen, DB_GET_STRING(r, 1))
+                ARRAY_PUSH(ityp, UPPER$(DB_GET_STRING(r, 2)))
+                ARRAY_PUSH(inn, DB_GET_INT(r, 3) <> 0)
+                ARRAY_PUSH(idf, IIF(DB_IS_NULL(r, 4), "", DB_GET_STRING(r, 4)))
+            WEND
+            DIM neu AS BOOLEAN : neu = FALSE
+            DIM fehlt AS ARRAY OF INTEGER : fehlt = []
+            DIM k AS INTEGER
+            FOR k = 0 TO dbSpZahl(s, t) - 1
+                DIM i AS INTEGER : i = dbListenIndex(inamen, dbSp$(s, t, k, "name"))
+                IF i < 0 THEN
+                    ARRAY_PUSH(fehlt, k)
+                ELSEIF ityp[i] <> dbTypSql$(dbSp$(s, t, k, "typ")) OR inn[i] <> dbSpAn(s, t, k, "pflicht") OR idf[i] <> dbSpDefault$(s, t, k) THEN
+                    neu = TRUE
+                END IF
+            NEXT
+            IF neu THEN
+                dbNeuAufbauen(db, s, t, name, inamen, ityp, inn, idf)
+            ELSE
+                DIM f AS INTEGER
+                FOR EACH f IN fehlt
+                    DB_EXEC(db, "ALTER TABLE " + dbQ$(name) + " ADD COLUMN " + dbSpalteSql$(s, t, f))
+                NEXT
+            END IF
+        END IF
+        dbIndexeAbgleichen(db, s, t, name)
+    NEXT
+END SUB
+
+FUNCTION dbListenIndex(liste AS ARRAY OF STRING, name AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(liste) - 1
+        IF LOWER$(liste[i]) = LOWER$(name) THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB dbNeuAufbauen(db AS DB_CONN, s AS JSON_HANDLE, t AS INTEGER, name AS STRING, inamen AS ARRAY OF STRING, ityp AS ARRAY OF STRING, inn AS ARRAY OF BOOLEAN, idf AS ARRAY OF STRING)
+    DIM teile AS ARRAY OF STRING : teile = ["id INTEGER PRIMARY KEY"]
+    DIM ziel AS ARRAY OF STRING : ziel = ["id"]
+    DIM quelle AS ARRAY OF STRING : quelle = [IIF(dbListenIndex(inamen, "id") >= 0, "id", "rowid")]
+    DIM k AS INTEGER
+    FOR k = 0 TO dbSpZahl(s, t) - 1
+        ARRAY_PUSH(teile, dbSpalteSql$(s, t, k))
+        DIM sn AS STRING : sn = dbSp$(s, t, k, "name")
+        DIM i AS INTEGER : i = dbListenIndex(inamen, sn)
+        IF i < 0 THEN CONTINUE
+        ARRAY_PUSH(ziel, dbQ$(sn))
+        ' Eine Pflichtspalte nimmt keine NULL -- dort steht dann ihr Leerwert.
+        IF dbSpAn(s, t, k, "pflicht") THEN
+            ARRAY_PUSH(quelle, "COALESCE(" + dbQ$(inamen[i]) + ", " + dbSpDefault$(s, t, k) + ")")
+        ELSE
+            ARRAY_PUSH(quelle, dbQ$(inamen[i]))
+        END IF
+    NEXT
+    ' Was das Programm selbst dazugelegt hat, bleibt mit seiner Erklaerung.
+    DIM i2 AS INTEGER
+    FOR i2 = 0 TO LEN(inamen) - 1
+        IF LOWER$(inamen[i2]) = "id" OR dbSpIndex(s, t, inamen[i2]) >= 0 THEN CONTINUE
+        DIM z AS STRING : z = dbQ$(inamen[i2]) + " " + ityp[i2]
+        IF inn[i2] THEN z = z + " NOT NULL"
+        IF idf[i2] <> "" THEN z = z + " DEFAULT " + idf[i2]
+        ARRAY_PUSH(teile, z)
+        ARRAY_PUSH(ziel, dbQ$(inamen[i2]))
+        ARRAY_PUSH(quelle, dbQ$(inamen[i2]))
+    NEXT
+    DB_EXEC(db, "CREATE TABLE " + dbQ$("studio_neu") + " (" + JOIN$(teile, ", ") + ")")
+    DB_EXEC(db, "INSERT INTO " + dbQ$("studio_neu") + " (" + JOIN$(ziel, ", ") + ") SELECT " + JOIN$(quelle, ", ") + " FROM " + dbQ$(name))
+    DB_EXEC(db, "DROP TABLE " + dbQ$(name))
+    DB_EXEC(db, "ALTER TABLE " + dbQ$("studio_neu") + " RENAME TO " + dbQ$(name))
+END SUB
+
+SUB dbIndexeAbgleichen(db AS DB_CONN, s AS JSON_HANDLE, t AS INTEGER, name AS STRING)
+    DIM soll AS ARRAY OF STRING : soll = []
+    DIM k AS INTEGER
+    FOR k = 0 TO dbSpZahl(s, t) - 1
+        IF dbSpAn(s, t, k, "eindeutig") THEN ARRAY_PUSH(soll, dbIndexName$(name, dbSp$(s, t, k, "name")))
+    NEXT
+    DIM ist AS ARRAY OF STRING : ist = []
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT name FROM sqlite_master WHERE type = 'index' AND lower(tbl_name) = lower(?)", name)
+    WHILE DB_NEXT(r)
+        DIM n AS STRING : n = DB_GET_STRING(r, 0)
+        IF LEFT$(n, LEN(DB_INDEX_VOR)) = DB_INDEX_VOR THEN ARRAY_PUSH(ist, n)
+    WEND
+    DIM n2 AS STRING
+    FOR EACH n2 IN ist
+        IF dbListenIndex(soll, n2) < 0 THEN DB_EXEC(db, "DROP INDEX " + dbQ$(n2))
+    NEXT
+    FOR k = 0 TO dbSpZahl(s, t) - 1
+        IF dbSpAn(s, t, k, "eindeutig") THEN DB_EXEC(db, dbIndexSql$(name, dbSp$(s, t, k, "name")))
+    NEXT
+END SUB
+
+' Ein neues Schema samt einigen Befehlen davor (umbenennen, loeschen) in EINER
+' Transaktion auf die Entwicklungsdatei. Geht etwas schief, bleibt alles, wie
+' es war -- die Datei UND das Schema. Liefert "" oder die Meldung.
+FUNCTION dbAusfuehren$(e AS Element, neu AS STRING, vorher AS ARRAY OF STRING) AS STRING
+    DIM p AS STRING : p = dbPfad$(e)
+    IF p = "" THEN
+        e.schema = neu
+        e.geaendert = TRUE
+        RETURN ""
+    END IF
+    DIM db AS DB_CONN
+    TRY
+        db = DB_OPEN(p)
+    CATCH ofehler
+        RETURN dbMeldung$(ofehler)
+    END TRY
+    DIM fehler AS STRING : fehler = ""
+    TRY
+        DB_BEGIN(db)
+        DIM sql AS STRING
+        FOR EACH sql IN vorher
+            DB_EXEC(db, sql)
+        NEXT
+        dbAbgleichenMit(db, JSON_PARSE(neu))
+        DB_COMMIT(db)
+    CATCH afehler
+        fehler = dbMeldung$(afehler)
+        TRY
+            DB_ROLLBACK(db)
+        CATCH rfehler
+        END TRY
+    END TRY
+    DB_CLOSE(db)
+    IF fehler = "" THEN
+        e.schema = neu
+        e.geaendert = TRUE
+    END IF
+    RETURN fehler
+END FUNCTION
+
+' Die Datei an das gespeicherte Schema angleichen (nach Laden und Sichern).
+FUNCTION dbAbgleichen$(e AS Element) AS STRING
+    RETURN dbAusfuehren$(e, JSON_STRINGIFY(dbSchema(e)), [])
+END FUNCTION
+
+' Steht die Tabelle bzw. Spalte schon in der Entwicklungsdatei? Dann wird sie
+' umbenannt statt neu angelegt.
+FUNCTION dbInDatei(e AS Element, tabelle AS STRING, spalte AS STRING) AS BOOLEAN
+    DIM p AS STRING : p = dbPfad$(e)
+    IF p = "" THEN RETURN FALSE
+    IF NOT FILEEXISTS(p) THEN RETURN FALSE
+    DIM db AS DB_CONN : db = DB_OPEN(p)
+    DIM da AS BOOLEAN
+    IF spalte = "" THEN da = dbTabelleDa(db, tabelle) ELSE da = dbSpalteDa(db, tabelle, spalte)
+    DB_CLOSE(db)
+    RETURN da
+END FUNCTION
+
+' --- Den Aufbau aendern -----------------------------------------------------------
+FUNCTION dbTabelleNeu$(e AS Element, name AS STRING) AS STRING
+    DIM f AS STRING : f = dbNameFehler$(name, "tabelle")
+    IF f <> "" THEN RETURN f
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    IF dbTabIndex(s, name) >= 0 THEN RETURN trf$("Eine Tabelle {0} gibt es schon.", [name])
+    DIM o AS JSON_HANDLE : o = JSON_PARSE("{}")
+    JSON_SET_STRING(o, "name", name)
+    JSON_SET_JSON(o, "spalten", JSON_NEW_ARRAY())
+    JSON_APPEND_JSON(s, "tabellen", o)
+    RETURN dbAusfuehren$(e, JSON_STRINGIFY(s), [])
+END FUNCTION
+
+FUNCTION dbTabelleUmbenennen$(e AS Element, alt AS STRING, neu AS STRING) AS STRING
+    IF alt = neu THEN RETURN ""
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM t AS INTEGER : t = dbTabIndex(s, alt)
+    IF t < 0 THEN RETURN trf$("Die Tabelle {0} gibt es nicht.", [alt])
+    DIM f AS STRING : f = dbNameFehler$(neu, "tabelle")
+    IF f <> "" THEN RETURN f
+    DIM t2 AS INTEGER : t2 = dbTabIndex(s, neu)
+    IF t2 >= 0 AND t2 <> t THEN RETURN trf$("Eine Tabelle {0} gibt es schon.", [neu])
+    JSON_SET_STRING(s, "tabellen." + STR$(t) + ".name", neu)
+    DIM vorher AS ARRAY OF STRING : vorher = []
+    IF dbInDatei(e, alt, "") AND LOWER$(alt) <> LOWER$(neu) THEN ARRAY_PUSH(vorher, "ALTER TABLE " + dbQ$(alt) + " RENAME TO " + dbQ$(neu))
+    RETURN dbAusfuehren$(e, JSON_STRINGIFY(s), vorher)
+END FUNCTION
+
+FUNCTION dbTabelleLoeschen$(e AS Element, name AS STRING) AS STRING
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM t AS INTEGER : t = dbTabIndex(s, name)
+    IF t < 0 THEN RETURN trf$("Die Tabelle {0} gibt es nicht.", [name])
+    JSON_REMOVE(s, "tabellen." + STR$(t))
+    RETURN dbAusfuehren$(e, JSON_STRINGIFY(s), ["DROP TABLE IF EXISTS " + dbQ$(name)])
+END FUNCTION
+
+FUNCTION dbSpalteNeu$(e AS Element, tabelle AS STRING, name AS STRING, typ AS STRING) AS STRING
+    DIM f AS STRING : f = dbNameFehler$(name, "spalte")
+    IF f <> "" THEN RETURN f
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM t AS INTEGER : t = dbTabIndex(s, tabelle)
+    IF t < 0 THEN RETURN trf$("Die Tabelle {0} gibt es nicht.", [tabelle])
+    IF dbSpIndex(s, t, name) >= 0 THEN RETURN trf$("Eine Spalte {0} gibt es in {1} schon.", [name, tabelle])
+    IF dbListenIndex(dbTypen(), typ) < 0 THEN typ = "text"
+    DIM o AS JSON_HANDLE : o = JSON_PARSE("{}")
+    JSON_SET_STRING(o, "name", name)
+    JSON_SET_STRING(o, "typ", typ)
+    JSON_SET_BOOL(o, "pflicht", FALSE)
+    JSON_SET_BOOL(o, "eindeutig", FALSE)
+    JSON_SET_STRING(o, "vorgabe", "")
+    JSON_APPEND_JSON(s, "tabellen." + STR$(t) + ".spalten", o)
+    RETURN dbAusfuehren$(e, JSON_STRINGIFY(s), [])
+END FUNCTION
+
+FUNCTION dbSpalteUmbenennen$(e AS Element, tabelle AS STRING, alt AS STRING, neu AS STRING) AS STRING
+    IF alt = neu THEN RETURN ""
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM t AS INTEGER : t = dbTabIndex(s, tabelle)
+    IF t < 0 THEN RETURN trf$("Die Tabelle {0} gibt es nicht.", [tabelle])
+    DIM k AS INTEGER : k = dbSpIndex(s, t, alt)
+    IF k < 0 THEN RETURN trf$("Die Spalte {0} gibt es nicht.", [alt])
+    DIM f AS STRING : f = dbNameFehler$(neu, "spalte")
+    IF f <> "" THEN RETURN f
+    DIM k2 AS INTEGER : k2 = dbSpIndex(s, t, neu)
+    IF k2 >= 0 AND k2 <> k THEN RETURN trf$("Eine Spalte {0} gibt es in {1} schon.", [neu, tabelle])
+    JSON_SET_STRING(s, dbSpPfad$(t, k) + ".name", neu)
+    DIM vorher AS ARRAY OF STRING : vorher = []
+    IF dbInDatei(e, tabelle, alt) AND LOWER$(alt) <> LOWER$(neu) THEN ARRAY_PUSH(vorher, "ALTER TABLE " + dbQ$(tabelle) + " RENAME COLUMN " + dbQ$(alt) + " TO " + dbQ$(neu))
+    RETURN dbAusfuehren$(e, JSON_STRINGIFY(s), vorher)
+END FUNCTION
+
+FUNCTION dbSpalteLoeschen$(e AS Element, tabelle AS STRING, name AS STRING) AS STRING
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM t AS INTEGER : t = dbTabIndex(s, tabelle)
+    IF t < 0 THEN RETURN trf$("Die Tabelle {0} gibt es nicht.", [tabelle])
+    DIM k AS INTEGER : k = dbSpIndex(s, t, name)
+    IF k < 0 THEN RETURN trf$("Die Spalte {0} gibt es nicht.", [name])
+    JSON_REMOVE(s, dbSpPfad$(t, k))
+    DIM vorher AS ARRAY OF STRING : vorher = ["DROP INDEX IF EXISTS " + dbQ$(dbIndexName$(tabelle, name))]
+    IF dbInDatei(e, tabelle, name) THEN ARRAY_PUSH(vorher, "ALTER TABLE " + dbQ$(tabelle) + " DROP COLUMN " + dbQ$(name))
+    RETURN dbAusfuehren$(e, JSON_STRINGIFY(s), vorher)
+END FUNCTION
+
+FUNCTION dbSpalteAendern$(e AS Element, tabelle AS STRING, name AS STRING, typ AS STRING, pflicht AS BOOLEAN, eindeutig AS BOOLEAN, vorgabe AS STRING) AS STRING
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM t AS INTEGER : t = dbTabIndex(s, tabelle)
+    IF t < 0 THEN RETURN trf$("Die Tabelle {0} gibt es nicht.", [tabelle])
+    DIM k AS INTEGER : k = dbSpIndex(s, t, name)
+    IF k < 0 THEN RETURN trf$("Die Spalte {0} gibt es nicht.", [name])
+    IF dbListenIndex(dbTypen(), typ) < 0 THEN RETURN trf$("'{0}' ist keine Art.", [typ])
+    IF vorgabe <> "" AND dbLiteral$(typ, vorgabe) = "" THEN RETURN trf$("Die Vorgabe '{0}' passt nicht zu {1}.", [vorgabe, dbTypName$(typ)])
+    DIM p AS STRING : p = dbSpPfad$(t, k)
+    JSON_SET_STRING(s, p + ".typ", typ)
+    JSON_SET_BOOL(s, p + ".pflicht", pflicht)
+    JSON_SET_BOOL(s, p + ".eindeutig", eindeutig)
+    JSON_SET_STRING(s, p + ".vorgabe", vorgabe)
+    RETURN dbAusfuehren$(e, JSON_STRINGIFY(s), [])
+END FUNCTION
+
+' Eine andere Datei: die Entwicklungsdaten ziehen mit, wenn es dort noch
+' keine gibt.
+FUNCTION dbDateiSetzen$(e AS Element, datei AS STRING) AS STRING
+    DIM d AS STRING : d = TRIM$(datei)
+    IF d = "" THEN RETURN tr$("Die Datei braucht einen Namen.")
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    IF d = dbDateiVon$(s) THEN RETURN ""
+    DIM alt AS STRING : alt = dbPfad$(e)
+    JSON_SET_STRING(s, "datei", d)
+    e.schema = JSON_STRINGIFY(s)
+    e.geaendert = TRUE
+    IF alt <> "" THEN
+        DIM neu AS STRING : neu = PATHJOIN(projOrdner, d)
+        IF FILEEXISTS(alt) AND NOT FILEEXISTS(neu) THEN RENAME(alt, neu)
+    END IF
+    RETURN dbAbgleichen$(e)
+END FUNCTION
+
+' --- Daten ------------------------------------------------------------------------
+'  Die Zeilen einer Tabelle zum Anzeigen: je Zeile die id und je Spalte des
+'  Schemas der Text, wie man ihn tippt (Geld 12,34, Ja/Nein, Kommazahl mit
+'  Komma). NULL ist leer.
+DIM dbIds AS ARRAY OF INTEGER : dbIds = []
+DIM dbZellen AS ARRAY OF STRING : dbZellen = []
+DIM dbGesamt AS INTEGER : dbGesamt = 0
+DIM dbNeueId AS INTEGER : dbNeueId = 0
+
+FUNCTION dbAnzeige$(typ AS STRING, r AS DB_RESULT, i AS INTEGER) AS STRING
+    IF DB_IS_NULL(r, i) THEN RETURN ""
+    SELECT CASE typ
+        CASE "geld" : RETURN dbGeldText$(DB_GET_INT(r, i))
+        CASE "wahr" : RETURN IIF(DB_GET_INT(r, i) <> 0, tr$("ja"), tr$("nein"))
+        CASE "zahl"
+            ' 1250.0 steht als 1250 da -- die Null hinter dem Komma sagt nichts.
+            DIM z AS STRING : z = DB_GET_STRING(r, i)
+            IF RIGHT$(z, 2) = ".0" THEN z = LEFT$(z, LEN(z) - 2)
+            RETURN REPLACE$(z, ".", ",")
+    END SELECT
+    RETURN DB_GET_STRING(r, i)
+END FUNCTION
+
+FUNCTION dbZeilenLesen$(e AS Element, tabelle AS STRING, grenze AS INTEGER) AS STRING
+    dbIds = [] : dbZellen = [] : dbGesamt = 0
+    DIM p AS STRING : p = dbPfad$(e)
+    IF p = "" THEN RETURN tr$("Erst das Projekt sichern -- dann gibt es eine Datei für die Daten.")
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM t AS INTEGER : t = dbTabIndex(s, tabelle)
+    IF t < 0 THEN RETURN trf$("Die Tabelle {0} gibt es nicht.", [tabelle])
+    DIM spalten AS ARRAY OF STRING : spalten = ["id"]
+    DIM k AS INTEGER
+    FOR k = 0 TO dbSpZahl(s, t) - 1
+        ARRAY_PUSH(spalten, dbQ$(dbSp$(s, t, k, "name")))
+    NEXT
+    DIM fehler AS STRING : fehler = ""
+    DIM db AS DB_CONN
+    TRY
+        db = DB_OPEN(p)
+        DIM rz AS DB_RESULT : rz = DB_QUERY(db, "SELECT COUNT(*) FROM " + dbQ$(tabelle))
+        IF DB_NEXT(rz) THEN dbGesamt = DB_GET_INT(rz, 0)
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT " + JOIN$(spalten, ", ") + " FROM " + dbQ$(tabelle) + " ORDER BY id LIMIT " + STR$(grenze))
+        WHILE DB_NEXT(r)
+            ARRAY_PUSH(dbIds, DB_GET_INT(r, 0))
+            FOR k = 0 TO dbSpZahl(s, t) - 1
+                ARRAY_PUSH(dbZellen, dbAnzeige$(dbSp$(s, t, k, "typ"), r, k + 1))
+            NEXT
+        WEND
+    CATCH lfehler
+        fehler = dbMeldung$(lfehler)
+    END TRY
+    TRY
+        DB_CLOSE(db)
+    CATCH zfehler
+    END TRY
+    RETURN fehler
+END FUNCTION
+
+' Einen getippten Wert in eine Zelle schreiben. Leer ist NULL -- ausser bei
+' einer Pflichtspalte.
+FUNCTION dbZelleSetzen$(e AS Element, tabelle AS STRING, id AS INTEGER, spalte AS STRING, text AS STRING) AS STRING
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM t AS INTEGER : t = dbTabIndex(s, tabelle)
+    IF t < 0 THEN RETURN trf$("Die Tabelle {0} gibt es nicht.", [tabelle])
+    DIM k AS INTEGER : k = dbSpIndex(s, t, spalte)
+    IF k < 0 THEN RETURN trf$("Die Spalte {0} gibt es nicht.", [spalte])
+    DIM typ AS STRING : typ = dbSp$(s, t, k, "typ")
+    DIM p AS STRING : p = dbPfad$(e)
+    IF p = "" THEN RETURN tr$("Erst das Projekt sichern -- dann gibt es eine Datei für die Daten.")
+    DIM leer AS BOOLEAN : leer = TRIM$(text) = ""
+    IF leer AND dbSpAn(s, t, k, "pflicht") THEN RETURN trf$("{0} ist ein Pflichtfeld.", [spalte])
+    DIM lit AS STRING : lit = ""
+    IF NOT leer THEN
+        lit = dbLiteral$(typ, text)
+        IF lit = "" THEN RETURN trf$("'{0}' passt nicht zu {1} ({2}).", [text, spalte, dbTypName$(typ)])
+    END IF
+    DIM sql AS STRING : sql = "UPDATE " + dbQ$(tabelle) + " SET " + dbQ$(spalte) + " = ? WHERE id = ?"
+    DIM fehler AS STRING : fehler = ""
+    DIM db AS DB_CONN
+    TRY
+        db = DB_OPEN(p)
+        IF leer THEN
+            DB_EXEC(db, sql, NIL, id)
+        ELSEIF dbTypSql$(typ) = "INTEGER" THEN
+            DB_EXEC(db, sql, INT(VAL(lit)), id)
+        ELSEIF typ = "zahl" THEN
+            DB_EXEC(db, sql, VAL(lit), id)
+        ELSEIF typ = "datum" THEN
+            DB_EXEC(db, sql, TRIM$(text), id)
+        ELSE
+            DB_EXEC(db, sql, text, id)
+        END IF
+    CATCH sfehler
+        fehler = dbMeldung$(sfehler)
+    END TRY
+    TRY
+        DB_CLOSE(db)
+    CATCH zfehler
+    END TRY
+    RETURN fehler
+END FUNCTION
+
+FUNCTION dbZeileNeu$(e AS Element, tabelle AS STRING) AS STRING
+    DIM p AS STRING : p = dbPfad$(e)
+    IF p = "" THEN RETURN tr$("Erst das Projekt sichern -- dann gibt es eine Datei für die Daten.")
+    DIM fehler AS STRING : fehler = ""
+    DIM db AS DB_CONN
+    TRY
+        db = DB_OPEN(p)
+        DB_EXEC(db, "INSERT INTO " + dbQ$(tabelle) + " DEFAULT VALUES")
+        dbNeueId = DB_LAST_ROWID(db)
+    CATCH nfehler
+        fehler = dbMeldung$(nfehler)
+    END TRY
+    TRY
+        DB_CLOSE(db)
+    CATCH zfehler
+    END TRY
+    RETURN fehler
+END FUNCTION
+
+FUNCTION dbZeileLoeschen$(e AS Element, tabelle AS STRING, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = dbPfad$(e)
+    IF p = "" THEN RETURN ""
+    DIM fehler AS STRING : fehler = ""
+    DIM db AS DB_CONN
+    TRY
+        db = DB_OPEN(p)
+        DB_EXEC(db, "DELETE FROM " + dbQ$(tabelle) + " WHERE id = ?", id)
+    CATCH dfehler
+        fehler = dbMeldung$(dfehler)
+    END TRY
+    TRY
+        DB_CLOSE(db)
+    CATCH zfehler
+    END TRY
+    RETURN fehler
+END FUNCTION
+
+' --- Im erzeugten Programm --------------------------------------------------------
+'  _studio/studio_datenbanken.dh: je Datenbank eine globale Verbindung unter
+'  ihrem Namen, beim Start geoeffnet; fehlende Tabellen, Spalten und Indexe
+'  legt das Programm selbst an. Ohne Datenbank im Projekt: "".
+FUNCTION dbText$(roh AS STRING) AS STRING
+    RETURN "!" + CHR$(34) + REPLACE$(REPLACE$(roh, "\", "\\"), CHR$(34), "\" + CHR$(34)) + CHR$(34)
+END FUNCTION
+
+FUNCTION datenbankCode$() AS STRING
+    DIM z AS ARRAY OF STRING : z = []
+    DIM e AS Element
+    FOR EACH e IN elemente
+        IF e.art <> "datenbank" THEN CONTINUE
+        IF LEN(z) = 0 THEN
+            ARRAY_PUSH(z, "' Erzeugt vom Drachenhauch Studio -- die Datenbanken des Projekts.")
+            ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "db" + CHR$(34))
+            ARRAY_PUSH(z, "")
+            ARRAY_PUSH(z, "' Aus dem Studio gestartet: die Entwicklungsdaten im Projektordner.")
+            ARRAY_PUSH(z, "FUNCTION studioDbPfad$(datei AS STRING) AS STRING")
+            ARRAY_PUSH(z, "    DIM o AS STRING : o = GETENV$(" + CHR$(34) + "DH_STUDIO_DATEN" + CHR$(34) + ")")
+            ARRAY_PUSH(z, "    IF o = " + CHR$(34) + CHR$(34) + " THEN RETURN datei")
+            ARRAY_PUSH(z, "    RETURN PATHJOIN(o, datei)")
+            ARRAY_PUSH(z, "END FUNCTION")
+            ARRAY_PUSH(z, "")
+            ARRAY_PUSH(z, "SUB studioDbSpalte(db AS DB_CONN, tabelle AS STRING, spalte AS STRING, def AS STRING)")
+            ARRAY_PUSH(z, "    DIM r AS DB_RESULT : r = DB_QUERY(db, " + dbText$("PRAGMA table_info(" + CHR$(34)) + " + tabelle + " + dbText$(CHR$(34) + ")") + ")")
+            ARRAY_PUSH(z, "    WHILE DB_NEXT(r)")
+            ARRAY_PUSH(z, "        IF LOWER$(DB_GET_STRING(r, 1)) = LOWER$(spalte) THEN")
+            ARRAY_PUSH(z, "            DB_CLOSE_RESULT(r)")
+            ARRAY_PUSH(z, "            RETURN")
+            ARRAY_PUSH(z, "        END IF")
+            ARRAY_PUSH(z, "    WEND")
+            ARRAY_PUSH(z, "    DB_EXEC(db, " + dbText$("ALTER TABLE " + CHR$(34)) + " + tabelle + " + dbText$(CHR$(34) + " ADD COLUMN ") + " + def)")
+            ARRAY_PUSH(z, "END SUB")
+        END IF
+        DIM s AS JSON_HANDLE : s = dbSchema(e)
+        ARRAY_PUSH(z, "")
+        ARRAY_PUSH(z, "' Datenbank " + e.name)
+        ARRAY_PUSH(z, "DIM " + e.name + " AS DB_CONN : " + e.name + " = DB_OPEN(studioDbPfad$(" + dbText$(dbDateiVon$(s)) + "))")
+        DIM t AS INTEGER
+        FOR t = 0 TO dbTabZahl(s) - 1
+            DIM tn AS STRING : tn = dbTabName$(s, t)
+            ARRAY_PUSH(z, "DB_EXEC(" + e.name + ", " + dbText$(dbTabelleSql$(s, t, tn)) + ")")
+            DIM k AS INTEGER
+            FOR k = 0 TO dbSpZahl(s, t) - 1
+                ARRAY_PUSH(z, "studioDbSpalte(" + e.name + ", " + dbText$(tn) + ", " + dbText$(dbSp$(s, t, k, "name")) + ", " + dbText$(dbSpalteSql$(s, t, k)) + ")")
+            NEXT
+            FOR k = 0 TO dbSpZahl(s, t) - 1
+                IF dbSpAn(s, t, k, "eindeutig") THEN ARRAY_PUSH(z, "DB_EXEC(" + e.name + ", " + dbText$(dbIndexSql$(tn, dbSp$(s, t, k, "name"))) + ")")
+            NEXT
+        NEXT
+    NEXT
+    IF LEN(z) = 0 THEN RETURN ""
+    RETURN JOIN$(z, CHR$(10)) + CHR$(10)
+END FUNCTION
+
+' Gibt es eine Datenbank im Projekt?
+FUNCTION hatDatenbank() AS BOOLEAN
+    DIM e AS Element
+    FOR EACH e IN elemente
+        IF e.art = "datenbank" THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Alle Datenbanken an ihr Schema angleichen; liefert die erste Meldung.
+FUNCTION datenbankenAbgleichen$() AS STRING
+    DIM e AS Element
+    FOR EACH e IN elemente
+        IF e.art <> "datenbank" THEN CONTINUE
+        DIM f AS STRING : f = dbAbgleichen$(e)
+        IF f <> "" THEN RETURN e.name + ": " + f
+    NEXT
+    RETURN ""
+END FUNCTION
