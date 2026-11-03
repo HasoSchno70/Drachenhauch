@@ -12,8 +12,8 @@
 --- langsam
 === das erzeugte fenster laedt, sichert, loescht und fuellt seine listen
 ' Neu setzt die Vorgabe (aktiv = ja), Sichern legt eine Zeile an und waehlt
-' sie in der Liste, Laden zeigt Geld als 12,50, die Klappliste traegt die
-' Namen, IdVon kennt die gewaehlte Zeile. Danach klickt das Programm selbst
+' sie in der Liste, Laden zeigt Geld als 12,50, die Klappliste zeigt die
+' genannte Spalte (umsatz), IdVon kennt die gewaehlte Zeile. Danach klickt das Programm selbst
 ' (eine Aufnahme) auf die zweite Zeile der Tabelle -- sie zeigt die Tabelle
 ' des Fensters, also laedt das Fenster Bert; ein Timer schreibt es hin.
 IMPORT "laeufer.dh"
@@ -45,7 +45,7 @@ slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
 --- datei proj/Hauptfenster.dhform
-{"title":"Haupt","name":"Hauptfenster","w":600,"h":400,"studio_tabelle":"Daten.kunden","timer":[{"name":"spaeter","intervall":700,"aktiv":true,"wiederholen":false}],"widgets":[{"kind":"table","name":"liste","x":10,"y":10,"w":300,"h":200,"table":{"headers":["a"]},"studio_quelle":"Daten.kunden"},{"kind":"textinput","name":"nameFeld","x":320,"y":10,"w":200,"h":28,"bind":"name"},{"kind":"textinput","name":"umsatzFeld","x":320,"y":50,"w":200,"h":28,"bind":"umsatz","zahlen":3},{"kind":"checkbox","name":"aktivFeld","text":"aktiv","x":320,"y":90,"w":100,"h":24,"bind":"aktiv"},{"kind":"dropdown","name":"wahl","x":320,"y":130,"w":200,"h":28,"items":[],"studio_quelle":"Daten.kunden","studio_spalten":"name"}]}
+{"title":"Haupt","name":"Hauptfenster","w":600,"h":400,"studio_tabelle":"Daten.kunden","timer":[{"name":"spaeter","intervall":700,"aktiv":true,"wiederholen":false}],"widgets":[{"kind":"table","name":"liste","x":10,"y":10,"w":300,"h":200,"table":{"headers":["a"]},"studio_quelle":"Daten.kunden"},{"kind":"textinput","name":"nameFeld","x":320,"y":10,"w":200,"h":28,"bind":"name"},{"kind":"textinput","name":"umsatzFeld","x":320,"y":50,"w":200,"h":28,"bind":"umsatz","zahlen":3},{"kind":"checkbox","name":"aktivFeld","text":"aktiv","x":320,"y":90,"w":100,"h":24,"bind":"aktiv"},{"kind":"dropdown","name":"wahl","x":320,"y":130,"w":200,"h":28,"items":[],"studio_quelle":"Daten.kunden","studio_spalten":"umsatz"}]}
 --- datei proj/Hauptfenster.dh
 CLASS Hauptfenster EXTENDS Hauptfenster_Basis
     SUB Geoeffnet()
@@ -80,7 +80,7 @@ ausgabe sichern TRUE 3
 ausgabe zeilen 3 Clara 7,25 gewaehlt 2
 ausgabe laden TRUE Anna 12,50 FALSE
 ausgabe ungesichert TRUE
-ausgabe klapp 3 Clara
+ausgabe klapp 3 7,25
 ausgabe id 3
 ausgabe loeschen TRUE 2 0
 ausgabe geklickt 2 Bert FALSE
