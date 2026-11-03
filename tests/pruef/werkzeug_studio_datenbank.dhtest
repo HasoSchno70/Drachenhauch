@@ -284,6 +284,91 @@ Anna Bremen 1999
   studio_u_kunden_ort
 check []
 
+=== umbenennen im studio zieht das gebaute programm nach
+' Eine aeltere Datei neben dem Programm kennt noch kunden.name/ort samt Index.
+' Im Studio werden ort -> stadt, kunden -> kundschaft und name -> vorname
+' umbenannt (artikel -> Artikel ist nur Gross/klein: SQLite sieht denselben
+' Namen, gemerkt wird es nicht, die Datei behaelt artikel).
+' Das Programm benennt der Reihe nach um, die Zeile behaelt ihre Werte, der
+' Index heisst danach nach Tabelle und Spalte; ein zweiter Lauf aendert nichts.
+IMPORT "kern.dh"
+projOrdner = CWD$() + "/proj"
+DIM e AS Element : e = elementNeu("datenbank", "Daten")
+e.schema = READLINES("Daten.dhdb")[0]
+PRINT "[" + dbSpalteUmbenennen$(e, "kunden", "ort", "stadt") + dbTabelleUmbenennen$(e, "kunden", "kundschaft") + dbSpalteUmbenennen$(e, "kundschaft", "name", "vorname") + dbTabelleUmbenennen$(e, "artikel", "Artikel") + "]"
+DIM s AS JSON_HANDLE : s = dbSchema(e)
+DIM u AS INTEGER
+FOR u = 0 TO JSON_LEN(s, "umbenannt") - 1
+    DIM up AS STRING : up = "umbenannt." + STR$(u)
+    PRINT "  "; JSON_GET_STRING(s, up + ".art"); " "; JSON_GET_STRING(s, up + ".tabelle"); " "; JSON_GET_STRING(s, up + ".alt"); " -> "; JSON_GET_STRING(s, up + ".neu")
+NEXT
+MKDIR("prog")
+WRITEALL("prog/studio_datenbanken.dh", datenbankCode$())
+DIM db AS DB_CONN : db = DB_OPEN("prog/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT NOT NULL DEFAULT '', ort TEXT)")
+DB_EXEC(db, "CREATE UNIQUE INDEX studio_u_kunden_ort ON kunden (ort)")
+DB_EXEC(db, "CREATE TABLE artikel (id INTEGER PRIMARY KEY, preis INTEGER NOT NULL DEFAULT 0)")
+DB_EXEC(db, "INSERT INTO kunden (name, ort) VALUES ('Anna', 'Bremen')")
+DB_CLOSE(db)
+DIM lauf AS INTEGER
+FOR lauf = 1 TO 2
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", CWD$() + "/prog/main.dh")
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF t <> "" THEN
+            aus = aus + t
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(30)
+    WEND
+    PRINT "lauf "; lauf; ": "; TRIM$(REPLACE$(aus, CHR$(13), ""))
+NEXT
+db = DB_OPEN("prog/daten.sqlite")
+DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT name FROM sqlite_master WHERE type IN ('table', 'index') ORDER BY name")
+WHILE DB_NEXT(r)
+    PRINT "  "; DB_GET_STRING(r, 0)
+WEND
+r = DB_QUERY(db, "PRAGMA table_info(kundschaft)")
+DIM sp AS ARRAY OF STRING : sp = []
+WHILE DB_NEXT(r)
+    ARRAY_PUSH(sp, DB_GET_STRING(r, 1))
+WEND
+PRINT "spalten "; JOIN$(sp, ",")
+DB_CLOSE(db)
+--- datei Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":true,"eindeutig":false,"vorgabe":""},{"name":"ort","typ":"text","pflicht":false,"eindeutig":true,"vorgabe":""}]},{"name":"artikel","spalten":[{"name":"preis","typ":"geld","pflicht":true,"eindeutig":false,"vorgabe":"0"}]}]}
+--- datei prog/main.dh
+IMPORT "studio_datenbanken.dh"
+DIM r AS DB_RESULT : r = DB_QUERY(Daten, "SELECT vorname, stadt FROM kundschaft")
+WHILE DB_NEXT(r)
+    PRINT DB_GET_STRING(r, 0); " "; DB_GET_STRING(r, 1)
+WEND
+--- datei kern.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "db"
+IMPORT "{sammlung}/../../studio/sprache.dh"
+IMPORT "{sammlung}/../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../studio/modell.dh"
+IMPORT "{sammlung}/../../studio/projekt.dh"
+IMPORT "{sammlung}/../../studio/datenbank.dh"
+--- erwartet
+[]
+  spalte kunden ort -> stadt
+  tabelle kunden kunden -> kundschaft
+  spalte kundschaft name -> vorname
+lauf 1: Anna Bremen
+lauf 2: Anna Bremen
+  artikel
+  kundschaft
+  studio_u_kundschaft_stadt
+spalten id,vorname,stadt
+
 === das projekt schreibt den aufbau als dhdb und liest ihn wieder
 ' Eine Datenbank hat keine .dh. Beim Umbenennen geht die alte .dhdb weg; die
 ' Datei mit den Daten bleibt, wie sie heisst.
@@ -476,6 +561,58 @@ db tabelle_neu  stadt
 wert Köln
 dhdb stadt TRUE stadt
 navigator TRUE
+
+=== der inspektor zeigt die datenbank, solange ihr reiter vorn ist
+' Bis dahin zeigte er im Reiter einer Datenbank (oder eines Moduls) weiter
+' das zuletzt offene Fenster samt seinen Feldern. Erster Lauf misst den
+' Reiter des Fensters, der zweite oeffnet die Datenbank und klickt zurueck:
+' dort sind die Felder des Fensters wieder da. Gezeigt wird die Folge der
+' Reiter, der Inspektor-Koepfe und ob Felder protokolliert wurden.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+SETENV("DH_STUDIO_OEFFNEN", "Daten")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, "", 12, p)
+DIM x AS INTEGER
+DIM y AS INTEGER
+slHin(10, 10)
+slWarten(14)
+(x, y) = slLage(log, "reiter 0")
+slKlick(x, y)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+DIM vorher AS STRING : vorher = ""
+DIM folge AS STRING : folge = ""
+DIM z AS STRING
+FOR EACH z IN slProtokoll(log)
+    DIM was AS STRING : was = ""
+    IF LEFT$(z, 5) = "vorn " OR LEFT$(z, 18) = "inspektor element " THEN was = z
+    IF LEFT$(z, 10) = "lage feld " THEN was = "felder"
+    IF was <> "" AND was <> vorher THEN folge = folge + was + " | "
+    IF was <> "" THEN vorher = was
+NEXT
+PRINT TRIM$(folge)
+--- argumente
+{sammlung}/../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "db"
+IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":true,"eindeutig":false,"vorgabe":""}]}]}
+--- erwartet
+felder | vorn layout Hauptfenster | felder | vorn datenbank Daten | inspektor element datenbank Daten | vorn layout Hauptfenster | felder |
 
 === f5 arbeitet auf den entwicklungsdaten, bauen nimmt sie mit
 ' Das Programm zaehlt die Kunden ueber die Verbindung Daten: aus dem Studio

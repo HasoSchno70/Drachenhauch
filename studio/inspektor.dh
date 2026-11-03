@@ -291,11 +291,39 @@ SUB farbfeldZeigen(z AS InspZeile, pfad AS STRING)
     END IF
 END SUB
 
+' Das Element des vorderen Reiters, wenn es nicht das Fenster in `doc` ist
+' (Datenbank, Modul, Klasse, Code eines anderen Fensters) -- sonst -1. Dann
+' zeigt der Inspektor dieses Element statt des zuletzt offenen Fensters.
+FUNCTION inspFremdesElement() AS INTEGER
+    DIM k AS INTEGER : k = reiterVorn()
+    IF k < 0 OR k >= LEN(reiter) THEN RETURN -1
+    IF reiter[k].art = "layout" THEN RETURN -1
+    DIM ei AS INTEGER : ei = elementVon(reiter[k].el)
+    IF ei = aktFenster THEN RETURN -1
+    RETURN ei
+END FUNCTION
+
 ' Die Editoren auf den Stand des Modells.
 SUB inspektorFuellen()
+    DIM fremd AS INTEGER : fremd = inspFremdesElement()
+    ' Eine Eingabe ohne Rueckgaengig-Schritt gehoert noch zum Fenster in `doc`.
+    IF fremd >= 0 AND inspAnhaengig >= 0 THEN merken()
     inspStumm = TRUE
     inspAnhaengig = -1
     DIM art AS STRING : art = ""
+    IF fremd >= 0 THEN
+        ' Nichts, was in `doc` steht, gehoert zu diesem Element.
+        GUI_SET_TEXT(inspTitel, elemente[fremd].name)
+        GUI_SET_TEXT(inspArt, artText$(elemente[fremd].art))
+        DIM zf AS InspZeile
+        FOR EACH zf IN inspZeilen
+            zf.sichtbar = FALSE
+        NEXT
+        inspektorLegen()
+        inspStumm = FALSE
+        protokoll("inspektor element " + elemente[fremd].art + " " + elemente[fremd].name)
+        RETURN
+    END IF
     IF abstandL >= 0 THEN
         art = "abstand"
         GUI_SET_TEXT(inspTitel, tr$("Abstandhalter"))

@@ -252,6 +252,7 @@ SUB reiterPruefen()
         werkzeugeNachziehen()
         navigatorAuswahl()
         IF k >= 0 THEN protokoll("vorn " + reiter[k].art + " " + reiterTitel$(reiter[k]))
+        inspektorFuellen()
         reiterProtokollieren()
         IF k >= 0 THEN feldBefunde(reiter[k])
     END IF

@@ -18,7 +18,10 @@
 '  auf ihr (DH_STUDIO_DATEN). Eine Aenderung am Aufbau gilt sofort fuer
 '  diese Datei (dbAusfuehren$). Das gebaute Programm legt seine eigene
 '  Datei neben sich an und ergaenzt fehlende Tabellen und Spalten selbst
-'  (datenbankCode$); umbenennen und loeschen tut es dort nicht.
+'  (datenbankCode$). Umbenennen zieht es dort nach: jede Umbenennung steht
+'  in "umbenannt" ([{"art": "tabelle"|"spalte", "tabelle", "alt", "neu"}]),
+'  und das Programm wendet sie der Reihe nach an, solange es den alten Namen
+'  noch gibt und den neuen nicht. Loeschen tut es dort nicht.
 '
 '  Eindeutig ist immer ein eigener Index (studio_u_<tabelle>_<spalte>):
 '  ALTER TABLE ADD COLUMN kann keine UNIQUE-Spalte anlegen.
@@ -74,6 +77,19 @@ FUNCTION dbSchema(e AS Element) AS JSON_HANDLE
     IF NOT JSON_HAS(s, "datei") THEN JSON_SET_STRING(s, "datei", LOWER$(e.name) + ".sqlite")
     RETURN s
 END FUNCTION
+
+' Eine Umbenennung fuer das gebaute Programm merken (nur, wenn sich mehr als
+' Gross/klein aendert -- SQLite sieht darin denselben Namen).
+SUB dbUmbenennungMerken(s AS JSON_HANDLE, art AS STRING, tabelle AS STRING, alt AS STRING, neu AS STRING)
+    IF LOWER$(alt) = LOWER$(neu) THEN RETURN
+    IF NOT JSON_HAS(s, "umbenannt") THEN JSON_SET_JSON(s, "umbenannt", JSON_NEW_ARRAY())
+    DIM o AS JSON_HANDLE : o = JSON_PARSE("{}")
+    JSON_SET_STRING(o, "art", art)
+    JSON_SET_STRING(o, "tabelle", tabelle)
+    JSON_SET_STRING(o, "alt", alt)
+    JSON_SET_STRING(o, "neu", neu)
+    JSON_APPEND_JSON(s, "umbenannt", o)
+END SUB
 
 FUNCTION dbDateiVon$(s AS JSON_HANDLE) AS STRING
     RETURN JSON_GET_STRING(s, "datei")
@@ -475,6 +491,7 @@ FUNCTION dbTabelleUmbenennen$(e AS Element, alt AS STRING, neu AS STRING) AS STR
     IF t2 >= 0 AND t2 <> t THEN RETURN trf$("Eine Tabelle {0} gibt es schon.", [neu])
     IF dbAbfIndex(s, neu) >= 0 THEN RETURN trf$("Den Namen {0} gibt es in {1} schon.", [neu, e.name])
     JSON_SET_STRING(s, "tabellen." + STR$(t) + ".name", neu)
+    dbUmbenennungMerken(s, "tabelle", alt, alt, neu)
     DIM vorher AS ARRAY OF STRING : vorher = []
     IF dbInDatei(e, alt, "") AND LOWER$(alt) <> LOWER$(neu) THEN ARRAY_PUSH(vorher, "ALTER TABLE " + dbQ$(alt) + " RENAME TO " + dbQ$(neu))
     RETURN dbAusfuehren$(e, JSON_STRINGIFY(s), vorher)
@@ -518,6 +535,7 @@ FUNCTION dbSpalteUmbenennen$(e AS Element, tabelle AS STRING, alt AS STRING, neu
     DIM k2 AS INTEGER : k2 = dbSpIndex(s, t, neu)
     IF k2 >= 0 AND k2 <> k THEN RETURN trf$("Eine Spalte {0} gibt es in {1} schon.", [neu, tabelle])
     JSON_SET_STRING(s, dbSpPfad$(t, k) + ".name", neu)
+    dbUmbenennungMerken(s, "spalte", tabelle, alt, neu)
     DIM vorher AS ARRAY OF STRING : vorher = []
     IF dbInDatei(e, tabelle, alt) AND LOWER$(alt) <> LOWER$(neu) THEN ARRAY_PUSH(vorher, "ALTER TABLE " + dbQ$(tabelle) + " RENAME COLUMN " + dbQ$(alt) + " TO " + dbQ$(neu))
     RETURN dbAusfuehren$(e, JSON_STRINGIFY(s), vorher)
@@ -743,6 +761,50 @@ FUNCTION datenbankCode$() AS STRING
             ARRAY_PUSH(z, "    DB_EXEC(db, " + dbText$("ALTER TABLE " + CHR$(34)) + " + tabelle + " + dbText$(CHR$(34) + " ADD COLUMN ") + " + def)")
             ARRAY_PUSH(z, "END SUB")
             ARRAY_PUSH(z, "")
+            ARRAY_PUSH(z, "' Was im Studio umbenannt wurde, auch in einer aelteren Datei umbenennen --")
+            ARRAY_PUSH(z, "' nur, solange es den alten Namen noch gibt und den neuen nicht.")
+            ARRAY_PUSH(z, "FUNCTION studioDbTabDa(db AS DB_CONN, name AS STRING) AS BOOLEAN")
+            ARRAY_PUSH(z, "    DIM r AS DB_RESULT : r = DB_QUERY(db, " + dbText$("SELECT name FROM sqlite_master WHERE type = 'table' AND lower(name) = lower(?)") + ", name)")
+            ARRAY_PUSH(z, "    DIM da AS BOOLEAN : da = DB_NEXT(r)")
+            ARRAY_PUSH(z, "    IF da THEN DB_CLOSE_RESULT(r)")
+            ARRAY_PUSH(z, "    RETURN da")
+            ARRAY_PUSH(z, "END FUNCTION")
+            ARRAY_PUSH(z, "")
+            ARRAY_PUSH(z, "FUNCTION studioDbSpDa(db AS DB_CONN, tabelle AS STRING, spalte AS STRING) AS BOOLEAN")
+            ARRAY_PUSH(z, "    IF NOT studioDbTabDa(db, tabelle) THEN RETURN FALSE")
+            ARRAY_PUSH(z, "    DIM r AS DB_RESULT : r = DB_QUERY(db, " + dbText$("PRAGMA table_info(" + CHR$(34)) + " + tabelle + " + dbText$(CHR$(34) + ")") + ")")
+            ARRAY_PUSH(z, "    WHILE DB_NEXT(r)")
+            ARRAY_PUSH(z, "        IF LOWER$(DB_GET_STRING(r, 1)) = LOWER$(spalte) THEN")
+            ARRAY_PUSH(z, "            DB_CLOSE_RESULT(r)")
+            ARRAY_PUSH(z, "            RETURN TRUE")
+            ARRAY_PUSH(z, "        END IF")
+            ARRAY_PUSH(z, "    WEND")
+            ARRAY_PUSH(z, "    RETURN FALSE")
+            ARRAY_PUSH(z, "END FUNCTION")
+            ARRAY_PUSH(z, "")
+            ARRAY_PUSH(z, "SUB studioDbTabUm(db AS DB_CONN, alt AS STRING, neu AS STRING)")
+            ARRAY_PUSH(z, "    IF NOT studioDbTabDa(db, alt) OR studioDbTabDa(db, neu) THEN RETURN")
+            ARRAY_PUSH(z, "    DB_EXEC(db, " + dbText$("ALTER TABLE " + CHR$(34)) + " + alt + " + dbText$(CHR$(34) + " RENAME TO " + CHR$(34)) + " + neu + CHR$(34))")
+            ARRAY_PUSH(z, "    ' Die Indexe fuer Eindeutig behalten ihren alten Namen; sie entstehen gleich neu.")
+            ARRAY_PUSH(z, "    DIM vor AS STRING : vor = " + dbText$(DB_INDEX_VOR) + " + LOWER$(neu) + " + dbText$("_"))
+            ARRAY_PUSH(z, "    DIM weg AS ARRAY OF STRING : weg = []")
+            ARRAY_PUSH(z, "    DIM r AS DB_RESULT : r = DB_QUERY(db, " + dbText$("SELECT name FROM sqlite_master WHERE type = 'index' AND lower(tbl_name) = lower(?)") + ", neu)")
+            ARRAY_PUSH(z, "    WHILE DB_NEXT(r)")
+            ARRAY_PUSH(z, "        DIM n AS STRING : n = DB_GET_STRING(r, 0)")
+            ARRAY_PUSH(z, "        IF LEFT$(n, " + STR$(LEN(DB_INDEX_VOR)) + ") = " + dbText$(DB_INDEX_VOR) + " AND LEFT$(n, LEN(vor)) <> vor THEN ARRAY_PUSH(weg, n)")
+            ARRAY_PUSH(z, "    WEND")
+            ARRAY_PUSH(z, "    DIM w AS STRING")
+            ARRAY_PUSH(z, "    FOR EACH w IN weg")
+            ARRAY_PUSH(z, "        DB_EXEC(db, " + dbText$("DROP INDEX " + CHR$(34)) + " + w + CHR$(34))")
+            ARRAY_PUSH(z, "    NEXT")
+            ARRAY_PUSH(z, "END SUB")
+            ARRAY_PUSH(z, "")
+            ARRAY_PUSH(z, "SUB studioDbSpUm(db AS DB_CONN, tabelle AS STRING, alt AS STRING, neu AS STRING)")
+            ARRAY_PUSH(z, "    IF NOT studioDbSpDa(db, tabelle, alt) OR studioDbSpDa(db, tabelle, neu) THEN RETURN")
+            ARRAY_PUSH(z, "    DB_EXEC(db, " + dbText$("DROP INDEX IF EXISTS " + CHR$(34) + DB_INDEX_VOR) + " + LOWER$(tabelle) + " + dbText$("_") + " + LOWER$(alt) + CHR$(34))")
+            ARRAY_PUSH(z, "    DB_EXEC(db, " + dbText$("ALTER TABLE " + CHR$(34)) + " + tabelle + " + dbText$(CHR$(34) + " RENAME COLUMN " + CHR$(34)) + " + alt + " + dbText$(CHR$(34) + " TO " + CHR$(34)) + " + neu + CHR$(34))")
+            ARRAY_PUSH(z, "END SUB")
+            ARRAY_PUSH(z, "")
             ARRAY_PUSH(z, "' Ein Wert zum Anzeigen: Geld 12,34, Ja/Nein, Kommazahl mit Komma.")
             ARRAY_PUSH(z, "FUNCTION studioDbText$(r AS DB_RESULT, i AS INTEGER, art AS STRING) AS STRING")
             ARRAY_PUSH(z, "    IF DB_IS_NULL(r, i) THEN RETURN " + CHR$(34) + CHR$(34))
@@ -820,6 +882,19 @@ FUNCTION datenbankCode$() AS STRING
         ARRAY_PUSH(z, "")
         ARRAY_PUSH(z, "' Datenbank " + e.name)
         ARRAY_PUSH(z, "DIM " + e.name + " AS DB_CONN : " + e.name + " = DB_OPEN(studioDbPfad$(" + dbText$(dbDateiVon$(s)) + "))")
+        DIM u AS INTEGER
+        IF JSON_HAS(s, "umbenannt") THEN
+            FOR u = 0 TO JSON_LEN(s, "umbenannt") - 1
+                DIM up AS STRING : up = "umbenannt." + STR$(u)
+                DIM ualt AS STRING : ualt = dbText$(JSON_GET_STRING(s, up + ".alt"))
+                DIM uneu AS STRING : uneu = dbText$(JSON_GET_STRING(s, up + ".neu"))
+                IF JSON_GET_STRING(s, up + ".art") = "tabelle" THEN
+                    ARRAY_PUSH(z, "studioDbTabUm(" + e.name + ", " + ualt + ", " + uneu + ")")
+                ELSE
+                    ARRAY_PUSH(z, "studioDbSpUm(" + e.name + ", " + dbText$(JSON_GET_STRING(s, up + ".tabelle")) + ", " + ualt + ", " + uneu + ")")
+                END IF
+            NEXT
+        END IF
         DIM t AS INTEGER
         FOR t = 0 TO dbTabZahl(s) - 1
             DIM tn AS STRING : tn = dbTabName$(s, t)
