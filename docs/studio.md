@@ -27,7 +27,7 @@ Der Form-Designer öffnet sein Formular mit Datei → Im Drachenhauch Studio
 **Stand: Stufe 4.** Projekte mit mehreren Fenstern, Modulen und Klassen,
 Ereignisse und ein Code-Feld je Methode; Starten, Bauen und Fehler an der
 Methode, in der sie stehen; Timer, Menüs, Dialoge, die warten, Bilder und
-ein Debugger.
+ein Debugger. Dazu eigene Controls und Datenbanken im Projekt.
 
 ## Die Oberfläche
 
@@ -394,6 +394,57 @@ neuen Namen mit, auch in deren Rückgängig-Ständen. Löschen geht erst, wenn
 keine Instanz mehr darauf zeigt; sonst nennt die Statuszeile, wo noch eine
 steht.
 
+## Datenbanken
+
+Projekt → Datenbank hinzufügen legt eine SQLite-Datenbank als Element an.
+Ihr Aufbau steht in `<Name>.dhdb` (JSON) im Projekt, die Daten in einer
+SQLite-Datei im Projektordner (Vorgabe `<name>.sqlite`, oben rechts im
+Reiter änderbar). Im Navigator stehen unter der Datenbank ihre Tabellen; ein
+Klick öffnet den Reiter der Datenbank: links die Tabellen mit Neu,
+Umbenennen und Löschen, rechts entweder ihre **Spalten** oder ihre
+**Daten**.
+
+| Art | in SQLite | getippt |
+|---|---|---|
+| Text | TEXT | wie er ist |
+| Ganze Zahl | INTEGER | `-4` |
+| Kommazahl | REAL | `2,5` oder `2.5` |
+| Geld | INTEGER in Cent | `19,99` (steht als 1999 in der Datei) |
+| Datum | TEXT | `2026-11-03` |
+| Ja/Nein | INTEGER 0/1 | `ja`/`nein` |
+
+Jede Tabelle hat die Spalte `id INTEGER PRIMARY KEY` von selbst -- die
+Datenbindung (`GUI_FORM_LOAD`/`GUI_FORM_SAVE`) braucht genau sie. Im
+Spalten-Gitter benennt man eine Spalte in ihrer Zelle um, wählt die Art aus
+der Liste und kreuzt **Pflicht** (NOT NULL; leer gilt dann der Leerwert der
+Art oder die Vorgabe) und **Eindeutig** (ein eigener Index) an. Im
+Daten-Gitter tippt man Werte in die Zellen (auch mehrere auf einmal mit
+Strg+V); leer ist NULL, außer bei einer Pflichtspalte. Angezeigt werden die
+ersten 1000 Zeilen.
+
+**Jede Änderung gilt sofort für die Datei im Projektordner**, in einer
+Transaktion: Geht sie nicht (ein Eindeutig auf doppelte Werte, ein Wert, der
+nicht zur Art passt), steht die Meldung in der Statuszeile, und Datei und
+Aufbau bleiben, wie sie waren. Eine Spalte zu ändern baut die Tabelle neu
+auf und kopiert ihre Zeilen um (SQLite kann eine Spalte nicht ändern);
+Spalten und Tabellen, die das Programm selbst angelegt hat, bleiben dabei
+stehen. Löschen und Umbenennen lassen sich nicht zurücknehmen.
+
+Im Programm ist die Datenbank eine globale Verbindung unter ihrem Namen,
+offen, bevor die App startet:
+
+```text
+DIM r AS DB_RESULT : r = DB_QUERY(Daten, "SELECT name FROM kunden ORDER BY name")
+```
+
+Aus dem Studio gestartet (F5) arbeitet das Programm auf der Datei im
+Projektordner -- was es schreibt, steht danach im Daten-Gitter. Bauen legt
+die Datei neben das gebaute Programm, wenn dort noch keine liegt; eine, in
+der schon gearbeitet wurde, bleibt. Das gebaute Programm legt fehlende
+Tabellen, Spalten und Indexe selbst an, umbenennen und löschen tut es dort
+nicht. Das Element zu löschen nimmt nur den Aufbau aus dem Projekt; die
+Datei mit den Daten bleibt liegen.
+
 ## Ein einzelnes Fenster
 
 Eine `.dhform` (dasselbe Format, das `GUI_SAVE` schreibt und `GUI_LOAD`
@@ -448,6 +499,7 @@ geerbte mit einer anderen Zahl von Parametern überschreibt.
 | `DH_STUDIO_KONFIG=datei` | `studio.json` an diesem Ort; die `ide.json` wird dann nicht gefragt |
 | `DH_STUDIO_SPRACHPROBE=1` | öffnet jeden Dialog einmal, schreibt seine Texte und die Zahl fehlender Übersetzungen ins Protokoll und endet |
 | `DH_STUDIO_LOESCHEN=element` | fragt beim Start wie „Element löschen …“ für dieses Element |
+| `DH_STUDIO_OEFFNEN=element[.tabelle]` | öffnet beim Start ein Element wie ein Klick im Navigator (bei einer Datenbank auf Wunsch eine Tabelle) |
 
 Die Prüfsammlungen `tests/pruef/werkzeug_studio.dhtest` (Stufe 1) und
 `tests/pruef/werkzeug_studio2.dhtest` (Stufe 2) starten das Studio zweimal:
@@ -458,3 +510,7 @@ das erzeugte Programm mit einem Klick laufen und prüft, an welcher Methode
 und Zeile ein Fehler landet. `tests/pruef/werkzeug_studio4.dhtest` (Stufe 4)
 legt Timer und Menüs an, lässt das erzeugte Programm Fragen, ein modales
 Fenster, Timer, Menükürzel und ein Bild durchlaufen und hält im Debugger.
+`tests/pruef/werkzeug_studio_datenbank.dhtest` prüft die Datenbanken: den
+Kern ohne Fenster (an der Datei, wie SQLite sie sieht), das erzeugte
+Programm an einer älteren Datei und das Studio mit echten Klicks in beide
+Gitter, F5 und Bauen.

@@ -27,7 +27,7 @@ designer opens its form with Datei → Im Drachenhauch Studio öffnen
 **Status: stage 4.** Projects with several windows, modules and classes,
 events and a code field per method; starting, building and errors shown at
 the method they belong to; timers, menus, dialogs that wait, images and a
-debugger.
+debugger. On top of that custom controls and databases in the project.
 
 ## The user interface
 
@@ -389,6 +389,54 @@ renamed, every instance in the other windows and controls takes the new
 name along, in their undo states too. Deleting only works once no instance
 points at it any more; otherwise the status bar says where one still is.
 
+## Databases
+
+Project → Add database adds an SQLite database as an element. Its structure
+is kept in `<Name>.dhdb` (JSON) in the project, the data in an SQLite file
+in the project folder (default `<name>.sqlite`, changeable at the top right
+of the tab). The navigator lists its tables under the database; a click
+opens the database tab: the tables on the left with New, Rename and Delete,
+on the right either their **columns** or their **data**.
+
+| Type | in SQLite | typed as |
+|---|---|---|
+| Text | TEXT | as it is |
+| Whole number | INTEGER | `-4` |
+| Decimal | REAL | `2,5` or `2.5` |
+| Money | INTEGER in cents | `19,99` (stored as 1999) |
+| Date | TEXT | `2026-11-03` |
+| Yes/No | INTEGER 0/1 | `yes`/`no` |
+
+Every table has the column `id INTEGER PRIMARY KEY` by itself -- data
+binding (`GUI_FORM_LOAD`/`GUI_FORM_SAVE`) needs exactly that. In the column
+grid you rename a column in its cell, pick the type from the list and tick
+**Required** (NOT NULL; when empty, the type's empty value or the default
+applies) and **Unique** (an index of its own). In the data grid you type
+values into the cells (several at once with Ctrl+V too); empty is NULL,
+except in a required column. The first 1000 rows are shown.
+
+**Every change applies to the file in the project folder at once**, in one
+transaction: if it fails (Unique on duplicate values, a value that does not
+fit the type), the status bar says why, and file and structure stay as they
+were. Changing a column rebuilds the table and copies its rows (SQLite
+cannot change a column); columns and tables the program created by itself
+stay. Deleting and renaming cannot be undone.
+
+In the program the database is a global connection under its name, open
+before the app starts:
+
+```text
+DIM r AS DB_RESULT : r = DB_QUERY(Daten, "SELECT name FROM kunden ORDER BY name")
+```
+
+Started from the studio (F5), the program works on the file in the project
+folder -- what it writes shows up in the data grid afterwards. Building puts
+the file next to the built program if there is none yet; one that has
+already been worked in stays. The built program creates missing tables,
+columns and indexes itself; it does not rename or delete there. Deleting
+the element only removes the structure from the project; the file with the
+data stays.
+
 ## A single window
 
 A `.dhform` (the same format that `GUI_SAVE` writes and `GUI_LOAD` reads)
@@ -442,6 +490,7 @@ a different number of parameters.
 | `DH_STUDIO_KONFIG=file` | `studio.json` in this place; the `ide.json` is then not consulted |
 | `DH_STUDIO_SPRACHPROBE=1` | opens every dialog once, writes its texts and the number of missing translations to the log, and quits |
 | `DH_STUDIO_LOESCHEN=element` | asks at start like "Delete element …" for this element |
+| `DH_STUDIO_OEFFNEN=element[.table]` | opens an element at start like a click in the navigator (for a database optionally a table) |
 
 The test collections `tests/pruef/werkzeug_studio.dhtest` (stage 1) and
 `tests/pruef/werkzeug_studio2.dhtest` (stage 2) start the studio twice: once
@@ -452,3 +501,7 @@ the generated program with a click and checks at which method and line an
 error lands. `tests/pruef/werkzeug_studio4.dhtest` (stage 4) creates timers
 and menus, runs the generated program through questions, a modal window,
 timers, a menu shortcut and an image, and halts in the debugger.
+`tests/pruef/werkzeug_studio_datenbank.dhtest` tests the databases: the core
+without a window (on the file, as SQLite sees it), the generated program on
+an older file, and the studio with real clicks into both grids, F5 and
+building.
