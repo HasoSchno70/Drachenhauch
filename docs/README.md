@@ -135,6 +135,7 @@ Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie e
 - **[Entwurf: Barrierefreiheit](entwurf-barrierefreiheit.md)** — der UIA-Baum eines dhrt-Fensters ist leer, gemessen; AccessKit, Sprachausgabe und Handwerk als Wege; Empfehlung: Handwerk sofort, dann AccessKit mit Windows zuerst
 - **[Entwurf: Was der gui gegen GTK 3 fehlt](entwurf-gui-wie-gtk.md)** — gemessen: 100 000 Tabellenzeilen sind keine Lücke; vier Pakete (Popover/Toast/Suchfeld, Bausteine wie Fluss-Layout und Mnemonics, Textformung/RTL/Rechtschreibung, Stildatei mit Selektoren und Klassen wie GTK-CSS) und ihre Reihenfolge; alles gebaut bis auf die volle Textformung (Ligaturen, indische Schriften)
 - **[Entwurf: Drachenhauch Studio](entwurf-studio.md)** — eine eigenständige IDE für Programme mit Oberfläche im Stil von Xojo: Projekt als Ordner, Fenster als Klasse mit Ereignis-Methoden, Layout-Editor, Bibliothek, Inspektor, Starten und Bauen; fünf Stufen
+- **[Entwurf: Berichte im Studio](entwurf-berichte.md)** — gedruckte Seiten aus den Daten des Projekts (Rechnung, Liste): Bänder mit Gruppen und Summen, Quelle mit Parametern, Entwurf auf einer Seite in mm, PDF/Drucken/Vorschau im Programm; drei Stufen
 - **[Entwurf: Drucken](entwurf-drucken.md)** — kein raylib fuers Papier: geprüfte Bausteine, vier Wege; Empfehlung: die Seite selbst zeichnen (GDI/CUPS als Ziele des pdf-Moduls), dazu ein Befehl, der eine Datei öffnet
 - **[Release 2026.41](release-2026.41.md)** — was in dieser Fassung neu ist
 - **[Release 2026.40](release-2026.40.md)** — was in dieser Fassung neu ist
