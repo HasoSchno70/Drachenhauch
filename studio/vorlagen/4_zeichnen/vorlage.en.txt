@@ -1,0 +1,2 @@
+Canvas with a timer
+A timer moves a ball, the Zeichnen event paints it, a click on the canvas moves it. The start for small games and animations.

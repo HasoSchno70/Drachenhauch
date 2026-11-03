@@ -799,7 +799,7 @@ SUB mausAufEntwurf()
         IF bewegt THEN
             ankerUebernehmen()
             nachAenderung(TRUE)
-            status("Fenster: " + STR$(fensterB()) + " × " + STR$(fensterH()))
+            status(trf$("Fenster: {0} × {1}", [STR$(fensterB()), STR$(fensterH())]))
             protokoll("fenstergroesse " + STR$(fensterB()) + " " + STR$(fensterH()))
         END IF
         RETURN
@@ -880,9 +880,9 @@ SUB zugAbschliessen()
             protokoll("eingesetzt " + feldText$(i, "name") + " " + feldText$(zielL, "name") + " " + STR$(stelleIn(zielL, i)))
         NEXT
         IF LEN(liste) = 1 THEN
-            status(feldText$(liste[0], "name") + " steht in " + feldText$(zielL, "name") + " an Stelle " + STR$(stelleIn(zielL, liste[0]) + 1) + ".")
+            status(trf$("{0} steht in {1} an Stelle {2}.", [feldText$(liste[0], "name"), feldText$(zielL, "name"), STR$(stelleIn(zielL, liste[0]) + 1)]))
         ELSE
-            status(STR$(LEN(liste)) + " Controls stehen jetzt in " + feldText$(zielL, "name") + ".")
+            status(trf$("{0} Controls stehen jetzt in {1}.", [STR$(LEN(liste)), feldText$(zielL, "name")]))
         END IF
     ELSEIF kindZug THEN
         ' Neben jedes Layout: heraus, frei an der Stelle ihres Umrisses. Was
@@ -902,9 +902,9 @@ SUB zugAbschliessen()
             JSON_SET_INT(doc, wz$(g, "y"), y)
         NEXT
         IF LEN(los) = 1 THEN
-            status(feldText$(los[0], "name") + " steht jetzt frei im Fenster.")
+            status(trf$("{0} steht jetzt frei im Fenster.", [feldText$(los[0], "name")]))
         ELSE
-            status(STR$(LEN(los)) + " Controls stehen jetzt frei im Fenster.")
+            status(trf$("{0} Controls stehen jetzt frei im Fenster.", [STR$(LEN(los))]))
         END IF
     END IF
 END SUB
@@ -1033,7 +1033,7 @@ SUB ablegen(p AS INTEGER, fx AS INTEGER, fy AS INTEGER, mittig AS BOOLEAN)
     zielL = -1
     auswahlSetzen(i)
     nachAenderung(TRUE)
-    status(b.name + " abgelegt: " + feldText$(i, "name"))
+    status(trf$("{0} abgelegt: {1}", [tr$(b.name), feldText$(i, "name")]))
     protokoll("neu " + b.kind + " " + feldText$(i, "name") + " " + STR$(x) + " " + STR$(y))
 END SUB
 
@@ -1053,7 +1053,7 @@ SUB abstandAblegen(fx AS INTEGER, fy AS INTEGER)
         pos = stelleIn(l, auswahl) + 1
     ELSE
         zielL = -1
-        status("Ein Abstandhalter gehört in ein Layout -- auf eine Zeile, Spalte oder ein Raster ziehen.")
+        status(tr$("Ein Abstandhalter gehört in ein Layout -- auf eine Zeile, Spalte oder ein Raster ziehen."))
         protokoll("abstand ohne layout")
         RETURN
     END IF
@@ -1063,7 +1063,7 @@ SUB abstandAblegen(fx AS INTEGER, fy AS INTEGER)
     abstandL = l
     abstandK = pos
     nachAenderung(TRUE)
-    status("Abstandhalter in " + feldText$(l, "name") + " an Stelle " + STR$(pos + 1) + ".")
+    status(trf$("Abstandhalter in {0} an Stelle {1}.", [feldText$(l, "name"), STR$(pos + 1)]))
     protokoll("neu abstand " + feldText$(l, "name") + " " + STR$(pos))
 END SUB
 
@@ -1197,7 +1197,7 @@ SUB timerAblegen()
     auswahlSetzen(-1)
     trayWahl = k
     nachAenderung(TRUE)
-    status("Timer angelegt: " + timerName$(k))
+    status(trf$("Timer angelegt: {0}", [timerName$(k)]))
     protokoll("neu timer " + timerName$(k))
     trayProtokollieren()
 END SUB
@@ -1285,12 +1285,12 @@ SUB anordnen(was AS STRING)
     DIM j0 AS INTEGER
     FOR EACH j0 IN gewaehlt
         IF verwaltet(j0) THEN
-            status("Was in einem Layout steht, legt das Layout -- zum Anordnen erst herausziehen.")
+            status(tr$("Was in einem Layout steht, legt das Layout -- zum Anordnen erst herausziehen."))
             RETURN
         END IF
     NEXT
     IF auswahl < 0 OR LEN(gewaehlt) < 2 THEN
-        status("Anordnen braucht mindestens zwei gewählte Controls (Umschalt+Klick oder ein Rahmen).")
+        status(tr$("Anordnen braucht mindestens zwei gewählte Controls (Umschalt+Klick oder ein Rahmen)."))
         RETURN
     END IF
     DIM bx AS INTEGER : bx = feldZahl(auswahl, "x")
@@ -1300,7 +1300,7 @@ SUB anordnen(was AS STRING)
     DIM j AS INTEGER
     IF was = "vert_w" OR was = "vert_s" THEN
         IF LEN(gewaehlt) < 3 THEN
-            status("Verteilen braucht mindestens drei gewählte Controls.")
+            status(tr$("Verteilen braucht mindestens drei gewählte Controls."))
             RETURN
         END IF
         DIM feld AS STRING : feld = IIF(was = "vert_w", "x", "y")
@@ -1350,7 +1350,7 @@ SUB anordnen(was AS STRING)
         NEXT
     END IF
     nachAenderung(TRUE)
-    status("Angeordnet: " + STR$(LEN(gewaehlt)) + " Controls.")
+    status(trf$("Angeordnet: {0} Controls.", [STR$(LEN(gewaehlt))]))
     protokoll("angeordnet " + was + " " + STR$(LEN(gewaehlt)))
 END SUB
 
@@ -1427,7 +1427,7 @@ SUB entwurfZeichnen()
             gestrichelt(sx1, sy1, sx2, sy2, F_BEHAELTER)
         END IF
         IF LEN(kinderListe(li)) = 0 THEN
-            DIM leer AS STRING : leer = "Controls hierher ziehen"
+            DIM leer AS STRING : leer = tr$("Controls hierher ziehen")
             DIM tw AS INTEGER : tw = TEXT_WIDTH(leer)
             IF tw < sx2 - sx1 - 8 AND sy2 - sy1 > 18 THEN TEXT((sx1 + sx2 - tw) \ 2, (sy1 + sy2 - 15) \ 2, leer, farbe("leise"))
         END IF

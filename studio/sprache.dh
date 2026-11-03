@@ -1,0 +1,155 @@
+' ============================================================
+'  Drachenhauch Studio -- die Sprache der Oberflaeche
+' ============================================================
+'  Jeder Anzeigetext geht durch tr$("deutscher Text"): auf Deutsch kommt er
+'  unveraendert zurueck, auf Englisch aus sprache/en.txt (je Zeile Deutsch,
+'  Tabulator, Englisch -- wie die IDE; keine JSON-Datei, das json-Modul
+'  liest einen Punkt im Schluessel als Pfad). Texte mit Werten gehen durch
+'  trf$("Gesichert: {0}", [name]): uebersetzt wird der Text OHNE die Werte,
+'  sonst kennte die Tafel ihn nie. Was sie nicht kennt, bleibt deutsch;
+'  tests/pruef/werkzeug_studio_englisch.dhtest prueft, dass keiner fehlt.
+'
+'  Was NICHT uebersetzt wird: die Namen der Ereignisse (Klick, Geaendert ...)
+'  -- sie sind Teil der Methodennamen im Projekt, und ein Projekt muss in
+'  beiden Sprachen dasselbe bleiben --, die Arten der .dhform und alles, was
+'  als Schluessel dient (Bausteinnamen, Gruppen des Inspektors); die werden
+'  erst beim Anzeigen uebersetzt.
+'
+'  Welche Sprache: DH_STUDIO_SPRACHE (fuer Pruefungen), sonst die eigene
+'  Einstellung in studio.json, sonst die der IDE (ide.json daneben), sonst
+'  DHRT_LANG (die IDE setzt es ihren Kindern, wenn sie englisch ist), sonst
+'  Deutsch. DH_STUDIO_KONFIG legt studio.json woanders hin -- dann wird die
+'  ide.json nicht gefragt, eine Pruefung haengt so nicht an der des Nutzers.
+' ============================================================
+
+DIM stKonfigPfad AS STRING : stKonfigPfad = GETENV$("DH_STUDIO_KONFIG")
+DIM stIdeFragen AS BOOLEAN : stIdeFragen = stKonfigPfad = ""
+IF stKonfigPfad = "" THEN
+    DIM stBasis AS STRING : stBasis = GETENV$("APPDATA")
+    IF stBasis = "" THEN stBasis = PATHJOIN(GETENV$("HOME"), ".config")
+    stKonfigPfad = PATHJOIN(stBasis, "Drachenhauch/studio.json")
+END IF
+
+' Ein Text aus einer JSON-Datei, ohne an einer kaputten zu scheitern.
+FUNCTION stEinstellung$(pfad AS STRING, schluessel AS STRING) AS STRING
+    IF NOT FILEEXISTS(pfad) THEN RETURN ""
+    DIM w AS STRING : w = ""
+    TRY
+        DIM j AS JSON_HANDLE : j = JSON_LOAD(pfad)
+        IF JSON_HAS(j, schluessel) THEN
+            IF JSON_TYPE(j, schluessel) = "string" THEN w = JSON_GET_STRING(j, schluessel)
+        END IF
+    CATCH stFehler
+        w = ""
+    END TRY
+    RETURN LOWER$(TRIM$(w))
+END FUNCTION
+
+DIM sprache AS STRING : sprache = LOWER$(TRIM$(GETENV$("DH_STUDIO_SPRACHE")))
+IF sprache = "" THEN sprache = stEinstellung$(stKonfigPfad, "sprache")
+IF sprache = "" AND stIdeFragen THEN
+    DIM stIde AS STRING : stIde = GETENV$("DH_IDE_KONFIG")
+    IF stIde = "" THEN stIde = PATHJOIN(DIRNAME(stKonfigPfad), "ide.json")
+    sprache = stEinstellung$(stIde, "sprache")
+END IF
+IF sprache = "" AND LEFT$(LOWER$(GETENV$("DHRT_LANG")), 2) = "en" THEN sprache = "en"
+IF sprache <> "en" THEN sprache = "de"
+
+DIM englisch AS BOOLEAN : englisch = FALSE
+DIM uebersetzung AS MAP OF STRING : uebersetzung = {}
+DIM sprachFehlt AS INTEGER : sprachFehlt = 0
+DIM sprachLuecken AS ARRAY OF STRING : sprachLuecken = []    ' fuer die Sprachprobe
+IF sprache = "en" THEN
+    ' dhrt run wechselt ins Verzeichnis der Quelle, also liegt die Tafel hier.
+    IF FILEEXISTS("sprache/en.txt") THEN
+        englisch = TRUE
+        DIM stZeile AS STRING
+        FOR EACH stZeile IN READLINES("sprache/en.txt")
+            stZeile = REPLACE$(stZeile, CHR$(13), "")
+            DIM stTab AS INTEGER : stTab = INSTR(stZeile, CHR$(9))
+            IF stTab > 0 THEN MAPPUT(uebersetzung, LEFT$(stZeile, stTab), MID$(stZeile, stTab + 1))
+        NEXT
+    ELSE
+        sprache = "de"
+    END IF
+END IF
+' Die Meldungen der Laufzeit in derselben Sprache: Pruefen (CODE_CHECK$ laeuft
+' in diesem Prozess) und jedes gestartete Programm, das die Variable erbt.
+IF englisch AND GETENV$("DHRT_LANG") = "" THEN SETENV("DHRT_LANG", "en")
+
+FUNCTION tr$(t AS STRING) AS STRING
+    IF NOT englisch THEN RETURN t
+    IF MAPHAS(uebersetzung, t) THEN RETURN MAPGET(uebersetzung, t)
+    sprachFehlt = sprachFehlt + 1
+    IF ARRAY_INDEXOF(sprachLuecken, t) < 0 THEN ARRAY_PUSH(sprachLuecken, t)
+    RETURN t
+END FUNCTION
+
+' Ein Text mit {0}, {1}, ...: erst uebersetzen, dann einsetzen -- von hinten,
+' damit ein eingesetzter Wert nicht noch einmal gelesen wird.
+FUNCTION trf$(t AS STRING, werte AS ARRAY OF STRING) AS STRING
+    DIM aus AS STRING : aus = tr$(t)
+    DIM i AS INTEGER
+    FOR i = LEN(werte) - 1 TO 0 STEP -1
+        aus = REPLACE$(aus, "{" + STR$(i) + "}", werte[i])
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Kuerzel fuer die Anzeige: auf Englisch "Ctrl+Shift+Down" statt
+' "Strg+Umschalt+Runter". Die Laufzeit versteht beide Schreibweisen.
+FUNCTION kz$(k AS STRING) AS STRING
+    IF NOT englisch OR k = "" THEN RETURN k
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(k, "+")
+    DIM aus AS STRING : aus = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 1
+        DIM w AS STRING : w = teile[i]
+        SELECT CASE LOWER$(w)
+            CASE "strg" : w = "Ctrl"
+            CASE "umschalt" : w = "Shift"
+            CASE "entf" : w = "Del"
+            CASE "einfg" : w = "Ins"
+            CASE "pos1" : w = "Home"
+            CASE "ende" : w = "End"
+            CASE "bild auf" : w = "PageUp"
+            CASE "bild ab" : w = "PageDown"
+            CASE "leer" : w = "Space"
+            CASE "rueck" : w = "Backspace"
+            CASE "links" : w = "Left"
+            CASE "rechts" : w = "Right"
+            CASE "hoch" : w = "Up"
+            CASE "runter" : w = "Down"
+        END SELECT
+        aus = aus + IIF(i > 0, "+", "") + w
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Die Sprache wechselt beim naechsten Start: die Fenster sind gebaut, und
+' jede Beschriftung einzeln nachzuziehen hiesse, jede zweimal zu kennen.
+SUB spracheWechseln()
+    DIM neu AS STRING : neu = IIF(englisch, "de", "en")
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    IF FILEEXISTS(stKonfigPfad) THEN
+        TRY
+            j = JSON_LOAD(stKonfigPfad)
+        CATCH stFehler2
+            j = JSON_PARSE("{}")
+        END TRY
+    END IF
+    JSON_SET_STRING(j, "sprache", neu)
+    TRY
+        IF DIRNAME(stKonfigPfad) <> "" AND NOT DIREXISTS(DIRNAME(stKonfigPfad)) THEN MKDIR(DIRNAME(stKonfigPfad))
+        WRITEALL(stKonfigPfad, JSON_STRINGIFY(j))
+    CATCH stFehler3
+        status("Die Einstellung lässt sich nicht sichern. / The setting cannot be saved: " + stKonfigPfad)
+        RETURN
+    END TRY
+    IF neu = "en" THEN
+        status("Beim nächsten Start ist die Oberfläche englisch. / The interface will be English at the next start.")
+    ELSE
+        status("The interface will be German at the next start. / Beim nächsten Start ist die Oberfläche deutsch.")
+    END IF
+    protokoll("sprache " + neu)
+END SUB

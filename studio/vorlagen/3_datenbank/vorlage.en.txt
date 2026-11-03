@@ -1,0 +1,2 @@
+Address book with a database
+An SQLite file next to the program, the table with a filter row on the left, the fields on the right -- bound to the columns, loading and saving take one call each.

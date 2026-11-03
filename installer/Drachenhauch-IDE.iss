@@ -100,6 +100,8 @@ Source: "..\studio\*.dh"; DestDir: "{app}\studio"; Flags: ignoreversion
 Source: "..\studio\*.dhstil"; DestDir: "{app}\studio"; Flags: ignoreversion
 ; die Projektvorlagen fuer "Neues Projekt"
 Source: "..\studio\vorlagen\*"; DestDir: "{app}\studio\vorlagen"; Flags: ignoreversion recursesubdirs createallsubdirs
+; die englische Oberflaeche des Studios (Ansicht -> English interface)
+Source: "..\studio\sprache\*.txt"; DestDir: "{app}\studio\sprache"; Flags: ignoreversion
 ; Die englische Oberflaeche der IDE (Ansicht -> Language).
 Source: "..\ide\sprache\*.txt"; DestDir: "{app}\ide\sprache"; Flags: ignoreversion
 ; Das Handbuch: die IDE liest docs\ neben ide\ (F1 schlaegt dort nach).

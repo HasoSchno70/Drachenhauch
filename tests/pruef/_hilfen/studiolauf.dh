@@ -85,6 +85,14 @@ FUNCTION slStarten(log AS STRING, aufnahme AS STRING, bilder AS INTEGER, datei A
     SETENV("DH_STUDIO_LOG", log)
     SETENV("DH_STUDIO_GROESSE", "1440x900")
     SETENV("DH_STUDIO_AUFNAHME", aufnahme)
+    ' Die Einstellungen des Studios (Sprache) im Fallordner -- sonst entschiede
+    ' die studio.json bzw. ide.json des Nutzers, in welcher Sprache es aufgeht.
+    ' "-" = fuer diesen Lauf keine (prueft den Weg ueber die ide.json).
+    IF GETENV$("DH_STUDIO_KONFIG") = "-" THEN
+        SETENV("DH_STUDIO_KONFIG", "")
+    ELSEIF GETENV$("DH_STUDIO_KONFIG") = "" THEN
+        SETENV("DH_STUDIO_KONFIG", PATHJOIN(CWD$(), "studio.json"))
+    END IF
     DIM p AS INTEGER
     IF datei = "" THEN
         p = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), slStudio)

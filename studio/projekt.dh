@@ -44,7 +44,7 @@ END CLASS
 DIM elemente AS ARRAY OF Element : elemente = []
 DIM methoden AS ARRAY OF Methode : methoden = []
 DIM projOrdner AS STRING : projOrdner = ""       ' leer = noch nie gesichert
-DIM projName AS STRING : projName = "Projekt"
+DIM projName AS STRING : projName = tr$("Projekt")
 DIM projStart AS STRING : projStart = ""
 DIM projLose AS BOOLEAN : projLose = FALSE      ' ein einzelnes .dhform ohne Projekt
 DIM projGeaendert AS BOOLEAN : projGeaendert = FALSE
@@ -77,10 +77,10 @@ END FUNCTION
 
 FUNCTION artText$(art AS STRING) AS STRING
     SELECT CASE art
-        CASE "app" : RETURN "Anwendung"
-        CASE "fenster" : RETURN "Fenster"
-        CASE "modul" : RETURN "Modul"
-        CASE "klasse" : RETURN "Klasse"
+        CASE "app" : RETURN tr$("Anwendung")
+        CASE "fenster" : RETURN tr$("Fenster")
+        CASE "modul" : RETURN tr$("Modul")
+        CASE "klasse" : RETURN tr$("Klasse")
     END SELECT
     RETURN art
 END FUNCTION
@@ -151,7 +151,7 @@ SUB projektLeeren()
     elemente = []
     methoden = []
     projOrdner = ""
-    projName = "Projekt"
+    projName = tr$("Projekt")
     projStart = ""
     projLose = FALSE
     projGeaendert = FALSE
@@ -164,8 +164,8 @@ SUB projektNeu(ordner AS STRING)
     projOrdner = ordner
     IF ordner <> "" THEN projName = BASENAME(ordner)
     DIM a AS Element : a = elementNeu("app", "App")
-    DIM f AS Element : f = elementNeu("fenster", "Hauptfenster")
-    projStart = "Hauptfenster"
+    DIM f AS Element : f = elementNeu("fenster", tr$("Hauptfenster"))
+    projStart = f.name
     projGeaendert = TRUE
 END SUB
 
@@ -334,15 +334,15 @@ END SUB
 FUNCTION standardVorspann$(e AS Element) AS STRING
     SELECT CASE e.art
         CASE "fenster"
-            RETURN "' " + e.name + " -- der Code des Fensters. Die Controls, ihr Aufbau und die" + CHR$(10) + _
-                   "' Verdrahtung der Ereignisse stehen in der Basisklasse, die das Studio" + CHR$(10) + _
-                   "' erzeugt (_studio/" + e.name + "_basis.dh)."
+            RETURN trf$("' {0} -- der Code des Fensters. Die Controls, ihr Aufbau und die", [e.name]) + CHR$(10) + _
+                   tr$("' Verdrahtung der Ereignisse stehen in der Basisklasse, die das Studio") + CHR$(10) + _
+                   trf$("' erzeugt (_studio/{0}_basis.dh).", [e.name])
         CASE "app"
-            RETURN "' Die Anwendung: was beim Start und beim Beenden geschieht."
+            RETURN tr$("' Die Anwendung: was beim Start und beim Beenden geschieht.")
         CASE "modul"
-            RETURN "' Modul " + e.name + ": SUBs und FUNCTIONs fuer das ganze Projekt."
+            RETURN trf$("' Modul {0}: SUBs und FUNCTIONs fuer das ganze Projekt.", [e.name])
     END SELECT
-    RETURN "' Klasse " + e.name + "."
+    RETURN trf$("' Klasse {0}.", [e.name])
 END FUNCTION
 
 ' Den Quelltext eines Elements aus seinen Teilen setzen. Nebenbei entsteht
@@ -420,12 +420,12 @@ END FUNCTION
 ' Liefert "" oder die Fehlermeldung.
 FUNCTION projektLaden$(ordner AS STRING) AS STRING
     DIM pfad AS STRING : pfad = PATHJOIN(ordner, PROJEKT_DATEI)
-    IF NOT FILEEXISTS(pfad) THEN RETURN "Im Ordner liegt keine " + PROJEKT_DATEI + "."
+    IF NOT FILEEXISTS(pfad) THEN RETURN trf$("Im Ordner liegt keine {0}.", [PROJEKT_DATEI])
     DIM j AS JSON_HANDLE
     TRY
         j = JSON_LOAD(pfad)
     CATCH fehler
-        RETURN PROJEKT_DATEI + " ist kein gültiges JSON: " + fehler
+        RETURN trf$("{0} ist kein gültiges JSON: {1}", [PROJEKT_DATEI, fehler])
     END TRY
     projektLeeren()
     projOrdner = ordner
@@ -539,24 +539,24 @@ END FUNCTION
 
 FUNCTION ereignisBeschreibung$(ereignis AS STRING) AS STRING
     SELECT CASE ereignis
-        CASE "Klick" : RETURN "wenn es angeklickt wird"
-        CASE "Ziehen" : RETURN "solange die Maus nach einem Druck auf die Fläche gehalten wird (x, y auf der Fläche)"
-        CASE "Rad" : RETURN "wenn das Mausrad über der Fläche gedreht wird"
-        CASE "Taste" : RETURN "wenn eine Taste gedrückt wird und kein Eingabefeld sie nimmt (Tastencode)"
-        CASE "Aktion" : RETURN "wenn die Zeit des Timers um ist bzw. der Menüeintrag gewählt wird"
-        CASE "Geaendert" : RETURN "wenn sich sein Wert durch die Bedienung ändert"
-        CASE "Enter" : RETURN "wenn im Feld Enter gedrückt wird"
-        CASE "FokusRein" : RETURN "wenn es den Tastaturfokus bekommt"
-        CASE "FokusRaus" : RETURN "wenn es den Tastaturfokus abgibt"
-        CASE "Doppelklick" : RETURN "bei einem Doppelklick auf einen Eintrag"
-        CASE "Zeichnen" : RETURN "in jedem Bild, um die Fläche zu bemalen"
-        CASE "Maus" : RETURN "wenn die Maus auf der Fläche gedrückt wird"
-        CASE "MausRein" : RETURN "wenn die Maus darüber kommt"
-        CASE "MausRaus" : RETURN "wenn die Maus es verlässt"
-        CASE "Geoeffnet" : RETURN "nachdem es aufgebaut ist"
-        CASE "Schliessen" : RETURN "wenn es geschlossen werden soll"
-        CASE "Groesse" : RETURN "wenn sich seine Größe ändert"
-        CASE "Beenden" : RETURN "bevor das Programm endet"
+        CASE "Klick" : RETURN tr$("wenn es angeklickt wird")
+        CASE "Ziehen" : RETURN tr$("solange die Maus nach einem Druck auf die Fläche gehalten wird (x, y auf der Fläche)")
+        CASE "Rad" : RETURN tr$("wenn das Mausrad über der Fläche gedreht wird")
+        CASE "Taste" : RETURN tr$("wenn eine Taste gedrückt wird und kein Eingabefeld sie nimmt (Tastencode)")
+        CASE "Aktion" : RETURN tr$("wenn die Zeit des Timers um ist bzw. der Menüeintrag gewählt wird")
+        CASE "Geaendert" : RETURN tr$("wenn sich sein Wert durch die Bedienung ändert")
+        CASE "Enter" : RETURN tr$("wenn im Feld Enter gedrückt wird")
+        CASE "FokusRein" : RETURN tr$("wenn es den Tastaturfokus bekommt")
+        CASE "FokusRaus" : RETURN tr$("wenn es den Tastaturfokus abgibt")
+        CASE "Doppelklick" : RETURN tr$("bei einem Doppelklick auf einen Eintrag")
+        CASE "Zeichnen" : RETURN tr$("in jedem Bild, um die Fläche zu bemalen")
+        CASE "Maus" : RETURN tr$("wenn die Maus auf der Fläche gedrückt wird")
+        CASE "MausRein" : RETURN tr$("wenn die Maus darüber kommt")
+        CASE "MausRaus" : RETURN tr$("wenn die Maus es verlässt")
+        CASE "Geoeffnet" : RETURN tr$("nachdem es aufgebaut ist")
+        CASE "Schliessen" : RETURN tr$("wenn es geschlossen werden soll")
+        CASE "Groesse" : RETURN tr$("wenn sich seine Größe ändert")
+        CASE "Beenden" : RETURN tr$("bevor das Programm endet")
     END SELECT
     RETURN ""
 END FUNCTION

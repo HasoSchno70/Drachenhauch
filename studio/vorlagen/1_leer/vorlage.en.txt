@@ -1,0 +1,2 @@
+Empty
+The app and an empty window -- drag controls in from the library.

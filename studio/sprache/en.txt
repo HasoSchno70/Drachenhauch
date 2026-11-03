@@ -1,0 +1,460 @@
+# Englische Oberflaeche des Drachenhauch Studios: je Zeile der deutsche Text,
+# ein Tabulator, der englische. Leerzeichen am Anfang und Ende gehoeren dazu.
+# {0}, {1} ... sind Werte, die trf$ nach dem Uebersetzen einsetzt -- sie
+# muessen in beiden Spalten stehen. Neue Texte im Studio: tr$("...") bzw.
+# trf$("...", [...]) und hier eine Zeile; tests/pruef/werkzeug_studio_englisch.dhtest
+# meldet, was fehlt. Zeilen ohne Tabulator (wie diese) sind Kommentare.
+#
+# --- Bibliothek: Gruppen, Namen, Grundnamen der Controls, Vorgaben --------
+Knöpfe und Schalter	Buttons and switches
+Knopf	Button
+löst beim Klick eine Aktion aus	triggers an action when clicked
+Kästchen	Checkbox
+Kaestchen	Checkbox
+an oder aus, mit Beschriftung	on or off, with a label
+Optionsfeld	Radio button
+Option	Option
+eines aus einer Gruppe	one out of a group
+Umschalter	Toggle
+Schalter	Switch
+Kippschalter wie am Telefon	a switch like on a phone
+Eingabe	Input
+Textfeld	Text field
+eine Zeile Text	one line of text
+Textbereich	Text area
+mehrzeiliger Text	text with several lines
+Zahlenfeld	Number field
+eine Zahl mit Pfeilen	a number with arrows
+Regler	Slider
+ein Wert zwischen zwei Grenzen	a value between two limits
+Drehknopf	Knob
+ein Wert zum Drehen	a value you turn
+Auswahl	Choice
+Klappliste	Drop-down list
+{'items':['Eintrag 1','Eintrag 2','Eintrag 3'],'sel':0}	{'items':['Item 1','Item 2','Item 3'],'sel':0}
+eines aus einer Liste, aufklappend	one out of a list that drops down
+Liste	List
+{'items':['Eintrag 1','Eintrag 2','Eintrag 3']}	{'items':['Item 1','Item 2','Item 3']}
+Einträge untereinander	items one below the other
+Baum	Tree
+Einträge mit Unterpunkten	items with sub-items
+Datumswähler	Date picker
+Datum	Date
+ein Tag aus dem Kalender	a day from the calendar
+Uhrzeit	Time
+Stunde und Minute	hour and minute
+Farbwähler	Color picker
+Farbe	Color
+eine Farbe aus Fläche und Streifen	a color from a field and a strip
+Anzeige	Display
+Beschriftung	Label
+Text, den man nicht ändert	text the user does not change
+Bild	Image
+ein Bild aus dem Projekt	an image from the project
+Fortschrittsbalken	Progress bar
+Fortschritt	Progress
+wie weit etwas ist	how far along something is
+Gesetzter Text	Rich text
+Text	Text
+# Überschrift	# Heading
+Markdown, gesetzt mit Überschriften und Listen	Markdown, typeset with headings and lists
+Kachel	Card
+Titel	Title
+Bild, Titel und Beschreibung -- ganz ein Knopf	image, title and description -- the whole card is a button
+Trennlinie	Separator
+Linie	Line
+eine waagerechte Linie	a horizontal line
+Daten	Data
+Tabelle	Table
+{'table':{'headers':['Name','Wert']}}	{'table':{'headers':['Name','Value']}}
+Zeilen und Spalten, sortierbar	rows and columns, sortable
+Gitter	Grid
+{'table':{'headers':['A','B','C'],'zellmodus':true,'col_edit':[true,true,true]}}	{'table':{'headers':['A','B','C'],'zellmodus':true,'col_edit':[true,true,true]}}
+eine Tabelle zum Bearbeiten wie in einer Tabellenkalkulation	a table you edit like a spreadsheet
+Baumtabelle	Tree table
+{'table':{'headers':['Name','Wert'],'baum':true}}	{'table':{'headers':['Name','Value'],'baum':true}}
+eine Tabelle, deren Zeilen einen Baum bilden	a table whose rows form a tree
+Behälter	Containers
+Bereich	Panel
+eine Fläche, die Controls zusammenfasst	an area that groups controls
+Gruppe	Group
+ein Rahmen mit Titel	a frame with a title
+Reiterwerk	Tab control
+Reiter	Tabs
+{'items':['Seite 1','Seite 2']}	{'items':['Page 1','Page 2']}
+Seiten mit Reitern	pages with tabs
+Akkordeon	Accordion
+{'items':['Abschnitt 1','Abschnitt 2']}	{'items':['Section 1','Section 2']}
+Abschnitte, die auf- und zuklappen	sections that open and close
+Assistent	Wizard
+{'items':['Schritt 1','Schritt 2']}	{'items':['Step 1','Step 2']}
+Schritt für Schritt mit Weiter und Zurück	step by step with Next and Back
+Zeile	Row
+ordnet seine Controls nebeneinander	arranges its controls side by side
+Spalte	Column
+ordnet seine Controls untereinander	arranges its controls one below the other
+Raster	Grid layout
+ordnet seine Controls in Zeilen und Spalten	arranges its controls in rows and columns
+Fluss	Flow
+Abstandhalter	Spacer
+Abstand	Spacing
+freier Platz in einem Layout -- schiebt, was danach kommt, ans Ende	free space in a layout -- pushes what comes after it to the end
+Leisten	Bars
+Werkzeugleiste	Toolbar
+Knöpfe mit Sinnbildern oben im Fenster	buttons with icons at the top of the window
+Statusleiste	Status bar
+Bereit.	Ready.
+Meldungen unten im Fenster	messages at the bottom of the window
+Pfadleiste	Breadcrumb bar
+Pfad	Path
+wo man gerade ist, zum Anklicken	where you are, clickable
+Zeichnen	Drawing
+Zeichenfläche	Canvas
+Zeichenflaeche	Canvas
+eine Fläche, auf die das Programm selbst zeichnet	an area the program draws on itself
+Unsichtbar	Invisible
+Timer	Timer
+ruft sein Ereignis Aktion in festen Abständen	calls its Aktion event at fixed intervals
+#
+# --- Hauptfenster: Menue, Werkzeugleiste, Dock -----------------------------
+Drachenhauch Studio	Drachenhauch Studio
+Datei	File
+Neues Projekt	New project
+Öffnen …	Open …
+Sichern	Save
+Sichern unter …	Save as …
+Beenden	Quit
+Bearbeiten	Edit
+Rückgängig	Undo
+Wiederholen	Redo
+Verdoppeln	Duplicate
+Löschen	Delete
+Alles auswählen   Strg+A	Select all   Ctrl+A
+Projekt	Project
+Fenster hinzufügen …	Add window …
+Modul hinzufügen …	Add module …
+Klasse hinzufügen …	Add class …
+Bild hinzufügen …	Add image …
+Methode hinzufügen …	Add method …
+Ereignis hinzufügen …	Add event …
+Methode entfernen	Remove method
+Menüs des Fensters …	Window menus …
+Als Startfenster	Make start window
+Element löschen …	Delete element …
+Ausführen	Run
+Starten	Run
+Anhalten	Stop
+Debuggen	Debug
+Schritt	Step
+Schritt hinein	Step into
+Schritt heraus	Step out
+Haltepunkt an/aus	Toggle breakpoint
+Prüfen	Check
+Bauen	Build
+Anordnen	Arrange
+Links ausrichten	Align left
+Rechts ausrichten	Align right
+Oben ausrichten	Align top
+Unten ausrichten	Align bottom
+Waagerecht mittig	Center horizontally
+Senkrecht mittig	Center vertically
+Gleiche Breite	Same width
+Gleiche Höhe	Same height
+Gleiche Größe	Same size
+Waagerecht verteilen	Distribute horizontally
+Senkrecht verteilen	Distribute vertically
+Nach vorn	Bring to front
+Nach hinten	Send to back
+Ansicht	View
+Am Raster einrasten	Snap to grid
+Ausrichtungslinien	Alignment guides
+Vergrößern	Zoom in
+Verkleinern	Zoom out
+Originalgröße	Actual size
+Helles Erscheinungsbild	Light appearance
+Hilfe	Help
+Über Drachenhauch Studio	About Drachenhauch Studio
+Neues Projekt (Strg+Umschalt+N)	New project (Ctrl+Shift+N)
+Neu	New
+Projekt oder Fenster öffnen (Strg+O)	Open project or window (Ctrl+O)
+Öffnen	Open
+Sichern (Strg+S)	Save (Ctrl+S)
+Fenster hinzufügen (Strg+N)	Add window (Ctrl+N)
+Fenster	Window
+Methode hinzufügen (Strg+Umschalt+M)	Add method (Ctrl+Shift+M)
+Methode	Method
+Ereignis hinzufügen (Strg+Umschalt+E, oder Doppelklick auf ein Control)	Add event (Ctrl+Shift+E, or double-click a control)
+Ereignis	Event
+Rückgängig (Strg+Z)	Undo (Ctrl+Z)
+Wiederholen (Strg+Y)	Redo (Ctrl+Y)
+Waagerecht mittig ausrichten	Center horizontally
+Verkleinern (Strg+Minus)	Zoom out (Ctrl+Minus)
+Vergrößern (Strg+Plus)	Zoom in (Ctrl+Plus)
+Starten (F5)	Run (F5)
+Anhalten (Umschalt+F5)	Stop (Shift+F5)
+Prüfen (Umschalt+F7)	Check (Shift+F7)
+Bauen: eine Programmdatei in bau/ (Strg+B)	Build: a program file in bau/ (Ctrl+B)
+Klick: Originalgröße	Click: actual size
+Navigator	Navigator
+Bibliothek	Library
+Inspektor	Inspector
+Ausgabe	Output
+Probleme	Problems
+Probleme ({0})	Problems ({0})
+Suchen	Search
+Starten (F5) zeigt hier, was das Programm ausgibt.	Run (F5) shows here what the program prints.
+Keine Probleme.	No problems.
+{0} -- {1}. Ziehen oder anklicken und dann ins Fenster klicken.	{0} -- {1}. Drag it, or click it and then click into the window.
+{0}: ins Fenster klicken, um abzulegen. Esc bricht ab.	{0}: click into the window to place it. Esc cancels.
+ (nicht gesichert)	 (not saved)
+#
+# --- Projekt, Elemente, Code ------------------------------------------------
+Anwendung	Application
+Modul	Module
+Klasse	Class
+Hauptfenster	MainWindow
+Fenster1	Window1
+' {0} -- der Code des Fensters. Die Controls, ihr Aufbau und die	' {0} -- the code of the window. The controls, how they are built and how
+' Verdrahtung der Ereignisse stehen in der Basisklasse, die das Studio	' their events are wired up are in the base class that the Studio
+' erzeugt (_studio/{0}_basis.dh).	' generates (_studio/{0}_basis.dh).
+' Die Anwendung: was beim Start und beim Beenden geschieht.	' The application: what happens at start and at the end.
+' Modul {0}: SUBs und FUNCTIONs fuer das ganze Projekt.	' Module {0}: SUBs and FUNCTIONs for the whole project.
+' Klasse {0}.	' Class {0}.
+Im Ordner liegt keine {0}.	There is no {0} in the folder.
+{0} ist kein gültiges JSON: {1}	{0} is not valid JSON: {1}
+ · Eigenschaften	 · Properties
+' Eigenschaften von {0}	' Properties of {0}
+DIM, CONST und was sonst außerhalb der Methoden steht	DIM, CONST and whatever else stands outside the methods
+Code der Methode	Code of the method
+Eigenschaften	Properties
+Ereignis {0} von {1}: {2}	Event {0} of {1}: {2}
+Ereignis {0}: {1}	Event {0}: {1}
+Methode von {0}	Method of {0}
+  (Start)	  (start)
+wenn es angeklickt wird	when it is clicked
+solange die Maus nach einem Druck auf die Fläche gehalten wird (x, y auf der Fläche)	while the mouse is held down after a press on the canvas (x, y on the canvas)
+wenn das Mausrad über der Fläche gedreht wird	when the mouse wheel turns over the canvas
+wenn eine Taste gedrückt wird und kein Eingabefeld sie nimmt (Tastencode)	when a key is pressed and no input field takes it (key code)
+wenn die Zeit des Timers um ist bzw. der Menüeintrag gewählt wird	when the timer's time is up, or the menu item is chosen
+wenn sich sein Wert durch die Bedienung ändert	when the user changes its value
+wenn im Feld Enter gedrückt wird	when Enter is pressed in the field
+wenn es den Tastaturfokus bekommt	when it gets the keyboard focus
+wenn es den Tastaturfokus abgibt	when it loses the keyboard focus
+bei einem Doppelklick auf einen Eintrag	on a double click on an item
+in jedem Bild, um die Fläche zu bemalen	in every frame, to paint the canvas
+wenn die Maus auf der Fläche gedrückt wird	when the mouse is pressed on the canvas
+wenn die Maus darüber kommt	when the mouse moves over it
+wenn die Maus es verlässt	when the mouse leaves it
+nachdem es aufgebaut ist	after it has been built
+wenn es geschlossen werden soll	when it is about to close
+wenn sich seine Größe ändert	when its size changes
+bevor das Programm endet	before the program ends
+#
+# --- Dialoge: Ereignis, Methode, Element, Vorlage ---------------------------
+Ereignisse haben nur Fenster, ihre Controls und die App.	Only windows, their controls and the app have events.
+Ereignis hinzufügen	Add event
+ (Timer)	 (timer)
+ (Menüeintrag)	 (menu item)
+Was soll {0} tun? Wähle das Ereignis:	What should {0} do? Choose the event:
+schon da	already there
+Hinzufügen	Add
+Abbrechen	Cancel
+Läuft {0}. Die Methode heißt {1}{2}	Runs {0}. The method is called {1}{2}
+ und ist schon da -- sie wird geöffnet.	 and already exists -- it will be opened.
+Erst ein Fenster, ein Modul oder eine Klasse wählen.	Choose a window, a module or a class first.
+Methode hinzufügen	Add method
+Methode hinzufügen zu {0}	Add method to {0}
+Name	Name
+Parameter	Parameters
+Rückgabe	Returns
+Parameter wie in Drachenhauch: a AS INTEGER, b AS STRING. Ohne Rückgabe wird es eine SUB.	Parameters as in Drachenhauch: a AS INTEGER, b AS STRING. Without a return type it becomes a SUB.
+Ein Name beginnt mit einem Buchstaben und hat nur Buchstaben, Ziffern und _.	A name starts with a letter and has only letters, digits and _.
+Eine Methode {0} gibt es in {1} schon.	{1} already has a method {0}.
+Die Rückgabe ist ein Typ, etwa INTEGER, STRING oder ARRAY OF FLOAT.	The return value is a type, such as INTEGER, STRING or ARRAY OF FLOAT.
+{0} hinzufügen	Add {0}
+Name (wird zum Namen der Klasse bzw. des Moduls):	Name (becomes the name of the class or module):
+Hinzufügen|Abbrechen	Add|Cancel
+'{0}' ist kein Name: ein Buchstabe vorn, dann Buchstaben, Ziffern und _.	'{0}' is not a name: a letter first, then letters, digits and _.
+Ein Element {0} gibt es schon.	There already is an element {0}.
+{0} {1} hinzugefügt.	{0} {1} added.
+Die App gehört zu jedem Projekt.	Every project has the app.
+{0} löschen	Delete {0}
+{0} mit seinem Code aus dem Projekt nehmen? Die Dateien verschwinden beim nächsten Sichern.	Remove {0} and its code from the project? The files disappear at the next save.
+Löschen|Abbrechen	Delete|Cancel
+{0} gelöscht.	{0} deleted.
+Starten kann nur ein Fenster.	Only a window can be the start.
+{0} ist jetzt das Startfenster.	{0} is now the start window.
+Erst die Methode öffnen, die weg soll.	First open the method you want to remove.
+Methode {0} entfernt.	Method {0} removed.
+Womit soll es anfangen?	What should it start with?
+Anlegen	Create
+#
+# --- Debugger -------------------------------------------------------------
+Debugger	Debugger
+Debuggen (F7) startet das Programm und hält an Haltepunkten.	Debug (F7) starts the program and stops at breakpoints.
+Weiter (F5)	Continue (F5)
+Schritt (F10)	Step (F10)
+Hinein (F11)	Into (F11)
+Heraus	Out
+Variablen erscheinen, wenn das Programm hält.	Variables appear when the program stops.
+Aufrufstapel	Call stack
+▶ {0} startet im Debugger …	▶ {0} starts in the debugger …
+Läuft …	Running …
+Debuggen: {0}	Debugging: {0}
+■ Debuggen beendet.	■ Debugging finished.
+Debuggen beendet.	Debugging finished.
+■ Beendet.	■ Finished.
+, Zeile {0}	, line {0}
+Fehler	Error
+Fehler in {0}: {1}	Error in {0}: {1}
+Laufzeitfehler in {0}: {1}	Runtime error in {0}: {1}
+Hält in {0}	Stopped in {0}
+Angehalten: {0}	Paused: {0}
+Aufruf: {0}	Call: {0}
+#
+# --- Entwurf ----------------------------------------------------------------
+Fenster: {0} × {1}	Window: {0} × {1}
+{0} steht in {1} an Stelle {2}.	{0} is now in {1} at position {2}.
+{0} Controls stehen jetzt in {1}.	{0} controls are now in {1}.
+{0} steht jetzt frei im Fenster.	{0} now stands freely in the window.
+{0} Controls stehen jetzt frei im Fenster.	{0} controls now stand freely in the window.
+{0} abgelegt: {1}	{0} placed: {1}
+Ein Abstandhalter gehört in ein Layout -- auf eine Zeile, Spalte oder ein Raster ziehen.	A spacer belongs in a layout -- drag it onto a row, column or grid layout.
+Abstandhalter in {0} an Stelle {1}.	Spacer in {0} at position {1}.
+Timer angelegt: {0}	Timer created: {0}
+Was in einem Layout steht, legt das Layout -- zum Anordnen erst herausziehen.	A layout places what is in it -- drag it out first to arrange it.
+Anordnen braucht mindestens zwei gewählte Controls (Umschalt+Klick oder ein Rahmen).	Arranging needs at least two selected controls (Shift+click or a selection frame).
+Verteilen braucht mindestens drei gewählte Controls.	Distributing needs at least three selected controls.
+Angeordnet: {0} Controls.	Arranged: {0} controls.
+Controls hierher ziehen	Drag controls here
+#
+# --- Pruefen, Starten, Bauen -----------------------------------------------
+Programm	Program
+ (erzeugt)	 (generated)
+, am Ende	, at the end
+ · Eigenschaften, Zeile {0}	 · Properties, line {0}
+Bilder gehören zu einem Projekt -- erst sichern.	Images belong to a project -- save it first.
+Bild hinzufügen	Add image
+Die Datei gibt es nicht: {0}	The file does not exist: {0}
+Bild hinzugefügt: bilder/{0}	Image added: bilder/{0}
+{0} braucht ein gesichertes Projekt.	{0} needs a saved project.
+Das Projekt hat kein Fenster.	The project has no window.
+1 Fehler -- erst beheben, dann {0}.	1 error -- fix it first, then {0}.
+{0} Fehler -- erst beheben, dann {1}.	{0} errors -- fix them first, then {1}.
+▶ {0} startet …	▶ {0} starts …
+Läuft: {0}	Running: {0}
+■ Angehalten.	■ Stopped.
+Angehalten.	Stopped.
+⚙ Baue {0} …	⚙ Building {0} …
+Baue …	Building …
+■ Beendet mit Rückgabe {0}.	■ Finished with exit code {0}.
+Beendet.	Finished.
+✓ Gebaut: {0}	✓ Built: {0}
+Gebaut: {0}	Built: {0}
+✕ Bauen fehlgeschlagen (Rückgabe {0}).	✕ Build failed (exit code {0}).
+Bauen fehlgeschlagen.	Build failed.
+{0} Fehler, {1} Warnungen.	{0} errors, {1} warnings.
+Keine Vorschläge an dieser Stelle.	No suggestions here.
+#
+# --- Inspektor -------------------------------------------------------------
+Breite	Width
+Höhe	Height
+Größe änderbar	Resizable
+Intervall (ms)	Interval (ms)
+Läuft beim Start	Runs at start
+Wiederholt sich	Repeats
+Kennung	Identity
+Art	Kind
+Lage	Position
+Links	Left
+Oben	Top
+Anker	Anchors
+Gewicht	Weight
+Layout	Layout
+Anordnung	Arrangement
+Spalten	Columns
+Rand	Margin
+Ausrichtung	Alignment
+Anfang;Mitte;Ende	Start;Center;End
+Kinder dehnen	Stretch children
+Rahmen	Frame
+Inhalt	Content
+Platzhalter	Placeholder
+Einträge	Items
+Gesetzt	Checked
+Minimum	Minimum
+Maximum	Maximum
+Wert	Value
+Aussehen	Appearance
+Knopfart	Button style
+Schriftgröße	Font size
+Schriftstil	Font style
+Hintergrund	Background
+Textfarbe	Text color
+Verhalten	Behavior
+Aktiviert	Enabled
+Sichtbar	Visible
+Hinweis	Tooltip
+Tab-Folge	Tab order
+Einträge durch Semikolon getrennt	items separated by semicolons
+Vorgabe	Default
+klebt am {0} Rand, wenn das Fenster wächst	sticks to the {0} edge when the window grows
+linken	left
+oberen	top
+rechten	right
+unteren	bottom
+Vorgabe des Themas	Theme default
+in {0}, Stelle {1}	in {0}, position {1}
+ -- {0} gewählt	 -- {0} selected
+Den Namen '{0}' gibt es in diesem Fenster schon.	This window already has the name '{0}'.
+Ein Element '{0}' gibt es im Projekt schon.	The project already has an element '{0}'.
+#
+# --- Menue-Editor ----------------------------------------------------------
+Menüs hat ein Fenster -- erst ein Layout öffnen.	Menus belong to a window -- open a layout first.
+Menüs	Menus
+Menüs von {0}	Menus of {0}
++ Menü	+ Menu
++ Eintrag	+ Item
++ Untermenü	+ Submenu
++ Trenner	+ Separator
+nach oben	move up
+nach unten	move down
+wird zum Feld des Fensters; das Ereignis heißt <Name>_Aktion	becomes a field of the window; the event is called <Name>_Aktion
+Kürzel	Shortcut
+z. B. Strg+S	e.g. Ctrl+S
+Mit Haken (an/aus)	With check mark (on/off)
+OK	OK
+Noch kein Menü. [+ Menü] legt eins an.	No menu yet. [+ Menu] creates one.
+Ohne Namen hat der Eintrag kein Ereignis.	Without a name the item has no event.
+Ereignis: {0}_Aktion -- Doppelklick im Navigator legt es an.	Event: {0}_Aktion -- double-click in the navigator creates it.
+Ein Trenner.	A separator.
+Ein Menü mit {0} Einträgen.	A menu with {0} items.
+Menüs übernommen.	Menus applied.
+Menü {0}	Menu {0}
+Eintrag	Item
+Untermenü	Submenu
+#
+# --- Datei, Sichern, Laden -------------------------------------------------
+Neues Projekt. Bausteine aus der Bibliothek ins Fenster ziehen.	New project. Drag controls from the library into the window.
+Neues Projekt in {0}.	New project in {0}.
+Die Vorlage geht nicht auf: {0}	The template does not open: {0}
+Neues Projekt aus der Vorlage {0}. F5 startet es; Sichern fragt nach einem Ordner.	New project from the template {0}. F5 runs it; Save asks for a folder.
+Geladen: {0} ({1} Controls)	Loaded: {0} ({1} controls)
+Neu: {0}	New: {0}
+Projekt {0}: {1} Elemente, {2} Methoden.	Project {0}: {1} elements, {2} methods.
+Fenster sichern	Save window
+Gesichert: {0}	Saved: {0}
+Ordner für das Projekt	Folder for the project
+Gesichert: {0} ({1} Elemente)	Saved: {0} ({1} elements)
+Projekt oder Fenster öffnen	Open project or window
+Ungesicherte Änderungen	Unsaved changes
+{0} ist nicht gesichert.	{0} is not saved.
+Das Fenster {0}	The window {0}
+Das Projekt {0}	The project {0}
+Sichern|Verwerfen|Abbrechen	Save|Discard|Cancel
+Eine IDE für Programme mit Oberfläche, mit der Laufzeit dhrt {0}.{1}Fenster entwerfen, Ereignisse und Code je Methode, prüfen, starten, debuggen und bauen.	An IDE for programs with a user interface, with the runtime dhrt {0}.{1}Design windows, events and code per method, check, run, debug and build.
+Abstandhalter aus {0} gelöscht.	Spacer removed from {0}.
+Timer gelöscht: {0}	Timer deleted: {0}
+1 Control gelöscht.	1 control deleted.
+{0} Controls gelöscht.	{0} controls deleted.
+Abgebrochen.	Cancelled.

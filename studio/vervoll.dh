@@ -71,7 +71,7 @@ SUB vervollOeffnen(vonSelbst AS BOOLEAN)
     WEND
     IF vonSelbst AND LEN(namen) > 100 THEN RETURN
     IF LEN(namen) = 0 THEN
-        IF NOT vonSelbst THEN status("Keine Vorschläge an dieser Stelle.")
+        IF NOT vonSelbst THEN status(tr$("Keine Vorschläge an dieser Stelle."))
         RETURN
     END IF
     GUI_LISTBOX_CLEAR(lstVv)
