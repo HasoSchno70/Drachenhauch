@@ -1,6 +1,6 @@
 ' Drachenhauch Studio, Stufe 5 Teil 4: das Beispielprojekt
-' examples/studio/rechnungen (vier Fenster, eine Klasse, zwei Module,
-' SQLite, PDF, CSV). Der erste Fall prueft, dass das Projekt genau so im
+' examples/studio/rechnungen (vier Fenster, eine Klasse, zwei Module, eine
+' Datenbank mit Abfrage, ein Bericht fuer die Rechnung, PDF, CSV). Der erste Fall prueft, dass das Projekt genau so im
 ' Ordner steht, wie das Studio es schreiben wuerde. Der zweite oeffnet eine
 ' Kopie im Studio, startet sie mit F5 und laesst danach das erzeugte
 ' Programm eine Probe fahren, die seine Teile direkt aufruft -- Datenbank,
@@ -17,8 +17,10 @@ PRINT "laden ["; projektLaden$(o); "]"
 PRINT "elemente "; LEN(elemente); " start "; projStart
 DIM e AS Element
 FOR EACH e IN elemente
-    DIM code AS STRING : code = JOIN$(READLINES(PATHJOIN(o, codeDatei$(e))), CHR$(10)) + CHR$(10)
-    DIM gleich AS BOOLEAN : gleich = codeSetzen$(e) = code
+    DIM gleich AS BOOLEAN : gleich = TRUE
+    IF hatCode(e) THEN gleich = codeSetzen$(e) = JOIN$(READLINES(PATHJOIN(o, codeDatei$(e))), CHR$(10)) + CHR$(10)
+    IF e.art = "datenbank" THEN gleich = JSON_PRETTY(dbSchema(e)) = JOIN$(READLINES(PATHJOIN(o, schemaDatei$(e))), CHR$(10))
+    IF e.art = "bericht" THEN gleich = JSON_PRETTY(berichtJ(e)) = JOIN$(READLINES(PATHJOIN(o, berichtDatei$(e))), CHR$(10))
     IF e.art = "fenster" THEN
         DIM lay AS STRING : lay = JOIN$(READLINES(PATHJOIN(o, layoutDatei$(e))), CHR$(10))
         gleich = gleich AND JSON_PRETTY(JSON_PARSE(e.layout)) = lay
@@ -32,14 +34,20 @@ PRINT "projektdatei "; projektJson$() = JOIN$(READLINES(PATHJOIN(o, PROJEKT_DATE
 IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
+IMPORT "db"
+IMPORT "pdf"
 IMPORT "{sammlung}/../../studio/sprache.dh"
 IMPORT "{sammlung}/../../studio/bibliothek.dh"
 IMPORT "{sammlung}/../../studio/modell.dh"
 IMPORT "{sammlung}/../../studio/projekt.dh"
+IMPORT "{sammlung}/../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../studio/berichte_laufzeit.dh"
+IMPORT "{sammlung}/../../studio/berichte.dh"
 --- erwartet
 laden []
-elemente 8 start Hauptfenster
+elemente 10 start Hauptfenster
 app App TRUE
+datenbank Daten TRUE
 modul Datenbank TRUE
 modul Ausgabe TRUE
 klasse Rechnung TRUE
@@ -47,6 +55,7 @@ fenster Hauptfenster TRUE
 fenster RechnungFenster TRUE
 fenster KundenFenster TRUE
 fenster ArtikelFenster TRUE
+bericht Rechnungsbeleg TRUE
 projektdatei TRUE
 
 === f5 startet das beispiel, und das erzeugte programm rechnet richtig
@@ -60,7 +69,7 @@ DIM p AS STRING : p = CWD$() + "/proj"
 MKDIR(p)
 DIM n AS STRING
 FOR EACH n IN DIRLIST(ARG$(1))
-    IF n <> "_studio" AND NOT DIREXISTS(PATHJOIN(ARG$(1), n)) THEN COPYFILE(PATHJOIN(ARG$(1), n), PATHJOIN(p, n))
+    IF n <> "_studio" AND n <> "rechnungen.db" AND NOT DIREXISTS(PATHJOIN(ARG$(1), n)) THEN COPYFILE(PATHJOIN(ARG$(1), n), PATHJOIN(p, n))
 NEXT
 slHin(10, 10)
 slWarten(10)
@@ -71,9 +80,10 @@ SETENV("DH_STUDIO_LAUF_BILDER", "20")
 DIM log AS STRING : log = CWD$() + "/s.log"
 DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
 PRINT "geprueft "; slHat(log, "geprueft 0 0")
-PRINT "erzeugt "; slHat(log, "erzeugt 8")
+PRINT "erzeugt "; slHat(log, "erzeugt 10")
 PRINT "beendet "; slHat(log, "beendet 0")
-PRINT "datenbank "; FILEEXISTS(p + "/_studio/rechnungen.db")
+' Die Datenbank liegt im Projektordner: das Element Daten legt sie an.
+PRINT "datenbank "; FILEEXISTS(p + "/rechnungen.db"); " "; NOT FILEEXISTS(p + "/_studio/rechnungen.db")
 ' Die Tabelle des Hauptfensters hat ein Doppelklick-Ereignis (Enter zaehlt mit).
 PRINT "doppelklick verdrahtet "; INSTR(JOIN$(READLINES(p + "/_studio/Hauptfenster_basis.dh"), CHR$(10)), "GUI_DOUBLE_CLICKED(Self.tabelle)") >= 0
 FUNCTION lauf$(k AS INTEGER, mitAus AS BOOLEAN) AS STRING
@@ -119,11 +129,21 @@ DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "5", p + "/_stud
 lauf$(k, TRUE)
 PRINT "code "; PROCESS_CODE(k)
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+' Die Rechnung aus dem Bericht Rechnungsbeleg: Adresse, Positionen mit
+' Nummer, die Steuer je Satz und der Betrag -- dieselben Zahlen wie oben.
+DIM pdf AS STRING : pdf = JOIN$(pdfSeiten(p + "/_studio/probe.pdf"), CHR$(10))
+PRINT "beleg "; INSTR(pdf, "Rechnung " + LEFT$(DATE$(), 4) + "-0001") >= 0; " "; INSTR(pdf, "Bäckerei Sonnenschein" + CHR$(10) + "Hauptstraße 12" + CHR$(10) + "80331 München") >= 0
+PRINT "zeilen "; INSTR(pdf, "1" + CHR$(10) + "Beratung (Stunde)" + CHR$(10) + "3" + CHR$(10) + "95,00" + CHR$(10) + "19 %" + CHR$(10) + "285,00") >= 0; " "; INSTR(pdf, "3" + CHR$(10) + "Versand") >= 0
+PRINT "netto "; INSTR(pdf, "Netto" + CHR$(10) + "350,70") >= 0; " 19 "; INSTR(pdf, "MwSt 19 %" + CHR$(10) + "55,27") >= 0; " 7 "; INSTR(pdf, "MwSt 7 %" + CHR$(10) + "4,19") >= 0; " gesamt "; INSTR(pdf, "410,16") >= 0; " seite "; INSTR(pdf, "Seite 1 von 1") >= 0
+' Die zweite Rechnung hat nur Positionen zu 7 %: keine Zeile fuer 19 %.
+pdf = JOIN$(pdfSeiten(p + "/_studio/probe2.pdf"), CHR$(10))
+PRINT "nur 7 "; INSTR(pdf, "MwSt 7 %" + CHR$(10) + "0,01") >= 0; " ohne 19 "; INSTR(pdf, "MwSt 19 %") < 0; " gesamt "; INSTR(pdf, "0,21") >= 0
 --- argumente
 {sammlung}/../../studio/studio.dh
 {sammlung}/../../examples/studio/rechnungen
 --- datei laeufer.dh
 IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
 slStudio = ARG$(0)
 --- datei probe_teil.dh
 ' --- Die Beispieldaten, die der erste Start angelegt hat.
@@ -172,6 +192,9 @@ eins.laden(1)
 eins.alsPdf("probe.pdf")
 DIM kopf AS BUFFER : kopf = READALL_BYTES("probe.pdf")
 PRINT "pdf "; BUFFER_TO_STRING$(BUFFER_SLICE(kopf, 0, 5)); " gross genug "; BUFFER_LEN(kopf) > 5000
+DIM zwei AS Rechnung : zwei = NEW Rechnung()
+zwei.laden(2)
+zwei.alsPdf("probe2.pdf")
 PRINT "csv "; csvExport("probe.csv")
 DIM zeile AS STRING
 FOR EACH zeile IN READLINES("probe.csv")
@@ -222,7 +245,7 @@ EXIT(0)
 geprueft TRUE
 erzeugt TRUE
 beendet TRUE
-datenbank TRUE
+datenbank TRUE TRUE
 doppelklick verdrahtet TRUE
 check []
 kunden 3 artikel 4 rechnungen 1
@@ -253,3 +276,7 @@ mit kunde TRUE offen FALSE nummer TRUE
 erste position Beratung (Stunde) x 4 brutto 45220
 rechnungen 3
 code 0
+beleg TRUE TRUE
+zeilen TRUE TRUE
+netto TRUE 19 TRUE 7 TRUE gesamt TRUE seite TRUE
+nur 7 TRUE ohne 19 TRUE gesamt TRUE

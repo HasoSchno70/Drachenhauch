@@ -119,6 +119,14 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
         Self.pdfAusgeben()
     END SUB
 
+    ' Die gewaehlte Rechnung im Vorschaufenster des Berichts.
+    SUB miVorschau_Aktion()
+        DIM rid AS INTEGER : rid = Self.gewaehlt()
+        IF rid < 0 THEN RETURN
+        DIM beleg AS Rechnung : beleg = NEW Rechnung()
+        IF beleg.laden(rid) THEN beleg.zeigen()
+    END SUB
+
     SUB miCsv_Aktion()
         DIM pfad AS STRING : pfad = PATHJOIN(CWD$(), "rechnungen.csv")
         DIM n AS INTEGER : n = csvExport(pfad)

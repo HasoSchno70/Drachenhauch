@@ -1,6 +1,6 @@
 ' Was das Programm nach draussen schreibt: Datum und Betraege fuer die
-' Anzeige, die Rechnung als PDF und alle Rechnungen als CSV.
-IMPORT "pdf"
+' Anzeige und alle Rechnungen als CSV. Die Rechnung als PDF setzt der
+' Bericht Rechnungsbeleg.
 
 ' 2026-11-01 -> 01.11.2026
 FUNCTION datumDeutsch$(d AS STRING) AS STRING
@@ -12,11 +12,6 @@ END FUNCTION
 FUNCTION centText$(cent AS INTEGER) AS STRING
     RETURN STR$(cent \ 100) + "," + RIGHT$("0" + STR$(cent MOD 100), 2)
 END FUNCTION
-
-' Text so setzen, dass er bei x = rechts endet.
-SUB pdfRechts(p AS PDF, rechts AS FLOAT, y AS FLOAT, t AS STRING)
-    PDF_TEXT(p, rechts - PDF_TEXT_WIDTH(p, t), y, t)
-END SUB
 
 ' Ein Feld der CSV: in Anfuehrungszeichen, wenn es ; oder " enthaelt.
 FUNCTION csvFeld$(t AS STRING) AS STRING

@@ -1,0 +1,390 @@
+{
+  "titel": "Rechnung",
+  "seite": {
+    "format": "A4",
+    "hoch": true,
+    "rand": [
+      15,
+      20,
+      15,
+      20
+    ]
+  },
+  "quelle": "Daten.Belegzeilen",
+  "bedingung": "rechnung = :id",
+  "sortieren": [
+    "id"
+  ],
+  "gruppen": [],
+  "baender": [
+    {
+      "art": "berichtskopf",
+      "hoehe": 58,
+      "elemente": [
+        {
+          "art": "text",
+          "x": 0,
+          "y": 5,
+          "b": 120,
+          "h": 4,
+          "text": "Beispiel GmbH · Musterweg 1 · 12345 Musterstadt",
+          "groesse": 8,
+          "farbe": "#555555"
+        },
+        {
+          "art": "linie",
+          "x": 0,
+          "y": 10,
+          "b": 80,
+          "h": 0,
+          "staerke": 0.2,
+          "farbe": "#999999"
+        },
+        {
+          "art": "feld",
+          "spalte": "kunde",
+          "x": 0,
+          "y": 13,
+          "b": 100,
+          "h": 6,
+          "groesse": 11
+        },
+        {
+          "art": "feld",
+          "spalte": "strasse",
+          "x": 0,
+          "y": 19,
+          "b": 100,
+          "h": 6,
+          "groesse": 11
+        },
+        {
+          "art": "feld",
+          "spalte": "ort",
+          "x": 0,
+          "y": 25,
+          "b": 100,
+          "h": 6,
+          "groesse": 11
+        },
+        {
+          "art": "text",
+          "x": 105,
+          "y": 13,
+          "b": 35,
+          "h": 5,
+          "text": "Datum:",
+          "ausrichtung": "rechts"
+        },
+        {
+          "art": "feld",
+          "spalte": "datum",
+          "format": "datum",
+          "x": 142,
+          "y": 13,
+          "b": 28,
+          "h": 5
+        },
+        {
+          "art": "text",
+          "x": 105,
+          "y": 19,
+          "b": 35,
+          "h": 5,
+          "text": "Nummer:",
+          "ausrichtung": "rechts"
+        },
+        {
+          "art": "feld",
+          "spalte": "nummer",
+          "x": 142,
+          "y": 19,
+          "b": 28,
+          "h": 5
+        },
+        {
+          "art": "feld",
+          "spalte": "titel",
+          "x": 0,
+          "y": 42,
+          "b": 170,
+          "h": 9,
+          "groesse": 18,
+          "fett": true
+        }
+      ]
+    },
+    {
+      "art": "seitenkopf",
+      "hoehe": 10,
+      "elemente": [
+        {
+          "art": "text",
+          "x": 0,
+          "y": 1,
+          "b": 9,
+          "h": 5,
+          "text": "Pos.",
+          "fett": true
+        },
+        {
+          "art": "text",
+          "x": 10,
+          "y": 1,
+          "b": 60,
+          "h": 5,
+          "text": "Bezeichnung",
+          "fett": true
+        },
+        {
+          "art": "text",
+          "x": 75,
+          "y": 1,
+          "b": 30,
+          "h": 5,
+          "text": "Menge",
+          "fett": true,
+          "ausrichtung": "rechts"
+        },
+        {
+          "art": "text",
+          "x": 107,
+          "y": 1,
+          "b": 25,
+          "h": 5,
+          "text": "Einzelpreis",
+          "fett": true,
+          "ausrichtung": "rechts"
+        },
+        {
+          "art": "text",
+          "x": 133,
+          "y": 1,
+          "b": 12,
+          "h": 5,
+          "text": "MwSt",
+          "fett": true,
+          "ausrichtung": "rechts"
+        },
+        {
+          "art": "text",
+          "x": 145,
+          "y": 1,
+          "b": 25,
+          "h": 5,
+          "text": "Summe",
+          "fett": true,
+          "ausrichtung": "rechts"
+        },
+        {
+          "art": "linie",
+          "x": 0,
+          "y": 7,
+          "b": 170,
+          "h": 0,
+          "staerke": 0.3
+        }
+      ]
+    },
+    {
+      "art": "detail",
+      "hoehe": 7,
+      "elemente": [
+        {
+          "art": "feld",
+          "spalte": "pos",
+          "format": "ganz",
+          "x": 0,
+          "y": 1,
+          "b": 9,
+          "h": 5
+        },
+        {
+          "art": "feld",
+          "spalte": "bezeichnung",
+          "x": 10,
+          "y": 1,
+          "b": 64,
+          "h": 5
+        },
+        {
+          "art": "feld",
+          "spalte": "menge",
+          "format": "ganz",
+          "x": 75,
+          "y": 1,
+          "b": 30,
+          "h": 5,
+          "ausrichtung": "rechts"
+        },
+        {
+          "art": "feld",
+          "spalte": "preis",
+          "format": "geld",
+          "x": 107,
+          "y": 1,
+          "b": 25,
+          "h": 5,
+          "ausrichtung": "rechts"
+        },
+        {
+          "art": "feld",
+          "spalte": "satz",
+          "x": 133,
+          "y": 1,
+          "b": 12,
+          "h": 5,
+          "ausrichtung": "rechts"
+        },
+        {
+          "art": "feld",
+          "spalte": "netto",
+          "format": "geld",
+          "x": 145,
+          "y": 1,
+          "b": 25,
+          "h": 5,
+          "ausrichtung": "rechts"
+        }
+      ]
+    },
+    {
+      "art": "seitenfuss",
+      "hoehe": 10,
+      "elemente": [
+        {
+          "art": "seitenzahl",
+          "x": 0,
+          "y": 3,
+          "b": 170,
+          "h": 5,
+          "ausrichtung": "mitte",
+          "groesse": 8
+        }
+      ]
+    },
+    {
+      "art": "berichtsfuss",
+      "hoehe": 50,
+      "elemente": [
+        {
+          "art": "linie",
+          "x": 100,
+          "y": 1,
+          "b": 70,
+          "h": 0,
+          "staerke": 0.3
+        },
+        {
+          "art": "text",
+          "x": 95,
+          "y": 4,
+          "b": 45,
+          "h": 5,
+          "text": "Netto",
+          "ausrichtung": "rechts"
+        },
+        {
+          "art": "summe",
+          "spalte": "netto",
+          "funktion": "summe",
+          "bereich": "bericht",
+          "format": "geld",
+          "x": 140,
+          "y": 4,
+          "b": 30,
+          "h": 5,
+          "ausrichtung": "rechts"
+        },
+        {
+          "art": "text",
+          "x": 95,
+          "y": 10,
+          "b": 45,
+          "h": 5,
+          "text": "MwSt 19 %",
+          "ausrichtung": "rechts",
+          "wo": "mwst = 19"
+        },
+        {
+          "art": "summe",
+          "spalte": "steuer",
+          "funktion": "summe",
+          "bereich": "bericht",
+          "format": "geld",
+          "x": 140,
+          "y": 10,
+          "b": 30,
+          "h": 5,
+          "ausrichtung": "rechts",
+          "wo": "mwst = 19"
+        },
+        {
+          "art": "text",
+          "x": 95,
+          "y": 16,
+          "b": 45,
+          "h": 5,
+          "text": "MwSt 7 %",
+          "ausrichtung": "rechts",
+          "wo": "mwst = 7"
+        },
+        {
+          "art": "summe",
+          "spalte": "steuer",
+          "funktion": "summe",
+          "bereich": "bericht",
+          "format": "geld",
+          "x": 140,
+          "y": 16,
+          "b": 30,
+          "h": 5,
+          "ausrichtung": "rechts",
+          "wo": "mwst = 7"
+        },
+        {
+          "art": "linie",
+          "x": 100,
+          "y": 23,
+          "b": 70,
+          "h": 0,
+          "staerke": 0.3
+        },
+        {
+          "art": "text",
+          "x": 95,
+          "y": 25,
+          "b": 45,
+          "h": 6,
+          "text": "Gesamt (EUR)",
+          "groesse": 11,
+          "fett": true,
+          "ausrichtung": "rechts"
+        },
+        {
+          "art": "summe",
+          "spalte": "brutto",
+          "funktion": "summe",
+          "bereich": "bericht",
+          "format": "geld",
+          "x": 140,
+          "y": 25,
+          "b": 30,
+          "h": 6,
+          "groesse": 11,
+          "fett": true,
+          "ausrichtung": "rechts"
+        },
+        {
+          "art": "text",
+          "x": 0,
+          "y": 40,
+          "b": 170,
+          "h": 5,
+          "text": "Zahlbar innerhalb von 14 Tagen ohne Abzug. Vielen Dank für Ihren Auftrag.",
+          "groesse": 9
+        }
+      ]
+    }
+  ]
+}
