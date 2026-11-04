@@ -978,3 +978,34 @@ Drachenhauch Studio	Drachenhauch Studio
 Werkzeug: Drachenhauch Studio	Tool: Drachenhauch Studio
 Drachenhauch Studio gestartet.	Drachenhauch Studio started.
 Im Drachenhauch Studio geöffnet: 	Opened in Drachenhauch Studio:
+Seriell	Serial
+Serieller Monitor	Serial monitor
+Serieller Monitor: verbinden/trennen	Serial monitor: connect/disconnect
+Port oder tcp:host:port	Port or tcp:host:port
+Der Port (COM3, /dev/ttyUSB0) -- oder tcp:host:port für eine Netzbrücke	The port (COM3, /dev/ttyUSB0) -- or tcp:host:port for a network bridge
+Baudrate -- wie Serial.begin() im Sketch	Baud rate -- as in Serial.begin() in the sketch
+Verbinden	Connect
+Trennen	Disconnect
+Kurve	Plot
+Zeilen aus Zahlen als Kurve zeichnen (12 34 oder temp:21.5)	Draw lines of numbers as a plot (12 34 or temp:21.5)
+Zeit	Time
+Jeder Zeile die Uhrzeit voranstellen	Put the time in front of every line
+Leeren	Clear
+Port wählen und [Verbinden] -- was das Gerät schickt, steht hier.	Choose a port and [Connect] -- what the device sends appears here.
+Text senden -- Enter schickt ihn	Send text -- Enter sends it
+ohne Zeilenende	no line ending
+Was hinter jeden gesendeten Text kommt	What follows every text sent
+Alle Zeilen kopieren	Copy all lines
+Erst einen Port wählen (oder tcp:host:port eintragen).	Choose a port first (or enter tcp:host:port).
+Netzziel: tcp:host:port, etwa tcp:192.168.1.40:23	Network target: tcp:host:port, for example tcp:192.168.1.40:23
+Keine Verbindung: 	No connection: 
+Diese Laufzeit ist ohne serielle Schnittstelle gebaut -- nur tcp:host:port geht.	This runtime is built without serial ports -- only tcp:host:port works.
+Port lässt sich nicht öffnen: 	Cannot open the port: 
+verbunden mit 	connected to 
+Verbindung verloren	connection lost
+Verbindung beendet	connection closed
+Nicht verbunden -- erst [Verbinden].	Not connected -- [Connect] first.
+ Zeilen kopiert.	 lines copied.
+getrennt	disconnected
+für das Programm freigegeben, danach wieder verbunden	released for the program, reconnected afterwards
+Noch keine Zahlenzeilen -- etwa: 12 34 oder temp:21.5	No lines of numbers yet -- for example: 12 34 or temp:21.5

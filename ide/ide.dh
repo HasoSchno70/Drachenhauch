@@ -113,6 +113,10 @@ IMPORT "imgfx"      ' fuer die gezeichneten Menue-Symbole (IMAGE_NEW/IMAGE_DRAW_
 IMPORT "regex"      ' fuer die Suche mit regulaeren Ausdruecken
 IMPORT "zeit"       ' ZEIT_JETZT fuer das Lebenszeichen der Absturz-Wiederherstellung
 IMPORT "video"      ' der Vorspann beim Start (daten/video/vorspann.mp4)
+IMPORT "net"        ' der serielle Monitor ueber eine Netzbruecke (tcp:host:port)
+' Der serielle Monitor nimmt die Schnittstelle, wenn diese Laufzeit sie hat
+' (gebaut mit --hardware); sonst geht er nur ueber tcp:host:port.
+IMPORT "serial" OPTIONAL
 
 CONST MAX_TABS = 12
 CONST NL = CHR$(10)
@@ -219,6 +223,8 @@ SUB bereichsFarben()
     GUI_SET_COLOR(lstWkZuletzt, "bg", farbMisch(grund, TON_PROJEKT, anteil))
     GUI_SET_COLOR(lstAusgabe, "bg", farbMisch(grund, TON_AUSGABE, anteil))
     GUI_SET_COLOR(lstTerminal, "bg", farbMisch(grund, TON_AUSGABE, anteil))
+    GUI_SET_COLOR(lstSeriell, "bg", farbMisch(grund, TON_AUSGABE, anteil))
+    GUI_SET_COLOR(tfSeriell, "bg", farbMisch(grund, TON_AUSGABE, anteil))
     GUI_SET_COLOR(tfEingabe, "bg", farbMisch(grund, TON_AUSGABE, anteil))
     GUI_SET_COLOR(lstProbleme, "bg", farbMisch(grund, TON_PROBLEME, anteil))
     GUI_SET_COLOR(tblVars, "bg", farbMisch(grund, TON_DEBUG, anteil))
@@ -1191,6 +1197,7 @@ GUI_DOCK_PANEL(win, "projekt", tr$("Projekt"), "links")
 GUI_DOCK_PANEL(win, "gliederung", tr$("Gliederung"), "links")
 GUI_DOCK_PANEL(win, "ausgabe", tr$("Ausgabe"), "unten")
 GUI_DOCK_TAB(win, "terminal", tr$("Terminal"), "ausgabe")
+GUI_DOCK_TAB(win, "seriell", tr$("Seriell"), "ausgabe")
 GUI_DOCK_PANEL(win, "probleme", tr$("Probleme"), "unten")
 GUI_DOCK_TAB(win, "debugger", tr$("Debugger"), "probleme")
 GUI_DOCK_SHOW(win, "debugger", FALSE)
@@ -1417,6 +1424,7 @@ DIM miLeiste AS INTEGER : miLeiste = GUI_MENU_ITEM(mAnsicht, tr$("Werkzeugleiste
 DIM miSeiten AS INTEGER : miSeiten = GUI_MENU_ITEM(mAnsicht, tr$("Seitenleiste"), kz$("Alt+1"))
 DIM miUnten AS INTEGER : miUnten = GUI_MENU_ITEM(mAnsicht, tr$("Untere Leiste"), kz$("Alt+2"))
 DIM miTerminal AS INTEGER : miTerminal = GUI_MENU_ITEM(mAnsicht, tr$("Terminal"), kz$("Alt+3"))
+DIM miSeriell AS INTEGER : miSeriell = GUI_MENU_ITEM(mAnsicht, tr$("Serieller Monitor"), kz$("Alt+4"))
 ' In der ANDEREN Sprache beschriftet: wer die jetzige nicht lesen kann,
 ' soll den Punkt trotzdem finden.
 DIM miSprache AS INTEGER : miSprache = GUI_MENU_ITEM(mAnsicht, IIF(englisch, "Sprache: Deutsch (beim nächsten Start)", "Language: English (at next start)"))
@@ -1722,6 +1730,37 @@ GUI_SET_VISIBLE(btnTermStopp, FALSE)
 ' Hier oben, weil layout() sie liest -- es laeuft vor dem Terminal-Abschnitt.
 DIM terminalAn AS BOOLEAN : terminalAn = FALSE
 DIM termProz AS INTEGER : termProz = -1
+' Serieller Monitor (Alt+4): Port, Baud und [Verbinden] im Kopf der Leiste,
+' darunter die empfangenen Zeilen und rechts die Kurve, unten die Zeile zum
+' Senden. Was man waehlt, merkt sich die ide.json (seriell_*).
+DIM ddSerPort AS GUI_WIDGET : ddSerPort = GUI_DROPDOWN(win, 0, 0, 160, 22, [])
+GUI_DROPDOWN_SET(ddSerPort, "bearbeitbar", 1)
+GUI_DROPDOWN_PLACEHOLDER(ddSerPort, tr$("Port oder tcp:host:port"))
+GUI_TOOLTIP(ddSerPort, tr$("Der Port (COM3, /dev/ttyUSB0) -- oder tcp:host:port für eine Netzbrücke"))
+GUI_SET_TEXT(ddSerPort, kText("seriell_ziel", ""))
+DIM serBaudListe AS ARRAY OF STRING : serBaudListe = ["300", "1200", "2400", "4800", "9600", "19200", "38400", "57600", "74880", "115200", "230400", "250000", "500000", "1000000", "2000000"]
+DIM ddSerBaud AS GUI_WIDGET : ddSerBaud = GUI_DROPDOWN(win, 0, 0, 96, 22, serBaudListe)
+GUI_TOOLTIP(ddSerBaud, tr$("Baudrate -- wie Serial.begin() im Sketch"))
+GUI_DROPDOWN_SET_SELECTED(ddSerBaud, MAX(0, ARRAY_INDEXOF(serBaudListe, STR$(kInt("seriell_baud", 115200)))))
+DIM btnSerVerbinden AS GUI_WIDGET : btnSerVerbinden = GUI_BUTTON(win, tr$("Verbinden"), 0, 0, 90, 20)
+GUI_BUTTON_VARIANT(btnSerVerbinden, "primaer")
+DIM chkSerKurve AS GUI_WIDGET : chkSerKurve = GUI_CHECKBOX(win, tr$("Kurve"), 0, 0, kBool("seriell_kurve", TRUE))
+GUI_TOOLTIP(chkSerKurve, tr$("Zeilen aus Zahlen als Kurve zeichnen (12 34 oder temp:21.5)"))
+DIM chkSerZeit AS GUI_WIDGET : chkSerZeit = GUI_CHECKBOX(win, tr$("Zeit"), 0, 0, kBool("seriell_zeit", FALSE))
+GUI_TOOLTIP(chkSerZeit, tr$("Jeder Zeile die Uhrzeit voranstellen"))
+DIM btnSerLeeren AS GUI_WIDGET : btnSerLeeren = GUI_BUTTON(win, tr$("Leeren"), 0, 0, 70, 20)
+DIM lstSeriell AS GUI_WIDGET : lstSeriell = GUI_LISTBOX(win, 0, 0, 10, 10, [])
+GUI_LISTBOX_PLACEHOLDER(lstSeriell, tr$("Port wählen und [Verbinden] -- was das Gerät schickt, steht hier."))
+DIM serBild AS IMAGE : serBild = IMAGE_NEW(8, 8, 0)
+DIM imgSeriell AS GUI_WIDGET : imgSeriell = GUI_IMAGE(win, 0, 0, 10, 10, serBild)
+GUI_IMAGE_MODE(imgSeriell, "mitte")
+DIM tfSeriell AS GUI_WIDGET : tfSeriell = GUI_TEXTINPUT(win, 0, 0, 10, 22, tr$("Text senden -- Enter schickt ihn"))
+DIM ddSerEnde AS GUI_WIDGET : ddSerEnde = GUI_DROPDOWN(win, 0, 0, 130, 22, [tr$("ohne Zeilenende"), "LF (\n)", "CR (\r)", "CR+LF"])
+GUI_TOOLTIP(ddSerEnde, tr$("Was hinter jeden gesendeten Text kommt"))
+GUI_DROPDOWN_SET_SELECTED(ddSerEnde, MAX(0, MIN(3, kInt("seriell_ende", 1))))
+DIM ctxSeriell AS INTEGER : ctxSeriell = GUI_CONTEXT(win)
+DIM miSerKopieren AS INTEGER : miSerKopieren = GUI_MENU_ITEM(ctxSeriell, tr$("Alle Zeilen kopieren"))
+GUI_CONTEXT_WIDGET(ctxSeriell, lstSeriell)
 ' Der Reiter der Leiste heisst schon "Probleme" -- ohne Ergebnis bleibt der
 ' Kopf daneben leer, sonst stuende das Wort zweimal nebeneinander.
 DIM lblProbleme AS GUI_WIDGET : lblProbleme = GUI_LABEL(win, "", 0, 0)
@@ -1885,6 +1924,11 @@ GUI_DOCK_ADD(win, "gliederung", lstGliederung) : GUI_DOCK_ADD(win, "gliederung",
 GUI_DOCK_ADD(win, "ausgabe", lstAusgabe) : GUI_DOCK_ADD(win, "ausgabe", lblAusgabe)
 GUI_DOCK_ADD(win, "ausgabe", tfAusgabeFilter)
 GUI_DOCK_ADD(win, "terminal", lstTerminal) : GUI_DOCK_ADD(win, "terminal", btnTermStopp)
+GUI_DOCK_ADD(win, "seriell", ddSerPort) : GUI_DOCK_ADD(win, "seriell", ddSerBaud)
+GUI_DOCK_ADD(win, "seriell", btnSerVerbinden) : GUI_DOCK_ADD(win, "seriell", chkSerKurve)
+GUI_DOCK_ADD(win, "seriell", chkSerZeit) : GUI_DOCK_ADD(win, "seriell", btnSerLeeren)
+GUI_DOCK_ADD(win, "seriell", lstSeriell) : GUI_DOCK_ADD(win, "seriell", imgSeriell)
+GUI_DOCK_ADD(win, "seriell", tfSeriell) : GUI_DOCK_ADD(win, "seriell", ddSerEnde)
 GUI_DOCK_ADD(win, "probleme", lstProbleme) : GUI_DOCK_ADD(win, "probleme", lblProbleme)
 GUI_DOCK_ADD(win, "probleme", lblHilfeKopf) : GUI_DOCK_ADD(win, "probleme", lblHilfe)
 GUI_DOCK_ADD(win, "debugger", lblDebug) : GUI_DOCK_ADD(win, "debugger", tblVars)
@@ -2906,6 +2950,25 @@ SUB layoutLeisten()
         GUI_SET_BOUNDS(btnTermStopp, kx + kb - 90, ky + 1, 90, kh - 2)
     END IF
     GUI_SET_VISIBLE(btnTermStopp, termProz >= 0)
+    (x, y, b, h) = GUI_DOCK_RECT(win, "seriell")
+    IF b > 0 THEN
+        (kx, ky, kb, kh) = GUI_DOCK_HEAD_RECT(win, "seriell")
+        DIM sx AS INTEGER : sx = kx + 4
+        GUI_SET_BOUNDS(ddSerPort, sx, ky, 170, kh) : sx = sx + 176
+        GUI_SET_BOUNDS(ddSerBaud, sx, ky, 96, kh) : sx = sx + 102
+        GUI_SET_BOUNDS(btnSerVerbinden, sx, ky + 1, 96, kh - 2) : sx = sx + 108
+        GUI_SET_BOUNDS(chkSerKurve, sx, ky + 2, 80, kh - 4) : sx = sx + 84
+        GUI_SET_BOUNDS(chkSerZeit, sx, ky + 2, 70, kh - 4) : sx = sx + 74
+        GUI_SET_BOUNDS(btnSerLeeren, sx, ky + 1, 70, kh - 2)
+        DIM sh AS INTEGER : sh = MAX(10, h - 28)
+        DIM kurveZeigen AS BOOLEAN : kurveZeigen = GUI_CHECKED(chkSerKurve) AND b >= 360
+        DIM lb AS INTEGER : lb = IIF(kurveZeigen, b * 45 \ 100, b)
+        GUI_SET_BOUNDS(lstSeriell, x, y, lb, sh)
+        GUI_SET_BOUNDS(imgSeriell, x + lb + 6, y, MAX(10, b - lb - 6), sh)
+        GUI_SET_VISIBLE(imgSeriell, kurveZeigen)
+        GUI_SET_BOUNDS(tfSeriell, x, y + sh + 4, MAX(40, b - 136), 22)
+        GUI_SET_BOUNDS(ddSerEnde, x + b - 130, y + sh + 4, 130, 22)
+    END IF
     (x, y, b, h) = GUI_DOCK_RECT(win, "probleme")
     IF b > 0 THEN
         GUI_SET_BOUNDS(lstProbleme, x, y, b, h \ 2 - 4)
@@ -13592,6 +13655,7 @@ FUNCTION prozessStartenDatei(art AS STRING, datei AS STRING) AS BOOLEAN
     ' Leiste kommt zurueck, und das Terminal macht ihr Platz.
     IF terminalAn THEN terminalZeigen(FALSE)
     IF NOT untenAn THEN leistenSetzen(seitenAn, TRUE)
+    serVorStart(datei)
     ausgabeRest = "" : prozessRest = ""
     prozessDatei = datei
     prozessArt = art
@@ -17614,6 +17678,447 @@ SUB terminalVerlaufTasten()
 END SUB
 
 
+' --- Serieller Monitor (Alt+4, seit 2026-11-04) ----------------------------
+' Liest eine serielle Schnittstelle (ein Arduino, ein ESP32 am USB) Zeile
+' fuer Zeile mit und schickt Text hinaus. Das Ziel ist ein Port (COM3,
+' /dev/ttyUSB0) oder `tcp:host:port` -- eine Netzbruecke, wie sie ein ESP32
+' im WLAN anbietet; ueber denselben Weg prueft sich der Monitor ohne Geraet.
+' Zeilen, die nur aus Zahlen bestehen (`12 34`, `temp:21.5,feuchte:40`),
+' zeichnet die Kurve -- dieselbe Regel wie der Plotter der Arduino-IDE.
+' Die Schnittstelle gehoert immer nur einem: startet F5 ein Programm, das
+' SERIAL_OPEN oder FIRMATA_OPEN aufruft, gibt der Monitor sie frei und
+' verbindet sich danach wieder.
+CONST SER_MAX_ZEILEN = 3000
+CONST SER_PUNKTE = 600
+CONST SER_REIHEN = 8
+' 0 = getrennt, 1 = seriell, 2 = tcp
+DIM serArt AS INTEGER : serArt = 0
+DIM serPort AS INTEGER : serPort = -1
+DIM serSock AS NET_SOCKET
+DIM serRest AS STRING : serRest = ""
+DIM serRestZeit AS FLOAT : serRestZeit = 0.0
+DIM serWieder AS BOOLEAN : serWieder = FALSE
+DIM serPortListe AS STRING : serPortListe = "-"
+DIM serPortFaellig AS FLOAT : serPortFaellig = 0.0
+' Die Kurve: je Reihe ein Ring mit SER_PUNKTE Werten. serKGesamt zaehlt alle
+' Zeilen mit Zahlen seit dem Leeren, serKAb die erste, in der eine Reihe
+' vorkam (vorher hat sie keinen Wert und wird nicht gezeichnet).
+DIM serKNamen AS ARRAY OF STRING : serKNamen = []
+DIM serKAb AS ARRAY OF INTEGER : serKAb = []
+DIM serKWert[SER_REIHEN * SER_PUNKTE] AS FLOAT
+DIM serKGesamt AS INTEGER : serKGesamt = 0
+DIM serKNeu AS BOOLEAN : serKNeu = TRUE
+DIM serKBilder AS INTEGER : serKBilder = 0
+DIM serBildB AS INTEGER : serBildB = 0
+DIM serBildH AS INTEGER : serBildH = 0
+
+FUNCTION serVerbunden() AS BOOLEAN
+    RETURN serArt <> 0
+END FUNCTION
+
+SUB serZeigen()
+    IF NOT untenAn THEN leistenSetzen(seitenAn, TRUE)
+    GUI_DOCK_ACTIVATE(win, "seriell")
+    serPortsAuffrischen()
+    layout()
+    GUI_FOCUS(IIF(serVerbunden(), tfSeriell, ddSerPort))
+    protokoll("seriell gezeigt")
+END SUB
+
+' Die Ports neu einlesen -- nur wenn sich die Liste geaendert hat, sonst
+' haelt die Klappliste ihren Text und ihre Markierung.
+SUB serPortsAuffrischen()
+    DIM liste AS STRING : liste = ""
+    IF MODULE_AVAILABLE("serial") THEN
+        TRY
+            liste = SERIAL_PORTS()
+        CATCH portFehler
+            liste = ""
+        END TRY
+    END IF
+    IF liste = serPortListe THEN RETURN
+    serPortListe = liste
+    DIM eintraege AS ARRAY OF STRING : eintraege = []
+    DIM p AS STRING
+    IF liste <> "" THEN
+        FOR EACH p IN SPLIT(liste, ",")
+            IF TRIM$(p) <> "" THEN ARRAY_PUSH(eintraege, TRIM$(p))
+        NEXT
+    END IF
+    DIM t AS STRING : t = GUI_TEXT(ddSerPort)
+    GUI_SET_DROPDOWN(ddSerPort, eintraege)
+    ' Ohne gewaehlten Port der erste gefundene -- meist der einzige.
+    IF t = "" AND LEN(eintraege) > 0 THEN t = eintraege[0]
+    GUI_SET_TEXT(ddSerPort, t)
+    protokoll("seriell ports " + STR$(LEN(eintraege)))
+END SUB
+
+FUNCTION serBaud() AS INTEGER
+    RETURN VAL(GUI_DROPDOWN_TEXT(ddSerBaud))
+END FUNCTION
+
+SUB serVerbinden(ziel AS STRING)
+    ziel = TRIM$(ziel)
+    IF serVerbunden() THEN serTrennen("")
+    IF ziel = "" THEN
+        serMeldung(tr$("Erst einen Port wählen (oder tcp:host:port eintragen)."))
+        RETURN
+    END IF
+    serRest = ""
+    IF LOWER$(LEFT$(ziel, 4)) = "tcp:" THEN
+        ' tcp:host:port -- der Port steht hinter dem LETZTEN Doppelpunkt,
+        ' damit auch eine IPv6-Adresse geht.
+        DIM rest AS STRING : rest = MID$(ziel, 4)
+        DIM k AS INTEGER : k = INSTRREV(rest, ":")
+        IF k <= 0 THEN
+            serMeldung(tr$("Netzziel: tcp:host:port, etwa tcp:192.168.1.40:23"))
+            RETURN
+        END IF
+        DIM wirt AS STRING : wirt = LEFT$(rest, k)
+        DIM nr AS INTEGER : nr = VAL(MID$(rest, k + 1))
+        TRY
+            serSock = NET_TCP_CONNECT(wirt, nr)
+            serArt = 2
+        CATCH netzFehler
+            serMeldung(tr$("Keine Verbindung: ") + netzFehler)
+            RETURN
+        END TRY
+    ELSE
+        IF NOT MODULE_AVAILABLE("serial") THEN
+            serMeldung(tr$("Diese Laufzeit ist ohne serielle Schnittstelle gebaut -- nur tcp:host:port geht."))
+            RETURN
+        END IF
+        TRY
+            serPort = SERIAL_OPEN(ziel, serBaud())
+            SERIAL_TIMEOUT(serPort, 0.0)
+            serArt = 1
+        CATCH oeffnenFehler
+            serMeldung(tr$("Port lässt sich nicht öffnen: ") + oeffnenFehler)
+            RETURN
+        END TRY
+    END IF
+    JSON_SET_STRING(konfig, "seriell_ziel", ziel)
+    GUI_SET_TEXT(btnSerVerbinden, tr$("Trennen"))
+    GUI_BUTTON_VARIANT(btnSerVerbinden, "gefahr")
+    serZeile("[" + tr$("verbunden mit ") + ziel + "]", F_KOMMENTAR)
+    GUI_FOCUS(tfSeriell)
+    protokoll("seriell verbunden " + ziel)
+END SUB
+
+SUB serTrennen(grund AS STRING)
+    IF serArt = 1 THEN
+        TRY
+            SERIAL_CLOSE(serPort)
+        CATCH zuFehler
+        END TRY
+        serPort = -1
+    ELSEIF serArt = 2 THEN
+        TRY
+            NET_CLOSE(serSock)
+        CATCH zuFehler2
+        END TRY
+    END IF
+    IF serArt = 0 THEN RETURN
+    serArt = 0
+    IF serRest <> "" THEN serZeile(serRest, -1) : serRest = ""
+    GUI_SET_TEXT(btnSerVerbinden, tr$("Verbinden"))
+    GUI_BUTTON_VARIANT(btnSerVerbinden, "primaer")
+    IF grund <> "" THEN serZeile("[" + grund + "]", F_KOMMENTAR)
+    protokoll("seriell getrennt " + grund)
+END SUB
+
+SUB serMeldung(t AS STRING)
+    GUI_SET_TEXT(lblStatus, t)
+    protokoll("seriell meldung " + t)
+END SUB
+
+' Eine Zeile in die Liste (ohne Zeilenende). -1 = Grundfarbe.
+SUB serZeile(z AS STRING, farbe AS INTEGER)
+    DIM zeig AS STRING : zeig = z
+    IF GUI_CHECKED(chkSerZeit) THEN zeig = MID$(TIME$(), 0, 8) + "  " + z
+    GUI_LISTBOX_ADD(lstSeriell, zeig)
+    DIM n AS INTEGER : n = GUI_LISTBOX_COUNT(lstSeriell)
+    IF farbe <> -1 THEN GUI_LISTBOX_COLOR(lstSeriell, n - 1, farbe)
+    IF n > SER_MAX_ZEILEN THEN GUI_LISTBOX_REMOVE(lstSeriell, 0) : n = n - 1
+    ' Mitlaufen, solange man nicht weiter oben eine Zeile gewaehlt hat.
+    IF GUI_LISTBOX_SELECTED(lstSeriell) >= n - 2 OR GUI_LISTBOX_SELECTED(lstSeriell) < 0 THEN
+        GUI_LISTBOX_SET_SELECTED(lstSeriell, n - 1)
+        GUI_LISTBOX_SCROLL_TO(lstSeriell, n - 1)
+    END IF
+    protokoll("seriell zeile " + z)
+END SUB
+
+' Empfangenes in Zeilen zerlegen; der angefangene Rest wartet auf sein Ende.
+SUB serText(t AS STRING)
+    IF t = "" THEN RETURN
+    serRest = serRest + t
+    serRestZeit = GET_TIME()
+    DIM k AS INTEGER : k = INSTR(serRest, CHR$(10))
+    WHILE k >= 0
+        DIM z AS STRING : z = LEFT$(serRest, k)
+        IF RIGHT$(z, 1) = CHR$(13) THEN z = LEFT$(z, LEN(z) - 1)
+        serRest = MID$(serRest, k + 1)
+        serZeile(z, -1)
+        serKurveLesen(z)
+        k = INSTR(serRest, CHR$(10))
+    WEND
+END SUB
+
+' Eine Zeile als Werte der Kurve lesen: Zahlen, getrennt durch Leerraum,
+' Komma oder Semikolon, wahlweise mit Namen (`temp:21.5`). Steht irgendein
+' anderes Wort darin, ist es keine Datenzeile.
+SUB serKurveLesen(z AS STRING)
+    DIM t AS STRING : t = TRIM$(REGEX_REPLACE(z, ":\s+", ":"))
+    IF t = "" THEN RETURN
+    DIM teile AS ARRAY OF STRING : teile = REGEX_SPLIT(t, "[\s,;]+")
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM werte AS ARRAY OF FLOAT : werte = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 1
+        DIM s AS STRING : s = teile[i]
+        IF s = "" THEN CONTINUE
+        DIM name AS STRING : name = STR$(LEN(werte) + 1)
+        DIM k AS INTEGER : k = INSTRREV(s, ":")
+        IF k > 0 THEN name = LEFT$(s, k) : s = MID$(s, k + 1)
+        IF NOT REGEX_TEST(s, "^[-+]?([0-9]+\.?[0-9]*|\.[0-9]+)([eE][-+]?[0-9]+)?$") THEN RETURN
+        ARRAY_PUSH(namen, name)
+        ARRAY_PUSH(werte, VAL(s))
+    NEXT
+    IF LEN(werte) = 0 THEN RETURN
+    DIM platz AS INTEGER : platz = serKGesamt MOD SER_PUNKTE
+    ' Jede Reihe traegt ihren letzten Wert weiter, wenn die Zeile sie nicht
+    ' nennt -- sonst risse die Kurve bei jeder kuerzeren Zeile ab.
+    DIM r AS INTEGER
+    FOR r = 0 TO LEN(serKNamen) - 1
+        IF serKGesamt > serKAb[r] THEN serKWert[r * SER_PUNKTE + platz] = serKWert[r * SER_PUNKTE + (serKGesamt - 1) MOD SER_PUNKTE]
+    NEXT
+    FOR i = 0 TO LEN(werte) - 1
+        r = ARRAY_INDEXOF(serKNamen, namen[i])
+        IF r < 0 THEN
+            IF LEN(serKNamen) >= SER_REIHEN THEN CONTINUE
+            ARRAY_PUSH(serKNamen, namen[i])
+            ARRAY_PUSH(serKAb, serKGesamt)
+            r = LEN(serKNamen) - 1
+        END IF
+        serKWert[r * SER_PUNKTE + platz] = werte[i]
+    NEXT
+    serKGesamt = serKGesamt + 1
+    serKNeu = TRUE
+END SUB
+
+SUB serLeeren()
+    GUI_LISTBOX_CLEAR(lstSeriell)
+    serKNamen = [] : serKAb = [] : serKGesamt = 0 : serKNeu = TRUE
+    protokoll("seriell geleert")
+END SUB
+
+SUB serSenden(t AS STRING)
+    IF NOT serVerbunden() THEN
+        serMeldung(tr$("Nicht verbunden -- erst [Verbinden]."))
+        RETURN
+    END IF
+    DIM ende AS STRING : ende = ""
+    SELECT CASE GUI_DROPDOWN_SELECTED(ddSerEnde)
+        CASE 1 : ende = CHR$(10)
+        CASE 2 : ende = CHR$(13)
+        CASE 3 : ende = CHR$(13) + CHR$(10)
+    END SELECT
+    TRY
+        IF serArt = 1 THEN
+            SERIAL_WRITE(serPort, t + ende)
+        ELSE
+            NET_SEND(serSock, t + ende)
+        END IF
+    CATCH sendFehler
+        serTrennen(tr$("Verbindung verloren"))
+        RETURN
+    END TRY
+    serZeile("> " + t, F_SCHLUESSEL)
+    GUI_SET_TEXT(tfSeriell, "")
+    protokoll("seriell gesendet " + t)
+END SUB
+
+' Je Bild: lesen, was da ist; ein angefangener Rest ohne Zeilenende kommt
+' nach einer halben Sekunde trotzdem (eine Eingabeaufforderung wie "> ").
+SUB seriellNachziehen()
+    IF serArt = 1 THEN
+        TRY
+            DIM n AS INTEGER : n = SERIAL_AVAILABLE(serPort)
+            IF n > 0 THEN serText(SERIAL_READ(serPort, MIN(n, 65536)))
+        CATCH leseFehler
+            serTrennen(tr$("Verbindung verloren"))
+        END TRY
+    ELSEIF serArt = 2 THEN
+        DIM tn AS STRING : tn = NET_RECV(serSock, 65536)
+        IF tn <> "" THEN serText(tn)
+        IF tn = "" AND NOT NET_IS_CONNECTED(serSock) THEN serTrennen(tr$("Verbindung beendet"))
+    END IF
+    IF serRest <> "" AND GET_TIME() - serRestZeit > 0.5 THEN
+        DIM rz AS STRING : rz = serRest
+        serRest = ""
+        serZeile(rz, -1)
+        serKurveLesen(rz)
+    END IF
+    IF serWieder AND prozess < 0 THEN
+        serWieder = FALSE
+        serVerbinden(kText("seriell_ziel", ""))
+    END IF
+    IF NOT GUI_DOCK_SHOWN(win, "seriell") THEN RETURN
+    IF NOT serVerbunden() AND GET_TIME() >= serPortFaellig THEN
+        serPortFaellig = GET_TIME() + 2.0
+        serPortsAuffrischen()
+    END IF
+    IF GUI_CLICKED(btnSerVerbinden) THEN
+        IF serVerbunden() THEN
+            serTrennen(tr$("getrennt"))
+        ELSE
+            serVerbinden(GUI_TEXT(ddSerPort))
+        END IF
+    END IF
+    IF GUI_ENTERED(ddSerPort) AND NOT serVerbunden() THEN serVerbinden(GUI_TEXT(ddSerPort))
+    IF GUI_ENTERED(tfSeriell) THEN serSenden(GUI_TEXT(tfSeriell))
+    IF GUI_CLICKED(btnSerLeeren) THEN serLeeren()
+    IF GUI_CLICKED(chkSerKurve) THEN
+        JSON_SET_BOOL(konfig, "seriell_kurve", GUI_CHECKED(chkSerKurve))
+        layout()
+        serKNeu = TRUE
+    END IF
+    IF GUI_CLICKED(miSerKopieren) THEN
+        DIM alle AS ARRAY OF STRING : alle = []
+        DIM i AS INTEGER
+        FOR i = 0 TO GUI_LISTBOX_COUNT(lstSeriell) - 1
+            ARRAY_PUSH(alle, GUI_LISTBOX_ITEM(lstSeriell, i))
+        NEXT
+        TRY
+            CLIPBOARD_SET(JOIN$(alle, NL))
+            serMeldung(STR$(LEN(alle)) + tr$(" Zeilen kopiert."))
+        CATCH ablageFehler
+            serMeldung(ablageFehler)
+        END TRY
+    END IF
+    serBaudMerken()
+    ' Die Kurve hoechstens jedes dritte Bild neu -- hundert Zeilen je
+    ' Sekunde brauchen kein Bild je Zeile.
+    serKBilder = serKBilder + 1
+    IF serKNeu AND serKBilder >= 3 AND GUI_CHECKED(chkSerKurve) THEN
+        serKBilder = 0
+        serKNeu = FALSE
+        serKurveZeichnen()
+    END IF
+END SUB
+
+SUB serBaudMerken()
+    IF kInt("seriell_baud", -1) <> serBaud() THEN JSON_SET_INT(konfig, "seriell_baud", serBaud())
+    IF kInt("seriell_ende", -1) <> GUI_DROPDOWN_SELECTED(ddSerEnde) THEN JSON_SET_INT(konfig, "seriell_ende", GUI_DROPDOWN_SELECTED(ddSerEnde))
+    IF kBool("seriell_zeit", NOT GUI_CHECKED(chkSerZeit)) <> GUI_CHECKED(chkSerZeit) THEN JSON_SET_BOOL(konfig, "seriell_zeit", GUI_CHECKED(chkSerZeit))
+END SUB
+
+' Gibt der Monitor die Schnittstelle fuer ein Programm frei? Nur wenn er
+' einen PORT haelt (eine Netzbruecke stoert niemanden) und das Programm sie
+' selbst oeffnet.
+SUB serVorStart(datei AS STRING)
+    IF serArt <> 1 OR NOT FILEEXISTS(datei) THEN RETURN
+    DIM q AS STRING : q = UPPER$(JOIN$(READLINES(datei), NL))
+    IF INSTR(q, "SERIAL_OPEN") < 0 AND INSTR(q, "FIRMATA_OPEN") < 0 THEN RETURN
+    serTrennen(tr$("für das Programm freigegeben, danach wieder verbunden"))
+    serWieder = TRUE
+END SUB
+
+FUNCTION serFarbe(r AS INTEGER) AS INTEGER
+    DIM farben AS ARRAY OF INTEGER : farben = [&H4FC3F7, &HFFB74D, &H81C784, &HF06292, &HBA68C8, &HFFF176, &H4DB6AC, &HE57373]
+    IF hell THEN farben = [&H1565C0, &HE65100, &H2E7D32, &HC2185B, &H6A1B9A, &H9E7D00, &H00796B, &HC62828]
+    RETURN farben[r MOD LEN(farben)]
+END FUNCTION
+
+SUB serKurveZeichnen()
+    DIM b AS INTEGER : b = GUI_GET_W(imgSeriell)
+    DIM h AS INTEGER : h = GUI_GET_H(imgSeriell)
+    IF b < 40 OR h < 30 THEN RETURN
+    DIM grund AS INTEGER : grund = farbMisch(GUI_THEME_GET("widget_bg"), TON_AUSGABE, IIF(hell, 0.08, 0.12))
+    IF b <> serBildB OR h <> serBildH THEN
+        DIM neu AS IMAGE : neu = IMAGE_NEW(b, h, grund)
+        GUI_SET_IMAGE(imgSeriell, neu)
+        IMAGE_FREE(serBild)
+        serBild = neu
+        serBildB = b : serBildH = h
+    END IF
+    IMAGE_FILL_RECT(serBild, 0, 0, b - 1, h - 1, grund)
+    DIM schrift AS INTEGER : schrift = GUI_THEME_GET("text_fg")
+    DIM leise AS INTEGER : leise = farbMisch(grund, schrift, 0.2)
+    DIM achse AS INTEGER : achse = farbMisch(grund, schrift, 0.6)
+    DIM gr AS INTEGER : gr = 13
+    DIM links AS INTEGER : links = 52
+    DIM oben AS INTEGER : oben = 22
+    DIM pb AS INTEGER : pb = b - links - 8
+    DIM ph AS INTEGER : ph = h - oben - 8
+    IF pb < 10 OR ph < 10 THEN RETURN
+    ' Sichtbar: die letzten SER_PUNKTE Zeilen.
+    DIM erste AS INTEGER : erste = MAX(0, serKGesamt - SER_PUNKTE)
+    DIM tief AS FLOAT : tief = 0.0
+    DIM hoch AS FLOAT : hoch = 0.0
+    DIM da AS BOOLEAN : da = FALSE
+    DIM r AS INTEGER
+    DIM i AS INTEGER
+    FOR r = 0 TO LEN(serKNamen) - 1
+        FOR i = MAX(erste, serKAb[r]) TO serKGesamt - 1
+            DIM w AS FLOAT : w = serKWert[r * SER_PUNKTE + i MOD SER_PUNKTE]
+            IF NOT da THEN tief = w : hoch = w : da = TRUE
+            tief = MIN(tief, w) : hoch = MAX(hoch, w)
+        NEXT
+    NEXT
+    IF NOT da THEN
+        serText2(serBild, links, oben + ph \ 2 - 8, tr$("Noch keine Zahlenzeilen -- etwa: 12 34 oder temp:21.5"), gr, achse)
+        protokoll("seriell kurve 0 0")
+        RETURN
+    END IF
+    IF hoch - tief < 0.000001 THEN tief = tief - 1.0 : hoch = hoch + 1.0
+    DIM rand AS FLOAT : rand = (hoch - tief) * 0.05
+    tief = tief - rand : hoch = hoch + rand
+    ' Gitter: vier Linien mit ihrem Wert links daneben.
+    DIM g AS INTEGER
+    FOR g = 0 TO 4
+        DIM gy AS INTEGER : gy = oben + (ph * g) \ 4
+        IMAGE_FILL_RECT(serBild, links, gy, links + pb - 1, gy, leise)
+        DIM gw AS FLOAT : gw = hoch - (hoch - tief) * g / 4.0
+        serText2(serBild, 2, gy - 7, serZahl$(gw, hoch - tief), gr, achse)
+    NEXT
+    ' Je Reihe ein Linienzug und ihr Name oben in ihrer Farbe.
+    DIM lx AS INTEGER : lx = links
+    FOR r = 0 TO LEN(serKNamen) - 1
+        DIM ab AS INTEGER : ab = MAX(erste, serKAb[r])
+        DIM xs AS ARRAY OF FLOAT : xs = []
+        DIM ys AS ARRAY OF FLOAT : ys = []
+        FOR i = ab TO serKGesamt - 1
+            ARRAY_PUSH(xs, links + (i - erste) * (pb - 1) / (SER_PUNKTE - 1.0))
+            ARRAY_PUSH(ys, oben + ph - 1 - (serKWert[r * SER_PUNKTE + i MOD SER_PUNKTE] - tief) * (ph - 1) / (hoch - tief))
+        NEXT
+        IF LEN(xs) = 1 THEN ARRAY_PUSH(xs, xs[0] + 1.0) : ARRAY_PUSH(ys, ys[0])
+        IF LEN(xs) >= 2 THEN IMAGE_POLYLINE(serBild, xs, ys, 2.0, serFarbe(r))
+        DIM nt AS STRING : nt = serKNamen[r] + " " + serZahl$(serKWert[r * SER_PUNKTE + (serKGesamt - 1) MOD SER_PUNKTE], hoch - tief)
+        IMAGE_FILL_RECT(serBild, lx, 6, lx + 9, 15, serFarbe(r))
+        serText2(serBild, lx + 13, 3, nt, gr, schrift)
+        lx = lx + 13 + LEN(nt) * 8 + 14
+    NEXT
+    protokoll("seriell kurve " + STR$(LEN(serKNamen)) + " " + STR$(serKGesamt - erste))
+END SUB
+
+' Eine Zahl fuer die Achse: so viele Stellen, wie der Bereich braucht.
+FUNCTION serZahl$(w AS FLOAT, bereich AS FLOAT) AS STRING
+    IF bereich >= 100.0 THEN RETURN FORMAT$(w, "%.0f")
+    IF bereich >= 1.0 THEN RETURN FORMAT$(w, "%.1f")
+    RETURN FORMAT$(w, "%.3f")
+END FUNCTION
+
+' Text in das Bild der Kurve -- in der Schrift der Oberflaeche, wenn es sie gibt.
+SUB serText2(bild AS IMAGE, x AS INTEGER, y AS INTEGER, t AS STRING, gr AS INTEGER, farbe AS INTEGER)
+    IF uiFont >= 0 THEN
+        IMAGE_DRAW_TEXT(bild, x, y, t, gr, farbe, uiFont)
+    ELSE
+        IMAGE_DRAW_TEXT(bild, x, y, t, gr, farbe)
+    END IF
+END SUB
+
+
 ' --- Profil im Code (seit 2026-09-29) -----------------------------------
 ' Nach Strg+Umschalt+Y steht die Messung nicht nur in der Tabelle, sondern
 ' im Code selbst: ein Band hinter jeder gemessenen Zeile, von blassgelb
@@ -18999,7 +19504,7 @@ paletteEintrag("Werkzeug: Tracker", "wz_tracker", "") : paletteEintrag("Werkzeug
 paletteEintrag("Ausdruck im Debugger auswerten", "ausdruck", "Strg+E")
 paletteEintrag("Eigene Schnipsel bearbeiten", "schnipsel_eigen", "") : paletteEintrag("Auswahl als Schnipsel sichern ...", "schnipsel_auswahl", "")
 paletteEintrag("Tastenkürzel ändern ...", "tasten", "") : paletteEintrag("Tastenkürzel zurücksetzen", "tasten_zurueck", "")
-paletteEintrag("Sprache der Oberfläche: Deutsch/English", "sprache", "") : paletteEintrag("Terminal ein/aus", "terminal", "Alt+3") : paletteEintrag("Terminal: laufenden Befehl abbrechen", "terminal_stopp", "")
+paletteEintrag("Sprache der Oberfläche: Deutsch/English", "sprache", "") : paletteEintrag("Terminal ein/aus", "terminal", "Alt+3") : paletteEintrag("Terminal: laufenden Befehl abbrechen", "terminal_stopp", "") : paletteEintrag("Serieller Monitor", "seriell", "Alt+4") : paletteEintrag("Serieller Monitor: verbinden/trennen", "seriell_verbinden", "")
 
 ' Unscharfer Filter: der Text als Teil ODER seine Zeichen der Reihe nach
 ' ("spred" findet "189_sprite_editor.dh").
@@ -19407,6 +19912,13 @@ SUB befehl(k AS STRING)
         CASE "terminal" : terminalZeigen(NOT (terminalAn AND untenAn))
         CASE "sprache" : spracheWechseln()
         CASE "terminal_stopp" : terminalAbbrechen()
+        CASE "seriell" : serZeigen()
+        CASE "seriell_verbinden"
+            IF serVerbunden() THEN
+                serTrennen(tr$("getrennt"))
+            ELSE
+                serVerbinden(GUI_TEXT(ddSerPort))
+            END IF
         CASE "sichern" : sichern(aktiverTab, FALSE)
         CASE "sichern_unter" : sichern(aktiverTab, TRUE)
         CASE "schliessen" : tabSchliessenFragen(aktiverTab)
@@ -19798,7 +20310,7 @@ menueBefehl(miExport, "export", "Strg+F6") : menueBefehl(miGroesser, "groesser",
 menueBefehl(miNormal, "schrift_normal", "Strg+0") : menueBefehl(miKuerzel, "kuerzel", "Strg+F1") : menueBefehl(miWeiterD, "weiter_d", "F8", FALSE)
 menueBefehl(miDrueber, "drueber", "F10", FALSE) : menueBefehl(miHinein, "hinein", "F11", FALSE) : menueBefehl(miHeraus, "heraus", "Umschalt+F11", FALSE)
 menueBefehl(miBisMarke, "bis_marke", "Strg+F10", FALSE) : menueBefehl(miSchnipselEigen, "schnipsel_eigen", "") : menueBefehl(miSchnipselAuswahl, "schnipsel_auswahl", "")
-menueBefehl(miTerminal, "terminal", "Alt+3") : menueBefehl(miSprache, "sprache", "") : menueBefehl(miTasten, "tasten", "") : menueBefehl(miTastenZurueck, "tasten_zurueck", "")
+menueBefehl(miTerminal, "terminal", "Alt+3") : menueBefehl(miSeriell, "seriell", "Alt+4") : menueBefehl(miSprache, "sprache", "") : menueBefehl(miTasten, "tasten", "") : menueBefehl(miTastenZurueck, "tasten_zurueck", "")
 ' Die Vorgabe der Kuerzel: was die Befehle bis hierher bekommen haben
 ' (Plugins melden ihre spaeter an und haben ihre eigene).
 DIM bkv AS INTEGER
@@ -19937,6 +20449,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(btnTermStopp) THEN befehl("terminal_stopp")
     terminalNachziehen()
     terminalVerlaufTasten()
+    seriellNachziehen()
     ' Werkzeugleiste: jeder Knopf ruft denselben Befehl wie sein Menuepunkt.
     IF (prozess >= 0) <> wzStoppAn THEN
         wzStoppAn = prozess >= 0
