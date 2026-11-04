@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2198,
+ "count": 2199,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -1393,6 +1393,7 @@
   "MODEL_TEXTURE": "apply an image as the surface",
   "MODEL_TEXTURE_NORMAL": "normal map for surface structure (only works with MODEL_LIT)",
   "MODEL_WIRES": "draw as a wireframe",
+  "MODULE_AVAILABLE": "is the module in this build? (hardware modules are missing without --hardware)",
   "MONITOR_COUNT": "number of connected monitors",
   "MONITOR_HEIGHT": "native height of monitor i (px)",
   "MONITOR_NAME": "display name of monitor i",

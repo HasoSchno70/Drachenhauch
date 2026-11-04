@@ -24,7 +24,7 @@ IF prBild > 20 AND NOT prAn THEN
     prGeraet = NET_TCP_ACCEPT(prLauscher)
     IF NET_IS_CONNECTED(prGeraet) THEN
         prAn = TRUE
-        NET_SEND(prGeraet, "hallo" + CHR$(13) + CHR$(10) + "zwei" + CHR$(10) + "Eingabe> ")
+        NET_SEND(prGeraet, "hallo" + CHR$(13) + CHR$(10) + "zwei" + CHR$(10))
     END IF
 END IF
 IF prBild = 40 THEN
@@ -33,6 +33,9 @@ IF prBild = 40 THEN
     GUI_DROPDOWN_SET_SELECTED(ddSerEnde, 3)
     serSenden("aus")
 END IF
+' Erst nach dem Senden: eine Eingabeaufforderung ohne Zeilenende. Unter Last
+' liefe die halbe Sekunde sonst schon vor Bild 40 ab.
+IF prBild = 45 THEN NET_SEND(prGeraet, "Eingabe> ")
 IF prAn AND prBild > 40 AND prBild < 100 THEN prBekommen = prBekommen + NET_RECV(prGeraet, 1000)
 IF prBild = 100 THEN
     protokoll("pr bekommen " + REPLACE$(REPLACE$(prBekommen, CHR$(13), "<CR>"), CHR$(10), "<LF>"))
