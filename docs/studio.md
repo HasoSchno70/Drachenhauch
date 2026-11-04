@@ -556,8 +556,8 @@ jedes Band mit einer Leiste, die seinen Namen trägt, darin die Elemente.
   (Vorgabegröße) oder ein Rechteck ziehen. Esc bricht ab.
 * **Spalten der Quelle** stehen rechts oben; eine Spalte in ein Band ziehen
   macht im Gruppen- oder Berichtsfuß eine Summe, im Seitenkopf eine
-  Überschrift, sonst ein Feld (Geld und Zahlen rechtsbündig). Ein Doppelklick
-  legt sie ins Detail.
+  Überschrift, sonst ein Feld (Geld und Zahlen rechtsbündig); eine Bildspalte
+  wird ein Bild-Element. Ein Doppelklick legt sie ins Detail.
 * **Ziehen** verschiebt, was gewählt ist (Raster 1 mm, Alt ohne); dabei rasten
   die Kanten und Mitten an anderen Elementen und an den Rändern ein, eine
   rosa Linie zeigt es. Ein einzelnes Element darf das Band wechseln. Acht
@@ -589,7 +589,13 @@ Zeile nicht. Was sich nicht so lesen lässt, nimmt das Feld nicht an.
 
 Strg+Rad zoomt, das Rad rollt (mit Umschalt seitwärts). **Vorschau …** setzt
 den Bericht mit den Daten der Entwicklungsdatei, fragt nach den Parametern und
-blättert durch die Seiten. Bildspalten setzt ein Bericht noch nicht.
+blättert durch die Seiten.
+
+Ein **Bild-Element** zeigt eine Datei aus `bilder/` (Eigenschaft Bild) oder,
+wenn es eine **Spalte** nennt, je Zeile das Bild aus dieser Bildspalte -- etwa
+ein Foto je Artikel im Detail. Ein Bild wird ins Rechteck eingepasst, ohne es
+zu verzerren; eine leere Zelle oder Bytes, die kein Bild sind, lassen es
+leer.
 
 Im Programm ist ein Bericht ein Objekt unter seinem Namen:
 

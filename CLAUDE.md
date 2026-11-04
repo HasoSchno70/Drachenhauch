@@ -3928,6 +3928,19 @@ englische "Panel" kam vom gleichnamigen gui-Schluessel). Tests ein Fall in
 `werkzeug_studio_beispiel.dhtest` vergleicht `.dhdb`/`.dhreport` im Rundweg
 und liest die PDFs (Positionen, Steuer zu 19 und 7 %, eine Rechnung nur zu
 7 % ohne 19-%-Zeile).
+**Bildspalten (selber Tag):** ein Bild-Element mit `spalte` zeigt je Zeile
+das Bild dieser BLOB-Spalte. `studioBBildSpaltenVon(j)` sammelt die Spalten
+der Bild-Elemente, `studioBLesen` liest nur diese mit `DB_GET_BUFFER` (Wert =
+Marke "[Bild]", Puffer in `studioBPufferStelle`/`studioBPuffer`) -- vorher
+gingen alle Spalten durch DB_GET_STRING. Gesetzt ueber `IMAGE_FROM_BUFFER`
+in TRY (kaputte Bytes bleiben leer) und `studioBBildSetzen` (eingepasst und
+mittig, auch fuer Dateien aus bilder/ -- vorher verzerrt). Eine gezogene
+Bildspalte wird ein Bild-Element (`berichtSpalteElement`), `spalte` gilt im
+Inspektor auch fuer Bilder. Test "bildspalten" in
+`werkzeug_studio_berichte.dhtest` (Pixel der Vorschau: Quadrat mittig,
+breites Bild fuellt, NULL/kaputt leer); vier Verfaelschungen fallen, der
+weggenommene `imgfx`-Import im erzeugten Code ist gleichwertig (das
+Datenbank-Element importiert es schon).
 
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 

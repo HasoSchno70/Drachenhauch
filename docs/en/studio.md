@@ -545,8 +545,8 @@ with a bar carrying its name, the elements inside.
   (default size) or drag a rectangle. Esc cancels.
 * **Columns of the source** are at the top right; dragging a column into a
   band makes a sum in a group or report footer, a heading in the page header,
-  otherwise a field (money and numbers right-aligned). A double-click puts it
-  into the detail.
+  otherwise a field (money and numbers right-aligned); an image column becomes
+  an image element. A double-click puts it into the detail.
 * **Dragging** moves what is selected (grid 1 mm, Alt without); edges and
   centres snap to other elements and to the margins, a pink line shows it. A
   single element may change its band. Eight handles change the size, the
@@ -578,8 +578,13 @@ accept.
 
 Ctrl+wheel zooms, the wheel scrolls (with Shift sideways). **Preview …**
 typesets the report with the data of the development file, asks for the
-parameters and pages through the result. A report does not typeset image
-columns yet.
+parameters and pages through the result.
+
+An **image element** shows a file from `bilder/` (property Bild) or, when it
+names a **column**, the image from that image column for each row -- a photo
+per article in the detail, for example. An image is fitted into the rectangle
+without distorting it; an empty cell or bytes that are not an image leave it
+empty.
 
 In the program a report is an object under its name:
 

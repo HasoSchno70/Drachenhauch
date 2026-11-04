@@ -34,8 +34,11 @@ Zeilen mit“, `mwst = 19`) dazu -- eine Summe rechnet nur über die Zeilen, auf
 die sie zutrifft, jedes andere Element erscheint nur, wenn sein Band eine
 solche Zeile hat. So steht die Steuer je Satz in der Rechnung, ohne
 Unterbericht. Geprüft in `werkzeug_studio_berichte.dhtest` und
-`werkzeug_studio_beispiel.dhtest` (liest die PDFs). Bildspalten setzt die
-Auslegung noch nicht (der Entwurf lehnt sie ab).
+`werkzeug_studio_beispiel.dhtest` (liest die PDFs). Danach kamen die
+Bildspalten (selber Tag): ein Bild-Element mit `spalte` zeigt je Zeile das
+Bild aus dieser BLOB-Spalte (gelesen mit `DB_GET_BUFFER`, gesetzt über
+`IMAGE_FROM_BUFFER`), Bilder werden eingepasst statt verzerrt, und eine
+gezogene Bildspalte wird ein Bild-Element.
 
 ## Gemessen vor Stufe 1
 
