@@ -568,8 +568,8 @@ jedes Band mit einer Leiste, die seinen Namen trägt, darin die Elemente.
   schieben um 1 mm (mit Umschalt 5 mm), Entf löscht, Strg+D verdoppelt,
   Strg+A wählt alle Elemente, Strg+Z/Strg+Y nehmen zurück und wiederholen.
 * **Eigenschaften** darunter gehören dem, was gewählt ist: beim Element Lage
-  und Maße in mm, Text, Spalte, Format, Funktion und Bereich einer Summe,
-  Schrift, Größe, fett, kursiv, Farbe (`#RRGGBB`), Ausrichtung, Strich,
+  und Maße in mm, Text, Spalte, Format, Funktion einer Summe und worüber sie
+  rechnet (Gruppe oder Bericht), „Nur Zeilen mit“ (unten), Schrift, Größe, fett, kursiv, Farbe (`#RRGGBB`), Ausrichtung, Strich,
   Füllung, Bild; beim Band die Höhe und bei einer Gruppe ihre Spalte, dazu
   „Band entfernen“ bzw. „Gruppe entfernen“; beim Bericht Titel, Quelle,
   Bedingung, Sortierung (`a; b`), Papier, Hochformat und Ränder (`o; r; u; l`
@@ -577,6 +577,15 @@ jedes Band mit einer Leiste, die seinen Namen trägt, darin die Elemente.
   (innen, mit Kopf und Fuß). Text übernimmt Enter oder das Verlassen des
   Feldes, eine Auswahl gilt sofort; sind mehrere Elemente gewählt, gilt der
   Wert für alle, zu denen er passt.
+
+**Nur Zeilen mit** schränkt ein Element auf Zeilen mit einem Wert ein:
+`mwst = 19` (auch `<>`, `<`, `>`, `<=`, `>=`; Text darf in Anführungszeichen
+stehen, Zahlen werden als Zahlen verglichen). Eine Summe rechnet dann nur über
+diese Zeilen, jedes andere Element erscheint nur, wenn sein Band mindestens
+eine solche Zeile hat. So steht in einer Rechnung die Steuer je Satz: im
+Berichtsfuß „MwSt 19 %“ und eine Summe der Steuer, beide mit `mwst = 19`,
+darunter dasselbe für 7 % -- eine Rechnung ohne Positionen zu 7 % zeigt diese
+Zeile nicht. Was sich nicht so lesen lässt, nimmt das Feld nicht an.
 
 Strg+Rad zoomt, das Rad rollt (mit Umschalt seitwärts). **Vorschau …** setzt
 den Bericht mit den Daten der Entwicklungsdatei, fragt nach den Parametern und
@@ -613,13 +622,15 @@ Ordner wählen, F5.
 
 | Element | Art | Was es tut |
 |---|---|---|
-| App | App | öffnet die Datenbank, bevor das erste Fenster aufgeht |
-| Datenbank | Modul | SQLite-Datei `rechnungen.db`, beim ersten Start mit Beispieldaten; nächste Rechnungsnummer |
+| App | App | füllt die Datenbank beim ersten Start, bevor das erste Fenster aufgeht |
+| Daten | Datenbank | die Tabellen in `rechnungen.db` mit Verweisen, dazu die Abfrage `Belegzeilen` (Positionsnummer, Netto, Steuer und Brutto je Zeile, Anschrift) |
+| Datenbank | Modul | Beispieldaten beim ersten Start; nächste Rechnungsnummer |
 | Ausgabe | Modul | Datum und Beträge für die Anzeige, CSV-Export |
-| Rechnung | Klasse | eine Rechnung samt Positionen: laden, rechnen, sichern (eine Transaktion), als PDF |
-| Hauptfenster | Fenster | alle Rechnungen mit Filterzeile, Menü mit Kürzeln, Neu/Bearbeiten/PDF/Löschen |
+| Rechnung | Klasse | eine Rechnung samt Positionen: laden, rechnen, sichern (eine Transaktion), als PDF und in der Vorschau über den Bericht |
+| Hauptfenster | Fenster | alle Rechnungen mit Filterzeile, Menü mit Kürzeln, Neu/Bearbeiten/PDF/Vorschau/Löschen |
 | RechnungFenster | Fenster | eine Rechnung anlegen oder ändern, modal |
 | KundenFenster, ArtikelFenster | Fenster | Stammdaten über die Datenbindung (Inspektor: Bindung) |
+| Rechnungsbeleg | Bericht | die Rechnung aus `Belegzeilen` mit `rechnung = :id`: Absender und Anschrift im Berichtskopf, Spaltenkopf auf jeder Seite, Netto, Steuer je Satz und Gesamt im Berichtsfuß |
 
 Was man daran sieht: Geld steht als INTEGER in Cent, die Steuer wird je
 Position gerundet; die Felder der Stammdaten sind an die Spalten gebunden,
@@ -627,8 +638,11 @@ Laden und Sichern sind also je ein Aufruf (`GUI_FORM_LOAD`/`GUI_FORM_SAVE`),
 und die Regeln (Pflichtfeld, PLZ, E-Mail) prüft `GUI_VALIDATE`; ein
 Doppelklick auf eine Rechnung öffnet sie (`tabelle_Doppelklick`); ungesicherte
 Eingaben werden mit `Frage(..., "Sichern|Verwerfen|Abbrechen")` erfragt, und
-`ZeigenModal` wartet, bis das Fenster zu ist. Die Datenbank, PDFs und die CSV
-landen beim Starten aus dem Studio in `_studio/`.
+`ZeigenModal` wartet, bis das Fenster zu ist. Die Rechnung druckt der Bericht:
+`Rechnung.alsPdf` ist ein Aufruf, `Rechnungsbeleg.Pdf(pfad, {"id": Self.id})`.
+Was gerechnet werden muss, rechnet die Abfrage. Die Datenbank liegt im
+Projektordner (das Element Daten legt sie an, der Reiter zeigt ihre Daten);
+PDFs und die CSV landen beim Starten aus dem Studio in `_studio/`.
 
 **Stolperstein beim Benennen:** Namen kennen keine Groß-/Kleinschreibung. Eine
 Methode `zeigen(id)` in einem Fenster überschreibt das geerbte `Zeigen()` --

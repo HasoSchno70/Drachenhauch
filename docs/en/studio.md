@@ -557,7 +557,8 @@ with a bar carrying its name, the elements inside.
   Shift 5 mm), Del deletes, Ctrl+D duplicates, Ctrl+A selects all elements,
   Ctrl+Z/Ctrl+Y undo and redo.
 * **Properties** below belong to what is selected: for an element position
-  and size in mm, text, column, format, function and range of a sum, font,
+  and size in mm, text, column, format, function of a sum and what it sums
+  over (group or report), "Only rows with" (below), font,
   size, bold, italic, colour (`#RRGGBB`), alignment, stroke, fill, image; for
   a band its height and for a group its column, plus "Remove band" or
   "Remove group"; for the report title, source, condition, sorting (`a; b`),
@@ -565,6 +566,15 @@ with a bar carrying its name, the elements inside.
   band" (what is missing) and "Add group" (inside, with header and footer).
   Text is taken over by Enter or leaving the field, a choice applies at once;
   with several elements selected the value applies to all it fits.
+
+**Only rows with** limits an element to rows with a value: `mwst = 19`
+(also `<>`, `<`, `>`, `<=`, `>=`; text may be in quotes, numbers are compared
+as numbers). A sum then only adds up those rows, every other element only
+appears when its band has at least one such row. That is how an invoice shows
+the tax per rate: in the report footer "MwSt 19 %" and a sum of the tax, both
+with `mwst = 19`, below it the same for 7 % -- an invoice without items at
+7 % does not show that line. What cannot be read like this, the field does not
+accept.
 
 Ctrl+wheel zooms, the wheel scrolls (with Shift sideways). **Preview …**
 typesets the report with the data of the development file, asks for the
@@ -600,13 +610,15 @@ folder, F5.
 
 | Element | Kind | What it does |
 |---|---|---|
-| App | App | opens the database before the first window appears |
-| Datenbank | module | SQLite file `rechnungen.db`, with sample data on the first start; next invoice number |
+| App | App | fills the database on the first start, before the first window appears |
+| Daten | database | the tables in `rechnungen.db` with references, plus the query `Belegzeilen` (item number, net, tax and gross per row, address) |
+| Datenbank | module | sample data on the first start; next invoice number |
 | Ausgabe | module | date and amounts for display, CSV export |
-| Rechnung | class | an invoice with its items: load, calculate, save (one transaction), as PDF |
-| Hauptfenster | window | all invoices with a filter row, menu with shortcuts, new/edit/PDF/delete |
+| Rechnung | class | an invoice with its items: load, calculate, save (one transaction), as PDF and in the preview through the report |
+| Hauptfenster | window | all invoices with a filter row, menu with shortcuts, new/edit/PDF/preview/delete |
 | RechnungFenster | window | create or change an invoice, modal |
 | KundenFenster, ArtikelFenster | window | master data through data binding (inspector: Bindung) |
+| Rechnungsbeleg | report | the invoice from `Belegzeilen` with `rechnung = :id`: sender and address in the report header, column header on every page, net, tax per rate and total in the report footer |
 
 What it shows: money is an INTEGER in cents, the tax is rounded per item; the
 master data fields are bound to the columns, so loading and saving are one
@@ -614,8 +626,11 @@ call each (`GUI_FORM_LOAD`/`GUI_FORM_SAVE`), and `GUI_VALIDATE` checks the
 rules (required, postcode, e-mail); a double-click on an invoice opens it
 (`tabelle_Doppelklick`); unsaved input is asked about with
 `Frage(..., "Sichern|Verwerfen|Abbrechen")`, and `ZeigenModal` waits until
-the window is closed. When started from the studio, the database, PDFs and
-the CSV end up in `_studio/`.
+the window is closed. The invoice is printed by the report: `Rechnung.alsPdf`
+is one call, `Rechnungsbeleg.Pdf(pfad, {"id": Self.id})`. What has to be
+calculated, the query calculates. The database is in the project folder (the
+element Daten creates it, its tab shows the data); when started from the
+studio, PDFs and the CSV end up in `_studio/`.
 
 **A pitfall when naming:** names are not case-sensitive. A method
 `zeigen(id)` in a window overrides the inherited `Zeigen()` -- `dhrt --check`

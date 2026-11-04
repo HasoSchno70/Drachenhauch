@@ -26,7 +26,15 @@ Ziehen mit Raster und Ausrichtungslinien, Griffe, Bandhöhe, Rahmen,
 Rückgängig je Reiter); jedes Band trägt eine Leiste mit seinem Namen statt
 einer Namensspalte neben dem Papier -- die Seite wird so breiter, und die
 Leiste ist die Stelle, an der man das Band wählt. Prüfung
-`tests/pruef/werkzeug_studio_berichte2.dhtest`. Bildspalten setzt die
+`tests/pruef/werkzeug_studio_berichte2.dhtest`. Stufe 3 ist gebaut
+(2026-11-04): das Beispiel `examples/studio/rechnungen` druckt seine Rechnung
+über den Bericht `Rechnungsbeleg` (Quelle: die Abfrage `Belegzeilen` des neuen
+Datenbank-Elements `Daten`); dafür kam die Element-Eigenschaft `wo` („Nur
+Zeilen mit“, `mwst = 19`) dazu -- eine Summe rechnet nur über die Zeilen, auf
+die sie zutrifft, jedes andere Element erscheint nur, wenn sein Band eine
+solche Zeile hat. So steht die Steuer je Satz in der Rechnung, ohne
+Unterbericht. Geprüft in `werkzeug_studio_berichte.dhtest` und
+`werkzeug_studio_beispiel.dhtest` (liest die PDFs). Bildspalten setzt die
 Auslegung noch nicht (der Entwurf lehnt sie ab).
 
 ## Gemessen vor Stufe 1
@@ -82,6 +90,7 @@ Ein Element hat `art`, `x`, `y`, `b`, `h` in mm relativ zu seinem Band:
 | `text` | fester Text |
 | `feld` | `spalte` der Quelle, mit `format` (text, ganz, zahl, geld, datum, wahr) |
 | `summe` | `spalte`, `funktion` (summe, anzahl, mittel, min, max), `bereich` (gruppe, bericht), `format` |
+| (jede Art) | `wo`: nur Zeilen mit einem Wert (`mwst = 19`, auch `<>`, `<`, `>`, `<=`, `>=`) -- eine Summe rechnet nur über sie, ein anderes Element erscheint nur, wenn das Band eine solche Zeile hat |
 | `seitenzahl` | „Seite n von m“ (Vorlage in `text`, `{n}` und `{m}`) |
 | `datum` | das Datum des Drucks |
 | `linie`, `rechteck` | Strichstärke, Farbe, bei `rechteck` eine Füllung |

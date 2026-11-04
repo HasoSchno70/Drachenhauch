@@ -3909,6 +3909,25 @@ BAND -- `bandNr`. Und ein Feld-Literal aus Widget-Handles ist ARRAY OF
 INTEGER. Bildspalten setzt die Auslegung noch nicht (abgelehnt). Tests
 `werkzeug_studio_berichte2.dhtest` (6, Projekt aus
 `_hilfen/berichtprojekt.dh`); 15 Verfaelschungen fallen je in ihrem Fall.
+**Stufe 3 (2026-11-04): im Einsatz.** Das Beispiel
+`examples/studio/rechnungen` druckt seine Rechnung ueber den Bericht
+`Rechnungsbeleg`: das neue Datenbank-Element `Daten` (Tabellen mit
+Verweisen, Datei `rechnungen.db` im Projektordner, gitignoriert) hat die
+Abfrage `Belegzeilen` (ROW_NUMBER als Positionsnummer, Netto/Steuer/Brutto
+je Zeile -- gerechnet wird in der Abfrage), das Modul `Datenbank` setzt nur
+noch `db = Daten` und fuellt Beispieldaten, `Rechnung.alsPdf` ist
+`Rechnungsbeleg.Pdf(pfad, {"id": Self.id})` (die Rechnung muss gesichert
+sein), neu Datei -> Vorschau. Dafuer die Element-Eigenschaft **`wo`** ("Nur
+Zeilen mit", `mwst = 19`, auch `<> < > <= >=`; `studioBWoZerlegen`/
+`studioBPasst` in berichte_laufzeit.dh): eine Summe rechnet nur ueber die
+passenden Zeilen, jedes andere Element erscheint nur, wenn sein Band eine
+solche hat -- die Steuer je Satz ohne Unterbericht. Nebenfund: `anzahl` ohne
+Spalte zaehlte 0. Im Inspektor heisst "Bereich" jetzt "Summe ueber" (das
+englische "Panel" kam vom gleichnamigen gui-Schluessel). Tests ein Fall in
+`werkzeug_studio_berichte.dhtest` (vier Verfaelschungen fallen), und
+`werkzeug_studio_beispiel.dhtest` vergleicht `.dhdb`/`.dhreport` im Rundweg
+und liest die PDFs (Positionen, Steuer zu 19 und 7 %, eine Rechnung nur zu
+7 % ohne 19-%-Zeile).
 
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
