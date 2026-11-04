@@ -86,7 +86,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 ## Herunterladen
 
-**[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 58 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz`; aktuell Fassung 2026.41.
+**[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 58 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz`; aktuell Fassung 2026.42.
 
 Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 226 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Der Windows-Installer ist nicht signiert, SmartScreen meldet sich also beim ersten Start; die macOS-App ist noch nicht beglaubigt.
 
@@ -130,7 +130,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Performance](docs/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
 - **Module** — 48 Stück, [Tabelle unten](#module)
 - **[IDE](docs/ide.md)** — die Entwicklungsumgebung, selbst in Drachenhauch geschrieben: Reiter, Projektbaum, Vervollständigung, Hilfe zum Wort, Schnipsel, Mehrfach-Marken, Faltung, geteilte Ansicht, Umbauten über das ganze Projekt, **Debugger** (auch bedingte Haltepunkte), **Profiler**, git blame/diff, Handbuch im Fenster, Willkommensseite mit Beispiel-Galerie
-- **[Drachenhauch Studio](docs/studio.md)** (`studio/studio.dh`) — Anwendungen mit Oberfläche im Stil von Xojo: Fenster-Entwurf mit Ausrichtungslinien, Inspektor, Navigator, Code je Ereignis, Layout-Behälter, Menüs, Timer, Bilder, Dialoge, Projektvorlagen, Starten/Bauen/Debuggen; Beispielprojekt `examples/studio/rechnungen/`
+- **[Drachenhauch Studio](docs/studio.md)** (`studio/studio.dh`) — Anwendungen mit Oberfläche im Stil von Xojo: Fenster-Entwurf mit Ausrichtungslinien, Inspektor, Navigator, Code je Ereignis, Layout-Behälter, eigene Controls, Datenbanken mit Abfragen, Berichte (PDF, Druck, Vorschau), Menüs, Timer, Bilder, Dialoge, Projektvorlagen, deutsche und englische Oberfläche, Starten/Bauen/Debuggen; Beispielprojekt `examples/studio/rechnungen/`
 - **Werkzeuge** — alle in Drachenhauch geschrieben, in der IDE unter *Werkzeuge* oder direkt mit `dhrt run examples/<datei>`:
   - **[Sprite-Editor](docs/sprite-editor.md)** (`189_sprite_editor.dh`) — Pixel-Art mit Einzelbildern, Ebenen, Lasso/Zauberstab/Verschieben, GIF mit Dauer je Bild, Atlas-Export für `ATLAS_LOAD`, DH-Code, `.dhanim`-Vorlage
   - **[Partikel-Editor](docs/particle-editor.md)** (`185_partikel_editor.dh`) — Emitter-Regler mit Live-Vorschau, Werkseinstellungen, eigene Stände als `.ini`, DH-Code
