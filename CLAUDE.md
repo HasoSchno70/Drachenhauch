@@ -3224,6 +3224,42 @@ ausserhalb des Repositorys zu tun ist: `docs/entwurf-sichtbarkeit.md`.
 **Falle beim Patchen:** ein Python-Ersatz mit `"\1"` landete als
 Steuerzeichen (Code 1) in der Datei -- Rueckstriche per Edit-Werkzeug setzen.
 
+## Serieller Monitor in der IDE, `IMPORT ... OPTIONAL` (2026-11-04)
+
+Erster Punkt der Bastler-Liste nach 2026.42. Die IDE hat einen Reiter
+**Seriell** neben Ausgabe/Terminal (Alt+4, `serZeigen`): Klappliste mit
+Port (bearbeitbar, alle 2 s neu aus `SERIAL_PORTS`, solange nichts verbunden
+ist) oder `tcp:host:port` (Netzbruecke, `NET_TCP_CONNECT` -- ueber diesen
+Weg prueft sich der Monitor ohne Geraet), Baud, Verbinden, Kurve, Zeit,
+Leeren; unten Senden mit Zeilenende. `seriellNachziehen` je Bild:
+`SERIAL_AVAILABLE` + `SERIAL_READ` bzw. `NET_RECV`, Zeilen ueber `serText`
+(CR LF/LF), ein Rest ohne Ende nach 0,5 s. **Kurve** (`serKurveLesen`): eine
+Zeile ist Daten, wenn ALLE Teile Zahlen sind (Trenner Leerraum/Komma/
+Semikolon, `name:wert`, `Name: 22` wird zu `Name:22`) -- sonst Text, wie
+der Plotter der Arduino-IDE; bis 8 Reihen in einem flachen Ring
+(`serKWert[r * SER_PUNKTE + i]`, 600 Werte), eine Reihe traegt ihren letzten
+Wert weiter, `serKAb` merkt, ab wann es sie gibt. Gezeichnet in ein IMAGE
+hinter einem `GUI_IMAGE` (`serKurveZeichnen`, Leinwand-Befehle, hoechstens
+jedes dritte Bild) -- so liegt die Kurve in der Fensterreihenfolge der gui
+statt ueber allem wie eine Zeichenflaeche. `serVorStart` in
+`prozessStartenDatei`: haelt der Monitor einen PORT und ruft das Programm
+`SERIAL_OPEN`/`FIRMATA_OPEN`, gibt er ihn frei und verbindet nach dem
+Programm wieder (`serWieder`). Port, Baud, Ende, Kurve, Zeit in der ide.json
+(`seriell_*`, direkt in `konfig` gesetzt). **Der Laufzeit-Baustein dazu:**
+die IDE konnte `serial` nicht WAHLWEISE benutzen -- ohne `IMPORT "serial"`
+warnte `--check` an jedem Aufruf, mit ihm jeder Bau ohne `--hardware` (die
+CI, bis dahin auch die macOS-/Linux-Pakete) beim Start. Neu
+**`IMPORT "modul" OPTIONAL`** (Regex-Gruppe 3 in `preprocess::import_re`;
+`NUR_OPTIONAL` je Vorverarbeitung -- ein zweiter, schlichter Import hebt es
+auf; an einer `.dh`-Datei faellt die Zeile weg, wenn es sie nicht gibt) und
+**`MODULE_AVAILABLE(modul$)`** (`preprocess::modul_verfuegbar`). Die Pakete
+fuer macOS/Linux bauen seither mit `serial midi` (Linux: `libudev-dev`).
+Tests `tests/pruef/import_optional.dhtest` (6; vier Verfaelschungen fallen
+je in ihrem Fall) und `tests/pruef/werkzeug_ide_seriell.dhtest` (4: ein
+Einschub spielt das Geraet ueber `NET_TCP_LISTEN(0)` + `NET_LISTENER_PORT`;
+fuenf Verfaelschungen der IDE fallen je in ihrem Fall). Mit echtem Arduino
+ungeprueft.
+
 ## Dogfooding 15: Landkarte (2026-10-26)
 
 `examples/karten/`: `kern.dh` (Web-Mercator, Kachelnummern, Haversine,

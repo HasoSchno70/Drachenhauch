@@ -229,7 +229,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 | [`httpd`](docs/module-httpd.md) | die andere Richtung: ein kleiner Webserver im Takt der Hauptschleife — Bedienoberfläche im Heimnetz |
 | [`mqtt`](docs/module-mqtt.md) | das Pub/Sub-Protokoll der IoT-Welt — der Weg zum ESP32 **über WLAN** |
 | [`firmata`](docs/module-firmata.md) | Arduino-/ESP32-Pins direkt schalten, ohne eigenen Sketch |
-| [`serial`](docs/module-serial.md) | rohe COM-Verbindung für eigene Protokolle |
+| [`serial`](docs/module-serial.md) | rohe COM-Verbindung für eigene Protokolle — und in der IDE ein **serieller Monitor mit Kurve** (Alt+4) |
 | [`usb`](docs/module-usb.md) | USB-HID: Bastelboards, Programmieradapter, eigene Controller |
 | [`midi`](docs/module-midi.md) | Noten von einem angeschlossenen Instrument lesen und welche hinausschicken |
 | [`bt`](docs/module-bt.md) | Bluetooth Low Energy: scannen, verbinden, Charakteristiken lesen/schreiben |
