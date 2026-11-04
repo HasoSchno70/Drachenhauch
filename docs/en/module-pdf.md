@@ -172,9 +172,12 @@ PRINT PRINTER_DEFAULT$() : PRINT PRINTERS()                ' for a dialog of you
   name it. If the printer is missing or
   does not accept the job, that is an error with the name, not a silent
   nothing.
-- `PDF_PREVIEW` draws in raylib's default font on white paper:
-  a preview, not an imagesetter. The height follows the aspect ratio; it needs a
-  window, because it is an `IMAGE`.
+- `PDF_PREVIEW` draws on white paper, text in the same font as the PDF
+  (built in or loaded with `PDF_FONT_LOAD`) and set character by character
+  where `PDF_TEXT_WIDTH` measures it -- a right-aligned amount ends in the
+  preview at the same place as on paper (up to 2026.41 it used raylib's pixel
+  font). Rotated text stays in the pixel font. The height follows the aspect
+  ratio; it needs a window, because it is an `IMAGE`.
 
 Deliberately not included: printing foreign PDFs (the module prints what it has set)
 and a recreated print dialog — `PRINTERS()` plus a dropdown in your

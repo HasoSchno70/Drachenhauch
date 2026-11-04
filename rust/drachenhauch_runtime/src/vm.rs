@@ -5753,22 +5753,30 @@ impl<'p> Vm<'p> {
                 let i = bi_int(a, 0, "PDF_PREVIEW")?;
                 let seite = bi_int(a, 1, "PDF_PREVIEW")?;
                 let breite = if a.len() > 2 { bi_int(a, 2, "PDF_PREVIEW")? as i32 } else { 600 };
-                let (ops, b_mm, h_mm) = {
+                let (ops, b_mm, h_mm, schriften) = {
                     let doc = self.pdf_d(i)?;
                     let n = doc.seiten.len() as i64;
                     if seite < 1 || seite > n {
                         return Err(format!("PDF_PREVIEW: Seite {} gibt es nicht (1..{})", seite, n));
                     }
                     let sz = &doc.seiten[(seite - 1) as usize];
-                    (sz.ops.clone(), sz.breite_mm, sz.hoehe_mm)
+                    // Die Schriften, die auf der Seite vorkommen -- je Nummer.
+                    let mut schriften: Vec<Option<(String, crate::pdf::SchriftDaten)>> = Vec::new();
+                    for op in &sz.ops {
+                        if let crate::pdf::Op::Text { schrift, .. } = op {
+                            while schriften.len() <= *schrift { schriften.push(None); }
+                            if schriften[*schrift].is_none() { schriften[*schrift] = doc.schrift_quelle(*schrift); }
+                        }
+                    }
+                    (sz.ops.clone(), sz.breite_mm, sz.hoehe_mm, schriften)
                 };
                 #[cfg(feature = "graphics")]
                 {
                     let g = self.gfx.as_mut().ok_or("PDF_PREVIEW: braucht ein Fenster (SCREEN) -- die Vorschau ist ein IMAGE")?;
-                    Value::Int(g.pdf_vorschau(&ops, b_mm, h_mm, breite)?)
+                    Value::Int(g.pdf_vorschau(&ops, b_mm, h_mm, breite, &schriften)?)
                 }
                 #[cfg(not(feature = "graphics"))]
-                { let _ = (ops, b_mm, h_mm, breite); return Err("PDF_PREVIEW: dieser Bau hat keine Grafik".into()); }
+                { let _ = (ops, b_mm, h_mm, breite, schriften); return Err("PDF_PREVIEW: dieser Bau hat keine Grafik".into()); }
             }
             "pdf_close" => {
                 let i = bi_int(a, 0, "PDF_CLOSE")? as usize;

@@ -172,9 +172,13 @@ PRINT PRINTER_DEFAULT$() : PRINT PRINTERS()                ' für einen eigenen 
   nennt ihn. Fehlt der Drucker oder
   nimmt er den Auftrag nicht an, ist das ein Fehler mit Namen, kein stilles
   Nichts.
-- `PDF_PREVIEW` zeichnet in raylibs Standardschrift auf weißes Papier:
-  eine Vorschau, kein Belichter. Höhe nach Seitenverhältnis; braucht ein
-  Fenster, weil es ein `IMAGE` ist.
+- `PDF_PREVIEW` zeichnet auf weißes Papier, Text in derselben Schrift wie
+  das PDF (eingebaut oder mit `PDF_FONT_LOAD` geladen) und Zeichen für
+  Zeichen so gesetzt, wie `PDF_TEXT_WIDTH` misst -- ein rechtsbündiger Betrag
+  endet in der Vorschau an derselben Stelle wie auf dem Papier (bis 2026.41
+  stand dort raylibs Pixelschrift). Gedrehter Text bleibt in der
+  Pixelschrift. Höhe nach Seitenverhältnis; braucht ein Fenster, weil es ein
+  `IMAGE` ist.
 
 Bewusst nicht: fremde PDFs drucken (das Modul druckt, was es gesetzt hat)
 und ein nachgebauter Druckdialog — `PRINTERS()` plus eine Klappliste im

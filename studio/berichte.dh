@@ -1,0 +1,441 @@
+' ============================================================
+'  Drachenhauch Studio -- Berichte (docs/entwurf-berichte.md)
+' ============================================================
+'  Ein Bericht ist ein Element der Art "bericht"; seine Beschreibung (JSON,
+'  Datei <Name>.dhreport) steht in e.schema wie der Aufbau einer Datenbank.
+'  Ausgelegt und gesetzt wird in berichte_laufzeit.dh -- dieselbe Datei
+'  nimmt das Studio fuer die Vorschau und das Programm (als
+'  _studio/studio_berichte.dh, samt einer Klasse je Bericht).
+'
+'  Hier das Modell und der erzeugte Code (ohne Oberflaeche, damit es sich
+'  ohne Fenster pruefen laesst); der Reiter steht in berichte_reiter.dh.
+' ============================================================
+
+CONST BERICHT_BAENDER = "berichtskopf,seitenkopf,gruppenkopf,detail,gruppenfuss,seitenfuss,berichtsfuss"
+
+FUNCTION berichtNeu$(name AS STRING) AS STRING
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    JSON_SET_STRING(j, "titel", name)
+    DIM s AS JSON_HANDLE : s = JSON_PARSE("{" + CHR$(34) + "format" + CHR$(34) + ":" + CHR$(34) + "A4" + CHR$(34) + "," + CHR$(34) + "hoch" + CHR$(34) + ":true," + CHR$(34) + "rand" + CHR$(34) + ":[15,15,15,15]}")
+    JSON_SET_JSON(j, "seite", s)
+    JSON_SET_STRING(j, "quelle", "")
+    JSON_SET_STRING(j, "bedingung", "")
+    JSON_SET_JSON(j, "gruppen", JSON_NEW_ARRAY())
+    JSON_SET_JSON(j, "baender", JSON_NEW_ARRAY())
+    berichtBandDazu(j, "berichtskopf", 20.0)
+    DIM t AS JSON_HANDLE : t = JSON_PARSE("{}")
+    JSON_SET_STRING(t, "art", "text")
+    JSON_SET_FLOAT(t, "x", 0.0) : JSON_SET_FLOAT(t, "y", 0.0)
+    JSON_SET_FLOAT(t, "b", 180.0) : JSON_SET_FLOAT(t, "h", 10.0)
+    JSON_SET_STRING(t, "text", name)
+    JSON_SET_FLOAT(t, "groesse", 16.0)
+    JSON_SET_BOOL(t, "fett", TRUE)
+    JSON_APPEND_JSON(j, "baender.0.elemente", t)
+    berichtBandDazu(j, "seitenkopf", 8.0)
+    berichtBandDazu(j, "detail", 6.0)
+    berichtBandDazu(j, "seitenfuss", 10.0)
+    DIM z AS JSON_HANDLE : z = JSON_PARSE("{}")
+    JSON_SET_STRING(z, "art", "seitenzahl")
+    JSON_SET_FLOAT(z, "x", 0.0) : JSON_SET_FLOAT(z, "y", 3.0)
+    JSON_SET_FLOAT(z, "b", 180.0) : JSON_SET_FLOAT(z, "h", 5.0)
+    JSON_SET_STRING(z, "ausrichtung", "mitte")
+    JSON_SET_FLOAT(z, "groesse", 8.0)
+    JSON_APPEND_JSON(j, "baender.3.elemente", z)
+    berichtBandDazu(j, "berichtsfuss", 8.0)
+    RETURN JSON_STRINGIFY(j)
+END FUNCTION
+
+SUB berichtBandDazu(j AS JSON_HANDLE, art AS STRING, hoehe AS FLOAT)
+    DIM b AS JSON_HANDLE : b = JSON_PARSE("{}")
+    JSON_SET_STRING(b, "art", art)
+    JSON_SET_FLOAT(b, "hoehe", hoehe)
+    JSON_SET_JSON(b, "elemente", JSON_NEW_ARRAY())
+    JSON_APPEND_JSON(j, "baender", b)
+END SUB
+
+' --- Bearbeiten (Stufe 2) ------------------------------------------------------------------
+'  Alles hier arbeitet auf dem JSON-Handle des Berichts; der Reiter merkt
+'  sich danach den Stand fuers Rueckgaengig.
+CONST BERICHT_TEXTARTEN = "text,feld,summe,seitenzahl,datum"
+CONST BERICHT_ELEMENTARTEN = "text,feld,summe,seitenzahl,datum,linie,rechteck,bild"
+
+' Die feste Reihenfolge der Baender: Kopf vor Gruppenkoepfen (aussen zuerst),
+' Detail, Gruppenfuesse (innen zuerst), Seitenfuss, Berichtsfuss.
+FUNCTION berichtBandSchluessel(art AS STRING, gruppe AS INTEGER) AS INTEGER
+    SELECT CASE art
+        CASE "berichtskopf" : RETURN 0
+        CASE "seitenkopf" : RETURN 100
+        CASE "gruppenkopf" : RETURN 200 + gruppe
+        CASE "detail" : RETURN 300
+        CASE "gruppenfuss" : RETURN 499 - gruppe
+        CASE "seitenfuss" : RETURN 500
+        CASE "berichtsfuss" : RETURN 600
+    END SELECT
+    RETURN 700
+END FUNCTION
+
+FUNCTION berichtBandGruppe(j AS JSON_HANDLE, b AS INTEGER) AS INTEGER
+    DIM p AS STRING : p = "baender." + STR$(b) + ".gruppe"
+    IF JSON_TYPE(j, p) <> "number" THEN RETURN 0
+    RETURN JSON_GET_INT(j, p)
+END FUNCTION
+
+FUNCTION berichtBandArt$(j AS JSON_HANDLE, b AS INTEGER) AS STRING
+    RETURN berichtText$(j, "baender." + STR$(b) + ".art")
+END FUNCTION
+
+' Ein Band an seiner Stelle einfuegen; liefert seinen Index. Ein Band, das es
+' schon gibt (ausser Gruppenbaendern einer anderen Gruppe), wird nicht doppelt
+' angelegt -- dann kommt -1.
+FUNCTION berichtBandEinfuegen(j AS JSON_HANDLE, art AS STRING, gruppe AS INTEGER, hoehe AS FLOAT) AS INTEGER
+    IF INSTR("," + BERICHT_BAENDER + ",", "," + art + ",") < 0 THEN RETURN -1
+    IF studioBBand(j, art, gruppe) >= 0 THEN RETURN -1
+    DIM nb AS JSON_HANDLE : nb = JSON_PARSE("{}")
+    JSON_SET_STRING(nb, "art", art)
+    IF art = "gruppenkopf" OR art = "gruppenfuss" THEN JSON_SET_INT(nb, "gruppe", gruppe)
+    JSON_SET_FLOAT(nb, "hoehe", hoehe)
+    JSON_SET_JSON(nb, "elemente", JSON_NEW_ARRAY())
+    DIM schl AS INTEGER : schl = berichtBandSchluessel(art, gruppe)
+    DIM neu AS JSON_HANDLE : neu = JSON_NEW_ARRAY()
+    DIM pos AS INTEGER : pos = -1
+    DIM n AS INTEGER : n = 0
+    DIM b AS INTEGER
+    FOR b = 0 TO JSON_LEN(j, "baender") - 1
+        IF pos < 0 AND berichtBandSchluessel(berichtBandArt$(j, b), berichtBandGruppe(j, b)) > schl THEN
+            JSON_APPEND_JSON(neu, "", nb)
+            pos = n
+            n = n + 1
+        END IF
+        JSON_APPEND_JSON(neu, "", JSON_GET_JSON(j, "baender." + STR$(b)))
+        n = n + 1
+    NEXT
+    IF pos < 0 THEN
+        JSON_APPEND_JSON(neu, "", nb)
+        pos = n
+    END IF
+    JSON_SET_JSON(j, "baender", neu)
+    RETURN pos
+END FUNCTION
+
+' Ein Band entfernen -- das Detail nicht (ohne Detail gaebe es keine Zeilen),
+' und die Baender einer Gruppe nur mit der Gruppe (berichtGruppeWeg).
+FUNCTION berichtBandWeg(j AS JSON_HANDLE, b AS INTEGER) AS BOOLEAN
+    IF b < 0 OR b >= JSON_LEN(j, "baender") THEN RETURN FALSE
+    DIM art AS STRING : art = berichtBandArt$(j, b)
+    IF art = "detail" OR art = "gruppenkopf" OR art = "gruppenfuss" THEN RETURN FALSE
+    JSON_REMOVE(j, "baender." + STR$(b))
+    RETURN TRUE
+END FUNCTION
+
+' Eine neue innerste Gruppe mit Kopf und Fuss; liefert ihre Nummer.
+FUNCTION berichtGruppeDazu(j AS JSON_HANDLE, spalte AS STRING) AS INTEGER
+    IF NOT JSON_HAS(j, "gruppen") THEN JSON_SET_JSON(j, "gruppen", JSON_NEW_ARRAY())
+    DIM g AS INTEGER : g = JSON_LEN(j, "gruppen")
+    DIM gj AS JSON_HANDLE : gj = JSON_PARSE("{}")
+    JSON_SET_STRING(gj, "spalte", spalte)
+    JSON_APPEND_JSON(j, "gruppen", gj)
+    berichtBandEinfuegen(j, "gruppenkopf", g, 8.0)
+    berichtBandEinfuegen(j, "gruppenfuss", g, 8.0)
+    RETURN g
+END FUNCTION
+
+' Eine Gruppe samt Kopf und Fuss entfernen; die inneren ruecken nach.
+SUB berichtGruppeWeg(j AS JSON_HANDLE, g AS INTEGER)
+    IF NOT JSON_HAS(j, "gruppen") THEN RETURN
+    IF g < 0 OR g >= JSON_LEN(j, "gruppen") THEN RETURN
+    JSON_REMOVE(j, "gruppen." + STR$(g))
+    DIM b AS INTEGER : b = JSON_LEN(j, "baender") - 1
+    WHILE b >= 0
+        DIM art AS STRING : art = berichtBandArt$(j, b)
+        IF art = "gruppenkopf" OR art = "gruppenfuss" THEN
+            DIM bg AS INTEGER : bg = berichtBandGruppe(j, b)
+            IF bg = g THEN
+                JSON_REMOVE(j, "baender." + STR$(b))
+            ELSEIF bg > g THEN
+                JSON_SET_INT(j, "baender." + STR$(b) + ".gruppe", bg - 1)
+            END IF
+        END IF
+        b = b - 1
+    WEND
+END SUB
+
+' Ein neues Element mit den Massen, die zu seiner Art passen. spalte und typ
+' (die Art der Spalte: text, ganz, zahl, geld, datum, wahr) nur bei Feld und
+' Summe.
+FUNCTION berichtElementNeu(art AS STRING, x AS FLOAT, y AS FLOAT, spalte AS STRING, typ AS STRING) AS JSON_HANDLE
+    DIM t AS JSON_HANDLE : t = JSON_PARSE("{}")
+    JSON_SET_STRING(t, "art", art)
+    DIM b AS FLOAT : b = 40.0
+    DIM h AS FLOAT : h = 5.0
+    SELECT CASE art
+        CASE "text"
+            JSON_SET_STRING(t, "text", tr$("Text"))
+            b = 30.0
+        CASE "feld", "summe"
+            JSON_SET_STRING(t, "spalte", spalte)
+            DIM f AS STRING : f = berichtFormatZuTyp$(typ)
+            IF f <> "text" THEN JSON_SET_STRING(t, "format", f)
+            IF f = "geld" OR f = "zahl" OR f = "ganz" OR art = "summe" THEN JSON_SET_STRING(t, "ausrichtung", "rechts")
+            IF art = "summe" THEN
+                JSON_SET_STRING(t, "funktion", IIF(f = "geld" OR f = "zahl" OR f = "ganz", "summe", "anzahl"))
+                JSON_SET_STRING(t, "bereich", "gruppe")
+                IF f <> "geld" AND f <> "zahl" THEN JSON_SET_STRING(t, "format", "ganz")
+                JSON_SET_BOOL(t, "fett", TRUE)
+            END IF
+            b = IIF(f = "text", 40.0, 25.0)
+        CASE "seitenzahl"
+            b = 40.0
+        CASE "datum"
+            b = 25.0
+        CASE "linie"
+            b = 60.0 : h = 0.0
+            JSON_SET_FLOAT(t, "staerke", 0.3)
+        CASE "rechteck"
+            b = 40.0 : h = 10.0
+            JSON_SET_FLOAT(t, "staerke", 0.3)
+        CASE "bild"
+            b = 20.0 : h = 20.0
+    END SELECT
+    JSON_SET_FLOAT(t, "x", x) : JSON_SET_FLOAT(t, "y", y)
+    JSON_SET_FLOAT(t, "b", b) : JSON_SET_FLOAT(t, "h", h)
+    IF INSTR("," + BERICHT_TEXTARTEN + ",", "," + art + ",") >= 0 THEN JSON_SET_FLOAT(t, "groesse", 10.0)
+    RETURN t
+END FUNCTION
+
+FUNCTION berichtFormatZuTyp$(typ AS STRING) AS STRING
+    SELECT CASE typ
+        CASE "ganz", "zahl", "geld", "datum", "wahr" : RETURN typ
+    END SELECT
+    RETURN "text"
+END FUNCTION
+
+' Die Art einer Spalte der Quelle (auch verweis.spalte); "" = unbekannt.
+FUNCTION berichtSpaltenTyp$(j AS JSON_HANDLE, spalte AS STRING) AS STRING
+    DIM ref AS STRING : ref = berichtText$(j, "quelle")
+    IF ref = "" OR spalte = "" THEN RETURN ""
+    IF NOT dbQuelle(ref) THEN RETURN ""
+    IF dbRefT < 0 THEN RETURN ""
+    IF LOWER$(spalte) = "id" THEN RETURN "ganz"
+    DIM s AS JSON_HANDLE : s = dbSchema(dbRefEl)
+    DIM t AS INTEGER : t = dbRefT
+    DIM k AS INTEGER : k = dbSpIndex(s, t, spalte)
+    IF k >= 0 THEN
+        IF dbSp$(s, t, k, "verweis") <> "" THEN RETURN "ganz"
+        RETURN dbSp$(s, t, k, "typ")
+    END IF
+    RETURN dbVerweisTyp$(s, t, spalte)
+END FUNCTION
+
+' Was beim Ablegen einer Spalte in ein Band entsteht: im Fuss eine Summe, im
+' Seitenkopf ihr Name als Ueberschrift, sonst ein Feld. (Bildspalten setzt
+' die Auslegung noch nicht -- der Reiter lehnt sie vorher ab.)
+FUNCTION berichtSpalteElement(j AS JSON_HANDLE, b AS INTEGER, spalte AS STRING, x AS FLOAT, y AS FLOAT) AS JSON_HANDLE
+    DIM typ AS STRING : typ = berichtSpaltenTyp$(j, spalte)
+    DIM art AS STRING : art = berichtBandArt$(j, b)
+    DIM t AS JSON_HANDLE
+    IF art = "seitenkopf" THEN
+        t = berichtElementNeu("text", x, y, "", "")
+        JSON_SET_STRING(t, "text", spalte)
+        JSON_SET_BOOL(t, "fett", TRUE)
+        DIM f AS STRING : f = berichtFormatZuTyp$(typ)
+        IF f = "geld" OR f = "zahl" OR f = "ganz" THEN
+            JSON_SET_STRING(t, "ausrichtung", "rechts")
+            JSON_SET_FLOAT(t, "b", 25.0)
+        ELSE
+            JSON_SET_FLOAT(t, "b", 40.0)
+        END IF
+    ELSEIF typ = "bild" THEN
+        ' Eine Bildspalte wird ein Bild-Element, das je Zeile ihr Bild zeigt.
+        t = berichtElementNeu("bild", x, y, "", "")
+        JSON_SET_STRING(t, "spalte", spalte)
+    ELSEIF art = "gruppenfuss" OR art = "berichtsfuss" THEN
+        t = berichtElementNeu("summe", x, y, spalte, typ)
+        IF art = "berichtsfuss" THEN JSON_SET_STRING(t, "bereich", "bericht")
+    ELSE
+        t = berichtElementNeu("feld", x, y, spalte, typ)
+    END IF
+    ' Ein Element nie hoeher als sein Band.
+    DIM bh AS FLOAT : bh = studioBHoehe(j, b)
+    IF JSON_GET_FLOAT(t, "h") > bh THEN JSON_SET_FLOAT(t, "h", MAX(1.0, bh))
+    IF y + JSON_GET_FLOAT(t, "h") > bh THEN JSON_SET_FLOAT(t, "y", MAX(0.0, bh - JSON_GET_FLOAT(t, "h")))
+    RETURN t
+END FUNCTION
+
+FUNCTION berichtJ(e AS Element) AS JSON_HANDLE
+    RETURN JSON_PARSE(IIF(e.schema = "", berichtNeu$(e.name), e.schema))
+END FUNCTION
+
+FUNCTION berichtDatei$(e AS Element) AS STRING
+    RETURN e.name + ".dhreport"
+END FUNCTION
+
+FUNCTION berichtText$(j AS JSON_HANDLE, pfad AS STRING) AS STRING
+    IF JSON_TYPE(j, pfad) <> "string" THEN RETURN ""
+    RETURN JSON_GET_STRING(j, pfad)
+END FUNCTION
+
+' Die Parameter der Bedingung (:name, ausserhalb von Text), je einmal.
+FUNCTION berichtParameter(e AS Element) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM sql AS STRING : sql = berichtText$(berichtJ(e), "bedingung")
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(sql)
+        DIM c AS STRING : c = MID$(sql, i, 1)
+        IF c = "'" THEN
+            DIM ende AS INTEGER : ende = INSTR(sql, "'", i + 1)
+            IF ende < 0 THEN BREAK
+            i = ende + 1
+        ELSEIF c = ":" AND i + 1 < LEN(sql) AND REGEX_TEST(MID$(sql, i + 1, 1), "^[A-Za-z_]$") THEN
+            DIM k AS INTEGER : k = i + 1
+            WHILE k < LEN(sql) AND REGEX_TEST(MID$(sql, k, 1), "^[A-Za-z0-9_]$")
+                k = k + 1
+            WEND
+            DIM n AS STRING : n = MID$(sql, i + 1, k - i - 1)
+            IF ARRAY_INDEXOF(aus, n) < 0 THEN ARRAY_PUSH(aus, n)
+            i = k
+        ELSE
+            i = i + 1
+        END IF
+    WEND
+    RETURN aus
+END FUNCTION
+
+' Alle Spalten, die der Bericht nennt (Felder, Summen, Gruppen, Sortierung,
+' Bedingung) -- daraus legt dbQuellSql$ die Verbunde ueber Verweise.
+FUNCTION berichtBedarf$(j AS JSON_HANDLE) AS STRING
+    DIM teile AS ARRAY OF STRING : teile = [berichtText$(j, "bedingung")]
+    DIM b AS INTEGER
+    FOR b = 0 TO JSON_LEN(j, "baender") - 1
+        DIM bp AS STRING : bp = "baender." + STR$(b) + ".elemente"
+        IF NOT JSON_HAS(j, bp) THEN CONTINUE
+        DIM k AS INTEGER
+        FOR k = 0 TO JSON_LEN(j, bp) - 1
+            ARRAY_PUSH(teile, berichtText$(j, bp + "." + STR$(k) + ".spalte"))
+        NEXT
+    NEXT
+    DIM g AS INTEGER
+    IF JSON_HAS(j, "gruppen") THEN
+        FOR g = 0 TO JSON_LEN(j, "gruppen") - 1
+            ARRAY_PUSH(teile, berichtText$(j, "gruppen." + STR$(g) + ".spalte"))
+        NEXT
+    END IF
+    IF JSON_HAS(j, "sortieren") THEN
+        FOR g = 0 TO JSON_LEN(j, "sortieren") - 1
+            ARRAY_PUSH(teile, berichtText$(j, "sortieren." + STR$(g)))
+        NEXT
+    END IF
+    RETURN JOIN$(teile, ";")
+END FUNCTION
+
+' Das SELECT der Quelle: alle Spalten (samt verweis.spalte, wo der Bericht
+' sie nennt), die Bedingung mit ihren :parametern, sortiert erst nach den
+' Gruppen, dann nach "sortieren". "" = keine Quelle (ein Bericht ohne Daten).
+FUNCTION berichtSql$(e AS Element) AS STRING
+    DIM j AS JSON_HANDLE : j = berichtJ(e)
+    DIM ref AS STRING : ref = berichtText$(j, "quelle")
+    IF ref = "" THEN RETURN ""
+    IF NOT dbQuelle(ref) THEN RETURN ""
+    DIM sql AS STRING : sql = "SELECT * FROM " + dbQuellSql$(dbRefEl, dbRefT, dbRefA, berichtBedarf$(j)) + " AS studio_q"
+    DIM bed AS STRING : bed = TRIM$(berichtText$(j, "bedingung"))
+    IF bed <> "" THEN sql = sql + " WHERE (" + bed + ")"
+    DIM ord AS ARRAY OF STRING : ord = []
+    DIM g AS INTEGER
+    IF JSON_HAS(j, "gruppen") THEN
+        FOR g = 0 TO JSON_LEN(j, "gruppen") - 1
+            DIM gs AS STRING : gs = berichtText$(j, "gruppen." + STR$(g) + ".spalte")
+            IF gs <> "" THEN ARRAY_PUSH(ord, dbQ$(gs))
+        NEXT
+    END IF
+    IF JSON_HAS(j, "sortieren") THEN
+        FOR g = 0 TO JSON_LEN(j, "sortieren") - 1
+            DIM ss AS STRING : ss = berichtText$(j, "sortieren." + STR$(g))
+            IF ss <> "" THEN ARRAY_PUSH(ord, dbQ$(ss))
+        NEXT
+    END IF
+    IF LEN(ord) > 0 THEN sql = sql + " ORDER BY " + JOIN$(ord, ", ")
+    RETURN sql
+END FUNCTION
+
+' Die Datenbank der Quelle ("" = keine).
+FUNCTION berichtDb$(e AS Element) AS STRING
+    DIM ref AS STRING : ref = berichtText$(berichtJ(e), "quelle")
+    IF ref = "" OR NOT dbQuelle(ref) THEN RETURN ""
+    RETURN dbRefEl.name
+END FUNCTION
+
+FUNCTION hatBericht() AS BOOLEAN
+    DIM e AS Element
+    FOR EACH e IN elemente
+        IF e.art = "bericht" THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' --- Erzeugter Code -------------------------------------------------------------------
+DIM berichtLaufzeitText AS STRING : berichtLaufzeitText = ""
+FUNCTION berichtLaufzeit$() AS STRING
+    IF berichtLaufzeitText = "" THEN berichtLaufzeitText = JOIN$(READLINES(PATHJOIN(studioQuelle, "berichte_laufzeit.dh")), CHR$(10)) + CHR$(10)
+    RETURN berichtLaufzeitText
+END FUNCTION
+
+' Ein langer Text als Ausdruck aus Stuecken (eine Zeile bleibt lesbar).
+FUNCTION berichtTextAusdruck$(roh AS STRING) AS STRING
+    IF LEN(roh) <= 96 THEN RETURN dhText$(roh)
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(roh)
+        ARRAY_PUSH(teile, dhText$(MID$(roh, i, 96)))
+        i = i + 96
+    WEND
+    RETURN JOIN$(teile, " + _" + CHR$(10) + "            ")
+END FUNCTION
+
+' _studio/studio_berichte.dh: die Auslegung, dann je Bericht eine Klasse und
+' eine globale Variable unter seinem Namen.
+FUNCTION berichteCode$() AS STRING
+    IF NOT hatBericht() THEN RETURN ""
+    DIM z AS ARRAY OF STRING : z = []
+    ARRAY_PUSH(z, "' Erzeugt vom Drachenhauch Studio -- die Berichte des Projekts.")
+    ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "json" + CHR$(34))
+    ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "db" + CHR$(34))
+    ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "pdf" + CHR$(34))
+    ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "regex" + CHR$(34))
+    ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "imgfx" + CHR$(34))
+    ARRAY_PUSH(z, berichtLaufzeit$())
+    ARRAY_PUSH(z, "DIM studioBKeineDb AS DB_CONN")
+    DIM e AS Element
+    FOR EACH e IN elemente
+        IF e.art <> "bericht" THEN CONTINUE
+        DIM db AS STRING : db = berichtDb$(e)
+        IF db = "" THEN db = "studioBKeineDb"
+        DIM titel AS STRING : titel = berichtText$(berichtJ(e), "titel")
+        IF titel = "" THEN titel = e.name
+        DIM k AS STRING : k = "StudioBericht_" + e.name
+        ARRAY_PUSH(z, "")
+        ARRAY_PUSH(z, "' Bericht " + e.name)
+        ARRAY_PUSH(z, "CLASS " + k)
+        ARRAY_PUSH(z, "    ' Der Bericht als PDF-Handle; werte = die Parameter der Bedingung.")
+        ARRAY_PUSH(z, "    FUNCTION Erzeugen(werte AS MAP OF ANY) AS PDF")
+        ARRAY_PUSH(z, "        RETURN studioBerichtPdf(" + berichtTextAusdruck$(JSON_STRINGIFY(berichtJ(e))) + ", " + db + ", " + berichtTextAusdruck$(berichtSql$(e)) + ", werte)")
+        ARRAY_PUSH(z, "    END FUNCTION")
+        ARRAY_PUSH(z, "")
+        ARRAY_PUSH(z, "    SUB Pdf(pfad AS STRING, werte AS MAP OF ANY)")
+        ARRAY_PUSH(z, "        DIM p AS PDF : p = Self.Erzeugen(werte)")
+        ARRAY_PUSH(z, "        PDF_SAVE(p, pfad)")
+        ARRAY_PUSH(z, "        PDF_CLOSE(p)")
+        ARRAY_PUSH(z, "    END SUB")
+        ARRAY_PUSH(z, "")
+        ARRAY_PUSH(z, "    SUB Drucken(werte AS MAP OF ANY, drucker AS STRING = " + CHR$(34) + CHR$(34) + ")")
+        ARRAY_PUSH(z, "        DIM p AS PDF : p = Self.Erzeugen(werte)")
+        ARRAY_PUSH(z, "        IF drucker = " + CHR$(34) + CHR$(34) + " THEN PDF_PRINT(p) ELSE PDF_PRINT(p, drucker)")
+        ARRAY_PUSH(z, "        PDF_CLOSE(p)")
+        ARRAY_PUSH(z, "    END SUB")
+        ARRAY_PUSH(z, "")
+        ARRAY_PUSH(z, "    SUB Vorschau(werte AS MAP OF ANY)")
+        ARRAY_PUSH(z, "        studioBerichtVorschau(Self.Erzeugen(werte), " + dhText$(titel) + ")")
+        ARRAY_PUSH(z, "    END SUB")
+        ARRAY_PUSH(z, "END CLASS")
+        ARRAY_PUSH(z, "DIM " + e.name + " AS " + k + " : " + e.name + " = NEW " + k + "()")
+    NEXT
+    RETURN JOIN$(z, CHR$(10)) + CHR$(10)
+END FUNCTION

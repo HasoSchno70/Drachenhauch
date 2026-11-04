@@ -147,84 +147,15 @@ CLASS Rechnung
         RETURN ok
     END FUNCTION
 
-    ' Die Rechnung als PDF auf A4.
+    ' Die Rechnung als PDF: gesetzt vom Bericht Rechnungsbeleg aus der
+    ' Datenbank -- die Rechnung muss also gesichert sein. Seitenkopf,
+    ' Umbruch und die Steuer je Satz stehen dort, nicht hier.
     SUB alsPdf(pfad AS STRING)
-        DIM p AS PDF : p = PDF_NEW("A4")
-        PDF_FONT(p, "sans", 8)
-        PDF_TEXT(p, 20, 20, "Beispiel GmbH · Musterweg 1 · 12345 Musterstadt")
-        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT name, strasse, plz, ort FROM kunden WHERE id = ?", Self.kunde)
-        PDF_FONT(p, "sans", 11)
-        IF DB_NEXT(r) THEN
-            PDF_TEXT(p, 20, 28, DB_GET_STRING(r, 0))
-            PDF_TEXT(p, 20, 34, DB_GET_STRING(r, 1))
-            PDF_TEXT(p, 20, 40, DB_GET_STRING(r, 2) + " " + DB_GET_STRING(r, 3))
-        END IF
-        PDF_FONT(p, "sans", 10)
-        pdfRechts(p, 190, 28, "Datum: " + datumDeutsch$(Self.datum))
-        pdfRechts(p, 190, 34, "Nummer: " + Self.nummer)
-        PDF_FONT(p, "sans-fett", 18)
-        PDF_TEXT(p, 20, 60, "Rechnung " + Self.nummer)
-        DIM y AS FLOAT : y = 78
-        Self.pdfKopf(p, y)
-        y = y + 8
-        PDF_FONT(p, "sans", 10)
-        DIM i AS INTEGER
-        FOR i = 0 TO LEN(Self.texte) - 1
-            IF y > 260 THEN
-                PDF_PAGE(p)
-                y = 20
-                Self.pdfKopf(p, y)
-                y = y + 8
-                PDF_FONT(p, "sans", 10)
-            END IF
-            PDF_TEXT(p, 20, y, STR$(i + 1))
-            PDF_TEXT(p, 30, y, Self.texte[i])
-            pdfRechts(p, 125, y, STR$(Self.mengen[i]))
-            pdfRechts(p, 152, y, EURO$(Self.preise[i]))
-            pdfRechts(p, 165, y, STR$(Self.saetze[i]) + " %")
-            pdfRechts(p, 190, y, EURO$(Self.summe(i)))
-            y = y + 7
-        NEXT
-        PDF_LINE(p, 120, y, 190, y)
-        y = y + 4
-        pdfRechts(p, 160, y, "Netto")
-        pdfRechts(p, 190, y, EURO$(Self.netto()))
-        ' Die Steuer je Satz -- so verlangt es eine Rechnung mit zwei Saetzen.
-        DIM gesehen AS ARRAY OF INTEGER : gesehen = []
-        FOR i = 0 TO LEN(Self.saetze) - 1
-            IF ARRAY_INDEXOF(gesehen, Self.saetze[i]) >= 0 THEN CONTINUE
-            ARRAY_PUSH(gesehen, Self.saetze[i])
-            y = y + 6
-            pdfRechts(p, 160, y, "MwSt " + STR$(Self.saetze[i]) + " %")
-            pdfRechts(p, 190, y, EURO$(Self.steuerSatz(Self.saetze[i])))
-        NEXT
-        y = y + 8
-        PDF_FONT(p, "sans-fett", 11)
-        pdfRechts(p, 160, y, "Gesamt")
-        pdfRechts(p, 190, y, EURO$(Self.brutto()))
-        PDF_FONT(p, "sans", 9)
-        PDF_TEXT(p, 20, y + 20, "Zahlbar innerhalb von 14 Tagen ohne Abzug. Vielen Dank für Ihren Auftrag.")
-        PDF_SAVE(p, pfad)
+        Rechnungsbeleg.Pdf(pfad, {"id": Self.id})
     END SUB
 
-    SUB pdfKopf(p AS PDF, y AS FLOAT)
-        PDF_FONT(p, "sans-fett", 10)
-        PDF_TEXT(p, 20, y, "Pos.")
-        PDF_TEXT(p, 30, y, "Bezeichnung")
-        pdfRechts(p, 125, y, "Menge")
-        pdfRechts(p, 152, y, "Einzelpreis")
-        pdfRechts(p, 165, y, "MwSt")
-        pdfRechts(p, 190, y, "Summe")
-        PDF_LINE(p, 20, y + 6, 190, y + 6)
+    ' Dieselbe Rechnung im Vorschaufenster, mit Blaettern und Drucken.
+    SUB zeigen()
+        Rechnungsbeleg.Vorschau({"id": Self.id})
     END SUB
-
-    ' Die Steuer aller Positionen mit diesem Satz.
-    FUNCTION steuerSatz(satz AS INTEGER) AS INTEGER
-        DIM s AS INTEGER : s = 0
-        DIM i AS INTEGER
-        FOR i = 0 TO LEN(Self.saetze) - 1
-            IF Self.saetze[i] = satz THEN s = s + Self.steuerVon(i)
-        NEXT
-        RETURN s
-    END FUNCTION
 END CLASS

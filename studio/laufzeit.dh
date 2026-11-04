@@ -15,6 +15,8 @@
 ' kehren erst dann zurueck -- wie in Xojo oder Visual Basic.
 
 IMPORT "gui"
+IMPORT "pdf"
+IMPORT "imgfx"
 
 CLASS StudioApp
     ' Nach dem Start, bevor das Startfenster aufgeht.
@@ -475,6 +477,54 @@ FUNCTION Eingabe(text AS STRING, vorgabe AS STRING = "", titel AS STRING = "") A
     IF studioAntwort(d) <> 1 THEN RETURN ""
     RETURN GUI_DIALOG_TEXT(d)
 END FUNCTION
+
+' Die Vorschau eines Berichts (studio_berichte.dh): ein Fenster mit der
+' Seite, Blaettern, Drucken, Sichern und Schliessen. Kehrt zurueck, wenn es
+' zu ist -- wie Frage() dreht sie dafuer selbst Bilder.
+SUB studioBerichtVorschau(p AS PDF, titel AS STRING)
+    DIM w AS GUI_WINDOW : w = GUI_WINDOW(titel, 40, 30, 640, MIN(860, SCREENHEIGHT() - 60))
+    DIM zurueck AS GUI_WIDGET : zurueck = GUI_BUTTON(w, "<", 10, 8, 40, 26)
+    DIM seite AS GUI_WIDGET : seite = GUI_LABEL(w, "", 58, 12)
+    DIM weiter AS GUI_WIDGET : weiter = GUI_BUTTON(w, ">", 150, 8, 40, 26)
+    DIM drucken AS GUI_WIDGET : drucken = GUI_BUTTON(w, "Drucken", 300, 8, 100, 26)
+    DIM sichern AS GUI_WIDGET : sichern = GUI_BUTTON(w, "Als PDF …", 406, 8, 110, 26)
+    DIM zu AS GUI_WIDGET : zu = GUI_BUTTON(w, "Schließen", 522, 8, 106, 26)
+    DIM bild AS GUI_WIDGET : bild = GUI_IMAGE(w, 10, 42, 620, GUI_WINDOW_GET_H(w) - 82, -1)
+    GUI_IMAGE_MODE(bild, "einpassen")
+    GUI_WINDOW_MODAL(w, TRUE)
+    GUI_FOCUS(zu)
+    ARRAY_PUSH(studioDialoge, w)
+    DIM nr AS INTEGER : nr = 1
+    DIM handle AS IMAGE : handle = -1
+    DIM neu AS BOOLEAN : neu = TRUE
+    WHILE TRUE
+        IF neu THEN
+            IF handle >= 0 THEN IMAGE_FREE(handle)
+            handle = PDF_PREVIEW(p, nr, 620)
+            GUI_SET_IMAGE(bild, handle)
+            GUI_SET_TEXT(seite, STR$(nr) + " / " + STR$(PDF_PAGE_COUNT(p)))
+            neu = FALSE
+        END IF
+        IF NOT studioBild() THEN BREAK
+        IF GUI_CLICKED(zu) OR GUI_WINDOW_CLOSED(w) THEN BREAK
+        IF GUI_CLICKED(weiter) AND nr < PDF_PAGE_COUNT(p) THEN nr = nr + 1 : neu = TRUE
+        IF GUI_CLICKED(zurueck) AND nr > 1 THEN nr = nr - 1 : neu = TRUE
+        IF GUI_CLICKED(drucken) THEN PDF_PRINT(p)
+        IF GUI_CLICKED(sichern) THEN
+            DIM ziel AS STRING : ziel = FILE_SAVE_DIALOG("PDF sichern", "pdf")
+            IF ziel <> "" THEN PDF_SAVE(p, ziel)
+        END IF
+    WEND
+    DIM rest AS ARRAY OF GUI_WINDOW : rest = []
+    DIM x AS GUI_WINDOW
+    FOR EACH x IN studioDialoge
+        IF NOT (x = w) THEN ARRAY_PUSH(rest, x)
+    NEXT
+    studioDialoge = rest
+    GUI_WINDOW_DESTROY(w)
+    IF handle >= 0 THEN IMAGE_FREE(handle)
+    PDF_CLOSE(p)
+END SUB
 
 ' Ein Bild aus dem Ordner bilder/ des Projekts (beim Starten und in der
 ' gebauten Fassung unter assets/bilder/).

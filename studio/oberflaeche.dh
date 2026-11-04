@@ -49,6 +49,7 @@ DIM miModulNeu AS INTEGER
 DIM miControlNeu AS INTEGER
 DIM miKlasseNeu AS INTEGER
 DIM miDatenbankNeu AS INTEGER
+DIM miBerichtNeu AS INTEGER
 DIM miMethodeNeu AS INTEGER
 DIM miEreignisNeu AS INTEGER
 DIM miMethodeWeg AS INTEGER
@@ -154,6 +155,7 @@ SUB oberflaecheAnlegen()
     miModulNeu = GUI_MENU_ITEM(m, tr$("Modul hinzufügen …"))
     miKlasseNeu = GUI_MENU_ITEM(m, tr$("Klasse hinzufügen …"))
     miDatenbankNeu = GUI_MENU_ITEM(m, tr$("Datenbank hinzufügen …"))
+    miBerichtNeu = GUI_MENU_ITEM(m, tr$("Bericht hinzufügen …"))
     miBildNeu = GUI_MENU_ITEM(m, tr$("Bild hinzufügen …"), kz$("Strg+Umschalt+B"))
     GUI_MENU_SEPARATOR(m)
     miMethodeNeu = GUI_MENU_ITEM(m, tr$("Methode hinzufügen …"), kz$("Strg+Umschalt+M")) : GUI_MENU_ICON(miMethodeNeu, "stift")
@@ -521,17 +523,20 @@ SUB werkzeugeNachziehen()
     ' Ist ein Code-Reiter vorn, gehoeren Strg+Z/Y, Entf und Strg+D dem
     ' Code-Feld: ein gesperrter Menuepunkt nimmt ihm die Taste nicht weg.
     DIM lay AS BOOLEAN : lay = layoutVorn()
-    GUI_TOOLBAR_ENABLE(tb, tbZurueck, lay AND kannZurueck())
-    GUI_TOOLBAR_ENABLE(tb, tbVor, lay AND kannVor())
-    GUI_MENU_ENABLE(miZurueck, lay AND kannZurueck())
-    GUI_MENU_ENABLE(miVor, lay AND kannVor())
+    ' Ein Bericht vorn hat sein eigenes Rueckgaengig und seine Auswahl.
+    DIM zr AS BOOLEAN : zr = (lay AND kannZurueck()) OR berichtKannZurueck()
+    DIM vr AS BOOLEAN : vr = (lay AND kannVor()) OR berichtKannVor()
+    GUI_TOOLBAR_ENABLE(tb, tbZurueck, zr)
+    GUI_TOOLBAR_ENABLE(tb, tbVor, vr)
+    GUI_MENU_ENABLE(miZurueck, zr)
+    GUI_MENU_ENABLE(miVor, vr)
     DIM mehrere AS BOOLEAN : mehrere = lay AND LEN(gewaehlt) >= 2
     GUI_TOOLBAR_ENABLE(tb, tbLinks, mehrere)
     GUI_TOOLBAR_ENABLE(tb, tbOben, mehrere)
     GUI_TOOLBAR_ENABLE(tb, tbMitteW, mehrere)
     GUI_TOOLBAR_ENABLE(tb, tbVerteilen, lay AND LEN(gewaehlt) >= 3)
-    GUI_MENU_ENABLE(miVerdoppeln, lay AND auswahl >= 0)
-    GUI_MENU_ENABLE(miLoeschen, lay AND (auswahl >= 0 OR trayWahl >= 0 OR abstandL >= 0))
+    GUI_MENU_ENABLE(miVerdoppeln, (lay AND auswahl >= 0) OR (berichtVorn() AND berichtHatAuswahl()))
+    GUI_MENU_ENABLE(miLoeschen, (lay AND (auswahl >= 0 OR trayWahl >= 0 OR abstandL >= 0)) OR berichtHatAuswahl())
     DIM k AS INTEGER
     FOR k = 0 TO LEN(anordnenPunkte) - 1
         GUI_MENU_ENABLE(anordnenPunkte[k], lay)

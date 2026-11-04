@@ -1,0 +1,627 @@
+' ============================================================
+'  Drachenhauch Studio -- Berichte auslegen und als PDF setzen
+' ============================================================
+'  Das Studio benutzt diese Datei fuer seine Vorschau und kopiert sie fuer
+'  ein Programm mit Berichten nach _studio/studio_berichte.dh. Sie kennt
+'  kein Fenster: aus der Beschreibung eines Berichts (JSON, docs/entwurf-
+'  berichte.md), einer Verbindung und dem SELECT seiner Quelle entsteht ein
+'  PDF-Handle. Sichern, Drucken und die Vorschau machen die Aufrufer.
+'
+'  Ablauf: erst alle Zeilen lesen, dann auslegen (welches Band kommt auf
+'  welche Seite, an welche Hoehe, mit welcher Zeile), dann zeichnen -- erst
+'  danach steht die Zahl der Seiten fest, die "Seite n von m" braucht.
+' ============================================================
+
+' Die Zeilen der Quelle: je Zeile die Werte als Text (NULL = leer, dazu ein
+' Merker), in der Reihenfolge von studioBSpalten.
+DIM studioBSpalten AS ARRAY OF STRING : studioBSpalten = []
+DIM studioBWerte AS ARRAY OF STRING : studioBWerte = []
+DIM studioBNull AS ARRAY OF BOOLEAN : studioBNull = []
+DIM studioBZeilen AS INTEGER : studioBZeilen = 0
+' Die Auslegung: je Eintrag Seite (ab 0), Hoehe auf der Seite (mm), Band,
+' Zeile fuer Felder und der Bereich der Zeilen fuer Summen.
+DIM studioBLSeite AS ARRAY OF INTEGER : studioBLSeite = []
+DIM studioBLY AS ARRAY OF FLOAT : studioBLY = []
+DIM studioBLBand AS ARRAY OF INTEGER : studioBLBand = []
+DIM studioBLZeile AS ARRAY OF INTEGER : studioBLZeile = []
+DIM studioBLVon AS ARRAY OF INTEGER : studioBLVon = []
+DIM studioBLBis AS ARRAY OF INTEGER : studioBLBis = []
+DIM studioBSeiten AS INTEGER : studioBSeiten = 0
+' Wo Bilder liegen (im Studio der Ordner bilder/ des Projekts).
+DIM studioBBilder AS STRING : studioBBilder = "assets/bilder"
+' Bildspalten: die Spalten, die ein Bild-Element nennt, liest studioBLesen
+' als Bytes statt als Text. Je Zelle mit Bild ihre Stelle in studioBWerte
+' und der Puffer.
+DIM studioBBildSpalten AS ARRAY OF STRING : studioBBildSpalten = []
+DIM studioBPufferStelle AS ARRAY OF INTEGER : studioBPufferStelle = []
+DIM studioBPuffer AS ARRAY OF BUFFER : studioBPuffer = []
+
+' --- Parameter ----------------------------------------------------------------------
+' Jedes :name ausserhalb von Text in '...' wird durch den Wert aus `werte`
+' als SQL-Literal ersetzt (Text in Anfuehrungszeichen, Zahlen wie sie sind).
+' Fehlt ein Wert, ist das ein Fehler mit dem Namen.
+FUNCTION studioBLiteral$(v AS ANY) AS STRING
+    DIM t AS STRING : t = TYPEOF(v)
+    IF t = "INTEGER" OR t = "FLOAT" THEN RETURN STR$(v)
+    IF t = "BOOLEAN" THEN RETURN IIF(v, "1", "0")
+    IF t = "NIL" THEN RETURN "NULL"
+    RETURN "'" + REPLACE$(STR$(v), "'", "''") + "'"
+END FUNCTION
+
+FUNCTION studioBParameter$(sql AS STRING, werte AS MAP OF ANY) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM i AS INTEGER : i = 0
+    DIM n AS INTEGER : n = LEN(sql)
+    WHILE i < n
+        DIM c AS STRING : c = MID$(sql, i, 1)
+        IF c = "'" THEN
+            DIM e AS INTEGER : e = INSTR(sql, "'", i + 1)
+            IF e < 0 THEN e = n - 1
+            aus = aus + MID$(sql, i, e - i + 1)
+            i = e + 1
+        ELSEIF c = ":" AND i + 1 < n AND REGEX_TEST(MID$(sql, i + 1, 1), "^[A-Za-z_]$") THEN
+            DIM j AS INTEGER : j = i + 1
+            WHILE j < n AND REGEX_TEST(MID$(sql, j, 1), "^[A-Za-z0-9_]$")
+                j = j + 1
+            WEND
+            DIM name AS STRING : name = MID$(sql, i + 1, j - i - 1)
+            DIM gefunden AS BOOLEAN : gefunden = FALSE
+            DIM k AS STRING
+            FOR EACH k IN MAPKEYS(werte)
+                IF LOWER$(k) = LOWER$(name) THEN
+                    aus = aus + studioBLiteral$(MAPGET(werte, k))
+                    gefunden = TRUE
+                    BREAK
+                END IF
+            NEXT
+            IF NOT gefunden THEN THROW "Bericht: Parameter :" + name + " fehlt"
+            i = j
+        ELSE
+            aus = aus + c
+            i = i + 1
+        END IF
+    WEND
+    RETURN aus
+END FUNCTION
+
+' --- Lesen --------------------------------------------------------------------------
+SUB studioBLesen(db AS DB_CONN, sql AS STRING)
+    studioBSpalten = [] : studioBWerte = [] : studioBNull = [] : studioBZeilen = 0
+    studioBPufferStelle = [] : studioBPuffer = []
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    DIM i AS INTEGER
+    DIM alsBild AS ARRAY OF BOOLEAN : alsBild = []
+    FOR i = 0 TO DB_COL_COUNT(r) - 1
+        ARRAY_PUSH(studioBSpalten, LOWER$(DB_COL_NAME(r, i)))
+        ARRAY_PUSH(alsBild, ARRAY_INDEXOF(studioBBildSpalten, LOWER$(DB_COL_NAME(r, i))) >= 0)
+    NEXT
+    WHILE DB_NEXT(r)
+        FOR i = 0 TO LEN(studioBSpalten) - 1
+            DIM leer AS BOOLEAN : leer = DB_IS_NULL(r, i)
+            ARRAY_PUSH(studioBNull, leer)
+            IF alsBild[i] AND NOT leer THEN
+                ' Der Wert ist nur eine Marke; das Bild liegt als Puffer daneben.
+                ARRAY_PUSH(studioBPufferStelle, LEN(studioBWerte))
+                ARRAY_PUSH(studioBPuffer, DB_GET_BUFFER(r, i))
+                ARRAY_PUSH(studioBWerte, "[Bild]")
+            ELSE
+                ARRAY_PUSH(studioBWerte, IIF(leer, "", DB_GET_STRING(r, i)))
+            END IF
+        NEXT
+        studioBZeilen = studioBZeilen + 1
+    WEND
+END SUB
+
+FUNCTION studioBSpalte(name AS STRING) AS INTEGER
+    RETURN ARRAY_INDEXOF(studioBSpalten, LOWER$(name))
+END FUNCTION
+
+FUNCTION studioBWert$(zeile AS INTEGER, spalte AS INTEGER) AS STRING
+    IF zeile < 0 OR zeile >= studioBZeilen OR spalte < 0 THEN RETURN ""
+    RETURN studioBWerte[zeile * LEN(studioBSpalten) + spalte]
+END FUNCTION
+
+' Das Bild einer Zelle (leerer Puffer: keins).
+FUNCTION studioBBildPuffer(zeile AS INTEGER, spalte AS INTEGER) AS BUFFER
+    DIM leer AS BUFFER : leer = BUFFER_NEW(0)
+    IF zeile < 0 OR zeile >= studioBZeilen OR spalte < 0 THEN RETURN leer
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(studioBPufferStelle, zeile * LEN(studioBSpalten) + spalte)
+    IF k < 0 THEN RETURN leer
+    RETURN studioBPuffer[k]
+END FUNCTION
+
+' Die Bildspalten einer Beschreibung: was die Bild-Elemente unter "spalte" nennen.
+FUNCTION studioBBildSpaltenVon(j AS JSON_HANDLE) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    IF NOT JSON_HAS(j, "baender") THEN RETURN aus
+    DIM b AS INTEGER
+    FOR b = 0 TO JSON_LEN(j, "baender") - 1
+        DIM bp AS STRING : bp = "baender." + STR$(b) + ".elemente"
+        IF NOT JSON_HAS(j, bp) THEN CONTINUE
+        DIM k AS INTEGER
+        FOR k = 0 TO JSON_LEN(j, bp) - 1
+            DIM p AS STRING : p = bp + "." + STR$(k)
+            IF studioBText$(j, p, "art", "") <> "bild" THEN CONTINUE
+            DIM s AS STRING : s = LOWER$(TRIM$(studioBText$(j, p, "spalte", "")))
+            IF s <> "" AND ARRAY_INDEXOF(aus, s) < 0 THEN ARRAY_PUSH(aus, s)
+        NEXT
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Ein Bild ins Rechteck x, y, b, h einpassen: so gross wie moeglich, ohne es
+' zu verzerren, in der Mitte. Ohne Hoehe bestimmt die Breite.
+SUB studioBBildSetzen(pdf AS PDF, bild AS IMAGE, x AS FLOAT, y AS FLOAT, b AS FLOAT, h AS FLOAT)
+    DIM bw AS FLOAT : bw = IMAGE_WIDTH(bild)
+    DIM bh AS FLOAT : bh = IMAGE_HEIGHT(bild)
+    IF bw <= 0.0 OR bh <= 0.0 OR b <= 0.0 THEN RETURN
+    IF h <= 0.0 THEN
+        PDF_IMAGE(pdf, bild, x, y, b, b * bh / bw)
+        RETURN
+    END IF
+    DIM m AS FLOAT : m = MIN(b / bw, h / bh)
+    DIM w AS FLOAT : w = bw * m
+    DIM hh AS FLOAT : hh = bh * m
+    PDF_IMAGE(pdf, bild, x + (b - w) / 2.0, y + (h - hh) / 2.0, w, hh)
+END SUB
+
+FUNCTION studioBIstNull(zeile AS INTEGER, spalte AS INTEGER) AS BOOLEAN
+    IF zeile < 0 OR zeile >= studioBZeilen OR spalte < 0 THEN RETURN TRUE
+    RETURN studioBNull[zeile * LEN(studioBSpalten) + spalte]
+END FUNCTION
+
+' --- Werte zum Anzeigen ---------------------------------------------------------------
+' Wie ein Wert aussieht: Geld steht in Cent (1999 -> 19,99), Kommazahlen mit
+' Komma, ein Datum JJJJ-MM-TT als TT.MM.JJJJ, Ja/Nein als ja/nein.
+FUNCTION studioBFormat$(roh AS STRING, format AS STRING) AS STRING
+    IF roh = "" THEN RETURN ""
+    SELECT CASE format
+        CASE "geld"
+            DIM c AS INTEGER : c = INT(VAL(roh))
+            RETURN IIF(c < 0, "-", "") + ZAHL$(ABS(c) \ 100) + "," + RIGHT$("0" + STR$(ABS(c) MOD 100), 2)
+        CASE "zahl"
+            DIM z AS STRING : z = roh
+            IF RIGHT$(z, 2) = ".0" THEN z = LEFT$(z, LEN(z) - 2)
+            RETURN REPLACE$(z, ".", ",")
+        CASE "ganz"
+            RETURN ZAHL$(INT(VAL(roh)))
+        CASE "datum"
+            IF REGEX_TEST(roh, "^[0-9]{4}-[0-9]{2}-[0-9]{2}") THEN RETURN MID$(roh, 8, 2) + "." + MID$(roh, 5, 2) + "." + LEFT$(roh, 4)
+            RETURN roh
+        CASE "wahr"
+            RETURN IIF(VAL(roh) <> 0, "ja", "nein")
+    END SELECT
+    RETURN roh
+END FUNCTION
+
+' --- Nur Zeilen mit ... -------------------------------------------------------------
+' Eine Einschraenkung "spalte = wert" (auch <>, <, >, <= und >=; der Wert
+' darf in Anfuehrungszeichen stehen). Zerlegt nach studioBWoSp/Op/Wert;
+' FALSE, wenn es keine solche Form ist.
+DIM studioBWoSp AS STRING
+DIM studioBWoOp AS STRING
+DIM studioBWoWert AS STRING
+FUNCTION studioBWoZerlegen(wo AS STRING) AS BOOLEAN
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(wo) AND INSTR("<>=", MID$(wo, i, 1)) < 0
+        i = i + 1
+    WEND
+    IF i >= LEN(wo) THEN RETURN FALSE
+    DIM op AS STRING : op = MID$(wo, i, 1)
+    DIM zwei AS STRING : zwei = MID$(wo, i, 2)
+    IF zwei = "<=" OR zwei = ">=" OR zwei = "<>" THEN op = zwei
+    studioBWoSp = LOWER$(TRIM$(LEFT$(wo, i)))
+    studioBWoOp = op
+    studioBWoWert = TRIM$(MID$(wo, i + LEN(op)))
+    IF LEN(studioBWoWert) >= 2 THEN
+        DIM a AS STRING : a = LEFT$(studioBWoWert, 1)
+        IF (a = "'" OR a = CHR$(34)) AND RIGHT$(studioBWoWert, 1) = a THEN studioBWoWert = MID$(studioBWoWert, 1, LEN(studioBWoWert) - 2)
+    END IF
+    IF NOT REGEX_TEST(studioBWoSp, "^[a-z0-9_.]+$") THEN RETURN FALSE
+    RETURN studioBWoWert <> "" AND INSTR("<>=", LEFT$(studioBWoWert, 1)) < 0
+END FUNCTION
+
+FUNCTION studioBIstZahl(t AS STRING) AS BOOLEAN
+    RETURN REGEX_TEST(t, "^-?[0-9]+(\.[0-9]+)?$")
+END FUNCTION
+
+' Trifft die zuletzt zerlegte Einschraenkung auf diese Zeile zu? Eine
+' unbekannte Spalte und ein leerer Wert treffen nie.
+FUNCTION studioBWoTrifft(zeile AS INTEGER) AS BOOLEAN
+    DIM sp AS INTEGER : sp = studioBSpalte(studioBWoSp)
+    IF sp < 0 OR studioBIstNull(zeile, sp) THEN RETURN FALSE
+    DIM w AS STRING : w = studioBWert$(zeile, sp)
+    DIM c AS INTEGER
+    IF studioBIstZahl(w) AND studioBIstZahl(studioBWoWert) THEN
+        DIM d AS FLOAT : d = VAL(w) - VAL(studioBWoWert)
+        c = IIF(d < 0.0, -1, IIF(d > 0.0, 1, 0))
+    ELSE
+        c = IIF(w < studioBWoWert, -1, IIF(w > studioBWoWert, 1, 0))
+    END IF
+    SELECT CASE studioBWoOp
+        CASE "=" : RETURN c = 0
+        CASE "<>" : RETURN c <> 0
+        CASE "<" : RETURN c < 0
+        CASE ">" : RETURN c > 0
+        CASE "<=" : RETURN c <= 0
+        CASE ">=" : RETURN c >= 0
+    END SELECT
+    RETURN FALSE
+END FUNCTION
+
+' Gilt die Einschraenkung wo fuer die Zeile? Leer gilt immer, eine, die sich
+' nicht lesen laesst, nie.
+FUNCTION studioBPasst(zeile AS INTEGER, wo AS STRING) AS BOOLEAN
+    IF wo = "" THEN RETURN TRUE
+    IF NOT studioBWoZerlegen(wo) THEN RETURN FALSE
+    RETURN studioBWoTrifft(zeile)
+END FUNCTION
+
+' Eine Summe ueber die Zeilen von..bis: summe, anzahl, mittel, min, max --
+' mit wo nur ueber die Zeilen, auf die es zutrifft.
+' Gerechnet wird mit dem gespeicherten Wert (Geld also in Cent).
+FUNCTION studioBSumme$(spalte AS INTEGER, funktion AS STRING, von AS INTEGER, bis AS INTEGER, wo AS STRING = "") AS STRING
+    DIM n AS INTEGER : n = 0
+    DIM s AS FLOAT : s = 0.0
+    DIM lo AS FLOAT : lo = 0.0
+    DIM hi AS FLOAT : hi = 0.0
+    DIM z AS INTEGER
+    FOR z = von TO bis
+        IF NOT studioBPasst(z, wo) THEN CONTINUE
+        IF funktion = "anzahl" AND spalte < 0 THEN
+            n = n + 1
+            CONTINUE
+        END IF
+        IF studioBIstNull(z, spalte) THEN CONTINUE
+        DIM v AS FLOAT : v = VAL(studioBWert$(z, spalte))
+        IF n = 0 THEN lo = v : hi = v
+        lo = MIN(lo, v) : hi = MAX(hi, v)
+        s = s + v
+        n = n + 1
+    NEXT
+    IF funktion = "anzahl" THEN RETURN STR$(n)
+    IF n = 0 THEN RETURN ""
+    DIM w AS FLOAT : w = s
+    IF funktion = "mittel" THEN w = s / n
+    IF funktion = "min" THEN w = lo
+    IF funktion = "max" THEN w = hi
+    IF w = INT(w) THEN RETURN STR$(INT(w))
+    RETURN STR$(w)
+END FUNCTION
+
+' --- Auslegen -----------------------------------------------------------------------
+' Die Nummer des Bandes einer Art (bei Gruppen: dieser Gruppe), -1 = keins.
+FUNCTION studioBBand(j AS JSON_HANDLE, art AS STRING, gruppe AS INTEGER) AS INTEGER
+    DIM b AS INTEGER
+    FOR b = 0 TO JSON_LEN(j, "baender") - 1
+        DIM p AS STRING : p = "baender." + STR$(b)
+        IF JSON_GET_STRING(j, p + ".art") <> art THEN CONTINUE
+        IF art = "gruppenkopf" OR art = "gruppenfuss" THEN
+            IF JSON_HAS(j, p + ".gruppe") THEN
+                IF JSON_GET_INT(j, p + ".gruppe") <> gruppe THEN CONTINUE
+            ELSEIF gruppe <> 0 THEN
+                CONTINUE
+            END IF
+        END IF
+        RETURN b
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION studioBHoehe(j AS JSON_HANDLE, b AS INTEGER) AS FLOAT
+    IF b < 0 THEN RETURN 0.0
+    RETURN JSON_GET_FLOAT(j, "baender." + STR$(b) + ".hoehe")
+END FUNCTION
+
+' Die Masse der Seite: (breite, hoehe, rand oben, rechts, unten, links).
+DIM studioBSeiteB AS FLOAT
+DIM studioBSeiteH AS FLOAT
+DIM studioBRand AS ARRAY OF FLOAT
+SUB studioBSeite(j AS JSON_HANDLE)
+    DIM format AS STRING : format = "a4"
+    DIM hoch AS BOOLEAN : hoch = TRUE
+    studioBRand = [15.0, 15.0, 15.0, 15.0]
+    IF JSON_HAS(j, "seite.format") THEN format = LOWER$(JSON_GET_STRING(j, "seite.format"))
+    IF JSON_HAS(j, "seite.hoch") THEN hoch = JSON_GET_BOOL(j, "seite.hoch")
+    IF JSON_HAS(j, "seite.rand") THEN
+        DIM k AS INTEGER
+        FOR k = 0 TO MIN(3, JSON_LEN(j, "seite.rand") - 1)
+            studioBRand[k] = JSON_GET_FLOAT(j, "seite.rand." + STR$(k))
+        NEXT
+    END IF
+    DIM b AS FLOAT : b = 210.0
+    DIM h AS FLOAT : h = 297.0
+    SELECT CASE format
+        CASE "a3" : b = 297.0 : h = 420.0
+        CASE "a5" : b = 148.0 : h = 210.0
+        CASE "letter" : b = 215.9 : h = 279.4
+        CASE "legal" : b = 215.9 : h = 355.6
+    END SELECT
+    IF hoch THEN
+        studioBSeiteB = b : studioBSeiteH = h
+    ELSE
+        studioBSeiteB = h : studioBSeiteH = b
+    END IF
+END SUB
+
+DIM studioBAktSeite AS INTEGER
+DIM studioBAktY AS FLOAT
+SUB studioBEintrag(bnr AS INTEGER, zeile AS INTEGER, von AS INTEGER, bis AS INTEGER, j AS JSON_HANDLE)
+    IF bnr < 0 THEN RETURN
+    ARRAY_PUSH(studioBLSeite, studioBAktSeite)
+    ARRAY_PUSH(studioBLY, studioBAktY)
+    ARRAY_PUSH(studioBLBand, bnr)
+    ARRAY_PUSH(studioBLZeile, zeile)
+    ARRAY_PUSH(studioBLVon, von)
+    ARRAY_PUSH(studioBLBis, bis)
+    studioBAktY = studioBAktY + studioBHoehe(j, bnr)
+END SUB
+
+' Ein Band an die laufende Stelle; passt es nicht mehr ueber den Seitenfuss,
+' erst der Seitenfuss unten, eine neue Seite und ihr Seitenkopf.
+SUB studioBSetzen(j AS JSON_HANDLE, bnr AS INTEGER, zeile AS INTEGER, von AS INTEGER, bis AS INTEGER)
+    IF bnr < 0 THEN RETURN
+    DIM fuss AS INTEGER : fuss = studioBBand(j, "seitenfuss", 0)
+    DIM unten AS FLOAT : unten = studioBSeiteH - studioBRand[2] - studioBHoehe(j, fuss)
+    IF studioBAktY + studioBHoehe(j, bnr) > unten + 0.001 AND studioBAktY > studioBRand[0] + studioBKopfHoehe(j) + 0.001 THEN
+        studioBSeitenEnde(j, zeile)
+        studioBAktSeite = studioBAktSeite + 1
+        studioBAktY = studioBRand[0]
+        studioBEintrag(studioBBand(j, "seitenkopf", 0), zeile, zeile, zeile, j)
+    END IF
+    studioBEintrag(bnr, zeile, von, bis, j)
+END SUB
+
+FUNCTION studioBKopfHoehe(j AS JSON_HANDLE) AS FLOAT
+    RETURN studioBHoehe(j, studioBBand(j, "seitenkopf", 0))
+END FUNCTION
+
+SUB studioBSeitenEnde(j AS JSON_HANDLE, zeile AS INTEGER)
+    DIM fuss AS INTEGER : fuss = studioBBand(j, "seitenfuss", 0)
+    IF fuss < 0 THEN RETURN
+    studioBAktY = studioBSeiteH - studioBRand[2] - studioBHoehe(j, fuss)
+    studioBEintrag(fuss, zeile, zeile, zeile, j)
+END SUB
+
+SUB studioBAuslegen(j AS JSON_HANDLE)
+    studioBLSeite = [] : studioBLY = [] : studioBLBand = [] : studioBLZeile = []
+    studioBLVon = [] : studioBLBis = []
+    studioBSeite(j)
+    studioBAktSeite = 0
+    studioBAktY = studioBRand[0]
+    DIM letzte AS INTEGER : letzte = studioBZeilen - 1
+    studioBEintrag(studioBBand(j, "berichtskopf", 0), 0, 0, letzte, j)
+    studioBEintrag(studioBBand(j, "seitenkopf", 0), 0, 0, letzte, j)
+    ' Gruppen: je Ebene die Spalte und wo die laufende Gruppe begann.
+    DIM ng AS INTEGER : ng = 0
+    IF JSON_HAS(j, "gruppen") THEN ng = JSON_LEN(j, "gruppen")
+    DIM gsp AS ARRAY OF INTEGER : gsp = []
+    DIM gab AS ARRAY OF INTEGER : gab = []
+    DIM g AS INTEGER
+    FOR g = 0 TO ng - 1
+        ARRAY_PUSH(gsp, studioBSpalte(JSON_GET_STRING(j, "gruppen." + STR$(g) + ".spalte")))
+        ARRAY_PUSH(gab, 0)
+    NEXT
+    DIM detail AS INTEGER : detail = studioBBand(j, "detail", 0)
+    DIM z AS INTEGER
+    FOR z = 0 TO letzte
+        ' Die erste Ebene, deren Wert sich geaendert hat: dort und darunter
+        ' enden die Gruppen (von innen nach aussen) und beginnen neu.
+        DIM neu AS INTEGER : neu = ng
+        IF z = 0 THEN
+            neu = 0
+        ELSE
+            FOR g = 0 TO ng - 1
+                IF studioBWert$(z, gsp[g]) <> studioBWert$(z - 1, gsp[g]) THEN
+                    neu = g
+                    BREAK
+                END IF
+            NEXT
+        END IF
+        IF z > 0 THEN
+            FOR g = ng - 1 TO neu STEP -1
+                studioBSetzen(j, studioBBand(j, "gruppenfuss", g), z - 1, gab[g], z - 1)
+            NEXT
+        END IF
+        FOR g = neu TO ng - 1
+            ' Das Ende der Gruppe steht noch nicht fest -- der Kopf sieht nur
+            ' ihre erste Zeile; Summen im Kopf rechnen bis zum Ende (unten).
+            gab[g] = z
+            studioBSetzen(j, studioBBand(j, "gruppenkopf", g), z, z, studioBGruppenEnde(z, g, gsp))
+        NEXT
+        studioBSetzen(j, detail, z, z, z)
+    NEXT
+    IF letzte >= 0 THEN
+        FOR g = ng - 1 TO 0 STEP -1
+            studioBSetzen(j, studioBBand(j, "gruppenfuss", g), letzte, gab[g], letzte)
+        NEXT
+    END IF
+    studioBSetzen(j, studioBBand(j, "berichtsfuss", 0), MAX(letzte, 0), 0, letzte)
+    studioBSeitenEnde(j, MAX(letzte, 0))
+    studioBSeiten = studioBAktSeite + 1
+END SUB
+
+' Die letzte Zeile der Gruppe der Ebene g, die in Zeile z beginnt.
+FUNCTION studioBGruppenEnde(z AS INTEGER, g AS INTEGER, gsp AS ARRAY OF INTEGER) AS INTEGER
+    DIM e AS INTEGER : e = z
+    WHILE e + 1 < studioBZeilen
+        DIM gleich AS BOOLEAN : gleich = TRUE
+        DIM k AS INTEGER
+        FOR k = 0 TO g
+            IF studioBWert$(e + 1, gsp[k]) <> studioBWert$(z, gsp[k]) THEN gleich = FALSE
+        NEXT
+        IF NOT gleich THEN BREAK
+        e = e + 1
+    WEND
+    RETURN e
+END FUNCTION
+
+' --- Zeichnen -----------------------------------------------------------------------
+FUNCTION studioBText$(j AS JSON_HANDLE, p AS STRING, feld AS STRING, vorgabe AS STRING) AS STRING
+    IF NOT JSON_HAS(j, p + "." + feld) THEN RETURN vorgabe
+    IF JSON_TYPE(j, p + "." + feld) <> "string" THEN RETURN vorgabe
+    RETURN JSON_GET_STRING(j, p + "." + feld)
+END FUNCTION
+
+FUNCTION studioBZahl(j AS JSON_HANDLE, p AS STRING, feld AS STRING, vorgabe AS FLOAT) AS FLOAT
+    IF JSON_TYPE(j, p + "." + feld) <> "number" THEN RETURN vorgabe
+    RETURN JSON_GET_FLOAT(j, p + "." + feld)
+END FUNCTION
+
+FUNCTION studioBAn(j AS JSON_HANDLE, p AS STRING, feld AS STRING) AS BOOLEAN
+    IF JSON_TYPE(j, p + "." + feld) <> "boolean" THEN RETURN FALSE
+    RETURN JSON_GET_BOOL(j, p + "." + feld)
+END FUNCTION
+
+FUNCTION studioBFarbe(j AS JSON_HANDLE, p AS STRING, feld AS STRING, vorgabe AS INTEGER) AS INTEGER
+    DIM t AS STRING : t = studioBText$(j, p, feld, "")
+    IF t = "" THEN RETURN vorgabe
+    RETURN COLOR_FROM_HEX(t)
+END FUNCTION
+
+' Text in sein Rechteck: Schrift, Ausrichtung, und gekuerzt, wo er nicht passt.
+SUB studioBTextSetzen(pdf AS PDF, j AS JSON_HANDLE, p AS STRING, text AS STRING, x AS FLOAT, y AS FLOAT, b AS FLOAT)
+    IF text = "" THEN RETURN
+    DIM schrift AS STRING : schrift = LOWER$(studioBText$(j, p, "schrift", "sans"))
+    DIM fett AS BOOLEAN : fett = studioBAn(j, p, "fett")
+    DIM kursiv AS BOOLEAN : kursiv = studioBAn(j, p, "kursiv")
+    IF fett AND kursiv THEN
+        schrift = schrift + "-fett-kursiv"
+    ELSEIF fett THEN
+        schrift = schrift + "-fett"
+    ELSEIF kursiv THEN
+        schrift = schrift + "-kursiv"
+    END IF
+    PDF_FONT(pdf, schrift, studioBZahl(j, p, "groesse", 10.0))
+    PDF_COLOR(pdf, studioBFarbe(j, p, "farbe", 0))
+    DIM t AS STRING : t = text
+    IF b > 0.0 AND PDF_TEXT_WIDTH(pdf, t) > b THEN
+        WHILE LEN(t) > 1 AND PDF_TEXT_WIDTH(pdf, t + "…") > b
+            t = LEFT$(t, LEN(t) - 1)
+        WEND
+        t = t + "…"
+    END IF
+    DIM w AS FLOAT : w = PDF_TEXT_WIDTH(pdf, t)
+    DIM ax AS FLOAT : ax = x
+    SELECT CASE studioBText$(j, p, "ausrichtung", "links")
+        CASE "mitte" : ax = x + (b - w) / 2.0
+        CASE "rechts" : ax = x + b - w
+    END SELECT
+    PDF_TEXT(pdf, ax, y, t)
+END SUB
+
+SUB studioBElement(pdf AS PDF, j AS JSON_HANDLE, p AS STRING, ox AS FLOAT, oy AS FLOAT, zeile AS INTEGER, von AS INTEGER, bis AS INTEGER)
+    DIM art AS STRING : art = studioBText$(j, p, "art", "")
+    DIM x AS FLOAT : x = ox + studioBZahl(j, p, "x", 0.0)
+    DIM y AS FLOAT : y = oy + studioBZahl(j, p, "y", 0.0)
+    DIM b AS FLOAT : b = studioBZahl(j, p, "b", 0.0)
+    DIM h AS FLOAT : h = studioBZahl(j, p, "h", 0.0)
+    ' "Nur Zeilen mit ...": eine Summe rechnet nur ueber sie, jedes andere
+    ' Element erscheint nur, wenn das Band mindestens eine solche Zeile hat.
+    DIM wo AS STRING : wo = TRIM$(studioBText$(j, p, "wo", ""))
+    IF wo <> "" AND art <> "summe" THEN
+        DIM da AS BOOLEAN : da = FALSE
+        DIM zw AS INTEGER
+        FOR zw = von TO bis
+            IF studioBPasst(zw, wo) THEN
+                da = TRUE
+                BREAK
+            END IF
+        NEXT
+        IF NOT da THEN RETURN
+    END IF
+    SELECT CASE art
+        CASE "text"
+            studioBTextSetzen(pdf, j, p, studioBText$(j, p, "text", ""), x, y, b)
+        CASE "feld"
+            DIM sp AS INTEGER : sp = studioBSpalte(studioBText$(j, p, "spalte", ""))
+            studioBTextSetzen(pdf, j, p, studioBFormat$(studioBWert$(zeile, sp), studioBText$(j, p, "format", "text")), x, y, b)
+        CASE "summe"
+            DIM ss AS INTEGER : ss = studioBSpalte(studioBText$(j, p, "spalte", ""))
+            DIM fn AS STRING : fn = studioBText$(j, p, "funktion", "summe")
+            DIM roh AS STRING : roh = ""
+            IF ss >= 0 OR fn = "anzahl" THEN roh = studioBSumme$(ss, fn, von, bis, wo)
+            DIM fm AS STRING : fm = studioBText$(j, p, "format", "text")
+            IF fn = "anzahl" THEN fm = "ganz"
+            IF fm = "geld" AND fn = "mittel" THEN roh = STR$(ROUND(VAL(roh)))
+            studioBTextSetzen(pdf, j, p, studioBFormat$(roh, fm), x, y, b)
+        CASE "seitenzahl"
+            DIM vorlage AS STRING : vorlage = studioBText$(j, p, "text", "Seite {n} von {m}")
+            studioBTextSetzen(pdf, j, p, REPLACE$(REPLACE$(vorlage, "{n}", STR$(PDF_PAGE_COUNT(pdf))), "{m}", STR$(studioBSeiten)), x, y, b)
+        CASE "datum"
+            studioBTextSetzen(pdf, j, p, studioBFormat$(DATE$(), "datum"), x, y, b)
+        CASE "linie"
+            PDF_LINE_WIDTH(pdf, studioBZahl(j, p, "staerke", 0.3))
+            PDF_COLOR(pdf, studioBFarbe(j, p, "farbe", 0))
+            PDF_LINE(pdf, x, y, x + b, y + h)
+        CASE "rechteck"
+            IF studioBText$(j, p, "fuellung", "") <> "" THEN
+                PDF_COLOR(pdf, studioBFarbe(j, p, "fuellung", 0))
+                PDF_RECT_FILL(pdf, x, y, b, h)
+            END IF
+            IF studioBZahl(j, p, "staerke", 0.3) > 0.0 THEN
+                PDF_LINE_WIDTH(pdf, studioBZahl(j, p, "staerke", 0.3))
+                PDF_COLOR(pdf, studioBFarbe(j, p, "farbe", 0))
+                PDF_RECT(pdf, x, y, b, h)
+            END IF
+        CASE "bild"
+            ' Aus einer Bildspalte (je Zeile ein anderes) oder eine Datei aus
+            ' bilder/. Was sich nicht als Bild lesen laesst, bleibt leer.
+            DIM bsp AS STRING : bsp = TRIM$(studioBText$(j, p, "spalte", ""))
+            IF bsp <> "" THEN
+                DIM puf AS BUFFER : puf = studioBBildPuffer(zeile, studioBSpalte(bsp))
+                IF BUFFER_LEN(puf) > 0 THEN
+                    TRY
+                        DIM zb AS IMAGE : zb = IMAGE_FROM_BUFFER(puf)
+                        studioBBildSetzen(pdf, zb, x, y, b, h)
+                        IMAGE_FREE(zb)
+                    CATCH bildfehler
+                    END TRY
+                END IF
+            ELSE
+                DIM datei AS STRING : datei = studioBText$(j, p, "bild", "")
+                IF datei <> "" THEN
+                    DIM pfad AS STRING : pfad = PATHJOIN(studioBBilder, datei)
+                    IF FILEEXISTS(pfad) THEN
+                        DIM bild AS IMAGE : bild = LOADIMAGE(pfad)
+                        studioBBildSetzen(pdf, bild, x, y, b, h)
+                    END IF
+                END IF
+            END IF
+    END SELECT
+END SUB
+
+' Der ganze Bericht: Beschreibung (JSON-Text), Verbindung, SELECT der Quelle
+' mit :parametern und ihre Werte -- das Ergebnis ist ein PDF-Handle.
+FUNCTION studioBerichtPdf(beschreibung AS STRING, db AS DB_CONN, sql AS STRING, werte AS MAP OF ANY) AS PDF
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(beschreibung)
+    studioBBildSpalten = studioBBildSpaltenVon(j)
+    IF sql <> "" THEN
+        studioBLesen(db, studioBParameter$(sql, werte))
+    ELSE
+        studioBSpalten = [] : studioBWerte = [] : studioBNull = [] : studioBZeilen = 0
+        studioBPufferStelle = [] : studioBPuffer = []
+    END IF
+    studioBAuslegen(j)
+    DIM format AS STRING : format = "a4"
+    IF JSON_HAS(j, "seite.format") THEN format = LOWER$(JSON_GET_STRING(j, "seite.format"))
+    DIM hoch AS BOOLEAN : hoch = TRUE
+    IF JSON_HAS(j, "seite.hoch") THEN hoch = JSON_GET_BOOL(j, "seite.hoch")
+    DIM pdf AS PDF : pdf = PDF_NEW(format, IIF(hoch, "hoch", "quer"))
+    IF JSON_HAS(j, "titel") THEN PDF_TITLE(pdf, JSON_GET_STRING(j, "titel"))
+    DIM seite AS INTEGER : seite = 0
+    DIM e AS INTEGER
+    FOR e = 0 TO LEN(studioBLSeite) - 1
+        WHILE studioBLSeite[e] > seite
+            PDF_PAGE(pdf)
+            seite = seite + 1
+        WEND
+        DIM bp AS STRING : bp = "baender." + STR$(studioBLBand[e])
+        IF NOT JSON_HAS(j, bp + ".elemente") THEN CONTINUE
+        DIM k AS INTEGER
+        FOR k = 0 TO JSON_LEN(j, bp + ".elemente") - 1
+            studioBElement(pdf, j, bp + ".elemente." + STR$(k), studioBRand[3], studioBLY[e], studioBLZeile[e], studioBLVon[e], studioBLBis[e])
+        NEXT
+    NEXT
+    RETURN pdf
+END FUNCTION

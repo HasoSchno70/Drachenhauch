@@ -1,19 +1,16 @@
-' Die Datenbank: eine SQLite-Datei neben dem Programm. Geld steht ueberall
-' als INTEGER in Cent (19,99 EUR = 1999), die MwSt als ganzer Prozentsatz --
-' so rundet nichts beim Rechnen.
+' Die Datenbank: das Element Daten (Daten.dhdb) legt die Datei und ihre
+' Tabellen an, bevor das Programm losgeht -- dieses Modul gibt ihr nur den
+' kurzen Namen db und fuellt sie beim ersten Start. Geld steht ueberall als
+' INTEGER in Cent (19,99 EUR = 1999), die MwSt als ganzer Prozentsatz -- so
+' rundet nichts beim Rechnen. Eine Position kopiert Text, Preis und Satz des
+' Artikels: wird der Artikel spaeter teurer, bleibt die alte Rechnung, wie
+' sie war.
 IMPORT "db"
-CONST DB_DATEI = "rechnungen.db"
 DIM db AS DB_CONN
 
-' Oeffnet die Datei und legt beim ersten Start Tabellen und Beispieldaten an.
+' Beim ersten Start kommen Beispieldaten hinein.
 SUB dbOeffnen()
-    db = DB_OPEN(DB_DATEI)
-    DB_EXEC(db, "CREATE TABLE IF NOT EXISTS kunden (id INTEGER PRIMARY KEY, name TEXT NOT NULL, strasse TEXT, plz TEXT, ort TEXT, email TEXT)")
-    DB_EXEC(db, "CREATE TABLE IF NOT EXISTS artikel (id INTEGER PRIMARY KEY, bezeichnung TEXT NOT NULL, preis INTEGER NOT NULL, mwst INTEGER NOT NULL)")
-    DB_EXEC(db, "CREATE TABLE IF NOT EXISTS rechnungen (id INTEGER PRIMARY KEY, nummer TEXT NOT NULL UNIQUE, kunde INTEGER NOT NULL, datum TEXT NOT NULL)")
-    ' Eine Position kopiert Text, Preis und Satz des Artikels: wird der
-    ' Artikel spaeter teurer, bleibt die alte Rechnung, wie sie war.
-    DB_EXEC(db, "CREATE TABLE IF NOT EXISTS positionen (id INTEGER PRIMARY KEY, rechnung INTEGER NOT NULL, bezeichnung TEXT NOT NULL, menge INTEGER NOT NULL, preis INTEGER NOT NULL, mwst INTEGER NOT NULL)")
+    db = Daten
     IF dbZahl("SELECT COUNT(*) FROM kunden") = 0 THEN beispielDaten()
 END SUB
 

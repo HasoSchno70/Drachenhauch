@@ -1,0 +1,145 @@
+{
+  "datei": "rechnungen.db",
+  "tabellen": [
+    {
+      "name": "kunden",
+      "spalten": [
+        {
+          "name": "name",
+          "typ": "text",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": ""
+        },
+        {
+          "name": "strasse",
+          "typ": "text",
+          "pflicht": false,
+          "eindeutig": false,
+          "vorgabe": ""
+        },
+        {
+          "name": "plz",
+          "typ": "text",
+          "pflicht": false,
+          "eindeutig": false,
+          "vorgabe": ""
+        },
+        {
+          "name": "ort",
+          "typ": "text",
+          "pflicht": false,
+          "eindeutig": false,
+          "vorgabe": ""
+        },
+        {
+          "name": "email",
+          "typ": "text",
+          "pflicht": false,
+          "eindeutig": false,
+          "vorgabe": ""
+        }
+      ]
+    },
+    {
+      "name": "artikel",
+      "spalten": [
+        {
+          "name": "bezeichnung",
+          "typ": "text",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": ""
+        },
+        {
+          "name": "preis",
+          "typ": "geld",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": ""
+        },
+        {
+          "name": "mwst",
+          "typ": "ganz",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": ""
+        }
+      ]
+    },
+    {
+      "name": "rechnungen",
+      "spalten": [
+        {
+          "name": "nummer",
+          "typ": "text",
+          "pflicht": true,
+          "eindeutig": true,
+          "vorgabe": ""
+        },
+        {
+          "name": "kunde",
+          "typ": "ganz",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": "",
+          "verweis": "kunden"
+        },
+        {
+          "name": "datum",
+          "typ": "datum",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": ""
+        }
+      ]
+    },
+    {
+      "name": "positionen",
+      "spalten": [
+        {
+          "name": "rechnung",
+          "typ": "ganz",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": "",
+          "verweis": "rechnungen"
+        },
+        {
+          "name": "bezeichnung",
+          "typ": "text",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": ""
+        },
+        {
+          "name": "menge",
+          "typ": "ganz",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": ""
+        },
+        {
+          "name": "preis",
+          "typ": "geld",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": ""
+        },
+        {
+          "name": "mwst",
+          "typ": "ganz",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": ""
+        }
+      ]
+    }
+  ],
+  "abfragen": [
+    {
+      "name": "Belegzeilen",
+      "sql": "SELECT p.id AS id, p.rechnung AS rechnung, ROW_NUMBER() OVER (PARTITION BY p.rechnung ORDER BY p.id) AS pos, 'Rechnung ' || r.nummer AS titel, r.nummer AS nummer, r.datum AS datum, k.name AS kunde, k.strasse AS strasse, k.plz || ' ' || k.ort AS ort, p.bezeichnung AS bezeichnung, p.menge AS menge, p.preis AS preis, p.mwst AS mwst, p.mwst || ' %' AS satz, p.menge * p.preis AS netto, (p.menge * p.preis * p.mwst + 50) / 100 AS steuer, p.menge * p.preis + (p.menge * p.preis * p.mwst + 50) / 100 AS brutto FROM positionen AS p JOIN rechnungen AS r ON r.id = p.rechnung LEFT JOIN kunden AS k ON k.id = r.kunde"
+    }
+  ]
+}

@@ -580,6 +580,7 @@ FUNCTION mainCode$() AS STRING
     ARRAY_PUSH(z, "' Ohne das Studio starten: dhrt run _studio/main.dh")
     ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "studio_laufzeit.dh" + CHR$(34))
     IF hatDatenbank() THEN ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "studio_datenbanken.dh" + CHR$(34))
+    IF hatBericht() THEN ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "studio_berichte.dh" + CHR$(34))
     DIM i AS INTEGER
     FOR EACH i IN reihenfolge()
         DIM e AS Element : e = elemente[i]
@@ -605,6 +606,13 @@ SUB erzeugen()
         WRITEALL(dbp, datenbankCode$())
     ELSEIF FILEEXISTS(dbp) THEN
         DELETEFILE(dbp)
+    END IF
+    ' Die Berichte: die Auslegung und je Bericht eine Klasse.
+    DIM bep AS STRING : bep = PATHJOIN(o, "studio_berichte.dh")
+    IF hatBericht() THEN
+        WRITEALL(bep, berichteCode$())
+    ELSEIF FILEEXISTS(bep) THEN
+        DELETEFILE(bep)
     END IF
     DIM i AS INTEGER
     FOR i = 0 TO LEN(elemente) - 1
@@ -693,6 +701,8 @@ FUNCTION ganzerText$() AS STRING
     gzDazu(teile, laufzeitQuelle$(), -1, TRUE, FALSE)
     DIM dbc AS STRING : dbc = datenbankCode$()
     IF dbc <> "" THEN gzDazu(teile, dbc, -1, TRUE, FALSE)
+    DIM bec AS STRING : bec = berichteCode$()
+    IF bec <> "" THEN gzDazu(teile, bec, -1, TRUE, FALSE)
     DIM i AS INTEGER
     FOR EACH i IN reihenfolge()
         IF hatLayout(elemente[i]) THEN gzDazu(teile, basisCode$(i), i, TRUE, FALSE)

@@ -10,6 +10,7 @@
 '    Werkzeuge.dh          ein Modul: SUBs und FUNCTIONs
 '    Kunde.dh              eine Klasse
 '    Daten.dhdb            eine Datenbank: ihr Aufbau (datenbank.dh)
+'    Liste.dhreport        ein Bericht: seine Beschreibung (berichte.dh)
 '
 '  Im Speicher ist ein Element zerlegt: Methoden (SUB/FUNCTION) einzeln,
 '  alles andere (DIM, CONST, PROPERTY, Kommentare zwischen den Methoden) als
@@ -20,11 +21,11 @@
 CONST PROJEKT_DATEI = "projekt.dhstudio"
 
 CLASS Element
-    DIM art AS STRING          ' app, fenster, control, modul, klasse, datenbank
+    DIM art AS STRING          ' app, fenster, control, modul, klasse, datenbank, bericht
     DIM name AS STRING
     DIM basis AS STRING        ' EXTENDS einer Klasse (leer = keine)
     DIM layout AS STRING       ' das Layout eines Fensters als JSON-Text
-    DIM schema AS STRING       ' der Aufbau einer Datenbank als JSON-Text
+    DIM schema AS STRING       ' der Aufbau einer Datenbank, die Beschreibung eines Berichts (JSON-Text)
     DIM verlauf AS STRING      ' seine Rueckgaengig-Staende, solange es nicht vorn ist
     DIM verlaufPos AS INTEGER
     DIM dekl AS STRING         ' Zeilen ausserhalb der Methoden
@@ -85,9 +86,10 @@ FUNCTION hatLayout(e AS Element) AS BOOLEAN
 END FUNCTION
 
 ' Hat das Element Code (eine .dh)? Eine Datenbank hat keinen -- im
-' Programm ist sie eine globale Verbindung unter ihrem Namen.
+' Programm ist sie eine globale Verbindung unter ihrem Namen --, ein Bericht
+' auch nicht (eine erzeugte Klasse, ein Objekt unter seinem Namen).
 FUNCTION hatCode(e AS Element) AS BOOLEAN
-    RETURN e.art <> "datenbank"
+    RETURN e.art <> "datenbank" AND e.art <> "bericht"
 END FUNCTION
 
 ' Ist das Layout, das gerade im Entwurf steht, ein eigenes Control?
@@ -104,6 +106,7 @@ FUNCTION artText$(art AS STRING) AS STRING
         CASE "modul" : RETURN tr$("Modul")
         CASE "klasse" : RETURN tr$("Klasse")
         CASE "datenbank" : RETURN tr$("Datenbank")
+        CASE "bericht" : RETURN tr$("Bericht")
     END SELECT
     RETURN art
 END FUNCTION
@@ -116,6 +119,7 @@ FUNCTION artSymbol$(art AS STRING) AS STRING
         CASE "modul" : RETURN "datei"
         CASE "klasse" : RETURN "ordner"
         CASE "datenbank" : RETURN "raster"
+        CASE "bericht" : RETURN "drucken"
     END SELECT
     RETURN "datei"
 END FUNCTION
@@ -149,6 +153,7 @@ FUNCTION elementNeu(art AS STRING, name AS STRING) AS Element
         e.layout = JSON_STRINGIFY(d)
     END IF
     IF art = "datenbank" THEN e.schema = dbSchemaNeu$(name)
+    IF art = "bericht" THEN e.schema = berichtNeu$(name)
     ARRAY_PUSH(elemente, e)
     projGeaendert = TRUE
     RETURN e
@@ -493,6 +498,17 @@ FUNCTION projektLaden$(ordner AS STRING) AS STRING
                 e.layout = JSON_STRINGIFY(d2)
             END IF
         END IF
+        IF e.art = "bericht" THEN
+            DIM bp AS STRING : bp = PATHJOIN(ordner, berichtDatei$(e))
+            e.schema = berichtNeu$(e.name)
+            IF FILEEXISTS(bp) THEN
+                TRY
+                    e.schema = JSON_STRINGIFY(JSON_LOAD(bp))
+                CATCH bfehler
+                    RETURN trf$("{0} ist kein gültiges JSON: {1}", [berichtDatei$(e), bfehler])
+                END TRY
+            END IF
+        END IF
         IF e.art = "datenbank" THEN
             DIM sp AS STRING : sp = PATHJOIN(ordner, schemaDatei$(e))
             e.schema = dbSchemaNeu$(e.name)
@@ -526,6 +542,7 @@ FUNCTION projektJson$() AS STRING
         IF hatCode(e) THEN JSON_SET_STRING(o, "code", codeDatei$(e))
         IF hatLayout(e) THEN JSON_SET_STRING(o, "layout", layoutDatei$(e))
         IF e.art = "datenbank" THEN JSON_SET_STRING(o, "schema", schemaDatei$(e))
+        IF e.art = "bericht" THEN JSON_SET_STRING(o, "bericht", berichtDatei$(e))
         JSON_APPEND_JSON(j, "elemente", o)
     NEXT
     RETURN JSON_PRETTY(j)
@@ -542,6 +559,7 @@ SUB projektSchreiben()
     FOR EACH e IN elemente
         IF hatCode(e) THEN WRITEALL(PATHJOIN(projOrdner, codeDatei$(e)), codeSetzen$(e))
         IF e.art = "datenbank" THEN WRITEALL(PATHJOIN(projOrdner, schemaDatei$(e)), JSON_PRETTY(dbSchema(e)))
+        IF e.art = "bericht" THEN WRITEALL(PATHJOIN(projOrdner, berichtDatei$(e)), JSON_PRETTY(berichtJ(e)))
         IF hatLayout(e) THEN
             WRITEALL(PATHJOIN(projOrdner, layoutDatei$(e)), JSON_PRETTY(JSON_PARSE(e.layout)))
         END IF
@@ -551,6 +569,8 @@ SUB projektSchreiben()
             alt = PATHJOIN(projOrdner, e.gesichertAls + ".dhform")
             IF FILEEXISTS(alt) THEN DELETEFILE(alt)
             alt = PATHJOIN(projOrdner, e.gesichertAls + ".dhdb")
+            IF FILEEXISTS(alt) THEN DELETEFILE(alt)
+            alt = PATHJOIN(projOrdner, e.gesichertAls + ".dhreport")
             IF FILEEXISTS(alt) THEN DELETEFILE(alt)
         END IF
         e.gesichertAls = e.name

@@ -10,6 +10,11 @@
       "code": "App.dh"
     },
     {
+      "art": "datenbank",
+      "name": "Daten",
+      "schema": "Daten.dhdb"
+    },
+    {
       "art": "modul",
       "name": "Datenbank",
       "code": "Datenbank.dh"
@@ -47,6 +52,11 @@
       "name": "ArtikelFenster",
       "code": "ArtikelFenster.dh",
       "layout": "ArtikelFenster.dhform"
+    },
+    {
+      "art": "bericht",
+      "name": "Rechnungsbeleg",
+      "bericht": "Rechnungsbeleg.dhreport"
     }
   ]
 }

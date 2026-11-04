@@ -520,6 +520,84 @@ WHILE DB_NEXT(r)
 WEND
 ```
 
+## Reports
+
+A **report** is a printed page from the project's data, for example an
+invoice or a list (Project → Add report …). Its description is in
+`<Name>.dhreport` (JSON); how it is built and what is still to come is in the
+[design](../entwurf-berichte.md) (German). A report has **bands** one below the
+other: report header, page header, group header, detail (per row of the
+source), group footer, page footer, report footer. They hold elements in mm:
+fixed text, fields (a column of the source, also `kunde.name` through a
+reference), sums (sum, count, average, min, max per group or report), page
+number ("Seite {n} von {m}"), date, lines, rectangles and images.
+
+The **source** is a table or query of a database of the project; the
+**condition** may have parameters (`rechnung = :id`). If a band no longer fits
+on the page, it goes onto the next one, with the page footer before it and the
+page header after it.
+
+The tab of a report is its **design**: the page in millimetres, every band
+with a bar carrying its name, the elements inside.
+
+* **Placing:** at the top the bar of elements (text, field, sum, page number,
+  date, line, rectangle, image) -- choose a kind, then click into a band
+  (default size) or drag a rectangle. Esc cancels.
+* **Columns of the source** are at the top right; dragging a column into a
+  band makes a sum in a group or report footer, a heading in the page header,
+  otherwise a field (money and numbers right-aligned); an image column becomes
+  an image element. A double-click puts it into the detail.
+* **Dragging** moves what is selected (grid 1 mm, Alt without); edges and
+  centres snap to other elements and to the margins, a pink line shows it. A
+  single element may change its band. Eight handles change the size, the
+  bottom edge of a band its height.
+* **Selecting:** click, with Shift or Ctrl to add, a frame over empty space
+  selects everything it touches; a click on the bar of a band selects the
+  band, a click beside all bands the report. Arrow keys move by 1 mm (with
+  Shift 5 mm), Del deletes, Ctrl+D duplicates, Ctrl+A selects all elements,
+  Ctrl+Z/Ctrl+Y undo and redo.
+* **Properties** below belong to what is selected: for an element position
+  and size in mm, text, column, format, function of a sum and what it sums
+  over (group or report), "Only rows with" (below), font,
+  size, bold, italic, colour (`#RRGGBB`), alignment, stroke, fill, image; for
+  a band its height and for a group its column, plus "Remove band" or
+  "Remove group"; for the report title, source, condition, sorting (`a; b`),
+  paper, portrait and margins (`t; r; b; l` or one number for all), plus "Add
+  band" (what is missing) and "Add group" (inside, with header and footer).
+  Text is taken over by Enter or leaving the field, a choice applies at once;
+  with several elements selected the value applies to all it fits.
+
+**Only rows with** limits an element to rows with a value: `mwst = 19`
+(also `<>`, `<`, `>`, `<=`, `>=`; text may be in quotes, numbers are compared
+as numbers). A sum then only adds up those rows, every other element only
+appears when its band has at least one such row. That is how an invoice shows
+the tax per rate: in the report footer "MwSt 19 %" and a sum of the tax, both
+with `mwst = 19`, below it the same for 7 % -- an invoice without items at
+7 % does not show that line. What cannot be read like this, the field does not
+accept.
+
+Ctrl+wheel zooms, the wheel scrolls (with Shift sideways). **Preview …**
+typesets the report with the data of the development file, asks for the
+parameters and pages through the result.
+
+An **image element** shows a file from `bilder/` (property Bild) or, when it
+names a **column**, the image from that image column for each row -- a photo
+per article in the detail, for example. An image is fitted into the rectangle
+without distorting it; an empty cell or bytes that are not an image leave it
+empty.
+
+In the program a report is an object under its name:
+
+```text
+Rechnungsbericht.Pdf("rechnung.pdf", {"id": 5})
+Rechnungsbericht.Drucken({"id": 5})
+Rechnungsbericht.Vorschau({"id": 5})
+DIM p AS PDF : p = Rechnungsbericht.Erzeugen({"id": 5})
+```
+
+`Vorschau` shows a window with the pages, Print, "Als PDF …" and Close and
+returns when it is closed. A missing parameter is an error naming it.
+
 ## A single window
 
 A `.dhform` (the same format that `GUI_SAVE` writes and `GUI_LOAD` reads)
@@ -537,13 +615,15 @@ folder, F5.
 
 | Element | Kind | What it does |
 |---|---|---|
-| App | App | opens the database before the first window appears |
-| Datenbank | module | SQLite file `rechnungen.db`, with sample data on the first start; next invoice number |
+| App | App | fills the database on the first start, before the first window appears |
+| Daten | database | the tables in `rechnungen.db` with references, plus the query `Belegzeilen` (item number, net, tax and gross per row, address) |
+| Datenbank | module | sample data on the first start; next invoice number |
 | Ausgabe | module | date and amounts for display, CSV export |
-| Rechnung | class | an invoice with its items: load, calculate, save (one transaction), as PDF |
-| Hauptfenster | window | all invoices with a filter row, menu with shortcuts, new/edit/PDF/delete |
+| Rechnung | class | an invoice with its items: load, calculate, save (one transaction), as PDF and in the preview through the report |
+| Hauptfenster | window | all invoices with a filter row, menu with shortcuts, new/edit/PDF/preview/delete |
 | RechnungFenster | window | create or change an invoice, modal |
 | KundenFenster, ArtikelFenster | window | master data through data binding (inspector: Bindung) |
+| Rechnungsbeleg | report | the invoice from `Belegzeilen` with `rechnung = :id`: sender and address in the report header, column header on every page, net, tax per rate and total in the report footer |
 
 What it shows: money is an INTEGER in cents, the tax is rounded per item; the
 master data fields are bound to the columns, so loading and saving are one
@@ -551,8 +631,11 @@ call each (`GUI_FORM_LOAD`/`GUI_FORM_SAVE`), and `GUI_VALIDATE` checks the
 rules (required, postcode, e-mail); a double-click on an invoice opens it
 (`tabelle_Doppelklick`); unsaved input is asked about with
 `Frage(..., "Sichern|Verwerfen|Abbrechen")`, and `ZeigenModal` waits until
-the window is closed. When started from the studio, the database, PDFs and
-the CSV end up in `_studio/`.
+the window is closed. The invoice is printed by the report: `Rechnung.alsPdf`
+is one call, `Rechnungsbeleg.Pdf(pfad, {"id": Self.id})`. What has to be
+calculated, the query calculates. The database is in the project folder (the
+element Daten creates it, its tab shows the data); when started from the
+studio, PDFs and the CSV end up in `_studio/`.
 
 **A pitfall when naming:** names are not case-sensitive. A method
 `zeigen(id)` in a window overrides the inherited `Zeigen()` -- `dhrt --check`
@@ -597,4 +680,7 @@ and the studio with real clicks in the tab, the navigator and the inspector;
 `tests/pruef/werkzeug_studio_datenbank4.dhtest` tests image columns (core,
 generated window including the picture in the table cell, "Image …" and
 dragging in the studio) and `tests/pruef/werkzeug_studio_verbunde.dhtest`
-joins through references.
+joins through references; `tests/pruef/werkzeug_studio_berichte.dhtest` tests
+reports (layout with sums and pages, F5 with parameters, tab and preview),
+`tests/pruef/werkzeug_studio_berichte2.dhtest` their design (placing,
+dragging, handles, columns, properties, bands and groups, undo).

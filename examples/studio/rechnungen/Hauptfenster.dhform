@@ -180,6 +180,11 @@
           "shortcut": "Strg+P"
         },
         {
+          "label": "Vorschau",
+          "name": "miVorschau",
+          "shortcut": "Strg+Umschalt+P"
+        },
+        {
           "label": "Alle als CSV exportieren",
           "name": "miCsv"
         },

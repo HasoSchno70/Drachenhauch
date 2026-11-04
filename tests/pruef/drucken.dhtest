@@ -85,6 +85,57 @@ ueberschrift zu sehen TRUE
 rechteck gefuellt TRUE
 seite 3 TRUE
 
+=== die vorschau setzt mit der schrift des pdfs
+' Ein rechtsbuendiger Betrag (190 - PDF_TEXT_WIDTH) endet in der Vorschau an
+' derselben Stelle wie im PDF, er beginnt dort, wo die gemessene Breite es
+' sagt, und die Grundlinie liegt bei y + Schriftgroesse. Bis 2026.41 setzte
+' die Vorschau Text in raylibs Pixelschrift -- die Kanten lagen daneben.
+IMPORT "pdf"
+IMPORT "imgfx"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM p AS PDF : p = PDF_NEW()
+PDF_FONT(p, "sans", 12)
+DIM t AS STRING : t = "Summe 123456 EUR"
+DIM w AS FLOAT : w = PDF_TEXT_WIDTH(p, t)
+PDF_TEXT(p, 190 - w, 100, t)
+PDF_FONT(p, "serif-fett", 20)
+PDF_TEXT(p, 20, 150, "Titel")
+DIM b AS IMAGE : b = PDF_PREVIEW(p, 1, 840)
+DIM f AS FLOAT : f = 840 / 210
+DIM links AS INTEGER : links = 99999
+DIM rechts AS INTEGER : rechts = -1
+DIM unten AS INTEGER : unten = -1
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = INT(98 * f) TO INT(110 * f)
+    FOR x = 0 TO IMAGEWIDTH(b) - 1
+        DIM c AS INTEGER : c = GETPIXEL(b, x, y)
+        IF ((c SHR 16) BAND 255) + ((c SHR 8) BAND 255) + (c BAND 255) < 384 THEN
+            links = MIN(links, x) : rechts = MAX(rechts, x) : unten = MAX(unten, y)
+        END IF
+    NEXT
+NEXT
+DIM grund AS FLOAT : grund = (100 + 12 * 25.4 / 72) * f
+PRINT "rechte kante "; ABS(rechts - 190 * f) <= 4
+PRINT "linke kante "; ABS(links - (190 - w) * f) <= 4
+PRINT "grundlinie "; ABS(unten - grund) <= 3
+' Der Titel in Serif fett: dunkle Punkte, wo er stehen soll.
+DIM tdunkel AS INTEGER : tdunkel = 0
+FOR y = INT(150 * f) TO INT(158 * f)
+    FOR x = INT(20 * f) TO INT(45 * f)
+        IF (GETPIXEL(b, x, y) BAND 255) < 128 THEN tdunkel = tdunkel + 1
+    NEXT
+NEXT
+PRINT "titel "; tdunkel > 100
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+rechte kante TRUE
+linke kante TRUE
+grundlinie TRUE
+titel TRUE
+
 === fehler haben klare worte
 IMPORT "pdf"
 DIM p AS PDF : p = PDF_NEW()

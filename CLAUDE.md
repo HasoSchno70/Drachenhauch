@@ -3863,6 +3863,85 @@ darum ohne Profiler. Test-only: `protokoll` sammelt und schreibt je Bild
 einmal (`protokollSchreiben` vor FLIP und am Ende) -- vorher oeffnete jede
 der Tausenden Lage-Zeilen die Datei.
 
+**Berichte, Stufe 1 (2026-11-03, Entwurf `docs/entwurf-berichte.md`):**
+Element `bericht` (Beschreibung in `e.schema`, Datei `<Name>.dhreport`,
+`hatCode` FALSE). `studio/berichte_laufzeit.dh` legt aus und setzt (Prefix
+`studioB`, kein Fenster): erst alle Zeilen lesen (`studioBLesen`), dann
+auslegen (`studioBAuslegen`: Baender, Gruppen ueber Wertwechsel, Umbruch mit
+Seitenfuss/Seitenkopf), dann zeichnen -- erst danach steht m fuer "Seite n
+von m". `:parameter` setzt `studioBParameter$` als SQL-Literal ein
+(ausserhalb von Text, Gross/klein egal, fehlend = Fehler). `studio/berichte.dh`
+= Modell + erzeugter Code (`berichtSql$` mit `dbQuellSql$` und `bedarf`, also
+`kunde.name` ueber Verweise; je Bericht `CLASS StudioBericht_<Name>` mit
+`Erzeugen/Pdf/Drucken/Vorschau` und eine globale Variable unter dem Namen,
+in studio_berichte.dh unter _studio/); `studio/berichte_reiter.dh` = Reiter
+(Seite mit Baendern, gezeichnet in der Hauptschleife) und Vorschau
+(PDF_PREVIEW, ein Feld je Parameter). Die Vorschau im Programm steht in
+`laufzeit.dh` (`studioBerichtVorschau`, braucht die Bildschleife). **Falle:**
+`band` ist das Schluesselwort BAND. **Laufzeit:** `PDF_PREVIEW` setzt Text in
+der Schrift des PDFs (Schriftdaten ueber `Dokument::schrift_quelle`, je
+Schrift und Pixelgroesse ein raylib-Font in `Graphics::vorschau_schriften`)
+und Zeichen fuer Zeichen an die Stelle, die rustybuzz formt -- raylib rundet
+jeden Vorschub ab, ein rechtsbuendiger Betrag endete 12 Punkte zu frueh.
+Tests `werkzeug_studio_berichte.dhtest` (3), ein Fall in `drucken.dhtest`;
+neun Verfaelschungen fallen.
+**Stufe 2 (selber Tag): entwerfen.** Gearbeitet wird auf `r.ber.j` (JSON-
+Handle im `BerichtAnsicht` des Reiters); `berichtMerken` legt nach jedem
+fertigen Schritt den Text in `staende` (Rueckgaengig je Reiter) und in
+`e.schema`. Modell in berichte.dh (`berichtBandEinfuegen` nach
+`berichtBandSchluessel` -- Gruppenkoepfe aussen zuerst, Fuesse innen zuerst;
+`berichtGruppeDazu/Weg` mit Nachruecken; `berichtElementNeu`,
+`berichtSpalteElement`: Fuss = Summe, Seitenkopf = Ueberschrift, sonst Feld;
+`berichtSpaltenTyp$`). Jedes Band hat eine Leiste mit Namen (`BER_STRIP`)
+statt einer Namensspalte -- eine Quelle fuer Lagen ist `berBandY/Y2`,
+`berBandBeiY`, `berMmImBand`, `berElRect`. Maus in `berichtMaus` (nach
+`mausAufEntwurf`, setzt den Zeiger darueber), Spaltenzug ueber
+`berichtVorUpdate` vor GUI_UPDATE; Treffer: Griff, Element ohne Rand,
+Bandkante, Element mit 3 Punkten Rand (sonst gewann an der Kante das
+Element darueber -- vom Test gefunden). Raster 1 mm (`berRaster`),
+Ausrichtungslinien (`berEinrasten`, waagerecht gegen die ganze Seite,
+senkrecht im Band). Eigenschaften = feste Zeilen je Name
+(`BER_EIGENSCHAFTEN`), sichtbar je Auswahl (Element/Band/Bericht).
+Menue: `zurueck/vor` und Verdoppeln/Loeschen/Alles gehen bei
+`berichtVorn()` an den Bericht, `werkzeugeNachziehen` gibt sie frei.
+**Falle (zweimal):** das Feld `band` einer Klasse ist das Schluesselwort
+BAND -- `bandNr`. Und ein Feld-Literal aus Widget-Handles ist ARRAY OF
+INTEGER. Bildspalten setzt die Auslegung noch nicht (abgelehnt). Tests
+`werkzeug_studio_berichte2.dhtest` (6, Projekt aus
+`_hilfen/berichtprojekt.dh`); 15 Verfaelschungen fallen je in ihrem Fall.
+**Stufe 3 (2026-11-04): im Einsatz.** Das Beispiel
+`examples/studio/rechnungen` druckt seine Rechnung ueber den Bericht
+`Rechnungsbeleg`: das neue Datenbank-Element `Daten` (Tabellen mit
+Verweisen, Datei `rechnungen.db` im Projektordner, gitignoriert) hat die
+Abfrage `Belegzeilen` (ROW_NUMBER als Positionsnummer, Netto/Steuer/Brutto
+je Zeile -- gerechnet wird in der Abfrage), das Modul `Datenbank` setzt nur
+noch `db = Daten` und fuellt Beispieldaten, `Rechnung.alsPdf` ist
+`Rechnungsbeleg.Pdf(pfad, {"id": Self.id})` (die Rechnung muss gesichert
+sein), neu Datei -> Vorschau. Dafuer die Element-Eigenschaft **`wo`** ("Nur
+Zeilen mit", `mwst = 19`, auch `<> < > <= >=`; `studioBWoZerlegen`/
+`studioBPasst` in berichte_laufzeit.dh): eine Summe rechnet nur ueber die
+passenden Zeilen, jedes andere Element erscheint nur, wenn sein Band eine
+solche hat -- die Steuer je Satz ohne Unterbericht. Nebenfund: `anzahl` ohne
+Spalte zaehlte 0. Im Inspektor heisst "Bereich" jetzt "Summe ueber" (das
+englische "Panel" kam vom gleichnamigen gui-Schluessel). Tests ein Fall in
+`werkzeug_studio_berichte.dhtest` (vier Verfaelschungen fallen), und
+`werkzeug_studio_beispiel.dhtest` vergleicht `.dhdb`/`.dhreport` im Rundweg
+und liest die PDFs (Positionen, Steuer zu 19 und 7 %, eine Rechnung nur zu
+7 % ohne 19-%-Zeile).
+**Bildspalten (selber Tag):** ein Bild-Element mit `spalte` zeigt je Zeile
+das Bild dieser BLOB-Spalte. `studioBBildSpaltenVon(j)` sammelt die Spalten
+der Bild-Elemente, `studioBLesen` liest nur diese mit `DB_GET_BUFFER` (Wert =
+Marke "[Bild]", Puffer in `studioBPufferStelle`/`studioBPuffer`) -- vorher
+gingen alle Spalten durch DB_GET_STRING. Gesetzt ueber `IMAGE_FROM_BUFFER`
+in TRY (kaputte Bytes bleiben leer) und `studioBBildSetzen` (eingepasst und
+mittig, auch fuer Dateien aus bilder/ -- vorher verzerrt). Eine gezogene
+Bildspalte wird ein Bild-Element (`berichtSpalteElement`), `spalte` gilt im
+Inspektor auch fuer Bilder. Test "bildspalten" in
+`werkzeug_studio_berichte.dhtest` (Pixel der Vorschau: Quadrat mittig,
+breites Bild fuellt, NULL/kaputt leer); vier Verfaelschungen fallen, der
+weggenommene `imgfx`-Import im erzeugten Code ist gleichwertig (das
+Datenbank-Element importiert es schon).
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als
