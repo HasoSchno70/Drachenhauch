@@ -95,6 +95,74 @@ nur rechnung 2: 1
 Bericht: Parameter :ab fehlt
 text a = 'O''Neil' AND b = ':x' AND c = 2.5
 
+=== nur zeilen mit: summen und elemente je wert
+' Vier Positionen, drei zu 19 % und eine zu 7 %. Die Summen im Berichtsfuss
+' rechnen mit "wo" nur ueber ihre Zeilen, "anzahl" ohne Spalte zaehlt die
+' Zeilen, und ein Text mit wo, auf den keine Zeile passt (mwst = 0),
+' erscheint nicht. Mit nur 19-%-Zeilen faellt die Zeile fuer 7 % weg.
+' Was sich nicht als "spalte op wert" lesen laesst, lehnt die Zerlegung ab.
+IMPORT "kern.dh"
+projOrdner = CWD$() + "/proj"
+DIM e AS Element : e = elementNeu("datenbank", "Daten")
+e.schema = READLINES("proj/Daten.dhdb")[0]
+DIM b AS Element : b = elementNeu("bericht", "Beleg")
+b.schema = READLINES("proj/Beleg.dhreport")[0]
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DIM p AS PDF : p = studioBerichtPdf(b.schema, db, berichtSql$(b), {"r": 1})
+PDF_SAVE(p, "b.pdf")
+DIM t AS STRING : t = JOIN$(pdfSeiten("b.pdf"), CHR$(10))
+PRINT "19: "; INSTR(t, "MwSt 19 %") >= 0; " "; INSTR(t, "9,50") >= 0
+PRINT "7: "; INSTR(t, "MwSt 7 %") >= 0; " "; INSTR(t, "1,40") >= 0
+PRINT "zeilen zu 19: "; INSTR(t, "Zeilen" + CHR$(10) + "3" + CHR$(10)) >= 0
+PRINT "ohne passende zeile: "; INSTR(t, "steuerfrei") < 0
+p = studioBerichtPdf(b.schema, db, berichtSql$(b), {"r": 2})
+PDF_SAVE(p, "c.pdf")
+t = JOIN$(pdfSeiten("c.pdf"), CHR$(10))
+PRINT "nur 19: "; INSTR(t, "MwSt 19 %") >= 0; " ohne 7: "; INSTR(t, "MwSt 7 %") < 0
+DIM w AS STRING
+FOR EACH w IN ["mwst = 19", "mwst<>7", "name = 'O B'", "kunde.name >= " + CHR$(34) + "M" + CHR$(34), "mwst", "= 19", "mwst =", "mw st = 1", "mwst == 1"]
+    PRINT w; " -> "; studioBWoZerlegen(w)
+NEXT
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE pos (id INTEGER PRIMARY KEY, rechnung INTEGER, text TEXT, mwst INTEGER, steuer INTEGER)")
+DB_EXEC(db, "INSERT INTO pos (rechnung, text, mwst, steuer) VALUES (1, 'A', 19, 190), (1, 'B', 7, 140), (1, 'C', 19, 380), (1, 'D', 19, 380), (2, 'E', 19, 100)")
+DB_CLOSE(db)
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"pos","spalten":[{"name":"rechnung","typ":"ganz","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"text","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"mwst","typ":"ganz","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"steuer","typ":"geld","pflicht":false,"eindeutig":false,"vorgabe":""}]}]}
+--- datei proj/Beleg.dhreport
+{"titel":"Beleg","seite":{"format":"A4","hoch":true,"rand":[15,15,15,15]},"quelle":"Daten.pos","bedingung":"rechnung = :r","sortieren":["id"],"gruppen":[],"baender":[{"art":"detail","hoehe":6,"elemente":[{"art":"feld","spalte":"text","x":0,"y":0,"b":40,"h":5}]},{"art":"berichtsfuss","hoehe":30,"elemente":[{"art":"text","x":0,"y":0,"b":40,"h":6,"text":"MwSt 19 %","wo":"mwst = 19"},{"art":"summe","spalte":"steuer","funktion":"summe","format":"geld","x":100,"y":0,"b":40,"h":6,"ausrichtung":"rechts","wo":"mwst = 19"},{"art":"text","x":0,"y":7,"b":40,"h":6,"text":"MwSt 7 %","wo":"mwst = 7"},{"art":"summe","spalte":"steuer","funktion":"summe","format":"geld","x":100,"y":7,"b":40,"h":6,"ausrichtung":"rechts","wo":"mwst = 7"},{"art":"text","x":0,"y":14,"b":20,"h":6,"text":"Zeilen"},{"art":"summe","funktion":"anzahl","x":20,"y":14,"b":20,"h":6,"wo":"mwst = 19"},{"art":"text","x":0,"y":21,"b":40,"h":6,"text":"steuerfrei","wo":"mwst = 0"}]}]}
+--- datei kern.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "db"
+IMPORT "pdf"
+IMPORT "{sammlung}/../../studio/sprache.dh"
+IMPORT "{sammlung}/../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../studio/modell.dh"
+IMPORT "{sammlung}/../../studio/projekt.dh"
+IMPORT "{sammlung}/../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../studio/berichte_laufzeit.dh"
+IMPORT "{sammlung}/../../studio/berichte.dh"
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+--- erwartet
+19: TRUE TRUE
+7: TRUE TRUE
+zeilen zu 19: TRUE
+ohne passende zeile: TRUE
+nur 19: TRUE ohne 7: TRUE
+mwst = 19 -> TRUE
+mwst<>7 -> TRUE
+name = 'O B' -> TRUE
+kunde.name >= "M" -> TRUE
+mwst -> FALSE
+= 19 -> FALSE
+mwst = -> FALSE
+mw st = 1 -> FALSE
+mwst == 1 -> FALSE
+
 === f5 erzeugt eine klasse je bericht, pdf mit parametern
 ' Das Programm sichert Liste mit ab = 2 als PDF (nur die zweite Rechnung)
 ' und meldet einen fehlenden Parameter als Fehler; der erzeugte Code

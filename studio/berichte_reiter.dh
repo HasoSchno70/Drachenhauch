@@ -16,7 +16,7 @@
 CONST BER_PW = 270       ' Breite der Leiste rechts (Spalten, Eigenschaften)
 CONST BER_STRIP = 18     ' die Leiste ueber jedem Band mit seinem Namen (Punkte)
 CONST BER_ZEILE = 28     ' Abstand der Zeilen in den Eigenschaften
-CONST BER_EIGENSCHAFTEN = "x:zahl,y:zahl,b:zahl,h:zahl,text:text,spalte:wahl,format:wahl,funktion:wahl,bereich:wahl,schrift:wahl,groesse:zahl,fett:kasten,kursiv:kasten,farbe:text,ausrichtung:wahl,staerke:zahl,fuellung:text,bild:wahl,hoehe:zahl,gspalte:wahl,titel:text,quelle:wahl,bedingung:text,sortieren:text,papier:wahl,hoch:kasten,rand:text"
+CONST BER_EIGENSCHAFTEN = "x:zahl,y:zahl,b:zahl,h:zahl,text:text,spalte:wahl,format:wahl,funktion:wahl,bereich:wahl,wo:text,schrift:wahl,groesse:zahl,fett:kasten,kursiv:kasten,farbe:text,ausrichtung:wahl,staerke:zahl,fuellung:text,bild:wahl,hoehe:zahl,gspalte:wahl,titel:text,quelle:wahl,bedingung:text,sortieren:text,papier:wahl,hoch:kasten,rand:text"
 
 ' --- Der Reiter --------------------------------------------------------------------------
 CLASS BerichtAnsicht
@@ -161,7 +161,8 @@ FUNCTION berEigLabel$(name AS STRING) AS STRING
         CASE "spalte" : RETURN tr$("Spalte")
         CASE "format" : RETURN tr$("Format")
         CASE "funktion" : RETURN tr$("Funktion")
-        CASE "bereich" : RETURN tr$("Bereich")
+        CASE "bereich" : RETURN tr$("Summe über")
+        CASE "wo" : RETURN tr$("Nur Zeilen mit")
         CASE "schrift" : RETURN tr$("Schrift")
         CASE "groesse" : RETURN tr$("Größe (pt)")
         CASE "fett" : RETURN tr$("Fett")
@@ -490,7 +491,7 @@ END FUNCTION
 ' Gilt eine Eigenschaft fuer ein Element dieser Art?
 FUNCTION berEigGilt(name AS STRING, art AS STRING) AS BOOLEAN
     SELECT CASE name
-        CASE "x", "y", "b", "h" : RETURN TRUE
+        CASE "x", "y", "b", "h", "wo" : RETURN TRUE
         CASE "text" : RETURN art = "text" OR art = "seitenzahl"
         CASE "spalte", "format" : RETURN art = "feld" OR art = "summe"
         CASE "funktion", "bereich" : RETURN art = "summe"
@@ -727,6 +728,10 @@ FUNCTION berEigSetzen(r AS Reiter, i AS INTEGER, wert AS STRING) AS BOOLEAN
     DIM n AS STRING : n = r.ber.eigName[i]
     DIM typ AS STRING : typ = r.ber.eigTyp[i]
     IF typ = "zahl" AND NOT berZahlGut(wert) THEN RETURN FALSE
+    IF n = "wo" THEN
+        wert = TRIM$(wert)
+        IF wert <> "" AND NOT studioBWoZerlegen(wert) THEN RETURN FALSE
+    END IF
     IF (n = "farbe" OR n = "fuellung") AND wert <> "" THEN
         DIM hx AS STRING : hx = IIF(LEFT$(TRIM$(wert), 1) = "#", MID$(TRIM$(wert), 1), TRIM$(wert))
         IF NOT REGEX_TEST(hx, "^([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$") THEN RETURN FALSE

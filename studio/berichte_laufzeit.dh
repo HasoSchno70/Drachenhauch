@@ -134,15 +134,84 @@ FUNCTION studioBFormat$(roh AS STRING, format AS STRING) AS STRING
     RETURN roh
 END FUNCTION
 
-' Eine Summe ueber die Zeilen von..bis: summe, anzahl, mittel, min, max.
+' --- Nur Zeilen mit ... -------------------------------------------------------------
+' Eine Einschraenkung "spalte = wert" (auch <>, <, >, <= und >=; der Wert
+' darf in Anfuehrungszeichen stehen). Zerlegt nach studioBWoSp/Op/Wert;
+' FALSE, wenn es keine solche Form ist.
+DIM studioBWoSp AS STRING
+DIM studioBWoOp AS STRING
+DIM studioBWoWert AS STRING
+FUNCTION studioBWoZerlegen(wo AS STRING) AS BOOLEAN
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(wo) AND INSTR("<>=", MID$(wo, i, 1)) < 0
+        i = i + 1
+    WEND
+    IF i >= LEN(wo) THEN RETURN FALSE
+    DIM op AS STRING : op = MID$(wo, i, 1)
+    DIM zwei AS STRING : zwei = MID$(wo, i, 2)
+    IF zwei = "<=" OR zwei = ">=" OR zwei = "<>" THEN op = zwei
+    studioBWoSp = LOWER$(TRIM$(LEFT$(wo, i)))
+    studioBWoOp = op
+    studioBWoWert = TRIM$(MID$(wo, i + LEN(op)))
+    IF LEN(studioBWoWert) >= 2 THEN
+        DIM a AS STRING : a = LEFT$(studioBWoWert, 1)
+        IF (a = "'" OR a = CHR$(34)) AND RIGHT$(studioBWoWert, 1) = a THEN studioBWoWert = MID$(studioBWoWert, 1, LEN(studioBWoWert) - 2)
+    END IF
+    IF NOT REGEX_TEST(studioBWoSp, "^[a-z0-9_.]+$") THEN RETURN FALSE
+    RETURN studioBWoWert <> "" AND INSTR("<>=", LEFT$(studioBWoWert, 1)) < 0
+END FUNCTION
+
+FUNCTION studioBIstZahl(t AS STRING) AS BOOLEAN
+    RETURN REGEX_TEST(t, "^-?[0-9]+(\.[0-9]+)?$")
+END FUNCTION
+
+' Trifft die zuletzt zerlegte Einschraenkung auf diese Zeile zu? Eine
+' unbekannte Spalte und ein leerer Wert treffen nie.
+FUNCTION studioBWoTrifft(zeile AS INTEGER) AS BOOLEAN
+    DIM sp AS INTEGER : sp = studioBSpalte(studioBWoSp)
+    IF sp < 0 OR studioBIstNull(zeile, sp) THEN RETURN FALSE
+    DIM w AS STRING : w = studioBWert$(zeile, sp)
+    DIM c AS INTEGER
+    IF studioBIstZahl(w) AND studioBIstZahl(studioBWoWert) THEN
+        DIM d AS FLOAT : d = VAL(w) - VAL(studioBWoWert)
+        c = IIF(d < 0.0, -1, IIF(d > 0.0, 1, 0))
+    ELSE
+        c = IIF(w < studioBWoWert, -1, IIF(w > studioBWoWert, 1, 0))
+    END IF
+    SELECT CASE studioBWoOp
+        CASE "=" : RETURN c = 0
+        CASE "<>" : RETURN c <> 0
+        CASE "<" : RETURN c < 0
+        CASE ">" : RETURN c > 0
+        CASE "<=" : RETURN c <= 0
+        CASE ">=" : RETURN c >= 0
+    END SELECT
+    RETURN FALSE
+END FUNCTION
+
+' Gilt die Einschraenkung wo fuer die Zeile? Leer gilt immer, eine, die sich
+' nicht lesen laesst, nie.
+FUNCTION studioBPasst(zeile AS INTEGER, wo AS STRING) AS BOOLEAN
+    IF wo = "" THEN RETURN TRUE
+    IF NOT studioBWoZerlegen(wo) THEN RETURN FALSE
+    RETURN studioBWoTrifft(zeile)
+END FUNCTION
+
+' Eine Summe ueber die Zeilen von..bis: summe, anzahl, mittel, min, max --
+' mit wo nur ueber die Zeilen, auf die es zutrifft.
 ' Gerechnet wird mit dem gespeicherten Wert (Geld also in Cent).
-FUNCTION studioBSumme$(spalte AS INTEGER, funktion AS STRING, von AS INTEGER, bis AS INTEGER) AS STRING
+FUNCTION studioBSumme$(spalte AS INTEGER, funktion AS STRING, von AS INTEGER, bis AS INTEGER, wo AS STRING = "") AS STRING
     DIM n AS INTEGER : n = 0
     DIM s AS FLOAT : s = 0.0
     DIM lo AS FLOAT : lo = 0.0
     DIM hi AS FLOAT : hi = 0.0
     DIM z AS INTEGER
     FOR z = von TO bis
+        IF NOT studioBPasst(z, wo) THEN CONTINUE
+        IF funktion = "anzahl" AND spalte < 0 THEN
+            n = n + 1
+            CONTINUE
+        END IF
         IF studioBIstNull(z, spalte) THEN CONTINUE
         DIM v AS FLOAT : v = VAL(studioBWert$(z, spalte))
         IF n = 0 THEN lo = v : hi = v
@@ -387,6 +456,20 @@ SUB studioBElement(pdf AS PDF, j AS JSON_HANDLE, p AS STRING, ox AS FLOAT, oy AS
     DIM y AS FLOAT : y = oy + studioBZahl(j, p, "y", 0.0)
     DIM b AS FLOAT : b = studioBZahl(j, p, "b", 0.0)
     DIM h AS FLOAT : h = studioBZahl(j, p, "h", 0.0)
+    ' "Nur Zeilen mit ...": eine Summe rechnet nur ueber sie, jedes andere
+    ' Element erscheint nur, wenn das Band mindestens eine solche Zeile hat.
+    DIM wo AS STRING : wo = TRIM$(studioBText$(j, p, "wo", ""))
+    IF wo <> "" AND art <> "summe" THEN
+        DIM da AS BOOLEAN : da = FALSE
+        DIM zw AS INTEGER
+        FOR zw = von TO bis
+            IF studioBPasst(zw, wo) THEN
+                da = TRUE
+                BREAK
+            END IF
+        NEXT
+        IF NOT da THEN RETURN
+    END IF
     SELECT CASE art
         CASE "text"
             studioBTextSetzen(pdf, j, p, studioBText$(j, p, "text", ""), x, y, b)
@@ -397,7 +480,7 @@ SUB studioBElement(pdf AS PDF, j AS JSON_HANDLE, p AS STRING, ox AS FLOAT, oy AS
             DIM ss AS INTEGER : ss = studioBSpalte(studioBText$(j, p, "spalte", ""))
             DIM fn AS STRING : fn = studioBText$(j, p, "funktion", "summe")
             DIM roh AS STRING : roh = ""
-            IF ss >= 0 OR fn = "anzahl" THEN roh = studioBSumme$(ss, fn, von, bis)
+            IF ss >= 0 OR fn = "anzahl" THEN roh = studioBSumme$(ss, fn, von, bis, wo)
             DIM fm AS STRING : fm = studioBText$(j, p, "format", "text")
             IF fn = "anzahl" THEN fm = "ganz"
             IF fm = "geld" AND fn = "mittel" THEN roh = STR$(ROUND(VAL(roh)))

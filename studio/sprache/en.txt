@@ -671,3 +671,5 @@ Eigenschaften des Berichts	Properties of the report
 Spalten gehören in ein Band der Seite.	Columns belong in a band of the page.
 Elemente gehören in ein Band.	Elements belong in a band.
 Bildspalten zeigt ein Bericht noch nicht.	A report does not show image columns yet.
+Nur Zeilen mit	Only rows with
+Summe über	Sum over
