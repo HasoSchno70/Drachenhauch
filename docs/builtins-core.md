@@ -1172,6 +1172,7 @@ geklappt hat.
 | `CWD$()` → STRING | aktuelles Arbeitsverzeichnis |
 | `CHDIR(pfad$)` | Arbeitsverzeichnis wechseln |
 | `EXEPATH$()` → STRING | Pfad der laufenden Programmdatei |
+| `MODULE_AVAILABLE(modul$)` → BOOLEAN | ist das Modul in diesem Bau dabei? (Hardware-Module fehlen ohne `--hardware`) |
 | `EXIT([code])` | sofort beenden, `code` = Rückgabewert (0..255, Vorgabe 0) |
 | `EPRINT(text)` | Zeile nach **stderr** statt stdout |
 | `SHELL(programm$, ...)` → INTEGER | Programm starten, warten, Rückgabewert |
