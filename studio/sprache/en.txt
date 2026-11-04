@@ -670,6 +670,5 @@ Eigenschaften des Berichts	Properties of the report
 {0}: in ein Band klicken oder ein Rechteck ziehen.	{0}: click into a band or drag a rectangle.
 Spalten gehören in ein Band der Seite.	Columns belong in a band of the page.
 Elemente gehören in ein Band.	Elements belong in a band.
-Bildspalten zeigt ein Bericht noch nicht.	A report does not show image columns yet.
 Nur Zeilen mit	Only rows with
 Summe über	Sum over

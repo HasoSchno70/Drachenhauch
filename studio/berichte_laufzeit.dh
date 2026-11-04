@@ -29,6 +29,12 @@ DIM studioBLBis AS ARRAY OF INTEGER : studioBLBis = []
 DIM studioBSeiten AS INTEGER : studioBSeiten = 0
 ' Wo Bilder liegen (im Studio der Ordner bilder/ des Projekts).
 DIM studioBBilder AS STRING : studioBBilder = "assets/bilder"
+' Bildspalten: die Spalten, die ein Bild-Element nennt, liest studioBLesen
+' als Bytes statt als Text. Je Zelle mit Bild ihre Stelle in studioBWerte
+' und der Puffer.
+DIM studioBBildSpalten AS ARRAY OF STRING : studioBBildSpalten = []
+DIM studioBPufferStelle AS ARRAY OF INTEGER : studioBPufferStelle = []
+DIM studioBPuffer AS ARRAY OF BUFFER : studioBPuffer = []
 
 ' --- Parameter ----------------------------------------------------------------------
 ' Jedes :name ausserhalb von Text in '...' wird durch den Wert aus `werte`
@@ -81,16 +87,26 @@ END FUNCTION
 ' --- Lesen --------------------------------------------------------------------------
 SUB studioBLesen(db AS DB_CONN, sql AS STRING)
     studioBSpalten = [] : studioBWerte = [] : studioBNull = [] : studioBZeilen = 0
+    studioBPufferStelle = [] : studioBPuffer = []
     DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
     DIM i AS INTEGER
+    DIM alsBild AS ARRAY OF BOOLEAN : alsBild = []
     FOR i = 0 TO DB_COL_COUNT(r) - 1
         ARRAY_PUSH(studioBSpalten, LOWER$(DB_COL_NAME(r, i)))
+        ARRAY_PUSH(alsBild, ARRAY_INDEXOF(studioBBildSpalten, LOWER$(DB_COL_NAME(r, i))) >= 0)
     NEXT
     WHILE DB_NEXT(r)
         FOR i = 0 TO LEN(studioBSpalten) - 1
             DIM leer AS BOOLEAN : leer = DB_IS_NULL(r, i)
             ARRAY_PUSH(studioBNull, leer)
-            ARRAY_PUSH(studioBWerte, IIF(leer, "", DB_GET_STRING(r, i)))
+            IF alsBild[i] AND NOT leer THEN
+                ' Der Wert ist nur eine Marke; das Bild liegt als Puffer daneben.
+                ARRAY_PUSH(studioBPufferStelle, LEN(studioBWerte))
+                ARRAY_PUSH(studioBPuffer, DB_GET_BUFFER(r, i))
+                ARRAY_PUSH(studioBWerte, "[Bild]")
+            ELSE
+                ARRAY_PUSH(studioBWerte, IIF(leer, "", DB_GET_STRING(r, i)))
+            END IF
         NEXT
         studioBZeilen = studioBZeilen + 1
     WEND
@@ -104,6 +120,50 @@ FUNCTION studioBWert$(zeile AS INTEGER, spalte AS INTEGER) AS STRING
     IF zeile < 0 OR zeile >= studioBZeilen OR spalte < 0 THEN RETURN ""
     RETURN studioBWerte[zeile * LEN(studioBSpalten) + spalte]
 END FUNCTION
+
+' Das Bild einer Zelle (leerer Puffer: keins).
+FUNCTION studioBBildPuffer(zeile AS INTEGER, spalte AS INTEGER) AS BUFFER
+    DIM leer AS BUFFER : leer = BUFFER_NEW(0)
+    IF zeile < 0 OR zeile >= studioBZeilen OR spalte < 0 THEN RETURN leer
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(studioBPufferStelle, zeile * LEN(studioBSpalten) + spalte)
+    IF k < 0 THEN RETURN leer
+    RETURN studioBPuffer[k]
+END FUNCTION
+
+' Die Bildspalten einer Beschreibung: was die Bild-Elemente unter "spalte" nennen.
+FUNCTION studioBBildSpaltenVon(j AS JSON_HANDLE) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    IF NOT JSON_HAS(j, "baender") THEN RETURN aus
+    DIM b AS INTEGER
+    FOR b = 0 TO JSON_LEN(j, "baender") - 1
+        DIM bp AS STRING : bp = "baender." + STR$(b) + ".elemente"
+        IF NOT JSON_HAS(j, bp) THEN CONTINUE
+        DIM k AS INTEGER
+        FOR k = 0 TO JSON_LEN(j, bp) - 1
+            DIM p AS STRING : p = bp + "." + STR$(k)
+            IF studioBText$(j, p, "art", "") <> "bild" THEN CONTINUE
+            DIM s AS STRING : s = LOWER$(TRIM$(studioBText$(j, p, "spalte", "")))
+            IF s <> "" AND ARRAY_INDEXOF(aus, s) < 0 THEN ARRAY_PUSH(aus, s)
+        NEXT
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Ein Bild ins Rechteck x, y, b, h einpassen: so gross wie moeglich, ohne es
+' zu verzerren, in der Mitte. Ohne Hoehe bestimmt die Breite.
+SUB studioBBildSetzen(pdf AS PDF, bild AS IMAGE, x AS FLOAT, y AS FLOAT, b AS FLOAT, h AS FLOAT)
+    DIM bw AS FLOAT : bw = IMAGE_WIDTH(bild)
+    DIM bh AS FLOAT : bh = IMAGE_HEIGHT(bild)
+    IF bw <= 0.0 OR bh <= 0.0 OR b <= 0.0 THEN RETURN
+    IF h <= 0.0 THEN
+        PDF_IMAGE(pdf, bild, x, y, b, b * bh / bw)
+        RETURN
+    END IF
+    DIM m AS FLOAT : m = MIN(b / bw, h / bh)
+    DIM w AS FLOAT : w = bw * m
+    DIM hh AS FLOAT : hh = bh * m
+    PDF_IMAGE(pdf, bild, x + (b - w) / 2.0, y + (h - hh) / 2.0, w, hh)
+END SUB
 
 FUNCTION studioBIstNull(zeile AS INTEGER, spalte AS INTEGER) AS BOOLEAN
     IF zeile < 0 OR zeile >= studioBZeilen OR spalte < 0 THEN RETURN TRUE
@@ -505,12 +565,27 @@ SUB studioBElement(pdf AS PDF, j AS JSON_HANDLE, p AS STRING, ox AS FLOAT, oy AS
                 PDF_RECT(pdf, x, y, b, h)
             END IF
         CASE "bild"
-            DIM datei AS STRING : datei = studioBText$(j, p, "bild", "")
-            IF datei <> "" THEN
-                DIM pfad AS STRING : pfad = PATHJOIN(studioBBilder, datei)
-                IF FILEEXISTS(pfad) THEN
-                    DIM bild AS IMAGE : bild = LOADIMAGE(pfad)
-                    PDF_IMAGE(pdf, bild, x, y, b, h)
+            ' Aus einer Bildspalte (je Zeile ein anderes) oder eine Datei aus
+            ' bilder/. Was sich nicht als Bild lesen laesst, bleibt leer.
+            DIM bsp AS STRING : bsp = TRIM$(studioBText$(j, p, "spalte", ""))
+            IF bsp <> "" THEN
+                DIM puf AS BUFFER : puf = studioBBildPuffer(zeile, studioBSpalte(bsp))
+                IF BUFFER_LEN(puf) > 0 THEN
+                    TRY
+                        DIM zb AS IMAGE : zb = IMAGE_FROM_BUFFER(puf)
+                        studioBBildSetzen(pdf, zb, x, y, b, h)
+                        IMAGE_FREE(zb)
+                    CATCH bildfehler
+                    END TRY
+                END IF
+            ELSE
+                DIM datei AS STRING : datei = studioBText$(j, p, "bild", "")
+                IF datei <> "" THEN
+                    DIM pfad AS STRING : pfad = PATHJOIN(studioBBilder, datei)
+                    IF FILEEXISTS(pfad) THEN
+                        DIM bild AS IMAGE : bild = LOADIMAGE(pfad)
+                        studioBBildSetzen(pdf, bild, x, y, b, h)
+                    END IF
                 END IF
             END IF
     END SELECT
@@ -520,10 +595,12 @@ END SUB
 ' mit :parametern und ihre Werte -- das Ergebnis ist ein PDF-Handle.
 FUNCTION studioBerichtPdf(beschreibung AS STRING, db AS DB_CONN, sql AS STRING, werte AS MAP OF ANY) AS PDF
     DIM j AS JSON_HANDLE : j = JSON_PARSE(beschreibung)
+    studioBBildSpalten = studioBBildSpaltenVon(j)
     IF sql <> "" THEN
         studioBLesen(db, studioBParameter$(sql, werte))
     ELSE
         studioBSpalten = [] : studioBWerte = [] : studioBNull = [] : studioBZeilen = 0
+        studioBPufferStelle = [] : studioBPuffer = []
     END IF
     studioBAuslegen(j)
     DIM format AS STRING : format = "a4"

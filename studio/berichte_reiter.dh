@@ -493,7 +493,8 @@ FUNCTION berEigGilt(name AS STRING, art AS STRING) AS BOOLEAN
     SELECT CASE name
         CASE "x", "y", "b", "h", "wo" : RETURN TRUE
         CASE "text" : RETURN art = "text" OR art = "seitenzahl"
-        CASE "spalte", "format" : RETURN art = "feld" OR art = "summe"
+        CASE "spalte" : RETURN art = "feld" OR art = "summe" OR art = "bild"
+        CASE "format" : RETURN art = "feld" OR art = "summe"
         CASE "funktion", "bereich" : RETURN art = "summe"
         CASE "schrift", "groesse", "fett", "kursiv", "ausrichtung" : RETURN berIstTextArt(art)
         CASE "farbe" : RETURN berIstTextArt(art) OR art = "linie" OR art = "rechteck"
@@ -1481,10 +1482,6 @@ SUB berSpalteAblegen(r AS Reiter, spalte AS STRING, mx AS INTEGER, my AS INTEGER
         status(tr$("Spalten gehören in ein Band der Seite."))
         RETURN
     END IF
-    IF berichtSpaltenTyp$(j, spalte) = "bild" THEN
-        status(tr$("Bildspalten zeigt ein Bericht noch nicht."))
-        RETURN
-    END IF
     DIM t AS JSON_HANDLE : t = berichtSpalteElement(j, b, spalte, MAX(0.0, berRaster(berMmX(mx))), MAX(0.0, berRaster(berMmImBand(j, b, my))))
     DIM k AS INTEGER : k = berElemente(j, b)
     JSON_APPEND_JSON(j, "baender." + STR$(b) + ".elemente", t)
@@ -1499,10 +1496,6 @@ SUB berSpalteInsDetail(r AS Reiter, spalte AS STRING)
     DIM j AS JSON_HANDLE : j = r.ber.j
     DIM b AS INTEGER : b = studioBBand(j, "detail", 0)
     IF b < 0 THEN RETURN
-    IF berichtSpaltenTyp$(j, spalte) = "bild" THEN
-        status(tr$("Bildspalten zeigt ein Bericht noch nicht."))
-        RETURN
-    END IF
     DIM x AS FLOAT : x = 0.0
     DIM k AS INTEGER
     FOR k = 0 TO berElemente(j, b) - 1
@@ -1679,6 +1672,7 @@ SUB berichtElementZeichnen(j AS JSON_HANDLE, p AS STRING, ox AS FLOAT, oy AS INT
         CASE "bild"
             RECT(x1, y1, x2, y2, RGB(120, 140, 180))
             DIM bn AS STRING : bn = berichtText$(j, p + ".bild")
+            IF berichtText$(j, p + ".spalte") <> "" THEN bn = "[" + berichtText$(j, p + ".spalte") + "]"
             TEXT(x1 + 3, y1 + 2, IIF(bn = "", tr$("Bild"), bn), RGB(120, 140, 180))
             RETURN
     END SELECT

@@ -244,6 +244,10 @@ FUNCTION berichtSpalteElement(j AS JSON_HANDLE, b AS INTEGER, spalte AS STRING, 
         ELSE
             JSON_SET_FLOAT(t, "b", 40.0)
         END IF
+    ELSEIF typ = "bild" THEN
+        ' Eine Bildspalte wird ein Bild-Element, das je Zeile ihr Bild zeigt.
+        t = berichtElementNeu("bild", x, y, "", "")
+        JSON_SET_STRING(t, "spalte", spalte)
     ELSEIF art = "gruppenfuss" OR art = "berichtsfuss" THEN
         t = berichtElementNeu("summe", x, y, spalte, typ)
         IF art = "berichtsfuss" THEN JSON_SET_STRING(t, "bereich", "bericht")
@@ -396,6 +400,7 @@ FUNCTION berichteCode$() AS STRING
     ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "db" + CHR$(34))
     ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "pdf" + CHR$(34))
     ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "regex" + CHR$(34))
+    ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "imgfx" + CHR$(34))
     ARRAY_PUSH(z, berichtLaufzeit$())
     ARRAY_PUSH(z, "DIM studioBKeineDb AS DB_CONN")
     DIM e AS Element

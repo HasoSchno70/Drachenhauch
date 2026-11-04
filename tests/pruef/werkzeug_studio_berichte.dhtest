@@ -163,6 +163,86 @@ mwst = -> FALSE
 mw st = 1 -> FALSE
 mwst == 1 -> FALSE
 
+=== bildspalten: je zeile ihr bild, eingepasst
+' Vier Artikel: ein rotes Quadrat, ein blaues Bild doppelt so breit wie hoch,
+' einer ohne Bild (NULL) und einer mit Bytes, die kein Bild sind. Das
+' Bild-Element (20 x 10 mm) nennt die Bildspalte: das Quadrat steht 10 mm
+' breit in der Mitte, das blaue fuellt das Rechteck, die beiden anderen
+' Zeilen bleiben leer, und nichts bricht ab. Eine Bildspalte, ins Detail
+' gelegt, wird ein Bild-Element mit dieser Spalte.
+IMPORT "kern.dh"
+projOrdner = CWD$() + "/proj"
+DIM e AS Element : e = elementNeu("datenbank", "Daten")
+e.schema = READLINES("proj/Daten.dhdb")[0]
+DIM b AS Element : b = elementNeu("bericht", "Bilder")
+b.schema = READLINES("proj/Bilder.dhreport")[0]
+PRINT "bildspalten "; JOIN$(studioBBildSpaltenVon(JSON_PARSE(b.schema)), ",")
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+SCREEN(200, 100, "Bildspalten")
+DIM p AS PDF : p = studioBerichtPdf(b.schema, db, berichtSql$(b), {})
+PRINT "puffer "; LEN(studioBPuffer); " zeilen "; studioBZeilen
+PDF_SAVE(p, "b.pdf")
+PRINT "namen "; INSTR(JOIN$(pdfSeiten("b.pdf"), " "), "Kaputt") >= 0
+DIM v AS IMAGE : v = PDF_PREVIEW(p, 1, 900)
+DIM s AS FLOAT : s = 900.0 / 210.0
+FUNCTION farbe$(bild AS IMAGE, xmm AS FLOAT, ymm AS FLOAT, s AS FLOAT) AS STRING
+    DIM c AS INTEGER : c = GETPIXEL(bild, INT(xmm * s), INT(ymm * s))
+    DIM r AS INTEGER : r = (c SHR 16) BAND 255
+    DIM g AS INTEGER : g = (c SHR 8) BAND 255
+    DIM bl AS INTEGER : bl = c BAND 255
+    IF r > 200 AND g < 80 AND bl < 80 THEN RETURN "rot"
+    IF bl > 200 AND r < 80 AND g < 80 THEN RETURN "blau"
+    IF r > 230 AND g > 230 AND bl > 230 THEN RETURN "weiss"
+    RETURN "anders"
+END FUNCTION
+PRINT "quadrat mitte "; farbe$(v, 75.0, 20.0, s); " links frei "; farbe$(v, 67.0, 20.0, s); " rechts frei "; farbe$(v, 83.0, 20.0, s)
+PRINT "breit links "; farbe$(v, 66.0, 32.0, s); " rechts "; farbe$(v, 84.0, 32.0, s)
+PRINT "ohne bild "; farbe$(v, 75.0, 44.0, s); " kaputt "; farbe$(v, 75.0, 56.0, s)
+DIM bj AS JSON_HANDLE : bj = berichtJ(b)
+DIM t AS JSON_HANDLE : t = berichtSpalteElement(bj, studioBBand(bj, "detail", 0), "foto", 0.0, 0.0)
+PRINT "abgelegt "; berichtText$(t, "art"); " "; berichtText$(t, "spalte")
+--- vorher
+IMPORT "db"
+IMPORT "imgfx"
+DIM rot AS IMAGE : rot = IMAGE_NEW(40, 40, RGB(230, 20, 20))
+IMAGE_SAVE(rot, "rot.png")
+DIM blau AS IMAGE : blau = IMAGE_NEW(40, 20, RGB(20, 20, 230))
+IMAGE_SAVE(blau, "blau.png")
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE artikel (id INTEGER PRIMARY KEY, name TEXT, foto BLOB)")
+DB_EXEC(db, "INSERT INTO artikel (name, foto) VALUES (?, ?)", "Rot", READALL_BYTES("rot.png"))
+DB_EXEC(db, "INSERT INTO artikel (name, foto) VALUES (?, ?)", "Blau", READALL_BYTES("blau.png"))
+DB_EXEC(db, "INSERT INTO artikel (name) VALUES ('Ohne')")
+DIM kaputt AS BUFFER : kaputt = BUFFER_NEW(3)
+DB_EXEC(db, "INSERT INTO artikel (name, foto) VALUES (?, ?)", "Kaputt", kaputt)
+DB_CLOSE(db)
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"artikel","spalten":[{"name":"name","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"foto","typ":"bild","pflicht":false,"eindeutig":false,"vorgabe":""}]}]}
+--- datei proj/Bilder.dhreport
+{"titel":"Bilder","seite":{"format":"A4","hoch":true,"rand":[15,15,15,15]},"quelle":"Daten.artikel","bedingung":"","sortieren":["id"],"gruppen":[],"baender":[{"art":"detail","hoehe":12,"elemente":[{"art":"feld","spalte":"name","x":0,"y":0,"b":40,"h":5},{"art":"bild","spalte":"foto","x":50,"y":0,"b":20,"h":10}]}]}
+--- datei kern.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "db"
+IMPORT "pdf"
+IMPORT "{sammlung}/../../studio/sprache.dh"
+IMPORT "{sammlung}/../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../studio/modell.dh"
+IMPORT "{sammlung}/../../studio/projekt.dh"
+IMPORT "{sammlung}/../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../studio/berichte_laufzeit.dh"
+IMPORT "{sammlung}/../../studio/berichte.dh"
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+--- erwartet
+bildspalten foto
+puffer 3 zeilen 4
+namen TRUE
+quadrat mitte rot links frei weiss rechts frei weiss
+breit links blau rechts blau
+ohne bild weiss kaputt weiss
+abgelegt bild foto
+
 === f5 erzeugt eine klasse je bericht, pdf mit parametern
 ' Das Programm sichert Liste mit ab = 2 als PDF (nur die zweite Rechnung)
 ' und meldet einen fehlenden Parameter als Fehler; der erzeugte Code
