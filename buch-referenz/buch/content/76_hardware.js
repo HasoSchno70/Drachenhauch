@@ -95,8 +95,8 @@ module.exports = (H) => [
 
   H.h2("firmata – Arduino-Pins direkt steuern"),
   H.p("Mit dem serial-Modul redest du über ein selbst ausgedachtes Textprotokoll mit dem Mikrocontroller – du musst also auf beiden Seiten programmieren. Firmata dreht das um: Du lädst EINMAL den fertigen Sketch StandardFirmata auf das Board (in der Arduino-IDE unter Datei → Beispiele → Firmata), und danach steuerst du die Pins direkt aus Drachenhauch. Kein eigener Sketch, kein Protokoll-Basteln."),
-  H.cmd("FIRMATA_PORTS · FIRMATA_OPEN · FIRMATA_IS_OPEN · FIRMATA_CLOSE", 'FIRMATA_PORTS()   FIRMATA_OPEN(port$, baud)   FIRMATA_IS_OPEN(h)   FIRMATA_CLOSE(h)',
-    "FIRMATA_PORTS listet die verfügbaren seriellen Anschlüsse (dieselben wie SERIAL_PORTS). StandardFirmata läuft üblicherweise mit 57600 Baud.",
+  H.cmd("FIRMATA_PORTS · FIRMATA_OPEN · FIRMATA_IS_OPEN · FIRMATA_CLOSE", 'FIRMATA_PORTS()   FIRMATA_OPEN(ziel$ [, baud])   FIRMATA_IS_OPEN(h)   FIRMATA_CLOSE(h)',
+    "FIRMATA_PORTS listet die verfügbaren seriellen Anschlüsse (dieselben wie SERIAL_PORTS). FIRMATA_OPEN nimmt einen davon oder ein Netzziel tcp:host:port (StandardFirmataWiFi, Port 3030); die Baudrate gilt nur seriell, StandardFirmata läuft üblicherweise mit 57600 Baud.",
     [
       'IMPORT "firmata"',
       'PRINT FIRMATA_PORTS()',
@@ -144,7 +144,7 @@ module.exports = (H) => [
       'm = MQTT_CONNECT("192.168.1.50", 1883, "drachenhauch-spiel")',
       'IF NOT MQTT_IS_CONNECTED(m) THEN PRINT "Broker nicht erreichbar"',
     ]),
-  H.cmd("MQTT_PUBLISH · MQTT_SUBSCRIBE", 'MQTT_PUBLISH(h, topic$, inhalt$[, behalten]) AS BOOLEAN   MQTT_SUBSCRIBE(h, topic$) AS BOOLEAN',
+  H.cmd("MQTT_PUBLISH · MQTT_SUBSCRIBE", 'MQTT_PUBLISH(h, topic$, inhalt$[, behalten[, qos]]) AS BOOLEAN   MQTT_SUBSCRIBE(h, topic$[, qos]) AS BOOLEAN',
     "PUBLISH schickt eine Nachricht an ein Thema; mit behalten = TRUE merkt der Broker sie sich für später hinzukommende Empfänger. SUBSCRIBE abonniert ein Thema – Platzhalter sind erlaubt (+ für eine Ebene, # für alle darunter). Beide liefern FALSE, wenn die Verbindung weg ist – das ist ein Zustand, kein Fehler: MQTT_IS_CONNECTED sagt dann FALSE, und das Programm verbindet neu.",
     [
       'MQTT_PUBLISH(m, "spiel/punkte", STR$(punkte))',
