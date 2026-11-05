@@ -1207,7 +1207,7 @@ zurueckspringen, kaputte Datei ist ein Fehler).
 | `html` | HTTP-GET/POST/DOWNLOAD + HTML-Parsing (pure stdlib). `HTTP_GET/POST/DOWNLOAD`, `HTTP_STATUS/HEADER`, `URL_ENCODE/DECODE`, `HTML_TEXT`, `HTML_FIND_ALL`. | — |
 | `bt` | Bluetooth Low Energy (BLE) via `bleak`. Scan, Connect, Service/Characteristic-Listing, Read/Write/Notify auf Characteristics. Externer Dep, IoT/Sensor-Targets. | `BT_HANDLE` |
 | `serial` | RS-232 / USB-COM nativ ueber die Rust-Crate `serialport` (kein `pyserial` noetig). `SERIAL_OPEN/READ/WRITE/READLINE/AVAILABLE/FLUSH/TIMEOUT`. | `SERIAL_HANDLE` |
-| `firmata` | Direkte Arduino/ESP32-**Pin-Steuerung** ueber StandardFirmata (kein eigener Sketch/Text-Protokoll noetig -- einmalig StandardFirmata hochladen). Baut auf derselben `serialport`-Crate wie `serial` auf (Feature `serial`, keine neue Abhaengigkeit). `FIRMATA_PORTS/OPEN/CLOSE/IS_OPEN`, `FIRMATA_PIN_MODE`, `FIRMATA_DIGITAL_WRITE/READ`, `FIRMATA_ANALOG_WRITE/READ`, `FIRMATA_UPDATE` (Pro-Frame-Polling wie `INPUT_UPDATE`/`TIMER_UPDATE`). Nur Pin-I/O -- kein I2C/Servo/OneWire/Stepper/Encoder. **Zwei Nummerierungen** (echte Protokoll-Eigenheit): Schreiben nimmt die rohe digitale Pin-Nummer, `FIRMATA_ANALOG_READ` nimmt den Analog-**Kanal** (A0=0, A1=1, ...) -- nicht dieselbe Zahl fuer denselben physischen Pin. Doku `docs/module-firmata.md`, Demo `examples/147_firmata.dh`. | `FIRMATA_HANDLE` |
+| `firmata` | Direkte Arduino/ESP32-**Pin-Steuerung** ueber StandardFirmata (kein eigener Sketch/Text-Protokoll noetig -- einmalig StandardFirmata hochladen). Leitung seriell (Feature `serial`) ODER `tcp:host:port` (StandardFirmataWiFi, Port 3030) -- darum in JEDEM Bau. `FIRMATA_PORTS/OPEN/CLOSE/IS_OPEN/FIRMWARE$`, `FIRMATA_PIN_MODE`, `FIRMATA_DIGITAL_WRITE/READ`, `FIRMATA_ANALOG_WRITE/READ`, `FIRMATA_SERVO_*`, `FIRMATA_I2C_*`, `FIRMATA_STEPPER_*` (AccelStepperFirmata, braucht ConfigurableFirmata), `FIRMATA_UPDATE` (Pro-Frame-Polling wie `INPUT_UPDATE`/`TIMER_UPDATE`). Kein OneWire/Encoder. **Zwei Nummerierungen** (echte Protokoll-Eigenheit): Schreiben nimmt die rohe digitale Pin-Nummer, `FIRMATA_ANALOG_READ` nimmt den Analog-**Kanal** (A0=0, A1=1, ...) -- nicht dieselbe Zahl fuer denselben physischen Pin. Doku `docs/module-firmata.md`, Demo `examples/147_firmata.dh`. | `FIRMATA_HANDLE` |
 | `usb` | USB-HID via `hidapi`. Maker-Boards, Programmer, Custom-Controller. `USB_LIST/OPEN/READ/WRITE/PRODUCT`. | `USB_HANDLE` |
 | `wifi` | WiFi-Management (Windows-only via `netsh wlan`). `WIFI_SCAN/CONNECT/DISCONNECT/CURRENT/SIGNAL/PROFILES`. | — |
 | `tiled` | Tiled-Maps (JSON-Format, kein TMX) **lesen, aendern, anlegen und schreiben**. `TILED_LOAD`, Layer-/Tile-/Object-Access, Per-Tile/Per-Object-Custom-Properties (`solid`, `damage`, ...). Industriestandard fuer 2D-Level-Design. Plus **Bulk-Ops** fuer Generierung/Editor: `TILED_FILL_RECT`, `TILED_REPLACE`, `TILED_COUNT_GID`, `TILED_FLOOD_FILL` (Bucket-Fill). **Schreiben (2026-08-31, gefunden beim Tilemap-Piloten -- das Modul war bis dahin ein reiner Leser):** `TILED_NEW`, `TILED_ADD_LAYER`, `TILED_ADD_TILESET`, `TILED_TILESET_TILES`, `TILED_SAVE`, dazu `TILED_LAYER_RENAME` / `TILED_LAYER_VISIBLE` / `TILED_LAYER_SET_VISIBLE` / `TILED_REMOVE_LAYER` / **`TILED_MOVE_LAYER`** (die Reihenfolge der Ebenen IST ihre ZEICHENreihenfolge -- die erste liegt hinten, Umsortieren aendert also das Bild; herausnehmen und einsetzen, nicht tauschen, weil ein Tausch bei einem Sprung ueber mehrere Stellen etwas anderes waere). **Die `firstgid` vergibt die Laufzeit selbst** (deshalb braucht `TILED_ADD_TILESET` die Kachelzahl) -- sie von Hand setzen zu lassen waere die unangenehmste Fehlerquelle des Formats: ueberlappende Bereiche zerstoeren stillschweigend die Zuordnung ALLER Kacheln, ohne Fehlermeldung. **Die Sichtbarkeit einer Ebene ist nicht nur Anzeige**, Tiled speichert sie -- ohne den Setter liess sich eine ausgeblendete Ebene gar nicht so sichern. Der Namensindex (Name -> Position) wird bei Umbenennen/Entfernen neu aufgebaut, sonst zeigt ein stehengebliebener Eintrag stumm auf die Nachbar-Ebene. **Geprueft wird der Schreiber an einem FREMDEN Leser** (drachenhauch/tilemap/document.py, dem Modell des Qt-Editors), nicht am eigenen -- ein Format, das nur sein Schreiber wieder liest, ist nicht geprueft, sondern nur in sich stimmig. **Objekt-Ebenen und Eigenschaften anlegen (2026-09-02):** `TILED_ADD_OBJECT_LAYER`, `TILED_ADD_OBJECT`, `TILED_TILE_SET_PROP`/`REMOVE_PROP`, `TILED_OBJECT_SET_PROP`/`REMOVE_PROP` -- bis dahin konnte das Modul beides nur LESEN, also liess sich im Programm kein Spawn-Punkt setzen und keiner Kachel `solid` mitgeben. Der SCHREIBER war schon vollstaendig (`speichern` gab objectgroup und tiles aus), es gab nur nichts zu schreiben. **EIN Setzer je Ziel statt vier:** die Leser muessen typisiert sein (dort sagt der Aufrufer, was er erwartet), der Wert traegt seinen Typ beim Schreiben schon mit sich; ARRAY/MAP/Handles werden abgelehnt, weil Tiled genau vier Arten kennt. Adressiert wird ueber die GID wie beim Lesen, samt Flip-Bit-Maskierung -- sonst legte eine gespiegelte Kachel ihre Eigenschaft woanders ab. Geprueft gegen den FREMDEN Leser (`tests/pruef/tiled_objekte_eigenschaften.dhtest`). Objekte lassen sich auch wieder **entfernen und aendern** (`TILED_REMOVE_OBJECT`, `TILED_OBJECT_SET_NAME`/`SET_TYPE`/`SET_RECT` -- alle vier Masse auf einmal, weil Verschieben und Groessenaendern in einem Editor dieselbe Geste sind). Und `TILED_TILE_PROP_KEYS`/`TILED_OBJECT_PROP_KEYS` zaehlen die Schluessel AUF -- ohne sie liess sich nicht anzeigen, was eine Kachel hat (`TILED_TILE_HAS_PROP` beantwortet nur eine Frage, die man schon kennt); sortiert, weil die Ablage eine HashMap ist. **Zwei Schreiberfehler (2026-09-14):** `nextobjectid` stand fest auf 1 und die Objekt-Kennungen zaehlten je EBENE ab 1 -- Tiled vergab beim Bearbeiten doppelte Kennungen. Jetzt traegt jedes Objekt eine kartenweite `id` (`TiledMap::next_object_id`, beim Laden ueber `kennungen_ordnen` eindeutig gemacht, auch fuer alte Dateien mit Doppelten), und `nextobjectid` liegt ueber allen. Und die Eigenschaften (Kachel wie Objekt) kamen in HashMap-Reihenfolge heraus, dieselbe Karte zweimal gesichert gab zwei Dateien -- jetzt nach Namen sortiert, `tiles` nach Kachelnummer (`eigenschaften_json`/`kacheln_json`). Nicht angelegt werden koennen: isometrische/unendliche Karten und Objekte, die keine Rechtecke sind (Polygon, Ellipse). Doku `docs/module-tiled.md`, Editor `examples/187_tilemap_editor.dh`, Tests `tests/pruef/tiled_schreiben.dhtest`. | `TILED_MAP` |
@@ -3259,6 +3259,39 @@ je in ihrem Fall) und `tests/pruef/werkzeug_ide_seriell.dhtest` (4: ein
 Einschub spielt das Geraet ueber `NET_TCP_LISTEN(0)` + `NET_LISTENER_PORT`;
 fuenf Verfaelschungen der IDE fallen je in ihrem Fall). Mit echtem Arduino
 ungeprueft.
+
+## Firmata: Servo, I2C, Schrittmotor, Netz (2026-11-05)
+
+Zweiter Punkt der Bastler-Liste. `FIRMATA_OPEN` nimmt neben dem seriellen
+Port `tcp:host:port` (`firmata::Leitung` Seriell|Tcp, TCP ohne Warten gelesen
+und geschrieben -- ein WouldBlock beim Schreiben wartet kurz; Ok(0) beim
+Lesen = Gegenseite hat aufgelegt, ein Fehler). Der Netzweg braucht kein
+Feature: `mod firmata` ist ungated, `hardware_module_compiled("firmata")`
+ist immer wahr, nur `seriell_oeffnen`/`ports` haengen an `serial` und
+melden sonst "nur tcp:". Uebers Netz wird nicht 2 s auf den Autoreset
+gewartet. Neu: **Servo** (`SERVO_CONFIG` 0x70, Vorgabe 544/2400 wie die
+Arduino-Bibliothek; Winkel geht als Analogwert), **EXTENDED_ANALOG** (0x6F)
+fuer Pins ab 16 beim Schreiben, **I2C** (0x78 Config -- die erste Anfrage
+schickt es selbst, sonst ignoriert StandardFirmata alles --, 0x76 mit Art
+in Bits 3-4, 10-Bit-Adresse Bit 5 + obere drei Bits; Antwort 0x77 Adresse/
+Register/Daten in 7-Bit-Paaren; ohne Register meldet StandardFirmata
+Register 0, darum `i2c_letzte` je Adresse neben `i2c_daten` je (Adresse,
+Register); `FIRMATA_I2C_READ` wartet hoechstens 1 s auf eine Antwort mit
+NEUERER Nummer als vor der Frage -- `i2c_zaehler`), **Firmware** (0x79, aus
+der Meldung beim Start, sonst gefragt) und **Schrittmotor** ueber
+AccelStepperFirmata 0x62 (NICHT in StandardFirmata, braucht
+ConfigurableFirmata): 32-Bit-Zahlen als Betrag + Vorzeichenbit 0x08 im
+fuenften Byte (kein Zweierkomplement, wie firmata.js), Kommazahlen als
+23 Bit Ganzzahl * 10^(Exp-11) mit Vorzeichen in Bit 6 des vierten Bytes;
+"fertig" (0x0A) setzt `stepper_laeuft` zurueck. Beispiel 147 nimmt das Ziel
+als Argument -- dabei fiel ein alter Fehler auf: `INSTR(ports, ",") > 0` und
+`LEFT$(ports, komma - 1)` machten aus "COM3,COM4" "COM" (INSTR zaehlt ab 0,
+-1 = nicht da). Tests `tests/pruef/modules_firmata.dhtest` (15): das Board
+spielt `_hilfen/firmataboard.dh` im SELBEN Programm (`NET_TCP_LISTEN`, dann
+`FIRMATA_OPEN("tcp:...")`, dann `NET_TCP_ACCEPT` -- die Verbindung steht
+schon im Rueckstau) und vergleicht die Bytes in Hex; Beispiel 147 als
+eigener Prozess gegen ein gespieltes Board. Neun Verfaelschungen von
+firmata.rs fallen je in ihrem Fall. Mit echtem Board ungeprueft.
 
 ## Dogfooding 15: Landkarte (2026-10-26)
 

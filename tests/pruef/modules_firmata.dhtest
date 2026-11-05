@@ -345,3 +345,50 @@ IMPORT "{sammlung}/_hilfen/firmataboard.dh"
 
 --- erwartet
 FIRMATA_UPDATE: die Verbindung zum Board ist beendet
+
+=== das beispiel 147 gegen ein board im netz
+' Das Beispiel laeuft als eigener Prozess und verbindet sich mit dem Board,
+' das dieser Fall spielt: Firmware von selbst gemeldet, A0 auf Nachfrage.
+IMPORT "net"
+DIM l AS NET_LISTENER : l = NET_TCP_LISTEN(0, "127.0.0.1")
+DIM ziel AS STRING : ziel = "tcp:127.0.0.1:" + STR$(NET_LISTENER_PORT(l))
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", ziel)
+DIM s AS NET_SOCKET
+DIM t0 AS INTEGER : t0 = MILLIS()
+s = NET_TCP_ACCEPT(l)
+WHILE s = NIL AND MILLIS() - t0 < 10000
+    SLEEP(5)
+    s = NET_TCP_ACCEPT(l)
+WEND
+NET_SEND(s, BUFFER_FROM_HEX("F0790205530074005400F7"))
+DIM bekommen AS STRING : bekommen = ""
+DIM gemeldet AS BOOLEAN : gemeldet = FALSE
+DIM aus AS STRING : aus = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5 AND MILLIS() - t0 < 20000
+    DIM b AS BUFFER : b = NET_RECV_BYTES(s, 4096)
+    IF BUFFER_LEN(b) > 0 THEN bekommen = bekommen + UPPER$(BUFFER_TO_HEX$(b))
+    IF NOT gemeldet AND INSTR(bekommen, "C001") >= 0 THEN
+        NET_SEND(s, BUFFER_FROM_HEX("E02A03"))
+        gemeldet = TRUE
+    END IF
+    DIM z AS STRING : z = PROCESS_READ$(p)
+    IF z = "" THEN
+        IF NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(10)
+    ELSEIF INSTR(z, "Oeffne") < 0 THEN
+        aus = aus + TRIM$(z) + CHR$(10)
+    END IF
+WEND
+PRINT aus;
+PRINT "rueckgabe "; PROCESS_CODE(p)
+PRINT INSTR(bekommen, "F40D01") >= 0
+PRINT INSTR(bekommen, "912000910000912000910000912000910000") >= 0
+--- argumente
+{sammlung}/../../examples/147_firmata.dh
+--- erwartet
+Firmware:  StT 2.5
+A0:  426
+rueckgabe 0
+TRUE
+TRUE
