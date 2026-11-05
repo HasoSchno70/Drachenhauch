@@ -1801,3 +1801,13 @@ FIRMATA_FIRMWARE$: keine Antwort -- laeuft Firmata auf dem Board?	FIRMATA_FIRMWA
 {}: unbekannte Art "{}" -- treiber (Schritt + Richtung), zweidraht, dreidraht, vierdraht	{}: unknown type "{}" -- treiber (step + direction), zweidraht, dreidraht, vierdraht
 {}: "{}" braucht {} Pins, angegeben sind {}	{}: "{}" needs {} pins, {} given
 {}: Motor {} ist nicht eingerichtet -- erst FIRMATA_STEPPER_CONFIG	{}: motor {} is not set up -- call FIRMATA_STEPPER_CONFIG first
+
+# ---------------------------------------------------------------- mqtt QoS/TLS (2026-11-05)
+{}: QoS 2 kann dieser Client nicht -- 0 oder 1	{}: this client cannot do QoS 2 -- 0 or 1
+{}: QoS {} gibt es nicht -- 0 oder 1	{}: there is no QoS {} -- 0 or 1
+MQTT_TLS_CA: die Datei {} gibt es nicht	MQTT_TLS_CA: the file {} does not exist
+MQTT_CONNECT: CA-Datei {}: {}	MQTT_CONNECT: CA file {}: {}
+MQTT_CONNECT: in der CA-Datei {} steht kein Zertifikat (erwartet PEM, -----BEGIN CERTIFICATE-----)	MQTT_CONNECT: the CA file {} contains no certificate (expected PEM, -----BEGIN CERTIFICATE-----)
+MQTT_CONNECT: TLS liess sich nicht einrichten: {}	MQTT_CONNECT: TLS could not be set up: {}
+MQTT_CONNECT: {} ist kein gueltiger Servername fuer TLS	MQTT_CONNECT: {} is not a valid server name for TLS
+MQTT_CONNECT: TLS-Verbindung fehlgeschlagen: {}	MQTT_CONNECT: TLS connection failed: {}

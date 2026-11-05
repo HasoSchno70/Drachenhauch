@@ -1202,7 +1202,7 @@ zurueckspringen, kaputte Datei ist ein Fehler).
 | `curves` | Animation-Kurven (komplementaer zu `tween`'s Easings): `CURVE_BEZIER/BEZIER2`, `CURVE_CATMULL/CATMULL2`, `CURVE_HERMITE`, `CURVE_LERP`, `CURVE_SMOOTHSTEP`, `CURVE_SMOOTHERSTEP`. Pure Functions, kein State. | — |
 | `net` | TCP + UDP via stdlib-Sockets (cross-platform). Default non-blocking fuer Game-Loops. `NET_TCP_LISTEN/ACCEPT/CONNECT`, `NET_SEND/RECV`, `NET_UDP_BIND/SEND/RECV`. Encoding: UTF-8. | `NET_LISTENER`, `NET_SOCKET`, `NET_UDP` |
 | `midi` | Noten von einem angeschlossenen Instrument lesen und welche hinausschicken. Feature `midi` (Crate `midir`: WinMM/ALSA/CoreMIDI), also nur in `--hardware`-Bauten -- **ausser** `MIDI_NOTE_NAME$`/`MIDI_NOTE_FREQ`, die nur umrechnen und darum ungegatet in `midi.rs` stehen (samt Rust-`#[test]`s; nur so ist der nuetzlichste Teil auch auf einer Maschine ohne Anschluss pruefbar). Auflisten `MIDI_IN_COUNT/NAME$`, oeffnen `MIDI_IN_OPEN` -> `MIDI_IN`, empfangen ueber das Cursor-Muster von `db`/`mqtt` (`MIDI_NEXT` + `MIDI_NOTE/VELOCITY/CHANNEL/IS_NOTE_ON`), senden `MIDI_NOTE_ON/OFF/CC/SEND`. **Zwei Protokoll-Eigenheiten:** die meisten Instrumente schicken Note-AUS als Note-AN mit Anschlag 0 (`MIDI_IS_NOTE_OFF` faengt beide, sonst enden Toene nie), und Kanaele zaehlen nach aussen 1..16 statt 0..15. Die Entschluesselung eingehender Nachrichten arbeitet ueber ROHE BYTES statt ueber den Geraetetyp (`status_von`/`kanal_von`/`ist_note_aus`/... in midi.rs, die `&Eingang`-Fassungen sind Einzeiler darueber) -- haenge sie am Geraet, ist sie ohne Instrument NIRGENDS pruefbar, so ist sie es ueberall: neun ungegatete Rust-`#[test]`s mit erfundenen Nachrichten decken beide Note-aus-Formen, Kanal 1/16, Regler, leere und zu kurze Nachricht ab. Der Rueckruf laeuft auf midirs eigenem Faden in eine Warteschlange mit **1024** Plaetzen; beim Ueberlauf faellt die AELTESTE weg (wer live spielt, will den aktuellen Anschlag). Uhr/Active-Sensing/SysEx werden weggelassen. **Nicht umgesetzt:** SysEx, MIDI-Uhr/Timecode, `.mid`-Dateien, virtuelle Anschluesse. **Der ganze Kreis ist geprueft** -- Tests, die einen VIRTUELLEN Loopback-Port benutzen (loopMIDI, `winget install TobiasErichsen.loopMIDI`; ein Port unter dem Portnamen als Ein- UND Ausgang, genau daran erkannt, sonst uebersprungen). Damit sind Note-an-mit-Anschlag-0 und der 1024er-Deckel samt aelteste-faellt-weg belegt statt behauptet -- ein Keyboard braucht es dafuer nicht. Doku `docs/module-midi.md`, Demo `examples/181_midi.dh`. | `MIDI_IN`, `MIDI_OUT` |
-| `mqtt` | **MQTT-3.1.1-Client** (das im Maker-/IoT-Bereich dominante Pub/Sub-Protokoll fuer ESP32/IoT-Steuerung) -- direkt gegen die OASIS-Spec via `std::net` implementiert, Feature `net` (bereits im Standard-Build, kein neues Crate). Nur **QoS 0** (kein Packet-ID-Ack-Handshake noetig), kein UNSUBSCRIBE/Will/TLS. `MQTT_CONNECT(host,port,client_id[,keepalive_s[,user[,pass]]])`, `MQTT_PUBLISH(h,topic,payload[,retain])`, `MQTT_SUBSCRIBE`, `MQTT_UPDATE` (Pro-Frame-Polling + automatisches Keepalive-PINGREQ), eingehende Nachrichten ueber Cursor-Muster wie `db` (`MQTT_NEXT_MESSAGE`/`MQTT_MESSAGE_TOPIC`/`MQTT_MESSAGE_PAYLOAD`, analog `DB_NEXT`+`DB_GET_*`). Doku `docs/module-mqtt.md`, Demo `examples/148_mqtt.dh`. | `MQTT_HANDLE` |
+| `mqtt` | **MQTT-3.1.1-Client** (das im Maker-/IoT-Bereich dominante Pub/Sub-Protokoll fuer ESP32/IoT-Steuerung) -- direkt gegen die OASIS-Spec implementiert, Feature `net` (bereits im Standard-Build; bringt rustls fuer TLS mit). **QoS 0 und 1** (`MQTT_PENDING`/`MQTT_FLUSH`), `MQTT_UNSUBSCRIBE`, `MQTT_WILL`, TLS ueber `mqtts://host` + `MQTT_TLS_CA`; kein QoS 2, keine Sitzung ueber die Verbindung hinaus. `MQTT_CONNECT(host,port,client_id[,keepalive_s[,user[,pass]]])`, `MQTT_PUBLISH(h,topic,payload[,retain[,qos]])`, `MQTT_SUBSCRIBE(h,topic[,qos])`, `MQTT_UPDATE` (Pro-Frame-Polling + automatisches Keepalive-PINGREQ), eingehende Nachrichten ueber Cursor-Muster wie `db` (`MQTT_NEXT_MESSAGE`/`MQTT_MESSAGE_TOPIC`/`MQTT_MESSAGE_PAYLOAD`, analog `DB_NEXT`+`DB_GET_*`). Doku `docs/module-mqtt.md`, Demo `examples/148_mqtt.dh`. | `MQTT_HANDLE` |
 | `ecs` | Entity-Component-System. World mit Entity-IDs (INTEGER) und benannten typed Components (INT/FLOAT/STRING/BOOL/OBJ). Query 1/2/3-fach via Component-Intersection. `ECS_NEW_ENTITY`, `ECS_ADD_INT`, `ECS_QUERY2`, etc. Plus **Bulk-System-Ops** (`ECS_INTEGRATE_FLOAT`, `ECS_SCALE_FLOAT`, `ECS_FILL_*`, `ECS_CLAMP_FLOAT`, `ECS_REMOVE_DEAD`, `ECS_COUNT_WITH`) — siehe eigener Abschnitt unten. Nativ in `rust/drachenhauch_runtime/src/ecs.rs` (die fruehere Python-Fassung `modules/ecs_py.py` ist mit Stufe B entfernt). | `ECS_WORLD` |
 | `html` | HTTP-GET/POST/DOWNLOAD + HTML-Parsing (pure stdlib). `HTTP_GET/POST/DOWNLOAD`, `HTTP_STATUS/HEADER`, `URL_ENCODE/DECODE`, `HTML_TEXT`, `HTML_FIND_ALL`. | — |
 | `bt` | Bluetooth Low Energy (BLE) via `bleak`. Scan, Connect, Service/Characteristic-Listing, Read/Write/Notify auf Characteristics. Externer Dep, IoT/Sensor-Targets. | `BT_HANDLE` |
@@ -3292,6 +3292,35 @@ spielt `_hilfen/firmataboard.dh` im SELBEN Programm (`NET_TCP_LISTEN`, dann
 schon im Rueckstau) und vergleicht die Bytes in Hex; Beispiel 147 als
 eigener Prozess gegen ein gespieltes Board. Neun Verfaelschungen von
 firmata.rs fallen je in ihrem Fall. Mit echtem Board ungeprueft.
+
+## MQTT: QoS 1, Abmelden, TLS (2026-11-05)
+
+Dritter Punkt der Bastler-Liste. `mqtt::Strom` (Klar|Tls wie in smtp.rs);
+`MQTT_CONNECT("mqtts://host", ...)` (auch `ssl://`/`tls://`, `ziel_lesen`)
+liest waehrend Handschlag und CONNACK mit 5 s Zeitgrenze und stellt danach
+auf 1 ms -- vorher, mit 1 ms von Anfang an, scheiterte der Handschlag am
+Warten. Ein falsches Zertifikat zeigt sich als SCHREIBfehler des CONNECT
+(dort laeuft der Handschlag), darum die Meldung "TLS-Verbindung
+fehlgeschlagen" an beiden Stellen. `MQTT_TLS_CA(pfad$)` (Vm::mqtt_ca, gilt
+fuer jedes folgende Verbinden, `""` zurueck): dann NUR diese CA, PEM ueber
+`rustls::pki_types::pem`. Das Feature `net` bringt dafuer rustls +
+webpki-roots mit (waren ueber smtp/pg/ureq schon im Baum, Lockfile
+unveraendert). **QoS 1:** `encode_publish` mit QoS-Bits und Paketnummer
+hinter dem Topic; `unbestaetigt` (Nummer -> Zeit) bis PUBACK, eine
+Nummer, die noch offen ist, wird nicht wieder vergeben; eingehende QoS-1-
+Nachrichten bekommen ihr PUBACK in `update`. Kein Neusenden (Clean Session
+ist immer an) -- `MQTT_PENDING` zeigt, was offen ist, `MQTT_FLUSH(h[, ms])`
+wartet. `update` liest jetzt, bis nichts mehr da ist (vorher ein Stueck je
+Bild). `MQTT_UNSUBSCRIBE` (0xA2, UNSUBACK 0xB0). QoS 2 ist ein Fehler mit
+Hinweis. Tests: `modules_mqtt.dhtest` (+4; der Test-Broker
+`_hilfen/mqttbroker.dh` kann QoS 1 -- bestaetigt und schickt mit Nummer 77
+zurueck --, UNSUBSCRIBE, Modus `ohneack`, und schreibt jede Paketart nach
+`PORTDATEI.log`); TLS nur in Rust-Tests, weil das net-Modul kein TLS
+bedient: `tls_broker` ist ein rustls-SERVER mit fester Test-CA
+(`rust/drachenhauch_runtime/testdaten/mqtt_tls`, Schluessel der CA nach dem
+Ausstellen geloescht, gueltig bis 2126) -- Rundweg mit eigener CA und
+Ablehnung ohne. Sechs Verfaelschungen fallen je in ihrem Fall. Gegen einen
+echten Broker mit TLS ungeprueft.
 
 ## Dogfooding 15: Landkarte (2026-10-26)
 

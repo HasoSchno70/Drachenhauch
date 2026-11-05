@@ -228,7 +228,7 @@ Full documentation lives in [docs/en/](docs/en/README.md) — the English transl
 | [`net`](docs/en/module-net.md) | TCP and UDP, non-blocking by default — won't freeze your game loop |
 | [`html`](docs/en/module-html.md) | HTTP GET/POST/download + HTML scraping |
 | [`httpd`](docs/en/module-httpd.md) | the other direction: a small web server driven by the main loop — a control panel on the home network |
-| [`mqtt`](docs/en/module-mqtt.md) | the IoT world's pub/sub protocol — the way to reach an ESP32 **over Wi-Fi** |
+| [`mqtt`](docs/en/module-mqtt.md) | the IoT world's pub/sub protocol — the way to reach an ESP32 **over Wi-Fi**; QoS 0/1, TLS (`mqtts://`) |
 | [`firmata`](docs/en/module-firmata.md) | drive Arduino/ESP32 pins, servos, I2C devices and stepper motors directly, over USB or WiFi (`tcp:host:port`), no sketch of your own needed |
 | [`serial`](docs/en/module-serial.md) | raw COM connection for your own protocols — and in the IDE a **serial monitor with a plotter** (Alt+4) |
 | [`usb`](docs/en/module-usb.md) | USB HID: maker boards, programmers, custom controllers |
