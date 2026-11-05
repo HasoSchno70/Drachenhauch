@@ -45,7 +45,7 @@ FIRMATA_OPEN
 
 === firmata gibt es in jedem bau, ohne warnung
 ' Firmata haengt nicht mehr am Feature `serial`: ueber das Netz geht es
-' immer. Darum warnt --check nicht.
+' immer. Darum warnt --check nicht, und MODULE_AVAILABLE sagt ja.
 DIM p AS INTEGER : p = PROCESS_START("dhrt", "--check", "nutzt.dh")
 DIM aus AS STRING : aus = ""
 DIM leer AS INTEGER : leer = 0
@@ -59,6 +59,7 @@ WHILE leer < 5
     END IF
 WEND
 PRINT aus
+PRINT MODULE_AVAILABLE("firmata")
 --- datei nutzt.dh
 IMPORT "firmata"
 DIM h AS FIRMATA_HANDLE
@@ -66,6 +67,7 @@ h = FIRMATA_OPEN("tcp:127.0.0.1:3030")
 FIRMATA_SERVO_WRITE(h, 9, 90)
 --- erwartet
 []
+TRUE
 
 === ein netzziel ohne port ist ein fehler mit beispiel
 IMPORT "firmata"

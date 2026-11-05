@@ -50,7 +50,8 @@ stderr leer TRUE
 
 === module_available kennt die module dieses baus
 ' json ist immer dabei, ein erfundener Name nie. Fuer serial muss die Antwort
-' zu dem passen, was `dhrt --version` unter "dabei" nennt.
+' zu dem passen, was `dhrt --version` unter "dabei" nennt. Firmata gibt es
+' seit 2026-11-05 in jedem Bau (ueber das Netz, tcp:host:port).
 IMPORT "helfer.dh"
 dlStarten(["--version"])
 DIM dabei AS STRING : dabei = ""
@@ -61,14 +62,14 @@ NEXT
 PRINT "json "; MODULE_AVAILABLE("json"); " JSON "; MODULE_AVAILABLE("JSON")
 PRINT "quatsch "; MODULE_AVAILABLE("quatsch")
 PRINT "serial passt "; (MODULE_AVAILABLE("serial") = (INSTR(dabei, "seriell") >= 0))
-PRINT "firmata wie serial "; (MODULE_AVAILABLE("firmata") = MODULE_AVAILABLE("serial"))
+PRINT "firmata "; MODULE_AVAILABLE("firmata")
 --- datei helfer.dh
 IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
 --- erwartet
 json TRUE JSON TRUE
 quatsch FALSE
 serial passt TRUE
-firmata wie serial TRUE
+firmata TRUE
 
 === optional an einer datei: fehlt sie, faellt die zeile weg
 IMPORT "da.dh" OPTIONAL
