@@ -1,6 +1,11 @@
-' Modul `firmata`: Registrierung, IMPORT und Handle-Typ. Die Protokoll-Logik
-' (Bit-Packing, Nachrichten zerlegen) pruefen die Rust-Tests in firmata.rs;
-' ein Arduino braucht hier keiner. Bis 2026-09-17 tests/test_firmata_module.py.
+' Modul `firmata`: Registrierung, IMPORT und Handle-Typ, und das Protokoll
+' Byte fuer Byte ueber eine Netzverbindung -- das Board spielt
+' _hilfen/firmataboard.dh im selben Programm (FIRMATA_OPEN("tcp:...") wie mit
+' StandardFirmataWiFi). Damit braucht kein Fall einen Arduino und keiner den
+' Bau mit --hardware. Die Bytefolgen stehen in github.com/firmata/protocol
+' (protocol.md, servos.md, i2c.md, accelStepperFirmata.md); Kodierungen und
+' Zerlegen pruefen zusaetzlich die Rust-Tests in firmata.rs.
+' Bis 2026-09-17 tests/test_firmata_module.py.
 ' Format: docs/werkzeuge.md, dhrt test.
 
 === die befehle stehen im verzeichnis
@@ -15,20 +20,328 @@ END FUNCTION
 DIM namen AS ARRAY OF STRING
 namen = SPLIT$("FIRMATA_PORTS FIRMATA_OPEN FIRMATA_CLOSE FIRMATA_IS_OPEN " + _
     "FIRMATA_PIN_MODE FIRMATA_DIGITAL_WRITE FIRMATA_DIGITAL_READ " + _
-    "FIRMATA_ANALOG_WRITE FIRMATA_ANALOG_READ FIRMATA_UPDATE", " ")
+    "FIRMATA_ANALOG_WRITE FIRMATA_ANALOG_READ FIRMATA_UPDATE FIRMATA_FIRMWARE$ " + _
+    "FIRMATA_SERVO_ATTACH FIRMATA_SERVO_WRITE FIRMATA_I2C_CONFIG FIRMATA_I2C_WRITE " + _
+    "FIRMATA_I2C_READ FIRMATA_I2C_REQUEST FIRMATA_I2C_DATA FIRMATA_I2C_STOP " + _
+    "FIRMATA_STEPPER_CONFIG FIRMATA_STEPPER_MOVE FIRMATA_STEPPER_TO FIRMATA_STEPPER_ZERO " + _
+    "FIRMATA_STEPPER_STOP FIRMATA_STEPPER_SPEED FIRMATA_STEPPER_ACCEL " + _
+    "FIRMATA_STEPPER_POSITION FIRMATA_STEPPER_RUNNING", " ")
 DIM i AS INTEGER
 FOR i = 0 TO LEN(namen) - 1
     IF NOT bekannt(namen[i]) THEN PRINT "fehlt: " + namen[i]
 NEXT
 PRINT STR$(LEN(namen)) + " geprueft"
 --- erwartet
-10 geprueft
+28 geprueft
 
-=== import und handle-typ, oeffnen scheitert im klartext
-' Ohne das Feature `serial` meldet FIRMATA_OPEN das zur Laufzeit, mit ihm
-' gibt es den Anschluss nicht -- beides ein Fehler, der den Befehl nennt.
+=== import und handle-typ, ein unbekannter anschluss scheitert im klartext
+' Ohne das Feature `serial` meldet FIRMATA_OPEN, dass es nur tcp: gibt, mit
+' ihm gibt es den Anschluss nicht -- beides ein Fehler, der den Befehl nennt.
 IMPORT "firmata"
 DIM h AS FIRMATA_HANDLE
 h = FIRMATA_OPEN("GIBTSNICHT_ANSCHLUSS_7", 57600)
 --- fehler
 FIRMATA_OPEN
+
+=== firmata gibt es in jedem bau, ohne warnung
+' Firmata haengt nicht mehr am Feature `serial`: ueber das Netz geht es
+' immer. Darum warnt --check nicht.
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "--check", "nutzt.dh")
+DIM aus AS STRING : aus = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM z AS STRING : z = PROCESS_READ$(p)
+    IF z = "" THEN
+        IF NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(30)
+    ELSE
+        aus = aus + TRIM$(z)
+    END IF
+WEND
+PRINT aus
+--- datei nutzt.dh
+IMPORT "firmata"
+DIM h AS FIRMATA_HANDLE
+h = FIRMATA_OPEN("tcp:127.0.0.1:3030")
+FIRMATA_SERVO_WRITE(h, 9, 90)
+--- erwartet
+[]
+
+=== ein netzziel ohne port ist ein fehler mit beispiel
+IMPORT "firmata"
+DIM h AS FIRMATA_HANDLE
+h = FIRMATA_OPEN("tcp:192.168.1.50")
+--- fehler
+tcp:192.168.1.50:3030
+
+=== pins ueber das netz
+IMPORT "board.dh"
+fbStart()
+FIRMATA_PIN_MODE(fbH, 13, 1)
+FIRMATA_DIGITAL_WRITE(fbH, 13, TRUE)
+FIRMATA_DIGITAL_WRITE(fbH, 12, TRUE)
+FIRMATA_DIGITAL_WRITE(fbH, 13, FALSE)
+PRINT "schreiben: " + fbEmpfangen$()
+' Kanal 0 lesen schaltet seine Meldung ein; das Board meldet 1023.
+PRINT FIRMATA_ANALOG_READ(fbH, 0)
+PRINT "melden: " + fbEmpfangen$()
+fbSenden("E0 7F 07")
+SLEEP(30)
+FIRMATA_UPDATE(fbH)
+PRINT FIRMATA_ANALOG_READ(fbH, 0)
+' Pin 20 hat kein Nibble mehr: EXTENDED_ANALOG.
+FIRMATA_ANALOG_WRITE(fbH, 20, 300)
+PRINT "erweitert: " + fbEmpfangen$()
+--- datei board.dh
+IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+
+--- erwartet
+schreiben: F4 0D 01 91 20 00 91 30 00 91 10 00
+0
+melden: C0 01
+1023
+erweitert: F0 6F 14 2C 02 F7
+
+=== servo
+IMPORT "board.dh"
+fbStart()
+FIRMATA_SERVO_ATTACH(fbH, 9)
+PRINT "vorgabe: " + fbEmpfangen$()
+FIRMATA_SERVO_ATTACH(fbH, 10, 1000, 2000)
+PRINT "eigene: " + fbEmpfangen$()
+FIRMATA_SERVO_WRITE(fbH, 9, 90)
+FIRMATA_SERVO_WRITE(fbH, 20, 180)
+PRINT "stellen: " + fbEmpfangen$()
+TRY
+    FIRMATA_SERVO_WRITE(fbH, 9, 181)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    FIRMATA_SERVO_ATTACH(fbH, 9, 2000, 1000)
+CATCH e
+    PRINT e
+END TRY
+--- datei board.dh
+IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+
+--- erwartet
+vorgabe: F0 70 09 20 04 60 12 F7
+eigene: F0 70 0A 68 07 50 0F F7
+stellen: E9 5A 00 F0 6F 14 34 01 F7
+FIRMATA_SERVO_WRITE: Winkel 181 ausserhalb 0..180
+FIRMATA_SERVO_ATTACH: groesster Puls 1000 ausserhalb 2001..16383
+
+=== i2c schreiben schaltet i2c einmal ein
+IMPORT "board.dh"
+fbStart()
+FIRMATA_I2C_WRITE(fbH, &H3C, [0, &HAF])
+PRINT "erstes: " + fbEmpfangen$()
+FIRMATA_I2C_WRITE(fbH, &H3C, BUFFER_FROM_HEX("40FF"))
+PRINT "zweites: " + fbEmpfangen$()
+FIRMATA_I2C_CONFIG(fbH, 100)
+PRINT "verzoegerung: " + fbEmpfangen$()
+TRY
+    FIRMATA_I2C_WRITE(fbH, &H3C, [1, 256])
+CATCH e
+    PRINT e
+END TRY
+--- datei board.dh
+IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+
+--- erwartet
+erstes: F0 78 00 00 F7 F0 76 3C 00 00 00 2F 01 F7
+zweites: F0 76 3C 00 40 00 7F 01 F7
+verzoegerung: F0 78 64 00 F7
+FIRMATA_I2C_WRITE: Byte 1 ist 256 -- erlaubt sind 0..255
+
+=== i2c lesen wartet auf die antwort
+' Die Antwort liegt schon in der Leitung, bevor gefragt wird -- gezaehlt
+' wird sie trotzdem als neu, weil sie erst beim Warten gelesen wird.
+IMPORT "board.dh"
+fbStart()
+fbSenden("F0 77 68 00 3B 00 12 00 7F 01 F7")
+PRINT fbFeld$(FIRMATA_I2C_READ(fbH, &H68, &H3B, 2))
+PRINT "gefragt: " + fbEmpfangen$()
+' Dieselbe Frage noch einmal: die alte Antwort zaehlt nicht, es kommt keine.
+DIM t0 AS INTEGER : t0 = MILLIS()
+TRY
+    PRINT fbFeld$(FIRMATA_I2C_READ(fbH, &H68, &H3B, 2))
+CATCH e
+    PRINT e
+END TRY
+PRINT MILLIS() - t0 >= 900
+--- datei board.dh
+IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+
+--- erwartet
+[18 255]
+gefragt: F0 78 00 00 F7 F0 76 68 08 3B 00 02 00 F7
+FIRMATA_I2C_READ: keine Antwort von Adresse 104 (0x68) -- haengt dort ein Geraet, und laeuft StandardFirmata?
+TRUE
+
+=== i2c fortlaufend in der bildschleife
+IMPORT "board.dh"
+fbStart()
+FIRMATA_I2C_REQUEST(fbH, &H48, -1, 2, TRUE)
+PRINT "frage: " + fbEmpfangen$()
+FIRMATA_UPDATE(fbH)
+PRINT fbFeld$(FIRMATA_I2C_DATA(fbH, &H48))
+' StandardFirmata meldet ohne Register das Register 0.
+fbSenden("F0 77 48 00 00 00 19 00 40 01 F7")
+SLEEP(30)
+FIRMATA_UPDATE(fbH)
+PRINT fbFeld$(FIRMATA_I2C_DATA(fbH, &H48))
+PRINT fbFeld$(FIRMATA_I2C_DATA(fbH, &H48, 0))
+PRINT fbFeld$(FIRMATA_I2C_DATA(fbH, &H48, 5))
+fbSenden("F0 77 48 00 00 00 1A 00 00 01 F7")
+SLEEP(30)
+FIRMATA_UPDATE(fbH)
+PRINT fbFeld$(FIRMATA_I2C_DATA(fbH, &H48))
+FIRMATA_I2C_STOP(fbH, &H48)
+PRINT "stopp: " + fbEmpfangen$()
+' Eine 10-Bit-Adresse (0x2A5) setzt Bit 5 und die oberen drei Bits.
+FIRMATA_I2C_REQUEST(fbH, &H2A5, 7, 1)
+PRINT "zehn bit: " + fbEmpfangen$()
+--- datei board.dh
+IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+
+--- erwartet
+frage: F0 78 00 00 F7 F0 76 48 10 02 00 F7
+[]
+[25 192]
+[25 192]
+[]
+[26 128]
+stopp: F0 76 48 18 F7
+zehn bit: F0 76 25 2D 07 00 01 00 F7
+
+=== firmware aus der meldung beim start
+' Ein Board meldet seine Firmware beim Start von selbst; dann wird nicht
+' mehr gefragt.
+IMPORT "board.dh"
+fbStart()
+fbSenden("F0 79 02 05 53 00 74 00 F7")
+SLEEP(30)
+PRINT FIRMATA_FIRMWARE$(fbH)
+PRINT "gefragt: [" + fbEmpfangen$() + "]"
+--- datei board.dh
+IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+
+--- erwartet
+St 2.5
+gefragt: []
+
+=== firmware ohne antwort fragt und meldet
+IMPORT "board.dh"
+fbStart()
+TRY
+    PRINT FIRMATA_FIRMWARE$(fbH)
+CATCH e
+    PRINT e
+END TRY
+PRINT "gefragt: " + fbEmpfangen$()
+--- datei board.dh
+IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+
+--- erwartet
+FIRMATA_FIRMWARE$: keine Antwort -- laeuft Firmata auf dem Board?
+gefragt: F0 79 F7
+
+=== schrittmotor ueber accelstepperfirmata
+IMPORT "board.dh"
+fbStart()
+FIRMATA_STEPPER_CONFIG(fbH, 0, "treiber", 2, 3)
+PRINT "einrichten: " + fbEmpfangen$()
+FIRMATA_STEPPER_SPEED(fbH, 0, 400.0)
+FIRMATA_STEPPER_ACCEL(fbH, 0, 0.0)
+PRINT "tempo: " + fbEmpfangen$()
+FIRMATA_STEPPER_MOVE(fbH, 0, 200)
+PRINT "fahren: " + fbEmpfangen$()
+PRINT FIRMATA_STEPPER_RUNNING(fbH, 0)
+' Das Board meldet "fertig" bei 200.
+fbSenden("F0 62 0A 00 48 01 00 00 00 F7")
+SLEEP(30)
+FIRMATA_UPDATE(fbH)
+PRINT FIRMATA_STEPPER_RUNNING(fbH, 0)
+PRINT FIRMATA_STEPPER_POSITION(fbH, 0)
+PRINT "lage: " + fbEmpfangen$()
+FIRMATA_STEPPER_TO(fbH, 0, -50)
+PRINT "ziel: " + fbEmpfangen$()
+' Eine Lagemeldung unterwegs, dann anhalten.
+fbSenden("F0 62 06 00 05 00 00 00 08 F7")
+SLEEP(30)
+FIRMATA_UPDATE(fbH)
+PRINT FIRMATA_STEPPER_POSITION(fbH, 0)
+FIRMATA_STEPPER_STOP(fbH, 0)
+FIRMATA_STEPPER_ZERO(fbH, 0)
+PRINT FIRMATA_STEPPER_RUNNING(fbH, 0)
+PRINT "halt: " + fbEmpfangen$()
+FIRMATA_STEPPER_CONFIG(fbH, 1, "vierdraht", 8, 9, 10, 11)
+PRINT "vier: " + fbEmpfangen$()
+--- datei board.dh
+IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+
+--- erwartet
+einrichten: F0 62 00 00 10 02 03 F7
+tempo: F0 62 09 00 00 12 74 1D F7 F0 62 08 00 00 00 00 00 F7
+fahren: F0 62 02 00 48 01 00 00 00 F7
+TRUE
+FALSE
+200
+lage: F0 62 06 00 F7
+ziel: F0 62 03 00 32 00 00 00 08 F7
+-5
+FALSE
+halt: F0 62 06 00 F7 F0 62 05 00 F7 F0 62 01 00 F7
+vier: F0 62 00 01 40 08 09 0A 0B F7
+
+=== schrittmotor: fehler nennen, was fehlt
+IMPORT "board.dh"
+fbStart()
+TRY
+    FIRMATA_STEPPER_MOVE(fbH, 1, 10)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    FIRMATA_STEPPER_CONFIG(fbH, 0, "vierdraht", 2, 3)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    FIRMATA_STEPPER_CONFIG(fbH, 0, "schnell", 2, 3)
+CATCH e
+    PRINT e
+END TRY
+FIRMATA_STEPPER_CONFIG(fbH, 0, "treiber", 2, 3)
+TRY
+    FIRMATA_STEPPER_SPEED(fbH, 0, 0.0)
+CATCH e
+    PRINT e
+END TRY
+--- datei board.dh
+IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+
+--- erwartet
+FIRMATA_STEPPER_MOVE: Motor 1 ist nicht eingerichtet -- erst FIRMATA_STEPPER_CONFIG
+FIRMATA_STEPPER_CONFIG: "vierdraht" braucht 4 Pins, angegeben sind 2
+FIRMATA_STEPPER_CONFIG: unbekannte Art "schnell" -- treiber (Schritt + Richtung), zweidraht, dreidraht, vierdraht
+FIRMATA_STEPPER_SPEED: 0 muss > 0 sein
+
+=== das board legt auf
+IMPORT "board.dh"
+fbStart()
+NET_CLOSE(fbSock)
+SLEEP(100)
+TRY
+    FIRMATA_UPDATE(fbH)
+    PRINT "noch da"
+CATCH e
+    PRINT e
+END TRY
+--- datei board.dh
+IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+
+--- erwartet
+FIRMATA_UPDATE: die Verbindung zum Board ist beendet

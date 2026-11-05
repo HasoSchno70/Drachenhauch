@@ -1049,7 +1049,6 @@ pub struct Vm<'p> {
     midi_outs: Vec<Option<crate::midi::Ausgang>>,
     #[cfg(feature = "serial")]
     serial_ports: Vec<Option<crate::serial::Port>>,
-    #[cfg(feature = "serial")]
     firmata_boards: Vec<Option<crate::firmata::Board>>,
     #[cfg(feature = "usb")]
     usb_devs: Vec<Option<hidapi::HidDevice>>,
@@ -1222,7 +1221,6 @@ impl<'p> Vm<'p> {
             midi_outs: Vec::new(),
             #[cfg(feature = "serial")]
             serial_ports: Vec::new(),
-            #[cfg(feature = "serial")]
             firmata_boards: Vec::new(),
             #[cfg(feature = "usb")]
             usb_devs: Vec::new(),
@@ -6613,28 +6611,55 @@ impl<'p> Vm<'p> {
     }
 
     // ===================================================================
-    // Modul firmata (Feature `serial`, keine eigene Cargo-Abhaengigkeit)
+    // Modul firmata: in jedem Bau (tcp:host:port), seriell mit Feature `serial`
     // ===================================================================
     fn try_firmata(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("firmata_")) { return Ok(None); }
-        #[cfg(feature = "serial")]
-        { return self.try_firmata_impl(name, a); }
-        #[allow(unreachable_code)]
-        { let _ = (name, a); Ok(None) }
+        self.try_firmata_impl(name, a)
     }
-    #[cfg(feature = "serial")]
     fn firmata_board(&mut self, idx: i64) -> R<&mut crate::firmata::Board> {
         Self::handle_get_mut(&mut self.firmata_boards, idx, "FIRMATA", "ungueltiges/geschlossenes FIRMATA_HANDLE")
     }
-    #[cfg(feature = "serial")]
     fn try_firmata_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         use crate::firmata;
+        // Bytes fuer I2C: ein Feld aus Zahlen oder ein BUFFER.
+        fn bytes_arg(a: &[Value], i: usize, fn_: &str) -> R<Vec<i64>> {
+            match a.get(i) {
+                Some(Value::Buffer(b)) => Ok(b.borrow().iter().map(|&x| x as i64).collect()),
+                Some(Value::Array(arr)) => {
+                    let arr = arr.borrow();
+                    let mut out = Vec::with_capacity(arr.cells.len());
+                    for k in 0..arr.cells.len() {
+                        match arr.cells.get(k) {
+                            Value::Int(x) => out.push(x),
+                            Value::Float(f) if f.fract() == 0.0 => out.push(f as i64),
+                            v => return Err(format!("{}: im Feld steht an Stelle {} keine ganze Zahl ({})", fn_, k, v.type_name())),
+                        }
+                    }
+                    Ok(out)
+                }
+                Some(v) => Err(format!("{}: erwartet ein Feld aus Zahlen oder einen BUFFER, nicht {}", fn_, v.type_name())),
+                None => Err(format!("{}: die Bytes fehlen", fn_)),
+            }
+        }
+        fn int_opt(a: &[Value], i: usize, vorgabe: i64, fn_: &str) -> R<i64> {
+            if a.len() > i { bi_int(a, i, fn_) } else { Ok(vorgabe) }
+        }
+        fn feld(v: Vec<u8>) -> Value {
+            let n = v.len() as i64;
+            let mut arr = crate::value::DhArray::new("integer".to_string(), vec![n], || Value::Int(0));
+            for (k, x) in v.into_iter().enumerate() { arr.cells.set(k, Value::Int(x as i64)); }
+            Value::Array(Rc::new(RefCell::new(arr)))
+        }
         let v = match name {
             // Dieselbe Port-Liste wie SERIAL_PORTS() (serialport::available_ports) --
             // eigener Name, damit ein firmata-only-Script nicht extra IMPORT "serial" braucht.
-            "firmata_ports" => Value::str_rc(crate::serial::ports()),
+            "firmata_ports" => Value::str_rc(firmata::ports()?),
             "firmata_open" => {
-                let b = firmata::open(bi_str(a, 0, "FIRMATA_OPEN")?, bi_int(a, 1, "FIRMATA_OPEN")?)?;
+                let ziel = bi_str(a, 0, "FIRMATA_OPEN")?;
+                // Ueber das Netz zaehlt keine Baudrate -- dort darf sie fehlen.
+                let baud = if a.len() > 1 { bi_int(a, 1, "FIRMATA_OPEN")? } else { 57600 };
+                let b = firmata::open(ziel, baud)?;
                 self.firmata_boards.push(Some(b));
                 Value::Int((self.firmata_boards.len() - 1) as i64)
             }
@@ -6661,6 +6686,82 @@ impl<'p> Vm<'p> {
                 Value::Int(firmata::analog_read(self.firmata_board(i)?, ch)?)
             }
             "firmata_update" => { let i = bi_int(a, 0, "FIRMATA_UPDATE")?; firmata::update(self.firmata_board(i)?)?; Value::Nil }
+            "firmata_firmware$" => { let i = bi_int(a, 0, "FIRMATA_FIRMWARE$")?; Value::str_rc(firmata::firmware(self.firmata_board(i)?)?) }
+            "firmata_servo_attach" => {
+                const F: &str = "FIRMATA_SERVO_ATTACH";
+                let i = bi_int(a, 0, F)?; let pin = bi_int(a, 1, F)?;
+                let lo = int_opt(a, 2, 544, F)?; let hi = int_opt(a, 3, 2400, F)?;
+                firmata::servo_attach(self.firmata_board(i)?, pin, lo, hi)?; Value::Nil
+            }
+            "firmata_servo_write" => {
+                const F: &str = "FIRMATA_SERVO_WRITE";
+                let i = bi_int(a, 0, F)?; let pin = bi_int(a, 1, F)?; let w = bi_int(a, 2, F)?;
+                firmata::servo_write(self.firmata_board(i)?, pin, w)?; Value::Nil
+            }
+            "firmata_i2c_config" => {
+                let i = bi_int(a, 0, "FIRMATA_I2C_CONFIG")?; let d = int_opt(a, 1, 0, "FIRMATA_I2C_CONFIG")?;
+                firmata::i2c_config(self.firmata_board(i)?, d)?; Value::Nil
+            }
+            "firmata_i2c_write" => {
+                const F: &str = "FIRMATA_I2C_WRITE";
+                let i = bi_int(a, 0, F)?; let adr = bi_int(a, 1, F)?; let d = bytes_arg(a, 2, F)?;
+                firmata::i2c_write(self.firmata_board(i)?, adr, &d)?; Value::Nil
+            }
+            "firmata_i2c_read" => {
+                const F: &str = "FIRMATA_I2C_READ";
+                let i = bi_int(a, 0, F)?; let adr = bi_int(a, 1, F)?; let reg = bi_int(a, 2, F)?; let n = bi_int(a, 3, F)?;
+                feld(firmata::i2c_read(self.firmata_board(i)?, adr, reg, n)?)
+            }
+            "firmata_i2c_request" => {
+                const F: &str = "FIRMATA_I2C_REQUEST";
+                let i = bi_int(a, 0, F)?; let adr = bi_int(a, 1, F)?; let reg = bi_int(a, 2, F)?; let n = bi_int(a, 3, F)?;
+                let dauernd = if a.len() > 4 { bi_bool(a, 4, F)? } else { false };
+                firmata::i2c_request(self.firmata_board(i)?, F, adr, reg, n, dauernd)?; Value::Nil
+            }
+            "firmata_i2c_data" => {
+                const F: &str = "FIRMATA_I2C_DATA";
+                let i = bi_int(a, 0, F)?; let adr = bi_int(a, 1, F)?; let reg = int_opt(a, 2, -1, F)?;
+                feld(firmata::i2c_data(self.firmata_board(i)?, adr, reg)?)
+            }
+            "firmata_i2c_stop" => {
+                let i = bi_int(a, 0, "FIRMATA_I2C_STOP")?; let adr = bi_int(a, 1, "FIRMATA_I2C_STOP")?;
+                firmata::i2c_stop(self.firmata_board(i)?, adr)?; Value::Nil
+            }
+            "firmata_stepper_config" => {
+                const F: &str = "FIRMATA_STEPPER_CONFIG";
+                let i = bi_int(a, 0, F)?; let nr = bi_int(a, 1, F)?; let art = bi_str(a, 2, F)?.to_string();
+                let mut pins = Vec::new();
+                for k in 3..a.len() { pins.push(bi_int(a, k, F)?); }
+                firmata::stepper_config(self.firmata_board(i)?, nr, &art, &pins)?; Value::Nil
+            }
+            "firmata_stepper_move" | "firmata_stepper_to" => {
+                let absolut = name == "firmata_stepper_to";
+                let f = if absolut { "FIRMATA_STEPPER_TO" } else { "FIRMATA_STEPPER_MOVE" };
+                let i = bi_int(a, 0, f)?; let nr = bi_int(a, 1, f)?; let s = bi_int(a, 2, f)?;
+                firmata::stepper_move(self.firmata_board(i)?, nr, s, absolut)?; Value::Nil
+            }
+            "firmata_stepper_zero" => {
+                let i = bi_int(a, 0, "FIRMATA_STEPPER_ZERO")?; let nr = bi_int(a, 1, "FIRMATA_STEPPER_ZERO")?;
+                firmata::stepper_zero(self.firmata_board(i)?, nr)?; Value::Nil
+            }
+            "firmata_stepper_stop" => {
+                let i = bi_int(a, 0, "FIRMATA_STEPPER_STOP")?; let nr = bi_int(a, 1, "FIRMATA_STEPPER_STOP")?;
+                firmata::stepper_stop(self.firmata_board(i)?, nr)?; Value::Nil
+            }
+            "firmata_stepper_speed" | "firmata_stepper_accel" => {
+                let besch = name == "firmata_stepper_accel";
+                let f = if besch { "FIRMATA_STEPPER_ACCEL" } else { "FIRMATA_STEPPER_SPEED" };
+                let i = bi_int(a, 0, f)?; let nr = bi_int(a, 1, f)?; let w = bi_num(a, 2, f)?;
+                firmata::stepper_tempo(self.firmata_board(i)?, nr, w, besch)?; Value::Nil
+            }
+            "firmata_stepper_position" => {
+                let i = bi_int(a, 0, "FIRMATA_STEPPER_POSITION")?; let nr = bi_int(a, 1, "FIRMATA_STEPPER_POSITION")?;
+                Value::Int(firmata::stepper_position(self.firmata_board(i)?, nr)?)
+            }
+            "firmata_stepper_running" => {
+                let i = bi_int(a, 0, "FIRMATA_STEPPER_RUNNING")?; let nr = bi_int(a, 1, "FIRMATA_STEPPER_RUNNING")?;
+                Value::Bool(firmata::stepper_running(self.firmata_board(i)?, nr)?)
+            }
             _ => return Ok(None),
         };
         Ok(Some(v))

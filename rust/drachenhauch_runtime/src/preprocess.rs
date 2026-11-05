@@ -221,7 +221,9 @@ fn hardware_module_compiled(m: &str) -> bool {
     match m {
         "midi" => cfg!(feature = "midi"),
         "serial" => cfg!(feature = "serial"),
-        "firmata" => cfg!(feature = "serial"),
+        // Firmata geht in jedem Bau ueber tcp:host:port; nur die serielle
+        // Leitung braucht --hardware, das sagt FIRMATA_OPEN selbst.
+        "firmata" => true,
         "usb" => cfg!(feature = "usb"),
         "bt" => cfg!(feature = "bt"),
         "wifi" => cfg!(feature = "wifi"),
