@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2271,
+ "count": 2275,
  "builtins": [
   {
    "name": "ABS",
@@ -8613,6 +8613,12 @@
    "module": "mqtt"
   },
   {
+   "name": "MQTT_FLUSH",
+   "kind": "core",
+   "signature": "MQTT_FLUSH(h[, ms: INTEGER]) AS BOOLEAN",
+   "module": "mqtt"
+  },
+  {
    "name": "MQTT_IS_CONNECTED",
    "kind": "core",
    "signature": "MQTT_IS_CONNECTED(h) AS BOOLEAN",
@@ -8637,15 +8643,33 @@
    "module": "mqtt"
   },
   {
+   "name": "MQTT_PENDING",
+   "kind": "core",
+   "signature": "MQTT_PENDING(h) AS INTEGER",
+   "module": "mqtt"
+  },
+  {
    "name": "MQTT_PUBLISH",
    "kind": "core",
-   "signature": "MQTT_PUBLISH(h, topic$, payload$[, retain: BOOLEAN]) AS BOOLEAN",
+   "signature": "MQTT_PUBLISH(h, topic$, payload$[, retain: BOOLEAN[, qos: INTEGER]]) AS BOOLEAN",
    "module": "mqtt"
   },
   {
    "name": "MQTT_SUBSCRIBE",
    "kind": "core",
-   "signature": "MQTT_SUBSCRIBE(h, topic$) AS BOOLEAN",
+   "signature": "MQTT_SUBSCRIBE(h, topic$[, qos: INTEGER]) AS BOOLEAN",
+   "module": "mqtt"
+  },
+  {
+   "name": "MQTT_TLS_CA",
+   "kind": "core",
+   "signature": "MQTT_TLS_CA(pfad$)",
+   "module": "mqtt"
+  },
+  {
+   "name": "MQTT_UNSUBSCRIBE",
+   "kind": "core",
+   "signature": "MQTT_UNSUBSCRIBE(h, topic$) AS BOOLEAN",
    "module": "mqtt"
   },
   {

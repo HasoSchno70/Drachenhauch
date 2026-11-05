@@ -996,6 +996,9 @@ pub struct Vm<'p> {
     /// MQTT_WILL: der letzte Wille fuer das NAECHSTE MQTT_CONNECT.
     #[cfg(feature = "net")]
     mqtt_wille: Option<crate::mqtt::Wille>,
+    /// MQTT_TLS_CA: eigene CA (PEM) fuer jedes folgende MQTT_CONNECT mit mqtts://.
+    #[cfg(feature = "net")]
+    mqtt_ca: Option<String>,
     /// Modul `httpd` -- laufende Webserver (Tombstone-Vec wie ueberall:
     /// eine vergebene Nummer bleibt gueltig, auch wenn ein frueherer
     /// Server schon gestoppt wurde).
@@ -1189,6 +1192,8 @@ impl<'p> Vm<'p> {
             mqtt_clients: Vec::new(),
             #[cfg(feature = "net")]
             mqtt_wille: None,
+            #[cfg(feature = "net")]
+            mqtt_ca: None,
             httpd_server: Vec::new(),
             #[cfg(feature = "pdf")]
             pdf_dok: Vec::new(),
@@ -5958,7 +5963,7 @@ impl<'p> Vm<'p> {
                 // Der Wille gilt fuer genau diese Verbindung -- auch wenn sie
                 // scheitert, wer neu verbindet, setzt ihn neu.
                 let wille = self.mqtt_wille.take();
-                let c = mqtt::connect(&host, port, &client_id, keepalive, username.as_deref(), password.as_deref(), wille.as_ref())?;
+                let c = mqtt::connect(&host, port, &client_id, keepalive, username.as_deref(), password.as_deref(), wille.as_ref(), self.mqtt_ca.as_deref())?;
                 self.mqtt_clients.push(Some(c));
                 Value::Int((self.mqtt_clients.len() - 1) as i64)
             }
@@ -5974,6 +5979,19 @@ impl<'p> Vm<'p> {
                 self.mqtt_wille = Some(mqtt::Wille { topic, inhalt, retain });
                 Value::Nil
             }
+            // MQTT_TLS_CA(pfad$) -- "" = wieder die Wurzeln von webpki-roots
+            "mqtt_tls_ca" => {
+                let pfad = bi_str(a, 0, "MQTT_TLS_CA")?.to_string();
+                if pfad.is_empty() {
+                    self.mqtt_ca = None;
+                } else {
+                    if !std::path::Path::new(&pfad).is_file() {
+                        return Err(format!("MQTT_TLS_CA: die Datei {} gibt es nicht", pfad));
+                    }
+                    self.mqtt_ca = Some(pfad);
+                }
+                Value::Nil
+            }
             "mqtt_disconnect" => {
                 let i = bi_int(a, 0, "MQTT_DISCONNECT")? as usize;
                 if let Some(slot) = self.mqtt_clients.get_mut(i) {
@@ -5986,9 +6004,24 @@ impl<'p> Vm<'p> {
             "mqtt_publish" => {
                 let i = bi_int(a, 0, "MQTT_PUBLISH")?; let topic = bi_str(a, 1, "MQTT_PUBLISH")?.to_string(); let payload = bi_str(a, 2, "MQTT_PUBLISH")?.to_string();
                 let retain = if a.len() >= 4 { bi_bool(a, 3, "MQTT_PUBLISH")? } else { false };
-                Value::Bool(mqtt::publish(self.mqtt_client(i)?, &topic, &payload, retain))
+                let qos = mqtt::qos_pruefen("MQTT_PUBLISH", if a.len() >= 5 { bi_int(a, 4, "MQTT_PUBLISH")? } else { 0 })?;
+                Value::Bool(mqtt::publish(self.mqtt_client(i)?, &topic, &payload, retain, qos))
             }
-            "mqtt_subscribe" => { let i = bi_int(a, 0, "MQTT_SUBSCRIBE")?; let topic = bi_str(a, 1, "MQTT_SUBSCRIBE")?.to_string(); Value::Bool(mqtt::subscribe(self.mqtt_client(i)?, &topic)) }
+            "mqtt_subscribe" => {
+                let i = bi_int(a, 0, "MQTT_SUBSCRIBE")?; let topic = bi_str(a, 1, "MQTT_SUBSCRIBE")?.to_string();
+                let qos = mqtt::qos_pruefen("MQTT_SUBSCRIBE", if a.len() >= 3 { bi_int(a, 2, "MQTT_SUBSCRIBE")? } else { 0 })?;
+                Value::Bool(mqtt::subscribe(self.mqtt_client(i)?, &topic, qos))
+            }
+            "mqtt_unsubscribe" => {
+                let i = bi_int(a, 0, "MQTT_UNSUBSCRIBE")?; let topic = bi_str(a, 1, "MQTT_UNSUBSCRIBE")?.to_string();
+                Value::Bool(mqtt::unsubscribe(self.mqtt_client(i)?, &topic))
+            }
+            "mqtt_pending" => { let i = bi_int(a, 0, "MQTT_PENDING")?; Value::Int(mqtt::pending(self.mqtt_client(i)?) as i64) }
+            "mqtt_flush" => {
+                let i = bi_int(a, 0, "MQTT_FLUSH")?;
+                let ms = if a.len() >= 2 { bi_int(a, 1, "MQTT_FLUSH")? } else { 2000 };
+                Value::Bool(mqtt::flush(self.mqtt_client(i)?, ms)?)
+            }
             "mqtt_update" => { let i = bi_int(a, 0, "MQTT_UPDATE")?; mqtt::update(self.mqtt_client(i)?)?; Value::Nil }
             "mqtt_next_message" => { let i = bi_int(a, 0, "MQTT_NEXT_MESSAGE")?; Value::Bool(mqtt::next_message(self.mqtt_client(i)?)) }
             "mqtt_message_topic" => { let i = bi_int(a, 0, "MQTT_MESSAGE_TOPIC")?; Value::str_rc(mqtt::message_topic(self.mqtt_client(i)?)) }
