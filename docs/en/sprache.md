@@ -1713,7 +1713,28 @@ IMPORT "camera"
 
 List of all modules: see [README](README.md#modules).
 
-The resolution order: first `<name>.dh` is searched for in the current directory; if it does not exist, then `drachenhauch/modules/<name>.py`. This way your own `json.dh` can take precedence over the built-in.
+Your own `json.dh` is imported with its extension: `IMPORT "json.dh"`.
+Without the extension the built-in module always wins (see above).
+
+### Optional: `IMPORT "modul" OPTIONAL`
+
+The hardware modules (`serial`, `usb`, `bt`, `wifi`, `firmata`, `midi`) are
+only in builds with `--hardware`. A program that uses them when they are
+there and otherwise does without writes `OPTIONAL` after the import and asks
+`MODULE_AVAILABLE`:
+
+```basic
+IMPORT "serial" OPTIONAL
+
+IF MODULE_AVAILABLE("serial") THEN
+    PRINT SERIAL_PORTS()
+ELSE
+    PRINT "ohne serielle Schnittstelle"
+END IF
+```
+
+Without `OPTIONAL` a build without the module warns right at the start. With
+`OPTIONAL` on a `.dh` file the line is dropped when the file does not exist.
 
 ## Foreign libraries: DECLARE … LIB
 

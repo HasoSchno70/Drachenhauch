@@ -4322,6 +4322,16 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let p = std::env::current_exe().map_err(|e| format!("EXEPATH$: {}", e))?;
             Ok(Value::str_rc(p.to_string_lossy().into_owned()))
         }
+        "module_available" => {
+            arity!(1);
+            // Ist das Modul in DIESEM Bau benutzbar? Die Hardware-Module
+            // (serial, usb, bt, wifi, firmata, midi) fehlen in Bauten ohne
+            // --hardware -- ein Programm, das sie wahlweise benutzt
+            // (`IMPORT "serial" OPTIONAL`), fragt hier, statt jeden Aufruf in
+            // TRY zu legen.
+            let m = need_str(&a[0], "MODULE_AVAILABLE")?;
+            Ok(Value::Bool(crate::preprocess::modul_verfuegbar(m)))
+        }
 
         // ===== Modul: tween (zeitbasiert -> nicht deterministisch) =====
         "tween_new" | "tween_new_loop" | "tween_new_pingpong" => {

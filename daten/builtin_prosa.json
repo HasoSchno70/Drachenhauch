@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2203,
+ "count": 2204,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1394,6 +1394,7 @@
   "MODEL_TEXTURE": "ein Bild als Oberfläche auflegen",
   "MODEL_TEXTURE_NORMAL": "Normal-Map für Oberflächenstruktur (wirkt nur mit MODEL_LIT)",
   "MODEL_WIRES": "als Drahtgitter zeichnen",
+  "MODULE_AVAILABLE": "ist das Modul in diesem Bau dabei? (Hardware-Module fehlen ohne --hardware)",
   "MONITOR_COUNT": "Anzahl angeschlossener Monitore",
   "MONITOR_HEIGHT": "native Höhe von Monitor i (px)",
   "MONITOR_NAME": "Anzeigename von Monitor i",

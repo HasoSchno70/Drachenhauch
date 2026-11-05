@@ -1170,6 +1170,7 @@ worked.
 | `CWD$()` → STRING | current working directory |
 | `CHDIR(pfad$)` | change the working directory |
 | `EXEPATH$()` → STRING | path of the running program file |
+| `MODULE_AVAILABLE(modul$)` → BOOLEAN | is the module in this build? (hardware modules are missing without `--hardware`) |
 | `EXIT([code])` | end immediately, `code` = return value (0..255, default 0) |
 | `EPRINT(text)` | line to **stderr** instead of stdout |
 | `SHELL(programm$, ...)` → INTEGER | start a program, wait, return value |

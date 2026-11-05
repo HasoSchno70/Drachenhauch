@@ -150,7 +150,7 @@ fn import_re() -> &'static Regex {
     RE.get_or_init(|| {
         // 1:1 zu preprocess._IMPORT_RE (case-insensitive).
         Regex::new(
-            r#"(?i)^\s*IMPORT\s+"([^"]+)"\s*(?:AS\s+([A-Za-z_][A-Za-z0-9_]*)\s*)?(?:'.*)?$"#,
+            r#"(?i)^\s*IMPORT\s+"([^"]+)"\s*(?:AS\s+([A-Za-z_][A-Za-z0-9_]*)\s*)?(OPTIONAL\s*)?(?:'.*)?$"#,
         )
         .unwrap()
     })
@@ -176,6 +176,35 @@ fn looks_like_module_name(rel: &str) -> bool {
         return false;
     }
     is_valid_module_name(rel)
+}
+
+// `IMPORT "serial" OPTIONAL`: ein Programm, das ein Hardware-Modul nur
+// benutzt, wenn es da ist (und vorher MODULE_AVAILABLE fragt), soll in einem
+// Bau ohne das Modul nicht bei jedem Start gewarnt werden. Gemerkt je
+// Vorverarbeitung: was nur optional importiert wurde -- ein zweites IMPORT
+// ohne OPTIONAL warnt wieder.
+thread_local! {
+    static NUR_OPTIONAL: std::cell::RefCell<(HashSet<String>, HashSet<String>)> =
+        std::cell::RefCell::new((HashSet::new(), HashSet::new()));
+}
+
+fn optional_merken(modul: &str, optional: bool) {
+    NUR_OPTIONAL.with(|o| {
+        let mut o = o.borrow_mut();
+        if optional { o.0.insert(modul.to_string()); } else { o.1.insert(modul.to_string()); }
+    });
+}
+
+fn nur_optional(modul: &str) -> bool {
+    NUR_OPTIONAL.with(|o| { let o = o.borrow(); o.0.contains(modul) && !o.1.contains(modul) })
+}
+
+/// Ist das Modul in diesem Bau benutzbar? Fuer MODULE_AVAILABLE: ein
+/// eingebautes Modul, dessen Feature (bei den Hardware-Modulen) einkompiliert
+/// ist. Unbekannte Namen: FALSE.
+pub fn modul_verfuegbar(name: &str) -> bool {
+    let low = name.to_lowercase();
+    is_known_module(&low) && hardware_module_compiled(&low)
 }
 
 /// Existiert das Built-in-Modul? (entspricht `load_module(rel) == True`).
@@ -261,7 +290,7 @@ pub fn bibliothekspfade() -> Vec<std::path::PathBuf> {
 /// Basis fuer eine Warnung schon beim IMPORT statt erst beim ersten Aufruf.
 pub fn missing_hardware_modules(imports: &[(String, Option<String>)]) -> Vec<&'static str> {
     HARDWARE_MODULES.iter()
-        .filter(|&&m| !hardware_module_compiled(m)
+        .filter(|&&m| !hardware_module_compiled(m) && !nur_optional(m)
             && imports.iter().any(|(name, _)| name == m))
         .copied()
         .collect()
@@ -277,7 +306,7 @@ pub fn missing_hardware_imports_with_lines(source: &str) -> Vec<(usize, &'static
         if let Some(caps) = import_re().captures(raw) {
             let rel = caps.get(1).unwrap().as_str().to_lowercase();
             if let Some(&m) = HARDWARE_MODULES.iter().find(|&&h| h == rel) {
-                if !hardware_module_compiled(m) {
+                if !hardware_module_compiled(m) && caps.get(3).is_none() {
                     out.push((idx0 + 1, m));
                 }
             }
@@ -379,6 +408,7 @@ pub fn process(source: &str, base: &Path)
     let mut imports: Vec<(String, Option<String>)> = Vec::new();
     let mut herkunft: Vec<Herkunft> = Vec::new();
     let mut namensraeume: Vec<(String, String)> = Vec::new();
+    NUR_OPTIONAL.with(|o| { let mut o = o.borrow_mut(); o.0.clear(); o.1.clear(); });
     process_inner(ohne_bom(source), base, "", "", &mut seen, &mut out, &mut imports,
                   &mut herkunft, &mut namensraeume)?;
     Ok((out.join("\n"), imports, herkunft, namensraeume))
@@ -411,6 +441,7 @@ fn process_inner(
         };
         let rel = caps.get(1).unwrap().as_str().to_string();
         let alias = caps.get(2).map(|m| m.as_str().to_string());
+        let optional = caps.get(3).is_some();
         // Erst neben der importierenden Datei, dann die Bibliothekspfade.
         //
         // AUSSER bei einem eingebauten Modul: `IMPORT "json"` nimmt IMMER das
@@ -454,11 +485,19 @@ fn process_inner(
                 out.push(format!("' === IMPORT MODULE {}{} ===", rel, tag));
                 herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32, pfad: pfad.to_string() });
                 let low = rel.to_lowercase();
+                optional_merken(&low, optional);
                 let alias_lc = alias.as_ref().map(|a| a.to_lowercase());
                 let entry = (low, alias_lc);
                 if !imports.contains(&entry) {
                     imports.push(entry);
                 }
+                continue;
+            }
+            // OPTIONAL an einer Datei: fehlt sie, faellt die Zeile weg (etwa
+            // eine eigene Einstellungsdatei, die nicht jeder hat).
+            if optional {
+                out.push(format!("' [IMPORT OPTIONAL nicht gefunden: {}]", rel));
+                herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32, pfad: pfad.to_string() });
                 continue;
             }
             return Err(PreprocessError {

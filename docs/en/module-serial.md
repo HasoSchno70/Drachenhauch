@@ -16,6 +16,13 @@ python rust/build_runtime.py --hardware
 ```
 
 If the feature is missing, the first call to a `SERIAL_*` function reports that it is not available in this build.
+A program that also manages without the port writes
+`IMPORT "serial" OPTIONAL` and asks `MODULE_AVAILABLE("serial")` first --
+then a build without the feature does not warn right at the start (see
+[Language](sprache.md#optional-import-modul-optional)).
+
+To try things out without a program of your own, the IDE has a **serial
+monitor** with a plot (View → Serial monitor, Alt+4, see [IDE](ide.md)).
 
 ## Overview
 

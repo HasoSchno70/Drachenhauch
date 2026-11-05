@@ -47,19 +47,22 @@ jobs:
           workspaces: rust/drachenhauch_runtime
 
       # raylib baut GLFW fuer X11 UND Wayland; Kira spielt ueber ALSA, die
-      # Dialoge (rfd) brauchen GTK 3. xvfb fuer den Startversuch.
+      # Dialoge (rfd) brauchen GTK 3, die serielle Schnittstelle libudev.
+      # xvfb fuer den Startversuch.
       - name: System-Bibliotheken (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake clang libasound2-dev libgtk-3-dev \
+          sudo apt-get install -y cmake clang libasound2-dev libgtk-3-dev libudev-dev pkg-config \
             libx11-dev libxrandr-dev libxi-dev libxinerama-dev libxcursor-dev \
             libgl1-mesa-dev libwayland-dev libxkbcommon-dev wayland-protocols \
             xvfb xauth
 
       - name: dhrt bauen (mit Grafik)
         working-directory: rust/drachenhauch_runtime
-        run: cargo build --release --locked --features "graphics dialogs video db pg mysql net http smtp pdf physik jit ffi"
+        # serial und midi gehoeren dazu: der serielle Monitor der IDE und die
+        # Bastler-Module sollen auf dem Mac und unter Linux genauso gehen.
+        run: cargo build --release --locked --features "graphics dialogs video db pg mysql net http smtp pdf physik jit ffi serial midi"
 
       # Die kleinen Laufzeiten fuer `dhrt --export --schlank` -- dieselben
       # Features wie LAUFZEITEN in rust/build_runtime.py. Jede in ein eigenes

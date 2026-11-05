@@ -16,6 +16,14 @@ python rust/build_runtime.py --hardware
 ```
 
 Fehlt das Feature, meldet der erste Aufruf einer `SERIAL_*`-Funktion, dass sie in diesem Build nicht verfuegbar ist.
+Ein Programm, das auch ohne die Schnittstelle auskommt, schreibt
+`IMPORT "serial" OPTIONAL` und fragt vorher `MODULE_AVAILABLE("serial")` --
+dann warnt ein Bau ohne das Feature nicht schon beim Start (siehe
+[Sprache](sprache.md#wahlweise-import-modul-optional)).
+
+Zum Ausprobieren ohne eigenes Programm hat die IDE einen **seriellen
+Monitor** mit Kurve (Ansicht → Serieller Monitor, Alt+4, siehe
+[IDE](ide.md)).
 
 ## Übersicht
 
