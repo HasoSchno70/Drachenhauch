@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2303,
+ "count": 2320,
  "builtins": [
   {
    "name": "ABS",
@@ -1231,6 +1231,108 @@
    "kind": "core",
    "signature": "I2C_WRITE(bus, adresse: INTEGER, daten)",
    "module": "i2c"
+  },
+  {
+   "name": "MIC_DEVICES",
+   "kind": "core",
+   "signature": "MIC_DEVICES() AS ARRAY OF STRING",
+   "module": "audio"
+  },
+  {
+   "name": "MIC_START",
+   "kind": "core",
+   "signature": "MIC_START([geraet$])",
+   "module": "audio"
+  },
+  {
+   "name": "MIC_STOP",
+   "kind": "core",
+   "signature": "MIC_STOP()",
+   "module": "audio"
+  },
+  {
+   "name": "MIC_ACTIVE",
+   "kind": "core",
+   "signature": "MIC_ACTIVE() AS BOOLEAN",
+   "module": "audio"
+  },
+  {
+   "name": "MIC_ERROR$",
+   "kind": "core",
+   "signature": "MIC_ERROR$() AS STRING",
+   "module": "audio"
+  },
+  {
+   "name": "MIC_DEVICE$",
+   "kind": "core",
+   "signature": "MIC_DEVICE$() AS STRING",
+   "module": "audio"
+  },
+  {
+   "name": "MIC_RATE",
+   "kind": "core",
+   "signature": "MIC_RATE() AS INTEGER",
+   "module": "audio"
+  },
+  {
+   "name": "MIC_SAMPLES",
+   "kind": "core",
+   "signature": "MIC_SAMPLES() AS INTEGER",
+   "module": "audio"
+  },
+  {
+   "name": "MIC_LEVEL",
+   "kind": "core",
+   "signature": "MIC_LEVEL() AS FLOAT",
+   "module": "audio"
+  },
+  {
+   "name": "MIC_RMS",
+   "kind": "core",
+   "signature": "MIC_RMS() AS FLOAT",
+   "module": "audio"
+  },
+  {
+   "name": "MIC_PITCH",
+   "kind": "core",
+   "signature": "MIC_PITCH() AS FLOAT",
+   "module": "audio"
+  },
+  {
+   "name": "MIC_FFT",
+   "kind": "core",
+   "signature": "MIC_FFT(baender)",
+   "module": "audio"
+  },
+  {
+   "name": "MIC_WAVE",
+   "kind": "core",
+   "signature": "MIC_WAVE(werte)",
+   "module": "audio"
+  },
+  {
+   "name": "MIC_RECORD_START",
+   "kind": "core",
+   "signature": "MIC_RECORD_START([max_sekunden])",
+   "module": "audio"
+  },
+  {
+   "name": "MIC_RECORDING",
+   "kind": "core",
+   "signature": "MIC_RECORDING() AS BOOLEAN",
+   "module": "audio"
+  },
+  {
+   "name": "MIC_RECORD_STOP",
+   "kind": "core",
+   "signature": "MIC_RECORD_STOP() AS SOUND",
+   "module": "audio"
+  },
+  {
+   "name": "MIC_RECORD_SAVE",
+   "kind": "core",
+   "signature": "MIC_RECORD_SAVE(pfad$) AS INTEGER",
+   "module": "audio"
   },
   {
    "name": "SIZEOF",

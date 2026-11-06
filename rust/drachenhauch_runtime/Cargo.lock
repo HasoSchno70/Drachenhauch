@@ -1328,6 +1328,7 @@ dependencies = [
  "accesskit_windows",
  "btleplug",
  "bytes",
+ "cpal",
  "cranelift-codegen",
  "cranelift-frontend",
  "cranelift-jit",

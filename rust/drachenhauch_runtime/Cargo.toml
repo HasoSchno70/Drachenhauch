@@ -229,6 +229,10 @@ libloading = { version = "0.8", optional = true }
 # Nicht im Web-Build (emscripten bringt seinen eigenen mit).
 [target.'cfg(not(target_os = "emscripten"))'.dependencies]
 mimalloc = { version = "0.1", default-features = false }
+# Mikrofon (MIC_*, src/mikrofon.rs): dieselbe cpal-Fassung, die Kira fuer die
+# Ausgabe mitbringt -- hier nur direkt benannt, fuer den Eingang. Im Web gibt
+# es kein cpal (Kira benutzt dort ein eigenes Backend).
+cpal = { version = "0.18.1", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing", "Win32_Storage_Xps", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_Ime", "Win32_UI_Input_KeyboardAndMouse", "Win32_System_WinRT", "Win32_System_Console", "Win32_System_Com", "Win32_Globalization", "Foundation", "Foundation_Collections", "Media_Core", "Media_SpeechSynthesis", "Storage_Streams"] }
@@ -267,7 +271,7 @@ raylib = { version = "6.0", optional = true, features = ["opengl_es_30"] }
 [features]
 default = []
 # Grafik (raylib: Fenster/GL/Input) + Audio (Kira: src/audio.rs) + native Dialoge.
-graphics = ["dep:raylib", "dep:kira", "dep:mint", "dep:symphonia", "dep:xmrs", "dep:xmrsplayer", "dep:ttf-parser", "a11y", "tray"]
+graphics = ["dep:raylib", "dep:kira", "dep:cpal", "dep:mint", "dep:symphonia", "dep:xmrs", "dep:xmrsplayer", "dep:ttf-parser", "a11y", "tray"]
 # Grafik ueber OpenGL ES 3.0 statt OpenGL 3.3 -- fuer den Raspberry Pi (Pi 4/5
 # bieten ES 3.1, aber nur OpenGL 2.1/3.1). Dieselbe Sprache wie WebGL 2:
 # graphics.rs schreibt die Shader beim Laden auf `#version 300 es` um. Nur

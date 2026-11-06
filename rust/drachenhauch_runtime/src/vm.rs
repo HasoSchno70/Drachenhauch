@@ -595,7 +595,7 @@ fn ui_preset_metrics(name: &str) -> Vec<(&'static str, i64)> {
 /// damit ein Tippfehler im DH-Programm NICHT die Runtime abstuerzen laesst,
 /// sondern einen klaren Laufzeitfehler liefert.
 /// Zahl der Befehlsfamilien in `Vm::familie_rufen`; die letzte sind die reinen.
-pub(crate) const BUILTIN_FAMILIEN: u8 = 30;
+pub(crate) const BUILTIN_FAMILIEN: u8 = 31;
 
 fn safe_call_builtin(name: &str, args: &[Value]) -> Option<Result<Value, String>> {
     use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -1053,6 +1053,14 @@ pub struct Vm<'p> {
     #[cfg(feature = "serial")]
     serial_ports: Vec<Option<crate::serial::Port>>,
     firmata_boards: Vec<Option<crate::firmata::Board>>,
+    /// Der laufende Mikrofon-Eingang (MIC_START) und der Zustand von
+    /// MIC_FFT (Nachleuchten, Verstaerkung) -- getrennt von AUDIO_FFT.
+    #[cfg(feature = "graphics")]
+    mikrofon: Option<crate::mikrofon::Lauf>,
+    #[cfg(feature = "graphics")]
+    mic_baender: Vec<f32>,
+    #[cfg(feature = "graphics")]
+    mic_agc: f32,
     gpio_chips: Vec<Option<crate::pins::Chip>>,
     i2c_busse: Vec<Option<crate::pins::Bus>>,
     spi_geraete: Vec<Option<crate::pins::Spi>>,
@@ -1230,6 +1238,12 @@ impl<'p> Vm<'p> {
             #[cfg(feature = "serial")]
             serial_ports: Vec::new(),
             firmata_boards: Vec::new(),
+            #[cfg(feature = "graphics")]
+            mikrofon: None,
+            #[cfg(feature = "graphics")]
+            mic_baender: Vec::new(),
+            #[cfg(feature = "graphics")]
+            mic_agc: 1e-4,
             gpio_chips: Vec::new(),
             i2c_busse: Vec::new(),
             spi_geraete: Vec::new(),
@@ -2273,6 +2287,7 @@ impl<'p> Vm<'p> {
             28 => if name == "__ffi" { crate::ffi::vm_setzen(self); crate::ffi::rufen(a).map(Some) }
                   else { crate::ffi::zeiger_befehl(name, a).transpose() },
             29 => self.try_pins(name, a),
+            30 => self.try_mikrofon(name, a),
             _ => match safe_call_builtin(name, a) {
                 Some(Ok(v)) => Ok(Some(v)),
                 Some(Err(e)) if e.starts_with("__UNKNOWN_BUILTIN__:") => Err(unknown_builtin_msg(name)),
@@ -6654,6 +6669,135 @@ impl<'p> Vm<'p> {
     // Module gpio/i2c/spi: die Pins des Kernels (pins.rs). In jedem Bau;
     // ausserhalb von Linux meldet jeder Aufruf "nur unter Linux".
     // ===================================================================
+    // ===================================================================
+    // Mikrofon (MIC_*, src/mikrofon.rs): ein Eingang zur Zeit
+    // ===================================================================
+    fn try_mikrofon(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !name.starts_with("mic_") { return Ok(None); }
+        #[cfg(feature = "graphics")]
+        { return self.try_mikrofon_impl(name, a); }
+        #[allow(unreachable_code)]
+        { let _ = a; Ok(None) }
+    }
+
+    #[cfg(feature = "graphics")]
+    fn try_mikrofon_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::mikrofon as mic;
+        fn float_feld(a: &[Value], f: &str) -> R<Rc<RefCell<crate::value::DhArray>>> {
+            let arr = match a.first() {
+                Some(Value::Array(x)) => x.clone(),
+                _ => return Err(format!("{}: erwartet ARRAY OF FLOAT", f)),
+            };
+            {
+                let b = arr.borrow();
+                if b.element_type != "float" || b.dims.len() != 1 {
+                    return Err(format!("{}: erwartet 1D ARRAY OF FLOAT", f));
+                }
+            }
+            Ok(arr)
+        }
+        fn keine_args(a: &[Value], f: &str) -> R<()> {
+            if a.is_empty() { Ok(()) } else { Err(format!("{}: erwartet keine Argumente, erhalten {}", f, a.len())) }
+        }
+        // Was nur mit laufendem Eingang einen Sinn hat: ohne ihn waere eine
+        // stille Null von "es ist leise" nicht zu unterscheiden.
+        macro_rules! lauf { ($f:expr) => {
+            match self.mikrofon.as_ref() {
+                Some(l) => l,
+                None => return Err(format!("{}: es laeuft kein Mikrofon -- erst MIC_START", $f)),
+            }
+        }; }
+        let v = match name {
+            "mic_devices" => {
+                keine_args(a, "MIC_DEVICES")?;
+                let namen = mic::geraete()?;
+                let n = namen.len() as i64;
+                let mut arr = crate::value::DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+                for (k, s) in namen.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(s)); }
+                Value::Array(Rc::new(RefCell::new(arr)))
+            }
+            "mic_start" => {
+                if a.len() > 1 { return Err(format!("MIC_START: erwartet 0..1 Argumente, erhalten {}", a.len())); }
+                let wunsch = if a.is_empty() { String::new() } else { bi_str(a, 0, "MIC_START")?.to_string() };
+                self.mikrofon = None;
+                self.mic_baender.clear();
+                self.mic_agc = 1e-4;
+                self.mikrofon = Some(mic::starten(&wunsch)?);
+                Value::Nil
+            }
+            "mic_stop" => { keine_args(a, "MIC_STOP")?; self.mikrofon = None; Value::Nil }
+            "mic_active" => { keine_args(a, "MIC_ACTIVE")?; Value::Bool(self.mikrofon.is_some() && mic::fehler().is_none()) }
+            "mic_error$" => { keine_args(a, "MIC_ERROR$")?; Value::str_rc(mic::fehler().unwrap_or_default()) }
+            "mic_device$" => { keine_args(a, "MIC_DEVICE$")?; Value::str_rc(self.mikrofon.as_ref().map(|l| l.name.clone()).unwrap_or_default()) }
+            "mic_rate" => { keine_args(a, "MIC_RATE")?; Value::Int(self.mikrofon.as_ref().map_or(0, |l| l.rate as i64)) }
+            "mic_level" => { keine_args(a, "MIC_LEVEL")?; lauf!("MIC_LEVEL"); Value::Float(mic::spitze_nehmen()) }
+            "mic_rms" => {
+                keine_args(a, "MIC_RMS")?;
+                // Die letzten 50 ms -- so lang wie ein Pegelmesser mittelt.
+                let n = (lauf!("MIC_RMS").rate as usize / 20).max(1);
+                Value::Float(mic::effektivwert(&mic::juengste(n)))
+            }
+            "mic_pitch" => {
+                keine_args(a, "MIC_PITCH")?;
+                let rate = lauf!("MIC_PITCH").rate;
+                Value::Float(mic::tonhoehe(&mic::juengste(mic::tonhoehe_werte(rate)), rate))
+            }
+            "mic_fft" => {
+                let arr = float_feld(a, "MIC_FFT")?;
+                lauf!("MIC_FFT");
+                let n = arr.borrow().cells.len();
+                let mut tmp = vec![0.0f32; n];
+                let proben = mic::juengste(crate::audio::FFT_N);
+                crate::audio::baender_rechnen(&proben, &mut self.mic_baender, &mut self.mic_agc, &mut tmp);
+                let mut b = arr.borrow_mut();
+                for i in 0..n { b.cells.set(i, Value::Float(tmp[i] as f64)); }
+                Value::Nil
+            }
+            "mic_wave" => {
+                let arr = float_feld(a, "MIC_WAVE")?;
+                lauf!("MIC_WAVE");
+                let n = arr.borrow().cells.len();
+                if n > mic::RING { return Err(format!("MIC_WAVE: hoechstens {} Werte, das Feld hat {}", mic::RING, n)); }
+                let werte = mic::juengste(n);
+                let mut b = arr.borrow_mut();
+                for i in 0..n { b.cells.set(i, Value::Float(werte[i] as f64)); }
+                Value::Nil
+            }
+            "mic_samples" => { keine_args(a, "MIC_SAMPLES")?; lauf!("MIC_SAMPLES"); Value::Int(mic::gesamt() as i64) }
+            "mic_record_start" => {
+                if a.len() > 1 { return Err(format!("MIC_RECORD_START: erwartet 0..1 Argumente, erhalten {}", a.len())); }
+                let sek = if a.is_empty() { 600.0 } else { bi_num(a, 0, "MIC_RECORD_START")? };
+                if !(sek > 0.0 && sek <= mic::MAX_SEKUNDEN) {
+                    return Err("MIC_RECORD_START: max_sekunden muss 0 < x <= 3600 sein".into());
+                }
+                let rate = lauf!("MIC_RECORD_START").rate;
+                mic::aufnahme_starten(rate, sek);
+                Value::Nil
+            }
+            "mic_recording" => { keine_args(a, "MIC_RECORDING")?; Value::Bool(self.mikrofon.is_some() && mic::aufnahme_laeuft()) }
+            "mic_record_stop" => {
+                keine_args(a, "MIC_RECORD_STOP")?;
+                let rate = lauf!("MIC_RECORD_STOP").rate;
+                let werte = mic::aufnahme_nehmen()
+                    .ok_or("MIC_RECORD_STOP: es laeuft keine Aufnahme -- erst MIC_RECORD_START")?;
+                let pcm: Vec<f64> = if werte.is_empty() { vec![0.0] } else { werte.iter().map(|&w| w as f64).collect() };
+                Value::Int(self.audio_mut()?.sound_aus_pcm(&pcm, rate))
+            }
+            "mic_record_save" => {
+                let pfad = bi_str(a, 0, "MIC_RECORD_SAVE")?.to_string();
+                if a.len() > 1 { return Err(format!("MIC_RECORD_SAVE: erwartet 1 Argument, erhalten {}", a.len())); }
+                let rate = lauf!("MIC_RECORD_SAVE").rate;
+                let werte = mic::aufnahme_nehmen()
+                    .ok_or("MIC_RECORD_SAVE: es laeuft keine Aufnahme -- erst MIC_RECORD_START")?;
+                std::fs::write(&pfad, mic::wav_bytes(&werte, rate))
+                    .map_err(|e| format!("MIC_RECORD_SAVE: '{}' -- {}", pfad, e))?;
+                Value::Int(werte.len() as i64)
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
     fn try_pins(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("gpio_") || name.starts_with("i2c_") || name.starts_with("spi_")) { return Ok(None); }
         use crate::pins;
